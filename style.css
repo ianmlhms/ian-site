@@ -52,12 +52,44 @@ a:hover {
   color: var(--text);
 }
 
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+}
+
 .nav-links {
   display: flex;
   gap: var(--space);
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+/* Highlighted call-to-action button (top-right) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  color: #0f1115;
+  background: var(--accent);
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+@media (max-width: 480px) {
+  .nav-links {
+    display: none;
+  }
 }
 
 /* Sections */
