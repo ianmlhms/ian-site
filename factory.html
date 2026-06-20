@@ -172,7 +172,7 @@ const STATUS = {
   failed:{c:'var(--failed)',l:'Failed'},
 };
 const PLAT = {youtube:'var(--yt)', tiktok:'var(--tt)', instagram:'var(--ig)'};
-const PLATMETA = {tiktok:{l:'TikTok',c:'var(--tt)'}, instagram:{l:'Instagram',c:'var(--ig)'}};
+const PLATMETA = {tiktok:{l:'TikTok',c:'var(--tt)'}, instagram:{l:'Instagram',c:'var(--ig)'}, youtube:{l:'YouTube',c:'var(--yt)'}};
 const ORDER = ['posted','approved','pending','rejected','failed'];
 
 const countBy = (arr,f)=>arr.reduce((m,x)=>{const k=f(x);m[k]=(m[k]||0)+1;return m;},{});
@@ -193,7 +193,7 @@ const enabledCh = CH.filter(c=>c.enabled).length;
 const totFollowers = sum(SOC, a=>a.followers||0);
 const totLikes = sum(SOC.filter(a=>a.platform==='tiktok'), a=>a.likes||0);
 const kpis = [
-  {v:fmtN(totFollowers), l:'<b>Followers</b> (TT+IG)', c:'var(--accent)'},
+  {v:fmtN(totFollowers), l:'<b>Followers</b> (TT+IG+YT)', c:'var(--accent)'},
   {v:fmtN(totLikes), l:'TikTok likes', c:'var(--tt)'},
   {v:posted, l:'<b>Posted</b> (live)', c:'var(--posted)'},
   {v:V.length, l:'Total videos'},
@@ -214,14 +214,17 @@ function socCard(a){
   const stale = a.stale ? `<span class="stale" title="live fetch failed — showing last good value from ${fmtDate(a.as_of)}">⚠ cached</span>` : '';
   const sec = a.platform==='tiktok'
     ? `<div><b>${fmtN(a.likes)}</b>likes</div><div><b>${fmtN(a.videos)}</b>videos</div>`
+    : a.platform==='youtube'
+    ? `<div><b>${fmtN(a.videos)}</b>videos</div>${a.views!=null?`<div><b>${fmtN(a.views)}</b>views</div>`:''}`
     : `<div><b>${fmtN(a.posts)}</b>posts</div>`;
+  const flabel = a.platform==='youtube' ? 'subscribers' : 'followers';
   return `<div class="ch">
     <div class="top"><span class="plat" style="width:11px;height:11px;background:${m.c}"></span>
       <span class="name">${m.l}</span>
       <a href="${a.url}" target="_blank" rel="noopener" class="mono" style="font-size:12px">@${esc(a.handle)}</a>
       <span style="margin-left:auto">${stale}</span></div>
     <div class="muted" style="font-size:12px">${esc(chName(a.channel_id))}</div>
-    <div class="nums"><div><b>${fmtN(a.followers)}</b>followers</div>${sec}</div>
+    <div class="nums"><div><b>${fmtN(a.followers)}</b>${flabel}</div>${sec}</div>
   </div>`;
 }
 document.getElementById('social').innerHTML = SOC.length
@@ -309,10 +312,13 @@ bars(document.getElementById('byLang'),
 function socLine(id,p){
   const a=socFor(id,p); const m=PLATMETA[p];
   if(!a) return '';
-  const extra = p==='tiktok' ? ` · ${fmtN(a.likes)} likes` : ` · ${fmtN(a.posts)} posts`;
+  const extra = p==='tiktok' ? ` · ${fmtN(a.likes)} likes`
+    : p==='youtube' ? ` · ${fmtN(a.videos)} videos`
+    : ` · ${fmtN(a.posts)} posts`;
+  const flabel = p==='youtube' ? 'subscribers' : 'followers';
   return `<div class="soc-row"><span class="lbl"><span class="plat" style="width:9px;height:9px;background:${m.c}"></span>${m.l}</span>
     <a href="${a.url}" target="_blank" rel="noopener">@${esc(a.handle)}</a>
-    <span style="margin-left:auto" class="mono"><b>${fmtN(a.followers)}</b> followers${extra}${a.stale?' <span class="stale" title="cached">⚠</span>':''}</span></div>`;
+    <span style="margin-left:auto" class="mono"><b>${fmtN(a.followers)}</b> ${flabel}${extra}${a.stale?' <span class="stale" title="cached">⚠</span>':''}</span></div>`;
 }
 document.getElementById('channels').innerHTML = CH.map(c=>{
   const vids=V.filter(v=>v.channel_id===c.id);
@@ -329,7 +335,7 @@ document.getElementById('channels').innerHTML = CH.map(c=>{
       <span class="k">Length</span><span>${c.target_min_s}–${c.target_max_s}s</span>
       <span class="k">Platforms</span><span>${plats}</span>
     </div>
-    ${socLine(c.id,'tiktok')}${socLine(c.id,'instagram')}
+    ${socLine(c.id,'tiktok')}${socLine(c.id,'instagram')}${socLine(c.id,'youtube')}
     <div class="nums"><div><b>${vids.length}</b>made</div><div><b style="color:var(--posted)">${post}</b>posted</div>
       <div><b>${fmtDur(vids.length?sum(vids,v=>v.duration_s)/vids.length:0)}</b>avg</div></div>
   </div>`;
@@ -379,7 +385,7 @@ render();
 
 document.getElementById('foot').innerHTML =
   `Snapshot of <span class="mono">${esc(DATA.db_path)}</span> · re-run <span class="mono">~/.shortsfactory/dashboard.sh</span> to refresh · ` +
-  `social via public TikTok/Instagram endpoints (unofficial) · YouTube uploads are <b>${esc(DATA.defaults.youtube_privacy)}</b>`;
+  `social via public TikTok/Instagram/YouTube endpoints (unofficial) · YouTube uploads are <b>${esc(DATA.defaults.youtube_privacy)}</b>`;
 
 } /* end renderDashboard */
 
