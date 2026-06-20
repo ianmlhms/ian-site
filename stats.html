@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShortsFactory — Stats</title>
+<meta name="description" content="Live stats from Ian's ShortsFactory short-video pipeline.">
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --border:#283039;
+    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff;
+    --yt:#ff4444; --tt:#25f4ee; --ig:#e1306c; --posted:#3fb950;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 20px 60px}
+  .top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px}
+  h1{font-size:22px;margin:0}
+  h1 .dot{color:var(--accent)}
+  .sub{color:var(--muted);font-size:12.5px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:34px 0 12px;font-weight:600}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:18px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 18px}
+  .kpi .v{font-size:28px;font-weight:700;line-height:1.1}
+  .kpi .l{color:var(--muted);font-size:12.5px;margin-top:4px}
+  .socrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+  .soc{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:8px 14px;font-size:13px;display:flex;align-items:center;gap:8px}
+  .soc .dot{width:9px;height:9px;border-radius:50%}
+  .soc b{color:var(--text)}
+  .vids{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .vid{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;color:var(--text)}
+  .vid:hover{border-color:var(--accent);text-decoration:none}
+  .vid .thumb{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+  .vid .body{padding:11px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .vid .t{font-size:13px;font-weight:600;line-height:1.35;max-height:54px;overflow:hidden}
+  .vid .meta{display:flex;gap:8px;color:var(--muted);font-size:11.5px;margin-top:auto;flex-wrap:wrap}
+  .muted{color:var(--muted)}
+  footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="margin-bottom:8px"><a class="muted" href="/">‹ Home</a></div>
+  <div class="top">
+    <div>
+      <h1><span class="dot">▸</span> ShortsFactory <span class="muted" style="font-weight:400">Stats</span></h1>
+      <div class="sub" id="sub">Loading…</div>
+    </div>
+    <div class="sub" id="genat"></div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Channels</h2>
+  <div class="socrow" id="social"></div>
+
+  <h2>Published videos</h2>
+  <div class="vids" id="vids"></div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+const fmtN = n=>n==null?'—':(n>=10000?(n/1000).toFixed(0)+'k':n>=1000?(n/1000).toFixed(1)+'k':''+n);
+const fmtDur = s=>{s=Math.round(s);return s>=60?`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`:`${s}s`;};
+const esc = s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDate = iso=>{const d=new Date(iso); return isNaN(d)?'—':d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});};
+const sum = (arr,f)=>arr.reduce((a,x)=>a+f(x),0);
+const PLATC = {tiktok:'var(--tt)', instagram:'var(--ig)'};
+
+async function boot(){
+  let DATA;
+  try{
+    const r = await fetch('data/factory.json',{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    DATA = await r.json();
+  }catch(e){
+    document.getElementById('sub').textContent = 'Could not load stats ('+e+').';
+    return;
+  }
+  const V = DATA.videos || [], CH = DATA.channels || [];
+  const SOC = (DATA.social && DATA.social.accounts) || [];
+  const chName = id => (CH.find(c=>c.id===id)||{}).display_name || id;
+
+  // Public KPIs — counts only, no internal config
+  const posted = V.filter(v=>v.status==='posted');
+  const followers = sum(SOC, a=>a.followers||0);
+  const likes = sum(SOC.filter(a=>a.platform==='tiktok'), a=>a.likes||0);
+  const minutes = sum(posted, v=>v.duration_s)/60;
+  const kpis = [
+    {v:fmtN(followers), l:'Followers (TikTok + Instagram)', c:'var(--accent)'},
+    {v:fmtN(likes), l:'TikTok likes', c:'var(--tt)'},
+    {v:posted.length, l:'Videos published', c:'var(--posted)'},
+    {v:minutes.toFixed(1)+'m', l:'Content produced'},
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(k=>
+    `<div class="kpi"><div class="v" style="color:${k.c||'var(--text)'}">${k.v}</div><div class="l">${esc(k.l)}</div></div>`).join('');
+  document.getElementById('sub').textContent =
+    `${CH.filter(c=>c.enabled).length} channels · ${posted.length} videos live`;
+  document.getElementById('genat').textContent = DATA.generated_at ? 'Updated ' + fmtDate(DATA.generated_at) : '';
+
+  // Social handles (followers only)
+  document.getElementById('social').innerHTML = SOC.length ? SOC.map(a=>
+    `<a class="soc" href="${esc(a.url)}" target="_blank" rel="noopener">
+       <span class="dot" style="background:${PLATC[a.platform]||'#888'}"></span>
+       @${esc(a.handle)} · <b>${fmtN(a.followers)}</b> followers
+     </a>`).join('') : '<span class="muted">No channels yet.</span>';
+
+  // Published videos (YouTube links — already public)
+  const cards = posted.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(v=>{
+    const yt = v.youtube_id;
+    const thumb = yt ? `style="background-image:url('https://i.ytimg.com/vi/${encodeURIComponent(yt)}/hqdefault.jpg')"` : '';
+    const href = yt ? `https://youtube.com/watch?v=${encodeURIComponent(yt)}` : '#';
+    return `<a class="vid" href="${href}" target="_blank" rel="noopener">
+      <span class="thumb" ${thumb}>${yt?'':'▶'}</span>
+      <span class="body">
+        <span class="t">${esc(v.title)}</span>
+        <span class="meta"><span>${esc(chName(v.channel_id))}</span><span>${fmtDur(v.duration_s)}</span><span>${v.language?v.language.toUpperCase():''}</span></span>
+      </span></a>`;
+  }).join('');
+  document.getElementById('vids').innerHTML = cards || '<span class="muted">No published videos yet.</span>';
+
+  document.getElementById('foot').innerHTML =
+    `Auto-updated from Ian's ShortsFactory pipeline · <a href="factory.html">full dashboard</a>`;
+}
+boot();
+</script>
+</body>
+</html>

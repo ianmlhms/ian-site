@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShortsFactory — Dashboard</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --border:#283039;
+    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff;
+    --pending:#d29922; --approved:#58a6ff; --posted:#3fb950;
+    --rejected:#6e7681; --failed:#f85149;
+    --yt:#ff4444; --tt:#25f4ee; --ig:#e1306c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  header{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px}
+  h1{font-size:22px;margin:0;letter-spacing:.2px}
+  h1 .dot{color:var(--accent)}
+  .sub{color:var(--muted);font-size:12.5px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
+     margin:34px 0 12px;font-weight:600}
+  h2 .note{text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:18px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .kpi .v{font-size:26px;font-weight:700;line-height:1.1}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:4px}
+  .kpi .l b{color:var(--text);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .card h3{margin:0 0 14px;font-size:14px;font-weight:600}
+  .donut-wrap{display:flex;align-items:center;gap:18px}
+  .donut-num{fill:var(--text);font-size:26px;font-weight:700}
+  .donut-lbl{fill:var(--muted);font-size:11px}
+  .legend{list-style:none;margin:0;padding:0;font-size:13px;flex:1}
+  .legend li{display:flex;align-items:center;gap:8px;padding:3px 0}
+  .legend .sw{width:11px;height:11px;border-radius:3px;flex:none}
+  .legend .lv{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+  .bar{display:flex;align-items:center;gap:10px;margin:9px 0;font-size:13px}
+  .bar-l{width:96px;color:var(--muted);flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar-track{flex:1;background:var(--panel2);border-radius:6px;height:18px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;min-width:2px;transition:width .4s}
+  .bar-v{width:34px;text-align:right;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+  .spark{display:flex;align-items:flex-end;gap:3px;height:90px;margin-top:6px}
+  .spark .b{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
+  .spark .b:hover{opacity:1}
+  .spark-x{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:6px}
+  .chcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+  .ch{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .ch .top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .ch .name{font-size:15px;font-weight:600}
+  .ch .niche{color:var(--muted);font-size:12.5px;margin:8px 0 12px}
+  .ch .meta{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12.5px}
+  .ch .meta .k{color:var(--muted)}
+  .ch .nums{display:flex;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap}
+  .ch .nums div{font-size:12px;color:var(--muted)} .ch .nums b{display:block;font-size:18px;color:var(--text)}
+  .soc-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px}
+  .soc-row .lbl{display:flex;align-items:center;gap:6px;min-width:92px}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;
+    border:1px solid var(--border)}
+  .pill.on{color:var(--posted);border-color:rgba(63,185,80,.4)}
+  .pill.off{color:var(--muted)}
+  .stale{color:var(--pending);font-size:11px;cursor:help}
+  .posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}
+  .post{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;color:var(--text)}
+  .post:hover{border-color:var(--accent);text-decoration:none}
+  .post .thumb{aspect-ratio:1/1;background:var(--panel2) center/cover no-repeat}
+  .post.tt .thumb{display:flex;align-items:center;justify-content:center;color:var(--tt);font-weight:700;letter-spacing:.5px}
+  .post .pbody{padding:11px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .post .ptop{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  .post .pcap{font-size:12.5px;line-height:1.35;max-height:70px;overflow:hidden}
+  .post .pmeta{display:flex;gap:12px;color:var(--muted);font-size:12px;margin-top:auto}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .toolbar input{background:var(--panel);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:7px 11px;font-size:13px;min-width:200px}
+  .chip{background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:999px;
+    padding:5px 12px;font-size:12.5px;cursor:pointer;user-select:none}
+  .chip.active{color:var(--text);border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;cursor:pointer;white-space:nowrap}
+  tbody tr:hover{background:var(--panel)}
+  td.title{max-width:380px}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap}
+  .mono{font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;padding:40px}
+  footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
+  .plat{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px}
+
+  /* PIN gate */
+  .gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+  .gate-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:32px 28px;width:320px;max-width:100%;text-align:center}
+  .gate-icon{font-size:34px;margin-bottom:8px}
+  .gate-box h2{margin:0 0 6px;font-size:18px}
+  .gate-box p{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .gate-box input{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 12px;font-size:20px;text-align:center;letter-spacing:8px;margin-bottom:12px}
+  .gate-box button{width:100%;background:var(--accent);color:#0e1116;border:none;border-radius:8px;padding:11px;font-size:15px;font-weight:700;cursor:pointer}
+  .gate-box button:hover{filter:brightness(1.08)}
+  .gate-err{color:var(--failed);font-size:12.5px;margin-top:10px}
+  .gate-box .home{display:inline-block;margin-top:14px;font-size:12.5px;color:var(--muted)}
+  .backlink{color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<div id="gate" class="gate" style="display:none">
+  <div class="gate-box">
+    <div class="gate-icon">🔒</div>
+    <h2>ShortsFactory — Full Dashboard</h2>
+    <p>Enter PIN to view the detailed production dashboard.</p>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" maxlength="8">
+    <button id="pinBtn">Unlock</button>
+    <div id="pinErr" class="gate-err" style="display:none">Wrong PIN — try again.</div>
+    <a class="home" href="/">‹ back to ian.lu</a>
+  </div>
+</div>
+<div class="wrap" id="dash" style="display:none">
+  <div style="margin-bottom:6px"><a class="backlink" href="/">‹ Home</a> · <a class="backlink" href="stats.html">public view</a></div>
+  <header>
+    <div>
+      <h1><span class="dot">▸</span> ShortsFactory <span class="muted" style="font-weight:400">Production Dashboard</span></h1>
+      <div class="sub" id="subhead"></div>
+    </div>
+    <div class="sub" id="genat"></div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <h2>Social reach <span class="note muted" id="socAt"></span></h2>
+  <div class="chcards" id="social"></div>
+
+  <h2>Recent posts <span class="note muted">Instagram items show live engagement · TikTok per-video needs the official API</span></h2>
+  <div class="posts" id="posts"></div>
+
+  <h2>Production breakdown</h2>
+  <div class="grid">
+    <div class="card"><h3>Status</h3><div class="donut-wrap"><div id="donut"></div><ul class="legend" id="statusLegend"></ul></div></div>
+    <div class="card"><h3>Videos per channel</h3><div id="byChannel"></div></div>
+    <div class="card"><h3>Format</h3><div id="byFormat"></div></div>
+    <div class="card"><h3>Platform reach</h3><div id="byPlatform"></div></div>
+    <div class="card"><h3>Language</h3><div id="byLang"></div></div>
+    <div class="card"><h3>Output over last 30 days</h3><div class="spark" id="spark"></div><div class="spark-x" id="sparkX"></div></div>
+  </div>
+
+  <h2>Channels</h2>
+  <div class="chcards" id="channels"></div>
+
+  <h2>Videos</h2>
+  <div class="toolbar">
+    <input id="q" placeholder="Search title, topic, id…">
+    <span id="filters"></span>
+  </div>
+  <div class="card" style="padding:6px 8px"><table id="tbl"><thead></thead><tbody></tbody></table>
+    <div class="empty" id="tblEmpty" style="display:none">No videos match.</div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+function renderDashboard(DATA){
+const V = DATA.videos || [];
+const CH = DATA.channels || [];
+const SOC = (DATA.social && DATA.social.accounts) || [];
+
+const STATUS = {
+  pending:{c:'var(--pending)',l:'Pending'}, approved:{c:'var(--approved)',l:'Approved'},
+  posted:{c:'var(--posted)',l:'Posted'}, rejected:{c:'var(--rejected)',l:'Rejected'},
+  failed:{c:'var(--failed)',l:'Failed'},
+};
+const PLAT = {youtube:'var(--yt)', tiktok:'var(--tt)', instagram:'var(--ig)'};
+const PLATMETA = {tiktok:{l:'TikTok',c:'var(--tt)'}, instagram:{l:'Instagram',c:'var(--ig)'}};
+const ORDER = ['posted','approved','pending','rejected','failed'];
+
+const countBy = (arr,f)=>arr.reduce((m,x)=>{const k=f(x);m[k]=(m[k]||0)+1;return m;},{});
+const sum = (arr,f)=>arr.reduce((a,x)=>a+f(x),0);
+const fmtDur = s=>{s=Math.round(s);return s>=60?`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`:`${s}s`;};
+const fmtN = n=>n==null?'—':(n>=10000?(n/1000).toFixed(0)+'k':n>=1000?(n/1000).toFixed(1)+'k':''+n);
+const esc = s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmtDate = iso=>{const d=new Date(iso); return isNaN(d)?'—':d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});};
+const chName = id => (CH.find(c=>c.id===id)||{}).display_name || id;
+const socFor = (id,p) => SOC.find(a=>a.channel_id===id && a.platform===p);
+
+// ---- KPIs ----
+const byStatus = countBy(V, v=>v.status);
+const posted = byStatus.posted||0;
+const totalMin = sum(V.filter(v=>['posted','approved','pending'].includes(v.status)), v=>v.duration_s)/60;
+const avg = V.length ? sum(V,v=>v.duration_s)/V.length : 0;
+const enabledCh = CH.filter(c=>c.enabled).length;
+const totFollowers = sum(SOC, a=>a.followers||0);
+const totLikes = sum(SOC.filter(a=>a.platform==='tiktok'), a=>a.likes||0);
+const kpis = [
+  {v:fmtN(totFollowers), l:'<b>Followers</b> (TT+IG)', c:'var(--accent)'},
+  {v:fmtN(totLikes), l:'TikTok likes', c:'var(--tt)'},
+  {v:posted, l:'<b>Posted</b> (live)', c:'var(--posted)'},
+  {v:V.length, l:'Total videos'},
+  {v:byStatus.pending||0, l:'Pending approval', c:'var(--pending)'},
+  {v:byStatus.failed||0, l:'Failed', c:(byStatus.failed?'var(--failed)':null)},
+  {v:totalMin.toFixed(1)+'m', l:'Content produced'},
+  {v:fmtDur(avg), l:'Avg length'},
+];
+document.getElementById('kpis').innerHTML = kpis.map(k=>
+  `<div class="kpi"><div class="v" style="color:${k.c||'var(--text)'}">${k.v}</div><div class="l">${k.l}</div></div>`).join('');
+document.getElementById('subhead').innerHTML =
+  `${V.length} videos · ${enabledCh} active channel${enabledCh!==1?'s':''} · model ${esc(DATA.defaults.llm_model)} · ${esc(DATA.defaults.resolution)} @ ${DATA.defaults.fps}fps`;
+document.getElementById('genat').textContent = 'Generated ' + fmtDate(DATA.generated_at);
+
+// ---- Social reach ----
+function socCard(a){
+  const m = PLATMETA[a.platform] || {l:a.platform,c:'#888'};
+  const stale = a.stale ? `<span class="stale" title="live fetch failed — showing last good value from ${fmtDate(a.as_of)}">⚠ cached</span>` : '';
+  const sec = a.platform==='tiktok'
+    ? `<div><b>${fmtN(a.likes)}</b>likes</div><div><b>${fmtN(a.videos)}</b>videos</div>`
+    : `<div><b>${fmtN(a.posts)}</b>posts</div>`;
+  return `<div class="ch">
+    <div class="top"><span class="plat" style="width:11px;height:11px;background:${m.c}"></span>
+      <span class="name">${m.l}</span>
+      <a href="${a.url}" target="_blank" rel="noopener" class="mono" style="font-size:12px">@${esc(a.handle)}</a>
+      <span style="margin-left:auto">${stale}</span></div>
+    <div class="muted" style="font-size:12px">${esc(chName(a.channel_id))}</div>
+    <div class="nums"><div><b>${fmtN(a.followers)}</b>followers</div>${sec}</div>
+  </div>`;
+}
+document.getElementById('social').innerHTML = SOC.length
+  ? SOC.map(socCard).join('') : '<div class="muted">No social handles configured in channels.yaml.</div>';
+if (DATA.social && DATA.social.fetched_at)
+  document.getElementById('socAt').textContent = '· fetched ' + fmtDate(DATA.social.fetched_at);
+
+// ---- Recent posts (Instagram items + TikTok profile cards) ----
+const POSTS = (DATA.posts || []).slice().sort((a,b)=>(b.ts||0)-(a.ts||0));
+function postCard(p){
+  const m=PLATMETA[p.platform]||{l:p.platform,c:'#888'};
+  const stats=[];
+  if(p.is_video && p.views!=null) stats.push(`▶ ${fmtN(p.views)}`);
+  if(p.likes!=null) stats.push(`♥ ${fmtN(p.likes)}`);
+  if(p.comments!=null) stats.push(`💬 ${fmtN(p.comments)}`);
+  const date=p.ts?new Date(p.ts*1000).toLocaleDateString([], {month:'short',day:'numeric'}):'';
+  const thumb=p.thumb?` style="background-image:url('${p.thumb}')"`:'';
+  return `<a class="post" href="${p.url}" target="_blank" rel="noopener">
+    <span class="thumb"${thumb}></span>
+    <span class="pbody">
+      <span class="ptop"><span class="plat" style="width:9px;height:9px;background:${m.c}"></span>${m.l} · ${esc(chName(p.channel_id))}${date?` · ${date}`:''}</span>
+      <span class="pcap">${esc(p.caption)||'<span class="muted">(no caption)</span>'}</span>
+      <span class="pmeta">${stats.map(s=>`<span>${s}</span>`).join('')||'<span class="muted">—</span>'}</span>
+    </span></a>`;
+}
+function ttCard(a){
+  return `<a class="post tt" href="${a.url}" target="_blank" rel="noopener">
+    <span class="thumb">TikTok ▶</span>
+    <span class="pbody">
+      <span class="ptop"><span class="plat" style="width:9px;height:9px;background:var(--tt)"></span>TikTok · ${esc(chName(a.channel_id))}</span>
+      <span class="pcap">@${esc(a.handle)}</span>
+      <span class="pmeta"><span>${fmtN(a.videos)} videos</span><span>♥ ${fmtN(a.likes)} likes</span></span>
+    </span></a>`;
+}
+const ttAccts = SOC.filter(a=>a.platform==='tiktok' && (a.videos||0)>0);
+document.getElementById('posts').innerHTML =
+  (POSTS.map(postCard).join('') + ttAccts.map(ttCard).join('')) || '<div class="muted">No posts found yet.</div>';
+
+// ---- Donut (status) ----
+function donut(items,size){
+  const tot=items.reduce((a,b)=>a+b.value,0)||1, r=size/2-12, c=2*Math.PI*r, k=size/2;
+  let off=0, arcs='';
+  for(const it of items){ if(!it.value)continue; const len=it.value/tot*c;
+    arcs+=`<circle cx="${k}" cy="${k}" r="${r}" fill="none" stroke="${it.color}" stroke-width="20" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${k} ${k})"/>`; off+=len; }
+  if(!arcs) arcs=`<circle cx="${k}" cy="${k}" r="${r}" fill="none" stroke="var(--panel2)" stroke-width="20"/>`;
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${arcs}<text x="${k}" y="${k-2}" text-anchor="middle" class="donut-num">${items.reduce((a,b)=>a+b.value,0)}</text><text x="${k}" y="${k+16}" text-anchor="middle" class="donut-lbl">videos</text></svg>`;
+}
+const statusItems = ORDER.filter(s=>byStatus[s]).map(s=>({label:STATUS[s].l,value:byStatus[s],color:STATUS[s].c}));
+document.getElementById('donut').innerHTML = donut(statusItems.length?statusItems:[{label:'',value:0,color:''}],150);
+document.getElementById('statusLegend').innerHTML = ORDER.map(s=>
+  `<li><span class="sw" style="background:${STATUS[s].c}"></span>${STATUS[s].l}<span class="lv">${byStatus[s]||0}</span></li>`).join('');
+
+// ---- Horizontal bars ----
+function bars(el, rows, color){
+  const max=Math.max(1,...rows.map(r=>r.v));
+  el.innerHTML = rows.length ? rows.map(r=>
+    `<div class="bar"><div class="bar-l" title="${esc(r.l)}">${esc(r.l)}</div><div class="bar-track"><div class="bar-fill" style="width:${r.v/max*100}%;background:${r.color||color}"></div></div><div class="bar-v">${r.v}</div></div>`
+  ).join('') : '<div class="muted" style="padding:8px 0">No data yet.</div>';
+}
+bars(document.getElementById('byChannel'),
+  Object.entries(countBy(V,v=>v.channel_id)).sort((a,b)=>b[1]-a[1]).map(([id,v])=>({l:chName(id),v})), 'var(--accent)');
+bars(document.getElementById('byFormat'),
+  Object.entries(countBy(V,v=>v.fmt)).map(([l,v])=>({l,v})), '#a371f7');
+const platCounts={}; V.forEach(v=>v.platforms.forEach(p=>platCounts[p]=(platCounts[p]||0)+1));
+bars(document.getElementById('byPlatform'),
+  Object.entries(platCounts).sort((a,b)=>b[1]-a[1]).map(([l,v])=>({l,v,color:PLAT[l]||'var(--accent)'})));
+bars(document.getElementById('byLang'),
+  Object.entries(countBy(V,v=>v.language)).map(([l,v])=>({l:l.toUpperCase(),v})), '#3fb950');
+
+// ---- 30-day sparkline ----
+(function(){
+  const days=30, today=new Date(); today.setHours(0,0,0,0);
+  const buckets=Array(days).fill(0), labels=[];
+  for(let i=0;i<days;i++){const d=new Date(today); d.setDate(d.getDate()-(days-1-i)); labels.push(d);}
+  V.forEach(v=>{const d=new Date(v.created_at); if(isNaN(d))return; d.setHours(0,0,0,0);
+    const idx=Math.round((d-labels[0])/86400000); if(idx>=0&&idx<days)buckets[idx]++;});
+  const max=Math.max(1,...buckets);
+  document.getElementById('spark').innerHTML = buckets.map((n,i)=>
+    `<div class="b" style="height:${n/max*100}%" title="${labels[i].toLocaleDateString()}: ${n}"></div>`).join('');
+  document.getElementById('sparkX').innerHTML =
+    `<span>${labels[0].toLocaleDateString([], {month:'short',day:'numeric'})}</span><span>today</span>`;
+})();
+
+// ---- Channel cards (with social) ----
+function socLine(id,p){
+  const a=socFor(id,p); const m=PLATMETA[p];
+  if(!a) return '';
+  const extra = p==='tiktok' ? ` · ${fmtN(a.likes)} likes` : ` · ${fmtN(a.posts)} posts`;
+  return `<div class="soc-row"><span class="lbl"><span class="plat" style="width:9px;height:9px;background:${m.c}"></span>${m.l}</span>
+    <a href="${a.url}" target="_blank" rel="noopener">@${esc(a.handle)}</a>
+    <span style="margin-left:auto" class="mono"><b>${fmtN(a.followers)}</b> followers${extra}${a.stale?' <span class="stale" title="cached">⚠</span>':''}</span></div>`;
+}
+document.getElementById('channels').innerHTML = CH.map(c=>{
+  const vids=V.filter(v=>v.channel_id===c.id);
+  const post=vids.filter(v=>v.status==='posted').length;
+  const plats=c.platforms.map(p=>`<span class="plat" style="background:${PLAT[p]||'#888'}" title="${p}"></span>`).join('')+' '+c.platforms.join(', ');
+  return `<div class="ch">
+    <div class="top"><span class="name">${esc(c.display_name)}</span>
+      <span class="pill ${c.enabled?'on':'off'}">${c.enabled?'enabled':'disabled'}</span></div>
+    <div class="muted mono" style="font-size:12px">${esc(c.id)}</div>
+    <div class="niche">${esc(c.niche)}</div>
+    <div class="meta">
+      <span class="k">Format</span><span>${esc(c.format)} · ${c.language.toUpperCase()}</span>
+      <span class="k">Schedule</span><span>daily ${esc(c.schedule)}</span>
+      <span class="k">Length</span><span>${c.target_min_s}–${c.target_max_s}s</span>
+      <span class="k">Platforms</span><span>${plats}</span>
+    </div>
+    ${socLine(c.id,'tiktok')}${socLine(c.id,'instagram')}
+    <div class="nums"><div><b>${vids.length}</b>made</div><div><b style="color:var(--posted)">${post}</b>posted</div>
+      <div><b>${fmtDur(vids.length?sum(vids,v=>v.duration_s)/vids.length:0)}</b>avg</div></div>
+  </div>`;
+}).join('') || '<div class="muted">No channels configured.</div>';
+
+// ---- Videos table (sortable + searchable + status filter) ----
+const COLS=[['created_at','When'],['channel_id','Channel'],['status','Status'],['fmt','Format'],
+  ['duration_s','Len'],['title','Title / topic'],['platforms','Targets'],['youtube_id','Link']];
+let sortKey='created_at', sortDir=-1, statusFilter='all', query='';
+document.querySelector('#tbl thead').innerHTML='<tr>'+COLS.map(([k,l])=>
+  `<th data-k="${k}">${l}</th>`).join('')+'</tr>';
+document.getElementById('filters').innerHTML='<span class="chip active" data-s="all">All</span>'+
+  ORDER.filter(s=>byStatus[s]).map(s=>`<span class="chip" data-s="${s}">${STATUS[s].l} ${byStatus[s]}</span>`).join('');
+
+function badge(s){const m=STATUS[s]||{c:'var(--muted)',l:s};
+  return `<span class="badge" style="color:${m.c};background:${m.c}22">${m.l}</span>`;}
+function ytLink(id){return id?`<a href="https://youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener">▶ open</a>`:'<span class="muted">—</span>';}
+function platDots(ps){return ps.map(p=>`<span class="plat" style="background:${PLAT[p]||'#888'}" title="${p}"></span>`).join('')||'<span class="muted">—</span>';}
+
+function render(){
+  let rows=V.filter(v=>(statusFilter==='all'||v.status===statusFilter));
+  if(query){const q=query.toLowerCase();
+    rows=rows.filter(v=>(v.title+' '+v.topic+' '+v.id).toLowerCase().includes(q));}
+  rows.sort((a,b)=>{let x=a[sortKey],y=b[sortKey];
+    if(sortKey==='platforms'){x=x.length;y=y.length;}
+    if(typeof x==='string'){x=x.toLowerCase();y=(''+y).toLowerCase();}
+    return x<y?-sortDir:x>y?sortDir:0;});
+  const tb=document.querySelector('#tbl tbody');
+  tb.innerHTML=rows.map(v=>`<tr>
+    <td class="mono muted" title="${esc(v.created_at)}">${fmtDate(v.created_at)}</td>
+    <td>${esc(chName(v.channel_id))}</td>
+    <td>${badge(v.status)}${v.error?` <span title="${esc(v.error)}" style="color:var(--failed)">⚠</span>`:''}</td>
+    <td>${esc(v.fmt)}${v.image_count?` <span class="muted">${v.image_count}🖼</span>`:''}</td>
+    <td class="mono">${fmtDur(v.duration_s)}</td>
+    <td class="title">${esc(v.title)||'<span class=muted>—</span>'}</td>
+    <td>${platDots(v.platforms)}</td>
+    <td>${ytLink(v.youtube_id)}</td></tr>`).join('');
+  document.getElementById('tblEmpty').style.display=rows.length?'none':'block';
+}
+document.querySelectorAll('#tbl thead th').forEach(th=>th.onclick=()=>{
+  const k=th.dataset.k; if(sortKey===k)sortDir*=-1; else{sortKey=k;sortDir=1;} render();});
+document.getElementById('filters').onclick=e=>{ if(!e.target.dataset.s)return;
+  statusFilter=e.target.dataset.s;
+  document.querySelectorAll('#filters .chip').forEach(c=>c.classList.toggle('active',c===e.target)); render();};
+document.getElementById('q').oninput=e=>{query=e.target.value; render();};
+render();
+
+document.getElementById('foot').innerHTML =
+  `Snapshot of <span class="mono">${esc(DATA.db_path)}</span> · re-run <span class="mono">~/.shortsfactory/dashboard.sh</span> to refresh · ` +
+  `social via public TikTok/Instagram endpoints (unofficial) · YouTube uploads are <b>${esc(DATA.defaults.youtube_privacy)}</b>`;
+
+} /* end renderDashboard */
+
+/* ---- PIN gate + live data fetch ---- */
+(function(){
+  const PIN='1243', KEY='sf_unlocked';
+  const gate=document.getElementById('gate'), dash=document.getElementById('dash');
+  const inp=document.getElementById('pin'), err=document.getElementById('pinErr');
+  async function load(){
+    gate.style.display='none'; dash.style.display='';
+    try{
+      const r=await fetch('data/factory.json',{cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      renderDashboard(await r.json());
+    }catch(e){
+      dash.innerHTML='<div class="wrap"><p class="muted">Could not load data ('+e+').</p></div>';
+    }
+  }
+  function tryUnlock(){
+    if(inp.value===PIN){ sessionStorage.setItem(KEY,'1'); load(); }
+    else { err.style.display=''; inp.value=''; inp.focus(); }
+  }
+  if(sessionStorage.getItem(KEY)==='1'){ load(); }
+  else {
+    gate.style.display='';
+    document.getElementById('pinBtn').onclick=tryUnlock;
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter') tryUnlock(); });
+    inp.focus();
+  }
+})();
+</script>
+</body>
+</html>
