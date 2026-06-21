@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notifikatiounen — Hëllef · ian.lu</title>
+<meta name="description" content="Wéi ee Messenger-Notifikatiounen uschalt.">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  a{color:var(--accent2);text-decoration:none}
+  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  header .home{color:var(--muted);font-weight:700}
+  header h1{font-size:18px;margin:0}
+  .wrap{max-width:640px;margin:0 auto;padding:22px 18px 60px}
+  .langs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+  .lang{padding:8px 16px;border-radius:30px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-weight:700;font-size:14px;cursor:pointer}
+  .lang.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .doc{display:none}
+  .doc.show{display:block}
+  .doc h2{font-size:22px;margin:0 0 6px}
+  .doc .lead{color:var(--muted);margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:16px}
+  .card.warn{border-left:3px solid #ffcc4d}
+  .card h3{margin:0 0 10px;font-size:16px}
+  .card ol{margin:0;padding-left:20px}
+  .card li{margin:7px 0}
+  .card .note{color:var(--muted);font-size:13px}
+  .done{color:#44ff88;font-weight:700}
+  kbd{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:13px;font-family:inherit;color:var(--accent2)}
+</style>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<header>
+  <a class="home" href="messenger.html">‹ Messenger</a>
+  <h1>🔔 Notifikatiounen — Hëllef</h1>
+</header>
+
+<div class="wrap">
+  <div class="langs">
+    <button class="lang active" data-l="lb">🇱🇺 Lëtzebuergesch</button>
+    <button class="lang" data-l="de">🇩🇪 Deutsch</button>
+    <button class="lang" data-l="en">🇬🇧 English</button>
+  </div>
+
+  <!-- ===================== Lëtzebuergesch ===================== -->
+  <section class="doc show" data-l="lb">
+    <h2>Messenger-Notifikatioune uschalten</h2>
+    <p class="lead">Esou kriss du eng Notifikatioun, wann der een eng Noriicht schéckt — och wann d'Säit zou ass.</p>
+
+    <div class="card">
+      <h3>📱 iPhone / iPad</h3>
+      <p class="note">Du muss d'App fir d'éischt „installéieren“ — Apple erlaabt Notifikatiounen nëmme fir installéiert Web-Appen.</p>
+      <ol>
+        <li>Maach <kbd>ian.lu/messenger</kbd> am <b>Safari</b> op a mell dech un.</li>
+        <li>Tipp op de Deele-Knäppchen (<b>□↑</b>) → <b>Op den Home-Bildschirm</b> → <b>Bäisetzen</b>.</li>
+        <li>Maach de Messenger <b>iwwer dat neit Symbol</b> um Home-Bildschirm op (net iwwer Safari).</li>
+        <li>Tipp uewen op <b>🔔 Notify</b> → <b>Erlaben</b>.</li>
+      </ol>
+      <p><span class="done">Fäerdeg ✅</span> — du kriss elo Notifikatiounen, och wann d'App zou ass.</p>
+    </div>
+
+    <div class="card">
+      <h3>💻 Computer / Android</h3>
+      <ol>
+        <li>Maach <kbd>ian.lu/messenger</kbd> op a mell dech un.</li>
+        <li>Klick op <b>🔔 Notify</b> → <b>Erlaben</b>.</li>
+      </ol>
+    </div>
+
+    <div class="card warn">
+      <h3>🔕 De Knäppchen weist „blocked“? (iPhone/iPad)</h3>
+      <p class="note">Du hues virdru „Net erlaben“ gedréckt. Apple weist deen Dialog nëmmen <b>eemol</b> — du muss et an den Astellungen nei aschalten.</p>
+      <ol>
+        <li>Vergewëssere dech, datt s du de Messenger <b>iwwer d'Home-Bildschirm-Symbol</b> opgemaach hues (net Safari).</li>
+        <li><b>Astellungen → Matdeelungen → Messenger</b> → „Matdeelungen erlaben“ uschalten.</li>
+        <li class="note">Wann „Messenger“ net an der Lëscht ass: läsch d'Symbol vum Home-Bildschirm, setz et iwwer Safari nei bäi, maach et iwwer d'Symbol op, tipp op 🔔 Notify a wiel dës Kéier <b>Erlaben</b>.</li>
+        <li>Tipp nees op <b>🔔 Notify</b> — et sollt op <b>🔔 On</b> wiesselen.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ===================== Deutsch ===================== -->
+  <section class="doc" data-l="de">
+    <h2>Messenger-Benachrichtigungen einschalten</h2>
+    <p class="lead">So bekommst du eine Benachrichtigung, wenn dir jemand schreibt — auch wenn die Seite geschlossen ist.</p>
+
+    <div class="card">
+      <h3>📱 iPhone / iPad</h3>
+      <p class="note">Du musst die App zuerst „installieren“ — Apple erlaubt Benachrichtigungen nur für installierte Web-Apps.</p>
+      <ol>
+        <li>Öffne <kbd>ian.lu/messenger</kbd> in <b>Safari</b> und melde dich an.</li>
+        <li>Tippe auf das Teilen-Symbol (<b>□↑</b>) → <b>Zum Home-Bildschirm</b> → <b>Hinzufügen</b>.</li>
+        <li>Öffne Messenger <b>über das neue Symbol</b> auf dem Home-Bildschirm (nicht über Safari).</li>
+        <li>Tippe oben auf <b>🔔 Notify</b> → <b>Erlauben</b>.</li>
+      </ol>
+      <p><span class="done">Fertig ✅</span> — du bekommst jetzt Benachrichtigungen, auch wenn die App geschlossen ist.</p>
+    </div>
+
+    <div class="card">
+      <h3>💻 Computer / Android</h3>
+      <ol>
+        <li>Öffne <kbd>ian.lu/messenger</kbd> und melde dich an.</li>
+        <li>Klicke auf <b>🔔 Notify</b> → <b>Erlauben</b>.</li>
+      </ol>
+    </div>
+
+    <div class="card warn">
+      <h3>🔕 Knopf zeigt „blocked“? (iPhone/iPad)</h3>
+      <p class="note">Du hast vorher „Nicht erlauben“ getippt. Apple zeigt diesen Dialog nur <b>einmal</b> — du musst es in den Einstellungen neu aktivieren.</p>
+      <ol>
+        <li>Stelle sicher, dass du Messenger <b>über das Home-Bildschirm-Symbol</b> geöffnet hast (nicht Safari).</li>
+        <li><b>Einstellungen → Mitteilungen → Messenger</b> → „Mitteilungen erlauben“ einschalten.</li>
+        <li class="note">Wenn „Messenger“ nicht in der Liste ist: lösche das Symbol vom Home-Bildschirm, füge es über Safari neu hinzu, öffne es über das Symbol, tippe auf 🔔 Notify und wähle diesmal <b>Erlauben</b>.</li>
+        <li>Tippe erneut auf <b>🔔 Notify</b> — es sollte auf <b>🔔 On</b> wechseln.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ===================== English ===================== -->
+  <section class="doc" data-l="en">
+    <h2>Turn on Messenger notifications</h2>
+    <p class="lead">This gets you a notification when someone messages you — even when the page is closed.</p>
+
+    <div class="card">
+      <h3>📱 iPhone / iPad</h3>
+      <p class="note">You have to “install” the app first — Apple only allows notifications for installed web apps.</p>
+      <ol>
+        <li>Open <kbd>ian.lu/messenger</kbd> in <b>Safari</b> and sign in.</li>
+        <li>Tap the Share button (<b>□↑</b>) → <b>Add to Home Screen</b> → <b>Add</b>.</li>
+        <li>Open Messenger again <b>from the new icon</b> on your Home Screen (not from Safari).</li>
+        <li>Tap <b>🔔 Notify</b> at the top → <b>Allow</b>.</li>
+      </ol>
+      <p><span class="done">Done ✅</span> — you’ll get message notifications even when the app is closed.</p>
+    </div>
+
+    <div class="card">
+      <h3>💻 Computer / Android</h3>
+      <ol>
+        <li>Open <kbd>ian.lu/messenger</kbd> and sign in.</li>
+        <li>Click <b>🔔 Notify</b> → <b>Allow</b>.</li>
+      </ol>
+    </div>
+
+    <div class="card warn">
+      <h3>🔕 Button says “blocked”? (iPhone/iPad)</h3>
+      <p class="note">You tapped “Don’t Allow” earlier. Apple only shows that prompt <b>once</b> — you have to re-enable it in Settings.</p>
+      <ol>
+        <li>Make sure you opened Messenger <b>from the Home Screen icon</b> (not Safari).</li>
+        <li><b>Settings → Notifications → Messenger</b> → turn on “Allow Notifications”.</li>
+        <li class="note">If “Messenger” isn’t in the list: delete the Home Screen icon, re-add it from Safari, open it from the icon, tap 🔔 Notify, and choose <b>Allow</b> this time.</li>
+        <li>Tap <b>🔔 Notify</b> again — it should switch to <b>🔔 On</b>.</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<script>
+  const langs = document.querySelectorAll(".lang");
+  const docs = document.querySelectorAll(".doc");
+  function setLang(l) {
+    langs.forEach((b) => b.classList.toggle("active", b.dataset.l === l));
+    docs.forEach((d) => d.classList.toggle("show", d.dataset.l === l));
+    document.documentElement.lang = l;
+    try { localStorage.setItem("helpLang", l); } catch {}
+  }
+  langs.forEach((b) => (b.onclick = () => setLang(b.dataset.l)));
+  let saved = "lb";
+  try { saved = localStorage.getItem("helpLang") || "lb"; } catch {}
+  setLang(saved);
+</script>
+</body>
+</html>
