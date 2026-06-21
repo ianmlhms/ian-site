@@ -10,6 +10,7 @@ let sb = null;
 let current = null;          // {id, display, is_dm, invite_code, ...}
 let channel = null;
 const seen = new Set();
+let memberSubbed = false;
 
 /* ---------- small prompt modal ---------- */
 function promptModal(title, label, okText = "OK") {
@@ -258,6 +259,13 @@ async function showApp() {
   try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
   try { const { data } = await sb.rpc("is_admin"); if (data) showAdminLink(); } catch {}
   loadChats();
+  if (!memberSubbed) {
+    memberSubbed = true;
+    const uid = auth.session().user.id;
+    sb.channel("mem-" + uid)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "group_members", filter: "user_id=eq." + uid }, () => loadChats())
+      .subscribe();
+  }
   const dm = new URLSearchParams(location.search).get("dm");
   if (dm) {
     try {

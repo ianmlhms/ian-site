@@ -9,12 +9,41 @@ const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Bat
 const READY = new Set(["connect4", "slf", "battleship"]);
 
 async function refresh() {
-  const [{ data: fr }, { data: rq }, { data: gi }] = await Promise.all([
+  const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: dir }] = await Promise.all([
     sb.rpc("my_friends"), sb.rpc("friend_requests"), sb.rpc("my_game_invites"),
+    sb.rpc("sent_requests"), sb.rpc("directory"),
   ]);
   renderFriends(fr || []);
   renderRequests(rq || []);
   renderInvites(gi || []);
+  renderSent(sent || []);
+  renderDirectory(dir || []);
+}
+
+function renderSent(list) {
+  $("sentWrap").style.display = list.length ? "" : "none";
+  $("sent").innerHTML = list.map(s => `
+    <div class="row">
+      <span class="name"><span class="av">👤</span>${esc(s.username)} <span style="color:var(--muted);font-weight:400">— pending</span></span>
+      <button class="mini x" data-cancel="${s.user_id}">Cancel</button>
+    </div>`).join("");
+  $("sent").querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => { await sb.rpc("remove_friend", { p_other: b.dataset.cancel }); refresh(); });
+}
+
+function renderDirectory(list) {
+  const el = $("directory");
+  if (!list.length) { el.innerHTML = `<div class="empty">No other users yet.</div>`; return; }
+  el.innerHTML = list.map(u => {
+    let btn;
+    if (u.status === "friend") btn = `<span class="mini" style="opacity:.55">✓ Friend</span>`;
+    else if (u.status === "sent") btn = `<span class="mini" style="opacity:.55">Requested</span>`;
+    else if (u.status === "incoming") btn = `<button class="mini go" data-add="${esc(u.username)}">Accept</button>`;
+    else btn = `<button class="mini go" data-add="${esc(u.username)}">+ Add</button>`;
+    return `<div class="row"><span class="name"><span class="av">👤</span>${esc(u.username)}</span>${btn}</div>`;
+  }).join("");
+  el.querySelectorAll("[data-add]").forEach(b => b.onclick = async () => {
+    try { await sb.rpc("add_friend", { p_username: b.dataset.add }); refresh(); } catch (e) { alert(e.message); }
+  });
 }
 
 function renderFriends(list) {
@@ -94,10 +123,11 @@ async function addFriend() {
   } catch (e) { msg.className = "msgline err"; msg.textContent = e.message || "Couldn't add."; }
 }
 
-function showApp() {
+async function showApp() {
   $("gate").style.display = "none"; $("app").style.display = "";
   $("addBtn").onclick = addFriend;
   $("addInput").addEventListener("keydown", e => { if (e.key === "Enter") addFriend(); });
+  try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
   refresh();
   // live notify on new game invites — subscribe only once per page load
   if (!inviteSubbed) {
