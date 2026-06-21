@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Games — ian.lu</title>
+<meta name="description" content="Multiplayer games to play across two iPads.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(900px 500px at 70% -10%,rgba(110,168,254,.12),transparent),var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 70px}
+  .intro{color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.5}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px}
+  .card .ico{font-size:40px}
+  .card h2{font-size:20px;margin:8px 0 4px}
+  .card p{color:var(--muted);font-size:13px;margin:0 0 16px;min-height:34px}
+  .card .create{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:800;cursor:pointer;font-size:14px}
+  .joinrow{display:flex;gap:8px;margin-top:10px}
+  .joinrow input{flex:1;min-width:0;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:14px}
+  .joinrow button{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:0 14px;font-weight:700;cursor:pointer}
+  .joinrow button:hover{border-color:var(--accent2);color:var(--accent2)}
+  .tip{margin-top:22px;color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>🎲 Games</h1>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <p class="intro">Play across two iPads: tap <b>Start</b> on one, share the <b>room code</b>, and <b>Join</b> on the other. (Or invite a friend by username from the <a href="friends.html">Friends</a> page.)</p>
+  <div class="cards" id="cards"></div>
+  <p class="tip">Stad-Land-Fluss supports 2+ players — everyone joins the same code.</p>
+</div>
+
+<script>
+const GAMES = [
+  { id:"connect4", ico:"🔴", name:"Connect 4", desc:"Drop discs, get four in a row. 1 v 1." },
+  { id:"slf", ico:"🔤", name:"Stad-Land-Fluss", desc:"A letter is drawn — race to fill the categories. 2+ players." },
+  { id:"battleship", ico:"🚢", name:"Battleship", desc:"Hide your fleet, sink your opponent's. 1 v 1." },
+];
+const code = () => Math.random().toString(36).slice(2, 8);
+document.getElementById("cards").innerHTML = GAMES.map(g => `
+  <div class="card">
+    <div class="ico">${g.ico}</div>
+    <h2>${g.name}</h2>
+    <p>${g.desc}</p>
+    <button class="create" data-c="${g.id}">Start a game</button>
+    <div class="joinrow">
+      <input id="code-${g.id}" placeholder="room code" autocomplete="off">
+      <button data-j="${g.id}">Join</button>
+    </div>
+  </div>`).join("");
+document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => location.href = `${b.dataset.c}.html?room=${code()}&role=host`);
+document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
+  const c = (document.getElementById("code-" + b.dataset.j).value || "").trim().toLowerCase();
+  if (c) location.href = `${b.dataset.j}.html?room=${encodeURIComponent(c)}&role=guest`;
+});
+</script>
+</body>
+</html>

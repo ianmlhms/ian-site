@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stad-Land-Fluss — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+  .wrap{max-width:680px;margin:0 auto;padding:22px 18px 60px}
+  .players{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px}
+  .letter{font-size:64px;font-weight:900;text-align:center;color:var(--accent);margin:10px 0}
+  .big{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
+  .big.stop{background:#ff5d6c}
+  .cat{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .cat label{width:120px;color:var(--muted);font-size:14px;flex:none}
+  .cat input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 13px;font-size:15px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
+  th{color:var(--muted);font-size:12px}
+  td.pts{text-align:right;font-weight:800}
+  .tot{margin-top:16px}
+  .muted{color:var(--muted)}.center{text-align:center}
+  h3{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="games.html">‹ Games</a>
+  <h1>🔤 Stad-Land-Fluss</h1>
+  <div class="spacer"></div>
+  <span class="code">room <code id="roomc"></code></span>
+</header>
+<div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const CATS = ["Stad","Land","Numm","Déier","Beruff","Iessen"];
+const LETTERS = "ABDEFGHIKLMNOPRSTUVW";
+const params = new URLSearchParams(location.search);
+const room = (params.get("room")||"demo").toLowerCase();
+const role = params.get("role")==="guest" ? "guest" : "host";
+const cid = Math.random().toString(36).slice(2,10);
+document.getElementById("roomc").textContent = room;
+
+const cfg = window.PB_CONFIG;
+const sb = supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey);
+const ch = sb.channel("slf:"+room, { config:{ broadcast:{self:false}, presence:{key:cid} }});
+const $ = (id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let name="Player", phase="lobby", letter="", round=0, stopped=false, answers={}, totals={}, collectTimer=null;
+
+async function getName(){
+  let n=localStorage.getItem("playerName");
+  if(!n){ try{ const {data}=await sb.auth.getSession(); n=data.session?.user?.user_metadata?.username; }catch{} }
+  if(!n){ n=(prompt("Your name for the game:")||"Player").slice(0,20); }
+  localStorage.setItem("playerName", n); return n;
+}
+function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
+function pick(){ return LETTERS[Math.floor(Math.random()*LETTERS.length)]; }
+
+function render(){
+  const ps = players();
+  if (phase==="lobby"){
+    $("app").innerHTML = `
+      <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
+      <p class="muted">${ps.length<2?"Waiting for players — share the room code above.":"Ready!"}</p>
+      ${role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>Start round ${round+1}</button>` : `<p class="center muted">Waiting for the host to start…</p>`}
+      ${renderTotals(ps)}`;
+    if(role==="host") $("startBtn") && ($("startBtn").onclick=startRound);
+  } else if (phase==="play"){
+    $("app").innerHTML = `
+      <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}</span>`).join("")}</div>
+      <div class="letter">${letter}</div>
+      ${CATS.map((c,i)=>`<div class="cat"><label>${c}</label><input id="c${i}" autocomplete="off" placeholder="${letter}…"></div>`).join("")}
+      <button class="big stop" id="stopBtn">✋ Stop! (reveal)</button>`;
+    $("c0").focus();
+    $("stopBtn").onclick=()=>{ ch.send({type:"broadcast",event:"stop",payload:{}}); doStop(); };
+  } else if (phase==="results"){
+    $("app").innerHTML = `
+      <div class="letter" style="font-size:34px">Letter: ${letter}</div>
+      ${renderRound(ps)}
+      ${renderTotals(ps)}
+      ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>` : `<p class="center muted">Waiting for host…</p>`}`;
+    if(role==="host") $("nextBtn").onclick=()=>{ phase="lobby"; render(); };
+  }
+}
+function renderRound(ps){
+  let rows = `<h3>Round ${round}</h3><table><tr><th>Category</th>${ps.map(p=>`<th>${esc(p.name)}</th>`).join("")}</tr>`;
+  CATS.forEach((cat,i)=>{
+    rows += `<tr><td class="muted">${cat}</td>` + ps.map(p=>{
+      const a=(answers[p.cid]?.ans?.[i])||""; const pts=scoreCell(i,p.cid,ps);
+      return `<td>${esc(a)||"—"} <span class="pts" style="color:var(--good)">${pts?("+"+pts):""}</span></td>`;
+    }).join("") + `</tr>`;
+  });
+  rows += `</table>`; return rows;
+}
+function renderTotals(ps){
+  if(!Object.keys(totals).length) return "";
+  const sorted=[...ps].sort((a,b)=>(totals[b.cid]||0)-(totals[a.cid]||0));
+  return `<div class="tot"><h3>Scores</h3><table>${sorted.map(p=>`<tr><td>👤 ${esc(p.name)}</td><td class="pts">${totals[p.cid]||0}</td></tr>`).join("")}</table></div>`;
+}
+function valid(a){ return a && a.trim() && a.trim()[0].toUpperCase()===letter; }
+function scoreCell(i,pcid,ps){
+  const a=(answers[pcid]?.ans?.[i])||"";
+  if(!valid(a)) return 0;
+  const v=a.trim().toLowerCase();
+  let dup=false;
+  ps.forEach(p=>{ if(p.cid!==pcid){ const o=(answers[p.cid]?.ans?.[i])||""; if(valid(o)&&o.trim().toLowerCase()===v) dup=true; }});
+  return dup?5:10;
+}
+
+function startRound(){
+  round++; letter=pick(); stopped=false; answers={};
+  ch.send({type:"broadcast",event:"start",payload:{round,letter}});
+  enterPlay();
+}
+function enterPlay(){ phase="play"; stopped=false; answers={}; render(); }
+function doStop(){
+  if(stopped) return; stopped=true; phase="collect";
+  const ans=CATS.map((_,i)=>($("c"+i)?($("c"+i).value||""):""));
+  answers[cid]={name,ans};
+  ch.send({type:"broadcast",event:"answers",payload:{cid,name,ans}});
+  clearTimeout(collectTimer); collectTimer=setTimeout(finish,4000);
+  checkComplete();
+}
+function checkComplete(){ const ps=players(); if(ps.every(p=>answers[p.cid])) finish(); }
+function finish(){
+  if(phase==="results") return; clearTimeout(collectTimer);
+  const ps=players();
+  ps.forEach(p=>{ let s=0; CATS.forEach((_,i)=>s+=scoreCell(i,p.cid,ps)); totals[p.cid]=(totals[p.cid]||0)+s; });
+  phase="results"; render();
+}
+
+ch.on("broadcast",{event:"start"},({payload})=>{ round=payload.round; letter=payload.letter; enterPlay(); })
+  .on("broadcast",{event:"stop"},()=>doStop())
+  .on("broadcast",{event:"answers"},({payload})=>{ answers[payload.cid]={name:payload.name,ans:payload.ans}; if(stopped) checkComplete(); })
+  .on("presence",{event:"sync"},()=>{ if(phase==="lobby"||phase==="results") render(); })
+  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
+</script>
+</body>
+</html>

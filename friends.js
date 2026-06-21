@@ -6,7 +6,7 @@ const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;","
 let sb = null;
 
 const GAMES = { connect4: "Connect 4", slf: "Stad-Land-Fluss", battleship: "Battleship" };
-const READY = new Set(["connect4"]); // games built so far
+const READY = new Set(["connect4", "slf", "battleship"]);
 
 async function refresh() {
   const [{ data: fr }, { data: rq }, { data: gi }] = await Promise.all([
@@ -62,10 +62,17 @@ function renderInvites(list) {
 }
 
 function chooseGame(uid, name) {
-  const opts = Object.keys(GAMES).map(g => `${GAMES[g]}${READY.has(g) ? "" : " (soon)"}`).join("\n");
-  // simple menu: only Connect 4 ready for now
-  if (!confirm(`Invite ${name} to Connect 4?\n(Stad-Land-Fluss & Battleship are coming next.)`)) return;
-  invite(uid, "connect4");
+  const m = document.createElement("div");
+  m.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:5000";
+  m.innerHTML = `<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;width:280px">
+    <h3 style="margin:0 0 12px;font-size:16px">Invite ${esc(name)} to…</h3>
+    ${Object.keys(GAMES).map(g => `<button data-g="${g}" style="display:block;width:100%;margin:6px 0;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-weight:700;cursor:pointer">${esc(GAMES[g])}</button>`).join("")}
+    <button data-x style="display:block;width:100%;margin-top:8px;padding:9px;border:none;background:none;color:var(--muted);cursor:pointer">Cancel</button>
+  </div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m) m.remove(); });
+  m.querySelector("[data-x]").onclick = () => m.remove();
+  m.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { m.remove(); invite(uid, b.dataset.g); });
 }
 
 async function invite(uid, game) {
