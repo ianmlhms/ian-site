@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friends — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{max-width:680px;margin:0 auto;padding:22px 18px 80px}
+  #gate{text-align:center;color:var(--muted);padding:50px 20px}
+  .auth-go{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-weight:800;cursor:pointer;margin-top:12px}
+  .add{display:flex;gap:10px;margin-bottom:8px}
+  .add input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 13px;font-size:14px}
+  .add button{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:0 18px;font-weight:800;cursor:pointer}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:26px 0 10px}
+  .row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 14px;margin-bottom:8px}
+  .row .name{font-weight:700;flex:1}
+  .row .name .av{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--card2);align-items:center;justify-content:center;margin-right:8px}
+  .mini{border:1px solid var(--border);background:var(--card2);color:var(--text);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700;cursor:pointer}
+  .mini:hover{border-color:var(--accent2);color:var(--accent2)}
+  .mini.go{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .mini.x{color:var(--muted)} .mini.x:hover{color:#ff6b6b;border-color:#ff6b6b}
+  .empty{color:var(--muted);font-size:13.5px;padding:6px 2px}
+  .msgline{font-size:12.5px;margin:4px 0 0;min-height:16px}
+  .msgline.err{color:#ff6b6b}.msgline.ok{color:#3fb950}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>👥 Friends</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <div id="gate" style="display:none">
+    <h3>Sign in to manage friends</h3>
+    <button class="auth-go" id="gateBtn">Sign in / Create account</button>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="add">
+      <input id="addInput" placeholder="Add a friend by username" autocomplete="off">
+      <button id="addBtn">Add</button>
+    </div>
+    <div class="msgline" id="addMsg"></div>
+
+    <div id="invitesWrap" style="display:none"><h2>🎮 Game invites</h2><div id="invites"></div></div>
+    <div id="reqWrap" style="display:none"><h2>Friend requests</h2><div id="requests"></div></div>
+
+    <h2>Your friends</h2>
+    <div id="friends"></div>
+  </div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="friends.js?v=1"></script>
+</body>
+</html>

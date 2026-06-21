@@ -258,6 +258,13 @@ async function showApp() {
   try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
   try { const { data } = await sb.rpc("is_admin"); if (data) showAdminLink(); } catch {}
   loadChats();
+  const dm = new URLSearchParams(location.search).get("dm");
+  if (dm) {
+    try {
+      const { data, error } = await sb.rpc("start_dm", { p_username: dm, p_me_username: auth.username() });
+      if (!error && data) { history.replaceState({}, "", "messenger.html"); loadChats(data.id); }
+    } catch (e) { console.warn(e); }
+  }
 }
 function showAdminLink() {
   if ($("adminLink")) return;

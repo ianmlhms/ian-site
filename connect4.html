@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect 4 — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--red:#ff5d6c;--yellow:#ffcc4d;--board:#1b2150}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
+  .status{font-size:18px;font-weight:800;min-height:24px;text-align:center}
+  .sub{color:var(--muted);font-size:13px;text-align:center}
+  .board{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;background:var(--board);padding:12px;border-radius:16px;touch-action:manipulation}
+  .cell{width:min(11vw,58px);height:min(11vw,58px);border-radius:50%;background:var(--bg);transition:background .15s}
+  .cell.r{background:var(--red)} .cell.y{background:var(--yellow)}
+  .col{display:contents}
+  .board.mine .cell{cursor:pointer}
+  .colbtns{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;width:100%;max-width:498px;padding:0 12px}
+  .colbtns button{height:26px;border:none;border-radius:8px;background:var(--card2);color:var(--muted);cursor:pointer;font-size:14px}
+  .colbtns button:hover:not(:disabled){background:var(--accent);color:#fff}
+  .colbtns button:disabled{opacity:.3;cursor:default}
+  .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+  .btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
+  .btn:hover{border-color:var(--accent2)}
+  code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="friends.html">‹ Friends</a>
+  <h1>🔴 Connect 4</h1>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="status">Connecting…</div>
+  <div class="sub" id="sub"></div>
+  <div class="colbtns" id="colbtns"></div>
+  <div class="board" id="board"></div>
+  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const COLS = 7, ROWS = 6;
+const params = new URLSearchParams(location.search);
+const room = params.get("room") || "demo";
+const role = params.get("role") === "guest" ? "guest" : "host";
+const me = role === "host" ? 1 : 2;          // 1 = red (host, first), 2 = yellow
+const opp = me === 1 ? 2 : 1;
+let board = [], turn = 1, over = false, oppHere = false;
+
+const $ = (id) => document.getElementById(id);
+const cfg = window.PB_CONFIG;
+const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
+const ch = sb.channel("c4:" + room, { config: { broadcast: { self: false }, presence: { key: role } } });
+
+function fresh() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); turn = 1; over = false; }
+function render() {
+  const b = $("board"); b.className = "board" + (turn === me && !over && oppHere ? " mine" : "");
+  b.innerHTML = "";
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const d = document.createElement("div");
+    d.className = "cell" + (board[r][c] === 1 ? " r" : board[r][c] === 2 ? " y" : "");
+    b.appendChild(d);
+  }
+  const cb = $("colbtns"); cb.innerHTML = "";
+  for (let c = 0; c < COLS; c++) {
+    const btn = document.createElement("button"); btn.textContent = "▼";
+    btn.disabled = over || turn !== me || !oppHere || board[0][c] !== 0;
+    btn.onclick = () => play(c, me, true);
+    cb.appendChild(btn);
+  }
+  updateStatus();
+}
+function updateStatus() {
+  const mineColor = me === 1 ? "var(--red)" : "var(--yellow)";
+  const dot = `<span class="me" style="background:${mineColor}"></span>`;
+  if (over === "draw") return setStatus("It's a draw.");
+  if (over) return setStatus((over === me ? "You win! 🎉" : "You lost.") );
+  if (!oppHere) return setStatus(`Waiting for opponent…`, `Share room <code>${room}</code> or invite from Friends.`);
+  setStatus(turn === me ? `Your turn ${dot}` : `Opponent's turn`);
+}
+function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
+
+function drop(col, player) {
+  for (let r = ROWS - 1; r >= 0; r--) if (board[r][col] === 0) { board[r][col] = player; return r; }
+  return -1;
+}
+function play(col, player, local) {
+  if (over || board[0][col] !== 0) return;
+  if (local && (turn !== me || !oppHere)) return;
+  const r = drop(col, player);
+  if (r < 0) return;
+  if (wins(r, col, player)) over = player;
+  else if (board[0].every(v => v !== 0)) over = "draw";
+  else turn = player === 1 ? 2 : 1;
+  render();
+  if (over) $("rematch").style.display = "";
+  if (local) ch.send({ type: "broadcast", event: "move", payload: { col, player } });
+}
+function wins(r, c, p) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let n = 1;
+    for (const s of [1, -1]) { let rr = r + dr*s, cc = c + dc*s;
+      while (rr>=0&&rr<ROWS&&cc>=0&&cc<COLS&&board[rr][cc]===p){ n++; rr+=dr*s; cc+=dc*s; } }
+    if (n >= 4) return true;
+  }
+  return false;
+}
+
+ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.col, payload.player, false))
+  .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
+  .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); })
+  .on("presence", { event: "sync" }, () => {
+    const st = ch.presenceState();
+    oppHere = !!st[opp === 1 ? "host" : "guest"];
+    if (role === "host" && oppHere) ch.send({ type: "broadcast", event: "state", payload: { board, turn, over } });
+    render();
+  })
+  .subscribe(async (status) => {
+    if (status === "SUBSCRIBED") { fresh(); render(); await ch.track({ role }); }
+  });
+
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); ch.send({ type: "broadcast", event: "reset" }); };
+</script>
+</body>
+</html>

@@ -83,6 +83,7 @@ body {
 .tile.shorts:hover { border-color: #3fb950; }
 .tile.msg:hover { border-color: #4de8ff; }
 .tile.grades:hover { border-color: #3fb950; }
+.tile.friends:hover { border-color: #a371f7; }
 .tile.dash:hover { border-color: #58a6ff; }
 .tile.admin:hover { border-color: #ffcc00; }
 
