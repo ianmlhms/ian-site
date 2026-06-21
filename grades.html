@@ -86,6 +86,8 @@
     Coefficients are auto-filled from the Luxembourg Ministry's official grille horaire (ESC/ESG lower cycle).
     The weighted average is <b>indicative</b> — the real promotion decision also depends on failing-subject and
     compensation rules, which this tool doesn't judge. Edit any coefficient or subject to match your own bulletin.
+    <br><b>7e–4e</b> use the exact official coefficients. The <b>upper cycle (3e–1ère)</b> splits into sections A–G
+    with options and combined branches — those templates are an editable general base; adjust them to your section.
   </p>
 </div>
 
@@ -116,6 +118,33 @@ const TEMPLATES = {
     ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],
     ["Biologie",2],["Physique / Chimie",2],["Histoire",2],["Géographie",2],
     ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
+  ],
+  "4e (classique)": [
+    ["Français",4],["Allemand",4],["Anglais",4],["Latin",3],["Mathématiques",4],
+    ["Histoire",2],["Géographie",2],["Biologie",2],["Physique / Chimie",2],
+    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
+  ],
+  "4e (moderne)": [
+    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],
+    ["Histoire",2],["Géographie",2],["Biologie",2],["Physique / Chimie",2],
+    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
+  ],
+  // Upper cycle (3e–1ère) splits into sections A–G with options/combined branches.
+  // These are editable general-classique bases — adjust to your section.
+  "3e (classique – general)": [
+    ["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",3],
+    ["Histoire",2],["Géographie",2],["Biologie",2],["Physique",2],["Chimie",2],
+    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
+  ],
+  "2e (classique – general)": [
+    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",3],
+    ["Philosophie",2],["Histoire",2],["Biologie",3],["Physique",3],["Chimie",3],
+    ["Éducation artistique",2],["Éducation physique",1],["Cours à option",2],
+  ],
+  "1ère (classique – general)": [
+    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",3],
+    ["Philosophie",2],["Histoire",2],["Biologie",3],["Physique",3],["Chimie",3],
+    ["Éducation physique",1],["Cours à option",2],
   ],
 };
 
