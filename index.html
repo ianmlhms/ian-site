@@ -3,59 +3,51 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="The personal website of Ian Mulheims." />
-  <title>Ian Mulheims</title>
+  <meta name="description" content="ian.lu — apps and tools by Ian Mulheims." />
+  <title>ian.lu</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="site-header">
-    <nav class="nav">
-      <a class="brand" href="/">Ian Mulheims</a>
-      <div class="nav-right">
-        <ul class="nav-links">
-          <li><a href="#about">About</a></li>
-          <li><a href="stats.html">ShortsFactory</a></li>
-          <li><a href="messenger.html">Messenger</a></li>
-          <li><a href="#contact">Contact</a></li>
-        </ul>
-        <a class="btn" href="pixelbreak.html">🎮 PixelBreak</a>
-        <span id="acctHost"></span>
-      </div>
-    </nav>
+  <header class="bar">
+    <a class="brand" href="/">ian.lu</a>
+    <span id="acctHost"></span>
   </header>
 
-  <main>
-    <section class="hero">
-      <h1>Hi, I'm Ian.</h1>
-      <p class="lead">This is my website. It's just getting started.</p>
-    </section>
-
-    <section id="about" class="section">
-      <h2>About</h2>
-      <p>
-        I'm a student in Luxembourg who likes building things — apps,
-        videos, and now this site. More about me coming soon.
-      </p>
-    </section>
-
-    <section id="contact" class="section">
-      <h2>Contact</h2>
-      <p>
-        Reach me at <a href="mailto:konto@ian.lu">konto@ian.lu</a>.
-      </p>
-    </section>
+  <main class="hub">
+    <div class="tiles">
+      <a class="tile pixel" href="pixelbreak.html">
+        <span class="ico">🎮</span><span class="tname">PixelBreak</span><span class="tsub">Arcade games</span>
+      </a>
+      <a class="tile shorts" href="stats.html">
+        <span class="ico">📊</span><span class="tname">ShortsFactory</span><span class="tsub">Channel stats</span>
+      </a>
+      <a class="tile msg" href="messenger.html">
+        <span class="ico">💬</span><span class="tname">Messenger</span><span class="tsub">Chat &amp; groups</span>
+      </a>
+      <a class="tile dash admin-only" href="factory.html" style="display:none">
+        <span class="ico">📈</span><span class="tname">Dashboard</span><span class="tsub">Full ShortsFactory</span>
+      </a>
+      <a class="tile admin admin-only" href="admin.html" style="display:none">
+        <span class="ico">🛡</span><span class="tname">Admin</span><span class="tsub">Moderation</span>
+      </a>
+    </div>
   </main>
 
-  <footer class="site-footer">
-    <p>&copy; <span id="year"></span> Ian Mulheims</p>
-  </footer>
+  <footer><span id="year"></span> · Ian Mulheims</footer>
 
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module">
-    import { mountAccountButton } from "./auth.js?v=3";
+    import { mountAccountButton, client, onAuth } from "./auth.js?v=3";
     mountAccountButton(document.getElementById("acctHost"));
+    async function refreshAdminTiles() {
+      let admin = false;
+      try { const sb = await client(); const { data } = await sb.rpc("is_admin"); admin = !!data; } catch {}
+      document.querySelectorAll(".admin-only").forEach((e) => (e.style.display = admin ? "" : "none"));
+    }
+    onAuth(() => refreshAdminTiles());
+    refreshAdminTiles();
   </script>
 </body>
 </html>
