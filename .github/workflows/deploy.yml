@@ -18,7 +18,7 @@ jobs:
           mkdir -p _site
           rsync -a --delete \
             --exclude='.git' --exclude='.github' --exclude='scripts' \
-            --exclude='README.md' --exclude='.gitignore' --exclude='.DS_Store' \
+            --exclude='README.md' --exclude='HANDOFF.md' --exclude='.gitignore' --exclude='.DS_Store' \
             --exclude='_site' \
             ./ _site/
 
