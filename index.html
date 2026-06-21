@@ -19,6 +19,7 @@
           <li><a href="#contact">Contact</a></li>
         </ul>
         <a class="btn" href="pixelbreak.html">🎮 PixelBreak</a>
+        <span id="acctHost"></span>
       </div>
     </nav>
   </header>
@@ -50,5 +51,11 @@
   </footer>
 
   <script src="main.js"></script>
+  <script src="pixelbreak-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module">
+    import { mountAccountButton } from "./auth.js?v=3";
+    mountAccountButton(document.getElementById("acctHost"));
+  </script>
 </body>
 </html>
