@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grade Calculator — ian.lu</title>
+<meta name="description" content="Luxembourg grade calculator with per-year subjects and coefficients.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--good:#3fb950;--bad:#ff6b6b;--accent2:#4de8ff}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(900px 500px at 70% -10%,rgba(110,168,254,.12),transparent),var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}
+  .bar h1{font-size:18px;margin:0}
+  .wrap{max-width:860px;margin:0 auto;padding:22px 18px 60px}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+  select,input{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 11px;font-size:14px;font-family:inherit}
+  select{min-width:180px}
+  .btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600}
+  .btn:hover{border-color:var(--accent2);color:var(--accent2)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;color:var(--muted);font-size:12px;font-weight:600;padding:8px 8px;border-bottom:1px solid var(--border)}
+  td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+  td.subj{font-weight:600}
+  .coef{width:58px;text-align:center}
+  .marks{width:100%;min-width:120px}
+  .avg{font-weight:800;text-align:right;width:64px;font-variant-numeric:tabular-nums}
+  .avg.good{color:var(--good)} .avg.bad{color:var(--bad)}
+  .del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px}
+  .del:hover{color:var(--bad)}
+  .addrow{margin:10px 0 4px}
+  .summary{display:flex;flex-wrap:wrap;gap:16px;margin:22px 0;padding:18px;background:var(--card);border:1px solid var(--border);border-radius:14px}
+  .kpi .v{font-size:30px;font-weight:800;line-height:1}
+  .kpi .l{color:var(--muted);font-size:12.5px;margin-top:4px}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-top:18px}
+  .panel h3{margin:0 0 12px;font-size:15px}
+  .needrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .needrow label{font-size:13px;color:var(--muted)}
+  .result{margin-top:14px;font-size:15px}
+  .result b{font-size:22px}
+  .note{color:var(--muted);font-size:12px;margin-top:26px;line-height:1.5}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>📊 Grade calculator</h1>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <label>Year / track:
+      <select id="yearSel"></select>
+    </label>
+    <button class="btn" id="resetBtn">Reset to official template</button>
+    <span class="hint">Marks are out of <b>60</b> (pass = 30). Your data is saved on this device.</span>
+  </div>
+
+  <table id="tbl">
+    <thead><tr><th>Subject</th><th>Coef.</th><th>Your marks (comma-separated)</th><th style="text-align:right">Avg</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="addrow"><button class="btn" id="addBtn">+ add subject</button></div>
+
+  <div class="summary">
+    <div class="kpi"><div class="v" id="overall">—</div><div class="l">Weighted average /60</div></div>
+    <div class="kpi"><div class="v" id="status">—</div><div class="l">vs. pass mark (30)</div></div>
+    <div class="kpi"><div class="v" id="filled">—</div><div class="l">Subjects with marks</div></div>
+  </div>
+
+  <div class="panel">
+    <h3>🎯 What do I need on the next test?</h3>
+    <div class="needrow">
+      <label>Subject <select id="needSubj"></select></label>
+      <label>Target avg <input id="needTarget" type="number" min="0" max="60" value="30" style="width:70px"></label>
+      <label>Next test counts as <input id="needWeight" type="number" min="1" max="10" value="1" style="width:56px"> mark(s)</label>
+      <button class="btn" id="needBtn">Calculate</button>
+    </div>
+    <div class="result" id="needResult"></div>
+  </div>
+
+  <p class="note">
+    Coefficients are auto-filled from the Luxembourg Ministry's official grille horaire (ESC/ESG lower cycle).
+    The weighted average is <b>indicative</b> — the real promotion decision also depends on failing-subject and
+    compensation rules, which this tool doesn't judge. Edit any coefficient or subject to match your own bulletin.
+  </p>
+</div>
+
+<script>
+// Official MEN coefficients (grille horaire) — lower cycle.
+const TEMPLATES = {
+  "7e": [
+    ["Français",4],["Allemand",4],["Luxembourgeois",1],["Mathématiques",4],
+    ["Sciences naturelles",3],["Histoire",2],["Géographie",2],
+    ["Éducation artistique",1],["Éducation musicale",1],["Éducation physique",1],["Vie et société",2],
+  ],
+  "6e (classique – Latin)": [
+    ["Français",4],["Allemand",4],["Latin",4],["Mathématiques",4],
+    ["Sciences naturelles",3],["Histoire",2],["Géographie",2],
+    ["Éducation artistique",1],["Éducation physique",1],["Vie et société",2],
+  ],
+  "6e (moderne – Anglais)": [
+    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],
+    ["Sciences naturelles",3],["Histoire",2],["Géographie",2],
+    ["Éducation artistique",1],["Éducation physique",1],["Vie et société",2],
+  ],
+  "5e (classique)": [
+    ["Français",4],["Allemand",4],["Anglais",4],["Latin",4],["Mathématiques",4],
+    ["Biologie",2],["Physique / Chimie",2],["Histoire",2],["Géographie",2],
+    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
+  ],
+  "5e (moderne)": [
+    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],
+    ["Biologie",2],["Physique / Chimie",2],["Histoire",2],["Géographie",2],
+    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
+  ],
+};
+
+const $ = (id) => document.getElementById(id);
+let year = localStorage.getItem("gc_year") || "5e (classique)";
+let rows = [];   // [{name, coef, marks:""}]
+
+function keyFor(y){ return "gc_data_" + y; }
+function loadYear(y){
+  year = y; localStorage.setItem("gc_year", y);
+  const saved = localStorage.getItem(keyFor(y));
+  if (saved) { try { rows = JSON.parse(saved); } catch { rows = template(y); } }
+  else rows = template(y);
+  render();
+}
+function template(y){ return (TEMPLATES[y]||[]).map(([name,coef]) => ({name, coef, marks:""})); }
+function save(){ localStorage.setItem(keyFor(year), JSON.stringify(rows)); }
+
+function parseMarks(s){
+  return (s||"").split(/[, ]+/).map(x=>parseFloat(x.replace(",",".")))
+    .filter(n=>!isNaN(n) && n>=0 && n<=60);
+}
+function subjAvg(r){ const m=parseMarks(r.marks); return m.length? m.reduce((a,b)=>a+b,0)/m.length : null; }
+
+function render(){
+  // year select
+  const ys = $("yearSel");
+  ys.innerHTML = Object.keys(TEMPLATES).map(y=>`<option ${y===year?"selected":""}>${y}</option>`).join("");
+  // rows
+  const tb = $("rows");
+  tb.innerHTML = rows.map((r,i)=>{
+    const a = subjAvg(r);
+    const cls = a==null ? "" : (a>=30?"good":"bad");
+    return `<tr>
+      <td class="subj"><input data-i="${i}" data-f="name" value="${esc(r.name)}" style="width:100%;background:none;border:none;color:var(--text);font-weight:600"></td>
+      <td><input class="coef" data-i="${i}" data-f="coef" type="number" min="0" step="1" value="${r.coef}"></td>
+      <td><input class="marks" data-i="${i}" data-f="marks" value="${esc(r.marks)}" placeholder="e.g. 45, 38, 52"></td>
+      <td class="avg ${cls}">${a==null?"—":a.toFixed(1)}</td>
+      <td><button class="del" data-del="${i}" title="Remove">✕</button></td>
+    </tr>`;
+  }).join("");
+  // wire inputs
+  tb.querySelectorAll("input").forEach(inp=>{
+    inp.oninput = () => {
+      const i=+inp.dataset.i, f=inp.dataset.f;
+      rows[i][f] = (f==="coef") ? (parseFloat(inp.value)||0) : inp.value;
+      save();
+      if (f!=="name") { updateSummary(); refreshAvg(i); }
+    };
+  });
+  tb.querySelectorAll(".del").forEach(b=> b.onclick=()=>{ rows.splice(+b.dataset.del,1); save(); render(); });
+  // need-subject select
+  $("needSubj").innerHTML = rows.map((r,i)=>`<option value="${i}">${esc(r.name)}</option>`).join("");
+  updateSummary();
+}
+function refreshAvg(i){
+  const cell = $("rows").querySelectorAll("tr")[i]?.querySelector(".avg");
+  if(!cell) return;
+  const a = subjAvg(rows[i]);
+  cell.textContent = a==null?"—":a.toFixed(1);
+  cell.className = "avg " + (a==null?"":(a>=30?"good":"bad"));
+}
+
+function updateSummary(){
+  let num=0, den=0, filled=0;
+  rows.forEach(r=>{ const a=subjAvg(r); if(a!=null && r.coef>0){ num+=a*r.coef; den+=r.coef; filled++; } });
+  const avg = den? num/den : null;
+  $("overall").textContent = avg==null? "—" : avg.toFixed(2);
+  $("overall").style.color = avg==null? "var(--text)" : (avg>=30?"var(--good)":"var(--bad)");
+  $("status").textContent = avg==null? "—" : (avg>=30? "✓ pass" : "✗ below");
+  $("status").style.color = avg==null? "var(--text)" : (avg>=30?"var(--good)":"var(--bad)");
+  $("status").style.fontSize="22px";
+  $("filled").textContent = filled + " / " + rows.length;
+  $("filled").style.fontSize="22px";
+}
+
+function calcNeed(){
+  const i = +$("needSubj").value;
+  const r = rows[i]; if(!r) return;
+  const target = parseFloat($("needTarget").value)||0;
+  const w = Math.max(1, parseInt($("needWeight").value)||1);
+  const m = parseMarks(r.marks);
+  const sum = m.reduce((a,b)=>a+b,0), n = m.length;
+  // (sum + w*g) / (n + w) = target  →  g = (target*(n+w) - sum) / w
+  const g = (target*(n+w) - sum) / w;
+  const el = $("needResult");
+  if (g <= 0) {
+    el.innerHTML = `You're already at or above ${target} in <b>${esc(r.name)}</b> — even a <b>0</b> on the next test keeps your average ≥ ${target}. 🎉`;
+  } else if (g > 60) {
+    el.innerHTML = `To hit a <b>${target}</b> average in <b>${esc(r.name)}</b> you'd need <b>${g.toFixed(1)}/60</b> — that's above the max, so it's not reachable with one ${w>1?`(×${w})`:""} test. Aim a bit lower.`;
+  } else {
+    el.innerHTML = `In <b>${esc(r.name)}</b>, you need <b>${g.toFixed(1)} / 60</b> on your next test${w>1?` (counting as ${w} marks)`:""} to reach a <b>${target}</b> average.`;
+  }
+}
+
+const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+$("yearSel").onchange = (e)=> loadYear(e.target.value);
+$("resetBtn").onclick = ()=>{ if(confirm("Reset subjects & coefficients to the official template for "+year+"? Your entered marks for this year will be cleared.")){ rows=template(year); save(); render(); } };
+$("addBtn").onclick = ()=>{ rows.push({name:"New subject", coef:1, marks:""}); save(); render(); };
+$("needBtn").onclick = calcNeed;
+
+loadYear(year);
+</script>
+</body>
+</html>
