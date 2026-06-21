@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Messenger — ian.lu</title>
+<meta name="description" content="Real-time group messenger.">
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff}
+  *{box-sizing:border-box}
+  body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);flex:none}
+  header .home{color:var(--muted);font-weight:700}
+  header h1{font-size:18px;margin:0}
+  header .spacer{flex:1}
+  #gate{flex:1;display:none;align-items:center;justify-content:center;padding:20px;text-align:center}
+  .gate-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px 28px;max-width:340px}
+  .gate-box h3{margin:0 0 8px;font-size:22px}
+  .gate-box p{color:var(--muted);font-size:14px;margin:0 0 18px}
+  .auth-go{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer}
+  #app{flex:1;display:none;min-height:0}
+  .sidebar{width:260px;border-right:1px solid var(--border);display:flex;flex-direction:column;flex:none}
+  .side-head{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .side-head .t{font-weight:800;font-size:15px;flex:1}
+  .side-head button{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:16px;cursor:pointer}
+  .side-head button:hover{border-color:var(--accent2);color:var(--accent2)}
+  #groupList{list-style:none;margin:0;padding:8px;overflow-y:auto;flex:1}
+  .grp{padding:10px 12px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+  .grp:hover{background:var(--card)}
+  .grp.active{background:var(--card2)}
+  .grp .gname{font-weight:700;font-size:14px}
+  .grp .gcode{font-size:11px;color:var(--muted)}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:24px 12px;line-height:1.5}
+  .chat{flex:1;display:flex;flex-direction:column;min-width:0}
+  .chat-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex:none}
+  .chat-head .invite{margin-left:auto;color:var(--muted);font-size:12px}
+  .chat-head code{background:var(--card2);padding:2px 7px;border-radius:6px;color:var(--accent2)}
+  .messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:8px}
+  .msg{display:flex}
+  .msg.mine{justify-content:flex-end}
+  .bubble{max-width:72%;background:var(--card);border:1px solid var(--border);padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.4;position:relative}
+  .msg.mine .bubble{background:var(--accent);border-color:var(--accent);color:#fff}
+  .bubble .who{display:block;font-size:11px;font-weight:800;color:var(--accent2);margin-bottom:2px}
+  .msg.mine .bubble .who{color:rgba(255,255,255,.85)}
+  .bubble .time{font-size:10px;color:var(--muted);margin-left:8px;float:right;margin-top:3px}
+  .msg.mine .bubble .time{color:rgba(255,255,255,.7)}
+  .composer{display:none;gap:10px;padding:14px 18px;border-top:1px solid var(--border);flex:none}
+  .composer input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:24px;padding:11px 16px;font-size:14px;outline:none}
+  .composer input:focus{border-color:var(--accent2)}
+  .composer button{background:var(--accent);color:#fff;border:none;border-radius:24px;padding:0 20px;font-weight:800;cursor:pointer}
+  @media(max-width:640px){.sidebar{width:150px}.bubble{max-width:85%}}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>💬 Messenger</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div id="gate"></div>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="side-head">
+      <span class="t">Groups</span>
+      <button id="newG" title="New group">+</button>
+      <button id="joinG" title="Join by code">⇲</button>
+    </div>
+    <ul id="groupList"></ul>
+  </aside>
+  <section class="chat">
+    <div class="chat-head" id="chatHead">Select a group, or create one ←</div>
+    <div class="messages" id="messages"></div>
+    <form class="composer" id="composer">
+      <input id="msgInput" placeholder="Message…" autocomplete="off" maxlength="2000">
+      <button type="submit">Send</button>
+    </form>
+  </section>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script type="module" src="messenger.js"></script>
+</body>
+</html>
