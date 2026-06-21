@@ -141,7 +141,9 @@ var g=GAMES[idx];
 if(!g||!g.b64)return;
 document.getElementById('gt').textContent=g.name;
 var frame=document.getElementById('gf');
-frame.srcdoc=b64decode(g.b64);
+var src=b64decode(g.b64);
+frame.srcdoc=(window.PB&&PB.instrument)?PB.instrument(src):src;
+if(window.PB&&PB.onOpenGame)PB.onOpenGame(g);
 document.getElementById('overlay').classList.add('open');
 document.body.style.overflow='hidden';
 }
@@ -149,6 +151,7 @@ function closeGame(){
 document.getElementById('overlay').classList.remove('open');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
+if(window.PB&&PB.onCloseGame)PB.onCloseGame();
 }
 function goHome(){
 closeGame();
@@ -161,5 +164,7 @@ renderGames(GAMES);
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeGame()});
 renderGames(GAMES);
 </script>
+<script src="pixelbreak-config.js"></script>
+<script type="module" src="pixelbreak-records.js"></script>
 </body>
 </html>
