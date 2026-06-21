@@ -111,8 +111,10 @@ Old full data was scrubbed from git history.
 ## 7. Open items
 
 - **Rotate the FTP password** (exposed during setup) + update `FTP_PASSWORD` secret.
-- **Finish Web Push (§8):** run `messenger-setup-v4.sql`, deploy the `notify` Edge Function,
-  set VAPID + `NOTIFY_SECRET` secrets, create the DB webhook, add ian.lu to the iPad Home Screen.
+- ~~Finish Web Push~~ **DONE (Jun 2026):** v4 SQL run; `notify` Edge Function deployed
+  (`--no-verify-jwt`); VAPID + `NOTIFY_SECRET` secrets set; DB webhook on `messages` INSERT live
+  (header `x-notify-secret`); verified arriving on the iPad home-screen PWA. (Function logs in the
+  dashboard lag a few min via Logflare — delivery itself is instant.)
 - A proper **PNG `apple-touch-icon`** would render nicer on the iOS Home Screen than the SVG.
 - Light mode swaps core CSS vars site-wide; a few deeply-custom spots may still look dark — tune as reported.
 - Possible next features discussed: live class quiz; manual-placement polish; per-section upper-cycle grade coefficients (currently a general editable base for 3e–1ère).
