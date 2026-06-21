@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stad-Land-Fluss — ian.lu</title>
+<title>Stadt-Land-Fluss — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=1"></script>
 <style>
@@ -35,7 +35,7 @@
 <body>
 <header class="bar">
   <a class="home" href="games.html">‹ Games</a>
-  <h1>🔤 Stad-Land-Fluss</h1>
+  <h1>🔤 Stadt-Land-Fluss</h1>
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
 </header>
@@ -44,7 +44,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const CATS = ["Stad","Land","Numm","Déier","Beruff","Iessen"];
+const CATS = ["Stadt","Land","Fluss","Name","Tier","Beruf"];
 const LETTERS = "ABDEFGHIKLMNOPRSTUVW";
 const params = new URLSearchParams(location.search);
 const room = (params.get("room")||"demo").toLowerCase();

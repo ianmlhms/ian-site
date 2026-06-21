@@ -39,13 +39,13 @@
 <div class="wrap">
   <p class="intro">Play across two iPads: tap <b>Start</b> on one, share the <b>room code</b>, and <b>Join</b> on the other. (Or invite a friend by username from the <a href="friends.html">Friends</a> page.)</p>
   <div class="cards" id="cards"></div>
-  <p class="tip">Stad-Land-Fluss supports 2+ players — everyone joins the same code.</p>
+  <p class="tip">Stadt-Land-Fluss supports 2+ players — everyone joins the same code.</p>
 </div>
 
 <script>
 const GAMES = [
   { id:"connect4", ico:"🔴", name:"Connect 4", desc:"Drop discs, get four in a row. 1 v 1." },
-  { id:"slf", ico:"🔤", name:"Stad-Land-Fluss", desc:"A letter is drawn — race to fill the categories. 2+ players." },
+  { id:"slf", ico:"🔤", name:"Stadt-Land-Fluss", desc:"A letter is drawn — race to fill the categories. 2+ players." },
   { id:"battleship", ico:"🚢", name:"Battleship", desc:"Hide your fleet, sink your opponent's. 1 v 1." },
 ];
 const code = () => Math.random().toString(36).slice(2, 8);

@@ -24,7 +24,8 @@ header{background:linear-gradient(135deg,#1a1a35 0%,#0d0d1a 50%,#1a1025 100%);pa
 .search-box input::placeholder{color:#555}
 .si{font-size:16px;opacity:0.4}
 .header-right{display:flex;align-items:center;gap:12px}
-.home-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:30px;border:2px solid #2a2a4a;background:#1a1a30;color:var(--text);text-decoration:none;font-weight:700;font-size:14px;font-family:'Nunito',sans-serif;white-space:nowrap;transition:all 0.2s}
+.header-left{display:flex;align-items:center;gap:14px}
+.home-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:30px;border:2px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;font-weight:700;font-size:14px;font-family:'Nunito',sans-serif;white-space:nowrap;transition:all 0.2s}
 .home-btn:hover{border-color:var(--accent);color:var(--accent)}
 .nav-pills{display:flex;gap:6px;padding:12px 30px 0;max-width:1200px;margin:0 auto;flex-wrap:wrap}
 .pill{padding:6px 14px;border-radius:18px;border:1px solid #2a2a4a;background:transparent;color:var(--text2);cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s;font-family:'Nunito',sans-serif}
@@ -61,16 +62,18 @@ footer{text-align:center;padding:25px;color:#444;font-size:12px;border-top:1px s
 <body>
 <header>
 <div class="header-inner">
+<div class="header-left">
+<a class="home-btn" href="index.html">&#x2039; Home</a>
 <div class="logo" onclick="goHome()">
 <div class="logo-icon">&#x1F3AE;</div>
 <div><div class="logo-text">PixelBreak</div><div class="logo-sub">Games for Breaks</div></div>
+</div>
 </div>
 <div class="header-right">
 <div class="search-box">
 <span class="si">&#x1F50D;</span>
 <input type="text" id="search" placeholder="Search games..." oninput="applyFilters()">
 </div>
-<a class="home-btn" href="index.html">&#x2039; Home</a>
 </div>
 </div>
 </header>

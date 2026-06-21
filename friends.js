@@ -3,9 +3,9 @@ import * as auth from "./auth.js?v=3";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let sb = null;
+let sb = null, inviteSubbed = false;
 
-const GAMES = { connect4: "Connect 4", slf: "Stad-Land-Fluss", battleship: "Battleship" };
+const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship" };
 const READY = new Set(["connect4", "slf", "battleship"]);
 
 async function refresh() {
@@ -99,10 +99,13 @@ function showApp() {
   $("addBtn").onclick = addFriend;
   $("addInput").addEventListener("keydown", e => { if (e.key === "Enter") addFriend(); });
   refresh();
-  // live notify on new game invites
-  sb.channel("ginv-" + auth.session().user.id)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "game_invites", filter: "to_user=eq." + auth.session().user.id }, refresh)
-    .subscribe();
+  // live notify on new game invites — subscribe only once per page load
+  if (!inviteSubbed) {
+    inviteSubbed = true;
+    sb.channel("ginv-" + auth.session().user.id)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "game_invites", filter: "to_user=eq." + auth.session().user.id }, refresh)
+      .subscribe();
+  }
 }
 function showGate() {
   $("app").style.display = "none"; $("gate").style.display = "";
