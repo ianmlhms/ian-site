@@ -66,5 +66,8 @@ document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
   if (c) location.href = `${b.dataset.j}.html?room=${encodeURIComponent(c)}&role=guest`;
 });
 </script>
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="notify-ambient.js?v=1"></script>
 </body>
 </html>

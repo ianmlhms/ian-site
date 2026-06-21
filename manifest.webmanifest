@@ -1,0 +1,13 @@
+{
+  "name": "ian.lu Messenger",
+  "short_name": "Messenger",
+  "description": "Chat, groups and DMs on ian.lu.",
+  "start_url": "./messenger.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#0d0d1a",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

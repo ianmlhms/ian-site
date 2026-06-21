@@ -1,16 +1,21 @@
 /* Messenger — group chat + DMs + media, on Supabase. Shared accounts with PixelBreak. */
 import * as auth from "./auth.js";
+import { registerSW, enablePush, disablePush, pushState } from "./notify.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
+const SNIPPET = 80; // chars kept of a quoted reply
 
 let sb = null;
 let current = null;          // {id, display, is_dm, invite_code, ...}
-let channel = null;
+let channel = null;          // current chat's realtime channel
+let allChannel = null;       // all-my-messages channel (drives unread badges)
 const seen = new Set();
 let memberSubbed = false;
+let replyTo = null;          // {id, user, preview} when replying, else null
+let suppressClickUntil = 0;  // swallow the click that follows a gesture-reply
 
 /* ---------- small prompt modal ---------- */
 function promptModal(title, label, okText = "OK") {
@@ -43,11 +48,15 @@ async function loadChats(selectId) {
 function renderChatList(chats) {
   const ul = $("groupList");
   if (!chats.length) { ul.innerHTML = `<li class="empty">No chats yet.<br>Create a group, join with a code, or DM someone.</li>`; return; }
-  ul.innerHTML = chats.map((g) =>
-    `<li class="grp ${current && current.id === g.id ? "active" : ""}" data-id="${g.id}">
-       <span class="gname">${g.is_dm ? "💬 " : ""}${esc(g.display)}</span>
-       ${g.is_dm ? "" : `<span class="gcode">#${esc(g.invite_code)}</span>`}
-     </li>`).join("");
+  ul.innerHTML = chats.map((g) => {
+    const prev = g.last_preview
+      ? `<span class="gprev">${g.last_sender ? esc(g.last_sender) + ": " : ""}${esc(g.last_preview)}</span>`
+      : (g.is_dm ? "" : `<span class="gcode">#${esc(g.invite_code)}</span>`);
+    return `<li class="grp ${current && current.id === g.id ? "active" : ""} ${g.unread ? "unread" : ""}" data-id="${g.id}">
+       <span class="gtop"><span class="gname">${g.is_dm ? "💬 " : ""}${esc(g.display)}</span>${g.unread ? '<span class="dot"></span>' : ""}</span>
+       ${prev}
+     </li>`;
+  }).join("");
   ul.querySelectorAll(".grp").forEach((li) =>
     (li.onclick = () => { const g = chats.find((x) => x.id === +li.dataset.id); selectChat(g); }));
 }
@@ -77,8 +86,13 @@ async function newDM() {
 /* ---------- a single chat ---------- */
 async function selectChat(g) {
   current = g; seen.clear();
-  closeMembers();
-  document.querySelectorAll(".grp").forEach((li) => li.classList.toggle("active", +li.dataset.id === g.id));
+  closeMembers(); cancelReply();
+  markRead(g.id);
+  document.querySelectorAll(".grp").forEach((li) => {
+    const on = +li.dataset.id === g.id;
+    li.classList.toggle("active", on);
+    if (on) li.classList.remove("unread");           // clear the badge immediately
+  });
   $("chatHead").innerHTML =
     `<b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b>
      ${g.is_dm ? "" : `<span class="invite" title="Share so others can join">code: <code>${esc(g.invite_code)}</code></span>`}
@@ -128,6 +142,63 @@ async function toggleMembers() {
 }
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 
+async function markRead(gid) { try { await sb.rpc("mark_read", { p_group_id: gid }); } catch (e) { console.warn("[msgr] mark_read", e); } }
+
+/* ---------- reply ---------- */
+function snippet(m) {
+  if (m.content && m.content.trim()) return m.content.trim().slice(0, SNIPPET);
+  if (m.media_type === "video") return "📹 Video";
+  if (m.media_type === "image") return "📷 Photo";
+  return "Message";
+}
+function startReply(m) {
+  replyTo = { id: m.id, user: m.username, preview: snippet(m) };
+  $("rbUser").textContent = m.username;
+  $("rbText").textContent = replyTo.preview;
+  $("replyBar").classList.add("open");
+  $("msgInput").focus();
+}
+function cancelReply() { replyTo = null; const b = $("replyBar"); if (b) b.classList.remove("open"); }
+
+/* ---------- image lightbox ---------- */
+function openLightbox(src) {
+  const lb = $("lightbox");
+  $("lbImg").src = src;
+  lb.classList.add("open");
+}
+function closeLightbox() { const lb = $("lightbox"); lb.classList.remove("open"); $("lbImg").src = ""; }
+
+/* Attach swipe-to-reply + long-press-to-reply to a rendered message. */
+function attachReplyGestures(el, m) {
+  const bubble = el.querySelector(".bubble");
+  let startX = 0, startY = 0, dx = 0, dragging = false, lpTimer = null;
+  const cue = document.createElement("span");
+  cue.className = "reply-cue"; cue.textContent = "↩"; bubble.appendChild(cue);
+  const reset = () => { bubble.classList.remove("swiping"); bubble.style.transform = ""; cue.style.opacity = "0"; dx = 0; dragging = false; };
+  const clearLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+  el.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY; dragging = true;
+    lpTimer = setTimeout(() => { clearLp(); if (navigator.vibrate) navigator.vibrate(15); suppressClickUntil = Date.now() + 500; startReply(m); }, 500);
+  }, { passive: true });
+  el.addEventListener("touchmove", (e) => {
+    if (!dragging) return;
+    dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dy) > Math.abs(dx)) { clearLp(); return; }     // vertical scroll, ignore
+    if (Math.abs(dx) > 6) clearLp();
+    const mineDir = el.classList.contains("mine") ? Math.min(dx, 0) : Math.max(dx, 0);
+    bubble.classList.add("swiping");
+    bubble.style.transform = `translateX(${Math.max(-90, Math.min(90, mineDir))}px)`;
+    cue.style.opacity = String(Math.min(1, Math.abs(mineDir) / 60));
+  }, { passive: true });
+  el.addEventListener("touchend", () => {
+    clearLp();
+    if (Math.abs(dx) > 55) { suppressClickUntil = Date.now() + 500; startReply(m); }
+    reset();
+  });
+  el.addEventListener("touchcancel", () => { clearLp(); reset(); });
+}
+
 /* ---------- messages ---------- */
 const DELETE_WINDOW = 30000; // ms a user can delete their own message
 
@@ -141,14 +212,33 @@ function appendMessage(m) {
   el.className = "msg" + (mine ? " mine" : "");
   el.dataset.mid = m.id;
   const body = m.content ? esc(m.content) : "";
-  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${body}<span class="time">${fmtTime(m.created_at)}</span></div>`;
+  const replyHtml = m.reply_user
+    ? `<span class="reply-quote" data-rid="${m.reply_to || ""}"><span class="rq-user">${esc(m.reply_user)}</span><span class="rq-text">${esc(m.reply_preview || "")}</span></span>`
+    : "";
+  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${replyHtml}${body}<span class="time">${fmtTime(m.created_at)}</span></div>`;
+  const bubble = el.querySelector(".bubble");
+  // tap a quoted reply to jump to the original
+  const rq = el.querySelector(".reply-quote");
+  if (rq) rq.onclick = () => {
+    const t = box.querySelector(`[data-mid="${rq.dataset.rid}"]`);
+    if (!t) return;
+    t.scrollIntoView({ behavior: "smooth", block: "center" });
+    const tb = t.querySelector(".bubble"); if (tb) { tb.style.outline = "2px solid var(--accent2)"; setTimeout(() => (tb.style.outline = ""), 1200); }
+  };
   if (m.media_url) {
     const wrap = document.createElement(m.media_type === "video" ? "video" : "img");
     wrap.className = "media";
     if (m.media_type === "video") wrap.controls = true;
-    el.querySelector(".bubble").insertBefore(wrap, el.querySelector(".time"));
+    else wrap.onclick = () => { if (Date.now() < suppressClickUntil) return; if (wrap.src) openLightbox(wrap.src); };   // tap photo → fullscreen
+    bubble.insertBefore(wrap, el.querySelector(".time"));
     signedUrl(m.media_url).then((u) => { if (u) wrap.src = u; });
   }
+  // desktop hover reply button
+  const rbtn = document.createElement("button");
+  rbtn.className = "reply-btn"; rbtn.title = "Reply"; rbtn.textContent = "↩";
+  rbtn.onclick = (e) => { e.stopPropagation(); startReply(m); };
+  bubble.appendChild(rbtn);
+  attachReplyGestures(el, m);
   if (mine) {
     const age = Date.now() - new Date(m.created_at).getTime();
     if (age < DELETE_WINDOW) {
@@ -187,7 +277,7 @@ function subscribe(gid) {
   channel = sb.channel("grp-" + gid)
     .on("postgres_changes",
       { event: "INSERT", schema: "public", table: "messages", filter: "group_id=eq." + gid },
-      (payload) => appendMessage(payload.new))
+      (payload) => { appendMessage(payload.new); markRead(gid); })   // chat is open → keep it read
     .on("postgres_changes",
       { event: "DELETE", schema: "public", table: "messages", filter: "group_id=eq." + gid },
       (payload) => removeMessage(payload.old.id))
@@ -201,8 +291,10 @@ async function send(e) {
   if (!content || !current) return;
   inp.value = "";
   const u = auth.session().user;
-  const { data, error } = await sb.from("messages")
-    .insert({ group_id: current.id, user_id: u.id, username: auth.username(), content }).select().single();
+  const row = { group_id: current.id, user_id: u.id, username: auth.username(), content };
+  if (replyTo) { row.reply_to = replyTo.id; row.reply_user = replyTo.user; row.reply_preview = replyTo.preview; }
+  cancelReply();
+  const { data, error } = await sb.from("messages").insert(row).select().single();
   if (error) { inp.value = content; return alert(error.message); }
   appendMessage(data);
 }
@@ -219,9 +311,10 @@ async function uploadAndSend(file) {
   att.disabled = false; att.textContent = "📎";
   if (upErr) return alert("Upload failed: " + upErr.message);
   const u = auth.session().user;
-  const { data, error } = await sb.from("messages")
-    .insert({ group_id: current.id, user_id: u.id, username: auth.username(), content: "", media_url: path, media_type: type })
-    .select().single();
+  const row = { group_id: current.id, user_id: u.id, username: auth.username(), content: "", media_url: path, media_type: type };
+  if (replyTo) { row.reply_to = replyTo.id; row.reply_user = replyTo.user; row.reply_preview = replyTo.preview; }
+  cancelReply();
+  const { data, error } = await sb.from("messages").insert(row).select().single();
   if (error) return alert(error.message);
   appendMessage(data);
 }
@@ -256,6 +349,10 @@ async function showApp() {
   $("composer").onsubmit = send;
   $("attachBtn").onclick = () => $("fileInput").click();
   $("fileInput").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; uploadAndSend(f); };
+  $("rbX").onclick = cancelReply;
+  $("lbX").onclick = closeLightbox;
+  $("lightbox").onclick = (e) => { if (e.target.id === "lightbox") closeLightbox(); };
+  setupNotifyButton();
   try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
   try { const { data } = await sb.rpc("is_admin"); if (data) showAdminLink(); } catch {}
   loadChats();
@@ -264,6 +361,11 @@ async function showApp() {
     const uid = auth.session().user.id;
     sb.channel("mem-" + uid)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "group_members", filter: "user_id=eq." + uid }, () => loadChats())
+      .subscribe();
+    // Any new message in a chat I'm not currently in → refresh unread badges + ordering.
+    allChannel = sb.channel("all-msgs-" + uid)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" },
+        ({ new: m }) => { if (m && m.user_id !== uid && (!current || m.group_id !== current.id)) loadChats(); })
       .subscribe();
   }
   const dm = new URLSearchParams(location.search).get("dm");
@@ -274,6 +376,27 @@ async function showApp() {
     } catch (e) { console.warn(e); }
   }
 }
+async function setupNotifyButton() {
+  const btn = $("notifyBtn");
+  await registerSW();
+  const render = async () => {
+    const st = await pushState();
+    if (st === "unsupported") { btn.style.display = "none"; return; }
+    btn.style.display = "";
+    if (st === "subscribed") { btn.textContent = "🔔 On"; btn.classList.add("on"); btn.title = "Notifications on — tap to turn off"; }
+    else if (st === "denied") { btn.textContent = "🔕 Blocked"; btn.classList.remove("on"); btn.title = "Enable notifications in your browser/Safari settings"; }
+    else { btn.textContent = "🔔 Notify"; btn.classList.remove("on"); btn.title = "Get notified of new messages"; }
+  };
+  btn.onclick = async () => {
+    const st = await pushState();
+    if (st === "subscribed") { await disablePush(); }
+    else if (st === "denied") { alert("Notifications are blocked. Enable them for this site in your browser/Safari settings, then try again."); }
+    else { const r = await enablePush(); if (!r.ok && r.error) alert(r.error); }
+    render();
+  };
+  render();
+}
+
 function showAdminLink() {
   if ($("adminLink")) return;
   const a = document.createElement("a");

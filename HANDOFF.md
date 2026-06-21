@@ -45,8 +45,9 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=4`, `friends.js?v=3`,
-`pixelbreak-records.js?v=3`, `admin.js?v=4`, `factory-auth.js?v=3`.
+Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=5`, `friends.js?v=3`,
+`pixelbreak-records.js?v=3`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=1`
+(`notify.js`/`sw.js` are imported, not query-versioned — hard-refresh or bump the importer).
 
 ## 3. Supabase
 
@@ -57,8 +58,9 @@ Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=4`, `friends.js
 - Email confirmation is **ON** by default for signups.
 
 All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run new migrations there manually):
-`supabase-setup.sql` (scores) · `messenger-setup.sql` / `-v2` / `-v3` · `dashboard-private-setup.sql`
+`supabase-setup.sql` (scores) · `messenger-setup.sql` / `-v2` / `-v3` / **`-v4`** · `dashboard-private-setup.sql`
 · `admin-users-setup.sql` · `grades-sync-setup.sql` · `social-games-setup.sql` · `social-fix.sql`.
+⚠️ **`messenger-setup-v4.sql` must be run** (replies, read-state, push tables) — see §8.
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -74,7 +76,8 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **PixelBreak** | `pixelbreak.html`, `pixelbreak-records.js`, `pixelbreak-config.js` | 31 embedded single-player games + accounts, high-score capture, leaderboards. Home button top-left. |
 | **ShortsFactory stats** | `stats.html` | Public sanitized stats, reads `data/factory.json`. |
 | **ShortsFactory dashboard** | `factory.html`, `factory-auth.js` | Full dashboard, **admin-only** (Supabase login + `is_admin`), reads `dashboard_state`. |
-| **Messenger** | `messenger.html`, `messenger.js` | Groups + 1:1 DMs (by username), member lists, leave, photo/video (private `chat-media` bucket, signed URLs), 30-sec delete, realtime. `?dm=username` deep-links a DM. |
+| **Messenger** | `messenger.html`, `messenger.js` | Groups + 1:1 DMs (by username), member lists, leave, photo/video (private `chat-media` bucket, signed URLs), 30-sec delete, realtime. `?dm=username` deep-links a DM. **Tap a photo → fullscreen lightbox. Swipe a message (or long-press) to reply** (denormalised `reply_*` cols; quoted bubble jumps to original). **Unread chats show the name in bold + a dot + last-message preview** (`chat_reads`/`mark_read`, `my_chats` v4 returns `unread`/`last_preview`). **🔔 Notify** button = Web Push opt-in. |
+| **Notifications** | `notify.js`, `notify-ambient.js`, `sw.js`, `manifest.webmanifest` | Shared module. `initAmbient()` (loaded via `notify-ambient.js` on most pages) shows live in-app toasts + system notifications for new messages while you're elsewhere on the site (e.g. in a game) — no server. `enablePush()` subscribes the device for **Web Push** (closed-app notifications) via the `notify` Edge Function. See **§8**. |
 | **Admin** | `admin.html`, `admin.js` | Read all groups/DMs/messages; delete group/message; add/remove members; **Users tab**: list/delete users, reset password (can't view — bcrypt). |
 | **Grades** | `grades.html` | Luxembourg grade calc: Year → Track/Section (7e–1ère, official MEN coefficients), "what do I need next", **account sync** (`grade_sheets`) + local fallback. |
 | **Friends** | `friends.html`, `friends.js` | Add by username, **People** directory, sent/received requests, Message (→ DM) or invite to a game. |
@@ -108,5 +111,27 @@ Old full data was scrubbed from git history.
 ## 7. Open items
 
 - **Rotate the FTP password** (exposed during setup) + update `FTP_PASSWORD` secret.
+- **Finish Web Push (§8):** run `messenger-setup-v4.sql`, deploy the `notify` Edge Function,
+  set VAPID + `NOTIFY_SECRET` secrets, create the DB webhook, add ian.lu to the iPad Home Screen.
+- A proper **PNG `apple-touch-icon`** would render nicer on the iOS Home Screen than the SVG.
 - Light mode swaps core CSS vars site-wide; a few deeply-custom spots may still look dark — tune as reported.
 - Possible next features discussed: live class quiz; manual-placement polish; per-section upper-cycle grade coefficients (currently a general editable base for 3e–1ère).
+
+## 8. Notifications (in-app + Web Push)
+
+Two layers:
+1. **In-app / foreground** (no server): `notify.js` `initAmbient()` — loaded via
+   `notify-ambient.js` on most pages (index, games, connect4, slf, battleship, friends,
+   grades, pixelbreak) — subscribes to `messages` INSERTs over Realtime (RLS scopes it to
+   your chats) and shows a toast + a system Notification (if permission granted). This is the
+   "get messenger notifications while you're in a game" piece.
+2. **Web Push / closed-app** (needs backend): `sw.js` + `manifest.webmanifest` +
+   `push_subscriptions` table + the **`notify` Edge Function** (`supabase/functions/notify`).
+   The 🔔 Notify button in Messenger calls `enablePush()` → stores the device subscription;
+   a **DB webhook on `messages` INSERT** calls the function, which signs a push with the
+   **VAPID** keypair and fans it out to every group member's devices.
+
+VAPID **public** key is in `pixelbreak-config.js` (`vapidPublicKey`); the **private** key +
+`NOTIFY_SECRET` are Supabase function secrets only (never committed — repo is public).
+**Full deploy walkthrough: `scripts/PUSH-SETUP.md`.** iOS only delivers push to the site once
+it's **Added to Home Screen** (iOS 16.4+).
