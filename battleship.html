@@ -7,7 +7,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=1"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ship:#5b6bbf;--hit:#ff5d6c;--miss:#33384f;--water:#10142e}
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ship:#5b6bbf;--hit:#ff5d6c;--miss:#33384f;--water:#10142e;--ok:#3fb950}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   a{color:var(--accent2);text-decoration:none}
@@ -18,14 +18,21 @@
   .status{font-size:17px;font-weight:800;text-align:center;min-height:22px}
   .sub{color:var(--muted);font-size:13px;text-align:center}
   .label{align-self:flex-start;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:-6px}
-  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;width:100%;max-width:420px;background:var(--water);padding:8px;border-radius:12px}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;width:100%;max-width:420px;background:var(--water);padding:8px;border-radius:12px;touch-action:manipulation}
   .cell{aspect-ratio:1;border-radius:6px;background:#1a2040;display:flex;align-items:center;justify-content:center;font-size:16px}
   .cell.ship{background:var(--ship)} .cell.hit{background:var(--hit)} .cell.miss{background:var(--miss);color:var(--muted)}
+  .grid.place .cell{cursor:pointer}
   .grid.fire .cell:not(.hit):not(.miss){cursor:pointer}
   .grid.fire .cell:not(.hit):not(.miss):hover{outline:2px solid var(--accent2)}
-  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 18px;font-weight:800;cursor:pointer}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}
+  .btn:disabled{opacity:.4;cursor:default}
   .btn.ghost{background:var(--card);border:1px solid var(--border);color:var(--text)}
-  .row{display:flex;gap:10px}
+  .fleet{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .ship-pip{display:flex;gap:2px;padding:5px 7px;border-radius:8px;border:1px solid var(--border);background:var(--card)}
+  .ship-pip.next{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .ship-pip.done{opacity:.35}
+  .ship-pip i{width:11px;height:11px;border-radius:2px;background:var(--ship);display:block}
 </style>
 </head>
 <body>
@@ -38,12 +45,21 @@
 <div class="wrap">
   <div class="status" id="status">Connecting…</div>
   <div class="sub" id="sub"></div>
-  <div id="setup" style="display:none;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px">
-    <div class="label">Your fleet — arrange it</div>
-    <div class="grid" id="own"></div>
-    <div class="row"><button class="btn ghost" id="shuffle">🔀 Shuffle</button><button class="btn" id="ready">Ready</button></div>
+
+  <div id="setup" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
+    <div class="label">Your fleet — place your ships</div>
+    <div class="fleet" id="fleet"></div>
+    <div class="grid place" id="own"></div>
+    <div class="toolbar">
+      <button class="btn ghost" id="rotate">↻ Rotate: <span id="orient">Horizontal</span></button>
+      <button class="btn ghost" id="shuffle">🔀 Shuffle</button>
+      <button class="btn ghost" id="clear">Clear</button>
+      <button class="btn" id="ready" disabled>Ready</button>
+    </div>
+    <div class="sub">Tap to place · tap a ship to remove it.</div>
   </div>
-  <div id="play" style="display:none;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px">
+
+  <div id="play" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
     <div class="label">Enemy waters — tap to fire</div>
     <div class="grid fire" id="enemy"></div>
     <div class="label">Your fleet</div>
@@ -66,30 +82,48 @@ const sb=supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey);
 const ch=sb.channel("bs:"+room,{config:{broadcast:{self:false},presence:{key:role}}});
 const $=(id)=>document.getElementById(id);
 
-let own=[], enemy=[], myReady=false, oppReady=false, oppHere=false, turn="host", phase="setup", over=false;
-const empty=()=>Array.from({length:N},()=>Array(N).fill(0)); // 0 water,1 ship,2 hit,3 miss
-const shipCells=()=>{let n=0;own.forEach(r=>r.forEach(v=>{if(v===1||v===2)n++;}));return n;};
+let own=empty(), enemy=empty(), placed=[], toPlace=[...SHIPS], orient="h";
+let myReady=false, oppReady=false, oppHere=false, turn="host", phase="setup", over=false;
+function empty(){ return Array.from({length:N},()=>Array(N).fill(0)); }
+const allPlaced=()=>toPlace.length===0;
 
-function place(){
-  const b=empty();
-  for(const len of SHIPS){
-    let ok=false,tries=0;
-    while(!ok && tries++<500){
-      const horiz=Math.random()<.5;
-      const r=Math.floor(Math.random()*(horiz?N:N-len+1));
-      const c=Math.floor(Math.random()*(horiz?N-len+1:N));
-      let free=true;
-      for(let k=0;k<len;k++){ if(b[r+(horiz?0:k)][c+(horiz?k:0)]) free=false; }
-      if(free){ for(let k=0;k<len;k++) b[r+(horiz?0:k)][c+(horiz?k:0)]=1; ok=true; }
-    }
-  }
-  own=b;
+// ---------- placement ----------
+function fits(r,c,len,o){
+  for(let k=0;k<len;k++){ const rr=r+(o==="v"?k:0), cc=c+(o==="h"?k:0);
+    if(rr<0||rr>=N||cc<0||cc>=N||own[rr][cc]!==0) return false; }
+  return true;
 }
+function tryPlace(r,c){
+  if(!toPlace.length) return;
+  const len=toPlace[0];
+  if(!fits(r,c,len,orient)) return;
+  const cells=[];
+  for(let k=0;k<len;k++){ const rr=r+(orient==="v"?k:0), cc=c+(orient==="h"?k:0); own[rr][cc]=1; cells.push([rr,cc]); }
+  placed.push({len,cells}); toPlace.shift();
+  renderSetup();
+}
+function removeAt(r,c){
+  const i=placed.findIndex(s=>s.cells.some(([rr,cc])=>rr===r&&cc===c));
+  if(i<0) return;
+  placed[i].cells.forEach(([rr,cc])=>own[rr][cc]=0);
+  toPlace.unshift(placed[i].len); placed.splice(i,1);
+  renderSetup();
+}
+function shuffle(){
+  own=empty(); placed=[]; toPlace=[];
+  for(const len of SHIPS){ let ok=false,t=0;
+    while(!ok&&t++<600){ const o=Math.random()<.5?"h":"v";
+      const r=Math.floor(Math.random()*N), c=Math.floor(Math.random()*N);
+      if(fits(r,c,len,o)){ const cells=[]; for(let k=0;k<len;k++){const rr=r+(o==="v"?k:0),cc=c+(o==="h"?k:0);own[rr][cc]=1;cells.push([rr,cc]);} placed.push({len,cells}); ok=true; } } }
+  renderSetup();
+}
+function clearAll(){ own=empty(); placed=[]; toPlace=[...SHIPS]; renderSetup(); }
+
+// ---------- rendering ----------
 function grid(el,board,reveal,onclick){
   el.innerHTML="";
   for(let r=0;r<N;r++)for(let c=0;c<N;c++){
-    const d=document.createElement("div"); let cls="cell";
-    const v=board[r][c];
+    const d=document.createElement("div"); const v=board[r][c]; let cls="cell";
     if(v===2)cls+=" hit"; else if(v===3)cls+=" miss"; else if(v===1&&reveal)cls+=" ship";
     d.className=cls; d.textContent=v===2?"✶":v===3?"·":"";
     if(onclick) d.onclick=()=>onclick(r,c);
@@ -97,11 +131,20 @@ function grid(el,board,reveal,onclick){
   }
 }
 function setStatus(h,s=""){ $("status").innerHTML=h; $("sub").innerHTML=s; }
-
+function renderFleet(){
+  const pip=(len,cls)=>`<span class="ship-pip ${cls}">${Array(len).fill("<i></i>").join("")}</span>`;
+  let html="";
+  toPlace.forEach((len,i)=> html+=pip(len, i===0?"next":""));   // still to place (first = next)
+  placed.forEach(s=> html+=pip(s.len,"done"));                  // already placed (dimmed)
+  $("fleet").innerHTML=html;
+}
 function renderSetup(){
   $("setup").style.display="flex"; $("play").style.display="none";
-  grid($("own"),own,true,null);
-  setStatus(myReady?"Waiting for opponent…":"Arrange your fleet",
+  renderFleet();
+  grid($("own"), own, true, (r,c)=>{ if(myReady)return; if(own[r][c]===1) removeAt(r,c); else tryPlace(r,c); });
+  $("ready").disabled = !allPlaced() || myReady;
+  $("orient").textContent = orient==="h"?"Horizontal":"Vertical";
+  setStatus(myReady?"Waiting for opponent…":(allPlaced()?"Fleet ready — press Ready":"Place your ships"),
     oppHere?"":"Share room <code>"+room+"</code> so your opponent can join.");
 }
 function renderPlay(){
@@ -114,39 +157,42 @@ function renderPlay(){
   $("rematch").style.display=over?"":"none";
 }
 
+// ---------- battle ----------
 function bothReady(){ if(myReady&&oppReady&&phase==="setup"){ phase="play"; turn="host"; enemy=empty(); renderPlay(); } }
 function fire(r,c){
-  if(over||turn!==role) return;
+  if(over||turn!==role||phase!=="play") return;
   if(enemy[r][c]===2||enemy[r][c]===3) return;
-  turn=other; // lock until result
+  turn=other;
   ch.send({type:"broadcast",event:"fire",payload:{r,c}});
   renderPlay();
 }
 function onFire(r,c){
   const hitShip=own[r][c]===1||own[r][c]===2;
-  own[r][c]= hitShip?2:3;
-  const lost = !own.flat().some(v=>v===1);
+  own[r][c]=hitShip?2:3;
+  const lost=!own.flat().some(v=>v===1);
   ch.send({type:"broadcast",event:"result",payload:{r,c,hit:hitShip,lost}});
-  if(lost){ over=other; } // the firer (other) won
-  turn=role; // now my turn
+  if(lost) over=other;
+  turn=role;
   renderPlay();
 }
-function onResult(r,c,hit,lost){
-  enemy[r][c]=hit?2:3;
-  if(lost){ over=role; } // I sank their last ship
-  renderPlay();
-}
+function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; renderPlay(); }
 
 ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="setup")renderSetup(); })
   .on("broadcast",{event:"fire"},({payload})=>{ if(phase==="play") onFire(payload.r,payload.c); })
   .on("broadcast",{event:"result"},({payload})=>onResult(payload.r,payload.c,payload.hit,payload.lost))
   .on("broadcast",{event:"reset"},()=>resetGame(false))
-  .on("presence",{event:"sync"},()=>{ const st=ch.presenceState(); oppHere=!!st[other]; if(phase==="setup")renderSetup(); })
-  .subscribe(async(s)=>{ if(s==="SUBSCRIBED"){ place(); phase="setup"; renderSetup(); await ch.track({role}); }});
+  .on("presence",{event:"sync"},()=>{
+    const st=ch.presenceState(); oppHere=!!st[other];
+    if(oppHere && myReady) ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
+    if(phase==="setup")renderSetup();
+  })
+  .subscribe(async(s)=>{ if(s==="SUBSCRIBED"){ clearAll(); phase="setup"; renderSetup(); await ch.track({role}); }});
 
-$("shuffle").onclick=()=>{ if(myReady)return; place(); renderSetup(); };
-$("ready").onclick=()=>{ if(myReady)return; myReady=true; ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
-function resetGame(send){ over=false; myReady=false; oppReady=false; phase="setup"; place(); enemy=empty(); renderSetup(); if(send) ch.send({type:"broadcast",event:"reset",payload:{}}); }
+$("rotate").onclick=()=>{ orient=orient==="h"?"v":"h"; renderSetup(); };
+$("shuffle").onclick=()=>{ if(!myReady) shuffle(); };
+$("clear").onclick=()=>{ if(!myReady) clearAll(); };
+$("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true; ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
+function resetGame(send){ over=false; myReady=false; oppReady=false; phase="setup"; clearAll(); enemy=empty(); renderSetup(); if(send) ch.send({type:"broadcast",event:"reset",payload:{}}); }
 $("rematch").onclick=()=>resetGame(true);
 </script>
 </body>
