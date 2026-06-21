@@ -110,10 +110,8 @@
   <div class="gate-box">
     <div class="gate-icon">🔒</div>
     <h2>ShortsFactory — Full Dashboard</h2>
-    <p>Enter PIN to view the detailed production dashboard.</p>
-    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="••••" maxlength="8">
-    <button id="pinBtn">Unlock</button>
-    <div id="pinErr" class="gate-err" style="display:none">Wrong PIN — try again.</div>
+    <p id="gateMsg">Admin access only.</p>
+    <button id="signInBtn">Sign in</button>
     <a class="home" href="index.html">‹ back to ian.lu</a>
   </div>
 </div>
@@ -389,33 +387,11 @@ document.getElementById('foot').innerHTML =
 
 } /* end renderDashboard */
 
-/* ---- PIN gate + live data fetch ---- */
-(function(){
-  const PIN='1243', KEY='sf_unlocked';
-  const gate=document.getElementById('gate'), dash=document.getElementById('dash');
-  const inp=document.getElementById('pin'), err=document.getElementById('pinErr');
-  async function load(){
-    gate.style.display='none'; dash.style.display='';
-    try{
-      const r=await fetch('data/factory.json',{cache:'no-store'});
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      renderDashboard(await r.json());
-    }catch(e){
-      dash.innerHTML='<div class="wrap"><p class="muted">Could not load data ('+e+').</p></div>';
-    }
-  }
-  function tryUnlock(){
-    if(inp.value===PIN){ sessionStorage.setItem(KEY,'1'); load(); }
-    else { err.style.display=''; inp.value=''; inp.focus(); }
-  }
-  if(sessionStorage.getItem(KEY)==='1'){ load(); }
-  else {
-    gate.style.display='';
-    document.getElementById('pinBtn').onclick=tryUnlock;
-    inp.addEventListener('keydown',e=>{ if(e.key==='Enter') tryUnlock(); });
-    inp.focus();
-  }
-})();
+/* Data fetch + access control live in factory-auth.js (Supabase admin login). */
+window.renderDashboard = renderDashboard;
 </script>
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="factory-auth.js?v=3"></script>
 </body>
 </html>
