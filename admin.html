@@ -30,11 +30,25 @@
   .grow .meta{font-size:11px;color:var(--muted);margin-top:3px}
   .detail{flex:1;display:flex;flex-direction:column;min-width:0}
   .detail-h{padding:14px 18px;border-bottom:1px solid var(--border);font-size:14px}
-  .detail-h .members{color:var(--muted);font-size:12.5px;margin-top:4px}
+  .dh-top{display:flex;align-items:center;gap:10px}
+  .tag.dm{background:var(--dm);color:#fff;padding:1px 6px;border-radius:6px;font-size:10px}
+  .danger{margin-left:auto;background:#3a1620;border:1px solid #ff6b6b;color:#ff8888;border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer;font-weight:700}
+  .danger:hover{background:#ff6b6b;color:#fff}
+  .members{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{display:inline-flex;align-items:center;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:3px 6px 3px 11px;font-size:12.5px}
+  .chip-x{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0 2px}
+  .chip-x:hover{color:#ff6b6b}
+  .muted{color:var(--muted);font-size:12.5px}
+  .addmem{display:flex;gap:8px;margin-top:10px}
+  .addmem input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 11px;font-size:13px}
+  .addmem button{background:var(--accent2);color:#06121a;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer}
   .mlist{flex:1;overflow-y:auto;padding:14px 18px}
-  .am{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:14px;display:flex;gap:10px}
+  .am{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:14px;display:flex;gap:10px;align-items:flex-start}
   .am .who{color:var(--accent2);font-weight:700;flex:none}
-  .am .when{color:var(--muted);font-size:11px;flex:none;margin-left:auto}
+  .am .txt{flex:1;min-width:0}
+  .msg-del{background:none;border:none;cursor:pointer;font-size:13px;opacity:.5;flex:none}
+  .msg-del:hover{opacity:1}
+  .am .when{color:var(--muted);font-size:11px;flex:none}
   .am .media{display:block;max-width:200px;max-height:200px;border-radius:8px;margin-top:4px}
   .empty{color:var(--muted);text-align:center;padding:40px}
 </style>

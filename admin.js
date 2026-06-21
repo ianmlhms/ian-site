@@ -32,30 +32,70 @@ function renderList(list) {
 
 async function openGroup(id) {
   current = groups.find((g) => g.id === id);
+  if (!current) return;
   document.querySelectorAll(".grow").forEach((li) => li.classList.toggle("active", +li.dataset.id === id));
   const [{ data: members }, { data: msgs }] = await Promise.all([
     sb.rpc("admin_members", { p_group_id: id }),
     sb.rpc("admin_messages", { p_group_id: id }),
   ]);
+  const chips = (members || []).map((m) =>
+    `<span class="chip">${esc(m.username)}<button class="chip-x" data-uid="${m.user_id}" title="Remove from group">&times;</button></span>`).join("") || "<span class='muted'>no members</span>";
   $("detailH").innerHTML =
-    `<b>${esc(current.name)}</b> ${current.is_dm ? '<span class="tag" style="background:#ff6b9d;color:#fff;padding:1px 6px;border-radius:6px;font-size:10px">DM</span>' : ""}
-     <div class="members">Members: ${(members || []).map((m) => esc(m.username)).join(", ") || "—"}</div>`;
+    `<div class="dh-top"><b>${esc(current.name)}</b>${current.is_dm ? '<span class="tag dm">DM</span>' : ""}
+       <button class="danger" id="delGroup">Delete group</button></div>
+     <div class="members" id="memberBar">${chips}</div>
+     <div class="addmem"><input id="addUser" placeholder="add member by username" autocomplete="off"><button id="addBtn">Add</button></div>`;
+  $("delGroup").onclick = () => deleteGroup(id);
+  $("addBtn").onclick = () => addMember(id);
+  $("addUser").addEventListener("keydown", (e) => { if (e.key === "Enter") addMember(id); });
+  $("memberBar").querySelectorAll(".chip-x").forEach((b) => (b.onclick = () => removeMember(id, b.dataset.uid)));
+
   const box = $("mlist");
   if (!msgs || !msgs.length) { box.innerHTML = `<div class="empty">No messages.</div>`; return; }
   box.innerHTML = "";
   msgs.forEach((m) => {
     const el = document.createElement("div");
     el.className = "am";
-    el.innerHTML = `<span class="who">${esc(m.username)}</span><span class="txt">${esc(m.content || "")}</span><span class="when">${fmt(m.created_at)}</span>`;
+    el.innerHTML = `<span class="who">${esc(m.username)}</span><span class="txt">${esc(m.content || "")}</span>
+      <button class="msg-del" title="Delete message">🗑</button><span class="when">${fmt(m.created_at)}</span>`;
     if (m.media_url) {
       const tag = m.media_type === "video" ? document.createElement("video") : document.createElement("img");
       tag.className = "media"; if (m.media_type === "video") tag.controls = true;
       el.querySelector(".txt").appendChild(tag);
       signedUrl(m.media_url).then((u) => { if (u) tag.src = u; });
     }
+    el.querySelector(".msg-del").onclick = () => deleteMessage(m.id, id);
     box.appendChild(el);
   });
   box.scrollTop = 0;
+}
+
+async function deleteGroup(id) {
+  if (!confirm("Delete this entire group/DM and ALL its messages? This cannot be undone.")) return;
+  const { error } = await sb.rpc("admin_delete_group", { p_group_id: id });
+  if (error) return alert(error.message);
+  current = null;
+  $("detailH").innerHTML = "Select a group to inspect";
+  $("mlist").innerHTML = "";
+  loadGroups();
+}
+async function deleteMessage(mid, gid) {
+  const { error } = await sb.rpc("admin_delete_message", { p_message_id: mid });
+  if (error) return alert(error.message);
+  openGroup(gid);
+}
+async function removeMember(gid, uid) {
+  if (!confirm("Remove this member from the group?")) return;
+  const { error } = await sb.rpc("admin_remove_member", { p_group_id: gid, p_user_id: uid });
+  if (error) return alert(error.message);
+  await openGroup(gid); loadGroups();
+}
+async function addMember(gid) {
+  const u = ($("addUser").value || "").trim();
+  if (!u) return;
+  const { error } = await sb.rpc("admin_add_member", { p_group_id: gid, p_username: u });
+  if (error) return alert(error.message);
+  await openGroup(gid); loadGroups();
 }
 
 function showDenied() {

@@ -128,6 +128,8 @@ async function toggleMembers() {
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 
 /* ---------- messages ---------- */
+const DELETE_WINDOW = 30000; // ms a user can delete their own message
+
 function appendMessage(m) {
   if (seen.has(m.id)) return;
   seen.add(m.id);
@@ -136,6 +138,7 @@ function appendMessage(m) {
   const mine = auth.session() && m.user_id === auth.session().user.id;
   const el = document.createElement("div");
   el.className = "msg" + (mine ? " mine" : "");
+  el.dataset.mid = m.id;
   const body = m.content ? esc(m.content) : "";
   el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${body}<span class="time">${fmtTime(m.created_at)}</span></div>`;
   if (m.media_url) {
@@ -145,8 +148,30 @@ function appendMessage(m) {
     el.querySelector(".bubble").insertBefore(wrap, el.querySelector(".time"));
     signedUrl(m.media_url).then((u) => { if (u) wrap.src = u; });
   }
+  if (mine) {
+    const age = Date.now() - new Date(m.created_at).getTime();
+    if (age < DELETE_WINDOW) {
+      const del = document.createElement("button");
+      del.className = "del-btn"; del.title = "Delete (within 30s)"; del.textContent = "🗑";
+      del.onclick = () => deleteOwnMessage(m.id);
+      el.querySelector(".bubble").appendChild(del);
+      setTimeout(() => del.remove(), DELETE_WINDOW - age);
+    }
+  }
   box.appendChild(el);
   box.scrollTop = box.scrollHeight;
+}
+
+function removeMessage(id) {
+  const el = $("messages").querySelector(`[data-mid="${id}"]`);
+  if (el) el.remove();
+  seen.delete(id);
+}
+
+async function deleteOwnMessage(id) {
+  const { error } = await sb.from("messages").delete().eq("id", id);
+  if (error) return alert(error.message);
+  removeMessage(id); // realtime DELETE removes it for everyone else
 }
 
 async function signedUrl(path) {
@@ -162,6 +187,9 @@ function subscribe(gid) {
     .on("postgres_changes",
       { event: "INSERT", schema: "public", table: "messages", filter: "group_id=eq." + gid },
       (payload) => appendMessage(payload.new))
+    .on("postgres_changes",
+      { event: "DELETE", schema: "public", table: "messages", filter: "group_id=eq." + gid },
+      (payload) => removeMessage(payload.old.id))
     .subscribe();
 }
 
