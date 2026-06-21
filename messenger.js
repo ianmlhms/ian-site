@@ -16,6 +16,9 @@ const seen = new Set();
 let memberSubbed = false;
 let replyTo = null;          // {id, user, preview} when replying, else null
 let suppressClickUntil = 0;  // swallow the click that follows a gesture-reply
+let currentOthers = [];      // other members' user_ids in the open chat
+let readMap = {};            // user_id -> last_read_at (others, in the open chat)
+let readThreshold = null;    // ms: msgs sent at/before this are read by ALL others
 
 /* ---------- small prompt modal ---------- */
 function promptModal(title, label, okText = "OK") {
@@ -86,6 +89,7 @@ async function newDM() {
 /* ---------- a single chat ---------- */
 async function selectChat(g) {
   current = g; seen.clear();
+  currentOthers = []; readMap = {}; readThreshold = null;
   closeMembers(); cancelReply();
   markRead(g.id);
   document.querySelectorAll(".grp").forEach((li) => {
@@ -111,6 +115,7 @@ async function selectChat(g) {
   (data || []).forEach(appendMessage);
   if (!data || !data.length) box.innerHTML = `<div class="empty">No messages yet — say hi 👋</div>`;
   subscribe(g.id);
+  loadReceipts(g.id);
 }
 
 async function leaveChat() {
@@ -143,6 +148,40 @@ async function toggleMembers() {
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 
 async function markRead(gid) { try { await sb.rpc("mark_read", { p_group_id: gid }); } catch (e) { console.warn("[msgr] mark_read", e); } }
+
+/* ---------- read receipts (✓ / ✓✓) ---------- */
+// Load who else is in the chat + their last-read times, then paint the ticks.
+async function loadReceipts(gid) {
+  const me = auth.session().user.id;
+  readMap = {}; readThreshold = null;
+  const [{ data: mem }, { data: reads }] = await Promise.all([
+    sb.from("group_members").select("user_id").eq("group_id", gid),
+    sb.from("chat_reads").select("user_id,last_read_at").eq("group_id", gid),
+  ]);
+  currentOthers = (mem || []).map((r) => r.user_id).filter((id) => id !== me);
+  (reads || []).forEach((r) => { if (r.user_id !== me) readMap[r.user_id] = r.last_read_at; });
+  recomputeThreshold(); updateTicks();
+}
+// "Read" = every other member has a read time at/after the message → blue ✓✓.
+function recomputeThreshold() {
+  if (!currentOthers.length) { readThreshold = null; return; }
+  let min = null;
+  for (const id of currentOthers) {
+    const t = readMap[id];
+    if (!t) { readThreshold = null; return; }        // someone hasn't read → nothing is "read by all"
+    const ts = new Date(t).getTime();
+    if (min === null || ts < min) min = ts;
+  }
+  readThreshold = min;
+}
+function tickIsRead(tsIso) { return readThreshold !== null && new Date(tsIso).getTime() <= readThreshold; }
+function paintTick(el) {
+  const read = tickIsRead(el.dataset.ts);
+  el.textContent = read ? "✓✓" : "✓";
+  el.classList.toggle("read", read);
+  el.title = read ? "Gelies" : "Geschéckt";
+}
+function updateTicks() { $("messages").querySelectorAll(".msg.mine .ticks").forEach(paintTick); }
 
 /* ---------- reply ---------- */
 function snippet(m) {
@@ -240,6 +279,9 @@ function appendMessage(m) {
   bubble.appendChild(rbtn);
   attachReplyGestures(el, m);
   if (mine) {
+    const tk = document.createElement("span");
+    tk.className = "ticks"; tk.dataset.ts = m.created_at;
+    bubble.appendChild(tk); paintTick(tk);
     const age = Date.now() - new Date(m.created_at).getTime();
     if (age < DELETE_WINDOW) {
       const del = document.createElement("button");
@@ -281,6 +323,12 @@ function subscribe(gid) {
     .on("postgres_changes",
       { event: "DELETE", schema: "public", table: "messages", filter: "group_id=eq." + gid },
       (payload) => removeMessage(payload.old.id))
+    .on("postgres_changes",
+      { event: "*", schema: "public", table: "chat_reads", filter: "group_id=eq." + gid },
+      ({ new: r }) => {                                  // someone read → refresh ticks live
+        const me = auth.session()?.user?.id;
+        if (r && r.user_id && r.user_id !== me) { readMap[r.user_id] = r.last_read_at; recomputeThreshold(); updateTicks(); }
+      })
     .subscribe();
 }
 
