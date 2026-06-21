@@ -21,6 +21,20 @@
   .side{width:320px;border-right:1px solid var(--border);display:flex;flex-direction:column;flex:none}
   .side-h{padding:12px 14px;border-bottom:1px solid var(--border)}
   .side-h input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 11px;font-size:13px}
+  .tabs{display:flex;gap:6px;margin-bottom:10px}
+  .tab{flex:1;background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px;font-size:13px;font-weight:700;cursor:pointer}
+  .tab.active{background:var(--card2);color:var(--text);border-color:var(--accent2)}
+  .uinfo{display:flex;flex-direction:column;gap:6px;font-size:13.5px;margin-top:10px}
+  .uinfo .k{color:var(--muted);font-size:12px}
+  .uact{margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+  .uact h4{margin:0 0 8px;font-size:13px}
+  .pwrow{display:flex;gap:8px}
+  .pwrow input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 11px;font-size:14px;font-family:ui-monospace,monospace}
+  .pwrow button{background:var(--accent2);color:#06121a;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer}
+  .pwgen{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 11px;cursor:pointer}
+  .pwresult{margin-top:10px;font-size:13.5px;color:var(--posted,#3fb950)}
+  .pwresult code{background:var(--card2);padding:2px 8px;border-radius:6px;color:#ffcc00;font-size:15px;user-select:all}
+  .hint{color:var(--muted);font-size:12px;margin-top:4px}
   .glist{list-style:none;margin:0;padding:8px;overflow-y:auto;flex:1}
   .grow{padding:10px 12px;border-radius:10px;cursor:pointer}
   .grow:hover{background:var(--card)}
@@ -66,7 +80,10 @@
 
 <div id="panel">
   <aside class="side">
-    <div class="side-h"><input id="search" placeholder="Search groups / DMs…"></div>
+    <div class="side-h">
+      <div class="tabs"><button id="tabGroups" class="tab active">Groups</button><button id="tabUsers" class="tab">Users</button></div>
+      <input id="search" placeholder="Search…">
+    </div>
     <ul class="glist" id="glist"></ul>
   </aside>
   <section class="detail">
@@ -77,6 +94,6 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="admin.js?v=3"></script>
+<script type="module" src="admin.js?v=4"></script>
 </body>
 </html>
