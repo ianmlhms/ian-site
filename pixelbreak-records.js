@@ -61,9 +61,18 @@ window.addEventListener("message", (e) => {
 });
 
 /* ---------------- cloud: auth + scores ---------------- */
+async function getCreateClient() {
+  if (window.supabase && window.supabase.createClient) return window.supabase.createClient;
+  try {
+    return (await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm")).createClient;
+  } catch {
+    return (await import("https://esm.sh/@supabase/supabase-js@2")).createClient;
+  }
+}
+
 async function initCloud() {
   if (!cloudEnabled) return;
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const createClient = await getCreateClient();
   sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
   const { data } = await sb.auth.getSession();
   applySession(data.session);

@@ -7,11 +7,24 @@ export const authConfigured =
 let _sb = null, _ready = null, _session = null;
 const _cbs = [];
 
+async function getCreateClient() {
+  // Prefer the global UMD build (loaded via <script> in the page) — most reliable
+  // across browsers (Safari/iOS in particular). Fall back to an ESM CDN import.
+  if (window.supabase && window.supabase.createClient) return window.supabase.createClient;
+  try {
+    const m = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+    return m.createClient;
+  } catch {
+    const m = await import("https://esm.sh/@supabase/supabase-js@2");
+    return m.createClient;
+  }
+}
+
 export async function client() {
   if (_sb) return _sb;
   if (!_ready) {
     _ready = (async () => {
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const createClient = await getCreateClient();
       _sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
       const { data } = await _sb.auth.getSession();
       _session = data.session;
