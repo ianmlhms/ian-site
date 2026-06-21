@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — Messenger</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ffcc00;--accent2:#4de8ff;--dm:#ff6b9d}
+  *{box-sizing:border-box}
+  body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);flex:none}
+  header .home{color:var(--muted);font-weight:700}
+  header h1{font-size:18px;margin:0}
+  header h1 .b{color:var(--accent)}
+  header .spacer{flex:1}
+  #msg{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:20px}
+  .auth-go{background:var(--dm);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:15px;font-weight:800;cursor:pointer;margin-top:14px}
+  #panel{flex:1;display:none;min-height:0}
+  .side{width:320px;border-right:1px solid var(--border);display:flex;flex-direction:column;flex:none}
+  .side-h{padding:12px 14px;border-bottom:1px solid var(--border)}
+  .side-h input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 11px;font-size:13px}
+  .glist{list-style:none;margin:0;padding:8px;overflow-y:auto;flex:1}
+  .grow{padding:10px 12px;border-radius:10px;cursor:pointer}
+  .grow:hover{background:var(--card)}
+  .grow.active{background:var(--card2)}
+  .grow .n{font-weight:700;font-size:14px}
+  .grow .tag{font-size:10px;padding:1px 6px;border-radius:6px;background:var(--dm);color:#fff;margin-left:6px;vertical-align:middle}
+  .grow .meta{font-size:11px;color:var(--muted);margin-top:3px}
+  .detail{flex:1;display:flex;flex-direction:column;min-width:0}
+  .detail-h{padding:14px 18px;border-bottom:1px solid var(--border);font-size:14px}
+  .detail-h .members{color:var(--muted);font-size:12.5px;margin-top:4px}
+  .mlist{flex:1;overflow-y:auto;padding:14px 18px}
+  .am{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:14px;display:flex;gap:10px}
+  .am .who{color:var(--accent2);font-weight:700;flex:none}
+  .am .when{color:var(--muted);font-size:11px;flex:none;margin-left:auto}
+  .am .media{display:block;max-width:200px;max-height:200px;border-radius:8px;margin-top:4px}
+  .empty{color:var(--muted);text-align:center;padding:40px}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>🛡 <span class="b">Admin</span> · Messenger</h1>
+  <div class="spacer"></div>
+  <a href="messenger.html" style="margin-right:14px;color:var(--muted)">Messenger</a>
+  <span id="acctHost"></span>
+</header>
+
+<div id="msg">Loading…</div>
+
+<div id="panel">
+  <aside class="side">
+    <div class="side-h"><input id="search" placeholder="Search groups / DMs…"></div>
+    <ul class="glist" id="glist"></ul>
+  </aside>
+  <section class="detail">
+    <div class="detail-h" id="detailH">Select a group to inspect</div>
+    <div class="mlist" id="mlist"></div>
+  </section>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

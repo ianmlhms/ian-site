@@ -33,10 +33,22 @@
   .grp .gname{font-weight:700;font-size:14px}
   .grp .gcode{font-size:11px;color:var(--muted)}
   .empty{color:var(--muted);font-size:13px;text-align:center;padding:24px 12px;line-height:1.5}
-  .chat{flex:1;display:flex;flex-direction:column;min-width:0}
+  .chat{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
   .chat-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex:none}
-  .chat-head .invite{margin-left:auto;color:var(--muted);font-size:12px}
+  .chat-head .invite{color:var(--muted);font-size:12px}
   .chat-head code{background:var(--card2);padding:2px 7px;border-radius:6px;color:var(--accent2)}
+  .head-actions{margin-left:auto;display:flex;gap:6px}
+  .head-actions button{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;width:34px;height:32px;cursor:pointer;font-size:15px}
+  .head-actions button:hover{border-color:var(--accent2)}
+  .member-panel{position:absolute;top:60px;right:0;width:230px;max-height:70%;overflow-y:auto;background:var(--card2);border:1px solid var(--border);border-radius:12px;margin:8px;display:none;z-index:10}
+  .member-panel.open{display:block}
+  .mp-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:800;font-size:13px}
+  .mp-head button{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+  .mp-list{padding:8px 14px}
+  .mp-row{padding:6px 0;font-size:14px}
+  .mp-row .you{color:var(--muted);font-size:12px}
+  .media{max-width:240px;max-height:240px;border-radius:10px;display:block;margin-top:6px;cursor:pointer}
+  .admin-link{color:#ffcc00;font-weight:700;margin-right:14px;white-space:nowrap}
   .messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:8px}
   .msg{display:flex}
   .msg.mine{justify-content:flex-end}
@@ -49,7 +61,10 @@
   .composer{display:none;gap:10px;padding:14px 18px;border-top:1px solid var(--border);flex:none}
   .composer input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:24px;padding:11px 16px;font-size:14px;outline:none}
   .composer input:focus{border-color:var(--accent2)}
-  .composer button{background:var(--accent);color:#fff;border:none;border-radius:24px;padding:0 20px;font-weight:800;cursor:pointer}
+  .composer button[type=submit]{background:var(--accent);color:#fff;border:none;border-radius:24px;padding:0 20px;font-weight:800;cursor:pointer}
+  #attachBtn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:50%;width:42px;height:42px;font-size:18px;cursor:pointer;flex:none}
+  #attachBtn:hover{border-color:var(--accent2)}
+  #attachBtn:disabled{opacity:.6;cursor:default}
   @media(max-width:640px){.sidebar{width:150px}.bubble{max-width:85%}}
 </style>
 </head>
@@ -66,16 +81,20 @@
 <div id="app">
   <aside class="sidebar">
     <div class="side-head">
-      <span class="t">Groups</span>
+      <span class="t">Chats</span>
+      <button id="newDM" title="Message someone by username">@</button>
       <button id="newG" title="New group">+</button>
       <button id="joinG" title="Join by code">⇲</button>
     </div>
     <ul id="groupList"></ul>
   </aside>
   <section class="chat">
-    <div class="chat-head" id="chatHead">Select a group, or create one ←</div>
+    <div class="chat-head" id="chatHead">Select a chat ←</div>
     <div class="messages" id="messages"></div>
+    <div class="member-panel" id="memberPanel"></div>
     <form class="composer" id="composer">
+      <button type="button" id="attachBtn" title="Send photo or video">📎</button>
+      <input type="file" id="fileInput" accept="image/*,video/*" hidden>
       <input id="msgInput" placeholder="Message…" autocomplete="off" maxlength="2000">
       <button type="submit">Send</button>
     </form>
