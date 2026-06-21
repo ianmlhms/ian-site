@@ -28,6 +28,9 @@
   .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}
   .btn:disabled{opacity:.4;cursor:default}
   .btn.ghost{background:var(--card);border:1px solid var(--border);color:var(--text)}
+  .seg{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .seg-b{background:var(--card);color:var(--muted);border:none;padding:10px 14px;font-weight:800;cursor:pointer;font-size:13px}
+  .seg-b.active{background:var(--accent);color:#fff}
   .fleet{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
   .ship-pip{display:flex;gap:2px;padding:5px 7px;border-radius:8px;border:1px solid var(--border);background:var(--card)}
   .ship-pip.next{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
@@ -51,12 +54,15 @@
     <div class="fleet" id="fleet"></div>
     <div class="grid place" id="own"></div>
     <div class="toolbar">
-      <button class="btn ghost" id="rotate">↻ Rotate: <span id="orient">Horizontal</span></button>
+      <div class="seg">
+        <button id="orientH" class="seg-b active">→ Horizontal</button>
+        <button id="orientV" class="seg-b">↓ Vertical</button>
+      </div>
       <button class="btn ghost" id="shuffle">🔀 Shuffle</button>
       <button class="btn ghost" id="clear">Clear</button>
       <button class="btn" id="ready" disabled>Ready</button>
     </div>
-    <div class="sub">Tap to place · tap a ship to remove it.</div>
+    <div class="sub">Pick a direction, tap a square to place · tap a ship to remove it.</div>
   </div>
 
   <div id="play" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
@@ -143,7 +149,8 @@ function renderSetup(){
   renderFleet();
   grid($("own"), own, true, (r,c)=>{ if(myReady)return; if(own[r][c]===1) removeAt(r,c); else tryPlace(r,c); });
   $("ready").disabled = !allPlaced() || myReady;
-  $("orient").textContent = orient==="h"?"Horizontal":"Vertical";
+  $("orientH").classList.toggle("active", orient==="h");
+  $("orientV").classList.toggle("active", orient==="v");
   setStatus(myReady?"Waiting for opponent…":(allPlaced()?"Fleet ready — press Ready":"Place your ships"),
     oppHere?"":"Share room <code>"+room+"</code> so your opponent can join.");
 }
@@ -188,7 +195,8 @@ ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="
   })
   .subscribe(async(s)=>{ if(s==="SUBSCRIBED"){ clearAll(); phase="setup"; renderSetup(); await ch.track({role}); }});
 
-$("rotate").onclick=()=>{ orient=orient==="h"?"v":"h"; renderSetup(); };
+$("orientH").onclick=()=>{ orient="h"; renderSetup(); };
+$("orientV").onclick=()=>{ orient="v"; renderSetup(); };
 $("shuffle").onclick=()=>{ if(!myReady) shuffle(); };
 $("clear").onclick=()=>{ if(!myReady) clearAll(); };
 $("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true; ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
