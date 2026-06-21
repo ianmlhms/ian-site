@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Grade Calculator — ian.lu</title>
-<meta name="description" content="Luxembourg grade calculator with per-year subjects and coefficients.">
+<meta name="description" content="Luxembourg grade calculator with per-year/section subjects and coefficients.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--good:#3fb950;--bad:#ff6b6b;--accent2:#4de8ff}
@@ -14,16 +14,17 @@
   .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}
   .bar h1{font-size:18px;margin:0}
-  .wrap{max-width:860px;margin:0 auto;padding:22px 18px 60px}
-  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+  .bar .spacer{flex:1}
+  .wrap{max-width:880px;margin:0 auto;padding:22px 18px 60px}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:6px}
   select,input{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 11px;font-size:14px;font-family:inherit}
-  select{min-width:180px}
+  select{min-width:130px}
   .btn{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;font-weight:600}
   .btn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .syncline{font-size:12.5px;color:var(--muted);margin:6px 0 16px}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th{text-align:left;color:var(--muted);font-size:12px;font-weight:600;padding:8px 8px;border-bottom:1px solid var(--border)}
   td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
-  td.subj{font-weight:600}
   .coef{width:58px;text-align:center}
   .marks{width:100%;min-width:120px}
   .avg{font-weight:800;text-align:right;width:64px;font-variant-numeric:tabular-nums}
@@ -34,13 +35,12 @@
   .summary{display:flex;flex-wrap:wrap;gap:16px;margin:22px 0;padding:18px;background:var(--card);border:1px solid var(--border);border-radius:14px}
   .kpi .v{font-size:30px;font-weight:800;line-height:1}
   .kpi .l{color:var(--muted);font-size:12.5px;margin-top:4px}
-  .hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+  .hint{color:var(--muted);font-size:12.5px}
   .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-top:18px}
   .panel h3{margin:0 0 12px;font-size:15px}
   .needrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
   .needrow label{font-size:13px;color:var(--muted)}
   .result{margin-top:14px;font-size:15px}
-  .result b{font-size:22px}
   .note{color:var(--muted);font-size:12px;margin-top:26px;line-height:1.5}
 </style>
 </head>
@@ -48,16 +48,17 @@
 <header class="bar">
   <a class="home" href="index.html">‹ Home</a>
   <h1>📊 Grade calculator</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
 </header>
 
 <div class="wrap">
   <div class="controls">
-    <label>Year / track:
-      <select id="yearSel"></select>
-    </label>
-    <button class="btn" id="resetBtn">Reset to official template</button>
-    <span class="hint">Marks are out of <b>60</b> (pass = 30). Your data is saved on this device.</span>
+    <label>Year <select id="yearSel"></select></label>
+    <label id="variantWrap">Section <select id="variantSel"></select></label>
+    <button class="btn" id="resetBtn">Reset to template</button>
   </div>
+  <div class="syncline" id="syncLine"></div>
 
   <table id="tbl">
     <thead><tr><th>Subject</th><th>Coef.</th><th>Your marks (comma-separated)</th><th style="text-align:right">Avg</th><th></th></tr></thead>
@@ -83,171 +84,175 @@
   </div>
 
   <p class="note">
-    Coefficients are auto-filled from the Luxembourg Ministry's official grille horaire (ESC/ESG lower cycle).
-    The weighted average is <b>indicative</b> — the real promotion decision also depends on failing-subject and
-    compensation rules, which this tool doesn't judge. Edit any coefficient or subject to match your own bulletin.
-    <br><b>7e–4e</b> use the exact official coefficients. The <b>upper cycle (3e–1ère)</b> splits into sections A–G
-    with options and combined branches — those templates are an editable general base; adjust them to your section.
+    Coefficients come from the Luxembourg Ministry's official grille horaire. Marks are out of <b>60</b> (pass = 30).
+    <b>7e–4e</b> are exact. The <b>upper cycle (3e–1ère)</b> sections include option groups (e.g. "3 langues parmi 4") and
+    combined branches collapsed into single rows — adjust to your exact choices. The weighted average is <b>indicative</b>;
+    real promotion also depends on failing-subject/compensation rules. Sign in to sync your sheets across devices.
   </p>
 </div>
 
-<script>
-// Official MEN coefficients (grille horaire) — lower cycle.
-const TEMPLATES = {
-  "7e": [
-    ["Français",4],["Allemand",4],["Luxembourgeois",1],["Mathématiques",4],
-    ["Sciences naturelles",3],["Histoire",2],["Géographie",2],
-    ["Éducation artistique",1],["Éducation musicale",1],["Éducation physique",1],["Vie et société",2],
-  ],
-  "6e (classique – Latin)": [
-    ["Français",4],["Allemand",4],["Latin",4],["Mathématiques",4],
-    ["Sciences naturelles",3],["Histoire",2],["Géographie",2],
-    ["Éducation artistique",1],["Éducation physique",1],["Vie et société",2],
-  ],
-  "6e (moderne – Anglais)": [
-    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],
-    ["Sciences naturelles",3],["Histoire",2],["Géographie",2],
-    ["Éducation artistique",1],["Éducation physique",1],["Vie et société",2],
-  ],
-  "5e (classique)": [
-    ["Français",4],["Allemand",4],["Anglais",4],["Latin",4],["Mathématiques",4],
-    ["Biologie",2],["Physique / Chimie",2],["Histoire",2],["Géographie",2],
-    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
-  ],
-  "5e (moderne)": [
-    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],
-    ["Biologie",2],["Physique / Chimie",2],["Histoire",2],["Géographie",2],
-    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
-  ],
-  "4e (classique)": [
-    ["Français",4],["Allemand",4],["Anglais",4],["Latin",3],["Mathématiques",4],
-    ["Histoire",2],["Géographie",2],["Biologie",2],["Physique / Chimie",2],
-    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
-  ],
-  "4e (moderne)": [
-    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],
-    ["Histoire",2],["Géographie",2],["Biologie",2],["Physique / Chimie",2],
-    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
-  ],
-  // Upper cycle (3e–1ère) splits into sections A–G with options/combined branches.
-  // These are editable general-classique bases — adjust to your section.
-  "3e (classique – general)": [
-    ["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",3],
-    ["Histoire",2],["Géographie",2],["Biologie",2],["Physique",2],["Chimie",2],
-    ["Éducation artistique",2],["Éducation physique",1],["Vie et société",2],
-  ],
-  "2e (classique – general)": [
-    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",3],
-    ["Philosophie",2],["Histoire",2],["Biologie",3],["Physique",3],["Chimie",3],
-    ["Éducation artistique",2],["Éducation physique",1],["Cours à option",2],
-  ],
-  "1ère (classique – general)": [
-    ["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",3],
-    ["Philosophie",2],["Histoire",2],["Biologie",3],["Physique",3],["Chimie",3],
-    ["Éducation physique",1],["Cours à option",2],
-  ],
+<script type="module">
+import * as auth from "./auth.js?v=3";
+
+// ---- Official coefficients (MEN grille horaire) ----
+const L = (c)=>[["Français",c],["Allemand",c],["Anglais",c],["Latin",c]]; // 4-language option group
+const YEARS = {
+  "7e": { label:"", variants: { "": [
+    ["Français",4],["Allemand",4],["Luxembourgeois",1],["Mathématiques",4],["Sciences naturelles",3],
+    ["Histoire",2],["Géographie",2],["Éducation artistique",1],["Éducation musicale",1],["Éducation physique",1],["Vie et société",2],
+  ]}},
+  "6e": { label:"Track", variants: {
+    "Classique (Latin)": [["Français",4],["Allemand",4],["Latin",4],["Mathématiques",4],["Sciences naturelles",3],["Histoire",2],["Géographie",2],["Éducation artistique",1],["Éducation physique",1],["Vie et société",2]],
+    "Moderne (Anglais)": [["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],["Sciences naturelles",3],["Histoire",2],["Géographie",2],["Éducation artistique",1],["Éducation physique",1],["Vie et société",2]],
+  }},
+  "5e": { label:"Track", variants: {
+    "Classique": [["Français",4],["Allemand",4],["Anglais",4],["Latin",4],["Mathématiques",4],["Biologie",2],["Physique / Chimie",2],["Histoire",2],["Géographie",2],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+    "Moderne": [["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],["Biologie",2],["Physique / Chimie",2],["Histoire",2],["Géographie",2],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+  }},
+  "4e": { label:"Option", variants: {
+    "Classique": [["Français",4],["Allemand",4],["Anglais",4],["Latin",3],["Mathématiques",4],["Histoire",2],["Géographie",2],["Biologie",2],["Physique / Chimie",2],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+    "Moderne": [["Français",4],["Allemand",4],["Anglais",4],["Mathématiques",4],["Histoire",2],["Géographie",2],["Biologie",2],["Physique / Chimie",2],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+  }},
+  "3e": { label:"Section", variants: {
+    "A – Langues": [["Français",4],["Allemand",4],["Anglais",4],["Latin",3],["4e langue viv. / Grec (option)",3],["Mathématiques",2],["Histoire",2],["Biologie",2],["Physique",2],["Chimie",2],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+    "B – Maths-informatique": [["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",4],["Histoire",2],["Biologie",2],["Physique",3],["Chimie",3],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+    "C – Sciences naturelles": [["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",3],["Histoire",2],["Biologie",4],["Physique",3],["Chimie",3],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+    "D – Sciences économiques": [["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",3],["Histoire",2],["Sciences écon. et sociales",4],["Biologie",2],["Physique",2],["Chimie",2],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+    "E – Arts plastiques": [["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",3],["Histoire",2],["Biologie",2],["Physique",2],["Chimie",2],["Éducation artistique",4],["Éducation physique",1],["Vie et société",2]],
+    "F – Musique": [["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",3],["Histoire",2],["Biologie",2],["Physique",2],["Chimie",2],["Éducation artistique",2],["Éducation musicale",4],["Éducation physique",1],["Vie et société",2]],
+    "G – Sciences humaines": [["Français",3],["Allemand",3],["Anglais",3],["Latin",3],["Mathématiques",3],["Histoire",2],["Géographie",2],["Sciences écon. et sociales",4],["Biologie",2],["Physique",2],["Chimie",2],["Éducation artistique",2],["Éducation physique",1],["Vie et société",2]],
+  }},
+  "2e": { label:"Section", variants: {
+    "A – Langues": [["Français",4],["Allemand",4],["Anglais",4],["Latin (section AL)",3],["4e langue viv. / Grec (option)",3],["Histoire / Instr. civique",3],["Philosophie",2],["Éducation artistique",2],["Éducation musicale",2],["Éducation physique",1],["Cours à option",2]],
+    "B – Maths-informatique": [...L(3),["Mathématiques I",3],["Maths II / Informatique",4],["Histoire / Instr. civique",3],["Physique",3],["Chimie",3],["Éducation physique",1],["Cours à option",2]],
+    "C – Sciences naturelles": [...L(3),["Mathématiques",3],["Histoire / Instr. civique",3],["Biologie",4],["Physique",3],["Chimie",3],["Éducation physique",1],["Cours à option",2]],
+    "D – Sciences économiques": [...L(3),["Mathématiques",3],["Histoire / Instr. civique",3],["Philosophie",2],["Géographie",2],["Économie politique",3],["Économie de gestion",4],["Éducation physique",1],["Cours à option",2]],
+    "E – Arts plastiques": [...L(3),["Mathématiques",2],["Histoire / Instr. civique",3],["Économie générale",2],["Chimie",2],["Éducation artistique I",4],["Éducation artistique II",3],["Éducation musicale",2],["Éducation physique",1],["Cours à option",2]],
+    "F – Musique": [...L(3),["Mathématiques",2],["Histoire / Instr. civique",3],["Économie générale",2],["Physique",2],["Éducation artistique",2],["Éducation musicale I",4],["Éducation musicale II",3],["Éducation physique",1],["Cours à option",2]],
+    "G – Sciences humaines": [...L(3),["Mathématiques",2],["Histoire / Instr. civique",3],["Philosophie",2],["Géographie",2],["Économie politique",2],["Économie de gestion",4],["Éducation artistique",2],["Éducation musicale",2],["Éducation physique",1],["Cours à option",2]],
+  }},
+  "1ère": { label:"Section", variants: {
+    "A – Langues": [["Français",4],["Allemand",4],["Anglais",4],["Latin (section AL)",3],["4e langue viv. / Grec (option)",4],["Philosophie",3],["Histoire",2],["Économie générale",2],["Éducation physique",1],["Cours à option",2]],
+    "B – Maths-informatique": [...L(3),["Mathématiques I",3],["Maths II / Informatique",4],["Philosophie",2],["Histoire ou Économie générale",2],["Physique",3],["Chimie",3],["Éducation physique",1],["Cours à option",2]],
+    "C – Sciences naturelles": [...L(3),["Mathématiques",3],["Philosophie",2],["Histoire ou Économie générale",2],["Biologie",4],["Physique",3],["Chimie",3],["Éducation physique",1],["Cours à option",2]],
+    "D – Sciences économiques": [...L(3),["Mathématiques",3],["Philosophie",2],["Histoire",2],["Économie politique",4],["Économie de gestion",3],["Éducation physique",1],["Cours à option",2]],
+    "E – Arts plastiques": [...L(3),["Mathématiques",2],["Philosophie",2],["Éducation artistique I",4],["Éducation artistique II",3],["Éducation artistique III",3],["Éducation musicale",2],["Éducation physique",1],["Cours à option",2]],
+    "F – Musique": [...L(3),["Mathématiques",2],["Philosophie",2],["Éducation artistique",2],["Éducation musicale I",4],["Éducation musicale II",3],["Éducation musicale III",3],["Éducation physique",1],["Cours à option",2]],
+    "G – Sciences humaines": [...L(3),["Mathématiques",2],["Philosophie",2],["Histoire / Géographie",3],["Économie politique",2],["Sciences sociales",4],["Éducation artistique",2],["Éducation physique",1],["Cours à option",2]],
+  }},
 };
 
-const $ = (id) => document.getElementById(id);
-let year = localStorage.getItem("gc_year") || "5e (classique)";
-let rows = [];   // [{name, coef, marks:""}]
+const $ = (id)=>document.getElementById(id);
+const esc = (s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let sb=null, signedIn=false, saveTimer=null;
+let year = localStorage.getItem("gc_year") || "5e";
+let variant = localStorage.getItem("gc_variant") || "";
+let rows = [];
 
-function keyFor(y){ return "gc_data_" + y; }
-function loadYear(y){
-  year = y; localStorage.setItem("gc_year", y);
-  const saved = localStorage.getItem(keyFor(y));
-  if (saved) { try { rows = JSON.parse(saved); } catch { rows = template(y); } }
-  else rows = template(y);
+function variants(y){ return Object.keys(YEARS[y].variants); }
+function template(){ return (YEARS[year]?.variants[variant] || []).map(([name,coef])=>({name,coef,marks:""})); }
+function key(){ return variant ? `${year} | ${variant}` : year; }
+function lsKey(){ return "gc_data_" + key(); }
+
+async function loadSheet(){
+  localStorage.setItem("gc_year",year); localStorage.setItem("gc_variant",variant);
+  let data=null;
+  if (signedIn){
+    try { const { data:d } = await sb.from("grade_sheets").select("data").eq("sheet_key",key()).maybeSingle(); if(d) data=d.data; } catch(e){ console.warn(e); }
+  }
+  if (!data){ const ls=localStorage.getItem(lsKey()); if(ls){ try{ data=JSON.parse(ls); }catch{} } }
+  rows = data || template();
   render();
 }
-function template(y){ return (TEMPLATES[y]||[]).map(([name,coef]) => ({name, coef, marks:""})); }
-function save(){ localStorage.setItem(keyFor(year), JSON.stringify(rows)); }
-
-function parseMarks(s){
-  return (s||"").split(/[, ]+/).map(x=>parseFloat(x.replace(",",".")))
-    .filter(n=>!isNaN(n) && n>=0 && n<=60);
+function save(){
+  localStorage.setItem(lsKey(), JSON.stringify(rows));
+  if (signedIn){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async ()=>{
+      try { await sb.from("grade_sheets").upsert({ user_id: auth.session().user.id, sheet_key:key(), data:rows, updated_at:new Date().toISOString() }, { onConflict:"user_id,sheet_key" }); syncMsg("Synced ✓"); }
+      catch(e){ syncMsg("Sync error: "+e.message); }
+    }, 600);
+  }
 }
-function subjAvg(r){ const m=parseMarks(r.marks); return m.length? m.reduce((a,b)=>a+b,0)/m.length : null; }
+function syncMsg(m){ $("syncLine").textContent = signedIn ? m : "Not signed in — saved on this device only. Sign in (top-right) to sync across devices."; }
+
+const parseMarks = (s)=>(""+(s||"")).split(/[, ]+/).map(x=>parseFloat((""+x).replace(",","."))).filter(n=>!isNaN(n)&&n>=0&&n<=60);
+const subjAvg = (r)=>{ const m=parseMarks(r.marks); return m.length? m.reduce((a,b)=>a+b,0)/m.length : null; };
+
+function renderPickers(){
+  $("yearSel").innerHTML = Object.keys(YEARS).map(y=>`<option ${y===year?"selected":""}>${y}</option>`).join("");
+  const vs = variants(year);
+  if (!variant || !vs.includes(variant)) variant = vs[0];
+  const single = vs.length===1 && vs[0]==="";
+  $("variantWrap").style.display = single ? "none" : "";
+  $("variantWrap").childNodes[0].nodeValue = (YEARS[year].label||"Section") + " ";
+  $("variantSel").innerHTML = vs.map(v=>`<option ${v===variant?"selected":""}>${v||"—"}</option>`).join("");
+}
 
 function render(){
-  // year select
-  const ys = $("yearSel");
-  ys.innerHTML = Object.keys(TEMPLATES).map(y=>`<option ${y===year?"selected":""}>${y}</option>`).join("");
-  // rows
+  renderPickers();
   const tb = $("rows");
   tb.innerHTML = rows.map((r,i)=>{
-    const a = subjAvg(r);
-    const cls = a==null ? "" : (a>=30?"good":"bad");
+    const a=subjAvg(r), cls = a==null?"":(a>=30?"good":"bad");
     return `<tr>
-      <td class="subj"><input data-i="${i}" data-f="name" value="${esc(r.name)}" style="width:100%;background:none;border:none;color:var(--text);font-weight:600"></td>
+      <td><input data-i="${i}" data-f="name" value="${esc(r.name)}" style="width:100%;background:none;border:none;color:var(--text);font-weight:600"></td>
       <td><input class="coef" data-i="${i}" data-f="coef" type="number" min="0" step="1" value="${r.coef}"></td>
       <td><input class="marks" data-i="${i}" data-f="marks" value="${esc(r.marks)}" placeholder="e.g. 45, 38, 52"></td>
       <td class="avg ${cls}">${a==null?"—":a.toFixed(1)}</td>
       <td><button class="del" data-del="${i}" title="Remove">✕</button></td>
     </tr>`;
   }).join("");
-  // wire inputs
-  tb.querySelectorAll("input").forEach(inp=>{
-    inp.oninput = () => {
-      const i=+inp.dataset.i, f=inp.dataset.f;
-      rows[i][f] = (f==="coef") ? (parseFloat(inp.value)||0) : inp.value;
-      save();
-      if (f!=="name") { updateSummary(); refreshAvg(i); }
-    };
+  tb.querySelectorAll("input").forEach(inp=> inp.oninput=()=>{
+    const i=+inp.dataset.i,f=inp.dataset.f;
+    rows[i][f] = f==="coef" ? (parseFloat(inp.value)||0) : inp.value;
+    save(); if(f!=="name"){ updateSummary(); refreshAvg(i); }
   });
   tb.querySelectorAll(".del").forEach(b=> b.onclick=()=>{ rows.splice(+b.dataset.del,1); save(); render(); });
-  // need-subject select
   $("needSubj").innerHTML = rows.map((r,i)=>`<option value="${i}">${esc(r.name)}</option>`).join("");
-  updateSummary();
+  updateSummary(); syncMsg(signedIn?"Synced ✓":"");
 }
 function refreshAvg(i){
-  const cell = $("rows").querySelectorAll("tr")[i]?.querySelector(".avg");
-  if(!cell) return;
-  const a = subjAvg(rows[i]);
-  cell.textContent = a==null?"—":a.toFixed(1);
-  cell.className = "avg " + (a==null?"":(a>=30?"good":"bad"));
+  const cell=$("rows").querySelectorAll("tr")[i]?.querySelector(".avg"); if(!cell) return;
+  const a=subjAvg(rows[i]); cell.textContent=a==null?"—":a.toFixed(1); cell.className="avg "+(a==null?"":(a>=30?"good":"bad"));
 }
-
 function updateSummary(){
-  let num=0, den=0, filled=0;
-  rows.forEach(r=>{ const a=subjAvg(r); if(a!=null && r.coef>0){ num+=a*r.coef; den+=r.coef; filled++; } });
-  const avg = den? num/den : null;
-  $("overall").textContent = avg==null? "—" : avg.toFixed(2);
-  $("overall").style.color = avg==null? "var(--text)" : (avg>=30?"var(--good)":"var(--bad)");
-  $("status").textContent = avg==null? "—" : (avg>=30? "✓ pass" : "✗ below");
-  $("status").style.color = avg==null? "var(--text)" : (avg>=30?"var(--good)":"var(--bad)");
-  $("status").style.fontSize="22px";
-  $("filled").textContent = filled + " / " + rows.length;
-  $("filled").style.fontSize="22px";
+  let num=0,den=0,filled=0;
+  rows.forEach(r=>{ const a=subjAvg(r); if(a!=null&&r.coef>0){ num+=a*r.coef; den+=r.coef; filled++; }});
+  const avg=den?num/den:null;
+  $("overall").textContent=avg==null?"—":avg.toFixed(2);
+  $("overall").style.color=avg==null?"var(--text)":(avg>=30?"var(--good)":"var(--bad)");
+  $("status").textContent=avg==null?"—":(avg>=30?"✓ pass":"✗ below"); $("status").style.fontSize="22px";
+  $("status").style.color=avg==null?"var(--text)":(avg>=30?"var(--good)":"var(--bad)");
+  $("filled").textContent=filled+" / "+rows.length; $("filled").style.fontSize="22px";
 }
-
 function calcNeed(){
-  const i = +$("needSubj").value;
-  const r = rows[i]; if(!r) return;
-  const target = parseFloat($("needTarget").value)||0;
-  const w = Math.max(1, parseInt($("needWeight").value)||1);
-  const m = parseMarks(r.marks);
-  const sum = m.reduce((a,b)=>a+b,0), n = m.length;
-  // (sum + w*g) / (n + w) = target  →  g = (target*(n+w) - sum) / w
-  const g = (target*(n+w) - sum) / w;
-  const el = $("needResult");
-  if (g <= 0) {
-    el.innerHTML = `You're already at or above ${target} in <b>${esc(r.name)}</b> — even a <b>0</b> on the next test keeps your average ≥ ${target}. 🎉`;
-  } else if (g > 60) {
-    el.innerHTML = `To hit a <b>${target}</b> average in <b>${esc(r.name)}</b> you'd need <b>${g.toFixed(1)}/60</b> — that's above the max, so it's not reachable with one ${w>1?`(×${w})`:""} test. Aim a bit lower.`;
-  } else {
-    el.innerHTML = `In <b>${esc(r.name)}</b>, you need <b>${g.toFixed(1)} / 60</b> on your next test${w>1?` (counting as ${w} marks)`:""} to reach a <b>${target}</b> average.`;
-  }
+  const i=+$("needSubj").value, r=rows[i]; if(!r) return;
+  const target=parseFloat($("needTarget").value)||0, w=Math.max(1,parseInt($("needWeight").value)||1);
+  const m=parseMarks(r.marks), sum=m.reduce((a,b)=>a+b,0), n=m.length;
+  const g=(target*(n+w)-sum)/w, el=$("needResult");
+  if (g<=0) el.innerHTML=`You're already at/above ${target} in <b>${esc(r.name)}</b> — even a <b>0</b> next keeps you there. 🎉`;
+  else if (g>60) el.innerHTML=`Reaching <b>${target}</b> in <b>${esc(r.name)}</b> needs <b>${g.toFixed(1)}/60</b> — above the max, so not reachable on one ${w>1?`(×${w}) `:""}test.`;
+  else el.innerHTML=`In <b>${esc(r.name)}</b>, you need <b>${g.toFixed(1)} / 60</b> on the next test${w>1?` (counting ${w} marks)`:""} for a <b>${target}</b> average.`;
 }
 
-const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+$("yearSel").onchange=e=>{ year=e.target.value; variant=variants(year)[0]; loadSheet(); };
+$("variantSel").onchange=e=>{ variant=(e.target.value==="—"?"":e.target.value); loadSheet(); };
+$("resetBtn").onclick=()=>{ if(confirm("Reset subjects & coefficients to the official template? Marks for this sheet are cleared.")){ rows=template(); save(); render(); } };
+$("addBtn").onclick=()=>{ rows.push({name:"New subject",coef:1,marks:""}); save(); render(); };
+$("needBtn").onclick=calcNeed;
 
-$("yearSel").onchange = (e)=> loadYear(e.target.value);
-$("resetBtn").onclick = ()=>{ if(confirm("Reset subjects & coefficients to the official template for "+year+"? Your entered marks for this year will be cleared.")){ rows=template(year); save(); render(); } };
-$("addBtn").onclick = ()=>{ rows.push({name:"New subject", coef:1, marks:""}); save(); render(); };
-$("needBtn").onclick = calcNeed;
-
-loadYear(year);
+(async function boot(){
+  render();   // show local immediately
+  loadSheetLocalFirst();
+  if (auth.authConfigured){
+    auth.mountAccountButton($("acctHost"));
+    sb = await auth.client();
+    auth.onAuth(()=>{ signedIn=!!auth.session(); loadSheet(); });
+    signedIn=!!auth.session();
+    loadSheet();
+  }
+})();
+function loadSheetLocalFirst(){ const ls=localStorage.getItem(lsKey()); rows = ls?JSON.parse(ls):template(); render(); }
 </script>
 </body>
 </html>
