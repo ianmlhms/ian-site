@@ -35,7 +35,10 @@ end; $$;
 grant execute on function public.mark_read(bigint) to authenticated;
 
 -- ---- 3) my_chats v4: + last message preview, sender, and unread flag ------
--- Ordered by most-recent activity. Backward compatible (only adds columns).
+-- Ordered by most-recent activity. The return columns changed since v2, so the
+-- old function must be dropped first (Postgres can't CREATE OR REPLACE a new
+-- OUT-parameter signature).
+drop function if exists public.my_chats();
 create or replace function public.my_chats()
 returns table(
   id bigint, name text, invite_code text, is_dm boolean, created_at timestamptz,
