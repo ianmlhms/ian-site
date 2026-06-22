@@ -98,14 +98,17 @@ async function selectChat(g) {
     if (on) li.classList.remove("unread");           // clear the badge immediately
   });
   $("chatHead").innerHTML =
-    `<b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b>
+    `<button class="back-btn" id="backBtn" title="Chats">‹</button>
+     <b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b>
      ${g.is_dm ? "" : `<span class="invite" title="Share so others can join">code: <code>${esc(g.invite_code)}</code></span>`}
      <span class="head-actions">
        <button id="membersBtn" title="Members">👥</button>
        <button id="leaveBtn" title="Leave">🚪</button>
      </span>`;
+  $("backBtn").onclick = goBackToList;
   $("membersBtn").onclick = toggleMembers;
   $("leaveBtn").onclick = leaveChat;
+  $("app").classList.add("chat-open");   // mobile: show the conversation full-screen
   $("composer").style.display = "flex";
   const box = $("messages");
   box.innerHTML = `<div class="empty">Loading…</div>`;
@@ -130,6 +133,7 @@ async function leaveChat() {
   $("messages").innerHTML = "";
   $("composer").style.display = "none";
   closeMembers();
+  $("app").classList.remove("chat-open");   // mobile: back to the list
   loadChats();
 }
 
@@ -146,6 +150,9 @@ async function toggleMembers() {
     data.map((m) => `<div class="mp-row">👤 ${esc(m.username)}${m.user_id === me ? " <span class='you'>(you)</span>" : ""}</div>`).join("");
 }
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
+
+// Mobile: go back from a full-screen conversation to the chat list.
+function goBackToList() { closeMembers(); $("app").classList.remove("chat-open"); }
 
 async function markRead(gid) { try { await sb.rpc("mark_read", { p_group_id: gid }); } catch (e) { console.warn("[msgr] mark_read", e); } }
 

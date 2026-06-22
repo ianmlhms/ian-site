@@ -45,7 +45,7 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=6`, `friends.js?v=3`,
+Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=7`, `friends.js?v=3`,
 `pixelbreak-records.js?v=3`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=1`
 (`notify.js`/`sw.js` are imported, not query-versioned — hard-refresh or bump the importer).
 
