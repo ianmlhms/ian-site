@@ -82,7 +82,8 @@ const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 
 let name="Player", phase="lobby", rounds=5, round=0, target=null, mode="visible";
 let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
-let wins={}, distTot={}, peeking=false, peekTimer=null;
+let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false;
+function recordResult(game,result){ try{ const a=window.__pbAuth; if(a&&a.session&&a.sb) a.sb.rpc("record_match",{p_game:game,p_result:result}); }catch{} }
 
 const MAXD = Math.sqrt(255*255*3);
 const FLASH_MS = 3000; // flash mode: how long the target is shown before it hides
@@ -220,8 +221,13 @@ function applyReveal(p){
   clearTimeout(peekTimer); peeking=false;
   round=p.round; target=p.target; results=p.results; winner=p.winner; wins=p.wins; distTot=p.distTot; isFinal=p.isFinal; rounds=p.rounds;
   phase="results"; render();
+  if(isFinal && !AI && !recorded){
+    recorded=true;
+    const sorted=[...players()].sort((a,b)=>(wins[b.cid]||0)-(wins[a.cid]||0)||(distTot[a.cid]||0)-(distTot[b.cid]||0));
+    recordResult("color", sorted[0] && sorted[0].cid===cid ? "win" : "loss");
+  }
 }
-function resetAll(){ clearTimeout(peekTimer); peeking=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
+function resetAll(){ clearTimeout(peekTimer); peeking=false; recorded=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
 
 if(AI){
   document.querySelector(".bar h1").textContent="🎨 Colour Dial — vs Computer";

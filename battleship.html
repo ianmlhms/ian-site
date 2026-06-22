@@ -93,6 +93,8 @@ const $=(id)=>document.getElementById(id);
 let own=empty(), enemy=empty(), placed=[], toPlace=[...SHIPS], orient="h";
 let myReady=false, oppReady=false, oppHere=false, turn="host", phase="setup", over=false;
 let aiBoard=null, aiHunt=[];   // AI mode: computer's hidden fleet + its hit-follow-up queue
+let recorded=false;
+function recordResult(game,result){ try{ const a=window.__pbAuth; if(a&&a.session&&a.sb) a.sb.rpc("record_match",{p_game:game,p_result:result}); }catch{} }
 function empty(){ return Array.from({length:N},()=>Array(N).fill(0)); }
 const allPlaced=()=>toPlace.length===0;
 
@@ -164,6 +166,7 @@ function renderPlay(){
   grid($("ownSmall"),own,true,null);
   if(over) setStatus(over===role?"You win! 🎉":"You lost.","");
   else setStatus(turn===role?"Your turn — fire!":(AI?"Computer firing…":"Opponent's turn…"));
+  if(over && !AI && !recorded){ recorded=true; recordResult("battleship", over===role?"win":"loss"); }
   $("rematch").style.display=over?"":"none";
 }
 
@@ -251,7 +254,7 @@ $("clear").onclick=()=>{ if(!myReady) clearAll(); };
 $("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true;
   if(AI){ aiPlace(); oppReady=true; renderSetup(); bothReady(); return; }
   ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
-function resetGame(send){ over=false; myReady=false; oppReady=false; phase="setup"; clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
+function resetGame(send){ over=false; recorded=false; myReady=false; oppReady=false; phase="setup"; clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
 $("rematch").onclick=()=>resetGame(true);
 </script>
 </body>

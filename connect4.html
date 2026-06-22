@@ -57,14 +57,15 @@ const room = params.get("room") || "demo";
 const role = params.get("role") === "guest" ? "guest" : "host";
 const me = role === "host" ? 1 : 2;          // 1 = red (host, first), 2 = yellow
 const opp = me === 1 ? 2 : 1;
-let board = [], turn = 1, over = false, oppHere = false;
+let board = [], turn = 1, over = false, oppHere = false, recorded = false;
+function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
 
 const $ = (id) => document.getElementById(id);
 const cfg = window.PB_CONFIG;
 const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 const ch = sb.channel("c4:" + room, { config: { broadcast: { self: false }, presence: { key: role } } });
 
-function fresh() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); turn = 1; over = false; }
+function fresh() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); turn = 1; over = false; recorded = false; }
 function render() {
   const b = $("board"); b.className = "board" + (turn === me && !over && oppHere ? " mine" : "");
   b.innerHTML = "";
@@ -106,6 +107,7 @@ function play(col, player, local) {
   else turn = player === 1 ? 2 : 1;
   render();
   if (over) $("rematch").style.display = "";
+  if (over && !AI && !recorded) { recorded = true; recordResult("connect4", over === "draw" ? "draw" : over === me ? "win" : "loss"); }
   if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: { col, player } });
   if (AI && !over && turn === opp) setTimeout(aiMove, 350);   // computer replies
 }

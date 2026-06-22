@@ -63,6 +63,8 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
 ⚠️ **`messenger-setup-v4.sql` must be run** (replies, read-state, push tables) — see §8.
 ⚠️ **`messenger-setup-v5.sql` must be run** (read receipts: chat_reads shared-select policy + realtime).
 ⚠️ **`messenger-setup-v6.sql` must be run** (emoji reactions table + realtime; `messages.edited_at` + update policy).
+⚠️ **`wordle-setup.sql` must be run** (Wordle public leaderboard: `wordle_results` + RPCs). [run ✓]
+⚠️ **`rankings-setup.sql` must be run** (cross-game rankings: `game_results` + `record_match`/`game_leaderboard`).
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -88,7 +90,8 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **Stadt-Land-Fluss** | `slf.html` | 2+ players, realtime (`slf:<room>`), letter→categories→uniqueness scoring. |
 | **Battleship** | `battleship.html` | 1v1, realtime (`bs:<room>`), manual ship placement (H/V toggle) + Shuffle. **`?ai=1`** = local single-player vs a hunt/target computer (random fleet, checkerboard hunt). |
 | **Colour Dial** | `color.html` | dialed.gg-style: everyone matches the same target colour with R/G/B sliders, closest match wins the round; host sets the round count **and mode** in the lobby. Two modes: **👁 visible** (target stays on screen) and **⚡ flash** (target shown ~3s then hidden — match from memory). Realtime (`col:<room>`), **host-authoritative** scoring. **`?ai=1`** = solo vs two bots (🤖 Pixel / 🤖 Byte) that guess with random error. 2+ players. |
-| **Wuertspill (Wordle)** | `wordle.html` | Single-player daily Wordle in **Lëtzebuergesch + Deutsch** (language toggle). Deterministic daily word per language, 6 guesses, on-screen QWERTZ keyboard (incl. ÄÖÜËÉ), emoji-grid share, local stats/streak. No backend/SQL. Home tile "🟩 Wuertspill". Word lists are editable arrays at the top of the file (LB list is conservative — expand it). |
+| **Wuertspill (Wordle)** | `wordle.html` | Single-player daily Wordle in **Lëtzebuergesch + Deutsch** (language toggle). Deterministic daily word per language, 6 guesses, on-screen QWERTZ keyboard (incl. ÄÖÜËÉ), emoji-grid share, local stats/streak. **Public leaderboard** (🏆 Top, signed-in results → `wordle_results`, `record_wordle`/`wordle_leaderboard`). Home tile "🟩 Wuertspill". Word lists are editable arrays at the top of the file (LB list is conservative — expand it). |
+| **Leaderboard** | `leaderboard.html` | Cross-game rankings (All / Connect 4 / Battleship / Colour Dial), public read. Players **self-report their own win/loss** via the shared authed client (`window.__pbAuth.sb`) on match end — only when signed in. `game_results` table + `record_match`/`game_leaderboard`. Linked from the Games hub. SLF excluded (endless). |
 | **Theme** | `theme.js` | Floating 🎨 picker (dark/light + accent) on every page; sets CSS vars on `:root`, localStorage. |
 | **Shared auth** | `auth.js` | Supabase client + account button + sign-in modal (loads supabase-js from jsDelivr UMD global, **not** esm.sh — that broke in Safari). |
 
