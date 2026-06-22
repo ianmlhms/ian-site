@@ -103,6 +103,12 @@ Old full data was scrubbed from git history.
 
 ## 6. Gotchas / conventions
 
+- **One Supabase client only.** `auth.js` caches its client on `window.__pbAuth`, so every
+  import (even mismatched `auth.js` vs `auth.js?v=3`) shares ONE GoTrue. Two session-managing
+  clients on the same localStorage race on token refresh → "signed in but everything 401s"
+  (no chats, no admin link). Realtime-only clients (the game pages' own `createClient`) must pass
+  `{ auth:{ persistSession:false, autoRefreshToken:false } }` so they don't touch the session.
+  `notify-ambient.js` is deliberately NOT on `pixelbreak.html` (it runs its own login client there).
 - **Bump `?v=` on any JS change** (see §2) — the #1 source of "it didn't update".
 - **`git pull --rebase` before pushing** — the Mac mini commits dashboard refreshes to the same repo.
 - After any **git history rewrite**, every clone must `git reset --hard` (never plain pull) or old commits return.

@@ -4,8 +4,13 @@ const cfg = window.PB_CONFIG || {};
 export const authConfigured =
   /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) && (cfg.anonKey || "").trim().length > 20;
 
-let _sb = null, _ready = null, _session = null;
-const _cbs = [];
+// Shared across EVERY instance of this module — even when it's imported under
+// different "?v=" query strings (auth.js vs auth.js?v=3 are otherwise separate
+// modules with separate clients). Two Supabase/GoTrue clients on the same
+// localStorage race on token refresh and corrupt the session, which shows up as
+// "signed in but everything 401s" (no chats load, admin link missing). One global
+// client avoids that.
+const _g = (window.__pbAuth = window.__pbAuth || { sb: null, ready: null, session: null, cbs: [] });
 
 async function getCreateClient() {
   // Prefer the global UMD build (loaded via <script> in the page) — most reliable
@@ -21,24 +26,24 @@ async function getCreateClient() {
 }
 
 export async function client() {
-  if (_sb) return _sb;
-  if (!_ready) {
-    _ready = (async () => {
+  if (_g.sb) return _g.sb;
+  if (!_g.ready) {
+    _g.ready = (async () => {
       const createClient = await getCreateClient();
-      _sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
-      const { data } = await _sb.auth.getSession();
-      _session = data.session;
-      _sb.auth.onAuthStateChange((_e, s) => { _session = s; _cbs.forEach((cb) => cb(s)); });
-      return _sb;
+      _g.sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
+      const { data } = await _g.sb.auth.getSession();
+      _g.session = data.session;
+      _g.sb.auth.onAuthStateChange((_e, s) => { _g.session = s; _g.cbs.forEach((cb) => cb(s)); });
+      return _g.sb;
     })();
   }
-  await _ready;
-  return _sb;
+  await _g.ready;
+  return _g.sb;
 }
 
-export const session = () => _session;
-export const username = () => (_session ? (_session.user.user_metadata?.username || _session.user.email) : null);
-export function onAuth(cb) { _cbs.push(cb); }
+export const session = () => _g.session;
+export const username = () => (_g.session ? (_g.session.user.user_metadata?.username || _g.session.user.email) : null);
+export function onAuth(cb) { _g.cbs.push(cb); }
 
 export async function signIn(email, password) {
   const sb = await client();

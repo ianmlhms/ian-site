@@ -54,7 +54,7 @@ const cid = Math.random().toString(36).slice(2,10);
 document.getElementById("roomc").textContent = room;
 
 const cfg = window.PB_CONFIG;
-const sb = supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey);
+const sb = supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey, { auth:{ persistSession:false, autoRefreshToken:false } });
 const ch = sb.channel("slf:"+room, { config:{ broadcast:{self:false}, presence:{key:cid} }});
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -63,7 +63,7 @@ let name="Player", phase="lobby", letter="", round=0, stopped=false, answers={},
 
 async function getName(){
   let n=localStorage.getItem("playerName");
-  if(!n){ try{ const {data}=await sb.auth.getSession(); n=data.session?.user?.user_metadata?.username; }catch{} }
+  if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} }
   if(!n){ n=(prompt("Your name for the game:")||"Player").slice(0,20); }
   localStorage.setItem("playerName", n); return n;
 }

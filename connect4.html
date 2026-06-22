@@ -60,7 +60,7 @@ let board = [], turn = 1, over = false, oppHere = false;
 
 const $ = (id) => document.getElementById(id);
 const cfg = window.PB_CONFIG;
-const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
+const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 const ch = sb.channel("c4:" + room, { config: { broadcast: { self: false }, presence: { key: role } } });
 
 function fresh() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); turn = 1; over = false; }
