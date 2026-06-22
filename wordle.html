@@ -37,6 +37,20 @@
   .stats{display:flex;gap:18px;color:var(--muted);font-size:13px;margin-top:4px}
   .stats b{color:var(--text);font-size:18px;display:block;text-align:center}
   .share{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-weight:800;cursor:pointer;display:none}
+  .lbbtn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:7px 11px;font-weight:800;cursor:pointer;font-size:13px}
+  .lbbtn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .lb-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:5000;padding:18px}
+  .lb-modal.open{display:flex}
+  .lb-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:430px;width:100%;max-height:82vh;overflow:auto}
+  .lb-box h2{margin:0 0 12px;font-size:18px}
+  .lb-tabs{display:flex;gap:8px;margin-bottom:12px}
+  .lb-tabs button{flex:1;padding:7px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-weight:800;cursor:pointer}
+  .lb-tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .lb-box table{width:100%;border-collapse:collapse;font-size:14px}
+  .lb-box th,.lb-box td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
+  .lb-box th{color:var(--muted);font-size:12px}
+  .lb-box td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
 </style>
 </head>
 <body>
@@ -44,6 +58,8 @@
   <a class="home" href="index.html">‹ Home</a>
   <h1>🟩 Wuertspill</h1>
   <div class="spacer"></div>
+  <button class="lbbtn" id="lbBtn">🏆 Top</button>
+  <span id="acctHost"></span>
   <div class="langs"><button data-l="lb" class="on">🇱🇺 LB</button><button data-l="de">🇩🇪 DE</button></div>
 </header>
 
@@ -157,6 +173,7 @@ function finish(won){
   s.played++; if(won){ s.wins++; s.streak++; s.max=Math.max(s.max,s.streak); s.dist[guesses.length-1]++; } else s.streak=0;
   localStorage.setItem(statsKey(), JSON.stringify(s));
   renderStats();
+  window.recordWordle?.(lang, dayIndex(), won?guesses.length:0);   // public leaderboard (if signed in)
 }
 function renderStats(){
   const s=JSON.parse(localStorage.getItem(statsKey())||"null")||{played:0,wins:0,streak:0,max:0};
@@ -182,8 +199,52 @@ document.querySelectorAll(".langs button").forEach(b=> b.onclick=()=>{
   flash(""); load();
 });
 $("share").onclick=shareResult;
+$("lbBtn").onclick=()=>window.openWordleBoard?.(lang);
 document.querySelectorAll(".langs button").forEach(x=>x.classList.toggle("on",x.dataset.l===lang));
 load();
+</script>
+
+<div class="lb-modal" id="lbModal">
+  <div class="lb-box">
+    <button class="lb-close" id="lbClose">&times;</button>
+    <h2>🏆 Leaderboard</h2>
+    <div class="lb-tabs"><button data-lb="lb" class="on">🇱🇺 LB</button><button data-lb="de">🇩🇪 DE</button></div>
+    <div id="lbBody">…</div>
+  </div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import * as auth from "./auth.js?v=3";
+  let sb = null;
+  const $ = (id) => document.getElementById(id);
+  (async () => { if (!auth.authConfigured) return; auth.mountAccountButton($("acctHost")); sb = await auth.client(); })();
+
+  window.recordWordle = async (lang, day, guesses) => {
+    try { if (!sb) sb = await auth.client(); if (!auth.session()) return; await sb.rpc("record_wordle", { p_username: auth.username(), p_lang: lang, p_day: day, p_guesses: guesses }); }
+    catch (e) { console.warn("[wordle] record", e); }
+  };
+
+  let boardLang = "lb";
+  async function drawBoard() {
+    const body = $("lbBody"); body.innerHTML = "Lueden…";
+    try {
+      if (!sb) sb = await auth.client();
+      const { data, error } = await sb.rpc("wordle_leaderboard", { p_lang: boardLang });
+      if (error) throw error;
+      if (!data || !data.length) { body.innerHTML = `<p style="color:var(--muted)">Nach keng Resultater — spill a kommzréck!</p>`; return; }
+      const esc = (s) => (""+(s??"")).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]));
+      const tody = (t) => t == null ? "—" : t === 0 ? "✗" : t + "/6";
+      body.innerHTML = `<table><tr><th>#</th><th>Spiller</th><th class="n">Gewonn</th><th class="n">⌀</th><th class="n">Haut</th></tr>` +
+        data.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.username)}</td><td class="n">${r.wins}/${r.played}</td><td class="n">${r.avg_guesses ?? "—"}</td><td class="n">${tody(r.today)}</td></tr>`).join("") +
+        `</table>`;
+    } catch (e) { body.innerHTML = "Feeler beim Lueden."; console.warn(e); }
+  }
+  window.openWordleBoard = (lang) => { boardLang = lang || "lb"; $("lbModal").classList.add("open"); document.querySelectorAll("[data-lb]").forEach(b => b.classList.toggle("on", b.dataset.lb === boardLang)); drawBoard(); };
+  $("lbClose").onclick = () => $("lbModal").classList.remove("open");
+  $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") $("lbModal").classList.remove("open"); };
+  document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; document.querySelectorAll("[data-lb]").forEach(x => x.classList.toggle("on", x === b)); drawBoard(); });
 </script>
 </body>
 </html>
