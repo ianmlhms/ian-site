@@ -64,7 +64,8 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
 ⚠️ **`messenger-setup-v5.sql` must be run** (read receipts: chat_reads shared-select policy + realtime).
 ⚠️ **`messenger-setup-v6.sql` must be run** (emoji reactions table + realtime; `messages.edited_at` + update policy).
 ⚠️ **`wordle-setup.sql` must be run** (Wordle public leaderboard: `wordle_results` + RPCs). [run ✓]
-⚠️ **`rankings-setup.sql` must be run** (cross-game rankings: `game_results` + `record_match`/`game_leaderboard`).
+⚠️ **`rankings-setup.sql` must be run** (cross-game rankings: `game_results` + `record_match`/`game_leaderboard`). [run ✓]
+⚠️ **`homework-setup.sql`** (WebUntis homework table) + deploy `webuntis-sync` Edge Function — see `scripts/WEBUNTIS-SETUP.md`.
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -84,6 +85,7 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **Notifications** | `notify.js`, `notify-ambient.js`, `sw.js`, `manifest.webmanifest` | Shared module. `initAmbient()` (loaded via `notify-ambient.js` on most pages) shows live in-app toasts + system notifications for new messages while you're elsewhere on the site (e.g. in a game) — no server. `enablePush()` subscribes the device for **Web Push** (closed-app notifications) via the `notify` Edge Function. See **§8**. |
 | **Admin** | `admin.html`, `admin.js` | Read all groups/DMs/messages; delete group/message; add/remove members; **Users tab**: list/delete users, reset password (can't view — bcrypt). |
 | **Grades** | `grades.html` | Luxembourg grade calc: Year → Track/Section (7e–1ère, official MEN coefficients), "what do I need next", **account sync** (`grade_sheets`) + local fallback. |
+| **Hausaufgaben** | `homework.html` | **Admin-only** WebUntis homework. "Sync now" invokes the **`webuntis-sync` Edge Function** (logs in with WebUntis creds from function secrets, upserts into `homework`). `homework` table is admin-read. Home tile is admin-only. Deploy/secrets: `scripts/WEBUNTIS-SETUP.md`. School = Aline Mayrisch / `laml.webuntis.com`. |
 | **Friends** | `friends.html`, `friends.js` | Add by username, **People** directory, sent/received requests, Message (→ DM) or invite to a game. |
 | **Games hub** | `games.html` | New category (separate from PixelBreak). Start/Join by code, or invite a friend. |
 | **Connect 4** | `connect4.html` | 1v1, realtime broadcast (`c4:<room>`). **`?ai=1`** = local single-player vs a minimax/alpha-beta computer (no network). |

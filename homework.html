@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hausaufgaben — ian.lu</title>
+<meta name="description" content="WebUntis homework, synced.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#ffcc4d;--red:#ff5d6c;--good:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{max-width:620px;margin:0 auto;padding:22px 16px 60px}
+  .gate{text-align:center;color:var(--muted);padding:50px 16px}
+  .row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}
+  .btn:disabled{opacity:.5;cursor:default}
+  .synced{color:var(--muted);font-size:12.5px}
+  .day{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px}
+  .hw{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:10px;border-left:3px solid var(--accent)}
+  .hw.soon{border-left-color:var(--warn)} .hw.over{border-left-color:var(--red);opacity:.7}
+  .hw .subj{font-weight:800;font-size:13px;color:var(--accent2)}
+  .hw .due{float:right;font-size:12px;color:var(--muted)}
+  .hw .txt{margin-top:5px;font-size:14px;line-height:1.4}
+  .hw .rem{margin-top:4px;font-size:12.5px;color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;padding:34px 10px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>📚 Hausaufgaben</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+<div class="wrap" id="wrap"><p class="empty">Loading…</p></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=3";
+const $ = (id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+let sb=null;
+
+async function boot(){
+  if(!auth.authConfigured){ $("wrap").innerHTML=`<p class="empty">Not configured.</p>`; return; }
+  auth.mountAccountButton($("acctHost"));
+  sb=await auth.client();
+  auth.onAuth(()=>render());
+  render();
+}
+async function render(){
+  if(!auth.session()){ $("wrap").innerHTML=`<div class="gate">Sign in to see your homework.<br><br><button class="btn" id="signin">Sign in</button></div>`; $("signin").onclick=auth.openAuthModal; return; }
+  let admin=false; try{ const { data }=await sb.rpc("is_admin"); admin=!!data; }catch{}
+  if(!admin){ $("wrap").innerHTML=`<div class="gate">This page is private.</div>`; return; }
+  showApp();
+}
+async function showApp(){
+  $("wrap").innerHTML=`
+    <div class="row">
+      <button class="btn" id="syncBtn">🔄 Sync now</button>
+      <span class="synced" id="synced"></span>
+    </div>
+    <div id="list"><p class="empty">Loading…</p></div>`;
+  $("syncBtn").onclick=syncNow;
+  loadList();
+}
+function fmtDate(d){ if(!d) return ""; const dt=new Date(d+"T00:00:00"); return dt.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"}); }
+async function loadList(){
+  const today=new Date().toISOString().slice(0,10);
+  const { data, error }=await sb.from("homework").select("*").or(`due_date.gte.${today},due_date.is.null`).order("due_date",{ascending:true,nullsFirst:false});
+  const list=$("list");
+  if(error){ list.innerHTML=`<div class="empty">Couldn't load.</div>`; return; }
+  if(!data || !data.length){ list.innerHTML=`<div class="empty">No upcoming homework. Hit “Sync now”.</div>`; return; }
+  if(data[0]?.synced_at) $("synced").textContent="Last synced "+new Date(data[0].synced_at).toLocaleString();
+  list.innerHTML=data.map(h=>{
+    const due=h.due_date; const days=due?Math.round((new Date(due)-new Date(today))/86400000):99;
+    const cls=days<0?"over":days<=1?"soon":"";
+    return `<div class="hw ${cls}">
+      <span class="due">${due?fmtDate(due):""}</span>
+      <span class="subj">${esc(h.subject||"—")}</span>
+      <div class="txt">${esc(h.text||h.remark||"(no text)")}</div>
+      ${h.text&&h.remark?`<div class="rem">${esc(h.remark)}</div>`:""}
+    </div>`;
+  }).join("");
+}
+async function syncNow(){
+  const b=$("syncBtn"); b.disabled=true; b.textContent="🔄 Syncing…";
+  try{
+    const { data, error }=await sb.functions.invoke("webuntis-sync");
+    if(error) throw error;
+    $("synced").textContent = data?.ok ? `Synced ${data.count} item(s)` : (data?.error||"Sync failed");
+  }catch(e){ $("synced").textContent="Sync failed: "+(e.message||e); }
+  b.disabled=false; b.textContent="🔄 Sync now";
+  loadList();
+}
+boot();
+</script>
+</body>
+</html>
