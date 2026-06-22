@@ -45,7 +45,7 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=7`, `friends.js?v=3`,
+Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=7`, `friends.js?v=4`,
 `pixelbreak-records.js?v=3`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=1`
 (`notify.js`/`sw.js` are imported, not query-versioned — hard-refresh or bump the importer).
 
@@ -86,6 +86,7 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **Connect 4** | `connect4.html` | 1v1, realtime broadcast (`c4:<room>`). |
 | **Stadt-Land-Fluss** | `slf.html` | 2+ players, realtime (`slf:<room>`), letter→categories→uniqueness scoring. |
 | **Battleship** | `battleship.html` | 1v1, realtime (`bs:<room>`), manual ship placement (H/V toggle) + Shuffle. |
+| **Colour Dial** | `color.html` | dialed.gg-style: everyone matches the same target colour with R/G/B sliders, closest match wins the round; host sets the round count in the lobby. Realtime (`col:<room>`), **host-authoritative** scoring (host computes + broadcasts `reveal`). 2+ players. |
 | **Theme** | `theme.js` | Floating 🎨 picker (dark/light + accent) on every page; sets CSS vars on `:root`, localStorage. |
 | **Shared auth** | `auth.js` | Supabase client + account button + sign-in modal (loads supabase-js from jsDelivr UMD global, **not** esm.sh — that broke in Safari). |
 

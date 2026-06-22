@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colour Dial — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff;--good:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+  .wrap{max-width:560px;margin:0 auto;padding:22px 18px 60px}
+  .players{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px}
+  .pchip.locked{border-color:var(--good);color:var(--good)}
+  .big{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
+  .big:disabled{opacity:.45;cursor:default}
+  .ghost{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+  .swatch{width:100%;height:130px;border-radius:16px;border:1px solid var(--border)}
+  .swatch.sm{width:34px;height:24px;height:24px;border-radius:6px;display:inline-block;vertical-align:middle}
+  .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px;text-align:center}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;margin:8px 0 6px}
+  .two .cap{font-size:11px;color:var(--muted);text-align:center;margin-bottom:5px}
+  .sliders{margin:16px 0 8px}
+  .srow{display:flex;align-items:center;gap:10px;margin:12px 0}
+  .srow b{width:18px;font-size:14px}
+  .srow input[type=range]{flex:1;accent-color:var(--accent)}
+  .srow .v{width:34px;text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+  .srow.R b{color:#ff5d6c}.srow.G b{color:#3fb950}.srow.B b{color:#6ea8fe}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{padding:8px;border-bottom:1px solid var(--border);text-align:left}
+  th{color:var(--muted);font-size:12px}
+  td.pts{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+  .win{background:linear-gradient(90deg,rgba(255,107,157,.18),transparent);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:6px 0 14px;font-size:18px;font-weight:800;text-align:center}
+  h3{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
+  .muted{color:var(--muted)}.center{text-align:center}
+  .rounds{display:flex;align-items:center;gap:10px;justify-content:center;margin:14px 0}
+  .rounds input{width:70px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px;font-size:15px;text-align:center}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="games.html">‹ Games</a>
+  <h1>🎨 Colour Dial</h1>
+  <div class="spacer"></div>
+  <span class="code">room <code id="roomc"></code></span>
+</header>
+<div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="notify-ambient.js?v=1"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const room = (params.get("room")||"demo").toLowerCase();
+const role = params.get("role")==="guest" ? "guest" : "host";
+const cid = Math.random().toString(36).slice(2,10);
+document.getElementById("roomc").textContent = room;
+
+const cfg = window.PB_CONFIG;
+const sb = supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey);
+const ch = sb.channel("col:"+room, { config:{ broadcast:{self:false}, presence:{key:cid} }});
+const $ = (id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let name="Player", phase="lobby", rounds=5, round=0, target=null;
+let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
+let wins={}, distTot={};
+
+const MAXD = Math.sqrt(255*255*3);
+const rgbCss=(c)=>c?`rgb(${c.r},${c.g},${c.b})`:"#222";
+const dist=(a,b)=>Math.sqrt((a.r-b.r)**2+(a.g-b.g)**2+(a.b-b.b)**2);
+const acc=(d)=>Math.max(0,Math.round(100*(1-d/MAXD)));
+function hslToRgb(h,s,l){ s/=100;l/=100; const k=n=>(n+h/30)%12; const a=s*Math.min(l,1-l);
+  const f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+  return {r:Math.round(255*f(0)),g:Math.round(255*f(8)),b:Math.round(255*f(4))}; }
+function randTarget(){ return hslToRgb(Math.floor(Math.random()*360), 55+Math.random()*40, 38+Math.random()*32); }
+
+async function getName(){
+  let n=localStorage.getItem("playerName");
+  if(!n){ try{ const {data}=await sb.auth.getSession(); n=data.session?.user?.user_metadata?.username; }catch{} }
+  if(!n){ n=(prompt("Your name for the game:")||"Player").slice(0,20); }
+  localStorage.setItem("playerName", n); return n;
+}
+function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
+const lockedCount=(ps)=>ps.filter(p=>guesses[p.cid]).length;
+
+function render(){
+  const ps=players();
+  if(phase==="lobby"){
+    $("app").innerHTML = `
+      <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
+      <p class="muted center">Everyone sees the same colour, then dials in their best match with the R/G/B sliders. Closest match wins the round.</p>
+      ${role==="host"
+        ? `<div class="rounds"><span class="muted">Best of</span><input id="rounds" type="number" min="1" max="15" value="${rounds}"><span class="muted">rounds</span></div>
+           <button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
+        : `<p class="center muted">Best of <b>${rounds}</b> rounds · waiting for the host to start…</p>`}
+      ${standings(ps)}`;
+    if(role==="host"){
+      $("rounds").onchange=()=>{ rounds=Math.max(1,Math.min(15,+$("rounds").value||5)); ch.send({type:"broadcast",event:"cfg",payload:{rounds}}); };
+      if($("startBtn")) $("startBtn").onclick=startRound;
+    }
+  } else if(phase==="play"){
+    $("app").innerHTML = `
+      <div class="players">${ps.map(p=>`<span class="pchip ${guesses[p.cid]?"locked":""}">👤 ${esc(p.name)}${guesses[p.cid]?" ✓":""}</span>`).join("")}</div>
+      <p class="muted center">Round ${round} / ${rounds}</p>
+      <div class="two">
+        <div><div class="cap">Match this</div><div class="swatch" style="background:${rgbCss(target)}"></div></div>
+        <div><div class="cap">Your guess</div><div class="swatch" id="mySw" style="background:${rgbCss(guess)}"></div></div>
+      </div>
+      <div class="sliders">
+        ${["R","G","B"].map(ch2=>`<div class="srow ${ch2}"><b>${ch2}</b>
+          <input type="range" min="0" max="255" value="${guess[ch2.toLowerCase()]}" id="s${ch2}" ${locked?"disabled":""}>
+          <span class="v" id="v${ch2}">${guess[ch2.toLowerCase()]}</span></div>`).join("")}
+      </div>
+      ${locked
+        ? `<p class="center muted">🔒 Locked — waiting for others (${lockedCount(ps)}/${ps.length})</p>
+           ${role==="host"?`<button class="big ghost" id="revealBtn">Reveal now</button>`:""}`
+        : `<button class="big" id="lockBtn">Lock in my colour</button>`}`;
+    if(!locked){
+      ["R","G","B"].forEach(c=>{ $("s"+c).oninput=()=>{ guess[c.toLowerCase()]=+$("s"+c).value; $("v"+c).textContent=$("s"+c).value; $("mySw").style.background=rgbCss(guess); }; });
+      $("lockBtn").onclick=lockIn;
+    } else if(role==="host" && $("revealBtn")){ $("revealBtn").onclick=reveal; }
+  } else if(phase==="results"){
+    $("app").innerHTML = `
+      ${isFinal?finalBanner(ps):`<p class="muted center">Round ${round} / ${rounds}</p>`}
+      <div class="lbl">The colour was</div>
+      <div class="swatch" style="background:${rgbCss(target)}"></div>
+      <table><tr><th>Player</th><th>Match</th><th>Accuracy</th></tr>
+        ${(results||[]).map(r=>`<tr><td>${winner===r.cid?"🏆 ":""}${esc(r.name)}${r.cid===cid?" (you)":""}</td>
+          <td><span class="swatch sm" style="background:${rgbCss(r.rgb)}"></span></td>
+          <td class="pts">${r.acc}%</td></tr>`).join("")}
+      </table>
+      ${standings(ps)}
+      ${role==="host"
+        ? (isFinal?`<button class="big" id="againBtn" style="margin-top:18px">Play again</button>`
+                  :`<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`)
+        : `<p class="center muted">Waiting for host…</p>`}`;
+    if(role==="host"){
+      if(isFinal && $("againBtn")) $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
+      if(!isFinal && $("nextBtn")) $("nextBtn").onclick=startRound;
+    }
+  }
+}
+function standings(ps){
+  if(!Object.keys(wins).length && !Object.keys(distTot).length) return "";
+  const sorted=[...ps].sort((a,b)=>(wins[b.cid]||0)-(wins[a.cid]||0) || (distTot[a.cid]||0)-(distTot[b.cid]||0));
+  return `<h3>Standings</h3><table>${sorted.map(p=>`<tr><td>👤 ${esc(p.name)}</td><td class="pts">${wins[p.cid]||0} 🏆</td></tr>`).join("")}</table>`;
+}
+function finalBanner(ps){
+  const sorted=[...ps].sort((a,b)=>(wins[b.cid]||0)-(wins[a.cid]||0) || (distTot[a.cid]||0)-(distTot[b.cid]||0));
+  if(!sorted.length) return "";
+  const top=sorted[0], tie=sorted[1] && (wins[sorted[1].cid]||0)===(wins[top.cid]||0) && (distTot[sorted[1].cid]||0)===(distTot[top.cid]||0);
+  return `<div class="win">${tie?"🤝 It's a tie!":`🏆 ${esc(top.name)}${top.cid===cid?" (you)":""} wins!`}</div>`;
+}
+
+function startRound(){
+  round++; target=randTarget(); guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false;
+  ch.send({type:"broadcast",event:"round",payload:{round,target,rounds}});
+  phase="play"; render();
+}
+function lockIn(){
+  if(locked) return; locked=true;
+  guesses[cid]={name,rgb:{...guess}};
+  ch.send({type:"broadcast",event:"guess",payload:{cid,name,rgb:{...guess}}});
+  render();
+  if(role==="host") maybeReveal();
+}
+function maybeReveal(){ const ps=players(); if(ps.length && ps.every(p=>guesses[p.cid])) reveal(); }
+function reveal(){
+  if(phase!=="play") return;
+  const ps=players();
+  const res=ps.map(p=>{ const g=guesses[p.cid]?.rgb||null; const d=g?dist(g,target):MAXD; return {cid:p.cid,name:p.name,rgb:g,dist:d,acc:acc(d)}; });
+  res.sort((a,b)=>a.dist-b.dist);
+  const win=res.length?res[0].cid:null;
+  res.forEach(r=>{ distTot[r.cid]=(distTot[r.cid]||0)+r.dist; });
+  if(win) wins[win]=(wins[win]||0)+1;
+  const fin = round>=rounds;
+  const payload={round,target,results:res,winner:win,wins,distTot,isFinal:fin,rounds};
+  ch.send({type:"broadcast",event:"reveal",payload});
+  applyReveal(payload);
+}
+function applyReveal(p){
+  round=p.round; target=p.target; results=p.results; winner=p.winner; wins=p.wins; distTot=p.distTot; isFinal=p.isFinal; rounds=p.rounds;
+  phase="results"; render();
+}
+function resetAll(){ phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
+
+ch.on("broadcast",{event:"cfg"},({payload})=>{ rounds=payload.rounds; if(phase==="lobby") render(); })
+  .on("broadcast",{event:"round"},({payload})=>{ round=payload.round; target=payload.target; rounds=payload.rounds; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; phase="play"; render(); })
+  .on("broadcast",{event:"guess"},({payload})=>{ guesses[payload.cid]={name:payload.name,rgb:payload.rgb}; if(phase==="play") render(); if(role==="host") maybeReveal(); })
+  .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
+  .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
+  .on("presence",{event:"sync"},()=>{ if(role==="host") ch.send({type:"broadcast",event:"cfg",payload:{rounds}}); if(phase==="lobby"||phase==="results") render(); })
+  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
+</script>
+</body>
+</html>
