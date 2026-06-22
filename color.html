@@ -23,6 +23,14 @@
   .ghost{background:var(--card2);color:var(--text);border:1px solid var(--border)}
   .swatch{width:100%;height:130px;border-radius:16px;border:1px solid var(--border)}
   .swatch.sm{width:34px;height:24px;height:24px;border-radius:6px;display:inline-block;vertical-align:middle}
+  .swatch.covered{display:flex;align-items:center;justify-content:center;color:var(--muted);font-weight:700;font-size:14px;
+    background:repeating-linear-gradient(45deg,#1e1e35,#1e1e35 12px,#161625 12px,#161625 24px)}
+  .peekbar{height:6px;background:var(--card2);border-radius:4px;overflow:hidden;margin-top:8px}
+  .peekbar i{display:block;height:100%;width:100%;background:var(--accent);animation:peekshrink 3s linear forwards}
+  @keyframes peekshrink{from{width:100%}to{width:0}}
+  .modes{display:flex;gap:8px;justify-content:center;margin:0 0 14px}
+  .modebtn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;cursor:pointer;font-size:13px}
+  .modebtn.on{border-color:var(--accent);color:var(--text)}
   .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px;text-align:center}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;margin:8px 0 6px}
   .two .cap{font-size:11px;color:var(--muted);text-align:center;margin-bottom:5px}
@@ -68,11 +76,12 @@ const ch = sb.channel("col:"+room, { config:{ broadcast:{self:false}, presence:{
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-let name="Player", phase="lobby", rounds=5, round=0, target=null;
+let name="Player", phase="lobby", rounds=5, round=0, target=null, mode="visible";
 let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
-let wins={}, distTot={};
+let wins={}, distTot={}, peeking=false, peekTimer=null;
 
 const MAXD = Math.sqrt(255*255*3);
+const FLASH_MS = 3000; // flash mode: how long the target is shown before it hides
 const rgbCss=(c)=>c?`rgb(${c.r},${c.g},${c.b})`:"#222";
 const dist=(a,b)=>Math.sqrt((a.r-b.r)**2+(a.g-b.g)**2+(a.b-b.b)**2);
 const acc=(d)=>Math.max(0,Math.round(100*(1-d/MAXD)));
@@ -98,11 +107,16 @@ function render(){
       <p class="muted center">Everyone sees the same colour, then dials in their best match with the R/G/B sliders. Closest match wins the round.</p>
       ${role==="host"
         ? `<div class="rounds"><span class="muted">Best of</span><input id="rounds" type="number" min="1" max="15" value="${rounds}"><span class="muted">rounds</span></div>
+           <div class="modes">
+             <button class="modebtn ${mode==="visible"?"on":""}" data-mode="visible">👁 Stays visible</button>
+             <button class="modebtn ${mode==="flash"?"on":""}" data-mode="flash">⚡ Flash (memory)</button>
+           </div>
            <button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
-        : `<p class="center muted">Best of <b>${rounds}</b> rounds · waiting for the host to start…</p>`}
+        : `<p class="center muted">Best of <b>${rounds}</b> rounds · ${mode==="flash"?"⚡ flash (from memory)":"👁 colour stays visible"} · waiting for the host…</p>`}
       ${standings(ps)}`;
     if(role==="host"){
-      $("rounds").onchange=()=>{ rounds=Math.max(1,Math.min(15,+$("rounds").value||5)); ch.send({type:"broadcast",event:"cfg",payload:{rounds}}); };
+      $("rounds").onchange=()=>{ rounds=Math.max(1,Math.min(15,+$("rounds").value||5)); sendCfg(); };
+      $("app").querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{ mode=b.dataset.mode; sendCfg(); render(); });
       if($("startBtn")) $("startBtn").onclick=startRound;
     }
   } else if(phase==="play"){
@@ -110,7 +124,7 @@ function render(){
       <div class="players">${ps.map(p=>`<span class="pchip ${guesses[p.cid]?"locked":""}">👤 ${esc(p.name)}${guesses[p.cid]?" ✓":""}</span>`).join("")}</div>
       <p class="muted center">Round ${round} / ${rounds}</p>
       <div class="two">
-        <div><div class="cap">Match this</div><div class="swatch" style="background:${rgbCss(target)}"></div></div>
+        <div><div class="cap">${(mode==="flash"&&peeking)?"👀 Memorise!":"Match this"}</div>${targetSwatch()}</div>
         <div><div class="cap">Your guess</div><div class="swatch" id="mySw" style="background:${rgbCss(guess)}"></div></div>
       </div>
       <div class="sliders">
@@ -159,10 +173,22 @@ function finalBanner(ps){
   return `<div class="win">${tie?"🤝 It's a tie!":`🏆 ${esc(top.name)}${top.cid===cid?" (you)":""} wins!`}</div>`;
 }
 
+function sendCfg(){ ch.send({type:"broadcast",event:"cfg",payload:{rounds,mode}}); }
+function targetSwatch(){
+  if(mode!=="flash" || peeking)
+    return `<div class="swatch" style="background:${rgbCss(target)}"></div>${(mode==="flash"&&peeking)?'<div class="peekbar"><i></i></div>':""}`;
+  return `<div class="swatch covered">🙈 from memory</div>`;
+}
+function beginPlay(){
+  phase="play"; clearTimeout(peekTimer);
+  peeking = (mode==="flash");
+  if(peeking) peekTimer=setTimeout(()=>{ peeking=false; if(phase==="play") render(); }, FLASH_MS);
+  render();
+}
 function startRound(){
   round++; target=randTarget(); guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false;
-  ch.send({type:"broadcast",event:"round",payload:{round,target,rounds}});
-  phase="play"; render();
+  ch.send({type:"broadcast",event:"round",payload:{round,target,rounds,mode}});
+  beginPlay();
 }
 function lockIn(){
   if(locked) return; locked=true;
@@ -186,17 +212,18 @@ function reveal(){
   applyReveal(payload);
 }
 function applyReveal(p){
+  clearTimeout(peekTimer); peeking=false;
   round=p.round; target=p.target; results=p.results; winner=p.winner; wins=p.wins; distTot=p.distTot; isFinal=p.isFinal; rounds=p.rounds;
   phase="results"; render();
 }
-function resetAll(){ phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
+function resetAll(){ clearTimeout(peekTimer); peeking=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
 
-ch.on("broadcast",{event:"cfg"},({payload})=>{ rounds=payload.rounds; if(phase==="lobby") render(); })
-  .on("broadcast",{event:"round"},({payload})=>{ round=payload.round; target=payload.target; rounds=payload.rounds; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; phase="play"; render(); })
+ch.on("broadcast",{event:"cfg"},({payload})=>{ rounds=payload.rounds; if(payload.mode) mode=payload.mode; if(phase==="lobby") render(); })
+  .on("broadcast",{event:"round"},({payload})=>{ round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode||mode; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; beginPlay(); })
   .on("broadcast",{event:"guess"},({payload})=>{ guesses[payload.cid]={name:payload.name,rgb:payload.rgb}; if(phase==="play") render(); if(role==="host") maybeReveal(); })
   .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
   .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
-  .on("presence",{event:"sync"},()=>{ if(role==="host") ch.send({type:"broadcast",event:"cfg",payload:{rounds}}); if(phase==="lobby"||phase==="results") render(); })
+  .on("presence",{event:"sync"},()=>{ if(role==="host") sendCfg(); if(phase==="lobby"||phase==="results") render(); })
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
 </script>
 </body>
