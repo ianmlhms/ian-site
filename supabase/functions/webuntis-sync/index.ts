@@ -1,20 +1,20 @@
 // Supabase Edge Function: webuntis-sync
-// Logs into WebUntis with the admin's credentials (function secrets), fetches
-// upcoming homework, and upserts it into public.homework. Invoked by the admin
-// from homework.html ("Sync now"), and optionally by a daily cron.
+// Logs into WebUntis with the admin's "Untis Mobile" SECRET (TOTP) — more reliable
+// than user/password and 2FA-proof — fetches upcoming homework, and upserts it
+// into public.homework. Invoked by the admin from homework.html ("Sync now").
 //
 // Secrets (set with `supabase secrets set ...`, see scripts/WEBUNTIS-SETUP.md):
-//   WEBUNTIS_SERVER  e.g. https://laml.webuntis.com   (no trailing /WebUntis)
-//   WEBUNTIS_SCHOOL  e.g. "Aline Mayrisch"
-//   WEBUNTIS_USER    your WebUntis login
-//   WEBUNTIS_PASS    your WebUntis password            (secret)
-//   ADMIN_EMAIL      konto@ian.lu                       (who may trigger it)
+//   WEBUNTIS_SERVER  https://laml.webuntis.com         (no trailing /WebUntis)
+//   WEBUNTIS_SCHOOL  laml                               (API id, NOT the display name)
+//   WEBUNTIS_USER    Mulla383                           (from the QR/secret screen)
+//   WEBUNTIS_SECRET  the base32 key from "Zugriff über Untis Mobile"   (secret)
+//   ADMIN_EMAIL      konto@ian.lu                        (who may trigger it)
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SERVER = (Deno.env.get("WEBUNTIS_SERVER") || "https://laml.webuntis.com").replace(/\/+$/, "");
-const SCHOOL = Deno.env.get("WEBUNTIS_SCHOOL") || "Aline Mayrisch";
+const SCHOOL = Deno.env.get("WEBUNTIS_SCHOOL") || "laml";
 const USER = Deno.env.get("WEBUNTIS_USER") || "";
-const PASS = Deno.env.get("WEBUNTIS_PASS") || "";
+const SECRET = (Deno.env.get("WEBUNTIS_SECRET") || "").replace(/\s+/g, "").toUpperCase();
 const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") || "konto@ian.lu";
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
@@ -26,6 +26,26 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 const ymd = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 const fromYmd = (n: number) => { const s = String(n); return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : null; };
 
+// ---- TOTP from the Untis Mobile secret (RFC 6238, base32, SHA-1, 30s, 6 digits)
+function base32Decode(b32: string): Uint8Array {
+  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const c of b32.replace(/=+$/, "")) { const v = A.indexOf(c); if (v >= 0) bits += v.toString(2).padStart(5, "0"); }
+  const out: number[] = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) out.push(parseInt(bits.slice(i, i + 8), 2));
+  return new Uint8Array(out);
+}
+async function totp(secret: string, t = Date.now()): Promise<string> {
+  const counter = Math.floor(t / 1000 / 30);
+  const buf = new ArrayBuffer(8); const dv = new DataView(buf);
+  dv.setUint32(0, Math.floor(counter / 2 ** 32)); dv.setUint32(4, counter >>> 0);
+  const key = await crypto.subtle.importKey("raw", base32Decode(secret), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const h = new Uint8Array(await crypto.subtle.sign("HMAC", key, buf));
+  const o = h[h.length - 1] & 0xf;
+  const bin = ((h[o] & 0x7f) << 24) | ((h[o + 1] & 0xff) << 16) | ((h[o + 2] & 0xff) << 8) | (h[o + 3] & 0xff);
+  return String(bin % 1000000).padStart(6, "0");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -36,24 +56,23 @@ Deno.serve(async (req) => {
     if (!user || user.email !== ADMIN_EMAIL) return json({ error: "forbidden" }, 403);
   } catch { return json({ error: "forbidden" }, 403); }
 
-  if (!USER || !PASS) return json({ error: "WebUntis credentials not set (WEBUNTIS_USER / WEBUNTIS_PASS)" }, 500);
+  if (!USER || !SECRET) return json({ error: "WebUntis not configured (WEBUNTIS_USER / WEBUNTIS_SECRET)" }, 500);
 
-  // 2) Authenticate (JSON-RPC) → sessionId + cookies.
-  const rpcUrl = `${SERVER}/WebUntis/jsonrpc.do?school=${encodeURIComponent(SCHOOL)}`;
-  const authRes = await fetch(rpcUrl, {
+  // 2) Authenticate with the mobile secret (getUserData2017) → session cookie.
+  const otp = await totp(SECRET);
+  const internUrl = `${SERVER}/WebUntis/jsonrpc_intern.do?m=getUserData2017&school=${encodeURIComponent(SCHOOL)}&v=i3.5`;
+  const authRes = await fetch(internUrl, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: "1", method: "authenticate", params: { user: USER, password: PASS, client: "ianlu-sync" }, jsonrpc: "2.0" }),
+    body: JSON.stringify({ id: "ianlu", method: "getUserData2017", params: [{ auth: { clientTime: Date.now(), user: USER, otp: Number(otp) } }], jsonrpc: "2.0" }),
   });
   const setCookies = (authRes.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]);
   const authJson = await authRes.json().catch(() => ({}));
-  const sessionId = authJson?.result?.sessionId;
-  if (!sessionId) return json({ error: "WebUntis login failed", detail: authJson?.error ?? null }, 502);
+  if (authJson?.error) return json({ error: "WebUntis login failed", detail: authJson.error }, 502);
 
   let cookie = setCookies.join("; ");
-  if (!/JSESSIONID=/.test(cookie)) cookie += (cookie ? "; " : "") + `JSESSIONID=${sessionId}`;
-  if (!/schoolname=/.test(cookie)) cookie += `; schoolname="_${btoa(SCHOOL)}"`;
+  if (!/schoolname=/.test(cookie)) cookie += (cookie ? "; " : "") + `schoolname="_${btoa(SCHOOL)}"`;
 
-  // 3) Bearer token for the REST API (best effort — some tenants don't need it).
+  // 3) Bearer token for the REST API (best effort).
   let bearer = "";
   try { const t = await fetch(`${SERVER}/WebUntis/api/token/new`, { headers: { Cookie: cookie } }); if (t.ok) bearer = (await t.text()).trim(); } catch { /* ignore */ }
 
@@ -82,15 +101,11 @@ Deno.serve(async (req) => {
     synced_at: new Date().toISOString(),
   })).filter((r: any) => r.id != null);
 
-  // 5) Upsert into the homework table (service role).
+  // 5) Upsert (service role).
   const admin = createClient(SB_URL, SERVICE);
   if (rows.length) {
     const { error } = await admin.from("homework").upsert(rows, { onConflict: "id" });
     if (error) return json({ error: "db upsert failed", detail: error.message }, 500);
   }
-
-  // 6) Logout (best effort).
-  try { await fetch(rpcUrl, { method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ id: "2", method: "logout", params: {}, jsonrpc: "2.0" }) }); } catch { /* ignore */ }
-
   return json({ ok: true, count: rows.length });
 });
