@@ -80,10 +80,11 @@
 <script>
 const N=8, SHIPS=[4,3,3,2];
 const params=new URLSearchParams(location.search);
+const AI=params.get("ai")==="1";               // single-player vs computer
 const room=(params.get("room")||"demo").toLowerCase();
 const role=params.get("role")==="guest"?"guest":"host";
 const other=role==="host"?"guest":"host";
-document.getElementById("roomc").textContent=room;
+document.getElementById("roomc").textContent=AI?"computer 🤖":room;
 const cfg=window.PB_CONFIG;
 const sb=supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey, { auth:{ persistSession:false, autoRefreshToken:false } });
 const ch=sb.channel("bs:"+room,{config:{broadcast:{self:false},presence:{key:role}}});
@@ -91,6 +92,7 @@ const $=(id)=>document.getElementById(id);
 
 let own=empty(), enemy=empty(), placed=[], toPlace=[...SHIPS], orient="h";
 let myReady=false, oppReady=false, oppHere=false, turn="host", phase="setup", over=false;
+let aiBoard=null, aiHunt=[];   // AI mode: computer's hidden fleet + its hit-follow-up queue
 function empty(){ return Array.from({length:N},()=>Array(N).fill(0)); }
 const allPlaced=()=>toPlace.length===0;
 
@@ -161,7 +163,7 @@ function renderPlay(){
   grid($("enemy"),enemy,false,(r,c)=>fire(r,c));
   grid($("ownSmall"),own,true,null);
   if(over) setStatus(over===role?"You win! 🎉":"You lost.","");
-  else setStatus(turn===role?"Your turn — fire!":"Opponent's turn…");
+  else setStatus(turn===role?"Your turn — fire!":(AI?"Computer firing…":"Opponent's turn…"));
   $("rematch").style.display=over?"":"none";
 }
 
@@ -170,9 +172,50 @@ function bothReady(){ if(myReady&&oppReady&&phase==="setup"){ phase="play"; turn
 function fire(r,c){
   if(over||turn!==role||phase!=="play") return;
   if(enemy[r][c]===2||enemy[r][c]===3) return;
+  if(AI){
+    const hit = aiBoard[r][c]===1 || aiBoard[r][c]===2;
+    if(aiBoard[r][c]===1) aiBoard[r][c]=2;
+    enemy[r][c]=hit?2:3;
+    if(!aiBoard.flat().some(v=>v===1)){ over=role; renderPlay(); return; }   // sank them all
+    turn=other; renderPlay();
+    setTimeout(aiFire, 650);
+    return;
+  }
   turn=other;
   ch.send({type:"broadcast",event:"fire",payload:{r,c}});
   renderPlay();
+}
+
+// ---------- computer opponent (AI mode) ----------
+function fitsOn(b,r,c,len,o){
+  for(let k=0;k<len;k++){ const rr=r+(o==="v"?k:0), cc=c+(o==="h"?k:0);
+    if(rr<0||rr>=N||cc<0||cc>=N||b[rr][cc]!==0) return false; }
+  return true;
+}
+function aiPlace(){
+  aiBoard=empty(); aiHunt=[];
+  for(const len of SHIPS){ let ok=false,t=0;
+    while(!ok&&t++<800){ const o=Math.random()<.5?"h":"v";
+      const r=Math.floor(Math.random()*N), c=Math.floor(Math.random()*N);
+      if(fitsOn(aiBoard,r,c,len,o)){ for(let k=0;k<len;k++){const rr=r+(o==="v"?k:0),cc=c+(o==="h"?k:0); aiBoard[rr][cc]=1;} ok=true; } } }
+}
+const aiTried=(r,c)=> own[r][c]===2 || own[r][c]===3;   // computer already fired here
+function aiPickTarget(){
+  while(aiHunt.length){ const [r,c]=aiHunt.pop(); if(!aiTried(r,c)) return [r,c]; }   // chase a hit
+  const par=[], any=[];
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++) if(!aiTried(r,c)){ any.push([r,c]); if((r+c)%2===0) par.push([r,c]); }
+  const pool=par.length?par:any;                          // checkerboard hunt
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function aiFire(){
+  if(over) return;
+  const [r,c]=aiPickTarget();
+  const hit = own[r][c]===1;
+  own[r][c]= hit?2:3;
+  if(hit){ for(const [dr,dc] of [[0,1],[0,-1],[1,0],[-1,0]]){ const rr=r+dr, cc=c+dc;
+    if(rr>=0&&rr<N&&cc>=0&&cc<N&&!aiTried(rr,cc)) aiHunt.push([rr,cc]); } }
+  if(!own.flat().some(v=>v===1)){ over=other; renderPlay(); return; }   // computer wins
+  turn=role; renderPlay();
 }
 function onFire(r,c){
   const hitShip=own[r][c]===1||own[r][c]===2;
@@ -185,23 +228,30 @@ function onFire(r,c){
 }
 function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; renderPlay(); }
 
-ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="setup")renderSetup(); })
-  .on("broadcast",{event:"fire"},({payload})=>{ if(phase==="play") onFire(payload.r,payload.c); })
-  .on("broadcast",{event:"result"},({payload})=>onResult(payload.r,payload.c,payload.hit,payload.lost))
-  .on("broadcast",{event:"reset"},()=>resetGame(false))
-  .on("presence",{event:"sync"},()=>{
-    const st=ch.presenceState(); oppHere=!!st[other];
-    if(oppHere && myReady) ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
-    if(phase==="setup")renderSetup();
-  })
-  .subscribe(async(s)=>{ if(s==="SUBSCRIBED"){ clearAll(); phase="setup"; renderSetup(); await ch.track({role}); }});
+if(AI){
+  document.querySelector(".bar h1").textContent="🚢 Battleship — vs Computer";
+  clearAll(); phase="setup"; oppHere=true; renderSetup();
+} else {
+  ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="setup")renderSetup(); })
+    .on("broadcast",{event:"fire"},({payload})=>{ if(phase==="play") onFire(payload.r,payload.c); })
+    .on("broadcast",{event:"result"},({payload})=>onResult(payload.r,payload.c,payload.hit,payload.lost))
+    .on("broadcast",{event:"reset"},()=>resetGame(false))
+    .on("presence",{event:"sync"},()=>{
+      const st=ch.presenceState(); oppHere=!!st[other];
+      if(oppHere && myReady) ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
+      if(phase==="setup")renderSetup();
+    })
+    .subscribe(async(s)=>{ if(s==="SUBSCRIBED"){ clearAll(); phase="setup"; renderSetup(); await ch.track({role}); }});
+}
 
 $("orientH").onclick=()=>{ orient="h"; renderSetup(); };
 $("orientV").onclick=()=>{ orient="v"; renderSetup(); };
 $("shuffle").onclick=()=>{ if(!myReady) shuffle(); };
 $("clear").onclick=()=>{ if(!myReady) clearAll(); };
-$("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true; ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
-function resetGame(send){ over=false; myReady=false; oppReady=false; phase="setup"; clearAll(); enemy=empty(); renderSetup(); if(send) ch.send({type:"broadcast",event:"reset",payload:{}}); }
+$("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true;
+  if(AI){ aiPlace(); oppReady=true; renderSetup(); bothReady(); return; }
+  ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
+function resetGame(send){ over=false; myReady=false; oppReady=false; phase="setup"; clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
 $("rematch").onclick=()=>resetGame(true);
 </script>
 </body>

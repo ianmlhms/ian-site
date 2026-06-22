@@ -52,6 +52,7 @@
 <script>
 const COLS = 7, ROWS = 6;
 const params = new URLSearchParams(location.search);
+const AI = params.get("ai") === "1";          // single-player vs computer
 const room = params.get("room") || "demo";
 const role = params.get("role") === "guest" ? "guest" : "host";
 const me = role === "host" ? 1 : 2;          // 1 = red (host, first), 2 = yellow
@@ -87,7 +88,7 @@ function updateStatus() {
   if (over === "draw") return setStatus("It's a draw.");
   if (over) return setStatus((over === me ? "You win! 🎉" : "You lost.") );
   if (!oppHere) return setStatus(`Waiting for opponent…`, `Share room <code>${room}</code> or invite from Friends.`);
-  setStatus(turn === me ? `Your turn ${dot}` : `Opponent's turn`);
+  setStatus(turn === me ? `Your turn ${dot}` : (AI ? `Computer thinking…` : `Opponent's turn`));
 }
 function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
 
@@ -105,7 +106,8 @@ function play(col, player, local) {
   else turn = player === 1 ? 2 : 1;
   render();
   if (over) $("rematch").style.display = "";
-  if (local) ch.send({ type: "broadcast", event: "move", payload: { col, player } });
+  if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: { col, player } });
+  if (AI && !over && turn === opp) setTimeout(aiMove, 350);   // computer replies
 }
 function wins(r, c, p) {
   const dirs = [[0,1],[1,0],[1,1],[1,-1]];
@@ -118,20 +120,88 @@ function wins(r, c, p) {
   return false;
 }
 
-ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.col, payload.player, false))
-  .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
-  .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); })
-  .on("presence", { event: "sync" }, () => {
-    const st = ch.presenceState();
-    oppHere = !!st[opp === 1 ? "host" : "guest"];
-    if (role === "host" && oppHere) ch.send({ type: "broadcast", event: "state", payload: { board, turn, over } });
-    render();
-  })
-  .subscribe(async (status) => {
-    if (status === "SUBSCRIBED") { fresh(); render(); await ch.track({ role }); }
-  });
+if (AI) {
+  document.querySelector(".bar h1").textContent = "🔴 Connect 4 — vs Computer";
+  oppHere = true; fresh(); render();
+} else {
+  ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.col, payload.player, false))
+    .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); })
+    .on("presence", { event: "sync" }, () => {
+      const st = ch.presenceState();
+      oppHere = !!st[opp === 1 ? "host" : "guest"];
+      if (role === "host" && oppHere) ch.send({ type: "broadcast", event: "state", payload: { board, turn, over } });
+      render();
+    })
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") { fresh(); render(); await ch.track({ role }); }
+    });
+}
 
-$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); ch.send({ type: "broadcast", event: "reset" }); };
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+
+/* ---------- AI (minimax + alpha-beta), computer plays `opp` (=2) ---------- */
+function aiMove() {
+  if (over) return;
+  const col = aiBestMove();
+  if (col != null) play(col, opp, false);
+}
+const cloneB = (b) => b.map((row) => row.slice());
+function colsOpen(b) { const a = []; for (let c = 0; c < COLS; c++) if (b[0][c] === 0) a.push(c); return a; }
+function dropSim(b, c, p) { for (let r = ROWS - 1; r >= 0; r--) if (b[r][c] === 0) { b[r][c] = p; return r; } return -1; }
+function winAt(b, r, c, p) {
+  for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    let n = 1;
+    for (const s of [1, -1]) { let rr = r + dr * s, cc = c + dc * s; while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && b[rr][cc] === p) { n++; rr += dr * s; cc += dc * s; } }
+    if (n >= 4) return true;
+  }
+  return false;
+}
+function winScore(w) {
+  const n2 = w.filter((v) => v === 2).length, n1 = w.filter((v) => v === 1).length, n0 = w.filter((v) => v === 0).length;
+  if (n2 && n1) return 0;
+  if (n2 === 3 && n0 === 1) return 50;
+  if (n2 === 2 && n0 === 2) return 10;
+  if (n1 === 3 && n0 === 1) return -80;
+  if (n1 === 2 && n0 === 2) return -10;
+  return 0;
+}
+function evalBoard(b) {
+  let s = 0;
+  for (let r = 0; r < ROWS; r++) { if (b[r][3] === 2) s += 3; else if (b[r][3] === 1) s -= 3; }
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+    const w = []; for (let k = 0; k < 4; k++) { const rr = r + dr * k, cc = c + dc * k; if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) { w.length = 0; break; } w.push(b[rr][cc]); }
+    if (w.length === 4) s += winScore(w);
+  }
+  return s;
+}
+function minimax(b, depth, alpha, beta, maxing) {
+  const valid = colsOpen(b);
+  if (depth === 0 || !valid.length) return valid.length ? evalBoard(b) : 0;
+  if (maxing) {
+    let best = -1e9;
+    for (const c of valid) { const nb = cloneB(b); const r = dropSim(nb, c, 2); const v = winAt(nb, r, c, 2) ? 100000 + depth : minimax(nb, depth - 1, alpha, beta, false); best = Math.max(best, v); alpha = Math.max(alpha, v); if (alpha >= beta) break; }
+    return best;
+  } else {
+    let best = 1e9;
+    for (const c of valid) { const nb = cloneB(b); const r = dropSim(nb, c, 1); const v = winAt(nb, r, c, 1) ? -100000 - depth : minimax(nb, depth - 1, alpha, beta, true); best = Math.min(best, v); beta = Math.min(beta, v); if (alpha >= beta) break; }
+    return best;
+  }
+}
+function aiBestMove() {
+  const DEPTH = 5, valid = colsOpen(board);
+  if (!valid.length) return null;
+  for (const c of valid) { const nb = cloneB(board); const r = dropSim(nb, c, 2); if (winAt(nb, r, c, 2)) return c; }  // win now
+  for (const c of valid) { const nb = cloneB(board); const r = dropSim(nb, c, 1); if (winAt(nb, r, c, 1)) return c; }  // block
+  const order = valid.slice().sort((a, b) => Math.abs(3 - a) - Math.abs(3 - b));   // centre first (better pruning)
+  let best = -1e9, bestCols = [];
+  for (const c of order) {
+    const nb = cloneB(board); const r = dropSim(nb, c, 2);
+    const v = winAt(nb, r, c, 2) ? 100000 : minimax(nb, DEPTH - 1, -1e9, 1e9, false);
+    if (v > best) { best = v; bestCols = [c]; } else if (v === best) bestCols.push(c);
+  }
+  return bestCols[Math.floor(Math.random() * bestCols.length)];
+}
 </script>
 </body>
 </html>

@@ -44,9 +44,9 @@
 
 <script>
 const GAMES = [
-  { id:"connect4", ico:"🔴", name:"Connect 4", desc:"Drop discs, get four in a row. 1 v 1." },
+  { id:"connect4", ico:"🔴", name:"Connect 4", desc:"Drop discs, get four in a row. 1 v 1.", ai:true },
   { id:"slf", ico:"🔤", name:"Stadt-Land-Fluss", desc:"A letter is drawn — race to fill the categories. 2+ players." },
-  { id:"battleship", ico:"🚢", name:"Battleship", desc:"Hide your fleet, sink your opponent's. 1 v 1." },
+  { id:"battleship", ico:"🚢", name:"Battleship", desc:"Hide your fleet, sink your opponent's. 1 v 1.", ai:true },
   { id:"color", ico:"🎨", name:"Colour Dial", desc:"Everyone matches the same colour with R/G/B sliders — closest wins. 2+ players." },
 ];
 const code = () => Math.random().toString(36).slice(2, 8);
@@ -56,12 +56,14 @@ document.getElementById("cards").innerHTML = GAMES.map(g => `
     <h2>${g.name}</h2>
     <p>${g.desc}</p>
     <button class="create" data-c="${g.id}">Start a game</button>
+    ${g.ai ? `<button class="create" data-ai="${g.id}" style="background:var(--card2);border:1px solid var(--border);margin-top:8px">🤖 vs Computer</button>` : ""}
     <div class="joinrow">
       <input id="code-${g.id}" placeholder="room code" autocomplete="off">
       <button data-j="${g.id}">Join</button>
     </div>
   </div>`).join("");
 document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => location.href = `${b.dataset.c}.html?room=${code()}&role=host`);
+document.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => location.href = `${b.dataset.ai}.html?ai=1`);
 document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
   const c = (document.getElementById("code-" + b.dataset.j).value || "").trim().toLowerCase();
   if (c) location.href = `${b.dataset.j}.html?room=${encodeURIComponent(c)}&role=guest`;
