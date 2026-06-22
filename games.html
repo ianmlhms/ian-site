@@ -47,7 +47,7 @@ const GAMES = [
   { id:"connect4", ico:"🔴", name:"Connect 4", desc:"Drop discs, get four in a row. 1 v 1.", ai:true },
   { id:"slf", ico:"🔤", name:"Stadt-Land-Fluss", desc:"A letter is drawn — race to fill the categories. 2+ players." },
   { id:"battleship", ico:"🚢", name:"Battleship", desc:"Hide your fleet, sink your opponent's. 1 v 1.", ai:true },
-  { id:"color", ico:"🎨", name:"Colour Dial", desc:"Everyone matches the same colour with R/G/B sliders — closest wins. 2+ players." },
+  { id:"color", ico:"🎨", name:"Colour Dial", desc:"Everyone matches the same colour with R/G/B sliders — closest wins. 2+ players.", ai:true },
 ];
 const code = () => Math.random().toString(36).slice(2, 8);
 document.getElementById("cards").innerHTML = GAMES.map(g => `

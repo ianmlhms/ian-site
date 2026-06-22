@@ -65,10 +65,14 @@
 <script type="module" src="notify-ambient.js?v=1"></script>
 <script>
 const params = new URLSearchParams(location.search);
+const AI = params.get("ai")==="1";              // single-player vs computer bots
 const room = (params.get("room")||"demo").toLowerCase();
 const role = params.get("role")==="guest" ? "guest" : "host";
 const cid = Math.random().toString(36).slice(2,10);
-document.getElementById("roomc").textContent = room;
+document.getElementById("roomc").textContent = AI ? "computer 🤖" : room;
+const AI_BOTS = [{cid:"bot1",name:"🤖 Pixel",err:32},{cid:"bot2",name:"🤖 Byte",err:58}];
+const jitter=(v,e)=>Math.max(0,Math.min(255,Math.round(v+(Math.random()*2-1)*e)));
+const botGuess=(e)=>({r:jitter(target.r,e),g:jitter(target.g,e),b:jitter(target.b,e)});
 
 const cfg = window.PB_CONFIG;
 const sb = supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey, { auth:{ persistSession:false, autoRefreshToken:false } });
@@ -96,7 +100,7 @@ async function getName(){
   if(!n){ n=(prompt("Your name for the game:")||"Player").slice(0,20); }
   localStorage.setItem("playerName", n); return n;
 }
-function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
+function players(){ if(AI) return [{cid,name}, ...AI_BOTS.map(b=>({cid:b.cid,name:b.name}))]; const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
 const lockedCount=(ps)=>ps.filter(p=>guesses[p.cid]).length;
 
 function render(){
@@ -156,7 +160,7 @@ function render(){
                   :`<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`)
         : `<p class="center muted">Waiting for host…</p>`}`;
     if(role==="host"){
-      if(isFinal && $("againBtn")) $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
+      if(isFinal && $("againBtn")) $("againBtn").onclick=()=>{ if(!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
       if(!isFinal && $("nextBtn")) $("nextBtn").onclick=startRound;
     }
   }
@@ -173,7 +177,7 @@ function finalBanner(ps){
   return `<div class="win">${tie?"🤝 It's a tie!":`🏆 ${esc(top.name)}${top.cid===cid?" (you)":""} wins!`}</div>`;
 }
 
-function sendCfg(){ ch.send({type:"broadcast",event:"cfg",payload:{rounds,mode}}); }
+function sendCfg(){ if(AI) return; ch.send({type:"broadcast",event:"cfg",payload:{rounds,mode}}); }
 function targetSwatch(){
   if(mode!=="flash" || peeking)
     return `<div class="swatch" style="background:${rgbCss(target)}"></div>${(mode==="flash"&&peeking)?'<div class="peekbar"><i></i></div>':""}`;
@@ -187,12 +191,13 @@ function beginPlay(){
 }
 function startRound(){
   round++; target=randTarget(); guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false;
-  ch.send({type:"broadcast",event:"round",payload:{round,target,rounds,mode}});
+  if(!AI) ch.send({type:"broadcast",event:"round",payload:{round,target,rounds,mode}});
   beginPlay();
 }
 function lockIn(){
   if(locked) return; locked=true;
   guesses[cid]={name,rgb:{...guess}};
+  if(AI){ AI_BOTS.forEach(b=> guesses[b.cid]={name:b.name,rgb:botGuess(b.err)}); render(); reveal(); return; }
   ch.send({type:"broadcast",event:"guess",payload:{cid,name,rgb:{...guess}}});
   render();
   if(role==="host") maybeReveal();
@@ -208,7 +213,7 @@ function reveal(){
   if(win) wins[win]=(wins[win]||0)+1;
   const fin = round>=rounds;
   const payload={round,target,results:res,winner:win,wins,distTot,isFinal:fin,rounds};
-  ch.send({type:"broadcast",event:"reveal",payload});
+  if(!AI) ch.send({type:"broadcast",event:"reveal",payload});
   applyReveal(payload);
 }
 function applyReveal(p){
@@ -218,13 +223,19 @@ function applyReveal(p){
 }
 function resetAll(){ clearTimeout(peekTimer); peeking=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
 
-ch.on("broadcast",{event:"cfg"},({payload})=>{ rounds=payload.rounds; if(payload.mode) mode=payload.mode; if(phase==="lobby") render(); })
-  .on("broadcast",{event:"round"},({payload})=>{ round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode||mode; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; beginPlay(); })
-  .on("broadcast",{event:"guess"},({payload})=>{ guesses[payload.cid]={name:payload.name,rgb:payload.rgb}; if(phase==="play") render(); if(role==="host") maybeReveal(); })
-  .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
-  .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
-  .on("presence",{event:"sync"},()=>{ if(role==="host") sendCfg(); if(phase==="lobby"||phase==="results") render(); })
-  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
+if(AI){
+  document.querySelector(".bar h1").textContent="🎨 Colour Dial — vs Computer";
+  name = localStorage.getItem("playerName") || window.__pbAuth?.session?.user?.user_metadata?.username || "Du";
+  phase="lobby"; render();
+} else {
+  ch.on("broadcast",{event:"cfg"},({payload})=>{ rounds=payload.rounds; if(payload.mode) mode=payload.mode; if(phase==="lobby") render(); })
+    .on("broadcast",{event:"round"},({payload})=>{ round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode||mode; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; beginPlay(); })
+    .on("broadcast",{event:"guess"},({payload})=>{ guesses[payload.cid]={name:payload.name,rgb:payload.rgb}; if(phase==="play") render(); if(role==="host") maybeReveal(); })
+    .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
+    .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
+    .on("presence",{event:"sync"},()=>{ if(role==="host") sendCfg(); if(phase==="lobby"||phase==="results") render(); })
+    .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wuertspill — ian.lu</title>
+<meta name="description" content="Wordle op Lëtzebuergesch an Däitsch.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;
+        --correct:#538d4e;--present:#b59f3b;--absent:#3a3a3c}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .langs{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .langs button{background:var(--card);color:var(--muted);border:none;padding:7px 12px;font-weight:800;cursor:pointer;font-size:13px}
+  .langs button.on{background:var(--accent);color:#fff}
+  .wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 12px 30px}
+  .msg{min-height:22px;font-weight:700;color:var(--accent2);text-align:center}
+  .board{display:grid;grid-template-rows:repeat(6,1fr);gap:6px}
+  .row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .tile{width:54px;height:54px;border:2px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;
+        font-size:26px;font-weight:800;text-transform:uppercase;transition:transform .1s}
+  .tile.filled{border-color:#5a5a72}
+  .tile.correct{background:var(--correct);border-color:var(--correct);color:#fff}
+  .tile.present{background:var(--present);border-color:var(--present);color:#fff}
+  .tile.absent{background:var(--absent);border-color:var(--absent);color:#fff}
+  .tile.pop{transform:scale(1.1)}
+  .kb{display:flex;flex-direction:column;gap:6px;width:100%;max-width:500px;margin-top:6px}
+  .kb .krow{display:flex;gap:5px;justify-content:center}
+  .key{flex:1;max-width:42px;height:50px;border:none;border-radius:7px;background:#3a3a4f;color:var(--text);font-weight:800;font-size:15px;cursor:pointer;text-transform:uppercase}
+  .key.wide{max-width:64px;font-size:12px}
+  .key.correct{background:var(--correct)} .key.present{background:var(--present)} .key.absent{background:#23232c;color:#777}
+  .stats{display:flex;gap:18px;color:var(--muted);font-size:13px;margin-top:4px}
+  .stats b{color:var(--text);font-size:18px;display:block;text-align:center}
+  .share{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-weight:800;cursor:pointer;display:none}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>🟩 Wuertspill</h1>
+  <div class="spacer"></div>
+  <div class="langs"><button data-l="lb" class="on">🇱🇺 LB</button><button data-l="de">🇩🇪 DE</button></div>
+</header>
+
+<div class="wrap">
+  <div class="msg" id="msg"></div>
+  <div class="board" id="board"></div>
+  <button class="share" id="share">📋 Resultat deelen</button>
+  <div class="kb" id="kb"></div>
+  <div class="stats" id="stats"></div>
+</div>
+
+<script>
+// ==== Word lists (5 letters, UPPERCASE). Add/fix words freely — esp. LB! ====
+const WORDS = {
+  lb: ["MOIEN","MERCI","KLENG","ÄPPEL","KAFFI","FRËNN","DËSCH","ËMMER","HÄERZ","VÉIER",
+       "WÄISS","GRÉNG","PÄERD","FËSCH","SPILL","DAACH","BAACH","MOUND","LAANG","KUERZ"],
+  de: ["BLUME","TISCH","STUHL","APFEL","BIRNE","TIGER","MUSIK","SCHUH","JACKE","MAUER",
+       "GABEL","TASSE","KANNE","SALAT","PIZZA","NUDEL","KARTE","LAMPE","BLATT","WOLKE",
+       "REGEN","SONNE","STERN","NACHT","MONDE","HONIG","VOGEL","FISCH","PFERD","KATZE"],
+};
+const LABEL = { lb:"Lëtzebuergesch", de:"Deutsch" };
+const ROWS = 6, COLS = 5;
+let lang = localStorage.getItem("wordleLang") || "lb";
+let answer = "", guesses = [], current = "", done = false;
+
+const $ = (id)=>document.getElementById(id);
+const dayIndex = ()=> Math.floor(Date.now()/86400000);
+const stateKey = ()=> `wordle_${lang}_${dayIndex()}`;
+const statsKey = ()=> `wordleStats_${lang}`;
+
+function pickAnswer(){
+  const list = WORDS[lang];
+  const off = lang==="de"?7:0;                       // different word than the other language
+  return list[(dayIndex()+off) % list.length];
+}
+function load(){
+  answer = pickAnswer();
+  const s = JSON.parse(localStorage.getItem(stateKey()) || "null");
+  guesses = s?.guesses || []; current = ""; done = s?.done || false;
+  render(); drawKeyboard(); renderStats();
+  if(done){ $("share").style.display=""; $("msg").textContent = guesses.includes(answer) ? "Gewonnen! 🎉" : "Léisung: "+answer; }
+}
+function save(){ localStorage.setItem(stateKey(), JSON.stringify({ guesses, done })); }
+
+function scoreGuess(g){
+  const res = Array(COLS).fill("absent"), a = answer.split(""), used = Array(COLS).fill(false);
+  for(let i=0;i<COLS;i++){ if(g[i]===a[i]){ res[i]="correct"; used[i]=true; a[i]=null; } }
+  for(let i=0;i<COLS;i++){ if(res[i]==="correct") continue;
+    const j=a.indexOf(g[i]); if(j>-1){ res[i]="present"; a[j]=null; } }
+  return res;
+}
+function render(){
+  const b=$("board"); b.innerHTML="";
+  for(let r=0;r<ROWS;r++){
+    const row=document.createElement("div"); row.className="row";
+    const g=guesses[r];
+    const score=g?scoreGuess(g):null;
+    for(let c=0;c<COLS;c++){
+      const t=document.createElement("div"); t.className="tile";
+      if(g){ t.textContent=g[c]; t.classList.add(score[c]); }
+      else if(r===guesses.length && current[c]){ t.textContent=current[c]; t.classList.add("filled"); }
+      row.appendChild(t);
+    }
+    b.appendChild(row);
+  }
+}
+const KB=[["Q","W","E","R","T","Z","U","I","O","P"],
+          ["A","S","D","F","G","H","J","K","L"],
+          ["Ä","Ö","Ü","Ë","É"],
+          ["ENT","Y","X","C","V","B","N","M","DEL"]];
+function letterStates(){
+  const order={absent:0,present:1,correct:2}, st={};
+  for(const g of guesses){ const sc=scoreGuess(g);
+    for(let i=0;i<COLS;i++){ const L=g[i], s=sc[i];
+      if(st[L]===undefined || order[s]>order[st[L]]) st[L]=s; } }
+  return st;
+}
+function drawKeyboard(){
+  const st=letterStates(); const kb=$("kb"); kb.innerHTML="";
+  for(const row of KB){
+    const r=document.createElement("div"); r.className="krow";
+    for(const k of row){
+      const b=document.createElement("button"); b.className="key"+(k==="ENT"||k==="DEL"?" wide":"");
+      b.textContent = k==="ENT"?"Enter":k==="DEL"?"⌫":k;
+      if(st[k]) b.classList.add(st[k]);
+      b.onclick=()=> key(k==="ENT"?"Enter":k==="DEL"?"Backspace":k);
+      r.appendChild(b);
+    }
+    kb.appendChild(r);
+  }
+}
+function flash(t){ $("msg").textContent=t; }
+function key(k){
+  if(done) return;
+  if(k==="Enter"){
+    if(current.length<COLS) return flash("Net genuch Buschtawen");
+    guesses.push(current);
+    const won = current===answer;
+    current="";
+    if(won||guesses.length===ROWS){ done=true; finish(won); }
+    save(); render(); drawKeyboard();
+    return;
+  }
+  if(k==="Backspace"){ current=current.slice(0,-1); render(); return; }
+  if(/^[A-ZÄÖÜËÉ]$/.test(k) && current.length<COLS){ current+=k; render(); }
+}
+function finish(won){
+  $("msg").textContent = won ? ["Genial!","Super!","Gutt!","Net schlecht","Knapp!","Puh! 😅"][guesses.length-1] : "Léisung: "+answer;
+  $("share").style.display="";
+  const s=JSON.parse(localStorage.getItem(statsKey())||"null")||{played:0,wins:0,streak:0,max:0,dist:[0,0,0,0,0,0]};
+  s.played++; if(won){ s.wins++; s.streak++; s.max=Math.max(s.max,s.streak); s.dist[guesses.length-1]++; } else s.streak=0;
+  localStorage.setItem(statsKey(), JSON.stringify(s));
+  renderStats();
+}
+function renderStats(){
+  const s=JSON.parse(localStorage.getItem(statsKey())||"null")||{played:0,wins:0,streak:0,max:0};
+  $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b>${s.streak}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
+}
+function shareResult(){
+  const emo={correct:"🟩",present:"🟨",absent:"⬛"};
+  const grid=guesses.map(g=>scoreGuess(g).map(s=>emo[s]).join("")).join("\n");
+  const won=guesses.includes(answer);
+  const txt=`ian.lu Wuertspill (${lang.toUpperCase()}) ${won?guesses.length:"X"}/6\n${grid}\nian.lu/wordle.html`;
+  if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(()=>flash("Kopéiert! 📋")).catch(()=>flash(txt)); }
+  else flash("Konnt net kopéieren");
+}
+
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Enter") key("Enter");
+  else if(e.key==="Backspace") key("Backspace");
+  else { const k=e.key.toUpperCase(); if(/^[A-ZÄÖÜËÉ]$/.test(k)) key(k); }
+});
+document.querySelectorAll(".langs button").forEach(b=> b.onclick=()=>{
+  lang=b.dataset.l; localStorage.setItem("wordleLang",lang);
+  document.querySelectorAll(".langs button").forEach(x=>x.classList.toggle("on",x.dataset.l===lang));
+  flash(""); load();
+});
+$("share").onclick=shareResult;
+document.querySelectorAll(".langs button").forEach(x=>x.classList.toggle("on",x.dataset.l===lang));
+load();
+</script>
+</body>
+</html>
