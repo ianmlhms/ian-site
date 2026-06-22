@@ -19,6 +19,15 @@ let suppressClickUntil = 0;  // swallow the click that follows a gesture-reply
 let currentOthers = [];      // other members' user_ids in the open chat
 let readMap = {};            // user_id -> last_read_at (others, in the open chat)
 let readThreshold = null;    // ms: msgs sent at/before this are read by ALL others
+let reactMap = {};           // message_id -> [{user_id, username, emoji}]
+let onlineUsers = new Set(); // usernames currently online (presence)
+let onlineSubbed = false;
+let allChats = [];           // last loaded chats, for search filtering
+let lastTypingSent = 0, typingClear = null;
+let mediaRecorder = null, recChunks = [], recording = false;
+const REACT_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+const mutedSet = () => new Set(JSON.parse(localStorage.getItem("mutedChats") || "[]"));
+function toggleMute(gid) { const s = mutedSet(); s.has(gid) ? s.delete(gid) : s.add(gid); localStorage.setItem("mutedChats", JSON.stringify([...s])); }
 
 /* ---------- small prompt modal ---------- */
 function promptModal(title, label, okText = "OK") {
@@ -44,24 +53,33 @@ function promptModal(title, label, okText = "OK") {
 async function loadChats(selectId) {
   const { data, error } = await sb.rpc("my_chats");
   if (error) { console.warn("[msgr] my_chats", error); return; }
-  renderChatList(data || []);
-  if (selectId) { const g = (data || []).find((x) => x.id === selectId); if (g) selectChat(g); }
+  allChats = data || [];
+  renderChatList(applySearch(allChats));
+  if (selectId) { const g = allChats.find((x) => x.id === selectId); if (g) selectChat(g); }
+}
+
+function applySearch(chats) {
+  const q = ($("searchInput")?.value || "").trim().toLowerCase();
+  if (!q) return chats;
+  return chats.filter((g) => (g.display + " " + (g.last_preview || "") + " " + (g.last_sender || "")).toLowerCase().includes(q));
 }
 
 function renderChatList(chats) {
   const ul = $("groupList");
-  if (!chats.length) { ul.innerHTML = `<li class="empty">No chats yet.<br>Create a group, join with a code, or DM someone.</li>`; return; }
+  if (!chats.length) { ul.innerHTML = `<li class="empty">${($("searchInput")?.value || "").trim() ? "No chats match." : "No chats yet.<br>Create a group, join with a code, or DM someone."}</li>`; return; }
   ul.innerHTML = chats.map((g) => {
     const prev = g.last_preview
       ? `<span class="gprev">${g.last_sender ? esc(g.last_sender) + ": " : ""}${esc(g.last_preview)}</span>`
       : (g.is_dm ? "" : `<span class="gcode">#${esc(g.invite_code)}</span>`);
+    const online = g.is_dm && onlineUsers.has(g.display) ? '<span class="on-dot" title="online"></span>' : "";
+    const muted = mutedSet().has(g.id) ? " 🔕" : "";
     return `<li class="grp ${current && current.id === g.id ? "active" : ""} ${g.unread ? "unread" : ""}" data-id="${g.id}">
-       <span class="gtop"><span class="gname">${g.is_dm ? "💬 " : ""}${esc(g.display)}</span>${g.unread ? '<span class="dot"></span>' : ""}</span>
+       <span class="gtop"><span class="gname">${g.is_dm ? "💬 " : ""}${esc(g.display)}${online}${muted}</span>${g.unread ? '<span class="dot"></span>' : ""}</span>
        ${prev}
      </li>`;
   }).join("");
   ul.querySelectorAll(".grp").forEach((li) =>
-    (li.onclick = () => { const g = chats.find((x) => x.id === +li.dataset.id); selectChat(g); }));
+    (li.onclick = () => { const g = allChats.find((x) => x.id === +li.dataset.id); selectChat(g); }));
 }
 
 async function newGroup() {
@@ -89,7 +107,7 @@ async function newDM() {
 /* ---------- a single chat ---------- */
 async function selectChat(g) {
   current = g; seen.clear();
-  currentOthers = []; readMap = {}; readThreshold = null;
+  currentOthers = []; readMap = {}; readThreshold = null; reactMap = {}; hideTyping();
   closeMembers(); cancelReply();
   markRead(g.id);
   document.querySelectorAll(".grp").forEach((li) => {
@@ -97,15 +115,18 @@ async function selectChat(g) {
     li.classList.toggle("active", on);
     if (on) li.classList.remove("unread");           // clear the badge immediately
   });
+  const onlineHead = g.is_dm && onlineUsers.has(g.display) ? `<span class="on-dot"></span><span class="presence">online</span>` : "";
   $("chatHead").innerHTML =
     `<button class="back-btn" id="backBtn" title="Chats">‹</button>
-     <b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b>
+     <b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b><span id="headPresence">${onlineHead}</span>
      ${g.is_dm ? "" : `<span class="invite" title="Share so others can join">code: <code>${esc(g.invite_code)}</code></span>`}
      <span class="head-actions">
+       <button id="muteBtn" title="Mute notifications">${mutedSet().has(g.id) ? "🔕" : "🔔"}</button>
        <button id="membersBtn" title="Members">👥</button>
        <button id="leaveBtn" title="Leave">🚪</button>
      </span>`;
   $("backBtn").onclick = goBackToList;
+  $("muteBtn").onclick = () => { toggleMute(g.id); $("muteBtn").textContent = mutedSet().has(g.id) ? "🔕" : "🔔"; renderChatList(applySearch(allChats)); };
   $("membersBtn").onclick = toggleMembers;
   $("leaveBtn").onclick = leaveChat;
   $("app").classList.add("chat-open");   // mobile: show the conversation full-screen
@@ -119,6 +140,7 @@ async function selectChat(g) {
   if (!data || !data.length) box.innerHTML = `<div class="empty">No messages yet — say hi 👋</div>`;
   subscribe(g.id);
   loadReceipts(g.id);
+  loadReactions(g.id);
 }
 
 async function leaveChat() {
@@ -189,6 +211,141 @@ function paintTick(el) {
   el.title = read ? "Gelies" : "Geschéckt";
 }
 function updateTicks() { $("messages").querySelectorAll(".msg.mine .ticks").forEach(paintTick); }
+
+/* ---------- reactions ---------- */
+async function loadReactions(gid) {
+  reactMap = {};
+  const { data } = await sb.from("message_reactions").select("message_id,user_id,username,emoji").eq("group_id", gid);
+  (data || []).forEach((r) => { (reactMap[r.message_id] = reactMap[r.message_id] || []).push(r); });
+  $("messages").querySelectorAll(".msg").forEach((el) => renderReactions(+el.dataset.mid));
+}
+function renderReactions(mid) {
+  const el = $("messages").querySelector(`[data-mid="${mid}"] .reacts`);
+  if (!el) return;
+  const me = auth.session().user.id;
+  const byEmoji = {};
+  (reactMap[mid] || []).forEach((r) => { (byEmoji[r.emoji] = byEmoji[r.emoji] || []).push(r); });
+  el.innerHTML = Object.keys(byEmoji).map((em) => {
+    const rs = byEmoji[em], mineR = rs.some((r) => r.user_id === me);
+    return `<span class="react-chip ${mineR ? "mine-r" : ""}" data-em="${em}" title="${rs.map((r) => esc(r.username)).join(", ")}">${em} ${rs.length}</span>`;
+  }).join("");
+  el.querySelectorAll(".react-chip").forEach((c) => (c.onclick = () => toggleReaction(mid, c.dataset.em)));
+}
+async function toggleReaction(mid, emoji) {
+  const me = auth.session().user.id;
+  const list = reactMap[mid] || [];
+  const had = list.some((r) => r.user_id === me && r.emoji === emoji);
+  if (had) {
+    reactMap[mid] = list.filter((r) => !(r.user_id === me && r.emoji === emoji));
+    renderReactions(mid);
+    await sb.from("message_reactions").delete().eq("message_id", mid).eq("user_id", me).eq("emoji", emoji);
+  } else {
+    const row = { message_id: mid, group_id: current.id, user_id: me, username: auth.username(), emoji };
+    reactMap[mid] = [...list, row]; renderReactions(mid);
+    await sb.from("message_reactions").insert(row);
+  }
+}
+function onReaction(type, r) {
+  if (!current || r.group_id !== current.id) return;
+  if (r.user_id === auth.session().user.id) return;     // already applied locally
+  const list = reactMap[r.message_id] = reactMap[r.message_id] || [];
+  if (type === "INSERT") { if (!list.some((x) => x.user_id === r.user_id && x.emoji === r.emoji)) list.push(r); }
+  else reactMap[r.message_id] = list.filter((x) => !(x.user_id === r.user_id && x.emoji === r.emoji));
+  renderReactions(r.message_id);
+}
+function openReactPicker(mid, anchorEl) {
+  closeReactPicker();
+  const pop = document.createElement("div");
+  pop.className = "react-pop"; pop.id = "reactPop";
+  pop.innerHTML = REACT_EMOJIS.map((e) => `<button data-e="${e}">${e}</button>`).join("");
+  anchorEl.closest(".bubble").appendChild(pop);
+  pop.querySelectorAll("button").forEach((b) => (b.onclick = (ev) => { ev.stopPropagation(); toggleReaction(mid, b.dataset.e); closeReactPicker(); }));
+  setTimeout(() => document.addEventListener("click", closeReactPicker, { once: true }), 0);
+}
+function closeReactPicker() { const p = $("reactPop"); if (p) p.remove(); }
+
+/* ---------- edit ---------- */
+async function editMessage(m) {
+  const next = prompt("Edit message:", m.content || "");
+  if (next === null) return;
+  const t = next.trim();
+  if (!t || t === (m.content || "")) return;
+  m.content = t;
+  const { error } = await sb.from("messages").update({ content: t, edited_at: new Date().toISOString() }).eq("id", m.id);
+  if (error) return alert(error.message);
+  updateMessageContent(m.id, t, true);
+}
+function updateMessageContent(id, content, edited) {
+  const bubble = $("messages").querySelector(`[data-mid="${id}"] .bubble`);
+  if (!bubble) return;
+  const txt = bubble.querySelector(".msg-text"); if (txt) txt.textContent = content;
+  if (edited && !bubble.querySelector(".edited")) {
+    const tag = document.createElement("span"); tag.className = "edited"; tag.textContent = "(edited)";
+    bubble.querySelector(".time").before(tag);
+  }
+}
+
+/* ---------- typing indicator ---------- */
+function sendTyping() {
+  if (!current || !channel) return;
+  const now = Date.now();
+  if (now - lastTypingSent < 1500) return;
+  lastTypingSent = now;
+  channel.send({ type: "broadcast", event: "typing", payload: { user: auth.username() } });
+}
+function showTyping(user) {
+  const t = $("typing"); if (!t) return;
+  t.textContent = `${user} is typing…`; t.classList.add("show");
+  clearTimeout(typingClear); typingClear = setTimeout(hideTyping, 3000);
+}
+function hideTyping() { const t = $("typing"); if (t) { t.classList.remove("show"); t.textContent = ""; } clearTimeout(typingClear); }
+
+/* ---------- voice messages ---------- */
+async function toggleRecording() {
+  if (recording) { stopRecording(); return; }
+  if (!current) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recChunks = [];
+    const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
+    mediaRecorder.onstop = async () => { stream.getTracks().forEach((t) => t.stop()); await sendVoice(new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" })); };
+    mediaRecorder.start();
+    recording = true; $("micBtn").classList.add("rec"); $("micBtn").textContent = "⏹";
+  } catch { alert("Couldn't access the microphone."); }
+}
+function stopRecording() {
+  if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎤"; try { mediaRecorder.stop(); } catch {} }
+}
+async function sendVoice(blob) {
+  if (!current || !blob.size) return;
+  const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+  const path = `${current.id}/${crypto.randomUUID()}.${ext}`;
+  const { error: upErr } = await sb.storage.from("chat-media").upload(path, blob, { contentType: blob.type });
+  if (upErr) return alert("Upload failed: " + upErr.message);
+  const u = auth.session().user;
+  const { data, error } = await sb.from("messages")
+    .insert({ group_id: current.id, user_id: u.id, username: auth.username(), content: "", media_url: path, media_type: "audio" }).select().single();
+  if (error) return alert(error.message);
+  appendMessage(data);
+}
+
+/* ---------- online presence ---------- */
+function startOnlinePresence() {
+  if (onlineSubbed) return; onlineSubbed = true;
+  const oc = sb.channel("online", { config: { presence: { key: auth.username() } } });
+  oc.on("presence", { event: "sync" }, () => {
+    const st = oc.presenceState();
+    onlineUsers = new Set(Object.keys(st).map((k) => (st[k][0] || {}).username).filter(Boolean));
+    renderChatList(applySearch(allChats));
+    refreshHeadPresence();
+  }).subscribe(async (s) => { if (s === "SUBSCRIBED") await oc.track({ username: auth.username() }); });
+}
+function refreshHeadPresence() {
+  const hp = $("headPresence"); if (!hp || !current) return;
+  hp.innerHTML = current.is_dm && onlineUsers.has(current.display) ? `<span class="on-dot"></span><span class="presence">online</span>` : "";
+}
 
 /* ---------- reply ---------- */
 function snippet(m) {
@@ -261,7 +418,7 @@ function appendMessage(m) {
   const replyHtml = m.reply_user
     ? `<span class="reply-quote" data-rid="${m.reply_to || ""}"><span class="rq-user">${esc(m.reply_user)}</span><span class="rq-text">${esc(m.reply_preview || "")}</span></span>`
     : "";
-  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${replyHtml}${body}<span class="time">${fmtTime(m.created_at)}</span></div>`;
+  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? '<span class="edited">(edited)</span>' : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
   const bubble = el.querySelector(".bubble");
   // tap a quoted reply to jump to the original
   const rq = el.querySelector(".reply-quote");
@@ -272,33 +429,52 @@ function appendMessage(m) {
     const tb = t.querySelector(".bubble"); if (tb) { tb.style.outline = "2px solid var(--accent2)"; setTimeout(() => (tb.style.outline = ""), 1200); }
   };
   if (m.media_url) {
-    const wrap = document.createElement(m.media_type === "video" ? "video" : "img");
-    wrap.className = "media";
-    if (m.media_type === "video") wrap.controls = true;
-    else wrap.onclick = () => { if (Date.now() < suppressClickUntil) return; if (wrap.src) openLightbox(wrap.src); };   // tap photo → fullscreen
-    bubble.insertBefore(wrap, el.querySelector(".time"));
-    signedUrl(m.media_url).then((u) => { if (u) wrap.src = u; });
+    if (m.media_type === "audio") {
+      const au = document.createElement("audio"); au.className = "voice"; au.controls = true;
+      bubble.insertBefore(au, el.querySelector(".time"));
+      signedUrl(m.media_url).then((u) => { if (u) au.src = u; });
+    } else {
+      const wrap = document.createElement(m.media_type === "video" ? "video" : "img");
+      wrap.className = "media";
+      if (m.media_type === "video") wrap.controls = true;
+      else wrap.onclick = () => { if (Date.now() < suppressClickUntil) return; if (wrap.src) openLightbox(wrap.src); };   // tap photo → fullscreen
+      bubble.insertBefore(wrap, el.querySelector(".time"));
+      signedUrl(m.media_url).then((u) => { if (u) wrap.src = u; });
+    }
   }
   // desktop hover reply button
   const rbtn = document.createElement("button");
   rbtn.className = "reply-btn"; rbtn.title = "Reply"; rbtn.textContent = "↩";
   rbtn.onclick = (e) => { e.stopPropagation(); startReply(m); };
   bubble.appendChild(rbtn);
+  // react button + picker
+  const reactBtn = document.createElement("button");
+  reactBtn.className = "react-btn"; reactBtn.title = "React"; reactBtn.textContent = "🙂";
+  reactBtn.onclick = (e) => { e.stopPropagation(); openReactPicker(m.id, reactBtn); };
+  bubble.appendChild(reactBtn);
   attachReplyGestures(el, m);
   if (mine) {
+    let delRight = -8;
+    if (m.content) {                                   // edit own text messages, anytime
+      const ed = document.createElement("button");
+      ed.className = "del-btn"; ed.title = "Edit"; ed.textContent = "✏️";
+      ed.onclick = () => editMessage(m);
+      bubble.appendChild(ed); delRight = 20;            // delete sits to the left of edit
+    }
     const tk = document.createElement("span");
     tk.className = "ticks"; tk.dataset.ts = m.created_at;
     bubble.appendChild(tk); paintTick(tk);
     const age = Date.now() - new Date(m.created_at).getTime();
     if (age < DELETE_WINDOW) {
       const del = document.createElement("button");
-      del.className = "del-btn"; del.title = "Delete (within 30s)"; del.textContent = "🗑";
+      del.className = "del-btn"; del.style.right = delRight + "px"; del.title = "Delete (within 30s)"; del.textContent = "🗑";
       del.onclick = () => deleteOwnMessage(m.id);
-      el.querySelector(".bubble").appendChild(del);
+      bubble.appendChild(del);
       setTimeout(() => del.remove(), DELETE_WINDOW - age);
     }
   }
   box.appendChild(el);
+  renderReactions(m.id);
   box.scrollTop = box.scrollHeight;
 }
 
@@ -331,11 +507,21 @@ function subscribe(gid) {
       { event: "DELETE", schema: "public", table: "messages", filter: "group_id=eq." + gid },
       (payload) => removeMessage(payload.old.id))
     .on("postgres_changes",
+      { event: "UPDATE", schema: "public", table: "messages", filter: "group_id=eq." + gid },
+      ({ new: m }) => { if (m) updateMessageContent(m.id, m.content, !!m.edited_at); })   // edits
+    .on("postgres_changes",
+      { event: "INSERT", schema: "public", table: "message_reactions", filter: "group_id=eq." + gid },
+      ({ new: r }) => onReaction("INSERT", r))
+    .on("postgres_changes",
+      { event: "DELETE", schema: "public", table: "message_reactions", filter: "group_id=eq." + gid },
+      ({ old: r }) => onReaction("DELETE", r))
+    .on("postgres_changes",
       { event: "*", schema: "public", table: "chat_reads", filter: "group_id=eq." + gid },
       ({ new: r }) => {                                  // someone read → refresh ticks live
         const me = auth.session()?.user?.id;
         if (r && r.user_id && r.user_id !== me) { readMap[r.user_id] = r.last_read_at; recomputeThreshold(); updateTicks(); }
       })
+    .on("broadcast", { event: "typing" }, ({ payload }) => { if (payload && payload.user !== auth.username()) showTyping(payload.user); })
     .subscribe();
 }
 
@@ -407,6 +593,10 @@ async function showApp() {
   $("rbX").onclick = cancelReply;
   $("lbX").onclick = closeLightbox;
   $("lightbox").onclick = (e) => { if (e.target.id === "lightbox") closeLightbox(); };
+  $("micBtn").onclick = toggleRecording;
+  $("msgInput").addEventListener("input", sendTyping);
+  $("searchInput").addEventListener("input", () => renderChatList(applySearch(allChats)));
+  startOnlinePresence();
   setupNotifyButton();
   try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
   try { const { data } = await sb.rpc("is_admin"); if (data) showAdminLink(); } catch {}

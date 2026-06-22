@@ -119,6 +119,40 @@
   .lightbox.open{display:flex}
   .lightbox img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
   .lightbox .lb-x{position:absolute;top:14px;right:18px;background:none;border:none;color:#fff;font-size:34px;cursor:pointer;line-height:1}
+  /* search box in sidebar */
+  .search-box{padding:8px 10px;border-bottom:1px solid var(--border)}
+  .search-box input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:8px 13px;font-size:13px;outline:none}
+  .search-box input:focus{border-color:var(--accent2)}
+  /* online dot */
+  .on-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#3fb950;margin-left:6px;vertical-align:middle}
+  .chat-head .on-dot{margin-left:2px}
+  .chat-head .presence{color:#3fb950;font-size:12px;font-weight:700}
+  /* edited tag */
+  .edited{font-size:10px;color:var(--muted);margin-left:6px}
+  .msg.mine .edited{color:rgba(255,255,255,.65)}
+  /* reactions */
+  .react-btn{position:absolute;bottom:-10px;background:#161625;border:1px solid var(--border);border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;line-height:1;opacity:0;transition:opacity .1s}
+  .msg:not(.mine) .react-btn{right:-8px}.msg.mine .react-btn{left:-8px}
+  .msg:hover .react-btn{opacity:.7}.react-btn:hover{opacity:1!important;border-color:var(--accent)}
+  .reacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+  .reacts:empty{display:none}
+  .react-chip{display:inline-flex;align-items:center;gap:3px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:1px 7px;font-size:12px;cursor:pointer;line-height:1.5}
+  .react-chip.mine-r{border-color:var(--accent);background:rgba(255,107,157,.18)}
+  .msg.mine .react-chip{background:rgba(0,0,0,.18)}
+  .react-pop{position:absolute;bottom:18px;display:flex;gap:4px;background:#161625;border:1px solid var(--border);border-radius:20px;padding:5px 8px;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .msg.mine .react-pop{left:-8px}.msg:not(.mine) .react-pop{right:-8px}
+  .react-pop button{background:none;border:none;font-size:19px;cursor:pointer;line-height:1;padding:1px;border-radius:6px}
+  .react-pop button:hover{transform:scale(1.25)}
+  /* audio / voice messages */
+  .voice{margin-top:6px;max-width:230px}
+  audio.voice{height:38px;width:230px}
+  #micBtn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:50%;width:42px;height:42px;font-size:18px;cursor:pointer;flex:none}
+  #micBtn:hover{border-color:var(--accent2)}
+  #micBtn.rec{background:#ff5d6c;border-color:#ff5d6c;color:#fff;animation:recpulse 1s infinite}
+  @keyframes recpulse{0%,100%{opacity:1}50%{opacity:.6}}
+  /* typing indicator */
+  .typing{display:none;padding:2px 18px 6px;color:var(--muted);font-size:12px;font-style:italic}
+  .typing.show{display:block}
   @media(max-width:640px){
     .bubble{max-width:85%}
     /* one pane at a time: chat list, OR the open conversation full-screen */
@@ -152,18 +186,21 @@
       <button id="newG" title="New group">+</button>
       <button id="joinG" title="Join by code">⇲</button>
     </div>
+    <div class="search-box"><input id="searchInput" placeholder="🔍 Search chats…" autocomplete="off"></div>
     <ul id="groupList"></ul>
   </aside>
   <section class="chat">
     <div class="chat-head" id="chatHead">Select a chat ←</div>
     <div class="messages" id="messages"></div>
     <div class="member-panel" id="memberPanel"></div>
+    <div class="typing" id="typing"></div>
     <div class="reply-bar" id="replyBar">
       <div class="rb-body"><span class="rb-user" id="rbUser"></span><span class="rb-text" id="rbText"></span></div>
       <button class="rb-x" id="rbX" type="button" title="Cancel reply">&times;</button>
     </div>
     <form class="composer" id="composer">
       <button type="button" id="attachBtn" title="Send photo or video">📎</button>
+      <button type="button" id="micBtn" title="Record a voice message">🎤</button>
       <input type="file" id="fileInput" accept="image/*,video/*" hidden>
       <input id="msgInput" placeholder="Message…" autocomplete="off" maxlength="2000">
       <button type="submit">Send</button>
@@ -178,6 +215,6 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="messenger.js?v=7"></script>
+<script type="module" src="messenger.js?v=8"></script>
 </body>
 </html>

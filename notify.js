@@ -130,6 +130,7 @@ function startAmbient(sb) {
   sb.channel("ambient-msgs")
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, ({ new: m }) => {
       if (!m || m.user_id === me) return;
+      try { if (JSON.parse(localStorage.getItem("mutedChats") || "[]").includes(m.group_id)) return; } catch {}  // per-chat mute
       const body = m.content && m.content.trim()
         ? m.content
         : m.media_type === "video" ? "📹 Video" : m.media_type === "image" ? "📷 Photo" : "New message";
