@@ -66,7 +66,7 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
 ⚠️ **`wordle-setup.sql` must be run** (Wordle public leaderboard: `wordle_results` + RPCs). [run ✓]
 ⚠️ **`rankings-setup.sql` must be run** (cross-game rankings: `game_results` + `record_match`/`game_leaderboard`). [run ✓]
 ⚠️ **`homework-setup.sql`** (WebUntis homework table) + deploy `webuntis-sync` Edge Function — see `scripts/WEBUNTIS-SETUP.md`.
-⚠️ **`hotel-setup.sql` must be run** (private Hotel-Simulator cloud saves: `hotel_saves` + owner-only RLS). **[NOT yet run]**
+⚠️ **`hotel-setup.sql`** (private Hotel-Simulator cloud saves: `hotel_saves` + owner-only RLS). [run ✓]
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -142,11 +142,9 @@ Web Push is fully live (see §8). Latest cache versions are in §2.
 (`reversi.html`), Dots & Boxes (`dots.html`), Tic-Tac-Toe (`tictactoe.html`)** — all with
 `?ai=1` + leaderboard recording, registered in games hub / friends.js (`?v=6`) / leaderboard tabs.
 
-**Private Hotel-Simulator — DONE (deployed), but needs 2 manual steps:** `hotel.html` (Quinn's
-German hotel-builder) gated to `konto@ian.lu` + `quinn@mulheims.lu`, with Supabase cloud saves
-(`hotel_saves`, separate per account). **OUTSTANDING:** (1) run `scripts/hotel-setup.sql` in
-Supabase; (2) create the brother's account at ian.lu with the exact email `quinn@mulheims.lu`
-(confirmation email). Until both are done, his saves/gate won't work.
+**Private Hotel-Simulator — DONE & LIVE:** `hotel.html` (Quinn's German hotel-builder) gated to
+`konto@ian.lu` + `quinn@mulheims.lu`, with Supabase cloud saves (`hotel_saves`, separate per
+account). `hotel-setup.sql` run ✓; Quinn's account (`quinn@mulheims.lu`) created ✓.
 
 **Needs real-device playtesting:** Molerei (`draw.html`) and Colour Dial — multiplayer was not
 tested with 2+ devices. Watch for stroke lag, scoring, drawer rotation.
