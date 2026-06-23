@@ -124,16 +124,35 @@ Old full data was scrubbed from git history.
 - Realtime `postgres_changes`: register `.on()` **before** `.subscribe()`, and don't double-subscribe the same channel.
 - `iOS Safari` quirks handled: `100dvh` for full-height pages; UMD supabase-js (not esm.sh); theme uses CSS vars.
 
-## 7. Open items
+## 7. Status & open items (as of Jun 2026)
 
+**All SQL migrations have been run** by the user: messenger v2–v6, grades-sync, social-games,
+social-fix, admin-users, dashboard-private, `wordle-setup`, `rankings-setup`, `homework-setup`.
+Web Push is fully live (see §8). Latest cache versions are in §2.
+
+**In progress — Wave 2 (games):** a large feature batch. DONE this session:
+messenger v6 (reactions/edit/typing/online/mute/search/voice), **Wordle** (`wordle.html`, +public
+leaderboard), **Colour Dial AI** (`color.html?ai=1`), **Connect4/Battleship AI** (`?ai=1`),
+**cross-game leaderboard** (`leaderboard.html`), **Molerei** draw-&-guess (`draw.html`).
+**TODO next:** the remaining **1v1 AI games — Reversi/Othello, Dots & Boxes, Tic-Tac-Toe**
+(follow the `?ai=1` pattern in connect4/battleship; record results via `recordResult(...)`).
+
+**Needs real-device playtesting:** Molerei (`draw.html`) and Colour Dial — multiplayer was not
+tested with 2+ devices. Watch for stroke lag, scoring, drawer rotation.
+
+**WebUntis homework — PARKED (blocked by the school):** table/page/Edge Function are built
+(`homework.html`, `supabase/functions/webuntis-sync`, `scripts/homework-setup.sql` run) but LAML
+has **`publicAppAccessAllowed:false`** + IAM SSO (`urn:x-iam-education-lu:auth`), so the mobile-secret
+(TOTP) login is rejected server-side ("bad credentials") even with correct creds. Verified: TOTP code
+is correct, no clock skew. Revisit if the school enables app access, else make `homework.html`
+manual-entry. School API id = `laml` (NOT "Aline Mayrisch"); user `Mulla383`, Schulnummer 6349000.
+
+**Smaller open items:**
 - **Rotate the FTP password** (exposed during setup) + update `FTP_PASSWORD` secret.
-- ~~Finish Web Push~~ **DONE (Jun 2026):** v4 SQL run; `notify` Edge Function deployed
-  (`--no-verify-jwt`); VAPID + `NOTIFY_SECRET` secrets set; DB webhook on `messages` INSERT live
-  (header `x-notify-secret`); verified arriving on the iPad home-screen PWA. (Function logs in the
-  dashboard lag a few min via Logflare — delivery itself is instant.)
 - A proper **PNG `apple-touch-icon`** would render nicer on the iOS Home Screen than the SVG.
-- Light mode swaps core CSS vars site-wide; a few deeply-custom spots may still look dark — tune as reported.
-- Possible next features discussed: live class quiz; manual-placement polish; per-section upper-cycle grade coefficients (currently a general editable base for 3e–1ère).
+- Per-chat **mute** only affects in-app notifications, not server Web Push (would need a server-side mute table).
+- Light mode: a few deeply-custom spots may still look dark — tune as reported.
+- **Luxembourgish Wordle word list** in `wordle.html` (`WORDS.lb`) is a conservative starter — expand/verify it.
 
 ## 8. Notifications (in-app + Web Push)
 
