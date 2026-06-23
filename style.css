@@ -87,6 +87,7 @@ body {
 .tile.games:hover { border-color: #ffb347; }
 .tile.dash:hover { border-color: #58a6ff; }
 .tile.admin:hover { border-color: #ffcc00; }
+.tile.hotel:hover { border-color: #38bdf8; }
 
 footer {
   text-align: center;

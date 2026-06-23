@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hotel-Bausimulator</title>
+<style>
+  :root{
+    --bg:#0f172a; --panel:#1e293b; --panel2:#273449; --text:#e2e8f0;
+    --muted:#94a3b8; --accent:#38bdf8; --accent2:#0ea5e9; --line:#334155;
+    --grid:#334155; --gridbg:#1a2434; --font:'Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden;}
+  button{font-family:inherit;cursor:pointer;}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+
+  /* ---------- STARTBILDSCHIRM ---------- */
+  #start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 25%, var(--panel2), var(--bg));z-index:50;padding:20px;overflow:auto;}
+  .start-card{max-width:780px;width:100%;background:var(--panel);border-radius:18px;padding:32px 38px;
+    box-shadow:0 30px 80px rgba(0,0,0,.5);border:1px solid var(--line);margin:auto;}
+  .start-card h1{margin:0 0 6px;font-size:30px;}
+  .start-card .sub{color:var(--muted);margin:0 0 22px;font-size:14px;}
+  .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 11px;font-weight:700;}
+  .styles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .style-opt{border:2px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;text-align:center;transition:.15s;background:var(--panel2);}
+  .style-opt:hover{transform:translateY(-3px);}
+  .style-opt.selected{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent);}
+  .style-opt .swatch{height:46px;border-radius:8px;margin-bottom:9px;}
+  .style-opt strong{display:block;font-size:14px;}
+  .style-opt span{font-size:11px;color:var(--muted);}
+  .field label{display:block;font-size:13px;margin-bottom:7px;color:var(--muted);}
+  .txt{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:15px;}
+  .stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:fit-content;}
+  .stepper button{width:40px;height:40px;background:var(--panel2);border:none;color:var(--text);font-size:20px;}
+  .stepper button:hover{background:var(--accent);color:#fff;}
+  .stepper input{width:56px;height:40px;text-align:center;border:none;background:transparent;color:var(--text);font-size:17px;font-weight:600;-moz-appearance:textfield;}
+  .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;}
+  #bldList{display:flex;flex-direction:column;gap:10px;}
+  .bld-row{display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .bld-row .idx{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto;}
+  .bld-row input.name{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;}
+  .bld-row .flbl{font-size:12px;color:var(--muted);}
+  .start-btn{margin-top:26px;width:100%;padding:15px;font-size:17px;font-weight:700;border:none;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+  .start-btn:hover{filter:brightness(1.08);}
+  .resume{margin-top:12px;width:100%;padding:12px;font-size:14px;font-weight:600;border:1px solid var(--accent);border-radius:10px;background:transparent;color:var(--accent);}
+  .resume:hover{background:color-mix(in srgb,var(--accent) 15%,transparent);}
+  #resumeList{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
+  .hotel-row{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .hotel-row .h-info{flex:1;min-width:0;}
+  .hotel-row .h-info b{display:block;font-size:14px;}
+  .hotel-row .h-info small{color:var(--muted);font-size:11px;}
+  .hotel-row button{padding:7px 11px;border-radius:8px;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--text);}
+  .hotel-row .h-open{border-color:var(--accent);color:var(--accent);font-weight:600;}
+  .hotel-row .h-del{border-color:transparent;color:var(--muted);}
+  .hotel-row .h-del:hover{color:#ef4444;}
+
+  /* ---------- APP ---------- */
+  #app{display:none;height:100%;flex-direction:column;}
+  header.topbar{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto;flex-wrap:wrap;}
+  header.topbar h2{margin:0;font-size:17px;white-space:nowrap;}
+  .views{display:flex;gap:6px;margin-left:8px;}
+  .view-tab{padding:8px 14px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);color:var(--text);font-size:13px;}
+  .view-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .stats{display:flex;gap:14px;margin-left:auto;font-size:12px;color:var(--muted);}
+  .stats b{color:var(--text);}
+  .tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;}
+  .tbtn:hover{border-color:var(--accent);}
+  .main{flex:1 1 auto;min-height:0;position:relative;}
+  .view{position:absolute;inset:0;display:none;}
+  .view.active{display:flex;}
+
+  /* ---- LAGEPLAN ---- */
+  #viewSite{flex-direction:column;}
+  .site-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto;}
+  .site-bar .hint{margin-left:auto;font-size:12px;color:var(--muted);}
+  .site-wrap{flex:1;overflow:auto;padding:26px;display:flex;align-items:flex-start;justify-content:center;}
+  #plot{position:relative;background:
+      linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px),
+      repeating-linear-gradient(45deg,transparent,transparent 18px,color-mix(in srgb,#22c55e 8%,transparent) 18px,color-mix(in srgb,#22c55e 8%,transparent) 20px);
+    background-size:40px 40px,40px 40px,auto,auto;background-color:var(--gridbg);
+    border:3px solid var(--line);border-radius:8px;flex:0 0 auto;}
+  .plot-label{position:absolute;top:8px;left:12px;font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;pointer-events:none;}
+  .bld-block{position:absolute;background:color-mix(in srgb,var(--accent) 22%,var(--panel));border:2px solid var(--accent);border-radius:8px;
+    cursor:grab;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px;overflow:hidden;box-shadow:0 6px 16px rgba(0,0,0,.35);}
+  .bld-block:active{cursor:grabbing;}
+  .bld-block.sel{outline:3px solid var(--accent2);outline-offset:2px;}
+  .bld-block .bb-ico{font-size:24px;}
+  .bld-block .bb-name{font-weight:700;font-size:14px;margin-top:2px;}
+  .bld-block .bb-info{font-size:11px;color:var(--muted);margin-top:2px;}
+  .bld-block .bb-resize{position:absolute;right:2px;bottom:2px;width:16px;height:16px;cursor:nwse-resize;
+    background:linear-gradient(135deg,transparent 50%,var(--accent2) 50%);border-radius:0 0 6px 0;}
+  .bld-block .bb-edit{position:absolute;top:4px;right:6px;font-size:11px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:3px 7px;opacity:0;transition:.12s;}
+  .bld-block:hover .bb-edit{opacity:1;}
+  .out-block{position:absolute;border:2px solid;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;cursor:grab;overflow:hidden;box-shadow:0 4px 10px rgba(0,0,0,.22);}
+  .out-block:active{cursor:grabbing;}
+  .out-block .ob-ico{font-size:22px;}
+  .out-block .ob-name{font-size:12px;font-weight:600;margin-top:2px;}
+  .out-block .ob-del{position:absolute;top:3px;right:4px;font-size:11px;background:rgba(0,0,0,.45);color:#fff;border:none;border-radius:50%;width:18px;height:18px;opacity:0;transition:.12s;}
+  .out-block:hover .ob-del{opacity:1;}
+  .out-block .ob-resize{position:absolute;right:2px;bottom:2px;width:15px;height:15px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.45) 50%);border-radius:0 0 9px 0;}
+
+  /* ---- GRUNDRISS ---- */
+  #viewFloor{flex-direction:row;}
+  .palette{width:260px;flex:0 0 260px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px;}
+  .palette h3{margin:4px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  .search{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);margin-bottom:10px;font-size:13px;}
+  .cat-head{font-size:12px;font-weight:700;color:var(--accent);margin:13px 0 7px;letter-spacing:.5px;}
+  .part{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);margin-bottom:6px;cursor:grab;transition:.12s;user-select:none;}
+  .part:hover{border-color:var(--accent);transform:translateX(2px);}
+  .part .ico{font-size:19px;width:24px;text-align:center;}
+  .part .meta{flex:1;min-width:0;}
+  .part .meta b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .part .meta small{color:var(--muted);font-size:11px;}
+  .part .dot{width:11px;height:11px;border-radius:3px;flex:0 0 auto;}
+
+  .editor{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;background:var(--bg);}
+  .editor-bar{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto;flex-wrap:wrap;}
+  .editor-bar .floor-name{font-size:15px;font-weight:600;}
+  .editor-bar .hint{margin-left:auto;font-size:12px;color:var(--muted);}
+  .canvas-wrap{flex:1 1 auto;overflow:auto;padding:24px;display:flex;align-items:flex-start;justify-content:center;}
+  #grid{position:relative;background:var(--gridbg);border:2px solid var(--line);border-radius:6px;flex:0 0 auto;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);}
+  #grid.drag-over{box-shadow:0 0 0 3px var(--accent) inset;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent) inset;}100%{box-shadow:0 0 0 14px transparent inset;}}
+  #grid.flash{animation:pulse .7s ease-out 1;}
+  .room{position:absolute;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:12px;text-align:center;overflow:hidden;cursor:grab;box-shadow:0 4px 10px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);padding:2px;}
+  .room:hover{filter:brightness(1.12);}
+  .room.dragging{opacity:.6;cursor:grabbing;z-index:20;}
+  .room .r-ico{font-size:19px;line-height:1;}
+  .room .r-name{font-weight:600;margin-top:2px;line-height:1.05;}
+  .room .r-size{font-size:10px;opacity:.85;}
+  .room .r-del{position:absolute;top:2px;right:3px;font-size:12px;opacity:0;background:rgba(0,0,0,.5);border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;}
+  .room:hover .r-del{opacity:1;}
+  .room .r-resize{position:absolute;right:1px;bottom:1px;width:14px;height:14px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(255,255,255,.85) 50%);border-radius:0 0 5px 0;}
+  .room.shaft{border:2px dashed rgba(255,255,255,.92);box-shadow:0 0 0 2px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.45);}
+  .room .r-badge{font-size:9px;background:rgba(0,0,0,.5);border-radius:6px;padding:1px 5px;margin-top:2px;white-space:nowrap;}
+  .room.sel{outline:3px solid var(--accent2);outline-offset:1px;z-index:18;}
+  /* Zusammengefügter Raum: Container fängt KEINE Klicks ab, nur seine Kacheln –
+     so bleiben Räume in den leeren Ecken (z. B. L-Form) bedien-/verschiebbar. */
+  .room.merged{overflow:visible;pointer-events:none;background:transparent!important;box-shadow:none!important;border:none!important;}
+  .room.merged .r-tile{pointer-events:auto;}
+  .room.merged .r-del{pointer-events:auto;}
+  .r-tile{position:absolute;border-radius:4px;border:1px solid rgba(255,255,255,.3);box-shadow:0 2px 6px rgba(0,0,0,.3);}
+  .r-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.7);}
+  .ghost{position:absolute;border:2px dashed var(--accent);border-radius:6px;background:color-mix(in srgb,var(--accent) 18%,transparent);pointer-events:none;display:none;z-index:15;}
+
+  .floornav{width:170px;flex:0 0 170px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding:12px;}
+  .floornav h3{margin:2px 0 9px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  .fl-item{display:flex;align-items:center;gap:7px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--panel2);transition:.12s;}
+  .fl-item.active{background:color-mix(in srgb,var(--accent) 25%,var(--panel2));border-left:3px solid var(--accent);}
+  .fl-item:hover{filter:brightness(1.1);}
+  .fl-item .fl-name{font-size:13px;font-weight:600;flex:1;}
+  .fl-item .fl-count{font-size:11px;color:var(--muted);}
+  .fl-item .fl-del{background:transparent;border:none;color:var(--muted);font-size:13px;border-radius:5px;padding:1px 5px;line-height:1;}
+  .fl-item .fl-del:hover{color:#ef4444;background:color-mix(in srgb,#ef4444 15%,transparent);}
+
+  /* ---- FRONTANSICHT ---- */
+  #viewFront{flex-direction:column;}
+  .front-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto;}
+  .front-wrap{flex:1;overflow:auto;padding:30px;display:flex;align-items:flex-end;justify-content:center;gap:34px;background:linear-gradient(180deg,var(--gridbg),var(--bg));}
+  .front-bld{display:flex;flex-direction:column;align-items:center;}
+  .front-stack{display:flex;flex-direction:column;border:2px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;overflow:hidden;background:var(--panel);}
+  .front-floor{display:flex;border-bottom:1px solid var(--line);}
+  .front-cell{flex:0 0 auto;}
+  .front-base{height:16px;width:100%;background:var(--panel2);border:2px solid var(--line);border-top:none;border-radius:0 0 6px 6px;}
+  .front-name{margin-top:8px;font-size:13px;font-weight:600;}
+  .front-sub{font-size:11px;color:var(--muted);}
+  .ground-line{position:relative;}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--text);padding:11px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.25s;z-index:100;}
+  .toast.show{opacity:1;}
+  .hidden{display:none!important;}
+</style>
+</head>
+<body>
+
+<!-- ===================== ZUGANGS-SPERRE (privat) ===================== -->
+<div id="hotelGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 25%,#273449,#0f172a);padding:20px;">
+  <div style="max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:18px;padding:34px 32px;text-align:center;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 30px 80px rgba(0,0,0,.5);">
+    <div style="font-size:44px;line-height:1;margin-bottom:10px">🏨</div>
+    <h1 style="margin:0 0 6px;font-size:24px">Hotel-Simulator</h1>
+    <p id="hotelGateMsg" style="color:#94a3b8;font-size:14px;margin:0 0 20px">Wird geladen…</p>
+    <button id="hotelSignin" style="display:none;background:#38bdf8;color:#06283a;border:none;border-radius:10px;padding:11px 22px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit">Anmelden</button>
+    <p style="margin-top:18px;margin-bottom:0"><a href="/" style="color:#94a3b8;font-size:13px;text-decoration:none">&lsaquo; Zurück zu ian.lu</a></p>
+  </div>
+</div>
+
+<!-- ===================== STARTBILDSCHIRM ===================== -->
+<div id="start">
+  <div class="start-card">
+    <h1>🏨 Hotel-Bausimulator</h1>
+    <p class="sub">Plane dein eigenes Luxushotel: Stil wählen, Grundstück mit Gebäuden anlegen, Stockwerke einrichten und Räume per Drag-and-Drop einbauen.</p>
+
+    <div class="section-title">1 · Stil wählen</div>
+    <div class="styles" id="styleOpts">
+      <div class="style-opt" data-style="playful">
+        <div class="swatch" style="background:linear-gradient(135deg,#ff7eb3,#ffd166,#06d6a0)"></div>
+        <strong>Bunt &amp; verspielt</strong><span>Farbig &amp; freundlich</span>
+      </div>
+      <div class="style-opt" data-style="luxury">
+        <div class="swatch" style="background:linear-gradient(135deg,#1a1208,#caa84b,#3b2f1a)"></div>
+        <strong>Elegant &amp; luxuriös</strong><span>Gold &amp; Marmor</span>
+      </div>
+      <div class="style-opt" data-style="minimal">
+        <div class="swatch" style="background:linear-gradient(135deg,#e2e8f0,#94a3b8,#475569)"></div>
+        <strong>Schlicht &amp; modern</strong><span>Klar &amp; funktional</span>
+      </div>
+    </div>
+
+    <div class="section-title">2 · Hotelname</div>
+    <div class="field"><input class="txt" id="hotelName" placeholder="z. B. Grand Palace Resort" value="Mein Luxushotel"></div>
+
+    <div class="section-title">3 · Wie viele Gebäude?</div>
+    <div class="stepper">
+      <button type="button" id="bldMinus">−</button>
+      <input id="numBld" type="number" value="2" min="1" max="8">
+      <button type="button" id="bldPlus">+</button>
+    </div>
+
+    <div class="section-title">4 · Stockwerke pro Gebäude</div>
+    <div id="bldList"></div>
+
+    <button class="start-btn" id="startBtn">Hotel erstellen →</button>
+    <button class="resume hidden" id="resumeBtn">⟳ Gespeichertes Hotel fortsetzen</button>
+    <div id="resumeList" class="hidden"></div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+  <header class="topbar">
+    <h2 id="hotelTitle">🏨 Hotel</h2>
+    <div class="views">
+      <button class="view-tab" data-view="site">🗺️ Lageplan</button>
+      <button class="view-tab" data-view="floor">📐 Grundriss</button>
+      <button class="view-tab" data-view="front">🏢 Frontansicht</button>
+    </div>
+    <div class="stats">
+      <span>Gebäude <b id="stBld">0</b></span>
+      <span>Stockwerke <b id="stFlr">0</b></span>
+      <span>Räume <b id="stRooms">0</b></span>
+    </div>
+    <button class="tbtn" id="saveBtn">💾 Speichern</button>
+    <button class="tbtn" id="exportBtn">⬇︎ Export</button>
+    <button class="tbtn" id="importBtn">⬆︎ Import</button>
+    <button class="tbtn" id="restartBtn">Neu</button>
+    <input type="file" id="importFile" accept="application/json" class="hidden">
+  </header>
+
+  <div class="main">
+    <!-- LAGEPLAN -->
+    <section class="view" id="viewSite">
+      <div class="site-bar">
+        <button class="tbtn" id="addBldBtn2">+ Gebäude</button>
+        <button class="tbtn" id="delBldBtn">🗑 Gebäude löschen</button>
+        <select class="tbtn" id="outdoorSel"><option value="">🌳 Außenanlage hinzufügen…</option></select>
+        <span class="hint">Gebäude/Außenanlagen ziehen = verschieben · Ecke = Größe · Doppelklick aufs Gebäude öffnet die Stockwerke</span>
+      </div>
+      <div class="site-wrap"><div id="plot"><div class="plot-label">🌳 Grundstück / Lageplan</div></div></div>
+    </section>
+
+    <!-- GRUNDRISS -->
+    <section class="view" id="viewFloor">
+      <aside class="palette">
+        <h3>Bauteile</h3>
+        <input class="search" id="search" placeholder="🔍 Bauteil suchen...">
+        <div id="palette"></div>
+      </aside>
+      <div class="editor">
+        <div class="editor-bar">
+          <button class="tbtn" id="backToSite">← Lageplan</button>
+          <span class="floor-name" id="floorName">Erdgeschoss</span>
+          <button class="tbtn" id="mergeBtn">🔗 Zusammenfügen</button>
+          <button class="tbtn" id="clearFloorBtn">Etage leeren</button>
+          <span class="hint">Ziehen = verschieben · Ecke = Größe · Raum anklicken = auswählen · 2+ auswählen, dann „Zusammenfügen"</span>
+        </div>
+        <div class="canvas-wrap"><div id="grid"><div class="ghost" id="ghost"></div></div></div>
+      </div>
+      <aside class="floornav">
+        <h3 id="floornavTitle">Stockwerke</h3>
+        <button class="tbtn" id="addFloorBtn" style="width:100%;margin-bottom:10px;">+ Stockwerk</button>
+        <div id="floorList"></div>
+      </aside>
+    </section>
+
+    <!-- FRONTANSICHT -->
+    <section class="view" id="viewFront">
+      <div class="front-bar"><b>Frontansicht des Hotels</b><span class="hint" style="margin-left:auto;color:var(--muted);font-size:12px;">Gebäude in Reihenfolge des Lageplans · jedes Stockwerk zeigt seinen Grundriss</span></div>
+      <div class="front-wrap" id="frontWrap"></div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ THEMES ============ */
+const THEMES={
+  playful:{'--bg':'#fdf2f8','--panel':'#ffffff','--panel2':'#fff0f6','--text':'#3b1f2b','--muted':'#9d6b80','--accent':'#ec4899','--accent2':'#f97316','--line':'#fbcfe8','--grid':'#f5d0e0','--gridbg':'#fff7fb','--font':"'Comic Sans MS','Segoe UI',sans-serif"},
+  luxury:{'--bg':'#14110b','--panel':'#1d1810','--panel2':'#2a2114','--text':'#f3e9d2','--muted':'#b9a878','--accent':'#caa84b','--accent2':'#9a7b2e','--line':'#3a2f1c','--grid':'#3a2f1c','--gridbg':'#1a150d','--font':"'Georgia','Times New Roman',serif"},
+  minimal:{'--bg':'#f8fafc','--panel':'#ffffff','--panel2':'#f1f5f9','--text':'#1e293b','--muted':'#64748b','--accent':'#0ea5e9','--accent2':'#0284c7','--line':'#e2e8f0','--grid':'#e2e8f0','--gridbg':'#fbfdff','--font':"'Segoe UI',system-ui,sans-serif"},
+};
+function applyTheme(n){const t=THEMES[n]||THEMES.minimal;for(const k in t)document.documentElement.style.setProperty(k,t[k]);}
+
+/* ============ KATALOG ============ */
+const CATALOG=[
+ {cat:'Gästezimmer',items:[
+   {id:'single',name:'Einzelzimmer',ico:'🛏️',w:1,h:1,color:'#60a5fa'},
+   {id:'double',name:'Doppelzimmer',ico:'🛏️',w:2,h:1,color:'#3b82f6'},
+   {id:'twin',name:'Zweibettzimmer',ico:'🛏️',w:2,h:1,color:'#2563eb'},
+   {id:'family',name:'Familienzimmer',ico:'👨‍👩‍👧',w:2,h:2,color:'#6366f1'},
+   {id:'junior',name:'Junior-Suite',ico:'🛋️',w:2,h:2,color:'#8b5cf6'},
+   {id:'suite',name:'Luxus-Suite',ico:'✨',w:3,h:2,color:'#a855f7'},
+   {id:'president',name:'Präsidenten-Suite',ico:'👑',w:3,h:3,color:'#c026d3'},
+   {id:'penthouse',name:'Penthouse',ico:'🌃',w:4,h:3,color:'#db2777'},
+ ]},
+ {cat:'Gastronomie',items:[
+   {id:'restaurant',name:'Restaurant',ico:'🍽️',w:3,h:2,color:'#ef4444'},
+   {id:'finedining',name:'Gourmet-Restaurant',ico:'🍷',w:3,h:3,color:'#b91c1c'},
+   {id:'bar',name:'Bar',ico:'🍸',w:2,h:1,color:'#f97316'},
+   {id:'cafe',name:'Café',ico:'☕',w:2,h:1,color:'#d97706'},
+   {id:'kitchen',name:'Küche',ico:'🍳',w:2,h:2,color:'#facc15'},
+   {id:'banquet',name:'Bankettsaal',ico:'🥂',w:4,h:3,color:'#eab308'},
+   {id:'wine',name:'Weinkeller',ico:'🍾',w:2,h:1,color:'#7c2d12'},
+ ]},
+ {cat:'Wellness & Freizeit',items:[
+   {id:'spa',name:'Spa',ico:'💆',w:3,h:2,color:'#14b8a6'},
+   {id:'sauna',name:'Sauna',ico:'🧖',w:2,h:1,color:'#0d9488'},
+   {id:'pool',name:'Innenpool',ico:'🏊',w:4,h:3,color:'#06b6d4'},
+   {id:'gym',name:'Fitnessstudio',ico:'🏋️',w:2,h:2,color:'#0891b2'},
+   {id:'massage',name:'Massageraum',ico:'💅',w:1,h:1,color:'#2dd4bf'},
+   {id:'casino',name:'Casino',ico:'🎰',w:3,h:2,color:'#e11d48'},
+   {id:'cinema',name:'Kino',ico:'🎬',w:3,h:2,color:'#9333ea'},
+   {id:'kids',name:'Kinderclub',ico:'🧸',w:2,h:2,color:'#f472b6'},
+   {id:'library',name:'Bibliothek',ico:'📚',w:2,h:2,color:'#a16207'},
+ ]},
+ {cat:'Empfang & Service',items:[
+   {id:'reception',name:'Rezeption',ico:'🛎️',w:2,h:2,color:'#22c55e'},
+   {id:'lobby',name:'Lobby',ico:'🛋️',w:3,h:2,color:'#16a34a'},
+   {id:'concierge',name:'Concierge',ico:'🎩',w:1,h:1,color:'#15803d'},
+   {id:'office',name:'Büro',ico:'💼',w:1,h:1,color:'#65a30d'},
+   {id:'conference',name:'Konferenzraum',ico:'📊',w:3,h:2,color:'#4d7c0f'},
+   {id:'shop',name:'Boutique',ico:'🛍️',w:2,h:1,color:'#84cc16'},
+   {id:'laundry',name:'Wäscherei',ico:'🧺',w:2,h:1,color:'#a3a3a3'},
+   {id:'storage',name:'Lager',ico:'📦',w:1,h:1,color:'#737373'},
+ ]},
+ {cat:'Infrastruktur & Außen',items:[
+   {id:'elevator',name:'Aufzug',ico:'🛗',w:1,h:1,color:'#94a3b8'},
+   {id:'stairs',name:'Treppenhaus',ico:'🪜',w:1,h:1,color:'#64748b'},
+   {id:'hallway',name:'Flur',ico:'🚪',w:1,h:1,color:'#cbd5e1'},
+   {id:'wc',name:'Toiletten',ico:'🚻',w:1,h:1,color:'#7dd3fc'},
+   {id:'parking',name:'Parkhaus',ico:'🅿️',w:4,h:2,color:'#475569'},
+   {id:'terrace',name:'Dachterrasse',ico:'🌅',w:3,h:2,color:'#fb923c'},
+   {id:'garden',name:'Garten',ico:'🌳',w:3,h:2,color:'#22c55e'},
+   {id:'rooftoppool',name:'Dachpool',ico:'🌊',w:3,h:2,color:'#38bdf8'},
+ ]},
+];
+const PARTS={};CATALOG.forEach(c=>c.items.forEach(i=>PARTS[i.id]=i));
+
+/* Außenanlagen für den Lageplan (Pixel-Größen auf dem Grundstück) */
+const OUTDOOR=[
+  {id:'o_garden',name:'Garten',ico:'🌳',color:'#22c55e',w:160,h:120},
+  {id:'o_pool',name:'Außenpool',ico:'🏊',color:'#06b6d4',w:160,h:100},
+  {id:'o_parking',name:'Parkplatz',ico:'🅿️',color:'#475569',w:180,h:120},
+  {id:'o_terrace',name:'Terrasse',ico:'⛱️',color:'#fb923c',w:140,h:100},
+  {id:'o_playground',name:'Spielplatz',ico:'🛝',color:'#f472b6',w:140,h:120},
+  {id:'o_tennis',name:'Tennisplatz',ico:'🎾',color:'#84cc16',w:120,h:170},
+  {id:'o_garage',name:'Tiefgarage-Einfahrt',ico:'🚗',color:'#64748b',w:140,h:80},
+  {id:'o_fountain',name:'Brunnen',ico:'⛲',color:'#38bdf8',w:90,h:90},
+  {id:'o_path',name:'Weg / Einfahrt',ico:'🛣️',color:'#a3a3a3',w:200,h:60},
+  {id:'o_helipad',name:'Hubschrauberlandeplatz',ico:'🚁',color:'#7c3aed',w:130,h:130},
+];
+const OUT={};OUTDOOR.forEach(o=>OUT[o.id]=o);
+
+/* ============ ZUSTAND ============ */
+const COLS=14,ROWS=9,CELL=56;
+const PLOTW=900,PLOTH=520,SNAP=20;
+const SAVE_KEY='hotelSimSave_v2';   // alt – nur für Migration
+const LIB_KEY='hotelSimLibrary_v1'; // Index aller gespeicherten Hotels
+var SB=null, HOTELS=[];             // Supabase-Client + Cloud-Hotels (pro Konto, vom Gate gesetzt)
+let state=null, chosenStyle='minimal', view='site';
+let selectedRooms=new Set();
+// Zell-Helfer (Räume können Rechtecke {x,y,w,h} ODER zusammengefügte Formen {cells:[...]} sein)
+function rectCells(r){const a=[];for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)a.push({x,y});return a;}
+function cellsOf(r){return r.cells?r.cells:rectCells(r);}
+function bbox(cells){const xs=cells.map(c=>c.x),ys=cells.map(c=>c.y);const minx=Math.min(...xs),miny=Math.min(...ys);return{minx,miny,w:Math.max(...xs)-minx+1,h:Math.max(...ys)-miny+1};}
+function clearSel(){selectedRooms.clear();updateMergeBtn();}
+function updateMergeBtn(){const n=selectedRooms.size,b=document.getElementById('mergeBtn');if(b)b.textContent=n>=2?`🔗 Zusammenfügen (${n})`:'🔗 Zusammenfügen';}
+
+function floorLabel(i){return i===0?'Erdgeschoss':i+'. OG';}
+function uid(){return Math.random().toString(36).slice(2,9);}
+function newFloor(i){return{name:floorLabel(i),rooms:[]};}
+function newBuilding(idx,name,nFlr){
+  const floors=[];for(let f=0;f<nFlr;f++)floors.push(newFloor(f));
+  const col=idx%4;
+  return{id:uid(),name:name||('Gebäude '+(idx+1)),floors,shafts:[],
+    site:{x:40+col*210,y:80+Math.floor(idx/4)*180,w:180,h:130}};
+}
+const THROUGH=new Set(['elevator','stairs']); // verlaufen durch alle Etagen
+
+/* ============ STARTBILDSCHIRM ============ */
+document.querySelectorAll('.style-opt').forEach(el=>el.addEventListener('click',()=>{
+  document.querySelectorAll('.style-opt').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');chosenStyle=el.dataset.style;applyTheme(chosenStyle);
+}));
+document.querySelector('[data-style="minimal"]').click();
+
+function renderBldList(){
+  const n=parseInt(document.getElementById('numBld').value)||1;
+  const list=document.getElementById('bldList');
+  const old=[...list.querySelectorAll('.bld-row')].map(r=>({name:r.querySelector('.name').value,fl:r.querySelector('.flr').value}));
+  list.innerHTML='';
+  for(let i=0;i<n;i++){
+    const row=document.createElement('div');row.className='bld-row';
+    row.innerHTML=`<div class="idx">${i+1}</div>
+      <input class="name" value="${old[i]?old[i].name:'Gebäude '+(i+1)}">
+      <span class="flbl">Stockwerke:</span>
+      <div class="stepper">
+        <button type="button" class="fm">−</button>
+        <input class="flr" type="number" min="1" max="40" value="${old[i]?old[i].fl:5}" style="width:48px;">
+        <button type="button" class="fp">+</button>
+      </div>`;
+    const inp=row.querySelector('.flr');
+    row.querySelector('.fm').onclick=()=>{inp.value=Math.max(1,(parseInt(inp.value)||1)-1);};
+    row.querySelector('.fp').onclick=()=>{inp.value=Math.min(40,(parseInt(inp.value)||1)+1);};
+    list.appendChild(row);
+  }
+}
+document.getElementById('bldMinus').onclick=()=>{const i=document.getElementById('numBld');i.value=Math.max(1,(parseInt(i.value)||1)-1);renderBldList();};
+document.getElementById('bldPlus').onclick=()=>{const i=document.getElementById('numBld');i.value=Math.min(8,(parseInt(i.value)||1)+1);renderBldList();};
+document.getElementById('numBld').addEventListener('input',renderBldList);
+renderBldList();
+
+document.getElementById('startBtn').onclick=()=>{
+  const rows=[...document.querySelectorAll('#bldList .bld-row')];
+  state={id:uid(),style:chosenStyle,name:document.getElementById('hotelName').value||'Mein Hotel',buildings:[],outdoor:[],curB:0,curF:0};
+  rows.forEach((r,i)=>state.buildings.push(newBuilding(i,r.querySelector('.name').value,parseInt(r.querySelector('.flr').value)||1)));
+  enterApp();
+};
+
+document.getElementById('resumeBtn').onclick=()=>{
+  const box=document.getElementById('resumeList');const willShow=box.classList.contains('hidden');
+  box.classList.toggle('hidden',!willShow);if(willShow)renderResumeList();
+};
+
+function enterApp(){
+  applyTheme(state.style);
+  document.getElementById('start').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('hotelTitle').textContent='🏨 '+state.name;
+  buildPalette();fillOutdoorSelect();setupGrid();
+  setView('site');renderAll();save();
+}
+
+/* ============ VIEW-WECHSEL ============ */
+document.querySelectorAll('.view-tab').forEach(t=>t.onclick=()=>setView(t.dataset.view));
+function setView(v){
+  view=v;clearSel();
+  document.querySelectorAll('.view-tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  document.getElementById('view'+v[0].toUpperCase()+v.slice(1)).classList.add('active');
+  renderAll();
+}
+
+/* ============ PALETTE ============ */
+function buildPalette(){
+  const wrap=document.getElementById('palette');wrap.innerHTML='';
+  CATALOG.forEach(cat=>{
+    const h=document.createElement('div');h.className='cat-head';h.textContent=cat.cat;wrap.appendChild(h);
+    cat.items.forEach(it=>{
+      const el=document.createElement('div');el.className='part';el.draggable=true;el.dataset.id=it.id;
+      el.dataset.search=(it.name+' '+cat.cat).toLowerCase();
+      el.innerHTML=`<span class="ico">${it.ico}</span><div class="meta"><b>${it.name}</b><small>${it.w}×${it.h} · skalierbar</small></div><span class="dot" style="background:${it.color}"></span>`;
+      el.addEventListener('dragstart',e=>{dragNew=it.id;e.dataTransfer.setData('text/plain',it.id);e.dataTransfer.effectAllowed='copy';});
+      wrap.appendChild(el);
+    });
+  });
+}
+document.getElementById('search').addEventListener('input',e=>{
+  const q=e.target.value.toLowerCase().trim();
+  document.querySelectorAll('.part').forEach(p=>p.style.display=p.dataset.search.includes(q)?'':'none');
+  document.querySelectorAll('.cat-head').forEach(hd=>{let n=hd.nextElementSibling,any=false;while(n&&n.classList.contains('part')){if(n.style.display!=='none')any=true;n=n.nextElementSibling;}hd.style.display=any?'':'none';});
+});
+
+/* ============ LAGEPLAN ============ */
+let selBld=null;
+const plot=document.getElementById('plot');
+plot.style.width=PLOTW+'px';plot.style.height=PLOTH+'px';
+function fillOutdoorSelect(){
+  const sel=document.getElementById('outdoorSel');
+  sel.innerHTML='<option value="">🌳 Außenanlage hinzufügen…</option>'+OUTDOOR.map(o=>`<option value="${o.id}">${o.ico} ${o.name}</option>`).join('');
+}
+document.getElementById('outdoorSel').onchange=function(){
+  const id=this.value;this.value='';if(!id)return;const o=OUT[id];
+  const n=(state.outdoor=state.outdoor||[]).length;
+  state.outdoor.push({id:uid(),typeId:id,x:Math.min(PLOTW-o.w,40+(n%5)*30),y:Math.min(PLOTH-o.h,40+(n%5)*24),w:o.w,h:o.h});
+  renderSite();save();toast(o.name+' hinzugefügt – auf dem Grundstück platzieren.');
+};
+function renderSite(){
+  plot.querySelectorAll('.bld-block,.out-block').forEach(b=>b.remove());
+  (state.outdoor||[]).forEach(o=>{
+    const od=OUT[o.typeId];if(!od)return;const el=document.createElement('div');el.className='out-block';
+    el.style.left=o.x+'px';el.style.top=o.y+'px';el.style.width=o.w+'px';el.style.height=o.h+'px';
+    el.style.background='color-mix(in srgb,'+od.color+' 32%,var(--panel))';el.style.borderColor=od.color;
+    el.innerHTML=`<div class="ob-ico">${od.ico}</div><div class="ob-name">${od.name}</div><button class="ob-del" title="Entfernen">✕</button><div class="ob-resize"></div>`;
+    el.querySelector('.ob-del').onclick=ev=>{ev.stopPropagation();const i=state.outdoor.indexOf(o);if(i>-1)state.outdoor.splice(i,1);renderSite();save();};
+    el.addEventListener('mousedown',ev=>startOutDrag(ev,el,o));
+    plot.appendChild(el);
+  });
+  state.buildings.forEach((b,i)=>{
+    const el=document.createElement('div');el.className='bld-block'+(b.id===selBld?' sel':'');
+    const rooms=b.floors.reduce((a,f)=>a+f.rooms.length,0);
+    el.innerHTML=`<button class="bb-edit">Bearbeiten ✎</button><div class="bb-ico">🏢</div><div class="bb-name">${b.name}</div><div class="bb-info">${b.floors.length} Stockw. · ${rooms} Räume</div><div class="bb-resize"></div>`;
+    posBld(el,b);
+    el.querySelector('.bb-edit').onclick=ev=>{ev.stopPropagation();openBuilding(i);};
+    el.addEventListener('dblclick',()=>openBuilding(i));
+    el.addEventListener('mousedown',ev=>startBldDrag(ev,el,b));
+    plot.appendChild(el);
+  });
+}
+function posBld(el,b){el.style.left=b.site.x+'px';el.style.top=b.site.y+'px';el.style.width=b.site.w+'px';el.style.height=b.site.h+'px';}
+function startOutDrag(ev,el,o){
+  if(ev.target.classList.contains('ob-del'))return;
+  const resize=ev.target.classList.contains('ob-resize');
+  const sx=ev.clientX,sy=ev.clientY,ox=o.x,oy=o.y,ow=o.w,oh=o.h;let moved=false;
+  function mv(e){const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    if(resize){o.w=Math.max(50,Math.min(PLOTW-o.x,Math.round((ow+dx)/SNAP)*SNAP));o.h=Math.max(50,Math.min(PLOTH-o.y,Math.round((oh+dy)/SNAP)*SNAP));}
+    else{o.x=Math.max(0,Math.min(PLOTW-o.w,Math.round((ox+dx)/SNAP)*SNAP));o.y=Math.max(0,Math.min(PLOTH-o.h,Math.round((oy+dy)/SNAP)*SNAP));}
+    el.style.left=o.x+'px';el.style.top=o.y+'px';el.style.width=o.w+'px';el.style.height=o.h+'px';}
+  function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);if(moved)save();}
+  document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);ev.preventDefault();
+}
+function startBldDrag(ev,el,b){
+  if(ev.target.classList.contains('bb-edit'))return; // Bearbeiten-Klick nicht stören
+  selBld=b.id;
+  plot.querySelectorAll('.bld-block').forEach(x=>x.classList.remove('sel'));
+  el.classList.add('sel');
+  const resize=ev.target.classList.contains('bb-resize');
+  const sx=ev.clientX,sy=ev.clientY,ox=b.site.x,oy=b.site.y,ow=b.site.w,oh=b.site.h;let moved=false;
+  function mv(e){
+    const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    if(resize){b.site.w=Math.max(80,Math.min(PLOTW-b.site.x,Math.round((ow+dx)/SNAP)*SNAP));b.site.h=Math.max(70,Math.min(PLOTH-b.site.y,Math.round((oh+dy)/SNAP)*SNAP));}
+    else{b.site.x=Math.max(0,Math.min(PLOTW-b.site.w,Math.round((ox+dx)/SNAP)*SNAP));b.site.y=Math.max(0,Math.min(PLOTH-b.site.h,Math.round((oy+dy)/SNAP)*SNAP));}
+    posBld(el,b);
+  }
+  function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);if(moved){save();}}
+  document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);ev.preventDefault();
+}
+document.getElementById('addBldBtn2').onclick=()=>{
+  const nFlr=state.buildings[0]?state.buildings[0].floors.length:5;
+  const b=newBuilding(state.buildings.length,null,nFlr);state.buildings.push(b);selBld=b.id;renderAll();save();toast('Gebäude hinzugefügt.');
+};
+document.getElementById('delBldBtn').onclick=()=>{
+  if(!selBld){toast('Erst ein Gebäude anklicken.');return;}
+  if(state.buildings.length<=1){toast('Mindestens ein Gebäude muss bleiben.');return;}
+  if(confirm('Ausgewähltes Gebäude wirklich löschen?')){
+    const i=state.buildings.findIndex(b=>b.id===selBld);state.buildings.splice(i,1);selBld=null;
+    if(state.curB>=state.buildings.length)state.curB=0;renderAll();save();
+  }
+};
+function openBuilding(i){state.curB=i;state.curF=0;setView('floor');flashGrid();}
+
+/* ============ GRUNDRISS ============ */
+const grid=document.getElementById('grid'),ghost=document.getElementById('ghost');
+let dragNew=null;
+function setupGrid(){grid.style.width=(COLS*CELL)+'px';grid.style.height=(ROWS*CELL)+'px';grid.style.backgroundSize=CELL+'px '+CELL+'px';}
+function curB(){return state.buildings[state.curB];}
+function curFloor(){return curB().floors[state.curF];}
+function flashGrid(){grid.classList.remove('flash');void grid.offsetWidth;grid.classList.add('flash');}
+function cellFromEvent(e){const r=grid.getBoundingClientRect();return{cx:Math.floor((e.clientX-r.left)/CELL),cy:Math.floor((e.clientY-r.top)/CELL)};}
+// Überlappung ist erlaubt – nur die Rasterränder begrenzen.
+function fits(w,h,x,y){return x>=0&&y>=0&&x+w<=COLS&&y+h<=ROWS;}
+grid.addEventListener('dragover',e=>{
+  e.preventDefault();e.dataTransfer.dropEffect='copy';grid.classList.add('drag-over');
+  if(!dragNew)return;const p=PARTS[dragNew];if(!p)return;const{cx,cy}=cellFromEvent(e);
+  ghost.style.display='block';ghost.style.left=(cx*CELL)+'px';ghost.style.top=(cy*CELL)+'px';
+  ghost.style.width=(p.w*CELL)+'px';ghost.style.height=(p.h*CELL)+'px';
+  ghost.style.borderColor=fits(p.w,p.h,cx,cy,curFloor())?'var(--accent)':'#ef4444';
+});
+grid.addEventListener('dragleave',e=>{if(e.target===grid){grid.classList.remove('drag-over');ghost.style.display='none';}});
+grid.addEventListener('drop',e=>{
+  e.preventDefault();grid.classList.remove('drag-over');ghost.style.display='none';
+  const id=e.dataTransfer.getData('text/plain')||dragNew;const p=PARTS[id];dragNew=null;if(!p)return;
+  let{cx,cy}=cellFromEvent(e);
+  cx=Math.max(0,Math.min(COLS-p.w,cx));cy=Math.max(0,Math.min(ROWS-p.h,cy));
+  if(THROUGH.has(id)){const b=curB();(b.shafts=b.shafts||[]).push({id:uid(),typeId:id,x:cx,y:cy,w:p.w,h:p.h});toast(p.name+' verläuft jetzt durch alle Etagen.');}
+  else curFloor().rooms.push({typeId:id,x:cx,y:cy,w:p.w,h:p.h});
+  afterEdit();
+});
+document.addEventListener('dragend',()=>{dragNew=null;grid.classList.remove('drag-over');ghost.style.display='none';});
+
+function renderGrid(){
+  grid.querySelectorAll('.room').forEach(r=>r.remove());
+  const fl=curFloor(),b=curB();
+  fl.rooms.forEach(rm=>addEl(rm,false));
+  (b.shafts||[]).forEach(sh=>addEl(sh,true));
+}
+function afterEdit(){renderGrid();renderFloorList();renderStats();save();}
+function addEl(obj,isShaft){
+  const p=PARTS[obj.typeId];const cells=cellsOf(obj);const bb=bbox(cells);
+  const el=document.createElement('div');
+  el.className='room'+(isShaft?' shaft':'')+(obj.cells?' merged':'')+(selectedRooms.has(obj)?' sel':'');
+  el.style.left=(bb.minx*CELL)+'px';el.style.top=(bb.miny*CELL)+'px';
+  el.style.width=(bb.w*CELL-2)+'px';el.style.height=(bb.h*CELL-2)+'px';
+  if(obj.cells){ // zusammengefügte Form (beliebig)
+    el.style.background='transparent';el.style.boxShadow='none';el.style.border='none';
+    let html='';
+    cells.forEach(c=>{html+=`<span class="r-tile" style="left:${(c.x-bb.minx)*CELL}px;top:${(c.y-bb.miny)*CELL}px;width:${CELL-2}px;height:${CELL-2}px;background:${p.color}"></span>`;});
+    html+=`<span class="r-label"><span class="r-ico">${p.ico}</span><span class="r-name">${p.name}</span></span><span class="r-del" title="Entfernen">✕</span>`;
+    el.innerHTML=html;
+  }else{ // Rechteck
+    el.style.background=p.color;const big=obj.w*obj.h>=2;
+    el.innerHTML=`<span class="r-ico">${p.ico}</span>`
+      +(big?`<span class="r-name">${p.name}</span>`:'')
+      +(isShaft?`<span class="r-badge">↕ alle Etagen</span>`:(big?`<span class="r-size">${obj.w}×${obj.h}</span>`:''))
+      +`<span class="r-del" title="Entfernen">✕</span><span class="r-resize" title="Größe ändern"></span>`;
+    el.querySelector('.r-resize').addEventListener('mousedown',ev=>startResize(ev,obj,el));
+  }
+  el.querySelector('.r-del').onclick=ev=>{ev.stopPropagation();const arr=isShaft?curB().shafts:curFloor().rooms;const i=arr.indexOf(obj);if(i>-1)arr.splice(i,1);selectedRooms.delete(obj);updateMergeBtn();afterEdit();};
+  if(obj.cells){ // zusammengefügt: Klicks nur auf den Kacheln
+    el.querySelectorAll('.r-tile').forEach(t=>t.addEventListener('mousedown',ev=>{grid.appendChild(el);startMove(ev,obj,el,isShaft);}));
+  }else{
+    el.addEventListener('mousedown',ev=>{if(ev.target.classList.contains('r-resize')||ev.target.classList.contains('r-del'))return;grid.appendChild(el);startMove(ev,obj,el,isShaft);});
+  }
+  grid.appendChild(el);
+}
+function startMove(ev,obj,el,isShaft){
+  ev.preventDefault();const gr=grid.getBoundingClientRect();const bb=bbox(cellsOf(obj));
+  const offX=ev.clientX-(gr.left+bb.minx*CELL),offY=ev.clientY-(gr.top+bb.miny*CELL);
+  let moved=false;el.classList.add('dragging');
+  function mv(e){
+    let nx=Math.round((e.clientX-offX-gr.left)/CELL),ny=Math.round((e.clientY-offY-gr.top)/CELL);
+    nx=Math.max(0,Math.min(COLS-bb.w,nx));ny=Math.max(0,Math.min(ROWS-bb.h,ny));
+    if(nx!==bb.minx||ny!==bb.miny)moved=true;
+    el.style.left=(nx*CELL)+'px';el.style.top=(ny*CELL)+'px';el._t={x:nx,y:ny};
+  }
+  function up(){
+    document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);el.classList.remove('dragging');
+    if(moved&&el._t){const dx=el._t.x-bb.minx,dy=el._t.y-bb.miny;
+      if(obj.cells)obj.cells.forEach(c=>{c.x+=dx;c.y+=dy;});else{obj.x+=dx;obj.y+=dy;}
+      afterEdit();
+    }else if(!isShaft){ // reiner Klick = Auswahl umschalten
+      if(selectedRooms.has(obj))selectedRooms.delete(obj);else selectedRooms.add(obj);
+      updateMergeBtn();renderGrid();
+    }
+  }
+  document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+}
+function startResize(ev,obj,el){
+  ev.preventDefault();ev.stopPropagation();const sx=ev.clientX,sy=ev.clientY,ow=obj.w,oh=obj.h;
+  function mv(e){
+    let nw=Math.max(1,Math.min(COLS-obj.x,ow+Math.round((e.clientX-sx)/CELL)));
+    let nh=Math.max(1,Math.min(ROWS-obj.y,oh+Math.round((e.clientY-sy)/CELL)));
+    el._s={w:nw,h:nh};el.style.width=(nw*CELL-2)+'px';el.style.height=(nh*CELL-2)+'px';
+  }
+  function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);if(el._s){obj.w=el._s.w;obj.h=el._s.h;}afterEdit();}
+  document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
+}
+
+function renderFloorList(){
+  const b=curB();document.getElementById('floornavTitle').textContent='Stockwerke · '+b.name;
+  const list=document.getElementById('floorList');list.innerHTML='';
+  for(let f=b.floors.length-1;f>=0;f--){
+    const fl=b.floors[f];const it=document.createElement('div');it.className='fl-item'+(f===state.curF?' active':'');
+    it.innerHTML=`<span class="fl-name">${fl.name}</span><span class="fl-count">${fl.rooms.length} 🚪</span><button class="fl-del" title="Stockwerk löschen">✕</button>`;
+    it.onclick=()=>{state.curF=f;clearSel();renderGrid();renderFloorList();document.getElementById('floorName').textContent=b.name+' · '+fl.name;flashGrid();};
+    it.querySelector('.fl-del').onclick=ev=>{ev.stopPropagation();delFloor(f);};
+    list.appendChild(it);
+  }
+  document.getElementById('floorName').textContent=b.name+' · '+curFloor().name;
+}
+document.getElementById('addFloorBtn').onclick=()=>{const b=curB();b.floors.push(newFloor(b.floors.length));state.curF=b.floors.length-1;renderGrid();renderFloorList();renderStats();save();toast('Stockwerk hinzugefügt.');};
+function delFloor(f){
+  const b=curB();
+  if(b.floors.length<=1){toast('Mindestens ein Stockwerk muss bleiben.');return;}
+  if(!confirm('Dieses Stockwerk wirklich löschen?'))return;
+  b.floors.splice(f,1);b.floors.forEach((fl,i)=>fl.name=floorLabel(i));
+  if(state.curF>=b.floors.length)state.curF=b.floors.length-1;
+  renderGrid();renderFloorList();renderStats();save();
+}
+document.getElementById('clearFloorBtn').onclick=()=>{curFloor().rooms=[];renderGrid();renderFloorList();renderStats();save();};
+
+/* Ausgewählte Räume zu einem Raum (beliebige Form) zusammenfügen */
+function mergeSelected(){
+  const fl=curFloor();
+  const valid=[...selectedRooms].filter(r=>fl.rooms.includes(r));
+  if(valid.length<2){toast('Klicke zuerst zwei (oder mehr) Räume auf dieser Etage an.');return;}
+  const set=new Set();const type=valid[0].typeId;
+  valid.forEach(r=>cellsOf(r).forEach(c=>set.add(c.x+','+c.y)));
+  const cells=[...set].map(s=>{const[a,b]=s.split(',').map(Number);return{x:a,y:b};});
+  valid.forEach(r=>{const i=fl.rooms.indexOf(r);if(i>-1)fl.rooms.splice(i,1);});
+  fl.rooms.push({typeId:type,cells});
+  clearSel();afterEdit();toast(valid.length+' Räume zusammengefügt ✓');
+}
+document.getElementById('mergeBtn').onclick=mergeSelected;
+document.getElementById('backToSite').onclick=()=>setView('site');
+
+/* ============ FRONTANSICHT ============ */
+function renderFront(){
+  const wrap=document.getElementById('frontWrap');wrap.innerHTML='';
+  const order=[...state.buildings].sort((a,b)=>a.site.x-b.site.x);
+  const fc=7; // pixel pro feld
+  order.forEach(b=>{
+    const col=document.createElement('div');col.className='front-bld';
+    const stack=document.createElement('div');stack.className='front-stack';
+    for(let f=b.floors.length-1;f>=0;f--){
+      const fl=b.floors[f];const row=document.createElement('div');row.className='front-floor';
+      const occ=Array(COLS).fill(null);
+      fl.rooms.forEach(rm=>{const p=PARTS[rm.typeId];cellsOf(rm).forEach(c=>{if(c.x<COLS&&!occ[c.x])occ[c.x]=p.color;});});
+      (b.shafts||[]).forEach(sh=>{const p=PARTS[sh.typeId];for(let xx=sh.x;xx<sh.x+sh.w&&xx<COLS;xx++){occ[xx]=p.color;}});
+      for(let xx=0;xx<COLS;xx++){const c=document.createElement('div');c.className='front-cell';c.style.width=fc+'px';c.style.height=(fc*2)+'px';c.style.background=occ[xx]||'color-mix(in srgb,var(--line) 60%,transparent)';row.appendChild(c);}
+      stack.appendChild(row);
+    }
+    col.appendChild(stack);
+    const base=document.createElement('div');base.className='front-base';base.style.width=(COLS*fc+4)+'px';col.appendChild(base);
+    const nm=document.createElement('div');nm.className='front-name';nm.textContent=b.name;col.appendChild(nm);
+    const sub=document.createElement('div');sub.className='front-sub';sub.textContent=b.floors.length+' Stockwerke';col.appendChild(sub);
+    wrap.appendChild(col);
+  });
+}
+
+/* ============ STATS / RENDER ============ */
+function renderStats(){
+  let flr=0,rooms=0;state.buildings.forEach(b=>{flr+=b.floors.length;b.floors.forEach(f=>rooms+=f.rooms.length);rooms+=(b.shafts||[]).length;});
+  document.getElementById('stBld').textContent=state.buildings.length;
+  document.getElementById('stFlr').textContent=flr;document.getElementById('stRooms').textContent=rooms;
+}
+function renderAll(){
+  if(!state)return;renderStats();
+  if(view==='site')renderSite();
+  else if(view==='floor'){renderGrid();renderFloorList();}
+  else if(view==='front')renderFront();
+}
+
+/* ============ SPEICHERN / LADEN (Cloud, pro Konto) ============
+   Hotels werden in Supabase (Tabelle hotel_saves) gespeichert – getrennt pro Konto,
+   per RLS nur für den Besitzer sichtbar. HOTELS ist der In-Memory-Spiegel, den das
+   Gate beim Anmelden mit __hotelBoot() füllt; Änderungen werden zu Supabase gespiegelt. */
+function libGet(){return HOTELS.map(h=>({id:h.id,name:h.name,style:h.style,ts:h.ts,buildings:h.buildings}));}
+function migrateRooms(s){if(!s.outdoor)s.outdoor=[];s.buildings.forEach(b=>{if(!b.shafts)b.shafts=[];b.floors.forEach(f=>f.rooms.forEach(r=>{if(r.w==null&&!r.cells){const p=PARTS[r.typeId];r.w=p?p.w:1;r.h=p?p.h:1;}}));});}
+function save(){
+  if(!state)return;if(!state.id)state.id=uid();
+  const meta={id:state.id,name:state.name,style:state.style,ts:Date.now(),buildings:state.buildings.length};
+  const data=JSON.parse(JSON.stringify(state));
+  const rec={...meta,data};
+  const i=HOTELS.findIndex(h=>h.id===state.id);if(i>-1)HOTELS[i]=rec;else HOTELS.push(rec);
+  if(SB){
+    SB.from('hotel_saves').upsert(
+      {hotel_id:meta.id,name:meta.name,style:meta.style,buildings:meta.buildings,ts:meta.ts,data},
+      {onConflict:'user_id,hotel_id'}
+    ).then(({error})=>{if(error){console.warn('hotel save',error);toast('Cloud-Speichern fehlgeschlagen – erneut versuchen.');}});
+  }
+}
+function loadHotel(id){
+  const h=HOTELS.find(x=>x.id===id);if(!h||!h.data||!h.data.buildings)return false;
+  const s=JSON.parse(JSON.stringify(h.data));migrateRooms(s);state=s;state.id=id;chosenStyle=s.style||'minimal';return true;
+}
+function deleteHotel(id){
+  HOTELS=HOTELS.filter(h=>h.id!==id);
+  if(SB)SB.from('hotel_saves').delete().eq('hotel_id',id).then(({error})=>{if(error)console.warn('hotel delete',error);});
+}
+/* Vom Gate aufgerufen, sobald ein berechtigtes Konto angemeldet ist. */
+function __hotelBoot(client,rows){
+  SB=client;
+  HOTELS=(rows||[]).map(r=>({id:r.hotel_id,name:r.name,style:r.style,buildings:r.buildings,ts:r.ts,data:r.data}));
+  checkResume();
+  const box=document.getElementById('resumeList');
+  if(box&&!box.classList.contains('hidden'))renderResumeList();
+}
+function renderResumeList(){
+  const lib=libGet().sort((a,b)=>b.ts-a.ts);const box=document.getElementById('resumeList');box.innerHTML='';
+  if(!lib.length){box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px;">Noch keine gespeicherten Hotels.</div>';return;}
+  lib.forEach(h=>{
+    const row=document.createElement('div');row.className='hotel-row';const d=new Date(h.ts);
+    row.innerHTML=`<div class="h-info"><b>${h.name||'Hotel'}</b><small>${h.buildings} Gebäude · Stil: ${h.style} · ${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="h-open">Öffnen</button><button class="h-del" title="Löschen">🗑</button>`;
+    row.querySelector('.h-open').onclick=()=>{if(loadHotel(h.id))enterApp();};
+    row.querySelector('.h-del').onclick=()=>{if(confirm('Dieses Hotel löschen?')){deleteHotel(h.id);renderResumeList();checkResume();}};
+    box.appendChild(row);
+  });
+}
+document.getElementById('saveBtn').onclick=()=>{save();toast('Gespeichert ✓ – beim Start über „Fortsetzen" wählbar.');};
+document.getElementById('exportBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(state.name||'hotel').replace(/\s+/g,'_')+'.json';a.click();
+};
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const s=JSON.parse(r.result);if(!s.buildings)throw 0;
+    migrateRooms(s);
+    state=s;state.id=uid();chosenStyle=s.style||'minimal';state.curB=0;state.curF=0;enterApp();toast('Hotel importiert ✓');
+  }catch(err){toast('Datei konnte nicht gelesen werden.');}};
+  r.readAsText(f);
+};
+document.getElementById('restartBtn').onclick=()=>{if(confirm('Zurück zum Startbildschirm? Dieses Hotel bleibt gespeichert – du kannst auch ein zweites anlegen.')){save();document.getElementById('app').style.display='none';document.getElementById('start').style.display='flex';document.getElementById('resumeList').classList.add('hidden');checkResume();}};
+
+/* ============ TOAST ============ */
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1900);}
+
+/* ============ INIT ============ */
+function checkResume(){document.getElementById('resumeBtn').classList.toggle('hidden',libGet().length===0);}
+checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
+</script>
+
+<!-- ===================== ZUGANG + CLOUD-SPEICHER (ian.lu) ===================== -->
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+  import { client, session, onAuth, openAuthModal } from "./auth.js?v=3";
+  const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // nur diese Konten dürfen rein
+  const gate = document.getElementById("hotelGate");
+  const msg = document.getElementById("hotelGateMsg");
+  const signinBtn = document.getElementById("hotelSignin");
+  signinBtn.onclick = openAuthModal;
+  let bootedEmail = null;
+
+  function showGate(text, canSignIn) {
+    gate.style.display = "flex";
+    msg.textContent = text;
+    signinBtn.style.display = canSignIn ? "" : "none";
+  }
+
+  async function check() {
+    const sb = await client();
+    const email = (session()?.user?.email || "").toLowerCase();
+    if (!email) { bootedEmail = null; return showGate("Dieser Bereich ist privat. Bitte melde dich an.", true); }
+    if (!ALLOW.includes(email)) { bootedEmail = null; return showGate("Dieses Konto hat keinen Zugriff auf den Hotel-Simulator.", true); }
+    if (email !== bootedEmail) {                               // berechtigt → Cloud-Hotels laden
+      bootedEmail = email;
+      const { data, error } = await sb
+        .from("hotel_saves")
+        .select("hotel_id,name,style,buildings,ts,data")
+        .order("updated_at", { ascending: false });
+      if (error) console.warn("hotel load", error);
+      window.__hotelBoot(sb, data || []);
+    }
+    gate.style.display = "none";
+  }
+  onAuth(() => check());
+  check();
+</script>
+</body>
+</html>

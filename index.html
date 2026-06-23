@@ -38,6 +38,9 @@
       <a class="tile grades" href="grades.html">
         <span class="ico">🎓</span><span class="tname">Grades</span><span class="tsub">Average calculator</span>
       </a>
+      <a class="tile hotel private-hotel" href="hotel.html" style="display:none">
+        <span class="ico">🏨</span><span class="tname">Hotel-Simulator</span><span class="tsub">Bausimulator · privat</span>
+      </a>
       <a class="tile hw admin-only" href="homework.html" style="display:none">
         <span class="ico">📚</span><span class="tname">Hausaufgaben</span><span class="tsub">WebUntis homework</span>
       </a>
@@ -57,15 +60,19 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module" src="notify-ambient.js?v=1"></script>
   <script type="module">
-    import { mountAccountButton, client, onAuth } from "./auth.js?v=3";
+    import { mountAccountButton, client, session, onAuth } from "./auth.js?v=3";
+    const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     mountAccountButton(document.getElementById("acctHost"));
-    async function refreshAdminTiles() {
+    async function refreshTiles() {
       let admin = false;
       try { const sb = await client(); const { data } = await sb.rpc("is_admin"); admin = !!data; } catch {}
       document.querySelectorAll(".admin-only").forEach((e) => (e.style.display = admin ? "" : "none"));
+      const email = (session()?.user?.email || "").toLowerCase();
+      const hotel = HOTEL_ALLOW.includes(email);
+      document.querySelectorAll(".private-hotel").forEach((e) => (e.style.display = hotel ? "" : "none"));
     }
-    onAuth(() => refreshAdminTiles());
-    refreshAdminTiles();
+    onAuth(() => refreshTiles());
+    refreshTiles();
   </script>
 </body>
 </html>
