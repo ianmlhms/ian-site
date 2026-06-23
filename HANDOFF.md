@@ -66,6 +66,7 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
 ⚠️ **`wordle-setup.sql` must be run** (Wordle public leaderboard: `wordle_results` + RPCs). [run ✓]
 ⚠️ **`rankings-setup.sql` must be run** (cross-game rankings: `game_results` + `record_match`/`game_leaderboard`). [run ✓]
 ⚠️ **`homework-setup.sql`** (WebUntis homework table) + deploy `webuntis-sync` Edge Function — see `scripts/WEBUNTIS-SETUP.md`.
+⚠️ **`hotel-setup.sql` must be run** (private Hotel-Simulator cloud saves: `hotel_saves` + owner-only RLS). **[NOT yet run]**
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -94,7 +95,11 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **Colour Dial** | `color.html` | dialed.gg-style: everyone matches the same target colour with R/G/B sliders, closest match wins the round; host sets the round count **and mode** in the lobby. Two modes: **👁 visible** (target stays on screen) and **⚡ flash** (target shown ~3s then hidden — match from memory). Realtime (`col:<room>`), **host-authoritative** scoring. **`?ai=1`** = solo vs two bots (🤖 Pixel / 🤖 Byte) that guess with random error. 2+ players. |
 | **Molerei (draw & guess)** | `draw.html` | Skribbl-style realtime: one player draws a secret word (canvas strokes broadcast as normalised segments on `draw:<room>`), everyone else guesses in a chat box. **Host-authoritative** (host picks word options/validates guesses/scores/rotates drawer over `LAPS=2` laps, 75s turns). Drawer rotates each turn; speed-based scoring. Targeted DOM updates during a turn so the canvas isn't wiped. 2+ players. |
 | **Wuertspill (Wordle)** | `wordle.html` | Single-player daily Wordle in **Lëtzebuergesch + Deutsch** (language toggle). Deterministic daily word per language, 6 guesses, on-screen QWERTZ keyboard (incl. ÄÖÜËÉ), emoji-grid share, local stats/streak. **Public leaderboard** (🏆 Top, signed-in results → `wordle_results`, `record_wordle`/`wordle_leaderboard`). Home tile "🟩 Wuertspill". Word lists are editable arrays at the top of the file (LB list is conservative — expand it). |
-| **Leaderboard** | `leaderboard.html` | Cross-game rankings (All / Connect 4 / Battleship / Colour Dial), public read. Players **self-report their own win/loss** via the shared authed client (`window.__pbAuth.sb`) on match end — only when signed in. `game_results` table + `record_match`/`game_leaderboard`. Linked from the Games hub. SLF excluded (endless). |
+| **Reversi** | `reversi.html` | 1v1 Othello, realtime (`rev:<room>`), legal-move hints + pass handling. **`?ai=1`** = vs computer (alpha-beta minimax, positional weights + mobility, depth-8 endgame). Records to leaderboard. |
+| **Dots & Boxes** | `dots.html` | 1v1, realtime (`dab:<room>`), 4×4 boxes; complete a box → go again. **`?ai=1`** = vs computer (greedy chain-aware heuristic). Records to leaderboard. |
+| **Tic-Tac-Toe** | `tictactoe.html` | 1v1, realtime (`ttt:<room>`). **`?ai=1`** = vs computer (perfect minimax). Records to leaderboard. |
+| **Hotel-Simulator** | `hotel.html`, `scripts/hotel-setup.sql` | **PRIVATE** German hotel-builder (Quinn's project). Email-allowlist gate (`konto@ian.lu` + `quinn@mulheims.lu`) via shared `auth.js`; home tile hidden from others. Cloud saves in `hotel_saves` (owner-only RLS, separate per account) replacing the original localStorage. B1 privacy: not listed/usable without an allowed login, but HTML is still fetchable by direct URL. |
+| **Leaderboard** | `leaderboard.html` | Cross-game rankings (All / Connect 4 / Battleship / Colour Dial / Reversi / Dots / Tic-Tac-Toe), public read. Players **self-report their own win/loss** via the shared authed client (`window.__pbAuth.sb`) on match end — only when signed in. `game_results` table + `record_match`/`game_leaderboard`. Linked from the Games hub. SLF excluded (endless). |
 | **Theme** | `theme.js` | Floating 🎨 picker (dark/light + accent) on every page; sets CSS vars on `:root`, localStorage. |
 | **Shared auth** | `auth.js` | Supabase client + account button + sign-in modal (loads supabase-js from jsDelivr UMD global, **not** esm.sh — that broke in Safari). |
 
@@ -130,12 +135,18 @@ Old full data was scrubbed from git history.
 social-fix, admin-users, dashboard-private, `wordle-setup`, `rankings-setup`, `homework-setup`.
 Web Push is fully live (see §8). Latest cache versions are in §2.
 
-**In progress — Wave 2 (games):** a large feature batch. DONE this session:
-messenger v6 (reactions/edit/typing/online/mute/search/voice), **Wordle** (`wordle.html`, +public
-leaderboard), **Colour Dial AI** (`color.html?ai=1`), **Connect4/Battleship AI** (`?ai=1`),
-**cross-game leaderboard** (`leaderboard.html`), **Molerei** draw-&-guess (`draw.html`).
-**TODO next:** the remaining **1v1 AI games — Reversi/Othello, Dots & Boxes, Tic-Tac-Toe**
-(follow the `?ai=1` pattern in connect4/battleship; record results via `recordResult(...)`).
+**Wave 2 (games) — DONE.** messenger v6 (reactions/edit/typing/online/mute/search/voice),
+**Wordle** (`wordle.html`, +public leaderboard), **Colour Dial AI** (`color.html?ai=1`),
+**Connect4/Battleship AI** (`?ai=1`), **cross-game leaderboard** (`leaderboard.html`),
+**Molerei** draw-&-guess (`draw.html`), and the remaining **1v1 AI games — Reversi
+(`reversi.html`), Dots & Boxes (`dots.html`), Tic-Tac-Toe (`tictactoe.html`)** — all with
+`?ai=1` + leaderboard recording, registered in games hub / friends.js (`?v=6`) / leaderboard tabs.
+
+**Private Hotel-Simulator — DONE (deployed), but needs 2 manual steps:** `hotel.html` (Quinn's
+German hotel-builder) gated to `konto@ian.lu` + `quinn@mulheims.lu`, with Supabase cloud saves
+(`hotel_saves`, separate per account). **OUTSTANDING:** (1) run `scripts/hotel-setup.sql` in
+Supabase; (2) create the brother's account at ian.lu with the exact email `quinn@mulheims.lu`
+(confirmation email). Until both are done, his saves/gate won't work.
 
 **Needs real-device playtesting:** Molerei (`draw.html`) and Colour Dial — multiplayer was not
 tested with 2+ devices. Watch for stroke lag, scoring, drawer rotation.
