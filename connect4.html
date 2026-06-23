@@ -60,6 +60,31 @@ const opp = me === 1 ? 2 : 1;
 let board = [], turn = 1, over = false, oppHere = false, recorded = false;
 function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
 
+/* ---------- difficulty (AI mode) ---------- */
+let difficulty = (params.get("diff") || "normal").toLowerCase();
+if (!["easy", "normal", "hard"].includes(difficulty)) difficulty = "normal";
+const BLUNDER = { easy: 0.55, normal: 0.18, hard: 0 };
+const blunder = () => Math.random() < BLUNDER[difficulty];
+function mountDiff() {
+  const bar = document.querySelector(".bar");
+  if (!bar || document.getElementById("diffPick")) return;
+  const w = document.createElement("div"); w.id = "diffPick"; w.style.cssText = "display:flex;gap:4px;margin-left:auto";
+  [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]].forEach(([d, lbl]) => {
+    const b = document.createElement("button"); b.textContent = lbl; b.dataset.d = d;
+    b.style.cssText = "background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
+    b.onclick = () => { difficulty = d; paintDiff(); };
+    w.appendChild(b);
+  });
+  bar.appendChild(w); paintDiff();
+}
+function paintDiff() {
+  document.querySelectorAll("#diffPick button").forEach((b) => {
+    const on = b.dataset.d === difficulty;
+    b.style.background = on ? "var(--accent)" : "var(--card2)";
+    b.style.color = on ? "#fff" : "var(--muted)";
+  });
+}
+
 const $ = (id) => document.getElementById(id);
 const cfg = window.PB_CONFIG;
 const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -124,7 +149,7 @@ function wins(r, c, p) {
 
 if (AI) {
   document.querySelector(".bar h1").textContent = "🔴 Connect 4 — vs Computer";
-  oppHere = true; fresh(); render();
+  mountDiff(); oppHere = true; fresh(); render();
 } else {
   ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.col, payload.player, false))
     .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
@@ -191,8 +216,10 @@ function minimax(b, depth, alpha, beta, maxing) {
   }
 }
 function aiBestMove() {
-  const DEPTH = 5, valid = colsOpen(board);
+  const valid = colsOpen(board);
   if (!valid.length) return null;
+  if (blunder()) return valid[Math.floor(Math.random() * valid.length)];          // weaker levels play a random column
+  const DEPTH = difficulty === "easy" ? 2 : difficulty === "hard" ? 5 : 4;
   for (const c of valid) { const nb = cloneB(board); const r = dropSim(nb, c, 2); if (winAt(nb, r, c, 2)) return c; }  // win now
   for (const c of valid) { const nb = cloneB(board); const r = dropSim(nb, c, 1); if (winAt(nb, r, c, 1)) return c; }  // block
   const order = valid.slice().sort((a, b) => Math.abs(3 - a) - Math.abs(3 - b));   // centre first (better pruning)

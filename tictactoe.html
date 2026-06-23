@@ -55,6 +55,31 @@ const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 let board = [], turn = 1, over = false, oppHere = false, recorded = false;
 function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
 
+/* ---------- difficulty (AI mode) ---------- */
+let difficulty = (params.get("diff") || "normal").toLowerCase();
+if (!["easy", "normal", "hard"].includes(difficulty)) difficulty = "normal";
+const BLUNDER = { easy: 0.6, normal: 0.22, hard: 0 };   // hard = perfect (never blunders)
+const blunder = () => Math.random() < BLUNDER[difficulty];
+function mountDiff() {
+  const bar = document.querySelector(".bar");
+  if (!bar || document.getElementById("diffPick")) return;
+  const w = document.createElement("div"); w.id = "diffPick"; w.style.cssText = "display:flex;gap:4px;margin-left:auto";
+  [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]].forEach(([d, lbl]) => {
+    const b = document.createElement("button"); b.textContent = lbl; b.dataset.d = d;
+    b.style.cssText = "background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
+    b.onclick = () => { difficulty = d; paintDiff(); };
+    w.appendChild(b);
+  });
+  bar.appendChild(w); paintDiff();
+}
+function paintDiff() {
+  document.querySelectorAll("#diffPick button").forEach((b) => {
+    const on = b.dataset.d === difficulty;
+    b.style.background = on ? "var(--accent)" : "var(--card2)";
+    b.style.color = on ? "#fff" : "var(--muted)";
+  });
+}
+
 const $ = (id) => document.getElementById(id);
 const cfg = window.PB_CONFIG;
 const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -102,7 +127,7 @@ function play(i, player, local) {
 
 if (AI) {
   document.querySelector(".bar h1").textContent = "✕ Tic-Tac-Toe — vs Computer";
-  oppHere = true; fresh(); render();
+  mountDiff(); oppHere = true; fresh(); render();
 } else {
   ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.i, payload.player, false))
     .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
@@ -136,6 +161,7 @@ function score(b, player, depth) {
   return player === opp ? Math.max(...vals) : Math.min(...vals);
 }
 function aiBest() {
+  if (blunder()) { const e = []; for (let i = 0; i < 9; i++) if (!board[i]) e.push(i); return e.length ? e[Math.floor(Math.random() * e.length)] : null; }
   let best = -1e9, moves = [];
   for (let i = 0; i < 9; i++) if (!board[i]) {
     const b = board.slice(); b[i] = opp;

@@ -93,6 +93,29 @@ const $=(id)=>document.getElementById(id);
 let own=empty(), enemy=empty(), placed=[], toPlace=[...SHIPS], orient="h";
 let myReady=false, oppReady=false, oppHere=false, turn="host", phase="setup", over=false;
 let aiBoard=null, aiHunt=[];   // AI mode: computer's hidden fleet + its hit-follow-up queue
+
+/* ---------- difficulty (AI mode) ---------- */
+let difficulty=(params.get("diff")||"normal").toLowerCase();
+if(!["easy","normal","hard"].includes(difficulty)) difficulty="normal";
+function mountDiff(){
+  const bar=document.querySelector(".bar");
+  if(!bar||document.getElementById("diffPick"))return;
+  const w=document.createElement("div"); w.id="diffPick"; w.style.cssText="display:flex;gap:4px;margin-left:auto";
+  [["easy","Easy"],["normal","Normal"],["hard","Hard"]].forEach(([d,lbl])=>{
+    const b=document.createElement("button"); b.textContent=lbl; b.dataset.d=d;
+    b.style.cssText="background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
+    b.onclick=()=>{difficulty=d; paintDiff();};
+    w.appendChild(b);
+  });
+  bar.appendChild(w); paintDiff();
+}
+function paintDiff(){
+  document.querySelectorAll("#diffPick button").forEach(b=>{
+    const on=b.dataset.d===difficulty;
+    b.style.background=on?"var(--accent)":"var(--card2)";
+    b.style.color=on?"#fff":"var(--muted)";
+  });
+}
 let recorded=false;
 function recordResult(game,result){ try{ const a=window.__pbAuth; if(a&&a.session&&a.sb) a.sb.rpc("record_match",{p_game:game,p_result:result}); }catch{} }
 function empty(){ return Array.from({length:N},()=>Array(N).fill(0)); }
@@ -204,10 +227,10 @@ function aiPlace(){
 }
 const aiTried=(r,c)=> own[r][c]===2 || own[r][c]===3;   // computer already fired here
 function aiPickTarget(){
-  while(aiHunt.length){ const [r,c]=aiHunt.pop(); if(!aiTried(r,c)) return [r,c]; }   // chase a hit
+  if(difficulty!=="easy"){ while(aiHunt.length){ const [r,c]=aiHunt.pop(); if(!aiTried(r,c)) return [r,c]; } }  // normal/hard chase a hit; easy doesn't
   const par=[], any=[];
   for(let r=0;r<N;r++)for(let c=0;c<N;c++) if(!aiTried(r,c)){ any.push([r,c]); if((r+c)%2===0) par.push([r,c]); }
-  const pool=par.length?par:any;                          // checkerboard hunt
+  const pool=(difficulty==="hard"&&par.length)?par:any;   // only hard uses the checkerboard parity hunt
   return pool[Math.floor(Math.random()*pool.length)];
 }
 function aiFire(){
@@ -233,7 +256,7 @@ function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; render
 
 if(AI){
   document.querySelector(".bar h1").textContent="🚢 Battleship — vs Computer";
-  clearAll(); phase="setup"; oppHere=true; renderSetup();
+  mountDiff(); clearAll(); phase="setup"; oppHere=true; renderSetup();
 } else {
   ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="setup")renderSetup(); })
     .on("broadcast",{event:"fire"},({payload})=>{ if(phase==="play") onFire(payload.r,payload.c); })

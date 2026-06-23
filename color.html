@@ -71,6 +71,30 @@ const role = params.get("role")==="guest" ? "guest" : "host";
 const cid = Math.random().toString(36).slice(2,10);
 document.getElementById("roomc").textContent = AI ? "computer 🤖" : room;
 const AI_BOTS = [{cid:"bot1",name:"🤖 Pixel",err:32},{cid:"bot2",name:"🤖 Byte",err:58}];
+
+/* ---------- difficulty (AI mode): scales bot error — easy = sloppier bots, hard = sharper ---------- */
+let difficulty=(params.get("diff")||"normal").toLowerCase();
+if(!["easy","normal","hard"].includes(difficulty)) difficulty="normal";
+const DIFF_MUL={easy:1.8,normal:1,hard:0.45};
+function mountDiff(){
+  const bar=document.querySelector(".bar");
+  if(!bar||document.getElementById("diffPick"))return;
+  const w=document.createElement("div"); w.id="diffPick"; w.style.cssText="display:flex;gap:4px;margin-left:auto";
+  [["easy","Easy"],["normal","Normal"],["hard","Hard"]].forEach(([d,lbl])=>{
+    const b=document.createElement("button"); b.textContent=lbl; b.dataset.d=d;
+    b.style.cssText="background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
+    b.onclick=()=>{difficulty=d; paintDiff();};
+    w.appendChild(b);
+  });
+  bar.appendChild(w); paintDiff();
+}
+function paintDiff(){
+  document.querySelectorAll("#diffPick button").forEach(b=>{
+    const on=b.dataset.d===difficulty;
+    b.style.background=on?"var(--accent)":"var(--card2)";
+    b.style.color=on?"#fff":"var(--muted)";
+  });
+}
 const jitter=(v,e)=>Math.max(0,Math.min(255,Math.round(v+(Math.random()*2-1)*e)));
 const botGuess=(e)=>({r:jitter(target.r,e),g:jitter(target.g,e),b:jitter(target.b,e)});
 
@@ -198,7 +222,7 @@ function startRound(){
 function lockIn(){
   if(locked) return; locked=true;
   guesses[cid]={name,rgb:{...guess}};
-  if(AI){ AI_BOTS.forEach(b=> guesses[b.cid]={name:b.name,rgb:botGuess(b.err)}); render(); reveal(); return; }
+  if(AI){ AI_BOTS.forEach(b=> guesses[b.cid]={name:b.name,rgb:botGuess(b.err*DIFF_MUL[difficulty])}); render(); reveal(); return; }
   ch.send({type:"broadcast",event:"guess",payload:{cid,name,rgb:{...guess}}});
   render();
   if(role==="host") maybeReveal();
@@ -232,7 +256,7 @@ function resetAll(){ clearTimeout(peekTimer); peeking=false; recorded=false; pha
 if(AI){
   document.querySelector(".bar h1").textContent="🎨 Colour Dial — vs Computer";
   name = localStorage.getItem("playerName") || window.__pbAuth?.session?.user?.user_metadata?.username || "Du";
-  phase="lobby"; render();
+  mountDiff(); phase="lobby"; render();
 } else {
   ch.on("broadcast",{event:"cfg"},({payload})=>{ rounds=payload.rounds; if(payload.mode) mode=payload.mode; if(phase==="lobby") render(); })
     .on("broadcast",{event:"round"},({payload})=>{ round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode||mode; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; beginPlay(); })

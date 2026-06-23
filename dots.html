@@ -67,6 +67,29 @@ const COL = { 1: "var(--p1)", 2: "var(--p2)" };
 let h = [], v = [], own = [], turn = 1, over = false, oppHere = false, recorded = false;
 function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
 
+/* ---------- difficulty (AI mode) ---------- */
+let difficulty = (params.get("diff") || "normal").toLowerCase();
+if (!["easy", "normal", "hard"].includes(difficulty)) difficulty = "normal";
+function mountDiff() {
+  const bar = document.querySelector(".bar");
+  if (!bar || document.getElementById("diffPick")) return;
+  const w = document.createElement("div"); w.id = "diffPick"; w.style.cssText = "display:flex;gap:4px;margin-left:auto";
+  [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]].forEach(([d, lbl]) => {
+    const b = document.createElement("button"); b.textContent = lbl; b.dataset.d = d;
+    b.style.cssText = "background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
+    b.onclick = () => { difficulty = d; paintDiff(); };
+    w.appendChild(b);
+  });
+  bar.appendChild(w); paintDiff();
+}
+function paintDiff() {
+  document.querySelectorAll("#diffPick button").forEach((b) => {
+    const on = b.dataset.d === difficulty;
+    b.style.background = on ? "var(--accent)" : "var(--card2)";
+    b.style.color = on ? "#fff" : "var(--muted)";
+  });
+}
+
 const $ = (id) => document.getElementById(id);
 const cfg = window.PB_CONFIG;
 const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -147,7 +170,7 @@ function play(t, i, j, player, local) {
 
 if (AI) {
   document.querySelector(".bar h1").innerHTML = "▦ Dots &amp; Boxes — vs Computer";
-  oppHere = true; fresh(); render();
+  mountDiff(); oppHere = true; fresh(); render();
 } else {
   ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.t, payload.i, payload.j, payload.player, false))
     .on("broadcast", { event: "state" }, ({ payload }) => { h = payload.h; v = payload.v; own = payload.own; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
@@ -177,15 +200,18 @@ function freeEdges() {
   for (let i = 0; i < N; i++) for (let j = 0; j <= N; j++) if (!v[i][j]) a.push({ t: "v", i, j });
   return a;
 }
+const rand = (a) => a[Math.floor(Math.random() * a.length)];
 function aiPick() {
   const free = freeEdges();
-  const comp = free.filter(e => sidesAfter(e.t, e.i, e.j).some(s => s === 4));      // completes a box
-  if (comp.length) return comp[Math.floor(Math.random() * comp.length)];
+  const comp = free.filter(e => sidesAfter(e.t, e.i, e.j).some(s => s === 4));      // completes a box — always grab it
+  if (comp.length) return rand(comp);
+  if (difficulty === "easy") return rand(free);                                     // easy: otherwise random (often gives boxes away)
   const safe = free.filter(e => sidesAfter(e.t, e.i, e.j).every(s => s !== 3));      // doesn't hand over a box
-  if (safe.length) return safe[Math.floor(Math.random() * safe.length)];
-  let best = 1e9, bm = [];                                                           // forced to sacrifice — give the least
+  if (safe.length) return rand(safe);
+  if (difficulty === "normal") return rand(free);                                   // normal: forced to give — random sacrifice
+  let best = 1e9, bm = [];                                                           // hard: give the smallest sacrifice
   for (const e of free) { const three = sidesAfter(e.t, e.i, e.j).filter(s => s === 3).length; if (three < best) { best = three; bm = [e]; } else if (three === best) bm.push(e); }
-  return bm[Math.floor(Math.random() * bm.length)];
+  return rand(bm);
 }
 function aiMove() {
   if (over) return;
