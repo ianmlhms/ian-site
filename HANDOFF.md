@@ -45,7 +45,7 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=8`, `friends.js?v=4`,
+Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=8`, `friends.js?v=5`,
 `pixelbreak-records.js?v=3`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=1`
 (`notify.js`/`sw.js` are imported, not query-versioned — hard-refresh or bump the importer).
 
@@ -92,6 +92,7 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **Stadt-Land-Fluss** | `slf.html` | 2+ players, realtime (`slf:<room>`), letter→categories→uniqueness scoring. |
 | **Battleship** | `battleship.html` | 1v1, realtime (`bs:<room>`), manual ship placement (H/V toggle) + Shuffle. **`?ai=1`** = local single-player vs a hunt/target computer (random fleet, checkerboard hunt). |
 | **Colour Dial** | `color.html` | dialed.gg-style: everyone matches the same target colour with R/G/B sliders, closest match wins the round; host sets the round count **and mode** in the lobby. Two modes: **👁 visible** (target stays on screen) and **⚡ flash** (target shown ~3s then hidden — match from memory). Realtime (`col:<room>`), **host-authoritative** scoring. **`?ai=1`** = solo vs two bots (🤖 Pixel / 🤖 Byte) that guess with random error. 2+ players. |
+| **Molerei (draw & guess)** | `draw.html` | Skribbl-style realtime: one player draws a secret word (canvas strokes broadcast as normalised segments on `draw:<room>`), everyone else guesses in a chat box. **Host-authoritative** (host picks word options/validates guesses/scores/rotates drawer over `LAPS=2` laps, 75s turns). Drawer rotates each turn; speed-based scoring. Targeted DOM updates during a turn so the canvas isn't wiped. 2+ players. |
 | **Wuertspill (Wordle)** | `wordle.html` | Single-player daily Wordle in **Lëtzebuergesch + Deutsch** (language toggle). Deterministic daily word per language, 6 guesses, on-screen QWERTZ keyboard (incl. ÄÖÜËÉ), emoji-grid share, local stats/streak. **Public leaderboard** (🏆 Top, signed-in results → `wordle_results`, `record_wordle`/`wordle_leaderboard`). Home tile "🟩 Wuertspill". Word lists are editable arrays at the top of the file (LB list is conservative — expand it). |
 | **Leaderboard** | `leaderboard.html` | Cross-game rankings (All / Connect 4 / Battleship / Colour Dial), public read. Players **self-report their own win/loss** via the shared authed client (`window.__pbAuth.sb`) on match end — only when signed in. `game_results` table + `record_match`/`game_leaderboard`. Linked from the Games hub. SLF excluded (endless). |
 | **Theme** | `theme.js` | Floating 🎨 picker (dark/light + accent) on every page; sets CSS vars on `:root`, localStorage. |
