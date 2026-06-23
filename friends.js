@@ -5,8 +5,8 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let sb = null, inviteSubbed = false;
 
-const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Dial", draw: "Molerei" };
-const READY = new Set(["connect4", "slf", "battleship", "color", "draw"]);
+const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Dial", draw: "Molerei", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe" };
+const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe"]);
 
 async function refresh() {
   const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: dir }] = await Promise.all([

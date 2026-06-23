@@ -50,6 +50,9 @@ const GAMES = [
   { id:"battleship", ico:"🚢", name:"Battleship", desc:"Hide your fleet, sink your opponent's. 1 v 1.", ai:true },
   { id:"color", ico:"🎨", name:"Colour Dial", desc:"Everyone matches the same colour with R/G/B sliders — closest wins. 2+ players.", ai:true },
   { id:"draw", ico:"✏️", name:"Molerei", desc:"One player draws a secret word, everyone else races to guess it. 2+ players." },
+  { id:"reversi", ico:"⚫", name:"Reversi", desc:"Flank your opponent's discs to flip them — most discs wins. 1 v 1.", ai:true },
+  { id:"dots", ico:"▦", name:"Dots & Boxes", desc:"Draw a line, close a box to claim it and go again. 1 v 1.", ai:true },
+  { id:"tictactoe", ico:"✕", name:"Tic-Tac-Toe", desc:"Three in a row. Quick classic. 1 v 1.", ai:true },
 ];
 const code = () => Math.random().toString(36).slice(2, 8);
 document.getElementById("cards").innerHTML = GAMES.map(g => `

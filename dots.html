@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dots & Boxes — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--p1:#6ea8fe;--p2:#ff5d6c;--board:#1b2150;--th:16px;--edge:min(11vw,52px);--lw:7px}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px}
+  .status{font-size:18px;font-weight:800;min-height:24px;text-align:center}
+  .sub{color:var(--muted);font-size:13px;text-align:center}
+  .scores{display:flex;gap:18px;font-weight:800;font-size:15px}
+  .scores .s{display:flex;align-items:center;gap:7px}
+  .swatch{display:inline-block;width:16px;height:16px;border-radius:4px}
+  .board{display:grid;background:var(--board);padding:12px;border-radius:16px;touch-action:manipulation}
+  .dot{display:flex;align-items:center;justify-content:center}
+  .dot::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .hedge{display:flex;align-items:center;padding:0 1px}
+  .hedge i{height:var(--lw);width:100%;border-radius:4px;background:#23234a}
+  .vedge{display:flex;justify-content:center;padding:1px 0}
+  .vedge i{width:var(--lw);height:100%;border-radius:4px;background:#23234a}
+  .edge.set i{background:var(--ec,#888)}
+  .board.mine .edge.open{cursor:pointer}
+  .board.mine .edge.open i{background:#34345e}
+  .board.mine .edge.open:hover i{background:var(--accent)}
+  .box{display:flex;align-items:center;justify-content:center;font-weight:800;font-size:min(6vw,22px)}
+  .me{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin:0 4px}
+  .btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
+  .btn:hover{border-color:var(--accent2)}
+  code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="friends.html">‹ Friends</a>
+  <h1>▦ Dots &amp; Boxes</h1>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="status">Connecting…</div>
+  <div class="sub" id="sub"></div>
+  <div class="scores" id="scores"></div>
+  <div class="board" id="board"></div>
+  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="notify-ambient.js?v=1"></script>
+<script>
+const N = 4;                                   // boxes per side (5x5 dots)
+const params = new URLSearchParams(location.search);
+const AI = params.get("ai") === "1";          // single-player vs computer
+const room = params.get("room") || "demo";
+const role = params.get("role") === "guest" ? "guest" : "host";
+const me = role === "host" ? 1 : 2;          // 1 = blue (host, first), 2 = red
+const opp = me === 1 ? 2 : 1;
+const COL = { 1: "var(--p1)", 2: "var(--p2)" };
+let h = [], v = [], own = [], turn = 1, over = false, oppHere = false, recorded = false;
+function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
+
+const $ = (id) => document.getElementById(id);
+const cfg = window.PB_CONFIG;
+const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const ch = sb.channel("dab:" + room, { config: { broadcast: { self: false }, presence: { key: role } } });
+
+function fresh() {
+  h = Array.from({ length: N + 1 }, () => Array(N).fill(0));
+  v = Array.from({ length: N }, () => Array(N + 1).fill(0));
+  own = Array.from({ length: N }, () => Array(N).fill(0));
+  turn = 1; over = false; recorded = false;
+}
+const boxComplete = (r, c) => h[r][c] && h[r + 1][c] && v[r][c] && v[r][c + 1];
+const currentSides = (r, c) => (h[r][c] ? 1 : 0) + (h[r + 1][c] ? 1 : 0) + (v[r][c] ? 1 : 0) + (v[r][c + 1] ? 1 : 0);
+function tally() { let a = 0, b = 0; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { if (own[r][c] === 1) a++; else if (own[r][c] === 2) b++; } return [a, b]; }
+
+function render() {
+  const mine = turn === me && !over && oppHere;
+  const b = $("board"); b.className = "board" + (mine ? " mine" : "");
+  b.style.gridTemplateColumns = `repeat(${N}, var(--th) var(--edge)) var(--th)`;
+  b.style.gridTemplateRows = `repeat(${N}, var(--th) var(--edge)) var(--th)`;
+  b.innerHTML = "";
+  for (let gr = 0; gr <= 2 * N; gr++) for (let gc = 0; gc <= 2 * N; gc++) {
+    const d = document.createElement("div");
+    const er = gr % 2 === 0, ec = gc % 2 === 0;
+    if (er && ec) { d.className = "dot"; }
+    else if (er && !ec) {            // horizontal edge
+      const i = gr / 2, j = (gc - 1) / 2, set = h[i][j];
+      d.className = "edge hedge " + (set ? "set" : (mine ? "open" : ""));
+      if (set) d.style.setProperty("--ec", COL[set]);
+      d.innerHTML = "<i></i>";
+      if (mine && !set) d.onclick = () => play("h", i, j, me, true);
+    } else if (!er && ec) {          // vertical edge
+      const i = (gr - 1) / 2, j = gc / 2, set = v[i][j];
+      d.className = "edge vedge " + (set ? "set" : (mine ? "open" : ""));
+      if (set) d.style.setProperty("--ec", COL[set]);
+      d.innerHTML = "<i></i>";
+      if (mine && !set) d.onclick = () => play("v", i, j, me, true);
+    } else {                         // box
+      const i = (gr - 1) / 2, j = (gc - 1) / 2, o = own[i][j];
+      d.className = "box";
+      if (o) { d.style.background = o === 1 ? "rgba(110,168,254,.18)" : "rgba(255,93,108,.18)"; d.style.color = COL[o]; d.textContent = o === me ? "★" : "•"; }
+    }
+    b.appendChild(d);
+  }
+  const [s1, s2] = tally();
+  const mine1 = me === 1;
+  $("scores").innerHTML =
+    `<span class="s"><span class="swatch" style="background:var(--p1)"></span>${s1}${mine1 ? " (you)" : ""}</span>` +
+    `<span class="s"><span class="swatch" style="background:var(--p2)"></span>${s2}${!mine1 ? " (you)" : ""}</span>`;
+  updateStatus();
+}
+function updateStatus() {
+  const dot = `<span class="me" style="background:${COL[me]}"></span>`;
+  if (over === "draw") return setStatus("It's a draw.");
+  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
+  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
+  setStatus(turn === me ? `Your turn ${dot}` : (AI ? "Computer thinking…" : "Opponent's turn"),
+    "Complete a box to go again.");
+}
+function setStatus(hh, sub = "") { $("status").innerHTML = hh; $("sub").innerHTML = sub; }
+
+function play(t, i, j, player, local) {
+  if (over || player !== turn) return;
+  if (local && (turn !== me || !oppHere)) return;
+  if (t === "h" ? h[i][j] : v[i][j]) return;     // edge already drawn
+  if (t === "h") h[i][j] = player; else v[i][j] = player;
+  let got = 0;
+  const boxes = t === "h" ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
+  for (const [r, c] of boxes) if (r >= 0 && r < N && c >= 0 && c < N && !own[r][c] && boxComplete(r, c)) { own[r][c] = player; got++; }
+  if (got === 0) turn = player === 1 ? 2 : 1;     // no box → pass turn
+  if (own.every(row => row.every(o => o))) { const [s1, s2] = tally(); over = s1 > s2 ? 1 : s2 > s1 ? 2 : "draw"; }
+  render();
+  if (over) $("rematch").style.display = "";
+  if (over && !AI && !recorded) { recorded = true; recordResult("dots", over === "draw" ? "draw" : over === me ? "win" : "loss"); }
+  if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: { t, i, j, player } });
+  if (AI && !over && turn === opp) setTimeout(aiMove, got ? 280 : 420);   // computer replies / continues a chain
+}
+
+if (AI) {
+  document.querySelector(".bar h1").innerHTML = "▦ Dots &amp; Boxes — vs Computer";
+  oppHere = true; fresh(); render();
+} else {
+  ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.t, payload.i, payload.j, payload.player, false))
+    .on("broadcast", { event: "state" }, ({ payload }) => { h = payload.h; v = payload.v; own = payload.own; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); })
+    .on("presence", { event: "sync" }, () => {
+      const st = ch.presenceState();
+      oppHere = !!st[opp === 1 ? "host" : "guest"];
+      if (role === "host" && oppHere) ch.send({ type: "broadcast", event: "state", payload: { h, v, own, turn, over } });
+      render();
+    })
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") { fresh(); render(); await ch.track({ role }); }
+    });
+}
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+
+/* ---------- AI (greedy chain-aware heuristic), computer plays `opp` ---------- */
+function sidesAfter(t, i, j) {           // would-be side count of each adjacent box after placing this edge
+  const boxes = t === "h" ? [[i - 1, j], [i, j]] : [[i, j - 1], [i, j]];
+  const res = [];
+  for (const [r, c] of boxes) if (r >= 0 && r < N && c >= 0 && c < N) res.push(currentSides(r, c) + 1);
+  return res;
+}
+function freeEdges() {
+  const a = [];
+  for (let i = 0; i <= N; i++) for (let j = 0; j < N; j++) if (!h[i][j]) a.push({ t: "h", i, j });
+  for (let i = 0; i < N; i++) for (let j = 0; j <= N; j++) if (!v[i][j]) a.push({ t: "v", i, j });
+  return a;
+}
+function aiPick() {
+  const free = freeEdges();
+  const comp = free.filter(e => sidesAfter(e.t, e.i, e.j).some(s => s === 4));      // completes a box
+  if (comp.length) return comp[Math.floor(Math.random() * comp.length)];
+  const safe = free.filter(e => sidesAfter(e.t, e.i, e.j).every(s => s !== 3));      // doesn't hand over a box
+  if (safe.length) return safe[Math.floor(Math.random() * safe.length)];
+  let best = 1e9, bm = [];                                                           // forced to sacrifice — give the least
+  for (const e of free) { const three = sidesAfter(e.t, e.i, e.j).filter(s => s === 3).length; if (three < best) { best = three; bm = [e]; } else if (three === best) bm.push(e); }
+  return bm[Math.floor(Math.random() * bm.length)];
+}
+function aiMove() {
+  if (over) return;
+  const e = aiPick();
+  if (e) play(e.t, e.i, e.j, opp, false);
+}
+</script>
+</body>
+</html>

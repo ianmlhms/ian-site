@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tic-Tac-Toe — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--x:#6ea8fe;--o:#ff5d6c;--board:#1b2150}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
+  .status{font-size:18px;font-weight:800;min-height:24px;text-align:center}
+  .sub{color:var(--muted);font-size:13px;text-align:center}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--board);padding:12px;border-radius:16px;touch-action:manipulation}
+  .cell{width:min(22vw,92px);height:min(22vw,92px);border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:min(13vw,56px);font-weight:800;line-height:1}
+  .cell[data-p="1"]{color:var(--x)} .cell[data-p="2"]{color:var(--o)}
+  .board.mine .cell:not([data-p="1"]):not([data-p="2"]){cursor:pointer}
+  .board.mine .cell:not([data-p="1"]):not([data-p="2"]):hover{background:var(--card2)}
+  .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+  .btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
+  .btn:hover{border-color:var(--accent2)}
+  code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="friends.html">‹ Friends</a>
+  <h1>✕ Tic-Tac-Toe</h1>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="status">Connecting…</div>
+  <div class="sub" id="sub"></div>
+  <div class="board" id="board"></div>
+  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="notify-ambient.js?v=1"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const AI = params.get("ai") === "1";          // single-player vs computer
+const room = params.get("room") || "demo";
+const role = params.get("role") === "guest" ? "guest" : "host";
+const me = role === "host" ? 1 : 2;          // 1 = X (host, first), 2 = O
+const opp = me === 1 ? 2 : 1;
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+let board = [], turn = 1, over = false, oppHere = false, recorded = false;
+function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
+
+const $ = (id) => document.getElementById(id);
+const cfg = window.PB_CONFIG;
+const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const ch = sb.channel("ttt:" + room, { config: { broadcast: { self: false }, presence: { key: role } } });
+
+function fresh() { board = Array(9).fill(0); turn = 1; over = false; recorded = false; }
+const mark = (p) => p === 1 ? "✕" : p === 2 ? "◯" : "";
+function render() {
+  const b = $("board"); b.className = "board" + (turn === me && !over && oppHere ? " mine" : "");
+  b.innerHTML = "";
+  for (let i = 0; i < 9; i++) {
+    const d = document.createElement("div");
+    d.className = "cell"; if (board[i]) d.dataset.p = board[i];
+    d.textContent = mark(board[i]);
+    if (turn === me && !over && oppHere && !board[i]) d.onclick = () => play(i, me, true);
+    b.appendChild(d);
+  }
+  updateStatus();
+}
+function updateStatus() {
+  const dot = `<span class="me" style="background:${me === 1 ? "var(--x)" : "var(--o)"}"></span>`;
+  if (over === "draw") return setStatus("It's a draw.");
+  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
+  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
+  setStatus(turn === me ? `Your turn ${dot}` : (AI ? "Computer thinking…" : "Opponent's turn"));
+}
+function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
+
+function winner(b) {
+  for (const [a, c, d] of LINES) if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a];
+  return b.every(v => v) ? "draw" : 0;
+}
+function play(i, player, local) {
+  if (over || board[i]) return;
+  if (local && (turn !== me || !oppHere)) return;
+  board[i] = player;
+  const w = winner(board);
+  if (w) over = w; else turn = player === 1 ? 2 : 1;
+  render();
+  if (over) $("rematch").style.display = "";
+  if (over && !AI && !recorded) { recorded = true; recordResult("tictactoe", over === "draw" ? "draw" : over === me ? "win" : "loss"); }
+  if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: { i, player } });
+  if (AI && !over && turn === opp) setTimeout(aiMove, 350);   // computer replies
+}
+
+if (AI) {
+  document.querySelector(".bar h1").textContent = "✕ Tic-Tac-Toe — vs Computer";
+  oppHere = true; fresh(); render();
+} else {
+  ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.i, payload.player, false))
+    .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); })
+    .on("presence", { event: "sync" }, () => {
+      const st = ch.presenceState();
+      oppHere = !!st[opp === 1 ? "host" : "guest"];
+      if (role === "host" && oppHere) ch.send({ type: "broadcast", event: "state", payload: { board, turn, over } });
+      render();
+    })
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") { fresh(); render(); await ch.track({ role }); }
+    });
+}
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+
+/* ---------- AI (perfect minimax), computer plays `opp` ---------- */
+function aiMove() {
+  if (over) return;
+  const i = aiBest();
+  if (i != null) play(i, opp, false);
+}
+function score(b, player, depth) {
+  const w = winner(b);
+  if (w === opp) return 10 - depth;
+  if (w === me) return depth - 10;
+  if (w === "draw") return 0;
+  const next = player === 1 ? 2 : 1;
+  const vals = [];
+  for (let i = 0; i < 9; i++) if (!b[i]) { b[i] = player; vals.push(score(b, next, depth + 1)); b[i] = 0; }
+  return player === opp ? Math.max(...vals) : Math.min(...vals);
+}
+function aiBest() {
+  let best = -1e9, moves = [];
+  for (let i = 0; i < 9; i++) if (!board[i]) {
+    const b = board.slice(); b[i] = opp;
+    const s = score(b, me, 1);
+    if (s > best) { best = s; moves = [i]; } else if (s === best) moves.push(i);
+  }
+  return moves.length ? moves[Math.floor(Math.random() * moves.length)] : null;
+}
+</script>
+</body>
+</html>

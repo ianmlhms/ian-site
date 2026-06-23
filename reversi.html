@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reversi — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--felt:#176b3a;--feltline:#0e4f29}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px}
+  .status{font-size:18px;font-weight:800;min-height:24px;text-align:center}
+  .sub{color:var(--muted);font-size:13px;text-align:center}
+  .scores{display:flex;gap:18px;font-weight:800;font-size:15px}
+  .scores .s{display:flex;align-items:center;gap:7px}
+  .disc{display:inline-block;width:18px;height:18px;border-radius:50%}
+  .disc.b{background:#1a1a1a;border:1px solid #000} .disc.w{background:#f4f4f8;border:1px solid #bbb}
+  .board{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;background:var(--feltline);padding:8px;border-radius:12px;touch-action:manipulation}
+  .cell{width:min(10.2vw,46px);height:min(10.2vw,46px);background:var(--felt);border-radius:4px;display:flex;align-items:center;justify-content:center}
+  .cell .pc{width:78%;height:78%;border-radius:50%}
+  .cell .pc.b{background:radial-gradient(circle at 35% 30%,#444,#000)}
+  .cell .pc.w{background:radial-gradient(circle at 35% 30%,#fff,#cfcfda)}
+  .board.mine .cell.legal{cursor:pointer}
+  .board.mine .cell.legal::after{content:"";width:26%;height:26%;border-radius:50%;background:rgba(255,255,255,.28)}
+  .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+  .btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
+  .btn:hover{border-color:var(--accent2)}
+  code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="friends.html">‹ Friends</a>
+  <h1>⚫ Reversi</h1>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="status">Connecting…</div>
+  <div class="sub" id="sub"></div>
+  <div class="scores" id="scores"></div>
+  <div class="board" id="board"></div>
+  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module" src="notify-ambient.js?v=1"></script>
+<script>
+const N = 8;
+const params = new URLSearchParams(location.search);
+const AI = params.get("ai") === "1";          // single-player vs computer
+const room = params.get("room") || "demo";
+const role = params.get("role") === "guest" ? "guest" : "host";
+const me = role === "host" ? 1 : 2;          // 1 = black (host, moves first), 2 = white
+const opp = me === 1 ? 2 : 1;
+const DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const WEIGHT = [
+  [120,-20,20,5,5,20,-20,120],
+  [-20,-40,-5,-5,-5,-5,-40,-20],
+  [20,-5,15,3,3,15,-5,20],
+  [5,-5,3,3,3,3,-5,5],
+  [5,-5,3,3,3,3,-5,5],
+  [20,-5,15,3,3,15,-5,20],
+  [-20,-40,-5,-5,-5,-5,-40,-20],
+  [120,-20,20,5,5,20,-20,120]];
+let board = [], turn = 1, over = false, oppHere = false, recorded = false;
+function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
+
+const $ = (id) => document.getElementById(id);
+const cfg = window.PB_CONFIG;
+const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+const ch = sb.channel("rev:" + room, { config: { broadcast: { self: false }, presence: { key: role } } });
+
+function fresh() {
+  board = Array.from({ length: N }, () => Array(N).fill(0));
+  board[3][3] = 2; board[3][4] = 1; board[4][3] = 1; board[4][4] = 2;
+  turn = 1; over = false; recorded = false;
+}
+function flipsFor(b, r, c, p) {
+  if (b[r][c] !== 0) return [];
+  const o = p === 1 ? 2 : 1, out = [];
+  for (const [dr, dc] of DIRS) {
+    let rr = r + dr, cc = c + dc; const line = [];
+    while (rr >= 0 && rr < N && cc >= 0 && cc < N && b[rr][cc] === o) { line.push([rr, cc]); rr += dr; cc += dc; }
+    if (line.length && rr >= 0 && rr < N && cc >= 0 && cc < N && b[rr][cc] === p) out.push(...line);
+  }
+  return out;
+}
+function legalCells(b, p) { const a = []; for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (flipsFor(b, r, c, p).length) a.push([r, c]); return a; }
+const hasMove = (b, p) => legalCells(b, p).length > 0;
+function counts(b) { let a = 0, c = 0; for (let r = 0; r < N; r++) for (let q = 0; q < N; q++) { if (b[r][q] === 1) a++; else if (b[r][q] === 2) c++; } return [a, c]; }
+
+function render() {
+  const legal = (turn === me && !over && oppHere) ? legalCells(board, me) : [];
+  const lset = new Set(legal.map(([r, c]) => r * N + c));
+  const b = $("board"); b.className = "board" + (legal.length ? " mine" : "");
+  b.innerHTML = "";
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const d = document.createElement("div");
+    d.className = "cell" + (lset.has(r * N + c) ? " legal" : "");
+    if (board[r][c]) { const pc = document.createElement("div"); pc.className = "pc " + (board[r][c] === 1 ? "b" : "w"); d.appendChild(pc); }
+    if (lset.has(r * N + c)) d.onclick = () => play(r, c, me, true);
+    b.appendChild(d);
+  }
+  const [cb, cw] = counts(board);
+  $("scores").innerHTML = `<span class="s"><span class="disc b"></span>${cb}</span><span class="s"><span class="disc w"></span>${cw}</span>`;
+  updateStatus();
+}
+function updateStatus() {
+  const dot = `<span class="me" style="background:${me === 1 ? "#1a1a1a" : "#f4f4f8"}"></span>`;
+  if (over === "draw") return setStatus("It's a draw.");
+  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
+  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
+  if (turn !== me && !hasMove(board, me) && hasMove(board, turn)) {}  // opponent moves; my pass handled in advance
+  setStatus(turn === me ? `Your turn ${dot}` : (AI ? "Computer thinking…" : "Opponent's turn"),
+    (turn === me && !legalCells(board, me).length) ? "No moves — you must pass." : "");
+}
+function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
+
+function advanceTurn(justPlayed) {
+  const other = justPlayed === 1 ? 2 : 1;
+  if (hasMove(board, other)) turn = other;
+  else if (hasMove(board, justPlayed)) turn = justPlayed;   // other passes
+  else { const [cb, cw] = counts(board); over = cb > cw ? 1 : cw > cb ? 2 : "draw"; }
+}
+function play(r, c, player, local) {
+  if (over || player !== turn) return;
+  if (local && (turn !== me || !oppHere)) return;
+  const flips = flipsFor(board, r, c, player);
+  if (!flips.length) return;
+  board[r][c] = player;
+  for (const [fr, fc] of flips) board[fr][fc] = player;
+  advanceTurn(player);
+  render();
+  if (over) $("rematch").style.display = "";
+  if (over && !AI && !recorded) { recorded = true; recordResult("reversi", over === "draw" ? "draw" : over === me ? "win" : "loss"); }
+  if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: { r, c, player } });
+  if (AI && !over && turn === opp) setTimeout(aiMove, 480);   // computer replies
+}
+
+if (AI) {
+  document.querySelector(".bar h1").textContent = "⚫ Reversi — vs Computer";
+  oppHere = true; fresh(); render();
+} else {
+  ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.r, payload.c, payload.player, false))
+    .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); })
+    .on("presence", { event: "sync" }, () => {
+      const st = ch.presenceState();
+      oppHere = !!st[opp === 1 ? "host" : "guest"];
+      if (role === "host" && oppHere) ch.send({ type: "broadcast", event: "state", payload: { board, turn, over } });
+      render();
+    })
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") { fresh(); render(); await ch.track({ role }); }
+    });
+}
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+
+/* ---------- AI (minimax + alpha-beta, positional + mobility), computer plays `opp` ---------- */
+const cloneB = (b) => b.map((row) => row.slice());
+function applySim(b, r, c, p) { const nb = cloneB(b); nb[r][c] = p; for (const [fr, fc] of flipsFor(b, r, c, p)) nb[fr][fc] = p; return nb; }
+function evalB(b) {
+  let s = 0;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { if (b[r][c] === opp) s += WEIGHT[r][c]; else if (b[r][c] === me) s -= WEIGHT[r][c]; }
+  s += 8 * (legalCells(b, opp).length - legalCells(b, me).length);
+  return s;
+}
+function terminalScore(b) { const [cb, cw] = counts(b); const oc = opp === 1 ? cb : cw, mc = opp === 1 ? cw : cb; return oc > mc ? 1e6 + (oc - mc) : oc < mc ? -1e6 - (mc - oc) : 0; }
+function minimax(b, depth, alpha, beta, player) {
+  if (depth === 0) return evalB(b);
+  const moves = legalCells(b, player);
+  if (!moves.length) {
+    if (!hasMove(b, player === 1 ? 2 : 1)) return terminalScore(b);
+    return minimax(b, depth - 1, alpha, beta, player === 1 ? 2 : 1);   // pass
+  }
+  if (player === opp) {
+    let best = -1e9;
+    for (const [r, c] of moves) { best = Math.max(best, minimax(applySim(b, r, c, player), depth - 1, alpha, beta, me)); alpha = Math.max(alpha, best); if (alpha >= beta) break; }
+    return best;
+  } else {
+    let best = 1e9;
+    for (const [r, c] of moves) { best = Math.min(best, minimax(applySim(b, r, c, player), depth - 1, alpha, beta, opp)); beta = Math.min(beta, best); if (alpha >= beta) break; }
+    return best;
+  }
+}
+function aiMove() {
+  if (over) return;
+  const moves = legalCells(board, opp);
+  if (!moves.length) return;
+  const empties = 64 - counts(board)[0] - counts(board)[1];
+  const DEPTH = empties <= 10 ? 8 : 4;
+  let best = -1e9, bm = [];
+  for (const [r, c] of moves) {
+    const v = minimax(applySim(board, r, c, opp), DEPTH - 1, -1e9, 1e9, me);
+    if (v > best) { best = v; bm = [[r, c]]; } else if (v === best) bm.push([r, c]);
+  }
+  const [r, c] = bm[Math.floor(Math.random() * bm.length)];
+  play(r, c, opp, false);
+}
+</script>
+</body>
+</html>
