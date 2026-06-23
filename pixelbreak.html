@@ -18,10 +18,10 @@ header{background:linear-gradient(135deg,#1a1a35 0%,#0d0d1a 50%,#1a1025 100%);pa
 @keyframes lp{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 .logo-text{font-family:'Fredoka',sans-serif;font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:11px;color:var(--text2);letter-spacing:2px;text-transform:uppercase}
-.search-box{display:flex;align-items:center;gap:8px;background:#1a1a30;border:2px solid #2a2a4a;border-radius:30px;padding:7px 16px;width:280px;transition:border-color 0.3s}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--card2);border:2px solid var(--border);border-radius:30px;padding:7px 16px;width:280px;transition:border-color 0.3s}
 .search-box:focus-within{border-color:var(--accent2)}
 .search-box input{background:none;border:none;color:var(--text);font-size:14px;outline:none;width:100%;font-family:'Nunito',sans-serif}
-.search-box input::placeholder{color:#555}
+.search-box input::placeholder{color:var(--muted)}
 .si{font-size:16px;opacity:0.4}
 .header-right{display:flex;align-items:center;gap:12px}
 .header-left{display:flex;align-items:center;gap:14px}
@@ -54,7 +54,7 @@ main{max-width:1200px;margin:0 auto;padding:16px 30px 50px}
 #cb{background:var(--accent);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s}
 #cb:hover{transform:scale(1.1)}
 #gf{width:95%;max-width:960px;height:82vh;border:none;border-radius:var(--radius);background:#000;box-shadow:0 0 50px rgba(0,0,0,0.5)}
-footer{text-align:center;padding:25px;color:#444;font-size:12px;border-top:1px solid rgba(255,255,255,0.03)}
+footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
 @media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:12px 12px 35px}.nav-pills{padding:8px 12px 0}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.game-thumb{height:90px;font-size:36px}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">

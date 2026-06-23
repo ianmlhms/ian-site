@@ -69,7 +69,7 @@
   .bubble .time{font-size:10px;color:var(--muted);margin-left:8px;float:right;margin-top:3px}
   .ticks{font-size:11px;margin-left:5px;color:rgba(255,255,255,.6);letter-spacing:-1px}
   .ticks.read{color:var(--accent2)}
-  .del-btn{position:absolute;top:-10px;right:-8px;background:#161625;border:1px solid var(--border);border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer;line-height:1;opacity:.55}
+  .del-btn{position:absolute;top:-10px;right:-8px;background:var(--card);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer;line-height:1;opacity:.55}
   .del-btn:hover{opacity:1;border-color:#ff6b6b}
   .msg.mine .bubble .time{color:rgba(255,255,255,.7)}
   .composer{display:none;gap:10px;padding:14px 18px;border-top:1px solid var(--border);flex:none}
@@ -103,7 +103,7 @@
   .msg.mine .reply-quote .rq-user{color:#fff}
   .msg.mine .reply-quote .rq-text{color:rgba(255,255,255,.8)}
   /* desktop hover reply button */
-  .reply-btn{position:absolute;top:-10px;right:-8px;background:#161625;border:1px solid var(--border);border-radius:50%;width:24px;height:24px;font-size:11px;cursor:pointer;line-height:1;opacity:0;transition:opacity .1s}
+  .reply-btn{position:absolute;top:-10px;right:-8px;background:var(--card);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;font-size:11px;cursor:pointer;line-height:1;opacity:0;transition:opacity .1s}
   .msg.mine .reply-btn{right:auto;left:-8px}
   .msg:hover .reply-btn{opacity:.65}
   .reply-btn:hover{opacity:1!important;border-color:var(--accent2)}
@@ -131,7 +131,7 @@
   .edited{font-size:10px;color:var(--muted);margin-left:6px}
   .msg.mine .edited{color:rgba(255,255,255,.65)}
   /* reactions */
-  .react-btn{position:absolute;bottom:-10px;background:#161625;border:1px solid var(--border);border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;line-height:1;opacity:0;transition:opacity .1s}
+  .react-btn{position:absolute;bottom:-10px;background:var(--card);border:1px solid var(--border);border-radius:50%;width:22px;height:22px;font-size:11px;cursor:pointer;line-height:1;opacity:0;transition:opacity .1s}
   .msg:not(.mine) .react-btn{right:-8px}.msg.mine .react-btn{left:-8px}
   .msg:hover .react-btn{opacity:.7}.react-btn:hover{opacity:1!important;border-color:var(--accent)}
   .reacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
@@ -139,7 +139,7 @@
   .react-chip{display:inline-flex;align-items:center;gap:3px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:1px 7px;font-size:12px;cursor:pointer;line-height:1.5}
   .react-chip.mine-r{border-color:var(--accent);background:rgba(255,107,157,.18)}
   .msg.mine .react-chip{background:rgba(0,0,0,.18)}
-  .react-pop{position:absolute;bottom:18px;display:flex;gap:4px;background:#161625;border:1px solid var(--border);border-radius:20px;padding:5px 8px;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .react-pop{position:absolute;bottom:18px;display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 8px;z-index:20;box-shadow:0 6px 20px rgba(0,0,0,.4)}
   .msg.mine .react-pop{left:-8px}.msg:not(.mine) .react-pop{right:-8px}
   .react-pop button{background:none;border:none;font-size:19px;cursor:pointer;line-height:1;padding:1px;border-radius:6px}
   .react-pop button:hover{transform:scale(1.25)}
