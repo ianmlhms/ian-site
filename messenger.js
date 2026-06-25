@@ -352,7 +352,19 @@ function snippet(m) {
   if (m.content && m.content.trim()) return m.content.trim().slice(0, SNIPPET);
   if (m.media_type === "video") return "📹 Video";
   if (m.media_type === "image") return "📷 Photo";
+  if (m.media_type === "file") return "📎 " + (m.content ? m.content.slice(0, SNIPPET) : "File");
   return "Message";
+}
+/* pick an emoji for a filename's extension */
+function fileIcon(name) {
+  const ext = (name || "").split(".").pop().toLowerCase();
+  if (ext === "pdf") return "📕";
+  if (["doc", "docx", "odt", "rtf", "txt", "md"].includes(ext)) return "📝";
+  if (["xls", "xlsx", "csv", "ods", "numbers"].includes(ext)) return "📊";
+  if (["ppt", "pptx", "key", "odp"].includes(ext)) return "📽️";
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return "🗜️";
+  if (["mp3", "wav", "m4a", "flac", "aac", "ogg"].includes(ext)) return "🎵";
+  return "📄";
 }
 function startReply(m) {
   replyTo = { id: m.id, user: m.username, preview: snippet(m) };
@@ -414,7 +426,8 @@ function appendMessage(m) {
   const el = document.createElement("div");
   el.className = "msg" + (mine ? " mine" : "");
   el.dataset.mid = m.id;
-  const body = m.content ? esc(m.content) : "";
+  const isFile = m.media_type === "file";
+  const body = (m.content && !isFile) ? esc(m.content) : "";   // for files, content holds the filename, shown in the chip
   const replyHtml = m.reply_user
     ? `<span class="reply-quote" data-rid="${m.reply_to || ""}"><span class="rq-user">${esc(m.reply_user)}</span><span class="rq-text">${esc(m.reply_preview || "")}</span></span>`
     : "";
@@ -433,6 +446,13 @@ function appendMessage(m) {
       const au = document.createElement("audio"); au.className = "voice"; au.controls = true;
       bubble.insertBefore(au, el.querySelector(".time"));
       signedUrl(m.media_url).then((u) => { if (u) au.src = u; });
+    } else if (m.media_type === "file") {
+      const a = document.createElement("a");
+      a.className = "filechip"; a.target = "_blank"; a.rel = "noopener";
+      a.download = m.content || "file";
+      a.innerHTML = `<span class="fc-ico">${fileIcon(m.content)}</span><span class="fc-name">${esc(m.content || "File")}</span><span class="fc-dl">⬇</span>`;
+      bubble.insertBefore(a, el.querySelector(".time"));
+      signedUrl(m.media_url).then((u) => { if (u) a.href = u; });
     } else {
       const wrap = document.createElement(m.media_type === "video" ? "video" : "img");
       wrap.className = "media";
@@ -542,17 +562,17 @@ async function send(e) {
 
 async function uploadAndSend(file) {
   if (!file || !current) return;
-  const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : null;
-  if (!type) return alert("Only images and videos can be sent.");
+  const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : "file";
   if (file.size > MAX_MEDIA) return alert("File too large (max 50 MB).");
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
   const path = `${current.id}/${crypto.randomUUID()}.${ext}`;
   const att = $("attachBtn"); att.disabled = true; att.textContent = "⏳";
-  const { error: upErr } = await sb.storage.from("chat-media").upload(path, file, { contentType: file.type });
+  const { error: upErr } = await sb.storage.from("chat-media").upload(path, file, { contentType: file.type || "application/octet-stream" });
   att.disabled = false; att.textContent = "📎";
   if (upErr) return alert("Upload failed: " + upErr.message);
   const u = auth.session().user;
-  const row = { group_id: current.id, user_id: u.id, username: auth.username(), content: "", media_url: path, media_type: type };
+  // for generic files we keep the original filename in `content` (no text body for files)
+  const row = { group_id: current.id, user_id: u.id, username: auth.username(), content: type === "file" ? (file.name || "file").slice(0, 120) : "", media_url: path, media_type: type };
   if (replyTo) { row.reply_to = replyTo.id; row.reply_user = replyTo.user; row.reply_preview = replyTo.preview; }
   cancelReply();
   const { data, error } = await sb.from("messages").insert(row).select().single();

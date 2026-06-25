@@ -57,6 +57,11 @@
   .mp-row{padding:6px 0;font-size:14px}
   .mp-row .you{color:var(--muted);font-size:12px}
   .media{max-width:240px;max-height:240px;border-radius:10px;display:block;margin-top:6px;cursor:pointer}
+  .filechip{display:flex;align-items:center;gap:9px;margin-top:6px;max-width:240px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;text-decoration:none;color:var(--text)}
+  .filechip:hover{border-color:var(--accent2)}
+  .filechip .fc-ico{font-size:20px;flex:none}
+  .filechip .fc-name{flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .filechip .fc-dl{font-size:15px;color:var(--muted);flex:none}
   .admin-link{color:#ffcc00;font-weight:700;margin-right:14px;white-space:nowrap}
   .messages{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:18px;display:flex;flex-direction:column;gap:8px}
   .msg{display:flex}
@@ -199,9 +204,9 @@
       <button class="rb-x" id="rbX" type="button" title="Cancel reply">&times;</button>
     </div>
     <form class="composer" id="composer">
-      <button type="button" id="attachBtn" title="Send photo or video">📎</button>
+      <button type="button" id="attachBtn" title="Send a photo, video or file">📎</button>
       <button type="button" id="micBtn" title="Record a voice message">🎤</button>
-      <input type="file" id="fileInput" accept="image/*,video/*" hidden>
+      <input type="file" id="fileInput" hidden>
       <input id="msgInput" placeholder="Message…" autocomplete="off" maxlength="2000">
       <button type="submit">Send</button>
     </form>
@@ -215,6 +220,6 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="messenger.js?v=8"></script>
+<script type="module" src="messenger.js?v=9"></script>
 </body>
 </html>
