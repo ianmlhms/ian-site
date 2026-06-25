@@ -25,8 +25,11 @@ REPO_DIR="${REPO_DIR:-$HOME/ian-site}"
 PY="${PY:-$HOME/.shortsfactory/venv/bin/python}"
 
 # 1) Pull first, on a clean tree, so we never diverge from the remote.
+#    Name origin + branch explicitly so this works even if the branch has no
+#    upstream tracking configured (e.g. after a fresh clone or history rewrite).
 cd "$REPO_DIR"
-git pull --quiet --rebase --autostash || true
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+git pull --quiet --rebase --autostash origin "$BRANCH" || true
 
 # 2) Build data: sanitized public file to the repo + full data to Supabase.
 PYTHONPATH="$SF_DIR" "$PY" "$SF_DIR/scripts/publish_factory.py" "$REPO_DIR/data/factory.json"
@@ -38,5 +41,5 @@ if git diff --cached --quiet; then
   exit 0
 fi
 git commit --quiet -m "stats: refresh dashboard data ($(date -u +%FT%TZ))"
-git push --quiet
+git push --quiet origin "$BRANCH"
 echo "dashboard: published to ian-site"
