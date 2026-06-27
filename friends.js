@@ -9,15 +9,38 @@ const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Bat
 const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe"]);
 
 async function refresh() {
-  const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: dir }] = await Promise.all([
+  const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: dir }, { data: act }] = await Promise.all([
     sb.rpc("my_friends"), sb.rpc("friend_requests"), sb.rpc("my_game_invites"),
-    sb.rpc("sent_requests"), sb.rpc("directory"),
+    sb.rpc("sent_requests"), sb.rpc("directory"), sb.rpc("friends_activity", { p_limit: 30 }),
   ]);
   renderFriends(fr || []);
   renderRequests(rq || []);
   renderInvites(gi || []);
   renderSent(sent || []);
   renderDirectory(dir || []);
+  renderActivity(act || []);
+}
+
+const VERB = { win: "won", loss: "lost", draw: "drew" };
+function ago(ts) {
+  const s = Math.max(1, Math.floor((Date.now() - new Date(ts).getTime()) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60); if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60); if (h < 24) return h + "h ago";
+  const d = Math.floor(h / 24); return d === 1 ? "yesterday" : d + "d ago";
+}
+function renderActivity(list) {
+  const wrap = $("activityWrap"); if (!wrap) return;
+  if (!list.length) { wrap.style.display = "none"; return; }
+  wrap.style.display = "";
+  $("activity").innerHTML = list.map((a) => {
+    const who = a.is_me ? "You" : esc(a.username);
+    const game = esc(GAMES[a.game] || a.game);
+    const verb = VERB[a.result] || a.result;
+    return `<div class="act-row"><span class="act-emoji">${a.result === "win" ? "🏆" : a.result === "loss" ? "❌" : "🤝"}</span>` +
+      `<span class="act-text"><b>${who}</b> ${verb} at <b>${game}</b></span>` +
+      `<span class="act-time">${ago(a.created_at)}</span></div>`;
+  }).join("");
 }
 
 function renderSent(list) {
