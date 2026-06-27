@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="ian.lu — apps and tools by Ian Mulheims." />
-  <title>ian.lu</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="description" content="Ian Mulheims — a student from Luxembourg who builds apps, games and tools for the browser, iPhone and Apple Watch." />
+  <meta property="og:title" content="ian.lu — Ian Mulheims" />
+  <meta property="og:description" content="Apps, games and tools by Ian Mulheims." />
+  <meta property="og:type" content="website" />
+  <title>ian.lu — Ian Mulheims</title>
+  <link rel="stylesheet" href="style.css?v=2" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <script src="theme.js?v=1"></script>
@@ -16,45 +19,107 @@
     <span id="acctHost"></span>
   </header>
 
-  <main class="hub">
-    <div class="tiles">
-      <a class="tile pixel" href="pixelbreak.html">
-        <span class="ico">🎮</span><span class="tname">PixelBreak</span><span class="tsub">Arcade games</span>
-      </a>
-      <a class="tile shorts" href="stats.html">
-        <span class="ico">📊</span><span class="tname">ShortsFactory</span><span class="tsub">Channel stats</span>
-      </a>
-      <a class="tile msg" href="messenger.html">
-        <span class="ico">💬</span><span class="tname">Messenger</span><span class="tsub">Chat &amp; groups</span>
-      </a>
-      <a class="tile friends" href="friends.html">
-        <span class="ico">👥</span><span class="tname">Friends</span><span class="tsub">Add, chat &amp; play</span>
-      </a>
-      <a class="tile games" href="games.html">
-        <span class="ico">🎲</span><span class="tname">Games</span><span class="tsub">Play on two iPads</span>
-      </a>
-      <a class="tile wordle" href="wordle.html">
-        <span class="ico">🟩</span><span class="tname">Wuertspill</span><span class="tsub">Wordle · LB &amp; DE</span>
-      </a>
-      <a class="tile grades" href="grades.html">
-        <span class="ico">🎓</span><span class="tname">Grades</span><span class="tsub">Average calculator</span>
-      </a>
-      <a class="tile hotel private-hotel" href="hotel.html" style="display:none">
-        <span class="ico">🏨</span><span class="tname">Hotel-Simulator</span><span class="tsub">Bausimulator · privat</span>
-      </a>
-      <a class="tile hw admin-only" href="homework.html" style="display:none">
-        <span class="ico">📚</span><span class="tname">Hausaufgaben</span><span class="tsub">WebUntis homework</span>
-      </a>
-      <a class="tile dash admin-only" href="factory.html" style="display:none">
-        <span class="ico">📈</span><span class="tname">Dashboard</span><span class="tsub">Full ShortsFactory</span>
-      </a>
-      <a class="tile admin admin-only" href="admin.html" style="display:none">
-        <span class="ico">🛡</span><span class="tname">Admin</span><span class="tsub">Moderation</span>
-      </a>
-    </div>
+  <main class="page">
+    <!-- public hero -->
+    <section class="hero">
+      <span class="hero-kicker">👋 Moien, ech sinn</span>
+      <h1 class="hero-name">Ian Mulheims</h1>
+      <p class="hero-tag">A student from Luxembourg who builds <strong>apps, games and tools</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.</p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="#projects">See what I've built</a>
+        <a class="btn-ghost" href="#apps">Open the apps</a>
+      </div>
+    </section>
+
+    <!-- public projects showcase -->
+    <section class="section" id="projects">
+      <h2 class="sec-title">Projects</h2>
+      <div class="proj-grid">
+        <a class="proj-card" href="pixelbreak.html">
+          <span class="pico">🎮</span>
+          <span class="ptitle">PixelBreak</span>
+          <span class="pdesc">31 arcade games, all playable in the browser — no install, no ads.</span>
+          <span class="ptags"><span class="ptag">Web</span><span class="ptag">JavaScript</span></span>
+        </a>
+        <a class="proj-card" href="games.html">
+          <span class="pico">🎲</span>
+          <span class="ptitle">Multiplayer Games</span>
+          <span class="pdesc">Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels.</span>
+          <span class="ptags"><span class="ptag">Realtime</span><span class="ptag">Supabase</span></span>
+        </a>
+        <a class="proj-card" href="messenger.html">
+          <span class="pico">💬</span>
+          <span class="ptitle">Messenger</span>
+          <span class="pdesc">Real-time chat with groups, voice notes, file sharing, replies and reactions.</span>
+          <span class="ptags"><span class="ptag">Realtime</span><span class="ptag">PWA</span></span>
+        </a>
+        <a class="proj-card" href="wordle.html">
+          <span class="pico">🟩</span>
+          <span class="ptitle">Wuertspill</span>
+          <span class="pdesc">Wordle, but in Luxembourgish and German — the way I actually speak.</span>
+          <span class="ptags"><span class="ptag">Web</span><span class="ptag">Lëtzebuergesch</span></span>
+        </a>
+        <div class="proj-card static">
+          <span class="pico">🏎️</span>
+          <span class="ptitle">KartTracker</span>
+          <span class="pdesc">A go-kart lap timer for iPhone + Apple Watch — live lap times, best-lap tracking and session history.</span>
+          <span class="ptags"><span class="ptag">SwiftUI</span><span class="ptag">watchOS</span></span>
+        </div>
+        <div class="proj-card static">
+          <span class="pico">🎬</span>
+          <span class="ptitle">ShortsFactory</span>
+          <span class="pdesc">An automated pipeline that generates faceless short videos and uploads them — with a Telegram approval step.</span>
+          <span class="ptags"><span class="ptag">Python</span><span class="ptag">Automation</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- private app launcher (signed-in) -->
+    <section class="section" id="apps">
+      <h2 class="sec-title">Your apps</h2>
+      <p class="apps-gate" id="appsGate">Sign in to open your apps.</p>
+      <div class="tiles">
+        <a class="tile pixel" href="pixelbreak.html">
+          <span class="ico">🎮</span><span class="tname">PixelBreak</span><span class="tsub">Arcade games</span>
+        </a>
+        <a class="tile shorts" href="stats.html">
+          <span class="ico">📊</span><span class="tname">ShortsFactory</span><span class="tsub">Channel stats</span>
+        </a>
+        <a class="tile msg" href="messenger.html">
+          <span class="ico">💬</span><span class="tname">Messenger</span><span class="tsub">Chat &amp; groups</span>
+        </a>
+        <a class="tile friends" href="friends.html">
+          <span class="ico">👥</span><span class="tname">Friends</span><span class="tsub">Add, chat &amp; play</span>
+        </a>
+        <a class="tile games" href="games.html">
+          <span class="ico">🎲</span><span class="tname">Games</span><span class="tsub">Play on two iPads</span>
+        </a>
+        <a class="tile wordle" href="wordle.html">
+          <span class="ico">🟩</span><span class="tname">Wuertspill</span><span class="tsub">Wordle · LB &amp; DE</span>
+        </a>
+        <a class="tile grades" href="grades.html">
+          <span class="ico">🎓</span><span class="tname">Grades</span><span class="tsub">Average calculator</span>
+        </a>
+        <a class="tile hotel private-hotel" href="hotel.html" style="display:none">
+          <span class="ico">🏨</span><span class="tname">Hotel-Simulator</span><span class="tsub">Bausimulator · privat</span>
+        </a>
+        <a class="tile hw admin-only" href="homework.html" style="display:none">
+          <span class="ico">📚</span><span class="tname">Hausaufgaben</span><span class="tsub">WebUntis homework</span>
+        </a>
+        <a class="tile dash admin-only" href="factory.html" style="display:none">
+          <span class="ico">📈</span><span class="tname">Dashboard</span><span class="tsub">Full ShortsFactory</span>
+        </a>
+        <a class="tile admin admin-only" href="admin.html" style="display:none">
+          <span class="ico">🛡</span><span class="tname">Admin</span><span class="tsub">Moderation</span>
+        </a>
+      </div>
+    </section>
   </main>
 
-  <footer><span id="year"></span> · Ian Mulheims</footer>
+  <footer>
+    <span id="year"></span> · Ian Mulheims ·
+    <a href="https://github.com/ianmlhms" rel="noopener" class="foot-link">GitHub</a>
+  </footer>
 
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
@@ -65,6 +130,8 @@
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     mountAccountButton(document.getElementById("acctHost"));
     async function refreshTiles() {
+      const signedIn = !!session();
+      document.body.classList.toggle("signed-in", signedIn);
       let admin = false;
       try { const sb = await client(); const { data } = await sb.rpc("is_admin"); admin = !!data; } catch {}
       document.querySelectorAll(".admin-only").forEach((e) => (e.style.display = admin ? "" : "none"));
