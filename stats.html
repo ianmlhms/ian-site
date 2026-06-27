@@ -70,7 +70,7 @@ const fmtDur = s=>{s=Math.round(s);return s>=60?`${Math.floor(s/60)}:${String(s%
 const esc = s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmtDate = iso=>{const d=new Date(iso); return isNaN(d)?'—':d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});};
 const sum = (arr,f)=>arr.reduce((a,x)=>a+f(x),0);
-const PLATC = {tiktok:'var(--tt)', instagram:'var(--ig)'};
+const PLATC = {tiktok:'var(--tt)', instagram:'var(--ig)', youtube:'var(--yt)'};
 
 async function boot(){
   let DATA;
@@ -92,7 +92,7 @@ async function boot(){
   const likes = sum(SOC.filter(a=>a.platform==='tiktok'), a=>a.likes||0);
   const minutes = sum(posted, v=>v.duration_s)/60;
   const kpis = [
-    {v:fmtN(followers), l:'Followers (TikTok + Instagram)', c:'var(--accent)'},
+    {v:fmtN(followers), l:'Total audience (all platforms)', c:'var(--accent)'},
     {v:fmtN(likes), l:'TikTok likes', c:'var(--tt)'},
     {v:posted.length, l:'Videos published', c:'var(--posted)'},
     {v:minutes.toFixed(1)+'m', l:'Content produced'},
@@ -103,11 +103,11 @@ async function boot(){
     `${CH.filter(c=>c.enabled).length} channels · ${posted.length} videos live`;
   document.getElementById('genat').textContent = DATA.generated_at ? 'Updated ' + fmtDate(DATA.generated_at) : '';
 
-  // Social handles (followers only)
+  // Social handles (audience size; YouTube counts subscribers, others followers)
   document.getElementById('social').innerHTML = SOC.length ? SOC.map(a=>
     `<a class="soc" href="${esc(a.url)}" target="_blank" rel="noopener">
        <span class="dot" style="background:${PLATC[a.platform]||'#888'}"></span>
-       @${esc(a.handle)} · <b>${fmtN(a.followers)}</b> followers
+       @${esc(a.handle)} · <b>${fmtN(a.followers)}</b> ${a.platform==='youtube'?'subscribers':'followers'}
      </a>`).join('') : '<span class="muted">No channels yet.</span>';
 
   // Published videos (YouTube links — already public)
