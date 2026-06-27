@@ -1,7 +1,7 @@
 /* Service worker for ian.lu — Web Push notifications (Messenger).
  * Kept tiny on purpose: it only handles incoming pushes and clicks. The page
  * registers it (notify.js). Bump CACHE_TAG if you ever add real caching. */
-const CACHE_TAG = "ianlu-sw-v1";
+const CACHE_TAG = "ianlu-sw-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
@@ -14,7 +14,7 @@ self.addEventListener("push", (event) => {
     body: d.body || "New message",
     icon: "favicon.svg",
     badge: "favicon.svg",
-    tag: d.group_id ? "grp-" + d.group_id : "msgr",   // collapse repeats per chat
+    tag: d.tag || (d.group_id ? "grp-" + d.group_id : "msgr"),   // collapse repeats per source
     renotify: true,
     data: { url: d.url || "messenger.html" },
   };
@@ -24,10 +24,11 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || "messenger.html";
+  const page = url.split("/").pop().split("?")[0].split("#")[0] || url;   // e.g. "friends.html"
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
       for (const w of wins) {
-        if (w.url.includes("messenger") && "focus" in w) return w.focus();
+        if (page && w.url.includes(page) && "focus" in w) return w.focus();   // already on that page → focus it
       }
       return self.clients.openWindow(url);
     })

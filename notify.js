@@ -13,6 +13,13 @@ import * as auth from "./auth.js";
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;
 
+// Pretty game names — keep in sync with friends.js GAMES.
+const GAME_NAMES = {
+  connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship",
+  color: "Colour Dial", draw: "Molerei", reversi: "Reversi",
+  dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
+};
+
 /* ---------- service worker ---------- */
 let _swReg = null;
 export async function registerSW() {
@@ -138,6 +145,26 @@ function startAmbient(sb) {
       const go = () => (location.href = "messenger.html");
       showToast(title, body, go);
       systemNotify(title, body, "messenger.html");
+    })
+    .subscribe();
+
+  // Friend requests + game invites aimed at me (so I'm notified while I'm
+  // elsewhere on the site, e.g. mid-game). Closed-app delivery is handled by
+  // the `notify` Edge Function; this is the foreground complement.
+  const social = () => (location.href = "friends.html");
+  sb.channel("ambient-social-" + me)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "friendships", filter: "addressee=eq." + me }, async ({ new: f }) => {
+      if (!f || (f.status && f.status !== "pending")) return;
+      const { data: p } = await sb.from("profiles").select("username").eq("id", f.requester).maybeSingle();
+      const body = (p?.username || "Someone") + " wants to be friends";
+      showToast("👋 Friend request", body, social);
+      systemNotify("👋 Friend request", body, "friends.html");
+    })
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "game_invites", filter: "to_user=eq." + me }, ({ new: gi }) => {
+      if (!gi || (gi.status && gi.status !== "pending")) return;
+      const body = (gi.from_name || "Someone") + " invited you to " + (GAME_NAMES[gi.game] || gi.game);
+      showToast("🎮 Game invite", body, social);
+      systemNotify("🎮 Game invite", body, "friends.html");
     })
     .subscribe();
 }

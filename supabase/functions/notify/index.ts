@@ -1,14 +1,15 @@
 // Supabase Edge Function: notify
-// Fan-out Web Push for new messages. Invoked by a Database Webhook on
-// public.messages INSERT. Sends a push to every group member except the sender
-// who has a stored push subscription — so notifications arrive on the iPad even
-// when the site is fully closed.
+// Fan-out Web Push for new activity. Invoked by Database Webhooks on INSERT into:
+//   - public.messages       → "new message"      (notify other group members)
+//   - public.friendships    → "friend request"   (notify the addressee)
+//   - public.game_invites   → "game invite"      (notify the invitee)
+// so notifications arrive on the iPad even when the site is fully closed.
 //
 // Deploy (see scripts/PUSH-SETUP.md for the full walkthrough):
 //   supabase functions deploy notify --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
 //   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:konto@ian.lu NOTIFY_SECRET=...
 //
-// The DB webhook must send header  x-notify-secret: <NOTIFY_SECRET>.
+// Each DB webhook must send header  x-notify-secret: <NOTIFY_SECRET>.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -24,8 +25,72 @@ const admin = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
+// Pretty game names — keep in sync with friends.js GAMES.
+const GAME_NAMES: Record<string, string> = {
+  connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship",
+  color: "Colour Dial", draw: "Molerei", reversi: "Reversi",
+  dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
+};
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+async function usernameOf(id: string): Promise<string> {
+  const { data } = await admin.from("profiles").select("username").eq("id", id).maybeSingle();
+  return data?.username || "Someone";
+}
+
+// What to push, derived from which table fired the webhook.
+type Plan = { recipients: string[]; title: string; body: string; url: string; tag: string };
+
+async function planFor(table: string, rec: any): Promise<Plan | null> {
+  if (table === "messages") {
+    if (!rec?.group_id) return null;
+    const { data: group } = await admin
+      .from("groups").select("name, is_dm").eq("id", rec.group_id).maybeSingle();
+    const { data: members } = await admin
+      .from("group_members").select("user_id").eq("group_id", rec.group_id).neq("user_id", rec.user_id);
+    const recipients = (members ?? []).map((m: any) => m.user_id);
+    const sender = rec.username || "Someone";
+    const title = group?.is_dm ? `💬 ${sender}` : `${sender} · ${group?.name ?? "Group"}`;
+    const body = (rec.content && rec.content.trim())
+      ? rec.content.trim().slice(0, 140)
+      : rec.media_type === "video" ? "📹 Video"
+      : rec.media_type === "image" ? "📷 Photo"
+      : rec.media_type === "audio" ? "🎤 Voice message"
+      : rec.media_type === "file" ? "📎 File"
+      : "New message";
+    return { recipients, title, body, url: "messenger.html", tag: "grp-" + rec.group_id };
+  }
+
+  if (table === "friendships") {
+    if (rec?.status && rec.status !== "pending") return null;   // only new requests
+    if (!rec?.addressee) return null;
+    const name = await usernameOf(rec.requester);
+    return {
+      recipients: [rec.addressee],
+      title: "👋 Friend request",
+      body: `${name} wants to be friends`,
+      url: "friends.html",
+      tag: "friend-" + rec.requester,
+    };
+  }
+
+  if (table === "game_invites") {
+    if (rec?.status && rec.status !== "pending") return null;
+    if (!rec?.to_user) return null;
+    const gname = GAME_NAMES[rec.game] || rec.game;
+    return {
+      recipients: [rec.to_user],
+      title: "🎮 Game invite",
+      body: `${rec.from_name || "Someone"} invited you to ${gname}`,
+      url: "friends.html",
+      tag: "invite-" + rec.from_user,
+    };
+  }
+
+  return null;
+}
 
 Deno.serve(async (req) => {
   // Shared-secret guard (the function is deployed with --no-verify-jwt).
@@ -35,29 +100,19 @@ Deno.serve(async (req) => {
 
   let payload: any;
   try { payload = await req.json(); } catch { return json({ error: "bad json" }, 400); }
-  const msg = payload?.record;
-  if (!msg || !msg.group_id) return json({ ok: true, skipped: "no record" });
+  const table = payload?.table;
+  const rec = payload?.record;
+  if (!table || !rec) return json({ ok: true, skipped: "no record" });
 
-  // Chat context for a nicer title.
-  const { data: group } = await admin
-    .from("groups").select("name, is_dm").eq("id", msg.group_id).maybeSingle();
-
-  // Recipients = members of the group except the sender.
-  const { data: members } = await admin
-    .from("group_members").select("user_id").eq("group_id", msg.group_id).neq("user_id", msg.user_id);
-  const ids = (members ?? []).map((m: any) => m.user_id);
-  if (!ids.length) return json({ ok: true, recipients: 0 });
+  const plan = await planFor(table, rec);
+  if (!plan) return json({ ok: true, skipped: "nothing to send for " + table });
+  if (!plan.recipients.length) return json({ ok: true, recipients: 0 });
 
   const { data: subs } = await admin
-    .from("push_subscriptions").select("endpoint, subscription").in("user_id", ids);
-  if (!subs || !subs.length) return json({ ok: true, recipients: ids.length, subs: 0 });
+    .from("push_subscriptions").select("endpoint, subscription").in("user_id", plan.recipients);
+  if (!subs || !subs.length) return json({ ok: true, recipients: plan.recipients.length, subs: 0 });
 
-  const sender = msg.username || "Someone";
-  const title = group?.is_dm ? `💬 ${sender}` : `${sender} · ${group?.name ?? "Group"}`;
-  const body = (msg.content && msg.content.trim())
-    ? msg.content.trim().slice(0, 140)
-    : msg.media_type === "video" ? "📹 Video" : msg.media_type === "image" ? "📷 Photo" : "New message";
-  const data = JSON.stringify({ title, body, group_id: msg.group_id, url: "messenger.html" });
+  const data = JSON.stringify({ title: plan.title, body: plan.body, url: plan.url, tag: plan.tag });
 
   let sent = 0;
   await Promise.all(subs.map(async (s: any) => {
@@ -74,5 +129,5 @@ Deno.serve(async (req) => {
     }
   }));
 
-  return json({ ok: true, recipients: ids.length, sent });
+  return json({ ok: true, table, recipients: plan.recipients.length, sent });
 });
