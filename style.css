@@ -88,6 +88,7 @@ body {
 .tile.dash:hover { border-color: #58a6ff; }
 .tile.admin:hover { border-color: #ffcc00; }
 .tile.hotel:hover { border-color: #38bdf8; }
+.tile.karts:hover { border-color: #ff6b9d; }
 
 footer {
   text-align: center;

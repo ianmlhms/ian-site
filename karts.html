@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KartTracker — All sessions</title>
+<script src="theme.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--best:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{max-width:760px;margin:0 auto;padding:22px 18px 80px}
+  .state{color:var(--muted);text-align:center;padding:50px 20px}
+  .auth-go{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-weight:800;cursor:pointer;margin-top:12px}
+  .sumline{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .sess{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:13px 15px;margin-bottom:10px}
+  .sess .info{flex:1;min-width:0}
+  .sess .name{font-weight:800;font-size:15px}
+  .sess .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .sess .best{color:var(--best);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .sess .best small{display:block;color:var(--muted);font-weight:600;font-size:11px;text-align:right}
+  .act{display:flex;gap:8px;flex:none}
+  .mini{border:1px solid var(--border);background:var(--card2);color:var(--text);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none}
+  .mini:hover{border-color:var(--accent2);color:var(--accent2)}
+  .mini.x{color:var(--muted)} .mini.x:hover{color:#ff6b6b;border-color:#ff6b6b}
+</style>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>🏎️ KartTracker — All sessions</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <div id="state" class="state">Loading…</div>
+  <div id="list"></div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=3";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let sb = null;
+
+function fmtLap(s){ if(s==null||isNaN(s)) return "—"; const m=Math.floor(s/60), r=s-m*60; const ss=r.toFixed(3); return m>0?`${m}:${r<10?"0":""}${ss}`:ss; }
+function fmtDate(iso){ const d=new Date(iso); return isNaN(d)?"":d.toLocaleDateString([], {weekday:"short",day:"numeric",month:"short",year:"numeric"})+" · "+d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}); }
+function bestOf(laps){ const v=(laps||[]).filter(x=>typeof x==="number"&&x>0); return v.length?Math.min(...v):null; }
+function topKmh(track){ return Math.max(0, ...(track||[]).map(p=>(p.speed||0)*3.6)); }
+
+async function load(){
+  const { data, error } = await sb.from("kart_sessions").select("id,payload,created_at").order("created_at",{ascending:false});
+  if(error){ $("state").textContent = "Could not load sessions: "+error.message; return; }
+  const rows = data || [];
+  if(!rows.length){ $("state").textContent = "No sessions shared yet. Tap “Share Web Link” on a session in the KartTracker app."; $("list").innerHTML=""; return; }
+  $("state").textContent = "";
+  $("state").innerHTML = `<div class="sumline">${rows.length} session${rows.length>1?"s":""} · newest first</div>`;
+  $("list").innerHTML = rows.map(r=>{
+    const p = r.payload || {};
+    const best = bestOf(p.lapTimes);
+    const laps = (p.lapTimes||[]).filter(x=>typeof x==="number"&&x>0).length;
+    const tk = topKmh(p.track);
+    return `<div class="sess" data-id="${esc(r.id)}">
+      <div class="info">
+        <div class="name">${esc(p.trackName || "Karting session")}</div>
+        <div class="sub">${esc(fmtDate(p.date || r.created_at))} · ${laps} lap${laps===1?"":"s"}${tk>0?` · top ${tk.toFixed(0)} km/h`:""}</div>
+      </div>
+      <div class="best">${fmtLap(best)}<small>best lap</small></div>
+      <div class="act">
+        <a class="mini" href="kart.html?s=${encodeURIComponent(r.id)}" target="_blank" rel="noopener">View</a>
+        <button class="mini x" data-del="${esc(r.id)}">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+  $("list").querySelectorAll("[data-del]").forEach(b=> b.onclick = async () => {
+    if(!confirm("Delete this session permanently?")) return;
+    b.disabled = true; b.textContent = "…";
+    const { error } = await sb.rpc("kart_delete", { p_id: b.dataset.del });
+    if(error){ alert("Delete failed: "+error.message); b.disabled=false; b.textContent="Delete"; return; }
+    load();
+  });
+}
+
+async function render(){
+  const s = session();
+  if(!s){
+    $("list").innerHTML = "";
+    $("state").innerHTML = `<div>Sign in to view your KartTracker sessions.</div><button class="auth-go" id="gateBtn">Sign in</button>`;
+    $("gateBtn").onclick = openAuthModal;
+    return;
+  }
+  let admin = false;
+  try { const { data } = await sb.rpc("is_admin"); admin = !!data; } catch {}
+  if(!admin){ $("list").innerHTML=""; $("state").textContent = "This panel is private."; return; }
+  load();
+}
+
+(async function boot(){
+  mountAccountButton($("acctHost"));
+  sb = await client();
+  onAuth(() => render());
+  render();
+})();
+</script>
+</body>
+</html>
