@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KartTracker — All sessions</title>
 <script src="theme.js?v=1"></script>
+<script src="i18n-dict.js?v=1"></script>
+<script src="i18n.js?v=1"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--best:#3fb950}
   *{box-sizing:border-box}
@@ -32,14 +34,15 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="index.html">‹ Home</a>
-  <h1>🏎️ KartTracker — All sessions</h1>
+  <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+  <h1 data-i18n="karts.h1">🏎️ KartTracker — All sessions</h1>
   <div class="spacer"></div>
+  <span id="langSw"></span>
   <span id="acctHost"></span>
 </header>
 
 <div class="wrap">
-  <div id="state" class="state">Loading…</div>
+  <div id="state" class="state" data-i18n="common.loading">Loading…</div>
   <div id="list"></div>
 </div>
 
@@ -48,6 +51,7 @@
 <script type="module">
 import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=3";
 
+const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let sb = null;
@@ -59,11 +63,11 @@ function topKmh(track){ return Math.max(0, ...(track||[]).map(p=>(p.speed||0)*3.
 
 async function load(){
   const { data, error } = await sb.from("kart_sessions").select("id,payload,created_at").order("created_at",{ascending:false});
-  if(error){ $("state").textContent = "Could not load sessions: "+error.message; return; }
+  if(error){ $("state").textContent = T("karts.loadErr")+": "+error.message; return; }
   const rows = data || [];
-  if(!rows.length){ $("state").textContent = "No sessions shared yet. Tap “Share Web Link” on a session in the KartTracker app."; $("list").innerHTML=""; return; }
+  if(!rows.length){ $("state").textContent = T("karts.none"); $("list").innerHTML=""; return; }
   $("state").textContent = "";
-  $("state").innerHTML = `<div class="sumline">${rows.length} session${rows.length>1?"s":""} · newest first</div>`;
+  $("state").innerHTML = `<div class="sumline">${rows.length} ${rows.length>1?T("karts.sessions"):T("karts.session")} · ${T("karts.newest")}</div>`;
   $("list").innerHTML = rows.map(r=>{
     const p = r.payload || {};
     const best = bestOf(p.lapTimes);
@@ -71,21 +75,21 @@ async function load(){
     const tk = topKmh(p.track);
     return `<div class="sess" data-id="${esc(r.id)}">
       <div class="info">
-        <div class="name">${esc(p.trackName || "Karting session")}</div>
-        <div class="sub">${esc(fmtDate(p.date || r.created_at))} · ${laps} lap${laps===1?"":"s"}${tk>0?` · top ${tk.toFixed(0)} km/h`:""}</div>
+        <div class="name">${esc(p.trackName || T("karts.session.title"))}</div>
+        <div class="sub">${esc(fmtDate(p.date || r.created_at))} · ${laps} ${laps===1?T("karts.lap"):T("karts.laps")}${tk>0?` · ${T("karts.top")} ${tk.toFixed(0)} km/h`:""}</div>
       </div>
-      <div class="best">${fmtLap(best)}<small>best lap</small></div>
+      <div class="best">${fmtLap(best)}<small>${T("karts.bestLap")}</small></div>
       <div class="act">
-        <a class="mini" href="kart.html?s=${encodeURIComponent(r.id)}" target="_blank" rel="noopener">View</a>
-        <button class="mini x" data-del="${esc(r.id)}">Delete</button>
+        <a class="mini" href="kart.html?s=${encodeURIComponent(r.id)}" target="_blank" rel="noopener">${T("karts.view")}</a>
+        <button class="mini x" data-del="${esc(r.id)}">${T("karts.delete")}</button>
       </div>
     </div>`;
   }).join("");
   $("list").querySelectorAll("[data-del]").forEach(b=> b.onclick = async () => {
-    if(!confirm("Delete this session permanently?")) return;
+    if(!confirm(T("karts.delConfirm"))) return;
     b.disabled = true; b.textContent = "…";
     const { error } = await sb.rpc("kart_delete", { p_id: b.dataset.del });
-    if(error){ alert("Delete failed: "+error.message); b.disabled=false; b.textContent="Delete"; return; }
+    if(error){ alert(T("karts.delFailed")+": "+error.message); b.disabled=false; b.textContent=T("karts.delete"); return; }
     load();
   });
 }
@@ -94,13 +98,13 @@ async function render(){
   const s = session();
   if(!s){
     $("list").innerHTML = "";
-    $("state").innerHTML = `<div>Sign in to view your KartTracker sessions.</div><button class="auth-go" id="gateBtn">Sign in</button>`;
+    $("state").innerHTML = `<div>${T("karts.gate")}</div><button class="auth-go" id="gateBtn">${T("auth.signinShort")}</button>`;
     $("gateBtn").onclick = openAuthModal;
     return;
   }
   let admin = false;
   try { const { data } = await sb.rpc("is_admin"); admin = !!data; } catch {}
-  if(!admin){ $("list").innerHTML=""; $("state").textContent = "This panel is private."; return; }
+  if(!admin){ $("list").innerHTML=""; $("state").textContent = T("karts.private"); return; }
   load();
 }
 
@@ -109,6 +113,7 @@ async function render(){
   sb = await client();
   onAuth(() => render());
   render();
+  document.addEventListener("i18n:change", () => { if (sb) render(); });
 })();
 </script>
 </body>

@@ -11,6 +11,8 @@
 <meta name="theme-color" content="#0d0d1a">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="theme.js?v=1"></script>
+<script src="i18n-dict.js?v=1"></script>
+<script src="i18n.js?v=1"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff}
   *{box-sizing:border-box}
@@ -173,11 +175,12 @@
 </head>
 <body>
 <header>
-  <a class="home" href="index.html">‹ Home</a>
-  <h1>💬 Messenger</h1>
+  <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+  <h1 data-i18n="msg.h1">💬 Messenger</h1>
   <div class="spacer"></div>
-  <a href="notify-help.html" class="ntf-btn" title="How to turn on notifications" style="text-decoration:none">❓</a>
+  <a href="notify-help.html" class="ntf-btn" data-i18n-attr="title:msg.notifyHelp" title="How to turn on notifications" style="text-decoration:none">❓</a>
   <button id="notifyBtn" class="ntf-btn" style="display:none" title="Get notified of new messages">🔔 Notify</button>
+  <span id="langSw"></span>
   <span id="acctHost"></span>
 </header>
 
@@ -186,16 +189,16 @@
 <div id="app">
   <aside class="sidebar">
     <div class="side-head">
-      <span class="t">Chats</span>
-      <button id="newDM" title="Message someone by username">@</button>
-      <button id="newG" title="New group">+</button>
-      <button id="joinG" title="Join by code">⇲</button>
+      <span class="t" data-i18n="msg.chats">Chats</span>
+      <button id="newDM" data-i18n-attr="title:msg.tip.dm" title="Message someone by username">@</button>
+      <button id="newG" data-i18n-attr="title:msg.tip.newGroup" title="New group">+</button>
+      <button id="joinG" data-i18n-attr="title:msg.tip.join" title="Join by code">⇲</button>
     </div>
-    <div class="search-box"><input id="searchInput" placeholder="🔍 Search chats…" autocomplete="off"></div>
+    <div class="search-box"><input id="searchInput" data-i18n-attr="placeholder:msg.searchPlaceholder" placeholder="🔍 Search chats…" autocomplete="off"></div>
     <ul id="groupList"></ul>
   </aside>
   <section class="chat">
-    <div class="chat-head" id="chatHead">Select a chat ←</div>
+    <div class="chat-head" id="chatHead" data-i18n="msg.selectChat">Select a chat ←</div>
     <div class="messages" id="messages"></div>
     <div class="member-panel" id="memberPanel"></div>
     <div class="typing" id="typing"></div>
@@ -204,11 +207,11 @@
       <button class="rb-x" id="rbX" type="button" title="Cancel reply">&times;</button>
     </div>
     <form class="composer" id="composer">
-      <button type="button" id="attachBtn" title="Send a photo, video or file">📎</button>
-      <button type="button" id="micBtn" title="Record a voice message">🎤</button>
+      <button type="button" id="attachBtn" data-i18n-attr="title:msg.tip.attach" title="Send a photo, video or file">📎</button>
+      <button type="button" id="micBtn" data-i18n-attr="title:msg.tip.voice" title="Record a voice message">🎤</button>
       <input type="file" id="fileInput" hidden>
-      <input id="msgInput" placeholder="Message…" autocomplete="off" maxlength="2000">
-      <button type="submit">Send</button>
+      <input id="msgInput" data-i18n-attr="placeholder:msg.composerPlaceholder" placeholder="Message…" autocomplete="off" maxlength="2000">
+      <button type="submit" data-i18n="msg.send">Send</button>
     </form>
   </section>
 </div>
@@ -220,6 +223,6 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="messenger.js?v=10"></script>
+<script type="module" src="messenger.js?v=11"></script>
 </body>
 </html>

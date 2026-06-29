@@ -6,6 +6,8 @@
 <title>ShortsFactory — Stats</title>
 <meta name="description" content="Live stats from Ian's ShortsFactory short-video pipeline.">
 <script src="theme.js?v=1"></script>
+<script src="i18n-dict.js?v=1"></script>
+<script src="i18n.js?v=1"></script>
 <style>
   :root{
     --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --border:#283039;
@@ -44,7 +46,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div style="margin-bottom:8px"><a class="muted" href="index.html">‹ Home</a></div>
+  <div style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between"><a class="muted" href="index.html" data-i18n="nav.home">‹ Home</a><span id="langSw"></span></div>
   <div class="top">
     <div>
       <h1><span class="dot">▸</span> ShortsFactory <span class="muted" style="font-weight:400">Stats</span></h1>
@@ -55,10 +57,10 @@
 
   <div class="kpis" id="kpis"></div>
 
-  <h2>Channels</h2>
+  <h2 data-i18n="stats.channels">Channels</h2>
   <div class="socrow" id="social"></div>
 
-  <h2>Published videos</h2>
+  <h2 data-i18n="stats.published">Published videos</h2>
   <div class="vids" id="vids"></div>
 
   <footer id="foot"></footer>
@@ -71,17 +73,22 @@ const esc = s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const fmtDate = iso=>{const d=new Date(iso); return isNaN(d)?'—':d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});};
 const sum = (arr,f)=>arr.reduce((a,x)=>a+f(x),0);
 const PLATC = {tiktok:'var(--tt)', instagram:'var(--ig)', youtube:'var(--yt)'};
+const T = (k) => (window.I18N ? window.I18N.t(k) : k);
+let DATA = null;
 
 async function boot(){
-  let DATA;
   try{
     const r = await fetch('data/factory.json',{cache:'no-store'});
     if(!r.ok) throw new Error('HTTP '+r.status);
     DATA = await r.json();
   }catch(e){
-    document.getElementById('sub').textContent = 'Could not load stats ('+e+').';
+    document.getElementById('sub').textContent = T('stats.loadErr') + ' ('+e+').';
     return;
   }
+  render();
+  document.addEventListener('i18n:change', () => { if (DATA) render(); });
+}
+function render(){
   const V = DATA.videos || [], CH = DATA.channels || [];
   const SOC = (DATA.social && DATA.social.accounts) || [];
   const chName = id => (CH.find(c=>c.id===id)||{}).display_name || id;
@@ -92,23 +99,23 @@ async function boot(){
   const likes = sum(SOC.filter(a=>a.platform==='tiktok'), a=>a.likes||0);
   const minutes = sum(posted, v=>v.duration_s)/60;
   const kpis = [
-    {v:fmtN(followers), l:'Total audience (all platforms)', c:'var(--accent)'},
-    {v:fmtN(likes), l:'TikTok likes', c:'var(--tt)'},
-    {v:posted.length, l:'Videos published', c:'var(--posted)'},
-    {v:minutes.toFixed(1)+'m', l:'Content produced'},
+    {v:fmtN(followers), l:T('stats.kpi.audience'), c:'var(--accent)'},
+    {v:fmtN(likes), l:T('stats.kpi.likes'), c:'var(--tt)'},
+    {v:posted.length, l:T('stats.kpi.videos'), c:'var(--posted)'},
+    {v:minutes.toFixed(1)+'m', l:T('stats.kpi.produced')},
   ];
   document.getElementById('kpis').innerHTML = kpis.map(k=>
     `<div class="kpi"><div class="v" style="color:${k.c||'var(--text)'}">${k.v}</div><div class="l">${esc(k.l)}</div></div>`).join('');
   document.getElementById('sub').textContent =
-    `${CH.filter(c=>c.enabled).length} channels · ${posted.length} videos live`;
-  document.getElementById('genat').textContent = DATA.generated_at ? 'Updated ' + fmtDate(DATA.generated_at) : '';
+    T('stats.subline').replace('{ch}', CH.filter(c=>c.enabled).length).replace('{v}', posted.length);
+  document.getElementById('genat').textContent = DATA.generated_at ? T('stats.updated') + ' ' + fmtDate(DATA.generated_at) : '';
 
   // Social handles (audience size; YouTube counts subscribers, others followers)
   document.getElementById('social').innerHTML = SOC.length ? SOC.map(a=>
     `<a class="soc" href="${esc(a.url)}" target="_blank" rel="noopener">
        <span class="dot" style="background:${PLATC[a.platform]||'#888'}"></span>
-       @${esc(a.handle)} · <b>${fmtN(a.followers)}</b> ${a.platform==='youtube'?'subscribers':'followers'}
-     </a>`).join('') : '<span class="muted">No channels yet.</span>';
+       @${esc(a.handle)} · <b>${fmtN(a.followers)}</b> ${a.platform==='youtube'?T('stats.subs'):T('stats.followers')}
+     </a>`).join('') : `<span class="muted">${T('stats.noChannels')}</span>`;
 
   // Published videos (YouTube links — already public)
   const cards = posted.slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).map(v=>{
@@ -122,10 +129,9 @@ async function boot(){
         <span class="meta"><span>${esc(chName(v.channel_id))}</span><span>${fmtDur(v.duration_s)}</span><span>${v.language?v.language.toUpperCase():''}</span></span>
       </span></a>`;
   }).join('');
-  document.getElementById('vids').innerHTML = cards || '<span class="muted">No published videos yet.</span>';
+  document.getElementById('vids').innerHTML = cards || `<span class="muted">${T('stats.noVideos')}</span>`;
 
-  document.getElementById('foot').innerHTML =
-    `Auto-updated from Ian's ShortsFactory pipeline · <a href="factory.html">full dashboard</a>`;
+  document.getElementById('foot').innerHTML = T('stats.foot');
 }
 boot();
 </script>

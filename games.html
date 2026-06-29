@@ -7,6 +7,8 @@
 <meta name="description" content="Multiplayer games to play across two iPads.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=1"></script>
+<script src="i18n-dict.js?v=1"></script>
+<script src="i18n.js?v=1"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
   *{box-sizing:border-box}
@@ -31,48 +33,54 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="index.html">‹ Home</a>
-  <h1>🎲 Games</h1>
+  <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+  <h1 data-i18n="games.h1">🎲 Games</h1>
   <div class="spacer"></div>
-  <a href="leaderboard.html" style="font-weight:700">🏆 Leaderboard</a>
+  <a href="leaderboard.html" style="font-weight:700" data-i18n="games.lb">🏆 Leaderboard</a>
+  <span id="langSw"></span>
 </header>
 
 <div class="wrap">
-  <p class="intro">Play across two iPads: tap <b>Start</b> on one, share the <b>room code</b>, and <b>Join</b> on the other. (Or invite a friend by username from the <a href="friends.html">Friends</a> page.)</p>
+  <p class="intro" data-i18n-html="games.intro">Play across two iPads: tap <b>Start</b> on one, share the <b>room code</b>, and <b>Join</b> on the other. (Or invite a friend by username from the <a href="friends.html">Friends</a> page.)</p>
   <div class="cards" id="cards"></div>
-  <p class="tip">Stadt-Land-Fluss supports 2+ players — everyone joins the same code.</p>
+  <p class="tip" data-i18n="games.tip">Stadt-Land-Fluss supports 2+ players — everyone joins the same code.</p>
 </div>
 
 <script>
+const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 const GAMES = [
-  { id:"connect4", ico:"🔴", name:"Connect 4", desc:"Drop discs, get four in a row. 1 v 1.", ai:true },
-  { id:"slf", ico:"🔤", name:"Stadt-Land-Fluss", desc:"A letter is drawn — race to fill the categories. 2+ players." },
-  { id:"battleship", ico:"🚢", name:"Battleship", desc:"Hide your fleet, sink your opponent's. 1 v 1.", ai:true },
-  { id:"color", ico:"🎨", name:"Colour Dial", desc:"Everyone matches the same colour with R/G/B sliders — closest wins. 2+ players.", ai:true },
-  { id:"draw", ico:"✏️", name:"Molerei", desc:"One player draws a secret word, everyone else races to guess it. 2+ players." },
-  { id:"reversi", ico:"⚫", name:"Reversi", desc:"Flank your opponent's discs to flip them — most discs wins. 1 v 1.", ai:true },
-  { id:"dots", ico:"▦", name:"Dots & Boxes", desc:"Draw a line, close a box to claim it and go again. 1 v 1.", ai:true },
-  { id:"tictactoe", ico:"✕", name:"Tic-Tac-Toe", desc:"Three in a row. Quick classic. 1 v 1.", ai:true },
+  { id:"connect4", ico:"🔴", name:"Connect 4", desc:"g.connect4.desc", ai:true },
+  { id:"slf", ico:"🔤", name:"Stadt-Land-Fluss", desc:"g.slf.desc" },
+  { id:"battleship", ico:"🚢", name:"Battleship", desc:"g.battleship.desc", ai:true },
+  { id:"color", ico:"🎨", name:"Colour Dial", desc:"g.color.desc", ai:true },
+  { id:"draw", ico:"✏️", name:"Molerei", desc:"g.draw.desc" },
+  { id:"reversi", ico:"⚫", name:"Reversi", desc:"g.reversi.desc", ai:true },
+  { id:"dots", ico:"▦", name:"Dots & Boxes", desc:"g.dots.desc", ai:true },
+  { id:"tictactoe", ico:"✕", name:"Tic-Tac-Toe", desc:"g.tictactoe.desc", ai:true },
 ];
 const code = () => Math.random().toString(36).slice(2, 8);
-document.getElementById("cards").innerHTML = GAMES.map(g => `
-  <div class="card">
-    <div class="ico">${g.ico}</div>
-    <h2>${g.name}</h2>
-    <p>${g.desc}</p>
-    <button class="create" data-c="${g.id}">Start a game</button>
-    ${g.ai ? `<button class="create" data-ai="${g.id}" style="background:var(--card2);border:1px solid var(--border);margin-top:8px">🤖 vs Computer</button>` : ""}
-    <div class="joinrow">
-      <input id="code-${g.id}" placeholder="room code" autocomplete="off">
-      <button data-j="${g.id}">Join</button>
-    </div>
-  </div>`).join("");
-document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => location.href = `${b.dataset.c}.html?room=${code()}&role=host`);
-document.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => location.href = `${b.dataset.ai}.html?ai=1`);
-document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
-  const c = (document.getElementById("code-" + b.dataset.j).value || "").trim().toLowerCase();
-  if (c) location.href = `${b.dataset.j}.html?room=${encodeURIComponent(c)}&role=guest`;
-});
+function renderCards() {
+  document.getElementById("cards").innerHTML = GAMES.map(g => `
+    <div class="card">
+      <div class="ico">${g.ico}</div>
+      <h2>${g.name}</h2>
+      <p>${T(g.desc)}</p>
+      <button class="create" data-c="${g.id}">${T("games.start")}</button>
+      ${g.ai ? `<button class="create" data-ai="${g.id}" style="background:var(--card2);border:1px solid var(--border);margin-top:8px">${T("games.vsAi")}</button>` : ""}
+      <div class="joinrow">
+        <input id="code-${g.id}" placeholder="${T("games.code")}" autocomplete="off">
+        <button data-j="${g.id}">${T("btn.join")}</button>
+      </div>
+    </div>`).join("");
+  document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => location.href = `${b.dataset.c}.html?room=${code()}&role=host`);
+  document.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => location.href = `${b.dataset.ai}.html?ai=1`);
+  document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
+    const c = (document.getElementById("code-" + b.dataset.j).value || "").trim().toLowerCase();
+    if (c) location.href = `${b.dataset.j}.html?room=${encodeURIComponent(c)}&role=guest`;
+  });
+}
+renderCards();
+document.addEventListener("i18n:change", renderCards);
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

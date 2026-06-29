@@ -7,6 +7,8 @@
 <meta name="description" content="Luxembourg grade calculator with per-year/section subjects and coefficients.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=1"></script>
+<script src="i18n-dict.js?v=1"></script>
+<script src="i18n.js?v=1"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--good:#3fb950;--bad:#ff6b6b;--accent2:#4de8ff}
   *{box-sizing:border-box}
@@ -47,44 +49,45 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="index.html">‹ Home</a>
-  <h1>📊 Grade calculator</h1>
+  <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+  <h1 data-i18n="grades.h1">📊 Grade calculator</h1>
   <div class="spacer"></div>
+  <span id="langSw"></span>
   <span id="acctHost"></span>
 </header>
 
 <div class="wrap">
   <div class="controls">
-    <label>Year <select id="yearSel"></select></label>
-    <label id="variantWrap">Section <select id="variantSel"></select></label>
-    <button class="btn" id="resetBtn">Reset to template</button>
+    <label><span data-i18n="grades.year">Year</span> <select id="yearSel"></select></label>
+    <label id="variantWrap"><span id="variantLabel" data-i18n="grades.section">Section</span> <select id="variantSel"></select></label>
+    <button class="btn" id="resetBtn" data-i18n="grades.reset">Reset to template</button>
   </div>
   <div class="syncline" id="syncLine"></div>
 
   <table id="tbl">
-    <thead><tr><th>Subject</th><th>Coef.</th><th>Your marks (comma-separated)</th><th style="text-align:right">Avg</th><th></th></tr></thead>
+    <thead><tr><th data-i18n="grades.subject">Subject</th><th data-i18n="grades.coef">Coef.</th><th data-i18n="grades.marks">Your marks (comma-separated)</th><th style="text-align:right" data-i18n="grades.avg">Avg</th><th></th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
-  <div class="addrow"><button class="btn" id="addBtn">+ add subject</button></div>
+  <div class="addrow"><button class="btn" id="addBtn" data-i18n="grades.addSubject">+ add subject</button></div>
 
   <div class="summary">
-    <div class="kpi"><div class="v" id="overall">—</div><div class="l">Weighted average /60</div></div>
-    <div class="kpi"><div class="v" id="status">—</div><div class="l">vs. pass mark (30)</div></div>
-    <div class="kpi"><div class="v" id="filled">—</div><div class="l">Subjects with marks</div></div>
+    <div class="kpi"><div class="v" id="overall">—</div><div class="l" data-i18n="grades.weighted">Weighted average /60</div></div>
+    <div class="kpi"><div class="v" id="status">—</div><div class="l" data-i18n="grades.vsPass">vs. pass mark (30)</div></div>
+    <div class="kpi"><div class="v" id="filled">—</div><div class="l" data-i18n="grades.withMarks">Subjects with marks</div></div>
   </div>
 
   <div class="panel">
-    <h3>🎯 What do I need on the next test?</h3>
+    <h3 data-i18n="grades.needTitle">🎯 What do I need on the next test?</h3>
     <div class="needrow">
-      <label>Subject <select id="needSubj"></select></label>
-      <label>Target avg <input id="needTarget" type="number" min="0" max="60" value="30" style="width:70px"></label>
-      <label>Next test counts as <input id="needWeight" type="number" min="1" max="10" value="1" style="width:56px"> mark(s)</label>
-      <button class="btn" id="needBtn">Calculate</button>
+      <label><span data-i18n="grades.subject">Subject</span> <select id="needSubj"></select></label>
+      <label><span data-i18n="grades.target">Target avg</span> <input id="needTarget" type="number" min="0" max="60" value="30" style="width:70px"></label>
+      <label><span data-i18n="grades.counts">Next test counts as</span> <input id="needWeight" type="number" min="1" max="10" value="1" style="width:56px"> <span data-i18n="grades.marksWord">mark(s)</span></label>
+      <button class="btn" id="needBtn" data-i18n="grades.calculate">Calculate</button>
     </div>
     <div class="result" id="needResult"></div>
   </div>
 
-  <p class="note">
+  <p class="note" data-i18n-html="grades.note">
     Coefficients come from the Luxembourg Ministry's official grille horaire. Marks are out of <b>60</b> (pass = 30).
     <b>7e–4e</b> are exact. The <b>upper cycle (3e–1ère)</b> sections include option groups (e.g. "3 langues parmi 4") and
     combined branches collapsed into single rows — adjust to your exact choices. The weighted average is <b>indicative</b>;
@@ -145,6 +148,8 @@ const YEARS = {
 
 const $ = (id)=>document.getElementById(id);
 const esc = (s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const T = (k)=>(window.I18N?window.I18N.t(k):k);
+const VARLABEL = { Track:"grades.track", Option:"grades.option", Section:"grades.section" };
 let sb=null, signedIn=false, saveTimer=null;
 let year = localStorage.getItem("gc_year") || "5e";
 let variant = localStorage.getItem("gc_variant") || "";
@@ -170,12 +175,12 @@ function save(){
   if (signedIn){
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async ()=>{
-      try { await sb.from("grade_sheets").upsert({ user_id: auth.session().user.id, sheet_key:key(), data:rows, updated_at:new Date().toISOString() }, { onConflict:"user_id,sheet_key" }); syncMsg("Synced ✓"); }
-      catch(e){ syncMsg("Sync error: "+e.message); }
+      try { await sb.from("grade_sheets").upsert({ user_id: auth.session().user.id, sheet_key:key(), data:rows, updated_at:new Date().toISOString() }, { onConflict:"user_id,sheet_key" }); syncMsg(T("grades.synced")); }
+      catch(e){ syncMsg(T("grades.syncErr")+": "+e.message); }
     }, 600);
   }
 }
-function syncMsg(m){ $("syncLine").textContent = signedIn ? m : "Not signed in — saved on this device only. Sign in (top-right) to sync across devices."; }
+function syncMsg(m){ $("syncLine").textContent = signedIn ? m : T("grades.notSignedIn"); }
 
 const parseMarks = (s)=>(""+(s||"")).split(/[, ]+/).map(x=>parseFloat((""+x).replace(",","."))).filter(n=>!isNaN(n)&&n>=0&&n<=60);
 const subjAvg = (r)=>{ const m=parseMarks(r.marks); return m.length? m.reduce((a,b)=>a+b,0)/m.length : null; };
@@ -186,7 +191,7 @@ function renderPickers(){
   if (!variant || !vs.includes(variant)) variant = vs[0];
   const single = vs.length===1 && vs[0]==="";
   $("variantWrap").style.display = single ? "none" : "";
-  $("variantWrap").childNodes[0].nodeValue = (YEARS[year].label||"Section") + " ";
+  $("variantLabel").textContent = T(VARLABEL[YEARS[year].label] || "grades.section");
   $("variantSel").innerHTML = vs.map(v=>`<option ${v===variant?"selected":""}>${v||"—"}</option>`).join("");
 }
 
@@ -198,9 +203,9 @@ function render(){
     return `<tr>
       <td><input data-i="${i}" data-f="name" value="${esc(r.name)}" style="width:100%;background:none;border:none;color:var(--text);font-weight:600"></td>
       <td><input class="coef" data-i="${i}" data-f="coef" type="number" min="0" step="1" value="${r.coef}"></td>
-      <td><input class="marks" data-i="${i}" data-f="marks" value="${esc(r.marks)}" placeholder="e.g. 45, 38, 52"></td>
+      <td><input class="marks" data-i="${i}" data-f="marks" value="${esc(r.marks)}" placeholder="${esc(T("grades.marksPlaceholder"))}"></td>
       <td class="avg ${cls}">${a==null?"—":a.toFixed(1)}</td>
-      <td><button class="del" data-del="${i}" title="Remove">✕</button></td>
+      <td><button class="del" data-del="${i}" title="${esc(T("grades.remove"))}">✕</button></td>
     </tr>`;
   }).join("");
   tb.querySelectorAll("input").forEach(inp=> inp.oninput=()=>{
@@ -210,7 +215,7 @@ function render(){
   });
   tb.querySelectorAll(".del").forEach(b=> b.onclick=()=>{ rows.splice(+b.dataset.del,1); save(); render(); });
   $("needSubj").innerHTML = rows.map((r,i)=>`<option value="${i}">${esc(r.name)}</option>`).join("");
-  updateSummary(); syncMsg(signedIn?"Synced ✓":"");
+  updateSummary(); syncMsg(signedIn?T("grades.synced"):"");
 }
 function refreshAvg(i){
   const cell=$("rows").querySelectorAll("tr")[i]?.querySelector(".avg"); if(!cell) return;
@@ -222,7 +227,7 @@ function updateSummary(){
   const avg=den?num/den:null;
   $("overall").textContent=avg==null?"—":avg.toFixed(2);
   $("overall").style.color=avg==null?"var(--text)":(avg>=30?"var(--good)":"var(--bad)");
-  $("status").textContent=avg==null?"—":(avg>=30?"✓ pass":"✗ below"); $("status").style.fontSize="22px";
+  $("status").textContent=avg==null?"—":(avg>=30?T("grades.pass"):T("grades.below")); $("status").style.fontSize="22px";
   $("status").style.color=avg==null?"var(--text)":(avg>=30?"var(--good)":"var(--bad)");
   $("filled").textContent=filled+" / "+rows.length; $("filled").style.fontSize="22px";
 }
@@ -231,16 +236,20 @@ function calcNeed(){
   const target=parseFloat($("needTarget").value)||0, w=Math.max(1,parseInt($("needWeight").value)||1);
   const m=parseMarks(r.marks), sum=m.reduce((a,b)=>a+b,0), n=m.length;
   const g=(target*(n+w)-sum)/w, el=$("needResult");
-  if (g<=0) el.innerHTML=`You're already at/above ${target} in <b>${esc(r.name)}</b> — even a <b>0</b> next keeps you there. 🎉`;
-  else if (g>60) el.innerHTML=`Reaching <b>${target}</b> in <b>${esc(r.name)}</b> needs <b>${g.toFixed(1)}/60</b> — above the max, so not reachable on one ${w>1?`(×${w}) `:""}test.`;
-  else el.innerHTML=`In <b>${esc(r.name)}</b>, you need <b>${g.toFixed(1)} / 60</b> on the next test${w>1?` (counting ${w} marks)`:""} for a <b>${target}</b> average.`;
+  const subj=esc(r.name);
+  const wt = w>1 ? `(×${w}) ` : "";
+  const wc = w>1 ? T("grades.need.weight").replace("{w}", w) : "";
+  if (g<=0) el.innerHTML = T("grades.need.already").replace("{target}",target).replace("{subject}",subj);
+  else if (g>60) el.innerHTML = T("grades.need.tooHigh").replace("{target}",target).replace("{subject}",subj).replace("{g}",g.toFixed(1)).replace("{wt}",wt);
+  else el.innerHTML = T("grades.need.normal").replace("{subject}",subj).replace("{g}",g.toFixed(1)).replace("{wc}",wc).replace("{target}",target);
 }
 
 $("yearSel").onchange=e=>{ year=e.target.value; variant=variants(year)[0]; loadSheet(); };
 $("variantSel").onchange=e=>{ variant=(e.target.value==="—"?"":e.target.value); loadSheet(); };
-$("resetBtn").onclick=()=>{ if(confirm("Reset subjects & coefficients to the official template? Marks for this sheet are cleared.")){ rows=template(); save(); render(); } };
-$("addBtn").onclick=()=>{ rows.push({name:"New subject",coef:1,marks:""}); save(); render(); };
+$("resetBtn").onclick=()=>{ if(confirm(T("grades.resetConfirm"))){ rows=template(); save(); render(); } };
+$("addBtn").onclick=()=>{ rows.push({name:T("grades.newSubject"),coef:1,marks:""}); save(); render(); };
 $("needBtn").onclick=calcNeed;
+document.addEventListener("i18n:change", render);
 
 (async function boot(){
   render();   // show local immediately

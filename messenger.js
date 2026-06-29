@@ -4,6 +4,7 @@ import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=2"
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
 const SNIPPET = 80; // chars kept of a quoted reply
@@ -66,7 +67,7 @@ function applySearch(chats) {
 
 function renderChatList(chats) {
   const ul = $("groupList");
-  if (!chats.length) { ul.innerHTML = `<li class="empty">${($("searchInput")?.value || "").trim() ? "No chats match." : "No chats yet.<br>Create a group, join with a code, or DM someone."}</li>`; return; }
+  if (!chats.length) { ul.innerHTML = `<li class="empty">${($("searchInput")?.value || "").trim() ? T("msg.noMatch") : T("msg.noChats")}</li>`; return; }
   ul.innerHTML = chats.map((g) => {
     const prev = g.last_preview
       ? `<span class="gprev">${g.last_sender ? esc(g.last_sender) + ": " : ""}${esc(g.last_preview)}</span>`
@@ -83,21 +84,21 @@ function renderChatList(chats) {
 }
 
 async function newGroup() {
-  const name = await promptModal("New group", "Group name", "Create");
+  const name = await promptModal(T("msg.newGroup.title"), T("msg.newGroup.label"), T("msg.newGroup.ok"));
   if (!name) return;
   const { data, error } = await sb.rpc("create_group", { p_name: name, p_username: auth.username() });
   if (error) return alert(error.message);
   await loadChats(data.id);
 }
 async function joinGroup() {
-  const code = await promptModal("Join a group", "Invite code (e.g. a1b2c3)", "Join");
+  const code = await promptModal(T("msg.join.title"), T("msg.join.label"), T("btn.join"));
   if (!code) return;
   const { data, error } = await sb.rpc("join_group", { p_code: code, p_username: auth.username() });
   if (error) return alert(error.message);
   await loadChats(data.id);
 }
 async function newDM() {
-  const uname = await promptModal("Message someone", "Their username", "Start chat");
+  const uname = await promptModal(T("msg.dm.title"), T("msg.dm.label"), T("msg.dm.ok"));
   if (!uname) return;
   const { data, error } = await sb.rpc("start_dm", { p_username: uname, p_me_username: auth.username() });
   if (error) return alert(error.message);
@@ -117,12 +118,12 @@ async function selectChat(g) {
   });
   const onlineHead = g.is_dm && onlineUsers.has(g.display) ? `<span class="on-dot"></span><span class="presence">online</span>` : "";
   $("chatHead").innerHTML =
-    `<button class="back-btn" id="backBtn" title="Chats">‹</button>
+    `<button class="back-btn" id="backBtn" title="${esc(T("msg.chats"))}">‹</button>
      <b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b><span id="headPresence">${onlineHead}</span>
-     ${g.is_dm ? "" : `<span class="invite" title="Share so others can join">code: <code>${esc(g.invite_code)}</code></span>`}
+     ${g.is_dm ? "" : `<span class="invite" title="${esc(T("msg.tip.join"))}">code: <code>${esc(g.invite_code)}</code></span>`}
      <span class="head-actions">
-       <button id="muteBtn" title="Mute notifications">${mutedSet().has(g.id) ? "🔕" : "🔔"}</button>
-       <button id="membersBtn" title="Members">👥</button>
+       <button id="muteBtn" title="Mute">${mutedSet().has(g.id) ? "🔕" : "🔔"}</button>
+       <button id="membersBtn" title="${esc(T("msg.members"))}">👥</button>
        <button id="leaveBtn" title="Leave">🚪</button>
      </span>`;
   $("backBtn").onclick = goBackToList;
@@ -132,12 +133,12 @@ async function selectChat(g) {
   $("app").classList.add("chat-open");   // mobile: show the conversation full-screen
   $("composer").style.display = "flex";
   const box = $("messages");
-  box.innerHTML = `<div class="empty">Loading…</div>`;
+  box.innerHTML = `<div class="empty">${T("common.loading")}</div>`;
   const { data, error } = await sb.from("messages").select("*").eq("group_id", g.id).order("created_at").limit(300);
-  if (error) { box.innerHTML = `<div class="empty">Couldn't load messages.</div>`; return; }
+  if (error) { box.innerHTML = `<div class="empty">${T("msg.loadErr")}</div>`; return; }
   box.innerHTML = "";
   (data || []).forEach(appendMessage);
-  if (!data || !data.length) box.innerHTML = `<div class="empty">No messages yet — say hi 👋</div>`;
+  if (!data || !data.length) box.innerHTML = `<div class="empty">${T("msg.noMessages")}</div>`;
   subscribe(g.id);
   loadReceipts(g.id);
   loadReactions(g.id);
@@ -145,13 +146,13 @@ async function selectChat(g) {
 
 async function leaveChat() {
   if (!current) return;
-  if (!confirm(`Leave "${current.display}"? You'll need an invite to rejoin.`)) return;
+  if (!confirm(T("msg.leaveConfirm").replace("{name}", current.display))) return;
   const uid = auth.session().user.id;
   const { error } = await sb.from("group_members").delete().eq("group_id", current.id).eq("user_id", uid);
   if (error) return alert(error.message);
   if (channel) { sb.removeChannel(channel); channel = null; }
   current = null;
-  $("chatHead").innerHTML = "Select a chat ←";
+  $("chatHead").innerHTML = T("msg.selectChat");
   $("messages").innerHTML = "";
   $("composer").style.display = "none";
   closeMembers();
@@ -164,12 +165,12 @@ async function toggleMembers() {
   const p = $("memberPanel");
   if (p.classList.contains("open")) return closeMembers();
   p.classList.add("open");
-  p.innerHTML = `<div class="mp-head">Members <button id="mpX">&times;</button></div><div class="mp-list">Loading…</div>`;
+  p.innerHTML = `<div class="mp-head">${T("msg.members")} <button id="mpX">&times;</button></div><div class="mp-list">${T("common.loading")}</div>`;
   $("mpX").onclick = closeMembers;
   const { data, error } = await sb.from("group_members").select("username,user_id,joined_at").eq("group_id", current.id);
   const me = auth.session().user.id;
-  p.querySelector(".mp-list").innerHTML = error || !data ? "Couldn't load." :
-    data.map((m) => `<div class="mp-row">👤 ${esc(m.username)}${m.user_id === me ? " <span class='you'>(you)</span>" : ""}</div>`).join("");
+  p.querySelector(".mp-list").innerHTML = error || !data ? T("msg.loadFail") :
+    data.map((m) => `<div class="mp-row">👤 ${esc(m.username)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
 }
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 
@@ -208,7 +209,7 @@ function paintTick(el) {
   const read = tickIsRead(el.dataset.ts);
   el.textContent = read ? "✓✓" : "✓";
   el.classList.toggle("read", read);
-  el.title = read ? "Gelies" : "Geschéckt";
+  el.title = read ? T("msg.read") : T("msg.sent");
 }
 function updateTicks() { $("messages").querySelectorAll(".msg.mine .ticks").forEach(paintTick); }
 
@@ -266,7 +267,7 @@ function closeReactPicker() { const p = $("reactPop"); if (p) p.remove(); }
 
 /* ---------- edit ---------- */
 async function editMessage(m) {
-  const next = prompt("Edit message:", m.content || "");
+  const next = prompt(T("msg.editPrompt"), m.content || "");
   if (next === null) return;
   const t = next.trim();
   if (!t || t === (m.content || "")) return;
@@ -280,7 +281,7 @@ function updateMessageContent(id, content, edited) {
   if (!bubble) return;
   const txt = bubble.querySelector(".msg-text"); if (txt) txt.textContent = content;
   if (edited && !bubble.querySelector(".edited")) {
-    const tag = document.createElement("span"); tag.className = "edited"; tag.textContent = "(edited)";
+    const tag = document.createElement("span"); tag.className = "edited"; tag.textContent = T("msg.edited");
     bubble.querySelector(".time").before(tag);
   }
 }
@@ -295,7 +296,7 @@ function sendTyping() {
 }
 function showTyping(user) {
   const t = $("typing"); if (!t) return;
-  t.textContent = `${user} is typing…`; t.classList.add("show");
+  t.textContent = T("msg.typing").replace("{user}", user); t.classList.add("show");
   clearTimeout(typingClear); typingClear = setTimeout(hideTyping, 3000);
 }
 function hideTyping() { const t = $("typing"); if (t) { t.classList.remove("show"); t.textContent = ""; } clearTimeout(typingClear); }
@@ -313,7 +314,7 @@ async function toggleRecording() {
     mediaRecorder.onstop = async () => { stream.getTracks().forEach((t) => t.stop()); await sendVoice(new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" })); };
     mediaRecorder.start();
     recording = true; $("micBtn").classList.add("rec"); $("micBtn").textContent = "⏹";
-  } catch { alert("Couldn't access the microphone."); }
+  } catch { alert(T("msg.micErr")); }
 }
 function stopRecording() {
   if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎤"; try { mediaRecorder.stop(); } catch {} }
@@ -323,7 +324,7 @@ async function sendVoice(blob) {
   const ext = blob.type.includes("mp4") ? "mp4" : "webm";
   const path = `${current.id}/${crypto.randomUUID()}.${ext}`;
   const { error: upErr } = await sb.storage.from("chat-media").upload(path, blob, { contentType: blob.type });
-  if (upErr) return alert("Upload failed: " + upErr.message);
+  if (upErr) return alert(T("msg.uploadFail") + ": " + upErr.message);
   const u = auth.session().user;
   const { data, error } = await sb.from("messages")
     .insert({ group_id: current.id, user_id: u.id, username: auth.username(), content: "", media_url: path, media_type: "audio" }).select().single();
@@ -350,10 +351,10 @@ function refreshHeadPresence() {
 /* ---------- reply ---------- */
 function snippet(m) {
   if (m.content && m.content.trim()) return m.content.trim().slice(0, SNIPPET);
-  if (m.media_type === "video") return "📹 Video";
-  if (m.media_type === "image") return "📷 Photo";
-  if (m.media_type === "file") return "📎 " + (m.content ? m.content.slice(0, SNIPPET) : "File");
-  return "Message";
+  if (m.media_type === "video") return T("msg.snippet.video");
+  if (m.media_type === "image") return T("msg.snippet.photo");
+  if (m.media_type === "file") return "📎 " + (m.content ? m.content.slice(0, SNIPPET) : T("msg.snippet.file").replace("📎 ", ""));
+  return T("msg.snippet.msg");
 }
 /* pick an emoji for a filename's extension */
 function fileIcon(name) {
@@ -431,7 +432,7 @@ function appendMessage(m) {
   const replyHtml = m.reply_user
     ? `<span class="reply-quote" data-rid="${m.reply_to || ""}"><span class="rq-user">${esc(m.reply_user)}</span><span class="rq-text">${esc(m.reply_preview || "")}</span></span>`
     : "";
-  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? '<span class="edited">(edited)</span>' : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
+  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? `<span class="edited">${T("msg.edited")}</span>` : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
   const bubble = el.querySelector(".bubble");
   // tap a quoted reply to jump to the original
   const rq = el.querySelector(".reply-quote");
@@ -563,13 +564,13 @@ async function send(e) {
 async function uploadAndSend(file) {
   if (!file || !current) return;
   const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : "file";
-  if (file.size > MAX_MEDIA) return alert("File too large (max 50 MB).");
+  if (file.size > MAX_MEDIA) return alert(T("msg.tooLarge"));
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
   const path = `${current.id}/${crypto.randomUUID()}.${ext}`;
   const att = $("attachBtn"); att.disabled = true; att.textContent = "⏳";
   const { error: upErr } = await sb.storage.from("chat-media").upload(path, file, { contentType: file.type || "application/octet-stream" });
   att.disabled = false; att.textContent = "📎";
-  if (upErr) return alert("Upload failed: " + upErr.message);
+  if (upErr) return alert(T("msg.uploadFail") + ": " + upErr.message);
   const u = auth.session().user;
   // for generic files we keep the original filename in `content` (no text body for files)
   const row = { group_id: current.id, user_id: u.id, username: auth.username(), content: type === "file" ? (file.name || "file").slice(0, 120) : "", media_url: path, media_type: type };
@@ -583,7 +584,7 @@ async function uploadAndSend(file) {
 /* ---------- boot ---------- */
 async function boot() {
   if (!auth.authConfigured) {
-    $("gate").innerHTML = `<div class="gate-box"><h3>Messenger isn't configured yet</h3></div>`;
+    $("gate").innerHTML = `<div class="gate-box"><h3>${T("msg.h1")}</h3></div>`;
     $("gate").style.display = "flex"; return;
   }
   auth.mountAccountButton($("acctHost"));
@@ -597,8 +598,8 @@ function showGate() {
   $("app").style.display = "none";
   $("gate").style.display = "flex";
   $("gate").innerHTML = `<div class="gate-box">
-    <h3>💬 Messenger</h3><p>Sign in to chat, create groups and DM people.<br>Same account as PixelBreak.</p>
-    <button class="auth-go" id="gateBtn">Sign in / Create account</button></div>`;
+    <h3>${T("msg.h1")}</h3><p>${T("msg.gateTitle")}<br>${T("msg.gateSub")}</p>
+    <button class="auth-go" id="gateBtn">${T("auth.signin")}</button></div>`;
   $("gateBtn").onclick = auth.openAuthModal;
 }
 async function showApp() {
@@ -648,14 +649,14 @@ async function setupNotifyButton() {
     const st = await pushState();
     if (st === "unsupported") { btn.style.display = "none"; return; }
     btn.style.display = "";
-    if (st === "subscribed") { btn.textContent = "🔔 On"; btn.classList.add("on"); btn.title = "Notifications on — tap to turn off"; }
-    else if (st === "denied") { btn.textContent = "🔕 Blocked"; btn.classList.remove("on"); btn.title = "Enable notifications in your browser/Safari settings"; }
-    else { btn.textContent = "🔔 Notify"; btn.classList.remove("on"); btn.title = "Get notified of new messages"; }
+    if (st === "subscribed") { btn.textContent = T("msg.notify.on"); btn.classList.add("on"); btn.title = T("msg.notify.onTip"); }
+    else if (st === "denied") { btn.textContent = T("msg.notify.blocked"); btn.classList.remove("on"); btn.title = T("msg.notify.blockedTip"); }
+    else { btn.textContent = T("msg.notify.notify"); btn.classList.remove("on"); btn.title = T("msg.notify.offTip"); }
   };
   btn.onclick = async () => {
     const st = await pushState();
     if (st === "subscribed") { await disablePush(); }
-    else if (st === "denied") { alert("Notifications are blocked. Enable them for this site in your browser/Safari settings, then try again."); }
+    else if (st === "denied") { alert(T("msg.notify.blockedAlert")); }
     else { const r = await enablePush(); if (!r.ok && r.error) alert(r.error); }
     render();
   };
@@ -670,3 +671,10 @@ function showAdminLink() {
 }
 
 boot();
+
+// Re-render dynamic chrome when the site language changes.
+document.addEventListener("i18n:change", () => {
+  if (!sb) return;
+  if (auth.session()) { if (allChats.length) renderChatList(applySearch(allChats)); }
+  else showGate();
+});

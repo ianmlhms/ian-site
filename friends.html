@@ -6,6 +6,8 @@
 <title>Friends — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=1"></script>
+<script src="i18n-dict.js?v=1"></script>
+<script src="i18n.js?v=1"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
   *{box-sizing:border-box}
@@ -40,43 +42,44 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="index.html">‹ Home</a>
-  <h1>👥 Friends</h1>
+  <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+  <h1 data-i18n="friends.h1">👥 Friends</h1>
   <div class="spacer"></div>
+  <span id="langSw"></span>
   <span id="acctHost"></span>
 </header>
 
 <div class="wrap">
   <div id="gate" style="display:none">
-    <h3>Sign in to manage friends</h3>
-    <button class="auth-go" id="gateBtn">Sign in / Create account</button>
+    <h3 data-i18n="friends.gateTitle">Sign in to manage friends</h3>
+    <button class="auth-go" id="gateBtn" data-i18n="auth.signin">Sign in / Create account</button>
   </div>
 
   <div id="app" style="display:none">
     <div class="add">
-      <input id="addInput" placeholder="Add a friend by username" autocomplete="off">
-      <button id="addBtn">Add</button>
+      <input id="addInput" data-i18n-attr="placeholder:friends.addPlaceholder" placeholder="Add a friend by username" autocomplete="off">
+      <button id="addBtn" data-i18n="friends.add">Add</button>
     </div>
     <div class="msgline" id="addMsg"></div>
 
-    <div id="invitesWrap" style="display:none"><h2>🎮 Game invites</h2><div id="invites"></div></div>
-    <div id="reqWrap" style="display:none"><h2>Friend requests</h2><div id="requests"></div></div>
+    <div id="invitesWrap" style="display:none"><h2 data-i18n="friends.invites">🎮 Game invites</h2><div id="invites"></div></div>
+    <div id="reqWrap" style="display:none"><h2 data-i18n="friends.requests">Friend requests</h2><div id="requests"></div></div>
 
-    <div id="activityWrap" style="display:none"><h2>📊 Recent activity</h2><div id="activity"></div></div>
+    <div id="activityWrap" style="display:none"><h2 data-i18n="friends.activity">📊 Recent activity</h2><div id="activity"></div></div>
 
-    <h2>Your friends</h2>
+    <h2 data-i18n="friends.yours">Your friends</h2>
     <div id="friends"></div>
 
-    <div id="sentWrap" style="display:none"><h2>Requests you sent</h2><div id="sent"></div></div>
+    <div id="sentWrap" style="display:none"><h2 data-i18n="friends.sent">Requests you sent</h2><div id="sent"></div></div>
 
-    <h2>People</h2>
+    <h2 data-i18n="friends.people">People</h2>
     <div id="directory"></div>
   </div>
 </div>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="friends.js?v=7"></script>
+<script type="module" src="friends.js?v=8"></script>
 <script type="module" src="notify-ambient.js?v=2"></script>
 </body>
 </html>
