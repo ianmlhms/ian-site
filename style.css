@@ -204,6 +204,15 @@ footer {
 
 /* app launcher visibility: hidden until signed in */
 #apps .tiles { display: none; }
-.apps-gate { color: var(--muted); font-size: 14px; }
+.apps-gate {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 20px 22px; margin-top: 6px;
+}
+.apps-gate .ag-ico { font-size: 30px; line-height: 1; flex: none; }
+.apps-gate .ag-text { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 200px; }
+.apps-gate .ag-text strong { font-size: 16px; font-weight: 800; color: var(--text); }
+.apps-gate .ag-text span { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+.apps-gate .btn-primary { flex: none; }
 body.signed-in #apps .tiles { display: grid; max-width: none; }
 body.signed-in .apps-gate { display: none; }
