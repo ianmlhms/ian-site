@@ -1,5 +1,7 @@
 /* Site-wide theme: dark / light + custom accent. Sets CSS variables and injects
- * a floating 🎨 picker on every page that includes this script. */
+ * a floating 🎨 picker on every page that includes this script. Also injects a
+ * ↻ refresh button when launched from the home screen (standalone PWA), where
+ * there is no browser toolbar to reload from. */
 (function () {
   const KEY = "site_theme";
   const ACCENTS = ["#6ea8fe", "#ff6b9d", "#3fb950", "#a371f7", "#ffb347", "#4de8ff"];
@@ -85,6 +87,30 @@
     pop.querySelector(".th-custom").oninput = (e)=>{ const c=get(); c.accent=e.target.value; save(c); sync(); };
     document.addEventListener("click",(e)=>{ if(!pop.contains(e.target) && e.target!==fab) pop.classList.remove("open"); });
   }
-  if (document.body) buildPicker();
-  else document.addEventListener("DOMContentLoaded", buildPicker);
+  // ---- home-screen (standalone) refresh button ----
+  function buildRefresh() {
+    // Only useful when launched from the home screen — a standalone PWA has no
+    // browser toolbar, so there is otherwise no way to reload the page.
+    const standalone = window.navigator.standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches;
+    if (!standalone || document.getElementById("pwaRefresh")) return;
+    const css = document.createElement("style");
+    css.textContent = `
+    #pwaRefresh{position:fixed;right:66px;bottom:14px;z-index:9000;width:42px;height:42px;border-radius:50%;
+      border:1px solid var(--border);background:var(--card);color:var(--text);font-size:20px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+    #pwaRefresh:active{transform:scale(.92)}
+    #pwaRefresh.spin{animation:pwaSpin .6s linear}
+    @keyframes pwaSpin{to{transform:rotate(360deg)}}`;
+    document.head.appendChild(css);
+    const btn = document.createElement("button");
+    btn.id = "pwaRefresh"; btn.title = "Refresh"; btn.setAttribute("aria-label", "Refresh");
+    btn.textContent = "↻";
+    btn.onclick = () => { btn.classList.add("spin"); location.reload(); };
+    document.body.appendChild(btn);
+  }
+
+  function boot() { buildPicker(); buildRefresh(); }
+  if (document.body) boot();
+  else document.addEventListener("DOMContentLoaded", boot);
 })();
