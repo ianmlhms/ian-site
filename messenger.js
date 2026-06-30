@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
+const adminTag = (uid) => (adminIds.has(uid) ? ` <span class="admin-tag">👑 Admin</span>` : "");
 const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
 const SNIPPET = 80; // chars kept of a quoted reply
 
@@ -22,6 +23,7 @@ let readMap = {};            // user_id -> last_read_at (others, in the open cha
 let readThreshold = null;    // ms: msgs sent at/before this are read by ALL others
 let reactMap = {};           // message_id -> [{user_id, username, emoji}]
 let onlineUsers = new Set(); // usernames currently online (presence)
+let adminIds = new Set();    // user_ids of app admins → shown with a 👑 tag
 let onlineSubbed = false;
 let allChats = [];           // last loaded chats, for search filtering
 let lastTypingSent = 0, typingClear = null;
@@ -170,7 +172,7 @@ async function toggleMembers() {
   const { data, error } = await sb.from("group_members").select("username,user_id,joined_at").eq("group_id", current.id);
   const me = auth.session().user.id;
   p.querySelector(".mp-list").innerHTML = error || !data ? T("msg.loadFail") :
-    data.map((m) => `<div class="mp-row">👤 ${esc(m.username)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
+    data.map((m) => `<div class="mp-row">👤 ${esc(m.username)}${adminTag(m.user_id)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
 }
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 
@@ -432,7 +434,7 @@ function appendMessage(m) {
   const replyHtml = m.reply_user
     ? `<span class="reply-quote" data-rid="${m.reply_to || ""}"><span class="rq-user">${esc(m.reply_user)}</span><span class="rq-text">${esc(m.reply_preview || "")}</span></span>`
     : "";
-  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? `<span class="edited">${T("msg.edited")}</span>` : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
+  el.innerHTML = `<div class="bubble"><span class="who">${esc(m.username)}${adminTag(m.user_id)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? `<span class="edited">${T("msg.edited")}</span>` : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
   const bubble = el.querySelector(".bubble");
   // tap a quoted reply to jump to the original
   const rq = el.querySelector(".reply-quote");
@@ -589,6 +591,7 @@ async function boot() {
   }
   auth.mountAccountButton($("acctHost"));
   sb = await auth.client();
+  try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] admin ids", e); }
   auth.onAuth((s) => (s ? showApp() : showGate()));
   auth.session() ? showApp() : showGate();
 }

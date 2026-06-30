@@ -5,6 +5,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 let sb = null, inviteSubbed = false;
+let adminIds = new Set();   // user_ids of app admins → pinned on top + 👑 tagged
 
 const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Dial", draw: "Molerei", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe" };
 const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe"]);
@@ -73,9 +74,11 @@ function renderDirectory(list) {
 function renderFriends(list) {
   const el = $("friends");
   if (!list.length) { el.innerHTML = `<div class="empty">${T("friends.noFriends")}</div>`; return; }
-  el.innerHTML = list.map(f => `
+  // admins (👑) always pinned to the top; everyone else keeps username order
+  const ordered = [...list.filter(f => adminIds.has(f.user_id)), ...list.filter(f => !adminIds.has(f.user_id))];
+  el.innerHTML = ordered.map(f => `
     <div class="row">
-      <span class="name"><span class="av">👤</span>${esc(f.username)}</span>
+      <span class="name"><span class="av">👤</span>${esc(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">👑 Admin</span>` : ""}</span>
       <button class="mini" data-msg="${esc(f.username)}">${T("friends.message")}</button>
       <button class="mini go" data-play="${f.user_id}" data-name="${esc(f.username)}">${T("friends.play")}</button>
       <button class="mini x" data-remove="${f.user_id}" title="${T("grades.remove")}">✕</button>
@@ -170,6 +173,7 @@ function showGate() {
   if (!auth.authConfigured) { $("gate").style.display = ""; $("gate").innerHTML = T("friends.notConfigured"); return; }
   auth.mountAccountButton($("acctHost"));
   sb = await auth.client();
+  try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn(e); }
   auth.onAuth(() => (auth.session() ? showApp() : showGate()));
   auth.session() ? showApp() : showGate();
 })();
