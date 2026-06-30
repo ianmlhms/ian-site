@@ -13,7 +13,7 @@ window.I18N_DICT = {
   "btn.join":        { lb: "Bäitrieden", de: "Beitreten", en: "Join" },
 
   /* ---------- index / landing ---------- */
-  "index.kicker":   { lb: "👋 Moien, ech sinn", de: "👋 Hallo, ich bin", en: "👋 Hi, I'm" },
+  "index.kicker":   { lb: "👋 Moien, ech sinn den", de: "👋 Hallo, ich bin", en: "👋 Hi, I'm" },
   "index.tag":      {
     lb: "E Schüler aus Lëtzebuerg, deen <strong>Apps, Spiller a Programmer</strong> baut — am Browser, um iPhone an op der Apple&nbsp;Watch.",
     de: "Ein Schüler aus Luxemburg, der <strong>Apps, Spiele und Tools</strong> baut — im Browser, auf dem iPhone und auf der Apple&nbsp;Watch.",
