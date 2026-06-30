@@ -23,6 +23,8 @@ window.I18N_DICT = {
   "index.cta2":     { lb: "Apps opmaachen", de: "Apps öffnen", en: "Open the apps" },
   "index.projects": { lb: "Projeten", de: "Projekte", en: "Projects" },
   "index.yourApps": { lb: "Deng Apps", de: "Deine Apps", en: "Your apps" },
+  "about.title":    { lb: "Iwwer mech", de: "Über mich", en: "About me" },
+  "about.bio":      { lb: "Ech sinn den Ian, e Schüler aus Lëtzebuerg, deen gär Spiller, Live-Apps a kleng Tools baut — am Web mat purem JavaScript a Supabase, um iPhone an op der Apple Watch mat SwiftUI. Déi meescht Projeten hei ënnen hunn als e kuerzt „kann ech dat bauen?“ ugefaangen a gi lo vu menge Frënn a menger Famill benotzt.", de: "Ich bin Ian, ein Schüler aus Luxemburg, der gerne Spiele, Echtzeit-Apps und kleine Tools baut — im Web mit reinem JavaScript und Supabase, auf iPhone und Apple Watch mit SwiftUI. Die meisten Projekte hier unten haben als kurzes „kann ich das bauen?“ angefangen und werden jetzt von meinen Freunden und meiner Familie genutzt.", en: "I'm Ian, a student from Luxembourg who loves building games, real-time apps and small tools — on the web with plain JavaScript and Supabase, and on iPhone and Apple Watch with SwiftUI. Most of the projects below started as a quick \"can I build this?\" and ended up being used by my friends and family." },
   "index.appsGate": { lb: "Mell dech un fir deng Apps opzemaachen.", de: "Melde dich an, um deine Apps zu öffnen.", en: "Sign in to open your apps." },
 
   "proj.pixelbreak.desc": {

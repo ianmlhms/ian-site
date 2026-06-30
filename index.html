@@ -14,11 +14,11 @@
   <!-- Google AdSense (public pages only) -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
   <script src="theme.js?v=3"></script>
-  <script src="i18n-dict.js?v=1"></script>
+  <script src="i18n-dict.js?v=2"></script>
   <script src="i18n.js?v=1"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
-    // unless the URL points at a specific section (#projects / #apps).
+    // unless the URL points at a specific section (#apps).
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
     addEventListener("pageshow", function () { if (!location.hash) window.scrollTo(0, 0); });
   </script>
@@ -33,61 +33,7 @@
   </header>
 
   <main class="page">
-    <!-- public hero -->
-    <section class="hero">
-      <span class="hero-kicker" data-i18n="index.kicker">👋 Moien, ech sinn</span>
-      <h1 class="hero-name">Ian Mulheims</h1>
-      <p class="hero-tag" data-i18n-html="index.tag">A student from Luxembourg who builds <strong>apps, games and tools</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.</p>
-      <div class="hero-cta">
-        <a class="btn-primary" href="#projects" data-i18n="index.cta1">See what I've built</a>
-        <a class="btn-ghost" href="#apps" data-i18n="index.cta2">Open the apps</a>
-      </div>
-    </section>
-
-    <!-- public projects showcase -->
-    <section class="section" id="projects">
-      <h2 class="sec-title" data-i18n="index.projects">Projects</h2>
-      <div class="proj-grid">
-        <a class="proj-card" href="pixelbreak.html">
-          <span class="pico">🎮</span>
-          <span class="ptitle">PixelBreak</span>
-          <span class="pdesc" data-i18n="proj.pixelbreak.desc">31 arcade games, all playable in the browser — no install, no ads.</span>
-          <span class="ptags"><span class="ptag">Web</span><span class="ptag">JavaScript</span></span>
-        </a>
-        <a class="proj-card" href="games.html">
-          <span class="pico">🎲</span>
-          <span class="ptitle">Multiplayer Games</span>
-          <span class="pdesc" data-i18n="proj.games.desc">Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels.</span>
-          <span class="ptags"><span class="ptag" data-i18n="tag.realtime">Realtime</span><span class="ptag">Supabase</span></span>
-        </a>
-        <a class="proj-card" href="messenger.html">
-          <span class="pico">💬</span>
-          <span class="ptitle">Messenger</span>
-          <span class="pdesc" data-i18n="proj.messenger.desc">Real-time chat with groups, voice notes, file sharing, replies and reactions.</span>
-          <span class="ptags"><span class="ptag" data-i18n="tag.realtime">Realtime</span><span class="ptag">PWA</span></span>
-        </a>
-        <a class="proj-card" href="wordle.html">
-          <span class="pico">🟩</span>
-          <span class="ptitle">Wuertspill</span>
-          <span class="pdesc" data-i18n="proj.wordle.desc">Wordle, but in Luxembourgish and German — the way I actually speak.</span>
-          <span class="ptags"><span class="ptag">Web</span><span class="ptag">Lëtzebuergesch</span></span>
-        </a>
-        <div class="proj-card static">
-          <span class="pico">🏎️</span>
-          <span class="ptitle">KartTracker</span>
-          <span class="pdesc" data-i18n="proj.kart.desc">A go-kart lap timer for iPhone + Apple Watch — live lap times, best-lap tracking and session history.</span>
-          <span class="ptags"><span class="ptag">SwiftUI</span><span class="ptag">watchOS</span></span>
-        </div>
-        <div class="proj-card static">
-          <span class="pico">🎬</span>
-          <span class="ptitle">ShortsFactory</span>
-          <span class="pdesc" data-i18n="proj.shorts.desc">An automated pipeline that generates faceless short videos and uploads them — with a Telegram approval step.</span>
-          <span class="ptags"><span class="ptag">Python</span><span class="ptag" data-i18n="tag.automation">Automation</span></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- private app launcher (signed-in) -->
+    <!-- apps first -->
     <section class="section" id="apps">
       <h2 class="sec-title" data-i18n="index.yourApps">Your apps</h2>
       <p class="apps-gate" id="appsGate" data-i18n="index.appsGate">Sign in to open your apps.</p>
@@ -130,10 +76,21 @@
         </a>
       </div>
     </section>
+
+    <!-- welcome + about (the rest, at the end) -->
+    <section class="hero">
+      <span class="hero-kicker" data-i18n="index.kicker">👋 Moien, ech sinn</span>
+      <h1 class="hero-name">Ian Mulheims</h1>
+      <p class="hero-tag" data-i18n-html="index.tag">A student from Luxembourg who builds <strong>apps, games and tools</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.</p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="about.html" data-i18n="index.cta1">See what I've built</a>
+      </div>
+    </section>
   </main>
 
   <footer>
     <span id="year"></span> · Ian Mulheims ·
+    <a href="about.html" class="foot-link" data-i18n="about.title">About me</a> ·
     <a href="https://github.com/ianmlhms" rel="noopener" class="foot-link">GitHub</a>
   </footer>
 
