@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="style.css?v=4" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script src="theme.js?v=2"></script>
+  <script src="theme.js?v=3"></script>
   <script src="i18n-dict.js?v=1"></script>
   <script src="i18n.js?v=1"></script>
   <script>
@@ -142,9 +142,13 @@
   <script type="module">
     import { mountAccountButton, client, session, onAuth } from "./auth.js?v=3";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
+    const HOTEL_ONLY = ["quinn@mulheims.lu"];                    // these accounts ONLY get the hotel builder
     mountAccountButton(document.getElementById("acctHost"));
     async function refreshTiles() {
       const signedIn = !!session();
+      // restricted accounts get bounced straight to their one app (also covers
+      // signing in while already on the hub; theme.js guards direct loads)
+      if (HOTEL_ONLY.includes((session()?.user?.email || "").toLowerCase())) { location.replace("hotel.html"); return; }
       document.body.classList.toggle("signed-in", signedIn);
       let admin = false;
       try { const sb = await client(); const { data } = await sb.rpc("is_admin"); admin = !!data; } catch {}

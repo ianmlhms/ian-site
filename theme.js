@@ -36,6 +36,33 @@
 
   apply(get()); // apply ASAP (before paint where possible)
 
+  // ---- per-account access restriction ----
+  // Some accounts may only use one app. A restricted user landing on any other
+  // page is sent to their allowed app. Runs in <head> before paint, so there is
+  // no flash of the hub. Reads the Supabase session straight from localStorage
+  // (no SDK needed here); the real data is still protected server-side by RLS.
+  function restrictionGuard() {
+    const HOTEL_ONLY = ["quinn@mulheims.lu"]; // limited to the hotel builder
+    if (/(^|\/)hotel\.html$/.test(location.pathname)) return; // already allowed
+    let email = "";
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!/^sb-.+-auth-token$/.test(k)) continue;
+        const raw = JSON.parse(localStorage.getItem(k) || "null");
+        const s = (raw && raw.currentSession) || raw; // tolerate version differences
+        email = ((s && s.user && s.user.email) || "").toLowerCase();
+        if (!email && s && s.access_token) {           // fall back to the JWT payload
+          const p = JSON.parse(atob(s.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+          email = (p.email || "").toLowerCase();
+        }
+        break;
+      }
+    } catch (e) { /* unreadable session — leave navigation alone */ }
+    if (email && HOTEL_ONLY.includes(email)) location.replace("hotel.html");
+  }
+  restrictionGuard();
+
   // ---- floating picker ----
   function buildPicker() {
     if (document.getElementById("themeFab")) return;
