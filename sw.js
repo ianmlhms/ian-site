@@ -1,7 +1,6 @@
 /* Service worker for ian.lu — Web Push notifications (Messenger).
  * Kept tiny on purpose: it only handles incoming pushes and clicks. The page
- * registers it (notify.js). Bump CACHE_TAG if you ever add real caching. */
-const CACHE_TAG = "ianlu-sw-v2";
+ * registers it (notify.js). No fetch handler — pages are never cached here. */
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));

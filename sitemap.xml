@@ -2,32 +2,42 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://ian.lu/</loc>
-    <lastmod>2026-06-30</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://ian.lu/about.html</loc>
-    <lastmod>2026-06-30</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://ian.lu/pixelbreak.html</loc>
-    <lastmod>2026-06-30</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://ian.lu/games.html</loc>
-    <lastmod>2026-06-30</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://ian.lu/wordle.html</loc>
-    <lastmod>2026-06-30</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://ian.lu/leaderboard.html</loc>
+    <lastmod>2026-07-01</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/grades.html</loc>
+    <lastmod>2026-07-01</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://ian.lu/stats.html</loc>
-    <lastmod>2026-06-30</lastmod>
+    <lastmod>2026-07-01</lastmod>
     <priority>0.5</priority>
   </url>
 </urlset>

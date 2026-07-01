@@ -45,8 +45,10 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions: `theme.js?v=1`, `auth.js?v=3`, `messenger.js?v=8`, `friends.js?v=5`,
-`pixelbreak-records.js?v=3`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=1`
+Current versions (Jul 2026): `theme.js?v=3`, `auth.js?v=3`, `i18n-dict.js?v=5` (same on ALL
+pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=8`, `friends.js?v=6`,
+`pixelbreak-records.js?v=4`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=2`,
+`game-common.js?v=1`, `game-common.css?v=1`, `style.css?v=5`
 (`notify.js`/`sw.js` are imported, not query-versioned — hard-refresh or bump the importer).
 
 ## 3. Supabase
@@ -105,6 +107,16 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 
 **Multiplayer games** use Supabase **Realtime Broadcast** (channel per room, presence by role/clientId) —
 no DB tables, no extra SQL. Players join via room code or friend invite. Name = account username or a prompt.
+
+**`game-common.js` + `game-common.css` (Jul 2026):** shared plumbing for the 1v1 board games
+(connect4, tictactoe, reversi, dots, battleship). Provides the sanitised `room`/`role`/`AI`
+context, the realtime channel factory (persistSession:false enforced), `joinRoom()` with
+refresh-safe state resync (a rejoining client sends `gc-req`; a peer whose game has progressed
+answers `gc-state` — the host never pushes a fresh board over a live one) and seat-collision
+detection, plus `recordResult` and the AI difficulty picker. Battleship additionally persists
+its local view in sessionStorage (the opponent never knows your fleet, so it can't be restored
+from the peer). color/draw/slf still run their own host-authoritative protocols but track
+`role` in presence and show a "host left" notice to guests.
 
 ## 5. ShortsFactory dashboard data pipeline (Mac mini)
 
@@ -167,8 +179,9 @@ manual-entry. School API id = `laml` (NOT "Aline Mayrisch"); user `Mulla383`, Sc
 
 Two layers:
 1. **In-app / foreground** (no server): `notify.js` `initAmbient()` — loaded via
-   `notify-ambient.js` on most pages (index, games, connect4, slf, battleship, friends,
-   grades, pixelbreak) — subscribes to `messages` INSERTs over Realtime (RLS scopes it to
+   `notify-ambient.js` on most pages (index, games hub, every multiplayer game page,
+   leaderboard, friends, grades — but NOT pixelbreak/wordle/messenger) — subscribes to
+   `messages` INSERTs over Realtime (RLS scopes it to
    your chats) and shows a toast + a system Notification (if permission granted). This is the
    "get messenger notifications while you're in a game" piece.
 2. **Web Push / closed-app** (needs backend): `sw.js` + `manifest.webmanifest` +

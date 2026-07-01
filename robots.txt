@@ -1,4 +1,13 @@
 User-agent: *
 Allow: /
+# private / sign-in-only pages — nothing useful to index
+Disallow: /admin.html
+Disallow: /factory.html
+Disallow: /homework.html
+Disallow: /hotel.html
+Disallow: /karts.html
+Disallow: /kart.html
+Disallow: /messenger.html
+Disallow: /friends.html
 
 Sitemap: https://ian.lu/sitemap.xml
