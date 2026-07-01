@@ -87,6 +87,8 @@
 
     const fab = document.createElement("button");
     fab.id = "themeFab"; fab.title = "Theme"; fab.textContent = "🎨";
+    fab.setAttribute("aria-label", "Theme");
+    fab.setAttribute("aria-haspopup", "true");
     const pop = document.createElement("div");
     pop.id = "themePop";
     const t = get();
