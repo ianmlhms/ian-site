@@ -60,6 +60,65 @@ const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 let name="Player", phase="lobby", letter="", round=0, stopped=false, answers={}, totals={}, collectTimer=null, hostHere=true;
+let verdicts={}, verdictTimer=null;   // "cid|catIndex" -> false when Wikidata says the word isn't real
+
+/* ---------- answer checking (Wikidata) ----------
+ * On reveal the HOST asks Wikidata whether each answer really is a city /
+ * country / river / first name / animal / profession, then broadcasts the
+ * verdicts so every client scores identically. Fails OPEN: if the check
+ * errors or times out, answers count as valid and the game just continues. */
+const VERIFY_TIMEOUT_MS = 12000;      // per Wikidata query
+const VERDICT_WAIT_MS   = 20000;      // guests: give up waiting for the host's verdicts
+const VERIFY_CONCURRENCY = 4;
+const CAT_CHECKS = [
+  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q486972 }",                    // Stadt — human settlement
+  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q6256 }",                      // Land — country
+  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q355304 }",                    // Fluss — watercourse
+  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q202444 }",                    // Name — given name
+  '?item (wdt:P279|wdt:P171)* wd:Q729. hint:Prior hint:gearing "forward".',  // Tier — chains to Animalia
+  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q28640 wd:Q12737077 }",        // Beruf — profession/occupation
+];
+async function checkWord(term, cat){
+  const safe = term.trim().slice(0,60).replace(/[\\"]/g,"");
+  const query = `SELECT ?item WHERE {
+    SERVICE wikibase:mwapi {
+      bd:serviceParam wikibase:endpoint "www.wikidata.org";
+                      wikibase:api "EntitySearch";
+                      mwapi:search "${safe}";
+                      mwapi:language "de";
+                      mwapi:limit "10".
+      ?item wikibase:apiOutputItem mwapi:item.
+    }
+    ${CAT_CHECKS[cat]} } LIMIT 1`;
+  const ctrl = new AbortController();
+  const to = setTimeout(()=>ctrl.abort(), VERIFY_TIMEOUT_MS);
+  try{
+    const r = await fetch("https://query.wikidata.org/sparql", {
+      method:"POST", signal:ctrl.signal,
+      headers:{ "Content-Type":"application/x-www-form-urlencoded", "Accept":"application/sparql-results+json",
+                "Api-User-Agent":"ianlu-slf/1.0 (https://ian.lu)" },
+      body:"format=json&query="+encodeURIComponent(query),
+    });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    return data.results.bindings.length > 0;
+  }catch(e){ console.warn("[slf] check skipped for", term, e); return null; }   // unknown → counts as valid
+  finally{ clearTimeout(to); }
+}
+async function validateAll(ps){
+  const jobs=[];
+  ps.forEach(p=>{ CATS.forEach((_,i)=>{
+    const a=(answers[p.cid]?.ans?.[i]||"").trim();
+    if(a && valid(a)) jobs.push({ key:p.cid+"|"+i, term:a, cat:i });
+  }); });
+  const v={};
+  for(let at=0; at<jobs.length; at+=VERIFY_CONCURRENCY){
+    const slice=jobs.slice(at, at+VERIFY_CONCURRENCY);
+    const res=await Promise.all(slice.map(j=>checkWord(j.term, j.cat)));
+    res.forEach((ok,k)=>{ if(ok===false) v[slice[k].key]=false; });
+  }
+  return v;
+}
 
 async function getName(){
   let n=localStorage.getItem("playerName");
@@ -76,6 +135,7 @@ function render(){
     $("app").innerHTML = `
       <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
       <p class="muted">${ps.length<2?"Waiting for players — share the room code above.":"Ready!"}</p>
+      <p class="muted" style="font-size:12.5px">🔎 At the reveal, answers are checked against Wikidata — made-up words score 0.</p>
       ${role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>Start round ${round+1}</button>`
                       : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
                                   : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="games.html">start a new game</a>.</p>`)}
@@ -89,6 +149,10 @@ function render(){
       <button class="big stop" id="stopBtn">✋ Stop! (reveal)</button>`;
     $("c0").focus();
     $("stopBtn").onclick=()=>{ ch.send({type:"broadcast",event:"stop",payload:{}}); doStop(); };
+  } else if (phase==="checking"){
+    $("app").innerHTML = `
+      <div class="letter" style="font-size:34px">Letter: ${letter}</div>
+      <p class="center muted">🔎 Checking the answers on Wikidata…</p>`;
   } else if (phase==="results"){
     $("app").innerHTML = `
       <div class="letter" style="font-size:34px">Letter: ${letter}</div>
@@ -105,7 +169,9 @@ function renderRound(ps){
   CATS.forEach((cat,i)=>{
     rows += `<tr><td class="muted">${cat}</td>` + ps.map(p=>{
       const a=(answers[p.cid]?.ans?.[i])||""; const pts=scoreCell(i,p.cid,ps);
-      return `<td>${esc(a)||"—"} <span class="pts" style="color:var(--good)">${pts?("+"+pts):""}</span></td>`;
+      const isBad = verdicts[p.cid+"|"+i]===false;
+      const shown = !a ? "—" : isBad ? `<s style="color:#ff5d6c">${esc(a)}</s> ❌` : esc(a);
+      return `<td>${shown} <span class="pts" style="color:var(--good)">${pts?("+"+pts):""}</span></td>`;
     }).join("") + `</tr>`;
   });
   rows += `</table>`; return rows;
@@ -119,9 +185,11 @@ function valid(a){ return a && a.trim() && a.trim()[0].toUpperCase()===letter; }
 function scoreCell(i,pcid,ps){
   const a=(answers[pcid]?.ans?.[i])||"";
   if(!valid(a)) return 0;
+  if(verdicts[pcid+"|"+i]===false) return 0;          // not a real word for this category
   const v=a.trim().toLowerCase();
   let dup=false;
-  ps.forEach(p=>{ if(p.cid!==pcid){ const o=(answers[p.cid]?.ans?.[i])||""; if(valid(o)&&o.trim().toLowerCase()===v) dup=true; }});
+  ps.forEach(p=>{ if(p.cid!==pcid){ const o=(answers[p.cid]?.ans?.[i])||"";
+    if(valid(o)&&verdicts[p.cid+"|"+i]!==false&&o.trim().toLowerCase()===v) dup=true; }});
   return dup?5:10;
 }
 
@@ -130,7 +198,7 @@ function startRound(){
   ch.send({type:"broadcast",event:"start",payload:{round,letter}});
   enterPlay();
 }
-function enterPlay(){ phase="play"; stopped=false; answers={}; render(); }
+function enterPlay(){ phase="play"; stopped=false; answers={}; verdicts={}; clearTimeout(verdictTimer); render(); }
 function doStop(){
   if(stopped) return; stopped=true; phase="collect";
   const ans=CATS.map((_,i)=>($("c"+i)?($("c"+i).value||""):""));
@@ -141,7 +209,21 @@ function doStop(){
 }
 function checkComplete(){ const ps=players(); if(ps.every(p=>answers[p.cid])) finish(); }
 function finish(){
-  if(phase==="results") return; clearTimeout(collectTimer);
+  if(phase==="results"||phase==="checking") return;
+  clearTimeout(collectTimer);
+  phase="checking"; render();
+  if(role==="host") hostValidate();
+  else verdictTimer=setTimeout(()=>applyVerdicts({}), VERDICT_WAIT_MS);   // host gone? score unchecked
+}
+async function hostValidate(){
+  const v = await validateAll(players());
+  ch.send({type:"broadcast",event:"verdicts",payload:{v}});
+  applyVerdicts(v);
+}
+function applyVerdicts(v){
+  if(phase==="results") return;                       // score each round only once
+  clearTimeout(verdictTimer);
+  verdicts = v || {};
   const ps=players();
   ps.forEach(p=>{ let s=0; CATS.forEach((_,i)=>s+=scoreCell(i,p.cid,ps)); totals[p.cid]=(totals[p.cid]||0)+s; });
   phase="results"; render();
@@ -150,6 +232,7 @@ function finish(){
 ch.on("broadcast",{event:"start"},({payload})=>{ round=payload.round; letter=payload.letter; enterPlay(); })
   .on("broadcast",{event:"stop"},()=>doStop())
   .on("broadcast",{event:"answers"},({payload})=>{ answers[payload.cid]={name:payload.name,ans:payload.ans}; if(stopped) checkComplete(); })
+  .on("broadcast",{event:"verdicts"},({payload})=>applyVerdicts(payload.v||{}))
   .on("presence",{event:"sync"},()=>{
     const st=ch.presenceState();
     const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
