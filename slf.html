@@ -28,6 +28,8 @@
   th{color:var(--muted);font-size:12px}
   td.pts{text-align:right;font-weight:800}
   .tot{margin-top:16px}
+  .ovr{background:var(--card2);border:1px solid var(--border);color:var(--good);border-radius:8px;padding:2px 7px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .ovr:hover{border-color:var(--good)}
   .muted{color:var(--muted)}.center{text-align:center}
   h3{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
 </style>
@@ -61,6 +63,7 @@ const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 
 let name="Player", phase="lobby", letter="", round=0, stopped=false, answers={}, totals={}, collectTimer=null, hostHere=true;
 let verdicts={}, verdictTimer=null;   // "cid|catIndex" -> false when Wikidata says the word isn't real
+let roundScores={}, roundPlayers=[];  // this round's scoring, kept so host overrides can re-score
 
 /* ---------- answer checking (Wikidata) ----------
  * On reveal the HOST asks Wikidata whether each answer really is a city /
@@ -161,7 +164,10 @@ function render(){
       ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`
                       : (hostHere ? `<p class="center muted">Waiting for host…</p>`
                                   : `<p class="center muted">⚠️ The host left — <a href="games.html">start a new game</a>.</p>`)}`;
-    if(role==="host") $("nextBtn").onclick=()=>{ phase="lobby"; render(); };
+    if(role==="host"){
+      $("nextBtn").onclick=()=>{ phase="lobby"; render(); };
+      $("app").querySelectorAll("[data-ov]").forEach(b=> b.onclick=()=>overrideVerdict(b.dataset.ov,true));
+    }
   }
 }
 function renderRound(ps){
@@ -170,7 +176,8 @@ function renderRound(ps){
     rows += `<tr><td class="muted">${cat}</td>` + ps.map(p=>{
       const a=(answers[p.cid]?.ans?.[i])||""; const pts=scoreCell(i,p.cid,ps);
       const isBad = verdicts[p.cid+"|"+i]===false;
-      const shown = !a ? "—" : isBad ? `<s style="color:#ff5d6c">${esc(a)}</s> ❌` : esc(a);
+      const ovr = role==="host" ? ` <button class="ovr" data-ov="${p.cid}|${i}" title="Wikidata got it wrong? Count this answer anyway.">✓ count it</button>` : "";
+      const shown = !a ? "—" : isBad ? `<s style="color:#ff5d6c">${esc(a)}</s> ❌${ovr}` : esc(a);
       return `<td>${shown} <span class="pts" style="color:var(--good)">${pts?("+"+pts):""}</span></td>`;
     }).join("") + `</tr>`;
   });
@@ -198,7 +205,7 @@ function startRound(){
   ch.send({type:"broadcast",event:"start",payload:{round,letter}});
   enterPlay();
 }
-function enterPlay(){ phase="play"; stopped=false; answers={}; verdicts={}; clearTimeout(verdictTimer); render(); }
+function enterPlay(){ phase="play"; stopped=false; answers={}; verdicts={}; roundScores={}; clearTimeout(verdictTimer); render(); }
 function doStop(){
   if(stopped) return; stopped=true; phase="collect";
   const ans=CATS.map((_,i)=>($("c"+i)?($("c"+i).value||""):""));
@@ -224,15 +231,30 @@ function applyVerdicts(v){
   if(phase==="results") return;                       // score each round only once
   clearTimeout(verdictTimer);
   verdicts = v || {};
-  const ps=players();
-  ps.forEach(p=>{ let s=0; CATS.forEach((_,i)=>s+=scoreCell(i,p.cid,ps)); totals[p.cid]=(totals[p.cid]||0)+s; });
+  roundPlayers = players();
+  roundScores = {};
+  roundPlayers.forEach(p=>{ let s=0; CATS.forEach((_,i)=>s+=scoreCell(i,p.cid,roundPlayers)); roundScores[p.cid]=s; totals[p.cid]=(totals[p.cid]||0)+s; });
   phase="results"; render();
+}
+// Host judgement call: Wikidata rejected a word the players know is real —
+// flip the verdict and re-score the whole round (duplicates included).
+function overrideVerdict(key, send){
+  if(phase!=="results" || verdicts[key]!==false) return;
+  delete verdicts[key];
+  roundPlayers.forEach(p=>{
+    let s=0; CATS.forEach((_,i)=>s+=scoreCell(i,p.cid,roundPlayers));
+    totals[p.cid]=(totals[p.cid]||0)+s-(roundScores[p.cid]||0);
+    roundScores[p.cid]=s;
+  });
+  if(send) ch.send({type:"broadcast",event:"override",payload:{key}});
+  render();
 }
 
 ch.on("broadcast",{event:"start"},({payload})=>{ round=payload.round; letter=payload.letter; enterPlay(); })
   .on("broadcast",{event:"stop"},()=>doStop())
   .on("broadcast",{event:"answers"},({payload})=>{ answers[payload.cid]={name:payload.name,ans:payload.ans}; if(stopped) checkComplete(); })
   .on("broadcast",{event:"verdicts"},({payload})=>applyVerdicts(payload.v||{}))
+  .on("broadcast",{event:"override"},({payload})=>overrideVerdict(payload.key,false))
   .on("presence",{event:"sync"},()=>{
     const st=ch.presenceState();
     const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
