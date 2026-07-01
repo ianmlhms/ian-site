@@ -94,7 +94,8 @@ async function planFor(table: string, rec: any): Promise<Plan | null> {
 
 Deno.serve(async (req) => {
   // Shared-secret guard (the function is deployed with --no-verify-jwt).
-  if (NOTIFY_SECRET && req.headers.get("x-notify-secret") !== NOTIFY_SECRET) {
+  // Fails closed: with NOTIFY_SECRET unset, nobody can invoke the function.
+  if (!NOTIFY_SECRET || req.headers.get("x-notify-secret") !== NOTIFY_SECRET) {
     return json({ error: "unauthorized" }, 401);
   }
 

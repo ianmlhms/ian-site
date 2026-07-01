@@ -5,3 +5,6 @@
 .vscode/
 .idea/
 *.swp
+
+# Supabase CLI local state
+supabase/.temp/

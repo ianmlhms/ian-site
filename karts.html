@@ -62,7 +62,7 @@ function bestOf(laps){ const v=(laps||[]).filter(x=>typeof x==="number"&&x>0); r
 function topKmh(track){ return Math.max(0, ...(track||[]).map(p=>(p.speed||0)*3.6)); }
 
 async function load(){
-  const { data, error } = await sb.from("kart_sessions").select("id,payload,created_at").order("created_at",{ascending:false});
+  const { data, error } = await sb.rpc("kart_list");   // admin-gated (kart_sessions has no public SELECT)
   if(error){ $("state").textContent = T("karts.loadErr")+": "+error.message; return; }
   const rows = data || [];
   if(!rows.length){ $("state").textContent = T("karts.none"); $("list").innerHTML=""; return; }

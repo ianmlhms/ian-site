@@ -72,8 +72,14 @@ async function getCreateClient() {
 
 async function initCloud() {
   if (!cloudEnabled) return;
-  const createClient = await getCreateClient();
-  sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
+  // Reuse the site-wide client if auth.js already created one — two GoTrue
+  // clients on the same localStorage race on token refresh (see auth.js).
+  if (window.__pbAuth && window.__pbAuth.sb) {
+    sb = window.__pbAuth.sb;
+  } else {
+    const createClient = await getCreateClient();
+    sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
+  }
   const { data } = await sb.auth.getSession();
   applySession(data.session);
   sb.auth.onAuthStateChange((_e, s) => applySession(s));

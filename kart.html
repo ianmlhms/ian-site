@@ -117,13 +117,15 @@ async function boot(){
   if(!cfg.url||!cfg.anonKey){ $("state").textContent="Cloud not configured."; return; }
   let row;
   try{
-    const r = await fetch(`${cfg.url}/rest/v1/kart_sessions?id=eq.${encodeURIComponent(id)}&select=payload`, {
-      headers:{ apikey:cfg.anonKey, Authorization:"Bearer "+cfg.anonKey }, cache:"no-store",
+    // kart_get() is the only read path — sessions are unlisted, the UUID is the key.
+    const r = await fetch(`${cfg.url}/rest/v1/rpc/kart_get`, {
+      method:"POST", cache:"no-store",
+      headers:{ apikey:cfg.anonKey, Authorization:"Bearer "+cfg.anonKey, "Content-Type":"application/json" },
+      body: JSON.stringify({ p_id: id }),
     });
     if(!r.ok) throw new Error("HTTP "+r.status);
-    const rows = await r.json();
-    if(!rows.length){ $("state").textContent="Session not found (it may have been removed)."; return; }
-    row = rows[0].payload;
+    row = await r.json();
+    if(!row){ $("state").textContent="Session not found (it may have been removed)."; return; }
   }catch(e){ $("state").textContent="Could not load session ("+e+")."; return; }
 
   const s = stats(row.lapTimes);
