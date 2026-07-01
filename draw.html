@@ -72,7 +72,7 @@ const ch = sb.channel("draw:"+room, { config:{ broadcast:{self:false}, presence:
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-let name="Player", phase="lobby", drawerCid=null, round=0, totalTurns=0;
+let name="Player", phase="lobby", drawerCid=null, round=0, totalTurns=0, hostHere=true;
 let scores={}, order=[], word="", mask="", roundEnd=0, guessed=new Set(), logLines=[];
 let endTimer=null, tick=null;
 const me=()=>cid, isDrawer=()=>drawerCid===cid;
@@ -88,14 +88,17 @@ function render(){
   if(phase==="lobby"){
     html += `<p class="muted center">One player draws a secret word, everyone else races to guess it in the chat. Most points after ${LAPS} laps wins.</p>`;
     html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
-                          : `<p class="center muted">Waiting for the host…</p>`;
+                          : (hostHere ? `<p class="center muted">Waiting for the host…</p>`
+                                      : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="games.html">start a new game</a>.</p>`);
     $("app").innerHTML=html; if(role==="host"&&$("startBtn")) $("startBtn").onclick=start; return;
   }
   if(phase==="final"){
     const sorted=[...ps].sort((a,b)=>(scores[b.cid]||0)-(scores[a.cid]||0));
     const top=sorted[0];
     html = `<div class="win">🏆 ${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+html;
-    html += role==="host" ? `<button class="big" id="againBtn">Play again</button>` : `<p class="center muted">Waiting for host…</p>`;
+    html += role==="host" ? `<button class="big" id="againBtn">Play again</button>`
+                          : (hostHere ? `<p class="center muted">Waiting for host…</p>`
+                                      : `<p class="center muted">⚠️ The host left — <a href="games.html">start a new game</a>.</p>`);
     $("app").innerHTML=html; if(role==="host") $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); }; return;
   }
   // choosing / drawing / reveal
@@ -216,8 +219,15 @@ ch.on("broadcast",{event:"turn"},({payload})=>applyTurn(payload))
   .on("broadcast",{event:"clear"},()=>clearCanvas())
   .on("broadcast",{event:"pick"},({payload})=>{ if(role==="host"&&phase==="choosing"&&isDrawerHost()) hostPick(payload.word); })
   .on("broadcast",{event:"guess"},({payload})=>{ if(role==="host") hostGuess(payload); })
-  .on("presence",{event:"sync"},()=>{ if(phase==="lobby"||phase==="final") render(); })
-  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
+  .on("presence",{event:"sync"},()=>{
+    const st=ch.presenceState();
+    const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+    // mid-round we only log (a re-render would wipe the canvas)
+    if(hostHere&&!hh&&phase!=="lobby"&&phase!=="final") addLog({sys:true,t:"⚠️ The host left — the game can't continue until they rejoin."});
+    hostHere=hh;
+    if(phase==="lobby"||phase==="final") render();
+  })
+  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 function isDrawerHost(){ return true; } // host validates picks regardless
 </script>
 </body>

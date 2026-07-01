@@ -72,16 +72,26 @@
 </div>
 
 <script>
-// ==== Word lists (5 letters, UPPERCASE). Add/fix words freely — esp. LB! ====
+// ==== Word lists (5 letters, UPPERCASE) ====
+// APPEND ONLY, never insert/reorder/delete: the daily word is picked by
+// position, so any change before the end of a list shifts every day's answer
+// (and appending shifts future days once — fine, mid-list edits are not).
 const WORDS = {
   lb: ["MOIEN","MERCI","KLENG","ÄPPEL","KAFFI","FRËNN","DËSCH","ËMMER","HÄERZ","VÉIER",
        "WÄISS","GRÉNG","PÄERD","FËSCH","SPILL","DAACH","BAACH","MOUND","LAANG","KUERZ",
        "WUERT","BLUMM","OWEND","STUFF","GAART","BRÉIF","BROUT","FEIER","BËSCH","STEEN",
        "FAARF","MUSEK","GLÉCK","FOUSS","MOUNT","BAUCH","KLEED","HAART","WEECH","KRÄIZ",
-       "BUERG","ENGEL","DUERF","SCHOF","MAUER"],
+       "BUERG","ENGEL","DUERF","SCHOF","MAUER",
+       "GEESS","IESEL","KUERF","GAASS","BRONG","SIWEN","AACHT","FUUSS","BLËTZ","HÉICH",
+       "KRANK","INSEL"],
   de: ["BLUME","TISCH","STUHL","APFEL","BIRNE","TIGER","MUSIK","SCHUH","JACKE","MAUER",
        "GABEL","TASSE","KANNE","SALAT","PIZZA","NUDEL","KARTE","LAMPE","BLATT","WOLKE",
-       "REGEN","SONNE","STERN","NACHT","MONDE","HONIG","VOGEL","FISCH","PFERD","KATZE"],
+       "REGEN","SONNE","STERN","NACHT","MONDE","HONIG","VOGEL","FISCH","PFERD","KATZE",
+       "AMPEL","ANKER","BESEN","BIENE","BODEN","BRETT","EIMER","ENGEL","FEDER","FEUER",
+       "FLUSS","GEIGE","HOTEL","INSEL","KABEL","KERZE","KETTE","KRONE","LICHT","MOTOR",
+       "MÜNZE","NADEL","NEBEL","OZEAN","PALME","PILOT","PLATZ","RADIO","RIESE","SEIFE",
+       "SPIEL","STADT","STEIN","STIFT","TAFEL","TEICH","WIESE","WURST","ZEBRA","ZIEGE",
+       "ZWERG"],
 };
 const LABEL = { lb:"Lëtzebuergesch", de:"Deutsch" };
 const ROWS = 6, COLS = 5;
@@ -89,7 +99,11 @@ let lang = localStorage.getItem("wordleLang") || "lb";
 let answer = "", guesses = [], current = "", done = false;
 
 const $ = (id)=>document.getElementById(id);
-const dayIndex = ()=> Math.floor(Date.now()/86400000);
+// Luxembourg-local day number (plain UTC would roll the word at 1/2 am local).
+const dayIndex = ()=>{
+  const [y,m,d] = new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Luxembourg"}).format(new Date()).split("-").map(Number);
+  return Math.floor(Date.UTC(y, m-1, d)/86400000);
+};
 const stateKey = ()=> `wordle_${lang}_${dayIndex()}`;
 const statsKey = ()=> `wordleStats_${lang}`;
 

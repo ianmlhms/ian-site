@@ -58,6 +58,10 @@ const GAMES = [
   { id:"dots", ico:"▦", name:"Dots & Boxes", desc:"g.dots.desc", ai:true },
   { id:"tictactoe", ico:"✕", name:"Tic-Tac-Toe", desc:"g.tictactoe.desc", ai:true },
 ];
+const SOLO = [
+  { href:"wordle.html", ico:"🟩", name:"Wuertspill", desc:"g.wordle.desc" },
+  { href:"pixelbreak.html", ico:"🎮", name:"PixelBreak", desc:"g.pixelbreak.desc" },
+];
 const code = () => Math.random().toString(36).slice(2, 8);
 function renderCards() {
   document.getElementById("cards").innerHTML = GAMES.map(g => `
@@ -71,7 +75,14 @@ function renderCards() {
         <input id="code-${g.id}" placeholder="${T("games.code")}" autocomplete="off">
         <button data-j="${g.id}">${T("btn.join")}</button>
       </div>
+    </div>`).join("") + SOLO.map(g => `
+    <div class="card">
+      <div class="ico">${g.ico}</div>
+      <h2>${g.name}</h2>
+      <p>${T(g.desc)}</p>
+      <button class="create" data-href="${g.href}">${T("games.play")}</button>
     </div>`).join("");
+  document.querySelectorAll("[data-href]").forEach(b => b.onclick = () => location.href = b.dataset.href);
   document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => location.href = `${b.dataset.c}.html?room=${code()}&role=host`);
   document.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => location.href = `${b.dataset.ai}.html?ai=1`);
   document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {

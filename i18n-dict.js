@@ -143,6 +143,9 @@ window.I18N_DICT = {
   "g.reversi.desc":    { lb: "Schléiss d'Disken vum Géigner an fir se ze dréinen — déi meeschten Disken gewënnt. 1 géint 1.", de: "Flankiere die Steine des Gegners, um sie zu drehen — die meisten Steine gewinnen. 1 gegen 1.", en: "Flank your opponent's discs to flip them — most discs wins. 1 v 1." },
   "g.dots.desc":       { lb: "Zeechen eng Linn, maach eng Këscht zou fir se ze huelen a spill nach eng Kéier. 1 géint 1.", de: "Zeichne eine Linie, schließe eine Box, um sie zu beanspruchen, und spiele erneut. 1 gegen 1.", en: "Draw a line, close a box to claim it and go again. 1 v 1." },
   "g.tictactoe.desc":  { lb: "Dräi op enger Rei. E séiere Klassiker. 1 géint 1.", de: "Drei in einer Reihe. Schneller Klassiker. 1 gegen 1.", en: "Three in a row. Quick classic. 1 v 1." },
+  "games.play":        { lb: "Spillen", de: "Spielen", en: "Play" },
+  "g.wordle.desc":     { lb: "Rod dat geheimt Wuert vum Dag — op Lëtzebuergesch oder Däitsch.", de: "Errate das geheime Wort des Tages — auf Luxemburgisch oder Deutsch.", en: "Guess the secret word of the day — in Luxembourgish or German." },
+  "g.pixelbreak.desc": { lb: "31 Arcade-Minispiller mat Highscores a Leaderboard.", de: "31 Arcade-Minispiele mit Highscores und Bestenliste.", en: "31 arcade mini-games with high scores and a leaderboard." },
 
   /* ---------- stats (ShortsFactory) ---------- */
   "stats.channels":     { lb: "Channeler", de: "Kanäle", en: "Channels" },

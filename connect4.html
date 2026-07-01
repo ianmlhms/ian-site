@@ -6,16 +6,11 @@
 <title>Connect 4 — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=3"></script>
+<link rel="stylesheet" href="game-common.css?v=1">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--red:#ff5d6c;--yellow:#ffcc4d;--board:#1b2150}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  :root{--red:#ff5d6c;--yellow:#ffcc4d;--board:#1b2150}
+  body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
-  .status{font-size:18px;font-weight:800;min-height:24px;text-align:center}
-  .sub{color:var(--muted);font-size:13px;text-align:center}
   .board{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;background:var(--board);padding:12px;border-radius:16px;touch-action:manipulation}
   .cell{width:min(11vw,58px);height:min(11vw,58px);border-radius:50%;background:var(--bg);transition:background .15s}
   .cell.r{background:var(--red)} .cell.y{background:var(--yellow)}
@@ -26,14 +21,11 @@
   .colbtns button:hover:not(:disabled){background:var(--accent);color:#fff}
   .colbtns button:disabled{opacity:.3;cursor:default}
   .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
-  .btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 16px;font-weight:700;cursor:pointer}
-  .btn:hover{border-color:var(--accent2)}
-  code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
 </style>
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="friends.html">‹ Friends</a>
+  <a class="home" href="games.html">‹ Games</a>
   <h1>🔴 Connect 4</h1>
   <div class="spacer"></div>
 </header>
@@ -48,47 +40,24 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="game-common.js?v=1"></script>
 <script type="module" src="notify-ambient.js?v=2"></script>
 <script>
 const COLS = 7, ROWS = 6;
-const params = new URLSearchParams(location.search);
-const AI = params.get("ai") === "1";          // single-player vs computer
-const room = params.get("room") || "demo";
-const role = params.get("role") === "guest" ? "guest" : "host";
+const GC = window.GameCommon;
+const { AI, room, role } = GC;
 const me = role === "host" ? 1 : 2;          // 1 = red (host, first), 2 = yellow
 const opp = me === 1 ? 2 : 1;
 let board = [], turn = 1, over = false, oppHere = false, recorded = false;
-function recordResult(game, result){ try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {} }
+const recordResult = GC.recordResult;
 
 /* ---------- difficulty (AI mode) ---------- */
-let difficulty = (params.get("diff") || "normal").toLowerCase();
-if (!["easy", "normal", "hard"].includes(difficulty)) difficulty = "normal";
+let difficulty = GC.difficultyFromUrl();
 const BLUNDER = { easy: 0.55, normal: 0.18, hard: 0 };
 const blunder = () => Math.random() < BLUNDER[difficulty];
-function mountDiff() {
-  const bar = document.querySelector(".bar");
-  if (!bar || document.getElementById("diffPick")) return;
-  const w = document.createElement("div"); w.id = "diffPick"; w.style.cssText = "display:flex;gap:4px;margin-left:auto";
-  [["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]].forEach(([d, lbl]) => {
-    const b = document.createElement("button"); b.textContent = lbl; b.dataset.d = d;
-    b.style.cssText = "background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
-    b.onclick = () => { difficulty = d; paintDiff(); };
-    w.appendChild(b);
-  });
-  bar.appendChild(w); paintDiff();
-}
-function paintDiff() {
-  document.querySelectorAll("#diffPick button").forEach((b) => {
-    const on = b.dataset.d === difficulty;
-    b.style.background = on ? "var(--accent)" : "var(--card2)";
-    b.style.color = on ? "#fff" : "var(--muted)";
-  });
-}
 
 const $ = (id) => document.getElementById(id);
-const cfg = window.PB_CONFIG;
-const sb = supabase.createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
-const ch = sb.channel("c4:" + room, { config: { broadcast: { self: false }, presence: { key: role } } });
+let ch = null;   // realtime channel (multiplayer only)
 
 function fresh() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); turn = 1; over = false; recorded = false; }
 function render() {
@@ -149,20 +118,20 @@ function wins(r, c, p) {
 
 if (AI) {
   document.querySelector(".bar h1").textContent = "🔴 Connect 4 — vs Computer";
-  mountDiff(); oppHere = true; fresh(); render();
+  GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
+  oppHere = true; fresh(); render();
 } else {
+  ch = GC.createChannel("c4");
   ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.col, payload.player, false))
-    .on("broadcast", { event: "state" }, ({ payload }) => { board = payload.board; turn = payload.turn; over = payload.over; render(); if (over) $("rematch").style.display = ""; })
-    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); })
-    .on("presence", { event: "sync" }, () => {
-      const st = ch.presenceState();
-      oppHere = !!st[opp === 1 ? "host" : "guest"];
-      if (role === "host" && oppHere) ch.send({ type: "broadcast", event: "state", payload: { board, turn, over } });
-      render();
-    })
-    .subscribe(async (status) => {
-      if (status === "SUBSCRIBED") { fresh(); render(); await ch.track({ role }); }
-    });
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); });
+  fresh(); render();
+  GC.joinRoom(ch, {
+    getState: () => ({ board, turn, over }),
+    setState: (p) => { board = p.board; turn = p.turn; over = p.over; render(); if (over) $("rematch").style.display = ""; },
+    isStarted: () => over !== false || board.some((row) => row.some((v) => v)),
+    onPeers: (here) => { oppHere = here; render(); },
+    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+  });
 }
 
 $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };

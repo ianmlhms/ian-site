@@ -106,7 +106,7 @@ const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 
 let name="Player", phase="lobby", rounds=5, round=0, target=null, mode="visible";
 let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
-let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false;
+let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false, hostHere=true;
 function recordResult(game,result){ try{ const a=window.__pbAuth; if(a&&a.session&&a.sb) a.sb.rpc("record_match",{p_game:game,p_result:result}); }catch{} }
 
 const MAXD = Math.sqrt(255*255*3);
@@ -130,6 +130,12 @@ const lockedCount=(ps)=>ps.filter(p=>guesses[p.cid]).length;
 
 function render(){
   const ps=players();
+  drawApp(ps);
+  if(!AI && role!=="host" && !hostHere)
+    $("app").insertAdjacentHTML("afterbegin",
+      '<div class="win">⚠️ The host left the room — the game can\'t continue. <a href="games.html">Back to games</a></div>');
+}
+function drawApp(ps){
   if(phase==="lobby"){
     $("app").innerHTML = `
       <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
@@ -263,8 +269,14 @@ if(AI){
     .on("broadcast",{event:"guess"},({payload})=>{ guesses[payload.cid]={name:payload.name,rgb:payload.rgb}; if(phase==="play") render(); if(role==="host") maybeReveal(); })
     .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
     .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
-    .on("presence",{event:"sync"},()=>{ if(role==="host") sendCfg(); if(phase==="lobby"||phase==="results") render(); })
-    .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
+    .on("presence",{event:"sync"},()=>{
+      const st=ch.presenceState();
+      const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+      const hostChanged = hh!==hostHere; hostHere=hh;
+      if(role==="host") sendCfg();
+      if(phase==="lobby"||phase==="results"||hostChanged) render();
+    })
+    .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 }
 </script>
 </body>

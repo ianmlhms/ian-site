@@ -59,7 +59,7 @@ const ch = sb.channel("slf:"+room, { config:{ broadcast:{self:false}, presence:{
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-let name="Player", phase="lobby", letter="", round=0, stopped=false, answers={}, totals={}, collectTimer=null;
+let name="Player", phase="lobby", letter="", round=0, stopped=false, answers={}, totals={}, collectTimer=null, hostHere=true;
 
 async function getName(){
   let n=localStorage.getItem("playerName");
@@ -76,7 +76,9 @@ function render(){
     $("app").innerHTML = `
       <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
       <p class="muted">${ps.length<2?"Waiting for players — share the room code above.":"Ready!"}</p>
-      ${role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>Start round ${round+1}</button>` : `<p class="center muted">Waiting for the host to start…</p>`}
+      ${role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>Start round ${round+1}</button>`
+                      : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
+                                  : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="games.html">start a new game</a>.</p>`)}
       ${renderTotals(ps)}`;
     if(role==="host") $("startBtn") && ($("startBtn").onclick=startRound);
   } else if (phase==="play"){
@@ -92,7 +94,9 @@ function render(){
       <div class="letter" style="font-size:34px">Letter: ${letter}</div>
       ${renderRound(ps)}
       ${renderTotals(ps)}
-      ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>` : `<p class="center muted">Waiting for host…</p>`}`;
+      ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`
+                      : (hostHere ? `<p class="center muted">Waiting for host…</p>`
+                                  : `<p class="center muted">⚠️ The host left — <a href="games.html">start a new game</a>.</p>`)}`;
     if(role==="host") $("nextBtn").onclick=()=>{ phase="lobby"; render(); };
   }
 }
@@ -146,8 +150,13 @@ function finish(){
 ch.on("broadcast",{event:"start"},({payload})=>{ round=payload.round; letter=payload.letter; enterPlay(); })
   .on("broadcast",{event:"stop"},()=>doStop())
   .on("broadcast",{event:"answers"},({payload})=>{ answers[payload.cid]={name:payload.name,ans:payload.ans}; if(stopped) checkComplete(); })
-  .on("presence",{event:"sync"},()=>{ if(phase==="lobby"||phase==="results") render(); })
-  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name}); render(); }});
+  .on("presence",{event:"sync"},()=>{
+    const st=ch.presenceState();
+    const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+    const hostChanged = hh!==hostHere; hostHere=hh;
+    if(phase==="lobby"||phase==="results"||hostChanged&&phase!=="play") render();
+  })
+  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 </script>
 </body>
 </html>

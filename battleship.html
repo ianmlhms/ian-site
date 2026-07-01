@@ -6,17 +6,11 @@
 <title>Battleship — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=3"></script>
+<link rel="stylesheet" href="game-common.css?v=1">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ship:#5b6bbf;--hit:#ff5d6c;--miss:#33384f;--water:#10142e;--ok:#3fb950}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+  :root{--ship:#5b6bbf;--hit:#ff5d6c;--miss:#33384f;--water:#10142e;--ok:#3fb950}
   .wrap{max-width:560px;margin:0 auto;padding:18px;display:flex;flex-direction:column;align-items:center;gap:14px}
-  .status{font-size:17px;font-weight:800;text-align:center;min-height:22px}
-  .sub{color:var(--muted);font-size:13px;text-align:center}
+  .status{font-size:17px;min-height:22px}
   .label{align-self:flex-start;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:-6px}
   .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;width:100%;max-width:420px;background:var(--water);padding:8px;border-radius:12px;touch-action:manipulation}
   .cell{aspect-ratio:1;border-radius:6px;background:#1a2040;display:flex;align-items:center;justify-content:center;font-size:16px}
@@ -76,50 +70,43 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="game-common.js?v=1"></script>
 <script type="module" src="notify-ambient.js?v=2"></script>
 <script>
 const N=8, SHIPS=[4,3,3,2];
-const params=new URLSearchParams(location.search);
-const AI=params.get("ai")==="1";               // single-player vs computer
-const room=(params.get("room")||"demo").toLowerCase();
-const role=params.get("role")==="guest"?"guest":"host";
-const other=role==="host"?"guest":"host";
+const GC=window.GameCommon;
+const { AI, room, role, other } = GC;
 document.getElementById("roomc").textContent=AI?"computer 🤖":room;
-const cfg=window.PB_CONFIG;
-const sb=supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey, { auth:{ persistSession:false, autoRefreshToken:false } });
-const ch=sb.channel("bs:"+room,{config:{broadcast:{self:false},presence:{key:role}}});
 const $=(id)=>document.getElementById(id);
+let ch=null;   // realtime channel (multiplayer only)
 
 let own=empty(), enemy=empty(), placed=[], toPlace=[...SHIPS], orient="h";
 let myReady=false, oppReady=false, oppHere=false, turn="host", phase="setup", over=false;
 let aiBoard=null, aiHunt=[];   // AI mode: computer's hidden fleet + its hit-follow-up queue
 
 /* ---------- difficulty (AI mode) ---------- */
-let difficulty=(params.get("diff")||"normal").toLowerCase();
-if(!["easy","normal","hard"].includes(difficulty)) difficulty="normal";
-function mountDiff(){
-  const bar=document.querySelector(".bar");
-  if(!bar||document.getElementById("diffPick"))return;
-  const w=document.createElement("div"); w.id="diffPick"; w.style.cssText="display:flex;gap:4px;margin-left:auto";
-  [["easy","Easy"],["normal","Normal"],["hard","Hard"]].forEach(([d,lbl])=>{
-    const b=document.createElement("button"); b.textContent=lbl; b.dataset.d=d;
-    b.style.cssText="background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
-    b.onclick=()=>{difficulty=d; paintDiff();};
-    w.appendChild(b);
-  });
-  bar.appendChild(w); paintDiff();
-}
-function paintDiff(){
-  document.querySelectorAll("#diffPick button").forEach(b=>{
-    const on=b.dataset.d===difficulty;
-    b.style.background=on?"var(--accent)":"var(--card2)";
-    b.style.color=on?"#fff":"var(--muted)";
-  });
-}
+let difficulty=GC.difficultyFromUrl();
 let recorded=false;
-function recordResult(game,result){ try{ const a=window.__pbAuth; if(a&&a.session&&a.sb) a.sb.rpc("record_match",{p_game:game,p_result:result}); }catch{} }
+const recordResult=GC.recordResult;
 function empty(){ return Array.from({length:N},()=>Array(N).fill(0)); }
 const allPlaced=()=>toPlace.length===0;
+
+/* ---------- local persistence (fleet can't be restored by the opponent) ----
+ * The opponent never learns our ship positions, so a refresh mid-battle would
+ * lose them forever. Keep the whole local view in sessionStorage; the shared
+ * facts (turn, over, opponent readiness) are re-synced from the peer on rejoin. */
+const storeKey="bs:"+room+":"+role;
+function persistLocal(){ if(AI) return; try{ sessionStorage.setItem(storeKey, JSON.stringify({own,enemy,placed,toPlace,orient,myReady,oppReady,phase,turn,over})); }catch{} }
+function restoreLocal(){
+  if(AI) return false;
+  try{
+    const s=JSON.parse(sessionStorage.getItem(storeKey)||"null");
+    if(!s) return false;
+    ({own,enemy,placed,toPlace,orient,myReady,oppReady,phase,turn,over}=s);
+    return true;
+  }catch{ return false; }
+}
+function clearLocal(){ try{ sessionStorage.removeItem(storeKey); }catch{} }
 
 // ---------- placement ----------
 function fits(r,c,len,o){
@@ -173,6 +160,7 @@ function renderFleet(){
   $("fleet").innerHTML=html;
 }
 function renderSetup(){
+  persistLocal();
   $("setup").style.display="flex"; $("play").style.display="none";
   renderFleet();
   grid($("own"), own, true, (r,c)=>{ if(myReady)return; if(own[r][c]===1) removeAt(r,c); else tryPlace(r,c); });
@@ -183,6 +171,7 @@ function renderSetup(){
     oppHere?"":"Share room <code>"+room+"</code> so your opponent can join.");
 }
 function renderPlay(){
+  persistLocal();
   $("setup").style.display="none"; $("play").style.display="flex";
   $("enemy").className="grid"+(turn===role&&!over?" fire":"");
   grid($("enemy"),enemy,false,(r,c)=>fire(r,c));
@@ -256,18 +245,32 @@ function onResult(r,c,hit,lost){ enemy[r][c]=hit?2:3; if(lost) over=role; render
 
 if(AI){
   document.querySelector(".bar h1").textContent="🚢 Battleship — vs Computer";
-  mountDiff(); clearAll(); phase="setup"; oppHere=true; renderSetup();
+  GC.mountDifficulty(()=>difficulty,(d)=>{difficulty=d;});
+  clearAll(); phase="setup"; oppHere=true; renderSetup();
 } else {
+  ch=GC.createChannel("bs");
   ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="setup")renderSetup(); })
     .on("broadcast",{event:"fire"},({payload})=>{ if(phase==="play") onFire(payload.r,payload.c); })
     .on("broadcast",{event:"result"},({payload})=>onResult(payload.r,payload.c,payload.hit,payload.lost))
-    .on("broadcast",{event:"reset"},()=>resetGame(false))
-    .on("presence",{event:"sync"},()=>{
-      const st=ch.presenceState(); oppHere=!!st[other];
-      if(oppHere && myReady) ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
-      if(phase==="setup")renderSetup();
-    })
-    .subscribe(async(s)=>{ if(s==="SUBSCRIBED"){ clearAll(); phase="setup"; renderSetup(); await ch.track({role}); }});
+    .on("broadcast",{event:"reset"},()=>resetGame(false));
+  if(!restoreLocal()){ phase="setup"; }        // refresh mid-game restores our fleet
+  if(phase==="play"||over) renderPlay(); else renderSetup();
+  GC.joinRoom(ch,{
+    // Only the shared facts travel; each side's fleet stays local.
+    getState:()=>({turn,over,phase,iAmReady:myReady}),
+    setState:(p)=>{
+      oppReady=p.iAmReady; turn=p.turn; over=p.over;
+      if(p.phase==="play"&&myReady&&phase==="setup"){ phase="play"; enemy=enemy||empty(); }
+      if(phase==="play"||over) renderPlay(); else renderSetup();
+    },
+    isStarted:()=>myReady||phase!=="setup"||!!over,
+    onPeers:(here)=>{
+      oppHere=here;
+      if(oppHere&&myReady&&phase==="setup") ch.send({type:"broadcast",event:"ready",payload:{}}); // re-announce for late joiners
+      if(phase==="setup") renderSetup();
+    },
+    onSeatTaken:()=>setStatus("Seat already taken",`This room already has a ${role} — join with the other role or start a new room.`),
+  });
 }
 
 $("orientH").onclick=()=>{ orient="h"; renderSetup(); };
@@ -277,7 +280,7 @@ $("clear").onclick=()=>{ if(!myReady) clearAll(); };
 $("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true;
   if(AI){ aiPlace(); oppReady=true; renderSetup(); bothReady(); return; }
   ch.send({type:"broadcast",event:"ready",payload:{}}); renderSetup(); bothReady(); };
-function resetGame(send){ over=false; recorded=false; myReady=false; oppReady=false; phase="setup"; clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
+function resetGame(send){ over=false; recorded=false; myReady=false; oppReady=false; phase="setup"; turn="host"; clearLocal(); clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
 $("rematch").onclick=()=>resetGame(true);
 </script>
 </body>
