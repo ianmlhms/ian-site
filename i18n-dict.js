@@ -64,13 +64,11 @@ window.I18N_DICT = {
 
   /* tile names + subtitles */
   "tile.pixelbreak":     { lb: "PixelBreak", de: "PixelBreak", en: "PixelBreak" },
-  "tile.pixelbreak.sub": { lb: "Arcade-Spiller", de: "Arcade-Spiele", en: "Arcade games" },
+  "tile.pixelbreak.sub": { lb: "Arcade & 2-iPad-Spiller", de: "Arcade- & 2-iPad-Spiele", en: "Arcade & 2-iPad games" },
   "tile.shorts.sub":     { lb: "Channel-Statistiken", de: "Kanal-Statistiken", en: "Channel stats" },
   "tile.messenger.sub":  { lb: "Chat & Gruppen", de: "Chat & Gruppen", en: "Chat & groups" },
   "tile.friends":        { lb: "Frënn", de: "Freunde", en: "Friends" },
   "tile.friends.sub":    { lb: "Bäisetzen, chatten & spillen", de: "Hinzufügen, chatten & spielen", en: "Add, chat & play" },
-  "tile.games":          { lb: "Spiller", de: "Spiele", en: "Games" },
-  "tile.games.sub":      { lb: "Op zwee iPads spillen", de: "Auf zwei iPads spielen", en: "Play on two iPads" },
   "tile.wordle.sub":     { lb: "Wordle · LB & DE", de: "Wordle · LB & DE", en: "Wordle · LB & DE" },
   "tile.grades":         { lb: "Noten", de: "Noten", en: "Grades" },
   "tile.grades.sub":     { lb: "Moyenne-Rechner", de: "Durchschnittsrechner", en: "Average calculator" },
