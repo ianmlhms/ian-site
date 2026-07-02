@@ -29,8 +29,9 @@ a { color: var(--accent2); text-decoration: none; }
 .bar {
   display: flex; align-items: center; gap: 14px;
   padding: 12px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(13, 13, 26, 0.82);
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  background: color-mix(in srgb, var(--card) 84%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   position: sticky; top: 0; z-index: 50;

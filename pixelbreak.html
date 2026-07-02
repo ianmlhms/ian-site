@@ -21,7 +21,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;min-height:100vh}
 ::selection{background:var(--accent);color:#fff}
-header{background:linear-gradient(135deg,#1a1a35 0%,#0d0d1a 50%,#1a1025 100%);padding:24px 30px 16px;position:sticky;top:0;z-index:100;border-bottom:1px solid rgba(255,255,255,0.05)}
+header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
 .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer}
 .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(255,107,157,0.3);animation:lp 3s ease-in-out infinite}
@@ -42,7 +42,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .sec-sub{color:var(--text2);font-size:13px;margin:2px 0 16px}
 .count{font-size:13px;color:var(--text2);margin-bottom:12px}
 .game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
-.game-card{background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;transition:transform 0.25s,box-shadow 0.25s,background 0.25s;position:relative;border:1px solid rgba(255,255,255,0.05)}
+.game-card{background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;transition:transform 0.25s,box-shadow 0.25s,background 0.25s;position:relative;border:1px solid var(--border)}
 .game-card.online{border-color:rgba(77,232,255,0.22)}
 .game-card.online:hover{box-shadow:0 14px 40px rgba(0,0,0,0.45),0 0 26px rgba(77,232,255,0.14)}
 .game-card:hover{transform:translateY(-6px);box-shadow:0 14px 40px rgba(0,0,0,0.45);background:var(--card-hover)}
@@ -54,7 +54,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .game-info{padding:10px 12px}
 .game-name{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
 .game-tags{display:flex;gap:4px;flex-wrap:wrap}
-.tag{font-size:10px;padding:2px 7px;border-radius:7px;background:rgba(255,255,255,0.06);color:var(--text2)}
+.tag{font-size:10px;padding:2px 7px;border-radius:7px;background:var(--card2);color:var(--text2)}
 .tag.mp{background:rgba(77,232,255,0.15);color:var(--accent2)}
 .tag.hot{background:rgba(255,107,157,0.15);color:var(--accent)}
 .tag.new{background:rgba(68,255,136,0.15);color:var(--accent4)}
@@ -84,7 +84,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 #om .go{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px;font-family:'Nunito',sans-serif}
 #om .go.alt{background:var(--card-hover);border:1px solid rgba(255,255,255,0.15)}
 #om .jr{display:flex;gap:8px;margin-top:4px}
-#om .jr input{flex:1;min-width:0;background:#1a1a30;border:1px solid #2a2a4a;color:var(--text);border-radius:10px;padding:11px;font-size:14px;text-transform:lowercase;font-family:'Nunito',sans-serif}
+#om .jr input{flex:1;min-width:0;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px;font-size:14px;text-transform:lowercase;font-family:'Nunito',sans-serif}
 #om .jr button{background:var(--accent2);color:#0d0d1a;border:none;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
 #om .x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
 footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
@@ -254,6 +254,6 @@ applyFilters();
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="pixelbreak-records.js?v=6"></script>
+<script type="module" src="pixelbreak-records.js?v=7"></script>
 </body>
 </html>

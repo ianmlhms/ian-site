@@ -231,7 +231,7 @@ async function fetchBoard(gid) {
 function css() {
   const s = document.createElement("style");
   s.textContent = `
-  .pb-acct{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:30px;border:2px solid #2a2a4a;background:#1a1a30;color:var(--text);font-weight:700;font-size:14px;cursor:pointer;font-family:'Nunito',sans-serif;white-space:nowrap}
+  .pb-acct{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:30px;border:2px solid var(--border);background:var(--card2);color:var(--text);font-weight:700;font-size:14px;cursor:pointer;font-family:'Nunito',sans-serif;white-space:nowrap}
   .pb-acct:hover{border-color:var(--accent2);color:var(--accent2)}
   .gbest{font-size:13px;color:var(--accent3);font-weight:700;margin-left:auto;white-space:nowrap}
   .gboard-btn{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px}
@@ -241,9 +241,9 @@ function css() {
   .pb-box{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:26px 24px;width:340px;max-width:100%;font-family:'Nunito',sans-serif}
   .pb-box h3{margin:0 0 4px;font-family:'Fredoka',sans-serif;font-size:20px}
   .pb-tabs{display:flex;gap:8px;margin:14px 0}
-  .pb-tab{flex:1;padding:8px;border-radius:10px;border:1px solid #2a2a4a;background:transparent;color:var(--text2);cursor:pointer;font-weight:700;font-size:13px}
+  .pb-tab{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-weight:700;font-size:13px}
   .pb-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
-  .pb-box input{width:100%;background:#1a1a30;border:1px solid #2a2a4a;color:var(--text);border-radius:10px;padding:11px 12px;font-size:14px;margin-bottom:10px;font-family:'Nunito',sans-serif}
+  .pb-box input{width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 12px;font-size:14px;margin-bottom:10px;font-family:'Nunito',sans-serif}
   .pb-go{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer}
   .pb-go:hover{filter:brightness(1.08)}
   .pb-msg{font-size:12.5px;margin-top:10px;min-height:16px}
