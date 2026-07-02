@@ -57,22 +57,23 @@ main{max-width:1200px;margin:0 auto;padding:16px 30px 50px}
 .tag.hot{background:rgba(255,107,157,0.15);color:var(--accent)}
 .tag.new{background:rgba(68,255,136,0.15);color:var(--accent4)}
 .ext{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;padding:2px 6px;border-radius:5px}
-#overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.94);z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
 #overlay.open{display:flex}
-#gh{display:flex;align-items:center;justify-content:space-between;width:95%;max-width:960px;padding:8px 0;color:#fff}
-#gh h2{font-family:'Fredoka',sans-serif;font-size:20px}
-#cb{background:var(--accent);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s}
+#gh{display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 14px;color:#fff;background:#0d0d1a;flex:none}
+#gh h2{font-family:'Fredoka',sans-serif;font-size:18px}
+#cb{background:var(--accent);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none}
 #cb:hover{transform:scale(1.1)}
-#gf{width:95%;max-width:960px;height:82vh;border:none;border-radius:var(--radius);background:#000;box-shadow:0 0 50px rgba(0,0,0,0.5)}
-/* on-screen touch controls (shown only on touch devices) — drive any game via synthetic key events */
-#tc{display:none;width:95%;max-width:960px;align-items:center;justify-content:space-between;gap:14px;padding:12px 6px 4px;user-select:none;-webkit-user-select:none;touch-action:none}
+#gf{flex:1;width:100%;border:none;border-radius:0;background:#000;min-height:0}
+/* on-screen touch controls (touch devices only) — float over the game, drive it via synthetic key events */
+#tc{display:none;position:absolute;bottom:14px;left:0;right:0;align-items:flex-end;justify-content:space-between;gap:14px;padding:0 16px;user-select:none;-webkit-user-select:none;touch-action:none;pointer-events:none;z-index:5}
+#tc .tb{pointer-events:auto;opacity:0.82}
 #tc .dpad{position:relative;width:156px;height:156px;flex:none}
 #tc .tb{position:absolute;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:20px;border-radius:12px;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:pointer}
 #tc .dpad .tb{width:50px;height:50px}
 #tc .up{left:53px;top:0}#tc .left{left:0;top:53px}#tc .down{left:53px;top:106px}#tc .right{left:106px;top:53px}
 #tc .act{position:static;width:78px;height:78px;border-radius:50%;background:var(--accent);border:none;font-weight:800;font-size:24px;flex:none}
 #tc .tb.on{background:var(--accent2);color:#0d0d1a}
-@media (pointer:coarse){#tc{display:flex}#gf{height:58vh}}
+@media (pointer:coarse){#tc{display:flex}}
 footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
 @media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:12px 12px 35px}.nav-pills{padding:8px 12px 0}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.game-thumb{height:90px;font-size:36px}}
 </style>
