@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Never run two FTP mirrors at once — concurrent `mirror --delete` runs
+# against the same httpdocs collide and one fails. Queue instead.
+concurrency:
+  group: plesk-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
