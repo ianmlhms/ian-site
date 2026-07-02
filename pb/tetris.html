@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Block Drop - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+#game{display:flex;gap:20px;align-items:flex-start}
+canvas{border-radius:8px;border:2px solid #333}
+#side{color:#fff;width:140px}
+#side h3{color:#ff6b9d;margin-bottom:8px}
+#next{background:#111;border:2px solid #333;border-radius:8px;margin-bottom:15px}
+.stat{margin-bottom:10px}
+.stat label{font-size:12px;color:#888}
+.stat .val{font-size:24px;font-weight:bold;color:#ff6b9d}
+</style>
+</head>
+<body>
+<div id="game">
+<canvas id="c" width="300" height="600"></canvas>
+<div id="side">
+<h3>NEXT</h3>
+<canvas id="next" width="120" height="120"></canvas>
+<div class="stat"><label>SCORE</label><div class="val" id="sc">0</div></div>
+<div class="stat"><label>LINES</label><div class="val" id="ln">0</div></div>
+<div class="stat"><label>LEVEL</label><div class="val" id="lv">1</div></div>
+<div style="margin-top:20px;font-size:11px;color:#555">
+↑ Rotate<br>← → Move<br>↓ Soft Drop<br>Space Hard Drop
+</div>
+</div>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+const NC=document.getElementById('next'),NX=NC.getContext('2d');
+const COLS=10,ROWS=20,SZ=30;
+const SHAPES=[
+  {blocks:[[0,0],[1,0],[2,0],[3,0]],color:'#00e5ff'},
+  {blocks:[[0,0],[1,0],[0,1],[1,1]],color:'#ffcc00'},
+  {blocks:[[0,0],[1,0],[2,0],[1,1]],color:'#aa44ff'},
+  {blocks:[[0,0],[1,0],[2,0],[2,1]],color:'#ff8800'},
+  {blocks:[[0,0],[1,0],[2,0],[0,1]],color:'#4488ff'},
+  {blocks:[[0,0],[1,0],[1,1],[2,1]],color:'#44ff44'},
+  {blocks:[[1,0],[2,0],[0,1],[1,1]],color:'#ff4444'},
+];
+let grid,piece,next,score,lines,level,gameOver,dropTimer,dropInterval;
+
+function newPiece(){
+  piece={shape:next||SHAPES[Math.floor(Math.random()*7)],x:3,y:0,rot:0};
+  next=SHAPES[Math.floor(Math.random()*7)];
+  let blocks=getBlocks(piece);
+  for(let b of blocks)if(grid[b.y]&&grid[b.y][b.x])gameOver=true;
+}
+function getBlocks(p){
+  let s=p.shape.blocks,r=p.rot%4,res=[];
+  for(let b of s){
+    let x=b[0],y=b[1];
+    for(let i=0;i<r;i++){let t=x;x=-y+2;y=t}
+    res.push({x:x+p.x,y:y+p.y});
+  }return res;
+}
+function valid(p){
+  let blocks=getBlocks(p);
+  for(let b of blocks){if(b.x<0||b.x>=COLS||b.y>=ROWS)return false;if(b.y>=0&&grid[b.y][b.x])return false}
+  return true;
+}
+function lock(){
+  let blocks=getBlocks(piece);
+  for(let b of blocks)if(b.y>=0)grid[b.y][b.x]=piece.shape.color;
+  // Clear lines
+  let cleared=0;
+  for(let y=ROWS-1;y>=0;y--){
+    if(grid[y].every(c=>c)){grid.splice(y,1);grid.unshift(Array(COLS).fill(0));cleared++;y++}
+  }
+  if(cleared){lines+=cleared;score+=[0,100,300,500,800][cleared]*level;level=Math.floor(lines/10)+1;
+    dropInterval=Math.max(50,500-level*40);
+    document.getElementById('sc').textContent=score;
+    document.getElementById('ln').textContent=lines;
+    document.getElementById('lv').textContent=level;
+  }
+  newPiece();
+}
+function draw(){
+  X.fillStyle='#111';X.fillRect(0,0,C.width,C.height);
+  // Grid
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
+    if(grid[y][x]){X.fillStyle=grid[y][x];X.shadowColor=grid[y][x];X.shadowBlur=5;
+      X.beginPath();X.roundRect(x*SZ+1,y*SZ+1,SZ-2,SZ-2,3);X.fill();X.shadowBlur=0}
+    else{X.strokeStyle='#1a1a2a';X.strokeRect(x*SZ,y*SZ,SZ,SZ)}
+  }
+  // Current piece
+  if(!gameOver){
+    let blocks=getBlocks(piece);
+    // Ghost
+    let ghost={...piece};while(valid({...ghost,y:ghost.y+1}))ghost.y++;
+    let gb=getBlocks(ghost);
+    X.globalAlpha=0.2;X.fillStyle=piece.shape.color;
+    for(let b of gb){X.fillRect(b.x*SZ+2,b.y*SZ+2,SZ-4,SZ-4)}
+    X.globalAlpha=1;
+    // Piece
+    X.fillStyle=piece.shape.color;X.shadowColor=piece.shape.color;X.shadowBlur=8;
+    for(let b of blocks)if(b.y>=0){X.beginPath();X.roundRect(b.x*SZ+1,b.y*SZ+1,SZ-2,SZ-2,3);X.fill()}
+    X.shadowBlur=0;
+  }
+  // Next piece preview
+  NX.fillStyle='#111';NX.fillRect(0,0,120,120);
+  NX.fillStyle=next.color;NX.shadowColor=next.color;NX.shadowBlur=5;
+  for(let b of next.blocks){NX.beginPath();NX.roundRect(b[0]*25+20,b[1]*25+30,23,23,3);NX.fill()}
+  NX.shadowBlur=0;
+  if(gameOver){
+    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#ff6b9d';X.font='bold 36px Segoe UI';X.textAlign='center';
+    X.fillText('GAME OVER',C.width/2,C.height/2-20);
+    X.fillStyle='#fff';X.font='16px Segoe UI';X.fillText('Press SPACE',C.width/2,C.height/2+20);
+  }
+}
+function start(){
+  grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  score=0;lines=0;level=1;gameOver=false;dropInterval=500;dropTimer=0;
+  next=SHAPES[Math.floor(Math.random()*7)];newPiece();
+  document.getElementById('sc').textContent=0;
+  document.getElementById('ln').textContent=0;
+  document.getElementById('lv').textContent=1;
+}
+let lastTime=0;
+function loop(t){
+  let dt=t-lastTime;lastTime=t;
+  if(!gameOver){dropTimer+=dt;if(dropTimer>dropInterval){dropTimer=0;
+    if(valid({...piece,y:piece.y+1}))piece.y++;else lock()}}
+  draw();requestAnimationFrame(loop);
+}
+document.addEventListener('keydown',e=>{
+  if(gameOver){if(e.key===' ')start();e.preventDefault();return}
+  if(e.key==='ArrowLeft'&&valid({...piece,x:piece.x-1}))piece.x--;
+  if(e.key==='ArrowRight'&&valid({...piece,x:piece.x+1}))piece.x++;
+  if(e.key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++}
+  if(e.key==='ArrowUp'){let t={...piece,rot:piece.rot+1};if(valid(t))piece.rot++}
+  if(e.key===' '){while(valid({...piece,y:piece.y+1})){piece.y++;score+=2}lock()}
+  e.preventDefault();
+});
+start();requestAnimationFrame(loop);
+</script>
+</body>
+</html>

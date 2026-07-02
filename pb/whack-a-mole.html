@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Whack-a-Mole - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#2a1810;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;overflow:hidden}
+#hud{margin-bottom:15px;font-size:20px;display:flex;gap:30px}
+#board{display:grid;grid-template-columns:repeat(3,120px);gap:15px}
+.hole{width:120px;height:100px;background:radial-gradient(ellipse at center,#1a0a05 0%,#3a2010 100%);border-radius:50%;position:relative;overflow:hidden;cursor:pointer;border:3px solid #5a3a20}
+.mole{position:absolute;bottom:-60px;left:50%;transform:translateX(-50%);font-size:50px;transition:bottom 0.15s;pointer-events:none}
+.mole.up{bottom:10px}
+.mole.hit{bottom:10px;filter:grayscale(1)}
+#msg{margin-top:15px;font-size:22px;min-height:30px}
+button{padding:10px 30px;font-size:18px;background:#ff6b35;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;margin-top:10px}
+button:hover{background:#e55a25}
+</style>
+</head>
+<body>
+<div id="hud"><span>Score: <b id="score">0</b></span><span>⏱ <b id="timer">30</b>s</span><span>Combo: <b id="combo">0</b>x</span></div>
+<div id="board"></div>
+<div id="msg"></div>
+<button onclick="startGame()">START</button>
+<script>
+let score,timeLeft,combo,moles,interval,timerInt,active;
+function init(){
+  let b=document.getElementById('board');b.innerHTML='';
+  moles=[];
+  for(let i=0;i<9;i++){
+    let h=document.createElement('div');h.className='hole';
+    let m=document.createElement('div');m.className='mole';m.textContent='🐹';
+    h.appendChild(m);h.addEventListener('click',()=>whack(i));
+    b.appendChild(h);moles.push({el:m,up:false,hit:false});
+  }
+}
+function startGame(){
+  init();score=0;timeLeft=30;combo=0;active=true;
+  document.getElementById('score').textContent=0;
+  document.getElementById('timer').textContent=30;
+  document.getElementById('combo').textContent=0;
+  document.getElementById('msg').textContent='';
+  if(interval)clearInterval(interval);
+  if(timerInt)clearInterval(timerInt);
+  interval=setInterval(popup,800);
+  timerInt=setInterval(()=>{timeLeft--;document.getElementById('timer').textContent=timeLeft;
+    if(timeLeft<=0){clearInterval(interval);clearInterval(timerInt);active=false;
+      document.getElementById('msg').textContent='🎉 Final Score: '+score}},1000);
+}
+function popup(){
+  // Hide all first
+  moles.forEach(m=>{m.el.className='mole';m.up=false;m.hit=false});
+  // Show 1-2 moles
+  let count=Math.random()<0.3?2:1;
+  let indices=[];
+  while(indices.length<count){let i=Math.floor(Math.random()*9);if(!indices.includes(i))indices.push(i)}
+  for(let i of indices){moles[i].up=true;moles[i].el.className='mole up';
+    // Golden mole
+    moles[i].el.textContent=Math.random()<0.1?'⭐':'🐹';
+  }
+  setTimeout(()=>{for(let i of indices){if(!moles[i].hit){moles[i].el.className='mole';moles[i].up=false;combo=0;document.getElementById('combo').textContent=0}}},1200-Math.min(timeLeft<15?400:0,400));
+}
+function whack(i){
+  if(!active||!moles[i].up||moles[i].hit)return;
+  moles[i].hit=true;moles[i].el.className='mole hit';
+  let pts=moles[i].el.textContent==='⭐'?5:1;
+  combo++;pts*=Math.min(combo,5);
+  score+=pts;
+  document.getElementById('score').textContent=score;
+  document.getElementById('combo').textContent=combo;
+  moles[i].el.textContent='💫';
+  setTimeout(()=>{moles[i].el.className='mole';moles[i].up=false},200);
+}
+init();
+</script>
+</body>
+</html>

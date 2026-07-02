@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pixel Painter - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;gap:15px}
+canvas{border-radius:8px;border:2px solid #2a2a4a;cursor:crosshair;image-rendering:pixelated}
+#tools{display:flex;flex-direction:column;gap:8px;width:50px}
+.color-btn{width:40px;height:40px;border-radius:8px;border:3px solid transparent;cursor:pointer}
+.color-btn.active{border-color:#fff;transform:scale(1.1)}
+.tool-btn{width:40px;height:40px;border-radius:8px;border:2px solid #3a3a5a;cursor:pointer;background:#1a1a2e;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+.tool-btn.active{border-color:#4de8ff;background:#2a2a4a}
+#size{width:40px;text-align:center;background:#1a1a2e;border:1px solid #3a3a5a;color:#fff;border-radius:4px;padding:4px}
+</style>
+</head>
+<body>
+<div id="tools">
+<div class="tool-btn active" onclick="setTool('draw')" title="Draw">✏️</div>
+<div class="tool-btn" onclick="setTool('erase')" title="Eraser">🧹</div>
+<div class="tool-btn" onclick="setTool('fill')" title="Fill">🪣</div>
+<div class="tool-btn" onclick="clearCanvas()" title="Clear">🗑️</div>
+<input type="range" id="sz" min="1" max="5" value="1" style="width:40px;margin:5px 0" oninput="brushSize=+this.value">
+<div id="colors"></div>
+</div>
+<canvas id="c" width="640" height="640"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+const PX=16,GRID=40;
+const PALETTE=['#000000','#ffffff','#ff4466','#ff8844','#ffcc00','#44ff88','#44aaff','#aa66ff','#ff66aa','#884422','#666666','#1a1a2e','#00cccc','#88cc44','#4444aa','#cc4488'];
+let grid=Array.from({length:GRID},()=>Array(GRID).fill(null));
+let color=PALETTE[2],tool='draw',brushSize=1,drawing=false;
+
+// Render palette
+let ch='';PALETTE.forEach((c,i)=>{ch+=`<div class="color-btn ${i===2?'active':''}" style="background:${c}" onclick="setColor('${c}',this)"></div>`});
+document.getElementById('colors').innerHTML=ch;
+
+function setColor(c,el){color=c;document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
+function setTool(t){tool=t;document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tool-btn')[t==='draw'?0:t==='erase'?1:2].classList.add('active')}
+function clearCanvas(){grid=Array.from({length:GRID},()=>Array(GRID).fill(null));render()}
+
+function paint(mx,my){
+  let r=C.getBoundingClientRect();
+  let x=Math.floor((mx-r.left)*C.width/r.width/PX);
+  let y=Math.floor((my-r.top)*C.height/r.height/PX);
+  if(x<0||x>=GRID||y<0||y>=GRID)return;
+  if(tool==='fill'){floodFill(x,y,grid[y][x],color);render();return}
+  for(let dy=-brushSize+1;dy<brushSize;dy++)for(let dx=-brushSize+1;dx<brushSize;dx++){
+    let nx=x+dx,ny=y+dy;
+    if(nx>=0&&nx<GRID&&ny>=0&&ny<GRID)grid[ny][nx]=tool==='erase'?null:color;
+  }
+  render();
+}
+
+function floodFill(x,y,target,fill){
+  if(target===fill)return;
+  let stack=[[x,y]];
+  while(stack.length){
+    let[cx,cy]=stack.pop();
+    if(cx<0||cx>=GRID||cy<0||cy>=GRID)continue;
+    if(grid[cy][cx]!==target)continue;
+    grid[cy][cx]=fill;
+    stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
+  }
+}
+
+function render(){
+  X.fillStyle='#1a1a2e';X.fillRect(0,0,C.width,C.height);
+  // Grid lines
+  X.strokeStyle='rgba(255,255,255,0.05)';X.lineWidth=0.5;
+  for(let i=0;i<=GRID;i++){X.beginPath();X.moveTo(i*PX,0);X.lineTo(i*PX,C.height);X.stroke();
+    X.beginPath();X.moveTo(0,i*PX);X.lineTo(C.width,i*PX);X.stroke()}
+  // Pixels
+  for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++){
+    if(grid[y][x]){X.fillStyle=grid[y][x];X.fillRect(x*PX,y*PX,PX,PX)}
+  }
+}
+
+C.addEventListener('mousedown',e=>{drawing=true;paint(e.clientX,e.clientY)});
+C.addEventListener('mousemove',e=>{if(drawing)paint(e.clientX,e.clientY)});
+C.addEventListener('mouseup',()=>drawing=false);
+C.addEventListener('mouseleave',()=>drawing=false);
+render();
+</script>
+</body>
+</html>

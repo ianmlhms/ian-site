@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mine Sweep - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;overflow:hidden}
+#hud{margin-bottom:10px;display:flex;gap:30px;font-size:18px}
+.stat{background:#1a1a2e;padding:6px 16px;border-radius:10px}
+#board{display:grid;gap:2px;background:#1a1a2e;padding:8px;border-radius:12px;box-shadow:0 0 30px rgba(255,50,50,0.15)}
+.cell{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;user-select:none;transition:background 0.1s}
+.cell.hidden{background:#3a3a5a}
+.cell.hidden:hover{background:#4a4a6a}
+.cell.revealed{background:#1a1a2e}
+.cell.flagged{background:#3a3a5a}
+.cell.mine{background:#ff2244}
+.c1{color:#44aaff}.c2{color:#44cc44}.c3{color:#ff4466}.c4{color:#aa44ff}.c5{color:#ff8844}.c6{color:#44cccc}.c7{color:#fff}.c8{color:#888}
+#msg{margin-top:15px;font-size:20px;min-height:30px}
+#diff{margin-bottom:15px;display:flex;gap:10px}
+#diff button{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px;background:#3a3a5a;color:#fff}
+#diff button:hover{background:#5a5a7a}
+#diff button.active{background:#ff6b9d;color:#fff}
+</style>
+</head>
+<body>
+<div id="diff">
+<button onclick="init(9,9,10)" class="active">Easy</button>
+<button onclick="init(16,16,40)">Medium</button>
+<button onclick="init(20,16,60)">Hard</button>
+</div>
+<div id="hud"><div class="stat">💣 <span id="mines">10</span></div><div class="stat" id="timer">⏱ 0s</div></div>
+<div id="board"></div>
+<div id="msg"></div>
+<script>
+let W,H,MINES,grid,revealed,flagged,gameOver,firstClick,timerInt,seconds;
+function init(w,h,m){
+  W=w;H=h;MINES=m;grid=[];revealed=[];flagged=[];gameOver=false;firstClick=true;seconds=0;
+  if(timerInt)clearInterval(timerInt);
+  document.getElementById('msg').textContent='';
+  document.getElementById('mines').textContent=m;
+  document.getElementById('timer').textContent='⏱ 0s';
+  document.querySelectorAll('#diff button').forEach(b=>b.classList.remove('active'));
+  if(m===10)document.querySelectorAll('#diff button')[0].classList.add('active');
+  else if(m===40)document.querySelectorAll('#diff button')[1].classList.add('active');
+  else document.querySelectorAll('#diff button')[2].classList.add('active');
+  for(let y=0;y<H;y++){grid[y]=[];revealed[y]=[];flagged[y]=[];for(let x=0;x<W;x++){grid[y][x]=0;revealed[y][x]=false;flagged[y][x]=false}}
+  render();
+}
+function placeMines(sx,sy){
+  let placed=0;
+  while(placed<MINES){
+    let x=Math.floor(Math.random()*W),y=Math.floor(Math.random()*H);
+    if(grid[y][x]===-1||( Math.abs(x-sx)<=1&&Math.abs(y-sy)<=1))continue;
+    grid[y][x]=-1;placed++;
+  }
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    if(grid[y][x]===-1)continue;let c=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      let nx=x+dx,ny=y+dy;if(nx>=0&&nx<W&&ny>=0&&ny<H&&grid[ny][nx]===-1)c++}
+    grid[y][x]=c;
+  }
+}
+function reveal(x,y){
+  if(x<0||x>=W||y<0||y>=H||revealed[y][x]||flagged[y][x]||gameOver)return;
+  if(firstClick){placeMines(x,y);firstClick=false;timerInt=setInterval(()=>{seconds++;document.getElementById('timer').textContent='⏱ '+seconds+'s'},1000)}
+  revealed[y][x]=true;
+  if(grid[y][x]===-1){gameOver=true;clearInterval(timerInt);
+    for(let yy=0;yy<H;yy++)for(let xx=0;xx<W;xx++)if(grid[yy][xx]===-1)revealed[yy][xx]=true;
+    document.getElementById('msg').innerHTML='💥 <span style="color:#ff4466">BOOM! Game Over</span> — Click a difficulty to retry';render();return}
+  if(grid[y][x]===0)for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)reveal(x+dx,y+dy);
+  // Check win
+  let unrevealed=0;for(let yy=0;yy<H;yy++)for(let xx=0;xx<W;xx++)if(!revealed[yy][xx])unrevealed++;
+  if(unrevealed===MINES){gameOver=true;clearInterval(timerInt);
+    document.getElementById('msg').innerHTML='🎉 <span style="color:#44ff88">YOU WIN!</span> Time: '+seconds+'s'}
+  render();
+}
+function flag(x,y){
+  if(revealed[y][x]||gameOver)return;
+  flagged[y][x]=!flagged[y][x];
+  let fc=0;for(let yy=0;yy<H;yy++)for(let xx=0;xx<W;xx++)if(flagged[yy][xx])fc++;
+  document.getElementById('mines').textContent=MINES-fc;
+  render();
+}
+function render(){
+  let b=document.getElementById('board');
+  b.style.gridTemplateColumns=`repeat(${W},32px)`;
+  let h='';
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    let cls='cell';let txt='';
+    if(revealed[y][x]){
+      cls+=' revealed';
+      if(grid[y][x]===-1){cls+=' mine';txt='💣'}
+      else if(grid[y][x]>0){txt=grid[y][x];cls+=' c'+grid[y][x]}
+    }else if(flagged[y][x]){cls+=' flagged';txt='🚩'}
+    else cls+=' hidden';
+    h+=`<div class="${cls}" data-x="${x}" data-y="${y}">${txt}</div>`;
+  }
+  b.innerHTML=h;
+  b.querySelectorAll('.cell').forEach(c=>{
+    let x=+c.dataset.x,y=+c.dataset.y;
+    c.addEventListener('click',()=>reveal(x,y));
+    c.addEventListener('contextmenu',e=>{e.preventDefault();flag(x,y)});
+  });
+}
+init(9,9,10);
+</script>
+</body>
+</html>

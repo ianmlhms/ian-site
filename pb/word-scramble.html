@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Word Scramble - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
+#scrambled{font-size:52px;letter-spacing:12px;color:#ff6b9d;font-weight:bold;margin:20px 0;text-shadow:0 0 20px rgba(255,107,157,0.4)}
+#hint{font-size:16px;color:#888;margin-bottom:20px}
+input{background:#1a1a2e;border:2px solid #3a3a5a;color:#fff;font-size:28px;padding:12px 20px;border-radius:12px;text-align:center;width:300px;outline:none;letter-spacing:4px}
+input:focus{border-color:#ff6b9d}
+#hud{display:flex;gap:30px;font-size:18px;margin-bottom:30px}
+#feedback{margin-top:20px;font-size:24px;min-height:35px}
+#timer-bar{width:300px;height:6px;background:#2a2a4a;border-radius:3px;margin-top:15px;overflow:hidden}
+#timer-fill{height:100%;background:#00ff88;transition:width 0.5s;border-radius:3px}
+button{margin-top:15px;padding:8px 20px;background:#3a3a5a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px}
+</style>
+</head>
+<body>
+<div id="hud"><span>Score: <b id="sc">0</b></span><span>Streak: <b id="st">0</b>🔥</span><span>Level: <b id="lv">1</b></span></div>
+<div id="hint"></div>
+<div id="scrambled"></div>
+<input id="guess" placeholder="Type your answer..." autofocus autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
+<div id="timer-bar"><div id="timer-fill" style="width:100%"></div></div>
+<div id="feedback"></div>
+<button onclick="skip()">Skip (−5 pts)</button>
+<script>
+const WORDS=[
+  {w:'PLANET',h:'Space'},
+  {w:'GUITAR',h:'Music'},
+  {w:'CASTLE',h:'Medieval'},
+  {w:'DRAGON',h:'Fantasy'},
+  {w:'ROCKET',h:'Space'},
+  {w:'JUNGLE',h:'Nature'},
+  {w:'BRIDGE',h:'Structure'},
+  {w:'PIRATE',h:'Sea'},
+  {w:'FROZEN',h:'Cold'},
+  {w:'SHADOW',h:'Dark'},
+  {w:'PUZZLE',h:'Game'},
+  {w:'ISLAND',h:'Geography'},
+  {w:'KNIGHT',h:'Medieval'},
+  {w:'TROPHY',h:'Winner'},
+  {w:'ZOMBIE',h:'Horror'},
+  {w:'MUSEUM',h:'Culture'},
+  {w:'VOLCANO',h:'Nature'},
+  {w:'DOLPHIN',h:'Ocean'},
+  {w:'RAINBOW',h:'Weather'},
+  {w:'COMPASS',h:'Navigation'},
+  {w:'PENGUIN',h:'Animal'},
+  {w:'DIAMOND',h:'Gem'},
+  {w:'THUNDER',h:'Weather'},
+  {w:'TORNADO',h:'Weather'},
+  {w:'CRYSTAL',h:'Mineral'},
+  {w:'POPCORN',h:'Snack'},
+  {w:'BLANKET',h:'Cozy'},
+  {w:'GIRAFFE',h:'Animal'},
+  {w:'CHICKEN',h:'Animal'},
+  {w:'OCTOPUS',h:'Ocean'},
+];
+let score=0,streak=0,level=1,current,timeLeft=100,used=new Set();
+
+function scramble(w){
+  let a=w.split('');
+  for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+  return a.join('')===w?scramble(w):a.join('');
+}
+function next(){
+  let available=WORDS.filter(w=>!used.has(w.w));
+  if(!available.length){used.clear();available=WORDS}
+  current=available[Math.floor(Math.random()*available.length)];
+  used.add(current.w);
+  document.getElementById('scrambled').textContent=scramble(current.w);
+  document.getElementById('hint').textContent='Hint: '+current.h+' ('+current.w.length+' letters)';
+  document.getElementById('guess').value='';
+  document.getElementById('feedback').textContent='';
+  timeLeft=100;
+}
+function skip(){score=Math.max(0,score-5);streak=0;
+  document.getElementById('feedback').innerHTML=`<span style="color:#ffcc00">It was: ${current.w}</span>`;
+  document.getElementById('sc').textContent=score;document.getElementById('st').textContent=0;
+  setTimeout(next,1000);
+}
+document.getElementById('guess').addEventListener('input',e=>{
+  let v=e.target.value.toUpperCase();
+  if(v===current.w){
+    score+=10+streak*3;streak++;level=Math.floor(streak/3)+1;
+    document.getElementById('feedback').innerHTML='<span style="color:#44ff88">✓ Correct!</span>';
+    document.getElementById('sc').textContent=score;document.getElementById('st').textContent=streak;document.getElementById('lv').textContent=level;
+    setTimeout(next,600);
+  }
+});
+setInterval(()=>{
+  timeLeft-=0.8+level*0.2;
+  if(timeLeft<=0){streak=0;document.getElementById('st').textContent=0;
+    document.getElementById('feedback').innerHTML=`<span style="color:#ff4466">Time! It was ${current.w}</span>`;
+    setTimeout(next,1200);timeLeft=100}
+  document.getElementById('timer-fill').style.width=Math.max(0,timeLeft)+'%';
+  document.getElementById('timer-fill').style.background=timeLeft>25?'#00ff88':'#ff4466';
+},100);
+next();
+</script>
+</body>
+</html>

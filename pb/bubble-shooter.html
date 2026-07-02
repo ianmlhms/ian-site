@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bubble Pop - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a1a2a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(100,200,255,0.2)}
+</style>
+</head>
+<body>
+<canvas id="c" width="480" height="600"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d'),R=18,COLS=13;
+const COLORS=['#ff4466','#4488ff','#44cc44','#ffcc00','#aa66ff','#ff8844'];
+let grid,shooter,nextColor,score,gameOver,aimAngle=-Math.PI/2,flying=null;
+
+function init(){
+  grid=[];score=0;gameOver=false;flying=null;
+  for(let row=0;row<8;row++){
+    grid[row]=[];
+    let cols=row%2===0?COLS:COLS-1;
+    for(let c=0;c<cols;c++){
+      grid[row][c]=row<5?COLORS[Math.floor(Math.random()*COLORS.length)]:null;
+    }
+  }
+  nextColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+  shooter={color:COLORS[Math.floor(Math.random()*COLORS.length)]};
+}
+
+function getPos(row,col){
+  let x=col*R*2+R+(row%2===0?0:R);
+  let y=row*R*1.73+R+20;
+  return{x,y};
+}
+
+function snap(x,y){
+  let bestR=0,bestC=0,bestD=Infinity;
+  for(let row=0;row<20;row++){
+    let cols=row%2===0?COLS:COLS-1;
+    for(let c=0;c<cols;c++){
+      let p=getPos(row,c);
+      let d=Math.hypot(x-p.x,y-p.y);
+      if(d<bestD){bestD=d;bestR=row;bestC=c}
+    }
+  }
+  return{row:bestR,col:bestC};
+}
+
+function getNeighbors(row,col){
+  let n=[];
+  let even=row%2===0;
+  let dirs=even?[[-1,-1],[-1,0],[0,-1],[0,1],[1,-1],[1,0]]:[[-1,0],[-1,1],[0,-1],[0,1],[1,0],[1,1]];
+  for(let[dr,dc]of dirs){
+    let r=row+dr,c=col+dc;
+    let cols=r%2===0?COLS:COLS-1;
+    if(r>=0&&r<20&&c>=0&&c<cols)n.push({row:r,col:c});
+  }
+  return n;
+}
+
+function findCluster(row,col,color){
+  let visited=new Set(),cluster=[];
+  let stack=[{row,col}];
+  while(stack.length){
+    let{row:r,col:c}=stack.pop();
+    let key=r+','+c;
+    if(visited.has(key))continue;visited.add(key);
+    if(!grid[r]||grid[r][c]!==color)continue;
+    cluster.push({row:r,col:c});
+    for(let n of getNeighbors(r,c))stack.push(n);
+  }
+  return cluster;
+}
+
+function removeFloating(){
+  let connected=new Set();
+  // BFS from top row
+  for(let c=0;c<COLS;c++){
+    if(!grid[0]||!grid[0][c])continue;
+    let stack=[{row:0,col:c}];
+    while(stack.length){
+      let{row:r,col:cc}=stack.pop();
+      let key=r+','+cc;
+      if(connected.has(key))continue;connected.add(key);
+      if(!grid[r]||!grid[r][cc])continue;
+      for(let n of getNeighbors(r,cc))stack.push(n);
+    }
+  }
+  let removed=0;
+  for(let r=0;r<20;r++){if(!grid[r])continue;
+    let cols=r%2===0?COLS:COLS-1;
+    for(let c=0;c<cols;c++){
+      if(grid[r][c]&&!connected.has(r+','+c)){grid[r][c]=null;removed++}
+    }
+  }
+  return removed;
+}
+
+function shoot(){
+  if(flying||gameOver)return;
+  flying={x:C.width/2,y:C.height-40,vx:Math.cos(aimAngle)*10,vy:Math.sin(aimAngle)*10,color:shooter.color};
+  shooter.color=nextColor;
+  nextColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+}
+
+function draw(){
+  X.fillStyle='#0a1a2a';X.fillRect(0,0,C.width,C.height);
+  // Grid bubbles
+  for(let r=0;r<20;r++){if(!grid[r])continue;
+    let cols=r%2===0?COLS:COLS-1;
+    for(let c=0;c<cols;c++){
+      if(!grid[r][c])continue;
+      let p=getPos(r,c);
+      X.fillStyle=grid[r][c];X.shadowColor=grid[r][c];X.shadowBlur=6;
+      X.beginPath();X.arc(p.x,p.y,R-1,0,Math.PI*2);X.fill();
+      X.fillStyle='rgba(255,255,255,0.2)';
+      X.beginPath();X.arc(p.x-4,p.y-4,R/3,0,Math.PI*2);X.fill();
+    }
+  }
+  X.shadowBlur=0;
+
+  // Flying bubble
+  if(flying){
+    flying.x+=flying.vx;flying.y+=flying.vy;
+    if(flying.x<R||flying.x>C.width-R)flying.vx*=-1;
+    if(flying.y<R){
+      let s=snap(flying.x,flying.y);
+      if(!grid[s.row])grid[s.row]=[];
+      grid[s.row][s.col]=flying.color;
+      let cluster=findCluster(s.row,s.col,flying.color);
+      if(cluster.length>=3){for(let c of cluster)grid[c.row][c.col]=null;score+=cluster.length*10;
+        let floats=removeFloating();score+=floats*15}
+      flying=null;
+    }
+    // Check collision with grid
+    if(flying){
+      for(let r=0;r<20;r++){if(!grid[r])continue;
+        let cols=r%2===0?COLS:COLS-1;
+        for(let c=0;c<cols;c++){
+          if(!grid[r][c])continue;
+          let p=getPos(r,c);
+          if(Math.hypot(flying.x-p.x,flying.y-p.y)<R*2-2){
+            let s=snap(flying.x,flying.y);
+            if(!grid[s.row])grid[s.row]=[];
+            grid[s.row][s.col]=flying.color;
+            let cluster=findCluster(s.row,s.col,flying.color);
+            if(cluster.length>=3){for(let cl of cluster)grid[cl.row][cl.col]=null;score+=cluster.length*10;
+              let floats=removeFloating();score+=floats*15}
+            flying=null;break;
+          }
+        }if(!flying)break;
+      }
+    }
+    if(flying){
+      X.fillStyle=flying.color;X.shadowColor=flying.color;X.shadowBlur=10;
+      X.beginPath();X.arc(flying.x,flying.y,R-1,0,Math.PI*2);X.fill();X.shadowBlur=0;
+    }
+  }
+
+  // Aim line
+  X.strokeStyle='rgba(255,255,255,0.2)';X.setLineDash([5,5]);X.lineWidth=1;
+  X.beginPath();X.moveTo(C.width/2,C.height-40);
+  X.lineTo(C.width/2+Math.cos(aimAngle)*150,C.height-40+Math.sin(aimAngle)*150);X.stroke();
+  X.setLineDash([]);
+
+  // Shooter
+  X.fillStyle=shooter.color;X.shadowColor=shooter.color;X.shadowBlur=12;
+  X.beginPath();X.arc(C.width/2,C.height-40,R,0,Math.PI*2);X.fill();
+  // Next
+  X.fillStyle=nextColor;X.shadowBlur=4;
+  X.beginPath();X.arc(C.width/2+50,C.height-35,R*0.7,0,Math.PI*2);X.fill();
+  X.shadowBlur=0;
+  X.fillStyle='rgba(255,255,255,0.4)';X.font='11px Segoe UI';X.textAlign='center';
+  X.fillText('next',C.width/2+50,C.height-15);
+
+  // HUD
+  X.fillStyle='#fff';X.font='bold 20px Segoe UI';X.textAlign='left';
+  X.fillText('Score: '+score,15,C.height-15);
+
+  requestAnimationFrame(draw);
+}
+
+C.addEventListener('mousemove',e=>{
+  let r=C.getBoundingClientRect();
+  let mx=(e.clientX-r.left)*C.width/r.width,my=(e.clientY-r.top)*C.height/r.height;
+  aimAngle=Math.atan2(my-(C.height-40),mx-C.width/2);
+  if(aimAngle>-0.15)aimAngle=-0.15;if(aimAngle<-Math.PI+0.15)aimAngle=-Math.PI+0.15;
+});
+C.addEventListener('click',shoot);
+document.addEventListener('keydown',e=>{if(e.key===' '){shoot();e.preventDefault()}});
+init();draw();
+</script>
+</body>
+</html>

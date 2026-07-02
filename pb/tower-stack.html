@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tower Stack - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a2e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(255,100,200,0.2)}
+</style>
+</head>
+<body>
+<canvas id="c" width="400" height="600"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let blocks,current,score,gameOver,speed,cameraY;
+const COLORS=['#ff6b9d','#ff8844','#ffcc00','#44ff88','#44aaff','#aa66ff','#ff4466'];
+function start(){
+  blocks=[{x:150,y:550,w:100}];current={x:0,y:0,w:100,dir:1};
+  score=0;gameOver=false;speed=2;cameraY=0;
+}
+function place(){
+  let top=blocks[blocks.length-1];
+  let cx=current.x,cw=current.w;
+  let overlap=Math.min(cx+cw,top.x+top.w)-Math.max(cx,top.x);
+  if(overlap<=0){gameOver=true;return}
+  let nx=Math.max(cx,top.x);
+  blocks.push({x:nx,y:top.y-30,w:overlap});
+  current.w=overlap;current.x=0;
+  score++;speed=Math.min(5,2+score*0.1);
+  if(blocks.length>5)cameraY+=(30-cameraY*0.1);
+}
+function draw(){
+  let hue=(score*20)%360;
+  let bg=X.createLinearGradient(0,0,0,C.height);
+  bg.addColorStop(0,`hsl(${hue},30%,8%)`);bg.addColorStop(1,`hsl(${hue+60},30%,15%)`);
+  X.fillStyle=bg;X.fillRect(0,0,C.width,C.height);
+  // Stars
+  X.fillStyle='#fff';for(let i=0;i<40;i++){X.globalAlpha=0.1+Math.sin(Date.now()/600+i)*0.1;
+    X.fillRect((i*97)%C.width,(i*53)%C.height,1.5,1.5)}X.globalAlpha=1;
+  
+  let offy=Math.max(0,(blocks.length-12)*30);
+  if(!gameOver){
+    current.x+=current.dir*speed;
+    if(current.x>C.width-current.w||current.x<0)current.dir*=-1;
+    let cy=blocks[blocks.length-1].y-30+offy;
+    X.fillStyle=COLORS[score%COLORS.length];X.shadowColor=COLORS[score%COLORS.length];X.shadowBlur=10;
+    X.beginPath();X.roundRect(current.x,cy,current.w,28,4);X.fill();X.shadowBlur=0;
+  }
+  // Draw blocks
+  for(let i=0;i<blocks.length;i++){
+    let b=blocks[i],by=b.y+offy;
+    if(by>C.height+30||by<-30)continue;
+    X.fillStyle=COLORS[i%COLORS.length];X.shadowColor=COLORS[i%COLORS.length];X.shadowBlur=6;
+    X.beginPath();X.roundRect(b.x,by,b.w,28,4);X.fill();
+    X.fillStyle='rgba(255,255,255,0.15)';X.fillRect(b.x+2,by+2,b.w-4,10);
+    X.shadowBlur=0;
+  }
+  // Score
+  X.fillStyle='#fff';X.font='bold 36px Segoe UI';X.textAlign='center';
+  X.fillText(score,C.width/2,50);
+  if(score===0&&!gameOver){X.font='16px Segoe UI';X.fillStyle='rgba(255,255,255,0.5)';X.fillText('Click or SPACE to stack!',C.width/2,C.height-30)}
+  if(gameOver){
+    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#ff6b9d';X.font='bold 40px Segoe UI';X.fillText('Tower: '+score,C.width/2,270);
+    X.fillStyle='#fff';X.font='18px Segoe UI';X.fillText('Press SPACE to retry',C.width/2,320);
+  }
+  requestAnimationFrame(draw);
+}
+function act(){if(gameOver)start();else place()}
+document.addEventListener('keydown',e=>{if(e.key===' '){act();e.preventDefault()}});
+C.addEventListener('click',act);
+start();draw();
+</script>
+</body>
+</html>

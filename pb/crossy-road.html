@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cross Rush - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a2a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(100,255,100,0.2);max-width:100vw;max-height:100vh}
+</style>
+</head>
+<body>
+<canvas id="c" width="500" height="600"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d'),SZ=40;
+const N_LEVELS=20;
+let state='menu';           // menu | play | dead | win
+let mode='endless';         // endless | level
+let level=1;
+let player,lanes,rows,best=0,cameraY=0,rng=Math.random,levelLen=0,flash=0,lastT=0;
+
+/* ---------- progress: unlocked levels + endless best, synced to the account ---------- */
+let prog={v:1,lvl:1,eb:0};
+function applyProg(p){
+  if(!p||p.v!==1)return;
+  prog.lvl=Math.max(prog.lvl,Math.min(N_LEVELS+1,p.lvl||1));
+  prog.eb=Math.max(prog.eb,p.eb||0);
+  best=prog.eb;
+}
+function pushProg(){try{parent.postMessage({__pbSave:1,data:prog},'*')}catch(e){}}
+applyProg(window.__pbSave);
+window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1)applyProg(d.data)});
+try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}
+
+/* ---------- seeded rng so every level is the same course every time ---------- */
+function mulberry(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ---------- difficulty ---------- */
+function diff(){
+  if(mode==='level'){
+    const n=level;
+    return{road:0.32+n*0.012,river:n>=4?0.05+n*0.007:0,rail:n>=3?0.03+n*0.004:0,
+      spd:1+n*0.055,cars:2+Math.floor(n/8),len:28+n*4};
+  }
+  const d=Math.min(1,rows/120);   // endless ramps over ~120 rows
+  return{road:0.34+d*0.18,river:rows>10?0.05+d*0.1:0,rail:rows>18?0.03+d*0.07:0,
+    spd:1+d*1.2,cars:2+Math.floor(d*2),len:Infinity};
+}
+
+let hazardRun=0,lastType='grass';   // breathers + no stacked rivers/rails (unwinnable hops)
+function genLane(y){
+  const D=diff();
+  if(y>=0)return{y,type:'grass',spd:0,cars:[],logs:[],trees:[],phase:0};
+  if(mode==='level'&&-y>=D.len)return{y,type:'finish',spd:0,cars:[],logs:[],trees:[],phase:0};
+  let r=rng(),type='grass';
+  if(hazardRun<3){
+    if(r<D.road)type='road';
+    else if(r<D.road+D.river)type='river';
+    else if(r<D.road+D.river+D.rail)type='rail';
+  }
+  if((type==='river'&&lastType==='river')||(type==='rail'&&lastType==='rail'))type='grass';
+  hazardRun=type==='grass'?0:hazardRun+1;lastType=type;
+  const dir=rng()>0.5?1:-1;
+  const spd=(0.5+rng()*0.8)*D.spd*dir;
+  const l={y,type,spd,cars:[],logs:[],trees:[],phase:rng()*10};
+  if(type==='road'){
+    // evenly slotted cars, car width capped so every slot keeps a ≥65px gap
+    const n=Math.max(2,Math.min(4,D.cars+(rng()<0.5?1:0)));
+    const slot=C.width/n;
+    for(let i=0;i<n;i++)l.cars.push({x:i*slot+rng()*(slot*0.3),w:30+rng()*Math.max(5,slot-65-30),
+      color:['#ff4444','#4488ff','#ffcc00','#44cc44','#ff88cc'][Math.floor(rng()*5)]});
+  }
+  if(type==='river'){
+    l.spd*=0.65;                                       // logs drift slower than traffic
+    const n=2+Math.floor(rng()*2);
+    for(let i=0;i<n;i++)l.logs.push({x:i*(C.width/n)+rng()*40,w:85+rng()*35});
+  }
+  if(type==='grass'&&rng()<0.5){for(let i=0;i<3;i++)l.trees.push({x:20+rng()*(C.width-60)})}
+  return l;
+}
+
+const SALT=[0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,2,0,2,0];   // per-level seed salt — every level verified beatable
+function begin(m,n,salt){
+  mode=m;level=n||1;
+  rng=mode==='level'?mulberry(987654+level*3131+(salt!==undefined?salt:SALT[level-1])*77777):Math.random;
+  player={x:250,y:0,targetX:250,targetY:0,onLog:null};
+  rows=0;cameraY=0;flash=0;hazardRun=0;lastType='grass';state='play';
+  levelLen=mode==='level'?diff().len:Infinity;
+  lanes=[];for(let i=6;i>=-14;i--)lanes.push(genLane(i));   // descending y keeps seeded gen deterministic
+}
+const getLane=y=>lanes.find(l=>l.y===y);
+
+function die(){
+  state='dead';flash=1;
+  if(mode==='endless'&&rows>prog.eb){prog.eb=rows;best=rows;pushProg()}
+}
+function winLevel(){
+  state='win';
+  if(level>=prog.lvl&&prog.lvl<=N_LEVELS){prog.lvl=level+1;pushProg()}
+}
+
+/* ---------- menu layout (tap/click) ---------- */
+let btns=[];
+function drawMenu(){
+  btns=[];
+  X.fillStyle='#12210f';X.fillRect(0,0,C.width,C.height);
+  X.textAlign='center';
+  X.fillStyle='#88ff88';X.font='bold 40px Segoe UI';X.fillText('🐔 Cross Rush',C.width/2,70);
+  X.fillStyle='#9ab89a';X.font='14px Segoe UI';
+  X.fillText('Arrows / WASD to hop. Don’t get splatted.',C.width/2,98);
+  // endless button
+  const eb={x:70,y:125,w:360,h:56,act:()=>begin('endless')};
+  X.fillStyle='#2d7a2d';X.beginPath();X.roundRect(eb.x,eb.y,eb.w,eb.h,14);X.fill();
+  X.fillStyle='#fff';X.font='bold 24px Segoe UI';X.fillText('▶ ENDLESS',C.width/2,eb.y+36);
+  if(best>0){X.font='13px Segoe UI';X.fillStyle='rgba(255,255,255,0.75)';X.fillText('best: '+best,C.width/2,eb.y+52)}
+  btns.push(eb);
+  X.fillStyle='#88ff88';X.font='bold 18px Segoe UI';X.fillText('LEVELS',C.width/2,225);
+  // 20 levels, 5 per row
+  for(let i=0;i<N_LEVELS;i++){
+    const col=i%5,row=Math.floor(i/5);
+    const b={x:55+col*80,y:245+row*80,w:66,h:66,lvl:i+1};
+    const unlocked=b.lvl<=prog.lvl;
+    X.fillStyle=unlocked?(b.lvl<prog.lvl?'#2d7a2d':'#c8a018'):'#26332a';
+    X.beginPath();X.roundRect(b.x,b.y,b.w,b.h,12);X.fill();
+    X.fillStyle=unlocked?'#fff':'#4a5a4e';X.font='bold 24px Segoe UI';
+    X.fillText(unlocked?b.lvl:'🔒',b.x+33,b.y+42);
+    if(unlocked){b.act=()=>begin('level',b.lvl);btns.push(b)}
+  }
+  X.fillStyle='#6a8a6a';X.font='12px Segoe UI';
+  X.fillText(prog.lvl>N_LEVELS?'All levels cleared! 🏆':'Beat a level to unlock the next',C.width/2,585);
+}
+C.addEventListener('pointerdown',e=>{
+  const r=C.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(C.width/r.width),y=(e.clientY-r.top)*(C.height/r.height);
+  if(state==='menu'){for(const b of btns)if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){b.act();return}}
+  else if(state==='dead')begin(mode,level);
+  else if(state==='win')state='menu';
+});
+
+/* ---------- main loop ---------- */
+function draw(ts){
+  requestAnimationFrame(draw);
+  const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;lastT=ts;
+  if(state==='menu'){drawMenu();return}
+  X.fillStyle='#1a2a1a';X.fillRect(0,0,C.width,C.height);
+  const offy=-cameraY*SZ+C.height*0.6;
+  for(const l of lanes){
+    const ly=l.y*SZ+offy;
+    if(ly>C.height+SZ||ly<-SZ*2)continue;
+    if(l.type==='road')X.fillStyle='#333';
+    else if(l.type==='river')X.fillStyle='#1e4a6e';
+    else if(l.type==='rail')X.fillStyle='#3a3228';
+    else if(l.type==='finish')X.fillStyle='#c8a018';
+    else X.fillStyle='#2d5a27';
+    X.fillRect(0,ly,C.width,SZ);
+    if(l.type==='finish'){
+      X.fillStyle='#fff';X.font='bold 20px Segoe UI';X.textAlign='center';
+      X.fillText('🏁 FINISH 🏁',C.width/2,ly+27);
+    }
+    if(l.type==='road'){
+      X.strokeStyle='rgba(255,255,255,0.1)';X.setLineDash([10,10]);
+      X.beginPath();X.moveTo(0,ly+SZ/2);X.lineTo(C.width,ly+SZ/2);X.stroke();X.setLineDash([]);
+      for(const c of l.cars){
+        if(state==='play')c.x+=l.spd*m;
+        if(c.x>C.width+60)c.x=-c.w-10;if(c.x<-c.w-60)c.x=C.width+10;
+        X.fillStyle=c.color;X.shadowColor=c.color;X.shadowBlur=5;
+        X.beginPath();X.roundRect(c.x,ly+5,c.w,SZ-10,5);X.fill();X.shadowBlur=0;
+        X.fillStyle='rgba(255,255,255,0.4)';X.fillRect(l.spd>0?c.x+c.w-8:c.x+2,ly+10,6,4);
+      }
+    }
+    if(l.type==='river'){
+      X.fillStyle='rgba(255,255,255,0.07)';
+      for(let i=0;i<4;i++)X.fillRect((i*140+(l.phase*40+performance.now()/40*Math.sign(l.spd)))%C.width,ly+8+i*7,26,2);
+      for(const g of l.logs){
+        if(state==='play')g.x+=l.spd*m;
+        if(g.x>C.width+40)g.x=-g.w-10;if(g.x<-g.w-40)g.x=C.width+10;
+        X.fillStyle='#7a5230';X.beginPath();X.roundRect(g.x,ly+7,g.w,SZ-14,10);X.fill();
+        X.strokeStyle='rgba(0,0,0,0.25)';X.beginPath();X.moveTo(g.x+8,ly+SZ/2);X.lineTo(g.x+g.w-8,ly+SZ/2);X.stroke();
+      }
+    }
+    if(l.type==='rail'){
+      X.fillStyle='#5a4a38';for(let i=0;i<13;i++)X.fillRect(i*40+8,ly+6,10,SZ-12);
+      X.fillStyle='#999';X.fillRect(0,ly+10,C.width,4);X.fillRect(0,ly+SZ-14,C.width,4);
+      if(state==='play')l.phase+=m/60;
+      const cyc=l.phase%6;                   // 0-4.4 idle, 4.4-5.4 warn, 5.4-6 train
+      if(cyc>4.4&&cyc<5.4&&Math.floor(cyc*6)%2===0){
+        X.fillStyle='#ff4444';X.beginPath();X.arc(14,ly+SZ/2,7,0,Math.PI*2);X.fill();
+      }
+      if(cyc>=5.4){
+        const tx=(cyc-5.4)/0.6*(C.width+300)-300;
+        X.fillStyle='#c0c8d0';X.beginPath();X.roundRect(tx,ly+4,280,SZ-8,6);X.fill();
+        X.fillStyle='#2a3a4a';for(let i=0;i<6;i++)X.fillRect(tx+16+i*44,ly+11,26,SZ-22);
+        l.trainX=tx;l.trainW=280;
+      }else l.trainX=null;
+    }
+    for(const t of l.trees){
+      X.fillStyle='#3a2a1a';X.fillRect(t.x+5,ly+5,6,SZ-10);
+      X.fillStyle='#2a7a2a';X.beginPath();X.arc(t.x+8,ly+8,12,0,Math.PI*2);X.fill();
+    }
+  }
+  if(state==='play'){
+    player.x+=(player.targetX-player.x)*Math.min(1,0.3*m);
+    player.y+=(player.targetY-player.y)*Math.min(1,0.3*m);
+    cameraY+=(player.targetY-cameraY)*Math.min(1,0.1*m);
+    const lane=getLane(Math.round(player.targetY));
+    if(lane){
+      if(lane.type==='road'){
+        for(const c of lane.cars)if(player.targetX>c.x-5&&player.targetX<c.x+c.w+5){die();break}
+      }else if(lane.type==='river'){
+        let log=null;
+        for(const g of lane.logs)if(player.targetX>g.x-6&&player.targetX<g.x+g.w+6){log=g;break}
+        if(log){const dx=lane.spd*m;player.targetX+=dx;player.x+=dx;
+          // pinned at the wall: a short grace window to hop off before the splat
+          if(player.targetX<12||player.targetX>C.width-12){
+            player.targetX=Math.max(12,Math.min(C.width-12,player.targetX));player.x=player.targetX;
+            player.edgeT=(player.edgeT||0)+m/60;if(player.edgeT>0.7)die();
+          }else player.edgeT=0;}
+        else if(Math.abs(player.y-player.targetY)<0.25)die();   // landed in water
+      }else if(lane.type==='rail'){
+        if(lane.trainX!=null&&player.targetX>lane.trainX-10&&player.targetX<lane.trainX+lane.trainW+10)die();
+      }else if(lane.type==='finish')winLevel();
+      for(const t of lane.trees)if(Math.abs(player.targetX-t.x-8)<15)player.targetX+=player.targetX>t.x+8?SZ:-SZ;
+    }
+  }
+  // player
+  const py=player.y*SZ+offy;
+  X.fillStyle='#ffcc00';X.shadowColor='#ffcc00';X.shadowBlur=10;
+  X.beginPath();X.arc(player.x,py+SZ/2,14,0,Math.PI*2);X.fill();
+  X.fillStyle='#fff';X.beginPath();X.arc(player.x+4,py+SZ/2-3,4,0,Math.PI*2);X.fill();
+  X.fillStyle='#333';X.beginPath();X.arc(player.x+5,py+SZ/2-3,2,0,Math.PI*2);X.fill();
+  X.shadowBlur=0;
+  // HUD
+  X.fillStyle='#fff';X.font='bold 24px Segoe UI';X.textAlign='center';
+  X.fillText(mode==='endless'?rows:('Level '+level+'  ·  '+Math.min(rows,levelLen)+'/'+levelLen),C.width/2,35);
+  if(state==='dead'){
+    if(flash>0){X.fillStyle=`rgba(255,60,60,${flash*0.5})`;X.fillRect(0,0,C.width,C.height);flash-=0.04*m}
+    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#ff4444';X.font='bold 42px Segoe UI';X.fillText('SPLAT!',C.width/2,240);
+    X.fillStyle='#ffcc00';X.font='24px Segoe UI';
+    X.fillText(mode==='endless'?('Score: '+rows):('Level '+level),C.width/2,290);
+    if(mode==='endless'){X.fillStyle='#888';X.font='16px Segoe UI';X.fillText('Best: '+best,C.width/2,318)}
+    X.fillStyle='#fff';X.font='16px Segoe UI';
+    X.fillText('SPACE / tap: retry   ·   M: menu',C.width/2,360);
+  }
+  if(state==='win'){
+    X.fillStyle='rgba(0,0,0,0.65)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#88ff88';X.font='bold 40px Segoe UI';X.fillText('LEVEL '+level+' CLEAR! 🎉',C.width/2,250);
+    X.fillStyle='#fff';X.font='17px Segoe UI';
+    X.fillText(level<N_LEVELS?('Level '+(level+1)+' unlocked'):'You beat every level! 🏆',C.width/2,295);
+    X.fillText('SPACE / tap: menu'+(level<N_LEVELS?'   ·   N: next level':''),C.width/2,335);
+  }
+  // lane housekeeping
+  let minY=Math.min(...lanes.map(l=>l.y));
+  while(minY>cameraY-10){minY--;lanes.push(genLane(minY))}
+  lanes=lanes.filter(l=>l.y<cameraY+20);
+}
+
+document.addEventListener('keydown',e=>{
+  const k=e.key;e.preventDefault();
+  if(state==='menu'){if(k===' '||k==='Enter')begin('endless');return}
+  if(state==='dead'){if(k===' ')begin(mode,level);if(k==='m'||k==='M')state='menu';return}
+  if(state==='win'){
+    if(k==='n'||k==='N'){if(level<N_LEVELS)begin('level',level+1);return}
+    if(k===' '||k==='m'||k==='M')state='menu';return}
+  if(state!=='play')return;
+  if(k==='ArrowUp'||k==='w'){player.targetY--;
+    const r=-player.targetY;
+    if(r>rows){rows=r;if(mode==='endless')window.score=Math.max(window.score||0,rows)}
+    if(!getLane(Math.round(player.targetY)))lanes.push(genLane(Math.round(player.targetY)));}
+  if(k==='ArrowDown'||k==='s')player.targetY=Math.min(player.targetY+1,Math.ceil(cameraY)+5);
+  if(k==='ArrowLeft'||k==='a')player.targetX-=SZ;
+  if(k==='ArrowRight'||k==='d')player.targetX+=SZ;
+  player.targetX=Math.max(20,Math.min(C.width-20,player.targetX));
+});
+window.score=0;
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

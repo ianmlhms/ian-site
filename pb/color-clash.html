@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Color Clash - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;user-select:none}
+#word{font-size:72px;font-weight:bold;margin:30px 0;text-shadow:0 0 20px rgba(255,255,255,0.2)}
+#prompt{font-size:20px;opacity:0.7;margin-bottom:20px}
+#buttons{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:500px}
+.btn{padding:16px 32px;font-size:20px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;color:#fff;min-width:100px;transition:transform 0.1s}
+.btn:hover{transform:scale(1.05)}
+.btn:active{transform:scale(0.95)}
+#hud{display:flex;gap:30px;font-size:20px;margin-bottom:20px}
+#feedback{font-size:28px;margin-top:20px;min-height:40px}
+#timer-bar{width:300px;height:8px;background:#2a2a4a;border-radius:4px;margin-bottom:10px;overflow:hidden}
+#timer-fill{height:100%;background:#00ff88;transition:width 0.1s;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="hud"><span>Score: <b id="score">0</b></span><span>Streak: <b id="streak">0</b>🔥</span><span>Level: <b id="level">1</b></span></div>
+<div id="timer-bar"><div id="timer-fill" style="width:100%"></div></div>
+<div id="prompt">What COLOR is the text?</div>
+<div id="word">RED</div>
+<div id="buttons"></div>
+<div id="feedback"></div>
+<script>
+const COLORS=[
+  {name:'RED',hex:'#ff4466'},{name:'BLUE',hex:'#4488ff'},{name:'GREEN',hex:'#44cc44'},
+  {name:'YELLOW',hex:'#ffcc00'},{name:'PURPLE',hex:'#aa66ff'},{name:'ORANGE',hex:'#ff8844'},
+  {name:'PINK',hex:'#ff66aa'},{name:'CYAN',hex:'#44dddd'}
+];
+let score=0,streak=0,level=1,timeLeft=100,timer,correct;
+
+function newRound(){
+  let textColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+  let wordColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+  correct=textColor.name;
+  document.getElementById('word').textContent=wordColor.name;
+  document.getElementById('word').style.color=textColor.hex;
+  // Generate buttons - correct + 3 random
+  let opts=[textColor];
+  while(opts.length<Math.min(4+Math.floor(level/3),6)){
+    let c=COLORS[Math.floor(Math.random()*COLORS.length)];
+    if(!opts.find(o=>o.name===c.name))opts.push(c);
+  }
+  opts.sort(()=>Math.random()-0.5);
+  let h='';
+  for(let o of opts)h+=`<button class="btn" style="background:${o.hex}" onclick="answer('${o.name}')">${o.name}</button>`;
+  document.getElementById('buttons').innerHTML=h;
+  timeLeft=100;
+}
+
+function answer(name){
+  if(name===correct){
+    score+=10+streak*2;streak++;
+    level=Math.floor(streak/5)+1;
+    document.getElementById('feedback').innerHTML='<span style="color:#44ff88">✓ Correct!</span>';
+  }else{
+    streak=0;score=Math.max(0,score-5);
+    document.getElementById('feedback').innerHTML='<span style="color:#ff4466">✗ It was '+correct+'</span>';
+  }
+  document.getElementById('score').textContent=score;
+  document.getElementById('streak').textContent=streak;
+  document.getElementById('level').textContent=level;
+  setTimeout(newRound,400);
+}
+
+setInterval(()=>{
+  timeLeft-=1.5+level*0.3;
+  if(timeLeft<=0){streak=0;score=Math.max(0,score-3);
+    document.getElementById('feedback').innerHTML='<span style="color:#ffcc00">⏱ Too slow!</span>';
+    document.getElementById('streak').textContent=0;document.getElementById('score').textContent=score;
+    setTimeout(newRound,300);timeLeft=100}
+  document.getElementById('timer-fill').style.width=timeLeft+'%';
+  document.getElementById('timer-fill').style.background=timeLeft>30?'#00ff88':'#ff4466';
+},100);
+
+newRound();
+</script>
+</body>
+</html>

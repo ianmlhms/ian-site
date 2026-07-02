@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cookie Craze - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#2a1810;font-family:'Segoe UI',sans-serif;color:#fff;overflow:hidden;height:100vh}
+#game{display:flex;height:100vh;max-width:1000px;margin:0 auto}
+#left{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#3a2015,#2a1810)}
+#right{width:300px;background:#1a0f08;padding:20px;overflow-y:auto;border-left:2px solid #4a3020}
+#cookie{width:250px;height:250px;cursor:pointer;transition:transform 0.1s;user-select:none;position:relative}
+#cookie:hover{transform:scale(1.05)}
+#cookie:active{transform:scale(0.95)}
+#cookie canvas{width:100%;height:100%}
+#count{font-size:42px;font-weight:bold;color:#f4a460;text-shadow:0 0 20px rgba(244,164,96,0.5);margin-bottom:5px}
+#persec{font-size:16px;color:#b8860b;margin-bottom:30px}
+.upgrade{background:#3a2518;border:2px solid #5a3828;border-radius:10px;padding:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s}
+.upgrade:hover{background:#4a3528;border-color:#f4a460}
+.upgrade.locked{opacity:0.4;cursor:not-allowed}
+.upgrade h3{color:#f4a460;font-size:15px;margin-bottom:3px}
+.upgrade p{font-size:12px;color:#b8860b}
+.upgrade .cost{color:#ffcc00;font-weight:bold;font-size:14px;float:right}
+#particles{position:absolute;top:0;left:0;pointer-events:none;width:100%;height:100%}
+.float-text{position:absolute;color:#f4a460;font-weight:bold;font-size:22px;pointer-events:none;animation:floatUp 1s ease-out forwards;text-shadow:0 0 10px rgba(244,164,96,0.8)}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-80px)}}
+h2{color:#f4a460;font-size:18px;margin-bottom:15px;text-align:center}
+</style>
+</head>
+<body>
+<div id="game">
+<div id="left">
+<div id="count">0 cookies</div>
+<div id="persec">per second: 0</div>
+<div id="cookie" onclick="clickCookie(event)"><canvas id="cc" width="250" height="250"></canvas></div>
+</div>
+<div id="right">
+<h2>🍪 Upgrades</h2>
+<div id="upgrades"></div>
+</div>
+</div>
+<script>
+let cookies=0,cps=0,clickPower=1,totalClicks=0,totalBaked=0;
+const upgrades=[
+  {name:'Auto Clicker',desc:'Clicks once per second',baseCost:15,cps:0.1,count:0,icon:'👆'},
+  {name:'Grandma',desc:'Bakes cookies slowly',baseCost:100,cps:1,count:0,icon:'👵'},
+  {name:'Cookie Farm',desc:'Grows cookie plants',baseCost:500,cps:5,count:0,icon:'🌾'},
+  {name:'Cookie Factory',desc:'Mass production!',baseCost:3000,cps:20,count:0,icon:'🏭'},
+  {name:'Cookie Mine',desc:'Digs up ancient cookies',baseCost:10000,cps:50,count:0,icon:'⛏️'},
+  {name:'Cookie Bank',desc:'Generates cookie interest',baseCost:50000,cps:150,count:0,icon:'🏦'},
+  {name:'Cookie Temple',desc:'Prays for cookies',baseCost:200000,cps:500,count:0,icon:'🏛️'},
+  {name:'Cookie Wizard',desc:'Conjures cookies magically',baseCost:1000000,cps:2000,count:0,icon:'🧙'},
+  {name:'Cookie Portal',desc:'Opens dimensional cookie rifts',baseCost:5000000,cps:8000,count:0,icon:'🌀'},
+  {name:'Cookie Planet',desc:'An entire planet of cookies',baseCost:50000000,cps:50000,count:0,icon:'🪐'},
+];
+
+const clickUpgrades=[
+  {name:'Stronger Fingers',desc:'+1 click power',baseCost:50,power:1,count:0,icon:'💪'},
+  {name:'Double Click',desc:'+5 click power',baseCost:500,power:5,count:0,icon:'✌️'},
+  {name:'Golden Touch',desc:'+25 click power',baseCost:5000,power:25,count:0,icon:'✨'},
+  {name:'Cookie Storm',desc:'+100 click power',baseCost:50000,power:100,count:0,icon:'⚡'},
+];
+
+function getCost(u){return Math.floor(u.baseCost*Math.pow(1.15,u.count))}
+
+function format(n){
+  if(n>=1e12)return(n/1e12).toFixed(1)+'T';
+  if(n>=1e9)return(n/1e9).toFixed(1)+'B';
+  if(n>=1e6)return(n/1e6).toFixed(1)+'M';
+  if(n>=1e3)return(n/1e3).toFixed(1)+'K';
+  return Math.floor(n);
+}
+
+function clickCookie(e){
+  cookies+=clickPower;totalBaked+=clickPower;totalClicks++;
+  window.score=Math.floor(totalBaked);
+  let ft=document.createElement('div');ft.className='float-text';
+  ft.textContent='+'+format(clickPower);
+  ft.style.left=(e.clientX-30)+'px';ft.style.top=(e.clientY-20)+'px';
+  document.body.appendChild(ft);
+  setTimeout(()=>ft.remove(),1000);
+  updateUI();
+}
+
+function buyUpgrade(i,type){
+  let u=type==='cps'?upgrades[i]:clickUpgrades[i];
+  let cost=getCost(u);
+  if(cookies>=cost){
+    cookies-=cost;u.count++;
+    if(type==='cps'){cps=0;upgrades.forEach(u2=>cps+=u2.cps*u2.count)}
+    else{clickPower=1;clickUpgrades.forEach(u2=>clickPower+=u2.power*u2.count)}
+    updateUI();pushSave();
+  }
+}
+
+/* The shop DOM is built ONCE and then updated in place — rebuilding it on a
+ * timer destroyed the element mid-click, which ate purchases. */
+function buildUpgrades(){
+  let h='<h2 style="margin-top:10px">⚡ Click Power</h2>';
+  clickUpgrades.forEach((u,i)=>{
+    h+=`<div class="upgrade" data-type="click" data-i="${i}">
+      <span class="cost"></span><h3></h3><p>${u.desc}</p></div>`;
+  });
+  h+='<h2 style="margin-top:20px">🔄 Production</h2>';
+  upgrades.forEach((u,i)=>{
+    h+=`<div class="upgrade" data-type="cps" data-i="${i}">
+      <span class="cost"></span><h3></h3><p></p></div>`;
+  });
+  const box=document.getElementById('upgrades');
+  box.innerHTML=h;
+  box.addEventListener('click',(e)=>{
+    const row=e.target.closest('.upgrade');
+    if(row)buyUpgrade(+row.dataset.i,row.dataset.type);
+  });
+}
+
+function refreshUpgrades(){
+  document.querySelectorAll('#upgrades .upgrade').forEach(row=>{
+    const u=row.dataset.type==='cps'?upgrades[+row.dataset.i]:clickUpgrades[+row.dataset.i];
+    const cost=getCost(u);
+    row.classList.toggle('locked',cookies<cost);
+    row.querySelector('.cost').textContent=format(cost)+' 🍪';
+    row.querySelector('h3').textContent=`${u.icon} ${u.name} (${u.count})`;
+    if(row.dataset.type==='cps')row.querySelector('p').textContent=`${u.desc} [${format(u.cps*u.count)}/s]`;
+  });
+}
+
+function updateUI(){
+  document.getElementById('count').textContent=format(cookies)+' cookies';
+  document.getElementById('persec').textContent='per second: '+format(cps)+' | click power: '+format(clickPower);
+  refreshUpgrades();
+}
+
+// Draw cookie
+const cc=document.getElementById('cc'),cx=cc.getContext('2d');
+function drawCookie(){
+  cx.clearRect(0,0,250,250);
+  let t=Date.now()/2000;
+  cx.save();cx.translate(125,125);cx.rotate(Math.sin(t)*0.05);
+  // Shadow
+  cx.beginPath();cx.arc(3,3,95,0,Math.PI*2);cx.fillStyle='rgba(0,0,0,0.3)';cx.fill();
+  // Cookie base
+  let g=cx.createRadialGradient(0,0,20,0,0,95);
+  g.addColorStop(0,'#d4a04a');g.addColorStop(0.7,'#c48a30');g.addColorStop(1,'#a06820');
+  cx.beginPath();cx.arc(0,0,95,0,Math.PI*2);cx.fillStyle=g;cx.fill();
+  // Chips
+  cx.fillStyle='#5a3010';
+  let chips=[[20,-30],[-40,20],[10,40],[-20,-50],[45,10],[-10,15],[30,-60],[-50,-20],[25,55],[-35,45]];
+  for(let[cx2,cy2]of chips){cx.beginPath();cx.ellipse(cx2,cy2,8,6,cx2,0,Math.PI*2);cx.fill()}
+  // Highlights
+  cx.globalAlpha=0.15;cx.fillStyle='#fff';
+  cx.beginPath();cx.ellipse(-20,-25,40,25,-0.5,0,Math.PI*2);cx.fill();
+  cx.globalAlpha=1;
+  cx.restore();
+  requestAnimationFrame(drawCookie);
+}
+drawCookie();
+
+/* ---------- persistence: local save injected by PixelBreak, cloud save arrives
+ * via postMessage; whichever has more total cookies baked wins ---------- */
+function snapshot(){
+  return {v:1,c:Math.floor(cookies),tb:Math.floor(totalBaked),tc:totalClicks,
+    u:upgrades.map(u=>u.count),cu:clickUpgrades.map(u=>u.count)};
+}
+function applySave(sv){
+  if(!sv||sv.v!==1||!(sv.tb>totalBaked))return;
+  cookies=sv.c||0;totalBaked=sv.tb||0;totalClicks=sv.tc||0;
+  (sv.u||[]).forEach((n,i)=>{if(upgrades[i])upgrades[i].count=n||0});
+  (sv.cu||[]).forEach((n,i)=>{if(clickUpgrades[i])clickUpgrades[i].count=n||0});
+  cps=0;upgrades.forEach(u=>cps+=u.cps*u.count);
+  clickPower=1;clickUpgrades.forEach(u=>clickPower+=u.power*u.count);
+  window.score=Math.floor(totalBaked);
+  updateUI();
+}
+function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}catch(e){}}
+window.addEventListener('message',(e)=>{const d=e.data;if(d&&d.__pbLoadSave===1)applySave(d.data)});
+
+// Game loop
+setInterval(()=>{cookies+=cps/10;totalBaked+=cps/10;window.score=Math.floor(totalBaked);updateUI()},100);
+buildUpgrades();
+applySave(window.__pbSave);                       // local save (injected before load)
+try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}  // ask for the cloud save
+setInterval(pushSave,5000);
+window.addEventListener('pagehide',pushSave);
+updateUI();
+</script>
+</body>
+</html>

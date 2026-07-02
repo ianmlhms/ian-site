@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Maze Runner - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,255,200,0.15)}
+#hud{margin-bottom:10px;font-size:18px;display:flex;gap:20px}
+</style>
+</head>
+<body>
+<div id="hud"><span>Level: <b id="lv">1</b></span><span>⏱ <b id="tm">0</b>s</span><span style="font-size:13px;opacity:0.5">Arrow keys / WASD to move</span></div>
+<canvas id="c"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let maze,W,H,SZ,player,goal,level=1,seconds=0,timerInt,won;
+function init(lv){
+  level=lv;W=7+lv*2;H=7+lv*2;W=Math.min(W,25);H=Math.min(H,19);
+  SZ=Math.min(Math.floor(600/W),Math.floor(500/H));
+  C.width=W*SZ;C.height=H*SZ;
+  maze=Array.from({length:H},()=>Array.from({length:W},()=>({top:true,right:true,bottom:true,left:true,visited:false})));
+  // Generate maze using DFS
+  let stack=[[0,0]];maze[0][0].visited=true;
+  while(stack.length){
+    let[cx,cy]=stack[stack.length-1];
+    let neighbors=[];
+    if(cy>0&&!maze[cy-1][cx].visited)neighbors.push([cx,cy-1,'top','bottom']);
+    if(cx<W-1&&!maze[cy][cx+1].visited)neighbors.push([cx+1,cy,'right','left']);
+    if(cy<H-1&&!maze[cy+1][cx].visited)neighbors.push([cx,cy+1,'bottom','top']);
+    if(cx>0&&!maze[cy][cx-1].visited)neighbors.push([cx-1,cy,'left','right']);
+    if(neighbors.length){
+      let[nx,ny,w1,w2]=neighbors[Math.floor(Math.random()*neighbors.length)];
+      maze[cy][cx][w1]=false;maze[ny][nx][w2]=false;maze[ny][nx].visited=true;
+      stack.push([nx,ny]);
+    }else stack.pop();
+  }
+  player={x:0,y:0};goal={x:W-1,y:H-1};won=false;
+  seconds=0;if(timerInt)clearInterval(timerInt);
+  timerInt=setInterval(()=>{if(!won){seconds++;document.getElementById('tm').textContent=seconds}},1000);
+  document.getElementById('lv').textContent=level;
+  draw();
+}
+function move(dx,dy){
+  if(won)return;
+  let c=maze[player.y][player.x];
+  if(dx===0&&dy===-1&&!c.top){player.y--}
+  else if(dx===1&&dy===0&&!c.right){player.x++}
+  else if(dx===0&&dy===1&&!c.bottom){player.y++}
+  else if(dx===-1&&dy===0&&!c.left){player.x--}
+  if(player.x===goal.x&&player.y===goal.y){won=true;clearInterval(timerInt);
+    setTimeout(()=>init(level+1),1200)}
+  draw();
+}
+function draw(){
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
+  X.strokeStyle='#3a5a5a';X.lineWidth=2;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    let cx=x*SZ,cy=y*SZ,c=maze[y][x];
+    if(c.top){X.beginPath();X.moveTo(cx,cy);X.lineTo(cx+SZ,cy);X.stroke()}
+    if(c.right){X.beginPath();X.moveTo(cx+SZ,cy);X.lineTo(cx+SZ,cy+SZ);X.stroke()}
+    if(c.bottom){X.beginPath();X.moveTo(cx,cy+SZ);X.lineTo(cx+SZ,cy+SZ);X.stroke()}
+    if(c.left){X.beginPath();X.moveTo(cx,cy);X.lineTo(cx,cy+SZ);X.stroke()}
+  }
+  // Goal
+  X.fillStyle='#ffcc00';X.shadowColor='#ffcc00';X.shadowBlur=12;
+  X.beginPath();X.arc(goal.x*SZ+SZ/2,goal.y*SZ+SZ/2,SZ/3,0,Math.PI*2);X.fill();
+  X.font=Math.floor(SZ*0.5)+'px serif';X.textAlign='center';X.textBaseline='middle';
+  X.fillText('⭐',goal.x*SZ+SZ/2,goal.y*SZ+SZ/2);
+  // Player
+  X.fillStyle='#00ffcc';X.shadowColor='#00ffcc';X.shadowBlur=15;
+  X.beginPath();X.arc(player.x*SZ+SZ/2,player.y*SZ+SZ/2,SZ/3,0,Math.PI*2);X.fill();
+  X.shadowBlur=0;
+  if(won){
+    X.fillStyle='rgba(0,0,0,0.5)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#00ffcc';X.font='bold 36px Segoe UI';X.textAlign='center';
+    X.fillText('Level Complete!',C.width/2,C.height/2);
+  }
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowUp'||e.key==='w')move(0,-1);
+  if(e.key==='ArrowDown'||e.key==='s')move(0,1);
+  if(e.key==='ArrowLeft'||e.key==='a')move(-1,0);
+  if(e.key==='ArrowRight'||e.key==='d')move(1,0);
+  e.preventDefault();
+});
+init(1);
+</script>
+</body>
+</html>

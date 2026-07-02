@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Sprint - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 40px rgba(100,100,255,0.3)}
+#overlay{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(0,0,0,0.8);z-index:20;color:#fff}
+#overlay h1{font-size:48px;color:#7b68ee;margin-bottom:10px}
+#overlay p{font-size:16px;margin-bottom:20px;opacity:0.7}
+#overlay button{padding:14px 40px;font-size:20px;background:#7b68ee;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
+#overlay button:hover{background:#6a5acd}
+.hidden{display:none!important}
+#hud{position:absolute;top:15px;left:50%;transform:translateX(-50%);color:#7b68ee;font-size:24px;font-weight:bold;z-index:10;text-shadow:0 0 10px rgba(123,104,238,0.5)}
+</style>
+</head>
+<body>
+<div id="hud">0m</div>
+<canvas id="c"></canvas>
+<div id="overlay">
+<h1>🚀 Space Sprint</h1>
+<p>Run through the space tunnel! Don't fall off!</p>
+<p style="font-size:14px">← → Move · ↑ / SPACE Jump · Run on walls!</p>
+<button onclick="startGame()">PLAY</button>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+C.width=800;C.height=500;
+let player,platforms,speed,dist,gameOver,started=false,keys={},gravity;
+
+class Player{
+  constructor(){this.x=200;this.y=300;this.vx=0;this.vy=0;this.w=20;this.h=30;this.onGround=false;this.wall=0;this.jumping=false}
+  update(m){
+    if(keys['ArrowLeft']||keys['a'])this.vx=-4;
+    else if(keys['ArrowRight']||keys['d'])this.vx=4;
+    else this.vx*=Math.pow(0.8,m);
+    if((keys['ArrowUp']||keys[' ']||keys['w'])&&(this.onGround)){this.vy=-10;this.jumping=true}
+    this.vy+=0.45*m;
+    this.x+=this.vx*m;
+    this.y+=this.vy*m;
+    if(this.x<0)this.x=0;
+    if(this.x>C.width-this.w)this.x=C.width-this.w;
+    this.onGround=false;
+    for(let p of platforms){
+      let px=p.x-cameraX;
+      if(this.x+this.w>px&&this.x<px+p.w&&this.y+this.h>p.y&&this.y+this.h<p.y+20&&this.vy>=0){
+        this.y=p.y-this.h;this.vy=0;this.onGround=true;this.jumping=false;
+      }
+    }
+    if(this.y>C.height+50)gameOver=true;
+  }
+  draw(){
+    // Glow
+    X.shadowColor='#7b68ee';X.shadowBlur=15;
+    // Body
+    X.fillStyle='#7b68ee';
+    X.fillRect(this.x,this.y,this.w,this.h);
+    // Head
+    X.fillStyle='#9b88ff';
+    X.beginPath();X.arc(this.x+this.w/2,this.y-2,this.w/2,0,Math.PI*2);X.fill();
+    // Eyes
+    X.fillStyle='#fff';
+    X.fillRect(this.x+4,this.y-5,5,4);
+    X.fillRect(this.x+12,this.y-5,5,4);
+    // Legs animation
+    let legOff=Math.sin(Date.now()/80)*4;
+    X.fillStyle='#6a5acd';
+    X.fillRect(this.x+3,this.y+this.h,5,8+legOff);
+    X.fillRect(this.x+12,this.y+this.h,5,8-legOff);
+    X.shadowBlur=0;
+  }
+}
+
+let cameraX=0;
+
+function generatePlatforms(){
+  platforms=[];
+  let x=0;
+  for(let i=0;i<500;i++){
+    let w=60+Math.random()*120;
+    let gap=30+Math.random()*60+Math.min(i*0.5,40);
+    let y=300+Math.sin(i*0.3)*80+(Math.random()-0.5)*60;
+    y=Math.max(200,Math.min(420,y));
+    platforms.push({x,y,w,gap:false,color:i%10===0?'#ff4488':'#3a3a6a'});
+    // Add gaps
+    if(i>5&&Math.random()<0.3){
+      x+=w+gap;
+    } else {
+      x+=w+2;
+    }
+  }
+}
+
+function drawStars(){
+  X.fillStyle='#fff';
+  for(let i=0;i<80;i++){
+    let sx=(i*173+cameraX*0.1*(1+(i%3)*0.5))%C.width;
+    let sy=(i*91)%C.height;
+    X.globalAlpha=0.2+Math.sin(Date.now()/500+i)*0.2;
+    X.fillRect(sx,sy,1.5,1.5);
+  }
+  X.globalAlpha=1;
+}
+
+function startGame(){
+  document.getElementById('overlay').classList.add('hidden');
+  player=new Player();speed=3;dist=0;gameOver=false;started=true;cameraX=0;
+  generatePlatforms();
+}
+
+let lastT=0;
+function loop(ts){
+  requestAnimationFrame(loop);   // single persistent loop — never stack on retry
+  // delta-time: the game runs at the same real speed on 30/60/120 Hz screens
+  const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;
+  lastT=ts;
+  if(!started)return;
+  X.fillStyle='#0a0a2a';X.fillRect(0,0,C.width,C.height);
+  drawStars();
+  
+  if(!gameOver){
+    cameraX+=speed*m;
+    speed=4.2+Math.min(dist/1200,5.5);
+    dist=Math.floor(cameraX/10);
+    document.getElementById('hud').textContent=dist+'m';
+    window.score=dist;
+    player.update(m);
+  }
+  
+  // Draw platforms
+  for(let p of platforms){
+    let px=p.x-cameraX;
+    if(px<-200||px>C.width+100)continue;
+    X.fillStyle=p.color;
+    X.shadowColor=p.color==='#ff4488'?'#ff4488':'#5555aa';
+    X.shadowBlur=8;
+    X.fillRect(px,p.y,p.w,15);
+    X.fillStyle=p.color==='#ff4488'?'#ff6699':'#4a4a7a';
+    X.fillRect(px,p.y,p.w,5);
+    X.shadowBlur=0;
+    // Grid lines
+    X.strokeStyle='rgba(255,255,255,0.1)';X.lineWidth=1;
+    for(let gx=px;gx<px+p.w;gx+=20){X.beginPath();X.moveTo(gx,p.y);X.lineTo(gx,p.y+15);X.stroke()}
+  }
+  
+  player.draw();
+  
+  if(gameOver){
+    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#ff4488';X.font='bold 44px Segoe UI';X.textAlign='center';
+    X.fillText('YOU FELL!',C.width/2,200);
+    X.fillStyle='#fff';X.font='22px Segoe UI';
+    X.fillText('Distance: '+dist+'m',C.width/2,255);
+    X.fillText('Press SPACE to retry',C.width/2,300);
+  }
+}
+
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '&&gameOver)startGame();e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[e.key]=false});
+loop();
+</script>
+</body>
+</html>

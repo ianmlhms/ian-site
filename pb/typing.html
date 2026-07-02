@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Type Racer - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
+#text-display{font-size:22px;line-height:1.8;max-width:600px;text-align:center;margin:20px 0;padding:20px;background:#1a1a2e;border-radius:12px;border:2px solid #2a2a4a}
+.correct{color:#44ff88}.wrong{color:#ff4466;text-decoration:underline}.pending{color:#555}
+.current{background:rgba(255,255,255,0.1);border-radius:3px;padding:0 2px}
+input{background:#1a1a2e;border:2px solid #3a3a5a;color:#fff;font-size:20px;padding:12px 20px;border-radius:12px;width:400px;outline:none;text-align:center}
+input:focus{border-color:#4de8ff}
+#hud{display:flex;gap:30px;font-size:20px;margin-bottom:20px}
+.stat{background:#1a1a2e;padding:8px 18px;border-radius:10px}
+.stat b{color:#4de8ff}
+#progress{width:400px;height:6px;background:#2a2a4a;border-radius:3px;margin-top:15px;overflow:hidden}
+#prog-fill{height:100%;background:#4de8ff;transition:width 0.3s;border-radius:3px}
+#result{margin-top:20px;font-size:18px;min-height:25px}
+button{margin-top:15px;padding:10px 25px;background:#4de8ff;color:#0a0a1a;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
+</style>
+</head>
+<body>
+<div id="hud">
+<div class="stat">WPM: <b id="wpm">0</b></div>
+<div class="stat">Accuracy: <b id="acc">100</b>%</div>
+<div class="stat">⏱ <b id="timer">0</b>s</div>
+</div>
+<div id="text-display"></div>
+<input id="inp" placeholder="Start typing..." autofocus autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
+<div id="progress"><div id="prog-fill" style="width:0%"></div></div>
+<div id="result"></div>
+<button onclick="newTest()">New Text</button>
+<script>
+const TEXTS=[
+  "The quick brown fox jumps over the lazy dog near the old wooden fence",
+  "Programming is the art of telling a computer what to do step by step",
+  "Every great journey begins with a single step forward into the unknown",
+  "Stars shine brightest in the darkest night sky above the mountain peaks",
+  "Music brings people together and creates memories that last a lifetime",
+  "The ocean waves crash against the rocky shore under a golden sunset",
+  "Knowledge is power but wisdom is knowing how to use it properly",
+  "Adventure awaits those brave enough to leave their comfort zone behind",
+  "The secret to success is to start before you feel completely ready",
+  "Time flies when you are having fun with friends and good company",
+  "A creative mind finds solutions where others only see problems ahead",
+  "The best way to predict the future is to create it yourself today",
+];
+let text,pos,errors,startTime,timerInt,done;
+function newTest(){
+  text=TEXTS[Math.floor(Math.random()*TEXTS.length)];
+  pos=0;errors=0;done=false;startTime=null;
+  if(timerInt)clearInterval(timerInt);
+  document.getElementById('inp').value='';document.getElementById('inp').focus();
+  document.getElementById('result').textContent='';
+  document.getElementById('wpm').textContent='0';
+  document.getElementById('acc').textContent='100';
+  document.getElementById('timer').textContent='0';
+  document.getElementById('prog-fill').style.width='0%';
+  renderText();
+}
+function renderText(){
+  let h='';
+  for(let i=0;i<text.length;i++){
+    let cls=i<pos?'correct':i===pos?'current':'pending';
+    h+=`<span class="${cls}">${text[i]}</span>`;
+  }
+  document.getElementById('text-display').innerHTML=h;
+}
+document.getElementById('inp').addEventListener('input',e=>{
+  if(done)return;
+  let v=e.target.value;
+  if(!startTime){startTime=Date.now();timerInt=setInterval(()=>{
+    let s=Math.floor((Date.now()-startTime)/1000);
+    document.getElementById('timer').textContent=s;
+    let mins=(Date.now()-startTime)/60000;
+    if(mins>0)document.getElementById('wpm').textContent=Math.round((pos/5)/mins);
+  },200)}
+  /* Process every char in the field (iPad predictive text can insert several at
+   * once) and match case-insensitively — iPadOS auto-capitalizes the first key
+   * into an empty field even on hardware keyboards, which used to lock the game
+   * after the first letter. */
+  let hadError=false;
+  for(const ch of v){
+    if(pos<text.length&&ch.toLowerCase()===text[pos].toLowerCase())pos++;
+    else{errors++;hadError=true}
+  }
+  e.target.value='';
+  if(hadError){
+    let spans=document.querySelectorAll('#text-display .current');
+    spans.forEach(s=>{s.classList.add('wrong');setTimeout(()=>s.classList.remove('wrong'),300)});
+  }
+  let acc=Math.round(((pos)/(pos+errors))*100)||100;
+  document.getElementById('acc').textContent=acc;
+  document.getElementById('prog-fill').style.width=(pos/text.length*100)+'%';
+  renderText();
+  if(pos>=text.length){
+    done=true;clearInterval(timerInt);
+    let secs=(Date.now()-startTime)/1000;
+    let wpm=Math.round((text.split(' ').length)/(secs/60));
+    window.score=Math.max(window.score||0,wpm);
+    document.getElementById('result').innerHTML=`🎉 Done! <b style="color:#4de8ff">${wpm} WPM</b> with <b style="color:#44ff88">${acc}%</b> accuracy in <b>${secs.toFixed(1)}s</b>`;
+  }
+});
+newTest();
+</script>
+</body>
+</html>

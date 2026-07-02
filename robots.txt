@@ -1,6 +1,7 @@
 User-agent: *
 Allow: /
 # private / sign-in-only pages — nothing useful to index
+Disallow: /pb/
 Disallow: /admin.html
 Disallow: /factory.html
 Disallow: /homework.html

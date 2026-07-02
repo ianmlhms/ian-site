@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sky Hop - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a2a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 40px rgba(100,255,100,0.2)}
+#overlay{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(0,0,0,0.8);z-index:20;color:#fff}
+#overlay h1{font-size:48px;color:#88ff88;margin-bottom:10px}
+#overlay p{font-size:16px;margin-bottom:20px;opacity:0.7}
+#overlay button{padding:14px 40px;font-size:20px;background:#88ff88;color:#1a2a1a;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
+.hidden{display:none!important}
+#hud{position:absolute;top:15px;left:50%;transform:translateX(-50%);color:#88ff88;font-size:24px;font-weight:bold;z-index:10}
+</style>
+</head>
+<body>
+<div id="hud">Score: 0</div>
+<canvas id="c" width="400" height="600"></canvas>
+<div id="overlay">
+<h1>🐸 Sky Hop</h1>
+<p>Jump higher and higher! Don't fall!</p>
+<p style="font-size:14px">← → or A/D to move</p>
+<button onclick="startGame()">PLAY</button>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let player,platforms,score,maxY,camY,gameOver,started=false,keys={};
+
+class Player{
+  constructor(){this.x=200;this.y=500;this.vx=0;this.vy=0;this.w=30;this.h=30;this.dir=1}
+  update(){
+    if(keys['ArrowLeft']||keys['a']){this.vx=-5;this.dir=-1}
+    else if(keys['ArrowRight']||keys['d']){this.vx=5;this.dir=1}
+    else this.vx*=0.85;
+    this.vy+=0.35;
+    this.x+=this.vx;this.y+=this.vy;
+    // Wrap around
+    if(this.x<-this.w)this.x=C.width;
+    if(this.x>C.width)this.x=-this.w;
+  }
+  draw(offy){
+    let dy=this.y+offy;
+    X.save();X.translate(this.x+this.w/2,dy+this.h/2);
+    if(this.dir<0)X.scale(-1,1);
+    // Body
+    X.fillStyle='#66cc66';
+    X.beginPath();X.ellipse(0,0,this.w/2,this.h/2,0,0,Math.PI*2);X.fill();
+    // Eyes
+    X.fillStyle='#fff';
+    X.beginPath();X.arc(4,-6,6,0,Math.PI*2);X.fill();
+    X.beginPath();X.arc(14,-6,6,0,Math.PI*2);X.fill();
+    X.fillStyle='#222';
+    X.beginPath();X.arc(6,-6,3,0,Math.PI*2);X.fill();
+    X.beginPath();X.arc(16,-6,3,0,Math.PI*2);X.fill();
+    // Mouth
+    X.strokeStyle='#2a5a2a';X.lineWidth=2;
+    X.beginPath();X.arc(10,2,6,0,Math.PI);X.stroke();
+    // Feet
+    if(this.vy>0){
+      X.fillStyle='#55aa55';
+      X.fillRect(-12,12,10,5);X.fillRect(5,12,10,5);
+    }else{
+      X.fillStyle='#55aa55';
+      X.fillRect(-12,14,10,3);X.fillRect(5,14,10,3);
+    }
+    X.restore();
+    // Nose/snout
+  }
+}
+
+function genPlatform(y){
+  let type='normal';
+  let r=Math.random();
+  if(score>500&&r<0.1)type='breaking';
+  else if(score>200&&r<0.2)type='moving';
+  else if(r<0.08)type='spring';
+  return{x:Math.random()*(C.width-70),y,w:70,type,mx:type==='moving'?1:0,broken:false,springUsed:false};
+}
+
+function generatePlatforms(){
+  platforms=[];
+  for(let i=0;i<20;i++){
+    platforms.push(genPlatform(600-i*35));
+  }
+  platforms.push({x:165,y:545,w:70,type:'normal',mx:0,broken:false,springUsed:false});  // guaranteed landing under the spawn
+}
+
+function startGame(){
+  document.getElementById('overlay').classList.add('hidden');
+  player=new Player();score=0;maxY=player.y;camY=0;gameOver=false;started=true;
+  generatePlatforms();
+}
+
+function loop(){
+  requestAnimationFrame(loop);   // single persistent loop — never stack on retry
+  if(!started)return;
+  X.clearRect(0,0,C.width,C.height);
+  // Background gradient
+  let bg=X.createLinearGradient(0,0,0,C.height);
+  let hue=(score/10)%360;
+  bg.addColorStop(0,`hsl(${140+hue*0.1},30%,10%)`);
+  bg.addColorStop(1,`hsl(${160+hue*0.1},25%,18%)`);
+  X.fillStyle=bg;X.fillRect(0,0,C.width,C.height);
+
+  if(!gameOver){
+    player.update();
+    // camera follows the highest point reached (never scrolls back down)
+    if(player.y<maxY){
+      maxY=player.y;
+      score=Math.floor((600-maxY)/5);
+      document.getElementById('hud').textContent='Score: '+score;
+      window.score=score;
+    }
+    camY=Math.min(camY,maxY-300);
+    // Platform collision — pure world coordinates, feet crossing the top
+    if(player.vy>0){
+      const feet=player.y+player.h, prevFeet=feet-player.vy;
+      for(let p of platforms){
+        if(p.broken)continue;
+        if(player.x+player.w>p.x&&player.x<p.x+p.w&&
+           feet>=p.y-2&&prevFeet<=p.y+12){
+          if(p.type==='breaking'){p.broken=true;continue}
+          player.vy=p.type==='spring'?-15:-10;
+          if(p.type==='spring')p.springUsed=true;
+          break;
+        }
+      }
+    }
+    // Moving platforms
+    for(let p of platforms){
+      if(p.type==='moving'){p.x+=p.mx*2;if(p.x<0||p.x>C.width-p.w)p.mx*=-1}
+    }
+    // Drop platforms that scrolled out below, add new ones above
+    platforms=platforms.filter(p=>p.y<camY+C.height+80&&!p.broken);
+    let topP=platforms.length?Math.min(...platforms.map(p=>p.y)):camY+C.height;
+    while(topP>camY-60){
+      topP-=35+Math.random()*25;
+      platforms.unshift(genPlatform(topP));
+    }
+    // Game over: fell one screen below the highest point
+    if(player.y-camY>C.height+60)gameOver=true;
+
+    // Draw platforms
+    for(let p of platforms){
+      let py=p.y-camY;
+      if(py<-20||py>C.height+20||p.broken)continue;
+      if(p.type==='normal'){X.fillStyle='#44aa44';X.shadowColor='#44aa44';X.shadowBlur=8}
+      else if(p.type==='moving'){X.fillStyle='#4488cc';X.shadowColor='#4488cc';X.shadowBlur=8}
+      else if(p.type==='breaking'){X.fillStyle='#cc6644';X.shadowColor='#cc6644';X.shadowBlur=8}
+      else if(p.type==='spring'){X.fillStyle='#ccaa22';X.shadowColor='#ccaa22';X.shadowBlur=8}
+      X.beginPath();X.roundRect(p.x,py,p.w,12,6);X.fill();
+      X.shadowBlur=0;
+      // Spring coil
+      if(p.type==='spring'&&!p.springUsed){
+        X.fillStyle='#ffdd44';X.fillRect(p.x+p.w/2-5,py-12,10,12);
+        X.fillStyle='#ffee88';X.fillRect(p.x+p.w/2-7,py-14,14,5);
+      }
+      // Grass detail
+      if(p.type==='normal'){
+        X.fillStyle='#55cc55';
+        for(let gx=p.x+5;gx<p.x+p.w-5;gx+=8){
+          X.fillRect(gx,py-3,2,4);
+        }
+      }
+    }
+    player.draw(-camY);
+  }
+
+  if(gameOver){
+    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#ff6644';X.font='bold 44px Segoe UI';X.textAlign='center';
+    X.fillText('GAME OVER',C.width/2,250);
+    X.fillStyle='#88ff88';X.font='26px Segoe UI';
+    X.fillText('Score: '+score,C.width/2,300);
+    X.fillStyle='#fff';X.font='18px Segoe UI';
+    X.fillText('Press SPACE to retry',C.width/2,345);
+  }
+}
+
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '&&gameOver)startGame();e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[e.key]=false});
+loop();
+</script>
+</body>
+</html>

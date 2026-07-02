@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gravity Ball - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(200,100,255,0.2)}
+</style>
+</head>
+<body>
+<canvas id="c" width="600" height="500"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let ball,goal,walls,gravDir,level,particles=[],won,keys={};
+const LEVELS=[
+  {walls:[{x:200,y:200,w:200,h:15},{x:100,y:350,w:250,h:15}],start:{x:50,y:100},end:{x:550,y:450}},
+  {walls:[{x:0,y:250,w:400,h:15},{x:200,y:150,w:400,h:15},{x:0,y:380,w:350,h:15}],start:{x:50,y:50},end:{x:550,y:450}},
+  {walls:[{x:150,y:100,w:15,h:200},{x:300,y:200,w:15,h:200},{x:450,y:50,w:15,h:200},{x:100,y:350,w:400,h:15}],start:{x:50,y:50},end:{x:550,y:450}},
+  {walls:[{x:0,y:200,w:250,h:15},{x:350,y:200,w:250,h:15},{x:200,y:300,w:200,h:15},{x:100,y:100,w:15,h:200},{x:500,y:100,w:15,h:200}],start:{x:50,y:450},end:{x:550,y:50}},
+  {walls:[{x:100,y:150,w:400,h:12},{x:100,y:250,w:400,h:12},{x:100,y:350,w:400,h:12},{x:100,y:150,w:12,h:100},{x:500,y:250,w:12,h:100}],start:{x:50,y:50},end:{x:550,y:450}},
+];
+function addP(x,y,c){for(let i=0;i<10;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20,color:c})}}
+
+function initLevel(n){
+  level=n%LEVELS.length;
+  let l=LEVELS[level];
+  ball={x:l.start.x,y:l.start.y,vx:0,vy:0,r:10};
+  goal=l.end;walls=l.walls;gravDir={x:0,y:1};won=false;particles=[];
+}
+
+function loop(){
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
+  // Grid
+  X.strokeStyle='rgba(255,255,255,0.03)';
+  for(let i=0;i<C.width;i+=30){X.beginPath();X.moveTo(i,0);X.lineTo(i,C.height);X.stroke()}
+  for(let i=0;i<C.height;i+=30){X.beginPath();X.moveTo(0,i);X.lineTo(C.width,i);X.stroke()}
+
+  if(!won){
+    // Gravity controls
+    if(keys['ArrowUp']||keys['w'])gravDir={x:0,y:-1};
+    if(keys['ArrowDown']||keys['s'])gravDir={x:0,y:1};
+    if(keys['ArrowLeft']||keys['a'])gravDir={x:-1,y:0};
+    if(keys['ArrowRight']||keys['d'])gravDir={x:1,y:0};
+
+    ball.vx+=gravDir.x*0.3;ball.vy+=gravDir.y*0.3;
+    ball.vx*=0.98;ball.vy*=0.98;
+    ball.x+=ball.vx;ball.y+=ball.vy;
+
+    // Wall collision
+    for(let w of walls){
+      if(ball.x+ball.r>w.x&&ball.x-ball.r<w.x+w.w&&ball.y+ball.r>w.y&&ball.y-ball.r<w.y+w.h){
+        // Push out
+        let overlapX=Math.min(ball.x+ball.r-w.x,w.x+w.w-(ball.x-ball.r));
+        let overlapY=Math.min(ball.y+ball.r-w.y,w.y+w.h-(ball.y-ball.r));
+        if(overlapX<overlapY){
+          if(ball.x<w.x+w.w/2){ball.x=w.x-ball.r}else{ball.x=w.x+w.w+ball.r}
+          ball.vx*=-0.5;
+        }else{
+          if(ball.y<w.y+w.h/2){ball.y=w.y-ball.r}else{ball.y=w.y+w.h+ball.r}
+          ball.vy*=-0.5;
+        }
+      }
+    }
+    // Borders
+    if(ball.x<ball.r){ball.x=ball.r;ball.vx*=-0.5}
+    if(ball.x>C.width-ball.r){ball.x=C.width-ball.r;ball.vx*=-0.5}
+    if(ball.y<ball.r){ball.y=ball.r;ball.vy*=-0.5}
+    if(ball.y>C.height-ball.r){ball.y=C.height-ball.r;ball.vy*=-0.5}
+
+    // Goal check
+    if(Math.hypot(ball.x-goal.x,ball.y-goal.y)<25){
+      won=true;addP(goal.x,goal.y,'#ffcc00');
+      setTimeout(()=>initLevel(level+1),1200);
+    }
+  }
+
+  // Draw walls
+  X.fillStyle='#4a3a6a';X.shadowColor='#8866cc';X.shadowBlur=8;
+  for(let w of walls){X.beginPath();X.roundRect(w.x,w.y,w.w,w.h,4);X.fill()}
+  X.shadowBlur=0;
+
+  // Goal
+  X.fillStyle='#ffcc00';X.shadowColor='#ffcc00';X.shadowBlur=15;
+  X.beginPath();X.arc(goal.x,goal.y,12+Math.sin(Date.now()/300)*3,0,Math.PI*2);X.fill();
+  X.shadowBlur=0;
+
+  // Ball
+  X.fillStyle='#cc66ff';X.shadowColor='#cc66ff';X.shadowBlur=12;
+  X.beginPath();X.arc(ball.x,ball.y,ball.r,0,Math.PI*2);X.fill();
+  X.fillStyle='rgba(255,255,255,0.3)';X.beginPath();X.arc(ball.x-3,ball.y-3,4,0,Math.PI*2);X.fill();
+  X.shadowBlur=0;
+
+  // Gravity indicator
+  X.fillStyle='rgba(255,255,255,0.15)';X.font='14px Segoe UI';X.textAlign='center';
+  X.fillText('Gravity: '+(gravDir.y<0?'↑':gravDir.y>0?'↓':gravDir.x<0?'←':'→'),C.width/2,C.height-15);
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
+    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/20;X.fillStyle=p.color;
+    X.fillRect(p.x-2,p.y-2,4,4)}X.globalAlpha=1;
+
+  // HUD
+  X.fillStyle='#cc66ff';X.font='bold 20px Segoe UI';X.textAlign='left';
+  X.fillText('Level '+(level+1),15,30);
+  X.font='12px Segoe UI';X.fillStyle='rgba(255,255,255,0.4)';
+  X.fillText('Arrow keys change gravity direction',15,50);
+
+  if(won){
+    X.fillStyle='rgba(0,0,0,0.4)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#ffcc00';X.font='bold 36px Segoe UI';X.textAlign='center';
+    X.fillText('Level Complete!',C.width/2,C.height/2);
+  }
+
+  requestAnimationFrame(loop);
+}
+document.addEventListener('keydown',e=>{keys[e.key]=true;e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[e.key]=false});
+initLevel(0);loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Memory Match - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
+#hud{margin-bottom:15px;display:flex;gap:25px;font-size:18px}
+#board{display:grid;gap:8px}
+.card{width:75px;height:90px;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:36px;transition:transform 0.3s,background 0.3s;transform-style:preserve-3d;background:#2a2a4a;border:2px solid #3a3a5a;user-select:none}
+.card:hover{border-color:#5a5a8a}
+.card.flipped,.card.matched{background:#1a1a3a;border-color:#4de8ff;transform:rotateY(180deg)}
+.card.matched{border-color:#44ff88;opacity:0.7}
+.card .inner{transform:rotateY(180deg)}
+.card:not(.flipped):not(.matched) .inner{visibility:hidden}
+#msg{margin-top:15px;font-size:20px;min-height:30px}
+#diff{margin-bottom:15px;display:flex;gap:10px}
+#diff button{padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;background:#2a2a4a;color:#fff;font-size:13px}
+#diff button.active{background:#4de8ff;color:#0a0a1a}
+</style>
+</head>
+<body>
+<div id="diff">
+<button class="active" onclick="init(4)">4x4</button>
+<button onclick="init(5)">5x4</button>
+<button onclick="init(6)">6x5</button>
+</div>
+<div id="hud"><span>Moves: <b id="moves">0</b></span><span>Pairs: <b id="pairs">0</b>/<b id="total">8</b></span><span>⏱ <b id="timer">0s</b></span></div>
+<div id="board"></div>
+<div id="msg"></div>
+<script>
+const EMOJIS=['🍎','🍋','🍇','🌸','🔥','⚡','🎮','🎵','🌙','🍕','🎯','🐱','🦊','🐸','🌈'];
+let cards,flipped,matched,moves,pairs,total,cols,rows,locked,timerInt,seconds;
+function init(c){
+  cols=c;rows=c<=4?4:c<=5?4:5;total=cols*rows/2;
+  let icons=EMOJIS.slice(0,total);
+  cards=[...icons,...icons].sort(()=>Math.random()-0.5);
+  flipped=[];matched=new Set();moves=0;pairs=0;locked=false;seconds=0;
+  if(timerInt)clearInterval(timerInt);
+  timerInt=setInterval(()=>{seconds++;document.getElementById('timer').textContent=seconds+'s'},1000);
+  document.getElementById('moves').textContent=0;
+  document.getElementById('pairs').textContent=0;
+  document.getElementById('total').textContent=total;
+  document.getElementById('msg').textContent='';
+  document.querySelectorAll('#diff button').forEach((b,i)=>b.classList.toggle('active',(c===4&&i===0)||(c===5&&i===1)||(c===6&&i===2)));
+  render();
+}
+function flip(i){
+  if(locked||flipped.includes(i)||matched.has(i))return;
+  flipped.push(i);render();
+  if(flipped.length===2){
+    moves++;document.getElementById('moves').textContent=moves;
+    locked=true;
+    setTimeout(()=>{
+      if(cards[flipped[0]]===cards[flipped[1]]){
+        matched.add(flipped[0]);matched.add(flipped[1]);pairs++;
+        document.getElementById('pairs').textContent=pairs;
+        if(pairs===total){clearInterval(timerInt);document.getElementById('msg').textContent='🎉 Complete in '+moves+' moves, '+seconds+'s!'}
+      }
+      flipped=[];locked=false;render();
+    },700);
+  }
+}
+function render(){
+  let b=document.getElementById('board');
+  b.style.gridTemplateColumns=`repeat(${cols},75px)`;
+  let h='';
+  for(let i=0;i<cards.length;i++){
+    let cls='card';
+    if(flipped.includes(i))cls+=' flipped';
+    if(matched.has(i))cls+=' matched';
+    h+=`<div class="${cls}" onclick="flip(${i})"><span class="inner">${cards[i]}</span></div>`;
+  }
+  b.innerHTML=h;
+}
+init(4);
+</script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neon Snake - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,255,100,0.2)}
+#hud{position:absolute;top:15px;left:50%;transform:translateX(-50%);color:#00ff66;font-size:22px;font-weight:bold;z-index:10}
+</style>
+</head>
+<body>
+<div id="hud">Score: 0</div>
+<canvas id="c" width="600" height="600"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d'),G=20,W=30,H=30;
+let snake,dir,food,score,gameOver,speed,interval;
+function start(){
+  snake=[{x:15,y:15},{x:14,y:15},{x:13,y:15}];dir={x:1,y:0};lastDir=dir;score=0;gameOver=false;speed=120;
+  placeFood();if(interval)clearInterval(interval);interval=setInterval(tick,speed);update();
+}
+function placeFood(){food={x:Math.floor(Math.random()*W),y:Math.floor(Math.random()*H),type:Math.random()<0.15?'super':'normal'}}
+function tick(){
+  if(gameOver)return;
+  let h={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+  if(h.x<0||h.x>=W||h.y<0||h.y>=H){gameOver=true;update();return}
+  for(let s of snake)if(s.x===h.x&&s.y===h.y){gameOver=true;update();return}
+  snake.unshift(h);
+  if(h.x===food.x&&h.y===food.y){
+    score+=food.type==='super'?5:1;
+    document.getElementById('hud').textContent='Score: '+score;
+    placeFood();
+    if(speed>50){speed-=2;clearInterval(interval);interval=setInterval(tick,speed)}
+  }else snake.pop();
+  update();
+}
+function update(){
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
+  // Grid
+  X.strokeStyle='rgba(255,255,255,0.03)';X.lineWidth=0.5;
+  for(let i=0;i<=W;i++){X.beginPath();X.moveTo(i*G,0);X.lineTo(i*G,C.height);X.stroke()}
+  for(let i=0;i<=H;i++){X.beginPath();X.moveTo(0,i*G);X.lineTo(C.width,i*G);X.stroke()}
+  // Snake
+  for(let i=0;i<snake.length;i++){
+    let s=snake[i],a=1-i/snake.length*0.5;
+    X.fillStyle=i===0?'#00ff66':`rgba(0,${200-i*3},${80+i*2},${a})`;
+    X.shadowColor='#00ff66';X.shadowBlur=i===0?15:5;
+    X.beginPath();X.roundRect(s.x*G+1,s.y*G+1,G-2,G-2,4);X.fill();
+  }
+  X.shadowBlur=0;
+  // Eyes on head
+  let h=snake[0];
+  X.fillStyle='#fff';
+  X.beginPath();X.arc(h.x*G+8,h.y*G+8,3,0,Math.PI*2);X.fill();
+  X.beginPath();X.arc(h.x*G+14,h.y*G+8,3,0,Math.PI*2);X.fill();
+  // Food
+  X.fillStyle=food.type==='super'?'#ffcc00':'#ff4466';
+  X.shadowColor=food.type==='super'?'#ffcc00':'#ff4466';X.shadowBlur=12;
+  X.beginPath();X.arc(food.x*G+G/2,food.y*G+G/2,G/2-2,0,Math.PI*2);X.fill();
+  if(food.type==='super'){X.fillStyle='#fff';X.font='12px Segoe UI';X.textAlign='center';X.fillText('★',food.x*G+G/2,food.y*G+G/2+4)}
+  X.shadowBlur=0;
+  if(gameOver){
+    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#ff4466';X.font='bold 44px Segoe UI';X.textAlign='center';
+    X.fillText('GAME OVER',C.width/2,270);
+    X.fillStyle='#00ff66';X.font='24px Segoe UI';X.fillText('Score: '+score,C.width/2,320);
+    X.fillStyle='#fff';X.font='16px Segoe UI';X.fillText('Press SPACE to retry',C.width/2,360);
+  }
+}
+let lastDir=dir;
+document.addEventListener('keydown',e=>{
+  if(e.key===' '&&gameOver){start();return}
+  let nd=null;
+  if((e.key==='ArrowUp'||e.key==='w')&&lastDir.y!==1)nd={x:0,y:-1};
+  if((e.key==='ArrowDown'||e.key==='s')&&lastDir.y!==-1)nd={x:0,y:1};
+  if((e.key==='ArrowLeft'||e.key==='a')&&lastDir.x!==1)nd={x:-1,y:0};
+  if((e.key==='ArrowRight'||e.key==='d')&&lastDir.x!==-1)nd={x:1,y:0};
+  if(nd){dir=nd;lastDir=nd}e.preventDefault();
+});
+start();
+</script>
+</body>
+</html>

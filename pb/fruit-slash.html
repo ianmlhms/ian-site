@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fruit Slash - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a0a2a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(200,50,255,0.2);cursor:crosshair}
+</style>
+</head>
+<body>
+<canvas id="c" width="600" height="600"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+const FRUITS=['🍎','🍊','🍋','🍇','🍉','🍓','🥝','🍑'];
+let fruits=[],slashes=[],particles=[],score=0,lives=3,gameOver=false,mouseTrail=[],frame=0;
+
+function spawn(){
+  if(gameOver)return;
+  let n=1+Math.floor(Math.random()*3);
+  for(let i=0;i<n;i++){
+    let isBomb=Math.random()<0.1;
+    fruits.push({x:100+Math.random()*400,y:C.height+30,
+      vx:(Math.random()-0.5)*4,vy:-12-Math.random()*5,
+      emoji:isBomb?'💣':FRUITS[Math.floor(Math.random()*FRUITS.length)],
+      r:25,sliced:false,bomb:isBomb,rot:0,rv:(Math.random()-0.5)*0.1});
+  }
+}
+function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*4;
+  particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*15,color:c})}}
+
+let mouseDown=false,lastMouse={x:0,y:0};
+C.addEventListener('mousedown',e=>{mouseDown=true;let r=C.getBoundingClientRect();lastMouse={x:(e.clientX-r.left)*C.width/r.width,y:(e.clientY-r.top)*C.height/r.height}});
+C.addEventListener('mouseup',()=>{mouseDown=false;mouseTrail=[]});
+C.addEventListener('mousemove',e=>{
+  if(!mouseDown)return;
+  let r=C.getBoundingClientRect();
+  let mx=(e.clientX-r.left)*C.width/r.width,my=(e.clientY-r.top)*C.height/r.height;
+  mouseTrail.push({x:mx,y:my,life:10});
+  // Check slice
+  for(let f of fruits){
+    if(f.sliced)continue;
+    if(Math.hypot(mx-f.x,my-f.y)<f.r+10){
+      f.sliced=true;
+      if(f.bomb){lives--;addP(f.x,f.y,'#ff4444',20);if(lives<=0)gameOver=true}
+      else{score++;addP(f.x,f.y,'#ffcc00',15)}
+    }
+  }
+  lastMouse={x:mx,y:my};
+});
+
+function loop(){
+  frame++;
+  X.fillStyle='#1a0a2a';X.fillRect(0,0,C.width,C.height);
+  // BG pattern
+  X.strokeStyle='rgba(255,255,255,0.02)';
+  for(let i=0;i<C.width;i+=40){X.beginPath();X.moveTo(i,0);X.lineTo(i,C.height);X.stroke()}
+
+  if(!gameOver&&frame%60===0)spawn();
+
+  // Update fruits
+  for(let i=fruits.length-1;i>=0;i--){
+    let f=fruits[i];f.x+=f.vx;f.y+=f.vy;f.vy+=0.25;f.rot+=f.rv;
+    if(f.y>C.height+50){
+      if(!f.sliced&&!f.bomb){lives--;if(lives<=0)gameOver=true}
+      fruits.splice(i,1);continue;
+    }
+    if(!f.sliced){
+      X.save();X.translate(f.x,f.y);X.rotate(f.rot);
+      X.font='40px serif';X.textAlign='center';X.textBaseline='middle';
+      X.fillText(f.emoji,0,0);X.restore();
+    }
+  }
+
+  // Slash trail
+  for(let i=mouseTrail.length-1;i>=0;i--){
+    mouseTrail[i].life--;if(mouseTrail[i].life<=0){mouseTrail.splice(i,1);continue}
+    X.globalAlpha=mouseTrail[i].life/10;X.fillStyle='#fff';
+    X.beginPath();X.arc(mouseTrail[i].x,mouseTrail[i].y,3,0,Math.PI*2);X.fill();
+  }
+  X.globalAlpha=1;
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.life--;
+    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/30;X.fillStyle=p.color;
+    X.fillRect(p.x-3,p.y-3,6,6)}X.globalAlpha=1;
+
+  // HUD
+  X.fillStyle='#fff';X.font='bold 28px Segoe UI';X.textAlign='left';X.fillText('Score: '+score,20,40);
+  X.textAlign='right';X.fillText('❤️'.repeat(Math.max(0,lives)),C.width-20,40);
+
+  if(gameOver){
+    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
+    X.textAlign='center';X.fillStyle='#ff4466';X.font='bold 44px Segoe UI';X.fillText('GAME OVER',C.width/2,260);
+    X.fillStyle='#ffcc00';X.font='26px Segoe UI';X.fillText('Score: '+score,C.width/2,310);
+    X.fillStyle='#fff';X.font='16px Segoe UI';X.fillText('Press SPACE to retry',C.width/2,355);
+  }
+  requestAnimationFrame(loop);
+}
+document.addEventListener('keydown',e=>{if(e.key===' '&&gameOver){score=0;lives=3;gameOver=false;fruits=[];particles=[]}});
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Pixel - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a2a3a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(255,200,0,0.2)}
+</style>
+</head>
+<body>
+<canvas id="c" width="400" height="600"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let bird,pipes,score,gameOver,started,frame=0,nextPipe=0,fails=0;
+const assist=()=>Math.min(fails,10);   // dies stack up -> the game quietly gets easier
+function start(){
+  bird={x:80,y:300,vy:0,rot:0};pipes=[];score=0;gameOver=false;started=false;frame=0;nextPipe=0;
+}
+function addPipe(){
+  let gap=150-Math.min(score*2,40)+assist()*7;
+  let top=60+Math.random()*(C.height-gap-120);
+  pipes.push({x:C.width,top,bot:top+gap,scored:false});
+}
+function draw(){
+  frame++;
+  // Sky
+  let g=X.createLinearGradient(0,0,0,C.height);
+  g.addColorStop(0,'#4dc9f6');g.addColorStop(0.7,'#87CEEB');g.addColorStop(1,'#68b86a');
+  X.fillStyle=g;X.fillRect(0,0,C.width,C.height);
+  // Clouds
+  X.fillStyle='rgba(255,255,255,0.6)';
+  for(let i=0;i<4;i++){
+    let cx2=(i*120+frame*0.3)%500-50;
+    X.beginPath();X.ellipse(cx2,40+i*25,50,15,0,0,Math.PI*2);X.fill();
+  }
+  // Ground
+  X.fillStyle='#5a8a3a';X.fillRect(0,C.height-40,C.width,40);
+  X.fillStyle='#6a9a4a';X.fillRect(0,C.height-40,C.width,8);
+
+  if(started&&!gameOver){
+    bird.vy+=0.4;bird.y+=bird.vy;bird.rot=Math.min(bird.vy*3,90);
+    if(frame>=nextPipe){addPipe();nextPipe=frame+90+assist()*5;}
+    const pv=2.5-Math.min(assist()*0.08,0.7);
+    for(let p of pipes){
+      p.x-=pv;
+      if(!p.scored&&p.x+50<bird.x){p.scored=true;score++;window.score=Math.max(window.score||0,score);}
+      if(bird.x+15>p.x&&bird.x-15<p.x+50&&(bird.y-15<p.top||bird.y+15>p.bot))gameOver=true;
+    }
+    pipes=pipes.filter(p=>p.x>-60);
+    if(bird.y>C.height-55||bird.y<0)gameOver=true;
+    if(gameOver){if(score>=8)fails=Math.max(0,fails-2);else fails++;}
+  }
+
+  // Pipes
+  for(let p of pipes){
+    X.fillStyle='#2ecc71';X.fillRect(p.x,0,50,p.top);X.fillRect(p.x,p.bot,50,C.height-p.bot);
+    X.fillStyle='#27ae60';X.fillRect(p.x-3,p.top-20,56,20);X.fillRect(p.x-3,p.bot,56,20);
+    X.strokeStyle='#1a8a4a';X.lineWidth=2;X.strokeRect(p.x,0,50,p.top);X.strokeRect(p.x,p.bot,50,C.height-p.bot);
+  }
+
+  // Bird
+  X.save();X.translate(bird.x,bird.y);X.rotate(bird.rot*Math.PI/180);
+  X.fillStyle='#f1c40f';X.beginPath();X.ellipse(0,0,18,14,0,0,Math.PI*2);X.fill();
+  X.fillStyle='#e67e22';X.beginPath();X.moveTo(12,-3);X.lineTo(22,0);X.lineTo(12,4);X.fill();
+  X.fillStyle='#fff';X.beginPath();X.arc(6,-4,6,0,Math.PI*2);X.fill();
+  X.fillStyle='#333';X.beginPath();X.arc(8,-4,3,0,Math.PI*2);X.fill();
+  // Wing
+  let wingY=Math.sin(frame*0.3)*4;
+  X.fillStyle='#e8b809';X.beginPath();X.ellipse(-5,5+wingY,12,6,-0.3,0,Math.PI*2);X.fill();
+  X.restore();
+
+  // Score
+  X.fillStyle='#fff';X.font='bold 48px Segoe UI';X.textAlign='center';
+  X.strokeStyle='rgba(0,0,0,0.3)';X.lineWidth=4;
+  X.strokeText(score,C.width/2,70);X.fillText(score,C.width/2,70);
+  if(assist()>2&&started&&!gameOver){
+    X.font='13px Segoe UI';X.fillStyle='rgba(255,255,255,0.55)';
+    X.fillText('💛 assist on — it gets harder again as you improve',C.width/2,95);
+  }
+
+  if(!started&&!gameOver){
+    X.fillStyle='rgba(0,0,0,0.3)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#f1c40f';X.font='bold 40px Segoe UI';X.fillText('Flappy Pixel',C.width/2,240);
+    X.fillStyle='#fff';X.font='18px Segoe UI';X.fillText('Click or press SPACE to flap',C.width/2,290);
+  }
+  if(gameOver){
+    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
+    X.fillStyle='#e74c3c';X.font='bold 42px Segoe UI';X.fillText('GAME OVER',C.width/2,250);
+    X.fillStyle='#f1c40f';X.font='26px Segoe UI';X.fillText('Score: '+score,C.width/2,300);
+    X.fillStyle='#fff';X.font='16px Segoe UI';X.fillText('Press SPACE to retry',C.width/2,345);
+  }
+  requestAnimationFrame(draw);
+}
+function flap(){if(gameOver){start();return}if(!started)started=true;bird.vy=-7}
+document.addEventListener('keydown',e=>{if(e.key===' '){flap();e.preventDefault()}});
+C.addEventListener('click',flap);
+start();draw();
+</script>
+</body>
+</html>

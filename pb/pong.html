@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neon Pong - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
+canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,255,200,0.2);max-width:100vw;max-height:100vh}
+#info{position:absolute;top:15px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;z-index:10;background:rgba(0,0,0,0.4);padding:5px 14px;border-radius:12px}
+#menu{position:fixed;inset:0;background:rgba(6,6,22,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:30;color:#fff}
+#menu h1{font-size:34px;letter-spacing:2px;color:#00ffcc;text-shadow:0 0 18px rgba(0,255,204,0.6)}
+#menu button{width:280px;padding:13px;font-size:17px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;background:#16323a;color:#fff}
+#menu button:hover{background:#1e4a55}
+#menu .join{display:flex;gap:8px;width:280px}
+#menu .join input{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid #2a5a6a;background:#0e2228;color:#fff;font-size:17px;text-transform:lowercase;text-align:center}
+#menu .join button{width:auto;padding:12px 20px}
+#mStatus{min-height:24px;font-size:16px;color:#7fe8d0;text-align:center}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="info">🟢 P1: W/S · 🔵 P2: ↑/↓ · First to 10 wins!</div>
+<canvas id="c" width="800" height="500"></canvas>
+<div id="menu">
+  <h1>NEON PONG</h1>
+  <button id="mLocal">👥 2 Players — one device</button>
+  <button id="mAI">🤖 vs Computer</button>
+  <button id="mHost">🌐 Host online game</button>
+  <div class="join"><input id="mCode" maxlength="5" placeholder="code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button id="mJoin">Join</button></div>
+  <div id="mStatus"></div>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d');
+let keys={},particles=[];
+let p1={y:250,score:0,h:80},p2={y:250,score:0,h:80};
+let ball={x:400,y:250,vx:5,vy:3,speed:5,trail:[]};
+const PW=12,PX1=30,PX2=C.width-30-PW;
+
+/* ---------- modes + online bridge ---------- */
+let mode=null,running=false,peerN=1,netFrame=0,lastT=0;
+const remoteKeys={up:false,down:false,sp:false};
+let guestTarget=null;      // last host snapshot (guest render target)
+const NET={open(code,role){parent.postMessage({__pbNet:{op:'open',code,role}},'*')},
+ send(d){parent.postMessage({__pbNet:{op:'send',d}},'*')},
+ onMsg:null,onPeers:null,onErr:null};
+window.addEventListener('message',e=>{const d=e.data;if(!d)return;
+ if(d.__pbNetMsg&&NET.onMsg)NET.onMsg(d.__pbNetMsg.r,d.__pbNetMsg.d);
+ if(d.__pbNetPeers&&NET.onPeers)NET.onPeers(d.__pbNetPeers);
+ if(d.__pbNetErr&&NET.onErr)NET.onErr(d.__pbNetErr)});
+const menu=document.getElementById('menu'),mStatus=document.getElementById('mStatus');
+const status=(t)=>mStatus.textContent=t;
+const randCode=()=>Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,5).padEnd(5,'x');
+function begin(){p1.score=0;p2.score=0;p1.y=250;p2.y=250;resetBall(1);running=true;menu.classList.add('hidden');
+  document.getElementById('info').textContent=
+    mode==='local'?'🟢 P1: W/S · 🔵 P2: ↑/↓ · First to 10 wins!':
+    mode==='ai'?'🟢 You: W/S or ↑/↓ · First to 10 wins!':
+    '🟢 You are '+(mode==='host'?'GREEN (left)':'BLUE (right)')+' · W/S or ↑/↓ · First to 10!';}
+function backToMenu(msg){running=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
+  menu.classList.remove('hidden');status(msg||'')}
+document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
+document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
+document.getElementById('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
+  status('Room code: '+c.toUpperCase()+' — waiting for the other iPad…')};
+document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();
+  if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
+  mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'…')};
+NET.onPeers=(p)=>{peerN=p.n;
+  if(!running&&(mode==='host'||mode==='guest')&&p.n>=2)begin();
+  if(running&&(mode==='host'||mode==='guest')&&p.n<2)backToMenu('Opponent left the game.')};
+NET.onErr=(e)=>{if(mode==='host'||mode==='guest')backToMenu(e==='offline'?'Online play needs the internet.':'Connection problem — try again.')};
+NET.onMsg=(r,d)=>{
+  if(mode==='host'&&d&&d.t==='k'){remoteKeys.up=!!d.up;remoteKeys.down=!!d.down;remoteKeys.sp=!!d.sp}
+  if(mode==='guest'&&d&&d.t==='s')guestTarget=d;
+};
+const meUp=()=>keys['w']||keys['W']||keys['ArrowUp'];
+const meDown=()=>keys['s']||keys['S']||keys['ArrowDown'];
+function sendKeys(){NET.send({t:'k',up:!!meUp(),down:!!meDown(),sp:!!keys[' ']})}
+
+/* ---------- AI: tracks the ball with limited speed + slight lag ---------- */
+function aiMove(){
+  const target=ball.vx>0?ball.y+ball.vy*6:C.height/2;
+  const d=target-p2.y;
+  if(Math.abs(d)>10)p2.y+=Math.sign(d)*Math.min(5.4,Math.abs(d)*0.12);
+  p2.y=Math.max(p2.h/2,Math.min(C.height-p2.h/2,p2.y));
+}
+
+function resetBall(dir){
+  ball.x=400;ball.y=250;ball.speed=5;
+  ball.vx=dir*5;ball.vy=(Math.random()-0.5)*6;ball.trail=[];
+}
+function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*4;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*10,color:c})}}
+
+function loop(ts){
+  requestAnimationFrame(loop);
+  const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;lastT=ts;
+  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
+  X.strokeStyle='rgba(255,255,255,0.03)';
+  for(let i=0;i<C.width;i+=40){X.beginPath();X.moveTo(i,0);X.lineTo(i,C.height);X.stroke()}
+  X.setLineDash([10,10]);X.strokeStyle='rgba(255,255,255,0.1)';X.lineWidth=2;
+  X.beginPath();X.moveTo(C.width/2,0);X.lineTo(C.width/2,C.height);X.stroke();X.setLineDash([]);
+
+  const over=p1.score>=10||p2.score>=10;
+  if(running&&!over){
+    if(mode==='guest'){
+      // local prediction for my paddle; everything else lerps to the host state
+      if(meUp())p2.y=Math.max(p2.h/2,p2.y-6*m);
+      if(meDown())p2.y=Math.min(C.height-p2.h/2,p2.y+6*m);
+      if(guestTarget){
+        p1.y+=(guestTarget.p1y-p1.y)*0.35;
+        p2.y+=(guestTarget.p2y-p2.y)*0.15;
+        ball.x+=(guestTarget.bx-ball.x)*0.5;ball.y+=(guestTarget.by-ball.y)*0.5;
+        p1.score=guestTarget.s1;p2.score=guestTarget.s2;
+        ball.trail.push({x:ball.x,y:ball.y});if(ball.trail.length>15)ball.trail.shift();
+      }
+      if(++netFrame%5===0)sendKeys();
+    }else{
+      // I simulate (local / ai / host)
+      const p1Up=mode==='local'?keys['w']||keys['W']:meUp();
+      const p1Down=mode==='local'?keys['s']||keys['S']:meDown();
+      if(p1Up)p1.y=Math.max(p1.h/2,p1.y-6*m);
+      if(p1Down)p1.y=Math.min(C.height-p1.h/2,p1.y+6*m);
+      if(mode==='ai')aiMove();
+      else{
+        const p2Up=mode==='host'?remoteKeys.up:keys['ArrowUp'];
+        const p2Down=mode==='host'?remoteKeys.down:keys['ArrowDown'];
+        if(p2Up)p2.y=Math.max(p2.h/2,p2.y-6*m);
+        if(p2Down)p2.y=Math.min(C.height-p2.h/2,p2.y+6*m);
+      }
+      ball.trail.push({x:ball.x,y:ball.y});if(ball.trail.length>15)ball.trail.shift();
+      ball.x+=ball.vx*m;ball.y+=ball.vy*m;
+      if(ball.y<8||ball.y>C.height-8){ball.vy*=-1;ball.y=Math.max(8,Math.min(C.height-8,ball.y));addP(ball.x,ball.y,'#fff',5)}
+      if(ball.x-8<PX1+PW&&ball.y>p1.y-p1.h/2&&ball.y<p1.y+p1.h/2&&ball.vx<0){
+        ball.vx=Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p1.y)*0.1;addP(ball.x,ball.y,'#00ff88',10);
+      }
+      if(ball.x+8>PX2&&ball.y>p2.y-p2.h/2&&ball.y<p2.y+p2.h/2&&ball.vx>0){
+        ball.vx=-Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p2.y)*0.1;addP(ball.x,ball.y,'#4488ff',10);
+      }
+      if(ball.x<0){p2.score++;addP(50,p1.y,'#ff4444',20);resetBall(1)}
+      if(ball.x>C.width){p1.score++;addP(C.width-50,p2.y,'#ff4444',20);resetBall(-1);
+        if(mode==='ai'&&p1.score>=10)window.score=(window.score||0)+1}
+      if(mode==='host'&&++netFrame%5===0)
+        NET.send({t:'s',p1y:Math.round(p1.y),p2y:Math.round(p2.y),bx:Math.round(ball.x),by:Math.round(ball.y),s1:p1.score,s2:p2.score});
+    }
+  }
+
+  for(let i=0;i<ball.trail.length;i++){
+    X.globalAlpha=i/ball.trail.length*0.3;X.fillStyle='#00ffcc';
+    X.beginPath();X.arc(ball.trail[i].x,ball.trail[i].y,6,0,Math.PI*2);X.fill();
+  }
+  X.globalAlpha=1;
+  X.fillStyle='#fff';X.shadowColor='#00ffcc';X.shadowBlur=20;
+  X.beginPath();X.arc(ball.x,ball.y,8,0,Math.PI*2);X.fill();X.shadowBlur=0;
+  X.fillStyle='#00ff88';X.shadowColor='#00ff88';X.shadowBlur=15;
+  X.beginPath();X.roundRect(PX1,p1.y-p1.h/2,PW,p1.h,6);X.fill();
+  X.fillStyle='#4488ff';X.shadowColor='#4488ff';
+  X.beginPath();X.roundRect(PX2,p2.y-p2.h/2,PW,p2.h,6);X.fill();X.shadowBlur=0;
+  X.font='bold 60px Segoe UI';X.textAlign='center';X.globalAlpha=0.2;
+  X.fillStyle='#00ff88';X.fillText(p1.score,C.width/4,80);
+  X.fillStyle='#4488ff';X.fillText(p2.score,C.width*3/4,80);X.globalAlpha=1;
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
+    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/30;X.fillStyle=p.color;
+    X.fillRect(p.x-2,p.y-2,4,4);X.globalAlpha=1}
+  if(running&&over){
+    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
+    const p1w=p1.score>=10;
+    X.fillStyle=p1w?'#00ff88':'#4488ff';X.font='bold 48px Segoe UI';X.textAlign='center';
+    let name=p1w?'P1':'P2';
+    if(mode==='ai')name=p1w?'YOU':'COMPUTER';
+    if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'YOU':'THEY';
+    X.fillText(name+(name==='YOU'?' WIN!':' WINS!'),C.width/2,250);
+    X.fillStyle='#fff';X.font='20px Segoe UI';
+    X.fillText(mode==='guest'?'Host presses SPACE to rematch · M: menu':'Press SPACE to rematch · M: menu',C.width/2,300);
+    if(mode!=='guest'&&(keys[' ']||(mode==='host'&&remoteKeys.sp))){p1.score=0;p2.score=0;resetBall(1)}
+  }
+}
+document.addEventListener('keydown',e=>{keys[e.key]=true;
+  if(running&&(e.key==='m'||e.key==='M'))backToMenu();
+  if((mode==='guest')&&['w','s','W','S','ArrowUp','ArrowDown',' '].includes(e.key))sendKeys();
+  if(['ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[e.key]=false;
+  if((mode==='guest')&&['w','s','W','S','ArrowUp','ArrowDown',' '].includes(e.key))sendKeys()});
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

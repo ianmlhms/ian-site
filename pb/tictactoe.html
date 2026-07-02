@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tic Tac Toe - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
+#mode{margin-bottom:20px;display:flex;gap:10px}
+#mode button{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;background:#2a2a4a;color:#fff;font-size:14px}
+#mode button.active{background:#ff6b9d}
+#board{display:grid;grid-template-columns:repeat(3,100px);gap:8px}
+.cell{width:100px;height:100px;background:#1a1a2e;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px;cursor:pointer;transition:all 0.2s;border:2px solid #2a2a4a}
+.cell:hover{background:#2a2a4a;border-color:#4a4a6a}
+.cell.x{color:#ff6b9d;text-shadow:0 0 15px rgba(255,107,157,0.5)}
+.cell.o{color:#4de8ff;text-shadow:0 0 15px rgba(77,232,255,0.5)}
+.cell.win{border-color:#ffcc00;box-shadow:0 0 20px rgba(255,204,0,0.3)}
+#msg{margin-top:20px;font-size:22px;min-height:35px}
+#score{margin-top:10px;font-size:16px;color:#888}
+</style>
+</head>
+<body>
+<div id="mode">
+<button class="active" onclick="setMode('ai')">vs AI</button>
+<button onclick="setMode('2p')">2 Player</button>
+</div>
+<div id="board"></div>
+<div id="msg">X's turn</div>
+<div id="score">X: 0 | O: 0 | Draw: 0</div>
+<script>
+let board,turn,over,mode='ai',scores={X:0,O:0,D:0};
+const WINS=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function setMode(m){mode=m;document.querySelectorAll('#mode button').forEach((b,i)=>b.classList.toggle('active',i===(m==='ai'?0:1)));reset()}
+function reset(){board=Array(9).fill('');turn='X';over=false;document.getElementById('msg').textContent="X's turn";render()}
+function checkWin(b,p){for(let w of WINS)if(w.every(i=>b[i]===p))return w;return null}
+function minimax(b,isMax,depth){
+  let wX=checkWin(b,'X'),wO=checkWin(b,'O');
+  if(wO)return 10-depth;if(wX)return depth-10;if(b.every(c=>c))return 0;
+  let best=isMax?-Infinity:Infinity;
+  for(let i=0;i<9;i++){if(b[i])continue;b[i]=isMax?'O':'X';
+    let s=minimax(b,!isMax,depth+1);b[i]='';best=isMax?Math.max(best,s):Math.min(best,s)}
+  return best;
+}
+function aiMove(){
+  let best=-Infinity,move=0;
+  for(let i=0;i<9;i++){if(board[i])continue;board[i]='O';let s=minimax(board,false,0);board[i]='';
+    if(s>best){best=s;move=i}}
+  board[move]='O';
+}
+function play(i){
+  if(board[i]||over)return;
+  board[i]=turn;
+  let w=checkWin(board,turn);
+  if(w){over=true;document.getElementById('msg').textContent=turn+' wins! (click to play again)';
+    scores[turn]++;render(w);return}
+  if(board.every(c=>c)){over=true;scores.D++;document.getElementById('msg').textContent='Draw! (click to play again)';render();return}
+  turn=turn==='X'?'O':'X';
+  if(mode==='ai'&&turn==='O'&&!over){aiMove();
+    let w2=checkWin(board,'O');
+    if(w2){over=true;scores.O++;document.getElementById('msg').textContent='O wins! (click to play again)';render(w2);return}
+    if(board.every(c=>c)){over=true;scores.D++;document.getElementById('msg').textContent='Draw! (click to play again)';render();return}
+    turn='X';
+  }
+  document.getElementById('msg').textContent=turn+"'s turn";render();
+}
+function render(winCells){
+  let h='';for(let i=0;i<9;i++){
+    let cls='cell';if(board[i])cls+=' '+board[i].toLowerCase();
+    if(winCells&&winCells.includes(i))cls+=' win';
+    h+=`<div class="${cls}" onclick="${over?'reset()':'play('+i+')'}">${board[i]}</div>`}
+  document.getElementById('board').innerHTML=h;
+  document.getElementById('score').textContent=`X: ${scores.X} | O: ${scores.O} | Draw: ${scores.D}`;
+}
+reset();
+</script>
+</body>
+</html>

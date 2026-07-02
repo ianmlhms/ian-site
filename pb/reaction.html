@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Reaction Test - PixelBreak</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden;cursor:pointer;user-select:none;transition:background 0.2s}
+body.waiting{background:#cc2222}
+body.ready{background:#22aa22}
+body.result{background:#1a1a2e}
+body.idle{background:#2244aa}
+#text{color:#fff;text-align:center}
+#text h1{font-size:48px;margin-bottom:10px}
+#text p{font-size:20px;opacity:0.8}
+#times{margin-top:20px;font-size:16px;color:rgba(255,255,255,0.6)}
+</style>
+</head>
+<body class="idle" onclick="handleClick()">
+<div id="text">
+<h1>⚡ Reaction Test</h1>
+<p>Click to start, then click when the screen turns GREEN!</p>
+<div id="times"></div>
+</div>
+<script>
+let state='idle',startTime,timeout,times=[];
+function handleClick(){
+  if(state==='idle'){
+    state='waiting';document.body.className='waiting';
+    document.querySelector('h1').textContent='Wait...';
+    document.querySelector('p').textContent="Don't click yet!";
+    timeout=setTimeout(()=>{
+      state='ready';document.body.className='ready';
+      document.querySelector('h1').textContent='CLICK NOW!';
+      document.querySelector('p').textContent='';
+      startTime=Date.now();
+    },1500+Math.random()*3000);
+  }else if(state==='waiting'){
+    clearTimeout(timeout);state='idle';document.body.className='idle';
+    document.querySelector('h1').textContent='Too early! 😅';
+    document.querySelector('p').textContent='Click to try again';
+  }else if(state==='ready'){
+    let ms=Date.now()-startTime;times.push(ms);if(times.length>5)times.shift();
+    state='idle';document.body.className='result';
+    document.querySelector('h1').textContent=ms+'ms';
+    let avg=Math.round(times.reduce((a,b)=>a+b)/times.length);
+    let best=Math.min(...times);
+    document.querySelector('p').textContent='Click to try again';
+    document.getElementById('times').textContent=`Average: ${avg}ms · Best: ${best}ms · Attempts: ${times.length}`;
+  }
+}
+</script>
+</body>
+</html>
