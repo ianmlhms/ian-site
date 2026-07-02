@@ -39,12 +39,67 @@ const REPORTER = `<script>(function(){
   document.addEventListener('visibilitychange',rep);
 })();<\/script>`;
 
-PB.instrument = (html) =>
-  html.indexOf("</body>") >= 0 ? html.replace("</body>", REPORTER + "</body>") : html + REPORTER;
+PB.instrument = (html) => {
+  let inject = REPORTER;
+  // hand the game its locally saved state (page must call onOpenGame BEFORE instrument)
+  const g = PB.current;
+  if (g) {
+    const sv = localStorage.getItem(SAVE_PREFIX + g.id);
+    if (sv) inject += `<script>window.__pbSave=${sv.replace(/</g, "\\u003c")};<\/script>`;
+  }
+  return html.indexOf("</body>") >= 0 ? html.replace("</body>", inject + "</body>") : html + inject;
+};
 
 /* ---------------- open / close hooks ---------------- */
-PB.onOpenGame = (g) => { PB.current = g; sessionMax = null; renderGameBar(); };
-PB.onCloseGame = () => { PB.current = null; };
+PB.onOpenGame = (g) => { PB.current = g; sessionMax = null; renderGameBar(); loadCloudSave(g); };
+PB.onCloseGame = () => { flushSave(); PB.current = null; };
+
+/* ---------------- game-state saves (progress, not just score) ----------------
+ * Games post {__pbSave:1,data:{...}} → stored in localStorage always, and
+ * upserted (debounced) to the game_saves table when signed in.
+ * On open, the local save is injected inline; the cloud save is fetched and
+ * delivered via {__pbLoadSave:1,data} — games keep whichever has more progress. */
+const SAVE_PREFIX = "pb_save_";
+let saveTimer = null, pendingSave = null, cloudSave;   // undefined = fetching, null = none
+
+window.addEventListener("message", (e) => {
+  const d = e.data;
+  const g = PB.current; if (!g) return;
+  if (d && d.__pbSave === 1 && d.data) {
+    try { localStorage.setItem(SAVE_PREFIX + g.id, JSON.stringify(d.data)); } catch {}
+    pendingSave = { g, data: d.data };
+    if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
+  }
+  if (d && d.__pbWantSave === 1 && cloudSave !== undefined) sendCloudSave();
+});
+
+function sendCloudSave() {
+  if (!cloudSave || !PB.current) return;
+  const fr = document.getElementById("gf");
+  try { fr.contentWindow.postMessage({ __pbLoadSave: 1, data: cloudSave }, "*"); } catch {}
+}
+
+async function flushSave() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  const p = pendingSave; pendingSave = null;
+  if (!p || !sb || !session) return;
+  try {
+    await sb.from("game_saves").upsert(
+      { user_id: session.user.id, game_id: p.g.id, data: p.data, updated_at: new Date().toISOString() },
+      { onConflict: "user_id,game_id" });
+  } catch (err) { console.warn("[PB] save state failed", err); }
+}
+
+async function loadCloudSave(g) {
+  cloudSave = undefined;
+  if (!sb || !session) { cloudSave = null; return; }
+  try {
+    const { data } = await sb.from("game_saves")
+      .select("data").eq("user_id", session.user.id).eq("game_id", g.id).maybeSingle();
+    cloudSave = (data && data.data) || null;
+  } catch { cloudSave = null; }
+  if (PB.current === g) sendCloudSave();
+}
 
 /* ---------------- receive scores from the game iframe ---------------- */
 window.addEventListener("message", (e) => {
