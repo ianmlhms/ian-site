@@ -48,7 +48,7 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="games.html">‹ Games</a>
+  <a class="home" href="pixelbreak.html">‹ Games</a>
   <h1>🎨 Molerei</h1>
   <div class="spacer"></div>
   <span class="muted">room <code id="roomc"></code></span>
@@ -89,7 +89,7 @@ function render(){
     html += `<p class="muted center">One player draws a secret word, everyone else races to guess it in the chat. Most points after ${LAPS} laps wins.</p>`;
     html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
                           : (hostHere ? `<p class="center muted">Waiting for the host…</p>`
-                                      : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="games.html">start a new game</a>.</p>`);
+                                      : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="pixelbreak.html">start a new game</a>.</p>`);
     $("app").innerHTML=html; if(role==="host"&&$("startBtn")) $("startBtn").onclick=start; return;
   }
   if(phase==="final"){
@@ -98,7 +98,7 @@ function render(){
     html = `<div class="win">🏆 ${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+html;
     html += role==="host" ? `<button class="big" id="againBtn">Play again</button>`
                           : (hostHere ? `<p class="center muted">Waiting for host…</p>`
-                                      : `<p class="center muted">⚠️ The host left — <a href="games.html">start a new game</a>.</p>`);
+                                      : `<p class="center muted">⚠️ The host left — <a href="pixelbreak.html">start a new game</a>.</p>`);
     $("app").innerHTML=html; if(role==="host") $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); }; return;
   }
   // choosing / drawing / reveal

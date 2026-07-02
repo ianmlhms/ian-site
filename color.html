@@ -53,7 +53,7 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="games.html">‹ Games</a>
+  <a class="home" href="pixelbreak.html">‹ Games</a>
   <h1>🎨 Colour Dial</h1>
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
@@ -133,7 +133,7 @@ function render(){
   drawApp(ps);
   if(!AI && role!=="host" && !hostHere)
     $("app").insertAdjacentHTML("afterbegin",
-      '<div class="win">⚠️ The host left the room — the game can\'t continue. <a href="games.html">Back to games</a></div>');
+      '<div class="win">⚠️ The host left the room — the game can\'t continue. <a href="pixelbreak.html">Back to games</a></div>');
 }
 function drawApp(ps){
   if(phase==="lobby"){

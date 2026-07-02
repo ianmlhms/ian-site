@@ -36,7 +36,7 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="games.html">‹ Games</a>
+  <a class="home" href="pixelbreak.html">‹ Games</a>
   <h1>🔤 Stadt-Land-Fluss</h1>
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
@@ -141,7 +141,7 @@ function render(){
       <p class="muted" style="font-size:12.5px">🔎 At the reveal, answers are checked against Wikidata — made-up words score 0.</p>
       ${role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>Start round ${round+1}</button>`
                       : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
-                                  : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="games.html">start a new game</a>.</p>`)}
+                                  : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="pixelbreak.html">start a new game</a>.</p>`)}
       ${renderTotals(ps)}`;
     if(role==="host") $("startBtn") && ($("startBtn").onclick=startRound);
   } else if (phase==="play"){
@@ -163,7 +163,7 @@ function render(){
       ${renderTotals(ps)}
       ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`
                       : (hostHere ? `<p class="center muted">Waiting for host…</p>`
-                                  : `<p class="center muted">⚠️ The host left — <a href="games.html">start a new game</a>.</p>`)}`;
+                                  : `<p class="center muted">⚠️ The host left — <a href="pixelbreak.html">start a new game</a>.</p>`)}`;
     if(role==="host"){
       $("nextBtn").onclick=()=>{ phase="lobby"; render(); };
       $("app").querySelectorAll("[data-ov]").forEach(b=> b.onclick=()=>overrideVerdict(b.dataset.ov,true));

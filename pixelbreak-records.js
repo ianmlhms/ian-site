@@ -52,7 +52,7 @@ PB.instrument = (html) => {
 
 /* ---------------- open / close hooks ---------------- */
 PB.onOpenGame = (g) => { PB.current = g; sessionMax = null; renderGameBar(); loadCloudSave(g); };
-PB.onCloseGame = () => { flushSave(); PB.current = null; };
+PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; };
 
 /* ---------------- game-state saves (progress, not just score) ----------------
  * Games post {__pbSave:1,data:{...}} → stored in localStorage always, and
@@ -71,7 +71,70 @@ window.addEventListener("message", (e) => {
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
   if (d && d.__pbWantSave === 1 && cloudSave !== undefined) sendCloudSave();
+  if (d && d.__pbNet) {
+    const n = d.__pbNet;
+    if (n.op === "open" && /^[a-z0-9]{4,10}$/.test(n.code || "") && (n.role === "host" || n.role === "guest"))
+      netOpen(n.code, n.role);
+    else if (n.op === "send") netSend(n.d);
+    else if (n.op === "close") netClose();
+  }
 });
+
+/* ---------------- online play relay (PB.net) ----------------
+ * Games post {__pbNet:{op:'open',code,role}} / {op:'send',d} / {op:'close'}.
+ * We hold a Supabase realtime channel pbn_<gameId>_<code>; peer broadcasts come
+ * back into the iframe as {__pbNetMsg:{r,d}}, presence as {__pbNetPeers:{n,roles}},
+ * subscribe success as {__pbNetUp:1}, failures as {__pbNetErr}. Works signed out —
+ * realtime broadcast only needs the anon key, on a dedicated non-persisting client
+ * so we never touch the shared auth client's socket or its 10 msg/s default cap. */
+let netChan = null, netClient = null, netRole = null;
+
+async function getNetClient() {
+  if (netClient) return netClient;
+  const createClient = await getCreateClient();
+  netClient = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    realtime: { params: { eventsPerSecond: 24 } },
+  });
+  return netClient;
+}
+
+function netPost(msg) {
+  const fr = document.getElementById("gf");
+  try { fr.contentWindow.postMessage(msg, "*"); } catch {}
+}
+
+async function netOpen(code, role) {
+  netClose();
+  if (!cloudEnabled) { netPost({ __pbNetErr: "offline" }); return; }
+  const g = PB.current; if (!g) return;
+  const client = await getNetClient();
+  if (PB.current !== g) return;                      // game was closed while loading
+  netRole = role;
+  const ch = client.channel("pbn_" + g.id + "_" + code, {
+    config: { presence: { key: role }, broadcast: { self: false } },
+  });
+  netChan = ch;
+  ch.on("broadcast", { event: "d" }, (m) => netPost({ __pbNetMsg: m.payload }));
+  ch.on("presence", { event: "sync" }, () => {
+    const st = ch.presenceState();
+    netPost({ __pbNetPeers: { n: Object.keys(st).length, roles: Object.keys(st) } });
+  });
+  ch.subscribe(async (status) => {
+    if (status === "SUBSCRIBED") { try { await ch.track({ t: Date.now() }); } catch {} netPost({ __pbNetUp: 1 }); }
+    else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") netPost({ __pbNetErr: status });
+  });
+}
+
+function netSend(d) {
+  if (!netChan || d === undefined) return;
+  try { netChan.send({ type: "broadcast", event: "d", payload: { r: netRole, d } }); } catch {}
+}
+
+function netClose() {
+  if (netChan) { try { netChan.unsubscribe(); } catch {} netChan = null; }
+  netRole = null;
+}
 
 function sendCloudSave() {
   if (!cloudSave || !PB.current) return;

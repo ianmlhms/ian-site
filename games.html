@@ -4,103 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Games — ian.lu</title>
-<meta name="description" content="Free multiplayer browser games to play across two iPads — Connect 4, Battleship, Reversi, Molerei and more. By Ian Mulheims.">
-<meta property="og:title" content="Games — ian.lu">
-<meta property="og:description" content="Multiplayer browser games to play across two iPads.">
-<meta property="og:type" content="website">
-<meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
-<link rel="canonical" href="https://ian.lu/games.html">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0;url=pixelbreak.html">
+<link rel="canonical" href="https://ian.lu/pixelbreak.html">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=4"></script>
-<script src="i18n-dict.js?v=5"></script>
-<script src="i18n.js?v=1"></script>
-<style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;background:radial-gradient(900px 500px at 70% -10%,rgba(110,168,254,.12),transparent),var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 70px}
-  .intro{color:var(--muted);font-size:14px;margin-bottom:20px;line-height:1.5}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px}
-  .card .ico{font-size:40px}
-  .card h2{font-size:20px;margin:8px 0 4px}
-  .card p{color:var(--muted);font-size:13px;margin:0 0 16px;min-height:34px}
-  .card .create{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:800;cursor:pointer;font-size:14px}
-  .joinrow{display:flex;gap:8px;margin-top:10px}
-  .joinrow input{flex:1;min-width:0;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:14px}
-  .joinrow button{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:0 14px;font-weight:700;cursor:pointer}
-  .joinrow button:hover{border-color:var(--accent2);color:var(--accent2)}
-  .tip{margin-top:22px;color:var(--muted);font-size:12.5px}
-</style>
+<script>location.replace('pixelbreak.html'+(location.hash||''));</script>
+<style>body{background:#0d0d1a;color:#e8e8f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}a{color:#4de8ff}</style>
 </head>
 <body>
-<header class="bar">
-  <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
-  <h1 data-i18n="games.h1">🎲 Games</h1>
-  <div class="spacer"></div>
-  <a href="leaderboard.html" style="font-weight:700" data-i18n="games.lb">🏆 Leaderboard</a>
-  <span id="langSw"></span>
-</header>
-
-<div class="wrap">
-  <p class="intro" data-i18n-html="games.intro">Play across two iPads: tap <b>Start</b> on one, share the <b>room code</b>, and <b>Join</b> on the other. (Or invite a friend by username from the <a href="friends.html">Friends</a> page.)</p>
-  <div class="cards" id="cards"></div>
-  <p class="tip" data-i18n="games.tip">Stadt-Land-Fluss supports 2+ players — everyone joins the same code.</p>
-</div>
-
-<script>
-const T = (k) => (window.I18N ? window.I18N.t(k) : k);
-const GAMES = [
-  { id:"connect4", ico:"🔴", name:"Connect 4", desc:"g.connect4.desc", ai:true },
-  { id:"slf", ico:"🔤", name:"Stadt-Land-Fluss", desc:"g.slf.desc" },
-  { id:"battleship", ico:"🚢", name:"Battleship", desc:"g.battleship.desc", ai:true },
-  { id:"color", ico:"🎨", name:"Colour Dial", desc:"g.color.desc", ai:true },
-  { id:"draw", ico:"✏️", name:"Molerei", desc:"g.draw.desc" },
-  { id:"reversi", ico:"⚫", name:"Reversi", desc:"g.reversi.desc", ai:true },
-  { id:"dots", ico:"▦", name:"Dots & Boxes", desc:"g.dots.desc", ai:true },
-  { id:"tictactoe", ico:"✕", name:"Tic-Tac-Toe", desc:"g.tictactoe.desc", ai:true },
-];
-const SOLO = [
-  { href:"wordle.html", ico:"🟩", name:"Wuertspill", desc:"g.wordle.desc" },
-  { href:"pixelbreak.html", ico:"🎮", name:"PixelBreak", desc:"g.pixelbreak.desc" },
-];
-const code = () => Math.random().toString(36).slice(2, 8);
-function renderCards() {
-  document.getElementById("cards").innerHTML = GAMES.map(g => `
-    <div class="card">
-      <div class="ico">${g.ico}</div>
-      <h2>${g.name}</h2>
-      <p>${T(g.desc)}</p>
-      <button class="create" data-c="${g.id}">${T("games.start")}</button>
-      ${g.ai ? `<button class="create" data-ai="${g.id}" style="background:var(--card2);border:1px solid var(--border);margin-top:8px">${T("games.vsAi")}</button>` : ""}
-      <div class="joinrow">
-        <input id="code-${g.id}" placeholder="${T("games.code")}" autocomplete="off">
-        <button data-j="${g.id}">${T("btn.join")}</button>
-      </div>
-    </div>`).join("") + SOLO.map(g => `
-    <div class="card">
-      <div class="ico">${g.ico}</div>
-      <h2>${g.name}</h2>
-      <p>${T(g.desc)}</p>
-      <button class="create" data-href="${g.href}">${T("games.play")}</button>
-    </div>`).join("");
-  document.querySelectorAll("[data-href]").forEach(b => b.onclick = () => location.href = b.dataset.href);
-  document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => location.href = `${b.dataset.c}.html?room=${code()}&role=host`);
-  document.querySelectorAll("[data-ai]").forEach(b => b.onclick = () => location.href = `${b.dataset.ai}.html?ai=1`);
-  document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
-    const c = (document.getElementById("code-" + b.dataset.j).value || "").trim().toLowerCase();
-    if (c) location.href = `${b.dataset.j}.html?room=${encodeURIComponent(c)}&role=guest`;
-  });
-}
-renderCards();
-document.addEventListener("i18n:change", renderCards);
-</script>
-<script src="pixelbreak-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="notify-ambient.js?v=2"></script>
+<p>All games now live on <a href="pixelbreak.html">🎮 PixelBreak</a> — taking you there…</p>
 </body>
 </html>
