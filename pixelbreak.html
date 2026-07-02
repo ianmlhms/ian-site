@@ -17,16 +17,17 @@
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
 <script src="theme.js?v=4"></script>
 <style>
-:root{--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
+:root{--brand1:#ff6b9d;--brand2:#4de8ff;--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
+html[data-theme="light"]{--brand1:#e23d78;--brand2:#0e7ec2}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;min-height:100vh}
 ::selection{background:var(--accent);color:#fff}
 header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
 .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer}
-.logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(255,107,157,0.3);animation:lp 3s ease-in-out infinite}
+.logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--brand1),var(--brand2));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(255,107,157,0.3);animation:lp 3s ease-in-out infinite}
 @keyframes lp{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-.logo-text{font-family:'Fredoka',sans-serif;font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-text{font-family:'Fredoka',sans-serif;font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--brand1),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:11px;color:var(--text2);letter-spacing:2px;text-transform:uppercase}
 .search-box{display:flex;align-items:center;gap:8px;background:var(--card2);border:2px solid var(--border);border-radius:30px;padding:7px 16px;width:280px;transition:border-color 0.3s}
 .search-box:focus-within{border-color:var(--accent2)}
