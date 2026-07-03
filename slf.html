@@ -131,7 +131,20 @@ async function getName(){
   localStorage.setItem("playerName", n); return n;
 }
 function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
-function pick(){ return LETTERS[Math.floor(Math.random()*LETTERS.length)]; }
+// Shuffled-bag draw: every letter comes up once before any repeats, and the
+// same letter can never be picked twice in a row (guarded at bag refill).
+let letterBag = [];
+function pick(){
+  if (!letterBag.length){
+    letterBag = LETTERS.split("");
+    for (let i=letterBag.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [letterBag[i], letterBag[j]] = [letterBag[j], letterBag[i]];
+    }
+    if (letterBag[letterBag.length-1] === letter) letterBag.unshift(letterBag.pop());
+  }
+  return letterBag.pop();
+}
 
 function render(){
   const ps = players();
