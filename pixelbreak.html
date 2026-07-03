@@ -183,10 +183,14 @@ document.getElementById('arcadeSec').style.display=arcade.length?'':'none';
 document.getElementById('count').textContent=arcade.length+' games \u00b7 high scores save to your account';
 }
 var openSeq=0;
-function openGame(idx){
+function openGame(idx,fromHistory){
 var g=GAMES[idx];
 if(!g||!g.src)return;
 var seq=++openSeq;
+// Each game gets its own URL (?g=<id>) so it can be reloaded, shared and
+// bookmarked; the back button returns to the hub.
+if(!fromHistory)history.pushState({g:g.id},'',location.pathname+'?g='+encodeURIComponent(g.id));
+document.title=g.name+' — PixelBreak';
 document.getElementById('gt').textContent=g.name;
 var frame=document.getElementById('gf');
 // Give the game keyboard focus as soon as it loads, so arrow/space keys work on
@@ -207,13 +211,29 @@ if(seq!==openSeq)return;
 frame.srcdoc='<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#0d0d1a;color:#e8e8f0;font-family:system-ui;text-align:center;padding:20px">Could not load the game &mdash; check your connection and try again.';
 });
 }
-function closeGame(){
+function closeGame(fromHistory){
 openSeq++;
 document.getElementById('overlay').classList.remove('open');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
+document.title='PixelBreak - Play Games';
+if(!fromHistory&&/[?&]g=/.test(location.search))history.pushState(null,'',location.pathname);
 if(window.PB&&PB.onCloseGame)PB.onCloseGame();
 }
+function gameIdxById(id){
+for(var i=0;i<GAMES.length;i++)if(GAMES[i].id===id&&GAMES[i].src)return i;
+return -1;
+}
+window.addEventListener('popstate',function(e){
+var id=(e.state&&e.state.g)||new URLSearchParams(location.search).get('g');
+var i=id?gameIdxById(id):-1;
+if(i>=0)openGame(i,true);else closeGame(true);
+});
+(function(){
+var id=new URLSearchParams(location.search).get('g');
+var i=id?gameIdxById(id):-1;
+if(i>=0)openGame(i,true);
+})();
 function goHome(){
 closeGame();
 document.getElementById('search').value='';
