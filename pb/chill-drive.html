@@ -72,13 +72,13 @@ if(!window.THREE){
 
 /* ---------- world tuning (same simulation as the classic Chill Drive) ---------- */
 const SEGL=200, DRAW=90;
-const MAXV=190, ACCEL=0.8, BRAKE=3.5, COAST=0.985, GRASS_CAP=55, GRASS_DRAG=0.95;
+const MAXV=320, ACCEL=0.8, BRAKE=3.5, COAST=0.985, GRASS_CAP=55, GRASS_DRAG=0.95;
 const STEER_F=0.013, CENTRI=0.19, KMH=1.25, METER=50, GRADE_F=1.4, DOWN_MAX=1.12;
 const CAR_W=0.42, NEAR_W=0.8, INVULN=150, CAR_LEN=110, MAX_CRASH=5, N_LEVELS=20;
 const LANE_X=[-0.55,0,0.55], CAR_COLS=[0xd9534f,0x5bc0de,0xf0ad4e,0x9b8ce8,0x7ac47a,0xe8e8e8];
 /* 3D world scale: one segment = 4 m of road. TS slows simulation time so the
  * classic arcade numbers translate to a believable, controllable 3D speed. */
-const SEG_WLD=4, RH=7.6, CURVE_K=0.006, Y_K=0.009, CHUNK=128, TS=0.22;
+const SEG_WLD=4, RH=7.6, CURVE_K=0.0075, Y_K=0.009, CHUNK=128, TS=0.22;
 
 /* ---------- environments (the 3 endless worlds) ---------- */
 const ENVS=[
@@ -599,7 +599,6 @@ function update(){
   const steerT=(keys.right?1:0)-(keys.left?1:0);
   steerS+=(steerT-steerS)*0.14;
   playerX+=STEER_F*sp*3.6*steerS;
-  playerX-=segAt(pos).curve*sp*sp*CENTRI*0.06;
   playerX=Math.max(-2.4,Math.min(2.4,playerX));
   const offRoad=Math.abs(playerX)>1.05;
   if(offRoad){
@@ -624,7 +623,7 @@ function update(){
     if(!car.passed&&ahead<0){
       car.passed=true;
       const gap=Math.abs(car.x-playerX);
-      if(gap<NEAR_W&&speed>MAXV*0.62&&!offRoad&&invuln===0){
+      if(gap<NEAR_W&&speed>118&&!offRoad&&invuln===0){
         combo++;const pts=25*combo;stylePts+=pts;
         pop('+'+pts+(combo>1?'  x'+combo:''),'#ffcc66');
         sfx.whoosh();
