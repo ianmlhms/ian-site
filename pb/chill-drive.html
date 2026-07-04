@@ -503,7 +503,7 @@ function startEndless(e,z){
   if(zen)cfgNow.traffic=0;
   genRoad(cfgNow);resetRun();buildWorld();
   state='play';$('ov').classList.add('hidden');$('mm').classList.remove('hidden');
-  $('progl').textContent=zen?'zen':ENV.name.toLowerCase();$('prog').textContent='∞';
+  $('progl').textContent=(zen?'zen · ':'')+ENV.name.toLowerCase();$('prog').textContent='∞';
   audio();
 }
 function startLevel(n){
@@ -525,6 +525,7 @@ function overlay(h,p,btn,menuMode){
 }
 function menu(){
   state='menu';
+  paintZen();
   overlay('🛣️ Chill Drive 3D',
     'Cruise, overtake, survive — 5 crashes end your run.<br>Pick your endless world · close overtakes earn style · ↑↓ speed · ←→ steer',
     null,true);
@@ -563,12 +564,18 @@ $('go').onclick=()=>{
   else if(state==='failed')startLevel(lvl);
   else startEndless(envIdx,zen);
 };
-$('go2').onclick=()=>startEndless(0,true);
+let zenSel=false;
+function paintZen(){
+  $('go2').textContent=zenSel?'🧘 ZEN ON — pick a world above':'🧘 ZEN DRIVE — no traffic';
+  $('go2').style.background=zenSel?'#5dd18a':'#9be89b';
+  $('go2').style.boxShadow=zenSel?'0 0 0 3px #fff inset':'none';
+}
+$('go2').onclick=()=>{zenSel=!zenSel;paintZen();};
 $('goMenu').onclick=()=>menu();
 $('mm').onclick=()=>menu();
-$('e0').onclick=()=>startEndless(0,false);
-$('e1').onclick=()=>startEndless(1,false);
-$('e2').onclick=()=>startEndless(2,false);
+$('e0').onclick=()=>startEndless(0,zenSel);
+$('e1').onclick=()=>startEndless(1,zenSel);
+$('e2').onclick=()=>startEndless(2,zenSel);
 $('lvls').addEventListener('click',(e)=>{
   const l=e.target&&e.target.dataset?e.target.dataset.l:null;
   if(l)startLevel(+l);
