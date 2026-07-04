@@ -86,8 +86,13 @@ function sendKeys(){NET.send({t:'k',k:{u:+!!meU(),d:+!!meD(),l:+!!meL(),r:+!!meR
 function aiMove(m){
   let tx,ty;
   if(puck.y<C.height/2+40&&puck.vy>-8){
-    tx=puck.x;ty=puck.y-puck.r-10;                 // get above the puck, whack it down
-    if(puck.y<p2.y)ty=puck.y+30;                   // puck slipped behind: retreat around it
+    // line up on the goal->puck line so the strike drives the puck at the goal
+    const gx=puck.x-C.width/2,gy=puck.y-(C.height-6),gl=Math.hypot(gx,gy)||1;
+    tx=puck.x+gx/gl*(puck.r+8);ty=puck.y+gy/gl*(puck.r+8);
+    // mallet below the puck: swing around its side, never push through it
+    if(p2.y>puck.y-4&&Math.abs(p2.x-puck.x)<p2.r+puck.r+14){
+      tx=puck.x+(p2.x<puck.x?-1:1)*(p2.r+puck.r+20);ty=p2.y;
+    }
   }else{tx=C.width/2+(puck.x-C.width/2)*0.35;ty=100}
   const dx=tx-p2.x,dy=ty-p2.y,d=Math.hypot(dx,dy);
   const s=Math.min(SPD*0.95*m,d);
