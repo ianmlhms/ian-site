@@ -90,22 +90,57 @@ const meU=()=>keys['w']||keys['W']||keys['ArrowUp'],meD=()=>keys['s']||keys['S']
       meF=()=>keys[' ']||keys['Enter'];
 function sendKeys(){NET.send({t:'k',k:{u:+!!meU(),d:+!!meD(),l:+!!meL(),r:+!!meR(),f:+!!meF()}})}
 
-/* ---------- AI tank ---------- */
-let aiWander=0;
+/* ---------- AI tank: respects walls (line of sight + detours) ---------- */
+let aiWander=0,aiDir=null,aiDirT=0;
+function losClear(x1,y1,x2,y2){
+  const d=Math.hypot(x2-x1,y2-y1),steps=Math.ceil(d/10);
+  for(let i=1;i<steps;i++){
+    const x=x1+(x2-x1)*i/steps,y=y1+(y2-y1)*i/steps;
+    for(const w of walls)if(x>w.x-6&&x<w.x+w.w+6&&y>w.y-6&&y<w.y+w.h+6)return false;
+  }
+  return true;
+}
+function pathClear(x,y,ang,len){
+  const steps=Math.ceil(len/10);
+  for(let i=1;i<=steps;i++){
+    const px=x+Math.cos(ang)*i*10,py=y+Math.sin(ang)*i*10;
+    if(px<25||px>C.width-25||py<25||py>C.height-25)return false;
+    for(const w of walls)if(px>w.x-20&&px<w.x+w.w+20&&py>w.y-16&&py<w.y+w.h+16)return false;
+  }
+  return true;
+}
 function aiKeys(){
   const dx=p1.x-p2.x,dy=p1.y-p2.y,dist=Math.hypot(dx,dy);
-  let want=Math.atan2(dy,dx);
-  if(Math.random()<0.01)aiWander=(Math.random()-0.5)*1.2;
-  if(dist>220)want+=aiWander*0.4;                    // approach loosely
+  const direct=Math.atan2(dy,dx);
+  const los=losClear(p2.x,p2.y,p1.x,p1.y);
+  let want;
+  if(los){
+    aiDir=null;
+    if(Math.random()<0.01)aiWander=(Math.random()-0.5)*1.2;
+    want=direct+(dist>220?aiWander*0.4:0);
+  }else{
+    // no line of sight: drive along a committed detour heading around the wall
+    aiDirT--;
+    if(aiDir===null||aiDirT<=0||!pathClear(p2.x,p2.y,aiDir,60)){
+      aiDir=direct+Math.PI;
+      for(const off of [0.5,-0.5,1,-1,1.6,-1.6,2.2,-2.2]){
+        if(pathClear(p2.x,p2.y,direct+off,110)){aiDir=direct+off;break;}
+      }
+      aiDirT=45;
+    }
+    want=aiDir;
+  }
   let da=want-p2.angle;
   while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;
-  const aligned=Math.abs(da)<0.12;
-  // stuck against a wall? reverse and turn
+  let aimDa=direct-p2.angle;
+  while(aimDa>Math.PI)aimDa-=Math.PI*2;while(aimDa<-Math.PI)aimDa+=Math.PI*2;
+  // about to nose into a wall? reverse out
   const nx=p2.x+Math.cos(p2.angle)*3,ny=p2.y+Math.sin(p2.angle)*3;
   let blocked=false;
   for(let w of walls)if(nx>w.x-18&&nx<w.x+w.w+18&&ny>w.y-14&&ny<w.y+w.h+14)blocked=true;
-  return{l:+(da<-0.06),r:+(da>0.06),u:+(!blocked&&dist>140),d:+blocked,
-    f:+(aligned&&dist<420&&Math.random()<0.5)};
+  return{l:+(da<-0.06),r:+(da>0.06),
+    u:+(!blocked&&(los?dist>140:true)),d:+blocked,
+    f:+(los&&Math.abs(aimDa)<0.12&&dist<420&&Math.random()<0.5)};
 }
 
 function drawTank(t){

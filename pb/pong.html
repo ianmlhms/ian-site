@@ -77,11 +77,32 @@ const meUp=()=>keys['w']||keys['W']||keys['ArrowUp'];
 const meDown=()=>keys['s']||keys['S']||keys['ArrowDown'];
 function sendKeys(){NET.send({t:'k',up:!!meUp(),down:!!meDown(),sp:!!keys[' ']})}
 
-/* ---------- AI: tracks the ball with limited speed + slight lag ---------- */
+/* ---------- AI: predicts the intercept, then picks the return angle whose
+ * landing point is furthest from the player's paddle ---------- */
+function foldY(y0,vy,frames){
+  const H=C.height;
+  const yu=y0+vy*frames;
+  const f=((yu%(2*H))+2*H)%(2*H);
+  return f>H?2*H-f:f;
+}
 function aiMove(){
-  const target=ball.vx>0?ball.y+ball.vy*6:C.height/2;
+  let target=C.height/2;
+  if(ball.vx>0){
+    const H=C.height, frames=(PX2-ball.x)/ball.vx;
+    const fold=(((ball.y+ball.vy*frames)%(2*H))+2*H)%(2*H);
+    let py,avy;                                  // arrival y + arrival vy (wall bounces flip it)
+    if(fold>H){py=2*H-fold;avy=-ball.vy}else{py=fold;avy=ball.vy}
+    const backFrames=(PX2-PX1-PW)/Math.abs(ball.vx*1.05);
+    let bestOff=0,bestD=-1;
+    for(let off=-(p2.h/2-10);off<=p2.h/2-10;off+=5){
+      const landing=foldY(py,avy+off*0.1,backFrames);
+      const d=Math.abs(landing-p1.y);
+      if(d>bestD){bestD=d;bestOff=off}
+    }
+    target=py-bestOff;                           // contact offset angles the shot
+  }
   const d=target-p2.y;
-  if(Math.abs(d)>10)p2.y+=Math.sign(d)*Math.min(5.4,Math.abs(d)*0.12);
+  if(Math.abs(d)>6)p2.y+=Math.sign(d)*Math.min(5.4,Math.abs(d)*0.12);
   p2.y=Math.max(p2.h/2,Math.min(C.height-p2.h/2,p2.y));
 }
 
