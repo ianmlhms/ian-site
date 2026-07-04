@@ -39,8 +39,47 @@ const REPORTER = `<script>(function(){
   document.addEventListener('visibilitychange',rep);
 })();<\/script>`;
 
+/* ---------------- sound + haptics shim injected into each game ----------------
+ * Universal feedback with zero per-game edits: a short blip + vibration when the
+ * score goes up. Continuously ticking scores (distance counters in driving games)
+ * are detected by back-to-back increases and suppressed after the first blip. */
+const SOUND = `<script>(function(){
+  if(window.__pbSnd)return;window.__pbSnd=1;
+  var muted=__PB_MUTED__,ac=null;
+  function ctx(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}
+    if(ac&&ac.state==='suspended')ac.resume();}
+  document.addEventListener('pointerdown',ctx,{capture:true});
+  document.addEventListener('keydown',ctx,{capture:true});
+  function blip(){
+    if(muted||!ac||ac.state!=='running')return;
+    try{var o=ac.createOscillator(),g=ac.createGain();o.type='triangle';o.frequency.value=660;
+    g.gain.setValueAtTime(0.07,ac.currentTime);g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.09);
+    o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+0.1);}catch(e){}
+    if(navigator.vibrate)try{navigator.vibrate(12)}catch(e){}
+  }
+  var last=null,lastInc=0;
+  function num(x){var n=parseInt(String(x).replace(/[^0-9-]/g,''),10);return isNaN(n)?null:n;}
+  function read(){try{
+    if(typeof window.score==='number'&&isFinite(window.score))return window.score;
+    var el=document.querySelector('[id*="score" i]:not([id*="high" i]),[class*="score" i]:not([class*="high" i])');
+    if(el){var n=num(el.textContent);if(n!=null)return n;}
+  }catch(e){}return null;}
+  setInterval(function(){
+    var s=read();if(s==null)return;
+    if(last!=null&&s>last){
+      var t=Date.now();
+      if(t-lastInc>700)blip();      // discrete scoring only, not a running counter
+      lastInc=t;
+    }
+    last=s;
+  },250);
+  window.addEventListener('message',function(e){var d=e.data;if(d&&d.__pbSndMute!==undefined)muted=!!d.__pbSndMute;});
+})();<\/script>`;
+
+const isMuted = () => localStorage.getItem("pb_muted") === "1";
+
 PB.instrument = (html) => {
-  let inject = REPORTER;
+  let inject = REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
   // hand the game its locally saved state (page must call onOpenGame BEFORE instrument)
   const g = PB.current;
   if (g) {
@@ -339,6 +378,14 @@ function renderGameBar() {
     best = document.createElement("span"); best.id = "gbest"; best.className = "gbest";
     const cb = document.getElementById("cb");
     gh.insertBefore(best, cb);
+    const mb = document.createElement("button");
+    mb.className = "gboard-btn"; mb.title = "Sound"; mb.textContent = isMuted() ? "🔇" : "🔊";
+    mb.onclick = () => {
+      localStorage.setItem("pb_muted", isMuted() ? "0" : "1");
+      mb.textContent = isMuted() ? "🔇" : "🔊";
+      try { document.getElementById("gf").contentWindow.postMessage({ __pbSndMute: isMuted() }, "*"); } catch {}
+    };
+    gh.insertBefore(mb, cb);
     if (cloudEnabled) {
       const bb = document.createElement("button");
       bb.className = "gboard-btn"; bb.title = "Leaderboard"; bb.textContent = "🏆";

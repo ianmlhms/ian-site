@@ -10,6 +10,8 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <link rel="canonical" href="https://ian.lu/pixelbreak.html">
+<link rel="manifest" href="pixelbreak.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
@@ -106,6 +108,7 @@ footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-t
 </div>
 </div>
 <div class="header-right">
+<button id="installBtn" style="display:none;background:var(--card-hover);border:1px solid var(--accent2);color:var(--accent2);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">📲 Install</button>
 <div class="search-box">
 <span class="si">&#x1F50D;</span>
 <input type="text" id="search" placeholder="Search games..." oninput="applyFilters()">
@@ -292,8 +295,72 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
 
 applyFilters();
 </script>
+<!-- feedback box: suggest a game / report a bug -->
+<button id="fbFab" title="Feedback" style="position:fixed;bottom:18px;left:18px;z-index:900;width:48px;height:48px;border-radius:50%;border:1px solid var(--accent2);background:var(--card);color:var(--accent2);font-size:22px;cursor:pointer">💬</button>
+<div id="fbPanel" style="display:none;position:fixed;bottom:76px;left:18px;z-index:901;width:290px;max-width:calc(100vw - 36px);background:var(--card);border:1px solid var(--accent2);border-radius:14px;padding:14px;font-family:'Nunito',sans-serif">
+  <div style="font-weight:700;margin-bottom:8px">Feedback</div>
+  <select id="fbKind" style="width:100%;margin-bottom:8px;padding:8px;border-radius:8px;border:1px solid var(--card-hover);background:var(--bg);color:var(--text);font-family:inherit">
+    <option value="idea">💡 Suggest a game</option>
+    <option value="bug">🐛 Report a bug</option>
+    <option value="other">💬 Something else</option>
+  </select>
+  <textarea id="fbMsg" rows="3" maxlength="2000" placeholder="Tell me…" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--card-hover);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical"></textarea>
+  <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+    <button id="fbSend" style="flex:1;padding:9px;border-radius:8px;border:none;background:var(--accent2);color:#0d0d1a;font-weight:800;cursor:pointer;font-family:inherit">Send</button>
+    <span id="fbNote" style="font-size:12px;color:var(--text2)"></span>
+  </div>
+</div>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="pixelbreak-records.js?v=7"></script>
+<script type="module" src="pixelbreak-records.js?v=8"></script>
+<script type="module">
+/* ---------- feedback box ---------- */
+import * as auth from "./auth.js?v=3";
+const fab=document.getElementById('fbFab'),panel=document.getElementById('fbPanel');
+fab.onclick=()=>{panel.style.display=panel.style.display==='none'?'':'none';};
+document.getElementById('fbSend').onclick=async()=>{
+  const msg=document.getElementById('fbMsg').value.trim();
+  const note=document.getElementById('fbNote');
+  if(msg.length<3){note.textContent='Too short';return;}
+  note.textContent='…';
+  try{
+    const sb=await auth.client();
+    const {error}=await sb.from('feedback').insert({
+      kind:document.getElementById('fbKind').value,
+      message:msg.slice(0,2000),
+      page:new URLSearchParams(location.search).get('g')||'pixelbreak',
+      username:auth.session()?auth.username():null,
+    });
+    if(error)throw error;
+    document.getElementById('fbMsg').value='';
+    note.textContent='Merci! 🎉';
+    setTimeout(()=>{panel.style.display='none';note.textContent='';},1500);
+  }catch(e){console.warn('[feedback]',e);note.textContent='Failed — try again';}
+};
+</script>
+<script>
+/* ---------- install as app (PWA) ---------- */
+(function(){
+  var btn=document.getElementById('installBtn');
+  if(!btn)return;
+  var standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  if(standalone)return;
+  var deferred=null;
+  window.addEventListener('beforeinstallprompt',function(e){
+    e.preventDefault();deferred=e;btn.style.display='';
+  });
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(isIOS)btn.style.display='';
+  btn.onclick=function(){
+    if(deferred){deferred.prompt();deferred=null;btn.style.display='none';return;}
+    // iOS has no install prompt: explain the Share-menu route
+    var tip=document.createElement('div');
+    tip.textContent='Op iOS: Deelen-Knäppchen ⬆️ → "Zum Home-Bildschierm"';
+    tip.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card-hover);border:1px solid var(--accent2);color:var(--text);padding:12px 18px;border-radius:12px;font-weight:700;z-index:9999;max-width:90vw;text-align:center';
+    document.body.appendChild(tip);
+    setTimeout(function(){tip.remove();},5000);
+  };
+})();
+</script>
 </body>
 </html>

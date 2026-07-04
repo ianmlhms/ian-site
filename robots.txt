@@ -10,5 +10,7 @@ Disallow: /karts.html
 Disallow: /kart.html
 Disallow: /messenger.html
 Disallow: /friends.html
+Disallow: /exams.html
+Disallow: /profile.html
 
 Sitemap: https://ian.lu/sitemap.xml

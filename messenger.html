@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#0d0d1a">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="theme.js?v=4"></script>
-<script src="i18n-dict.js?v=6"></script>
+<script src="i18n-dict.js?v=7"></script>
 <script src="i18n.js?v=1"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff}
@@ -66,7 +66,8 @@
   .filechip .fc-dl{font-size:15px;color:var(--muted);flex:none}
   .admin-link{color:#ffcc00;font-weight:700;margin-right:14px;white-space:nowrap}
   .messages{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:18px;display:flex;flex-direction:column;gap:8px}
-  .msg{display:flex}
+  .msg{display:flex;align-items:flex-end;gap:6px}
+  .av-chip{flex:none;width:26px;height:26px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:15px}
   .msg.mine{justify-content:flex-end}
   .bubble{max-width:72%;background:var(--card);border:1px solid var(--border);padding:8px 12px;border-radius:14px;font-size:14px;line-height:1.4;position:relative}
   .msg.mine .bubble{background:var(--accent);border-color:var(--accent);color:#fff}
@@ -226,6 +227,6 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="messenger.js?v=12"></script>
+<script type="module" src="messenger.js?v=13"></script>
 </body>
 </html>

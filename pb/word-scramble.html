@@ -18,7 +18,7 @@ button{margin-top:15px;padding:8px 20px;background:#3a3a5a;color:#fff;border:non
 </style>
 </head>
 <body>
-<div id="hud"><span>Score: <b id="sc">0</b></span><span>Streak: <b id="st">0</b>🔥</span><span>Level: <b id="lv">1</b></span></div>
+<div id="hud"><span>Score: <b id="sc">0</b></span><span>Streak: <b id="st">0</b>🔥</span><span>Level: <b id="lv">1</b></span><button id="langBtn" onclick="switchLang()" style="margin:0;padding:4px 12px;font-size:13px">🇬🇧 EN</button></div>
 <div id="hint"></div>
 <div id="scrambled"></div>
 <input id="guess" placeholder="Type your answer..." autofocus autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
@@ -26,6 +26,34 @@ button{margin-top:15px;padding:8px 20px;background:#3a3a5a;color:#fff;border:non
 <div id="feedback"></div>
 <button onclick="skip()">Skip (−5 pts)</button>
 <script>
+const WORDS_LB=[
+  {w:'MOIEN',h:'Begréissung'},
+  {w:'MERCI',h:'Héiflechkeet'},
+  {w:'SCHOUL',h:'Léieren'},
+  {w:'KICHEN',h:'Doheem'},
+  {w:'GAART',h:'Planzen'},
+  {w:'BLUMM',h:'Planz'},
+  {w:'PÄERD',h:'Déier'},
+  {w:'FËSCH',h:'Déier'},
+  {w:'KAFFI',h:'Gedrénks'},
+  {w:'BROUT',h:'Iessen'},
+  {w:'DËSCH',h:'Miwwel'},
+  {w:'MUSEK',h:'Lauschteren'},
+  {w:'FEIER',h:'Waarm'},
+  {w:'BËSCH',h:'Natur'},
+  {w:'HIMMEL',h:'Uewen'},
+  {w:'WIEDER',h:'Reen a Sonn'},
+  {w:'FRËNN',h:'Leit'},
+  {w:'PÄIPERLEK',h:'Insekt'},
+  {w:'KACHEN',h:'Kichen'},
+  {w:'SPILLEN',h:'Fräizäit'},
+  {w:'LIESEN',h:'Bicher'},
+  {w:'DANZEN',h:'Musek'},
+  {w:'ZOCKER',h:'Séiss'},
+  {w:'SCHLASS',h:'Buerg'},
+  {w:'KIRMES',h:'Fest'},
+  {w:'BRÉCK',h:'Struktur'},
+];
 const WORDS=[
   {w:'PLANET',h:'Space'},
   {w:'GUITAR',h:'Music'},
@@ -59,6 +87,16 @@ const WORDS=[
   {w:'OCTOPUS',h:'Ocean'},
 ];
 let score=0,streak=0,level=1,current,timeLeft=100,used=new Set();
+let lang=localStorage.getItem('pb_ws_lang')||'en';
+const list=()=>lang==='lb'?WORDS_LB:WORDS;
+function paintLang(){document.getElementById('langBtn').textContent=lang==='lb'?'🇱🇺 LB':'🇬🇧 EN';}
+function switchLang(){
+  lang=lang==='lb'?'en':'lb';
+  localStorage.setItem('pb_ws_lang',lang);
+  used.clear();paintLang();next();
+  document.getElementById('guess').focus();
+}
+paintLang();
 
 function scramble(w){
   let a=w.split('');
@@ -66,12 +104,12 @@ function scramble(w){
   return a.join('')===w?scramble(w):a.join('');
 }
 function next(){
-  let available=WORDS.filter(w=>!used.has(w.w));
-  if(!available.length){used.clear();available=WORDS}
+  let available=list().filter(w=>!used.has(w.w));
+  if(!available.length){used.clear();available=list()}
   current=available[Math.floor(Math.random()*available.length)];
   used.add(current.w);
   document.getElementById('scrambled').textContent=scramble(current.w);
-  document.getElementById('hint').textContent='Hint: '+current.h+' ('+current.w.length+' letters)';
+  document.getElementById('hint').textContent=(lang==='lb'?'Tipp: ':'Hint: ')+current.h+' ('+current.w.length+(lang==='lb'?' Buschtawen)':' letters)');
   document.getElementById('guess').value='';
   document.getElementById('feedback').textContent='';
   timeLeft=100;

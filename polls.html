@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ëmfroen — ian.lu</title>
+<meta name="description" content="Klass-Ëmfroen op ian.lu — stëmm mat of!">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=4"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:640px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  .q{font-weight:800;font-size:16px;margin:0 0 12px}
+  .opt{position:relative;display:block;width:100%;text-align:left;border:1px solid var(--border);background:var(--card2);color:var(--text);
+       border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:14px;font-weight:600;cursor:pointer;overflow:hidden}
+  .opt:disabled{cursor:default}
+  .opt .fill{position:absolute;inset:0;background:rgba(110,168,254,.18);transform-origin:left;z-index:0}
+  .opt .lbl{position:relative;z-index:1;display:flex;justify-content:space-between;gap:8px}
+  .opt.mine{border-color:var(--accent)}
+  .opt.mine .lbl::before{content:"✓ ";color:var(--accent)}
+  .meta{color:var(--muted);font-size:12px;margin-top:4px;display:flex;gap:10px;align-items:center}
+  .closed{color:#f87171;font-weight:700}
+  .adminrow{display:flex;gap:8px;margin-top:10px}
+  .abtn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer}
+  .abtn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .newpoll input{width:100%;margin-bottom:8px;padding:9px 11px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
+  .gate{text-align:center;color:var(--muted);padding:8px}
+  .msg{min-height:18px;color:var(--accent2);font-weight:700;font-size:13px}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>🗳️ Ëmfroen</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <div class="card newpoll" id="newPoll" style="display:none">
+    <p class="q">Nei Ëmfro</p>
+    <input id="npQ" maxlength="200" placeholder="Fro…">
+    <div id="npOpts"></div>
+    <div class="adminrow">
+      <button class="abtn" id="npAdd">+ Optioun</button>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn" id="npCreate">Erstellen</button>
+    </div>
+    <div class="msg" id="npMsg"></div>
+  </div>
+  <div class="gate" id="gate" style="display:none">🔒 <a href="#" id="gateBtn">Mell dech un</a> fir matzestëmmen.</div>
+  <div id="list"><p class="gate">Lueden…</p></div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=3";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let sb=null,isAdmin=false,polls=[],results={},myVotes={};
+
+async function refresh(){
+  try{
+    sb=sb||await auth.client();
+    const [{data:ps,error:e1},{data:rs,error:e2}]=await Promise.all([
+      sb.from("polls").select("*").order("created_at",{ascending:false}),
+      sb.rpc("poll_results_all"),
+    ]);
+    if(e1)throw e1; if(e2)throw e2;
+    polls=ps||[];
+    results={};
+    for(const r of rs||[]){(results[r.poll_id]||(results[r.poll_id]={}))[r.option_idx]=+r.votes;}
+    myVotes={};
+    if(auth.session()){
+      const {data:mv}=await sb.from("poll_votes").select("poll_id,option_idx");
+      for(const v of mv||[])myVotes[v.poll_id]=v.option_idx;
+    }
+    render();
+  }catch(e){console.warn("[polls]",e);$("list").innerHTML='<p class="gate">Feeler beim Lueden.</p>';}
+}
+
+function render(){
+  const signedIn=!!auth.session();
+  $("gate").style.display=signedIn?"none":"";
+  if(!polls.length){$("list").innerHTML='<p class="gate">Nach keng Ëmfroen.</p>';return;}
+  $("list").innerHTML=polls.map(p=>{
+    const res=results[p.id]||{};
+    const total=Object.values(res).reduce((a,b)=>a+b,0);
+    const mine=myVotes[p.id];
+    const canVote=signedIn&&p.is_open;
+    const opts=p.options.map((o,i)=>{
+      const n=res[i]||0,pct=total?Math.round(100*n/total):0;
+      return `<button class="opt${mine===i?" mine":""}" data-p="${p.id}" data-i="${i}" ${canVote?"":"disabled"}>
+        <span class="fill" style="transform:scaleX(${total?n/total:0})"></span>
+        <span class="lbl"><span>${esc(o)}</span><span>${pct}% · ${n}</span></span></button>`;
+    }).join("");
+    const admin=isAdmin?`<div class="adminrow">
+      <button class="abtn" data-close="${p.id}" data-open="${p.is_open?0:1}">${p.is_open?"Zoumaachen":"Opmaachen"}</button>
+      <button class="abtn" data-del="${p.id}">Läschen</button></div>`:"";
+    return `<div class="card"><p class="q">${esc(p.question)}</p>${opts}
+      <div class="meta"><span>${total} Stëmmen</span>${p.is_open?"":'<span class="closed">· zou</span>'}</div>${admin}</div>`;
+  }).join("");
+  $("list").querySelectorAll(".opt:not([disabled])").forEach(b=>b.onclick=()=>vote(b.dataset.p,+b.dataset.i));
+  $("list").querySelectorAll("[data-close]").forEach(b=>b.onclick=async()=>{
+    await sb.from("polls").update({is_open:b.dataset.open==="1"}).eq("id",b.dataset.close);refresh();});
+  $("list").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Ëmfro läschen?"))return;
+    await sb.from("polls").delete().eq("id",b.dataset.del);refresh();});
+}
+
+async function vote(pollId,idx){
+  try{
+    const {error}=await sb.from("poll_votes").upsert(
+      {poll_id:pollId,option_idx:idx,user_id:auth.session().user.id},{onConflict:"poll_id,user_id"});
+    if(error)throw error;
+    refresh();
+  }catch(e){console.warn("[polls] vote",e);}
+}
+
+/* ---- creation (admin only) ---- */
+function addOptInput(){
+  const n=$("npOpts").children.length;
+  if(n>=6)return;
+  const inp=document.createElement("input");
+  inp.maxLength=80;inp.placeholder="Optioun "+(n+1);
+  $("npOpts").appendChild(inp);
+}
+$("npAdd").onclick=addOptInput;
+$("npCreate").onclick=async()=>{
+  const q=$("npQ").value.trim();
+  const opts=[...$("npOpts").children].map(i=>i.value.trim()).filter(Boolean);
+  if(q.length<3||opts.length<2){$("npMsg").textContent="Fro + mindestens 2 Optiounen.";return;}
+  $("npMsg").textContent="…";
+  try{
+    const {error}=await sb.from("polls").insert({question:q,options:opts});
+    if(error)throw error;
+    $("npQ").value="";$("npOpts").innerHTML="";addOptInput();addOptInput();
+    $("npMsg").textContent="Erstallt! ✓";setTimeout(()=>$("npMsg").textContent="",1500);
+    refresh();
+  }catch(e){console.warn(e);$("npMsg").textContent="Feeler beim Erstellen.";}
+};
+addOptInput();addOptInput();
+
+(async()=>{
+  auth.mountAccountButton($("acctHost"));
+  $("gateBtn").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
+  auth.onAuth(async()=>{
+    isAdmin=false;
+    try{sb=sb||await auth.client();if(auth.session()){const{data}=await sb.rpc("is_admin");isAdmin=!!data;}}catch{}
+    $("newPoll").style.display=isAdmin?"":"none";
+    refresh();
+  });
+  try{sb=await auth.client();if(auth.session()){const{data}=await sb.rpc("is_admin");isAdmin=!!data;}}catch{}
+  $("newPoll").style.display=isAdmin?"":"none";
+  refresh();
+})();
+</script>
+</body>
+</html>

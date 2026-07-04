@@ -13,6 +13,24 @@ window.I18N_DICT = {
   "btn.join":        { lb: "Bäitrieden", de: "Beitreten", en: "Join" },
 
   /* ---------- index / landing ---------- */
+  "index.playTitle": { lb: "40 Spiller. Direkt am Browser.", de: "40 Spiele. Direkt im Browser.", en: "40 games. Right in your browser." },
+  "index.playSub":  {
+    lb: "Arcade-Spiller, Multiplayer op zwee Apparater an all Dag e Wordle — näischt installéieren, einfach spillen.",
+    de: "Arcade-Spiele, Multiplayer auf zwei Geräten und täglich ein Wordle — nichts installieren, einfach spielen.",
+    en: "Arcade games, multiplayer across two devices and a daily Wordle — nothing to install, just play.",
+  },
+  "index.playNow":  { lb: "▶ Elo spillen", de: "▶ Jetzt spielen", en: "▶ Play now" },
+  "index.playMp":   { lb: "Multiplayer", de: "Multiplayer", en: "Multiplayer" },
+  "index.stat1":    { lb: "40+ Spiller", de: "40+ Spiele", en: "40+ games" },
+  "index.stat2":    { lb: "Online-Multiplayer", de: "Online-Multiplayer", en: "Online multiplayer" },
+  "index.stat3":    { lb: "Leaderboards", de: "Bestenlisten", en: "Leaderboards" },
+  "index.vacLabel": { lb: "☀️ Summervakanz an", de: "☀️ Sommerferien in", en: "☀️ Summer holidays in" },
+  "index.vacDone":  { lb: "🎉 Summervakanz!", de: "🎉 Sommerferien!", en: "🎉 Summer holidays!" },
+  "tile.exams.sub": { lb: "Test-Countdowns · privat", de: "Prüfungs-Countdowns · privat", en: "Test countdowns · private" },
+  "tile.profile":   { lb: "Profil", de: "Profil", en: "Profile" },
+  "tile.profile.sub":{ lb: "Avatar & Statistiken", de: "Avatar & Statistiken", en: "Avatar & stats" },
+  "tile.polls":     { lb: "Ëmfroen", de: "Umfragen", en: "Polls" },
+  "tile.polls.sub": { lb: "Klass-Ëmfroen — stëmm of!", de: "Klassen-Umfragen — stimm ab!", en: "Class polls — vote!" },
   "index.kicker":   { lb: "👋 Moien, ech sinn den", de: "👋 Hallo, ich bin", en: "👋 Hi, I'm" },
   "index.tag":      {
     lb: "E Schüler aus Lëtzebuerg, deen <strong>Apps, Spiller a Programmer</strong> baut — am Browser, um iPhone an op der Apple&nbsp;Watch.",

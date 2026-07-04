@@ -10,6 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <link rel="canonical" href="https://ian.lu/wordle.html">
+<link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=4"></script>
@@ -195,21 +196,29 @@ function finish(won){
   $("msg").textContent = won ? ["Genial!","Super!","Gutt!","Net schlecht","Knapp!","Puh! 😅"][guesses.length-1] : "Léisung: "+answer;
   $("share").style.display="";
   const s=JSON.parse(localStorage.getItem(statsKey())||"null")||{played:0,wins:0,streak:0,max:0,dist:[0,0,0,0,0,0]};
-  s.played++; if(won){ s.wins++; s.streak++; s.max=Math.max(s.max,s.streak); s.dist[guesses.length-1]++; } else s.streak=0;
+  const day=dayIndex();
+  // a daily streak only survives if yesterday was played too
+  s.played++; if(won){ s.streak=(s.lastDay===day-1?s.streak:0)+1; s.wins++; s.max=Math.max(s.max,s.streak); s.dist[guesses.length-1]++; } else s.streak=0;
+  s.lastDay=day;
   localStorage.setItem(statsKey(), JSON.stringify(s));
   renderStats();
   window.recordWordle?.(lang, dayIndex(), won?guesses.length:0);   // public leaderboard (if signed in)
 }
+// streak shown as 0 once a day was skipped (finish() resets it on the next game)
+function liveStreak(s){ return s.lastDay===undefined||s.lastDay>=dayIndex()-1 ? s.streak : 0; }
 function renderStats(){
   const s=JSON.parse(localStorage.getItem(statsKey())||"null")||{played:0,wins:0,streak:0,max:0};
-  $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b>${s.streak}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
+  $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b>🔥 ${liveStreak(s)}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
 }
 function shareResult(){
   const emo={correct:"🟩",present:"🟨",absent:"⬛"};
   const grid=guesses.map(g=>scoreGuess(g).map(s=>emo[s]).join("")).join("\n");
   const won=guesses.includes(answer);
-  const txt=`ian.lu Wuertspill (${lang.toUpperCase()}) ${won?guesses.length:"X"}/6\n${grid}\nian.lu/wordle.html`;
-  if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(()=>flash("Kopéiert! 📋")).catch(()=>flash(txt)); }
+  const s=JSON.parse(localStorage.getItem(statsKey())||"null");
+  const streak=s?liveStreak(s):0;
+  const txt=`ian.lu Wuertspill (${lang.toUpperCase()}) ${won?guesses.length:"X"}/6${streak>1?` · 🔥${streak}`:""}\n${grid}\nian.lu/wordle.html`;
+  if(navigator.share){ navigator.share({text:txt}).catch(()=>{}); }
+  else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(()=>flash("Kopéiert! 📋")).catch(()=>flash(txt)); }
   else flash("Konnt net kopéieren");
 }
 

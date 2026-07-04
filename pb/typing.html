@@ -31,7 +31,20 @@ button{margin-top:15px;padding:10px 25px;background:#4de8ff;color:#0a0a1a;border
 <div id="progress"><div id="prog-fill" style="width:0%"></div></div>
 <div id="result"></div>
 <button onclick="newTest()">New Text</button>
+<button id="langBtn" onclick="switchLang()" style="margin-left:8px;background:#3a3a5a;color:#fff">🇬🇧 EN</button>
 <script>
+const TEXTS_LB=[
+  "Moien alleguer haut ass e flotten Dag fir eppes Neies ze léieren",
+  "D'Vakanz kënnt ëmmer méi no an d'Schoul ass geschwënn eriwwer",
+  "Lëtzebuerg ass e klengt Land mat ville schéine Plazen an Dierfer",
+  "E gudde Kaffi um Moien mécht de ganzen Dag direkt vill besser",
+  "D'Wieder haut ass schéin d'Sonn schéngt an et ass waarm dobaussen",
+  "Meng Frënn a meng Famill si mir dat Wichtegst op der Welt",
+  "Owes kucke mir gär e Film oder spillen e Spill zesummen",
+  "De Fuuss leeft séier duerch de Bësch an d'Villercher fléien ewech",
+  "Wien all Dag e bësse trainéiert gëtt ëmmer besser beim Tippen",
+  "Mëttes iesse mir zesummen an duerno gi mir dobaussen spillen",
+];
 const TEXTS=[
   "The quick brown fox jumps over the lazy dog near the old wooden fence",
   "Programming is the art of telling a computer what to do step by step",
@@ -47,8 +60,13 @@ const TEXTS=[
   "The best way to predict the future is to create it yourself today",
 ];
 let text,pos,errors,startTime,timerInt,done;
+let lang=localStorage.getItem('pb_typ_lang')||'en';
+function paintLang(){document.getElementById('langBtn').textContent=lang==='lb'?'🇱🇺 LB':'🇬🇧 EN';}
+function switchLang(){lang=lang==='lb'?'en':'lb';localStorage.setItem('pb_typ_lang',lang);paintLang();newTest();}
+paintLang();
 function newTest(){
-  text=TEXTS[Math.floor(Math.random()*TEXTS.length)];
+  const list=lang==='lb'?TEXTS_LB:TEXTS;
+  text=list[Math.floor(Math.random()*list.length)];
   pos=0;errors=0;done=false;startTime=null;
   if(timerInt)clearInterval(timerInt);
   document.getElementById('inp').value='';document.getElementById('inp').focus();
