@@ -87,16 +87,38 @@ const meU=()=>keys['w']||keys['W']||keys['ArrowUp'],
       meS=()=>keys['g']||keys['G']||keys['l']||keys['L'];
 function sendKeys(){NET.send({t:'k',k:{u:+!!meU(),l:+!!meL(),r:+!!meR(),a:+!!meA(),s:+!!meS(),sp:+!!keys[' ']}})}
 
-/* ---------- AI fighter ---------- */
+/* ---------- AI fighter: climbs platforms to reach the player ---------- */
 let aiJumpT=0;
 function aiKeys(){
   const dx=p1.x-p2.x,adx=Math.abs(dx),ady=Math.abs(p1.y-p2.y);
+  const pcx=p1.x+p1.w/2,mcx=p2.x+p2.w/2;
+  const myFoot=p2.y+p2.h,pFoot=p1.y+p1.h;
   aiJumpT--;
-  const wantJump=(p1.y<p2.y-60&&p2.onGround&&aiJumpT<=0)||(p2.onGround&&Math.random()<0.006);
-  if(wantJump)aiJumpT=40;
   const retreat=p2.hp<25&&Math.random()<0.3;
-  return{u:+wantJump,
-    l:+(retreat?dx>0:dx<-34),r:+(retreat?dx<0:dx>34),
+  let tx=pcx,dead=30,jump=false;
+  if(!retreat&&pFoot<myFoot-60){
+    // player is higher up: climb toward them platform by platform
+    let best=null;
+    for(const pl of PLATS){
+      if(pl.y>=myFoot-10)continue;               // not above us
+      if(myFoot-pl.y>125)continue;               // beyond jump reach from here
+      const cx=pl.x+pl.w/2;
+      const d=Math.abs(cx-pcx)+(pl.y>pFoot?200:0)+Math.abs(cx-mcx)*0.3;
+      if(!best||d<best.d)best={cx,w:pl.w,d};
+    }
+    if(best){
+      tx=best.cx;dead=10;
+      // stay on the current platform while lining up the climb jump
+      if(p2.onGround)for(const pl of PLATS)
+        if(p2.x+p2.w>pl.x&&p2.x<pl.x+pl.w&&Math.abs(myFoot-pl.y)<3)
+          tx=Math.max(pl.x+4,Math.min(pl.x+pl.w-4,tx));
+      if(Math.abs(mcx-best.cx)<best.w/2+80&&p2.onGround){jump=true;aiJumpT=40;}
+    }
+  }else if(p1.y<p2.y-60&&p2.onGround&&aiJumpT<=0){jump=true;aiJumpT=40;}
+  if(!jump&&p2.onGround&&Math.random()<0.006&&aiJumpT<=0){jump=true;aiJumpT=40;}
+  const dtx=tx-mcx;
+  return{u:+jump,
+    l:+(retreat?dx>0:dtx<-dead),r:+(retreat?dx<0:dtx>dead),
     a:+(adx<48&&ady<40&&Math.random()<0.3),
     s:+(adx<62&&ady<50&&Math.random()<0.05),sp:0};
 }
