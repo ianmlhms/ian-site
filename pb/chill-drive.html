@@ -149,7 +149,7 @@ function buildCenterline(from){
   if(from===0)cl=[{x:0,z:0,y:0,h:0}];
   let p=cl[cl.length-1];
   for(let i=cl.length-1;i<segs.length;i++){
-    const h=p.h+segs[i].curve*CURVE_K;
+    const h=p.h-segs[i].curve*CURVE_K;
     p={x:p.x+Math.sin(h)*SEG_WLD,z:p.z+Math.cos(h)*SEG_WLD,y:segs[i].y*Y_K,h:h};
     cl.push(p);
   }
@@ -158,8 +158,8 @@ function pointAt(s,lat){
   const f=Math.max(0,s/SEGL), i=Math.min(cl.length-2,Math.floor(f)), t=f-i;
   const a=cl[i],b=cl[i+1];
   const h=a.h+(b.h-a.h)*t;
-  const x=a.x+(b.x-a.x)*t+Math.cos(h)*lat*RH;
-  const z=a.z+(b.z-a.z)*t-Math.sin(h)*lat*RH;
+  const x=a.x+(b.x-a.x)*t-Math.cos(h)*lat*RH;
+  const z=a.z+(b.z-a.z)*t+Math.sin(h)*lat*RH;
   return {x:x,y:a.y+(b.y-a.y)*t,z:z,h:h};
 }
 
@@ -180,7 +180,7 @@ function levelCfg(n){
 }
 
 /* ---------- state ---------- */
-let keys={},speed=0,pos=0,playerX=0,time=0;
+let keys={},speed=0,pos=0,playerX=0,time=0,steerS=0;
 let cars=[],stylePts=0,combo=0,invuln=0,shake=0,muted=false;
 let state='menu',mode='endless',lvl=0,crashes=0,cfgNow=null,zen=false,envIdx=0;
 function spawnCar(ahead){
@@ -253,7 +253,7 @@ const C=$('c');
 const renderer=new THREE.WebGLRenderer({canvas:C,antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(74,1,0.5,1500);
+const camera=new THREE.PerspectiveCamera(74,1,1,1100);
 let W=innerWidth,H=innerHeight;
 function resize(){W=innerWidth;H=innerHeight;renderer.setSize(W,H,false);camera.aspect=W/H;camera.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();
@@ -268,7 +268,7 @@ function makeMats(){
     road:new THREE.MeshLambertMaterial({color:ENV.road,side:DS}),
     line:new THREE.MeshBasicMaterial({color:ENV.line,side:DS}),
     rumble:new THREE.MeshBasicMaterial({color:ENV.rumble,side:DS}),
-    ground:new THREE.MeshLambertMaterial({color:ENV.ground,side:DS}),
+    ground:new THREE.MeshBasicMaterial({color:ENV.ground,side:DS}),
     mount:new THREE.MeshLambertMaterial({color:ENV.mount,flatShading:true}),
     trunk:new THREE.MeshLambertMaterial({color:ENV.trunk}),
     leaf:new THREE.MeshLambertMaterial({color:ENV.leaf,flatShading:true}),
@@ -323,7 +323,7 @@ function buildChunk(k){
     pos.push(p.x-r[0]*rw,p.y,p.z-r[1]*rw, p.x+r[0]*rw,p.y,p.z+r[1]*rw);
     posL.push(p.x-r[0]*rw*1.16,p.y+0.05,p.z-r[1]*rw*1.16, p.x-r[0]*rw*0.97,p.y+0.05,p.z-r[1]*rw*0.97,
               p.x+r[0]*rw*0.97,p.y+0.05,p.z+r[1]*rw*0.97, p.x+r[0]*rw*1.16,p.y+0.05,p.z+r[1]*rw*1.16);
-    posG.push(p.x-r[0]*210,p.y-0.04,p.z-r[1]*210, p.x+r[0]*210,p.y-0.04,p.z+r[1]*210);
+    posG.push(p.x-r[0]*210,p.y-0.14,p.z-r[1]*210, p.x+r[0]*210,p.y-0.14,p.z+r[1]*210);
   }
   for(let i=0;i<i1-i0;i++){
     const a=vi+i*2;
@@ -477,7 +477,7 @@ function makeFinish(){
     b.position.set(-rw*1.1+rw*2.2/10*(q+0.5),6.6-r*0.55,0);g.add(b);
   }
   const p=pointAt(courseEnd,0);
-  g.position.set(p.x,p.y,p.z);g.rotation.y=-p.h;
+  g.position.set(p.x,p.y,p.z);g.rotation.y=p.h;
   return g;
 }
 
@@ -497,7 +497,7 @@ function buildWorld(){
 }
 
 /* ---------- flow ---------- */
-function resetRun(){speed=0;pos=0;playerX=0;stylePts=0;combo=0;invuln=0;crashes=0;shake=0;}
+function resetRun(){speed=0;pos=0;playerX=0;stylePts=0;combo=0;invuln=0;crashes=0;shake=0;steerS=0;yawS=0;}
 function startEndless(e,z){
   mode='endless';zen=!!z;envIdx=e;ENV=ENVS[e];cfgNow=endlessCfg(ENV);
   if(zen)cfgNow.traffic=0;
@@ -596,8 +596,9 @@ function update(){
   else speed*=COAST;
   speed=Math.max(0,Math.min(speed-grade*GRADE_F,MAXV*DOWN_MAX));
   const sp=speed/MAXV;
-  if(keys.left)playerX-=STEER_F*sp*3.6;
-  if(keys.right)playerX+=STEER_F*sp*3.6;
+  const steerT=(keys.right?1:0)-(keys.left?1:0);
+  steerS+=(steerT-steerS)*0.14;
+  playerX+=STEER_F*sp*3.6*steerS;
   playerX-=segAt(pos).curve*sp*sp*CENTRI*0.06;
   playerX=Math.max(-2.4,Math.min(2.4,playerX));
   const offRoad=Math.abs(playerX)>1.05;
@@ -652,23 +653,24 @@ function update(){
 
 /* ---------- 3D frame sync ---------- */
 const camPos=new THREE.Vector3(0,6,-14),camLook=new THREE.Vector3();
-let camInit=false,prevPX=0;
+let camInit=false,prevPX=0,yawS=0;
 function sync(){
   ensureChunks();
-  const lean=(keys.left?-1:0)+(keys.right?1:0), sp=speed/MAXV;
+  const lean=steerS, sp=speed/MAXV;
   const pp=pointAt(pos,playerX);
   const dPX=playerX-prevPX;prevPX=playerX;
   if(player){
     player.position.set(pp.x,pp.y,pp.z);
-    player.rotation.y=-pp.h-Math.max(-0.42,Math.min(0.42,dPX*10));
-    player.rotation.z=lean*0.07*sp;
+    yawS+=(Math.max(-0.42,Math.min(0.42,-dPX*9))-yawS)*0.22;
+    player.rotation.y=pp.h+yawS;
+    player.rotation.z=lean*0.06*sp;
     player.visible=!(invuln>0&&Math.floor(time/5)%2===1);
   }
   for(const car of cars){
     if(!car.mesh)continue;
     const cp=pointAt(car.z,car.x);
     car.mesh.position.set(cp.x,cp.y,cp.z);
-    car.mesh.rotation.y=-cp.h;
+    car.mesh.rotation.y=cp.h;
   }
   const back=pointAt(Math.max(0,pos-560),playerX*0.8);
   const tx=back.x,ty=back.y+4.6,tz=back.z;
