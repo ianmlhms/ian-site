@@ -92,6 +92,8 @@ footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-t
 @media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:12px 12px 35px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.game-thumb{height:90px;font-size:36px}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 <header>
@@ -183,6 +185,8 @@ document.getElementById('arcadeSec').style.display=arcade.length?'':'none';
 document.getElementById('count').textContent=arcade.length+' games \u00b7 high scores save to your account';
 }
 var openSeq=0;
+var _cnEl=document.querySelector('link[rel="canonical"]'),_mdEl=document.querySelector('meta[name="description"]');
+var _cn0=_cnEl?_cnEl.href:'',_md0=_mdEl?_mdEl.content:'';
 function openGame(idx,fromHistory){
 var g=GAMES[idx];
 if(!g||!g.src)return;
@@ -191,6 +195,9 @@ var seq=++openSeq;
 // bookmarked; the back button returns to the hub.
 if(!fromHistory)history.pushState({g:g.id},'',location.pathname+'?g='+encodeURIComponent(g.id));
 document.title=g.name+' — PixelBreak';
+if(_cnEl)_cnEl.href='https://ian.lu/pixelbreak.html?g='+encodeURIComponent(g.id);
+if(_mdEl)_mdEl.content=g.name+' — play free in your browser on PixelBreak. '+(g.desc||'');
+if(!fromHistory&&window.goatcounter&&goatcounter.count)goatcounter.count({path:'/pixelbreak.html?g='+g.id});
 document.getElementById('gt').textContent=g.name;
 var frame=document.getElementById('gf');
 // Give the game keyboard focus as soon as it loads, so arrow/space keys work on
@@ -217,6 +224,8 @@ document.getElementById('overlay').classList.remove('open');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
 document.title='PixelBreak - Play Games';
+if(_cnEl)_cnEl.href=_cn0;
+if(_mdEl)_mdEl.content=_md0;
 if(!fromHistory&&/[?&]g=/.test(location.search))history.pushState(null,'',location.pathname);
 if(window.PB&&PB.onCloseGame)PB.onCloseGame();
 }
