@@ -21,6 +21,9 @@ canvas{display:block;width:100vw;height:100vh}
 #ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(8,14,26,.82);z-index:20;color:#fff;text-align:center;padding:16px;overflow-y:auto}
 #ov h1{font-size:min(10vw,40px);color:#66ccff;margin-bottom:8px}
 #ov .sub{font-size:15px;opacity:.85;margin-bottom:16px;line-height:1.55}
+#modes{display:flex;gap:8px;justify-content:center;margin-bottom:12px}
+#modes .mode{padding:9px 20px;font-size:14px;font-weight:bold;border-radius:24px;cursor:pointer;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff}
+#modes .mode.on{background:#9be89b;color:#0e1a2a;border-color:transparent}
 #envs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
 #envs button,#ov button.big{padding:13px 24px;font-size:16px;border:none;border-radius:10px;cursor:pointer;font-weight:bold;color:#0e1a2a}
 #envs button:active,#ov button.big:active{transform:scale(.96)}
@@ -49,13 +52,16 @@ canvas{display:block;width:100vw;height:100vh}
 <div id="ov">
 <h1 id="ovh">🛣️ Chill Drive 3D</h1>
 <div class="sub" id="ovp">Cruise, overtake, survive — 5 crashes end your run.<br>Close overtakes earn style points. ↑↓ speed · ←→ steer</div>
+<div id="modes">
+<button id="mTraffic" class="mode on">🚗 TRAFFIC</button>
+<button id="mZen" class="mode">🧘 ZEN — no traffic</button>
+</div>
 <div id="envs">
 <button id="e0">🌄 MEADOWS</button>
 <button id="e1">🏜️ DESERT SUNSET</button>
 <button id="e2">🌃 NEON NIGHT</button>
 </div>
 <button class="big" id="go" style="display:none">DRIVE AGAIN</button>
-<button class="big" id="go2" style="margin-top:10px;background:#9be89b">🧘 ZEN DRIVE — no traffic</button>
 <button class="big" id="goMenu" style="margin-top:10px;background:rgba(255,255,255,.18);color:#fff">🏠 MAIN MENU</button>
 <div id="lvlt">— or race 20 levels (reach the finish, max 5 crashes) —</div>
 <div id="lvls"></div>
@@ -66,7 +72,7 @@ canvas{display:block;width:100vw;height:100vh}
 const $=(id)=>document.getElementById(id);
 if(!window.THREE){
   $('ovp').innerHTML='Could not load the 3D engine — check your connection and reload.';
-  $('envs').style.display='none';$('go2').style.display='none';$('lvlt').style.display='none';
+  $('envs').style.display='none';$('modes').style.display='none';$('lvlt').style.display='none';
   throw new Error('three.js failed to load');
 }
 
@@ -518,7 +524,7 @@ function overlay(h,p,btn,menuMode){
   $('envs').style.display=menuMode?'':'none';
   $('go').style.display=menuMode?'none':'';
   if(btn)$('go').textContent=btn;
-  $('go2').style.display=menuMode?'':'none';
+  $('modes').style.display=menuMode?'':'none';
   $('goMenu').style.display=menuMode?'none':'';
   $('mm').classList.add('hidden');
   $('ov').classList.remove('hidden');
@@ -566,11 +572,11 @@ $('go').onclick=()=>{
 };
 let zenSel=false;
 function paintZen(){
-  $('go2').textContent=zenSel?'🧘 ZEN ON — pick a world above':'🧘 ZEN DRIVE — no traffic';
-  $('go2').style.background=zenSel?'#5dd18a':'#9be89b';
-  $('go2').style.boxShadow=zenSel?'0 0 0 3px #fff inset':'none';
+  $('mTraffic').classList.toggle('on',!zenSel);
+  $('mZen').classList.toggle('on',zenSel);
 }
-$('go2').onclick=()=>{zenSel=!zenSel;paintZen();};
+$('mTraffic').onclick=()=>{zenSel=false;paintZen();};
+$('mZen').onclick=()=>{zenSel=true;paintZen();};
 $('goMenu').onclick=()=>menu();
 $('mm').onclick=()=>menu();
 $('e0').onclick=()=>startEndless(0,zenSel);
