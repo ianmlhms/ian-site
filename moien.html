@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moien — ian.lu</title>
+<meta name="description" content="Däin Dag zu Lëtzebuerg — d'Wieder an déi nächst Bussen an Zich op engem Bléck.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=4"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}
+  .muted{color:var(--muted);font-size:13px}
+  /* greeting */
+  .greet{text-align:center;padding:8px 4px 2px}
+  .greet h2{margin:0;font-size:26px;font-weight:800}
+  .greet .date{color:var(--muted);font-size:14px;margin-top:4px}
+  .greet .clock{font-size:34px;font-weight:800;letter-spacing:.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+  /* weather */
+  .wxtop{display:flex;align-items:center;gap:16px}
+  .wxemoji{font-size:52px;line-height:1}
+  .wxtemp{font-size:40px;font-weight:800;line-height:1}
+  .wxdesc{color:var(--muted);font-size:14px;margin-top:2px}
+  .wxmeta{margin-left:auto;text-align:right;font-size:12.5px;color:var(--muted);line-height:1.7}
+  .wxday{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px}
+  .hours{display:flex;gap:8px;overflow-x:auto;margin-top:14px;padding-bottom:2px}
+  .hr{flex:none;text-align:center;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:8px 10px;min-width:56px}
+  .hr .h{font-size:11px;color:var(--muted)}.hr .e{font-size:20px;margin:3px 0}.hr .t{font-size:13px;font-weight:700}
+  /* transport */
+  .card h3{margin:0 0 12px;font-size:16px}
+  #stopq{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px}
+  #stops .st{padding:9px 11px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:13.5px}
+  #stops .st:hover{border-color:var(--accent2)}
+  .dep{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
+  .dep:last-child{border-bottom:none}
+  .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 6px}
+  .dep .dir{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dep .time{flex:none;font-weight:700;font-size:14px}
+  .dep .time em{color:#f87171;font-style:normal;font-size:12px}
+  .dep .time .ok{color:var(--ok)}
+  .dep.canc{opacity:.5;text-decoration:line-through}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>🌤️ Moien</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <div class="greet">
+    <h2 id="hi">Moien!</h2>
+    <div class="date" id="date"></div>
+    <div class="clock" id="clock">--:--</div>
+  </div>
+
+  <div class="card" id="wx"><div class="muted">Wieder gëtt gelueden…</div></div>
+
+  <div class="card">
+    <h3>🚌 Nächst Departuren</h3>
+    <input id="stopq" placeholder="Arrêt sichen (z.B. Luxembourg, Gare)…" style="display:none">
+    <div id="stops"></div>
+    <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
+  </div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=3";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pad=(n)=>(n<10?"0":"")+n;
+
+/* ---- greeting + clock ---- */
+const DAYS=["Sonndeg","Méindeg","Dënschdeg","Mëttwoch","Donneschdeg","Freideg","Samschdeg"];
+const MON=["Januar","Februar","Mäerz","Abrëll","Mee","Juni","Juli","August","September","Oktober","November","Dezember"];
+function tick(){
+  const d=new Date();
+  const h=d.getHours();
+  $("hi").textContent=(h<11?"Moien":h<14?"Gudde Mëtteg":h<18?"Schéinen Nomëtteg":h<23?"Gudden Owend":"Gutt Nuecht")+"!";
+  $("date").textContent=`${DAYS[d.getDay()]}, ${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`;
+  $("clock").textContent=`${pad(h)}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+tick(); setInterval(tick,1000);
+
+/* ---- weather (Open-Meteo, no key) ---- */
+function wmo(c,day){
+  const m={0:["☀️","🌙","Kloer"],1:["🌤️","☁️","Meeschtens kloer"],2:["⛅","☁️","Deelweis bewëllkt"],3:["☁️","☁️","Bewëllkt"],
+    45:["🌫️","🌫️","Niwwel"],48:["🌫️","🌫️","Niwwel"],51:["🌦️","🌦️","Liicht Sprëtzelen"],53:["🌦️","🌦️","Sprëtzelen"],55:["🌧️","🌧️","Staark Sprëtzelen"],
+    56:["🌧️","🌧️","Gefruere Sprëtzelen"],57:["🌧️","🌧️","Gefruere Sprëtzelen"],61:["🌦️","🌦️","Liichte Reen"],63:["🌧️","🌧️","Reen"],65:["🌧️","🌧️","Staarke Reen"],
+    66:["🌧️","🌧️","Gefruere Reen"],67:["🌧️","🌧️","Gefruere Reen"],71:["🌨️","🌨️","Liichte Schnéi"],73:["🌨️","🌨️","Schnéi"],75:["❄️","❄️","Staarke Schnéi"],77:["🌨️","🌨️","Schnéikären"],
+    80:["🌦️","🌦️","Reenschauer"],81:["🌧️","🌧️","Reenschauer"],82:["⛈️","⛈️","Staark Reenschauer"],85:["🌨️","🌨️","Schnéischauer"],86:["❄️","❄️","Schnéischauer"],
+    95:["⛈️","⛈️","Donnerwieder"],96:["⛈️","⛈️","Donnerwieder mat Hagel"],99:["⛈️","⛈️","Donnerwieder mat Hagel"]};
+  const e=m[c]||["🌡️","🌡️","—"]; return {emoji:day?e[0]:e[1],text:e[2]};
+}
+async function loadWeather(){
+  try{
+    const u="https://api.open-meteo.com/v1/forecast?latitude=49.61&longitude=6.13&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&hourly=temperature_2m,weather_code&timezone=Europe%2FLuxembourg&forecast_days=1";
+    const r=await fetch(u); const d=await r.json();
+    const c=d.current, w=wmo(c.weather_code,c.is_day);
+    const dl=d.daily, hr=d.hourly;
+    const now=new Date(); let idx=hr.time.findIndex(t=>new Date(t)>=now); if(idx<0)idx=0;
+    let hours="";
+    for(let i=idx;i<Math.min(idx+8,hr.time.length);i++){
+      const hh=hr.time[i].slice(11,16), hw=wmo(hr.weather_code[i],1);
+      hours+=`<div class="hr"><div class="h">${hh}</div><div class="e">${hw.emoji}</div><div class="t">${Math.round(hr.temperature_2m[i])}°</div></div>`;
+    }
+    $("wx").innerHTML=`
+      <div class="wxtop">
+        <div class="wxemoji">${w.emoji}</div>
+        <div><div class="wxtemp">${Math.round(c.temperature_2m)}°</div><div class="wxdesc">${w.text}</div></div>
+        <div class="wxmeta">Gefillt ${Math.round(c.apparent_temperature)}°<br>💨 ${Math.round(c.wind_speed_10m)} km/h<br>💧 ${c.relative_humidity_2m}%</div>
+      </div>
+      <div class="wxday"><span>⬆ ${Math.round(dl.temperature_2m_max[0])}°</span><span>⬇ ${Math.round(dl.temperature_2m_min[0])}°</span>
+        <span>🌧 ${dl.precipitation_probability_max[0]}%</span><span>🌅 ${dl.sunrise[0].slice(11,16)}</span><span>🌇 ${dl.sunset[0].slice(11,16)}</span></div>
+      <div class="hours">${hours}</div>`;
+  }catch(e){ $("wx").innerHTML='<div class="muted">Wieder konnt net gelueden ginn.</div>'; }
+}
+loadWeather();
+
+/* ---- transport (Edge Function proxy) ---- */
+let curStop=null, tpTimer=null;
+async function tp(params){
+  const u=new URL(`${PB_CONFIG.url}/functions/v1/transport`);
+  Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
+  const r=await fetch(u,{headers:{apikey:PB_CONFIG.anonKey,Authorization:`Bearer ${PB_CONFIG.anonKey}`}});
+  return r.json();
+}
+function renderDeps(list){
+  if(!list||!list.length){$("deps").innerHTML='<div class="muted">Keng Departuren an der nächster Stonn.</div>';return;}
+  $("deps").innerHTML=list.map(d=>{
+    const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
+    return `<div class="dep ${d.cancelled?"canc":""}"><span class="line">${esc(d.line)}</span>
+      <span class="dir">${esc(d.dir)}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span></div>`;
+  }).join("");
+}
+async function loadBoard(){
+  if(!curStop)return;
+  const d=await tp({action:"board",id:curStop.id});
+  if(d.error){$("deps").innerHTML='<div class="muted">Departuren net verfügbar.</div>';return;}
+  renderDeps(d.departures);
+}
+function selectStop(s){
+  curStop=s; $("stopq").value=s.name; $("stops").innerHTML="";
+  localStorage.setItem("moienStop",JSON.stringify(s));
+  loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(loadBoard,45000);
+}
+let searchT=null;
+$("stopq").addEventListener("input",()=>{
+  clearTimeout(searchT);
+  const q=$("stopq").value.trim();
+  if(q.length<2){$("stops").innerHTML="";return;}
+  searchT=setTimeout(async()=>{
+    const d=await tp({action:"search",q});
+    $("stops").innerHTML=(d.stops||[]).map(s=>`<div class="st" data-id="${esc(s.id)}">${esc(s.name)}</div>`).join("");
+    $("stops").querySelectorAll(".st").forEach(el=>el.onclick=()=>{
+      const s=(d.stops||[]).find(x=>x.id===el.dataset.id); if(s)selectStop(s);
+    });
+  },300);
+});
+async function initTransport(){
+  const cfg=await tp({action:"search",q:"lux"});
+  if(cfg.configured===false){
+    $("tpNote").innerHTML="🚧 Live-Departuren kommen geschwënn — den API-Schlëssel vum Verkéiersbond gëtt ugefrot.";
+    return;
+  }
+  $("stopq").style.display="";
+  const saved=JSON.parse(localStorage.getItem("moienStop")||"null");
+  if(saved){ selectStop(saved); }
+  else $("tpNote").innerHTML='<span class="muted">Sich uewen en Arrêt fir déi nächst Bussen an Zich ze gesinn.</span>';
+}
+initTransport();
+
+auth.mountAccountButton($("acctHost"));
+</script>
+</body>
+</html>

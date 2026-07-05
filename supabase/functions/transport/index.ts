@@ -1,0 +1,84 @@
+// Supabase Edge Function: transport
+// Proxies Luxembourg public-transport real-time data (Verkéiersbond / HAFAS ReST)
+// for moien.html. The API key must stay server-side and the HAFAS host has no CORS,
+// so the browser calls this function instead.
+//
+// Request a free key by email (opendata-api@atp.etat.lu), then:
+//   supabase functions deploy transport --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
+//   supabase secrets set TRANSPORT_API_KEY=... --project-ref lvksqmgfwkfbblfsozfk
+//
+// Actions (query string):
+//   ?action=search&q=Luxembourg,Gare   → stop search  → [{id,name}]
+//   ?action=board&id=<stopId>          → next departures → [{line,dir,time,planned,delay,cancelled,cat}]
+// If TRANSPORT_API_KEY is unset it returns {configured:false} so the page shows a friendly notice.
+
+const KEY = Deno.env.get("TRANSPORT_API_KEY") ?? "";
+const HOST = "https://cdt.hafas.de/opendata/apiserver";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, "content-type": "application/json" } });
+
+const hhmm = (t?: string) => (t ? t.slice(0, 5) : "");
+function delayMin(planned?: string, rt?: string): number {
+  if (!planned || !rt) return 0;
+  const p = planned.split(":").map(Number), r = rt.split(":").map(Number);
+  if (p.length < 2 || r.length < 2) return 0;
+  let d = (r[0] * 60 + r[1]) - (p[0] * 60 + p[1]);
+  if (d < -720) d += 1440;  // crossed midnight
+  return d;
+}
+
+async function hafas(path: string, params: Record<string, string>) {
+  const qs = new URLSearchParams({ accessId: KEY, format: "json", ...params });
+  const r = await fetch(`${HOST}/${path}?${qs}`);
+  if (!r.ok) throw new Error("hafas " + r.status);
+  return r.json();
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (!KEY) return json({ configured: false });
+
+  const url = new URL(req.url);
+  const action = url.searchParams.get("action") ?? "board";
+
+  try {
+    if (action === "search") {
+      const q = (url.searchParams.get("q") ?? "").slice(0, 80);
+      if (q.length < 2) return json({ configured: true, stops: [] });
+      const data = await hafas("location.name", { input: q, type: "S", maxNo: "8", lang: "de" });
+      const raw = data?.stopLocationOrCoordLocation ?? [];
+      const stops = raw
+        .map((x: any) => x?.StopLocation ?? x?.stopLocation ?? x)
+        .filter((s: any) => s?.id && s?.name)
+        .map((s: any) => ({ id: s.id, name: s.name }));
+      return json({ configured: true, stops });
+    }
+
+    // default: departure board
+    const id = url.searchParams.get("id") ?? "";
+    if (!id) return json({ configured: true, departures: [] });
+    const data = await hafas("departureBoard", { id, maxJourneys: "12", duration: "90", lang: "de" });
+    const departures = (data?.Departure ?? []).map((d: any) => {
+      const planned = hhmm(d.time), rt = hhmm(d.rtTime);
+      return {
+        line: d?.Product?.[0]?.line ?? d?.Product?.line ?? d.name ?? "?",
+        cat: d?.Product?.[0]?.catOutL ?? d?.Product?.catOutL ?? "",
+        dir: d.direction ?? d.directionFlag ?? "",
+        time: rt || planned,
+        planned,
+        delay: delayMin(planned, rt),
+        cancelled: !!d.cancelled,
+      };
+    });
+    return json({ configured: true, stop: data?.stopLocationOrCoordLocation?.[0]?.name, departures });
+  } catch (e: any) {
+    console.error("transport", e?.message);
+    return json({ configured: true, error: "fetch failed" }, 502);
+  }
+});
