@@ -74,8 +74,8 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
 ⚠️ **`security-hardening-v1.sql`** (RLS lockdown: group_members insert via RPCs only, chat-media
    scoped reads, kart_sessions locked, server-derived usernames, notify fail-closed pairing). [run ✓ Jul 2026, verified]
 ⚠️ **`features-v1.sql`** (feedback box, class polls, exams, profile avatars — Jul 2026).
-   [PENDING unless Ian already ran it — polls.html/exams.html/profile.html/feedback show load
-   errors until it runs; full SQL was pasted in chat on 5 Jul 2026]
+   [run ✓ 5 Jul 2026 — verified live: polls/poll_votes/exams/feedback tables +
+   `poll_results_all()` RPC + `profiles.avatar` column all present]
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -181,8 +181,8 @@ Old full data was scrubbed from git history.
   LB modes in Word Scramble/Typing, feedback box, real daily Wordle streaks + native share.
 
 **Open items after Wave 3:**
-- ⚠️ **Run `scripts/features-v1.sql`** if not yet done (see §3) — polls/exams/profile/feedback
-  error politely until then. Test after: create poll, pick avatar, check Messenger avatar, add exam.
+- ✅ **`scripts/features-v1.sql` run** (5 Jul 2026, verified live — see §3). Remaining manual test:
+  create a poll, pick an avatar, check the Messenger avatar, add an exam.
 - **Countdown date**: Ian asked for "9th June 12:40" which was already past — implemented as
   **9 July 2026 12:40**; confirm with him.
 - **Google Search Console**: suggested but not set up. Verify ian.lu (DNS record or HTML file
