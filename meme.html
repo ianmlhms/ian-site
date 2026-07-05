@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meme Party — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=4"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:17px;margin:0}.bar .spacer{flex:1}
+  .bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+  .wrap{max-width:560px;margin:0 auto;padding:14px 12px 40px}
+  .scores{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:13px}
+  .pchip.lead{border-color:var(--accent);color:var(--accent)}
+  .topbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;min-height:26px}
+  .topbar .rnd{color:var(--muted);font-size:13px}
+  .topbar .prog{flex:1;text-align:center;color:var(--muted);font-size:13px}
+  .topbar .timer{font-weight:800;color:var(--accent2)}
+  .big{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px;font-weight:800;font-size:15px;cursor:pointer;margin-top:8px}
+  .big:disabled{opacity:.45;cursor:default}
+  .muted{color:var(--muted)}.center{text-align:center}
+  .win{background:linear-gradient(90deg,rgba(110,168,254,.2),transparent);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
+  /* meme */
+  .meme{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#111;line-height:0}
+  .meme img{width:100%;display:block}
+  .mtext{position:absolute;left:0;right:0;text-align:center;padding:2px 6px;font-family:Impact,"Haettenschweiler","Arial Narrow Bold",sans-serif;text-transform:uppercase;color:#fff;font-weight:900;line-height:1.05;letter-spacing:.5px;word-break:break-word;-webkit-text-stroke:1.5px #000;paint-order:stroke fill}
+  .mtext.top{top:2%}.mtext.bottom{bottom:2%}
+  .meme.big .mtext{font-size:clamp(20px,7vw,32px);-webkit-text-stroke-width:2px}
+  .grid .mtext{font-size:16px}
+  .cin{width:100%;margin-top:8px;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:15px;outline:none}
+  .cin:focus{border-color:var(--accent2)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  .ventry{position:relative;border:2px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .12s}
+  .ventry:not(.mine):hover{border-color:var(--accent2)}
+  .ventry.mine{cursor:default}
+  .ventry.voted{border-color:var(--accent)}
+  .ventry.won{border-color:var(--good)}
+  .mlabel{padding:6px 8px;font-size:12.5px;font-weight:700;text-align:center;background:var(--card)}
+  .invite{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:13px;margin:12px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .invite code{background:var(--card2);padding:3px 7px;border-radius:6px;color:var(--accent2);font-size:12px;word-break:break-all;flex:1;min-width:0}
+  .invite button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-weight:700;cursor:pointer}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="pixelbreak.html">‹ Games</a>
+  <h1>😂 Meme Party</h1>
+  <div class="spacer"></div>
+  <span class="muted">room <code id="roomc"></code></span>
+</header>
+<div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const POOL = [
+  "https://i.imgflip.com/30b1gx.jpg","https://i.imgflip.com/1g8my4.jpg","https://i.imgflip.com/1ur9b0.jpg","https://i.imgflip.com/3lmzyx.jpg",
+  "https://i.imgflip.com/3oevdk.jpg","https://i.imgflip.com/22bdq6.jpg","https://i.imgflip.com/5c7lwq.png","https://i.imgflip.com/28j0te.jpg",
+  "https://i.imgflip.com/46e43q.png","https://i.imgflip.com/261o3j.jpg","https://i.imgflip.com/26jxvz.jpg","https://i.imgflip.com/2fm6x.jpg",
+  "https://i.imgflip.com/1c1uej.jpg","https://i.imgflip.com/23ls.jpg","https://i.imgflip.com/1ihzfe.jpg","https://i.imgflip.com/24y43o.jpg",
+  "https://i.imgflip.com/9ehk.jpg","https://i.imgflip.com/345v97.jpg","https://i.imgflip.com/1otk96.jpg","https://i.imgflip.com/26am.jpg",
+  "https://i.imgflip.com/54hjww.jpg","https://i.imgflip.com/21uy0f.jpg","https://i.imgflip.com/1jwhww.jpg","https://i.imgflip.com/8d317n.png",
+  "https://i.imgflip.com/1b42wl.jpg","https://i.imgflip.com/3pdf2w.png","https://i.imgflip.com/43a45p.png","https://i.imgflip.com/2odckz.jpg",
+  "https://i.imgflip.com/1bij.jpg","https://i.imgflip.com/72epa9.png","https://i.imgflip.com/avnxpz.png","https://i.imgflip.com/1o00in.jpg",
+  "https://i.imgflip.com/46hhvr.jpg","https://i.imgflip.com/2ybua0.png","https://i.imgflip.com/2xscjb.png","https://i.imgflip.com/wxica.jpg",
+  "https://i.imgflip.com/2za3u1.jpg","https://i.imgflip.com/145qvv.jpg","https://i.imgflip.com/64sz4u.png","https://i.imgflip.com/1wz1x.jpg",
+  "https://i.imgflip.com/2gnnjh.jpg","https://i.imgflip.com/gtj5t.jpg","https://i.imgflip.com/38el31.jpg","https://i.imgflip.com/1tl71a.jpg",
+  "https://i.imgflip.com/m78d.jpg","https://i.imgflip.com/3i7p.jpg","https://i.imgflip.com/gk5el.jpg","https://i.imgflip.com/19vcz0.jpg"
+];
+const ROUNDS=4, CAP_SECS=70, VOTE_SECS=35, REVEAL_SECS=7, VOTE_POINTS=100;
+const params = new URLSearchParams(location.search);
+let room = (params.get("room")||"").toLowerCase();
+const role = params.get("role")==="guest" ? "guest" : "host";
+if(!room){ room = Math.random().toString(36).slice(2,6); history.replaceState(null,"",`?room=${room}`); }
+const cid = Math.random().toString(36).slice(2,10);
+document.getElementById("roomc").textContent = room;
+const inviteURL = location.origin+location.pathname+"?room="+room+"&role=guest";
+const cfg = window.PB_CONFIG;
+const sb = supabase.createClient(cfg.url.replace(/\/$/,""), cfg.anonKey, { auth:{ persistSession:false, autoRefreshToken:false } });
+const ch = sb.channel("meme:"+room, { config:{ broadcast:{self:false}, presence:{key:cid} }});
+const $ = (id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let name="Player", phase="lobby", round=0, totalRounds=0, hostHere=true;
+let scores={}, template=null, roundEnd=0, entries=[], results=[], progress=null;
+let myCap=null, myVote=null;
+// host-only
+let captions={}, votes={}, capTimer=null, voteTimer=null, tick=null;
+
+function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
+async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Your name:")||"Player").slice(0,16);} localStorage.setItem("playerName",n); return n; }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+function memeHTML(url,top,bottom){ return `<div class="meme"><img src="${esc(url)}" loading="lazy"><div class="mtext top">${esc(top||"")}</div><div class="mtext bottom">${esc(bottom||"")}</div></div>`; }
+function scoreChips(){ const ps=players(); const mx=Math.max(0,...ps.map(p=>scores[p.cid]||0));
+  return `<div class="scores">${ps.map(p=>`<span class="pchip ${(scores[p.cid]||0)===mx&&mx>0?"lead":""}">${esc(p.name)} · ${scores[p.cid]||0}</span>`).join("")}</div>`; }
+function topbar(){ const s=Math.max(0,Math.ceil((roundEnd-Date.now())/1000));
+  return `<div class="topbar"><span class="rnd">Round ${round}/${totalRounds}</span><span class="prog" id="prog">${progress?progress.done+"/"+progress.total+" ready":""}</span><span class="timer" id="timerEl">${s}s</span></div>`; }
+
+/* ---------- render ---------- */
+function render(){
+  if(phase==="lobby"){
+    let html = `<p class="muted center">Everyone captions the <b>same meme</b>, then you vote for the funniest. Most votes over ${ROUNDS} rounds wins. 3+ players is best!</p>`;
+    html += scoreChips();
+    html += `<div class="invite">🔗 <code>${esc(inviteURL)}</code><button id="cpy">Copy</button></div>`;
+    const ps=players();
+    html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
+                          : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
+                                      : `<p class="center muted">⚠️ The host left — ask them to rejoin.</p>`);
+    $("app").innerHTML=html;
+    if($("cpy")) $("cpy").onclick=()=>{ navigator.clipboard?.writeText(inviteURL); $("cpy").textContent="Copied ✓"; };
+    if(role==="host"&&$("startBtn")) $("startBtn").onclick=start;
+    return;
+  }
+  if(phase==="final"){
+    const ps=[...players()].sort((a,b)=>(scores[b.cid]||0)-(scores[a.cid]||0));
+    const top=ps[0];
+    let html = `<div class="win">🏆 ${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+scoreChips();
+    html += role==="host" ? `<button class="big" id="againBtn">Play again</button>`
+                          : (hostHere ? `<p class="center muted">Waiting for host…</p>` : `<p class="center muted">⚠️ The host left.</p>`);
+    $("app").innerHTML=html;
+    if(role==="host"&&$("againBtn")) $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
+    return;
+  }
+  let html = scoreChips()+topbar();
+  if(phase==="caption"){
+    html += `<div class="meme big" id="prev"><img src="${esc(template)}"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
+    if(myCap){ html += `<p class="center muted">✅ Meme sent! Waiting for the others…</p>`; }
+    else html += `<input id="capT" class="cin" placeholder="Top text" maxlength="60" autocomplete="off">
+                  <input id="capB" class="cin" placeholder="Bottom text" maxlength="60" autocomplete="off">
+                  <button class="big" id="capBtn">Send meme</button>`;
+    $("app").innerHTML=html;
+    if(myCap){ $("pt").textContent=myCap.top; $("pb").textContent=myCap.bottom; }
+    else { const upd=()=>{ $("pt").textContent=$("capT").value.toUpperCase(); $("pb").textContent=$("capB").value.toUpperCase(); };
+      $("capT").oninput=upd; $("capB").oninput=upd; $("capBtn").onclick=submitCaption; }
+    startTick(); return;
+  }
+  if(phase==="vote"){
+    html += `<p class="center muted">Vote for the funniest 👇</p><div class="grid">`+entries.map(e=>{
+      const mine=e.cid===cid, voted=myVote===e.cid;
+      return `<div class="ventry ${mine?"mine":""} ${voted?"voted":""}" data-cid="${e.cid}">${memeHTML(template,e.top,e.bottom)}
+        <div class="mlabel">${mine?"Your meme":(voted?"✓ Voted":"Tap to vote")}</div></div>`;
+    }).join("")+`</div>`;
+    $("app").innerHTML=html;
+    $("app").querySelectorAll(".ventry:not(.mine)").forEach(el=>el.onclick=()=>castVote(el.dataset.cid));
+    startTick(); return;
+  }
+  if(phase==="reveal"){
+    const best=results.length?results[0].votes:0;
+    html = scoreChips()+`<h3 class="center">Results — round ${round}/${totalRounds}</h3><div class="grid">`+results.map(r=>{
+      return `<div class="ventry ${r.votes===best&&best>0?"won":""}">${memeHTML(template,r.top,r.bottom)}
+        <div class="mlabel">${r.votes===best&&best>0?"👑 ":""}${esc(r.name)} · ${r.votes} ${r.votes===1?"vote":"votes"}${r.gain?` (+${r.gain})`:""}</div></div>`;
+    }).join("")+`</div>`;
+    $("app").innerHTML=html; return;
+  }
+}
+function updateProg(){ const el=$("prog"); if(el&&progress) el.textContent=progress.done+"/"+progress.total+" ready"; }
+function startTick(){ clearTimeout(tick); const step=()=>{ const el=$("timerEl"); if(!el||(phase!=="caption"&&phase!=="vote")) return;
+  el.textContent=Math.max(0,Math.ceil((roundEnd-Date.now())/1000))+"s"; tick=setTimeout(step,500); }; step(); }
+
+/* ---------- player actions ---------- */
+function submitCaption(){
+  const top=($("capT").value||"").slice(0,60).toUpperCase(), bottom=($("capB").value||"").slice(0,60).toUpperCase();
+  if(!top && !bottom) return;
+  myCap={top,bottom};
+  if(role==="host") hostCaption({cid,name,top,bottom});
+  else ch.send({type:"broadcast",event:"caption",payload:{cid,name,top,bottom}});
+  render();
+}
+function castVote(choice){
+  if(myVote||choice===cid) return;
+  myVote=choice;
+  if(role==="host") hostVote({voter:cid,choice});
+  else ch.send({type:"broadcast",event:"castvote",payload:{voter:cid,choice}});
+  render();
+}
+
+/* ---------- host logic ---------- */
+function start(){ const ps=players(); scores={}; ps.forEach(p=>scores[p.cid]=0); round=0; totalRounds=ROUNDS; nextRound(); }
+function nextRound(){
+  round++;
+  if(round>totalRounds){ phase="final"; ch.send({type:"broadcast",event:"final",payload:{scores}}); applyFinal({scores}); return; }
+  template=POOL[Math.floor(Math.random()*POOL.length)]; captions={}; votes={}; entries=[]; progress=null;
+  roundEnd=Date.now()+CAP_SECS*1000; phase="caption";
+  const p={round,totalRounds,template,end:roundEnd,scores};
+  ch.send({type:"broadcast",event:"round",payload:p}); applyRound(p);
+  clearTimeout(capTimer); capTimer=setTimeout(endCaption, CAP_SECS*1000);
+}
+function hostCaption(c){
+  if(phase!=="caption"||captions[c.cid]) return;
+  captions[c.cid]={name:c.name,top:c.top,bottom:c.bottom};
+  bcastProgress("caption", Object.keys(captions).length);
+  if(Object.keys(captions).length>=players().length) endCaption();
+}
+function endCaption(){
+  if(phase!=="caption") return; clearTimeout(capTimer);
+  entries=Object.entries(captions).map(([c,v])=>({cid:c,name:v.name,top:v.top,bottom:v.bottom})); shuffle(entries);
+  if(entries.length<2){ results=entries.map(e=>({...e,votes:0,gain:0})); phase="reveal";
+    ch.send({type:"broadcast",event:"reveal",payload:{results,scores,template}}); applyReveal({results,scores,template});
+    setTimeout(()=>{ if(role==="host") nextRound(); }, REVEAL_SECS*1000); return; }
+  votes={}; progress=null; roundEnd=Date.now()+VOTE_SECS*1000; phase="vote";
+  const p={entries,end:roundEnd}; ch.send({type:"broadcast",event:"votephase",payload:p}); applyVote(p);
+  clearTimeout(voteTimer); voteTimer=setTimeout(endVote, VOTE_SECS*1000);
+}
+function hostVote(v){
+  if(phase!=="vote"||votes[v.voter]||v.voter===v.choice) return;
+  if(!entries.some(e=>e.cid===v.choice)) return;
+  votes[v.voter]=v.choice; bcastProgress("vote", Object.keys(votes).length);
+  if(Object.keys(votes).length>=players().length) endVote();
+}
+function endVote(){
+  if(phase!=="vote") return; clearTimeout(voteTimer);
+  const tally={}; entries.forEach(e=>tally[e.cid]=0); Object.values(votes).forEach(c=>{ if(tally[c]!=null) tally[c]++; });
+  entries.forEach(e=>{ scores[e.cid]=(scores[e.cid]||0)+tally[e.cid]*VOTE_POINTS; });
+  results=entries.map(e=>({...e,votes:tally[e.cid],gain:tally[e.cid]*VOTE_POINTS})).sort((a,b)=>b.votes-a.votes);
+  phase="reveal"; ch.send({type:"broadcast",event:"reveal",payload:{results,scores,template}}); applyReveal({results,scores,template});
+  setTimeout(()=>{ if(role==="host") nextRound(); }, REVEAL_SECS*1000);
+}
+function bcastProgress(ph,done){ const total=players().length; progress={phase:ph,done,total}; ch.send({type:"broadcast",event:"progress",payload:progress}); updateProg(); }
+
+/* ---------- apply (all clients) ---------- */
+function applyRound(p){ round=p.round; totalRounds=p.totalRounds; template=p.template; roundEnd=p.end; scores=p.scores||scores; phase="caption"; myCap=null; myVote=null; progress=null; render(); }
+function applyVote(p){ entries=p.entries; roundEnd=p.end; phase="vote"; myVote=null; progress=null; render(); }
+function applyReveal(p){ results=p.results; scores=p.scores; template=p.template; phase="reveal"; clearTimeout(tick); render(); }
+function applyFinal(p){ scores=p.scores; phase="final"; clearTimeout(tick); render(); }
+function resetAll(){ phase="lobby"; round=0; totalRounds=0; scores={}; template=null; entries=[]; results=[]; myCap=null; myVote=null; progress=null; captions={}; votes={}; }
+
+/* ---------- wire ---------- */
+ch.on("broadcast",{event:"round"},({payload})=>applyRound(payload))
+  .on("broadcast",{event:"votephase"},({payload})=>applyVote(payload))
+  .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
+  .on("broadcast",{event:"final"},({payload})=>applyFinal(payload))
+  .on("broadcast",{event:"progress"},({payload})=>{ progress=payload; updateProg(); })
+  .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
+  .on("broadcast",{event:"caption"},({payload})=>{ if(role==="host") hostCaption(payload); })
+  .on("broadcast",{event:"castvote"},({payload})=>{ if(role==="host") hostVote(payload); })
+  .on("presence",{event:"sync"},()=>{
+    const st=ch.presenceState();
+    hostHere = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+    if(phase==="lobby"||phase==="final") render();
+  })
+  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
+</script>
+</body>
+</html>
