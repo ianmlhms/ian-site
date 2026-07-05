@@ -207,7 +207,7 @@ async function send(){
     });
     const data=await res.json().catch(()=>({}));
     if(!res.ok){
-      wait.innerHTML=fmt(data.message||(res.status===429?"Daagslimit erreecht — muer erëm.":"Feeler — nach eng Kéier probéieren."));
+      wait.innerHTML=fmt(data.message||(res.status===429?"Daageslimit erreecht — muer erëm.":"Feeler — nach eng Kéier probéieren."));
       history.pop();
     }else{
       const badge=data.badge?`<span class="badge">${esc(data.badge)}</span><br>`:"";

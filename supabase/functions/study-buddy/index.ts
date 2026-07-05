@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
   });
   if (capErr) return json({ error: "usage check failed" }, 500);
   if (!isIan && (count ?? 0) > DAILY_LIMIT) {
-    return json({ error: "limit", message: "Daagslimit erreecht — muer probéieren." }, 429);
+    return json({ error: "limit", message: "Daageslimit erreecht — muer probéieren." }, 429);
   }
 
   const { provider, model } = pickModel(user.email, count ?? 1);
