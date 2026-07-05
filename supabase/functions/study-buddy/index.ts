@@ -142,10 +142,14 @@ async function callOpenAI(sys: string, turns: Turn[]): Promise<string> {
         ] }
       : { role: t.role, content: t.text });
   }
+  const body: any = { model: MODEL, max_completion_tokens: MAX_TOKENS, messages };
+  // GPT-5 reasoning models burn the whole token budget on hidden reasoning and
+  // return empty content unless reasoning is minimised — we want direct answers.
+  if (MODEL.includes("gpt-5")) body.reasoning_effort = "minimal";
   const data = await post("https://api.openai.com/v1/chat/completions", {
     "authorization": "Bearer " + API_KEY,
     "content-type": "application/json",
-  }, { model: MODEL, max_completion_tokens: MAX_TOKENS, messages });
+  }, body);
   return (data?.choices?.[0]?.message?.content ?? "").trim();
 }
 
