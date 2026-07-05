@@ -5,7 +5,7 @@
 // Vision-capable for the "scan a page" mode.
 //
 // MODEL ROUTING (per request, decided below in pickModel):
-//   • Ian (konto@ian.lu / ian@ian.lu)  → Claude Sonnet 4.6, and no daily cap.
+//   • Ian (konto@ian.lu only)          → Claude Sonnet 4.6, and no daily cap.
 //   • Everyone else, messages 1–10/day → Claude Haiku 4.5   (premium taste, good LB).
 //   • Everyone else, messages 11+/day  → Gemini 2.5 Flash-Lite (best budget LB + ~10× cheaper).
 // Keys needed as secrets: ANTHROPIC_API_KEY (Sonnet+Haiku) and GEMINI_API_KEY.
@@ -24,7 +24,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const MODEL_SONNET = "claude-sonnet-4-6";              // Ian only
 const MODEL_HAIKU = "claude-haiku-4-5-20251001";       // everyone, first 10/day
 const MODEL_GEMINI = "gemini-2.5-flash-lite";          // everyone, 11+/day
-const IAN_EMAILS = new Set(["konto@ian.lu", "ian@ian.lu"]);
+const IAN_EMAILS = new Set(["konto@ian.lu"]);  // "me" = konto@ian.lu ONLY; ian@ian.lu is Ian's TEST account → normal user
 const FREE_CLAUDE = 10;          // first N messages/day go to Claude for non-Ian users
 const DAILY_LIMIT = 40;          // messages per user per day (Ian exempt)
 const MAX_TOKENS = 1500;

@@ -26,7 +26,7 @@ Model is chosen per message, not by a single global switch:
 
 | Who / when | Model | Why |
 |---|---|---|
-| **Ian** (`konto@ian.lu` / `ian@ian.lu`) — always | **Claude Sonnet 4.6** | owner gets the best; no daily cap |
+| **Ian** (`konto@ian.lu` only) — always | **Claude Sonnet 4.6** | owner gets the best; no daily cap. `ian@ian.lu` is a test account = normal user |
 | Everyone else, **messages 1–10/day** | **Claude Haiku 4.5** | premium taste, good LB |
 | Everyone else, **messages 11+/day** | **Gemini 2.5 Flash-Lite** | best budget LB, ~10× cheaper, native vision |
 

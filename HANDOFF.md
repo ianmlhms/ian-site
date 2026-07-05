@@ -78,7 +78,8 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
    `poll_results_all()` RPC + `profiles.avatar` column all present]
 ✅ **`study-buddy-v1.sql`** (AI tutor daily-usage cap: `ai_usage` + `ai_usage_bump()` RPC — Jul 2026).
    [run ✓; `study-buddy` Edge Function deployed ✓. **Per-request model routing** (`pickModel()`):
-   Ian (`konto@ian.lu`/`ian@ian.lu`) → Claude Sonnet 4.6 (no cap); everyone else msgs 1–10/day →
+   Ian (`konto@ian.lu` only) → Claude Sonnet 4.6 (no cap); everyone else (incl. test acct
+   `ian@ian.lu`) msgs 1–10/day →
    Claude Haiku 4.5, msgs 11+/day → Gemini 2.5 Flash-Lite (best budget LB; GPT-5 nano's LB was
    garbled so it's not routed to). Keys set: `ANTHROPIC_API_KEY` + `GEMINI_API_KEY` (+ optional
    `OPENAI_API_KEY`). See `scripts/STUDY-BUDDY-SETUP.md`.]
