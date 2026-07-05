@@ -1,19 +1,39 @@
 // Supabase Edge Function: study-buddy
 // The ian.lu AI homework tutor. Called from buddy.html by a signed-in user.
 // Gates on a real Supabase user token + a per-user daily message cap, then
-// forwards the conversation to Claude (Anthropic API) with a mode-specific
-// system prompt. Vision-capable for the "scan a page" mode.
+// forwards the conversation to an LLM with a mode-specific system prompt.
+// Vision-capable for the "scan a page" mode.
+//
+// PROVIDER SWITCH — set the secret AI_PROVIDER to one of: anthropic | openai | gemini
+//   anthropic → needs ANTHROPIC_API_KEY   (default; model claude-haiku-4-5-20251001)
+//   openai    → needs OPENAI_API_KEY       (default model gpt-5-nano)
+//   gemini    → needs GEMINI_API_KEY       (default model gemini-2.5-flash-lite)
+// Optionally override the model with the secret AI_MODEL. All three support the
+// scan (image) mode. Switching costs nothing to redeploy — just change the secret.
 //
 // Deploy (see scripts/STUDY-BUDDY-SETUP.md):
 //   supabase functions deploy study-buddy --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   (your Anthropic API key)
+//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   (and/or OPENAI_API_KEY / GEMINI_API_KEY)
+//   supabase secrets set AI_PROVIDER=anthropic
 //
-// Cost control lives here (DAILY_LIMIT) AND in the Anthropic console (set a hard
+// Cost control lives here (DAILY_LIMIT) AND in the provider console (set a hard
 // monthly spend cap — that is the real safety net).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
-const MODEL = "claude-haiku-4-5-20251001";
+const PROVIDER = (Deno.env.get("AI_PROVIDER") ?? "anthropic").toLowerCase();
+const DEFAULT_MODEL: Record<string, string> = {
+  anthropic: "claude-haiku-4-5-20251001",
+  openai: "gpt-5-nano",
+  gemini: "gemini-2.5-flash-lite",
+};
+const KEY_ENV: Record<string, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  gemini: "GEMINI_API_KEY",
+};
+const MODEL = Deno.env.get("AI_MODEL") || DEFAULT_MODEL[PROVIDER] || DEFAULT_MODEL.anthropic;
+const API_KEY = Deno.env.get(KEY_ENV[PROVIDER] ?? "ANTHROPIC_API_KEY") ?? "";
+
 const DAILY_LIMIT = 40;          // messages per user per day
 const MAX_TOKENS = 1500;
 const MAX_HISTORY = 12;          // conversation turns kept per request
@@ -66,6 +86,8 @@ const MODES: Record<string, string> = {
     "the exercise numbers. Show the key working so it can be copied and understood.",
 };
 
+type Turn = { role: "user" | "assistant"; text: string; image?: { media_type: string; data: string } };
+
 async function userFromRequest(req: Request): Promise<string | null> {
   const auth = req.headers.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
@@ -75,10 +97,87 @@ async function userFromRequest(req: Request): Promise<string | null> {
   return data.user.id;
 }
 
+// ---- provider adapters: each returns the assistant's reply text or throws ----
+async function post(url: string, headers: Record<string, string>, body: unknown) {
+  const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const t = await r.text();
+    console.error(PROVIDER, r.status, t.slice(0, 300));
+    throw new Error("provider " + r.status);
+  }
+  return r.json();
+}
+
+async function callAnthropic(sys: string, turns: Turn[]): Promise<string> {
+  const messages = turns.map((t) =>
+    t.image
+      ? { role: t.role, content: [
+          { type: "image", source: { type: "base64", media_type: t.image.media_type, data: t.image.data } },
+          { type: "text", text: t.text },
+        ] }
+      : { role: t.role, content: t.text });
+  const data = await post("https://api.anthropic.com/v1/messages", {
+    "x-api-key": API_KEY,
+    "anthropic-version": "2023-06-01",
+    "content-type": "application/json",
+  }, {
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    system: [
+      { type: "text", text: BASE, cache_control: { type: "ephemeral" } },
+      { type: "text", text: sys },
+    ],
+    messages,
+  });
+  return (data?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+}
+
+async function callOpenAI(sys: string, turns: Turn[]): Promise<string> {
+  const messages: any[] = [{ role: "system", content: BASE + "\n" + sys }];
+  for (const t of turns) {
+    messages.push(t.image
+      ? { role: t.role, content: [
+          { type: "text", text: t.text },
+          { type: "image_url", image_url: { url: `data:${t.image.media_type};base64,${t.image.data}` } },
+        ] }
+      : { role: t.role, content: t.text });
+  }
+  const data = await post("https://api.openai.com/v1/chat/completions", {
+    "authorization": "Bearer " + API_KEY,
+    "content-type": "application/json",
+  }, { model: MODEL, max_completion_tokens: MAX_TOKENS, messages });
+  return (data?.choices?.[0]?.message?.content ?? "").trim();
+}
+
+async function callGemini(sys: string, turns: Turn[]): Promise<string> {
+  const contents = turns.map((t) => {
+    const parts: any[] = [];
+    if (t.image) parts.push({ inline_data: { mime_type: t.image.media_type, data: t.image.data } });
+    parts.push({ text: t.text });
+    return { role: t.role === "assistant" ? "model" : "user", parts };
+  });
+  const data = await post(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+    { "x-goog-api-key": API_KEY, "content-type": "application/json" },
+    {
+      system_instruction: { parts: [{ text: BASE + "\n" + sys }] },
+      contents,
+      generationConfig: { maxOutputTokens: MAX_TOKENS },
+    },
+  );
+  return (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("").trim();
+}
+
+function callModel(sys: string, turns: Turn[]): Promise<string> {
+  if (PROVIDER === "openai") return callOpenAI(sys, turns);
+  if (PROVIDER === "gemini") return callGemini(sys, turns);
+  return callAnthropic(sys, turns);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  if (!ANTHROPIC_KEY) return json({ error: "server not configured" }, 500);
+  if (!API_KEY) return json({ error: `server not configured (${KEY_ENV[PROVIDER] ?? "key"} missing)` }, 500);
 
   const uid = await userFromRequest(req);
   if (!uid) return json({ error: "sign in first" }, 401);
@@ -101,52 +200,22 @@ Deno.serve(async (req) => {
   const history = Array.isArray(payload?.messages) ? payload.messages.slice(-MAX_HISTORY) : [];
   const image = payload?.image;  // { media_type, data } base64, scan mode only
 
-  // Build Claude messages from the sanitized history (roles + string text only).
-  const messages = history
+  // Build a provider-neutral turn list from the sanitized history.
+  const turns: Turn[] = history
     .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.text === "string")
-    .map((m: any) => ({ role: m.role, content: m.text.slice(0, 6000) }));
+    .map((m: any) => ({ role: m.role, text: m.text.slice(0, 6000) }));
 
   if (image?.data && image?.media_type) {
-    const last = messages[messages.length - 1];
-    const text = last?.role === "user" ? last.content : "Léis dës Hausaufgaben.";
-    if (last?.role === "user") messages.pop();
-    messages.push({
-      role: "user",
-      content: [
-        { type: "image", source: { type: "base64", media_type: image.media_type, data: image.data } },
-        { type: "text", text },
-      ],
-    });
+    const last = turns[turns.length - 1];
+    const text = last?.role === "user" ? last.text : "Léis dës Hausaufgaben.";
+    if (last?.role === "user") turns.pop();
+    turns.push({ role: "user", text, image: { media_type: image.media_type, data: image.data } });
   }
-  if (!messages.length) return json({ error: "empty" }, 400);
+  if (!turns.length) return json({ error: "empty" }, 400);
 
   const subjectLine = subject ? `\nSubject the student picked: ${subject}.` : "";
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: [
-          { type: "text", text: BASE, cache_control: { type: "ephemeral" } },
-          { type: "text", text: MODES[mode] + subjectLine },
-        ],
-        messages,
-      }),
-    });
-    if (!r.ok) {
-      const body = await r.text();
-      console.error("anthropic", r.status, body.slice(0, 300));
-      return json({ error: "ai failed" }, 502);
-    }
-    const data = await r.json();
-    const reply = (data?.content ?? [])
-      .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
+    const reply = await callModel(MODES[mode] + subjectLine, turns);
     return json({ reply: reply || "…", remaining: Math.max(0, DAILY_LIMIT - (count ?? 0)) });
   } catch (e: any) {
     console.error("study-buddy", e?.message);
