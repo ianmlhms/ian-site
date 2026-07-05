@@ -3,7 +3,7 @@
 Personal site + web apps for Ian Mulheims. Static front-end (HTML/CSS/vanilla JS),
 backed by **Supabase** for accounts, data and realtime. No build step.
 
-_Last updated: June 2026._
+_Last updated: 5 July 2026._
 
 ---
 
@@ -37,18 +37,19 @@ gh run list --repo ianmlhms/ian-site --workflow "Deploy to ian.lu (Plesk FTP)" -
 ```
 
 **Repo secrets** (Settings → Secrets → Actions): `FTP_SERVER` = `185.11.137.140`,
-`FTP_USERNAME` = `ftp-zlssfj7utm6y`, `FTP_PASSWORD`. ⚠️ The FTP password was exposed in
-plaintext during setup — **should be rotated** in Plesk (Connection info ✏️) and the secret updated.
+`FTP_USERNAME` = `ftp-zlssfj7utm6y`, `FTP_PASSWORD` (rotated Jul 2026 after the setup-time
+exposure — done ✓). `deploy.yml` has a `plesk-deploy` concurrency group so two pushes can't
+run parallel FTP mirrors (that race once broke a deploy).
 
 ### ⚠️ Cache-busting (read this!)
 GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A normal reload
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions (Jul 2026): `theme.js?v=3`, `auth.js?v=3`, `i18n-dict.js?v=5` (same on ALL
-pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=8`, `friends.js?v=6`,
-`pixelbreak-records.js?v=4`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=2`,
-`game-common.js?v=1`, `game-common.css?v=1`, `style.css?v=5`
+Current versions (5 Jul 2026): `theme.js?v=4`, `auth.js?v=3`, `i18n-dict.js?v=7` (same on ALL
+pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=13`, `friends.js?v=6`,
+`pixelbreak-records.js?v=8`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=2`,
+`game-common.js?v=1`, `game-common.css?v=1`, `style.css?v=6`
 (`notify.js`/`sw.js` are imported, not query-versioned — hard-refresh or bump the importer).
 
 ## 3. Supabase
@@ -69,6 +70,12 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
 ⚠️ **`rankings-setup.sql` must be run** (cross-game rankings: `game_results` + `record_match`/`game_leaderboard`). [run ✓]
 ⚠️ **`homework-setup.sql`** (WebUntis homework table) + deploy `webuntis-sync` Edge Function — see `scripts/WEBUNTIS-SETUP.md`.
 ⚠️ **`hotel-setup.sql`** (private Hotel-Simulator cloud saves: `hotel_saves` + owner-only RLS). [run ✓]
+⚠️ **`game-saves-v1.sql`** (PixelBreak cross-device game-state saves). [run ✓]
+⚠️ **`security-hardening-v1.sql`** (RLS lockdown: group_members insert via RPCs only, chat-media
+   scoped reads, kart_sessions locked, server-derived usernames, notify fail-closed pairing). [run ✓ Jul 2026, verified]
+⚠️ **`features-v1.sql`** (feedback box, class polls, exams, profile avatars — Jul 2026).
+   [PENDING unless Ian already ran it — polls.html/exams.html/profile.html/feedback show load
+   errors until it runs; full SQL was pasted in chat on 5 Jul 2026]
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -80,8 +87,11 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 
 | Page | Files | What it is |
 |---|---|---|
-| **Home** | `index.html`, `style.css`, `main.js` | Launcher with tiles (admin-only tiles appear when signed in as admin). |
-| **PixelBreak** | `pixelbreak.html`, `pixelbreak-records.js`, `pixelbreak-config.js` | 31 embedded single-player games + accounts, high-score capture, leaderboards. Home button top-left. |
+| **Home** | `index.html`, `style.css`, `main.js` | Play-first hero ("40 Spiller…", LB/DE/EN via i18n) + live **summer-holiday countdown** (target `2026-07-09T12:40+02:00`, inline script at the bottom of index.html) + launcher tiles (admin-only tiles appear when signed in as admin). |
+| **PixelBreak** | `pixelbreak.html`, `pb/*.html` (31 games), `pixelbreak-records.js`, `pixelbreak-config.js`, `pixelbreak.webmanifest` | Hub + 31 single-player games as separate files in `pb/` (fetched into a sandboxed iframe srcdoc; `robots.txt` disallows `/pb/`). **Per-game URLs** `?g=<id>` (pushState + dynamic title/canonical/meta-description; all 31 in sitemap.xml). Accounts, high scores, cloud game-saves, PB.net multiplayer relay. **Install-as-app** button (`beforeinstallprompt`; iOS hint toast). **Feedback box** (💬 FAB → `feedback` table). **Sound+haptics shim** injected into every game by `PB.instrument` (score-up blip + vibration, running-counter suppression, 🔊/🔇 in game bar, localStorage `pb_muted`). Chill Drive is a true-3D three.js game (see pb/chill-drive.html). Word Scramble + Typing have 🇱🇺 LB toggles. |
+| **Polls** | `polls.html` | Class polls: admin creates/closes/deletes (RLS-gated), signed-in users vote (one changeable vote, `poll_votes` PK), anonymous totals via `poll_results_all()` RPC. Needs `features-v1.sql`. |
+| **Exams** | `exams.html` | **Admin-only** exam countdowns (subject/date/note, live tick, red <3 days, auto-hides >1 day past). `exams` table, admin RLS. Not indexed (robots + noindex). Needs `features-v1.sql`. |
+| **Profile** | `profile.html` | Avatar picker (24 emoji presets → `profiles.avatar` via `set_avatar` RPC) + player stats (game_leaderboard + local Wordle stats). Messenger renders avatars next to bubbles/member list (`avatarMap` in messenger.js, fails quietly pre-migration). Needs `features-v1.sql`. |
 | **ShortsFactory stats** | `stats.html` | Public sanitized stats, reads `data/factory.json`. |
 | **ShortsFactory dashboard** | `factory.html`, `factory-auth.js` | Full dashboard, **admin-only** (Supabase login + `is_admin`), reads `dashboard_state`. |
 | **Messenger** | `messenger.html`, `messenger.js` | Groups + 1:1 DMs (by username), member lists, leave, photo/video (private `chat-media` bucket, signed URLs), 30-sec delete, realtime. `?dm=username` deep-links a DM. **Tap a photo → fullscreen lightbox. Swipe a message (or long-press) to reply** (denormalised `reply_*` cols; quoted bubble jumps to original). **Unread chats show the name in bold + a dot + last-message preview** (`chat_reads`/`mark_read`, `my_chats` v4 returns `unread`/`last_preview`). **🔔 Notify** button = Web Push opt-in. **Read receipts**: own messages show ✓ (sent) → blue ✓✓ "Gelies" once all other members have read (`chat_reads` + v5 select policy + realtime). **❓** header link → `notify-help.html`. **v6 features**: emoji **reactions** (`message_reactions` table + realtime; 🙂 button/pop), **edit** own messages (✏️, `edited_at`, realtime UPDATE), **typing indicator** (broadcast on the chat channel), **online dots** (global `online` presence channel keyed by username), **per-chat mute** (localStorage `mutedChats`; honoured by `notify.js` ambient — NOT server push), **chat search** (sidebar filter), **voice messages** (MediaRecorder → `chat-media`, `media_type:'audio'`). |
@@ -90,7 +100,7 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **Grades** | `grades.html` | Luxembourg grade calc: Year → Track/Section (7e–1ère, official MEN coefficients), "what do I need next", **account sync** (`grade_sheets`) + local fallback. |
 | **Hausaufgaben** | `homework.html` | **Admin-only** WebUntis homework. "Sync now" invokes the **`webuntis-sync` Edge Function** (logs in with WebUntis creds from function secrets, upserts into `homework`). `homework` table is admin-read. Home tile is admin-only. Deploy/secrets: `scripts/WEBUNTIS-SETUP.md`. School = Aline Mayrisch / `laml.webuntis.com`. |
 | **Friends** | `friends.html`, `friends.js` | Add by username, **People** directory, sent/received requests, Message (→ DM) or invite to a game. |
-| **Games hub** | `games.html` | New category (separate from PixelBreak). Start/Join by code, or invite a friend. |
+| **Games hub** | `games.html` | Now just a redirect to `pixelbreak.html` — the hub lists the online 1v1 games as `o-*` entries alongside the arcade games. |
 | **Connect 4** | `connect4.html` | 1v1, realtime broadcast (`c4:<room>`). **`?ai=1`** = local single-player vs a minimax/alpha-beta computer (no network). |
 | **Stadt-Land-Fluss** | `slf.html` | 2+ players, realtime (`slf:<room>`), letter→categories→uniqueness scoring. **Answers are fact-checked against Wikidata at the reveal** (host queries query.wikidata.org per answer — city/country/river/given-name/animal/profession class checks — and broadcasts verdicts; invalid answers score 0, shown struck-through). The host gets a "✓ count it" override next to each rejected answer (re-scores the round incl. duplicates, broadcast to guests). Fails open on API errors/timeouts so the game never blocks. |
 | **Battleship** | `battleship.html` | 1v1, realtime (`bs:<room>`), manual ship placement (H/V toggle) + Shuffle. **`?ai=1`** = local single-player vs a hunt/target computer (random fleet, checkerboard hunt). |
@@ -140,8 +150,50 @@ Old full data was scrubbed from git history.
 - New Supabase features need their SQL **run manually** in the dashboard.
 - Realtime `postgres_changes`: register `.on()` **before** `.subscribe()`, and don't double-subscribe the same channel.
 - `iOS Safari` quirks handled: `100dvh` for full-height pages; UMD supabase-js (not esm.sh); theme uses CSS vars.
+- **Never inline node scripts with single quotes in `bash node -e '…'`** — zsh strips them
+  silently (string matches fail without error). Write patch scripts to a temp file with a
+  `must()` guard before any `writeFileSync` (pattern: earlier sessions' `patch-*.js`).
+- **Headless testing** works well: `python3 -m http.server 8123` + Chrome
+  `--headless --disable-gpu --virtual-time-budget=6000 --dump-dom/--screenshot`
+  (WebGL needs `--enable-unsafe-swiftshader`, budgets ≤9000ms). Game-AI changes were validated
+  with a Node harness (ctx Proxy + rAF pump + seeded RNG) compared old-vs-new via `git stash`.
 
-## 7. Status & open items (as of Jun 2026)
+## 7. Status & open items (as of 5 Jul 2026)
+
+**Wave 3 (Jul 2026) — DONE & LIVE** (commits up to "Site features: countdown hero, polls, …"):
+- **Security audit closed out**: `security-hardening-v1.sql` run ✓, `notify` Edge Function
+  redeployed fail-closed ✓ (verified: anon `kart_sessions` select returns `[]`, notify → 401),
+  FTP password rotated ✓.
+- **Analytics**: GoatCounter on all 19 public pages (site code **`ianm`** →
+  https://ianm.goatcounter.com; account owned by Ian). PixelBreak counts each game open as its
+  own pageview (`/pixelbreak.html?g=<id>`). Private pages (admin/grades/homework/hotel/factory/
+  stats/exams) deliberately have NO counter.
+- **SEO**: 31 per-game URLs + polls in `sitemap.xml`; per-game canonical/title/description;
+  Wordle titled "Wordle op Lëtzebuergesch" (near-zero keyword competition).
+- **PixelBreak games split** from one giant base64 HTML into `pb/*.html` + per-game URLs.
+- **Chill Drive rebuilt in 3D** (three.js r160 UMD, 3 endless worlds + 20 levels, traffic/zen
+  mode pills, sim constants preserved so old level saves work).
+- **Game AI fixes** (all validated with a headless Node harness, old-vs-new): Tank Wars routes
+  around walls, Neon Pong aims returns away from the player, Air Hockey strikes along the
+  goal line (no more own-goals), Pixel Fighters climbs platforms to reach a camping player.
+- **Features wave**: homepage hero + holiday countdown, class polls, private exam countdowns,
+  profile avatars (shown in Messenger), PWA install, universal game sounds/haptics,
+  LB modes in Word Scramble/Typing, feedback box, real daily Wordle streaks + native share.
+
+**Open items after Wave 3:**
+- ⚠️ **Run `scripts/features-v1.sql`** if not yet done (see §3) — polls/exams/profile/feedback
+  error politely until then. Test after: create poll, pick avatar, check Messenger avatar, add exam.
+- **Countdown date**: Ian asked for "9th June 12:40" which was already past — implemented as
+  **9 July 2026 12:40**; confirm with him.
+- **Google Search Console**: suggested but not set up. Verify ian.lu (DNS record or HTML file
+  in repo root) and submit `https://ian.lu/sitemap.xml` so the 31 game pages get crawled.
+- **AdSense**: script + `ads.txt` present on index/about/pixelbreak, **awaiting Google
+  approval — do not remove**; after approval add real `<ins>` ad units (PixelBreak hub is the
+  highest-session-time spot).
+- **Feedback reading UI**: submissions land in the `feedback` table (admin-only read); there's
+  no admin.html tab for it yet — read via Supabase Table Editor, or build a third admin tab.
+
+## 7b. Older status (Jun 2026)
 
 **All SQL migrations have been run** by the user: messenger v2–v6, grades-sync, social-games,
 social-fix, admin-users, dashboard-private, `wordle-setup`, `rankings-setup`, `homework-setup`.
@@ -169,8 +221,9 @@ is correct, no clock skew. Revisit if the school enables app access, else make `
 manual-entry. School API id = `laml` (NOT "Aline Mayrisch"); user `Mulla383`, Schulnummer 6349000.
 
 **Smaller open items:**
-- **Rotate the FTP password** (exposed during setup) + update `FTP_PASSWORD` secret.
-- A proper **PNG `apple-touch-icon`** would render nicer on the iOS Home Screen than the SVG.
+- ~~Rotate the FTP password~~ done ✓ Jul 2026.
+- ~~PNG apple-touch-icon~~ done ✓ (`apple-touch-icon.png` 180px + `icon-192.png`/`icon-512.png`
+  rasterized from favicon.svg for the manifests `site.webmanifest`/`pixelbreak.webmanifest`).
 - Per-chat **mute** only affects in-app notifications, not server Web Push (would need a server-side mute table).
 - Light mode: a few deeply-custom spots may still look dark — tune as reported.
 - **Luxembourgish Wordle word list** in `wordle.html` (`WORDS.lb`) is a conservative starter — expand/verify it.
