@@ -91,7 +91,7 @@
 
   <div class="chatwrap" id="chatwrap">
     <div class="subbar">
-      <button class="back" id="back">‹ Modi</button>
+      <button class="back" id="back">‹ Zréck</button>
       <span class="tag" id="modeTag"></span>
       <select id="subject"></select>
     </div>
@@ -117,12 +117,12 @@ const fmt=(s)=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>"
 
 const MODES=[
   {id:"ask",       ic:"❓",c:"#6ea8fe",label:"Erklären & léisen",desc:"Schrëtt fir Schrëtt eng Aufgab verstoen",ph:"Schreif deng Fro…"},
-  {id:"flashcards",ic:"🃏",c:"#f7b955",label:"Lernkaarten",      desc:"Notizen oder Thema → e Kaartespill",   ph:"Thema oder Notizen paschten…"},
-  {id:"quiz",      ic:"🎯",c:"#4de8ff",label:"Quiz mech",         desc:"Loosst dech iwwert en Thema ofrappen", ph:"Iwwer wat soll ech dech testen?"},
-  {id:"language",  ic:"🗣️",c:"#b17cff",label:"Sproochen",        desc:"Grammaire, Vocabulaire, Korrekturen",  ph:"Sproch, Text oder Fro…"},
+  {id:"flashcards",ic:"🃏",c:"#f7b955",label:"Léierkaarten",     desc:"Notizen oder Thema → e Kaartespill",   ph:"Thema oder Notizen aginn…"},
+  {id:"quiz",      ic:"🎯",c:"#4de8ff",label:"Quiz mech",         desc:"Loosst dech iwwert en Thema testen",  ph:"Iwwer wat soll ech dech testen?"},
+  {id:"language",  ic:"🗣️",c:"#b17cff",label:"Sproochen",        desc:"Grammaire, Vocabulaire, Korrekturen",  ph:"Sprooch, Text oder Fro…"},
   {id:"scan",      ic:"📸",c:"#3fb950",label:"Säit scannen",      desc:"Foto(en) vun der Aufgab → ganz Léisung",ph:"(optional) Notiz fir d'Fotoen…"},
 ];
-const SUBJECTS=["Allgemeng","Mathé","Däitsch","Franséisch","Englesch","Latäin","Physik","Chimie","Biologie","Geschicht","Geographie","Informatik","Konscht","Reliioun/Moral"];
+const SUBJECTS=["Allgemeng","Mathé","Däitsch","Franséisch","Englesch","Latäin","Physik","Chimie","Biologie","Geschicht","Geographie","Informatik","Konscht","Relioun/Moral"];
 
 let sb=null, mode=null, history=[], pending=[], busy=false, remaining=null, convId=null, convos=[];
 
@@ -141,7 +141,7 @@ function openMode(id){
   mode=MODES.find(m=>m.id===id); history=[]; pending=[]; convId=null;
   $("subject").value="Allgemeng";
   enterChat();
-  $("stream").innerHTML=`<div class="hint">${mode.id==="scan"?"Maach eng Foto (oder e puer) vun der Aufgab an dréck 📷.":"Stell deng éischt Fro — du kanns och Fotoen dobäileeën."}</div>`;
+  $("stream").innerHTML=`<div class="hint">${mode.id==="scan"?"Maach eng Foto (oder e puer) vun der Aufgab an dréck 📷.":"Stell deng éischt Fro — du kanns och Fotoen matschécken."}</div>`;
 }
 $("back").onclick=()=>{ $("chatwrap").style.display="none"; $("picker").style.display=""; loadConvos(); };
 
