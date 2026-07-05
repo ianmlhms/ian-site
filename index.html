@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Ian Mulheims — a student from Luxembourg who builds apps, games and tools for the browser, iPhone and Apple Watch." />
+  <meta name="description" content="Ian Mulheims — a personal homepage with useful apps, weather, school tools and projects from Luxembourg." />
   <meta property="og:title" content="ian.lu — Ian Mulheims" />
-  <meta property="og:description" content="Apps, games and tools by Ian Mulheims." />
+  <meta property="og:description" content="A personal homepage with useful apps, weather, school tools and projects by Ian Mulheims." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
   <link rel="canonical" href="https://ian.lu/" />
   <title>ian.lu — Ian Mulheims</title>
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
   <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
@@ -18,7 +18,7 @@
   <!-- Google AdSense (public pages only) -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
   <script src="theme.js?v=4"></script>
-  <script src="i18n-dict.js?v=9"></script>
+  <script src="i18n-dict.js?v=10"></script>
   <script src="i18n.js?v=1"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
@@ -39,23 +39,30 @@
   </header>
 
   <main class="page">
-    <!-- what the site is, in 3 seconds -->
-    <section class="play-hero">
-      <h1 class="ph-title" data-i18n="index.playTitle">40 games. Right in your browser.</h1>
-      <p class="ph-sub" data-i18n="index.playSub">Arcade games, multiplayer across two devices and a daily Wordle — nothing to install, just play.</p>
-      <div class="hero-cta">
-        <a class="btn-primary" href="pixelbreak.html" data-i18n="index.playNow">▶ Play now</a>
-        <a class="btn-ghost" href="games.html" data-i18n="index.playMp">Multiplayer</a>
+    <section class="today-hero">
+      <div class="today-greet">
+        <span class="hero-kicker" id="todayHi">Moien</span>
+        <h1 class="today-title">ian.lu</h1>
+        <p class="today-sub" data-i18n="index.homeSub">Weather, school tools, messages and projects in one place.</p>
+        <div class="hero-cta">
+          <a class="btn-primary" href="#apps" data-i18n="index.openApps">Open apps</a>
+          <a class="btn-ghost" href="moien.html" data-i18n="index.openMoien">Open Moien</a>
+        </div>
       </div>
-      <div class="ph-stats">
-        <span class="ph-chip">🎮 <span data-i18n="index.stat1">40+ games</span></span>
-        <span class="ph-chip">👥 <span data-i18n="index.stat2">Online multiplayer</span></span>
-        <span class="ph-chip">🏆 <span data-i18n="index.stat3">Leaderboards</span></span>
-      </div>
-      <div class="vac-card" id="vacCard">
-        <span class="vac-label" id="vacPre" data-i18n="index.vacLabel">☀️ Summer holidays in</span>
-        <span class="vac-label" id="vacPost" style="display:none" data-i18n="index.vacDone">🎉 Summer holidays!</span>
-        <span class="vac-timer" id="vacTimer"></span>
+
+      <div class="today-panel" aria-label="Today">
+        <div class="date-card">
+          <div class="date-line" id="todayDate">Loading date…</div>
+          <div class="clock-line" id="todayClock">--:--</div>
+        </div>
+        <div class="weather-card" id="homeWeather">
+          <div class="weather-muted" data-i18n="common.loading">Loading…</div>
+        </div>
+        <div class="vac-card" id="vacCard">
+          <span class="vac-label" id="vacPre" data-i18n="index.vacLabel">Summer holidays in</span>
+          <span class="vac-label" id="vacPost" style="display:none" data-i18n="index.vacDone">Summer holidays!</span>
+          <span class="vac-timer" id="vacTimer"></span>
+        </div>
       </div>
     </section>
 
@@ -66,7 +73,7 @@
         <span class="ag-ico">🔒</span>
         <div class="ag-text">
           <strong data-i18n="index.appsGateTitle">Sign in to use the apps</strong>
-          <span data-i18n="index.appsGateSub">Create a free account or sign in — then you can open Messenger, Friends, Games, Grades and more.</span>
+          <span data-i18n="index.appsGateSub">Create a free account or sign in — then you can open Messenger, Friends, Grades, projects and more.</span>
         </div>
         <button class="btn-primary" id="appsGateBtn" data-i18n="auth.signin">Sign in / Create account</button>
       </div>
@@ -122,11 +129,10 @@
       </div>
     </section>
 
-    <!-- welcome + about (the rest, at the end) -->
-    <section class="hero">
+    <section class="hero about-compact">
       <span class="hero-kicker" data-i18n="index.kicker">👋 Moien, ech sinn</span>
       <p class="hero-name">Ian Mulheims</p>
-      <p class="hero-tag" data-i18n-html="index.tag">A student from Luxembourg who builds <strong>apps, games and tools</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.</p>
+      <p class="hero-tag" data-i18n-html="index.tag">A student from Luxembourg who builds <strong>apps, school tools and small web projects</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.</p>
       <div class="hero-cta">
         <a class="btn-primary" href="about.html" data-i18n="index.cta1">See what I've built</a>
       </div>
@@ -140,6 +146,119 @@
   </footer>
 
   <script>
+    // Moien-style date, clock and weather preview for the homepage.
+    (function () {
+      const hiEl = document.getElementById("todayHi");
+      const dateEl = document.getElementById("todayDate");
+      const clockEl = document.getElementById("todayClock");
+      const wxEl = document.getElementById("homeWeather");
+      const pad = (n) => String(n).padStart(2, "0");
+      const words = {
+        lb: {
+          days: ["Sonndeg", "Méindeg", "Dënschdeg", "Mëttwoch", "Donneschdeg", "Freideg", "Samschdeg"],
+          months: ["Januar", "Februar", "Mäerz", "Abrëll", "Mee", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+          feels: "Gefillt",
+          high: "Max",
+          rain: "Reen",
+          wind: "Wand",
+          place: "Lëtzebuerg",
+          weatherError: "Wieder konnt net gelueden ginn.",
+        },
+        de: {
+          days: ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
+          months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
+          feels: "Gefühlt",
+          high: "Max",
+          rain: "Regen",
+          wind: "Wind",
+          place: "Luxemburg",
+          weatherError: "Wetter konnte nicht geladen werden.",
+        },
+        en: {
+          days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+          months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+          feels: "Feels",
+          high: "High",
+          rain: "Rain",
+          wind: "Wind",
+          place: "Luxembourg",
+          weatherError: "Weather could not be loaded.",
+        },
+      };
+      let weatherData = null;
+      const currentLang = () => (window.I18N && words[window.I18N.lang] ? window.I18N.lang : "lb");
+      function tickToday() {
+        const d = new Date();
+        const h = d.getHours();
+        const w = words[currentLang()];
+        hiEl.textContent = h < 11 ? "Moien" : h < 14 ? "Gudde Mëtteg" : h < 18 ? "Schéinen Nomëtteg" : h < 23 ? "Gudden Owend" : "Gutt Nuecht";
+        dateEl.textContent = w.days[d.getDay()] + ", " + d.getDate() + ". " + w.months[d.getMonth()] + " " + d.getFullYear();
+        clockEl.textContent = pad(h) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+      }
+      function wmo(code, isDay) {
+        const map = {
+          0: ["☀️", "🌙", { lb: "Kloer", de: "Klar", en: "Clear" }],
+          1: ["🌤️", "☁️", { lb: "Meeschtens kloer", de: "Meist klar", en: "Mostly clear" }],
+          2: ["⛅", "☁️", { lb: "Deelweis bewölkt", de: "Teilweise bewölkt", en: "Partly cloudy" }],
+          3: ["☁️", "☁️", { lb: "Bewölkt", de: "Bewölkt", en: "Cloudy" }],
+          45: ["🌫️", "🌫️", { lb: "Niwwel", de: "Nebel", en: "Fog" }],
+          48: ["🌫️", "🌫️", { lb: "Niwwel", de: "Nebel", en: "Fog" }],
+          51: ["🌦️", "🌦️", { lb: "Liicht Sprëtzelen", de: "Leichter Niesel", en: "Light drizzle" }],
+          53: ["🌦️", "🌦️", { lb: "Sprëtzelen", de: "Niesel", en: "Drizzle" }],
+          55: ["🌧️", "🌧️", { lb: "Staark Sprëtzelen", de: "Starker Niesel", en: "Heavy drizzle" }],
+          61: ["🌦️", "🌦️", { lb: "Liichte Reen", de: "Leichter Regen", en: "Light rain" }],
+          63: ["🌧️", "🌧️", { lb: "Reen", de: "Regen", en: "Rain" }],
+          65: ["🌧️", "🌧️", { lb: "Staarke Reen", de: "Starker Regen", en: "Heavy rain" }],
+          71: ["🌨️", "🌨️", { lb: "Liichte Schnéi", de: "Leichter Schnee", en: "Light snow" }],
+          73: ["🌨️", "🌨️", { lb: "Schnéi", de: "Schnee", en: "Snow" }],
+          75: ["❄️", "❄️", { lb: "Staarke Schnéi", de: "Starker Schnee", en: "Heavy snow" }],
+          80: ["🌦️", "🌦️", { lb: "Reenschauer", de: "Regenschauer", en: "Rain showers" }],
+          81: ["🌧️", "🌧️", { lb: "Reenschauer", de: "Regenschauer", en: "Rain showers" }],
+          82: ["⛈️", "⛈️", { lb: "Staark Schauer", de: "Starke Schauer", en: "Heavy showers" }],
+          95: ["⛈️", "⛈️", { lb: "Donnerwieder", de: "Gewitter", en: "Thunderstorm" }],
+          96: ["⛈️", "⛈️", { lb: "Donnerwieder", de: "Gewitter", en: "Thunderstorm" }],
+          99: ["⛈️", "⛈️", { lb: "Donnerwieder", de: "Gewitter", en: "Thunderstorm" }],
+        };
+        const v = map[code] || ["🌡️", "🌡️", { lb: "Wieder", de: "Wetter", en: "Weather" }];
+        return { emoji: isDay ? v[0] : v[1], text: v[2][currentLang()] || v[2].en };
+      }
+      function renderWeather() {
+        if (!weatherData) return;
+        const current = weatherData.current;
+        const daily = weatherData.daily;
+        const weather = wmo(current.weather_code, current.is_day);
+        const w = words[currentLang()];
+        wxEl.innerHTML =
+          '<div class="weather-top">' +
+            '<span class="weather-emoji">' + weather.emoji + '</span>' +
+            '<span><strong>' + Math.round(current.temperature_2m) + '°</strong><em>' + w.place + ' · ' + weather.text + '</em></span>' +
+          '</div>' +
+          '<div class="weather-meta">' +
+            '<span>' + w.feels + ' ' + Math.round(current.apparent_temperature) + '°</span>' +
+            '<span>' + w.high + ' ' + Math.round(daily.temperature_2m_max[0]) + '°</span>' +
+            '<span>' + w.rain + ' ' + daily.precipitation_probability_max[0] + '%</span>' +
+            '<span>' + w.wind + ' ' + Math.round(current.wind_speed_10m) + ' km/h</span>' +
+          '</div>';
+      }
+      async function loadWeather() {
+        try {
+          const url = "https://api.open-meteo.com/v1/forecast?latitude=49.61&longitude=6.13&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Europe%2FLuxembourg&forecast_days=1";
+          const res = await fetch(url);
+          weatherData = await res.json();
+          renderWeather();
+        } catch (e) {
+          wxEl.innerHTML = '<div class="weather-muted">' + words[currentLang()].weatherError + '</div>';
+        }
+      }
+      tickToday();
+      setInterval(tickToday, 1000);
+      loadWeather();
+      document.addEventListener("i18n:change", function () {
+        tickToday();
+        renderWeather();
+      });
+    })();
+
     // Live countdown to the summer holidays (Ian's last lesson ends 9 July 2026, 12:40).
     (function () {
       const VACATION_START = new Date("2026-07-09T12:40:00+02:00").getTime();

@@ -13,19 +13,15 @@ window.I18N_DICT = {
   "btn.join":        { lb: "Bäitrieden", de: "Beitreten", en: "Join" },
 
   /* ---------- index / landing ---------- */
-  "index.playTitle": { lb: "40 Spiller. Direkt am Browser.", de: "40 Spiele. Direkt im Browser.", en: "40 games. Right in your browser." },
-  "index.playSub":  {
-    lb: "Arcade-Spiller, Multiplayer op zwee Apparater an all Dag e Wordle — näischt installéieren, einfach spillen.",
-    de: "Arcade-Spiele, Multiplayer auf zwei Geräten und täglich ein Wordle — nichts installieren, einfach spielen.",
-    en: "Arcade games, multiplayer across two devices and a daily Wordle — nothing to install, just play.",
+  "index.homeSub": {
+    lb: "Wieder, Schoul-Tools, Noriichten a Projeten op enger Plaz.",
+    de: "Wetter, Schul-Tools, Nachrichten und Projekte an einem Ort.",
+    en: "Weather, school tools, messages and projects in one place.",
   },
-  "index.playNow":  { lb: "▶ Elo spillen", de: "▶ Jetzt spielen", en: "▶ Play now" },
-  "index.playMp":   { lb: "Multiplayer", de: "Multiplayer", en: "Multiplayer" },
-  "index.stat1":    { lb: "40+ Spiller", de: "40+ Spiele", en: "40+ games" },
-  "index.stat2":    { lb: "Online-Multiplayer", de: "Online-Multiplayer", en: "Online multiplayer" },
-  "index.stat3":    { lb: "Leaderboards", de: "Bestenlisten", en: "Leaderboards" },
-  "index.vacLabel": { lb: "☀️ Summervakanz an", de: "☀️ Sommerferien in", en: "☀️ Summer holidays in" },
-  "index.vacDone":  { lb: "🎉 Summervakanz!", de: "🎉 Sommerferien!", en: "🎉 Summer holidays!" },
+  "index.openApps": { lb: "Apps opmaachen", de: "Apps öffnen", en: "Open apps" },
+  "index.openMoien": { lb: "Moien opmaachen", de: "Moien öffnen", en: "Open Moien" },
+  "index.vacLabel": { lb: "Summervakanz an", de: "Sommerferien in", en: "Summer holidays in" },
+  "index.vacDone":  { lb: "Summervakanz!", de: "Sommerferien!", en: "Summer holidays!" },
   "tile.exams.sub": { lb: "Test-Countdowns · privat", de: "Prüfungs-Countdowns · privat", en: "Test countdowns · private" },
   "tile.profile":   { lb: "Profil", de: "Profil", en: "Profile" },
   "tile.profile.sub":{ lb: "Avatar & Statistiken", de: "Avatar & Statistiken", en: "Avatar & stats" },
@@ -33,9 +29,9 @@ window.I18N_DICT = {
   "tile.polls.sub": { lb: "Klass-Ëmfroen — stëmm of!", de: "Klassen-Umfragen — stimm ab!", en: "Class polls — vote!" },
   "index.kicker":   { lb: "👋 Moien, ech sinn den", de: "👋 Hallo, ich bin", en: "👋 Hi, I'm" },
   "index.tag":      {
-    lb: "E Schüler aus Lëtzebuerg, deen <strong>Apps, Spiller a Programmer</strong> baut — am Browser, um iPhone an op der Apple&nbsp;Watch.",
-    de: "Ein Schüler aus Luxemburg, der <strong>Apps, Spiele und Tools</strong> baut — im Browser, auf dem iPhone und auf der Apple&nbsp;Watch.",
-    en: "A student from Luxembourg who builds <strong>apps, games and tools</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.",
+    lb: "E Schüler aus Lëtzebuerg, deen <strong>Apps, Schoul-Tools a kleng Web-Projeten</strong> baut — am Browser, um iPhone an op der Apple&nbsp;Watch.",
+    de: "Ein Schüler aus Luxemburg, der <strong>Apps, Schul-Tools und kleine Web-Projekte</strong> baut — im Browser, auf dem iPhone und auf der Apple&nbsp;Watch.",
+    en: "A student from Luxembourg who builds <strong>apps, school tools and small web projects</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.",
   },
   "index.cta1":     { lb: "Kuck wat ech gebaut hunn", de: "Sieh, was ich gebaut habe", en: "See what I've built" },
   "index.cta2":     { lb: "Apps opmaachen", de: "Apps öffnen", en: "Open the apps" },
@@ -45,7 +41,7 @@ window.I18N_DICT = {
   "about.bio":      { lb: "Ech sinn den Ian, e Schüler aus Lëtzebuerg, deen gär Spiller, Live-Apps a kleng Tools baut — am Web mat purem JavaScript a Supabase, um iPhone an op der Apple Watch mat SwiftUI. Déi meescht Projeten hei ënnen hunn als e kuerzt „kann ech dat bauen?“ ugefaangen a gi lo vu menge Frënn a menger Famill benotzt.", de: "Ich bin Ian, ein Schüler aus Luxemburg, der gerne Spiele, Echtzeit-Apps und kleine Tools baut — im Web mit reinem JavaScript und Supabase, auf iPhone und Apple Watch mit SwiftUI. Die meisten Projekte hier unten haben als kurzes „kann ich das bauen?“ angefangen und werden jetzt von meinen Freunden und meiner Familie genutzt.", en: "I'm Ian, a student from Luxembourg who loves building games, real-time apps and small tools — on the web with plain JavaScript and Supabase, and on iPhone and Apple Watch with SwiftUI. Most of the projects below started as a quick \"can I build this?\" and ended up being used by my friends and family." },
   "index.appsGate": { lb: "Mell dech un fir deng Apps opzemaachen.", de: "Melde dich an, um deine Apps zu öffnen.", en: "Sign in to open your apps." },
   "index.appsGateTitle": { lb: "Mell dech un fir d'Apps ze benotzen", de: "Melde dich an, um die Apps zu nutzen", en: "Sign in to use the apps" },
-  "index.appsGateSub": { lb: "Erstell e gratis Kont oder mell dech un — duerno kanns du Messenger, Frënn, Spiller, Noten a méi opmaachen.", de: "Erstelle ein kostenloses Konto oder melde dich an — danach kannst du Messenger, Freunde, Spiele, Noten und mehr öffnen.", en: "Create a free account or sign in — then you can open Messenger, Friends, Games, Grades and more." },
+  "index.appsGateSub": { lb: "Erstell e gratis Kont oder mell dech un — duerno kanns du Messenger, Frënn, Noten, Projeten a méi opmaachen.", de: "Erstelle ein kostenloses Konto oder melde dich an — danach kannst du Messenger, Freunde, Noten, Projekte und mehr öffnen.", en: "Create a free account or sign in — then you can open Messenger, Friends, Grades, projects and more." },
 
   "proj.pixelbreak.desc": {
     lb: "31 Arcade-Spiller, all am Browser spillbar — keng Installatioun, keng Reklammen.",
