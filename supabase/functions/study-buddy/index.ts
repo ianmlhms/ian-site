@@ -228,7 +228,9 @@ Deno.serve(async (req) => {
   try {
     const reply = await callModel(provider, model, MODES[mode] + subjectLine, turns);
     const remaining = isIan ? null : Math.max(0, DAILY_LIMIT - (count ?? 0));
-    return json({ reply: reply || "…", remaining });
+    // Badge shown next to the reply: Ian sees the real model name; others see a friendly tier.
+    const badge = isIan ? "Claude Sonnet 4.6" : (model === MODEL_HAIKU ? "Premium" : "Standard");
+    return json({ reply: reply || "…", remaining, badge });
   } catch (e: any) {
     console.error("study-buddy", e?.message);
     return json({ error: "ai error" }, 502);

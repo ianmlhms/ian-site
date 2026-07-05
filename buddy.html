@@ -37,6 +37,7 @@
   .b.ai{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px}
   .b img{max-width:200px;border-radius:8px;display:block;margin-bottom:6px}
   .b b{font-weight:800}
+  .b.ai .badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent2);background:rgba(77,232,255,.1);border:1px solid var(--border);border-radius:6px;padding:1px 6px;margin-bottom:6px}
   .hint{color:var(--muted);font-size:12px;text-align:center}
   .composer{display:flex;gap:8px;align-items:flex-end;border-top:1px solid var(--border);padding-top:10px}
   .composer textarea{flex:1;resize:none;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:14.5px;font-family:inherit;max-height:120px}
@@ -171,7 +172,8 @@ async function send(){
       wait.innerHTML=fmt(data.message||(res.status===429?"Daagslimit erreecht — muer erëm.":"Feeler — nach eng Kéier probéieren."));
       history.pop();
     }else{
-      wait.innerHTML=fmt(data.reply||"…");
+      const badge=data.badge?`<span class="badge">${esc(data.badge)}</span><br>`:"";
+      wait.innerHTML=badge+fmt(data.reply||"…");
       history[history.length-1].text=data.reply||"";
       if(typeof data.remaining==="number"){remaining=data.remaining;renderLeft();}
     }
