@@ -34,6 +34,9 @@
   .mtext.top{top:2%}.mtext.bottom{bottom:2%}
   .meme.big .mtext{font-size:clamp(20px,7vw,32px);-webkit-text-stroke-width:2px}
   .grid .mtext{font-size:16px}
+  .reroll{width:100%;margin-top:8px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px;font-weight:700;cursor:pointer}
+  .reroll:hover{border-color:var(--accent2)}
+  .reroll:disabled{opacity:.5;cursor:default}
   .cin{width:100%;margin-top:8px;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:15px;outline:none}
   .cin:focus{border-color:var(--accent2)}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
@@ -61,7 +64,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const POOL = [
+const FALLBACK = [
   "https://i.imgflip.com/30b1gx.jpg","https://i.imgflip.com/1g8my4.jpg","https://i.imgflip.com/1ur9b0.jpg","https://i.imgflip.com/3lmzyx.jpg",
   "https://i.imgflip.com/3oevdk.jpg","https://i.imgflip.com/22bdq6.jpg","https://i.imgflip.com/5c7lwq.png","https://i.imgflip.com/28j0te.jpg",
   "https://i.imgflip.com/46e43q.png","https://i.imgflip.com/261o3j.jpg","https://i.imgflip.com/26jxvz.jpg","https://i.imgflip.com/2fm6x.jpg",
@@ -75,7 +78,17 @@ const POOL = [
   "https://i.imgflip.com/2gnnjh.jpg","https://i.imgflip.com/gtj5t.jpg","https://i.imgflip.com/38el31.jpg","https://i.imgflip.com/1tl71a.jpg",
   "https://i.imgflip.com/m78d.jpg","https://i.imgflip.com/3i7p.jpg","https://i.imgflip.com/gk5el.jpg","https://i.imgflip.com/19vcz0.jpg"
 ];
-const ROUNDS=4, CAP_SECS=70, VOTE_SECS=35, REVEAL_SECS=7, VOTE_POINTS=100;
+// ~300 templates fetched at runtime (memegen 211 + imgflip 100, both CORS-enabled);
+// falls back to the hardcoded list if the fetches fail.
+let POOL = FALLBACK.slice();
+async function loadPool(){
+  const urls=[];
+  try{ const d=await (await fetch("https://api.memegen.link/templates")).json(); (d||[]).forEach(t=>{ if(t&&t.blank) urls.push(t.blank); }); }catch(e){}
+  try{ const d=await (await fetch("https://api.imgflip.com/get_memes")).json(); ((d&&d.data&&d.data.memes)||[]).forEach(m=>{ if(m&&m.url) urls.push(m.url); }); }catch(e){}
+  if(urls.length>=30) POOL=urls;
+}
+loadPool();
+const ROUNDS=4, CAP_SECS=70, VOTE_SECS=35, REVEAL_SECS=7, VOTE_POINTS=100, MAX_REROLLS=10;
 const params = new URLSearchParams(location.search);
 let room = (params.get("room")||"").toLowerCase();
 const role = params.get("role")==="guest" ? "guest" : "host";
@@ -91,7 +104,7 @@ const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 
 let name="Player", phase="lobby", round=0, totalRounds=0, hostHere=true;
 let scores={}, template=null, roundEnd=0, entries=[], results=[], progress=null;
-let myCap=null, myVote=null;
+let myCap=null, myVote=null, myTemplate=null, rerollsLeft=0;
 // host-only
 let captions={}, votes={}, capTimer=null, voteTimer=null, tick=null;
 
@@ -107,7 +120,7 @@ function topbar(){ const s=Math.max(0,Math.ceil((roundEnd-Date.now())/1000));
 /* ---------- render ---------- */
 function render(){
   if(phase==="lobby"){
-    let html = `<p class="muted center">Everyone captions the <b>same meme</b>, then you vote for the funniest. Most votes over ${ROUNDS} rounds wins. 3+ players is best!</p>`;
+    let html = `<p class="muted center">Everyone gets a meme — keep it or <b>change it up to ${MAX_REROLLS}×</b> — caption it, then vote for the funniest. Most votes over ${ROUNDS} rounds wins. 3+ players is best!</p>`;
     html += scoreChips();
     html += `<div class="invite">🔗 <code>${esc(inviteURL)}</code><button id="cpy">Copy</button></div>`;
     const ps=players();
@@ -131,21 +144,23 @@ function render(){
   }
   let html = scoreChips()+topbar();
   if(phase==="caption"){
-    html += `<div class="meme big" id="prev"><img src="${esc(template)}"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
+    html += `<div class="meme big" id="prev"><img src="${esc(myTemplate||template)}"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
     if(myCap){ html += `<p class="center muted">✅ Meme sent! Waiting for the others…</p>`; }
-    else html += `<input id="capT" class="cin" placeholder="Top text" maxlength="60" autocomplete="off">
+    else html += `<button class="reroll" id="rrBtn">🔄 Change meme (${rerollsLeft})</button>
+                  <input id="capT" class="cin" placeholder="Top text" maxlength="60" autocomplete="off">
                   <input id="capB" class="cin" placeholder="Bottom text" maxlength="60" autocomplete="off">
                   <button class="big" id="capBtn">Send meme</button>`;
     $("app").innerHTML=html;
     if(myCap){ $("pt").textContent=myCap.top; $("pb").textContent=myCap.bottom; }
     else { const upd=()=>{ $("pt").textContent=$("capT").value.toUpperCase(); $("pb").textContent=$("capB").value.toUpperCase(); };
-      $("capT").oninput=upd; $("capB").oninput=upd; $("capBtn").onclick=submitCaption; }
+      $("capT").oninput=upd; $("capB").oninput=upd; $("capBtn").onclick=submitCaption;
+      $("rrBtn").onclick=reroll; if(rerollsLeft<=0)$("rrBtn").disabled=true; }
     startTick(); return;
   }
   if(phase==="vote"){
     html += `<p class="center muted">Vote for the funniest 👇</p><div class="grid">`+entries.map(e=>{
       const mine=e.cid===cid, voted=myVote===e.cid;
-      return `<div class="ventry ${mine?"mine":""} ${voted?"voted":""}" data-cid="${e.cid}">${memeHTML(template,e.top,e.bottom)}
+      return `<div class="ventry ${mine?"mine":""} ${voted?"voted":""}" data-cid="${e.cid}">${memeHTML(e.template||template,e.top,e.bottom)}
         <div class="mlabel">${mine?"Your meme":(voted?"✓ Voted":"Tap to vote")}</div></div>`;
     }).join("")+`</div>`;
     $("app").innerHTML=html;
@@ -155,7 +170,7 @@ function render(){
   if(phase==="reveal"){
     const best=results.length?results[0].votes:0;
     html = scoreChips()+`<h3 class="center">Results — round ${round}/${totalRounds}</h3><div class="grid">`+results.map(r=>{
-      return `<div class="ventry ${r.votes===best&&best>0?"won":""}">${memeHTML(template,r.top,r.bottom)}
+      return `<div class="ventry ${r.votes===best&&best>0?"won":""}">${memeHTML(r.template||template,r.top,r.bottom)}
         <div class="mlabel">${r.votes===best&&best>0?"👑 ":""}${esc(r.name)} · ${r.votes} ${r.votes===1?"vote":"votes"}${r.gain?` (+${r.gain})`:""}</div></div>`;
     }).join("")+`</div>`;
     $("app").innerHTML=html; return;
@@ -166,12 +181,19 @@ function startTick(){ clearTimeout(tick); const step=()=>{ const el=$("timerEl")
   el.textContent=Math.max(0,Math.ceil((roundEnd-Date.now())/1000))+"s"; tick=setTimeout(step,500); }; step(); }
 
 /* ---------- player actions ---------- */
+function reroll(){
+  if(rerollsLeft<=0) return;
+  rerollsLeft--; myTemplate=POOL[Math.floor(Math.random()*POOL.length)];
+  const img=document.querySelector('#prev img'); if(img) img.src=myTemplate;
+  const b=$("rrBtn"); if(b){ b.textContent=rerollsLeft>0?`🔄 Change meme (${rerollsLeft})`:"No changes left"; if(rerollsLeft<=0) b.disabled=true; }
+}
 function submitCaption(){
   const top=($("capT").value||"").slice(0,60).toUpperCase(), bottom=($("capB").value||"").slice(0,60).toUpperCase();
   if(!top && !bottom) return;
-  myCap={top,bottom};
-  if(role==="host") hostCaption({cid,name,top,bottom});
-  else ch.send({type:"broadcast",event:"caption",payload:{cid,name,top,bottom}});
+  const tpl=myTemplate||template;
+  myCap={top,bottom,template:tpl};
+  if(role==="host") hostCaption({cid,name,top,bottom,template:tpl});
+  else ch.send({type:"broadcast",event:"caption",payload:{cid,name,top,bottom,template:tpl}});
   render();
 }
 function castVote(choice){
@@ -195,13 +217,13 @@ function nextRound(){
 }
 function hostCaption(c){
   if(phase!=="caption"||captions[c.cid]) return;
-  captions[c.cid]={name:c.name,top:c.top,bottom:c.bottom};
+  captions[c.cid]={name:c.name,top:c.top,bottom:c.bottom,template:c.template||template};
   bcastProgress("caption", Object.keys(captions).length);
   if(Object.keys(captions).length>=players().length) endCaption();
 }
 function endCaption(){
   if(phase!=="caption") return; clearTimeout(capTimer);
-  entries=Object.entries(captions).map(([c,v])=>({cid:c,name:v.name,top:v.top,bottom:v.bottom})); shuffle(entries);
+  entries=Object.entries(captions).map(([c,v])=>({cid:c,name:v.name,top:v.top,bottom:v.bottom,template:v.template})); shuffle(entries);
   if(entries.length<2){ results=entries.map(e=>({...e,votes:0,gain:0})); phase="reveal";
     ch.send({type:"broadcast",event:"reveal",payload:{results,scores,template}}); applyReveal({results,scores,template});
     setTimeout(()=>{ if(role==="host") nextRound(); }, REVEAL_SECS*1000); return; }
@@ -226,11 +248,11 @@ function endVote(){
 function bcastProgress(ph,done){ const total=players().length; progress={phase:ph,done,total}; ch.send({type:"broadcast",event:"progress",payload:progress}); updateProg(); }
 
 /* ---------- apply (all clients) ---------- */
-function applyRound(p){ round=p.round; totalRounds=p.totalRounds; template=p.template; roundEnd=p.end; scores=p.scores||scores; phase="caption"; myCap=null; myVote=null; progress=null; render(); }
+function applyRound(p){ round=p.round; totalRounds=p.totalRounds; template=p.template; myTemplate=p.template; rerollsLeft=MAX_REROLLS; roundEnd=p.end; scores=p.scores||scores; phase="caption"; myCap=null; myVote=null; progress=null; render(); }
 function applyVote(p){ entries=p.entries; roundEnd=p.end; phase="vote"; myVote=null; progress=null; render(); }
 function applyReveal(p){ results=p.results; scores=p.scores; template=p.template; phase="reveal"; clearTimeout(tick); render(); }
 function applyFinal(p){ scores=p.scores; phase="final"; clearTimeout(tick); render(); }
-function resetAll(){ phase="lobby"; round=0; totalRounds=0; scores={}; template=null; entries=[]; results=[]; myCap=null; myVote=null; progress=null; captions={}; votes={}; }
+function resetAll(){ phase="lobby"; round=0; totalRounds=0; scores={}; template=null; myTemplate=null; rerollsLeft=0; entries=[]; results=[]; myCap=null; myVote=null; progress=null; captions={}; votes={}; }
 
 /* ---------- wire ---------- */
 ch.on("broadcast",{event:"round"},({payload})=>applyRound(payload))
