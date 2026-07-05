@@ -76,6 +76,9 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
 ⚠️ **`features-v1.sql`** (feedback box, class polls, exams, profile avatars — Jul 2026).
    [run ✓ 5 Jul 2026 — verified live: polls/poll_votes/exams/feedback tables +
    `poll_results_all()` RPC + `profiles.avatar` column all present]
+⚠️ **`study-buddy-v1.sql`** (AI tutor daily-usage cap: `ai_usage` + `ai_usage_bump()` RPC — Jul 2026).
+   [PENDING + deploy the `study-buddy` Edge Function + set `ANTHROPIC_API_KEY` — see
+   `scripts/STUDY-BUDDY-SETUP.md`. buddy.html errors politely until all three are done.]
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
@@ -89,6 +92,7 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 |---|---|---|
 | **Home** | `index.html`, `style.css`, `main.js` | Play-first hero ("40 Spiller…", LB/DE/EN via i18n) + live **summer-holiday countdown** (target `2026-07-09T12:40+02:00`, inline script at the bottom of index.html) + launcher tiles (admin-only tiles appear when signed in as admin). |
 | **PixelBreak** | `pixelbreak.html`, `pb/*.html` (31 games), `pixelbreak-records.js`, `pixelbreak-config.js`, `pixelbreak.webmanifest` | Hub + 31 single-player games as separate files in `pb/` (fetched into a sandboxed iframe srcdoc; `robots.txt` disallows `/pb/`). **Per-game URLs** `?g=<id>` (pushState + dynamic title/canonical/meta-description; all 31 in sitemap.xml). Accounts, high scores, cloud game-saves, PB.net multiplayer relay. **Install-as-app** button (`beforeinstallprompt`; iOS hint toast). **Feedback box** (💬 FAB → `feedback` table). **Sound+haptics shim** injected into every game by `PB.instrument` (score-up blip + vibration, running-counter suppression, 🔊/🔇 in game bar, localStorage `pb_muted`). Chill Drive is a true-3D three.js game (see pb/chill-drive.html). Word Scramble + Typing have 🇱🇺 LB toggles. |
+| **Study Buddy** | `buddy.html`, `supabase/functions/study-buddy`, `scripts/study-buddy-v1.sql` | **AI homework tutor** (Claude Haiku 4.5 via Edge Function). Sign-in gated; 5 modes picked up front: ask/explain · flashcards · quiz-me · language help · **scan & solve** (photo of a homework page → full worked answer, vision). Subject picker. Per-user **daily cap** (`DAILY_LIMIT=40`, `ai_usage` + `ai_usage_bump()`), hard spend cap set in the Anthropic console. System prompt = `BASE`+`MODES` in `index.ts`. Setup: `scripts/STUDY-BUDDY-SETUP.md`. Phase 2 (not built): schoolbook RAG via pgvector. |
 | **Polls** | `polls.html` | Class polls: admin creates/closes/deletes (RLS-gated), signed-in users vote (one changeable vote, `poll_votes` PK), anonymous totals via `poll_results_all()` RPC. Needs `features-v1.sql`. |
 | **Exams** | `exams.html` | **Admin-only** exam countdowns (subject/date/note, live tick, red <3 days, auto-hides >1 day past). `exams` table, admin RLS. Not indexed (robots + noindex). Needs `features-v1.sql`. |
 | **Profile** | `profile.html` | Avatar picker (24 emoji presets → `profiles.avatar` via `set_avatar` RPC) + player stats (game_leaderboard + local Wordle stats). Messenger renders avatars next to bubbles/member list (`avatarMap` in messenger.js, fails quietly pre-migration). Needs `features-v1.sql`. |

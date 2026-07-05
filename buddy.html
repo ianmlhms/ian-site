@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Buddy — ian.lu</title>
+<meta name="description" content="AI-Hëllef fir d'Hausaufgaben op ian.lu — erklären, Lernkaarten, Quiz, Sproochen a Säiten scannen.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=4"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:680px;margin:0 auto;padding:18px 14px 24px;display:flex;flex-direction:column;gap:14px;min-height:0}
+  .gate{text-align:center;color:var(--muted);padding:20px}
+  /* mode picker */
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mode{text-align:left;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;color:var(--text)}
+  .mode:hover{border-color:var(--accent2)}
+  .mode .ic{font-size:26px}
+  .mode b{display:block;margin:6px 0 3px;font-size:15px}
+  .mode span{color:var(--muted);font-size:12.5px;line-height:1.35}
+  @media(max-width:480px){.modes{grid-template-columns:1fr}}
+  /* chat */
+  .chatwrap{display:none;flex:1;flex-direction:column;gap:10px;min-height:0}
+  .subbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .subbar .back{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer;font-size:13px}
+  .subbar .tag{font-weight:800;font-size:14px}
+  .subbar select{margin-left:auto;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:13px}
+  .stream{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px}
+  .b{max-width:88%;padding:10px 13px;border-radius:14px;font-size:14.5px;line-height:1.45;white-space:normal;word-wrap:break-word}
+  .b.me{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .b.ai{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:4px}
+  .b img{max-width:200px;border-radius:8px;display:block;margin-bottom:6px}
+  .b b{font-weight:800}
+  .hint{color:var(--muted);font-size:12px;text-align:center}
+  .composer{display:flex;gap:8px;align-items:flex-end;border-top:1px solid var(--border);padding-top:10px}
+  .composer textarea{flex:1;resize:none;background:var(--card2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:14.5px;font-family:inherit;max-height:120px}
+  .composer button{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:0 16px;height:42px;font-weight:800;cursor:pointer;font-size:14px}
+  .composer button:disabled{opacity:.5;cursor:default}
+  .iconbtn{background:var(--card2)!important;color:var(--text)!important;border:1px solid var(--border)!important;font-size:18px!important}
+  .thumb{display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .thumb img{width:34px;height:34px;object-fit:cover;border-radius:6px}
+  .thumb .x{cursor:pointer;color:#f87171;font-weight:800}
+  .left{color:var(--muted);font-size:11.5px;text-align:right}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>🤖 Study Buddy</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <div class="gate" id="gate" style="display:none">🔒 <a href="#" id="gateBtn">Mell dech un</a> fir de Study Buddy ze benotzen.</div>
+
+  <div id="picker" style="display:none">
+    <p class="hint" style="text-align:left;font-size:14px;color:var(--text)">Wat brauchs du?</p>
+    <div class="modes" id="modes"></div>
+  </div>
+
+  <div class="chatwrap" id="chatwrap">
+    <div class="subbar">
+      <button class="back" id="back">‹ Modi</button>
+      <span class="tag" id="modeTag"></span>
+      <select id="subject"></select>
+    </div>
+    <div class="stream" id="stream"></div>
+    <div class="thumb" id="thumb"><img id="thumbImg"><span>Foto ugehaang</span><span class="x" id="thumbX">✕</span></div>
+    <div class="composer">
+      <button class="iconbtn" id="picBtn" title="Foto scannen" style="display:none">📷</button>
+      <textarea id="input" rows="1" placeholder="Schreif deng Fro…"></textarea>
+      <button id="send">Schécken</button>
+    </div>
+    <div class="left" id="left"></div>
+    <input type="file" id="file" accept="image/*" capture="environment" style="display:none">
+  </div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=3";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=(s)=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>");
+
+const MODES=[
+  {id:"ask",       ic:"❓",label:"Erklären & léisen",desc:"Schrëtt fir Schrëtt eng Aufgab verstoen",ph:"Schreif deng Fro…"},
+  {id:"flashcards",ic:"🃏",label:"Lernkaarten",      desc:"Notizen oder Thema → e Kaartespill",   ph:"Thema oder Notizen paschten…"},
+  {id:"quiz",      ic:"🎯",label:"Quiz mech",         desc:"Loosst dech iwwert en Thema ofrappen", ph:"Iwwer wat soll ech dech testen?"},
+  {id:"language",  ic:"🗣️",label:"Sproochen",        desc:"Grammaire, Vocabulaire, Korrekturen",  ph:"Sproch, Text oder Fro…"},
+  {id:"scan",      ic:"📸",label:"Säit scannen",      desc:"Foto vun der Aufgab → ganz Léisung",   ph:"(optional) Notiz fir d'Foto…"},
+];
+const SUBJECTS=["Allgemeng","Mathé","Däitsch","Franséisch","Englesch","Latäin","Physik","Chimie","Biologie","Geschicht","Geographie","Informatik","Konscht","Reliioun/Moral"];
+
+let sb=null, mode=null, history=[], pending=null, busy=false, remaining=null;
+
+/* ---- mode picker ---- */
+$("modes").innerHTML=MODES.map(m=>
+  `<button class="mode" data-m="${m.id}"><span class="ic">${m.ic}</span><b>${m.label}</b><span>${m.desc}</span></button>`).join("");
+$("modes").querySelectorAll(".mode").forEach(b=>b.onclick=()=>openMode(b.dataset.m));
+$("subject").innerHTML=SUBJECTS.map(s=>`<option>${s}</option>`).join("");
+
+function openMode(id){
+  mode=MODES.find(m=>m.id===id); history=[]; pending=null;
+  $("picker").style.display="none";
+  $("chatwrap").style.display="flex";
+  $("modeTag").textContent=mode.ic+" "+mode.label;
+  $("input").placeholder=mode.ph;
+  $("picBtn").style.display=mode.id==="scan"?"":"none";
+  $("thumb").style.display="none";
+  $("stream").innerHTML=`<div class="hint">${mode.id==="scan"?"Maach eng Foto vun der Aufgab-Säit an dréck 📷.":"Stell deng éischt Fro."}</div>`;
+  renderLeft();
+}
+$("back").onclick=()=>{ $("chatwrap").style.display="none"; $("picker").style.display=""; };
+
+function push(role,text,img){
+  history.push({role,text});
+  const d=document.createElement("div");
+  d.className="b "+(role==="user"?"me":"ai");
+  d.innerHTML=(img?`<img src="${img}">`:"")+fmt(text);
+  if($("stream").querySelector(".hint"))$("stream").innerHTML="";
+  $("stream").appendChild(d);
+  $("stream").scrollTop=$("stream").scrollHeight;
+  return d;
+}
+function renderLeft(){ $("left").textContent=remaining==null?"":`${remaining} Noriichten haut iwwreg`; }
+
+/* ---- image attach (scan mode) ---- */
+$("picBtn").onclick=()=>$("file").click();
+$("file").onchange=()=>{
+  const f=$("file").files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{ pending={dataUrl:r.result}; $("thumbImg").src=r.result; $("thumb").style.display="flex"; };
+  r.readAsDataURL(f); $("file").value="";
+};
+$("thumbX").onclick=()=>{ pending=null; $("thumb").style.display="none"; };
+
+/* ---- send ---- */
+async function send(){
+  if(busy)return;
+  const text=$("input").value.trim();
+  if(!text && !pending)return;
+  let image=null;
+  if(pending){
+    const m=/^data:(image\/[a-z0-9.+-]+);base64,(.*)$/i.exec(pending.dataUrl);
+    if(m)image={media_type:m[1],data:m[2]};
+  }
+  busy=true; $("send").disabled=true;
+  push("user", text||"📷 Foto", pending?pending.dataUrl:null);
+  $("input").value=""; $("input").style.height="auto";
+  const shownImg=pending; pending=null; $("thumb").style.display="none";
+  const wait=push("assistant","…");
+  try{
+    const token=auth.session()?.access_token;
+    const res=await fetch(`${PB_CONFIG.url}/functions/v1/study-buddy`,{
+      method:"POST",
+      headers:{"content-type":"application/json","apikey":PB_CONFIG.anonKey,"Authorization":`Bearer ${token}`},
+      body:JSON.stringify({mode:mode.id,subject:$("subject").value,messages:history.slice(0,-1),image}),
+    });
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok){
+      wait.innerHTML=fmt(data.message||(res.status===429?"Daagslimit erreecht — muer erëm.":"Feeler — nach eng Kéier probéieren."));
+      history.pop();
+    }else{
+      wait.innerHTML=fmt(data.reply||"…");
+      history[history.length-1].text=data.reply||"";
+      if(typeof data.remaining==="number"){remaining=data.remaining;renderLeft();}
+    }
+  }catch(e){ wait.innerHTML=fmt("Netzwierk-Feeler."); history.pop(); }
+  $("stream").scrollTop=$("stream").scrollHeight;
+  busy=false; $("send").disabled=false; $("input").focus();
+}
+$("send").onclick=send;
+$("input").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();} });
+$("input").addEventListener("input",()=>{ $("input").style.height="auto"; $("input").style.height=Math.min(120,$("input").scrollHeight)+"px"; });
+
+/* ---- gate / boot ---- */
+function applyAuth(){
+  const signedIn=!!auth.session();
+  $("gate").style.display=signedIn?"none":"";
+  $("picker").style.display=signedIn?"":"none";
+  if(!signedIn)$("chatwrap").style.display="none";
+}
+(async()=>{
+  auth.mountAccountButton($("acctHost"));
+  $("gateBtn").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
+  auth.onAuth(applyAuth);
+  try{ sb=await auth.client(); }catch{}
+  applyAuth();
+})();
+</script>
+</body>
+</html>
