@@ -21,28 +21,23 @@ supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   --project-ref lvksqmgfwkfbbl
 (`--no-verify-jwt` because the function does its own auth: it validates the caller's
 Supabase user token via `auth.getUser` and rejects anyone not signed in.)
 
-## Switching model / provider (AI_PROVIDER)
-The function works with three providers — flip a secret, no code change:
+## Model routing (per request — in `pickModel()` in `index.ts`)
+Model is chosen per message, not by a single global switch:
 
-| `AI_PROVIDER` | Key secret needed | Default model | Notes |
-|---|---|---|---|
-| `anthropic` (default) | `ANTHROPIC_API_KEY` | `claude-haiku-4-5-20251001` | strongest Luxembourgish |
-| `openai` | `OPENAI_API_KEY` | `gpt-5-nano` | ~15× cheaper, vision ok |
-| `gemini` | `GEMINI_API_KEY` | `gemini-2.5-flash-lite` | ~10× cheaper, native vision |
+| Who / when | Model | Why |
+|---|---|---|
+| **Ian** (`konto@ian.lu` / `ian@ian.lu`) — always | **Claude Sonnet 4.6** | owner gets the best; no daily cap |
+| Everyone else, **messages 1–10/day** | **Claude Haiku 4.5** | premium taste, good LB |
+| Everyone else, **messages 11+/day** | **Gemini 2.5 Flash-Lite** | best budget LB, ~10× cheaper, native vision |
 
-```sh
-# example: try OpenAI GPT-5 nano
-supabase secrets set OPENAI_API_KEY=sk-... AI_PROVIDER=openai --project-ref lvksqmgfwkfbblfsozfk
-# back to Claude
-supabase secrets set AI_PROVIDER=anthropic --project-ref lvksqmgfwkfbblfsozfk
-```
-Optional: override the exact model with the `AI_MODEL` secret. Secrets take effect on the
-next call — no redeploy. All three support the scan (image) mode. Get keys at
-platform.openai.com or aistudio.google.com. **Set a monthly spend cap in whichever
-provider's console** — that is the real safety net.
+Keys required as secrets: **`ANTHROPIC_API_KEY`** (Sonnet + Haiku) and **`GEMINI_API_KEY`**.
+`OPENAI_API_KEY` is optional — the GPT-5-nano adapter is still in the code but nothing routes
+to it (its Luxembourgish tested poorly). To change the tiers/models/emails, edit the constants
+at the top of `index.ts` (`FREE_CLAUDE`, `MODEL_*`, `IAN_EMAILS`) and redeploy.
+**Set a monthly spend cap in each provider's console** — that is the real safety net.
 
 ## How it works / tuning
-- **Daily cap:** `DAILY_LIMIT = 40` messages per user per day, in `index.ts`. Change + redeploy to adjust.
+- **Daily cap:** `DAILY_LIMIT = 40` messages per user per day (Ian exempt), in `index.ts`.
 - **Modes:** ask · flashcards · quiz · language · scan (photo → full worked answer). System
   prompts are the `BASE` + `MODES` constants in `index.ts`.
 - **Cost:** ~½ cent/question on Haiku, ~10–15× less on GPT-5 nano / Gemini Flash-Lite.

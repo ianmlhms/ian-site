@@ -4,39 +4,37 @@
 // forwards the conversation to an LLM with a mode-specific system prompt.
 // Vision-capable for the "scan a page" mode.
 //
-// PROVIDER SWITCH — set the secret AI_PROVIDER to one of: anthropic | openai | gemini
-//   anthropic → needs ANTHROPIC_API_KEY   (default; model claude-haiku-4-5-20251001)
-//   openai    → needs OPENAI_API_KEY       (default model gpt-5-nano)
-//   gemini    → needs GEMINI_API_KEY       (default model gemini-2.5-flash-lite)
-// Optionally override the model with the secret AI_MODEL. All three support the
-// scan (image) mode. Switching costs nothing to redeploy — just change the secret.
+// MODEL ROUTING (per request, decided below in pickModel):
+//   • Ian (konto@ian.lu / ian@ian.lu)  → Claude Sonnet 4.6, and no daily cap.
+//   • Everyone else, messages 1–10/day → Claude Haiku 4.5   (premium taste, good LB).
+//   • Everyone else, messages 11+/day  → Gemini 2.5 Flash-Lite (best budget LB + ~10× cheaper).
+// Keys needed as secrets: ANTHROPIC_API_KEY (Sonnet+Haiku) and GEMINI_API_KEY.
+// (OPENAI_API_KEY kept optional — GPT-5 nano adapter still here but not routed to,
+//  its Luxembourgish tested poorly.)
 //
 // Deploy (see scripts/STUDY-BUDDY-SETUP.md):
 //   supabase functions deploy study-buddy --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
-//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...   (and/or OPENAI_API_KEY / GEMINI_API_KEY)
-//   supabase secrets set AI_PROVIDER=anthropic
+//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-... GEMINI_API_KEY=...
 //
-// Cost control lives here (DAILY_LIMIT) AND in the provider console (set a hard
-// monthly spend cap — that is the real safety net).
+// Cost control lives here (DAILY_LIMIT + the tiering) AND in each provider console
+// (set a hard monthly spend cap — that is the real safety net).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const PROVIDER = (Deno.env.get("AI_PROVIDER") ?? "anthropic").toLowerCase();
-const DEFAULT_MODEL: Record<string, string> = {
-  anthropic: "claude-haiku-4-5-20251001",
-  openai: "gpt-5-nano",
-  gemini: "gemini-2.5-flash-lite",
-};
-const KEY_ENV: Record<string, string> = {
-  anthropic: "ANTHROPIC_API_KEY",
-  openai: "OPENAI_API_KEY",
-  gemini: "GEMINI_API_KEY",
-};
-const MODEL = Deno.env.get("AI_MODEL") || DEFAULT_MODEL[PROVIDER] || DEFAULT_MODEL.anthropic;
-const API_KEY = Deno.env.get(KEY_ENV[PROVIDER] ?? "ANTHROPIC_API_KEY") ?? "";
-
-const DAILY_LIMIT = 40;          // messages per user per day
+// ---- models & routing config ----
+const MODEL_SONNET = "claude-sonnet-4-6";              // Ian only
+const MODEL_HAIKU = "claude-haiku-4-5-20251001";       // everyone, first 10/day
+const MODEL_GEMINI = "gemini-2.5-flash-lite";          // everyone, 11+/day
+const IAN_EMAILS = new Set(["konto@ian.lu", "ian@ian.lu"]);
+const FREE_CLAUDE = 10;          // first N messages/day go to Claude for non-Ian users
+const DAILY_LIMIT = 40;          // messages per user per day (Ian exempt)
 const MAX_TOKENS = 1500;
 const MAX_HISTORY = 12;          // conversation turns kept per request
+
+const KEYS: Record<string, string> = {
+  anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
+  openai: Deno.env.get("OPENAI_API_KEY") ?? "",
+  gemini: Deno.env.get("GEMINI_API_KEY") ?? "",
+};
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -88,27 +86,27 @@ const MODES: Record<string, string> = {
 
 type Turn = { role: "user" | "assistant"; text: string; image?: { media_type: string; data: string } };
 
-async function userFromRequest(req: Request): Promise<string | null> {
+async function userFromRequest(req: Request): Promise<{ id: string; email: string } | null> {
   const auth = req.headers.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) return null;
   const { data, error } = await admin.auth.getUser(token);
   if (error || !data?.user) return null;
-  return data.user.id;
+  return { id: data.user.id, email: (data.user.email ?? "").toLowerCase() };
 }
 
 // ---- provider adapters: each returns the assistant's reply text or throws ----
-async function post(url: string, headers: Record<string, string>, body: unknown) {
+async function post(url: string, headers: Record<string, string>, body: unknown, tag: string) {
   const r = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
   if (!r.ok) {
     const t = await r.text();
-    console.error(PROVIDER, r.status, t.slice(0, 300));
+    console.error(tag, r.status, t.slice(0, 300));
     throw new Error("provider " + r.status);
   }
   return r.json();
 }
 
-async function callAnthropic(sys: string, turns: Turn[]): Promise<string> {
+async function callAnthropic(model: string, sys: string, turns: Turn[]): Promise<string> {
   const messages = turns.map((t) =>
     t.image
       ? { role: t.role, content: [
@@ -117,22 +115,22 @@ async function callAnthropic(sys: string, turns: Turn[]): Promise<string> {
         ] }
       : { role: t.role, content: t.text });
   const data = await post("https://api.anthropic.com/v1/messages", {
-    "x-api-key": API_KEY,
+    "x-api-key": KEYS.anthropic,
     "anthropic-version": "2023-06-01",
     "content-type": "application/json",
   }, {
-    model: MODEL,
+    model,
     max_tokens: MAX_TOKENS,
     system: [
       { type: "text", text: BASE, cache_control: { type: "ephemeral" } },
       { type: "text", text: sys },
     ],
     messages,
-  });
+  }, "anthropic");
   return (data?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
 }
 
-async function callOpenAI(sys: string, turns: Turn[]): Promise<string> {
+async function callOpenAI(model: string, sys: string, turns: Turn[]): Promise<string> {
   const messages: any[] = [{ role: "system", content: BASE + "\n" + sys }];
   for (const t of turns) {
     messages.push(t.image
@@ -142,18 +140,16 @@ async function callOpenAI(sys: string, turns: Turn[]): Promise<string> {
         ] }
       : { role: t.role, content: t.text });
   }
-  const body: any = { model: MODEL, max_completion_tokens: MAX_TOKENS, messages };
-  // GPT-5 reasoning models burn the whole token budget on hidden reasoning and
-  // return empty content unless reasoning is minimised — we want direct answers.
-  if (MODEL.includes("gpt-5")) body.reasoning_effort = "minimal";
+  const body: any = { model, max_completion_tokens: MAX_TOKENS, messages };
+  if (model.includes("gpt-5")) body.reasoning_effort = "minimal";
   const data = await post("https://api.openai.com/v1/chat/completions", {
-    "authorization": "Bearer " + API_KEY,
+    "authorization": "Bearer " + KEYS.openai,
     "content-type": "application/json",
-  }, body);
+  }, body, "openai");
   return (data?.choices?.[0]?.message?.content ?? "").trim();
 }
 
-async function callGemini(sys: string, turns: Turn[]): Promise<string> {
+async function callGemini(model: string, sys: string, turns: Turn[]): Promise<string> {
   const contents = turns.map((t) => {
     const parts: any[] = [];
     if (t.image) parts.push({ inline_data: { mime_type: t.image.media_type, data: t.image.data } });
@@ -161,40 +157,51 @@ async function callGemini(sys: string, turns: Turn[]): Promise<string> {
     return { role: t.role === "assistant" ? "model" : "user", parts };
   });
   const data = await post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-    { "x-goog-api-key": API_KEY, "content-type": "application/json" },
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    { "x-goog-api-key": KEYS.gemini, "content-type": "application/json" },
     {
       system_instruction: { parts: [{ text: BASE + "\n" + sys }] },
       contents,
       generationConfig: { maxOutputTokens: MAX_TOKENS },
     },
+    "gemini",
   );
   return (data?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? "").join("").trim();
 }
 
-function callModel(sys: string, turns: Turn[]): Promise<string> {
-  if (PROVIDER === "openai") return callOpenAI(sys, turns);
-  if (PROVIDER === "gemini") return callGemini(sys, turns);
-  return callAnthropic(sys, turns);
+// Decide provider + model for this request.
+function pickModel(email: string, count: number): { provider: string; model: string } {
+  if (IAN_EMAILS.has(email)) return { provider: "anthropic", model: MODEL_SONNET };
+  if (count <= FREE_CLAUDE) return { provider: "anthropic", model: MODEL_HAIKU };
+  return { provider: "gemini", model: MODEL_GEMINI };
+}
+
+function callModel(provider: string, model: string, sys: string, turns: Turn[]): Promise<string> {
+  if (provider === "openai") return callOpenAI(model, sys, turns);
+  if (provider === "gemini") return callGemini(model, sys, turns);
+  return callAnthropic(model, sys, turns);
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  if (!API_KEY) return json({ error: `server not configured (${KEY_ENV[PROVIDER] ?? "key"} missing)` }, 500);
 
-  const uid = await userFromRequest(req);
-  if (!uid) return json({ error: "sign in first" }, 401);
+  const user = await userFromRequest(req);
+  if (!user) return json({ error: "sign in first" }, 401);
+  const isIan = IAN_EMAILS.has(user.email);
 
-  // ---- daily cap (atomic bump; returns the new count) ----
+  // ---- daily counter (atomic bump; returns the new count). Ian is exempt from the cap. ----
   const { data: count, error: capErr } = await admin.rpc("ai_usage_bump", {
-    p_user: uid,
+    p_user: user.id,
     p_limit: DAILY_LIMIT,
   });
   if (capErr) return json({ error: "usage check failed" }, 500);
-  if ((count ?? 0) > DAILY_LIMIT) {
+  if (!isIan && (count ?? 0) > DAILY_LIMIT) {
     return json({ error: "limit", message: "Daagslimit erreecht — muer probéieren." }, 429);
   }
+
+  const { provider, model } = pickModel(user.email, count ?? 1);
+  if (!KEYS[provider]) return json({ error: `server not configured (${provider} key missing)` }, 500);
 
   let payload: any;
   try { payload = await req.json(); } catch { return json({ error: "bad json" }, 400); }
@@ -219,8 +226,9 @@ Deno.serve(async (req) => {
 
   const subjectLine = subject ? `\nSubject the student picked: ${subject}.` : "";
   try {
-    const reply = await callModel(MODES[mode] + subjectLine, turns);
-    return json({ reply: reply || "…", remaining: Math.max(0, DAILY_LIMIT - (count ?? 0)) });
+    const reply = await callModel(provider, model, MODES[mode] + subjectLine, turns);
+    const remaining = isIan ? null : Math.max(0, DAILY_LIMIT - (count ?? 0));
+    return json({ reply: reply || "…", remaining });
   } catch (e: any) {
     console.error("study-buddy", e?.message);
     return json({ error: "ai error" }, 502);
