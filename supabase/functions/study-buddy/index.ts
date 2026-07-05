@@ -2,7 +2,7 @@
 // The ian.lu AI homework tutor. Called from buddy.html by a signed-in user.
 // Gates on a real Supabase user token + a per-user daily message cap, then
 // forwards the conversation to an LLM with a mode-specific system prompt.
-// Vision-capable for the "scan a page" mode.
+// Vision-capable in every mode (one or more images per message).
 //
 // MODEL ROUTING (per request, decided below in pickModel):
 //   • Ian (konto@ian.lu only)          → Claude Sonnet 4.6, and no daily cap.
@@ -29,6 +29,7 @@ const FREE_CLAUDE = 10;          // first N messages/day go to Claude for non-Ia
 const DAILY_LIMIT = 40;          // messages per user per day (Ian exempt)
 const MAX_TOKENS = 1500;
 const MAX_HISTORY = 12;          // conversation turns kept per request
+const MAX_IMAGES = 6;            // images attached to one message
 
 const KEYS: Record<string, string> = {
   anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
@@ -79,12 +80,13 @@ const MODES: Record<string, string> = {
     "MODE: Language help. Help with grammar, vocabulary, translation and correcting " +
     "the student's text. Point out each mistake and explain the correction simply.",
   scan:
-    "MODE: Scan & solve. The student uploaded a photo of a homework page. Read every " +
-    "exercise on it and give the complete, correct worked answers, numbered to match " +
-    "the exercise numbers. Show the key working so it can be copied and understood.",
+    "MODE: Scan & solve. The student uploaded one or more photos of homework pages. " +
+    "Read every exercise on them and give the complete, correct worked answers, numbered " +
+    "to match the exercise numbers. Show the key working so it can be copied and understood.",
 };
 
-type Turn = { role: "user" | "assistant"; text: string; image?: { media_type: string; data: string } };
+type Img = { media_type: string; data: string };
+type Turn = { role: "user" | "assistant"; text: string; images?: Img[] };
 
 async function userFromRequest(req: Request): Promise<{ id: string; email: string } | null> {
   const auth = req.headers.get("authorization") ?? "";
@@ -108,9 +110,9 @@ async function post(url: string, headers: Record<string, string>, body: unknown,
 
 async function callAnthropic(model: string, sys: string, turns: Turn[]): Promise<string> {
   const messages = turns.map((t) =>
-    t.image
+    t.images?.length
       ? { role: t.role, content: [
-          { type: "image", source: { type: "base64", media_type: t.image.media_type, data: t.image.data } },
+          ...t.images.map((im) => ({ type: "image", source: { type: "base64", media_type: im.media_type, data: im.data } })),
           { type: "text", text: t.text },
         ] }
       : { role: t.role, content: t.text });
@@ -133,10 +135,10 @@ async function callAnthropic(model: string, sys: string, turns: Turn[]): Promise
 async function callOpenAI(model: string, sys: string, turns: Turn[]): Promise<string> {
   const messages: any[] = [{ role: "system", content: BASE + "\n" + sys }];
   for (const t of turns) {
-    messages.push(t.image
+    messages.push(t.images?.length
       ? { role: t.role, content: [
           { type: "text", text: t.text },
-          { type: "image_url", image_url: { url: `data:${t.image.media_type};base64,${t.image.data}` } },
+          ...t.images.map((im) => ({ type: "image_url", image_url: { url: `data:${im.media_type};base64,${im.data}` } })),
         ] }
       : { role: t.role, content: t.text });
   }
@@ -152,7 +154,7 @@ async function callOpenAI(model: string, sys: string, turns: Turn[]): Promise<st
 async function callGemini(model: string, sys: string, turns: Turn[]): Promise<string> {
   const contents = turns.map((t) => {
     const parts: any[] = [];
-    if (t.image) parts.push({ inline_data: { mime_type: t.image.media_type, data: t.image.data } });
+    for (const im of t.images ?? []) parts.push({ inline_data: { mime_type: im.media_type, data: im.data } });
     parts.push({ text: t.text });
     return { role: t.role === "assistant" ? "model" : "user", parts };
   });
@@ -209,18 +211,23 @@ Deno.serve(async (req) => {
   const mode = MODES[payload?.mode] ? payload.mode : "ask";
   const subject = (payload?.subject ?? "").toString().slice(0, 40);
   const history = Array.isArray(payload?.messages) ? payload.messages.slice(-MAX_HISTORY) : [];
-  const image = payload?.image;  // { media_type, data } base64, scan mode only
+
+  // images can arrive as `images` (array) or legacy `image` (single).
+  const imgs: Img[] = (Array.isArray(payload?.images) ? payload.images : [])
+    .concat(payload?.image ? [payload.image] : [])
+    .filter((i: any) => i?.data && i?.media_type)
+    .slice(0, MAX_IMAGES);
 
   // Build a provider-neutral turn list from the sanitized history.
   const turns: Turn[] = history
     .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.text === "string")
     .map((m: any) => ({ role: m.role, text: m.text.slice(0, 6000) }));
 
-  if (image?.data && image?.media_type) {
+  if (imgs.length) {
     const last = turns[turns.length - 1];
-    const text = last?.role === "user" ? last.text : "Léis dës Hausaufgaben.";
+    const text = last?.role === "user" ? last.text : "Kuck dir dës Biller un.";
     if (last?.role === "user") turns.pop();
-    turns.push({ role: "user", text, image: { media_type: image.media_type, data: image.data } });
+    turns.push({ role: "user", text, images: imgs });
   }
   if (!turns.length) return json({ error: "empty" }, 400);
 

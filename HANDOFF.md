@@ -83,6 +83,10 @@ All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run
    Claude Haiku 4.5, msgs 11+/day → Gemini 2.5 Flash-Lite (best budget LB; GPT-5 nano's LB was
    garbled so it's not routed to). Keys set: `ANTHROPIC_API_KEY` + `GEMINI_API_KEY` (+ optional
    `OPENAI_API_KEY`). See `scripts/STUDY-BUDDY-SETUP.md`.]
+⚠️ **`study-buddy-conversations-v1.sql`** (saved chats: `buddy_conversations`, owner-only RLS,
+   14-day pg_cron purge — Jul 2026). [PENDING run. Page persists/resumes conversations + a
+   read filter hides >14d even if pg_cron isn't enabled. buddy.html also now does multi-image
+   upload in every mode + a redesigned mode picker.]
 
 Key tables: `profiles` (auto-created per user via `handle_new_user` trigger), `scores`,
 `groups`/`group_members`/`messages`, `dashboard_state` (admin-only), `app_admins`,
