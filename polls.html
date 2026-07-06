@@ -92,6 +92,7 @@ async function refresh(){
 
 function render(){
   const signedIn=!!auth.session();
+  const myUid=auth.session()?.user?.id;
   $("gate").style.display=signedIn?"none":"";
   if(!polls.length){$("list").innerHTML='<p class="gate">Nach keng Ëmfroen.</p>';return;}
   $("list").innerHTML=polls.map(p=>{
@@ -105,7 +106,8 @@ function render(){
         <span class="fill" style="transform:scaleX(${total?n/total:0})"></span>
         <span class="lbl"><span>${esc(o)}</span><span>${pct}% · ${n}</span></span></button>`;
     }).join("");
-    const admin=isAdmin?`<div class="adminrow">
+    const canManage=isAdmin||(myUid&&p.created_by===myUid);
+    const admin=canManage?`<div class="adminrow">
       <button class="abtn" data-close="${p.id}" data-open="${p.is_open?0:1}">${p.is_open?"Zoumaachen":"Opmaachen"}</button>
       <button class="abtn" data-del="${p.id}">Läschen</button></div>`:"";
     return `<div class="card"><p class="q">${esc(p.question)}</p>${opts}
@@ -158,11 +160,11 @@ addOptInput();addOptInput();
   auth.onAuth(async()=>{
     isAdmin=false;
     try{sb=sb||await auth.client();if(auth.session()){const{data}=await sb.rpc("is_admin");isAdmin=!!data;}}catch{}
-    $("newPoll").style.display=isAdmin?"":"none";
+    $("newPoll").style.display=auth.session()?"":"none";
     refresh();
   });
   try{sb=await auth.client();if(auth.session()){const{data}=await sb.rpc("is_admin");isAdmin=!!data;}}catch{}
-  $("newPoll").style.display=isAdmin?"":"none";
+  $("newPoll").style.display=auth.session()?"":"none";
   refresh();
 })();
 </script>
