@@ -107,13 +107,27 @@ create policy exams_admin_all on public.exams
 alter table public.profiles add column if not exists avatar text
   check (avatar is null or char_length(avatar) <= 8);
 
--- avatar-only updates go through this RPC so the username column stays locked
+-- avatar-only updates go through this RPC so the username column stays locked.
+-- Accepts either a short emoji OR an uploaded photo URL in the avatars bucket
+-- (see scripts/avatar-upload-v1.sql, which must also run to relax the column
+-- check + create the bucket). Kept in sync here so re-running this base script
+-- never reverts to the emoji-only version.
 create or replace function public.set_avatar(p_avatar text)
 returns void language plpgsql security definer set search_path = public as $$
+declare v text := nullif(trim(p_avatar), '');
 begin
-  if p_avatar is not null and char_length(trim(p_avatar)) > 8 then
-    raise exception 'avatar too long';
+  if v is not null then
+    if v like 'http%' then
+      if v not like 'https://%/storage/v1/object/public/avatars/%' then
+        raise exception 'avatar url not allowed';
+      end if;
+      if char_length(v) > 400 then
+        raise exception 'avatar url too long';
+      end if;
+    elsif char_length(v) > 8 then
+      raise exception 'avatar too long';
+    end if;
   end if;
-  update public.profiles set avatar = nullif(trim(p_avatar), '') where id = auth.uid();
+  update public.profiles set avatar = v where id = auth.uid();
 end; $$;
 grant execute on function public.set_avatar(text) to authenticated;
