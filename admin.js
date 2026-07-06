@@ -1,6 +1,6 @@
 /* Admin panel — moderate groups/messages AND manage registered users.
  * All privileged actions are guarded server-side by is_admin(). */
-import * as auth from "./auth.js";
+import * as auth from "./auth.js?v=4";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

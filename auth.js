@@ -5,7 +5,7 @@ export const authConfigured =
   /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) && (cfg.anonKey || "").trim().length > 20;
 
 // Shared across EVERY instance of this module — even when it's imported under
-// different "?v=" query strings (auth.js vs auth.js?v=3 are otherwise separate
+// different "?v=" query strings (auth.js vs auth.js?v=4 are otherwise separate
 // modules with separate clients). Two Supabase/GoTrue clients on the same
 // localStorage race on token refresh and corrupt the session, which shows up as
 // "signed in but everything 401s" (no chats load, admin link missing). One global
@@ -25,13 +25,46 @@ async function getCreateClient() {
   }
 }
 
+// Best-effort read of the persisted session straight from localStorage. Used
+// only as a recovery hint: getSession() can transiently return null (a flaky /
+// mid-flight token refresh, Safari throttling), which otherwise makes a
+// signed-in user look logged out — no chats, no admin link, profile shows the
+// sign-in gate. If a real session is stored, we re-establish it below.
+function storedSession() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!/^sb-.+-auth-token$/.test(k)) continue;
+      const raw = JSON.parse(localStorage.getItem(k) || "null");
+      const s = (raw && raw.currentSession) || raw; // tolerate storage-format differences
+      if (s && s.access_token && s.refresh_token && s.user) return s;
+    }
+  } catch { /* unreadable storage — treat as no stored session */ }
+  return null;
+}
+
 export async function client() {
   if (_g.sb) return _g.sb;
   if (!_g.ready) {
     _g.ready = (async () => {
       const createClient = await getCreateClient();
       _g.sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
-      const { data } = await _g.sb.auth.getSession();
+      let { data } = await _g.sb.auth.getSession();
+      if (!data.session) {
+        // getSession came back empty. If a session is actually persisted, recover
+        // it (setSession refreshes an expired access token when the refresh token
+        // is still good) rather than declaring the user logged out. If the refresh
+        // token is genuinely dead, this fails quietly and we stay signed out.
+        const stored = storedSession();
+        if (stored) {
+          try {
+            const r = await _g.sb.auth.setSession({
+              access_token: stored.access_token, refresh_token: stored.refresh_token,
+            });
+            if (r.data && r.data.session) data = r.data;
+          } catch { /* dead refresh token — genuinely signed out */ }
+        }
+      }
       _g.session = data.session;
       _g.sb.auth.onAuthStateChange((_e, s) => { _g.session = s; _g.cbs.forEach((cb) => cb(s)); });
       return _g.sb;
