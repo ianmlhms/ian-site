@@ -139,10 +139,31 @@ function openUser(uid) {
        </div>
        <div class="hint">Passwords can't be viewed (they're encrypted). Set a new one here and share it — the user can change it later after signing in.</div>
        <div class="pwresult" id="pwResult"></div>
+     </div>
+     <div class="uact">
+       <h4>FakeStake balance 🪙</h4>
+       <div class="pwrow">
+         <input id="casBal" type="number" min="0" step="1" placeholder="loading…">
+         <button id="setCas">Set</button>
+       </div>
+       <div class="hint">Play-money coins in this user's FakeStake casino account. Takes effect the next time they open the casino.</div>
+       <div class="pwresult" id="casResult"></div>
      </div>`;
   $("delUser").onclick = () => deleteUser(uid);
   $("genPw").onclick = () => { $("newPw").value = genPassword(); };
   $("setPw").onclick = () => setUserPassword(uid);
+  $("setCas").onclick = () => setUserCasino(uid);
+  // fill the current balance (profiles is readable; null = never played)
+  sb.from("profiles").select("casino_balance").eq("id", uid).single().then(({ data }) => {
+    const el = $("casBal"); if (el) el.value = data && data.casino_balance != null ? Number(data.casino_balance) : 0;
+  });
+}
+async function setUserCasino(uid) {
+  const v = parseFloat($("casBal").value);
+  if (!Number.isFinite(v) || v < 0) return alert("Enter a non-negative number.");
+  const { error } = await sb.rpc("admin_set_casino_balance", { p_user_id: uid, p_bal: v });
+  if (error) return alert(error.message);
+  $("casResult").innerHTML = `✓ Balance set to 🪙 ${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
 }
 async function deleteUser(uid) {
   if (!confirm("Permanently delete this user and ALL their data (messages, scores, memberships)? This cannot be undone.")) return;
