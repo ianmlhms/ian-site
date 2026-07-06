@@ -79,7 +79,6 @@ window.I18N_DICT = {
   /* tile names + subtitles */
   "tile.pixelbreak":     { lb: "PixelBreak", de: "PixelBreak", en: "PixelBreak" },
   "tile.pixelbreak.sub": { lb: "Arcade & 2-iPad-Spiller", de: "Arcade- & 2-iPad-Spiele", en: "Arcade & 2-iPad games" },
-  "tile.shorts.sub":     { lb: "Channel-Statistiken", de: "Kanal-Statistiken", en: "Channel stats" },
   "tile.messenger.sub":  { lb: "Chat & Gruppen", de: "Chat & Gruppen", en: "Chat & groups" },
   "tile.friends":        { lb: "Frënn", de: "Freunde", en: "Friends" },
   "tile.friends.sub":    { lb: "Bäisetzen, chatten & spillen", de: "Hinzufügen, chatten & spielen", en: "Add, chat & play" },
