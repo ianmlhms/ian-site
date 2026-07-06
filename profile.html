@@ -66,14 +66,25 @@ const isUrl=(v)=>/^https?:\/\//.test(v||"");
 const avInner=(v)=>v?(isUrl(v)?`<img src="${esc(v)}" alt="avatar">`:esc(v)):"👤";
 let sb=null,myAvatar=null;
 
-// centre-crop to a square and downscale to a small JPEG so storage stays tiny
+// Fit the WHOLE image into a small square JPEG (any aspect ratio, nothing cropped).
+// The square is filled with a soft blurred copy of the photo so there are no
+// solid letterbox bars, then the full image is drawn on top, centred.
 function squareResize(file,size){
   return new Promise((res,rej)=>{
     const img=new Image();
     img.onload=()=>{
-      const s=Math.min(img.width,img.height);
       const c=document.createElement("canvas");c.width=size;c.height=size;
-      c.getContext("2d").drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,size,size);
+      const ctx=c.getContext("2d");
+      // blurred cover background (fills the whole square, may crop — that's fine)
+      const cov=Math.max(size/img.width,size/img.height);
+      const cw=img.width*cov,ch=img.height*cov;
+      ctx.filter="blur(14px)";
+      ctx.drawImage(img,(size-cw)/2,(size-ch)/2,cw,ch);
+      ctx.filter="none";
+      // full image, contained (whole photo visible, nothing cut off)
+      const con=Math.min(size/img.width,size/img.height);
+      const iw=img.width*con,ih=img.height*con;
+      ctx.drawImage(img,(size-iw)/2,(size-ih)/2,iw,ih);
       c.toBlob(b=>b?res(b):rej(new Error("Could not process image")),"image/jpeg",0.85);
     };
     img.onerror=()=>rej(new Error("That file isn't a readable image"));
@@ -103,7 +114,7 @@ async function boot(){
         <button class="uplbtn ghost" id="rmBtn"${isUrl(myAvatar)?"":" hidden"}>Remove photo</button>
         <input type="file" id="uplFile" accept="image/*" hidden>
       </div>
-      <div class="upl-hint">Square-cropped and stored small (256px). Or pick an emoji below.</div>
+      <div class="upl-hint">Any image works — the whole photo is kept and stored small (256px). Or pick an emoji below.</div>
       <div class="msg" id="uplMsg"></div>
     </div>
     <h2>Or pick an emoji</h2>
