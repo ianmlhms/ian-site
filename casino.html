@@ -87,10 +87,11 @@
   .toast.win{color:var(--green)} .toast.lose{color:var(--red)}
 
   /* dice */
-  .dicetrack{position:relative;height:64px;margin:26px 0 10px;border-radius:12px;
+  .dicetrack{position:relative;height:64px;margin:26px 0 10px;border-radius:12px;cursor:pointer;touch-action:none;
     background:linear-gradient(90deg,var(--red) 0 var(--split,50%),var(--green) var(--split,50%) 100%)}
   .diceticks{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;font-weight:700;padding:0 2px}
-  .dicemark{position:absolute;top:-6px;width:6px;height:76px;background:#fff;border-radius:4px;transform:translateX(-50%);transition:left .35s cubic-bezier(.2,.9,.3,1)}
+  .dicemark{position:absolute;top:-6px;width:8px;height:76px;background:#fff;border-radius:5px;transform:translateX(-50%);cursor:grab;box-shadow:0 0 0 2px rgba(0,0,0,.15);transition:left .06s linear}
+  .dicehint{color:var(--muted);font-size:12px;text-align:center;margin-top:18px}
   .diceroll{position:absolute;top:-46px;transform:translateX(-50%);background:#fff;color:#0f212e;font-weight:800;
     font-size:14px;padding:4px 9px;border-radius:8px;transition:left .35s cubic-bezier(.2,.9,.3,1);white-space:nowrap}
   .diceroll:after{content:"";position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);
@@ -237,11 +238,11 @@ async function loadCloud(){
 
 /* ---- history chips ---- */
 const history = [];
-function pushHist(mult, win){
-  history.unshift({mult, win});
+function pushHist(mult, win, label){
+  history.unshift({ text: label != null ? label : mult.toFixed(2) + "×", win });
   if (history.length > 12) history.pop();
   $("#hist").innerHTML = history.map(h =>
-    `<span class="hchip ${h.win?"win":"lose"}">${h.mult.toFixed(2)}×</span>`).join("");
+    `<span class="hchip ${h.win?"win":"lose"}">${h.text}</span>`).join("");
 }
 
 /* ---- toast ---- */
@@ -297,20 +298,19 @@ const Dice = {
       <div class="seg" style="margin-bottom:10px">
         <button id="under">Roll Under</button><button id="over" class="on">Roll Over</button>
       </div>
-      <label class="f">Target: <b id="tval" style="color:#fff">50.00</b></label>
-      <input class="inp" id="tsl" type="range" min="2" max="98" step="1" value="50" style="padding:6px 0">`;
+      <label class="f">Target: <b id="tval" style="color:#fff">50.00</b></label>`;
     $("#board").innerHTML = `
       <div style="max-width:520px;margin:auto;width:100%">
-        <div class="diceroll" id="droll" style="left:50%;display:none">0.00</div>
+        <div class="diceroll" id="droll" style="left:50%">—</div>
         <div class="diceticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
         <div class="dicetrack" id="dtrack"><div class="dicemark" id="dmark" style="left:50%"></div></div>
+        <div class="dicehint">Drag the bar to set your target — you win in the green zone.</div>
       </div>`;
     const info = ui.info;
     function refresh(){
       const chance = over ? (100 - target) : target;
       const mult = HE * 100 / chance;
       $("#tval").textContent = target.toFixed(2);
-      $("#dtrack").style.setProperty("--split", target + "%");
       // green side = win side
       $("#dtrack").style.background = over
         ? `linear-gradient(90deg,var(--red) 0 ${target}%,var(--green) ${target}% 100%)`
@@ -322,7 +322,18 @@ const Dice = {
         <div class="kv"><span>Win chance</span><b>${chance.toFixed(2)}%</b></div>
         <div class="kv"><span>Profit on win</span><b style="color:var(--green)">🪙 ${fmt(bet*(mult-1))}</b></div>`;
     }
-    $("#tsl").oninput = e => { target = parseFloat(e.target.value); refresh(); };
+    // drag anywhere on the coloured bar to choose the target (2–98)
+    const track = $("#dtrack");
+    let drag = false;
+    const setFromX = (clientX) => {
+      const rect = track.getBoundingClientRect();
+      const pct = (clientX - rect.left) / rect.width * 100;
+      target = Math.max(2, Math.min(98, Math.round(pct * 100) / 100));
+      refresh();
+    };
+    track.addEventListener("pointerdown", e => { drag = true; try{ track.setPointerCapture(e.pointerId); }catch(_){} setFromX(e.clientX); });
+    track.addEventListener("pointermove", e => { if (drag) setFromX(e.clientX); });
+    track.addEventListener("pointerup",   () => { drag = false; });
     $("#bet").oninput = refresh;
     $("#over").onclick  = () => { over = true;  $("#over").classList.add("on");  $("#under").classList.remove("on"); refresh(); };
     $("#under").onclick = () => { over = false; $("#under").classList.add("on"); $("#over").classList.remove("on");  refresh(); };
@@ -330,18 +341,16 @@ const Dice = {
 
     function roll(bet){
       if (!takeStake(bet)) return;
-      const r = rnd() * 100;
+      const r = rnd() * 100;                              // the actual random roll, 0–100
       const win = over ? (r > target) : (r < target);
       const chance = over ? (100 - target) : target;
       const mult = HE * 100 / chance;
-      const roll = $("#droll"); roll.style.display = "block";
-      roll.textContent = r.toFixed(2); roll.style.left = r + "%";
-      roll.style.color = win ? "var(--green)" : "var(--red)";
-      $("#dmark").style.left = r + "%";
+      const pill = $("#droll");
+      pill.textContent = r.toFixed(2); pill.style.left = r + "%";
+      pill.style.color = win ? "var(--green)" : "var(--red)";
       if (win){ setBal(getBal() + bet*mult); toast(`+🪙 ${fmt(bet*(mult-1))}`, "win"); }
       else toast("Lost", "lose");
-      pushHist(win ? mult : 0, win);
-      setTimeout(() => { $("#dmark").style.left = target + "%"; }, 900);
+      pushHist(win ? mult : 0, win, r.toFixed(2));        // history shows the rolled number, not the multiplier
       refresh();
     }
   }
