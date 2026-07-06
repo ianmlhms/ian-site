@@ -158,16 +158,50 @@ async function setUserPassword(uid) {
   $("pwResult").innerHTML = `✓ Password set to <code>${esc(pw)}</code> — give this to the user.`;
 }
 
+/* ============================ FEEDBACK ============================ */
+let feedback = [];
+const KIND = { idea: "💡", bug: "🐛", other: "💬" };
+async function loadFeedback() {
+  const { data, error } = await sb.from("feedback").select("*").order("created_at", { ascending: false });
+  if (error) { $("mlist").innerHTML = `<div class="empty">Error: ${esc(error.message)}</div>`; return; }
+  feedback = data || [];
+  renderFeedback(feedback);
+}
+function renderFeedback(list) {
+  $("glist").innerHTML = `<li class="empty">${list.length} submission(s)</li>`;
+  const box = $("mlist");
+  if (!list.length) { box.innerHTML = `<div class="empty">No feedback yet.</div>`; return; }
+  box.innerHTML = "";
+  list.forEach((f) => {
+    const el = document.createElement("div");
+    el.className = "am";
+    el.innerHTML = `<span class="who">${KIND[f.kind] || "💬"}</span>
+      <span class="txt">${esc(f.message)}<br><span class="muted">${esc(f.page || "?")}${f.username ? " · " + esc(f.username) : ""}</span></span>
+      <button class="msg-del" title="Delete">🗑</button><span class="when">${fmt(f.created_at)}</span>`;
+    el.querySelector(".msg-del").onclick = () => deleteFeedback(f.id);
+    box.appendChild(el);
+  });
+  box.scrollTop = 0;
+}
+async function deleteFeedback(id) {
+  if (!confirm("Delete this feedback?")) return;
+  const { error } = await sb.from("feedback").delete().eq("id", id);
+  if (error) return alert(error.message);
+  loadFeedback();
+}
+
 /* ============================ SHARED ============================ */
 function setMode(m) {
   mode = m; current = null;
   $("tabGroups").classList.toggle("active", m === "groups");
   $("tabUsers").classList.toggle("active", m === "users");
+  $("tabFeedback").classList.toggle("active", m === "feedback");
   $("search").value = "";
-  $("search").placeholder = m === "groups" ? "Search groups / DMs…" : "Search users…";
-  $("detailH").innerHTML = m === "groups" ? "Select a group to inspect" : "Select a user";
+  $("search").placeholder = m === "groups" ? "Search groups / DMs…" : m === "users" ? "Search users…" : "Search feedback…";
+  $("detailH").innerHTML = m === "groups" ? "Select a group to inspect" : m === "users" ? "Select a user" : "💬 Feedback";
   $("mlist").innerHTML = "";
-  if (m === "groups") loadGroups(); else loadUsers();
+  $("glist").innerHTML = "";
+  if (m === "groups") loadGroups(); else if (m === "users") loadUsers(); else loadFeedback();
 }
 
 function showDenied() {
@@ -188,10 +222,12 @@ async function gate() {
   $("panel").style.display = "flex";
   $("tabGroups").onclick = () => setMode("groups");
   $("tabUsers").onclick = () => setMode("users");
+  $("tabFeedback").onclick = () => setMode("feedback");
   $("search").oninput = (e) => {
     const q = e.target.value.toLowerCase();
     if (mode === "groups") renderGroupList(groups.filter((g) => (g.name + " " + g.invite_code).toLowerCase().includes(q)));
-    else renderUserList(users.filter((u) => ((u.email || "") + " " + (u.username || "")).toLowerCase().includes(q)));
+    else if (mode === "users") renderUserList(users.filter((u) => ((u.email || "") + " " + (u.username || "")).toLowerCase().includes(q)));
+    else renderFeedback(feedback.filter((f) => ((f.message || "") + " " + (f.username || "") + " " + (f.page || "")).toLowerCase().includes(q)));
   };
   setMode("groups");
 }
