@@ -139,7 +139,16 @@
     document.body.appendChild(btn);
   }
 
-  function boot() { buildPicker(); buildRefresh(); }
+  // ---- site-wide feedback widget ----
+  function loadFeedback() {
+    // pixelbreak has its own feedback box; skip loading a second one there
+    if (document.getElementById("fbFab") || document.getElementById("fbScript")) return;
+    const s = document.createElement("script");
+    s.id = "fbScript"; s.src = "feedback.js?v=1";
+    document.body.appendChild(s);
+  }
+
+  function boot() { buildPicker(); buildRefresh(); loadFeedback(); }
   if (document.body) boot();
   else document.addEventListener("DOMContentLoaded", boot);
 })();
