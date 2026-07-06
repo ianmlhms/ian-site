@@ -20,7 +20,13 @@
   .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
   .me{display:flex;align-items:center;gap:14px}
-  .me .big{width:64px;height:64px;border-radius:50%;background:var(--card2);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:34px}
+  .me .big{width:64px;height:64px;border-radius:50%;background:var(--card2);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:34px;overflow:hidden}
+  .me .big img{width:100%;height:100%;object-fit:cover;display:block}
+  .upl{display:flex;gap:10px;flex-wrap:wrap}
+  .uplbtn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:14px}
+  .uplbtn.ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border)}
+  .uplbtn:hover{filter:brightness(1.06)}
+  .upl-hint{color:var(--muted);font-size:12px;margin-top:8px}
   .me .name{font-weight:800;font-size:20px}
   .me .sub{color:var(--muted);font-size:13px}
   h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 0}
@@ -55,7 +61,25 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","🦁","🐯","🐵",
                "🦄","🐙","🐢","🦖","🐬","🦅","⚡","🔥","🌟","🍕","🎮","🏎️"];
+const BUCKET="avatars", AV_PX=256;
+const isUrl=(v)=>/^https?:\/\//.test(v||"");
+const avInner=(v)=>v?(isUrl(v)?`<img src="${esc(v)}" alt="avatar">`:esc(v)):"👤";
 let sb=null,myAvatar=null;
+
+// centre-crop to a square and downscale to a small JPEG so storage stays tiny
+function squareResize(file,size){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const s=Math.min(img.width,img.height);
+      const c=document.createElement("canvas");c.width=size;c.height=size;
+      c.getContext("2d").drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,size,size);
+      c.toBlob(b=>b?res(b):rej(new Error("Could not process image")),"image/jpeg",0.85);
+    };
+    img.onerror=()=>rej(new Error("That file isn't a readable image"));
+    img.src=URL.createObjectURL(file);
+  });
+}
 
 async function boot(){
   sb=await auth.client();
@@ -69,13 +93,24 @@ async function boot(){
   try{const {data}=await sb.from("profiles").select("avatar").eq("id",auth.session().user.id).single();myAvatar=data?.avatar||null;}catch{}
   $("wrap").innerHTML=`
     <div class="card me">
-      <div class="big" id="bigAv">${myAvatar||"👤"}</div>
+      <div class="big" id="bigAv">${avInner(myAvatar)}</div>
       <div><div class="name">${esc(uname)}</div><div class="sub">ian.lu player</div></div>
     </div>
-    <h2>Pick your avatar</h2>
+    <h2>Profile picture</h2>
+    <div class="card">
+      <div class="upl">
+        <button class="uplbtn" id="uplBtn">📷 Upload a photo</button>
+        <button class="uplbtn ghost" id="rmBtn"${isUrl(myAvatar)?"":" hidden"}>Remove photo</button>
+        <input type="file" id="uplFile" accept="image/*" hidden>
+      </div>
+      <div class="upl-hint">Square-cropped and stored small (256px). Or pick an emoji below.</div>
+      <div class="msg" id="uplMsg"></div>
+    </div>
+    <h2>Or pick an emoji</h2>
     <div class="card"><div class="grid" id="avGrid"></div><div class="msg" id="avMsg"></div></div>
     <h2>Your stats</h2>
     <div class="card stats" id="stats"><div class="gate">Loading…</div></div>`;
+  wireUpload();
   const grid=$("avGrid");
   for(const a of AVATARS){
     const b=document.createElement("button");
@@ -84,7 +119,7 @@ async function boot(){
       try{
         const {error}=await sb.rpc("set_avatar",{p_avatar:a});
         if(error)throw error;
-        myAvatar=a;$("bigAv").textContent=a;
+        myAvatar=a;$("bigAv").innerHTML=avInner(a);$("rmBtn").hidden=true;
         grid.querySelectorAll(".avb").forEach(x=>x.classList.toggle("on",x.textContent===a));
         $("avMsg").textContent="Saved ✓";setTimeout(()=>$("avMsg").textContent="",1200);
       }catch(e){console.warn(e);$("avMsg").textContent="Couldn't save (run the migration?)";}
@@ -92,6 +127,51 @@ async function boot(){
     grid.appendChild(b);
   }
   loadStats(uname);
+}
+
+function setUpl(t,err){
+  const m=$("uplMsg");if(!m)return;
+  m.textContent=t;m.style.color=err?"#ff6b6b":"var(--accent2)";
+  if(t&&!err&&/✓/.test(t))setTimeout(()=>{if($("uplMsg"))$("uplMsg").textContent="";},1600);
+}
+
+function wireUpload(){
+  $("uplBtn").onclick=()=>$("uplFile").click();
+  $("uplFile").onchange=async(e)=>{
+    const file=e.target.files&&e.target.files[0];
+    e.target.value="";                 // allow re-picking the same file later
+    if(!file)return;
+    if(!/^image\//.test(file.type)){setUpl("Please choose an image file.",true);return;}
+    setUpl("Processing…");
+    try{
+      const blob=await squareResize(file,AV_PX);
+      const uid=auth.session().user.id;
+      const path=`${uid}/avatar.jpg`;
+      const {error:upErr}=await sb.storage.from(BUCKET)
+        .upload(path,blob,{upsert:true,contentType:"image/jpeg",cacheControl:"3600"});
+      if(upErr)throw upErr;
+      const url=sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl+"?v="+Date.now();
+      const {error}=await sb.rpc("set_avatar",{p_avatar:url});
+      if(error)throw error;
+      myAvatar=url;
+      $("bigAv").innerHTML=avInner(url);
+      $("avGrid").querySelectorAll(".avb").forEach(x=>x.classList.remove("on"));
+      $("rmBtn").hidden=false;
+      setUpl("Saved ✓");
+    }catch(err){console.warn(err);setUpl(err.message||"Upload failed — is the migration run?",true);}
+  };
+  $("rmBtn").onclick=async()=>{
+    setUpl("Removing…");
+    try{
+      const {error}=await sb.rpc("set_avatar",{p_avatar:""});
+      if(error)throw error;
+      try{await sb.storage.from(BUCKET).remove([`${auth.session().user.id}/avatar.jpg`]);}catch{}
+      myAvatar=null;
+      $("bigAv").innerHTML=avInner(null);
+      $("rmBtn").hidden=true;
+      setUpl("Removed ✓");
+    }catch(err){console.warn(err);setUpl("Couldn't remove the photo.",true);}
+  };
 }
 
 async function loadStats(uname){

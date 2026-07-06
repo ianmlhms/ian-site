@@ -24,8 +24,13 @@ let readThreshold = null;    // ms: msgs sent at/before this are read by ALL oth
 let reactMap = {};           // message_id -> [{user_id, username, emoji}]
 let onlineUsers = new Set(); // usernames currently online (presence)
 let adminIds = new Set();    // user_ids of app admins → shown with a 👑 tag
-let avatarMap = {};          // user_id -> avatar emoji (from profiles)
+let avatarMap = {};          // user_id -> avatar emoji OR uploaded-photo URL (from profiles)
 const avatarOf = (uid) => avatarMap[uid] || "👤";
+// render an avatar as an <img> when it's an uploaded photo URL, else the emoji glyph
+const avatarHtml = (uid) => {
+  const a = avatarOf(uid);
+  return /^https?:\/\//.test(a) ? `<img class="av-img" src="${esc(a)}" alt="">` : a;
+};
 let onlineSubbed = false;
 let allChats = [];           // last loaded chats, for search filtering
 let lastTypingSent = 0, typingClear = null;
@@ -175,7 +180,7 @@ async function toggleMembers() {
   const { data, error } = await sb.from("group_members").select("username,user_id,joined_at").eq("group_id", current.id);
   const me = auth.session().user.id;
   p.querySelector(".mp-list").innerHTML = error || !data ? T("msg.loadFail") :
-    data.map((m) => `<div class="mp-row">${avatarOf(m.user_id)} ${esc(m.username)}${adminTag(m.user_id)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
+    data.map((m) => `<div class="mp-row"><span class="mp-av">${avatarHtml(m.user_id)}</span> ${esc(m.username)}${adminTag(m.user_id)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
 }
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 
@@ -437,7 +442,7 @@ function appendMessage(m) {
   const replyHtml = m.reply_user
     ? `<span class="reply-quote" data-rid="${m.reply_to || ""}"><span class="rq-user">${esc(m.reply_user)}</span><span class="rq-text">${esc(m.reply_preview || "")}</span></span>`
     : "";
-  const avHtml = mine ? "" : `<span class="av-chip" aria-hidden="true">${avatarOf(m.user_id)}</span>`;
+  const avHtml = mine ? "" : `<span class="av-chip" aria-hidden="true">${avatarHtml(m.user_id)}</span>`;
   el.innerHTML = `${avHtml}<div class="bubble"><span class="who">${esc(m.username)}${adminTag(m.user_id)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? `<span class="edited">${T("msg.edited")}</span>` : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
   const bubble = el.querySelector(".bubble");
   // tap a quoted reply to jump to the original
