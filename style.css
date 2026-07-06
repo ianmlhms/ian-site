@@ -133,7 +133,7 @@ footer {
   padding: 34px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: linear-gradient(145deg, rgba(22,22,37,.96), rgba(30,30,53,.84));
+  background: linear-gradient(145deg, var(--card), var(--card2));
   min-width: 0;
 }
 .today-title {
@@ -142,7 +142,7 @@ footer {
   font-weight: 800;
   letter-spacing: 0;
   line-height: .98;
-  background: linear-gradient(120deg, #e8e8f0, #6ea8fe 64%, #4de8ff);
+  background: linear-gradient(120deg, var(--text), var(--accent) 64%, var(--accent2));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
