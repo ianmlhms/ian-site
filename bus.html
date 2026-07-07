@@ -247,7 +247,9 @@ async function loadBoard(){
    `trip` returns every stop with scheduled + real times (→ delays). */
 const TRANSITOUS="https://api.transitous.org/api/v1";
 const motisStopId=(id)=>`lu-administration-des-transports-publics_${String(id).padStart(12,"0")}`;
-const clockOf=(iso)=>iso?new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"";
+// always local 24h "HH:MM" — toLocaleTimeString can emit "09:01 PM" on some
+// locales, which would never match the HAFAS board's 24h times
+const clockOf=(iso)=>{ if(!iso)return""; const d=new Date(iso); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
 const delayOf=(real,sched)=>(real&&sched)?Math.round((new Date(real)-new Date(sched))/60000):0;
 const normLine=(s)=>(""+(s||"")).toUpperCase().replace(/[^A-Z0-9]/g,"");
 async function findTripId(dep){
@@ -289,7 +291,7 @@ async function loadDepDetail(i,box){
   box.innerHTML='<div class="muted" style="padding:8px 2px">Wee gëtt gelueden…</div>';
   try{
     const tripId=await findTripId(DEPS[i]);
-    if(!tripId){ box.innerHTML='<div class="muted" style="padding:8px 2px">Kee Detail fonnt.</div>'; return; }
+    if(!tripId){ box.innerHTML='<div class="muted" style="padding:8px 2px">Detail fir dës Linn net verfügbar.</div>'; return; }
     const u=new URL(`${TRANSITOUS}/trip`); u.searchParams.set("tripId",tripId);
     const d=await (await fetch(u)).json();
     const leg=(d.legs||[]).find(l=>l.mode!=="WALK")||(d.legs||[])[0];
