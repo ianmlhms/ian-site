@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       const lon = url.searchParams.get("lon") ?? "";
       if (!/^-?\d+\.?\d*$/.test(lat) || !/^-?\d+\.?\d*$/.test(lon)) return json({ configured: true, stops: [] });
       const data = await hafas("location.nearbystops", {
-        originCoordLat: lat, originCoordLong: lon, maxNo: "8", r: "1500", lang: "de",
+        originCoordLat: lat, originCoordLong: lon, maxNo: "12", r: "3000", lang: "de",
       });
       const raw = data?.stopLocationOrCoordLocation ?? [];
       const stops = raw
