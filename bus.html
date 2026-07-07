@@ -27,6 +27,11 @@
   #stops .st{display:flex;justify-content:space-between;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:13.5px}
   #stops .st:hover{border-color:var(--accent2)}
   #stops .st .dist{color:var(--muted);font-size:12px;flex:none}
+  #recents{margin-bottom:2px}
+  .rectitle{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 7px}
+  .recchips{display:flex;flex-wrap:wrap;gap:7px}
+  .recchip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .recchip:hover{border-color:var(--accent2)}
   .dep{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
   .dep:last-child{border-bottom:none}
   .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 6px}
@@ -98,11 +103,11 @@
           <div class="pickrow"><input id="fromq" placeholder="Vun … (z.B. Gare)" autocomplete="off"><div id="fromList"></div></div>
           <div class="pickrow"><input id="toq" placeholder="Bis … (z.B. Kirchberg)" autocomplete="off"><div id="toList"></div></div>
         </div>
-        <button id="tpSwap" title="Tauschen">⇅</button>
+        <button id="tpSwap" title="Wiesselen">⇅</button>
       </div>
       <div class="tpwhen">
-        <select id="tpMode" title="Ofoert oder Arrivée">
-          <option value="dep">Ofoert</option>
+        <select id="tpMode" title="Depart oder Arrivée">
+          <option value="dep">Depart</option>
           <option value="arr">Arrivée</option>
         </select>
         <input type="datetime-local" id="tpTime">
@@ -119,6 +124,7 @@
       <input id="stopq" placeholder="Arrêt oder Gare sichen…" autocomplete="off">
       <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
     </div>
+    <div id="recents"></div>
     <div id="stops"></div>
     <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
   </div>
@@ -136,6 +142,22 @@ const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
    list (moien-stops.json, all ~2800 Luxembourg stops). Only the departure board
    goes through the Edge Function → ministry HAFAS API (accessId stays server-side). */
 let curStop=null, tpTimer=null, STOPS=[], NORMS=[];
+// recently opened stops, for one-tap access (newest first, max 6)
+const MAX_RECENTS=6;
+let RECENTS=(()=>{ try{ const r=JSON.parse(localStorage.getItem("moienRecents")); return Array.isArray(r)?r:[]; }catch{ return []; } })();
+function pushRecent(s){
+  RECENTS=[{id:s.id,name:s.name}, ...RECENTS.filter(r=>String(r.id)!==String(s.id))].slice(0,MAX_RECENTS);
+  localStorage.setItem("moienRecents", JSON.stringify(RECENTS));
+}
+function renderRecents(){
+  const host=$("recents"); if(!host)return;
+  if(!RECENTS.length){ host.innerHTML=""; return; }
+  host.innerHTML=`<div class="rectitle">🕘 Zulescht benotzt</div><div class="recchips">`+
+    RECENTS.map(r=>`<button class="recchip" data-id="${esc(r.id)}">${esc(r.name)}</button>`).join("")+`</div>`;
+  host.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{
+    const r=RECENTS.find(x=>String(x.id)===el.dataset.id); if(r)selectStop(r);
+  });
+}
 // accent-insensitive, and treat commas as spaces so "hollerich kierfecht" matches
 // the stop "Hollerich, Kierfecht" (the comma is optional).
 const norm=(s)=>(""+(s||"")).normalize("NFD").replace(/[\u0300-\u036f]/g,"")
@@ -183,6 +205,7 @@ function selectStop(s){
   $("stopq").value=s.name; $("stops").innerHTML="";
   $("deps").innerHTML='<div class="muted">Lueden…</div>';
   localStorage.setItem("moienStop",JSON.stringify(curStop));
+  pushRecent(curStop); renderRecents();
   loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(loadBoard,45000);
 }
 /* local text search over the bundled stops (accent- & comma-insensitive, prefix-first).
@@ -255,7 +278,7 @@ function renderTrip(data){
     const mins=Math.round((it.duration||0)/60);
     const legs=it.legs.filter(l=>l.mode!=="WALK"||l.duration>90);
     const chain=legs.map(legLabel).join('<span class="arrow">›</span>');
-    const chg=it.transfers===1?"1 Ëmklammen":`${it.transfers} Ëmklammen`;
+    const chg=it.transfers>0?`${it.transfers}× ëmklammen`:"direkt";
     return `<div class="trip" data-i="${idx}">
       <div class="thead">
         <span class="ttime">${fmtClock(it.startTime)} → ${fmtClock(it.endTime)}</span>
@@ -317,7 +340,8 @@ function wireSearch(){
     clearTimeout(searchT);
     searchT=setTimeout(()=>{
       const q=$("stopq").value.trim();
-      if(q.length<2){$("stops").innerHTML="";return;}
+      if(q.length<2){$("stops").innerHTML="";renderRecents();return;}
+      $("recents").innerHTML="";
       renderStops(searchStops(q));
     },160);
   });
@@ -353,6 +377,7 @@ async function initTransport(){
   const saved=JSON.parse(localStorage.getItem("moienStop")||"null");
   if(saved&&saved.id){ selectStop(saved); }
   else $("tpNote").innerHTML='<span class="muted">Sich en Arrêt oder tipp 📍 fir déi no bei dir.</span>';
+  renderRecents();
 }
 initTransport();
 
