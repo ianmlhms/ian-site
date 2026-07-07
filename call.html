@@ -78,9 +78,14 @@ const peerId=q.get("peer")||"";
 const peerName=q.get("name")||"…";
 $("peerName").textContent=peerName;
 
+// STUN finds a direct path; TURN relays when the two networks can't connect
+// directly (different NATs / mobile data). OpenRelay is a free public TURN.
 const ICE={iceServers:[
   {urls:"stun:stun.l.google.com:19302"},
   {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"turn:openrelay.metered.ca:80",           username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443",          username:"openrelayproject",credential:"openrelayproject"},
+  {urls:"turn:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"},
 ]};
 
 let sb=null, me=null, myName=null, callId=null;
@@ -123,13 +128,16 @@ async function boot(){
 function buildPeer(){
   pc=new RTCPeerConnection(ICE);
   localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  pc.onicecandidate=(e)=>{ if(e.candidate) room && room.send({type:"broadcast",event:"ice",payload:{c:e.candidate}}); };
+  pc.onicecandidate=(e)=>{
+    if(e.candidate){ console.log("[call] local ICE", e.candidate.type, e.candidate.protocol); room && room.send({type:"broadcast",event:"ice",payload:{c:e.candidate}}); }
+  };
   pc.ontrack=(e)=>{ if(noAnswerTimer){ clearTimeout(noAnswerTimer); noAnswerTimer=null; } const r=$("remote"); if(r.srcObject!==e.streams[0]){ r.srcObject=e.streams[0]; } r.classList.remove("waiting"); $("center").classList.add("hidden"); };
+  pc.oniceconnectionstatechange=()=>console.log("[call] iceConnectionState", pc.iceConnectionState);
   pc.onconnectionstatechange=()=>{
-    const s=pc.connectionState;
+    const s=pc.connectionState; console.log("[call] connectionState", s);
     if(s==="connected"){ setStatus(T("call.connected")); }
     else if(s==="failed"){ setStatus(T("call.lost")); }
-    else if(s==="disconnected"){ setStatus(T("call.lost")); }
+    // "disconnected" is often transient — let ICE try to recover before giving up
   };
 }
 
