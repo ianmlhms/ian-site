@@ -24,6 +24,10 @@
   .tpbtn{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-size:15px;font-weight:700;cursor:pointer}
   .tpbtn:hover{filter:brightness(1.05)}
   .tpbtn:disabled{opacity:.55;cursor:default}
+  #linerow{display:flex;gap:8px}
+  #lineq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  .linex{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:15px;cursor:pointer}
+  .linex:hover{border-color:var(--accent2);color:var(--text)}
   #stops .st{display:flex;justify-content:space-between;gap:8px;padding:12px 12px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:15px}
   #stops .st:hover{border-color:var(--accent2)}
   #stops .st .dist{color:var(--muted);font-size:12px;flex:none}
@@ -147,6 +151,10 @@
       <input id="stopq" placeholder="Arrêt oder Gare sichen…" autocomplete="off">
       <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
     </div>
+    <div id="linerow" style="display:none;margin-top:8px">
+      <input id="lineq" placeholder="Linn filteren (z.B. 321)" autocomplete="off">
+      <button class="linex" id="lineClear" title="Läschen" style="display:none">✕</button>
+    </div>
     <div id="depwhen" style="display:none;margin-top:10px">
       <div class="wrow" id="depWhenChips"></div>
       <input type="hidden" id="depTime">
@@ -200,13 +208,18 @@ async function tp(params){
 // rail categories the HAFAS board returns at stations (buses have cat "Bus"/"")
 const RAIL=new Set(["RB","RE","IC","IR","TER","TGV","ICE","EC","EN","CFL","TRAIN"]);
 const railIcon=(cat)=>/TGV|ICE/i.test(cat||"")?"🚄":"🚆";
-let DEPS=[];
-function renderDeps(list){
-  DEPS=list||[];
+let DEPS=[], lineFilter="";
+// line filter: match the line label, train number or category (e.g. "321", "RB")
+const depMatch=(d)=>{ if(!lineFilter)return true; const f=normLine(lineFilter);
+  return normLine(d.line).includes(f)||(d.num&&normLine(d.num).includes(f))||(d.cat&&normLine(d.cat).includes(f)); };
+function renderDeps(list){ DEPS=list||[]; paintDeps(); }
+function paintDeps(){
   if(!DEPS.length){
     const msg=$("depTime").value?"Keng Departuren ëm dës Zäit.":"Keng Departuren an der nächster Stonn.";
     $("deps").innerHTML=`<div class="muted">${msg}</div>`;return;}
-  $("deps").innerHTML=DEPS.map((d,i)=>{
+  const rows=DEPS.map((d,i)=>[d,i]).filter(([d])=>depMatch(d));
+  if(!rows.length){ $("deps").innerHTML=`<div class="muted">Keng Departure fir „${esc(lineFilter)}" an der Lëscht.</div>`; return; }
+  $("deps").innerHTML=rows.map(([d,i])=>{
     const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
     const train=RAIL.has((d.cat||"").toUpperCase());
     const lab=train?`${railIcon(d.cat)} ${esc(d.line||d.cat)}`:esc(d.line);
@@ -219,6 +232,15 @@ function renderDeps(list){
       <div class="depdetail" hidden></div>`;
   }).join("");
   $("deps").querySelectorAll(".dep").forEach(el=>el.onclick=()=>toggleDep(+el.dataset.i,el));
+}
+function wireLineFilter(){
+  const clr=$("lineClear");
+  $("lineq").addEventListener("input",()=>{
+    lineFilter=$("lineq").value.trim();
+    clr.style.display=lineFilter?"":"none";
+    paintDeps();
+  });
+  clr.onclick=()=>{ $("lineq").value=""; lineFilter=""; clr.style.display="none"; paintDeps(); };
 }
 function toggleDep(i,el){
   const box=el.nextElementSibling;
@@ -311,6 +333,7 @@ function renderStops(stops){
 function selectStop(s){
   curStop={id:s.id,name:s.name};
   $("stopq").value=s.name; $("stops").innerHTML="";
+  $("linerow").style.display="";
   $("deps").innerHTML='<div class="muted">Lueden…</div>';
   localStorage.setItem("moienStop",JSON.stringify(curStop));
   pushRecent(curStop); renderRecents();
@@ -539,7 +562,7 @@ async function initTransport(){
     NORMS=STOPS.map(s=>norm(s[1]));   // precompute normalized names for fast search
   }catch(e){ $("tpNote").innerHTML='<span class="muted">Arrêt-Lëscht net gelueden.</span>'; return; }
   $("tprow").style.display=""; $("depwhen").style.display="";
-  wireSearch();
+  wireSearch(); wireLineFilter();
   // departure board: look up a later moment (buses & trains). Empty = live "now".
   wireWhen("depTime","depWhenChips","depPicker",loadBoard);
   // route finder
