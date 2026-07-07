@@ -53,6 +53,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
 import * as auth from "./auth.js?v=4";
+import { mountPicker } from "./datetime-picker.js?v=1";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let sb=null,exams=[],timer=null;
@@ -71,8 +72,9 @@ async function boot(){
   $("wrap").innerHTML=`
     <div class="card newx">
       <input id="nSubj" class="full" maxlength="100" placeholder="Fach / Prüfung (z.B. Mathe-Klassenarbeit)">
-      <input id="nDate" type="date"><input id="nTime" type="time" value="08:00">
+      <input type="hidden" id="nDate"><input type="hidden" id="nTime" value="08:00">
       <div class="xchips full" id="nQuick"></div>
+      <div class="full" id="nPicker"></div>
       <input id="nNote" class="full" maxlength="200" placeholder="Notiz (optional, z.B. Kapitel 4–6)">
       <button class="btn full" id="nAdd">Hinzufügen</button>
       <div class="msg" id="nMsg"></div>
@@ -117,20 +119,25 @@ function render(){
   });
 }
 
-// friendlier date entry: default to today, block past dates, one-tap presets
+// friendlier date entry: a tappable calendar + iOS-style time wheels, defaulted
+// to today 08:00, plus one-tap Heute/Morgen presets. Native inputs are hidden
+// and kept in sync so addExam() reads nDate (YYYY-MM-DD) + nTime (HH:MM).
 function wireQuickDate(){
   const iso=(d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const today=new Date();
-  $("nDate").min=iso(today);
-  if(!$("nDate").value)$("nDate").value=iso(today);
+  const hm=(d)=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const sync=(d)=>{ if(d){ $("nDate").value=iso(d); $("nTime").value=hm(d); } };
   const setActive=(el)=>$("nQuick").querySelectorAll(".xchip").forEach(x=>x.classList.toggle("on",x===el));
+  const def=new Date(); def.setHours(8,0,0,0);
+  sync(def);
+  const picker=mountPicker($("nPicker"),{ value:def, time:true, min:new Date(), lang:"de",
+    onChange:(d)=>{ sync(d); setActive(null); } });
   const presets=[["Heute",0],["Morgen",1],["Übermorgen",2],["+1 Woche",7]];
   $("nQuick").innerHTML=presets.map(([l,o],i)=>`<button type="button" class="xchip${i===0?" on":""}" data-o="${o}">${l}</button>`).join("");
   $("nQuick").querySelectorAll(".xchip").forEach(b=>b.onclick=()=>{
-    const d=new Date(); d.setDate(d.getDate()+ +b.dataset.o); $("nDate").value=iso(d); setActive(b);
+    const d=new Date(); d.setDate(d.getDate()+ +b.dataset.o);
+    const [H,M]=($("nTime").value||"08:00").split(":"); d.setHours(+H,+M,0,0);
+    picker.set(d); sync(d); setActive(b);
   });
-  // manual date edits clear the preset highlight
-  $("nDate").addEventListener("input",()=>setActive(null));
 }
 
 async function addExam(){

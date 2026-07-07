@@ -63,7 +63,6 @@
   .wchip:hover{border-color:var(--accent2)}
   .wchip.on{background:var(--accent2);border-color:var(--accent2);color:#06121a;font-weight:700}
   .wchip.wcal{padding:7px 11px;font-size:14px}
-  input[type=datetime-local]{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:13.5px;color-scheme:dark;width:100%}
   #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-weight:700;font-size:14px;cursor:pointer}
   #tpFind:disabled{opacity:.55;cursor:default}
   #rectrips{margin-top:12px}
@@ -117,7 +116,8 @@
         </select>
         <div class="wrow" id="tpWhenChips" style="flex:1"></div>
       </div>
-      <input type="datetime-local" id="tpTime" style="display:none;margin-top:8px">
+      <input type="hidden" id="tpTime">
+      <div id="tpPicker" style="display:none;margin-top:8px"></div>
       <button id="tpFind">Wee sichen</button>
       <div id="rectrips"></div>
       <div id="trip"></div>
@@ -132,7 +132,8 @@
     </div>
     <div id="depwhen" style="display:none;margin-top:10px">
       <div class="wrow" id="depWhenChips"></div>
-      <input type="datetime-local" id="depTime" style="display:none;margin-top:8px">
+      <input type="hidden" id="depTime">
+      <div id="depPicker" style="display:none;margin-top:8px"></div>
     </div>
     <div id="recents"></div>
     <div id="stops"></div>
@@ -144,6 +145,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
 import * as auth from "./auth.js?v=4";
+import { mountPicker } from "./datetime-picker.js?v=1";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -394,14 +396,16 @@ $("tpGeo").onclick=()=>{
 };
 
 /* Friendly "when" picker: one-tap relative chips (now / +15′ / +30′ / +1h /
-   this evening / tomorrow) that write into a hidden datetime-local; the 🗓 chip
-   reveals that input for an exact moment. onChange fires after every pick. */
-function wireWhen(inputId, hostId, onChange){
-  const inp=$(inputId), host=$(hostId);
+   this evening / tomorrow) that write "YYYY-MM-DDTHH:MM" into a hidden input;
+   the 🗓 chip reveals the custom calendar + scroll-wheel picker for an exact
+   moment. onChange fires after every pick. */
+function wireWhen(inputId, hostId, pickerId, onChange){
+  const inp=$(inputId), host=$(hostId), phost=$(pickerId);
   const pad=(n)=>String(n).padStart(2,"0");
   const toLocal=(d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   const setActive=(k)=>host.querySelectorAll(".wchip").forEach(b=>b.classList.toggle("on",b.dataset.k===k));
   const fire=()=>{ try{ onChange&&onChange(); }catch(e){ console.warn("[when]",e); } };
+  let picker=null;
   const presets=[["now","Elo"],["m15","+15′"],["m30","+30′"],["h1","+1 St."],["eve","Owend"],["tmr","Muer"]];
   host.innerHTML=presets.map(([k,l])=>`<button type="button" class="wchip${k==="now"?" on":""}" data-k="${k}">${l}</button>`).join("")
     +`<button type="button" class="wchip wcal" data-k="cal" title="Datum &amp; Zäit wielen">🗓</button>`;
@@ -417,15 +421,18 @@ function wireWhen(inputId, hostId, onChange){
   };
   host.querySelectorAll(".wchip").forEach(b=>b.onclick=()=>{
     if(b.dataset.k==="cal"){
-      const hidden=getComputedStyle(inp).display==="none";
-      if(hidden){ if(!inp.value)inp.value=toLocal(new Date()); inp.style.display=""; setActive("cal"); inp.focus(); fire(); }
-      else inp.style.display="none";
+      if(phost.style.display!=="none"){ phost.style.display="none"; return; }
+      phost.style.display="";   // show before mounting so the scroll wheels can measure
+      const seed=inp.value?new Date(inp.value):null;
+      if(!picker){
+        picker=mountPicker(phost,{ value:seed, time:true, min:new Date(), lang:"lb",
+          onChange:(d)=>{ inp.value=d?toLocal(d):""; setActive("cal"); fire(); } });
+      }else picker.set(seed);
+      setActive("cal");
       return;
     }
-    inp.style.display="none"; apply(b.dataset.k); fire();
+    phost.style.display="none"; apply(b.dataset.k); fire();
   });
-  // committing a precise value keeps the 🗓 chip highlighted
-  inp.addEventListener("change",()=>{ setActive("cal"); fire(); });
 }
 
 async function initTransport(){
@@ -437,14 +444,14 @@ async function initTransport(){
   $("tprow").style.display=""; $("depwhen").style.display="";
   wireSearch();
   // departure board: look up a later moment (buses & trains). Empty = live "now".
-  wireWhen("depTime","depWhenChips",loadBoard);
+  wireWhen("depTime","depWhenChips","depPicker",loadBoard);
   // route finder
   $("tproute").style.display=""; $("tpRouteNote").style.display="none";
   wireStopPicker("fromq","fromList",s=>{tripFrom=s;});
   wireStopPicker("toq","toList",s=>{tripTo=s;});
   $("tpFind").onclick=findTrip;
   renderRecentTrips();
-  wireWhen("tpTime","tpWhenChips",null);
+  wireWhen("tpTime","tpWhenChips","tpPicker",null);
   $("tpSwap").onclick=()=>{
     const a=$("fromq").value; $("fromq").value=$("toq").value; $("toq").value=a;
     const t=tripFrom; tripFrom=tripTo; tripTo=t;
