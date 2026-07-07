@@ -5,6 +5,26 @@ import * as auth from "./auth.js?v=4";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? "—" : d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
+const fileIcon = (name) => { const e = (name || "").split(".").pop().toLowerCase(); return ({ pdf: "📕", zip: "🗜", doc: "📘", docx: "📘", xls: "📗", xlsx: "📗", ppt: "📙", pptx: "📙", txt: "📄", mp3: "🎵", wav: "🎵" })[e] || "📎"; };
+
+// Render a message's attachment. Handles every media_type the messenger can send
+// (image / video / audio / file) — previously only image/video, so voice notes and
+// file attachments showed a broken-image box.
+function appendMedia(container, m) {
+  let tag;
+  if (m.media_type === "audio") {
+    tag = document.createElement("audio"); tag.controls = true; tag.className = "media";
+  } else if (m.media_type === "video") {
+    tag = document.createElement("video"); tag.controls = true; tag.className = "media";
+  } else if (m.media_type === "file") {
+    tag = document.createElement("a"); tag.className = "filechip"; tag.target = "_blank"; tag.rel = "noopener";
+    tag.innerHTML = `<span>${fileIcon(m.content)}</span><span>${esc(m.content || "File")}</span><span>⬇</span>`;
+  } else {
+    tag = document.createElement("img"); tag.className = "media";   // image (default)
+  }
+  container.appendChild(tag);
+  signedUrl(m.media_url).then((u) => { if (u) { if (tag.tagName === "A") tag.href = u; else tag.src = u; } });
+}
 
 let sb = null, mode = "groups", groups = [], users = [], current = null;
 
@@ -55,14 +75,12 @@ async function openGroup(id) {
   msgs.forEach((m) => {
     const el = document.createElement("div");
     el.className = "am";
-    el.innerHTML = `<span class="who">${esc(m.username)}</span><span class="txt">${esc(m.content || "")}</span>
+    // For file messages, content holds the filename (shown in the chip below), so
+    // don't repeat it as text. Other media (image/video/audio) carry empty content.
+    const txt = m.media_type === "file" ? "" : (m.content || "");
+    el.innerHTML = `<span class="who">${esc(m.username)}</span><span class="txt">${esc(txt)}</span>
       <button class="msg-del" title="Delete message">🗑</button><span class="when">${fmt(m.created_at)}</span>`;
-    if (m.media_url) {
-      const tag = m.media_type === "video" ? document.createElement("video") : document.createElement("img");
-      tag.className = "media"; if (m.media_type === "video") tag.controls = true;
-      el.querySelector(".txt").appendChild(tag);
-      signedUrl(m.media_url).then((u) => { if (u) tag.src = u; });
-    }
+    if (m.media_url) appendMedia(el.querySelector(".txt"), m);
     el.querySelector(".msg-del").onclick = () => deleteMessage(m.id, id);
     box.appendChild(el);
   });
