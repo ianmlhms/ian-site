@@ -127,6 +127,10 @@
       <input id="stopq" placeholder="Arrêt oder Gare sichen…" autocomplete="off">
       <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
     </div>
+    <div class="tpwhen" id="depwhen" style="display:none">
+      <input type="datetime-local" id="depTime">
+      <button type="button" id="depNow" title="Elo">Elo</button>
+    </div>
     <div id="recents"></div>
     <div id="stops"></div>
     <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
@@ -175,7 +179,9 @@ async function tp(params){
 const RAIL=new Set(["RB","RE","IC","IR","TER","TGV","ICE","EC","EN","CFL","TRAIN"]);
 const railIcon=(cat)=>/TGV|ICE/i.test(cat||"")?"🚄":"🚆";
 function renderDeps(list){
-  if(!list||!list.length){$("deps").innerHTML='<div class="muted">Keng Departuren an der nächster Stonn.</div>';return;}
+  if(!list||!list.length){
+    const msg=$("depTime").value?"Keng Departuren ëm dës Zäit.":"Keng Departuren an der nächster Stonn.";
+    $("deps").innerHTML=`<div class="muted">${msg}</div>`;return;}
   $("deps").innerHTML=list.map(d=>{
     const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
     const train=RAIL.has((d.cat||"").toUpperCase());
@@ -190,7 +196,11 @@ function renderDeps(list){
 }
 async function loadBoard(){
   if(!curStop)return;
-  const d=await tp({action:"board",id:curStop.id});
+  const params={action:"board",id:curStop.id};
+  // optional future moment: datetime-local gives "YYYY-MM-DDTHH:MM" in local time
+  const when=$("depTime").value;
+  if(when){ const [date,time]=when.split("T"); if(date)params.date=date; if(time)params.time=time.slice(0,5); }
+  const d=await tp(params);
   if(d.error){$("deps").innerHTML='<div class="muted">Departuren net verfügbar.</div>';return;}
   renderDeps(d.departures);
 }
@@ -386,8 +396,11 @@ async function initTransport(){
     STOPS=await r.json();
     NORMS=STOPS.map(s=>norm(s[1]));   // precompute normalized names for fast search
   }catch(e){ $("tpNote").innerHTML='<span class="muted">Arrêt-Lëscht net gelueden.</span>'; return; }
-  $("tprow").style.display="";
+  $("tprow").style.display=""; $("depwhen").style.display="";
   wireSearch();
+  // departure board: look up a later moment (buses & trains). Empty = live "now".
+  $("depTime").addEventListener("change",loadBoard);
+  $("depNow").onclick=()=>{ $("depTime").value=""; loadBoard(); };
   // route finder
   $("tproute").style.display=""; $("tpRouteNote").style.display="none";
   wireStopPicker("fromq","fromList",s=>{tripFrom=s;});
