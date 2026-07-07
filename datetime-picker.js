@@ -9,8 +9,12 @@
      opts.min      Date | null   earliest selectable day (earlier days disabled)
      opts.lang     "lb" | "de"   month/weekday labels (default "de")
      opts.minuteStep number      minute granularity for the wheel (default 1)
+     opts.confirm  boolean       show the OK button (default true)
+     opts.confirmLabel string    OK button label (default "OK")
      opts.onChange (Date|null) => void   fired on every user pick
-   get() returns the chosen Date (or null); set(Date|null) updates the widget. */
+     opts.onConfirm (Date) => void       fired when OK is pressed (or api.confirm())
+   Returns { get, set, confirm }: get() → chosen Date|null; set(Date|null)
+   updates the widget; confirm() commits the shown value and calls onConfirm. */
 
 const L = {
   lb: { months: ["Januar","Februar","Mäerz","Abrëll","Mee","Juni","Juli","August","September","Oktober","November","Dezember"],
@@ -24,39 +28,43 @@ const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); retur
 const sameDay = (a, b) => a && b &&
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-const ROW = 32;        // wheel item height (px)
+const ROW = 36;        // wheel item height (px) — sized for touch
 const VISIBLE = 5;     // rows shown in the wheel viewport
 const MID = (VISIBLE - 1) / 2;
 
 const CSS = `
-.dtp{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;max-width:320px;user-select:none}
-.dtp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.dtp-title{font-weight:700;font-size:14px}
-.dtp-nav{background:none;border:1px solid var(--border);color:var(--text);border-radius:8px;width:32px;height:32px;font-size:17px;cursor:pointer;line-height:1}
+.dtp{background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:14px;width:100%;max-width:340px;margin:0 auto;user-select:none;-webkit-user-select:none;box-sizing:border-box}
+.dtp *{box-sizing:border-box}
+.dtp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dtp-title{font-weight:700;font-size:15px}
+.dtp-nav{background:none;border:1px solid var(--border);color:var(--text);border-radius:9px;width:40px;height:40px;font-size:19px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent}
 .dtp-nav:hover{border-color:var(--accent2)}
-.dtp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px}
+.dtp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:5px}
 .dtp-dow span{text-align:center;font-size:11px;color:var(--muted)}
-.dtp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
-.dtp-d,.dtp-e{height:34px;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:8px}
-.dtp-d{background:none;border:1px solid transparent;color:var(--text);cursor:pointer;padding:0}
+.dtp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dtp-d,.dtp-e{aspect-ratio:1/1;min-height:40px;display:flex;align-items:center;justify-content:center;font-size:14px;border-radius:9px}
+.dtp-d{background:none;border:1px solid transparent;color:var(--text);cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
 .dtp-d:hover{border-color:var(--accent2)}
 .dtp-d.today{border-color:var(--border)}
 .dtp-d.on{background:var(--accent2);color:#06121a;font-weight:800;border-color:var(--accent2)}
 .dtp-d:disabled{color:var(--muted);opacity:.35;cursor:default;border-color:transparent}
-.dtp-time{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:10px}
+.dtp-time{display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:12px}
 .dtp-time .lbl{align-self:flex-start;color:var(--muted);font-size:12px}
-.dtp-wheels{display:flex;align-items:center;gap:4px;position:relative}
+.dtp-wheels{display:flex;align-items:center;gap:6px;position:relative}
 .dtp-wheels::after{content:"";position:absolute;left:6px;right:6px;top:50%;height:${ROW}px;transform:translateY(-50%);
   border-top:1px solid var(--accent2);border-bottom:1px solid var(--accent2);opacity:.55;pointer-events:none;border-radius:6px}
-.wheel{height:${ROW * VISIBLE}px;width:60px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;
-  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+.wheel{height:${ROW * VISIBLE}px;width:72px;overflow-y:scroll;scroll-snap-type:y mandatory;scrollbar-width:none;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   -webkit-mask-image:linear-gradient(to bottom,transparent,#000 32%,#000 68%,transparent);
   mask-image:linear-gradient(to bottom,transparent,#000 32%,#000 68%,transparent)}
 .wheel::-webkit-scrollbar{display:none}
-.wheel-item{height:${ROW}px;display:flex;align-items:center;justify-content:center;font-size:19px;scroll-snap-align:center;
+.wheel-item{height:${ROW}px;display:flex;align-items:center;justify-content:center;font-size:20px;scroll-snap-align:center;
   color:var(--muted);font-variant-numeric:tabular-nums;cursor:pointer}
 .wheel-item.sel{color:var(--text);font-weight:800}
 .dtp-colon{font-size:20px;color:var(--text);font-weight:800;margin-top:-2px}
+.dtp-ok{width:100%;margin-top:14px;padding:13px;border:none;border-radius:11px;background:var(--accent2);color:#06121a;
+  font-weight:800;font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.dtp-ok:active{filter:brightness(.94)}
 `;
 
 function ensureCSS() {
@@ -150,7 +158,8 @@ export function mountPicker(host, opts = {}) {
       ? `<div class="dtp-time"><span class="lbl">${t.time}</span>
            <div class="dtp-wheels"><div class="wh-h"></div><b class="dtp-colon">:</b><div class="wh-m"></div></div>
          </div>`
-      : "");
+      : "") +
+    (opts.confirm === false ? "" : `<button type="button" class="dtp-ok">${opts.confirmLabel || "OK"}</button>`);
 
   const q = (s) => host.querySelector(s);
   const grid = q(".dtp-grid");
@@ -158,6 +167,8 @@ export function mountPicker(host, opts = {}) {
 
   const emit = () => opts.onChange && opts.onChange(selected ? new Date(cur) : null);
   const commitTime = () => { if (!selected) selected = new Date(cur); emit(); };
+  // OK / Enter: commit whatever is shown (even if the user never tapped a day)
+  const doConfirm = () => { selected = new Date(cur); opts.onConfirm && opts.onConfirm(new Date(cur)); };
 
   let hourWheel = null, minWheel = null;
   const minVals = [];
@@ -199,10 +210,14 @@ export function mountPicker(host, opts = {}) {
     emit();
   });
 
+  const okBtn = q(".dtp-ok");
+  if (okBtn) okBtn.onclick = doConfirm;
+
   renderCal();
 
   return {
     get: () => (selected ? new Date(cur) : null),
+    confirm: doConfirm,
     set: (d) => {
       if (d) {
         cur = new Date(d);
