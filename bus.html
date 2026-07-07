@@ -30,8 +30,11 @@
   .dep{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
   .dep:last-child{border-bottom:none}
   .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 6px}
-  .dep .dir{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .dep .time{flex:none;font-weight:700;font-size:14px}
+  .dep .dir{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13.5px}
+  .dep .dir .dname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dep .dir .sub{color:var(--muted);font-size:11.5px;margin-top:1px}
+  .dep .dir .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2)}
+  .dep .time{flex:none;font-weight:700;font-size:14px;text-align:right}
   .dep .time em{color:#f87171;font-style:normal;font-size:12px}
   .dep .time .ok{color:var(--ok)}
   .dep.canc{opacity:.5;text-decoration:line-through}
@@ -58,6 +61,17 @@
   .leg.walk{background:transparent;border-style:dashed;color:var(--muted)}
   .leg .ln{font-weight:800}
   .trip .arrow{color:var(--muted);font-size:12px}
+  .trip{cursor:pointer}
+  .trip.open{border-color:var(--accent2)}
+  .trip .tcaret{color:var(--muted);font-size:11px;transition:transform .15s}
+  .trip.open .tcaret{transform:rotate(180deg)}
+  .tripdetail{margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:12px}
+  .dleg{font-size:12.5px;line-height:1.5}
+  .dleg.walk{color:var(--muted)}
+  .dleg .dlt{display:flex;gap:8px;align-items:baseline}
+  .dleg .dtime{color:var(--muted);font-variant-numeric:tabular-nums;flex:none;min-width:40px;font-weight:700}
+  .dleg .dlmid{color:var(--muted);padding:3px 0 3px 48px}
+  .dleg .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:11px;color:var(--accent2);margin-left:6px}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -127,8 +141,12 @@ function renderDeps(list){
     const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
     const train=RAIL.has((d.cat||"").toUpperCase());
     const lab=train?`${railIcon(d.cat)} ${esc(d.line||d.cat)}`:esc(d.line);
+    const bits=[];
+    if(train && d.num) bits.push(`Zuch ${esc(d.num)}`);
+    if(d.platform) bits.push(`<span class="q">Quai ${esc(d.platform)}</span>`);
+    const sub=bits.length?`<span class="sub">${bits.join(" · ")}</span>`:"";
     return `<div class="dep ${train?"train":""} ${d.cancelled?"canc":""}"><span class="line">${lab}</span>
-      <span class="dir">${esc(d.dir)}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span></div>`;
+      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span></div>`;
   }).join("");
 }
 async function loadBoard(){
@@ -215,22 +233,52 @@ function legLabel(lg){
   const ic=MODEICON[lg.mode]||"🚌", ln=lg.routeShortName||lg.mode;
   return `<span class="leg">${ic} <span class="ln">${esc(ln)}</span></span>`;
 }
+let TRIPS=[];
 function renderTrip(data){
-  const its=(data&&data.itineraries)||[];
-  if(!its.length){$("trip").innerHTML='<div class="muted" style="margin-top:10px">Kee Wee fonnt.</div>';return;}
-  $("trip").innerHTML=its.slice(0,4).map(it=>{
+  TRIPS=((data&&data.itineraries)||[]).slice(0,4);
+  if(!TRIPS.length){$("trip").innerHTML='<div class="muted" style="margin-top:10px">Kee Wee fonnt.</div>';return;}
+  $("trip").innerHTML=TRIPS.map((it,idx)=>{
     const mins=Math.round((it.duration||0)/60);
     const legs=it.legs.filter(l=>l.mode!=="WALK"||l.duration>90);
     const chain=legs.map(legLabel).join('<span class="arrow">›</span>');
     const chg=it.transfers===1?"1 Ëmklammen":`${it.transfers} Ëmklammen`;
-    return `<div class="trip">
+    return `<div class="trip" data-i="${idx}">
       <div class="thead">
         <span class="ttime">${fmtClock(it.startTime)} → ${fmtClock(it.endTime)}</span>
-        <span class="tmeta">${mins} min · ${chg}</span>
+        <span class="tmeta">${mins} min · ${chg} <span class="tcaret">▾</span></span>
       </div>
       <div class="legs">${chain||'<span class="leg walk">🚶 zu Fouss</span>'}</div>
+      <div class="tripdetail" hidden></div>
     </div>`;
   }).join("");
+  $("trip").querySelectorAll(".trip").forEach(el=>el.onclick=()=>toggleTripDetail(+el.dataset.i,el));
+}
+// one leg of the itinerary, expanded: board time+stop, the ride, alight time+stop
+function legDetail(lg){
+  const t1=fmtClock(lg.startTime), t2=fmtClock(lg.endTime);
+  if(lg.mode==="WALK"){
+    const m=Math.max(1,Math.round((lg.duration||0)/60));
+    return `<div class="dleg walk">🚶 ${m} min zu Fouss (${esc(lg.from.name)} → ${esc(lg.to.name)})</div>`;
+  }
+  const ic=MODEICON[lg.mode]||"🚌", line=esc(lg.routeShortName||lg.mode);
+  const num=(lg.tripShortName&&lg.tripShortName!==lg.routeShortName)?` ${esc(lg.tripShortName)}`:"";
+  const head=lg.headsign?` → ${esc(lg.headsign)}`:"";
+  const ns=(lg.intermediateStops||[]).length;
+  const stops=ns?` · ${ns} Arrêt${ns>1?"en":""}`:"";
+  const q1=lg.from.track?`<span class="q">Quai ${esc(lg.from.track)}</span>`:"";
+  const q2=lg.to.track?`<span class="q">Quai ${esc(lg.to.track)}</span>`:"";
+  return `<div class="dleg">
+    <div class="dlt"><span class="dtime">${t1}</span><b>${esc(lg.from.name)}</b>${q1}</div>
+    <div class="dlmid">${ic} <b>${line}</b>${num}${head}${stops}</div>
+    <div class="dlt"><span class="dtime">${t2}</span><b>${esc(lg.to.name)}</b>${q2}</div>
+  </div>`;
+}
+function toggleTripDetail(i,el){
+  const box=el.querySelector(".tripdetail"); if(!box)return;
+  if(box.hasAttribute("hidden")){
+    if(!box.dataset.done){ box.innerHTML=(TRIPS[i].legs||[]).map(legDetail).join(""); box.dataset.done="1"; }
+    box.removeAttribute("hidden"); el.classList.add("open");
+  }else{ box.setAttribute("hidden",""); el.classList.remove("open"); }
 }
 async function findTrip(){
   if(!tripFrom||!tripTo){$("trip").innerHTML='<div class="muted" style="margin-top:10px">Wiel en Depart an eng Destinatioun.</div>';return;}

@@ -9,7 +9,7 @@
 //
 // Actions (query string):
 //   ?action=nearby&lat=49.61&lon=6.13  → stops near a coordinate → [{id,name,dist}]
-//   ?action=board&id=<stopId>          → next departures → [{line,dir,time,planned,delay,cancelled,cat}]
+//   ?action=board&id=<stopId>          → next departures → [{line,num,cat,dir,platform,time,planned,delay,cancelled}]
 // This Luxembourg HAFAS key only exposes departureBoard + location.nearbystops
 // (there is NO free-text location.name search), so stop selection is by geolocation.
 // If TRANSPORT_API_KEY is unset it returns {configured:false} so the page shows a friendly notice.
@@ -71,10 +71,13 @@ Deno.serve(async (req) => {
     const data = await hafas("departureBoard", { id, maxJourneys: "12", duration: "90", lang: "de" });
     const departures = (data?.Departure ?? []).map((d: any) => {
       const planned = hhmm(d.time), rt = hhmm(d.rtTime);
+      const prod = Array.isArray(d?.Product) ? d.Product[0] : d?.Product;
       return {
-        line: d?.Product?.[0]?.line ?? d?.Product?.line ?? d.name ?? "?",
-        cat: d?.Product?.[0]?.catOutL ?? d?.Product?.catOutL ?? "",
+        line: prod?.line ?? d.name ?? "?",
+        num: prod?.num ?? prod?.displayNumber ?? "",
+        cat: prod?.catOutL ?? "",
         dir: d.direction ?? d.directionFlag ?? "",
+        platform: d?.rtPlatform?.text ?? d?.platform?.text ?? d.rtTrack ?? d.track ?? "",
         time: rt || planned,
         planned,
         delay: delayMin(planned, rt),
