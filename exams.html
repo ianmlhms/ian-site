@@ -32,6 +32,10 @@
   .newx{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .newx input{padding:9px 11px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px;color-scheme:dark}
   .newx .full{grid-column:1/-1}
+  .xchips{display:flex;flex-wrap:wrap;gap:7px}
+  .xchip{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:7px 13px;font-size:12.5px;cursor:pointer;line-height:1}
+  .xchip:hover{border-color:var(--accent2)}
+  .xchip.on{background:var(--accent2);border-color:var(--accent2);color:#06121a;font-weight:700}
   .msg{min-height:18px;color:var(--accent2);font-weight:700;font-size:13px;grid-column:1/-1}
 </style>
 </head>
@@ -68,12 +72,14 @@ async function boot(){
     <div class="card newx">
       <input id="nSubj" class="full" maxlength="100" placeholder="Fach / Prüfung (z.B. Mathe-Klassenarbeit)">
       <input id="nDate" type="date"><input id="nTime" type="time" value="08:00">
+      <div class="xchips full" id="nQuick"></div>
       <input id="nNote" class="full" maxlength="200" placeholder="Notiz (optional, z.B. Kapitel 4–6)">
       <button class="btn full" id="nAdd">Hinzufügen</button>
       <div class="msg" id="nMsg"></div>
     </div>
     <div id="list"></div>`;
   $("nAdd").onclick=addExam;
+  wireQuickDate();
   await refresh();
 }
 
@@ -109,6 +115,22 @@ function render(){
     await sb.from("exams").delete().eq("id",b.dataset.id);
     refresh();
   });
+}
+
+// friendlier date entry: default to today, block past dates, one-tap presets
+function wireQuickDate(){
+  const iso=(d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const today=new Date();
+  $("nDate").min=iso(today);
+  if(!$("nDate").value)$("nDate").value=iso(today);
+  const setActive=(el)=>$("nQuick").querySelectorAll(".xchip").forEach(x=>x.classList.toggle("on",x===el));
+  const presets=[["Heute",0],["Morgen",1],["Übermorgen",2],["+1 Woche",7]];
+  $("nQuick").innerHTML=presets.map(([l,o],i)=>`<button type="button" class="xchip${i===0?" on":""}" data-o="${o}">${l}</button>`).join("");
+  $("nQuick").querySelectorAll(".xchip").forEach(b=>b.onclick=()=>{
+    const d=new Date(); d.setDate(d.getDate()+ +b.dataset.o); $("nDate").value=iso(d); setActive(b);
+  });
+  // manual date edits clear the preset highlight
+  $("nDate").addEventListener("input",()=>setActive(null));
 }
 
 async function addExam(){

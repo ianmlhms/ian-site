@@ -55,12 +55,15 @@
   .picklist .st:last-child{border-bottom:none}
   .picklist .st:hover{background:var(--card)}
   #tpSwap{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;width:40px;height:44px;font-size:16px;cursor:pointer}
-  .tpwhen{display:flex;gap:8px;margin-top:8px;align-items:center}
-  .tpwhen select,.tpwhen input{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:13.5px}
-  .tpwhen select{flex:none}
-  .tpwhen input{flex:1;min-width:0}
-  .tpwhen button{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:9px 12px;cursor:pointer;font-size:14px}
-  .tpwhen button:hover{border-color:var(--accent2);color:var(--text)}
+  .tpwhen{display:flex;gap:8px;margin-top:8px;align-items:flex-start}
+  .tpwhen select{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:13.5px}
+  /* one-tap "when" chips (Elo / +15′ / Owend / Muer / 🗓) */
+  .wrow{display:flex;flex-wrap:wrap;gap:7px}
+  .wchip{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:7px 13px;font-size:12.5px;cursor:pointer;line-height:1}
+  .wchip:hover{border-color:var(--accent2)}
+  .wchip.on{background:var(--accent2);border-color:var(--accent2);color:#06121a;font-weight:700}
+  .wchip.wcal{padding:7px 11px;font-size:14px}
+  input[type=datetime-local]{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:13.5px;color-scheme:dark;width:100%}
   #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-weight:700;font-size:14px;cursor:pointer}
   #tpFind:disabled{opacity:.55;cursor:default}
   #rectrips{margin-top:12px}
@@ -112,9 +115,9 @@
           <option value="dep">Depart</option>
           <option value="arr">Arrivée</option>
         </select>
-        <input type="datetime-local" id="tpTime">
-        <button type="button" id="tpNow" title="Elo">Elo</button>
+        <div class="wrow" id="tpWhenChips" style="flex:1"></div>
       </div>
+      <input type="datetime-local" id="tpTime" style="display:none;margin-top:8px">
       <button id="tpFind">Wee sichen</button>
       <div id="rectrips"></div>
       <div id="trip"></div>
@@ -127,9 +130,9 @@
       <input id="stopq" placeholder="Arrêt oder Gare sichen…" autocomplete="off">
       <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
     </div>
-    <div class="tpwhen" id="depwhen" style="display:none">
-      <input type="datetime-local" id="depTime">
-      <button type="button" id="depNow" title="Elo">Elo</button>
+    <div id="depwhen" style="display:none;margin-top:10px">
+      <div class="wrow" id="depWhenChips"></div>
+      <input type="datetime-local" id="depTime" style="display:none;margin-top:8px">
     </div>
     <div id="recents"></div>
     <div id="stops"></div>
@@ -390,6 +393,41 @@ $("tpGeo").onclick=()=>{
   );
 };
 
+/* Friendly "when" picker: one-tap relative chips (now / +15′ / +30′ / +1h /
+   this evening / tomorrow) that write into a hidden datetime-local; the 🗓 chip
+   reveals that input for an exact moment. onChange fires after every pick. */
+function wireWhen(inputId, hostId, onChange){
+  const inp=$(inputId), host=$(hostId);
+  const pad=(n)=>String(n).padStart(2,"0");
+  const toLocal=(d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const setActive=(k)=>host.querySelectorAll(".wchip").forEach(b=>b.classList.toggle("on",b.dataset.k===k));
+  const fire=()=>{ try{ onChange&&onChange(); }catch(e){ console.warn("[when]",e); } };
+  const presets=[["now","Elo"],["m15","+15′"],["m30","+30′"],["h1","+1 St."],["eve","Owend"],["tmr","Muer"]];
+  host.innerHTML=presets.map(([k,l])=>`<button type="button" class="wchip${k==="now"?" on":""}" data-k="${k}">${l}</button>`).join("")
+    +`<button type="button" class="wchip wcal" data-k="cal" title="Datum &amp; Zäit wielen">🗓</button>`;
+  const apply=(k)=>{
+    const now=new Date();
+    if(k==="now") inp.value="";
+    else if(k==="m15") inp.value=toLocal(new Date(now.getTime()+15*60000));
+    else if(k==="m30") inp.value=toLocal(new Date(now.getTime()+30*60000));
+    else if(k==="h1")  inp.value=toLocal(new Date(now.getTime()+60*60000));
+    else if(k==="eve"){ const d=new Date(now); d.setHours(18,0,0,0); if(d<=now)d.setDate(d.getDate()+1); inp.value=toLocal(d); }
+    else if(k==="tmr"){ const d=new Date(now); d.setDate(d.getDate()+1); d.setHours(8,0,0,0); inp.value=toLocal(d); }
+    setActive(k);
+  };
+  host.querySelectorAll(".wchip").forEach(b=>b.onclick=()=>{
+    if(b.dataset.k==="cal"){
+      const hidden=getComputedStyle(inp).display==="none";
+      if(hidden){ if(!inp.value)inp.value=toLocal(new Date()); inp.style.display=""; setActive("cal"); inp.focus(); fire(); }
+      else inp.style.display="none";
+      return;
+    }
+    inp.style.display="none"; apply(b.dataset.k); fire();
+  });
+  // committing a precise value keeps the 🗓 chip highlighted
+  inp.addEventListener("change",()=>{ setActive("cal"); fire(); });
+}
+
 async function initTransport(){
   try{
     const r=await fetch("moien-stops.json");
@@ -399,15 +437,14 @@ async function initTransport(){
   $("tprow").style.display=""; $("depwhen").style.display="";
   wireSearch();
   // departure board: look up a later moment (buses & trains). Empty = live "now".
-  $("depTime").addEventListener("change",loadBoard);
-  $("depNow").onclick=()=>{ $("depTime").value=""; loadBoard(); };
+  wireWhen("depTime","depWhenChips",loadBoard);
   // route finder
   $("tproute").style.display=""; $("tpRouteNote").style.display="none";
   wireStopPicker("fromq","fromList",s=>{tripFrom=s;});
   wireStopPicker("toq","toList",s=>{tripTo=s;});
   $("tpFind").onclick=findTrip;
   renderRecentTrips();
-  $("tpNow").onclick=()=>{ $("tpTime").value=""; $("tpMode").value="dep"; };
+  wireWhen("tpTime","tpWhenChips",null);
   $("tpSwap").onclick=()=>{
     const a=$("fromq").value; $("fromq").value=$("toq").value; $("toq").value=a;
     const t=tripFrom; tripFrom=tripTo; tripTo=t;
