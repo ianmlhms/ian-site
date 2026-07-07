@@ -7,7 +7,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=5"></script>
-<script src="i18n-dict.js?v=12"></script>
+<script src="i18n-dict.js?v=13"></script>
 <script src="i18n.js?v=1"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
@@ -23,6 +23,14 @@
   .add input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 13px;font-size:14px}
   .add button{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:0 18px;font-weight:800;cursor:pointer}
   h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:26px 0 10px}
+  .tabs{display:flex;gap:4px;margin:16px 0 18px;border-bottom:1px solid var(--border);overflow-x:auto}
+  .tab{appearance:none;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:14px;font-weight:700;padding:9px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--text);border-bottom-color:var(--accent)}
+  .tbadge{background:var(--accent);color:#fff;font-size:11px;font-weight:800;border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+  .panel{display:none}
+  .panel.active{display:block}
+  .panel h2:first-child,.panel>div:first-child h2{margin-top:6px}
   .row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 14px;margin-bottom:8px}
   .row .name{font-weight:700;flex:1}
   .row .name .av{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--card2);align-items:center;justify-content:center;margin-right:8px}
@@ -66,24 +74,51 @@
     </div>
     <div class="msgline" id="addMsg"></div>
 
-    <div id="invitesWrap" style="display:none"><h2 data-i18n="friends.invites">🎮 Game invites</h2><div id="invites"></div></div>
-    <div id="reqWrap" style="display:none"><h2 data-i18n="friends.requests">Friend requests</h2><div id="requests"></div></div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="friends" data-i18n="friends.tab.friends">Friends</button>
+      <button class="tab" data-tab="people" data-i18n="friends.people">People</button>
+      <button class="tab" data-tab="requests"><span data-i18n="friends.tab.requests">Requests</span><span class="tbadge" id="badge-requests" style="display:none">0</span></button>
+      <button class="tab" data-tab="activity" data-i18n="friends.tab.activity">Activity</button>
+    </nav>
 
-    <div id="activityWrap" style="display:none"><h2 data-i18n="friends.activity">📊 Recent activity</h2><div id="activity"></div></div>
+    <section class="panel active" data-panel="friends">
+      <div id="friends"></div>
+    </section>
 
-    <h2 data-i18n="friends.yours">Your friends</h2>
-    <div id="friends"></div>
+    <section class="panel" data-panel="people">
+      <div id="directory"></div>
+    </section>
 
-    <div id="sentWrap" style="display:none"><h2 data-i18n="friends.sent">Requests you sent</h2><div id="sent"></div></div>
+    <section class="panel" data-panel="requests">
+      <div id="invitesWrap" style="display:none"><h2 data-i18n="friends.invites">🎮 Game invites</h2><div id="invites"></div></div>
+      <div id="reqWrap" style="display:none"><h2 data-i18n="friends.requests">Friend requests</h2><div id="requests"></div></div>
+      <div id="sentWrap" style="display:none"><h2 data-i18n="friends.sent">Requests you sent</h2><div id="sent"></div></div>
+      <div class="empty" id="reqEmpty" style="display:none" data-i18n="friends.noReq">Nothing new right now.</div>
+    </section>
 
-    <h2 data-i18n="friends.people">People</h2>
-    <div id="directory"></div>
+    <section class="panel" data-panel="activity">
+      <div id="activityWrap"><h2 data-i18n="friends.activity">📊 Recent activity</h2><div id="activity"></div></div>
+    </section>
   </div>
 </div>
 
+<script>
+// Segmented-tab controller (pure UI; friends.js still renders into the same IDs).
+(function () {
+  const tabs = document.getElementById("tabs");
+  if (!tabs) return;
+  tabs.addEventListener("click", (e) => {
+    const b = e.target.closest(".tab"); if (!b) return;
+    const name = b.dataset.tab;
+    tabs.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === b));
+    document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === name));
+  });
+})();
+</script>
+
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="friends.js?v=9"></script>
+<script type="module" src="friends.js?v=10"></script>
 <script type="module" src="notify-ambient.js?v=2"></script>
 </body>
 </html>

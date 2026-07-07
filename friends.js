@@ -21,6 +21,17 @@ async function refresh() {
   renderSent(sent || []);
   renderDirectory(dir || []);
   renderActivity(act || []);
+  updateRequestsTab(rq || [], gi || [], sent || []);
+}
+
+// Requests tab: badge counts actionable items (friend requests + game invites);
+// a friendly empty line shows when the whole tab (incl. sent) is empty.
+function updateRequestsTab(rq, gi, sent) {
+  const pending = rq.length + gi.length;
+  const badge = $("badge-requests");
+  if (badge) { badge.textContent = pending; badge.style.display = pending ? "" : "none"; }
+  const empty = $("reqEmpty");
+  if (empty) empty.style.display = (pending + sent.length) ? "none" : "";
 }
 
 const VERB = { win: "friends.verb.won", loss: "friends.verb.lost", draw: "friends.verb.drew" };
@@ -33,8 +44,8 @@ function ago(ts) {
 }
 function renderActivity(list) {
   const wrap = $("activityWrap"); if (!wrap) return;
-  if (!list.length) { wrap.style.display = "none"; return; }
   wrap.style.display = "";
+  if (!list.length) { $("activity").innerHTML = `<div class="empty">${T("friends.noActivity")}</div>`; return; }
   $("activity").innerHTML = list.map((a) => {
     const who = a.is_me ? T("friends.you") : esc(a.username);
     const game = esc(GAMES[a.game] || a.game);
