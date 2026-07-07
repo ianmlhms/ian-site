@@ -90,10 +90,12 @@ function renderFriends(list) {
   el.innerHTML = ordered.map(f => `
     <div class="row">
       <span class="name"><span class="av">👤</span>${esc(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">👑 Admin</span>` : ""}</span>
+      <button class="mini" data-call="${f.user_id}" data-name="${esc(f.username)}" title="${T("friends.call")}">📹</button>
       <button class="mini" data-msg="${esc(f.username)}">${T("friends.message")}</button>
       <button class="mini go" data-play="${f.user_id}" data-name="${esc(f.username)}">${T("friends.play")}</button>
       <button class="mini x" data-remove="${f.user_id}" title="${T("grades.remove")}">✕</button>
     </div>`).join("");
+  el.querySelectorAll("[data-call]").forEach(b => b.onclick = () => location.href = "call.html?peer=" + encodeURIComponent(b.dataset.call) + "&name=" + encodeURIComponent(b.dataset.name));
   el.querySelectorAll("[data-msg]").forEach(b => b.onclick = () => location.href = "messenger.html?dm=" + encodeURIComponent(b.dataset.msg));
   el.querySelectorAll("[data-play]").forEach(b => b.onclick = () => chooseGame(b.dataset.play, b.dataset.name));
   el.querySelectorAll("[data-remove]").forEach(b => b.onclick = async () => {

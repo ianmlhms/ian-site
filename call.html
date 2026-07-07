@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=5"></script>
+<script src="i18n-dict.js?v=14"></script>
+<script src="i18n.js?v=1"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--border:#2a2a4a;--text:#e8e8f0;--muted:#9a9ab8;--accent:#6ea8fe;--danger:#ff5d6c}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:#000;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  #stage{position:fixed;inset:0;background:#05050a}
+  #remote{width:100%;height:100%;object-fit:cover;background:#05050a}
+  #remote.waiting{opacity:0}
+  #local{position:fixed;right:14px;top:14px;width:112px;height:150px;object-fit:cover;border-radius:14px;border:1px solid rgba(255,255,255,.2);background:#111;box-shadow:0 6px 20px rgba(0,0,0,.5);transform:scaleX(-1);z-index:4}
+  #local.off{display:none}
+  .topbar{position:fixed;top:0;left:0;right:0;padding:16px 18px;display:flex;align-items:center;gap:10px;z-index:3;background:linear-gradient(#000a,transparent)}
+  .topbar .who{font-weight:800;font-size:17px}
+  .topbar .st{color:var(--muted);font-size:13px}
+  .center{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:2;text-align:center;padding:24px}
+  .avatar{width:96px;height:96px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:44px}
+  .center .nm{font-size:22px;font-weight:800}
+  .center .sub{color:var(--muted);font-size:14px}
+  .controls{position:fixed;left:0;right:0;bottom:0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));display:flex;gap:18px;align-items:center;justify-content:center;z-index:3;background:linear-gradient(transparent,#000b)}
+  .cbtn{width:60px;height:60px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+  .cbtn:hover{background:rgba(255,255,255,.24)}
+  .cbtn.off{background:#fff;color:#111}
+  .cbtn.hang{background:var(--danger);width:66px;height:66px}
+  .cbtn.hang:hover{filter:brightness(1.08)}
+  .cbtn.answer{background:#3fb950;width:66px;height:66px}
+  .msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--muted);z-index:6}
+  .msg a{color:var(--accent)}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="remote" class="waiting" autoplay playsinline></video>
+  <video id="local" autoplay playsinline muted></video>
+
+  <div class="topbar hidden" id="topbar">
+    <span class="who" id="who"></span>
+    <span class="st" id="status"></span>
+  </div>
+
+  <div class="center" id="center">
+    <div class="avatar">📹</div>
+    <div class="nm" id="peerName">…</div>
+    <div class="sub" id="centerSub" data-i18n="call.calling">Calling…</div>
+  </div>
+
+  <div class="controls hidden" id="controls">
+    <button class="cbtn" id="micBtn" title="Mic">🎙️</button>
+    <button class="cbtn answer hidden" id="answerBtn" title="Answer">📞</button>
+    <button class="cbtn hang" id="hangBtn" title="Hang up">📵</button>
+    <button class="cbtn" id="camBtn" title="Camera">🎥</button>
+  </div>
+
+  <div class="msg hidden" id="fatal"></div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const T=(k)=>(window.I18N?window.I18N.t(k):k);
+const q=new URLSearchParams(location.search);
+
+// caller: ?peer=<uid>&name=<name>   |   callee: ?call=<id>&peer=<uid>&name=<name>&answer=1
+const isCallee=q.get("answer")==="1";
+const peerId=q.get("peer")||"";
+const peerName=q.get("name")||"…";
+$("peerName").textContent=peerName;
+
+const ICE={iceServers:[
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun1.l.google.com:19302"},
+]};
+
+let sb=null, me=null, myName=null, callId=null;
+let room=null, inbox=null, pc=null, localStream=null;
+let offered=false, remoteReady=false, pendingIce=[], pingTimer=null, ended=false, noAnswerTimer=null;
+
+function fatal(html){ $("fatal").innerHTML=html; $("fatal").classList.remove("hidden"); $("center").classList.add("hidden"); }
+function setStatus(s){ $("status").textContent=s; $("centerSub").textContent=s; }
+
+async function boot(){
+  if(!auth.authConfigured){ fatal(T("call.signin")); return; }
+  sb=await auth.client();
+  if(!auth.session()){ fatal(`${T("call.signin")} <a href="index.html">${T("nav.home")}</a>`); return; }
+  if(!peerId){ fatal(T("call.badLink")); return; }
+  me=auth.session().user.id; myName=auth.username()||"?";
+  callId=isCallee ? (q.get("call")||"") : (crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
+  if(isCallee && !callId){ fatal(T("call.badLink")); return; }
+
+  try{ localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
+  catch(e){ fatal(T("call.noMedia")); return; }
+  $("local").srcObject=localStream;
+  $("who").textContent=peerName;
+  $("topbar").classList.remove("hidden");
+  $("controls").classList.remove("hidden");
+  wireControls();
+  buildPeer();
+  joinRoom();
+
+  if(!isCallee){
+    setStatus(T("call.calling"));
+    ring("ring");                 // notify the callee's inbox
+    noAnswerTimer=setTimeout(()=>{ if(!remoteReady){ ring("cancel"); endCall(T("call.ended"),true); } },40000);
+  }else{
+    setStatus(T("call.connecting"));
+  }
+  window.addEventListener("pagehide",cleanup);
+  window.addEventListener("beforeunload",cleanup);
+}
+
+function buildPeer(){
+  pc=new RTCPeerConnection(ICE);
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.onicecandidate=(e)=>{ if(e.candidate) room && room.send({type:"broadcast",event:"ice",payload:{c:e.candidate}}); };
+  pc.ontrack=(e)=>{ if(noAnswerTimer){ clearTimeout(noAnswerTimer); noAnswerTimer=null; } const r=$("remote"); if(r.srcObject!==e.streams[0]){ r.srcObject=e.streams[0]; } r.classList.remove("waiting"); $("center").classList.add("hidden"); };
+  pc.onconnectionstatechange=()=>{
+    const s=pc.connectionState;
+    if(s==="connected"){ setStatus(T("call.connected")); }
+    else if(s==="failed"){ setStatus(T("call.lost")); }
+    else if(s==="disconnected"){ setStatus(T("call.lost")); }
+  };
+}
+
+function joinRoom(){
+  room=sb.channel("call:"+callId,{config:{broadcast:{self:false}}});
+  room
+    .on("broadcast",{event:"ready"},()=>{ if(!isCallee){ stopPing(); makeOffer(); } })
+    .on("broadcast",{event:"ping"},()=>{ if(isCallee) room.send({type:"broadcast",event:"ready",payload:{}}); })
+    .on("broadcast",{event:"offer"},async ({payload})=>{ if(isCallee) await onOffer(payload.sdp); })
+    .on("broadcast",{event:"answer"},async ({payload})=>{ if(!isCallee) await onAnswer(payload.sdp); })
+    .on("broadcast",{event:"ice"},({payload})=>addIce(payload.c))
+    .on("broadcast",{event:"bye"},()=>endCall(T("call.ended")))
+    .subscribe((s)=>{
+      if(s!=="SUBSCRIBED") return;
+      if(isCallee){ room.send({type:"broadcast",event:"ready",payload:{}}); }
+      else { startPing(); }   // ping until the callee is in the room, then offer
+    });
+}
+function startPing(){ stopPing(); let n=0; pingTimer=setInterval(()=>{ if(++n>20){ stopPing(); return; } room.send({type:"broadcast",event:"ping",payload:{}}); },1000); room.send({type:"broadcast",event:"ping",payload:{}}); }
+function stopPing(){ if(pingTimer){ clearInterval(pingTimer); pingTimer=null; } }
+
+async function makeOffer(){
+  if(offered||ended) return; offered=true;
+  const o=await pc.createOffer(); await pc.setLocalDescription(o);
+  room.send({type:"broadcast",event:"offer",payload:{sdp:pc.localDescription}});
+}
+async function onOffer(sdp){
+  await pc.setRemoteDescription(sdp); remoteReady=true; flushIce();
+  const a=await pc.createAnswer(); await pc.setLocalDescription(a);
+  room.send({type:"broadcast",event:"answer",payload:{sdp:pc.localDescription}});
+  setStatus(T("call.connecting"));
+}
+async function onAnswer(sdp){ await pc.setRemoteDescription(sdp); remoteReady=true; flushIce(); }
+function addIce(c){ if(!c) return; if(remoteReady){ pc.addIceCandidate(c).catch(()=>{}); } else pendingIce.push(c); }
+function flushIce(){ pendingIce.forEach(c=>pc.addIceCandidate(c).catch(()=>{})); pendingIce=[]; }
+
+// send a message to the peer's personal ring inbox (subscribe, send once)
+function ring(event){
+  inbox=sb.channel("rtc:"+peerId,{config:{broadcast:{self:false}}});
+  inbox.subscribe((s)=>{ if(s==="SUBSCRIBED"){ inbox.send({type:"broadcast",event,payload:{callId,from:me,fromName:myName}}); } });
+}
+
+function wireControls(){
+  $("hangBtn").onclick=()=>{ if(!isCallee && !offered) ring("cancel"); endCall(T("call.ended"),true); };
+  $("micBtn").onclick=()=>{
+    const t=localStream.getAudioTracks()[0]; if(!t) return; t.enabled=!t.enabled;
+    $("micBtn").classList.toggle("off",!t.enabled); $("micBtn").textContent=t.enabled?"🎙️":"🔇";
+  };
+  $("camBtn").onclick=()=>{
+    const t=localStream.getVideoTracks()[0]; if(!t) return; t.enabled=!t.enabled;
+    $("camBtn").classList.toggle("off",!t.enabled); $("local").classList.toggle("off",!t.enabled);
+  };
+}
+
+function endCall(reason,sendBye){
+  if(ended) return; ended=true;
+  if(sendBye && room){ try{ room.send({type:"broadcast",event:"bye",payload:{}}); }catch{} }
+  setStatus(reason); cleanup();
+  setTimeout(()=>{ location.href="friends.html"; },900);
+}
+function cleanup(){
+  stopPing(); if(noAnswerTimer){ clearTimeout(noAnswerTimer); noAnswerTimer=null; }
+  try{ localStream&&localStream.getTracks().forEach(t=>t.stop()); }catch{}
+  try{ pc&&pc.close(); }catch{}
+  try{ room&&sb.removeChannel(room); }catch{}
+  try{ inbox&&sb.removeChannel(inbox); }catch{}
+}
+
+boot();
+</script>
+</body>
+</html>
