@@ -12,6 +12,8 @@
 //   ?action=board&id=<stopId>[&date=YYYY-MM-DD&time=HH:MM]
 //                                      → departures (buses & trains) from now or a later moment
 //                                      → [{line,num,cat,dir,platform,time,planned,delay,cancelled}]
+// (The full stop-by-stop itinerary for a departure is fetched client-side from
+//  transitous/MOTIS — this HAFAS key cannot do journeyDetail.)
 // This Luxembourg HAFAS key only exposes departureBoard + location.nearbystops
 // (there is NO free-text location.name search), so stop selection is by geolocation.
 // If TRANSPORT_API_KEY is unset it returns {configured:false} so the page shows a friendly notice.

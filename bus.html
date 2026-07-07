@@ -44,6 +44,23 @@
   .dep .time .ok{color:var(--ok)}
   .dep.canc{opacity:.5;text-decoration:line-through}
   .dep.train .line{background:#20304a;border-color:#3a5a8a;color:#8fc7ff}
+  .dep{cursor:pointer}
+  .dep .dcaret{flex:none;color:var(--muted);font-size:11px;margin-left:2px;transition:transform .15s}
+  .dep.open .dcaret{transform:rotate(180deg)}
+  /* expanded stop-by-stop itinerary */
+  .depdetail{padding:2px 2px 12px 8px}
+  .journey{margin-left:6px}
+  .jstop{display:flex;gap:10px;align-items:baseline;padding:5px 0 5px 14px;position:relative}
+  .jstop::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
+  .jstop::after{content:"";position:absolute;left:-3px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--border);border:2px solid var(--card)}
+  .jstop:first-child::before{top:10px}
+  .jstop:last-child::before{bottom:auto;height:10px}
+  .jstop.here::after{background:var(--accent2)}
+  .jstop.here .jn{color:var(--text);font-weight:800}
+  .jstop .jt{flex:none;min-width:66px;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12.5px}
+  .jstop .jt em{color:#f87171;font-style:normal}
+  .jstop .jn{flex:1;min-width:0;font-size:13px;color:var(--muted)}
+  .jstop .jn .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2);font-size:11px;margin-left:6px}
   /* route finder */
   .triprow{display:flex;gap:8px;align-items:center}
   .triprow .cols{flex:1;min-width:0}
@@ -183,11 +200,13 @@ async function tp(params){
 // rail categories the HAFAS board returns at stations (buses have cat "Bus"/"")
 const RAIL=new Set(["RB","RE","IC","IR","TER","TGV","ICE","EC","EN","CFL","TRAIN"]);
 const railIcon=(cat)=>/TGV|ICE/i.test(cat||"")?"🚄":"🚆";
+let DEPS=[];
 function renderDeps(list){
-  if(!list||!list.length){
+  DEPS=list||[];
+  if(!DEPS.length){
     const msg=$("depTime").value?"Keng Departuren ëm dës Zäit.":"Keng Departuren an der nächster Stonn.";
     $("deps").innerHTML=`<div class="muted">${msg}</div>`;return;}
-  $("deps").innerHTML=list.map(d=>{
+  $("deps").innerHTML=DEPS.map((d,i)=>{
     const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
     const train=RAIL.has((d.cat||"").toUpperCase());
     const lab=train?`${railIcon(d.cat)} ${esc(d.line||d.cat)}`:esc(d.line);
@@ -195,12 +214,24 @@ function renderDeps(list){
     if(train && d.num) bits.push(`Zuch ${esc(d.num)}`);
     if(d.platform) bits.push(`<span class="q">Quai ${esc(d.platform)}</span>`);
     const sub=bits.length?`<span class="sub">${bits.join(" · ")}</span>`:"";
-    return `<div class="dep ${train?"train":""} ${d.cancelled?"canc":""}"><span class="line">${lab}</span>
-      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span></div>`;
+    return `<div class="dep ${train?"train":""} ${d.cancelled?"canc":""}" data-i="${i}"><span class="line">${lab}</span>
+      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span><span class="dcaret">▾</span></div>
+      <div class="depdetail" hidden></div>`;
   }).join("");
+  $("deps").querySelectorAll(".dep").forEach(el=>el.onclick=()=>toggleDep(+el.dataset.i,el));
+}
+function toggleDep(i,el){
+  const box=el.nextElementSibling;
+  if(!box||!box.classList.contains("depdetail"))return;
+  if(box.hasAttribute("hidden")){
+    el.classList.add("open"); box.removeAttribute("hidden");
+    if(!box.dataset.done){ box.dataset.done="1"; loadDepDetail(i,box); }
+  }else{ box.setAttribute("hidden",""); el.classList.remove("open"); }
 }
 async function loadBoard(){
   if(!curStop)return;
+  // don't collapse an itinerary the user is reading during the 45s auto-refresh
+  if($("deps").querySelector(".depdetail:not([hidden])"))return;
   const params={action:"board",id:curStop.id};
   // optional future moment: datetime-local gives "YYYY-MM-DDTHH:MM" in local time
   const when=$("depTime").value;
@@ -208,6 +239,63 @@ async function loadBoard(){
   const d=await tp(params);
   if(d.error){$("deps").innerHTML='<div class="muted">Departuren net verfügbar.</div>';return;}
   renderDeps(d.departures);
+}
+
+/* Full stop-by-stop itinerary for a clicked departure. The HAFAS key can't do
+   journeyDetail, so we resolve the trip via transitous (MOTIS): its stop id is
+   our stop id zero-padded, `stoptimes` gives each departure a tripId, and
+   `trip` returns every stop with scheduled + real times (→ delays). */
+const TRANSITOUS="https://api.transitous.org/api/v1";
+const motisStopId=(id)=>`lu-administration-des-transports-publics_${String(id).padStart(12,"0")}`;
+const clockOf=(iso)=>iso?new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"";
+const delayOf=(real,sched)=>(real&&sched)?Math.round((new Date(real)-new Date(sched))/60000):0;
+const normLine=(s)=>(""+(s||"")).toUpperCase().replace(/[^A-Z0-9]/g,"");
+async function findTripId(dep){
+  const base=$("depTime").value?new Date($("depTime").value):new Date();
+  const u=new URL(`${TRANSITOUS}/stoptimes`);
+  u.searchParams.set("stopId",motisStopId(curStop.id));
+  u.searchParams.set("time",base.toISOString());
+  u.searchParams.set("n","60"); u.searchParams.set("arriveBy","false");
+  const d=await (await fetch(u)).json();
+  const sts=d.stopTimes||[];
+  const want=dep.planned||dep.time, wl=normLine(dep.line);
+  let timeMatch=null;
+  for(const s of sts){
+    if(clockOf(s.place&&s.place.scheduledDeparture)!==want)continue;
+    const rl=normLine(s.routeShortName);
+    if(rl===wl||(wl&&(rl.includes(wl)||wl.includes(rl))))return s.tripId;  // best: same time + line
+    if(!timeMatch)timeMatch=s.tripId;                                       // fallback: same time
+  }
+  return timeMatch;
+}
+// strip "(Bus)"/"(Tram)" tags and a leading city so board names match trip names
+const stopKey=(n)=>norm(n).replace(/\(.*?\)/g," ").replace(/^(luxembourg|luxemburg)\s+/,"").replace(/\s+/g," ").trim();
+function renderJourney(leg){
+  const stops=[leg.from,...(leg.intermediateStops||[]),leg.to];
+  const myId=curStop?String(curStop.id).padStart(12,"0"):"";
+  const myKey=curStop?stopKey(curStop.name):"";
+  const rows=stops.map((s,idx)=>{
+    const first=idx===0;
+    const real=first?(s.departure||s.arrival):(s.arrival||s.departure);
+    const sched=first?(s.scheduledDeparture||s.scheduledArrival):(s.scheduledArrival||s.scheduledDeparture);
+    const dl=delayOf(real,sched), dlt=dl?` <em>${dl>0?"+":""}${dl}</em>`:"";
+    const here=(s.stopId&&myId&&s.stopId.endsWith(myId)) || (myKey&&stopKey(s.name)===myKey);
+    const q=s.track?`<span class="q">Quai ${esc(s.track)}</span>`:"";
+    return `<div class="jstop${here?" here":""}"><span class="jt">${esc(clockOf(real))}${dlt}</span><span class="jn">${esc(s.name)}${q}</span></div>`;
+  }).join("");
+  return `<div class="journey">${rows}</div>`;
+}
+async function loadDepDetail(i,box){
+  box.innerHTML='<div class="muted" style="padding:8px 2px">Wee gëtt gelueden…</div>';
+  try{
+    const tripId=await findTripId(DEPS[i]);
+    if(!tripId){ box.innerHTML='<div class="muted" style="padding:8px 2px">Kee Detail fonnt.</div>'; return; }
+    const u=new URL(`${TRANSITOUS}/trip`); u.searchParams.set("tripId",tripId);
+    const d=await (await fetch(u)).json();
+    const leg=(d.legs||[]).find(l=>l.mode!=="WALK")||(d.legs||[])[0];
+    if(!leg||!leg.from){ box.innerHTML='<div class="muted" style="padding:8px 2px">Kee Detail fonnt.</div>'; return; }
+    box.innerHTML=renderJourney(leg);
+  }catch(e){ console.warn("[dep detail]",e); box.innerHTML='<div class="muted" style="padding:8px 2px">Detail net verfügbar — probéier nach eng Kéier.</div>'; }
 }
 function renderStops(stops){
   if(!stops||!stops.length){$("stops").innerHTML='<div class="muted">Keng Arrêten fonnt.</div>';return;}
