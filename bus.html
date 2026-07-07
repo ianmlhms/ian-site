@@ -69,8 +69,11 @@ const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
    Stop discovery (text search + nearby) is LOCAL against the bundled GTFS stop
    list (moien-stops.json, all ~2800 Luxembourg stops). Only the departure board
    goes through the Edge Function → ministry HAFAS API (accessId stays server-side). */
-let curStop=null, tpTimer=null, STOPS=[];
-const norm=(s)=>(""+(s||"")).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+let curStop=null, tpTimer=null, STOPS=[], NORMS=[];
+// accent-insensitive, and treat commas as spaces so "hollerich kierfecht" matches
+// the stop "Hollerich, Kierfecht" (the comma is optional).
+const norm=(s)=>(""+(s||"")).normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .toLowerCase().replace(/,/g," ").replace(/\s+/g," ").trim();
 async function tp(params){
   const u=new URL(`${PB_CONFIG.url}/functions/v1/transport`);
   Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
@@ -107,15 +110,17 @@ function selectStop(s){
   localStorage.setItem("moienStop",JSON.stringify(curStop));
   loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(loadBoard,45000);
 }
-/* local text search over the bundled stops (accent-insensitive, prefix-first) */
+/* local text search over the bundled stops (accent- & comma-insensitive, prefix-first).
+   Uses the precomputed NORMS[] so every keystroke stays cheap. */
 function searchStops(q){
   const n=norm(q); if(n.length<2)return[];
   const res=[];
-  for(const [id,name,lat,lon] of STOPS){
-    const nn=norm(name), i=nn.indexOf(n);
+  for(let k=0;k<STOPS.length;k++){
+    const nn=NORMS[k], i=nn.indexOf(n);
     if(i<0)continue;
+    const [id,name,lat,lon]=STOPS[k];
     // rank: word-start match beats mid-word, earlier beats later
-    const wordStart=(i===0||nn[i-1]===" "||nn[i-1]===",")?0:1;
+    const wordStart=(i===0||nn[i-1]===" ")?0:1;
     res.push({id,name,lat,lon,rank:wordStart*1000+i});
     if(res.length>400)break;
   }
@@ -158,6 +163,7 @@ async function initTransport(){
   try{
     const r=await fetch("moien-stops.json");
     STOPS=await r.json();
+    NORMS=STOPS.map(s=>norm(s[1]));   // precompute normalized names for fast search
   }catch(e){ $("tpNote").innerHTML='<span class="muted">Arrêt-Lëscht net gelueden.</span>'; return; }
   $("tprow").style.display="";
   wireSearch();
