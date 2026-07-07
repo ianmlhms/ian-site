@@ -143,12 +143,35 @@
   function loadFeedback() {
     // pixelbreak has its own feedback box; skip loading a second one there
     if (document.getElementById("fbFab") || document.getElementById("fbScript")) return;
+    // no feedback button on phones — keeps the small-screen UI uncluttered
+    if (window.matchMedia && window.matchMedia("(max-width: 760px)").matches) return;
     const s = document.createElement("script");
     s.id = "fbScript"; s.src = "feedback.js?v=1";
     document.body.appendChild(s);
   }
 
-  function boot() { buildPicker(); buildRefresh(); loadFeedback(); }
+  // ---- site-wide mobile polish ----
+  // A small stylesheet injected on every page. Uses low-specificity element
+  // selectors so any page's own styles still win; only fills the gaps. Injected
+  // LAST so its #themeFab/#pwaRefresh overrides beat buildPicker's base rules.
+  function injectMobileCss() {
+    if (document.getElementById("mobileFix")) return;
+    const css = document.createElement("style");
+    css.id = "mobileFix";
+    css.textContent = `
+    a,button{-webkit-tap-highlight-color:transparent}
+    @media (max-width:760px){
+      #fbFab,#fbPanel{display:none!important}                       /* feedback off on phones */
+      #themeFab,#pwaRefresh{width:40px;height:40px}                 /* smaller floating buttons */
+      #themeFab{right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+      #pwaRefresh{right:calc(60px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+      img,video{max-width:100%}                                    /* never force horizontal scroll */
+      input,select,textarea{font-size:16px}                        /* stop iOS zoom on unstyled fields */
+    }`;
+    document.head.appendChild(css);
+  }
+
+  function boot() { buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); }
   if (document.body) boot();
   else document.addEventListener("DOMContentLoaded", boot);
 })();
