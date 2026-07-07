@@ -50,6 +50,12 @@
   .picklist .st:last-child{border-bottom:none}
   .picklist .st:hover{background:var(--card)}
   #tpSwap{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;width:40px;height:44px;font-size:16px;cursor:pointer}
+  .tpwhen{display:flex;gap:8px;margin-top:8px;align-items:center}
+  .tpwhen select,.tpwhen input{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 11px;font-size:13.5px}
+  .tpwhen select{flex:none}
+  .tpwhen input{flex:1;min-width:0}
+  .tpwhen button{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:9px 12px;cursor:pointer;font-size:14px}
+  .tpwhen button:hover{border-color:var(--accent2);color:var(--text)}
   #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-weight:700;font-size:14px;cursor:pointer}
   #tpFind:disabled{opacity:.55;cursor:default}
   .trip{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
@@ -93,6 +99,14 @@
           <div class="pickrow"><input id="toq" placeholder="Bis … (z.B. Kirchberg)" autocomplete="off"><div id="toList"></div></div>
         </div>
         <button id="tpSwap" title="Tauschen">⇅</button>
+      </div>
+      <div class="tpwhen">
+        <select id="tpMode" title="Ofoert oder Arrivée">
+          <option value="dep">Ofoert</option>
+          <option value="arr">Arrivée</option>
+        </select>
+        <input type="datetime-local" id="tpTime">
+        <button type="button" id="tpNow" title="Elo">Elo</button>
       </div>
       <button id="tpFind">Wee sichen</button>
       <div id="trip"></div>
@@ -287,7 +301,11 @@ async function findTrip(){
     const u=new URL("https://api.transitous.org/api/v1/plan");
     u.searchParams.set("fromPlace",`${tripFrom.lat},${tripFrom.lon}`);
     u.searchParams.set("toPlace",`${tripTo.lat},${tripTo.lon}`);
-    u.searchParams.set("arriveBy","false");
+    // empty time = now; otherwise plan for a chosen departure or arrival moment
+    const when=$("tpTime").value;
+    const arriveBy=when && $("tpMode").value==="arr";
+    if(when) u.searchParams.set("time", new Date(when).toISOString());
+    u.searchParams.set("arriveBy", arriveBy?"true":"false");
     const r=await fetch(u); renderTrip(await r.json());
   }catch(e){ $("trip").innerHTML='<div class="muted" style="margin-top:10px">Wee net verfügbar — probéier nach eng Kéier.</div>'; }
   finally{ $("tpFind").disabled=false; }
@@ -327,6 +345,7 @@ async function initTransport(){
   wireStopPicker("fromq","fromList",s=>{tripFrom=s;});
   wireStopPicker("toq","toList",s=>{tripTo=s;});
   $("tpFind").onclick=findTrip;
+  $("tpNow").onclick=()=>{ $("tpTime").value=""; $("tpMode").value="dep"; };
   $("tpSwap").onclick=()=>{
     const a=$("fromq").value; $("fromq").value=$("toq").value; $("toq").value=a;
     const t=tripFrom; tripFrom=tripTo; tripTo=t;
