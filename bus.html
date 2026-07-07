@@ -63,6 +63,8 @@
   .tpwhen button:hover{border-color:var(--accent2);color:var(--text)}
   #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-weight:700;font-size:14px;cursor:pointer}
   #tpFind:disabled{opacity:.55;cursor:default}
+  #rectrips{margin-top:12px}
+  #rectrips .recchip .ar{color:var(--muted)}
   .trip{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
   .trip .thead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
   .trip .ttime{font-weight:800;font-size:15px}
@@ -114,6 +116,7 @@
         <button type="button" id="tpNow" title="Elo">Elo</button>
       </div>
       <button id="tpFind">Wee sichen</button>
+      <div id="rectrips"></div>
       <div id="trip"></div>
     </div>
     <div class="muted" id="tpRouteNote">Lueden…</div>
@@ -330,8 +333,29 @@ async function findTrip(){
     if(when) u.searchParams.set("time", new Date(when).toISOString());
     u.searchParams.set("arriveBy", arriveBy?"true":"false");
     const r=await fetch(u); renderTrip(await r.json());
+    pushRecentTrip(tripFrom, tripTo);
   }catch(e){ $("trip").innerHTML='<div class="muted" style="margin-top:10px">Wee net verfügbar — probéier nach eng Kéier.</div>'; }
   finally{ $("tpFind").disabled=false; }
+}
+// recently searched itineraries, for one-tap re-run (newest first, max 6)
+let RTRIPS=(()=>{ try{ const r=JSON.parse(localStorage.getItem("moienRecentTrips")); return Array.isArray(r)?r:[]; }catch{ return []; } })();
+function pushRecentTrip(from,to){
+  const key=(t)=>String(t.id);
+  RTRIPS=[{from,to}, ...RTRIPS.filter(r=>!(key(r.from)===key(from)&&key(r.to)===key(to)))].slice(0,6);
+  localStorage.setItem("moienRecentTrips", JSON.stringify(RTRIPS));
+  renderRecentTrips();
+}
+function renderRecentTrips(){
+  const host=$("rectrips"); if(!host)return;
+  if(!RTRIPS.length){ host.innerHTML=""; return; }
+  host.innerHTML=`<div class="rectitle">🕘 Lescht Weeër</div><div class="recchips">`+
+    RTRIPS.map((r,i)=>`<button class="recchip" data-i="${i}">${esc(r.from.name)} <span class="ar">→</span> ${esc(r.to.name)}</button>`).join("")+`</div>`;
+  host.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{
+    const r=RTRIPS[+el.dataset.i]; if(!r)return;
+    tripFrom=r.from; tripTo=r.to;
+    $("fromq").value=r.from.name; $("toq").value=r.to.name;
+    findTrip();
+  });
 }
 
 let searchT=null;
@@ -369,6 +393,7 @@ async function initTransport(){
   wireStopPicker("fromq","fromList",s=>{tripFrom=s;});
   wireStopPicker("toq","toList",s=>{tripTo=s;});
   $("tpFind").onclick=findTrip;
+  renderRecentTrips();
   $("tpNow").onclick=()=>{ $("tpTime").value=""; $("tpMode").value="dep"; };
   $("tpSwap").onclick=()=>{
     const a=$("fromq").value; $("fromq").value=$("toq").value; $("toq").value=a;
