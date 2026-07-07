@@ -6,6 +6,17 @@ const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;","
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 let sb = null, inviteSubbed = false;
 let adminIds = new Set();   // user_ids of app admins → pinned on top + 👑 tagged
+let classByName = new Map();   // lowercased username → school class (shown as a tag)
+async function loadClasses() {
+  try {
+    const { data } = await sb.from("profiles").select("username, class");
+    classByName = new Map((data || []).filter(p => p.class).map(p => [String(p.username).toLowerCase(), p.class]));
+  } catch (e) { console.warn("[friends] classes", e); }
+}
+const classTag = (name) => {
+  const c = classByName.get(String(name || "").toLowerCase());
+  return c ? ` <span class="class-tag">${esc(c)}</span>` : "";
+};
 
 const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Dial", draw: "Molerei", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe" };
 const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe"]);
@@ -14,6 +25,7 @@ async function refresh() {
   const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: dir }, { data: act }] = await Promise.all([
     sb.rpc("my_friends"), sb.rpc("friend_requests"), sb.rpc("my_game_invites"),
     sb.rpc("sent_requests"), sb.rpc("directory"), sb.rpc("friends_activity", { p_limit: 30 }),
+    loadClasses(),
   ]);
   renderFriends(fr || []);
   renderRequests(rq || []);
@@ -51,7 +63,7 @@ function renderActivity(list) {
     const game = esc(GAMES[a.game] || a.game);
     const verb = VERB[a.result] ? T(VERB[a.result]) : a.result;
     return `<div class="act-row"><span class="act-emoji">${a.result === "win" ? "🏆" : a.result === "loss" ? "❌" : "🤝"}</span>` +
-      `<span class="act-text"><b>${who}</b> ${verb} <b>${game}</b></span>` +
+      `<span class="act-text"><b>${who}</b>${a.is_me ? "" : classTag(a.username)} ${verb} <b>${game}</b></span>` +
       `<span class="act-time">${ago(a.created_at)}</span></div>`;
   }).join("");
 }
@@ -60,7 +72,7 @@ function renderSent(list) {
   $("sentWrap").style.display = list.length ? "" : "none";
   $("sent").innerHTML = list.map(s => `
     <div class="row">
-      <span class="name"><span class="av">👤</span>${esc(s.username)} <span style="color:var(--muted);font-weight:400">${T("friends.pending")}</span></span>
+      <span class="name"><span class="av">👤</span>${esc(s.username)}${classTag(s.username)} <span style="color:var(--muted);font-weight:400">${T("friends.pending")}</span></span>
       <button class="mini x" data-cancel="${s.user_id}">${T("btn.cancel")}</button>
     </div>`).join("");
   $("sent").querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => { await sb.rpc("remove_friend", { p_other: b.dataset.cancel }); refresh(); });
@@ -75,7 +87,7 @@ function renderDirectory(list) {
     else if (u.status === "sent") btn = `<span class="mini" style="opacity:.55">${T("friends.requested")}</span>`;
     else if (u.status === "incoming") btn = `<button class="mini go" data-add="${esc(u.username)}">${T("friends.accept")}</button>`;
     else btn = `<button class="mini go" data-add="${esc(u.username)}">${T("friends.addPlus")}</button>`;
-    return `<div class="row"><span class="name"><span class="av">👤</span>${esc(u.username)}</span>${btn}</div>`;
+    return `<div class="row"><span class="name"><span class="av">👤</span>${esc(u.username)}${classTag(u.username)}</span>${btn}</div>`;
   }).join("");
   el.querySelectorAll("[data-add]").forEach(b => b.onclick = async () => {
     try { await sb.rpc("add_friend", { p_username: b.dataset.add }); refresh(); } catch (e) { alert(e.message); }
@@ -89,7 +101,7 @@ function renderFriends(list) {
   const ordered = [...list.filter(f => adminIds.has(f.user_id)), ...list.filter(f => !adminIds.has(f.user_id))];
   el.innerHTML = ordered.map(f => `
     <div class="row">
-      <span class="name"><span class="av">👤</span>${esc(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">👑 Admin</span>` : ""}</span>
+      <span class="name"><span class="av">👤</span>${esc(f.username)}${classTag(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">👑 Admin</span>` : ""}</span>
       <button class="mini" data-call="${f.user_id}" data-name="${esc(f.username)}" title="${T("friends.call")}">📹</button>
       <button class="mini" data-msg="${esc(f.username)}">${T("friends.message")}</button>
       <button class="mini go" data-play="${f.user_id}" data-name="${esc(f.username)}">${T("friends.play")}</button>
@@ -108,7 +120,7 @@ function renderRequests(list) {
   $("reqWrap").style.display = list.length ? "" : "none";
   $("requests").innerHTML = list.map(r => `
     <div class="row">
-      <span class="name"><span class="av">👤</span>${esc(r.username)} <span style="color:var(--muted);font-weight:400">${T("friends.wantsFriend")}</span></span>
+      <span class="name"><span class="av">👤</span>${esc(r.username)}${classTag(r.username)} <span style="color:var(--muted);font-weight:400">${T("friends.wantsFriend")}</span></span>
       <button class="mini go" data-accept="${r.id}">${T("friends.accept")}</button>
     </div>`).join("");
   $("requests").querySelectorAll("[data-accept]").forEach(b => b.onclick = async () => {
@@ -120,7 +132,7 @@ function renderInvites(list) {
   $("invitesWrap").style.display = list.length ? "" : "none";
   $("invites").innerHTML = list.map(i => `
     <div class="row">
-      <span class="name">🎮 <b>${esc(i.from_name)}</b> ${T("friends.invitedYou")} <b>${esc(GAMES[i.game] || i.game)}</b></span>
+      <span class="name">🎮 <b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(GAMES[i.game] || i.game)}</b></span>
       <button class="mini go" data-join="${i.game}|${esc(i.room)}|${i.id}">${T("btn.join")}</button>
     </div>`).join("");
   $("invites").querySelectorAll("[data-join]").forEach(b => b.onclick = async () => {
