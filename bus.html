@@ -35,6 +35,7 @@
   .dep .time em{color:#f87171;font-style:normal;font-size:12px}
   .dep .time .ok{color:var(--ok)}
   .dep.canc{opacity:.5;text-decoration:line-through}
+  .dep.train .line{background:#20304a;border-color:#3a5a8a;color:#8fc7ff}
   /* route finder */
   .triprow{display:flex;gap:8px;align-items:center}
   .triprow .cols{flex:1;min-width:0}
@@ -63,7 +64,7 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>🚌 Bussen</h1>
+  <h1>🚌 Bus &amp; Zuch</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
@@ -87,7 +88,7 @@
   <div class="card">
     <h3>🚌 Nächst Departuren</h3>
     <div id="tprow" style="display:none">
-      <input id="stopq" placeholder="Arrêt sichen (z.B. Kirchberg)…" autocomplete="off">
+      <input id="stopq" placeholder="Arrêt oder Gare sichen…" autocomplete="off">
       <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
     </div>
     <div id="stops"></div>
@@ -117,11 +118,16 @@ async function tp(params){
   const r=await fetch(u,{headers:{apikey:PB_CONFIG.anonKey,Authorization:`Bearer ${PB_CONFIG.anonKey}`}});
   return r.json();
 }
+// rail categories the HAFAS board returns at stations (buses have cat "Bus"/"")
+const RAIL=new Set(["RB","RE","IC","IR","TER","TGV","ICE","EC","EN","CFL","TRAIN"]);
+const railIcon=(cat)=>/TGV|ICE/i.test(cat||"")?"🚄":"🚆";
 function renderDeps(list){
   if(!list||!list.length){$("deps").innerHTML='<div class="muted">Keng Departuren an der nächster Stonn.</div>';return;}
   $("deps").innerHTML=list.map(d=>{
     const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
-    return `<div class="dep ${d.cancelled?"canc":""}"><span class="line">${esc(d.line)}</span>
+    const train=RAIL.has((d.cat||"").toUpperCase());
+    const lab=train?`${railIcon(d.cat)} ${esc(d.line||d.cat)}`:esc(d.line);
+    return `<div class="dep ${train?"train":""} ${d.cancelled?"canc":""}"><span class="line">${lab}</span>
       <span class="dir">${esc(d.dir)}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span></div>`;
   }).join("");
 }

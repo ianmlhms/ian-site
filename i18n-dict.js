@@ -85,7 +85,7 @@ window.I18N_DICT = {
   "tile.wordle.sub":     { lb: "Wordle · LB & DE", de: "Wordle · LB & DE", en: "Wordle · LB & DE" },
   "tile.buddy.sub":      { lb: "AI-Hëllef fir d'Hausaufgaben", de: "KI-Hilfe für Hausaufgaben", en: "AI homework help" },
   "tile.moien.sub":      { lb: "Wieder", de: "Wetter", en: "Weather" },
-  "tile.bus.sub":        { lb: "Live Departuren", de: "Live-Abfahrten", en: "Live departures" },
+  "tile.bus.sub":        { lb: "Departuren & Weeër", de: "Abfahrten & Routen", en: "Departures & routes" },
   "tile.grades":         { lb: "Noten", de: "Noten", en: "Grades" },
   "tile.grades.sub":     { lb: "Moyenne-Rechner", de: "Durchschnittsrechner", en: "Average calculator" },
   "tile.hotel.sub":      { lb: "Bausimulator · privat", de: "Bausimulator · privat", en: "Builder · private" },
