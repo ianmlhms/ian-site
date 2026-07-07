@@ -8,8 +8,10 @@
 //   supabase secrets set TRANSPORT_API_KEY=... --project-ref lvksqmgfwkfbblfsozfk
 //
 // Actions (query string):
-//   ?action=search&q=Luxembourg,Gare   → stop search  → [{id,name}]
+//   ?action=nearby&lat=49.61&lon=6.13  → stops near a coordinate → [{id,name,dist}]
 //   ?action=board&id=<stopId>          → next departures → [{line,dir,time,planned,delay,cancelled,cat}]
+// This Luxembourg HAFAS key only exposes departureBoard + location.nearbystops
+// (there is NO free-text location.name search), so stop selection is by geolocation.
 // If TRANSPORT_API_KEY is unset it returns {configured:false} so the page shows a friendly notice.
 
 const KEY = Deno.env.get("TRANSPORT_API_KEY") ?? "";
@@ -48,15 +50,18 @@ Deno.serve(async (req) => {
   const action = url.searchParams.get("action") ?? "board";
 
   try {
-    if (action === "search") {
-      const q = (url.searchParams.get("q") ?? "").slice(0, 80);
-      if (q.length < 2) return json({ configured: true, stops: [] });
-      const data = await hafas("location.name", { input: q, type: "S", maxNo: "8", lang: "de" });
+    if (action === "nearby") {
+      const lat = url.searchParams.get("lat") ?? "";
+      const lon = url.searchParams.get("lon") ?? "";
+      if (!/^-?\d+\.?\d*$/.test(lat) || !/^-?\d+\.?\d*$/.test(lon)) return json({ configured: true, stops: [] });
+      const data = await hafas("location.nearbystops", {
+        originCoordLat: lat, originCoordLong: lon, maxNo: "8", r: "1500", lang: "de",
+      });
       const raw = data?.stopLocationOrCoordLocation ?? [];
       const stops = raw
         .map((x: any) => x?.StopLocation ?? x?.stopLocation ?? x)
-        .filter((s: any) => s?.id && s?.name)
-        .map((s: any) => ({ id: s.id, name: s.name }));
+        .filter((s: any) => (s?.extId || s?.id) && s?.name)
+        .map((s: any) => ({ id: s.extId ?? s.id, name: s.name, dist: s.dist ?? null }));
       return json({ configured: true, stops });
     }
 

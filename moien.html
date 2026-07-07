@@ -35,9 +35,15 @@
   .hr .h{font-size:11px;color:var(--muted)}.hr .e{font-size:20px;margin:3px 0}.hr .t{font-size:13px;font-weight:700}
   /* transport */
   .card h3{margin:0 0 12px;font-size:16px}
-  #stopq{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px}
-  #stops .st{padding:9px 11px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:13.5px}
+  #tpbtns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .tpbtn{flex:1;min-width:140px;padding:10px 12px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-size:13.5px;font-weight:700;cursor:pointer}
+  .tpbtn.ghost{background:var(--card2);color:var(--text);border-color:var(--border)}
+  .tpbtn:hover{filter:brightness(1.05)}
+  .tpbtn:disabled{opacity:.55;cursor:default}
+  #stops .st{display:flex;justify-content:space-between;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:13.5px}
   #stops .st:hover{border-color:var(--accent2)}
+  #stops .st .dist{color:var(--muted);font-size:12px;flex:none}
+  #stops .back{color:var(--accent2);font-size:12.5px;cursor:pointer;display:inline-block;margin:8px 0 0}
   .dep{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
   .dep:last-child{border-bottom:none}
   .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 6px}
@@ -68,7 +74,10 @@
 
   <div class="card">
     <h3>🚌 Nächst Departuren</h3>
-    <input id="stopq" placeholder="Arrêt sichen (z.B. Luxembourg, Gare)…" style="display:none">
+    <div id="tpbtns" style="display:none">
+      <button class="tpbtn" id="tpGeo">📍 Arrêten no bei mir</button>
+      <button class="tpbtn ghost" id="tpCity">🏙 Zentrum Lëtzebuerg</button>
+    </div>
     <div id="stops"></div>
     <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
   </div>
@@ -129,7 +138,10 @@ async function loadWeather(){
 }
 loadWeather();
 
-/* ---- transport (Edge Function proxy) ---- */
+/* ---- transport (Edge Function proxy) ----
+   The Luxembourg HAFAS key has no free-text stop search, only nearby-by-coords +
+   departure board, so stops are chosen by geolocation (or the city-centre button). */
+const LUX_CENTRE={lat:49.6116, lon:6.1319};
 let curStop=null, tpTimer=null;
 async function tp(params){
   const u=new URL(`${PB_CONFIG.url}/functions/v1/transport`);
@@ -151,34 +163,58 @@ async function loadBoard(){
   if(d.error){$("deps").innerHTML='<div class="muted">Departuren net verfügbar.</div>';return;}
   renderDeps(d.departures);
 }
+function renderStops(stops){
+  if(!stops||!stops.length){$("stops").innerHTML='<div class="muted">Keng Arrêten an der Géigend fonnt.</div>';return;}
+  $("stops").innerHTML=stops.map(s=>
+    `<div class="st" data-id="${esc(s.id)}"><span>${esc(s.name)}</span>${s.dist!=null?`<span class="dist">${Math.round(s.dist)} m</span>`:""}</div>`
+  ).join("");
+  $("stops").querySelectorAll(".st").forEach(el=>el.onclick=()=>{
+    const s=stops.find(x=>String(x.id)===el.dataset.id); if(s)selectStop(s);
+  });
+}
 function selectStop(s){
-  curStop=s; $("stopq").value=s.name; $("stops").innerHTML="";
-  localStorage.setItem("moienStop",JSON.stringify(s));
+  curStop={id:s.id,name:s.name};
+  $("stops").innerHTML=`<span class="back" id="tpBack">‹ Aner Arrêt</span>`;
+  $("tpBack").onclick=showLastStops;
+  $("deps").innerHTML='<div class="muted">Lueden…</div>';
+  localStorage.setItem("moienStop",JSON.stringify(curStop));
   loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(loadBoard,45000);
 }
-let searchT=null;
-$("stopq").addEventListener("input",()=>{
-  clearTimeout(searchT);
-  const q=$("stopq").value.trim();
-  if(q.length<2){$("stops").innerHTML="";return;}
-  searchT=setTimeout(async()=>{
-    const d=await tp({action:"search",q});
-    $("stops").innerHTML=(d.stops||[]).map(s=>`<div class="st" data-id="${esc(s.id)}">${esc(s.name)}</div>`).join("");
-    $("stops").querySelectorAll(".st").forEach(el=>el.onclick=()=>{
-      const s=(d.stops||[]).find(x=>x.id===el.dataset.id); if(s)selectStop(s);
-    });
-  },300);
-});
+let lastStops=[];
+function showLastStops(){
+  clearInterval(tpTimer); curStop=null;
+  $("deps").innerHTML="";
+  renderStops(lastStops);
+}
+async function findNearby(coords,label){
+  $("stops").innerHTML=`<div class="muted">${label} gëtt gesicht…</div>`;
+  $("deps").innerHTML="";
+  const d=await tp({action:"nearby",lat:coords.lat.toFixed(5),lon:coords.lon.toFixed(5)});
+  if(d.error){$("stops").innerHTML='<div class="muted">Arrêten net verfügbar.</div>';return;}
+  lastStops=d.stops||[];
+  renderStops(lastStops);
+}
+$("tpGeo").onclick=()=>{
+  if(!navigator.geolocation){findNearby(LUX_CENTRE,"Arrêten");return;}
+  $("stops").innerHTML='<div class="muted">Standuert gëtt ugefrot…</div>';
+  navigator.geolocation.getCurrentPosition(
+    p=>findNearby({lat:p.coords.latitude,lon:p.coords.longitude},"Arrêten no bei dir"),
+    ()=>{$("stops").innerHTML='<div class="muted">Kee Standuert — probéier „Zentrum Lëtzebuerg“.</div>';},
+    {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+  );
+};
+$("tpCity").onclick=()=>findNearby(LUX_CENTRE,"Arrêten am Zentrum");
+
 async function initTransport(){
-  const cfg=await tp({action:"search",q:"lux"});
+  const cfg=await tp({action:"nearby"});   // no coords → returns just the configured flag, no upstream call
   if(cfg.configured===false){
     $("tpNote").innerHTML="🚧 Live-Departuren kommen geschwënn — den API-Schlëssel vum Verkéiersbond gëtt ugefrot.";
     return;
   }
-  $("stopq").style.display="";
+  $("tpbtns").style.display="";
   const saved=JSON.parse(localStorage.getItem("moienStop")||"null");
-  if(saved){ selectStop(saved); }
-  else $("tpNote").innerHTML='<span class="muted">Sich uewen en Arrêt fir déi nächst Bussen an Zich ze gesinn.</span>';
+  if(saved&&saved.id){ selectStop(saved); }
+  else $("tpNote").innerHTML='<span class="muted">Wiel en Arrêt no bei dir fir déi nächst Bussen an Zich.</span>';
 }
 initTransport();
 
