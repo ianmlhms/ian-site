@@ -32,6 +32,9 @@
   .ovr:hover{border-color:var(--good)}
   .muted{color:var(--muted)}.center{text-align:center}
   h3{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
+  .catpick .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+  .chip{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
 </style>
 <link rel="stylesheet" href="game-common.css?v=3">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -50,7 +53,30 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module" src="notify-ambient.js?v=2"></script>
 <script>
-const CATS = ["Stadt","Land","Fluss","Name","Tier","Beruf"];
+/* 15 categories to choose from. `check` is the Wikidata WHERE-fragment used to
+   verify an answer; null = no online check (that category always counts). */
+const CATALOG = [
+  { name:"Stadt",     check:"?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q486972 }" },              // human settlement
+  { name:"Land",      check:"?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q6256 }" },                // country
+  { name:"Fluss",     check:"?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q355304 }" },              // watercourse
+  { name:"Name",      check:"?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q202444 }" },              // given name
+  { name:"Tier",      check:'?item (wdt:P279|wdt:P171)* wd:Q729. hint:Prior hint:gearing "forward".' },   // Animalia
+  { name:"Beruf",     check:"?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q28640 wd:Q12737077 }" },  // profession/occupation
+  { name:"Pflanze",   check:'?item (wdt:P279|wdt:P171)* wd:Q756. hint:Prior hint:gearing "forward".' },   // Plantae
+  { name:"Farbe",     check:"?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q1075 }" },                // colour
+  { name:"Sportart",  check:"?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q349 wd:Q31629 }" },       // sport / type of sport
+  { name:"Essen",     check:null },
+  { name:"Getränk",   check:null },
+  { name:"Automarke", check:null },
+  { name:"Film",      check:null },
+  { name:"Band",      check:null },
+  { name:"Körperteil",check:null },
+];
+const DEFAULT_CATS = [0,1,2,3,4,5];   // the classic six
+let selIdx = (()=>{ try{ const s=JSON.parse(localStorage.getItem("slfCats"));
+  if(Array.isArray(s)&&s.length>=2&&s.every(n=>Number.isInteger(n)&&n>=0&&n<CATALOG.length)) return s;
+}catch{} return [...DEFAULT_CATS]; })();
+let cats = DEFAULT_CATS.map(i=>CATALOG[i]);   // the categories in play this round
 const LETTERS = "ABDEFGHIKLMNOPRSTUVW";
 const params = new URLSearchParams(location.search);
 const room = (params.get("room")||"demo").toLowerCase();
@@ -76,15 +102,8 @@ let roundScores={}, roundPlayers=[];  // this round's scoring, kept so host over
 const VERIFY_TIMEOUT_MS = 12000;      // per Wikidata query
 const VERDICT_WAIT_MS   = 20000;      // guests: give up waiting for the host's verdicts
 const VERIFY_CONCURRENCY = 4;
-const CAT_CHECKS = [
-  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q486972 }",                    // Stadt — human settlement
-  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q6256 }",                      // Land — country
-  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q355304 }",                    // Fluss — watercourse
-  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q202444 }",                    // Name — given name
-  '?item (wdt:P279|wdt:P171)* wd:Q729. hint:Prior hint:gearing "forward".',  // Tier — chains to Animalia
-  "?item wdt:P31/wdt:P279* ?c. VALUES ?c { wd:Q28640 wd:Q12737077 }",        // Beruf — profession/occupation
-];
-async function checkWord(term, cat){
+async function checkWord(term, check){
+  if(!check) return null;                          // category has no online check → always valid
   const safe = term.trim().slice(0,60).replace(/[\\"]/g,"");
   const query = `SELECT ?item WHERE {
     SERVICE wikibase:mwapi {
@@ -95,7 +114,7 @@ async function checkWord(term, cat){
                       mwapi:limit "10".
       ?item wikibase:apiOutputItem mwapi:item.
     }
-    ${CAT_CHECKS[cat]} } LIMIT 1`;
+    ${check} } LIMIT 1`;
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort(), VERIFY_TIMEOUT_MS);
   try{
@@ -113,14 +132,14 @@ async function checkWord(term, cat){
 }
 async function validateAll(ps){
   const jobs=[];
-  ps.forEach(p=>{ CATS.forEach((_,i)=>{
+  ps.forEach(p=>{ cats.forEach((c,i)=>{
     const a=(answers[p.cid]?.ans?.[i]||"").trim();
-    if(a && valid(a)) jobs.push({ key:p.cid+"|"+i, term:a, cat:i });
+    if(a && valid(a) && c.check) jobs.push({ key:p.cid+"|"+i, term:a, check:c.check });
   }); });
   const v={};
   for(let at=0; at<jobs.length; at+=VERIFY_CONCURRENCY){
     const slice=jobs.slice(at, at+VERIFY_CONCURRENCY);
-    const res=await Promise.all(slice.map(j=>checkWord(j.term, j.cat)));
+    const res=await Promise.all(slice.map(j=>checkWord(j.term, j.check)));
     res.forEach((ok,k)=>{ if(ok===false) v[slice[k].key]=false; });
   }
   return v;
@@ -155,16 +174,20 @@ function render(){
       <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
       <p class="muted">${ps.length<2?"Waiting for players — share the room code above.":"Ready!"}</p>
       <p class="muted" style="font-size:12.5px">🔎 At the reveal, answers are checked against Wikidata — made-up words score 0.</p>
-      ${role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>Start round ${round+1}</button>`
+      ${role==="host" ? renderCatPicker() : ""}
+      ${role==="host" ? `<button class="big" id="startBtn" ${(ps.length<2||selIdx.length<2)?"disabled":""}>Start round ${round+1}</button>`
                       : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
                                   : `<p class="center muted">⚠️ The host left the room — ask them to rejoin, or <a href="pixelbreak.html">start a new game</a>.</p>`)}
       ${renderTotals(ps)}`;
-    if(role==="host") $("startBtn") && ($("startBtn").onclick=startRound);
+    if(role==="host"){
+      $("startBtn") && ($("startBtn").onclick=startRound);
+      $("app").querySelectorAll(".chip").forEach(b=> b.onclick=()=>toggleCat(+b.dataset.ci));
+    }
   } else if (phase==="play"){
     $("app").innerHTML = `
       <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}</span>`).join("")}</div>
       <div class="letter">${letter}</div>
-      ${CATS.map((c,i)=>`<div class="cat"><label>${c}</label><input id="c${i}" autocomplete="off" placeholder="${letter}…"></div>`).join("")}
+      ${cats.map((c,i)=>`<div class="cat"><label>${esc(c.name)}</label><input id="c${i}" autocomplete="off" placeholder="${letter}…"></div>`).join("")}
       <button class="big stop" id="stopBtn">✋ Stop! (reveal)</button>`;
     $("c0").focus();
     $("stopBtn").onclick=()=>{ ch.send({type:"broadcast",event:"stop",payload:{}}); doStop(); };
@@ -188,8 +211,8 @@ function render(){
 }
 function renderRound(ps){
   let rows = `<h3>Round ${round}</h3><table><tr><th>Category</th>${ps.map(p=>`<th>${esc(p.name)}</th>`).join("")}</tr>`;
-  CATS.forEach((cat,i)=>{
-    rows += `<tr><td class="muted">${cat}</td>` + ps.map(p=>{
+  cats.forEach((cat,i)=>{
+    rows += `<tr><td class="muted">${esc(cat.name)}</td>` + ps.map(p=>{
       const a=(answers[p.cid]?.ans?.[i])||""; const pts=scoreCell(i,p.cid,ps);
       const isBad = verdicts[p.cid+"|"+i]===false;
       const ovr = role==="host" ? ` <button class="ovr" data-ov="${p.cid}|${i}" title="Wikidata got it wrong? Count this answer anyway.">✓ count it</button>` : "";
@@ -218,13 +241,26 @@ function scoreCell(i,pcid,ps){
 
 function startRound(){
   round++; letter=pick(); stopped=false; answers={};
-  ch.send({type:"broadcast",event:"start",payload:{round,letter}});
+  cats = selIdx.map(i=>CATALOG[i]);
+  ch.send({type:"broadcast",event:"start",payload:{round,letter,cats:selIdx}});
   enterPlay();
+}
+function toggleCat(i){
+  const has=selIdx.includes(i);
+  if(has && selIdx.length<=2) return;                 // keep at least two categories
+  selIdx = has ? selIdx.filter(x=>x!==i) : [...selIdx,i].sort((a,b)=>a-b);
+  localStorage.setItem("slfCats", JSON.stringify(selIdx));
+  render();
+}
+function renderCatPicker(){
+  return `<div class="catpick"><h3>Kategorien (${selIdx.length})</h3>
+    <div class="chips">${CATALOG.map((c,i)=>`<button class="chip${selIdx.includes(i)?" on":""}" data-ci="${i}">${esc(c.name)}</button>`).join("")}</div>
+    ${selIdx.length<2?'<p class="muted" style="font-size:12px">Wähle mindestens 2 Kategorien.</p>':''}</div>`;
 }
 function enterPlay(){ phase="play"; stopped=false; answers={}; verdicts={}; roundScores={}; clearTimeout(verdictTimer); render(); }
 function doStop(){
   if(stopped) return; stopped=true; phase="collect";
-  const ans=CATS.map((_,i)=>($("c"+i)?($("c"+i).value||""):""));
+  const ans=cats.map((_,i)=>($("c"+i)?($("c"+i).value||""):""));
   answers[cid]={name,ans};
   ch.send({type:"broadcast",event:"answers",payload:{cid,name,ans}});
   clearTimeout(collectTimer); collectTimer=setTimeout(finish,4000);
@@ -249,7 +285,7 @@ function applyVerdicts(v){
   verdicts = v || {};
   roundPlayers = players();
   roundScores = {};
-  roundPlayers.forEach(p=>{ let s=0; CATS.forEach((_,i)=>s+=scoreCell(i,p.cid,roundPlayers)); roundScores[p.cid]=s; totals[p.cid]=(totals[p.cid]||0)+s; });
+  roundPlayers.forEach(p=>{ let s=0; cats.forEach((_,i)=>s+=scoreCell(i,p.cid,roundPlayers)); roundScores[p.cid]=s; totals[p.cid]=(totals[p.cid]||0)+s; });
   phase="results"; render();
 }
 // Host judgement call: Wikidata rejected a word the players know is real —
@@ -258,7 +294,7 @@ function overrideVerdict(key, send){
   if(phase!=="results" || verdicts[key]!==false) return;
   delete verdicts[key];
   roundPlayers.forEach(p=>{
-    let s=0; CATS.forEach((_,i)=>s+=scoreCell(i,p.cid,roundPlayers));
+    let s=0; cats.forEach((_,i)=>s+=scoreCell(i,p.cid,roundPlayers));
     totals[p.cid]=(totals[p.cid]||0)+s-(roundScores[p.cid]||0);
     roundScores[p.cid]=s;
   });
@@ -266,7 +302,8 @@ function overrideVerdict(key, send){
   render();
 }
 
-ch.on("broadcast",{event:"start"},({payload})=>{ round=payload.round; letter=payload.letter; enterPlay(); })
+ch.on("broadcast",{event:"start"},({payload})=>{ round=payload.round; letter=payload.letter;
+    cats=(Array.isArray(payload.cats)?payload.cats:DEFAULT_CATS).map(i=>CATALOG[i]).filter(Boolean); enterPlay(); })
   .on("broadcast",{event:"stop"},()=>doStop())
   .on("broadcast",{event:"answers"},({payload})=>{ answers[payload.cid]={name:payload.name,ans:payload.ans}; if(stopped) checkComplete(); })
   .on("broadcast",{event:"verdicts"},({payload})=>applyVerdicts(payload.v||{}))
