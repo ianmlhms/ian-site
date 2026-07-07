@@ -123,7 +123,8 @@ async function boot(){
 
   if(!isCallee){
     setStatus(T("call.calling"));
-    ring("ring");                 // notify the callee's inbox
+    ring("ring");                 // realtime inbox (rings if the callee has the site open)
+    pushRing();                   // web push (system notification even if the site is closed)
     noAnswerTimer=setTimeout(()=>{ if(!remoteReady){ ring("cancel"); endCall(T("call.ended"),true); } },40000);
   }else{
     setStatus(T("call.connecting"));
@@ -185,6 +186,20 @@ function flushIce(){ pendingIce.forEach(c=>pc.addIceCandidate(c).catch(()=>{}));
 function ring(event){
   inbox=sb.channel("rtc:"+peerId,{config:{broadcast:{self:false}}});
   inbox.subscribe((s)=>{ if(s==="SUBSCRIBED"){ inbox.send({type:"broadcast",event,payload:{callId,from:me,fromName:myName}}); } });
+}
+
+// Fire a real Web Push so the callee gets a system notification even with the
+// site closed (like a message). The notify function authenticates via our JWT
+// and only pushes to accepted friends. Best-effort — never blocks the call.
+async function pushRing(){
+  try{
+    const tok=auth.session()?.access_token; if(!tok) return;
+    await fetch(`${PB_CONFIG.url}/functions/v1/notify`,{
+      method:"POST",
+      headers:{ "content-type":"application/json", apikey:PB_CONFIG.anonKey, Authorization:`Bearer ${tok}` },
+      body:JSON.stringify({ type:"call", to:peerId, callId, fromName:myName }),
+    });
+  }catch(e){ console.warn("[call] push ring failed",e); }
 }
 
 function wireControls(){

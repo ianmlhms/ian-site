@@ -32,8 +32,13 @@ const GAME_NAMES: Record<string, string> = {
   dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
 };
 
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-notify-secret",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, "content-type": "application/json" } });
 
 async function usernameOf(id: string): Promise<string> {
   const { data } = await admin.from("profiles").select("username").eq("id", id).maybeSingle();
@@ -92,29 +97,14 @@ async function planFor(table: string, rec: any): Promise<Plan | null> {
   return null;
 }
 
-Deno.serve(async (req) => {
-  // Shared-secret guard (the function is deployed with --no-verify-jwt).
-  // Fails closed: with NOTIFY_SECRET unset, nobody can invoke the function.
-  if (!NOTIFY_SECRET || req.headers.get("x-notify-secret") !== NOTIFY_SECRET) {
-    return json({ error: "unauthorized" }, 401);
-  }
-
-  let payload: any;
-  try { payload = await req.json(); } catch { return json({ error: "bad json" }, 400); }
-  const table = payload?.table;
-  const rec = payload?.record;
-  if (!table || !rec) return json({ ok: true, skipped: "no record" });
-
-  const plan = await planFor(table, rec);
-  if (!plan) return json({ ok: true, skipped: "nothing to send for " + table });
+// Fan a Plan out to Web Push. Shared by the webhook path and the call path.
+async function sendPlan(plan: Plan) {
   if (!plan.recipients.length) return json({ ok: true, recipients: 0 });
-
   const { data: subs } = await admin
     .from("push_subscriptions").select("endpoint, subscription").in("user_id", plan.recipients);
   if (!subs || !subs.length) return json({ ok: true, recipients: plan.recipients.length, subs: 0 });
 
   const data = JSON.stringify({ title: plan.title, body: plan.body, url: plan.url, tag: plan.tag });
-
   let sent = 0;
   await Promise.all(subs.map(async (s: any) => {
     try {
@@ -129,6 +119,62 @@ Deno.serve(async (req) => {
       }
     }
   }));
+  return json({ ok: true, recipients: plan.recipients.length, sent });
+}
 
-  return json({ ok: true, table, recipients: plan.recipients.length, sent });
+// Incoming-call push (FaceTime). The browser can't hold NOTIFY_SECRET, so this
+// path authenticates with the *caller's own Supabase JWT* and only pushes when
+// the two users are accepted friends — so nobody can spam-ring a stranger.
+async function handleCallPush(req: Request, p: any) {
+  const authz = req.headers.get("Authorization") || "";
+  const token = authz.startsWith("Bearer ") ? authz.slice(7) : "";
+  if (!token) return json({ error: "unauthenticated" }, 401);
+  const { data: u, error } = await admin.auth.getUser(token);
+  const caller = u?.user?.id;
+  if (error || !caller) return json({ error: "invalid token" }, 401);
+
+  const to = String(p?.to || "");
+  if (!to || to === caller) return json({ ok: true, skipped: "no target" });
+
+  // accepted friendship in either direction
+  const { data: fr } = await admin
+    .from("friendships").select("id").eq("status", "accepted")
+    .or(`and(requester.eq.${caller},addressee.eq.${to}),and(requester.eq.${to},addressee.eq.${caller})`)
+    .limit(1);
+  if (!fr || !fr.length) return json({ ok: true, skipped: "not friends" });
+
+  const name = await usernameOf(caller);
+  const url = `call.html?call=${encodeURIComponent(String(p?.callId || ""))}` +
+    `&peer=${encodeURIComponent(caller)}&name=${encodeURIComponent(name)}&answer=1`;
+  return await sendPlan({
+    recipients: [to],
+    title: `📹 ${name}`,
+    body: "rifft dech un…",
+    url,
+    tag: "call-" + caller,
+  });
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
+  let payload: any;
+  try { payload = await req.json(); } catch { return json({ error: "bad json" }, 400); }
+
+  // Authenticated client path for FaceTime call rings (no shared secret).
+  if (payload?.type === "call") return await handleCallPush(req, payload);
+
+  // Webhook path — shared-secret guard (deployed with --no-verify-jwt).
+  // Fails closed: with NOTIFY_SECRET unset, nobody can invoke this path.
+  if (!NOTIFY_SECRET || req.headers.get("x-notify-secret") !== NOTIFY_SECRET) {
+    return json({ error: "unauthorized" }, 401);
+  }
+
+  const table = payload?.table;
+  const rec = payload?.record;
+  if (!table || !rec) return json({ ok: true, skipped: "no record" });
+
+  const plan = await planFor(table, rec);
+  if (!plan) return json({ ok: true, skipped: "nothing to send for " + table });
+  return await sendPlan(plan);
 });
