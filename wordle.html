@@ -280,5 +280,6 @@ load();
   $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") $("lbModal").classList.remove("open"); };
   document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; document.querySelectorAll("[data-lb]").forEach(x => x.classList.toggle("on", x === b)); drawBoard(); });
 </script>
+  <script type="module" src="rtc-ring.js?v=1"></script>
 </body>
 </html>

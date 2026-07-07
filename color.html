@@ -282,5 +282,6 @@ if(AI){
     .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 }
 </script>
+  <script type="module" src="rtc-ring.js?v=1"></script>
 </body>
 </html>
