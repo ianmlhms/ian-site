@@ -35,6 +35,28 @@
   .dep .time em{color:#f87171;font-style:normal;font-size:12px}
   .dep .time .ok{color:var(--ok)}
   .dep.canc{opacity:.5;text-decoration:line-through}
+  /* route finder */
+  .triprow{display:flex;gap:8px;align-items:center}
+  .triprow .cols{flex:1;min-width:0}
+  .pickrow{position:relative;margin-bottom:8px}
+  .pickrow:last-child{margin-bottom:0}
+  .pickrow input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px}
+  .picklist{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;background:var(--card2);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .picklist .st{padding:9px 11px;cursor:pointer;font-size:13.5px;border-bottom:1px solid var(--border)}
+  .picklist .st:last-child{border-bottom:none}
+  .picklist .st:hover{background:var(--card)}
+  #tpSwap{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;width:40px;height:44px;font-size:16px;cursor:pointer}
+  #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-weight:700;font-size:14px;cursor:pointer}
+  #tpFind:disabled{opacity:.55;cursor:default}
+  .trip{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
+  .trip .thead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+  .trip .ttime{font-weight:800;font-size:15px}
+  .trip .tmeta{color:var(--muted);font-size:12.5px;flex:none}
+  .trip .legs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .leg{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 7px}
+  .leg.walk{background:transparent;border-style:dashed;color:var(--muted)}
+  .leg .ln{font-weight:800}
+  .trip .arrow{color:var(--muted);font-size:12px}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -47,6 +69,21 @@
 </header>
 
 <div class="wrap">
+  <div class="card">
+    <h3>🧭 Wee fannen</h3>
+    <div id="tproute" style="display:none">
+      <div class="triprow">
+        <div class="cols">
+          <div class="pickrow"><input id="fromq" placeholder="Vun … (z.B. Gare)" autocomplete="off"><div id="fromList"></div></div>
+          <div class="pickrow"><input id="toq" placeholder="Bis … (z.B. Kirchberg)" autocomplete="off"><div id="toList"></div></div>
+        </div>
+        <button id="tpSwap" title="Tauschen">⇅</button>
+      </div>
+      <button id="tpFind">Wee sichen</button>
+      <div id="trip"></div>
+    </div>
+    <div class="muted" id="tpRouteNote">Lueden…</div>
+  </div>
   <div class="card">
     <h3>🚌 Nächst Departuren</h3>
     <div id="tprow" style="display:none">
@@ -138,6 +175,70 @@ function nearestStops(lat,lon,k){
   out.sort((a,b)=>a.dist-b.dist);
   return out.slice(0,k);
 }
+
+/* ---- route finder (from → to) ---------------------------------------
+   Routing uses transitous (free, no-key MOTIS engine that includes the
+   Luxembourg GTFS feed), called by the coordinates we already hold for
+   every bundled stop — so no API key and no Edge Function are involved. */
+let tripFrom=null, tripTo=null;
+function wireStopPicker(inputId,listId,setPick){
+  const inp=$(inputId), list=$(listId); let t=null;
+  const close=()=>{list.innerHTML="";list.className="";};
+  inp.addEventListener("input",()=>{
+    setPick(null);
+    clearTimeout(t);
+    t=setTimeout(()=>{
+      const q=inp.value.trim();
+      if(q.length<2){close();return;}
+      const hits=searchStops(q);
+      if(!hits.length){close();return;}
+      list.className="picklist";
+      list.innerHTML=hits.map(s=>`<div class="st" data-id="${esc(s.id)}">${esc(s.name)}</div>`).join("");
+      list.querySelectorAll(".st").forEach(el=>el.onclick=()=>{
+        const s=hits.find(x=>String(x.id)===el.dataset.id);
+        if(s){ inp.value=s.name; setPick(s); close(); }
+      });
+    },160);
+  });
+  inp.addEventListener("blur",()=>setTimeout(close,180));
+}
+const fmtClock=(iso)=>new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+const MODEICON={WALK:"🚶",BUS:"🚌",COACH:"🚌",TRAM:"🚊",RAIL:"🚆",REGIONAL_RAIL:"🚆",REGIONAL_FAST_RAIL:"🚆",LONG_DISTANCE:"🚆",HIGHSPEED_RAIL:"🚄",SUBWAY:"🚇",FERRY:"⛴️"};
+function legLabel(lg){
+  if(lg.mode==="WALK"){const m=Math.max(1,Math.round((lg.duration||0)/60));return `<span class="leg walk">🚶 ${m}′</span>`;}
+  const ic=MODEICON[lg.mode]||"🚌", ln=lg.routeShortName||lg.mode;
+  return `<span class="leg">${ic} <span class="ln">${esc(ln)}</span></span>`;
+}
+function renderTrip(data){
+  const its=(data&&data.itineraries)||[];
+  if(!its.length){$("trip").innerHTML='<div class="muted" style="margin-top:10px">Kee Wee fonnt.</div>';return;}
+  $("trip").innerHTML=its.slice(0,4).map(it=>{
+    const mins=Math.round((it.duration||0)/60);
+    const legs=it.legs.filter(l=>l.mode!=="WALK"||l.duration>90);
+    const chain=legs.map(legLabel).join('<span class="arrow">›</span>');
+    const chg=it.transfers===1?"1 Ëmklammen":`${it.transfers} Ëmklammen`;
+    return `<div class="trip">
+      <div class="thead">
+        <span class="ttime">${fmtClock(it.startTime)} → ${fmtClock(it.endTime)}</span>
+        <span class="tmeta">${mins} min · ${chg}</span>
+      </div>
+      <div class="legs">${chain||'<span class="leg walk">🚶 zu Fouss</span>'}</div>
+    </div>`;
+  }).join("");
+}
+async function findTrip(){
+  if(!tripFrom||!tripTo){$("trip").innerHTML='<div class="muted" style="margin-top:10px">Wiel en Depart an eng Destinatioun.</div>';return;}
+  $("tpFind").disabled=true; $("trip").innerHTML='<div class="muted" style="margin-top:10px">Wee gëtt gesicht…</div>';
+  try{
+    const u=new URL("https://api.transitous.org/api/v1/plan");
+    u.searchParams.set("fromPlace",`${tripFrom.lat},${tripFrom.lon}`);
+    u.searchParams.set("toPlace",`${tripTo.lat},${tripTo.lon}`);
+    u.searchParams.set("arriveBy","false");
+    const r=await fetch(u); renderTrip(await r.json());
+  }catch(e){ $("trip").innerHTML='<div class="muted" style="margin-top:10px">Wee net verfügbar — probéier nach eng Kéier.</div>'; }
+  finally{ $("tpFind").disabled=false; }
+}
+
 let searchT=null;
 function wireSearch(){
   $("stopq").addEventListener("input",()=>{
@@ -167,6 +268,15 @@ async function initTransport(){
   }catch(e){ $("tpNote").innerHTML='<span class="muted">Arrêt-Lëscht net gelueden.</span>'; return; }
   $("tprow").style.display="";
   wireSearch();
+  // route finder
+  $("tproute").style.display=""; $("tpRouteNote").style.display="none";
+  wireStopPicker("fromq","fromList",s=>{tripFrom=s;});
+  wireStopPicker("toq","toList",s=>{tripTo=s;});
+  $("tpFind").onclick=findTrip;
+  $("tpSwap").onclick=()=>{
+    const a=$("fromq").value; $("fromq").value=$("toq").value; $("toq").value=a;
+    const t=tripFrom; tripFrom=tripTo; tripTo=t;
+  };
   const saved=JSON.parse(localStorage.getItem("moienStop")||"null");
   if(saved&&saved.id){ selectStop(saved); }
   else $("tpNote").innerHTML='<span class="muted">Sich en Arrêt oder tipp 📍 fir déi no bei dir.</span>';
