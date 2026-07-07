@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bussen — ian.lu</title>
+<meta name="description" content="Déi nächst Bussen an Zich zu Lëtzebuerg — live Departuren.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=5"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}
+  .muted{color:var(--muted);font-size:13px}
+  .card h3{margin:0 0 12px;font-size:16px}
+  #tprow{display:flex;gap:8px;margin-bottom:4px}
+  #stopq{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:14px}
+  .tpbtn{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-size:15px;font-weight:700;cursor:pointer}
+  .tpbtn:hover{filter:brightness(1.05)}
+  .tpbtn:disabled{opacity:.55;cursor:default}
+  #stops .st{display:flex;justify-content:space-between;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:13.5px}
+  #stops .st:hover{border-color:var(--accent2)}
+  #stops .st .dist{color:var(--muted);font-size:12px;flex:none}
+  .dep{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
+  .dep:last-child{border-bottom:none}
+  .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 6px}
+  .dep .dir{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dep .time{flex:none;font-weight:700;font-size:14px}
+  .dep .time em{color:#f87171;font-style:normal;font-size:12px}
+  .dep .time .ok{color:var(--ok)}
+  .dep.canc{opacity:.5;text-decoration:line-through}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>🚌 Bussen</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h3>🚌 Nächst Departuren</h3>
+    <div id="tprow" style="display:none">
+      <input id="stopq" placeholder="Arrêt sichen (z.B. Kirchberg)…" autocomplete="off">
+      <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
+    </div>
+    <div id="stops"></div>
+    <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
+  </div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---- transport ----
+   Stop discovery (text search + nearby) is LOCAL against the bundled GTFS stop
+   list (moien-stops.json, all ~2800 Luxembourg stops). Only the departure board
+   goes through the Edge Function → ministry HAFAS API (accessId stays server-side). */
+let curStop=null, tpTimer=null, STOPS=[];
+const norm=(s)=>(""+(s||"")).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+async function tp(params){
+  const u=new URL(`${PB_CONFIG.url}/functions/v1/transport`);
+  Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
+  const r=await fetch(u,{headers:{apikey:PB_CONFIG.anonKey,Authorization:`Bearer ${PB_CONFIG.anonKey}`}});
+  return r.json();
+}
+function renderDeps(list){
+  if(!list||!list.length){$("deps").innerHTML='<div class="muted">Keng Departuren an der nächster Stonn.</div>';return;}
+  $("deps").innerHTML=list.map(d=>{
+    const late=d.delay>0, dl=late?` <em>+${d.delay}</em>`:(d.delay===0?' <span class="ok">•</span>':"");
+    return `<div class="dep ${d.cancelled?"canc":""}"><span class="line">${esc(d.line)}</span>
+      <span class="dir">${esc(d.dir)}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span></div>`;
+  }).join("");
+}
+async function loadBoard(){
+  if(!curStop)return;
+  const d=await tp({action:"board",id:curStop.id});
+  if(d.error){$("deps").innerHTML='<div class="muted">Departuren net verfügbar.</div>';return;}
+  renderDeps(d.departures);
+}
+function renderStops(stops){
+  if(!stops||!stops.length){$("stops").innerHTML='<div class="muted">Keng Arrêten fonnt.</div>';return;}
+  $("stops").innerHTML=stops.map(s=>
+    `<div class="st" data-id="${esc(s.id)}"><span>${esc(s.name)}</span>${s.dist!=null?`<span class="dist">${s.dist<1000?Math.round(s.dist)+" m":(s.dist/1000).toFixed(1)+" km"}</span>`:""}</div>`
+  ).join("");
+  $("stops").querySelectorAll(".st").forEach(el=>el.onclick=()=>{
+    const s=stops.find(x=>String(x.id)===el.dataset.id); if(s)selectStop(s);
+  });
+}
+function selectStop(s){
+  curStop={id:s.id,name:s.name};
+  $("stopq").value=s.name; $("stops").innerHTML="";
+  $("deps").innerHTML='<div class="muted">Lueden…</div>';
+  localStorage.setItem("moienStop",JSON.stringify(curStop));
+  loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(loadBoard,45000);
+}
+/* local text search over the bundled stops (accent-insensitive, prefix-first) */
+function searchStops(q){
+  const n=norm(q); if(n.length<2)return[];
+  const res=[];
+  for(const [id,name,lat,lon] of STOPS){
+    const nn=norm(name), i=nn.indexOf(n);
+    if(i<0)continue;
+    // rank: word-start match beats mid-word, earlier beats later
+    const wordStart=(i===0||nn[i-1]===" "||nn[i-1]===",")?0:1;
+    res.push({id,name,lat,lon,rank:wordStart*1000+i});
+    if(res.length>400)break;
+  }
+  res.sort((a,b)=>a.rank-b.rank||a.name.length-b.name.length);
+  return res.slice(0,12);
+}
+/* local nearest stops by haversine distance */
+function nearestStops(lat,lon,k){
+  const R=6371000, toRad=(d)=>d*Math.PI/180;
+  const out=STOPS.map(([id,name,slat,slon])=>{
+    const dLat=toRad(slat-lat), dLon=toRad(slon-lon);
+    const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat))*Math.cos(toRad(slat))*Math.sin(dLon/2)**2;
+    return {id,name,lat:slat,lon:slon,dist:2*R*Math.asin(Math.sqrt(a))};
+  });
+  out.sort((a,b)=>a.dist-b.dist);
+  return out.slice(0,k);
+}
+let searchT=null;
+function wireSearch(){
+  $("stopq").addEventListener("input",()=>{
+    clearTimeout(searchT);
+    searchT=setTimeout(()=>{
+      const q=$("stopq").value.trim();
+      if(q.length<2){$("stops").innerHTML="";return;}
+      renderStops(searchStops(q));
+    },160);
+  });
+}
+$("tpGeo").onclick=()=>{
+  if(!navigator.geolocation){$("stops").innerHTML='<div class="muted">Kee Standuert op dësem Apparat.</div>';return;}
+  $("stops").innerHTML='<div class="muted">Standuert gëtt ugefrot…</div>';
+  navigator.geolocation.getCurrentPosition(
+    p=>renderStops(nearestStops(p.coords.latitude,p.coords.longitude,8)),
+    ()=>{$("stops").innerHTML='<div class="muted">Kee Standuert — sich uewen en Arrêt.</div>';},
+    {enableHighAccuracy:true,timeout:8000,maximumAge:60000}
+  );
+};
+
+async function initTransport(){
+  try{
+    const r=await fetch("moien-stops.json");
+    STOPS=await r.json();
+  }catch(e){ $("tpNote").innerHTML='<span class="muted">Arrêt-Lëscht net gelueden.</span>'; return; }
+  $("tprow").style.display="";
+  wireSearch();
+  const saved=JSON.parse(localStorage.getItem("moienStop")||"null");
+  if(saved&&saved.id){ selectStop(saved); }
+  else $("tpNote").innerHTML='<span class="muted">Sich en Arrêt oder tipp 📍 fir déi no bei dir.</span>';
+}
+initTransport();
+
+auth.mountAccountButton($("acctHost"));
+</script>
+</body>
+</html>

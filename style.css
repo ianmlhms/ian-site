@@ -94,6 +94,7 @@ body {
 .tile.karts:hover { border-color: #ff6b9d; }
 .tile.polls:hover { border-color: #ffb347; }
 .tile.exams:hover { border-color: #f87171; }
+.tile.bus:hover { border-color: #4de8ff; }
 
 footer {
   text-align: center;
