@@ -192,8 +192,10 @@ const avg = V.length ? sum(V,v=>v.duration_s)/V.length : 0;
 const enabledCh = CH.filter(c=>c.enabled).length;
 const totFollowers = sum(SOC, a=>a.followers||0);
 const totLikes = sum(SOC.filter(a=>a.platform==='tiktok'), a=>a.likes||0);
+const totYtViews = sum(V, v=>v.views||0);
 const kpis = [
   {v:fmtN(totFollowers), l:'<b>Followers</b> (TT+IG+YT)', c:'var(--accent)'},
+  {v:fmtN(totYtViews), l:'<b>YouTube views</b> (posted)', c:'var(--yt)'},
   {v:fmtN(totLikes), l:'TikTok likes', c:'var(--tt)'},
   {v:posted, l:'<b>Posted</b> (live)', c:'var(--posted)'},
   {v:V.length, l:'Total videos'},
@@ -343,7 +345,7 @@ document.getElementById('channels').innerHTML = CH.map(c=>{
 
 // ---- Videos table (sortable + searchable + status filter) ----
 const COLS=[['created_at','When'],['channel_id','Channel'],['status','Status'],['fmt','Format'],
-  ['duration_s','Len'],['title','Title / topic'],['platforms','Targets'],['youtube_id','Link']];
+  ['duration_s','Len'],['title','Title / topic'],['platforms','Targets'],['views','Views'],['youtube_id','Link']];
 let sortKey='created_at', sortDir=-1, statusFilter='all', query='';
 document.querySelector('#tbl thead').innerHTML='<tr>'+COLS.map(([k,l])=>
   `<th data-k="${k}">${l}</th>`).join('')+'</tr>';
@@ -361,6 +363,7 @@ function render(){
     rows=rows.filter(v=>(v.title+' '+v.topic+' '+v.id).toLowerCase().includes(q));}
   rows.sort((a,b)=>{let x=a[sortKey],y=b[sortKey];
     if(sortKey==='platforms'){x=x.length;y=y.length;}
+    if(sortKey==='views'){x=x||0;y=y||0;}
     if(typeof x==='string'){x=x.toLowerCase();y=(''+y).toLowerCase();}
     return x<y?-sortDir:x>y?sortDir:0;});
   const tb=document.querySelector('#tbl tbody');
@@ -372,6 +375,7 @@ function render(){
     <td class="mono">${fmtDur(v.duration_s)}</td>
     <td class="title">${esc(v.title)||'<span class=muted>—</span>'}</td>
     <td>${platDots(v.platforms)}</td>
+    <td class="mono" title="${v.views!=null?v.views+' views'+(v.likes!=null?` · ${v.likes} likes`:'')+(v.comments!=null?` · ${v.comments} comments`:''):'no data'}">${v.views!=null?fmtN(v.views):'<span class=muted>—</span>'}</td>
     <td>${ytLink(v.youtube_id)}</td></tr>`).join('');
   document.getElementById('tblEmpty').style.display=rows.length?'none':'block';
 }
