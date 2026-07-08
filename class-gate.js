@@ -11,6 +11,12 @@ import * as auth from "./auth.js?v=4";
 const T = (k, fb) => { try { const v = window.I18N && window.I18N.t && window.I18N.t(k); return (v && v !== k) ? v : fb; } catch { return fb; } };
 let sb = null, checking = false, shown = false, done = false;
 
+// A user who isn't in a school class (e.g. an adult) can skip the prompt. We
+// remember that per-account in localStorage so they're never nagged again on
+// this device — it's a cosmetic tag, not something worth a server round-trip.
+const skipKey = (uid) => "classGateSkip:" + uid;
+const hasSkipped = (uid) => { try { return !!localStorage.getItem(skipKey(uid)); } catch { return false; } };
+
 // A class must name a *specific* class inside a year (e.g. 5C6, 7C1, 2CG, 3CB),
 // not just the year level ("5e", "7", "5EME"). Normalize to a compact upper form,
 // then require year-digits + section letters (+ optional class number) and reject
@@ -24,6 +30,7 @@ async function start() {
   if (done || shown || checking || !auth.authConfigured) return;
   const uid = auth.session()?.user?.id;
   if (!uid) return;                       // wait for sign-in (onAuth re-calls)
+  if (hasSkipped(uid)) { done = true; return; }   // opted out of the class tag
   checking = true;
   try {
     sb = sb || await auth.client();
@@ -55,6 +62,9 @@ function showModal() {
        <div id="class-err" style="color:#ff7b86;font-size:12.5px;min-height:16px;margin-bottom:8px"></div>
        <button id="class-save" disabled
          style="width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;color:#04121f;background:#4ea6ff;opacity:.5">${esc(T("class.save", "Späicheren"))}</button>
+       <div style="color:#7a7a98;font-size:11.5px;text-align:center;margin-top:12px;margin-bottom:2px">${esc(T("class.skipHint", "D'Klass hëlleft nëmmen, fir deng Kollegen ze fannen."))}</div>
+       <button id="class-skip"
+         style="width:100%;border:none;background:none;color:#8a8ab0;font-size:12.5px;cursor:pointer;text-decoration:underline;padding:4px">${esc(T("class.skip", "Ech sinn net an enger Klass (z.B. Erwuessenen) — iwwersprangen"))}</button>
      </div>`;
   document.body.appendChild(ov);
 
@@ -73,7 +83,15 @@ function showModal() {
   });
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter" && !btn.disabled) save(); });
   btn.onclick = save;
+  document.getElementById("class-skip").onclick = skip;
   setTimeout(() => inp.focus(), 60);
+
+  function skip() {
+    const uid = auth.session()?.user?.id;
+    try { if (uid) localStorage.setItem(skipKey(uid), "1"); } catch { /* private mode — dismiss anyway */ }
+    done = true; shown = false;
+    ov.remove();
+  }
 
   async function save() {
     if (!validClass(inp.value)) {

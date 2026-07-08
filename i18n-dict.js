@@ -148,6 +148,8 @@ window.I18N_DICT = {
   "class.save":         { lb: "Späicheren", de: "Speichern", en: "Save" },
   "class.errFormat":    { lb: "Gëff eng genau Klass an, z.B. 5C6 — net nëmmen d'Joer.", de: "Gib eine genaue Klasse an, z.B. 5C6 — nicht nur das Jahr.", en: "Enter a specific class, e.g. 5C6 — not just the year." },
   "class.err":          { lb: "Konnt net gespäichert ginn, probéier nach eng Kéier.", de: "Konnte nicht gespeichert werden, versuch es erneut.", en: "Couldn't save, please try again." },
+  "class.skip":         { lb: "Ech sinn net an enger Klass (z.B. Erwuessenen) — iwwersprangen", de: "Ich bin in keiner Klasse (z.B. Erwachsene) — überspringen", en: "I'm not in a class (e.g. adults) — skip" },
+  "class.skipHint":     { lb: "D'Klass hëlleft nëmmen, fir deng Kollegen ze fannen.", de: "Die Klasse hilft nur dabei, deine Freunde zu finden.", en: "Your class only helps friends find you." },
   "time.now":           { lb: "elo grad", de: "gerade eben", en: "just now" },
   "time.yesterday":     { lb: "gëschter", de: "gestern", en: "yesterday" },
   "time.mAgo":          { lb: "min hir", de: "Min. her", en: "m ago" },

@@ -271,6 +271,6 @@ ch.on("broadcast",{event:"round"},({payload})=>applyRound(payload))
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 </script>
   <script type="module" src="rtc-ring.js?v=1"></script>
-  <script type="module" src="class-gate.js?v=1"></script>
+  <script type="module" src="class-gate.js?v=2"></script>
 </body>
 </html>
