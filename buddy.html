@@ -111,12 +111,12 @@
     <div class="stream" id="stream"></div>
     <div class="thumbs" id="thumbs"></div>
     <div class="composer">
-      <button class="iconbtn" id="picBtn" title="Fotoen eroplueden">📷</button>
+      <button class="iconbtn" id="picBtn" title="Foto oder PDF eroplueden">📷</button>
       <textarea id="input" rows="1" placeholder="Schreif deng Fro…"></textarea>
       <button id="send">Schécken</button>
     </div>
     <div class="left" id="left"></div>
-    <input type="file" id="file" accept="image/*" multiple capture="environment" style="display:none">
+    <input type="file" id="file" accept="image/*,application/pdf" multiple style="display:none">
   </div>
 </div>
 
@@ -154,7 +154,7 @@ function openMode(id){
   mode=MODES.find(m=>m.id===id); history=[]; pending=[]; convId=null;
   $("subject").value="Allgemeng";
   enterChat();
-  $("stream").innerHTML=`<div class="hint">${mode.id==="scan"?"Maach eng Foto (oder e puer) vun der Aufgab an dréck 📷.":"Stell deng éischt Fro — du kanns och Fotoen matschécken."}</div>`;
+  $("stream").innerHTML=`<div class="hint">${mode.id==="scan"?"Maach eng Foto — oder lued e fäerdegt Foto/PDF vun der Aufgab erop (📷) — an dréck Schécken.":"Stell deng éischt Fro — du kanns och Fotoen oder e PDF matschécken."}</div>`;
 }
 $("back").onclick=()=>{ $("chatwrap").style.display="none"; $("picker").style.display=""; loadConvos(); };
 
@@ -223,16 +223,69 @@ function renderReply(elm,text,badgeStr){
   elm.innerHTML=(badge?badge+"<br>":"")+fmt(text);
 }
 
-/* ---- image attach (all modes, multiple) ---- */
-$("picBtn").onclick=()=>$("file").click();
-$("file").onchange=()=>{
-  for(const f of $("file").files){
-    if(!f.type.startsWith("image/"))continue;
-    const r=new FileReader();
-    r.onload=()=>{ pending.push({dataUrl:r.result}); renderThumbs(); };
-    r.readAsDataURL(f);
+/* ---- image + PDF attach (all modes): existing photos, camera, or PDFs ----
+   Files are downscaled to keep the request small, and multi-page PDFs are
+   rendered to images client-side (pdf.js) so the vision backend is unchanged.
+   The backend caps a message at 6 images, so we enforce the same cap here. */
+const MAX_IMG=6, MAX_DIM=1600, JPEG_Q=0.82;
+let _pdfjs=null;
+async function ensurePdfjs(){
+  if(_pdfjs)return _pdfjs;
+  const m=await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs");
+  m.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs";
+  _pdfjs=m; return m;
+}
+function _scaled(w,h){ const mx=Math.max(w,h); if(mx>MAX_DIM){const k=MAX_DIM/mx; return [Math.round(w*k),Math.round(h*k)];} return [w,h]; }
+function imgToDataUrl(file){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{ const [w,h]=_scaled(img.naturalWidth,img.naturalHeight);
+      const c=document.createElement("canvas"); c.width=w; c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(img.src); res(c.toDataURL("image/jpeg",JPEG_Q)); };
+    img.onerror=()=>{ URL.revokeObjectURL(img.src); rej(new Error("img")); };
+    img.src=URL.createObjectURL(file);
+  });
+}
+async function pdfToDataUrls(file,limit){
+  const lib=await ensurePdfjs();
+  const pdf=await lib.getDocument({data:await file.arrayBuffer()}).promise;
+  const pages=Math.min(pdf.numPages,limit), urls=[];
+  for(let p=1;p<=pages;p++){
+    const page=await pdf.getPage(p), v1=page.getViewport({scale:1});
+    const [w]=_scaled(v1.width,v1.height), vp=page.getViewport({scale:w/v1.width});
+    const c=document.createElement("canvas"); c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+    await page.render({canvasContext:c.getContext("2d"),viewport:vp}).promise;
+    urls.push(c.toDataURL("image/jpeg",JPEG_Q));
   }
-  $("file").value="";
+  return {urls,total:pdf.numPages};
+}
+function attachHint(msg){
+  let t=$("atHint");
+  if(!t){ t=document.createElement("div"); t.id="atHint"; t.className="hint";
+    t.style.cssText="position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;z-index:60;max-width:90%;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.4)";
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>{t.style.display="none";},2600);
+}
+$("picBtn").onclick=()=>$("file").click();
+$("file").onchange=async()=>{
+  const files=[...$("file").files]; $("file").value=""; if(!files.length)return;
+  let full=false; $("picBtn").disabled=true;
+  for(const f of files){
+    if(pending.length>=MAX_IMG){full=true;break;}
+    try{
+      if(f.type==="application/pdf"||/\.pdf$/i.test(f.name||"")){
+        const {urls,total}=await pdfToDataUrls(f,MAX_IMG-pending.length);
+        for(const u of urls){ if(pending.length>=MAX_IMG){full=true;break;} pending.push({dataUrl:u}); }
+        if(total>urls.length)full=true;
+      }else if(f.type.startsWith("image/")){
+        pending.push({dataUrl:await imgToDataUrl(f)});
+      }
+      renderThumbs();
+    }catch(e){ console.warn("[buddy attach]",f.name,e); attachHint("Konnt d'Datei net liesen."); }
+  }
+  $("picBtn").disabled=false; renderThumbs();
+  if(full)attachHint(`Maximal ${MAX_IMG} Säiten/Biller pro Message.`);
 };
 function renderThumbs(){
   const el=$("thumbs");
