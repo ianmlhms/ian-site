@@ -7,6 +7,7 @@ const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 const fmtTime = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const adminTag = (uid) => (adminIds.has(uid) ? ` <span class="admin-tag">👑 Admin</span>` : "");
+const vipTag = (uid) => (vipIds.has(uid) ? ` <span class="vip-tag">⭐ VIP</span>` : "");
 const classTag = (uid) => (classByUid[uid] ? ` <span class="class-tag">${esc(classByUid[uid])}</span>` : "");
 const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
 const SNIPPET = 80; // chars kept of a quoted reply
@@ -25,6 +26,7 @@ let readThreshold = null;    // ms: msgs sent at/before this are read by ALL oth
 let reactMap = {};           // message_id -> [{user_id, username, emoji}]
 let onlineUsers = new Set(); // usernames currently online (presence)
 let adminIds = new Set();    // user_ids of app admins → shown with a 👑 tag
+let vipIds = new Set();       // user_ids of VIP users → shown with a ⭐ VIP tag
 let avatarMap = {};          // user_id -> avatar emoji OR uploaded-photo URL (from profiles)
 let classByUid = {};         // user_id -> school class (shown as a tag next to the name)
 const avatarOf = (uid) => avatarMap[uid] || "👤";
@@ -183,7 +185,7 @@ async function toggleMembers() {
   const { data, error } = await sb.from("group_members").select("username,user_id,joined_at").eq("group_id", current.id);
   const me = auth.session().user.id;
   p.querySelector(".mp-list").innerHTML = error || !data ? T("msg.loadFail") :
-    data.map((m) => `<div class="mp-row"><span class="mp-av">${avatarHtml(m.user_id)}</span> ${esc(m.username)}${classTag(m.user_id)}${adminTag(m.user_id)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
+    data.map((m) => `<div class="mp-row"><span class="mp-av">${avatarHtml(m.user_id)}</span> ${esc(m.username)}${classTag(m.user_id)}${adminTag(m.user_id)}${vipTag(m.user_id)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
 }
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 
@@ -446,7 +448,7 @@ function appendMessage(m) {
     ? `<span class="reply-quote" data-rid="${m.reply_to || ""}"><span class="rq-user">${esc(m.reply_user)}</span><span class="rq-text">${esc(m.reply_preview || "")}</span></span>`
     : "";
   const avHtml = mine ? "" : `<span class="av-chip" aria-hidden="true">${avatarHtml(m.user_id)}</span>`;
-  el.innerHTML = `${avHtml}<div class="bubble"><span class="who">${esc(m.username)}${classTag(m.user_id)}${adminTag(m.user_id)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? `<span class="edited">${T("msg.edited")}</span>` : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
+  el.innerHTML = `${avHtml}<div class="bubble"><span class="who">${esc(m.username)}${classTag(m.user_id)}${adminTag(m.user_id)}${vipTag(m.user_id)}</span>${replyHtml}<span class="msg-text">${body}</span>${m.edited_at ? `<span class="edited">${T("msg.edited")}</span>` : ""}<span class="time">${fmtTime(m.created_at)}</span><span class="reacts"></span></div>`;
   const bubble = el.querySelector(".bubble");
   // tap a quoted reply to jump to the original
   const rq = el.querySelector(".reply-quote");
@@ -624,6 +626,7 @@ async function boot() {
   auth.mountAccountButton($("acctHost"));
   sb = await auth.client();
   try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] admin ids", e); }
+  try { const { data } = await sb.rpc("vip_user_ids"); vipIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] vip ids", e); }
   loadAvatars();
   loadClasses();
   auth.onAuth((s) => (s ? showApp() : showGate()));
