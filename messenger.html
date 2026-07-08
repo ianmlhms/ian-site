@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Messenger — ian.lu</title>
 <meta name="description" content="Real-time group messenger.">
 <link rel="manifest" href="manifest.webmanifest">
@@ -17,10 +17,10 @@
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff}
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--text);
+  body{margin:0;height:100vh;height:100dvh;height:var(--vvh,100dvh);display:flex;flex-direction:column;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--text);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   a{color:var(--accent2);text-decoration:none}
-  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);flex:none}
+  header{display:flex;align-items:center;gap:14px;padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) 14px max(20px,env(safe-area-inset-left));border-bottom:1px solid var(--border);flex:none}
   header .home{color:var(--muted);font-weight:700}
   header h1{font-size:18px;margin:0}
   header .spacer{flex:1}
@@ -84,7 +84,7 @@
   .del-btn{position:absolute;top:-10px;right:-8px;background:var(--card);border:1px solid var(--border);border-radius:50%;width:24px;height:24px;font-size:12px;cursor:pointer;line-height:1;opacity:.55}
   .del-btn:hover{opacity:1;border-color:#ff6b6b}
   .msg.mine .bubble .time{color:rgba(255,255,255,.7)}
-  .composer{display:none;gap:10px;padding:14px 18px;border-top:1px solid var(--border);flex:none}
+  .composer{display:none;gap:10px;padding:14px max(18px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));border-top:1px solid var(--border);flex:none}
   .composer input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:24px;padding:11px 16px;font-size:14px;outline:none}
   .composer input:focus{border-color:var(--accent2)}
   .composer button[type=submit]{background:var(--accent);color:#fff;border:none;border-radius:24px;padding:0 20px;font-weight:800;cursor:pointer}
@@ -174,6 +174,17 @@
     #app.chat-open .chat{display:flex}
     .back-btn{display:inline-flex}
     .member-panel{width:auto;left:0;right:0;max-height:60%}
+    /* 16px inputs stop iOS from zooming on focus */
+    .composer input, .search-box input{font-size:16px}
+    /* roomier touch targets */
+    .side-head button{width:38px;height:38px;font-size:18px}
+    .head-actions button{width:40px;height:36px;font-size:17px}
+    .back-btn{width:40px;height:36px}
+    .composer button[type=submit]{padding:0 18px;font-size:15px}
+    .messages{padding:14px 12px}
+    /* full-screen conversation: hide the global top bar, back-btn navigates */
+    body:has(#app.chat-open) header{display:none}
+    #app.chat-open .chat-head{padding-top:max(14px,env(safe-area-inset-top))}
   }
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -228,6 +239,21 @@
   <img id="lbImg" alt="">
 </div>
 
+<script>
+/* Mobile keyboard fit: track the visual viewport so the composer stays above
+   the on-screen keyboard instead of being covered by it (iOS/Android). */
+(function(){
+  var vv=window.visualViewport; if(!vv)return;
+  var root=document.documentElement;
+  function fit(){ root.style.setProperty("--vvh", vv.height+"px"); }
+  vv.addEventListener("resize",fit); vv.addEventListener("scroll",fit); fit();
+  // when the keyboard opens on focus, keep the latest messages in view
+  document.addEventListener("focusin",function(e){
+    if(!e.target.closest||!e.target.closest(".composer"))return;
+    setTimeout(function(){ var m=document.getElementById("messages"); if(m)m.scrollTop=m.scrollHeight; },250);
+  });
+})();
+</script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module" src="messenger.js?v=15"></script>
