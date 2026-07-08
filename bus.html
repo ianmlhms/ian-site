@@ -108,6 +108,23 @@
   .dleg .dtime{color:var(--muted);font-variant-numeric:tabular-nums;flex:none;min-width:40px;font-weight:700}
   .dleg .dlmid{color:var(--muted);padding:3px 0 3px 48px}
   .dleg .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:11px;color:var(--accent2);margin-left:6px}
+  /* line-first search: type a line → pick a direction → next departures + stops */
+  #lnrow{display:flex;gap:8px}
+  #lnq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  #lndirs{display:flex;flex-wrap:wrap;gap:8px}
+  #lndirs:not(:empty){margin-top:10px}
+  .lndir{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 12px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;-webkit-tap-highlight-color:transparent}
+  .lndir:hover{border-color:var(--accent2)}
+  .lndir.on{background:var(--accent2);border-color:var(--accent2);color:#06121a;font-weight:700}
+  .lndir .lnl{font-weight:800;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1px 6px;font-size:12px}
+  .lndir.on .lnl{background:rgba(0,0,0,.15);border-color:transparent;color:#06121a}
+  #lnout:not(:empty){margin-top:12px}
+  #lnpick{display:flex;flex-wrap:wrap;gap:8px}
+  .lnsub{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:0 0 7px}
+  .lnnext{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+  .lnnext .t{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:13px;font-variant-numeric:tabular-nums}
+  .lnnext .t em{color:#f87171;font-style:normal;font-size:11px;margin-left:3px}
+  .lnnext .t.ok{border-color:var(--ok)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -163,6 +180,15 @@
     <div id="recents"></div>
     <div id="stops"></div>
     <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
+  </div>
+  <div class="card">
+    <h3>🔎 Linn sichen</h3>
+    <div id="lnrow">
+      <input id="lnq" placeholder="Buslinn (z.B. 321, 16, T1)" autocomplete="off" inputmode="text">
+      <button class="tpbtn" id="lnGo">Sichen</button>
+    </div>
+    <div id="lndirs"></div>
+    <div id="lnout"><div class="muted">Tipp eng Buslinn fir hir Richtungen, nächst Departuren an all Arrêten ze gesinn.</div></div>
   </div>
 </div>
 
@@ -321,6 +347,102 @@ async function loadDepDetail(i,box){
     box.innerHTML=renderJourney(leg);
   }catch(e){ console.warn("[dep detail]",e); box.innerHTML='<div class="muted" style="padding:8px 2px">Detail net verfügbar — probéier nach eng Kéier.</div>'; }
 }
+
+/* ---- line-first search -----------------------------------------------
+   Type a bus/tram line → pick a direction → see its next departures + all stops.
+   The open real-time feed has no line index, so we ship a small static one
+   (moien-lines.json, built from the GTFS): line → [{h:headsign, o:origin stopId,
+   s:[stop names]}] per direction. The stop list is therefore instant/offline;
+   the live "next departures" come from transitous stoptimes at the origin stop,
+   and (when a run is due) its full itinerary with real times via /trip. Trains
+   are excluded — the feed labels them only "RB"/"RE", so use the board for those. */
+let LINES=null, NLINES=null, lnDirs=[], lnLine="";
+async function motis(path,params){
+  const u=new URL(`${TRANSITOUS}/${path}`);
+  Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
+  return (await fetch(u)).json();
+}
+const lineMatch=(a,b)=>{ const x=normLine(a),y=normLine(b); return !!x&&!!y&&(x===y||x.includes(y)||y.includes(x)); };
+async function loadLines(){
+  if(LINES)return LINES;
+  LINES=await (await fetch("moien-lines.json")).json();
+  NLINES=new Map(Object.keys(LINES).map(k=>[normLine(k),k]));   // normalized → real key
+  return LINES;
+}
+async function lineSearch(){
+  const raw=$("lnq").value.trim(), q=normLine(raw);
+  $("lndirs").innerHTML=""; lnDirs=[]; lnLine="";
+  if(!q){ $("lnout").innerHTML='<div class="muted">Tipp eng Linnennummer.</div>'; return; }
+  $("lnGo").disabled=true; $("lnout").innerHTML='<div class="muted">Linn gëtt gesicht…</div>';
+  try{
+    await loadLines();
+    // exact line first, else lines starting with the query (e.g. "16" → 16, 16A…)
+    let key=NLINES.get(q);
+    if(!key){
+      const cands=[...NLINES.keys()].filter(k=>k.startsWith(q)).map(k=>NLINES.get(k))
+        .sort((a,b)=>a.length-b.length||a.localeCompare(b));
+      if(cands.length===1) key=cands[0];
+      else if(cands.length>1){ renderLineChoices(cands.slice(0,24)); return; }
+    }
+    if(!key){ $("lnout").innerHTML=`<div class="muted">Keng Buslinn „${esc(raw)}" fonnt. Fir Zich benotz d'Departurestafel uewen.</div>`; return; }
+    lnLine=key; lnDirs=LINES[key]||[];
+    if(!lnDirs.length){ $("lnout").innerHTML='<div class="muted">Keng Richtung fir dës Linn.</div>'; return; }
+    $("lnq").value=key;
+    renderLineDirs();
+    if(lnDirs.length===1) selectLineDir(0);
+    else $("lnout").innerHTML='<div class="muted">Wiel eng Richtung uewen.</div>';
+  }catch(e){ console.warn("[line]",e); $("lnout").innerHTML='<div class="muted">Linn-Lëscht net gelueden — probéier nach eng Kéier.</div>'; }
+  finally{ $("lnGo").disabled=false; }
+}
+// several lines share the typed prefix → let the user pick which one
+function renderLineChoices(keys){
+  $("lnout").innerHTML=`<div class="lnsub">Wéi eng Linn?</div><div id="lnpick"></div>`;
+  $("lnpick").innerHTML=keys.map(k=>`<button class="lndir" data-k="${esc(k)}"><span class="lnl">${esc(k)}</span></button>`).join("");
+  $("lnpick").querySelectorAll(".lndir").forEach(el=>el.onclick=()=>{ $("lnq").value=el.dataset.k; lineSearch(); });
+}
+function renderLineDirs(){
+  $("lndirs").innerHTML=lnDirs.map((d,i)=>
+    `<button class="lndir" data-i="${i}"><span class="lnl">${esc(lnLine)}</span>→ ${esc(d.h)}</button>`).join("");
+  $("lndirs").querySelectorAll(".lndir").forEach(el=>el.onclick=()=>selectLineDir(+el.dataset.i));
+}
+// plain stop list (no times) — instant fallback from the static index
+function renderStopList(names){
+  return `<div class="journey">`+(names||[]).map(n=>
+    `<div class="jstop"><span class="jt"></span><span class="jn">${esc(n)}</span></div>`).join("")+`</div>`;
+}
+async function selectLineDir(i){
+  const d=lnDirs[i]; if(!d)return;
+  $("lndirs").querySelectorAll(".lndir").forEach((el,k)=>el.classList.toggle("on",k===i));
+  // stops render instantly from the static index; live times fill in after
+  $("lnout").innerHTML=`<div class="lnsub">Nächst Departuren</div><div class="lnnext"><span class="muted">Lueden…</span></div>`+
+    `<div class="lnsub">All Arrêten</div><div id="lnstops">${renderStopList(d.s)}</div>`;
+  try{
+    // n is generous: an origin can be a busy hub where the target line is a small
+    // fraction of departures, so we over-fetch (~2 h span) then keep the line's runs
+    const data=await motis("stoptimes",{stopId:motisStopId(d.o),n:"120",arriveBy:"false"});
+    const all=(data.stopTimes||[]).filter(s=>lineMatch(s.routeShortName,lnLine));
+    // at a genuine origin every departure is this direction; only disambiguate by
+    // headsign when two directions of the line happen to share the same origin stop
+    const shared=lnDirs.filter(x=>x.o===d.o).length>1;
+    const dir=all.filter(s=>stopKey(s.headsign||"")===stopKey(d.h));
+    const use=((shared?dir:all).length?(shared?dir:all):all).slice(0,10);
+    const rows=use.map(s=>{
+      const p=s.place||{}, real=p.departure||p.arrival, sched=p.scheduledDeparture||p.scheduledArrival;
+      const dl=delayOf(real,sched), dlt=dl?` <em>${dl>0?"+":""}${dl}</em>`:"";
+      return `<span class="t${dl?"":" ok"}">${esc(clockOf(real))}${dlt}</span>`;
+    });
+    setLnNext(rows.length?rows.join(""):'<span class="muted">Keng weider Departuren haut.</span>');
+    // upgrade the plain stop list to the real itinerary (per-stop times + delays)
+    const tripId=(use[0]||{}).tripId;
+    if(tripId){
+      const t=await motis("trip",{tripId});
+      const leg=(t.legs||[]).find(l=>l.mode!=="WALK")||(t.legs||[])[0];
+      if(leg&&leg.from&&$("lnstops")) $("lnstops").innerHTML=renderJourney(leg);
+    }
+  }catch(e){ console.warn("[line next]",e); setLnNext('<span class="muted">—</span>'); }
+}
+function setLnNext(html){ const w=$("lnout").querySelector(".lnnext"); if(w)w.innerHTML=html; }
+
 function renderStops(stops){
   if(!stops||!stops.length){$("stops").innerHTML='<div class="muted">Keng Arrêten fonnt.</div>';return;}
   $("stops").innerHTML=stops.map(s=>
@@ -563,6 +685,9 @@ async function initTransport(){
   }catch(e){ $("tpNote").innerHTML='<span class="muted">Arrêt-Lëscht net gelueden.</span>'; return; }
   $("tprow").style.display=""; $("depwhen").style.display="";
   wireSearch(); wireLineFilter();
+  // line-first search
+  $("lnGo").onclick=lineSearch;
+  $("lnq").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); lineSearch(); } });
   // departure board: look up a later moment (buses & trains). Empty = live "now".
   wireWhen("depTime","depWhenChips","depPicker",loadBoard);
   // route finder
