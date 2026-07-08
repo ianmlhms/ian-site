@@ -32,9 +32,61 @@
     root.style.setProperty("color-scheme", mode);
     document.documentElement.dataset.theme = mode;
   }
-  function save(t) { localStorage.setItem(KEY, JSON.stringify(t)); apply(t); }
+  function save(t) { localStorage.setItem(KEY, JSON.stringify(t)); apply(t); pushTheme(t); }
 
   apply(get()); // apply ASAP (before paint where possible)
+
+  // ---- cross-device theme sync (#19) ----
+  // localStorage stays the instant source (no flash on load); when signed in we
+  // also mirror the choice to profiles.theme via PostgREST so it follows the
+  // user to any device. No supabase-js needed here (theme.js loads first) — we
+  // read the session token straight from localStorage, like restrictionGuard.
+  function readSession() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!/^sb-.+-auth-token$/.test(k)) continue;
+        const raw = JSON.parse(localStorage.getItem(k) || "null");
+        const s = (raw && raw.currentSession) || raw;
+        const token = s && s.access_token;
+        let uid = s && s.user && s.user.id;
+        if (token && !uid) {
+          const p = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+          uid = p.sub;
+        }
+        if (token && uid) return { token, uid };
+      }
+    } catch (e) { /* unreadable session */ }
+    return null;
+  }
+  function pushTheme(t) {
+    const c = window.PB_CONFIG, s = readSession();
+    if (!c || !s || !t || (!t.mode && !t.accent)) return;
+    fetch(c.url + "/rest/v1/rpc/set_theme", {
+      method: "POST",
+      headers: { apikey: c.anonKey, Authorization: "Bearer " + s.token, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_theme: t }),
+    }).catch(() => {});   // best-effort; localStorage already has it
+  }
+  async function serverSync() {
+    const c = window.PB_CONFIG, s = readSession();
+    if (!c || !s) return;
+    try {
+      const r = await fetch(c.url + "/rest/v1/profiles?id=eq." + s.uid + "&select=theme", {
+        headers: { apikey: c.anonKey, Authorization: "Bearer " + s.token },
+      });
+      const rows = await r.json();
+      const srv = rows && rows[0] && rows[0].theme;
+      const local = get();
+      if (srv && (srv.mode || srv.accent)) {
+        if (JSON.stringify(srv) !== JSON.stringify(local)) {   // another device changed it
+          localStorage.setItem(KEY, JSON.stringify(srv)); apply(srv);
+        }
+      } else if (local && (local.mode || local.accent)) {
+        pushTheme(local);   // first sync: seed the server from this device
+      }
+    } catch (e) { /* offline / not migrated — stay on localStorage */ }
+  }
 
   // ---- per-account access restriction ----
   // Some accounts may only use one app. A restricted user landing on any other
@@ -171,7 +223,7 @@
     document.head.appendChild(css);
   }
 
-  function boot() { buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); }
+  function boot() { buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); serverSync(); }
   if (document.body) boot();
   else document.addEventListener("DOMContentLoaded", boot);
 })();

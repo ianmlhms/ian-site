@@ -29,6 +29,25 @@ let adminIds = new Set();    // user_ids of app admins → shown with a 👑 tag
 let vipIds = new Set();       // user_ids of VIP users → shown with a ⭐ VIP tag
 let avatarMap = {};          // user_id -> avatar emoji OR uploaded-photo URL (from profiles)
 let classByUid = {};         // user_id -> school class (shown as a tag next to the name)
+// Per-account visibility restriction (server-driven): a restricted viewer only
+// sees/DMs an allowlist of people. UX-only — RLS still protects the real data.
+let restricted = false, allowName = new Set();
+async function loadRestriction() {
+  try {
+    const { data: r } = await sb.rpc("is_view_restricted");
+    restricted = !!r;
+    if (!restricted) return;
+    const { data: ids } = await sb.rpc("visible_user_ids");
+    const uids = (ids || []).map(x => x.user_id);
+    if (uids.length) {
+      const { data: profs } = await sb.from("profiles").select("username").in("id", uids);
+      allowName = new Set((profs || []).map(p => String(p.username).toLowerCase()));
+    }
+  } catch (e) { console.warn("[msgr] restriction", e); }
+}
+// Hide DM conversations with people the viewer isn't allowed to see (groups kept).
+const visChats = (list) => (!restricted ? (list || [])
+  : (list || []).filter(g => !g.is_dm || allowName.has(String(g.display).toLowerCase())));
 const avatarOf = (uid) => avatarMap[uid] || "👤";
 // render an avatar as an <img> when it's an uploaded photo URL, else the emoji glyph
 const avatarHtml = (uid) => {
@@ -67,7 +86,7 @@ function promptModal(title, label, okText = "OK") {
 async function loadChats(selectId) {
   const { data, error } = await sb.rpc("my_chats");
   if (error) { console.warn("[msgr] my_chats", error); return; }
-  allChats = data || [];
+  allChats = visChats(data || []);
   renderChatList(applySearch(allChats));
   if (selectId) { const g = allChats.find((x) => x.id === selectId); if (g) selectChat(g); }
 }
@@ -113,6 +132,7 @@ async function joinGroup() {
 async function newDM() {
   const uname = await promptModal(T("msg.dm.title"), T("msg.dm.label"), T("msg.dm.ok"));
   if (!uname) return;
+  if (restricted && !allowName.has(uname.trim().toLowerCase())) { alert("Dës Persoun ass net verfügbar."); return; }
   const { data, error } = await sb.rpc("start_dm", { p_username: uname, p_me_username: auth.username() });
   if (error) return alert(error.message);
   await loadChats(data.id);
@@ -627,6 +647,7 @@ async function boot() {
   sb = await auth.client();
   try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] admin ids", e); }
   try { const { data } = await sb.rpc("vip_user_ids"); vipIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[msgr] vip ids", e); }
+  await loadRestriction();
   loadAvatars();
   loadClasses();
   auth.onAuth((s) => (s ? showApp() : showGate()));

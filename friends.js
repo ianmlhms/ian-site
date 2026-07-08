@@ -7,6 +7,31 @@ const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 let sb = null, inviteSubbed = false;
 let adminIds = new Set();   // user_ids of app admins → pinned on top + 👑 tagged
 let vipIds = new Set();      // user_ids of VIP users → ⭐ VIP tag
+// Per-account visibility restriction (server-driven): a restricted viewer only
+// sees an allowlist of people. UX-only — RLS still protects the real data.
+let restricted = false, allowUid = new Set(), allowName = new Set();
+async function loadRestriction() {
+  try {
+    const { data: r } = await sb.rpc("is_view_restricted");
+    restricted = !!r;
+    if (!restricted) return;
+    const { data: ids } = await sb.rpc("visible_user_ids");
+    allowUid = new Set((ids || []).map(x => x.user_id));
+    if (allowUid.size) {
+      const { data: profs } = await sb.from("profiles").select("username").in("id", [...allowUid]);
+      allowName = new Set((profs || []).map(p => String(p.username).toLowerCase()));
+    }
+  } catch (e) { console.warn("[friends] restriction", e); }
+}
+// Keep only allowed people (by user_id or username). Always keep own "is_me" rows.
+function vis(list, uidKey, nameKey) {
+  if (!restricted) return list || [];
+  return (list || []).filter(x => {
+    if (x && x.is_me) return true;
+    const u = uidKey ? x[uidKey] : null, n = nameKey ? x[nameKey] : null;
+    return (u && allowUid.has(u)) || (n && allowName.has(String(n).toLowerCase()));
+  });
+}
 const vipTag = (uid) => (vipIds.has(uid) ? ` <span class="vip-tag">⭐ VIP</span>` : "");
 let classByName = new Map();   // lowercased username → school class (shown as a tag)
 async function loadClasses() {
@@ -29,13 +54,16 @@ async function refresh() {
     sb.rpc("sent_requests"), sb.rpc("directory"), sb.rpc("friends_activity", { p_limit: 30 }),
     loadClasses(),
   ]);
-  renderFriends(fr || []);
-  renderRequests(rq || []);
-  renderInvites(gi || []);
-  renderSent(sent || []);
-  renderDirectory(dir || []);
-  renderActivity(act || []);
-  updateRequestsTab(rq || [], gi || [], sent || []);
+  const frF = vis(fr, "user_id", "username"), rqF = vis(rq, null, "username"),
+        giF = vis(gi, null, "from_name"), sentF = vis(sent, null, "username"),
+        dirF = vis(dir, "user_id", "username"), actF = vis(act, null, "username");
+  renderFriends(frF);
+  renderRequests(rqF);
+  renderInvites(giF);
+  renderSent(sentF);
+  renderDirectory(dirF);
+  renderActivity(actF);
+  updateRequestsTab(rqF, giF, sentF);
 }
 
 // Requests tab: badge counts actionable items (friend requests + game invites);
@@ -202,6 +230,7 @@ function showGate() {
   sb = await auth.client();
   try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn(e); }
   try { const { data } = await sb.rpc("vip_user_ids"); vipIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[friends] vip ids", e); }
+  await loadRestriction();
   auth.onAuth(() => (auth.session() ? showApp() : showGate()));
   auth.session() ? showApp() : showGate();
 })();
