@@ -121,10 +121,13 @@
   #lnout:not(:empty){margin-top:12px}
   #lnpick{display:flex;flex-wrap:wrap;gap:8px}
   .lnsub{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:0 0 7px}
-  .lnnext{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
-  .lnnext .t{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:13px;font-variant-numeric:tabular-nums}
-  .lnnext .t em{color:#f87171;font-style:normal;font-size:11px;margin-left:3px}
-  .lnnext .t.ok{border-color:var(--ok)}
+  #lndeps .lndep{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid var(--border);cursor:pointer}
+  #lndeps .lndep:last-of-type{border-bottom:none}
+  #lndeps .lndep .lnt{flex:1;font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+  #lndeps .lndep .lnt em{color:#f87171;font-style:normal;font-size:12px;margin-left:6px}
+  #lndeps .lndep .lnt .ok{color:var(--ok);margin-left:6px}
+  #lndeps .lndep .dcaret{flex:none;color:var(--muted);font-size:11px;transition:transform .15s}
+  #lndeps .lndep.open .dcaret{transform:rotate(180deg)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -302,16 +305,26 @@ const delayOf=(real,sched)=>(real&&sched)?Math.round((new Date(real)-new Date(sc
 const normLine=(s)=>(""+(s||"")).toUpperCase().replace(/[^A-Z0-9]/g,"");
 async function findTripId(dep){
   const base=$("depTime").value?new Date($("depTime").value):new Date();
+  const want=dep.planned||dep.time;                       // scheduled "HH:MM"
+  const [hh,mm]=(want||"").split(":").map(Number);
+  // anchor the lookup at the departure's OWN time, so a far-out board entry
+  // (e.g. an afternoon-only line at a quiet stop) is still inside the window —
+  // a fixed n from "now" could otherwise stop short of it and match nothing
+  const anchor=new Date(base);
+  if(!isNaN(hh)){ anchor.setHours(hh,mm,0,0); if(anchor.getTime()<base.getTime()-6*3600000)anchor.setDate(anchor.getDate()+1); }
   const u=new URL(`${TRANSITOUS}/stoptimes`);
   u.searchParams.set("stopId",motisStopId(curStop.id));
-  u.searchParams.set("time",base.toISOString());
-  u.searchParams.set("n","60"); u.searchParams.set("arriveBy","false");
+  u.searchParams.set("time",new Date(anchor.getTime()-120000).toISOString());  // 2 min before
+  u.searchParams.set("n","25"); u.searchParams.set("arriveBy","false");
   const d=await (await fetch(u)).json();
   const sts=d.stopTimes||[];
-  const want=dep.planned||dep.time, wl=normLine(dep.line);
+  const wl=normLine(dep.line), wantMin=isNaN(hh)?null:hh*60+mm;
+  const minOf=(iso)=>{ const x=new Date(iso); return x.getHours()*60+x.getMinutes(); };
   let timeMatch=null;
   for(const s of sts){
-    if(clockOf(s.place&&s.place.scheduledDeparture)!==want)continue;
+    const sd=s.place&&s.place.scheduledDeparture; if(!sd)continue;
+    if(wantMin!=null){ let diff=Math.abs(minOf(sd)-wantMin); if(diff>720)diff=1440-diff; if(diff>1)continue; }  // ±1 min (midnight-safe)
+    else if(clockOf(sd)!==want)continue;
     const rl=normLine(s.routeShortName);
     if(rl===wl||(wl&&(rl.includes(wl)||wl.includes(rl))))return s.tripId;  // best: same time + line
     if(!timeMatch)timeMatch=s.tripId;                                       // fallback: same time
@@ -410,38 +423,63 @@ function renderStopList(names){
   return `<div class="journey">`+(names||[]).map(n=>
     `<div class="jstop"><span class="jt"></span><span class="jn">${esc(n)}</span></div>`).join("")+`</div>`;
 }
+let LNDEPS=[];
 async function selectLineDir(i){
   const d=lnDirs[i]; if(!d)return;
   $("lndirs").querySelectorAll(".lndir").forEach((el,k)=>el.classList.toggle("on",k===i));
-  // stops render instantly from the static index; live times fill in after
-  $("lnout").innerHTML=`<div class="lnsub">Nächst Departuren</div><div class="lnnext"><span class="muted">Lueden…</span></div>`+
-    `<div class="lnsub">All Arrêten</div><div id="lnstops">${renderStopList(d.s)}</div>`;
+  $("lnout").innerHTML=`<div class="lnsub">Nächst Departuren — klick fir de ganze Wee mat Zäiten</div><div id="lndeps"><div class="muted">Lueden…</div></div>`;
   try{
     // n is generous: an origin can be a busy hub where the target line is a small
     // fraction of departures, so we over-fetch (~2 h span) then keep the line's runs
     const data=await motis("stoptimes",{stopId:motisStopId(d.o),n:"120",arriveBy:"false"});
-    const all=(data.stopTimes||[]).filter(s=>lineMatch(s.routeShortName,lnLine));
+    const depAt=(s)=>{ const p=s.place||{}; return new Date(p.departure||p.scheduledDeparture||0); };
+    const seen=new Set();
+    const all=(data.stopTimes||[])
+      .filter(s=>lineMatch(s.routeShortName,lnLine))
+      .filter(s=>{ const k=(s.tripId||"")+"|"+((s.place||{}).scheduledDeparture||""); if(seen.has(k))return false; seen.add(k); return true; })
+      .sort((a,b)=>depAt(a)-depAt(b));   // API order isn't strictly chronological
     // at a genuine origin every departure is this direction; only disambiguate by
     // headsign when two directions of the line happen to share the same origin stop
     const shared=lnDirs.filter(x=>x.o===d.o).length>1;
     const dir=all.filter(s=>stopKey(s.headsign||"")===stopKey(d.h));
     const use=((shared?dir:all).length?(shared?dir:all):all).slice(0,10);
-    const rows=use.map(s=>{
-      const p=s.place||{}, real=p.departure||p.arrival, sched=p.scheduledDeparture||p.scheduledArrival;
-      const dl=delayOf(real,sched), dlt=dl?` <em>${dl>0?"+":""}${dl}</em>`:"";
-      return `<span class="t${dl?"":" ok"}">${esc(clockOf(real))}${dlt}</span>`;
-    });
-    setLnNext(rows.length?rows.join(""):'<span class="muted">Keng weider Departuren haut.</span>');
-    // upgrade the plain stop list to the real itinerary (per-stop times + delays)
-    const tripId=(use[0]||{}).tripId;
-    if(tripId){
-      const t=await motis("trip",{tripId});
-      const leg=(t.legs||[]).find(l=>l.mode!=="WALK")||(t.legs||[])[0];
-      if(leg&&leg.from&&$("lnstops")) $("lnstops").innerHTML=renderJourney(leg);
+    if(!use.length){
+      $("lndeps").innerHTML='<div class="muted">Keng weider Departuren haut.</div>';
+      $("lnout").insertAdjacentHTML("beforeend",`<div class="lnsub" style="margin-top:12px">All Arrêten</div>${renderStopList(d.s)}`);
+      return;
     }
-  }catch(e){ console.warn("[line next]",e); setLnNext('<span class="muted">—</span>'); }
+    LNDEPS=use;
+    // each departure is expandable → its full route with per-stop times + delays
+    $("lndeps").innerHTML=use.map((s,k)=>{
+      const p=s.place||{}, real=p.departure||p.arrival, sched=p.scheduledDeparture||p.scheduledArrival;
+      const dl=delayOf(real,sched);
+      const dlt=dl?` <em>${dl>0?"+":""}${dl}</em>`:` <span class="ok">•</span>`;
+      return `<div class="lndep" data-k="${k}"><span class="lnt">${esc(clockOf(real||sched))}${dlt}</span><span class="dcaret">▾</span></div>
+        <div class="depdetail" hidden></div>`;
+    }).join("");
+    $("lndeps").querySelectorAll(".lndep").forEach(el=>el.onclick=()=>toggleLnDep(+el.dataset.k,el));
+    // auto-open the next departure so the full route + times show straight away
+    const first=$("lndeps").querySelector(".lndep"); if(first)toggleLnDep(0,first);
+  }catch(e){ console.warn("[line next]",e); $("lndeps").innerHTML='<div class="muted">Departuren net verfügbar.</div>'; }
 }
-function setLnNext(html){ const w=$("lnout").querySelector(".lnnext"); if(w)w.innerHTML=html; }
+function toggleLnDep(k,el){
+  const box=el.nextElementSibling; if(!box||!box.classList.contains("depdetail"))return;
+  if(box.hasAttribute("hidden")){
+    el.classList.add("open"); box.removeAttribute("hidden");
+    if(!box.dataset.done){ box.dataset.done="1"; loadLnDepDetail(k,box); }
+  }else{ box.setAttribute("hidden",""); el.classList.remove("open"); }
+}
+async function loadLnDepDetail(k,box){
+  const s=LNDEPS[k], tripId=s&&s.tripId;
+  box.innerHTML='<div class="muted" style="padding:8px 2px">Wee gëtt gelueden…</div>';
+  if(!tripId){ box.innerHTML='<div class="muted" style="padding:8px 2px">Kee Detail fir dës Course.</div>'; return; }
+  try{
+    const t=await motis("trip",{tripId});
+    const leg=(t.legs||[]).find(l=>l.mode!=="WALK")||(t.legs||[])[0];
+    if(!leg||!leg.from){ box.innerHTML='<div class="muted" style="padding:8px 2px">Kee Detail.</div>'; return; }
+    box.innerHTML=renderJourney(leg);
+  }catch(e){ console.warn("[ln detail]",e); box.innerHTML='<div class="muted" style="padding:8px 2px">Detail net verfügbar — probéier nach eng Kéier.</div>'; }
+}
 
 function renderStops(stops){
   if(!stops||!stops.length){$("stops").innerHTML='<div class="muted">Keng Arrêten fonnt.</div>';return;}
