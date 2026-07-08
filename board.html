@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Klass-Tafel — ian.lu</title>
+<meta name="description" content="Klass-Hausaufgaben op ian.lu — deng Klass hält zesummen fest wat ze maache ass.">
+<link rel="canonical" href="https://ian.lu/board.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ian.lu">
+<meta property="og:title" content="Klass-Tafel — ian.lu">
+<meta property="og:description" content="Klass-Hausaufgaben — deng Klass hält zesummen fest wat ze maache ass.">
+<meta property="og:url" content="https://ian.lu/board.html">
+<meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=7"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--bad:#f87171}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .class-tag{display:inline-block;font-size:11px;font-weight:800;color:#5cc8ff;background:rgba(92,200,255,.14);border:1px solid rgba(92,200,255,.45);border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:middle;letter-spacing:.3px}
+  .wrap{flex:1;width:100%;max-width:640px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+  .newhw input{width:100%;margin-bottom:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  .newhw .row2{display:flex;gap:8px}.newhw .row2 input{margin-bottom:0}
+  .btn{background:var(--accent);color:#04121f;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
+  .adminrow{display:flex;gap:8px;align-items:center;margin-top:10px}
+  .hw{display:flex;gap:12px;align-items:flex-start;padding:12px 4px;border-bottom:1px solid var(--border)}
+  .hw:last-child{border-bottom:none}
+  .chk{flex:none;width:26px;height:26px;border-radius:8px;border:2px solid var(--border);background:var(--card2);cursor:pointer;font-size:15px;color:var(--ok);display:flex;align-items:center;justify-content:center;padding:0}
+  .chk.on{border-color:var(--ok);background:rgba(63,185,80,.16)}
+  .hw .body{flex:1;min-width:0}
+  .hw .ttl{font-weight:700;font-size:15px;word-break:break-word}
+  .hw.done .ttl{text-decoration:line-through;color:var(--muted)}
+  .subj{display:inline-block;font-size:11px;font-weight:800;color:var(--accent);background:rgba(110,168,254,.14);border:1px solid rgba(110,168,254,.4);border-radius:999px;padding:1px 8px;margin-right:6px;vertical-align:middle}
+  .meta{color:var(--muted);font-size:12px;margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .due{font-weight:700}.due.soon{color:#ffb347}.due.over{color:var(--bad)}
+  .del{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;flex:none;line-height:1;padding:2px 4px}
+  .del:hover{color:var(--bad)}
+  .gate,.empty{text-align:center;color:var(--muted);padding:10px}
+  .msg{min-height:18px;color:var(--accent2);font-weight:700;font-size:13px}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>📋 Klass-Tafel<span id="classTag"></span></h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <div class="card newhw" id="newHw" style="display:none">
+    <input id="hwTitle" maxlength="200" placeholder="Wat ass ze maachen? z.B. Mathe S.42 Nr. 1–8">
+    <div class="row2">
+      <input id="hwSubject" maxlength="40" placeholder="Fach (optionnel)" style="flex:1">
+      <input id="hwDue" type="date" style="flex:none;width:150px">
+    </div>
+    <div class="adminrow">
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn" id="hwAdd">Dobäisetzen</button>
+    </div>
+    <div class="msg" id="hwMsg"></div>
+  </div>
+  <div class="gate" id="gate" style="display:none">🔒 <a href="#" id="gateBtn">Mell dech un</a> fir d'Klass-Tafel ze gesinn.</div>
+  <div class="gate" id="noclass" style="display:none">🎓 Setz zeréischt deng Klass, da gesäis du d'Tafel vun denger Klass.</div>
+  <div class="card" id="listCard" style="display:none"><div id="list"><p class="empty">Lueden…</p></div></div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const DONE_KEY="classBoardDone";
+let sb=null,myClass=null,isAdmin=false,rows=[],names={};
+
+// Personal "done" ticks live in localStorage — the list itself is shared, but
+// whether *you* finished an item is your own business (no server round-trip).
+const doneSet=()=>{try{return new Set(JSON.parse(localStorage.getItem(DONE_KEY)||"[]"));}catch{return new Set();}};
+const setDone=(s)=>{try{localStorage.setItem(DONE_KEY,JSON.stringify([...s]));}catch{}};
+const toggleDone=(id)=>{const s=doneSet();s.has(id)?s.delete(id):s.add(id);setDone(s);render();};
+
+const fmtDue=(d)=>{
+  if(!d)return null;
+  const due=new Date(d+"T00:00:00"), today=new Date(); today.setHours(0,0,0,0);
+  const days=Math.round((due-today)/864e5);
+  const cls=days<0?"over":days<=1?"soon":"";
+  const label=days<0?`iwwerfälleg (${-days}d)`:days===0?"haut":days===1?"muer":`an ${days}d`;
+  return {cls,label};
+};
+
+async function refresh(){
+  try{
+    sb=sb||await auth.client();
+    if(!auth.session()){show("gate");return;}
+    // my class drives whether the board is usable at all
+    const {data:me}=await sb.from("profiles").select("class").eq("id",auth.session().user.id).maybeSingle();
+    myClass=(me&&me.class)||null;
+    $("classTag").innerHTML=myClass?`<span class="class-tag">${esc(myClass)}</span>`:"";
+    if(!myClass){show("noclass");$("newHw").style.display="none";return;}
+    const {data,error}=await sb.from("class_homework").select("*").order("due",{ascending:true,nullsFirst:false}).order("created_at",{ascending:false});
+    if(error)throw error;
+    rows=data||[];
+    await loadNames();
+    $("newHw").style.display="";show("listCard");render();
+  }catch(e){console.warn("[board]",e);show("listCard");$("list").innerHTML='<p class="empty">Feeler beim Lueden.</p>';}
+}
+function show(id){for(const k of ["gate","noclass","listCard"])$(k).style.display=k===id?"":"none";}
+
+async function loadNames(){
+  const ids=[...new Set(rows.map(r=>r.created_by))].filter(id=>!(id in names));
+  if(!ids.length)return;
+  const {data}=await sb.from("profiles").select("id,username").in("id",ids);
+  for(const p of data||[])names[p.id]=p.username;
+}
+
+function render(){
+  const done=doneSet(), myUid=auth.session()?.user?.id;
+  if(!rows.length){$("list").innerHTML='<p class="empty">Nach näischt op der Tafel. Setz déi éischt Aufgab dobäi! ✍️</p>';return;}
+  $("list").innerHTML=rows.map(r=>{
+    const isDone=done.has(r.id);
+    const d=fmtDue(r.due);
+    const canDel=isAdmin||r.created_by===myUid;
+    return `<div class="hw${isDone?" done":""}">
+      <button class="chk${isDone?" on":""}" data-done="${r.id}" title="Erdeg">${isDone?"✓":""}</button>
+      <div class="body">
+        <div class="ttl">${r.subject?`<span class="subj">${esc(r.subject)}</span>`:""}${esc(r.title)}</div>
+        <div class="meta">
+          ${d?`<span class="due ${d.cls}">📅 ${d.label}</span>`:""}
+          <span>vun ${esc(names[r.created_by]||"?")}</span>
+        </div>
+      </div>
+      ${canDel?`<button class="del" data-del="${r.id}" title="Läschen">✕</button>`:""}
+    </div>`;
+  }).join("");
+  $("list").querySelectorAll("[data-done]").forEach(b=>b.onclick=()=>toggleDone(b.dataset.done));
+  $("list").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    if(!confirm("Aus der Tafel läschen?"))return;
+    await sb.from("class_homework").delete().eq("id",b.dataset.del);refresh();});
+}
+
+$("hwAdd").onclick=async()=>{
+  const title=$("hwTitle").value.trim();
+  const subject=$("hwSubject").value.trim()||null;
+  const due=$("hwDue").value||null;
+  if(title.length<2){$("hwMsg").textContent="Gëff zeréischt eng Aufgab an.";return;}
+  $("hwMsg").textContent="…";
+  try{
+    const {error}=await sb.from("class_homework").insert({class:myClass,title,subject,due});
+    if(error)throw error;
+    $("hwTitle").value="";$("hwSubject").value="";$("hwDue").value="";
+    $("hwMsg").textContent="Dobäigesat ✓";setTimeout(()=>$("hwMsg").textContent="",1500);
+    refresh();
+  }catch(e){console.warn("[board] add",e);$("hwMsg").textContent="Feeler beim Dobäisetzen.";}
+};
+$("hwTitle").addEventListener("keydown",e=>{if(e.key==="Enter")$("hwAdd").click();});
+
+(async()=>{
+  auth.mountAccountButton($("acctHost"));
+  $("gateBtn").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
+  auth.onAuth(async()=>{
+    isAdmin=false;
+    try{sb=sb||await auth.client();if(auth.session()){const{data}=await sb.rpc("is_admin");isAdmin=!!data;}}catch{}
+    refresh();
+  });
+  try{sb=await auth.client();if(auth.session()){const{data}=await sb.rpc("is_admin");isAdmin=!!data;}}catch{}
+  refresh();
+})();
+</script>
+  <script type="module" src="rtc-ring.js?v=1"></script>
+  <script type="module" src="class-gate.js?v=2"></script>
+</body>
+</html>

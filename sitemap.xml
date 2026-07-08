@@ -205,4 +205,19 @@
     <lastmod>2026-07-08</lastmod>
     <priority>0.7</priority>
   </url>
+  <url>
+    <loc>https://ian.lu/board.html</loc>
+    <lastmod>2026-07-08</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/classchat.html</loc>
+    <lastmod>2026-07-08</lastmod>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/timetable.html</loc>
+    <lastmod>2026-07-08</lastmod>
+    <priority>0.6</priority>
+  </url>
 </urlset>
