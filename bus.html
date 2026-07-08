@@ -47,6 +47,10 @@
   .recchips{display:flex;flex-wrap:wrap;gap:7px}
   .recchip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:8px 14px;font-size:13.5px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .recchip:hover{border-color:var(--accent2)}
+  .recchip.fav{border-color:#f7b95566}
+  #favstops{margin-bottom:2px}#favlines{margin-top:10px}
+  .favstar{font-size:16px;line-height:1}
+  .favstar.on{color:#f7b955;border-color:#f7b95588}
   .dep{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
   .dep:last-child{border-bottom:none}
   .dep .line{flex:none;min-width:44px;text-align:center;font-weight:800;font-size:13px;background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:3px 6px}
@@ -181,6 +185,7 @@
     <div id="tprow" style="display:none">
       <input id="stopq" placeholder="Arrêt oder Gare sichen…" autocomplete="off">
       <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
+      <button class="tpbtn favstar" id="favStar" title="Als Favorit späicheren" style="display:none">☆</button>
     </div>
     <div id="linerow" style="display:none;margin-top:8px">
       <input id="lineq" placeholder="Linn filteren (z.B. 321)" autocomplete="off">
@@ -191,6 +196,7 @@
       <input type="hidden" id="depTime">
       <div id="depPicker" style="display:none;margin-top:8px"></div>
     </div>
+    <div id="favstops"></div>
     <div id="recents"></div>
     <div id="stops"></div>
     <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
@@ -200,7 +206,9 @@
     <div id="lnrow">
       <input id="lnq" placeholder="Buslinn (z.B. 321, 16, T1)" autocomplete="off" inputmode="text">
       <button class="tpbtn" id="lnGo">Sichen</button>
+      <button class="tpbtn favstar" id="favLineStar" title="Linn als Favorit" style="display:none">☆</button>
     </div>
+    <div id="favlines"></div>
     <div id="lndirs"></div>
     <div id="lnout"><div class="muted">Tipp eng Buslinn fir hir Richtungen, nächst Departuren an all Arrêten ze gesinn.</div></div>
   </div>
@@ -234,6 +242,56 @@ function renderRecents(){
   host.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{
     const r=RECENTS.find(x=>String(x.id)===el.dataset.id); if(r)selectStop(r);
   });
+}
+
+// ---- favourites: starred stops + lines, for permanent one-tap access ----
+const MAX_FAVS=12;
+const loadFav=(k)=>{ try{ const r=JSON.parse(localStorage.getItem(k)); return Array.isArray(r)?r:[]; }catch{ return []; } };
+let FAVSTOPS=loadFav("moienFavStops"), FAVLINES=loadFav("moienFavLines");
+const isFavStop=(id)=>FAVSTOPS.some(f=>String(f.id)===String(id));
+const isFavLine=(k)=>FAVLINES.includes(k);
+function toggleFavStop(s){
+  if(!s)return;
+  FAVSTOPS=isFavStop(s.id)?FAVSTOPS.filter(f=>String(f.id)!==String(s.id))
+                          :[{id:s.id,name:s.name},...FAVSTOPS].slice(0,MAX_FAVS);
+  localStorage.setItem("moienFavStops",JSON.stringify(FAVSTOPS));
+  renderFavs(); updateFavStar();
+}
+function toggleFavLine(k){
+  if(!k)return;
+  FAVLINES=isFavLine(k)?FAVLINES.filter(l=>l!==k):[k,...FAVLINES].slice(0,MAX_FAVS);
+  localStorage.setItem("moienFavLines",JSON.stringify(FAVLINES));
+  renderFavs(); updateFavLineStar();
+}
+function updateFavStar(){
+  const b=$("favStar"); if(!b)return;
+  b.style.display=curStop?"":"none";
+  const on=curStop&&isFavStop(curStop.id);
+  b.textContent=on?"⭐":"☆"; b.classList.toggle("on",!!on);
+  b.title=on?"Favorit ewechhuelen":"Als Favorit späicheren";
+}
+function updateFavLineStar(){
+  const b=$("favLineStar"); if(!b)return;
+  b.style.display=lnLine?"":"none";
+  const on=lnLine&&isFavLine(lnLine);
+  b.textContent=on?"⭐":"☆"; b.classList.toggle("on",!!on);
+  b.title=on?"Favorit ewechhuelen":"Linn als Favorit";
+}
+function renderFavs(){
+  const hs=$("favstops");
+  if(hs){
+    hs.innerHTML=FAVSTOPS.length?`<div class="rectitle">⭐ Favoritten</div><div class="recchips">`+
+      FAVSTOPS.map(f=>`<button class="recchip fav" data-id="${esc(f.id)}">${esc(f.name)}</button>`).join("")+`</div>`:"";
+    hs.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{
+      const f=FAVSTOPS.find(x=>String(x.id)===el.dataset.id); if(f)selectStop(f);
+    });
+  }
+  const hl=$("favlines");
+  if(hl){
+    hl.innerHTML=FAVLINES.length?`<div class="rectitle">⭐ Favoritt-Linnen</div><div class="recchips">`+
+      FAVLINES.map(k=>`<button class="recchip fav" data-k="${esc(k)}">${esc(k)}</button>`).join("")+`</div>`:"";
+    hl.querySelectorAll(".recchip").forEach(el=>el.onclick=()=>{ $("lnq").value=el.dataset.k; lineSearch(); });
+  }
 }
 // accent-insensitive, and treat commas as spaces so "hollerich kierfecht" matches
 // the stop "Hollerich, Kierfecht" (the comma is optional).
@@ -395,7 +453,7 @@ async function loadLines(){
 }
 async function lineSearch(){
   const raw=$("lnq").value.trim(), q=normLine(raw);
-  $("lndirs").innerHTML=""; lnDirs=[]; lnLine="";
+  $("lndirs").innerHTML=""; lnDirs=[]; lnLine=""; updateFavLineStar();
   if(!q){ $("lnout").innerHTML='<div class="muted">Tipp eng Linnennummer.</div>'; return; }
   $("lnGo").disabled=true; $("lnout").innerHTML='<div class="muted">Linn gëtt gesicht…</div>';
   try{
@@ -412,6 +470,7 @@ async function lineSearch(){
     lnLine=key; lnDirs=LINES[key]||[];
     if(!lnDirs.length){ $("lnout").innerHTML='<div class="muted">Keng Richtung fir dës Linn.</div>'; return; }
     $("lnq").value=key;
+    updateFavLineStar();
     renderLineDirs();
     if(lnDirs.length===1) selectLineDir(0);
     else $("lnout").innerHTML='<div class="muted">Wiel eng Richtung uewen.</div>';
@@ -507,7 +566,7 @@ function selectStop(s){
   $("linerow").style.display="";
   $("deps").innerHTML='<div class="muted">Lueden…</div>';
   localStorage.setItem("moienStop",JSON.stringify(curStop));
-  pushRecent(curStop); renderRecents();
+  pushRecent(curStop); renderRecents(); updateFavStar();
   loadBoard(); clearInterval(tpTimer); tpTimer=setInterval(loadBoard,45000);
 }
 /* local text search over the bundled stops (accent- & comma-insensitive, prefix-first).
@@ -663,8 +722,8 @@ function wireSearch(){
     clearTimeout(searchT);
     searchT=setTimeout(()=>{
       const q=$("stopq").value.trim();
-      if(q.length<2){$("stops").innerHTML="";renderRecents();return;}
-      $("recents").innerHTML="";
+      if(q.length<2){$("stops").innerHTML="";renderRecents();renderFavs();return;}
+      $("recents").innerHTML=""; $("favstops").innerHTML="";
       renderStops(searchStops(q));
     },160);
   });
@@ -737,6 +796,9 @@ async function initTransport(){
   // line-first search
   $("lnGo").onclick=lineSearch;
   $("lnq").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); lineSearch(); } });
+  // favourites (starred stops + lines)
+  $("favStar").onclick=()=>toggleFavStop(curStop);
+  $("favLineStar").onclick=()=>toggleFavLine(lnLine);
   // departure board: look up a later moment (buses & trains). Empty = live "now".
   wireWhen("depTime","depWhenChips","depPicker",loadBoard);
   // route finder
@@ -753,7 +815,7 @@ async function initTransport(){
   const saved=JSON.parse(localStorage.getItem("moienStop")||"null");
   if(saved&&saved.id){ selectStop(saved); }
   else $("tpNote").innerHTML='<span class="muted">Sich en Arrêt oder tipp 📍 fir déi no bei dir.</span>';
-  renderRecents();
+  renderRecents(); renderFavs(); updateFavStar(); updateFavLineStar();
 }
 initTransport();
 
