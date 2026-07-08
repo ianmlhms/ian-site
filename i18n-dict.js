@@ -156,6 +156,8 @@ window.I18N_DICT = {
   "class.err":          { lb: "Konnt net gespäichert ginn, probéier nach eng Kéier.", de: "Konnte nicht gespeichert werden, versuch es erneut.", en: "Couldn't save, please try again." },
   "class.skip":         { lb: "Ech sinn net an enger Klass (z.B. Erwuessenen) — iwwersprangen", de: "Ich bin in keiner Klasse (z.B. Erwachsene) — überspringen", en: "I'm not in a class (e.g. adults) — skip" },
   "class.skipHint":     { lb: "D'Klass hëlleft nëmmen, fir deng Kollegen ze fannen.", de: "Die Klasse hilft nur dabei, deine Freunde zu finden.", en: "Your class only helps friends find you." },
+  "class.reSub":        { lb: "Neit Schouljoer — kontrolléier w.e.g. deng Klass a passt se un wann néideg.", de: "Neues Schuljahr — bitte überprüfe deine Klasse und passe sie ggf. an.", en: "New school year — please check your class and update it if needed." },
+  "class.reYes":        { lb: "Jo, richteg ✓", de: "Ja, stimmt ✓", en: "Yes, that's right ✓" },
   "time.now":           { lb: "elo grad", de: "gerade eben", en: "just now" },
   "time.yesterday":     { lb: "gëschter", de: "gestern", en: "yesterday" },
   "time.mAgo":          { lb: "min hir", de: "Min. her", en: "m ago" },

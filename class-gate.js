@@ -17,6 +17,15 @@ let sb = null, checking = false, shown = false, done = false;
 const skipKey = (uid) => "classGateSkip:" + uid;
 const hasSkipped = (uid) => { try { return !!localStorage.getItem(skipKey(uid)); } catch { return false; } };
 
+// Season rollover. After the summer bump (5C6 -> 4C6, applied server-side on
+// 9 Jul 2026, scripts/class-rollover-v1.sql), the section letters/number can
+// also have changed when school restarts — so from 15 Sep we ask each user to
+// confirm (or fix) their new class once. "Confirmed" is stored server-side on
+// profiles.class_confirmed = SEASON so it doesn't re-nag across devices.
+const SEASON = "2026-09";
+const RECONFIRM_FROM = new Date("2026-09-15T00:00:00").getTime();
+const needsReconfirm = (confirmed) => Date.now() >= RECONFIRM_FROM && confirmed !== SEASON;
+
 // A class must name a *specific* class inside a year (e.g. 5C6, 7C1, 2CG, 3CB),
 // not just the year level ("5e", "7", "5EME"). Normalize to a compact upper form,
 // then require year-digits + section letters (+ optional class number) and reject
@@ -34,8 +43,12 @@ async function start() {
   checking = true;
   try {
     sb = sb || await auth.client();
-    const { data } = await sb.from("profiles").select("class").eq("id", uid).maybeSingle();
-    if (data && data.class && String(data.class).trim()) { done = true; return; }
+    const { data } = await sb.from("profiles").select("class, class_confirmed").eq("id", uid).maybeSingle();
+    const cls = data && data.class ? String(data.class).trim() : "";
+    if (cls) {
+      if (needsReconfirm(data.class_confirmed)) { showReconfirm(cls); return; }
+      done = true; return;
+    }
     showModal();
   } catch (e) {
     console.warn("[class] check failed", e);   // fail open — don't block the page on error
@@ -109,6 +122,70 @@ function showModal() {
       err.textContent = T("class.err", "Konnt net gespäichert ginn, probéier nach eng Kéier.");
       btn.disabled = false; btn.style.opacity = "1";
       console.warn("[class] save failed", e);
+    }
+  }
+}
+
+// Start-of-year check: "is <class> still your class?" Prefilled + editable, so
+// the user either confirms as-is or corrects it. On success we save the class
+// (only if it changed) and always stamp class_confirmed so we don't ask again.
+function showReconfirm(cls) {
+  if (shown || document.getElementById("class-gate")) return;
+  shown = true;
+  const cur = normClass(cls);
+  const ov = document.createElement("div");
+  ov.id = "class-gate";
+  ov.style.cssText = "position:fixed;inset:0;z-index:100001;background:rgba(6,6,14,.72);backdrop-filter:blur(4px);" +
+    "display:flex;align-items:center;justify-content:center;padding:18px;" +
+    "font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
+  ov.innerHTML =
+    `<div style="width:100%;max-width:360px;background:#141426;border:1px solid #2a2a4a;border-radius:18px;padding:22px;color:#e8e8f0;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+       <div style="font-size:34px;line-height:1;margin-bottom:10px">📅</div>
+       <div style="font-weight:800;font-size:18px;margin-bottom:6px">${esc(T("class.reTitle", "Ass " + cur + " nach ëmmer deng Klass?"))}</div>
+       <div style="color:#9a9ab8;font-size:13.5px;margin-bottom:14px">${esc(T("class.reSub", "Neit Schouljoer — kontrolléier w.e.g. deng Klass a passt se un wann néideg."))}</div>
+       <input id="class-input" type="text" autocomplete="off" maxlength="12" value="${esc(cur)}"
+         style="width:100%;box-sizing:border-box;background:#0e0e1c;border:1px solid #33335a;border-radius:12px;padding:12px 14px;color:#fff;font-size:16px;outline:none;margin-bottom:6px">
+       <div id="class-err" style="color:#ff7b86;font-size:12.5px;min-height:16px;margin-bottom:8px"></div>
+       <button id="class-save"
+         style="width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;color:#04121f;background:#4ea6ff">${esc(T("class.reYes", "Jo, richteg ✓"))}</button>
+     </div>`;
+  document.body.appendChild(ov);
+
+  const inp = document.getElementById("class-input");
+  const btn = document.getElementById("class-save");
+  const err = document.getElementById("class-err");
+  const sync = () => {
+    const changed = normClass(inp.value) !== cur;
+    btn.textContent = changed ? T("class.save", "Späicheren") : T("class.reYes", "Jo, richteg ✓");
+  };
+  inp.addEventListener("input", () => {
+    const raw = inp.value.trim();
+    err.textContent = (raw && !validClass(raw)) ? T("class.errFormat", "Gëff eng genau Klass an, z.B. 5C6 — net nëmmen d'Joer.") : "";
+    sync();
+  });
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") confirm(); });
+  btn.onclick = confirm;
+  setTimeout(() => inp.focus(), 60);
+
+  async function confirm() {
+    const v = normClass(inp.value);
+    if (!validClass(v)) {
+      err.textContent = T("class.errFormat", "Gëff eng genau Klass an, z.B. 5C6 — net nëmmen d'Joer.");
+      return;
+    }
+    btn.disabled = true; btn.style.opacity = ".5"; err.textContent = "";
+    try {
+      if (v !== cur) {
+        const { error } = await sb.rpc("set_class", { p_class: v });
+        if (error) throw error;
+      }
+      await sb.rpc("mark_class_confirmed");   // stamp so we don't ask again
+      done = true; shown = false;
+      ov.remove();
+    } catch (e) {
+      err.textContent = T("class.err", "Konnt net gespäichert ginn, probéier nach eng Kéier.");
+      btn.disabled = false; btn.style.opacity = "1";
+      console.warn("[class] reconfirm failed", e);
     }
   }
 }
