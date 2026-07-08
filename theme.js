@@ -42,7 +42,7 @@
   // no flash of the hub. Reads the Supabase session straight from localStorage
   // (no SDK needed here); the real data is still protected server-side by RLS.
   function restrictionGuard() {
-    const HOTEL_ONLY = ["quinn@mulheims.lu"]; // limited to the hotel builder
+    const HOTEL_ONLY = []; // emails limited to the hotel builder (none currently)
     if (/(^|\/)hotel\.html$/.test(location.pathname)) return; // already allowed
     let email = "";
     try {

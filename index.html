@@ -22,7 +22,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <!-- Google AdSense (public pages only) -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
-  <script src="theme.js?v=6"></script>
+  <script src="theme.js?v=7"></script>
   <script src="i18n-dict.js?v=15"></script>
   <script src="i18n.js?v=1"></script>
   <script>
@@ -295,7 +295,7 @@
   <script type="module">
     import { mountAccountButton, openAuthModal, client, session, onAuth } from "./auth.js?v=4";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
-    const HOTEL_ONLY = ["quinn@mulheims.lu"];                    // these accounts ONLY get the hotel builder
+    const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)
     mountAccountButton(document.getElementById("acctHost"));
     document.getElementById("appsGateBtn").onclick = openAuthModal;   // signed-out gate → sign-in modal
     async function refreshTiles() {
