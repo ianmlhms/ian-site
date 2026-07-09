@@ -595,6 +595,21 @@ async function send(e) {
   const { data, error } = await sb.from("messages").insert(row).select().single();
   if (error) { inp.value = content; return alert(error.message); }
   appendMessage(data);
+  notifyMentions(content);
+}
+
+// @name -> an in-app notification for that person (alerts.html). The RPC only
+// inserts if the username exists; never notifies yourself.
+function notifyMentions(content) {
+  const names = [...new Set((content.match(/@([A-Za-z0-9_]{3,20})/g) || []).map(t => t.slice(1)))];
+  if (!names.length) return;
+  const meName = (auth.username() || "").toLowerCase();
+  for (const n of names) {
+    if (n.toLowerCase() === meName) continue;
+    sb.rpc("add_notification", { p_to_username: n, p_kind: "mention",
+      p_title: (auth.username() || "Een") + " huet dech ernimmt: " + (current?.display || ""),
+      p_body: content.slice(0, 120), p_url: "messenger.html" }).then(() => {}, () => {});
+  }
 }
 
 async function uploadAndSend(file) {

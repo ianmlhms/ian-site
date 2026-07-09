@@ -223,7 +223,71 @@
     document.head.appendChild(css);
   }
 
-  function boot() { buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); serverSync(); }
+  // ---- PWA: real-app feel (#20) ----
+  // Register the service worker on every page (idempotent; notify.js may also
+  // register the same URL). Gives offline app-shell + faster repeat loads.
+  function registerSW() {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+
+  // Mobile bottom tab bar so the site feels like a native app. Skipped on pages
+  // that own the bottom of the screen (chat composers, full-screen games, call).
+  const NAV = [
+    { href: "index.html", ic: "🏠", label: "Heem" },
+    { href: "pixelbreak.html", ic: "🎮", label: "Spiller" },
+    { href: "messenger.html", ic: "💬", label: "Chat" },
+    { href: "friends.html", ic: "👥", label: "Frënn" },
+    { href: "profile.html", ic: "🪪", label: "Profil" },
+  ];
+  const NAV_SKIP = /(^|\/)(call|messenger|classchat|hotel|casino|games|pixelbreak|kart)\.html$/;
+  function buildBottomNav() {
+    if (!window.matchMedia("(max-width:760px)").matches) return;
+    if (NAV_SKIP.test(location.pathname)) return;
+    if (document.getElementById("appNav")) return;
+    const cur = location.pathname.split("/").pop() || "index.html";
+    const css = document.createElement("style");
+    css.textContent = `
+    #appNav{position:fixed;left:0;right:0;bottom:0;z-index:8000;display:flex;
+      background:var(--card);border-top:1px solid var(--border);
+      padding-bottom:env(safe-area-inset-bottom,0px)}
+    #appNav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+      padding:8px 0 6px;color:var(--muted);font-size:10.5px;text-decoration:none;
+      -webkit-tap-highlight-color:transparent}
+    #appNav a .i{font-size:20px;line-height:1}
+    #appNav a.on{color:var(--accent)}
+    body{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px)) !important}
+    #themeFab,#pwaRefresh{bottom:calc(72px + env(safe-area-inset-bottom,0px)) !important}`;
+    document.head.appendChild(css);
+    const nav = document.createElement("nav");
+    nav.id = "appNav";
+    nav.innerHTML = NAV.map(n => `<a href="${n.href}" class="${cur === n.href ? "on" : ""}"><span class="i">${n.ic}</span>${n.label}</a>`).join("");
+    document.body.appendChild(nav);
+  }
+
+  // Install prompt: a small dismissible chip when the browser offers install
+  // (Android/desktop Chrome). iOS uses the Share-sheet, no event to hook.
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; showInstall(); });
+  function showInstall() {
+    if (document.getElementById("pwaInstall")) return;
+    const standalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+    if (standalone) return;
+    try { if (localStorage.getItem("pwaInstallDismissed")) return; } catch (e) {}
+    const b = document.createElement("button");
+    b.id = "pwaInstall"; b.textContent = "⬇︎ Install";
+    b.style.cssText = "position:fixed;left:14px;z-index:9001;bottom:calc(72px + env(safe-area-inset-bottom,0px));" +
+      "background:var(--accent);color:#fff;border:none;border-radius:20px;padding:10px 15px;font-weight:800;" +
+      "font-size:13px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)";
+    b.onclick = async () => {
+      b.remove();
+      try { localStorage.setItem("pwaInstallDismissed", "1"); } catch (e) {}
+      if (deferredPrompt) { deferredPrompt.prompt(); try { await deferredPrompt.userChoice; } catch (e) {} deferredPrompt = null; }
+    };
+    document.body.appendChild(b);
+  }
+
+  function boot() { buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); serverSync(); registerSW(); buildBottomNav(); }
   if (document.body) boot();
   else document.addEventListener("DOMContentLoaded", boot);
 })();

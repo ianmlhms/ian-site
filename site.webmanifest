@@ -1,15 +1,26 @@
 {
   "name": "ian.lu — Games & Apps",
   "short_name": "ian.lu",
-  "description": "Games, messenger and tools by Ian Mulheims.",
-  "start_url": "./",
+  "description": "Games, messenger and school tools by Ian Mulheims.",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
   "background_color": "#0d0d1a",
   "theme_color": "#0d0d1a",
+  "lang": "lb",
+  "categories": ["games", "social", "education"],
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Messenger", "url": "messenger.html", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Klass-Chat", "url": "classchat.html" },
+    { "name": "Tester", "url": "exams.html" },
+    { "name": "Spiller", "url": "pixelbreak.html" }
   ]
 }

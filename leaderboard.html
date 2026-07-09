@@ -16,7 +16,7 @@
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=8"></script>
+<script src="theme.js?v=9"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
@@ -58,6 +58,10 @@
     <button data-g="dots">▦ Dots &amp; Boxes</button>
     <button data-g="tictactoe">✕ Tic-Tac-Toe</button>
   </div>
+  <div class="tabs" id="periods" style="margin-top:8px">
+    <button data-p="all" class="on">All-time</button>
+    <button data-p="7">This week</button>
+  </div>
   <div id="body"><p class="muted">Loading…</p></div>
   <p class="muted" style="font-size:12.5px;margin-top:18px">Only games played while <b>signed in</b> count. Win/loss is self-reported per player.</p>
 </div>
@@ -69,14 +73,16 @@
 import * as auth from "./auth.js?v=4";
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
-let sb=null, game="";
+let sb=null, game="", period="all";
 (async()=>{ if(auth.authConfigured){ auth.mountAccountButton($("acctHost")); sb=await auth.client(); } draw(); })();
 
 async function draw(){
   const body=$("body"); body.innerHTML=`<p class="muted">Loading…</p>`;
   try{
     if(!sb) sb=await auth.client();
-    const { data, error }=await sb.rpc("game_leaderboard",{ p_game: game||null });
+    const { data, error }=period==="all"
+      ? await sb.rpc("game_leaderboard",{ p_game: game||null })
+      : await sb.rpc("game_leaderboard_window",{ p_game: game||null, p_days: +period });
     if(error) throw error;
     if(!data||!data.length){ body.innerHTML=`<div class="empty">No games recorded yet — play a match while signed in!</div>`; return; }
     body.innerHTML=`<table><tr><th class="rank">#</th><th>Player</th><th class="n">W</th><th class="n">L</th><th class="n">Win%</th></tr>`+
@@ -85,6 +91,7 @@ async function draw(){
   }catch(e){ body.innerHTML=`<div class="empty">Couldn't load the leaderboard.</div>`; console.warn(e); }
 }
 document.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>{ game=b.dataset.g; document.querySelectorAll("[data-g]").forEach(x=>x.classList.toggle("on",x===b)); draw(); });
+document.querySelectorAll("[data-p]").forEach(b=> b.onclick=()=>{ period=b.dataset.p; document.querySelectorAll("[data-p]").forEach(x=>x.classList.toggle("on",x===b)); draw(); });
 </script>
   <script type="module" src="rtc-ring.js?v=1"></script>
   <script type="module" src="class-gate.js?v=3"></script>

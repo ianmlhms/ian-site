@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sichen — ian.lu</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=9"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--text);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:600px;margin:0 auto;padding:18px 14px 40px}
+  #q{width:100%;padding:13px 15px;border-radius:12px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
+  .gate{text-align:center;color:var(--muted);padding:40px 16px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 8px}
+  .r{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+  .r .ic{font-size:20px}
+  .r .t{font-weight:700}
+  .r .s{color:var(--muted);font-size:12.5px;margin-top:1px}
+  .r .go{margin-left:auto;color:var(--accent2);font-size:13px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>🔎 Sichen</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap">
+  <input id="q" placeholder="Sich no Leit, Hausaufgaben, Tester, Kaarten…" autocomplete="off">
+  <div id="out"><div class="gate">Fänk un ze tippen…</div></div>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let sb=null,timer=null;
+
+async function boot(){
+  sb=await auth.client();
+  auth.mountAccountButton($("acctHost"));
+  if(!auth.session()){
+    $("out").innerHTML=`<div class="gate">Mell dech un fir ze sichen.<br><br><button class="btn" id="si" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer">Umellen</button></div>`;
+    $("si").onclick=auth.openAuthModal;return;
+  }
+  $("q").addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(run,220);});
+  $("q").focus();
+}
+
+function grp(title,rows){ return rows.length?`<h2>${title}</h2>${rows.join("")}`:""; }
+function row(ic,t,s,href){ return `<a class="r" href="${href}"><span class="ic">${ic}</span><span><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></span><span class="go">›</span></a>`; }
+
+async function run(){
+  const q=$("q").value.trim();
+  if(q.length<2){$("out").innerHTML=`<div class="gate">Fänk un ze tippen…</div>`;return;}
+  $("out").innerHTML=`<div class="gate">Sichen…</div>`;
+  const like="%"+q.replace(/[%_]/g,"")+"%";
+  const [ppl,hw,ex,dk]=await Promise.all([
+    sb.from("profiles").select("username,class").ilike("username",like).limit(8),
+    sb.from("class_homework").select("id,title,subject").ilike("title",like).limit(8),
+    sb.from("exams").select("id,subject,note").ilike("subject",like).limit(8),
+    sb.from("flashcard_decks").select("id,title").ilike("title",like).limit(8),
+  ]);
+  const rPpl=(ppl.data||[]).map(p=>row("👤",p.username,p.class||"ian.lu player","profile.html?u="+encodeURIComponent(p.username)));
+  const rHw=(hw.data||[]).map(h=>row("📋",h.title,h.subject||"Hausaufgab","board.html"));
+  const rEx=(ex.data||[]).map(e=>row("⏳",e.subject,e.note||"Test","exams.html"));
+  const rDk=(dk.data||[]).map(d=>row("🃏",d.title,"Kaartekëscht","flashcards.html?deck="+d.id));
+  const html=grp("Leit",rPpl)+grp("Hausaufgaben",rHw)+grp("Tester",rEx)+grp("Kaarten",rDk);
+  $("out").innerHTML=html||`<div class="gate">Näischt fonnt fir „${esc(q)}“.</div>`;
+}
+
+auth.onAuth(boot);
+boot();
+</script>
+  <script type="module" src="rtc-ring.js?v=1"></script>
+  <script type="module" src="class-gate.js?v=3"></script>
+</body>
+</html>

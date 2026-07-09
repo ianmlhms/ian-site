@@ -7,7 +7,7 @@
 <meta name="description" content="Your ian.lu player profile — avatar and game stats.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=8"></script>
+<script src="theme.js?v=9"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
   *{box-sizing:border-box}
@@ -48,6 +48,7 @@
   .class-tag{background:rgba(92,200,255,.15);color:#5cc8ff;border:1px solid rgba(92,200,255,.35)}
   .admin-tag{background:rgba(255,207,77,.15);color:#ffcf4d;border:1px solid rgba(255,207,77,.35)}
   .vip-tag{background:rgba(215,179,255,.15);color:#d7b3ff;border:1px solid rgba(215,179,255,.35)}
+  .ach{display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px;margin:0 6px 6px 0}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -80,6 +81,46 @@ const YEAR_ONLY=/^\d{1,2}(E|È|EME|ÈME|IEME|IÈME)?$/;
 const CLASS_SHAPE=/^\d{1,2}[A-Z]{1,4}\d{0,2}$/;
 const validClass=(r)=>{const v=normClass(r);return CLASS_SHAPE.test(v)&&!YEAR_ONLY.test(v);};
 const validName=(n)=>/^[A-Za-z0-9_]{3,20}$/.test((n||"").trim());
+const qs=new URLSearchParams(location.search);
+
+// Cosmetic badges derived from stats (server wins/losses + local wordle best).
+function achievements(s){
+  const A=[];
+  const add=(cond,html)=>{if(cond)A.push(`<span class="ach">${html}</span>`);};
+  add(s.wins>=1,"🏆 First win");
+  add(s.wins>=10,"🔥 10 wins");
+  add(s.wins>=50,"🌟 50 wins");
+  add((s.total||0)>=100,"💯 100 games");
+  add(s.pct!=null&&s.pct>=60&&(s.total||0)>=10,"🎯 60%+ win rate");
+  add((s.wordleMax||0)>=5,`📚 Wordle streak ${s.wordleMax}`);
+  return A.length?A.join(""):'<span style="color:var(--muted)">No badges yet — play some games!</span>';
+}
+
+// Read-only view of another player: profile.html?u=<username>.
+async function renderPublic(username){
+  const {data:p}=await sb.from("profiles").select("id,avatar,class,username").ilike("username",username).maybeSingle();
+  if(!p){$("wrap").innerHTML=`<div class="gate">No player called “${esc(username)}”.<br><br><a href="profile.html">‹ Your profile</a></div>`;return;}
+  let isAdmin=false,isVip=false;
+  try{const {data}=await sb.rpc("admin_user_ids");isAdmin=(data||[]).some(r=>r.user_id===p.id);}catch{}
+  try{const {data}=await sb.rpc("vip_user_ids");isVip=(data||[]).some(r=>r.user_id===p.id);}catch{}
+  const tags=(p.class?`<span class="class-tag">${esc(p.class)}</span>`:"")+(isAdmin?`<span class="admin-tag">👑 Admin</span>`:"")+(isVip?`<span class="vip-tag">⭐ VIP</span>`:"");
+  let stats={wins:0,losses:0,total:0,pct:null};
+  try{const {data}=await sb.rpc("game_leaderboard",{p_game:null});const m=(data||[]).find(r=>r.username===p.username);if(m)stats={wins:m.wins,losses:m.losses,total:m.total,pct:m.winpct};}catch{}
+  $("wrap").innerHTML=`
+    <div class="card me">
+      <div class="big">${avInner(p.avatar)}</div>
+      <div><div class="name">${esc(p.username)}</div><div class="sub">ian.lu player</div><div class="tags">${tags}</div></div>
+    </div>
+    <h2>Stats</h2>
+    <div class="card stats">
+      <div class="stat"><b>${stats.wins}</b><span>Match wins</span></div>
+      <div class="stat"><b>${stats.losses}</b><span>Losses</span></div>
+      <div class="stat"><b>${stats.pct==null?"—":stats.pct+"%"}</b><span>Win rate</span></div>
+    </div>
+    <h2>Achievements</h2>
+    <div class="card">${achievements(stats)}</div>
+    <div class="hint" style="margin-top:14px"><a href="profile.html">‹ Your profile</a></div>`;
+}
 
 // Fit the WHOLE image into a small square JPEG (any aspect ratio, nothing cropped).
 // The square is filled with a soft blurred copy of the photo so there are no
@@ -110,6 +151,8 @@ function squareResize(file,size){
 async function boot(){
   sb=await auth.client();
   auth.mountAccountButton($("acctHost"));
+  const viewU=qs.get("u");
+  if(viewU && viewU.toLowerCase()!==(auth.username()||"").toLowerCase()){ return renderPublic(viewU); }
   if(!auth.session()){
     $("wrap").innerHTML=`<div class="gate">Sign in to see your profile.<br><br><button class="btn" id="signin">Sign in</button></div>`;
     $("signin").onclick=auth.openAuthModal;
@@ -162,7 +205,10 @@ async function boot(){
     <h2>Or pick an emoji</h2>
     <div class="card"><div class="grid" id="avGrid"></div><div class="msg" id="avMsg"></div></div>
     <h2>Your stats</h2>
-    <div class="card stats" id="stats"><div class="gate">Loading…</div></div>`;
+    <div class="card stats" id="stats"><div class="gate">Loading…</div></div>
+    <h2>Achievements</h2>
+    <div class="card" id="ach"><div class="gate">Loading…</div></div>
+    <div class="hint" style="margin-top:8px">Your public profile: <a id="shareLink" href="profile.html?u=${encodeURIComponent(uname)}">ian.lu/profile.html?u=${esc(uname)}</a></div>`;
   wireUpload();
   wireName();
   wireClass();
@@ -283,20 +329,22 @@ function wireUpload(){
 }
 
 async function loadStats(uname){
-  let wins=0,losses=0,pct=null;
+  let wins=0,losses=0,pct=null,total=0;
   try{
     const {data}=await sb.rpc("game_leaderboard",{p_game:null});
     const me=(data||[]).find(r=>r.username===uname);
-    if(me){wins=me.wins;losses=me.losses;pct=me.winpct;}
+    if(me){wins=me.wins;losses=me.losses;pct=me.winpct;total=me.total;}
   }catch(e){console.warn(e);}
   const w=(l)=>JSON.parse(localStorage.getItem("wordleStats_"+l)||"null")||{played:0,wins:0,streak:0,max:0};
   const lb=w("lb"),de=w("de");
+  const wordleMax=Math.max(lb.max,de.max);
   $("stats").innerHTML=`
     <div class="stat"><b>${wins}</b><span>Match wins</span></div>
     <div class="stat"><b>${losses}</b><span>Losses</span></div>
     <div class="stat"><b>${pct==null?"—":pct+"%"}</b><span>Win rate</span></div>
     <div class="stat"><b>${lb.wins+de.wins}/${lb.played+de.played}</b><span>Wordle wins</span></div>
-    <div class="stat"><b>${Math.max(lb.max,de.max)}</b><span>Best streak</span></div>`;
+    <div class="stat"><b>${wordleMax}</b><span>Best streak</span></div>`;
+  if($("ach"))$("ach").innerHTML=achievements({wins,losses,pct,total,wordleMax});
 }
 
 auth.onAuth(boot);

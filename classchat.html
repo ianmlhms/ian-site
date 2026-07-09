@@ -15,7 +15,7 @@
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=8"></script>
+<script src="theme.js?v=9"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
   *{box-sizing:border-box}
@@ -124,9 +124,20 @@ async function send(){
   const body=$("msg").value.trim();
   if(!body)return;
   $("msg").value="";$("send").disabled=true;
-  try{const {error}=await sb.from("class_chat").insert({class:myClass,body});if(error)throw error;}
+  try{const {error}=await sb.from("class_chat").insert({class:myClass,body});if(error)throw error;notifyMentions(body);}
   catch(e){console.warn("[classchat] send",e);$("msg").value=body;}
   finally{$("send").disabled=false;$("msg").focus();}
+}
+// @name mentions -> an in-app notification for that classmate (alerts.html).
+function notifyMentions(body){
+  const names=[...new Set((body.match(/@([A-Za-z0-9_]{3,20})/g)||[]).map(t=>t.slice(1)))];
+  const meName=(auth.username()||"").toLowerCase();
+  for(const n of names){
+    if(n.toLowerCase()===meName)continue;
+    sb.rpc("add_notification",{p_to_username:n,p_kind:"mention",
+      p_title:(auth.username()||"Een")+" huet dech am Klass-Chat ernimmt",
+      p_body:body.slice(0,120),p_url:"classchat.html"}).then(()=>{},()=>{});
+  }
 }
 $("send").onclick=send;
 $("msg").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});

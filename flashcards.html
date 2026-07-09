@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kaarten — ian.lu</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=9"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700;cursor:pointer}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
+  .gate{text-align:center;color:var(--muted);padding:50px 16px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
+  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  .deckrow{display:flex;align-items:center;gap:12px;cursor:pointer}
+  .deckrow .t{font-weight:800}
+  .deckrow .s{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .deckrow .n{margin-left:auto;color:var(--muted);font-size:13px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 0}
+  input,textarea{padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit;width:100%}
+  /* study */
+  .flip{perspective:1200px;height:280px;cursor:pointer}
+  .inner{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}
+  .inner.back{transform:rotateY(180deg)}
+  .face{position:absolute;inset:0;backface-visibility:hidden;background:var(--card);border:1px solid var(--border);border-radius:18px;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-size:22px;font-weight:700}
+  .face.b{transform:rotateY(180deg);font-weight:500;color:var(--accent2)}
+  .face .side{position:absolute;top:12px;left:16px;font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:700}
+  .nav{display:flex;align-items:center;gap:12px;justify-content:center;margin-top:6px}
+  .nav button{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:12px;width:52px;height:44px;font-size:20px;cursor:pointer}
+  .prog{color:var(--muted);font-size:13px;min-width:66px;text-align:center}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  /* edit */
+  .crow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:start}
+  .del{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
+  .del:hover{color:var(--warn)}
+  .settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center;color:var(--muted);font-size:13px}
+  .msg{min-height:16px;color:var(--accent2);font-weight:700;font-size:13px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <span class="home" id="back">‹ Zeréck</span>
+  <h1>🃏 Kaarten</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const qs=new URLSearchParams(location.search);
+let sb=null,me=null,myClass=null,deck=null,cards=[],idx=0,flipped=false;
+
+async function boot(){
+  sb=await auth.client();
+  auth.mountAccountButton($("acctHost"));
+  $("back").onclick=()=>{ if(deck){deck=null;location.search="";} else history.length>1?history.back():location.href="index.html"; };
+  if(!auth.session()){
+    $("wrap").innerHTML=`<div class="gate">Mell dech un, fir Kaarten ze léieren.<br><br><button class="btn" id="si">Umellen</button></div>`;
+    $("si").onclick=auth.openAuthModal;return;
+  }
+  me=auth.session().user.id;
+  try{const {data}=await sb.from("profiles").select("class").eq("id",me).maybeSingle();myClass=data?.class||null;}catch{}
+  const deckId=qs.get("deck"), examId=qs.get("exam");
+  if(deckId){ return openDeck(deckId); }
+  if(examId){ return newDeckForExam(examId, qs.get("class")||myClass); }
+  listView();
+}
+
+async function listView(){
+  $("wrap").innerHTML=`<div class="gate">Lueden…</div>`;
+  const {data:decks}=await sb.from("flashcard_decks").select("id,title,owner,shared,class,exam_id,created_at").order("created_at",{ascending:false});
+  const counts={};
+  const {data:cc}=await sb.from("flashcards").select("deck_id");
+  for(const c of cc||[])counts[c.deck_id]=(counts[c.deck_id]||0)+1;
+  const mine=(decks||[]).filter(d=>d.owner===me);
+  const shared=(decks||[]).filter(d=>d.owner!==me);
+  const row=(d)=>`<div class="card"><div class="deckrow" data-open="${d.id}">
+      <div><div class="t">${esc(d.title)}</div><div class="s">${d.shared?"👥 gedeelt · ":""}${d.class?esc(d.class):""}</div></div>
+      <div class="n">${counts[d.id]||0} 🃏</div></div></div>`;
+  $("wrap").innerHTML=`
+    <div class="card">
+      <div class="settings" style="gap:8px">
+        <input id="newTitle" placeholder="Nei Këscht (z.B. Vokabelen Englesch)" style="flex:1;min-width:180px">
+        <button class="btn" id="newBtn">Uleeën</button>
+      </div>
+      <div class="msg" id="lm"></div>
+    </div>
+    <h2>Meng Këschten</h2>
+    ${mine.length?mine.map(row).join(""):'<div class="gate">Nach keng — lee eng un 👆</div>'}
+    ${shared.length?`<h2>Klass-Këschten</h2>${shared.map(row).join("")}`:""}`;
+  $("newBtn").onclick=async()=>{
+    const t=$("newTitle").value.trim();
+    if(!t){return;}
+    const {data,error}=await sb.from("flashcard_decks").insert({title:t,class:myClass}).select("id").single();
+    if(error){$("lm").textContent="Feeler (Migratioun gelaf?).";return;}
+    openDeck(data.id);
+  };
+  $("wrap").querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>openDeck(el.dataset.open));
+}
+
+async function newDeckForExam(examId,cls){
+  const {data,error}=await sb.from("flashcard_decks").insert({title:"Nei Këscht",class:cls||myClass,exam_id:examId,shared:true}).select("id").single();
+  if(error){$("wrap").innerHTML='<div class="gate">Feeler beim Uleeën (Migratioun gelaf?).</div>';return;}
+  history.replaceState(null,"","flashcards.html?deck="+data.id);
+  openDeck(data.id,true);
+}
+
+async function openDeck(id,edit){
+  const {data:d}=await sb.from("flashcard_decks").select("*").eq("id",id).maybeSingle();
+  if(!d){$("wrap").innerHTML='<div class="gate">Këscht net fonnt.</div>';return;}
+  deck=d;
+  const {data:cs}=await sb.from("flashcards").select("*").eq("deck_id",id).order("pos").order("id");
+  cards=cs||[];idx=0;flipped=false;
+  (edit||!cards.length)?editView():studyView();
+}
+
+/* ---------- study ---------- */
+function studyView(){
+  const mine=deck.owner===me;
+  $("wrap").innerHTML=`
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-weight:800;font-size:17px">${esc(deck.title)}</div>
+        <div class="spacer" style="flex:1"></div>
+        ${mine?`<button class="ghost" id="editBtn">✏️ Änneren</button>`:""}
+      </div>
+    </div>
+    <div class="flip" id="flip"><div class="inner" id="inner">
+      <div class="face"><span class="side">Fro</span><span id="front"></span></div>
+      <div class="face b"><span class="side">Äntwert</span><span id="back2"></span></div>
+    </div></div>
+    <div class="nav">
+      <button id="prev">‹</button>
+      <div class="prog" id="prog"></div>
+      <button id="next">›</button>
+    </div>
+    <div class="tools">
+      <button class="ghost" id="shuf">🔀 Mëschen</button>
+      ${deck.owner===me?`<button class="ghost" id="shareBtn"></button>`:""}
+    </div>`;
+  $("flip").onclick=()=>{flipped=!flipped;$("inner").classList.toggle("back",flipped);};
+  $("prev").onclick=()=>go(-1);$("next").onclick=()=>go(1);
+  $("shuf").onclick=()=>{for(let i=cards.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cards[i],cards[j]]=[cards[j],cards[i]];}idx=0;flipped=false;paint();};
+  if($("editBtn"))$("editBtn").onclick=editView;
+  if($("shareBtn")){const upd=()=>$("shareBtn").textContent=deck.shared?"👥 Gedeelt mat der Klass":"🔒 Just fir mech";upd();
+    $("shareBtn").onclick=async()=>{deck.shared=!deck.shared;await sb.from("flashcard_decks").update({shared:deck.shared}).eq("id",deck.id);upd();};}
+  document.onkeydown=(e)=>{if(e.key==="ArrowLeft")go(-1);else if(e.key==="ArrowRight")go(1);else if(e.key===" "){e.preventDefault();$("flip").click();}};
+  paint();
+}
+function go(d){ if(!cards.length)return; idx=(idx+d+cards.length)%cards.length; flipped=false; $("inner").classList.remove("back"); paint(); }
+function paint(){
+  if(!cards.length)return;
+  const c=cards[idx];
+  $("front").textContent=c.front;$("back2").textContent=c.back;
+  $("prog").textContent=(idx+1)+" / "+cards.length;
+  $("inner").classList.toggle("back",flipped);
+}
+
+/* ---------- edit ---------- */
+function editView(){
+  document.onkeydown=null;
+  const rows=cards.map(c=>`<div class="crow" data-id="${c.id}">
+      <textarea class="cf" rows="2" placeholder="Fro">${esc(c.front)}</textarea>
+      <textarea class="cb" rows="2" placeholder="Äntwert">${esc(c.back)}</textarea>
+      <button class="del" data-del="${c.id}" title="Läschen">✕</button>
+    </div>`).join("");
+  $("wrap").innerHTML=`
+    <div class="card">
+      <input id="dTitle" value="${esc(deck.title)}" maxlength="80">
+      <div class="settings" style="margin-top:10px">
+        <label><input type="checkbox" id="dShare" ${deck.shared?"checked":""}> Mat der Klass deelen</label>
+        ${deck.exam_id?`<span>· un en Test gebonnen</span>`:""}
+      </div>
+      <div class="msg" id="em"></div>
+    </div>
+    <h2>Kaarten</h2>
+    <div id="rows">${rows||""}</div>
+    <div class="crow">
+      <textarea class="nf" rows="2" placeholder="Nei Fro"></textarea>
+      <textarea class="nb" rows="2" placeholder="Nei Äntwert"></textarea>
+      <button class="del" id="addCard" title="Bäisetzen">＋</button>
+    </div>
+    <div class="tools" style="justify-content:flex-start">
+      ${cards.length?`<button class="btn" id="study">▶︎ Léieren</button>`:""}
+      <button class="ghost" id="delDeck">Këscht läschen</button>
+    </div>`;
+  $("dTitle").onchange=()=>saveDeck();
+  $("dShare").onchange=()=>saveDeck();
+  $("rows").querySelectorAll(".crow").forEach(r=>{
+    const id=r.dataset.id;
+    r.querySelector(".cf").onchange=()=>saveCard(id,r);
+    r.querySelector(".cb").onchange=()=>saveCard(id,r);
+    r.querySelector("[data-del]").onclick=async()=>{await sb.from("flashcards").delete().eq("id",id);openDeck(deck.id,true);};
+  });
+  $("addCard").onclick=addCard;
+  if($("study"))$("study").onclick=()=>{idx=0;flipped=false;studyView();};
+  $("delDeck").onclick=async()=>{if(!confirm("Ganz Këscht läschen?"))return;await sb.from("flashcard_decks").delete().eq("id",deck.id);deck=null;location.href="flashcards.html";};
+}
+async function saveDeck(){
+  deck.title=$("dTitle").value.trim()||deck.title;deck.shared=$("dShare").checked;
+  await sb.from("flashcard_decks").update({title:deck.title,shared:deck.shared}).eq("id",deck.id);
+  setEm("Gespäichert ✓");
+}
+async function saveCard(id,r){
+  const front=r.querySelector(".cf").value.trim(),back=r.querySelector(".cb").value.trim();
+  await sb.from("flashcards").update({front,back}).eq("id",id);
+  const c=cards.find(x=>x.id===id);if(c){c.front=front;c.back=back;}
+  setEm("Gespäichert ✓");
+}
+async function addCard(){
+  const nf=$("wrap").querySelector(".nf"),nb=$("wrap").querySelector(".nb");
+  const front=nf.value.trim(),back=nb.value.trim();
+  if(!front&&!back)return;
+  const pos=(cards.reduce((m,c)=>Math.max(m,c.pos||0),0))+1;
+  const {error}=await sb.from("flashcards").insert({deck_id:deck.id,front,back,pos});
+  if(error){setEm("Feeler.",true);return;}
+  openDeck(deck.id,true);
+}
+function setEm(t,err){const m=$("em");if(!m)return;m.textContent=t;m.style.color=err?"#ff6b6b":"var(--accent2)";if(!err)setTimeout(()=>{if(m)m.textContent="";},1200);}
+
+auth.onAuth(boot);
+boot();
+</script>
+  <script type="module" src="rtc-ring.js?v=1"></script>
+  <script type="module" src="class-gate.js?v=3"></script>
+</body>
+</html>
