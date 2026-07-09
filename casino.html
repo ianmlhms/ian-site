@@ -966,7 +966,17 @@ const ChickenCross = {
       .then(THREE => { if(killed) return; view = makeView3D(THREE, $("#chkStage"), api); const l=$("#chkLoad"); if(l) l.remove(); view.rebuild(); })
       .catch(() => { if(killed) return; view = makeView2D($("#chkStage"), api); const l=$("#chkLoad"); if(l) l.remove(); view.rebuild(); });
 
-    this._cleanup = () => { killed = true; if(view) view.destroy(); };
+    // spacebar hops (ignored while typing in the bet field)
+    const onKey = (e) => {
+      if (e.code !== "Space" && e.key !== " ") return;
+      const t = e.target;
+      if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+      e.preventDefault();
+      requestHop();
+    };
+    document.addEventListener("keydown", onKey);
+
+    this._cleanup = () => { killed = true; document.removeEventListener("keydown", onKey); if(view) view.destroy(); };
 
     function buildLanes(){
       const d = CHICK_DIFFS[diff];
@@ -1069,10 +1079,11 @@ function makeView3D(THREE, stage, api){
   function makeChicken(){
     const g = new THREE.Group();
     const body = box(0.85,0.7,1.05,0xffffff); body.position.y = 0.55; g.add(body);
-    const head = box(0.5,0.5,0.5,0xffffff); head.position.set(0,1.05,0.32); g.add(head);
-    const beak = box(0.18,0.18,0.26,0xffa51f); beak.position.set(0,1.02,0.66); g.add(beak);
-    const comb = box(0.16,0.22,0.36,0xe3443f); comb.position.set(0,1.4,0.28); g.add(comb);
-    const tail = box(0.22,0.46,0.28,0xffffff); tail.position.set(0,0.78,-0.62); tail.rotation.x = -0.5; g.add(tail);
+    // faces -Z (the direction it hops, away from the camera)
+    const head = box(0.5,0.5,0.5,0xffffff); head.position.set(0,1.05,-0.32); g.add(head);
+    const beak = box(0.18,0.18,0.26,0xffa51f); beak.position.set(0,1.02,-0.66); g.add(beak);
+    const comb = box(0.16,0.22,0.36,0xe3443f); comb.position.set(0,1.4,-0.28); g.add(comb);
+    const tail = box(0.22,0.46,0.28,0xffffff); tail.position.set(0,0.78,0.62); tail.rotation.x = 0.5; g.add(tail);
     const l1 = box(0.14,0.35,0.14,0xffa51f); l1.position.set(-0.22,0.17,0.05); g.add(l1);
     const l2 = box(0.14,0.35,0.14,0xffa51f); l2.position.set(0.22,0.17,0.05); g.add(l2);
     return g;
@@ -1114,21 +1125,26 @@ function makeView3D(THREE, stage, api){
       const car = makeCar(CAR_COLORS[(Math.random()*CAR_COLORS.length)|0]);
       const cd = Math.random()<0.5 ? 1 : -1;
       car.position.set((Math.random()*2-1)*6, 0, laneZ(i+1)); car.rotation.y = cd>0 ? 0 : Math.PI;
-      car.userData = { speed: 2.6 + Math.random()*3.0, dir: cd, ambient:true };
+      car.userData = { speed: 2.6 + Math.random()*3.0, dir: cd, ambient:true, lane: i+1 };
       world.add(car);
     }
     const bank = box(ROAD_W,0.4,LW*2,0x57b24a); bank.position.set(0,-0.2,laneZ(n+1)); world.add(bank);
     chicken = makeChicken(); world.add(chicken);
     shadow = new THREE.Mesh(new THREE.CircleGeometry(0.5,18), new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.22, depthWrite:false }));
     shadow.rotation.x = -Math.PI/2; world.add(shadow);
-    place(api.pos); markNext(); updateCam(true);
+    place(api.pos); markNext(); updateTraffic(); updateCam(true);
   }
   function place(p){ if(chicken){ chicken.position.set(0,0,laneZ(p)); chicken.rotation.set(0,0,0); } if(shadow) shadow.position.set(0,0.02,laneZ(p)); }
   function markNext(){
     const p = api.pos;
     laneMeshes.forEach((m,i) => m.material.emissive.setHex((api.active && !api.dead && (i+1)===p+1) ? 0x6a4e00 : 0x000000));
   }
-  function refresh(){ if(destroyed) return; if(!api.dead) place(api.pos); markNext(); }
+  // traffic only runs on lanes you haven't safely reached yet — a lane the
+  // chicken has crossed onto (or past) is cleared, so no car drives through it.
+  function updateTraffic(){
+    for (const o of world.children){ if (o.userData && o.userData.ambient) o.visible = o.userData.lane > api.pos; }
+  }
+  function refresh(){ if(destroyed) return; if(!api.dead) place(api.pos); markNext(); updateTraffic(); }
   function updateCam(snap){
     const cz = chicken ? chicken.position.z : 0;
     camPos.set(CAM_OFF.x, CAM_OFF.y, cz + CAM_OFF.z);
@@ -1144,7 +1160,7 @@ function makeView3D(THREE, stage, api){
     raf = requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta());
     for (const o of world.children){
-      if (o.userData && o.userData.ambient){
+      if (o.userData && o.userData.ambient && o.visible){
         o.position.x += o.userData.dir * o.userData.speed * dt;
         if (o.position.x > 9) o.position.x = -9; else if (o.position.x < -9) o.position.x = 9;
       }
