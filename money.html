@@ -664,34 +664,48 @@ async function onImportFile(file){
   }catch(e){console.warn("[import]",e);$("impMsg").textContent="Import feelgeschloen — kuck d'Datei.";$("impMsg").style.color="var(--warn)";}
 }
 async function previewImport(rows,account){
-  const {data:existing}=await sb.from("finance_tx").select("at,amount,kind,note").limit(8000);
+  const {data:existing}=await sb.from("finance_tx").select("id,at,amount,kind,note,account,cat").limit(8000);
   const key=(r)=>`${String(r.at).slice(0,10)}|${(+r.amount).toFixed(2)}|${r.kind}|${(r.note||"").slice(0,30)}`;
-  const have=new Set((existing||[]).map(key));
-  const fresh=rows.filter(r=>!have.has(key(r)));
-  const dupes=rows.length-fresh.length;
+  const have=new Map((existing||[]).map(r=>[key(r),r]));
+  const fresh=[],backfill=[];
+  for(const r of rows){
+    const ex=have.get(key(r));
+    if(!ex){fresh.push(r);continue;}
+    // already present → backfill account / deterministic category if missing
+    const patch={};
+    if(!ex.account&&r.account)patch.account=r.account;
+    if(!ex.cat&&r.cat)patch.cat=r.cat;
+    if(Object.keys(patch).length)backfill.push({id:ex.id,...patch});
+  }
+  const untouched=rows.length-fresh.length-backfill.length;
   const inSum=fresh.filter(r=>r.kind==="in").reduce((a,r)=>a+r.amount,0);
   const outSum=fresh.filter(r=>r.kind==="out").reduce((a,r)=>a+r.amount,0);
   const list=fresh.slice(0,300).map(r=>`<div class="row"><span class="ic">${r.kind==="in"?"➕":"➖"}</span><div><div class="t" style="font-size:13px">${esc(r.note)}</div><div class="s">${r.at}</div></div><div class="amt ${r.kind}">${r.kind==="in"?"+":"−"}${CUR}${r.amount.toFixed(2)}</div></div>`).join("");
   $("impModalBody").innerHTML=`
     <div class="hint" style="margin-bottom:8px">Konto: <b style="color:var(--text)">${esc(account)}</b><br>
-      ${fresh.length} nei Buchungen${dupes?` · ${dupes} scho present (iwwersprongen)`:""}<br>
+      ${fresh.length} nei Buchungen${backfill.length?` · <span style="color:var(--accent2)">${backfill.length} kréien Konto/Kategorie</span>`:""}${untouched?` · ${untouched} onverännert`:""}<br>
       <span style="color:var(--ok)">+${CUR}${inSum.toFixed(2)}</span> · <span style="color:var(--warn)">−${CUR}${outSum.toFixed(2)}</span></div>
-    ${list||'<div class="hint">Alles scho importéiert 👍</div>'}
+    ${list||'<div class="hint">Keng nei Buchungen — mä existéierend kréien elo hiert Konto. 👍</div>'}
     ${fresh.length>300?'<div class="hint">…just déi éischt 300 gewisen; all ginn importéiert.</div>':""}`;
-  $("impModalGo").textContent=`${fresh.length} importéieren`;
-  $("impModalGo").disabled=!fresh.length;
-  $("impModalGo").onclick=()=>doImport(fresh);
+  const total=fresh.length+backfill.length;
+  $("impModalGo").textContent=backfill.length&&!fresh.length?`${backfill.length} aktualiséieren`:`${total} uwennen`;
+  $("impModalGo").disabled=!total;
+  $("impModalGo").onclick=()=>doImport(fresh,backfill);
   $("impModal").classList.add("open");
 }
-async function doImport(fresh){
-  $("impModalGo").disabled=true;$("impModalGo").textContent="Importéieren…";
+async function doImport(fresh,backfill=[]){
+  $("impModalGo").disabled=true;$("impModalGo").textContent="Uwennen…";
   try{
     for(let i=0;i<fresh.length;i+=200){
       const batch=fresh.slice(i,i+200).map(r=>({amount:r.amount,kind:r.kind,note:r.note,cat:r.cat||null,account:r.account||null,at:r.at+"T12:00:00Z",currency:"EUR"}));
       const {error}=await sb.from("finance_tx").insert(batch);if(error)throw error;
     }
+    for(let i=0;i<backfill.length;i+=20){
+      await Promise.all(backfill.slice(i,i+20).map(u=>{const{id,...p}=u;return sb.from("finance_tx").update(p).eq("id",id);}));
+    }
     $("impModal").classList.remove("open");
-    $("impMsg").textContent=`✓ ${fresh.length} Buchungen importéiert`;$("impMsg").style.color="var(--ok)";
+    const parts=[];if(fresh.length)parts.push(`${fresh.length} nei`);if(backfill.length)parts.push(`${backfill.length} aktualiséiert`);
+    $("impMsg").textContent=`✓ ${parts.join(" · ")||"näischt ze änneren"}`;$("impMsg").style.color="var(--ok)";
     setTimeout(()=>$("impMsg").textContent="",2500);await loadAll();
   }catch(e){console.warn(e);$("impModalGo").disabled=false;$("impModalGo").textContent="Nach eng Kéier";$("impMsg").textContent="Import feelgeschloen.";}
 }
