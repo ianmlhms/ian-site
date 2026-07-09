@@ -100,7 +100,11 @@ async function boot(){
       <div class="msg" id="txMsg"></div>
     </div>
 
-    <h2>Buchungen</h2>
+    <h2 style="display:flex;align-items:center;gap:10px">Buchungen
+      <button class="ghost" id="importBtn" style="margin-left:auto">📥 Kontoscritt importéieren</button>
+      <input type="file" id="impFile" accept=".csv,.pdf,text/csv,application/pdf" hidden>
+    </h2>
+    <div class="hint" id="impMsg" style="margin-top:-6px"></div>
     <div class="card" id="txList"><div class="gate">Lueden…</div></div>
 
     <h2>Abonnementer</h2>
@@ -124,7 +128,121 @@ async function boot(){
   fillCats();
   $("addTx").onclick=addTx;
   $("addSub").onclick=addSub;
+  $("importBtn").onclick=()=>$("impFile").click();
+  $("impFile").onchange=(e)=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)onImportFile(f);};
   await Promise.all([loadTx(),loadSubs()]);
+}
+
+/* ---------------- statement import (CSV + BDL PDF) ----------------
+ * Parses a bank export in the browser, shows a preview, and only inserts what you
+ * confirm — skipping rows you already have. No third party, no bank login. */
+function decodeBytes(buf){
+  const b=new Uint8Array(buf);
+  if(b[0]===0xff&&b[1]===0xfe)return new TextDecoder("utf-16le").decode(b);
+  if(b[0]===0xfe&&b[1]===0xff)return new TextDecoder("utf-16be").decode(b);
+  const n=Math.min(b.length,400);let even=0,odd=0;
+  for(let i=0;i<n;i++)if(b[i]===0)(i%2?odd++:even++);
+  if(even+odd>n*0.25)return new TextDecoder(odd>=even?"utf-16le":"utf-16be").decode(b);
+  return new TextDecoder("utf-8").decode(b);
+}
+const impMoney=(s)=>{const n=parseFloat(String(s).replace(/\s/g,"").replace(/\./g,"").replace(",","."));return Number.isFinite(n)?n:null;};
+const impDate=(d)=>{const m=String(d).trim().match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{2,4})$/);if(!m)return null;let[,dd,mm,yy]=m;if(yy.length===2)yy="20"+yy;return`${yy}-${mm}-${dd}`;};
+function parseCSVstmt(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
+  const delim=(lines[0].match(/;/g)||[]).length>=(lines[0].match(/,/g)||[]).length?";":",";
+  const H=lines[0].split(delim).map(h=>h.trim().toLowerCase());
+  const find=(names,ex=[])=>{for(const n of names){const i=H.indexOf(n);if(i>=0&&!ex.includes(i))return i;}for(const n of names){const i=H.findIndex((h,idx)=>!ex.includes(idx)&&h.includes(n));if(i>=0)return i;}return-1;};
+  const iDate=find(["transaktionsdatum","date transaction","date valeur","date"]);
+  const iAmt=find(["betrag in eur","montant en eur","montant","betrag"],[iDate]);
+  const iDesc=find(["transaktion","description","libellé","libelle"],[iDate,iAmt]);
+  const iComm=find(["communication 1","communication","nom de la contrepartie"],[iDate,iAmt,iDesc]);
+  const iCtry=find(["land","localité de la contrepartie","localité"],[iDate,iAmt,iDesc,iComm]);
+  if(iDate<0||iAmt<0)return[];
+  const out=[];
+  for(const line of lines.slice(1)){
+    const c=line.split(delim);const at=impDate(c[iDate]);const amt=impMoney(c[iAmt]);
+    if(!at||amt===null||amt===0)continue;
+    let desc=(c[iDesc]||"").trim();
+    if(iComm>=0&&c[iComm]&&c[iComm].trim()&&c[iComm].trim()!==desc)desc+=" · "+c[iComm].trim();
+    if(iCtry>=0&&c[iCtry]&&c[iCtry].trim())desc+=" ("+c[iCtry].trim()+")";
+    out.push({at,amount:Math.abs(amt),kind:amt<0?"out":"in",note:desc.slice(0,180)});
+  }
+  return out;
+}
+function parseBDL(text){
+  const lines=text.split(/\r?\n/).map(l=>l.replace(/(\d)\s+,\s+(\d)/g,"$1,$2").replace(/,\s+(\d{2})\b/g,",$1").replace(/([+-])\s+(?=[\d.])/g,"$1"));
+  const out=[];const re=/(\d{2}-\d{2}-\d{2})\s+.*?([+-][\d.\s]*\d,\d{2})\s*$/;
+  for(let i=0;i<lines.length;i++){
+    const L=lines[i];if(/SOLDE|ANCIEN|NOUVEAU|REPORT/i.test(L))continue;
+    const m=L.match(re);if(!m)continue;
+    const amt=impMoney(m[2]);if(amt===null||amt===0)continue;
+    const[dd,mm,yy]=m[1].split("-");const at=`20${yy}-${mm}-${dd}`;
+    let label="",comm="";
+    for(let j=i+1;j<Math.min(i+14,lines.length);j++){
+      const t=lines[j].trim();if(re.test(lines[j])||/SOLDE/i.test(t))break;
+      if(!label&&/(Virement|Achat|Paiement|Retrait|Domiciliation|Ordre|Frais|Intérêts|Remboursement)/i.test(t))label=t.replace(/\s*\|\s*n°\S+/i,"").trim();
+      const cm=t.match(/^(?:COMMUNICATION|REMARQUE)\s*:?\s*(.*)$/i);
+      if(cm&&cm[1])comm=cm[1].trim();else if(/^(COMMUNICATION|REMARQUE)\s*:?\s*$/i.test(t)&&lines[j+1])comm=lines[j+1].trim();
+    }
+    out.push({at,amount:Math.abs(amt),kind:amt<0?"out":"in",note:([label,comm].filter(Boolean).join(" · ")||"BDL").slice(0,180)});
+  }
+  return out;
+}
+async function pdfToLines(buf){
+  const pdfjs=await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.min.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs";
+  const doc=await pdfjs.getDocument({data:buf}).promise;const lines=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const tc=await(await doc.getPage(p)).getTextContent();const rows={};
+    for(const it of tc.items){const y=Math.round(it.transform[5]);(rows[y]=rows[y]||[]).push({x:it.transform[4],s:it.str});}
+    Object.keys(rows).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const l=rows[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(" ").replace(/\s+/g," ").trim();if(l)lines.push(l);
+    });
+  }
+  return lines.join("\n");
+}
+async function onImportFile(file){
+  $("impMsg").textContent="Liesen…";$("impMsg").style.color="var(--muted)";
+  try{
+    const buf=await file.arrayBuffer();
+    let rows;
+    if(/\.pdf$/i.test(file.name)||file.type==="application/pdf")rows=parseBDL(await pdfToLines(buf));
+    else rows=parseCSVstmt(decodeBytes(buf));
+    if(!rows.length){$("impMsg").textContent="Keng Buchungen an där Datei fonnt.";$("impMsg").style.color="var(--warn)";return;}
+    previewImport(rows);
+  }catch(e){console.warn("[import]",e);$("impMsg").textContent="Import feelgeschloen — kuck d'Datei.";$("impMsg").style.color="var(--warn)";}
+}
+async function previewImport(rows){
+  // skip rows already present (match date+amount+kind+start of note)
+  const {data:existing}=await sb.from("finance_tx").select("at,amount,kind,note").limit(5000);
+  const key=(r)=>`${String(r.at).slice(0,10)}|${(+r.amount).toFixed(2)}|${r.kind}|${(r.note||"").slice(0,30)}`;
+  const have=new Set((existing||[]).map(key));
+  const fresh=rows.filter(r=>!have.has(key(r)));
+  const dupes=rows.length-fresh.length;
+  const inSum=fresh.filter(r=>r.kind==="in").reduce((a,r)=>a+r.amount,0);
+  const outSum=fresh.filter(r=>r.kind==="out").reduce((a,r)=>a+r.amount,0);
+  const list=fresh.slice(0,300).map(r=>`<div class="tx"><span style="font-size:15px">${r.kind==="in"?"➕":"➖"}</span><div><div class="t" style="font-size:13px">${esc(r.note)}</div><div class="s">${r.at}</div></div><div class="amt ${r.kind}">${r.kind==="in"?"+":"−"}${CUR}${r.amount.toFixed(2)}</div></div>`).join("");
+  $("impModalBody").innerHTML=`
+    <div class="hint" style="margin-bottom:8px">${fresh.length} nei Buchungen${dupes?` · ${dupes} scho present (iwwersprongen)`:""}<br>
+      <span style="color:var(--ok)">+${CUR}${inSum.toFixed(2)}</span> · <span style="color:var(--warn)">−${CUR}${outSum.toFixed(2)}</span></div>
+    ${list||'<div class="hint">Alles scho importéiert 👍</div>'}
+    ${fresh.length>300?'<div class="hint">…n, just déi éischt 300 gewisen; all ginn importéiert.</div>':""}`;
+  $("impModalGo").textContent=`${fresh.length} importéieren`;
+  $("impModalGo").disabled=!fresh.length;
+  $("impModalGo").onclick=()=>doImport(fresh);
+  $("impModal").classList.add("open");
+}
+async function doImport(fresh){
+  $("impModalGo").disabled=true;$("impModalGo").textContent="Importéieren…";
+  try{
+    for(let i=0;i<fresh.length;i+=200){
+      const batch=fresh.slice(i,i+200).map(r=>({amount:r.amount,kind:r.kind,note:r.note,at:r.at+"T12:00:00Z",currency:"EUR"}));
+      const {error}=await sb.from("finance_tx").insert(batch);if(error)throw error;
+    }
+    $("impModal").classList.remove("open");
+    $("impMsg").textContent=`✓ ${fresh.length} Buchungen importéiert`;$("impMsg").style.color="var(--ok)";
+    setTimeout(()=>$("impMsg").textContent="",2500);loadTx();
+  }catch(e){console.warn(e);$("impModalGo").disabled=false;$("impModalGo").textContent="Nach eng Kéier";$("impMsg").textContent="Import feelgeschloen.";}
 }
 
 function fillCats(){ $("tCat").innerHTML=CATS[kind].map(c=>`<option>${c}</option>`).join(""); }
@@ -207,6 +325,27 @@ async function addSub(){
 
 auth.onAuth(boot);
 boot();
+</script>
+
+<div id="impModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:6000;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;max-width:480px;width:100%;max-height:82vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <b style="font-size:16px">Import — Virschau</b>
+      <button id="impModalX" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">&times;</button>
+    </div>
+    <div id="impModalBody" style="overflow:auto;flex:1"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="ghost" id="impModalCancel" style="flex:1">Ofbriechen</button>
+      <button class="btn" id="impModalGo" style="flex:2">Importéieren</button>
+    </div>
+  </div>
+</div>
+<style>#impModal.open{display:flex!important}</style>
+<script type="module">
+  const c=(id)=>document.getElementById(id);
+  const close=()=>c("impModal").classList.remove("open");
+  c("impModalX").onclick=close;c("impModalCancel").onclick=close;
+  c("impModal").addEventListener("click",e=>{if(e.target.id==="impModal")close();});
 </script>
 </body>
 </html>

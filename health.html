@@ -133,9 +133,12 @@ async function boot(){
 
 async function loadToken(){
   try{
-    const {data,error}=await sb.rpc("get_health_token");
+    // create the token row once; keep the existing token on any later visit
+    const fresh=(crypto.randomUUID()+crypto.randomUUID()).replace(/-/g,"");
+    await sb.from("user_integrations").upsert({provider:"watch",access_token:fresh},{onConflict:"user_id,provider",ignoreDuplicates:true});
+    const {data,error}=await sb.from("user_integrations").select("access_token").eq("provider","watch").maybeSingle();
     if(error)throw error;
-    $("tok").value=data||"";
+    $("tok").value=data?.access_token||"";
   }catch(e){console.warn("[health] token",e);$("tok").placeholder="Token feelt — Migratioun gelaf?";}
 }
 function copyToken(){
