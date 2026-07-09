@@ -12,5 +12,9 @@ Disallow: /messenger.html
 Disallow: /friends.html
 Disallow: /exams.html
 Disallow: /profile.html
+Disallow: /health.html
+Disallow: /money.html
+Disallow: /countdowns.html
+Disallow: /me.html
 
 Sitemap: https://ian.lu/sitemap.xml

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Dashboard — ian.lu</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=9"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:760px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
+  .gate{text-align:center;color:var(--muted);padding:50px 16px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 2px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  .panel .h{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:10px}
+  .panel .h .ic{font-size:18px}
+  .stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:14px}
+  .stat:last-child{border-bottom:none}
+  .stat b{font-variant-numeric:tabular-nums}
+  .big{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+  .sub{color:var(--muted);font-size:12px}
+  .muted{color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Home</a>
+  <h1>📊 My Dashboard</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap" id="wrap"><div class="gate">Loading…</div></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const GH_USER="ianmlhms", GC="https://ianm.goatcounter.com";
+let sb=null;
+
+async function boot(){
+  sb=await auth.client();
+  auth.mountAccountButton($("acctHost"));
+  if(!auth.session()){
+    $("wrap").innerHTML=`<div class="gate">Sign in.<br><br><button class="btn" id="si" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer">Sign in</button></div>`;
+    $("si").onclick=auth.openAuthModal;return;
+  }
+  let admin=false; try{const {data}=await sb.rpc("is_admin");admin=!!data;}catch{}
+  if(!admin){$("wrap").innerHTML=`<div class="gate">This dashboard is private.</div>`;return;}
+  $("wrap").innerHTML=`
+    <div class="grid">
+      <div class="panel" id="pGh"><div class="h"><span class="ic">🐙</span>GitHub</div><div class="muted">Loading…</div></div>
+      <div class="panel" id="pGc"><div class="h"><span class="ic">📈</span>Site traffic</div><div class="muted">Loading…</div></div>
+      <div class="panel" id="pSf"><div class="h"><span class="ic">🎬</span>ShortsFactory</div><div class="muted">Loading…</div></div>
+      <div class="panel" id="pFit"><div class="h"><span class="ic">💪</span>This week</div><div class="muted">Loading…</div></div>
+    </div>
+    <h2>Recent GitHub activity</h2>
+    <div class="panel" id="pEvents"><div class="muted">Loading…</div></div>`;
+  loadGithub(); loadGoat(); loadShorts(); loadFitness();
+}
+
+async function loadGithub(){
+  try{
+    const u=await (await fetch(`https://api.github.com/users/${GH_USER}`)).json();
+    const repos=await (await fetch(`https://api.github.com/users/${GH_USER}/repos?per_page=100&sort=pushed`)).json();
+    const stars=Array.isArray(repos)?repos.reduce((a,r)=>a+(r.stargazers_count||0),0):0;
+    $("pGh").innerHTML=`<div class="h"><span class="ic">🐙</span>GitHub</div>
+      <div class="stat"><span>Public repos</span><b>${u.public_repos??"–"}</b></div>
+      <div class="stat"><span>Followers</span><b>${u.followers??"–"}</b></div>
+      <div class="stat"><span>Total stars</span><b>${stars}</b></div>`;
+    const evs=await (await fetch(`https://api.github.com/users/${GH_USER}/events/public?per_page=30`)).json();
+    if(Array.isArray(evs)){
+      const push=evs.filter(e=>e.type==="PushEvent");
+      const commits=push.reduce((a,e)=>a+(e.payload?.commits?.length||0),0);
+      $("pEvents").innerHTML=push.slice(0,8).map(e=>{
+        const when=new Date(e.created_at).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+        const n=e.payload?.commits?.length||0;
+        return `<div class="stat"><span>${esc(e.repo?.name||"")} · ${n} commit${n!==1?"s":""}</span><b class="sub">${when}</b></div>`;
+      }).join("")||'<div class="muted">No recent pushes.</div>';
+      $("pEvents").insertAdjacentHTML("afterbegin",`<div class="big">${commits}</div><div class="sub" style="margin-bottom:8px">commits in the last ${push.length} pushes</div>`);
+    }
+  }catch(e){console.warn(e);$("pGh").innerHTML=`<div class="h">🐙 GitHub</div><div class="muted">Couldn't load.</div>`;}
+}
+
+async function loadGoat(){
+  try{
+    const j=await (await fetch(`${GC}/counter/TOTAL.json`)).json();
+    const count=(j.count||"").replace(/\s/g,"")||"–";
+    $("pGc").innerHTML=`<div class="h"><span class="ic">📈</span>Site traffic</div>
+      <div class="big">${esc(count)}</div><div class="sub">total pageviews (GoatCounter)</div>
+      <div class="stat" style="margin-top:8px"><span>Dashboard</span><b><a href="${GC}" target="_blank" rel="noopener">open →</a></b></div>`;
+  }catch(e){
+    $("pGc").innerHTML=`<div class="h"><span class="ic">📈</span>Site traffic</div>
+      <div class="muted">Public totals off — <a href="${GC}" target="_blank" rel="noopener">open dashboard →</a></div>`;
+  }
+}
+
+async function loadShorts(){
+  try{
+    const d=await (await fetch(`data/factory.json?t=${Date.now()}`)).json();
+    const vids=d.videos||d.published||[];
+    const n=Array.isArray(vids)?vids.length:(d.count??d.total??"–");
+    const followers=d.followers??d.subscribers;
+    $("pSf").innerHTML=`<div class="h"><span class="ic">🎬</span>ShortsFactory</div>
+      <div class="big">${n}</div><div class="sub">videos published</div>
+      ${followers!=null?`<div class="stat" style="margin-top:8px"><span>Followers</span><b>${followers}</b></div>`:""}
+      <div class="stat"><span>Full dashboard</span><b><a href="factory.html">open →</a></b></div>`;
+  }catch(e){$("pSf").innerHTML=`<div class="h"><span class="ic">🎬</span>ShortsFactory</div><div class="muted">No data yet.</div>`;}
+}
+
+async function loadFitness(){
+  try{
+    const weekAgo=new Date(Date.now()-7*86400000).toISOString();
+    const {data}=await sb.from("workouts").select("duration_min,distance_km,type").gte("at",weekAgo);
+    const mins=(data||[]).reduce((a,w)=>a+(w.duration_min||0),0);
+    const km=(data||[]).reduce((a,w)=>a+(+w.distance_km||0),0);
+    $("pFit").innerHTML=`<div class="h"><span class="ic">💪</span>This week</div>
+      <div class="stat"><span>Workouts</span><b>${(data||[]).length}</b></div>
+      <div class="stat"><span>Active time</span><b>${Math.floor(mins/60)}h ${mins%60}m</b></div>
+      <div class="stat"><span>Distance</span><b>${km.toFixed(1)} km</b></div>
+      <div class="stat"><span>Details</span><b><a href="health.html">open →</a></b></div>`;
+  }catch(e){$("pFit").innerHTML=`<div class="h"><span class="ic">💪</span>This week</div><div class="muted"><a href="health.html">Set up →</a></div>`;}
+}
+
+auth.onAuth(boot);
+boot();
+</script>
+</body>
+</html>

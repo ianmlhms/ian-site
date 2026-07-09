@@ -95,6 +95,10 @@ body {
 .tile.polls:hover { border-color: #ffb347; }
 .tile.exams:hover { border-color: #f87171; }
 .tile.bus:hover { border-color: #4de8ff; }
+.tile.health:hover { border-color: #3fb950; }
+.tile.money:hover { border-color: #ffcc00; }
+.tile.countdowns:hover { border-color: #a371f7; }
+.tile.me:hover { border-color: #58a6ff; }
 
 footer {
   text-align: center;

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Health — ian.lu</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=9"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--warn:#f87171;--strava:#fc4c02}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:680px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
+  .gate{text-align:center;color:var(--muted);padding:50px 16px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:14px}
+  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:4px 0 0}
+  input,select{padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit}
+  .day{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .metric{flex:1;min-width:120px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+  .metric b{display:block;font-size:22px}
+  .metric span{font-size:11.5px;color:var(--muted)}
+  .water{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:6px}
+  .water button{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:16px;font-weight:800;cursor:pointer}
+  .field{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .field input,.field select{flex:1;min-width:90px}
+  .wk{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+  .wk .ic{font-size:20px}
+  .wk .t{font-weight:700}.wk .s{color:var(--muted);font-size:12px}
+  .wk .r{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+  .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(252,76,2,.16);color:var(--strava);margin-left:6px}
+  .del{background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer}.del:hover{color:var(--warn)}
+  .msg{min-height:15px;color:var(--accent2);font-weight:700;font-size:12.5px}
+  .connect{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .stravabtn{background:var(--strava);color:#fff;border:none;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;font-size:13px}
+  .hint{color:var(--muted);font-size:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>💪 Health</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cfg=window.PB_CONFIG||{};
+let sb=null,me=null,today=null,workouts=[];
+const TYPES={run:"🏃 Lafen",ride:"🚴 Vëlo",swim:"🏊 Schwammen",gym:"🏋️ Gym",walk:"🚶 Trëppelen",kart:"🏎️ Kart",other:"⭐ Aneres"};
+const dayKey=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Luxembourg"}).format(new Date());
+
+async function boot(){
+  sb=await auth.client();
+  auth.mountAccountButton($("acctHost"));
+  if(!auth.session()){
+    $("wrap").innerHTML=`<div class="gate">Mell dech un fir deng Gesondheet ze verfollegen.<br><br><button class="btn" id="si">Umellen</button></div>`;
+    $("si").onclick=auth.openAuthModal;return;
+  }
+  me=auth.session().user.id;
+  await handleStravaReturn();
+  $("wrap").innerHTML=`
+    <h2>Haut</h2>
+    <div class="card">
+      <div class="day">
+        <div class="metric"><b id="mWater">0</b><span>Waasser (Glieser)</span>
+          <div class="water"><button id="wMinus">−</button><button id="wPlus">＋</button></div></div>
+        <div class="metric"><b id="mSleep">–</b><span>Schlof (Stonnen)</span></div>
+        <div class="metric"><b id="mWeight">–</b><span>Gewiicht (kg)</span></div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <input id="iSleep" type="number" step="0.5" min="0" max="24" placeholder="Schlof (h)">
+        <input id="iWeight" type="number" step="0.1" min="0" max="300" placeholder="Gewiicht (kg)">
+        <button class="btn" id="saveDay">Späicheren</button>
+      </div>
+      <div class="msg" id="dayMsg"></div>
+    </div>
+
+    <h2>Training bäisetzen</h2>
+    <div class="card">
+      <div class="field">
+        <select id="wType">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
+        <input id="wDur" type="number" min="1" placeholder="Minutten">
+        <input id="wDist" type="number" step="0.1" min="0" placeholder="km (optional)">
+      </div>
+      <div class="field" style="margin-top:8px">
+        <input id="wNote" placeholder="Notiz (optional)" style="flex:2">
+        <button class="btn" id="addW">Bäisetzen</button>
+      </div>
+      <div class="msg" id="wMsg"></div>
+    </div>
+
+    <h2>Trainingen</h2>
+    <div class="card" id="wList"><div class="gate">Lueden…</div></div>
+
+    <h2>Sync</h2>
+    <div class="card">
+      <div class="connect" id="stravaBox">
+        <button class="stravabtn" id="stravaBtn">Mat Strava verbannen</button>
+        <span class="hint" id="stravaState"></span>
+      </div>
+      <p class="hint" style="margin-top:10px">Strava synct all deng Aktivitéiten — och déi vun der Apple&nbsp;Watch, wann s du se an Strava ophëls. Kee Strava-Premium néideg.</p>
+    </div>`;
+
+  $("wPlus").onclick=()=>bumpWater(1);
+  $("wMinus").onclick=()=>bumpWater(-1);
+  $("saveDay").onclick=saveDay;
+  $("addW").onclick=addWorkout;
+  $("stravaBtn").onclick=connectStrava;
+  await Promise.all([loadDay(),loadWorkouts(),loadStravaState()]);
+}
+
+/* ---------------- daily micro-trackers ---------------- */
+async function loadDay(){
+  const {data}=await sb.from("health_days").select("*").eq("day",dayKey()).maybeSingle();
+  today=data||{day:dayKey(),water_ml:0,sleep_h:null,weight_kg:null};
+  paintDay();
+}
+function paintDay(){
+  const glasses=Math.round((today.water_ml||0)/250);
+  $("mWater").textContent=glasses;
+  $("mSleep").textContent=today.sleep_h!=null?today.sleep_h:"–";
+  $("mWeight").textContent=today.weight_kg!=null?today.weight_kg:"–";
+}
+async function upsertDay(patch){
+  today={...today,...patch};
+  paintDay();
+  const row={day:dayKey(),water_ml:today.water_ml||0,sleep_h:today.sleep_h,weight_kg:today.weight_kg};
+  const {error}=await sb.from("health_days").upsert(row,{onConflict:"user_id,day"});
+  if(error)console.warn("[health] day",error);
+}
+function bumpWater(g){ upsertDay({water_ml:Math.max(0,(today.water_ml||0)+g*250)}); }
+async function saveDay(){
+  const s=$("iSleep").value,w=$("iWeight").value;
+  await upsertDay({sleep_h:s!==""?+s:today.sleep_h,weight_kg:w!==""?+w:today.weight_kg});
+  $("iSleep").value="";$("iWeight").value="";
+  $("dayMsg").textContent="Gespäichert ✓";setTimeout(()=>$("dayMsg").textContent="",1400);
+}
+
+/* ---------------- workouts ---------------- */
+async function loadWorkouts(){
+  const {data,error}=await sb.from("workouts").select("*").order("at",{ascending:false}).limit(60);
+  if(error){$("wList").innerHTML='<div class="gate">Feeler beim Lueden.</div>';return;}
+  workouts=data||[];renderWorkouts();
+}
+function fmtDur(m){ if(m==null)return""; const h=Math.floor(m/60); return h?`${h}h ${m%60}m`:`${m}m`; }
+function renderWorkouts(){
+  if(!workouts.length){$("wList").innerHTML='<div class="gate">Nach keng Trainingen.</div>';return;}
+  $("wList").innerHTML=workouts.map(w=>{
+    const ic=(TYPES[w.type]||"⭐ Aneres").split(" ")[0];
+    const when=new Date(w.at).toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});
+    const strava=w.source==="strava"?`<span class="tag">STRAVA</span>`:"";
+    const bits=[fmtDur(w.duration_min),w.distance_km?w.distance_km+" km":"",w.calories?w.calories+" kcal":""].filter(Boolean).join(" · ");
+    return `<div class="wk"><span class="ic">${ic}</span>
+      <div><div class="t">${esc((TYPES[w.type]||"Aneres").split(" ").slice(1).join(" "))}${strava}</div>
+        <div class="s">${when}${w.note?" · "+esc(w.note):""}</div></div>
+      <div class="r">${esc(bits)}</div>
+      ${w.source==="strava"?"":`<button class="del" data-del="${w.id}">✕</button>`}</div>`;
+  }).join("");
+  $("wList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    await sb.from("workouts").delete().eq("id",b.dataset.del);loadWorkouts();
+  });
+}
+async function addWorkout(){
+  const type=$("wType").value,dur=$("wDur").value,dist=$("wDist").value;
+  if(!dur){$("wMsg").textContent="Wéi laang? (Minutten)";return;}
+  $("wMsg").textContent="…";
+  try{
+    const {error}=await sb.from("workouts").insert({type,duration_min:+dur,distance_km:dist?+dist:null,note:$("wNote").value.trim()||null,at:new Date().toISOString(),source:"manual"});
+    if(error)throw error;
+    $("wDur").value="";$("wDist").value="";$("wNote").value="";
+    $("wMsg").textContent="Gespäichert ✓";setTimeout(()=>$("wMsg").textContent="",1400);
+    loadWorkouts();
+  }catch(e){console.warn(e);$("wMsg").textContent="Feeler beim Späicheren.";}
+}
+
+/* ---------------- Strava connect (custom OAuth via edge function) ----------------
+ * Flow: browser → Strava authorize → back here with ?code → we POST the code to
+ * the `strava-sync` edge function, which exchanges it for tokens (client secret
+ * lives ONLY in the function's secrets), stores them server-side, and pulls
+ * activities into `workouts`. The client never sees the token. */
+const STRAVA_CLIENT_ID=cfg.stravaClientId||"";
+function connectStrava(){
+  if(!STRAVA_CLIENT_ID){alert("Strava ass nach net konfiguréiert (stravaClientId feelt an der Config).");return;}
+  const redirect=location.origin+location.pathname;
+  const u=new URL("https://www.strava.com/oauth/authorize");
+  u.searchParams.set("client_id",STRAVA_CLIENT_ID);
+  u.searchParams.set("redirect_uri",redirect);
+  u.searchParams.set("response_type","code");
+  u.searchParams.set("approval_prompt","auto");
+  u.searchParams.set("scope","read,activity:read_all");
+  location.href=u.toString();
+}
+async function handleStravaReturn(){
+  const p=new URLSearchParams(location.search);
+  const code=p.get("code");
+  if(!code||!p.get("scope"))return;
+  history.replaceState(null,"",location.pathname);   // clean the URL
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${cfg.url}/functions/v1/strava-sync`,{
+      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
+      body:JSON.stringify({op:"connect",code,redirect_uri:location.origin+location.pathname}),
+    });
+    if(!r.ok)throw new Error("HTTP "+r.status);
+  }catch(e){console.warn("[strava] connect",e);}
+}
+async function loadStravaState(){
+  try{
+    const {data}=await sb.rpc("integration_status",{p_provider:"strava"});
+    const on=!!data;
+    $("stravaState").textContent=on?"✓ Verbonnen — synct beim Opmaachen.":"";
+    if(on){$("stravaBtn").textContent="Elo synchroniséieren";$("stravaBtn").onclick=syncStrava;}
+  }catch{}
+}
+async function syncStrava(){
+  $("stravaState").textContent="Synchroniséieren…";
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${cfg.url}/functions/v1/strava-sync`,{
+      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
+      body:JSON.stringify({op:"sync"}),
+    });
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    $("stravaState").textContent="✓ Synchroniséiert";loadWorkouts();
+  }catch(e){console.warn(e);$("stravaState").textContent="Sync feelgeschloen";}
+}
+
+auth.onAuth(boot);
+boot();
+</script>
+</body>
+</html>

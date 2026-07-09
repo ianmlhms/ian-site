@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sue — ian.lu</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
+<script src="theme.js?v=9"></script>
+<style>
+  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--warn:#f87171}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+  a{color:var(--accent2);text-decoration:none}
+  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
+  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .wrap{flex:1;width:100%;max-width:680px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
+  .gate{text-align:center;color:var(--muted);padding:50px 16px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:14px}
+  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;font-size:13px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:4px 0 0}
+  input,select{padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit}
+  .bal{display:flex;gap:10px;flex-wrap:wrap}
+  .bal .metric{flex:1;min-width:100px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+  .bal .metric b{display:block;font-size:20px}.bal .metric.in b{color:var(--ok)}.bal .metric.out b{color:var(--warn)}
+  .bal .metric span{font-size:11px;color:var(--muted)}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+  .seg button{background:var(--card2);color:var(--muted);border:none;padding:8px 12px;font-weight:800;cursor:pointer;font-size:13px}
+  .seg button.on{background:var(--accent);color:#fff}
+  .field{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  .field input,.field select{flex:1;min-width:90px}
+  .tx{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+  .tx .t{font-weight:700}.tx .s{color:var(--muted);font-size:12px}
+  .tx .amt{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+  .tx .amt.in{color:var(--ok)}.tx .amt.out{color:var(--warn)}
+  .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(110,168,254,.16);color:var(--accent);margin-left:6px}
+  .sub{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+  .sub .due{margin-left:auto;text-align:right;font-size:12px}
+  .sub .due.soon{color:var(--warn);font-weight:800}
+  .del{background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer}.del:hover{color:var(--warn)}
+  .msg{min-height:15px;color:var(--accent2);font-weight:700;font-size:12.5px}
+  .hint{color:var(--muted);font-size:12px;line-height:1.5}
+  .bankbtn{background:#0a7d33;color:#fff;border:none;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;font-size:13px}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="index.html">‹ Heem</a>
+  <h1>💶 Sue</h1>
+  <div class="spacer"></div>
+  <span id="acctHost"></span>
+</header>
+
+<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=4";
+const $=(id)=>document.getElementById(id);
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cfg=window.PB_CONFIG||{};
+let sb=null,me=null,tx=[],subs=[],kind="out";
+const CUR="€";
+const CATS={out:["🍔 Iessen","🎮 Fräizäit","🚌 Transport","👕 Kleeder","🎁 Kaddoen","📱 Abo","📚 Schoul","⭐ Aneres"],
+            in:["💼 Aarbecht","🎁 Kaddo","💰 Spuergeld","⭐ Aneres"]};
+
+async function boot(){
+  sb=await auth.client();
+  auth.mountAccountButton($("acctHost"));
+  if(!auth.session()){
+    $("wrap").innerHTML=`<div class="gate">Mell dech un fir deng Suen ze verfollegen.<br><br><button class="btn" id="si">Umellen</button></div>`;
+    $("si").onclick=auth.openAuthModal;return;
+  }
+  me=auth.session().user.id;
+  await handleBankReturn();
+  $("wrap").innerHTML=`
+    <div class="card">
+      <div class="bal">
+        <div class="metric in"><b id="mIn">${CUR}0</b><span>Rakomm (Mount)</span></div>
+        <div class="metric out"><b id="mOut">${CUR}0</b><span>Ausginn (Mount)</span></div>
+        <div class="metric"><b id="mNet">${CUR}0</b><span>Bilan</span></div>
+      </div>
+    </div>
+
+    <h2>Buchung bäisetzen</h2>
+    <div class="card">
+      <div class="seg" id="kindSeg">
+        <button data-k="out" class="on">− Ausginn</button><button data-k="in">＋ Rakomm</button>
+      </div>
+      <div class="field">
+        <input id="tAmt" type="number" step="0.01" min="0" placeholder="Betrag (${CUR})" style="flex:.8">
+        <select id="tCat"></select>
+      </div>
+      <div class="field">
+        <input id="tNote" placeholder="Notiz (optional)" style="flex:2">
+        <button class="btn" id="addTx">Bäisetzen</button>
+      </div>
+      <div class="msg" id="txMsg"></div>
+    </div>
+
+    <h2>Buchungen</h2>
+    <div class="card" id="txList"><div class="gate">Lueden…</div></div>
+
+    <h2>Abonnementer</h2>
+    <div class="card">
+      <div class="field">
+        <input id="sName" placeholder="Numm (z.B. Spotify)" style="flex:1.4">
+        <input id="sAmt" type="number" step="0.01" min="0" placeholder="${CUR}/Mount" style="flex:.7">
+        <select id="sCycle"><option value="monthly">Mount</option><option value="yearly">Joer</option><option value="weekly">Woch</option></select>
+      </div>
+      <div class="field">
+        <input id="sNext" type="date" style="flex:1">
+        <button class="btn" id="addSub">Bäisetzen</button>
+      </div>
+      <div class="msg" id="subMsg"></div>
+      <div id="subList" style="margin-top:6px"></div>
+    </div>
+
+    <h2>Bank-Sync</h2>
+    <div class="card">
+      <button class="bankbtn" id="bankBtn">Bankkont verbannen</button>
+      <span class="hint" id="bankState" style="margin-left:8px"></span>
+      <p class="hint" style="margin-top:10px">D'Verbindung leeft iwwer <b>GoCardless Bank Account Data</b> (fréier Nordigen) — du gëss op der Säit vun denger Bank gefrot fir zouzestëmmen. <b>Ech gesinn deng Bank-Passwierder ni</b> — d'Tokens bleiwe just um Server. Ënnerstëtzt lëtzebuergesch Banken (Spuerkeess/BCEE, BGL, ING…).</p>
+    </div>`;
+
+  $("kindSeg").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{
+    kind=b.dataset.k;$("kindSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.k===kind));fillCats();
+  });
+  fillCats();
+  $("addTx").onclick=addTx;
+  $("addSub").onclick=addSub;
+  $("bankBtn").onclick=connectBank;
+  await Promise.all([loadTx(),loadSubs(),loadBankState()]);
+}
+
+function fillCats(){ $("tCat").innerHTML=CATS[kind].map(c=>`<option>${c}</option>`).join(""); }
+
+/* ---------------- transactions ---------------- */
+async function loadTx(){
+  const {data,error}=await sb.from("finance_tx").select("*").order("at",{ascending:false}).limit(80);
+  if(error){$("txList").innerHTML='<div class="gate">Feeler beim Lueden.</div>';return;}
+  tx=data||[];renderTx();paintBalance();
+}
+function paintBalance(){
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  let inc=0,out=0;
+  for(const t of tx){const d=new Date(t.at);if(d.getMonth()!==m||d.getFullYear()!==y)continue;t.kind==="in"?inc+=+t.amount:out+=+t.amount;}
+  $("mIn").textContent=CUR+inc.toFixed(2);
+  $("mOut").textContent=CUR+out.toFixed(2);
+  $("mNet").textContent=CUR+(inc-out).toFixed(2);
+}
+function renderTx(){
+  if(!tx.length){$("txList").innerHTML='<div class="gate">Nach keng Buchungen.</div>';return;}
+  $("txList").innerHTML=tx.map(t=>{
+    const ic=(t.category||"⭐").split(" ")[0];
+    const when=new Date(t.at).toLocaleDateString("de-DE",{day:"numeric",month:"short"});
+    const bank=t.source==="bank"?`<span class="tag">BANK</span>`:"";
+    return `<div class="tx"><span style="font-size:18px">${ic}</span>
+      <div><div class="t">${esc((t.category||"Aneres").split(" ").slice(1).join(" ")||"Aneres")}${bank}</div>
+        <div class="s">${when}${t.note?" · "+esc(t.note):""}</div></div>
+      <div class="amt ${t.kind}">${t.kind==="in"?"+":"−"}${CUR}${(+t.amount).toFixed(2)}</div>
+      ${t.source==="bank"?"":`<button class="del" data-del="${t.id}">✕</button>`}</div>`;
+  }).join("");
+  $("txList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    await sb.from("finance_tx").delete().eq("id",b.dataset.del);loadTx();
+  });
+}
+async function addTx(){
+  const amt=$("tAmt").value;
+  if(!amt||+amt<=0){$("txMsg").textContent="Betrag uginn.";return;}
+  $("txMsg").textContent="…";
+  try{
+    const {error}=await sb.from("finance_tx").insert({amount:+amt,kind,category:$("tCat").value,note:$("tNote").value.trim()||null,at:new Date().toISOString(),source:"manual",currency:"EUR"});
+    if(error)throw error;
+    $("tAmt").value="";$("tNote").value="";$("txMsg").textContent="Gespäichert ✓";
+    setTimeout(()=>$("txMsg").textContent="",1300);loadTx();
+  }catch(e){console.warn(e);$("txMsg").textContent="Feeler beim Späicheren.";}
+}
+
+/* ---------------- subscriptions ---------------- */
+async function loadSubs(){
+  const {data,error}=await sb.from("subscriptions").select("*").order("next_at");
+  if(error){$("subList").innerHTML="";return;}
+  subs=data||[];renderSubs();
+}
+const DAY=86400000;
+function renderSubs(){
+  if(!subs.length){$("subList").innerHTML='<div class="hint">Nach keng Abonnementer.</div>';return;}
+  const perMonth=subs.reduce((a,s)=>a+(s.cycle==="yearly"?s.amount/12:s.cycle==="weekly"?s.amount*4.33:+s.amount),0);
+  $("subList").innerHTML=subs.map(s=>{
+    const days=Math.ceil((new Date(s.next_at).getTime()-Date.now())/DAY);
+    const due=isNaN(days)?"":days<0?"iwwerfälleg":days===0?"haut":`an ${days} Deeg`;
+    const cyc={monthly:"/Mount",yearly:"/Joer",weekly:"/Woch"}[s.cycle]||"";
+    return `<div class="sub"><span style="font-size:18px">📱</span>
+      <div><div class="t">${esc(s.name)}</div><div class="s">${CUR}${(+s.amount).toFixed(2)}${cyc}</div></div>
+      <div class="due${days<=5?" soon":""}">${esc(due)}<br><span class="s">${new Date(s.next_at).toLocaleDateString("de-DE",{day:"numeric",month:"short"})}</span></div>
+      <button class="del" data-del="${s.id}">✕</button></div>`;
+  }).join("")+`<div class="hint" style="margin-top:8px">≈ ${CUR}${perMonth.toFixed(2)} / Mount total</div>`;
+  $("subList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+    await sb.from("subscriptions").delete().eq("id",b.dataset.del);loadSubs();
+  });
+}
+async function addSub(){
+  const name=$("sName").value.trim(),amt=$("sAmt").value,next=$("sNext").value;
+  if(!name||!amt||!next){$("subMsg").textContent="Numm, Betrag an Datum uginn.";return;}
+  $("subMsg").textContent="…";
+  try{
+    const {error}=await sb.from("subscriptions").insert({name,amount:+amt,cycle:$("sCycle").value,next_at:next,currency:"EUR"});
+    if(error)throw error;
+    $("sName").value="";$("sAmt").value="";$("subMsg").textContent="Gespäichert ✓";
+    setTimeout(()=>$("subMsg").textContent="",1300);loadSubs();
+  }catch(e){console.warn(e);$("subMsg").textContent="Feeler beim Späicheren.";}
+}
+
+/* ---------------- bank sync (GoCardless via edge function) ----------------
+ * connect → edge function creates a requisition and returns the bank consent
+ * link; user approves at their bank; on return (?ref=) we finalize + pull
+ * transactions into finance_tx. Tokens/secrets live ONLY in the function. */
+async function connectBank(){
+  $("bankState").textContent="…";
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    const r=await fetch(`${cfg.url}/functions/v1/bank-sync`,{
+      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
+      body:JSON.stringify({op:"connect",redirect:location.origin+location.pathname}),
+    });
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();
+    if(j.link)location.href=j.link;          // → bank consent page
+    else $("bankState").textContent="Bank-Sync nach net konfiguréiert.";
+  }catch(e){console.warn(e);$("bankState").textContent="Feeler — Bank-Sync nach net ageriicht.";}
+}
+async function handleBankReturn(){
+  const ref=new URLSearchParams(location.search).get("ref");
+  if(!ref)return;
+  history.replaceState(null,"",location.pathname);
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    await fetch(`${cfg.url}/functions/v1/bank-sync`,{
+      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
+      body:JSON.stringify({op:"finalize",ref}),
+    });
+  }catch(e){console.warn("[bank] finalize",e);}
+}
+async function loadBankState(){
+  try{
+    const {data}=await sb.rpc("integration_status",{p_provider:"bank"});
+    if(data){$("bankState").textContent="✓ Verbonnen";$("bankBtn").textContent="Elo synchroniséieren";
+      $("bankBtn").onclick=async()=>{
+        $("bankState").textContent="Synchroniséieren…";
+        const {data:{session}}=await sb.auth.getSession();
+        await fetch(`${cfg.url}/functions/v1/bank-sync`,{method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},body:JSON.stringify({op:"sync"})});
+        $("bankState").textContent="✓ Synchroniséiert";loadTx();
+      };}
+  }catch{}
+}
+
+auth.onAuth(boot);
+boot();
+</script>
+</body>
+</html>
