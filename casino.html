@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FakeStake — ian.lu</title>
-<meta name="description" content="FakeStake — a play-money casino: Dice, Limbo, Mines, Plinko, Crash, Blackjack and Roulette. No real money, just fun coins.">
+<meta name="description" content="FakeStake — a play-money casino: Dice, Limbo, Mines, Plinko, Crash, Blackjack, Roulette and Chicken Cross. No real money, just fun coins.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0f212e">
 <style>
@@ -146,6 +146,22 @@
     border-radius:10px;padding:1px 5px;min-width:16px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.4)}
   .rmsg{text-align:center;font-weight:800;font-size:15px;min-height:22px;margin-top:10px}
   .rmsg.win{color:var(--green)}.rmsg.lose{color:var(--red)}
+
+  /* chicken cross */
+  .chkroad{display:flex;gap:6px;overflow-x:auto;padding:10px 2px 4px;align-items:stretch;
+    background:repeating-linear-gradient(0deg,transparent,transparent 22px,rgba(255,255,255,.05) 22px,rgba(255,255,255,.05) 24px);border-radius:12px}
+  .lane{flex:0 0 74px;min-height:150px;border-radius:12px;background:var(--panel2);border:1px solid var(--border);
+    display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:10px 4px;
+    transition:transform .06s,background .15s;user-select:none}
+  .lane.curb{flex-basis:56px;background:var(--panel3)}
+  .lane.next{cursor:pointer;border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+  .lane.next:hover{background:var(--panel3);transform:translateY(-3px)}
+  .lane.passed{background:rgba(0,231,1,.12);border-color:var(--green)}
+  .lane.dead{background:rgba(237,65,99,.16);border-color:var(--red)}
+  .lane .mult{font-weight:800;font-size:13px;color:var(--text)}
+  .lane .chick{font-size:30px;line-height:1;min-height:34px}
+  .chkstat{text-align:center;font-weight:800;font-size:15px;min-height:22px;margin-top:12px}
+  .chkstat.win{color:var(--green)}.chkstat.lose{color:var(--red)}
 
   @media(max-width:820px){
     .stage{grid-template-columns:1fr;padding:12px}
@@ -876,8 +892,113 @@ const Roulette = {
   unmount(){ if (this._cleanup) this._cleanup(); }
 };
 
+/* --------------------------- CHICKEN CROSS ------------------------------ *
+ * Cross the road lane by lane. Every lane you clear bumps the multiplier;
+ * step in front of a car and you lose it all. Cash out any time. Harder
+ * difficulties = more cars per lane = fewer survivors but bigger payouts.
+ * Fair: survival chance q per lane, so payout after n lanes = HE / q^n.     */
+const CHICK_DIFFS = {
+  easy:      { name:"Easy",      q:0.97, n:24 },
+  medium:    { name:"Medium",    q:0.91, n:22 },
+  hard:      { name:"Hard",      q:0.83, n:18 },
+  daredevil: { name:"Daredevil", q:0.60, n:10 },
+};
+const ChickenCross = {
+  id:"chicken", name:"Chicken Cross", emoji:"🐔",
+  mount(){
+    let diff = "easy", lanes = [], active = false, pos = 0, bet = 0, dead = false;
+    const ui = betPanel("Bet", start);
+    ui.opts.innerHTML = `
+      <label class="f">Difficulty</label>
+      <select class="inp" id="cdiff">${
+        Object.entries(CHICK_DIFFS).map(([k,d]) =>
+          `<option value="${k}" ${k==="easy"?"selected":""}>${d.name}</option>`).join("")
+      }</select>`;
+    buildLanes(); renderRoad();
+    $("#cdiff").onchange = e => { if(!active){ diff = e.target.value; buildLanes(); pos = 0; dead = false; renderRoad(); info(); } };
+    $("#bet").oninput = info; info();
+
+    function buildLanes(){
+      const d = CHICK_DIFFS[diff];
+      lanes = Array.from({length:d.n}, (_,i) => HE / Math.pow(d.q, i+1));
+    }
+    function mult(){ return pos >= 1 ? lanes[pos-1] : 1; }
+    function info(){
+      const nextM = lanes[pos];   // multiplier of the lane you'd cross next
+      ui.info.innerHTML = `
+        ${active ? `<div class="kv"><span>Current</span><b>${mult().toFixed(2)}×</b></div>
+        <div class="kv"><span>Cash out</span><b style="color:var(--green)">🪙 ${fmt(bet*mult())}</b></div>` : ""}
+        ${nextM != null
+          ? `<div class="kv"><span>${active?"Next lane":"First lane"}</span><b>${nextM.toFixed(2)}×</b></div>`
+          : `<div class="kv"><span>Crossed it all!</span><b>${mult().toFixed(2)}×</b></div>`}`;
+    }
+    function renderRoad(){
+      const curbChick = (!dead && pos===0) ? "🐔" : "";
+      let html = `<div class="chkroad" id="road"><div class="lane curb"><div class="mult">Start</div><div class="chick">${curbChick}</div></div>`;
+      html += lanes.map((m,i) => {
+        const idx = i+1; let cls = "lane", mid = "";
+        if (idx < pos) cls += " passed";
+        if (!dead && idx === pos) mid = "🐔";
+        if (active && !dead && idx === pos+1) cls += " next";
+        if (dead && idx === pos+1){ cls += " dead"; mid = "🚗"; }
+        return `<div class="${cls}" data-idx="${idx}"><div class="mult">${m.toFixed(2)}×</div><div class="chick">${mid}</div></div>`;
+      }).join("");
+      html += `</div><div class="chkstat" id="cstat"></div>`;
+      $("#board").innerHTML = html;
+      $("#road").querySelectorAll(".lane[data-idx]").forEach(l =>
+        l.onclick = () => { if (+l.dataset.idx === pos+1) hop(); });
+      scrollToChick();
+    }
+    function scrollToChick(){
+      const road = $("#road"); if(!road) return;
+      const tile = road.querySelector(`.lane[data-idx="${Math.max(1,pos+1)}"]`) || road.firstElementChild;
+      if (tile) road.scrollTo({ left: tile.offsetLeft - road.clientWidth/2 + tile.clientWidth/2, behavior:"smooth" });
+    }
+    function setStat(msg, cls){ const s = $("#cstat"); if(s){ s.textContent = msg||""; s.className = "chkstat " + (cls||""); } }
+    function start(b){
+      if (active) return;
+      if (!takeStake(b)) return;
+      bet = b; active = true; dead = false; pos = 0;
+      ui.go.textContent = "Cash Out"; ui.go.classList.add("cashbtn"); ui.go.onclick = cashout;
+      $("#bet").disabled = true; $("#cdiff").disabled = true;
+      renderRoad(); info();
+      setStat("Tap the next lane to cross →");
+    }
+    function hop(){
+      if (!active || dead) return;
+      if (rnd() >= CHICK_DIFFS[diff].q){    // stepped in front of a car
+        dead = true; renderRoad();
+        setStat("Splat! 🚗💥", "lose");
+        endRound(false);
+        return;
+      }
+      pos++;
+      renderRoad(); info();
+      if (pos >= lanes.length){ setStat("You crossed it all! 🎉", "win"); cashout(); }
+      else setStat(`Safe on ${mult().toFixed(2)}× — cash out or cross again`);
+    }
+    function cashout(){
+      if (!active) return;
+      if (pos === 0){ endRound(true); return; }   // nothing crossed yet
+      const win = bet * mult();
+      setBal(getBal() + win);
+      toast(`+🪙 ${fmt(win - bet)}`, "win");
+      pushHist(mult(), true);
+      endRound(true, true);
+    }
+    function endRound(cashed){
+      active = false;
+      if (!cashed) pushHist(0, false);
+      ui.go.textContent = "Bet"; ui.go.classList.remove("cashbtn"); ui.go.onclick = () => start(ui.read());
+      $("#bet").disabled = false; $("#cdiff").disabled = false;
+      renderRoad();
+      setTimeout(() => { if (!active){ pos = 0; dead = false; renderRoad(); info(); setStat(""); } }, cashed ? 500 : 1200);
+    }
+  }
+};
+
 /* ======================================================================== */
-const GAMES = [Dice, Limbo, Mines, Plinko, Crash, Blackjack, Roulette];
+const GAMES = [Dice, Limbo, Mines, Plinko, Crash, Blackjack, Roulette, ChickenCross];
 
 function switchTo(g){
   if (current && current.unmount) current.unmount();
