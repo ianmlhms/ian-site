@@ -9,10 +9,4 @@ window.PB_CONFIG = {
   vapidPublicKey: "BHdzW-Ddjk2OnSmwvF0QdvbkcZW6FjRKQQhSzEQ-6V_UKvNmzf1Cxl1K6R4whS1JJzsFtjkmUt_gbz7RF8_jPxw",
   // FaceTime (call.html) fetches TURN credentials from the `turn` Edge Function,
   // which mints them from the Metered secret (kept server-side). No keys here.
-  //
-  // Strava OAuth *client id* is public (the client SECRET lives only in the
-  // strava-sync Edge Function secrets). Fill this in after creating a Strava API
-  // app at https://www.strava.com/settings/api — until then health.html hides the
-  // Strava button. (Bank sync uses no public key at all.)
-  stravaClientId: "",
 };

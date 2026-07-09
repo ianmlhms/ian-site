@@ -75,7 +75,6 @@ async function boot(){
     $("si").onclick=auth.openAuthModal;return;
   }
   me=auth.session().user.id;
-  await handleBankReturn();
   $("wrap").innerHTML=`
     <div class="card">
       <div class="bal">
@@ -117,13 +116,6 @@ async function boot(){
       </div>
       <div class="msg" id="subMsg"></div>
       <div id="subList" style="margin-top:6px"></div>
-    </div>
-
-    <h2>Bank-Sync</h2>
-    <div class="card">
-      <button class="bankbtn" id="bankBtn">Bankkont verbannen</button>
-      <span class="hint" id="bankState" style="margin-left:8px"></span>
-      <p class="hint" style="margin-top:10px">D'Verbindung leeft iwwer <b>GoCardless Bank Account Data</b> (fréier Nordigen) — du gëss op der Säit vun denger Bank gefrot fir zouzestëmmen. <b>Ech gesinn deng Bank-Passwierder ni</b> — d'Tokens bleiwe just um Server. Ënnerstëtzt lëtzebuergesch Banken (Spuerkeess/BCEE, BGL, ING…).</p>
     </div>`;
 
   $("kindSeg").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{
@@ -132,8 +124,7 @@ async function boot(){
   fillCats();
   $("addTx").onclick=addTx;
   $("addSub").onclick=addSub;
-  $("bankBtn").onclick=connectBank;
-  await Promise.all([loadTx(),loadSubs(),loadBankState()]);
+  await Promise.all([loadTx(),loadSubs()]);
 }
 
 function fillCats(){ $("tCat").innerHTML=CATS[kind].map(c=>`<option>${c}</option>`).join(""); }
@@ -157,12 +148,11 @@ function renderTx(){
   $("txList").innerHTML=tx.map(t=>{
     const ic=(t.category||"⭐").split(" ")[0];
     const when=new Date(t.at).toLocaleDateString("de-DE",{day:"numeric",month:"short"});
-    const bank=t.source==="bank"?`<span class="tag">BANK</span>`:"";
     return `<div class="tx"><span style="font-size:18px">${ic}</span>
-      <div><div class="t">${esc((t.category||"Aneres").split(" ").slice(1).join(" ")||"Aneres")}${bank}</div>
+      <div><div class="t">${esc((t.category||"Aneres").split(" ").slice(1).join(" ")||"Aneres")}</div>
         <div class="s">${when}${t.note?" · "+esc(t.note):""}</div></div>
       <div class="amt ${t.kind}">${t.kind==="in"?"+":"−"}${CUR}${(+t.amount).toFixed(2)}</div>
-      ${t.source==="bank"?"":`<button class="del" data-del="${t.id}">✕</button>`}</div>`;
+      <button class="del" data-del="${t.id}">✕</button></div>`;
   }).join("");
   $("txList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     await sb.from("finance_tx").delete().eq("id",b.dataset.del);loadTx();
@@ -173,7 +163,7 @@ async function addTx(){
   if(!amt||+amt<=0){$("txMsg").textContent="Betrag uginn.";return;}
   $("txMsg").textContent="…";
   try{
-    const {error}=await sb.from("finance_tx").insert({amount:+amt,kind,category:$("tCat").value,note:$("tNote").value.trim()||null,at:new Date().toISOString(),source:"manual",currency:"EUR"});
+    const {error}=await sb.from("finance_tx").insert({amount:+amt,kind,category:$("tCat").value,note:$("tNote").value.trim()||null,at:new Date().toISOString(),currency:"EUR"});
     if(error)throw error;
     $("tAmt").value="";$("tNote").value="";$("txMsg").textContent="Gespäichert ✓";
     setTimeout(()=>$("txMsg").textContent="",1300);loadTx();
@@ -213,49 +203,6 @@ async function addSub(){
     $("sName").value="";$("sAmt").value="";$("subMsg").textContent="Gespäichert ✓";
     setTimeout(()=>$("subMsg").textContent="",1300);loadSubs();
   }catch(e){console.warn(e);$("subMsg").textContent="Feeler beim Späicheren.";}
-}
-
-/* ---------------- bank sync (GoCardless via edge function) ----------------
- * connect → edge function creates a requisition and returns the bank consent
- * link; user approves at their bank; on return (?ref=) we finalize + pull
- * transactions into finance_tx. Tokens/secrets live ONLY in the function. */
-async function connectBank(){
-  $("bankState").textContent="…";
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const r=await fetch(`${cfg.url}/functions/v1/bank-sync`,{
-      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
-      body:JSON.stringify({op:"connect",redirect:location.origin+location.pathname}),
-    });
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    const j=await r.json();
-    if(j.link)location.href=j.link;          // → bank consent page
-    else $("bankState").textContent="Bank-Sync nach net konfiguréiert.";
-  }catch(e){console.warn(e);$("bankState").textContent="Feeler — Bank-Sync nach net ageriicht.";}
-}
-async function handleBankReturn(){
-  const ref=new URLSearchParams(location.search).get("ref");
-  if(!ref)return;
-  history.replaceState(null,"",location.pathname);
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    await fetch(`${cfg.url}/functions/v1/bank-sync`,{
-      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
-      body:JSON.stringify({op:"finalize",ref}),
-    });
-  }catch(e){console.warn("[bank] finalize",e);}
-}
-async function loadBankState(){
-  try{
-    const {data}=await sb.rpc("integration_status",{p_provider:"bank"});
-    if(data){$("bankState").textContent="✓ Verbonnen";$("bankBtn").textContent="Elo synchroniséieren";
-      $("bankBtn").onclick=async()=>{
-        $("bankState").textContent="Synchroniséieren…";
-        const {data:{session}}=await sb.auth.getSession();
-        await fetch(`${cfg.url}/functions/v1/bank-sync`,{method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},body:JSON.stringify({op:"sync"})});
-        $("bankState").textContent="✓ Synchroniséiert";loadTx();
-      };}
-  }catch{}
 }
 
 auth.onAuth(boot);

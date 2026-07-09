@@ -34,7 +34,7 @@
   .wk .ic{font-size:20px}
   .wk .t{font-weight:700}.wk .s{color:var(--muted);font-size:12px}
   .wk .r{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
-  .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(252,76,2,.16);color:var(--strava);margin-left:6px}
+  .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(110,168,254,.16);color:var(--accent);margin-left:6px}
   .del{background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer}.del:hover{color:var(--warn)}
   .msg{min-height:15px;color:var(--accent2);font-weight:700;font-size:12.5px}
   .connect{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -71,7 +71,6 @@ async function boot(){
     $("si").onclick=auth.openAuthModal;return;
   }
   me=auth.session().user.id;
-  await handleStravaReturn();
   $("wrap").innerHTML=`
     <h2>Haut</h2>
     <div class="card">
@@ -106,21 +105,44 @@ async function boot(){
     <h2>Trainingen</h2>
     <div class="card" id="wList"><div class="gate">Lueden…</div></div>
 
-    <h2>Sync</h2>
+    <h2>Apple Watch / Health Sync</h2>
     <div class="card">
-      <div class="connect" id="stravaBox">
-        <button class="stravabtn" id="stravaBtn">Mat Strava verbannen</button>
-        <span class="hint" id="stravaState"></span>
+      <p class="hint">Synchroniséier automatesch vun denger <b>Apple Watch</b> mat engem <b>Kuerzbefeel (Shortcut)</b> — kee Premium, keng App néideg. Dee leeft z.B. all Owend an schéckt Schrëtt, Schlof, Gewiicht an Trainingen op ian.lu.</p>
+      <div class="field" style="margin-top:10px">
+        <input id="tok" readonly placeholder="Token lueden…" style="flex:2;font-family:monospace;font-size:13px">
+        <button class="ghost" id="copyTok">Kopéieren</button>
       </div>
-      <p class="hint" style="margin-top:10px">Strava synct all deng Aktivitéiten — och déi vun der Apple&nbsp;Watch, wann s du se an Strava ophëls. Kee Strava-Premium néideg.</p>
+      <div class="hint" id="tokMsg" style="margin-top:6px"></div>
+      <details style="margin-top:10px">
+        <summary class="hint" style="cursor:pointer">Wéi ariichten? (Kuerzbefeel)</summary>
+        <ol class="hint" style="margin:8px 0 0 18px;padding:0">
+          <li>Kuerzbefeeler-App → <b>Automatioun</b> → <b>Auerzäit</b> (z.B. 22:00, all Dag).</li>
+          <li>Aktioun <b>„Gesondheetsprouwen fannen"</b> fir Schrëtt / Schlof / Gewiicht (haut).</li>
+          <li>Aktioun <b>„Inhalt vun URL huelen"</b> → POST op<br><code style="word-break:break-all">${cfg.url}/functions/v1/health-ingest</code><br>mat JSON: <code>{"token":"…","steps":…,"sleep_h":…,"weight_kg":…}</code> (däin Token uewen).</li>
+        </ol>
+      </details>
     </div>`;
 
   $("wPlus").onclick=()=>bumpWater(1);
   $("wMinus").onclick=()=>bumpWater(-1);
   $("saveDay").onclick=saveDay;
   $("addW").onclick=addWorkout;
-  $("stravaBtn").onclick=connectStrava;
-  await Promise.all([loadDay(),loadWorkouts(),loadStravaState()]);
+  $("copyTok").onclick=copyToken;
+  await Promise.all([loadDay(),loadWorkouts(),loadToken()]);
+}
+
+async function loadToken(){
+  try{
+    const {data,error}=await sb.rpc("get_health_token");
+    if(error)throw error;
+    $("tok").value=data||"";
+  }catch(e){console.warn("[health] token",e);$("tok").placeholder="Token feelt — Migratioun gelaf?";}
+}
+function copyToken(){
+  const v=$("tok").value;if(!v)return;
+  (navigator.clipboard?navigator.clipboard.writeText(v):Promise.reject())
+    .then(()=>{$("tokMsg").textContent="Kopéiert ✓";setTimeout(()=>$("tokMsg").textContent="",1400);})
+    .catch(()=>{$("tok").select();document.execCommand&&document.execCommand("copy");});
 }
 
 /* ---------------- daily micro-trackers ---------------- */
@@ -162,13 +184,13 @@ function renderWorkouts(){
   $("wList").innerHTML=workouts.map(w=>{
     const ic=(TYPES[w.type]||"⭐ Aneres").split(" ")[0];
     const when=new Date(w.at).toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});
-    const strava=w.source==="strava"?`<span class="tag">STRAVA</span>`:"";
+    const synced=w.source==="watch"?`<span class="tag">⌚ WATCH</span>`:"";
     const bits=[fmtDur(w.duration_min),w.distance_km?w.distance_km+" km":"",w.calories?w.calories+" kcal":""].filter(Boolean).join(" · ");
     return `<div class="wk"><span class="ic">${ic}</span>
-      <div><div class="t">${esc((TYPES[w.type]||"Aneres").split(" ").slice(1).join(" "))}${strava}</div>
+      <div><div class="t">${esc((TYPES[w.type]||"Aneres").split(" ").slice(1).join(" "))}${synced}</div>
         <div class="s">${when}${w.note?" · "+esc(w.note):""}</div></div>
       <div class="r">${esc(bits)}</div>
-      ${w.source==="strava"?"":`<button class="del" data-del="${w.id}">✕</button>`}</div>`;
+      ${w.source==="watch"?"":`<button class="del" data-del="${w.id}">✕</button>`}</div>`;
   }).join("");
   $("wList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     await sb.from("workouts").delete().eq("id",b.dataset.del);loadWorkouts();
@@ -185,58 +207,6 @@ async function addWorkout(){
     $("wMsg").textContent="Gespäichert ✓";setTimeout(()=>$("wMsg").textContent="",1400);
     loadWorkouts();
   }catch(e){console.warn(e);$("wMsg").textContent="Feeler beim Späicheren.";}
-}
-
-/* ---------------- Strava connect (custom OAuth via edge function) ----------------
- * Flow: browser → Strava authorize → back here with ?code → we POST the code to
- * the `strava-sync` edge function, which exchanges it for tokens (client secret
- * lives ONLY in the function's secrets), stores them server-side, and pulls
- * activities into `workouts`. The client never sees the token. */
-const STRAVA_CLIENT_ID=cfg.stravaClientId||"";
-function connectStrava(){
-  if(!STRAVA_CLIENT_ID){alert("Strava ass nach net konfiguréiert (stravaClientId feelt an der Config).");return;}
-  const redirect=location.origin+location.pathname;
-  const u=new URL("https://www.strava.com/oauth/authorize");
-  u.searchParams.set("client_id",STRAVA_CLIENT_ID);
-  u.searchParams.set("redirect_uri",redirect);
-  u.searchParams.set("response_type","code");
-  u.searchParams.set("approval_prompt","auto");
-  u.searchParams.set("scope","read,activity:read_all");
-  location.href=u.toString();
-}
-async function handleStravaReturn(){
-  const p=new URLSearchParams(location.search);
-  const code=p.get("code");
-  if(!code||!p.get("scope"))return;
-  history.replaceState(null,"",location.pathname);   // clean the URL
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const r=await fetch(`${cfg.url}/functions/v1/strava-sync`,{
-      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
-      body:JSON.stringify({op:"connect",code,redirect_uri:location.origin+location.pathname}),
-    });
-    if(!r.ok)throw new Error("HTTP "+r.status);
-  }catch(e){console.warn("[strava] connect",e);}
-}
-async function loadStravaState(){
-  try{
-    const {data}=await sb.rpc("integration_status",{p_provider:"strava"});
-    const on=!!data;
-    $("stravaState").textContent=on?"✓ Verbonnen — synct beim Opmaachen.":"";
-    if(on){$("stravaBtn").textContent="Elo synchroniséieren";$("stravaBtn").onclick=syncStrava;}
-  }catch{}
-}
-async function syncStrava(){
-  $("stravaState").textContent="Synchroniséieren…";
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const r=await fetch(`${cfg.url}/functions/v1/strava-sync`,{
-      method:"POST",headers:{"Content-Type":"application/json",apikey:cfg.anonKey,Authorization:`Bearer ${session?.access_token||cfg.anonKey}`},
-      body:JSON.stringify({op:"sync"}),
-    });
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    $("stravaState").textContent="✓ Synchroniséiert";loadWorkouts();
-  }catch(e){console.warn(e);$("stravaState").textContent="Sync feelgeschloen";}
 }
 
 auth.onAuth(boot);
