@@ -145,27 +145,51 @@ function decodeBytes(buf){
   if(even+odd>n*0.25)return new TextDecoder(odd>=even?"utf-16le":"utf-16be").decode(b);
   return new TextDecoder("utf-8").decode(b);
 }
-const impMoney=(s)=>{const n=parseFloat(String(s).replace(/\s/g,"").replace(/\./g,"").replace(",","."));return Number.isFinite(n)?n:null;};
-const impDate=(d)=>{const m=String(d).trim().match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{2,4})$/);if(!m)return null;let[,dd,mm,yy]=m;if(yy.length===2)yy="20"+yy;return`${yy}-${mm}-${dd}`;};
+// robust amount: handles 1.234,56 · 800.00 · -2,00 · 1 284,01 (auto decimal sep)
+const impMoney=(s)=>{
+  s=String(s).replace(/[^\d.,-]/g,"");if(!s||s==="-")return null;
+  const lc=s.lastIndexOf(","),ld=s.lastIndexOf(".");
+  const dec=lc>ld?",":(ld>lc?".":"");
+  if(dec){const thou=dec===","?".":",";s=s.split(thou).join("").replace(dec,".");}
+  const n=parseFloat(s);return Number.isFinite(n)?n:null;
+};
+const impDate=(d)=>{
+  d=String(d).trim();
+  let m=d.match(/^(\d{4})-(\d{2})-(\d{2})$/);if(m)return`${m[1]}-${m[2]}-${m[3]}`;
+  m=d.match(/^(\d{2})[\/.-](\d{2})[\/.-](\d{2,4})$/);if(m){let[,dd,mm,yy]=m;if(yy.length===2)yy="20"+yy;return`${yy}-${mm}-${dd}`;}
+  return null;
+};
 function parseCSVstmt(text){
-  const lines=text.split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];
-  const delim=(lines[0].match(/;/g)||[]).length>=(lines[0].match(/,/g)||[]).length?";":",";
-  const H=lines[0].split(delim).map(h=>h.trim().toLowerCase());
+  let lines=text.split(/\r?\n/).filter(l=>l.trim());
+  lines=lines.filter(l=>!/^"?sep=.{1,3}"?$/i.test(l.trim()));   // Excel "sep=;" hint
+  if(!lines.length)return[];
+  let hi=lines.findIndex(l=>/(date|datum)/i.test(l)&&/(montant|betrag|debit|credit|description|transaktion|libell)/i.test(l));
+  if(hi<0)hi=0;
+  const delim=(lines[hi].match(/;/g)||[]).length>=(lines[hi].match(/,/g)||[]).length?";":",";
+  const H=lines[hi].split(delim).map(h=>h.trim().toLowerCase());
   const find=(names,ex=[])=>{for(const n of names){const i=H.indexOf(n);if(i>=0&&!ex.includes(i))return i;}for(const n of names){const i=H.findIndex((h,idx)=>!ex.includes(idx)&&h.includes(n));if(i>=0)return i;}return-1;};
-  const iDate=find(["transaktionsdatum","date transaction","date valeur","date"]);
+  const iDate=find(["transaction date","transaktionsdatum","date transaction","date valeur","date"]);
   const iAmt=find(["betrag in eur","montant en eur","montant","betrag"],[iDate]);
-  const iDesc=find(["transaktion","description","libellé","libelle"],[iDate,iAmt]);
-  const iComm=find(["communication 1","communication","nom de la contrepartie"],[iDate,iAmt,iDesc]);
-  const iCtry=find(["land","localité de la contrepartie","localité"],[iDate,iAmt,iDesc,iComm]);
-  if(iDate<0||iAmt<0)return[];
+  const iDeb=find(["debit (eur)","débit","debit"],[iDate,iAmt]);
+  const iCred=find(["credit (eur)","crédit","credit"],[iDate,iAmt,iDeb]);
+  const iDesc=find(["transaktion","description","libellé","libelle"],[iDate,iAmt,iDeb,iCred]);
+  const iComm=find(["payment details","communication 1","communication","nom de la contrepartie"],[iDate,iAmt,iDeb,iCred,iDesc]);
+  const iCtry=find(["land","localité de la contrepartie","localité"],[iDate,iAmt,iDeb,iCred,iDesc,iComm]);
+  if(iDate<0||(iAmt<0&&iDeb<0&&iCred<0))return[];
   const out=[];
-  for(const line of lines.slice(1)){
-    const c=line.split(delim);const at=impDate(c[iDate]);const amt=impMoney(c[iAmt]);
-    if(!at||amt===null||amt===0)continue;
+  for(const line of lines.slice(hi+1)){
+    const c=line.split(delim);const at=impDate(c[iDate]);if(!at)continue;
+    let amount=null,kind=null;
+    if(iAmt>=0&&c[iAmt]&&c[iAmt].trim()){const a=impMoney(c[iAmt]);if(a){amount=Math.abs(a);kind=a<0?"out":"in";}}
+    if(amount===null&&(iCred>=0||iDeb>=0)){
+      const cr=iCred>=0?impMoney(c[iCred]):null,db=iDeb>=0?impMoney(c[iDeb]):null;
+      if(cr){amount=Math.abs(cr);kind="in";}else if(db){amount=Math.abs(db);kind="out";}
+    }
+    if(amount===null||amount===0)continue;
     let desc=(c[iDesc]||"").trim();
     if(iComm>=0&&c[iComm]&&c[iComm].trim()&&c[iComm].trim()!==desc)desc+=" · "+c[iComm].trim();
     if(iCtry>=0&&c[iCtry]&&c[iCtry].trim())desc+=" ("+c[iCtry].trim()+")";
-    out.push({at,amount:Math.abs(amt),kind:amt<0?"out":"in",note:desc.slice(0,180)});
+    out.push({at,amount,kind,note:desc.slice(0,180)});
   }
   return out;
 }
