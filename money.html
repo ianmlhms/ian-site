@@ -145,6 +145,16 @@ function decodeBytes(buf){
   if(even+odd>n*0.25)return new TextDecoder(odd>=even?"utf-16le":"utf-16be").decode(b);
   return new TextDecoder("utf-8").decode(b);
 }
+// quote-aware CSV field split (handles "…,…" and "" escapes); works for any delim
+function splitCSV(line,delim){
+  const out=[];let cur="",q=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(q){ if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;}else q=false; } else cur+=ch; }
+    else{ if(ch==='"')q=true; else if(ch===delim){out.push(cur);cur="";} else cur+=ch; }
+  }
+  out.push(cur);return out;
+}
 // robust amount: handles 1.234,56 · 800.00 · -2,00 · 1 284,01 (auto decimal sep)
 const impMoney=(s)=>{
   s=String(s).replace(/[^\d.,-]/g,"");if(!s||s==="-")return null;
@@ -166,7 +176,7 @@ function parseCSVstmt(text){
   let hi=lines.findIndex(l=>/(date|datum)/i.test(l)&&/(montant|betrag|debit|credit|description|transaktion|libell)/i.test(l));
   if(hi<0)hi=0;
   const delim=(lines[hi].match(/;/g)||[]).length>=(lines[hi].match(/,/g)||[]).length?";":",";
-  const H=lines[hi].split(delim).map(h=>h.trim().toLowerCase());
+  const H=splitCSV(lines[hi],delim).map(h=>h.trim().toLowerCase());
   const find=(names,ex=[])=>{for(const n of names){const i=H.indexOf(n);if(i>=0&&!ex.includes(i))return i;}for(const n of names){const i=H.findIndex((h,idx)=>!ex.includes(idx)&&h.includes(n));if(i>=0)return i;}return-1;};
   const iDate=find(["transaction date","transaktionsdatum","date transaction","date valeur","date"]);
   const iAmt=find(["betrag in eur","montant en eur","montant","betrag"],[iDate]);
@@ -178,7 +188,7 @@ function parseCSVstmt(text){
   if(iDate<0||(iAmt<0&&iDeb<0&&iCred<0))return[];
   const out=[];
   for(const line of lines.slice(hi+1)){
-    const c=line.split(delim);const at=impDate(c[iDate]);if(!at)continue;
+    const c=splitCSV(line,delim);const at=impDate(c[iDate]);if(!at)continue;
     let amount=null,kind=null;
     if(iAmt>=0&&c[iAmt]&&c[iAmt].trim()){const a=impMoney(c[iAmt]);if(a){amount=Math.abs(a);kind=a<0?"out":"in";}}
     if(amount===null&&(iCred>=0||iDeb>=0)){
@@ -190,6 +200,39 @@ function parseCSVstmt(text){
     if(iComm>=0&&c[iComm]&&c[iComm].trim()&&c[iComm].trim()!==desc)desc+=" · "+c[iComm].trim();
     if(iCtry>=0&&c[iCtry]&&c[iCtry].trim())desc+=" ("+c[iCtry].trim()+")";
     out.push({at,amount,kind,note:desc.slice(0,180)});
+  }
+  return out;
+}
+// Trade Republic export: quoted CSV, signed `amount`, investment + card + cash rows
+function parseTR(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length)return[];
+  const H=splitCSV(lines[0],",").map(h=>h.trim().toLowerCase());
+  const ix=(n)=>H.indexOf(n);
+  const iDate=ix("date")>=0?ix("date"):ix("datetime");
+  const iType=ix("type"),iName=ix("name"),iAmt=ix("amount"),iDesc=ix("description");
+  const iCp=ix("counterparty_name"),iOc=ix("original_currency");
+  if(iDate<0||iAmt<0)return[];
+  const clean=(s)=>String(s||"").replace(/\s+/g," ").trim();
+  const out=[];
+  for(const line of lines.slice(1)){
+    const c=splitCSV(line,",");
+    const at=impDate(clean(c[iDate]).slice(0,10));if(!at)continue;
+    const a=impMoney(c[iAmt]);if(a===null||a===0)continue;
+    const kind=a<0?"out":"in";
+    const type=clean(c[iType]).toUpperCase();
+    const name=clean(c[iName]),desc=clean(c[iDesc]),cp=clean(c[iCp]);
+    let category="",note="";
+    if(/BUY/.test(type)){category="📈 Investéieren";note="Kaf · "+(name||desc);}
+    else if(/SELL/.test(type)){category="📈 Investéieren";note="Verkaf · "+(name||desc);}
+    else if(type==="DIVIDEND"){category="💰 Dividend";note=name||desc;}
+    else if(/INTEREST|BONUS|SAVEBACK/.test(type)){category="💰 Zënsen";note=desc||name||"Zënsen";}
+    else if(/ORDERING_FEE|_FEE/.test(type)){category="💳 Gebür";note=desc||"Kaartegebür";}
+    else if(/CARD_TRANSACTION/.test(type)){note=name||desc;}   // merchant → CATRULES emoji
+    else if(/INBOUND|INPAYMENT|OUTBOUND|OUTPAYMENT|TRANSFER/.test(type)){category="💸 Iwwerweisung";note=cp||name||desc;}
+    else{note=name||desc||type;}
+    if(/INTERNATIONAL/.test(type)&&iOc>=0&&clean(c[iOc]))note+=" ("+clean(c[iOc])+")";
+    out.push({at,amount:Math.abs(a),kind,category:category||undefined,note:(note||"Trade Republic").slice(0,180)});
   }
   return out;
 }
@@ -231,7 +274,7 @@ async function onImportFile(file){
     const buf=await file.arrayBuffer();
     let rows;
     if(/\.pdf$/i.test(file.name)||file.type==="application/pdf")rows=parseBDL(await pdfToLines(buf));
-    else rows=parseCSVstmt(decodeBytes(buf));
+    else{const text=decodeBytes(buf);rows=/transaction_id|counterparty_iban|asset_class/i.test(text.slice(0,400))?parseTR(text):parseCSVstmt(text);}
     if(!rows.length){$("impMsg").textContent="Keng Buchungen an där Datei fonnt.";$("impMsg").style.color="var(--warn)";return;}
     previewImport(rows);
   }catch(e){console.warn("[import]",e);$("impMsg").textContent="Import feelgeschloen — kuck d'Datei.";$("impMsg").style.color="var(--warn)";}
@@ -260,7 +303,7 @@ async function doImport(fresh){
   $("impModalGo").disabled=true;$("impModalGo").textContent="Importéieren…";
   try{
     for(let i=0;i<fresh.length;i+=200){
-      const batch=fresh.slice(i,i+200).map(r=>({amount:r.amount,kind:r.kind,note:r.note,at:r.at+"T12:00:00Z",currency:"EUR"}));
+      const batch=fresh.slice(i,i+200).map(r=>({amount:r.amount,kind:r.kind,note:r.note,category:r.category||null,at:r.at+"T12:00:00Z",currency:"EUR"}));
       const {error}=await sb.from("finance_tx").insert(batch);if(error)throw error;
     }
     $("impModal").classList.remove("open");
