@@ -261,14 +261,31 @@ function paintBalance(){
   $("mOut").textContent=CUR+out.toFixed(2);
   $("mNet").textContent=CUR+(inc-out).toFixed(2);
 }
+// Guess an emoji + short category label from a merchant/description (for imports
+// with no manual category). Keyword-based; falls back to 💳.
+const CATRULES=[
+  [/youtube|spotify|netflix|disney|icloud|apple\.com|itunes|google\s*\*|patreon|twitch|steam|playstation|xbox|nintendo|openai|chatgpt|anthropic|claude|adobe|notion|discord|whoop|navigraph/i,"📱","Abo/Digital"],
+  [/restaurant|pizza|kebab|sushi|mcdo|mcdonald|burger|kfc|bistro|café|cafe|coffee|starbucks|bakery|boulangerie|glace|seoul|grill|dallmayr/i,"🍔","Iessen"],
+  [/cactus|auchan|delhaize|cora|aldi|lidl|colruyt|supermarch|alima|proxy|panier/i,"🛒","Akaf"],
+  [/amazon|zalando|temu|shein|decathlon|nike|adidas|zara|h&m|action|fnac|mediamarkt|paddle|apple store/i,"🛍️","Shopping"],
+  [/cfl|bus|mobilit|uber|bolt|parking|aral|shell|esso|total|tank|station|kinepolis|cinema|kino/i,"🎬","Fräizäit/Transport"],
+  [/pharmacie|apotheke|dokter|dokteur|medic|hospital|clinique|benedikt/i,"💊","Gesondheet"],
+  [/virement|payconiq|iban|retrait|atm|cash|distributeur|mulheims|wiwinius|epargne|spuerkeess/i,"💸","Iwwerweisung"],
+];
+function guessTx(t){
+  if(t.category)return {ic:(t.category.split(" ")[0]||"⭐"),title:esc(t.category.split(" ").slice(1).join(" ")||"Aneres"),sub:t.note?esc(t.note):""};
+  const s=t.note||"";
+  for(const[re,ic]of CATRULES)if(re.test(s))return {ic,title:esc(s||"Buchung"),sub:""};
+  return {ic:"💳",title:esc(s||"Buchung"),sub:""};
+}
 function renderTx(){
   if(!tx.length){$("txList").innerHTML='<div class="gate">Nach keng Buchungen.</div>';return;}
   $("txList").innerHTML=tx.map(t=>{
-    const ic=(t.category||"⭐").split(" ")[0];
+    const g=guessTx(t);
     const when=new Date(t.at).toLocaleDateString("de-DE",{day:"numeric",month:"short"});
-    return `<div class="tx"><span style="font-size:18px">${ic}</span>
-      <div><div class="t">${esc((t.category||"Aneres").split(" ").slice(1).join(" ")||"Aneres")}</div>
-        <div class="s">${when}${t.note?" · "+esc(t.note):""}</div></div>
+    return `<div class="tx"><span style="font-size:18px">${g.ic}</span>
+      <div><div class="t">${g.title}</div>
+        <div class="s">${when}${g.sub?" · "+g.sub:""}</div></div>
       <div class="amt ${t.kind}">${t.kind==="in"?"+":"−"}${CUR}${(+t.amount).toFixed(2)}</div>
       <button class="del" data-del="${t.id}">✕</button></div>`;
   }).join("");
