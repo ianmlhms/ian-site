@@ -7,6 +7,7 @@ const T = (k) => (window.I18N ? window.I18N.t(k) : k);   // i18n lookup
 let sb = null, inviteSubbed = false;
 let adminIds = new Set();   // user_ids of app admins → pinned on top + 👑 tagged
 let vipIds = new Set();      // user_ids of VIP users → ⭐ VIP tag
+let ipIds = new Set();       // user_ids of IP users → 💠 IP tag
 // Per-account visibility restriction (server-driven): a restricted viewer only
 // sees an allowlist of people. UX-only — RLS still protects the real data.
 let restricted = false, allowUid = new Set(), allowName = new Set();
@@ -33,6 +34,7 @@ function vis(list, uidKey, nameKey) {
   });
 }
 const vipTag = (uid) => (vipIds.has(uid) ? ` <span class="vip-tag">⭐ VIP</span>` : "");
+const ipTag = (uid) => (ipIds.has(uid) ? ` <span class="ip-tag">💠 IP</span>` : "");
 let classByName = new Map();   // lowercased username → school class (shown as a tag)
 async function loadClasses() {
   try {
@@ -131,7 +133,7 @@ function renderFriends(list) {
   const ordered = [...list.filter(f => adminIds.has(f.user_id)), ...list.filter(f => !adminIds.has(f.user_id))];
   el.innerHTML = ordered.map(f => `
     <div class="row">
-      <span class="name"><span class="av">👤</span>${esc(f.username)}${classTag(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">👑 Admin</span>` : ""}${vipTag(f.user_id)}</span>
+      <span class="name"><span class="av">👤</span>${esc(f.username)}${classTag(f.username)}${adminIds.has(f.user_id) ? ` <span class="admin-tag">👑 Admin</span>` : ""}${vipTag(f.user_id)}${ipTag(f.user_id)}</span>
       <button class="mini" data-call="${f.user_id}" data-name="${esc(f.username)}" title="${T("friends.call")}">📹</button>
       <button class="mini" data-msg="${esc(f.username)}">${T("friends.message")}</button>
       <button class="mini go" data-play="${f.user_id}" data-name="${esc(f.username)}">${T("friends.play")}</button>
@@ -230,6 +232,7 @@ function showGate() {
   sb = await auth.client();
   try { const { data } = await sb.rpc("admin_user_ids"); adminIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn(e); }
   try { const { data } = await sb.rpc("vip_user_ids"); vipIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[friends] vip ids", e); }
+  try { const { data } = await sb.rpc("ip_user_ids"); ipIds = new Set((data || []).map((r) => r.user_id)); } catch (e) { console.warn("[friends] ip ids", e); }
   await loadRestriction();
   auth.onAuth(() => (auth.session() ? showApp() : showGate()));
   auth.session() ? showApp() : showGate();

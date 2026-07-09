@@ -27,6 +27,7 @@
   .class-tag{display:inline-block;font-size:11px;font-weight:800;color:#5cc8ff;background:rgba(92,200,255,.14);border:1px solid rgba(92,200,255,.45);border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:middle;letter-spacing:.3px}
   .admin-tag{display:inline-block;font-size:9.5px;font-weight:800;color:#ffcf4d;background:rgba(255,207,77,.14);border:1px solid rgba(255,207,77,.45);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:middle}
   .vip-tag{display:inline-block;font-size:9.5px;font-weight:800;color:#d7b3ff;background:rgba(170,110,255,.16);border:1px solid rgba(170,110,255,.5);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:middle}
+  .ip-tag{display:inline-block;font-size:9.5px;font-weight:800;color:#6fe3d2;background:rgba(60,220,200,.14);border:1px solid rgba(60,220,200,.5);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:middle}
   .ct{display:inline-block;font-size:9.5px;font-weight:800;color:#5cc8ff;background:rgba(92,200,255,.14);border:1px solid rgba(92,200,255,.45);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:middle}
   #chat{flex:1;overflow-y:auto;padding:14px max(12px,env(safe-area-inset-left)) 14px max(12px,env(safe-area-inset-right));display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
   .b{max-width:82%;padding:8px 12px;border-radius:14px;background:var(--card);border:1px solid var(--border);align-self:flex-start}
@@ -66,10 +67,10 @@
 import * as auth from "./auth.js?v=4";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let sb=null,myClass=null,me=null,adminIds=new Set(),vipIds=new Set(),prof={},chan=null,seen=new Set();
+let sb=null,myClass=null,me=null,adminIds=new Set(),vipIds=new Set(),ipIds=new Set(),prof={},chan=null,seen=new Set();
 
 const fmtTime=(t)=>{const d=new Date(t);return d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});};
-const tags=(uid)=>`${prof[uid]&&prof[uid].class?`<span class="ct">${esc(prof[uid].class)}</span>`:""}${adminIds.has(uid)?` <span class="admin-tag">👑</span>`:""}${vipIds.has(uid)?` <span class="vip-tag">⭐</span>`:""}`;
+const tags=(uid)=>`${prof[uid]&&prof[uid].class?`<span class="ct">${esc(prof[uid].class)}</span>`:""}${adminIds.has(uid)?` <span class="admin-tag">👑</span>`:""}${vipIds.has(uid)?` <span class="vip-tag">⭐</span>`:""}${ipIds.has(uid)?` <span class="ip-tag">💠</span>`:""}`;
 
 function bubble(m){
   if(seen.has(m.id))return; seen.add(m.id);
@@ -99,6 +100,7 @@ async function start(){
   $("classTag").innerHTML=`<span class="class-tag">${esc(myClass)}</span>`;
   try{const{data}=await sb.rpc("admin_user_ids");adminIds=new Set((data||[]).map(r=>r.user_id));}catch{}
   try{const{data}=await sb.rpc("vip_user_ids");vipIds=new Set((data||[]).map(r=>r.user_id));}catch{}
+  try{const{data}=await sb.rpc("ip_user_ids");ipIds=new Set((data||[]).map(r=>r.user_id));}catch{}
   const {data:msgs,error}=await sb.from("class_chat").select("*").order("created_at",{ascending:true}).limit(200);
   if(error){$("status").textContent="Feeler beim Lueden.";console.warn(error);return;}
   await ensureNames((msgs||[]).map(m=>m.user_id));

@@ -48,6 +48,7 @@
   .class-tag{background:rgba(92,200,255,.15);color:#5cc8ff;border:1px solid rgba(92,200,255,.35)}
   .admin-tag{background:rgba(255,207,77,.15);color:#ffcf4d;border:1px solid rgba(255,207,77,.35)}
   .vip-tag{background:rgba(215,179,255,.15);color:#d7b3ff;border:1px solid rgba(215,179,255,.35)}
+  .ip-tag{background:rgba(60,220,200,.14);color:#6fe3d2;border:1px solid rgba(60,220,200,.4)}
   .ach{display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px;margin:0 6px 6px 0}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -100,10 +101,11 @@ function achievements(s){
 async function renderPublic(username){
   const {data:p}=await sb.from("profiles").select("id,avatar,class,username").ilike("username",username).maybeSingle();
   if(!p){$("wrap").innerHTML=`<div class="gate">No player called “${esc(username)}”.<br><br><a href="profile.html">‹ Your profile</a></div>`;return;}
-  let isAdmin=false,isVip=false;
+  let isAdmin=false,isVip=false,isIp=false;
   try{const {data}=await sb.rpc("admin_user_ids");isAdmin=(data||[]).some(r=>r.user_id===p.id);}catch{}
   try{const {data}=await sb.rpc("vip_user_ids");isVip=(data||[]).some(r=>r.user_id===p.id);}catch{}
-  const tags=(p.class?`<span class="class-tag">${esc(p.class)}</span>`:"")+(isAdmin?`<span class="admin-tag">👑 Admin</span>`:"")+(isVip?`<span class="vip-tag">⭐ VIP</span>`:"");
+  try{const {data}=await sb.rpc("ip_user_ids");isIp=(data||[]).some(r=>r.user_id===p.id);}catch{}
+  const tags=(p.class?`<span class="class-tag">${esc(p.class)}</span>`:"")+(isAdmin?`<span class="admin-tag">👑 Admin</span>`:"")+(isVip?`<span class="vip-tag">⭐ VIP</span>`:"")+(isIp?`<span class="ip-tag">💠 IP</span>`:"");
   let stats={wins:0,losses:0,total:0,pct:null};
   try{const {data}=await sb.rpc("game_leaderboard",{p_game:null});const m=(data||[]).find(r=>r.username===p.username);if(m)stats={wins:m.wins,losses:m.losses,total:m.total,pct:m.winpct};}catch{}
   $("wrap").innerHTML=`
@@ -161,13 +163,15 @@ async function boot(){
   const uname=auth.username();
   const uid=auth.session().user.id;
   try{const {data}=await sb.from("profiles").select("avatar, class").eq("id",uid).single();myAvatar=data?.avatar||null;myClass=data?.class||null;}catch{}
-  let isAdmin=false,isVip=false;
+  let isAdmin=false,isVip=false,isIp=false;
   try{const {data}=await sb.rpc("admin_user_ids");isAdmin=(data||[]).some(r=>r.user_id===uid);}catch{}
   try{const {data}=await sb.rpc("vip_user_ids");isVip=(data||[]).some(r=>r.user_id===uid);}catch{}
+  try{const {data}=await sb.rpc("ip_user_ids");isIp=(data||[]).some(r=>r.user_id===uid);}catch{}
   const tagsHtml=
     (myClass?`<span class="class-tag">${esc(myClass)}</span>`:"")+
     (isAdmin?`<span class="admin-tag">👑 Admin</span>`:"")+
-    (isVip?`<span class="vip-tag">⭐ VIP</span>`:"");
+    (isVip?`<span class="vip-tag">⭐ VIP</span>`:"")+
+    (isIp?`<span class="ip-tag">💠 IP</span>`:"");
   $("wrap").innerHTML=`
     <div class="card me">
       <div class="big" id="bigAv">${avInner(myAvatar)}</div>
