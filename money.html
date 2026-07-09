@@ -176,6 +176,7 @@ function shell(){
       <input type="file" id="impFile" accept=".csv,.pdf,text/csv,application/pdf" hidden>
     </h2>
     <div class="hint" id="impMsg" style="margin-top:-4px"></div>
+    <div style="margin-top:2px"><button class="ghost" id="delImp" style="font-size:12px;padding:6px 10px">🗑️ Importéiert Buchungen läschen</button></div>
     <div class="chips" id="filterChips"></div>
     <div class="card" id="txList"><div class="gate">Lueden…</div></div>
 
@@ -225,6 +226,7 @@ function wireShell(){
   $("importBtn").onclick=()=>$("impFile").click();
   $("impFile").onchange=(e)=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)onImportFile(f);};
   $("aiInsight").onclick=aiInsight;
+  $("delImp").onclick=delImported;
 }
 function fillCats(){ $("tCat").innerHTML=ADDCATS[addKind].map(c=>`<option value="${c}">${catIc(c)} ${catLbl(c)}</option>`).join(""); }
 
@@ -648,6 +650,33 @@ function accountFromFile(fn,isTR,isPdf){
   if(/^LU13/.test(ib))return "BDL";
   if(isPdf||/bdl/i.test(fn))return "BDL";
   return "Bank";
+}
+// Imported rows all carry an exact 12:00:00 UTC timestamp (doImport writes
+// at:<date>+"T12:00:00Z"); manual entries use the real time. So this cleanly
+// tells the two apart without touching anything you typed by hand.
+function isImported(t){
+  const d=new Date(t.at);
+  return d.getUTCHours()===12&&d.getUTCMinutes()===0&&d.getUTCSeconds()===0&&d.getUTCMilliseconds()===0;
+}
+async function delImported(){
+  const b=$("delImp");
+  const imp=tx.filter(isImported);
+  if(!imp.length){$("impMsg").textContent="Keng importéiert Buchungen fonnt.";$("impMsg").style.color="var(--muted)";b.dataset.armed="";b.textContent="🗑️ Importéiert Buchungen läschen";return;}
+  if(b.dataset.armed!=="1"){
+    b.dataset.armed="1";b.textContent=`⚠️ Sécher? ${imp.length} läschen`;b.style.color="var(--warn)";b.style.borderColor="var(--warn)";
+    setTimeout(()=>{if(b.dataset.armed==="1"){b.dataset.armed="";b.textContent="🗑️ Importéiert Buchungen läschen";b.style.color="";b.style.borderColor="";}},4500);
+    return;
+  }
+  b.dataset.armed="";b.style.color="";b.style.borderColor="";b.disabled=true;b.textContent="Läschen…";
+  const ids=imp.map(t=>t.id);
+  try{
+    for(let i=0;i<ids.length;i+=200){
+      const {error}=await sb.from("finance_tx").delete().in("id",ids.slice(i,i+200));if(error)throw error;
+    }
+    $("impMsg").textContent=`✓ ${ids.length} importéiert Buchungen geläscht`;$("impMsg").style.color="var(--ok)";
+    tx=tx.filter(t=>!isImported(t));render();await loadAll();
+  }catch(e){console.warn(e);$("impMsg").textContent="Läsche feelgeschloen.";$("impMsg").style.color="var(--warn)";}
+  b.disabled=false;b.textContent="🗑️ Importéiert Buchungen läschen";
 }
 async function onImportFile(file){
   $("impMsg").textContent="Liesen…";$("impMsg").style.color="var(--muted)";
