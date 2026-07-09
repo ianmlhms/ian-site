@@ -125,8 +125,8 @@ async function boot(){
 
 /* ---------------- daily micro-trackers ---------------- */
 async function loadDay(){
-  const {data}=await sb.from("health_days").select("*").eq("day",dayKey()).maybeSingle();
-  today=data||{day:dayKey(),water_ml:0,sleep_h:null,weight_kg:null};
+  const {data}=await sb.from("health_days").select("*").eq("log_date",dayKey()).maybeSingle();
+  today=data||{log_date:dayKey(),water_ml:0,sleep_h:null,weight_kg:null};
   paintDay();
 }
 function paintDay(){
@@ -138,8 +138,8 @@ function paintDay(){
 async function upsertDay(patch){
   today={...today,...patch};
   paintDay();
-  const row={day:dayKey(),water_ml:today.water_ml||0,sleep_h:today.sleep_h,weight_kg:today.weight_kg};
-  const {error}=await sb.from("health_days").upsert(row,{onConflict:"user_id,day"});
+  const row={log_date:dayKey(),water_ml:today.water_ml||0,sleep_h:today.sleep_h,weight_kg:today.weight_kg};
+  const {error}=await sb.from("health_days").upsert(row,{onConflict:"user_id,log_date"});
   if(error)console.warn("[health] day",error);
 }
 function bumpWater(g){ upsertDay({water_ml:Math.max(0,(today.water_ml||0)+g*250)}); }

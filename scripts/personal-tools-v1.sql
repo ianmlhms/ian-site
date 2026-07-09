@@ -26,12 +26,12 @@ create policy countdowns_own on public.countdowns
 -- ---- 2) Health: one row per day + workout log (health.html) ----------------
 create table if not exists public.health_days (
   user_id    uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  day        date not null,
+  log_date   date not null,                          -- "day" is a reserved keyword in some PG contexts
   water_ml   int  not null default 0 check (water_ml between 0 and 20000),
   sleep_h    numeric(4,1) check (sleep_h is null or sleep_h between 0 and 24),
   weight_kg  numeric(5,1) check (weight_kg is null or weight_kg between 0 and 400),
   updated_at timestamptz not null default now(),
-  primary key (user_id, day)
+  primary key (user_id, log_date)
 );
 alter table public.health_days enable row level security;
 drop policy if exists health_days_own on public.health_days;
