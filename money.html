@@ -244,28 +244,49 @@ async function loadAll(){
   aiCategorise();   // background: fill the rows the keyword rules missed
 }
 
-// Deterministic internal-transfer detection: an `out` on one account matched to an
-// `in` of the same amount on a DIFFERENT account within a few days AND with a
-// transfer-like label on at least one side (so a coincidental amount match — e.g. a
-// shop payment vs a Payconiq from a friend — is NOT hidden). Both sides are excluded
-// from income/spending. Manual overrides (pair_id manual-*) are respected. Missed
-// ones can be flagged by hand with the 🔁 button.
-const TRHINT=/trade republic|top\s*up|apple pay|alimentation|approvision|r[eé]appro|epargne|spuerkonto|savings|virement (interne|compte|vers)|to trade|from trade|between account|eegent|internal transfer/i;
-const isTransferish=(t)=>TRHINT.test(t.note||"");
+// Internal-transfer detection: same amount leaving one account and arriving on
+// another within 4 days (Ian's rule), PLUS label-based flagging of the many
+// single-sided Trade Republic top-ups. Both sides are excluded from
+// income/spending. Manual overrides (pair_id manual-*) are respected; a wrong guess
+// is undone with the 🔁/↩︎ button. No re-import needed — pairing only rejects a match
+// when both rows carry a known, identical account tag.
+// A note that clearly names another of Ian's own accounts → internal move even
+// without a matching partner row (many TR top-ups only show as one line).
+function labelTransfer(t){
+  const s=t.note||"";
+  if(/apple pay top|card top up|\btop\s*up\b|virement interne|internal transfer|between (my )?accounts?/i.test(s))return true;
+  if(/trade republic/i.test(s)&&t.account!=="Trade Republic")return true;
+  return false;
+}
+// A real internal transfer names Ian himself or an own-account target; a card
+// purchase that just happens to match an amount never does. These two gates keep
+// the amount+date pairing from hiding real spending/income.
+const TR_SIGNAL=/\bian\b|trade republic|apple pay top|card top up|\btop\s*up\b|compte courant|virement interne|\bepargne\b|spuerkonto|alimentation|standing order|ordre permanent/i;
+const TR_CARD=/\((germany|netherlands|belgium|luxembourg|france|spain|italy|austria|ireland|usa|united)\b|paiement |payments|pay\*|paypal|\bcarte\b|\.com\b/i;
 async function detectTransfers(){
-  const MAXD=5*86400000;
-  const outs=tx.filter(t=>t.kind==="out"&&!String(t.pair_id||"").startsWith("manual"));
-  const ins =tx.filter(t=>t.kind==="in" &&!String(t.pair_id||"").startsWith("manual"));
+  const MAXD=4*86400000;
+  const active=(t)=>!String(t.pair_id||"").startsWith("manual");
+  const sig=(t)=>TR_SIGNAL.test(t.note||"");
+  const card=(t)=>TR_CARD.test(t.note||"");
+  const flagged=new Map();   // id -> pair_id
+  // (1) label-based: unambiguous transfers to/from Trade Republic (no partner needed)
+  for(const t of tx){if(active(t)&&labelTransfer(t))flagged.set(t.id,"label-"+t.id);}
+  // (2) amount+direction pairing: same amount out of one account & into another within
+  //     4 days, on rows that look like a real transfer (self/own-account label, never a
+  //     card purchase). Works even if accounts aren't tagged (only rejects a match when
+  //     BOTH sides carry a known identical account) — so no re-import is needed.
+  const outs=tx.filter(t=>t.kind==="out"&&active(t)&&!flagged.has(t.id)&&!card(t));
+  const ins =tx.filter(t=>t.kind==="in" &&active(t)&&!flagged.has(t.id));
   const byAmt=new Map();
   for(const t of ins){const k=(+t.amount).toFixed(2);if(!byAmt.has(k))byAmt.set(k,[]);byAmt.get(k).push(t);}
-  const used=new Set();const flagged=new Map();   // id -> pair_id
+  const used=new Set();
   for(const o of outs){
     const cands=byAmt.get((+o.amount).toFixed(2))||[];
     let best=null,bd=Infinity;
     for(const i of cands){
-      if(used.has(i.id))continue;
-      if(!i.account||!o.account||i.account===o.account)continue;
-      if(!isTransferish(o)&&!isTransferish(i))continue;
+      if(used.has(i.id)||card(i))continue;
+      if(i.account&&o.account&&i.account===o.account)continue;   // same known account ≠ transfer
+      if(!sig(o)&&!sig(i))continue;                              // needs a real-transfer signal
       const dd=Math.abs(new Date(i.at)-new Date(o.at));if(dd>MAXD)continue;
       if(dd<bd){bd=dd;best=i;}
     }
