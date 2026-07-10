@@ -1,6 +1,6 @@
 /* Gates the full ShortsFactory dashboard behind Supabase admin login and loads
  * the data from the admin-only `dashboard_state` table (not the public file). */
-import * as auth from "./auth.js?v=4";
+import * as auth from "./auth.js?v=5";
 
 const $ = (id) => document.getElementById(id);
 let sb = null;

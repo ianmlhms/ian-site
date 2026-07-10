@@ -4,7 +4,7 @@
  * profile, a required modal asks for it (new users at sign-up, existing users
  * the next time they open the site). Saved via the set_class RPC; the class is
  * then shown next to their name everywhere (see friends.js / messenger.js). */
-import * as auth from "./auth.js?v=4";
+import * as auth from "./auth.js?v=5";
 
 // Use i18n when the key exists; otherwise fall back to the Luxembourgish default
 // (t() returns the key unchanged when it's missing — treat that as "not found").

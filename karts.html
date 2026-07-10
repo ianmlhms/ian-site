@@ -51,7 +51,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=4";
+import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=5";
 
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 const $ = (id) => document.getElementById(id);
@@ -118,7 +118,7 @@ async function render(){
   document.addEventListener("i18n:change", () => { if (sb) render(); });
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=1"></script>
-  <script type="module" src="class-gate.js?v=3"></script>
+  <script type="module" src="rtc-ring.js?v=2"></script>
+  <script type="module" src="class-gate.js?v=4"></script>
 </body>
 </html>

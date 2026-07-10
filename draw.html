@@ -60,7 +60,7 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="notify-ambient.js?v=2"></script>
+<script type="module" src="notify-ambient.js?v=3"></script>
 <script>
 const WORDS = ["HAUS","BAUM","AUTO","HUND","KATZE","SONNE","MOND","STERN","BLUME","FISCH","VOGEL","APFEL","BANANE","PIZZA","BURG","SCHIFF","ZUG","FLUGZEUG","RAKETE","ROBOTER","BRILLE","SCHUH","HUT","UHR","HERZ","SCHLANGE","ELEFANT","GIRAFFE","KROKODIL","PINGUIN","SCHMETTERLING","REGENBOGEN","WOLKE","BERG","BRÜCKE","GITARRE","FUSSBALL","KRONE","DRACHE","GESPENST","SCHNEEMANN","KAKTUS","LEUCHTTURM","AMPEL","FAHRRAD","EISBÄR","KERZE","TASSE","LÖFFEL","SCHLÜSSEL"];
 const LAPS = 2, TURN_SECS = 75, COLORS = ["#000000","#e53527","#1d72e8","#2ca02c","#ffcc00","#8b5a2b","#ff7ac0","#ffffff"];
@@ -233,7 +233,7 @@ ch.on("broadcast",{event:"turn"},({payload})=>applyTurn(payload))
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 function isDrawerHost(){ return true; } // host validates picks regardless
 </script>
-  <script type="module" src="rtc-ring.js?v=1"></script>
-  <script type="module" src="class-gate.js?v=3"></script>
+  <script type="module" src="rtc-ring.js?v=2"></script>
+  <script type="module" src="class-gate.js?v=4"></script>
 </body>
 </html>

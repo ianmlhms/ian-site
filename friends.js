@@ -1,5 +1,5 @@
 /* Friends: add by username, list, message (DM) or invite to a game. */
-import * as auth from "./auth.js?v=4";
+import * as auth from "./auth.js?v=5";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

@@ -8,7 +8,7 @@
  *                   notify-ambient.js on non-messenger pages.
  * Foreground notifications use the Notification API (no server). Closed-app push
  * is delivered by the Supabase Edge Function `notify` → the service worker. */
-import * as auth from "./auth.js?v=4";
+import * as auth from "./auth.js?v=5";
 
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;
@@ -119,7 +119,7 @@ function systemNotify(title, body, url) {
 }
 
 /* ---------- ambient (foreground) message notifications ---------- */
-let _ambientStarted = false;
+let _ambientStarted = false, _ambientLive = false;
 export async function initAmbient() {
   if (_ambientStarted || !auth.authConfigured) return;
   _ambientStarted = true;
@@ -130,8 +130,10 @@ export async function initAmbient() {
 }
 
 function startAmbient(sb) {
+  if (_ambientLive) return;   // onAuth can fire again (sign-out/in) — never stack a second subscription
   const me = auth.session()?.user?.id;
   if (!me) return;
+  _ambientLive = true;
   // RLS scopes realtime to messages in groups you belong to, so no extra filter
   // is needed — we just skip your own messages.
   sb.channel("ambient-msgs")

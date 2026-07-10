@@ -73,7 +73,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="game-common.js?v=1"></script>
-<script type="module" src="notify-ambient.js?v=2"></script>
+<script type="module" src="notify-ambient.js?v=3"></script>
 <script>
 const N=8, SHIPS=[4,3,3,2];
 const GC=window.GameCommon;
@@ -285,7 +285,7 @@ $("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true;
 function resetGame(send){ over=false; recorded=false; myReady=false; oppReady=false; phase="setup"; turn="host"; clearLocal(); clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
 $("rematch").onclick=()=>resetGame(true);
 </script>
-  <script type="module" src="rtc-ring.js?v=1"></script>
-  <script type="module" src="class-gate.js?v=3"></script>
+  <script type="module" src="rtc-ring.js?v=2"></script>
+  <script type="module" src="class-gate.js?v=4"></script>
 </body>
 </html>

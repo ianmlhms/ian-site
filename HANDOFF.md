@@ -46,11 +46,12 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions (5 Jul 2026): `theme.js?v=4`, `auth.js?v=3`, `i18n-dict.js?v=7` (same on ALL
-pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=13`, `friends.js?v=6`,
-`pixelbreak-records.js?v=8`, `admin.js?v=4`, `factory-auth.js?v=3`, `notify-ambient.js?v=2`,
-`game-common.js?v=1`, `game-common.css?v=1`, `style.css?v=6`
-(`notify.js`/`sw.js` are imported, not query-versioned — hard-refresh or bump the importer).
+Current versions (10 Jul 2026): `theme.js?v=9`, `auth.js?v=5`, `i18n-dict.js?v=20` (same on ALL
+pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=20`, `friends.js?v=16`,
+`pixelbreak-records.js?v=8`, `admin.js?v=8`, `factory-auth.js?v=5`, `notify.js?v=3`,
+`notify-ambient.js?v=3`, `class-gate.js?v=4`, `rtc-ring.js?v=2`,
+`game-common.js?v=1`, `game-common.css?v=3`, `style.css?v=9`
+(`sw.js` is registered, not query-versioned — it updates on its own SW lifecycle).
 
 ## 3. Supabase
 
@@ -159,6 +160,10 @@ Old full data was scrubbed from git history.
   `{ auth:{ persistSession:false, autoRefreshToken:false } }` so they don't touch the session.
   `notify-ambient.js` is deliberately NOT on `pixelbreak.html` (it runs its own login client there).
 - **Bump `?v=` on any JS change** (see §2) — the #1 source of "it didn't update".
+- **`auth.onAuth` only fires on real changes** (sign-in/out, user switch, USER_UPDATED) —
+  silent `TOKEN_REFRESHED` / tab-refocus `SIGNED_IN` echoes are filtered in auth.js (Jul 10 2026),
+  because many pages hang a full `boot()` rebuild off it. `mountAccountButton` is idempotent
+  (re-mounting reuses the existing button instead of stacking a duplicate).
 - **`git pull --rebase` before pushing** — the Mac mini commits dashboard refreshes to the same repo.
 - After any **git history rewrite**, every clone must `git reset --hard` (never plain pull) or old commits return.
 - New Supabase features need their SQL **run manually** in the dashboard.

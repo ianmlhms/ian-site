@@ -5,7 +5,7 @@ export const authConfigured =
   /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) && (cfg.anonKey || "").trim().length > 20;
 
 // Shared across EVERY instance of this module — even when it's imported under
-// different "?v=" query strings (auth.js vs auth.js?v=4 are otherwise separate
+// different "?v=" query strings (auth.js vs auth.js?v=5 are otherwise separate
 // modules with separate clients). Two Supabase/GoTrue clients on the same
 // localStorage race on token refresh and corrupt the session, which shows up as
 // "signed in but everything 401s" (no chats load, admin link missing). One global
@@ -66,7 +66,19 @@ export async function client() {
         }
       }
       _g.session = data.session;
-      _g.sb.auth.onAuthStateChange((_e, s) => { _g.session = s; _g.cbs.forEach((cb) => cb(s)); });
+      _g.lastUid = data.session?.user?.id || null;
+      _g.sb.auth.onAuthStateChange((e, s) => {
+        _g.session = s;
+        const uid = s?.user?.id || null;
+        const changed = uid !== _g.lastUid;
+        // GoTrue re-emits SIGNED_IN on tab refocus and TOKEN_REFRESHED hourly.
+        // Pages hang whole boot()/gate() rebuilds off onAuth, so only notify
+        // them when something user-visible changed (sign-in/out, user switch,
+        // USER_UPDATED for username edits) — not for silent token churn.
+        if ((e === "TOKEN_REFRESHED" || e === "SIGNED_IN" || e === "INITIAL_SESSION") && !changed) return;
+        _g.lastUid = uid;
+        _g.cbs.forEach((cb) => cb(s));
+      });
       return _g.sb;
     })();
   }
@@ -181,16 +193,21 @@ export function openAuthModal() {
   m.classList.add("open");
 }
 
-/* Render a sign-in / username button into a host element and keep it in sync. */
+/* Render a sign-in / username button into a host element and keep it in sync.
+ * Idempotent: pages that re-run boot() on auth changes call this again — reuse
+ * the existing button instead of stacking a duplicate next to it. */
 export function mountAccountButton(host) {
   injectCss();
-  const btn = document.createElement("button");
-  btn.className = "auth-btn";
-  btn.onclick = openAuthModal;
-  host.appendChild(btn);
+  const existing = host.querySelector(".auth-btn");
+  const btn = existing || document.createElement("button");
   const sync = () => { btn.innerHTML = session() ? `👤 ${esc(username())}` : "👤 Sign in"; };
-  onAuth(sync);
-  client().then(sync).catch(() => sync());
+  if (!existing) {
+    btn.className = "auth-btn";
+    btn.onclick = openAuthModal;
+    host.appendChild(btn);
+    onAuth(sync);
+    client().then(sync).catch(() => sync());
+  }
   sync();
   return btn;
 }

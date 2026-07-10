@@ -131,7 +131,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=4";
+import * as auth from "./auth.js?v=5";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=(s)=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>");
@@ -415,7 +415,7 @@ function applyAuth(){
   applyAuth();
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=1"></script>
-  <script type="module" src="class-gate.js?v=3"></script>
+  <script type="module" src="rtc-ring.js?v=2"></script>
+  <script type="module" src="class-gate.js?v=4"></script>
 </body>
 </html>
