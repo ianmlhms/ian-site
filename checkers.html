@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Checkers — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=9"></script>
+<link rel="stylesheet" href="game-common.css?v=3">
+<style>
+  :root{--red:#ff5d6c;--cyan:#4de8ff;--dark:#1b2150;--light:#12122a}
+  body{display:flex;flex-direction:column}
+  .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
+  .board{display:grid;grid-template-columns:repeat(8,1fr);border:3px solid var(--border);border-radius:12px;overflow:hidden;touch-action:manipulation}
+  .sq{width:min(11vw,52px);height:min(11vw,52px);display:flex;align-items:center;justify-content:center;background:var(--light)}
+  .sq.d{background:var(--dark)}
+  .sq.sel{box-shadow:inset 0 0 0 3px var(--accent)}
+  .sq.tgt{cursor:pointer}
+  .sq.tgt::after{content:"";width:30%;height:30%;border-radius:50%;background:var(--accent);opacity:.75}
+  .pc{width:78%;height:78%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:min(5vw,24px);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .pc.p1{background:radial-gradient(circle at 35% 30%,#ff8b96,var(--red))}
+  .pc.p2{background:radial-gradient(circle at 35% 30%,#9df2ff,var(--cyan));color:#0d0d1a}
+  .pc.mine{cursor:pointer}
+  .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="pixelbreak.html">‹ Games</a>
+  <h1>🟠 Checkers</h1>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="status">Connecting…</div>
+  <div class="sub" id="sub"></div>
+  <div class="board" id="board"></div>
+  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="game-common.js?v=1"></script>
+<script type="module" src="notify-ambient.js?v=4"></script>
+<script>
+/* English draughts: men move diagonally forward, captures are mandatory (and
+ * chain), reaching the far row crowns a king (which ends the move). A player
+ * with no legal move loses. Host = red (player 1), moves first. */
+const GC = window.GameCommon;
+const { AI, room, role } = GC;
+const me = role === "host" ? 1 : 2;
+const opp = 3 - me;
+let board = [], turn = 1, over = false, lock = null, sel = null;
+let oppHere = false, recorded = false, moveCount = 0;
+const recordResult = GC.recordResult;
+
+let difficulty = GC.difficultyFromUrl();
+const BLUNDER = { easy: 0.45, normal: 0.15, hard: 0 };
+const blunder = () => Math.random() < BLUNDER[difficulty];
+
+const $ = (id) => document.getElementById(id);
+let ch = null;
+
+/* ---------- rules (shared by UI, network replay and AI) ---------- */
+const on = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
+const owner = (v) => (v === 1 || v === 3) ? 1 : (v === 2 || v === 4) ? 2 : 0;
+const isKing = (v) => v > 2;
+
+function fresh() {
+  board = Array.from({ length: 8 }, () => Array(8).fill(0));
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 8; c++) if ((r + c) % 2 === 1) board[r][c] = 2;
+  for (let r = 5; r < 8; r++) for (let c = 0; c < 8; c++) if ((r + c) % 2 === 1) board[r][c] = 1;
+  turn = 1; over = false; lock = null; sel = null; recorded = false; moveCount = 0;
+}
+function pieceMoves(b, r, c) {
+  const v = b[r][c], p = owner(v), out = { steps: [], jumps: [] };
+  if (!p) return out;
+  const dirs = isKing(v) ? [[-1,-1],[-1,1],[1,-1],[1,1]] : (p === 1 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]);
+  for (const [dr, dc] of dirs) {
+    const r1 = r + dr, c1 = c + dc;
+    if (!on(r1, c1)) continue;
+    if (!b[r1][c1]) out.steps.push({ fr: r, fc: c, tr: r1, tc: c1, cr: null, cc: null });
+    else if (owner(b[r1][c1]) === 3 - p) {
+      const r2 = r + 2 * dr, c2 = c + 2 * dc;
+      if (on(r2, c2) && !b[r2][c2]) out.jumps.push({ fr: r, fc: c, tr: r2, tc: c2, cr: r1, cc: c1 });
+    }
+  }
+  return out;
+}
+function legalMoves(b, p, lk) {
+  if (lk) return pieceMoves(b, lk.r, lk.c).jumps;   // mid-chain: must continue jumping
+  const jumps = [], steps = [];
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (owner(b[r][c]) === p) {
+    const m = pieceMoves(b, r, c);
+    jumps.push(...m.jumps); steps.push(...m.steps);
+  }
+  return jumps.length ? jumps : steps;   // captures are mandatory
+}
+function applyMove(b, m) {
+  const v = b[m.fr][m.fc];
+  b[m.fr][m.fc] = 0;
+  if (m.cr != null) b[m.cr][m.cc] = 0;
+  let nv = v, crowned = false;
+  if (v === 1 && m.tr === 0) { nv = 3; crowned = true; }
+  if (v === 2 && m.tr === 7) { nv = 4; crowned = true; }
+  b[m.tr][m.tc] = nv;
+  return crowned;
+}
+function play(m, local) {
+  if (over) return;
+  if (local && (turn !== me || !oppHere)) return;
+  const p = turn;
+  const crowned = applyMove(board, m);
+  moveCount++;
+  if (m.cr != null && !crowned && pieceMoves(board, m.tr, m.tc).jumps.length) {
+    lock = { r: m.tr, c: m.tc };                 // chain continues, same player
+    sel = turn === me ? { r: m.tr, c: m.tc } : null;
+  } else {
+    lock = null; sel = null; turn = 3 - p;
+    if (!legalMoves(board, turn, null).length) over = p;
+  }
+  render();
+  if (over) {
+    $("rematch").style.display = "";
+    if (!AI && !recorded) { recorded = true; recordResult("checkers", over === me ? "win" : "loss"); }
+  }
+  if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: m });
+  if (AI && !over && turn === opp) setTimeout(aiMove, 420);
+}
+
+/* ---------- render ---------- */
+function render() {
+  const legal = (turn === me && !over && oppHere) ? legalMoves(board, me, lock) : [];
+  const targets = sel ? legal.filter((m) => m.fr === sel.r && m.fc === sel.c) : [];
+  const canPick = new Set(legal.map((m) => m.fr + "," + m.fc));
+  const b = $("board"); b.innerHTML = "";
+  for (let dr = 0; dr < 8; dr++) for (let dc = 0; dc < 8; dc++) {
+    // guests see the board flipped so their pieces start at the bottom
+    const r = me === 1 ? dr : 7 - dr, c = me === 1 ? dc : 7 - dc;
+    const sq = document.createElement("div");
+    sq.className = "sq" + ((r + c) % 2 === 1 ? " d" : "");
+    const t = targets.find((m) => m.tr === r && m.tc === c);
+    if (t) { sq.classList.add("tgt"); sq.onclick = () => play(t, true); }
+    if (sel && sel.r === r && sel.c === c) sq.classList.add("sel");
+    const v = board[r][c];
+    if (v) {
+      const pc = document.createElement("div");
+      pc.className = "pc p" + owner(v);
+      if (isKing(v)) pc.textContent = "♛";
+      if (owner(v) === me && canPick.has(r + "," + c)) {
+        pc.classList.add("mine");
+        pc.onclick = (e) => { e.stopPropagation(); sel = (sel && sel.r === r && sel.c === c) ? null : { r, c }; render(); };
+      }
+      sq.appendChild(pc);
+    }
+    b.appendChild(sq);
+  }
+  updateStatus(legal);
+}
+function updateStatus(legal) {
+  const dot = `<span class="me" style="background:${me === 1 ? "var(--red)" : "var(--cyan)"}"></span>`;
+  if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
+  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
+  if (turn !== me) return setStatus(AI ? "Computer thinking…" : "Opponent's turn");
+  const forced = legal.length && legal[0].cr != null;
+  setStatus(`Your turn ${dot}`, lock ? "Keep jumping with the same piece!" : forced ? "Capture is mandatory." : "");
+}
+function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
+
+/* ---------- wiring ---------- */
+if (AI) {
+  document.querySelector(".bar h1").textContent = "🟠 Checkers — vs Computer";
+  GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
+  oppHere = true; fresh(); render();
+} else {
+  ch = GC.createChannel("chk");
+  ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload, false))
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); });
+  fresh(); render();
+  GC.joinRoom(ch, {
+    getState: () => ({ board, turn, over, lock, moveCount }),
+    setState: (p) => { board = p.board; turn = p.turn; over = p.over; lock = p.lock; moveCount = p.moveCount || 0; sel = null; render(); if (over) $("rematch").style.display = ""; },
+    isStarted: () => moveCount > 0 || over !== false,
+    onPeers: (here) => { oppHere = here; render(); },
+    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+  });
+}
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+
+/* ---------- AI (minimax + alpha-beta over jump chains), computer = player 2 ---------- */
+function evalBoard(b) {
+  let s = 0;
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+    const v = b[r][c]; if (!v) continue;
+    const p = owner(v);
+    const val = isKing(v) ? 170 : 100 + (p === 2 ? r : 7 - r) * 3;   // men gain value advancing
+    s += p === 2 ? val : -val;
+  }
+  return s;
+}
+function minimax(b, p, lk, depth, alpha, beta) {
+  const ms = legalMoves(b, p, lk);
+  if (!ms.length) return p === 2 ? -100000 - depth : 100000 + depth;   // stuck = lost
+  if (depth <= 0) return evalBoard(b);
+  const maxing = p === 2;
+  let best = maxing ? -1e9 : 1e9;
+  for (const m of ms) {
+    const nb = b.map((row) => row.slice());
+    const crowned = applyMove(nb, m);
+    let np = 3 - p, nlk = null;
+    if (m.cr != null && !crowned && pieceMoves(nb, m.tr, m.tc).jumps.length) { np = p; nlk = { r: m.tr, c: m.tc }; }
+    const v = minimax(nb, np, nlk, depth - 1, alpha, beta);
+    if (maxing) { best = Math.max(best, v); alpha = Math.max(alpha, v); }
+    else { best = Math.min(best, v); beta = Math.min(beta, v); }
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+function aiMove() {
+  if (over || turn !== opp) return;
+  const ms = legalMoves(board, opp, lock);
+  if (!ms.length) return;
+  let m;
+  if (blunder()) m = ms[Math.floor(Math.random() * ms.length)];
+  else {
+    const DEPTH = difficulty === "easy" ? 2 : difficulty === "hard" ? 7 : 4;
+    let best = -1e9, bm = [];
+    for (const mv of ms) {
+      const nb = board.map((row) => row.slice());
+      const crowned = applyMove(nb, mv);
+      let np = 1, nlk = null;
+      if (mv.cr != null && !crowned && pieceMoves(nb, mv.tr, mv.tc).jumps.length) { np = 2; nlk = { r: mv.tr, c: mv.tc }; }
+      const v = minimax(nb, np, nlk, DEPTH - 1, -1e9, 1e9);
+      if (v > best) { best = v; bm = [mv]; } else if (v === best) bm.push(mv);
+    }
+    m = bm[Math.floor(Math.random() * bm.length)];
+  }
+  play(m, false);
+}
+</script>
+  <script type="module" src="rtc-ring.js?v=2"></script>
+  <script type="module" src="class-gate.js?v=4"></script>
+</body>
+</html>

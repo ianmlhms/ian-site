@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dice Duel — ian.lu</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="theme.js?v=9"></script>
+<link rel="stylesheet" href="game-common.css?v=3">
+<style>
+  body{display:flex;flex-direction:column}
+  .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;gap:12px;max-width:520px;margin:0 auto;width:100%}
+  .dice{display:flex;gap:10px}
+  .die{width:56px;height:56px;border-radius:12px;background:#f5f2ea;color:#1a1a2e;font-size:40px;line-height:1;
+    display:flex;align-items:center;justify-content:center;border:2px solid transparent;cursor:default;user-select:none}
+  .die.held{border-color:var(--accent);transform:translateY(6px);background:#dfe9ff}
+  .die.can{cursor:pointer}
+  .rollbtn{font-size:15px;padding:12px 26px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center}
+  td:first-child,th:first-child{text-align:left}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+  td.open{color:var(--muted)}
+  td.pick{color:var(--accent2);font-weight:800;cursor:pointer;background:rgba(110,168,254,.08);border-radius:6px}
+  td.pick:hover{background:rgba(110,168,254,.2)}
+  tr.tot td{font-weight:800;border-top:2px solid var(--border)}
+  .colme{color:var(--accent2)}
+</style>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="pixelbreak.html">‹ Games</a>
+  <h1>🎲 Dice Duel</h1>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <div class="status" id="status">Connecting…</div>
+  <div class="sub" id="sub"></div>
+  <div class="dice" id="dice"></div>
+  <button class="btn rollbtn" id="roll">🎲 Roll</button>
+  <table id="card"></table>
+  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+</div>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="game-common.js?v=1"></script>
+<script type="module" src="notify-ambient.js?v=4"></script>
+<script>
+/* Yahtzee-style dice duel: 3 rolls per turn, hold dice between rolls, score one
+ * of 14 categories per turn. Upper section pays a 35 bonus at 63+. Only dice
+ * rolls and category picks are broadcast; both clients score identically. */
+const GC = window.GameCommon;
+const { AI, room, role } = GC;
+const me = role === "host" ? 1 : 2;
+const opp = 3 - me;
+const $ = (id) => document.getElementById(id);
+const recordResult = GC.recordResult;
+const FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
+let difficulty = GC.difficultyFromUrl();
+const BLUNDER = { easy: 0.4, normal: 0.12, hard: 0 };
+const blunder = () => Math.random() < BLUNDER[difficulty];
+
+const sum = (d) => d.reduce((a, b) => a + b, 0);
+const counts = (d) => { const c = [0, 0, 0, 0, 0, 0, 0]; d.forEach((v) => c[v]++); return c; };
+const hasKind = (d, n) => counts(d).some((c) => c >= n);
+const isFull = (d) => { const c = counts(d).filter(Boolean).sort(); return c.length === 2 && c[0] === 2; };
+function straightLen(d) {
+  const c = counts(d); let best = 0, run = 0;
+  for (let f = 1; f <= 6; f++) { run = c[f] ? run + 1 : 0; best = Math.max(best, run); }
+  return best;
+}
+const UPPER = [1, 2, 3, 4, 5, 6].map((f) => ({ id: "u" + f, n: ["Ones","Twos","Threes","Fours","Fives","Sixes"][f - 1], f: (d) => d.filter((v) => v === f).length * f }));
+const LOWER = [
+  { id: "k3", n: "3 of a kind", f: (d) => hasKind(d, 3) ? sum(d) : 0 },
+  { id: "k4", n: "4 of a kind", f: (d) => hasKind(d, 4) ? sum(d) : 0 },
+  { id: "full", n: "Full House", f: (d) => isFull(d) ? 25 : 0 },
+  { id: "sm", n: "Small Straight", f: (d) => straightLen(d) >= 4 ? 30 : 0 },
+  { id: "lg", n: "Large Straight", f: (d) => straightLen(d) >= 5 ? 40 : 0 },
+  { id: "five", n: "5 of a kind ★", f: (d) => hasKind(d, 5) ? 50 : 0 },
+  { id: "chance", n: "Chance", f: (d) => sum(d) },
+];
+const CATS = [...UPPER, ...LOWER];
+const catById = Object.fromEntries(CATS.map((c) => [c.id, c]));
+
+/* ---------- state ---------- */
+let sc = { 1: {}, 2: {} }, turn = 1, dice = [1, 1, 1, 1, 1], held = [false, false, false, false, false];
+let rolls = 0, over = false, oppHere = false, recorded = false, started = false;
+let ch = null;
+
+function fresh() {
+  sc = { 1: {}, 2: {} }; turn = 1; dice = [1, 1, 1, 1, 1]; held = [false, false, false, false, false];
+  rolls = 0; over = false; recorded = false; started = false;
+}
+const upperSum = (p) => UPPER.reduce((a, c) => a + (sc[p][c.id] ?? 0), 0);
+const bonus = (p) => upperSum(p) >= 63 ? 35 : 0;
+const total = (p) => CATS.reduce((a, c) => a + (sc[p][c.id] ?? 0), 0) + bonus(p);
+const done = (p) => CATS.every((c) => sc[p][c.id] != null);
+
+/* ---------- turn actions (run identically from local input and broadcasts) ---------- */
+function applyRoll(d, r) { dice = d; rolls = r; started = true; render(); }
+function applyHold(h) { held = h; render(); }
+function applyScore(p, catId) {
+  sc[p][catId] = catById[catId].f(dice);
+  held = [false, false, false, false, false]; rolls = 0;
+  if (done(1) && done(2)) {
+    over = true;
+    render();
+    $("rematch").style.display = "";
+    if (!AI && !recorded) {
+      recorded = true;
+      const mine = total(me), theirs = total(opp);
+      recordResult("diceduel", mine === theirs ? "draw" : mine > theirs ? "win" : "loss");
+    }
+    return;
+  }
+  turn = 3 - p;
+  render();
+  if (AI && turn === opp) setTimeout(aiTurn, 700);
+}
+function rollDice() {
+  if (turn !== me || rolls >= 3 || over || !oppHere) return;
+  const d = dice.map((v, i) => (rolls > 0 && held[i]) ? v : 1 + Math.floor(Math.random() * 6));
+  const r = rolls + 1;
+  applyRoll(d, r);
+  if (!AI) ch.send({ type: "broadcast", event: "roll", payload: { d, r } });
+}
+function toggleHold(i) {
+  if (turn !== me || rolls === 0 || rolls >= 3 || over) return;
+  held[i] = !held[i]; render();
+  if (!AI) ch.send({ type: "broadcast", event: "hold", payload: { h: held } });
+}
+function pickCat(catId) {
+  if (turn !== me || rolls === 0 || over || sc[me][catId] != null) return;
+  applyScore(me, catId);
+  if (!AI) ch.send({ type: "broadcast", event: "score", payload: { cat: catId } });
+}
+
+/* ---------- render ---------- */
+function render() {
+  const myTurn = turn === me && !over && oppHere;
+  $("dice").innerHTML = dice.map((v, i) =>
+    `<div class="die${held[i] ? " held" : ""}${myTurn && rolls > 0 && rolls < 3 ? " can" : ""}" data-i="${i}">${rolls === 0 ? "🎲" : FACES[v]}</div>`).join("");
+  $("dice").querySelectorAll(".can").forEach((el) => { el.onclick = () => toggleHold(+el.dataset.i); });
+  const rb = $("roll");
+  rb.disabled = !myTurn || rolls >= 3;
+  rb.textContent = rolls === 0 ? "🎲 Roll" : `🎲 Roll again (${3 - rolls} left)`;
+  rb.style.opacity = rb.disabled ? ".4" : "1";
+
+  const row = (c) => {
+    const meV = sc[me][c.id], opV = sc[opp][c.id];
+    const canPick = myTurn && rolls > 0 && meV == null;
+    const meCell = meV != null ? meV : canPick ? `<td class="pick" data-cat="${c.id}">${c.f(dice)}</td>` : '<td class="open">–</td>';
+    const meTd = meV != null ? `<td>${meV}</td>` : meCell;
+    return `<tr><td>${c.n}</td>${meTd}<td class="open">${opV != null ? opV : "–"}</td></tr>`;
+  };
+  $("card").innerHTML =
+    `<tr><th>Category</th><th class="colme">You</th><th>${AI ? "🤖" : "Opponent"}</th></tr>` +
+    UPPER.map(row).join("") +
+    `<tr><td style="color:var(--muted)">Bonus (63+)</td><td>${upperSum(me)}/63 ${bonus(me) ? "→ +35" : ""}</td><td class="open">${upperSum(opp)}/63 ${bonus(opp) ? "→ +35" : ""}</td></tr>` +
+    LOWER.map(row).join("") +
+    `<tr class="tot"><td>Total</td><td class="colme">${total(me)}</td><td>${total(opp)}</td></tr>`;
+  $("card").querySelectorAll(".pick").forEach((el) => { el.onclick = () => pickCat(el.dataset.cat); });
+  updateStatus(myTurn);
+}
+function updateStatus(myTurn) {
+  if (over) {
+    const mine = total(me), theirs = total(opp);
+    return setStatus(mine === theirs ? "It's a draw!" : mine > theirs ? "You win! 🎉" : "You lost.", `${mine} : ${theirs}`);
+  }
+  if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
+  if (!myTurn) return setStatus(AI ? "Computer thinking…" : "Opponent's turn");
+  if (rolls === 0) return setStatus("Your turn", "Roll the dice!");
+  setStatus("Your turn", rolls < 3 ? "Hold dice, roll again, or pick a category." : "Pick a category on the scorecard.");
+}
+function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
+$("roll").onclick = rollDice;
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+
+/* ---------- wiring ---------- */
+if (AI) {
+  document.querySelector(".bar h1").textContent = "🎲 Dice Duel — vs Computer";
+  GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
+  oppHere = true; fresh(); render();
+} else {
+  ch = GC.createChannel("dd");
+  ch.on("broadcast", { event: "roll" }, ({ payload }) => { if (turn === opp) applyRoll(payload.d, payload.r); })
+    .on("broadcast", { event: "hold" }, ({ payload }) => { if (turn === opp) applyHold(payload.h); })
+    .on("broadcast", { event: "score" }, ({ payload }) => { if (turn === opp) applyScore(opp, payload.cat); })
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); });
+  fresh(); render();
+  GC.joinRoom(ch, {
+    getState: () => ({ sc, turn, dice, held, rolls, over, started }),
+    setState: (p) => { sc = p.sc; turn = p.turn; dice = p.dice; held = p.held; rolls = p.rolls; over = p.over; started = p.started; render(); if (over) $("rematch").style.display = ""; },
+    isStarted: () => started || over,
+    onPeers: (here) => { oppHere = here; render(); },
+    onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
+  });
+}
+
+/* ---------- AI opponent (seat 2) ---------- */
+function aiHolds() {
+  // chase a straight when 4 distinct-in-a-row show and the straights are open
+  const wantStraight = (sc[opp].sm == null || sc[opp].lg == null) && straightLen(dice) >= 4;
+  if (wantStraight) {
+    const c = counts(dice), used = [0, 0, 0, 0, 0, 0, 0];
+    held = dice.map((v) => { if (c[v] && !used[v]) { used[v] = 1; return true; } return false; });
+    return;
+  }
+  // otherwise keep the biggest group (ties → higher face)
+  const c = counts(dice);
+  let face = 1;
+  for (let f = 1; f <= 6; f++) if (c[f] >= c[face]) face = f;
+  held = dice.map((v) => v === face);
+}
+function aiPick() {
+  const open = CATS.filter((c) => sc[opp][c.id] == null);
+  if (blunder()) return open[Math.floor(Math.random() * open.length)].id;
+  let best = null, bv = -1e9;
+  for (const c of open) {
+    let v = c.f(dice);
+    if (c.id[0] === "u") { const f = +c.id[1]; v += v >= f * 3 ? 4 : -3; }   // upper: push toward the bonus
+    if (c.id === "chance") v -= 6;                                          // save chance for a bad turn
+    if (v === 0) v -= (c.id === "five" || c.id === "lg") ? -2 : 8;          // dump zeros into long shots
+    if (v > bv) { bv = v; best = c; }
+  }
+  return best.id;
+}
+function aiTurn() {
+  if (over || turn !== opp) return;
+  const step = () => {
+    if (rolls < 3) {
+      dice = dice.map((v, i) => (rolls > 0 && held[i]) ? v : 1 + Math.floor(Math.random() * 6));
+      rolls++; started = true;
+      // stop early on a great hand
+      const jackpot = hasKind(dice, 4) || straightLen(dice) >= 5 || isFull(dice);
+      aiHolds(); render();
+      if (rolls < 3 && !jackpot) { setTimeout(step, 650); return; }
+    }
+    setTimeout(() => applyScore(opp, aiPick()), 550);
+  };
+  held = [false, false, false, false, false];
+  setTimeout(step, 400);
+}
+</script>
+  <script type="module" src="rtc-ring.js?v=2"></script>
+  <script type="module" src="class-gate.js?v=4"></script>
+</body>
+</html>
