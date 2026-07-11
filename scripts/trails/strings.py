@@ -17,6 +17,16 @@ REGIONS = {
 DIFFICULTIES = {
     "easy": {"de": "leicht", "fr": "facile", "en": "easy"},
     "moderate": {"de": "mittel", "fr": "moyenne", "en": "moderate"},
+    "hard": {"de": "anspruchsvoll", "fr": "exigeante", "en": "challenging"},
+}
+
+EXTRA = {
+    "de": {"fact_gain": "Höhenmeter", "photos_title": "Eindrücke vom Weg",
+           "profile_title": "Höhenprofil", "photo_via": "via Wikimedia Commons"},
+    "fr": {"fact_gain": "Dénivelé +", "photos_title": "Impressions du parcours",
+           "profile_title": "Profil altimétrique", "photo_via": "via Wikimedia Commons"},
+    "en": {"fact_gain": "Elevation gain", "photos_title": "Impressions from the trail",
+           "profile_title": "Elevation profile", "photo_via": "via Wikimedia Commons"},
 }
 
 UI = {

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Auto-Pédestre Bettborn : boucle de 10 km près de Bettborn (Centre / Guttland). Carte, durée, difficulté et accès en bus." />
+  <meta property="og:title" content="Auto-Pédestre Bettborn" />
+  <meta property="og:description" content="Auto-Pédestre Bettborn : boucle de 10 km près de Bettborn (Centre / Guttland). Carte, durée, difficulté et accès en bus." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Pr%C3%A9izerdaul%2C_Horas_%28100%29.jpg/960px-Pr%C3%A9izerdaul%2C_Horas_%28100%29.jpg" />
+  <link rel="canonical" href="https://ian.lu/trails/fr/bettborn.html" />
+  <link rel="alternate" hreflang="de" href="https://ian.lu/trails/de/bettborn.html" />
+  <link rel="alternate" hreflang="fr" href="https://ian.lu/trails/fr/bettborn.html" />
+  <link rel="alternate" hreflang="en" href="https://ian.lu/trails/en/bettborn.html" />
+  <link rel="alternate" hreflang="x-default" href="https://ian.lu/trails/" />
+  <title>Auto-Pédestre Bettborn — boucle de randonnée à Bettborn | Auto-Pédestres Luxembourg</title>
+  <link rel="stylesheet" href="../trails.css?v=2" />
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+  <!-- Google AdSense (public pages only) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TouristAttraction", "name": "Auto-Pédestre Bettborn", "description": "Auto-Pédestre Bettborn : boucle de 10 km près de Bettborn (Centre / Guttland). Carte, durée, difficulté et accès en bus.", "url": "https://ian.lu/trails/fr/bettborn.html", "isAccessibleForFree": true, "address": {"@type": "PostalAddress", "addressLocality": "Bettborn", "addressCountry": "LU"}, "geo": {"@type": "GeoCoordinates", "latitude": 49.81011, "longitude": 5.92437}, "image": ["https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Pr%C3%A9izerdaul%2C_Horas_%28100%29.jpg/960px-Pr%C3%A9izerdaul%2C_Horas_%28100%29.jpg", "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Pr%C3%A9izerdaul%2C_Horas_%28101%29.jpg/960px-Pr%C3%A9izerdaul%2C_Horas_%28101%29.jpg", "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Pr%C3%A9izerdaul%2C_Horas_%28102%29.jpg/960px-Pr%C3%A9izerdaul%2C_Horas_%28102%29.jpg"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Auto-Pédestres", "item": "https://ian.lu/trails/fr/"}, {"@type": "ListItem", "position": 2, "name": "Auto-Pédestre Bettborn", "item": "https://ian.lu/trails/fr/bettborn.html"}]}]}</script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="./">Auto-Pédestres Luxembourg</a>
+    <nav class="langs" aria-label="Langue"><a href="../de/bettborn.html">DE</a><a href="../fr/bettborn.html" class="on">FR</a><a href="../en/bettborn.html">EN</a></nav>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumbs"><a href="./">Auto-Pédestres</a> <span>›</span> Auto-Pédestre Bettborn</nav>
+    <h1>Auto-Pédestre Bettborn</h1>
+    <p class="sub">Centre / Guttland · Bettborn</p>
+
+    <section class="facts" aria-label="En bref">
+      <div class="fact"><span class="k">Distance</span><span class="v">10 km</span></div>
+      <div class="fact"><span class="k">Durée</span><span class="v">env. 3 h</span></div>
+      <div class="fact"><span class="k">Difficulté</span><span class="v">moyenne</span></div>
+      <div class="fact"><span class="k">Commune</span><span class="v">Bettborn</span></div>
+      <div class="fact"><span class="k">Dénivelé +</span><span class="v">180 m</span></div>
+      <div class="fact"><span class="k">Type</span><span class="v">Boucle (Auto-Pédestre)</span></div>
+    </section>
+
+    <div id="map" role="img" aria-label="Carte"></div>
+    <p class="map-note">Tracé issu d&#x27;OpenStreetMap — de petits écarts sur le terrain sont possibles. Le balisage bleu sur place fait foi.</p>
+    <figure class="profile"><figcaption>Profil altimétrique (276–409 m)</figcaption>
+    <svg viewBox="0 0 600 130" role="img" preserveAspectRatio="none"><polygon points="14,116 14.0,70.8 20.9,76.1 25.7,80.0 35.3,86.1 39.6,89.9 44.9,90.7 48.7,89.2 56.2,86.9 62.0,83.8 69.0,81.5 74.8,79.2 78.0,75.4 83.9,71.5 93.0,66.9 95.6,62.3 101.5,57.7 108.4,53.1 112.7,49.3 119.1,43.1 124.5,38.5 131.4,33.2 136.2,29.3 145.8,24.7 152.7,20.9 153.8,17.8 161.8,14.8 167.7,14.0 169.8,15.5 177.8,17.8 185.3,21.7 193.8,27.0 193.8,30.9 204.5,33.2 212.0,36.2 212.0,40.8 216.2,42.4 223.7,43.9 229.0,47.0 234.9,49.3 245.6,50.8 245.6,52.3 251.4,53.9 257.8,54.6 266.4,54.6 276.0,56.9 276.0,59.2 285.6,63.8 285.6,69.2 296.3,75.4 308.0,79.2 308.0,85.3 310.1,91.5 318.1,96.1 326.1,99.9 326.1,103.0 335.8,103.7 338.4,103.7 343.8,104.5 350.2,106.0 357.1,108.3 361.9,109.9 375.2,110.6 375.2,110.6 378.4,110.6 388.6,111.4 390.7,112.2 397.1,112.9 406.7,114.5 407.8,116.0 412.6,116.0 418.5,113.7 424.9,112.2 432.3,107.6 435.5,103.7 448.3,99.1 448.3,94.5 455.8,89.2 459.5,83.8 465.4,78.4 475.5,75.4 478.2,71.5 483.0,70.0 489.4,68.5 501.2,66.2 501.2,62.3 510.2,59.2 514.5,57.7 517.7,56.9 523.0,59.2 528.9,61.5 535.3,67.7 545.4,73.1 584.9,76.9 584.9,80.0 584.9,83.8 584.9,83.8 584.9,83.8 584.9,83.8 584.9,83.8 586.0,83.8 586,116" class="p-fill"/><polyline points="14.0,70.8 20.9,76.1 25.7,80.0 35.3,86.1 39.6,89.9 44.9,90.7 48.7,89.2 56.2,86.9 62.0,83.8 69.0,81.5 74.8,79.2 78.0,75.4 83.9,71.5 93.0,66.9 95.6,62.3 101.5,57.7 108.4,53.1 112.7,49.3 119.1,43.1 124.5,38.5 131.4,33.2 136.2,29.3 145.8,24.7 152.7,20.9 153.8,17.8 161.8,14.8 167.7,14.0 169.8,15.5 177.8,17.8 185.3,21.7 193.8,27.0 193.8,30.9 204.5,33.2 212.0,36.2 212.0,40.8 216.2,42.4 223.7,43.9 229.0,47.0 234.9,49.3 245.6,50.8 245.6,52.3 251.4,53.9 257.8,54.6 266.4,54.6 276.0,56.9 276.0,59.2 285.6,63.8 285.6,69.2 296.3,75.4 308.0,79.2 308.0,85.3 310.1,91.5 318.1,96.1 326.1,99.9 326.1,103.0 335.8,103.7 338.4,103.7 343.8,104.5 350.2,106.0 357.1,108.3 361.9,109.9 375.2,110.6 375.2,110.6 378.4,110.6 388.6,111.4 390.7,112.2 397.1,112.9 406.7,114.5 407.8,116.0 412.6,116.0 418.5,113.7 424.9,112.2 432.3,107.6 435.5,103.7 448.3,99.1 448.3,94.5 455.8,89.2 459.5,83.8 465.4,78.4 475.5,75.4 478.2,71.5 483.0,70.0 489.4,68.5 501.2,66.2 501.2,62.3 510.2,59.2 514.5,57.7 517.7,56.9 523.0,59.2 528.9,61.5 535.3,67.7 545.4,73.1 584.9,76.9 584.9,80.0 584.9,83.8 584.9,83.8 584.9,83.8 584.9,83.8 584.9,83.8 586.0,83.8" class="p-line"/></svg></figure>
+
+    <article class="desc">
+      <p>Cette Auto-Pédestre explore les environs de Bettborn, dans le Guttland, le cœur varié du pays entre champs et bois. La boucle fait 10 km ; comptez environ 3 h de marche à allure normale. Le parcours cumule environ 180 m de dénivelé, et la plus grande partie du tracé suit des chemins forestiers et agricoles.</p>
+      <p>Le tracé suit surtout des chemins proches de la nature, entre bois et campagne. Le circuit est entièrement balisé du signe bleu des Auto-Pédestres ; en boucle, il n&#x27;a pas de départ imposé.</p>
+    </article>
+
+    <section class="highlights">
+      <h2>Points forts</h2>
+      <ul>
+        <li>Surtout chemins forestiers et agricoles</li>
+        <li>Arrêt de bus sur le parcours</li>
+        <li>Guttland</li>
+      </ul>
+    </section>
+
+    <section class="gallery">
+      <h2>Impressions du parcours</h2>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Pr%C3%A9izerdaul%2C_Horas_%28100%29.jpg/960px-Pr%C3%A9izerdaul%2C_Horas_%28100%29.jpg" alt="" loading="lazy" /><figcaption>GilPe · CC BY-SA 4.0 · <a href="https://commons.wikimedia.org/w/index.php?curid=101420467" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Pr%C3%A9izerdaul%2C_Horas_%28101%29.jpg/960px-Pr%C3%A9izerdaul%2C_Horas_%28101%29.jpg" alt="" loading="lazy" /><figcaption>GilPe · CC BY-SA 4.0 · <a href="https://commons.wikimedia.org/w/index.php?curid=101420479" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Pr%C3%A9izerdaul%2C_Horas_%28102%29.jpg/960px-Pr%C3%A9izerdaul%2C_Horas_%28102%29.jpg" alt="" loading="lazy" /><figcaption>GilPe · CC BY-SA 4.0 · <a href="https://commons.wikimedia.org/w/index.php?curid=101420496" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+    </section>
+
+    <section class="bus">
+      <h2>Y aller en bus</h2>
+      <p>Les transports publics sont gratuits au Luxembourg. Ces arrêts se trouvent sur le parcours :</p>
+      <ul class="stops">
+        <li><span class="stop-name">Pratz, Zentrum</span><span class="stop-meta">à 10 m du sentier</span><span class="stop-lines"><span class="line-chip">961</span><span class="line-chip">962</span><span class="line-chip">K13</span><span class="line-chip">M14</span><span class="line-chip">MH3</span></span></li>
+        <li><span class="stop-name">Pratz, Horass Millen</span><span class="stop-meta">à 10 m du sentier</span><span class="stop-lines"><span class="line-chip">961</span><span class="line-chip">962</span><span class="line-chip">K13</span><span class="line-chip">M14</span><span class="line-chip">MH3</span></span></li>
+        <li><span class="stop-name">Pratz, Haaptstrooss</span><span class="stop-meta">à 50 m du sentier</span><span class="stop-lines"><span class="line-chip">911</span><span class="line-chip">950</span><span class="line-chip">F01</span><span class="line-chip">K14</span><span class="line-chip">K35</span><span class="line-chip">M03</span><span class="line-chip">M04</span><span class="line-chip">M15</span></span></li>
+        <li><span class="stop-name">Pratz, Biebergriescht</span><span class="stop-meta">à 80 m du sentier</span><span class="stop-lines"><span class="line-chip">911</span><span class="line-chip">950</span><span class="line-chip">K13</span><span class="line-chip">K14</span><span class="line-chip">K35</span><span class="line-chip">M03</span><span class="line-chip">M04</span><span class="line-chip">M14</span></span></li>
+      </ul>
+      <p class="bus-live"><a href="https://ian.lu/bus.html" rel="noopener">Départs en direct pour tous les arrêts : ian.lu/bus</a></p>
+    </section>
+
+  </main>
+
+  <footer class="site-foot">Un projet de ian.lu · Tracés © contributeurs OpenStreetMap · Horaires : data.public.lu · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      if (typeof L === 'undefined') { return; }
+      var map = L.map('map', { scrollWheelZoom: false });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+      map.fitBounds([[49.79543, 5.90926], [49.82479, 5.93949]], { padding: [20, 20] });
+      fetch('../geo/bettborn.geojson')
+        .then(function (r) { if (!r.ok) { throw new Error('geojson ' + r.status); } return r.json(); })
+        .then(function (geo) {
+          var line = L.geoJSON(geo, { style: { color: '#1d6fce', weight: 4, opacity: 0.85 } }).addTo(map);
+          map.fitBounds(line.getBounds(), { padding: [20, 20] });
+        })
+        .catch(function (err) { console.log('[trails] map line unavailable:', err.message); });
+    });
+  </script>
+</body>
+</html>

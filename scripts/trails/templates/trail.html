@@ -7,11 +7,11 @@
   <meta property="og:title" content="$og_title" />
   <meta property="og:description" content="$meta_desc" />
   <meta property="og:type" content="article" />
-  <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
+  <meta property="og:image" content="$og_image" />
   <link rel="canonical" href="$canonical" />
 $alternates
   <title>$title</title>
-  <link rel="stylesheet" href="../trails.css?v=1" />
+  <link rel="stylesheet" href="../trails.css?v=2" />
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
   <!-- Google AdSense (public pages only) -->
@@ -37,12 +37,13 @@ $alternates
       <div class="fact"><span class="k">$fact_duration</span><span class="v">$duration</span></div>
       <div class="fact"><span class="k">$fact_difficulty</span><span class="v">$difficulty</span></div>
       <div class="fact"><span class="k">$fact_commune</span><span class="v">$commune</span></div>
+$gain_fact
       <div class="fact"><span class="k">$fact_type</span><span class="v">$fact_type_value</span></div>
     </section>
 
     <div id="map" role="img" aria-label="$map_title"></div>
     <p class="map-note">$map_note</p>
-
+$profile_html
     <article class="desc">
 $description_html
     </article>
@@ -54,6 +55,7 @@ $highlights_html
       </ul>
     </section>
 
+$gallery_html
     <section class="bus">
       <h2>$bus_title</h2>
       <p>$bus_intro</p>

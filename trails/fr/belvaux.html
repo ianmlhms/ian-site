@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Auto-Pédestre Belvaux : boucle de 9,4 km près de Belvaux (Minett – Terres Rouges). Carte, durée, difficulté et accès en bus." />
+  <meta property="og:title" content="Auto-Pédestre Belvaux" />
+  <meta property="og:description" content="Auto-Pédestre Belvaux : boucle de 9,4 km près de Belvaux (Minett – Terres Rouges). Carte, durée, difficulté et accès en bus." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Zolwer_-_rue_du_Ch%C3%A2teau.jpg/960px-Zolwer_-_rue_du_Ch%C3%A2teau.jpg" />
+  <link rel="canonical" href="https://ian.lu/trails/fr/belvaux.html" />
+  <link rel="alternate" hreflang="de" href="https://ian.lu/trails/de/belvaux.html" />
+  <link rel="alternate" hreflang="fr" href="https://ian.lu/trails/fr/belvaux.html" />
+  <link rel="alternate" hreflang="en" href="https://ian.lu/trails/en/belvaux.html" />
+  <link rel="alternate" hreflang="x-default" href="https://ian.lu/trails/" />
+  <title>Auto-Pédestre Belvaux — boucle de randonnée à Belvaux | Auto-Pédestres Luxembourg</title>
+  <link rel="stylesheet" href="../trails.css?v=2" />
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+  <!-- Google AdSense (public pages only) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TouristAttraction", "name": "Auto-Pédestre Belvaux", "description": "Auto-Pédestre Belvaux : boucle de 9,4 km près de Belvaux (Minett – Terres Rouges). Carte, durée, difficulté et accès en bus.", "url": "https://ian.lu/trails/fr/belvaux.html", "isAccessibleForFree": true, "address": {"@type": "PostalAddress", "addressLocality": "Belvaux", "addressCountry": "LU"}, "geo": {"@type": "GeoCoordinates", "latitude": 49.51759, "longitude": 5.92709}, "image": ["https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Zolwer_-_rue_du_Ch%C3%A2teau.jpg/960px-Zolwer_-_rue_du_Ch%C3%A2teau.jpg", "https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28101%29.jpg/960px-Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28101%29.jpg", "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28102%29.jpg/960px-Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28102%29.jpg"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Auto-Pédestres", "item": "https://ian.lu/trails/fr/"}, {"@type": "ListItem", "position": 2, "name": "Auto-Pédestre Belvaux", "item": "https://ian.lu/trails/fr/belvaux.html"}]}]}</script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="./">Auto-Pédestres Luxembourg</a>
+    <nav class="langs" aria-label="Langue"><a href="../de/belvaux.html">DE</a><a href="../fr/belvaux.html" class="on">FR</a><a href="../en/belvaux.html">EN</a></nav>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumbs"><a href="./">Auto-Pédestres</a> <span>›</span> Auto-Pédestre Belvaux</nav>
+    <h1>Auto-Pédestre Belvaux</h1>
+    <p class="sub">Minett – Terres Rouges · Belvaux</p>
+
+    <section class="facts" aria-label="En bref">
+      <div class="fact"><span class="k">Distance</span><span class="v">9,4 km</span></div>
+      <div class="fact"><span class="k">Durée</span><span class="v">env. 2½ h</span></div>
+      <div class="fact"><span class="k">Difficulté</span><span class="v">moyenne</span></div>
+      <div class="fact"><span class="k">Commune</span><span class="v">Belvaux</span></div>
+      <div class="fact"><span class="k">Dénivelé +</span><span class="v">170 m</span></div>
+      <div class="fact"><span class="k">Type</span><span class="v">Boucle (Auto-Pédestre)</span></div>
+    </section>
+
+    <div id="map" role="img" aria-label="Carte"></div>
+    <p class="map-note">Tracé issu d&#x27;OpenStreetMap — de petits écarts sur le terrain sont possibles. Le balisage bleu sur place fait foi.</p>
+    <figure class="profile"><figcaption>Profil altimétrique (334–408 m)</figcaption>
+    <svg viewBox="0 0 600 130" role="img" preserveAspectRatio="none"><polygon points="14,116 14.0,15.4 20.3,16.8 26.7,16.8 32.4,14.0 41.6,15.4 43.4,19.5 52.0,20.9 54.9,26.4 60.7,36.1 66.4,44.3 75.1,51.2 79.1,62.2 85.4,70.5 89.5,73.3 98.1,73.3 104.4,70.5 106.7,65.0 114.8,56.7 120.6,51.2 125.2,48.5 130.9,44.3 136.7,40.2 141.3,36.1 147.1,42.9 153.4,49.8 178.2,59.5 178.2,70.5 178.2,84.3 178.2,84.3 181.6,80.2 188.0,77.4 202.9,71.9 202.9,66.4 208.7,60.9 211.0,59.5 216.8,65.0 222.5,71.9 243.8,78.8 243.8,88.4 243.8,98.1 245.0,100.8 251.3,103.6 257.1,106.4 266.9,106.4 270.3,105.0 274.4,102.2 280.1,95.3 285.9,87.1 292.8,74.6 298.0,60.9 303.7,47.1 308.9,36.1 315.3,27.8 320.4,25.0 329.1,27.8 332.5,27.8 338.3,27.8 345.2,27.8 352.7,26.4 358.5,25.0 360.8,27.8 368.3,31.9 374.6,38.8 379.8,44.3 385.0,47.1 390.1,45.7 395.9,47.1 402.2,52.6 406.9,62.2 414.3,73.3 420.7,89.8 424.1,103.6 429.9,110.5 439.1,113.2 443.1,116.0 455.8,114.6 455.8,111.9 463.3,109.1 465.6,105.0 474.8,99.5 480.6,93.9 484.6,87.1 489.8,78.8 495.6,71.9 504.8,66.4 505.9,66.4 511.1,66.4 520.9,66.4 526.7,66.4 530.1,62.2 535.9,52.6 540.5,45.7 548.6,40.2 551.4,36.1 560.1,41.6 563.0,54.0 571.0,65.0 577.4,73.3 581.4,81.5 586.0,85.7 586,116" class="p-fill"/><polyline points="14.0,15.4 20.3,16.8 26.7,16.8 32.4,14.0 41.6,15.4 43.4,19.5 52.0,20.9 54.9,26.4 60.7,36.1 66.4,44.3 75.1,51.2 79.1,62.2 85.4,70.5 89.5,73.3 98.1,73.3 104.4,70.5 106.7,65.0 114.8,56.7 120.6,51.2 125.2,48.5 130.9,44.3 136.7,40.2 141.3,36.1 147.1,42.9 153.4,49.8 178.2,59.5 178.2,70.5 178.2,84.3 178.2,84.3 181.6,80.2 188.0,77.4 202.9,71.9 202.9,66.4 208.7,60.9 211.0,59.5 216.8,65.0 222.5,71.9 243.8,78.8 243.8,88.4 243.8,98.1 245.0,100.8 251.3,103.6 257.1,106.4 266.9,106.4 270.3,105.0 274.4,102.2 280.1,95.3 285.9,87.1 292.8,74.6 298.0,60.9 303.7,47.1 308.9,36.1 315.3,27.8 320.4,25.0 329.1,27.8 332.5,27.8 338.3,27.8 345.2,27.8 352.7,26.4 358.5,25.0 360.8,27.8 368.3,31.9 374.6,38.8 379.8,44.3 385.0,47.1 390.1,45.7 395.9,47.1 402.2,52.6 406.9,62.2 414.3,73.3 420.7,89.8 424.1,103.6 429.9,110.5 439.1,113.2 443.1,116.0 455.8,114.6 455.8,111.9 463.3,109.1 465.6,105.0 474.8,99.5 480.6,93.9 484.6,87.1 489.8,78.8 495.6,71.9 504.8,66.4 505.9,66.4 511.1,66.4 520.9,66.4 526.7,66.4 530.1,62.2 535.9,52.6 540.5,45.7 548.6,40.2 551.4,36.1 560.1,41.6 563.0,54.0 571.0,65.0 577.4,73.3 581.4,81.5 586.0,85.7" class="p-line"/></svg></figure>
+
+    <article class="desc">
+      <p>Autour de Belvaux, le Minett, le sud du Luxembourg, montre son visage vert : forêts et friches riches en espèces ont recouvert les anciens sites miniers. La boucle fait 9,4 km ; comptez environ 2½ h de marche à allure normale. Le parcours cumule environ 170 m de dénivelé, environ la moitié du tracé évite le bitume.</p>
+      <p>En chemin, on passe près de Zolwerknapp. Le circuit est entièrement balisé du signe bleu des Auto-Pédestres ; en boucle, il n&#x27;a pas de départ imposé.</p>
+    </article>
+
+    <section class="highlights">
+      <h2>Points forts</h2>
+      <ul>
+        <li>Zolwerknapp</li>
+        <li>Arrêt de bus sur le parcours</li>
+        <li>Minett – Terres Rouges</li>
+      </ul>
+    </section>
+
+    <section class="gallery">
+      <h2>Impressions du parcours</h2>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Zolwer_-_rue_du_Ch%C3%A2teau.jpg/960px-Zolwer_-_rue_du_Ch%C3%A2teau.jpg" alt="" loading="lazy" /><figcaption>MMFE · CC BY-SA 4.0 · <a href="https://commons.wikimedia.org/w/index.php?curid=49127662" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28101%29.jpg/960px-Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28101%29.jpg" alt="" loading="lazy" /><figcaption>GilPe · CC BY-SA 4.0 · <a href="https://commons.wikimedia.org/w/index.php?curid=94707023" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28102%29.jpg/960px-Soleuvre%2C_marquage_multicolore_rue_Jean_Anen_%28102%29.jpg" alt="" loading="lazy" /><figcaption>GilPe · CC BY-SA 4.0 · <a href="https://commons.wikimedia.org/w/index.php?curid=94707030" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+    </section>
+
+    <section class="bus">
+      <h2>Y aller en bus</h2>
+      <p>Les transports publics sont gratuits au Luxembourg. Ces arrêts se trouvent sur le parcours :</p>
+      <ul class="stops">
+        <li><span class="stop-name">Soleuvre, Zolwerknapp</span><span class="stop-meta">à 10 m du sentier</span><span class="stop-lines"><span class="line-chip">3</span><span class="line-chip">15</span></span></li>
+        <li><span class="stop-name">Belvaux, Mairie/Poste</span><span class="stop-meta">à 20 m du sentier</span><span class="stop-lines"><span class="line-chip">3</span><span class="line-chip">15</span><span class="line-chip">651</span><span class="line-chip">L60</span></span></li>
+        <li><span class="stop-name">Soleuvre, Dickskopp</span><span class="stop-meta">à 20 m du sentier</span><span class="stop-lines">voir horaires</span></li>
+        <li><span class="stop-name">Belvaux-Soleuvre, Gare</span><span class="stop-meta">à 30 m du sentier</span><span class="stop-lines">voir horaires</span></li>
+      </ul>
+      <p class="bus-live"><a href="https://ian.lu/bus.html" rel="noopener">Départs en direct pour tous les arrêts : ian.lu/bus</a></p>
+    </section>
+
+  </main>
+
+  <footer class="site-foot">Un projet de ian.lu · Tracés © contributeurs OpenStreetMap · Horaires : data.public.lu · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      if (typeof L === 'undefined') { return; }
+      var map = L.map('map', { scrollWheelZoom: false });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+      map.fitBounds([[49.50776, 5.91497], [49.52742, 5.93921]], { padding: [20, 20] });
+      fetch('../geo/belvaux.geojson')
+        .then(function (r) { if (!r.ok) { throw new Error('geojson ' + r.status); } return r.json(); })
+        .then(function (geo) {
+          var line = L.geoJSON(geo, { style: { color: '#1d6fce', weight: 4, opacity: 0.85 } }).addTo(map);
+          map.fitBounds(line.getBounds(), { padding: [20, 20] });
+        })
+        .catch(function (err) { console.log('[trails] map line unavailable:', err.message); });
+    });
+  </script>
+</body>
+</html>

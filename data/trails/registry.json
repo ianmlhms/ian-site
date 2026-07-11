@@ -1,0 +1,634 @@
+{
+ "trails": [
+  {
+   "slug": "reimberg",
+   "osm_rel": 8032747,
+   "name": "Auto Pédestre Reimberg",
+   "place": "Reimberg"
+  },
+  {
+   "slug": "abweiler",
+   "osm_rel": 2680252,
+   "name": "Auto-Pédestre Abweiler",
+   "place": "Abweiler"
+  },
+  {
+   "slug": "bascharage",
+   "osm_rel": 2347944,
+   "name": "Auto-Pédestre Bascharage",
+   "place": "Bascharage"
+  },
+  {
+   "slug": "baschleiden",
+   "osm_rel": 15814976,
+   "name": "Auto-Pédestre Baschleiden",
+   "place": "Baschleiden"
+  },
+  {
+   "slug": "bech",
+   "osm_rel": 4760933,
+   "name": "Auto-Pédestre Bech",
+   "place": "Bech"
+  },
+  {
+   "slug": "bech-kleinmacher",
+   "osm_rel": 3228886,
+   "name": "Auto-Pédestre Bech-Kleinmacher",
+   "place": "Bech-Kleinmacher"
+  },
+  {
+   "slug": "beckerich",
+   "osm_rel": 6314894,
+   "name": "Auto-Pédestre Beckerich",
+   "place": "Beckerich"
+  },
+  {
+   "slug": "belvaux",
+   "osm_rel": 3965977,
+   "name": "Auto-Pédestre Belvaux",
+   "place": "Belvaux"
+  },
+  {
+   "slug": "berbourg",
+   "osm_rel": 8623182,
+   "name": "Auto-Pédestre Berbourg",
+   "place": "Berbourg"
+  },
+  {
+   "slug": "bereldange",
+   "osm_rel": 7758982,
+   "name": "Auto-Pédestre Bereldange",
+   "place": "Bereldange"
+  },
+  {
+   "slug": "bergem",
+   "osm_rel": 2006610,
+   "name": "Auto-Pédestre Bergem",
+   "place": "Bergem"
+  },
+  {
+   "slug": "beringen",
+   "osm_rel": 3558076,
+   "name": "Auto-Pédestre Beringen",
+   "place": "Beringen"
+  },
+  {
+   "slug": "bertrange",
+   "osm_rel": 2965529,
+   "name": "Auto-Pédestre Bertrange",
+   "place": "Bertrange"
+  },
+  {
+   "slug": "bettborn",
+   "osm_rel": 2348459,
+   "name": "Auto-Pédestre Bettborn",
+   "place": "Bettborn"
+  },
+  {
+   "slug": "bettel",
+   "osm_rel": 11664090,
+   "name": "Auto-Pédestre Bettel",
+   "place": "Bettel"
+  },
+  {
+   "slug": "bettendorf-1",
+   "osm_rel": 11664089,
+   "name": "Auto-Pédestre Bettendorf 1",
+   "place": "Bettendorf"
+  },
+  {
+   "slug": "bonnevoie",
+   "osm_rel": 7759086,
+   "name": "Auto-Pédestre Bonnevoie",
+   "place": "Bonnevoie"
+  },
+  {
+   "slug": "born",
+   "osm_rel": 2342006,
+   "name": "Auto-Pédestre Born",
+   "place": "Born"
+  },
+  {
+   "slug": "boulaide-1",
+   "osm_rel": 7429893,
+   "name": "Auto-Pédestre Boulaide 1",
+   "place": "Boulaide"
+  },
+  {
+   "slug": "bourglinster",
+   "osm_rel": 3635131,
+   "name": "Auto-Pédestre Bourglinster",
+   "place": "Bourglinster"
+  },
+  {
+   "slug": "boxhorn",
+   "osm_rel": 5907844,
+   "name": "Auto-Pédestre Boxhorn",
+   "place": "Boxhorn"
+  },
+  {
+   "slug": "brandenbourg",
+   "osm_rel": 6143987,
+   "name": "Auto-Pédestre Brandenbourg",
+   "place": "Brandenbourg"
+  },
+  {
+   "slug": "bridel",
+   "osm_rel": 6748868,
+   "name": "Auto-Pédestre Bridel",
+   "place": "Bridel"
+  },
+  {
+   "slug": "burden",
+   "osm_rel": 2258462,
+   "name": "Auto-Pédestre Burden",
+   "place": "Burden"
+  },
+  {
+   "slug": "cessange",
+   "osm_rel": 2401772,
+   "name": "Auto-Pédestre Cessange",
+   "place": "Cessange"
+  },
+  {
+   "slug": "clemency-1",
+   "osm_rel": 6325760,
+   "name": "Auto-Pédestre Clemency 1",
+   "place": "Clemency"
+  },
+  {
+   "slug": "clemency-2",
+   "osm_rel": 3518835,
+   "name": "Auto-Pédestre Clemency 2",
+   "place": "Clemency"
+  },
+  {
+   "slug": "consthum",
+   "osm_rel": 18732230,
+   "name": "Auto-Pédestre Consthum",
+   "place": "Consthum"
+  },
+  {
+   "slug": "contern",
+   "osm_rel": 4730822,
+   "name": "Auto-Pédestre Contern",
+   "place": "Contern"
+  },
+  {
+   "slug": "dahl",
+   "osm_rel": 2820016,
+   "name": "Auto-Pédestre Dahl",
+   "place": "Dahl"
+  },
+  {
+   "slug": "dalheim",
+   "osm_rel": 2510500,
+   "name": "Auto-Pédestre Dalheim",
+   "place": "Dalheim"
+  },
+  {
+   "slug": "differdange",
+   "osm_rel": 7442605,
+   "name": "Auto-Pédestre Differdange",
+   "place": "Differdange"
+  },
+  {
+   "slug": "dippach",
+   "osm_rel": 2457383,
+   "name": "Auto-Pédestre Dippach",
+   "place": "Dippach"
+  },
+  {
+   "slug": "dudelange-ginzebierg",
+   "osm_rel": 2432328,
+   "name": "Auto-Pédestre Dudelange Ginzebierg",
+   "place": "Dudelange Ginzebierg"
+  },
+  {
+   "slug": "dudelange-haard",
+   "osm_rel": 2373118,
+   "name": "Auto-Pédestre Dudelange Haard",
+   "place": "Dudelange Haard"
+  },
+  {
+   "slug": "echternach-gare",
+   "osm_rel": 6619830,
+   "name": "Auto-Pédestre Echternach 2 / Gare",
+   "place": "Echternach"
+  },
+  {
+   "slug": "ehnen",
+   "osm_rel": 2185955,
+   "name": "Auto-Pédestre Ehnen",
+   "place": "Ehnen"
+  },
+  {
+   "slug": "eischen-i",
+   "osm_rel": 3809779,
+   "name": "Auto-Pédestre Eischen I",
+   "place": "Eischen"
+  },
+  {
+   "slug": "eischen-ii",
+   "osm_rel": 2639438,
+   "name": "Auto-Pédestre Eischen II",
+   "place": "Eischen"
+  },
+  {
+   "slug": "ellange",
+   "osm_rel": 1980635,
+   "name": "Auto-Pédestre Ellange",
+   "place": "Ellange"
+  },
+  {
+   "slug": "esch-sur-alzette",
+   "osm_rel": 3134263,
+   "name": "Auto-Pédestre Esch-sur-Alzette",
+   "place": "Esch-sur-Alzette"
+  },
+  {
+   "slug": "ettelbruck-1",
+   "osm_rel": 8411454,
+   "name": "Auto-Pédestre Ettelbruck 1",
+   "place": "Ettelbruck"
+  },
+  {
+   "slug": "ettelbruck-2",
+   "osm_rel": 8415204,
+   "name": "Auto-Pédestre Ettelbruck 2",
+   "place": "Ettelbruck"
+  },
+  {
+   "slug": "fischbach-ii",
+   "osm_rel": 4627746,
+   "name": "Auto-Pédestre Fischbach II",
+   "place": "Fischbach"
+  },
+  {
+   "slug": "flaxweiler",
+   "osm_rel": 9598963,
+   "name": "Auto-Pédestre Flaxweiler",
+   "place": "Flaxweiler"
+  },
+  {
+   "slug": "garnich",
+   "osm_rel": 3115205,
+   "name": "Auto-Pédestre Garnich",
+   "place": "Garnich"
+  },
+  {
+   "slug": "gostingen",
+   "osm_rel": 3555535,
+   "name": "Auto-Pédestre Gostingen",
+   "place": "Gostingen"
+  },
+  {
+   "slug": "gralingen",
+   "osm_rel": 12914268,
+   "name": "Auto-Pédestre Gralingen",
+   "place": "Gralingen"
+  },
+  {
+   "slug": "grevenmacher-ii",
+   "osm_rel": 2032397,
+   "name": "Auto-Pédestre Grevenmacher II",
+   "place": "Grevenmacher"
+  },
+  {
+   "slug": "grosbous",
+   "osm_rel": 2326376,
+   "name": "Auto-Pédestre Grosbous",
+   "place": "Grosbous"
+  },
+  {
+   "slug": "grengewald",
+   "osm_rel": 18611422,
+   "name": "Auto-Pédestre Gréngewald",
+   "place": "Gréngewald"
+  },
+  {
+   "slug": "heinerscheid-1",
+   "osm_rel": 4251112,
+   "name": "Auto-Pédestre Heinerscheid 1",
+   "place": "Heinerscheid"
+  },
+  {
+   "slug": "heisdorf",
+   "osm_rel": 2605477,
+   "name": "Auto-Pédestre Heisdorf",
+   "place": "Heisdorf"
+  },
+  {
+   "slug": "hesperange",
+   "osm_rel": 12772647,
+   "name": "Auto-Pédestre Hesperange",
+   "place": "Hesperange"
+  },
+  {
+   "slug": "insenborn",
+   "osm_rel": 7474232,
+   "name": "Auto-Pédestre Insenborn",
+   "place": "Insenborn"
+  },
+  {
+   "slug": "itzig",
+   "osm_rel": 2442612,
+   "name": "Auto-Pédestre Itzig",
+   "place": "Itzig"
+  },
+  {
+   "slug": "kayl",
+   "osm_rel": 2579801,
+   "name": "Auto-Pédestre Kayl",
+   "place": "Kayl"
+  },
+  {
+   "slug": "kehlen",
+   "osm_rel": 1430571,
+   "name": "Auto-Pédestre Kehlen",
+   "place": "Kehlen"
+  },
+  {
+   "slug": "koerich",
+   "osm_rel": 3327680,
+   "name": "Auto-Pédestre Koerich",
+   "place": "Koerich"
+  },
+  {
+   "slug": "kopstal",
+   "osm_rel": 18611864,
+   "name": "Auto-Pédestre Kopstal",
+   "place": "Kopstal"
+  },
+  {
+   "slug": "lamadelaine",
+   "osm_rel": 2891543,
+   "name": "Auto-Pédestre Lamadelaine",
+   "place": "Lamadelaine"
+  },
+  {
+   "slug": "leudelange",
+   "osm_rel": 1899955,
+   "name": "Auto-Pédestre Leudelange",
+   "place": "Leudelange"
+  },
+  {
+   "slug": "leudelange-gare-anc-roedgen",
+   "osm_rel": 2353866,
+   "name": "Auto-Pédestre Leudelange-Gare (anc.Roedgen)",
+   "place": "Leudelange-Gare"
+  },
+  {
+   "slug": "limpertsberg",
+   "osm_rel": 7759282,
+   "name": "Auto-Pédestre Limpertsberg",
+   "place": "Limpertsberg"
+  },
+  {
+   "slug": "lintgen",
+   "osm_rel": 9060543,
+   "name": "Auto-Pédestre Lintgen",
+   "place": "Lintgen"
+  },
+  {
+   "slug": "lorentzweiler",
+   "osm_rel": 3509341,
+   "name": "Auto-Pédestre Lorentzweiler",
+   "place": "Lorentzweiler"
+  },
+  {
+   "slug": "luxembourg-centre",
+   "osm_rel": 7755193,
+   "name": "Auto-Pédestre Luxembourg-Centre",
+   "place": "Luxembourg-Centre"
+  },
+  {
+   "slug": "mamer-2",
+   "osm_rel": 3099941,
+   "name": "Auto-Pédestre Mamer 2",
+   "place": "Mamer"
+  },
+  {
+   "slug": "mamer-thillsmillen",
+   "osm_rel": 2298889,
+   "name": "Auto-Pédestre Mamer Thillsmillen",
+   "place": "Mamer Thillsmillen"
+  },
+  {
+   "slug": "mensdorf",
+   "osm_rel": 2772076,
+   "name": "Auto-Pédestre Mensdorf",
+   "place": "Mensdorf"
+  },
+  {
+   "slug": "mondercange",
+   "osm_rel": 7446140,
+   "name": "Auto-Pédestre Mondercange",
+   "place": "Mondercange"
+  },
+  {
+   "slug": "mondorf",
+   "osm_rel": 2344601,
+   "name": "Auto-Pédestre Mondorf",
+   "place": "Mondorf"
+  },
+  {
+   "slug": "nospelt",
+   "osm_rel": 3144342,
+   "name": "Auto-Pédestre Nospelt",
+   "place": "Nospelt"
+  },
+  {
+   "slug": "nospelt-2",
+   "osm_rel": 9994617,
+   "name": "Auto-Pédestre Nospelt 2",
+   "place": "Nospelt"
+  },
+  {
+   "slug": "oetrange",
+   "osm_rel": 4283268,
+   "name": "Auto-Pédestre Oetrange",
+   "place": "Oetrange"
+  },
+  {
+   "slug": "petange",
+   "osm_rel": 7465023,
+   "name": "Auto-Pédestre Pétange",
+   "place": "Pétange"
+  },
+  {
+   "slug": "redange",
+   "osm_rel": 2096380,
+   "name": "Auto-Pédestre Redange",
+   "place": "Redange"
+  },
+  {
+   "slug": "reisdorf",
+   "osm_rel": 4751957,
+   "name": "Auto-Pédestre Reisdorf",
+   "place": "Reisdorf"
+  },
+  {
+   "slug": "remich",
+   "osm_rel": 8462620,
+   "name": "Auto-Pédestre Remich",
+   "place": "Remich"
+  },
+  {
+   "slug": "rodange",
+   "osm_rel": 7435453,
+   "name": "Auto-Pédestre Rodange",
+   "place": "Rodange"
+  },
+  {
+   "slug": "roder",
+   "osm_rel": 9233967,
+   "name": "Auto-Pédestre Roder",
+   "place": "Roder"
+  },
+  {
+   "slug": "roodt-sur-syre",
+   "osm_rel": 12343877,
+   "name": "Auto-Pédestre Roodt sur Syre",
+   "place": "Roodt sur Syre"
+  },
+  {
+   "slug": "rosport",
+   "osm_rel": 6496825,
+   "name": "Auto-Pédestre Rosport",
+   "place": "Rosport"
+  },
+  {
+   "slug": "rumelange-1",
+   "osm_rel": 1970106,
+   "name": "Auto-Pédestre Rumelange 1",
+   "place": "Rumelange"
+  },
+  {
+   "slug": "rumelange-2",
+   "osm_rel": 2411876,
+   "name": "Auto-Pédestre Rumelange 2",
+   "place": "Rumelange"
+  },
+  {
+   "slug": "sandweiler",
+   "osm_rel": 2982282,
+   "name": "Auto-Pédestre Sandweiler",
+   "place": "Sandweiler"
+  },
+  {
+   "slug": "schieren",
+   "osm_rel": 5625656,
+   "name": "Auto-Pédestre Schieren",
+   "place": "Schieren"
+  },
+  {
+   "slug": "schifflange",
+   "osm_rel": 7461228,
+   "name": "Auto-Pédestre Schifflange",
+   "place": "Schifflange"
+  },
+  {
+   "slug": "schlindermanderscheid",
+   "osm_rel": 11664213,
+   "name": "Auto-Pédestre Schlindermanderscheid",
+   "place": "Schlindermanderscheid"
+  },
+  {
+   "slug": "schuttrange",
+   "osm_rel": 2439749,
+   "name": "Auto-Pédestre Schuttrange",
+   "place": "Schuttrange"
+  },
+  {
+   "slug": "schwebsange",
+   "osm_rel": 3686338,
+   "name": "Auto-Pédestre Schwebsange",
+   "place": "Schwebsange"
+  },
+  {
+   "slug": "senningerberg",
+   "osm_rel": 9235582,
+   "name": "Auto-Pédestre Senningerberg",
+   "place": "Senningerberg"
+  },
+  {
+   "slug": "stadtbredimus",
+   "osm_rel": 9060760,
+   "name": "Auto-Pédestre Stadtbredimus",
+   "place": "Stadtbredimus"
+  },
+  {
+   "slug": "steinfort",
+   "osm_rel": 3809676,
+   "name": "Auto-Pédestre Steinfort",
+   "place": "Steinfort"
+  },
+  {
+   "slug": "strassen",
+   "osm_rel": 2251560,
+   "name": "Auto-Pédestre Strassen",
+   "place": "Strassen"
+  },
+  {
+   "slug": "tuntange",
+   "osm_rel": 3087361,
+   "name": "Auto-Pédestre Tuntange",
+   "place": "Tuntange"
+  },
+  {
+   "slug": "vichten",
+   "osm_rel": 6155777,
+   "name": "Auto-Pédestre Vichten",
+   "place": "Vichten"
+  },
+  {
+   "slug": "wahlhausen",
+   "osm_rel": 3937351,
+   "name": "Auto-Pédestre Wahlhausen",
+   "place": "Wahlhausen"
+  },
+  {
+   "slug": "walferdange",
+   "osm_rel": 18573173,
+   "name": "Auto-Pédestre Walferdange",
+   "place": "Walferdange"
+  },
+  {
+   "slug": "wellenstein",
+   "osm_rel": 2417183,
+   "name": "Auto-Pédestre Wellenstein",
+   "place": "Wellenstein"
+  },
+  {
+   "slug": "wiltz",
+   "osm_rel": 16821409,
+   "name": "Auto-Pédestre Wiltz",
+   "place": "Wiltz"
+  },
+  {
+   "slug": "wormeldange",
+   "osm_rel": 2121659,
+   "name": "Auto-Pédestre Wormeldange",
+   "place": "Wormeldange"
+  },
+  {
+   "slug": "steinsel",
+   "osm_rel": 3432372,
+   "name": "Autopedestre Steinsel",
+   "place": "Steinsel"
+  },
+  {
+   "slug": "altrier",
+   "osm_rel": 19183790,
+   "name": "Autopédestre Altrier",
+   "place": "Altrier"
+  },
+  {
+   "slug": "troisvierges",
+   "osm_rel": 9239943,
+   "name": "Autopédestre Troisvierges",
+   "place": "Troisvierges"
+  }
+ ]
+}

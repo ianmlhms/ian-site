@@ -1,0 +1,2072 @@
+[
+{
+"name": "Château de Septfontaines",
+"kind": "castle",
+"lat": 49.70073,
+"lon": 5.96384
+},
+{
+"name": "Fuerner Knupp",
+"kind": "viewpoint",
+"lat": 49.9239,
+"lon": 6.19714
+},
+{
+"name": "Niclosbierg",
+"kind": "viewpoint",
+"lat": 49.94615,
+"lon": 6.16771
+},
+{
+"name": "Schloss",
+"kind": "viewpoint",
+"lat": 49.93233,
+"lon": 6.20146
+},
+{
+"name": "Point de Vue Victor Hugo",
+"kind": "viewpoint",
+"lat": 49.94991,
+"lon": 6.18411
+},
+{
+"name": "Maison Victor Hugo",
+"kind": "museum",
+"lat": 49.93393,
+"lon": 6.20775
+},
+{
+"name": "Museum of Caricature et Cartoon",
+"kind": "museum",
+"lat": 49.93345,
+"lon": 6.20498
+},
+{
+"name": "Musée de la Ville de Vianden et du Jouet",
+"kind": "museum",
+"lat": 49.93359,
+"lon": 6.20252
+},
+{
+"name": "Musée Koffergrouf Stolzembourg",
+"kind": "museum",
+"lat": 49.96429,
+"lon": 6.16787
+},
+{
+"name": "Musée de l'Abbaye",
+"kind": "museum",
+"lat": 49.81359,
+"lon": 6.42184
+},
+{
+"name": "Saint-Donatus",
+"kind": "viewpoint",
+"lat": 49.97105,
+"lon": 5.9943
+},
+{
+"name": "Beobachtungshütte",
+"kind": "viewpoint",
+"lat": 49.4981,
+"lon": 6.355
+},
+{
+"name": "Beobachtungsturm",
+"kind": "viewpoint",
+"lat": 49.49527,
+"lon": 6.36457
+},
+{
+"name": "Beobachtungspunkt",
+"kind": "viewpoint",
+"lat": 49.50038,
+"lon": 6.35977
+},
+{
+"name": "Geierslay",
+"kind": "viewpoint",
+"lat": 49.82155,
+"lon": 6.38874
+},
+{
+"name": "Musee de Police",
+"kind": "museum",
+"lat": 49.64506,
+"lon": 5.98742
+},
+{
+"name": "Centre de documentation sur les migrations humaines",
+"kind": "museum",
+"lat": 49.47255,
+"lon": 6.0792
+},
+{
+"name": "Adlerhorst",
+"kind": "viewpoint",
+"lat": 49.82507,
+"lon": 6.3386
+},
+{
+"name": "Musée National de la Résistance",
+"kind": "museum",
+"lat": 49.49237,
+"lon": 5.97589
+},
+{
+"name": "Neimillen",
+"kind": "viewpoint",
+"lat": 49.61904,
+"lon": 6.23669
+},
+{
+"name": "Mariendall - Reiterlei (Ritterfels)",
+"kind": "viewpoint",
+"lat": 49.71179,
+"lon": 6.06328
+},
+{
+"name": "Centre de découverte de la Forêt Burfelt",
+"kind": "museum",
+"lat": 49.90017,
+"lon": 5.85709
+},
+{
+"name": "Berdorfer Casselt",
+"kind": "viewpoint",
+"lat": 49.83583,
+"lon": 6.3401
+},
+{
+"name": "Ueweschlaed",
+"kind": "viewpoint",
+"lat": 49.95194,
+"lon": 6.03146
+},
+{
+"name": "Hockslay",
+"kind": "viewpoint",
+"lat": 49.94513,
+"lon": 6.02898
+},
+{
+"name": "Teufelsinsel",
+"kind": "viewpoint",
+"lat": 49.82575,
+"lon": 6.33871
+},
+{
+"name": "Priedigtstulll",
+"kind": "viewpoint",
+"lat": 49.89545,
+"lon": 6.11864
+},
+{
+"name": "Bock",
+"kind": "viewpoint",
+"lat": 49.61141,
+"lon": 6.1362
+},
+{
+"name": "Bredelsteen",
+"kind": "viewpoint",
+"lat": 49.70281,
+"lon": 6.22012
+},
+{
+"name": "The Family of Man",
+"kind": "museum",
+"lat": 50.05451,
+"lon": 6.03004
+},
+{
+"name": "Schiessentümpel",
+"kind": "waterfall",
+"lat": 49.7851,
+"lon": 6.2993
+},
+{
+"name": "Perekop",
+"kind": "viewpoint",
+"lat": 49.81809,
+"lon": 6.3761
+},
+{
+"name": "Hammer Dällchen",
+"kind": "viewpoint",
+"lat": 49.60868,
+"lon": 6.15154
+},
+{
+"name": "Koeppchen",
+"kind": "viewpoint",
+"lat": 49.61453,
+"lon": 6.40596
+},
+{
+"name": "Panorama Kordall",
+"kind": "viewpoint",
+"lat": 49.54067,
+"lon": 5.88183
+},
+{
+"name": "Musée européen Schengen",
+"kind": "museum",
+"lat": 49.47086,
+"lon": 6.36628
+},
+{
+"name": "Kuelscheier Felsspalten",
+"kind": "viewpoint",
+"lat": 49.7685,
+"lon": 6.32527
+},
+{
+"name": "Himmelsbierg",
+"kind": "viewpoint",
+"lat": 49.78729,
+"lon": 6.22074
+},
+{
+"name": "Zolwerknapp",
+"kind": "viewpoint",
+"lat": 49.52692,
+"lon": 5.93802
+},
+{
+"name": "Fautefiels",
+"kind": "viewpoint",
+"lat": 49.69406,
+"lon": 6.14998
+},
+{
+"name": "Ancien Quai de Chargement",
+"kind": "ruins",
+"lat": 49.54167,
+"lon": 5.86895
+},
+{
+"name": "Houfels",
+"kind": "viewpoint",
+"lat": 49.87164,
+"lon": 5.80803
+},
+{
+"name": "Burgkapp",
+"kind": "viewpoint",
+"lat": 49.77972,
+"lon": 6.32721
+},
+{
+"name": "Schlaedbësch",
+"kind": "viewpoint",
+"lat": 49.90777,
+"lon": 6.07378
+},
+{
+"name": "Stromberg",
+"kind": "viewpoint",
+"lat": 49.46332,
+"lon": 6.36264
+},
+{
+"name": "Château de Bourscheid",
+"kind": "viewpoint",
+"lat": 49.8981,
+"lon": 6.06765
+},
+{
+"name": "Trellsbam",
+"kind": "viewpoint",
+"lat": 49.8213,
+"lon": 6.10478
+},
+{
+"name": "Altlinster",
+"kind": "viewpoint",
+"lat": 49.70165,
+"lon": 6.21825
+},
+{
+"name": "Kallektuffquell",
+"kind": "waterfall",
+"lat": 49.77134,
+"lon": 6.28515
+},
+{
+"name": "Missiounskraiz",
+"kind": "viewpoint",
+"lat": 49.67008,
+"lon": 6.07212
+},
+{
+"name": "Conservatoire National de Véhicules Historiques Diekirch",
+"kind": "museum",
+"lat": 49.86804,
+"lon": 6.15855
+},
+{
+"name": "Ravelin Pâté",
+"kind": "viewpoint",
+"lat": 49.60896,
+"lon": 6.12817
+},
+{
+"name": "Priedegtstull",
+"kind": "viewpoint",
+"lat": 49.60878,
+"lon": 6.12823
+},
+{
+"name": "Fausse braie Beck-Jost",
+"kind": "viewpoint",
+"lat": 49.60925,
+"lon": 6.12809
+},
+{
+"name": "Déi al Millen",
+"kind": "museum",
+"lat": 49.72672,
+"lon": 5.89617
+},
+{
+"name": "Vue Kiischpelt",
+"kind": "viewpoint",
+"lat": 49.98241,
+"lon": 6.01944
+},
+{
+"name": "Schloss Remich",
+"kind": "castle",
+"lat": 49.55696,
+"lon": 6.38079
+},
+{
+"name": "Château de Walferdange",
+"kind": "castle",
+"lat": 49.6604,
+"lon": 6.13381
+},
+{
+"name": "Musée du Vin",
+"kind": "museum",
+"lat": 49.60089,
+"lon": 6.38613
+},
+{
+"name": "Panorama pavillon",
+"kind": "viewpoint",
+"lat": 49.90789,
+"lon": 6.21729
+},
+{
+"name": "Musée de l'aviation",
+"kind": "museum",
+"lat": 49.50116,
+"lon": 6.28244
+},
+{
+"name": "Gringlee",
+"kind": "viewpoint",
+"lat": 49.91563,
+"lon": 6.09173
+},
+{
+"name": "Fort Dumoulin",
+"kind": "castle",
+"lat": 49.61317,
+"lon": 6.1508
+},
+{
+"name": "Gruewen",
+"kind": "viewpoint",
+"lat": 49.91185,
+"lon": 5.98819
+},
+{
+"name": "Hide Out FEB/JUN 1944",
+"kind": "ruins",
+"lat": 49.93852,
+"lon": 6.001
+},
+{
+"name": "Plane spotting",
+"kind": "viewpoint",
+"lat": 49.63807,
+"lon": 6.23458
+},
+{
+"name": "Kippiglay",
+"kind": "viewpoint",
+"lat": 49.82392,
+"lon": 6.32074
+},
+{
+"name": "Ratskeller",
+"kind": "museum",
+"lat": 49.61126,
+"lon": 6.13039
+},
+{
+"name": "Point de vue \"Hoflee\"",
+"kind": "viewpoint",
+"lat": 49.93836,
+"lon": 6.04485
+},
+{
+"name": "Plane Spotting001",
+"kind": "viewpoint",
+"lat": 49.6269,
+"lon": 6.20467
+},
+{
+"name": "Plane Spotting002",
+"kind": "viewpoint",
+"lat": 49.61938,
+"lon": 6.18698
+},
+{
+"name": "Sideschlee",
+"kind": "viewpoint",
+"lat": 50.11706,
+"lon": 6.00185
+},
+{
+"name": "Taiperlee",
+"kind": "viewpoint",
+"lat": 49.78234,
+"lon": 6.22016
+},
+{
+"name": "Scheiferei",
+"kind": "viewpoint",
+"lat": 49.70213,
+"lon": 6.21623
+},
+{
+"name": "Musée Dräi Eechelen",
+"kind": "museum",
+"lat": 49.61639,
+"lon": 6.1393
+},
+{
+"name": "Koffergrouf vu Stolzebuerg",
+"kind": "museum",
+"lat": 49.96777,
+"lon": 6.15044
+},
+{
+"name": "Kailslee",
+"kind": "viewpoint",
+"lat": 50.09347,
+"lon": 6.11839
+},
+{
+"name": "Priedigstull",
+"kind": "viewpoint",
+"lat": 49.7258,
+"lon": 6.08829
+},
+{
+"name": "Musée de la Police Grand-Ducale",
+"kind": "museum",
+"lat": 49.60612,
+"lon": 6.13921
+},
+{
+"name": "Pont de Burgley",
+"kind": "ruins",
+"lat": 49.87798,
+"lon": 5.83829
+},
+{
+"name": "Kinneksknäppchen",
+"kind": "viewpoint",
+"lat": 49.90971,
+"lon": 6.13663
+},
+{
+"name": "Siewenschlueff",
+"kind": "viewpoint",
+"lat": 49.8323,
+"lon": 6.34407
+},
+{
+"name": "Eisenerzgrube",
+"kind": "ruins",
+"lat": 49.49559,
+"lon": 6.00462
+},
+{
+"name": "Kasselslay",
+"kind": "viewpoint",
+"lat": 50.06506,
+"lon": 6.11317
+},
+{
+"name": "Näerdener Gare: Musée chemins de fer régionaux",
+"kind": "museum",
+"lat": 49.74204,
+"lon": 5.92239
+},
+{
+"name": "Fuusslee",
+"kind": "viewpoint",
+"lat": 49.91001,
+"lon": 6.08413
+},
+{
+"name": "Musée de la Bataille des Ardennes",
+"kind": "museum",
+"lat": 50.05434,
+"lon": 6.02984
+},
+{
+"name": "Intepéilchen",
+"kind": "viewpoint",
+"lat": 49.58275,
+"lon": 6.32275
+},
+{
+"name": "Vugelsmillen",
+"kind": "viewpoint",
+"lat": 49.8178,
+"lon": 6.32767
+},
+{
+"name": "Panorama-Aufzug Pfaffenthal",
+"kind": "viewpoint",
+"lat": 49.61559,
+"lon": 6.13065
+},
+{
+"name": "Musée Tudor sur l'électricité et les accumulateurs",
+"kind": "museum",
+"lat": 49.80389,
+"lon": 6.49842
+},
+{
+"name": "Musée Rural et Artisanal",
+"kind": "museum",
+"lat": 49.52365,
+"lon": 6.12993
+},
+{
+"name": "Casino Luxembourg - Forum d'art contemporain",
+"kind": "museum",
+"lat": 49.60978,
+"lon": 6.12717
+},
+{
+"name": "Château de Birtrange",
+"kind": "castle",
+"lat": 49.82634,
+"lon": 6.08909
+},
+{
+"name": "Brenschenterlay",
+"kind": "viewpoint",
+"lat": 49.82388,
+"lon": 6.295
+},
+{
+"name": "Plaakesch Kopp",
+"kind": "viewpoint",
+"lat": 49.49928,
+"lon": 6.02056
+},
+{
+"name": "Belvédère Burfelt",
+"kind": "viewpoint",
+"lat": 49.89765,
+"lon": 5.85757
+},
+{
+"name": "Plane Spotting006",
+"kind": "viewpoint",
+"lat": 49.63334,
+"lon": 6.2392
+},
+{
+"name": "Musée de l'Ardoise",
+"kind": "museum",
+"lat": 49.82476,
+"lon": 5.7538
+},
+{
+"name": "Fort Parkhöhe",
+"kind": "castle",
+"lat": 49.61679,
+"lon": 6.14644
+},
+{
+"name": "Citadelle du Saint-Esprit",
+"kind": "castle",
+"lat": 49.60715,
+"lon": 6.13578
+},
+{
+"name": "Fort Wallis",
+"kind": "castle",
+"lat": 49.60405,
+"lon": 6.13446
+},
+{
+"name": "Fort Élisabeth",
+"kind": "castle",
+"lat": 49.6048,
+"lon": 6.13081
+},
+{
+"name": "Fort Bourbon",
+"kind": "castle",
+"lat": 49.6073,
+"lon": 6.12868
+},
+{
+"name": "Fort Neipperg",
+"kind": "castle",
+"lat": 49.60497,
+"lon": 6.14089
+},
+{
+"name": "Fort Rheinsheim",
+"kind": "castle",
+"lat": 49.60693,
+"lon": 6.1218
+},
+{
+"name": "Fort Wedell",
+"kind": "castle",
+"lat": 49.59792,
+"lon": 6.12885
+},
+{
+"name": "Bastion Berlaymont",
+"kind": "castle",
+"lat": 49.61399,
+"lon": 6.13001
+},
+{
+"name": "Bastion Camus",
+"kind": "castle",
+"lat": 49.61139,
+"lon": 6.12596
+},
+{
+"name": "Fort Louvigny",
+"kind": "castle",
+"lat": 49.6114,
+"lon": 6.12293
+},
+{
+"name": "Fort Vauban",
+"kind": "castle",
+"lat": 49.61302,
+"lon": 6.12315
+},
+{
+"name": "Fort Marie",
+"kind": "castle",
+"lat": 49.61444,
+"lon": 6.12332
+},
+{
+"name": "Bastion Marie",
+"kind": "castle",
+"lat": 49.61329,
+"lon": 6.12601
+},
+{
+"name": "Fort Charles",
+"kind": "castle",
+"lat": 49.61722,
+"lon": 6.12774
+},
+{
+"name": "Fort Royal",
+"kind": "castle",
+"lat": 49.61531,
+"lon": 6.12606
+},
+{
+"name": "Fort Berlaimont",
+"kind": "castle",
+"lat": 49.61565,
+"lon": 6.12863
+},
+{
+"name": "Fort Olizy",
+"kind": "castle",
+"lat": 49.61873,
+"lon": 6.13678
+},
+{
+"name": "View on Schlass Schëndels",
+"kind": "viewpoint",
+"lat": 49.72126,
+"lon": 6.09188
+},
+{
+"name": "beim Engel",
+"kind": "viewpoint",
+"lat": 50.01991,
+"lon": 6.00789
+},
+{
+"name": "replica Roman mozaic Vichten",
+"kind": "museum",
+"lat": 49.80368,
+"lon": 5.99582
+},
+{
+"name": "Millefiels",
+"kind": "viewpoint",
+"lat": 49.86679,
+"lon": 5.75776
+},
+{
+"name": "Bléck op Esch-Sauer",
+"kind": "viewpoint",
+"lat": 49.91327,
+"lon": 5.93461
+},
+{
+"name": "Deportation Museum",
+"kind": "museum",
+"lat": 49.59539,
+"lon": 6.12082
+},
+{
+"name": "Thillenvogtei",
+"kind": "museum",
+"lat": 49.84969,
+"lon": 5.90005
+},
+{
+"name": "Epicerie Binck",
+"kind": "museum",
+"lat": 49.53395,
+"lon": 5.86335
+},
+{
+"name": "Ferme Paaschent",
+"kind": "ruins",
+"lat": 49.77013,
+"lon": 6.28788
+},
+{
+"name": "Ferme Farenhaff",
+"kind": "ruins",
+"lat": 49.74797,
+"lon": 6.27488
+},
+{
+"name": "Galerie d’art contemporain ‘Am Tunnel’",
+"kind": "museum",
+"lat": 49.60547,
+"lon": 6.12781
+},
+{
+"name": "Antimon-Musée",
+"kind": "museum",
+"lat": 49.92088,
+"lon": 5.96624
+},
+{
+"name": "Musee de la Banque",
+"kind": "museum",
+"lat": 49.60729,
+"lon": 6.12853
+},
+{
+"name": "Robbesscheier",
+"kind": "museum",
+"lat": 50.03277,
+"lon": 6.03818
+},
+{
+"name": "Kalléksuewen",
+"kind": "viewpoint",
+"lat": 49.85119,
+"lon": 6.0836
+},
+{
+"name": "Point de Vue",
+"kind": "viewpoint",
+"lat": 49.91224,
+"lon": 6.05583
+},
+{
+"name": "Bomm",
+"kind": "viewpoint",
+"lat": 49.95123,
+"lon": 6.02672
+},
+{
+"name": "Geesselee",
+"kind": "viewpoint",
+"lat": 49.98163,
+"lon": 6.0078
+},
+{
+"name": "Musée d'Histoire de la Brasserie Diekirch",
+"kind": "museum",
+"lat": 49.8682,
+"lon": 6.15844
+},
+{
+"name": "Park Sënnesräich",
+"kind": "museum",
+"lat": 50.05853,
+"lon": 5.93937
+},
+{
+"name": "Um Kalléksuewen",
+"kind": "ruins",
+"lat": 49.8514,
+"lon": 6.08212
+},
+{
+"name": "Casemates du Bock",
+"kind": "museum",
+"lat": 49.61166,
+"lon": 6.13669
+},
+{
+"name": "Matchbox Autos Museum",
+"kind": "museum",
+"lat": 49.78341,
+"lon": 6.51537
+},
+{
+"name": "Utah Bike Park",
+"kind": "viewpoint",
+"lat": 49.4885,
+"lon": 6.0086
+},
+{
+"name": "Schreibmuseum und ehemaliges Klassenzimmer",
+"kind": "museum",
+"lat": 50.09491,
+"lon": 5.97104
+},
+{
+"name": "Museum Moulin d'Asselborn",
+"kind": "museum",
+"lat": 50.08799,
+"lon": 5.96402
+},
+{
+"name": "Museum der Modelle der Schlösser und Burgen Luxemburgs",
+"kind": "museum",
+"lat": 50.05434,
+"lon": 6.03022
+},
+{
+"name": "Museum of the Battle of the Bulge",
+"kind": "museum",
+"lat": 49.96627,
+"lon": 5.93832
+},
+{
+"name": "National Tannery Museum",
+"kind": "museum",
+"lat": 49.96629,
+"lon": 5.93796
+},
+{
+"name": "Rackésmillen",
+"kind": "museum",
+"lat": 50.00004,
+"lon": 5.9896
+},
+{
+"name": "National Brewery Museum",
+"kind": "museum",
+"lat": 49.96622,
+"lon": 5.93812
+},
+{
+"name": "Château de Vianden",
+"kind": "museum",
+"lat": 49.93521,
+"lon": 6.20259
+},
+{
+"name": "Lake Sure Viewpoint",
+"kind": "viewpoint",
+"lat": 49.9113,
+"lon": 5.91453
+},
+{
+"name": "Tuchfabrik",
+"kind": "museum",
+"lat": 49.90716,
+"lon": 5.93076
+},
+{
+"name": "Naturparkausstellung",
+"kind": "museum",
+"lat": 49.90712,
+"lon": 5.93052
+},
+{
+"name": "Viewpoint on the Sure",
+"kind": "viewpoint",
+"lat": 49.91003,
+"lon": 6.09282
+},
+{
+"name": "Lëschenhaus",
+"kind": "ruins",
+"lat": 49.79742,
+"lon": 6.415
+},
+{
+"name": "Plane Spotting007",
+"kind": "viewpoint",
+"lat": 49.63795,
+"lon": 6.23386
+},
+{
+"name": "Plane Spotting003",
+"kind": "viewpoint",
+"lat": 49.61841,
+"lon": 6.20477
+},
+{
+"name": "Plane Spotting004",
+"kind": "viewpoint",
+"lat": 49.6242,
+"lon": 6.20948
+},
+{
+"name": "Plane Spotting005",
+"kind": "viewpoint",
+"lat": 49.63198,
+"lon": 6.23371
+},
+{
+"name": "Plateau de Wincrange",
+"kind": "viewpoint",
+"lat": 50.08927,
+"lon": 5.94483
+},
+{
+"name": "Panorama Bocksbierg",
+"kind": "viewpoint",
+"lat": 49.71819,
+"lon": 6.49535
+},
+{
+"name": "Duelenhéicht",
+"kind": "viewpoint",
+"lat": 49.71583,
+"lon": 6.27356
+},
+{
+"name": "Rocky Spot",
+"kind": "viewpoint",
+"lat": 49.50214,
+"lon": 5.89931
+},
+{
+"name": "Europa Experience Luxembourg",
+"kind": "museum",
+"lat": 49.62139,
+"lon": 6.14908
+},
+{
+"name": "Kuesselt",
+"kind": "viewpoint",
+"lat": 49.89003,
+"lon": 6.06246
+},
+{
+"name": "Hangelsbour",
+"kind": "waterfall",
+"lat": 49.78677,
+"lon": 6.20627
+},
+{
+"name": "Geo-Expo",
+"kind": "museum",
+"lat": 49.83425,
+"lon": 6.29245
+},
+{
+"name": "Burgruine Berbourg",
+"kind": "castle",
+"lat": 49.73177,
+"lon": 6.39167
+},
+{
+"name": "Pompjeesmusee Gemeng Miersch",
+"kind": "museum",
+"lat": 49.7678,
+"lon": 6.11535
+},
+{
+"name": "Réserve naturelle Aarnescht",
+"kind": "nature_reserve",
+"lat": 49.66707,
+"lon": 6.25261
+},
+{
+"name": "MUDAM",
+"kind": "museum",
+"lat": 49.61682,
+"lon": 6.14003
+},
+{
+"name": "Palais Grand Ducal",
+"kind": "castle",
+"lat": 49.61099,
+"lon": 6.13291
+},
+{
+"name": "Fort Thüngen",
+"kind": "castle",
+"lat": 49.61649,
+"lon": 6.13943
+},
+{
+"name": "Hall Paul Wurth",
+"kind": "museum",
+"lat": 49.53494,
+"lon": 5.86119
+},
+{
+"name": "Buerg Fiels",
+"kind": "castle",
+"lat": 49.78561,
+"lon": 6.21723
+},
+{
+"name": "Um Bierg",
+"kind": "nature_reserve",
+"lat": 49.51782,
+"lon": 6.11942
+},
+{
+"name": "Altenhoven",
+"kind": "nature_reserve",
+"lat": 49.51744,
+"lon": 6.11535
+},
+{
+"name": "Miami University John E. Dolibois European Campus",
+"kind": "castle",
+"lat": 49.52135,
+"lon": 5.88902
+},
+{
+"name": "Musée militaire de Diekirch",
+"kind": "museum",
+"lat": 49.87095,
+"lon": 6.15984
+},
+{
+"name": "Musée national d'histoire naturelle",
+"kind": "museum",
+"lat": 49.6097,
+"lon": 6.1356
+},
+{
+"name": "Nouveau Château d'Ansembourg",
+"kind": "castle",
+"lat": 49.70068,
+"lon": 6.04662
+},
+{
+"name": "Kneppchen",
+"kind": "nature_reserve",
+"lat": 49.70813,
+"lon": 6.19164
+},
+{
+"name": "Stréissel",
+"kind": "nature_reserve",
+"lat": 49.52319,
+"lon": 6.09533
+},
+{
+"name": "Lëtzebuerg City Museum",
+"kind": "museum",
+"lat": 49.60997,
+"lon": 6.13363
+},
+{
+"name": "Musée national d'histore et d'art Luxembourg",
+"kind": "museum",
+"lat": 49.61172,
+"lon": 6.13372
+},
+{
+"name": "Fort Obergrünewald",
+"kind": "castle",
+"lat": 49.61535,
+"lon": 6.13761
+},
+{
+"name": "Wachhaus",
+"kind": "ruins",
+"lat": 49.61503,
+"lon": 6.13698
+},
+{
+"name": "Réduit",
+"kind": "ruins",
+"lat": 49.61502,
+"lon": 6.13622
+},
+{
+"name": "Redoute Lambert",
+"kind": "castle",
+"lat": 49.61,
+"lon": 6.12344
+},
+{
+"name": "Fort Niedergrünewald",
+"kind": "castle",
+"lat": 49.6163,
+"lon": 6.13386
+},
+{
+"name": "Villa Vauban",
+"kind": "museum",
+"lat": 49.61311,
+"lon": 6.12249
+},
+{
+"name": "Fensterdall Zone B",
+"kind": "nature_reserve",
+"lat": 49.75677,
+"lon": 6.0371
+},
+{
+"name": "Baggerweieren Haff Réimech",
+"kind": "nature_reserve",
+"lat": 49.49907,
+"lon": 6.35965
+},
+{
+"name": "Musée de Tramways et de Bus",
+"kind": "museum",
+"lat": 49.59907,
+"lon": 6.10275
+},
+{
+"name": "Fort Rumigny",
+"kind": "castle",
+"lat": 49.61115,
+"lon": 6.14565
+},
+{
+"name": "Fort Rubamprez",
+"kind": "castle",
+"lat": 49.61061,
+"lon": 6.14312
+},
+{
+"name": "Lei",
+"kind": "nature_reserve",
+"lat": 49.59537,
+"lon": 6.06523
+},
+{
+"name": "Ellergronn",
+"kind": "nature_reserve",
+"lat": 49.46803,
+"lon": 5.98068
+},
+{
+"name": "Naturbësch Laangmuer",
+"kind": "nature_reserve",
+"lat": 49.66388,
+"lon": 6.20649
+},
+{
+"name": "Gréiveschlass",
+"kind": "castle",
+"lat": 49.66952,
+"lon": 5.95023
+},
+{
+"name": "Château de Schengen",
+"kind": "castle",
+"lat": 49.47011,
+"lon": 6.36585
+},
+{
+"name": "Massenoire",
+"kind": "museum",
+"lat": 49.50071,
+"lon": 5.94822
+},
+{
+"name": "Luxembourg Science Center",
+"kind": "museum",
+"lat": 49.52207,
+"lon": 5.8944
+},
+{
+"name": "Château de Meysembourg",
+"kind": "castle",
+"lat": 49.77045,
+"lon": 6.18893
+},
+{
+"name": "Centre d'Art Nei Liicht",
+"kind": "museum",
+"lat": 49.48256,
+"lon": 6.08581
+},
+{
+"name": "Maison néolithique",
+"kind": "museum",
+"lat": 49.70149,
+"lon": 6.16086
+},
+{
+"name": "Château de Lauterborn",
+"kind": "castle",
+"lat": 49.79619,
+"lon": 6.38722
+},
+{
+"name": "Buerg Beefort",
+"kind": "castle",
+"lat": 49.83362,
+"lon": 6.28658
+},
+{
+"name": "Château d'Esch-sur-Sûre",
+"kind": "castle",
+"lat": 49.91105,
+"lon": 5.93438
+},
+{
+"name": "Réserve naturelle communale Driesch",
+"kind": "nature_reserve",
+"lat": 49.64296,
+"lon": 6.02222
+},
+{
+"name": "Kuebendaellchen",
+"kind": "nature_reserve",
+"lat": 49.51434,
+"lon": 6.33975
+},
+{
+"name": "Château de Pettingen",
+"kind": "ruins",
+"lat": 49.77048,
+"lon": 6.10788
+},
+{
+"name": "Puits des Ardoisières Angelsberg",
+"kind": "ruins",
+"lat": 49.84041,
+"lon": 5.75134
+},
+{
+"name": "Château de Bettendorf",
+"kind": "castle",
+"lat": 49.87605,
+"lon": 6.22026
+},
+{
+"name": "Nemmeswiss",
+"kind": "nature_reserve",
+"lat": 49.5966,
+"lon": 6.05544
+},
+{
+"name": "Musée national des Mines",
+"kind": "museum",
+"lat": 49.46128,
+"lon": 6.02123
+},
+{
+"name": "Château de Bettembourg",
+"kind": "castle",
+"lat": 49.51733,
+"lon": 6.09678
+},
+{
+"name": "Vieux Château d'Ansembourg",
+"kind": "castle",
+"lat": 49.703,
+"lon": 6.03819
+},
+{
+"name": "Grouwen a Feldbunn",
+"kind": "museum",
+"lat": 49.47514,
+"lon": 5.9756
+},
+{
+"name": "Château de Wiltz",
+"kind": "castle",
+"lat": 49.96647,
+"lon": 5.93851
+},
+{
+"name": "Château de Fischbach",
+"kind": "castle",
+"lat": 49.7476,
+"lon": 6.18685
+},
+{
+"name": "Schüttbuerg",
+"kind": "castle",
+"lat": 49.96437,
+"lon": 6.02649
+},
+{
+"name": "Château de Limpertsberg",
+"kind": "castle",
+"lat": 49.62532,
+"lon": 6.12732
+},
+{
+"name": "Ambassade de Russie",
+"kind": "castle",
+"lat": 49.64337,
+"lon": 6.13776
+},
+{
+"name": "A Possen",
+"kind": "museum",
+"lat": 49.5288,
+"lon": 6.35423
+},
+{
+"name": "Fondation de l'Architecture et de l'ingénierie Luxembourg",
+"kind": "museum",
+"lat": 49.59756,
+"lon": 6.12466
+},
+{
+"name": "Kommunales Naturschutzgebeit Grafelt",
+"kind": "nature_reserve",
+"lat": 49.61211,
+"lon": 6.03003
+},
+{
+"name": "Château de Hollenfels",
+"kind": "castle",
+"lat": 49.7121,
+"lon": 6.05159
+},
+{
+"name": "Laerensmillen",
+"kind": "ruins",
+"lat": 49.71242,
+"lon": 6.44488
+},
+{
+"name": "Musée 385th bomb group",
+"kind": "museum",
+"lat": 49.80992,
+"lon": 5.76383
+},
+{
+"name": "Réserve naturelle communale Mimelsratt",
+"kind": "nature_reserve",
+"lat": 49.63999,
+"lon": 6.02126
+},
+{
+"name": "Pomhouse",
+"kind": "museum",
+"lat": 49.4734,
+"lon": 6.08164
+},
+{
+"name": "Waassertuerm",
+"kind": "museum",
+"lat": 49.47339,
+"lon": 6.0819
+},
+{
+"name": "Direbond",
+"kind": "nature_reserve",
+"lat": 49.63096,
+"lon": 6.00916
+},
+{
+"name": "Château d'Erpeldange",
+"kind": "castle",
+"lat": 49.86008,
+"lon": 6.11165
+},
+{
+"name": "Château de Vianden",
+"kind": "castle",
+"lat": 49.93488,
+"lon": 6.20283
+},
+{
+"name": "Château d'Aspelt",
+"kind": "castle",
+"lat": 49.52481,
+"lon": 6.22258
+},
+{
+"name": "Lénger Wisen",
+"kind": "nature_reserve",
+"lat": 49.565,
+"lon": 5.89234
+},
+{
+"name": "Musée Rural A Schiewesch",
+"kind": "museum",
+"lat": 50.11739,
+"lon": 6.03667
+},
+{
+"name": "Château de Betzdorf",
+"kind": "castle",
+"lat": 49.69407,
+"lon": 6.33073
+},
+{
+"name": "Batterie du Rham",
+"kind": "castle",
+"lat": 49.60947,
+"lon": 6.14057
+},
+{
+"name": "Sicona Ouest",
+"kind": "nature_reserve",
+"lat": 49.58896,
+"lon": 6.03281
+},
+{
+"name": "Belgrad",
+"kind": "nature_reserve",
+"lat": 49.50724,
+"lon": 6.16697
+},
+{
+"name": "Villa Berlaymont",
+"kind": "castle",
+"lat": 50.0554,
+"lon": 6.03208
+},
+{
+"name": "Château de Bourglinster",
+"kind": "castle",
+"lat": 49.70256,
+"lon": 6.2173
+},
+{
+"name": "Ausgriewermusee",
+"kind": "museum",
+"lat": 49.67386,
+"lon": 6.00794
+},
+{
+"name": "Château de Weymerich",
+"kind": "castle",
+"lat": 49.70269,
+"lon": 6.27281
+},
+{
+"name": "Espace Muséologique",
+"kind": "museum",
+"lat": 49.52394,
+"lon": 5.83546
+},
+{
+"name": "Musée Eugène Pesch",
+"kind": "museum",
+"lat": 49.52631,
+"lon": 5.83787
+},
+{
+"name": "Mine Grouwen",
+"kind": "museum",
+"lat": 49.51744,
+"lon": 5.8787
+},
+{
+"name": "Schlass Beefort",
+"kind": "castle",
+"lat": 49.8338,
+"lon": 6.28581
+},
+{
+"name": "Musée d'Histoire(s) de la ville de Diekirch",
+"kind": "museum",
+"lat": 49.86891,
+"lon": 6.16159
+},
+{
+"name": "Kulturhuef",
+"kind": "museum",
+"lat": 49.68331,
+"lon": 6.44905
+},
+{
+"name": "Château d'Useldange",
+"kind": "castle",
+"lat": 49.7682,
+"lon": 5.9803
+},
+{
+"name": "Musée Michel Lucius",
+"kind": "museum",
+"lat": 49.79637,
+"lon": 5.9532
+},
+{
+"name": "Administration communale",
+"kind": "castle",
+"lat": 49.74787,
+"lon": 6.10316
+},
+{
+"name": "Gipsminen Walferdingen",
+"kind": "ruins",
+"lat": 49.66071,
+"lon": 6.14414
+},
+{
+"name": "Réserve naturelle Dreckwiss",
+"kind": "nature_reserve",
+"lat": 49.55025,
+"lon": 5.90624
+},
+{
+"name": "Polverhaischen",
+"kind": "ruins",
+"lat": 49.46199,
+"lon": 6.01645
+},
+{
+"name": "Heringerbuerg",
+"kind": "castle",
+"lat": 49.79368,
+"lon": 6.30765
+},
+{
+"name": "Réserve naturelle Prënzebierg",
+"kind": "nature_reserve",
+"lat": 49.54122,
+"lon": 5.87638
+},
+{
+"name": "Château de Sanem",
+"kind": "castle",
+"lat": 49.54327,
+"lon": 5.92598
+},
+{
+"name": "Réserve naturelle Brill",
+"kind": "nature_reserve",
+"lat": 49.50946,
+"lon": 6.00639
+},
+{
+"name": "Caponière du fort Lambert",
+"kind": "ruins",
+"lat": 49.61002,
+"lon": 6.12369
+},
+{
+"name": "Steekollen",
+"kind": "nature_reserve",
+"lat": 49.66694,
+"lon": 5.90606
+},
+{
+"name": "Réserve naturelle Dumontshaff",
+"kind": "nature_reserve",
+"lat": 49.51605,
+"lon": 6.028
+},
+{
+"name": "Boufferdanger Muer",
+"kind": "nature_reserve",
+"lat": 49.59155,
+"lon": 5.90676
+},
+{
+"name": "Villa Romana",
+"kind": "museum",
+"lat": 49.80442,
+"lon": 6.41211
+},
+{
+"name": "Buerg Branebuerg",
+"kind": "castle",
+"lat": 49.91288,
+"lon": 6.13765
+},
+{
+"name": "Musée de la Poterie",
+"kind": "museum",
+"lat": 49.67517,
+"lon": 6.00762
+},
+{
+"name": "Telpeschholz & Zone tampon",
+"kind": "nature_reserve",
+"lat": 49.69,
+"lon": 6.02185
+},
+{
+"name": "Château de Colpach",
+"kind": "castle",
+"lat": 49.75942,
+"lon": 5.82585
+},
+{
+"name": "Réserve naturelle Haard",
+"kind": "nature_reserve",
+"lat": 49.46761,
+"lon": 6.05416
+},
+{
+"name": "Marais de Grendel",
+"kind": "nature_reserve",
+"lat": 49.75382,
+"lon": 5.81847
+},
+{
+"name": "Musée de Calèche",
+"kind": "museum",
+"lat": 49.52304,
+"lon": 6.12759
+},
+{
+"name": "Château de Schoenfels",
+"kind": "castle",
+"lat": 49.71967,
+"lon": 6.0932
+},
+{
+"name": "Wehrturm Schlass Schëndels",
+"kind": "castle",
+"lat": 49.71935,
+"lon": 6.09288
+},
+{
+"name": "Mirador de Lamadelaine",
+"kind": "viewpoint",
+"lat": 49.54383,
+"lon": 5.85204
+},
+{
+"name": "Zeiwelt",
+"kind": "nature_reserve",
+"lat": 49.59247,
+"lon": 6.04424
+},
+{
+"name": "Buurschter Schlass",
+"kind": "castle",
+"lat": 49.90558,
+"lon": 6.07923
+},
+{
+"name": "Réimer Villa Echternach",
+"kind": "museum",
+"lat": 49.80401,
+"lon": 6.4119
+},
+{
+"name": "Wolfswiss",
+"kind": "nature_reserve",
+"lat": 49.54225,
+"lon": 5.96931
+},
+{
+"name": "Möllerei",
+"kind": "museum",
+"lat": 49.50155,
+"lon": 5.94719
+},
+{
+"name": "Koerich Castle",
+"kind": "castle",
+"lat": 49.66954,
+"lon": 5.95045
+},
+{
+"name": "Verluerekascht",
+"kind": "castle",
+"lat": 49.78379,
+"lon": 6.21804
+},
+{
+"name": "Sonnebierg",
+"kind": "nature_reserve",
+"lat": 49.66296,
+"lon": 6.14673
+},
+{
+"name": "Biodiversum",
+"kind": "museum",
+"lat": 49.49346,
+"lon": 6.36189
+},
+{
+"name": "Ënneschte Bësch",
+"kind": "nature_reserve",
+"lat": 49.59442,
+"lon": 6.06831
+},
+{
+"name": "Ronnheck",
+"kind": "nature_reserve",
+"lat": 49.73144,
+"lon": 6.25154
+},
+{
+"name": "Eesebuerer Schlass",
+"kind": "castle",
+"lat": 49.69186,
+"lon": 6.18502
+},
+{
+"name": "Réserve naturelle Lalléngerbierg - Brucherbierg",
+"kind": "nature_reserve",
+"lat": 49.49501,
+"lon": 6.01256
+},
+{
+"name": "Réserve naturelle Weimericht",
+"kind": "nature_reserve",
+"lat": 49.71281,
+"lon": 6.2728
+},
+{
+"name": "Beetebuerger Bësch",
+"kind": "nature_reserve",
+"lat": 49.54581,
+"lon": 6.08491
+},
+{
+"name": "Pulverdepot Fort Obergrünwald",
+"kind": "ruins",
+"lat": 49.61472,
+"lon": 6.13567
+},
+{
+"name": "Schlass Ischpelt",
+"kind": "castle",
+"lat": 50.07551,
+"lon": 6.04556
+},
+{
+"name": "Sanatorium Kaul, foundation ruins (1920s)",
+"kind": "ruins",
+"lat": 49.9792,
+"lon": 5.92394
+},
+{
+"name": "Parc Industriel et Ferroviaire du Fond-de-Gras",
+"kind": "museum",
+"lat": 49.53539,
+"lon": 5.85747
+},
+{
+"name": "Château Helfent",
+"kind": "castle",
+"lat": 49.60416,
+"lon": 6.07919
+},
+{
+"name": "Biotope Donven-Machtum",
+"kind": "nature_reserve",
+"lat": 49.64557,
+"lon": 6.41813
+},
+{
+"name": "Fensterdall Zone A",
+"kind": "nature_reserve",
+"lat": 49.75798,
+"lon": 6.03593
+},
+{
+"name": "Ancienne Carrière de Bettendorf - Schoofsbësch",
+"kind": "nature_reserve",
+"lat": 49.86332,
+"lon": 6.20571
+},
+{
+"name": "Tempelskamp",
+"kind": "viewpoint",
+"lat": 49.90272,
+"lon": 5.84416
+},
+{
+"name": "Geeschterhaischen",
+"kind": "ruins",
+"lat": 49.66927,
+"lon": 6.16709
+},
+{
+"name": "Buerg Stolzebuerg",
+"kind": "castle",
+"lat": 49.96579,
+"lon": 6.16613
+},
+{
+"name": "General Patton Memorial",
+"kind": "museum",
+"lat": 49.84867,
+"lon": 6.10411
+},
+{
+"name": "Textil Musée Larochette",
+"kind": "museum",
+"lat": 49.78401,
+"lon": 6.21942
+},
+{
+"name": "Réserve Naturelle Leiffrächen",
+"kind": "nature_reserve",
+"lat": 49.4747,
+"lon": 6.01869
+},
+{
+"name": "Am Bauch",
+"kind": "nature_reserve",
+"lat": 49.52107,
+"lon": 5.99495
+},
+{
+"name": "Beiemusee",
+"kind": "museum",
+"lat": 49.86761,
+"lon": 6.16058
+},
+{
+"name": "Schuerelserschlass",
+"kind": "castle",
+"lat": 49.83056,
+"lon": 5.88157
+},
+{
+"name": "Réserve naturelle Vallée de la Haute-Sûre - Bruch/Pont Misère",
+"kind": "nature_reserve",
+"lat": 49.86173,
+"lon": 5.7923
+},
+{
+"name": "Pompjeesmusee",
+"kind": "museum",
+"lat": 49.96799,
+"lon": 5.92802
+},
+{
+"name": "Saueruecht",
+"kind": "nature_reserve",
+"lat": 49.84028,
+"lon": 6.3182
+},
+{
+"name": "Elteschmuer",
+"kind": "nature_reserve",
+"lat": 49.8388,
+"lon": 6.26064
+},
+{
+"name": "Akescht",
+"kind": "nature_reserve",
+"lat": 49.98329,
+"lon": 6.1457
+},
+{
+"name": "Lellingen - Freng / Op Baerel",
+"kind": "nature_reserve",
+"lat": 49.99557,
+"lon": 6.03595
+},
+{
+"name": "Sonlez-Pamer",
+"kind": "nature_reserve",
+"lat": 49.9606,
+"lon": 5.80454
+},
+{
+"name": "Réserve Naturelle Deiwelskopp",
+"kind": "nature_reserve",
+"lat": 49.75091,
+"lon": 6.4919
+},
+{
+"name": "Vitarium by Luxlait",
+"kind": "museum",
+"lat": 49.77887,
+"lon": 6.08224
+},
+{
+"name": "Pëttenerbësch",
+"kind": "nature_reserve",
+"lat": 49.77049,
+"lon": 6.08938
+},
+{
+"name": "Château Berwart",
+"kind": "castle",
+"lat": 49.49921,
+"lon": 5.98704
+},
+{
+"name": "Réimesch Villa zu Miersch",
+"kind": "ruins",
+"lat": 49.74635,
+"lon": 6.09873
+},
+{
+"name": "Wëntrenger Schlass",
+"kind": "castle",
+"lat": 49.50218,
+"lon": 6.35383
+},
+{
+"name": "PLOMM Kannermusée",
+"kind": "museum",
+"lat": 49.96673,
+"lon": 5.92453
+},
+{
+"name": "Kasselslay-Zogel",
+"kind": "nature_reserve",
+"lat": 50.06873,
+"lon": 6.11979
+},
+{
+"name": "Rosport-Hëlt",
+"kind": "nature_reserve",
+"lat": 49.80334,
+"lon": 6.52007
+},
+{
+"name": "Schlënnerdall - Molberlay",
+"kind": "nature_reserve",
+"lat": 49.96073,
+"lon": 6.0686
+},
+{
+"name": "Hautbellain - Fooschtbaach",
+"kind": "nature_reserve",
+"lat": 50.16882,
+"lon": 5.97509
+},
+{
+"name": "Cornelysmillen - Schucklai",
+"kind": "nature_reserve",
+"lat": 50.13934,
+"lon": 5.96456
+},
+{
+"name": "Conzefenn",
+"kind": "nature_reserve",
+"lat": 50.1492,
+"lon": 6.04606
+},
+{
+"name": "Ditgesbaach",
+"kind": "nature_reserve",
+"lat": 49.83992,
+"lon": 6.10825
+},
+{
+"name": "Michelbouch - Biischtert / Etangs de Bissen",
+"kind": "nature_reserve",
+"lat": 49.81538,
+"lon": 6.05103
+},
+{
+"name": "Nommerlayen",
+"kind": "nature_reserve",
+"lat": 49.7808,
+"lon": 6.16838
+},
+{
+"name": "Birelergronn",
+"kind": "nature_reserve",
+"lat": 49.62294,
+"lon": 6.23231
+},
+{
+"name": "Schlass Schraasseg",
+"kind": "castle",
+"lat": 49.61145,
+"lon": 6.25825
+},
+{
+"name": "Ourschleife/Falkenstein",
+"kind": "nature_reserve",
+"lat": 49.96241,
+"lon": 6.19215
+},
+{
+"name": "Mittleres Ourtal zw. Dreiländereck und Rellesmühle",
+"kind": "nature_reserve",
+"lat": 50.08737,
+"lon": 6.13008
+},
+{
+"name": "Château de Clervaux",
+"kind": "castle",
+"lat": 50.05444,
+"lon": 6.03022
+},
+{
+"name": "Château de Berg",
+"kind": "castle",
+"lat": 49.81469,
+"lon": 6.08769
+},
+{
+"name": "Buerg Hesper",
+"kind": "castle",
+"lat": 49.57291,
+"lon": 6.15438
+},
+{
+"name": "Bastion du fort Lambert",
+"kind": "ruins",
+"lat": 49.61,
+"lon": 6.12346
+},
+{
+"name": "Villa Baldauff",
+"kind": "castle",
+"lat": 49.60863,
+"lon": 6.12466
+},
+{
+"name": "Fortifications de Grevenmacher",
+"kind": "ruins",
+"lat": 49.67966,
+"lon": 6.44064
+},
+{
+"name": "Château de Stradtbredimus",
+"kind": "castle",
+"lat": 49.56412,
+"lon": 6.36821
+},
+{
+"name": "Fortifications d'Echternach",
+"kind": "ruins",
+"lat": 49.81218,
+"lon": 6.4217
+},
+{
+"name": "Écluse du Grund",
+"kind": "ruins",
+"lat": 49.60778,
+"lon": 6.13681
+}
+]

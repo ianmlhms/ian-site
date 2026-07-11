@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Auto-Pédestre Oetrange : boucle de 11,6 km près de Oetrange (Centre / Guttland). Carte, durée, difficulté et accès en bus." />
+  <meta property="og:title" content="Auto-Pédestre Oetrange" />
+  <meta property="og:description" content="Auto-Pédestre Oetrange : boucle de 11,6 km près de Oetrange (Centre / Guttland). Carte, durée, difficulté et accès en bus." />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-102.jpg/960px-H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-102.jpg" />
+  <link rel="canonical" href="https://ian.lu/trails/fr/oetrange.html" />
+  <link rel="alternate" hreflang="de" href="https://ian.lu/trails/de/oetrange.html" />
+  <link rel="alternate" hreflang="fr" href="https://ian.lu/trails/fr/oetrange.html" />
+  <link rel="alternate" hreflang="en" href="https://ian.lu/trails/en/oetrange.html" />
+  <link rel="alternate" hreflang="x-default" href="https://ian.lu/trails/" />
+  <title>Auto-Pédestre Oetrange — boucle de randonnée à Oetrange | Auto-Pédestres Luxembourg</title>
+  <link rel="stylesheet" href="../trails.css?v=2" />
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+  <!-- Google AdSense (public pages only) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "TouristAttraction", "name": "Auto-Pédestre Oetrange", "description": "Auto-Pédestre Oetrange : boucle de 11,6 km près de Oetrange (Centre / Guttland). Carte, durée, difficulté et accès en bus.", "url": "https://ian.lu/trails/fr/oetrange.html", "isAccessibleForFree": true, "address": {"@type": "PostalAddress", "addressLocality": "Oetrange", "addressCountry": "LU"}, "geo": {"@type": "GeoCoordinates", "latitude": 49.59381, "longitude": 6.27637}, "image": ["https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-102.jpg/960px-H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-102.jpg", "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-103.jpg/960px-H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-103.jpg", "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-101.jpg/960px-H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-101.jpg"]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Auto-Pédestres", "item": "https://ian.lu/trails/fr/"}, {"@type": "ListItem", "position": 2, "name": "Auto-Pédestre Oetrange", "item": "https://ian.lu/trails/fr/oetrange.html"}]}]}</script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="./">Auto-Pédestres Luxembourg</a>
+    <nav class="langs" aria-label="Langue"><a href="../de/oetrange.html">DE</a><a href="../fr/oetrange.html" class="on">FR</a><a href="../en/oetrange.html">EN</a></nav>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumbs"><a href="./">Auto-Pédestres</a> <span>›</span> Auto-Pédestre Oetrange</nav>
+    <h1>Auto-Pédestre Oetrange</h1>
+    <p class="sub">Centre / Guttland · Oetrange</p>
+
+    <section class="facts" aria-label="En bref">
+      <div class="fact"><span class="k">Distance</span><span class="v">11,6 km</span></div>
+      <div class="fact"><span class="k">Durée</span><span class="v">env. 3 h</span></div>
+      <div class="fact"><span class="k">Difficulté</span><span class="v">moyenne</span></div>
+      <div class="fact"><span class="k">Commune</span><span class="v">Oetrange</span></div>
+      <div class="fact"><span class="k">Dénivelé +</span><span class="v">90 m</span></div>
+      <div class="fact"><span class="k">Type</span><span class="v">Boucle (Auto-Pédestre)</span></div>
+    </section>
+
+    <div id="map" role="img" aria-label="Carte"></div>
+    <p class="map-note">Tracé issu d&#x27;OpenStreetMap — de petits écarts sur le terrain sont possibles. Le balisage bleu sur place fait foi.</p>
+    <figure class="profile"><figcaption>Profil altimétrique (255–301 m)</figcaption>
+    <svg viewBox="0 0 600 130" role="img" preserveAspectRatio="none"><polygon points="14,116 14.0,62.8 23.9,67.2 33.2,65.0 33.2,65.0 48.0,58.3 48.0,51.7 58.3,45.0 58.3,42.8 73.6,40.6 73.6,47.3 73.6,51.7 79.5,49.5 84.9,49.5 109.6,47.3 109.6,40.6 109.6,29.5 109.6,25.1 125.3,20.7 125.3,18.4 125.3,14.0 134.7,16.2 144.1,20.7 144.1,25.1 159.3,29.5 159.3,31.7 159.3,34.0 175.1,36.2 175.1,38.4 180.0,40.6 184.0,42.8 193.3,38.4 193.3,40.6 199.7,38.4 214.5,40.6 214.5,47.3 218.0,58.3 223.9,67.2 229.3,76.1 233.7,87.2 239.6,96.0 246.1,102.7 252.0,109.3 262.8,107.1 262.8,104.9 272.2,98.3 275.1,91.6 287.9,87.2 287.9,87.2 293.8,89.4 298.8,93.8 303.7,100.5 311.1,102.7 316.0,104.9 324.4,107.1 328.8,111.6 333.3,111.6 340.6,116.0 346.1,116.0 349.5,109.3 356.9,102.7 365.3,93.8 368.7,87.2 376.1,85.0 385.5,85.0 385.5,82.7 393.9,85.0 410.1,82.7 410.1,80.5 410.1,82.7 419.0,85.0 419.0,87.2 430.8,82.7 430.8,76.1 445.6,71.7 445.6,69.4 450.5,65.0 454.0,65.0 459.9,65.0 469.7,60.6 480.6,56.1 480.6,47.3 482.5,40.6 504.2,36.2 504.2,34.0 504.2,34.0 505.2,42.8 511.6,51.7 522.9,62.8 522.9,69.4 530.3,69.4 535.3,62.8 551.0,58.3 551.0,53.9 561.9,53.9 561.9,58.3 565.8,60.6 577.6,60.6 577.6,58.3 580.6,53.9 586.0,51.7 586,116" class="p-fill"/><polyline points="14.0,62.8 23.9,67.2 33.2,65.0 33.2,65.0 48.0,58.3 48.0,51.7 58.3,45.0 58.3,42.8 73.6,40.6 73.6,47.3 73.6,51.7 79.5,49.5 84.9,49.5 109.6,47.3 109.6,40.6 109.6,29.5 109.6,25.1 125.3,20.7 125.3,18.4 125.3,14.0 134.7,16.2 144.1,20.7 144.1,25.1 159.3,29.5 159.3,31.7 159.3,34.0 175.1,36.2 175.1,38.4 180.0,40.6 184.0,42.8 193.3,38.4 193.3,40.6 199.7,38.4 214.5,40.6 214.5,47.3 218.0,58.3 223.9,67.2 229.3,76.1 233.7,87.2 239.6,96.0 246.1,102.7 252.0,109.3 262.8,107.1 262.8,104.9 272.2,98.3 275.1,91.6 287.9,87.2 287.9,87.2 293.8,89.4 298.8,93.8 303.7,100.5 311.1,102.7 316.0,104.9 324.4,107.1 328.8,111.6 333.3,111.6 340.6,116.0 346.1,116.0 349.5,109.3 356.9,102.7 365.3,93.8 368.7,87.2 376.1,85.0 385.5,85.0 385.5,82.7 393.9,85.0 410.1,82.7 410.1,80.5 410.1,82.7 419.0,85.0 419.0,87.2 430.8,82.7 430.8,76.1 445.6,71.7 445.6,69.4 450.5,65.0 454.0,65.0 459.9,65.0 469.7,60.6 480.6,56.1 480.6,47.3 482.5,40.6 504.2,36.2 504.2,34.0 504.2,34.0 505.2,42.8 511.6,51.7 522.9,62.8 522.9,69.4 530.3,69.4 535.3,62.8 551.0,58.3 551.0,53.9 561.9,53.9 561.9,58.3 565.8,60.6 577.6,60.6 577.6,58.3 580.6,53.9 586.0,51.7" class="p-line"/></svg></figure>
+
+    <article class="desc">
+      <p>Oetrange se trouve dans le Guttland — chemins champêtres, passages en forêt et abords de village rythment la boucle. La boucle fait 11,6 km ; comptez environ 3 h de marche à allure normale. Le dénivelé reste insignifiant, environ la moitié du tracé évite le bitume.</p>
+      <p>Par de petits chemins, la boucle relie les plus beaux coins des alentours. Le circuit est entièrement balisé du signe bleu des Auto-Pédestres ; en boucle, il n&#x27;a pas de départ imposé.</p>
+    </article>
+
+    <section class="highlights">
+      <h2>Points forts</h2>
+      <ul>
+        <li>Très peu de dénivelé</li>
+        <li>Arrêt de bus sur le parcours</li>
+        <li>Guttland</li>
+      </ul>
+    </section>
+
+    <section class="gallery">
+      <h2>Impressions du parcours</h2>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-102.jpg/960px-H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-102.jpg" alt="" loading="lazy" /><figcaption>Jwh · CC BY-SA 3.0 lu · <a href="https://commons.wikimedia.org/w/index.php?curid=38213434" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-103.jpg/960px-H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-103.jpg" alt="" loading="lazy" /><figcaption>Jwh · CC BY-SA 3.0 lu · <a href="https://commons.wikimedia.org/w/index.php?curid=38213437" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+      <figure><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-101.jpg/960px-H%C3%A4erz-Jesu_Kapell_um_Pl%C3%A4itr%C3%A9ngerhaff-101.jpg" alt="" loading="lazy" /><figcaption>Jwh · CC BY-SA 3.0 lu · <a href="https://commons.wikimedia.org/w/index.php?curid=38213438" rel="noopener">via Wikimedia Commons</a></figcaption></figure>
+    </section>
+
+    <section class="bus">
+      <h2>Y aller en bus</h2>
+      <p>Les transports publics sont gratuits au Luxembourg. Ces arrêts se trouvent sur le parcours :</p>
+      <ul class="stops">
+        <li><span class="stop-name">Oetrange, Éiter</span><span class="stop-meta">à 0 m du sentier</span><span class="stop-lines"><span class="line-chip">421</span><span class="line-chip">D06</span><span class="line-chip">E07</span><span class="line-chip">L05</span><span class="line-chip">R03</span></span></li>
+        <li><span class="stop-name">Oetrange, Staefeld</span><span class="stop-meta">à 10 m du sentier</span><span class="stop-lines"><span class="line-chip">421</span><span class="line-chip">D06</span><span class="line-chip">E07</span><span class="line-chip">L05</span><span class="line-chip">R03</span></span></li>
+        <li><span class="stop-name">Oetrange, Kurzebierg</span><span class="stop-meta">à 20 m du sentier</span><span class="stop-lines"><span class="line-chip">324</span><span class="line-chip">325</span><span class="line-chip">327</span><span class="line-chip">C09</span></span></li>
+        <li><span class="stop-name">Moutfort, Kapell</span><span class="stop-meta">à 50 m du sentier</span><span class="stop-lines"><span class="line-chip">324</span><span class="line-chip">325</span><span class="line-chip">327</span><span class="line-chip">401</span><span class="line-chip">403</span><span class="line-chip">406</span><span class="line-chip">411</span><span class="line-chip">456</span></span></li>
+      </ul>
+      <p class="bus-live"><a href="https://ian.lu/bus.html" rel="noopener">Départs en direct pour tous les arrêts : ian.lu/bus</a></p>
+    </section>
+
+  </main>
+
+  <footer class="site-foot">Un projet de ian.lu · Tracés © contributeurs OpenStreetMap · Horaires : data.public.lu · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      if (typeof L === 'undefined') { return; }
+      var map = L.map('map', { scrollWheelZoom: false });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+      map.fitBounds([[49.58459, 6.25646], [49.60304, 6.29627]], { padding: [20, 20] });
+      fetch('../geo/oetrange.geojson')
+        .then(function (r) { if (!r.ok) { throw new Error('geojson ' + r.status); } return r.json(); })
+        .then(function (geo) {
+          var line = L.geoJSON(geo, { style: { color: '#1d6fce', weight: 4, opacity: 0.85 } }).addTo(map);
+          map.fitBounds(line.getBounds(), { padding: [20, 20] });
+        })
+        .catch(function (err) { console.log('[trails] map line unavailable:', err.message); });
+    });
+  </script>
+</body>
+</html>
