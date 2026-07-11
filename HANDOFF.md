@@ -47,9 +47,9 @@ does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** 
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
 Current versions (11 Jul 2026): `theme.js?v=9`, `auth.js?v=5`, `i18n-dict.js?v=20` (same on ALL
-pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=21`, `friends.js?v=17`,
-`pixelbreak-records.js?v=8`, `admin.js?v=8`, `factory-auth.js?v=5`, `notify.js?v=4`,
-`notify-ambient.js?v=4`, `class-gate.js?v=4`, `rtc-ring.js?v=2`,
+pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=22`, `friends.js?v=18`,
+`pixelbreak-records.js?v=8`, `admin.js?v=8`, `factory-auth.js?v=5`, `notify.js?v=5`,
+`notify-ambient.js?v=5`, `class-gate.js?v=4`, `rtc-ring.js?v=2`,
 `game-common.js?v=1`, `game-common.css?v=3`, `style.css?v=9`
 (`sw.js` is registered, not query-versioned — it updates on its own SW lifecycle).
 
@@ -130,9 +130,9 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 | **Tic-Tac-Toe** | `tictactoe.html` | 1v1, realtime (`ttt:<room>`). **`?ai=1`** = vs computer (perfect minimax). Records to leaderboard. |
 | **Checkers** | `checkers.html` | 1v1 English draughts, realtime (`chk:<room>`): mandatory chain captures, kings, board flipped for the guest. **`?ai=1`** = vs computer (alpha-beta minimax over jump chains, depth 2/4/7). Records to leaderboard (`checkers`). |
 | **Mau-Mau** | `maumau.html` | 1v1 card game (32-card deck) on `mau:<room>`: match suit/rank, 7 = +2 (stackable), 8 = play again, J = wish a suit. Whole game derives **deterministically from one seed** (deal + reshuffles via mulberry32) so clients only exchange the seed and moves. **`?ai=1`** = vs bot. Records to leaderboard (`maumau`). |
-| **Dice Duel** | `dice-duel.html` | 1v1 Yahtzee-style on `dd:<room>`: 3 rolls, hold dice, 14 categories, 63+ upper bonus. Only rolls/holds/picks are broadcast; both clients score identically. **`?ai=1`** = vs heuristic bot. Records to leaderboard (`diceduel`). |
+| **Kniffel (Dice Duel)** | `dice-duel.html` | 1v1 Yahtzee-style on `dd:<room>`: 3 rolls, hold dice, 14 categories, 63+ upper bonus. Only rolls/holds/picks are broadcast; both clients score identically. **`?ai=1`** = vs heuristic bot. Records to leaderboard (`diceduel`). |
 | **Hotel-Simulator** | `hotel.html`, `scripts/hotel-setup.sql` | **PRIVATE** German hotel-builder (Quinn's project). Email-allowlist gate (`konto@ian.lu` + `quinn@mulheims.lu`) via shared `auth.js`; home tile hidden from others. Cloud saves in `hotel_saves` (owner-only RLS, separate per account) replacing the original localStorage. B1 privacy: not listed/usable without an allowed login, but HTML is still fetchable by direct URL. |
-| **Leaderboard** | `leaderboard.html` | Cross-game rankings (All / Connect 4 / Battleship / Colour Dial / Reversi / Dots / Tic-Tac-Toe / Checkers / Mau-Mau / Dice Duel), public read. Players **self-report their own win/loss** via the shared authed client (`window.__pbAuth.sb`) on match end — only when signed in. `game_results` table + `record_match`/`game_leaderboard`. Linked from the Games hub. SLF excluded (endless). |
+| **Leaderboard** | `leaderboard.html` | Cross-game rankings (All / Connect 4 / Battleship / Colour Dial / Reversi / Dots / Tic-Tac-Toe / Checkers / Mau-Mau / Kniffel), public read. Players **self-report their own win/loss** via the shared authed client (`window.__pbAuth.sb`) on match end — only when signed in. `game_results` table + `record_match`/`game_leaderboard`. Linked from the Games hub. SLF excluded (endless). |
 | **Theme** | `theme.js` | Floating 🎨 picker (dark/light + accent) on every page; sets CSS vars on `:root`, localStorage. |
 | **Shared auth** | `auth.js` | Supabase client + account button + sign-in modal (loads supabase-js from jsDelivr UMD global, **not** esm.sh — that broke in Safari). |
 

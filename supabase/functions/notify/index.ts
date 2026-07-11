@@ -30,7 +30,7 @@ const GAME_NAMES: Record<string, string> = {
   connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship",
   color: "Colour Dial", draw: "Molerei", reversi: "Reversi",
   dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
-  checkers: "Checkers", maumau: "Mau-Mau", "dice-duel": "Dice Duel",
+  checkers: "Checkers", maumau: "Mau-Mau", "dice-duel": "Kniffel",
 };
 
 const CORS = {

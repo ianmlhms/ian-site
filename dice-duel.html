@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Dice Duel — ian.lu</title>
+<title>Kniffel — ian.lu</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script src="theme.js?v=9"></script>
 <link rel="stylesheet" href="game-common.css?v=3">
@@ -32,7 +32,7 @@
 <body>
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Games</a>
-  <h1>🎲 Dice Duel</h1>
+  <h1>🎲 Kniffel</h1>
   <div class="spacer"></div>
 </header>
 
@@ -48,7 +48,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="game-common.js?v=1"></script>
-<script type="module" src="notify-ambient.js?v=4"></script>
+<script type="module" src="notify-ambient.js?v=5"></script>
 <script>
 /* Yahtzee-style dice duel: 3 rolls per turn, hold dice between rolls, score one
  * of 14 categories per turn. Upper section pays a 35 bonus at 63+. Only dice
@@ -183,7 +183,7 @@ $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; ren
 
 /* ---------- wiring ---------- */
 if (AI) {
-  document.querySelector(".bar h1").textContent = "🎲 Dice Duel — vs Computer";
+  document.querySelector(".bar h1").textContent = "🎲 Kniffel — vs Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
 } else {

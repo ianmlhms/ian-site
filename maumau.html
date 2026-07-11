@@ -60,7 +60,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="game-common.js?v=1"></script>
-<script type="module" src="notify-ambient.js?v=4"></script>
+<script type="module" src="notify-ambient.js?v=5"></script>
 <script>
 /* Mau-Mau with a 32-card deck. The whole game is derived deterministically from
  * one seed (deal + every reshuffle), so clients only exchange the seed and the
@@ -102,12 +102,14 @@ function setup(s) {
   discard = [deck[10]]; stock = deck.slice(11);
   wish = null; pending = 0; turn = 1; over = 0; moveCount = 0; recorded = false; dealt = true;
 }
-const top = () => discard[discard.length - 1];
+// "topCard" not "top" — a global lexical `top` collides with the browser's
+// non-configurable window.top and kills the whole script with a SyntaxError.
+const topCard = () => discard[discard.length - 1];
 function canPlay(c) {
   if (pending) return rankOf(c) === 0;                    // only another 7 passes the draw on
   if (rankOf(c) === 4) return true;                       // J goes on anything
   if (wish !== null) return suitOf(c) === wish;
-  return suitOf(c) === suitOf(top()) || rankOf(c) === rankOf(top());
+  return suitOf(c) === suitOf(topCard()) || rankOf(c) === rankOf(topCard());
 }
 function takeCard() {
   if (!stock.length) {
@@ -141,7 +143,7 @@ function cardHTML(c, mini) {
 function render() {
   $("opp").innerHTML = hands[opp].map(() => '<div class="card back mini"></div>').join("") +
     `<span style="color:var(--muted);font-size:13px;margin-left:8px">${AI ? "🤖" : "Opponent"}: ${hands[opp].length}</span>`;
-  $("top").innerHTML = dealt ? cardHTML(top()) : '<div class="card back"></div>';
+  $("top").innerHTML = dealt ? cardHTML(topCard()) : '<div class="card back"></div>';
   $("stockN").textContent = stock.length + " left";
   const badges = [];
   if (pending) badges.push(`<span class="badge">+${pending} draw</span>`);
