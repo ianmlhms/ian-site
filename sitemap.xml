@@ -240,4 +240,24 @@
     <lastmod>2026-07-11</lastmod>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://ian.lu/mtb/</loc>
+    <lastmod>2026-07-12</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/mtb/de/</loc>
+    <lastmod>2026-07-12</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/mtb/fr/</loc>
+    <lastmod>2026-07-12</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/mtb/en/</loc>
+    <lastmod>2026-07-12</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>

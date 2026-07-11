@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="ian.lu/trails" xmlns="http://www.topografix.com/GPX/1/1">
+<metadata><name>MTB 1 (Steinsel)</name><link href="https://ian.lu/mtb/"/></metadata>
+<trk><name>MTB 1 (Steinsel)</name><trkseg><trkpt lat="49.6774" lon="6.11465"/><trkpt lat="49.6775" lon="6.11477"/><trkpt lat="49.6776" lon="6.11478"/><trkpt lat="49.67782" lon="6.11471"/><trkpt lat="49.67779" lon="6.11462"/></trkseg><trkseg><trkpt lat="49.6774" lon="6.11465"/><trkpt lat="49.67779" lon="6.11462"/><trkpt lat="49.67781" lon="6.11446"/><trkpt lat="49.67811" lon="6.11445"/><trkpt lat="49.67822" lon="6.11421"/><trkpt lat="49.67842" lon="6.1149"/></trkseg><trkseg><trkpt lat="49.67842" lon="6.1149"/><trkpt lat="49.67838" lon="6.11519"/></trkseg><trkseg><trkpt lat="49.67838" lon="6.11519"/><trkpt lat="49.67799" lon="6.11503"/><trkpt lat="49.6775" lon="6.11493"/><trkpt lat="49.6774" lon="6.11465"/></trkseg></trk>
+</gpx>

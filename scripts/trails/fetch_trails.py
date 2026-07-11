@@ -27,11 +27,9 @@ import time
 import urllib.parse
 import urllib.request
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_DIR = os.path.join(REPO, "data", "trails")
-GEO_DIR = os.path.join(DATA_DIR, "geo")
-REGISTRY_JSON = os.path.join(DATA_DIR, "registry.json")
-COMPUTED_JSON = os.path.join(DATA_DIR, "computed.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import REPO, pick_category  # noqa: E402
+
 STOPS_JSON = os.path.join(REPO, "moien-stops.json")
 LINES_JSON = os.path.join(REPO, "moien-lines.json")
 
@@ -260,8 +258,11 @@ def process_relation(trail: dict, rel: dict, way_tags: dict, stops: list, line_i
 
 
 def main() -> None:
-    trails = load_json(REGISTRY_JSON)["trails"]
-    wanted = set(sys.argv[1:])
+    cat, args = pick_category(sys.argv[1:])
+    geo_dir = os.path.join(cat["data_dir"], "geo")
+    computed_json = os.path.join(cat["data_dir"], "computed.json")
+    trails = load_json(os.path.join(cat["data_dir"], "registry.json"))["trails"]
+    wanted = set(args)
     if wanted:
         trails = [t for t in trails if t["slug"] in wanted]
         missing = wanted - {t["slug"] for t in trails}
@@ -272,8 +273,8 @@ def main() -> None:
 
     stops = load_json(STOPS_JSON)
     line_index = build_line_index(load_json(LINES_JSON))
-    computed = load_json(COMPUTED_JSON) if os.path.exists(COMPUTED_JSON) else {}
-    os.makedirs(GEO_DIR, exist_ok=True)
+    computed = load_json(computed_json) if os.path.exists(computed_json) else {}
+    os.makedirs(geo_dir, exist_ok=True)
 
     updated = dict(computed)
     failed = []
@@ -293,15 +294,15 @@ def main() -> None:
                 continue
             merged = {**computed.get(trail["slug"], {}), **entry}
             updated = {**updated, trail["slug"]: merged}
-            with open(os.path.join(GEO_DIR, f"{trail['slug']}.geojson"), "w", encoding="utf-8") as f:
+            with open(os.path.join(geo_dir, f"{trail['slug']}.geojson"), "w", encoding="utf-8") as f:
                 json.dump(geojson, f, ensure_ascii=False, separators=(",", ":"))
             print(f"  ✓ {trail['slug']}: {entry['length_km']} km, {entry['natural_pct']}% paths, "
                   f"{len(entry['bus_stops'])} stops")
         time.sleep(2)
 
-    with open(COMPUTED_JSON, "w", encoding="utf-8") as f:
+    with open(computed_json, "w", encoding="utf-8") as f:
         json.dump(updated, f, ensure_ascii=False, indent=1, sort_keys=True)
-    print(f"Wrote {COMPUTED_JSON} — {len(trails) - len(failed)} ok, {len(failed)} failed"
+    print(f"Wrote {computed_json} — {len(trails) - len(failed)} ok, {len(failed)} failed"
           + (f" ({', '.join(failed)})" if failed else ""))
 
 

@@ -177,6 +177,8 @@ footer.site-foot {
 .card .teaser { font-size: 14px; color: var(--muted); margin: 2px 0 0; }
 .card .cta { font-size: 14px; font-weight: 700; color: var(--accent); margin-top: auto; }
 
+.sister { margin: 26px 0 0; font-weight: 600; }
+
 /* chooser */
 .chooser { text-align: center; padding-top: 60px; }
 .lang-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 28px; }

@@ -1,0 +1,244 @@
+{
+ "trails": [
+  {
+   "slug": "mini-bike",
+   "osm_rel": 15427350,
+   "name": "Becher mini Bike",
+   "place": "mini Bike"
+  },
+  {
+   "slug": "steinsel-1",
+   "osm_rel": 4712361,
+   "name": "MTB 1 (Steinsel)",
+   "place": "Steinsel"
+  },
+  {
+   "slug": "steinsel-2",
+   "osm_rel": 4712362,
+   "name": "MTB 2 (Steinsel)",
+   "place": "Steinsel"
+  },
+  {
+   "slug": "bavigne-boulaide",
+   "osm_rel": 2133894,
+   "name": "MTB Bavigne - Boulaide",
+   "place": "Bavigne - Boulaide"
+  },
+  {
+   "slug": "beaufort-berdorf",
+   "osm_rel": 3329271,
+   "name": "MTB Beaufort-Berdorf",
+   "place": "Beaufort-Berdorf"
+  },
+  {
+   "slug": "bech",
+   "osm_rel": 12981093,
+   "name": "MTB Bech",
+   "place": "Bech"
+  },
+  {
+   "slug": "beckerich",
+   "osm_rel": 3068740,
+   "name": "MTB Beckerich",
+   "place": "Beckerich"
+  },
+  {
+   "slug": "bettendorf-reisdorf",
+   "osm_rel": 2339920,
+   "name": "MTB Bettendorf-Reisdorf",
+   "place": "Bettendorf-Reisdorf"
+  },
+  {
+   "slug": "clervaux",
+   "osm_rel": 11730359,
+   "name": "MTB Clervaux",
+   "place": "Clervaux"
+  },
+  {
+   "slug": "dalheim",
+   "osm_rel": 1863436,
+   "name": "MTB Dalheim",
+   "place": "Dalheim"
+  },
+  {
+   "slug": "dragon",
+   "osm_rel": 14628299,
+   "name": "MTB Dragon",
+   "place": "Dragon"
+  },
+  {
+   "slug": "erpeldange",
+   "osm_rel": 2318434,
+   "name": "MTB Erpeldange",
+   "place": "Erpeldange"
+  },
+  {
+   "slug": "goesdorf",
+   "osm_rel": 2205648,
+   "name": "MTB Goesdorf",
+   "place": "Goesdorf"
+  },
+  {
+   "slug": "greiveldange",
+   "osm_rel": 1984302,
+   "name": "MTB Greiveldange",
+   "place": "Greiveldange"
+  },
+  {
+   "slug": "grevenmacher",
+   "osm_rel": 2094819,
+   "name": "MTB Grevenmacher",
+   "place": "Grevenmacher"
+  },
+  {
+   "slug": "grengewald",
+   "osm_rel": 13397134,
+   "name": "MTB Gréngewald",
+   "place": "Gréngewald"
+  },
+  {
+   "slug": "hoscheid",
+   "osm_rel": 3070263,
+   "name": "MTB Hoscheid",
+   "place": "Hoscheid"
+  },
+  {
+   "slug": "hosingen-lellingen",
+   "osm_rel": 1939072,
+   "name": "MTB Hosingen - Lellingen",
+   "place": "Hosingen - Lellingen"
+  },
+  {
+   "slug": "ingeldorf-ettelbruck",
+   "osm_rel": 7596588,
+   "name": "MTB Ingeldorf-Ettelbrück",
+   "place": "Ingeldorf-Ettelbrück"
+  },
+  {
+   "slug": "larochette",
+   "osm_rel": 11586473,
+   "name": "MTB Larochette",
+   "place": "Larochette"
+  },
+  {
+   "slug": "manternach",
+   "osm_rel": 2303941,
+   "name": "MTB Manternach",
+   "place": "Manternach"
+  },
+  {
+   "slug": "park-kelbech",
+   "osm_rel": 13575764,
+   "name": "MTB Park Kelbech",
+   "place": "Park Kelbech"
+  },
+  {
+   "slug": "preizerdaul",
+   "osm_rel": 1938896,
+   "name": "MTB Préizerdaul",
+   "place": "Préizerdaul"
+  },
+  {
+   "slug": "rambrouch",
+   "osm_rel": 11826189,
+   "name": "MTB Rambrouch",
+   "place": "Rambrouch"
+  },
+  {
+   "slug": "redrock-ellergrond",
+   "osm_rel": 7356479,
+   "name": "MTB RedRock Ellergrond",
+   "place": "RedRock Ellergrond"
+  },
+  {
+   "slug": "redrock-haard-black",
+   "osm_rel": 13572043,
+   "name": "MTB RedRock Haard Black",
+   "place": "RedRock Haard Black"
+  },
+  {
+   "slug": "redrock-lallenger-gaalgebierg",
+   "osm_rel": 13472118,
+   "name": "MTB RedRock Lallénger-Gaalgebierg",
+   "place": "RedRock Lallénger-Gaalgebierg"
+  },
+  {
+   "slug": "redrock-belvaux-differdange",
+   "osm_rel": 14076357,
+   "name": "MTB Redrock Belvaux-Differdange",
+   "place": "Redrock Belvaux-Differdange"
+  },
+  {
+   "slug": "saeul",
+   "osm_rel": 2130933,
+   "name": "MTB Saeul",
+   "place": "Saeul"
+  },
+  {
+   "slug": "strecke",
+   "osm_rel": 2919574,
+   "name": "MTB Strecke",
+   "place": "Strecke"
+  },
+  {
+   "slug": "vianden",
+   "osm_rel": 14648482,
+   "name": "MTB Vianden",
+   "place": "Vianden"
+  },
+  {
+   "slug": "weiler-la-tour",
+   "osm_rel": 4205951,
+   "name": "MTB Weiler-la-Tour",
+   "place": "Weiler-la-Tour"
+  },
+  {
+   "slug": "weiswampach-troisvierges",
+   "osm_rel": 1938887,
+   "name": "MTB Weiswampach - Troisvierges",
+   "place": "Weiswampach - Troisvierges"
+  },
+  {
+   "slug": "wiltz-1",
+   "osm_rel": 2345418,
+   "name": "MTB Wiltz 1",
+   "place": "Wiltz"
+  },
+  {
+   "slug": "wiltz-2",
+   "osm_rel": 2328396,
+   "name": "MTB Wiltz 2",
+   "place": "Wiltz"
+  },
+  {
+   "slug": "winseler",
+   "osm_rel": 2328130,
+   "name": "MTB Winseler",
+   "place": "Winseler"
+  },
+  {
+   "slug": "wormeldange",
+   "osm_rel": 943992,
+   "name": "MTB Wormeldange",
+   "place": "Wormeldange"
+  },
+  {
+   "slug": "hosingen",
+   "osm_rel": 1939122,
+   "name": "Mountainbike / VTT Tour 05 Hosingen",
+   "place": "Hosingen"
+  },
+  {
+   "slug": "saeul-2",
+   "osm_rel": 2130884,
+   "name": "Mountainbike / VTT Tour 26b Saeul",
+   "place": "Saeul"
+  },
+  {
+   "slug": "transardennaise-vtt",
+   "osm_rel": 11562031,
+   "name": "TransArdennaise VTT",
+   "place": "TransArdennaise VTT"
+  }
+ ]
+}

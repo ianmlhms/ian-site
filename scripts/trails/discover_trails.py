@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
-"""Auto-discover every Auto-Pédestre route relation in Luxembourg from OSM.
+"""Auto-discover every route relation of a category in Luxembourg from OSM.
 
-Writes data/trails/registry.json — the machine-generated trail list that
+Writes <data_dir>/registry.json — the machine-generated trail list that
 fetch_trails.py / build.py run from:
 
   { "trails": [ { "slug", "osm_rel", "name", "place" }, ... ] }
 
-Matching rule: relation name starts with "Auto-Pédestre" / "Auto Pédestre" /
-"Autopédestre" / "Autopedestre" (case-insensitive). "Old Auto-Pédestre ..."
-relations are decommissioned routes and are skipped.
+Categories (see config.py):
+  hiking — relations named "Auto-Pédestre …" ("Old Auto-Pédestre" = skipped)
+  mtb    — every named route=mtb relation
 
-Slugs are stable: if data/trails/curated.json already contains an entry for
+Slugs are stable: if <data_dir>/curated.json already contains an entry for
 the same osm_rel, its slug (and place/region overrides) win, so live URLs
 never change once published.
 
 Usage:
-    python3 scripts/trails/discover_trails.py [cached_overpass_tags.json]
-
-The optional argument is a cached Overpass response (out tags) to avoid
-re-querying while iterating.
+    python3 scripts/trails/discover_trails.py [--cat mtb] [cached_tags.json]
 """
 from __future__ import annotations
 
@@ -30,22 +27,21 @@ import unicodedata
 import urllib.parse
 import urllib.request
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_DIR = os.path.join(REPO, "data", "trails")
-REGISTRY_JSON = os.path.join(DATA_DIR, "registry.json")
-CURATED_JSON = os.path.join(DATA_DIR, "curated.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import pick_category  # noqa: E402
 
 OVERPASS_MIRRORS = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass-api.de/api/interpreter",
 ]
 USER_AGENT = "ian.lu-trails/1.0 (https://ian.lu)"
-NAME_RE = re.compile(r"^auto[ -]?p[ée]destre\b", re.IGNORECASE)
 
-QUERY = """
+QUERY_TMPL = """
 [out:json][timeout:180];
 area["ISO3166-1"="LU"][admin_level=2]->.lu;
-relation["route"="hiking"](area.lu);
+(
+{members}
+);
 out tags;
 """
 
@@ -55,8 +51,9 @@ def load_json(path: str):
         return json.load(f)
 
 
-def overpass_tags() -> dict:
-    body = urllib.parse.urlencode({"data": QUERY}).encode()
+def overpass_tags(members: str) -> dict:
+    query = QUERY_TMPL.format(members=members)
+    body = urllib.parse.urlencode({"data": query}).encode()
     last_err: Exception = RuntimeError("no mirror configured")
     for url in OVERPASS_MIRRORS:
         try:
@@ -69,52 +66,69 @@ def overpass_tags() -> dict:
     raise SystemExit(f"All Overpass mirrors failed: {last_err}")
 
 
-def slugify(name: str) -> str:
-    stripped = re.sub(NAME_RE, "", name).strip(" -–")
+def slugify(name: str, strip_re: re.Pattern) -> str:
+    stripped = strip_re.sub("", name.strip(), count=1).strip(" -–")
     ascii_name = unicodedata.normalize("NFKD", stripped).encode("ascii", "ignore").decode()
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_name.lower()).strip("-")
+    # "1-steinsel" (from "MTB 1 (Steinsel)") reads better as "steinsel-1"
+    m = re.match(r"^(\d+)-(.+)$", slug)
+    if m:
+        slug = f"{m.group(2)}-{m.group(1)}"
     return slug or "trail"
 
 
-def extract_place(name: str) -> str:
-    """'Auto-Pédestre Leudelange-Gare (anc.Roedgen)' -> 'Leudelange-Gare'."""
-    place = re.sub(NAME_RE, "", name).strip(" -–")
-    place = place.split("(")[0].split("/")[0]
-    place = re.sub(r"\b(?:[0-9]+|I{1,3}|IV|V)\s*$", "", place.strip())
-    return place.strip(" -–") or place
+def extract_place(name: str, strip_re: re.Pattern) -> str:
+    """'MTB 1 (Steinsel)' -> 'Steinsel'; 'Auto-Pédestre Eischen II' -> 'Eischen'."""
+    place = strip_re.sub("", name.strip(), count=1).strip(" -–:")
+    paren = re.search(r"\(([^)]+)\)", place)
+    before = place.split("(")[0].strip(" -–")
+    if paren and (not before or re.fullmatch(r"[0-9IVX ]+", before)):
+        place = paren.group(1)
+    else:
+        place = before or place
+    place = place.split("/")[0]
+    place = re.sub(r"\b(?:[0-9]+[a-z]?|I{1,3}|IV|V)\s*$", "", place.strip())
+    return place.strip(" -–") or name
 
 
 def main() -> None:
-    if len(sys.argv) > 1:
-        print(f"Using cached Overpass response: {sys.argv[1]}")
-        data = load_json(sys.argv[1])
-    else:
-        print("Querying Overpass for all hiking relations in Luxembourg ...")
-        data = overpass_tags()
+    cat, args = pick_category(sys.argv[1:])
+    include_re = re.compile(cat["name_include"], re.IGNORECASE)
+    strip_re = re.compile(cat["name_strip"], re.IGNORECASE)
+    registry_path = os.path.join(cat["data_dir"], "registry.json")
+    curated_path = os.path.join(cat["data_dir"], "curated.json")
 
-    curated = load_json(CURATED_JSON).get("trails", []) if os.path.exists(CURATED_JSON) else []
+    if args:
+        print(f"Using cached Overpass response: {args[0]}")
+        data = load_json(args[0])
+    else:
+        print(f"Querying Overpass for {cat['key']} relations in Luxembourg ...")
+        data = overpass_tags(cat["overpass_members"])
+
+    curated = load_json(curated_path).get("trails", []) if os.path.exists(curated_path) else []
     slug_by_rel = {t["osm_rel"]: t["slug"] for t in curated if "osm_rel" in t and "slug" in t}
 
     matches = []
     for el in data.get("elements", []):
         name = el.get("tags", {}).get("name", "")
-        if NAME_RE.match(name):
+        if name and include_re.match(name):
             matches.append((name, el["id"]))
     matches.sort()
 
     trails, used = [], set()
     for name, rel_id in matches:
-        slug = slug_by_rel.get(rel_id) or slugify(name)
+        slug = slug_by_rel.get(rel_id) or slugify(name, strip_re)
         base, n = slug, 2
         while slug in used:
             slug, n = f"{base}-{n}", n + 1
         used.add(slug)
-        trails.append({"slug": slug, "osm_rel": rel_id, "name": name, "place": extract_place(name)})
+        trails.append({"slug": slug, "osm_rel": rel_id, "name": name,
+                       "place": extract_place(name, strip_re)})
 
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(REGISTRY_JSON, "w", encoding="utf-8") as f:
+    os.makedirs(cat["data_dir"], exist_ok=True)
+    with open(registry_path, "w", encoding="utf-8") as f:
         json.dump({"trails": trails}, f, ensure_ascii=False, indent=1)
-    print(f"Registry: {len(trails)} Auto-Pédestres → {REGISTRY_JSON}")
+    print(f"Registry ({cat['key']}): {len(trails)} routes → {registry_path}")
 
 
 if __name__ == "__main__":

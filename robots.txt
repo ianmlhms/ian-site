@@ -19,3 +19,4 @@ Disallow: /me.html
 
 Sitemap: https://ian.lu/sitemap.xml
 Sitemap: https://ian.lu/sitemap-trails.xml
+Sitemap: https://ian.lu/sitemap-mtb.xml

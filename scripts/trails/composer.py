@@ -17,9 +17,10 @@ BUS_ON_ROUTE_M = 150
 KIND_PRIORITY = {"castle": 0, "ruins": 1, "waterfall": 2, "viewpoint": 3, "museum": 4, "nature_reserve": 5}
 
 
-def duration_label(length_km: float, elev_gain: int = 0) -> str:
-    """Naismith-ish walking time, rounded to half hours: '2½', '3', '½'."""
-    hours = length_km / 4.0 + (elev_gain or 0) / 600.0
+def duration_label(length_km: float, elev_gain: int = 0,
+                   speed_kmh: float = 4.0, climb_m_per_h: int = 600) -> str:
+    """Naismith-ish moving time, rounded to half hours: '2½', '3', '½'."""
+    hours = length_km / speed_kmh + (elev_gain or 0) / climb_m_per_h
     halves = max(1, round(hours * 2))
     whole, half = divmod(halves, 2)
     if whole == 0:
@@ -27,10 +28,12 @@ def duration_label(length_km: float, elev_gain: int = 0) -> str:
     return f"{whole}½" if half else str(whole)
 
 
-def auto_difficulty(length_km: float, elev_gain: int) -> str:
-    if length_km >= 12 or (elev_gain or 0) >= 400:
+def auto_difficulty(length_km: float, elev_gain: int,
+                    thresholds: tuple = (7, 120, 12, 400)) -> str:
+    easy_km, easy_gain, hard_km, hard_gain = thresholds
+    if length_km >= hard_km or (elev_gain or 0) >= hard_gain:
         return "hard"
-    if length_km < 7 and (elev_gain or 0) < FLAT_GAIN_M:
+    if length_km < easy_km and (elev_gain or 0) < easy_gain:
         return "easy"
     return "moderate"
 
@@ -221,6 +224,193 @@ REGION_HIGHLIGHT = {
 }
 
 
+MTB_OPENERS = {
+    "de": {
+        "eislek": [
+            "Rund um {p} führt die Tour durch das Éislek, den bergigen Norden Luxemburgs — lange Anstiege, schnelle Waldabfahrten und weite Blicke über die Ardennenkämme.",
+            "Diese MTB-Runde erkundet die Gegend um {p} im Éislek, wo tiefe Täler und bewaldete Höhenrücken für ständiges Auf und Ab sorgen.",
+            "{p} liegt mitten im Éislek — die Runde nutzt die für den Norden typische Mischung aus Waldpfaden, Forstwegen und offenen Kammpassagen.",
+        ],
+        "mullerthal": [
+            "Bei {p} fährt man durch die Müllerthal-Region: sandige Waldböden, Felspassagen in Sichtweite und ein ständiger Wechsel aus Tal und Plateau.",
+            "Diese MTB-Runde erkundet die Gegend um {p} in der Müllerthal-Region, wo Sandsteinfelsen und dichte Wälder die Kulisse stellen.",
+            "{p} gehört zur Müllerthal-Region im Osten Luxemburgs — die Tour verbindet flowige Waldtrails mit kurzen, knackigen Rampen.",
+        ],
+        "moselle": [
+            "Rund um {p} rollt die Tour durch die Weinbaulandschaft der Luxemburger Mosel — Anstiege durch die Rebhänge, schnelle Plateauwege und Blicke über das Flusstal.",
+            "Diese MTB-Runde erkundet die Umgebung von {p} an der Mosel: Weinberge, Feldwege auf dem Plateau und Abfahrten Richtung Fluss.",
+            "{p} liegt in der Moselregion — der Anstieg aus dem Tal ist der Preis für die Aussicht, die Abfahrt die Belohnung.",
+        ],
+        "minett": [
+            "Rund um {p} fährt man mitten durch den Minett: alte Tagebauflächen, rote Erde und ein überraschend verwinkeltes Wegenetz aus Trails und Forstwegen.",
+            "Diese MTB-Runde erkundet die Gegend um {p} in den Roten Erden, wo auf ehemaligem Bergbaugelände heute einige der besten Trails des Landes liegen.",
+            "{p} gehört zum Minett — kurze steile Rampen, schnelle Kurven und Industriegeschichte am Wegesrand prägen die Runde.",
+        ],
+        "center": [
+            "Rund um {p} im Guttland rollt die Tour über Feldwege, Waldpassagen und ruhige Verbindungssträßchen — ideales Terrain, um Kilometer zu machen.",
+            "Diese MTB-Runde erkundet die Umgebung von {p} im Guttland, der hügeligen Mitte des Landes zwischen Feldern und Wäldern.",
+            "{p} liegt im Guttland — die Runde wechselt zwischen rollenden Feldpassagen und kurzen Waldstücken.",
+        ],
+    },
+    "fr": {
+        "eislek": [
+            "Autour de {p}, le circuit traverse l'Éislek, le nord montagneux du Luxembourg — longues montées, descentes forestières rapides et larges vues sur les crêtes ardennaises.",
+            "Ce circuit VTT explore les environs de {p}, dans l'Éislek, où vallées profondes et crêtes boisées imposent un constant jeu de montées et descentes.",
+            "{p} se trouve en plein Éislek — le tour enchaîne sentiers forestiers, chemins d'exploitation et passages de crête typiques du nord.",
+        ],
+        "mullerthal": [
+            "Près de {p}, on roule dans la région du Mullerthal : sols forestiers sablonneux, rochers de grès en toile de fond et alternance permanente de vallons et de plateaux.",
+            "Ce circuit VTT explore les alentours de {p}, dans la région du Mullerthal, entre rochers de grès et forêts denses.",
+            "{p} appartient à la région du Mullerthal — le tour combine singletracks fluides et rampes courtes et raides.",
+        ],
+        "moselle": [
+            "Autour de {p}, le circuit parcourt le vignoble de la Moselle luxembourgeoise — montées dans les coteaux, chemins rapides sur le plateau et vues sur la vallée.",
+            "Ce circuit VTT explore les environs de {p}, sur la Moselle : vignes, chemins de plateau et descentes vers le fleuve.",
+            "{p} se situe dans la région de la Moselle — la montée depuis la vallée se paie, la descente récompense.",
+        ],
+        "minett": [
+            "Autour de {p}, on roule en plein Minett : anciennes mines à ciel ouvert, terre rouge et un réseau étonnamment dense de trails et chemins forestiers.",
+            "Ce circuit VTT explore les alentours de {p}, dans les Terres Rouges, où les friches minières abritent quelques-uns des meilleurs trails du pays.",
+            "{p} fait partie du Minett — rampes courtes et raides, virages rapides et patrimoine industriel au bord du chemin.",
+        ],
+        "center": [
+            "Autour de {p}, dans le Guttland, le circuit enchaîne chemins agricoles, passages forestiers et petites routes calmes — un terrain idéal pour avaler les kilomètres.",
+            "Ce circuit VTT explore les environs de {p}, dans le Guttland, le centre vallonné du pays entre champs et bois.",
+            "{p} se trouve dans le Guttland — le tour alterne portions champêtres roulantes et courts secteurs boisés.",
+        ],
+    },
+    "en": {
+        "eislek": [
+            "Around {p} the tour crosses the Éislek, Luxembourg's mountainous north — long climbs, fast forest descents and wide views over the Ardennes ridges.",
+            "This MTB loop explores the area around {p} in the Éislek, where deep valleys and wooded ridgelines keep the trail constantly rising and falling.",
+            "{p} sits in the heart of the Éislek — the loop links the forest paths, gravel roads and open ridge sections typical of the north.",
+        ],
+        "mullerthal": [
+            "Near {p} you ride through the Mullerthal region: sandy forest floor, sandstone rocks in sight and a constant switch between valley and plateau.",
+            "This MTB loop explores the area around {p} in the Mullerthal region, with sandstone cliffs and dense forest as the backdrop.",
+            "{p} belongs to the Mullerthal region — the tour mixes flowing forest trails with short, punchy ramps.",
+        ],
+        "moselle": [
+            "Around {p} the tour rolls through the Luxembourg Moselle wine country — climbs through the vineyards, fast plateau tracks and views over the river valley.",
+            "This MTB loop explores the surroundings of {p} on the Moselle: vines, plateau farm tracks and descents back towards the river.",
+            "{p} lies in the Moselle region — the climb out of the valley is the price, the descent the reward.",
+        ],
+        "minett": [
+            "Around {p} you ride straight through the Minett: former open-cast mines, red earth and a surprisingly intricate network of trails and forest roads.",
+            "This MTB loop explores the area around {p} in the Red Rocks region, where the old mining land now hides some of the country's best trails.",
+            "{p} is part of the Minett — short steep ramps, fast corners and industrial heritage beside the trail define the loop.",
+        ],
+        "center": [
+            "Around {p}, in the Guttland, the tour rolls over farm tracks, forest sections and quiet lanes — ideal terrain for covering distance.",
+            "This MTB loop explores the surroundings of {p} in the Guttland, the rolling centre of the country between fields and woods.",
+            "{p} lies in the Guttland — the loop alternates between rolling farmland sections and short stretches of forest.",
+        ],
+    },
+}
+
+MTB_LENGTH_SENTENCES = {
+    "de": [
+        "Die Runde ist {l} km lang; mit normalem Tempo sitzt man etwa {d} Stunden im Sattel.",
+        "Mit {l} km Länge ist die Tour in rund {d} Stunden zu fahren.",
+        "Die Strecke misst {l} km — je nach Tempo etwa {d} Stunden Fahrzeit.",
+    ],
+    "fr": [
+        "La boucle fait {l} km ; comptez environ {d} h de selle à allure normale.",
+        "Avec ses {l} km, le circuit se roule en {d} h environ.",
+        "Le parcours mesure {l} km — soit environ {d} h de VTT selon le rythme.",
+    ],
+    "en": [
+        "The loop is {l} km long; at a normal pace expect about {d} hours in the saddle.",
+        "At {l} km, the tour takes roughly {d} hours to ride.",
+        "The route measures {l} km — about {d} hours of riding, depending on pace.",
+    ],
+}
+
+MTB_NATURE_CLAUSES = {
+    "de": [", und der Großteil verläuft abseits des Asphalts auf Wald- und Feldwegen",
+           ", etwa die Hälfte der Strecke ist unbefestigt",
+           ", die Tour mischt ruhige Sträßchen mit Wald- und Feldwegen"],
+    "fr": [", et la majeure partie se roule hors bitume, sur chemins forestiers et agricoles",
+           ", environ la moitié du parcours est non revêtue",
+           ", le tour mêle petites routes calmes et chemins"],
+    "en": [", and most of it runs off-tarmac on forest and field tracks",
+           ", with about half the distance unpaved",
+           ", mixing quiet lanes with forest and field tracks"],
+}
+
+MTB_TERRAIN_SENTENCES = {
+    "de": {"flat": "Große Steigungen fehlen — die Runde rollt zügig{nat}.",
+           "rolling": "Unterwegs sammeln sich rund {g} Höhenmeter an{nat}.",
+           "hilly": "Mit etwa {g} Höhenmetern ist die Tour konditionell fordernd{nat}."},
+    "fr": {"flat": "Pas de grosses montées — la boucle roule vite{nat}.",
+           "rolling": "Le parcours cumule environ {g} m de dénivelé{nat}.",
+           "hilly": "Avec quelque {g} m de dénivelé, le tour demande de la caisse{nat}."},
+    "en": {"flat": "There are no big climbs — the loop rolls fast{nat}.",
+           "rolling": "The route gathers about {g} m of climbing{nat}.",
+           "hilly": "With some {g} m of climbing, the tour demands fitness{nat}."},
+}
+
+MTB_POI_SENTENCES = {
+    "de": {"one": ["Unterwegs kommt man an {a} vorbei.", "An der Strecke liegt {a}."],
+           "two": ["Unterwegs kommt man unter anderem an {a} und {b} vorbei.",
+                    "An der Strecke liegen unter anderem {a} und {b}.",
+                    "Sehenswert an der Strecke: {a} und {b}."]},
+    "fr": {"one": ["En chemin, on passe près de {a}.", "Sur le parcours : {a}."],
+           "two": ["En chemin, on passe notamment près de {a} et de {b}.",
+                    "Sur le parcours, entre autres : {a} et {b}.",
+                    "À voir en chemin : {a} et {b}."]},
+    "en": {"one": ["Along the way you pass {a}.", "On the route: {a}."],
+           "two": ["Along the way you pass {a} and {b}, among other sights.",
+                    "On the route, among others: {a} and {b}.",
+                    "Worth a look en route: {a} and {b}."]},
+}
+
+MTB_LANDSCAPE_SENTENCES = {
+    "de": ["Gefahren wird überwiegend auf naturbelassenen Wegen durch Wald und Flur.",
+           "Wald- und Feldwege wechseln sich mit ruhigen Nebenstraßen ab.",
+           "Auf kleinen Wegen verbindet die Tour die schönsten Ecken der Umgebung."],
+    "fr": ["On roule surtout sur des chemins naturels, entre bois et campagne.",
+           "Chemins forestiers et agricoles alternent avec de calmes routes secondaires.",
+           "Par de petits chemins, le tour relie les plus beaux coins des alentours."],
+    "en": ["Most of the riding is on natural-surface tracks through woods and open country.",
+           "Forest and field tracks alternate with quiet back roads.",
+           "On small tracks, the tour links the prettiest corners of the area."],
+}
+
+MTB_PRACTICAL_SENTENCES = {
+    "de": ["Die Tour ist als Rundkurs ausgeschildert und lässt sich an jedem Punkt beginnen — Helm auf und los.",
+           "Als beschilderte Rundtour hat die Strecke keinen festen Startpunkt; gefahren wird in Pfeilrichtung."],
+    "fr": ["Le circuit est balisé en boucle et peut se commencer n'importe où — casque obligatoire, évidemment.",
+           "Boucle balisée, le parcours n'a pas de départ imposé ; on suit le sens des flèches."],
+    "en": ["The tour is signposted as a loop and can be started anywhere — helmet on and off you go.",
+           "As a waymarked loop the route has no fixed start; ride in the direction of the arrows."],
+}
+
+MTB_HIGHLIGHT_LABELS = {
+    "de": {"gain": "{g} Höhenmeter", "flat": "Schnell rollende Strecke", "natural": "Überwiegend unbefestigte Wege",
+           "bus": "Bushaltestelle direkt an der Strecke"},
+    "fr": {"gain": "{g} m de dénivelé", "flat": "Parcours roulant", "natural": "Surtout chemins non revêtus",
+           "bus": "Arrêt de bus sur le parcours"},
+    "en": {"gain": "{g} m of climbing", "flat": "Fast-rolling route", "natural": "Mostly unpaved tracks",
+           "bus": "Bus stop right on the route"},
+}
+
+BANKS = {
+    "hiking": {
+        "openers": OPENERS, "length": LENGTH_SENTENCES, "nature": NATURE_CLAUSES,
+        "terrain": TERRAIN_SENTENCES, "poi": POI_SENTENCES, "landscape": LANDSCAPE_SENTENCES,
+        "practical": PRACTICAL_SENTENCES, "labels": HIGHLIGHT_LABELS,
+        "flat_gain": FLAT_GAIN_M, "hilly_gain": HILLY_GAIN_M,
+    },
+    "mtb": {
+        "openers": MTB_OPENERS, "length": MTB_LENGTH_SENTENCES, "nature": MTB_NATURE_CLAUSES,
+        "terrain": MTB_TERRAIN_SENTENCES, "poi": MTB_POI_SENTENCES, "landscape": MTB_LANDSCAPE_SENTENCES,
+        "practical": MTB_PRACTICAL_SENTENCES, "labels": MTB_HIGHLIGHT_LABELS,
+        "flat_gain": 200, "hilly_gain": 500,
+    },
+}
+
+
 def _fmt_len(length_km: float, lang: str) -> str:
     return f"{length_km:g}".replace(".", "," if lang != "en" else ".")
 
@@ -230,31 +420,34 @@ def _sorted_pois(entry: dict) -> list:
     return sorted(pois, key=lambda p: (KIND_PRIORITY.get(p["kind"], 9), p["dist_m"]))
 
 
-def compose(trail: dict, entry: dict, region: str, lang: str) -> dict:
+def compose(trail: dict, entry: dict, region: str, lang: str, cat_key: str = "hiking",
+            speed_kmh: float = 4.0, climb_m_per_h: int = 600) -> dict:
     """Return {"paragraphs": [p1, p2], "highlights": [...]} from facts."""
+    bank = BANKS[cat_key]
     slug, place = trail["slug"], trail["place"]
     gain = entry.get("elev_gain") or 0
     natural = entry.get("natural_pct") or 0
-    band = "flat" if gain < FLAT_GAIN_M else ("hilly" if gain >= HILLY_GAIN_M else "rolling")
+    band = "flat" if gain < bank["flat_gain"] else ("hilly" if gain >= bank["hilly_gain"] else "rolling")
     nat_idx = 0 if natural >= 70 else (1 if natural >= 40 else 2)
 
-    opener = _pick(slug, f"open-{lang}", OPENERS[lang][region]).format(p=place)
-    length_s = _pick(slug, f"len-{lang}", LENGTH_SENTENCES[lang]).format(
-        l=_fmt_len(entry["length_km"], lang), d=duration_label(entry["length_km"], gain))
-    terrain_s = TERRAIN_SENTENCES[lang][band].format(g=gain, nat=NATURE_CLAUSES[lang][nat_idx])
+    opener = _pick(slug, f"open-{lang}", bank["openers"][lang][region]).format(p=place)
+    length_s = _pick(slug, f"len-{lang}", bank["length"][lang]).format(
+        l=_fmt_len(entry["length_km"], lang),
+        d=duration_label(entry["length_km"], gain, speed_kmh, climb_m_per_h))
+    terrain_s = bank["terrain"][lang][band].format(g=gain, nat=bank["nature"][lang][nat_idx])
     paragraph1 = f"{opener} {length_s} {terrain_s}"
 
     pois = _sorted_pois(entry)
     if len(pois) >= 2:
-        poi_s = _pick(slug, f"poi-{lang}", POI_SENTENCES[lang]["two"]).format(a=pois[0]["name"], b=pois[1]["name"])
+        poi_s = _pick(slug, f"poi-{lang}", bank["poi"][lang]["two"]).format(a=pois[0]["name"], b=pois[1]["name"])
     elif len(pois) == 1:
-        poi_s = _pick(slug, f"poi-{lang}", POI_SENTENCES[lang]["one"]).format(a=pois[0]["name"])
+        poi_s = _pick(slug, f"poi-{lang}", bank["poi"][lang]["one"]).format(a=pois[0]["name"])
     else:
-        poi_s = _pick(slug, f"land-{lang}", LANDSCAPE_SENTENCES[lang])
-    practical_s = _pick(slug, f"prak-{lang}", PRACTICAL_SENTENCES[lang])
+        poi_s = _pick(slug, f"land-{lang}", bank["landscape"][lang])
+    practical_s = _pick(slug, f"prak-{lang}", bank["practical"][lang])
     paragraph2 = f"{poi_s} {practical_s}"
 
-    labels = HIGHLIGHT_LABELS[lang]
+    labels = bank["labels"][lang]
     highlights = [p["name"] for p in pois[:2]]
     if gain >= 250:
         highlights.append(labels["gain"].format(g=gain))

@@ -29,15 +29,17 @@ from string import Template
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from composer import auto_difficulty, compose, duration_label  # noqa: E402
-from strings import DIFFICULTIES, EXTRA, REGIONS, UI  # noqa: E402
+from config import REPO, pick_category  # noqa: E402
+from strings import DIFFICULTIES, EXTRA, REGIONS, UI_BY_CAT  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(os.path.dirname(HERE))
-DATA_DIR = os.path.join(REPO, "data", "trails")
-OUT_DIR = os.path.join(REPO, "trails")
 TEMPLATE_DIR = os.path.join(HERE, "templates")
 
-BASE_URL = "https://ian.lu/trails"
+# set per category in main()
+CAT: dict = {}
+UI: dict = {}
+DATA_DIR = OUT_DIR = BASE_URL = ""
+
 LANGS = ("de", "fr", "en")
 GEAR_TITLES = {"de": "Ausrüstung", "fr": "Équipement", "en": "Gear"}
 AFFILIATE_DISCLOSURE = {
@@ -77,10 +79,13 @@ def merge_trails() -> list:
             print(f"  ! {slug}: missing computed data/geometry — skipped", file=sys.stderr)
             continue
         override = curated.get(slug, {})
+        if override.get("exclude"):
+            continue
         region = override.get("region") or entry.get("region") or "center"
         if region not in REGIONS:
             raise SystemExit(f"{slug}: unknown region '{region}'")
-        difficulty = override.get("difficulty") or auto_difficulty(entry["length_km"], entry.get("elev_gain") or 0)
+        difficulty = override.get("difficulty") or auto_difficulty(
+            entry["length_km"], entry.get("elev_gain") or 0, CAT["difficulty"])
         trail = {
             "slug": slug,
             "name": override.get("name") or base["name"],
@@ -98,7 +103,8 @@ def merge_trails() -> list:
 def texts_for(trail: dict, lang: str) -> dict:
     if trail["descriptions"] and trail["highlights"]:
         return {"paragraphs": trail["descriptions"][lang], "highlights": trail["highlights"][lang]}
-    return compose({"slug": trail["slug"], "place": trail["place"]}, trail["entry"], trail["region"], lang)
+    return compose({"slug": trail["slug"], "place": trail["place"]}, trail["entry"], trail["region"],
+                   lang, CAT["key"], CAT["speed_kmh"], CAT["climb_m_per_h"])
 
 
 def fmt_len(length_km: float, lang: str) -> str:
@@ -260,7 +266,7 @@ def komoot_url(geo: dict) -> str:
     phone this opens the Komoot app with the trail ready to save/start."""
     parts = [f"p%5B{i}%5D%5Bloc%5D={lat:.5f}%2C{lon:.5f}"
              for i, (lat, lon) in enumerate(route_samples(geo))]
-    return "https://www.komoot.com/plan/?sport=hike&" + "&".join(parts)
+    return f"https://www.komoot.com/plan/?sport={CAT['komoot_sport']}&" + "&".join(parts)
 
 
 def gpx_content(trail: dict, geo: dict) -> str:
@@ -339,7 +345,8 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
         gain_fact=gain_fact_html(entry, lang),
         actions=actions_html(trail, geo, lang),
         length=length,
-        duration=esc(ui["duration_fmt"].format(duration_label(entry["length_km"], entry.get("elev_gain") or 0))),
+        duration=esc(ui["duration_fmt"].format(duration_label(
+            entry["length_km"], entry.get("elev_gain") or 0, CAT["speed_kmh"], CAT["climb_m_per_h"]))),
         difficulty=esc(DIFFICULTIES[trail["difficulty"]][lang]),
         map_title=esc(ui["map_title"]),
         map_note=esc(ui["map_note"]),
@@ -357,6 +364,12 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
         bbox_sw=f"{bbox[0]}, {bbox[1]}",
         bbox_ne=f"{bbox[2]}, {bbox[3]}",
     )
+
+
+def sister_html(lang: str) -> str:
+    if CAT["key"] == "hiking":
+        return f'<a href="../../mtb/{lang}/">{esc(EXTRA[lang]["sister_mtb"])}</a>'
+    return f'<a href="../../trails/{lang}/">{esc(EXTRA[lang]["sister_hiking"])}</a>'
 
 
 def render_index(tpl: Template, trails: list, lang: str) -> str:
@@ -377,7 +390,7 @@ def render_index(tpl: Template, trails: list, lang: str) -> str:
             f'        <span class="region">{esc(REGIONS[trail["region"]][lang])}</span>\n'
             f"        <h3>{esc(trail['name'])}</h3>\n"
             f'        <span class="badges"><span class="badge">{length} km</span>'
-            f'<span class="badge">{esc(ui["duration_fmt"].format(duration_label(entry["length_km"], entry.get("elev_gain") or 0)))}</span>'
+            f'<span class="badge">{esc(ui["duration_fmt"].format(duration_label(entry["length_km"], entry.get("elev_gain") or 0, CAT["speed_kmh"], CAT["climb_m_per_h"])))}</span>'
             f'<span class="badge">{esc(DIFFICULTIES[trail["difficulty"]][lang])}</span></span>\n'
             f'        <p class="teaser">{esc(teaser)}</p>\n'
             f'        <span class="cta">{esc(ui["card_cta"])} ›</span>\n'
@@ -398,6 +411,7 @@ def render_index(tpl: Template, trails: list, lang: str) -> str:
         filter_all=esc(ui["filter_all"]),
         filter_buttons=filter_buttons,
         cards_html="\n".join(cards),
+        sister_html=sister_html(lang),
         footer_note=esc(ui["footer_note"]),
     )
 
@@ -424,6 +438,11 @@ def build_sitemap(trails: list) -> str:
 
 
 def main() -> None:
+    global CAT, UI, DATA_DIR, OUT_DIR, BASE_URL
+    CAT, _ = pick_category(sys.argv[1:])
+    UI = UI_BY_CAT[CAT["key"]]
+    DATA_DIR, OUT_DIR, BASE_URL = CAT["data_dir"], CAT["out_dir"], CAT["base_url"]
+
     trails = merge_trails()
     if not trails:
         raise SystemExit("No renderable trails.")
@@ -432,7 +451,7 @@ def main() -> None:
 
     trail_tpl = load_template("trail.html")
     index_tpl = load_template("index.html")
-    chooser_tpl = load_template("chooser.html")
+    chooser_tpl = load_template(CAT["chooser_template"])
 
     for lang in LANGS:
         for trail in trails:
@@ -455,10 +474,10 @@ def main() -> None:
               gpx_content(trail, load_geojson(trail["slug"])))
     shutil.copyfile(os.path.join(TEMPLATE_DIR, "trails.css"), os.path.join(OUT_DIR, "trails.css"))
 
-    write(os.path.join(REPO, "sitemap-trails.xml"), build_sitemap(trails))
+    write(CAT["sitemap_file"], build_sitemap(trails))
 
     with_photos = sum(1 for t in trails if t["entry"].get("images"))
-    print(f"Built {len(trails) * len(LANGS) + len(LANGS) + 1} pages for {len(trails)} trails "
+    print(f"Built {len(trails) * len(LANGS) + len(LANGS) + 1} {CAT['key']} pages for {len(trails)} trails "
           f"({with_photos} with photos) → {OUT_DIR}")
 
 

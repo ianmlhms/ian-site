@@ -29,12 +29,12 @@ import time
 import urllib.parse
 import urllib.request
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_DIR = os.path.join(REPO, "data", "trails")
-GEO_DIR = os.path.join(DATA_DIR, "geo")
-REGISTRY_JSON = os.path.join(DATA_DIR, "registry.json")
-COMPUTED_JSON = os.path.join(DATA_DIR, "computed.json")
-POIS_JSON = os.path.join(DATA_DIR, "pois.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import REPO, pick_category  # noqa: E402
+
+# the country-wide POI list is category-independent — always from data/trails
+POIS_JSON = os.path.join(REPO, "data", "trails", "pois.json")
+GEO_DIR = ""  # set per category in main()
 
 USER_AGENT = "ian.lu-trails/1.0 (https://ian.lu; konto@ian.lu)"
 ELEVATION_URL = "https://api.opentopodata.org/v1/eudem25m"
@@ -212,12 +212,16 @@ def pick_images(points: list) -> list:
 # --- main ----------------------------------------------------------------------
 
 def main() -> None:
-    args = [a for a in sys.argv[1:] if a != "--force"]
-    force = "--force" in sys.argv
-    registry = load_json(REGISTRY_JSON)["trails"]
+    global GEO_DIR
+    cat, rest = pick_category(sys.argv[1:])
+    args = [a for a in rest if a != "--force"]
+    force = "--force" in rest
+    GEO_DIR = os.path.join(cat["data_dir"], "geo")
+    computed_json = os.path.join(cat["data_dir"], "computed.json")
+    registry = load_json(os.path.join(cat["data_dir"], "registry.json"))["trails"]
     if args:
         registry = [t for t in registry if t["slug"] in set(args)]
-    computed = load_json(COMPUTED_JSON)
+    computed = load_json(computed_json)
     pois = load_json(POIS_JSON) if os.path.exists(POIS_JSON) else []
 
     updated = dict(computed)
@@ -247,12 +251,12 @@ def main() -> None:
         print(f"  ✓ {slug}: +{additions.get('elev_gain', entry.get('elev_gain', '?'))} m, "
               f"{len(updated[slug].get('pois', []))} POIs, {len(updated[slug].get('images', []))} photos")
         if done % 10 == 0:
-            with open(COMPUTED_JSON, "w", encoding="utf-8") as f:
+            with open(computed_json, "w", encoding="utf-8") as f:
                 json.dump(updated, f, ensure_ascii=False, indent=1, sort_keys=True)
 
-    with open(COMPUTED_JSON, "w", encoding="utf-8") as f:
+    with open(computed_json, "w", encoding="utf-8") as f:
         json.dump(updated, f, ensure_ascii=False, indent=1, sort_keys=True)
-    print(f"Enriched {done} trails → {COMPUTED_JSON}")
+    print(f"Enriched {done} trails → {computed_json}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,57 @@
+{
+ "trails": [
+  {
+   "slug": "weiswampach-troisvierges",
+   "osm_rel": 1938887,
+   "exclude": true,
+   "note": "OSM relation has only 4 geometry points - unmapped; re-include when fixed upstream"
+  },
+  {
+   "slug": "dragon",
+   "osm_rel": 14628299,
+   "exclude": true,
+   "note": "0.3 km trail stub, no route"
+  },
+  {
+   "slug": "transardennaise-vtt",
+   "osm_rel": 11562031,
+   "exclude": true,
+   "note": "265 km point-to-point mostly in Belgium - not a Luxembourg loop"
+  },
+  {
+   "slug": "mini-bike",
+   "osm_rel": 15427350,
+   "commune": "Bech"
+  },
+  {
+   "slug": "strecke",
+   "osm_rel": 2919574,
+   "commune": "Rodershausen"
+  },
+  {
+   "slug": "park-kelbech",
+   "osm_rel": 13575764,
+   "commune": "Leudelange"
+  },
+  {
+   "slug": "redrock-ellergrond",
+   "osm_rel": 7356479,
+   "commune": "Esch-sur-Alzette"
+  },
+  {
+   "slug": "redrock-haard-black",
+   "osm_rel": 13572043,
+   "commune": "Dudelange"
+  },
+  {
+   "slug": "redrock-lallenger-gaalgebierg",
+   "osm_rel": 13472118,
+   "commune": "Kayl"
+  },
+  {
+   "slug": "redrock-belvaux-differdange",
+   "osm_rel": 14076357,
+   "commune": "Differdange"
+  }
+ ]
+}
