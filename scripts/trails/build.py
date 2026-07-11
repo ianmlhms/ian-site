@@ -233,6 +233,36 @@ def start_point(geo: dict) -> tuple:
     return lat, lon
 
 
+def route_samples(geo: dict, spacing_km: float = 0.8, max_points: int = 18) -> list:
+    """Evenly spaced (lat, lon) along the walking-ordered route, loop closed."""
+    points, cum = [], 0.0
+    for seg in geo["geometry"]["coordinates"]:
+        for lon, lat in seg:
+            if points:
+                d_lat = lat - points[-1][0]
+                d_lon = lon - points[-1][1]
+                cum += (d_lat ** 2 + d_lon ** 2) ** 0.5 * 111  # ~km, fine for spacing
+            points.append((lat, lon, cum))
+    total = points[-1][2] or 1
+    count = max(6, min(max_points, int(total / spacing_km)))
+    targets = [total * i / count for i in range(count)]
+    samples, j = [], 0
+    for target in targets:
+        while j < len(points) - 1 and points[j][2] < target:
+            j += 1
+        samples.append((points[j][0], points[j][1]))
+    samples.append((points[0][0], points[0][1]))  # close the loop
+    return samples
+
+
+def komoot_url(geo: dict) -> str:
+    """Planner link pre-filled with the whole route as waypoints — on the
+    phone this opens the Komoot app with the trail ready to save/start."""
+    parts = [f"p%5B{i}%5D%5Bloc%5D={lat:.5f}%2C{lon:.5f}"
+             for i, (lat, lon) in enumerate(route_samples(geo))]
+    return "https://www.komoot.com/plan/?sport=hike&" + "&".join(parts)
+
+
 def gpx_content(trail: dict, geo: dict) -> str:
     name = esc(trail["name"])
     segs = []
@@ -250,7 +280,7 @@ def gpx_content(trail: dict, geo: dict) -> str:
 def actions_html(trail: dict, geo: dict, lang: str) -> str:
     lat, lon = start_point(geo)
     labels = EXTRA[lang]
-    komoot = f"https://www.komoot.com/plan/@{lat:.5f},{lon:.5f},14z"
+    komoot = komoot_url(geo)
     gmaps = f"https://maps.google.com/?q={lat:.5f},{lon:.5f}"
     return (
         '    <nav class="actions">\n'
