@@ -237,6 +237,12 @@ async function loadAll(){
     sb.from("subscriptions").select("*").order("next_at"),
   ]);
   tx=txData||[];subs=subData||[];
+  // One-time repair (Jul 2026): the old categoriser truncated its replies, so many
+  // imported rows got stuck as "other". Clear those once so the fixed AI re-runs.
+  if(!localStorage.getItem("money-recat-v2")){
+    tx.forEach(t=>{if(t.cat==="other"&&isImported(t))t.cat=null;});
+    localStorage.setItem("money-recat-v2","1");
+  }
   tx.forEach(t=>{t._cat=seedCat(t);});
   await detectTransfers();
   render();
@@ -459,7 +465,7 @@ async function aiCategorise(){
     for(let i=0;i<todo.length;i+=60){
       const batch=todo.slice(i,i+60);
       const res=await fnCall({items:batch.map(t=>({id:t.id,note:t.note,amount:+t.amount,kind:t.kind,account:t.account||""}))});
-      if(!res.ok)break;
+      if(!res.ok){$("aiMsg").textContent="AI-Feeler beim Kategoriséieren.";aiBusy=false;return;}
       const j=await res.json().catch(()=>({}));
       const map=new Map((j.cats||[]).map(c=>[String(c.id),c.cat]));
       const ups=[];

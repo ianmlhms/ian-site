@@ -16,7 +16,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const MAX_ITEMS = 80;      // rows accepted per categorise call
-const MAX_TOKENS = 1500;
+// Generous output budget: a full batch's JSON answer must NEVER be truncated —
+// a cut-off reply fails to parse and silently drops the whole batch to "other".
+const MAX_TOKENS = 8000;
 
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const admin = createClient(
@@ -64,6 +66,11 @@ const SYS =
   "cash (ATM withdrawals, cash), " +
   "transfer (moving money between the person's OWN accounts), " +
   "other (anything that does not clearly fit).\n" +
+  "Bank labels often look like 'PAIEMENT VISA <merchant> <city>', " +
+  "'DOMICILIATION <company>' or 'Achat <merchant>' — judge by the merchant or " +
+  "company name inside the label, not the payment-method words around it. " +
+  "Use 'other' ONLY as a true last resort: an unfamiliar merchant name still " +
+  "deserves your best guess from the specific categories above.\n" +
   "Return ONLY minified JSON of the form {\"cats\":[{\"id\":\"<id>\"," +
   "\"cat\":\"<slug>\"}]} with one entry per input id, no prose, no code fences.";
 
@@ -96,6 +103,9 @@ async function anthropic(sys: string, user: string): Promise<string> {
     throw new Error("provider " + r.status);
   }
   const data = await r.json();
+  if (data?.stop_reason === "max_tokens") {
+    console.error("anthropic reply truncated at max_tokens — raise MAX_TOKENS");
+  }
   return (data?.content ?? [])
     .filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
 }
@@ -108,25 +118,28 @@ function extractJson(s: string): any {
 }
 
 async function categorise(items: any[]): Promise<{ id: string; cat: string }[]> {
-  const clean = items
-    .filter((it) => it && it.id != null)
-    .slice(0, MAX_ITEMS)
-    .map((it) => ({
-      id: String(it.id),
-      note: String(it.note ?? "").slice(0, 140),
-      amount: Number(it.amount) || 0,
-      dir: it.kind === "in" ? "in" : "out",
-      account: String(it.account ?? "").slice(0, 40),
-    }));
+  // The model sees small positional ids (0,1,2…) instead of the real UUIDs:
+  // far fewer output tokens (no truncation) and no chance of a mistyped UUID.
+  const source = items.filter((it) => it && it.id != null).slice(0, MAX_ITEMS);
+  const realIds = source.map((it) => String(it.id));
+  const clean = source.map((it, i) => ({
+    id: String(i),
+    note: String(it.note ?? "").slice(0, 140),
+    amount: Number(it.amount) || 0,
+    dir: it.kind === "in" ? "in" : "out",
+    account: String(it.account ?? "").slice(0, 40),
+  }));
   if (!clean.length) return [];
   const reply = await anthropic(SYS, JSON.stringify({ transactions: clean }));
   const parsed = extractJson(reply);
   const rows = Array.isArray(parsed?.cats) ? parsed.cats : [];
+  if (!rows.length) console.error("categorise: unparseable reply", reply.slice(0, 200));
   const out: { id: string; cat: string }[] = [];
   for (const r of rows) {
-    const id = r?.id != null ? String(r.id) : "";
+    const idx = Number(r?.id);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= realIds.length) continue;
     const cat = CATSET.has(r?.cat) ? r.cat : "other";
-    if (id) out.push({ id, cat });
+    out.push({ id: realIds[idx], cat });
   }
   return out;
 }
