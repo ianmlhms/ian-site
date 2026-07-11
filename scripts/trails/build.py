@@ -224,6 +224,43 @@ def trail_jsonld(trail: dict, lang: str, meta_desc: str, canonical: str, ui: dic
     return json.dumps(graph, ensure_ascii=False)
 
 
+def load_geojson(slug: str) -> dict:
+    return load_json(os.path.join(DATA_DIR, "geo", f"{slug}.geojson"))
+
+
+def start_point(geo: dict) -> tuple:
+    lon, lat = geo["geometry"]["coordinates"][0][0]
+    return lat, lon
+
+
+def gpx_content(trail: dict, geo: dict) -> str:
+    name = esc(trail["name"])
+    segs = []
+    for seg in geo["geometry"]["coordinates"]:
+        pts = "".join(f'<trkpt lat="{lat}" lon="{lon}"/>' for lon, lat in seg)
+        segs.append(f"<trkseg>{pts}</trkseg>")
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<gpx version="1.1" creator="ian.lu/trails" xmlns="http://www.topografix.com/GPX/1/1">\n'
+        f'<metadata><name>{name}</name><link href="{BASE_URL}/"/></metadata>\n'
+        f'<trk><name>{name}</name>{"".join(segs)}</trk>\n</gpx>\n'
+    )
+
+
+def actions_html(trail: dict, geo: dict, lang: str) -> str:
+    lat, lon = start_point(geo)
+    labels = EXTRA[lang]
+    komoot = f"https://www.komoot.com/plan/@{lat:.5f},{lon:.5f},14z"
+    gmaps = f"https://maps.google.com/?q={lat:.5f},{lon:.5f}"
+    return (
+        '    <nav class="actions">\n'
+        f'      <a class="act" href="../gpx/{trail["slug"]}.gpx" download>⬇ {labels["dl_gpx"]}</a>\n'
+        f'      <a class="act" href="{komoot}" rel="noopener" target="_blank">{labels["open_komoot"]}</a>\n'
+        f'      <a class="act" href="{gmaps}" rel="noopener" target="_blank">📍 {labels["open_start"]}</a>\n'
+        "    </nav>"
+    )
+
+
 def gain_fact_html(entry: dict, lang: str) -> str:
     gain = entry.get("elev_gain")
     if not gain:
@@ -242,6 +279,7 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
     meta_desc = ui["trail_meta"].format(name=trail["name"], length=length, commune=trail["place"], region=region_label)
     texts = texts_for(trail, lang)
     bbox = entry["bbox"]
+    geo = load_geojson(slug)
     images = entry.get("images") or []
     og_image = images[0]["src"] if images else "https://ian.lu/apple-touch-icon.png"
     return tpl.substitute(
@@ -269,6 +307,7 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
         fact_type=esc(ui["fact_type"]),
         fact_type_value=esc(ui["fact_type_value"]),
         gain_fact=gain_fact_html(entry, lang),
+        actions=actions_html(trail, geo, lang),
         length=length,
         duration=esc(ui["duration_fmt"].format(duration_label(entry["length_km"], entry.get("elev_gain") or 0))),
         difficulty=esc(DIFFICULTIES[trail["difficulty"]][lang]),
@@ -376,11 +415,14 @@ def main() -> None:
     )
 
     os.makedirs(os.path.join(OUT_DIR, "geo"), exist_ok=True)
+    os.makedirs(os.path.join(OUT_DIR, "gpx"), exist_ok=True)
     for trail in trails:
         shutil.copyfile(
             os.path.join(DATA_DIR, "geo", f"{trail['slug']}.geojson"),
             os.path.join(OUT_DIR, "geo", f"{trail['slug']}.geojson"),
         )
+        write(os.path.join(OUT_DIR, "gpx", f"{trail['slug']}.gpx"),
+              gpx_content(trail, load_geojson(trail["slug"])))
     shutil.copyfile(os.path.join(TEMPLATE_DIR, "trails.css"), os.path.join(OUT_DIR, "trails.css"))
 
     write(os.path.join(REPO, "sitemap-trails.xml"), build_sitemap(trails))

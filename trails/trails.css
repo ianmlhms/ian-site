@@ -68,6 +68,19 @@ h2 { font-size: 21px; margin: 34px 0 10px; }
 .fact .k { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .fact .v { font-weight: 700; }
 
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.act {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 15px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--accent);
+}
+.act:hover { border-color: var(--accent); }
+
 #map {
   height: 380px;
   border-radius: 12px;

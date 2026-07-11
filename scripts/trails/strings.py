@@ -22,11 +22,17 @@ DIFFICULTIES = {
 
 EXTRA = {
     "de": {"fact_gain": "Höhenmeter", "photos_title": "Eindrücke vom Weg",
-           "profile_title": "Höhenprofil", "photo_via": "via Wikimedia Commons"},
+           "profile_title": "Höhenprofil", "photo_via": "via Wikimedia Commons",
+           "dl_gpx": "GPX-Datei laden", "open_komoot": "In Komoot planen",
+           "open_start": "Startpunkt in Google Maps"},
     "fr": {"fact_gain": "Dénivelé +", "photos_title": "Impressions du parcours",
-           "profile_title": "Profil altimétrique", "photo_via": "via Wikimedia Commons"},
+           "profile_title": "Profil altimétrique", "photo_via": "via Wikimedia Commons",
+           "dl_gpx": "Télécharger le GPX", "open_komoot": "Planifier dans Komoot",
+           "open_start": "Départ dans Google Maps"},
     "en": {"fact_gain": "Elevation gain", "photos_title": "Impressions from the trail",
-           "profile_title": "Elevation profile", "photo_via": "via Wikimedia Commons"},
+           "profile_title": "Elevation profile", "photo_via": "via Wikimedia Commons",
+           "dl_gpx": "Download GPX", "open_komoot": "Plan in Komoot",
+           "open_start": "Start point in Google Maps"},
 }
 
 UI = {
