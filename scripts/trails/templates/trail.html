@@ -72,6 +72,11 @@ $gear_html
   <footer class="site-foot">$footer_note · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
 
   <script>
+    document.querySelectorAll('.langs [data-lang]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
+      });
+    });
     window.addEventListener('DOMContentLoaded', function () {
       if (typeof L === 'undefined') { return; }
       var map = L.map('map', { scrollWheelZoom: false });

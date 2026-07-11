@@ -15,14 +15,37 @@ $alternates
   <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
+  <script>
+    // Auto-pick a language: a manually chosen one (stored by the language
+    // switcher) wins; otherwise the browser language decides. The chooser
+    // below stays as no-JS / crawler fallback.
+    (function () {
+      var LANGS = ['de', 'fr', 'en'];
+      var pref = null;
+      try { pref = localStorage.getItem('trails_lang'); } catch (e) { /* private mode */ }
+      if (LANGS.indexOf(pref) === -1) {
+        var nav = (navigator.language || 'en').toLowerCase();
+        pref = (nav.indexOf('de') === 0 || nav.indexOf('lb') === 0) ? 'de'
+             : nav.indexOf('fr') === 0 ? 'fr' : 'en';
+      }
+      location.replace(pref + '/');
+    })();
+  </script>
   <main class="wrap chooser">
     <h1>Auto-Pédestres Luxembourg</h1>
     <p class="sub">Luxembourg's waymarked loop trails — with maps and bus access.</p>
     <div class="lang-cards">
-      <a class="lang-card" href="de/" lang="de"><strong>Deutsch</strong><span>Rundwanderwege mit Karte &amp; Busanreise</span></a>
-      <a class="lang-card" href="fr/" lang="fr"><strong>Français</strong><span>Boucles de randonnée avec carte &amp; accès en bus</span></a>
-      <a class="lang-card" href="en/" lang="en"><strong>English</strong><span>Loop trails with maps &amp; bus access</span></a>
+      <a class="lang-card" href="de/" lang="de" data-lang="de"><strong>Deutsch</strong><span>Rundwanderwege mit Karte &amp; Busanreise</span></a>
+      <a class="lang-card" href="fr/" lang="fr" data-lang="fr"><strong>Français</strong><span>Boucles de randonnée avec carte &amp; accès en bus</span></a>
+      <a class="lang-card" href="en/" lang="en" data-lang="en"><strong>English</strong><span>Loop trails with maps &amp; bus access</span></a>
     </div>
+    <script>
+      document.querySelectorAll('[data-lang]').forEach(function (a) {
+        a.addEventListener('click', function () {
+          try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
+        });
+      });
+    </script>
   </main>
   <footer class="site-foot">A project by <a href="https://ian.lu/" rel="noopener">ian.lu</a> · Route data © OpenStreetMap contributors</footer>
 </body>

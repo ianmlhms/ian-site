@@ -27,7 +27,7 @@
 <body>
   <header class="site">
     <a class="brand" href="./">Autopédestres Luxemburg</a>
-    <nav class="langs" aria-label="Sprache"><a href="../de/strassen.html" class="on">DE</a><a href="../fr/strassen.html">FR</a><a href="../en/strassen.html">EN</a></nav>
+    <nav class="langs" aria-label="Sprache"><a href="../de/strassen.html" class="on" data-lang="de">DE</a><a href="../fr/strassen.html" data-lang="fr">FR</a><a href="../en/strassen.html" data-lang="en">EN</a></nav>
   </header>
 
   <main class="wrap">
@@ -92,6 +92,11 @@
   <footer class="site-foot">Ein Projekt von ian.lu · Streckendaten © OpenStreetMap-Mitwirkende · Fahrplandaten: data.public.lu · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
 
   <script>
+    document.querySelectorAll('.langs [data-lang]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
+      });
+    });
     window.addEventListener('DOMContentLoaded', function () {
       if (typeof L === 'undefined') { return; }
       var map = L.map('map', { scrollWheelZoom: false });

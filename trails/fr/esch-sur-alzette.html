@@ -27,7 +27,7 @@
 <body>
   <header class="site">
     <a class="brand" href="./">Auto-Pédestres Luxembourg</a>
-    <nav class="langs" aria-label="Langue"><a href="../de/esch-sur-alzette.html">DE</a><a href="../fr/esch-sur-alzette.html" class="on">FR</a><a href="../en/esch-sur-alzette.html">EN</a></nav>
+    <nav class="langs" aria-label="Langue"><a href="../de/esch-sur-alzette.html" data-lang="de">DE</a><a href="../fr/esch-sur-alzette.html" class="on" data-lang="fr">FR</a><a href="../en/esch-sur-alzette.html" data-lang="en">EN</a></nav>
   </header>
 
   <main class="wrap">
@@ -93,6 +93,11 @@
   <footer class="site-foot">Un projet de ian.lu · Tracés © contributeurs OpenStreetMap · Horaires : data.public.lu · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
 
   <script>
+    document.querySelectorAll('.langs [data-lang]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
+      });
+    });
     window.addEventListener('DOMContentLoaded', function () {
       if (typeof L === 'undefined') { return; }
       var map = L.map('map', { scrollWheelZoom: false });

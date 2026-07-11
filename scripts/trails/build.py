@@ -115,7 +115,7 @@ def lang_switcher(current: str, href_of) -> str:
     parts = []
     for lang in LANGS:
         cls = ' class="on"' if lang == current else ""
-        parts.append(f'<a href="{href_of(lang)}"{cls}>{lang.upper()}</a>')
+        parts.append(f'<a href="{href_of(lang)}"{cls} data-lang="{lang}">{lang.upper()}</a>')
     return "".join(parts)
 
 

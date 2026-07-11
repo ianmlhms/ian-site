@@ -27,7 +27,7 @@
 <body>
   <header class="site">
     <a class="brand" href="./">Auto-Pédestres Luxembourg</a>
-    <nav class="langs" aria-label="Language"><a href="../de/grevenmacher-ii.html">DE</a><a href="../fr/grevenmacher-ii.html">FR</a><a href="../en/grevenmacher-ii.html" class="on">EN</a></nav>
+    <nav class="langs" aria-label="Language"><a href="../de/grevenmacher-ii.html" data-lang="de">DE</a><a href="../fr/grevenmacher-ii.html" data-lang="fr">FR</a><a href="../en/grevenmacher-ii.html" class="on" data-lang="en">EN</a></nav>
   </header>
 
   <main class="wrap">
@@ -93,6 +93,11 @@
   <footer class="site-foot">A project by ian.lu · Route data © OpenStreetMap contributors · Timetables: data.public.lu · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
 
   <script>
+    document.querySelectorAll('.langs [data-lang]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
+      });
+    });
     window.addEventListener('DOMContentLoaded', function () {
       if (typeof L === 'undefined') { return; }
       var map = L.map('map', { scrollWheelZoom: false });
