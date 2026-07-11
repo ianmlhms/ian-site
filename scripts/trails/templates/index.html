@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="$lang">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="$meta_desc" />
+  <meta property="og:title" content="$og_title" />
+  <meta property="og:description" content="$meta_desc" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
+  <link rel="canonical" href="$canonical" />
+$alternates
+  <title>$title</title>
+  <link rel="stylesheet" href="../trails.css?v=1" />
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+  <!-- Google AdSense (public pages only) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="./">$site_name</a>
+    <nav class="langs" aria-label="$lang_switch_label">$lang_links</nav>
+  </header>
+
+  <main class="wrap">
+    <h1>$index_h1</h1>
+    <div class="intro">
+$intro_html
+    </div>
+
+    <nav class="filters" aria-label="Filter">
+      <button class="filter on" data-region="all">$filter_all</button>
+$filter_buttons
+    </nav>
+
+    <div class="cards">
+$cards_html
+    </div>
+  </main>
+
+  <footer class="site-foot">$footer_note · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
+
+  <script>
+    document.querySelectorAll('.filter').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.filter').forEach(function (b) { b.classList.remove('on'); });
+        btn.classList.add('on');
+        var region = btn.dataset.region;
+        document.querySelectorAll('.card').forEach(function (card) {
+          card.style.display = (region === 'all' || card.dataset.region === region) ? '' : 'none';
+        });
+      });
+    });
+  </script>
+</body>
+</html>

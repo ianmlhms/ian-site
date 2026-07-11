@@ -1,0 +1,304 @@
+{
+  "trails": [
+    {
+      "slug": "grengewald",
+      "osm_rel": 18611422,
+      "name": "Auto-Pédestre Gréngewald",
+      "commune": "Niederanven",
+      "region": "center",
+      "difficulty": "easy",
+      "descriptions": {
+        "de": [
+          "Der Gréngewald ist das größte zusammenhängende Waldgebiet Luxemburgs und liegt direkt nordöstlich der Hauptstadt, zwischen Kirchberg, Senningerberg und dem Alzette-Tal. Diese Autopédestre-Runde führt auf breiten Forstwegen und ruhigen Pfaden durch alte Buchen- und Eichenbestände, die früher herzogliches Jagdrevier waren.",
+          "Trotz der Nähe zur Stadt ist der Wald erstaunlich still: Man hört Spechte statt Verkehr, und im Frühjahr bedeckt Bärlauch ganze Hänge. Die Quellen des Gréngewald liefern bis heute einen Teil des Trinkwassers der Hauptstadt — ein Grund, warum große Teile des Waldes seit Jahrzehnten geschützt sind.",
+          "Die Runde ist technisch einfach und fast durchgehend schattig — ideal für heiße Sommertage. Festes Schuhwerk genügt; nach Regen können die Waldwege stellenweise matschig sein. Unterwegs weisen die blauen Autopédestre-Markierungen zuverlässig den Weg."
+        ],
+        "fr": [
+          "Le Gréngewald est le plus grand massif forestier d'un seul tenant du Luxembourg, juste au nord-est de la capitale, entre le Kirchberg, Senningerberg et la vallée de l'Alzette. Cette boucle Auto-Pédestre emprunte de larges chemins forestiers et des sentiers calmes à travers de vieilles hêtraies et chênaies, ancien territoire de chasse ducal.",
+          "Malgré la proximité de la ville, la forêt est étonnamment silencieuse : on y entend les pics plutôt que la circulation, et au printemps l'ail des ours couvre des pentes entières. Les sources du Gréngewald fournissent encore aujourd'hui une partie de l'eau potable de la capitale — c'est pourquoi de larges zones de la forêt sont protégées depuis des décennies.",
+          "La boucle est techniquement facile et presque entièrement ombragée — idéale par temps chaud. De bonnes chaussures suffisent ; après la pluie, certains chemins forestiers peuvent être boueux. Le balisage bleu des Auto-Pédestres guide de façon fiable tout au long du parcours."
+        ],
+        "en": [
+          "The Gréngewald is Luxembourg's largest continuous forest, sitting just north-east of the capital between Kirchberg, Senningerberg and the Alzette valley. This Auto-Pédestre loop follows broad forestry tracks and quiet paths through old beech and oak stands that once served as a ducal hunting ground.",
+          "Despite being minutes from the city, the forest is remarkably quiet: you hear woodpeckers instead of traffic, and in spring wild garlic carpets entire slopes. The Gréngewald's springs still supply part of the capital's drinking water — one reason large parts of the forest have been protected for decades.",
+          "The loop is technically easy and shaded almost the whole way — perfect for hot summer days. Sturdy shoes are enough; after rain some forest tracks get muddy. The blue Auto-Pédestre waymarks guide you reliably throughout."
+        ]
+      },
+      "highlights": {
+        "de": ["Größter zusammenhängender Wald Luxemburgs", "Alte Buchen- und Eichenbestände", "Fast durchgehend schattig", "Nur wenige Minuten von Kirchberg entfernt"],
+        "fr": ["Plus grand massif forestier du Luxembourg", "Vieilles hêtraies et chênaies", "Presque entièrement à l'ombre", "À quelques minutes du Kirchberg"],
+        "en": ["Luxembourg's largest continuous forest", "Old beech and oak woodland", "Shaded almost the entire way", "Minutes away from Kirchberg"]
+      }
+    },
+    {
+      "slug": "senningerberg",
+      "osm_rel": 9235582,
+      "name": "Auto-Pédestre Senningerberg",
+      "commune": "Niederanven",
+      "region": "center",
+      "difficulty": "moderate",
+      "descriptions": {
+        "de": [
+          "Diese rund elf Kilometer lange Runde erkundet das Plateau von Senningerberg in der Gemeinde Niederanven, zwischen dem Rand des Gréngewald und dem offenen Syrdall. Der Weg wechselt angenehm zwischen Waldstücken, Feldwegen und Ortsrandpassagen mit weiten Blicken über das Tal der Syr.",
+          "Obwohl der Flughafen Findel gleich nebenan liegt, verläuft der größte Teil der Strecke überraschend ruhig durch Wald und Flur. Gerade die Abschnitte am Waldrand zeigen, wie schnell man hier aus dem Siedlungsraum in echte Landschaft kommt — typisch für die Gemeinden im Osten der Hauptstadt.",
+          "Mit seiner Länge ist der Rundweg eine solide Halbtagestour, bleibt aber ohne nennenswerte technische Schwierigkeiten. Er ist gut mit dem Bus erreichbar und lässt sich dank der Ringform an mehreren Stellen beginnen."
+        ],
+        "fr": [
+          "Cette boucle d'environ onze kilomètres explore le plateau de Senningerberg, dans la commune de Niederanven, entre la lisière du Gréngewald et la vallée ouverte de la Syre. Le parcours alterne agréablement entre passages forestiers, chemins agricoles et abords de village avec de larges vues sur le Syrdall.",
+          "Bien que l'aéroport du Findel soit tout proche, la plus grande partie de l'itinéraire traverse des campagnes et des bois étonnamment calmes. Les tronçons en lisière de forêt montrent à quelle vitesse on passe ici de l'espace urbain à un vrai paysage rural — typique des communes à l'est de la capitale.",
+          "Par sa longueur, cette boucle constitue une bonne demi-journée de marche, sans difficulté technique notable. Elle est bien desservie par le bus et, grâce à sa forme en anneau, peut se commencer à plusieurs endroits."
+        ],
+        "en": [
+          "This roughly eleven-kilometre loop explores the Senningerberg plateau in the commune of Niederanven, between the edge of the Gréngewald forest and the open Syre valley. The route alternates pleasantly between woodland, farm tracks and village-edge paths with wide views over the Syrdall.",
+          "Although Findel airport sits right next door, most of the route runs through surprisingly quiet fields and woods. The forest-edge sections show how quickly you move from built-up areas into genuine countryside here — typical of the communes east of the capital.",
+          "At this length the loop makes a solid half-day walk, yet it stays free of technical difficulty. It is well served by bus, and because it is a circuit you can start it from several points."
+        ]
+      },
+      "highlights": {
+        "de": ["Weite Blicke über das Syrdall", "Waldrand des Gréngewald", "Ruhige Feld- und Waldwege", "Mehrere mögliche Startpunkte"],
+        "fr": ["Larges vues sur le Syrdall", "Lisière du Gréngewald", "Chemins agricoles et forestiers calmes", "Plusieurs points de départ possibles"],
+        "en": ["Wide views over the Syre valley", "Edge of the Gréngewald forest", "Quiet field and forest tracks", "Several possible starting points"]
+      }
+    },
+    {
+      "slug": "luxembourg-centre",
+      "osm_rel": 7755193,
+      "name": "Auto-Pédestre Luxembourg-Centre",
+      "commune": "Luxembourg",
+      "region": "center",
+      "difficulty": "easy",
+      "descriptions": {
+        "de": [
+          "Die städtischste aller Autopédestres: Diese gut sechs Kilometer lange Runde durchquert die Hauptstadt und verbindet die Oberstadt mit den grünen Tälern von Pétrusse und Alzette. Kaum eine andere europäische Hauptstadt lässt sich so sehr als Wanderung erleben — mit Felswänden, Flussufern und Parks mitten im Zentrum.",
+          "Unterwegs passiert man die Reste der alten Festungsanlagen, deren Altstadtviertel und Befestigungen seit 1994 zum UNESCO-Welterbe gehören. Der Blick vom Bockfelsen und von der Corniche hinunter in den Grund gehört zu den bekanntesten Panoramen des Landes.",
+          "Die Strecke ist kurz, enthält aber einige Treppen und Anstiege zwischen Tal und Oberstadt. Sie lässt sich jederzeit abkürzen oder mit Café-Pausen strecken — und ist als einzige Autopédestre komplett mit Stadtbus, Tram und Zug erreichbar."
+        ],
+        "fr": [
+          "La plus urbaine de toutes les Auto-Pédestres : cette boucle d'un peu plus de six kilomètres traverse la capitale et relie la ville haute aux vallées vertes de la Pétrusse et de l'Alzette. Peu de capitales européennes se découvrent aussi bien en randonnée — falaises, berges de rivière et parcs en plein centre.",
+          "En chemin, on longe les vestiges de l'ancienne forteresse ; les vieux quartiers et les fortifications sont inscrits au patrimoine mondial de l'UNESCO depuis 1994. La vue depuis le rocher du Bock et depuis la Corniche sur le Grund compte parmi les panoramas les plus célèbres du pays.",
+          "Le parcours est court mais comporte des escaliers et des montées entre la vallée et la ville haute. Il peut se raccourcir à tout moment ou s'allonger de pauses café — et c'est la seule Auto-Pédestre entièrement accessible en bus urbain, en tram et en train."
+        ],
+        "en": [
+          "The most urban of all Auto-Pédestres: this loop of just over six kilometres crosses the capital, linking the upper town with the green Pétrusse and Alzette valleys. Few European capitals can be experienced as a hike quite like this — cliff faces, riverbanks and parks right in the centre.",
+          "Along the way you pass the remains of the old fortress; the old quarters and fortifications have been a UNESCO World Heritage site since 1994. The view from the Bock promontory and from the Corniche down into the Grund is among the most famous panoramas in the country.",
+          "The route is short but includes stairways and climbs between valley and upper town. You can shorten it at any point or stretch it with café stops — and it is the only Auto-Pédestre fully reachable by city bus, tram and train."
+        ]
+      },
+      "highlights": {
+        "de": ["UNESCO-Welterbe Altstadt und Festungen", "Pétrusse- und Alzette-Tal", "Aussicht von Bock und Corniche", "Perfekt mit Bus, Tram und Zug erreichbar"],
+        "fr": ["Vieille ville et fortifications UNESCO", "Vallées de la Pétrusse et de l'Alzette", "Vues du Bock et de la Corniche", "Accès parfait en bus, tram et train"],
+        "en": ["UNESCO old town and fortifications", "Pétrusse and Alzette valleys", "Views from the Bock and the Corniche", "Perfect access by bus, tram and train"]
+      }
+    },
+    {
+      "slug": "echternach-gare",
+      "osm_rel": 6619830,
+      "name": "Auto-Pédestre Echternach 2 / Gare",
+      "commune": "Echternach",
+      "region": "mullerthal",
+      "difficulty": "easy",
+      "descriptions": {
+        "de": [
+          "Eine kompakte Runde von gut fünf Kilometern ab dem Busbahnhof von Echternach, der ältesten Stadt Luxemburgs. Der Weg steigt aus dem Sauertal in die bewaldeten Hänge über der Stadt und öffnet immer wieder Blicke auf Abteistadt und Flusstal — auf der anderen Uferseite liegt bereits Deutschland.",
+          "Echternach wuchs um die im Jahr 698 vom heiligen Willibrord gegründete Benediktinerabtei, deren barocke Gebäude noch heute das Stadtbild prägen. Wer die Runde verlängern will, steht hier zugleich am Tor zur Müllerthal-Region mit ihren berühmten Sandsteinfelsen.",
+          "Die Strecke eignet sich gut als Einstieg in die Region: kurz, überwiegend schattig und dank des Busbahnhofs Echternach Gare hervorragend ohne Auto erreichbar. Ein paar Anstiege in den Hangwald sorgen für Bewegung, bleiben aber moderat."
+        ],
+        "fr": [
+          "Une boucle compacte d'un peu plus de cinq kilomètres au départ de la gare routière d'Echternach, la plus ancienne ville du Luxembourg. Le chemin s'élève de la vallée de la Sûre vers les pentes boisées au-dessus de la ville, avec des vues répétées sur la cité abbatiale et la rivière — la rive opposée est déjà allemande.",
+          "Echternach s'est développée autour de l'abbaye bénédictine fondée en 698 par saint Willibrord, dont les bâtiments baroques marquent encore le paysage urbain. Ceux qui veulent prolonger la marche se trouvent ici à la porte de la région du Mullerthal et de ses célèbres rochers de grès.",
+          "Le parcours est une bonne introduction à la région : court, largement ombragé et parfaitement accessible sans voiture grâce à la gare routière d'Echternach. Quelques montées dans la forêt de pente donnent du rythme, mais restent modérées."
+        ],
+        "en": [
+          "A compact loop of just over five kilometres from the bus station of Echternach, Luxembourg's oldest town. The path climbs out of the Sûre valley into the wooded slopes above the town, repeatedly opening views over the abbey town and the river — the opposite bank is already Germany.",
+          "Echternach grew around the Benedictine abbey founded in 698 by Saint Willibrord, whose baroque buildings still define the townscape. If you want to walk further, you are standing at the gateway to the Mullerthal region and its famous sandstone rock formations.",
+          "The route makes a good introduction to the region: short, mostly shaded and superbly reachable without a car thanks to the Echternach bus station. A few climbs into the hillside forest add exercise but stay moderate."
+        ]
+      },
+      "highlights": {
+        "de": ["Älteste Stadt Luxemburgs", "Abtei aus dem Jahr 698", "Blicke über das Sauertal nach Deutschland", "Tor zur Müllerthal-Region"],
+        "fr": ["Plus ancienne ville du Luxembourg", "Abbaye fondée en 698", "Vues sur la vallée de la Sûre vers l'Allemagne", "Porte de la région du Mullerthal"],
+        "en": ["Luxembourg's oldest town", "Abbey founded in 698", "Views across the Sûre valley into Germany", "Gateway to the Mullerthal region"]
+      }
+    },
+    {
+      "slug": "esch-sur-alzette",
+      "osm_rel": 3134263,
+      "name": "Auto-Pédestre Esch-sur-Alzette",
+      "commune": "Esch-sur-Alzette",
+      "region": "minett",
+      "difficulty": "moderate",
+      "descriptions": {
+        "de": [
+          "Diese Runde um Luxemburgs zweitgrößte Stadt zeigt die überraschend grüne Seite des Minett. Vom Stadtrand führt der Weg in die bewaldeten Hügel rund um das Naturschutzgebiet Ellergronn, wo auf ehemaligem Bergbaugelände heute Wald, Weiher und seltene Arten zu Hause sind.",
+          "Über ein Jahrhundert lang wurde hier Eisenerz abgebaut — die rote Minett-Erde gab der ganzen Region ihren Namen. Am Ellergronn erinnern die erhaltenen Anlagen der früheren Grube Cockerill an diese Zeit; heute ist das Gebiet ein Zentrum für Naturpädagogik.",
+          "Der Weg klettert in mehreren Abschnitten durch den Hangwald und belohnt mit Ausblicken über die Stadt, die 2022 Europäische Kulturhauptstadt war. Start und Ziel sind gut an das dichte Bus- und Bahnnetz von Esch angebunden."
+        ],
+        "fr": [
+          "Cette boucle autour de la deuxième ville du Luxembourg montre le visage étonnamment vert du Minett. Depuis la lisière de la ville, le chemin gagne les collines boisées autour de la réserve naturelle de l'Ellergronn, où forêts, étangs et espèces rares occupent d'anciens sites miniers.",
+          "Pendant plus d'un siècle, on a extrait ici le minerai de fer — la terre rouge du Minett a donné son nom à toute la région. À l'Ellergronn, les installations préservées de l'ancienne mine Cockerill rappellent cette époque ; le site est aujourd'hui un centre d'éducation à la nature.",
+          "Le sentier grimpe par endroits à travers la forêt de pente et récompense par des vues sur la ville, Capitale européenne de la culture en 2022. Le départ et l'arrivée sont bien reliés au dense réseau de bus et de trains d'Esch."
+        ],
+        "en": [
+          "This loop around Luxembourg's second city reveals the surprisingly green side of the Minett. From the edge of town the path climbs into the wooded hills around the Ellergronn nature reserve, where forest, ponds and rare species now occupy former mining land.",
+          "Iron ore was mined here for over a century — the red Minett earth gave the whole region its name. At Ellergronn, the preserved buildings of the former Cockerill mine recall that era; today the site is a centre for nature education.",
+          "The trail climbs through hillside forest in several stretches and rewards you with views over the city, which was European Capital of Culture in 2022. Start and finish connect well to Esch's dense bus and rail network."
+        ]
+      },
+      "highlights": {
+        "de": ["Naturschutzgebiet Ellergronn", "Industriegeschichte der Grube Cockerill", "Rote Minett-Landschaft", "Blicke über die Kulturhauptstadt 2022"],
+        "fr": ["Réserve naturelle de l'Ellergronn", "Histoire minière de la mine Cockerill", "Paysages rouges du Minett", "Vues sur la Capitale de la culture 2022"],
+        "en": ["Ellergronn nature reserve", "Mining heritage of the Cockerill pit", "Red Minett landscapes", "Views over the 2022 Capital of Culture"]
+      }
+    },
+    {
+      "slug": "dudelange-haard",
+      "osm_rel": 2373118,
+      "name": "Auto-Pédestre Dudelange Haard",
+      "commune": "Dudelange",
+      "region": "minett",
+      "difficulty": "moderate",
+      "descriptions": {
+        "de": [
+          "Die Haard zwischen Dudelange und Kayl ist eines der eindrucksvollsten Naturschutzgebiete des Landes: eine offene, fast mediterran wirkende Landschaft, die im Tagebau des Eisenerzabbaus entstand. Diese gut acht Kilometer lange Runde führt mitten hindurch.",
+          "Wo bis in die 1970er Jahre Bagger die rote Erde abtrugen, wachsen heute Magerrasen mit Orchideen, und Schmetterlinge profitieren von den warmen, kargen Hängen. Das Gebiet gehört zum UNESCO-Biosphärenreservat Minett und wird teils von Rindern beweidet, die die Landschaft offen halten.",
+          "Der Weg wechselt zwischen offenen Plateaus mit weiten Ausblicken bis nach Frankreich und schattigen Waldstücken. Einige kurze Steigungen auf teils steinigen Wegen machen die Runde abwechslungsreich, aber nicht schwierig."
+        ],
+        "fr": [
+          "La Haard, entre Dudelange et Kayl, est l'une des réserves naturelles les plus impressionnantes du pays : un paysage ouvert, presque méditerranéen, né de l'extraction du minerai de fer à ciel ouvert. Cette boucle de huit kilomètres la traverse en plein cœur.",
+          "Là où les excavatrices arrachaient la terre rouge jusqu'aux années 1970 poussent aujourd'hui des pelouses sèches à orchidées, et les papillons profitent des pentes chaudes et maigres. Le site fait partie de la réserve de biosphère UNESCO Minett et est en partie pâturé par des bovins qui maintiennent le paysage ouvert.",
+          "Le sentier alterne plateaux ouverts, avec de larges vues jusqu'en France, et passages forestiers ombragés. Quelques montées courtes sur des chemins parfois caillouteux rendent la boucle variée mais jamais difficile."
+        ],
+        "en": [
+          "The Haard between Dudelange and Kayl is one of the country's most striking nature reserves: an open, almost Mediterranean-feeling landscape created by open-cast iron-ore mining. This eight-kilometre loop runs right through its heart.",
+          "Where excavators stripped the red earth until the 1970s, dry orchid meadows now grow, and butterflies thrive on the warm, barren slopes. The area belongs to the UNESCO Minett Biosphere reserve and is partly grazed by cattle that keep the landscape open.",
+          "The path alternates between open plateaus with views reaching into France and shaded stretches of woodland. A few short climbs on sometimes stony paths keep the loop varied without making it difficult."
+        ]
+      },
+      "highlights": {
+        "de": ["Ehemaliger Erz-Tagebau, heute Naturschutzgebiet", "Orchideen und seltene Schmetterlinge", "UNESCO-Biosphäre Minett", "Weite Blicke bis nach Frankreich"],
+        "fr": ["Ancienne mine à ciel ouvert devenue réserve", "Orchidées et papillons rares", "Biosphère UNESCO Minett", "Vues jusqu'en France"],
+        "en": ["Former open-cast mine turned nature reserve", "Orchids and rare butterflies", "UNESCO Minett Biosphere", "Views reaching into France"]
+      }
+    },
+    {
+      "slug": "remich",
+      "osm_rel": 8462620,
+      "name": "Auto-Pédestre Remich",
+      "commune": "Remich",
+      "region": "moselle",
+      "difficulty": "moderate",
+      "descriptions": {
+        "de": [
+          "Remich, die kleine „Perle der Mosel“, ist Ausgangspunkt dieser Runde durch die Weinberge des luxemburgischen Moseltals. Vom Flussufer steigt der Weg in die Rebhänge über der Stadt, wo Rivaner, Riesling und Pinot wachsen, und öffnet weite Blicke über den Fluss ins deutsche Ufergebiet.",
+          "Die Mosel prägt hier alles: das Klima, die Landschaft und die Dörfer mit ihren Winzerhöfen. Oben auf dem Plateau wandert man zwischen Rebzeilen und Feldgehölzen; unten lädt die lange Uferpromenade von Remich zum Ausklang mit Blick auf vorbeiziehende Flusskreuzer ein.",
+          "Der Anstieg in die Weinberge ist der einzige nennenswerte Höhenunterschied der Runde — dafür gibt es kaum eine schönere Belohnung als den Blick über das Moseltal am Abend. Im Herbst zur Lese ist die Strecke besonders stimmungsvoll."
+        ],
+        "fr": [
+          "Remich, la petite « perle de la Moselle », est le point de départ de cette boucle à travers les vignobles de la Moselle luxembourgeoise. Depuis la rive, le chemin monte dans les coteaux au-dessus de la ville, où mûrissent rivaner, riesling et pinot, et ouvre de larges vues sur le fleuve et la rive allemande.",
+          "Ici, la Moselle façonne tout : le climat, le paysage et les villages avec leurs domaines viticoles. Sur le plateau, on chemine entre les rangs de vigne et les bosquets ; en bas, la longue esplanade de Remich invite à terminer la balade en regardant passer les bateaux.",
+          "La montée dans les vignes constitue le seul vrai dénivelé de la boucle — récompensé par l'une des plus belles vues sur la vallée de la Moselle, surtout en fin de journée. En automne, pendant les vendanges, le parcours est particulièrement atmosphérique."
+        ],
+        "en": [
+          "Remich, the little \"Pearl of the Moselle\", is the starting point of this loop through the vineyards of Luxembourg's Moselle valley. From the riverbank the path climbs into the slopes above the town, where Rivaner, Riesling and Pinot grapes ripen, opening wide views across the river to the German side.",
+          "The Moselle shapes everything here: the climate, the landscape and the villages with their winegrowers' estates. Up on the plateau you walk between vine rows and hedgerows; down below, Remich's long riverside promenade is the perfect place to finish while river cruisers glide past.",
+          "The climb into the vineyards is the loop's only real ascent — rewarded by one of the finest views over the Moselle valley, especially in the evening light. In autumn, during the grape harvest, the route is at its most atmospheric."
+        ]
+      },
+      "highlights": {
+        "de": ["Weinberge über der Mosel", "Blicke bis zum deutschen Ufer", "Uferpromenade von Remich", "Besonders schön zur Weinlese"],
+        "fr": ["Vignobles au-dessus de la Moselle", "Vues jusqu'à la rive allemande", "Esplanade de Remich", "Magnifique pendant les vendanges"],
+        "en": ["Vineyards above the Moselle", "Views to the German bank", "Remich riverside promenade", "At its best during the grape harvest"]
+      }
+    },
+    {
+      "slug": "ettelbruck-1",
+      "osm_rel": 8411454,
+      "name": "Auto-Pédestre Ettelbruck 1",
+      "commune": "Ettelbruck",
+      "region": "eislek",
+      "difficulty": "moderate",
+      "descriptions": {
+        "de": [
+          "Ettelbruck liegt dort, wo Alzette und Wark in die Sauer münden und das hügelige Éislek beginnt — ein natürlicher Ausgangspunkt zum Wandern. Diese gut neun Kilometer lange Runde steigt aus dem Talkessel in die bewaldeten Höhen rund um die Stadt.",
+          "Die Stadt ist als „Patton-Stadt“ bekannt: Hier stoppte die 3. US-Armee unter General Patton im Dezember 1944 während der Ardennenoffensive den deutschen Vorstoß, woran heute ein Museum und ein Denkmal erinnern. Wer mag, verbindet die Wanderung mit diesem Stück Geschichte.",
+          "Oben angekommen wechseln sich Hochflächen, Waldkämme und Ausblicke über das Sauertal ab. Als Verkehrsknoten der Nordstad ist Ettelbruck mit Zug und Bus aus dem ganzen Land bequem erreichbar — die Runde beginnt wenige Minuten vom Bahnhof."
+        ],
+        "fr": [
+          "Ettelbruck se trouve là où l'Alzette et la Wark rejoignent la Sûre et où commence l'Éislek vallonné — un point de départ naturel pour la randonnée. Cette boucle d'environ neuf kilomètres s'élève de la cuvette vers les hauteurs boisées autour de la ville.",
+          "La ville est connue comme « ville de Patton » : en décembre 1944, la 3e armée américaine du général Patton y stoppa l'avancée allemande pendant la bataille des Ardennes, ce que rappellent aujourd'hui un musée et un mémorial. On peut facilement combiner la marche avec cette page d'histoire.",
+          "Sur les hauteurs alternent plateaux, crêtes boisées et vues sur la vallée de la Sûre. Nœud ferroviaire de la Nordstad, Ettelbruck est facilement accessible en train et en bus depuis tout le pays — la boucle commence à quelques minutes de la gare."
+        ],
+        "en": [
+          "Ettelbruck sits where the Alzette and Wark rivers meet the Sûre and the rolling Éislek begins — a natural base for hiking. This roughly nine-kilometre loop climbs out of the valley basin into the wooded heights around the town.",
+          "The town is known as \"Patton Town\": in December 1944, General Patton's Third US Army halted the German advance here during the Battle of the Bulge, remembered today by a museum and a memorial. The walk combines easily with this piece of history.",
+          "Up top, plateaus, wooded ridges and views over the Sûre valley alternate. As the Nordstad's transport hub, Ettelbruck is easy to reach by train and bus from the whole country — the loop starts minutes from the station."
+        ]
+      },
+      "highlights": {
+        "de": ["Tor zum Éislek", "Patton-Museum und Gedenkstätte", "Blicke über das Sauertal", "Direkt am Bahnknoten der Nordstad"],
+        "fr": ["Porte de l'Éislek", "Musée et mémorial Patton", "Vues sur la vallée de la Sûre", "Au nœud ferroviaire de la Nordstad"],
+        "en": ["Gateway to the Éislek", "Patton museum and memorial", "Views over the Sûre valley", "Right at the Nordstad rail hub"]
+      }
+    },
+    {
+      "slug": "wiltz",
+      "osm_rel": 16821409,
+      "name": "Auto-Pédestre Wiltz",
+      "commune": "Wiltz",
+      "region": "eislek",
+      "difficulty": "moderate",
+      "descriptions": {
+        "de": [
+          "Wiltz zieht sich in zwei Ebenen — Ober- und Niederstadt — die steilen Hänge des Wiltztals hinauf, mitten im Éislek. Diese Runde erkundet die bewaldeten Höhen rund um die Stadt und zeigt die typische Landschaft des luxemburgischen Nordens: tiefe Täler, Kämme und dichte Wälder.",
+          "Über der Stadt thront das Renaissanceschloss, das heute unter anderem ein Museum zur Ardennenoffensive beherbergt — Wiltz stand im Winter 1944/45 mitten in den Kämpfen. Im Sommer wird der Schlossgarten zur Bühne des traditionsreichen Festival de Wiltz.",
+          "Die Steigungen zwischen Tal und Höhenzügen verlangen etwas Kondition, dafür ist man hier oft allein mit dem Wald. Wiltz ist Endpunkt einer Bahnstrecke und gut mit dem Zug erreichbar — ideal für eine autofreie Wandertour in den Norden."
+        ],
+        "fr": [
+          "Wiltz s'étage sur deux niveaux — ville haute et ville basse — le long des pentes raides de la vallée de la Wiltz, en plein Éislek. Cette boucle explore les hauteurs boisées autour de la ville et révèle le paysage typique du nord luxembourgeois : vallées profondes, crêtes et forêts denses.",
+          "Au-dessus de la ville trône le château Renaissance, qui abrite notamment un musée de la bataille des Ardennes — Wiltz fut au cœur des combats durant l'hiver 1944/45. En été, les jardins du château deviennent la scène du traditionnel Festival de Wiltz.",
+          "Les montées entre vallée et crêtes demandent un peu de souffle, mais on y marche souvent seul avec la forêt. Wiltz est le terminus d'une ligne ferroviaire et facilement accessible en train — idéal pour une randonnée sans voiture dans le nord."
+        ],
+        "en": [
+          "Wiltz climbs the steep slopes of the Wiltz valley on two levels — upper and lower town — in the heart of the Éislek. This loop explores the wooded heights around the town and shows the classic landscape of Luxembourg's north: deep valleys, ridgelines and dense forest.",
+          "Above the town stands the Renaissance castle, which today houses, among other things, a Battle of the Bulge museum — Wiltz was at the centre of the fighting in the winter of 1944/45. In summer the castle gardens become the stage of the long-running Festival de Wiltz.",
+          "The climbs between valley and ridge demand a little fitness, but you often have the forest to yourself. Wiltz is the terminus of a railway line and easy to reach by train — ideal for a car-free hiking day in the north."
+        ]
+      },
+      "highlights": {
+        "de": ["Éislek-Landschaft mit tiefen Tälern", "Renaissanceschloss mit Ardennen-Museum", "Festivalstadt im Sommer", "Bequem mit dem Zug erreichbar"],
+        "fr": ["Paysages de l'Éislek aux vallées profondes", "Château Renaissance et musée des Ardennes", "Ville de festival en été", "Facilement accessible en train"],
+        "en": ["Éislek landscape of deep valleys", "Renaissance castle with Ardennes museum", "Festival town in summer", "Easy to reach by train"]
+      }
+    },
+    {
+      "slug": "insenborn",
+      "osm_rel": 7474232,
+      "name": "Auto-Pédestre Insenborn",
+      "commune": "Esch-sur-Sûre",
+      "region": "eislek",
+      "difficulty": "moderate",
+      "descriptions": {
+        "de": [
+          "Insenborn liegt am Ufer des Obersauer-Stausees, der größten Wasserfläche Luxemburgs und Herzstück des gleichnamigen Naturparks. Diese Runde erkundet die Hänge und Wälder über dem See, dessen fjordartige Arme sich tief in die Éislek-Landschaft schneiden.",
+          "Der Stausee ist zugleich das wichtigste Trinkwasserreservoir des Landes — ein Großteil Luxemburgs trinkt Wasser von hier. Gleichzeitig ist er im Sommer das beliebteste Badeziel des Nordens, mit offiziellen Badezonen unter anderem bei Insenborn.",
+          "Unterwegs wechseln sich Seeblicke, stille Waldpassagen und offene Wiesenhänge ab. Wer mag, kombiniert die Wanderung im Sommer mit einem Sprung in den See oder einer Fahrt mit dem Solarboot des Naturparks."
+        ],
+        "fr": [
+          "Insenborn se trouve au bord du lac de la Haute-Sûre, le plus grand plan d'eau du Luxembourg et cœur du parc naturel du même nom. Cette boucle explore les pentes et forêts au-dessus du lac, dont les bras en forme de fjords s'enfoncent profondément dans le paysage de l'Éislek.",
+          "Le lac de barrage est aussi la principale réserve d'eau potable du pays — une grande partie du Luxembourg boit l'eau d'ici. En été, c'est en même temps la destination de baignade préférée du nord, avec des zones officielles notamment près d'Insenborn.",
+          "En chemin alternent vues sur le lac, passages forestiers silencieux et prairies ouvertes. En été, on peut combiner la randonnée avec une baignade ou une sortie en bateau solaire du parc naturel."
+        ],
+        "en": [
+          "Insenborn lies on the shore of the Upper Sûre lake, Luxembourg's largest body of water and the heart of the natural park of the same name. This loop explores the slopes and forests above the lake, whose fjord-like arms cut deep into the Éislek landscape.",
+          "The reservoir is also the country's most important drinking-water source — much of Luxembourg drinks water from here. At the same time it is the north's favourite summer swimming spot, with official bathing zones near Insenborn among others.",
+          "Along the way, lake views, quiet forest passages and open meadow slopes take turns. In summer you can combine the hike with a swim or a trip on the natural park's solar-powered boat."
+        ]
+      },
+      "highlights": {
+        "de": ["Luxemburgs größter See", "Fjordartige Seearme im Naturpark Öewersauer", "Badezonen im Sommer", "Stille Wald- und Wiesenwege"],
+        "fr": ["Plus grand lac du Luxembourg", "Bras du lac en forme de fjords", "Zones de baignade en été", "Chemins calmes entre bois et prairies"],
+        "en": ["Luxembourg's largest lake", "Fjord-like lake arms in the Öewersauer park", "Summer bathing zones", "Quiet forest and meadow paths"]
+      }
+    }
+  ]
+}

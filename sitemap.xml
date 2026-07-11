@@ -220,4 +220,24 @@
     <lastmod>2026-07-08</lastmod>
     <priority>0.6</priority>
   </url>
+  <url>
+    <loc>https://ian.lu/trails/</loc>
+    <lastmod>2026-07-11</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/trails/de/</loc>
+    <lastmod>2026-07-11</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/trails/fr/</loc>
+    <lastmod>2026-07-11</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ian.lu/trails/en/</loc>
+    <lastmod>2026-07-11</lastmod>
+    <priority>0.8</priority>
+  </url>
 </urlset>

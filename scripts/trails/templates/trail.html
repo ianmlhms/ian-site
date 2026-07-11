@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="$lang">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="$meta_desc" />
+  <meta property="og:title" content="$og_title" />
+  <meta property="og:description" content="$meta_desc" />
+  <meta property="og:type" content="article" />
+  <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
+  <link rel="canonical" href="$canonical" />
+$alternates
+  <title>$title</title>
+  <link rel="stylesheet" href="../trails.css?v=1" />
+  <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
+  <!-- Google AdSense (public pages only) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script type="application/ld+json">$jsonld</script>
+</head>
+<body>
+  <header class="site">
+    <a class="brand" href="./">$site_name</a>
+    <nav class="langs" aria-label="$lang_switch_label">$lang_links</nav>
+  </header>
+
+  <main class="wrap">
+    <nav class="crumbs"><a href="./">$breadcrumb_home</a> <span>›</span> $name</nav>
+    <h1>$name</h1>
+    <p class="sub">$region_label · $commune</p>
+
+    <section class="facts" aria-label="$facts_title">
+      <div class="fact"><span class="k">$fact_length</span><span class="v">$length km</span></div>
+      <div class="fact"><span class="k">$fact_duration</span><span class="v">$duration</span></div>
+      <div class="fact"><span class="k">$fact_difficulty</span><span class="v">$difficulty</span></div>
+      <div class="fact"><span class="k">$fact_commune</span><span class="v">$commune</span></div>
+      <div class="fact"><span class="k">$fact_type</span><span class="v">$fact_type_value</span></div>
+    </section>
+
+    <div id="map" role="img" aria-label="$map_title"></div>
+    <p class="map-note">$map_note</p>
+
+    <article class="desc">
+$description_html
+    </article>
+
+    <section class="highlights">
+      <h2>$highlights_title</h2>
+      <ul>
+$highlights_html
+      </ul>
+    </section>
+
+    <section class="bus">
+      <h2>$bus_title</h2>
+      <p>$bus_intro</p>
+      <ul class="stops">
+$bus_html
+      </ul>
+      <p class="bus-live"><a href="https://ian.lu/bus.html" rel="noopener">$bus_live</a></p>
+    </section>
+$gear_html
+  </main>
+
+  <footer class="site-foot">$footer_note · <a href="https://ian.lu/" rel="noopener">ian.lu</a></footer>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function () {
+      if (typeof L === 'undefined') { return; }
+      var map = L.map('map', { scrollWheelZoom: false });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+      map.fitBounds([[$bbox_sw], [$bbox_ne]], { padding: [20, 20] });
+      fetch('../geo/$slug.geojson')
+        .then(function (r) { if (!r.ok) { throw new Error('geojson ' + r.status); } return r.json(); })
+        .then(function (geo) {
+          var line = L.geoJSON(geo, { style: { color: '#1d6fce', weight: 4, opacity: 0.85 } }).addTo(map);
+          map.fitBounds(line.getBounds(), { padding: [20, 20] });
+        })
+        .catch(function (err) { console.log('[trails] map line unavailable:', err.message); });
+    });
+  </script>
+</body>
+</html>
