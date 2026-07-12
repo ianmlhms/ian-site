@@ -57,16 +57,29 @@ import * as auth from "./auth.js?v=5";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const EMOJIS=["🎉","🎂","✈️","🏝️","🎄","🎁","🏁","🎓","⚽","🎸","🎮","❤️","🍕","🎇"];
-let sb=null,me=null,items=[],timer=null,pickEmoji=EMOJIS[0];
+let sb=null,me=null,items=[],timer=null,pickEmoji=EMOJIS[0],local=false;
+
+/* Signed-out visitors keep their countdowns on this device only; the rows
+ * move to the cloud automatically the first time they sign in. */
+const LS_KEY="countdowns-local";
+function localList(){try{return JSON.parse(localStorage.getItem(LS_KEY)||"[]");}catch{return[];}}
+const localSave=(arr)=>localStorage.setItem(LS_KEY,JSON.stringify(arr));
+
+async function migrateLocal(){
+  const orphans=localList().filter(x=>x&&x.title&&x.at);
+  if(!orphans.length)return;
+  try{
+    const {error}=await sb.from("countdowns").insert(orphans.map(({title,emoji,at})=>({title,emoji,at})));
+    if(!error)localStorage.removeItem(LS_KEY);
+  }catch(e){console.warn("[countdowns] migrate",e);}
+}
 
 async function boot(){
   sb=await auth.client();
   auth.mountAccountButton($("acctHost"));
-  if(!auth.session()){
-    $("wrap").innerHTML=`<div class="gate">Mell dech un fir deng Countdowns.<br><br><button class="btn" id="si">Umellen</button></div>`;
-    $("si").onclick=auth.openAuthModal;return;
-  }
-  me=auth.session().user.id;
+  local=!auth.session();
+  me=auth.session()?.user?.id||null;
+  if(!local)await migrateLocal();
   $("wrap").innerHTML=`
     <div class="card newx">
       <input id="nTitle" maxlength="80" placeholder="Op wat waards du? (z.B. Vakanz a Spuenien)">
@@ -78,7 +91,9 @@ async function boot(){
       <button class="btn" id="add">Countdown bäisetzen</button>
       <div class="msg" id="msg"></div>
     </div>
+    ${local?`<div class="gate" style="padding:6px 16px">Ouni Kont ginn deng Countdowns nëmmen op dësem Apparat gespäichert — <a href="#" id="si">mell dech un</a>, fir se iwwerall ze hunn.</div>`:""}
     <div id="list"><div class="gate">Lueden…</div></div>`;
+  if(local)$("si").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
   const emo=$("emo");
   EMOJIS.forEach((e,i)=>{const b=document.createElement("button");b.textContent=e;if(i===0)b.classList.add("on");
     b.onclick=()=>{pickEmoji=e;emo.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.textContent===e));};emo.appendChild(b);});
@@ -88,9 +103,13 @@ async function boot(){
 }
 
 async function refresh(){
-  const {data,error}=await sb.from("countdowns").select("*").order("at");
-  if(error){$("list").innerHTML='<div class="gate">Feeler beim Lueden.</div>';return;}
-  items=data||[];
+  if(local){
+    items=localList().slice().sort((a,b)=>new Date(a.at)-new Date(b.at));
+  }else{
+    const {data,error}=await sb.from("countdowns").select("*").order("at");
+    if(error){$("list").innerHTML='<div class="gate">Feeler beim Lueden.</div>';return;}
+    items=data||[];
+  }
   render();
   if(!timer)timer=setInterval(paint,1000);
 }
@@ -129,7 +148,9 @@ function render(){
   }).join("");
   $("list").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     if(!confirm("Countdown läschen?"))return;
-    await sb.from("countdowns").delete().eq("id",b.dataset.del);refresh();
+    if(local)localSave(localList().filter(x=>String(x.id)!==b.dataset.del));
+    else await sb.from("countdowns").delete().eq("id",b.dataset.del);
+    refresh();
   });
 }
 
@@ -138,8 +159,13 @@ async function add(){
   if(!title||!date){$("msg").textContent="Titel an Datum uginn.";return;}
   $("msg").textContent="…";
   try{
-    const {error}=await sb.from("countdowns").insert({title,emoji:pickEmoji,at:new Date(date+"T"+time).toISOString()});
-    if(error)throw error;
+    const at=new Date(date+"T"+time).toISOString();
+    if(local){
+      localSave([...localList(),{id:Date.now().toString(36),title,emoji:pickEmoji,at}]);
+    }else{
+      const {error}=await sb.from("countdowns").insert({title,emoji:pickEmoji,at});
+      if(error)throw error;
+    }
     $("nTitle").value="";$("msg").textContent="Gespäichert ✓";
     setTimeout(()=>$("msg").textContent="",1400);
     refresh();

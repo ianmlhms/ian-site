@@ -46,11 +46,11 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions (11 Jul 2026): `theme.js?v=9`, `auth.js?v=5`, `i18n-dict.js?v=20` (same on ALL
+Current versions (12 Jul 2026): `theme.js?v=9`, `auth.js?v=5`, `i18n-dict.js?v=21` (same on ALL
 pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=22`, `friends.js?v=18`,
 `pixelbreak-records.js?v=8`, `admin.js?v=8`, `factory-auth.js?v=5`, `notify.js?v=5`,
 `notify-ambient.js?v=5`, `class-gate.js?v=4`, `rtc-ring.js?v=2`,
-`game-common.js?v=1`, `game-common.css?v=3`, `style.css?v=9`
+`game-common.js?v=1`, `game-common.css?v=3`, `style.css?v=10`
 (`sw.js` is registered, not query-versioned — it updates on its own SW lifecycle).
 
 ## 3. Supabase
@@ -99,7 +99,7 @@ Realtime publication includes `messages`, `game_invites`, `group_members`.
 
 | Page | Files | What it is |
 |---|---|---|
-| **Home** | `index.html`, `style.css`, `main.js` | Play-first hero ("40 Spiller…", LB/DE/EN via i18n) + live **summer-holiday countdown** (target `2026-07-09T12:40+02:00`, inline script at the bottom of index.html) + launcher tiles (admin-only tiles appear when signed in as admin). |
+| **Home** | `index.html`, `style.css`, `main.js` | Play-first hero ("40 Spiller…", LB/DE/EN via i18n) + live **summer-holiday countdown** (target `2026-07-09T12:40+02:00`, inline script at the bottom of index.html) + launcher tiles. **Tiles are visible signed-out** (since 12 Jul 2026): account-needing tiles carry a 🔒 badge (`.lockb`, hidden via `body.signed-in`; each page still shows its own sign-in gate inside); admin-only tiles appear when signed in as admin. Countdowns works signed-out too (device-local `localStorage` `countdowns-local`, auto-migrated to the `countdowns` table on first sign-in). |
 | **PixelBreak** | `pixelbreak.html`, `pb/*.html` (31 games), `pixelbreak-records.js`, `pixelbreak-config.js`, `pixelbreak.webmanifest` | Hub + 31 single-player games as separate files in `pb/` (fetched into a sandboxed iframe srcdoc; `robots.txt` disallows `/pb/`). **Per-game URLs** `?g=<id>` (pushState + dynamic title/canonical/meta-description; all 31 in sitemap.xml). Accounts, high scores, cloud game-saves, PB.net multiplayer relay. **Install-as-app** button (`beforeinstallprompt`; iOS hint toast). **Feedback box** (💬 FAB → `feedback` table). **Sound+haptics shim** injected into every game by `PB.instrument` (score-up blip + vibration, running-counter suppression, 🔊/🔇 in game bar, localStorage `pb_muted`). Chill Drive is a true-3D three.js game (see pb/chill-drive.html). Word Scramble + Typing have 🇱🇺 LB toggles. |
 | **Study Buddy** | `buddy.html`, `supabase/functions/study-buddy`, `scripts/study-buddy-v1.sql` | **AI homework tutor** (Claude Haiku 4.5 via Edge Function). Sign-in gated; 5 modes picked up front: ask/explain · flashcards · quiz-me · language help · **scan & solve** (photo of a homework page → full worked answer, vision). Subject picker. Per-user **daily cap** (`DAILY_LIMIT=40`, `ai_usage` + `ai_usage_bump()`), hard spend cap set in the Anthropic console. System prompt = `BASE`+`MODES` in `index.ts`. Setup: `scripts/STUDY-BUDDY-SETUP.md`. Phase 2 (not built): schoolbook RAG via pgvector. |
 | **Moien** | `moien.html`, `supabase/functions/transport` | **Luxembourg day companion.** LB greeting + live clock/date, **weather** via Open-Meteo (no key, live now), and **live public-transport departures** via the `transport` Edge Function (proxies the Verkéiersbond/HAFAS `departureBoard`+`location.name`). Transport is dormant until `TRANSPORT_API_KEY` is set — request a free key from opendata-api@atp.etat.lu; page shows a "coming soon" notice meanwhile. Setup: `scripts/MOIEN-SETUP.md`. Public page (no login). |

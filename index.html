@@ -15,7 +15,7 @@
   <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
   <link rel="canonical" href="https://ian.lu/" />
   <title>ian.lu — Ian Mulheims</title>
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
   <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
@@ -23,7 +23,7 @@
   <!-- Google AdSense (public pages only) -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
   <script src="theme.js?v=9"></script>
-  <script src="i18n-dict.js?v=20"></script>
+  <script src="i18n-dict.js?v=21"></script>
   <script src="i18n.js?v=1"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
@@ -77,8 +77,8 @@
       <div class="apps-gate" id="appsGate">
         <span class="ag-ico">🔒</span>
         <div class="ag-text">
-          <strong data-i18n="index.appsGateTitle">Sign in to use the apps</strong>
-          <span data-i18n="index.appsGateSub">Create a free account or sign in — then you can open Messenger, Friends, Grades, projects and more.</span>
+          <strong data-i18n="index.appsGateTitle">Some apps need a free account</strong>
+          <span data-i18n="index.appsGateSub">Everything without a 🔒 works right away — sign in to unlock Messenger, Friends, Grades and more.</span>
         </div>
         <button class="btn-primary" id="appsGateBtn" data-i18n="auth.signin">Sign in / Create account</button>
       </div>
@@ -87,13 +87,13 @@
           <span class="ico" aria-hidden="true">🎮</span><span class="tname">PixelBreak</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
         </a>
         <a class="tile msg" href="messenger.html">
-          <span class="ico" aria-hidden="true">💬</span><span class="tname">Messenger</span><span class="tsub" data-i18n="tile.messenger.sub">Chat &amp; groups</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💬</span><span class="tname">Messenger</span><span class="tsub" data-i18n="tile.messenger.sub">Chat &amp; groups</span>
         </a>
         <a class="tile friends" href="friends.html">
-          <span class="ico" aria-hidden="true">👥</span><span class="tname" data-i18n="tile.friends">Friends</span><span class="tsub" data-i18n="tile.friends.sub">Add, chat &amp; play</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">👥</span><span class="tname" data-i18n="tile.friends">Friends</span><span class="tsub" data-i18n="tile.friends.sub">Add, chat &amp; play</span>
         </a>
         <a class="tile buddy" href="buddy.html">
-          <span class="ico" aria-hidden="true">🤖</span><span class="tname">Study Buddy</span><span class="tsub" data-i18n="tile.buddy.sub">AI homework help</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🤖</span><span class="tname">Study Buddy</span><span class="tsub" data-i18n="tile.buddy.sub">AI homework help</span>
         </a>
         <a class="tile moien" href="moien.html">
           <span class="ico" aria-hidden="true">🌤️</span><span class="tname">Moien</span><span class="tsub" data-i18n="tile.moien.sub">Weather</span>
@@ -105,46 +105,46 @@
           <span class="ico" aria-hidden="true">🟩</span><span class="tname">Wuertspill</span><span class="tsub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
         </a>
         <a class="tile friends" href="profile.html">
-          <span class="ico" aria-hidden="true">🪪</span><span class="tname" data-i18n="tile.profile">Profile</span><span class="tsub" data-i18n="tile.profile.sub">Avatar &amp; stats</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🪪</span><span class="tname" data-i18n="tile.profile">Profile</span><span class="tsub" data-i18n="tile.profile.sub">Avatar &amp; stats</span>
         </a>
         <a class="tile polls" href="polls.html">
           <span class="ico" aria-hidden="true">🗳️</span><span class="tname" data-i18n="tile.polls">Ëmfroen</span><span class="tsub" data-i18n="tile.polls.sub">Class polls — vote!</span>
         </a>
         <a class="tile grades" href="grades.html">
-          <span class="ico" aria-hidden="true">🎓</span><span class="tname" data-i18n="tile.grades">Grades</span><span class="tsub" data-i18n="tile.grades.sub">Average calculator</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🎓</span><span class="tname" data-i18n="tile.grades">Grades</span><span class="tsub" data-i18n="tile.grades.sub">Average calculator</span>
         </a>
         <a class="tile board" href="board.html">
-          <span class="ico" aria-hidden="true">📋</span><span class="tname" data-i18n="tile.board">Klass-Tafel</span><span class="tsub" data-i18n="tile.board.sub">Shared class homework</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">📋</span><span class="tname" data-i18n="tile.board">Klass-Tafel</span><span class="tsub" data-i18n="tile.board.sub">Shared class homework</span>
         </a>
         <a class="tile classchat" href="classchat.html">
-          <span class="ico" aria-hidden="true">🗣️</span><span class="tname" data-i18n="tile.classchat">Klass-Chat</span><span class="tsub" data-i18n="tile.classchat.sub">Live chat with your class</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗣️</span><span class="tname" data-i18n="tile.classchat">Klass-Chat</span><span class="tsub" data-i18n="tile.classchat.sub">Live chat with your class</span>
         </a>
         <a class="tile timetable" href="timetable.html">
-          <span class="ico" aria-hidden="true">🗓️</span><span class="tname" data-i18n="tile.timetable">Stonneplang</span><span class="tsub" data-i18n="tile.timetable.sub">Your weekly timetable</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗓️</span><span class="tname" data-i18n="tile.timetable">Stonneplang</span><span class="tsub" data-i18n="tile.timetable.sub">Your weekly timetable</span>
         </a>
         <a class="tile exams" href="exams.html">
-          <span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.exams">Tester</span><span class="tsub" data-i18n="tile.exams.sub">Countdowns, notes &amp; flashcards</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.exams">Tester</span><span class="tsub" data-i18n="tile.exams.sub">Countdowns, notes &amp; flashcards</span>
         </a>
         <a class="tile flashcards" href="flashcards.html">
-          <span class="ico" aria-hidden="true">🃏</span><span class="tname" data-i18n="tile.cards">Kaarten</span><span class="tsub" data-i18n="tile.cards.sub">Flashcards to study</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🃏</span><span class="tname" data-i18n="tile.cards">Kaarten</span><span class="tsub" data-i18n="tile.cards.sub">Flashcards to study</span>
         </a>
         <a class="tile alerts" href="alerts.html">
-          <span class="ico" aria-hidden="true">🔔</span><span class="tname" data-i18n="tile.alerts">Neiegkeeten</span><span class="tsub" data-i18n="tile.alerts.sub">Mentions &amp; alerts</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🔔</span><span class="tname" data-i18n="tile.alerts">Neiegkeeten</span><span class="tsub" data-i18n="tile.alerts.sub">Mentions &amp; alerts</span>
         </a>
         <a class="tile search" href="search.html">
-          <span class="ico" aria-hidden="true">🔎</span><span class="tname" data-i18n="tile.search">Sichen</span><span class="tsub" data-i18n="tile.search.sub">Search everything</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🔎</span><span class="tname" data-i18n="tile.search">Sichen</span><span class="tsub" data-i18n="tile.search.sub">Search everything</span>
         </a>
         <a class="tile health" href="health.html">
-          <span class="ico" aria-hidden="true">💪</span><span class="tname" data-i18n="tile.health">Health</span><span class="tsub" data-i18n="tile.health.sub">Water, sleep &amp; workouts</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💪</span><span class="tname" data-i18n="tile.health">Health</span><span class="tsub" data-i18n="tile.health.sub">Water, sleep &amp; workouts</span>
         </a>
         <a class="tile money" href="money.html">
-          <span class="ico" aria-hidden="true">💶</span><span class="tname" data-i18n="tile.money">Sue</span><span class="tsub" data-i18n="tile.money.sub">Spending &amp; subscriptions</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💶</span><span class="tname" data-i18n="tile.money">Sue</span><span class="tsub" data-i18n="tile.money.sub">Spending &amp; subscriptions</span>
         </a>
         <a class="tile countdowns" href="countdowns.html">
           <span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.countdowns">Countdowns</span><span class="tsub" data-i18n="tile.countdowns.sub">Count down to anything</span>
         </a>
         <a class="tile ask" href="ask.html">
-          <span class="ico" aria-hidden="true">🧠</span><span class="tname">Frot deng Daten</span><span class="tsub">AI iwwer deng eegen Donnéeën</span>
+          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🧠</span><span class="tname">Frot deng Daten</span><span class="tsub">AI iwwer deng eegen Donnéeën</span>
         </a>
         <a class="tile me admin-only" href="me.html" style="display:none">
           <span class="ico" aria-hidden="true">📊</span><span class="tname">My Dashboard</span><span class="tsub" data-i18n="tile.me.sub">GitHub, traffic &amp; stats</span>

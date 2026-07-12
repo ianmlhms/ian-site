@@ -59,6 +59,7 @@ body {
 }
 
 .tile {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -327,8 +328,14 @@ footer {
 }
 .proj-card.static .ptag { background: var(--bg); }
 
-/* app launcher visibility: hidden until signed in */
-#apps .tiles { display: none; }
+/* app launcher: everyone sees the grid; tiles that need an account carry a 🔒
+   badge until the visitor signs in */
+#apps .tiles { max-width: none; }
+.tile .lockb {
+  position: absolute; top: 9px; right: 11px;
+  font-size: 13px; line-height: 1; opacity: .7;
+}
+body.signed-in .tile .lockb { display: none; }
 .apps-gate {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--border); border-radius: 16px;
@@ -339,7 +346,6 @@ footer {
 .apps-gate .ag-text strong { font-size: 16px; font-weight: 800; color: var(--text); }
 .apps-gate .ag-text span { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 .apps-gate .btn-primary { flex: none; }
-body.signed-in #apps .tiles { display: grid; max-width: none; }
 body.signed-in .apps-gate { display: none; }
 
 .about-compact {
