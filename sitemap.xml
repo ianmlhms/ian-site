@@ -201,6 +201,11 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://ian.lu/skylens.html</loc>
+    <lastmod>2026-07-13</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://ian.lu/bus.html</loc>
     <lastmod>2026-07-08</lastmod>
     <priority>0.7</priority>

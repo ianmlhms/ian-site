@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+  <meta name="description" content="SkyLens is Ian's live aircraft tracker for Luxembourg: follow nearby flights on a radar map, inspect flight details and identify aircraft with the camera.">
+  <meta name="theme-color" content="#07111d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SkyLens">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ian.lu">
+  <meta property="og:title" content="SkyLens — Live Aircraft Radar">
+  <meta property="og:description" content="Explore live aircraft around Luxembourg on a radar map and point your camera at the sky to identify them.">
+  <meta property="og:url" content="https://ian.lu/skylens.html">
+  <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="https://ian.lu/skylens.html">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="skylens.webmanifest">
+  <link rel="preconnect" href="https://lvksqmgfwkfbblfsozfk.supabase.co" crossorigin>
+  <link rel="preconnect" href="https://api.adsb.lol" crossorigin>
+  <link rel="preconnect" href="https://api.airplanes.live" crossorigin>
+  <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <title>SkyLens — Live Aircraft Radar</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3ynohVqZjMZ2BvItuV9E1QwJpD+g=" crossorigin="anonymous">
+  <link rel="stylesheet" href="skylens.css?v=1">
+  <script src="theme.js?v=9"></script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"SkyLens","url":"https://ian.lu/skylens.html","applicationCategory":"TravelApplication","operatingSystem":"Any","description":"A live aircraft radar and camera aircraft identifier for Luxembourg."}
+  </script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+  <header class="sky-header">
+    <a class="sky-brand" href="index.html" aria-label="Back to ian.lu">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40"><circle class="radar-ring" cx="20" cy="20" r="14"/><path class="radar-sweep" d="M20 20 31.8 12.5"/><path class="brand-plane" d="M32.8 18.8 23 14.7 21.2 6c-.2-1.1-2.2-1.1-2.4 0L17 14.7l-9.8 4.1c-1.1.5-.8 2 .4 2.2l9.5 1 .5 6.7-3.3 2.4c-.8.6-.4 1.8.6 1.7l5.1-.7 5.1.7c1 .1 1.4-1.1.6-1.7l-3.3-2.4.5-6.7 9.5-1c1.2-.2 1.5-1.7.4-2.2Z"/></svg>
+      </span>
+      <span><strong>SkyLens</strong><small>by ian.lu</small></span>
+    </a>
+
+    <div class="view-switch" role="group" aria-label="View">
+      <button class="view-button is-active" id="radarMode" type="button" aria-pressed="true">
+        <span aria-hidden="true">◉</span> Radar
+      </button>
+      <button class="view-button" id="listMode" type="button" aria-pressed="false">
+        <span aria-hidden="true">≡</span> List
+      </button>
+    </div>
+
+    <div class="header-actions">
+      <button class="icon-button ar-launch" id="openAr" type="button" title="Open camera view">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5 10 3h4l1.5 2H19a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h3.5ZM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-2a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
+        <span>Sky view</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="sky-main">
+    <section class="command-bar" aria-label="Aircraft controls">
+      <label class="search-box" for="flightSearch">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 20-4.6-4.6a7.5 7.5 0 1 0-1 1L20 21l1-1ZM5.5 10.5a5 5 0 1 1 10 0 5 5 0 0 1-10 0Z"/></svg>
+        <input id="flightSearch" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Flight, registration, aircraft…">
+        <kbd>/</kbd>
+      </label>
+
+      <div class="filter-scroller" id="filterBar" role="group" aria-label="Quick filters">
+        <button class="filter-chip is-active" data-filter="all" type="button">All <span id="countAll">0</span></button>
+        <button class="filter-chip" data-filter="interesting" type="button">★ Interesting <span id="countInteresting">0</span></button>
+        <button class="filter-chip" data-filter="military" type="button">Military</button>
+        <button class="filter-chip emergency-filter" data-filter="emergency" type="button">Emergency</button>
+        <button class="filter-chip" data-filter="cargo" type="button">Cargo</button>
+        <button class="filter-chip" data-filter="low" type="button">Low</button>
+      </div>
+    </section>
+
+    <div class="workspace" id="workspace">
+      <section class="radar-view" id="radarView" aria-label="Live aircraft radar">
+        <div id="map" role="application" aria-label="Interactive map of live aircraft"></div>
+
+        <div class="map-summary glass-panel" aria-live="polite">
+          <span class="live-pulse" id="livePulse"></span>
+          <span id="feedStatus">Connecting…</span>
+          <span class="summary-dot">·</span>
+          <strong id="visibleCount">0 aircraft</strong>
+          <button class="status-refresh" id="refreshNow" type="button" aria-label="Refresh aircraft now" title="Refresh now">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5l2-2a6.5 6.5 0 1 0 .7 7.3l1.7 1a8.5 8.5 0 1 1-.9-9.7L20 7Z"/></svg>
+          </button>
+        </div>
+
+        <div class="map-tools" aria-label="Map tools">
+          <button class="map-tool" id="locateMe" type="button" title="Use my location" aria-label="Use my location">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2h2v3.1a7 7 0 0 1 5.9 5.9H22v2h-3.1a7 7 0 0 1-5.9 5.9V22h-2v-3.1A7 7 0 0 1 5.1 13H2v-2h3.1A7 7 0 0 1 11 5.1V2Zm1 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>
+          </button>
+          <button class="map-tool" id="homeView" type="button" title="Return to Luxembourg" aria-label="Return to Luxembourg">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 8h-3v9h-5v-6h-2v6H6v-9H3l9-8Z"/></svg>
+          </button>
+        </div>
+
+        <div class="legend glass-panel" aria-label="Map legend">
+          <span><i class="legend-plane normal"></i> Flight</span>
+          <span><i class="legend-plane special"></i> Interesting</span>
+          <span><i class="legend-plane alert"></i> Emergency</span>
+        </div>
+      </section>
+
+      <section class="list-view" id="listView" hidden aria-label="Aircraft list">
+        <div class="list-heading">
+          <div><span class="eyebrow">LIVE AIRSPACE</span><h1>Flights around you</h1></div>
+          <span id="listSummary">0 aircraft</span>
+        </div>
+        <div class="flight-table-head" aria-hidden="true">
+          <span>Flight</span><span>Aircraft</span><span>Altitude</span><span>Speed</span><span>Distance</span>
+        </div>
+        <div class="flight-list" id="flightList"></div>
+        <div class="empty-state" id="emptyState" hidden>
+          <span aria-hidden="true">✈</span>
+          <h2>No aircraft match</h2>
+          <p>Try a different search or filter.</p>
+        </div>
+      </section>
+
+      <aside class="flight-drawer" id="flightDrawer" aria-label="Selected aircraft" aria-hidden="true">
+        <button class="drawer-close" id="closeDrawer" type="button" aria-label="Close flight details">×</button>
+        <div class="drawer-hero">
+          <span class="drawer-kicker" id="detailState">LIVE FLIGHT</span>
+          <div class="drawer-title-row">
+            <div><h2 id="detailFlight">—</h2><p id="detailRoute">Route unavailable</p></div>
+            <div class="heading-dial" id="headingDial" title="Aircraft heading">
+              <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21"/><path class="dial-plane" d="M24 7 28 22l10 5v3l-11-2-1 8 4 3v2l-6-2-6 2v-2l4-3-1-8-11 2v-3l10-5 4-15Z"/></svg>
+              <span id="detailHeading">—</span>
+            </div>
+          </div>
+          <div class="detail-badges" id="detailBadges"></div>
+        </div>
+
+        <div class="detail-primary">
+          <div><span>Altitude</span><strong id="detailAltitude">—</strong></div>
+          <div><span>Ground speed</span><strong id="detailSpeed">—</strong></div>
+          <div><span>Vertical rate</span><strong id="detailVertical">—</strong></div>
+        </div>
+
+        <dl class="detail-grid">
+          <div><dt>Registration</dt><dd id="detailRegistration">—</dd></div>
+          <div><dt>Aircraft</dt><dd id="detailType">—</dd></div>
+          <div><dt>Callsign</dt><dd id="detailCallsign">—</dd></div>
+          <div><dt>ICAO hex</dt><dd id="detailHex">—</dd></div>
+          <div><dt>Squawk</dt><dd id="detailSquawk">—</dd></div>
+          <div><dt>Distance</dt><dd id="detailDistance">—</dd></div>
+        </dl>
+
+        <div class="trail-note"><span class="trail-line"></span><span id="trailText">Trail starts while SkyLens is open</span></div>
+        <div class="drawer-actions">
+          <button class="primary-action" id="followFlight" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 4 8 6 2-6 2-4 8-4-8-6-2 6-2 4-8Z"/></svg>
+            Follow
+          </button>
+          <button class="secondary-action" id="centerFlight" type="button">Center on map</button>
+        </div>
+        <p class="data-note">Positions come from community ADS-B receivers and can be delayed or incomplete.</p>
+      </aside>
+    </div>
+  </main>
+
+  <section class="ar-overlay" id="arOverlay" hidden aria-label="Sky camera view">
+    <video id="arVideo" autoplay muted playsinline></video>
+    <div class="ar-shade"></div>
+    <div class="ar-header">
+      <button class="ar-close" id="closeAr" type="button" aria-label="Close sky view">×</button>
+      <div class="ar-brand"><strong>SkyLens</strong><span id="arSensorStatus">Camera view</span></div>
+      <div class="ar-count"><span class="live-pulse"></span><span id="arCount">0 nearby</span></div>
+    </div>
+    <div class="ar-compass"><span id="arHeading">Point your phone at the horizon</span></div>
+    <div class="ar-reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="ar-targets" id="arTargets"></div>
+    <div class="ar-nearest" id="arNearest"></div>
+    <div class="ar-permission" id="arPermission">
+      <div class="permission-icon" aria-hidden="true">⌁</div>
+      <h2>Identify aircraft in the sky</h2>
+      <p>SkyLens uses your rear camera, location and motion sensors to place live flight labels in the right direction.</p>
+      <button id="startAr" type="button">Start sky view</button>
+      <small>Camera frames stay on your device.</small>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <noscript><div class="noscript">SkyLens needs JavaScript to show live aircraft.</div></noscript>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+  <script src="skylens.js?v=1"></script>
+</body>
+</html>

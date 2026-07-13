@@ -18,6 +18,7 @@
     { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "shortcuts": [
+    { "name": "SkyLens", "url": "skylens.html", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
     { "name": "Messenger", "url": "messenger.html", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
     { "name": "Klass-Chat", "url": "classchat.html" },
     { "name": "Tester", "url": "exams.html" },
