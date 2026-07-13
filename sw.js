@@ -4,10 +4,10 @@
  *    Safe with the site's ?v= versioning: bumped asset URLs are cache misses and
  *    fetch fresh; navigations are network-first so pages are never stale online. */
 
-const CACHE = "ianlu-v2";
+const CACHE = "ianlu-v3";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
-  "skylens.html", "skylens.css?v=1", "skylens.js?v=1", "skylens.webmanifest",
+  "skylens.html", "skylens.css?v=1", "skylens.js?v=2", "skylens.webmanifest",
 ];
 
 self.addEventListener("install", (event) => {

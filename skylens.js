@@ -105,6 +105,8 @@
     routeCache: loadRouteCache(),
     routePending: new Set(),
     suppressMoveRefresh: false,
+    mapResizeObserver: null,
+    mapResizeFrame: 0,
     toastTimer: 0,
     ar: {
       active: false, stream: null, heading: null, elevation: 0, orientationAvailable: false,
@@ -256,6 +258,24 @@
     try { sessionStorage.setItem("skylens:routes", JSON.stringify(Object.fromEntries(state.routeCache))); } catch (_) {}
   }
 
+  function syncMapSize(map = state.map) {
+    if (!map || state.map !== map || els.radarView.hidden) return;
+    if (state.mapResizeFrame) cancelAnimationFrame(state.mapResizeFrame);
+    state.mapResizeFrame = requestAnimationFrame(() => {
+      state.mapResizeFrame = 0;
+      if (state.map === map && !els.radarView.hidden) {
+        map.invalidateSize({ pan: false, debounceMoveend: true });
+      }
+    });
+  }
+
+  function stabilizeMapSize(map = state.map) {
+    syncMapSize(map);
+    for (const delay of [120, 450, 1200]) {
+      setTimeout(() => syncMapSize(map), delay);
+    }
+  }
+
   function initMap() {
     if (!window.L) {
       showToast("The map library could not load. The flight list is still available.");
@@ -265,10 +285,11 @@
     const map = L.map("map", {
       center: [initial.lat, initial.lon], zoom: initial.zoom, zoomControl: false,
       worldCopyJump: true, preferCanvas: true, minZoom: 3, maxZoom: 17,
+      zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false,
     });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>",
-      crossOrigin: true,
+      updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 5,
     }).addTo(map);
     L.control.zoom({ position: "bottomleft" }).addTo(map);
     L.marker([LUX_AIRPORT.lat, LUX_AIRPORT.lon], {
@@ -278,6 +299,11 @@
     map.on("moveend", handleMapMove);
     map.on("click", () => { if (innerWidth > 740) closeDetails(); });
     state.map = map;
+    if (window.ResizeObserver) {
+      state.mapResizeObserver = new ResizeObserver(() => syncMapSize(map));
+      state.mapResizeObserver.observe(els.radarView);
+    }
+    map.whenReady(() => stabilizeMapSize(map));
   }
 
   function visibleQuery() {
@@ -692,7 +718,7 @@
     els.radarMode.setAttribute("aria-pressed", String(radar));
     els.listMode.setAttribute("aria-pressed", String(!radar));
     try { localStorage.setItem("skylens:view", state.mode); } catch (_) {}
-    if (radar && state.map) setTimeout(() => state.map.invalidateSize(), 0);
+    if (radar && state.map) stabilizeMapSize(state.map);
   }
 
   function locateUser() {
@@ -952,11 +978,17 @@
       }
     });
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden && Date.now() - state.lastUpdated > REFRESH_MS) refreshAircraft(true);
+      if (!document.hidden) {
+        stabilizeMapSize(state.map);
+        if (Date.now() - state.lastUpdated > REFRESH_MS) refreshAircraft(true);
+      }
     });
+    window.addEventListener("pageshow", () => stabilizeMapSize(state.map));
     window.addEventListener("beforeunload", () => {
       if (state.requestController) state.requestController.abort();
       if (state.ar.stream) state.ar.stream.getTracks().forEach((track) => track.stop());
+      if (state.mapResizeObserver) state.mapResizeObserver.disconnect();
+      if (state.mapResizeFrame) cancelAnimationFrame(state.mapResizeFrame);
     });
   }
 
