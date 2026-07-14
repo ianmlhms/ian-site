@@ -137,6 +137,17 @@
           <div class="detail-badges" id="detailBadges"></div>
         </div>
 
+        <div class="aircraft-photo" id="detailPhoto">
+          <div class="aircraft-photo-placeholder" id="detailPhotoPlaceholder">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5 15.2 10l7.6 3.8v2.6l-8.1-1.7-1.1 6 3.2 2.1V24L12 22.8 7.2 24v-1.2l3.2-2.1-1.1-6-8.1 1.7v-2.6L8.8 10 12 1.5Z"/></svg>
+            <span id="detailPhotoMessage">Finding aircraft photo…</span>
+          </div>
+          <a class="aircraft-photo-link" id="detailPhotoLink" href="#" target="_blank" rel="noopener noreferrer" hidden>
+            <img id="detailPhotoImage" alt="" decoding="async">
+          </a>
+          <a class="aircraft-photo-credit" id="detailPhotoCredit" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+        </div>
+
         <div class="detail-primary">
           <div><span>Altitude</span><strong id="detailAltitude">—</strong></div>
           <div><span>Ground speed</span><strong id="detailSpeed">—</strong></div>
@@ -190,6 +201,6 @@
   <noscript><div class="noscript">SkyLens needs JavaScript to show live aircraft.</div></noscript>
 
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
-  <script src="skylens.js?v=2"></script>
+  <script src="skylens.js?v=3"></script>
 </body>
 </html>

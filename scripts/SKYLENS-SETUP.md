@@ -73,6 +73,21 @@ GET .../skylens?action=route&callsign=CLX123&lat=49.66&lon=6.25
 Returns `{callsign,route,origin,destination}`. Route data is best-effort and can
 legitimately be null.
 
+## Selected-aircraft photo
+
+```text
+GET .../skylens?action=photo&hex=4D0111&registration=LX-VCB
+```
+
+Returns either `{photo:{thumbnailUrl,width,height,link,photographer,provider}}`
+or `{photo:null}`. The lookup is lazy and only runs when a user opens an
+aircraft. It queries the free Planespotters.net Photo API by ICAO hex first and
+registration second, keeps metadata cacheable for one hour, and never proxies
+or stores image files. Clients must use the original thumbnail URL unchanged,
+link the image to `photo.link`, and display `© photographer · Planespotters.net`.
+This follows the provider's public Photo API terms, including the maximum
+24-hour API-response retention rule.
+
 ## Data license and reliability
 
 ADSB.lol publishes its API and data under ODbL 1.0 and notes that production

@@ -62,6 +62,9 @@
     detailVertical: $("detailVertical"), detailRegistration: $("detailRegistration"), detailType: $("detailType"),
     detailCallsign: $("detailCallsign"), detailHex: $("detailHex"), detailSquawk: $("detailSquawk"),
     detailDistance: $("detailDistance"), detailHeading: $("detailHeading"), headingDial: $("headingDial"),
+    detailPhoto: $("detailPhoto"), detailPhotoPlaceholder: $("detailPhotoPlaceholder"),
+    detailPhotoMessage: $("detailPhotoMessage"), detailPhotoLink: $("detailPhotoLink"),
+    detailPhotoImage: $("detailPhotoImage"), detailPhotoCredit: $("detailPhotoCredit"),
     trailText: $("trailText"), toast: $("toast"), openAr: $("openAr"), arOverlay: $("arOverlay"),
     closeAr: $("closeAr"), startAr: $("startAr"), arPermission: $("arPermission"), arVideo: $("arVideo"),
     arSensorStatus: $("arSensorStatus"), arHeading: $("arHeading"), arTargets: $("arTargets"),
@@ -104,6 +107,8 @@
     requestController: null,
     routeCache: loadRouteCache(),
     routePending: new Set(),
+    photoCache: new Map(),
+    photoPending: new Set(),
     suppressMoveRefresh: false,
     mapResizeObserver: null,
     mapResizeFrame: 0,
@@ -616,6 +621,7 @@
     updateFollowButton();
     updateShareUrl();
     enrichRoute(aircraft);
+    enrichPhoto(aircraft);
     if (options && options.center && state.map) {
       state.suppressMoveRefresh = true;
       state.map.setView([aircraft.lat, aircraft.lon], Math.max(state.map.getZoom(), 10), { animate: true });
@@ -661,8 +667,77 @@
     els.detailDistance.textContent = formatDistance(aircraft.distanceNm) + (aircraft.bearingDeg === null ? "" : " · " + cardinal(aircraft.bearingDeg));
     els.detailHeading.textContent = aircraft.trackDeg === null ? "—" : Math.round(aircraft.trackDeg) + "° " + cardinal(aircraft.trackDeg);
     els.headingDial.style.setProperty("--heading", (aircraft.trackDeg ?? 0) + "deg");
+    renderAircraftPhoto(aircraft);
     const trail = state.trails.get(aircraft.id) || [];
     els.trailText.textContent = trail.length > 1 ? trail.length + " positions captured this session" : "Trail starts while SkyLens is open";
+  }
+
+  function renderAircraftPhoto(aircraft) {
+    const hasResult = state.photoCache.has(aircraft.id);
+    const photo = state.photoCache.get(aircraft.id);
+    const pending = state.photoPending.has(aircraft.id);
+    const showPlaceholder = (message) => {
+      els.detailPhotoMessage.textContent = message;
+      els.detailPhotoPlaceholder.hidden = false;
+      els.detailPhotoLink.hidden = true;
+      els.detailPhotoCredit.hidden = true;
+    };
+
+    if (!hasResult || pending) {
+      showPlaceholder("Finding aircraft photo…");
+      return;
+    }
+    if (!photo) {
+      showPlaceholder("No photo available for this aircraft");
+      return;
+    }
+
+    const reveal = () => {
+      if (state.selectedId !== aircraft.id) return;
+      els.detailPhotoPlaceholder.hidden = true;
+      els.detailPhotoLink.hidden = false;
+      els.detailPhotoCredit.hidden = false;
+    };
+    const fail = () => {
+      state.photoCache.set(aircraft.id, null);
+      if (state.selectedId === aircraft.id) showPlaceholder("Aircraft photo unavailable");
+    };
+
+    els.detailPhotoLink.href = photo.link;
+    els.detailPhotoCredit.href = photo.link;
+    els.detailPhotoCredit.textContent = "© " + photo.photographer + " · " + photo.provider;
+    els.detailPhotoImage.alt = (aircraft.registration || aircraft.flight || aircraft.hex.toUpperCase()) + " aircraft photo";
+    els.detailPhotoImage.onload = reveal;
+    els.detailPhotoImage.onerror = fail;
+    if (els.detailPhotoImage.src !== photo.thumbnailUrl) {
+      showPlaceholder("Loading aircraft photo…");
+      els.detailPhotoImage.src = photo.thumbnailUrl;
+    } else if (els.detailPhotoImage.complete && els.detailPhotoImage.naturalWidth > 0) {
+      reveal();
+    }
+  }
+
+  async function enrichPhoto(aircraft) {
+    if (state.photoCache.has(aircraft.id) || state.photoPending.has(aircraft.id)) return;
+    state.photoPending.add(aircraft.id);
+    if (state.selectedId === aircraft.id) renderAircraftPhoto(aircraft);
+    const qs = new URLSearchParams({ action: "photo", hex: cleanHex(aircraft.hex) });
+    if (aircraft.registration) qs.set("registration", aircraft.registration);
+    try {
+      const payload = await requestJson(PROXY + "?" + qs, null, 10000);
+      const photo = payload && payload.photo;
+      state.photoCache.set(aircraft.id, photo
+        && typeof photo.thumbnailUrl === "string"
+        && typeof photo.link === "string"
+        && typeof photo.photographer === "string"
+        ? photo
+        : null);
+    } catch (_) {
+      state.photoCache.set(aircraft.id, null);
+    } finally {
+      state.photoPending.delete(aircraft.id);
+      if (state.selectedId === aircraft.id) renderAircraftPhoto(aircraft);
+    }
   }
 
   function drawSelectedTrail() {

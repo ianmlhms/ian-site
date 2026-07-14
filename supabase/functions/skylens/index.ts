@@ -10,12 +10,15 @@
 //   ?lat=49.6494&lon=6.2571&radius=30&limit=150
 // Route enrichment for one selected flight:
 //   ?action=route&callsign=CLX123&lat=49.6&lon=6.2
+// Photo enrichment for one selected aircraft:
+//   ?action=photo&hex=4D0111&registration=LX-VCB
 
 // Data: ADSB.lol / airplanes.live. ADSB.lol public data is ODbL 1.0.
 
 const PRIMARY = "https://api.adsb.lol";
 const FALLBACK = "https://api.airplanes.live";
 const ROUTES = `${PRIMARY}/api/0/routeset`;
+const PHOTOS = "https://api.planespotters.net/pub/photos";
 const USER_AGENT = "SkyLens/1.0 (https://ian.lu/skylens.html)";
 
 const CORS = {
@@ -24,13 +27,15 @@ const CORS = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-const json = (body: unknown, status = 200, cache = false) =>
+const json = (body: unknown, status = 200, cacheSeconds = 0) =>
   new Response(JSON.stringify(body), {
     status,
     headers: {
       ...CORS,
       "content-type": "application/json; charset=utf-8",
-      "cache-control": cache ? "public, max-age=5, s-maxage=10" : "no-store",
+      "cache-control": cacheSeconds > 0
+        ? `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}`
+        : "no-store",
     },
   });
 
@@ -159,10 +164,65 @@ async function route(url: URL) {
       route: routeText && routeText.toLowerCase() !== "unknown" ? routeText : null,
       origin: parts[0] ?? null,
       destination: parts.length > 1 ? parts[parts.length - 1] : null,
-    }, 200, true);
+    }, 200, 5);
   } catch (error) {
     console.error("skylens route", error instanceof Error ? error.message : String(error));
-    return json({ callsign, route: null, origin: null, destination: null }, 200, true);
+    return json({ callsign, route: null, origin: null, destination: null }, 200, 5);
+  }
+}
+
+type PhotoResult = {
+  thumbnailUrl: string;
+  width: number | null;
+  height: number | null;
+  link: string;
+  photographer: string;
+  provider: "Planespotters.net";
+};
+
+async function fetchPhoto(kind: "hex" | "reg", value: string): Promise<PhotoResult | null> {
+  const response = await fetch(`${PHOTOS}/${kind}/${encodeURIComponent(value)}`, {
+    headers: { "user-agent": USER_AGENT, accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`photo ${response.status}`);
+  const body = await response.json();
+  const item = body && Array.isArray(body.photos) ? body.photos[0] : null;
+  if (!item || typeof item !== "object") return null;
+  const thumbnail = item.thumbnail_large ?? item.thumbnail;
+  const thumbnailUrl = text(thumbnail?.src);
+  const link = text(item.link);
+  const photographer = text(item.photographer);
+  if (!thumbnailUrl || !link || !photographer) return null;
+  return {
+    thumbnailUrl,
+    width: numeric(thumbnail?.size?.width),
+    height: numeric(thumbnail?.size?.height),
+    link,
+    photographer,
+    provider: "Planespotters.net",
+  };
+}
+
+async function photo(url: URL) {
+  const hex = upper(url.searchParams.get("hex")).replace(/^~/, "");
+  const registration = upper(url.searchParams.get("registration"));
+  const lookups: Array<["hex" | "reg", string]> = [];
+  if (/^[0-9A-F]{6}$/.test(hex)) lookups.push(["hex", hex]);
+  if (registration && registration.length <= 20) lookups.push(["reg", registration]);
+  if (!lookups.length) return json({ error: "a valid hex or registration is required" }, 400);
+
+  try {
+    for (const [kind, value] of lookups) {
+      const result = await fetchPhoto(kind, value);
+      if (result) {
+        return json({ photo: result }, 200, 3600);
+      }
+    }
+    return json({ photo: null }, 200, 3600);
+  } catch (error) {
+    console.error("skylens photo", error instanceof Error ? error.message : String(error));
+    return json({ photo: null }, 200, 60);
   }
 }
 
@@ -172,6 +232,7 @@ Deno.serve(async (request) => {
 
   const url = new URL(request.url);
   if (url.searchParams.get("action") === "route") return route(url);
+  if (url.searchParams.get("action") === "photo") return photo(url);
 
   const lat = Number(url.searchParams.get("lat") ?? "49.6494");
   const lon = Number(url.searchParams.get("lon") ?? "6.2571");
@@ -196,7 +257,7 @@ Deno.serve(async (request) => {
       count: aircraft.length,
       aircraft,
       attribution: "Live ADS-B data: ADSB.lol / airplanes.live",
-    }, 200, true);
+    }, 200, 5);
   } catch (error) {
     console.error("skylens", error instanceof Error ? error.message : String(error));
     return json({ error: "live aircraft feed unavailable", aircraft: [] }, 502);

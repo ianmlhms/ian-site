@@ -24,6 +24,18 @@ const aircraft = [
 
 globalThis.fetch = async (input) => {
   const url = String(input);
+  if (url.includes("api.planespotters.net/pub/photos")) {
+    return Response.json({
+      photos: [{
+        thumbnail_large: {
+          src: "https://cdn.planespotters.net/example_280.jpg",
+          size: { width: 420, height: 280 },
+        },
+        link: "https://www.planespotters.net/photo/123/example",
+        photographer: "Test Photographer",
+      }],
+    });
+  }
   if (url.includes("/api/0/routeset")) {
     return Response.json([{ _airport_codes_iata: "LUX-JFK" }]);
   }
@@ -63,5 +75,26 @@ const route = await handler(new Request(
 assert.deepEqual(await route.json(), {
   callsign: "CLX123", route: "LUX-JFK", origin: "LUX", destination: "JFK",
 });
+
+const photo = await handler(new Request(
+  "https://example.test/skylens?action=photo&hex=4D0111&registration=LX-VCB",
+));
+assert.equal(photo.status, 200);
+assert.deepEqual(await photo.json(), {
+  photo: {
+    thumbnailUrl: "https://cdn.planespotters.net/example_280.jpg",
+    width: 420,
+    height: 280,
+    link: "https://www.planespotters.net/photo/123/example",
+    photographer: "Test Photographer",
+    provider: "Planespotters.net",
+  },
+});
+assert.match(photo.headers.get("cache-control"), /max-age=3600/);
+
+const invalidPhoto = await handler(new Request(
+  "https://example.test/skylens?action=photo&hex=not-a-hex",
+));
+assert.equal(invalidPhoto.status, 400);
 
 console.log("SkyLens Edge Function contract tests passed.");
