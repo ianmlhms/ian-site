@@ -23,10 +23,13 @@ note **Schule** (`laml`), **Benutzer** and **Schlüssel** (the base32 secret key
 supabase secrets set --project-ref lvksqmgfwkfbblfsozfk \
   WEBUNTIS_SERVER="https://laml.webuntis.com" \
   WEBUNTIS_SCHOOL="laml" \
-  WEBUNTIS_USER="<Benutzer from that screen>" \
+  WEBUNTIS_USER="MulIa383" \
   WEBUNTIS_SECRET="<Schlüssel / secret key>" \
   ADMIN_EMAIL="konto@ian.lu"
 ```
+⚠️ The username is **`MulIa383`** — capital i, not lowercase L ("Mulla383" was a
+misread; the DailyBriefing bot's QR decode settled it). Same secret as in the
+Mini's `~/.dailybriefing/.env`.
 `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` are injected — don't set them.
 ⚠️ `WEBUNTIS_SCHOOL` is the API id **`laml`** (lowercase), not the display name "Aline Mayrisch".
 The secret is sensitive (a permanent login). To revoke it later: *Geräte abmelden* on that screen.
@@ -42,8 +45,9 @@ service-role JWT; if the admin check rejects it, tell me and I'll add a
 cron-secret bypass header.)
 
 ## Notes / troubleshooting
-WebUntis' unofficial API varies by tenant. If **Sync now** returns an error, open
-Supabase ▸ Edge Functions ▸ `webuntis-sync` ▸ Logs — the function returns the
-failing step (`WebUntis login failed`, `homework fetch failed` + status/body).
-Paste that and I'll adjust the auth/endpoint (e.g. token vs. cookie, or the
-`/api/homeworks/lessons` path) — it may need one tweak for LAML's instance.
+The function uses the **mobile JSON-RPC API** (`jsonrpc_intern.do`, TOTP auth in
+every call — `getUserData2017` + `getHomeWork2017`). LAML blocks the browser
+REST API (`publicAppAccessAllowed:false`), but the mobile API works — proven by
+the DailyBriefing bot, which fetches the timetable the same way. If **Sync now**
+shows an error, it names the failing step (also in Supabase ▸ Edge Functions ▸
+`webuntis-sync` ▸ Logs); paste it and I'll adjust the field mapping.

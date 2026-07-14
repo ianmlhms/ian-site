@@ -3,10 +3,15 @@
 // than user/password and 2FA-proof — fetches upcoming homework, and upserts it
 // into public.homework. Invoked by the admin from homework.html ("Sync now").
 //
+// Uses the mobile JSON-RPC API (jsonrpc_intern.do, auth embedded in every call)
+// — the browser REST API (/api/homeworks/lessons) is blocked for LAML
+// (publicAppAccessAllowed:false), but the mobile API works: proven by the
+// DailyBriefing bot, which fetches the timetable the same way.
+//
 // Secrets (set with `supabase secrets set ...`, see scripts/WEBUNTIS-SETUP.md):
 //   WEBUNTIS_SERVER  https://laml.webuntis.com         (no trailing /WebUntis)
 //   WEBUNTIS_SCHOOL  laml                               (API id, NOT the display name)
-//   WEBUNTIS_USER    Mulla383                           (from the QR/secret screen)
+//   WEBUNTIS_USER    MulIa383                           (capital I — from the QR/secret screen)
 //   WEBUNTIS_SECRET  the base32 key from "Zugriff über Untis Mobile"   (secret)
 //   ADMIN_EMAIL      konto@ian.lu                        (who may trigger it)
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -21,10 +26,19 @@ const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+const SYNC_WINDOW_DAYS = 35;
+
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json", ...CORS } });
-const ymd = (d: Date) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-const fromYmd = (n: number) => { const s = String(n); return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : null; };
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+// Homework dates arrive as ISO strings on the mobile API, but some tenants use yyyymmdd ints.
+const toDate = (v: unknown): string | null => {
+  if (v == null) return null;
+  const s = String(v);
+  if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return null;
+};
 
 // ---- TOTP from the Untis Mobile secret (RFC 6238, base32, SHA-1, 30s, 6 digits)
 function base32Decode(b32: string): Uint8Array {
@@ -46,6 +60,25 @@ async function totp(secret: string, t = Date.now()): Promise<string> {
   return String(bin % 1000000).padStart(6, "0");
 }
 
+// One mobile-API call: fresh TOTP auth is embedded in the params of every request.
+async function callUntis(method: string, extra: Record<string, unknown>): Promise<any> {
+  const now = Date.now();
+  const res = await fetch(`${SERVER}/WebUntis/jsonrpc_intern.do?school=${encodeURIComponent(SCHOOL)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "User-Agent": "ianlu-webuntis-sync" },
+    body: JSON.stringify({
+      id: "ianlu", jsonrpc: "2.0", method,
+      params: [{ ...extra, auth: { user: USER, otp: Number(await totp(SECRET, now)), clientTime: now } }],
+    }),
+  });
+  const payload = await res.json().catch(() => null);
+  if (!payload || typeof payload !== "object" || !("result" in payload)) {
+    const err = (payload as any)?.error ?? {};
+    throw new Error(`${method} failed: ${err.code ?? `HTTP ${res.status}`} ${err.message ?? "invalid response"}`);
+  }
+  return (payload as any).result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -56,56 +89,59 @@ Deno.serve(async (req) => {
     if (!user || user.email !== ADMIN_EMAIL) return json({ error: "forbidden" }, 403);
   } catch { return json({ error: "forbidden" }, 403); }
 
-  if (!USER || !SECRET) return json({ error: "WebUntis not configured (WEBUNTIS_USER / WEBUNTIS_SECRET)" }, 500);
+  if (!USER || !SECRET) return json({ error: "WebUntis not configured (WEBUNTIS_USER / WEBUNTIS_SECRET)" });
 
-  // 2) Authenticate with the mobile secret (getUserData2017) → session cookie.
-  const otp = await totp(SECRET);
-  const internUrl = `${SERVER}/WebUntis/jsonrpc_intern.do?m=getUserData2017&school=${encodeURIComponent(SCHOOL)}&v=i3.5`;
-  const authRes = await fetch(internUrl, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: "ianlu", method: "getUserData2017", params: [{ auth: { clientTime: Date.now(), user: USER, otp: Number(otp) } }], jsonrpc: "2.0" }),
-  });
-  const setCookies = (authRes.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]);
-  const authJson = await authRes.json().catch(() => ({}));
-  if (authJson?.error) return json({ error: "WebUntis login failed", detail: authJson.error }, 502);
+  // Upstream errors return 200 + {error} so homework.html can show the failing
+  // step directly (supabase-js invoke() hides non-2xx response bodies).
+  try {
+    // 2) Who am I + subject-name catalogue.
+    const userData = await callUntis("getUserData2017", {});
+    const elem = userData?.userData ?? {};
+    const elemId = elem.elemId, elemType = elem.elemType;
+    if (typeof elemId !== "number" || typeof elemType !== "string") {
+      return json({ error: "WebUntis user data has no element id", detail: JSON.stringify(elem).slice(0, 300) });
+    }
+    const subjects: Record<number, string> = {};
+    for (const s of userData?.masterData?.subjects ?? []) {
+      if (s && typeof s.id === "number") subjects[s.id] = String(s.name || s.longName || "").trim();
+    }
 
-  let cookie = setCookies.join("; ");
-  if (!/schoolname=/.test(cookie)) cookie += (cookie ? "; " : "") + `schoolname="_${btoa(SCHOOL)}"`;
+    // 3) Homework for the next SYNC_WINDOW_DAYS days.
+    const start = new Date(), end = new Date();
+    end.setDate(end.getDate() + SYNC_WINDOW_DAYS);
+    const hw = await callUntis("getHomeWork2017", {
+      id: elemId, type: elemType, startDate: isoDate(start), endDate: isoDate(end),
+    });
+    const homeworks: any[] = hw?.homeWorks ?? hw?.homeworks ?? hw?.records ?? [];
+    const lessons = hw?.lessonsById ?? {};
+    const subjectOf = (h: any): string => {
+      const l = lessons?.[String(h.lessonId)] ?? {};
+      const sid = l.subjectId ?? l?.subject?.id;
+      if (typeof sid === "number" && subjects[sid]) return subjects[sid];
+      if (typeof l.subject === "string" && l.subject) return l.subject;
+      return h.subject || "";
+    };
 
-  // 3) Bearer token for the REST API (best effort).
-  let bearer = "";
-  try { const t = await fetch(`${SERVER}/WebUntis/api/token/new`, { headers: { Cookie: cookie } }); if (t.ok) bearer = (await t.text()).trim(); } catch { /* ignore */ }
+    const rows = homeworks.map((h: any) => ({
+      id: h.id,
+      subject: subjectOf(h),
+      assigned_date: toDate(h.startDate ?? h.date),
+      due_date: toDate(h.endDate ?? h.dueDate),
+      text: h.text || "",
+      remark: h.remark || "",
+      completed: !!h.completed,
+      synced_at: new Date().toISOString(),
+    })).filter((r: any) => r.id != null);
 
-  // 4) Homework for the next 5 weeks.
-  const start = new Date(), end = new Date(); end.setDate(end.getDate() + 35);
-  const hwUrl = `${SERVER}/WebUntis/api/homeworks/lessons?startDate=${ymd(start)}&endDate=${ymd(end)}`;
-  const headers: Record<string, string> = { Cookie: cookie };
-  if (bearer) headers["Authorization"] = `Bearer ${bearer}`;
-  const hwRes = await fetch(hwUrl, { headers });
-  if (!hwRes.ok) { const body = await hwRes.text().catch(() => ""); return json({ error: "homework fetch failed", status: hwRes.status, body: body.slice(0, 300) }, 502); }
-  const hwJson = await hwRes.json().catch(() => ({}));
-  const data = hwJson?.data ?? hwJson;
-  const homeworks = data?.homeworks ?? data?.records ?? [];
-  const lessons = data?.lessons ?? [];
-  const subjById: Record<string, string> = {};
-  for (const l of lessons) subjById[l.id] = l.subject ?? l?.subjects?.[0]?.element?.name ?? l?.subjects?.[0]?.name ?? "";
-
-  const rows = homeworks.map((h: any) => ({
-    id: h.id,
-    subject: subjById[h.lessonId] || h.subject || "",
-    assigned_date: h.date ? fromYmd(h.date) : null,
-    due_date: h.dueDate ? fromYmd(h.dueDate) : null,
-    text: h.text || "",
-    remark: h.remark || "",
-    completed: !!h.completed,
-    synced_at: new Date().toISOString(),
-  })).filter((r: any) => r.id != null);
-
-  // 5) Upsert (service role).
-  const admin = createClient(SB_URL, SERVICE);
-  if (rows.length) {
-    const { error } = await admin.from("homework").upsert(rows, { onConflict: "id" });
-    if (error) return json({ error: "db upsert failed", detail: error.message }, 500);
+    // 4) Upsert (service role).
+    if (rows.length) {
+      const admin = createClient(SB_URL, SERVICE);
+      const { error } = await admin.from("homework").upsert(rows, { onConflict: "id" });
+      if (error) return json({ error: "db upsert failed — " + error.message });
+    }
+    return json({ ok: true, count: rows.length });
+  } catch (e) {
+    console.error("[webuntis-sync]", e);
+    return json({ error: String((e as Error)?.message || e) });
   }
-  return json({ ok: true, count: rows.length });
 });
