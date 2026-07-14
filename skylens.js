@@ -294,7 +294,7 @@
     });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>",
-      updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 5,
+      updateWhenIdle: false, updateWhenZooming: false, keepBuffer: 2,
     }).addTo(map);
     L.control.zoom({ position: "bottomleft" }).addTo(map);
     L.marker([LUX_AIRPORT.lat, LUX_AIRPORT.lon], {

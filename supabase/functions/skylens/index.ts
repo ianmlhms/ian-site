@@ -41,7 +41,12 @@ const json = (body: unknown, status = 200, cacheSeconds = 0) =>
 
 const SPECIAL_TYPES = new Set(["A124", "A225", "A3ST", "A337", "A388", "C5M", "BLCF"]);
 const EMERGENCY_SQUAWKS = new Set(["7500", "7600", "7700"]);
-const CARGO_PREFIXES = ["CLX", "FDX", "UPS", "GTI", "BOX", "BCS", "DHL", "ABR", "ASL"];
+// Kept in sync with CARGO_PREFIXES in skylens.js so a flight is classified the
+// same whether the client reads the proxy or falls back to a feed directly.
+const CARGO_PREFIXES = [
+  "ABW", "BCS", "BOX", "CKS", "CLX", "DHK", "EAT", "FDX", "GTI", "ICE",
+  "MPH", "NCA", "PAC", "SRR", "TAY", "UPS",
+];
 
 const text = (value: unknown) => String(value ?? "").trim();
 const upper = (value: unknown) => text(value).toUpperCase();
@@ -246,7 +251,7 @@ Deno.serve(async (request) => {
     const feed = await nearby(lat, lon, radius);
     const aircraft = feed.aircraft
       .map((item) => normalize(item, lat, lon))
-      .filter((item) => item !== null)
+      .filter((item): item is NonNullable<typeof item> => item !== null)
       .sort((a, b) => Number(b.interesting) - Number(a.interesting) || a.distanceNm - b.distanceNm)
       .slice(0, limit);
     return json({
