@@ -38,11 +38,18 @@ The secret is sensitive (a permanent login). To revoke it later: *Geräte abmeld
 Open **https://ian.lu/homework.html** signed in as konto@ian.lu → **Sync now**.
 The 📚 Hausaufgaben tile also appears on the home page when you're signed in as admin.
 
-## 5. (Optional) Daily auto-sync
-Supabase ▸ Database ▸ **Cron** (or Edge Functions ▸ Schedules) → schedule
-`webuntis-sync` once a day. (Scheduled invocations come from Supabase with a
-service-role JWT; if the admin check rejects it, tell me and I'll add a
-cron-secret bypass header.)
+## 5. Daily auto-sync (set up Jul 15 2026)
+pg_cron calls the function every morning (04:30 UTC = 06:30 LU summer) with an
+`x-cron-secret` header — same pattern as the briefing push. Three parts:
+1. Redeploy **with `--no-verify-jwt`** (pg_net sends no JWT; the function
+   enforces admin-JWT-or-cron-secret itself, failing closed):
+   ```sh
+   supabase functions deploy webuntis-sync --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
+   ```
+2. `supabase secrets set WEBUNTIS_CRON_SECRET=<random hex> --project-ref lvksqmgfwkfbblfsozfk`
+3. Run **`scripts/webuntis-cron-v1.sql`** in the SQL editor with the same
+   secret pasted in (the repo copy holds a placeholder — the repo is public,
+   never commit the real value).
 
 ## Notes / troubleshooting
 The function uses the **mobile JSON-RPC API** (`jsonrpc_intern.do`, TOTP auth in

@@ -9,11 +9,17 @@
 // DailyBriefing bot, which fetches the timetable the same way.
 //
 // Secrets (set with `supabase secrets set ...`, see scripts/WEBUNTIS-SETUP.md):
-//   WEBUNTIS_SERVER  https://laml.webuntis.com         (no trailing /WebUntis)
-//   WEBUNTIS_SCHOOL  laml                               (API id, NOT the display name)
-//   WEBUNTIS_USER    MulIa383                           (capital I — from the QR/secret screen)
-//   WEBUNTIS_SECRET  the base32 key from "Zugriff über Untis Mobile"   (secret)
-//   ADMIN_EMAIL      konto@ian.lu                        (who may trigger it)
+//   WEBUNTIS_SERVER       https://laml.webuntis.com     (no trailing /WebUntis)
+//   WEBUNTIS_SCHOOL       laml                          (API id, NOT the display name)
+//   WEBUNTIS_USER         MulIa383                      (capital I — from the QR/secret screen)
+//   WEBUNTIS_SECRET       the base32 key from "Zugriff über Untis Mobile"   (secret)
+//   ADMIN_EMAIL           konto@ian.lu                  (who may trigger it)
+//   WEBUNTIS_CRON_SECRET  random hex — lets the daily pg_cron job call this
+//                         function via `x-cron-secret` (scripts/webuntis-cron-v1.sql).
+//                         Cron path is disabled while unset (fails closed).
+//
+// Deploy with --no-verify-jwt (like notify/briefing): pg_net sends no JWT, and
+// the function enforces admin-JWT-or-cron-secret itself.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SERVER = (Deno.env.get("WEBUNTIS_SERVER") || "https://laml.webuntis.com").replace(/\/+$/, "");
@@ -21,6 +27,7 @@ const SCHOOL = Deno.env.get("WEBUNTIS_SCHOOL") || "laml";
 const USER = Deno.env.get("WEBUNTIS_USER") || "";
 const SECRET = (Deno.env.get("WEBUNTIS_SECRET") || "").replace(/\s+/g, "").toUpperCase();
 const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") || "konto@ian.lu";
+const CRON_SECRET = Deno.env.get("WEBUNTIS_CRON_SECRET") || "";
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -82,12 +89,16 @@ async function callUntis(method: string, extra: Record<string, unknown>): Promis
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
-  // 1) Only the admin may trigger a sync.
-  try {
-    const userClient = createClient(SB_URL, ANON, { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } });
-    const { data: { user } } = await userClient.auth.getUser();
-    if (!user || user.email !== ADMIN_EMAIL) return json({ error: "forbidden" }, 403);
-  } catch { return json({ error: "forbidden" }, 403); }
+  // 1) Two allowed callers: the admin (JWT from homework.html) or the daily
+  //    pg_cron job (x-cron-secret header). Cron path fails closed while unset.
+  const isCron = !!CRON_SECRET && req.headers.get("x-cron-secret") === CRON_SECRET;
+  if (!isCron) {
+    try {
+      const userClient = createClient(SB_URL, ANON, { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user || user.email !== ADMIN_EMAIL) return json({ error: "forbidden" }, 403);
+    } catch { return json({ error: "forbidden" }, 403); }
+  }
 
   if (!USER || !SECRET) return json({ error: "WebUntis not configured (WEBUNTIS_USER / WEBUNTIS_SECRET)" });
 
