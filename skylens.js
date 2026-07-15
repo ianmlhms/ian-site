@@ -292,7 +292,9 @@
     const map = L.map("map", {
       center: [initial.lat, initial.lon], zoom: initial.zoom, zoomControl: false,
       worldCopyJump: true, preferCanvas: true, minZoom: 3, maxZoom: 17,
-      zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false,
+      // Smooth, cursor-anchored zoom. (The earlier animation-off flags were a
+      // red herring for the map bug, which was really the leaflet.css SRI hash.)
+      zoomSnap: 0.5, zoomDelta: 0.5, wheelPxPerZoomLevel: 100, scrollWheelZoom: true,
     });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19, attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>",
