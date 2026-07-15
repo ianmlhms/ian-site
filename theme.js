@@ -265,17 +265,46 @@
     document.body.appendChild(nav);
   }
 
-  // Install prompt: a small dismissible chip when the browser offers install
-  // (Android/desktop Chrome). iOS uses the Share-sheet, no event to hook.
+  // Install prompt: a small dismissible chip. Android/desktop Chrome fire
+  // beforeinstallprompt; iOS Safari has no event, so the chip shows proactively
+  // there and opens a short Add-to-Home-Screen guide instead.
   let deferredPrompt = null;
+  // The native iOS wrapper app appends "IanLuApp" to its user agent — inside it
+  // there is nothing to install.
+  const IS_WRAPPER = /IanLuApp/.test(navigator.userAgent);
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredPrompt = e; showInstall(); });
+  function isIosSafari() {
+    const ua = navigator.userAgent;
+    const ios = /iPad|iPhone|iPod/.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    return ios && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA/.test(ua);
+  }
+  function showIosGuide() {
+    if (document.getElementById("pwaIosGuide")) return;
+    const s = document.createElement("div");
+    s.id = "pwaIosGuide";
+    s.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9002;background:var(--card);" +
+      "border-top:1px solid var(--border);border-radius:16px 16px 0 0;" +
+      "padding:18px 20px calc(18px + env(safe-area-inset-bottom,0px));" +
+      "box-shadow:0 -6px 24px rgba(0,0,0,.35);font-size:14.5px;line-height:1.6";
+    s.innerHTML = "<b>📲 ian.lu als App installéieren</b><br>" +
+      "1. Ënnen an der Mëtt op <b>Deelen</b> ⬆️ tippen<br>" +
+      "2. <b>Zum Home-Bildschierm ➕</b> wielen<br>" +
+      '<a href="notify-help.html" style="color:var(--accent)">Méi Hëllef</a>' +
+      '<button id="pwaIosClose" style="position:absolute;top:10px;right:12px;background:none;border:none;' +
+      'color:var(--muted);font-size:18px;cursor:pointer">✕</button>';
+    document.body.appendChild(s);
+    document.getElementById("pwaIosClose").onclick = () => s.remove();
+  }
   function showInstall() {
+    if (IS_WRAPPER) return;
     if (document.getElementById("pwaInstall")) return;
     const standalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
     if (standalone) return;
     try { if (localStorage.getItem("pwaInstallDismissed")) return; } catch (e) {}
+    const ios = !deferredPrompt && isIosSafari();
     const b = document.createElement("button");
-    b.id = "pwaInstall"; b.textContent = "⬇︎ Install";
+    b.id = "pwaInstall"; b.textContent = ios ? "📲 Als App" : "⬇︎ Install";
     b.style.cssText = "position:fixed;left:14px;z-index:9001;bottom:calc(72px + env(safe-area-inset-bottom,0px));" +
       "background:var(--accent);color:#fff;border:none;border-radius:20px;padding:10px 15px;font-weight:800;" +
       "font-size:13px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)";
@@ -283,11 +312,15 @@
       b.remove();
       try { localStorage.setItem("pwaInstallDismissed", "1"); } catch (e) {}
       if (deferredPrompt) { deferredPrompt.prompt(); try { await deferredPrompt.userChoice; } catch (e) {} deferredPrompt = null; }
+      else if (ios) showIosGuide();
     };
     document.body.appendChild(b);
   }
 
-  function boot() { buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); serverSync(); registerSW(); buildBottomNav(); }
+  function boot() {
+    buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); serverSync(); registerSW(); buildBottomNav();
+    if (isIosSafari()) showInstall();
+  }
   if (document.body) boot();
   else document.addEventListener("DOMContentLoaded", boot);
 })();

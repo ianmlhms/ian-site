@@ -46,7 +46,7 @@ GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A no
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions (12 Jul 2026): `theme.js?v=9`, `auth.js?v=5`, `i18n-dict.js?v=21` (same on ALL
+Current versions (15 Jul 2026): `theme.js?v=10`, `auth.js?v=5`, `i18n-dict.js?v=21` (same on ALL
 pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=22`, `friends.js?v=18`,
 `pixelbreak-records.js?v=8`, `admin.js?v=8`, `factory-auth.js?v=5`, `notify.js?v=5`,
 `notify-ambient.js?v=5`, `class-gate.js?v=4`, `rtc-ring.js?v=2`,
@@ -274,3 +274,24 @@ VAPID **public** key is in `pixelbreak-config.js` (`vapidPublicKey`); the **priv
 `NOTIFY_SECRET` are Supabase function secrets only (never committed — repo is public).
 **Full deploy walkthrough: `scripts/PUSH-SETUP.md`.** iOS only delivers push to the site once
 it's **Added to Home Screen** (iOS 16.4+).
+
+## 9. iOS wrapper app (15 Jul 2026)
+
+A native SwiftUI+WKWebView app that loads the live site lives at **`~/IanLuApp`**
+(local Mac only — deliberately NOT in this repo, nothing to deploy). Facts the
+site side must know:
+
+- Its user agent ends in **`IanLuApp/1.0`** — `theme.js` uses this to hide the
+  install chip inside the app. Keep the marker if the UA is ever changed.
+- **No push inside the wrapper** (free Apple team = no push entitlement; Web
+  Push doesn't run in WKWebView). The installed **PWA remains the
+  notifications route** — don't "fix" that by removing PWA install paths.
+- `WKAppBoundDomains = ian.lu` in the app, so `sw.js` runs inside it.
+- Signing is a free personal team: the app re-signs every **7 days** via Xcode
+  (same routine as KartTracker2/SkyLens).
+- `scripts/normalize_head.py` (idempotent) keeps theme-color / touch-icon /
+  manifest / web-app-capable meta consistent across all top-level pages — run
+  it after creating a new page.
+- iOS Safari now shows a proactive "📲 Als App" chip (`theme.js` — no
+  `beforeinstallprompt` on iOS) that opens a small Add-to-Home-Screen guide;
+  dismissal is remembered in `localStorage.pwaInstallDismissed`.
