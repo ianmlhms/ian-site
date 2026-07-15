@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
 
   // ---- workouts → upsert (deduped by ext_id) ----
   let nWork = 0;
+  let workError: string | null = null;
   if (Array.isArray(body.workouts) && body.workouts.length) {
     const rows = body.workouts.slice(0, 50).map((w: Record<string, unknown>) => ({
       user_id: uid, source: "watch",
@@ -87,8 +88,9 @@ Deno.serve(async (req) => {
       note: w.note ? String(w.note).slice(0, 200) : null,
     }));
     const { error } = await admin.from("workouts").upsert(rows, { onConflict: "user_id,source,ext_id" });
-    if (!error) nWork = rows.length;
+    if (error) { workError = error.message; console.error("[health-ingest] workouts upsert:", error.message); }
+    else nWork = rows.length;
   }
 
-  return json({ ok: true, day: touchedDay, workouts: nWork });
+  return json({ ok: !workError, day: touchedDay, workouts: nWork, ...(workError ? { error: workError } : {}) });
 });
