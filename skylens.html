@@ -23,9 +23,12 @@
   <link rel="preconnect" href="https://api.adsb.lol" crossorigin>
   <link rel="preconnect" href="https://api.airplanes.live" crossorigin>
   <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin>
-  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <title>SkyLens — Live Aircraft Radar</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3ynohVqZjMZ2BvItuV9E1QwJpD+g=" crossorigin="anonymous">
+  <!-- Leaflet served from unpkg: its bytes match Leaflet's official SRI hashes.
+       jsdelivr's copy of leaflet.css fails the integrity check and the browser
+       silently drops the stylesheet, which collapses the tile layout. -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3ynohVqZjMZ2BvItuV9E1QwJpD+g=" crossorigin="anonymous">
   <link rel="stylesheet" href="skylens.css?v=1">
   <script src="theme.js?v=10"></script>
   <script type="application/ld+json">
@@ -201,7 +204,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <noscript><div class="noscript">SkyLens needs JavaScript to show live aircraft.</div></noscript>
 
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
   <script src="skylens.js?v=4"></script>
 </body>
 </html>
