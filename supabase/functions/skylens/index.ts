@@ -231,6 +231,59 @@ async function photo(url: URL) {
   }
 }
 
+// Historical flight path ("where it flew from") for one selected aircraft.
+// ADSB.lol exposes the readsb/tar1090 trace files; trace_recent covers roughly
+// the current flight leg. Files are gzip-encoded, so decompress when needed.
+// The point tuple is [secondsOffset, lat, lon, altitude, ...].
+const MAX_TRACE_POINTS = 500;
+
+async function fetchTrace(hex: string): Promise<Array<[number, number]>> {
+  const sub = hex.slice(-2);
+  const response = await fetch(
+    `https://adsb.lol/data/traces/${sub}/trace_recent_${hex}.json`,
+    {
+      headers: { "user-agent": USER_AGENT, accept: "application/json", referer: "https://globe.adsb.lol/" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  if (!response.ok) throw new Error(`trace ${response.status}`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  let body: string;
+  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    const stream = new Response(bytes).body!.pipeThrough(new DecompressionStream("gzip"));
+    body = await new Response(stream).text();
+  } else {
+    body = new TextDecoder().decode(bytes);
+  }
+  const data = JSON.parse(body);
+  const trace = Array.isArray(data.trace) ? data.trace : [];
+  const points: Array<[number, number]> = [];
+  for (const point of trace) {
+    const lat = numeric(point?.[1]);
+    const lon = numeric(point?.[2]);
+    if (lat !== null && lon !== null) points.push([Number(lat.toFixed(5)), Number(lon.toFixed(5))]);
+  }
+  if (points.length <= MAX_TRACE_POINTS) return points;
+  const step = Math.ceil(points.length / MAX_TRACE_POINTS);
+  const reduced = points.filter((_, index) => index % step === 0);
+  const last = points[points.length - 1];
+  if (reduced[reduced.length - 1] !== last) reduced.push(last);
+  return reduced;
+}
+
+async function trace(url: URL) {
+  const hex = upper(url.searchParams.get("hex")).replace(/^~/, "").toLowerCase();
+  if (!/^[0-9a-f]{6}$/.test(hex)) return json({ error: "a valid hex is required" }, 400);
+  try {
+    const path = await fetchTrace(hex);
+    return json({ hex, path, count: path.length }, 200, 20);
+  } catch (error) {
+    console.error("skylens trace", error instanceof Error ? error.message : String(error));
+    return json({ hex, path: [] }, 200, 20);
+  }
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (request.method !== "GET") return json({ error: "method not allowed" }, 405);
@@ -238,6 +291,7 @@ Deno.serve(async (request) => {
   const url = new URL(request.url);
   if (url.searchParams.get("action") === "route") return route(url);
   if (url.searchParams.get("action") === "photo") return photo(url);
+  if (url.searchParams.get("action") === "trace") return trace(url);
 
   const lat = Number(url.searchParams.get("lat") ?? "49.6494");
   const lon = Number(url.searchParams.get("lon") ?? "6.2571");

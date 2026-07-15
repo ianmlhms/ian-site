@@ -109,6 +109,8 @@
     routePending: new Set(),
     photoCache: new Map(),
     photoPending: new Set(),
+    tracePath: new Map(),
+    tracePending: new Set(),
     suppressMoveRefresh: false,
     mapResizeObserver: null,
     mapResizeFrame: 0,
@@ -622,6 +624,7 @@
     updateShareUrl();
     enrichRoute(aircraft);
     enrichPhoto(aircraft);
+    enrichTrace(aircraft);
     if (options && options.center && state.map) {
       state.suppressMoveRefresh = true;
       state.map.setView([aircraft.lat, aircraft.lon], Math.max(state.map.getZoom(), 10), { animate: true });
@@ -742,12 +745,45 @@
 
   function drawSelectedTrail() {
     if (!state.map || !state.selectedId) return;
-    if (state.trailLayer) state.trailLayer.remove();
-    const trail = state.trails.get(state.selectedId) || [];
-    if (trail.length < 2) { state.trailLayer = null; return; }
-    state.trailLayer = L.polyline(trail.map((point) => [point[0], point[1]]), {
-      color: "#32D6FF", weight: 3, opacity: .82, lineJoin: "round", dashArray: "1 7",
+    if (state.trailLayer) { state.trailLayer.remove(); state.trailLayer = null; }
+    const historical = state.tracePath.get(state.selectedId);
+    const aircraft = state.aircraft.get(state.selectedId);
+    let points;
+    if (historical && historical.path.length > 1) {
+      // Real flight history from ADS-B, connected to the current live position.
+      points = historical.path.slice();
+      if (aircraft) points.push([aircraft.lat, aircraft.lon]);
+    } else {
+      // Fallback: positions captured while SkyLens has been open this session.
+      points = (state.trails.get(state.selectedId) || []).map((point) => [point[0], point[1]]);
+    }
+    if (points.length < 2) return;
+    state.trailLayer = L.polyline(points, {
+      color: "#32D6FF", weight: 3, opacity: .82, lineJoin: "round", smoothFactor: 1.2,
     }).addTo(state.map);
+  }
+
+  async function enrichTrace(aircraft) {
+    if (state.tracePending.has(aircraft.id)) return;
+    const cached = state.tracePath.get(aircraft.id);
+    if (cached && Date.now() - cached.at < 30000) { drawSelectedTrail(); return; }
+    state.tracePending.add(aircraft.id);
+    try {
+      const qs = new URLSearchParams({ action: "trace", hex: cleanHex(aircraft.hex) });
+      const payload = await requestJson(PROXY + "?" + qs, null, 11000);
+      const path = Array.isArray(payload.path)
+        ? payload.path.filter((point) => Array.isArray(point) && validLat(num(point[0])) && validLon(num(point[1])))
+        : [];
+      state.tracePath.set(aircraft.id, { path, at: Date.now() });
+      if (state.selectedId === aircraft.id) {
+        drawSelectedTrail();
+        if (path.length > 1) els.trailText.textContent = path.length + " point flight path from ADS-B history";
+      }
+    } catch (_) {
+      state.tracePath.set(aircraft.id, { path: [], at: Date.now() });
+    } finally {
+      state.tracePending.delete(aircraft.id);
+    }
   }
 
   async function enrichRoute(aircraft) {
