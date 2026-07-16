@@ -8,6 +8,9 @@
 //   supabase functions deploy shortcut-api --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
 //
 // POST JSON: { "token": "…", "action": "steps" }
+// or GET:    ?token=…&action=steps
+//   (GET exists because the Shortcuts importer silently drops hand-built
+//    JSON request bodies — a bare URL always survives.)
 // → { ok, date, steps, sleep_h, water_ml, speak }
 //   `speak` is a ready Luxembourgish sentence the Shortcut can read aloud.
 // Extend with more actions (water, homework, countdowns…) as needed.
@@ -37,11 +40,12 @@ const speakSteps = (steps: number | null, sleepH: number | null, waterMl: number
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (req.method !== "POST") return json({ error: "POST only" }, 405);
+  if (req.method !== "POST" && req.method !== "GET") return json({ error: "GET or POST only" }, 405);
 
-  const body = await req.json().catch(() => ({}));
-  const token = String(body.token || "").trim();
-  const action = String(body.action || "steps").trim();
+  const query = new URL(req.url).searchParams;
+  const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const token = String(body.token || query.get("token") || "").trim();
+  const action = String(body.action || query.get("action") || "steps").trim();
   if (!token) return json({ error: "no token" }, 400);
 
   const admin = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
