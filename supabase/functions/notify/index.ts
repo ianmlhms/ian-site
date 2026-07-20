@@ -5,6 +5,10 @@
 //   - public.game_invites   → "game invite"      (notify the invitee)
 // so notifications arrive on the iPad even when the site is fully closed.
 //
+// @mentions: handled inside the messages branch — a member named with
+// "@username" in the text gets a distinct "… huet dech ernimmt" push and is
+// excluded from the generic message push, so nobody is notified twice.
+//
 // Deploy (see scripts/PUSH-SETUP.md for the full walkthrough):
 //   supabase functions deploy notify --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
 //   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:konto@ian.lu NOTIFY_SECRET=...
@@ -46,17 +50,26 @@ async function usernameOf(id: string): Promise<string> {
   return data?.username || "Someone";
 }
 
-// What to push, derived from which table fired the webhook.
+// Distinct @usernames in a message body (mirrors messenger.js notifyMentions).
+function mentionsIn(content: string): string[] {
+  const hits = content.match(/@([A-Za-z0-9_]{3,20})/g) || [];
+  return [...new Set(hits.map((t) => t.slice(1).toLowerCase()))];
+}
+
+// What to push, derived from which table fired the webhook. May yield more than
+// one plan (e.g. a group message → one generic push + one @mention push).
 type Plan = { recipients: string[]; title: string; body: string; url: string; tag: string };
 
-async function planFor(table: string, rec: any): Promise<Plan | null> {
+async function planFor(table: string, rec: any): Promise<Plan[]> {
   if (table === "messages") {
-    if (!rec?.group_id) return null;
+    if (!rec?.group_id) return [];
     const { data: group } = await admin
       .from("groups").select("name, is_dm").eq("id", rec.group_id).maybeSingle();
     const { data: members } = await admin
       .from("group_members").select("user_id").eq("group_id", rec.group_id).neq("user_id", rec.user_id);
     const recipients = (members ?? []).map((m: any) => m.user_id);
+    if (!recipients.length) return [];
+
     const sender = rec.username || "Someone";
     const title = group?.is_dm ? `💬 ${sender}` : `${sender} · ${group?.name ?? "Group"}`;
     const body = (rec.content && rec.content.trim())
@@ -66,44 +79,95 @@ async function planFor(table: string, rec: any): Promise<Plan | null> {
       : rec.media_type === "audio" ? "🎤 Voice message"
       : rec.media_type === "file" ? "📎 File"
       : "New message";
-    return { recipients, title, body, url: "messenger.html", tag: "grp-" + rec.group_id };
+    const tag = "grp-" + rec.group_id;
+
+    // @mentions get a higher-signal push and drop out of the generic one so
+    // they're not pushed twice. Only real group members can be mentioned here
+    // (a mention resolves to a member's id); DMs skip this (pointless 1:1).
+    const names = group?.is_dm ? [] : mentionsIn(rec.content || "");
+    let mentioned: string[] = [];
+    if (names.length) {
+      const wanted = new Set(names);
+      const { data: profs } = await admin
+        .from("profiles").select("id, username").in("id", recipients);
+      mentioned = (profs ?? [])
+        .filter((p: any) => p.username && wanted.has(String(p.username).toLowerCase()))
+        .map((p: any) => p.id);
+    }
+    const isMentioned = new Set(mentioned);
+    const others = recipients.filter((id: string) => !isMentioned.has(id));
+
+    const plans: Plan[] = [];
+    if (others.length) plans.push({ recipients: others, title, body, url: "messenger.html", tag });
+    if (mentioned.length) plans.push({
+      recipients: mentioned,
+      title: `💬 ${sender} huet dech ernimmt`,
+      body,
+      url: "messenger.html",
+      tag,   // same tag → replaces (never stacks with) the group's other push
+    });
+    return plans;
   }
 
   if (table === "friendships") {
-    if (rec?.status && rec.status !== "pending") return null;   // only new requests
-    if (!rec?.addressee) return null;
+    if (rec?.status && rec.status !== "pending") return [];   // only new requests
+    if (!rec?.addressee) return [];
     const name = await usernameOf(rec.requester);
-    return {
+    return [{
       recipients: [rec.addressee],
       title: "👋 Friend request",
       body: `${name} wants to be friends`,
       url: "friends.html",
       tag: "friend-" + rec.requester,
-    };
+    }];
   }
 
   if (table === "game_invites") {
-    if (rec?.status && rec.status !== "pending") return null;
-    if (!rec?.to_user) return null;
+    if (rec?.status && rec.status !== "pending") return [];
+    if (!rec?.to_user) return [];
     const gname = GAME_NAMES[rec.game] || rec.game;
-    return {
+    return [{
       recipients: [rec.to_user],
       title: "🎮 Game invite",
       body: `${rec.from_name || "Someone"} invited you to ${gname}`,
       url: "friends.html",
       tag: "invite-" + rec.from_user,
-    };
+    }];
   }
 
-  return null;
+  if (table === "class_chat") {
+    // Class chat has no generic push (that would spam the whole class on every
+    // line); only @mentioned classmates get one, matching the in-app alert.
+    if (!rec?.class || !rec?.body) return [];
+    const names = mentionsIn(rec.body);
+    if (!names.length) return [];
+    const wanted = new Set(names);
+    const { data: mates } = await admin
+      .from("profiles").select("id, username").eq("class", rec.class);
+    const recipients = (mates ?? [])
+      .filter((p: any) => p.id !== rec.user_id
+        && p.username && wanted.has(String(p.username).toLowerCase()))
+      .map((p: any) => p.id);
+    if (!recipients.length) return [];
+    const sender = await usernameOf(rec.user_id);
+    return [{
+      recipients,
+      title: `💬 ${sender} huet dech ernimmt`,
+      body: rec.body.trim().slice(0, 140),
+      url: "classchat.html",
+      tag: "class-" + rec.class,
+    }];
+  }
+
+  return [];
 }
 
-// Fan a Plan out to Web Push. Shared by the webhook path and the call path.
-async function sendPlan(plan: Plan) {
-  if (!plan.recipients.length) return json({ ok: true, recipients: 0 });
+// Fan a single Plan out to Web Push. Returns counts; no Response.
+async function deliver(plan: Plan): Promise<{ recipients: number; sent: number }> {
+  if (!plan.recipients.length) return { recipients: 0, sent: 0 };
   const { data: subs } = await admin
     .from("push_subscriptions").select("endpoint, subscription").in("user_id", plan.recipients);
-  if (!subs || !subs.length) return json({ ok: true, recipients: plan.recipients.length, subs: 0 });
+  if (!subs || !subs.length) return { recipients: plan.recipients.length, sent: 0 };
 
   const data = JSON.stringify({ title: plan.title, body: plan.body, url: plan.url, tag: plan.tag });
   let sent = 0;
@@ -120,7 +184,13 @@ async function sendPlan(plan: Plan) {
       }
     }
   }));
-  return json({ ok: true, recipients: plan.recipients.length, sent });
+  return { recipients: plan.recipients.length, sent };
+}
+
+// Response wrapper for the single-plan call path.
+async function sendPlan(plan: Plan) {
+  const r = await deliver(plan);
+  return json({ ok: true, ...r });
 }
 
 // Incoming-call push (FaceTime). The browser can't hold NOTIFY_SECRET, so this
@@ -175,7 +245,14 @@ Deno.serve(async (req) => {
   const rec = payload?.record;
   if (!table || !rec) return json({ ok: true, skipped: "no record" });
 
-  const plan = await planFor(table, rec);
-  if (!plan) return json({ ok: true, skipped: "nothing to send for " + table });
-  return await sendPlan(plan);
+  const plans = await planFor(table, rec);
+  if (!plans.length) return json({ ok: true, skipped: "nothing to send for " + table });
+
+  let recipients = 0, sent = 0;
+  for (const plan of plans) {
+    const r = await deliver(plan);
+    recipients += r.recipients;
+    sent += r.sent;
+  }
+  return json({ ok: true, recipients, sent });
 });
