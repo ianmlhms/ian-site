@@ -92,7 +92,9 @@ let ICE={iceServers:[
 ]};
 async function loadIce(){
   try{
-    const r=await fetch(`${PB_CONFIG.url}/functions/v1/turn`,{headers:{apikey:PB_CONFIG.anonKey,Authorization:`Bearer ${PB_CONFIG.anonKey}`}});
+    const token=auth.session()?.access_token;
+    if(!token) throw new Error("signed-in session missing");
+    const r=await fetch(`${PB_CONFIG.url}/functions/v1/turn`,{headers:{apikey:PB_CONFIG.anonKey,Authorization:`Bearer ${token}`}});
     const d=await r.json();
     if(d&&Array.isArray(d.iceServers)&&d.iceServers.length){ ICE={iceServers:d.iceServers}; console.log("[call] ICE servers loaded, TURN:",d.turn); }
   }catch(e){ console.warn("[call] TURN fetch failed, STUN only",e); }

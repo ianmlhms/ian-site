@@ -11,8 +11,12 @@
 // If the secret is unset or Metered errors, it returns just STUN so calls still
 // work between directly-reachable peers.
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const SECRET = Deno.env.get("METERED_SECRET") ?? "";
 const DOMAIN = Deno.env.get("METERED_DOMAIN") ?? "";
+const SB_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +38,20 @@ const EXPIRY_SECONDS = 14400;   // 4h — plenty for a call; auto-expires so cre
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
+  // Calls are account-only in call.html. Require that same signed-in session
+  // here so anonymous callers cannot mint relay credentials at Ian's expense.
+  const auth = req.headers.get("Authorization") ?? "";
+  if (!auth.startsWith("Bearer ") || !SB_URL || !SB_ANON) {
+    return json({ error: "sign in first" }, 401);
+  }
+  const client = createClient(SB_URL, SB_ANON, {
+    global: { headers: { Authorization: auth } },
+    auth: { persistSession: false },
+  });
+  const { data: { user }, error } = await client.auth.getUser();
+  if (error || !user) return json({ error: "sign in first" }, 401);
+
   if (!SECRET || !DOMAIN) return json({ iceServers: STUN, turn: false });
 
   try {

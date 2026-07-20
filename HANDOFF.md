@@ -3,7 +3,7 @@
 Personal site + web apps for Ian Mulheims. Static front-end (HTML/CSS/vanilla JS),
 backed by **Supabase** for accounts, data and realtime. No build step.
 
-_Last updated: 14 July 2026._
+_Last updated: 20 July 2026._
 
 ---
 
@@ -60,6 +60,7 @@ pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=22`, `friends.js?v=18
 - **Admin** = the account with email `konto@ian.lu` (row in `app_admins`; `is_admin()` checks the JWT email).
 - **Service-role key** (secret) is set only on the **Mac mini** for the dashboard publisher — never in the repo.
 - Email confirmation is **ON** by default for signups.
+- **TURN credentials are authenticated** (20 Jul security audit): the `turn` Edge Function now validates a real Supabase user JWT before minting Metered relay credentials; `call.html` passes its signed-in session token. Anonymous callers receive 401. Deploy this function with `--no-verify-jwt` so its own explicit authentication code handles the token consistently.
 
 All SQL lives in `scripts/` and **has been run** in the Supabase SQL editor (run new migrations there manually):
 `supabase-setup.sql` (scores) · `messenger-setup.sql` / `-v2` / `-v3` / **`-v4`** · `dashboard-private-setup.sql`
