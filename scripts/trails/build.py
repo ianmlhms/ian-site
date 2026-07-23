@@ -361,9 +361,19 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
         bus_live=esc(ui["bus_live"]),
         gear_html=gear_html(affiliate, lang),
         footer_note=esc(ui["footer_note"]),
+        privacy=privacy_link(lang),
         bbox_sw=f"{bbox[0]}, {bbox[1]}",
         bbox_ne=f"{bbox[2]}, {bbox[3]}",
     )
+
+
+PRIVACY_LABEL = {"de": "Datenschutz", "fr": "Confidentialité", "en": "Privacy"}
+
+
+def privacy_link(lang: str) -> str:
+    """Footer link to the privacy policy — required for AdSense and the GDPR."""
+    label = PRIVACY_LABEL.get(lang, PRIVACY_LABEL["en"])
+    return f'<a href="https://ian.lu/privacy.html" rel="noopener">{label}</a>'
 
 
 def sister_html(lang: str) -> str:
@@ -413,6 +423,7 @@ def render_index(tpl: Template, trails: list, lang: str) -> str:
         cards_html="\n".join(cards),
         sister_html=sister_html(lang),
         footer_note=esc(ui["footer_note"]),
+        privacy=privacy_link(lang),
     )
 
 
