@@ -1,0 +1,5 @@
+# Pages check_site.py should not report as orphans, with the reason.
+# One repo-relative path per line.
+
+call.html    # opened from Messenger with a room id built in JS, never linked statically
+kart.html    # shared by UUID link from KartTracker; deliberately not discoverable
