@@ -231,6 +231,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://ian.lu/geoportal/</loc>
+    <lastmod>2026-07-23</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://ian.lu/trails/</loc>
     <lastmod>2026-07-11</lastmod>
     <priority>0.8</priority>
