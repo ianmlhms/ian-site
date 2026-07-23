@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Interaktive Karte aller 105 Auto-Pédestre-Wanderwege und 37 Mountainbike-Runden in Luxemburg — mit Länge, Höhenmetern, Schwierigkeit, Bushaltestellen und GPX." />
+  <meta property="og:title" content="Wanderkarte Luxemburg — alle Auto-Pédestres und MTB-Touren" />
+  <meta property="og:description" content="105 Auto-Pédestres und 37 Mountainbike-Runden auf einer Karte." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
+  <link rel="canonical" href="https://ian.lu/kaart/" />
+  <title>Wanderkarte Luxemburg · ian.lu</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="map.css?v=1" />
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+
+<header class="site">
+  <a class="brand" href="../trails/">
+    <span id="title">Wanderkarte Luxemburg</span>
+    <small id="subtitle">105 Auto-Pédestres und 37 Mountainbike-Runden auf einer Karte</small>
+  </a>
+  <span class="head-spacer"></span>
+  <nav class="langs" aria-label="Sprache">
+    <button type="button" data-lang="de" class="on">DE</button>
+    <button type="button" data-lang="fr">FR</button>
+    <button type="button" data-lang="en">EN</button>
+  </nav>
+</header>
+
+<aside class="panel">
+  <div class="controls">
+    <input id="search" class="search" type="search" autocomplete="off" placeholder="Weg oder Ort suchen …" />
+
+    <div class="cats">
+      <button type="button" class="cat" id="cat-hiking" data-cat="hiking" aria-pressed="true">
+        <span class="dot"></span><span class="label">Wandern</span>
+      </button>
+      <button type="button" class="cat" id="cat-mtb" data-cat="mtb" aria-pressed="true">
+        <span class="dot"></span><span class="label">Mountainbike</span>
+      </button>
+    </div>
+
+    <details class="filters">
+      <summary id="filters-summary">Filter</summary>
+
+      <div class="frow">
+        <span id="lbl-difficulty">Schwierigkeit</span>
+        <div class="chips" id="f-difficulty"></div>
+      </div>
+
+      <div class="frow">
+        <span id="lbl-region">Region</span>
+        <div class="chips" id="f-region"></div>
+      </div>
+
+      <div class="frow">
+        <span id="lbl-length">Max. Länge: 40 km</span>
+        <input id="f-length" type="range" min="2" max="40" step="1" value="40" />
+      </div>
+
+      <div class="frow">
+        <label class="checkline">
+          <input id="f-bus" type="checkbox" />
+          <span id="lbl-bus">Nur mit Bushaltestelle am Weg</span>
+        </label>
+      </div>
+    </details>
+  </div>
+
+  <p class="count" id="count">&nbsp;<button type="button" id="reset">Filter zurücksetzen</button></p>
+
+  <div class="list" id="list"></div>
+
+  <section class="detail" id="detail" hidden>
+    <button type="button" class="back" id="back">‹ Zurück zur Liste</button>
+    <div class="detail-body" id="detail-body"></div>
+  </section>
+</aside>
+
+<div id="map">
+  <div class="loading" id="loading">Karte wird geladen …</div>
+</div>
+
+<script src="i18n.js?v=1"></script>
+<script src="map.js?v=1"></script>
+</body>
+</html>
