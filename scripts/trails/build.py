@@ -376,6 +376,11 @@ def privacy_link(lang: str) -> str:
     return f'<a href="https://ian.lu/privacy.html" rel="noopener">{label}</a>'
 
 
+def map_link_html(lang: str) -> str:
+    """Entry point to /kaart/ — without this the maps are unreachable from here."""
+    return f'<a href="https://ian.lu/kaart/">{esc(EXTRA[lang]["map_link"])}</a>'
+
+
 def sister_html(lang: str) -> str:
     if CAT["key"] == "hiking":
         return f'<a href="../../mtb/{lang}/">{esc(EXTRA[lang]["sister_mtb"])}</a>'
@@ -422,6 +427,7 @@ def render_index(tpl: Template, trails: list, lang: str) -> str:
         filter_buttons=filter_buttons,
         cards_html="\n".join(cards),
         sister_html=sister_html(lang),
+        map_link=map_link_html(lang),
         footer_note=esc(ui["footer_note"]),
         privacy=privacy_link(lang),
     )

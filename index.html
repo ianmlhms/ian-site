@@ -103,6 +103,12 @@
         <a class="tile bus skylens" href="skylens.html">
           <span class="ico" aria-hidden="true">🛩️</span><span class="tname">SkyLens</span><span class="tsub">Live aircraft radar &amp; sky view</span>
         </a>
+        <a class="tile bus" href="kaart/">
+          <span class="ico" aria-hidden="true">🗺️</span><span class="tname" data-i18n="tile.kaart">Wanderkaart</span><span class="tsub" data-i18n="tile.kaart.sub">All hiking &amp; MTB routes on one map</span>
+        </a>
+        <a class="tile bus" href="geoportal/">
+          <span class="ico" aria-hidden="true">🛰️</span><span class="tname">Geoportal</span><span class="tsub" data-i18n="tile.geoportal.sub">Official maps, aerial photos &amp; cadastre</span>
+        </a>
         <a class="tile bus" href="bus.html">
           <span class="ico" aria-hidden="true">🚌</span><span class="tname">Bus &amp; Zuch</span><span class="tsub" data-i18n="tile.bus.sub">Live departures &amp; routes</span>
         </a>
@@ -197,14 +203,14 @@
         timetable — need a free account, and those are marked with a lock.</p>
 
       <h3 data-i18n="intro.h3">Walking and cycling in Luxembourg</h3>
-      <p data-i18n="intro.p3">The part I've put the most work into is the trail directory. Luxembourg has
+      <p data-i18n-html="intro.p3">The part I've put the most work into is the trail directory. Luxembourg has
         around 105 signposted circular walks called Auto-Pédestres, plus a network of marked mountain-bike
         loops, and the information about them is scattered and often hard to use. Every route here has its
         length, walking or riding time, elevation gain and profile, a real map of the actual path, and —
         because public transport in Luxembourg is free — the nearest bus stops and which lines serve them.
-        You can also see all of them at once on the trail map, or open the geoportal, which puts the routes
-        on top of the country's official topographic maps, aerial photography going back to 1967, and the
-        LiDAR terrain model.</p>
+        You can also see all of them at once on the <a href="kaart/">trail map</a>, or open the
+        <a href="geoportal/">geoportal</a>, which puts the routes on top of the country's official
+        topographic maps, aerial photography going back to 1967, and the LiDAR terrain model.</p>
 
       <h3 data-i18n="intro.h4">How it's built</h3>
       <p data-i18n="intro.p4">Everything is written by hand — plain JavaScript in the browser, Supabase for
