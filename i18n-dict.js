@@ -342,4 +342,46 @@ window.I18N_DICT = {
   "msg.notify.blockedTip": { lb: "Aktivéier Notifikatiounen an de Browser-/Safari-Astellungen", de: "Aktiviere Benachrichtigungen in den Browser-/Safari-Einstellungen", en: "Enable notifications in your browser/Safari settings" },
   "msg.notify.offTip": { lb: "Loss dech bei neie Noriichte mellen", de: "Bei neuen Nachrichten benachrichtigen lassen", en: "Get notified of new messages" },
   "msg.notify.blockedAlert": { lb: "Notifikatioune si gespaart. Aktivéier se fir dës Säit an de Browser-/Safari-Astellungen a probéier nees.", de: "Benachrichtigungen sind blockiert. Aktiviere sie für diese Seite in den Browser-/Safari-Einstellungen und versuche es erneut.", en: "Notifications are blocked. Enable them for this site in your browser/Safari settings, then try again." },
+
+  /* --- homepage intro (written text, not UI labels) --- */
+  "intro.h1": {
+    lb: "Wat ian.lu ass",
+    de: "Was ian.lu ist",
+    en: "What ian.lu is",
+  },
+  "intro.p1": {
+    lb: "Op ian.lu leeën ech dat of, wat ech bauen. Ech sinn a Lëtzebuerg am Lycée, a bal alles hei huet als Fro ugefaang — kann ech en Ronnenzäit-Timer fir de Kart maachen, kann ech all markéierte Wanderwee vum Land op eng Kaart bréngen, kann ech e Chat schreiwen, deen direkt reagéiert. D'Äntwerte ginn um Enn vu menge Frënn, menger Klass a menger Famill benotzt — dofir stinn se hei an net an engem Dossier op mengem Laptop.",
+    de: "Auf ian.lu lege ich ab, was ich baue. Ich bin Schüler in Luxemburg, und fast alles hier hat als Frage angefangen — kann ich einen Rundenzeit-Timer fürs Kartfahren bauen, kann ich jeden markierten Wanderweg des Landes auf eine Karte bringen, kann ich einen Chat schreiben, der sich sofort anfühlt. Die Antworten werden am Ende von meinen Freunden, meiner Klasse und meiner Familie benutzt — deshalb stehen sie hier und nicht in einem Ordner auf meinem Laptop.",
+    en: "ian.lu is where I put the things I build. I'm a secondary-school student in Luxembourg, and almost everything here started as a question — can I make a lap timer for karting, can I put every marked walking trail in the country on one map, can I write a chat app that feels instant. The answers ended up being used by my friends, my class and my family, so they live here rather than in a folder on my laptop.",
+  },
+  "intro.h2": {
+    lb: "Wat ouni Kont geet",
+    de: "Was ohne Konto funktioniert",
+    en: "What you can use without an account",
+  },
+  "intro.p2": {
+    lb: "De gréissten Deel vun der Säit ass op. Du kanns all PixelBreak-Spiller direkt am Browser spillen, ouni eppes z'installéieren, live Bus- an Zuchdeparturen am ganze Land nokucken, d'Wieder kucken, mat SkyLens d'Fligeren iwwer dir verfollegen an all Wander- a Mountainbike-Tour vum Land duerchkucken. Nëmme wat perséinlech ass — Noriichten, Frënn, Noten, däi Stonneplang — brauch e gratis Kont, an dat ass mat engem Schloss markéiert.",
+    de: "Der größte Teil der Seite ist offen. Du kannst alle PixelBreak-Spiele direkt im Browser spielen, ohne etwas zu installieren, live Bus- und Zugabfahrten im ganzen Land nachsehen, das Wetter checken, mit SkyLens Flugzeuge über dir verfolgen und jede Wander- und Mountainbike-Tour des Landes durchstöbern. Nur was persönlich ist — Nachrichten, Freunde, Noten, dein Stundenplan — braucht ein kostenloses Konto, und das ist mit einem Schloss markiert.",
+    en: "Most of the site is open. You can play all of the PixelBreak arcade games in the browser with nothing installed, look up live bus and train departures anywhere in Luxembourg, check the weather, follow aircraft overhead in SkyLens, and browse every hiking and mountain-bike route in the country. Only the things that are personal to you — messages, friends, grades, your timetable — need a free account, and those are marked with a lock.",
+  },
+  "intro.h3": {
+    lb: "Wanderen a Vëlofueren zu Lëtzebuerg",
+    de: "Wandern und Radfahren in Luxemburg",
+    en: "Walking and cycling in Luxembourg",
+  },
+  "intro.p3": {
+    lb: "Am meeschten Aarbecht stécht am Weeër-Verzeechnes. Lëtzebuerg huet ronn 105 ausgeschilderte Rondweeër, d'Auto-Pédestres, dobäi e Netz vu markéierte Mountainbike-Ronnen — an d'Informatioune doriwwer si verspreet an dacks ëmständlech. All Tour hei huet seng Längt, d'Gang- oder Fuerzäit, d'Héichtemeter an d'Profil, eng richteg Kaart mam tatsächleche Wee an — well den ëffentlechen Transport zu Lëtzebuerg gratis ass — déi nooste Busarrêten an d'Linnen, déi do halen. Du kanns se och all op eemol op der Weeërkaart kucken, oder de Geoportal opmaachen, deen d'Touren op déi offiziell topografesch Kaarten, Loftbiller bis zréck op 1967 an d'LiDAR-Geländemodell leet.",
+    de: "Die meiste Arbeit steckt im Wegeverzeichnis. Luxemburg hat rund 105 ausgeschilderte Rundwanderwege, die Auto-Pédestres, dazu ein Netz markierter Mountainbike-Runden — und die Informationen darüber sind verstreut und oft umständlich. Jede Route hier hat ihre Länge, Geh- oder Fahrzeit, Höhenmeter und ein Höhenprofil, eine echte Karte mit dem tatsächlichen Wegverlauf und — weil der öffentliche Verkehr in Luxemburg kostenlos ist — die nächsten Bushaltestellen samt Linien. Du kannst sie auch alle auf einmal auf der Wanderkarte sehen oder das Geoportal öffnen, das die Routen auf die amtlichen topografischen Karten, Luftbilder bis zurück ins Jahr 1967 und das LiDAR-Geländemodell legt.",
+    en: "The part I've put the most work into is the trail directory. Luxembourg has around 105 signposted circular walks called Auto-Pédestres, plus a network of marked mountain-bike loops, and the information about them is scattered and often hard to use. Every route here has its length, walking or riding time, elevation gain and profile, a real map of the actual path, and — because public transport in Luxembourg is free — the nearest bus stops and which lines serve them. You can also see all of them at once on the trail map, or open the geoportal, which puts the routes on top of the country's official topographic maps, aerial photography going back to 1967, and the LiDAR terrain model.",
+  },
+  "intro.h4": {
+    lb: "Wéi et gebaut ass",
+    de: "Wie es gebaut ist",
+    en: "How it's built",
+  },
+  "intro.p4": {
+    lb: "Alles ass mat der Hand geschriwwen — normale JavaScript am Browser, Supabase fir Konten, Live-Chat a Späicher, a Python fir d'Pipelines, déi d'Weeërsäiten aus OpenStreetMap-Donnéeë generéieren. Do stécht kee Site-Builder a kee Modell hannendrun. Wann eppes hei futti oder falsch ass, ass et menges fir ze fléken — a du kanns mer et soen.",
+    de: "Alles ist von Hand geschrieben — normales JavaScript im Browser, Supabase für Konten, Echtzeit-Chat und Speicher, und Python für die Pipelines, die die Wegseiten aus OpenStreetMap-Daten erzeugen. Dahinter steckt kein Website-Baukasten und keine Vorlage. Wenn hier etwas kaputt oder falsch ist, ist es meins zu reparieren — und du kannst es mir sagen.",
+    en: "Everything is written by hand — plain JavaScript in the browser, Supabase for accounts, real-time chat and storage, and Python for the pipelines that generate the trail pages from OpenStreetMap data. There is no site builder and no template behind it. If something here is broken or wrong, it's mine to fix, and you can tell me about it.",
+  },
 };

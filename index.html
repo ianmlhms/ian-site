@@ -180,6 +180,38 @@
         <a class="btn-primary" href="about.html" data-i18n="index.cta1">See what I've built</a>
       </div>
     </section>
+
+    <section class="site-intro">
+      <h2 data-i18n="intro.h1">What ian.lu is</h2>
+      <p data-i18n="intro.p1">ian.lu is where I put the things I build. I'm a secondary-school student in
+        Luxembourg, and almost everything here started as a question — can I make a lap timer for karting,
+        can I put every marked walking trail in the country on one map, can I write a chat app that feels
+        instant. The answers ended up being used by my friends, my class and my family, so they live here
+        rather than in a folder on my laptop.</p>
+
+      <h3 data-i18n="intro.h2">What you can use without an account</h3>
+      <p data-i18n="intro.p2">Most of the site is open. You can play all of the PixelBreak arcade games in
+        the browser with nothing installed, look up live bus and train departures anywhere in Luxembourg,
+        check the weather, follow aircraft overhead in SkyLens, and browse every hiking and mountain-bike
+        route in the country. Only the things that are personal to you — messages, friends, grades, your
+        timetable — need a free account, and those are marked with a lock.</p>
+
+      <h3 data-i18n="intro.h3">Walking and cycling in Luxembourg</h3>
+      <p data-i18n="intro.p3">The part I've put the most work into is the trail directory. Luxembourg has
+        around 105 signposted circular walks called Auto-Pédestres, plus a network of marked mountain-bike
+        loops, and the information about them is scattered and often hard to use. Every route here has its
+        length, walking or riding time, elevation gain and profile, a real map of the actual path, and —
+        because public transport in Luxembourg is free — the nearest bus stops and which lines serve them.
+        You can also see all of them at once on the trail map, or open the geoportal, which puts the routes
+        on top of the country's official topographic maps, aerial photography going back to 1967, and the
+        LiDAR terrain model.</p>
+
+      <h3 data-i18n="intro.h4">How it's built</h3>
+      <p data-i18n="intro.p4">Everything is written by hand — plain JavaScript in the browser, Supabase for
+        accounts, real-time chat and storage, and Python for the pipelines that generate the trail pages
+        from OpenStreetMap data. There is no site builder and no template behind it. If something here is
+        broken or wrong, it's mine to fix, and you can tell me about it.</p>
+    </section>
   </main>
 
   <footer>
@@ -340,13 +372,21 @@
     mountAccountButton(document.getElementById("acctHost"));
     document.getElementById("appsGateBtn").onclick = openAuthModal;   // signed-out gate → sign-in modal
     async function refreshTiles() {
+      // client() is what restores the persisted session, and session() stays
+      // undefined until it has. Reading it first showed a signed-in user the
+      // signed-out hub — sign-in gate plus 🔒 badges on every locked tile —
+      // and it never corrected itself, because onAuthStateChange deliberately
+      // swallows INITIAL_SESSION when the user has not changed. So await the
+      // client before asking whether anyone is signed in.
+      let sb = null;
+      try { sb = await client(); } catch { /* offline: fall back to the signed-out hub */ }
       const signedIn = !!session();
       // restricted accounts get bounced straight to their one app (also covers
       // signing in while already on the hub; theme.js guards direct loads)
       if (HOTEL_ONLY.includes((session()?.user?.email || "").toLowerCase())) { location.replace("hotel.html"); return; }
       document.body.classList.toggle("signed-in", signedIn);
       let admin = false;
-      try { const sb = await client(); const { data } = await sb.rpc("is_admin"); admin = !!data; } catch {}
+      try { if (sb) { const { data } = await sb.rpc("is_admin"); admin = !!data; } } catch {}
       document.querySelectorAll(".admin-only").forEach((e) => (e.style.display = admin ? "" : "none"));
       const email = (session()?.user?.email || "").toLowerCase();
       const hotel = HOTEL_ALLOW.includes(email);

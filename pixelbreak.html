@@ -43,6 +43,11 @@ header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-ind
 main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .sec-title{font-family:'Fredoka',sans-serif;font-size:23px;margin:26px 0 2px;display:flex;align-items:center;gap:9px;letter-spacing:0.3px}
 .sec-sub{color:var(--text2);font-size:13px;margin:2px 0 16px}
+.pb-about{max-width:760px;margin:40px auto 0;padding:0 4px}
+.pb-about h2{font-family:'Fredoka',sans-serif;font-size:23px;margin:0 0 10px;letter-spacing:.3px}
+.pb-about h3{font-family:'Fredoka',sans-serif;font-size:16px;margin:22px 0 6px}
+.pb-about p{color:var(--text2);font-size:14.5px;line-height:1.7;margin:0}
+.pb-about strong{color:var(--text)}
 .count{font-size:13px;color:var(--text2);margin-bottom:12px}
 .game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
 .game-card{background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;transition:transform 0.25s,box-shadow 0.25s,background 0.25s;position:relative;border:1px solid var(--border)}
@@ -128,6 +133,41 @@ footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-t
 <h2 class="sec-title"><span aria-hidden="true">🕹️</span> Arcade</h2>
 <p class="sec-sub" id="count"></p>
 <div class="game-grid" id="grid"></div>
+</section>
+
+<section class="pb-about">
+<h2>About PixelBreak</h2>
+<p>PixelBreak is a small browser arcade I built myself. Every game runs directly in this page — there is
+nothing to download, no account to create and no launcher to install. Open it on a phone, an iPad, a school
+laptop or a desktop, pick a game, and it starts immediately. Your high scores are kept locally on the device
+you played on.</p>
+
+<h3>What's in it</h3>
+<p>There are just over thirty games, grouped so you can find something for the time you actually have.
+The <strong>action</strong> games are the quick, reflex-driven ones — a stunt-driving game with twelve
+levels, a space tunnel runner, an endless jumper, a snake, a brick breaker and a couple of space shooters.
+The <strong>puzzle</strong> games are slower: block-dropping, 2048, minesweeper, memory matching, a
+procedurally generated maze and a gravity puzzle where you change which way is down. The
+<strong>casual</strong> set is for a five-minute break — stacking towers, slicing fruit, whack-a-mole, a
+reaction-speed test, a typing race and a word scramble. There is also a pixel-art drawing board, and
+FakeStake, a play-money casino that uses fake coins only and never involves real money.</p>
+
+<h3>Playing against someone else</h3>
+<p>A handful of games are built for two people rather than one. Tank Wars, Neon Pong, Air Hockey and Pixel
+Fighters can each be played three ways: two players sharing one keyboard, one player against the computer,
+or across two separate devices. For the two-device mode, one player starts a room and the other joins by
+typing the room code — useful when two people have an iPad each and are sitting in the same room. There is
+no matchmaking and no chat; the room code is the whole system.</p>
+
+<h3>Controls</h3>
+<p>On a computer the games use the arrow keys and the space bar. On a touchscreen an on-screen D-pad and
+action button appear underneath the game, so everything is playable without a keyboard.</p>
+
+<h3>Where the games come from</h3>
+<p>All of the built-in games were written from scratch for this site. Several are openly inspired by
+well-known arcade concepts — the kind of games most people have played some version of — but the code, the
+artwork and the level design are my own, and none of it is copied from another game. If something is buggy
+or unfair, there is a feedback button at the top of the page and I do read it.</p>
 </section>
 </main>
 <div id="overlay">

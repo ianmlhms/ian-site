@@ -352,6 +352,31 @@ body.signed-in .apps-gate { display: none; }
   padding-top: 46px;
 }
 
+/* Written intro under the app tiles — real prose about the site. */
+.site-intro {
+  max-width: 720px;
+  margin: 8px auto 0;
+  padding: 30px 20px 10px;
+}
+.site-intro h2 {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+.site-intro h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 26px 0 8px;
+  color: var(--text);
+}
+.site-intro p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
 @media (max-width: 760px) {
   .bar { padding: 14px 16px; }
   .bar > span { gap: 6px !important; min-width: 0; }
