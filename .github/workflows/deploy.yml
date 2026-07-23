@@ -16,6 +16,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # A normal deploy takes 2-3 min. Without this, a stalled FTP connection
+    # hangs until GitHub's 6-hour limit — and because the concurrency group
+    # queues with cancel-in-progress:false, that one hang blocks every later
+    # deploy for hours (happened 23 Jul 2026). Fail fast instead.
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
 
@@ -43,6 +48,9 @@ jobs:
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
+            set net:timeout 20;
+            set net:max-retries 3;
+            set net:reconnect-interval-base 5;
             open -u \"$FTP_USER\",\"$FTP_PASS\" \"$FTP_HOST\";
             mirror -R --delete --verbose --parallel=4 _site/ httpdocs/;
           "
