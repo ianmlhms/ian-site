@@ -192,6 +192,17 @@ def check_orphans(pages: list, inbound: dict, listed: set, js_refs: set, problem
             problems.append(("warn", "orphans", f"{page}: nothing links here and it is not in the sitemap"))
 
 
+def check_jsonld(pages: list, problems: list) -> None:
+    """Malformed JSON-LD costs rich-result eligibility and is otherwise invisible."""
+    block = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+    for page in pages:
+        for raw in block.findall(read(page)):
+            try:
+                json.loads(raw)
+            except Exception as exc:
+                problems.append(("error", "jsonld", f"{page}: invalid JSON-LD ({str(exc)[:50]})"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quiet", action="store_true", help="only print problems")
@@ -202,6 +213,7 @@ def main() -> None:
 
     inbound = check_links(pages, problems)
     check_i18n(pages, problems)
+    check_jsonld(pages, problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)
     check_orphans(pages, inbound, listed, js_referenced(pages), problems)

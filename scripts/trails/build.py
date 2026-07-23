@@ -141,14 +141,19 @@ def bus_stops_html(stops: list, ui: dict) -> str:
     return "\n".join(items)
 
 
-def gallery_html(images: list, lang: str) -> str:
+def gallery_html(images: list, lang: str, alt_base: str = "") -> str:
     if not images:
         return ""
     figures = []
-    for img in images:
+    for i, img in enumerate(images, 1):
         credit = f'{esc(img["artist"])} · {esc(img["license"])} · <a href="{esc(img["page"])}" rel="noopener">{EXTRA[lang]["photo_via"]}</a>'
+        # Descriptive alt for image-search + accessibility (was empty), and an
+        # onerror that hides the figure so a blocked/rotted Wikimedia hotlink
+        # degrades to nothing instead of a broken-image icon.
+        alt = esc(f"{alt_base} ({i})" if alt_base else "")
         figures.append(
-            f'      <figure><img src="{esc(img["src"])}" alt="" loading="lazy" />'
+            f'      <figure><img src="{esc(img["src"])}" alt="{alt}" loading="lazy"'
+            f' onerror="this.closest(&#39;figure&#39;).style.display=&#39;none&#39;" />'
             f"<figcaption>{credit}</figcaption></figure>"
         )
     return (
@@ -354,7 +359,8 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
         description_html="\n".join(f"      <p>{esc(p)}</p>" for p in texts["paragraphs"]),
         highlights_title=esc(ui["highlights_title"]),
         highlights_html="\n".join(f"        <li>{esc(h)}</li>" for h in texts["highlights"]),
-        gallery_html=gallery_html(images, lang),
+        gallery_html=gallery_html(images, lang, ui["photo_alt"].format(
+            name=trail["name"], commune=trail["place"], region=region_label)),
         bus_title=esc(ui["bus_title"]),
         bus_intro=esc(ui["bus_intro"]),
         bus_html=bus_stops_html(entry["bus_stops"], ui),
