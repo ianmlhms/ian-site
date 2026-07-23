@@ -6,12 +6,13 @@ computed.json and geo/*.geojson per category (see config.py) — and emits three
 compact JSON files that both map pages fetch:
 
   kaart/data/routes.json      metadata for every route (facts, bus, centre, url)
-  kaart/data/geo-hiking.json  {slug: [[[lat, lon], ...], ...]}  polyline rings
+  kaart/data/geo-hiking.json  {slug: ["<encoded polyline>", ...]}  one per ring
   kaart/data/geo-mtb.json     same, for the MTB loops
 
 Geometry is split per category so a map can lazily load only what is toggled on.
 Coordinates are flipped to Leaflet order (lat, lon) here so the browser never has
-to; they keep the 5-decimal precision the pipeline already stores (~1 m).
+to, simplified, then packed as Google encoded polylines — ian.lu runs on nginx
+with gzip off, so shrinking the bytes themselves is the only lever available.
 
 The page assets (index.html / map.css / map.js) are hand-written source files and
 are NOT generated — only data/ is. That keeps this script small and means editing
@@ -46,6 +47,27 @@ SIMPLIFY_DEG = 0.00008
 def load_json(path: str):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
+
+
+def encode_polyline(points: list, precision: int = 5) -> str:
+    """Google encoded-polyline format for a (lat, lon) list.
+
+    ian.lu is served by nginx with compression switched off, so raw coordinate
+    arrays would ship uncompressed. This packs the same 5-decimal precision into
+    roughly a fifth of the bytes; map.js decodes it.
+    """
+    factor = 10 ** precision
+    out, prev_lat, prev_lon = [], 0, 0
+    for lat, lon in points:
+        ilat, ilon = round(lat * factor), round(lon * factor)
+        for delta in (ilat - prev_lat, ilon - prev_lon):
+            value = ~(delta << 1) if delta < 0 else (delta << 1)
+            while value >= 0x20:
+                out.append(chr((0x20 | (value & 0x1f)) + 63))
+                value >>= 5
+            out.append(chr(value + 63))
+        prev_lat, prev_lon = ilat, ilon
+    return "".join(out)
 
 
 def _perp_dist(pt: list, start: list, end: list) -> float:
@@ -93,7 +115,7 @@ def route_rings(geo: dict) -> list:
     else:
         return []
     rings = [[[pt[1], pt[0]] for pt in part] for part in parts if part]
-    return [simplify(ring) for ring in rings]
+    return [encode_polyline(simplify(ring)) for ring in rings]
 
 
 def bus_summary(entry: dict) -> list:

@@ -29,6 +29,34 @@
 
   $ = function (sel) { return document.querySelector(sel); };
 
+  /* Google encoded-polyline -> [[lat, lon], ...]. The build script packs the
+     geometry this way because ian.lu is served without gzip. */
+  function decodePolyline(str, precision) {
+    var factor = Math.pow(10, precision || 5);
+    var index = 0, lat = 0, lon = 0, points = [];
+
+    while (index < str.length) {
+      var shift = 0, result = 0, byte;
+      do {
+        byte = str.charCodeAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+      lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+
+      shift = 0; result = 0;
+      do {
+        byte = str.charCodeAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+      lon += (result & 1) ? ~(result >> 1) : (result >> 1);
+
+      points.push([lat / factor, lon / factor]);
+    }
+    return points;
+  }
+
   function detectLang() {
     try {
       var stored = localStorage.getItem('trails_lang');
@@ -110,8 +138,9 @@
 
   function drawRoutes() {
     state.routes.forEach(function (route) {
-      var rings = state.geo[route.cat] && state.geo[route.cat][route.slug];
-      if (!rings) return;
+      var encoded = state.geo[route.cat] && state.geo[route.cat][route.slug];
+      if (!encoded) return;
+      var rings = encoded.map(function (ring) { return decodePolyline(ring); });
       var line = L.polyline(rings, {
         color: COLORS[route.cat],
         weight: 3,
