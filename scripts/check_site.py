@@ -7,7 +7,10 @@ Catches the classes of bug that are invisible until someone hits the page:
   anchors    #fragment links pointing at an id no page defines
   i18n       data-i18n keys missing from i18n-dict.js (they render as the raw
              key, e.g. a footer that literally reads "footer.privacy")
-  sitemap    sitemap URLs whose file is missing, or that are noindex'd
+  sitemap    sitemap URLs whose file is missing, or that are noindex'd, and the
+             trail sitemaps' completeness (every generated page listed + exists)
+  hreflang   the trail pages' de/fr/en/x-default cluster: complete, self-
+             referential, canonical-agreeing, and every target present
   orphans    public pages nothing links to (how /kaart/ shipped unreachable)
   meta       pages missing title / description / canonical
 
@@ -203,6 +206,77 @@ def check_jsonld(pages: list, problems: list) -> None:
                 problems.append(("error", "jsonld", f"{page}: invalid JSON-LD ({str(exc)[:50]})"))
 
 
+# The multilingual trail directories: each is a generated cluster with its own
+# sitemap. These are the SEO/money pages, and hreflang is their most fragile
+# property — a broken cluster silently costs correct-language serving.
+TRAIL_SITES = (
+    {"base": "trails", "sitemap": "sitemap-trails.xml"},
+    {"base": "mtb", "sitemap": "sitemap-mtb.xml"},
+)
+TRAIL_LANGS = ("de", "fr", "en")
+
+
+def check_hreflang(problems: list) -> None:
+    """Each trail page must carry a complete, self-referential hreflang cluster
+    whose self-link matches the canonical and whose targets all exist."""
+    for site in TRAIL_SITES:
+        base = site["base"]
+        pages = [
+            os.path.relpath(p, REPO)
+            for lang in TRAIL_LANGS
+            for p in _glob(os.path.join(REPO, base, lang, "*.html"))
+            if not p.endswith("index.html")
+        ]
+        for page in pages:
+            html = read(page)
+            pairs = dict(re.findall(r'hreflang="([^"]+)"\s+href="([^"]+)"', html))
+            lang = page.split(os.sep)[-2]
+            for needed in TRAIL_LANGS + ("x-default",):
+                if needed not in pairs:
+                    problems.append(("error", "hreflang", f"{page}: missing hreflang {needed}"))
+            canon = re.search(r'rel="canonical"\s+href="([^"]+)"', html)
+            self_href = pairs.get(lang)
+            if canon and self_href and canon.group(1) != self_href:
+                problems.append(("error", "hreflang",
+                                 f"{page}: canonical != self hreflang ({lang})"))
+            for lng, href in pairs.items():
+                if lng == "x-default":
+                    continue
+                rel = href.replace("https://ian.lu/", "")
+                if not os.path.exists(os.path.join(REPO, rel)):
+                    problems.append(("error", "hreflang", f"{page}: hreflang {lng} -> missing {rel}"))
+
+
+def check_trail_sitemaps(problems: list) -> None:
+    """Every generated trail page must be in its sitemap, and every listed URL
+    must exist — either gap is a crawl error on the money pages."""
+    for site in TRAIL_SITES:
+        sm_path = os.path.join(REPO, site["sitemap"])
+        if not os.path.exists(sm_path):
+            problems.append(("error", "sitemap", f"missing {site['sitemap']}"))
+            continue
+        listed = set(re.findall(r"<loc>([^<]+)</loc>", open(sm_path, encoding="utf-8").read()))
+        for loc in listed:
+            rel = loc.replace("https://ian.lu/", "")
+            if rel.endswith("/"):
+                rel += "index.html"
+            if not os.path.exists(os.path.join(REPO, rel)):
+                problems.append(("error", "sitemap", f"{site['sitemap']}: {loc} -> missing file"))
+        for lang in TRAIL_LANGS:
+            for p in _glob(os.path.join(REPO, site["base"], lang, "*.html")):
+                if p.endswith("index.html"):
+                    continue
+                url = "https://ian.lu/" + os.path.relpath(p, REPO)
+                if url not in listed:
+                    problems.append(("error", "sitemap",
+                                     f"{site['sitemap']}: page not listed — {url}"))
+
+
+def _glob(pattern: str) -> list:
+    import glob
+    return glob.glob(pattern)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quiet", action="store_true", help="only print problems")
@@ -214,6 +288,8 @@ def main() -> None:
     inbound = check_links(pages, problems)
     check_i18n(pages, problems)
     check_jsonld(pages, problems)
+    check_hreflang(problems)
+    check_trail_sitemaps(problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)
     check_orphans(pages, inbound, listed, js_referenced(pages), problems)
