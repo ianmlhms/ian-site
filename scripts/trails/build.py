@@ -310,6 +310,62 @@ def gain_fact_html(entry: dict, lang: str) -> str:
             f'<span class="v">{gain} m</span></div>')
 
 
+def _haversine_km(a: list, b: list) -> float:
+    """Great-circle distance in km between two [lat, lon] points."""
+    import math
+    lat1, lon1, lat2, lon2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    h = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return 2 * 6371.0 * math.asin(min(1.0, math.sqrt(h)))
+
+
+NEARBY_COUNT = 5
+
+
+def attach_nearby(trails: list) -> None:
+    """Precompute each trail's nearest neighbours by centre point.
+
+    Adds internal links between individual trail pages (the biggest SEO lever
+    for a programmatic site) and a genuinely useful "what else is near here".
+    Mutates each trail dict with a "nearby" list, nearest first.
+    """
+    located = [t for t in trails if t["entry"].get("center")]
+    for trail in trails:
+        here = trail["entry"].get("center")
+        if not here:
+            trail["nearby"] = []
+            continue
+        others = []
+        for other in located:
+            if other["slug"] == trail["slug"]:
+                continue
+            others.append((_haversine_km(here, other["entry"]["center"]), other))
+        others.sort(key=lambda pair: pair[0])
+        trail["nearby"] = [
+            {"slug": o["slug"], "name": o["name"], "difficulty": o["difficulty"], "dist": d}
+            for d, o in others[:NEARBY_COUNT]
+        ]
+
+
+def nearby_html(trail: dict, lang: str) -> str:
+    nearby = trail.get("nearby") or []
+    if not nearby:
+        return ""
+    ui = UI[lang]
+    rows = []
+    for n in nearby:
+        dist = f"{n['dist']:.1f}".replace(".", "," if lang != "en" else ".")
+        diff = DIFFICULTIES[n["difficulty"]][lang]
+        rows.append(
+            f'      <li><a href="{esc(n["slug"])}.html">{esc(n["name"])}</a>'
+            f' <span class="near-meta">{esc(diff)} · {esc(ui["nearby_dist"].format(d=dist))}</span></li>'
+        )
+    return (
+        f'    <section class="nearby">\n      <h2>{esc(ui["nearby_title"])}</h2>\n'
+        f'      <ul class="near-list">\n' + "\n".join(rows) + "\n      </ul>\n    </section>\n"
+    )
+
+
 def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
     ui = UI[lang]
     entry = trail["entry"]
@@ -361,6 +417,7 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
         highlights_html="\n".join(f"        <li>{esc(h)}</li>" for h in texts["highlights"]),
         gallery_html=gallery_html(images, lang, ui["photo_alt"].format(
             name=trail["name"], commune=trail["place"], region=region_label)),
+        nearby_html=nearby_html(trail, lang),
         bus_title=esc(ui["bus_title"]),
         bus_intro=esc(ui["bus_intro"]),
         bus_html=bus_stops_html(entry["bus_stops"], ui),
@@ -467,6 +524,7 @@ def main() -> None:
     DATA_DIR, OUT_DIR, BASE_URL = CAT["data_dir"], CAT["out_dir"], CAT["base_url"]
 
     trails = merge_trails()
+    attach_nearby(trails)
     if not trails:
         raise SystemExit("No renderable trails.")
     affiliate_path = os.path.join(DATA_DIR, "affiliate.json")

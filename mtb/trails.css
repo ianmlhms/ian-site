@@ -198,3 +198,10 @@ footer.site-foot {
   h1 { font-size: 25px; }
   #map { height: 300px; }
 }
+
+.nearby { margin: 26px 0 6px; }
+.near-list { list-style: none; padding: 0; margin: 12px 0 0; }
+.near-list li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.near-list li:last-child { border-bottom: 0; }
+.near-list a { font-weight: 600; text-decoration: none; }
+.near-meta { color: var(--muted); font-size: 14px; margin-left: 6px; }
