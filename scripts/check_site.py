@@ -11,6 +11,8 @@ Catches the classes of bug that are invisible until someone hits the page:
              trail sitemaps' completeness (every generated page listed + exists)
   hreflang   the trail pages' de/fr/en/x-default cluster: complete, self-
              referential, canonical-agreeing, and every target present
+  cache      a versioned asset (?v=N) that changed without its version being
+             bumped — the change ships but users keep the cached old copy
   orphans    public pages nothing links to (how /kaart/ shipped unreachable)
   meta       pages missing title / description / canonical
 
@@ -26,6 +28,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from collections import defaultdict
 
@@ -277,6 +280,83 @@ def _glob(pattern: str) -> list:
     return glob.glob(pattern)
 
 
+def check_cache_versions(problems: list) -> None:
+    """A versioned asset changed but its ?v= was not bumped -> users keep the
+    cached copy and the change silently does nothing.
+
+    Real bug, 26 Jul 2026: new i18n keys shipped correctly but index.html still
+    asked for i18n-dict.js?v=21, so the homepage rendered the raw key
+    "tile.partyspill" on Ian's phone.
+
+    It compares the VERSION STRING across revisions, not merely "was some HTML
+    also edited" — that weaker test would have passed straight through the real
+    bug, because index.html was edited in the same commit for an unrelated
+    reason. Git failures are reported as "cannot check", never as a failure.
+    """
+    ref = re.compile(r'(?:src|href)="([\w./-]+\.(?:js|css))\?v=(\d+)"')
+    # asset -> {version: str, page: str used as the witness}
+    assets: dict = {}
+    for path in sorted(_glob(os.path.join(REPO, "*.html"))):
+        page = os.path.relpath(path, REPO)
+        for name, ver in ref.findall(read(page)):
+            name = name.lstrip("./")
+            seen = assets.setdefault(name, {"versions": set(), "page": page})
+            seen["versions"].add(ver)
+
+    def git(*args):
+        try:
+            out = subprocess.run(["git"] + list(args), cwd=REPO,
+                                 capture_output=True, text=True, timeout=45)
+            return out.stdout if out.returncode == 0 else None
+        except Exception:
+            return None
+
+    status = git("status", "--porcelain")
+    if status is None:
+        problems.append(("warn", "cache", "git unavailable — cache versions not checked"))
+        return
+    dirty = {line[3:].strip() for line in status.splitlines()}
+
+    def version_in(rev: str, page: str, asset: str):
+        blob = git("show", f"{rev}:{page}")
+        if blob is None:
+            return None
+        found = re.search(re.escape(asset) + r"\?v=(\d+)", blob)
+        return found.group(1) if found else None
+
+    for asset, info in sorted(assets.items()):
+        versions, page = info["versions"], info["page"]
+        if len(versions) > 1:
+            problems.append(("error", "cache",
+                             f"{asset} is requested with several versions: {sorted(versions)}"))
+        if not os.path.exists(os.path.join(REPO, asset)):
+            continue
+        now = sorted(versions)[-1]
+
+        # 1. Uncommitted: asset edited since HEAD, version string unchanged.
+        if asset in dirty:
+            if version_in("HEAD", page, asset) == now:
+                problems.append(("error", "cache",
+                                 f"{asset} is modified but ?v={now} is unchanged — bump it"))
+            continue
+
+        # A bump already waiting in the working tree IS the fix — do not keep
+        # reporting the historical miss it corrects.
+        if version_in("HEAD", page, asset) not in (None, now):
+            continue
+
+        # 2. Committed: in the commit that last touched the asset, did the
+        #    version string actually differ from its parent?
+        last = (git("log", "-1", "--format=%H", "--", asset) or "").strip()
+        if not last:
+            continue
+        before = version_in(last + "^", page, asset)
+        after = version_in(last, page, asset)
+        if before is not None and after is not None and before == after:
+            problems.append(("error", "cache",
+                             f"{asset} changed in {last[:7]} without bumping ?v={after}"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--quiet", action="store_true", help="only print problems")
@@ -290,6 +370,7 @@ def main() -> None:
     check_jsonld(pages, problems)
     check_hreflang(problems)
     check_trail_sitemaps(problems)
+    check_cache_versions(problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)
     check_orphans(pages, inbound, listed, js_referenced(pages), problems)
