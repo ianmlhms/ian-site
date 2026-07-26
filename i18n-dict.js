@@ -345,6 +345,9 @@ window.I18N_DICT = {
 
   "footer.privacy":    { lb: "Dateschutz", de: "Datenschutz", en: "Privacy" },
 
+  "tile.partyspill":     { lb: "Partyspill", de: "Partyspiele", en: "Party games" },
+  "tile.partyspill.sub": { lb: "15 Spiller op engem Handy", de: "15 Spiele auf einem Handy", en: "15 party games on one phone" },
+
   /* --- map tiles --- */
   "tile.kaart":        { lb: "Weeërkaart", de: "Wanderkarte", en: "Trail map" },
   "tile.kaart.sub":    { lb: "All Wander- a MTB-Touren op enger Kaart", de: "Alle Wander- und MTB-Touren auf einer Karte", en: "All hiking & MTB routes on one map" },
