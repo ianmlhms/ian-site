@@ -340,21 +340,19 @@ def check_cache_versions(problems: list) -> None:
                                  f"{asset} is modified but ?v={now} is unchanged — bump it"))
             continue
 
-        # A bump already waiting in the working tree IS the fix — do not keep
-        # reporting the historical miss it corrects.
-        if version_in("HEAD", page, asset) not in (None, now):
-            continue
-
-        # 2. Committed: in the commit that last touched the asset, did the
-        #    version string actually differ from its parent?
+        # 2. Committed: the version must have changed at or after the asset's
+        #    last modification. Comparing against the CURRENT version (not the
+        #    one at that commit) means a bump made in a later commit still
+        #    counts as fixed — otherwise the check keeps reporting a miss that
+        #    has already been corrected, and a checker that cries wolf about
+        #    fixed problems gets ignored.
         last = (git("log", "-1", "--format=%H", "--", asset) or "").strip()
         if not last:
             continue
         before = version_in(last + "^", page, asset)
-        after = version_in(last, page, asset)
-        if before is not None and after is not None and before == after:
+        if before is not None and before == now:
             problems.append(("error", "cache",
-                             f"{asset} changed in {last[:7]} without bumping ?v={after}"))
+                             f"{asset} changed in {last[:7]} but ?v={now} was never bumped since"))
 
 
 def main() -> None:
