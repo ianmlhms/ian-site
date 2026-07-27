@@ -21,17 +21,31 @@
   "use strict";
 
   var LANGS = ["lb", "de", "en"];
-  var DEFAULT_LANG = "lb"; // Luxembourgish first (per site preference)
+  // English is the default because the static markup's fallback text IS
+  // English: a crawler with no JS sees English, so anything else would make
+  // <html lang> a lie — which is exactly the violation AdSense flagged in
+  // July ("nicht unterstützte Sprache"). AdSense supports neither Luxembourgish
+  // nor a mismatched declaration. Luxembourgish is still auto-selected for
+  // people whose browser asks for it, and any explicit choice is remembered.
+  var DEFAULT_LANG = "en";
   var STORE_KEY = "site_lang";
   var DICT = window.I18N_DICT || {};
 
   function read() {
     try {
       var v = localStorage.getItem(STORE_KEY);
-      return LANGS.indexOf(v) >= 0 ? v : DEFAULT_LANG;
+      if (LANGS.indexOf(v) >= 0) return v;   // an explicit choice always wins
     } catch (e) {
-      return DEFAULT_LANG;
+      return DEFAULT_LANG;                   // private mode: no stored choice
     }
+    // No stored choice yet: follow the browser. Only "lb" and "de" are picked
+    // up automatically; everything else (including crawlers, which announce no
+    // useful preference) lands on English.
+    var nav = "";
+    try { nav = (navigator.language || "").slice(0, 2).toLowerCase(); } catch (e) {}
+    if (nav === "lb") return "lb";
+    if (nav === "de") return "de";
+    return DEFAULT_LANG;
   }
 
   var lang = read();
