@@ -1,21 +1,21 @@
 User-agent: *
 Allow: /
-# private / sign-in-only pages — nothing useful to index
+
+# Game iframe payloads, not pages — nothing to index.
 Disallow: /pb/
-Disallow: /admin.html
-Disallow: /factory.html
-Disallow: /homework.html
-Disallow: /hotel.html
-Disallow: /karts.html
-Disallow: /kart.html
-Disallow: /messenger.html
-Disallow: /friends.html
-Disallow: /exams.html
-Disallow: /profile.html
-Disallow: /health.html
-Disallow: /money.html
-Disallow: /countdowns.html
-Disallow: /me.html
+
+# NOTE: the private / sign-in-only pages (admin, factory, homework, hotel,
+# karts, kart, messenger, friends, exams, profile, health, money, countdowns,
+# me) are deliberately NOT disallowed here any more.
+#
+# They all carry <meta name="robots" content="noindex">, and a noindex is only
+# obeyed if Google is allowed to CRAWL the page and read it. Blocking them here
+# as well meant Google never saw the noindex, so they could sit in the index as
+# bare URL entries indefinitely — the opposite of the intent, and thin entries
+# count against the site in an AdSense review.
+#
+# Crawling them leaks nothing: they are auth-gated and render almost no markup
+# to a signed-out crawler.
 
 Sitemap: https://ian.lu/sitemap.xml
 Sitemap: https://ian.lu/sitemap-trails.xml
