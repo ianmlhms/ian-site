@@ -123,7 +123,7 @@ window.PS_CONTENT = {
 
   wouldYouRather: [
     { lb: "Ëmmer ze spéit oder ëmmer eng Stonn ze fréi?", de: "Immer zu spät oder immer eine Stunde zu früh?", en: "Always late, or always an hour early?" },
-    { lb: "Fléien kënnen oder onsichtbar sinn?", de: "Fliegen können oder unsichtbar sein?", en: "Be able to fly, or be invisible?" },
+    { lb: "Fléien kënnen oder onsiichtbar sinn?", de: "Fliegen können oder unsichtbar sein?", en: "Be able to fly, or be invisible?" },
     { lb: "Ni méi Wifi oder ni méi waarmt Waasser?", de: "Nie mehr WLAN oder nie mehr warmes Wasser?", en: "Never have wifi again, or never have hot water?" },
     { lb: "Ëmmer d'Wourecht soen oder ni méi schwätzen?", de: "Immer die Wahrheit sagen oder nie mehr sprechen?", en: "Always tell the truth, or never speak again?" },
     { lb: "An der Vergaangenheet oder an der Zukunft liewen?", de: "In der Vergangenheit oder in der Zukunft leben?", en: "Live in the past or the future?" },
@@ -156,7 +156,7 @@ window.PS_CONTENT = {
     { lb: "Wien géif als éischten hëllefen?", de: "Wer würde als Erster helfen?", en: "Who would help first?" },
     { lb: "Wien huet déi bescht Iddien?", de: "Wer hat die besten Ideen?", en: "Who has the best ideas?" },
     { lb: "Wien kann am beschten kachen?", de: "Wer kann am besten kochen?", en: "Who is the best cook?" },
-    { lb: "Wien bleift am roueglechsten?", de: "Wer bleibt am ruhigsten?", en: "Who stays calmest?" },
+    { lb: "Wien bleift am rouegsten?", de: "Wer bleibt am ruhigsten?", en: "Who stays calmest?" },
     { lb: "Wien erzielt déi bescht Geschichten?", de: "Wer erzählt die besten Geschichten?", en: "Who tells the best stories?" },
   ],
 

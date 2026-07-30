@@ -52,7 +52,7 @@
     giveClue: { lb: "Sot EE Wuert dat dëse Punkt beschreift.", de: "Sag EIN Wort das diesen Punkt beschreibt.", en: "Say ONE word describing this point." },
     guessNow: { lb: "Zitt de Reegler dohin wou der mengt.", de: "Zieht den Regler dahin wo ihr denkt.", en: "Drag the slider to where you think it is." },
     off: { lb: "Ofwäichung", de: "Abweichung", en: "Off by" },
-    describeWithout: { lb: "Erkläer dëst — ouni dës Wierder:", de: "Erkläre das — ohne diese Wörter:", en: "Describe this — without these words:" },
+    describeWithout: { lb: "Erklär dëst — ouni dës Wierder:", de: "Erkläre das — ohne diese Wörter:", en: "Describe this — without these words:" },
     correct: { lb: "Richteg", de: "Richtig", en: "Correct" },
     skip: { lb: "Iwwersprangen", de: "Überspringen", en: "Skip" },
     twoHow: { lb: "seet dräi Saachen iwwer sech: zwou stëmmen, eng ass gelunn. D'Grupp rot wéi eng.", de: "sagt drei Dinge über sich: zwei stimmen, eine ist gelogen. Die Gruppe rät welche.", en: "says three things about themselves: two true, one a lie. The group guesses which." },

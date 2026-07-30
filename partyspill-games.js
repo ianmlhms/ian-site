@@ -27,7 +27,7 @@ window.PS_GAMES = [
   },
   {
     id: "guesswhat", emoji: "❓", archetype: "secret", min: 3, accent: "#4de8ff",
-    name: { lb: "Roud Mol", de: "Rate mal", en: "Guess What?" },
+    name: { lb: "Rot mol", de: "Rate mal", en: "Guess What?" },
     tag: { lb: "Du weess net wat d'Wuert ass — dot esou wéi wann.",
            de: "Du kennst das Wort nicht — tu so als ob.",
            en: "You don't know the word — bluff until you do." },
@@ -84,7 +84,7 @@ window.PS_GAMES = [
            de: "Zwei Möglichkeiten, keine gut.",
            en: "Two options, neither good." },
     bank: "wouldYouRather",
-    how: { lb: "Jiddereen seet séng Wiel — an dann muss ee se verdeedegen.",
+    how: { lb: "Jiddereen seet seng Wiel — an dann muss ee se verdeedegen.",
            de: "Alle sagen ihre Wahl — und müssen sie verteidigen.",
            en: "Everyone picks — then has to defend it." },
   },
@@ -132,7 +132,7 @@ window.PS_GAMES = [
   {
     id: "taboo", emoji: "🚫", archetype: "taboo", min: 3, accent: "#e5484d",
     name: { lb: "Tabu", de: "Tabu", en: "Taboo" },
-    tag: { lb: "Erkläer d'Wuert — awer net mat dëse Wierder.",
+    tag: { lb: "Erklär d'Wuert — awer net mat dëse Wierder.",
            de: "Erkläre das Wort — aber nicht mit diesen Wörtern.",
            en: "Describe the word — without using these." },
     seconds: 60,
