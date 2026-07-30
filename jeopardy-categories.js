@@ -1,17 +1,25 @@
-/* Quiz-board question banks. Pure data, no logic.
+/* Jeopardy — the category pool. Pure data, no logic.
  *
- * Shape: 3 banks, each 5 categories x 5 clues, values 100..500.
- * Every string is {lb, de, en}, Luxembourgish first.
+ * A FLAT pool of categories, not fixed banks: a game picks any 5, which is what
+ * makes "choose from 20" and "add your own" possible. Each category is exactly
+ * 5 clues, one per point value (100..500), and every string is {lb, de, en}.
  *
- * Written from scratch for ian.lu. Facts kept to stable, checkable ones
- * (geography, history, biology) rather than anything that dates quickly.
+ * Custom categories the user writes are stored separately in localStorage and
+ * merged with this pool at runtime — this file is never modified by the app.
+ *
+ * All questions written from scratch for ian.lu. Facts kept to stable,
+ * checkable ones rather than anything that dates quickly.
  */
-window.JQ_BANKS = [
-{
-  id: "scouten",
-  name: { lb: "Scouten", de: "Pfadfinder", en: "Scouting" },
-  cats: [
-    { name: { lb: "Knäppchen", de: "Knoten", en: "Knots" }, clues: [
+window.JQ_TOPICS = {
+  scouten:    { lb: "Scouten", de: "Pfadfinder", en: "Scouting" },
+  letzebuerg: { lb: "Lëtzebuerg", de: "Luxemburg", en: "Luxembourg" },
+  natur:      { lb: "Natur & Wëssen", de: "Natur & Wissen", en: "Nature & Science" },
+  alldag:     { lb: "Alldag & Kultur", de: "Alltag & Kultur", en: "Everyday & Culture" },
+  eegen:      { lb: "Eege Kategorien", de: "Eigene Kategorien", en: "Your own" },
+};
+
+window.JQ_CATEGORIES = [
+{ id: "knots", topic: "scouten", name: { lb: "Knäppchen", de: "Knoten", en: "Knots" }, clues: [
       { q: { lb: "Wéi ee Knäppche benotzt du fir zwee glech décke Seeler ze verbannen?", de: "Welchen Knoten nutzt du, um zwei gleich dicke Seile zu verbinden?", en: "Which knot joins two ropes of equal thickness?" },
         a: { lb: "De Kreuzknäppchen", de: "Der Kreuzknoten", en: "The reef knot" } },
       { q: { lb: "Wéi ee Knäppche mécht eng Bucht déi sech net zesummenzitt?", de: "Welcher Knoten macht eine Schlinge, die sich nicht zuzieht?", en: "Which knot makes a loop that will not tighten?" },
@@ -23,7 +31,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi ee Knäppche léisst sech nach ënner Spannung liicht opmaachen?", de: "Welcher Knoten lässt sich noch unter Spannung leicht öffnen?", en: "Which knot can still be released easily under load?" },
         a: { lb: "De Zimmermannsstek", de: "Der Zimmermannsstek", en: "The timber hitch" } },
     ]},
-    { name: { lb: "Camp", de: "Lager", en: "Camp" }, clues: [
+{ id: "camp", topic: "scouten", name: { lb: "Camp", de: "Lager", en: "Camp" }, clues: [
       { q: { lb: "Firwat gräift man e Zelt ni un d'Bannenzelt wann et reent?", de: "Warum berührt man bei Regen nie das Innenzelt?", en: "Why should you never touch the inner tent when it rains?" },
         a: { lb: "Well d'Waasser dann duerchzitt", de: "Weil das Wasser dann durchzieht", en: "Because water then wicks through" } },
       { q: { lb: "Wat leet man ënnert de Schlofsak fir waarm ze bleiwen?", de: "Was legt man unter den Schlafsack, um warm zu bleiben?", en: "What goes under your sleeping bag to keep you warm?" },
@@ -35,7 +43,7 @@ window.JQ_BANKS = [
       { q: { lb: "Firwat baut man en Zelt net an enger Mulde op?", de: "Warum baut man ein Zelt nicht in einer Mulde auf?", en: "Why not pitch a tent in a hollow?" },
         a: { lb: "Do sammelt sech d'Waasser", de: "Dort sammelt sich das Wasser", en: "Water collects there" } },
     ]},
-    { name: { lb: "Éischt Hëllef", de: "Erste Hilfe", en: "First aid" }, clues: [
+{ id: "firstaid", topic: "scouten", name: { lb: "Éischt Hëllef", de: "Erste Hilfe", en: "First aid" }, clues: [
       { q: { lb: "Wéi eng Notrufnummer gëllt an der ganzer EU?", de: "Welche Notrufnummer gilt in der ganzen EU?", en: "Which emergency number works across the EU?" },
         a: { lb: "112", de: "112", en: "112" } },
       { q: { lb: "Wéi laang killt man eng Verbrennung mat Waasser?", de: "Wie lange kühlt man eine Verbrennung mit Wasser?", en: "How long do you cool a burn with water?" },
@@ -47,7 +55,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wat mécht man bei staarkem Bluten un engem Aarm?", de: "Was tut man bei starker Blutung am Arm?", en: "What do you do for heavy bleeding on an arm?" },
         a: { lb: "Drock drop an den Aarm héich halen", de: "Druck darauf und den Arm hochhalten", en: "Apply pressure and raise the arm" } },
     ]},
-    { name: { lb: "Orientéierung", de: "Orientierung", en: "Navigation" }, clues: [
+{ id: "navigation", topic: "scouten", name: { lb: "Orientéierung", de: "Orientierung", en: "Navigation" }, clues: [
       { q: { lb: "Op wéi eng Säit weist d'Nol vum Kompass?", de: "Wohin zeigt die Kompassnadel?", en: "Which way does a compass needle point?" },
         a: { lb: "Op den Norden", de: "Nach Norden", en: "North" } },
       { q: { lb: "Wéi vill Grad huet eng ganz Kompassrous?", de: "Wie viele Grad hat eine ganze Kompassrose?", en: "How many degrees in a full compass rose?" },
@@ -59,7 +67,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wat heescht et wann op der Kaart 1:25 000 steet?", de: "Was bedeutet der Maßstab 1:25 000?", en: "What does a 1:25,000 scale mean?" },
         a: { lb: "1 cm op der Kaart ass 250 m an der Natur", de: "1 cm auf der Karte sind 250 m in der Natur", en: "1 cm on the map is 250 m on the ground" } },
     ]},
-    { name: { lb: "Geschicht", de: "Geschichte", en: "History" }, clues: [
+{ id: "scouthistory", topic: "scouten", name: { lb: "Geschicht", de: "Geschichte", en: "History" }, clues: [
       { q: { lb: "Wien huet d'Scoutsbewegung gegrënnt?", de: "Wer gründete die Pfadfinderbewegung?", en: "Who founded the Scout movement?" },
         a: { lb: "De Robert Baden-Powell", de: "Robert Baden-Powell", en: "Robert Baden-Powell" } },
       { q: { lb: "A wéi ee Joerhonnert ass d'Scoutsbewegung entstanen?", de: "In welchem Jahrhundert entstand die Pfadfinderbewegung?", en: "In which century did Scouting begin?" },
@@ -71,13 +79,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi heescht e groussen internationale Scoutslager?", de: "Wie heißt ein großes internationales Pfadfinderlager?", en: "What is a large international Scout camp called?" },
         a: { lb: "E Jamboree", de: "Ein Jamboree", en: "A Jamboree" } },
     ]},
-  ],
-},
-{
-  id: "letzebuerg",
-  name: { lb: "Lëtzebuerg", de: "Luxemburg", en: "Luxembourg" },
-  cats: [
-    { name: { lb: "Geographie", de: "Geografie", en: "Geography" }, clues: [
+{ id: "geography", topic: "letzebuerg", name: { lb: "Geographie", de: "Geografie", en: "Geography" }, clues: [
       { q: { lb: "Wéi vill Länner grenzen u Lëtzebuerg?", de: "Wie viele Länder grenzen an Luxemburg?", en: "How many countries border Luxembourg?" },
         a: { lb: "Dräi", de: "Drei", en: "Three" } },
       { q: { lb: "Wéi heescht de längsten Floss vu Lëtzebuerg?", de: "Wie heißt der längste Fluss Luxemburgs?", en: "What is Luxembourg's longest river?" },
@@ -89,7 +91,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi heescht de héchste Punkt vu Lëtzebuerg?", de: "Wie heißt der höchste Punkt Luxemburgs?", en: "What is Luxembourg's highest point?" },
         a: { lb: "De Kneiff", de: "Der Kneiff", en: "The Kneiff" } },
     ]},
-    { name: { lb: "Geschicht", de: "Geschichte", en: "History" }, clues: [
+{ id: "luxhistory", topic: "letzebuerg", name: { lb: "Geschicht", de: "Geschichte", en: "History" }, clues: [
       { q: { lb: "Wéi eng Regierungsform huet Lëtzebuerg?", de: "Welche Staatsform hat Luxemburg?", en: "What form of state is Luxembourg?" },
         a: { lb: "E Groussherzogtum", de: "Ein Großherzogtum", en: "A Grand Duchy" } },
       { q: { lb: "Wéi eng Sprooch ass zënter 1984 Nationalsprooch?", de: "Welche Sprache ist seit 1984 Nationalsprache?", en: "Which language became the national language in 1984?" },
@@ -101,7 +103,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi heescht déi bekannteste Buerg am Norde vum Land?", de: "Wie heißt die bekannteste Burg im Norden?", en: "What is the best-known castle in the north?" },
         a: { lb: "D'Buerg Veianen", de: "Die Burg Vianden", en: "Vianden Castle" } },
     ]},
-    { name: { lb: "Traditiounen", de: "Traditionen", en: "Traditions" }, clues: [
+{ id: "traditions", topic: "letzebuerg", name: { lb: "Traditiounen", de: "Traditionen", en: "Traditions" }, clues: [
       { q: { lb: "Wéini ass Nationalfeierdag?", de: "Wann ist Nationalfeiertag?", en: "When is National Day?" },
         a: { lb: "Den 23. Juni", de: "Am 23. Juni", en: "23 June" } },
       { q: { lb: "Wéi heescht déi grouss Kiermes an der Stad am Hierscht?", de: "Wie heißt die große Kirmes in der Stadt?", en: "What is the city's big funfair called?" },
@@ -113,7 +115,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi heescht déi traditionell Wurscht op der Fouer?", de: "Wie heißt die traditionelle Wurst auf der Fouer?", en: "What is the traditional sausage at the fair?" },
         a: { lb: "D'Grillwurscht — a Gromperekichelcher dozou", de: "Die Grillwurst — mit Kartoffelpuffer", en: "Grilled sausage — with potato fritters" } },
     ]},
-    { name: { lb: "Symbolen", de: "Symbole", en: "Symbols" }, clues: [
+{ id: "symbols", topic: "letzebuerg", name: { lb: "Symbolen", de: "Symbole", en: "Symbols" }, clues: [
       { q: { lb: "Wéi eng dräi Faarwen huet d'Fändel?", de: "Welche drei Farben hat die Flagge?", en: "Which three colours are on the flag?" },
         a: { lb: "Rout, wäiss, blo", de: "Rot, weiß, blau", en: "Red, white, blue" } },
       { q: { lb: "Wéi eng Déier ass am Wope vu Lëtzebuerg?", de: "Welches Tier ist im Wappen Luxemburgs?", en: "Which animal is on Luxembourg's coat of arms?" },
@@ -125,7 +127,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi heescht déi bekannte Bréck iwwer d'Pétrusse?", de: "Wie heißt die bekannte Brücke über die Petruss?", en: "What is the famous bridge over the Pétrusse?" },
         a: { lb: "D'Adolphe-Bréck", de: "Die Adolphe-Brücke", en: "The Adolphe Bridge" } },
     ]},
-    { name: { lb: "Haut", de: "Heute", en: "Today" }, clues: [
+{ id: "luxtoday", topic: "letzebuerg", name: { lb: "Haut", de: "Heute", en: "Today" }, clues: [
       { q: { lb: "Wat ass zënter 2020 gratis fir jiddereen am Land?", de: "Was ist seit 2020 für alle im Land gratis?", en: "What has been free for everyone since 2020?" },
         a: { lb: "Den ëffentlechen Transport", de: "Der öffentliche Verkehr", en: "Public transport" } },
       { q: { lb: "Ongeféier wéi vill Leit wunnen zu Lëtzebuerg?", de: "Wie viele Menschen leben etwa in Luxemburg?", en: "Roughly how many people live in Luxembourg?" },
@@ -137,13 +139,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi eng Regioun heescht och d'Rout Erd?", de: "Welche Region heißt auch Rote Erde?", en: "Which region is also called the Red Rocks?" },
         a: { lb: "De Minett", de: "Der Minett", en: "The Minett" } },
     ]},
-  ],
-},
-{
-  id: "natur",
-  name: { lb: "Natur & Wëssen", de: "Natur & Wissen", en: "Nature & Science" },
-  cats: [
-    { name: { lb: "Déieren", de: "Tiere", en: "Animals" }, clues: [
+{ id: "animals", topic: "natur", name: { lb: "Déieren", de: "Tiere", en: "Animals" }, clues: [
       { q: { lb: "Wéi vill Been huet eng Spann?", de: "Wie viele Beine hat eine Spinne?", en: "How many legs does a spider have?" },
         a: { lb: "Aacht", de: "Acht", en: "Eight" } },
       { q: { lb: "Wéi vill Been huet en Insekt?", de: "Wie viele Beine hat ein Insekt?", en: "How many legs does an insect have?" },
@@ -155,7 +151,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wat ass dat séierste Landdéier?", de: "Was ist das schnellste Landtier?", en: "What is the fastest land animal?" },
         a: { lb: "De Cheetah", de: "Der Gepard", en: "The cheetah" } },
     ]},
-    { name: { lb: "Planzen", de: "Pflanzen", en: "Plants" }, clues: [
+{ id: "plants", topic: "natur", name: { lb: "Planzen", de: "Pflanzen", en: "Plants" }, clues: [
       { q: { lb: "Wéi heescht de Prozess mat deem Planzen aus Liicht Energie maachen?", de: "Wie heißt der Prozess, mit dem Pflanzen aus Licht Energie machen?", en: "What is the process by which plants make energy from light?" },
         a: { lb: "Photosynthese", de: "Photosynthese", en: "Photosynthesis" } },
       { q: { lb: "Wéi ee Gas gi Planzen dobäi of?", de: "Welches Gas geben Pflanzen dabei ab?", en: "Which gas do plants give off doing it?" },
@@ -167,7 +163,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi kann een d'Alter vun engem gefällten Bam zielen?", de: "Wie zählt man das Alter eines gefällten Baums?", en: "How do you tell a felled tree's age?" },
         a: { lb: "Un de Joresréng", de: "An den Jahresringen", en: "By its growth rings" } },
     ]},
-    { name: { lb: "Weltraum", de: "Weltraum", en: "Space" }, clues: [
+{ id: "space", topic: "natur", name: { lb: "Weltraum", de: "Weltraum", en: "Space" }, clues: [
       { q: { lb: "Wéi vill Planéiten huet eist Sonnesystem?", de: "Wie viele Planeten hat unser Sonnensystem?", en: "How many planets are in our solar system?" },
         a: { lb: "Aacht", de: "Acht", en: "Eight" } },
       { q: { lb: "Wéi ee Planéit gëtt de roude Planéit genannt?", de: "Welcher Planet heißt der rote Planet?", en: "Which planet is called the red planet?" },
@@ -179,7 +175,7 @@ window.JQ_BANKS = [
       { q: { lb: "Ronn wéi vill Deeg brauch de Mound ëm d'Äerd?", de: "Wie viele Tage braucht der Mond um die Erde?", en: "Roughly how many days does the Moon take to orbit Earth?" },
         a: { lb: "Ronn 27 Deeg", de: "Rund 27 Tage", en: "About 27 days" } },
     ]},
-    { name: { lb: "Kierper", de: "Körper", en: "Body" }, clues: [
+{ id: "body", topic: "natur", name: { lb: "Kierper", de: "Körper", en: "Body" }, clues: [
       { q: { lb: "Wéi vill Kummeren huet d'Häerz?", de: "Wie viele Kammern hat das Herz?", en: "How many chambers does the heart have?" },
         a: { lb: "Véier", de: "Vier", en: "Four" } },
       { q: { lb: "Wat ass dat gréisste Organ vum Mënsch?", de: "Was ist das größte Organ des Menschen?", en: "What is the body's largest organ?" },
@@ -191,7 +187,7 @@ window.JQ_BANKS = [
       { q: { lb: "Wou gëtt de Sauerstoff an d'Blutt opgeholl?", de: "Wo wird Sauerstoff ins Blut aufgenommen?", en: "Where does oxygen enter the blood?" },
         a: { lb: "An de Longen", de: "In den Lungen", en: "In the lungs" } },
     ]},
-    { name: { lb: "Physik", de: "Physik", en: "Physics" }, clues: [
+{ id: "physics", topic: "natur", name: { lb: "Physik", de: "Physik", en: "Physics" }, clues: [
       { q: { lb: "Bei wéi vill Grad Celsius kacht Waasser um Mieresspigel?", de: "Bei wie viel Grad kocht Wasser auf Meereshöhe?", en: "At what temperature does water boil at sea level?" },
         a: { lb: "100 °C", de: "100 °C", en: "100 °C" } },
       { q: { lb: "Bei wéi vill Grad gefréiert Waasser?", de: "Bei wie viel Grad friert Wasser?", en: "At what temperature does water freeze?" },
@@ -203,6 +199,64 @@ window.JQ_BANKS = [
       { q: { lb: "Wéi eng chemesch Formel huet Waasser?", de: "Welche chemische Formel hat Wasser?", en: "What is the chemical formula for water?" },
         a: { lb: "H₂O", de: "H₂O", en: "H₂O" } },
     ]},
-  ],
-},
+{ id: "sport", topic: "alldag", name: { lb: "Sport", de: "Sport", en: "Sport" }, clues: [
+  { q: { lb: "Wéi vill Spiller pro Equipe stinn beim Fussball um Terrain?", de: "Wie viele Spieler pro Team stehen beim Fußball auf dem Feld?", en: "How many football players per team are on the pitch?" },
+    a: { lb: "Eelef", de: "Elf", en: "Eleven" } },
+  { q: { lb: "All wéi vill Joer sinn déi olympesch Summerspiller?", de: "Alle wie viele Jahre finden die Olympischen Sommerspiele statt?", en: "How often are the Summer Olympics held?" },
+    a: { lb: "All véier Joer", de: "Alle vier Jahre", en: "Every four years" } },
+  { q: { lb: "Wéi vill Réng huet dat olympescht Symbol?", de: "Wie viele Ringe hat das olympische Symbol?", en: "How many rings are in the Olympic symbol?" },
+    a: { lb: "Fënnef", de: "Fünf", en: "Five" } },
+  { q: { lb: "Wéi laang ass e Marathon ongeféier?", de: "Wie lang ist ein Marathon ungefähr?", en: "Roughly how long is a marathon?" },
+    a: { lb: "42 km", de: "42 km", en: "42 km" } },
+  { q: { lb: "Wéi heescht dat gréisst Vëlosrennen a Frankräich?", de: "Wie heißt das größte Radrennen Frankreichs?", en: "What is France's biggest cycling race?" },
+    a: { lb: "D'Tour de France", de: "Die Tour de France", en: "The Tour de France" } },
+]},
+{ id: "media", topic: "alldag", name: { lb: "Musek & Film", de: "Musik & Film", en: "Music & Film" }, clues: [
+  { q: { lb: "Wéi vill Saiten huet eng normal Gitar?", de: "Wie viele Saiten hat eine normale Gitarre?", en: "How many strings does a standard guitar have?" },
+    a: { lb: "Sechs", de: "Sechs", en: "Six" } },
+  { q: { lb: "Wéi vill wäiss a schwaarz Tasten huet e Piano zesummen?", de: "Wie viele Tasten hat ein Klavier insgesamt?", en: "How many keys does a piano have in total?" },
+    a: { lb: "88", de: "88", en: "88" } },
+  { q: { lb: "Wéi heescht en Film ouni Toun aus de fréie Joeren?", de: "Wie heißt ein Film ohne Ton aus der Frühzeit?", en: "What is an early film without sound called?" },
+    a: { lb: "E Stommfilm", de: "Ein Stummfilm", en: "A silent film" } },
+  { q: { lb: "Wéi vill Musiker sinn an engem Quartett?", de: "Wie viele Musiker sind in einem Quartett?", en: "How many musicians are in a quartet?" },
+    a: { lb: "Véier", de: "Vier", en: "Four" } },
+  { q: { lb: "Wéi heescht de Präis fir déi bescht Filmer an Hollywood?", de: "Wie heißt der Filmpreis in Hollywood?", en: "What is Hollywood's main film award called?" },
+    a: { lb: "Den Oscar", de: "Der Oscar", en: "The Oscar" } },
+]},
+{ id: "maths", topic: "alldag", name: { lb: "Mathematik", de: "Mathematik", en: "Maths" }, clues: [
+  { q: { lb: "Wéi vill Säiten huet en Dräieck?", de: "Wie viele Seiten hat ein Dreieck?", en: "How many sides does a triangle have?" },
+    a: { lb: "Dräi", de: "Drei", en: "Three" } },
+  { q: { lb: "Wat gëtt 7 × 8?", de: "Was ergibt 7 × 8?", en: "What is 7 × 8?" },
+    a: { lb: "56", de: "56", en: "56" } },
+  { q: { lb: "Wéi vill Grad huet d'Zomm vun de Wénkelen an engem Dräieck?", de: "Wie viel Grad ergibt die Winkelsumme im Dreieck?", en: "What do a triangle's angles add up to?" },
+    a: { lb: "180°", de: "180°", en: "180°" } },
+  { q: { lb: "Wéi heesse Zuelen déi nëmmen duerch 1 a sech selwer deelbar sinn?", de: "Wie heißen Zahlen, die nur durch 1 und sich selbst teilbar sind?", en: "What are numbers divisible only by 1 and themselves called?" },
+    a: { lb: "Primzuelen", de: "Primzahlen", en: "Prime numbers" } },
+  { q: { lb: "Op zwou Kommastellen: wat ass π?", de: "Auf zwei Nachkommastellen: was ist π?", en: "To two decimal places, what is π?" },
+    a: { lb: "3,14", de: "3,14", en: "3.14" } },
+]},
+{ id: "tech", topic: "alldag", name: { lb: "Technik & Internet", de: "Technik & Internet", en: "Tech & Internet" }, clues: [
+  { q: { lb: "Wéi vill Bit sinn en Byte?", de: "Wie viele Bit sind ein Byte?", en: "How many bits are in a byte?" },
+    a: { lb: "Aacht", de: "Acht", en: "Eight" } },
+  { q: { lb: "Wéi eng Sprooch beschreift den Opbau vun enger Websäit?", de: "Welche Sprache beschreibt den Aufbau einer Webseite?", en: "Which language describes a web page's structure?" },
+    a: { lb: "HTML", de: "HTML", en: "HTML" } },
+  { q: { lb: "Wat heescht \"www\"?", de: "Wofür steht \"www\"?", en: "What does \"www\" stand for?" },
+    a: { lb: "World Wide Web", de: "World Wide Web", en: "World Wide Web" } },
+  { q: { lb: "Wéi eng Firma huet dat éischt iPhone erausbruecht?", de: "Welche Firma brachte das erste iPhone heraus?", en: "Which company released the first iPhone?" },
+    a: { lb: "Apple", de: "Apple", en: "Apple" } },
+  { q: { lb: "Wat ass e Programm deen op Froen äntwert an aus Daten léiert?", de: "Was ist ein Programm, das aus Daten lernt und antwortet?", en: "What is a program that learns from data and answers called?" },
+    a: { lb: "Eng KI (kënschtlech Intelligenz)", de: "Eine KI (künstliche Intelligenz)", en: "An AI (artificial intelligence)" } },
+]},
+{ id: "food", topic: "alldag", name: { lb: "Iessen & Kachen", de: "Essen & Kochen", en: "Food & Cooking" }, clues: [
+  { q: { lb: "Aus wéi engem Land kënnt d'Pizza ursprénglech?", de: "Aus welchem Land kommt die Pizza ursprünglich?", en: "Which country does pizza originally come from?" },
+    a: { lb: "Aus Italien", de: "Aus Italien", en: "Italy" } },
+  { q: { lb: "Wéi heescht dat Lëtzebuerger Nationalgeriicht mat Bounen a Rippercher?", de: "Wie heißt das Luxemburger Gericht mit Bohnen und Rippchen?", en: "What is Luxembourg's dish of beans and smoked pork called?" },
+    a: { lb: "Judd mat Gaardebounen", de: "Judd mat Gaardebounen", en: "Judd mat Gaardebounen" } },
+  { q: { lb: "Aus wat gëtt Schockela gemaach?", de: "Woraus wird Schokolade gemacht?", en: "What is chocolate made from?" },
+    a: { lb: "Aus Kakao", de: "Aus Kakao", en: "Cocoa" } },
+  { q: { lb: "Wéi eng Zutat léisst den Teig opgoen?", de: "Welche Zutat lässt Teig aufgehen?", en: "Which ingredient makes dough rise?" },
+    a: { lb: "Hief", de: "Hefe", en: "Yeast" } },
+  { q: { lb: "Wéi eng Kichelcher gëtt et traditionell op der Fouer?", de: "Welche Küchlein gibt es traditionell auf der Fouer?", en: "Which fritters are traditional at the Fouer?" },
+    a: { lb: "Gromperekichelcher", de: "Gromperekichelcher", en: "Gromperekichelcher" } },
+]},
 ];

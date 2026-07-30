@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,follow">
+<!-- App shell with almost no crawlable text, and deliberately not linked from
+     the homepage or the tiles. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jeopardy — Quizbrett fir Gruppen | ian.lu</title>
+<meta name="description" content="Jeopardy-Brett fir Gruppen: wiel 5 aus 20 Kategorien, schreif eege Froen, wiel en Theme — an exportéier alles als Word-Dokument fir op Pabeier ze spillen.">
+<link rel="canonical" href="https://ian.lu/jeopardy.html">
+<meta name="theme-color" content="#0b1d3a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<script src="theme.js?v=10"></script>
+<style>
+  /* Themes: each sets the same variable names, so nothing else changes. */
+  body[data-jq="classic"]{--bg:#0b1d3a;--panel:#122b52;--cell:#15326b;--cellhi:#1b3f85;
+    --accent:#ffd66b;--accent2:#ffc23d;--text:#f2f5fb;--muted:#93a6c7;--line:#23406f;--on-accent:#1a1200}
+  body[data-jq="forest"]{--bg:#0f1c14;--panel:#16291d;--cell:#1d3a27;--cellhi:#27502f;
+    --accent:#8fd694;--accent2:#b7e6a8;--text:#eef5ee;--muted:#93b39a;--line:#2a4a33;--on-accent:#08170c}
+  body[data-jq="crimson"]{--bg:#25060c;--panel:#3a0d15;--cell:#4d1119;--cellhi:#671720;
+    --accent:#ffd166;--accent2:#ff9f45;--text:#fdf1f1;--muted:#c79a9a;--line:#5c1c24;--on-accent:#2a0a00}
+  body[data-jq="paper"]{--bg:#f4f1e8;--panel:#ffffff;--cell:#e9e4d4;--cellhi:#dcd5c0;
+    --accent:#1d4ed8;--accent2:#1e40af;--text:#1b2430;--muted:#5f6b7a;--line:#d6cfbd;--on-accent:#ffffff}
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+  button{font:inherit;color:inherit;cursor:pointer}
+  input,textarea{font:inherit}
+
+  .bar{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .bar .home{color:var(--muted);font-weight:700;text-decoration:none;font-size:14px}
+  .bar h1{font-size:15px;margin:0;font-weight:800;letter-spacing:.5px;color:var(--accent)}
+  .bar .spacer{flex:1}
+  .langs button{background:none;border:0;color:var(--muted);font-weight:700;font-size:12px;padding:4px 4px}
+  .langs button.on{color:var(--accent)}
+
+  .wrap{max-width:920px;margin:0 auto;padding:16px 14px 44px}
+  .screen{display:none}.screen.on{display:block}
+
+  h2{font-size:18px;margin:0 0 5px;font-weight:800}
+  .sub{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0 0 14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px;margin-bottom:12px}
+
+  .btn{display:block;width:100%;padding:14px;border-radius:11px;border:0;background:var(--accent);
+    color:var(--on-accent);font-weight:800;font-size:16px;margin-top:9px}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn.small{padding:10px;font-size:14px}
+  .btn:disabled{opacity:.4}
+  .row{display:flex;gap:8px}.row .btn{margin-top:0}
+
+  /* themes + categories */
+  .themes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .th{width:38px;height:38px;border-radius:50%;border:2px solid var(--line);padding:0}
+  .th[aria-pressed="true"]{border-color:var(--accent);transform:scale(1.1)}
+  .grp{color:var(--muted);font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 7px}
+  .cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .catbtn{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:11px;text-align:left;font-size:14px;font-weight:700}
+  .catbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+  .catbtn small{display:block;color:var(--muted);font-weight:500;font-size:11.5px;margin-top:2px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+  .chip{background:var(--cell);border:1px solid var(--line);border-radius:20px;padding:6px 11px;font-size:14px;display:flex;align-items:center;gap:7px}
+  .chip button{background:none;border:0;color:var(--muted);padding:0;font-size:15px;line-height:1}
+  .addrow{display:flex;gap:8px}
+  .addrow input{flex:1;min-width:0;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:15px}
+  .addrow input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+
+  /* board */
+  .board{display:grid;gap:5px}
+  .cat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 4px;text-align:center;
+    font-weight:800;font-size:11px;text-transform:uppercase;color:var(--accent);
+    display:flex;align-items:center;justify-content:center;min-height:52px;line-height:1.25}
+  .cellbtn{background:var(--cell);border:1px solid var(--line);border-radius:8px;min-height:56px;
+    font-weight:800;font-size:18px;color:var(--accent);display:flex;align-items:center;justify-content:center}
+  .cellbtn:hover:not(:disabled){background:var(--cellhi)}
+  .cellbtn:disabled{background:transparent;border-style:dashed;opacity:.35}
+
+  .scores{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+  .sc{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:7px 11px;font-size:13.5px;min-width:90px}
+  .sc b{display:block;font-size:18px;font-variant-numeric:tabular-nums;color:var(--accent)}
+  .sc.neg b{color:#e5484d}
+
+  .clue{text-align:center}
+  .clue .val{color:var(--accent);font-weight:800;font-size:13.5px;letter-spacing:.5px}
+  .clue .dd{color:var(--accent2);font-weight:800;font-size:13px;margin-top:5px}
+  .clue .q{font-size:23px;font-weight:700;line-height:1.35;margin:15px 0}
+  .clue .a{font-size:21px;font-weight:800;color:var(--accent);margin:13px 0}
+  .who{display:grid;gap:7px;margin-top:5px}
+  .who button{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--cell);text-align:left;font-size:15px;font-weight:700}
+  .who button.minus{background:transparent}
+  .hint{color:var(--muted);font-size:12.5px;text-align:center;margin-top:11px}
+  .final{text-align:center}.final .win{font-size:25px;font-weight:800;color:var(--accent);margin:9px 0}
+
+  /* editor */
+  .field{margin-bottom:10px}
+  .field label{display:block;color:var(--muted);font-size:12px;font-weight:700;margin-bottom:4px}
+  .field input,.field textarea{width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);
+    background:var(--bg);color:var(--text);font-size:15px}
+  .field textarea{min-height:56px;resize:vertical}
+  .field input:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .qrow{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+  .qrow b{color:var(--accent);font-size:13px}
+  .mine{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px}
+  .mine:last-child{border-bottom:0}
+  .mine span button{background:none;border:0;color:var(--muted);font-size:14px;padding:0 6px}
+
+  @media (max-width:520px){
+    .cat{font-size:9px;min-height:44px;padding:5px 2px}
+    .cellbtn{min-height:44px;font-size:15px}
+    .clue .q{font-size:19px}
+  }
+</style>
+</head>
+<body data-jq="classic">
+
+<header class="bar">
+  <a class="home" href="./">‹ Heem</a>
+  <h1>JEOPARDY</h1>
+  <span class="spacer"></span>
+  <nav class="langs" id="langs" aria-label="Sprooch">
+    <button type="button" data-l="lb" class="on">LB</button>
+    <button type="button" data-l="de">DE</button>
+    <button type="button" data-l="en">EN</button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <section class="screen on" id="s-setup">
+    <h2 id="tTheme"></h2>
+    <div class="themes" id="themes"></div>
+
+    <h2 style="margin-top:18px" id="tPick"></h2>
+    <p class="sub" id="tPickSub"></p>
+    <div id="catgroups"></div>
+
+    <h2 style="margin-top:20px" id="tTeams"></h2>
+    <div class="chips" id="chips"></div>
+    <div class="addrow">
+      <input id="tInput" type="text" maxlength="16" autocomplete="off">
+      <button class="btn" style="width:auto;padding:11px 17px;margin:0" id="tAdd">+</button>
+    </div>
+    <p class="hint" id="tWarn"></p>
+    <button class="btn" id="start"></button>
+    <div class="row" style="margin-top:9px">
+      <button class="btn ghost small" id="toEdit"></button>
+      <button class="btn ghost small" id="toWord"></button>
+    </div>
+  </section>
+
+  <section class="screen" id="s-board">
+    <div class="board" id="board"></div>
+    <div class="scores" id="scores"></div>
+    <button class="btn ghost small" id="quit" style="margin-top:15px"></button>
+  </section>
+
+  <section class="screen" id="s-clue"><div class="card clue" id="clue"></div></section>
+  <section class="screen" id="s-end"><div class="card final" id="final"></div></section>
+
+  <section class="screen" id="s-edit">
+    <h2 id="tEdit"></h2>
+    <p class="sub" id="tEditSub"></p>
+    <div class="card" id="mine"></div>
+    <div class="card" id="form"></div>
+    <div class="row">
+      <button class="btn ghost small" id="expJson"></button>
+      <button class="btn ghost small" id="impJson"></button>
+    </div>
+    <button class="btn ghost" id="backSetup" style="margin-top:9px"></button>
+    <input type="file" id="fileIn" accept="application/json" hidden>
+  </section>
+
+</main>
+
+<script src="jeopardy-categories.js?v=1"></script>
+<script src="jeopardy-docx.js?v=1"></script>
+<script src="jeopardy-edit.js?v=1"></script>
+<script src="jeopardy.js?v=1"></script>
+</body>
+</html>

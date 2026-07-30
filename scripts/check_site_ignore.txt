@@ -3,4 +3,4 @@
 
 call.html    # opened from Messenger with a room id built in JS, never linked statically
 kart.html    # shared by UUID link from KartTracker; deliberately not discoverable
-quizbrett.html  # Ian asked for it deliberately NOT linked from the homepage or the tiles
+jeopardy.html  # Ian asked for it deliberately NOT linked from the homepage or the tiles
