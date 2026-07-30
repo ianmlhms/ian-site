@@ -19,16 +19,16 @@ window.JQ_TOPICS = {
 };
 
 window.JQ_CATEGORIES = [
-{ id: "knots", topic: "scouten", name: { lb: "Knäppchen", de: "Knoten", en: "Knots" }, clues: [
-      { q: { lb: "Wéi ee Knäppche benotzt du fir zwee gläich décke Seeler ze verbannen?", de: "Welchen Knoten nutzt du, um zwei gleich dicke Seile zu verbinden?", en: "Which knot joins two ropes of equal thickness?" },
-        a: { lb: "De Kreuzknäppchen", de: "Der Kreuzknoten", en: "The reef knot" } },
-      { q: { lb: "Wéi ee Knäppche mécht eng Bucht déi sech net zesummenzitt?", de: "Welcher Knoten macht eine Schlinge, die sich nicht zuzieht?", en: "Which knot makes a loop that will not tighten?" },
+{ id: "knots", topic: "scouten", name: { lb: "Kniet", de: "Knoten", en: "Knots" }, clues: [
+      { q: { lb: "Wéi ee Knuet benotzt du fir zwee gläich décke Seeler ze verbannen?", de: "Welchen Knoten nutzt du, um zwei gleich dicke Seile zu verbinden?", en: "Which knot joins two ropes of equal thickness?" },
+        a: { lb: "De Kräizknuet", de: "Der Kreuzknoten", en: "The reef knot" } },
+      { q: { lb: "Wéi ee Knuet mécht eng Bucht déi sech net zesummenzitt?", de: "Welcher Knoten macht eine Schlinge, die sich nicht zuzieht?", en: "Which knot makes a loop that will not tighten?" },
         a: { lb: "De Palstek", de: "Der Palstek", en: "The bowline" } },
-      { q: { lb: "Wéi ee Knäppche benotzt de Kletterer als Sécherung um Enn vum Seel?", de: "Welchen Knoten nutzen Kletterer als Sicherung am Seilende?", en: "Which knot do climbers tie as a stopper at the rope's end?" },
-        a: { lb: "Den Aachterknäppchen", de: "Der Achterknoten", en: "The figure-eight knot" } },
+      { q: { lb: "Wéi ee Knuet benotzt de Kletterer als Sécherung um Enn vum Seel?", de: "Welchen Knoten nutzen Kletterer als Sicherung am Seilende?", en: "Which knot do climbers tie as a stopper at the rope's end?" },
+        a: { lb: "Den Aachterknuet", de: "Der Achterknoten", en: "The figure-eight knot" } },
       { q: { lb: "Wéi verbënnt een zwee Stécker Holz am rechten Wénkel beim Bauen?", de: "Wie verbindet man zwei Hölzer im rechten Winkel beim Bauen?", en: "How do you lash two poles together at a right angle?" },
-        a: { lb: "Mat enger Kreuzbindung", de: "Mit einem Kreuzbund", en: "With a square lashing" } },
-      { q: { lb: "Wéi ee Knäppche léisst sech nach ënner Spannung liicht opmaachen?", de: "Welcher Knoten lässt sich noch unter Spannung leicht öffnen?", en: "Which knot can still be released easily under load?" },
+        a: { lb: "Mat enger Kräizbindung", de: "Mit einem Kreuzbund", en: "With a square lashing" } },
+      { q: { lb: "Wéi ee Knuet léisst sech nach ënner Spannung liicht opmaachen?", de: "Welcher Knoten lässt sich noch unter Spannung leicht öffnen?", en: "Which knot can still be released easily under load?" },
         a: { lb: "De Zimmermannsstek", de: "Der Zimmermannsstek", en: "The timber hitch" } },
     ]},
 { id: "camp", topic: "scouten", name: { lb: "Camp", de: "Lager", en: "Camp" }, clues: [
@@ -74,7 +74,7 @@ window.JQ_CATEGORIES = [
         a: { lb: "Am 20. Joerhonnert (1907)", de: "Im 20. Jahrhundert (1907)", en: "The 20th century (1907)" } },
       { q: { lb: "Wéi ee Symbol ass d'weltwäit Zeeche vun de Scouten?", de: "Welches Symbol ist das weltweite Pfadfinderzeichen?", en: "What is the worldwide Scout emblem?" },
         a: { lb: "D'Lilie (Fleur-de-lis)", de: "Die Lilie (Fleur-de-lis)", en: "The fleur-de-lis" } },
-      { q: { lb: "Wat ass de Wahlspruch vun de Scouten?", de: "Was ist der Wahlspruch der Pfadfinder?", en: "What is the Scout motto?" },
+      { q: { lb: "Wat ass d'Devise vun de Scouten?", de: "Was ist der Wahlspruch der Pfadfinder?", en: "What is the Scout motto?" },
         a: { lb: "Sief prett", de: "Sei bereit", en: "Be prepared" } },
       { q: { lb: "Wéi heescht e groussen internationale Scoutslager?", de: "Wie heißt ein großes internationales Pfadfinderlager?", en: "What is a large international Scout camp called?" },
         a: { lb: "E Jamboree", de: "Ein Jamboree", en: "A Jamboree" } },
@@ -218,7 +218,7 @@ window.JQ_CATEGORIES = [
     a: { lb: "88", de: "88", en: "88" } },
   { q: { lb: "Wéi heescht en Film ouni Toun aus de fréie Joeren?", de: "Wie heißt ein Film ohne Ton aus der Frühzeit?", en: "What is an early film without sound called?" },
     a: { lb: "E Stommfilm", de: "Ein Stummfilm", en: "A silent film" } },
-  { q: { lb: "Wéi vill Musiker sinn an engem Quartett?", de: "Wie viele Musiker sind in einem Quartett?", en: "How many musicians are in a quartet?" },
+  { q: { lb: "Wéi vill Museker sinn an engem Quartett?", de: "Wie viele Musiker sind in einem Quartett?", en: "How many musicians are in a quartet?" },
     a: { lb: "Véier", de: "Vier", en: "Four" } },
   { q: { lb: "Wéi heescht de Präis fir déi bescht Filmer an Hollywood?", de: "Wie heißt der Filmpreis in Hollywood?", en: "What is Hollywood's main film award called?" },
     a: { lb: "Den Oscar", de: "Der Oscar", en: "The Oscar" } },
@@ -254,7 +254,7 @@ window.JQ_CATEGORIES = [
     a: { lb: "Judd mat Gaardebounen", de: "Judd mat Gaardebounen", en: "Judd mat Gaardebounen" } },
   { q: { lb: "Aus wat gëtt Schockela gemaach?", de: "Woraus wird Schokolade gemacht?", en: "What is chocolate made from?" },
     a: { lb: "Aus Kakao", de: "Aus Kakao", en: "Cocoa" } },
-  { q: { lb: "Wéi eng Zutat léisst den Teig opgoen?", de: "Welche Zutat lässt Teig aufgehen?", en: "Which ingredient makes dough rise?" },
+  { q: { lb: "Wéi eng Zutat léisst den Deeg opgoen?", de: "Welche Zutat lässt Teig aufgehen?", en: "Which ingredient makes dough rise?" },
     a: { lb: "Hief", de: "Hefe", en: "Yeast" } },
   { q: { lb: "Wéi eng Kichelcher gëtt et traditionell op der Fouer?", de: "Welche Küchlein gibt es traditionell auf der Fouer?", en: "Which fritters are traditional at the Fouer?" },
     a: { lb: "Gromperekichelcher", de: "Gromperekichelcher", en: "Gromperekichelcher" } },
