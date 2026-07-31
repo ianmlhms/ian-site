@@ -64,9 +64,10 @@
     <button class="btn alt" id="beReceiver">📥 Empfänken (filmt deen aneren Ecran)</button>
     <p class="note">Tipp: hal déi zwee Handyen roueg, ongeféier 15–25 cm auserneen, a stell den
       Ecran vum Sender esou hell wéi méiglech.</p>
-    <p class="note"><b>Wéi séier?</b> Vun 1 bis iwwer 20 KB pro Sekonn, jee no
+    <p class="note"><b>Wéi séier?</b> Bis ongeféier 50 KB pro Sekonn, jee no
       Astellung an Handy — also gutt fir en Text,
-      e Bild oder e PDF, net fir e Video. Maximal 2 MB.
+      e Bild oder e PDF. Keng Gréisstelimitt méi — mee grouss Fichieren daueren
+      laang, an d'Dauer gëtt dir ugewisen ier s du starts.
       D'Frames dierfe verluer goen: de Sender widderhëlt sech onendlech, an et geet
       duer, genuch Frames ze filmen — egal wéi eng.</p>
   </section>
@@ -80,12 +81,13 @@
     </div>
     <div class="card">
       <div class="stat"><span>Dicht</span><b id="sDensity">—</b></div>
-      <input type="range" id="density" min="0" max="3" value="1">
-      <div class="stat"><span>Frame-Tempo</span><b id="sFps">12 / Sek.</b></div>
-      <input type="range" id="fps" min="2" max="24" value="12">
+      <input type="range" id="density" min="0" max="4" value="2">
+      <div class="stat"><span>Frame-Tempo</span><b id="sFps">20 / Sek.</b></div>
+      <input type="range" id="fps" min="2" max="30" value="20">
       <div class="stat"><span>Duerchsaz</span><b id="sRate">—</b></div>
       <p class="note">Méi Dicht = méi Daten pro Frame, mee och méi schwéier ze
-        filmen. Fänk mat „Normal“ un a gëff méi héich, sou laang wéi et nach klappt.</p>
+        filmen. Wann näischt méi ukënnt, gëff eng Stuf erof. „Maximal“ ass QR v40 —
+        méi passt technesch net an ee Code.</p>
     </div>
     <div class="card" id="qrwrap"><span style="color:#666">QR</span></div>
     <div class="stat"><span>Frames geschéckt</span><b id="sSent">0</b></div>
@@ -109,9 +111,9 @@
 <canvas id="work" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="beam-fountain.js?v=1"></script>
-<script src="beam-wire.js?v=1"></script>
-<script src="beam-decode.js?v=1"></script>
-<script src="beam.js?v=2"></script>
+<script src="beam-fountain.js?v=2"></script>
+<script src="beam-wire.js?v=2"></script>
+<script src="beam-decode.js?v=2"></script>
+<script src="beam.js?v=3"></script>
 </body>
 </html>

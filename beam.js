@@ -21,22 +21,30 @@
      so it is the user's dial rather than a constant. QR versions here are
      measured, not estimated. */
   var LEVELS = [
-    { label: 'Sécher',  block: 180,  qr: 10 },
-    { label: 'Normal',  block: 600,  qr: 20 },
-    { label: 'Séier',   block: 1000, qr: 26 },
-    { label: 'Maximal', block: 1400, qr: 32 }
+    { label: 'Sécher',     block: 300,  qr: 13 },
+    { label: 'Normal',     block: 900,  qr: 25 },
+    { label: 'Séier',      block: 1400, qr: 32 },
+    { label: 'Ganz séier', block: 1800, qr: 36 },
+    { label: 'Maximal',    block: 2100, qr: 40 }
   ];
-  var DEFAULT_LEVEL = 1;
+  var DEFAULT_LEVEL = 2;
 
-  var META_EVERY = 7;              // frames between filename frames
-  var MAX_BYTES = 2 * 1024 * 1024;
+  var META_EVERY = 24;             // frames between filename frames
+  var MAX_BYTES = 512 * 1024 * 1024;   // only a sanity bound; time is the real limit
   var QR_ECC = 'L';                // least redundancy, most payload
-  var QUIET = 2;                   // QR quiet-zone modules
+  /* The QR spec's minimum quiet zone is 4 modules. Going below it works with
+     some decoders and not others, and the page background behind the code is
+     dark, so anything less is a real decode hazard. */
+  var QUIET = 4;
   var CAM_WIDTH = 900;             // downscale before decoding, for speed
 
   /* Measured: the codec needs ~1.2 packets per block, and only 6 of every 7
      frames carry data — the rest carry the filename. */
   var OVERHEAD = 1.2 * (META_EVERY / (META_EVERY - 1));
+
+  /* 16-bit seeds: past this many blocks the sender starts repeating packets
+     the decoder already has, and progress crawls. */
+  var MAX_USEFUL_BLOCKS = 40000;
 
   /* ---------- helpers ---------- */
 
@@ -59,29 +67,45 @@
 
   /* ---------- QR drawing ---------- */
 
+  /* Painting a v40 code as one fillRect per module is ~31k canvas calls per
+     frame, which throttles the sender before the camera is even the limit.
+     Instead: write the modules into an ImageData at one pixel per module on a
+     tiny offscreen canvas, then blit it up with smoothing off. One drawImage,
+     and the nearest-neighbour scale keeps module edges hard — soft edges are
+     what kill decode rates. */
+  var qrSrc = document.createElement('canvas');
+
   function drawQR(canvas, text) {
     var qr = qrcode(0, QR_ECC);          // 0 = smallest version that fits
     qr.addData(text);
     qr.make();
     var n = qr.getModuleCount();
     var total = n + QUIET * 2;
-    /* Integer scale keeps module edges crisp; blurred edges kill decode rates.
-       Denser codes need more physical pixels, so scale up to the display box. */
-    var box = Math.min(canvas.parentNode.clientWidth || 320, 720);
-    var scale = Math.max(2, Math.floor(box / total));
-    canvas.width = canvas.height = total * scale;
-    canvas.style.width = '100%';
-    var ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#000';
+
+    if (qrSrc.width !== total) { qrSrc.width = qrSrc.height = total; }
+    var sctx = qrSrc.getContext('2d');
+    var img = sctx.createImageData(total, total);
+    var px = img.data;
+    px.fill(255);                        // white page, including the quiet zone
     for (var r = 0; r < n; r++) {
+      var rowStart = ((r + QUIET) * total + QUIET) * 4;
       for (var c = 0; c < n; c++) {
-        if (qr.isDark(r, c)) {
-          ctx.fillRect((c + QUIET) * scale, (r + QUIET) * scale, scale, scale);
-        }
+        if (!qr.isDark(r, c)) continue;
+        var o = rowStart + c * 4;
+        px[o] = px[o + 1] = px[o + 2] = 0;
       }
     }
+    sctx.putImageData(img, 0, 0);
+
+    /* Integer scale so every module lands on a whole number of pixels. */
+    var box = Math.min(canvas.parentNode.clientWidth || 320, 760);
+    var scale = Math.max(2, Math.floor(box / total));
+    var size = total * scale;
+    if (canvas.width !== size) { canvas.width = canvas.height = size; }
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(qrSrc, 0, 0, total, total, 0, 0, size, size);
+    canvas.style.width = '100%';
   }
 
   /* ---------- sender ---------- */
@@ -135,6 +159,13 @@
     }
   }
 
+  function humanTime(secs) {
+    if (secs < 90) return '≈' + secs + ' s';
+    var m = Math.round(secs / 60);
+    if (m < 90) return '≈' + m + ' min';
+    return '≈' + (m / 60).toFixed(1) + ' Stonnen';
+  }
+
   function describeFile() {
     if (!picked) return;
     var lv = level();
@@ -143,7 +174,17 @@
     var secs = Math.max(1, Math.round(frames / fps()));
     $('sSize').textContent = humanSize(picked.bytes.length);
     $('sK').textContent = k + ' Blocken, ≈' + frames + ' Frames';
-    $('sTime').textContent = '≈' + secs + ' s am beschte Fall';
+
+    /* The best case assumes every displayed frame is read. In practice the
+       camera misses plenty, so say so rather than promising the floor. */
+    var t = $('sTime');
+    t.textContent = humanTime(secs) + ' am beschte Fall';
+    if (k > MAX_USEFUL_BLOCKS) {
+      t.textContent = 'Ze vill Blocken (' + k + ') — gëff méi Dicht';
+      t.className = 'warn';
+    } else {
+      t.className = '';
+    }
   }
 
   function describeRate() {
@@ -278,15 +319,22 @@
           if (!w || !h) return;
 
           busy = true;
-          var scale = Math.min(1, CAM_WIDTH / w);
-          canvas.width = Math.round(w * scale);
-          canvas.height = Math.round(h * scale);
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           recv.frames++;
           $('rFrames').textContent = String(recv.frames);
 
-          var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          backend.detect(canvas, img)
+          /* Only pay for the pixel copy when the decoder actually needs it. */
+          var pending;
+          if (backend.needsImageData) {
+            var scale = Math.min(1, CAM_WIDTH / w);
+            canvas.width = Math.round(w * scale);
+            canvas.height = Math.round(h * scale);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            pending = backend.detect(canvas, ctx.getImageData(0, 0, canvas.width, canvas.height));
+          } else {
+            pending = backend.detect(video, null);
+          }
+
+          pending
             .then(function (text) { if (text) handleFrame(text); })
             .catch(function () { /* a bad frame, not a fatal error */ })
             .then(function () { busy = false; });
@@ -325,7 +373,7 @@
     $('sTime').textContent = '—';
     if (!f) { $('sSize').textContent = '—'; $('sK').textContent = '—'; return; }
 
-    if (f.size > MAX_BYTES) {
+    if (f.size > MAX_BYTES) {                // sanity only; no practical cap
       $('sSize').textContent = humanSize(f.size) + ' — ze grouss';
       $('sK').textContent = 'max ' + humanSize(MAX_BYTES);
       return;

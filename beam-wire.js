@@ -15,8 +15,8 @@
   'use strict';
 
   var HEADER_BYTES = 8;
-  var MAX_DECLARED_SIZE = 8 * 1024 * 1024;   // sanity bound on a decoded header
-  var MAX_BLOCK_SIZE = 2048;
+  var MAX_DECLARED_SIZE = 512 * 1024 * 1024; // sanity bound on a decoded header
+  var MAX_BLOCK_SIZE = 4096;                 // QR v40 at ECC L holds ~2953 bytes
 
   var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   var B64INV = (function () {

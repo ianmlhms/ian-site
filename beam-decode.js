@@ -26,8 +26,12 @@
     catch (e) { return null; }
     return {
       name: 'BarcodeDetector',
-      detect: function (canvas) {
-        return det.detect(canvas).then(function (codes) {
+      /* Reads the <video> element straight off the compositor, so the caller
+         can skip drawImage + getImageData entirely — both are expensive per
+         frame and pure waste here. */
+      needsImageData: false,
+      detect: function (source) {
+        return det.detect(source).then(function (codes) {
           return codes && codes.length ? codes[0].rawValue : null;
         });
       }
@@ -57,7 +61,8 @@
       };
       var wrapper = {
         name: 'zxing-wasm',
-        detect: function (canvas, imageData) {
+        needsImageData: true,
+        detect: function (source, imageData) {
           return mod.readBarcodesFromImageData(imageData, opts).then(function (res) {
             if (!res || !res.length) return null;
             return res[0].text != null ? res[0].text : res[0].rawValue;
@@ -76,7 +81,8 @@
     if (!window.jsQR) return null;
     return {
       name: 'jsQR',
-      detect: function (canvas, imageData) {
+      needsImageData: true,
+      detect: function (source, imageData) {
         var code = window.jsQR(imageData.data, imageData.width, imageData.height,
                                { inversionAttempts: 'dontInvert' });
         return Promise.resolve(code ? code.data : null);
