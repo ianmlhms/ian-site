@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,follow">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beam — Fichier iwwer QR-Codes schécken | ian.lu</title>
+<meta name="description" content="Schéck e Fichier vun engem Handy op deen aneren ouni Wifi, Bluetooth oder Internet: een Ecran weist QR-Codes, deen aneren filmt se.">
+<link rel="canonical" href="https://ian.lu/beam.html">
+<meta name="theme-color" content="#0d0d1a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="theme.js?v=10"></script>
+<style>
+  :root{--bg:#0d0d1a;--panel:#161625;--line:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;
+        --accent:#4de8ff;--accent2:#ff6b9d;--good:#3fb950;--bad:#e5484d}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+  button{font:inherit;color:inherit;cursor:pointer}
+  .bar{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .bar .home{color:var(--muted);font-weight:700;text-decoration:none;font-size:14px}
+  .bar h1{font-size:15px;margin:0;font-weight:800;letter-spacing:.5px;color:var(--accent)}
+  .wrap{max-width:620px;margin:0 auto;padding:16px 14px 40px}
+  .screen{display:none}.screen.on{display:block}
+  h2{font-size:18px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:13.5px;line-height:1.6;margin:0 0 16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
+  .btn{display:block;width:100%;padding:15px;border-radius:12px;border:0;background:var(--accent);
+       color:#04222a;font-weight:800;font-size:16px;margin-top:10px}
+  .btn.alt{background:var(--accent2);color:#3a0018}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn:disabled{opacity:.45}
+  /* sender */
+  #qrwrap{background:#fff;border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center}
+  #qrwrap canvas,#qrwrap img{width:100%;height:auto;image-rendering:pixelated;display:block}
+  .stat{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:10px}
+  .stat b{color:var(--text);font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  /* receiver */
+  #cam{width:100%;border-radius:10px;background:#000;display:block}
+  .prog{height:12px;background:var(--line);border-radius:8px;overflow:hidden;margin-top:12px}
+  .prog i{display:block;height:100%;width:0;background:var(--good);transition:width .2s}
+  .note{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.55}
+  .warn{color:var(--bad)}
+  .ok{color:var(--good);font-weight:700}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a class="home" href="./">‹ Heem</a>
+  <h1>BEAM</h1>
+</header>
+
+<main class="wrap">
+
+  <section class="screen on" id="s-pick">
+    <h2>Fichier iwwer d'Liicht schécken</h2>
+    <p class="sub">Ee Handy weist eng Serie vu QR-Codes, deen aneren filmt se a setzt de Fichier
+      nees zesummen. Kee Wifi, kee Bluetooth, keen Internet — nëmmen d'Kamera.</p>
+    <button class="btn" id="beSender">📤 Schécken (weist QR-Codes)</button>
+    <button class="btn alt" id="beReceiver">📥 Empfänken (filmt deen aneren Ecran)</button>
+    <p class="note">Tipp: hal déi zwee Handyen roueg, ongeféier 15–25 cm auserneen, a stell den
+      Ecran vum Sender esou hell wéi méiglech.</p>
+    <p class="note"><b>Wéi séier?</b> Vun 1 bis iwwer 20 KB pro Sekonn, jee no
+      Astellung an Handy — also gutt fir en Text,
+      e Bild oder e PDF, net fir e Video. Maximal 2 MB.
+      D'Frames dierfe verluer goen: de Sender widderhëlt sech onendlech, an et geet
+      duer, genuch Frames ze filmen — egal wéi eng.</p>
+  </section>
+
+  <section class="screen" id="s-send">
+    <div class="card">
+      <input type="file" id="file" style="width:100%">
+      <div class="stat"><span>Gréisst</span><b id="sSize">—</b></div>
+      <div class="stat"><span>Blocken</span><b id="sK">—</b></div>
+      <div class="stat"><span>Dauer</span><b id="sTime">—</b></div>
+    </div>
+    <div class="card">
+      <div class="stat"><span>Dicht</span><b id="sDensity">—</b></div>
+      <input type="range" id="density" min="0" max="3" value="1">
+      <div class="stat"><span>Frame-Tempo</span><b id="sFps">12 / Sek.</b></div>
+      <input type="range" id="fps" min="2" max="24" value="12">
+      <div class="stat"><span>Duerchsaz</span><b id="sRate">—</b></div>
+      <p class="note">Méi Dicht = méi Daten pro Frame, mee och méi schwéier ze
+        filmen. Fänk mat „Normal“ un a gëff méi héich, sou laang wéi et nach klappt.</p>
+    </div>
+    <div class="card" id="qrwrap"><span style="color:#666">QR</span></div>
+    <div class="stat"><span>Frames geschéckt</span><b id="sSent">0</b></div>
+    <button class="btn" id="startSend" disabled>Start</button>
+    <button class="btn ghost" id="backSend">Zréck</button>
+  </section>
+
+  <section class="screen" id="s-recv">
+    <video id="cam" playsinline muted></video>
+    <div class="prog"><i id="bar"></i></div>
+    <div class="stat"><span>Frames gesammelt</span><b id="rBlocks">0 / ?</b></div>
+    <div class="stat"><span>Kamerabiller gelies</span><b id="rFrames">0</b></div>
+    <div class="stat"><span>Decoder</span><b id="rEngine">…</b></div>
+    <p class="note" id="rNote">Riicht d'Kamera op den anere Ecran.</p>
+    <button class="btn" id="saveFile" style="display:none">⬇ Fichier späicheren</button>
+    <button class="btn ghost" id="backRecv">Zréck</button>
+  </section>
+
+</main>
+
+<canvas id="work" hidden></canvas>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="beam-fountain.js?v=1"></script>
+<script src="beam-wire.js?v=1"></script>
+<script src="beam-decode.js?v=1"></script>
+<script src="beam.js?v=2"></script>
+</body>
+</html>
