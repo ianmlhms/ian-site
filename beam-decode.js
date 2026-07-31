@@ -1,49 +1,113 @@
 /* Beam — QR decoding back-end selection.
  *
- * Decode speed is the whole bottleneck of this app: the sender can paint
- * frames far faster than a phone can read them, so throughput is simply
- * "how many frames per second can we decode". Three back-ends, best first:
+ * Everything here returns raw frame BYTES, not a string: the wire format is
+ * binary now, which is worth a third of every frame. That rules out
+ * BarcodeDetector, whose only output is a DOMString — it was the fastest
+ * option on Android but cannot carry binary, and it never existed on iOS
+ * anyway. So, best first:
  *
- *   1. BarcodeDetector  — native, hardware-accelerated. Android Chrome.
- *   2. zxing-cpp (WASM) — fast C++ decoder. Works everywhere, notably iOS
- *                         Safari, which has never shipped BarcodeDetector.
- *   3. jsQR             — pure JS, slowest. Last-resort fallback so the page
- *                         still works if the CDN or WASM is blocked.
+ *   1. worker pool  — zxing-cpp (WASM) in N workers, decoding in parallel
+ *   2. inline zxing — same decoder on the main thread, if workers are blocked
+ *   3. jsQR         — pure JS, slowest, but its binaryData does carry bytes
  *
- * Every back-end is wrapped to the same shape: detect(canvas, imageData)
- * resolving to a string or null. Failures degrade to the next back-end rather
- * than breaking the page.
+ * Every back-end exposes the same shape:
+ *   { name, capacity, free(), submit(imageLike) -> Promise<Uint8Array|null> }
  */
 (function () {
   'use strict';
 
   var ZXING_BASE = 'https://cdn.jsdelivr.net/npm/zxing-wasm@1.3.4/dist/';
+  var WORKER_URL = 'beam-worker.js?v=1';
+  var BOOT_TIMEOUT_MS = 8000;
+  var MAX_WORKERS = 4;
 
-  function fromBarcodeDetector() {
-    if (!window.BarcodeDetector) return null;
-    var det;
-    try { det = new window.BarcodeDetector({ formats: ['qr_code'] }); }
-    catch (e) { return null; }
-    return {
-      name: 'BarcodeDetector',
-      /* Reads the <video> element straight off the compositor, so the caller
-         can skip drawImage + getImageData entirely — both are expensive per
-         frame and pure waste here. */
-      needsImageData: false,
-      detect: function (source) {
-        return det.detect(source).then(function (codes) {
-          return codes && codes.length ? codes[0].rawValue : null;
-        });
-      }
-    };
+  function workerCount() {
+    var cores = navigator.hardwareConcurrency || 2;
+    /* Leave a core for capture and rendering; more workers than that just adds
+       WASM instances (a few MB each) without decoding more frames. */
+    return Math.max(1, Math.min(MAX_WORKERS, cores - 1));
   }
 
-  /* Dynamic import of an ES module from inside a classic script. The WASM
-     binary lives next to the module on the CDN, so point locateFile at it. */
-  function fromZxing() {
+  /* ---- 1. worker pool ---- */
+
+  function tryPool() {
+    if (typeof Worker === 'undefined') return Promise.resolve(null);
+
+    var slots = [];
+    try {
+      for (var i = 0; i < workerCount(); i++) {
+        slots.push({ w: new Worker(WORKER_URL, { type: 'module' }), busy: false, resolve: null });
+      }
+    } catch (e) {
+      slots.forEach(function (s) { try { s.w.terminate(); } catch (e2) {} });
+      return Promise.resolve(null);
+    }
+
+    var booted = slots.map(function (slot) {
+      return new Promise(function (done) {
+        var settled = false;
+        var timer = setTimeout(function () {
+          if (!settled) { settled = true; done(false); }
+        }, BOOT_TIMEOUT_MS);
+
+        slot.w.onmessage = function (e) {
+          var msg = e.data || {};
+          if (msg.ready !== undefined) {
+            if (!settled) { settled = true; clearTimeout(timer); done(!!msg.ready); }
+            return;
+          }
+          var r = slot.resolve;
+          slot.resolve = null; slot.busy = false;
+          if (r) r(msg.bytes ? new Uint8Array(msg.bytes) : null);
+        };
+        slot.w.onerror = function () {
+          if (!settled) { settled = true; clearTimeout(timer); done(false); }
+          var r = slot.resolve;
+          slot.resolve = null; slot.busy = false;
+          if (r) r(null);
+        };
+      });
+    });
+
+    return Promise.all(booted).then(function (oks) {
+      var live = slots.filter(function (_, i) { return oks[i]; });
+      slots.filter(function (_, i) { return !oks[i]; })
+           .forEach(function (s) { try { s.w.terminate(); } catch (e) {} });
+      if (!live.length) return null;
+
+      var seq = 0;
+      return {
+        name: 'zxing ×' + live.length,
+        capacity: live.length,
+        free: function () {
+          var n = 0;
+          for (var i = 0; i < live.length; i++) if (!live[i].busy) n++;
+          return n;
+        },
+        submit: function (img) {
+          var slot = null;
+          for (var i = 0; i < live.length; i++) { if (!live[i].busy) { slot = live[i]; break; } }
+          if (!slot) return Promise.resolve(null);
+          slot.busy = true;
+          return new Promise(function (resolve) {
+            slot.resolve = resolve;
+            try {
+              var buf = img.data.buffer;
+              slot.w.postMessage({ id: ++seq, buf: buf, width: img.width, height: img.height }, [buf]);
+            } catch (e) {
+              slot.busy = false; slot.resolve = null; resolve(null);
+            }
+          });
+        }
+      };
+    }).catch(function () { return null; });
+  }
+
+  /* ---- 2. inline zxing ---- */
+
+  function tryInline() {
     if (typeof WebAssembly === 'undefined') return Promise.resolve(null);
-    var url = ZXING_BASE + 'es/reader/index.js';
-    return import(/* webpackIgnore: true */ url).then(function (mod) {
+    return import(/* webpackIgnore: true */ ZXING_BASE + 'es/reader/index.js').then(function (mod) {
       if (!mod || !mod.readBarcodesFromImageData) return null;
       if (mod.setZXingModuleOverrides) {
         mod.setZXingModuleOverrides({
@@ -52,50 +116,54 @@
           }
         });
       }
-      var opts = {
-        formats: ['QRCode'],
-        maxNumberOfSymbols: 1,
-        tryHarder: false,      // at 24 fps we want speed; a miss costs nothing
-        tryRotate: false,
-        tryInvert: false
-      };
-      var wrapper = {
-        name: 'zxing-wasm',
-        needsImageData: true,
-        detect: function (source, imageData) {
-          return mod.readBarcodesFromImageData(imageData, opts).then(function (res) {
-            if (!res || !res.length) return null;
-            return res[0].text != null ? res[0].text : res[0].rawValue;
-          });
+      var opts = { formats: ['QRCode'], maxNumberOfSymbols: 1,
+                   tryHarder: false, tryRotate: false, tryInvert: false };
+      var inFlight = 0;
+      var api = {
+        name: 'zxing',
+        capacity: 1,
+        free: function () { return inFlight ? 0 : 1; },
+        submit: function (img) {
+          inFlight++;
+          return mod.readBarcodesFromImageData(img, opts).then(function (res) {
+            var hit = res && res.filter(function (r) { return r.bytes && r.bytes.length; })[0];
+            return hit ? new Uint8Array(hit.bytes) : null;
+          }).catch(function () { return null; })
+            .then(function (v) { inFlight--; return v; });
         }
       };
-      /* Force the module to compile now and prove it actually decodes,
-         rather than discovering it is broken mid-transfer. */
-      var probe = new ImageData(new Uint8ClampedArray(4 * 4 * 4).fill(255), 4, 4);
-      return wrapper.detect(null, probe).then(function () { return wrapper; })
+      /* Compile now and prove it runs, rather than failing on the first frame. */
+      return mod.readBarcodesFromImageData(new ImageData(8, 8), opts)
+        .then(function () { return api; })
         .catch(function () { return null; });
     }).catch(function () { return null; });
   }
 
-  function fromJsQR() {
+  /* ---- 3. jsQR ---- */
+
+  function tryJsQR() {
     if (!window.jsQR) return null;
     return {
       name: 'jsQR',
-      needsImageData: true,
-      detect: function (source, imageData) {
-        var code = window.jsQR(imageData.data, imageData.width, imageData.height,
+      capacity: 1,
+      free: function () { return 1; },
+      submit: function (img) {
+        var code = window.jsQR(img.data, img.width, img.height,
                                { inversionAttempts: 'dontInvert' });
-        return Promise.resolve(code ? code.data : null);
+        /* binaryData is what keeps jsQR usable now the wire format is binary;
+           its .data string would mangle every byte above 0x7F. */
+        if (code && code.binaryData && code.binaryData.length) {
+          return Promise.resolve(new Uint8Array(code.binaryData));
+        }
+        return Promise.resolve(null);
       }
     };
   }
 
-  /* Resolves to the fastest working back-end, or null if none work. */
   function create() {
-    var native = fromBarcodeDetector();
-    if (native) return Promise.resolve(native);
-    return fromZxing().then(function (zx) {
-      return zx || fromJsQR();
+    return tryPool().then(function (pool) {
+      if (pool) return pool;
+      return tryInline().then(function (inline) { return inline || tryJsQR(); });
     });
   }
 

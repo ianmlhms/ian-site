@@ -1,62 +1,35 @@
-/* Beam — wire format.
+/* Beam — wire format (binary).
  *
- * Everything that turns bytes into the text inside a QR code and back again.
- * Kept DOM-free so it can be unit-tested in Node: a bug here corrupts files
+ * Frames are raw bytes in QR byte mode. An earlier version base64'd them,
+ * which cost 33% of every frame for nothing but decoder compatibility:
+ * BarcodeDetector only hands back a string, so binary was unreadable there.
+ * Dropping BarcodeDetector in favour of zxing-cpp (faster anyway, and the only
+ * option on iOS regardless) buys that third of the payload back — measured:
+ * 2953 usable bytes in a v40 code instead of 2100.
+ *
+ * Layout, data frame:
+ *   [0]     0xB3        magic
+ *   [1]     0x44 'D'    kind
+ *   [2..5]  size        total file bytes, big-endian
+ *   [6..7]  blockSize
+ *   [8..9]  seed
+ *   [10..]  payload     exactly blockSize bytes
+ *
+ * Meta frame: magic, 0x4D 'M', then UTF-8 JSON {n,t,s}.
+ *
+ * DOM-free so it can be unit-tested in Node: a bug here corrupts files
  * silently, which is far worse than a bug that simply fails to decode.
- *
- * Frame text is base64 with a one-char kind prefix:
- *   "D" + base64( size(4) | blockSize(2) | seed(2) | payload )
- *   "M" + base64( utf8 JSON {n:name, t:mime, s:size} )
- *
- * base64 (not raw binary) because QR byte mode round-trips through the
- * decoders as a UTF-8 *string*; non-ASCII bytes would be mangled.
  */
 (function () {
   'use strict';
 
-  var HEADER_BYTES = 8;
+  var MAGIC = 0xB3;
+  var KIND_DATA = 0x44;                      // 'D'
+  var KIND_META = 0x4D;                      // 'M'
+  var HEADER_BYTES = 10;
+  var META_HEADER_BYTES = 2;
   var MAX_DECLARED_SIZE = 512 * 1024 * 1024; // sanity bound on a decoded header
-  var MAX_BLOCK_SIZE = 4096;                 // QR v40 at ECC L holds ~2953 bytes
-
-  var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  var B64INV = (function () {
-    var t = {};
-    for (var i = 0; i < B64.length; i++) t[B64.charAt(i)] = i;
-    return t;
-  })();
-
-  function toBase64(bytes) {
-    var out = '', i;
-    for (i = 0; i + 2 < bytes.length; i += 3) {
-      var n = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-      out += B64.charAt((n >> 18) & 63) + B64.charAt((n >> 12) & 63) +
-             B64.charAt((n >> 6) & 63) + B64.charAt(n & 63);
-    }
-    var rest = bytes.length - i;
-    if (rest === 1) {
-      out += B64.charAt(bytes[i] >> 2) + B64.charAt((bytes[i] << 4) & 63) + '==';
-    } else if (rest === 2) {
-      var m = (bytes[i] << 8) | bytes[i + 1];
-      out += B64.charAt(m >> 10) + B64.charAt((m >> 4) & 63) + B64.charAt((m << 2) & 63) + '=';
-    }
-    return out;
-  }
-
-  /* Returns null on anything malformed. A camera pointed at the world will
-     hand us junk strings constantly; none of them may throw. */
-  function fromBase64(str) {
-    if (typeof str !== 'string') return null;
-    var clean = str.replace(/=+$/, '');
-    var out = new Uint8Array(Math.floor(clean.length * 3 / 4));
-    var acc = 0, bits = 0, p = 0;
-    for (var i = 0; i < clean.length; i++) {
-      var v = B64INV[clean.charAt(i)];
-      if (v === undefined) return null;
-      acc = (acc << 6) | v; bits += 6;
-      if (bits >= 8) { bits -= 8; out[p++] = (acc >>> bits) & 255; }
-    }
-    return out.subarray(0, p);
-  }
+  var MAX_BLOCK_SIZE = 4096;                 // QR v40 at ECC L holds 2953 bytes
 
   function utf8Bytes(str) {
     var esc = encodeURIComponent(str), out = [];
@@ -73,57 +46,59 @@
     try { return decodeURIComponent(s); } catch (e) { return null; }
   }
 
-  /* ---- frames ---- */
+  /* ---- building ---- */
 
   function dataFrame(size, blockSize, seed, payload) {
-    var body = new Uint8Array(HEADER_BYTES + payload.length);
-    body[0] = (size >>> 24) & 255; body[1] = (size >>> 16) & 255;
-    body[2] = (size >>> 8) & 255;  body[3] = size & 255;
-    body[4] = (blockSize >>> 8) & 255; body[5] = blockSize & 255;
-    body[6] = (seed >>> 8) & 255;      body[7] = seed & 255;
-    body.set(payload, HEADER_BYTES);
-    return 'D' + toBase64(body);
+    var out = new Uint8Array(HEADER_BYTES + payload.length);
+    out[0] = MAGIC; out[1] = KIND_DATA;
+    out[2] = (size >>> 24) & 255; out[3] = (size >>> 16) & 255;
+    out[4] = (size >>> 8) & 255;  out[5] = size & 255;
+    out[6] = (blockSize >>> 8) & 255; out[7] = blockSize & 255;
+    out[8] = (seed >>> 8) & 255;      out[9] = seed & 255;
+    out.set(payload, HEADER_BYTES);
+    return out;
   }
 
-  /* padTo: pad the encoded JSON to this many bytes so the meta frame produces
-     exactly the same QR version as a data frame. Without it the code visibly
-     resizes every time a filename frame comes round, and the receiving camera
-     has to refocus mid-stream. Trailing whitespace is legal JSON, so the
-     padding needs no special handling on the way back. */
+  /* padTo: pad the JSON so the meta frame is the same length as a data frame,
+     which pins every frame in the stream to one QR version. A code that
+     changes size makes the receiving camera refocus, costing far more frames
+     than the padding does. Trailing whitespace is legal JSON, so the padding
+     needs no handling on the way back. */
   function metaFrame(name, mime, size, padTo) {
-    var json = JSON.stringify({ n: name, t: mime, s: size });
-    var bytes = utf8Bytes(json);
-    if (padTo && bytes.length > padTo) {
-      /* Too long to pad: shorten the name until it fits rather than blowing
-         the frame size back up. */
-      var room = padTo - utf8Bytes(JSON.stringify({ n: '', t: mime, s: size })).length;
+    var body = utf8Bytes(JSON.stringify({ n: name, t: mime, s: size }));
+    var room = padTo ? padTo - META_HEADER_BYTES : 0;
+
+    if (room && body.length > room) {
+      /* Too long to pad: shorten the name rather than let the frame grow back
+         to a different QR version. */
+      var fixed = utf8Bytes(JSON.stringify({ n: '', t: mime, s: size })).length;
       var cut = name;
-      while (cut.length > 1 && utf8Bytes(cut).length > Math.max(0, room)) {
+      while (cut.length > 1 && utf8Bytes(cut).length > Math.max(0, room - fixed)) {
         cut = cut.slice(0, -1);
       }
-      json = JSON.stringify({ n: cut, t: mime, s: size });
-      bytes = utf8Bytes(json);
+      body = utf8Bytes(JSON.stringify({ n: cut, t: mime, s: size }));
     }
-    if (padTo && bytes.length < padTo) {
-      var pad = new Uint8Array(padTo);
-      pad.fill(32);                    // spaces
-      pad.set(bytes, 0);
-      bytes = pad;
-    }
-    return 'M' + toBase64(bytes);
+
+    var len = room > body.length ? room : body.length;
+    var out = new Uint8Array(META_HEADER_BYTES + len);
+    out[0] = MAGIC; out[1] = KIND_META;
+    out.fill(32, META_HEADER_BYTES);         // spaces
+    out.set(body, META_HEADER_BYTES);
+    return out;
   }
 
-  /* Parse any frame text. Returns {kind:'data',...}, {kind:'meta',...} or null. */
-  function parseFrame(text) {
-    if (typeof text !== 'string' || text.length < 2) return null;
-    var kind = text.charAt(0);
-    if (kind !== 'D' && kind !== 'M') return null;
+  /* ---- parsing ---- */
 
-    var bytes = fromBase64(text.substring(1));
-    if (!bytes) return null;
+  /* Returns {kind:'data'|'meta', ...} or null. A camera pointed at the world
+     produces junk constantly; none of it may throw, and none of it may be
+     mistaken for a frame. */
+  function parseFrame(bytes) {
+    if (!bytes || typeof bytes.length !== 'number') return null;
+    if (bytes.length < META_HEADER_BYTES + 1) return null;
+    if (bytes[0] !== MAGIC) return null;
 
-    if (kind === 'M') {
-      var json = utf8String(bytes);
+    if (bytes[1] === KIND_META) {
+      var json = utf8String(bytes.subarray(META_HEADER_BYTES));
       if (!json) return null;
       var m;
       try { m = JSON.parse(json); } catch (e) { return null; }
@@ -131,10 +106,12 @@
       return { kind: 'meta', name: m.n, mime: typeof m.t === 'string' ? m.t : '', size: m.s };
     }
 
+    if (bytes[1] !== KIND_DATA) return null;
     if (bytes.length <= HEADER_BYTES) return null;
-    var size = (bytes[0] * 16777216) + (bytes[1] << 16) + (bytes[2] << 8) + bytes[3];
-    var blockSize = (bytes[4] << 8) + bytes[5];
-    var seed = (bytes[6] << 8) + bytes[7];
+
+    var size = (bytes[2] * 16777216) + (bytes[3] << 16) + (bytes[4] << 8) + bytes[5];
+    var blockSize = (bytes[6] << 8) + bytes[7];
+    var seed = (bytes[8] << 8) + bytes[9];
     if (size <= 0 || size > MAX_DECLARED_SIZE) return null;
     if (blockSize <= 0 || blockSize > MAX_BLOCK_SIZE) return null;
     /* The payload must be exactly one block: a truncated or padded read is a
@@ -145,11 +122,23 @@
              payload: bytes.subarray(HEADER_BYTES) };
   }
 
+  /* qrcode-generator takes a string; in byte mode each char maps to one byte,
+     so latin1 round-trips binary exactly. Chunked because apply() blows the
+     argument limit on a full-size v40 frame. */
+  function toLatin1(bytes) {
+    var s = '', CHUNK = 8192;
+    for (var i = 0; i < bytes.length; i += CHUNK) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return s;
+  }
+
   var api = {
-    HEADER_BYTES: HEADER_BYTES,
-    toBase64: toBase64, fromBase64: fromBase64,
+    MAGIC: MAGIC, HEADER_BYTES: HEADER_BYTES, META_HEADER_BYTES: META_HEADER_BYTES,
+    MAX_BLOCK_SIZE: MAX_BLOCK_SIZE,
     utf8Bytes: utf8Bytes, utf8String: utf8String,
-    dataFrame: dataFrame, metaFrame: metaFrame, parseFrame: parseFrame
+    dataFrame: dataFrame, metaFrame: metaFrame, parseFrame: parseFrame,
+    toLatin1: toLatin1
   };
   if (typeof window !== 'undefined') window.BEAM_WIRE = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

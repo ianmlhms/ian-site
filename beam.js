@@ -21,13 +21,22 @@
      so it is the user's dial rather than a constant. QR versions here are
      measured, not estimated. */
   var LEVELS = [
-    { label: 'Sécher',     block: 300,  qr: 13 },
-    { label: 'Normal',     block: 900,  qr: 25 },
-    { label: 'Séier',      block: 1400, qr: 32 },
-    { label: 'Ganz séier', block: 1800, qr: 36 },
-    { label: 'Maximal',    block: 2100, qr: 40 }
+    { label: 'Sécher',     block: 400,  qr: 13 },
+    { label: 'Normal',     block: 1200, qr: 25 },
+    { label: 'Séier',      block: 1800, qr: 31 },
+    { label: 'Ganz séier', block: 2400, qr: 36 },
+    { label: 'Maximal',    block: 2943, qr: 40 }
   ];
   var DEFAULT_LEVEL = 2;
+
+  /* qrcode-generator hands its input through stringToBytes; the default
+     mangles anything above 0x7F. In byte mode one char is one byte, so latin1
+     round-trips our binary frames exactly. Set once, globally. */
+  qrcode.stringToBytes = function (str) {
+    var out = [];
+    for (var i = 0; i < str.length; i++) out.push(str.charCodeAt(i) & 255);
+    return out;
+  };
 
   var META_EVERY = 24;             // frames between filename frames
   var MAX_BYTES = 512 * 1024 * 1024;   // only a sanity bound; time is the real limit
@@ -36,7 +45,10 @@
      some decoders and not others, and the page background behind the code is
      dark, so anything less is a real decode hazard. */
   var QUIET = 4;
-  var CAM_WIDTH = 900;             // downscale before decoding, for speed
+  /* A v40 code is 177 modules; at ~3 px per module the code alone needs
+     ~530 px, and it rarely fills more than half the frame. Downscaling
+     further is the difference between decoding and not. */
+  var CAM_WIDTH = 1080;
 
   /* Measured: the codec needs ~1.2 packets per block, and only 6 of every 7
      frames carry data — the rest carry the filename. */
@@ -75,9 +87,9 @@
      what kill decode rates. */
   var qrSrc = document.createElement('canvas');
 
-  function drawQR(canvas, text) {
+  function drawQR(canvas, frameBytes) {
     var qr = qrcode(0, QR_ECC);          // 0 = smallest version that fits
-    qr.addData(text);
+    qr.addData(W.toLatin1(frameBytes), 'Byte');
     qr.make();
     var n = qr.getModuleCount();
     var total = n + QUIET * 2;
@@ -128,8 +140,8 @@
     /* Pad the filename frame to the data-frame size so every frame in the
        stream renders at the same QR version — a code that changes size makes
        the camera refocus and costs far more than the padding does. */
-    var metaText = W.metaFrame(file.name, file.mime, file.bytes.length,
-                               lv.block + W.HEADER_BYTES);
+    var metaFrame = W.metaFrame(file.name, file.mime, file.bytes.length,
+                                lv.block + W.HEADER_BYTES);
 
     var canvas = document.createElement('canvas');
     $('qrwrap').innerHTML = '';
@@ -138,15 +150,15 @@
     var seed = 1, sent = 0;
 
     function tick() {
-      var text;
+      var frame;
       if (sent % META_EVERY === 0) {
-        text = metaText;                       // repeated, so a receiver that
+        frame = metaFrame;                     // repeated, so a receiver that
       } else {                                 // joins late still gets the name
         var s = seed++ & 0xffff;
         if (s === 0) s = 1;
-        text = W.dataFrame(file.bytes.length, lv.block, s, enc.packet(s));
+        frame = W.dataFrame(file.bytes.length, lv.block, s, enc.packet(s));
       }
-      drawQR(canvas, text);
+      drawQR(canvas, frame);
       sent++;
       $('sSent').textContent = String(sent);
     }
@@ -201,11 +213,16 @@
 
   /* ---------- receiver ---------- */
 
-  var recv = { stream: null, raf: null, decoder: null, meta: null,
-               frames: 0, collected: 0, needed: 0, done: false };
+  var recv = { stream: null, raf: null, rvfc: null, backend: null, decoder: null,
+               meta: null, frames: 0, collected: 0, needed: 0, done: false };
 
   function stopReceiving() {
     if (recv.raf) { cancelAnimationFrame(recv.raf); recv.raf = null; }
+    if (recv.rvfc) {
+      var v = $('cam');
+      if (v && v.cancelVideoFrameCallback) { try { v.cancelVideoFrameCallback(recv.rvfc); } catch (e) {} }
+      recv.rvfc = null;
+    }
     if (recv.stream) {
       recv.stream.getTracks().forEach(function (t) { t.stop(); });
       recv.stream = null;
@@ -227,9 +244,9 @@
     setNote("Riicht d'Kamera op den anere Ecran.");
   }
 
-  function handleFrame(text) {
-    if (recv.done || !text) return;
-    var f = W.parseFrame(text);
+  function handleFrame(bytes) {
+    if (recv.done || !bytes) return;
+    var f = W.parseFrame(bytes);
     if (!f) return;                            // junk from the camera
 
     if (f.kind === 'meta') { recv.meta = f; return; }
@@ -294,7 +311,8 @@
         video: {
           facingMode: 'environment',
           width: { ideal: 1920 },     // detail matters more than frame rate
-          height: { ideal: 1080 }
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
         },
         audio: false
       })
@@ -312,38 +330,47 @@
           stopReceiving();
           return;
         }
+        recv.backend = backend;
         $('rEngine').textContent = backend.name;
-        var busy = false;
 
-        function loop() {
-          recv.raf = requestAnimationFrame(loop);
-          if (busy || recv.done || video.readyState < 2) return;
-
+        function grabAndSubmit() {
           var w = video.videoWidth, h = video.videoHeight;
           if (!w || !h) return;
-
-          busy = true;
+          var scale = Math.min(1, CAM_WIDTH / w);
+          var cw = Math.round(w * scale), chh = Math.round(h * scale);
+          if (canvas.width !== cw || canvas.height !== chh) {
+            canvas.width = cw; canvas.height = chh;
+          }
+          ctx.drawImage(video, 0, 0, cw, chh);
           recv.frames++;
           $('rFrames').textContent = String(recv.frames);
-
-          /* Only pay for the pixel copy when the decoder actually needs it. */
-          var pending;
-          if (backend.needsImageData) {
-            var scale = Math.min(1, CAM_WIDTH / w);
-            canvas.width = Math.round(w * scale);
-            canvas.height = Math.round(h * scale);
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            pending = backend.detect(canvas, ctx.getImageData(0, 0, canvas.width, canvas.height));
-          } else {
-            pending = backend.detect(video, null);
-          }
-
-          pending
-            .then(function (text) { if (text) handleFrame(text); })
-            .catch(function () { /* a bad frame, not a fatal error */ })
-            .then(function () { busy = false; });
+          backend.submit(ctx.getImageData(0, 0, cw, chh))
+            .then(function (bytes) { if (bytes) handleFrame(bytes); })
+            .catch(function () { /* a bad frame, not a fatal error */ });
         }
-        loop();
+
+        function onFrame() {
+          if (recv.done) return;
+          /* Frames are disposable — the fountain does not care which ones are
+             dropped — so when every decoder is busy, skip rather than queue.
+             Queueing would only decode stale frames later. */
+          if (video.readyState >= 2 && backend.free() > 0) grabAndSubmit();
+          schedule();
+        }
+
+        function schedule() {
+          if (recv.done) return;
+          /* requestVideoFrameCallback fires once per NEW camera frame. With
+             requestAnimationFrame at 60 Hz and a 30 fps camera, half of every
+             decode was the same image twice — pure waste at the exact place
+             that limits throughput. */
+          if (video.requestVideoFrameCallback) {
+            recv.rvfc = video.requestVideoFrameCallback(onFrame);
+          } else {
+            recv.raf = requestAnimationFrame(onFrame);
+          }
+        }
+        schedule();
       })
       .catch(function (err) {
         var why = err && err.name ? err.name : 'Feeler';
