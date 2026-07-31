@@ -85,8 +85,32 @@
     return 'D' + toBase64(body);
   }
 
-  function metaFrame(name, mime, size) {
-    return 'M' + toBase64(utf8Bytes(JSON.stringify({ n: name, t: mime, s: size })));
+  /* padTo: pad the encoded JSON to this many bytes so the meta frame produces
+     exactly the same QR version as a data frame. Without it the code visibly
+     resizes every time a filename frame comes round, and the receiving camera
+     has to refocus mid-stream. Trailing whitespace is legal JSON, so the
+     padding needs no special handling on the way back. */
+  function metaFrame(name, mime, size, padTo) {
+    var json = JSON.stringify({ n: name, t: mime, s: size });
+    var bytes = utf8Bytes(json);
+    if (padTo && bytes.length > padTo) {
+      /* Too long to pad: shorten the name until it fits rather than blowing
+         the frame size back up. */
+      var room = padTo - utf8Bytes(JSON.stringify({ n: '', t: mime, s: size })).length;
+      var cut = name;
+      while (cut.length > 1 && utf8Bytes(cut).length > Math.max(0, room)) {
+        cut = cut.slice(0, -1);
+      }
+      json = JSON.stringify({ n: cut, t: mime, s: size });
+      bytes = utf8Bytes(json);
+    }
+    if (padTo && bytes.length < padTo) {
+      var pad = new Uint8Array(padTo);
+      pad.fill(32);                    // spaces
+      pad.set(bytes, 0);
+      bytes = pad;
+    }
+    return 'M' + toBase64(bytes);
   }
 
   /* Parse any frame text. Returns {kind:'data',...}, {kind:'meta',...} or null. */

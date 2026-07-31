@@ -125,7 +125,11 @@
   function startSending(file) {
     var lv = level();
     var enc = new F.Encoder(file.bytes, lv.block);
-    var metaText = W.metaFrame(file.name, file.mime, file.bytes.length);
+    /* Pad the filename frame to the data-frame size so every frame in the
+       stream renders at the same QR version — a code that changes size makes
+       the camera refocus and costs far more than the padding does. */
+    var metaText = W.metaFrame(file.name, file.mime, file.bytes.length,
+                               lv.block + W.HEADER_BYTES);
 
     var canvas = document.createElement('canvas');
     $('qrwrap').innerHTML = '';
