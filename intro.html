@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Intro — Rot d'Lidd | ian.lu</title>
+<meta name="description" content="Eng Sekonn vun engem Lidd, dann dräi, dann fënnef — wie et fréi erkennt, kritt méi Punkten. Op e puer Handyen gläichzäiteg spillbar.">
+<link rel="canonical" href="https://ian.lu/intro.html">
+<meta name="theme-color" content="#120c1e">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script src="theme.js?v=10"></script>
+<style>
+  :root{--bg:#120c1e;--panel:#1c1430;--panel2:#241a3d;--line:#352a55;--text:#f0ecfa;
+        --muted:#9b8fc0;--accent:#c06bff;--accent2:#ff6bb5;--good:#3fb950;--bad:#e5484d}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%}
+  button{font:inherit;color:inherit;cursor:pointer}
+  .bar{display:flex;align-items:center;gap:10px;padding:11px 14px;
+       border-bottom:1px solid var(--line);background:var(--panel)}
+  .bar a{color:var(--muted);font-weight:700;text-decoration:none;font-size:14px}
+  .bar h1{font-size:15px;margin:0;font-weight:800;letter-spacing:1px;color:var(--accent)}
+  .bar .code{margin-left:auto;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .wrap{max-width:620px;margin:0 auto;padding:16px 14px 48px}
+  .screen{display:none}.screen.on{display:block}
+  h2{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13.5px;line-height:1.6;margin:0 0 14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+        padding:15px;margin-bottom:12px}
+  .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
+       font-weight:700;margin-bottom:8px}
+  .btn{display:block;width:100%;padding:15px;border-radius:12px;border:0;
+       background:var(--accent);color:#180029;font-weight:800;font-size:16px;margin-top:10px}
+  .btn.alt{background:var(--accent2);color:#3a0020}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .btn:disabled{opacity:.45}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+  .pick{padding:12px 10px;border-radius:11px;border:1px solid var(--line);
+        background:var(--panel2);text-align:center;font-weight:700;font-size:14px}
+  .pick.on{background:var(--accent);color:#180029;border-color:var(--accent)}
+  .row{display:flex;gap:8px}
+  .row .pick{flex:1}
+  /* play */
+  .stage{text-align:center;padding:22px 14px}
+  .disc{width:130px;height:130px;border-radius:50%;margin:0 auto 14px;
+        background:radial-gradient(circle at 50% 50%,#2a1f47 0 24%,#160f28 25% 100%);
+        border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
+        font-size:44px}
+  .disc.spin{animation:sp 3s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .secs{font-size:34px;font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums}
+  .stepbar{display:flex;gap:5px;justify-content:center;margin:12px 0 4px}
+  .stepbar i{width:26px;height:5px;border-radius:3px;background:var(--line)}
+  .stepbar i.done{background:var(--accent)}
+  .answers{display:grid;gap:8px;margin-top:14px}
+  .ans{padding:13px 14px;border-radius:12px;border:1px solid var(--line);
+       background:var(--panel2);text-align:left;font-size:14.5px;line-height:1.35}
+  .ans b{display:block;font-size:15px}
+  .ans small{color:var(--muted)}
+  .ans.sel{border-color:var(--accent);background:#2e1f4d}
+  .ans:disabled{opacity:.6}
+  /* scores */
+  .sc{display:flex;justify-content:space-between;padding:9px 2px;
+      border-bottom:1px solid var(--line);font-size:14px}
+  .sc:last-child{border-bottom:0}
+  .sc b{font-variant-numeric:tabular-nums}
+  .sc.me{color:var(--accent)}
+  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;
+       background:var(--panel2);color:var(--muted);margin-left:6px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.55}
+  .warn{color:var(--bad)}
+  .big{font-size:20px;font-weight:800;margin:6px 0}
+  .art{width:120px;height:120px;border-radius:12px;margin:0 auto 10px;display:block;
+       background:var(--panel2)}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <a href="pixelbreak.html">‹ Spiller</a>
+  <h1>INTRO</h1>
+  <span class="code" id="roomCode"></span>
+</header>
+
+<main class="wrap">
+
+  <!-- ---------- lobby ---------- -->
+  <section class="screen on" id="s-lobby">
+    <h2>Rot d'Lidd</h2>
+    <p class="sub">Éischt <b>1 Sekonn</b>, dann 3, dann 5 … wie fréi erkennt, kritt méi Punkten.</p>
+
+    <div class="card" id="hostCfg">
+      <div class="lbl">Kategorie</div>
+      <div class="grid" id="cats"></div>
+
+      <div class="lbl" style="margin-top:16px">Wéi vill Lidder</div>
+      <div class="row" id="counts"></div>
+
+      <div class="lbl" style="margin-top:16px">Toun</div>
+      <div class="row" id="modes"></div>
+      <p class="note" id="modeNote"></p>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Spiller</div>
+      <div id="lobbyPlayers"></div>
+      <p class="note" id="joinHint"></p>
+    </div>
+
+    <button class="btn" id="startBtn">Starten</button>
+    <p class="note" id="lobbyNote"></p>
+  </section>
+
+  <!-- ---------- play ---------- -->
+  <section class="screen" id="s-play">
+    <div class="card stage">
+      <div class="disc" id="disc">🎵</div>
+      <div class="secs" id="secs">1s</div>
+      <div class="stepbar" id="stepbar"></div>
+      <div class="sub" id="playSub" style="margin:8px 0 0"></div>
+    </div>
+    <div class="answers" id="answers"></div>
+    <button class="btn ghost" id="moreBtn">Méi héieren ▸</button>
+    <div class="card" style="margin-top:12px">
+      <div class="lbl">Punkten</div>
+      <div id="playScores"></div>
+    </div>
+  </section>
+
+  <!-- ---------- reveal ---------- -->
+  <section class="screen" id="s-reveal">
+    <div class="card stage">
+      <img class="art" id="revArt" alt="">
+      <div class="big" id="revTitle"></div>
+      <div class="sub" id="revArtist" style="margin:0"></div>
+      <div class="sub" id="revWho" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Punkten</div>
+      <div id="revScores"></div>
+    </div>
+    <button class="btn" id="nextBtn">Weider ▸</button>
+  </section>
+
+  <!-- ---------- final ---------- -->
+  <section class="screen" id="s-final">
+    <div class="card stage">
+      <div style="font-size:52px">🏆</div>
+      <div class="big" id="winner"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Schlussstand</div>
+      <div id="finalScores"></div>
+    </div>
+    <button class="btn" id="againBtn">Nach eng Kéier</button>
+    <a class="btn ghost" href="pixelbreak.html" style="text-align:center;text-decoration:none">Zréck bei d'Spiller</a>
+  </section>
+
+</main>
+
+<audio id="player" preload="auto" playsinline></audio>
+
+<script src="pixelbreak-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="intro-catalog.js?v=1"></script>
+<script src="intro-rounds.js?v=1"></script>
+<script src="intro.js?v=1"></script>
+</body>
+</html>
