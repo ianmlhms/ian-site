@@ -5,3 +5,4 @@ call.html    # opened from Messenger with a room id built in JS, never linked st
 kart.html    # shared by UUID link from KartTracker; deliberately not discoverable
 jeopardy.html  # Ian asked for it deliberately NOT linked from the homepage or the tiles
 beam.html    # experimental QR file transfer; noindex, kept off the tiles until Ian tries it on two phones
+simlog.html  # private flight-sim logbook; noindex, own-only, reached by URL (not a homepage tile)
