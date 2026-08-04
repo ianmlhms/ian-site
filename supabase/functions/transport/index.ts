@@ -20,6 +20,7 @@
 
 const KEY = Deno.env.get("TRANSPORT_API_KEY") ?? "";
 const HOST = "https://cdt.hafas.de/opendata/apiserver";
+const HAFAS_TIMEOUT_MS = 8000;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -41,9 +42,19 @@ function delayMin(planned?: string, rt?: string): number {
 
 async function hafas(path: string, params: Record<string, string>) {
   const qs = new URLSearchParams({ accessId: KEY, format: "json", ...params });
-  const r = await fetch(`${HOST}/${path}?${qs}`);
-  if (!r.ok) throw new Error("hafas " + r.status);
-  return r.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), HAFAS_TIMEOUT_MS);
+  try {
+    const r = await fetch(`${HOST}/${path}?${qs}`, { signal: controller.signal });
+    if (!r.ok) {
+      const err = new Error("hafas " + r.status) as Error & { status?: number };
+      err.status = r.status;
+      throw err;
+    }
+    return await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /* ---- lock-screen widget (?action=widget) --------------------------------
@@ -180,6 +191,11 @@ Deno.serve(async (req) => {
     return json({ configured: true, stop: data?.stopLocationOrCoordLocation?.[0]?.name, departures });
   } catch (e: any) {
     console.error("transport", e?.message);
+    if (e?.status >= 400 && e.status < 500) {
+      return action === "nearby"
+        ? json({ configured: true, stops: [] })
+        : json({ configured: true, departures: [] });
+    }
     return json({ configured: true, error: "fetch failed" }, 502);
   }
 });
