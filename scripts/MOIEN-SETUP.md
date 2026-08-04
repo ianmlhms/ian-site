@@ -6,13 +6,17 @@ public-transport departures** (needs a free key + the `transport` Edge Function)
 ## Weather — nothing to do
 Uses **Open-Meteo** (no key, CORS-friendly), Luxembourg City coords 49.61, 6.13. Live already.
 
-## Live departures — request a key, then deploy the proxy
+## Live departures — LIVE (key already set, verified 4 Aug 2026)
 The Verkéiersbond real-time API (HAFAS `departureBoard`) needs a key and has no CORS, so the
 page calls the `transport` Edge Function which proxies it.
 
-1. **Request a free API key** by email: **opendata-api@atp.etat.lu** (Administration des
-   transports publics). Say it's for a small personal website showing departure boards.
-2. **Deploy the function + set the key:**
+✅ **`TRANSPORT_API_KEY` is already configured** and the board works. Verified live 4 Aug 2026:
+the function returns `{configured:true}`, `nearbystops` returns real stops, and
+`?action=board&id=200504002` (Niederanven Laach) returned 8 live departures (line 321, CB NA1).
+**No key request or deploy is needed — this section is historical.** The original setup was:
+
+1. ~~Request a free API key by email **opendata-api@atp.etat.lu**~~ (done).
+2. ~~Deploy the function + set the key:~~
    ```sh
    supabase functions deploy transport --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk
    supabase secrets set TRANSPORT_API_KEY=<key> --project-ref lvksqmgfwkfbblfsozfk
@@ -20,8 +24,12 @@ page calls the `transport` Edge Function which proxies it.
 3. Reload `moien.html` — the search box appears; type a stop, pick it, see live departures
    (delay in red `+N`, cancellations struck through). Your last stop is remembered locally.
 
-Until the key is set the function returns `{configured:false}` and the page shows a friendly
-"coming soon" notice — nothing errors.
+If the key were ever unset the function returns `{configured:false}` and the page shows a
+friendly "coming soon" notice — nothing errors.
+
+> Note (4 Aug 2026): the board action's query param is **`id`** (`?action=board&id=<stopId>`),
+> not `stop`. Minor open observations: `direction` comes back `null` on departures, and
+> Luxembourg Gare (`200405035`) returned a transient `"fetch failed"` — neither blocks the board.
 
 ## Notes
 - Endpoints proxied: `location.name` (stop search) and `departureBoard` (next 90 min, ~12 runs).
