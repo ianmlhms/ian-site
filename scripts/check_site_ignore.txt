@@ -6,3 +6,4 @@ kart.html    # shared by UUID link from KartTracker; deliberately not discoverab
 jeopardy.html  # Ian asked for it deliberately NOT linked from the homepage or the tiles
 beam.html    # experimental QR file transfer; noindex, kept off the tiles until Ian tries it on two phones
 simlog.html  # private flight-sim logbook; noindex, own-only, reached by URL (not a homepage tile)
+geometrydash.html  # standalone canvas arcade game; noindex, reached by URL (not yet on the PixelBreak hub)
