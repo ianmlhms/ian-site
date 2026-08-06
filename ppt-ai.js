@@ -5,6 +5,7 @@ const DEFAULT_LANG = "de";
 const DEFAULT_LAYOUT = "bullets";
 const DEFAULT_SLIDE_TITLE = "Ouni Titel";
 const MAX_INSTRUCTIONS = 30000;
+const JOB_POLL_MS = 2000;
 const MIN_SLIDES = 1;
 const MAX_SLIDES = 60;
 const ALLOWED_LANGS = new Set(["lb", "de", "en", "fr"]);
@@ -138,7 +139,7 @@ function validatedRequest(input) {
   const instructions = stringValue(input?.instructions).slice(0, MAX_INSTRUCTIONS);
   const images = Array.isArray(input?.images) ? input.images : [];
   if (!instructions && !images.length) throw new Error("Gëff Instruktiounen oder eng Datei derbäi.");
-  return {
+  const request = {
     action: "outline",
     instructions,
     lang: ALLOWED_LANGS.has(input?.lang) ? input.lang : DEFAULT_LANG,
@@ -147,26 +148,86 @@ function validatedRequest(input) {
     presenters: stringArray(input?.presenters, 12),
     images: images.filter((image) => typeof image?.media_type === "string" && typeof image?.data === "string").slice(0, 6),
   };
+  return input?.force === "api" || input?.force === "mini" ? { ...request, force: input.force } : request;
 }
 
-/** Generate a deck through the owner-only edge function using the shared auth session. */
-export async function generateDeck(input) {
-  const config = configuration();
-  const token = auth.session()?.access_token;
-  if (!token) throw new Error("Mell dech fir d'éischt un.");
+function abortError() {
+  const error = new Error("D'Generéierung gouf ofgebrach.");
+  error.name = "AbortError";
+  return error;
+}
+
+function wait(milliseconds, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(abortError()); return; }
+    const onAbort = () => { clearTimeout(timer); reject(abortError()); };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+async function postFunction(config, token, body, signal) {
   let response;
   try {
     response = await fetch(`${config.url.replace(/\/$/, "")}/functions/v1/deck-ai`, {
-      method: "POST",
+      method: "POST", signal,
       headers: { "content-type": "application/json", apikey: config.anonKey, Authorization: `Bearer ${token}` },
-      body: JSON.stringify(validatedRequest(input)),
+      body: JSON.stringify(body),
     });
-  } catch { throw new Error("Netzwierkfeeler — d'Präsentatioun konnt net generéiert ginn."); }
+  } catch (error) {
+    if (signal?.aborted || error?.name === "AbortError") throw abortError();
+    throw new Error("Netzwierkfeeler — d'Präsentatioun konnt net generéiert ginn.");
+  }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
     const fallback = response.status === 403 ? "Dësen Outil ass privat." : "D'AI konnt keng Präsentatioun erstellen.";
     throw new Error(stringValue(data?.error, fallback) || fallback);
   }
-  if (data?.mode !== "api") throw new Error("D'Server-Äntwert huet en onbekannte Modus.");
-  return validateDeck(data.deck);
+  return data;
+}
+
+function reportProgress(callback, details) {
+  if (typeof callback !== "function") return;
+  try { callback(Object.freeze(details)); }
+  catch (error) { console.error("ppt-ai progress callback", error); }
+}
+
+async function waitForMini(config, token, jobId, options) {
+  const startedAt = Date.now();
+  while (true) {
+    reportProgress(options.onProgress, { mode: "mini", status: "waiting", jobId, elapsedMs: Date.now() - startedAt });
+    await wait(JOB_POLL_MS, options.signal);
+    const data = await postFunction(config, token, { action: "job", jobId }, options.signal);
+    if (data?.status === "done") return validateDeck(data.deck);
+    if (data?.status === "error") throw new Error(stringValue(data.error, "De Mac mini konnt d'Präsentatioun net erstellen."));
+    if (data?.status !== "queued" && data?.status !== "running") throw new Error("De Job huet en onbekannte Status.");
+  }
+}
+
+/** Generate a deck through the owner-only edge function using the shared auth session. */
+export async function generateDeck(input, options = {}) {
+  const config = configuration();
+  const token = auth.session()?.access_token;
+  if (!token) throw new Error("Mell dech fir d'éischt un.");
+  const data = await postFunction(config, token, validatedRequest(input), options.signal);
+  if (data?.mode === "api") return Object.freeze({ deck: validateDeck(data.deck), engine: "api" });
+  if (data?.mode !== "mini" || typeof data.jobId !== "string") {
+    throw new Error("D'Server-Äntwert huet en onbekannte Modus.");
+  }
+  return Object.freeze({ deck: await waitForMini(config, token, data.jobId, options), engine: "mini" });
+}
+
+/** Start a cancellable generation; an optional caller AbortSignal is mirrored. */
+export function createDeckGeneration(input, options = {}) {
+  const controller = new AbortController();
+  const mirrorAbort = () => controller.abort();
+  if (options.signal?.aborted) controller.abort();
+  else options.signal?.addEventListener("abort", mirrorAbort, { once: true });
+  const promise = generateDeck(input, { ...options, signal: controller.signal });
+  const cleanup = () => options.signal?.removeEventListener("abort", mirrorAbort);
+  void promise.then(cleanup, cleanup);
+  return Object.freeze({ promise, signal: controller.signal, cancel: () => controller.abort() });
 }

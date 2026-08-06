@@ -1,5 +1,5 @@
-import { validateDeck } from "./ppt-ai.js?v=3";
-import { safeExportFilename } from "./ppt-export-pptx.js?v=3";
+import { validateDeck } from "./ppt-ai.js?v=4";
+import { safeExportFilename } from "./ppt-export-pptx.js?v=4";
 
 const DOCX_URL = "https://cdn.jsdelivr.net/npm/docx@8/+esm";
 const DOCX_EXTENSION = ".docx";

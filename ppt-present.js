@@ -1,6 +1,6 @@
 import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
 import { renderSlide } from "./ppt-render-dom.js?v=3";
-import { validateDeck } from "./ppt-ai.js?v=3";
+import { validateDeck } from "./ppt-ai.js?v=4";
 import { draggable, prefersReducedMotion, spring } from "./ppt-motion.js?v=3";
 
 const CSS_PIXELS_PER_INCH = 96;

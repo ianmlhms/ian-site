@@ -1,6 +1,6 @@
 import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
-import { validateDeck } from "./ppt-ai.js?v=3";
-import { safeExportFilename } from "./ppt-export-pptx.js?v=3";
+import { validateDeck } from "./ppt-ai.js?v=4";
+import { safeExportFilename } from "./ppt-export-pptx.js?v=4";
 
 const JSPDF_URL = "https://cdn.jsdelivr.net/npm/jspdf@2/+esm";
 const PAGE_WIDTH_IN = 13.333;

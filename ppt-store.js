@@ -1,8 +1,8 @@
 import * as auth from "./auth.js?v=5";
-import { validateDeck } from "./ppt-ai.js?v=3";
+import { validateDeck } from "./ppt-ai.js?v=4";
 
 const TABLE = "decks";
-const ENGINE = "ian-layout-v1";
+const DEFAULT_ENGINE = "api";
 const AUTOSAVE_DELAY_MS = 1200;
 const MAX_SOURCE_TEXT = 100000;
 const STYLE_META_TAGLINE = "_deckTagline";
@@ -13,6 +13,7 @@ const FULL_COLUMNS = "id,title,subject,lang,presenters,source_text,slides,style,
 let database = null;
 let activeDeckId = null;
 let activeSourceText = "";
+let activeEngine = DEFAULT_ENGINE;
 let autosaveTimer = null;
 let autosaveRevision = 0;
 
@@ -53,7 +54,11 @@ function publicStyle(style) {
   return Object.fromEntries(Object.entries(style).filter(([key]) => key !== STYLE_META_TAGLINE));
 }
 
-function rowPayload(deck, style) {
+function engineValue(engine) {
+  return engine === "mini" ? "mini" : "api";
+}
+
+function rowPayload(deck, style, engine) {
   return {
     title: deck.title,
     subject: deck.subject,
@@ -62,7 +67,7 @@ function rowPayload(deck, style) {
     source_text: activeSourceText.slice(0, MAX_SOURCE_TEXT) || null,
     slides: deck.slides.map((slide) => ({ ...slide })),
     style: styleValue(style, deck.tagline),
-    engine: ENGINE,
+    engine: engineValue(engine),
     updated_at: new Date().toISOString(),
   };
 }
@@ -96,9 +101,10 @@ function announceError(error) {
 }
 
 /** Start an insert workflow and remember the source text for subsequent autosaves. */
-export function startNewDeck(sourceText = "") {
+export function startNewDeck(sourceText = "", engine = DEFAULT_ENGINE) {
   activeDeckId = null;
   activeSourceText = typeof sourceText === "string" ? sourceText : "";
+  activeEngine = engineValue(engine);
   cancelAutosave();
 }
 
@@ -126,14 +132,16 @@ export async function loadDeck(id) {
   const stored = storedDeck(data);
   activeDeckId = stored.id;
   activeSourceText = stored.sourceText;
+  activeEngine = engineValue(stored.engine);
   return stored;
 }
 
-export async function saveDeck(deck, style) {
+export async function saveDeck(deck, style, engine = activeEngine) {
   requireSession();
   const safeDeck = validateDeck(deck);
   const sb = await client();
-  const payload = rowPayload(safeDeck, style);
+  activeEngine = engineValue(engine);
+  const payload = rowPayload(safeDeck, style, activeEngine);
   const query = activeDeckId
     ? sb.from(TABLE).update(payload).eq("id", activeDeckId)
     : sb.from(TABLE).insert(payload);
@@ -177,4 +185,4 @@ export function scheduleAutosave(deck, style, onSaved = null, onError = null) {
   }, AUTOSAVE_DELAY_MS);
 }
 
-export const STORE_ENGINE = ENGINE;
+export const STORE_ENGINE = DEFAULT_ENGINE;

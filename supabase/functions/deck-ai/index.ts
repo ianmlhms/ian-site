@@ -1,7 +1,6 @@
 // Supabase Edge Function: deck-ai
 // Owner-only outline generation and a hardened presentation-photo proxy.
 import { createClient } from "npm:@supabase/supabase-js@2";
-
 const MODEL = "claude-sonnet-4-6";
 const MAX_TOKENS = 8000;
 const UPSTREAM_TIMEOUT_MS = 8000;
@@ -13,23 +12,22 @@ const HARD_MAX_SLIDES = 60;   // absolute sanity bound; MIN/MAX above are only t
 const MIN_PHOTOS = 7;
 const MAX_PHOTOS = 18;
 const MAX_SEARCH_COUNT = 8;
+const HEARTBEAT_MAX_AGE_MS = 90000;
+const STUCK_JOB_AGE_MS = 5 * 60 * 1000;
 const IAN_EMAILS = new Set(["konto@ian.lu"]);
 const LANGS = new Set(["lb", "de", "en", "fr"]);
 const LAYOUTS = new Set([
   "title", "toc", "bullets", "bullets-image", "image-full",
   "photo-numbered", "example", "sources", "closing",
 ]);
-
 const KEYS = {
   anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
   pexels: Deno.env.get("PEXELS_API_KEY") ?? "",
 };
-
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
-
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
@@ -50,6 +48,8 @@ type Photo = {
   link: string;
 };
 type UpstreamResult = { photos: Photo[]; isClientError: boolean };
+type OutlineRequest = { todayISO: string; instructions: string; lang: string;
+  subject: string | null; slideCount: number; presenters: string[]; images: ImageBlock[] };
 
 async function userFromRequest(req: Request): Promise<{ id: string; email: string } | null> {
   const auth = req.headers.get("authorization") ?? "";
@@ -168,9 +168,6 @@ function isValidSlide(slide: any): boolean {
   return slide.image === null && typeof slide.notes === "string";
 }
 
-// Structure is enforced; slide- and photo-count targets are only nudges to the model.
-// Rejecting a usable 9-slide or 6-photo deck would burn a paid call and hand Ian a
-// dead end, so those land in the log instead of a 502.
 function isValidDeck(deck: any): boolean {
   if (!deck || typeof deck !== "object" || deck.version !== 1) return false;
   if (typeof deck.title !== "string" || !LANGS.has(deck.lang)) return false;
@@ -189,22 +186,29 @@ function isValidDeck(deck: any): boolean {
   return true;
 }
 
-async function anthropicOutline(payload: any): Promise<unknown> {
-  if (!KEYS.anthropic) throw new Error("Anthropic key missing");
-  const images = requestImages(payload.images);
-  const prompt = JSON.stringify({
-    task: "Create the complete deck JSON now.",
-    // The model has no clock; Ian's sources slide needs a truthful access date.
+function sanitisedOutline(payload: any): OutlineRequest {
+  return {
     todayISO: new Date().toISOString().slice(0, 10),
-    instructions: cleanString(payload.instructions, MAX_INSTRUCTIONS),
-    lang: LANGS.has(payload.lang) ? payload.lang : "de",
-    subject: cleanString(payload.subject, 120) || null,
-    slideCount: Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, Number(payload.slideCount) || 12)),
-    presenters: isStringArray(payload.presenters) ? payload.presenters.map((name) => cleanString(name, 80)).filter(Boolean) : [],
-  });
+    instructions: cleanString(payload?.instructions, MAX_INSTRUCTIONS),
+    lang: LANGS.has(payload?.lang) ? payload.lang : "de",
+    subject: cleanString(payload?.subject, 120) || null,
+    slideCount: Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, Number(payload?.slideCount) || 12)),
+    presenters: isStringArray(payload?.presenters) ? payload.presenters
+      .map((name) => cleanString(name, 80)).filter(Boolean) : [],
+    images: requestImages(payload?.images),
+  };
+}
+
+function outlinePrompt(request: OutlineRequest): string {
+  const { images: _images, ...prompt } = request;
+  return JSON.stringify({ task: "Create the complete deck JSON now.", ...prompt });
+}
+
+async function anthropicOutline(request: OutlineRequest): Promise<unknown> {
+  if (!KEYS.anthropic) throw new Error("Anthropic key missing");
   const content = [
-    ...images.map((image) => ({ type: "image", source: { type: "base64", media_type: image.media_type, data: image.data } })),
-    { type: "text", text: prompt },
+    ...request.images.map((image) => ({ type: "image", source: { type: "base64", media_type: image.media_type, data: image.data } })),
+    { type: "text", text: outlinePrompt(request) },
   ];
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -301,18 +305,75 @@ async function photoSearch(query: string, count: number): Promise<Photo[]> {
   }
 }
 
-async function handleOutline(payload: any): Promise<Response> {
-  if (!cleanString(payload?.instructions, MAX_INSTRUCTIONS) && !requestImages(payload?.images).length) {
-    return json({ error: "Add instructions or a source image first." }, 400);
-  }
+async function miniIsAlive(): Promise<boolean> {
   try {
-    const deck = await anthropicOutline(payload);
+    const { data, error } = await admin.from("service_heartbeats").select("beat_at")
+      .eq("service", "deckworker").maybeSingle();
+    if (error || !data?.beat_at) return false;
+    const beatAt = Date.parse(data.beat_at);
+    return Number.isFinite(beatAt) && beatAt > Date.now() - HEARTBEAT_MAX_AGE_MS;
+  } catch (error) {
+    console.error("deck-ai heartbeat", (error as Error)?.message);
+    return false;
+  }
+}
+
+async function queueMiniJob(request: OutlineRequest, userId: string): Promise<string> {
+  const { data, error } = await admin.from("deck_jobs")
+    .insert({ user_id: userId, status: "queued", request }).select("id").single();
+  if (error || !data?.id) throw new Error(error?.message || "The job could not be queued");
+  return data.id;
+}
+
+async function apiOutline(request: OutlineRequest): Promise<Response> {
+  try {
+    const deck = await anthropicOutline(request);
     if (!isValidDeck(deck)) return json({ error: "The model returned a deck that did not match the required schema." }, 502);
     return json({ mode: "api", deck });
   } catch (error) {
     console.error("deck-ai outline", (error as Error)?.message);
     return json({ error: `The presentation could not be generated: ${(error as Error)?.message || "AI error"}.` }, 502);
   }
+}
+
+async function handleOutline(payload: any, userId: string): Promise<Response> {
+  const request = sanitisedOutline(payload);
+  if (!request.instructions && !request.images.length) {
+    return json({ error: "Add instructions or a source image first." }, 400);
+  }
+  const force = payload?.force === "api" || payload?.force === "mini" ? payload.force : null;
+  const alive = force === "api" ? false : await miniIsAlive();
+  if (force === "mini" && !alive) return json({ error: "The Mac mini is not responding." }, 503);
+  if (alive) {
+    try { return json({ mode: "mini", jobId: await queueMiniJob(request, userId) }, 202); }
+    catch (error) {
+      console.error("deck-ai queue", (error as Error)?.message);
+      if (force === "mini") return json({ error: "The Mac mini job could not be queued." }, 503);
+    }
+  }
+  return apiOutline(request);
+}
+
+async function handleJob(payload: any, userId: string): Promise<Response> {
+  const jobId = cleanString(payload?.jobId, 80);
+  if (!/^[0-9a-f-]{36}$/i.test(jobId)) return json({ error: "Invalid job id." }, 400);
+  const cutoff = new Date(Date.now() - STUCK_JOB_AGE_MS).toISOString();
+  const stopped = "The Mac mini stopped responding while generating the presentation.";
+  const { error: reclaimError } = await admin.from("deck_jobs")
+    .update({ status: "error", error: stopped, updated_at: new Date().toISOString() })
+    .eq("id", jobId).eq("user_id", userId).eq("status", "running").lt("updated_at", cutoff);
+  if (reclaimError) console.error("deck-ai reclaim", reclaimError.message);
+  const { data, error } = await admin.from("deck_jobs").select("status,result,error")
+    .eq("id", jobId).eq("user_id", userId).maybeSingle();
+  if (error) return json({ error: "The job could not be read." }, 502);
+  if (!data) return json({ error: "Job not found." }, 404);
+  if (data.status === "done" && !isValidDeck(data.result)) {
+    const message = "The Mac mini returned a deck that did not match the required schema.";
+    await admin.from("deck_jobs").update({ status: "error", error: message, updated_at: new Date().toISOString() })
+      .eq("id", jobId).eq("user_id", userId).eq("status", "done");
+    return json({ status: "error", deck: null, error: message });
+  }
+  return json({ status: data.status, deck: data.status === "done" ? data.result : null, error: data.error || null });
 }
 
 async function handleImages(payload: any): Promise<Response> {
@@ -332,7 +393,8 @@ Deno.serve(async (req) => {
   let payload: any;
   try { payload = await req.json(); }
   catch { return json({ error: "bad json" }, 400); }
-  if (payload?.action === "outline") return handleOutline(payload);
+  if (payload?.action === "outline") return handleOutline(payload, user.id);
+  if (payload?.action === "job") return handleJob(payload, user.id);
   if (payload?.action === "images") return handleImages(payload);
   return json({ error: "Unknown action." }, 400);
 });
