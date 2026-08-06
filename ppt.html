@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0d0d1a">
+<title>PPT Builder — ian.lu</title>
+<link rel="icon" href="favicon.svg?v=1" type="image/svg+xml">
+<script src="theme.js?v=10"></script>
+<link rel="stylesheet" href="ppt.css?v=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
+<link rel="manifest" href="site.webmanifest?v=1">
+</head>
+<body>
+<header class="studio-bar">
+  <a class="home-link" href="index.html">‹ ian.lu</a>
+  <div class="brand"><span class="brand-mark">P</span><span>PPT Builder</span></div>
+  <div class="bar-spacer"></div>
+  <button class="toolbar-button" id="newDeck" type="button" hidden>Nei Präsentatioun</button>
+  <span id="acctHost"></span>
+</header>
+
+<main id="root" class="boot-root">
+  <section class="gate-panel" aria-live="polite">
+    <div class="gate-icon">▣</div>
+    <h1>Presentatiounsstudio</h1>
+    <p>Studio gëtt gestart…</p>
+  </section>
+</main>
+
+<script src="pixelbreak-config.js?v=1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+import * as auth from "./auth.js?v=5";
+import { STYLE_PACKS, DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=1";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=1";
+import { renderSlide, renderThumb } from "./ppt-render-dom.js?v=1";
+import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=1";
+import { generateDeck } from "./ppt-ai.js?v=1";
+import { fillDeckImages } from "./ppt-images.js?v=1";
+import { exportPptx } from "./ppt-export-pptx.js?v=1";
+import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck } from "./ppt-store.js?v=1";
+
+const OWNER_EMAIL = "konto@ian.lu";
+const DEFAULT_SLIDE_COUNT = 12;
+const MAX_PRESENTERS = 6;
+const PREVIEW_PADDING_PX = 24;
+const PREVIEW_MAX_SCALE = 0.76;
+const RESIZE_WAIT_MS = 120;
+const $ = (id) => document.getElementById(id);
+const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
+}[character]));
+
+let selectedFiles = Object.freeze([]);
+let currentDeck = null;
+let currentStoreId = null;
+let currentStyle = Object.freeze({ ...DEFAULT_STYLE });
+let selectedSlide = 0;
+let isBusy = false;
+let bootNumber = 0;
+let resizeTimer = null;
+
+function gate(title, message, canSignIn = false) {
+  $("newDeck").hidden = true;
+  $("root").className = "boot-root";
+  $("root").innerHTML = `<section class="gate-panel"><div class="gate-icon">▣</div>
+    <h1>${esc(title)}</h1><p>${esc(message)}</p>
+    ${canSignIn ? '<button class="primary-button" id="signIn" type="button">Umellen</button>' : ""}</section>`;
+  if (canSignIn) $("signIn").onclick = () => auth.openAuthModal();
+}
+
+function styleCards() {
+  return Object.values(STYLE_PACKS).map((pack) => `<button class="style-card" type="button" data-pack="${esc(pack.id)}">
+    <span class="style-preview style-preview--${esc(pack.id)}"><i>Aa</i><b></b><b></b></span>
+    <strong>${esc(pack.name)}</strong><small>${esc(pack.description)}</small></button>`).join("");
+}
+
+function appMarkup() {
+  return `<div class="studio-grid">
+    <aside class="input-panel material-panel scroll-fade">
+      <div class="panel-heading"><span class="eyebrow">Quell</span><h1>Wat soll dran?</h1></div>
+      <label class="field-label">Instruktiounen
+        <textarea id="instructions" rows="7" placeholder="Aufgabestellung, Thema, wichteg Punkten…"></textarea>
+      </label>
+      <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="Dateien dobäisetzen">
+        <input id="fileInput" type="file" multiple accept=".pdf,.docx,.txt,.md,image/*">
+        <span class="drop-icon">＋</span><strong>Dateien dobäisetzen</strong>
+        <small>PDF, DOCX oder Biller · max. 8</small>
+      </div>
+      <div class="file-chips" id="fileChips"></div>
+      <div class="field-row">
+        <label class="field-label">Sproch<select id="lang"><option value="lb">Lëtzebuergesch</option><option value="de" selected>Deutsch</option><option value="en">English</option><option value="fr">Français</option></select></label>
+        <label class="field-label">Slides<input id="slideCount" type="number" min="10" max="30" value="${DEFAULT_SLIDE_COUNT}"></label>
+      </div>
+      <label class="field-label">Fach<input id="subject" maxlength="120" placeholder="z. B. Geografie"></label>
+      <label class="field-label">Virdroender<input id="presenterCount" type="number" min="1" max="${MAX_PRESENTERS}" value="1"></label>
+      <div class="presenter-fields" id="presenterFields"></div>
+      <fieldset class="style-picker"><legend>Stil</legend><div class="style-grid">${styleCards()}</div></fieldset>
+      <button class="primary-button generate-button" id="generate" type="button"><span>Generëieren</span><span aria-hidden="true">→</span></button>
+      <div class="progress" id="progress" hidden><div class="progress-track"><i id="progressBar"></i></div><p id="progressText"></p></div>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </aside>
+
+    <section class="preview-column">
+      <div class="preview-toolbar material-panel"><div><span class="eyebrow">Live Virschau</span><strong id="slideLabel">Nach keng Slide</strong></div>
+        <button class="primary-button export-button" id="export" type="button" disabled>Eroflueden .pptx</button></div>
+      <div class="preview-scroll scroll-fade"><div class="preview-host" id="previewHost">
+        <div class="empty-preview"><span>▣</span><h2>Deng Präsentatioun erschéngt hei</h2><p>Instruktiounen dobäisetzen a generéieren.</p></div>
+      </div></div>
+    </section>
+
+    <aside class="info-panel material-panel scroll-fade"><div id="deckInfo"><span class="eyebrow">Presentatioun</span><h2>Nach näischt op</h2><p class="muted">Titel, Sproch a Verdeelung stinn hei.</p></div>
+      <div class="saved-heading"><span class="eyebrow">Gespäichert</span><button class="icon-button" id="refreshDecks" type="button" aria-label="Lëscht aktualiséieren">↻</button></div>
+      <div class="deck-list" id="deckList"><p class="muted">Lueden…</p></div></aside>
+  </div>
+  <nav class="filmstrip material-panel" id="filmstrip" aria-label="Slides"><div class="filmstrip-empty">Nach keng Slides</div></nav>`;
+}
+
+function renderApp() {
+  $("root").className = "studio-root";
+  $("root").innerHTML = appMarkup();
+  $("newDeck").hidden = false;
+  bindInputs();
+  renderPresenters();
+  syncStyleCards();
+  refreshDeckList();
+}
+
+function setStatus(message, isError = false) {
+  const element = $("status");
+  if (!element) return;
+  element.textContent = message;
+  element.classList.toggle("is-error", isError);
+}
+
+function setProgress(message, percent) {
+  $("progress").hidden = false;
+  $("progressText").textContent = message;
+  $("progressBar").style.width = `${Math.max(0, Math.min(100, percent))}%`;
+}
+
+function renderFileChips() {
+  $("fileChips").innerHTML = selectedFiles.map((file, index) => `<span class="file-chip"><span>${esc(file.name)}</span>
+    <button type="button" data-remove-file="${index}" aria-label="${esc(file.name)} ewechhuelen">×</button></span>`).join("");
+  $("fileChips").querySelectorAll("[data-remove-file]").forEach((button) => {
+    button.onclick = () => {
+      selectedFiles = Object.freeze(selectedFiles.filter((_, index) => index !== Number(button.dataset.removeFile)));
+      renderFileChips();
+    };
+  });
+}
+
+function addFiles(fileList) {
+  const incoming = Array.from(fileList || []);
+  const combined = [...selectedFiles, ...incoming];
+  if (combined.length > INGEST_LIMITS.maxFiles) { setStatus(`Maximal ${INGEST_LIMITS.maxFiles} Dateie sinn erlaabt.`, true); return; }
+  selectedFiles = Object.freeze(combined);
+  renderFileChips();
+  setStatus("");
+}
+
+function presenterNames() {
+  return Array.from($("presenterFields").querySelectorAll("input")).map((input) => input.value.trim()).filter(Boolean);
+}
+
+function renderPresenters() {
+  const count = Math.min(MAX_PRESENTERS, Math.max(1, Number($("presenterCount").value) || 1));
+  const previous = presenterNames();
+  $("presenterFields").innerHTML = Array.from({ length: count }, (_, index) => `<label class="field-label compact">Numm ${index + 1}
+    <input data-presenter="${index}" maxlength="80" value="${esc(previous[index] || "")}" placeholder="Numm"></label>`).join("");
+}
+
+function syncStyleCards() {
+  document.querySelectorAll("[data-pack]").forEach((card) => {
+    const isSelected = card.dataset.pack === currentStyle.pack;
+    card.classList.toggle("is-selected", isSelected);
+    card.setAttribute("aria-pressed", String(isSelected));
+  });
+}
+
+function bindDropZone() {
+  const zone = $("dropZone"), input = $("fileInput");
+  zone.onclick = () => input.click();
+  zone.onkeydown = (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); input.click(); } };
+  input.onchange = () => { addFiles(input.files); input.value = ""; };
+  ["dragenter", "dragover"].forEach((name) => zone.addEventListener(name, (event) => { event.preventDefault(); zone.classList.add("is-over"); }));
+  ["dragleave", "drop"].forEach((name) => zone.addEventListener(name, (event) => { event.preventDefault(); zone.classList.remove("is-over"); }));
+  zone.addEventListener("drop", (event) => addFiles(event.dataTransfer?.files));
+}
+
+function bindInputs() {
+  bindDropZone();
+  $("presenterCount").oninput = renderPresenters;
+  $("generate").onclick = generate;
+  $("export").onclick = download;
+  $("refreshDecks").onclick = refreshDeckList;
+  document.querySelectorAll("[data-pack]").forEach((card) => card.onclick = () => {
+    currentStyle = Object.freeze({ ...currentStyle, pack: card.dataset.pack });
+    syncStyleCards();
+    renderCurrentSlide();
+  });
+}
+
+function renderCurrentSlide() {
+  if (!currentDeck || !$("previewHost")) return;
+  const slide = currentDeck.slides[selectedSlide];
+  if (!slide) return;
+  const host = $("previewHost");
+  const width = Math.max(320, host.clientWidth - PREVIEW_PADDING_PX * 2);
+  const scale = Math.min(PREVIEW_MAX_SCALE, width / (13.333 * 96));
+  renderSlide(layoutSlide(slideForLayout(currentDeck, slide), resolveTokens(currentStyle), selectedSlide + 1), host, scale);
+  $("slideLabel").textContent = `${selectedSlide + 1} / ${currentDeck.slides.length} · ${slide.title}`;
+}
+
+function renderDeck() {
+  if (!currentDeck) return;
+  selectedSlide = Math.min(selectedSlide, currentDeck.slides.length - 1);
+  renderCurrentSlide();
+  $("filmstrip").innerHTML = currentDeck.slides.map((slide, index) => `<button class="thumb${index === selectedSlide ? " is-selected" : ""}" type="button" data-slide="${index}" aria-label="Slide ${index + 1}: ${esc(slide.title)}"><span class="thumb-canvas"></span><small>${index + 1}</small></button>`).join("");
+  $("filmstrip").querySelectorAll("[data-slide]").forEach((button) => {
+    const index = Number(button.dataset.slide);
+    renderThumb(layoutSlide(slideForLayout(currentDeck, currentDeck.slides[index]), resolveTokens(currentStyle), index + 1), button.querySelector(".thumb-canvas"));
+    button.onclick = () => { selectedSlide = index; renderDeck(); };
+  });
+  $("export").disabled = false;
+  $("deckInfo").innerHTML = `<span class="eyebrow">Presentatioun</span><h2>${esc(currentDeck.title)}</h2>
+    <dl><div><dt>Fach</dt><dd>${esc(currentDeck.subject || "—")}</dd></div><div><dt>Sproch</dt><dd>${esc(currentDeck.lang.toUpperCase())}</dd></div><div><dt>Slides</dt><dd>${currentDeck.slides.length}</dd></div></dl>
+    <p class="muted">${esc(currentDeck.presenters.join(" · ") || "Solo · kee Footer")}</p>`;
+}
+
+async function generate() {
+  if (isBusy) return;
+  isBusy = true; $("generate").disabled = true; setStatus("");
+  try {
+    setProgress("Instruktioune liesen…", 14);
+    const ingested = await ingestFiles(selectedFiles);
+    const sourceText = [$("instructions").value.trim(), ingested.text].filter(Boolean).join("\n\n");
+    startNewDeck(sourceText); currentStoreId = null;
+    setProgress("Slides schreiwen…", 42);
+    const outline = await generateDeck({ instructions: sourceText, lang: $("lang").value, subject: $("subject").value,
+      slideCount: Number($("slideCount").value), presenters: presenterNames(), images: ingested.images });
+    setProgress("Fotoen sichen…", 72);
+    currentDeck = await fillDeckImages(outline);
+    selectedSlide = 0; renderDeck();
+    setProgress("Präsentatioun späicheren…", 94);
+    const stored = await saveDeck(currentDeck, currentStyle); currentStoreId = stored.id;
+    setProgress("Fäerdeg", 100); setStatus("Präsentatioun ass prett ✓");
+    await refreshDeckList();
+  } catch (error) { setStatus(error instanceof Error ? error.message : "Generéiere feelgeschloen.", true); }
+  finally { isBusy = false; $("generate").disabled = false; setTimeout(() => { if ($("progress")) $("progress").hidden = true; }, 700); }
+}
+
+async function download() {
+  if (!currentDeck || isBusy) return;
+  isBusy = true; $("export").disabled = true; setStatus("PowerPoint gëtt gebaut…");
+  try { await exportPptx(currentDeck, resolveTokens(currentStyle)); setStatus("PowerPoint ass erofgelueden ✓"); }
+  catch (error) { setStatus(error instanceof Error ? error.message : "Export feelgeschloen.", true); }
+  finally { isBusy = false; $("export").disabled = false; }
+}
+
+function deckRows(items) {
+  if (!items.length) return '<p class="muted">Nach keng Präsentatioun gespäichert.</p>';
+  return items.map((item) => `<article class="deck-row"><button type="button" data-open="${esc(item.id)}"><strong>${esc(item.title)}</strong><small>${esc(item.subject || item.lang.toUpperCase())}</small></button>
+    <button class="delete-button" type="button" data-delete="${esc(item.id)}" aria-label="${esc(item.title)} läschen">×</button></article>`).join("");
+}
+
+async function refreshDeckList() {
+  if (!$("deckList")) return;
+  try {
+    const items = await listDecks(); $("deckList").innerHTML = deckRows(items);
+    $("deckList").querySelectorAll("[data-open]").forEach((button) => button.onclick = () => openStored(button.dataset.open));
+    $("deckList").querySelectorAll("[data-delete]").forEach((button) => button.onclick = () => removeStored(button.dataset.delete));
+  } catch (error) { $("deckList").innerHTML = `<p class="status is-error">${esc(error.message || "Lëscht net disponibel.")}</p>`; }
+}
+
+async function openStored(id) {
+  try {
+    const stored = await loadDeck(id); currentDeck = stored.deck; currentStyle = Object.freeze({ ...DEFAULT_STYLE, ...stored.style });
+    currentStoreId = stored.id; selectedSlide = 0; $("instructions").value = stored.sourceText;
+    $("lang").value = currentDeck.lang; $("subject").value = currentDeck.subject || "";
+    syncStyleCards(); renderDeck(); setStatus("Präsentatioun gelueden.");
+  } catch (error) { setStatus(error.message || "Lueden feelgeschloen.", true); }
+}
+
+async function removeStored(id) {
+  if (!confirm("Dës Präsentatioun wierklech läschen?")) return;
+  try {
+    await deleteDeck(id);
+    if (currentStoreId === id) resetStudio();
+    await refreshDeckList();
+  } catch (error) { setStatus(error.message || "Läschen feelgeschloen.", true); }
+}
+
+function resetStudio() {
+  selectedFiles = Object.freeze([]); currentDeck = null; currentStoreId = null;
+  currentStyle = Object.freeze({ ...DEFAULT_STYLE }); selectedSlide = 0; startNewDeck(); renderApp();
+}
+
+async function boot() {
+  const run = ++bootNumber;
+  try {
+    await auth.client(); if (run !== bootNumber) return;
+    auth.mountAccountButton($("acctHost"));
+    const session = auth.session();
+    if (!session?.user) { gate("Presentatiounsstudio", "Mell dech un, fir däi private Studio opzemaachen.", true); return; }
+    if ((session.user.email || "").toLowerCase() !== OWNER_EMAIL) { gate("Dësen Outil ass privat", "De PPT Builder ass nëmme fir säi Besëtzer fräigeschalt."); return; }
+    renderApp();
+  } catch { gate("Studio net disponibel", "D'Verbindung konnt net gestart ginn. Probéier et nach eng Kéier."); }
+}
+
+$("newDeck").onclick = resetStudio;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderCurrentSlide, RESIZE_WAIT_MS); });
+window.addEventListener("ppt:store-error", (event) => setStatus(event.detail?.message || "Späicherfeeler", true));
+window.addEventListener("ppt:export-warning", (event) => setStatus(event.detail?.message || "Fotoe feelen.", true));
+auth.onAuth(boot);
+boot();
+</script>
+</body>
+</html>
