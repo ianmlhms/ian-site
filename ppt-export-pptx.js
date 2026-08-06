@@ -1,4 +1,4 @@
-import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=1";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=2";
 import { validateDeck } from "./ppt-ai.js?v=1";
 
 const PPTXGENJS_URL = "https://cdn.jsdelivr.net/npm/pptxgenjs@3/+esm";

@@ -113,10 +113,10 @@ function overlayFor(style, pack) {
   const input = style && typeof style === "object" ? style : {};
   return {
     accent: validHex(input.accent) ? input.accent.toUpperCase() : pack.accent,
-    titleScale: finiteNumber(input.titleScale, DEFAULT_STYLE.titleScale, 0.7, 1.35),
+    titleScale: finiteNumber(input.titleScale, DEFAULT_STYLE.titleScale, 0.8, 1.3),
     density: Math.round(finiteNumber(input.density, DEFAULT_STYLE.density, 3, 8)),
-    imageArea: finiteNumber(input.imageArea, DEFAULT_STYLE.imageArea, 0.3, 0.65),
-    radius: finiteNumber(input.radius, DEFAULT_STYLE.radius, 0, 32),
+    imageArea: finiteNumber(input.imageArea, DEFAULT_STYLE.imageArea, 0.25, 0.65),
+    radius: finiteNumber(input.radius, DEFAULT_STYLE.radius, 0, 24),
     alternating: typeof input.alternating === "boolean" ? input.alternating : pack.alternating,
     footer: typeof input.footer === "boolean" ? input.footer : DEFAULT_STYLE.footer,
     photoTreatment: photoTreatment(input.photoTreatment),

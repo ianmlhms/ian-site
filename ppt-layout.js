@@ -33,6 +33,9 @@ const BULLET_TEXT_INSET_IN = 0.22;
 const COVER_CHAR_SPACING = -0.25;
 const SECTION_LAYOUTS = new Set(["title", "closing"]);
 const UNNUMBERED_LAYOUTS = new Set(["title", "closing"]);
+// The cover already names the whole group in its tagline ("… Von Ian an Ben"),
+// so repeating them in the corner footer would print the names twice.
+const UNFOOTERED_LAYOUTS = new Set(["title"]);
 const GEO = Object.freeze({
   coverImageWidth: 5.25, coverAccentY: 1.2, coverAccentW: 0.1, coverAccentH: 3.75,
   coverTextX: 1.03, coverTitleY: 1.32, coverTitleH: 2.25, coverTaglineY: 3.72,
@@ -318,7 +321,8 @@ function baseBoxes(slide, tokens, colors) {
 }
 
 function footerBoxes(slide, tokens, colors, slideNumber) {
-  const presenter = tokens.footer && slide.presenter ? [textBox(slide.presenter, PAGE_MARGIN_IN, FOOTER_Y_IN, GEO.footerPresenterW, FOOTER_H_IN, {
+  const hasPresenter = tokens.footer && slide.presenter && !UNFOOTERED_LAYOUTS.has(slide.layout);
+  const presenter = hasPresenter ? [textBox(slide.presenter, PAGE_MARGIN_IN, FOOTER_Y_IN, GEO.footerPresenterW, FOOTER_H_IN, {
     font: tokens.bodyFont, size: FOOTER_PT, color: colors.isDark ? tokens.textOnDark : tokens.footerColor,
     valign: "middle",
   })] : [];

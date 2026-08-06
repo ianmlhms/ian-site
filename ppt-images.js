@@ -3,6 +3,7 @@ import { validateDeck } from "./ppt-ai.js?v=1";
 
 const MAX_CONCURRENCY = 4;
 const SEARCH_COUNT = 1;
+const PICKER_SEARCH_COUNT = 8;
 const MAX_SOURCES_PER_SLIDE = 40;
 const EDGE_ACTION = "images";
 const PHOTO_SOURCES = new Set(["pexels", "wikimedia"]);
@@ -54,20 +55,28 @@ function validPhoto(raw) {
   return Object.freeze({ url, thumb, credit, source, link });
 }
 
-async function searchPhoto(query) {
+export async function searchPhotos(query, count = PICKER_SEARCH_COUNT) {
+  const cleanQuery = stringValue(query);
+  const requested = Math.min(PICKER_SEARCH_COUNT, Math.max(1, Number(count) || PICKER_SEARCH_COUNT));
+  if (!cleanQuery) throw new Error("Gëff e Sichbegrëff fir d'Foto an.");
   const config = configuration();
   let response;
   try {
     response = await fetch(`${config.url.replace(/\/$/, "")}/functions/v1/deck-ai`, {
       method: "POST",
       headers: headers(config),
-      body: JSON.stringify({ action: EDGE_ACTION, query, count: SEARCH_COUNT }),
+      body: JSON.stringify({ action: EDGE_ACTION, query: cleanQuery, count: requested }),
     });
-  } catch { throw new Error(`Keng Verbindung fir d'Fotosich: ${query}`); }
+  } catch { throw new Error(`Keng Verbindung fir d'Fotosich: ${cleanQuery}`); }
   if (!response.ok) throw new Error(`Fotosich net disponibel (HTTP ${response.status}).`);
   const data = await response.json().catch(() => null);
   if (!data || !Array.isArray(data.photos)) throw new Error("Ongëlteg Äntwert vun der Fotosich.");
-  return validPhoto(data.photos[0]);
+  return Object.freeze(data.photos.map(validPhoto).filter(Boolean));
+}
+
+async function searchPhoto(query) {
+  const photos = await searchPhotos(query, SEARCH_COUNT);
+  return photos[0] || null;
 }
 
 function indexedQueries(deck) {
@@ -137,16 +146,47 @@ function splitSourceSlide(slide, sources) {
   }));
 }
 
-function appendCredits(slides, lang) {
+function uniqueSlideId(slides, stem) {
+  const ids = new Set(slides.map((slide) => slide.id));
+  if (!ids.has(stem)) return stem;
+  let suffix = 2;
+  while (ids.has(`${stem}-${suffix}`)) suffix += 1;
+  return `${stem}-${suffix}`;
+}
+
+function addSourceSlide(slides, credits) {
+  const slide = {
+    id: uniqueSlideId(slides, "sources-photos"), layout: "sources", section: null,
+    presenter: null, title: "Quellen", bullets: [], caption: null, fields: [],
+    sources: credits, imageQuery: null, image: null, notes: "",
+  };
+  const closingIndex = slides.findIndex((item) => item.layout === "closing");
+  const index = closingIndex < 0 ? slides.length : closingIndex;
+  return [...slides.slice(0, index), ...splitSourceSlide(slide, credits), ...slides.slice(index)];
+}
+
+function appendCredits(slides, lang, removedPhotos = []) {
   const photos = slides.map((slide) => slide.image).filter(Boolean);
   const credits = photos.map((photo) => sourceEntry(photo, lang));
-  if (!credits.length) return slides.map((slide) => ({ ...slide }));
+  const managed = [...photos, ...removedPhotos].map((photo) => sourceEntry(photo, lang).text);
   const sourceIndex = slides.findIndex((slide) => slide.layout === "sources");
-  return slides.flatMap((slide, index) => {
+  const cleaned = slides.map((slide) => slide.layout !== "sources" ? { ...slide } : {
+    ...slide, sources: (slide.sources || []).filter((source) => !managed.includes(source.text)),
+  });
+  if (!credits.length) return cleaned;
+  if (sourceIndex < 0) return addSourceSlide(cleaned, credits);
+  return cleaned.flatMap((slide, index) => {
     if (index !== sourceIndex) return [{ ...slide }];
     const sources = uniqueEntries([...(slide.sources || []), ...credits]);
     return splitSourceSlide(slide, sources);
   });
+}
+
+/** Rebuild managed photo credits after a swap or clear and freeze the new deck. */
+export function reconcilePhotoCredits(deck, removedPhotos = []) {
+  const safeDeck = validateDeck(deck);
+  const removed = Array.isArray(removedPhotos) ? removedPhotos.filter(Boolean) : [];
+  return validateDeck({ ...safeDeck, slides: appendCredits(safeDeck.slides, safeDeck.lang, removed) });
 }
 
 function notifyCompletion(found, requested) {
