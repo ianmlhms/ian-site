@@ -8,7 +8,7 @@
 <title>PPT Builder — ian.lu</title>
 <link rel="icon" href="favicon.svg?v=1" type="image/svg+xml">
 <script src="theme.js?v=10"></script>
-<link rel="stylesheet" href="ppt.css?v=2">
+<link rel="stylesheet" href="ppt.css?v=3">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -32,21 +32,25 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
 import * as auth from "./auth.js?v=5";
-import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=2";
-import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=1";
-import { generateDeck } from "./ppt-ai.js?v=1";
-import { fillDeckImages } from "./ppt-images.js?v=2";
-import { exportPptx } from "./ppt-export-pptx.js?v=1";
-import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=1";
-import { createHistory } from "./ppt-history.js?v=2";
-import { createEditor } from "./ppt-editor.js?v=2";
-import { createInspector } from "./ppt-inspector.js?v=2";
+import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=3";
+import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3";
+import { generateDeck } from "./ppt-ai.js?v=3";
+import { fillDeckImages } from "./ppt-images.js?v=3";
+import { exportPptx } from "./ppt-export-pptx.js?v=3";
+import { exportPdf } from "./ppt-export-pdf.js?v=3";
+import { exportCuesDocx, exportScriptDocx } from "./ppt-export-docx.js?v=3";
+import { startPresenting } from "./ppt-present.js?v=3";
+import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=3";
+import { createHistory } from "./ppt-history.js?v=3";
+import { createEditor } from "./ppt-editor.js?v=3";
+import { createInspector } from "./ppt-inspector.js?v=3";
 
 const OWNER_EMAIL = "konto@ian.lu";
 const DEFAULT_SLIDE_COUNT = 12;
 const MAX_PRESENTERS = 6;
 const RESIZE_WAIT_MS = 120;
 const PROGRESS_HIDE_MS = 700;
+const MENU_CLOSE_MS = 220;
 const $ = (id) => document.getElementById(id);
 const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
@@ -100,7 +104,15 @@ function appMarkup() {
       <div class="preview-toolbar material-panel"><div><span class="eyebrow">Live Virschau</span><strong id="slideLabel">Nach keng Slide</strong></div>
         <div class="preview-actions"><button class="icon-text-button" id="undo" type="button" disabled>↶ <span>Zréck</span></button>
           <button class="icon-text-button" id="redo" type="button" disabled>↷ <span>Nees viru</span></button>
-          <button class="primary-button export-button" id="export" type="button" disabled>Eroflueden .pptx</button></div></div>
+          <div class="export-menu" id="exportMenu"><button class="icon-text-button export-button" id="exportTrigger" type="button"
+            aria-haspopup="menu" aria-expanded="false" disabled>Exportéieren <span aria-hidden="true">⌄</span></button>
+            <div class="export-popover material-panel" id="exportPopover" role="menu" hidden>
+              <button type="button" role="menuitem" data-export="pptx">PowerPoint (.pptx)</button>
+              <button type="button" role="menuitem" data-export="pdf">PDF</button>
+              <button type="button" role="menuitem" data-export="script">Word — Vollstännegen Text</button>
+              <button type="button" role="menuitem" data-export="cues">Word — Stëchwierder</button>
+            </div></div>
+          <button class="primary-button present-button" id="present" type="button" disabled>Presentéieren</button></div></div>
       <div class="slide-controls material-panel" id="slideControls" hidden></div>
       <div class="preview-scroll scroll-fade"><div class="preview-host" id="previewHost">
         <div class="empty-preview"><span>▣</span><h2>Deng Präsentatioun erschéngt hei</h2><p>Instruktiounen dobäisetzen a generéieren.</p></div>
@@ -182,7 +194,8 @@ function renderDesigner(index = selectedSlide) {
   if (!currentDeck) return;
   selectedSlide = Math.max(0, Math.min(index, currentDeck.slides.length - 1));
   $("slideControls").hidden = false;
-  editor.render(selectedSlide); updateLabel(); updateHistoryButtons(); $("export").disabled = false;
+  editor.render(selectedSlide); updateLabel(); updateHistoryButtons();
+  $("exportTrigger").disabled = false; $("present").disabled = false;
 }
 
 function applyDeck(deck, meta, index) {
@@ -216,7 +229,10 @@ function bindInputs() {
   bindDropZone();
   $("presenterCount").oninput = renderPresenters;
   $("generate").onclick = generate;
-  $("export").onclick = download;
+  $("exportTrigger").onclick = toggleExportMenu;
+  $("exportPopover").querySelectorAll("[data-export]").forEach((button) =>
+    button.onclick = () => runExport(button.dataset.export, button));
+  $("present").onclick = presentDeck;
   $("refreshDecks").onclick = refreshDeckList;
   $("undo").onclick = () => restoreHistory(history.undo());
   $("redo").onclick = () => restoreHistory(history.redo());
@@ -251,12 +267,50 @@ async function generate() {
   finally { isBusy = false; $("generate").disabled = false; setTimeout(() => { if ($("progress")) $("progress").hidden = true; }, PROGRESS_HIDE_MS); }
 }
 
-async function download() {
-  if (!currentDeck || isBusy) return;
-  isBusy = true; $("export").disabled = true; setStatus("PowerPoint gëtt gebaut…");
-  try { await exportPptx(currentDeck, resolveTokens(currentStyle)); setStatus("PowerPoint ass erofgelueden ✓"); }
+function setExportMenu(open, focusFirst = false) {
+  const trigger = $("exportTrigger"); const popover = $("exportPopover");
+  if (!trigger || !popover) return;
+  trigger.setAttribute("aria-expanded", String(open));
+  if (open) {
+    popover.hidden = false;
+    requestAnimationFrame(() => { popover.classList.add("is-open"); if (focusFirst) popover.querySelector("button")?.focus(); });
+    return;
+  }
+  popover.classList.remove("is-open");
+  setTimeout(() => { if (trigger.getAttribute("aria-expanded") === "false") popover.hidden = true; }, MENU_CLOSE_MS);
+}
+
+function toggleExportMenu() {
+  setExportMenu($("exportTrigger").getAttribute("aria-expanded") !== "true");
+}
+
+function exportDetails(kind) {
+  const options = {
+    pptx: { progress: "PowerPoint gëtt gebaut…", success: "PowerPoint ass erofgelueden ✓", run: () => exportPptx(currentDeck, resolveTokens(currentStyle)) },
+    pdf: { progress: "PDF gëtt gebaut…", success: "PDF ass erofgelueden ✓", run: () => exportPdf(currentDeck, resolveTokens(currentStyle)) },
+    script: { progress: "Vollstännegen Text gëtt gebaut…", success: "Vollstännegen Text ass erofgelueden ✓", run: () => exportScriptDocx(currentDeck) },
+    cues: { progress: "Stëchwierder ginn gebaut…", success: "Stëchwierder sinn erofgelueden ✓", run: () => exportCuesDocx(currentDeck) },
+  };
+  return options[kind] || null;
+}
+
+async function runExport(kind, button) {
+  const details = exportDetails(kind);
+  if (!currentDeck || !details || isBusy) return;
+  isBusy = true; button.disabled = true; $("exportTrigger").disabled = true; $("present").disabled = true;
+  setExportMenu(false); setStatus(details.progress);
+  try { await details.run(); setStatus(details.success); }
   catch (error) { setStatus(error instanceof Error ? error.message : "Export feelgeschloen.", true); }
-  finally { isBusy = false; $("export").disabled = false; }
+  finally {
+    isBusy = false; button.disabled = false; $("exportTrigger").disabled = false; $("present").disabled = false; $("exportTrigger").focus();
+  }
+}
+
+function presentDeck() {
+  if (!currentDeck || isBusy) return;
+  setExportMenu(false);
+  try { startPresenting(currentDeck, resolveTokens(currentStyle), selectedSlide); setStatus("Presentatioun gestart."); }
+  catch (error) { setStatus(error instanceof Error ? error.message : "Presentéiere feelgeschloen.", true); }
 }
 
 function deckRows(items) {
@@ -302,6 +356,22 @@ function keyboardHistory(event) {
   event.preventDefault(); restoreHistory(event.shiftKey ? history.redo() : history.undo());
 }
 
+function keyboardExportMenu(event) {
+  const trigger = $("exportTrigger");
+  if (!trigger) return;
+  const open = trigger.getAttribute("aria-expanded") === "true";
+  if (event.key === "ArrowDown" && event.target === trigger) {
+    event.preventDefault(); setExportMenu(true, true); return;
+  }
+  if (event.key !== "Escape" || !open) return;
+  event.preventDefault(); setExportMenu(false); trigger.focus();
+}
+
+function closeExportMenuOutside(event) {
+  const menu = $("exportMenu");
+  if (menu && !menu.contains(event.target)) setExportMenu(false);
+}
+
 async function boot() {
   const run = ++bootNumber;
   try {
@@ -316,6 +386,8 @@ async function boot() {
 
 $("newDeck").onclick = resetStudio;
 document.addEventListener("keydown", keyboardHistory);
+document.addEventListener("keydown", keyboardExportMenu);
+document.addEventListener("pointerdown", closeExportMenuOutside);
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => editor?.renderPreview(), RESIZE_WAIT_MS); });
 window.addEventListener("ppt:store-error", (event) => setStatus(event.detail?.message || "Späicherfeeler", true));
 window.addEventListener("ppt:export-warning", (event) => setStatus(event.detail?.message || "Fotoe feelen.", true));

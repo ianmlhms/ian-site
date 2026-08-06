@@ -1,5 +1,5 @@
-import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=2";
-import { validateDeck } from "./ppt-ai.js?v=1";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
+import { validateDeck } from "./ppt-ai.js?v=3";
 
 const PPTXGENJS_URL = "https://cdn.jsdelivr.net/npm/pptxgenjs@3/+esm";
 const LAYOUT_NAME = "IANLU16x9";
@@ -147,7 +147,7 @@ function addDeckSlide(pptx, deck, sourceSlide, tokens, images, slideNumber) {
   return pptSlide;
 }
 
-function safeFilename(title) {
+export function safeExportFilename(title, extension) {
   const cleaned = String(title || FALLBACK_FILENAME)
     .normalize("NFC")
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, " ")
@@ -155,7 +155,10 @@ function safeFilename(title) {
     .replace(/[. ]+$/g, "")
     .trim()
     .slice(0, MAX_FILENAME_LENGTH);
-  return `${cleaned || FALLBACK_FILENAME}${PPTX_EXTENSION}`;
+  const suffix = String(extension || PPTX_EXTENSION).startsWith(".")
+    ? String(extension || PPTX_EXTENSION)
+    : `.${String(extension)}`;
+  return `${cleaned || FALLBACK_FILENAME}${suffix}`;
 }
 
 function configurePresentation(PptxGenJS, deck) {
@@ -192,7 +195,7 @@ export async function exportPptx(deck, tokens) {
   const pptx = configurePresentation(PptxGenJS, safeDeck);
   safeDeck.slides.forEach((slide, index) => addDeckSlide(pptx, safeDeck, slide, tokens, images, index + 1));
   announceSkipped(images);
-  try { await pptx.writeFile({ fileName: safeFilename(safeDeck.title) }); }
+  try { await pptx.writeFile({ fileName: safeExportFilename(safeDeck.title, PPTX_EXTENSION) }); }
   catch (error) {
     console.error("[ppt] export", error);
     throw new Error("D'PowerPoint-Datei konnt net erstallt ginn.");

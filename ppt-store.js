@@ -1,5 +1,5 @@
 import * as auth from "./auth.js?v=5";
-import { validateDeck } from "./ppt-ai.js?v=1";
+import { validateDeck } from "./ppt-ai.js?v=3";
 
 const TABLE = "decks";
 const ENGINE = "ian-layout-v1";

@@ -1,5 +1,5 @@
-import { DEFAULT_STYLE, STYLE_PACKS, resolveTokens, styleForPack } from "./ppt-style-packs.js?v=2";
-import { esc } from "./ppt-render-dom.js?v=1";
+import { DEFAULT_STYLE, STYLE_PACKS, resolveTokens, styleForPack } from "./ppt-style-packs.js?v=3";
+import { esc } from "./ppt-render-dom.js?v=3";
 
 const CONTROLS = Object.freeze([
   { key: "titleScale", label: "Titelgréisst", min: 0.8, max: 1.3, step: 0.05 },

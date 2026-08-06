@@ -1,10 +1,10 @@
-import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=2";
-import { renderSlide, renderThumb, esc } from "./ppt-render-dom.js?v=1";
-import { resolveTokens } from "./ppt-style-packs.js?v=2";
-import { spring, draggable, project, rubberband, FLICK_BOUNCE, prefersReducedMotion } from "./ppt-motion.js?v=2";
-import { moveSlide, insertSlide, duplicateSlide, deleteSlide, updateSlide, setDeckMeta } from "./ppt-deck-ops.js?v=2";
-import { reconcilePhotoCredits } from "./ppt-images.js?v=2";
-import { openImagePicker } from "./ppt-image-picker.js?v=2";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
+import { renderSlide, renderThumb, esc } from "./ppt-render-dom.js?v=3";
+import { resolveTokens } from "./ppt-style-packs.js?v=3";
+import { spring, draggable, project, rubberband, FLICK_BOUNCE, prefersReducedMotion } from "./ppt-motion.js?v=3";
+import { moveSlide, insertSlide, duplicateSlide, deleteSlide, updateSlide, setDeckMeta } from "./ppt-deck-ops.js?v=3";
+import { reconcilePhotoCredits } from "./ppt-images.js?v=3";
+import { openImagePicker } from "./ppt-image-picker.js?v=3";
 
 const SLIDE_WIDTH_PX = 13.333 * 96;
 const PREVIEW_PADDING_PX = 24;

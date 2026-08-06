@@ -1,6 +1,6 @@
-import { spring } from "./ppt-motion.js?v=2";
-import { searchPhotos } from "./ppt-images.js?v=2";
-import { esc } from "./ppt-render-dom.js?v=1";
+import { spring } from "./ppt-motion.js?v=3";
+import { searchPhotos } from "./ppt-images.js?v=3";
+import { esc } from "./ppt-render-dom.js?v=3";
 
 const OPEN_SCALE = 0.94;
 const OPEN_OFFSET_PX = 18;
