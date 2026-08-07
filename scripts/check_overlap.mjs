@@ -35,7 +35,9 @@ const CONCURRENCY = 4;
 const SETTLE_MS = 900;            // let deferred scripts paint before measuring
 const VIEWPORT_HEIGHT = 900;
 const KINDS = ["overflow", "offscreen", "collision", "clipped", "contrast", "hit-target"];
-const SKIP = new Set(["googled2bde022f66de7b9.html"]);
+// googled…html is a bare Search Console token; games.html is a <meta refresh>
+// redirect that never loads theme.js, so it measures an unstyled flash.
+const SKIP = new Set(["googled2bde022f66de7b9.html", "games.html"]);
 
 function parseArgs(argv) {
   const flags = { widths: [390, 1280], themes: ["dark", "light"], pages: null, write: false, quiet: false };
