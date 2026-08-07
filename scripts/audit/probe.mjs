@@ -44,11 +44,19 @@ export function auditPage(options) {
   }
 
   /* ---- colour maths (WCAG 2.1) ---- */
+  /* Chrome serialises color-mix() as `color(srgb 0.086 0.09 0.145 / 0.9)` —
+   * components are 0–1 floats there, but 0–255 ints in rgb(). Reading the
+   * former as the latter turns every glass surface into near-black and invents
+   * hundreds of contrast failures, so the two syntaxes must be told apart. */
   function parseColour(value) {
-    const parts = String(value).match(/[\d.]+/g);
+    const text = String(value);
+    const parts = text.match(/[\d.]+/g);
     if (!parts || parts.length < 3) return null;
+    const isUnit = /^color\(/i.test(text.trim());
+    const scale = isUnit ? 255 : 1;
     const alpha = parts.length > 3 ? Number(parts[3]) : 1;
-    return { r: Number(parts[0]), g: Number(parts[1]), b: Number(parts[2]), a: alpha };
+    return { r: Number(parts[0]) * scale, g: Number(parts[1]) * scale,
+      b: Number(parts[2]) * scale, a: alpha };
   }
   function over(top, bottom) {
     const a = top.a;

@@ -108,15 +108,15 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 2,
-    "hit-target": 3
+    "contrast": 0,
+    "hit-target": 0
   },
   "connect4.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 2,
+    "contrast": 1,
     "hit-target": 10
   },
   "countdowns.html": {
@@ -132,7 +132,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 2,
     "hit-target": 3
   },
   "doc.html": {
@@ -140,7 +140,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 3,
+    "contrast": 1,
     "hit-target": 1
   },
   "dots.html": {
@@ -313,7 +313,7 @@
   },
   "moien.html": {
     "overflow": 0,
-    "offscreen": 3,
+    "offscreen": 0,
     "collision": 0,
     "clipped": 0,
     "contrast": 1,
@@ -364,7 +364,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 3,
+    "contrast": 1,
     "hit-target": 1
   },
   "privacy.html": {
@@ -412,8 +412,8 @@
     "offscreen": 1,
     "collision": 7,
     "clipped": 0,
-    "contrast": 15,
-    "hit-target": 21
+    "contrast": 5,
+    "hit-target": 88
   },
   "slf.html": {
     "overflow": 0,
@@ -428,7 +428,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 2,
     "hit-target": 3
   },
   "timetable.html": {
