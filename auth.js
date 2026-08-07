@@ -1,213 +1,361 @@
-/* Shared Supabase auth for the site (same project/accounts as PixelBreak).
- * Reads window.PB_CONFIG from pixelbreak-config.js. ES module. */
-const cfg = window.PB_CONFIG || {};
-export const authConfigured =
-  /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) && (cfg.anonKey || "").trim().length > 20;
+/* Shared Supabase auth for ian.lu. ES module. */
+import "./i18n-dict.js?v=25";
+import { openAuthDialog } from "./auth-ui.js?v=3";
+import { esc } from "./pin-pad.js?v=2";
+import {
+  openProfilePinDialog,
+  resetPinBriefing,
+  startPinBriefing,
+} from "./pin-brief.js?v=3";
 
-// Shared across EVERY instance of this module — even when it's imported under
-// different "?v=" query strings (auth.js vs auth.js?v=5 are otherwise separate
-// modules with separate clients). Two Supabase/GoTrue clients on the same
-// localStorage race on token refresh and corrupt the session, which shows up as
-// "signed in but everything 401s" (no chats load, admin link missing). One global
-// client avoids that.
-const _g = (window.__pbAuth = window.__pbAuth || { sb: null, ready: null, session: null, cbs: [] });
+const cfg = window.PB_CONFIG || {};
+const PASSWORD_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+  "abcdefghijklmnopqrstuvwxyz" +
+  "0123456789-_";
+const RANDOM_PASSWORD_LENGTH = 32;
+const PIN_FUNCTION = "auth-pin";
+
+export const authConfigured =
+  /^https:\/\/.+\.supabase\.co\/?$/.test(
+    (cfg.url || "").trim(),
+  ) && (cfg.anonKey || "").trim().length > 20;
+
+// One cache for every URL variant of this module. Multiple
+// GoTrue clients race on refresh and corrupt the session.
+const _g = (window.__pbAuth = window.__pbAuth || {
+  sb: null,
+  ready: null,
+  session: null,
+  cbs: [],
+});
 
 async function getCreateClient() {
-  // Prefer the global UMD build (loaded via <script> in the page) — most reliable
-  // across browsers (Safari/iOS in particular). Fall back to an ESM CDN import.
-  if (window.supabase && window.supabase.createClient) return window.supabase.createClient;
+  if (window.supabase?.createClient) {
+    return window.supabase.createClient;
+  }
   try {
-    const m = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
-    return m.createClient;
+    const module = await import(
+      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+    );
+    return module.createClient;
   } catch {
-    const m = await import("https://esm.sh/@supabase/supabase-js@2");
-    return m.createClient;
+    const module = await import(
+      "https://esm.sh/@supabase/supabase-js@2"
+    );
+    return module.createClient;
   }
 }
 
-// Best-effort read of the persisted session straight from localStorage. Used
-// only as a recovery hint: getSession() can transiently return null (a flaky /
-// mid-flight token refresh, Safari throttling), which otherwise makes a
-// signed-in user look logged out — no chats, no admin link, profile shows the
-// sign-in gate. If a real session is stored, we re-establish it below.
 function storedSession() {
   try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!/^sb-.+-auth-token$/.test(k)) continue;
-      const raw = JSON.parse(localStorage.getItem(k) || "null");
-      const s = (raw && raw.currentSession) || raw; // tolerate storage-format differences
-      if (s && s.access_token && s.refresh_token && s.user) return s;
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!/^sb-.+-auth-token$/.test(key)) continue;
+      const parsed = JSON.parse(
+        localStorage.getItem(key) || "null",
+      );
+      const stored = parsed?.currentSession || parsed;
+      if (stored?.access_token &&
+          stored?.refresh_token && stored?.user) {
+        return stored;
+      }
     }
-  } catch { /* unreadable storage — treat as no stored session */ }
+  } catch { /* unreadable storage means no recovery hint */ }
   return null;
+}
+
+async function recoverSession(sb, data) {
+  if (data.session) return data;
+  const stored = storedSession();
+  if (!stored) return data;
+  try {
+    const result = await sb.auth.setSession({
+      access_token: stored.access_token,
+      refresh_token: stored.refresh_token,
+    });
+    return result.data?.session ? result.data : data;
+  } catch {
+    return data;
+  }
+}
+
+function notifyAuth(event, current) {
+  _g.session = current;
+  const userId = current?.user?.id || null;
+  const changed = userId !== _g.lastUid;
+  if (changed && current) {
+    void ensureProfile().finally(schedulePinBriefing);
+  } else {
+    schedulePinBriefing();
+  }
+  const quiet = event === "TOKEN_REFRESHED" ||
+    event === "SIGNED_IN" || event === "INITIAL_SESSION";
+  if (quiet && !changed) return;
+  _g.lastUid = userId;
+  _g.cbs.forEach((callback) => callback(current));
+}
+
+async function ensureProfile() {
+  const current = _g.session;
+  const name = current?.user?.user_metadata?.username;
+  if (!_g.sb || !current || !name) return;
+  const { error } = await _g.sb.rpc("upsert_profile", {
+    p_username: String(name).slice(0, 24),
+  });
+  if (error) console.warn("profile setup failed", error.message);
+}
+
+function schedulePinBriefing() {
+  injectCss();
+  if (document.body) {
+    void startPinBriefing(uiDeps);
+    return;
+  }
+  document.addEventListener(
+    "DOMContentLoaded",
+    () => void startPinBriefing(uiDeps),
+    { once: true },
+  );
+}
+
+async function initializeClient() {
+  const createClient = await getCreateClient();
+  _g.sb = createClient(
+    cfg.url.replace(/\/$/, ""),
+    cfg.anonKey,
+  );
+  const initial = await _g.sb.auth.getSession();
+  const data = await recoverSession(_g.sb, initial.data);
+  _g.session = data.session;
+  _g.lastUid = data.session?.user?.id || null;
+  _g.sb.auth.onAuthStateChange(notifyAuth);
+  await ensureProfile();
+  schedulePinBriefing();
+  return _g.sb;
 }
 
 export async function client() {
   if (_g.sb) return _g.sb;
-  if (!_g.ready) {
-    _g.ready = (async () => {
-      const createClient = await getCreateClient();
-      _g.sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
-      let { data } = await _g.sb.auth.getSession();
-      if (!data.session) {
-        // getSession came back empty. If a session is actually persisted, recover
-        // it (setSession refreshes an expired access token when the refresh token
-        // is still good) rather than declaring the user logged out. If the refresh
-        // token is genuinely dead, this fails quietly and we stay signed out.
-        const stored = storedSession();
-        if (stored) {
-          try {
-            const r = await _g.sb.auth.setSession({
-              access_token: stored.access_token, refresh_token: stored.refresh_token,
-            });
-            if (r.data && r.data.session) data = r.data;
-          } catch { /* dead refresh token — genuinely signed out */ }
-        }
-      }
-      _g.session = data.session;
-      _g.lastUid = data.session?.user?.id || null;
-      _g.sb.auth.onAuthStateChange((e, s) => {
-        _g.session = s;
-        const uid = s?.user?.id || null;
-        const changed = uid !== _g.lastUid;
-        // GoTrue re-emits SIGNED_IN on tab refocus and TOKEN_REFRESHED hourly.
-        // Pages hang whole boot()/gate() rebuilds off onAuth, so only notify
-        // them when something user-visible changed (sign-in/out, user switch,
-        // USER_UPDATED for username edits) — not for silent token churn.
-        if ((e === "TOKEN_REFRESHED" || e === "SIGNED_IN" || e === "INITIAL_SESSION") && !changed) return;
-        _g.lastUid = uid;
-        _g.cbs.forEach((cb) => cb(s));
-      });
-      return _g.sb;
-    })();
-  }
+  if (!_g.ready) _g.ready = initializeClient();
   await _g.ready;
   return _g.sb;
 }
 
 export const session = () => _g.session;
-export const username = () => (_g.session ? (_g.session.user.user_metadata?.username || _g.session.user.email) : null);
-export function onAuth(cb) { _g.cbs.push(cb); }
 
-export async function signIn(email, password) {
-  const sb = await client();
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) throw error;
+export const username = () => _g.session
+  ? (_g.session.user.user_metadata?.username ||
+    _g.session.user.email)
+  : null;
+
+export function onAuth(callback) {
+  _g.cbs.push(callback);
 }
-export async function signUp(email, password, uname) {
+
+function randomPassword() {
+  const bytes = new Uint8Array(RANDOM_PASSWORD_LENGTH);
+  crypto.getRandomValues(bytes);
+  return Array.from(
+    bytes,
+    (byte) => PASSWORD_ALPHABET[byte & 63],
+  ).join("");
+}
+
+async function invokePin(body) {
   const sb = await client();
-  const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username: uname } } });
-  if (error) throw error;
+  const { data, error } = await sb.functions.invoke(
+    PIN_FUNCTION,
+    { body },
+  );
+  if (error) throw new Error("PIN request failed");
+  if (!data || data.error) throw new Error("PIN request failed");
   return data;
 }
-export async function signOut() { const sb = await client(); await sb.auth.signOut(); }
 
-/* ---------------- reusable UI ---------------- */
-const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+export async function loginWithPin(identifier, pin) {
+  const sb = await client();
+  const data = await invokePin({
+    action: "login",
+    identifier,
+    pin,
+  });
+  if (!data.hashed_token) throw new Error("PIN request failed");
+  const result = await sb.auth.verifyOtp({
+    type: "email",
+    token_hash: data.hashed_token,
+  });
+  if (result.error) throw result.error;
+  return result.data;
+}
+
+export async function loginWithPassword(
+  identifier,
+  password,
+) {
+  const sb = await client();
+  const data = await invokePin({
+    action: "login",
+    identifier,
+    password,
+  });
+  const accessToken = data.session?.access_token;
+  const refreshToken = data.session?.refresh_token;
+  if (!accessToken || !refreshToken) {
+    throw new Error("Password request failed");
+  }
+  const result = await sb.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  if (result.error) throw result.error;
+  return result.data;
+}
+
+export async function signIn(identifier, password) {
+  return loginWithPassword(identifier, password);
+}
+
+export async function signUp(email, _password, uname) {
+  return signUpRandom(email, uname);
+}
+
+export async function signUpRandom(email, uname) {
+  const sb = await client();
+  const password = randomPassword();
+  _g.pinSetupPending = true;
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { username: uname, pin_account: true },
+    },
+  });
+  if (error) {
+    _g.pinSetupPending = false;
+    throw error;
+  }
+  if (!data.session) _g.pinSetupPending = false;
+  return data;
+}
+
+export async function setPin(pin, length, proof = {}) {
+  _g.pinSetupPending = true;
+  try {
+    const data = await invokePin({
+      action: "set",
+      pin,
+      length,
+      currentCredential: proof.currentCredential || "",
+      recovery: proof.recovery === true,
+    });
+    _g.pinSetupPending = false;
+    schedulePinBriefing();
+    return data;
+  } catch (error) {
+    _g.pinSetupPending = false;
+    throw error;
+  }
+}
+
+export async function pinStatus() {
+  const sb = await client();
+  const [pinResult, edgeStatus] = await Promise.all([
+    sb.rpc("has_pin"),
+    invokePin({ action: "status" }),
+  ]);
+  if (pinResult.error) throw pinResult.error;
+  return Object.freeze({
+    hasPin: pinResult.data === true,
+    isLegacy: edgeStatus.isLegacy === true,
+  });
+}
+
+export async function resetPin(email) {
+  const sb = await client();
+  const redirectTo = location.href.replace(/#.*$/, "");
+  const { error } = await sb.auth.resetPasswordForEmail(
+    email,
+    { redirectTo },
+  );
+  if (error) throw error;
+}
+
+export async function signOut() {
+  const sb = await client();
+  const { error } = await sb.auth.signOut();
+  if (error) throw error;
+  resetPinBriefing();
+}
+
+const uiDeps = Object.freeze({
+  session,
+  username,
+  signOut,
+  loginPin: loginWithPin,
+  loginPassword: loginWithPassword,
+  signUpRandom,
+  setPin,
+  pinStatus,
+  resetPin,
+  pinSetupPending: () => _g.pinSetupPending === true,
+});
 
 function injectCss() {
   if (document.getElementById("auth-css")) return;
-  const s = document.createElement("style");
-  s.id = "auth-css";
-  s.textContent = `
-  .auth-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:30px;border:1px solid #2a2a4a;background:#1a1a30;color:#e8e8f0;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;white-space:nowrap}
-  .auth-btn:hover{border-color:#4de8ff;color:#4de8ff}
-  .auth-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:5000;padding:18px}
-  .auth-modal.open{display:flex}
-  .auth-box{background:#161625;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:26px 24px;width:340px;max-width:100%;color:#e8e8f0;font-family:inherit}
-  .auth-box h3{margin:0 0 4px;font-size:20px}
-  .auth-tabs{display:flex;gap:8px;margin:14px 0}
-  .auth-tab{flex:1;padding:8px;border-radius:10px;border:1px solid #2a2a4a;background:transparent;color:#8888aa;cursor:pointer;font-weight:700;font-size:13px}
-  .auth-tab.active{background:#ff6b9d;border-color:#ff6b9d;color:#fff}
-  .auth-box input{width:100%;background:#1a1a30;border:1px solid #2a2a4a;color:#e8e8f0;border-radius:10px;padding:11px 12px;font-size:14px;margin-bottom:10px;font-family:inherit}
-  .auth-go{width:100%;background:#ff6b9d;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer}
-  .auth-go:hover{filter:brightness(1.08)}
-  .auth-msg{font-size:12.5px;margin-top:10px;min-height:16px}
-  .auth-msg.err{color:#ff6b6b}.auth-msg.ok{color:#44ff88}
-  .auth-x{float:right;background:none;border:none;color:#8888aa;font-size:20px;cursor:pointer;line-height:1}`;
-  document.head.appendChild(s);
-}
-
-let _modal;
-function modalEl() {
-  if (_modal) return _modal;
-  injectCss();
-  _modal = document.createElement("div");
-  _modal.className = "auth-modal";
-  _modal.innerHTML = `<div class="auth-box"></div>`;
-  _modal.addEventListener("click", (e) => { if (e.target === _modal) _modal.classList.remove("open"); });
-  document.body.appendChild(_modal);
-  return _modal;
+  const style = document.createElement("style");
+  style.id = "auth-css";
+  style.textContent = `
+    .auth-btn{display:inline-flex;align-items:center;gap:6px}
+    .auth-modal{position:fixed;inset:0;display:none;
+      align-items:center;justify-content:center;z-index:5000;
+      padding:18px}
+    .auth-modal.open{display:flex}
+    .auth-box{width:360px;max-width:100%;max-height:90vh;
+      overflow:auto;box-sizing:border-box}
+    .auth-x{float:right}
+    .auth-tabs,.pin-row{display:flex;gap:8px}
+    .auth-tab{flex:1}
+    .auth-box input:not(.pin-box){width:100%;box-sizing:border-box}
+    .auth-go{width:100%}
+    .pin-pad{display:flex;justify-content:center;gap:6px}
+    .pin-box{width:2.25em;text-align:center;box-sizing:border-box}
+    .pin-brief{max-width:380px}
+  `;
+  document.head.appendChild(style);
 }
 
 export function openAuthModal() {
-  const m = modalEl();
-  if (session()) {
-    m.querySelector(".auth-box").innerHTML =
-      `<button class="auth-x">&times;</button><h3>Signed in</h3>
-       <p style="color:#8888aa;font-size:13px">as <b>${esc(username())}</b></p>
-       <button class="auth-go" id="authOut">Sign out</button>`;
-    m.querySelector(".auth-x").onclick = () => m.classList.remove("open");
-    m.querySelector("#authOut").onclick = async () => { await signOut(); m.classList.remove("open"); };
-    m.classList.add("open");
-    return;
-  }
-  let mode = "in";
-  const draw = () => {
-    m.querySelector(".auth-box").innerHTML = `
-      <button class="auth-x">&times;</button>
-      <h3>Account</h3>
-      <div class="auth-tabs">
-        <button class="auth-tab ${mode === "in" ? "active" : ""}" data-m="in">Sign in</button>
-        <button class="auth-tab ${mode === "up" ? "active" : ""}" data-m="up">Create account</button>
-      </div>
-      ${mode === "up" ? '<input id="authUser" placeholder="Username" maxlength="24" autocomplete="username">' : ""}
-      <input id="authEmail" type="email" placeholder="Email" autocomplete="email">
-      <input id="authPass" type="password" placeholder="Password (min 6)" autocomplete="current-password">
-      <button class="auth-go">${mode === "up" ? "Create account" : "Sign in"}</button>
-      <div class="auth-msg" id="authMsg"></div>`;
-    const box = m.querySelector(".auth-box");
-    box.querySelector(".auth-x").onclick = () => m.classList.remove("open");
-    box.querySelectorAll(".auth-tab").forEach((t) => (t.onclick = () => { mode = t.dataset.m; draw(); }));
-    box.querySelector(".auth-go").onclick = submit;
-  };
-  const v = (id) => (document.getElementById(id)?.value || "").trim();
-  const submit = async () => {
-    const msg = document.getElementById("authMsg");
-    const email = v("authEmail"), pass = v("authPass");
-    msg.className = "auth-msg";
-    if (!email || pass.length < 6) { msg.className = "auth-msg err"; msg.textContent = "Enter an email and a 6+ char password."; return; }
-    msg.textContent = "…";
-    try {
-      if (mode === "up") {
-        const data = await signUp(email, pass, v("authUser") || email.split("@")[0]);
-        if (!data.session) { msg.className = "auth-msg ok"; msg.textContent = "Account created — confirm via email, then sign in."; return; }
-      } else {
-        await signIn(email, pass);
-      }
-      m.classList.remove("open");
-    } catch (e) { msg.className = "auth-msg err"; msg.textContent = e.message || "Something went wrong."; }
-  };
-  draw();
-  m.classList.add("open");
+  injectCss();
+  openAuthDialog(uiDeps);
 }
 
-/* Render a sign-in / username button into a host element and keep it in sync.
- * Idempotent: pages that re-run boot() on auth changes call this again — reuse
- * the existing button instead of stacking a duplicate next to it. */
+export function openPinSetup() {
+  injectCss();
+  if (!session()) {
+    openAuthModal();
+    return;
+  }
+  void openProfilePinDialog(uiDeps);
+}
+
 export function mountAccountButton(host) {
   injectCss();
   const existing = host.querySelector(".auth-btn");
-  const btn = existing || document.createElement("button");
-  const sync = () => { btn.innerHTML = session() ? `👤 ${esc(username())}` : "👤 Sign in"; };
+  const button = existing || document.createElement("button");
+  const sync = () => {
+    const label = session()
+      ? `👤 ${esc(username())}`
+      : "👤 " + esc(window.I18N?.t?.("auth.signinShort") || "Sign in");
+    button.innerHTML = label;
+  };
   if (!existing) {
-    btn.className = "auth-btn";
-    btn.onclick = openAuthModal;
-    host.appendChild(btn);
+    button.className = "auth-btn";
+    button.addEventListener("click", openAuthModal);
+    host.appendChild(button);
     onAuth(sync);
-    client().then(sync).catch(() => sync());
+    client().then(sync).catch(sync);
   }
   sync();
-  return btn;
+  return button;
 }

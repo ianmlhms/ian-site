@@ -278,7 +278,7 @@ load();
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-  import * as auth from "./auth.js?v=5";
+  import * as auth from "./auth.js?v=8";
   let sb = null;
   const $ = (id) => document.getElementById(id);
   (async () => { if (!auth.authConfigured) return; auth.mountAccountButton($("acctHost")); sb = await auth.client(); })();
@@ -308,7 +308,7 @@ load();
   $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") $("lbModal").classList.remove("open"); };
   document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; document.querySelectorAll("[data-lb]").forEach(x => x.classList.toggle("on", x === b)); drawBoard(); });
 </script>
-  <script type="module" src="rtc-ring.js?v=2"></script>
-  <script type="module" src="class-gate.js?v=4"></script>
+  <script type="module" src="rtc-ring.js?v=5"></script>
+  <script type="module" src="class-gate.js?v=7"></script>
 </body>
 </html>

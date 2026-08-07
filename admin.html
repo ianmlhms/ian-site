@@ -93,6 +93,18 @@
     <div class="side-h">
       <div class="tabs"><button id="tabGroups" class="tab active">Groups</button><button id="tabUsers" class="tab">Users</button><button id="tabFeedback" class="tab">Feedback</button></div>
       <input id="search" placeholder="Search…">
+      <div class="uact">
+        <h4>PIN zerécksetzen</h4>
+        <div class="pwrow">
+          <input id="pinResetUser"
+            placeholder="Benotzernumm">
+          <button id="pinResetBtn">Zerécksetzen</button>
+        </div>
+        <div class="hint">
+          Erstellt e sécheren eemolege Link fir de Benotzer.
+        </div>
+        <div class="pwresult" id="pinResetResult"></div>
+      </div>
     </div>
     <ul class="glist" id="glist"></ul>
   </aside>
@@ -104,8 +116,74 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="admin.js?v=8"></script>
-  <script type="module" src="rtc-ring.js?v=2"></script>
-  <script type="module" src="class-gate.js?v=4"></script>
+<script type="module" src="admin.js?v=11"></script>
+<script type="module">
+import { client } from "./auth.js?v=8";
+
+const username = document.getElementById("pinResetUser");
+const reset = document.getElementById("pinResetBtn");
+const output = document.getElementById("pinResetResult");
+
+function showMessage(message) {
+  output.replaceChildren();
+  output.textContent = message;
+}
+
+function showRecoveryLink(name, url) {
+  showMessage(`PIN fir ${name} geläscht. Deelt dëse Link:`);
+  const row = document.createElement("div");
+  row.className = "pwrow";
+  const field = document.createElement("input");
+  field.value = url;
+  field.readOnly = true;
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "Kopéieren";
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      copy.textContent = "Kopéiert ✓";
+    } catch {
+      field.select();
+      document.execCommand("copy");
+    }
+  });
+  row.append(field, copy);
+  output.appendChild(row);
+}
+
+async function resetPin() {
+  const name = username.value.trim();
+  if (!name) {
+    showMessage("Gëff e Benotzernumm an.");
+    return;
+  }
+  reset.disabled = true;
+  showMessage("Reset leeft…");
+  try {
+    const sb = await client();
+    const { data, error } = await sb.functions.invoke(
+      "auth-pin",
+      { body: { action: "admin-reset", username: name } },
+    );
+    if (error || !data?.recovery_url) {
+      throw new Error(data?.error || "reset failed");
+    }
+    showRecoveryLink(data.username || name, data.recovery_url);
+  } catch (error) {
+    console.warn("PIN admin reset failed", error);
+    showMessage("De PIN konnt net zeréckgesat ginn.");
+  } finally {
+    reset.disabled = false;
+  }
+}
+
+reset.addEventListener("click", resetPin);
+username.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") resetPin();
+});
+</script>
+  <script type="module" src="rtc-ring.js?v=5"></script>
+  <script type="module" src="class-gate.js?v=7"></script>
 </body>
 </html>
