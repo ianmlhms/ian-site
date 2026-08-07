@@ -63,8 +63,9 @@ revoke all on public.pin_admin_resets
   from public, anon, authenticated;
 grant all on public.pin_admin_resets to service_role;
 -- Email and username resolution stay server-only.
-create index if not exists users_email_lower_idx
-  on auth.users(lower(email));
+-- No index on auth.users: the platform owns it, so
+-- indexing fails with "must be owner of table users".
+-- A seq scan over 86 rows costs nothing.
 create index if not exists profiles_name_lower_idx
   on public.profiles(lower(username));
 create or replace function public.lookup_pin_account(

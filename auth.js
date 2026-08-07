@@ -162,14 +162,28 @@ function randomPassword() {
   ).join("");
 }
 
+/* Thrown when auth-pin itself is unreachable, as opposed to it answering
+ * "those credentials are wrong". Only the former may fall back to GoTrue —
+ * falling back on a genuine rejection would just retry a bad password. */
+class PinServiceDown extends Error {}
+
+/** A rejection carries our own JSON body; anything else is the service failing. */
+function isServiceDown(error, data) {
+  if (!error) return !data;
+  const status = error.context?.status;
+  return typeof status !== "number" || status === 404 || status >= 500;
+}
+
 async function invokePin(body) {
   const sb = await client();
   const { data, error } = await sb.functions.invoke(
     PIN_FUNCTION,
     { body },
   );
-  if (error) throw new Error("PIN request failed");
-  if (!data || data.error) throw new Error("PIN request failed");
+  if (error || !data || data.error) {
+    if (isServiceDown(error, data)) throw new PinServiceDown("PIN service unavailable");
+    throw new Error("PIN request failed");
+  }
   return data;
 }
 
@@ -194,11 +208,19 @@ export async function loginWithPassword(
   password,
 ) {
   const sb = await client();
-  const data = await invokePin({
-    action: "login",
-    identifier,
-    password,
-  });
+  let data;
+  try {
+    data = await invokePin({ action: "login", identifier, password });
+  } catch (error) {
+    // auth-pin down. Legacy accounts still have a real password GoTrue knows,
+    // so sign them in directly rather than locking the whole site out — which
+    // is exactly what happened when the frontend shipped ahead of the function.
+    // Only works with an email; username resolution needs the service role.
+    if (!(error instanceof PinServiceDown) || !identifier.includes("@")) throw error;
+    const direct = await sb.auth.signInWithPassword({ email: identifier, password });
+    if (direct.error) throw direct.error;
+    return direct.data;
+  }
   const accessToken = data.session?.access_token;
   const refreshToken = data.session?.refresh_token;
   if (!accessToken || !refreshToken) {
