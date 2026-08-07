@@ -8,3 +8,6 @@
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Claude Code local state (agent worktrees live here)
+.claude/

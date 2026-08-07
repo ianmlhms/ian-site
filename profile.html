@@ -11,6 +11,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=11"></script>
+<script src="i18n-dict.js?v=25"></script>
+<script src="i18n.js?v=2"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
   *{box-sizing:border-box}
@@ -74,7 +76,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=5";
+import * as auth from "./auth.js?v=8";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","🦁","🐯","🐵",
@@ -215,6 +217,11 @@ async function boot(){
     </div>
     <h2>Or pick an emoji</h2>
     <div class="card"><div class="grid" id="avGrid"></div><div class="msg" id="avMsg"></div></div>
+    <h2 data-i18n="pin.profileTitle">PIN</h2>
+    <div class="card">
+      <button class="btn" id="pinChange" data-i18n="pin.change">Change PIN</button>
+      <div class="hint" data-i18n="pin.changeHint">Use 4 or 6 digits. Six is recommended.</div>
+    </div>
     <h2>Your stats</h2>
     <div class="card stats" id="stats"><div class="gate">Loading…</div></div>
     <h2>Achievements</h2>
@@ -223,6 +230,8 @@ async function boot(){
   wireUpload();
   wireName();
   wireClass();
+  $("pinChange").onclick=auth.openPinSetup;
+  window.I18N?.apply($("wrap"));
   const grid=$("avGrid");
   for(const a of AVATARS){
     const b=document.createElement("button");
@@ -361,7 +370,7 @@ async function loadStats(uname){
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=2"></script>
-  <script type="module" src="class-gate.js?v=4"></script>
+  <script type="module" src="rtc-ring.js?v=5"></script>
+  <script type="module" src="class-gate.js?v=7"></script>
 </body>
 </html>

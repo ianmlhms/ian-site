@@ -1,5 +1,5 @@
 import { spring } from "./ppt-motion.js?v=3";
-import { searchPhotos } from "./ppt-images.js?v=5";
+import { searchPhotos } from "./ppt-images.js?v=8";
 import { esc } from "./ppt-render-dom.js?v=5";
 
 const OPEN_SCALE = 0.94;
