@@ -178,6 +178,12 @@
         <a class="tile admin admin-only" href="admin.html" style="display:none">
           <span class="ico" aria-hidden="true">🛡</span><span class="tname">Admin</span><span class="tsub" data-i18n="tile.admin.sub">Moderation</span>
         </a>
+        <a class="tile ppt owner-only" href="ppt.html" style="display:none">
+          <span class="ico" aria-hidden="true">▣</span><span class="tname">PPT Builder</span><span class="tsub">Presentatiounen aus dem Optrag</span>
+        </a>
+        <a class="tile doc owner-only" href="doc.html" style="display:none">
+          <span class="ico" aria-hidden="true">📄</span><span class="tname">Word Builder</span><span class="tsub">Dokumenter a mengem Stil</span>
+        </a>
       </div>
     </section>
 
@@ -378,6 +384,7 @@
     import { mountAccountButton, openAuthModal, client, session, onAuth } from "./auth.js?v=5";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)
+    const OWNER_EMAIL = "konto@ian.lu";                          // the PPT/Word studios; ian@ian.lu is the test account
     mountAccountButton(document.getElementById("acctHost"));
     document.getElementById("appsGateBtn").onclick = openAuthModal;   // signed-out gate → sign-in modal
     async function refreshTiles() {
@@ -400,6 +407,11 @@
       const email = (session()?.user?.email || "").toLowerCase();
       const hotel = HOTEL_ALLOW.includes(email);
       document.querySelectorAll(".private-hotel").forEach((e) => (e.style.display = hotel ? "" : "none"));
+      // The studios gate on konto@ian.lu server-side, so they key on the owner
+      // email rather than is_admin() — ian@ian.lu is an admin but is the test
+      // account, and would get a tile that 403s.
+      const owner = email === OWNER_EMAIL;
+      document.querySelectorAll(".owner-only").forEach((e) => (e.style.display = owner ? "" : "none"));
     }
     onAuth(() => refreshTiles());
     refreshTiles();
