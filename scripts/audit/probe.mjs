@@ -37,6 +37,15 @@ export function auditPage(options) {
     return text.trim();
   }
 
+  /** True when any ancestor is taken out of normal flow (a deliberate overlay). */
+  function isOverlaid(node) {
+    for (let cur = node.parentElement; cur && cur !== document.body; cur = cur.parentElement) {
+      const position = getComputedStyle(cur).position;
+      if (position === "fixed" || position === "absolute" || position === "sticky") return true;
+    }
+    return false;
+  }
+
   function isVisible(node, style, rect) {
     if (style.visibility === "hidden" || style.display === "none") return false;
     if (Number(style.opacity) < 0.05) return false;
@@ -148,8 +157,12 @@ export function auditPage(options) {
     /* 5. collision candidates: block boxes in normal flow, not page-sized.
      * Purely inline elements are excluded — an inline rect spans every line box
      * it touches, so a <strong> mid-paragraph "overlaps" the <a> after it
-     * without anything being visually wrong. */
+     * without anything being visually wrong. Elements *inside* a fixed or
+     * absolute ancestor are excluded too: the links in the fixed bottom app-nav
+     * are themselves `static`, so content scrolling under the nav — which is
+     * what a fixed bar is for — otherwise reads as a collision on every page. */
     if (text && style.position === "static" && style.display !== "inline"
+      && !isOverlaid(node)
       && rect.width * rect.height < view.w * view.h * MAX_COMPARE_AREA) {
       textBoxes.push({ node, rect });
     }

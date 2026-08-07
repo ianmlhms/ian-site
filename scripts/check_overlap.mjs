@@ -40,7 +40,8 @@ const KINDS = ["overflow", "offscreen", "collision", "clipped", "contrast", "hit
 const SKIP = new Set(["googled2bde022f66de7b9.html", "games.html"]);
 
 function parseArgs(argv) {
-  const flags = { widths: [390, 1280], themes: ["dark", "light"], pages: null, write: false, quiet: false };
+  const flags = { widths: [390, 1280], themes: ["dark", "light"], pages: null, write: false,
+    quiet: false, settle: SETTLE_MS };
   for (let i = 0; i < argv.length; i += 1) {
     const [key, inline] = argv[i].split("=");
     const value = inline ?? argv[i + 1];
@@ -49,6 +50,7 @@ function parseArgs(argv) {
     if (key === "--widths") flags.widths = value.split(",").map(Number);
     else if (key === "--themes") flags.themes = value.split(",");
     else if (key === "--pages") flags.pages = value.split(",");
+    else if (key === "--settle") flags.settle = Number(value);
     else continue;
     if (inline === undefined) i += 1;
   }
@@ -80,7 +82,7 @@ async function waitForServer() {
   throw new Error("static server did not start");
 }
 
-async function auditOne(client, page, width, theme) {
+async function auditOne(client, page, width, theme, settle = SETTLE_MS) {
   const url = `http://127.0.0.1:${SERVER_PORT}/${page}`;
   const { targetId, sessionId } = await openPage(client, url, width, VIEWPORT_HEIGHT);
   try {
@@ -91,7 +93,7 @@ async function auditOne(client, page, width, theme) {
     }, sessionId);
     await client.send("Page.reload", { ignoreCache: false }, sessionId);
     await Promise.race([client.once("Page.loadEventFired", sessionId), sleep(20000)]);
-    await sleep(SETTLE_MS);
+    await sleep(settle);
     const result = await evaluate(client, sessionId, auditPage, { theme });
     return { page, width, theme, ...result };
   } finally {
@@ -173,7 +175,8 @@ async function main() {
     await waitForServer();
     client = await launchChrome(DEBUG_PORT, profile);
     console.log(`Auditing ${pages.length} pages × ${flags.widths.join("/")}px × ${flags.themes.join("/")} …`);
-    const results = await runPool(jobs, (job) => auditOne(client, job.page, job.width, job.theme));
+    const results = await runPool(jobs, (job) =>
+      auditOne(client, job.page, job.width, job.theme, flags.settle));
     const perPage = summarise(results);
 
     if (flags.write) {
