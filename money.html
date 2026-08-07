@@ -7,17 +7,17 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--warn:#f87171;--gold:#f0b429}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2);text-decoration:none}
+  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{flex:1;width:100%;max-width:720px;margin:0 auto;padding:16px 14px 48px;display:flex;flex-direction:column;gap:14px}
   .gate{text-align:center;color:var(--muted);padding:50px 16px}
-  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:14px}
+  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:14px}
   .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;font-size:13px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
   h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 0;display:flex;align-items:center;gap:10px}
@@ -29,7 +29,7 @@
   .bal .metric span{font-size:11px;color:var(--muted)}
   .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;flex-wrap:wrap}
   .seg button{background:var(--card2);color:var(--muted);border:none;padding:8px 12px;font-weight:800;cursor:pointer;font-size:13px}
-  .seg button.on{background:var(--accent);color:#fff}
+  .seg button.on{background:var(--accent);color:var(--accent-foreground)}
   .field{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
   .field input,.field select{flex:1;min-width:90px}
   .row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
@@ -43,20 +43,20 @@
   .catbar .track{flex:1;height:9px;background:var(--card2);border-radius:6px;overflow:hidden}
   .catbar .fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
   .catbar .val{font-size:12px;color:var(--muted);width:96px;text-align:right;flex:0 0 auto;font-variant-numeric:tabular-nums}
-  .catbar.pick{cursor:pointer}.catbar.pick:hover .lab{color:var(--accent2)}
+  .catbar.pick{cursor:pointer}.catbar.pick:hover .lab{color:var(--accent2-text)}
   .chip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
-  .chip.on{border-color:var(--accent);color:var(--text)}
+  .chip.on{border-color:var(--accent-border);color:var(--text)}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
   .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(136,136,170,.18);color:var(--muted);margin-left:6px}
   .due{margin-left:auto;text-align:right;font-size:12px}.due.soon{color:var(--warn);font-weight:800}
   .del{background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:2px 4px}.del:hover{color:var(--warn)}
-  .flip{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px}.flip:hover{color:var(--accent2)}
-  .msg{min-height:15px;color:var(--accent2);font-weight:700;font-size:12.5px}
+  .flip{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:2px 4px}.flip:hover{color:var(--accent2-text)}
+  .msg{min-height:15px;color:var(--accent2-text);font-weight:700;font-size:12.5px}
   .hint{color:var(--muted);font-size:12px;line-height:1.5}
   .ai{background:linear-gradient(135deg,rgba(110,168,254,.12),rgba(77,232,255,.08));border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.55}
   details.acc>summary{cursor:pointer;list-style:none;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;padding:2px 0}
   details.acc>summary::-webkit-details-marker{display:none}
-  details.acc>summary::before{content:"▸ ";color:var(--accent)}
+  details.acc>summary::before{content:"▸ ";color:var(--accent-text)}
   details.acc[open]>summary::before{content:"▾ "}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
@@ -743,7 +743,7 @@ async function previewImport(rows,account){
   const list=fresh.slice(0,300).map(r=>`<div class="row"><span class="ic">${r.kind==="in"?"➕":"➖"}</span><div><div class="t" style="font-size:13px">${esc(r.note)}</div><div class="s">${r.at}</div></div><div class="amt ${r.kind}">${r.kind==="in"?"+":"−"}${CUR}${r.amount.toFixed(2)}</div></div>`).join("");
   $("impModalBody").innerHTML=`
     <div class="hint" style="margin-bottom:8px">Konto: <b style="color:var(--text)">${esc(account)}</b><br>
-      ${fresh.length} nei Buchungen${backfill.length?` · <span style="color:var(--accent2)">${backfill.length} kréien Konto/Kategorie</span>`:""}${untouched?` · ${untouched} onverännert`:""}<br>
+      ${fresh.length} nei Buchungen${backfill.length?` · <span style="color:var(--accent2-text)">${backfill.length} kréien Konto/Kategorie</span>`:""}${untouched?` · ${untouched} onverännert`:""}<br>
       <span style="color:var(--ok)">+${CUR}${inSum.toFixed(2)}</span> · <span style="color:var(--warn)">−${CUR}${outSum.toFixed(2)}</span></div>
     ${list||'<div class="hint">Keng nei Buchungen — mä existéierend kréien elo hiert Konto. 👍</div>'}
     ${fresh.length>300?'<div class="hint">…just déi éischt 300 gewisen; all ginn importéiert.</div>':""}`;
@@ -775,7 +775,7 @@ boot();
 </script>
 
 <div id="impModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:6000;align-items:center;justify-content:center;padding:16px">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;max-width:480px;width:100%;max-height:82vh;display:flex;flex-direction:column">
+  <div style="background:var(--glass-solid);border:1px solid var(--border);border-radius:16px;padding:18px;max-width:480px;width:100%;max-height:82vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <b style="font-size:16px">Import — Virschau</b>
       <button id="impModalX" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">&times;</button>

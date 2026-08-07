@@ -6,19 +6,19 @@
   <!-- Admin-only kart session list. Kept out of the index, like admin.html and me.html. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>KartTracker — All sessions</title>
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <script src="i18n-dict.js?v=23"></script>
 <script src="i18n.js?v=2"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--best:#3fb950}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2);text-decoration:none}
+  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{max-width:760px;margin:0 auto;padding:22px 18px 80px}
   .state{color:var(--muted);text-align:center;padding:50px 20px}
-  .auth-go{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-weight:800;cursor:pointer;margin-top:12px}
+  .auth-go{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:12px 18px;font-weight:800;cursor:pointer;margin-top:12px}
   .sumline{color:var(--muted);font-size:13px;margin-bottom:14px}
   .sess{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:13px 15px;margin-bottom:10px}
   .sess .info{flex:1;min-width:0}
@@ -28,7 +28,7 @@
   .sess .best small{display:block;color:var(--muted);font-weight:600;font-size:11px;text-align:right}
   .act{display:flex;gap:8px;flex:none}
   .mini{border:1px solid var(--border);background:var(--card2);color:var(--text);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none}
-  .mini:hover{border-color:var(--accent2);color:var(--accent2)}
+  .mini:hover{border-color:var(--accent2-text);color:var(--accent2-text)}
   .mini.x{color:var(--muted)} .mini.x:hover{color:#ff6b6b;border-color:#ff6b6b}
 </style>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">

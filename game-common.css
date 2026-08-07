@@ -24,7 +24,7 @@ body {
   color: var(--text);
   font-family: 'Nunito', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-a { color: var(--accent2); text-decoration: none; }
+a { color: var(--accent2-text); text-decoration: none; }
 
 .bar {
   display: flex; align-items: center; gap: 14px;
@@ -42,12 +42,12 @@ a { color: var(--accent2); text-decoration: none; }
   border-radius: 30px; padding: 7px 14px; white-space: nowrap;
   transition: border-color 0.2s, color 0.2s;
 }
-.bar .home:hover { border-color: var(--accent); color: var(--accent); }
+.bar .home:hover { border-color: var(--accent-border); color: var(--accent-text); }
 .bar h1 { font-family: 'Fredoka', sans-serif; font-size: 19px; font-weight: 600; letter-spacing: 0.3px; margin: 0; }
 .bar .spacer { flex: 1; }
 .bar .code { color: var(--muted); font-size: 13px; }
 
-code { background: var(--card2); padding: 3px 9px; border-radius: 8px; color: var(--accent2); font-weight: 700; }
+code { background: var(--card2); padding: 3px 9px; border-radius: 8px; color: var(--accent2-text); font-weight: 700; }
 
 .status { font-size: 19px; font-weight: 800; min-height: 24px; text-align: center; }
 .sub { color: var(--muted); font-size: 13px; text-align: center; }
@@ -58,7 +58,7 @@ code { background: var(--card2); padding: 3px 9px; border-radius: 8px; color: va
   font-family: 'Nunito', sans-serif; font-size: 14px;
   transition: border-color 0.2s, transform 0.15s, background 0.2s;
 }
-.btn:hover { border-color: var(--accent2); transform: translateY(-1px); }
+.btn:hover { border-color: var(--accent-border); transform: translateY(-1px); }
 
 .muted { color: var(--muted); }
 .center { text-align: center; }

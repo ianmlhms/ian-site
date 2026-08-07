@@ -1,33 +1,9 @@
 import { spring } from "./ppt-motion.js?v=3";
-import { applyThemeContrast } from "./glass-contrast.js?v=1";
 
 const NARROW_QUERY = "(max-width: 70rem)";
 const PANEL_DURATION = 0.36;
 const PANEL_BOUNCE = 0.04;
-let contrastObserver = null;
 let themeUpgradeQueued = false;
-
-function themeColours(root) {
-  const styles = getComputedStyle(root);
-  return { palette: { "--card": styles.getPropertyValue("--card").trim(),
-    "--bg": styles.getPropertyValue("--bg").trim() },
-  accent: styles.getPropertyValue("--accent").trim() };
-}
-
-function refreshContrast(root) {
-  const { palette, accent } = themeColours(root);
-  if (!/^#[\da-f]{3,6}$/i.test(accent)) return;
-  try { applyThemeContrast(root, palette, accent); }
-  catch (error) { console.error("studio contrast", error); }
-}
-
-function installContrast() {
-  const root = document.documentElement;
-  refreshContrast(root);
-  if (contrastObserver) return;
-  contrastObserver = new MutationObserver(() => refreshContrast(root));
-  contrastObserver.observe(root, { attributes: true, attributeFilter: ["style", "data-theme"] });
-}
 
 function upgradeThemeControls() {
   document.querySelectorAll("#themePop .th-sw").forEach((swatch) => {
@@ -135,6 +111,5 @@ export function createStudioShell(root, defaultPanel = "preview") {
 
 export function installStudioChrome() {
   document.body.classList.add("studio-active");
-  installContrast();
   ensureThemeControls();
 }

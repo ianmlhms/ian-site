@@ -7,19 +7,19 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171;--map-height:320px}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2);text-decoration:none}
+  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{flex:1;width:100%;max-width:1080px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
   .gate{text-align:center;color:var(--muted);padding:50px 16px}
   .gate .btn{margin-top:14px}
-  .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
+  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
   .btn:disabled{opacity:.55;cursor:wait}
   .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:13px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
@@ -30,7 +30,7 @@
   .newx{display:flex;flex-direction:column;gap:10px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.row label{flex:1;min-width:145px}
   .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .msg{min-height:16px;color:var(--accent2);font-weight:700;font-size:13px}
+  .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
   .msg.error{color:var(--warn)}
   .section-title{font-size:16px;margin:0 0 12px}
   .stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
@@ -45,7 +45,7 @@
   .date,.sub,.notes{color:var(--muted);font-size:12.5px}.route{font-size:17px;font-weight:800}
   .sub{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.duration{font-weight:800;font-variant-numeric:tabular-nums}
   .notes{grid-column:2/5;white-space:pre-wrap;overflow-wrap:anywhere}
-  .badge{display:inline-block;border:1px solid var(--border);background:var(--card2);border-radius:999px;padding:3px 7px;color:var(--accent2);font-size:10px;font-weight:800;text-transform:uppercase}
+  .badge{display:inline-block;border:1px solid var(--border);background:var(--card2);border-radius:999px;padding:3px 7px;color:var(--accent2-text);font-size:10px;font-weight:800;text-transform:uppercase}
   .flight-actions{display:flex;gap:6px;justify-content:flex-end;grid-column:5;grid-row:2}.flight-actions .ghost{padding:7px 9px}.danger:hover{color:var(--warn)}
   @media(max-width:850px){.stats{grid-template-columns:repeat(3,1fr)}.flight{grid-template-columns:82px 1fr auto}.plane{grid-column:2}.duration{grid-column:3;grid-row:1}.network{grid-column:1}.flight-actions{grid-column:3;grid-row:2}.notes{grid-column:2/4}}
   @media(max-width:520px){.bar{padding:12px}.bar h1{font-size:16px}.stats{grid-template-columns:repeat(2,1fr)}.flight{grid-template-columns:1fr auto}.date{grid-column:1}.route{grid-column:1}.plane{grid-column:1}.duration{grid-column:2;grid-row:2}.network{grid-column:2;grid-row:1}.flight-actions{grid-column:2;grid-row:3}.notes{grid-column:1/3}}

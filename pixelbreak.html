@@ -17,13 +17,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <!-- Google AdSense (public pages only) -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <style>
 :root{--brand1:#ff6b9d;--brand2:#4de8ff;--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
 html[data-theme="light"]{--brand1:#e23d78;--brand2:#0e7ec2}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;min-height:100vh}
-::selection{background:var(--accent);color:#fff}
+::selection{background:var(--accent);color:var(--accent-foreground)}
 header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
 .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer}
@@ -32,14 +32,14 @@ header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-ind
 .logo-text{font-family:'Fredoka',sans-serif;font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--brand1),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:11px;color:var(--text2);letter-spacing:2px;text-transform:uppercase}
 .search-box{display:flex;align-items:center;gap:8px;background:var(--card2);border:2px solid var(--border);border-radius:30px;padding:7px 16px;width:280px;transition:border-color 0.3s}
-.search-box:focus-within{border-color:var(--accent2)}
+.search-box:focus-within{border-color:var(--accent2-text)}
 .search-box input{background:none;border:none;color:var(--text);font-size:14px;outline:none;width:100%;font-family:'Nunito',sans-serif}
 .search-box input::placeholder{color:var(--muted)}
 .si{font-size:16px;opacity:0.4}
 .header-right{display:flex;align-items:center;gap:12px}
 .header-left{display:flex;align-items:center;gap:14px}
 .home-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:30px;border:2px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;font-weight:700;font-size:14px;font-family:'Nunito',sans-serif;white-space:nowrap;transition:all 0.2s}
-.home-btn:hover{border-color:var(--accent);color:var(--accent)}
+.home-btn:hover{border-color:var(--accent-border);color:var(--accent-text)}
 main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .sec-title{font-family:'Fredoka',sans-serif;font-size:23px;margin:26px 0 2px;display:flex;align-items:center;gap:9px;letter-spacing:0.3px}
 .sec-sub{color:var(--text2);font-size:13px;margin:2px 0 16px}
@@ -63,15 +63,15 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .game-name{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
 .game-tags{display:flex;gap:4px;flex-wrap:wrap}
 .tag{font-size:10px;padding:2px 7px;border-radius:7px;background:var(--card2);color:var(--text2)}
-.tag.mp{background:rgba(77,232,255,0.15);color:var(--accent2)}
-.tag.hot{background:rgba(255,107,157,0.15);color:var(--accent)}
+.tag.mp{background:rgba(77,232,255,0.15);color:var(--accent2-text)}
+.tag.hot{background:rgba(255,107,157,0.15);color:var(--accent-text)}
 .tag.new{background:rgba(68,255,136,0.15);color:var(--accent4)}
 .ext{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;padding:2px 6px;border-radius:5px}
 #overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
 #overlay.open{display:flex}
 #gh{display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 14px;color:#fff;background:#0d0d1a;flex:none}
 #gh h2{font-family:'Fredoka',sans-serif;font-size:18px}
-#cb{background:var(--accent);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none}
+#cb{background:var(--accent);border:none;color:var(--accent-foreground);width:34px;height:34px;border-radius:50%;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none}
 #cb:hover{transform:scale(1.1)}
 #gf{flex:1;width:100%;border:none;border-radius:0;background:#000;min-height:0}
 /* on-screen touch controls (touch devices only) — float over the game, drive it via synthetic key events */
@@ -82,18 +82,18 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 #tc .dpad .tb{width:50px;height:50px}
 #tc .up{left:53px;top:0}#tc .left{left:0;top:53px}#tc .down{left:53px;top:106px}#tc .right{left:106px;top:53px}
 #tc .act{position:static;width:78px;height:78px;border-radius:50%;background:var(--accent);border:none;font-weight:800;font-size:24px;flex:none}
-#tc .tb.on{background:var(--accent2);color:#0d0d1a}
+#tc .tb.on{background:var(--accent2);color:var(--accent2-foreground)}
 @media (pointer:coarse){#tc{display:flex}}
 #om{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
 #om.open{display:flex}
-#om .box{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;width:330px;max-width:100%}
+#om .box{background:var(--glass-solid);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;width:330px;max-width:100%}
 #om h3{font-family:'Fredoka',sans-serif;font-size:20px;margin-bottom:4px}
 #om p{color:var(--text2);font-size:13px;margin-bottom:14px}
-#om .go{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px;font-family:'Nunito',sans-serif}
+#om .go{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px;font-family:'Nunito',sans-serif}
 #om .go.alt{background:var(--card-hover);border:1px solid rgba(255,255,255,0.15)}
 #om .jr{display:flex;gap:8px;margin-top:4px}
 #om .jr input{flex:1;min-width:0;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px;font-size:14px;text-transform:lowercase;font-family:'Nunito',sans-serif}
-#om .jr button{background:var(--accent2);color:#0d0d1a;border:none;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
+#om .jr button{background:var(--accent2);color:var(--accent2-foreground);border:none;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
 #om .x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
 footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
 @media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:12px 12px 35px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.game-thumb{height:90px;font-size:36px}}
@@ -115,7 +115,7 @@ footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-t
 </div>
 </div>
 <div class="header-right">
-<button id="installBtn" style="display:none;background:var(--card-hover);border:1px solid var(--accent2);color:var(--accent2);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">📲 Install</button>
+<button id="installBtn" style="display:none;background:var(--card-hover);border:1px solid var(--accent2);color:var(--accent2-text);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">📲 Install</button>
 <div class="search-box">
 <span class="si">&#x1F50D;</span>
 <input type="text" id="search" placeholder="Search games..." oninput="applyFilters()">
@@ -343,8 +343,8 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
 applyFilters();
 </script>
 <!-- feedback box: suggest a game / report a bug -->
-<button id="fbFab" title="Feedback" style="position:fixed;bottom:18px;left:18px;z-index:900;width:48px;height:48px;border-radius:50%;border:1px solid var(--accent2);background:var(--card);color:var(--accent2);font-size:22px;cursor:pointer">💬</button>
-<div id="fbPanel" style="display:none;position:fixed;bottom:76px;left:18px;z-index:901;width:290px;max-width:calc(100vw - 36px);background:var(--card);border:1px solid var(--accent2);border-radius:14px;padding:14px;font-family:'Nunito',sans-serif">
+<button id="fbFab" title="Feedback" style="position:fixed;bottom:18px;left:18px;z-index:900;width:48px;height:48px;border-radius:50%;border:1px solid var(--accent2);background:var(--card);color:var(--accent2-text);font-size:22px;cursor:pointer">💬</button>
+<div id="fbPanel" style="display:none;position:fixed;bottom:76px;left:18px;z-index:901;width:290px;max-width:calc(100vw - 36px);background:var(--glass-solid);border:1px solid var(--accent2);border-radius:14px;padding:14px;font-family:'Nunito',sans-serif">
   <div style="font-weight:700;margin-bottom:8px">Feedback</div>
   <select id="fbKind" style="width:100%;margin-bottom:8px;padding:8px;border-radius:8px;border:1px solid var(--card-hover);background:var(--bg);color:var(--text);font-family:inherit">
     <option value="idea">💡 Suggest a game</option>
@@ -353,7 +353,7 @@ applyFilters();
   </select>
   <textarea id="fbMsg" rows="3" maxlength="2000" placeholder="Tell me…" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--card-hover);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical"></textarea>
   <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-    <button id="fbSend" style="flex:1;padding:9px;border-radius:8px;border:none;background:var(--accent2);color:#0d0d1a;font-weight:800;cursor:pointer;font-family:inherit">Send</button>
+    <button id="fbSend" style="flex:1;padding:9px;border-radius:8px;border:none;background:var(--accent2);color:var(--accent2-foreground);font-weight:800;cursor:pointer;font-family:inherit">Send</button>
     <span id="fbNote" style="font-size:12px;color:var(--text2)"></span>
   </div>
 </div>

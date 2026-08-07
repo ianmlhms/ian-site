@@ -9,20 +9,20 @@
   <meta name="description" content="Colour Dial — guess the colour together with a friend, or against an AI that reasons about hue." />
   <link rel="canonical" href="https://ian.lu/color.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2);text-decoration:none}
+  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2-text)}
   .wrap{max-width:560px;margin:0 auto;padding:22px 18px 60px}
   .players{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
   .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px}
   .pchip.locked{border-color:var(--good);color:var(--good)}
-  .big{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
+  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
   .big:disabled{opacity:.45;cursor:default}
   .ghost{background:var(--card2);color:var(--text);border:1px solid var(--border)}
   .swatch{width:100%;height:130px;border-radius:16px;border:1px solid var(--border)}
@@ -34,14 +34,14 @@
   @keyframes peekshrink{from{width:100%}to{width:0}}
   .modes{display:flex;gap:8px;justify-content:center;margin:0 0 14px}
   .modebtn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-weight:700;cursor:pointer;font-size:13px}
-  .modebtn.on{border-color:var(--accent);color:var(--text)}
+  .modebtn.on{border-color:var(--accent-border);color:var(--text)}
   .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.6px;margin:18px 0 8px;text-align:center}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;margin:8px 0 6px}
   .two .cap{font-size:11px;color:var(--muted);text-align:center;margin-bottom:5px}
   .sliders{margin:16px 0 8px}
   .srow{display:flex;align-items:center;gap:10px;margin:12px 0}
   .srow b{width:18px;font-size:14px}
-  .srow input[type=range]{flex:1;accent-color:var(--accent)}
+  .srow input[type=range]{flex:1;accent-color:var(--accent-text)}
   .srow .v{width:34px;text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
   .srow.R b{color:#ff5d6c}.srow.G b{color:#3fb950}.srow.B b{color:#6ea8fe}
   table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
@@ -54,7 +54,7 @@
   .rounds{display:flex;align-items:center;gap:10px;justify-content:center;margin:14px 0}
   .rounds input{width:70px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px;font-size:15px;text-align:center}
 </style>
-<link rel="stylesheet" href="game-common.css?v=3">
+<link rel="stylesheet" href="game-common.css?v=4">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
   <meta name="theme-color" content="#0d0d1a">

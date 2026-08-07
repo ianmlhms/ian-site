@@ -9,8 +9,8 @@
   <meta name="description" content="Connect 4 on ian.lu — drop discs and connect four, online on two devices or against three AI difficulty levels." />
   <link rel="canonical" href="https://ian.lu/connect4.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=10"></script>
-<link rel="stylesheet" href="game-common.css?v=3">
+<script src="theme.js?v=11"></script>
+<link rel="stylesheet" href="game-common.css?v=4">
 <style>
   :root{--red:#ff5d6c;--yellow:#ffcc4d;--board:#1b2150}
   body{display:flex;flex-direction:column}
@@ -22,7 +22,7 @@
   .board.mine .cell{cursor:pointer}
   .colbtns{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;width:100%;max-width:498px;padding:0 12px}
   .colbtns button{height:26px;border:none;border-radius:8px;background:var(--card2);color:var(--muted);cursor:pointer;font-size:14px}
-  .colbtns button:hover:not(:disabled){background:var(--accent);color:#fff}
+  .colbtns button:hover:not(:disabled){background:var(--accent);color:var(--accent-foreground)}
   .colbtns button:disabled{opacity:.3;cursor:default}
   .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
 </style>

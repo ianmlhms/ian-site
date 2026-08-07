@@ -7,13 +7,13 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--cyan:#4de8ff;--amber:#f5b942}
   *{box-sizing:border-box}
   html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   body{display:flex;flex-direction:column;overscroll-behavior:none}
-  a{color:var(--cyan);text-decoration:none}
+  a{color:var(--accent2-text);text-decoration:none}
   .bar{height:53px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);background:rgba(13,13,26,.92);z-index:5}
   .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.spacer{flex:1}
   .mute{width:40px;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--card);color:var(--text);font-size:18px;cursor:pointer}
@@ -26,8 +26,8 @@
   .hint{position:absolute;left:50%;bottom:15px;transform:translateX(-50%);color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none;text-shadow:0 1px 4px #000}
   .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(8,8,18,.5);backdrop-filter:blur(3px);text-align:center;z-index:3}
   .overlay.show{display:flex}.panel{min-width:min(360px,90vw);padding:26px;border:1px solid rgba(77,232,255,.42);border-radius:16px;background:rgba(22,22,37,.94);box-shadow:0 0 40px rgba(77,232,255,.15)}
-  .panel h2{margin:0 0 8px;color:var(--cyan);font-size:28px}.panel p{margin:5px 0;color:var(--muted)}
-  .panel strong{color:var(--text)}.again{margin-top:17px;color:var(--amber)!important;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+  .panel h2{margin:0 0 8px;color:var(--accent2-text);font-size:28px}.panel p{margin:5px 0;color:var(--muted)}
+  .panel strong{color:var(--text)}.again{margin-top:17px;color:var(--text)!important;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
   .fallback{display:grid;place-items:center;height:100%;padding:24px;color:var(--muted);text-align:center}
   @media (max-width:520px){.bar{padding:0 12px}.bar h1{font-size:16px}.hud{inset:9px 10px auto}.hint{bottom:9px}}
 </style>
