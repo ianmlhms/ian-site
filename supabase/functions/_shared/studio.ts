@@ -5,7 +5,7 @@ const STUCK_JOB_AGE_MS = 5 * 60 * 1000;
 const JOB_ID = /^[0-9a-f-]{36}$/i;
 const OWNER_EMAILS = new Set(["konto@ian.lu"]);
 const LANGS = new Set(["lb", "de", "en", "fr"]);
-const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e"]);
+const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -38,6 +38,9 @@ const VOICE_LEVELS = Object.freeze({
   "6e": { lb: "mother tongue", de: "B1+/B2", en: "B1", fr: "B1" },
   "5e": { lb: "mother tongue", de: "C1", en: "B2", fr: "B2" },
   "4e": { lb: "mother tongue", de: "C1", en: "B2+", fr: "B2+" },
+  "3e": { lb: "mother tongue", de: "C1", en: "C1", fr: "B2+/C1" },
+  "2e": { lb: "mother tongue", de: "C1+", en: "C1", fr: "C1" },
+  "1ère": { lb: "mother tongue", de: "C2", en: "C1+", fr: "C1" },
 });
 
 /** Extract the first complete JSON object while ignoring braces inside strings. */

@@ -127,7 +127,7 @@ function fontChoice(value) {
 }
 
 function schoolYear(value) {
-  return new Set(["7e", "6e", "5e", "4e"]).has(value) ? value : DEFAULT_SCHOOL_YEAR;
+  return new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]).has(value) ? value : DEFAULT_SCHOOL_YEAR;
 }
 
 function overlayFor(style, pack) {

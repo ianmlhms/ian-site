@@ -1,4 +1,4 @@
-@import url("./ppt.css?v=6");
+@import url("./ppt.css?v=7");
 
 .builder-link { padding: .38rem .65rem; border: 1px solid var(--border); border-radius: 999rem; color: var(--muted); font-size: .72rem; font-weight: 780; text-decoration: none; }
 .builder-link:hover, .builder-link:focus-visible { border-color: var(--accent); color: var(--text); }
@@ -20,8 +20,8 @@
 .authenticity-label output { color: var(--text); font-variant-numeric: tabular-nums; }
 .authenticity-label input { height: 1.6rem; padding: 0; accent-color: var(--accent); }
 .doc-preview-column { position: relative; min-width: 0; min-height: 0; overflow: hidden; border-radius: var(--studio-radius); background: var(--card2); }
-.doc-preview-column .preview-toolbar { position: absolute; }
-.doc-controls { position: absolute; z-index: 6; top: 4.2rem; right: 0; left: 0; display: flex; align-items: center; gap: .38rem; min-height: 3.25rem; overflow-x: auto; padding: .45rem .75rem; border-right: 0; border-left: 0; white-space: nowrap; }
+.doc-preview-column .preview-toolbar { position: static; }
+.doc-controls { position: static; display: flex; align-items: center; gap: .38rem; min-height: 3.25rem; overflow-x: auto; padding: .45rem .75rem; border-right: 0; border-left: 0; white-space: nowrap; }
 .doc-controls[hidden] { display: none; }
 .doc-controls label { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted); font-size: .68rem; }
 .doc-controls select, .doc-controls button { width: auto; min-height: 2.3rem; margin: 0; padding: .38rem .6rem; border: 1px solid var(--border); border-radius: .65rem; background: var(--card2); color: var(--text); font-size: .72rem; cursor: pointer; }
@@ -33,7 +33,7 @@
 .doc-body { display: grid; gap: .2rem; }
 .doc-block { position: relative; min-height: 1.35rem; margin: 0 -.7rem; padding: .24rem .7rem; border: 1px solid transparent; border-radius: .3rem; touch-action: pan-x; }
 .doc-block:hover, .doc-block:focus-visible, .doc-block.is-selected { border-color: #78a9ff; outline: 0; }
-.doc-block.is-dragging { z-index: 8; background: #fff; box-shadow: 0 .8rem 2.2rem rgba(0, 0, 0, .18); }
+.doc-block.is-dragging { z-index: var(--z-drag); background: #fff; box-shadow: 0 .8rem 2.2rem rgba(0, 0, 0, .18); }
 .doc-block p, .doc-block ul, .doc-block blockquote { margin: 0 0 8pt; }
 .doc-block h2 { margin: 12pt 0 5pt; font-size: 14pt; }
 .doc-block h3 { margin: 9pt 0 4pt; font-size: 12pt; }

@@ -6,6 +6,9 @@ const MAX_TOKENS = 12_000;
 type ImageBlock = { media_type: string; data: string };
 
 function taskFor(request: any): string {
+  if (request.action === "revise") {
+    return "Apply the instruction across the complete document and return the complete document JSON now. Preserve block ids and order unless the instruction explicitly requests a structural change.";
+  }
   if (request.action === "rewrite" && request.scope === "block") {
     return "Rewrite the target block and return exactly one replacement block JSON now.";
   }

@@ -1,11 +1,12 @@
 import * as auth from "./auth.js?v=5";
 import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3"; // Shared studio ingest; historical prefix kept intentionally.
-import { createDocumentGeneration, rewriteDocument } from "./doc-ai.js?v=1";
+import { createDocumentGeneration, reviseDocument, rewriteDocument } from "./doc-ai.js?v=2";
 import { documentText, validateDocument } from "./doc-schema.js?v=1";
 import { replaceBlock } from "./doc-ops.js?v=1";
 import { exportDocumentDocx } from "./doc-export.js?v=2";
 import { createHistory } from "./ppt-history.js?v=3";
 import { createDocumentEditor, esc } from "./doc-editor.js?v=1";
+import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=1"; installStudioChrome();
 import { deleteDocument, listDocuments, loadDocument, saveDocument,
   scheduleAutosave, startNewDocument } from "./doc-store.js?v=1";
 
@@ -38,7 +39,7 @@ const history = createHistory();
 function gate(title, message, canSignIn = false) {
   $("newDocument").hidden = true;
   $("root").className = "boot-root";
-  $("root").innerHTML = `<section class="gate-panel"><div class="gate-icon">▤</div>
+  $("root").innerHTML = `<section class="gate-panel glass glass--thick"><div class="gate-icon">▤</div>
     <h1>${esc(title)}</h1><p>${esc(message)}</p>
     ${canSignIn ? '<button class="primary-button" id="signIn" type="button">Umellen</button>' : ""}</section>`;
   if (canSignIn) $("signIn").onclick = () => auth.openAuthModal();
@@ -51,7 +52,7 @@ function typeCards() {
 }
 
 function inputPanel() {
-  return `<aside class="input-panel material-panel scroll-fade"><div class="panel-heading">
+  return `<aside class="input-panel glass glass--thick scroll-fade" data-panel="source" tabindex="-1"><div class="panel-heading">
       <span class="eyebrow">Quell</span><h1>Wat soll geschriwwe ginn?</h1></div>
     <label class="field-label">Instruktiounen<textarea id="instructions" rows="7"
       placeholder="Aufgabestellung, Thema, wichteg Punkten…"></textarea></label>
@@ -65,7 +66,8 @@ function inputPanel() {
       <label class="field-label">Wierder<input id="targetWords" type="number" min="80" max="5000" value="${DEFAULT_WORDS}"></label></div>
     <label class="field-label">Fach<input id="subject" maxlength="120" placeholder="z. B. Geografie"></label>
     <div class="voice-box"><span class="eyebrow">Deng Stëmm</span><div class="field-row">
-      <label class="field-label">Schouljoer<select id="schoolYear"><option>7e</option><option>6e</option><option>5e</option><option selected>4e</option></select></label>
+      <label class="field-label">Schouljoer<select id="schoolYear"><option>7e</option><option>6e</option><option>5e</option>
+        <option value="4e" selected>4e · aktuell 2026–27</option><option>3e</option><option>2e</option><option>1ère</option></select></label>
       <label class="field-label authenticity-label">Authentizitéit <output id="authenticityValue">75</output>
         <input id="authenticity" type="range" min="0" max="100" value="75"></label></div></div>
     <label class="toggle-row skip-mini"><span>Mini iwwersprangen<small>Direkt iwwer d'API</small></span>
@@ -81,15 +83,18 @@ function inputPanel() {
 }
 
 function previewPanel() {
-  return `<section class="doc-preview-column"><div class="preview-toolbar material-panel"><div>
+  return `<section class="doc-preview-column" data-panel="preview" tabindex="-1"><div class="preview-toolbar glass glass--chip"><div>
       <span class="eyebrow">Live Virschau</span><strong id="documentLabel">Nach keen Dokument</strong>
       <span class="engine-badge" id="engineLabel" hidden></span></div><div class="preview-actions">
       <button class="icon-text-button" id="undo" type="button" disabled>↶ <span>Zréck</span></button>
       <button class="icon-text-button" id="redo" type="button" disabled>↷ <span>Nees viru</span></button>
-      <button class="icon-text-button" id="rewriteAll" type="button" disabled>Ganzen Text mat AI</button>
       <button class="icon-text-button" id="copyText" type="button" disabled>Kopéieren</button>
       <button class="primary-button" id="exportDocx" type="button" disabled>Word exportéieren</button></div></div>
-    <div class="doc-controls material-panel" id="docControls" hidden></div>
+    <form class="revision-bar" id="reviseForm"><label><span>Änner dat ganzt Dokument</span>
+      <input id="reviseInstruction" maxlength="1200" placeholder="z. B. méi kuerz, ouni d'Lëtzebuerg-Beispiller"></label>
+      <button class="primary-button" id="reviseDocument" type="submit" disabled>Alles mat AI änneren</button>
+      <small>Opgepasst: Dëst schreift all Bléck nei. Eng Kéier „Zréck“ mécht déi ganz Ännerung réckgängeg.</small></form>
+    <div class="doc-controls glass glass--chip" id="docControls" hidden></div>
     <div class="doc-preview-scroll"><div class="doc-preview-host" id="docPreviewHost">
       <div class="empty-preview"><span>▤</span><h2>Däin Dokument erschéngt hei</h2><p>Instruktiounen dobäisetzen a generéieren.</p></div>
     </div></div></section>`;
@@ -98,9 +103,12 @@ function previewPanel() {
 function renderApp() {
   editor?.dispose();
   $("root").className = "doc-studio-root";
-  $("root").innerHTML = `<div class="doc-studio-grid">${inputPanel()}${previewPanel()}</div>`;
+  $("root").innerHTML = `<div class="doc-studio-grid"><nav class="panel-tabs glass glass--chip" role="tablist" aria-label="Studio Beräicher">
+      <button type="button" role="tab" data-panel-target="source">Quell</button>
+      <button type="button" role="tab" data-panel-target="preview">Virschau</button></nav>
+      ${inputPanel()}${previewPanel()}</div>`;
   $("newDocument").hidden = false;
-  bindInputs(); mountEditor(); refreshDocumentList(); consumeDeckSeed();
+  bindInputs(); mountEditor(); createStudioShell($("root"), "source"); refreshDocumentList(); consumeDeckSeed();
 }
 
 function setStatus(message, error = false) {
@@ -175,7 +183,7 @@ function bindInputs() {
   $("redo").onclick = () => restoreHistory(history.redo());
   $("exportDocx").onclick = exportWord;
   $("copyText").onclick = copyText;
-  $("rewriteAll").onclick = rewriteWhole;
+  $("reviseForm").onsubmit = (event) => { event.preventDefault(); rewriteWhole(); };
 }
 
 function mountEditor() {
@@ -191,7 +199,7 @@ function renderDocument() {
   if (!currentDocument) return;
   $("docControls").hidden = false; editor.render(); updateHistoryButtons();
   $("documentLabel").textContent = currentDocument.title;
-  ["exportDocx", "copyText", "rewriteAll"].forEach((id) => $(id).disabled = false);
+  ["exportDocx", "copyText", "reviseDocument"].forEach((id) => $(id).disabled = false);
 }
 
 function scheduleSave() {
@@ -233,7 +241,7 @@ async function generate() {
     const result = await generateThroughPreferredEngine({ instructions: sourceText, images: ingested.images,
       documentType: selectedType(), lang: $("lang").value, subject: $("subject").value, ...readSettings() });
     currentDocument = result.document; currentEngine = result.engine; showEngine(currentEngine);
-    history.reset({ deck: currentDocument, style: settings }); renderDocument(); setProgress("Dokument späicheren…", 92);
+    history.reset({ deck: currentDocument, style: settings }); renderDocument(); document.querySelector('[data-panel-target="preview"]')?.click(); setProgress("Dokument späicheren…", 92);
     const stored = await saveDocument(currentDocument, settings, currentEngine); currentStoreId = stored.id;
     setProgress("Fäerdeg", 100); setStatus(`Dokument ass prett ✓ · ${currentEngine === "mini" ? "Mac mini · €0" : "API"}`);
     await refreshDocumentList();
@@ -255,15 +263,17 @@ async function rewriteBlock(blockId, intent, custom) {
 
 async function rewriteWhole() {
   if (!currentDocument || isBusy) return;
-  const custom = prompt("Wéi soll dat ganzt Dokument geännert ginn?", "Méi kloer a flësseg, ouni Fakten ze verléieren.");
-  if (!custom?.trim()) return;
+  const custom = $("reviseInstruction").value.trim();
+  if (!custom) { setStatus("Gëff eng Uweisung fir dat ganzt Dokument an.", true); return; }
+  if (!confirm("Dëst schreift dat ganzt Dokument nei. Weiderfueren?")) return;
   isBusy = true; setStatus("AI ännert dat ganzt Dokument…");
   try {
-    const response = await rewriteDocument(currentDocument, null, "custom", custom, readSettings());
-    currentEngine = response.engine; showEngine(currentEngine); applyDocument(response.result, { kind: "rewrite" });
-    setStatus("Dokument geännert ✓");
+    $("reviseDocument").disabled = true;
+    const response = await reviseDocument(currentDocument, custom, readSettings(), { onProgress: showMiniProgress });
+    currentEngine = response.engine; showEngine(currentEngine); applyDocument(response.result, { kind: "revise", instruction: custom });
+    $("reviseInstruction").value = ""; setStatus("Ganzt Dokument geännert ✓ · Zréck mécht alles réckgängeg.");
   } catch (error) { setStatus(error.message || "Ëmschreiwe feelgeschloen.", true); }
-  finally { isBusy = false; }
+  finally { isBusy = false; $("reviseDocument").disabled = !currentDocument; }
 }
 
 async function exportWord() {
@@ -304,7 +314,7 @@ async function openStored(id) {
     $("schoolYear").value = settings.schoolYear; $("authenticity").value = settings.authenticity;
     $("authenticityValue").value = settings.authenticity; $("targetWords").value = settings.targetWords;
     const type = document.querySelector(`input[name="documentType"][value="${currentDocument.kind}"]`); if (type) type.checked = true;
-    history.reset({ deck: currentDocument, style: settings }); renderDocument(); showEngine(currentEngine); setStatus("Dokument gelueden.");
+    history.reset({ deck: currentDocument, style: settings }); renderDocument(); showEngine(currentEngine); document.querySelector('[data-panel-target="preview"]')?.click(); setStatus("Dokument gelueden.");
   } catch (error) { setStatus(error.message || "Lueden feelgeschloen.", true); }
 }
 

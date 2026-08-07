@@ -6,7 +6,7 @@ const DEFAULT_LANG = "de";
 const MAX_INSTRUCTIONS = 30000;
 const JOB_POLL_MS = 2000;
 const ALLOWED_LANGS = new Set(["lb", "de", "en", "fr"]);
-const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e"]);
+const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 const SLIDE_INTENTS = new Set(["rewrite", "shorter", "longer", "more-data", "simpler", "custom"]);
 
 function stringValue(value, fallback = "") {
@@ -191,6 +191,33 @@ function translationIsSafe(before, after, targetLang) {
   });
 }
 
+function asksForStructure(instruction) {
+  const action = "add|ajout|derb[aä]i|insert|remove|delete|ewech|supprim|reorder|r[ée]organis|verr[eé]ck";
+  const item = "slide|slides|block|blocks";
+  return new RegExp(`(?:${action})[\\s\\S]{0,32}(?:${item})|(?:${item})[\\s\\S]{0,32}(?:${action})`, "i")
+    .test(instruction);
+}
+
+function asksForMedia(instruction) {
+  const action = "add|ajout|insert|remove|delete|ewech|supprim|change|replace|wiessel|ersetz";
+  const media = "image|images|photo|photos|picture|bild|biller|foto|fotoen";
+  return new RegExp(`(?:${action})[\\s\\S]{0,32}(?:${media})|(?:${media})[\\s\\S]{0,32}(?:${action})`, "i")
+    .test(instruction);
+}
+
+function revisionIsSafe(before, raw, instruction) {
+  if (!raw || !Array.isArray(raw.slides)) return false;
+  if (!asksForStructure(instruction)) {
+    if (raw.slides.length !== before.slides.length) return false;
+    if (!before.slides.every((slide, index) => raw.slides[index]?.id === slide.id)) return false;
+  }
+  if (asksForMedia(instruction)) return true;
+  return before.slides.every((slide, index) => {
+    const next = raw.slides[index];
+    return next && sameJson(slide.image, next.image) && sameJson(slide.imageQuery, next.imageQuery);
+  });
+}
+
 /** Translate all words while rejecting any structural or media changes. */
 export async function translateDeck(deck, targetLang, style, options = {}) {
   const safeDeck = validateDeck(deck);
@@ -201,6 +228,21 @@ export async function translateDeck(deck, targetLang, style, options = {}) {
     throw new Error("D'Iwwersetzung huet d'Slide-Struktur geännert a gouf verworf.");
   }
   return translated;
+}
+
+/** Revise the complete deck while rejecting unexpected structural or media drift. */
+export async function reviseDeck(deck, instruction, style, options = {}) {
+  const safeDeck = validateDeck(deck);
+  const text = stringValue(instruction).slice(0, 1200);
+  if (!text) throw new Error("Gëff eng Uweisung fir déi ganz Präsentatioun an.");
+  const request = { action: "revise", kind: "deck", deck: safeDeck, instruction: text,
+    ...voiceSelection(style) };
+  return runAction(request, options, (raw) => {
+    if (!revisionIsSafe(safeDeck, raw, text)) {
+      throw new Error("D'AI huet onerwaart Slides, IDen oder Biller geännert; d'Revisioun gouf verworf.");
+    }
+    return validateDeck(raw);
+  });
 }
 
 /** Start a cancellable generation; an optional caller AbortSignal is mirrored. */

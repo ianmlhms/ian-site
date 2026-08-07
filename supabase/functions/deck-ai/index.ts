@@ -16,7 +16,7 @@ const MIN_PHOTOS = 7;
 const MAX_PHOTOS = 18;
 const MAX_SEARCH_COUNT = 8;
 const LANGS = new Set(["lb", "de", "en", "fr"]);
-const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e"]);
+const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 const LAYOUTS = new Set([
   "title", "toc", "bullets", "bullets-image", "image-full",
   "photo-numbered", "example", "sources", "closing", "chart", "quiz", "section",
@@ -221,6 +221,41 @@ function safeTranslatedSlide(slide: any, next: any): boolean {
   return stable && chart && quiz && shape;
 }
 
+function structuralRevisionRequested(instruction: string): boolean {
+  const action = "add|ajout|derb[aä]i|insert|remove|delete|ewech|supprim|reorder|r[ée]organis|verr[eé]ck";
+  const item = "slide|slides|block|blocks";
+  return new RegExp(`(?:${action})[\\s\\S]{0,32}(?:${item})|(?:${item})[\\s\\S]{0,32}(?:${action})`, "i")
+    .test(instruction);
+}
+
+function mediaRevisionRequested(instruction: string): boolean {
+  const action = "add|ajout|insert|remove|delete|ewech|supprim|change|replace|wiessel|ersetz";
+  const media = "image|images|photo|photos|picture|bild|biller|foto|fotoen";
+  return new RegExp(`(?:${action})[\\s\\S]{0,32}(?:${media})|(?:${media})[\\s\\S]{0,32}(?:${action})`, "i")
+    .test(instruction);
+}
+
+function safeRevision(before: any, raw: any, instruction: string): any | null {
+  const after = normalisedDeckResult(raw);
+  if (!after) return null;
+  if (!structuralRevisionRequested(instruction)) {
+    if (after.slides.length !== before.slides.length) return null;
+    if (!before.slides.every((slide: any, index: number) => after.slides[index]?.id === slide.id)) return null;
+  }
+  if (mediaRevisionRequested(instruction)) return after;
+  const media = new Map(after.slides.map((slide: any) => [slide.id, [slide.image, slide.imageQuery]]));
+  const stable = before.slides.every((slide: any) => !media.has(slide.id)
+    || sameJson(media.get(slide.id), [slide.image, slide.imageQuery]));
+  return stable ? after : null;
+}
+
+function reviseRequest(payload: any): any | null {
+  const deck = payload?.deck;
+  const instruction = cleanString(payload?.instruction, 1_200);
+  if (!isValidDeck(deck) || !instruction) return null;
+  return { action: "revise", kind: "deck", deck, instruction, ...voiceFields(payload, deck.lang) };
+}
+
 async function handleSlide(payload: any, userId: string): Promise<Response> {
   const request = slideRequest(payload);
   if (!request || request.intent === "custom" && !request.custom) return json({ error: "Invalid slide request." }, 400);
@@ -236,9 +271,17 @@ async function handleTranslate(payload: any, userId: string): Promise<Response> 
     (result) => safeTranslation(deck, result, targetLang) ? result : null);
 }
 
+async function handleRevise(payload: any, userId: string): Promise<Response> {
+  const request = reviseRequest(payload);
+  if (!request) return json({ error: "Invalid deck revision request." }, 400);
+  return routeRequest(request, payload, userId,
+    (result) => safeRevision(request.deck, result, request.instruction));
+}
+
 function normalisedJobResult(request: any, result: any): any | null {
   if (request?.action === "slide") return preservedSlide(result, request.target);
   if (request?.action === "translate") return safeTranslation(request.deck, result, request.targetLang) ? result : null;
+  if (request?.action === "revise") return safeRevision(request.deck, result, request.instruction);
   return normalisedDeckResult(result);
 }
 
@@ -272,6 +315,7 @@ Deno.serve(async (req) => {
   if (payload?.action === "outline") return handleOutline(payload, owner.user!.id);
   if (payload?.action === "slide") return handleSlide(payload, owner.user!.id);
   if (payload?.action === "translate") return handleTranslate(payload, owner.user!.id);
+  if (payload?.action === "revise") return handleRevise(payload, owner.user!.id);
   if (payload?.action === "job") return handleJob(payload, owner.user!.id);
   if (payload?.action === "images") return handleImages(payload);
   return json({ error: "Unknown action." }, 400);

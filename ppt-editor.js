@@ -1,13 +1,14 @@
 import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
 import { renderSlide, renderThumb, esc } from "./ppt-render-dom.js?v=5";
-import { resolveTokens } from "./ppt-style-packs.js?v=5";
+import { resolveTokens } from "./ppt-style-packs.js?v=6";
 import { spring, draggable, project, rubberband, FLICK_BOUNCE, prefersReducedMotion } from "./ppt-motion.js?v=3";
 import { moveSlide, insertSlide, duplicateSlide, deleteSlide, updateSlide, setDeckMeta } from "./ppt-deck-ops.js?v=5";
 import { reconcilePhotoCredits } from "./ppt-images.js?v=5";
-import { openImagePicker } from "./ppt-image-picker.js?v=5";
+import { openImagePicker } from "./ppt-image-picker.js?v=6";
 import { mountSlideControls } from "./ppt-slide-controls.js?v=5";
 
 const SLIDE_WIDTH_PX = 13.333 * 96;
+const SLIDE_HEIGHT_PX = 7.5 * 96;
 const PREVIEW_PADDING_PX = 24;
 const PREVIEW_MAX_SCALE = 0.76;
 const FOOTER_START_IN = 7;
@@ -157,8 +158,9 @@ class DeckEditor {
   }
 
   scale() {
-    const available = Math.max(320, this.previewHost.clientWidth - PREVIEW_PADDING_PX * 2);
-    return Math.min(PREVIEW_MAX_SCALE, available / SLIDE_WIDTH_PX);
+    const width = Math.max(1, this.previewHost.clientWidth - PREVIEW_PADDING_PX * 2);
+    const height = Math.max(1, this.previewHost.clientHeight - PREVIEW_PADDING_PX * 2);
+    return Math.min(PREVIEW_MAX_SCALE, width / SLIDE_WIDTH_PX, height / SLIDE_HEIGHT_PX);
   }
 
   change(nextDeck, meta, nextSelected = this.selected) {

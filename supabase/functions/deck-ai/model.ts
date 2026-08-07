@@ -11,6 +11,7 @@ function modelPrompt(request: any): string {
     outline: "Create the complete deck JSON now.",
     slide: "Return exactly one replacement slide JSON now.",
     translate: "Translate the deck and return the complete deck JSON now.",
+    revise: "Apply the instruction across the complete deck and return the complete deck JSON now. Preserve slide ids, order, and media unless the instruction explicitly requests a structural or media change.",
   };
   return JSON.stringify({ task: tasks[request.action] || tasks.outline, ...prompt });
 }

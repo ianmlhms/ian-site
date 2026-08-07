@@ -1,4 +1,4 @@
-import { rewriteSlide, translateDeck } from "./ppt-ai.js?v=5";
+import { reviseDeck, rewriteSlide, translateDeck } from "./ppt-ai.js?v=6";
 import { updateSlide } from "./ppt-deck-ops.js?v=5";
 
 const LANGUAGE_NAMES = Object.freeze({ lb: "Lëtzebuergesch", de: "Deutsch", en: "English", fr: "Français" });
@@ -53,6 +53,32 @@ class AiActions {
     finally { this.running = false; this.toggleTranslation(false); }
   }
 
+  async revise(instruction) {
+    const deck = this.config.getDeck();
+    const text = String(instruction || "").trim();
+    if (this.running || !deck || !text) return;
+    if (!confirm("Dëst schreift déi ganz Präsentatioun nei. Weiderfueren?")) return;
+    this.running = true;
+    this.toggleRevision(true);
+    this.config.setStatus("AI ännert déi ganz Präsentatioun…");
+    try {
+      const revised = await reviseDeck(deck, text, this.config.getStyle(), {
+        onProgress: (details) => this.config.setStatus(progressLabel(details, "Revisioun")),
+      });
+      this.config.onDeck(revised, { kind: "revise", instruction: text }, this.config.getIndex());
+      document.getElementById("reviseInstruction").value = "";
+      this.config.setStatus("Ganz Präsentatioun geännert ✓ · Zréck mécht alles réckgängeg.");
+    } catch (error) { this.config.setStatus(message(error, "D'Präsentatioun konnt net geännert ginn."), true); }
+    finally { this.running = false; this.toggleRevision(false); }
+  }
+
+  toggleRevision(disabled) {
+    const button = document.getElementById("reviseDeck");
+    const input = document.getElementById("reviseInstruction");
+    if (button) button.disabled = disabled || this.running || !this.config.getDeck();
+    if (input) input.disabled = disabled || this.running;
+  }
+
   toggleTranslation(disabled) {
     const button = document.getElementById("translateDeck");
     const select = document.getElementById("translateLang");
@@ -63,8 +89,12 @@ class AiActions {
   bind() {
     const button = document.getElementById("translateDeck");
     const select = document.getElementById("translateLang");
-    if (!button || !select) return;
-    button.onclick = () => this.translate(select.value);
+    if (button && select) button.onclick = () => this.translate(select.value);
+    const form = document.getElementById("reviseForm");
+    if (form) form.onsubmit = (event) => {
+      event.preventDefault();
+      this.revise(document.getElementById("reviseInstruction")?.value);
+    };
   }
 }
 
@@ -72,5 +102,5 @@ export function createAiActions(config) {
   const actions = new AiActions(config);
   actions.bind();
   return Object.freeze({ rewrite: (index, intent, custom) => actions.rewrite(index, intent, custom),
-    refresh: () => actions.toggleTranslation(false) });
+    refresh: () => { actions.toggleTranslation(false); actions.toggleRevision(false); } });
 }

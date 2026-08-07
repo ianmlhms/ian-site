@@ -1,5 +1,5 @@
 import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
-import { validateDeck } from "./ppt-ai.js?v=5";
+import { validateDeck } from "./ppt-ai.js?v=6";
 import { safeExportFilename } from "./ppt-export-pptx.js?v=5";
 import { drawPdfChart } from "./ppt-chart-pdf.js?v=5";
 

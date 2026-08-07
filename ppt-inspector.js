@@ -1,4 +1,4 @@
-import { CURATED_FONTS, DEFAULT_STYLE, STYLE_PACKS, resolveTokens, styleForPack } from "./ppt-style-packs.js?v=5";
+import { CURATED_FONTS, DEFAULT_STYLE, STYLE_PACKS, resolveTokens, styleForPack } from "./ppt-style-packs.js?v=6";
 import { esc } from "./ppt-render-dom.js?v=5";
 
 const CONTROLS = Object.freeze([
@@ -10,7 +10,7 @@ const CONTROLS = Object.freeze([
 const PHOTO_OPTIONS = Object.freeze([
   ["inset", "Inset"], ["rounded", "Ronn"], ["full-bleed", "Vollfläch"],
 ]);
-const YEARS = Object.freeze(["7e", "6e", "5e", "4e"]);
+const YEARS = Object.freeze(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 
 function styleCards(style) {
   return Object.values(STYLE_PACKS).map((pack) => {
@@ -44,7 +44,7 @@ function voiceMarkup(style) {
   const authenticity = Number(style.authenticity ?? DEFAULT_STYLE.authenticity);
   return `<div class="inspector-section voice-section"><span class="eyebrow">Stëmm</span>
     <label class="inspector-control"><span>Schouljoer</span><select data-style-select="schoolYear">
-      ${YEARS.map((year) => `<option value="${year}"${style.schoolYear === year ? " selected" : ""}>${year}</option>`).join("")}
+      ${YEARS.map((year) => `<option value="${year}"${style.schoolYear === year ? " selected" : ""}>${year}${year === "4e" ? " · aktuell 2026–27" : ""}</option>`).join("")}
     </select></label>
     ${rangeMarkup({ key: "authenticity", label: "Authentizitéit", min: 0, max: 100, step: 1 }, style)}
     <small class="control-hint">Telegraphesch a waarm; keng kënschtlech Feeler.</small></div>`;

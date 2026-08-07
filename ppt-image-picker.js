@@ -8,7 +8,7 @@ const EXIT_DURATION_S = 0.28;
 
 function pickerMarkup(query) {
   return `<div class="image-picker-backdrop" data-picker-close></div>
-    <section class="image-picker material-panel" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+    <section class="image-picker glass glass--thick" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
       <header><div><span class="eyebrow">Foto</span><h2 id="pickerTitle">Foto sichen</h2></div>
         <button class="icon-button" type="button" data-picker-close aria-label="Zoumaachen">×</button></header>
       <form class="image-search" data-image-search>

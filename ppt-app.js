@@ -1,7 +1,7 @@
 import * as auth from "./auth.js?v=5";
-import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=5";
+import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=6";
 import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3";
-import { createDeckGeneration } from "./ppt-ai.js?v=5";
+import { createDeckGeneration } from "./ppt-ai.js?v=6";
 import { fillDeckImages } from "./ppt-images.js?v=5";
 import { exportPptx } from "./ppt-export-pptx.js?v=5";
 import { exportPdf } from "./ppt-export-pdf.js?v=5";
@@ -9,11 +9,11 @@ import { exportCuesDocx, exportScriptDocx } from "./ppt-export-docx.js?v=6";
 import { startPresenting } from "./ppt-present.js?v=5";
 import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=5";
 import { createHistory } from "./ppt-history.js?v=3";
-import { createEditor } from "./ppt-editor.js?v=5";
-import { createInspector } from "./ppt-inspector.js?v=5";
-import { createAiActions } from "./ppt-ai-actions-ui.js?v=5";
-const OWNER_EMAIL = "konto@ian.lu";
-const DEFAULT_SLIDE_COUNT = 12;
+import { createEditor } from "./ppt-editor.js?v=6";
+import { createInspector } from "./ppt-inspector.js?v=6";
+import { createAiActions } from "./ppt-ai-actions-ui.js?v=6";
+import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=1"; installStudioChrome();
+const OWNER_EMAIL = "konto@ian.lu", DEFAULT_SLIDE_COUNT = 12;
 const MAX_PRESENTERS = 6;
 const RESIZE_WAIT_MS = 120;
 const PROGRESS_HIDE_MS = 700;
@@ -22,31 +22,22 @@ const $ = (id) => document.getElementById(id);
 const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
 }[character]));
-let selectedFiles = Object.freeze([]);
-let currentDeck = null;
-let currentStoreId = null;
-let currentEngine = null;
-let currentStyle = Object.freeze({ ...DEFAULT_STYLE });
-let selectedSlide = 0;
-let isBusy = false;
-let bootNumber = 0;
-let resizeTimer = null;
-let editor = null;
-let inspector = null;
-let aiActions = null;
-let activeGeneration = null;
+let selectedFiles = Object.freeze([]), currentDeck = null, currentStoreId = null;
+let currentEngine = null, currentStyle = Object.freeze({ ...DEFAULT_STYLE }), selectedSlide = 0;
+let isBusy = false, bootNumber = 0, resizeTimer = null;
+let editor = null, inspector = null, aiActions = null, activeGeneration = null;
 let apiFallbackRequested = false;
 const history = createHistory();
 function gate(title, message, canSignIn = false) {
   $("newDeck").hidden = true;
   $("root").className = "boot-root";
-  $("root").innerHTML = `<section class="gate-panel"><div class="gate-icon">▣</div>
+  $("root").innerHTML = `<section class="gate-panel glass glass--thick"><div class="gate-icon">▣</div>
     <h1>${esc(title)}</h1><p>${esc(message)}</p>
     ${canSignIn ? '<button class="primary-button" id="signIn" type="button">Umellen</button>' : ""}</section>`;
   if (canSignIn) $("signIn").onclick = () => auth.openAuthModal();
 }
 function inputPanelMarkup() {
-  return `<aside class="input-panel material-panel scroll-fade">
+  return `<aside class="input-panel glass glass--thick scroll-fade" data-panel="source" tabindex="-1">
       <div class="panel-heading"><span class="eyebrow">Quell</span><h1>Wat soll dran?</h1></div>
       <label class="field-label">Instruktiounen
         <textarea id="instructions" rows="7" placeholder="Aufgabestellung, Thema, wichteg Punkten…"></textarea></label>
@@ -73,17 +64,18 @@ function inputPanelMarkup() {
     </aside>`;
 }
 function designerMarkup() {
-  return `<section class="preview-column">
-      <div class="preview-toolbar material-panel"><div><span class="eyebrow">Live Virschau</span><strong id="slideLabel">Nach keng Slide</strong>
+  return `<section class="preview-column" data-panel="preview" tabindex="-1">
+      <div class="preview-toolbar glass glass--chip"><div><span class="eyebrow">Live Virschau</span><strong id="slideLabel">Nach keng Slide</strong>
         <span class="engine-badge" id="engineLabel" hidden></span></div>
         <div class="preview-actions"><button class="icon-text-button" id="undo" type="button" disabled>↶ <span>Zréck</span></button>
           <button class="icon-text-button" id="redo" type="button" disabled>↷ <span>Nees viru</span></button>
           <div class="translate-control"><select id="translateLang" aria-label="Zilsprooch"><option value="lb">LB</option>
             <option value="de">DE</option><option value="en">EN</option><option value="fr">FR</option></select>
             <button class="icon-text-button" id="translateDeck" type="button" disabled>Iwwersetzen</button></div>
+          <button class="icon-text-button" type="button" data-toggle-inspector aria-expanded="true">Designer</button>
           <div class="export-menu" id="exportMenu"><button class="icon-text-button export-button" id="exportTrigger" type="button"
             aria-haspopup="menu" aria-expanded="false" disabled>Exportéieren <span aria-hidden="true">⌄</span></button>
-            <div class="export-popover material-panel" id="exportPopover" role="menu" hidden>
+            <div class="export-popover solid-surface" id="exportPopover" role="menu" hidden>
               <button type="button" role="menuitem" data-export="pptx">PowerPoint (.pptx)</button>
               <button type="button" role="menuitem" data-export="pdf">PDF</button>
               <button type="button" role="menuitem" data-export="script">Word — Vollstännegen Text</button>
@@ -91,16 +83,24 @@ function designerMarkup() {
               <button type="button" role="menuitem" data-export="doc">Schreif de Sprëchtext</button>
             </div></div>
           <button class="primary-button present-button" id="present" type="button" disabled>Presentéieren</button></div></div>
-      <div class="slide-controls material-panel" id="slideControls" hidden></div>
+      <form class="revision-bar" id="reviseForm"><label><span>Änner déi ganz Präsentatioun</span>
+        <input id="reviseInstruction" maxlength="1200" placeholder="z. B. méi kuerz, ouni d'Lëtzebuerg-Beispiller"></label>
+        <button class="primary-button" id="reviseDeck" type="submit" disabled>Alles mat AI änneren</button>
+        <small>Opgepasst: Dëst schreift all Slides nei. Eng Kéier „Zréck“ mécht déi ganz Ännerung réckgängeg.</small></form>
+      <div class="slide-controls glass glass--chip" id="slideControls" hidden></div>
       <div class="preview-scroll scroll-fade"><div class="preview-host" id="previewHost">
         <div class="empty-preview"><span>▣</span><h2>Deng Präsentatioun erschéngt hei</h2><p>Instruktiounen dobäisetzen a generéieren.</p></div>
       </div></div>
     </section>
-    <aside class="inspector-panel material-panel scroll-fade" id="inspector"></aside>`;
+    <aside class="inspector-panel glass glass--thick scroll-fade" id="inspector" data-panel="inspector" tabindex="-1"></aside>`;
 }
 function appMarkup() {
-  return `<div class="studio-grid">${inputPanelMarkup()}${designerMarkup()}</div>
-    <nav class="filmstrip material-panel" id="filmstrip" aria-label="Slides">
+  return `<div class="studio-grid" data-inspector="open"><nav class="panel-tabs glass glass--chip" role="tablist" aria-label="Studio Beräicher">
+      <button type="button" role="tab" data-panel-target="source">Quell</button>
+      <button type="button" role="tab" data-panel-target="preview">Virschau</button>
+      <button type="button" role="tab" data-panel-target="inspector">Designer</button></nav>
+      ${inputPanelMarkup()}${designerMarkup()}</div>
+    <nav class="filmstrip glass glass--thick" id="filmstrip" aria-label="Slides">
       <div class="filmstrip-empty">Nach keng Slides</div></nav>`;
 }
 function setStatus(message, isError = false) {
@@ -230,7 +230,7 @@ function renderApp() {
   $("root").className = "studio-root";
   $("root").innerHTML = appMarkup();
   $("newDeck").hidden = false;
-  bindInputs(); renderPresenters(); mountDesigner(); refreshDeckList();
+  bindInputs(); renderPresenters(); mountDesigner(); createStudioShell($("root"), "source"); refreshDeckList();
 }
 async function generateOutline(request) {
   let force = $("skipMini").checked ? "api" : null;
@@ -259,7 +259,7 @@ async function generate() {
     const outline = result.deck; currentEngine = result.engine; showEngine(currentEngine);
     setProgress("Fotoe sichen…", 72);
     currentDeck = await fillDeckImages(outline); selectedSlide = 0;
-    history.reset({ deck: currentDeck, style: currentStyle }); renderDesigner(0);
+    history.reset({ deck: currentDeck, style: currentStyle }); renderDesigner(0); document.querySelector('[data-panel-target="preview"]')?.click();
     setProgress("Präsentatioun späicheren…", 94);
     const stored = await saveDeck(currentDeck, currentStyle, currentEngine); currentStoreId = stored.id;
     setProgress("Fäerdeg", 100); setStatus(`Präsentatioun ass prett ✓ · ${engineText(currentEngine)}`); await refreshDeckList();
@@ -344,7 +344,7 @@ async function openStored(id) {
     currentStyle = Object.freeze({ ...DEFAULT_STYLE, ...stored.style }); currentStoreId = stored.id; selectedSlide = 0;
     $("instructions").value = stored.sourceText; $("lang").value = currentDeck.lang; $("subject").value = currentDeck.subject || "";
     if ($("translateLang")) $("translateLang").value = currentDeck.lang;
-    history.reset({ deck: currentDeck, style: currentStyle }); inspector.render(); renderDesigner(0); showEngine(currentEngine);
+    history.reset({ deck: currentDeck, style: currentStyle }); inspector.render(); renderDesigner(0); showEngine(currentEngine); document.querySelector('[data-panel-target="preview"]')?.click();
     setStatus(`Präsentatioun gelueden · ${engineText(currentEngine)}`);
   } catch (error) { setStatus(error.message || "Lueden feelgeschloen.", true); }
 }

@@ -6,7 +6,7 @@ const MAX_INSTRUCTIONS = 30_000;
 const JOB_POLL_MS = 2_000;
 const ALLOWED_LANGS = new Set(["lb", "de", "en", "fr"]);
 const DOCUMENT_KINDS = new Set(["argumentation", "research", "script", "summary", "review", "steckbrief", "free"]);
-const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e"]);
+const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 const REWRITE_INTENTS = new Set(["rewrite", "shorter", "longer", "simpler", "more-data", "custom"]);
 
 function stringValue(value, fallback = "") {
@@ -138,6 +138,37 @@ export async function rewriteDocument(document, blockId, intent, custom, control
     return candidate.blocks[0];
   };
   const result = await run(request, options, validate);
+  return Object.freeze({ result: result.value, engine: result.engine });
+}
+
+function asksForStructure(instruction) {
+  const action = "add|ajout|derb[aä]i|insert|remove|delete|ewech|supprim|reorder|r[ée]organis|verr[eé]ck";
+  const item = "block|blocks|paragraph|paragraphs|paragraf|paragrafen";
+  return new RegExp(`(?:${action})[\\s\\S]{0,32}(?:${item})|(?:${item})[\\s\\S]{0,32}(?:${action})`, "i")
+    .test(instruction);
+}
+
+function validateRevision(before, raw, instruction) {
+  if (!raw || !Array.isArray(raw.blocks)) throw new Error("D'AI huet keng komplett Dokument-Revisioun zeréckginn.");
+  if (!asksForStructure(instruction)) {
+    if (raw.blocks.length !== before.blocks.length) {
+      throw new Error("D'AI huet onerwaart d'Zuel vun de Bléck geännert; d'Revisioun gouf verworf.");
+    }
+    const sameIds = before.blocks.every((block, index) => raw.blocks[index]?.id === block.id);
+    if (!sameIds) throw new Error("D'AI huet onerwaart Block-IDen oder hir Reiefolleg geännert; d'Revisioun gouf verworf.");
+  }
+  return validateDocument(raw);
+}
+
+/** Apply one instruction across the complete document as one undoable result. */
+export async function reviseDocument(document, instruction, controls, options = {}) {
+  const safe = validateDocument(document);
+  const text = stringValue(instruction).slice(0, 1_200);
+  if (!text) throw new Error("Gëff eng Uweisung fir dat ganzt Dokument an.");
+  const request = withForce({ action: "revise", kind: "document", document: safe,
+    instruction: text, targetWords: targetWords(controls?.targetWords),
+    ...voiceSelection(controls) }, controls?.force);
+  const result = await run(request, options, (raw) => validateRevision(safe, raw, text));
   return Object.freeze({ result: result.value, engine: result.engine });
 }
 

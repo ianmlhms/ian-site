@@ -13,7 +13,7 @@ const MAX_BLOCKS = 200;
 const LANGS = new Set(["lb", "de", "en", "fr"]);
 const KINDS = new Set(["argumentation", "research", "script", "summary", "review", "steckbrief", "free"]);
 const TYPES = new Set(["heading", "paragraph", "bullets", "fields", "quote", "sources", "vocab"]);
-const YEARS = new Set(["7e", "6e", "5e", "4e"]);
+const YEARS = new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 const INTENTS = new Set(["rewrite", "shorter", "longer", "simpler", "more-data", "custom"]);
 const API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 
@@ -108,7 +108,36 @@ function rewriteRequest(payload: any): any | null {
     ...voiceFields(payload, document.lang) };
 }
 
+function structuralRevisionRequested(instruction: string): boolean {
+  const action = "add|ajout|derb[aä]i|insert|remove|delete|ewech|supprim|reorder|r[ée]organis|verr[eé]ck";
+  const item = "block|blocks|paragraph|paragraphs|paragraf|paragrafen";
+  return new RegExp(`(?:${action})[\\s\\S]{0,32}(?:${item})|(?:${item})[\\s\\S]{0,32}(?:${action})`, "i")
+    .test(instruction);
+}
+
+function reviseRequest(payload: any): any | null {
+  const document = normaliseDocument(payload?.document);
+  const instruction = cleanString(payload?.instruction, 1_200);
+  if (!document || !instruction) return null;
+  return { action: "revise", kind: "document", document, instruction,
+    targetWords: Math.min(MAX_WORDS, Math.max(MIN_WORDS, Number(payload?.targetWords) || 500)),
+    ...voiceFields(payload, document.lang) };
+}
+
+function safeRevision(request: any, raw: any): any | null {
+  if (!raw || !Array.isArray(raw.blocks)) return null;
+  const before = request.document;
+  if (!structuralRevisionRequested(request.instruction)) {
+    if (raw.blocks.length !== before.blocks.length) return null;
+    if (!before.blocks.every((block: any, index: number) => raw.blocks[index]?.id === block.id)) return null;
+  }
+  const document = normaliseDocument(raw);
+  if (!document || document.kind !== before.kind || document.lang !== before.lang) return null;
+  return document;
+}
+
 function normaliseResult(request: any, result: any): any | null {
+  if (request?.action === "revise") return safeRevision(request, result);
   if (request?.action !== "rewrite" || request.scope === "document") {
     const document = normaliseDocument(result);
     if (!document) return null;
@@ -157,6 +186,12 @@ async function handleRewrite(payload: any, userId: string): Promise<Response> {
   return routeRequest(request, payload, userId);
 }
 
+async function handleRevise(payload: any, userId: string): Promise<Response> {
+  const request = reviseRequest(payload);
+  if (!request) return json({ error: "Invalid document revision request." }, 400);
+  return routeRequest(request, payload, userId);
+}
+
 async function handleJob(payload: any, userId: string): Promise<Response> {
   return readMiniJob(payload, userId, normaliseResult, {
     stopped: "The Mac mini stopped responding while generating the document.",
@@ -177,6 +212,7 @@ Deno.serve(async (req) => {
   catch { return json({ error: "bad json" }, 400); }
   if (payload?.action === "outline") return handleOutline(payload, owner.user!.id);
   if (payload?.action === "rewrite") return handleRewrite(payload, owner.user!.id);
+  if (payload?.action === "revise") return handleRevise(payload, owner.user!.id);
   if (payload?.action === "job") return handleJob(payload, owner.user!.id);
   return json({ error: "Unknown action." }, 400);
 });
