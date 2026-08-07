@@ -4,20 +4,68 @@
  * there is no browser toolbar to reload from. */
 (function () {
   const KEY = "site_theme";
+  const SITE_GLASS_URL = "site-glass.css?v=1";
+  const CONTRAST_MODULE_URL = "./glass-contrast.js?v=2";
   const ACCENTS = ["#6ea8fe", "#ff6b9d", "#3fb950", "#a371f7", "#ffb347", "#4de8ff"];
 
   const PALETTES = {
     dark: {
       "--bg": "#0d0d1a", "--text": "#e8e8f0", "--muted": "#8888aa", "--text2": "#8888aa",
-      "--border": "#2a2a4a", "--card": "#161625", "--card2": "#1e1e35", "--card-hover": "#1e1e35",
+      "--border": "#2a2a4a", "--card-opaque": "#161625", "--card2-opaque": "#1e1e35",
+      "--card": "color-mix(in srgb, #161625 90%, transparent)",
+      "--card2": "color-mix(in srgb, #1e1e35 92%, transparent)", "--card-hover": "#1e1e35",
       "--panel": "#161b22", "--panel2": "#1c232c", "--accent2": "#4de8ff",
     },
     light: {
       "--bg": "#f4f5fb", "--text": "#16182a", "--muted": "#5b6478", "--text2": "#5b6478",
-      "--border": "#d6d9ea", "--card": "#ffffff", "--card2": "#eceefb", "--card-hover": "#eceefb",
+      "--border": "#d6d9ea", "--card-opaque": "#ffffff", "--card2-opaque": "#eceefb",
+      "--card": "color-mix(in srgb, #ffffff 90%, transparent)",
+      "--card2": "color-mix(in srgb, #eceefb 92%, transparent)", "--card-hover": "#eceefb",
       "--panel": "#ffffff", "--panel2": "#eceefb", "--accent2": "#0891b2",
     },
   };
+  const PICKER_CSS = `
+    #themeFab{position:fixed;right:14px;bottom:14px;z-index:9000;width:44px;height:44px;border-radius:50%;
+      border:1px solid var(--border);background:var(--glass-solid);color:var(--text);font-size:18px;cursor:pointer;
+      box-shadow:0 4px 14px rgba(0,0,0,.3)}
+    #themePop{position:fixed;right:14px;bottom:66px;z-index:9000;background:var(--glass-solid);border:1px solid var(--border);
+      border-radius:14px;padding:14px;width:230px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);font-family:system-ui,sans-serif}
+    #themePop.open{display:block}
+    #themePop h4{margin:0 0 10px;font-size:13px;color:var(--text)}
+    .th-modes{display:flex;gap:8px;margin-bottom:12px}
+    .th-modes button{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card2);
+      color:var(--text);cursor:pointer;font-weight:700;font-size:13px}
+    .th-modes button.on{border-color:var(--accent-border);color:var(--accent-text)}
+    .th-acc{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .th-sw{width:44px;height:44px;border-radius:50%;cursor:pointer;border:6px solid transparent;padding:0}
+    .th-sw.on{border-color:var(--text)}
+    .th-custom{width:44px;height:44px;padding:0;border:none;background:none;cursor:pointer}`;
+
+  let contrastRequest = 0;
+
+  function injectSiteGlass() {
+    if (document.querySelector(`link[href="${SITE_GLASS_URL}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = SITE_GLASS_URL;
+    const firstStylesheet = document.head.querySelector('link[rel="stylesheet"],style');
+    document.head.insertBefore(link, firstStylesheet);
+  }
+
+  function refreshContrast(root, palette, accent) {
+    contrastRequest += 1;
+    const request = contrastRequest;
+    import(CONTRAST_MODULE_URL).then(({ applyThemeContrast }) => {
+      if (request !== contrastRequest) return;
+      applyThemeContrast(root, palette, accent);
+    }).catch((error) => console.error("site contrast", error));
+  }
+
+  function esc(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[character]);
+  }
 
   function get() {
     try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
@@ -31,9 +79,11 @@
     root.style.setProperty("--accent", accent);
     root.style.setProperty("color-scheme", mode);
     document.documentElement.dataset.theme = mode;
+    refreshContrast(root, pal, accent);
   }
   function save(t) { localStorage.setItem(KEY, JSON.stringify(t)); apply(t); pushTheme(t); }
 
+  injectSiteGlass();
   apply(get()); // apply ASAP (before paint where possible)
 
   // ---- cross-device theme sync (#19) ----
@@ -119,22 +169,7 @@
   function buildPicker() {
     if (document.getElementById("themeFab")) return;
     const css = document.createElement("style");
-    css.textContent = `
-    #themeFab{position:fixed;right:14px;bottom:14px;z-index:9000;width:42px;height:42px;border-radius:50%;
-      border:1px solid var(--border);background:var(--card);color:var(--text);font-size:18px;cursor:pointer;
-      box-shadow:0 4px 14px rgba(0,0,0,.3)}
-    #themePop{position:fixed;right:14px;bottom:64px;z-index:9000;background:var(--card);border:1px solid var(--border);
-      border-radius:14px;padding:14px;width:230px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);font-family:system-ui,sans-serif}
-    #themePop.open{display:block}
-    #themePop h4{margin:0 0 10px;font-size:13px;color:var(--text)}
-    .th-modes{display:flex;gap:8px;margin-bottom:12px}
-    .th-modes button{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--card2);
-      color:var(--text);cursor:pointer;font-weight:700;font-size:13px}
-    .th-modes button.on{border-color:var(--accent);color:var(--accent)}
-    .th-acc{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .th-sw{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent}
-    .th-sw.on{border-color:var(--text)}
-    .th-custom{width:30px;height:30px;padding:0;border:none;background:none;cursor:pointer}`;
+    css.textContent = PICKER_CSS;
     document.head.appendChild(css);
 
     const fab = document.createElement("button");
@@ -151,8 +186,8 @@
       </div>
       <h4>Accent</h4>
       <div class="th-acc">
-        ${ACCENTS.map(c=>`<span class="th-sw" data-acc="${c}" style="background:${c}"></span>`).join("")}
-        <input type="color" class="th-custom" title="Custom colour" value="${t.accent||'#6ea8fe'}">
+        ${ACCENTS.map(c=>`<button type="button" class="th-sw" data-acc="${esc(c)}" style="background:${esc(c)}" aria-label="Accent ${esc(c)}"></button>`).join("")}
+        <input type="color" class="th-custom" title="Custom colour" aria-label="Custom accent colour" value="${esc(t.accent||'#6ea8fe')}">
       </div>`;
     document.body.appendChild(fab);
     document.body.appendChild(pop);
@@ -163,9 +198,9 @@
       pop.querySelectorAll(".th-sw").forEach(s=>s.classList.toggle("on", cur.accent===s.dataset.acc));
     }
     fab.onclick = () => { pop.classList.toggle("open"); sync(); };
-    pop.querySelectorAll(".th-modes button").forEach(b=> b.onclick=()=>{ const c=get(); c.mode=b.dataset.mode; save(c); sync(); });
-    pop.querySelectorAll(".th-sw").forEach(s=> s.onclick=()=>{ const c=get(); c.accent=s.dataset.acc; save(c); sync(); });
-    pop.querySelector(".th-custom").oninput = (e)=>{ const c=get(); c.accent=e.target.value; save(c); sync(); };
+    pop.querySelectorAll(".th-modes button").forEach(b=> b.onclick=()=>{ save({ ...get(), mode: b.dataset.mode }); sync(); });
+    pop.querySelectorAll(".th-sw").forEach(s=> s.onclick=()=>{ save({ ...get(), accent: s.dataset.acc }); sync(); });
+    pop.querySelector(".th-custom").oninput = (e)=>{ save({ ...get(), accent: e.target.value }); sync(); };
     document.addEventListener("click",(e)=>{ if(!pop.contains(e.target) && e.target!==fab) pop.classList.remove("open"); });
   }
   // ---- home-screen (standalone) refresh button ----
@@ -177,8 +212,8 @@
     if (!standalone || document.getElementById("pwaRefresh")) return;
     const css = document.createElement("style");
     css.textContent = `
-    #pwaRefresh{position:fixed;right:66px;bottom:14px;z-index:9000;width:42px;height:42px;border-radius:50%;
-      border:1px solid var(--border);background:var(--card);color:var(--text);font-size:20px;cursor:pointer;
+    #pwaRefresh{position:fixed;right:66px;bottom:14px;z-index:9000;width:44px;height:44px;border-radius:50%;
+      border:1px solid var(--border);background:var(--glass-solid);color:var(--text);font-size:20px;cursor:pointer;
       display:flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.3)}
     #pwaRefresh:active{transform:scale(.92)}
     #pwaRefresh.spin{animation:pwaSpin .6s linear}
@@ -214,7 +249,7 @@
     a,button{-webkit-tap-highlight-color:transparent}
     @media (max-width:760px){
       #fbFab,#fbPanel{display:none!important}                       /* feedback off on phones */
-      #themeFab,#pwaRefresh{width:40px;height:40px}                 /* smaller floating buttons */
+      #themeFab,#pwaRefresh{width:44px;height:44px}
       #themeFab{right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
       #pwaRefresh{right:calc(60px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
       img,video{max-width:100%}                                    /* never force horizontal scroll */
@@ -249,19 +284,19 @@
     const css = document.createElement("style");
     css.textContent = `
     #appNav{position:fixed;left:0;right:0;bottom:0;z-index:8000;display:flex;
-      background:var(--card);border-top:1px solid var(--border);
+      background:var(--glass-solid);border-top:1px solid var(--border);
       padding-bottom:env(safe-area-inset-bottom,0px)}
     #appNav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
       padding:8px 0 6px;color:var(--muted);font-size:10.5px;text-decoration:none;
       -webkit-tap-highlight-color:transparent}
     #appNav a .i{font-size:20px;line-height:1}
-    #appNav a.on{color:var(--accent)}
+    #appNav a.on{color:var(--accent-text)}
     body{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px)) !important}
     #themeFab,#pwaRefresh{bottom:calc(72px + env(safe-area-inset-bottom,0px)) !important}`;
     document.head.appendChild(css);
     const nav = document.createElement("nav");
     nav.id = "appNav";
-    nav.innerHTML = NAV.map(n => `<a href="${n.href}" class="${cur === n.href ? "on" : ""}"><span class="i">${n.ic}</span>${n.label}</a>`).join("");
+    nav.innerHTML = NAV.map(n => `<a href="${esc(n.href)}" class="${cur === n.href ? "on" : ""}"><span class="i">${esc(n.ic)}</span>${esc(n.label)}</a>`).join("");
     document.body.appendChild(nav);
   }
 
@@ -283,7 +318,7 @@
     if (document.getElementById("pwaIosGuide")) return;
     const s = document.createElement("div");
     s.id = "pwaIosGuide";
-    s.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9002;background:var(--card);" +
+    s.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9002;background:var(--glass-solid);" +
       "border-top:1px solid var(--border);border-radius:16px 16px 0 0;" +
       "padding:18px 20px calc(18px + env(safe-area-inset-bottom,0px));" +
       "box-shadow:0 -6px 24px rgba(0,0,0,.35);font-size:14.5px;line-height:1.6";
@@ -306,7 +341,7 @@
     const b = document.createElement("button");
     b.id = "pwaInstall"; b.textContent = ios ? "📲 Als App" : "⬇︎ Install";
     b.style.cssText = "position:fixed;left:14px;z-index:9001;bottom:calc(72px + env(safe-area-inset-bottom,0px));" +
-      "background:var(--accent);color:#fff;border:none;border-radius:20px;padding:10px 15px;font-weight:800;" +
+      "background:var(--accent);color:var(--accent-foreground);border:none;border-radius:20px;padding:10px 15px;font-weight:800;" +
       "font-size:13px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)";
     b.onclick = async () => {
       b.remove();

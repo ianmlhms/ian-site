@@ -24,12 +24,12 @@
 </script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2);text-decoration:none}
+  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:16px}
@@ -38,21 +38,21 @@
   .card h3{margin:0 0 12px;font-size:16px}
   #tprow{display:flex;gap:8px;margin-bottom:4px}
   #stopq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
-  .tpbtn{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-size:15px;font-weight:700;cursor:pointer}
+  .tpbtn{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:var(--accent2-foreground);font-size:15px;font-weight:700;cursor:pointer}
   .tpbtn:hover{filter:brightness(1.05)}
   .tpbtn:disabled{opacity:.55;cursor:default}
   #linerow{display:flex;gap:8px}
   #lineq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
   .linex{flex:none;padding:10px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:15px;cursor:pointer}
-  .linex:hover{border-color:var(--accent2);color:var(--text)}
+  .linex:hover{border-color:var(--accent2-text);color:var(--text)}
   #stops .st{display:flex;justify-content:space-between;gap:8px;padding:12px 12px;border:1px solid var(--border);border-radius:9px;margin-top:6px;cursor:pointer;font-size:15px}
-  #stops .st:hover{border-color:var(--accent2)}
+  #stops .st:hover{border-color:var(--accent2-text)}
   #stops .st .dist{color:var(--muted);font-size:12px;flex:none}
   #recents{margin-bottom:2px}
   .rectitle{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 7px}
   .recchips{display:flex;flex-wrap:wrap;gap:7px}
   .recchip{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:8px 14px;font-size:13.5px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-  .recchip:hover{border-color:var(--accent2)}
+  .recchip:hover{border-color:var(--accent2-text)}
   .recchip.fav{border-color:#f7b95566}
   #favstops{margin-bottom:2px}#favlines{margin-top:10px}
   .favstar{font-size:16px;line-height:1}
@@ -63,7 +63,7 @@
   .dep .dir{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13.5px}
   .dep .dir .dname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dep .dir .sub{color:var(--muted);font-size:11.5px;margin-top:1px}
-  .dep .dir .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2)}
+  .dep .dir .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2-text)}
   .dep .time{flex:none;font-weight:700;font-size:14px;text-align:right}
   .dep .time em{color:#f87171;font-style:normal;font-size:12px}
   .dep .time .ok{color:var(--ok)}
@@ -85,7 +85,7 @@
   .jstop .jt{flex:none;min-width:66px;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12.5px}
   .jstop .jt em{color:#f87171;font-style:normal}
   .jstop .jn{flex:1;min-width:0;font-size:13px;color:var(--muted)}
-  .jstop .jn .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2);font-size:11px;margin-left:6px}
+  .jstop .jn .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;color:var(--accent2-text);font-size:11px;margin-left:6px}
   /* route finder */
   .triprow{display:flex;gap:8px;align-items:center}
   .triprow .cols{flex:1;min-width:0}
@@ -102,10 +102,10 @@
   /* one-tap "when" chips (Elo / +15′ / Owend / Muer / 🗓) */
   .wrow{display:flex;flex-wrap:wrap;gap:7px}
   .wchip{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:9px 14px;font-size:13.5px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent}
-  .wchip:hover{border-color:var(--accent2)}
-  .wchip.on{background:var(--accent2);border-color:var(--accent2);color:#06121a;font-weight:700}
+  .wchip:hover{border-color:var(--accent2-text)}
+  .wchip.on{background:var(--accent2);border-color:var(--accent2-text);color:var(--accent2-foreground);font-weight:700}
   .wchip.wcal{padding:7px 11px;font-size:14px}
-  #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:#06121a;font-weight:700;font-size:14px;cursor:pointer}
+  #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:var(--accent2-foreground);font-weight:700;font-size:14px;cursor:pointer}
   #tpFind:disabled{opacity:.55;cursor:default}
   #rectrips{margin-top:12px}
   #rectrips .recchip .ar{color:var(--muted)}
@@ -119,7 +119,7 @@
   .leg .ln{font-weight:800}
   .trip .arrow{color:var(--muted);font-size:12px}
   .trip{cursor:pointer}
-  .trip.open{border-color:var(--accent2)}
+  .trip.open{border-color:var(--accent2-text)}
   .trip .tcaret{color:var(--muted);font-size:11px;transition:transform .15s}
   .trip.open .tcaret{transform:rotate(180deg)}
   .tripdetail{margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:12px}
@@ -128,17 +128,17 @@
   .dleg .dlt{display:flex;gap:8px;align-items:baseline}
   .dleg .dtime{color:var(--muted);font-variant-numeric:tabular-nums;flex:none;min-width:40px;font-weight:700}
   .dleg .dlmid{color:var(--muted);padding:3px 0 3px 48px}
-  .dleg .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:11px;color:var(--accent2);margin-left:6px}
+  .dleg .q{background:var(--card2);border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:11px;color:var(--accent2-text);margin-left:6px}
   /* line-first search: type a line → pick a direction → next departures + stops */
   #lnrow{display:flex;gap:8px}
   #lnq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
   #lndirs{display:flex;flex-wrap:wrap;gap:8px}
   #lndirs:not(:empty){margin-top:10px}
   .lndir{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 12px;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;-webkit-tap-highlight-color:transparent}
-  .lndir:hover{border-color:var(--accent2)}
-  .lndir.on{background:var(--accent2);border-color:var(--accent2);color:#06121a;font-weight:700}
+  .lndir:hover{border-color:var(--accent2-text)}
+  .lndir.on{background:var(--accent2);border-color:var(--accent2-text);color:var(--accent2-foreground);font-weight:700}
   .lndir .lnl{font-weight:800;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1px 6px;font-size:12px}
-  .lndir.on .lnl{background:rgba(0,0,0,.15);border-color:transparent;color:#06121a}
+  .lndir.on .lnl{background:rgba(0,0,0,.15);border-color:transparent;color:inherit}
   #lnout:not(:empty){margin-top:12px}
   #lnpick{display:flex;flex-wrap:wrap;gap:8px}
   .lnsub{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:0 0 7px}

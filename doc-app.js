@@ -6,7 +6,7 @@ import { replaceBlock } from "./doc-ops.js?v=1";
 import { exportDocumentDocx } from "./doc-export.js?v=2";
 import { createHistory } from "./ppt-history.js?v=3";
 import { createDocumentEditor, esc } from "./doc-editor.js?v=1";
-import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=1"; installStudioChrome();
+import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=2"; installStudioChrome();
 import { deleteDocument, listDocuments, loadDocument, saveDocument,
   scheduleAutosave, startNewDocument } from "./doc-store.js?v=1";
 

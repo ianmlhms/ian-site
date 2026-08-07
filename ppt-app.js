@@ -12,7 +12,7 @@ import { createHistory } from "./ppt-history.js?v=3";
 import { createEditor } from "./ppt-editor.js?v=6";
 import { createInspector } from "./ppt-inspector.js?v=6";
 import { createAiActions } from "./ppt-ai-actions-ui.js?v=6";
-import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=1"; installStudioChrome();
+import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=2"; installStudioChrome();
 const OWNER_EMAIL = "konto@ian.lu", DEFAULT_SLIDE_COUNT = 12;
 const MAX_PRESENTERS = 6;
 const RESIZE_WAIT_MS = 120;

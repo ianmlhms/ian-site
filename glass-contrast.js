@@ -37,7 +37,7 @@ export function foregroundFor(background, minimum = BODY_TEXT_RATIO) {
   const lightRatio = contrastRatio(background, LIGHT_FOREGROUND);
   const choice = darkRatio >= lightRatio ? DARK_FOREGROUND : LIGHT_FOREGROUND;
   const ratio = Math.max(darkRatio, lightRatio);
-  if (ratio < minimum) throw new Error(`${background} cannot reach ${minimum}:1 with the studio foregrounds.`);
+  if (ratio < minimum) throw new Error(`${background} cannot reach ${minimum}:1 with the theme foregrounds.`);
   return choice;
 }
 
@@ -55,12 +55,18 @@ export function mixHex(foreground, background, weight) {
 }
 
 export function themeContrastValues(palette, accent) {
-  const card = palette?.["--card"];
+  const card = palette?.["--card-opaque"] || palette?.["--card"];
   const background = palette?.["--bg"];
+  const accent2 = palette?.["--accent2"];
   if (!expandedHex(card) || !expandedHex(background)) throw new TypeError("Theme palette is incomplete.");
   const glass = mixHex(card, background, 0.9);
   return Object.freeze({
     accentForeground: foregroundFor(accent, BODY_TEXT_RATIO),
+    accent2Foreground: foregroundFor(accent2, BODY_TEXT_RATIO),
+    accentText: contrastRatio(accent, glass) >= BODY_TEXT_RATIO
+      ? accent : foregroundFor(glass, BODY_TEXT_RATIO),
+    accent2Text: contrastRatio(accent2, glass) >= BODY_TEXT_RATIO
+      ? accent2 : foregroundFor(glass, BODY_TEXT_RATIO),
     accentBorder: contrastRatio(accent, glass) >= UI_RATIO ? accent : foregroundFor(glass, UI_RATIO),
     focusRing: foregroundFor(glass, UI_RATIO),
     glass,
@@ -72,6 +78,9 @@ export function applyThemeContrast(root, palette, accent) {
   if (!root?.style?.setProperty) throw new TypeError("A styleable theme root is required.");
   const values = themeContrastValues(palette, accent);
   setToken(root, "--accent-foreground", values.accentForeground);
+  setToken(root, "--accent2-foreground", values.accent2Foreground);
+  setToken(root, "--accent-text", values.accentText);
+  setToken(root, "--accent2-text", values.accent2Text);
   setToken(root, "--accent-border", values.accentBorder);
   setToken(root, "--focus-ring", values.focusRing);
   setToken(root, "--glass-composite", values.glass);

@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#0d0d1a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <style>
   :root{
     --bg:#0d0d1a; --card:#161625; --card2:#1e1e35; --border:#2a2a4a;
@@ -34,7 +34,7 @@
   .bar h1{font-size:16px;margin:0;font-weight:800}
   .bar .spacer{flex:1}
   .langs button{background:none;border:0;color:var(--muted);font-weight:700;font-size:12px;padding:4px 5px}
-  .langs button.on{color:var(--accent2)}
+  .langs button.on{color:var(--accent2-text)}
 
   .wrap{max-width:620px;margin:0 auto;padding:18px 16px 48px}
 
@@ -66,7 +66,7 @@
 
   .btn{
     display:block;width:100%;padding:15px;border-radius:14px;border:0;
-    background:var(--accent);color:#fff;font-weight:800;font-size:16px;margin-top:10px;
+    background:var(--accent);color:var(--accent-foreground);font-weight:800;font-size:16px;margin-top:10px;
   }
   .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
   .btn.big{padding:26px;font-size:20px}
@@ -105,7 +105,7 @@
   .banned{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:12px}
   .banned span{background:rgba(229,72,77,.15);color:#ff9b9b;border-radius:8px;padding:5px 10px;font-size:14px;font-weight:600}
   .poles{display:flex;justify-content:space-between;color:var(--muted);font-size:13px;font-weight:700;margin-top:6px}
-  input[type=range]{width:100%;accent-color:var(--accent2)}
+  input[type=range]{width:100%;accent-color:var(--accent2-text)}
   input[type=number]{
     width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);
     background:var(--card);color:var(--text);font-size:22px;text-align:center;font-weight:700;

@@ -17,20 +17,20 @@
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#0d0d1a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=10"></script>
+<script src="theme.js?v=11"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2);text-decoration:none}
+  a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2)}
+  .bar .code{color:var(--muted);font-size:13px}.bar code{background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--accent2-text)}
   .wrap{max-width:680px;margin:0 auto;padding:22px 18px 60px}
   .players{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
   .pchip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px;font-size:13px}
-  .letter{font-size:64px;font-weight:900;text-align:center;color:var(--accent);margin:10px 0}
-  .big{width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
+  .letter{font-size:64px;font-weight:900;text-align:center;color:var(--accent-text);margin:10px 0}
+  .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:14px;font-weight:800;font-size:16px;cursor:pointer}
   .big.stop{background:#ff5d6c}
   .cat{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .cat label{width:120px;color:var(--muted);font-size:14px;flex:none}
@@ -46,9 +46,9 @@
   h3{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
   .catpick .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
   .chip{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer}
-  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .chip.on{background:var(--accent);border-color:var(--accent-border);color:var(--accent-foreground);font-weight:700}
 </style>
-<link rel="stylesheet" href="game-common.css?v=3">
+  <link rel="stylesheet" href="game-common.css?v=4">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
@@ -232,7 +232,7 @@ function renderRound(ps){
       const a=(answers[p.cid]?.ans?.[i])||""; const pts=scoreCell(i,p.cid,ps);
       const isBad = verdicts[p.cid+"|"+i]===false;
       const ovr = role==="host" ? ` <button class="ovr" data-ov="${p.cid}|${i}" title="Wikidata got it wrong? Count this answer anyway.">✓ count it</button>` : "";
-      const shown = !a ? "—" : isBad ? `<s style="color:#ff5d6c">${esc(a)}</s> ❌${ovr}` : esc(a);
+      const shown = !a ? "—" : isBad ? `<s style="color:var(--text)">${esc(a)}</s> ❌${ovr}` : esc(a);
       return `<td>${shown} <span class="pts" style="color:var(--good)">${pts?("+"+pts):""}</span></td>`;
     }).join("") + `</tr>`;
   });

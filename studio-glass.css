@@ -1,18 +1,4 @@
 :root {
-  --space-1: .25rem;
-  --space-2: .5rem;
-  --space-3: .75rem;
-  --space-4: 1rem;
-  --space-5: 1.5rem;
-  --space-6: 2rem;
-  --radius-pane: 1.5rem;
-  --radius-inner: calc(var(--radius-pane) - var(--space-3));
-  --radius-control: calc(var(--radius-inner) - var(--space-2));
-  --hit-target: 2.75rem;
-  --z-chrome: 20;
-  --z-popover: 40;
-  --z-scrim: 60;
-  --z-sheet: 70;
   --z-presenter: 100;
   --z-content: 2;
   --z-content-edit: 5;
@@ -20,23 +6,15 @@
   --z-present-help: 12;
   --z-present-blank: 20;
   --z-present-notes: 30;
-  --glass-tint: color-mix(in srgb, var(--card) 90%, transparent);
-  --glass-solid: color-mix(in srgb, var(--card) 97%, var(--bg));
-  --glass-edge: color-mix(in srgb, white 72%, transparent);
-  --control-fill: color-mix(in srgb, var(--card2) 90%, var(--card));
-  --accent-foreground: #000;
-  --accent-border: var(--text);
-  --focus-ring: var(--text);
 }
 
-* { box-sizing: border-box; }
-html, body { min-width: 0; min-height: 100%; }
 body {
   background:
     radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 32rem),
     radial-gradient(circle at 88% 92%, color-mix(in srgb, var(--accent2) 8%, transparent), transparent 34rem),
     var(--bg);
 }
+
 .studio-active { padding-bottom: 0 !important; }
 .studio-active #appNav { display: none !important; }
 .studio-active #themeFab, .studio-active #pwaRefresh {
@@ -58,43 +36,6 @@ body {
 .studio-active #themePop .th-sw { display: inline-block; border-width: .4rem; }
 .studio-active #pwaInstall { color: var(--accent-foreground) !important; }
 
-.glass {
-  position: relative;
-  isolation: isolate;
-  border: 0;
-  background: var(--glass-tint);
-  box-shadow: 0 1.2rem 3rem color-mix(in srgb, #000 20%, transparent),
-    0 .18rem .5rem color-mix(in srgb, #000 18%, transparent);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-}
-.glass::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, var(--glass-edge),
-    color-mix(in srgb, white 22%, transparent) 38%, transparent 70%);
-  content: "";
-  pointer-events: none;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-}
-.glass--thick {
-  box-shadow: 0 1.8rem 4.5rem color-mix(in srgb, #000 25%, transparent),
-    0 .28rem .8rem color-mix(in srgb, #000 22%, transparent);
-}
-.glass--chip {
-  border-radius: var(--radius-inner);
-  box-shadow: 0 .65rem 1.5rem color-mix(in srgb, #000 16%, transparent),
-    0 .12rem .35rem color-mix(in srgb, #000 16%, transparent);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-}
-.solid-surface { background: var(--glass-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
-
 .studio-bar {
   z-index: var(--z-chrome);
   min-width: 0;
@@ -106,27 +47,11 @@ body {
 .brand-mark, .primary-button, #pwaInstall { color: var(--accent-foreground) !important; }
 .builder-link, .toolbar-button, .home-link { min-height: var(--hit-target); display: inline-flex; align-items: center; }
 
-button, input, select, textarea, [role="button"] { min-width: 0; }
-button { min-width: var(--hit-target); }
-button, select, input:not([type="range"]):not([type="radio"]):not([type="checkbox"]), [role="button"] {
-  min-height: var(--hit-target);
-}
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
-[role="button"]:focus-visible, a:focus-visible {
-  outline: .2rem solid var(--focus-ring);
-  outline-offset: .18rem;
-}
 input, select, textarea, .toolbar-button, .icon-button, .delete-button, .icon-text-button,
 .slide-controls button, .doc-controls button {
   border-color: color-mix(in srgb, var(--text) 24%, transparent);
   background: var(--control-fill);
 }
-input[type="range"] { min-height: var(--hit-target); padding: 0; }
-input[type="range"]::-webkit-slider-runnable-track { height: .5rem; border-radius: 999rem; background: var(--control-fill); }
-input[type="range"]::-webkit-slider-thumb { width: 1.6rem; height: 1.6rem; margin-top: -.55rem; }
-input[type="range"]::-moz-range-track { height: .5rem; border-radius: 999rem; background: var(--control-fill); }
-input[type="range"]::-moz-range-thumb { width: 1.6rem; height: 1.6rem; border: 0; }
-
 .boot-root { min-width: 0; min-height: calc(100dvh - 4.5rem); }
 .gate-panel { border-radius: var(--radius-pane); background: var(--glass-tint); }
 .studio-root, .doc-studio-root { height: calc(100dvh - 4.5rem); min-width: 0; min-height: 0; }
@@ -208,13 +133,6 @@ input[type="range"]::-moz-range-thumb { width: 1.6rem; height: 1.6rem; border: 0
 .thumb.is-selected, .style-card.is-selected, .doc-type-card input:checked + span { border-color: var(--accent-border); }
 .toggle-row { min-height: var(--hit-target); }
 .toggle-row input:focus-visible + i { outline: .2rem solid var(--focus-ring); outline-offset: .18rem; }
-.scroll-fade {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-4),
-    #000 calc(100% - var(--space-4)), transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-4),
-    #000 calc(100% - var(--space-4)), transparent);
-}
-
 @container preview (max-width: 46rem) {
   .preview-toolbar { align-items: stretch; }
   .preview-toolbar > div:first-child { flex: 1 1 12rem; }
@@ -259,18 +177,4 @@ input[type="range"]::-moz-range-thumb { width: 1.6rem; height: 1.6rem; border: 0
   .studio-grid, .doc-studio-grid { padding-inline: var(--space-1); }
   .input-panel, .inspector-panel, .preview-column, .doc-preview-column { border-radius: var(--radius-inner); }
   .field-row { flex-direction: column; gap: 0; }
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .glass { background: var(--glass-solid); backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .glass::before { background: linear-gradient(135deg, var(--text), transparent 72%); }
-}
-@media (prefers-contrast: more) {
-  :root { --glass-tint: color-mix(in srgb, var(--card) 98%, var(--bg)); }
-  .glass { background: var(--glass-tint); box-shadow: 0 0 0 2px var(--text); }
-  .glass::before { display: none; }
-  button, input, select, textarea, [role="button"] { border-color: var(--text) !important; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .glass, .glass * { transition: opacity .16s linear !important; transform: none !important; }
 }
