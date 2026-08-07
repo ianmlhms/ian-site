@@ -48,8 +48,14 @@ for (const [mode, palette] of Object.entries(palettes)) {
     const values = themeContrastValues(palette, accent);
     const pairs = [
       [`${mode}/${accent} accent label`, values.accentForeground, accent, CONTRAST.body],
+      [`${mode}/${accent} accent2 label`, values.accent2Foreground, palette["--accent2"], CONTRAST.body],
       [`${mode}/${accent} body text`, palette["--text"], values.glass, CONTRAST.body],
       [`${mode}/${accent} muted text`, palette["--muted"], values.glass, CONTRAST.body],
+      // The accent used AS text on the page, which is a different threshold from
+      // both "text on the accent" and "accent as a border" — the gap that let
+      // #0891b2 links ship at 3.38:1 on the light background.
+      [`${mode}/${accent} accent text`, values.accentText, values.glass, CONTRAST.body],
+      [`${mode}/${accent} accent2 text`, values.accent2Text, values.glass, CONTRAST.body],
       [`${mode}/${accent} accent border`, values.accentBorder, values.glass, CONTRAST.ui],
       [`${mode}/${accent} focus ring`, values.focusRing, values.glass, CONTRAST.ui],
     ];
