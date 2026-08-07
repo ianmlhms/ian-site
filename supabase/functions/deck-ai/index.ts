@@ -1,19 +1,20 @@
 // Supabase Edge Function: deck-ai
-// Owner-only outline generation and a hardened presentation-photo proxy.
-import { createClient } from "npm:@supabase/supabase-js@2";
+// Owner-only presentation generation and a hardened presentation-photo proxy.
 import { photoSearch } from "./photos.ts";
 import { anthropicJson } from "./model.ts";
+import {
+  CORS, cleanString, json, miniIsAlive, ownerFromRequest, queueMiniJob,
+  readMiniJob, resolveVoice,
+} from "../_shared/studio.ts";
+
 const MAX_IMAGES = 6;
-const MAX_INSTRUCTIONS = 30000;
+const MAX_INSTRUCTIONS = 30_000;
 const MIN_SLIDES = 10;
 const MAX_SLIDES = 30;
-const HARD_MAX_SLIDES = 60;   // absolute sanity bound; MIN/MAX above are only targets
+const HARD_MAX_SLIDES = 60;
 const MIN_PHOTOS = 7;
 const MAX_PHOTOS = 18;
 const MAX_SEARCH_COUNT = 8;
-const HEARTBEAT_MAX_AGE_MS = 90000;
-const STUCK_JOB_AGE_MS = 5 * 60 * 1000;
-const IAN_EMAILS = new Set(["konto@ian.lu"]);
 const LANGS = new Set(["lb", "de", "en", "fr"]);
 const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e"]);
 const LAYOUTS = new Set([
@@ -24,63 +25,11 @@ const KEYS = {
   anthropic: Deno.env.get("ANTHROPIC_API_KEY") ?? "",
   pexels: Deno.env.get("PEXELS_API_KEY") ?? "",
 };
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-);
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS, "content-type": "application/json" },
-  });
 
 type ImageBlock = { media_type: string; data: string };
-type VoiceSelection = { schoolYear?: unknown; lang?: unknown; authenticity?: unknown };
-type OutlineRequest = { action: "outline"; kind: "outline"; todayISO: string;
+type OutlineRequest = { action: "outline"; kind: "deck"; todayISO: string;
   instructions: string; lang: string; subject: string | null; slideCount: number;
   presenters: string[]; images: ImageBlock[]; schoolYear: string; authenticity: number; voice: string };
-
-const VOICE_LEVELS = Object.freeze({
-  "7e": { lb: "mother tongue", de: "B1", en: "A2–B1", fr: "A2–B1" },
-  "6e": { lb: "mother tongue", de: "B1+/B2", en: "B1", fr: "B1" },
-  "5e": { lb: "mother tongue", de: "C1", en: "B2", fr: "B2" },
-  "4e": { lb: "mother tongue", de: "C1", en: "B2+", fr: "B2+" },
-});
-
-/** Resolve trusted selections into model instructions; clients never supply prompt text. */
-export function resolveVoice(selection: VoiceSelection): string {
-  const schoolYear = SCHOOL_YEARS.has(selection?.schoolYear as string) ? selection.schoolYear as keyof typeof VOICE_LEVELS : "4e";
-  const lang = LANGS.has(selection?.lang as string) ? selection.lang as "lb" | "de" | "en" | "fr" : "de";
-  const raw = Number(selection?.authenticity);
-  const authenticity = Number.isFinite(raw) ? Math.min(100, Math.max(0, Math.round(raw))) : 75;
-  const level = VOICE_LEVELS[schoolYear][lang];
-  const strength = lang === "de" ? "German is Ian's strongest written language."
-    : lang === "fr" ? "French is Ian's weakest language; never write above the stated level."
-      : lang === "lb" ? "Luxembourgish is native and natural for notes and slide bullets." : "";
-  const authentic = "Telegraphic, warm and sincere; z.b. in German, a French-style space before :, an occasional comma splice, and an occasional Luxembourgish word in German are natural. Never manufacture errors.";
-  const tone = authenticity >= 85 ? `Use Ian's most authentic, slightly informal voice. ${authentic}`
-    : authenticity >= 60 ? `Write mostly like Ian, with light cleanup. ${authentic}`
-      : "Use cleaner, more formal phrasing, while staying recognisably Ian and strictly within the stated level; never manufacture errors or become uniformly elevated.";
-  return `Write ${lang} at the normal ${schoolYear} level (${level}). ${strength} Authenticity ${authenticity}/100. ${tone} Never output raw markdown or the banned AI templates.`;
-}
-
-async function userFromRequest(req: Request): Promise<{ id: string; email: string } | null> {
-  const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!token) return null;
-  const { data, error } = await admin.auth.getUser(token);
-  if (error || !data?.user) return null;
-  return { id: data.user.id, email: (data.user.email ?? "").toLowerCase() };
-}
-
-function cleanString(value: unknown, max = 500): string {
-  return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
 
 function requestImages(raw: unknown): ImageBlock[] {
   if (!Array.isArray(raw)) return [];
@@ -96,7 +45,8 @@ function isStringArray(value: unknown): value is string[] {
 
 function hasPairArray(value: unknown, keys: string[]): boolean {
   return Array.isArray(value) && value.every((item) =>
-    item && typeof item === "object" && keys.every((key) => typeof (item as Record<string, unknown>)[key] === "string")
+    item && typeof item === "object" && keys.every((key) =>
+      typeof (item as Record<string, unknown>)[key] === "string")
   );
 }
 
@@ -143,6 +93,11 @@ function isValidDeck(deck: any): boolean {
   if (!isStringArray(deck.presenters) || !Array.isArray(deck.slides)) return false;
   if (!deck.slides.length || deck.slides.length > HARD_MAX_SLIDES) return false;
   if (!deck.slides.every(isValidSlide)) return false;
+  warnTargets(deck);
+  return true;
+}
+
+function warnTargets(deck: any): void {
   const photoCount = deck.slides.filter((slide: any) => slide.imageQuery).length;
   if (deck.slides.length < MIN_SLIDES || deck.slides.length > MAX_SLIDES) {
     console.warn("deck-ai slide count off target", deck.slides.length);
@@ -150,7 +105,6 @@ function isValidDeck(deck: any): boolean {
   if (photoCount < MIN_PHOTOS || photoCount > MAX_PHOTOS) {
     console.warn("deck-ai photo count off target", photoCount);
   }
-  return true;
 }
 
 function normalisedDeckResult(result: any): any | null {
@@ -163,42 +117,23 @@ function normalisedDeckResult(result: any): any | null {
 
 function sanitisedOutline(payload: any): OutlineRequest {
   const lang = LANGS.has(payload?.lang) ? payload.lang : "de";
-  const schoolYear = SCHOOL_YEARS.has(payload?.schoolYear) ? payload.schoolYear : "4e";
-  const rawAuthenticity = Number(payload?.authenticity);
-  const authenticity = Number.isFinite(rawAuthenticity)
-    ? Math.min(100, Math.max(0, Math.round(rawAuthenticity))) : 75;
+  const voice = voiceFields(payload, lang);
   return {
-    action: "outline", kind: "outline",
-    todayISO: new Date().toISOString().slice(0, 10),
-    instructions: cleanString(payload?.instructions, MAX_INSTRUCTIONS),
-    lang,
+    action: "outline", kind: "deck", todayISO: new Date().toISOString().slice(0, 10),
+    instructions: cleanString(payload?.instructions, MAX_INSTRUCTIONS), lang,
     subject: cleanString(payload?.subject, 120) || null,
     slideCount: Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, Number(payload?.slideCount) || 12)),
-    presenters: isStringArray(payload?.presenters) ? payload.presenters
-      .map((name) => cleanString(name, 80)).filter(Boolean) : [],
-    images: requestImages(payload?.images),
-    schoolYear, authenticity, voice: resolveVoice({ schoolYear, lang, authenticity }),
+    presenters: isStringArray(payload?.presenters)
+      ? payload.presenters.map((name) => cleanString(name, 80)).filter(Boolean) : [],
+    images: requestImages(payload?.images), ...voice,
   };
 }
 
-async function miniIsAlive(): Promise<boolean> {
-  try {
-    const { data, error } = await admin.from("service_heartbeats").select("beat_at")
-      .eq("service", "deckworker").maybeSingle();
-    if (error || !data?.beat_at) return false;
-    const beatAt = Date.parse(data.beat_at);
-    return Number.isFinite(beatAt) && beatAt > Date.now() - HEARTBEAT_MAX_AGE_MS;
-  } catch (error) {
-    console.error("deck-ai heartbeat", (error as Error)?.message);
-    return false;
-  }
-}
-
-async function queueMiniJob(request: any, userId: string): Promise<string> {
-  const { data, error } = await admin.from("deck_jobs")
-    .insert({ user_id: userId, status: "queued", request }).select("id").single();
-  if (error || !data?.id) throw new Error(error?.message || "The job could not be queued");
-  return data.id;
+function voiceFields(payload: any, lang: string) {
+  const schoolYear = SCHOOL_YEARS.has(payload?.schoolYear) ? payload.schoolYear : "4e";
+  const raw = Number(payload?.authenticity);
+  const authenticity = Number.isFinite(raw) ? Math.min(100, Math.max(0, Math.round(raw))) : 75;
+  return { schoolYear, authenticity, voice: resolveVoice({ schoolYear, lang, authenticity }) };
 }
 
 async function apiResult(request: any, normalise: (result: any) => unknown | null): Promise<Response> {
@@ -215,7 +150,7 @@ async function apiResult(request: any, normalise: (result: any) => unknown | nul
 async function routeRequest(request: any, payload: any, userId: string,
   normalise: (result: any) => unknown | null): Promise<Response> {
   const force = payload?.force === "api" || payload?.force === "mini" ? payload.force : null;
-  const alive = force === "api" ? false : await miniIsAlive();
+  const alive = force === "api" ? false : await miniIsAlive("deck-ai");
   if (force === "mini" && !alive) return json({ error: "The Mac mini is not responding." }, 503);
   if (alive) {
     try { return json({ mode: "mini", jobId: await queueMiniJob(request, userId) }, 202); }
@@ -233,13 +168,6 @@ async function handleOutline(payload: any, userId: string): Promise<Response> {
     return json({ error: "Add instructions or a source image first." }, 400);
   }
   return routeRequest(request, payload, userId, normalisedDeckResult);
-}
-
-function voiceFields(payload: any, lang: string) {
-  const schoolYear = SCHOOL_YEARS.has(payload?.schoolYear) ? payload.schoolYear : "4e";
-  const raw = Number(payload?.authenticity);
-  const authenticity = Number.isFinite(raw) ? Math.min(100, Math.max(0, Math.round(raw))) : 75;
-  return { schoolYear, authenticity, voice: resolveVoice({ schoolYear, lang, authenticity }) };
 }
 
 function preservedSlide(result: any, target: any): any | null {
@@ -275,22 +203,22 @@ function safeTranslation(before: any, after: any, targetLang: string): boolean {
   if (!sameJson(before.presenters, after.presenters)) return false;
   if ((before.tagline === null) !== (after.tagline === null)
     || (before.subject === null) !== (after.subject === null)) return false;
-  return before.slides.every((slide: any, index: number) => {
-    const next = after.slides[index];
-    const stable = ["id", "layout", "presenter", "image", "imageQuery"]
-      .every((key) => sameJson(slide[key], next[key]));
-    const chart = Boolean(slide.chart) === Boolean(next.chart) && (slide.chart == null
-      || slide.chart.type === next.chart.type
-      && sameJson(slide.chart.series.map((item: any) => item.values), next.chart.series.map((item: any) => item.values)));
-    const quiz = Boolean(slide.quiz) === Boolean(next.quiz)
-      && (slide.quiz == null || slide.quiz.answerIndex === next.quiz.answerIndex
-        && slide.quiz.options.length === next.quiz.options.length);
-    const textShape = ["bullets", "fields", "sources"].every((key) => slide[key].length === next[key].length)
-      && (slide.section === null) === (next.section === null)
-      && (slide.caption === null) === (next.caption === null)
-      && (slide.chart == null || slide.chart.categories.length === next.chart.categories.length);
-    return stable && chart && quiz && textShape;
-  });
+  return before.slides.every((slide: any, index: number) => safeTranslatedSlide(slide, after.slides[index]));
+}
+
+function safeTranslatedSlide(slide: any, next: any): boolean {
+  const stable = ["id", "layout", "presenter", "image", "imageQuery"]
+    .every((key) => sameJson(slide[key], next[key]));
+  const chart = Boolean(slide.chart) === Boolean(next.chart) && (slide.chart == null
+    || slide.chart.type === next.chart.type && sameJson(slide.chart.series.map((item: any) => item.values),
+      next.chart.series.map((item: any) => item.values)));
+  const quiz = Boolean(slide.quiz) === Boolean(next.quiz) && (slide.quiz == null
+    || slide.quiz.answerIndex === next.quiz.answerIndex && slide.quiz.options.length === next.quiz.options.length);
+  const shape = ["bullets", "fields", "sources"].every((key) => slide[key].length === next[key].length)
+    && (slide.section === null) === (next.section === null)
+    && (slide.caption === null) === (next.caption === null)
+    && (slide.chart == null || slide.chart.categories.length === next.chart.categories.length);
+  return stable && chart && quiz && shape;
 }
 
 async function handleSlide(payload: any, userId: string): Promise<Response> {
@@ -303,42 +231,26 @@ async function handleTranslate(payload: any, userId: string): Promise<Response> 
   const deck = payload?.deck;
   const targetLang = LANGS.has(payload?.targetLang) ? payload.targetLang : null;
   if (!isValidDeck(deck) || !targetLang) return json({ error: "Invalid translation request." }, 400);
-  const request = { action: "translate", kind: "translate", deck, targetLang,
-    ...voiceFields(payload, targetLang) };
+  const request = { action: "translate", kind: "deck", deck, targetLang, ...voiceFields(payload, targetLang) };
   return routeRequest(request, payload, userId,
     (result) => safeTranslation(deck, result, targetLang) ? result : null);
 }
 
 function normalisedJobResult(request: any, result: any): any | null {
   if (request?.action === "slide") return preservedSlide(result, request.target);
-  if (request?.action === "translate") {
-    return safeTranslation(request.deck, result, request.targetLang) ? result : null;
-  }
+  if (request?.action === "translate") return safeTranslation(request.deck, result, request.targetLang) ? result : null;
   return normalisedDeckResult(result);
 }
 
 async function handleJob(payload: any, userId: string): Promise<Response> {
-  const jobId = cleanString(payload?.jobId, 80);
-  if (!/^[0-9a-f-]{36}$/i.test(jobId)) return json({ error: "Invalid job id." }, 400);
-  const cutoff = new Date(Date.now() - STUCK_JOB_AGE_MS).toISOString();
-  const stopped = "The Mac mini stopped responding while generating the presentation.";
-  const { error: reclaimError } = await admin.from("deck_jobs")
-    .update({ status: "error", error: stopped, updated_at: new Date().toISOString() })
-    .eq("id", jobId).eq("user_id", userId).eq("status", "running").lt("updated_at", cutoff);
-  if (reclaimError) console.error("deck-ai reclaim", reclaimError.message);
-  const { data, error } = await admin.from("deck_jobs").select("status,result,error,request")
-    .eq("id", jobId).eq("user_id", userId).maybeSingle();
-  if (error) return json({ error: "The job could not be read." }, 502);
-  if (!data) return json({ error: "Job not found." }, 404);
-  const result = data.status === "done" ? normalisedJobResult(data.request, data.result) : null;
-  if (data.status === "done" && !result) {
-    const message = "The Mac mini returned JSON that did not match the required schema.";
-    await admin.from("deck_jobs").update({ status: "error", error: message, updated_at: new Date().toISOString() })
-      .eq("id", jobId).eq("user_id", userId).eq("status", "done");
-    return json({ status: "error", result: null, error: message });
-  }
-  const deck = !data.request?.action || data.request.action === "outline" ? result : null;
-  return json({ status: data.status, result, deck, error: data.error || null });
+  return readMiniJob(payload, userId, normalisedJobResult, {
+    stopped: "The Mac mini stopped responding while generating the presentation.",
+    invalid: "The Mac mini returned JSON that did not match the required schema.",
+    logPrefix: "deck-ai",
+    response: (row, result) => ({ status: row.status, result,
+      deck: !row.request?.action || row.request.action === "outline" ? result : null,
+      error: row.error || null }),
+  });
 }
 
 async function handleImages(payload: any): Promise<Response> {
@@ -352,16 +264,15 @@ async function handleImages(payload: any): Promise<Response> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method" }, 405);
-  const user = await userFromRequest(req);
-  if (!user) return json({ error: "sign in first" }, 401);
-  if (!IAN_EMAILS.has(user.email)) return json({ error: "This tool is private." }, 403);
+  const owner = await ownerFromRequest(req);
+  if (owner.response) return owner.response;
   let payload: any;
   try { payload = await req.json(); }
   catch { return json({ error: "bad json" }, 400); }
-  if (payload?.action === "outline") return handleOutline(payload, user.id);
-  if (payload?.action === "slide") return handleSlide(payload, user.id);
-  if (payload?.action === "translate") return handleTranslate(payload, user.id);
-  if (payload?.action === "job") return handleJob(payload, user.id);
+  if (payload?.action === "outline") return handleOutline(payload, owner.user!.id);
+  if (payload?.action === "slide") return handleSlide(payload, owner.user!.id);
+  if (payload?.action === "translate") return handleTranslate(payload, owner.user!.id);
+  if (payload?.action === "job") return handleJob(payload, owner.user!.id);
   if (payload?.action === "images") return handleImages(payload);
   return json({ error: "Unknown action." }, 400);
 });

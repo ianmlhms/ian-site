@@ -1,22 +1,17 @@
 import { validateDeck } from "./ppt-ai.js?v=5";
 import { safeExportFilename } from "./ppt-export-pptx.js?v=5";
+import { bodyFont, countParagraph, createDocument, docxLibrary, DOCX_BODY_HALF_POINTS,
+  normalParagraph, packAndDownload, textParagraphs, titleParagraph } from "./docx-primitives.js?v=1";
 
-const DOCX_URL = "https://cdn.jsdelivr.net/npm/docx@8/+esm";
 const DOCX_EXTENSION = ".docx";
-const BODY_FONT = "Aptos";
-const FALLBACK_FONT = "Calibri";
-const BODY_HALF_POINTS = 22;
+const BODY_HALF_POINTS = DOCX_BODY_HALF_POINTS;
 const CUE_HALF_POINTS = 32;
 const CUE_TITLE_HALF_POINTS = 40;
-const TITLE_HALF_POINTS = 32;
-const BODY_SPACING_AFTER = 140;
-const TITLE_SPACING_AFTER = 120;
 const CARD_SPACING_AFTER = 180;
 const MIN_CUES = 3;
 const MAX_CUES = 6;
 const MAX_CUE_CHARACTERS = 72;
 const MAX_CUE_WORDS = 11;
-const BLOB_URL_REVOKE_MS = 1000;
 const SCRIPT_LABEL = "Vollstännegen Text";
 const CUES_LABEL = "Stëchwierder";
 const FILLER_PREFIX = /^(?:also|an dann|dat heescht|dofir|effektiv|fir datt|haaptsächlech|mir gesinn|well|wichteg|zum beispill|beispill)\s*[:;,–—-]?\s*/i;
@@ -25,33 +20,6 @@ const GENERIC_CUES = Object.freeze({
   title: ["Thema", "Zil", "Iwwerbléck"], closing: ["Merci", "Froen", "Ofschloss"],
   sources: ["Quellen", "Zougrëff", "Nokucken"], default: ["Haaptiddi", "Beispill", "Iwwergang"],
 });
-
-let libraryPromise = null;
-
-function docxLibrary() {
-  if (!libraryPromise) {
-    libraryPromise = import(DOCX_URL).then((module) => {
-      if (!module.Document || !module.Packer || !module.Paragraph || !module.TextRun) {
-        throw new Error("D'Word-Bibliothéik ass net disponibel.");
-      }
-      return module;
-    }).catch((error) => {
-      console.error("[ppt] Word-Bibliothéik", error);
-      libraryPromise = null;
-      throw new Error("D'Word-Bibliothéik konnt net geluede ginn.");
-    });
-  }
-  return libraryPromise;
-}
-
-function bodyFont() {
-  return { ascii: BODY_FONT, hAnsi: BODY_FONT, cs: FALLBACK_FONT, eastAsia: FALLBACK_FONT };
-}
-
-function textParagraphs(text) {
-  return String(text || "").split(/\n\s*\n/g)
-    .map((part) => part.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
-}
 
 function words(text) {
   return String(text || "").match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu) || [];
@@ -85,36 +53,6 @@ function speakerLine(deck) {
   return `Virdroender · ${assignments.join(" · ")}`;
 }
 
-function documentStyles() {
-  return {
-    default: {
-      document: {
-        run: { font: bodyFont(), size: BODY_HALF_POINTS },
-        paragraph: { spacing: { after: BODY_SPACING_AFTER } },
-      },
-    },
-  };
-}
-
-function createDocument(Docx, children, title, subject) {
-  return new Docx.Document({
-    creator: "Ian",
-    title,
-    subject,
-    description: "Erstallt mam PPT Builder op ian.lu",
-    styles: documentStyles(),
-    sections: [{ properties: {}, children }],
-  });
-}
-
-function titleParagraph(Docx, title) {
-  return new Docx.Paragraph({
-    alignment: Docx.AlignmentType.CENTER,
-    spacing: { after: TITLE_SPACING_AFTER },
-    children: [new Docx.TextRun({ text: title, bold: true, font: bodyFont(), size: TITLE_HALF_POINTS })],
-  });
-}
-
 function taglineParagraph(Docx, tagline) {
   if (!tagline) return [];
   return [new Docx.Paragraph({
@@ -141,23 +79,9 @@ function scriptHeading(Docx, deck, slide, index) {
   });
 }
 
-function normalParagraph(Docx, text) {
-  return new Docx.Paragraph({
-    spacing: { after: BODY_SPACING_AFTER },
-    children: [new Docx.TextRun({ text, font: bodyFont(), size: BODY_HALF_POINTS })],
-  });
-}
-
 function speakerNotes(slide) {
   const answer = slide.quiz?.options?.[slide.quiz.answerIndex];
   return [slide.notes, answer ? `Äntwert: ${answer}` : ""].filter(Boolean).join("\n\n");
-}
-
-function countParagraph(Docx, count) {
-  return new Docx.Paragraph({
-    spacing: { before: CARD_SPACING_AFTER },
-    children: [new Docx.TextRun({ text: `Words: ${count}`, font: bodyFont(), size: BODY_HALF_POINTS })],
-  });
 }
 
 function scriptChildren(Docx, deck) {
@@ -246,33 +170,13 @@ function cuesChildren(Docx, deck) {
   return [titleParagraph(Docx, `${deck.title} — ${CUES_LABEL}`), ...cards, countParagraph(Docx, count)];
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.hidden = true;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_REVOKE_MS);
-}
-
-async function packAndDownload(Docx, document, filename) {
-  try {
-    const blob = await Docx.Packer.toBlob(document);
-    downloadBlob(blob, filename);
-  } catch (error) {
-    console.error("[ppt] Word-Export", error);
-    throw new Error("D'Word-Datei konnt net erstallt ginn.");
-  }
-}
-
 /** Download the complete spoken script as a Word document. */
 export async function exportScriptDocx(deck) {
   const safeDeck = validateDeck(deck);
   const Docx = await docxLibrary();
-  const document = createDocument(Docx, scriptChildren(Docx, safeDeck), safeDeck.title, SCRIPT_LABEL);
+  const document = createDocument(Docx, scriptChildren(Docx, safeDeck), {
+    title: safeDeck.title, subject: SCRIPT_LABEL, description: "Erstallt mam PPT Builder op ian.lu",
+  });
   await packAndDownload(Docx, document, safeExportFilename(`${safeDeck.title} — ${SCRIPT_LABEL}`, DOCX_EXTENSION));
 }
 
@@ -280,6 +184,8 @@ export async function exportScriptDocx(deck) {
 export async function exportCuesDocx(deck) {
   const safeDeck = validateDeck(deck);
   const Docx = await docxLibrary();
-  const document = createDocument(Docx, cuesChildren(Docx, safeDeck), safeDeck.title, CUES_LABEL);
+  const document = createDocument(Docx, cuesChildren(Docx, safeDeck), {
+    title: safeDeck.title, subject: CUES_LABEL, description: "Erstallt mam PPT Builder op ian.lu",
+  });
   await packAndDownload(Docx, document, safeExportFilename(`${safeDeck.title} — ${CUES_LABEL}`, DOCX_EXTENSION));
 }

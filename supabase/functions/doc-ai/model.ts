@@ -1,27 +1,31 @@
-import { SYSTEM_PROMPT } from "./prompt.ts";
 import { balancedObject } from "../_shared/studio.ts";
+import { SYSTEM_PROMPT } from "./prompt.ts";
 
 const MODEL = "claude-sonnet-4-6";
-const MAX_TOKENS = 12000;
+const MAX_TOKENS = 12_000;
 type ImageBlock = { media_type: string; data: string };
+
+function taskFor(request: any): string {
+  if (request.action === "rewrite" && request.scope === "block") {
+    return "Rewrite the target block and return exactly one replacement block JSON now.";
+  }
+  if (request.action === "rewrite") return "Rewrite and return the complete document JSON now.";
+  return "Create and return the complete document JSON now.";
+}
 
 function modelPrompt(request: any): string {
   const { images: _images, ...prompt } = request;
-  const tasks: Record<string, string> = {
-    outline: "Create the complete deck JSON now.",
-    slide: "Return exactly one replacement slide JSON now.",
-    translate: "Translate the deck and return the complete deck JSON now.",
-  };
-  return JSON.stringify({ task: tasks[request.action] || tasks.outline, ...prompt });
+  return JSON.stringify({ task: taskFor(request), ...prompt });
 }
 
-export async function anthropicJson(request: any, apiKey: string): Promise<unknown> {
+function imageContent(images: ImageBlock[]): any[] {
+  return images.map((image) => ({ type: "image",
+    source: { type: "base64", media_type: image.media_type, data: image.data } }));
+}
+
+export async function anthropicDocument(request: any, apiKey: string): Promise<unknown> {
   if (!apiKey) throw new Error("Anthropic key missing");
-  const content = [
-    ...(request.images || []).map((image: ImageBlock) => ({ type: "image",
-      source: { type: "base64", media_type: image.media_type, data: image.data } })),
-    { type: "text", text: modelPrompt(request) },
-  ];
+  const content = [...imageContent(request.images || []), { type: "text", text: modelPrompt(request) }];
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
@@ -29,7 +33,7 @@ export async function anthropicJson(request: any, apiKey: string): Promise<unkno
       messages: [{ role: "user", content }] }),
   });
   if (!response.ok) {
-    console.error("deck-ai anthropic", response.status, (await response.text()).slice(0, 300));
+    console.error("doc-ai anthropic", response.status, (await response.text()).slice(0, 300));
     throw new Error(`Anthropic returned ${response.status}`);
   }
   const data = await response.json();

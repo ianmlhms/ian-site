@@ -5,7 +5,7 @@ import { createDeckGeneration } from "./ppt-ai.js?v=5";
 import { fillDeckImages } from "./ppt-images.js?v=5";
 import { exportPptx } from "./ppt-export-pptx.js?v=5";
 import { exportPdf } from "./ppt-export-pdf.js?v=5";
-import { exportCuesDocx, exportScriptDocx } from "./ppt-export-docx.js?v=5";
+import { exportCuesDocx, exportScriptDocx } from "./ppt-export-docx.js?v=6";
 import { startPresenting } from "./ppt-present.js?v=5";
 import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=5";
 import { createHistory } from "./ppt-history.js?v=3";
@@ -17,7 +17,7 @@ const DEFAULT_SLIDE_COUNT = 12;
 const MAX_PRESENTERS = 6;
 const RESIZE_WAIT_MS = 120;
 const PROGRESS_HIDE_MS = 700;
-const MENU_CLOSE_MS = 220;
+const MENU_CLOSE_MS = 220, PPT_SCRIPT_SEED_KEY = "ian-doc-script-seed-v1";
 const $ = (id) => document.getElementById(id);
 const esc = (value) => String(value ?? "").replace(/[&<>\"]/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;",
@@ -88,6 +88,7 @@ function designerMarkup() {
               <button type="button" role="menuitem" data-export="pdf">PDF</button>
               <button type="button" role="menuitem" data-export="script">Word — Vollstännegen Text</button>
               <button type="button" role="menuitem" data-export="cues">Word — Stëchwierder</button>
+              <button type="button" role="menuitem" data-export="doc">Schreif de Sprëchtext</button>
             </div></div>
           <button class="primary-button present-button" id="present" type="button" disabled>Presentéieren</button></div></div>
       <div class="slide-controls material-panel" id="slideControls" hidden></div>
@@ -287,8 +288,24 @@ function exportDetails(kind) {
     pdf: { progress: "PDF gëtt gebaut…", success: "PDF ass erofgelueden ✓", run: () => exportPdf(currentDeck, resolveTokens(currentStyle)) },
     script: { progress: "Vollstännegen Text gëtt gebaut…", success: "Vollstännegen Text ass erofgelueden ✓", run: () => exportScriptDocx(currentDeck) },
     cues: { progress: "Stëchwierder ginn gebaut…", success: "Stëchwierder sinn erofgelueden ✓", run: () => exportCuesDocx(currentDeck) },
+    doc: { progress: "Sprëchtext gëtt virbereet…", success: "Word Builder gëtt opgemaach…", run: openScriptDocument },
   };
   return options[kind] || null;
+}
+function scriptSeedBlocks(deck) {
+  const content = deck.slides.flatMap((slide, index) => {
+    if (!slide.notes.trim()) return [];
+    return [{ id: `${slide.id}-heading`, type: "heading", level: 2, text: `${index + 1} · ${slide.title}` }, { id: `${slide.id}-notes`, type: "paragraph", text: slide.notes }];
+  });
+  return content.length ? content : [{ id: "b1", type: "paragraph", text: "Nach kee Sprëchtext disponibel." }];
+}
+function openScriptDocument() {
+  const sourceText = currentDeck.slides.map((slide) => `${slide.title}\n${slide.notes}`).join("\n\n");
+  const words = sourceText.match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu)?.length || 0;
+  const seed = { document: { version: 1, kind: "script", title: `${currentDeck.title} — Sprëchtext`,
+    subject: currentDeck.subject, lang: currentDeck.lang, blocks: scriptSeedBlocks(currentDeck) }, sourceText,
+    settings: { schoolYear: currentStyle.schoolYear, authenticity: currentStyle.authenticity, targetWords: Math.max(80, words) } };
+  sessionStorage.setItem(PPT_SCRIPT_SEED_KEY, JSON.stringify(seed)); window.location.href = "doc.html";
 }
 async function runExport(kind, button) {
   const details = exportDetails(kind);
