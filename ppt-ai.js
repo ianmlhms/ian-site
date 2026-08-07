@@ -1,32 +1,16 @@
 import * as auth from "./auth.js?v=5";
+import { validateDeck, validateSlide } from "./ppt-ai-schema.js?v=5";
+export { validateDeck } from "./ppt-ai-schema.js?v=5";
 
-const DECK_VERSION = 1;
 const DEFAULT_LANG = "de";
-const DEFAULT_LAYOUT = "bullets";
-const DEFAULT_SLIDE_TITLE = "Ouni Titel";
 const MAX_INSTRUCTIONS = 30000;
 const JOB_POLL_MS = 2000;
-const MIN_SLIDES = 1;
-const MAX_SLIDES = 60;
 const ALLOWED_LANGS = new Set(["lb", "de", "en", "fr"]);
-const ALLOWED_LAYOUTS = new Set([
-  "title", "toc", "bullets", "bullets-image", "image-full",
-  "photo-numbered", "example", "sources", "closing",
-]);
-
-function deepFreeze(value) {
-  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
-  Object.values(value).forEach(deepFreeze);
-  return Object.freeze(value);
-}
+const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e"]);
+const SLIDE_INTENTS = new Set(["rewrite", "shorter", "longer", "more-data", "simpler", "custom"]);
 
 function stringValue(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
-}
-
-function nullableString(value) {
-  const text = stringValue(value);
-  return text || null;
 }
 
 function stringArray(value, maximum = 100) {
@@ -34,97 +18,9 @@ function stringArray(value, maximum = 100) {
   return value.map((item) => stringValue(item)).filter(Boolean).slice(0, maximum);
 }
 
-function pairArray(value, first, second, maximum) {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((item) => {
-    if (!item || typeof item !== "object") return [];
-    const left = stringValue(item[first]);
-    const right = stringValue(item[second]);
-    if (!left && !right) return [];
-    return [{ [first]: left, [second]: right }];
-  }).slice(0, maximum);
-}
-
-function httpUrl(value) {
-  if (typeof value !== "string") return "";
-  try {
-    const parsed = new URL(value);
-    return /^https?:$/.test(parsed.protocol) ? parsed.href : "";
-  } catch { return ""; }
-}
-
-function normaliseImage(value) {
-  if (!value || typeof value !== "object") return null;
-  const url = httpUrl(value.url);
-  const thumb = httpUrl(value.thumb) || url;
-  const link = httpUrl(value.link) || url;
-  const credit = stringValue(value.credit);
-  const source = value.source === "pexels" || value.source === "wikimedia" ? value.source : null;
-  if (!url || !thumb || !link || !credit || !source) return null;
-  return { url, thumb, credit, source, link };
-}
-
-function stableId(rawId, index, usedIds) {
-  const candidate = stringValue(rawId).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
-  if (candidate && !usedIds.includes(candidate)) return candidate;
-  let id = `s${index + 1}`;
-  let suffix = 1;
-  while (usedIds.includes(id)) { suffix += 1; id = `s${index + 1}-${suffix}`; }
-  return id;
-}
-
-function normaliseSlide(raw, index, usedIds) {
-  const source = raw && typeof raw === "object" ? raw : {};
-  const id = stableId(source.id, index, usedIds);
-  return {
-    id,
-    layout: ALLOWED_LAYOUTS.has(source.layout) ? source.layout : DEFAULT_LAYOUT,
-    section: nullableString(source.section),
-    presenter: nullableString(source.presenter),
-    title: stringValue(source.title, DEFAULT_SLIDE_TITLE) || DEFAULT_SLIDE_TITLE,
-    bullets: stringArray(source.bullets, 12),
-    caption: nullableString(source.caption),
-    fields: pairArray(source.fields, "label", "value", 10),
-    sources: pairArray(source.sources, "text", "accessed", 40),
-    imageQuery: nullableString(source.imageQuery),
-    image: normaliseImage(source.image),
-    notes: stringValue(source.notes),
-  };
-}
-
-function sourceDeck(raw) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new Error("D'AI huet keng gëlteg Präsentatioun zeréckginn.");
-  }
-  if (!Array.isArray(raw.slides)) throw new Error("D'AI-Äntwert enthält keng Slides.");
-  if (raw.slides.length < MIN_SLIDES) throw new Error("D'AI-Äntwert enthält keng Slide.");
-  if (raw.slides.length > MAX_SLIDES) throw new Error("D'AI-Äntwert enthält ze vill Slides.");
-  const invalidIndex = raw.slides.findIndex((slide) =>
-    !slide || typeof slide !== "object" || Array.isArray(slide) || typeof slide.title !== "string"
-  );
-  if (invalidIndex >= 0) throw new Error(`Slide ${invalidIndex + 1} ass ongëlteg.`);
-  return raw;
-}
-
-/** Strict boundary validator that returns a normalised, recursively frozen deck. */
-export function validateDeck(raw) {
-  const source = sourceDeck(raw);
-  const title = stringValue(source.title);
-  if (!title) throw new Error("D'Präsentatioun huet keen Titel.");
-  const normalised = source.slides.reduce((state, slide, index) => {
-    const next = normaliseSlide(slide, index, state.ids);
-    return { slides: [...state.slides, next], ids: [...state.ids, next.id] };
-  }, { slides: [], ids: [] });
-  const deck = {
-    version: DECK_VERSION,
-    title,
-    tagline: nullableString(source.tagline),
-    subject: nullableString(source.subject),
-    lang: ALLOWED_LANGS.has(source.lang) ? source.lang : DEFAULT_LANG,
-    presenters: stringArray(source.presenters, 12),
-    slides: normalised.slides,
-  };
-  return deepFreeze(deck);
+function authenticityValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.min(100, Math.max(0, Math.round(number))) : 75;
 }
 
 function configuration() {
@@ -146,9 +42,18 @@ function validatedRequest(input) {
     subject: stringValue(input?.subject).slice(0, 120),
     slideCount: Number.isFinite(Number(input?.slideCount)) ? Number(input.slideCount) : 12,
     presenters: stringArray(input?.presenters, 12),
+    schoolYear: SCHOOL_YEARS.has(input?.schoolYear) ? input.schoolYear : "4e",
+    authenticity: authenticityValue(input?.authenticity),
     images: images.filter((image) => typeof image?.media_type === "string" && typeof image?.data === "string").slice(0, 6),
   };
   return input?.force === "api" || input?.force === "mini" ? { ...request, force: input.force } : request;
+}
+
+function voiceSelection(input) {
+  return {
+    schoolYear: SCHOOL_YEARS.has(input?.schoolYear) ? input.schoolYear : "4e",
+    authenticity: authenticityValue(input?.authenticity),
+  };
 }
 
 function abortError() {
@@ -195,13 +100,13 @@ function reportProgress(callback, details) {
   catch (error) { console.error("ppt-ai progress callback", error); }
 }
 
-async function waitForMini(config, token, jobId, options) {
+async function waitForMini(config, token, jobId, options, validate) {
   const startedAt = Date.now();
   while (true) {
     reportProgress(options.onProgress, { mode: "mini", status: "waiting", jobId, elapsedMs: Date.now() - startedAt });
     await wait(JOB_POLL_MS, options.signal);
     const data = await postFunction(config, token, { action: "job", jobId }, options.signal);
-    if (data?.status === "done") return validateDeck(data.deck);
+    if (data?.status === "done") return validate(data.result ?? data.deck);
     if (data?.status === "error") throw new Error(stringValue(data.error, "De Mac mini konnt d'Präsentatioun net erstellen."));
     if (data?.status !== "queued" && data?.status !== "running") throw new Error("De Job huet en onbekannte Status.");
   }
@@ -213,11 +118,89 @@ export async function generateDeck(input, options = {}) {
   const token = auth.session()?.access_token;
   if (!token) throw new Error("Mell dech fir d'éischt un.");
   const data = await postFunction(config, token, validatedRequest(input), options.signal);
-  if (data?.mode === "api") return Object.freeze({ deck: validateDeck(data.deck), engine: "api" });
+  if (data?.mode === "api") return Object.freeze({ deck: validateDeck(data.result ?? data.deck), engine: "api" });
   if (data?.mode !== "mini" || typeof data.jobId !== "string") {
     throw new Error("D'Server-Äntwert huet en onbekannte Modus.");
   }
-  return Object.freeze({ deck: await waitForMini(config, token, data.jobId, options), engine: "mini" });
+  return Object.freeze({ deck: await waitForMini(config, token, data.jobId, options, validateDeck), engine: "mini" });
+}
+
+function authContext() {
+  const config = configuration();
+  const token = auth.session()?.access_token;
+  if (!token) throw new Error("Mell dech fir d'éischt un.");
+  return { config, token };
+}
+
+async function runAction(request, options, validate) {
+  const { config, token } = authContext();
+  const data = await postFunction(config, token, request, options.signal);
+  if (data?.mode === "api") return validate(data.result ?? data.deck ?? data.slide);
+  if (data?.mode !== "mini" || typeof data.jobId !== "string") {
+    throw new Error("D'Server-Äntwert huet en onbekannte Modus.");
+  }
+  return waitForMini(config, token, data.jobId, options, validate);
+}
+
+function slideContext(deck, index) {
+  const target = deck.slides[index];
+  if (!target) throw new Error("D'Slide gouf net fonnt.");
+  return {
+    deck: { title: deck.title, subject: deck.subject, lang: deck.lang },
+    section: target.section,
+    neighbours: [deck.slides[index - 1]?.title, deck.slides[index + 1]?.title].filter(Boolean),
+    target,
+  };
+}
+
+/** Rewrite exactly one slide; the caller applies it through updateSlide for undo. */
+export async function rewriteSlide(deck, index, intent, custom, style, options = {}) {
+  const safeDeck = validateDeck(deck);
+  const resolvedIntent = SLIDE_INTENTS.has(intent) ? intent : "rewrite";
+  const context = slideContext(safeDeck, index);
+  const request = { action: "slide", ...context, intent: resolvedIntent,
+    custom: resolvedIntent === "custom" ? stringValue(custom).slice(0, 1200) : "",
+    ...voiceSelection(style) };
+  return runAction(request, options, (raw) => validateSlide(raw, context.target.id));
+}
+
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function translationIsSafe(before, after, targetLang) {
+  if (after.lang !== targetLang || before.slides.length !== after.slides.length) return false;
+  if (!sameJson(before.presenters, after.presenters)) return false;
+  if ((before.tagline === null) !== (after.tagline === null)
+    || (before.subject === null) !== (after.subject === null)) return false;
+  return before.slides.every((slide, index) => {
+    const next = after.slides[index];
+    const stable = ["id", "layout", "presenter", "imageQuery"]
+      .every((key) => sameJson(slide[key], next[key]));
+    const chart = Boolean(slide.chart) === Boolean(next.chart) && (!slide.chart
+      || slide.chart.type === next.chart.type
+      && sameJson(slide.chart.series.map((series) => series.values), next.chart.series.map((series) => series.values)));
+    const quiz = Boolean(slide.quiz) === Boolean(next.quiz)
+      && (!slide.quiz || slide.quiz.answerIndex === next.quiz.answerIndex
+        && slide.quiz.options.length === next.quiz.options.length);
+    const textShape = ["bullets", "fields", "sources"].every((key) => slide[key].length === next[key].length)
+      && (slide.section === null) === (next.section === null)
+      && (slide.caption === null) === (next.caption === null)
+      && (!slide.chart || slide.chart.categories.length === next.chart.categories.length);
+    return stable && chart && quiz && textShape && sameJson(slide.image, next.image);
+  });
+}
+
+/** Translate all words while rejecting any structural or media changes. */
+export async function translateDeck(deck, targetLang, style, options = {}) {
+  const safeDeck = validateDeck(deck);
+  if (!ALLOWED_LANGS.has(targetLang)) throw new Error("D'Zilsprooch ass ongëlteg.");
+  const request = { action: "translate", deck: safeDeck, targetLang, ...voiceSelection(style) };
+  const translated = await runAction(request, options, validateDeck);
+  if (!translationIsSafe(safeDeck, translated, targetLang)) {
+    throw new Error("D'Iwwersetzung huet d'Slide-Struktur geännert a gouf verworf.");
+  }
+  return translated;
 }
 
 /** Start a cancellable generation; an optional caller AbortSignal is mirrored. */

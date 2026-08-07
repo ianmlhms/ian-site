@@ -1,5 +1,5 @@
-import { validateDeck } from "./ppt-ai.js?v=4";
-import { safeExportFilename } from "./ppt-export-pptx.js?v=4";
+import { validateDeck } from "./ppt-ai.js?v=5";
+import { safeExportFilename } from "./ppt-export-pptx.js?v=5";
 
 const DOCX_URL = "https://cdn.jsdelivr.net/npm/docx@8/+esm";
 const DOCX_EXTENSION = ".docx";
@@ -148,6 +148,11 @@ function normalParagraph(Docx, text) {
   });
 }
 
+function speakerNotes(slide) {
+  const answer = slide.quiz?.options?.[slide.quiz.answerIndex];
+  return [slide.notes, answer ? `Äntwert: ${answer}` : ""].filter(Boolean).join("\n\n");
+}
+
 function countParagraph(Docx, count) {
   return new Docx.Paragraph({
     spacing: { before: CARD_SPACING_AFTER },
@@ -157,10 +162,11 @@ function countParagraph(Docx, count) {
 
 function scriptChildren(Docx, deck) {
   const content = deck.slides.flatMap((slide, index) => {
-    if (!slide.notes.trim()) return [];
-    return [scriptHeading(Docx, deck, slide, index), ...textParagraphs(slide.notes).map((text) => normalParagraph(Docx, text))];
+    const notes = speakerNotes(slide);
+    if (!notes.trim()) return [];
+    return [scriptHeading(Docx, deck, slide, index), ...textParagraphs(notes).map((text) => normalParagraph(Docx, text))];
   });
-  const count = wordCount(deck.slides.map((slide) => slide.notes).filter(Boolean));
+  const count = wordCount(deck.slides.map(speakerNotes).filter(Boolean));
   return [titleParagraph(Docx, deck.title), ...taglineParagraph(Docx, deck.tagline),
     ...speakersParagraph(Docx, deck), ...content, countParagraph(Docx, count)];
 }

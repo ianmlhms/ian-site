@@ -1,16 +1,17 @@
 import * as auth from "./auth.js?v=5";
-import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=3";
+import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=5";
 import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3";
-import { createDeckGeneration } from "./ppt-ai.js?v=4";
-import { fillDeckImages } from "./ppt-images.js?v=4";
-import { exportPptx } from "./ppt-export-pptx.js?v=4";
-import { exportPdf } from "./ppt-export-pdf.js?v=4";
-import { exportCuesDocx, exportScriptDocx } from "./ppt-export-docx.js?v=4";
-import { startPresenting } from "./ppt-present.js?v=4";
-import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=4";
+import { createDeckGeneration } from "./ppt-ai.js?v=5";
+import { fillDeckImages } from "./ppt-images.js?v=5";
+import { exportPptx } from "./ppt-export-pptx.js?v=5";
+import { exportPdf } from "./ppt-export-pdf.js?v=5";
+import { exportCuesDocx, exportScriptDocx } from "./ppt-export-docx.js?v=5";
+import { startPresenting } from "./ppt-present.js?v=5";
+import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=5";
 import { createHistory } from "./ppt-history.js?v=3";
-import { createEditor } from "./ppt-editor.js?v=4";
-import { createInspector } from "./ppt-inspector.js?v=3";
+import { createEditor } from "./ppt-editor.js?v=5";
+import { createInspector } from "./ppt-inspector.js?v=5";
+import { createAiActions } from "./ppt-ai-actions-ui.js?v=5";
 const OWNER_EMAIL = "konto@ian.lu";
 const DEFAULT_SLIDE_COUNT = 12;
 const MAX_PRESENTERS = 6;
@@ -32,6 +33,7 @@ let bootNumber = 0;
 let resizeTimer = null;
 let editor = null;
 let inspector = null;
+let aiActions = null;
 let activeGeneration = null;
 let apiFallbackRequested = false;
 const history = createHistory();
@@ -43,9 +45,8 @@ function gate(title, message, canSignIn = false) {
     ${canSignIn ? '<button class="primary-button" id="signIn" type="button">Umellen</button>' : ""}</section>`;
   if (canSignIn) $("signIn").onclick = () => auth.openAuthModal();
 }
-function appMarkup() {
-  return `<div class="studio-grid">
-    <aside class="input-panel material-panel scroll-fade">
+function inputPanelMarkup() {
+  return `<aside class="input-panel material-panel scroll-fade">
       <div class="panel-heading"><span class="eyebrow">Quell</span><h1>Wat soll dran?</h1></div>
       <label class="field-label">Instruktiounen
         <textarea id="instructions" rows="7" placeholder="Aufgabestellung, Thema, wichteg Punkten…"></textarea></label>
@@ -69,12 +70,17 @@ function appMarkup() {
       <div class="saved-heading"><span class="eyebrow">Gespäichert</span>
         <button class="icon-button" id="refreshDecks" type="button" aria-label="Lëscht aktualiséieren">↻</button></div>
       <div class="deck-list" id="deckList"><p class="muted">Lueden…</p></div>
-    </aside>
-    <section class="preview-column">
+    </aside>`;
+}
+function designerMarkup() {
+  return `<section class="preview-column">
       <div class="preview-toolbar material-panel"><div><span class="eyebrow">Live Virschau</span><strong id="slideLabel">Nach keng Slide</strong>
         <span class="engine-badge" id="engineLabel" hidden></span></div>
         <div class="preview-actions"><button class="icon-text-button" id="undo" type="button" disabled>↶ <span>Zréck</span></button>
           <button class="icon-text-button" id="redo" type="button" disabled>↷ <span>Nees viru</span></button>
+          <div class="translate-control"><select id="translateLang" aria-label="Zilsprooch"><option value="lb">LB</option>
+            <option value="de">DE</option><option value="en">EN</option><option value="fr">FR</option></select>
+            <button class="icon-text-button" id="translateDeck" type="button" disabled>Iwwersetzen</button></div>
           <div class="export-menu" id="exportMenu"><button class="icon-text-button export-button" id="exportTrigger" type="button"
             aria-haspopup="menu" aria-expanded="false" disabled>Exportéieren <span aria-hidden="true">⌄</span></button>
             <div class="export-popover material-panel" id="exportPopover" role="menu" hidden>
@@ -89,9 +95,12 @@ function appMarkup() {
         <div class="empty-preview"><span>▣</span><h2>Deng Präsentatioun erschéngt hei</h2><p>Instruktiounen dobäisetzen a generéieren.</p></div>
       </div></div>
     </section>
-    <aside class="inspector-panel material-panel scroll-fade" id="inspector"></aside>
-  </div>
-  <nav class="filmstrip material-panel" id="filmstrip" aria-label="Slides"><div class="filmstrip-empty">Nach keng Slides</div></nav>`;
+    <aside class="inspector-panel material-panel scroll-fade" id="inspector"></aside>`;
+}
+function appMarkup() {
+  return `<div class="studio-grid">${inputPanelMarkup()}${designerMarkup()}</div>
+    <nav class="filmstrip material-panel" id="filmstrip" aria-label="Slides">
+      <div class="filmstrip-empty">Nach keng Slides</div></nav>`;
 }
 function setStatus(message, isError = false) {
   const element = $("status");
@@ -171,6 +180,7 @@ function renderDesigner(index = selectedSlide) {
   selectedSlide = Math.max(0, Math.min(index, currentDeck.slides.length - 1));
   $("slideControls").hidden = false;
   editor.render(selectedSlide); updateLabel(); updateHistoryButtons();
+  aiActions?.refresh();
   $("exportTrigger").disabled = false; $("present").disabled = false;
 }
 function applyDeck(deck, meta, index) {
@@ -191,9 +201,13 @@ function restoreHistory(state) {
   inspector.render(); renderDesigner(); scheduleSave();
 }
 function mountDesigner() {
+  aiActions = createAiActions({ getDeck: () => currentDeck, getStyle: () => currentStyle,
+    getIndex: () => selectedSlide, onDeck: applyDeck, setStatus,
+    setLanguage: (lang) => { if ($("lang")) $("lang").value = lang; } });
   editor = createEditor({ previewHost: $("previewHost"), filmstrip: $("filmstrip"), controlsHost: $("slideControls"),
     getDeck: () => currentDeck, getStyle: () => currentStyle, onChange: applyDeck,
-    onSelect: (index) => { selectedSlide = index; updateLabel(); } });
+    onSelect: (index) => { selectedSlide = index; updateLabel(); },
+    onRewrite: (index, intent, custom) => aiActions.rewrite(index, intent, custom) });
   inspector = createInspector($("inspector"), { getStyle: () => currentStyle, onChange: applyStyle });
 }
 function bindInputs() {
@@ -239,7 +253,8 @@ async function generate() {
     startNewDeck(sourceText); currentStoreId = null;
     setProgress("Slides schreiwen…", 42);
     const result = await generateOutline({ instructions: sourceText, lang: $("lang").value, subject: $("subject").value,
-      slideCount: Number($("slideCount").value), presenters: presenterNames(), images: ingested.images });
+      slideCount: Number($("slideCount").value), presenters: presenterNames(), images: ingested.images,
+      schoolYear: currentStyle.schoolYear, authenticity: currentStyle.authenticity });
     const outline = result.deck; currentEngine = result.engine; showEngine(currentEngine);
     setProgress("Fotoe sichen…", 72);
     currentDeck = await fillDeckImages(outline); selectedSlide = 0;
@@ -311,6 +326,7 @@ async function openStored(id) {
     const stored = await loadDeck(id); currentDeck = stored.deck; currentEngine = stored.engine === "mini" ? "mini" : "api";
     currentStyle = Object.freeze({ ...DEFAULT_STYLE, ...stored.style }); currentStoreId = stored.id; selectedSlide = 0;
     $("instructions").value = stored.sourceText; $("lang").value = currentDeck.lang; $("subject").value = currentDeck.subject || "";
+    if ($("translateLang")) $("translateLang").value = currentDeck.lang;
     history.reset({ deck: currentDeck, style: currentStyle }); inspector.render(); renderDesigner(0); showEngine(currentEngine);
     setStatus(`Präsentatioun gelueden · ${engineText(currentEngine)}`);
   } catch (error) { setStatus(error.message || "Lueden feelgeschloen.", true); }
@@ -322,6 +338,7 @@ async function removeStored(id) {
 }
 function resetStudio() {
   activeGeneration?.cancel(); selectedFiles = Object.freeze([]); currentDeck = null; currentStoreId = null; currentEngine = null;
+  aiActions = null;
   currentStyle = Object.freeze({ ...DEFAULT_STYLE }); selectedSlide = 0;
   history.reset(); startNewDeck(); renderApp();
 }

@@ -1,5 +1,5 @@
-import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
-import { validateDeck } from "./ppt-ai.js?v=4";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
+import { validateDeck } from "./ppt-ai.js?v=5";
 
 const PPTXGENJS_URL = "https://cdn.jsdelivr.net/npm/pptxgenjs@3/+esm";
 const LAYOUT_NAME = "IANLU16x9";
@@ -102,11 +102,36 @@ function addText(pptSlide, box) {
 
 function addRect(pptx, pptSlide, box) {
   const shape = box.radius > 0 ? pptx.ShapeType.roundRect : pptx.ShapeType.rect;
+  const opacity = Number.isFinite(Number(box.opacity)) ? Number(box.opacity) : 1;
   pptSlide.addShape(shape, {
     x: box.x, y: box.y, w: box.w, h: box.h,
-    fill: { color: withoutHash(box.fill, "FFFFFF") },
+    fill: { color: withoutHash(box.fill, "FFFFFF"),
+      transparency: Math.round((1 - Math.min(1, Math.max(0, opacity))) * 100) },
     line: { color: withoutHash(box.fill, "FFFFFF"), transparency: 100 },
     radius: box.radius,
+  });
+}
+
+function chartData(box) {
+  const series = box.chart.type === "pie" ? box.chart.series.slice(0, 1) : box.chart.series;
+  return series.map((item) => ({ name: item.name,
+    labels: [...box.chart.categories], values: [...item.values] }));
+}
+
+function addChart(pptx, pptSlide, box) {
+  const chartType = pptx.ChartType[box.chart.type] || pptx.ChartType.bar;
+  const colors = (box.colors?.palette || []).map((color) => withoutHash(color));
+  pptSlide.addChart(chartType, chartData(box), {
+    x: box.x, y: box.y, w: box.w, h: box.h,
+    showTitle: Boolean(box.chart.title), title: box.chart.title || "",
+    showLegend: box.chart.series.length > 1 || box.chart.type === "pie",
+    legendPos: "b",
+    chartColors: colors, showCatName: box.chart.type === "pie",
+    catAxisLabelFontFace: box.colors?.font, valAxisLabelFontFace: box.colors?.font,
+    legendFontFace: box.colors?.font, dataLabelFontFace: box.colors?.font,
+    titleFontFace: box.colors?.headlineFont,
+    showValue: box.chart.type === "pie", showPercent: box.chart.type === "pie",
+    showBorder: false,
   });
 }
 
@@ -135,6 +160,7 @@ function addBox(pptx, pptSlide, box, images) {
   if (box.kind === "text") { addText(pptSlide, box); return; }
   if (box.kind === "rect") { addRect(pptx, pptSlide, box); return; }
   if (box.kind === "image") { addImage(pptx, pptSlide, box, images); return; }
+  if (box.kind === "chart") { addChart(pptx, pptSlide, box); return; }
   console.warn("[ppt] Onbekannte Export-Box gouf iwwersprongen:", box.kind);
 }
 
@@ -143,7 +169,9 @@ function addDeckSlide(pptx, deck, sourceSlide, tokens, images, slideNumber) {
   const layout = layoutSlide(slideForLayout(deck, sourceSlide), tokens, slideNumber);
   pptSlide.background = { color: withoutHash(layout.background.fill, "FFFFFF") };
   layout.boxes.forEach((box) => addBox(pptx, pptSlide, box, images));
-  if (sourceSlide.notes) pptSlide.addNotes(sourceSlide.notes);
+  const answer = sourceSlide.quiz?.options?.[sourceSlide.quiz.answerIndex];
+  const notes = [sourceSlide.notes, answer ? `Äntwert: ${answer}` : ""].filter(Boolean).join("\n\n");
+  if (notes) pptSlide.addNotes(notes);
   return pptSlide;
 }
 
@@ -161,7 +189,7 @@ export function safeExportFilename(title, extension) {
   return `${cleaned || FALLBACK_FILENAME}${suffix}`;
 }
 
-function configurePresentation(PptxGenJS, deck) {
+function configurePresentation(PptxGenJS, deck, tokens) {
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: LAYOUT_NAME, width: SLIDE_WIDTH_IN, height: SLIDE_HEIGHT_IN });
   pptx.layout = LAYOUT_NAME;
@@ -171,8 +199,8 @@ function configurePresentation(PptxGenJS, deck) {
   pptx.title = deck.title;
   pptx.lang = deck.lang;
   pptx.theme = {
-    headFontFace: "Calibri Light",
-    bodyFontFace: "Calibri",
+    headFontFace: tokens.headlineFont,
+    bodyFontFace: tokens.bodyFont,
     lang: deck.lang,
   };
   return pptx;
@@ -192,7 +220,7 @@ export async function exportPptx(deck, tokens) {
   if (!tokens || typeof tokens !== "object") throw new Error("De Präsentatiounsstil feelt.");
   const PptxGenJS = await pptxLibrary();
   const images = await imageData(safeDeck, tokens);
-  const pptx = configurePresentation(PptxGenJS, safeDeck);
+  const pptx = configurePresentation(PptxGenJS, safeDeck, tokens);
   safeDeck.slides.forEach((slide, index) => addDeckSlide(pptx, safeDeck, slide, tokens, images, index + 1));
   announceSkipped(images);
   try { await pptx.writeFile({ fileName: safeExportFilename(safeDeck.title, PPTX_EXTENSION) }); }

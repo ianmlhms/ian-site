@@ -1,6 +1,7 @@
-import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
-import { validateDeck } from "./ppt-ai.js?v=4";
-import { safeExportFilename } from "./ppt-export-pptx.js?v=4";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
+import { validateDeck } from "./ppt-ai.js?v=5";
+import { safeExportFilename } from "./ppt-export-pptx.js?v=5";
+import { drawPdfChart } from "./ppt-chart-pdf.js?v=5";
 
 const JSPDF_URL = "https://cdn.jsdelivr.net/npm/jspdf@2/+esm";
 const PAGE_WIDTH_IN = 13.333;
@@ -14,7 +15,7 @@ const BASELINE_FACTOR = 0.82;
 const POINTS_PER_INCH = 72;
 const MAX_RASTER_EDGE_PX = 2400;
 const JPEG_QUALITY = 0.9;
-const SERIF_FACES = /georgia|times|cambria|serif/i;
+const SERIF_FACES = /georgia|garamond|times|cambria|serif/i;
 
 let libraryPromise = null;
 
@@ -148,9 +149,13 @@ function addImage(doc, box, images) {
 }
 
 function addRect(doc, box) {
+  const opacity = Number.isFinite(Number(box.opacity)) ? Math.min(1, Math.max(0, Number(box.opacity))) : 1;
+  const transparent = opacity < 1 && typeof doc.GState === "function" && typeof doc.setGState === "function";
+  if (transparent) { doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity })); }
   setFill(doc, box.fill);
-  if (box.radius > 0) { doc.roundedRect(box.x, box.y, box.w, box.h, box.radius, box.radius, "F"); return; }
-  doc.rect(box.x, box.y, box.w, box.h, "F");
+  if (box.radius > 0) doc.roundedRect(box.x, box.y, box.w, box.h, box.radius, box.radius, "F");
+  else doc.rect(box.x, box.y, box.w, box.h, "F");
+  if (transparent) doc.restoreGraphicsState();
 }
 
 function fontStyle(box) {
@@ -201,6 +206,7 @@ function addBox(doc, box, images) {
   if (box.kind === "rect") { addRect(doc, box); return; }
   if (box.kind === "image") { addImage(doc, box, images); return; }
   if (box.kind === "text") { addText(doc, box); return; }
+  if (box.kind === "chart") { drawPdfChart(doc, box); return; }
   console.warn("[ppt] Onbekannte PDF-Box iwwersprongen:", box.kind);
 }
 

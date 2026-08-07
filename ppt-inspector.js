@@ -1,5 +1,5 @@
-import { DEFAULT_STYLE, STYLE_PACKS, resolveTokens, styleForPack } from "./ppt-style-packs.js?v=3";
-import { esc } from "./ppt-render-dom.js?v=3";
+import { CURATED_FONTS, DEFAULT_STYLE, STYLE_PACKS, resolveTokens, styleForPack } from "./ppt-style-packs.js?v=5";
+import { esc } from "./ppt-render-dom.js?v=5";
 
 const CONTROLS = Object.freeze([
   { key: "titleScale", label: "Titelgréisst", min: 0.8, max: 1.3, step: 0.05 },
@@ -10,6 +10,7 @@ const CONTROLS = Object.freeze([
 const PHOTO_OPTIONS = Object.freeze([
   ["inset", "Inset"], ["rounded", "Ronn"], ["full-bleed", "Vollfläch"],
 ]);
+const YEARS = Object.freeze(["7e", "6e", "5e", "4e"]);
 
 function styleCards(style) {
   return Object.values(STYLE_PACKS).map((pack) => {
@@ -25,7 +26,35 @@ function numberText(key, value) {
   if (key === "titleScale") return `${Math.round(value * 100)}%`;
   if (key === "imageArea") return `${Math.round(value * 100)}%`;
   if (key === "radius") return `${Math.round(value)} px`;
+  if (key === "authenticity") {
+    if (value >= 85) return `${Math.round(value)} · ganz ech`;
+    if (value >= 60) return `${Math.round(value)} · meeschtens ech`;
+    return `${Math.round(value)} · méi propper`;
+  }
   return String(Math.round(value));
+}
+
+function fontOptions(value, fallback) {
+  const pack = `<option value=""${value ? "" : " selected"}>Pack · ${esc(fallback)}</option>`;
+  return pack + CURATED_FONTS.map((font) => `<option value="${esc(font)}" style="font-family:${esc(font)}"
+    ${value === font ? "selected" : ""}>${esc(font)}</option>`).join("");
+}
+
+function voiceMarkup(style) {
+  const authenticity = Number(style.authenticity ?? DEFAULT_STYLE.authenticity);
+  return `<div class="inspector-section voice-section"><span class="eyebrow">Stëmm</span>
+    <label class="inspector-control"><span>Schouljoer</span><select data-style-select="schoolYear">
+      ${YEARS.map((year) => `<option value="${year}"${style.schoolYear === year ? " selected" : ""}>${year}</option>`).join("")}
+    </select></label>
+    ${rangeMarkup({ key: "authenticity", label: "Authentizitéit", min: 0, max: 100, step: 1 }, style)}
+    <small class="control-hint">Telegraphesch a waarm; keng kënschtlech Feeler.</small></div>`;
+}
+
+function fontMarkup(style, tokens) {
+  return `<label class="inspector-control"><span>Titelschrëft</span>
+    <select data-style-select="headlineFont" style="font-family:${esc(tokens.headlineFont)}">${fontOptions(style.headlineFont, tokens.headlineFont)}</select></label>
+    <label class="inspector-control"><span>Textschrëft</span>
+    <select data-style-select="bodyFont" style="font-family:${esc(tokens.bodyFont)}">${fontOptions(style.bodyFont, tokens.bodyFont)}</select></label>`;
 }
 
 function rangeMarkup(control, style) {
@@ -52,10 +81,12 @@ function inspectorMarkup(style) {
   const inherited = style.alternating == null;
   return `<div class="inspector-heading"><span class="eyebrow">Designer</span><h2>Stil</h2></div>
     <div class="style-grid inspector-packs">${styleCards(style)}</div>
+    ${voiceMarkup(style)}
     <div class="inspector-section"><label class="inspector-control accent-control"><span>Akzentfaarf
       <output>${esc(tokens.accent)}</output></span><span><input type="color" data-style-color value="${esc(tokens.accent)}">
       <button type="button" data-reset-accent>Pack</button></span></label>
       ${CONTROLS.map((control) => rangeMarkup(control, style)).join("")}
+      ${fontMarkup(style, tokens)}
       ${toggleMarkup("alternating", "Ofwiesselnd Sektiounen", tokens.alternating, inherited)}
       <button class="inherit-style" type="button" data-inherit-alternating>Vum Pack iwwerhuelen</button>
       ${toggleMarkup("footer", "Virdroender-Fouss", tokens.footer)}
@@ -100,8 +131,21 @@ class StyleInspector {
   bindPacks() {
     this.host.querySelectorAll("[data-inspector-pack]").forEach((button) => {
       button.onclick = () => {
-        const next = styleForPack(button.dataset.inspectorPack);
+        const base = styleForPack(button.dataset.inspectorPack);
+        const current = this.getStyle();
+        const next = frozenStyle(base, { schoolYear: current.schoolYear,
+          authenticity: current.authenticity, headlineFont: current.headlineFont, bodyFont: current.bodyFont });
         this.onChange(next, { kind: "style", field: "pack" });
+        this.render();
+      };
+    });
+  }
+
+  bindSelects() {
+    this.host.querySelectorAll("[data-style-select]").forEach((select) => {
+      select.onchange = () => {
+        const key = select.dataset.styleSelect;
+        this.emit({ [key]: select.value || null }, { kind: "style", field: key });
         this.render();
       };
     });
@@ -146,7 +190,9 @@ class StyleInspector {
       this.render();
     };
     this.host.querySelector("[data-reset-style]").onclick = () => {
-      const next = styleForPack(this.getStyle().pack);
+      const current = this.getStyle();
+      const next = frozenStyle(styleForPack(current.pack), { schoolYear: current.schoolYear,
+        authenticity: current.authenticity });
       this.onChange(next, { kind: "style", field: "reset" });
       this.render();
     };
@@ -155,6 +201,7 @@ class StyleInspector {
   render() {
     this.host.innerHTML = inspectorMarkup(frozenStyle(this.getStyle(), {}));
     this.bindRanges();
+    this.bindSelects();
     this.bindPacks();
     this.bindToggles();
     this.bindColour();

@@ -1,3 +1,5 @@
+import { renderChartSvg } from "./ppt-chart-svg.js?v=5";
+
 const CSS_PIXELS_PER_INCH = 96;
 const POINTS_PER_INCH = 72;
 const DEFAULT_SCALE = 1;
@@ -68,7 +70,7 @@ function renderText(box, scale) {
   element.style.color = box.color;
   element.style.textAlign = textAlignment(box.align);
   element.style.lineHeight = String(finite(box.lineSpacing, 1.2));
-  element.style.letterSpacing = `${finite(box.charSpacing) * scale}px`;
+  element.style.letterSpacing = `${pointPixels(box.charSpacing, scale)}px`;
   element.style.whiteSpace = "normal";
   element.style.overflowWrap = "break-word";
   return element;
@@ -79,6 +81,7 @@ function renderRect(box, scale) {
   applyPosition(element, box, scale);
   element.className = "ppt-box ppt-box--rect";
   element.style.background = box.fill;
+  element.style.opacity = String(Math.min(1, Math.max(0, finite(box.opacity, 1))));
   element.style.borderRadius = `${pixels(box.radius, scale)}px`;
   return element;
 }
@@ -125,6 +128,7 @@ function renderBox(box, scale) {
   if (box.kind === "text") return renderText(box, scale);
   if (box.kind === "image") return renderImage(box, scale);
   if (box.kind === "rect") return renderRect(box, scale);
+  if (box.kind === "chart") return renderChartSvg(box, scale, pixels);
   console.warn("[ppt] Onbekannte Box gouf iwwersprongen.", box.kind);
   return null;
 }

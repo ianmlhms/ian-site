@@ -1,4 +1,4 @@
-import { validateDeck } from "./ppt-ai.js?v=4";
+import { validateDeck } from "./ppt-ai.js?v=5";
 
 const DEFAULT_LAYOUT = "bullets";
 const LAYOUTS = new Set([
@@ -11,6 +11,9 @@ const LAYOUTS = new Set([
   "example",
   "sources",
   "closing",
+  "chart",
+  "quiz",
+  "section",
 ]);
 const SLIDE_KEYS = new Set([
   "layout",
@@ -21,12 +24,14 @@ const SLIDE_KEYS = new Set([
   "caption",
   "fields",
   "sources",
+  "chart",
+  "quiz",
   "imageQuery",
   "image",
   "notes",
 ]);
 const META_KEYS = new Set(["title", "tagline", "subject", "lang"]);
-const CONTENT_EXCLUSIONS = new Set(["title", "closing", "sources"]);
+const CONTENT_EXCLUSIONS = new Set(["title", "closing", "sources", "section"]);
 const EMPTY_TITLES = Object.freeze({
   title: "Nei Presentatioun",
   toc: "Iwwersiicht",
@@ -37,6 +42,9 @@ const EMPTY_TITLES = Object.freeze({
   example: "Beispill",
   sources: "Quellen",
   closing: "Merci",
+  chart: "Daten",
+  quiz: "Quiz",
+  section: "Nei Sektioun",
 });
 
 function boundedIndex(value, length, allowEnd = false) {
@@ -61,7 +69,10 @@ function emptySlide(deck, layout) {
     id: nextId(deck), layout: resolved, section: null, presenter: null,
     title: EMPTY_TITLES[resolved], bullets: [], caption: null,
     fields: resolved === "example" ? [{ label: "Begrëff", value: "Wäert" }] : [],
-    sources: [], imageQuery: null, image: null, notes: "",
+    sources: [], chart: resolved === "chart" ? { type: "bar", title: "", categories: ["A", "B"],
+      series: [{ name: "Wäert", values: [1, 2] }], unit: "" } : null,
+    quiz: resolved === "quiz" ? { question: "Fro", options: ["A", "B", "C"], answerIndex: 0 } : null,
+    imageQuery: null, image: null, notes: "",
   };
 }
 

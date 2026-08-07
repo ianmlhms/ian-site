@@ -1,6 +1,6 @@
-import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
-import { renderSlide } from "./ppt-render-dom.js?v=3";
-import { validateDeck } from "./ppt-ai.js?v=4";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
+import { renderSlide } from "./ppt-render-dom.js?v=5";
+import { validateDeck } from "./ppt-ai.js?v=5";
 import { draggable, prefersReducedMotion, spring } from "./ppt-motion.js?v=3";
 
 const CSS_PIXELS_PER_INCH = 96;
@@ -64,6 +64,11 @@ function scaleFor(viewport) {
 function slideImage(deck, slide, tokens, index) {
   const layout = layoutSlide(slideForLayout(deck, slide), tokens, index + 1);
   return layout.boxes.find((box) => box.kind === "image" && box.url)?.url || "";
+}
+
+function presenterNotes(slide) {
+  const answer = slide.quiz?.options?.[slide.quiz.answerIndex];
+  return [slide.notes, answer ? `Äntwert: ${answer}` : ""].filter(Boolean).join("\n\n") || "—";
 }
 
 class Presenter {
@@ -137,7 +142,7 @@ class Presenter {
     const slide = this.deck.slides[this.index];
     this.root.querySelector("[data-present-counter]").textContent = `${this.index + 1} / ${this.deck.slides.length}`;
     this.root.querySelector("[data-present-speaker]").textContent = slide.presenter || this.deck.presenters[0] || "";
-    this.root.querySelector("[data-present-notes]").textContent = slide.notes || "—";
+    this.root.querySelector("[data-present-notes]").textContent = presenterNotes(slide);
     this.root.querySelector("[data-present-next]").textContent = this.deck.slides[this.index + 1]?.title || "—";
     this.preloadNext();
   }

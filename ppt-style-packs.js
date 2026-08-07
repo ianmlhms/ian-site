@@ -4,6 +4,12 @@ const DEFAULT_RADIUS_PX = 8;
 const DEFAULT_DENSITY = 5;
 const DEFAULT_IMAGE_AREA = 0.45;
 const DEFAULT_TITLE_SCALE = 1;
+const DEFAULT_SCHOOL_YEAR = "4e";
+const DEFAULT_AUTHENTICITY = 75;
+const FONT_CHOICES = new Set([
+  "Calibri", "Aptos", "Georgia", "Garamond", "Helvetica Neue",
+  "Avenir Next", "Futura", "Times New Roman", "Verdana", "Trebuchet MS",
+]);
 
 const OFFICE = {
   id: "office",
@@ -23,6 +29,7 @@ const OFFICE = {
   textOnDark: "#FFFFFF",
   footerColor: "#44546A",
   alternating: false,
+  chartColors: ["#ED7D31", "#4472C4", "#70AD47", "#A5A5A5"],
 };
 
 const APTOS = {
@@ -43,6 +50,7 @@ const APTOS = {
   textOnDark: "#FFFFFF",
   footerColor: "#156082",
   alternating: false,
+  chartColors: ["#E97132", "#156082", "#0E2841", "#78A7BA"],
 };
 
 const NAVY = {
@@ -63,6 +71,7 @@ const NAVY = {
   textOnDark: "#FFFFFF",
   footerColor: "#999999",
   alternating: true,
+  chartColors: ["#C8102E", "#33466F", "#D6A84B", "#7282A4"],
 };
 
 function deepFreeze(value) {
@@ -80,6 +89,10 @@ export const STYLE_PACKS = deepFreeze({
 export const DEFAULT_STYLE = deepFreeze({
   pack: "office",
   accent: null,
+  headlineFont: null,
+  bodyFont: null,
+  schoolYear: DEFAULT_SCHOOL_YEAR,
+  authenticity: DEFAULT_AUTHENTICITY,
   titleScale: DEFAULT_TITLE_SCALE,
   density: DEFAULT_DENSITY,
   imageArea: DEFAULT_IMAGE_AREA,
@@ -109,10 +122,22 @@ function photoTreatment(value) {
   return allowed.has(value) ? value : DEFAULT_STYLE.photoTreatment;
 }
 
+function fontChoice(value) {
+  return FONT_CHOICES.has(value) ? value : null;
+}
+
+function schoolYear(value) {
+  return new Set(["7e", "6e", "5e", "4e"]).has(value) ? value : DEFAULT_SCHOOL_YEAR;
+}
+
 function overlayFor(style, pack) {
   const input = style && typeof style === "object" ? style : {};
   return {
     accent: validHex(input.accent) ? input.accent.toUpperCase() : pack.accent,
+    headlineFont: fontChoice(input.headlineFont),
+    bodyFont: fontChoice(input.bodyFont),
+    schoolYear: schoolYear(input.schoolYear),
+    authenticity: Math.round(finiteNumber(input.authenticity, DEFAULT_AUTHENTICITY, 0, 100)),
     titleScale: finiteNumber(input.titleScale, DEFAULT_STYLE.titleScale, 0.8, 1.3),
     density: Math.round(finiteNumber(input.density, DEFAULT_STYLE.density, 3, 8)),
     imageArea: finiteNumber(input.imageArea, DEFAULT_STYLE.imageArea, 0.25, 0.65),
@@ -135,8 +160,8 @@ export function resolveTokens(style = DEFAULT_STYLE) {
     packName: pack.name,
     width: SLIDE_WIDTH_IN,
     height: SLIDE_HEIGHT_IN,
-    headlineFont: pack.headlineFont,
-    bodyFont: pack.bodyFont,
+    headlineFont: overlay.headlineFont || pack.headlineFont,
+    bodyFont: overlay.bodyFont || pack.bodyFont,
     primary: pack.primary,
     secondary: pack.secondary,
     accent: overlay.accent,
@@ -148,6 +173,7 @@ export function resolveTokens(style = DEFAULT_STYLE) {
     textOnLight: pack.textOnLight,
     textOnDark: pack.textOnDark,
     footerColor: pack.footerColor,
+    chartColors: [overlay.accent, ...pack.chartColors.filter((color) => color !== overlay.accent)],
     alternating: overlay.alternating,
     footer: overlay.footer,
     titleScale: overlay.titleScale,
@@ -155,6 +181,8 @@ export function resolveTokens(style = DEFAULT_STYLE) {
     imageArea: overlay.imageArea,
     radius: overlay.radius,
     photoTreatment: overlay.photoTreatment,
+    schoolYear: overlay.schoolYear,
+    authenticity: overlay.authenticity,
   });
 }
 
@@ -162,3 +190,5 @@ export function styleForPack(pack) {
   const requested = STYLE_PACKS[pack] ? pack : DEFAULT_STYLE.pack;
   return deepFreeze({ ...DEFAULT_STYLE, pack: requested });
 }
+
+export const CURATED_FONTS = Object.freeze([...FONT_CHOICES]);

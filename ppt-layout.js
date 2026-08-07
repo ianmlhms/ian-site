@@ -1,3 +1,5 @@
+import { chartBox, deepFreeze, estimatedLines, fitTextSize, imageBox, rectBox, textBox } from "./ppt-layout-primitives.js?v=5";
+
 const SLIDE_WIDTH_IN = 13.333;
 const SLIDE_HEIGHT_IN = 7.5;
 const PX_PER_IN = 96;
@@ -6,10 +8,10 @@ const FOOTER_Y_IN = 7.13;
 const FOOTER_H_IN = 0.18;
 const FOOTER_PT = 10;
 const SLIDE_NUMBER_X_IN = 12.34;
-const TITLE_PT = 32;
-const COVER_TITLE_PT = 42;
-const CLOSING_TITLE_PT = 38;
-const BODY_PT = 21;
+const TITLE_PT = 34;
+const COVER_TITLE_PT = 44;
+const CLOSING_TITLE_PT = 40;
+const BODY_PT = 20;
 const SOURCE_PT = 13;
 const CAPTION_PT = 17;
 const FIELD_LABEL_PT = 12;
@@ -18,20 +20,21 @@ const MIN_BODY_PT = 13;
 const MIN_SOURCE_PT = 9;
 const TITLE_STEP_PT = 2;
 const BODY_STEP_PT = 1;
-const TITLE_LINE_SPACING = 1.03;
-const BODY_LINE_SPACING = 1.18;
+const TITLE_LINE_SPACING = 1.01;
+const BODY_LINE_SPACING = 1.16;
 const SMALL_LINE_SPACING = 1.12;
 const IMAGE_GAP_IN = 0.42;
 const TITLE_TOP_IN = 0.58;
 const TITLE_HEIGHT_IN = 0.72;
-const CONTENT_TOP_IN = 1.58;
+const CONTENT_TOP_IN = 1.52;
 const CONTENT_BOTTOM_IN = 6.82;
 const ACCENT_BAR_H_IN = 0.1;
 const CARD_GAP_IN = 0.16;
-const AVERAGE_CHARACTER_EM = 0.52;
 const BULLET_TEXT_INSET_IN = 0.22;
+const BULLET_GAP_IN = 0.12;
 const COVER_CHAR_SPACING = -0.25;
-const SECTION_LAYOUTS = new Set(["title", "closing"]);
+const LARGE_CHAR_SPACING = -0.18;
+const SECTION_LAYOUTS = new Set(["title", "closing", "section", "quiz"]);
 const UNNUMBERED_LAYOUTS = new Set(["title", "closing"]);
 // The cover already names the whole group in its tagline ("… Von Ian an Ben"),
 // so repeating them in the corner footer would print the names twice.
@@ -57,59 +60,11 @@ const GEO = Object.freeze({
   closingAccentW: 1.4, closingTitleX: 1.3, closingTitleY: 2.05,
   closingTitleW: 10.73, closingTitleH: 2.45, closingTaglineX: 2.2,
   closingTaglineY: 4.65, closingTaglineW: 8.93, closingTaglineH: 0.65,
+  chartX: 0.78, chartY: 1.56, chartW: 8.65, chartH: 4.92, chartBulletX: 9.75,
+  chartBulletW: 2.85, quizQuestionY: 1.48, quizQuestionH: 1.08, quizOptionsY: 2.85,
+  quizOptionsH: 3.45, sectionNumberY: 1.45, sectionNumberH: 0.55,
   footerPresenterW: 4.2, slideNumberW: 0.32,
 });
-
-function deepFreeze(value) {
-  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
-  Object.values(value).forEach(deepFreeze);
-  return Object.freeze(value);
-}
-
-function safeText(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function estimatedLines(text, width, size) {
-  const averageCharacterIn = size / 72 * AVERAGE_CHARACTER_EM;
-  const charactersPerLine = Math.max(1, Math.floor(width / averageCharacterIn));
-  return safeText(text).split("\n").reduce((sum, line) =>
-    sum + Math.max(1, Math.ceil(line.length / charactersPerLine)), 0);
-}
-
-function fitTextSize(text, preferred, minimum, width, height, spacing, step) {
-  let size = preferred;
-  while (size > minimum) {
-    const requiredHeight = estimatedLines(text, width, size) * (size / 72) * spacing;
-    if (requiredHeight <= height) return size;
-    size -= step;
-  }
-  return minimum;
-}
-
-function textBox(text, x, y, w, h, options = {}) {
-  return {
-    kind: "text", x, y, w, h, text: safeText(text),
-    font: options.font || "Calibri",
-    size: options.size || BODY_PT,
-    bold: Boolean(options.bold),
-    italic: Boolean(options.italic),
-    color: options.color || "#111111",
-    align: options.align || "left",
-    valign: options.valign || "top",
-    lineSpacing: options.lineSpacing || BODY_LINE_SPACING,
-    charSpacing: options.charSpacing || 0,
-    bullet: Boolean(options.bullet),
-  };
-}
-
-function imageBox(url, x, y, w, h, radius) {
-  return { kind: "image", x, y, w, h, url: url || null, radius, fit: "cover" };
-}
-
-function rectBox(x, y, w, h, fill, radius = 0) {
-  return { kind: "rect", x, y, w, h, fill, radius };
-}
 
 function isDarkSlide(slide, tokens) {
   if (!tokens.alternating) return false;
@@ -133,20 +88,40 @@ function titleBox(slide, tokens, colors, width = SLIDE_WIDTH_IN - PAGE_MARGIN_IN
   const size = fitTextSize(slide.title, preferred, MIN_TITLE_PT, width, TITLE_HEIGHT_IN, TITLE_LINE_SPACING, TITLE_STEP_PT);
   return textBox(slide.title, PAGE_MARGIN_IN, TITLE_TOP_IN, width, TITLE_HEIGHT_IN, {
     font: tokens.headlineFont, size, bold: false, color: colors.title,
-    lineSpacing: TITLE_LINE_SPACING, valign: "middle",
+    lineSpacing: TITLE_LINE_SPACING, valign: "middle", charSpacing: LARGE_CHAR_SPACING,
   });
+}
+
+function fittedBulletSize(bullets, width, height) {
+  let size = BODY_PT;
+  while (size > MIN_BODY_PT) {
+    const lines = bullets.reduce((sum, text) => sum + estimatedLines(text, width, size), 0);
+    const required = lines * size / 72 * BODY_LINE_SPACING + BULLET_GAP_IN * (bullets.length - 1);
+    if (required <= height) return size;
+    size -= BODY_STEP_PT;
+  }
+  return MIN_BODY_PT;
 }
 
 function bulletBoxes(slide, tokens, colors, x, y, w, h) {
   const bullets = (Array.isArray(slide.bullets) ? slide.bullets : []).slice(0, tokens.density);
   if (!bullets.length) return [];
-  const rowHeight = h / bullets.length;
-  const longest = bullets.reduce((current, item) => item.length > current.length ? item : current, "");
-  const size = fitTextSize(longest, BODY_PT, MIN_BODY_PT, w - BULLET_TEXT_INSET_IN, rowHeight, BODY_LINE_SPACING, BODY_STEP_PT);
-  return bullets.map((bullet, index) => textBox(bullet, x, y + rowHeight * index, w, rowHeight, {
-    font: tokens.bodyFont, size, color: colors.text, bullet: true,
-    valign: "middle", lineSpacing: BODY_LINE_SPACING,
-  }));
+  const textWidth = w - BULLET_TEXT_INSET_IN;
+  const size = fittedBulletSize(bullets, textWidth, h);
+  const rawHeights = bullets.map((text) => estimatedLines(text, textWidth, size)
+    * size / 72 * BODY_LINE_SPACING + 0.16);
+  const available = Math.max(0.5, h - BULLET_GAP_IN * (bullets.length - 1));
+  const rawTotal = rawHeights.reduce((sum, value) => sum + value, 0);
+  const heightScale = Math.min(1, available / rawTotal);
+  const heights = rawHeights.map((value) => value * heightScale);
+  const total = heights.reduce((sum, value) => sum + value, 0) + BULLET_GAP_IN * (bullets.length - 1);
+  let cursor = y + Math.max(0, (h - total) / 2);
+  return bullets.map((bullet, index) => {
+    const box = textBox(bullet, x, cursor, w, heights[index], { font: tokens.bodyFont,
+      size, color: colors.text, bullet: true, valign: "middle", lineSpacing: BODY_LINE_SPACING });
+    cursor += heights[index] + BULLET_GAP_IN;
+    return box;
+  });
 }
 
 function titleLayout(slide, tokens, colors) {
@@ -216,7 +191,9 @@ function imageFullLayout(slide, tokens, colors) {
   const size = fitTextSize(title, COVER_TITLE_PT * tokens.titleScale, MIN_TITLE_PT, GEO.fullFitW, GEO.fullFitH, TITLE_LINE_SPACING, TITLE_STEP_PT);
   return [
     imageBox(slide.image?.url, 0, 0, SLIDE_WIDTH_IN, SLIDE_HEIGHT_IN, 0),
-    rectBox(0, GEO.fullOverlayY, SLIDE_WIDTH_IN, GEO.fullOverlayH, tokens.backgroundDark),
+    rectBox(0, 4.55, SLIDE_WIDTH_IN, 0.5, tokens.backgroundDark, 0, 0.12),
+    rectBox(0, 5.05, SLIDE_WIDTH_IN, 0.55, tokens.backgroundDark, 0, 0.34),
+    rectBox(0, 5.6, SLIDE_WIDTH_IN, 1.9, tokens.backgroundDark, 0, 0.76),
     textBox(title, PAGE_MARGIN_IN, GEO.fullTitleY, GEO.fullTitleW, GEO.fullTitleH, {
       font: tokens.headlineFont, size, color: tokens.textOnDark,
       valign: "middle", lineSpacing: TITLE_LINE_SPACING,
@@ -225,6 +202,65 @@ function imageFullLayout(slide, tokens, colors) {
       font: tokens.bodyFont, size: CAPTION_PT, color: tokens.textOnDark,
     }),
   ];
+}
+
+function sectionLayout(slide, tokens, colors) {
+  const label = slide.caption || (slide.section !== slide.title ? slide.section : "") || "";
+  const size = fitTextSize(slide.title, COVER_TITLE_PT * tokens.titleScale, MIN_TITLE_PT,
+    GEO.sectionFitW, GEO.sectionTitleH, TITLE_LINE_SPACING, TITLE_STEP_PT);
+  return [
+    rectBox(PAGE_MARGIN_IN, GEO.sectionAccentY, GEO.sectionAccentW, ACCENT_BAR_H_IN, tokens.accent),
+    textBox(label, PAGE_MARGIN_IN, GEO.sectionNumberY, GEO.sectionTitleW, GEO.sectionNumberH, {
+      font: tokens.bodyFont, size: SOURCE_PT, bold: true, color: tokens.accent,
+    }),
+    textBox(slide.title, PAGE_MARGIN_IN, GEO.sectionTitleY, GEO.sectionTitleW, GEO.sectionTitleH, {
+      font: tokens.headlineFont, size, color: colors.title, valign: "middle",
+      lineSpacing: TITLE_LINE_SPACING, charSpacing: LARGE_CHAR_SPACING,
+    }),
+  ];
+}
+
+function validChart(chart) {
+  return chart && ["bar", "line", "pie"].includes(chart.type) && Array.isArray(chart.categories)
+    && chart.categories.length && Array.isArray(chart.series) && chart.series.length
+    && chart.series.every((series) => Array.isArray(series.values)
+      && series.values.length === chart.categories.length && series.values.every(Number.isFinite));
+}
+
+function chartLayout(slide, tokens, colors) {
+  if (!validChart(slide.chart)) return bulletsLayout({ ...slide, layout: "bullets" }, tokens, colors);
+  const hasBullets = Array.isArray(slide.bullets) && slide.bullets.length > 0;
+  const width = hasBullets ? GEO.chartW : SLIDE_WIDTH_IN - PAGE_MARGIN_IN * 2;
+  const chart = chartBox(slide.chart, GEO.chartX, GEO.chartY, width, GEO.chartH, {
+    palette: tokens.chartColors, text: colors.text, muted: colors.muted, grid: tokens.secondary,
+    font: tokens.bodyFont, headlineFont: tokens.headlineFont,
+  });
+  const bullets = hasBullets ? bulletBoxes(slide, tokens, colors, GEO.chartBulletX,
+    GEO.chartY, GEO.chartBulletW, GEO.chartH) : [];
+  return [titleBox(slide, tokens, colors), chart, ...bullets];
+}
+
+function quizLayout(slide, tokens, colors) {
+  if (!slide.quiz?.question || !Array.isArray(slide.quiz.options)) {
+    return bulletsLayout({ ...slide, layout: "bullets" }, tokens, colors);
+  }
+  const options = slide.quiz.options.slice(0, 4);
+  const questionSize = fitTextSize(slide.quiz.question, TITLE_PT - 3, MIN_TITLE_PT,
+    11.2, GEO.quizQuestionH, TITLE_LINE_SPACING, TITLE_STEP_PT);
+  const gap = 0.18;
+  const height = (GEO.quizOptionsH - gap * (options.length - 1)) / options.length;
+  const longest = options.reduce((current, option) => option.length > current.length ? option : current, "");
+  const optionSize = fitTextSize(longest, CAPTION_PT, MIN_BODY_PT, 10.45, height,
+    BODY_LINE_SPACING, BODY_STEP_PT);
+  const cards = options.flatMap((option, index) => {
+    const y = GEO.quizOptionsY + index * (height + gap);
+    return [rectBox(1.1, y, 11.1, height, colors.isDark ? tokens.secondary : "#FFFFFF",
+      tokens.radius / PX_PER_IN), textBox(`${String.fromCharCode(65 + index)}  ${option}`, 1.42, y,
+      10.45, height, { font: tokens.bodyFont, size: optionSize, color: colors.text, valign: "middle" })];
+  });
+  return [titleBox(slide, tokens, colors), textBox(slide.quiz.question, 1.05, GEO.quizQuestionY,
+    11.2, GEO.quizQuestionH, { font: tokens.headlineFont, size: questionSize,
+      color: colors.title, valign: "middle", lineSpacing: TITLE_LINE_SPACING }), ...cards];
 }
 
 function photoNumberedLayout(slide, tokens, colors) {
@@ -315,7 +351,8 @@ function baseBoxes(slide, tokens, colors) {
     title: titleLayout, toc: tocLayout, bullets: bulletsLayout,
     "bullets-image": bulletsImageLayout, "image-full": imageFullLayout,
     "photo-numbered": photoNumberedLayout, example: exampleLayout,
-    sources: sourcesLayout, closing: closingLayout,
+    sources: sourcesLayout, closing: closingLayout, section: sectionLayout,
+    chart: chartLayout, quiz: quizLayout,
   };
   return (layouts[slide.layout] || bulletsLayout)(slide, tokens, colors);
 }

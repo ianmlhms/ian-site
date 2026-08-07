@@ -1,10 +1,11 @@
-import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=3";
-import { renderSlide, renderThumb, esc } from "./ppt-render-dom.js?v=3";
-import { resolveTokens } from "./ppt-style-packs.js?v=3";
+import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
+import { renderSlide, renderThumb, esc } from "./ppt-render-dom.js?v=5";
+import { resolveTokens } from "./ppt-style-packs.js?v=5";
 import { spring, draggable, project, rubberband, FLICK_BOUNCE, prefersReducedMotion } from "./ppt-motion.js?v=3";
-import { moveSlide, insertSlide, duplicateSlide, deleteSlide, updateSlide, setDeckMeta } from "./ppt-deck-ops.js?v=4";
-import { reconcilePhotoCredits } from "./ppt-images.js?v=4";
-import { openImagePicker } from "./ppt-image-picker.js?v=4";
+import { moveSlide, insertSlide, duplicateSlide, deleteSlide, updateSlide, setDeckMeta } from "./ppt-deck-ops.js?v=5";
+import { reconcilePhotoCredits } from "./ppt-images.js?v=5";
+import { openImagePicker } from "./ppt-image-picker.js?v=5";
+import { mountSlideControls } from "./ppt-slide-controls.js?v=5";
 
 const SLIDE_WIDTH_PX = 13.333 * 96;
 const PREVIEW_PADDING_PX = 24;
@@ -12,37 +13,6 @@ const PREVIEW_MAX_SCALE = 0.76;
 const FOOTER_START_IN = 7;
 const FLICK_THRESHOLD = 350;
 const DRAG_SCALE = 1.035;
-
-function layoutOptions(slide) {
-  if (slide.layout === "title") return ["title", "bullets", "closing"];
-  if (slide.layout === "sources" && slide.sources.length) return ["sources"];
-  const options = new Set(["bullets", "toc"]);
-  if (slide.bullets.length || slide.image) options.add("bullets-image");
-  if (slide.image) { options.add("image-full"); options.add("photo-numbered"); }
-  if (slide.fields.length) options.add("example");
-  if (!slide.bullets.length) options.add("closing");
-  options.add(slide.layout);
-  return [...options];
-}
-
-function layoutName(layout) {
-  return ({ title: "Titel", toc: "Iwwersiicht", bullets: "Text", "bullets-image": "Text + Foto",
-    "image-full": "Foto voll", "photo-numbered": "Foto nummeréiert", example: "Beispill",
-    sources: "Quellen", closing: "Ofschloss" })[layout] || layout;
-}
-
-function controlsMarkup(deck, slide, index) {
-  const presenters = ['<option value="">—</option>', ...deck.presenters.map((name) =>
-    `<option value="${esc(name)}"${slide.presenter === name ? " selected" : ""}>${esc(name)}</option>`)].join("");
-  const layouts = layoutOptions(slide).map((layout) =>
-    `<option value="${esc(layout)}"${slide.layout === layout ? " selected" : ""}>${esc(layoutName(layout))}</option>`).join("");
-  return `<label>Layout<select data-slide-layout>${layouts}</select></label>
-    <button type="button" data-move="-1"${index === 0 ? " disabled" : ""}>←</button>
-    <button type="button" data-move="1"${index === deck.slides.length - 1 ? " disabled" : ""}>→</button>
-    <button type="button" data-duplicate>Duebelen</button><button type="button" data-delete>Läschen</button>
-    <label>Virdroender<select data-slide-presenter>${presenters}</select></label>
-    <button type="button" data-edit-notes>Notizen</button><button type="button" data-photo-picker>Foto sichen</button>`;
-}
 
 function filmstripMarkup(deck, selected) {
   const slides = deck.slides.map((slide, index) => `<span class="thumb-wrap">
@@ -120,6 +90,16 @@ function editRegions(deck, slide, layout) {
   if (bullets.length) regions.push({ key: "bullets", value: slide.bullets.join("\n"), box: unionBoxes(bullets), multiline: true });
   const caption = slide.caption ? takeBox(boxes, slide.caption, used) : null;
   if (caption) regions.push({ key: "caption", value: slide.caption, box: caption, multiline: true });
+  if (slide.quiz) {
+    const question = takeBox(boxes, slide.quiz.question, used);
+    if (question) regions.push({ key: "quiz:question", value: slide.quiz.question, box: question, multiline: true });
+    slide.quiz.options.forEach((option, index) => {
+      const box = boxes.find((candidate, boxIndex) => !used.has(boxIndex) && candidate.text.endsWith(option));
+      if (!box) return;
+      used.add(boxes.indexOf(box));
+      regions.push({ key: `quiz:option:${index}`, value: option, box });
+    });
+  }
   slide.fields.forEach((field, index) => ["label", "value"].forEach((part) => {
     const box = takeBox(boxes, field[part], used);
     if (box) regions.push({ key: `fields:${index}:${part}`, value: field[part], box, multiline: part === "value" });
@@ -135,6 +115,12 @@ function editRegions(deck, slide, layout) {
 
 function patchForRegion(slide, region, value) {
   if (region.key === "bullets") return { bullets: value.split("\n").map((line) => line.trim()).filter(Boolean) };
+  if (region.key === "quiz:question") return { quiz: { ...slide.quiz, question: value } };
+  if (region.key.startsWith("quiz:option:")) {
+    const index = Number(region.key.split(":")[2]);
+    return { quiz: { ...slide.quiz, options: slide.quiz.options.map((option, itemIndex) =>
+      itemIndex === index ? value : option) } };
+  }
   if (!region.key.includes(":")) return { [region.key]: value };
   const [group, rawIndex, part] = region.key.split(":");
   const index = Number(rawIndex);
@@ -232,8 +218,7 @@ class DeckEditor {
     const layout = layoutSlide(slideForLayout(deck, slide), resolveTokens(this.getStyle()), this.selected + 1);
     const stage = renderSlide(layout, this.previewHost, scale);
     this.mountHotspots(stage, slide, layout, scale);
-    this.controlsHost.innerHTML = controlsMarkup(deck, slide, this.selected);
-    this.bindControls();
+    this.mountControls(deck, slide);
   }
 
   settleDrag(element, thumbs, from, target, centres, velocity) {
@@ -336,24 +321,22 @@ class DeckEditor {
     this.change(reconcilePhotoCredits(updated, [slide.image]), { kind: "image" });
   }
 
-  bindControls() {
-    const deck = this.getDeck();
-    const slide = deck.slides[this.selected];
-    this.controlsHost.querySelector("[data-slide-layout]").onchange = (event) =>
-      this.change(updateSlide(deck, this.selected, { layout: event.target.value }), { kind: "layout" });
-    this.controlsHost.querySelector("[data-slide-presenter]").onchange = (event) =>
-      this.change(updateSlide(deck, this.selected, { presenter: event.target.value || null }), { kind: "presenter" });
-    this.controlsHost.querySelectorAll("[data-move]").forEach((button) => button.onclick = () => {
-      const target = this.selected + Number(button.dataset.move);
-      this.change(moveSlide(deck, this.selected, target), { kind: "move" }, target);
+  mountControls(deck, slide) {
+    mountSlideControls(this.controlsHost, { deck, slide, index: this.selected,
+      onLayout: (layout) => {
+        const quiz = layout === "quiz" && !slide.quiz
+          ? { question: "Wéi eng Äntwert ass richteg?", options: ["Äntwert A", "Äntwert B", "Äntwert C"], answerIndex: 0 }
+          : slide.quiz;
+        this.change(updateSlide(deck, this.selected, { layout, quiz }), { kind: "layout" });
+      },
+      onPresenter: (presenter) => this.change(updateSlide(deck, this.selected, { presenter }), { kind: "presenter" }),
+      onMove: (delta) => this.change(moveSlide(deck, this.selected, this.selected + delta), { kind: "move" }, this.selected + delta),
+      onDuplicate: () => this.change(duplicateSlide(deck, this.selected), { kind: "duplicate" }, this.selected + 1),
+      onDelete: () => this.removeSelected(deck), onNotes: () => this.editNotes(),
+      onPhoto: (event) => openImagePicker({ slide, anchor: event.currentTarget,
+        onSelect: (image, query) => this.choosePhoto(slide, image, query) }),
+      onRewrite: (intent, custom) => this.onRewrite?.(this.selected, intent, custom),
     });
-    this.controlsHost.querySelector("[data-duplicate]").onclick = () =>
-      this.change(duplicateSlide(deck, this.selected), { kind: "duplicate" }, this.selected + 1);
-    this.controlsHost.querySelector("[data-delete]").onclick = () => this.removeSelected(deck);
-    this.controlsHost.querySelector("[data-edit-notes]").onclick = () => this.editNotes();
-    this.controlsHost.querySelector("[data-photo-picker]").onclick = (event) =>
-      openImagePicker({ slide, anchor: event.currentTarget,
-        onSelect: (image, query) => this.choosePhoto(slide, image, query) });
   }
 
   removeSelected(deck) {
