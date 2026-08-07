@@ -37,9 +37,12 @@ function sources(Docx, block) {
     [item.text, item.accessed].filter(Boolean).join(" — ")));
 }
 
+// docx v8 has no HighlightColor enum — `highlight` takes the raw OOXML colour name.
+const VOCAB_HIGHLIGHT = "yellow";
+
 function vocab(Docx, block) {
   return block.items.map((item) => normalParagraph(Docx, "", {
-    children: [textRun(Docx, item, { highlight: Docx.HighlightColor.YELLOW })] }));
+    children: [textRun(Docx, item, { highlight: VOCAB_HIGHLIGHT })] }));
 }
 
 function blockParagraphs(Docx, block) {

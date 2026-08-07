@@ -3,7 +3,7 @@ import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3"; // Shared stud
 import { createDocumentGeneration, rewriteDocument } from "./doc-ai.js?v=1";
 import { documentText, validateDocument } from "./doc-schema.js?v=1";
 import { replaceBlock } from "./doc-ops.js?v=1";
-import { exportDocumentDocx } from "./doc-export.js?v=1";
+import { exportDocumentDocx } from "./doc-export.js?v=2";
 import { createHistory } from "./ppt-history.js?v=3";
 import { createDocumentEditor, esc } from "./doc-editor.js?v=1";
 import { deleteDocument, listDocuments, loadDocument, saveDocument,
