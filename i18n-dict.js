@@ -60,6 +60,9 @@ window.I18N_DICT = {
   "common.loading":  { lb: "Lueden…", de: "Lädt…", en: "Loading…" },
   "btn.cancel":      { lb: "Ofbriechen", de: "Abbrechen", en: "Cancel" },
   "btn.join":        { lb: "Bäitrieden", de: "Beitreten", en: "Join" },
+  "qo.placeholder":  { lb: "App sichen…", de: "App suchen…", en: "Search apps…" },
+  "qo.empty":        { lb: "Keng App fonnt.", de: "Keine App gefunden.", en: "No apps found." },
+  "qo.hint":         { lb: "opmaachen · Esc zoumaachen", de: "öffnen · Esc schließen", en: "open · Esc close" },
 
   /* ---------- index / landing ---------- */
   "index.homeSub": { lb: "Wieder, Schoul-Tools, Noriichten a Projeten op enger Plaz.", de: "Wetter, Schul-Tools, Nachrichten und Projekte an einem Ort.", en: "Weather, school tools, messages and projects in one place." },
