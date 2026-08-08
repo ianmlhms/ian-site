@@ -13,7 +13,7 @@ import { createEditor } from "./ppt-editor.js?v=9";
 import { createInspector } from "./ppt-inspector.js?v=6";
 import { createAiActions } from "./ppt-ai-actions-ui.js?v=9";
 import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=2"; installStudioChrome();
-const OWNER_EMAIL = "konto@ian.lu", DEFAULT_SLIDE_COUNT = 12;
+const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"], DEFAULT_SLIDE_COUNT = 12;
 const MAX_PRESENTERS = 6;
 const RESIZE_WAIT_MS = 120;
 const PROGRESS_HIDE_MS = 700;
@@ -385,7 +385,7 @@ async function boot() {
     auth.mountAccountButton($("acctHost"));
     const session = auth.session();
     if (!session?.user) { gate("Presentatiounsstudio", "Mell dech un, fir däi private Studio opzemaachen.", true); return; }
-    if ((session.user.email || "").toLowerCase() !== OWNER_EMAIL) { gate("Dësen Outil ass privat", "De PPT Builder ass nëmme fir säi Besëtzer fräigeschalt."); return; }
+    if (!STUDIO_ALLOW.includes((session.user.email || "").toLowerCase())) { gate("Dësen Outil ass privat", "De PPT Builder ass nëmme fir fräigeschalte Konten."); return; }
     renderApp();
   } catch { gate("Studio net disponibel", "D'Verbindung konnt net gestart ginn. Probéier et nach eng Kéier."); }
 }

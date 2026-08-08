@@ -84,6 +84,15 @@ function connect(endpoint) {
           listeners.set(key, [...list, fn]);
         });
       },
+      /** Subscribe to every occurrence of an event. Returns an unsubscribe fn. */
+      on(method, sessionId, handler) {
+        const key = `${sessionId || ""}:${method}`;
+        listeners.set(key, [...(listeners.get(key) || []), handler]);
+        return () => listeners.set(
+          key,
+          (listeners.get(key) || []).filter((entry) => entry !== handler),
+        );
+      },
       close() { socket.close(); },
     }));
   });

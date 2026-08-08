@@ -46,6 +46,21 @@ export function auditPage(options) {
     return false;
   }
 
+  /* True when an ancestor scrolls horizontally on purpose. A carousel's later
+   * cards legitimately sit past the right edge — moien.html's hourly weather
+   * strip is `overflow-x: auto` and you swipe it — so measuring them against
+   * the viewport reports a deliberate design as three broken text boxes. */
+  function inHorizontalScroller(node) {
+    for (let cur = node.parentElement; cur && cur !== document.body; cur = cur.parentElement) {
+      const overflowX = getComputedStyle(cur).overflowX;
+      if (overflowX === "auto" || overflowX === "scroll") {
+        const box = cur.getBoundingClientRect();
+        if (box.right <= window.innerWidth + EDGE_TOLERANCE) return true;
+      }
+    }
+    return false;
+  }
+
   function isVisible(node, style, rect) {
     if (style.visibility === "hidden" || style.display === "none") return false;
     if (Number(style.opacity) < 0.05) return false;
@@ -122,7 +137,8 @@ export function auditPage(options) {
     const text = ownText(node);
 
     /* 2. text pushed outside the viewport */
-    if (text && (rect.right > view.w + EDGE_TOLERANCE || rect.left < -EDGE_TOLERANCE)) {
+    if (text && (rect.right > view.w + EDGE_TOLERANCE || rect.left < -EDGE_TOLERANCE)
+      && !inHorizontalScroller(node)) {
       const key = `off:${describe(node)}`;
       if (!seen.has(key)) {
         seen.add(key);

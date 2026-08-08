@@ -18,6 +18,13 @@
  *   node scripts/check_overlap.mjs                      # audit, compare to baseline
  *   node scripts/check_overlap.mjs --pages index.html   # one page
  *   node scripts/check_overlap.mjs --write-baseline     # accept current counts
+ *   node scripts/check_overlap.mjs --record-fixtures    # refresh the canned API replies
+ *
+ * The run is deterministic by construction: every off-site request is answered
+ * from scripts/audit/fixtures (see audit/net.mjs), animations are forced to
+ * their last frame, and measurement waits for the network to go quiet rather
+ * than for a fixed timer. A page that fails to measure is reported as BROKEN
+ * and fails the run — it is never folded in as a page with zero findings.
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -26,14 +33,30 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { closePage, evaluate, launchChrome, openPage, sleep } from "./audit/cdp.mjs";
 import { auditPage } from "./audit/probe.mjs";
+import { loadFixtures, routeRequest, saveFixture, wantsFixture } from "./audit/net.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const BASELINE = path.join(ROOT, "scripts", "audit", "baseline.json");
+const FIXTURES = path.join(ROOT, "scripts", "audit", "fixtures");
 const SERVER_PORT = 8731;
 const DEBUG_PORT = 9333;
 const CONCURRENCY = 4;
-const SETTLE_MS = 900;            // let deferred scripts paint before measuring
+const SETTLE_MS = 400;            // after the network goes quiet, not instead of it
+const IDLE_TIMEOUT_MS = 8000;     // a page that never idles still gets measured
 const VIEWPORT_HEIGHT = 900;
+const ATTEMPTS = 2;               // one retry: a timed-out probe must not read as "clean"
+const GEOLOCATION = { latitude: 49.6537, longitude: 6.2597, accuracy: 20 };  // Niederanven
+
+/* Animations are forced to their last frame rather than paused, so a transform
+ * that is mid-flight when we measure cannot invent an offscreen finding. */
+const FREEZE_CSS = `*, *::before, *::after {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  animation-fill-mode: both !important;
+  transition: none !important;
+  caret-color: transparent !important;
+}`;
 const KINDS = ["overflow", "offscreen", "collision", "clipped", "contrast", "hit-target"];
 // googled…html is a bare Search Console token; games.html is a <meta refresh>
 // redirect that never loads theme.js, so it measures an unstyled flash.
@@ -41,11 +64,12 @@ const SKIP = new Set(["googled2bde022f66de7b9.html", "games.html"]);
 
 function parseArgs(argv) {
   const flags = { widths: [390, 1280], themes: ["dark", "light"], pages: null, write: false,
-    quiet: false, settle: SETTLE_MS };
+    record: false, quiet: false, settle: SETTLE_MS };
   for (let i = 0; i < argv.length; i += 1) {
     const [key, inline] = argv[i].split("=");
     const value = inline ?? argv[i + 1];
     if (key === "--write-baseline") { flags.write = true; continue; }
+    if (key === "--record-fixtures") { flags.record = true; continue; }
     if (key === "--quiet") { flags.quiet = true; continue; }
     if (key === "--widths") flags.widths = value.split(",").map(Number);
     else if (key === "--themes") flags.themes = value.split(",");
@@ -82,10 +106,33 @@ async function waitForServer() {
   throw new Error("static server did not start");
 }
 
-async function auditOne(client, page, width, theme, settle = SETTLE_MS) {
+/** Resolve when the page stops making requests, or when we give up waiting. */
+async function waitForIdle(client, sessionId) {
+  const idle = new Promise((resolve) => {
+    const off = client.on("Page.lifecycleEvent", sessionId, (params) => {
+      if (params.name !== "networkIdle") return;
+      off();
+      resolve();
+    });
+  });
+  await Promise.race([idle, sleep(IDLE_TIMEOUT_MS)]);
+}
+
+async function attemptAudit(client, page, width, theme, settle, net) {
   const url = `http://127.0.0.1:${SERVER_PORT}/${page}`;
   const { targetId, sessionId } = await openPage(client, url, width, VIEWPORT_HEIGHT);
   try {
+    await client.send("Fetch.enable", {
+      patterns: [{ urlPattern: "*", requestStage: net.record ? "Response" : "Request" }],
+    }, sessionId);
+    client.on("Fetch.requestPaused", sessionId, (params) => {
+      void handlePaused(client, sessionId, params, net);
+    });
+    await client.send("Page.setLifecycleEventsEnabled", { enabled: true }, sessionId);
+    /* Headless denies geolocation, so pages built around "where am I" (skylens's
+     * aircraft list) rendered their empty state and their real controls went
+     * unmeasured. Pin it to Ian's village instead of asking. */
+    await client.send("Emulation.setGeolocationOverride", GEOLOCATION, sessionId);
     // Seed the theme before the page's own scripts run, so theme.js picks it up
     // on first paint rather than us measuring a half-applied palette.
     await client.send("Page.addScriptToEvaluateOnNewDocument", {
@@ -93,12 +140,54 @@ async function auditOne(client, page, width, theme, settle = SETTLE_MS) {
     }, sessionId);
     await client.send("Page.reload", { ignoreCache: false }, sessionId);
     await Promise.race([client.once("Page.loadEventFired", sessionId), sleep(20000)]);
+    await waitForIdle(client, sessionId);
+    await evaluate(client, sessionId, (css) => {
+      const style = document.createElement("style");
+      style.textContent = css;
+      document.head.appendChild(style);
+    }, FREEZE_CSS);
     await sleep(settle);
     const result = await evaluate(client, sessionId, auditPage, { theme });
     return { page, width, theme, ...result };
   } finally {
     await closePage(client, targetId);
   }
+}
+
+async function handlePaused(client, sessionId, params, net) {
+  try {
+    if (net.record) {
+      if (params.responseStatusCode && wantsFixture(params.request.url)) {
+        const body = await client.send("Fetch.getResponseBody",
+          { requestId: params.requestId }, sessionId).catch(() => null);
+        if (body) {
+          const header = (params.responseHeaders || [])
+            .find((h) => h.name.toLowerCase() === "content-type");
+          saveFixture(FIXTURES, params.request.url, {
+            status: params.responseStatusCode,
+            mime: (header?.value || "application/json").split(";")[0],
+            body: body.base64Encoded ? body.body : Buffer.from(body.body).toString("base64"),
+          });
+        }
+      }
+      await client.send("Fetch.continueRequest", { requestId: params.requestId }, sessionId);
+      return;
+    }
+    const command = routeRequest(params, net.fixtures);
+    await client.send(command.method, command.params, sessionId);
+  } catch { /* the tab closed mid-flight; nothing left to answer */ }
+}
+
+async function auditOne(client, page, width, theme, settle, net) {
+  let lastError;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+    try {
+      return await attemptAudit(client, page, width, theme, settle, net);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
 
 async function runPool(jobs, worker) {
@@ -138,27 +227,42 @@ function summarise(results) {
 function report(perPage, baseline, quiet) {
   let regressions = 0;
   let total = 0;
+  let broken = 0;
   const rows = [...perPage.entries()].sort();
   for (const [page, entry] of rows) {
     const sum = KINDS.reduce((acc, kind) => acc + entry.totals[kind], 0);
     total += sum;
     const previous = baseline[page] || {};
+    /* A viewport that failed to measure contributes 0 to every count, so its
+     * page looks cleaner than it is. Comparing that against the baseline is how
+     * a timeout got recorded as "0 findings" and every later healthy run then
+     * read as a regression. Report the breakage instead of ranking it. */
+    if (entry.failures.length) {
+      broken += 1;
+      console.log(`BROKEN     ${page.padEnd(24)} ${entry.failures.length} viewport(s) did not measure`);
+      for (const failure of entry.failures) console.log(`           ! ${failure}`);
+      continue;
+    }
     const worse = KINDS.filter((kind) => entry.totals[kind] > (previous[kind] ?? 0));
     if (worse.length) regressions += worse.length;
-    if (quiet && !sum && !worse.length && !entry.failures.length) continue;
+    if (quiet && !sum && !worse.length) continue;
     const badge = worse.length ? "REGRESSED" : sum ? "  " : "ok";
     const detail = KINDS.filter((kind) => entry.totals[kind])
       .map((kind) => `${kind}=${entry.totals[kind]}`).join(" ");
     console.log(`${badge.padEnd(10)} ${page.padEnd(24)} ${detail}`);
-    for (const failure of entry.failures) console.log(`           ! ${failure}`);
     for (const worseKind of worse) {
       console.log(`           ↑ ${worseKind}: ${previous[worseKind] ?? 0} → ${entry.totals[worseKind]}`);
-      for (const sample of entry.samples.filter((s) => s.kind === worseKind).slice(0, 4)) {
+      /* Workers finish in whatever order Chrome hands them back, so samples are
+       * sorted before printing — otherwise two identical runs produce diffs. */
+      const samples = entry.samples.filter((s) => s.kind === worseKind)
+        .sort((a, b) => `${a.width}${a.theme}${a.where}${a.detail}`
+          .localeCompare(`${b.width}${b.theme}${b.where}${b.detail}`));
+      for (const sample of samples.slice(0, 4)) {
         console.log(`             ${sample.width}px/${sample.theme} ${sample.where} — ${sample.detail}`);
       }
     }
   }
-  return { regressions, total };
+  return { regressions, total, broken };
 }
 
 async function main() {
@@ -174,20 +278,38 @@ async function main() {
   try {
     await waitForServer();
     client = await launchChrome(DEBUG_PORT, profile);
-    console.log(`Auditing ${pages.length} pages × ${flags.widths.join("/")}px × ${flags.themes.join("/")} …`);
+    await client.send("Browser.grantPermissions", { permissions: ["geolocation"] });
+    const net = { record: flags.record, fixtures: loadFixtures(FIXTURES) };
+    console.log(`Auditing ${pages.length} pages × ${flags.widths.join("/")}px × ${flags.themes.join("/")}`
+      + (flags.record ? " — RECORDING fixtures from the live internet" : ` — ${net.fixtures.size} fixtures`));
     const results = await runPool(jobs, (job) =>
-      auditOne(client, job.page, job.width, job.theme, flags.settle));
+      auditOne(client, job.page, job.width, job.theme, flags.settle, net));
     const perPage = summarise(results);
+    const failed = [...perPage.values()].filter((entry) => entry.failures.length).length;
 
+    if (flags.record) {
+      console.log(`\nFixtures in ${path.relative(ROOT, FIXTURES)}: ${loadFixtures(FIXTURES).size}`);
+      return;
+    }
     if (flags.write) {
+      /* Writing a baseline from a run where pages failed to measure bakes their
+       * zeros in as the accepted state, and every healthy run afterwards reads
+       * as a regression. That is exactly how this gate started crying wolf. */
+      if (failed) {
+        console.error(`\n${failed} page(s) failed to measure — refusing to write a baseline from a broken run.`);
+        report(perPage, baseline, true);
+        process.exitCode = 1;
+        return;
+      }
       const next = Object.fromEntries([...perPage.entries()].map(([page, entry]) => [page, entry.totals]));
       fs.writeFileSync(BASELINE, `${JSON.stringify(next, null, 2)}\n`);
       console.log(`\nBaseline written: ${path.relative(ROOT, BASELINE)}`);
       return;
     }
-    const { regressions, total } = report(perPage, baseline, flags.quiet);
-    console.log(`\n${total} findings across ${pages.length} pages; ${regressions} category regressions vs baseline.`);
-    if (regressions) process.exitCode = 1;
+    const { regressions, total, broken } = report(perPage, baseline, flags.quiet);
+    console.log(`\n${total} findings across ${pages.length} pages; `
+      + `${regressions} category regressions vs baseline; ${broken} page(s) failed to measure.`);
+    if (regressions || broken) process.exitCode = 1;
   } finally {
     if (client) { client.close(); client.kill?.(); }
     server.kill();

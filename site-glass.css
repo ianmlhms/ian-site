@@ -98,10 +98,13 @@ input:not([type="range"]):not([type="radio"]):not([type="checkbox"]) {
 :where(.icon-button, .delete-button, .auth-x, #themeFab, #pwaRefresh) {
   min-width: var(--hit-target);
 }
-:where(.btn, .ghost, .home-btn, .builder-link, .uplbtn, .lbbtn, .ntf-btn,
+:where(.btn, .ghost, .home, .home-btn, .builder-link, .uplbtn, .lbbtn, .ntf-btn,
   .auth-btn, .auth-go, .auth-x, .auth-tab, .tile, #appNav a) {
   min-height: var(--hit-target);
 }
+/* Back-links sit in flex toolbars, which blockifies them out of the probe's
+ * "inline text link" exemption — and they really are thumb targets. */
+:where(.home, .home-btn) { display: inline-flex; align-items: center; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
 summary:focus-visible, [role="button"]:focus-visible, a:focus-visible {
   outline: .2rem solid var(--focus-ring);

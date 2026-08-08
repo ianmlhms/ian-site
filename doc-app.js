@@ -10,7 +10,7 @@ import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=2"; 
 import { deleteDocument, listDocuments, loadDocument, saveDocument,
   scheduleAutosave, startNewDocument } from "./doc-store.js?v=4";
 
-const OWNER_EMAIL = "konto@ian.lu";
+const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"];
 const DEFAULT_WORDS = 500;
 const PROGRESS_HIDE_MS = 700;
 const PPT_SCRIPT_SEED_KEY = "ian-doc-script-seed-v1";
@@ -354,7 +354,7 @@ async function boot() {
     await auth.client(); if (run !== bootNumber) return; auth.mountAccountButton($("acctHost"));
     const session = auth.session();
     if (!session?.user) { gate("Dokumentstudio", "Mell dech un, fir däi private Studio opzemaachen.", true); return; }
-    if ((session.user.email || "").toLowerCase() !== OWNER_EMAIL) { gate("Dësen Outil ass privat", "De Word Builder ass nëmme fir säi Besëtzer fräigeschalt."); return; }
+    if (!STUDIO_ALLOW.includes((session.user.email || "").toLowerCase())) { gate("Dësen Outil ass privat", "De Word Builder ass nëmme fir fräigeschalte Konten."); return; }
     renderApp();
   } catch { gate("Studio net disponibel", "D'Verbindung konnt net gestart ginn. Probéier et nach eng Kéier."); }
 }
