@@ -56,7 +56,12 @@ const FREEZE_CSS = `*, *::before, *::after {
   animation-fill-mode: both !important;
   transition: none !important;
   caret-color: transparent !important;
-}`;
+}
+/* Chrome hides a closed <details> through an animation on ::details-content, so
+ * the blanket animation-fill-mode above un-hides it and every collapsed block
+ * lays out as if open. Re-assert the hiding rather than dropping the fill-mode,
+ * which is what forces the rest of the page to its settled frame. */
+details:not([open])::details-content { content-visibility: hidden !important; }`;
 const KINDS = ["overflow", "offscreen", "collision", "clipped", "contrast", "hit-target"];
 // googled…html is a bare Search Console token; games.html is a <meta refresh>
 // redirect that never loads theme.js, so it measures an unstyled flash.

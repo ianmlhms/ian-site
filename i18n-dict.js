@@ -63,8 +63,16 @@ window.I18N_DICT = {
 
   /* ---------- index / landing ---------- */
   "index.homeSub": { lb: "Wieder, Schoul-Tools, Noriichten a Projeten op enger Plaz.", de: "Wetter, Schul-Tools, Nachrichten und Projekte an einem Ort.", en: "Weather, school tools, messages and projects in one place." },
-  "index.vacLabel": { lb: "Summervakanz an", de: "Sommerferien in", en: "Summer holidays in" },
-  "index.vacDone":  { lb: "Summervakanz!", de: "Sommerferien!", en: "Summer holidays!" },
+  "grp.fav":        { lb: "Favoritten", de: "Favoriten", en: "Favorites" },
+  "grp.school":     { lb: "Schoul", de: "Schule", en: "School" },
+  "grp.social":     { lb: "Chat & Frënn", de: "Chat & Freunde", en: "Chat & Friends" },
+  "grp.fun":        { lb: "Spiller", de: "Spiele", en: "Games" },
+  "grp.maps":       { lb: "Kaarten & Ënnerwee", de: "Karten & unterwegs", en: "Maps & Getting Around" },
+  "grp.personal":   { lb: "Perséinlech", de: "Persönlich", en: "Personal" },
+  "grp.private":    { lb: "Privat", de: "Privat", en: "Private" },
+  "grp.edit":       { lb: "Änneren", de: "Ändern", en: "Edit" },
+  "grp.done":       { lb: "Fäerdeg", de: "Fertig", en: "Done" },
+  "grp.favHint":    { lb: "Tip op eng App, fir se bäizesetzen oder ewechzehuelen.", de: "Tippe auf eine App, um sie hinzuzufügen oder zu entfernen.", en: "Tap an app to add or remove it from your favorites." },
   "tile.exams":     { lb: "Tester", de: "Tests", en: "Tests" },
   "tile.exams.sub": { lb: "Countdowns, Notizen & Kaarten", de: "Countdowns, Notizen & Karten", en: "Countdowns, notes & flashcards" },
   "tile.cards":     { lb: "Kaarten", de: "Karten", en: "Flashcards" },
@@ -362,6 +370,7 @@ window.I18N_DICT = {
 
   /* --- homepage intro (written text, not UI labels) --- */
   "intro.h1": { lb: "Wat ian.lu ass", de: "Was ian.lu ist", en: "What ian.lu is" },
+  "intro.readMore": { lb: "Méi liesen", de: "Mehr lesen", en: "Read more" },
   "intro.p1": {
     lb: "Op ian.lu leeën ech dat of, wat ech bauen. Ech sinn a Lëtzebuerg am Lycée, a bal alles hei huet als Fro ugefaang — kann ech en Ronnenzäit-Timer fir de Kart maachen, kann ech all markéierte Wanderwee vum Land op eng Kaart bréngen, kann ech e Chat schreiwen, deen direkt reagéiert. D'Äntwerte ginn um Enn vu menge Frënn, menger Klass a menger Famill benotzt — dofir stinn se hei an net an engem Dossier op mengem Laptop.",
     de: "Auf ian.lu lege ich ab, was ich baue. Ich bin Schüler in Luxemburg, und fast alles hier hat als Frage angefangen — kann ich einen Rundenzeit-Timer fürs Kartfahren bauen, kann ich jeden markierten Wanderweg des Landes auf eine Karte bringen, kann ich einen Chat schreiben, der sich sofort anfühlt. Die Antworten werden am Ende von meinen Freunden, meiner Klasse und meiner Familie benutzt — deshalb stehen sie hier und nicht in einem Ordner auf meinem Laptop.",

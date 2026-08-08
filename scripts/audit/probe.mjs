@@ -64,6 +64,13 @@ export function auditPage(options) {
   function isVisible(node, style, rect) {
     if (style.visibility === "hidden" || style.display === "none") return false;
     if (Number(style.opacity) < 0.05) return false;
+    /* A descendant of a `content-visibility: hidden` subtree — the contents of a
+     * closed <details>, for one — keeps a non-zero layout box while never being
+     * painted, so a rect check alone reports the collapsed SEO text as sitting
+     * on top of the footer. checkVisibility() accounts for the whole subtree. */
+    if (typeof node.checkVisibility === "function" && !node.checkVisibility({
+      contentVisibilityAuto: true, opacityProperty: true, visibilityProperty: true,
+    })) return false;
     return rect.width > 0 && rect.height > 0;
   }
 

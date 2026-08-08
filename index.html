@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="google-site-verification" content="Xchs4Qh-ugHmeJ8A0yHEUirbjMN3PC7jx3" />
   <link rel="preconnect" href="https://lvksqmgfwkfbblfsozfk.supabase.co" crossorigin />
-  <link rel="preconnect" href="https://api.open-meteo.com" crossorigin />
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
   <link rel="dns-prefetch" href="https://ianm.goatcounter.com" />
   <meta name="description" content="Ian Mulheims — a personal homepage with useful apps, weather, school tools and projects from Luxembourg." />
@@ -15,7 +14,7 @@
   <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
   <link rel="canonical" href="https://ian.lu/" />
   <title>ian.lu — Ian Mulheims</title>
-  <link rel="stylesheet" href="style.css?v=14" />
+  <link rel="stylesheet" href="style.css?v=15" />
   <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
@@ -23,7 +22,7 @@
   <!-- Google AdSense (public pages only) -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
   <script src="theme.js?v=12"></script>
-  <script src="i18n-dict.js?v=28"></script>
+  <script src="i18n-dict.js?v=29"></script>
   <script src="i18n.js?v=2"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
@@ -48,24 +47,9 @@
   <main class="page">
     <section class="today-hero">
       <div class="today-greet">
-        <span class="hero-kicker" id="todayHi">Moien</span>
+        <span class="hero-kicker signed-in-only" id="todayHi">Moien</span>
         <h1 class="today-title">ian.lu</h1>
-        <p class="today-sub" data-i18n="index.homeSub">Weather, school tools, messages and projects in one place.</p>
-      </div>
-
-      <div class="today-panel" aria-label="Today">
-        <div class="date-card">
-          <div class="date-line" id="todayDate">Loading date…</div>
-          <div class="clock-line" id="todayClock">--:--</div>
-        </div>
-        <div class="weather-card" id="homeWeather">
-          <div class="weather-muted" data-i18n="common.loading">Loading…</div>
-        </div>
-        <div class="vac-card" id="vacCard">
-          <span class="vac-label" id="vacPre" data-i18n="index.vacLabel">Summer holidays in</span>
-          <span class="vac-label" id="vacPost" style="display:none" data-i18n="index.vacDone">Summer holidays!</span>
-          <span class="vac-timer" id="vacTimer"></span>
-        </div>
+        <p class="today-sub signed-out-only" data-i18n="index.homeSub">Weather, school tools, messages and projects in one place.</p>
       </div>
     </section>
 
@@ -80,110 +64,152 @@
         </div>
         <button class="btn-primary" id="appsGateBtn" data-i18n="auth.signin">Sign in / Create account</button>
       </div>
-      <div class="tiles">
-        <a class="tile pixel" href="pixelbreak.html">
-          <span class="ico" aria-hidden="true">🎮</span><span class="tname">PixelBreak</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
-        </a>
-        <a class="tile pixel" href="partyspill.html">
-          <span class="ico" aria-hidden="true">🎉</span><span class="tname" data-i18n="tile.partyspill">Partyspill</span><span class="tsub" data-i18n="tile.partyspill.sub">15 party games on one phone</span>
-        </a>
-        <a class="tile msg" href="messenger.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💬</span><span class="tname">Messenger</span><span class="tsub" data-i18n="tile.messenger.sub">Chat &amp; groups</span>
-        </a>
-        <a class="tile friends" href="friends.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">👥</span><span class="tname" data-i18n="tile.friends">Friends</span><span class="tsub" data-i18n="tile.friends.sub">Add, chat &amp; play</span>
-        </a>
-        <a class="tile buddy" href="buddy.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🤖</span><span class="tname">Study Buddy</span><span class="tsub" data-i18n="tile.buddy.sub">AI homework help</span>
-        </a>
-        <a class="tile moien" href="moien.html">
-          <span class="ico" aria-hidden="true">🌤️</span><span class="tname">Moien</span><span class="tsub" data-i18n="tile.moien.sub">Weather</span>
-        </a>
-        <a class="tile bus skylens" href="skylens.html">
-          <span class="ico" aria-hidden="true">🛩️</span><span class="tname">SkyLens</span><span class="tsub">Live aircraft radar &amp; sky view</span>
-        </a>
-        <a class="tile bus" href="kaart/">
-          <span class="ico" aria-hidden="true">🗺️</span><span class="tname" data-i18n="tile.kaart">Wanderkaart</span><span class="tsub" data-i18n="tile.kaart.sub">All hiking &amp; MTB routes on one map</span>
-        </a>
-        <a class="tile bus" href="geoportal/">
-          <span class="ico" aria-hidden="true">🛰️</span><span class="tname">Geoportal</span><span class="tsub" data-i18n="tile.geoportal.sub">Official maps, aerial photos &amp; cadastre</span>
-        </a>
-        <a class="tile bus" href="bus.html">
-          <span class="ico" aria-hidden="true">🚌</span><span class="tname">Bus &amp; Zuch</span><span class="tsub" data-i18n="tile.bus.sub">Live departures &amp; routes</span>
-        </a>
-        <a class="tile wordle" href="wordle.html">
-          <span class="ico" aria-hidden="true">🟩</span><span class="tname">Wuertspill</span><span class="tsub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
-        </a>
-        <a class="tile friends" href="profile.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🪪</span><span class="tname" data-i18n="tile.profile">Profile</span><span class="tsub" data-i18n="tile.profile.sub">Avatar &amp; stats</span>
-        </a>
-        <a class="tile polls" href="polls.html">
-          <span class="ico" aria-hidden="true">🗳️</span><span class="tname" data-i18n="tile.polls">Ëmfroen</span><span class="tsub" data-i18n="tile.polls.sub">Class polls — vote!</span>
-        </a>
-        <a class="tile grades" href="grades.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🎓</span><span class="tname" data-i18n="tile.grades">Grades</span><span class="tsub" data-i18n="tile.grades.sub">Average calculator</span>
-        </a>
-        <a class="tile board" href="board.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">📋</span><span class="tname" data-i18n="tile.board">Klass-Tafel</span><span class="tsub" data-i18n="tile.board.sub">Shared class homework</span>
-        </a>
-        <a class="tile classchat" href="classchat.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗣️</span><span class="tname" data-i18n="tile.classchat">Klass-Chat</span><span class="tsub" data-i18n="tile.classchat.sub">Live chat with your class</span>
-        </a>
-        <a class="tile timetable" href="timetable.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗓️</span><span class="tname" data-i18n="tile.timetable">Stonneplang</span><span class="tsub" data-i18n="tile.timetable.sub">Your weekly timetable</span>
-        </a>
-        <a class="tile exams" href="exams.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.exams">Tester</span><span class="tsub" data-i18n="tile.exams.sub">Countdowns, notes &amp; flashcards</span>
-        </a>
-        <a class="tile flashcards" href="flashcards.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🃏</span><span class="tname" data-i18n="tile.cards">Kaarten</span><span class="tsub" data-i18n="tile.cards.sub">Flashcards to study</span>
-        </a>
-        <a class="tile alerts" href="alerts.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🔔</span><span class="tname" data-i18n="tile.alerts">Neiegkeeten</span><span class="tsub" data-i18n="tile.alerts.sub">Mentions &amp; alerts</span>
-        </a>
-        <a class="tile search" href="search.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🔎</span><span class="tname" data-i18n="tile.search">Sichen</span><span class="tsub" data-i18n="tile.search.sub">Search everything</span>
-        </a>
-        <a class="tile health" href="health.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💪</span><span class="tname" data-i18n="tile.health">Health</span><span class="tsub" data-i18n="tile.health.sub">Water, sleep &amp; workouts</span>
-        </a>
-        <a class="tile money" href="money.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💶</span><span class="tname" data-i18n="tile.money">Sue</span><span class="tsub" data-i18n="tile.money.sub">Spending &amp; subscriptions</span>
-        </a>
-        <a class="tile countdowns" href="countdowns.html">
-          <span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.countdowns">Countdowns</span><span class="tsub" data-i18n="tile.countdowns.sub">Count down to anything</span>
-        </a>
-        <a class="tile ask" href="ask.html">
-          <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🧠</span><span class="tname">Frot deng Daten</span><span class="tsub">AI iwwer deng eegen Donnéeën</span>
-        </a>
-        <a class="tile me admin-only" href="me.html" style="display:none">
-          <span class="ico" aria-hidden="true">📊</span><span class="tname">My Dashboard</span><span class="tsub" data-i18n="tile.me.sub">GitHub, traffic &amp; stats</span>
-        </a>
-        <a class="tile hotel private-hotel" href="hotel.html" style="display:none">
-          <span class="ico" aria-hidden="true">🏨</span><span class="tname">Hotel-Simulator</span><span class="tsub" data-i18n="tile.hotel.sub">Bausimulator · privat</span>
-        </a>
-        <a class="tile karts admin-only" href="karts.html" style="display:none">
-          <span class="ico" aria-hidden="true">🏎️</span><span class="tname">KartTracker</span><span class="tsub" data-i18n="tile.karts.sub">All lap sessions</span>
-        </a>
-        <a class="tile hw admin-only" href="homework.html" style="display:none">
-          <span class="ico" aria-hidden="true">📚</span><span class="tname" data-i18n="tile.hw">Hausaufgaben</span><span class="tsub" data-i18n="tile.hw.sub">WebUntis homework</span>
-        </a>
-        <a class="tile dash admin-only" href="factory.html" style="display:none">
-          <span class="ico" aria-hidden="true">📈</span><span class="tname">Dashboard</span><span class="tsub" data-i18n="tile.dash.sub">Full ShortsFactory</span>
-        </a>
-        <a class="tile admin admin-only" href="admin.html" style="display:none">
-          <span class="ico" aria-hidden="true">🛡</span><span class="tname">Admin</span><span class="tsub" data-i18n="tile.admin.sub">Moderation</span>
-        </a>
-        <a class="tile ppt owner-only" href="ppt.html" style="display:none">
-          <span class="ico" aria-hidden="true">▣</span><span class="tname">PPT Builder</span><span class="tsub">Presentatiounen aus dem Optrag</span>
-        </a>
-        <a class="tile doc owner-only" href="doc.html" style="display:none">
-          <span class="ico" aria-hidden="true">📄</span><span class="tname">Word Builder</span><span class="tsub">Dokumenter a mengem Stil</span>
-        </a>
+      <div class="tile-group" id="grpFav" hidden>
+        <div class="group-head">
+          <h3 class="group-title" data-i18n="grp.fav">Favorites</h3>
+          <button class="group-edit" id="favEdit" type="button" data-i18n="grp.edit">Edit</button>
+          <p data-i18n="grp.favHint">Tap an app to add or remove it from your favorites.</p>
+        </div>
+        <div class="tiles" id="favTiles"></div>
+      </div>
+
+      <div class="tile-group">
+        <h3 class="group-title" data-i18n="grp.school">School</h3>
+        <div class="tiles">
+          <a class="tile grades" href="grades.html" data-app="grades.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🎓</span><span class="tname" data-i18n="tile.grades">Grades</span><span class="tsub" data-i18n="tile.grades.sub">Average calculator</span>
+          </a>
+          <a class="tile timetable" href="timetable.html" data-app="timetable.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗓️</span><span class="tname" data-i18n="tile.timetable">Stonneplang</span><span class="tsub" data-i18n="tile.timetable.sub">Your weekly timetable</span>
+          </a>
+          <a class="tile exams" href="exams.html" data-app="exams.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.exams">Tester</span><span class="tsub" data-i18n="tile.exams.sub">Countdowns, notes &amp; flashcards</span>
+          </a>
+          <a class="tile hw admin-only" href="homework.html" data-app="homework.html" style="display:none">
+            <span class="ico" aria-hidden="true">📚</span><span class="tname" data-i18n="tile.hw">Hausaufgaben</span><span class="tsub" data-i18n="tile.hw.sub">WebUntis homework</span>
+          </a>
+          <a class="tile flashcards" href="flashcards.html" data-app="flashcards.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🃏</span><span class="tname" data-i18n="tile.cards">Kaarten</span><span class="tsub" data-i18n="tile.cards.sub">Flashcards to study</span>
+          </a>
+          <a class="tile board" href="board.html" data-app="board.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">📋</span><span class="tname" data-i18n="tile.board">Klass-Tafel</span><span class="tsub" data-i18n="tile.board.sub">Shared class homework</span>
+          </a>
+          <a class="tile ask" href="ask.html" data-app="ask.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🧠</span><span class="tname">Frot deng Daten</span><span class="tsub">AI iwwer deng eegen Donnéeën</span>
+          </a>
+          <a class="tile search" href="search.html" data-app="search.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🔎</span><span class="tname" data-i18n="tile.search">Sichen</span><span class="tsub" data-i18n="tile.search.sub">Search everything</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="tile-group">
+        <h3 class="group-title" data-i18n="grp.social">Chat &amp; Friends</h3>
+        <div class="tiles">
+          <a class="tile msg" href="messenger.html" data-app="messenger.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💬</span><span class="tname">Messenger</span><span class="tsub" data-i18n="tile.messenger.sub">Chat &amp; groups</span>
+          </a>
+          <a class="tile friends" href="friends.html" data-app="friends.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">👥</span><span class="tname" data-i18n="tile.friends">Friends</span><span class="tsub" data-i18n="tile.friends.sub">Add, chat &amp; play</span>
+          </a>
+          <a class="tile classchat" href="classchat.html" data-app="classchat.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗣️</span><span class="tname" data-i18n="tile.classchat">Klass-Chat</span><span class="tsub" data-i18n="tile.classchat.sub">Live chat with your class</span>
+          </a>
+          <a class="tile polls" href="polls.html" data-app="polls.html">
+            <span class="ico" aria-hidden="true">🗳️</span><span class="tname" data-i18n="tile.polls">Ëmfroen</span><span class="tsub" data-i18n="tile.polls.sub">Class polls — vote!</span>
+          </a>
+          <a class="tile alerts" href="alerts.html" data-app="alerts.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🔔</span><span class="tname" data-i18n="tile.alerts">Neiegkeeten</span><span class="tsub" data-i18n="tile.alerts.sub">Mentions &amp; alerts</span>
+          </a>
+          <a class="tile friends" href="profile.html" data-app="profile.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🪪</span><span class="tname" data-i18n="tile.profile">Profile</span><span class="tsub" data-i18n="tile.profile.sub">Avatar &amp; stats</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="tile-group">
+        <h3 class="group-title" data-i18n="grp.fun">Games</h3>
+        <div class="tiles">
+          <a class="tile pixel" href="pixelbreak.html" data-app="pixelbreak.html">
+            <span class="ico" aria-hidden="true">🎮</span><span class="tname">PixelBreak</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
+          </a>
+          <a class="tile pixel" href="partyspill.html" data-app="partyspill.html">
+            <span class="ico" aria-hidden="true">🎉</span><span class="tname" data-i18n="tile.partyspill">Partyspill</span><span class="tsub" data-i18n="tile.partyspill.sub">15 party games on one phone</span>
+          </a>
+          <a class="tile wordle" href="wordle.html" data-app="wordle.html">
+            <span class="ico" aria-hidden="true">🟩</span><span class="tname">Wuertspill</span><span class="tsub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
+          </a>
+          <a class="tile countdowns" href="countdowns.html" data-app="countdowns.html">
+            <span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.countdowns">Countdowns</span><span class="tsub" data-i18n="tile.countdowns.sub">Count down to anything</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="tile-group">
+        <h3 class="group-title" data-i18n="grp.maps">Maps &amp; Getting Around</h3>
+        <div class="tiles">
+          <a class="tile bus" href="bus.html" data-app="bus.html">
+            <span class="ico" aria-hidden="true">🚌</span><span class="tname">Bus &amp; Zuch</span><span class="tsub" data-i18n="tile.bus.sub">Live departures &amp; routes</span>
+          </a>
+          <a class="tile moien" href="moien.html" data-app="moien.html">
+            <span class="ico" aria-hidden="true">🌤️</span><span class="tname">Moien</span><span class="tsub" data-i18n="tile.moien.sub">Weather</span>
+          </a>
+          <a class="tile bus skylens" href="skylens.html" data-app="skylens.html">
+            <span class="ico" aria-hidden="true">🛩️</span><span class="tname">SkyLens</span><span class="tsub">Live aircraft radar &amp; sky view</span>
+          </a>
+          <a class="tile bus" href="kaart/" data-app="kaart/">
+            <span class="ico" aria-hidden="true">🗺️</span><span class="tname" data-i18n="tile.kaart">Wanderkaart</span><span class="tsub" data-i18n="tile.kaart.sub">All hiking &amp; MTB routes on one map</span>
+          </a>
+          <a class="tile bus" href="geoportal/" data-app="geoportal/">
+            <span class="ico" aria-hidden="true">🛰️</span><span class="tname">Geoportal</span><span class="tsub" data-i18n="tile.geoportal.sub">Official maps, aerial photos &amp; cadastre</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="tile-group">
+        <h3 class="group-title" data-i18n="grp.personal">Personal</h3>
+        <div class="tiles">
+          <a class="tile buddy" href="buddy.html" data-app="buddy.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🤖</span><span class="tname">Study Buddy</span><span class="tsub" data-i18n="tile.buddy.sub">AI homework help</span>
+          </a>
+          <a class="tile health" href="health.html" data-app="health.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💪</span><span class="tname" data-i18n="tile.health">Health</span><span class="tsub" data-i18n="tile.health.sub">Water, sleep &amp; workouts</span>
+          </a>
+          <a class="tile money" href="money.html" data-app="money.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💶</span><span class="tname" data-i18n="tile.money">Sue</span><span class="tsub" data-i18n="tile.money.sub">Spending &amp; subscriptions</span>
+          </a>
+          <a class="tile me admin-only" href="me.html" data-app="me.html" style="display:none">
+            <span class="ico" aria-hidden="true">📊</span><span class="tname">My Dashboard</span><span class="tsub" data-i18n="tile.me.sub">GitHub, traffic &amp; stats</span>
+          </a>
+          <a class="tile karts admin-only" href="karts.html" data-app="karts.html" style="display:none">
+            <span class="ico" aria-hidden="true">🏎️</span><span class="tname">KartTracker</span><span class="tsub" data-i18n="tile.karts.sub">All lap sessions</span>
+          </a>
+          <a class="tile hotel private-hotel" href="hotel.html" data-app="hotel.html" style="display:none">
+            <span class="ico" aria-hidden="true">🏨</span><span class="tname">Hotel-Simulator</span><span class="tsub" data-i18n="tile.hotel.sub">Bausimulator · privat</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="tile-group">
+        <h3 class="group-title" data-i18n="grp.private">Private</h3>
+        <div class="tiles">
+          <a class="tile dash admin-only" href="factory.html" data-app="factory.html" style="display:none">
+            <span class="ico" aria-hidden="true">📈</span><span class="tname">Dashboard</span><span class="tsub" data-i18n="tile.dash.sub">Full ShortsFactory</span>
+          </a>
+          <a class="tile admin admin-only" href="admin.html" data-app="admin.html" style="display:none">
+            <span class="ico" aria-hidden="true">🛡</span><span class="tname">Admin</span><span class="tsub" data-i18n="tile.admin.sub">Moderation</span>
+          </a>
+          <a class="tile ppt owner-only" href="ppt.html" data-app="ppt.html" style="display:none">
+            <span class="ico" aria-hidden="true">▣</span><span class="tname">PPT Builder</span><span class="tsub">Presentatiounen aus dem Optrag</span>
+          </a>
+          <a class="tile doc owner-only" href="doc.html" data-app="doc.html" style="display:none">
+            <span class="ico" aria-hidden="true">📄</span><span class="tname">Word Builder</span><span class="tsub">Dokumenter a mengem Stil</span>
+          </a>
+        </div>
       </div>
     </section>
 
-    <section class="hero about-compact">
+    <section class="hero about-compact signed-out-only">
       <span class="hero-kicker" data-i18n="index.kicker">👋 Moien, ech sinn</span>
       <p class="hero-name">Ian Mulheims</p>
       <p class="hero-tag" data-i18n-html="index.tag">A student from Luxembourg who builds <strong>apps, school tools and small web projects</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.</p>
@@ -192,36 +218,39 @@
       </div>
     </section>
 
-    <section class="site-intro">
+    <section class="site-intro signed-out-only">
       <h2 data-i18n="intro.h1">What ian.lu is</h2>
-      <p data-i18n="intro.p1">ian.lu is where I put the things I build. I'm a secondary-school student in
-        Luxembourg, and almost everything here started as a question — can I make a lap timer for karting,
-        can I put every marked walking trail in the country on one map, can I write a chat app that feels
-        instant. The answers ended up being used by my friends, my class and my family, so they live here
-        rather than in a folder on my laptop.</p>
+      <details class="intro-more">
+        <summary data-i18n="intro.readMore">Read more</summary>
+        <p data-i18n="intro.p1">ian.lu is where I put the things I build. I'm a secondary-school student in
+          Luxembourg, and almost everything here started as a question — can I make a lap timer for karting,
+          can I put every marked walking trail in the country on one map, can I write a chat app that feels
+          instant. The answers ended up being used by my friends, my class and my family, so they live here
+          rather than in a folder on my laptop.</p>
 
-      <h3 data-i18n="intro.h2">What you can use without an account</h3>
-      <p data-i18n="intro.p2">Most of the site is open. You can play all of the PixelBreak arcade games in
-        the browser with nothing installed, look up live bus and train departures anywhere in Luxembourg,
-        check the weather, follow aircraft overhead in SkyLens, and browse every hiking and mountain-bike
-        route in the country. Only the things that are personal to you — messages, friends, grades, your
-        timetable — need a free account, and those are marked with a lock.</p>
+        <h3 data-i18n="intro.h2">What you can use without an account</h3>
+        <p data-i18n="intro.p2">Most of the site is open. You can play all of the PixelBreak arcade games in
+          the browser with nothing installed, look up live bus and train departures anywhere in Luxembourg,
+          check the weather, follow aircraft overhead in SkyLens, and browse every hiking and mountain-bike
+          route in the country. Only the things that are personal to you — messages, friends, grades, your
+          timetable — need a free account, and those are marked with a lock.</p>
 
-      <h3 data-i18n="intro.h3">Walking and cycling in Luxembourg</h3>
-      <p data-i18n-html="intro.p3">The part I've put the most work into is the trail directory. Luxembourg has
-        around 105 signposted circular walks called Auto-Pédestres, plus a network of marked mountain-bike
-        loops, and the information about them is scattered and often hard to use. Every route here has its
-        length, walking or riding time, elevation gain and profile, a real map of the actual path, and —
-        because public transport in Luxembourg is free — the nearest bus stops and which lines serve them.
-        You can also see all of them at once on the <a href="kaart/">trail map</a>, or open the
-        <a href="geoportal/">geoportal</a>, which puts the routes on top of the country's official
-        topographic maps, aerial photography going back to 1967, and the LiDAR terrain model.</p>
+        <h3 data-i18n="intro.h3">Walking and cycling in Luxembourg</h3>
+        <p data-i18n-html="intro.p3">The part I've put the most work into is the trail directory. Luxembourg has
+          around 105 signposted circular walks called Auto-Pédestres, plus a network of marked mountain-bike
+          loops, and the information about them is scattered and often hard to use. Every route here has its
+          length, walking or riding time, elevation gain and profile, a real map of the actual path, and —
+          because public transport in Luxembourg is free — the nearest bus stops and which lines serve them.
+          You can also see all of them at once on the <a href="kaart/">trail map</a>, or open the
+          <a href="geoportal/">geoportal</a>, which puts the routes on top of the country's official
+          topographic maps, aerial photography going back to 1967, and the LiDAR terrain model.</p>
 
-      <h3 data-i18n="intro.h4">How it's built</h3>
-      <p data-i18n="intro.p4">Everything is written by hand — plain JavaScript in the browser, Supabase for
-        accounts, real-time chat and storage, and Python for the pipelines that generate the trail pages
-        from OpenStreetMap data. There is no site builder and no template behind it. If something here is
-        broken or wrong, it's mine to fix, and you can tell me about it.</p>
+        <h3 data-i18n="intro.h4">How it's built</h3>
+        <p data-i18n="intro.p4">Everything is written by hand — plain JavaScript in the browser, Supabase for
+          accounts, real-time chat and storage, and Python for the pipelines that generate the trail pages
+          from OpenStreetMap data. There is no site builder and no template behind it. If something here is
+          broken or wrong, it's mine to fix, and you can tell me about it.</p>
+      </details>
     </section>
   </main>
 
@@ -235,139 +264,10 @@
   </footer>
 
   <script>
-    // Moien-style date, clock and weather preview for the homepage.
     (function () {
-      const hiEl = document.getElementById("todayHi");
-      const dateEl = document.getElementById("todayDate");
-      const clockEl = document.getElementById("todayClock");
-      const wxEl = document.getElementById("homeWeather");
-      const pad = (n) => String(n).padStart(2, "0");
-      const words = {
-        lb: {
-          days: ["Sonndeg", "Méindeg", "Dënschdeg", "Mëttwoch", "Donneschdeg", "Freideg", "Samschdeg"],
-          months: ["Januar", "Februar", "Mäerz", "Abrëll", "Mee", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
-          feels: "Gefillt",
-          high: "Max",
-          rain: "Reen",
-          wind: "Wand",
-          place: "Lëtzebuerg",
-          weatherError: "Wieder konnt net gelueden ginn.",
-        },
-        de: {
-          days: ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"],
-          months: ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"],
-          feels: "Gefühlt",
-          high: "Max",
-          rain: "Regen",
-          wind: "Wind",
-          place: "Luxemburg",
-          weatherError: "Wetter konnte nicht geladen werden.",
-        },
-        en: {
-          days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-          months: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-          feels: "Feels",
-          high: "High",
-          rain: "Rain",
-          wind: "Wind",
-          place: "Luxembourg",
-          weatherError: "Weather could not be loaded.",
-        },
-      };
-      let weatherData = null;
-      const currentLang = () => (window.I18N && words[window.I18N.lang] ? window.I18N.lang : "lb");
-      function tickToday() {
-        const d = new Date();
-        const h = d.getHours();
-        const w = words[currentLang()];
-        hiEl.textContent = h < 11 ? "Moien" : h < 14 ? "Gudde Mëtteg" : h < 18 ? "Schéinen Nomëtteg" : h < 23 ? "Gudden Owend" : "Gutt Nuecht";
-        dateEl.textContent = w.days[d.getDay()] + ", " + d.getDate() + ". " + w.months[d.getMonth()] + " " + d.getFullYear();
-        clockEl.textContent = pad(h) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
-      }
-      function wmo(code, isDay) {
-        const map = {
-          0: ["☀️", "🌙", { lb: "Kloer", de: "Klar", en: "Clear" }],
-          1: ["🌤️", "☁️", { lb: "Meeschtens kloer", de: "Meist klar", en: "Mostly clear" }],
-          2: ["⛅", "☁️", { lb: "Deelweis bewëllkt", de: "Teilweise bewölkt", en: "Partly cloudy" }],
-          3: ["☁️", "☁️", { lb: "Bewëllkt", de: "Bewölkt", en: "Cloudy" }],
-          45: ["🌫️", "🌫️", { lb: "Niwwel", de: "Nebel", en: "Fog" }],
-          48: ["🌫️", "🌫️", { lb: "Niwwel", de: "Nebel", en: "Fog" }],
-          51: ["🌦️", "🌦️", { lb: "Liicht Sprëtzelen", de: "Leichter Niesel", en: "Light drizzle" }],
-          53: ["🌦️", "🌦️", { lb: "Sprëtzelen", de: "Niesel", en: "Drizzle" }],
-          55: ["🌧️", "🌧️", { lb: "Staark Sprëtzelen", de: "Starker Niesel", en: "Heavy drizzle" }],
-          61: ["🌦️", "🌦️", { lb: "Liichte Reen", de: "Leichter Regen", en: "Light rain" }],
-          63: ["🌧️", "🌧️", { lb: "Reen", de: "Regen", en: "Rain" }],
-          65: ["🌧️", "🌧️", { lb: "Staarke Reen", de: "Starker Regen", en: "Heavy rain" }],
-          71: ["🌨️", "🌨️", { lb: "Liichte Schnéi", de: "Leichter Schnee", en: "Light snow" }],
-          73: ["🌨️", "🌨️", { lb: "Schnéi", de: "Schnee", en: "Snow" }],
-          75: ["❄️", "❄️", { lb: "Staarke Schnéi", de: "Starker Schnee", en: "Heavy snow" }],
-          80: ["🌦️", "🌦️", { lb: "Reenschauer", de: "Regenschauer", en: "Rain showers" }],
-          81: ["🌧️", "🌧️", { lb: "Reenschauer", de: "Regenschauer", en: "Rain showers" }],
-          82: ["⛈️", "⛈️", { lb: "Staark Schauer", de: "Starke Schauer", en: "Heavy showers" }],
-          95: ["⛈️", "⛈️", { lb: "Donnerwieder", de: "Gewitter", en: "Thunderstorm" }],
-          96: ["⛈️", "⛈️", { lb: "Donnerwieder", de: "Gewitter", en: "Thunderstorm" }],
-          99: ["⛈️", "⛈️", { lb: "Donnerwieder", de: "Gewitter", en: "Thunderstorm" }],
-        };
-        const v = map[code] || ["🌡️", "🌡️", { lb: "Wieder", de: "Wetter", en: "Weather" }];
-        return { emoji: isDay ? v[0] : v[1], text: v[2][currentLang()] || v[2].en };
-      }
-      function renderWeather() {
-        if (!weatherData) return;
-        const current = weatherData.current;
-        const daily = weatherData.daily;
-        const weather = wmo(current.weather_code, current.is_day);
-        const w = words[currentLang()];
-        wxEl.innerHTML =
-          '<div class="weather-top">' +
-            '<span class="weather-emoji">' + weather.emoji + '</span>' +
-            '<span><strong>' + Math.round(current.temperature_2m) + '°</strong><em>' + w.place + ' · ' + weather.text + '</em></span>' +
-          '</div>' +
-          '<div class="weather-meta">' +
-            '<span>' + w.feels + ' ' + Math.round(current.apparent_temperature) + '°</span>' +
-            '<span>' + w.high + ' ' + Math.round(daily.temperature_2m_max[0]) + '°</span>' +
-            '<span>' + w.rain + ' ' + daily.precipitation_probability_max[0] + '%</span>' +
-            '<span>' + w.wind + ' ' + Math.round(current.wind_speed_10m) + ' km/h</span>' +
-          '</div>';
-      }
-      async function loadWeather() {
-        try {
-          const url = "https://api.open-meteo.com/v1/forecast?latitude=49.61&longitude=6.13&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Europe%2FLuxembourg&forecast_days=1";
-          const res = await fetch(url);
-          weatherData = await res.json();
-          renderWeather();
-        } catch (e) {
-          wxEl.innerHTML = '<div class="weather-muted">' + words[currentLang()].weatherError + '</div>';
-        }
-      }
-      tickToday();
-      setInterval(tickToday, 1000);
-      loadWeather();
-      document.addEventListener("i18n:change", function () {
-        tickToday();
-        renderWeather();
-      });
-    })();
-
-    // Live countdown to the summer holidays (Ian's last lesson ends 9 July 2026, 12:40).
-    (function () {
-      const VACATION_START = new Date("2026-07-09T12:40:00+02:00").getTime();
-      const timerEl = document.getElementById("vacTimer");
-      const pad = (n) => String(n).padStart(2, "0");
-      function tick() {
-        const left = VACATION_START - Date.now();
-        if (left <= 0) {
-          document.getElementById("vacPre").style.display = "none";
-          document.getElementById("vacPost").style.display = "";
-          timerEl.textContent = "";
-          return;
-        }
-        const s = Math.floor(left / 1000);
-        const days = Math.floor(s / 86400);
-        timerEl.textContent =
-          days + "d " + pad(Math.floor(s / 3600) % 24) + "h " + pad(Math.floor(s / 60) % 60) + "m " + pad(s % 60) + "s";
-        setTimeout(tick, 1000);
-      }
-      tick();
+      const hour = new Date().getHours();
+      document.getElementById("todayHi").textContent =
+        hour < 11 ? "Moien" : hour < 14 ? "Gudde Mëtteg" : hour < 18 ? "Schéinen Nomëtteg" : hour < 23 ? "Gudden Owend" : "Gutt Nuecht";
     })();
   </script>
   <script src="main.js"></script>
@@ -381,8 +281,117 @@
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)
     const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"];   // PPT/Word studios; ian@ian.lu is the test account
+    const DEFAULT_FAVS = ["messenger.html", "grades.html", "timetable.html", "classchat.html", "pixelbreak.html", "bus.html"];
+    const favTiles = document.getElementById("favTiles");
+    const favGroup = document.getElementById("grpFav");
+    const favEdit = document.getElementById("favEdit");
+
+    function readFavorites() {
+      try {
+        const stored = localStorage.getItem("favApps");
+        if (stored === null) {
+          localStorage.setItem("favApps", JSON.stringify(DEFAULT_FAVS));
+          return DEFAULT_FAVS.slice();
+        }
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return [...new Set(parsed.filter((app) => typeof app === "string"))];
+      } catch {}
+      return DEFAULT_FAVS.slice();
+    }
+
+    let favorites = readFavorites();
+
+    function saveFavorites() {
+      try { localStorage.setItem("favApps", JSON.stringify(favorites)); } catch {}
+    }
+
+    function sourceTiles() {
+      return [...document.querySelectorAll("#apps .tile-group:not(#grpFav) .tile")];
+    }
+
+    function tileIsVisible(tile) {
+      const group = tile.closest(".tile-group");
+      return !tile.hidden && !group?.hidden && getComputedStyle(tile).display !== "none";
+    }
+
+    function addFavoriteStars() {
+      document.querySelectorAll("#apps .tile").forEach((tile) => {
+        if (tile.querySelector(".fav-star")) return;
+        const star = document.createElement("span");
+        star.className = "fav-star";
+        star.setAttribute("aria-hidden", "true");
+        tile.appendChild(star);
+      });
+      syncFavoriteStars();
+    }
+
+    function syncFavoriteStars() {
+      const editing = document.body.classList.contains("fav-edit");
+      document.querySelectorAll("#apps .tile").forEach((tile) => {
+        const star = tile.querySelector(".fav-star");
+        const pinned = favorites.includes(tile.dataset.app);
+        if (star) star.textContent = pinned ? "★" : "☆";
+        // The star itself is decorative (aria-hidden, pointer-events:none) — the
+        // whole tile is the toggle in edit mode, so the pressed state belongs
+        // on the tile or a screen reader cannot tell pinned from unpinned.
+        if (editing) {
+          tile.setAttribute("role", "button");
+          tile.setAttribute("aria-pressed", String(pinned));
+        } else {
+          tile.removeAttribute("role");
+          tile.removeAttribute("aria-pressed");
+        }
+      });
+    }
+
+    function renderFavorites() {
+      favTiles.replaceChildren();
+      const sources = sourceTiles();
+      favorites.forEach((app) => {
+        const source = sources.find((tile) => tile.dataset.app === app);
+        if (!source || !tileIsVisible(source)) return;
+        favTiles.appendChild(source.cloneNode(true));
+      });
+      favGroup.hidden = !favTiles.childElementCount;
+      if (document.body.classList.contains("fav-edit")) addFavoriteStars();
+    }
+
+    function refreshGroups() {
+      document.querySelectorAll("#apps .tile-group:not(#grpFav)").forEach((group) => {
+        group.hidden = false;
+        group.hidden = ![...group.querySelectorAll(".tile")].some((tile) => tileIsVisible(tile));
+      });
+    }
+
+    function updateEditButton() {
+      const editing = document.body.classList.contains("fav-edit");
+      const key = editing ? "grp.done" : "grp.edit";
+      favEdit.setAttribute("data-i18n", key);
+      favEdit.textContent = window.I18N ? I18N.t(key) : editing ? "Done" : "Edit";
+      favEdit.setAttribute("aria-pressed", String(editing));
+    }
+
     mountAccountButton(document.getElementById("acctHost"));
     document.getElementById("appsGateBtn").onclick = openAuthModal;   // signed-out gate → sign-in modal
+    favEdit.addEventListener("click", () => {
+      const editing = document.body.classList.toggle("fav-edit");
+      updateEditButton();
+      if (editing) addFavoriteStars();
+      else { renderFavorites(); syncFavoriteStars(); }
+    });
+    document.getElementById("apps").addEventListener("click", (event) => {
+      if (!document.body.classList.contains("fav-edit")) return;
+      const tile = event.target.closest(".tile");
+      if (!tile) return;
+      event.preventDefault();
+      const app = tile.dataset.app;
+      const index = favorites.indexOf(app);
+      if (index >= 0) favorites.splice(index, 1);
+      else favorites.push(app);
+      saveFavorites();
+      syncFavoriteStars();
+    });
+    document.addEventListener("i18n:change", updateEditButton);
     async function refreshTiles() {
       // client() is what restores the persisted session, and session() stays
       // undefined until it has. Reading it first showed a signed-in user the
@@ -408,6 +417,8 @@
       // that the studio itself then refuses.
       const studio = STUDIO_ALLOW.includes(email);
       document.querySelectorAll(".owner-only").forEach((e) => (e.style.display = studio ? "" : "none"));
+      refreshGroups();
+      renderFavorites();
     }
     onAuth(() => refreshTiles());
     refreshTiles();

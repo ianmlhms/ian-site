@@ -25,6 +25,10 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+.signed-in-only { display: none; }
+body.signed-in .signed-in-only { display: revert; }
+body.signed-in .signed-out-only { display: none; }
+
 /* Top bar */
 .bar {
   display: flex;
@@ -124,10 +128,7 @@ footer {
   padding: 56px 8px 40px;
 }
 
-/* Greeting above a full-width status strip. This used to be a two-column grid
- * whose left half was a 510x320 gradient card holding three short lines — once
- * the "Open apps" / "Open Moien" buttons came out it was mostly empty space,
- * and it pushed the app grid down for nothing. */
+/* Compact greeting above the app launcher. */
 .today-hero {
   display: flex;
   flex-direction: column;
@@ -147,76 +148,6 @@ footer {
   max-width: 480px; margin: 16px 0 0;
   font-size: clamp(15px, 2.4vw, 18px); line-height: 1.55;
   color: var(--muted);
-}
-.today-panel {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  min-width: 0;
-}
-.date-card,
-.weather-card,
-.vac-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 18px;
-  min-width: 0;
-}
-/* One shared floor so the three read as a single strip, not a ragged row. */
-.date-card, .weather-card, .vac-card { min-height: 132px; }
-.date-line {
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 700;
-}
-.clock-line {
-  margin-top: 6px;
-  font-size: 38px;
-  line-height: 1;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.weather-top {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.weather-emoji { font-size: 44px; line-height: 1; }
-.weather-top strong {
-  display: block; font-size: 38px; line-height: 1;
-}
-.weather-top em {
-  display: block; margin-top: 4px; font-style: normal; font-size: 13px;
-  color: var(--muted);
-}
-.weather-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.weather-meta span {
-  padding: 4px 8px;
-  background: var(--card2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-}
-.weather-muted { color: var(--muted); font-size: 13px; }
-.vac-card {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 6px;
-}
-.vac-label { font-size: 15px; font-weight: 600; color: var(--muted); }
-.vac-timer {
-  font-size: 17px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
 }
 .hero-kicker {
   display: inline-block;
@@ -312,6 +243,7 @@ footer {
 /* app launcher: everyone sees the grid; tiles that need an account carry a 🔒
    badge until the visitor signs in */
 #apps .tiles { max-width: none; }
+body:not(.signed-in) .tile:has(.lockb) { display: none; }
 .tile .lockb {
   position: absolute; top: 9px; right: 11px;
   font-size: 13px; line-height: 1; opacity: .7;
@@ -328,6 +260,64 @@ body.signed-in .tile .lockb { display: none; }
 .apps-gate .ag-text span { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 .apps-gate .btn-primary { flex: none; }
 body.signed-in .apps-gate { display: none; }
+
+.tile-group { margin-top: 28px; }
+.group-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 12px;
+}
+.group-title {
+  min-width: 0;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.35px;
+  text-transform: uppercase;
+}
+.group-head .group-title { margin-bottom: 0; }
+.group-head p {
+  display: none;
+  min-width: 0;
+  margin: 4px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+body.fav-edit .group-head p { display: block; }
+.group-edit {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.group-edit:hover { background: var(--card2); }
+.fav-star {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: var(--accent);
+  font-size: 24px;
+  line-height: 1;
+  pointer-events: none;
+}
+body.fav-edit .fav-star { display: grid; }
 
 .about-compact {
   padding-top: 46px;
@@ -357,6 +347,18 @@ body.signed-in .apps-gate { display: none; }
   line-height: 1.7;
   color: var(--muted);
 }
+.intro-more summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  width: fit-content;
+  max-width: 100%;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.intro-more[open] summary { margin-bottom: 12px; }
 
 @media (max-width: 760px) {
   .bar { padding: 14px 16px; }
@@ -375,12 +377,6 @@ body.signed-in .apps-gate { display: none; }
   }
   .page { padding: 16px; }
   .apps-gate .btn-primary { flex: 1 1 100%; text-align: center; }
-  /* The three status cards go side by side on a laptop and stack on a phone. */
-  .today-panel { grid-template-columns: 1fr; }
-  .date-card, .weather-card, .vac-card { min-height: 0; }
-  .vac-card { flex-direction: row; align-items: center; justify-content: space-between; }
-  .clock-line { font-size: 34px; }
-  .weather-top strong { font-size: 34px; }
   .tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .tile { min-height: 118px; padding: 16px; }
 }
