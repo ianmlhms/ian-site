@@ -63,8 +63,6 @@ window.I18N_DICT = {
 
   /* ---------- index / landing ---------- */
   "index.homeSub": { lb: "Wieder, Schoul-Tools, Noriichten a Projeten op enger Plaz.", de: "Wetter, Schul-Tools, Nachrichten und Projekte an einem Ort.", en: "Weather, school tools, messages and projects in one place." },
-  "index.openApps": { lb: "Apps opmaachen", de: "Apps öffnen", en: "Open apps" },
-  "index.openMoien": { lb: "Moien opmaachen", de: "Moien öffnen", en: "Open Moien" },
   "index.vacLabel": { lb: "Summervakanz an", de: "Sommerferien in", en: "Summer holidays in" },
   "index.vacDone":  { lb: "Summervakanz!", de: "Sommerferien!", en: "Summer holidays!" },
   "tile.exams":     { lb: "Tester", de: "Tests", en: "Tests" },
