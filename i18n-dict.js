@@ -70,6 +70,7 @@ window.I18N_DICT = {
   "grp.maps":       { lb: "Kaarten & Ënnerwee", de: "Karten & unterwegs", en: "Maps & Getting Around" },
   "grp.personal":   { lb: "Perséinlech", de: "Persönlich", en: "Personal" },
   "grp.private":    { lb: "Privat", de: "Privat", en: "Private" },
+  "grp.apps":       { lb: "Apps", de: "Apps", en: "apps" },
   "grp.edit":       { lb: "Änneren", de: "Ändern", en: "Edit" },
   "grp.done":       { lb: "Fäerdeg", de: "Fertig", en: "Done" },
   "grp.favHint":    { lb: "Tip op eng App, fir se bäizesetzen oder ewechzehuelen.", de: "Tippe auf eine App, um sie hinzuzufügen oder zu entfernen.", en: "Tap an app to add or remove it from your favorites." },

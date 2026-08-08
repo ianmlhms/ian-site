@@ -409,11 +409,11 @@
   },
   "skylens.html": {
     "overflow": 0,
-    "offscreen": 0,
+    "offscreen": 1,
     "collision": 0,
     "clipped": 0,
-    "contrast": 4,
-    "hit-target": 134
+    "contrast": 5,
+    "hit-target": 136
   },
   "slf.html": {
     "overflow": 0,

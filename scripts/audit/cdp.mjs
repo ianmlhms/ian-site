@@ -25,6 +25,21 @@ async function waitForEndpoint(port) {
   throw new Error(`Chrome did not open a debugging port on ${port} within ${LAUNCH_TIMEOUT_MS}ms`);
 }
 
+/* A crashed run can leave a headless Chrome holding the debugging port. The next
+ * run then "connects" to that corpse and hangs forever with no error — which is
+ * exactly what happened once. Step past any port that already answers. */
+export async function freePort(start) {
+  for (let port = start; port < start + 40; port += 1) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/version`,
+        { signal: AbortSignal.timeout(400) });
+      if (response.ok) continue;          // someone else's browser; try the next
+    } catch { /* nothing listening — this one is ours */ }
+    return port;
+  }
+  throw new Error(`no free debugging port in ${start}..${start + 40}`);
+}
+
 /** Launch headless Chrome and return a connected client. */
 export async function launchChrome(port, profileDir) {
   const child = spawn(CHROME, [

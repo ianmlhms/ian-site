@@ -63,6 +63,25 @@ function emptyBodyFor(resourceType) {
   return null;
 }
 
+/* A recorded payload ages against the wall clock. skylens stamps its response
+ * with `now` and greys out any aircraft older than 45s, so a fixture recorded
+ * this morning renders every plane as stale by lunchtime and the audit's counts
+ * drift day to day without anything changing. Re-stamp `now` on the way out so
+ * the canned reply is always "just fetched". */
+function refreshTimestamp(base64Body, mime) {
+  if (!/json/i.test(mime || "")) return base64Body;
+  try {
+    const payload = JSON.parse(Buffer.from(base64Body, "base64").toString("utf8"));
+    if (!payload || typeof payload !== "object" || !("now" in payload)) return base64Body;
+    payload.now = typeof payload.now === "number"
+      ? Date.now()
+      : new Date().toISOString();
+    return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+  } catch {
+    return base64Body;   // not JSON after all; serve it untouched
+  }
+}
+
 /**
  * Route one paused request. Returns the CDP command to send.
  * `fixtures` maps fixtureName() -> { status, mime, body } (body base64).
@@ -74,6 +93,7 @@ export function routeRequest(params, fixtures) {
 
   const fixture = fixtures.get(fixtureName(request.url));
   if (fixture) {
+    fixture.body = refreshTimestamp(fixture.body, fixture.mime);
     return {
       method: "Fetch.fulfillRequest",
       params: {

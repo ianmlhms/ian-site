@@ -155,7 +155,12 @@ export function auditPage(options) {
     }
 
     /* 3. text clipped by its own container */
+    /* A box a couple of pixels across is the visually-hidden / sr-only pattern
+     * (1px + overflow:hidden), not text a sighted reader is losing. Only the
+     * `clipped` check needs the exemption: a 1px *control* is still a real
+     * hit-target bug, so isVisible() deliberately keeps counting those. */
     if (text && style.overflow !== "visible" && node.scrollWidth > node.clientWidth + EDGE_TOLERANCE
+      && node.clientWidth > 2 && node.clientHeight > 2
       && style.overflowX !== "auto" && style.overflowX !== "scroll") {
       add("clipped", node, `content is ${node.scrollWidth}px wide in a ${node.clientWidth}px box (overflow: ${style.overflow})`);
     }

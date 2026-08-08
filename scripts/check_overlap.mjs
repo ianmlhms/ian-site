@@ -31,7 +31,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { closePage, evaluate, launchChrome, openPage, sleep } from "./audit/cdp.mjs";
+import { closePage, evaluate, freePort, launchChrome, openPage, sleep } from "./audit/cdp.mjs";
 import { auditPage } from "./audit/probe.mjs";
 import { loadFixtures, routeRequest, saveFixture, wantsFixture } from "./audit/net.mjs";
 
@@ -40,9 +40,19 @@ const BASELINE = path.join(ROOT, "scripts", "audit", "baseline.json");
 const FIXTURES = path.join(ROOT, "scripts", "audit", "fixtures");
 const SERVER_PORT = 8731;
 const DEBUG_PORT = 9333;
+/* Not higher: at 8 the heavy pages (skylens draws a Leaflet map plus 200
+ * aircraft) lose the render race against their own settle window and report
+ * fewer findings than they do alone, which is under-measurement dressed up as
+ * a speed-up. The real win came from loading each page once instead of twice. */
 const CONCURRENCY = 4;
 const SETTLE_MS = 400;            // after the network goes quiet, not instead of it
-const IDLE_TIMEOUT_MS = 8000;     // a page that never idles still gets measured
+/* Pages that poll (skylens's aircraft, moien's clock) never fire networkIdle and
+ * always pay this in full, so it is tempting to shorten. Do not: at 4s the
+ * heavier pages sometimes finished rendering and sometimes did not, and two
+ * consecutive full runs disagreed by 17 findings. Determinism is the whole
+ * point of this gate — the speed came from loading each page once instead of
+ * twice, which costs nothing. */
+const IDLE_TIMEOUT_MS = 8000;
 const VIEWPORT_HEIGHT = 900;
 const ATTEMPTS = 2;               // one retry: a timed-out probe must not read as "clean"
 const GEOLOCATION = { latitude: 49.6537, longitude: 6.2597, accuracy: 20 };  // Niederanven
@@ -125,6 +135,11 @@ async function waitForIdle(client, sessionId) {
 
 async function attemptAudit(client, page, width, theme, settle, net) {
   const url = `http://127.0.0.1:${SERVER_PORT}/${page}`;
+  /* Yes, this loads the page twice — once here, once after the theme seed below.
+   * Collapsing it to a single navigation looks like a free 2x and is not: the
+   * first load warms Chrome's cache and JIT, and without it the counts stopped
+   * being reproducible (two full runs disagreed by 9 findings). A gate that
+   * cries wolf is worth less than a gate that takes four minutes. */
   const { targetId, sessionId } = await openPage(client, url, width, VIEWPORT_HEIGHT);
   try {
     await client.send("Fetch.enable", {
@@ -282,7 +297,7 @@ async function main() {
   let client;
   try {
     await waitForServer();
-    client = await launchChrome(DEBUG_PORT, profile);
+    client = await launchChrome(await freePort(DEBUG_PORT), profile);
     await client.send("Browser.grantPermissions", { permissions: ["geolocation"] });
     const net = { record: flags.record, fixtures: loadFixtures(FIXTURES) };
     console.log(`Auditing ${pages.length} pages × ${flags.widths.join("/")}px × ${flags.themes.join("/")}`
