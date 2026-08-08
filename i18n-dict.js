@@ -23,6 +23,8 @@ window.I18N_DICT = {
   "pin.username": { lb: "Benotzernumm", de: "Benutzername", en: "Username" },
   "pin.email": { lb: "E-Mail", de: "E-Mail", en: "Email" },
   "pin.chooseLength": { lb: "Wiel 4 oder 6 Zifferen.", de: "Wähle 4 oder 6 Ziffern.", en: "Choose 4 or 6 digits." },
+  "pin.fourDigits": { lb: "4 Zifferen", de: "4 Ziffern", en: "4 digits" },
+  "pin.sixDigits": { lb: "6 Zifferen", de: "6 Ziffern", en: "6 digits" },
   "pin.enter": { lb: "PIN aginn", de: "PIN eingeben", en: "Enter PIN" },
   "pin.enterNew": { lb: "Neie PIN aginn", de: "Neue PIN eingeben", en: "Enter new PIN" },
   "pin.repeat": { lb: "PIN widderhuelen", de: "PIN wiederholen", en: "Repeat PIN" },

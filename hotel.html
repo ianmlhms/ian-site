@@ -818,7 +818,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-  import { client, session, onAuth, openAuthModal } from "./auth.js?v=9";
+  import { client, session, onAuth, openAuthModal } from "./auth.js?v=10";
   const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // nur diese Konten dürfen rein
   const gate = document.getElementById("hotelGate");
   const msg = document.getElementById("hotelGateMsg");
@@ -851,7 +851,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
   onAuth(() => check());
   check();
 </script>
-  <script type="module" src="rtc-ring.js?v=5"></script>
-  <script type="module" src="class-gate.js?v=7"></script>
+  <script type="module" src="rtc-ring.js?v=6"></script>
+  <script type="module" src="class-gate.js?v=8"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=8";
+import * as auth from "./auth.js?v=10";
 import { validateDeck } from "./ppt-ai.js?v=9";
 
 const MAX_CONCURRENCY = 4;

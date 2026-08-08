@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=8";
+import * as auth from "./auth.js?v=10";
 import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3"; // Shared studio ingest; historical prefix kept intentionally.
 import { createDocumentGeneration, reviseDocument, rewriteDocument } from "./doc-ai.js?v=5";
 import { documentText, validateDocument } from "./doc-schema.js?v=1";

@@ -1,4 +1,4 @@
-import { openPinDialog } from "./auth-ui.js?v=3";
+import { openPinDialog } from "./auth-ui.js?v=4";
 import { esc, translate } from "./pin-pad.js?v=2";
 
 const SKIP_PREFIX = "pinBriefSkip:";
@@ -100,12 +100,12 @@ function briefingMarkup() {
       "Wann s de däi PIN vergëss, schreif dem Ian. " +
         "En E-Mail-Reset ass net garantéiert.",
     ))}</p>
-    <div class="pin-row">
-      <button class="auth-go" id="pinBriefSet">${esc(t(
-        "pin.setNow",
-        "PIN elo setzen",
-      ))}</button>
-      <button class="auth-tab" id="pinBriefLater">${esc(t(
+    <button class="auth-go" id="pinBriefSet">${esc(t(
+      "pin.setNow",
+      "PIN elo setzen",
+    ))}</button>
+    <div class="auth-links">
+      <button class="auth-link" id="pinBriefLater">${esc(t(
         "pin.later",
         "Méi spéit",
       ))}</button>

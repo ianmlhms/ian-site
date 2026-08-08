@@ -1,12 +1,12 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=25";
-import { openAuthDialog } from "./auth-ui.js?v=3";
+import "./i18n-dict.js?v=27";
+import { openAuthDialog } from "./auth-ui.js?v=4";
 import { esc } from "./pin-pad.js?v=2";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=3";
+} from "./pin-brief.js?v=4";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =
@@ -323,28 +323,15 @@ const uiDeps = Object.freeze({
   pinSetupPending: () => _g.pinSetupPending === true,
 });
 
+/* Appended last so it outranks the per-page <style> blocks, which would
+ * otherwise dictate how the modal's inputs and buttons look. */
 function injectCss() {
   if (document.getElementById("auth-css")) return;
-  const style = document.createElement("style");
-  style.id = "auth-css";
-  style.textContent = `
-    .auth-btn{display:inline-flex;align-items:center;gap:6px}
-    .auth-modal{position:fixed;inset:0;display:none;
-      align-items:center;justify-content:center;z-index:5000;
-      padding:18px}
-    .auth-modal.open{display:flex}
-    .auth-box{width:360px;max-width:100%;max-height:90vh;
-      overflow:auto;box-sizing:border-box}
-    .auth-x{float:right}
-    .auth-tabs,.pin-row{display:flex;gap:8px}
-    .auth-tab{flex:1}
-    .auth-box input:not(.pin-box){width:100%;box-sizing:border-box}
-    .auth-go{width:100%}
-    .pin-pad{display:flex;justify-content:center;gap:6px}
-    .pin-box{width:2.25em;text-align:center;box-sizing:border-box}
-    .pin-brief{max-width:380px}
-  `;
-  document.head.appendChild(style);
+  const link = document.createElement("link");
+  link.id = "auth-css";
+  link.rel = "stylesheet";
+  link.href = "auth.css?v=1";
+  document.head.appendChild(link);
 }
 
 export function openAuthModal() {

@@ -71,7 +71,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=9";
+import * as auth from "./auth.js?v=10";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let sb=null,myClass=null,me=null,adminIds=new Set(),vipIds=new Set(),ipIds=new Set(),prof={},chan=null,seen=new Set();
@@ -162,7 +162,7 @@ auth.mountAccountButton($("acctHost"));
 auth.onAuth(()=>{if(auth.session())start();});
 start();
 </script>
-  <script type="module" src="rtc-ring.js?v=5"></script>
-  <script type="module" src="class-gate.js?v=7"></script>
+  <script type="module" src="rtc-ring.js?v=6"></script>
+  <script type="module" src="class-gate.js?v=8"></script>
 </body>
 </html>
