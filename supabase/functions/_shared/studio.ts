@@ -3,7 +3,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const HEARTBEAT_MAX_AGE_MS = 90_000;
 const STUCK_JOB_AGE_MS = 5 * 60 * 1000;
 const JOB_ID = /^[0-9a-f-]{36}$/i;
-const OWNER_EMAILS = new Set(["konto@ian.lu"]);
+/* Must stay in step with STUDIO_ALLOW in index.html, ppt-app.js and doc-app.js —
+ * those only decide what is *shown*, this is what actually grants access. */
+const OWNER_EMAILS = new Set(["konto@ian.lu", "matthieugerouville@gmail.com"]);
 const LANGS = new Set(["lb", "de", "en", "fr"]);
 const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 const admin = createClient(
