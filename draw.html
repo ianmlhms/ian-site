@@ -9,7 +9,7 @@
   <meta name="description" content="Molerei — a draw-and-guess party game on ian.lu. One player draws, everyone else guesses the word." />
   <link rel="canonical" href="https://ian.lu/draw.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
@@ -69,7 +69,7 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="notify-ambient.js?v=8"></script>
+<script type="module" src="notify-ambient.js?v=9"></script>
 <script>
 const WORDS = ["HAUS","BAUM","AUTO","HUND","KATZE","SONNE","MOND","STERN","BLUME","FISCH","VOGEL","APFEL","BANANE","PIZZA","BURG","SCHIFF","ZUG","FLUGZEUG","RAKETE","ROBOTER","BRILLE","SCHUH","HUT","UHR","HERZ","SCHLANGE","ELEFANT","GIRAFFE","KROKODIL","PINGUIN","SCHMETTERLING","REGENBOGEN","WOLKE","BERG","BRÜCKE","GITARRE","FUSSBALL","KRONE","DRACHE","GESPENST","SCHNEEMANN","KAKTUS","LEUCHTTURM","AMPEL","FAHRRAD","EISBÄR","KERZE","TASSE","LÖFFEL","SCHLÜSSEL"];
 const LAPS = 2, TURN_SECS = 75, COLORS = ["#000000","#e53527","#1d72e8","#2ca02c","#ffcc00","#8b5a2b","#ff7ac0","#ffffff"];
@@ -242,7 +242,7 @@ ch.on("broadcast",{event:"turn"},({payload})=>applyTurn(payload))
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 function isDrawerHost(){ return true; } // host validates picks regardless
 </script>
-  <script type="module" src="rtc-ring.js?v=6"></script>
-  <script type="module" src="class-gate.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=7"></script>
+  <script type="module" src="class-gate.js?v=9"></script>
 </body>
 </html>

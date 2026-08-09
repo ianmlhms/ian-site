@@ -124,7 +124,7 @@ a:focus-visible {
 .header-actions { justify-self: end; }
 
 .icon-button {
-  min-height: 39px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -204,7 +204,7 @@ a:focus-visible {
 
 .filter-chip span { margin-left: 4px; font-variant-numeric: tabular-nums; }
 .filter-chip:hover { border-color: color-mix(in srgb, var(--sky-cyan) 60%, var(--sky-border)); color: var(--sky-text); }
-.filter-chip.is-active { border-color: var(--sky-cyan); color: var(--sky-cyan-text); background: rgba(77, 217, 255, .1); }
+.filter-chip.is-active { border-color: var(--sky-cyan); color: color-mix(in srgb, var(--sky-cyan-text) 88%, var(--sky-text)); background: rgba(77, 217, 255, .1); }
 .filter-chip.emergency-filter.is-active { border-color: var(--sky-red); color: var(--sky-red-text); background: rgba(255, 92, 114, .1); }
 
 .workspace { position: relative; height: calc(100% - var(--command-height)); overflow: hidden; }
@@ -219,8 +219,11 @@ html[data-theme="dark"] .leaflet-tile-pane {
 .leaflet-control-zoom { border: 0 !important; box-shadow: 0 7px 25px rgba(0, 0, 0, .28) !important; }
 .leaflet-control-zoom a { color: var(--sky-text) !important; background: var(--sky-panel) !important; border-color: var(--sky-border) !important; }
 .leaflet-control-zoom a:hover { background: var(--sky-panel-strong) !important; }
+/* Leaflet ships 30px zoom buttons. They are third-party markup but they are the
+   map's main controls on a phone, so widen them to a thumb. */
+.leaflet-control-zoom a { width: 44px !important; height: 44px !important; line-height: 44px !important; }
 .leaflet-control-attribution { color: var(--sky-muted) !important; background: color-mix(in srgb, var(--sky-panel) 80%, transparent) !important; font-size: 9px !important; }
-.leaflet-control-attribution a { color: var(--sky-cyan-text) !important; }
+.leaflet-control-attribution a { color: var(--sky-text) !important; text-decoration: underline; }
 
 .glass-panel {
   border: 1px solid color-mix(in srgb, var(--sky-border) 78%, transparent);
@@ -256,11 +259,11 @@ html[data-theme="dark"] .leaflet-tile-pane {
 @keyframes blink { 50% { opacity: .35; } }
 
 .status-refresh {
-  width: 24px;
+  width: auto;
   height: 24px;
   display: grid;
   place-items: center;
-  padding: 0;
+  padding-inline: 15px;
   border: 0;
   border-radius: 50%;
   color: var(--sky-muted);
@@ -284,11 +287,11 @@ html[data-theme="dark"] .leaflet-tile-pane {
 }
 
 .map-tool {
-  width: 39px;
-  height: 39px;
+  width: auto;
+  min-height: 44px;
   display: grid;
   place-items: center;
-  padding: 0;
+  padding-inline: 13px;
   border: 1px solid var(--sky-border);
   border-radius: 11px;
   background: color-mix(in srgb, var(--sky-panel) 92%, transparent);
@@ -425,7 +428,7 @@ html[data-theme="dark"] .leaflet-tile-pane {
   backdrop-filter: blur(20px);
 }
 .flight-drawer.is-open { transform: translateX(0); }
-.drawer-close { position: absolute; z-index: 2; top: 14px; right: 14px; width: 32px; height: 32px; border: 0; border-radius: 50%; color: var(--sky-muted); background: var(--sky-panel-strong); cursor: pointer; font-size: 22px; line-height: 1; }
+.drawer-close { position: absolute; z-index: 2; top: 14px; right: 14px; width: auto; min-height: 44px; padding-inline: 16px; border: 0; border-radius: 50%; color: var(--sky-muted); background: var(--sky-panel-strong); cursor: pointer; font-size: 22px; line-height: 1; }
 .drawer-close:hover { color: var(--sky-text); }
 .drawer-hero { padding: 14px 0 20px; border-bottom: 1px solid var(--sky-border); }
 .drawer-kicker { color: var(--sky-green-text); font-size: 9px; font-weight: 900; letter-spacing: .16em; }
@@ -462,7 +465,7 @@ html[data-theme="dark"] .leaflet-tile-pane {
 .trail-note { display: flex; align-items: center; gap: 9px; margin: 15px 2px; color: var(--sky-muted); font-size: 10px; }
 .trail-line { width: 27px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, rgba(77,217,255,.2), var(--sky-cyan)); }
 .drawer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.primary-action, .secondary-action { min-height: 42px; border-radius: 10px; cursor: pointer; font-size: 11px; font-weight: 820; }
+.primary-action, .secondary-action { min-height: 44px; border-radius: 10px; cursor: pointer; font-size: 11px; font-weight: 820; }
 .primary-action { display: flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--sky-cyan); color: #06121f; background: var(--sky-cyan); }
 .primary-action svg { width: 16px; fill: currentColor; }
 .primary-action.is-active { color: var(--sky-cyan-text); background: rgba(77,217,255,.1); }
@@ -519,7 +522,7 @@ html[data-theme="dark"] .leaflet-tile-pane {
   .sky-header { grid-template-columns: 1fr auto; padding-inline: 11px; }
   .view-switch { position: fixed; z-index: 850; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: color-mix(in srgb, var(--sky-panel) 94%, transparent); box-shadow: 0 8px 30px rgba(0,0,0,.36); backdrop-filter: blur(14px); }
   .header-actions { grid-column: 2; }
-  .icon-button { width: 39px; padding: 0; }
+  .icon-button { width: auto; padding-inline: 12px; }
   .icon-button span { display: none; }
   .command-bar { display: grid; grid-template-rows: 42px 37px; gap: 5px; padding: 7px 10px 8px; }
   .search-box { width: 100%; min-width: 0; height: 39px; }

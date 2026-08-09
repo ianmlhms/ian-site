@@ -7,16 +7,16 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--cyan:#4de8ff;--amber:#f5b942}
   *{box-sizing:border-box}
   html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   body{display:flex;flex-direction:column;overscroll-behavior:none}
   a{color:var(--accent2-text);text-decoration:none}
-  .bar{height:53px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);background:rgba(13,13,26,.92);z-index:5}
+  .bar{height:53px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--bg) 92%,transparent);z-index:5}
   .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.spacer{flex:1}
-  .mute{width:40px;height:36px;border:1px solid var(--border);border-radius:9px;background:var(--card);color:var(--text);font-size:18px;cursor:pointer}
+  .mute{width:auto;min-height:44px;padding-inline:13px;border:1px solid var(--border);border-radius:9px;background:var(--card);color:var(--text);font-size:18px;cursor:pointer}
   .game{position:relative;flex:1;min-height:0;overflow:hidden}
   canvas{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
   .hud{position:absolute;inset:12px 14px auto;pointer-events:none;text-shadow:0 1px 5px #000}

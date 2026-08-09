@@ -35,20 +35,22 @@
   .style-opt.selected{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent);}
   .style-opt .swatch{height:46px;border-radius:8px;margin-bottom:9px;}
   .style-opt strong{display:block;font-size:14px;}
-  .style-opt span{font-size:11px;color:var(--muted);}
+  .style-opt span{font-size:11px;color:color-mix(in srgb,var(--muted) 85%,var(--text));}
   .field label{display:block;font-size:13px;margin-bottom:7px;color:var(--muted);}
   .txt{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:15px;}
   .stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:fit-content;}
-  .stepper button{width:40px;height:40px;background:var(--panel2);border:none;color:var(--text);font-size:20px;}
+  .stepper button{width:auto;min-height:44px;padding-inline:18px;background:var(--panel2);border:none;color:var(--text);font-size:20px;}
   .stepper button:hover{background:var(--accent);color:#fff;}
-  .stepper input{width:56px;height:40px;text-align:center;border:none;background:transparent;color:var(--text);font-size:17px;font-weight:600;-moz-appearance:textfield;}
+  .stepper input{width:56px;min-height:44px;text-align:center;border:none;background:transparent;color:var(--text);font-size:17px;font-weight:600;-moz-appearance:textfield;}
   .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;}
   #bldList{display:flex;flex-direction:column;gap:10px;}
-  .bld-row{display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
+  .bld-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
   .bld-row .idx{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:0 0 auto;}
-  .bld-row input.name{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;}
-  .bld-row .flbl{font-size:12px;color:var(--muted);}
-  .start-btn{margin-top:26px;width:100%;padding:15px;font-size:17px;font-weight:700;border:none;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+  .bld-row input.name{min-width:0;min-height:44px;flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;}
+  .bld-row .flbl{font-size:12px;color:color-mix(in srgb,var(--muted) 85%,var(--text));}
+  .bld-row .stepper{margin-left:auto;}
+  .start-btn{margin-top:26px;width:100%;min-height:44px;padding:15px;font-size:17px;font-weight:700;border:none;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+  #hotelSignin,#hotelName{min-height:44px;}
   .start-btn:hover{filter:brightness(1.08);}
   .resume{margin-top:12px;width:100%;padding:12px;font-size:14px;font-weight:600;border:1px solid var(--accent);border-radius:10px;background:transparent;color:var(--accent);}
   .resume:hover{background:color-mix(in srgb,var(--accent) 15%,transparent);}
@@ -818,7 +820,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-  import { client, session, onAuth, openAuthModal } from "./auth.js?v=10";
+  import { client, session, onAuth, openAuthModal } from "./auth.js?v=11";
   const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // nur diese Konten dürfen rein
   const gate = document.getElementById("hotelGate");
   const msg = document.getElementById("hotelGateMsg");
@@ -851,7 +853,7 @@ checkResume(); // Cloud-Hotels werden vom Gate via __hotelBoot() nachgeladen
   onAuth(() => check());
   check();
 </script>
-  <script type="module" src="rtc-ring.js?v=6"></script>
-  <script type="module" src="class-gate.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=7"></script>
+  <script type="module" src="class-gate.js?v=9"></script>
 </body>
 </html>

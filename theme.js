@@ -4,7 +4,7 @@
  * there is no browser toolbar to reload from. */
 (function () {
   const KEY = "site_theme";
-  const SITE_GLASS_URL = "site-glass.css?v=2";
+  const SITE_GLASS_URL = "site-glass.css?v=3";
   const CONTRAST_MODULE_URL = "./glass-contrast.js?v=2";
   const ACCENTS = ["#6ea8fe", "#ff6b9d", "#3fb950", "#a371f7", "#ffb347", "#4de8ff"];
 

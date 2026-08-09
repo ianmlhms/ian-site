@@ -105,6 +105,17 @@ input:not([type="range"]):not([type="radio"]):not([type="checkbox"]) {
 /* Back-links sit in flex toolbars, which blockifies them out of the probe's
  * "inline text link" exemption — and they really are thumb targets. */
 :where(.home, .home-btn) { display: inline-flex; align-items: center; }
+body :is(a.home, a.back, a.home-link, a.brand, a.sky-brand) {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-target);
+  padding-inline: var(--space-2);
+}
+/* Language controls are short labels, so grow them with padding. Toolbars
+ * containing a direct switcher may wrap rather than forcing a narrow screen. */
+body :is(.bar, header):has(> .langsw, > #langSw) { flex-wrap: wrap; }
+body :is(.bar, header):has(> .langsw, > #langSw) > * { min-width: 0; }
+body .langsw button { padding-inline: .875rem; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
 summary:focus-visible, [role="button"]:focus-visible, a:focus-visible {
   outline: .2rem solid var(--focus-ring);
@@ -133,6 +144,7 @@ input[type="range"]::-moz-range-track {
 input[type="range"]::-moz-range-thumb { width: 1.6rem; height: 1.6rem; border: 0; }
 
 #themeFab, #pwaRefresh { min-height: var(--hit-target); }
+body :is(#fbFab, #themeFab) { color: var(--text); }
 #pwaInstall, body .langsw button.on, body .pb-tab.active, body .pb-go {
   color: var(--accent-foreground);
 }

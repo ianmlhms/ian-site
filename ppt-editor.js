@@ -2,9 +2,9 @@ import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
 import { renderSlide, renderThumb, esc } from "./ppt-render-dom.js?v=5";
 import { resolveTokens } from "./ppt-style-packs.js?v=6";
 import { spring, draggable, project, rubberband, FLICK_BOUNCE, prefersReducedMotion } from "./ppt-motion.js?v=3";
-import { moveSlide, insertSlide, duplicateSlide, deleteSlide, updateSlide, setDeckMeta } from "./ppt-deck-ops.js?v=8";
-import { reconcilePhotoCredits } from "./ppt-images.js?v=8";
-import { openImagePicker } from "./ppt-image-picker.js?v=9";
+import { moveSlide, insertSlide, duplicateSlide, deleteSlide, updateSlide, setDeckMeta } from "./ppt-deck-ops.js?v=9";
+import { reconcilePhotoCredits } from "./ppt-images.js?v=9";
+import { openImagePicker } from "./ppt-image-picker.js?v=10";
 import { mountSlideControls } from "./ppt-slide-controls.js?v=5";
 
 const SLIDE_WIDTH_PX = 13.333 * 96;

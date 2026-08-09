@@ -1,10 +1,10 @@
 /* Class gate. Drop on any signed-in page:
- *   <script type="module" src="class-gate.js?v=8"></script>
+ *   <script type="module" src="class-gate.js?v=9"></script>
  * The first time a signed-in user is seen without a school class on their
  * profile, a required modal asks for it (new users at sign-up, existing users
  * the next time they open the site). Saved via the set_class RPC; the class is
  * then shown next to their name everywhere (see friends.js / messenger.js). */
-import * as auth from "./auth.js?v=10";
+import * as auth from "./auth.js?v=11";
 
 // Use i18n when the key exists; otherwise fall back to the Luxembourgish default
 // (t() returns the key unchanged when it's missing — treat that as "not found").
@@ -62,22 +62,22 @@ function showModal() {
   shown = true;
   const ov = document.createElement("div");
   ov.id = "class-gate";
-  ov.style.cssText = "position:fixed;inset:0;z-index:100001;background:rgba(6,6,14,.72);backdrop-filter:blur(4px);" +
+  ov.style.cssText = "position:fixed;inset:0;z-index:100001;background:color-mix(in srgb,#000 56%,transparent);backdrop-filter:blur(6px);" +
     "display:flex;align-items:center;justify-content:center;padding:18px;" +
     "font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
   ov.innerHTML =
-    `<div style="width:100%;max-width:360px;background:#141426;border:1px solid #2a2a4a;border-radius:18px;padding:22px;color:#e8e8f0;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    `<div style="width:100%;max-width:360px;background:var(--glass-solid,var(--card,#141426));border:1px solid var(--border,#2a2a4a);border-radius:18px;padding:22px;color:var(--text,#e8e8f0);box-shadow:0 20px 60px rgba(0,0,0,.35)">
        <div style="font-size:34px;line-height:1;margin-bottom:10px">🎓</div>
        <div style="font-weight:800;font-size:18px;margin-bottom:6px">${esc(T("class.title", "Wéi eng Klass bass du?"))}</div>
-       <div style="color:#9a9ab8;font-size:13.5px;margin-bottom:14px">${esc(T("class.sub", "Gëff deng genau Klass an (net nëmmen d'Joer), z.B. 5C6, 7C1, 2CG."))}</div>
+       <div style="color:var(--muted,#9a9ab8);font-size:13.5px;margin-bottom:14px">${esc(T("class.sub", "Gëff deng genau Klass an (net nëmmen d'Joer), z.B. 5C6, 7C1, 2CG."))}</div>
        <input id="class-input" type="text" autocomplete="off" maxlength="12" placeholder="${esc(T("class.ph", "z.B. 5C6"))}"
-         style="width:100%;box-sizing:border-box;background:#0e0e1c;border:1px solid #33335a;border-radius:12px;padding:12px 14px;color:#fff;font-size:16px;outline:none;margin-bottom:6px">
-       <div id="class-err" style="color:#ff7b86;font-size:12.5px;min-height:16px;margin-bottom:8px"></div>
+         style="width:100%;box-sizing:border-box;background:var(--card2,#0e0e1c);border:1px solid var(--border,#33335a);border-radius:12px;padding:12px 14px;color:var(--text,#fff);font-size:16px;outline:none;margin-bottom:6px">
+       <div id="class-err" style="color:color-mix(in srgb,#ff5a5a 55%,var(--text,#ff7b86));font-size:12.5px;min-height:16px;margin-bottom:8px"></div>
        <button id="class-save" disabled
-         style="width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;color:#04121f;background:#4ea6ff;opacity:.5">${esc(T("class.save", "Späicheren"))}</button>
-       <div style="color:#7a7a98;font-size:11.5px;text-align:center;margin-top:12px;margin-bottom:2px">${esc(T("class.skipHint", "D'Klass hëlleft nëmmen, fir deng Kollegen ze fannen."))}</div>
+         style="width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;color:var(--accent-foreground,#04121f);background:var(--accent,#4ea6ff);opacity:.5">${esc(T("class.save", "Späicheren"))}</button>
+       <div style="color:var(--muted,#7a7a98);font-size:11.5px;text-align:center;margin-top:12px;margin-bottom:2px">${esc(T("class.skipHint", "D'Klass hëlleft nëmmen, fir deng Kollegen ze fannen."))}</div>
        <button id="class-skip"
-         style="width:100%;border:none;background:none;color:#8a8ab0;font-size:12.5px;cursor:pointer;text-decoration:underline;padding:4px">${esc(T("class.skip", "Ech sinn net an enger Klass (z.B. Erwuessenen) — iwwersprangen"))}</button>
+         style="width:100%;border:none;background:none;color:var(--muted,#8a8ab0);font-size:12.5px;cursor:pointer;text-decoration:underline;padding:4px;min-height:44px">${esc(T("class.skip", "Ech sinn net an enger Klass (z.B. Erwuessenen) — iwwersprangen"))}</button>
      </div>`;
   document.body.appendChild(ov);
 
@@ -135,19 +135,19 @@ function showReconfirm(cls) {
   const cur = normClass(cls);
   const ov = document.createElement("div");
   ov.id = "class-gate";
-  ov.style.cssText = "position:fixed;inset:0;z-index:100001;background:rgba(6,6,14,.72);backdrop-filter:blur(4px);" +
+  ov.style.cssText = "position:fixed;inset:0;z-index:100001;background:color-mix(in srgb,#000 56%,transparent);backdrop-filter:blur(6px);" +
     "display:flex;align-items:center;justify-content:center;padding:18px;" +
     "font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
   ov.innerHTML =
-    `<div style="width:100%;max-width:360px;background:#141426;border:1px solid #2a2a4a;border-radius:18px;padding:22px;color:#e8e8f0;box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    `<div style="width:100%;max-width:360px;background:var(--glass-solid,var(--card,#141426));border:1px solid var(--border,#2a2a4a);border-radius:18px;padding:22px;color:var(--text,#e8e8f0);box-shadow:0 20px 60px rgba(0,0,0,.35)">
        <div style="font-size:34px;line-height:1;margin-bottom:10px">📅</div>
        <div style="font-weight:800;font-size:18px;margin-bottom:6px">${esc(T("class.reTitle", "Ass " + cur + " nach ëmmer deng Klass?"))}</div>
-       <div style="color:#9a9ab8;font-size:13.5px;margin-bottom:14px">${esc(T("class.reSub", "Neit Schouljoer — kontrolléier w.e.g. deng Klass a passt se un wann néideg."))}</div>
+       <div style="color:var(--muted,#9a9ab8);font-size:13.5px;margin-bottom:14px">${esc(T("class.reSub", "Neit Schouljoer — kontrolléier w.e.g. deng Klass a passt se un wann néideg."))}</div>
        <input id="class-input" type="text" autocomplete="off" maxlength="12" value="${esc(cur)}"
-         style="width:100%;box-sizing:border-box;background:#0e0e1c;border:1px solid #33335a;border-radius:12px;padding:12px 14px;color:#fff;font-size:16px;outline:none;margin-bottom:6px">
-       <div id="class-err" style="color:#ff7b86;font-size:12.5px;min-height:16px;margin-bottom:8px"></div>
+         style="width:100%;box-sizing:border-box;background:var(--card2,#0e0e1c);border:1px solid var(--border,#33335a);border-radius:12px;padding:12px 14px;color:var(--text,#fff);font-size:16px;outline:none;margin-bottom:6px">
+       <div id="class-err" style="color:color-mix(in srgb,#ff5a5a 55%,var(--text,#ff7b86));font-size:12.5px;min-height:16px;margin-bottom:8px"></div>
        <button id="class-save"
-         style="width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;color:#04121f;background:#4ea6ff">${esc(T("class.reYes", "Jo, richteg ✓"))}</button>
+         style="width:100%;border:none;border-radius:12px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;color:var(--accent-foreground,#04121f);background:var(--accent,#4ea6ff)">${esc(T("class.reYes", "Jo, richteg ✓"))}</button>
      </div>`;
   document.body.appendChild(ov);
 

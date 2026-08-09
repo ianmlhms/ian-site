@@ -207,7 +207,10 @@ export function auditPage(options) {
     const isTextLink = node.tagName === "A" && style.display.startsWith("inline")
       && parseColour(style.backgroundColor)?.a === 0 && style.borderStyle === "none";
     if (isTextLink) continue;
-    if (rect.width >= HIT_TARGET && rect.height >= HIT_TARGET) continue;
+    /* --hit-target is 2.75rem, which lands on 43.99…px once the browser has done
+     * its subpixel rounding. Without this tolerance a control that is exactly
+     * the right size reports "44×44px (needs 44×44)", which is nonsense. */
+    if (rect.width >= HIT_TARGET - 0.5 && rect.height >= HIT_TARGET - 0.5) continue;
     if (rect.bottom < 0 || rect.top > view.h) continue;   // off-screen, not on this view
     add("hit-target", node, `${Math.round(rect.width)}×${Math.round(rect.height)}px (needs ${HIT_TARGET}×${HIT_TARGET})`);
   }

@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
@@ -36,7 +36,7 @@
   .del:hover{color:var(--warn)}
   .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
   .emopick{display:flex;gap:4px;flex-wrap:wrap}
-  .emopick button{background:var(--card2);border:1px solid var(--border);border-radius:9px;font-size:18px;width:38px;height:38px;cursor:pointer}
+  .emopick button{background:var(--card2);border:1px solid var(--border);border-radius:9px;font-size:18px;width:44px;height:44px;cursor:pointer}
   .emopick button.on{border-color:var(--accent-border);background:rgba(110,168,254,.14)}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
@@ -57,7 +57,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=10";
+import * as auth from "./auth.js?v=11";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const EMOJIS=["🎉","🎂","✈️","🏝️","🎄","🎁","🏁","🎓","⚽","🎸","🎮","❤️","🍕","🎇"];

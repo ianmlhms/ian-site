@@ -1,5 +1,5 @@
 import { blockText, validateDocument, wordCount } from "./doc-schema.js?v=1";
-import { safeExportFilename } from "./ppt-export-pptx.js?v=8";
+import { safeExportFilename } from "./ppt-export-pptx.js?v=9";
 import { bodyFont, countParagraph, createDocument, docxLibrary, normalParagraph,
   packAndDownload, titleParagraph } from "./docx-primitives.js?v=1";
 

@@ -6,7 +6,7 @@
   <!-- Admin-only kart session list. Kept out of the index, like admin.html and me.html. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>KartTracker — All sessions</title>
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <script src="i18n-dict.js?v=31"></script>
 <script src="i18n.js?v=2"></script>
 <style>
@@ -57,7 +57,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=10";
+import { client, session, onAuth, mountAccountButton, openAuthModal } from "./auth.js?v=11";
 
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 const $ = (id) => document.getElementById(id);
@@ -124,7 +124,7 @@ async function render(){
   document.addEventListener("i18n:change", () => { if (sb) render(); });
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=6"></script>
-  <script type="module" src="class-gate.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=7"></script>
+  <script type="module" src="class-gate.js?v=9"></script>
 </body>
 </html>

@@ -3,24 +3,24 @@
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
-    "clipped": 1,
+    "clipped": 0,
     "contrast": 0,
-    "hit-target": 5
+    "hit-target": 0
   },
   "admin.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 1
+    "contrast": 0,
+    "hit-target": 0
   },
   "alerts.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "ask.html": {
@@ -28,7 +28,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "battleship.html": {
@@ -44,7 +44,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "board.html": {
@@ -52,7 +52,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "buddy.html": {
@@ -60,7 +60,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "bus.html": {
@@ -68,16 +68,16 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 3
+    "contrast": 0,
+    "hit-target": 0
   },
   "call.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 3,
-    "hit-target": 1
+    "contrast": 0,
+    "hit-target": 0
   },
   "casino.html": {
     "overflow": 0,
@@ -85,7 +85,7 @@
     "collision": 0,
     "clipped": 0,
     "contrast": 0,
-    "hit-target": 15
+    "hit-target": 0
   },
   "checkers.html": {
     "overflow": 0,
@@ -100,7 +100,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "color.html": {
@@ -117,15 +117,15 @@
     "collision": 0,
     "clipped": 0,
     "contrast": 0,
-    "hit-target": 7
+    "hit-target": 0
   },
   "countdowns.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 14
+    "contrast": 0,
+    "hit-target": 0
   },
   "dice-duel.html": {
     "overflow": 0,
@@ -141,7 +141,7 @@
     "collision": 0,
     "clipped": 0,
     "contrast": 0,
-    "hit-target": 1
+    "hit-target": 0
   },
   "dots.html": {
     "overflow": 0,
@@ -164,7 +164,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "factory.html": {
@@ -172,7 +172,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "flashcards.html": {
@@ -180,7 +180,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "friends.html": {
@@ -188,16 +188,16 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 3
+    "contrast": 0,
+    "hit-target": 0
   },
   "geometrydash.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 3,
-    "hit-target": 1
+    "contrast": 0,
+    "hit-target": 0
   },
   "grades.html": {
     "overflow": 0,
@@ -205,14 +205,14 @@
     "collision": 0,
     "clipped": 0,
     "contrast": 0,
-    "hit-target": 15
+    "hit-target": 0
   },
   "health.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "homework.html": {
@@ -220,7 +220,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "hotel.html": {
@@ -228,39 +228,39 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 5,
-    "hit-target": 13
+    "contrast": 0,
+    "hit-target": 0
   },
   "index.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
-    "clipped": 1,
+    "clipped": 0,
     "contrast": 0,
-    "hit-target": 4
+    "hit-target": 0
   },
   "intro.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 1
+    "contrast": 0,
+    "hit-target": 0
   },
   "jeopardy.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 11,
-    "hit-target": 7
+    "contrast": 0,
+    "hit-target": 0
   },
   "kart.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "karts.html": {
@@ -268,15 +268,15 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 4
+    "contrast": 0,
+    "hit-target": 0
   },
   "leaderboard.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "maumau.html": {
@@ -292,7 +292,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "meme.html": {
@@ -300,7 +300,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "messenger.html": {
@@ -308,15 +308,15 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 4
+    "contrast": 0,
+    "hit-target": 0
   },
   "moien.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "money.html": {
@@ -324,7 +324,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "notify-help.html": {
@@ -332,7 +332,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "partyspill.html": {
@@ -340,15 +340,15 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
-    "hit-target": 3
+    "contrast": 0,
+    "hit-target": 0
   },
   "pixelbreak.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 4,
+    "contrast": 0,
     "hit-target": 0
   },
   "polls.html": {
@@ -356,7 +356,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "ppt.html": {
@@ -365,7 +365,7 @@
     "collision": 0,
     "clipped": 0,
     "contrast": 0,
-    "hit-target": 1
+    "hit-target": 0
   },
   "privacy.html": {
     "overflow": 0,
@@ -373,14 +373,14 @@
     "collision": 0,
     "clipped": 0,
     "contrast": 0,
-    "hit-target": 1
+    "hit-target": 0
   },
   "profile.html": {
     "overflow": 0,
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "reversi.html": {
@@ -396,7 +396,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "simlog.html": {
@@ -404,7 +404,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "skylens.html": {
@@ -412,8 +412,8 @@
     "offscreen": 1,
     "collision": 0,
     "clipped": 0,
-    "contrast": 5,
-    "hit-target": 136
+    "contrast": 0,
+    "hit-target": 127
   },
   "slf.html": {
     "overflow": 0,
@@ -436,7 +436,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 1,
+    "contrast": 0,
     "hit-target": 0
   },
   "wordle.html": {
@@ -444,7 +444,7 @@
     "offscreen": 0,
     "collision": 0,
     "clipped": 0,
-    "contrast": 2,
+    "contrast": 0,
     "hit-target": 33
   }
 }

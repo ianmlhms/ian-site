@@ -10,14 +10,18 @@
   <link rel="canonical" href="https://ian.lu/call.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <script src="i18n-dict.js?v=31"></script>
 <script src="i18n.js?v=2"></script>
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--border:#2a2a4a;--text:#e8e8f0;--muted:#9a9ab8;--accent:#6ea8fe;--danger:#ff5d6c}
+  /* The call UI is permanently dark (body #000, #stage #05050a). It used to
+     declare --text/--muted on :root, but theme.js sets those same names on the
+     root element at runtime and wins, so in light theme the text turned dark
+     and sat on a black stage at 1.16:1. Page-local names cannot be clobbered. */
+  :root{--call-card:#161625;--call-border:#2a2a4a;--call-text:#e8e8f0;--call-muted:#9a9ab8;--call-link:#9ec5ff;--danger:#ff5d6c}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
-  body{background:#000;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  body{background:#000;color:var(--call-text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
   #stage{position:fixed;inset:0;background:#05050a}
   #remote{width:100%;height:100%;object-fit:cover;background:#05050a}
   #remote.waiting{opacity:0}
@@ -25,11 +29,11 @@
   #local.off{display:none}
   .topbar{position:fixed;top:0;left:0;right:0;padding:16px 18px;display:flex;align-items:center;gap:10px;z-index:3;background:linear-gradient(#000a,transparent)}
   .topbar .who{font-weight:800;font-size:17px}
-  .topbar .st{color:var(--muted);font-size:13px}
+  .topbar .st{color:var(--call-muted);font-size:13px}
   .center{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:2;text-align:center;padding:24px}
-  .avatar{width:96px;height:96px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:44px}
+  .avatar{width:96px;height:96px;border-radius:50%;background:var(--call-card);border:1px solid var(--call-border);display:flex;align-items:center;justify-content:center;font-size:44px}
   .center .nm{font-size:22px;font-weight:800}
-  .center .sub{color:var(--muted);font-size:14px}
+  .center .sub{color:var(--call-muted);font-size:14px}
   .controls{position:fixed;left:0;right:0;bottom:0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));display:flex;gap:18px;align-items:center;justify-content:center;z-index:3;background:linear-gradient(transparent,#000b)}
   .cbtn{width:60px;height:60px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
   .cbtn:hover{background:rgba(255,255,255,.24)}
@@ -37,8 +41,8 @@
   .cbtn.hang{background:var(--danger);width:66px;height:66px}
   .cbtn.hang:hover{filter:brightness(1.08)}
   .cbtn.answer{background:#3fb950;width:66px;height:66px}
-  .msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--muted);z-index:6}
-  .msg a{color:var(--accent-text)}
+  .msg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;color:var(--call-text);z-index:6}
+  .msg a{color:var(--call-link)}
   .hidden{display:none!important}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
@@ -75,7 +79,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=10";
+import * as auth from "./auth.js?v=11";
 const $=(id)=>document.getElementById(id);
 const T=(k)=>(window.I18N?window.I18N.t(k):k);
 const q=new URLSearchParams(location.search);
@@ -114,7 +118,7 @@ function setStatus(s){ $("status").textContent=s; $("centerSub").textContent=s; 
 async function boot(){
   if(!auth.authConfigured){ fatal(T("call.signin")); return; }
   sb=await auth.client();
-  if(!auth.session()){ fatal(`${T("call.signin")} <a href="index.html">${T("nav.home")}</a>`); return; }
+  if(!auth.session()){ fatal(`${T("call.signin")} <a class="home-link" href="index.html">${T("nav.home")}</a>`); return; }
   if(!peerId){ fatal(T("call.badLink")); return; }
   me=auth.session().user.id; myName=auth.username()||"?";
   callId=isCallee ? (q.get("call")||"") : (crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());

@@ -79,13 +79,14 @@ const SKIP = new Set(["googled2bde022f66de7b9.html", "games.html"]);
 
 function parseArgs(argv) {
   const flags = { widths: [390, 1280], themes: ["dark", "light"], pages: null, write: false,
-    record: false, quiet: false, settle: SETTLE_MS };
+    record: false, quiet: false, details: false, settle: SETTLE_MS };
   for (let i = 0; i < argv.length; i += 1) {
     const [key, inline] = argv[i].split("=");
     const value = inline ?? argv[i + 1];
     if (key === "--write-baseline") { flags.write = true; continue; }
     if (key === "--record-fixtures") { flags.record = true; continue; }
     if (key === "--quiet") { flags.quiet = true; continue; }
+    if (key === "--details") { flags.details = true; continue; }
     if (key === "--widths") flags.widths = value.split(",").map(Number);
     else if (key === "--themes") flags.themes = value.split(",");
     else if (key === "--pages") flags.pages = value.split(",");
@@ -244,7 +245,7 @@ function summarise(results) {
   return perPage;
 }
 
-function report(perPage, baseline, quiet) {
+function report(perPage, baseline, quiet, details = false) {
   let regressions = 0;
   let total = 0;
   let broken = 0;
@@ -270,14 +271,20 @@ function report(perPage, baseline, quiet) {
     const detail = KINDS.filter((kind) => entry.totals[kind])
       .map((kind) => `${kind}=${entry.totals[kind]}`).join(" ");
     console.log(`${badge.padEnd(10)} ${page.padEnd(24)} ${detail}`);
-    for (const worseKind of worse) {
-      console.log(`           ↑ ${worseKind}: ${previous[worseKind] ?? 0} → ${entry.totals[worseKind]}`);
+    /* --details prints every finding on every page, not only the categories that
+     * regressed. That is the working list when the job is "fix the bugs" rather
+     * than "did I make it worse". */
+    const shown = details ? KINDS.filter((kind) => entry.totals[kind]) : worse;
+    for (const worseKind of shown) {
+      if (worse.includes(worseKind)) {
+        console.log(`           ↑ ${worseKind}: ${previous[worseKind] ?? 0} → ${entry.totals[worseKind]}`);
+      }
       /* Workers finish in whatever order Chrome hands them back, so samples are
        * sorted before printing — otherwise two identical runs produce diffs. */
       const samples = entry.samples.filter((s) => s.kind === worseKind)
         .sort((a, b) => `${a.width}${a.theme}${a.where}${a.detail}`
           .localeCompare(`${b.width}${b.theme}${b.where}${b.detail}`));
-      for (const sample of samples.slice(0, 4)) {
+      for (const sample of samples.slice(0, details ? 99 : 4)) {
         console.log(`             ${sample.width}px/${sample.theme} ${sample.where} — ${sample.detail}`);
       }
     }
@@ -326,7 +333,7 @@ async function main() {
       console.log(`\nBaseline written: ${path.relative(ROOT, BASELINE)}`);
       return;
     }
-    const { regressions, total, broken } = report(perPage, baseline, flags.quiet);
+    const { regressions, total, broken } = report(perPage, baseline, flags.quiet, flags.details);
     console.log(`\n${total} findings across ${pages.length} pages; `
       + `${regressions} category regressions vs baseline; ${broken} page(s) failed to measure.`);
     if (regressions || broken) process.exitCode = 1;

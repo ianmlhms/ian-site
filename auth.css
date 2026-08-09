@@ -10,6 +10,13 @@
  * --hit-target, --glass-solid, --control-fill, --accent-foreground). */
 
 body .auth-btn { display: inline-flex; align-items: center; gap: var(--space-2); }
+/* style.css intentionally compacts this control on phones with an ID selector
+ * and !important padding. Keep the icon-only treatment, but let its box fit. */
+body #acctHost .auth-btn {
+  width: auto;
+  padding-inline: .875rem !important;
+  overflow: visible;
+}
 
 body .auth-modal {
   position: fixed;

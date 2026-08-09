@@ -9,7 +9,7 @@
 <meta name="description" content="Luxembourg grade calculator with per-year/section subjects and coefficients.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <script src="i18n-dict.js?v=31"></script>
 <script src="i18n.js?v=2"></script>
 <style>
@@ -35,7 +35,7 @@
   .marks{width:100%;min-width:120px}
   .avg{font-weight:800;text-align:right;width:64px;font-variant-numeric:tabular-nums}
   .avg.good{color:var(--good)} .avg.bad{color:var(--bad)}
-  .del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px}
+  .del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding-inline:16px;min-width:44px}
   .del:hover{color:var(--bad)}
   .addrow{margin:10px 0 4px}
   .summary{display:flex;flex-wrap:wrap;gap:16px;margin:22px 0;padding:18px;background:var(--card);border:1px solid var(--border);border-radius:14px}
@@ -103,7 +103,7 @@
 </div>
 
 <script type="module">
-import * as auth from "./auth.js?v=10";
+import * as auth from "./auth.js?v=11";
 
 // ---- Official coefficients (MEN grille horaire) ----
 const L = (c)=>[["Français",c],["Allemand",c],["Anglais",c],["Latin",c]]; // 4-language option group
@@ -273,8 +273,8 @@ function loadSheetLocalFirst(){ const ls=localStorage.getItem(lsKey()); rows = l
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="notify-ambient.js?v=8"></script>
-  <script type="module" src="rtc-ring.js?v=6"></script>
-  <script type="module" src="class-gate.js?v=8"></script>
+<script type="module" src="notify-ambient.js?v=9"></script>
+  <script type="module" src="rtc-ring.js?v=7"></script>
+  <script type="module" src="class-gate.js?v=9"></script>
 </body>
 </html>

@@ -330,7 +330,7 @@ function injectCss() {
   const link = document.createElement("link");
   link.id = "auth-css";
   link.rel = "stylesheet";
-  link.href = "auth.css?v=1";
+  link.href = "auth.css?v=2";
   document.head.appendChild(link);
 }
 

@@ -9,7 +9,7 @@
   <meta name="description" content="Dots & Boxes on ian.lu — claim the most squares, playable against a friend on two devices or an AI." />
   <link rel="canonical" href="https://ian.lu/dots.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <link rel="stylesheet" href="game-common.css?v=4">
 <style>
   :root{--p1:#6ea8fe;--p2:#ff5d6c;--board:#1b2150;--th:16px;--edge:min(11vw,52px);--lw:7px}
@@ -58,7 +58,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="game-common.js?v=1"></script>
-<script type="module" src="notify-ambient.js?v=8"></script>
+<script type="module" src="notify-ambient.js?v=9"></script>
 <script>
 const N = 4;                                   // boxes per side (5x5 dots)
 const GC = window.GameCommon;
@@ -199,7 +199,7 @@ function aiMove() {
   if (e) play(e.t, e.i, e.j, opp, false);
 }
 </script>
-  <script type="module" src="rtc-ring.js?v=6"></script>
-  <script type="module" src="class-gate.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=7"></script>
+  <script type="module" src="class-gate.js?v=9"></script>
 </body>
 </html>

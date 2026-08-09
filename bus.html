@@ -24,7 +24,7 @@
 </script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=13"></script>
+<script src="theme.js?v=14"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
   *{box-sizing:border-box}
@@ -96,7 +96,7 @@
   .picklist .st{padding:12px 12px;cursor:pointer;font-size:15px;border-bottom:1px solid var(--border)}
   .picklist .st:last-child{border-bottom:none}
   .picklist .st:hover{background:var(--card)}
-  #tpSwap{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;width:40px;height:44px;font-size:16px;cursor:pointer}
+  #tpSwap{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;width:auto;height:44px;padding-inline:13px;font-size:16px;cursor:pointer}
   .tpwhen{display:flex;gap:8px;margin-top:8px;align-items:flex-start}
   .tpwhen select{flex:none;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 11px;font-size:15px}
   /* one-tap "when" chips (Elo / +15′ / Owend / Muer / 🗓) */
@@ -104,7 +104,7 @@
   .wchip{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:18px;padding:9px 14px;font-size:13.5px;cursor:pointer;line-height:1;-webkit-tap-highlight-color:transparent}
   .wchip:hover{border-color:var(--accent2-text)}
   .wchip.on{background:var(--accent2);border-color:var(--accent2-text);color:var(--accent2-foreground);font-weight:700}
-  .wchip.wcal{padding:7px 11px;font-size:14px}
+  .wchip.wcal{padding:7px 12px;font-size:14px}
   #tpFind{width:100%;margin-top:10px;padding:11px;border-radius:10px;border:1px solid var(--accent2);background:var(--accent2);color:var(--accent2-foreground);font-weight:700;font-size:14px;cursor:pointer}
   #tpFind:disabled{opacity:.55;cursor:default}
   #rectrips{margin-top:12px}
@@ -227,7 +227,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=10";
+import * as auth from "./auth.js?v=11";
 import { mountPicker } from "./datetime-picker.js?v=2";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -831,7 +831,7 @@ initTransport();
 
 auth.mountAccountButton($("acctHost"));
 </script>
-  <script type="module" src="rtc-ring.js?v=6"></script>
-  <script type="module" src="class-gate.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=7"></script>
+  <script type="module" src="class-gate.js?v=9"></script>
 </body>
 </html>
