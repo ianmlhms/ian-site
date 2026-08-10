@@ -56,7 +56,10 @@ async function handleStatus() {
 
 async function handleCommand(payload: any, userId: string) {
   const service = cleanString(payload?.service, 40);
-  const action = cleanString(payload?.action, 20);
+  /* `verb`, not `action` — `action` already names the RPC being dispatched
+   * ("command"), so reading the launchd verb from the same key would always
+   * read back "command" and reject every restart. */
+  const action = cleanString(payload?.verb, 20);
   /* Allow-listed both sides. OpsAgent maps the key to a launchd label from its
    * own table, so nothing from this request ever reaches a shell. */
   if (!SERVICE_KEYS.has(service)) return json({ error: "Unknown service." }, 400);

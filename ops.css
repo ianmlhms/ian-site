@@ -1,0 +1,208 @@
+/* Mini Control Room — ops.html
+ *
+ * A glance-from-the-phone page: the status of a service must be readable
+ * before you have finished unlocking. Loaded after theme.js injects
+ * site-glass.css, so the site tokens (--space-*, --hit-target, --glass-solid)
+ * are available and these rules win on equal specificity. */
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  padding-bottom: var(--space-6, 3rem);
+}
+
+.ops-bar {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-2);
+}
+.ops-bar .home-link {
+  min-height: var(--hit-target);
+  display: inline-flex;
+  align-items: center;
+  padding-inline: var(--space-2);
+  color: var(--muted);
+  text-decoration: none;
+}
+.ops-bar .brand { display: flex; align-items: center; gap: var(--space-2); font-weight: 700; }
+.ops-bar .brand-mark { font-size: 1.1rem; }
+
+.ops-root { max-width: 46rem; margin: 0 auto; padding: var(--space-3); }
+.ops-booting { color: var(--muted); }
+
+/* ---- summary ---- */
+.ops-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+  margin-bottom: var(--space-3);
+  gap: var(--space-3);
+}
+.ops-summary h1 { margin: 0; font-size: 1.5rem; letter-spacing: -.02em; }
+.ops-summary p { margin: .25rem 0 0; color: var(--muted); }
+/* A left edge carries the overall verdict without colouring the whole card. */
+.ops-summary--ok { border-left: .3rem solid var(--ok, #3fb950); }
+.ops-summary--warn,
+.ops-summary--missed { border-left: .3rem solid #d29922; }
+.ops-summary--down { border-left: .3rem solid #ff5a5a; }
+.ops-summary--unknown { border-left: .3rem solid var(--border); }
+
+.ops-refresh {
+  width: var(--hit-target);
+  height: var(--hit-target);
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--control-fill);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.ops-refresh:hover { background: var(--card-hover); }
+
+.ops-banner {
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+  margin-bottom: var(--space-3);
+  border-left: .3rem solid var(--border);
+}
+.ops-banner h2 { margin: 0 0 var(--space-1); font-size: 1.05rem; }
+.ops-banner p { margin: 0; color: var(--muted); line-height: 1.5; }
+
+/* ---- one card per service ---- */
+.ops-grid { display: grid; gap: var(--space-2); }
+
+.svc {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-left-width: .3rem;
+  border-radius: var(--radius-inner);
+  background: var(--glass-solid);
+}
+.svc--ok { border-left-color: var(--ok, #3fb950); }
+.svc--warn,
+.svc--missed { border-left-color: #d29922; }
+.svc--down { border-left-color: #ff5a5a; }
+.svc--unknown { border-left-color: var(--border); }
+
+.svc-head { display: flex; align-items: center; gap: var(--space-2); }
+.svc-mark { font-size: 1.1rem; line-height: 1; }
+.svc--ok .svc-mark { color: var(--ok, #3fb950); }
+.svc--warn .svc-mark,
+.svc--missed .svc-mark { color: #d29922; }
+.svc--down .svc-mark { color: #ff5a5a; }
+.svc--unknown .svc-mark { color: var(--muted); }
+.svc-name { font-weight: 700; }
+.svc-kind {
+  margin-left: auto;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  background: var(--control-fill);
+  color: var(--muted);
+  font-size: .75rem;
+}
+.svc-what { margin: var(--space-1) 0 0; color: var(--muted); font-size: .85rem; }
+.svc-reason { margin: var(--space-2) 0 0; font-size: .95rem; line-height: 1.4; }
+.svc-error {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-inner);
+  background: color-mix(in srgb, #ff5a5a 12%, transparent);
+  color: color-mix(in srgb, #ff5a5a 55%, var(--text));
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+.chip {
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  background: var(--control-fill);
+  color: var(--muted);
+  font-size: .75rem;
+}
+.chip b { color: var(--text); font-weight: 600; }
+
+.svc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.svc-btn {
+  min-height: var(--hit-target);
+  min-width: var(--hit-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  background: var(--control-fill);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: .9rem;
+}
+.svc-btn:hover:not(:disabled) { background: var(--card-hover); }
+.svc-btn:disabled { opacity: .55; cursor: default; }
+.svc-hint,
+.svc-msg { color: var(--muted); font-size: .85rem; }
+
+/* ---- history ---- */
+.ops-alerts {
+  padding: var(--space-3);
+  border-radius: var(--radius-pane);
+  margin-top: var(--space-3);
+}
+.ops-alerts h2 { margin: 0 0 var(--space-2); font-size: 1rem; }
+.ops-alerts ul { display: grid; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
+.ops-alerts li { display: grid; gap: .15rem; font-size: .85rem; }
+.ops-alerts time { color: var(--muted); font-size: .75rem; }
+
+.ops-stamp { margin-top: var(--space-3); color: var(--muted); font-size: .78rem; text-align: center; }
+
+.gate-panel {
+  max-width: 26rem;
+  padding: var(--space-5);
+  border-radius: var(--radius-pane);
+  margin: var(--space-6) auto;
+  text-align: center;
+}
+.gate-icon { font-size: 2rem; }
+.gate-panel h1 { margin: var(--space-2) 0; font-size: 1.3rem; }
+.gate-panel p { margin: 0; color: var(--muted); line-height: 1.5; }
+.primary-button {
+  min-height: var(--hit-target);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-inner);
+  margin-top: var(--space-3);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 40rem) {
+  .ops-grid { grid-template-columns: 1fr 1fr; }
+}
