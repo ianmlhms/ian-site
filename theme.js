@@ -275,7 +275,7 @@
     { href: "friends.html", ic: "👥", label: "Frënn" },
     { href: "profile.html", ic: "🪪", label: "Profil" },
   ];
-  const NAV_SKIP = /(^|\/)(call|messenger|classchat|hotel|casino|games|pixelbreak|kart)\.html$/;
+  const NAV_SKIP = /(^|\/)(call|messenger|classchat|hotel|games|pixelbreak|kart)\.html$/;
   function buildBottomNav() {
     if (!window.matchMedia("(max-width:760px)").matches) return;
     if (NAV_SKIP.test(location.pathname)) return;
