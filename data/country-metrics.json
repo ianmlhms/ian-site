@@ -1,0 +1,128 @@
+[
+  {
+    "key": "name",
+    "de": "Land",
+    "en": "Country",
+    "type": "text",
+    "unit_de": "",
+    "unit_en": "",
+    "computed": false
+  },
+  {
+    "key": "continent",
+    "de": "Kontinent",
+    "en": "Continent",
+    "type": "text",
+    "unit_de": "",
+    "unit_en": "",
+    "computed": false
+  },
+  {
+    "key": "capital",
+    "de": "Hauptstadt",
+    "en": "Capital",
+    "type": "text",
+    "unit_de": "",
+    "unit_en": "",
+    "computed": false
+  },
+  {
+    "key": "population",
+    "de": "Bevölkerung",
+    "en": "Population",
+    "type": "number",
+    "unit_de": "Einwohner",
+    "unit_en": "people",
+    "computed": false
+  },
+  {
+    "key": "area_km2",
+    "de": "Fläche",
+    "en": "Area",
+    "type": "number",
+    "unit_de": "km²",
+    "unit_en": "km²",
+    "computed": false
+  },
+  {
+    "key": "density",
+    "de": "Bevölkerungsdichte",
+    "en": "Population Density",
+    "type": "number",
+    "unit_de": "Einw./km²",
+    "unit_en": "people/km²",
+    "computed": true
+  },
+  {
+    "key": "capital_population",
+    "de": "Einwohner Hauptstadt",
+    "en": "Capital Population",
+    "type": "number",
+    "unit_de": "Einwohner",
+    "unit_en": "people",
+    "computed": false
+  },
+  {
+    "key": "gdp_usd",
+    "de": "BIP",
+    "en": "GDP",
+    "type": "number",
+    "unit_de": "USD",
+    "unit_en": "USD",
+    "computed": false
+  },
+  {
+    "key": "gdp_per_capita_usd",
+    "de": "BIP pro Kopf",
+    "en": "GDP per Capita",
+    "type": "number",
+    "unit_de": "USD",
+    "unit_en": "USD",
+    "computed": false
+  },
+  {
+    "key": "currency",
+    "de": "Währung",
+    "en": "Currency",
+    "type": "text",
+    "unit_de": "",
+    "unit_en": "",
+    "computed": false
+  },
+  {
+    "key": "languages",
+    "de": "Sprachen",
+    "en": "Languages",
+    "type": "text",
+    "unit_de": "",
+    "unit_en": "",
+    "computed": false
+  },
+  {
+    "key": "calling_code",
+    "de": "Vorwahl",
+    "en": "Calling Code",
+    "type": "text",
+    "unit_de": "",
+    "unit_en": "",
+    "computed": false
+  },
+  {
+    "key": "forest_percent",
+    "de": "Waldanteil",
+    "en": "Forest cover",
+    "type": "number",
+    "unit_de": "%",
+    "unit_en": "%",
+    "computed": false
+  },
+  {
+    "key": "precipitation_mm",
+    "de": "Niederschlag",
+    "en": "Precipitation",
+    "type": "number",
+    "unit_de": "mm/Jahr",
+    "unit_en": "mm/year",
+    "computed": false
+  }
+]

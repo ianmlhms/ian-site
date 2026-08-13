@@ -85,6 +85,8 @@ window.I18N_DICT = {
   "tile.alerts.sub":{ lb: "Ernimmungen & Neiegkeeten", de: "Erwähnungen & Hinweise", en: "Mentions & alerts" },
   "tile.search":    { lb: "Sichen", de: "Suchen", en: "Search" },
   "tile.search.sub":{ lb: "Alles duerchsichen", de: "Alles durchsuchen", en: "Search everything" },
+  "tile.countries":    { lb: "Länner-Verglach", de: "Ländervergleich", en: "Country comparison" },
+  "tile.countries.sub":{ lb: "195 Länner niewenteneen", de: "195 Länder nebeneinander", en: "195 countries side by side" },
   "tile.health":    { lb: "Gesondheet", de: "Gesundheit", en: "Health" },
   "tile.health.sub":{ lb: "Waasser, Schlof & Training", de: "Wasser, Schlaf & Training", en: "Water, sleep & workouts" },
   "tile.money":     { lb: "Sue", de: "Geld", en: "Money" },
@@ -398,4 +400,79 @@ window.I18N_DICT = {
     de: "Alles ist von Hand geschrieben — normales JavaScript im Browser, Supabase für Konten, Echtzeit-Chat und Speicher, und Python für die Pipelines, die die Wegseiten aus OpenStreetMap-Daten erzeugen. Dahinter steckt kein Website-Baukasten und keine Vorlage. Wenn hier etwas kaputt oder falsch ist, ist es meins zu reparieren — und du kannst es mir sagen.",
     en: "Everything is written by hand — plain JavaScript in the browser, Supabase for accounts, real-time chat and storage, and Python for the pipelines that generate the trail pages from OpenStreetMap data. There is no site builder and no template behind it. If something here is broken or wrong, it's mine to fix, and you can tell me about it.",
   },
+
+  /* ---------- country comparison ----------
+   * The dataset itself only carries German and English fields, so the LB
+   * interface shows the German country/capital/currency names. Every string
+   * the app itself renders is here, including the metric labels and units —
+   * data/country-metrics.json's own de/en labels are deliberately unused, so
+   * that Luxembourgish exists too and there is one place to fix wording. */
+  "countries.title":          { lb: "🌍 Länner-Verglach", de: "🌍 Ländervergleich", en: "🌍 Country Comparison" },
+  "countries.loading":        { lb: "Daten gi gelueden…", de: "Daten werden geladen…", en: "Loading data…" },
+  "countries.loadingAria":    { lb: "Lueden", de: "Lädt", en: "Loading" },
+  "countries.errorTitle":     { lb: "D'Donnéeë konnten net gelueden ginn", de: "Die Daten konnten nicht geladen werden", en: "Could not load data" },
+  "countries.errorBody":      { lb: "D'Länner-Donnéeë sinn net ukomm. Probéier w.e.g. spéider nach eng Kéier.", de: "Die Länderdaten sind nicht angekommen. Bitte versuche es später noch einmal.", en: "The country data could not be loaded. Please try again later." },
+
+  "countries.countryHeading": { lb: "Länner", de: "Länder", en: "Countries" },
+  "countries.searchPlaceholder": { lb: "Land sichen…", de: "Land suchen…", en: "Search country…" },
+  "countries.searchLabel":    { lb: "Land sichen", de: "Land suchen", en: "Search country" },
+  "countries.add":            { lb: "Bäisetzen", de: "Hinzufügen", en: "Add" },
+  "countries.addLabel":       { lb: "Land bäisetzen", de: "Land hinzufügen", en: "Add country" },
+  "countries.notFound":       { lb: "Land net fonnt.", de: "Land nicht gefunden.", en: "Country not found." },
+  "countries.alreadyAdded":   { lb: "Dëst Land ass schonn dobäi.", de: "Dieses Land ist bereits dabei.", en: "This country has already been added." },
+  "countries.removeCountry":  { lb: "{name} ewechhuelen", de: "{name} entfernen", en: "Remove {name}" },
+  "countries.selectedLabel":  { lb: "Gewielte Länner", de: "Ausgewählte Länder", en: "Selected countries" },
+
+  "countries.continentLabel":      { lb: "Kontinent:", de: "Kontinent:", en: "Continent:" },
+  "countries.continentGroupLabel": { lb: "Kontinent wielen", de: "Kontinent auswählen", en: "Select continent" },
+  "countries.addContinent":        { lb: "{name} bäisetzen", de: "{name} hinzufügen", en: "Add {name}" },
+  "countries.removeContinent":     { lb: "{name} ewechhuelen", de: "{name} entfernen", en: "Remove {name}" },
+  "countries.selectAll":           { lb: "All Länner", de: "Alle Länder", en: "All countries" },
+  "countries.selectAllTitle":      { lb: "All Länner wielen", de: "Alle Länder auswählen", en: "Select all countries" },
+  "countries.clear":               { lb: "Auswiel eidel maachen", de: "Auswahl leeren", en: "Clear selection" },
+  "countries.clearTitle":          { lb: "Auswiel eidel maachen", de: "Auswahl leeren", en: "Clear selection" },
+
+  "countries.metricsHeading":    { lb: "Kennzuelen", de: "Kennzahlen", en: "Metrics" },
+  "countries.metricsGroupLabel": { lb: "Kennzuele wielen", de: "Kennzahlen auswählen", en: "Select metrics" },
+  "countries.computed":          { lb: "Berechent", de: "Berechnet", en: "Computed" },
+  "countries.tableHeading":      { lb: "Verglachstabell", de: "Vergleichstabelle", en: "Comparison table" },
+  "countries.chartsHeading":     { lb: "Diagrammer", de: "Diagramme", en: "Charts" },
+
+  "countries.noCountries": { lb: "Wiel uewen Länner aus, fir se ze vergläichen.", de: "Wähle oben Länder aus, um sie zu vergleichen.", en: "Select countries above to compare." },
+  "countries.noMetrics":   { lb: "Wiel uewen op mannst eng Kennzuel.", de: "Wähle oben mindestens eine Kennzahl.", en: "Select at least one metric above." },
+  "countries.noCharts":    { lb: "Keng numeresch Kennzuel gewielt.", de: "Keine numerische Kennzahl ausgewählt.", en: "No numeric metrics selected." },
+  "countries.noData":      { lb: "keng Daten", de: "keine Daten", en: "no data" },
+
+  "countries.sortDesc":      { lb: "↓ Ofst.", de: "↓ Abst.", en: "↓ Desc." },
+  "countries.sortAsc":       { lb: "↑ Opst.", de: "↑ Aufst.", en: "↑ Asc." },
+  "countries.sortDescTitle": { lb: "Ofsteigend zortéieren", de: "Absteigend sortieren", en: "Sort descending" },
+  "countries.sortAscTitle":  { lb: "Opsteigend zortéieren", de: "Aufsteigend sortieren", en: "Sort ascending" },
+
+  /* Abbreviations for very large GDP figures. */
+  "countries.number.billionShort":  { lb: "Mrd.", de: "Mrd.", en: "B" },
+  "countries.number.trillionShort": { lb: "Bio.", de: "Bio.", en: "T" },
+
+  "countries.metric.name":               { lb: "Land", de: "Land", en: "Country" },
+  "countries.metric.continent":          { lb: "Kontinent", de: "Kontinent", en: "Continent" },
+  "countries.metric.capital":            { lb: "Haaptstad", de: "Hauptstadt", en: "Capital" },
+  "countries.metric.population":         { lb: "Bevëlkerung", de: "Bevölkerung", en: "Population" },
+  "countries.metric.area_km2":           { lb: "Fläch", de: "Fläche", en: "Area" },
+  "countries.metric.density":            { lb: "Bevëlkerungsdicht", de: "Bevölkerungsdichte", en: "Population density" },
+  "countries.metric.capital_population": { lb: "Awunner Haaptstad", de: "Einwohner Hauptstadt", en: "Capital population" },
+  "countries.metric.gdp_usd":            { lb: "BIP", de: "BIP", en: "GDP" },
+  "countries.metric.gdp_per_capita_usd": { lb: "BIP pro Kapp", de: "BIP pro Kopf", en: "GDP per capita" },
+  "countries.metric.currency":           { lb: "Währung", de: "Währung", en: "Currency" },
+  "countries.metric.languages":          { lb: "Sproochen", de: "Sprachen", en: "Languages" },
+  "countries.metric.calling_code":       { lb: "Virwal", de: "Vorwahl", en: "Calling code" },
+  "countries.metric.forest_percent":     { lb: "Bëschundeel", de: "Waldanteil", en: "Forest cover" },
+  "countries.metric.precipitation_mm":   { lb: "Nidderschlag", de: "Niederschlag", en: "Precipitation" },
+
+  "countries.unit.population":         { lb: "Awunner", de: "Einwohner", en: "people" },
+  "countries.unit.area_km2":           { lb: "km²", de: "km²", en: "km²" },
+  "countries.unit.density":            { lb: "Awunner/km²", de: "Einw./km²", en: "people/km²" },
+  "countries.unit.capital_population": { lb: "Awunner", de: "Einwohner", en: "people" },
+  "countries.unit.gdp_usd":            { lb: "USD", de: "USD", en: "USD" },
+  "countries.unit.gdp_per_capita_usd": { lb: "USD", de: "USD", en: "USD" },
+  "countries.unit.forest_percent":     { lb: "%", de: "%", en: "%" },
+  "countries.unit.precipitation_mm":   { lb: "mm/Joer", de: "mm/Jahr", en: "mm/year" },
 };

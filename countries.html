@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Country Comparison — ian.lu</title>
+  <meta name="description" content="Compare 195 countries side by side across population, area, density, GDP, capitals, languages and more.">
+  <link rel="canonical" href="https://ian.lu/countries.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ian.lu">
+  <meta property="og:title" content="Country Comparison — ian.lu">
+  <meta property="og:description" content="Compare 195 countries side by side across population, area, density, GDP and more.">
+  <meta property="og:url" content="https://ian.lu/countries.html">
+  <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <meta name="theme-color" content="#0d0d1a">
+  <script src="theme.js?v=15"></script>
+  <script src="i18n-dict.js?v=32"></script>
+  <script src="i18n.js?v=2"></script>
+  <link rel="stylesheet" href="countries.css?v=1">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Country Comparison","url":"https://ian.lu/countries.html","applicationCategory":"EducationalApplication","operatingSystem":"Any","description":"Compare 195 countries across population, area, density, GDP, capitals, languages and other metrics."}
+  </script>
+  <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+</head>
+<body>
+  <header class="bar">
+    <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+    <h1 data-i18n="countries.title">🌍 Country Comparison</h1>
+    <div class="spacer"></div>
+    <span id="langSw"></span>
+    <span id="acctHost"></span>
+  </header>
+
+  <div id="loading" class="loading" aria-live="polite">
+    <div class="spinner" role="status" data-i18n-attr="aria-label:countries.loadingAria" aria-label="Loading"></div>
+    <p data-i18n="countries.loading">Loading data…</p>
+  </div>
+
+  <div id="error-banner" class="banner banner-error hidden" role="alert" aria-live="assertive">
+    <span class="banner-icon" aria-hidden="true">⚠️</span>
+    <div class="banner-content">
+      <h2 data-i18n="countries.errorTitle">Could not load data</h2>
+      <p data-i18n="countries.errorBody">The country data could not be loaded. Please try again later.</p>
+    </div>
+  </div>
+
+  <main id="app-content" class="app hidden">
+    <section class="card">
+      <div class="card-header">
+        <span class="icon" aria-hidden="true">🏳️</span>
+        <h2 data-i18n="countries.countryHeading">Countries</h2>
+      </div>
+      <div class="card-body">
+        <div class="country-search-row">
+          <div class="search-wrap">
+            <span class="search-icon" aria-hidden="true">🔍</span>
+            <input id="country-input" type="text" list="country-options" autocomplete="off"
+              placeholder="Search country…"
+              aria-label="Search country"
+              data-i18n-attr="placeholder:countries.searchPlaceholder|aria-label:countries.searchLabel">
+            <datalist id="country-options"></datalist>
+          </div>
+          <button id="add-country-btn" type="button" aria-label="Add country"
+            data-i18n-attr="aria-label:countries.addLabel">
+            <span aria-hidden="true">＋</span>
+            <span data-i18n="countries.add">Add</span>
+          </button>
+        </div>
+
+        <div class="bulk-actions-row">
+          <span class="bulk-label" data-i18n="countries.continentLabel">Continent:</span>
+          <div id="continent-buttons" role="group" aria-label="Select continent"
+            data-i18n-attr="aria-label:countries.continentGroupLabel"></div>
+          <span class="bulk-divider" aria-hidden="true"></span>
+          <button id="select-all-btn" class="bulk-btn" type="button" title="Select all countries"
+            data-i18n-attr="title:countries.selectAllTitle">
+            <span aria-hidden="true">🌐</span>
+            <span data-i18n="countries.selectAll">All countries</span>
+          </button>
+          <button id="clear-selection-btn" class="bulk-btn" type="button" title="Clear selection"
+            data-i18n-attr="title:countries.clearTitle">
+            <span aria-hidden="true">🗑️</span>
+            <span data-i18n="countries.clear">Clear selection</span>
+          </button>
+        </div>
+
+        <div id="country-chips" role="list" aria-label="Selected countries"
+          data-i18n-attr="aria-label:countries.selectedLabel"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <span class="icon" aria-hidden="true">📐</span>
+        <h2 data-i18n="countries.metricsHeading">Metrics</h2>
+      </div>
+      <div class="card-body">
+        <div id="metrics-toggles" class="metrics-grid" role="group" aria-label="Select metrics"
+          data-i18n-attr="aria-label:countries.metricsGroupLabel"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <span class="icon" aria-hidden="true">📋</span>
+        <h2 data-i18n="countries.tableHeading">Comparison table</h2>
+      </div>
+      <div class="card-body table-card-body">
+        <div id="table-container"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <span class="icon" aria-hidden="true">📊</span>
+        <h2 data-i18n="countries.chartsHeading">Charts</h2>
+      </div>
+      <div class="card-body">
+        <div id="charts-container"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="countries.js?v=1"></script>
+  <script src="pixelbreak-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module">
+    import * as auth from "./auth.js?v=11";
+    const $ = (id) => document.getElementById(id);
+    auth.mountAccountButton($("acctHost"));
+  </script>
+</body>
+</html>

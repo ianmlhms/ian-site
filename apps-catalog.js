@@ -15,6 +15,9 @@ export const APPS = Object.freeze([
     keywords: ["ai", "daten", "données", "fragen", "questions"] },
   { url: "search.html", name: "Sichen", icon: "🔎", group: "grp.school", locked: true,
     keywords: ["search", "suchen", "recherche", "finden", "trouver"] },
+  { url: "countries.html", name: "Länner-Verglach", icon: "🌍", group: "grp.school", locked: false,
+    keywords: ["länder", "countries", "pays", "vergleich", "comparison", "bevölkerung",
+               "population", "bip", "gdp", "hauptstadt", "capitale", "geografie"] },
 
   { url: "messenger.html", name: "Messenger", icon: "💬", group: "grp.social", locked: true,
     keywords: ["chat", "noriichten", "nachrichten", "messages", "gruppen"] },
