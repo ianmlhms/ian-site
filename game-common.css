@@ -16,7 +16,9 @@
 * { box-sizing: border-box; }
 body {
   margin: 0;
+  /* svh, not vh: 100vh is the large mobile viewport and overshoots the screen. */
   min-height: 100vh;
+  min-height: 100svh;
   background:
     radial-gradient(900px 480px at 75% -12%, rgba(110, 168, 254, 0.10), transparent),
     radial-gradient(700px 420px at 10% 110%, rgba(255, 107, 157, 0.06), transparent),

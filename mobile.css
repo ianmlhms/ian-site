@@ -1,0 +1,68 @@
+/* Loaded from theme.js before page-local styles are parsed. Every selector is
+ * prefixed with `body` or `html` so these shared fixes beat single-class page
+ * rules even though those rules appear later in the document. */
+
+/* The 100vh -> 100svh fix lives in each page's own body rule, NOT here. A global
+ * `html body { min-height: 100svh }` out-specifies the page rule and so also
+ * clamps messenger.html and classchat.html, which set `height: var(--vvh)` from
+ * visualViewport to shrink with the on-screen keyboard. Those bodies are
+ * overflow:hidden, so forcing them back to full height pushes the composer off
+ * the screen exactly while you are typing in it. */
+
+/* Only 3 pages load style.css, so the rest need their own horizontal guard.
+ * Deliberately on <html> ONLY: `overflow-x` on <body> turns the body into a
+ * scroll container, and a body that grows with its content never scrolls, so
+ * every body-level `position: sticky` header silently stops sticking — that is
+ * game-common.css's toolbar, pixelbreak's header, countries' and ops' bars. */
+html { overflow-x: hidden; }
+
+body a, body button { -webkit-tap-highlight-color: transparent; }
+
+@media (max-width: 760px) {
+  body .bar, body > header.bar {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  /* admin, doc, hotel, messenger, notify-help, ops, pixelbreak, ppt and skylens
+   * use a bare <header> with the same innards, so match both. Only .bar gets the
+   * padding change above — those nine style their own header box deliberately. */
+  body .bar h1, body > header h1 {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* The spacer only exists to push the account button right; on a narrow screen
+   * that space belongs to the title instead. */
+  body .bar .spacer, body > header .spacer { display: none; }
+  body .bar .home, body > header .home { flex: none; white-space: nowrap; }
+  body #langSw { flex: none; }
+  body #langSw button:not(.on) { display: none; }
+  body #acctHost { flex: none; }
+  /* auth.css deliberately makes its padding important, so this compact mobile
+   * control must do the same to preserve the 44px hit target. */
+  body #acctHost .auth-btn {
+    width: 44px;
+    height: 44px;
+    padding: 0 !important;
+    overflow: hidden;
+    font-size: 0 !important;
+    justify-content: center;
+  }
+  body #acctHost .auth-btn::before { content: "👤"; font-size: 16px; }
+
+  body #fbFab, body #fbPanel { display: none !important; }
+  body #themeFab, body #pwaRefresh { width: 44px; height: 44px; }
+  body #themeFab {
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  body #pwaRefresh {
+    right: calc(60px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  body img, body video { max-width: 100%; }
+  body input, body select, body textarea { font-size: 16px; }
+}

@@ -14,7 +14,11 @@ html { overflow-x: hidden; }
 
 body {
   margin: 0;
+  /* svh is the viewport height with the browser chrome shown. 100vh is the
+     LARGE viewport on mobile, so it always overshoots the screen and leaves the
+     page scrollable by the height of the URL bar with nothing to scroll to. */
   min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;

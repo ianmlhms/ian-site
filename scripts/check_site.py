@@ -30,6 +30,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from collections import defaultdict
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -280,6 +281,72 @@ def _glob(pattern: str) -> list:
     return glob.glob(pattern)
 
 
+INVISIBLE_CODEPOINTS = frozenset({
+    0x00AD, 0x061C, 0x180E, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F,
+    0x2028, 0x2029, 0x2060, 0xFEFF,
+})
+PICTOGRAPHIC_RANGES = (
+    (0x00A9, 0x00A9), (0x00AE, 0x00AE), (0x203C, 0x2049),
+    (0x2122, 0x2139), (0x2194, 0x21AA), (0x231A, 0x231B),
+    (0x2328, 0x2328), (0x2388, 0x2388), (0x23CF, 0x23FA),
+    (0x24C2, 0x24C2), (0x25AA, 0x25AB), (0x25B6, 0x25C0),
+    (0x25FB, 0x25FE), (0x2600, 0x2767), (0x2795, 0x2797),
+    (0x27A1, 0x27A1), (0x27B0, 0x27BF), (0x2934, 0x2935),
+    (0x2B05, 0x2B07), (0x2B1B, 0x2B1C), (0x2B50, 0x2B55),
+    (0x3030, 0x303D), (0x3297, 0x3299), (0x1F000, 0x1FAFF),
+)
+
+
+def _is_pictographic(character: str) -> bool:
+    point = ord(character)
+    return point == 0xFE0F or any(start <= point <= end
+                                  for start, end in PICTOGRAPHIC_RANGES)
+
+
+ASSET_EXTENSIONS = frozenset({".js", ".css", ".json", ".md"})
+
+
+def _invisible_files() -> list:
+    """Hand-written text worth checking: every page, plus the assets in the repo
+    root and data/. Deliberately skips trails/, mtb/ and pb/ — those are machine
+    generated, and walking them on the OneDrive mount takes minutes."""
+    generated = {part.rstrip("/") for part in GENERATED}
+    skipped = (SKIP_DIRS | generated) - {"data"}   # data/ holds hand-edited JSON
+    paths = []
+    for root, dirs, files in os.walk(REPO):
+        dirs[:] = [d for d in dirs if d not in skipped and not d.startswith(".")]
+        rel_root = os.path.relpath(root, REPO)
+        assets_here = rel_root == "." or rel_root.split(os.sep)[0] == "data"
+        for name in files:
+            extension = os.path.splitext(name)[1].lower()
+            if extension == ".html" or (assets_here and extension in ASSET_EXTENSIONS):
+                paths.append(os.path.relpath(os.path.join(root, name), REPO))
+    return sorted(paths)
+
+
+def check_invisible_chars(problems: list) -> None:
+    """Catch invisible Unicode carried by pasted AI or copied web text.
+
+    These characters break search, diffs, and copy-paste. Emoji ZWJ sequences
+    are exempt when the joiner sits between pictographic characters or VS16.
+    """
+    for path in _invisible_files():
+        text = read(path)
+        for index, character in enumerate(text):
+            point = ord(character)
+            is_tag = 0xE0000 <= point <= 0xE007F
+            if point not in INVISIBLE_CODEPOINTS and not is_tag:
+                continue
+            if (point == 0x200D and 0 < index < len(text) - 1
+                    and _is_pictographic(text[index - 1])
+                    and _is_pictographic(text[index + 1])):
+                continue
+            line = text.count("\n", 0, index) + 1
+            name = unicodedata.name(character, "UNNAMED CHARACTER")
+            problems.append(("error", "invisible",
+                             f"{path}:{line} U+{point:04X} {name}"))
+
+
 def check_cache_versions(problems: list) -> None:
     """A versioned asset changed but its ?v= was not bumped -> users keep the
     cached copy and the change silently does nothing.
@@ -369,6 +436,7 @@ def main() -> None:
     check_hreflang(problems)
     check_trail_sitemaps(problems)
     check_cache_versions(problems)
+    check_invisible_chars(problems)
     listed = check_sitemap(problems)
     check_meta(pages, problems)
     check_orphans(pages, inbound, listed, js_referenced(pages), problems)

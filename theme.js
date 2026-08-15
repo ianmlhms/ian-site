@@ -5,6 +5,7 @@
 (function () {
   const KEY = "site_theme";
   const SITE_GLASS_URL = "site-glass.css?v=3";
+  const MOBILE_CSS_URL = "mobile.css?v=1";
   const CONTRAST_MODULE_URL = "./glass-contrast.js?v=2";
   const ACCENTS = ["#6ea8fe", "#ff6b9d", "#3fb950", "#a371f7", "#ffb347", "#4de8ff"];
 
@@ -43,13 +44,16 @@
 
   let contrastRequest = 0;
 
-  function injectSiteGlass() {
-    if (document.querySelector(`link[href="${SITE_GLASS_URL}"]`)) return;
+  // `first` puts the sheet ahead of the page's own <style>, so page rules keep
+  // winning ties — that is how site-glass.css has always been layered. mobile.css
+  // does not need it: every rule there is `body`-prefixed and wins on specificity.
+  function injectStylesheet(url, { first = false } = {}) {
+    if (document.querySelector(`link[href="${url}"]`)) return;
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = SITE_GLASS_URL;
-    const firstStylesheet = document.head.querySelector('link[rel="stylesheet"],style');
-    document.head.insertBefore(link, firstStylesheet);
+    link.href = url;
+    if (first) document.head.insertBefore(link, document.head.querySelector('link[rel="stylesheet"],style'));
+    else document.head.appendChild(link);
   }
 
   function refreshContrast(root, palette, accent) {
@@ -83,7 +87,8 @@
   }
   function save(t) { localStorage.setItem(KEY, JSON.stringify(t)); apply(t); pushTheme(t); }
 
-  injectSiteGlass();
+  injectStylesheet(SITE_GLASS_URL, { first: true });
+  injectStylesheet(MOBILE_CSS_URL);
   apply(get()); // apply ASAP (before paint where possible)
 
   // ---- cross-device theme sync (#19) ----
@@ -237,27 +242,6 @@
     document.body.appendChild(s);
   }
 
-  // ---- site-wide mobile polish ----
-  // A small stylesheet injected on every page. Uses low-specificity element
-  // selectors so any page's own styles still win; only fills the gaps. Injected
-  // LAST so its #themeFab/#pwaRefresh overrides beat buildPicker's base rules.
-  function injectMobileCss() {
-    if (document.getElementById("mobileFix")) return;
-    const css = document.createElement("style");
-    css.id = "mobileFix";
-    css.textContent = `
-    a,button{-webkit-tap-highlight-color:transparent}
-    @media (max-width:760px){
-      #fbFab,#fbPanel{display:none!important}                       /* feedback off on phones */
-      #themeFab,#pwaRefresh{width:44px;height:44px}
-      #themeFab{right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-      #pwaRefresh{right:calc(60px + env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px))}
-      img,video{max-width:100%}                                    /* never force horizontal scroll */
-      input,select,textarea{font-size:16px}                        /* stop iOS zoom on unstyled fields */
-    }`;
-    document.head.appendChild(css);
-  }
-
   // ---- PWA: real-app feel (#20) ----
   // Register the service worker on every page (idempotent; notify.js may also
   // register the same URL). Gives offline app-shell + faster repeat loads.
@@ -291,8 +275,10 @@
       -webkit-tap-highlight-color:transparent}
     #appNav a .i{font-size:20px;line-height:1}
     #appNav a.on{color:var(--accent-text)}
-    body{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px)) !important}
-    #themeFab,#pwaRefresh{bottom:calc(72px + env(safe-area-inset-bottom,0px)) !important}`;
+    @media (max-width:760px){
+      body{padding-bottom:calc(60px + env(safe-area-inset-bottom,0px)) !important}
+      #themeFab,#pwaRefresh{bottom:calc(72px + env(safe-area-inset-bottom,0px)) !important}
+    }`;
     document.head.appendChild(css);
     const nav = document.createElement("nav");
     nav.id = "appNav";
@@ -353,7 +339,7 @@
   }
 
   function boot() {
-    buildPicker(); buildRefresh(); loadFeedback(); injectMobileCss(); serverSync(); registerSW(); buildBottomNav();
+    buildPicker(); buildRefresh(); loadFeedback(); serverSync(); registerSW(); buildBottomNav();
     if (isIosSafari()) showInstall();
   }
   if (document.body) boot();

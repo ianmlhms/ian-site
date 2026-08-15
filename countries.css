@@ -14,7 +14,9 @@ html {
 
 body {
   margin: 0;
+  /* svh, not vh: 100vh is the large mobile viewport and overshoots the screen. */
   min-height: 100vh;
+  min-height: 100svh;
   overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
