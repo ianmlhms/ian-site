@@ -449,3 +449,7 @@ body.fav-edit .fav-star { display: grid; }
   .tiles { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .tile { min-height: 118px; padding: 16px; }
 }
+
+@media (max-width: 900px) {
+  .private-haus { display: none !important; }
+}

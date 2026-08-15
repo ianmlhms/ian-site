@@ -115,8 +115,11 @@ function matchQuality(app, query) {
 function rankedApps(rawQuery) {
   const query = normalize(rawQuery);
   const usage = usageScores();
+  const catalog = matchMedia("(max-width: 900px)").matches
+    ? APPS.filter((app) => app.url !== "haus/")
+    : APPS;
   if (query) {
-    return APPS.map((app, authoredIndex) => ({
+    return catalog.map((app, authoredIndex) => ({
       app,
       authoredIndex,
       quality: matchQuality(app, query),
@@ -133,7 +136,7 @@ function rankedApps(rawQuery) {
   }
 
   const favorites = readFavorites();
-  return APPS.map((app, authoredIndex) => ({
+  return catalog.map((app, authoredIndex) => ({
     app,
     authoredIndex,
     favorite: favorites.has(app.url),

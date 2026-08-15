@@ -14,14 +14,14 @@
   <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
   <link rel="canonical" href="https://ian.lu/" />
   <title>ian.lu — Ian Mulheims</title>
-  <link rel="stylesheet" href="style.css?v=17" />
+  <link rel="stylesheet" href="style.css?v=18" />
   <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <!-- Google AdSense (public pages only) -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
-  <script src="theme.js?v=16"></script>
+  <script src="theme.js?v=17"></script>
   <script src="i18n-dict.js?v=32"></script>
   <script src="i18n.js?v=2"></script>
   <script>
@@ -200,6 +200,9 @@
           <a class="tile hotel private-hotel" href="hotel.html" data-app="hotel.html" style="display:none">
             <span class="ico" aria-hidden="true">🏨</span><span class="tname">Hotel-Simulator</span><span class="tsub" data-i18n="tile.hotel.sub">Bausimulator · privat</span>
           </a>
+          <a class="tile haus private-haus" href="haus/" data-app="haus/" style="display:none">
+            <span class="ico" aria-hidden="true">🏠</span><span class="tname">Haus-Planer</span><span class="tsub">Hausbau · privat</span>
+          </a>
         </div>
       </details>
 
@@ -294,6 +297,7 @@
   <script type="module">
     import { mountAccountButton, openAuthModal, client, session, onAuth } from "./auth.js?v=11";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
+    const HOUSE_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Haus-Planer
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)
     const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"];   // PPT/Word studios; ian@ian.lu is the test account
     const DEFAULT_FAVS = ["messenger.html", "grades.html", "timetable.html", "classchat.html", "pixelbreak.html", "bus.html"];
@@ -564,6 +568,8 @@
       const email = (session()?.user?.email || "").toLowerCase();
       const hotel = HOTEL_ALLOW.includes(email);
       document.querySelectorAll(".private-hotel").forEach((e) => (e.style.display = hotel ? "" : "none"));
+      const house = HOUSE_ALLOW.includes(email);
+      document.querySelectorAll(".private-haus").forEach((e) => (e.style.display = house ? "" : "none"));
       // The studios key on an explicit allow-list rather than is_admin():
       // ian@ian.lu is an admin but is the test account, and would get a tile
       // that the studio itself then refuses.

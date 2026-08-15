@@ -64,6 +64,8 @@ export const APPS = Object.freeze([
     keywords: ["karting", "ronnen", "runden", "tours", "laps", "zeiten"] },
   { url: "hotel.html", name: "Hotel-Simulator", icon: "🏨", group: "grp.personal", locked: false,
     keywords: ["builder", "bauen", "simulateur", "building", "hotel"] },
+  { url: "haus/", name: "Haus-Planer", icon: "🏠", group: "grp.personal", locked: true,
+    keywords: ["haus", "house", "bauen", "builder", "grundriss", "floor plan"] },
 
   { url: "factory.html", name: "Dashboard", icon: "📈", group: "grp.private", locked: false,
     keywords: ["shorts", "shortsfactory", "analytics", "video", "stats"] },

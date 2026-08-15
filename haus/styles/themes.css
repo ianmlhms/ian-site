@@ -1,0 +1,70 @@
+/* Vier Stile über CSS-Variablen. Aktiviert per [data-style] auf <html>. */
+
+:root,
+[data-style='modern'] {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --panel-2: #eceef1;
+  --text: #1c2128;
+  --muted: #6b7280;
+  --border: #dde1e6;
+  --accent: #2f6fed;
+  --accent-text: #ffffff;
+  --accent-soft: #e5edfd;
+  --radius: 6px;
+  --shadow: 0 1px 2px rgba(20, 24, 30, 0.08), 0 4px 12px rgba(20, 24, 30, 0.06);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --canvas-grid: #e2e5ea;
+  --canvas-bg: #fafbfc;
+}
+
+[data-style='classic'] {
+  --bg: #f6f1e7;
+  --panel: #fffdf8;
+  --panel-2: #efe6d3;
+  --text: #372c22;
+  --muted: #8a7a63;
+  --border: #ddccab;
+  --accent: #9c5a2e;
+  --accent-text: #fffaf2;
+  --accent-soft: #f1ddc2;
+  --radius: 4px;
+  --shadow: 0 1px 2px rgba(60, 40, 10, 0.1), 0 4px 12px rgba(60, 40, 10, 0.08);
+  --font: 'Georgia', 'Iowan Old Style', serif;
+  --canvas-grid: #e6dcc4;
+  --canvas-bg: #fbf7ee;
+}
+
+[data-style='scandi'] {
+  --bg: #f7f7f5;
+  --panel: #ffffff;
+  --panel-2: #eeede8;
+  --text: #2b2b28;
+  --muted: #86847c;
+  --border: #e3e1da;
+  --accent: #4a6b57;
+  --accent-text: #ffffff;
+  --accent-soft: #e6ede9;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(30, 30, 25, 0.06), 0 4px 12px rgba(30, 30, 25, 0.05);
+  --font: 'Helvetica Neue', Arial, sans-serif;
+  --canvas-grid: #eae8e2;
+  --canvas-bg: #fcfbf9;
+}
+
+[data-style='mediterranean'] {
+  --bg: #fbf3e6;
+  --panel: #fffaf1;
+  --panel-2: #f3e2c4;
+  --text: #4a3423;
+  --muted: #9c7f5c;
+  --border: #e6c99a;
+  --accent: #c9682f;
+  --accent-text: #fffaf2;
+  --accent-soft: #f6dfc0;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(90, 55, 15, 0.1), 0 4px 12px rgba(90, 55, 15, 0.08);
+  --font: 'Optima', 'Trebuchet MS', sans-serif;
+  --canvas-grid: #ecd8b0;
+  --canvas-bg: #fdf6ea;
+}

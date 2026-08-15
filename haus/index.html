@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Haus-Planer</title>
+  <link rel="stylesheet" href="./styles/themes.css?v=1" />
+  <link rel="stylesheet" href="./styles/base.css?v=1" />
+  <script src="../theme.js?v=17"></script>
+  <style>
+    #hausGate {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: var(--bg);
+    }
+    .haus-access-panel {
+      width: min(420px, 100%);
+      padding: 34px 32px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--glass-solid, var(--card));
+      color: var(--text);
+      text-align: center;
+    }
+    .haus-access-panel .icon { margin-bottom: 10px; font-size: 44px; line-height: 1; }
+    .haus-access-panel h1 { margin-bottom: 6px; font-size: 24px; }
+    .haus-access-panel p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+    .haus-access-panel button {
+      display: none;
+      padding: 11px 22px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: var(--accent-foreground);
+      font-weight: 800;
+      font-size: 15px;
+    }
+    .haus-access-panel .back { margin: 18px 0 0; }
+    .haus-access-panel a { color: var(--muted); font-size: 13px; text-decoration: none; }
+    #hausMobile { display: none; }
+    @media (max-width: 900px), (pointer: coarse) {
+      body > :not(#hausMobile) { display: none !important; }
+      #hausMobile {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: var(--bg);
+      }
+    }
+  </style>
+  <script type="importmap">
+  {"imports":{
+    "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }}
+  </script>
+</head>
+<body data-style="modern">
+  <div id="app">
+    <div id="topbar"></div>
+    <div id="body">
+      <div id="leftPanel" class="panel-left"></div>
+      <div id="canvasWrap"></div>
+      <div id="rightPanel" class="panel-right"></div>
+    </div>
+  </div>
+  <div id="wizardOverlay" class="hidden"></div>
+  <div id="toast"></div>
+
+  <div id="hausGate">
+    <div class="haus-access-panel">
+      <div class="icon" aria-hidden="true">🏠</div>
+      <h1>Haus-Planer</h1>
+      <p id="hausGateMsg">Wird geladen…</p>
+      <button id="hausSignin" type="button">Anmelden</button>
+      <p class="back"><a href="/">&lsaquo; Zurück zu ian.lu</a></p>
+    </div>
+  </div>
+
+  <div id="hausMobile">
+    <div class="haus-access-panel">
+      <div class="icon" aria-hidden="true">🏠</div>
+      <h1>Der Haus-Planer braucht einen größeren Bildschirm</h1>
+      <p class="back"><a href="/">&lsaquo; Zurück zu ian.lu</a></p>
+    </div>
+  </div>
+
+  <script src="../pixelbreak-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module">
+    const mobile = matchMedia("(max-width: 900px), (pointer: coarse)");
+    if (!mobile.matches) {
+      const auth = await import("../auth.js?v=11");
+      const { hydrate } = await import("./src/storage/supabase.js?v=1");
+      const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];
+      const gate = document.getElementById("hausGate");
+      const msg = document.getElementById("hausGateMsg");
+      const signinBtn = document.getElementById("hausSignin");
+      let activeEmail = null;
+      let booted = false;
+      let checkPromise = Promise.resolve();
+
+      function showGate(text, canSignIn) {
+        gate.style.display = "flex";
+        msg.textContent = text;
+        signinBtn.style.display = canSignIn ? "" : "none";
+      }
+
+      async function check() {
+        const sb = await auth.client();
+        const email = (auth.session()?.user?.email || "").toLowerCase();
+        if (!email) {
+          activeEmail = null;
+          showGate("Dieser Bereich ist privat. Bitte melde dich an.", true);
+          return;
+        }
+        if (!ALLOW.includes(email)) {
+          activeEmail = null;
+          showGate("Dieses Konto hat keinen Zugriff auf den Haus-Planer.", true);
+          return;
+        }
+        if (email !== activeEmail) {
+          showGate("Gespeicherte Häuser werden geladen…", false);
+          await hydrate(sb);
+          activeEmail = email;
+        }
+        if (!booted) {
+          await import("./src/main.js?v=1");
+          booted = true;
+        }
+        gate.style.display = "none";
+      }
+
+      function queueCheck() {
+        checkPromise = checkPromise.then(check).catch((error) => {
+          console.error("house planner boot", error);
+          showGate("Die Haus-Projekte konnten nicht geladen werden. Bitte lade die Seite neu.", false);
+        });
+        return checkPromise;
+      }
+
+      signinBtn.onclick = auth.openAuthModal;
+      auth.onAuth(queueCheck);
+      await queueCheck();
+    }
+  </script>
+</body>
+</html>

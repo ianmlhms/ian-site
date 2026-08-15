@@ -4,8 +4,15 @@
  * there is no browser toolbar to reload from. */
 (function () {
   const KEY = "site_theme";
-  const SITE_GLASS_URL = "site-glass.css?v=3";
-  const MOBILE_CSS_URL = "mobile.css?v=1";
+  // theme.js is included from pages at different depths (root, and haus/), and a
+  // bare "site-glass.css" in an href resolves against the PAGE, not this script —
+  // so from haus/ it would ask for /haus/site-glass.css and 404. Resolve against
+  // the script's own URL instead. (Dynamic import() below already does this,
+  // because module specifiers resolve against the importing module.)
+  const HERE = new URL(".", document.currentScript ? document.currentScript.src : location.href);
+  const asset = (path) => new URL(path, HERE).href;
+  const SITE_GLASS_URL = asset("site-glass.css?v=3");
+  const MOBILE_CSS_URL = asset("mobile.css?v=1");
   const CONTRAST_MODULE_URL = "./glass-contrast.js?v=2";
   const ACCENTS = ["#6ea8fe", "#ff6b9d", "#3fb950", "#a371f7", "#ffb347", "#4de8ff"];
 
@@ -238,7 +245,7 @@
     // no feedback button on phones — keeps the small-screen UI uncluttered
     if (window.matchMedia && window.matchMedia("(max-width: 760px)").matches) return;
     const s = document.createElement("script");
-    s.id = "fbScript"; s.src = "feedback.js?v=1";
+    s.id = "fbScript"; s.src = asset("feedback.js?v=1");
     document.body.appendChild(s);
   }
 
@@ -247,7 +254,9 @@
   // register the same URL). Gives offline app-shell + faster repeat loads.
   function registerSW() {
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // Resolved against this script, so a page in a subfolder still registers the
+    // root worker and keeps the site-wide "/" scope instead of 404ing.
+    navigator.serviceWorker.register(asset("sw.js")).catch(() => {});
   }
 
   // Mobile bottom tab bar so the site feels like a native app. Skipped on pages
