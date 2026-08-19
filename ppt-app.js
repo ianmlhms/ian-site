@@ -1,13 +1,13 @@
-import * as auth from "./auth.js?v=11";
+import * as auth from "./auth.js?v=12";
 import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=6";
 import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3";
-import { createDeckGeneration } from "./ppt-ai.js?v=10";
-import { fillDeckImages } from "./ppt-images.js?v=9";
+import { createDeckGeneration } from "./ppt-ai.js?v=11";
+import { fillDeckImages } from "./ppt-images.js?v=10";
 import { exportPptx } from "./ppt-export-pptx.js?v=9";
 import { exportPdf } from "./ppt-export-pdf.js?v=9";
 import { exportCuesDocx, exportScriptDocx } from "./ppt-export-docx.js?v=10";
 import { startPresenting } from "./ppt-present.js?v=9";
-import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=9";
+import { listDecks, loadDeck, saveDeck, deleteDeck, startNewDeck, scheduleAutosave } from "./ppt-store.js?v=10";
 import { createHistory } from "./ppt-history.js?v=3";
 import { createEditor } from "./ppt-editor.js?v=10";
 import { createInspector } from "./ppt-inspector.js?v=6";

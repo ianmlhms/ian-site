@@ -16,7 +16,7 @@
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=17"></script>
+<script src="theme.js?v=18"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;
         --correct:#00c853;--present:#ffb300;--absent:#3a3a3c}
@@ -279,7 +279,7 @@ load();
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-  import * as auth from "./auth.js?v=11";
+  import * as auth from "./auth.js?v=12";
   let sb = null;
   const $ = (id) => document.getElementById(id);
   (async () => { if (!auth.authConfigured) return; auth.mountAccountButton($("acctHost")); sb = await auth.client(); })();
@@ -309,7 +309,7 @@ load();
   $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") $("lbModal").classList.remove("open"); };
   document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; document.querySelectorAll("[data-lb]").forEach(x => x.classList.toggle("on", x === b)); drawBoard(); });
 </script>
-  <script type="module" src="rtc-ring.js?v=7"></script>
-  <script type="module" src="class-gate.js?v=9"></script>
+  <script type="module" src="rtc-ring.js?v=8"></script>
+  <script type="module" src="class-gate.js?v=10"></script>
 </body>
 </html>

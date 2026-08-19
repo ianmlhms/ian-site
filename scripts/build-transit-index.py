@@ -9,6 +9,8 @@ Luxembourg GTFS on data.public.lu.
                      s:[stop names]}, ... ] }  — one entry per direction, rail
                      excluded (trains carry no line number in this feed). Each
                      direction is represented by its LONGEST trip.
+  moien-school-lines.json : ["A01", "D02", ...]  — the school-transport lines,
+                     for bus.html's "school buses only" mode. See is_school_line().
 
 Usage:
     python scripts/build-transit-index.py            # auto-fetch latest GTFS
@@ -24,6 +26,7 @@ import csv
 import io
 import json
 import os
+import re
 import sys
 import urllib.request
 import zipfile
@@ -66,6 +69,34 @@ def build_stops(zf: zipfile.ZipFile) -> list:
              for r in rows(zf, "stops.txt")]
     stops.sort(key=lambda x: (x[1], x[0]))
     return stops
+
+
+# The RGTR runs both the ordinary regional network and the transport scolaire,
+# and the two are told apart by how the line is named: ordinary lines are plain
+# numbers (100-999), school lines carry a letter prefix (A01, D02, K55, RE3 …).
+# Checked against the calendar in the 2026-08-12 feed, where school-term-only
+# services can be spotted directly because the feed starts in the summer holidays:
+# the two definitions agreed on 409 of 411 lines. The exceptions were L50/L52,
+# cross-border CFL buses with ~40 trips a day that merely happen to start service
+# in September — so agency matters as well as the name.
+#
+# Deliberately not caught by the letter rule, and correctly so:
+#   CN1-CN8   Ville de Luxembourg night buses
+#   L11-L95   CFL rail-replacement and cross-border coaches
+#   T1        Luxtram
+#   RB/RE/IC/TER/TGV  CFL trains
+SCHOOL_LINE_NAME = re.compile(r"^[A-Za-z]")
+SCHOOL_AGENCY = "1"          # Régime Général des Transports Routiers
+
+
+def is_school_line(route: dict) -> bool:
+    return (route.get("agency_id") == SCHOOL_AGENCY
+            and bool(SCHOOL_LINE_NAME.match(route.get("route_short_name") or "")))
+
+
+def build_school_lines(zf: zipfile.ZipFile) -> list:
+    names = {r["route_short_name"] for r in rows(zf, "routes.txt") if is_school_line(r)}
+    return sorted(names)
 
 
 def build_lines(zf: zipfile.ZipFile) -> dict:
@@ -129,10 +160,13 @@ def main() -> None:
     zf = load_zip(src)
     stops = build_stops(zf)
     lines = build_lines(zf)
+    school = build_school_lines(zf)
     write("moien-stops.json", stops)
     write("moien-lines.json", lines)
+    write("moien-school-lines.json", school)
     print(f"done: {len(stops)} stops, {len(lines)} lines "
-          f"(rail excluded). Commit only if git shows a diff.")
+          f"(rail excluded), {len(school)} school lines. "
+          f"Commit only if git shows a diff.")
 
 
 if __name__ == "__main__":

@@ -94,9 +94,37 @@
   }
   function save(t) { localStorage.setItem(KEY, JSON.stringify(t)); apply(t); pushTheme(t); }
 
+  /* The hub's sign-in banner, the 🔒 badges and every "signed-in only" bit are
+   * driven by CSS off `html.auth-in`. auth.js can only set that truthfully after
+   * it has pulled the Supabase client off a CDN and restored the session — a few
+   * hundred ms on a good day, far longer on a bad one — and until then a signed-in
+   * user was shown the whole signed-out hub, "sign in to unlock…" banner included.
+   *
+   * The GoTrue session sits in localStorage and is readable synchronously, so make
+   * the optimistic call here instead, before first paint. auth.js then overwrites
+   * it with the truth in both directions, so a stale or expired token still ends
+   * up showing the banner — just a moment later, instead of a moment too early.
+   *
+   * (auth.js has its own copy of this read, for session recovery. It is an ES
+   * module; this file has to be a classic script that runs before the body exists,
+   * so the two cannot share one helper.) */
+  function storedSignIn() {
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!/^sb-.+-auth-token$/.test(key)) continue;
+        const parsed = JSON.parse(localStorage.getItem(key) || "null");
+        const stored = parsed?.currentSession || parsed;
+        if (stored?.access_token && stored?.user) return true;
+      }
+    } catch { /* private mode: fall back to the signed-out hub */ }
+    return false;
+  }
+
   injectStylesheet(SITE_GLASS_URL, { first: true });
   injectStylesheet(MOBILE_CSS_URL);
   apply(get()); // apply ASAP (before paint where possible)
+  document.documentElement.classList.toggle("auth-in", storedSignIn());
 
   // ---- cross-device theme sync (#19) ----
   // localStorage stays the instant source (no flash on load); when signed in we

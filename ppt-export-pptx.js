@@ -1,5 +1,5 @@
 import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
-import { validateDeck } from "./ppt-ai.js?v=10";
+import { validateDeck } from "./ppt-ai.js?v=11";
 
 const PPTXGENJS_URL = "https://cdn.jsdelivr.net/npm/pptxgenjs@3/+esm";
 const LAYOUT_NAME = "IANLU16x9";

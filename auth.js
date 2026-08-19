@@ -1,12 +1,12 @@
 /* Shared Supabase auth for ian.lu. ES module. */
 import "./i18n-dict.js?v=28";
-import { openAuthDialog } from "./auth-ui.js?v=4";
-import { esc } from "./pin-pad.js?v=2";
+import { openAuthDialog } from "./auth-ui.js?v=5";
+import { esc } from "./pin-pad.js?v=3";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=4";
+} from "./pin-brief.js?v=5";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =
@@ -65,6 +65,18 @@ function storedSession() {
   return null;
 }
 
+/** Synchronous best guess, for chrome that must decide before the client is up.
+ *  theme.js makes the same read before first paint; this one is for the pages
+ *  that still have to answer the question when the client never came up at all. */
+export const hasStoredSession = () => Boolean(storedSession());
+
+/* The CSS for the hub's sign-in banner, 🔒 badges and .signed-in-only elements
+ * keys off this class, so it has to be corrected the moment the truth is known —
+ * in both directions, since theme.js sets it optimistically before first paint. */
+function markSignedIn(current) {
+  document.documentElement.classList.toggle("auth-in", Boolean(current));
+}
+
 async function recoverSession(sb, data) {
   if (data.session) return data;
   const stored = storedSession();
@@ -82,6 +94,7 @@ async function recoverSession(sb, data) {
 
 function notifyAuth(event, current) {
   _g.session = current;
+  markSignedIn(current);
   const userId = current?.user?.id || null;
   const changed = userId !== _g.lastUid;
   if (changed && current) {
@@ -128,6 +141,7 @@ async function initializeClient() {
   const initial = await _g.sb.auth.getSession();
   const data = await recoverSession(_g.sb, initial.data);
   _g.session = data.session;
+  markSignedIn(data.session);
   _g.lastUid = data.session?.user?.id || null;
   _g.sb.auth.onAuthStateChange(notifyAuth);
   await ensureProfile();
@@ -137,7 +151,16 @@ async function initializeClient() {
 
 export async function client() {
   if (_g.sb) return _g.sb;
-  if (!_g.ready) _g.ready = initializeClient();
+  // Caching the rejected promise left one bad boot — CDN blocked, offline for a
+  // moment — reading as "signed out" for the rest of the page's life, which is how
+  // the sign-in banner ended up in front of a signed-in user. Clear it so the next
+  // caller (or the next onAuth pass) genuinely retries.
+  if (!_g.ready) {
+    _g.ready = initializeClient().catch((error) => {
+      _g.ready = null;
+      throw error;
+    });
+  }
   await _g.ready;
   return _g.sb;
 }

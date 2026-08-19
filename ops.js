@@ -7,7 +7,7 @@
  * English rather than Luxembourgish: every term here is technical (heartbeat,
  * daemon, launchd) and translating them would mean inventing vocabulary. The
  * two gate strings are the site's existing reviewed LB ones. */
-import * as auth from "./auth.js?v=11";
+import * as auth from "./auth.js?v=12";
 
 const OWNER = "konto@ian.lu";
 const REFRESH_MS = 20_000;

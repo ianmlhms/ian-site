@@ -29,9 +29,14 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* `html.auth-in` rather than `body.signed-in`: theme.js sets it from the stored
+   session before first paint, and auth.js corrects it the moment the real client
+   is up. Keyed on <body> it could only ever be set after the Supabase client had
+   loaded off a CDN, so every signed-in visitor got a flash — or on a slow or
+   failed load, a long stare — at the signed-out hub and its sign-in banner. */
 .signed-in-only { display: none; }
-body.signed-in .signed-in-only { display: revert; }
-body.signed-in .signed-out-only { display: none; }
+html.auth-in .signed-in-only { display: revert; }
+html.auth-in .signed-out-only { display: none; }
 
 /* Top bar */
 .bar {
@@ -247,12 +252,12 @@ footer {
 /* app launcher: everyone sees the grid; tiles that need an account carry a 🔒
    badge until the visitor signs in */
 #apps .tiles { max-width: none; }
-body:not(.signed-in) .tile:has(.lockb) { display: none; }
+html:not(.auth-in) .tile:has(.lockb) { display: none; }
 .tile .lockb {
   position: absolute; top: 9px; right: 11px;
   font-size: 13px; line-height: 1; opacity: .7;
 }
-body.signed-in .tile .lockb { display: none; }
+html.auth-in .tile .lockb { display: none; }
 .apps-gate {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--border); border-radius: 16px;
@@ -263,7 +268,7 @@ body.signed-in .tile .lockb { display: none; }
 .apps-gate .ag-text strong { font-size: 16px; font-weight: 800; color: var(--text); }
 .apps-gate .ag-text span { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 .apps-gate .btn-primary { flex: none; }
-body.signed-in .apps-gate { display: none; }
+html.auth-in .apps-gate { display: none; }
 
 .tile-group { margin-top: 28px; }
 .group-head {

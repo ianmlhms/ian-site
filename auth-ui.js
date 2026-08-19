@@ -1,4 +1,10 @@
-import { createPinPad, esc, translate, weakPin } from "./pin-pad.js?v=2";
+import {
+  createPinPad,
+  DEFAULT_PIN_LENGTH,
+  esc,
+  translate,
+  weakPin,
+} from "./pin-pad.js?v=3";
 const USERNAME_SHAPE = /^[A-Za-z0-9_]{3,20}$/;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let modal = null;
@@ -54,6 +60,26 @@ function setMessage(text, kind = "") {
 }
 function value(id) {
   return (box().querySelector(`#${id}`)?.value || "").trim();
+}
+
+/* Every dialog is redrawn from scratch to switch PIN length or sign-in method,
+ * which used to wipe whatever was already typed — changing 6 digits to 4 threw
+ * away the username you had just entered. Lift the plain fields out first and
+ * write them back after. The digit boxes are deliberately excluded: they belong
+ * to the length you are leaving. */
+function fieldValues() {
+  const values = {};
+  box().querySelectorAll("input[id]").forEach((input) => {
+    if (!input.classList.contains("pin-box")) values[input.id] = input.value;
+  });
+  return values;
+}
+
+function restoreFields(values) {
+  Object.entries(values || {}).forEach(([id, text]) => {
+    const input = box().querySelector(`#${CSS.escape(id)}`);
+    if (input) input.value = text;
+  });
 }
 function lengthTabs(length) {
   return `<div class="auth-tabs">
@@ -116,8 +142,9 @@ function wireModeTabs(deps, mode) {
     button.addEventListener("click", () => {
       const next = button.dataset.authMode;
       if (next === mode) return;
-      if (next === "up") drawSignUp(deps, 6);
-      else drawSignIn(deps, 6, "pin");
+      const values = fieldValues();
+      if (next === "up") drawSignUp(deps, DEFAULT_PIN_LENGTH, values);
+      else drawSignIn(deps, DEFAULT_PIN_LENGTH, "pin", values);
     });
   });
 }
@@ -180,8 +207,9 @@ function loginError(error) {
   );
 }
 
-function drawSignIn(deps, length, method) {
+function drawSignIn(deps, length, method, values) {
   box().innerHTML = loginMarkup("in", length, method);
+  restoreFields(values);
   wireClose();
   wireModeTabs(deps, "in");
   let pad = null;
@@ -206,9 +234,9 @@ function drawSignIn(deps, length, method) {
   };
   if (method === "pin") pad = attachPinPad(length, submit);
   box().querySelector("#authSubmit").addEventListener("click", submit);
-  wireLengthTabs(length, (next) => drawSignIn(deps, next, method));
+  wireLengthTabs(length, (next) => drawSignIn(deps, next, method, fieldValues()));
   box().querySelector("#authMethod").addEventListener("click", () => {
-    drawSignIn(deps, length, method === "pin" ? "password" : "pin");
+    drawSignIn(deps, length, method === "pin" ? "password" : "pin", fieldValues());
   });
   box().querySelector("#authForgot").addEventListener(
     "click",
@@ -270,8 +298,9 @@ async function submitSignUp(deps, first, second, length) {
   }
 }
 
-function drawSignUp(deps, length) {
+function drawSignUp(deps, length, values) {
   box().innerHTML = signupMarkup(length);
+  restoreFields(values);
   wireClose();
   wireModeTabs(deps, "up");
   const first = attachPinPad(length, () => second.focus());
@@ -280,7 +309,7 @@ function drawSignUp(deps, length) {
     label: t("pin.repeatDigit", "PIN nach eng Kéier, Ziffer"),
   });
   box().querySelector("#authPinAgain").appendChild(second.element);
-  wireLengthTabs(length, (next) => drawSignUp(deps, next));
+  wireLengthTabs(length, (next) => drawSignUp(deps, next, fieldValues()));
   box().querySelector("#authSubmit").addEventListener(
     "click",
     () => submitSignUp(deps, first, second, length),
@@ -339,7 +368,7 @@ export function openAuthDialog(deps) {
   ensureModal();
   modalLocked = false;
   if (!deps.session()) {
-    drawSignIn(deps, 6, "pin");
+    drawSignIn(deps, DEFAULT_PIN_LENGTH, "pin");
     openModal();
     return;
   }
@@ -382,18 +411,22 @@ function pinSetupMarkup(length, title, needsProof) {
 }
 
 export function openPinDialog(deps, options = {}) {
-  const length = options.length === 4 ? 4 : 6;
+  const length = options.length === 6 ? 6 : DEFAULT_PIN_LENGTH;
   const needsProof = options.hasPin === true && !options.recovery;
   modalLocked = Boolean(options.required);
   const title = options.recovery
     ? t("pin.newTitle", "Neie PIN setzen")
     : t("pin.changeTitle", "PIN änneren");
   box().innerHTML = pinSetupMarkup(length, title, needsProof);
+  restoreFields(options.values);
   wireClose();
   const first = attachPinPad(length, () => second.focus());
   const second = createPinPad({ length, label: t("pin.repeatDigit", "PIN nach eng Kéier, Ziffer") });
   box().querySelector("#authPinAgain").appendChild(second.element);
-  wireLengthTabs(length, (next) => openPinDialog(deps, { ...options, length: next }));
+  wireLengthTabs(length, (next) => openPinDialog(
+    deps,
+    { ...options, length: next, values: fieldValues() },
+  ));
   box().querySelector("#authSubmit").addEventListener("click", async () => {
     const pin = first.value();
     if (pin !== second.value() || pin.length !== length) {

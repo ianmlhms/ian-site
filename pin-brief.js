@@ -1,5 +1,5 @@
-import { openPinDialog } from "./auth-ui.js?v=4";
-import { esc, translate } from "./pin-pad.js?v=2";
+import { openPinDialog } from "./auth-ui.js?v=5";
+import { esc, translate } from "./pin-pad.js?v=3";
 
 const SKIP_PREFIX = "pinBriefSkip:";
 const VISIT_KEY = "pinBriefVisit";

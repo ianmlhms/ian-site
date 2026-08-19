@@ -1,4 +1,7 @@
 const ALLOWED_LENGTHS = Object.freeze([4, 6]);
+/* Most people here pick 4, so every dialog opens on it and 6 stays one tap away.
+ * The 4-digit warning under the length tabs still says why 6 is safer. */
+export const DEFAULT_PIN_LENGTH = 4;
 const DIGITS = /\d/g;
 const COMMON_4 = new Set([
   "1234", "1111", "0000", "1212", "7777",
@@ -71,7 +74,7 @@ export function translate(key, fallback) {
 function validLength(value) {
   return ALLOWED_LENGTHS.includes(Number(value))
     ? Number(value)
-    : 6;
+    : DEFAULT_PIN_LENGTH;
 }
 
 function digitsFrom(value, limit) {

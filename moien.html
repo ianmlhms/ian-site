@@ -21,7 +21,7 @@
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=17"></script>
+<script src="theme.js?v=18"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
   *{box-sizing:border-box}
@@ -82,7 +82,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=11";
+import * as auth from "./auth.js?v=12";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pad=(n)=>(n<10?"0":"")+n;
@@ -136,7 +136,7 @@ loadWeather();
 
 auth.mountAccountButton($("acctHost"));
 </script>
-  <script type="module" src="rtc-ring.js?v=7"></script>
-  <script type="module" src="class-gate.js?v=9"></script>
+  <script type="module" src="rtc-ring.js?v=8"></script>
+  <script type="module" src="class-gate.js?v=10"></script>
 </body>
 </html>
