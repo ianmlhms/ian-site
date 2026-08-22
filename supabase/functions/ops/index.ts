@@ -16,6 +16,10 @@ const NOTIFY_SECRET = Deno.env.get("NOTIFY_SECRET") ?? "";
 const SERVICE_KEYS = new Set(SERVICES.map((service) => service.key));
 const ACTIONS = new Set(["restart", "start", "stop"]);
 const MAX_ALERTS = 20;
+/* How far back to look for "what did we last say about this key". Repeats add
+ * rows, so this must comfortably outlast a long outage: if a key's latest row
+ * fell outside the window it would read as never-alerted and re-notify. */
+const ALERT_LOOKBACK_ROWS = 500;
 
 const admin = createClient(
   SUPABASE_URL,
@@ -92,7 +96,7 @@ async function lastAlertPerService(): Promise<Map<string, LastAlert>> {
     .from("service_alerts")
     .select("service, from_health, to_health, created_at")
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(ALERT_LOOKBACK_ROWS);
   const latest = new Map<string, LastAlert>();
   for (const row of data ?? []) {
     if (latest.has(row.service)) continue;
