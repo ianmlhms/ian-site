@@ -6,7 +6,9 @@
 // shared secret; every other action is gated by ownerFromRequest below.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { CORS, cleanString, json, ownerFromRequest } from "../_shared/studio.ts";
-import { evaluateAll, overallHealth, SERVICES, type Health } from "./health.ts";
+import { evaluateAll, overallHealth, SERVICES } from "./health.ts";
+import { type LastAlert, MACHINE_KEY, type PendingAlert, planAlerts } from "./alerting.ts";
+import { sendTelegram, telegramConfigured } from "./telegram.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const OPS_CRON_SECRET = Deno.env.get("OPS_CRON_SECRET") ?? "";
@@ -19,11 +21,6 @@ const admin = createClient(
   SUPABASE_URL,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
-
-/* Which health states are worth waking a phone for. `unknown` is excluded on
- * purpose: before OpsAgent is deployed every service reads unknown, and that is
- * a deployment fact, not an incident. */
-const ALERTABLE = new Set<Health>(["down", "missed", "warn"]);
 
 async function readHeartbeats() {
   const { data, error } = await admin
@@ -87,16 +84,23 @@ async function handleCommandStatus(payload: any) {
   return json({ command: data });
 }
 
-/** The health each service was last alerted at, so we only report transitions. */
-async function lastAlertedHealth(): Promise<Map<string, string>> {
+/** The most recent thing we said about each key: what state, and when.
+ * `from_health` comes along because a row whose health did not change is a
+ * repeat, and repeats are spaced further apart than first reports. */
+async function lastAlertPerService(): Promise<Map<string, LastAlert>> {
   const { data } = await admin
     .from("service_alerts")
-    .select("service, to_health, created_at")
+    .select("service, from_health, to_health, created_at")
     .order("created_at", { ascending: false })
     .limit(200);
-  const latest = new Map<string, string>();
+  const latest = new Map<string, LastAlert>();
   for (const row of data ?? []) {
-    if (!latest.has(row.service)) latest.set(row.service, row.to_health);
+    if (latest.has(row.service)) continue;
+    latest.set(row.service, {
+      health: row.to_health,
+      fromHealth: row.from_health,
+      createdAtMs: Date.parse(row.created_at),
+    });
   }
   return latest;
 }
@@ -116,32 +120,36 @@ async function pushAlert(record: unknown) {
   }
 }
 
-/* Cron path. Recomputes health and records a row only where the verdict has
- * CHANGED since the last recorded one — otherwise a dead service would push
- * every time the cron fires. */
+/* Two independent channels on purpose. Web push depends on a browser that is
+ * awake and subscribed; Telegram reaches a phone anywhere. The 20 Aug outage
+ * was detected correctly and pushed correctly — and still went unseen for 41
+ * hours, because push was the only way it could arrive. */
+async function deliver(alert: PendingAlert, record: unknown) {
+  const prefix = alert.service === MACHINE_KEY ? "🖥️" : "⚠️";
+  const icon = alert.toHealth === "ok" ? "✅" : prefix;
+  await Promise.allSettled([
+    pushAlert(record),
+    sendTelegram(`${icon} ${alert.message}\n\nhttps://ian.lu/ops.html`),
+  ]);
+}
+
+/* Cron path. Recomputes health, records what changed (or has gone unfixed for
+ * long enough to be worth saying again), and delivers only what a phone should
+ * buzz for. See alerting.ts for the three rules that decide all of that. */
 async function handleCheck() {
-  const services = evaluateAll(await readHeartbeats(), Date.now());
-  const previous = await lastAlertedHealth();
-  const transitions: unknown[] = [];
+  const nowMs = Date.now();
+  const services = evaluateAll(await readHeartbeats(), nowMs);
+  const planned = planAlerts(services, await lastAlertPerService(), nowMs);
+  let notified = 0;
 
-  for (const service of services) {
-    const before = previous.get(service.key);
-    if (before === service.health) continue;
-    /* First sighting of a healthy service is not news. */
-    if (before === undefined && !ALERTABLE.has(service.health)) continue;
-    /* Recovery IS news, but only if we previously said something was wrong. */
-    if (!ALERTABLE.has(service.health) && before && !ALERTABLE.has(before as Health)) continue;
-
-    const message = service.health === "ok"
-      ? `${service.label} is back — ${service.reason}`
-      : `${service.label}: ${service.reason}`;
+  for (const alert of planned) {
     const { data, error } = await admin
       .from("service_alerts")
       .insert({
-        service: service.key,
-        from_health: before ?? null,
-        to_health: service.health,
-        message,
+        service: alert.service,
+        from_health: alert.fromHealth,
+        to_health: alert.toHealth,
+        message: alert.message,
       })
       .select("id, service, from_health, to_health, message, created_at")
       .single();
@@ -149,11 +157,17 @@ async function handleCheck() {
       console.error("ops: alert insert failed", error.message);
       continue;
     }
-    transitions.push(data);
-    await pushAlert(data);
+    if (!alert.notify) continue;
+    await deliver(alert, data);
+    notified += 1;
   }
 
-  return json({ checked: services.length, transitions: transitions.length });
+  return json({
+    checked: services.length,
+    recorded: planned.length,
+    notified,
+    telegram: telegramConfigured(),
+  });
 }
 
 Deno.serve(async (req) => {
