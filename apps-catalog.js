@@ -21,6 +21,8 @@ export const APPS = Object.freeze([
 
   { url: "messenger.html", name: "Messenger", icon: "💬", group: "grp.social", locked: true,
     keywords: ["chat", "noriichten", "nachrichten", "messages", "gruppen"] },
+  { url: "inbox.html", name: "Vereenegt Inbox", icon: "📥", group: "grp.social", locked: true,
+    keywords: ["inbox", "noriichten", "messagen", "nachrichten", "messages", "whatsapp", "imessage", "boîte de réception"] },
   { url: "friends.html", name: "Friends", icon: "👥", group: "grp.social", locked: true,
     keywords: ["frënn", "freunde", "amis", "contacts"] },
   { url: "classchat.html", name: "Klass-Chat", icon: "🗣️", group: "grp.social", locked: true,

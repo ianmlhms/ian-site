@@ -1,6 +1,7 @@
 // Supabase Edge Function: notify
 // Fan-out Web Push for new activity. Invoked by Database Webhooks on INSERT into:
 //   - public.messages       → "new message"      (notify other group members)
+//   - public.bridge_messages → "bridge message"  (notify the bridge owner)
 //   - public.friendships    → "friend request"   (notify the addressee)
 //   - public.game_invites   → "game invite"      (notify the invitee)
 // so notifications arrive on the iPad even when the site is fully closed.
@@ -21,6 +22,7 @@ const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:konto@ian.lu";
 const NOTIFY_SECRET = Deno.env.get("NOTIFY_SECRET") ?? "";
+const PUSH_PREVIEW_LENGTH = 140;
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -61,6 +63,38 @@ function mentionsIn(content: string): string[] {
 type Plan = { recipients: string[]; title: string; body: string; url: string; tag: string };
 
 async function planFor(table: string, rec: any): Promise<Plan[]> {
+  if (table === "bridge_messages") {
+    if (!rec?.chat_id || rec.is_from_me === true) return [];
+    const { data: chat, error: chatError } = await admin
+      .from("bridge_chats")
+      .select("owner,title,last_preview,muted")
+      .eq("id", rec.chat_id)
+      .maybeSingle();
+    if (chatError) {
+      console.error("bridge chat lookup failed", chatError.message);
+      return [];
+    }
+    if (!chat?.owner || chat.muted === true) return [];
+
+    const body = rec.body?.trim()
+      ? String(rec.body).trim().slice(0, PUSH_PREVIEW_LENGTH)
+      : chat.last_preview?.trim()
+      ? String(chat.last_preview).trim().slice(0, PUSH_PREVIEW_LENGTH)
+      : rec.kind === "image" ? "📷 Bild"
+      : rec.kind === "video" ? "🎥 Video"
+      : rec.kind === "audio" ? "🎤 Sproochnoriicht"
+      : rec.kind === "file" ? "📎 Fichier"
+      : rec.kind === "system" ? "⚙️ System"
+      : "Nei Noriicht";
+    return [{
+      recipients: [chat.owner],
+      title: chat.title || "Chat ouni Numm",
+      body,
+      url: `inbox.html?chat=${encodeURIComponent(String(rec.chat_id))}`,
+      tag: `bridge-${rec.service || "message"}-${rec.chat_id}`,
+    }];
+  }
+
   if (table === "messages") {
     if (!rec?.group_id) return [];
     const { data: group } = await admin
