@@ -124,6 +124,13 @@
     #app.chat-open .chat-head{padding-top:max(12px,env(safe-area-inset-top));padding-right:max(18px,env(safe-area-inset-right));padding-left:max(18px,env(safe-area-inset-left))}
     .search-input,.composer input{font-size:16px}
   }
+
+  .chat-row button{display:flex;align-items:center;gap:12px}
+  .chat-row-texts{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+  .chat-avatar{flex:none;width:44px;height:44px;border-radius:50%;overflow:hidden;
+    display:grid;place-items:center;background:var(--border);color:var(--text);
+    font-size:15px;font-weight:600;letter-spacing:.5px}
+  .chat-avatar img{width:100%;height:100%;object-fit:cover;display:block}
 </style>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -190,6 +197,6 @@
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="inbox.js?v=1"></script>
+<script type="module" src="inbox.js?v=2"></script>
 </body>
 </html>

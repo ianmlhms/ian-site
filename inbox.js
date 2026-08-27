@@ -9,7 +9,7 @@ import {
   queueOutbox,
   searchMessages,
   subscribeToBridge,
-} from "./inbox-data.js?v=1";
+} from "./inbox-data.js?v=2";
 import {
   highlightMessage,
   renderAccounts,
@@ -20,7 +20,7 @@ import {
   renderMessagesLoading,
   renderSearchResults,
   showNotice,
-} from "./inbox-render.js?v=1";
+} from "./inbox-render.js?v=2";
 
 const SEARCH_DELAY_MS = 300;
 const ACCOUNT_REFRESH_MS = 30 * 1000;
@@ -65,7 +65,7 @@ function renderSidebar() {
     renderSearchResults(state.searchResults, chatsById(), selectChat);
     return;
   }
-  renderChatList(filteredChats(), state.selectedChatId, selectChat);
+  renderChatList(filteredChats(), state.selectedChatId, selectChat, (path) => createMediaUrl(supabase, path));
 }
 
 function showError(error) {

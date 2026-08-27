@@ -73,16 +73,53 @@ export function renderGate(isVisible, onSignIn) {
   button.onclick = onSignIn;
 }
 
-export function renderChatList(chats, selectedChatId, onSelect) {
+// Signed URLs cost a round trip and expire, so each chat's avatar is resolved
+// once per page load and reused for every re-render of the list.
+const avatarUrlCache = new Map();
+
+function initialsOf(title) {
+  const words = String(title || "?").trim().split(/\s+/).slice(0, 2);
+  return words.map((w) => w[0] || "").join("").toUpperCase() || "?";
+}
+
+function chatAvatar(chat, createMediaUrl) {
+  const avatar = document.createElement("span");
+  avatar.className = "chat-avatar";
+  avatar.textContent = initialsOf(chat.title);
+  if (!chat.avatar_path || typeof createMediaUrl !== "function") return avatar;
+
+  const cached = avatarUrlCache.get(chat.avatar_path);
+  if (cached) {
+    applyAvatarImage(avatar, cached, chat.title);
+    return avatar;
+  }
+  createMediaUrl(chat.avatar_path)
+    .then((url) => {
+      avatarUrlCache.set(chat.avatar_path, url);
+      applyAvatarImage(avatar, url, chat.title);
+    })
+    .catch(() => { /* initials stay; a missing avatar is not worth an error */ });
+  return avatar;
+}
+
+function applyAvatarImage(host, url, title) {
+  const image = document.createElement("img");
+  image.src = url;
+  image.alt = title || "";
+  image.loading = "lazy";
+  image.onload = () => { host.textContent = ""; host.append(image); };
+}
+
+export function renderChatList(chats, selectedChatId, onSelect, createMediaUrl) {
   const list = emptyNode(element("chatList"));
   if (!chats.length) {
     list.append(textNode("li", "empty", "Keng Chats an dësem Filter."));
     return;
   }
-  chats.forEach((chat) => list.append(chatRow(chat, selectedChatId, onSelect)));
+  chats.forEach((chat) => list.append(chatRow(chat, selectedChatId, onSelect, createMediaUrl)));
 }
 
-function chatRow(chat, selectedChatId, onSelect) {
+function chatRow(chat, selectedChatId, onSelect, createMediaUrl) {
   const item = document.createElement("li");
   item.className = `chat-row${chat.unread ? " unread" : ""}${chat.id === selectedChatId ? " active" : ""}`;
   const button = document.createElement("button");
@@ -98,7 +135,10 @@ function chatRow(chat, selectedChatId, onSelect) {
     textNode("span", `service-badge ${chat.service}`, serviceLabel(chat.service)),
     textNode("span", "chat-preview", chat.last_preview || "Nach keng Virschau"),
   );
-  button.append(top, bottom);
+  const texts = document.createElement("span");
+  texts.className = "chat-row-texts";
+  texts.append(top, bottom);
+  button.append(chatAvatar(chat, createMediaUrl), texts);
   item.append(button);
   return item;
 }
