@@ -296,3 +296,42 @@ site side must know:
 - iOS Safari now shows a proactive "📲 Als App" chip (`theme.js` — no
   `beforeinstallprompt` on iOS) that opens a small Add-to-Home-Screen guide;
   dismissal is remembered in `localStorage.pwaInstallDismissed`.
+
+## 10. Vereenegt Inbox — chats + mail (28 Aug 2026)
+
+`inbox.html` is the companion page for the [Unified Messenger] bridge. It has
+**two modes**, switched by the segmented control above the chat list:
+
+- **💬 Chats** — WhatsApp + iMessage, from `bridge_chats` / `bridge_messages`.
+- **✉️ Mail** — four IMAP mailboxes, from `bridge_mail_*`.
+
+Files: `inbox.js` (entry, mode state), `inbox-data.js` + `inbox-render.js`
+(chats), `inbox-mail-data.js` + `inbox-mail-render.js` (mail).
+
+### Mail schema
+`scripts/bridge-mail-v1.sql` — `bridge_mail_accounts`, `bridge_mail_messages`,
+`bridge_mail_attachments`, `bridge_mail_outbox`. Same RLS shape as the chat
+tables (`owner = auth.uid()`, service-role writes). All four are in the
+`supabase_realtime` publication. Seeded accounts:
+
+| label | address | provider |
+|---|---|---|
+| `mulheims` | ian@mulheims.lu | Microsoft 365 (receives `konto@ian.lu`, `ian@ian.lu`) |
+| `icloud` | ianmulheims@icloud.com | iCloud |
+| `gmail` | iamulheims@gmail.com | Google |
+| `school` | im9141@elaml.lu | Google Workspace |
+
+### Daemon
+`~/OneDrive - Mulheims/MessengerBridge/mail/` (stdlib Python, see its README).
+App passwords go in `~/.messengerbridge/mail.env` (0600, never in the repo).
+
+### Gotchas
+- **`hidden` needs help here.** `.connection-strip`, `.mail-strip` and
+  `.filters` all set an explicit `display:`, which beats the UA `[hidden]`
+  rule — there is an explicit `…[hidden]{display:none}` line for them.
+- **Never `innerHTML` mail content.** Bodies are other people's HTML. Plain
+  text is rendered into a `<pre>` via `textContent`; the rendered HTML is only
+  ever opened in a new tab through a signed Storage URL, off ian.lu's origin.
+- **No Web Push for mail yet.** The `notify` edge function has a
+  `bridge_messages` branch but no `bridge_mail_messages` one — deliberate, so
+  newsletters do not buzz the phone. Wire it with a bulk filter if wanted.

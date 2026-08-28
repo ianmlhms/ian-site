@@ -20,7 +20,27 @@ import {
   renderMessagesLoading,
   renderSearchResults,
   showNotice,
-} from "./inbox-render.js?v=2";
+} from "./inbox-render.js?v=3";
+import {
+  createMailBodyUrl,
+  fetchMailAccounts,
+  fetchMailAttachments,
+  fetchMailMessages,
+  fetchMailThread,
+  queueMailReply,
+  searchMail,
+  subscribeToMail,
+} from "./inbox-mail-data.js?v=1";
+import {
+  renderMailAccounts,
+  renderMailBody,
+  renderMailHeader,
+  renderMailList,
+  renderMailLoading,
+} from "./inbox-mail-render.js?v=1";
+
+const MODE_CHATS = "chats";
+const MODE_MAIL = "mail";
 
 const SEARCH_DELAY_MS = 300;
 const ACCOUNT_REFRESH_MS = 30 * 1000;
@@ -32,13 +52,22 @@ let state = Object.freeze({
   accounts: [],
   chats: [],
   filter: "all",
+  mailAccounts: [],
+  mailAttachments: [],
+  mailFilter: "all",
+  mailMessages: [],
+  mailSearchResults: [],
+  mailThread: [],
   messages: [],
+  mode: MODE_CHATS,
   pending: [],
   searchResults: [],
   searchTerm: "",
   selectedChatId: null,
+  selectedMailId: null,
 });
 let bridgeChannel = null;
+let mailChannel = null;
 let searchTimer = null;
 let accountTimer = null;
 let noticeTimer = null;
@@ -60,7 +89,31 @@ function filteredChats() {
   return state.chats.filter((chat) => chat.service === state.filter);
 }
 
+function mailAccountsById() {
+  return Object.fromEntries(state.mailAccounts.map((account) => [account.id, account]));
+}
+
+function currentMail() {
+  return state.mailMessages.find((mail) => mail.id === state.selectedMailId)
+    || state.mailSearchResults.find((mail) => mail.id === state.selectedMailId)
+    || null;
+}
+
+function filteredMail() {
+  const source = state.searchTerm ? state.mailSearchResults : state.mailMessages;
+  if (state.mailFilter === "people") return source.filter((mail) => !mail.is_bulk);
+  if (state.mailFilter === "bulk") return source.filter((mail) => mail.is_bulk);
+  if (state.mailFilter === "unread") {
+    return source.filter((mail) => !mail.is_read && !mail.is_from_me);
+  }
+  return source;
+}
+
 function renderSidebar() {
+  if (state.mode === MODE_MAIL) {
+    renderMailList(filteredMail(), state.selectedMailId, selectMail, mailAccountsById());
+    return;
+  }
   if (state.searchTerm) {
     renderSearchResults(state.searchResults, chatsById(), selectChat);
     return;
@@ -77,7 +130,21 @@ function pendingForCurrentChat() {
   return state.pending.filter((item) => item.chatId === state.selectedChatId);
 }
 
+function renderMailConversation() {
+  const mail = currentMail();
+  renderMailHeader(mail, mailAccountsById()[mail?.account_id], closeMobileChat);
+  renderMailBody(mail, state.mailThread, {
+    attachments: state.mailAttachments,
+    createBodyUrl: (path) => createMailBodyUrl(supabase, path),
+    onError: showError,
+  });
+}
+
 function renderConversation() {
+  if (state.mode === MODE_MAIL) {
+    renderMailConversation();
+    return;
+  }
   renderChatHeader(currentChat(), closeMobileChat);
   renderMessages(state.messages, pendingForCurrentChat(), {
     createMediaUrl: (path) => createMediaUrl(supabase, path),
@@ -95,8 +162,79 @@ function setFilter(service) {
   renderSidebar();
 }
 
+function setMailFilter(kind) {
+  setState({ mailFilter: kind });
+  document.querySelectorAll("[data-mail-filter]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.mailFilter === kind);
+  });
+  renderSidebar();
+}
+
+function setMode(mode) {
+  if (state.mode === mode) return;
+  setState({ mode, searchTerm: "", searchResults: [], mailSearchResults: [] });
+  const isMail = mode === MODE_MAIL;
+  document.querySelectorAll("[data-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.mode === mode);
+  });
+  document.getElementById("chatFilters").hidden = isMail;
+  document.getElementById("mailFilters").hidden = !isMail;
+  document.getElementById("mailStrip").hidden = !isMail;
+  document.getElementById("connectionStrip").hidden = isMail;
+  document.getElementById("sidebarTitle").textContent = isMail ? "All Mailen" : "All Chats";
+  const search = document.getElementById("searchInput");
+  search.value = "";
+  search.placeholder = isMail ? "Mailen duerchsichen…" : "Noriichten duerchsichen…";
+  document.getElementById("messageInput").placeholder = isMail ? "Äntwert…" : "Noriicht…";
+  document.getElementById("composer").hidden = isMail
+    ? !state.selectedMailId
+    : !state.selectedChatId;
+  closeMobileChat();
+  renderSidebar();
+  renderConversation();
+}
+
 function closeMobileChat() {
   document.getElementById("app").classList.remove("chat-open");
+}
+
+async function selectMail(mailId) {
+  const mail = state.mailMessages.find((entry) => entry.id === mailId)
+    || state.mailSearchResults.find((entry) => entry.id === mailId);
+  if (!mail) {
+    showNotice("Dës Mail ass net méi verfügbar.", "error");
+    return;
+  }
+  setState({ mailAttachments: [], mailThread: [], selectedMailId: mailId });
+  renderSidebar();
+  renderMailHeader(mail, mailAccountsById()[mail.account_id], closeMobileChat);
+  renderMailLoading();
+  document.getElementById("app").classList.add("chat-open");
+  document.getElementById("composer").hidden = false;
+  try {
+    const [mailThread, mailAttachments] = await Promise.all([
+      fetchMailThread(supabase, mail.thread_key),
+      mail.has_attachments ? fetchMailAttachments(supabase, mailId) : Promise.resolve([]),
+    ]);
+    if (state.selectedMailId !== mailId) return;
+    setState({ mailAttachments, mailThread });
+    renderMailConversation();
+  } catch (error) {
+    if (state.selectedMailId !== mailId) return;
+    renderMailConversation();
+    showError(error);
+  }
+}
+
+async function sendMailReply(body) {
+  const mail = currentMail();
+  if (!mail) return;
+  try {
+    await queueMailReply(supabase, mail, body);
+    showNotice("Äntwert an d'Waardschlaang gesat.", "success");
+  } catch (error) {
+    showError(error);
+  }
 }
 
 async function selectChat(chatId, remoteId = null) {
@@ -166,6 +304,12 @@ async function sendMessage(event) {
   event.preventDefault();
   const input = document.getElementById("messageInput");
   const body = input.value.trim();
+  if (state.mode === MODE_MAIL) {
+    if (!body) return;
+    input.value = "";
+    void sendMailReply(body);
+    return;
+  }
   const chat = currentChat();
   if (!chat || !body) return;
   input.value = "";
@@ -210,6 +354,14 @@ function sortedChats(chats) {
   return [...chats].sort((left, right) => {
     const rightTime = new Date(right.last_at || 0).getTime();
     const leftTime = new Date(left.last_at || 0).getTime();
+    return rightTime - leftTime;
+  });
+}
+
+function sortedMail(mail) {
+  return [...mail].sort((left, right) => {
+    const rightTime = new Date(right.sent_at || 0).getTime();
+    const leftTime = new Date(left.sent_at || 0).getTime();
     return rightTime - leftTime;
   });
 }
@@ -280,6 +432,37 @@ function onAccountUpdate(account) {
   renderAccounts(state.accounts);
 }
 
+function onMailInsert(mail) {
+  setState({
+    mailMessages: sortedMail(upsertById(state.mailMessages, mail)),
+  });
+  if (state.mode === MODE_MAIL) renderSidebar();
+}
+
+function onMailUpdate(mail) {
+  setState({
+    mailMessages: sortedMail(upsertById(state.mailMessages, mail)),
+    mailThread: state.mailThread.some((entry) => entry.id === mail.id)
+      ? upsertById(state.mailThread, mail)
+      : state.mailThread,
+  });
+  if (state.mode !== MODE_MAIL) return;
+  renderSidebar();
+  if (state.selectedMailId === mail.id) renderMailConversation();
+}
+
+function onMailOutboxUpdate(outbox) {
+  if (outbox.status === "sent") showNotice("Mail geschéckt.", "success");
+  if (outbox.status === "failed") {
+    showNotice(outbox.error || "D'Mail konnt net geschéckt ginn.", "error");
+  }
+}
+
+function onMailAccountUpdate(account) {
+  setState({ mailAccounts: upsertById(state.mailAccounts, account) });
+  renderMailAccounts(state.mailAccounts);
+}
+
 function onRealtimeStatus(status) {
   if (status === "SUBSCRIBED") {
     showNotice("Live-Verbindung aktiv.", "success");
@@ -289,6 +472,20 @@ function onRealtimeStatus(status) {
   }
   if (REALTIME_ERROR_STATES.includes(status)) {
     showNotice("D'Live-Verbindung ass ënnerbrach. D'Donnéeë kënnen al sinn.", "error");
+  }
+}
+
+async function runMailSearch(term) {
+  try {
+    const mailSearchResults = await searchMail(supabase, term);
+    if (state.searchTerm !== term) return;
+    setState({ mailSearchResults });
+    renderSidebar();
+  } catch (error) {
+    if (state.searchTerm !== term) return;
+    setState({ mailSearchResults: [] });
+    renderSidebar();
+    showError(error);
   }
 }
 
@@ -309,15 +506,18 @@ async function runSearch(term) {
 function onSearchInput(event) {
   const searchTerm = event.target.value.trim();
   window.clearTimeout(searchTimer);
-  setState({ searchResults: [], searchTerm });
+  setState({ mailSearchResults: [], searchResults: [], searchTerm });
   renderSidebar();
   if (!searchTerm) return;
-  searchTimer = window.setTimeout(() => void runSearch(searchTerm), SEARCH_DELAY_MS);
+  const run = state.mode === MODE_MAIL ? runMailSearch : runSearch;
+  searchTimer = window.setTimeout(() => void run(searchTerm), SEARCH_DELAY_MS);
 }
 
 function stopAuthenticatedApp() {
   if (bridgeChannel) void supabase.removeChannel(bridgeChannel);
   bridgeChannel = null;
+  if (mailChannel) void supabase.removeChannel(mailChannel);
+  mailChannel = null;
   window.clearInterval(accountTimer);
   accountTimer = null;
   window.clearTimeout(searchTimer);
@@ -325,11 +525,17 @@ function stopAuthenticatedApp() {
     accounts: [],
     chats: [],
     filter: "all",
+    mailAccounts: [],
+    mailAttachments: [],
+    mailMessages: [],
+    mailSearchResults: [],
+    mailThread: [],
     messages: [],
     pending: [],
     searchResults: [],
     searchTerm: "",
     selectedChatId: null,
+    selectedMailId: null,
   });
   document.getElementById("app").classList.remove("chat-open");
   document.getElementById("composer").hidden = true;
@@ -351,12 +557,20 @@ async function startAuthenticatedApp() {
     }, ACCOUNT_REFRESH_MS);
   }
   try {
-    const [chats, accounts] = await Promise.all([
+    const [chats, accounts, mailAccounts, mailMessages] = await Promise.all([
       fetchChats(supabase),
       fetchAccounts(supabase),
+      fetchMailAccounts(supabase).catch(() => []),
+      fetchMailMessages(supabase).catch(() => []),
     ]);
-    setState({ accounts, chats: sortedChats(chats) });
+    setState({
+      accounts,
+      chats: sortedChats(chats),
+      mailAccounts,
+      mailMessages: sortedMail(mailMessages),
+    });
     renderAccounts(state.accounts);
+    renderMailAccounts(state.mailAccounts);
     renderSidebar();
     renderChatHeader(null, closeMobileChat);
     subscribe(activeSession.user.id);
@@ -376,6 +590,14 @@ function subscribe(userId) {
     onOutboxUpdate,
     onStatus: onRealtimeStatus,
   });
+  if (mailChannel) void supabase.removeChannel(mailChannel);
+  mailChannel = subscribeToMail(supabase, userId, {
+    onMailAccountUpdate,
+    onMailInsert,
+    onMailOutboxUpdate,
+    onMailUpdate,
+    onStatus: () => {},
+  });
 }
 
 function openChatFromUrl() {
@@ -390,6 +612,12 @@ function bindUi() {
   document.getElementById("searchInput").addEventListener("input", onSearchInput);
   document.querySelectorAll("[data-service-filter]").forEach((button) => {
     button.addEventListener("click", () => setFilter(button.dataset.serviceFilter));
+  });
+  document.querySelectorAll("[data-mail-filter]").forEach((button) => {
+    button.addEventListener("click", () => setMailFilter(button.dataset.mailFilter));
+  });
+  document.querySelectorAll("[data-mode]").forEach((button) => {
+    button.addEventListener("click", () => setMode(button.dataset.mode));
   });
 }
 
