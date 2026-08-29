@@ -3,8 +3,7 @@ import {
   DEFAULT_PIN_LENGTH,
   esc,
   translate,
-  weakPin,
-} from "./pin-pad.js?v=3";
+} from "./pin-pad.js?v=4";
 const USERNAME_SHAPE = /^[A-Za-z0-9_]{3,20}$/;
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let modal = null;
@@ -275,10 +274,6 @@ async function submitSignUp(deps, first, second, length) {
     setMessage(t("pin.noMatch", "D'PINe sinn net d'selwecht."), "err");
     return;
   }
-  if (weakPin(pin)) {
-    setMessage(t("pin.weak", "Wiel e manner bekannte PIN."), "err");
-    return;
-  }
   setMessage("…");
   try {
     const data = await deps.signUpRandom(email, username);
@@ -431,10 +426,6 @@ export function openPinDialog(deps, options = {}) {
     const pin = first.value();
     if (pin !== second.value() || pin.length !== length) {
       setMessage(t("pin.noMatch", "D'PINe sinn net d'selwecht."), "err");
-      return;
-    }
-    if (weakPin(pin)) {
-      setMessage(t("pin.weak", "Wiel e manner bekannte PIN."), "err");
       return;
     }
     setMessage("…");

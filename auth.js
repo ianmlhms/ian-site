@@ -1,7 +1,7 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=28";
-import { openAuthDialog } from "./auth-ui.js?v=5";
-import { esc } from "./pin-pad.js?v=3";
+import "./i18n-dict.js?v=29";
+import { openAuthDialog } from "./auth-ui.js?v=6";
+import { esc } from "./pin-pad.js?v=4";
 import {
   openProfilePinDialog,
   resetPinBriefing,

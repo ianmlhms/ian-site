@@ -31,7 +31,6 @@ window.I18N_DICT = {
   "pin.repeatDigit": { lb: "PIN nach eng Kéier, Ziffer", de: "PIN erneut, Ziffer", en: "Repeat PIN, digit" },
   "pin.signupFields": { lb: "Kontrolléier Numm an E-Mail.", de: "Prüfe Name und E-Mail.", en: "Check the name and email." },
   "pin.noMatch": { lb: "D'PINe sinn net d'selwecht.", de: "Die PINs stimmen nicht überein.", en: "The PINs do not match." },
-  "pin.weak": { lb: "Wiel e manner bekannte PIN.", de: "Wähle eine weniger bekannte PIN.", en: "Choose a less common PIN." },
   "pin.confirmEmail": { lb: "De Kont ass do, mee de PIN konnt net direkt gesat ginn. Schreif dem Ian.", de: "Das Konto wurde erstellt, aber die PIN konnte nicht direkt gesetzt werden. Schreib Ian.", en: "The account was created, but the PIN could not be set immediately. Ask Ian." },
   "pin.signupError": { lb: "De Kont konnt net erstallt ginn.", de: "Das Konto konnte nicht erstellt werden.", en: "The account could not be created." },
   "pin.forgotTitle": { lb: "Neie PIN setzen", de: "Neue PIN festlegen", en: "Set a new PIN" },
