@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Burger Rush</title>
+<style>
+:root{color-scheme:dark;--ink:#fff8e7;--muted:#c8bca2;--panel:#272136;--panel-2:#342b43;--line:#574967;--red:#ee5c4d;--gold:#ffc84c;--green:#76d66b;--blue:#63c7e8;--shadow:0 5px 0 #15111d;--tap:44px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:#14101c;color:var(--ink);font-family:ui-rounded,"SF Pro Rounded",system-ui,sans-serif;overscroll-behavior:none}
+body{min-height:100svh;background:radial-gradient(circle at 50% -10%,#59405d 0,transparent 42%),linear-gradient(#261b31,#14101c 70%);touch-action:manipulation}
+button{min-width:var(--tap);min-height:var(--tap);border:1px solid #746181;border-radius:13px;background:linear-gradient(#4a3d59,#332a40);color:var(--ink);font:700 14px/1.1 inherit;box-shadow:0 3px 0 #17121e;cursor:pointer}
+button:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #17121e}
+button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
+[hidden]{display:none!important}
+.game-shell{width:min(100%,760px);min-height:100svh;margin:auto;display:flex;flex-direction:column;padding:max(8px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom));gap:8px}
+.brand{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 4px}
+.brand h1{margin:0;font-size:20px;letter-spacing:.02em}
+.brand-balance{display:flex;gap:12px;font-weight:800;color:var(--gold)}
+.play-area{display:flex;flex:1;min-height:0;flex-direction:column;gap:8px;overflow:auto;padding:1px 1px 4px}
+.zone{border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(57,47,71,.96),rgba(34,28,45,.96));box-shadow:var(--shadow)}
+.zone-heading{display:flex;align-items:center;justify-content:space-between;min-height:28px;padding:5px 9px;color:var(--muted);font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.customers{min-height:132px;padding:0 7px 8px;display:grid;grid-template-columns:repeat(var(--counter-slots,3),minmax(86px,1fr));gap:6px;overflow-x:auto}
+.customer{min-width:86px;min-height:94px;position:relative;display:flex;align-items:center;justify-content:flex-end;flex-direction:column;padding:3px;border-radius:13px;background:#211b2c;border:1px solid #4c4058}
+.customer.empty{opacity:.4;background:repeating-linear-gradient(135deg,#211b2c,#211b2c 7px,#282032 7px,#282032 14px)}
+.customer-art{width:46px;height:46px;margin-bottom:-4px}
+.order-bubble{width:100%;min-height:39px;display:flex;align-items:center;justify-content:center;gap:1px;padding:3px;border-radius:10px;background:#fff8e7;color:#251d2d}
+.order-item{width:31px;height:31px;display:grid;place-items:center}
+.patience{position:absolute;top:4px;left:5px;right:5px;height:6px;border-radius:9px;background:#4c3d50;overflow:hidden}
+.patience-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--red),var(--gold),var(--green));transform-origin:left}
+.tray-zone{padding-bottom:7px}
+.tray{min-height:66px;display:grid;grid-template-columns:repeat(var(--tray-slots,2),minmax(56px,1fr));gap:6px;padding:0 7px}
+.tray-slot,.station-slot{position:relative;display:grid;place-items:center;min-width:var(--tap);min-height:56px;border:1px dashed #75617f;border-radius:12px;background:#211b2c}
+.tray-slot.filled{border-style:solid;border-color:#d5b24f;background:#3b302b;animation:pop .18s ease-out}
+.tray-slot.shake{animation:shake .32s linear}
+.stations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.station{min-height:137px;padding:6px;display:flex;flex-direction:column;gap:5px}
+.station-title{display:flex;align-items:center;gap:5px;min-height:28px;font-size:13px;font-weight:900}
+.station-title .sprite{width:32px;height:32px}
+.station-slots{display:grid;grid-template-columns:repeat(2,minmax(44px,1fr));gap:5px;flex:1}
+.station-slot{border-style:solid;overflow:hidden}
+.station-slot .state-label{position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:6px;background:rgba(10,8,14,.78);font-size:9px;text-transform:uppercase}
+.station-slot.ready{border-color:var(--green);box-shadow:inset 0 0 12px rgba(118,214,107,.25)}
+.station-slot.burnt{border-color:var(--red);background:#392327}
+.station-slot.locked{opacity:.42}
+.drink-options,.toppings{display:flex;flex-wrap:wrap;gap:5px}
+.drink-choice,.topping{flex:1;padding:3px;min-width:44px;font-size:11px}
+.drink-choice.active,.topping.active{border-color:var(--gold);background:#5b472b}
+.assembly{display:grid;grid-template-columns:minmax(62px,1fr) minmax(62px,1fr);gap:5px;flex:1}
+.assembly-preview{min-height:62px;display:grid;place-items:center;border:1px dashed #75617f;border-radius:12px;background:#211b2c}
+.assembly-actions{display:flex;flex-direction:column;gap:5px}
+.plate-button{flex:1;background:linear-gradient(#e7814e,#b6493e);border-color:#ffb373}
+.sprite{position:relative;width:48px;height:48px;display:block;background-position:center;background-repeat:no-repeat;background-size:contain;pointer-events:none}
+.burger-stack{position:relative;width:52px;height:48px}
+.burger-layer{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;background-size:contain}
+.hud{position:sticky;bottom:0;z-index:5;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:7px;border:1px solid #6d586e;border-radius:16px;background:rgba(27,21,35,.96);box-shadow:0 -4px 18px rgba(8,6,12,.35)}
+.hud-cell{min-width:0;text-align:center}
+.hud-label{display:block;color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase}
+.hud-value{display:block;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:900;white-space:nowrap}
+.boost-button{grid-column:1/-1;min-height:44px;background:linear-gradient(#7d5adb,#4a36a0)}
+.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:rgba(10,8,14,.76);backdrop-filter:blur(5px)}
+.modal{width:min(94vw,430px);padding:20px;border:1px solid #806b89;border-radius:22px;background:linear-gradient(145deg,#40344d,#241d2e);box-shadow:0 16px 45px rgba(0,0,0,.5);text-align:center}
+.modal h2{margin:0 0 8px;font-size:27px}
+.modal p{margin:6px 0;color:var(--muted)}
+.modal-stars{min-height:42px;color:var(--gold);font-size:34px;letter-spacing:4px}
+.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.modal-actions .primary{background:linear-gradient(#ee7558,#bb413e);border-color:#ff9e75}
+.shop-layer{display:block;overflow:auto;padding:max(12px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom))}
+.shop{width:min(100%,620px);min-height:calc(100svh - 24px);margin:auto;padding:12px;border:1px solid #806b89;border-radius:20px;background:#201929}
+.shop-header{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.shop-title{margin:0;font-size:22px}
+.shop-balance{grid-column:1/-1;color:var(--gold);font-size:13px;font-weight:800}
+.shop-close{grid-column:2;grid-row:1}
+.shop-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
+.shop-tab.active{border-color:var(--gold);background:#5b472b}
+.shop-panel{display:flex;flex-direction:column;gap:7px}
+.upgrade-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:10px;border:1px solid #4e4059;border-radius:14px;background:#2d2538}
+.upgrade-name{margin:0 0 2px;font-size:15px}
+.upgrade-description{margin:0;color:var(--muted);font-size:12px}
+.upgrade-level{display:block;margin-top:4px;color:var(--blue);font-size:11px;font-weight:800}
+.upgrade-buy{min-width:72px}
+.toast{position:fixed;z-index:40;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));max-width:90vw;transform:translate(-50%,12px);padding:9px 14px;border-radius:12px;background:#111018;color:#fff;box-shadow:0 5px 20px #000;opacity:0;transition:.18s;pointer-events:none;text-align:center;font-weight:800}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.boot-error{margin:auto;padding:18px;color:#ffaca4;text-align:center}
+@keyframes pop{0%{transform:scale(.75)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@media(min-width:600px){.stations{grid-template-columns:repeat(4,minmax(0,1fr))}.station{min-height:180px}.customers{min-height:155px}.customer{min-height:116px}.customer-art{width:58px;height:58px}.hud-value{font-size:16px}}
+@media(max-height:670px){.brand{display:none}.customers{min-height:112px}.station{min-height:126px}.zone-heading{min-height:23px;padding-block:3px}.game-shell{gap:6px}.play-area{gap:6px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<main class="game-shell" id="game">
+  <header class="brand"><h1>🍔 Burger Rush</h1><div class="brand-balance"><span id="coinBalance">🪙 0</span><span id="starBalance">⭐ 0</span></div></header>
+  <div class="play-area">
+    <section class="zone" aria-labelledby="customersLabel">
+      <div class="zone-heading"><span id="customersLabel">Customer counter</span><span id="queueStatus">Get ready!</span></div>
+      <div class="customers" id="customers"></div>
+    </section>
+    <section class="zone tray-zone" aria-labelledby="trayLabel">
+      <div class="zone-heading"><span id="trayLabel">Serving tray</span><span id="trayStatus">0 / 2</span></div>
+      <div class="tray" id="tray"></div>
+    </section>
+    <section class="stations" aria-label="Kitchen stations">
+      <article class="zone station"><div class="station-title" id="grillTitle"></div><div class="station-slots" id="grill"></div></article>
+      <article class="zone station"><div class="station-title" id="fryerTitle"></div><div class="station-slots" id="fryer"></div></article>
+      <article class="zone station"><div class="station-title" id="drinksTitle"></div><div class="drink-options" id="drinkOptions"></div><div class="station-slots" id="drinks"></div></article>
+      <article class="zone station"><div class="station-title" id="toppingsTitle"></div><div class="toppings" id="toppings"></div><div class="assembly"><div class="assembly-preview" id="assembly"></div><div class="assembly-actions"><button class="plate-button" id="plateButton" type="button">Plate burger</button></div></div></article>
+    </section>
+  </div>
+  <footer class="hud" aria-label="Day status">
+    <div class="hud-cell"><span class="hud-label">Day</span><span class="hud-value" id="hudDay">1</span></div>
+    <div class="hud-cell"><span class="hud-label">Goal</span><span class="hud-value" id="hudGoal">🪙 70</span></div>
+    <div class="hud-cell"><span class="hud-label">Time</span><span class="hud-value" id="hudTime">60</span></div>
+    <div class="hud-cell"><span class="hud-label">Combo</span><span class="hud-value" id="hudCombo">×1</span></div>
+    <div class="hud-cell"><span class="hud-label">Today</span><span class="hud-value" id="hudCoins">🪙 0</span></div>
+    <button class="boost-button" id="boostButton" type="button" hidden>⚡ Instant cook</button>
+  </footer>
+</main>
+<div class="modal-layer" id="modalLayer">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle">Burger Rush</h2><div class="modal-stars" id="modalStars">🍔</div><p id="modalMessage">Cook fast, serve happy customers, and grow your restaurant.</p><p id="modalDetail"></p>
+    <div class="modal-actions"><button id="shopButton" type="button">Shop</button><button class="primary" id="startButton" type="button">Start day 1</button></div>
+  </section>
+</div>
+<div class="shop-layer" id="shopLayer" hidden><section class="shop" id="shop"></section></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="boot-error" id="bootError" hidden>Could not start Burger Rush. Reload the game and try again.</div>
+<script>
+(function(){
+  function showBootError(event){
+    console.error("[Burger Rush] Unhandled error.",event.error||event.reason||event.message||event);
+    var error=document.getElementById("bootError"),game=document.getElementById("game");
+    if(error)error.hidden=false;
+    if(game)game.hidden=true;
+    if(new URL(document.baseURI).searchParams.get("burgerTest")==="1"){
+      document.title="BR_TEST_FAIL console-error";
+      try{if(parent!==window)parent.document.title=document.title}catch(ignore){}
+    }
+  }
+  window.addEventListener("error",showBootError);
+  window.addEventListener("unhandledrejection",showBootError);
+})();
+</script>
+<script type="module" src="/pb/burger/ui.js?v=1"></script>
+</body>
+</html>

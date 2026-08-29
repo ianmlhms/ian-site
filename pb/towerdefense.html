@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Tower Defense 3D - PixelBreak</title>
+<style>
+:root{color-scheme:dark;--ink:#f6fbff;--muted:#aebdce;--panel:#101a2be8;--line:#344b67;--gold:#ffda70;--green:#67e1a0;--blue:#63ccff;--danger:#ff6f74}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{overflow:hidden;background:#07101d;color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:manipulation}
+button{min-width:44px;min-height:44px;border:1px solid #ffffff20;border-radius:11px;background:#243852;color:var(--ink);font:700 13px inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:active{transform:scale(.97)}button:disabled{opacity:.38;cursor:default;transform:none}.hidden{display:none!important}
+#shell{position:relative;width:100%;height:100dvh;max-width:980px;margin:auto;display:flex;flex-direction:column;background:#142438;isolation:isolate}
+#hud{z-index:5;display:grid;grid-template-columns:repeat(6,1fr);gap:2px;min-height:54px;padding:5px max(6px,env(safe-area-inset-right)) 5px max(6px,env(safe-area-inset-left));background:#0b1525f5;border-bottom:1px solid var(--line)}
+.stat{text-align:center;min-width:0}.stat b{display:block;color:var(--gold);font-size:clamp(14px,3vw,18px);line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stat span{display:block;color:var(--muted);font-size:8px;letter-spacing:.65px;text-transform:uppercase;white-space:nowrap}
+#stage{position:relative;min-height:220px;flex:1;overflow:hidden;background:#8bc4dd}#battlefield{display:block;width:100%;height:100%;touch-action:none}
+#notice{position:absolute;z-index:7;top:12px;left:50%;max-width:88%;padding:8px 14px;border:1px solid #ffffff24;border-radius:18px;background:#07111ee8;box-shadow:0 5px 18px #0008;font-size:12px;font-weight:750;text-align:center;opacity:0;pointer-events:none;transform:translate(-50%,-8px);transition:.18s ease}#notice.show{opacity:1;transform:translate(-50%,0)}
+#targetMode{position:absolute;z-index:6;top:10px;right:10px;padding:7px 11px;border-radius:16px;background:#bd5037;color:#fff;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;pointer-events:none}
+#dock{z-index:6;padding:6px max(7px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(7px,env(safe-area-inset-left));background:#0b1525f7;border-top:1px solid var(--line);box-shadow:0 -8px 22px #07101d66}
+#skillRow{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:5px}.skill{--cool:0deg;position:relative;overflow:hidden;height:45px;padding:3px;background:#273c57}.skill::after{content:"";position:absolute;inset:2px;border-radius:9px;background:conic-gradient(#07101dd9 var(--cool),transparent 0);pointer-events:none}.skill span,.skill small{position:relative;z-index:1;display:block}.skill span{font-size:16px;line-height:17px}.skill small{font-size:9px;line-height:14px;color:#d9e7f4}
+#actionRow{display:grid;grid-template-columns:minmax(135px,1.6fr) repeat(3,52px);gap:5px;margin-bottom:5px}#waveBtn{background:#268c5b;color:#fff}#speedBtn,#pauseBtn,#menuBtn{font-size:15px}
+#towerTray{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}.towerCard{height:51px;min-height:51px;padding:3px 1px;background:#263951}.towerCard strong,.towerCard span{display:block}.towerCard strong{font-size:11px;color:#dceaff}.towerCard span{font-size:10px;color:var(--gold);margin-top:3px}.towerCard.selected{outline:2px solid var(--gold);background:#365775}
+#inspectPanel{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;min-height:51px;margin-top:5px;padding-top:5px;border-top:1px solid #ffffff17}#inspectText{padding-left:3px;color:#c8d7e7;font-size:11px;line-height:14px}#upgradeBtn{background:#3768ba}#sellBtn{background:#9d454e}
+#overlay{position:absolute;z-index:20;inset:0;display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));overflow:auto;background:radial-gradient(circle at 50% 25%,#1b3953f5,#07101dfa 65%)}
+.panel{width:min(100%,680px);max-height:100%;padding:18px;border:1px solid #ffffff1e;border-radius:20px;background:#101b2dec;box-shadow:0 24px 70px #0009;text-align:center;overflow:auto}.panel h1{margin:0;color:var(--green);font-size:clamp(28px,7vw,44px);letter-spacing:-1px}.panel>p{max-width:520px;margin:7px auto 14px;color:#c1cfdd;font-size:13px;line-height:1.45}
+.menuTitle{display:flex;align-items:center;justify-content:space-between;margin:13px 1px 7px;color:#e8f2fb;font-size:12px;letter-spacing:.7px;text-transform:uppercase}.pill{padding:4px 8px;border-radius:12px;background:#273b55;color:var(--gold);font-size:11px;letter-spacing:0;text-transform:none}
+#levelGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.levelButton{height:50px;background:#263950}.levelButton strong,.levelButton span{display:block}.levelButton strong{font-size:15px}.levelButton span{margin-top:2px;color:var(--gold);font-size:9px}.levelButton.complete{background:#225e49;border-color:#65d69b66}
+#metaGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.metaButton{min-height:58px;padding:7px;text-align:left;background:#243650}.metaButton strong,.metaButton span{display:block}.metaButton strong{color:#9ce9bd;font-size:11px}.metaButton span{margin-top:4px;color:#bac9d8;font-size:9px;line-height:12px}
+#helpBtn{width:100%;margin-top:10px;background:#1f3047}#helpPanel{margin-top:7px;padding:9px 11px;border-radius:10px;background:#0a1321;color:#bac9d8;font-size:11px;line-height:1.55;text-align:left}
+#resultActions{display:flex;justify-content:center;gap:8px;margin-top:15px}#continueBtn{padding:0 24px;background:#2c9a64;font-size:15px}#resultMenuBtn{padding:0 18px}
+#branchSheet{position:absolute;z-index:30;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:14px;background:#050a12b8}.sheet{width:min(100%,520px);padding:15px;border:1px solid #ffffff25;border-radius:18px;background:#111e31;box-shadow:0 15px 50px #000b;text-align:center}.sheet h2{margin:0 0 4px;font-size:20px}.sheet>p{margin:0 0 10px;color:var(--gold);font-size:12px}.branchGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.branch{min-height:78px;padding:9px;background:#2a4160}.branch strong,.branch span{display:block}.branch strong{color:#83e6b0;font-size:13px}.branch span{margin-top:5px;color:#c6d4e1;font-size:10px;line-height:13px}#branchCancel{width:100%;margin-top:8px;background:#1e2c40}
+@media(min-width:700px){#dock{display:grid;grid-template-columns:1.05fr 1.3fr;column-gap:8px}#skillRow{grid-column:1;margin:0}#actionRow{grid-column:2;margin:0}#towerTray,#inspectPanel{grid-column:1/-1;margin-top:6px}.skill{height:51px}}
+@media(max-height:650px){#hud{min-height:46px}.stat b{font-size:13px;line-height:18px}#dock{padding-top:4px}.skill{height:42px}.towerCard{height:46px;min-height:46px}.panel{padding:13px}.panel h1{font-size:27px}.panel>p{margin-bottom:8px}.menuTitle{margin-top:8px}}
+@media(max-width:390px){#hud{grid-template-columns:repeat(3,1fr);min-height:78px}.stat b{line-height:17px}.stat span{font-size:7px}#towerTray{gap:3px}.towerCard strong{font-size:9px}.towerCard span{font-size:9px}#metaGrid{grid-template-columns:1fr}.panel{padding:13px}#levelGrid{gap:5px}.levelButton{height:46px}}
+</style>
+</head>
+<body>
+<main id="shell">
+  <header id="hud" aria-label="Battle statistics">
+    <div class="stat"><b id="gold">—</b><span>Gold</span></div>
+    <div class="stat"><b id="lives">—</b><span>Lives</span></div>
+    <div class="stat"><b id="wave">—</b><span>Wave</span></div>
+    <div class="stat"><b id="foes">—</b><span>Foes</span></div>
+    <div class="stat"><b id="kills">0</b><span>Lifetime</span></div>
+    <div class="stat"><b id="shards">0</b><span>Shards</span></div>
+  </header>
+  <section id="stage">
+    <canvas id="battlefield" aria-label="3D tower defense battlefield. Drag to pan, pinch or scroll to zoom, and tap to interact."></canvas>
+    <div id="notice" role="status" aria-live="polite"></div>
+    <div id="targetMode" class="hidden">Choose meteor target</div>
+  </section>
+  <section id="dock" aria-label="Battle controls">
+    <div id="skillRow">
+      <button class="skill" id="skill-meteor" aria-label="Meteor strike"><span>☄</span><small>Meteor</small></button>
+      <button class="skill" id="skill-freeze" aria-label="Freeze pulse"><span>❄</span><small>Freeze</small></button>
+      <button class="skill" id="skill-rally" aria-label="Rally damage boost"><span>⚔</span><small>Rally</small></button>
+      <button class="skill" id="skill-heal" aria-label="Repair base"><span>♥</span><small>Repair</small></button>
+    </div>
+    <div id="actionRow">
+      <button id="waveBtn">Start wave</button>
+      <button id="speedBtn" aria-label="Change game speed">1×</button>
+      <button id="pauseBtn" aria-label="Pause game">Ⅱ</button>
+      <button id="menuBtn" aria-label="Open level menu">☰</button>
+    </div>
+    <div id="towerTray" aria-label="Tower types"></div>
+    <div id="inspectPanel" class="hidden">
+      <div id="inspectText"></div>
+      <button id="upgradeBtn">Upgrade</button>
+      <button id="sellBtn">Sell</button>
+    </div>
+  </section>
+  <section id="overlay">
+    <div class="panel">
+      <h1 id="overlayTitle">Tower Defense 3D</h1>
+      <p id="overlayText">Command the battlefield, trigger skills, and forge permanent realm upgrades.</p>
+      <div id="menuSections">
+        <div class="menuTitle"><span>Battlefields</span><span class="pill"><span id="starTotal">0</span> stars</span></div>
+        <div id="levelGrid"></div>
+        <div class="menuTitle"><span>Permanent upgrades</span><span class="pill">◆ <span id="metaShardLabel">Spend shards</span></span></div>
+        <div id="metaGrid"></div>
+        <button id="helpBtn">How to command</button>
+        <div id="helpPanel" class="hidden">Build on glowing pads. During battle, tap open terrain to move your commander; nearby towers gain an aura bonus. Tap Meteor, then choose a target. Freeze, Rally, and Repair activate immediately. Starting a wave before the timer expires earns bonus gold. At tower level 3, choose one of two permanent branches for that tower.</div>
+      </div>
+      <div id="resultActions" class="hidden">
+        <button id="continueBtn">Next level</button>
+        <button id="resultMenuBtn">Levels</button>
+      </div>
+    </div>
+  </section>
+  <section id="branchSheet" class="hidden" aria-modal="true" role="dialog">
+    <div class="sheet">
+      <h2 id="branchTitle">Choose upgrade path</h2>
+      <p id="branchCost">0 gold</p>
+      <div class="branchGrid">
+        <button class="branch" id="branchA"><strong>Path A</strong><span>Specialization</span></button>
+        <button class="branch" id="branchB"><strong>Path B</strong><span>Specialization</span></button>
+      </div>
+      <button id="branchCancel">Cancel</button>
+    </div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
+window.addEventListener("unhandledrejection",function(event){document.documentElement.dataset.bootError=String(event.reason||"promise-error")});
+if(!window.THREE){
+  document.documentElement.dataset.bootError="three-missing";
+  document.getElementById("overlayText").textContent="The 3D engine could not load. Check your connection and reload.";
+  throw new Error("three.js r160 failed to load");
+}
+</script>
+<script type="module" src="/pb/towerdefense/main.js"></script>
+</body>
+</html>

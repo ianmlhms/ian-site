@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Idle Empire - PixelBreak</title>
+<style>
+:root{color-scheme:dark;--ink:#f8f3e7;--muted:#b9b2a3;--panel:#171b25;--panel2:#202636;--line:#394155;--gold:#ffcc4d;--green:#59e39a;--blue:#67c8ff;--danger:#ff7676}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{overflow:hidden;background:#090c13;color:var(--ink);font-family:ui-rounded,"SF Pro Rounded","Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
+button{min-height:44px;border:0;border-radius:12px;font:inherit;font-weight:800;color:#10131a;background:var(--gold);touch-action:manipulation}
+button:disabled{opacity:.4;filter:saturate(.4)}
+#game{height:100%;max-width:720px;margin:auto;display:flex;flex-direction:column;background:radial-gradient(circle at 90% 0,#263054 0,transparent 42%),linear-gradient(#111623,#090c13)}
+header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line);background:rgba(11,14,22,.92)}
+.topline{display:flex;align-items:center;gap:10px}
+.brand{flex:1;min-width:0}.brand h1{font-size:20px;line-height:1;margin:0;color:var(--gold);letter-spacing:.02em}.brand p{font-size:11px;color:var(--muted);margin:5px 0 0}
+#prestige-button{padding:0 13px;background:linear-gradient(135deg,#a98bff,#68c9ff)}
+.stats{display:grid;grid-template-columns:1.15fr .95fr .95fr .95fr;gap:7px;margin-top:10px}
+.stat{min-width:0;padding:8px 9px;border:1px solid var(--line);border-radius:10px;background:#111722}.stat span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.07em}.stat strong{display:block;overflow:hidden;margin-top:2px;color:var(--green);font-size:15px;white-space:nowrap;text-overflow:ellipsis}
+#business-list{flex:1;min-height:0;overflow-y:auto;padding:10px 10px calc(16px + env(safe-area-inset-bottom));overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.business{margin-bottom:10px;padding:11px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--panel2),var(--panel));box-shadow:0 7px 18px rgba(0,0,0,.2)}
+.business-head{display:flex;align-items:center;gap:9px}.icon{display:grid;width:42px;height:42px;flex:0 0 42px;place-items:center;border-radius:12px;background:#2b3347;font-size:23px}.business-title{flex:1;min-width:0}.business-title h2{overflow:hidden;margin:0;font-size:16px;white-space:nowrap;text-overflow:ellipsis}.business-title p{margin:3px 0 0;color:var(--muted);font-size:11px}.owned{min-width:48px;text-align:right;color:var(--gold);font-size:20px;font-weight:900}
+.progress{height:8px;overflow:hidden;margin:9px 0;border-radius:99px;background:#080b11}.progress-fill{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .06s linear}
+.details{display:flex;justify-content:space-between;gap:8px;margin-bottom:9px;color:var(--muted);font-size:11px}.details strong{color:var(--ink)}
+.actions{display:grid;grid-template-columns:.8fr 1.2fr;gap:8px}.run{background:var(--green)}.buy{background:var(--gold)}
+.manager{width:100%;margin-top:8px;padding:6px 10px;border:1px solid #535d77;background:#2b3347;color:var(--ink);font-size:12px}.manager.hired{border-color:#287552;background:#173f30;color:var(--green)}
+.milestone{margin:8px 1px 0;color:#97a2b9;font-size:10px;text-align:center}
+.notice{display:none;margin:10px 10px 0;padding:11px 42px 11px 12px;position:relative;border:1px solid #3d8c69;border-radius:13px;background:#143526;color:#dfffee;font-size:12px}.notice.show{display:block}.notice strong{display:block;margin-bottom:2px;color:var(--green);font-size:14px}.notice button{position:absolute;top:4px;right:5px;min-width:36px;padding:0;background:transparent;color:var(--ink);font-size:18px}
+.modal{display:none;position:fixed;inset:0;z-index:20;align-items:center;justify-content:center;padding:18px;background:rgba(3,5,9,.78)}.modal.show{display:flex}.modal-card{width:min(430px,100%);padding:20px;border:1px solid #737fa1;border-radius:20px;background:#171c29;box-shadow:0 24px 70px #000}.modal-card h2{margin:0 0 8px;color:#bca8ff}.modal-card p{margin:7px 0;color:var(--muted);font-size:14px;line-height:1.45}.preview{margin:14px 0;padding:12px;border-radius:12px;background:#0e121b;color:var(--ink)}.warning{color:#ffb9b9!important}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.cancel{background:#353d51;color:var(--ink)}.confirm{background:linear-gradient(135deg,#a98bff,#68c9ff)}
+@media (min-width:620px){.business{padding:13px}.actions{grid-template-columns:130px 1fr}.stats{gap:10px}.stat{padding:9px 11px}}
+@media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
+</style>
+</head>
+<body>
+<main id="game">
+  <header>
+    <div class="topline">
+      <div class="brand"><h1>Idle Empire</h1><p>Build it. Automate it. Start bigger.</p></div>
+      <button id="prestige-button" type="button">Investors</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>Cash</span><strong id="cash">$10</strong></div>
+      <div class="stat"><span>Lifetime</span><strong id="lifetime">$0</strong></div>
+      <div class="stat"><span>Auto / sec</span><strong id="income">$0</strong></div>
+      <div class="stat"><span>Investors</span><strong id="investors">0 · 1×</strong></div>
+    </div>
+  </header>
+  <section id="offline-notice" class="notice" aria-live="polite">
+    <strong>While you were away</strong><span id="offline-copy"></span>
+    <button id="offline-close" type="button" aria-label="Dismiss">×</button>
+  </section>
+  <section id="business-list" aria-label="Businesses"></section>
+</main>
+<section id="prestige-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="prestige-title">
+  <div class="modal-card">
+    <h2 id="prestige-title">Bring in investors?</h2>
+    <p>Investors permanently increase every business payout by 10% each.</p>
+    <div id="prestige-preview" class="preview"></div>
+    <p class="warning">This resets cash, businesses, managers, and active cycles. Lifetime earnings stay on your leaderboard.</p>
+    <div class="modal-actions">
+      <button id="prestige-cancel" class="cancel" type="button">Not yet</button>
+      <button id="prestige-confirm" class="confirm" type="button">Confirm reset</button>
+    </div>
+  </div>
+</section>
+<script>
+"use strict";
+
+const SAVE_VERSION=1;
+const STARTING_CASH=10;
+const SAVE_INTERVAL_MS=5000;
+const GAME_TICK_MS=50;
+const OFFLINE_CAP_SECONDS=2*60*60;
+const OFFLINE_NOTICE_MIN_SECONDS=5;
+const PRESTIGE_EARNINGS_UNIT=1e9;
+const INVESTOR_BONUS=0.1;
+const MILESTONE_FACTOR=2;
+const COST_LIMIT=Number.MAX_VALUE;
+const MAX_OWNED=1000000;
+const SUFFIX_BASE=1000;
+const ALPHABET_SIZE=26;
+const LOWERCASE_A_CODE=97;
+const MAX_SUFFIX_GROUP=102;
+const MILLISECONDS_PER_SECOND=1000;
+const DIGITS_PER_SUFFIX=3;
+const MILESTONES=Object.freeze([25,50,100,200]);
+
+const BUSINESSES=Object.freeze([
+  {id:"lemonade",name:"Lemonade Stand",icon:"🍋",baseCost:4,costGrowth:1.07,cycleSeconds:1,payout:1,managerCost:100,manager:"Lucy Squeezer"},
+  {id:"newspaper",name:"Newspaper Delivery",icon:"🗞️",baseCost:60,costGrowth:1.09,cycleSeconds:3,payout:15,managerCost:1500,manager:"Pat Press"},
+  {id:"carwash",name:"Car Wash",icon:"🚙",baseCost:720,costGrowth:1.1,cycleSeconds:6,payout:90,managerCost:12000,manager:"Wanda Wax"},
+  {id:"pizzeria",name:"Pizzeria",icon:"🍕",baseCost:8640,costGrowth:1.105,cycleSeconds:12,payout:1000,managerCost:120000,manager:"Pete Pepperoni"},
+  {id:"donut",name:"Donut Shop",icon:"🍩",baseCost:103680,costGrowth:1.11,cycleSeconds:25,payout:14000,managerCost:1.2e6,manager:"Dolly Dough"},
+  {id:"shrimp",name:"Shrimp Boat",icon:"🦐",baseCost:1.24e6,costGrowth:1.115,cycleSeconds:50,payout:180000,managerCost:15e6,manager:"Captain Coral"},
+  {id:"hockey",name:"Hockey Team",icon:"🏒",baseCost:14.9e6,costGrowth:1.12,cycleSeconds:120,payout:2.8e6,managerCost:200e6,manager:"Coach Slapshot"},
+  {id:"studio",name:"Movie Studio",icon:"🎬",baseCost:179e6,costGrowth:1.125,cycleSeconds:300,payout:50e6,managerCost:3e9,manager:"Mona Montage"},
+  {id:"bank",name:"Bank",icon:"🏦",baseCost:2.15e9,costGrowth:1.13,cycleSeconds:600,payout:900e6,managerCost:50e9,manager:"Buck Ledger"},
+  {id:"oil",name:"Oil Company",icon:"🛢️",baseCost:25.8e9,costGrowth:1.135,cycleSeconds:1200,payout:18e9,managerCost:1e12,manager:"Ollie Derrick"}
+]);
+
+const emptyOwned=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,0]));
+const emptyManagers=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,false]));
+const emptyRuntime=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,{startedAt:0,endsAt:0}]));
+const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now()});
+
+let state=initialState();
+let runtime=emptyRuntime();
+let isBooted=false;
+let pendingIncomingSave=null;
+let lastOfflineResult={elapsedSeconds:0,credited:0,wasCapped:false,clockWentBackwards:false};
+let cardRefs={};
+
+function reportError(context,error){
+  const detail=error instanceof Error?error.message:String(error);
+  console.error(`[Idle Empire] ${context}: ${detail}`);
+}
+
+function safeNumber(value,fallback=0){
+  return typeof value==="number"&&Number.isFinite(value)&&value>=0?value:fallback;
+}
+
+function safeAdd(left,right){
+  const sum=left+right;
+  return Number.isFinite(sum)?sum:COST_LIMIT;
+}
+
+function safeMultiply(left,right){
+  const product=left*right;
+  return Number.isFinite(product)?product:COST_LIMIT;
+}
+
+function format(value){
+  if(typeof value!=="number"||Number.isNaN(value))return"0";
+  if(!Number.isFinite(value))return value<0?"-∞":"∞";
+  const sign=value<0?"-":"";
+  const amount=Math.abs(value);
+  if(amount<SUFFIX_BASE-.5)return sign+trimNumber(amount,amount<10?2:amount<100?1:0);
+  let group=Math.min(Math.floor(Math.log10(amount)/DIGITS_PER_SUFFIX),MAX_SUFFIX_GROUP);
+  let scaled=amount/Math.pow(SUFFIX_BASE,group);
+  const firstDecimals=scaled<10?2:scaled<100?1:0;
+  if(Number(scaled.toFixed(firstDecimals))>=SUFFIX_BASE&&group<MAX_SUFFIX_GROUP){
+    group+=1;
+    scaled=amount/Math.pow(SUFFIX_BASE,group);
+  }
+  const suffix=group===1?"K":group===2?"M":group===3?"B":group===4?"T":letterSuffix(group-5);
+  const decimals=scaled<10?2:scaled<100?1:0;
+  return sign+trimNumber(scaled,decimals)+suffix;
+}
+
+function trimNumber(value,decimals){
+  if(decimals===0)return value.toFixed(0);
+  return value.toFixed(decimals).replace(/\.?0+$/,"");
+}
+
+function letterSuffix(index){
+  const first=Math.floor(index/ALPHABET_SIZE);
+  const second=index%ALPHABET_SIZE;
+  return String.fromCharCode(LOWERCASE_A_CODE+first)+String.fromCharCode(LOWERCASE_A_CODE+second);
+}
+
+function getBusiness(id){return BUSINESSES.find((business)=>business.id===id)}
+function getMilestoneCount(owned){return MILESTONES.filter((target)=>owned>=target).length}
+function getMilestoneMultiplier(owned){return Math.pow(MILESTONE_FACTOR,getMilestoneCount(owned))}
+function getInvestorMultiplier(investors=state.investors){return 1+investors*INVESTOR_BONUS}
+
+function getCost(business,owned=state.owned[business.id]){
+  const cost=business.baseCost*Math.pow(business.costGrowth,owned);
+  return Number.isFinite(cost)?cost:COST_LIMIT;
+}
+
+function getCycleDurationMs(business,owned=state.owned[business.id]){
+  return business.cycleSeconds*MILLISECONDS_PER_SECOND/getMilestoneMultiplier(owned);
+}
+
+function getCyclePayout(business,sourceState=state){
+  const owned=sourceState.owned[business.id]||0;
+  const base=safeMultiply(business.payout,owned);
+  const milestoneProfit=safeMultiply(base,getMilestoneMultiplier(owned));
+  return safeMultiply(milestoneProfit,getInvestorMultiplier(sourceState.investors));
+}
+
+function getAutomaticIncome(sourceState=state){
+  return BUSINESSES.reduce((total,business)=>{
+    if(!sourceState.managers[business.id])return total;
+    const perSecond=getCyclePayout(business,sourceState)/(getCycleDurationMs(business,sourceState.owned[business.id])/MILLISECONDS_PER_SECOND);
+    return safeAdd(total,perSecond);
+  },0);
+}
+
+function createElement(tag,className,text){
+  const element=document.createElement(tag);
+  if(className)element.className=className;
+  if(text!==undefined)element.textContent=text;
+  return element;
+}
+
+/* Cards are created once. Timed refreshes only update their existing fields. */
+function buildBusinessCards(){
+  const list=document.getElementById("business-list");
+  BUSINESSES.forEach((business)=>{
+    const card=createElement("article","business");
+    card.dataset.id=business.id;
+    const head=createElement("div","business-head");
+    head.append(createElement("div","icon",business.icon));
+    const title=createElement("div","business-title");
+    title.append(createElement("h2","",business.name),createElement("p","business-meta"));
+    const owned=createElement("div","owned");
+    head.append(title,owned);
+    const progress=createElement("div","progress");
+    const progressFill=createElement("div","progress-fill");
+    progress.append(progressFill);
+    const details=createElement("div","details");
+    const payout=createElement("span","payout");
+    const cycle=createElement("span","cycle");
+    details.append(payout,cycle);
+    const actions=createElement("div","actions");
+    const run=createElement("button","run","Run");
+    run.type="button";run.dataset.action="run";
+    const buy=createElement("button","buy");
+    buy.type="button";buy.dataset.action="buy";
+    actions.append(run,buy);
+    const manager=createElement("button","manager");
+    manager.type="button";manager.dataset.action="manager";
+    const milestone=createElement("div","milestone");
+    card.append(head,progress,details,actions,manager,milestone);
+    list.append(card);
+    cardRefs={...cardRefs,[business.id]:{card,owned,meta:title.lastChild,progressFill,payout,cycle,run,buy,manager,milestone}};
+  });
+  list.addEventListener("click",handleBusinessAction);
+}
+
+function handleBusinessAction(event){
+  const button=event.target.closest("button[data-action]");
+  if(!button)return;
+  const card=button.closest(".business");
+  if(!card)return;
+  const business=getBusiness(card.dataset.id);
+  if(!business)return;
+  if(button.dataset.action==="buy")buyBusiness(business);
+  if(button.dataset.action==="run")runBusiness(business);
+  if(button.dataset.action==="manager")buyManager(business);
+}
+
+function buyBusiness(business){
+  const currentOwned=state.owned[business.id];
+  if(currentOwned>=MAX_OWNED)return;
+  const cost=getCost(business,currentOwned);
+  if(state.cash<cost)return;
+  state={...state,cash:state.cash-cost,owned:{...state.owned,[business.id]:currentOwned+1}};
+  updateScore();refreshAll();pushSave();
+}
+
+function runBusiness(business){
+  if(state.owned[business.id]<=0||state.managers[business.id])return;
+  if(runtime[business.id].endsAt>0)return;
+  const now=Date.now();
+  const duration=getCycleDurationMs(business);
+  runtime={...runtime,[business.id]:{startedAt:now,endsAt:now+duration}};
+  refreshBusiness(business,now);
+}
+
+function buyManager(business){
+  if(state.managers[business.id]||state.owned[business.id]<=0||state.cash<business.managerCost)return;
+  state={...state,cash:state.cash-business.managerCost,managers:{...state.managers,[business.id]:true}};
+  const now=Date.now();
+  const duration=getCycleDurationMs(business);
+  runtime={...runtime,[business.id]:{startedAt:now,endsAt:now+duration}};
+  refreshAll();pushSave();
+}
+
+function applyEarnings(amount){
+  if(!(amount>0))return;
+  state={...state,cash:safeAdd(state.cash,amount),lifetime:safeAdd(state.lifetime,amount)};
+  updateScore();
+}
+
+function settleProduction(now){
+  let earnings=0;
+  let nextRuntime=runtime;
+  BUSINESSES.forEach((business)=>{
+    if(state.owned[business.id]<=0)return;
+    const cycle=runtime[business.id];
+    if(!(cycle.endsAt>0)||now<cycle.endsAt)return;
+    if(!state.managers[business.id]){
+      earnings=safeAdd(earnings,getCyclePayout(business));
+      nextRuntime={...nextRuntime,[business.id]:{startedAt:0,endsAt:0}};
+      return;
+    }
+    const duration=getCycleDurationMs(business);
+    const completed=1+Math.floor((now-cycle.endsAt)/duration);
+    earnings=safeAdd(earnings,getCyclePayout(business)*completed);
+    const endsAt=cycle.endsAt+completed*duration;
+    nextRuntime={...nextRuntime,[business.id]:{startedAt:endsAt-duration,endsAt}};
+  });
+  runtime=nextRuntime;
+  applyEarnings(earnings);
+}
+
+function gameTick(){
+  const now=Date.now();
+  settleProduction(now);
+  refreshAll(now);
+}
+
+function refreshAll(now=Date.now()){
+  document.getElementById("cash").textContent="$"+format(state.cash);
+  document.getElementById("lifetime").textContent="$"+format(state.lifetime);
+  document.getElementById("income").textContent="$"+format(getAutomaticIncome());
+  document.getElementById("investors").textContent=`${format(state.investors)} · ${format(getInvestorMultiplier())}×`;
+  BUSINESSES.forEach((business)=>refreshBusiness(business,now));
+}
+
+function refreshBusiness(business,now){
+  const refs=cardRefs[business.id];
+  if(!refs)return;
+  const owned=state.owned[business.id];
+  const hasManager=state.managers[business.id];
+  const cycle=runtime[business.id];
+  const cost=getCost(business,owned);
+  const duration=getCycleDurationMs(business,owned);
+  const payout=getCyclePayout(business);
+  const isRunning=cycle.endsAt>0;
+  const progress=isRunning?Math.max(0,Math.min(1,(now-cycle.startedAt)/(cycle.endsAt-cycle.startedAt))):0;
+  refs.owned.textContent="×"+format(owned);
+  refs.meta.textContent=`Base $${format(business.payout)} · growth ${business.costGrowth.toFixed(3).replace(/0+$/,"")}×`;
+  refs.progressFill.style.width=(progress*100).toFixed(1)+"%";
+  refs.payout.textContent=`Payout: $${format(payout)}`;
+  refs.cycle.textContent=`Cycle: ${format(duration/MILLISECONDS_PER_SECOND)}s`;
+  refs.run.textContent=hasManager?"Automated":isRunning?"Running…":"Run cycle";
+  refs.run.disabled=owned<=0||hasManager||isRunning;
+  refs.buy.textContent=`Buy 1 · $${format(cost)}`;
+  refs.buy.disabled=state.cash<cost||owned>=MAX_OWNED;
+  refs.manager.textContent=hasManager?`✓ ${business.manager} is managing`:`Hire ${business.manager} · $${format(business.managerCost)}`;
+  refs.manager.disabled=hasManager||owned<=0||state.cash<business.managerCost;
+  refs.manager.classList.toggle("hired",hasManager);
+  refs.milestone.textContent=getMilestoneCopy(owned);
+}
+
+function getMilestoneCopy(owned){
+  const next=MILESTONES.find((target)=>target>owned);
+  if(!next){
+    const multiplier=getMilestoneMultiplier(owned);
+    return `All milestones · ${format(multiplier)}× profit and speed`;
+  }
+  return `Next milestone: ${next} owned · ${next-owned} to go · doubles profit and speed`;
+}
+
+function getClaimableInvestors(sourceState=state){
+  const earned=Math.floor(Math.sqrt(sourceState.lifetime/PRESTIGE_EARNINGS_UNIT));
+  return Math.max(0,earned-sourceState.investors);
+}
+
+function openPrestige(){
+  const claimable=getClaimableInvestors();
+  const currentMultiplier=getInvestorMultiplier();
+  const nextMultiplier=getInvestorMultiplier(state.investors+claimable);
+  const preview=document.getElementById("prestige-preview");
+  preview.textContent=claimable>0
+    ?`Claim ${format(claimable)} investor${claimable===1?"":"s"}. Global profit: ${format(currentMultiplier)}× → ${format(nextMultiplier)}×.`
+    :`No investors are ready. Earn $${format(nextInvestorTarget())} lifetime for the next one.`;
+  const confirm=document.getElementById("prestige-confirm");
+  confirm.disabled=claimable===0;
+  confirm.textContent=claimable>0?`Reset for ${format(claimable)}`:"Nothing to claim";
+  document.getElementById("prestige-modal").classList.add("show");
+}
+
+function nextInvestorTarget(){
+  const nextTotal=state.investors+1;
+  return nextTotal*nextTotal*PRESTIGE_EARNINGS_UNIT;
+}
+
+function closePrestige(){document.getElementById("prestige-modal").classList.remove("show")}
+
+function confirmPrestige(){
+  const claimable=getClaimableInvestors();
+  if(claimable<=0)return;
+  state={v:SAVE_VERSION,cash:STARTING_CASH,lifetime:state.lifetime,owned:emptyOwned(),managers:emptyManagers(),investors:state.investors+claimable,ts:Date.now()};
+  runtime=emptyRuntime();
+  closePrestige();refreshAll();pushSave();
+}
+
+function normalizeSave(raw){
+  if(!raw||raw.v!==SAVE_VERSION||!raw.owned||!raw.managers||typeof raw.owned!=="object"||typeof raw.managers!=="object")return null;
+  const cash=safeNumber(raw.cash,STARTING_CASH);
+  const lifetime=safeNumber(raw.lifetime,0);
+  const investors=Math.floor(safeNumber(raw.investors,0));
+  const ts=safeNumber(raw.ts,Date.now());
+  const owned=Object.fromEntries(BUSINESSES.map((business)=>{
+    const count=Math.min(MAX_OWNED,Math.floor(safeNumber(raw.owned[business.id],0)));
+    return[business.id,count];
+  }));
+  const managers=Object.fromEntries(BUSINESSES.map((business)=>[business.id,raw.managers[business.id]===true]));
+  return{v:SAVE_VERSION,cash,lifetime,owned,managers,investors,ts};
+}
+
+function calculateOffline(save,now){
+  const rawElapsed=(now-save.ts)/MILLISECONDS_PER_SECOND;
+  const clockWentBackwards=rawElapsed<0;
+  const elapsedSeconds=Math.min(Math.max(rawElapsed,0),OFFLINE_CAP_SECONDS);
+  const credited=safeMultiply(getAutomaticIncome(save),elapsedSeconds);
+  return{elapsedSeconds,credited,wasCapped:rawElapsed>OFFLINE_CAP_SECONDS,clockWentBackwards};
+}
+
+function applySave(raw){
+  const save=normalizeSave(raw);
+  if(!save||!(save.lifetime>state.lifetime))return false;
+  const now=Date.now();
+  lastOfflineResult=calculateOffline(save,now);
+  state={...save,cash:safeAdd(save.cash,lastOfflineResult.credited),lifetime:safeAdd(save.lifetime,lastOfflineResult.credited),ts:now};
+  runtime=emptyRuntime();
+  startManagedCycles(now);
+  updateScore();
+  if(lastOfflineResult.elapsedSeconds>=OFFLINE_NOTICE_MIN_SECONDS)showOfflineNotice(lastOfflineResult);
+  if(isBooted)refreshAll(now);
+  return true;
+}
+
+function startManagedCycles(now){
+  runtime=BUSINESSES.reduce((next,business)=>{
+    if(!state.managers[business.id]||state.owned[business.id]<=0)return next;
+    const duration=getCycleDurationMs(business);
+    return{...next,[business.id]:{startedAt:now,endsAt:now+duration}};
+  },runtime);
+}
+
+function showOfflineNotice(result){
+  const capCopy=result.wasCapped?" (2-hour cap reached)":"";
+  document.getElementById("offline-copy").textContent=`Your managers earned $${format(result.credited)} across ${format(result.elapsedSeconds)} seconds${capCopy}.`;
+  document.getElementById("offline-notice").classList.add("show");
+}
+
+function snapshot(){
+  return{v:SAVE_VERSION,cash:state.cash,lifetime:state.lifetime,owned:{...state.owned},managers:{...state.managers},investors:state.investors,ts:Date.now()};
+}
+
+function pushSave(){
+  try{parent.postMessage({__pbSave:1,data:snapshot()},"*")}
+  catch(error){reportError("Could not save progress",error)}
+}
+
+function requestCloudSave(){
+  try{parent.postMessage({__pbWantSave:1},"*")}
+  catch(error){reportError("Could not request cloud progress",error)}
+}
+
+function updateScore(){window.score=Math.floor(state.lifetime)}
+
+function boot(){
+  buildBusinessCards();
+  isBooted=true;
+  applySave(window.__pbSave);
+  if(pendingIncomingSave)applySave(pendingIncomingSave);
+  pendingIncomingSave=null;
+  updateScore();refreshAll();requestCloudSave();
+  setInterval(gameTick,GAME_TICK_MS);
+  setInterval(pushSave,SAVE_INTERVAL_MS);
+}
+
+window.addEventListener("message",(event)=>{
+  const data=event.data;
+  if(!data||data.__pbLoadSave!==1)return;
+  if(!isBooted){
+    const pendingLifetime=safeNumber(pendingIncomingSave&&pendingIncomingSave.lifetime,0);
+    if(safeNumber(data.data&&data.data.lifetime,0)>pendingLifetime)pendingIncomingSave=data.data;
+    return;
+  }
+  applySave(data.data);
+});
+window.addEventListener("pagehide",pushSave);
+document.addEventListener("DOMContentLoaded",boot,{once:true});
+document.getElementById("prestige-button").addEventListener("click",openPrestige);
+document.getElementById("prestige-cancel").addEventListener("click",closePrestige);
+document.getElementById("prestige-confirm").addEventListener("click",confirmPrestige);
+document.getElementById("offline-close").addEventListener("click",()=>document.getElementById("offline-notice").classList.remove("show"));
+document.getElementById("prestige-modal").addEventListener("click",(event)=>{if(event.target.id==="prestige-modal")closePrestige()});
+
+/* Debug handle for headless verification only. Exposed during normal play it
+ * would be a ready-made cheat handle for the shared leaderboard. */
+const testMode=(()=>{
+  try{return new URL(document.baseURI).searchParams.get("idleTest")==="1"}
+  catch(error){console.warn("[Idle Empire] Could not read test mode.",error);return false}
+})();
+if(testMode)window.__idleEmpire=Object.freeze({
+  format,
+  applySave,
+  snapshot,
+  getState:()=>({...state,owned:{...state.owned},managers:{...state.managers}}),
+  getOfflineResult:()=>({...lastOfflineResult}),
+  getMetrics:(id)=>{
+    const business=getBusiness(id);
+    if(!business)return null;
+    return{cost:getCost(business),payout:getCyclePayout(business),cycleSeconds:getCycleDurationMs(business)/MILLISECONDS_PER_SECOND};
+  }
+});
+</script>
+</body>
+</html>
