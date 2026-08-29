@@ -4,7 +4,7 @@
  *    Safe with the site's ?v= versioning: bumped asset URLs are cache misses and
  *    fetch fresh; navigations are network-first so pages are never stale online. */
 
-const CACHE = "ianlu-v3";
+const CACHE = "ianlu-v4";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
   "skylens.html", "skylens.css?v=4", "skylens.js?v=2", "skylens.webmanifest",
@@ -27,6 +27,18 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;   // let CDN/Supabase pass straight through
+
+  /* PixelBreak game payloads are versioned by CONTENT, not by URL: pb/<game>.html
+   * keeps its name across rewrites and the arcade re-fetches it on every open.
+   * The cache-first branch below therefore froze a game at whatever version a
+   * player first loaded — it pinned the old 2D Road Rage after its 3D rebuild,
+   * and fetch({cache:"no-cache"}) does not help because that flag only bypasses
+   * the HTTP cache, not the service worker. Always go to the network here, and
+   * fall back to the cache only when offline. */
+  if (url.pathname.startsWith("/pb/")) {
+    event.respondWith(fetch(req).catch(() => caches.match(req)));
+    return;
+  }
 
   const isNav = req.mode === "navigate" ||
     (req.headers.get("accept") || "").includes("text/html");
