@@ -40,6 +40,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  /* The /demo pages are a showcase Ian iterates on while showing it to people,
+   * and their modules are only versioned by a hand-bumped ?v= that no automated
+   * check watches (check_site.py's cache check reads root *.html only). That is
+   * the same trap as /pb/ above, so take the same way out: always network, cache
+   * only as an offline fallback. Nothing here is worth caching offline anyway. */
+  if (url.pathname.startsWith("/demo")) {
+    event.respondWith(fetch(req).catch(() => caches.match(req)));
+    return;
+  }
+
   const isNav = req.mode === "navigate" ||
     (req.headers.get("accept") || "").includes("text/html");
 

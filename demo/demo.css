@@ -1,0 +1,300 @@
+/* Design system for the /demo pages.
+ *
+ * Deliberately NOT style.css. That sheet is built around the site chrome —
+ * header bar, app tiles, auth states — and a demo page has none of that. What
+ * it shares is the palette, so the demo still reads as ian.lu.
+ *
+ * This file is also the contract between the demo pages and the showcase
+ * modules: a module is handed a `.dbody` element and may only use the classes
+ * defined here. Nothing else is guaranteed to exist. */
+
+:root {
+  --bg: #0d0d1a;
+  --card: #161625;
+  --card2: #1e1e35;
+  --border: #2a2a4a;
+  --text: #e8e8f0;
+  --muted: #8888aa;
+  --accent: #6ea8fe;
+  --live: #4ade80;
+  --demo: #fbbf24;
+  --radius: 20px;
+  --gap: 18px;
+}
+
+* { box-sizing: border-box; }
+
+html { overflow-x: hidden; scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background:
+    radial-gradient(1100px 600px at 75% -12%, rgba(110, 168, 254, .16), transparent),
+    radial-gradient(800px 500px at 10% 105%, rgba(168, 110, 254, .10), transparent),
+    var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: inherit; }
+
+/* ---------- page shell ---------- */
+
+.dpage { max-width: 1120px; margin: 0 auto; padding: 28px 18px 64px; }
+
+.dhero { padding: 44px 4px 30px; text-align: center; }
+.dkicker {
+  display: inline-block; font-size: .74rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px; padding: 5px 13px; margin-bottom: 16px;
+}
+.dtitle {
+  margin: 0; font-size: clamp(2.6rem, 12vw, 5rem); font-weight: 800;
+  letter-spacing: -.03em; line-height: 1;
+  background: linear-gradient(180deg, #fff, #9db4e8);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.dsub { margin: 16px auto 0; max-width: 42ch; font-size: 1.06rem; color: #b9b9d4; line-height: 1.5; }
+.dhint { margin: 22px 0 0; font-size: .9rem; color: var(--muted); }
+
+.dfoot {
+  margin-top: 44px; padding-top: 26px; border-top: 1px solid var(--border);
+  text-align: center; color: var(--muted); font-size: .92rem;
+}
+
+/* ---------- cards ---------- */
+
+.dgrid { display: grid; gap: var(--gap); grid-template-columns: 1fr; }
+@media (min-width: 860px) {
+  .dgrid { grid-template-columns: repeat(2, 1fr); }
+  .dcard.wide { grid-column: 1 / -1; }
+}
+
+.dcard {
+  background: linear-gradient(180deg, var(--card2), var(--card));
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px; overflow: hidden;
+}
+.dcard-head { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 14px; }
+.dcard-ico { font-size: 1.6rem; line-height: 1.1; flex: 0 0 auto; }
+.dcard-text { flex: 1 1 auto; min-width: 0; }
+.dcard-title { margin: 0; font-size: 1.14rem; font-weight: 700; }
+.dcard-sub { margin: 3px 0 0; font-size: .92rem; color: var(--muted); line-height: 1.45; }
+.dcard-how {
+  margin: 10px 0 0; padding: 9px 11px; font-size: .84rem; line-height: 1.5;
+  color: #a8a8c8; background: rgba(110, 168, 254, .07);
+  border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 0 8px 8px 0;
+}
+
+.dbadge {
+  flex: 0 0 auto; font-size: .68rem; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; padding: 4px 9px; border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.dbadge.live { color: var(--live); }
+.dbadge.live::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px;
+  border-radius: 50%; background: currentColor; vertical-align: 1px;
+  animation: dpulse 1.8s ease-in-out infinite;
+}
+.dbadge.demo { color: var(--demo); }
+@keyframes dpulse { 0%, 100% { opacity: 1 } 50% { opacity: .25 } }
+
+/* ---------- controls ---------- */
+
+.dchips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 13px; }
+.dchip {
+  font: inherit; font-size: .87rem; cursor: pointer; color: var(--text);
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--border);
+  border-radius: 999px; padding: 8px 13px; min-height: 40px;
+}
+.dchip:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.dchip.on { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
+
+.dbtn {
+  font: inherit; cursor: pointer; color: var(--text); background: var(--card2);
+  border: 1px solid var(--border); border-radius: 12px; padding: 11px 18px;
+  min-height: 44px;
+}
+.dbtn:hover { border-color: var(--accent); }
+.dbtn-primary { background: var(--accent); border-color: var(--accent); color: #08101f; font-weight: 700; }
+
+/* ---------- rows, the shape most showcases render into ---------- */
+
+.dlist { display: flex; flex-direction: column; gap: 9px; }
+.drow {
+  display: flex; align-items: center; gap: 11px;
+  background: rgba(255, 255, 255, .035); border: 1px solid var(--border);
+  border-radius: 13px; padding: 11px 13px;
+}
+.drow-main { flex: 1 1 auto; min-width: 0; }
+.drow-title { font-weight: 600; font-size: .96rem; }
+.drow-sub { font-size: .82rem; color: var(--muted); margin-top: 2px; }
+.drow-side { flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; }
+.drow-big { font-size: 1.06rem; font-weight: 700; }
+.drow-small { font-size: .78rem; color: var(--muted); }
+
+/* A transit leg: the line number reads as a badge, walking legs as plain text. */
+.dleg { display: inline-flex; align-items: center; gap: 5px; margin: 3px 5px 0 0; font-size: .82rem; }
+.dline {
+  font-weight: 700; font-size: .78rem; padding: 2px 7px; border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.dline.rail { background: rgba(74, 222, 128, .2); border-color: rgba(74, 222, 128, .45); }
+.dwalk { color: var(--muted); }
+
+/* ---------- states ---------- */
+
+.dmuted { color: var(--muted); font-size: .9rem; }
+.dfail { color: #ffb4b4; font-size: .9rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dskel { display: flex; flex-direction: column; gap: 9px; }
+.dskel-row {
+  height: 56px; border-radius: 13px;
+  background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.09), rgba(255,255,255,.04));
+  background-size: 200% 100%; animation: dshimmer 1.35s linear infinite;
+}
+@keyframes dshimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+/* ---------- embeds ---------- */
+
+.dframe {
+  width: 100%; border: 0; display: block; border-radius: 13px;
+  background: #000; aspect-ratio: 4 / 5;
+}
+@media (min-width: 700px) { .dframe { aspect-ratio: 16 / 10; } }
+.dframe.tall { aspect-ratio: 3 / 4; }
+
+/* ---------- chat ---------- */
+
+.dchat { display: flex; flex-direction: column; gap: 8px; min-height: 250px; justify-content: flex-end; }
+.dmsg { display: flex; gap: 8px; align-items: flex-end; animation: dpop .22s ease-out; }
+.dmsg.me { flex-direction: row-reverse; }
+.davatar {
+  flex: 0 0 auto; width: 27px; height: 27px; border-radius: 50%;
+  display: grid; place-items: center; font-size: .74rem; font-weight: 700; color: #10101c;
+}
+.dbubble {
+  max-width: 74%; padding: 9px 13px; border-radius: 15px; font-size: .93rem; line-height: 1.4;
+  background: var(--card2); border: 1px solid var(--border);
+}
+.dmsg.me .dbubble { background: color-mix(in srgb, var(--accent) 28%, var(--card2)); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.dbubble.typing { display: flex; gap: 4px; padding: 12px 14px; }
+.dbubble.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: dbounce 1.15s infinite; }
+.dbubble.typing i:nth-child(2) { animation-delay: .16s }
+.dbubble.typing i:nth-child(3) { animation-delay: .32s }
+@keyframes dbounce { 0%, 60%, 100% { transform: translateY(0); opacity: .45 } 30% { transform: translateY(-4px); opacity: 1 } }
+@keyframes dpop { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+
+/* ---------- call ---------- */
+
+.dcall { display: grid; place-items: center; gap: 13px; padding: 22px 0; text-align: center; }
+.dcall-ava {
+  width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 2rem; font-weight: 700; color: #10101c; background: var(--accent);
+}
+.dcall-ava.ringing { animation: dring 1.15s ease-in-out infinite; }
+@keyframes dring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(110, 168, 254, .5) }
+  50% { box-shadow: 0 0 0 16px rgba(110, 168, 254, 0) }
+}
+.dcall-name { font-size: 1.2rem; font-weight: 700; }
+.dcall-state { font-size: .9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dcall-btns { display: flex; gap: 14px; }
+.dcall-btn {
+  width: 54px; height: 54px; border-radius: 50%; border: 0; cursor: pointer;
+  font-size: 1.35rem; display: grid; place-items: center; color: #fff;
+}
+.dcall-btn.accept { background: #22c55e; }
+.dcall-btn.decline { background: #ef4444; }
+
+/* ---------- study buddy ---------- */
+
+.dbuddy { min-height: 200px; }
+.dbuddy-q {
+  background: color-mix(in srgb, var(--accent) 22%, var(--card2));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 15px 15px 4px 15px; padding: 10px 14px; margin-left: auto;
+  max-width: 82%; width: fit-content; font-size: .93rem;
+}
+.dbuddy-a {
+  margin-top: 11px; background: var(--card2); border: 1px solid var(--border);
+  border-radius: 15px 15px 15px 4px; padding: 12px 14px; font-size: .93rem;
+  line-height: 1.55; white-space: pre-wrap; min-height: 2.6em;
+}
+.dcaret { display: inline-block; width: 7px; height: 1.05em; background: var(--accent); vertical-align: -2px; animation: dblink .9s steps(2) infinite; }
+@keyframes dblink { 50% { opacity: 0 } }
+
+/* ---------- wuertspill ---------- */
+
+.dwordle { display: grid; gap: 13px; justify-items: center; }
+.dwgrid { display: grid; grid-template-rows: repeat(6, 1fr); gap: 5px; }
+.dwrow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.dwcell {
+  width: 46px; height: 46px; display: grid; place-items: center;
+  font-size: 1.32rem; font-weight: 700; border-radius: 8px;
+  border: 2px solid var(--border); background: rgba(255, 255, 255, .03);
+}
+.dwcell.filled { border-color: #4a4a70; }
+.dwcell.hit { background: #4ade80; border-color: #4ade80; color: #0d1a0d; }
+.dwcell.near { background: #fbbf24; border-color: #fbbf24; color: #1a1405; }
+.dwcell.miss { background: #33334d; border-color: #33334d; color: #9a9ab8; }
+.dwkeys { display: grid; gap: 5px; width: 100%; max-width: 430px; }
+.dwkrow { display: flex; gap: 4px; justify-content: center; }
+.dwkey {
+  font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; color: var(--text);
+  background: var(--card2); border: 1px solid var(--border); border-radius: 7px;
+  min-width: 30px; height: 46px; flex: 1 1 auto; padding: 0 4px;
+}
+.dwkey.wide { flex: 1.6 1 auto; font-size: .75rem; }
+.dwkey.hit { background: #4ade80; color: #0d1a0d; border-color: #4ade80; }
+.dwkey.near { background: #fbbf24; color: #1a1405; border-color: #fbbf24; }
+.dwkey.miss { background: #262639; color: #6a6a88; }
+.dwmsg { font-size: .93rem; min-height: 1.4em; text-align: center; }
+
+/* ---------- trail mini map ---------- */
+
+.dtrail-map { width: 100%; height: 130px; display: block; }
+.dtrail-map path { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+.dtrail-map path.mtb { stroke: #fbbf24; }
+
+/* ---------- guided tour (demo3) ---------- */
+
+.tour { min-height: 100svh; display: flex; flex-direction: column; }
+.tstage { flex: 1 1 auto; display: grid; place-items: center; padding: 20px 16px 0; }
+.tstep { width: 100%; max-width: 760px; animation: dpop .3s ease-out; }
+.tstep-head { text-align: center; margin-bottom: 18px; }
+.tstep-n { font-size: .76rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.tstep-t { margin: 7px 0 0; font-size: clamp(1.6rem, 6vw, 2.3rem); font-weight: 800; letter-spacing: -.02em; }
+.tstep-n2 { margin: 9px auto 0; max-width: 46ch; color: #b9b9d4; line-height: 1.5; font-size: .98rem; }
+.tbar {
+  position: sticky; bottom: 0; display: flex; align-items: center; gap: 14px;
+  padding: 13px 16px calc(13px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px); border-top: 1px solid var(--border);
+}
+.tdots { flex: 1 1 auto; display: flex; gap: 6px; justify-content: center; }
+.tdot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); border: 0; padding: 0; cursor: pointer; }
+.tdot.on { background: var(--accent); transform: scale(1.35); }
+
+/* ---------- chooser (/demo) ---------- */
+
+.dchoose { display: grid; gap: 14px; max-width: 620px; margin: 0 auto; }
+.dchoose a {
+  display: flex; align-items: center; gap: 15px; text-decoration: none;
+  background: linear-gradient(180deg, var(--card2), var(--card));
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 19px;
+}
+.dchoose a:hover { border-color: var(--accent); }
+.dchoose .ico { font-size: 2rem; }
+.dchoose strong { display: block; font-size: 1.08rem; }
+.dchoose span.s { display: block; font-size: .9rem; color: var(--muted); margin-top: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  html { scroll-behavior: auto; }
+}

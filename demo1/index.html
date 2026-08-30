@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="lb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,follow">
+  <meta name="theme-color" content="#0d0d1a">
+  <title>ian.lu · Fir Kolleegen</title>
+  <meta name="description" content="Alles hei leeft live. Näischt ze installéieren, keng Umeldung.">
+  <link rel="canonical" href="https://ian.lu/demo1/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/demo/demo.css?v=1">
+</head>
+<body>
+  <header class="dhero">
+    <span class="dkicker" id="kicker"></span>
+    <h1 class="dtitle" id="title"></h1>
+    <p class="dsub" id="sub"></p>
+    <p class="dhint" id="hint"></p>
+  </header>
+  <main class="dpage">
+    <div class="dgrid" id="grid"></div>
+    <footer class="dfoot">
+      <p id="footer"></p>
+      <a class="dbtn dbtn-primary" href="/" id="cta"></a>
+    </footer>
+  </main>
+  <script type="module">
+    import { COPY } from "/demo/copy.js?v=1";
+    import { renderShowcases } from "/demo/showcase.js?v=1";
+    const copy = COPY.friends;
+    ["kicker", "title", "sub", "hint", "footer", "cta"].forEach((key) => {
+      document.getElementById(key).textContent = copy[key];
+    });
+    await renderShowcases(document.getElementById("grid"), "friends");
+  </script>
+</body>
+</html>
