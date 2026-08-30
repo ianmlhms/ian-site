@@ -9,35 +9,110 @@
   <meta name="description" content="E puer vun de Saachen, déi op dësem Site lafen — mat echten, live Donnéeën.">
   <link rel="canonical" href="https://ian.lu/demo2/">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/demo/demo.css?v=1">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/demo/demo.css?v=2">
   <link rel="stylesheet" href="/style.css?v=19">
-  <link rel="stylesheet" href="/demo/site.css?v=1">
+  <link rel="stylesheet" href="/auth.css?v=2">
+  <link rel="stylesheet" href="/demo/site.css?v=2">
+  <script src="/theme.js?v=18"></script>
+  <script src="/i18n-dict.js?v=33"></script>
+  <script src="/i18n.js?v=2"></script>
 </head>
 <body class="demo-replica">
   <header class="bar">
     <a class="brand" href="/">ian.lu</a>
+    <span style="display:flex;align-items:center;gap:12px">
+      <span id="langSw"></span>
+      <span id="acctHost"><button class="auth-btn" type="button"><span aria-hidden="true">👤</span><span data-i18n="auth.signinShort">Sign in</span></button></span>
+    </span>
   </header>
 
   <main class="page">
     <section class="today-hero">
       <div class="today-greet">
-        <span class="hero-kicker" id="kicker"></span>
-        <h1 class="today-title" id="title"></h1>
-        <p class="today-sub" id="sub"></p>
+        <span class="hero-kicker" id="todayHi">Moien</span>
+        <h1 class="today-title">ian.lu</h1>
+        <p class="today-sub" data-i18n="index.homeSub">Weather, school tools, messages and projects in one place.</p>
       </div>
     </section>
 
-    <section class="section">
-      <h2 class="sec-title" id="section-title"></h2>
-      <div id="showcase-groups"></div>
-    </section>
+    <!-- apps first -->
+    <section class="section" id="apps">
+      <h2 class="sec-title" data-i18n="index.yourApps">Your apps</h2>
 
-    <footer class="site-demo-foot">
-      <p id="footer-copy"></p>
-      <a class="btn-primary" href="/" id="cta"></a>
-    </footer>
+      <div class="tile-group" id="grpFav">
+        <div class="group-head">
+          <h3 class="group-title" data-i18n="grp.fav">Favorites</h3>
+        </div>
+        <div class="tiles">
+          <a class="tile pixelbreak" href="#" data-showcase="games" aria-expanded="false">
+            <span class="ico" aria-hidden="true">🎮</span><span class="tname" data-i18n="tile.pixelbreak">PixelBreak</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
+          </a>
+          <a class="tile bus" href="#" data-showcase="transit" aria-expanded="false">
+            <span class="ico" aria-hidden="true">🚌</span><span class="tname">Bus &amp; Zuch</span><span class="tsub" data-i18n="tile.bus.sub">Departures &amp; routes</span>
+          </a>
+        </div>
+      </div>
+
+      <details class="tile-group" data-group="grp.fun" open>
+        <summary class="group-head">
+          <h3 class="group-title"><span data-i18n="grp.fun">Games</span><span class="group-count"><span class="group-count-number">2</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
+        </summary>
+        <div class="tiles">
+          <a class="tile pixelbreak" href="#" data-showcase="games" aria-expanded="false">
+            <span class="ico" aria-hidden="true">🎮</span><span class="tname" data-i18n="tile.pixelbreak">PixelBreak</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
+          </a>
+          <a class="tile pixelbreak" href="#" data-showcase="duo" aria-expanded="false">
+            <span class="ico" aria-hidden="true">📱</span><span class="tname">2-iPad Spiller</span><span class="tsub">Zwee Ecranen, ee Spill</span>
+          </a>
+        </div>
+      </details>
+
+      <details class="tile-group" data-group="grp.maps" open>
+        <summary class="group-head">
+          <h3 class="group-title"><span data-i18n="grp.maps">Maps &amp; Getting Around</span><span class="group-count"><span class="group-count-number">2</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
+        </summary>
+        <div class="tiles">
+          <a class="tile bus" href="#" data-showcase="transit" aria-expanded="false">
+            <span class="ico" aria-hidden="true">🚌</span><span class="tname">Bus &amp; Zuch</span><span class="tsub" data-i18n="tile.bus.sub">Departures &amp; routes</span>
+          </a>
+          <a class="tile bus skylens" href="#" data-showcase="sky" aria-expanded="false">
+            <span class="ico" aria-hidden="true">🛩️</span><span class="tname">SkyLens</span><span class="tsub">Live aircraft radar &amp; sky view</span>
+          </a>
+        </div>
+      </details>
+
+      <details class="tile-group" data-group="grp.social" open>
+        <summary class="group-head">
+          <h3 class="group-title"><span data-i18n="grp.social">Chat &amp; Friends</span><span class="group-count"><span class="group-count-number">1</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
+        </summary>
+        <div class="tiles">
+          <a class="tile msg" href="#" data-showcase="chat" aria-expanded="false">
+            <span class="ico" aria-hidden="true">💬</span><span class="tname">Messenger</span><span class="tsub" data-i18n="tile.messenger.sub">Chat &amp; groups</span>
+          </a>
+        </div>
+      </details>
+
+      <details class="tile-group" data-group="grp.school" open>
+        <summary class="group-head">
+          <h3 class="group-title"><span data-i18n="grp.school">School</span><span class="group-count"><span class="group-count-number">1</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
+        </summary>
+        <div class="tiles">
+          <a class="tile buddy" href="#" data-showcase="buddy" aria-expanded="false">
+            <span class="ico" aria-hidden="true">🤖</span><span class="tname">Study Buddy</span><span class="tsub" data-i18n="tile.buddy.sub">AI homework help</span>
+          </a>
+        </div>
+      </details>
+    </section>
   </main>
 
-  <script type="module" src="/demo/site.js?v=1"></script>
+  <script>
+    (function () {
+      const hour = new Date().getHours();
+      document.getElementById("todayHi").textContent =
+        hour < 11 ? "Moien" : hour < 14 ? "Gudde Mëtteg" : hour < 18 ? "Schéinen Nomëtteg" : hour < 23 ? "Gudden Owend" : "Gutt Nuecht";
+    })();
+  </script>
+  <script type="module" src="/demo/site.js?v=2"></script>
 </body>
 </html>

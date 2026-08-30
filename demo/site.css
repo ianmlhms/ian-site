@@ -1,32 +1,13 @@
-/* The replica uses the real site's chrome; these rules only make tiles act as
-   inline demo controls and contain the existing showcase components. */
-.demo-replica .bar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-}
+/* The replica inherits all chrome and tile styling from the real homepage. */
+.demo-replica .tile { cursor: pointer; }
 
-.demo-replica .page { padding-top: 12px; }
-.demo-replica .today-hero { padding-top: 12px; }
-.demo-replica .today-sub { margin-top: 10px; }
-.demo-replica .section { margin-top: 18px; }
-.demo-replica .tile-group { margin-top: 18px; }
-.demo-replica .tile-group:first-of-type { margin-top: 0; }
-.demo-replica .group-title { margin-bottom: 9px; }
+.demo-replica .tile.pixelbreak:hover { border-color: #ff6b9d; }
 
-.demo-replica button.tile {
-  width: 100%;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
+.demo-replica .tile.selected,
 .demo-replica .tile[aria-expanded="true"] {
-  background: var(--card2);
   border-color: var(--accent);
+  background: var(--card2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .demo-replica .dpanel {
@@ -39,31 +20,15 @@
   animation: dpop .22s ease-out;
 }
 
+.demo-replica .dpanel > .dbadge {
+  display: block;
+  width: fit-content;
+  margin: 0 0 12px auto;
+}
+
 .demo-replica .dpanel .dbody { min-width: 0; }
 .demo-replica .dpanel .dframe { max-height: 620px; }
 
-.demo-replica .site-demo-foot {
-  margin-top: 36px;
-  padding: 24px 0 calc(20px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border);
-}
-
-.demo-replica .site-demo-foot p {
-  max-width: 58ch;
-  margin: 0 auto 16px;
-  font-size: 14px;
-  line-height: 1.55;
-}
-
 @media (max-width: 520px) {
-  .demo-replica .bar { padding: 14px 18px; }
-  .demo-replica .page { padding: 10px 14px 0; }
-  .demo-replica .today-title { font-size: 42px; }
-  .demo-replica .today-sub { font-size: 14px; line-height: 1.4; }
-  .demo-replica .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-  .demo-replica .tile { min-height: 94px; padding: 12px; }
-  .demo-replica .tile .ico { font-size: 24px; }
-  .demo-replica .tile .tname { font-size: 15px; }
-  .demo-replica .tile .tsub { display: none; }
   .demo-replica .dpanel { margin-top: 10px; padding: 10px; }
 }
