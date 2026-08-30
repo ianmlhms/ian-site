@@ -90,8 +90,8 @@ export const GAMES = Object.freeze([
     desc: "Grillen, servéieren, upgraden" },
   { id: "towerdefense", name: "Tower Defense", emoji: "🏰", feature: false,
     desc: "15 Level Wellen, an 3D" },
-  { id: "drive-mad",    name: "Road Rage",     emoji: "🏎️", feature: false,
-    desc: "16 Stunt-Strecken an 3D" },
+  { id: "chill-drive",  name: "Chill Drive",   emoji: "🚗", feature: false,
+    desc: "Rou fueren, ouni Stress" },
   { id: "idle-empire",  name: "Idle Empire",   emoji: "💰", feature: false,
     desc: "Tycoon mat Manager a Prestige" },
   { id: "2048",         name: "2048",          emoji: "🔢", feature: false,
@@ -99,6 +99,27 @@ export const GAMES = Object.freeze([
 ]);
 
 export const ARCADE_COUNT = 34;
+
+/* The two-device showcase. These are the games that normally need two iPads and
+ * two people: one browser joins a room as host, the other as guest, and they
+ * talk over a Supabase realtime broadcast channel. The demo opens BOTH sides in
+ * the same page, so one person can play both and watch the moves cross — which
+ * is the whole point of the feature and impossible to show with one board.
+ * game-common.js reads ?room= and ?role=, defaulting the room to "demo". */
+export const DUO_GAMES = Object.freeze([
+  { id: "connect4", name: "4 Gewënnt", emoji: "🔴" },
+  { id: "dots",     name: "Dots & Boxes", emoji: "⬛" },
+]);
+
+/* A fresh room per page load, so two visitors never land in the same game. */
+export const DUO_ROOM_PREFIX = "pbdemo";
+
+/* Bundled line index, the same file bus.html uses: line -> one entry per
+ * direction, each with a headsign `h`, an origin stop `o` and the stop list `s`.
+ * 776 KB raw / ~115 KB gzipped, so it is fetched only when the line search is
+ * actually opened — never on page load. */
+export const LINES_URL = "/moien-lines.json";
+export const LINE_RESULT_LIMIT = 8;
 
 /* The demo Wuertspill uses the same Luxembourgish list as wordle.html, so a
  * word that shows up here is a word that shows up in the real game. */

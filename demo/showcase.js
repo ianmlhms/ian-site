@@ -2,6 +2,7 @@ import { COPY, SHOWCASE_ORDER, UI } from "/demo/copy.js?v=1";
 
 const ICONS = Object.freeze({
   games: "🎮",
+  duo: "📱",
   transit: "🚌",
   sky: "🛩️",
   chat: "💬",
@@ -14,7 +15,7 @@ const ICONS = Object.freeze({
 const MODULE_PATHS = Object.freeze(Object.fromEntries(
   SHOWCASE_ORDER.map((id) => [id, `/demo/${id}.js?v=1`]),
 ));
-const WIDE_CARDS = new Set(["games", "transit", "maps"]);
+const WIDE_CARDS = new Set(["games", "duo", "transit", "sky", "trails", "maps"]);
 const OBSERVER_MARGIN = "300px";
 
 function makeElement(tag, className, text) {

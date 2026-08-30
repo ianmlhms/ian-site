@@ -10,29 +10,34 @@
   <link rel="canonical" href="https://ian.lu/demo2/">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/demo/demo.css?v=1">
+  <link rel="stylesheet" href="/style.css?v=19">
+  <link rel="stylesheet" href="/demo/site.css?v=1">
 </head>
-<body>
-  <header class="dhero">
-    <span class="dkicker" id="kicker"></span>
-    <h1 class="dtitle" id="title"></h1>
-    <p class="dsub" id="sub"></p>
-    <p class="dhint" id="hint"></p>
+<body class="demo-replica">
+  <header class="bar">
+    <a class="brand" href="/">ian.lu</a>
   </header>
-  <main class="dpage">
-    <div class="dgrid" id="grid"></div>
-    <footer class="dfoot">
-      <p id="footer"></p>
-      <a class="dbtn dbtn-primary" href="/" id="cta"></a>
+
+  <main class="page">
+    <section class="today-hero">
+      <div class="today-greet">
+        <span class="hero-kicker" id="kicker"></span>
+        <h1 class="today-title" id="title"></h1>
+        <p class="today-sub" id="sub"></p>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="sec-title" id="section-title"></h2>
+      <div id="showcase-groups"></div>
+    </section>
+
+    <footer class="site-demo-foot">
+      <p id="footer-copy"></p>
+      <a class="btn-primary" href="/" id="cta"></a>
     </footer>
   </main>
-  <script type="module">
-    import { COPY } from "/demo/copy.js?v=1";
-    import { renderShowcases } from "/demo/showcase.js?v=1";
-    const copy = COPY.adults;
-    ["kicker", "title", "sub", "hint", "footer", "cta"].forEach((key) => {
-      document.getElementById(key).textContent = copy[key];
-    });
-    await renderShowcases(document.getElementById("grid"), "adults");
-  </script>
+
+  <script type="module" src="/demo/site.js?v=1"></script>
 </body>
 </html>

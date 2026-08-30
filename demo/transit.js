@@ -7,6 +7,9 @@ import {
   STOPS,
 } from "./content.js?v=1";
 import { UI } from "./copy.js?v=1";
+import { failedState, loadingState } from "./states.js?v=1";
+import { attachExpandable, makeExpandableRow } from "./expand.js?v=1";
+import { mountLineSearch } from "./lines.js?v=1";
 
 const FETCH_TIMEOUT_MS = 9000;
 const LUXEMBOURG_TIME_ZONE = "Europe/Luxembourg";
@@ -138,9 +141,56 @@ function appendLegChain(target, legs) {
   appendWalk();
 }
 
-function itineraryRow(itinerary) {
+function formattedTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : clockFormatter.format(date);
+}
+
+function stopTimeRow(stopName, time) {
   const row = document.createElement("div");
-  row.className = "drow";
+  row.className = "drow-sub";
+  const clock = document.createElement("span");
+  clock.className = "drow-small";
+  clock.textContent = formattedTime(time);
+  const stop = document.createElement("span");
+  stop.className = "drow-title";
+  stop.textContent = stopName ?? "";
+  row.append(clock, document.createTextNode(" "), stop);
+  return row;
+}
+
+function itineraryDetail(itinerary) {
+  const detail = document.createElement("div");
+  detail.className = "dlist";
+  for (const leg of Array.isArray(itinerary.legs) ? itinerary.legs : []) {
+    const entry = document.createElement("div");
+    entry.className = "dleg dleg-block";
+
+    if (leg?.mode === "WALK") {
+      const walk = document.createElement("div");
+      walk.className = "dwalk";
+      walk.textContent = `🚶 ${minutes(legDuration(leg))} min`;
+      entry.append(walk);
+    } else {
+      const line = document.createElement("span");
+      line.className = ["RAIL", "TRAM", "SUBWAY"].includes(leg?.mode)
+        ? "dline rail"
+        : "dline";
+      line.textContent = leg?.routeShortName ?? "";
+      entry.append(line);
+    }
+
+    entry.append(
+      stopTimeRow(leg?.from?.name, leg?.from?.departure),
+      stopTimeRow(leg?.to?.name, leg?.to?.arrival),
+    );
+    detail.append(entry);
+  }
+  return detail;
+}
+
+function itineraryRow(itinerary) {
+  const { row, detail } = makeExpandableRow();
 
   const main = document.createElement("div");
   main.className = "drow-main";
@@ -164,32 +214,8 @@ function itineraryRow(itinerary) {
     ? UI.direct
     : `${transferCount}${UI.transfers}`;
   side.append(total, transfers);
-  row.append(main, side);
-  return row;
-}
-
-function loadingState() {
-  const skeleton = document.createElement("div");
-  skeleton.className = "dskel";
-  for (let index = 0; index < 3; index += 1) {
-    const row = document.createElement("div");
-    row.className = "dskel-row";
-    skeleton.append(row);
-  }
-  return skeleton;
-}
-
-function failedState() {
-  const failure = document.createElement("p");
-  failure.className = "dfail";
-  failure.append(document.createTextNode(UI.failed));
-  const button = document.createElement("button");
-  button.className = "dbtn";
-  button.type = "button";
-  button.dataset.retry = "true";
-  button.textContent = UI.retry;
-  failure.append(button);
-  return failure;
+  row.append(main, side, detail);
+  return { row, build: () => itineraryDetail(itinerary) };
 }
 
 export function mount(host, opts = {}) {
@@ -199,6 +225,7 @@ export function mount(host, opts = {}) {
   let requestVersion = 0;
   let activeController = null;
   const timers = new Set();
+  const detailBuilders = new WeakMap();
 
   const root = document.createElement("div");
   const chips = document.createElement("div");
@@ -215,10 +242,19 @@ export function mount(host, opts = {}) {
   const note = document.createElement("p");
   note.className = "dmuted";
   note.textContent = ITINERARIES[0].note;
+  const tripHint = document.createElement("p");
+  tripHint.className = "dmuted";
+  tripHint.textContent = UI.tripDetail;
   const results = document.createElement("div");
   results.replaceChildren(loadingState());
-  root.append(chips, note, results);
+
+  root.append(chips, tripHint, note, results);
   host.replaceChildren(root);
+
+  // The line search is the card's second, independent tool — it owns its own
+  // lazy 776 KB index, its own debounce and its own teardown.
+  const lineSearch = mountLineSearch(root);
+  const expandable = attachExpandable(results, detailBuilders);
 
   const abortActive = () => {
     activeController?.abort();
@@ -250,8 +286,8 @@ export function mount(host, opts = {}) {
       if (!payload || !Array.isArray(payload.itineraries)) throw new TypeError("Invalid itinerary payload");
       if (destroyed || version !== requestVersion) return;
 
-      const rows = payload.itineraries.slice(0, MAX_ITINERARIES).map(itineraryRow);
-      if (rows.length === 0) {
+      const entries = payload.itineraries.slice(0, MAX_ITINERARIES).map(itineraryRow);
+      if (entries.length === 0) {
         const empty = document.createElement("p");
         empty.className = "dmuted";
         empty.textContent = UI.failed;
@@ -259,7 +295,10 @@ export function mount(host, opts = {}) {
       } else {
         const list = document.createElement("div");
         list.className = "dlist";
-        list.append(...rows);
+        for (const entry of entries) {
+          detailBuilders.set(entry.row, entry);
+          list.append(entry.row);
+        }
         results.replaceChildren(list);
       }
     } catch (error) {
@@ -286,7 +325,7 @@ export function mount(host, opts = {}) {
   };
 
   const retryPlan = (event) => {
-    const button = event.target.closest("[data-retry]");
+    const button = event.target.closest('[data-retry="plan"]');
     if (button && results.contains(button)) plan();
   };
 
@@ -304,6 +343,8 @@ export function mount(host, opts = {}) {
       timers.clear();
       chips.removeEventListener("click", selectItinerary);
       results.removeEventListener("click", retryPlan);
+      expandable.detach();
+      lineSearch.destroy();
     },
   };
 }

@@ -1,8 +1,12 @@
 import { SKY } from "./content.js?v=1";
 import { UI } from "./copy.js?v=1";
+import { loadLeaflet } from "./leaflet.js?v=1";
 
 const FETCH_TIMEOUT_MS = 9000;
-const CLIMB_THRESHOLD_FPM = 250;
+const MAP_ZOOM = 9;
+const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const PLANE_PATH = "M12 1.5 15.2 10l7.6 3.8v2.6l-8.1-1.7-1.1 6 3.2 2.1V24L12 22.8 7.2 24v-1.2l3.2-2.1-1.1-6-8.1 1.7v-2.6L8.8 10 12 1.5Z";
 
 export const meta = { badge: "live" };
 
@@ -10,69 +14,32 @@ function cleanText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function skeleton() {
-  const loading = document.createElement("div");
-  loading.className = "dskel";
-  for (let index = 0; index < 3; index += 1) {
-    const row = document.createElement("div");
-    row.className = "dskel-row";
-    loading.append(row);
-  }
-  return loading;
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function altitudeText(altitudeFt) {
-  const altitude = Number(altitudeFt);
-  if (!Number.isFinite(altitude)) return "—";
+  const altitude = finiteNumber(altitudeFt);
+  if (altitude === null) return "—";
   return `${Math.round(altitude).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "\u2009")} ft`;
 }
 
-function verticalArrow(verticalRateFpm) {
-  const rate = Number(verticalRateFpm);
-  if (!Number.isFinite(rate) || Math.abs(rate) <= CLIMB_THRESHOLD_FPM) return "→";
-  return rate > 0 ? "↑" : "↓";
+function speedText(speedKt) {
+  const speed = finiteNumber(speedKt);
+  return speed === null ? "—" : `${Math.round(speed)} kt`;
 }
 
-function aircraftRow(aircraft) {
-  const row = document.createElement("div");
-  row.className = "drow";
-
-  const main = document.createElement("div");
-  main.className = "drow-main";
-  const title = document.createElement("div");
-  title.className = "drow-title";
-  const identifier = cleanText(aircraft.flight)
-    || cleanText(aircraft.registration)
-    || cleanText(aircraft.hex)
-    || "—";
-  const icons = ["✈", aircraft.cargo && "📦", aircraft.military && "🎖", aircraft.special && "⭐"]
-    .filter(Boolean)
-    .join("");
-  title.textContent = `${icons} ${identifier}`;
-
-  const sub = document.createElement("div");
-  sub.className = "drow-sub";
-  sub.textContent = [cleanText(aircraft.type), cleanText(aircraft.registration)].filter(Boolean).join(" · ");
-  main.append(title, sub);
-
-  const side = document.createElement("div");
-  side.className = "drow-side";
-  const altitude = document.createElement("div");
-  altitude.className = "drow-big";
-  altitude.textContent = `${altitudeText(aircraft.altitudeFt)} ${verticalArrow(aircraft.verticalRateFpm)}`;
-  const distance = document.createElement("div");
-  distance.className = "drow-small";
-  const distanceNm = Number(aircraft.distanceNm);
-  distance.textContent = Number.isFinite(distanceNm) ? `${Math.round(distanceNm)} NM` : "—";
-  side.append(altitude, distance);
-  row.append(main, side);
-  return row;
+function message(text, className = "dmuted") {
+  const paragraph = document.createElement("p");
+  paragraph.className = className;
+  paragraph.textContent = text;
+  return paragraph;
 }
 
 function failureState() {
-  const failure = document.createElement("p");
-  failure.className = "dfail";
-  failure.append(document.createTextNode(UI.failed));
+  const failure = message(UI.failed, "dfail");
   const button = document.createElement("button");
   button.type = "button";
   button.className = "dbtn";
@@ -82,53 +49,171 @@ function failureState() {
   return failure;
 }
 
+function sizeMapContainer(element) {
+  element.className = "dmap";   // height and radius live in demo.css
+}
+
+function aircraftId(aircraft) {
+  return cleanText(aircraft.hex).toLowerCase();
+}
+
+function visibleAircraft(aircraft) {
+  return aircraft
+    .filter((item) => item && item.onGround !== true)
+    .map((item) => ({
+      item,
+      id: aircraftId(item),
+      lat: finiteNumber(item.lat),
+      lon: finiteNumber(item.lon),
+    }))
+    .filter(({ id, lat, lon }) => id && lat !== null && lon !== null && Math.abs(lat) <= 90 && Math.abs(lon) <= 180)
+    .sort((left, right) => {
+      const leftDistance = finiteNumber(left.item.distanceNm);
+      const rightDistance = finiteNumber(right.item.distanceNm);
+      return (leftDistance ?? Infinity) - (rightDistance ?? Infinity);
+    })
+    .slice(0, Math.max(0, Number(SKY.maxRows) || 0));
+}
+
+function markerColour(aircraft) {
+  // Visual priority when flags overlap: military, special, interesting, cargo, ordinary.
+  if (aircraft.military) return "#ef4444";
+  if (aircraft.special) return "#c084fc";
+  if (aircraft.interesting) return "#facc15";
+  if (aircraft.cargo) return "#fb923c";
+  return "#1d6fce";
+}
+
+function markerIcon(Leaflet, aircraft) {
+  const track = finiteNumber(aircraft.trackDeg) ?? 0;
+  const colour = markerColour(aircraft);
+  const html = `<svg viewBox="0 0 24 25" aria-hidden="true" style="display:block;width:30px;height:31px;transform:rotate(${track}deg);transform-origin:50% 50%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.75))"><path style="fill:${colour};stroke:#ffffff;stroke-width:.7;stroke-linejoin:round;stroke-linecap:round;paint-order:stroke" d="${PLANE_PATH}"></path></svg>`;
+  return Leaflet.divIcon({
+    className: "",
+    html,
+    iconSize: [30, 31],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -13],
+  });
+}
+
+function popupContent(aircraft) {
+  const popup = document.createElement("div");
+  const identity = document.createElement("strong");
+  identity.textContent = cleanText(aircraft.flight)
+    || cleanText(aircraft.registration)
+    || cleanText(aircraft.hex)
+    || "—";
+  const details = document.createElement("div");
+  details.textContent = [cleanText(aircraft.registration), cleanText(aircraft.type)].filter(Boolean).join(" · ") || "—";
+  const metrics = document.createElement("div");
+  metrics.textContent = `${altitudeText(aircraft.altitudeFt)} · ${speedText(aircraft.groundSpeedKt)}`;
+  popup.append(identity, details, metrics);
+  return popup;
+}
+
 export function mount(host, opts = {}) {
   void opts;
   let destroyed = false;
   let activeController = null;
-  let hasGoodList = false;
+  let hasGoodFeed = false;
+  let map = null;
+  let resizeObserver = null;
+  let resizeFrame = 0;
+  const markerStates = new Map();
   const timers = new Set();
 
   const body = document.createElement("div");
-  body.replaceChildren(skeleton());
+  body.className = "dlist";
+  const mapElement = document.createElement("div");
+  mapElement.className = "dtrail-map";
+  mapElement.setAttribute("aria-label", UI.loading);
+  sizeMapContainer(mapElement);
+  const status = document.createElement("div");
+  status.replaceChildren(message(UI.loading));
+  body.append(mapElement, status);
   host.replaceChildren(body);
 
-  const renderList = (aircraft) => {
-    const visible = aircraft
-      .filter((item) => item && item.onGround !== true)
-      .slice()
-      .sort((left, right) => {
-        const leftDistance = Number(left.distanceNm);
-        const rightDistance = Number(right.distanceNm);
-        return (Number.isFinite(leftDistance) ? leftDistance : Infinity)
-          - (Number.isFinite(rightDistance) ? rightDistance : Infinity);
-      })
-      .slice(0, SKY.maxRows);
+  const scheduleInvalidate = () => {
+    if (!map || destroyed) return;
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0;
+      if (!map || destroyed) return;
+      const bounds = mapElement.getBoundingClientRect();
+      if (bounds.width > 0 && bounds.height > 0) map.invalidateSize({ pan: false });
+    });
+  };
 
-    const list = document.createElement("div");
-    list.className = "dlist";
-    list.append(...visible.map(aircraftRow));
-    if (visible.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "dmuted";
-      empty.textContent = UI.skyEmpty;
-      body.replaceChildren(list, empty);
-    } else {
-      body.replaceChildren(list);
-    }
+  const onViewportResize = () => {
+    sizeMapContainer(mapElement);
+    scheduleInvalidate();
+  };
+
+  const ensureMap = async () => {
+    if (map) return map;
+    mapElement.hidden = false;
+    sizeMapContainer(mapElement);
+    const Leaflet = await loadLeaflet();
+    if (destroyed) return null;
+    if (map) return map;
+    map = Leaflet.map(mapElement, {
+      center: [SKY.lat, SKY.lon],
+      zoom: MAP_ZOOM,
+      scrollWheelZoom: false,
+    });
+    Leaflet.tileLayer(TILE_URL, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
+    resizeObserver = window.ResizeObserver ? new ResizeObserver(scheduleInvalidate) : null;
+    resizeObserver?.observe(mapElement);
+    map.whenReady(scheduleInvalidate);
+    const delayedInvalidate = setTimeout(scheduleInvalidate, 250);
+    timers.add(delayedInvalidate);
+    return map;
+  };
+
+  const syncMarkers = (Leaflet, aircraft) => {
+    const visible = visibleAircraft(aircraft);
+    const nextIds = new Set(visible.map(({ id }) => id));
+
+    markerStates.forEach(({ marker }, id) => {
+      if (nextIds.has(id)) return;
+      marker.remove();
+      markerStates.delete(id);
+    });
+
+    visible.forEach(({ item, id, lat, lon }) => {
+      const colour = markerColour(item);
+      const iconKey = `${Math.round(finiteNumber(item.trackDeg) ?? 0)}|${colour}`;
+      const existing = markerStates.get(id);
+      if (!existing) {
+        const marker = Leaflet.marker([lat, lon], {
+          icon: markerIcon(Leaflet, item),
+          title: cleanText(item.flight) || cleanText(item.registration) || cleanText(item.hex),
+        }).addTo(map);
+        marker.bindPopup(popupContent(item));
+        markerStates.set(id, { marker, iconKey });
+        return;
+      }
+
+      existing.marker.setLatLng([lat, lon]);
+      if (existing.iconKey !== iconKey) {
+        existing.marker.setIcon(markerIcon(Leaflet, item));
+        existing.iconKey = iconKey;
+      }
+      existing.marker.getPopup()?.setContent(popupContent(item));
+    });
+
+    status.replaceChildren(visible.length === 0 ? message(UI.skyEmpty) : document.createTextNode(""));
   };
 
   const markStale = () => {
-    body.querySelector("[data-stale]")?.remove();
-    const stale = document.createElement("p");
-    stale.className = "dmuted";
-    stale.dataset.stale = "true";
-    stale.textContent = UI.failed;
-    body.append(stale);
+    status.replaceChildren(message(UI.failed));
   };
 
   const load = async () => {
     if (destroyed || activeController) return;
+    const activeMap = await ensureMap();
+    if (!activeMap || destroyed || activeController) return;
     const controller = new AbortController();
     activeController = controller;
     const url = new URL(SKY.proxy);
@@ -147,15 +232,12 @@ export function mount(host, opts = {}) {
       const payload = await response.json();
       if (!payload || !Array.isArray(payload.aircraft)) throw new TypeError("Invalid aircraft payload");
       if (destroyed) return;
-      renderList(payload.aircraft);
-      hasGoodList = true;
+      syncMarkers(window.L, payload.aircraft);
+      hasGoodFeed = true;
     } catch (error) {
       if (destroyed) return;
-      if (hasGoodList) {
-        markStale();
-      } else {
-        body.replaceChildren(failureState());
-      }
+      if (hasGoodFeed) markStale();
+      else status.replaceChildren(failureState());
     } finally {
       clearTimeout(timeout);
       timers.delete(timeout);
@@ -163,14 +245,26 @@ export function mount(host, opts = {}) {
     }
   };
 
+  const start = async () => {
+    try {
+      await load();
+    } catch (error) {
+      if (!destroyed) {
+        if (!map) mapElement.hidden = true;
+        status.replaceChildren(failureState());
+      }
+    }
+  };
+
   const retryLoad = (event) => {
     const button = event.target.closest("[data-retry]");
-    if (button && body.contains(button)) load();
+    if (button && body.contains(button)) void start();
   };
 
   body.addEventListener("click", retryLoad);
-  load();
-  const refreshTimer = setInterval(load, SKY.refreshMs);
+  window.addEventListener("resize", onViewportResize);
+  void start();
+  const refreshTimer = setInterval(() => void start(), SKY.refreshMs);
   timers.add(refreshTimer);
 
   return {
@@ -184,7 +278,15 @@ export function mount(host, opts = {}) {
         clearInterval(timer);
       });
       timers.clear();
+      cancelAnimationFrame(resizeFrame);
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       body.removeEventListener("click", retryLoad);
+      window.removeEventListener("resize", onViewportResize);
+      markerStates.clear();
+      if (map) map.remove();
+      map = null;
+      mapElement.remove();
     },
   };
 }

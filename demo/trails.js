@@ -1,76 +1,29 @@
 import { TRAILS } from "./content.js?v=1";
 import { UI } from "./copy.js?v=1";
+import { loadLeaflet } from "./leaflet.js?v=1";
 
 const FETCH_TIMEOUT_MS = 9000;
-const SVG_NS = "http://www.w3.org/2000/svg";
-const VIEWBOX_WIDTH = 600;
-const VIEWBOX_HEIGHT = 180;
-const VIEWBOX_PADDING = 12;
+const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const TRAIL_COLOUR = "#1d6fce";
+const MTB_COLOUR = "#fbbf24";
 
 export const meta = { badge: null };
 
-function geometryLines(geometry) {
+function validateGeometry(geometry) {
   if (!geometry || !Array.isArray(geometry.coordinates)) throw new TypeError("Invalid trail geometry");
-  const rawLines = geometry.type === "LineString"
+  const lines = geometry.type === "LineString"
     ? [geometry.coordinates]
     : geometry.type === "MultiLineString"
       ? geometry.coordinates
       : null;
-  if (!rawLines) throw new TypeError("Unsupported trail geometry");
-
-  const lines = rawLines
-    .map((line) => line
-      .filter((position) => Array.isArray(position)
-        && Number.isFinite(Number(position[0]))
-        && Number.isFinite(Number(position[1])))
-      .map((position) => [Number(position[0]), Number(position[1])]))
-    .filter((line) => line.length >= 2);
-  if (lines.length === 0) throw new TypeError("Empty trail geometry");
-  return lines;
-}
-
-function projectLines(lines) {
-  const points = lines.flat();
-  const longitudes = points.map(([longitude]) => longitude);
-  const latitudes = points.map(([, latitude]) => latitude);
-  const minLongitude = Math.min(...longitudes);
-  const maxLongitude = Math.max(...longitudes);
-  const minLatitude = Math.min(...latitudes);
-  const maxLatitude = Math.max(...latitudes);
-  const meanLatitude = (minLatitude + maxLatitude) / 2;
-  const longitudeScale = Math.cos(meanLatitude * Math.PI / 180);
-  const geographicWidth = Math.max((maxLongitude - minLongitude) * longitudeScale, Number.EPSILON);
-  const geographicHeight = Math.max(maxLatitude - minLatitude, Number.EPSILON);
-  const availableWidth = VIEWBOX_WIDTH - (2 * VIEWBOX_PADDING);
-  const availableHeight = VIEWBOX_HEIGHT - (2 * VIEWBOX_PADDING);
-  const scale = Math.min(availableWidth / geographicWidth, availableHeight / geographicHeight);
-  const drawnWidth = geographicWidth * scale;
-  const drawnHeight = geographicHeight * scale;
-  const offsetX = (VIEWBOX_WIDTH - drawnWidth) / 2;
-  const offsetY = (VIEWBOX_HEIGHT - drawnHeight) / 2;
-
-  return lines.map((line) => line.map(([longitude, latitude]) => ({
-    x: offsetX + ((longitude - minLongitude) * longitudeScale * scale),
-    y: offsetY + ((maxLatitude - latitude) * scale),
-  })));
-}
-
-function trailMap(lines, category) {
-  const svg = document.createElementNS(SVG_NS, "svg");
-  svg.setAttribute("class", "dtrail-map");
-  svg.setAttribute("viewBox", `0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`);
-  svg.setAttribute("aria-hidden", "true");
-
-  projectLines(lines).forEach((line) => {
-    const path = document.createElementNS(SVG_NS, "path");
-    if (category === "mtb") path.setAttribute("class", "mtb");
-    path.setAttribute("d", line
-      .map(({ x, y }, index) => `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`)
-      .join(" "));
-    svg.append(path);
-  });
-
-  return svg;
+  if (!lines) throw new TypeError("Unsupported trail geometry");
+  const hasLine = lines.some((line) => Array.isArray(line) && line.filter((position) =>
+    Array.isArray(position)
+      && Number.isFinite(Number(position[0]))
+      && Number.isFinite(Number(position[1])),
+  ).length >= 2);
+  if (!hasLine) throw new TypeError("Empty trail geometry");
 }
 
 function trailDetails(trail) {
@@ -89,10 +42,15 @@ function trailDetails(trail) {
   return row;
 }
 
+function message(text, className = "dmuted") {
+  const paragraph = document.createElement("p");
+  paragraph.className = className;
+  paragraph.textContent = text;
+  return paragraph;
+}
+
 function failureState() {
-  const failure = document.createElement("p");
-  failure.className = "dfail";
-  failure.append(document.createTextNode(UI.failed));
+  const failure = message(UI.failed, "dfail");
   const button = document.createElement("button");
   button.type = "button";
   button.className = "dbtn";
@@ -102,12 +60,20 @@ function failureState() {
   return failure;
 }
 
+function sizeMapContainer(element) {
+  element.className = "dmap";   // height and radius live in demo.css
+}
+
 export function mount(host, opts = {}) {
   void opts;
   let destroyed = false;
   let selectedIndex = 0;
   let requestVersion = 0;
   let activeController = null;
+  let map = null;
+  let routeLayer = null;
+  let resizeObserver = null;
+  let resizeFrame = 0;
   const geometryCache = new Map();
   const timers = new Set();
 
@@ -122,23 +88,69 @@ export function mount(host, opts = {}) {
     chip.textContent = trail.name;
     chips.append(chip);
   });
+
   const body = document.createElement("div");
-  const loading = document.createElement("p");
-  loading.className = "dmuted";
-  loading.textContent = UI.loading;
-  body.replaceChildren(loading);
+  const content = document.createElement("div");
+  content.className = "dlist";
+  const mapElement = document.createElement("div");
+  mapElement.className = "dtrail-map";
+  mapElement.setAttribute("aria-hidden", "true");
+  sizeMapContainer(mapElement);
+  const details = document.createElement("div");
+  details.replaceChildren(message(UI.loading));
+  const link = document.createElement("a");
+  link.className = "dbtn";
+  link.textContent = UI.openApp;
+  link.hidden = true;
+  content.append(mapElement, details, link);
+  body.append(content);
   root.append(chips, body);
   host.replaceChildren(root);
 
-  const render = (trail, lines) => {
-    const content = document.createElement("div");
-    content.className = "dlist";
-    const link = document.createElement("a");
-    link.className = "dbtn";
+  const scheduleInvalidate = () => {
+    if (!map || destroyed) return;
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0;
+      if (!map || destroyed) return;
+      const bounds = mapElement.getBoundingClientRect();
+      if (bounds.width > 0 && bounds.height > 0) map.invalidateSize({ pan: false });
+    });
+  };
+
+  const onViewportResize = () => {
+    sizeMapContainer(mapElement);
+    scheduleInvalidate();
+  };
+
+  const ensureMap = (Leaflet) => {
+    if (map) return map;
+    mapElement.hidden = false;
+    sizeMapContainer(mapElement);
+    map = Leaflet.map(mapElement, { scrollWheelZoom: false });
+    Leaflet.tileLayer(TILE_URL, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
+    resizeObserver = window.ResizeObserver ? new ResizeObserver(scheduleInvalidate) : null;
+    resizeObserver?.observe(mapElement);
+    map.whenReady(scheduleInvalidate);
+    const delayedInvalidate = setTimeout(scheduleInvalidate, 250);
+    timers.add(delayedInvalidate);
+    return map;
+  };
+
+  const render = (Leaflet, trail, geo) => {
+    ensureMap(Leaflet);
+    if (routeLayer) map.removeLayer(routeLayer);
+    const colour = trail.cat === "mtb" ? MTB_COLOUR : TRAIL_COLOUR;
+    routeLayer = Leaflet.geoJSON(geo, {
+      style: { color: colour, weight: 4, opacity: 0.85 },
+    }).addTo(map);
+    // The legacy SVG selector is more specific than Leaflet's presentation attribute.
+    routeLayer.eachLayer((layer) => layer.getElement()?.style.setProperty("stroke", colour));
+    map.fitBounds(routeLayer.getBounds(), { padding: [20, 20] });
+    details.replaceChildren(trailDetails(trail));
     link.href = `/${trail.cat === "mtb" ? "mtb" : "trails"}/de/${encodeURIComponent(trail.slug)}.html`;
-    link.textContent = UI.openApp;
-    content.append(trailMap(lines, trail.cat), trailDetails(trail), link);
-    body.replaceChildren(content);
+    link.hidden = false;
+    scheduleInvalidate();
   };
 
   const abortActive = () => {
@@ -146,39 +158,41 @@ export function mount(host, opts = {}) {
     activeController = null;
   };
 
+  const fetchGeometry = async (trail, controller) => {
+    const cached = geometryCache.get(trail.slug);
+    if (cached) return cached;
+    const response = await fetch(`/${trail.cat}/geo/${encodeURIComponent(trail.slug)}.geojson`, {
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    validateGeometry(payload?.geometry);
+    geometryCache.set(trail.slug, payload);
+    return payload;
+  };
+
   const load = async () => {
+    if (destroyed) return;
     abortActive();
     const version = ++requestVersion;
     const trail = TRAILS[selectedIndex];
-    const cached = geometryCache.get(trail.slug);
-    if (cached) {
-      render(trail, cached);
-      return;
-    }
-
-    const pending = document.createElement("p");
-    pending.className = "dmuted";
-    pending.textContent = UI.loading;
-    body.replaceChildren(pending);
+    mapElement.hidden = false;
+    details.replaceChildren(message(UI.loading));
+    link.hidden = true;
     const controller = new AbortController();
     activeController = controller;
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     timers.add(timeout);
 
     try {
-      const response = await fetch(`/${trail.cat}/geo/${encodeURIComponent(trail.slug)}.geojson`, {
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      const lines = geometryLines(payload?.geometry);
+      const [Leaflet, geo] = await Promise.all([loadLeaflet(), fetchGeometry(trail, controller)]);
       if (destroyed || version !== requestVersion) return;
-      geometryCache.set(trail.slug, lines);
-      render(trail, lines);
+      render(Leaflet, trail, geo);
     } catch (error) {
       if (destroyed || version !== requestVersion) return;
-      body.replaceChildren(failureState());
+      if (!map) mapElement.hidden = true;
+      details.replaceChildren(failureState());
     } finally {
       clearTimeout(timeout);
       timers.delete(timeout);
@@ -190,22 +204,23 @@ export function mount(host, opts = {}) {
     const chip = event.target.closest("[data-trail-index]");
     if (!chip || !chips.contains(chip)) return;
     const index = Number(chip.dataset.trailIndex);
-    if (!Number.isInteger(index) || !TRAILS[index]) return;
+    if (!Number.isInteger(index) || !TRAILS[index] || index === selectedIndex) return;
     selectedIndex = index;
     chips.querySelectorAll(".dchip").forEach((item, itemIndex) => {
       item.classList.toggle("on", itemIndex === selectedIndex);
     });
-    load();
+    void load();
   };
 
   const retryLoad = (event) => {
     const button = event.target.closest("[data-retry]");
-    if (button && body.contains(button)) load();
+    if (button && body.contains(button)) void load();
   };
 
   chips.addEventListener("click", selectTrail);
   body.addEventListener("click", retryLoad);
-  load();
+  window.addEventListener("resize", onViewportResize);
+  void load();
 
   return {
     destroy() {
@@ -215,9 +230,17 @@ export function mount(host, opts = {}) {
       abortActive();
       timers.forEach(clearTimeout);
       timers.clear();
-      geometryCache.clear();
+      cancelAnimationFrame(resizeFrame);
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       chips.removeEventListener("click", selectTrail);
       body.removeEventListener("click", retryLoad);
+      window.removeEventListener("resize", onViewportResize);
+      if (map) map.remove();
+      map = null;
+      routeLayer = null;
+      mapElement.remove();
+      geometryCache.clear();
     },
   };
 }
