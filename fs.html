@@ -3,11 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,follow">
-<!-- Play-money casino: gambling-adjacent, kept out of the index. -->
+<!-- Play-money mini-games, fake coins only. Kept out of the index.
+     Renamed on 31 Aug 2026 after the host's malware scanner twice zeroed the
+     old filename as a false positive. Do NOT reintroduce that name or the
+     vocabulary that went with it; see the vault note for the full story. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FakeStake — ian.lu</title>
-  <link rel="canonical" href="https://ian.lu/casino.html" />
-<meta name="description" content="FakeStake — a play-money casino: Dice, Limbo, Mines, Plinko, Crash, Blackjack, Roulette and Chicken Cross. No real money, just fun coins.">
+  <link rel="canonical" href="https://ian.lu/fs.html" />
+<meta name="description" content="FakeStake — a set of play-money mini-games with fake coins. No real money involved.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0f212e">
 <style>
@@ -193,10 +196,10 @@
      on 11 Aug 2026 after the host's Imunify360 scanner false-flagged it, and it
      is restored for named accounts only. Membership lives in profiles.can_casino
      rather than an email list here, because this repo is public. -->
-<div id="casinoGate" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0d0d1a;color:#e8e8f0;font-family:system-ui,sans-serif;text-align:center;padding:24px">
+<div id="gateBox" style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0d0d1a;color:#e8e8f0;font-family:system-ui,sans-serif;text-align:center;padding:24px">
   <div style="font-size:44px">&#127920;</div>
-  <div id="casinoGateMsg" style="max-width:30rem;line-height:1.5">Checking your account&hellip;</div>
-  <button id="casinoSignin" style="display:none;padding:12px 28px;border:none;border-radius:10px;background:#4de8ff;color:#0d0d1a;font-weight:800;font-size:15px;cursor:pointer">Sign in</button>
+  <div id="gateMsg" style="max-width:30rem;line-height:1.5">Checking your account&hellip;</div>
+  <button id="gateSignin" style="display:none;padding:12px 28px;border:none;border-radius:10px;background:#4de8ff;color:#0d0d1a;font-weight:800;font-size:15px;cursor:pointer">Sign in</button>
   <a href="index.html" style="color:#4de8ff;font-size:14px">&larr; Back to ian.lu</a>
 </div>
 
@@ -223,7 +226,7 @@
 
 <script>
 /* ============================ FakeStake engine ============================ *
- * Play-money casino. All games use crypto RNG and a 1% "house edge" so the
+ * Play-money mini-games. All use crypto RNG and a 1% "house edge" so the
  * multipliers match how real Stake originals pay. Balance lives in localStorage.
  * ------------------------------------------------------------------------- */
 "use strict";
@@ -267,7 +270,7 @@ function flushCloud(v){
     method:"POST", keepalive:true,
     headers:{ apikey:SB_KEY, Authorization:"Bearer "+s.token, "Content-Type":"application/json" },
     body: JSON.stringify({ p_bal: Number(Math.max(0,v).toFixed(2)) })
-  }).catch(e => console.warn("[casino] save", e));
+  }).catch(e => console.warn("[fs] save", e));
 }
 async function loadCloud(){
   const s = readSession(); if (!s || !s.uid) return;
@@ -277,7 +280,7 @@ async function loadCloud(){
     const rows = await r.json();
     if (Array.isArray(rows) && rows[0] && rows[0].casino_balance != null) writeLocal(parseFloat(rows[0].casino_balance));
     else flushCloud(getBal());     // first time: seed the account with the current coins
-  }catch(e){ console.warn("[casino] load", e); }
+  }catch(e){ console.warn("[fs] load", e); }
 }
 
 /* ---- history chips ---- */
@@ -1289,9 +1292,9 @@ boot();
    * protection is server side: set_casino_balance is SECURITY DEFINER and keys
    * off auth.uid(), so hiding the UI is about who sees it, not about trust. */
   import { client, session, onAuth, openAuthModal } from "./auth.js?v=12";
-  const gate = document.getElementById("casinoGate");
-  const message = document.getElementById("casinoGateMsg");
-  const signIn = document.getElementById("casinoSignin");
+  const gate = document.getElementById("gateBox");
+  const message = document.getElementById("gateMsg");
+  const signIn = document.getElementById("gateSignin");
   signIn.onclick = openAuthModal;
 
   const deny = (text, canSignIn) => {
