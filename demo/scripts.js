@@ -46,7 +46,7 @@ export const CALL = Object.freeze({
 /* Study Buddy. The real app streams an answer from an Edge Function; this
  * replays a fixed answer at a typing speed that reads like the live one. */
 export const BUDDY = Object.freeze({
-  charMs: 14,
+  charMs: 30,          // ms per character — half the old speed, so it reads as thinking
   turns: Object.freeze([
     {
       q: "Erkläer mir de Pythagoras a einfache Wierder.",

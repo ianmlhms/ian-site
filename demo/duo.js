@@ -3,6 +3,8 @@ import { DUO_GAMES, DUO_ROOM_PREFIX } from "./content.js?v=1";
 export const meta = { badge: "live" };
 
 const ROOM_SUFFIX_LENGTH = 10;
+const AUTOPLAY_DELAY_MS = Object.freeze({ min: 1200, max: 1800 });
+const EMPTY_TICKS_BEFORE_RESTART = 3;
 
 function freshRoom() {
   const bytes = new Uint8Array(8);
@@ -18,11 +20,29 @@ function gameUrl(gameId, room, role) {
   return `/${encodeURIComponent(gameId)}.html?${params}`;
 }
 
+function autoplayDelay() {
+  const range = AUTOPLAY_DELAY_MS.max - AUTOPLAY_DELAY_MS.min;
+  return AUTOPLAY_DELAY_MS.min + Math.round(Math.random() * range);
+}
+
+function readFrameDocument(frame) {
+  try {
+    return { accessible: true, document: frame.contentDocument };
+  } catch {
+    return { accessible: false, document: null };
+  }
+}
+
 export function mount(host, opts = {}) {
   void opts;
 
   let destroyed = false;
   let selectedGame = DUO_GAMES[0];
+  let round = 0;
+  let autoplayTimer = null;
+  let autoplayStopped = false;
+  let autoplayHasMoved = false;
+  let emptyTicks = 0;
   const chips = document.createElement("div");
   const frames = document.createElement("div");
   const frameEntries = ["host", "guest"].map((role, index) => {
@@ -41,6 +61,7 @@ export function mount(host, opts = {}) {
     return { role, frame, device };
   });
   const chipButtons = new Map();
+  const documentListeners = new Map();
 
   chips.className = "dchips";
   frames.className = "dduo-frames";
@@ -56,9 +77,118 @@ export function mount(host, opts = {}) {
     chips.append(button);
   }
 
+  const clearAutoplayTimer = () => {
+    if (autoplayTimer === null) return;
+    window.clearTimeout(autoplayTimer);
+    autoplayTimer = null;
+  };
+
+  const removeDocumentListeners = () => {
+    documentListeners.forEach(({ document: frameDocument, handleInteraction }) => {
+      try {
+        frameDocument.removeEventListener("pointerdown", handleInteraction);
+        frameDocument.removeEventListener("keydown", handleInteraction);
+      } catch {
+        // A document can disappear while its iframe is navigating.
+      }
+    });
+    documentListeners.clear();
+  };
+
+  const stopAutoplay = () => {
+    autoplayStopped = true;
+    clearAutoplayTimer();
+    removeDocumentListeners();
+  };
+
+  const attachInteractionListeners = (frame, activeRound) => {
+    const existing = documentListeners.get(frame);
+    if (existing) {
+      try {
+        existing.document.removeEventListener("pointerdown", existing.handleInteraction);
+        existing.document.removeEventListener("keydown", existing.handleInteraction);
+      } catch {
+        // The old document may already have been replaced.
+      }
+      documentListeners.delete(frame);
+    }
+
+    const result = readFrameDocument(frame);
+    if (!result.accessible || !result.document) return;
+
+    const handleInteraction = () => {
+      if (destroyed || activeRound !== round) return;
+      stopAutoplay();
+    };
+
+    try {
+      result.document.addEventListener("pointerdown", handleInteraction);
+      result.document.addEventListener("keydown", handleInteraction);
+      documentListeners.set(frame, { document: result.document, handleInteraction });
+    } catch {
+      // Loading or replacement can make a same-origin document briefly unusable.
+    }
+  };
+
+  const scheduleAutoplay = (activeRound) => {
+    clearAutoplayTimer();
+    if (destroyed || autoplayStopped || activeRound !== round) return;
+    autoplayTimer = window.setTimeout(() => autoplayTick(activeRound), autoplayDelay());
+  };
+
+  const autoplayTick = (activeRound) => {
+    autoplayTimer = null;
+    if (destroyed || autoplayStopped || activeRound !== round) return;
+
+    const candidates = [];
+    for (const { frame } of frameEntries) {
+      const result = readFrameDocument(frame);
+      if (!result.accessible || !result.document) {
+        scheduleAutoplay(activeRound);
+        return;
+      }
+      try {
+        candidates.push(...result.document.querySelectorAll(selectedGame.moveSelector));
+      } catch {
+        scheduleAutoplay(activeRound);
+        return;
+      }
+    }
+
+    if (candidates.length) {
+      const candidate = candidates[Math.floor(Math.random() * candidates.length)];
+      try {
+        candidate.click();
+        autoplayHasMoved = true;
+        emptyTicks = 0;
+      } catch {
+        // The game may have re-rendered between selection and the click.
+      }
+    } else if (autoplayHasMoved) {
+      emptyTicks += 1;
+      if (emptyTicks >= EMPTY_TICKS_BEFORE_RESTART) {
+        loadGame(selectedGame);
+        return;
+      }
+    }
+
+    scheduleAutoplay(activeRound);
+  };
+
+  const handleFrameLoad = (event) => {
+    if (destroyed) return;
+    attachInteractionListeners(event.currentTarget, round);
+  };
+
   const loadGame = (game) => {
     if (destroyed) return;
+    clearAutoplayTimer();
+    removeDocumentListeners();
     selectedGame = game;
+    round += 1;
+    autoplayStopped = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    autoplayHasMoved = false;
+    emptyTicks = 0;
     const room = freshRoom();
 
     frameEntries.forEach(({ role, frame }, index) => {
@@ -68,6 +198,7 @@ export function mount(host, opts = {}) {
     chipButtons.forEach((button, gameId) => {
       button.classList.toggle("on", gameId === game.id);
     });
+    scheduleAutoplay(round);
   };
 
   const handleChipClick = (event) => {
@@ -78,6 +209,7 @@ export function mount(host, opts = {}) {
   };
 
   chips.addEventListener("click", handleChipClick);
+  frameEntries.forEach(({ frame }) => frame.addEventListener("load", handleFrameLoad));
   host.append(chips, frames);
   loadGame(selectedGame);
 
@@ -85,9 +217,12 @@ export function mount(host, opts = {}) {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      clearAutoplayTimer();
+      removeDocumentListeners();
       chips.removeEventListener("click", handleChipClick);
       // Navigating away tears down both Supabase Realtime websocket clients.
       frameEntries.forEach(({ frame }) => {
+        frame.removeEventListener("load", handleFrameLoad);
         frame.src = "about:blank";
       });
     },

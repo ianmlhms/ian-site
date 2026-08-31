@@ -1,8 +1,10 @@
 import { BUDDY } from "./scripts.js?v=1";
 import { UI } from "./copy.js?v=1";
 
-const QUESTION_PAUSE_MS = 800;
-const TURN_PAUSE_MS = 1600;
+const QUESTION_PAUSE_MS = 1200;
+/* How long a finished answer stays up before the next turn replaces it. Long
+ * enough that someone being shown the page can actually read it. */
+const TURN_PAUSE_MS = 5000;
 const TYPING_TICK_MS = 16;
 
 export const meta = { badge: "demo" };

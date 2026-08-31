@@ -107,8 +107,9 @@ export const ARCADE_COUNT = 34;
  * is the whole point of the feature and impossible to show with one board.
  * game-common.js reads ?room= and ?role=, defaulting the room to "demo". */
 export const DUO_GAMES = Object.freeze([
-  { id: "connect4", name: "4 Gewënnt", emoji: "🔴" },
-  { id: "dots",     name: "Dots & Boxes", emoji: "⬛" },
+  // Move controls verified against connect4.html and dots.html respectively.
+  { id: "connect4", name: "4 Gewënnt", emoji: "🔴", moveSelector: "#colbtns button:not([disabled])" },
+  { id: "dots",     name: "Dots & Boxes", emoji: "⬛", moveSelector: ".edge.open" },
 ]);
 
 /* A fresh room per page load, so two visitors never land in the same game. */
