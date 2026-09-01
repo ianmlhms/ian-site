@@ -39,7 +39,12 @@ create index if not exists wardrobe_wears_user_day on public.wardrobe_wears (use
 create index if not exists wardrobe_wears_item on public.wardrobe_wears (item_id);
 
 -- ---- 4) Stylist chat --------------------------------------------------------
-create table if not exists public.wardrobe_chat (id uuid primary key default gen_random_uuid(), user_id uuid not null default auth.uid() references auth.users on delete cascade, role text not null, content text not null, outfit_id uuid references public.wardrobe_outfits on delete set null, created_at timestamptz not null default now());
+create table if not exists public.wardrobe_chat (id uuid primary key default gen_random_uuid(), user_id uuid not null default auth.uid() references auth.users on delete cascade, role text not null, content text not null, item_ids uuid[], created_at timestamptz not null default now());
+-- A reply proposes a set of items without necessarily saving an outfit row,
+-- so the ids live on the message. (v1 briefly had an outfit_id FK instead,
+-- which forced a junk outfit row per suggestion.) Idempotent fixups:
+alter table public.wardrobe_chat add column if not exists item_ids uuid[];
+alter table public.wardrobe_chat drop column if exists outfit_id;
 alter table public.wardrobe_chat drop constraint if exists wardrobe_chat_role_check;
 alter table public.wardrobe_chat add constraint wardrobe_chat_role_check check (role in ('user','assistant'));
 alter table public.wardrobe_chat enable row level security;
