@@ -10,9 +10,6 @@
 import * as auth from "./auth.js?v=12";
 
 const OWNER = "konto@ian.lu";
-/* OpsAgent reports on every other service's behalf, so its own health decides
- * whether any of the other verdicts are worth believing. See render(). */
-const WATCHER_KEY = "opsagent";
 const REFRESH_MS = 20_000;
 const COMMAND_POLL_MS = 1500;
 const COMMAND_TIMEOUT_MS = 90_000;
@@ -77,10 +74,10 @@ function detailChips(detail) {
   return chips.length ? `<div class="chips">${chips.join("")}</div>` : "";
 }
 
-function serviceCard(service, watcherSilent) {
-  /* No agent means nothing will ever claim the command, so the button would
+function serviceCard(service, anyReporting) {
+  /* With nothing listening the command is never claimed, so the button would
    * spin for COMMAND_TIMEOUT_MS and then fail. Don't offer it. */
-  const canRestart = service.health !== "unknown" && !watcherSilent;
+  const canRestart = service.health !== "unknown" && anyReporting;
   return `<article class="svc svc--${esc(service.health)}">
     <header class="svc-head">
       <span class="svc-mark" aria-hidden="true">${HEALTH_MARK[service.health] || "○"}</span>
@@ -97,8 +94,8 @@ function serviceCard(service, watcherSilent) {
       ${canRestart
         ? `<button class="svc-btn" type="button" data-restart="${esc(service.key)}"
              data-label="${esc(service.label)}">Restart</button>`
-        : `<span class="svc-hint">${watcherSilent
-            ? "no agent to restart it" : "nothing has reported yet"}</span>`}
+        : `<span class="svc-hint">${anyReporting
+            ? "nothing has reported yet" : "nothing is listening"}</span>`}
       <span class="svc-msg" id="msg-${esc(service.key)}" role="status"></span>
     </div>
   </article>`;
@@ -115,48 +112,51 @@ function alertsList(alerts) {
 }
 
 function render(state) {
-  /* The honesty rule. OpsAgent reports on every other service's behalf, so its
-   * own silence is the one verdict that invalidates all the others: a stale
-   * `down` is then only the age of whatever the agent last wrote, not evidence
-   * that the service stopped. Four confident red crosses are the same lie as
-   * four green ticks.
+  /* The honesty rule: a verdict is only evidence if whatever produces it is
+   * still alive. If nothing has reported recently, a red cross is just the age
+   * of the last thing written — the same lie as a green tick.
    *
-   * This used to test `every(health === "unknown")`, which is true only when no
-   * rows exist at all. Rows left behind by a retired host are stale rather than
-   * absent, so they slipped past it and the page reported services as down that
-   * were in fact healthy on the new host (1 Sep 2026). Ask about the watcher,
-   * not about the rows. */
-  const watcher = state.services.find((service) => service.key === WATCHER_KEY);
-  const watcherSilent = !watcher || watcher.health !== "ok";
+   * Deliberately asks "is anything reporting?" rather than naming a reporter.
+   * Two earlier versions were both too specific and both went stale:
+   *   - `every(health === "unknown")` was true only when rows are *absent*, so
+   *     rows left by a retired host slipped past it and the page called four
+   *     services down that were healthy on the new host (1 Sep 2026).
+   *   - Keying off OpsAgent's own health then broke the other way: OpsAgent is
+   *     retired, so under self-reporting services there is no such row at all
+   *     and the banner would latch on forever while everything ran fine.
+   * A live reporter of any shape — an external agent, or the services writing
+   * their own beats — satisfies this one, and so will the next shape. */
+  const anyReporting = state.services.some(
+    (service) => service.health === "ok" || service.health === "warn");
   const neverReported = state.services.every((service) => service.health === "unknown");
-  const frozenAt = watcher?.lastBeatISO
-    ? new Date(watcher.lastBeatISO).toLocaleString() : null;
+  const newestBeatMs = state.services.reduce((newest, service) => {
+    const beat = service.lastBeatISO ? Date.parse(service.lastBeatISO) : NaN;
+    return Number.isNaN(beat) ? newest : Math.max(newest, beat);
+  }, 0);
 
-  const banner = watcherSilent
-    ? `<section class="ops-banner glass">
-         <h2>${neverReported ? "No reports yet" : "No agent is reporting"}</h2>
+  const banner = anyReporting ? "" : `<section class="ops-banner glass">
+         <h2>${neverReported ? "No reports yet" : "Nothing is reporting"}</h2>
          <p>${neverReported
            ? "Nothing has ever written a heartbeat."
-           : `Nothing has reported since <b>${esc(frozenAt || "the last run")}</b>.`}
-            OpsAgent reports for all of these, so while it is silent the
-            verdicts below are <b>frozen, not measured</b> — a service shown as
-            down may be running perfectly well. Restarting is disabled until an
-            agent is reporting again.</p>
-       </section>`
-    : "";
+           : `Nothing has reported since <b>${
+               esc(new Date(newestBeatMs).toLocaleString())}</b>.`}
+            So the verdicts below are <b>frozen, not measured</b> — a service
+            shown as down may be running perfectly well. Restarting is disabled
+            until something is reporting again.</p>
+       </section>`;
 
   const healthy = state.services.filter((service) => service.health === "ok").length;
   $("root").innerHTML = `
     <section class="ops-summary glass glass--thick ops-summary--${esc(state.overall)}">
       <div>
         <h1>Server</h1>
-        <p>${watcherSilent ? "no agent reporting"
-          : `${healthy} of ${state.services.length} healthy`}</p>
+        <p>${anyReporting ? `${healthy} of ${state.services.length} healthy`
+          : "nothing reporting"}</p>
       </div>
       <button class="ops-refresh" id="refresh" type="button" title="Refresh now">↻</button>
     </section>
     ${banner}
-    <div class="ops-grid">${state.services.map((service) => serviceCard(service, watcherSilent)).join("")}</div>
+    <div class="ops-grid">${state.services.map((service) => serviceCard(service, anyReporting)).join("")}</div>
     ${alertsList(state.alerts || [])}
     <p class="ops-stamp">checked ${esc(new Date(state.checkedAt).toLocaleTimeString())}</p>`;
 
