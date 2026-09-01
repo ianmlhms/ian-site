@@ -1,4 +1,4 @@
-/* Mini Control Room — health of the services on the Mac mini.
+/* Control Room — health of the services on the server.
  *
  * The page deliberately computes nothing: every verdict, reason and age string
  * arrives already resolved from the `ops` edge function, so there is one place
@@ -10,6 +10,9 @@
 import * as auth from "./auth.js?v=12";
 
 const OWNER = "konto@ian.lu";
+/* OpsAgent reports on every other service's behalf, so its own health decides
+ * whether any of the other verdicts are worth believing. See render(). */
+const WATCHER_KEY = "opsagent";
 const REFRESH_MS = 20_000;
 const COMMAND_POLL_MS = 1500;
 const COMMAND_TIMEOUT_MS = 90_000;
@@ -74,8 +77,10 @@ function detailChips(detail) {
   return chips.length ? `<div class="chips">${chips.join("")}</div>` : "";
 }
 
-function serviceCard(service) {
-  const canRestart = service.health !== "unknown";
+function serviceCard(service, watcherSilent) {
+  /* No agent means nothing will ever claim the command, so the button would
+   * spin for COMMAND_TIMEOUT_MS and then fail. Don't offer it. */
+  const canRestart = service.health !== "unknown" && !watcherSilent;
   return `<article class="svc svc--${esc(service.health)}">
     <header class="svc-head">
       <span class="svc-mark" aria-hidden="true">${HEALTH_MARK[service.health] || "○"}</span>
@@ -92,7 +97,8 @@ function serviceCard(service) {
       ${canRestart
         ? `<button class="svc-btn" type="button" data-restart="${esc(service.key)}"
              data-label="${esc(service.label)}">Restart</button>`
-        : `<span class="svc-hint">nothing has reported yet</span>`}
+        : `<span class="svc-hint">${watcherSilent
+            ? "no agent to restart it" : "nothing has reported yet"}</span>`}
       <span class="svc-msg" id="msg-${esc(service.key)}" role="status"></span>
     </div>
   </article>`;
@@ -109,15 +115,33 @@ function alertsList(alerts) {
 }
 
 function render(state) {
-  const everyoneSilent = state.services.every((service) => service.health === "unknown");
-  /* The honest empty state. Before OpsAgent runs on the mini nothing writes
-   * these rows, and showing green ticks (or red crosses) would be a lie. */
-  const banner = everyoneSilent
+  /* The honesty rule. OpsAgent reports on every other service's behalf, so its
+   * own silence is the one verdict that invalidates all the others: a stale
+   * `down` is then only the age of whatever the agent last wrote, not evidence
+   * that the service stopped. Four confident red crosses are the same lie as
+   * four green ticks.
+   *
+   * This used to test `every(health === "unknown")`, which is true only when no
+   * rows exist at all. Rows left behind by a retired host are stale rather than
+   * absent, so they slipped past it and the page reported services as down that
+   * were in fact healthy on the new host (1 Sep 2026). Ask about the watcher,
+   * not about the rows. */
+  const watcher = state.services.find((service) => service.key === WATCHER_KEY);
+  const watcherSilent = !watcher || watcher.health !== "ok";
+  const neverReported = state.services.every((service) => service.health === "unknown");
+  const frozenAt = watcher?.lastBeatISO
+    ? new Date(watcher.lastBeatISO).toLocaleString() : null;
+
+  const banner = watcherSilent
     ? `<section class="ops-banner glass">
-         <h2>No reports yet</h2>
-         <p>Nothing has ever written a heartbeat. That almost certainly means
-            <b>OpsAgent is not running on the mini</b> — not that these services
-            are down. Deploy it and this page fills in by itself.</p>
+         <h2>${neverReported ? "No reports yet" : "No agent is reporting"}</h2>
+         <p>${neverReported
+           ? "Nothing has ever written a heartbeat."
+           : `Nothing has reported since <b>${esc(frozenAt || "the last run")}</b>.`}
+            OpsAgent reports for all of these, so while it is silent the
+            verdicts below are <b>frozen, not measured</b> — a service shown as
+            down may be running perfectly well. Restarting is disabled until an
+            agent is reporting again.</p>
        </section>`
     : "";
 
@@ -125,14 +149,14 @@ function render(state) {
   $("root").innerHTML = `
     <section class="ops-summary glass glass--thick ops-summary--${esc(state.overall)}">
       <div>
-        <h1>Mac mini</h1>
-        <p>${everyoneSilent ? "waiting for the first report"
+        <h1>Server</h1>
+        <p>${watcherSilent ? "no agent reporting"
           : `${healthy} of ${state.services.length} healthy`}</p>
       </div>
       <button class="ops-refresh" id="refresh" type="button" title="Refresh now">↻</button>
     </section>
     ${banner}
-    <div class="ops-grid">${state.services.map(serviceCard).join("")}</div>
+    <div class="ops-grid">${state.services.map((service) => serviceCard(service, watcherSilent)).join("")}</div>
     ${alertsList(state.alerts || [])}
     <p class="ops-stamp">checked ${esc(new Date(state.checkedAt).toLocaleTimeString())}</p>`;
 
@@ -159,7 +183,7 @@ async function refresh(manual = false) {
 }
 
 async function restart(key, label, button) {
-  if (!confirm(`Restart ${label} on the mini?`)) return;
+  if (!confirm(`Restart ${label} on the server?`)) return;
   const message = $(`msg-${key}`);
   button.disabled = true;
   message.textContent = "queued…";
@@ -217,7 +241,7 @@ async function boot() {
     auth.mountAccountButton($("acctHost"));
     const session = auth.session();
     if (!session?.user) {
-      gate("Mac mini", "Mell dech un, fir de Kontrollraum opzemaachen.", true);
+      gate("Server", "Mell dech un, fir de Kontrollraum opzemaachen.", true);
       return;
     }
     if ((session.user.email || "").toLowerCase() !== OWNER) {
