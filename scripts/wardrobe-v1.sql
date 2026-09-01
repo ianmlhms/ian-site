@@ -6,6 +6,13 @@
 
 -- ---- 1) Items ---------------------------------------------------------------
 create table if not exists public.wardrobe_items (id uuid primary key default gen_random_uuid(), user_id uuid not null default auth.uid() references auth.users on delete cascade, name text not null, category text not null default 'top', subcategory text, brand text, size text, material text, colors text[] not null default '{}', pattern text, seasons text[] not null default '{}', warmth int not null default 3, formality int not null default 3, is_waterproof boolean not null default false, is_favorite boolean not null default false, tags text[] not null default '{}', price_cents int, purchased_on date, location text not null default 'mine', photo_path text, label_path text, cutout_path text, wear_count int not null default 0, last_worn_on date, wash_after_wears int, needs_wash boolean not null default false, notes text, ai_fields jsonb not null default '{}'::jsonb, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+-- Quantity: identical multiples (boxers, socks, plain tees) are ONE row with a
+-- count, not N photographed rows. Laundry then works out of the existing wear
+-- counter: floor(wear_count / wash_after_wears) units are dirty, the rest are
+-- wearable. quantity = 1 reduces to exactly the old behaviour.
+alter table public.wardrobe_items add column if not exists quantity int not null default 1;
+alter table public.wardrobe_items drop constraint if exists wardrobe_items_quantity_check;
+alter table public.wardrobe_items add constraint wardrobe_items_quantity_check check (quantity between 1 and 200);
 alter table public.wardrobe_items drop constraint if exists wardrobe_items_category_check;
 alter table public.wardrobe_items add constraint wardrobe_items_category_check check (category in ('top','bottom','dress','outerwear','shoes','accessory','headwear','bag','underwear','sportswear','sleepwear','swimwear'));
 alter table public.wardrobe_items drop constraint if exists wardrobe_items_location_check;
