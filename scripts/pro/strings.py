@@ -26,6 +26,9 @@ UI = {
         "tva": "TVA",
         "placeholder": "[à compléter]",
         "skip": "Aller au contenu",
+        "stock_photo_notice": "Photos d'illustration — elles ne montrent pas {name}. Envoyez-moi vos propres photos et je les remplace.",
+        "photo_credits": "Crédits photo",
+        "unknown_author": "Auteur inconnu",
     },
     "de": {
         "preview": "Vorschau — diese Website ist noch nicht die offizielle Website von {name}.",
@@ -52,6 +55,9 @@ UI = {
         "tva": "MwSt.",
         "placeholder": "[zu ergänzen]",
         "skip": "Zum Inhalt",
+        "stock_photo_notice": "Illustrationsfotos — sie zeigen nicht {name}. Schicken Sie mir Ihre eigenen Fotos, dann ersetze ich sie.",
+        "photo_credits": "Bildnachweise",
+        "unknown_author": "Unbekannter Urheber",
     },
     "en": {
         "preview": "Preview — this site is not yet the official website of {name}.",
@@ -78,5 +84,8 @@ UI = {
         "tva": "VAT",
         "placeholder": "[to be completed]",
         "skip": "Skip to content",
+        "stock_photo_notice": "Illustration photos — they do not show {name}. Send me your own photos and I will replace them.",
+        "photo_credits": "Photo credits",
+        "unknown_author": "Unknown author",
     },
 }

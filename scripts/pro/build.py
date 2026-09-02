@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from string import Template
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
@@ -29,6 +29,8 @@ COLOUR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 LANG_RE = re.compile(r"^[a-z]{2,3}$")
 DEFAULT_THEME = {"brand": "#7A2E2E", "ground": "#FBF8F4", "ink": "#1B1917", "accent": "#C9A227"}
 MIN_TEXT_CONTRAST = 4.5
+LICENSE_NAMES = {"BY": "CC BY", "CC0": "CC0", "PDM": "Public Domain Mark"}
+STOCK_PHOTO_CSS = " .stock-photo-notice { width: min(100% - 2rem, 70rem); margin: 1rem auto 0; color: var(--muted); font-size: .88rem; } .photo-credits { width: min(100% - 2rem, 70rem); margin: 2rem auto; padding-top: 1.5rem; border-top: 1px solid var(--line); } .photo-credits h2 { margin: 0 0 .75rem; font: 700 1.35rem/1.2 var(--display); } .photo-credits ul { margin: 0; padding-left: 1.2rem; } .photo-credits li + li { margin-top: .45rem; }"
 
 sys.path.insert(0, str(HERE))
 from strings import UI  # noqa: E402
@@ -162,6 +164,22 @@ def relative_page_href(data: dict, current: str, target: str) -> str:
 def relative_asset(asset: str, data: dict, language: str) -> str:
     prefix = "" if language == data["defaultLanguage"] else "../"
     return prefix + quote(asset, safe="/._-")
+
+
+def outbound_url(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    parsed = urlparse(value)
+    return value if parsed.scheme in ("http", "https") and parsed.netloc else ""
+
+
+def load_credits(data: dict) -> list[dict] | None:
+    path = OUT_DIR / data["slug"] / "img" / "credits.json"
+    try:
+        credits = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return [credit for credit in credits if isinstance(credit, dict)] if isinstance(credits, list) else None
 
 
 def map_url(data: dict) -> str:
@@ -312,7 +330,14 @@ def render_contact(section: dict, data: dict, language: str, ui: dict, ident: st
 RENDERERS = {"hero": render_hero, "about": render_about, "menu": render_menu, "gallery": render_gallery, "hours": render_hours, "special": render_special, "contact": render_contact}
 
 
-def render_sections(data: dict, language: str, ui: dict) -> str:
+def stock_photo_notice(data: dict, ui: dict, credits: list[dict] | None) -> str:
+    preview = data.get("preview") if isinstance(data.get("preview"), dict) else {}
+    if credits is None or preview.get("isPreview") is not True:
+        return ""
+    return f'<p class="stock-photo-notice">{esc(ui["stock_photo_notice"].format(name=data["name"]))}</p>'
+
+
+def render_sections(data: dict, language: str, ui: dict, credits: list[dict] | None) -> str:
     rendered = []
     for number, section in enumerate(data["sections"], 1):
         renderer = RENDERERS.get(section["type"])
@@ -327,6 +352,10 @@ def render_sections(data: dict, language: str, ui: dict) -> str:
             continue
         if html_section:
             rendered.append(html_section)
+            if section["type"] == "hero":
+                notice = stock_photo_notice(data, ui, credits)
+                if notice:
+                    rendered.append(notice)
     return "\n".join(rendered)
 
 
@@ -355,7 +384,35 @@ def legal_html(data: dict, ui: dict) -> str:
     return f'<footer class="legal"><h2>{esc(ui["legal"])}</h2><dl>{"".join(rows)}</dl></footer>'
 
 
-def render_page(data: dict, language: str) -> str:
+def credit_link(label: str, url: Any) -> str:
+    href = outbound_url(url)
+    if not href:
+        return esc(label)
+    return f'<a href="{esc(href)}" target="_blank" rel="noopener">{esc(label)}</a>'
+
+
+def photo_credits_html(credits: list[dict] | None, ui: dict) -> str:
+    if credits is None:
+        return ""
+    rows = []
+    for credit in credits:
+        title = credit.get("title") if isinstance(credit.get("title"), str) and credit["title"].strip() else ""
+        creator = credit.get("creator") if isinstance(credit.get("creator"), str) and credit["creator"].strip() else ""
+        licence = credit.get("license") if isinstance(credit.get("license"), str) and credit["license"].strip() else ""
+        version = credit.get("license_version") if isinstance(credit.get("license_version"), str) and credit["license_version"].strip() else ""
+        licence_name = " ".join(part for part in (LICENSE_NAMES.get(licence, licence), version) if part)
+        title_html = credit_link(title, credit.get("source_url")) if title else ""
+        creator_html = credit_link(creator, credit.get("creator_url")) if creator else esc(ui["unknown_author"])
+        line = f"{title_html} — {creator_html}" if title_html else creator_html
+        if licence_name:
+            line += f", {credit_link(licence_name, credit.get('license_url'))}"
+        rows.append(f"<li>{line}</li>")
+    if not rows:
+        return ""
+    return f'\n  <section class="photo-credits" aria-labelledby="photo-credits-title"><h2 id="photo-credits-title">{esc(ui["photo_credits"])}</h2><ul>{"".join(rows)}</ul></section>'
+
+
+def render_page(data: dict, language: str, credits: list[dict] | None) -> str:
     ui = UI[language]
     switcher = []
     for target in data["languages"]:
@@ -368,10 +425,11 @@ def render_page(data: dict, language: str) -> str:
     alternates = "\n".join(f'  <link rel="alternate" hreflang="{esc(target)}" href="{esc(output_url(data, target))}">' for target in data["languages"])
     alternates += f'\n  <link rel="alternate" hreflang="x-default" href="{esc(output_url(data, data["defaultLanguage"]))}">'
     description = text(next((s.get("subtitle") for s in data["sections"] if s.get("type") == "hero"), {}), data, language) or data["name"]
+    credits_html = photo_credits_html(credits, ui)
     return load_template("page.html").substitute(
         lang=esc(language), title=esc(f"{data['name']} — {town(data)}"), description=esc(description), canonical=esc(canonical), alternates=alternates,
-        theme_vars=theme_vars, css_href="site.css" if language == data["defaultLanguage"] else "../site.css", skip_label=esc(ui["skip"]), preview=preview_html(data, language, ui),
-        home_href=esc(relative_page_href(data, language, data["defaultLanguage"])), name=esc(data["name"]), language_switcher="\n".join(switcher), sections=render_sections(data, language, ui), legal=legal_html(data, ui),
+        theme_vars=theme_vars, credits_style=STOCK_PHOTO_CSS if credits is not None else "", css_href="site.css" if language == data["defaultLanguage"] else "../site.css", skip_label=esc(ui["skip"]), preview=preview_html(data, language, ui),
+        home_href=esc(relative_page_href(data, language, data["defaultLanguage"])), name=esc(data["name"]), language_switcher="\n".join(switcher), sections=render_sections(data, language, ui, credits), credits=credits_html, legal=legal_html(data, ui),
         mobile_actions_label=esc(data["name"]), phone_href=esc(phone_href(data)), map_href=esc(map_url(data)), call_label=esc(ui["call"]), directions_label=esc(ui["directions"]),
     )
 
@@ -384,10 +442,11 @@ def build_file(path: Path) -> None:
     site_dir = OUT_DIR / data["slug"]
     site_dir.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(TEMPLATE_DIR / "site.css", site_dir / "site.css")
+    credits = load_credits(data)
     for language in data["languages"]:
         destination = output_path(data, language)
         destination.mkdir(parents=True, exist_ok=True)
-        (destination / "index.html").write_text(render_page(data, language), encoding="utf-8")
+        (destination / "index.html").write_text(render_page(data, language, credits), encoding="utf-8")
     print(f"built pro/{data['slug']}/ ({', '.join(data['languages'])})")
 
 
