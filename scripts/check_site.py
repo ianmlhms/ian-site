@@ -36,7 +36,7 @@ from collections import defaultdict
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Directories that are generated in bulk; scanned, but sampled for orphan checks.
-GENERATED = ("trails/", "mtb/", "pb/")
+GENERATED = ("trails/", "mtb/", "pb/", "pro/")
 SKIP_DIRS = {".git", "node_modules", "scripts", "data"}
 
 EXTERNAL = re.compile(r"^(https?:)?//|^(mailto|tel|javascript|data):", re.I)

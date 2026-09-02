@@ -11,3 +11,4 @@ ppt.html  # private owner-only presentation studio; noindex, reached directly by
 doc.html  # private owner-only document studio; noindex, cross-linked only from the PPT studio
 ops.html  # private owner-only Mac-mini control room; noindex, reached directly by URL
 haus/index.html  # private allow-listed Haus-Planer; gated, noindex, reached from the hub tile
+pro/  # private noindex client previews reached only by URL

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="$lang">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,follow">
+  <title>$title</title>
+  <meta name="description" content="$description">
+  <link rel="canonical" href="$canonical">
+$alternates
+  <style>:root {$theme_vars}</style>
+  <link rel="stylesheet" href="$css_href">
+</head>
+<body>
+  <a class="skip-link" href="#content">$skip_label</a>
+$preview
+  <header class="site-header">
+    <a class="wordmark" href="$home_href">$name</a>
+    <nav class="language-switcher" aria-label="Language">
+$language_switcher
+    </nav>
+  </header>
+  <main id="content">
+$sections
+  </main>
+$legal
+  <nav class="mobile-actions" aria-label="$mobile_actions_label">
+    <a href="$phone_href">$call_label</a>
+    <a href="$map_href" target="_blank" rel="noopener">$directions_label</a>
+  </nav>
+</body>
+</html>

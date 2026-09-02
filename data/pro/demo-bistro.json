@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "slug": "demo-bistro",
+  "name": "Bistro du Marché",
+  "languages": ["fr", "de", "en"],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#7A2E2E",
+    "ground": "#FBF8F4",
+    "ink": "#1B1917",
+    "accent": "#C9A227",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 26 00 00 00",
+    "email": "bonjour@bistro-demo.lu",
+    "address": "12, rue de la Gare\nL-1234 Luxembourg",
+    "lat": 49.6116,
+    "lon": 6.1319,
+    "facebook": "",
+    "instagram": ""
+  },
+  "hours": [
+    {"days": {"fr": "Mardi – vendredi", "de": "Dienstag – Freitag", "en": "Tuesday – Friday"}, "time": "11:30 – 14:00 · 18:00 – 22:00"},
+    {"days": {"fr": "Samedi", "de": "Samstag", "en": "Saturday"}, "time": "18:00 – 22:30"},
+    {"days": {"fr": "Dimanche et lundi", "de": "Sonntag und Montag", "en": "Sunday and Monday"}, "time": "closed"}
+  ],
+  "sections": [
+    {"type": "hero", "image": "img/hero.webp", "title": {"fr": "Une table simple, des produits de saison", "de": "Einfach gut essen, mit Zutaten der Saison", "en": "Simple plates, seasonal ingredients"}, "subtitle": {"fr": "Cuisine de marché, vins vivants et un accueil qui prend son temps.", "de": "Marktküche, natürliche Weine und ein herzlicher Empfang ohne Eile.", "en": "Market cooking, natural wines and a welcome that never rushes."}},
+    {"type": "about", "image": "img/salle.webp", "title": {"fr": "À deux pas de la gare", "de": "Zwei Schritte vom Bahnhof", "en": "A short walk from the station"}, "body": {"fr": "Le Bistro du Marché est une adresse de quartier imaginaire où l'on vient pour un déjeuner lumineux, un dîner tranquille et un verre choisi avec soin.\nNotre carte suit les saisons et les arrivages du matin.", "de": "Das fiktive Bistro du Marché ist ein Quartierlokal für ein helles Mittagessen, ein entspanntes Abendessen und ein sorgfältig ausgewähltes Glas Wein.\nUnsere Karte folgt den Jahreszeiten und dem Angebot des Morgens.", "en": "Bistro du Marché is an imaginary neighbourhood table for an easy lunch, a relaxed dinner and a thoughtfully chosen glass of wine.\nOur menu follows the seasons and each morning's market."}},
+    {"type": "menu", "title": {"fr": "La carte du moment", "de": "Unsere Karte", "en": "The current menu"}, "groups": [
+      {"name": {"fr": "À partager", "de": "Zum Teilen", "en": "To share"}, "items": [
+        {"name": {"fr": "Poireaux vinaigrette", "de": "Lauch mit Vinaigrette", "en": "Leeks with vinaigrette"}, "desc": {"fr": "Œuf parfait, noisettes grillées", "de": "Pochiertes Ei, geröstete Haselnüsse", "en": "Soft egg, toasted hazelnuts"}, "price": "12,50 €"},
+        {"name": {"fr": "Terrine de campagne", "de": "Terrine nach Landart", "en": "Country terrine"}, "desc": {"fr": "Pickles maison, pain au levain", "de": "Hausgemachte Pickles, Sauerteigbrot", "en": "House pickles, sourdough"}, "price": "14,00 €"}
+      ]},
+      {"name": {"fr": "Plats", "de": "Hauptgerichte", "en": "Mains"}, "items": [
+        {"name": {"fr": "Truite rôtie", "de": "Gebratene Forelle", "en": "Roast trout"}, "desc": {"fr": "Pommes grenailles, fenouil, sauce vierge", "de": "Kartoffeln, Fenchel, Kräuteröl", "en": "New potatoes, fennel, herb dressing"}, "price": "27,00 €"},
+        {"name": {"fr": "Risotto aux champignons", "de": "Pilzrisotto", "en": "Mushroom risotto"}, "desc": {"fr": "Parmesan affiné, herbes fraîches", "de": "Gereifter Parmesan, frische Kräuter", "en": "Aged Parmesan, fresh herbs"}, "price": "22,00 €"}
+      ]}
+    ]},
+    {"type": "gallery", "title": {"fr": "L'esprit du bistrot", "de": "Die Stimmung im Bistro", "en": "The bistro mood"}, "images": [
+      {"src": "img/table.webp", "alt": {"fr": "Une table dressée pour le service", "de": "Ein gedeckter Tisch zum Service", "en": "A table set for service"}},
+      {"src": "img/plat.webp", "alt": {"fr": "Une assiette de saison", "de": "Ein Teller der Saison", "en": "A seasonal plate"}},
+      {"src": "img/verre.webp", "alt": {"fr": "Un verre de vin au comptoir", "de": "Ein Glas Wein an der Theke", "en": "A glass of wine at the bar"}}
+    ]},
+    {"type": "hours", "title": {"fr": "Horaires", "de": "Öffnungszeiten", "en": "Opening hours"}},
+    {"type": "special", "title": {"fr": "Le jeudi, le plat change", "de": "Donnerstags gibt es etwas Neues", "en": "Thursday brings something new"}, "body": {"fr": "Chaque jeudi soir, le chef imagine un plat unique selon le marché. Demandez-le simplement en arrivant.", "de": "Jeden Donnerstagabend erfindet unser Koch ein einzelnes Gericht aus dem, was der Markt hergibt. Fragen Sie einfach bei Ihrer Ankunft danach.", "en": "Every Thursday evening, the chef creates one special dish from that day's market. Just ask when you arrive."}},
+    {"type": "contact", "title": {"fr": "Passez nous voir", "de": "Besuchen Sie uns", "en": "Come and see us"}, "showMap": true}
+  ],
+  "legal": {"operator": "", "address": "", "email": "", "phone": "", "rcs": "", "tva": ""}
+}
