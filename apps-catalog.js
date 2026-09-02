@@ -58,6 +58,8 @@ export const APPS = Object.freeze([
     keywords: ["study", "lernen", "léieren", "devoirs", "homework", "ai"] },
   { url: "health.html", name: "Health", icon: "💪", group: "grp.personal", locked: true,
     keywords: ["gesundheit", "santé", "gesondheet", "water", "schlaf", "sport"] },
+  { url: "fotovote.html", name: "Fotobuch", icon: "📷", group: "grp.personal", locked: true,
+    keywords: ["foto", "photo", "fotobuch", "photobook", "wëschen", "duell", "vote"] },
   { url: "money.html", name: "Sue", icon: "💶", group: "grp.personal", locked: true,
     keywords: ["geld", "argent", "suen", "ausgaben", "dépenses", "subscriptions"] },
   { url: "me.html", name: "My Dashboard", icon: "📊", group: "grp.personal", locked: false,
