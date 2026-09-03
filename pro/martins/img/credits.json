@@ -1,50 +1,54 @@
 [
  {
-  "title": "Pastel de nata (18616473070)",
-  "creator": "fw42 from Germany",
+  "file": "about.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Martins",
   "creator_url": "",
-  "license": "CC BY 2.0",
-  "license_version": "",
-  "license_url": "https://creativecommons.org/licenses/by/2.0",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Pastel_de_nata_(18616473070).jpg",
-  "description": "Portuguese egg tart pastry",
-  "categories": "Pastéis de nata|Flickr images reviewed by FlickreviewR 2|Files from fw42 Flickr stream",
-  "file": "about.webp"
- },
- {
-  "title": "The Bakery off Augusta",
-  "creator": "Greenville Daily Photo",
-  "creator_url": "",
-  "license": "CC0",
-  "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:The_Bakery_off_Augusta.jpg",
-  "description": "One of the display cases in    The Bakery off Augusta includes items similar to many bakeries, but they also sell items more commonly seen in Switzerland: Nussgipfel (Hazelnut croissant, below),     Chrabeli (Swiss Anise Crescent Cookies), and other special Swiss items, as well as custom cakes.",
-  "categories": "CC-Zero|Christmas cookies|Muffins|Danish pastry|Bakeries in South Carolina|December 2011 in South Carolina|Flickr images reviewed by FlickreviewR 2|Schnecken|Food display cases in the United States|Food in the United States photographed in 2011",
-  "file": "gallery1.webp"
- },
- {
-  "title": "Association Coffee, London, UK",
-  "creator": "Bex Walton",
-  "creator_url": "",
-  "license": "CC BY 2.0",
-  "license_version": "",
-  "license_url": "https://creativecommons.org/licenses/by/2.0",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Association_Coffee,_London,_UK.jpg",
-  "description": "Association Coffee, London, UK",
-  "categories": "Flickr images reviewed by FlickreviewR 2|Coffee shops in London|Coffee and croissants|Cups of coffee in London",
-  "file": "gallery2.webp"
- },
- {
-  "title": "Cabbage loaves proving Faîs'sie d'Cidre 2007",
-  "creator": "Man vyi",
-  "creator_url": "",
-  "license": "Public domain",
+  "license": "© Martins",
   "license_version": "",
   "license_url": "",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Cabbage_loaves_proving_Fa%C3%AEs%27sie_d%27Cidre_2007.jpg",
-  "description": "Des pains Jèrriais à Hamptonne, La Faîs'sie d'Cidre 2007",
-  "categories": "Bakeries in Jersey|Taken with Canon PowerShot A40|Hamptonne, Jersey|Self-published work|PD-self|Cabbage loaves|Bread dough",
-  "file": "hero.webp"
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJadPQumnK6kcRgT64HjFK4-A",
+  "description": "",
+  "categories": ""
+ },
+ {
+  "file": "gallery1.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Martins",
+  "creator_url": "",
+  "license": "© Martins",
+  "license_version": "",
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJadPQumnK6kcRgT64HjFK4-A",
+  "description": "",
+  "categories": ""
+ },
+ {
+  "file": "gallery2.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Martins",
+  "creator_url": "",
+  "license": "© Martins",
+  "license_version": "",
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJadPQumnK6kcRgT64HjFK4-A",
+  "description": "",
+  "categories": ""
+ },
+ {
+  "file": "hero.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Martins",
+  "creator_url": "",
+  "license": "© Martins",
+  "license_version": "",
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJadPQumnK6kcRgT64HjFK4-A",
+  "description": "",
+  "categories": ""
  }
 ]

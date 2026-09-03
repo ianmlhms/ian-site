@@ -1,27 +1,29 @@
 [
  {
-  "title": "Books in stack with lamps (Unsplash)",
-  "creator": "chuttersnap chuttersnap",
+  "file": "about.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Librairie Alinéa",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Librairie Alinéa",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Books_in_stack_with_lamps_(Unsplash).jpg",
-  "description": "chuttersnap 2016-12-18",
-  "categories": "CC-Zero|Images uploaded by Fæ|Images from Unsplash|Images from Unsplash (review needed)|Stacks of books",
-  "file": "about.webp"
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJUwljfCtPlUcRuNlNHj5OJU0",
+  "description": "",
+  "categories": ""
  },
  {
-  "title": "Bookshelves in Hove Library 2025-08-20",
-  "creator": "Andy Li",
+  "file": "gallery1.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Librairie Alinéa",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Librairie Alinéa",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Bookshelves_in_Hove_Library_2025-08-20.jpg",
-  "description": "Bookshelves in Hove Library",
-  "categories": "CC-Zero|Self-published work|Windows (interior views)|Files with coordinates missing SDC location of creation (50° N, 1° W)|Library bookshelves in England|Radiators in England|August 2025 in East Sussex|England photographs taken on 2025-08-20|Buildings in East Sussex photographed in 2025|Round windows in East Sussex|Interior of Hove Library|Windows of libraries in the United Kingdom",
-  "file": "gallery1.webp"
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJUwljfCtPlUcRuNlNHj5OJU0",
+  "description": "",
+  "categories": ""
  },
  {
   "title": "Open Book Policy (5914169915)",
@@ -36,15 +38,16 @@
   "file": "gallery2.webp"
  },
  {
-  "title": "Paris - A bookshop with filled bookshelves and blurred light bulbs hanging from the ceiling",
-  "creator": "Janko Ferlič thepootphotographer",
+  "file": "hero.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Librairie Alinéa",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Librairie Alinéa",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Paris_-_A_bookshop_with_filled_bookshelves_and_blurred_light_bulbs_hanging_from_the_ceiling.jpg",
-  "description": "Second-hand bookshop in Paris, France",
-  "categories": "CC-Zero|Images uploaded by Fæ|Images from Unsplash|Bookshops photographed in 2016|Interior light fixtures in Paris|Paris photographs taken on 2016-12-13|Bookshops in France photographed in 2016|Files with coordinates missing SDC location of creation (48° N, 2° E)|Shop interiors in 2016|Second-hand bookshops in Paris|Bookshop shelves in Paris",
-  "file": "hero.webp"
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJUwljfCtPlUcRuNlNHj5OJU0",
+  "description": "",
+  "categories": ""
  }
 ]

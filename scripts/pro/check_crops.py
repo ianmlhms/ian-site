@@ -54,7 +54,13 @@ try {
     client.close();
     client.kill();
   }
-  rmSync(profile, { recursive: true, force: true });
+  // Chrome keeps writing to its profile for a moment after kill(), so a
+  // plain rmSync races it and throws ENOTEMPTY *before* the measurements are
+  // printed — the gate then reports nothing at all. Retry, and give up
+  // quietly: the directory is in the OS temp dir and gets reaped anyway.
+  try {
+    rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  } catch { /* a stray temp profile must never fail the check */ }
 }
 
 console.log(JSON.stringify(measurements));

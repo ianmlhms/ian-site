@@ -1,15 +1,16 @@
 [
  {
-  "title": "Dog sweater 2",
-  "creator": "Sciencia58",
+  "file": "about.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Lil'O Trésor",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Lil'O Trésor",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Dog_sweater_2.jpg",
-  "description": "Underside of a hand-knitted dog jumper for a 4 kilo Yorkshire Terrier. First 48 stitches were cast on on two long knitting needles laid parallel. The stitches were then distributed on 4 knitting needles of 3.5 gauge, 12 stitches each. Pattern: One right one left. After the rows for the outer collar, a thinner white synthetic fibre wool was knitted on to keep the collar flexible at the neck. In the shoulder area a thicker synthetic fibre wool was chosen again. The stitch count of 48 stitches was always kept. In the chest area, the additional width required is created by the armholes. Towards the belly, 4 stitches were increased on the middle part at the bottom back. The edge at the back has been created by casting off. The edges at the armholes were crocheted around twice.",
-  "categories": "CC-Zero|Sweaters|Self-published work|Dog clothes",
-  "file": "about.webp"
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJzdNTw3pPlUcR_Sg6l5wl310",
+  "description": "",
+  "categories": ""
  },
  {
   "title": "Colorful soft toys",
@@ -36,15 +37,16 @@
   "file": "gallery2.webp"
  },
  {
-  "title": "Clothes hangers on railing (Unsplash)",
-  "creator": "Christian Fregnan christianfregnan",
+  "file": "hero.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Lil'O Trésor",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Lil'O Trésor",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Clothes_hangers_on_railing_(Unsplash).jpg",
-  "description": "Christian Fregnan 2017",
-  "categories": "CC-Zero|Images uploaded by Fæ|Images from Unsplash|Images from Unsplash (review needed)|Wooden clothes hangers",
-  "file": "hero.webp"
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJzdNTw3pPlUcR_Sg6l5wl310",
+  "description": "",
+  "categories": ""
  }
 ]

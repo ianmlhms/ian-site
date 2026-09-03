@@ -1,15 +1,16 @@
 [
  {
-  "title": "11 Depot St, Concord, United States (Unsplash)",
-  "creator": "Michael Browning michaelwb",
+  "file": "about.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Brasserie Beaulieu",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Brasserie Beaulieu",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:11_Depot_St,_Concord,_United_States_(Unsplash).jpg",
-  "description": "11 Depot St, Concord, United States",
-  "categories": "Concord, New Hampshire|Wine glasses|CC-Zero|Restaurants in New Hampshire|Images uploaded by Fæ|Images from Unsplash|Files with coordinates missing SDC location of creation|Table settings in the United States",
-  "file": "about.webp"
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJ4b9qtchIlUcR8Kv8sT_MgrI",
+  "description": "",
+  "categories": ""
  },
  {
   "title": "Hamburger (black bg)",
@@ -36,15 +37,16 @@
   "file": "gallery2.webp"
  },
  {
-  "title": "Brasserie General La Fayette - panoramio",
-  "creator": "Schölla Schwarz",
+  "file": "hero.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Brasserie Beaulieu",
   "creator_url": "",
-  "license": "CC BY 3.0",
+  "license": "© Brasserie Beaulieu",
   "license_version": "",
-  "license_url": "https://creativecommons.org/licenses/by/3.0",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Brasserie_General_La_Fayette_-_panoramio.jpg",
-  "description": "Brasserie General La Fayette",
-  "categories": "Panoramio files uploaded by Panoramio upload bot|Panoramio images reviewed by trusted users|Photos from Panoramio|Interiors of restaurants in Paris|France photographs taken on 2013-12-02|Files with coordinates missing SDC location of creation (48° N, 2° E)|Photos from Panoramio ID 440234",
-  "file": "hero.webp"
+  "license_url": "",
+  "source_url": "https://www.google.com/maps/place/?q=place_id:ChIJ4b9qtchIlUcR8Kv8sT_MgrI",
+  "description": "",
+  "categories": ""
  }
 ]
