@@ -125,22 +125,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "Les rayons",
-            "de": "Die Regale",
-            "en": "The shelves"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Une pile de livres",
-            "de": "Ein Bücherstapel",
-            "en": "A stack of books"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Un coin lecture",

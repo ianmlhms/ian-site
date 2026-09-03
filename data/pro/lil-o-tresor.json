@@ -176,22 +176,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "La boutique",
-            "de": "Die Boutique",
-            "en": "The shop"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Vêtements pour enfants",
-            "de": "Kinderkleidung",
-            "en": "Children's clothes"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Chaussures d'enfants",

@@ -147,22 +147,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "Travaux de peinture",
-            "de": "Malerarbeiten",
-            "en": "Painting work"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Rouleaux et pinceaux",
-            "de": "Rollen und Pinsel",
-            "en": "Rollers and brushes"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Une pièce rénovée",

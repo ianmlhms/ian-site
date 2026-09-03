@@ -171,22 +171,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "La salle du café",
-            "de": "Der Gastraum",
-            "en": "The dining room"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Un verre au comptoir",
-            "de": "Ein Glas am Tresen",
-            "en": "A drink at the bar"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Le jeu de quilles",

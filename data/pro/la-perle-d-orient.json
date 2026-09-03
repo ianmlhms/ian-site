@@ -125,22 +125,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "La salle du restaurant",
-            "de": "Der Gastraum",
-            "en": "The dining room"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Un plat de la carte",
-            "de": "Ein Gericht der Karte",
-            "en": "A dish from the menu"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Des dim sum",

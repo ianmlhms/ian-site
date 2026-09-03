@@ -160,22 +160,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "La salle",
-            "de": "Der Gastraum",
-            "en": "The dining room"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Des verres de vin",
-            "de": "Weingläser",
-            "en": "Wine glasses"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Le brunch",

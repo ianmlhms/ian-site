@@ -158,22 +158,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "La salle",
-            "de": "Der Gastraum",
-            "en": "Inside"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Un café",
-            "de": "Ein Kaffee",
-            "en": "A coffee"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "La terrasse",

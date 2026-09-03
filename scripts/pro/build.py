@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import sys
+from functools import lru_cache
 from pathlib import Path
 from string import Template
 from typing import Any
@@ -33,6 +34,7 @@ LICENSE_NAMES = {"BY": "CC BY", "CC0": "CC0", "PDM": "Public Domain Mark"}
 STOCK_PHOTO_CSS = " .stock-photo-notice { width: min(100% - 2rem, 70rem); margin: 1rem auto 0; color: var(--muted); font-size: .88rem; } .photo-credits { width: min(100% - 2rem, 70rem); margin: 2rem auto; padding-top: 1.5rem; border-top: 1px solid var(--line); } .photo-credits h2 { margin: 0 0 .75rem; font: 700 1.35rem/1.2 var(--display); } .photo-credits ul { margin: 0; padding-left: 1.2rem; } .photo-credits li + li { margin-top: .45rem; }"
 
 sys.path.insert(0, str(HERE))
+from imagesize import image_size  # noqa: E402
 from strings import UI  # noqa: E402
 
 
@@ -166,6 +168,32 @@ def relative_asset(asset: str, data: dict, language: str) -> str:
     return prefix + quote(asset, safe="/._-")
 
 
+WARNED_IMAGE_PATHS: set[Path] = set()
+
+
+@lru_cache(maxsize=None)
+def read_image_size(path: Path) -> tuple[int, int] | None:
+    """Cache trusted file dimensions while rendering each language variant."""
+    return image_size(path)
+
+
+def dimensions_attributes(data: dict, asset: str) -> str:
+    """Return safe HTML dimensions, warning once when a source is unreadable."""
+    path = OUT_DIR / data["slug"] / asset
+    dimensions = read_image_size(path)
+    if dimensions is None:
+        if path not in WARNED_IMAGE_PATHS:
+            try:
+                display_path = path.relative_to(REPO)
+            except ValueError:
+                display_path = path
+            print(f"warning: {display_path}: cannot read image dimensions; omitting width and height", file=sys.stderr)
+            WARNED_IMAGE_PATHS.add(path)
+        return ""
+    width, height = dimensions
+    return f' width="{esc(width)}" height="{esc(height)}"'
+
+
 def outbound_url(value: Any) -> str:
     if not isinstance(value, str):
         return ""
@@ -213,7 +241,7 @@ def render_hero(section: dict, data: dict, language: str, ui: dict) -> str:
     image = section.get("image")
     image_html = relative_asset(image, data, language) if isinstance(image, str) else ""
     return load_template("section-hero.html").substitute(
-        image=esc(image_html), image_alt=esc(title), name=esc(data["name"]), title=esc(title), subtitle=subtitle,
+        image=esc(image_html), image_alt=esc(title), dimensions=dimensions_attributes(data, image), name=esc(data["name"]), title=esc(title), subtitle=subtitle,
         phone_href=esc(phone_href(data)), map_href=esc(map_url(data)), call_label=esc(ui["call"]), directions_label=esc(ui["directions"]),
     ) if image_html else ""
 
@@ -226,7 +254,7 @@ def render_about(section: dict, data: dict, language: str, ui: dict, ident: str)
     image_path = section.get("image")
     image = ""
     if isinstance(image_path, str):
-        image = f'<figure><img src="{esc(relative_asset(image_path, data, language))}" alt="{esc(title or data["name"])}" width="1200" height="900" loading="lazy"><figcaption>{esc(data["name"])}</figcaption></figure>'
+        image = f'<figure><img src="{esc(relative_asset(image_path, data, language))}" alt="{esc(title or data["name"])}"{dimensions_attributes(data, image_path)} loading="lazy"><figcaption>{esc(data["name"])}</figcaption></figure>'
     return load_template("section-about.html").substitute(id=esc(ident), kicker=esc(ui["about"]), title=esc(title or data["name"]), body=body, image=image)
 
 
@@ -262,7 +290,7 @@ def render_gallery(section: dict, data: dict, language: str, ui: dict, ident: st
         if not isinstance(image, dict) or not isinstance(image.get("src"), str):
             continue
         alt = text(image.get("alt"), data, language) or data["name"]
-        images.append(f'<figure><img src="{esc(relative_asset(image["src"], data, language))}" alt="{esc(alt)}" width="1200" height="900" loading="lazy"><figcaption>{esc(alt)}</figcaption></figure>')
+        images.append(f'<figure><img src="{esc(relative_asset(image["src"], data, language))}" alt="{esc(alt)}"{dimensions_attributes(data, image["src"])} loading="lazy"><figcaption>{esc(alt)}</figcaption></figure>')
     if not images:
         return ""
     title = text(section.get("title"), data, language) or ui["gallery"]

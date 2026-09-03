@@ -163,22 +163,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "Les pains",
-            "de": "Die Brote",
-            "en": "The breads"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Pâtisserie portugaise",
-            "de": "Portugiesisches Gebäck",
-            "en": "A Portuguese pastry"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Le comptoir",

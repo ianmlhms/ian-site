@@ -151,22 +151,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "Les vignes en terrasses",
-            "de": "Die Terrassenweinberge",
-            "en": "The terraced vines"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "La cave",
-            "de": "Der Keller",
-            "en": "The cellar"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Une dégustation",

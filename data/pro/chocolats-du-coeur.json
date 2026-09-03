@@ -138,22 +138,6 @@
       },
       "images": [
         {
-          "src": "img/hero.webp",
-          "alt": {
-            "fr": "Pralines assorties",
-            "de": "Pralinen-Auswahl",
-            "en": "Assorted pralines"
-          }
-        },
-        {
-          "src": "img/about.webp",
-          "alt": {
-            "fr": "Le travail du chocolat",
-            "de": "Die Arbeit mit Schokolade",
-            "en": "Working the chocolate"
-          }
-        },
-        {
           "src": "img/gallery1.webp",
           "alt": {
             "fr": "Tablettes de chocolat",
