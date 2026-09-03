@@ -1,27 +1,29 @@
 [
  {
-  "title": "Wine cellars of taylor´s",
-  "creator": "Jairo from São Paulo, Brazil",
+  "file": "about.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Maison Viticole Roeder",
   "creator_url": "",
-  "license": "CC BY 2.0",
+  "license": "© Maison Viticole Roeder",
   "license_version": "",
-  "license_url": "https://creativecommons.org/licenses/by/2.0",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Wine_cellars_of_taylor%C2%B4s.jpg",
-  "description": "Taylor´s wine cellars at Vila Nova de Gaia, Portugal.",
-  "categories": "Taken with Sony DSLR-A100|Flickr images reviewed by FlickreviewR|Taylor's wine cellars|Port wine barrels",
-  "file": "about.webp"
+  "license_url": "",
+  "source_url": "https://biowenzer.wixsite.com/biowenzer",
+  "description": "",
+  "categories": ""
  },
  {
-  "title": "Bottle and glass of red wine",
-  "creator": "congerdesign",
+  "file": "gallery1.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Maison Viticole Roeder",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Maison Viticole Roeder",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Bottle_and_glass_of_red_wine.jpg",
-  "description": "wine vins",
-  "categories": "CC-Zero|Images from Pixabay|Glasses of red wine",
-  "file": "gallery1.webp"
+  "license_url": "",
+  "source_url": "https://biowenzer.wixsite.com/biowenzer",
+  "description": "",
+  "categories": ""
  },
  {
   "title": "Domina grapes on the vine",
@@ -36,15 +38,16 @@
   "file": "gallery2.webp"
  },
  {
-  "title": "Vineyard in Slovenia 2008",
-  "creator": "IgorMar",
+  "file": "hero.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Maison Viticole Roeder",
   "creator_url": "",
-  "license": "CC0",
+  "license": "© Maison Viticole Roeder",
   "license_version": "",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Vineyard_in_Slovenia_2008.jpg",
-  "description": "Vineyard in Slovenia.",
-  "categories": "Overhead power lines in Slovenia|CC-Zero|Summer landscapes in Slovenia|Images from Pixabay|Landscapes of Styria (Slovenia)|Vineyards in Styria (Slovenia) in summer",
-  "file": "hero.webp"
+  "license_url": "",
+  "source_url": "https://biowenzer.wixsite.com/biowenzer",
+  "description": "",
+  "categories": ""
  }
 ]

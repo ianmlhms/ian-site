@@ -1,15 +1,16 @@
 [
  {
-  "title": "Chocolate truffles - prep4",
-  "creator": "gran",
+  "file": "about.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Chocolats du Coeur",
   "creator_url": "",
-  "license": "CC BY 3.0",
+  "license": "© Chocolats du Coeur",
   "license_version": "",
-  "license_url": "https://creativecommons.org/licenses/by/3.0",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Chocolate_truffles_-_prep4.jpg",
-  "description": "chocolate truffles prep",
-  "categories": "GFDL|Taken with Samsung ST600|Chocolate truffles|License migration redundant|Self-published work",
-  "file": "about.webp"
+  "license_url": "",
+  "source_url": "https://www.tricentenaire.lu/fr/services/ateliers-dinclusion-professionnelle/chocolaterie",
+  "description": "",
+  "categories": ""
  },
  {
   "title": "Dark-brown-milk-candy (24298960866)",
@@ -36,15 +37,16 @@
   "file": "gallery2.webp"
  },
  {
-  "title": "Aladdin chokladask praliner",
-  "creator": "Hans Lindqvist",
+  "file": "hero.webp",
+  "ownerPhoto": true,
+  "title": "",
+  "creator": "Chocolats du Coeur",
   "creator_url": "",
-  "license": "Public domain",
+  "license": "© Chocolats du Coeur",
   "license_version": "",
   "license_url": "",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Aladdin_chokladask_praliner.jpg",
-  "description": "The pralines in a Swedish box of chocolates called \"Aladdin\" the 2008/2009 season (top layer, identical to the bottom layer).",
-  "categories": "Taken with Fujifilm FinePix F30|Aladdin (chocolate box)|Self-published work|PD-self|Posted to Wikimedia Foundation Pinterest|Chocolate textures",
-  "file": "hero.webp"
+  "source_url": "https://www.tricentenaire.lu/fr/services/ateliers-dinclusion-professionnelle/chocolaterie",
+  "description": "",
+  "categories": ""
  }
 ]

@@ -485,14 +485,21 @@ def render_contact(section: dict, data: dict, language: str, ui: dict, ident: st
 RENDERERS = {"hero": render_hero, "about": render_about, "menu": render_menu, "gallery": render_gallery, "hours": render_hours, "special": render_special, "contact": render_contact}
 
 
-def stock_photo_notice(data: dict, ui: dict, credits: list[dict] | None) -> str:
+def stock_credits(credits: list[dict] | None) -> list[dict]:
+    return [credit for credit in credits or [] if credit.get("ownerPhoto") is not True]
+
+
+def photo_notice_html(data: dict, ui: dict, credits: list[dict] | None) -> str:
     preview = data.get("preview") if isinstance(data.get("preview"), dict) else {}
-    if credits is None or preview.get("isPreview") is not True:
+    stock = stock_credits(credits)
+    if not stock or preview.get("isPreview") is not True:
         return ""
-    return f'<p class="stock-photo-notice">{esc(ui["stock_photo_notice"].format(name=data["name"]))}</p>'
+    key = "mixed_photo_notice" if len(stock) < len(credits or []) else "stock_photo_notice"
+    notice = ui[key] if key == "mixed_photo_notice" else ui[key].format(name=data["name"])
+    return f'<p class="stock-photo-notice">{esc(notice)}</p>'
 
 
-def render_sections(data: dict, language: str, ui: dict, credits: list[dict] | None) -> str:
+def render_sections(data: dict, language: str, ui: dict, notice: str) -> str:
     rendered = []
     for number, section in enumerate(data["sections"], 1):
         renderer = RENDERERS.get(section["type"])
@@ -507,10 +514,8 @@ def render_sections(data: dict, language: str, ui: dict, credits: list[dict] | N
             continue
         if html_section:
             rendered.append(html_section)
-            if section["type"] == "hero":
-                notice = stock_photo_notice(data, ui, credits)
-                if notice:
-                    rendered.append(notice)
+            if section["type"] == "hero" and notice:
+                rendered.append(notice)
     return "\n".join(rendered)
 
 
@@ -550,7 +555,7 @@ def photo_credits_html(credits: list[dict] | None, ui: dict) -> str:
     if credits is None:
         return ""
     rows = []
-    for credit in credits:
+    for credit in stock_credits(credits):
         title = credit.get("title") if isinstance(credit.get("title"), str) and credit["title"].strip() else ""
         creator = credit.get("creator") if isinstance(credit.get("creator"), str) and credit["creator"].strip() else ""
         licence = credit.get("license") if isinstance(credit.get("license"), str) and credit["license"].strip() else ""
@@ -580,11 +585,12 @@ def render_page(data: dict, language: str, credits: list[dict] | None) -> str:
     alternates = "\n".join(f'  <link rel="alternate" hreflang="{esc(target)}" href="{esc(output_url(data, target))}">' for target in data["languages"])
     alternates += f'\n  <link rel="alternate" hreflang="x-default" href="{esc(output_url(data, data["defaultLanguage"]))}">'
     description = text(next((s.get("subtitle") for s in data["sections"] if s.get("type") == "hero"), {}), data, language) or data["name"]
+    notice = photo_notice_html(data, ui, credits)
     credits_html = photo_credits_html(credits, ui)
     return load_template("page.html").substitute(
         lang=esc(language), title=esc(f"{data['name']} — {town(data)}"), description=esc(description), canonical=esc(canonical), alternates=alternates,
-        theme_vars=theme_vars, credits_style=STOCK_PHOTO_CSS if credits is not None else "", css_href="site.css" if language == data["defaultLanguage"] else "../site.css", skip_label=esc(ui["skip"]), preview=preview_html(data, language, ui),
-        home_href=esc(relative_page_href(data, language, data["defaultLanguage"])), name=esc(data["name"]), language_switcher="\n".join(switcher), sections=render_sections(data, language, ui, credits), credits=credits_html, legal=legal_html(data, ui),
+        theme_vars=theme_vars, credits_style=STOCK_PHOTO_CSS if notice or credits_html else "", css_href="site.css" if language == data["defaultLanguage"] else "../site.css", skip_label=esc(ui["skip"]), preview=preview_html(data, language, ui),
+        home_href=esc(relative_page_href(data, language, data["defaultLanguage"])), name=esc(data["name"]), language_switcher="\n".join(switcher), sections=render_sections(data, language, ui, notice), credits=credits_html, legal=legal_html(data, ui),
         mobile_actions_label=esc(data["name"]), phone_href=esc(phone_href(data)), map_href=esc(map_url(data)), call_label=esc(ui["call"]), directions_label=esc(ui["directions"]),
     )
 
