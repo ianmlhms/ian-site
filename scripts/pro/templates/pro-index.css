@@ -1,0 +1,38 @@
+:root {
+  color-scheme: light;
+  --ground: #fbf8f4;
+  --ink: #1b1917;
+  --muted: #655f59;
+  --surface: #fffdfa;
+  --line: #ddd6ce;
+  --display: Georgia, "Times New Roman", serif;
+  --body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 1rem/1.55 var(--body); }
+img { display: block; max-width: 100%; height: auto; }
+a { color: inherit; }
+a:focus-visible { outline: 3px solid var(--card-brand); outline-offset: 4px; }
+.pro-index { width: min(100% - 2rem, 76rem); margin: 0 auto; padding: clamp(2rem, 7vw, 5.5rem) 0; }
+.pro-intro { max-width: 46rem; margin-bottom: clamp(2rem, 5vw, 4rem); }
+.pro-kicker { margin: 0 0 .7rem; padding-left: .65rem; border-left: .25rem solid var(--ink); font-size: .78rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+h1 { margin: 0; font: 700 clamp(2.5rem, 7vw, 5rem)/1 var(--display); }
+.pro-intro > p:last-child { max-width: 42rem; margin: 1rem 0 0; color: var(--muted); font-size: clamp(1rem, 2.6vw, 1.18rem); }
+.pro-access-panel { max-width: 31rem; padding: 1.4rem; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 14px 32px rgb(27 25 23 / 7%); }
+.pro-access-panel p { margin: 0; }
+.pro-access-panel button { margin-top: 1rem; padding: .65rem 1rem; border: 0; border-radius: .2rem; background: var(--ink); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.pro-access-panel button:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; }
+.pro-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin: 0; padding: 0; list-style: none; }
+.pro-card { min-width: 0; border-top: .35rem solid var(--card-brand); background: var(--surface); box-shadow: 0 1px 0 var(--line), 0 14px 32px rgb(27 25 23 / 7%); }
+.pro-card a { display: grid; min-height: 2.75rem; text-decoration: none; }
+.pro-card a:hover .pro-card-name, .pro-card a:focus-visible .pro-card-name { text-decoration: underline; text-decoration-color: var(--card-brand); text-decoration-thickness: .13em; text-underline-offset: .2em; }
+.pro-card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.pro-card-copy { display: block; min-width: 0; padding: 1.1rem; overflow-wrap: anywhere; }
+.pro-card-name, .pro-card-title { display: block; }
+.pro-card-name { font: 700 clamp(1.35rem, 4vw, 1.8rem)/1.1 var(--display); }
+.pro-card-title { margin-top: .55rem; color: var(--muted); }
+.pro-card-town, .pro-demo { margin: .8rem 0 0; font-size: .9rem; }
+.pro-card-town { color: var(--muted); }
+.pro-demo { display: inline-block; padding: .25rem .45rem; background: var(--card-brand); color: #fff; font-weight: 750; }
+@media (min-width: 36rem) { .pro-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 64rem) { .pro-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.35rem; } }

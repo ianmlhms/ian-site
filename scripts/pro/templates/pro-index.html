@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,follow">
+  <title>Aperçus de sites — Ian Mulheims</title>
+  <meta name="description" content="Aperçus privés de sites web préparés pour des commerces luxembourgeois.">
+  <link rel="canonical" href="https://ian.lu/pro/">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <main class="pro-index">
+    <header class="pro-intro">
+      <p class="pro-kicker">Ian Mulheims</p>
+      <h1>Aperçus de sites</h1>
+      <p>Aperçus non publiés : chacun est présenté uniquement à son propriétaire ; ce ne sont pas des sites officiels.</p>
+    </header>
+    <section id="proGate" class="pro-access-panel" aria-live="polite">
+      <p id="proGateMsg">Chargement…</p>
+      <button id="proSignin" type="button">Se connecter</button>
+    </section>
+    <ul id="proGrid" class="pro-grid" hidden></ul>
+  </main>
+  <script src="../pixelbreak-config.js"></script>
+  <script type="module">
+    const auth = await import("../auth.js?v=12");
+    const gate = document.getElementById("proGate");
+    const message = document.getElementById("proGateMsg");
+    const signin = document.getElementById("proSignin");
+    const grid = document.getElementById("proGrid");
+    let checking = Promise.resolve();
+
+    function showGate(text, canSignIn) {
+      grid.hidden = true;
+      gate.hidden = false;
+      message.textContent = text;
+      signin.hidden = !canSignIn;
+    }
+
+    function localPath(value) {
+      const path = String(value || "");
+      return /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(path)
+        ? path : "";
+    }
+
+    function appendText(parent, tag, className, value) {
+      const node = document.createElement(tag);
+      node.className = className;
+      node.textContent = String(value || "");
+      parent.appendChild(node);
+      return node;
+    }
+
+    function render(sites) {
+      grid.replaceChildren();
+      for (const site of sites) {
+        const slug = localPath(site.slug);
+        const hero = localPath(site.hero);
+        if (!slug || !hero) continue;
+        const card = document.createElement("li");
+        card.className = "pro-card";
+        if (/^#[0-9A-F]{6}$/i.test(site.brand || "")) {
+          card.style.setProperty("--card-brand", site.brand);
+        }
+        const link = document.createElement("a");
+        link.setAttribute("href", `${slug}/`);
+        const image = document.createElement("img");
+        image.setAttribute("src", hero);
+        image.setAttribute("alt", "Photographie de présentation");
+        image.loading = "lazy";
+        const copy = document.createElement("span");
+        copy.className = "pro-card-copy";
+        appendText(copy, "span", "pro-card-name", site.name);
+        appendText(copy, "span", "pro-card-title", site.tagline);
+        if (site.town) appendText(copy, "p", "pro-card-town", site.town);
+        if (site.is_demo === true) {
+          appendText(copy, "p", "pro-demo",
+            "Démo fictive — entreprise imaginaire");
+        }
+        link.append(image, copy);
+        card.appendChild(link);
+        grid.appendChild(card);
+      }
+      gate.hidden = true;
+      grid.hidden = false;
+    }
+
+    async function checkAccess() {
+      const sb = await auth.client();
+      if (!auth.session()) {
+        showGate("Cet espace est privé. Connectez-vous.", true);
+        return;
+      }
+      showGate("Vérification de l’accès…", false);
+      const permission = await sb.rpc("is_admin");
+      if (permission.error) {
+        showGate("Impossible de vérifier l’accès.", false);
+        return;
+      }
+      if (permission.data !== true) {
+        showGate("Ce compte n’a pas accès.", false);
+        return;
+      }
+      const result = await sb.from("pro_sites")
+        .select("slug,name,tagline,town,brand,hero,is_demo")
+        .order("sort_key");
+      if (result.error) {
+        showGate("Impossible de charger les aperçus.", false);
+        return;
+      }
+      render(result.data || []);
+    }
+
+    function queueCheck() {
+      checking = checking.then(checkAccess).catch((error) => {
+        console.error("pro index", error);
+        showGate("Impossible de charger les aperçus.", false);
+      });
+      return checking;
+    }
+
+    signin.addEventListener("click", auth.openAuthModal);
+    auth.onAuth(queueCheck);
+    await queueCheck();
+  </script>
+</body>
+</html>
