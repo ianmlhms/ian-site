@@ -1,0 +1,225 @@
+{
+  "schema": 1,
+  "slug": "martins",
+  "name": "Martins",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#8A5A22",
+    "ground": "#FDF8EF",
+    "ink": "#241C10",
+    "accent": "#C4762B",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 26 58 12 06",
+    "email": "jorgemartins-f@hotmail.com",
+    "address": "19, rue Émile Mark, L-4620 Differdange",
+    "lat": 49.5228559,
+    "lon": 5.8902246,
+    "facebook": "https://www.facebook.com/pages/La-Ronde-Des-Pains/139865502868813",
+    "instagram": ""
+  },
+  "hours": [
+    {
+      "days": {
+        "fr": "Lundi – vendredi",
+        "de": "Montag – Freitag",
+        "en": "Monday – Friday"
+      },
+      "time": "5h30 – 18h00"
+    },
+    {
+      "days": {
+        "fr": "Samedi",
+        "de": "Samstag",
+        "en": "Saturday"
+      },
+      "time": "7h30 – 13h00"
+    },
+    {
+      "days": {
+        "fr": "Dimanche",
+        "de": "Sonntag",
+        "en": "Sunday"
+      },
+      "time": "7h30 – 12h30"
+    }
+  ],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Boulangerie-pâtisserie portugaise à Differdange",
+        "de": "Portugiesische Bäckerei und Konditorei in Differdingen",
+        "en": "Portuguese bakery and pâtisserie in Differdange"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "La boulangerie",
+        "de": "Die Bäckerei",
+        "en": "The bakery"
+      },
+      "body": {
+        "fr": "La Boulangerie Martins est une boulangerie-pâtisserie de Differdange, avec une petite restauration portugaise. On y trouve des torradas, du galão, des croissants, de la soupe, des bifanas, des hamburgers, des salades, des sandwiches et des pâtisseries portugaises.",
+        "de": "Die Boulangerie Martins ist eine Bäckerei und Konditorei in Differdingen, mit kleiner portugiesischer Küche. Es gibt Torradas, Galão, Croissants, Suppe, Bifanas, Hamburger, Salate, Sandwiches und portugiesisches Gebäck.",
+        "en": "Boulangerie Martins is a bakery and pâtisserie in Differdange, with a short Portuguese menu. You'll find torradas, galão, croissants, soup, bifanas, burgers, salads, sandwiches and Portuguese pastries."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "À la carte",
+        "de": "Auf der Karte",
+        "en": "On the menu"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Boulangerie-pâtisserie",
+                "de": "Bäckerei und Konditorei",
+                "en": "Bakery and pâtisserie"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Pâtisseries portugaises",
+                "de": "Portugiesisches Gebäck",
+                "en": "Portuguese pastries"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Bifanas et hamburgers",
+                "de": "Bifanas und Hamburger",
+                "en": "Bifanas and burgers"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Soupe et sandwiches",
+                "de": "Suppe und Sandwiches",
+                "en": "Soup and sandwiches"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "Les pains",
+            "de": "Die Brote",
+            "en": "The breads"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "Pâtisserie portugaise",
+            "de": "Portugiesisches Gebäck",
+            "en": "A Portuguese pastry"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "Le comptoir",
+            "de": "Die Theke",
+            "en": "The counter"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "Un café et un croissant",
+            "de": "Kaffee und Croissant",
+            "en": "Coffee and a croissant"
+          }
+        }
+      ]
+    },
+    {
+      "type": "hours",
+      "title": {
+        "fr": "Horaires",
+        "de": "Öffnungszeiten",
+        "en": "Opening hours"
+      }
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Martins",
+    "address": "19, rue Émile Mark, L-4620 Differdange",
+    "email": "jorgemartins-f@hotmail.com",
+    "phone": "+352 26 58 12 06",
+    "rcs": "",
+    "tva": ""
+  }
+}

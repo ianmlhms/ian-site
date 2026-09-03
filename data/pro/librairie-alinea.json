@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "slug": "librairie-alinea",
+  "name": "Librairie Alinéa",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#7A2E2E",
+    "ground": "#FBF8F4",
+    "ink": "#1B1917",
+    "accent": "#C9A227",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 22 67 87",
+    "email": "info@alinea.lu",
+    "address": "30, rue des Capucins, L-1313 Luxembourg",
+    "lat": 49.6128896,
+    "lon": 6.1298115,
+    "facebook": "https://www.facebook.com/alinea.librairie/",
+    "instagram": "https://www.instagram.com/alinealuxembourg/"
+  },
+  "hours": [],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Librairie indépendante, rue des Capucins",
+        "de": "Unabhängige Buchhandlung in der rue des Capucins",
+        "en": "Independent bookshop on rue des Capucins"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "La librairie",
+        "de": "Die Buchhandlung",
+        "en": "The bookshop"
+      },
+      "body": {
+        "fr": "La Librairie Alinéa est une librairie indépendante de la rue des Capucins, en plein centre de Luxembourg. Nous proposons des livres en français, en allemand, en anglais et en luxembourgeois, ainsi que de la papeterie et des cartes.",
+        "de": "Die Librairie Alinéa ist eine unabhängige Buchhandlung in der rue des Capucins, mitten in Luxemburg-Stadt. Wir führen Bücher auf Französisch, Deutsch, Englisch und Luxemburgisch sowie Schreibwaren und Karten.",
+        "en": "Librairie Alinéa is an independent bookshop on rue des Capucins, in the centre of Luxembourg City. We carry books in French, German, English and Luxembourgish, along with stationery and cards."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "Chez nous",
+        "de": "Bei uns",
+        "en": "In the shop"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Livres en quatre langues",
+                "de": "Bücher in vier Sprachen",
+                "en": "Books in four languages"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Librairie indépendante",
+                "de": "Unabhängige Buchhandlung",
+                "en": "Independent bookshop"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Papeterie et cartes",
+                "de": "Schreibwaren und Karten",
+                "en": "Stationery and cards"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "Les rayons",
+            "de": "Die Regale",
+            "en": "The shelves"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "Une pile de livres",
+            "de": "Ein Bücherstapel",
+            "en": "A stack of books"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "Un coin lecture",
+            "de": "Eine Leseecke",
+            "en": "A reading corner"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "La vitrine",
+            "de": "Das Schaufenster",
+            "en": "The shop window"
+          }
+        }
+      ]
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Librairie Alinéa",
+    "address": "30, rue des Capucins, L-1313 Luxembourg",
+    "email": "info@alinea.lu",
+    "phone": "+352 22 67 87",
+    "rcs": "",
+    "tva": ""
+  }
+}

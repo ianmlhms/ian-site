@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "slug": "lil-o-tresor",
+  "name": "Lil'O Trésor",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#243A5E",
+    "ground": "#F9F9FB",
+    "ink": "#15181F",
+    "accent": "#C2A05A",
+    "display": "sans"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 621 508 138",
+    "email": "lilyotresor@gmail.com",
+    "address": "9, rue du Fossé, L-1536 Luxembourg",
+    "lat": 49.6112991,
+    "lon": 6.1317703,
+    "facebook": "https://www.facebook.com/lilyotresor/",
+    "instagram": ""
+  },
+  "hours": [
+    {
+      "days": {
+        "fr": "Lundi – vendredi",
+        "de": "Montag – Freitag",
+        "en": "Monday – Friday"
+      },
+      "time": "10h00 – 18h00"
+    },
+    {
+      "days": {
+        "fr": "Samedi",
+        "de": "Samstag",
+        "en": "Saturday"
+      },
+      "time": "9h30 – 18h00"
+    },
+    {
+      "days": {
+        "fr": "Dimanche",
+        "de": "Sonntag",
+        "en": "Sunday"
+      },
+      "time": "closed"
+    }
+  ],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Vêtements pour enfants de 0 à 16 ans",
+        "de": "Kinderkleidung von 0 bis 16 Jahren",
+        "en": "Children's clothing, 0 to 16 years"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "La boutique",
+        "de": "Die Boutique",
+        "en": "The shop"
+      },
+      "body": {
+        "fr": "Lil'O Trésor habille les bébés, les enfants et les adolescents de 0 à 16 ans. La boutique existe depuis 2008, d'abord sous l'enseigne La Cie des Petits, puis en multimarques depuis février 2020. Nous proposons aussi le click & collect, la livraison à domicile et un service de personal shopper.",
+        "de": "Lil'O Trésor kleidet Babys, Kinder und Jugendliche von 0 bis 16 Jahren. Die Boutique besteht seit 2008, zunächst unter dem Namen La Cie des Petits, seit Februar 2020 als Multimarken-Geschäft. Wir bieten auch Click & Collect, Lieferung nach Hause und einen Personal-Shopper-Service.",
+        "en": "Lil'O Trésor dresses babies, children and teenagers from 0 to 16. The shop has been open since 2008, first as La Cie des Petits and, since February 2020, as a multi-brand store. We also offer click & collect, home delivery and a personal shopper service."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "Nos services",
+        "de": "Unsere Angebote",
+        "en": "What we offer"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Vêtements de 0 à 16 ans",
+                "de": "Kleidung von 0 bis 16 Jahren",
+                "en": "Clothing from 0 to 16"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Doudous",
+                "de": "Kuscheltiere",
+                "en": "Comforters and soft toys"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Certaines pièces en coton bio",
+                "de": "Einzelne Stücke aus Bio-Baumwolle",
+                "en": "Some pieces in organic cotton"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Click & collect et livraison",
+                "de": "Click & Collect und Lieferung",
+                "en": "Click & collect and delivery"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Personal shopper",
+                "de": "Personal Shopper",
+                "en": "Personal shopper"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "La boutique",
+            "de": "Die Boutique",
+            "en": "The shop"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "Vêtements pour enfants",
+            "de": "Kinderkleidung",
+            "en": "Children's clothes"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "Chaussures d'enfants",
+            "de": "Kinderschuhe",
+            "en": "Children's shoes"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "Un rayon de la boutique",
+            "de": "Ein Regal im Geschäft",
+            "en": "A shelf in the shop"
+          }
+        }
+      ]
+    },
+    {
+      "type": "hours",
+      "title": {
+        "fr": "Horaires",
+        "de": "Öffnungszeiten",
+        "en": "Opening hours"
+      }
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Lil'O Trésor",
+    "address": "9, rue du Fossé, L-1536 Luxembourg",
+    "email": "lilyotresor@gmail.com",
+    "phone": "+352 621 508 138",
+    "rcs": "",
+    "tva": ""
+  }
+}

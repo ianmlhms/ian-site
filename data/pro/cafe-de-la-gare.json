@@ -1,0 +1,233 @@
+{
+  "schema": 1,
+  "slug": "cafe-de-la-gare",
+  "name": "Café de la Gare",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#2F4A3A",
+    "ground": "#F7F6F1",
+    "ink": "#1A1E1B",
+    "accent": "#C08A2E",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 27 40 20 40",
+    "email": "info.cafedelagare@gmail.com",
+    "address": "197, rue Principale, L-5366 Munsbach, Schuttrange",
+    "lat": 49.6309193,
+    "lon": 6.2673981,
+    "facebook": "https://www.facebook.com/p/Cafe-de-la-Gare-61559038119576/",
+    "instagram": ""
+  },
+  "hours": [
+    {
+      "days": {
+        "fr": "Lundi",
+        "de": "Montag",
+        "en": "Monday"
+      },
+      "time": "17h00 – 1h00"
+    },
+    {
+      "days": {
+        "fr": "Mardi – vendredi",
+        "de": "Dienstag – Freitag",
+        "en": "Tuesday – Friday"
+      },
+      "time": "11h00 – 1h00"
+    },
+    {
+      "days": {
+        "fr": "Samedi",
+        "de": "Samstag",
+        "en": "Saturday"
+      },
+      "time": "17h00 – 1h00"
+    },
+    {
+      "days": {
+        "fr": "Dimanche",
+        "de": "Sonntag",
+        "en": "Sunday"
+      },
+      "time": "10h00 – 1h00"
+    }
+  ],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Café-restaurant en face de la gare de Munsbach",
+        "de": "Café-Restaurant gegenüber dem Bahnhof Munsbach",
+        "en": "Café and restaurant opposite Munsbach station"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "La maison",
+        "de": "Das Haus",
+        "en": "The place"
+      },
+      "body": {
+        "fr": "Le Café de la Gare est un café-restaurant de cuisine traditionnelle, installé juste en face de la gare de Munsbach. On y vient pour manger, boire un verre en terrasse ou faire une partie de quilles.",
+        "de": "Das Café de la Gare ist ein Café-Restaurant mit traditioneller Küche, direkt gegenüber dem Bahnhof Munsbach. Man kommt zum Essen, auf ein Glas auf der Terrasse oder für eine Partie Kegeln.",
+        "en": "Café de la Gare is a café and restaurant serving traditional food, right opposite Munsbach station. People come to eat, for a drink on the terrace, or for a game of skittles."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "Ce qu'on trouve ici",
+        "de": "Was es hier gibt",
+        "en": "What you'll find"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Cuisine traditionnelle",
+                "de": "Traditionelle Küche",
+                "en": "Traditional cooking"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Jeu de quilles",
+                "de": "Kegelbahn",
+                "en": "Skittle alley"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Terrasse",
+                "de": "Terrasse",
+                "en": "Terrace"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Parking gratuit",
+                "de": "Kostenlose Parkplätze",
+                "en": "Free parking"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "La salle du café",
+            "de": "Der Gastraum",
+            "en": "The dining room"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "Un verre au comptoir",
+            "de": "Ein Glas am Tresen",
+            "en": "A drink at the bar"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "Le jeu de quilles",
+            "de": "Die Kegelbahn",
+            "en": "The skittle alley"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "La terrasse",
+            "de": "Die Terrasse",
+            "en": "The terrace"
+          }
+        }
+      ]
+    },
+    {
+      "type": "hours",
+      "title": {
+        "fr": "Horaires",
+        "de": "Öffnungszeiten",
+        "en": "Opening hours"
+      }
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Café de la Gare",
+    "address": "197, rue Principale, L-5366 Munsbach, Schuttrange",
+    "email": "info.cafedelagare@gmail.com",
+    "phone": "+352 27 40 20 40",
+    "rcs": "",
+    "tva": ""
+  }
+}

@@ -1,0 +1,222 @@
+{
+  "schema": 1,
+  "slug": "brasserie-beaulieu",
+  "name": "Brasserie Beaulieu",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#2F4A3A",
+    "ground": "#F7F6F1",
+    "ink": "#1A1E1B",
+    "accent": "#C08A2E",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 26 48 33 02",
+    "email": "contact@brasseriebeaulieu.com",
+    "address": "25, rue Félix de Blochausen, L-1243 Luxembourg",
+    "lat": 49.6013091,
+    "lon": 6.1395714,
+    "facebook": "https://www.facebook.com/BrasserieBeaulieu/",
+    "instagram": "brasserie__beaulieu_"
+  },
+  "hours": [
+    {
+      "days": {
+        "fr": "Tous les jours",
+        "de": "Täglich",
+        "en": "Every day"
+      },
+      "time": "10h00 – 1h00"
+    }
+  ],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Brasserie et bar à vins à Bonnevoie",
+        "de": "Brasserie und Weinbar in Bonneweg",
+        "en": "Brasserie and wine bar in Bonnevoie"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "La brasserie",
+        "de": "Die Brasserie",
+        "en": "The brasserie"
+      },
+      "body": {
+        "fr": "La Brasserie Beaulieu est une brasserie de quartier à Bonnevoie. Notre carte des vins réunit des producteurs français, luxembourgeois et d'ailleurs, à côté d'un menu de semaine, de burgers, de croque-monsieur et d'un fish and chips. La terrasse compte une quarantaine de places, il y a un brunch le dimanche et de la musique le jeudi.",
+        "de": "Die Brasserie Beaulieu ist eine Quartiersbrasserie in Bonneweg. Unsere Weinkarte vereint Winzer aus Frankreich, Luxemburg und anderen Ländern, dazu ein Wochenmenü, Burger, Croque-Monsieur und Fish and Chips. Die Terrasse bietet rund 40 Plätze, sonntags gibt es Brunch und donnerstags Musik.",
+        "en": "Brasserie Beaulieu is a neighbourhood brasserie in Bonnevoie. Our wine list brings together French, Luxembourgish and other growers, alongside a weekday menu, burgers, croque-monsieur and fish and chips. The terrace seats around forty, there is brunch on Sundays and music on Thursdays."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "À la carte",
+        "de": "Auf der Karte",
+        "en": "On the menu"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Bar à vins",
+                "de": "Weinbar",
+                "en": "Wine bar"
+              },
+              "desc": {
+                "fr": "Producteurs français, luxembourgeois et d'ailleurs",
+                "de": "Winzer aus Frankreich, Luxemburg und anderen Ländern",
+                "en": "French, Luxembourgish and other growers"
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Menu de semaine",
+                "de": "Wochenmenü",
+                "en": "Weekday menu"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Burgers, croque-monsieur, fish and chips",
+                "de": "Burger, Croque-Monsieur, Fish and Chips",
+                "en": "Burgers, croque-monsieur, fish and chips"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Brunch le dimanche",
+                "de": "Brunch am Sonntag",
+                "en": "Sunday brunch"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Terrasse d'une quarantaine de places",
+                "de": "Terrasse mit rund 40 Plätzen",
+                "en": "Terrace seating around forty"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "La salle",
+            "de": "Der Gastraum",
+            "en": "The dining room"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "Des verres de vin",
+            "de": "Weingläser",
+            "en": "Wine glasses"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "Le brunch",
+            "de": "Der Brunch",
+            "en": "Brunch"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "La terrasse",
+            "de": "Die Terrasse",
+            "en": "The terrace"
+          }
+        }
+      ]
+    },
+    {
+      "type": "hours",
+      "title": {
+        "fr": "Horaires",
+        "de": "Öffnungszeiten",
+        "en": "Opening hours"
+      }
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Brasserie Beaulieu",
+    "address": "25, rue Félix de Blochausen, L-1243 Luxembourg",
+    "email": "contact@brasseriebeaulieu.com",
+    "phone": "+352 26 48 33 02",
+    "rcs": "",
+    "tva": ""
+  }
+}

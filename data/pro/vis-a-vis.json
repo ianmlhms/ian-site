@@ -1,0 +1,220 @@
+{
+  "schema": 1,
+  "slug": "vis-a-vis",
+  "name": "Vis-à-Vis",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#6B4A2F",
+    "ground": "#FAF6F0",
+    "ink": "#211C17",
+    "accent": "#B8863B",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 46 03 26",
+    "email": "visavislux@gmail.com",
+    "address": "2, rue Beaumont, L-1219 Luxembourg",
+    "lat": 49.6131063,
+    "lon": 6.1295805,
+    "facebook": "https://www.facebook.com/people/Vis-%C3%A0-Vis/100063567220584/",
+    "instagram": ""
+  },
+  "hours": [
+    {
+      "days": {
+        "fr": "Lundi",
+        "de": "Montag",
+        "en": "Monday"
+      },
+      "time": "10h00 – 1h00"
+    },
+    {
+      "days": {
+        "fr": "Mardi – vendredi",
+        "de": "Dienstag – Freitag",
+        "en": "Tuesday – Friday"
+      },
+      "time": "9h00 – 1h00"
+    },
+    {
+      "days": {
+        "fr": "Samedi",
+        "de": "Samstag",
+        "en": "Saturday"
+      },
+      "time": "8h30 – 1h00"
+    },
+    {
+      "days": {
+        "fr": "Dimanche",
+        "de": "Sonntag",
+        "en": "Sunday"
+      },
+      "time": "14h00 – 19h30"
+    }
+  ],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Bar-café au centre de Luxembourg",
+        "de": "Bar und Café im Zentrum von Luxemburg",
+        "en": "Bar and café in the centre of Luxembourg"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "Le café",
+        "de": "Das Café",
+        "en": "The café"
+      },
+      "body": {
+        "fr": "Le Café Vis-à-Vis est un bar-café du centre de Luxembourg, avec une terrasse et une petite restauration. C'est un café de quartier, fréquenté surtout par des habitués.",
+        "de": "Das Café Vis-à-Vis ist eine Bar und ein Café im Zentrum von Luxemburg, mit Terrasse und kleiner Speisekarte. Ein Quartierscafé, das vor allem von Stammgästen besucht wird.",
+        "en": "Café Vis-à-Vis is a bar and café in the centre of Luxembourg, with a terrace and a short food menu. A neighbourhood café, with mostly regulars."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "Chez nous",
+        "de": "Bei uns",
+        "en": "Here"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Bar-café du centre",
+                "de": "Bar und Café im Zentrum",
+                "en": "City-centre bar and café"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Terrasse",
+                "de": "Terrasse",
+                "en": "Terrace"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Petite restauration",
+                "de": "Kleine Speisekarte",
+                "en": "Light meals"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "La salle",
+            "de": "Der Gastraum",
+            "en": "Inside"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "Un café",
+            "de": "Ein Kaffee",
+            "en": "A coffee"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "La terrasse",
+            "de": "Die Terrasse",
+            "en": "The terrace"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "Le comptoir",
+            "de": "Der Tresen",
+            "en": "The bar"
+          }
+        }
+      ]
+    },
+    {
+      "type": "hours",
+      "title": {
+        "fr": "Horaires",
+        "de": "Öffnungszeiten",
+        "en": "Opening hours"
+      }
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Vis-à-Vis",
+    "address": "2, rue Beaumont, L-1219 Luxembourg",
+    "email": "visavislux@gmail.com",
+    "phone": "+352 46 03 26",
+    "rcs": "",
+    "tva": ""
+  }
+}

@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "slug": "maison-viticole-roeder",
+  "name": "Maison Viticole Roeder",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#5A2A3E",
+    "ground": "#FAF6F6",
+    "ink": "#1E1417",
+    "accent": "#B08A3C",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 691 628 731",
+    "email": "luc.roeder@biowenzer.lu",
+    "address": "27, rue de la Montagne, L-6586 Steinheim, Rosport-Mompach",
+    "lat": 49.8198952,
+    "lon": 6.4698914,
+    "facebook": "",
+    "instagram": ""
+  },
+  "hours": [],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Domaine viticole biologique à Steinheim",
+        "de": "Bio-Weingut in Steinheim",
+        "en": "Organic wine estate in Steinheim"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "Le domaine",
+        "de": "Das Weingut",
+        "en": "The estate"
+      },
+      "body": {
+        "fr": "La Maison Viticole Roeder est un petit domaine biologique installé à Steinheim, sur le terroir de la Hoelt près de Rosport. Luc Roeder a commencé à restaurer ses premières vignes en 2009 et travaille des terrasses aux murs en pierres sèches, avec une récolte entièrement manuelle. Le domaine produit notamment un Elbling de vieilles vignes, des Pinot, du Chardonnay et le crémant Cuvée Kimmfrächen.",
+        "de": "Die Maison Viticole Roeder ist ein kleines Bio-Weingut in Steinheim, auf dem Terroir der Hoelt bei Rosport. Luc Roeder begann 2009 mit der Wiederherstellung seiner ersten Reben und bewirtschaftet Terrassen mit Trockenmauern, bei vollständig manueller Lese. Das Weingut erzeugt unter anderem einen Elbling von alten Reben, Pinot, Chardonnay und den Crémant Cuvée Kimmfrächen.",
+        "en": "Maison Viticole Roeder is a small organic estate in Steinheim, on the Hoelt terroir near Rosport. Luc Roeder began restoring his first vines in 2009 and works dry-stone terraces, with an entirely manual harvest. The estate produces an old-vine Elbling, Pinot, Chardonnay and the Cuvée Kimmfrächen crémant."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "Nos vins",
+        "de": "Unsere Weine",
+        "en": "Our wines"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Vins biologiques",
+                "de": "Bio-Weine",
+                "en": "Organic wines"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Elbling de vieilles vignes",
+                "de": "Elbling von alten Reben",
+                "en": "Old-vine Elbling"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Crémant Cuvée Kimmfrächen",
+                "de": "Crémant Cuvée Kimmfrächen",
+                "en": "Cuvée Kimmfrächen crémant"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Vignoble en terrasses, récolte manuelle",
+                "de": "Terrassenweinberg, manuelle Lese",
+                "en": "Terraced vineyard, hand-harvested"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Dégustations sur demande",
+                "de": "Verkostungen auf Anfrage",
+                "en": "Tastings on request"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "Les vignes en terrasses",
+            "de": "Die Terrassenweinberge",
+            "en": "The terraced vines"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "La cave",
+            "de": "Der Keller",
+            "en": "The cellar"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "Une dégustation",
+            "de": "Eine Verkostung",
+            "en": "A tasting"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "Les vendanges",
+            "de": "Die Lese",
+            "en": "The harvest"
+          }
+        }
+      ]
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Maison Viticole Roeder",
+    "address": "27, rue de la Montagne, L-6586 Steinheim, Rosport-Mompach",
+    "email": "luc.roeder@biowenzer.lu",
+    "phone": "+352 691 628 731",
+    "rcs": "",
+    "tva": ""
+  }
+}

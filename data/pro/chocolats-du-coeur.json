@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "slug": "chocolats-du-coeur",
+  "name": "Chocolats du Coeur",
+  "languages": [
+    "fr",
+    "de",
+    "en"
+  ],
+  "defaultLanguage": "fr",
+  "theme": {
+    "brand": "#7A2E2E",
+    "ground": "#FBF8F4",
+    "ink": "#1B1917",
+    "accent": "#C9A227",
+    "display": "serif"
+  },
+  "preview": {
+    "isPreview": true,
+    "contact": "ian@mulheims.lu"
+  },
+  "contact": {
+    "phone": "+352 26 33 07 71",
+    "email": "info@chocolatsducoeur.lu",
+    "address": "14, Z.A.C. Klengbousbierg, L-7795 Bissen; bar : 50, route de Diekirch, L-7220 Walferdange",
+    "lat": 49.6628246,
+    "lon": 6.133635,
+    "facebook": "",
+    "instagram": ""
+  },
+  "hours": [],
+  "sections": [
+    {
+      "type": "hero",
+      "image": "img/hero.webp",
+      "title": {
+        "fr": "Chocolaterie artisanale du Tricentenaire",
+        "de": "Handwerkliche Schokoladenmanufaktur des Tricentenaire",
+        "en": "Artisan chocolate made by the Tricentenaire"
+      },
+      "subtitle": {
+        "fr": "",
+        "de": "",
+        "en": ""
+      }
+    },
+    {
+      "type": "about",
+      "image": "img/about.webp",
+      "title": {
+        "fr": "Notre chocolaterie",
+        "de": "Unsere Manufaktur",
+        "en": "Our chocolate workshop"
+      },
+      "body": {
+        "fr": "Chocolats du Coeur est la chocolaterie artisanale du Tricentenaire. Pralines, tablettes et fruits secs sont fabriqués à la main, avec des produits issus du commerce équitable. Nous tenons aussi un bar à Walferdange.",
+        "de": "Chocolats du Coeur ist die handwerkliche Schokoladenmanufaktur des Tricentenaire. Pralinen, Tafeln und Trockenfrüchte entstehen in Handarbeit, mit Produkten aus fairem Handel. In Walferdange führen wir ausserdem eine Bar.",
+        "en": "Chocolats du Coeur is the Tricentenaire's artisan chocolate workshop. Pralines, bars and dried fruit are made by hand, using fair-trade ingredients. We also run a bar in Walferdange."
+      }
+    },
+    {
+      "type": "menu",
+      "title": {
+        "fr": "Notre gamme",
+        "de": "Unser Sortiment",
+        "en": "Our range"
+      },
+      "groups": [
+        {
+          "name": {
+            "fr": "",
+            "de": "",
+            "en": ""
+          },
+          "items": [
+            {
+              "name": {
+                "fr": "Pralines et tablettes",
+                "de": "Pralinen und Tafeln",
+                "en": "Pralines and bars"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Fruits secs enrobés",
+                "de": "Umhüllte Trockenfrüchte",
+                "en": "Coated dried fruit"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Produits du commerce équitable",
+                "de": "Produkte aus fairem Handel",
+                "en": "Fair-trade products"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            },
+            {
+              "name": {
+                "fr": "Bar à Walferdange",
+                "de": "Bar in Walferdange",
+                "en": "Bar in Walferdange"
+              },
+              "desc": {
+                "fr": "",
+                "de": "",
+                "en": ""
+              },
+              "price": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "gallery",
+      "title": {
+        "fr": "En images",
+        "de": "In Bildern",
+        "en": "In pictures"
+      },
+      "images": [
+        {
+          "src": "img/hero.webp",
+          "alt": {
+            "fr": "Pralines assorties",
+            "de": "Pralinen-Auswahl",
+            "en": "Assorted pralines"
+          }
+        },
+        {
+          "src": "img/about.webp",
+          "alt": {
+            "fr": "Le travail du chocolat",
+            "de": "Die Arbeit mit Schokolade",
+            "en": "Working the chocolate"
+          }
+        },
+        {
+          "src": "img/gallery1.webp",
+          "alt": {
+            "fr": "Tablettes de chocolat",
+            "de": "Schokoladentafeln",
+            "en": "Chocolate bars"
+          }
+        },
+        {
+          "src": "img/gallery2.webp",
+          "alt": {
+            "fr": "Le comptoir",
+            "de": "Die Theke",
+            "en": "The counter"
+          }
+        }
+      ]
+    },
+    {
+      "type": "contact",
+      "title": {
+        "fr": "Nous trouver",
+        "de": "So finden Sie uns",
+        "en": "Find us"
+      },
+      "showMap": true
+    }
+  ],
+  "legal": {
+    "operator": "Chocolats du Coeur",
+    "address": "14, Z.A.C. Klengbousbierg, L-7795 Bissen; bar : 50, route de Diekirch, L-7220 Walferdange",
+    "email": "info@chocolatsducoeur.lu",
+    "phone": "+352 26 33 07 71",
+    "rcs": "",
+    "tva": ""
+  }
+}
