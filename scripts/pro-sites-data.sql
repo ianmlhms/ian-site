@@ -106,56 +106,6 @@ insert into public.pro_sites (
   hero, is_demo, sort_key
 )
 values (
-  'd-cor-style',
-  'D''cor Style',
-  'Aménagement et rénovation, entreprise fami' ||
-  'liale',
-  '2A, avenue de la Liberté, L-4601 Differdan' ||
-  'ge',
-  '#7A2E2E',
-  'd-cor-style/img/hero.webp',
-  false,
-  '0005'
-)
-on conflict (slug) do update set
-  name = excluded.name,
-  tagline = excluded.tagline,
-  town = excluded.town,
-  brand = excluded.brand,
-  hero = excluded.hero,
-  is_demo = excluded.is_demo,
-  sort_key = excluded.sort_key,
-  updated_at = now();
-
-insert into public.pro_sites (
-  slug, name, tagline, town, brand,
-  hero, is_demo, sort_key
-)
-values (
-  'la-perle-d-orient',
-  'La Perle d''Orient',
-  'Restaurant chinois à Mersch depuis 2001',
-  '1, rue Emmanuel Servais, L-7565 Mersch',
-  '#7A2E2E',
-  'la-perle-d-orient/img/hero.webp',
-  false,
-  '0006'
-)
-on conflict (slug) do update set
-  name = excluded.name,
-  tagline = excluded.tagline,
-  town = excluded.town,
-  brand = excluded.brand,
-  hero = excluded.hero,
-  is_demo = excluded.is_demo,
-  sort_key = excluded.sort_key,
-  updated_at = now();
-
-insert into public.pro_sites (
-  slug, name, tagline, town, brand,
-  hero, is_demo, sort_key
-)
-values (
   'librairie-alinea',
   'Librairie Alinéa',
   'Librairie indépendante, rue des Capucins',
@@ -163,7 +113,7 @@ values (
   '#7A2E2E',
   'librairie-alinea/img/hero.webp',
   false,
-  '0007'
+  '0005'
 )
 on conflict (slug) do update set
   name = excluded.name,
@@ -187,7 +137,7 @@ values (
   '#243A5E',
   'lil-o-tresor/img/hero.webp',
   false,
-  '0008'
+  '0006'
 )
 on conflict (slug) do update set
   name = excluded.name,
@@ -212,7 +162,7 @@ values (
   '#5A2A3E',
   'maison-viticole-roeder/img/hero.webp',
   false,
-  '0009'
+  '0007'
 )
 on conflict (slug) do update set
   name = excluded.name,
@@ -237,7 +187,7 @@ values (
   '#8A5A22',
   'martins/img/hero.webp',
   false,
-  '0010'
+  '0008'
 )
 on conflict (slug) do update set
   name = excluded.name,
@@ -261,7 +211,7 @@ values (
   '#6B4A2F',
   'vis-a-vis/img/hero.webp',
   false,
-  '0011'
+  '0009'
 )
 on conflict (slug) do update set
   name = excluded.name,
@@ -279,8 +229,6 @@ where slug <> all (array[
   'brasserie-beaulieu',
   'cafe-de-la-gare',
   'chocolats-du-coeur',
-  'd-cor-style',
-  'la-perle-d-orient',
   'librairie-alinea',
   'lil-o-tresor',
   'maison-viticole-roeder',
