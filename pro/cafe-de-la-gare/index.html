@@ -39,27 +39,55 @@
 </section>
 
 <section class="section about" aria-labelledby="section-2-about">
-  <div class="about-copy"><p class="kicker">Le bistrot</p><h2 id="section-2-about">La maison</h2><p>Le Café de la Gare est un café-restaurant de cuisine traditionnelle, installé juste en face de la gare de Munsbach. On y vient pour manger, boire un verre en terrasse ou faire une partie de quilles.</p></div>
+  <div class="about-copy"><p class="kicker">Munsbach</p><h2 id="section-2-about">La maison</h2><p>Le Café de la Gare est un café-restaurant de cuisine traditionnelle, installé juste en face de la gare de Munsbach. On y vient pour manger, boire un verre en terrasse ou faire une partie de quilles.</p></div>
 <figure><img src="img/about.webp" alt="La maison" width="1600" height="1200" loading="lazy"><figcaption>Café de la Gare</figcaption></figure>
 </section>
 
-<section class="section menu" aria-labelledby="section-3-menu">
-  <div class="section-heading"><p class="kicker">La carte</p><h2 id="section-3-menu">Ce qu&#x27;on trouve ici</h2></div>
-  <div class="menu-groups"><section class="menu-group"><h3>La carte</h3><ul><li class="menu-item"><strong>Cuisine traditionnelle</strong></li><li class="menu-item"><strong>Jeu de quilles</strong></li><li class="menu-item"><strong>Terrasse</strong></li><li class="menu-item"><strong>Parking gratuit</strong></li></ul></section></div>
+<section class="section rating" aria-labelledby="section-3-rating">
+  <div class="section-heading"><p class="kicker">Avis Google</p><h2 id="section-3-rating">Ce qu&#x27;en disent les clients</h2></div>
+  <a class="rating-badge" href="https://www.google.com/maps/place/?q=place_id:ChIJRdRcqHFElUcREhBgqJN6AgU" target="_blank" rel="noopener">
+    <span class="rating-score">4,4</span>
+    <span class="rating-details"><span>175 avis</span><span>Avis Google</span></span>
+  </a>
 </section>
 
-<section class="section gallery" aria-labelledby="section-4-gallery">
-  <div class="section-heading"><p class="kicker">En images</p><h2 id="section-4-gallery">En images</h2></div>
+<section class="section special" aria-labelledby="section-4-special">
+  <div><p class="kicker">Le midi</p><h2 id="section-4-special">Le plat du jour</h2><p>Du mardi au vendredi, à midi, un plat du jour à 14,50 €, café compris.</p><p>Le soir, la carte complète, et la terrasse dès qu&#x27;il fait beau.</p></div>
+</section>
+
+<section class="section menu" aria-labelledby="section-5-menu">
+  <div class="section-heading"><p class="kicker">La carte</p><h2 id="section-5-menu">La carte</h2><p class="section-note">Exemple de carte — les plats et les prix sont à remplacer par les vôtres.</p></div>
+  <div class="menu-groups"><section class="menu-group"><h3>Pour commencer</h3><ul><li class="menu-item"><strong>Soupe du jour</strong><span class="price">6,50 €</span></li><li class="menu-item"><strong>Salade du marché</strong><span class="price">9,50 €</span></li><li class="menu-item"><strong>Croquettes au fromage</strong><span class="price">8,50 €</span></li><li class="menu-item"><strong>Bouchée à la reine, petite portion</strong><span class="price">12,50 €</span></li></ul></section><section class="menu-group"><h3>Nos plats</h3><ul><li class="menu-item"><strong>Judd mat Gaardebounen</strong><span class="price">22,00 €</span></li><li class="menu-item"><strong>Escalope viennoise, frites</strong><span class="price">21,50 €</span></li><li class="menu-item"><strong>Bouchée à la reine, frites</strong><span class="price">19,50 €</span></li><li class="menu-item"><strong>Burger de la Gare</strong><span class="price">18,50 €</span></li><li class="menu-item"><strong>Poisson du jour</strong><span class="price">24,00 €</span></li><li class="menu-item"><strong>Filet de bœuf, sauce au poivre</strong><span class="price">28,50 €</span></li></ul></section><section class="menu-group"><h3>Desserts</h3><ul><li class="menu-item"><strong>Dame blanche</strong><span class="price">8,50 €</span></li><li class="menu-item"><strong>Tarte du jour</strong><span class="price">6,50 €</span></li><li class="menu-item"><strong>Café gourmand</strong><span class="price">9,50 €</span></li></ul></section><section class="menu-group"><h3>Boissons</h3><ul><li class="menu-item"><strong>Bière pression, 25 cl</strong><span class="price">3,20 €</span></li><li class="menu-item"><strong>Verre de vin</strong><span class="price">4,80 €</span></li><li class="menu-item"><strong>Crémant, coupe</strong><span class="price">6,50 €</span></li><li class="menu-item"><strong>Café</strong><span class="price">2,80 €</span></li></ul></section></div>
+</section>
+
+<section class="section booking" aria-labelledby="section-6-booking">
+  <div class="section-heading"><p class="kicker">Réservation</p><h2 id="section-6-booking">Réserver une table</h2><p class="booking-intro">Dites-nous quand vous venez et combien vous êtes.</p></div>
+  <div data-booking-panel>
+    <form class="booking-form" data-booking-form data-booking-confirmation="Votre demande de table">
+      <div class="booking-fields"><div class="booking-field"><label for="section-6-booking-date-1">Date <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="date" id="section-6-booking-date-1" name="date" data-booking-field data-booking-label="Date" required min="2026-09-05"></div><div class="booking-field"><label for="section-6-booking-time-2">Heure <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="time" id="section-6-booking-time-2" name="time" data-booking-field data-booking-label="Heure" required></div><div class="booking-field"><label for="section-6-booking-people-3">Nombre de personnes <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="number" id="section-6-booking-people-3" name="people" data-booking-field data-booking-label="Nombre de personnes" required min="1" max="40"></div><div class="booking-field"><label for="section-6-booking-name-4">Votre nom <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="text" id="section-6-booking-name-4" name="name" data-booking-field data-booking-label="Votre nom" required autocomplete="name"></div><div class="booking-field"><label for="section-6-booking-phone-5">Téléphone <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="tel" id="section-6-booking-phone-5" name="phone" data-booking-field data-booking-label="Téléphone" required autocomplete="tel"></div><div class="booking-field"><label for="section-6-booking-email-6">E-mail (facultatif)</label><input type="email" id="section-6-booking-email-6" name="email" data-booking-field data-booking-label="E-mail (facultatif)" autocomplete="email"></div><div class="booking-field"><label for="section-6-booking-note-7">Une remarque ? Terrasse, quilles, anniversaire…</label><textarea id="section-6-booking-note-7" name="note" data-booking-field data-booking-label="Une remarque ? Terrasse, quilles, anniversaire…" rows="4"></textarea></div></div>
+      <button class="booking-submit" type="submit">Demander une table</button>
+    </form>
+    <p class="booking-demo">Ceci est une démonstration : rien n&#x27;a été envoyé et rien n&#x27;est enregistré. Quand vous voulez, je branche ce formulaire sur votre boîte mail.</p>
+  </div>
+</section>
+
+<section class="section gallery" aria-labelledby="section-7-gallery">
+  <div class="section-heading"><p class="kicker">En images</p><h2 id="section-7-gallery">En images</h2></div>
   <div class="gallery-grid"><figure><img src="img/gallery1.webp" alt="Le jeu de quilles" width="1600" height="1200" loading="lazy"><figcaption>Le jeu de quilles</figcaption></figure><figure><img src="img/gallery2.webp" alt="La terrasse" width="1067" height="800" loading="lazy"><figcaption>La terrasse</figcaption></figure></div>
 </section>
 
-<section class="section hours" aria-labelledby="section-5-hours">
-  <div class="section-heading"><p class="kicker">Horaires</p><h2 id="section-5-hours">Horaires</h2></div>
+<section class="section hours" aria-labelledby="section-8-hours">
+  <div class="section-heading"><p class="kicker">Horaires</p><h2 id="section-8-hours">Horaires</h2></div>
   <dl><div><dt>Lundi</dt><dd class="">17h00 – 1h00</dd></div><div><dt>Mardi – vendredi</dt><dd class="">11h00 – 1h00</dd></div><div><dt>Samedi</dt><dd class="">17h00 – 1h00</dd></div><div><dt>Dimanche</dt><dd class="">10h00 – 1h00</dd></div></dl>
 </section>
 
-<section class="section contact" aria-labelledby="section-6-contact">
-  <div class="section-heading"><p class="kicker">Nous trouver</p><h2 id="section-6-contact">Nous trouver</h2></div>
+<section class="section faq" aria-labelledby="section-9-faq">
+  <div class="section-heading"><p class="kicker">Questions fréquentes</p><h2 id="section-9-faq">Questions fréquentes</h2><p class="section-note">Exemple de questions fréquentes — corrigez les réponses, elles sont à vous.</p></div>
+  <div class="faq-items"><details><summary>Faut-il réserver ?</summary><div><p>Ce n&#x27;est pas obligatoire, mais le week-end et pour la terrasse c&#x27;est plus sûr. Un coup de téléphone suffit.</p></div></details><details><summary>Y a-t-il une terrasse ?</summary><div><p>Oui, elle est ouverte dès qu&#x27;il fait assez beau.</p></div></details><details><summary>Peut-on jouer aux quilles ?</summary><div><p>Oui. Le jeu de quilles se réserve à l&#x27;avance, surtout en soirée.</p></div></details><details><summary>Prenez-vous les groupes et les fêtes de famille ?</summary><div><p>Oui, la salle se prépare pour les grandes tablées. Écrivez-nous ce que vous avez en tête.</p></div></details><details><summary>Dans quelles langues êtes-vous ?</summary><div><p>Luxembourgeois, français, allemand et anglais.</p></div></details></div>
+</section>
+
+<section class="section contact" aria-labelledby="section-10-contact">
+  <div class="section-heading"><p class="kicker">Nous trouver</p><h2 id="section-10-contact">Nous trouver</h2></div>
   <div class="contact-grid"><dl class="contact-details"><div><dt>Appeler</dt><dd><a href="tel:+35227402040">+352 27 40 20 40</a></dd></div><div><dt>E-mail</dt><dd><a href="mailto:info.cafedelagare@gmail.com">info.cafedelagare@gmail.com</a></dd></div><div><dt>Adresse</dt><dd>197, rue Principale, L-5366 Munsbach, Schuttrange</dd></div><div><dt>Facebook</dt><dd><a href="https://www.facebook.com/p/Cafe-de-la-Gare-61559038119576/" rel="noopener">Facebook</a></dd></div></dl><a class="map-link" href="https://www.openstreetmap.org/?mlat=49.63092&amp;mlon=6.26740#map=17/49.63092/6.26740" target="_blank" rel="noopener">Voir sur OpenStreetMap</a></div>
 </section>
 
@@ -69,5 +97,44 @@
     <a href="tel:+35227402040">Appeler</a>
     <a href="https://www.openstreetmap.org/?mlat=49.63092&amp;mlon=6.26740#map=17/49.63092/6.26740" target="_blank" rel="noopener">Itinéraire</a>
   </nav>
-</body>
+
+  <script>
+(() => {
+  const strings = {"heading": "Votre demande", "demo": "Ceci est une démonstration : rien n'a été envoyé et rien n'est enregistré. Quand vous voulez, je branche ce formulaire sur votre boîte mail."};
+  document.querySelectorAll("[data-booking-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const confirmation = document.createElement("div");
+      confirmation.className = "booking-confirmation";
+      confirmation.setAttribute("aria-live", "polite");
+      confirmation.setAttribute("tabindex", "-1");
+      const heading = document.createElement("h3");
+      heading.textContent = form.dataset.bookingConfirmation || strings.heading;
+      confirmation.append(heading);
+      const summary = document.createElement("dl");
+      form.querySelectorAll("[data-booking-field]").forEach((field) => {
+        let value = field.value.trim();
+        if (field.tagName === "SELECT" && field.selectedOptions.length) {
+          value = field.selectedOptions[0].textContent;
+        }
+        if (!value) return;
+        const term = document.createElement("dt");
+        term.textContent = field.dataset.bookingLabel;
+        const description = document.createElement("dd");
+        description.textContent = value;
+        summary.append(term, description);
+      });
+      confirmation.append(summary);
+      const demo = document.createElement("p");
+      demo.className = "booking-demo";
+      demo.textContent = strings.demo;
+      confirmation.append(demo);
+      const panel = form.closest("[data-booking-panel]");
+      panel.replaceChildren(confirmation);
+      confirmation.focus();
+    });
+  });
+})();
+  </script></body>
 </html>

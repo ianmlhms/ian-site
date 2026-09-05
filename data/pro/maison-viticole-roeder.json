@@ -1,189 +1,526 @@
 {
-  "schema": 1,
-  "slug": "maison-viticole-roeder",
-  "name": "Maison Viticole Roeder",
-  "languages": [
-    "fr",
-    "de",
-    "en"
-  ],
-  "defaultLanguage": "fr",
-  "theme": {
-    "brand": "#5A2A3E",
-    "ground": "#FAF6F6",
-    "ink": "#1E1417",
-    "accent": "#B08A3C",
-    "display": "serif"
+ "schema": 1,
+ "slug": "maison-viticole-roeder",
+ "name": "Maison Viticole Roeder",
+ "languages": [
+  "fr",
+  "de",
+  "en"
+ ],
+ "defaultLanguage": "fr",
+ "theme": {
+  "brand": "#5A2A3E",
+  "ground": "#FAF6F6",
+  "ink": "#1E1417",
+  "accent": "#B08A3C",
+  "display": "serif"
+ },
+ "preview": {
+  "isPreview": true,
+  "contact": "ian@mulheims.lu"
+ },
+ "contact": {
+  "phone": "+352 691 628 731",
+  "email": "luc.roeder@biowenzer.lu",
+  "address": "27, rue de la Montagne, L-6586 Steinheim, Rosport-Mompach",
+  "lat": 49.8198952,
+  "lon": 6.4698914,
+  "facebook": "",
+  "instagram": ""
+ },
+ "hours": [
+  {
+   "days": {
+    "fr": "Lundi – vendredi",
+    "de": "Montag – Freitag",
+    "en": "Monday – Friday"
+   },
+   "time": "16h00 – 18h30"
   },
-  "preview": {
-    "isPreview": true,
-    "contact": "ian@mulheims.lu"
+  {
+   "days": {
+    "fr": "Samedi",
+    "de": "Samstag",
+    "en": "Saturday"
+   },
+   "time": "9h00 – 18h00"
   },
-  "contact": {
-    "phone": "+352 691 628 731",
-    "email": "luc.roeder@biowenzer.lu",
-    "address": "27, rue de la Montagne, L-6586 Steinheim, Rosport-Mompach",
-    "lat": 49.8198952,
-    "lon": 6.4698914,
-    "facebook": "",
-    "instagram": ""
-  },
-  "hours": [],
-  "sections": [
-    {
-      "type": "hero",
-      "image": "img/hero.webp",
-      "title": {
-        "fr": "Domaine viticole biologique à Steinheim",
-        "de": "Bio-Weingut in Steinheim",
-        "en": "Organic wine estate in Steinheim"
-      },
-      "subtitle": {
-        "fr": "",
-        "de": "",
-        "en": ""
-      }
-    },
-    {
-      "type": "about",
-      "image": "img/about.webp",
-      "title": {
-        "fr": "Le domaine",
-        "de": "Das Weingut",
-        "en": "The estate"
-      },
-      "body": {
-        "fr": "La Maison Viticole Roeder est un petit domaine biologique installé à Steinheim, sur le terroir de la Hoelt près de Rosport. Luc Roeder a commencé à restaurer ses premières vignes en 2009 et travaille des terrasses aux murs en pierres sèches, avec une récolte entièrement manuelle. Le domaine produit notamment un Elbling de vieilles vignes, des Pinot, du Chardonnay et le crémant Cuvée Kimmfrächen.",
-        "de": "Die Maison Viticole Roeder ist ein kleines Bio-Weingut in Steinheim, auf dem Terroir der Hoelt bei Rosport. Luc Roeder begann 2009 mit der Wiederherstellung seiner ersten Reben und bewirtschaftet Terrassen mit Trockenmauern, bei vollständig manueller Lese. Das Weingut erzeugt unter anderem einen Elbling von alten Reben, Pinot, Chardonnay und den Crémant Cuvée Kimmfrächen.",
-        "en": "Maison Viticole Roeder is a small organic estate in Steinheim, on the Hoelt terroir near Rosport. Luc Roeder began restoring his first vines in 2009 and works dry-stone terraces, with an entirely manual harvest. The estate produces an old-vine Elbling, Pinot, Chardonnay and the Cuvée Kimmfrächen crémant."
-      }
-    },
-    {
-      "type": "menu",
-      "title": {
-        "fr": "Nos vins",
-        "de": "Unsere Weine",
-        "en": "Our wines"
-      },
-      "groups": [
-        {
-          "name": {
-            "fr": "",
-            "de": "",
-            "en": ""
-          },
-          "items": [
-            {
-              "name": {
-                "fr": "Vins biologiques",
-                "de": "Bio-Weine",
-                "en": "Organic wines"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Elbling de vieilles vignes",
-                "de": "Elbling von alten Reben",
-                "en": "Old-vine Elbling"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Crémant Cuvée Kimmfrächen",
-                "de": "Crémant Cuvée Kimmfrächen",
-                "en": "Cuvée Kimmfrächen crémant"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Vignoble en terrasses, récolte manuelle",
-                "de": "Terrassenweinberg, manuelle Lese",
-                "en": "Terraced vineyard, hand-harvested"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Dégustations sur demande",
-                "de": "Verkostungen auf Anfrage",
-                "en": "Tastings on request"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "type": "gallery",
-      "title": {
-        "fr": "En images",
-        "de": "In Bildern",
-        "en": "In pictures"
-      },
-      "images": [
-        {
-          "src": "img/gallery1.webp",
-          "alt": {
-            "fr": "Une dégustation",
-            "de": "Eine Verkostung",
-            "en": "A tasting"
-          }
-        },
-        {
-          "src": "img/gallery2.webp",
-          "alt": {
-            "fr": "Les vendanges",
-            "de": "Die Lese",
-            "en": "The harvest"
-          }
-        }
-      ]
-    },
-    {
-      "type": "contact",
-      "title": {
-        "fr": "Nous trouver",
-        "de": "So finden Sie uns",
-        "en": "Find us"
-      },
-      "showMap": true
-    }
-  ],
-  "legal": {
-    "operator": "Maison Viticole Roeder",
-    "address": "27, rue de la Montagne, L-6586 Steinheim, Rosport-Mompach",
-    "email": "luc.roeder@biowenzer.lu",
-    "phone": "+352 691 628 731",
-    "rcs": "",
-    "tva": ""
+  {
+   "days": {
+    "fr": "Dimanche",
+    "de": "Sonntag",
+    "en": "Sunday"
+   },
+   "time": "sur rendez-vous"
   }
+ ],
+ "sections": [
+  {
+   "type": "hero",
+   "image": "img/hero.webp",
+   "title": {
+    "fr": "Domaine viticole biologique à Steinheim",
+    "de": "Bio-Weingut in Steinheim",
+    "en": "Organic wine estate in Steinheim"
+   },
+   "subtitle": {
+    "fr": "",
+    "de": "",
+    "en": ""
+   }
+  },
+  {
+   "type": "about",
+   "image": "img/about.webp",
+   "title": {
+    "fr": "Le domaine",
+    "de": "Das Weingut",
+    "en": "The estate"
+   },
+   "body": {
+    "fr": "La Maison Viticole Roeder est un petit domaine biologique installé à Steinheim, sur le terroir de la Hoelt près de Rosport. Luc Roeder a commencé à restaurer ses premières vignes en 2009 et travaille des terrasses aux murs en pierres sèches, avec une récolte entièrement manuelle. Le domaine produit notamment un Elbling de vieilles vignes, des Pinot, du Chardonnay et le crémant Cuvée Kimmfrächen.",
+    "de": "Die Maison Viticole Roeder ist ein kleines Bio-Weingut in Steinheim, auf dem Terroir der Hoelt bei Rosport. Luc Roeder begann 2009 mit der Wiederherstellung seiner ersten Reben und bewirtschaftet Terrassen mit Trockenmauern, bei vollständig manueller Lese. Das Weingut erzeugt unter anderem einen Elbling von alten Reben, Pinot, Chardonnay und den Crémant Cuvée Kimmfrächen.",
+    "en": "Maison Viticole Roeder is a small organic estate in Steinheim, on the Hoelt terroir near Rosport. Luc Roeder began restoring his first vines in 2009 and works dry-stone terraces, with an entirely manual harvest. The estate produces an old-vine Elbling, Pinot, Chardonnay and the Cuvée Kimmfrächen crémant."
+   },
+   "kicker": {
+    "fr": "Steinheim, sur la Moselle",
+    "de": "Steinheim an der Mosel",
+    "en": "Steinheim, on the Moselle"
+   }
+  },
+  {
+   "type": "special",
+   "kicker": {
+    "fr": "Au domaine",
+    "de": "Am Weingut",
+    "en": "At the estate"
+   },
+   "title": {
+    "fr": "Vente à la propriété",
+    "de": "Ab-Hof-Verkauf",
+    "en": "Sales at the estate"
+   },
+   "body": {
+    "fr": "Le samedi de 9h à 18h, et en semaine de 16h à 18h30.\n\nOn peut goûter avant d'acheter, et repartir avec le carton.",
+    "de": "Samstags von 9 bis 18 Uhr, werktags von 16 bis 18.30 Uhr.\n\nProbieren vor dem Kauf, und der Karton kommt gleich mit.",
+    "en": "Saturdays from 9 a.m. to 6 p.m., weekdays from 4 to 6.30 p.m.\n\nTaste before you buy, and take the case with you."
+   }
+  },
+  {
+   "title": {
+    "fr": "Nos vins",
+    "de": "Unsere Weine",
+    "en": "Our wines"
+   },
+   "note": {
+    "fr": "Exemple de liste des vins — à remplacer par la vôtre, prix compris.",
+    "de": "Beispiel einer Weinliste — wird durch Ihre eigene ersetzt, Preise inklusive.",
+    "en": "Sample wine list — to be replaced by your own, prices included."
+   },
+   "groups": [
+    {
+     "name": {
+      "fr": "Vins blancs",
+      "de": "Weißweine",
+      "en": "White wines"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Elbling Vieilles Vignes",
+        "de": "Elbling Alte Reben",
+        "en": "Elbling Old Vines"
+       },
+       "price": "11,50 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      },
+      {
+       "name": {
+        "fr": "Rivaner",
+        "de": "Rivaner",
+        "en": "Rivaner"
+       },
+       "price": "9,50 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      },
+      {
+       "name": {
+        "fr": "Auxerrois",
+        "de": "Auxerrois",
+        "en": "Auxerrois"
+       },
+       "price": "12,00 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      },
+      {
+       "name": {
+        "fr": "Pinot Blanc",
+        "de": "Pinot Blanc",
+        "en": "Pinot Blanc"
+       },
+       "price": "13,00 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      },
+      {
+       "name": {
+        "fr": "Pinot Gris",
+        "de": "Pinot Gris",
+        "en": "Pinot Gris"
+       },
+       "price": "15,00 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      },
+      {
+       "name": {
+        "fr": "Riesling",
+        "de": "Riesling",
+        "en": "Riesling"
+       },
+       "price": "16,50 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Crémants",
+      "de": "Crémants",
+      "en": "Crémants"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Crémant Cuvée Kimmfrächen",
+        "de": "Crémant Cuvée Kimmfrächen",
+        "en": "Crémant Cuvée Kimmfrächen"
+       },
+       "price": "18,50 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      },
+      {
+       "name": {
+        "fr": "Crémant rosé",
+        "de": "Crémant rosé",
+        "en": "Crémant rosé"
+       },
+       "price": "19,50 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Vin rouge",
+      "de": "Rotwein",
+      "en": "Red wine"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Pinot Noir",
+        "de": "Pinot Noir",
+        "en": "Pinot Noir"
+       },
+       "price": "17,50 €",
+       "desc": {
+        "fr": "75 cl",
+        "de": "75 cl",
+        "en": "75 cl"
+       }
+      }
+     ]
+    }
+   ],
+   "type": "menu"
+  },
+  {
+   "type": "booking",
+   "kicker": {
+    "fr": "Dégustation",
+    "de": "Weinprobe",
+    "en": "Tasting"
+   },
+   "title": {
+    "fr": "Venir déguster",
+    "de": "Zur Weinprobe kommen",
+    "en": "Come and taste"
+   },
+   "intro": {
+    "fr": "La dégustation se fait sur rendez-vous, dans la cave, avec le vigneron.",
+    "de": "Die Weinprobe findet nach Vereinbarung im Keller statt, mit dem Winzer.",
+    "en": "Tastings are by appointment, in the cellar, with the winemaker."
+   },
+   "submit": {
+    "fr": "Demander un rendez-vous",
+    "de": "Termin anfragen",
+    "en": "Request an appointment"
+   },
+   "confirmation": {
+    "fr": "Votre demande de dégustation",
+    "de": "Ihre Anfrage für die Weinprobe",
+    "en": "Your tasting request"
+   },
+   "fields": [
+    {
+     "name": "date",
+     "type": "date",
+     "required": true,
+     "label": {
+      "fr": "Date souhaitée",
+      "de": "Wunschtermin",
+      "en": "Preferred date"
+     }
+    },
+    {
+     "name": "time",
+     "type": "time",
+     "required": true,
+     "label": {
+      "fr": "Heure",
+      "de": "Uhrzeit",
+      "en": "Time"
+     }
+    },
+    {
+     "name": "people",
+     "type": "number",
+     "required": true,
+     "min": 1,
+     "max": 30,
+     "label": {
+      "fr": "Nombre de personnes",
+      "de": "Anzahl Personen",
+      "en": "Number of people"
+     }
+    },
+    {
+     "name": "choice",
+     "type": "select",
+     "label": {
+      "fr": "Langue de la visite",
+      "de": "Sprache der Führung",
+      "en": "Language of the visit"
+     },
+     "options": [
+      {
+       "value": "lb",
+       "label": {
+        "fr": "Luxembourgeois",
+        "de": "Luxemburgisch",
+        "en": "Luxembourgish"
+       }
+      },
+      {
+       "value": "de",
+       "label": {
+        "fr": "Allemand",
+        "de": "Deutsch",
+        "en": "German"
+       }
+      },
+      {
+       "value": "fr",
+       "label": {
+        "fr": "Français",
+        "de": "Französisch",
+        "en": "French"
+       }
+      },
+      {
+       "value": "en",
+       "label": {
+        "fr": "Anglais",
+        "de": "Englisch",
+        "en": "English"
+       }
+      }
+     ]
+    },
+    {
+     "name": "name",
+     "type": "text",
+     "required": true,
+     "label": {
+      "fr": "Votre nom",
+      "de": "Ihr Name",
+      "en": "Your name"
+     }
+    },
+    {
+     "name": "email",
+     "type": "email",
+     "required": true,
+     "label": {
+      "fr": "E-mail",
+      "de": "E-Mail",
+      "en": "Email"
+     }
+    },
+    {
+     "name": "phone",
+     "type": "tel",
+     "label": {
+      "fr": "Téléphone (facultatif)",
+      "de": "Telefon (optional)",
+      "en": "Phone (optional)"
+     }
+    },
+    {
+     "name": "note",
+     "type": "textarea",
+     "label": {
+      "fr": "Une question, un souhait particulier ?",
+      "de": "Eine Frage oder ein besonderer Wunsch?",
+      "en": "A question, or something particular you would like?"
+     }
+    }
+   ]
+  },
+  {
+   "type": "gallery",
+   "title": {
+    "fr": "En images",
+    "de": "In Bildern",
+    "en": "In pictures"
+   },
+   "images": [
+    {
+     "src": "img/gallery1.webp",
+     "alt": {
+      "fr": "Une dégustation",
+      "de": "Eine Verkostung",
+      "en": "A tasting"
+     }
+    },
+    {
+     "src": "img/gallery2.webp",
+     "alt": {
+      "fr": "Les vendanges",
+      "de": "Die Lese",
+      "en": "The harvest"
+     }
+    }
+   ]
+  },
+  {
+   "type": "hours",
+   "title": {
+    "fr": "Horaires",
+    "de": "Öffnungszeiten",
+    "en": "Opening hours"
+   }
+  },
+  {
+   "type": "faq",
+   "title": {
+    "fr": "Questions fréquentes",
+    "de": "Häufige Fragen",
+    "en": "Frequently asked questions"
+   },
+   "note": {
+    "fr": "Exemple de questions fréquentes — corrigez les réponses, elles sont à vous.",
+    "de": "Beispiel für häufige Fragen — korrigieren Sie die Antworten, sie gehören Ihnen.",
+    "en": "Sample frequently asked questions — correct the answers, they are yours."
+   },
+   "items": [
+    {
+     "q": {
+      "fr": "Vos vins sont-ils bio ?",
+      "de": "Sind Ihre Weine bio?",
+      "en": "Are your wines organic?"
+     },
+     "a": {
+      "fr": "Oui, le domaine travaille en viticulture biologique, et la récolte se fait entièrement à la main.",
+      "de": "Ja, das Weingut arbeitet biologisch, und die Lese erfolgt vollständig von Hand.",
+      "en": "Yes, the estate works organically, and the harvest is done entirely by hand."
+     }
+    },
+    {
+     "q": {
+      "fr": "Peut-on visiter sans rendez-vous ?",
+      "de": "Kann man ohne Termin vorbeikommen?",
+      "en": "Can we visit without an appointment?"
+     },
+     "a": {
+      "fr": "Pour acheter, oui, aux heures d'ouverture. Pour une dégustation guidée, mieux vaut prévenir.",
+      "de": "Zum Einkaufen ja, während der Öffnungszeiten. Für eine geführte Probe besser vorher Bescheid geben.",
+      "en": "To buy, yes, during opening hours. For a guided tasting, better to let us know first."
+     }
+    },
+    {
+     "q": {
+      "fr": "Recevez-vous des groupes ?",
+      "de": "Empfangen Sie Gruppen?",
+      "en": "Do you take groups?"
+     },
+     "a": {
+      "fr": "Oui, jusqu'à une trentaine de personnes. Dites-nous combien vous êtes et quand.",
+      "de": "Ja, bis etwa dreißig Personen. Sagen Sie uns, wie viele Sie sind und wann.",
+      "en": "Yes, up to about thirty people. Tell us how many you are and when."
+     }
+    },
+    {
+     "q": {
+      "fr": "Livrez-vous ?",
+      "de": "Liefern Sie?",
+      "en": "Do you deliver?"
+     },
+     "a": {
+      "fr": "Au Luxembourg, oui, à partir de six bouteilles. Écrivez-nous, on s'arrange.",
+      "de": "Innerhalb Luxemburgs ja, ab sechs Flaschen. Schreiben Sie uns, wir finden eine Lösung.",
+      "en": "Within Luxembourg, yes, from six bottles. Write to us and we will arrange it."
+     }
+    }
+   ]
+  },
+  {
+   "type": "contact",
+   "title": {
+    "fr": "Nous trouver",
+    "de": "So finden Sie uns",
+    "en": "Find us"
+   },
+   "showMap": true
+  }
+ ],
+ "legal": {
+  "operator": "Maison Viticole Roeder",
+  "address": "27, rue de la Montagne, L-6586 Steinheim, Rosport-Mompach",
+  "email": "luc.roeder@biowenzer.lu",
+  "phone": "+352 691 628 731",
+  "rcs": "",
+  "tva": ""
+ }
 }

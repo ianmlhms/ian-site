@@ -1,217 +1,542 @@
 {
-  "schema": 1,
-  "slug": "cafe-de-la-gare",
-  "name": "Café de la Gare",
-  "languages": [
-    "fr",
-    "de",
-    "en"
-  ],
-  "defaultLanguage": "fr",
-  "theme": {
-    "brand": "#2F4A3A",
-    "ground": "#F7F6F1",
-    "ink": "#1A1E1B",
-    "accent": "#C08A2E",
-    "display": "serif"
+ "schema": 1,
+ "slug": "cafe-de-la-gare",
+ "name": "Café de la Gare",
+ "languages": [
+  "fr",
+  "de",
+  "en"
+ ],
+ "defaultLanguage": "fr",
+ "theme": {
+  "brand": "#2F4A3A",
+  "ground": "#F7F6F1",
+  "ink": "#1A1E1B",
+  "accent": "#C08A2E",
+  "display": "serif"
+ },
+ "preview": {
+  "isPreview": true,
+  "contact": "ian@mulheims.lu"
+ },
+ "contact": {
+  "phone": "+352 27 40 20 40",
+  "email": "info.cafedelagare@gmail.com",
+  "address": "197, rue Principale, L-5366 Munsbach, Schuttrange",
+  "lat": 49.6309193,
+  "lon": 6.2673981,
+  "facebook": "https://www.facebook.com/p/Cafe-de-la-Gare-61559038119576/",
+  "instagram": ""
+ },
+ "hours": [
+  {
+   "days": {
+    "fr": "Lundi",
+    "de": "Montag",
+    "en": "Monday"
+   },
+   "time": "17h00 – 1h00"
   },
-  "preview": {
-    "isPreview": true,
-    "contact": "ian@mulheims.lu"
+  {
+   "days": {
+    "fr": "Mardi – vendredi",
+    "de": "Dienstag – Freitag",
+    "en": "Tuesday – Friday"
+   },
+   "time": "11h00 – 1h00"
   },
-  "contact": {
-    "phone": "+352 27 40 20 40",
-    "email": "info.cafedelagare@gmail.com",
-    "address": "197, rue Principale, L-5366 Munsbach, Schuttrange",
-    "lat": 49.6309193,
-    "lon": 6.2673981,
-    "facebook": "https://www.facebook.com/p/Cafe-de-la-Gare-61559038119576/",
-    "instagram": ""
+  {
+   "days": {
+    "fr": "Samedi",
+    "de": "Samstag",
+    "en": "Saturday"
+   },
+   "time": "17h00 – 1h00"
   },
-  "hours": [
-    {
-      "days": {
-        "fr": "Lundi",
-        "de": "Montag",
-        "en": "Monday"
-      },
-      "time": "17h00 – 1h00"
-    },
-    {
-      "days": {
-        "fr": "Mardi – vendredi",
-        "de": "Dienstag – Freitag",
-        "en": "Tuesday – Friday"
-      },
-      "time": "11h00 – 1h00"
-    },
-    {
-      "days": {
-        "fr": "Samedi",
-        "de": "Samstag",
-        "en": "Saturday"
-      },
-      "time": "17h00 – 1h00"
-    },
-    {
-      "days": {
-        "fr": "Dimanche",
-        "de": "Sonntag",
-        "en": "Sunday"
-      },
-      "time": "10h00 – 1h00"
-    }
-  ],
-  "sections": [
-    {
-      "type": "hero",
-      "image": "img/hero.webp",
-      "title": {
-        "fr": "Café-restaurant en face de la gare de Munsbach",
-        "de": "Café-Restaurant gegenüber dem Bahnhof Munsbach",
-        "en": "Café and restaurant opposite Munsbach station"
-      },
-      "subtitle": {
-        "fr": "",
-        "de": "",
-        "en": ""
-      }
-    },
-    {
-      "type": "about",
-      "image": "img/about.webp",
-      "title": {
-        "fr": "La maison",
-        "de": "Das Haus",
-        "en": "The place"
-      },
-      "body": {
-        "fr": "Le Café de la Gare est un café-restaurant de cuisine traditionnelle, installé juste en face de la gare de Munsbach. On y vient pour manger, boire un verre en terrasse ou faire une partie de quilles.",
-        "de": "Das Café de la Gare ist ein Café-Restaurant mit traditioneller Küche, direkt gegenüber dem Bahnhof Munsbach. Man kommt zum Essen, auf ein Glas auf der Terrasse oder für eine Partie Kegeln.",
-        "en": "Café de la Gare is a café and restaurant serving traditional food, right opposite Munsbach station. People come to eat, for a drink on the terrace, or for a game of skittles."
-      }
-    },
-    {
-      "type": "menu",
-      "title": {
-        "fr": "Ce qu'on trouve ici",
-        "de": "Was es hier gibt",
-        "en": "What you'll find"
-      },
-      "groups": [
-        {
-          "name": {
-            "fr": "",
-            "de": "",
-            "en": ""
-          },
-          "items": [
-            {
-              "name": {
-                "fr": "Cuisine traditionnelle",
-                "de": "Traditionelle Küche",
-                "en": "Traditional cooking"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Jeu de quilles",
-                "de": "Kegelbahn",
-                "en": "Skittle alley"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Terrasse",
-                "de": "Terrasse",
-                "en": "Terrace"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Parking gratuit",
-                "de": "Kostenlose Parkplätze",
-                "en": "Free parking"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "type": "gallery",
-      "title": {
-        "fr": "En images",
-        "de": "In Bildern",
-        "en": "In pictures"
-      },
-      "images": [
-        {
-          "src": "img/gallery1.webp",
-          "alt": {
-            "fr": "Le jeu de quilles",
-            "de": "Die Kegelbahn",
-            "en": "The skittle alley"
-          }
-        },
-        {
-          "src": "img/gallery2.webp",
-          "alt": {
-            "fr": "La terrasse",
-            "de": "Die Terrasse",
-            "en": "The terrace"
-          }
-        }
-      ]
-    },
-    {
-      "type": "hours",
-      "title": {
-        "fr": "Horaires",
-        "de": "Öffnungszeiten",
-        "en": "Opening hours"
-      }
-    },
-    {
-      "type": "contact",
-      "title": {
-        "fr": "Nous trouver",
-        "de": "So finden Sie uns",
-        "en": "Find us"
-      },
-      "showMap": true
-    }
-  ],
-  "legal": {
-    "operator": "Café de la Gare",
-    "address": "197, rue Principale, L-5366 Munsbach, Schuttrange",
-    "email": "info.cafedelagare@gmail.com",
-    "phone": "+352 27 40 20 40",
-    "rcs": "",
-    "tva": ""
+  {
+   "days": {
+    "fr": "Dimanche",
+    "de": "Sonntag",
+    "en": "Sunday"
+   },
+   "time": "10h00 – 1h00"
   }
+ ],
+ "sections": [
+  {
+   "type": "hero",
+   "image": "img/hero.webp",
+   "title": {
+    "fr": "Café-restaurant en face de la gare de Munsbach",
+    "de": "Café-Restaurant gegenüber dem Bahnhof Munsbach",
+    "en": "Café and restaurant opposite Munsbach station"
+   },
+   "subtitle": {
+    "fr": "",
+    "de": "",
+    "en": ""
+   }
+  },
+  {
+   "type": "about",
+   "image": "img/about.webp",
+   "title": {
+    "fr": "La maison",
+    "de": "Das Haus",
+    "en": "The place"
+   },
+   "body": {
+    "fr": "Le Café de la Gare est un café-restaurant de cuisine traditionnelle, installé juste en face de la gare de Munsbach. On y vient pour manger, boire un verre en terrasse ou faire une partie de quilles.",
+    "de": "Das Café de la Gare ist ein Café-Restaurant mit traditioneller Küche, direkt gegenüber dem Bahnhof Munsbach. Man kommt zum Essen, auf ein Glas auf der Terrasse oder für eine Partie Kegeln.",
+    "en": "Café de la Gare is a café and restaurant serving traditional food, right opposite Munsbach station. People come to eat, for a drink on the terrace, or for a game of skittles."
+   },
+   "kicker": {
+    "fr": "Munsbach",
+    "de": "Munsbach",
+    "en": "Munsbach"
+   }
+  },
+  {
+   "type": "rating",
+   "score": "4,4",
+   "count": 175,
+   "label": {
+    "fr": "Ce qu'en disent les clients",
+    "de": "Was die Gäste sagen",
+    "en": "What guests say"
+   },
+   "source": "https://www.google.com/maps/place/?q=place_id:ChIJRdRcqHFElUcREhBgqJN6AgU"
+  },
+  {
+   "type": "special",
+   "kicker": {
+    "fr": "Le midi",
+    "de": "Mittags",
+    "en": "At lunchtime"
+   },
+   "title": {
+    "fr": "Le plat du jour",
+    "de": "Tagesgericht",
+    "en": "Dish of the day"
+   },
+   "body": {
+    "fr": "Du mardi au vendredi, à midi, un plat du jour à 14,50 €, café compris.\n\nLe soir, la carte complète, et la terrasse dès qu'il fait beau.",
+    "de": "Dienstags bis freitags mittags ein Tagesgericht für 14,50 €, Kaffee inbegriffen.\n\nAbends die ganze Karte — und die Terrasse, sobald das Wetter mitspielt.",
+    "en": "Tuesday to Friday at lunchtime, a dish of the day at €14.50, coffee included.\n\nIn the evening, the full menu, and the terrace as soon as the weather allows."
+   }
+  },
+  {
+   "title": {
+    "fr": "La carte",
+    "de": "Die Karte",
+    "en": "The menu"
+   },
+   "note": {
+    "fr": "Exemple de carte — les plats et les prix sont à remplacer par les vôtres.",
+    "de": "Beispielkarte — Gerichte und Preise werden durch Ihre eigenen ersetzt.",
+    "en": "Sample menu — the dishes and prices are to be replaced by your own."
+   },
+   "groups": [
+    {
+     "name": {
+      "fr": "Pour commencer",
+      "de": "Zum Anfang",
+      "en": "To start"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Soupe du jour",
+        "de": "Tagessuppe",
+        "en": "Soup of the day"
+       },
+       "price": "6,50 €"
+      },
+      {
+       "name": {
+        "fr": "Salade du marché",
+        "de": "Marktsalat",
+        "en": "Market salad"
+       },
+       "price": "9,50 €"
+      },
+      {
+       "name": {
+        "fr": "Croquettes au fromage",
+        "de": "Käsekroketten",
+        "en": "Cheese croquettes"
+       },
+       "price": "8,50 €"
+      },
+      {
+       "name": {
+        "fr": "Bouchée à la reine, petite portion",
+        "de": "Königinpastete, kleine Portion",
+        "en": "Vol-au-vent, small portion"
+       },
+       "price": "12,50 €"
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Nos plats",
+      "de": "Unsere Gerichte",
+      "en": "Main courses"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Judd mat Gaardebounen",
+        "de": "Judd mat Gaardebounen",
+        "en": "Smoked collar of pork with broad beans"
+       },
+       "price": "22,00 €"
+      },
+      {
+       "name": {
+        "fr": "Escalope viennoise, frites",
+        "de": "Wiener Schnitzel mit Pommes",
+        "en": "Wiener schnitzel with chips"
+       },
+       "price": "21,50 €"
+      },
+      {
+       "name": {
+        "fr": "Bouchée à la reine, frites",
+        "de": "Königinpastete mit Pommes",
+        "en": "Vol-au-vent with chips"
+       },
+       "price": "19,50 €"
+      },
+      {
+       "name": {
+        "fr": "Burger de la Gare",
+        "de": "Burger de la Gare",
+        "en": "Burger de la Gare"
+       },
+       "price": "18,50 €"
+      },
+      {
+       "name": {
+        "fr": "Poisson du jour",
+        "de": "Fisch des Tages",
+        "en": "Fish of the day"
+       },
+       "price": "24,00 €"
+      },
+      {
+       "name": {
+        "fr": "Filet de bœuf, sauce au poivre",
+        "de": "Rinderfilet mit Pfeffersauce",
+        "en": "Fillet of beef, pepper sauce"
+       },
+       "price": "28,50 €"
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Desserts",
+      "de": "Desserts",
+      "en": "Desserts"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Dame blanche",
+        "de": "Dame Blanche",
+        "en": "Dame blanche"
+       },
+       "price": "8,50 €"
+      },
+      {
+       "name": {
+        "fr": "Tarte du jour",
+        "de": "Kuchen des Tages",
+        "en": "Tart of the day"
+       },
+       "price": "6,50 €"
+      },
+      {
+       "name": {
+        "fr": "Café gourmand",
+        "de": "Café gourmand",
+        "en": "Café gourmand"
+       },
+       "price": "9,50 €"
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Boissons",
+      "de": "Getränke",
+      "en": "Drinks"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Bière pression, 25 cl",
+        "de": "Bier vom Fass, 25 cl",
+        "en": "Draught beer, 25 cl"
+       },
+       "price": "3,20 €"
+      },
+      {
+       "name": {
+        "fr": "Verre de vin",
+        "de": "Glas Wein",
+        "en": "Glass of wine"
+       },
+       "price": "4,80 €"
+      },
+      {
+       "name": {
+        "fr": "Crémant, coupe",
+        "de": "Crémant, Glas",
+        "en": "Crémant, glass"
+       },
+       "price": "6,50 €"
+      },
+      {
+       "name": {
+        "fr": "Café",
+        "de": "Kaffee",
+        "en": "Coffee"
+       },
+       "price": "2,80 €"
+      }
+     ]
+    }
+   ],
+   "type": "menu"
+  },
+  {
+   "type": "booking",
+   "kicker": {
+    "fr": "Réservation",
+    "de": "Reservierung",
+    "en": "Booking"
+   },
+   "title": {
+    "fr": "Réserver une table",
+    "de": "Tisch reservieren",
+    "en": "Book a table"
+   },
+   "intro": {
+    "fr": "Dites-nous quand vous venez et combien vous êtes.",
+    "de": "Sagen Sie uns, wann Sie kommen und zu wievielt.",
+    "en": "Tell us when you are coming and how many you are."
+   },
+   "submit": {
+    "fr": "Demander une table",
+    "de": "Tisch anfragen",
+    "en": "Request a table"
+   },
+   "confirmation": {
+    "fr": "Votre demande de table",
+    "de": "Ihre Tischanfrage",
+    "en": "Your table request"
+   },
+   "fields": [
+    {
+     "name": "date",
+     "type": "date",
+     "required": true,
+     "label": {
+      "fr": "Date",
+      "de": "Datum",
+      "en": "Date"
+     }
+    },
+    {
+     "name": "time",
+     "type": "time",
+     "required": true,
+     "label": {
+      "fr": "Heure",
+      "de": "Uhrzeit",
+      "en": "Time"
+     }
+    },
+    {
+     "name": "people",
+     "type": "number",
+     "required": true,
+     "min": 1,
+     "max": 40,
+     "label": {
+      "fr": "Nombre de personnes",
+      "de": "Anzahl Personen",
+      "en": "Number of people"
+     }
+    },
+    {
+     "name": "name",
+     "type": "text",
+     "required": true,
+     "label": {
+      "fr": "Votre nom",
+      "de": "Ihr Name",
+      "en": "Your name"
+     }
+    },
+    {
+     "name": "phone",
+     "type": "tel",
+     "required": true,
+     "label": {
+      "fr": "Téléphone",
+      "de": "Telefon",
+      "en": "Phone"
+     }
+    },
+    {
+     "name": "email",
+     "type": "email",
+     "label": {
+      "fr": "E-mail (facultatif)",
+      "de": "E-Mail (optional)",
+      "en": "Email (optional)"
+     }
+    },
+    {
+     "name": "note",
+     "type": "textarea",
+     "label": {
+      "fr": "Une remarque ? Terrasse, quilles, anniversaire…",
+      "de": "Eine Anmerkung? Terrasse, Kegelbahn, Geburtstag…",
+      "en": "Anything to add? Terrace, skittles, birthday…"
+     }
+    }
+   ]
+  },
+  {
+   "type": "gallery",
+   "title": {
+    "fr": "En images",
+    "de": "In Bildern",
+    "en": "In pictures"
+   },
+   "images": [
+    {
+     "src": "img/gallery1.webp",
+     "alt": {
+      "fr": "Le jeu de quilles",
+      "de": "Die Kegelbahn",
+      "en": "The skittle alley"
+     }
+    },
+    {
+     "src": "img/gallery2.webp",
+     "alt": {
+      "fr": "La terrasse",
+      "de": "Die Terrasse",
+      "en": "The terrace"
+     }
+    }
+   ]
+  },
+  {
+   "type": "hours",
+   "title": {
+    "fr": "Horaires",
+    "de": "Öffnungszeiten",
+    "en": "Opening hours"
+   }
+  },
+  {
+   "type": "faq",
+   "title": {
+    "fr": "Questions fréquentes",
+    "de": "Häufige Fragen",
+    "en": "Frequently asked questions"
+   },
+   "note": {
+    "fr": "Exemple de questions fréquentes — corrigez les réponses, elles sont à vous.",
+    "de": "Beispiel für häufige Fragen — korrigieren Sie die Antworten, sie gehören Ihnen.",
+    "en": "Sample frequently asked questions — correct the answers, they are yours."
+   },
+   "items": [
+    {
+     "q": {
+      "fr": "Faut-il réserver ?",
+      "de": "Muss man reservieren?",
+      "en": "Do I need to book?"
+     },
+     "a": {
+      "fr": "Ce n'est pas obligatoire, mais le week-end et pour la terrasse c'est plus sûr. Un coup de téléphone suffit.",
+      "de": "Nicht zwingend, aber am Wochenende und für die Terrasse ist es sicherer. Ein Anruf genügt.",
+      "en": "Not compulsory, but safer at the weekend and for the terrace. A phone call is enough."
+     }
+    },
+    {
+     "q": {
+      "fr": "Y a-t-il une terrasse ?",
+      "de": "Gibt es eine Terrasse?",
+      "en": "Is there a terrace?"
+     },
+     "a": {
+      "fr": "Oui, elle est ouverte dès qu'il fait assez beau.",
+      "de": "Ja, sie ist geöffnet, sobald das Wetter es zulässt.",
+      "en": "Yes, it opens as soon as the weather is good enough."
+     }
+    },
+    {
+     "q": {
+      "fr": "Peut-on jouer aux quilles ?",
+      "de": "Kann man kegeln?",
+      "en": "Can we play skittles?"
+     },
+     "a": {
+      "fr": "Oui. Le jeu de quilles se réserve à l'avance, surtout en soirée.",
+      "de": "Ja. Die Kegelbahn wird im Voraus reserviert, besonders abends.",
+      "en": "Yes. The skittle alley is booked in advance, especially in the evening."
+     }
+    },
+    {
+     "q": {
+      "fr": "Prenez-vous les groupes et les fêtes de famille ?",
+      "de": "Nehmen Sie Gruppen und Familienfeiern an?",
+      "en": "Do you take groups and family celebrations?"
+     },
+     "a": {
+      "fr": "Oui, la salle se prépare pour les grandes tablées. Écrivez-nous ce que vous avez en tête.",
+      "de": "Ja, der Saal wird für große Tafeln hergerichtet. Schreiben Sie uns, was Sie vorhaben.",
+      "en": "Yes, the room is laid out for long tables. Write and tell us what you have in mind."
+     }
+    },
+    {
+     "q": {
+      "fr": "Dans quelles langues êtes-vous ?",
+      "de": "In welchen Sprachen?",
+      "en": "Which languages do you speak?"
+     },
+     "a": {
+      "fr": "Luxembourgeois, français, allemand et anglais.",
+      "de": "Luxemburgisch, Französisch, Deutsch und Englisch.",
+      "en": "Luxembourgish, French, German and English."
+     }
+    }
+   ]
+  },
+  {
+   "type": "contact",
+   "title": {
+    "fr": "Nous trouver",
+    "de": "So finden Sie uns",
+    "en": "Find us"
+   },
+   "showMap": true
+  }
+ ],
+ "legal": {
+  "operator": "Café de la Gare",
+  "address": "197, rue Principale, L-5366 Munsbach, Schuttrange",
+  "email": "info.cafedelagare@gmail.com",
+  "phone": "+352 27 40 20 40",
+  "rcs": "",
+  "tva": ""
+ }
 }

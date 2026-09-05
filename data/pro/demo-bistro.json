@@ -32,7 +32,7 @@
   "sections": [
     {"type": "hero", "image": "img/hero.webp", "title": {"fr": "Une table simple, des produits de saison", "de": "Einfach gut essen, mit Zutaten der Saison", "en": "Simple plates, seasonal ingredients"}, "subtitle": {"fr": "Cuisine de marché, vins vivants et un accueil qui prend son temps.", "de": "Marktküche, natürliche Weine und ein herzlicher Empfang ohne Eile.", "en": "Market cooking, natural wines and a welcome that never rushes."}},
     {"type": "about", "image": "img/salle.webp", "title": {"fr": "À deux pas de la gare", "de": "Zwei Schritte vom Bahnhof", "en": "A short walk from the station"}, "body": {"fr": "Le Bistro du Marché est une adresse de quartier imaginaire où l'on vient pour un déjeuner lumineux, un dîner tranquille et un verre choisi avec soin.\nNotre carte suit les saisons et les arrivages du matin.", "de": "Das fiktive Bistro du Marché ist ein Quartierlokal für ein helles Mittagessen, ein entspanntes Abendessen und ein sorgfältig ausgewähltes Glas Wein.\nUnsere Karte folgt den Jahreszeiten und dem Angebot des Morgens.", "en": "Bistro du Marché is an imaginary neighbourhood table for an easy lunch, a relaxed dinner and a thoughtfully chosen glass of wine.\nOur menu follows the seasons and each morning's market."}},
-    {"type": "menu", "title": {"fr": "La carte du moment", "de": "Unsere Karte", "en": "The current menu"}, "groups": [
+    {"type": "menu", "title": {"fr": "La carte du moment", "de": "Unsere Karte", "en": "The current menu"}, "note": {"fr": "Exemple de carte — à remplacer par la vôtre.", "de": "Beispielkarte — bitte durch Ihre eigene ersetzen.", "en": "Example menu — replace it with your own."}, "groups": [
       {"name": {"fr": "À partager", "de": "Zum Teilen", "en": "To share"}, "items": [
         {"name": {"fr": "Poireaux vinaigrette", "de": "Lauch mit Vinaigrette", "en": "Leeks with vinaigrette"}, "desc": {"fr": "Œuf parfait, noisettes grillées", "de": "Pochiertes Ei, geröstete Haselnüsse", "en": "Soft egg, toasted hazelnuts"}, "price": "12,50 €"},
         {"name": {"fr": "Terrine de campagne", "de": "Terrine nach Landart", "en": "Country terrine"}, "desc": {"fr": "Pickles maison, pain au levain", "de": "Hausgemachte Pickles, Sauerteigbrot", "en": "House pickles, sourdough"}, "price": "14,00 €"}
@@ -42,6 +42,19 @@
         {"name": {"fr": "Risotto aux champignons", "de": "Pilzrisotto", "en": "Mushroom risotto"}, "desc": {"fr": "Parmesan affiné, herbes fraîches", "de": "Gereifter Parmesan, frische Kräuter", "en": "Aged Parmesan, fresh herbs"}, "price": "22,00 €"}
       ]}
     ]},
+    {"type": "booking", "title": {"fr": "Demander une table", "de": "Einen Tisch anfragen", "en": "Request a table"}, "intro": {"fr": "Choisissez le moment qui vous conviendrait. Nous vous montrerons simplement un récapitulatif.", "de": "Wählen Sie einen passenden Zeitpunkt. Wir zeigen Ihnen anschließend nur eine Zusammenfassung.", "en": "Choose a time that would suit you. We will simply show you a summary afterwards."}, "submit": {"fr": "Demander une table", "de": "Tisch anfragen", "en": "Request a table"}, "fields": [
+      {"name": "date", "type": "date", "label": {"fr": "Date", "de": "Datum", "en": "Date"}, "required": true},
+      {"name": "time", "type": "time", "label": {"fr": "Heure", "de": "Uhrzeit", "en": "Time"}, "required": true},
+      {"name": "people", "type": "number", "label": {"fr": "Nombre de personnes", "de": "Personenzahl", "en": "Number of people"}, "required": true, "min": 1, "max": 40},
+      {"name": "choice", "type": "select", "label": {"fr": "Service", "de": "Service", "en": "Service"}, "required": true, "options": [
+        {"value": "midi", "label": {"fr": "Déjeuner", "de": "Mittagessen", "en": "Lunch"}},
+        {"value": "soir", "label": {"fr": "Dîner", "de": "Abendessen", "en": "Dinner"}}
+      ]},
+      {"name": "name", "type": "text", "label": {"fr": "Nom", "de": "Name", "en": "Name"}, "required": true},
+      {"name": "phone", "type": "tel", "label": {"fr": "Téléphone", "de": "Telefon", "en": "Phone"}, "required": true},
+      {"name": "email", "type": "email", "label": {"fr": "E-mail", "de": "E-Mail", "en": "Email"}},
+      {"name": "note", "type": "textarea", "label": {"fr": "Un détail à préciser ?", "de": "Noch ein Hinweis?", "en": "Anything else to mention?"}}
+    ]},
     {"type": "gallery", "title": {"fr": "L'esprit du bistrot", "de": "Die Stimmung im Bistro", "en": "The bistro mood"}, "images": [
       {"src": "img/table.webp", "alt": {"fr": "Une table dressée pour le service", "de": "Ein gedeckter Tisch zum Service", "en": "A table set for service"}},
       {"src": "img/plat.webp", "alt": {"fr": "Une assiette de saison", "de": "Ein Teller der Saison", "en": "A seasonal plate"}},
@@ -49,6 +62,11 @@
     ]},
     {"type": "hours", "title": {"fr": "Horaires", "de": "Öffnungszeiten", "en": "Opening hours"}},
     {"type": "special", "title": {"fr": "Le jeudi, le plat change", "de": "Donnerstags gibt es etwas Neues", "en": "Thursday brings something new"}, "body": {"fr": "Chaque jeudi soir, le chef imagine un plat unique selon le marché. Demandez-le simplement en arrivant.", "de": "Jeden Donnerstagabend erfindet unser Koch ein einzelnes Gericht aus dem, was der Markt hergibt. Fragen Sie einfach bei Ihrer Ankunft danach.", "en": "Every Thursday evening, the chef creates one special dish from that day's market. Just ask when you arrive."}},
+    {"type": "faq", "title": {"fr": "Avant de venir", "de": "Vor Ihrem Besuch", "en": "Before your visit"}, "note": {"fr": "Exemples de réponses — elles seront remplacées avec vos informations.", "de": "Beispielantworten — sie werden durch Ihre Angaben ersetzt.", "en": "Example answers — they will be replaced with your information."}, "items": [
+      {"q": {"fr": "Puis-je venir sans réservation ?", "de": "Kann ich ohne Reservierung kommen?", "en": "Can I come without a reservation?"}, "a": {"fr": "Oui, selon les places disponibles. Pour une grande table, mieux vaut nous prévenir.", "de": "Ja, je nach Verfügbarkeit. Bei einer größeren Gruppe bitten wir um eine kurze Nachricht.", "en": "Yes, subject to availability. For a larger table, it is best to let us know first."}},
+      {"q": {"fr": "Proposez-vous des options végétariennes ?", "de": "Gibt es vegetarische Optionen?", "en": "Do you offer vegetarian options?"}, "a": {"fr": "La carte exemple comprend déjà une assiette végétarienne ; la vôtre pourra préciser les choix du jour.", "de": "Die Beispielkarte enthält bereits ein vegetarisches Gericht; Ihre eigene kann die Tagesauswahl nennen.", "en": "The example menu already includes a vegetarian plate; yours can describe the choices of the day."}}
+    ]},
+    {"type": "rating", "score": "4,6", "count": 469, "label": {"fr": "Exemple : avis du Bistrot Presse", "de": "Beispiel: Bewertungen des Bistrot Presse", "en": "Example: Bistrot Presse reviews"}, "source": "https://www.google.com/maps/search/?api=1&query=Bistrot%20Presse%2C%2024%20Rue%20du%20March%C3%A9-aux-Herbes%2C%20Luxembourg"},
     {"type": "contact", "title": {"fr": "Passez nous voir", "de": "Besuchen Sie uns", "en": "Come and see us"}, "showMap": true}
   ],
   "legal": {"operator": "", "address": "", "email": "", "phone": "", "rcs": "", "tva": ""}

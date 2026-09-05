@@ -44,26 +44,50 @@
 </section>
 
 <section class="section menu" aria-labelledby="section-3-menu">
-  <div class="section-heading"><p class="kicker">Speisekarte</p><h2 id="section-3-menu">Unsere Karte</h2></div>
+  <div class="section-heading"><p class="kicker">Speisekarte</p><h2 id="section-3-menu">Unsere Karte</h2><p class="section-note">Beispielkarte — bitte durch Ihre eigene ersetzen.</p></div>
   <div class="menu-groups"><section class="menu-group"><h3>Zum Teilen</h3><ul><li class="menu-item"><strong>Lauch mit Vinaigrette</strong><span class="price">12,50 €</span><p>Pochiertes Ei, geröstete Haselnüsse</p></li><li class="menu-item"><strong>Terrine nach Landart</strong><span class="price">14,00 €</span><p>Hausgemachte Pickles, Sauerteigbrot</p></li></ul></section><section class="menu-group"><h3>Hauptgerichte</h3><ul><li class="menu-item"><strong>Gebratene Forelle</strong><span class="price">27,00 €</span><p>Kartoffeln, Fenchel, Kräuteröl</p></li><li class="menu-item"><strong>Pilzrisotto</strong><span class="price">22,00 €</span><p>Gereifter Parmesan, frische Kräuter</p></li></ul></section></div>
 </section>
 
-<section class="section gallery" aria-labelledby="section-4-gallery">
-  <div class="section-heading"><p class="kicker">Impressionen</p><h2 id="section-4-gallery">Die Stimmung im Bistro</h2></div>
+<section class="section booking" aria-labelledby="section-4-booking">
+  <div class="section-heading"><p class="kicker">Tisch reservieren</p><h2 id="section-4-booking">Einen Tisch anfragen</h2><p class="booking-intro">Wählen Sie einen passenden Zeitpunkt. Wir zeigen Ihnen anschließend nur eine Zusammenfassung.</p></div>
+  <div data-booking-panel>
+    <form class="booking-form" data-booking-form>
+      <div class="booking-fields"><div class="booking-field"><label for="section-4-booking-date-1">Datum <span class="required-marker" aria-label="Pflichtfeld">*</span></label><input type="date" id="section-4-booking-date-1" name="date" data-booking-field data-booking-label="Datum" required min="2026-09-05"></div><div class="booking-field"><label for="section-4-booking-time-2">Uhrzeit <span class="required-marker" aria-label="Pflichtfeld">*</span></label><input type="time" id="section-4-booking-time-2" name="time" data-booking-field data-booking-label="Uhrzeit" required></div><div class="booking-field"><label for="section-4-booking-people-3">Personenzahl <span class="required-marker" aria-label="Pflichtfeld">*</span></label><input type="number" id="section-4-booking-people-3" name="people" data-booking-field data-booking-label="Personenzahl" required min="1" max="40"></div><div class="booking-field"><label for="section-4-booking-choice-4">Service <span class="required-marker" aria-label="Pflichtfeld">*</span></label><select id="section-4-booking-choice-4" name="choice" data-booking-field data-booking-label="Service" required><option value="midi">Mittagessen</option><option value="soir">Abendessen</option></select></div><div class="booking-field"><label for="section-4-booking-name-5">Name <span class="required-marker" aria-label="Pflichtfeld">*</span></label><input type="text" id="section-4-booking-name-5" name="name" data-booking-field data-booking-label="Name" required autocomplete="name"></div><div class="booking-field"><label for="section-4-booking-phone-6">Telefon <span class="required-marker" aria-label="Pflichtfeld">*</span></label><input type="tel" id="section-4-booking-phone-6" name="phone" data-booking-field data-booking-label="Telefon" required autocomplete="tel"></div><div class="booking-field"><label for="section-4-booking-email-7">E-Mail</label><input type="email" id="section-4-booking-email-7" name="email" data-booking-field data-booking-label="E-Mail" autocomplete="email"></div><div class="booking-field"><label for="section-4-booking-note-8">Noch ein Hinweis?</label><textarea id="section-4-booking-note-8" name="note" data-booking-field data-booking-label="Noch ein Hinweis?" rows="4"></textarea></div></div>
+      <button class="booking-submit" type="submit">Tisch anfragen</button>
+    </form>
+    <p class="booking-demo">Dies ist eine Demonstration: Es wurde nichts gesendet und nichts gespeichert. Auf Wunsch verbinde ich dieses Formular mit Ihrem Postfach.</p>
+  </div>
+</section>
+
+<section class="section gallery" aria-labelledby="section-5-gallery">
+  <div class="section-heading"><p class="kicker">Impressionen</p><h2 id="section-5-gallery">Die Stimmung im Bistro</h2></div>
   <div class="gallery-grid"><figure><img src="../img/table.webp" alt="Ein gedeckter Tisch zum Service" width="1200" height="900" loading="lazy"><figcaption>Ein gedeckter Tisch zum Service</figcaption></figure><figure><img src="../img/plat.webp" alt="Ein Teller der Saison" width="1200" height="900" loading="lazy"><figcaption>Ein Teller der Saison</figcaption></figure><figure><img src="../img/verre.webp" alt="Ein Glas Wein an der Theke" width="1200" height="900" loading="lazy"><figcaption>Ein Glas Wein an der Theke</figcaption></figure></div>
 </section>
 
-<section class="section hours" aria-labelledby="section-5-hours">
-  <div class="section-heading"><p class="kicker">Öffnungszeiten</p><h2 id="section-5-hours">Öffnungszeiten</h2></div>
+<section class="section hours" aria-labelledby="section-6-hours">
+  <div class="section-heading"><p class="kicker">Öffnungszeiten</p><h2 id="section-6-hours">Öffnungszeiten</h2></div>
   <dl><div><dt>Dienstag – Freitag</dt><dd class="">11:30 – 14:00 · 18:00 – 22:00</dd></div><div><dt>Samstag</dt><dd class="">18:00 – 22:30</dd></div><div><dt>Sonntag und Montag</dt><dd class="is-closed">Geschlossen</dd></div></dl>
 </section>
 
-<section class="section special" aria-labelledby="section-6-special">
-  <div><p class="kicker">Bistro du Marché</p><h2 id="section-6-special">Donnerstags gibt es etwas Neues</h2><p>Jeden Donnerstagabend erfindet unser Koch ein einzelnes Gericht aus dem, was der Markt hergibt. Fragen Sie einfach bei Ihrer Ankunft danach.</p></div>
+<section class="section special" aria-labelledby="section-7-special">
+  <div><p class="kicker">Bistro du Marché</p><h2 id="section-7-special">Donnerstags gibt es etwas Neues</h2><p>Jeden Donnerstagabend erfindet unser Koch ein einzelnes Gericht aus dem, was der Markt hergibt. Fragen Sie einfach bei Ihrer Ankunft danach.</p></div>
 </section>
 
-<section class="section contact" aria-labelledby="section-7-contact">
-  <div class="section-heading"><p class="kicker">Kontakt</p><h2 id="section-7-contact">Besuchen Sie uns</h2></div>
+<section class="section faq" aria-labelledby="section-8-faq">
+  <div class="section-heading"><p class="kicker">Häufige Fragen</p><h2 id="section-8-faq">Vor Ihrem Besuch</h2><p class="section-note">Beispielantworten — sie werden durch Ihre Angaben ersetzt.</p></div>
+  <div class="faq-items"><details><summary>Kann ich ohne Reservierung kommen?</summary><div><p>Ja, je nach Verfügbarkeit. Bei einer größeren Gruppe bitten wir um eine kurze Nachricht.</p></div></details><details><summary>Gibt es vegetarische Optionen?</summary><div><p>Die Beispielkarte enthält bereits ein vegetarisches Gericht; Ihre eigene kann die Tagesauswahl nennen.</p></div></details></div>
+</section>
+
+<section class="section rating" aria-labelledby="section-9-rating">
+  <div class="section-heading"><p class="kicker">Google-Bewertungen</p><h2 id="section-9-rating">Beispiel: Bewertungen des Bistrot Presse</h2></div>
+  <a class="rating-badge" href="https://www.google.com/maps/search/?api=1&amp;query=Bistrot%20Presse%2C%2024%20Rue%20du%20March%C3%A9-aux-Herbes%2C%20Luxembourg" target="_blank" rel="noopener">
+    <span class="rating-score">4,6</span>
+    <span class="rating-details"><span>469 Bewertungen</span><span>Google-Bewertungen</span></span>
+  </a>
+</section>
+
+<section class="section contact" aria-labelledby="section-10-contact">
+  <div class="section-heading"><p class="kicker">Kontakt</p><h2 id="section-10-contact">Besuchen Sie uns</h2></div>
   <div class="contact-grid"><dl class="contact-details"><div><dt>Anrufen</dt><dd><a href="tel:+35226000000">+352 26 00 00 00</a></dd></div><div><dt>E-Mail</dt><dd><a href="mailto:bonjour@bistro-demo.lu">bonjour@bistro-demo.lu</a></dd></div><div><dt>Adresse</dt><dd>12, rue de la Gare<br>L-1234 Luxembourg</dd></div></dl><a class="map-link" href="https://www.openstreetmap.org/?mlat=49.61160&amp;mlon=6.13190#map=17/49.61160/6.13190" target="_blank" rel="noopener">Auf OpenStreetMap ansehen</a></div>
 </section>
 
@@ -73,5 +97,44 @@
     <a href="tel:+35226000000">Anrufen</a>
     <a href="https://www.openstreetmap.org/?mlat=49.61160&amp;mlon=6.13190#map=17/49.61160/6.13190" target="_blank" rel="noopener">Route</a>
   </nav>
-</body>
+
+  <script>
+(() => {
+  const strings = {"heading": "Ihre Anfrage", "demo": "Dies ist eine Demonstration: Es wurde nichts gesendet und nichts gespeichert. Auf Wunsch verbinde ich dieses Formular mit Ihrem Postfach."};
+  document.querySelectorAll("[data-booking-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const confirmation = document.createElement("div");
+      confirmation.className = "booking-confirmation";
+      confirmation.setAttribute("aria-live", "polite");
+      confirmation.setAttribute("tabindex", "-1");
+      const heading = document.createElement("h3");
+      heading.textContent = form.dataset.bookingConfirmation || strings.heading;
+      confirmation.append(heading);
+      const summary = document.createElement("dl");
+      form.querySelectorAll("[data-booking-field]").forEach((field) => {
+        let value = field.value.trim();
+        if (field.tagName === "SELECT" && field.selectedOptions.length) {
+          value = field.selectedOptions[0].textContent;
+        }
+        if (!value) return;
+        const term = document.createElement("dt");
+        term.textContent = field.dataset.bookingLabel;
+        const description = document.createElement("dd");
+        description.textContent = value;
+        summary.append(term, description);
+      });
+      confirmation.append(summary);
+      const demo = document.createElement("p");
+      demo.className = "booking-demo";
+      demo.textContent = strings.demo;
+      confirmation.append(demo);
+      const panel = form.closest("[data-booking-panel]");
+      panel.replaceChildren(confirmation);
+      confirmation.focus();
+    });
+  });
+})();
+  </script></body>
 </html>

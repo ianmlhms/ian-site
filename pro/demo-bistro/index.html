@@ -44,26 +44,50 @@
 </section>
 
 <section class="section menu" aria-labelledby="section-3-menu">
-  <div class="section-heading"><p class="kicker">La carte</p><h2 id="section-3-menu">La carte du moment</h2></div>
+  <div class="section-heading"><p class="kicker">La carte</p><h2 id="section-3-menu">La carte du moment</h2><p class="section-note">Exemple de carte — à remplacer par la vôtre.</p></div>
   <div class="menu-groups"><section class="menu-group"><h3>À partager</h3><ul><li class="menu-item"><strong>Poireaux vinaigrette</strong><span class="price">12,50 €</span><p>Œuf parfait, noisettes grillées</p></li><li class="menu-item"><strong>Terrine de campagne</strong><span class="price">14,00 €</span><p>Pickles maison, pain au levain</p></li></ul></section><section class="menu-group"><h3>Plats</h3><ul><li class="menu-item"><strong>Truite rôtie</strong><span class="price">27,00 €</span><p>Pommes grenailles, fenouil, sauce vierge</p></li><li class="menu-item"><strong>Risotto aux champignons</strong><span class="price">22,00 €</span><p>Parmesan affiné, herbes fraîches</p></li></ul></section></div>
 </section>
 
-<section class="section gallery" aria-labelledby="section-4-gallery">
-  <div class="section-heading"><p class="kicker">En images</p><h2 id="section-4-gallery">L&#x27;esprit du bistrot</h2></div>
+<section class="section booking" aria-labelledby="section-4-booking">
+  <div class="section-heading"><p class="kicker">Réserver une table</p><h2 id="section-4-booking">Demander une table</h2><p class="booking-intro">Choisissez le moment qui vous conviendrait. Nous vous montrerons simplement un récapitulatif.</p></div>
+  <div data-booking-panel>
+    <form class="booking-form" data-booking-form>
+      <div class="booking-fields"><div class="booking-field"><label for="section-4-booking-date-1">Date <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="date" id="section-4-booking-date-1" name="date" data-booking-field data-booking-label="Date" required min="2026-09-05"></div><div class="booking-field"><label for="section-4-booking-time-2">Heure <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="time" id="section-4-booking-time-2" name="time" data-booking-field data-booking-label="Heure" required></div><div class="booking-field"><label for="section-4-booking-people-3">Nombre de personnes <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="number" id="section-4-booking-people-3" name="people" data-booking-field data-booking-label="Nombre de personnes" required min="1" max="40"></div><div class="booking-field"><label for="section-4-booking-choice-4">Service <span class="required-marker" aria-label="Champ obligatoire">*</span></label><select id="section-4-booking-choice-4" name="choice" data-booking-field data-booking-label="Service" required><option value="midi">Déjeuner</option><option value="soir">Dîner</option></select></div><div class="booking-field"><label for="section-4-booking-name-5">Nom <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="text" id="section-4-booking-name-5" name="name" data-booking-field data-booking-label="Nom" required autocomplete="name"></div><div class="booking-field"><label for="section-4-booking-phone-6">Téléphone <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="tel" id="section-4-booking-phone-6" name="phone" data-booking-field data-booking-label="Téléphone" required autocomplete="tel"></div><div class="booking-field"><label for="section-4-booking-email-7">E-mail</label><input type="email" id="section-4-booking-email-7" name="email" data-booking-field data-booking-label="E-mail" autocomplete="email"></div><div class="booking-field"><label for="section-4-booking-note-8">Un détail à préciser ?</label><textarea id="section-4-booking-note-8" name="note" data-booking-field data-booking-label="Un détail à préciser ?" rows="4"></textarea></div></div>
+      <button class="booking-submit" type="submit">Demander une table</button>
+    </form>
+    <p class="booking-demo">Ceci est une démonstration : rien n&#x27;a été envoyé et rien n&#x27;est enregistré. Quand vous voulez, je branche ce formulaire sur votre boîte mail.</p>
+  </div>
+</section>
+
+<section class="section gallery" aria-labelledby="section-5-gallery">
+  <div class="section-heading"><p class="kicker">En images</p><h2 id="section-5-gallery">L&#x27;esprit du bistrot</h2></div>
   <div class="gallery-grid"><figure><img src="img/table.webp" alt="Une table dressée pour le service" width="1200" height="900" loading="lazy"><figcaption>Une table dressée pour le service</figcaption></figure><figure><img src="img/plat.webp" alt="Une assiette de saison" width="1200" height="900" loading="lazy"><figcaption>Une assiette de saison</figcaption></figure><figure><img src="img/verre.webp" alt="Un verre de vin au comptoir" width="1200" height="900" loading="lazy"><figcaption>Un verre de vin au comptoir</figcaption></figure></div>
 </section>
 
-<section class="section hours" aria-labelledby="section-5-hours">
-  <div class="section-heading"><p class="kicker">Horaires</p><h2 id="section-5-hours">Horaires</h2></div>
+<section class="section hours" aria-labelledby="section-6-hours">
+  <div class="section-heading"><p class="kicker">Horaires</p><h2 id="section-6-hours">Horaires</h2></div>
   <dl><div><dt>Mardi – vendredi</dt><dd class="">11:30 – 14:00 · 18:00 – 22:00</dd></div><div><dt>Samedi</dt><dd class="">18:00 – 22:30</dd></div><div><dt>Dimanche et lundi</dt><dd class="is-closed">Fermé</dd></div></dl>
 </section>
 
-<section class="section special" aria-labelledby="section-6-special">
-  <div><p class="kicker">Bistro du Marché</p><h2 id="section-6-special">Le jeudi, le plat change</h2><p>Chaque jeudi soir, le chef imagine un plat unique selon le marché. Demandez-le simplement en arrivant.</p></div>
+<section class="section special" aria-labelledby="section-7-special">
+  <div><p class="kicker">Bistro du Marché</p><h2 id="section-7-special">Le jeudi, le plat change</h2><p>Chaque jeudi soir, le chef imagine un plat unique selon le marché. Demandez-le simplement en arrivant.</p></div>
 </section>
 
-<section class="section contact" aria-labelledby="section-7-contact">
-  <div class="section-heading"><p class="kicker">Nous trouver</p><h2 id="section-7-contact">Passez nous voir</h2></div>
+<section class="section faq" aria-labelledby="section-8-faq">
+  <div class="section-heading"><p class="kicker">Questions fréquentes</p><h2 id="section-8-faq">Avant de venir</h2><p class="section-note">Exemples de réponses — elles seront remplacées avec vos informations.</p></div>
+  <div class="faq-items"><details><summary>Puis-je venir sans réservation ?</summary><div><p>Oui, selon les places disponibles. Pour une grande table, mieux vaut nous prévenir.</p></div></details><details><summary>Proposez-vous des options végétariennes ?</summary><div><p>La carte exemple comprend déjà une assiette végétarienne ; la vôtre pourra préciser les choix du jour.</p></div></details></div>
+</section>
+
+<section class="section rating" aria-labelledby="section-9-rating">
+  <div class="section-heading"><p class="kicker">Avis Google</p><h2 id="section-9-rating">Exemple : avis du Bistrot Presse</h2></div>
+  <a class="rating-badge" href="https://www.google.com/maps/search/?api=1&amp;query=Bistrot%20Presse%2C%2024%20Rue%20du%20March%C3%A9-aux-Herbes%2C%20Luxembourg" target="_blank" rel="noopener">
+    <span class="rating-score">4,6</span>
+    <span class="rating-details"><span>469 avis</span><span>Avis Google</span></span>
+  </a>
+</section>
+
+<section class="section contact" aria-labelledby="section-10-contact">
+  <div class="section-heading"><p class="kicker">Nous trouver</p><h2 id="section-10-contact">Passez nous voir</h2></div>
   <div class="contact-grid"><dl class="contact-details"><div><dt>Appeler</dt><dd><a href="tel:+35226000000">+352 26 00 00 00</a></dd></div><div><dt>E-mail</dt><dd><a href="mailto:bonjour@bistro-demo.lu">bonjour@bistro-demo.lu</a></dd></div><div><dt>Adresse</dt><dd>12, rue de la Gare<br>L-1234 Luxembourg</dd></div></dl><a class="map-link" href="https://www.openstreetmap.org/?mlat=49.61160&amp;mlon=6.13190#map=17/49.61160/6.13190" target="_blank" rel="noopener">Voir sur OpenStreetMap</a></div>
 </section>
 
@@ -73,5 +97,44 @@
     <a href="tel:+35226000000">Appeler</a>
     <a href="https://www.openstreetmap.org/?mlat=49.61160&amp;mlon=6.13190#map=17/49.61160/6.13190" target="_blank" rel="noopener">Itinéraire</a>
   </nav>
-</body>
+
+  <script>
+(() => {
+  const strings = {"heading": "Votre demande", "demo": "Ceci est une démonstration : rien n'a été envoyé et rien n'est enregistré. Quand vous voulez, je branche ce formulaire sur votre boîte mail."};
+  document.querySelectorAll("[data-booking-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const confirmation = document.createElement("div");
+      confirmation.className = "booking-confirmation";
+      confirmation.setAttribute("aria-live", "polite");
+      confirmation.setAttribute("tabindex", "-1");
+      const heading = document.createElement("h3");
+      heading.textContent = form.dataset.bookingConfirmation || strings.heading;
+      confirmation.append(heading);
+      const summary = document.createElement("dl");
+      form.querySelectorAll("[data-booking-field]").forEach((field) => {
+        let value = field.value.trim();
+        if (field.tagName === "SELECT" && field.selectedOptions.length) {
+          value = field.selectedOptions[0].textContent;
+        }
+        if (!value) return;
+        const term = document.createElement("dt");
+        term.textContent = field.dataset.bookingLabel;
+        const description = document.createElement("dd");
+        description.textContent = value;
+        summary.append(term, description);
+      });
+      confirmation.append(summary);
+      const demo = document.createElement("p");
+      demo.className = "booking-demo";
+      demo.textContent = strings.demo;
+      confirmation.append(demo);
+      const panel = form.closest("[data-booking-panel]");
+      panel.replaceChildren(confirmation);
+      confirmation.focus();
+    });
+  });
+})();
+  </script></body>
 </html>

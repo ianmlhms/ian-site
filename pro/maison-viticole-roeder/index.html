@@ -40,22 +40,47 @@
 
 <p class="stock-photo-notice">Certaines photos sont encore des images d&#x27;illustration. Envoyez-moi les vôtres et je remplace le reste.</p>
 <section class="section about" aria-labelledby="section-2-about">
-  <div class="about-copy"><p class="kicker">Le bistrot</p><h2 id="section-2-about">Le domaine</h2><p>La Maison Viticole Roeder est un petit domaine biologique installé à Steinheim, sur le terroir de la Hoelt près de Rosport. Luc Roeder a commencé à restaurer ses premières vignes en 2009 et travaille des terrasses aux murs en pierres sèches, avec une récolte entièrement manuelle. Le domaine produit notamment un Elbling de vieilles vignes, des Pinot, du Chardonnay et le crémant Cuvée Kimmfrächen.</p></div>
+  <div class="about-copy"><p class="kicker">Steinheim, sur la Moselle</p><h2 id="section-2-about">Le domaine</h2><p>La Maison Viticole Roeder est un petit domaine biologique installé à Steinheim, sur le terroir de la Hoelt près de Rosport. Luc Roeder a commencé à restaurer ses premières vignes en 2009 et travaille des terrasses aux murs en pierres sèches, avec une récolte entièrement manuelle. Le domaine produit notamment un Elbling de vieilles vignes, des Pinot, du Chardonnay et le crémant Cuvée Kimmfrächen.</p></div>
 <figure><img src="img/about.webp" alt="Le domaine" width="2000" height="1500" loading="lazy"><figcaption>Maison Viticole Roeder</figcaption></figure>
 </section>
 
-<section class="section menu" aria-labelledby="section-3-menu">
-  <div class="section-heading"><p class="kicker">La carte</p><h2 id="section-3-menu">Nos vins</h2></div>
-  <div class="menu-groups"><section class="menu-group"><h3>La carte</h3><ul><li class="menu-item"><strong>Vins biologiques</strong></li><li class="menu-item"><strong>Elbling de vieilles vignes</strong></li><li class="menu-item"><strong>Crémant Cuvée Kimmfrächen</strong></li><li class="menu-item"><strong>Vignoble en terrasses, récolte manuelle</strong></li><li class="menu-item"><strong>Dégustations sur demande</strong></li></ul></section></div>
+<section class="section special" aria-labelledby="section-3-special">
+  <div><p class="kicker">Au domaine</p><h2 id="section-3-special">Vente à la propriété</h2><p>Le samedi de 9h à 18h, et en semaine de 16h à 18h30.</p><p>On peut goûter avant d&#x27;acheter, et repartir avec le carton.</p></div>
 </section>
 
-<section class="section gallery" aria-labelledby="section-4-gallery">
-  <div class="section-heading"><p class="kicker">En images</p><h2 id="section-4-gallery">En images</h2></div>
+<section class="section menu" aria-labelledby="section-4-menu">
+  <div class="section-heading"><p class="kicker">La carte</p><h2 id="section-4-menu">Nos vins</h2><p class="section-note">Exemple de liste des vins — à remplacer par la vôtre, prix compris.</p></div>
+  <div class="menu-groups"><section class="menu-group"><h3>Vins blancs</h3><ul><li class="menu-item"><strong>Elbling Vieilles Vignes</strong><span class="price">11,50 €</span><p>75 cl</p></li><li class="menu-item"><strong>Rivaner</strong><span class="price">9,50 €</span><p>75 cl</p></li><li class="menu-item"><strong>Auxerrois</strong><span class="price">12,00 €</span><p>75 cl</p></li><li class="menu-item"><strong>Pinot Blanc</strong><span class="price">13,00 €</span><p>75 cl</p></li><li class="menu-item"><strong>Pinot Gris</strong><span class="price">15,00 €</span><p>75 cl</p></li><li class="menu-item"><strong>Riesling</strong><span class="price">16,50 €</span><p>75 cl</p></li></ul></section><section class="menu-group"><h3>Crémants</h3><ul><li class="menu-item"><strong>Crémant Cuvée Kimmfrächen</strong><span class="price">18,50 €</span><p>75 cl</p></li><li class="menu-item"><strong>Crémant rosé</strong><span class="price">19,50 €</span><p>75 cl</p></li></ul></section><section class="menu-group"><h3>Vin rouge</h3><ul><li class="menu-item"><strong>Pinot Noir</strong><span class="price">17,50 €</span><p>75 cl</p></li></ul></section></div>
+</section>
+
+<section class="section booking" aria-labelledby="section-5-booking">
+  <div class="section-heading"><p class="kicker">Dégustation</p><h2 id="section-5-booking">Venir déguster</h2><p class="booking-intro">La dégustation se fait sur rendez-vous, dans la cave, avec le vigneron.</p></div>
+  <div data-booking-panel>
+    <form class="booking-form" data-booking-form data-booking-confirmation="Votre demande de dégustation">
+      <div class="booking-fields"><div class="booking-field"><label for="section-5-booking-date-1">Date souhaitée <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="date" id="section-5-booking-date-1" name="date" data-booking-field data-booking-label="Date souhaitée" required min="2026-09-05"></div><div class="booking-field"><label for="section-5-booking-time-2">Heure <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="time" id="section-5-booking-time-2" name="time" data-booking-field data-booking-label="Heure" required></div><div class="booking-field"><label for="section-5-booking-people-3">Nombre de personnes <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="number" id="section-5-booking-people-3" name="people" data-booking-field data-booking-label="Nombre de personnes" required min="1" max="30"></div><div class="booking-field"><label for="section-5-booking-choice-4">Langue de la visite</label><select id="section-5-booking-choice-4" name="choice" data-booking-field data-booking-label="Langue de la visite"><option value="lb">Luxembourgeois</option><option value="de">Allemand</option><option value="fr">Français</option><option value="en">Anglais</option></select></div><div class="booking-field"><label for="section-5-booking-name-5">Votre nom <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="text" id="section-5-booking-name-5" name="name" data-booking-field data-booking-label="Votre nom" required autocomplete="name"></div><div class="booking-field"><label for="section-5-booking-email-6">E-mail <span class="required-marker" aria-label="Champ obligatoire">*</span></label><input type="email" id="section-5-booking-email-6" name="email" data-booking-field data-booking-label="E-mail" required autocomplete="email"></div><div class="booking-field"><label for="section-5-booking-phone-7">Téléphone (facultatif)</label><input type="tel" id="section-5-booking-phone-7" name="phone" data-booking-field data-booking-label="Téléphone (facultatif)" autocomplete="tel"></div><div class="booking-field"><label for="section-5-booking-note-8">Une question, un souhait particulier ?</label><textarea id="section-5-booking-note-8" name="note" data-booking-field data-booking-label="Une question, un souhait particulier ?" rows="4"></textarea></div></div>
+      <button class="booking-submit" type="submit">Demander un rendez-vous</button>
+    </form>
+    <p class="booking-demo">Ceci est une démonstration : rien n&#x27;a été envoyé et rien n&#x27;est enregistré. Quand vous voulez, je branche ce formulaire sur votre boîte mail.</p>
+  </div>
+</section>
+
+<section class="section gallery" aria-labelledby="section-6-gallery">
+  <div class="section-heading"><p class="kicker">En images</p><h2 id="section-6-gallery">En images</h2></div>
   <div class="gallery-grid"><figure><img src="img/gallery1.webp" alt="Une dégustation" width="2000" height="1500" loading="lazy"><figcaption>Une dégustation</figcaption></figure><figure><img src="img/gallery2.webp" alt="Les vendanges" width="1920" height="1440" loading="lazy"><figcaption>Les vendanges</figcaption></figure></div>
 </section>
 
-<section class="section contact" aria-labelledby="section-5-contact">
-  <div class="section-heading"><p class="kicker">Nous trouver</p><h2 id="section-5-contact">Nous trouver</h2></div>
+<section class="section hours" aria-labelledby="section-7-hours">
+  <div class="section-heading"><p class="kicker">Horaires</p><h2 id="section-7-hours">Horaires</h2></div>
+  <dl><div><dt>Lundi – vendredi</dt><dd class="">16h00 – 18h30</dd></div><div><dt>Samedi</dt><dd class="">9h00 – 18h00</dd></div><div><dt>Dimanche</dt><dd class="">sur rendez-vous</dd></div></dl>
+</section>
+
+<section class="section faq" aria-labelledby="section-8-faq">
+  <div class="section-heading"><p class="kicker">Questions fréquentes</p><h2 id="section-8-faq">Questions fréquentes</h2><p class="section-note">Exemple de questions fréquentes — corrigez les réponses, elles sont à vous.</p></div>
+  <div class="faq-items"><details><summary>Vos vins sont-ils bio ?</summary><div><p>Oui, le domaine travaille en viticulture biologique, et la récolte se fait entièrement à la main.</p></div></details><details><summary>Peut-on visiter sans rendez-vous ?</summary><div><p>Pour acheter, oui, aux heures d&#x27;ouverture. Pour une dégustation guidée, mieux vaut prévenir.</p></div></details><details><summary>Recevez-vous des groupes ?</summary><div><p>Oui, jusqu&#x27;à une trentaine de personnes. Dites-nous combien vous êtes et quand.</p></div></details><details><summary>Livrez-vous ?</summary><div><p>Au Luxembourg, oui, à partir de six bouteilles. Écrivez-nous, on s&#x27;arrange.</p></div></details></div>
+</section>
+
+<section class="section contact" aria-labelledby="section-9-contact">
+  <div class="section-heading"><p class="kicker">Nous trouver</p><h2 id="section-9-contact">Nous trouver</h2></div>
   <div class="contact-grid"><dl class="contact-details"><div><dt>Appeler</dt><dd><a href="tel:+352691628731">+352 691 628 731</a></dd></div><div><dt>E-mail</dt><dd><a href="mailto:luc.roeder@biowenzer.lu">luc.roeder@biowenzer.lu</a></dd></div><div><dt>Adresse</dt><dd>27, rue de la Montagne, L-6586 Steinheim, Rosport-Mompach</dd></div></dl><a class="map-link" href="https://www.openstreetmap.org/?mlat=49.81990&amp;mlon=6.46989#map=17/49.81990/6.46989" target="_blank" rel="noopener">Voir sur OpenStreetMap</a></div>
 </section>
 
@@ -66,5 +91,44 @@
     <a href="tel:+352691628731">Appeler</a>
     <a href="https://www.openstreetmap.org/?mlat=49.81990&amp;mlon=6.46989#map=17/49.81990/6.46989" target="_blank" rel="noopener">Itinéraire</a>
   </nav>
-</body>
+
+  <script>
+(() => {
+  const strings = {"heading": "Votre demande", "demo": "Ceci est une démonstration : rien n'a été envoyé et rien n'est enregistré. Quand vous voulez, je branche ce formulaire sur votre boîte mail."};
+  document.querySelectorAll("[data-booking-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const confirmation = document.createElement("div");
+      confirmation.className = "booking-confirmation";
+      confirmation.setAttribute("aria-live", "polite");
+      confirmation.setAttribute("tabindex", "-1");
+      const heading = document.createElement("h3");
+      heading.textContent = form.dataset.bookingConfirmation || strings.heading;
+      confirmation.append(heading);
+      const summary = document.createElement("dl");
+      form.querySelectorAll("[data-booking-field]").forEach((field) => {
+        let value = field.value.trim();
+        if (field.tagName === "SELECT" && field.selectedOptions.length) {
+          value = field.selectedOptions[0].textContent;
+        }
+        if (!value) return;
+        const term = document.createElement("dt");
+        term.textContent = field.dataset.bookingLabel;
+        const description = document.createElement("dd");
+        description.textContent = value;
+        summary.append(term, description);
+      });
+      confirmation.append(summary);
+      const demo = document.createElement("p");
+      demo.className = "booking-demo";
+      demo.textContent = strings.demo;
+      confirmation.append(demo);
+      const panel = form.closest("[data-booking-panel]");
+      panel.replaceChildren(confirmation);
+      confirmation.focus();
+    });
+  });
+})();
+  </script></body>
 </html>

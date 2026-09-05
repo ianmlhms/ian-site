@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import sys
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from string import Template
@@ -361,6 +362,16 @@ def section_id(section: dict, number: int) -> str:
     return f"section-{number}-{re.sub(r'[^a-z0-9-]+', '-', section.get('type', 'section').lower()).strip('-')}"
 
 
+def section_kicker(section: dict, data: dict, language: str, default: str) -> str:
+    """The small line above a section heading, overridable per section.
+
+    The defaults are generic — "Le bistrot" above a bakery, the business name
+    twice running where a rating follows a special — so any section may name
+    its own.
+    """
+    return text(section.get("kicker"), data, language) or default
+
+
 def render_hero(section: dict, data: dict, language: str, ui: dict) -> str:
     title = text(section.get("title"), data, language) or data["name"]
     subtitle_text = text(section.get("subtitle"), data, language)
@@ -382,7 +393,7 @@ def render_about(section: dict, data: dict, language: str, ui: dict, ident: str)
     image = ""
     if isinstance(image_path, str):
         image = f'<figure><img src="{esc(relative_asset(image_path, data, language))}" alt="{esc(title or data["name"])}"{dimensions_attributes(data, image_path)} loading="lazy"><figcaption>{esc(data["name"])}</figcaption></figure>'
-    return load_template("section-about.html").substitute(id=esc(ident), kicker=esc(ui["about"]), title=esc(title or data["name"]), body=body, image=image)
+    return load_template("section-about.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["about"])), title=esc(title or data["name"]), body=body, image=image)
 
 
 def render_menu(section: dict, data: dict, language: str, ui: dict, ident: str) -> str:
@@ -408,7 +419,125 @@ def render_menu(section: dict, data: dict, language: str, ui: dict, ident: str) 
     if not groups:
         return ""
     title = text(section.get("title"), data, language) or ui["menu"]
-    return load_template("section-menu.html").substitute(id=esc(ident), kicker=esc(ui["menu"]), title=esc(title), groups="".join(groups))
+    note_text = text(section.get("note"), data, language)
+    note = f'<p class="section-note">{esc(note_text)}</p>' if note_text else ""
+    return load_template("section-menu.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["menu"])), title=esc(title), note=note, groups="".join(groups))
+
+
+BOOKING_FIELD_TYPES = {"date", "time", "number", "select", "text", "tel", "email", "textarea"}
+
+
+def booking_field_html(field: dict, data: dict, language: str, ui: dict, ident: str, index: int) -> str:
+    name = field.get("name")
+    field_type = field.get("type")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("booking field name must be a non-empty string")
+    if field_type not in BOOKING_FIELD_TYPES:
+        raise ValueError(f"booking field type '{field_type}' is not supported")
+    label = text(field.get("label"), data, language)
+    if not label:
+        raise ValueError("booking field label is missing")
+    required = field.get("required", False)
+    if not isinstance(required, bool):
+        raise ValueError("booking field required must be true or false")
+    if field_type != "number" and ("min" in field or "max" in field):
+        raise ValueError("booking min and max are only allowed on number fields")
+    safe_name = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "field"
+    field_id = f"{ident}-{safe_name}-{index}"
+    required_attr = " required" if required else ""
+    marker = f' <span class="required-marker" aria-label="{esc(ui["required"])}">*</span>' if required else ""
+    label_html = f'<label for="{esc(field_id)}">{esc(label)}{marker}</label>'
+    common = f' id="{esc(field_id)}" name="{esc(name.strip())}" data-booking-field data-booking-label="{esc(label)}"{required_attr}'
+    autocomplete = {"name": "name", "phone": "tel", "email": "email"}.get(name.strip(), "")
+    autocomplete_attr = f' autocomplete="{autocomplete}"' if autocomplete else ""
+    limits = ""
+    if field_type == "number":
+        minimum, maximum = field.get("min"), field.get("max")
+        for key, value in (("min", minimum), ("max", maximum)):
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"booking number {key} must be a number")
+            limits += f' {key}="{esc(value)}"'
+        if isinstance(minimum, (int, float)) and not isinstance(minimum, bool) and isinstance(maximum, (int, float)) and not isinstance(maximum, bool) and minimum > maximum:
+            raise ValueError("booking number min must not exceed max")
+    if field_type == "textarea":
+        control = f'<textarea{common}{autocomplete_attr} rows="4"></textarea>'
+    elif field_type == "select":
+        options = field.get("options")
+        if not isinstance(options, list) or not options:
+            raise ValueError("booking select must have options")
+        rendered_options = []
+        for option in options:
+            if not isinstance(option, dict) or not isinstance(option.get("value"), str) or not option["value"].strip():
+                raise ValueError("booking select options need a value")
+            option_label = text(option.get("label"), data, language)
+            if not option_label:
+                raise ValueError("booking select options need a label")
+            rendered_options.append(f'<option value="{esc(option["value"])}">{esc(option_label)}</option>')
+        control = f'<select{common}>{"".join(rendered_options)}</select>'
+    else:
+        date_min = f' min="{date.today().isoformat()}"' if field_type == "date" else ""
+        control = f'<input type="{esc(field_type)}"{common}{autocomplete_attr}{limits}{date_min}>'
+    return f'<div class="booking-field">{label_html}{control}</div>'
+
+
+def render_booking(section: dict, data: dict, language: str, ui: dict, ident: str) -> str:
+    fields_data = section.get("fields")
+    if not isinstance(fields_data, list) or not fields_data:
+        return ""
+    fields = []
+    for index, field in enumerate(fields_data, 1):
+        if not isinstance(field, dict):
+            raise ValueError("booking fields must be objects")
+        fields.append(booking_field_html(field, data, language, ui, ident, index))
+    title = text(section.get("title"), data, language) or ui["booking"]
+    kicker = section_kicker(section, data, language, ui["booking"])
+    intro_text = text(section.get("intro"), data, language)
+    intro = f'<p class="booking-intro">{esc(intro_text)}</p>' if intro_text else ""
+    submit = text(section.get("submit"), data, language) or ui["booking"]
+    # "Votre demande de table" is wrong above a bakery order and a cellar
+    # visit, so each section names its own confirmation heading.
+    heading = text(section.get("confirmation"), data, language)
+    confirmation = f' data-booking-confirmation="{esc(heading)}"' if heading else ""
+    return load_template("section-booking.html").substitute(
+        id=esc(ident), kicker=esc(kicker), title=esc(title), intro=intro,
+        fields="".join(fields), submit=esc(submit), demo=esc(ui["booking_demo"]),
+        confirmation=confirmation,
+    )
+
+
+def render_faq(section: dict, data: dict, language: str, ui: dict, ident: str) -> str:
+    items = []
+    for item in section.get("items", []):
+        if not isinstance(item, dict):
+            continue
+        question = text(item.get("q"), data, language)
+        answer = text(item.get("a"), data, language)
+        if question and answer:
+            items.append(f'<details><summary>{esc(question)}</summary><div>{paragraph_html(answer)}</div></details>')
+    if not items:
+        return ""
+    title = text(section.get("title"), data, language) or ui["faq"]
+    note_text = text(section.get("note"), data, language)
+    note = f'<p class="section-note">{esc(note_text)}</p>' if note_text else ""
+    return load_template("section-faq.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["faq"])), title=esc(title), note=note, items="".join(items))
+
+
+def render_rating(section: dict, data: dict, language: str, ui: dict, ident: str) -> str:
+    score = section.get("score")
+    count = section.get("count")
+    source = outbound_url(section.get("source"))
+    if not isinstance(score, str) or not score.strip() or len(score.strip()) > 12 or not isinstance(count, int) or isinstance(count, bool) or count <= 0 or not source:
+        return ""
+    label = text(section.get("label"), data, language) or ui["rating"]
+    # The kicker, the heading and the badge were all reading "Avis Google".
+    # Name the business above the heading, the way the special section does.
+    return load_template("section-rating.html").substitute(
+        id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["rating"])), score=esc(score.strip()), count=esc(count),
+        reviews=esc(ui["reviews"]), label=esc(label), source_label=esc(ui["rating"]),
+        source=esc(source),
+    )
 
 
 def render_gallery(section: dict, data: dict, language: str, ui: dict, ident: str) -> str:
@@ -421,7 +550,7 @@ def render_gallery(section: dict, data: dict, language: str, ui: dict, ident: st
     if not images:
         return ""
     title = text(section.get("title"), data, language) or ui["gallery"]
-    return load_template("section-gallery.html").substitute(id=esc(ident), kicker=esc(ui["gallery"]), title=esc(title), images="".join(images))
+    return load_template("section-gallery.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["gallery"])), title=esc(title), images="".join(images))
 
 
 def render_hours(section: dict, data: dict, language: str, ui: dict, ident: str) -> str:
@@ -439,7 +568,7 @@ def render_hours(section: dict, data: dict, language: str, ui: dict, ident: str)
     if not rows:
         return ""
     title = text(section.get("title"), data, language) or ui["hours"]
-    return load_template("section-hours.html").substitute(id=esc(ident), kicker=esc(ui["hours"]), title=esc(title), rows="".join(rows))
+    return load_template("section-hours.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["hours"])), title=esc(title), rows="".join(rows))
 
 
 def render_special(section: dict, data: dict, language: str, ui: dict, ident: str) -> str:
@@ -447,7 +576,7 @@ def render_special(section: dict, data: dict, language: str, ui: dict, ident: st
     body = paragraph_html(text(section.get("body"), data, language))
     if not title and not body:
         return ""
-    return load_template("section-special.html").substitute(id=esc(ident), kicker=esc(data["name"]), title=esc(title or data["name"]), body=body)
+    return load_template("section-special.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, data["name"])), title=esc(title or data["name"]), body=body)
 
 
 def phone_href(data: dict) -> str:
@@ -479,10 +608,10 @@ def render_contact(section: dict, data: dict, language: str, ui: dict, ident: st
     if section.get("showMap") is True:
         map_html = f'<a class="map-link" href="{esc(map_url(data))}" target="_blank" rel="noopener">{esc(ui["map"])}</a>'
     title = text(section.get("title"), data, language) or ui["contact"]
-    return load_template("section-contact.html").substitute(id=esc(ident), kicker=esc(ui["contact"]), title=esc(title), details=f'<dl class="contact-details">{"".join(details)}</dl>', map=map_html)
+    return load_template("section-contact.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["contact"])), title=esc(title), details=f'<dl class="contact-details">{"".join(details)}</dl>', map=map_html)
 
 
-RENDERERS = {"hero": render_hero, "about": render_about, "menu": render_menu, "gallery": render_gallery, "hours": render_hours, "special": render_special, "contact": render_contact}
+RENDERERS = {"hero": render_hero, "about": render_about, "menu": render_menu, "booking": render_booking, "faq": render_faq, "rating": render_rating, "gallery": render_gallery, "hours": render_hours, "special": render_special, "contact": render_contact}
 
 
 def stock_credits(credits: list[dict] | None) -> list[dict]:
@@ -572,6 +701,12 @@ def photo_credits_html(credits: list[dict] | None, ui: dict) -> str:
     return f'\n  <section class="photo-credits" aria-labelledby="photo-credits-title"><h2 id="photo-credits-title">{esc(ui["photo_credits"])}</h2><ul>{"".join(rows)}</ul></section>'
 
 
+def booking_script(ui: dict) -> str:
+    """Return the small, local-only booking demonstration behaviour."""
+    strings = json.dumps({"heading": ui["booking_confirmation"], "demo": ui["booking_demo"]}, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    return """\n  <script>\n(() => {\n  const strings = %s;\n  document.querySelectorAll("[data-booking-form]").forEach((form) => {\n    form.addEventListener("submit", (event) => {\n      event.preventDefault();\n      if (!form.reportValidity()) return;\n      const confirmation = document.createElement("div");\n      confirmation.className = "booking-confirmation";\n      confirmation.setAttribute("aria-live", "polite");\n      confirmation.setAttribute("tabindex", "-1");\n      const heading = document.createElement("h3");\n      heading.textContent = form.dataset.bookingConfirmation || strings.heading;\n      confirmation.append(heading);\n      const summary = document.createElement("dl");\n      form.querySelectorAll("[data-booking-field]").forEach((field) => {\n        let value = field.value.trim();\n        if (field.tagName === "SELECT" && field.selectedOptions.length) {\n          value = field.selectedOptions[0].textContent;\n        }\n        if (!value) return;\n        const term = document.createElement("dt");\n        term.textContent = field.dataset.bookingLabel;\n        const description = document.createElement("dd");\n        description.textContent = value;\n        summary.append(term, description);\n      });\n      confirmation.append(summary);\n      const demo = document.createElement("p");\n      demo.className = "booking-demo";\n      demo.textContent = strings.demo;\n      confirmation.append(demo);\n      const panel = form.closest("[data-booking-panel]");\n      panel.replaceChildren(confirmation);\n      confirmation.focus();\n    });\n  });\n})();\n  </script>""" % strings
+
+
 def render_page(data: dict, language: str, credits: list[dict] | None) -> str:
     ui = UI[language]
     switcher = []
@@ -592,6 +727,7 @@ def render_page(data: dict, language: str, credits: list[dict] | None) -> str:
         theme_vars=theme_vars, credits_style=STOCK_PHOTO_CSS if notice or credits_html else "", css_href="site.css" if language == data["defaultLanguage"] else "../site.css", skip_label=esc(ui["skip"]), preview=preview_html(data, language, ui),
         home_href=esc(relative_page_href(data, language, data["defaultLanguage"])), name=esc(data["name"]), language_switcher="\n".join(switcher), sections=render_sections(data, language, ui, notice), credits=credits_html, legal=legal_html(data, ui),
         mobile_actions_label=esc(data["name"]), phone_href=esc(phone_href(data)), map_href=esc(map_url(data)), call_label=esc(ui["call"]), directions_label=esc(ui["directions"]),
+        booking_script=booking_script(ui) if any(section.get("type") == "booking" for section in data["sections"]) else "",
     )
 
 

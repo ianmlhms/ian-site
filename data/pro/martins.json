@@ -1,209 +1,565 @@
 {
-  "schema": 1,
-  "slug": "martins",
-  "name": "Martins",
-  "languages": [
-    "fr",
-    "de",
-    "en"
-  ],
-  "defaultLanguage": "fr",
-  "theme": {
-    "brand": "#8A5A22",
-    "ground": "#FDF8EF",
-    "ink": "#241C10",
-    "accent": "#C4762B",
-    "display": "serif"
+ "schema": 1,
+ "slug": "martins",
+ "name": "Martins",
+ "languages": [
+  "fr",
+  "de",
+  "en"
+ ],
+ "defaultLanguage": "fr",
+ "theme": {
+  "brand": "#8A5A22",
+  "ground": "#FDF8EF",
+  "ink": "#241C10",
+  "accent": "#C4762B",
+  "display": "serif"
+ },
+ "preview": {
+  "isPreview": true,
+  "contact": "ian@mulheims.lu"
+ },
+ "contact": {
+  "phone": "+352 26 58 12 06",
+  "email": "jorgemartins-f@hotmail.com",
+  "address": "19, rue Émile Mark, L-4620 Differdange",
+  "lat": 49.5228559,
+  "lon": 5.8902246,
+  "facebook": "",
+  "instagram": ""
+ },
+ "hours": [
+  {
+   "days": {
+    "fr": "Lundi – vendredi",
+    "de": "Montag – Freitag",
+    "en": "Monday – Friday"
+   },
+   "time": "5h30 – 18h00"
   },
-  "preview": {
-    "isPreview": true,
-    "contact": "ian@mulheims.lu"
+  {
+   "days": {
+    "fr": "Samedi",
+    "de": "Samstag",
+    "en": "Saturday"
+   },
+   "time": "7h30 – 13h00"
   },
-  "contact": {
-    "phone": "+352 26 58 12 06",
-    "email": "jorgemartins-f@hotmail.com",
-    "address": "19, rue Émile Mark, L-4620 Differdange",
-    "lat": 49.5228559,
-    "lon": 5.8902246,
-    "facebook": "",
-    "instagram": ""
-  },
-  "hours": [
-    {
-      "days": {
-        "fr": "Lundi – vendredi",
-        "de": "Montag – Freitag",
-        "en": "Monday – Friday"
-      },
-      "time": "5h30 – 18h00"
-    },
-    {
-      "days": {
-        "fr": "Samedi",
-        "de": "Samstag",
-        "en": "Saturday"
-      },
-      "time": "7h30 – 13h00"
-    },
-    {
-      "days": {
-        "fr": "Dimanche",
-        "de": "Sonntag",
-        "en": "Sunday"
-      },
-      "time": "7h30 – 12h30"
-    }
-  ],
-  "sections": [
-    {
-      "type": "hero",
-      "image": "img/hero.webp",
-      "title": {
-        "fr": "Boulangerie-pâtisserie portugaise à Differdange",
-        "de": "Portugiesische Bäckerei und Konditorei in Differdingen",
-        "en": "Portuguese bakery and pâtisserie in Differdange"
-      },
-      "subtitle": {
-        "fr": "",
-        "de": "",
-        "en": ""
-      }
-    },
-    {
-      "type": "about",
-      "image": "img/about.webp",
-      "title": {
-        "fr": "La boulangerie",
-        "de": "Die Bäckerei",
-        "en": "The bakery"
-      },
-      "body": {
-        "fr": "La Boulangerie Martins est une boulangerie-pâtisserie de Differdange, avec une petite restauration portugaise. On y trouve des torradas, du galão, des croissants, de la soupe, des bifanas, des hamburgers, des salades, des sandwiches et des pâtisseries portugaises.",
-        "de": "Die Boulangerie Martins ist eine Bäckerei und Konditorei in Differdingen, mit kleiner portugiesischer Küche. Es gibt Torradas, Galão, Croissants, Suppe, Bifanas, Hamburger, Salate, Sandwiches und portugiesisches Gebäck.",
-        "en": "Boulangerie Martins is a bakery and pâtisserie in Differdange, with a short Portuguese menu. You'll find torradas, galão, croissants, soup, bifanas, burgers, salads, sandwiches and Portuguese pastries."
-      }
-    },
-    {
-      "type": "menu",
-      "title": {
-        "fr": "À la carte",
-        "de": "Auf der Karte",
-        "en": "On the menu"
-      },
-      "groups": [
-        {
-          "name": {
-            "fr": "",
-            "de": "",
-            "en": ""
-          },
-          "items": [
-            {
-              "name": {
-                "fr": "Boulangerie-pâtisserie",
-                "de": "Bäckerei und Konditorei",
-                "en": "Bakery and pâtisserie"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Pâtisseries portugaises",
-                "de": "Portugiesisches Gebäck",
-                "en": "Portuguese pastries"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Bifanas et hamburgers",
-                "de": "Bifanas und Hamburger",
-                "en": "Bifanas and burgers"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            },
-            {
-              "name": {
-                "fr": "Soupe et sandwiches",
-                "de": "Suppe und Sandwiches",
-                "en": "Soup and sandwiches"
-              },
-              "desc": {
-                "fr": "",
-                "de": "",
-                "en": ""
-              },
-              "price": ""
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "type": "gallery",
-      "title": {
-        "fr": "En images",
-        "de": "In Bildern",
-        "en": "In pictures"
-      },
-      "images": [
-        {
-          "src": "img/gallery1.webp",
-          "alt": {
-            "fr": "Le comptoir",
-            "de": "Die Theke",
-            "en": "The counter"
-          }
-        },
-        {
-          "src": "img/gallery2.webp",
-          "alt": {
-            "fr": "Un café et un croissant",
-            "de": "Kaffee und Croissant",
-            "en": "Coffee and a croissant"
-          }
-        }
-      ]
-    },
-    {
-      "type": "hours",
-      "title": {
-        "fr": "Horaires",
-        "de": "Öffnungszeiten",
-        "en": "Opening hours"
-      }
-    },
-    {
-      "type": "contact",
-      "title": {
-        "fr": "Nous trouver",
-        "de": "So finden Sie uns",
-        "en": "Find us"
-      },
-      "showMap": true
-    }
-  ],
-  "legal": {
-    "operator": "Martins",
-    "address": "19, rue Émile Mark, L-4620 Differdange",
-    "email": "jorgemartins-f@hotmail.com",
-    "phone": "+352 26 58 12 06",
-    "rcs": "",
-    "tva": ""
+  {
+   "days": {
+    "fr": "Dimanche",
+    "de": "Sonntag",
+    "en": "Sunday"
+   },
+   "time": "7h30 – 12h30"
   }
+ ],
+ "sections": [
+  {
+   "type": "hero",
+   "image": "img/hero.webp",
+   "title": {
+    "fr": "Boulangerie-pâtisserie portugaise à Differdange",
+    "de": "Portugiesische Bäckerei und Konditorei in Differdingen",
+    "en": "Portuguese bakery and pâtisserie in Differdange"
+   },
+   "subtitle": {
+    "fr": "",
+    "de": "",
+    "en": ""
+   }
+  },
+  {
+   "type": "about",
+   "image": "img/about.webp",
+   "title": {
+    "fr": "La boulangerie",
+    "de": "Die Bäckerei",
+    "en": "The bakery"
+   },
+   "body": {
+    "fr": "La Boulangerie Martins est une boulangerie-pâtisserie de Differdange, avec une petite restauration portugaise. On y trouve des torradas, du galão, des croissants, de la soupe, des bifanas, des hamburgers, des salades, des sandwiches et des pâtisseries portugaises.",
+    "de": "Die Boulangerie Martins ist eine Bäckerei und Konditorei in Differdingen, mit kleiner portugiesischer Küche. Es gibt Torradas, Galão, Croissants, Suppe, Bifanas, Hamburger, Salate, Sandwiches und portugiesisches Gebäck.",
+    "en": "Boulangerie Martins is a bakery and pâtisserie in Differdange, with a short Portuguese menu. You'll find torradas, galão, croissants, soup, bifanas, burgers, salads, sandwiches and Portuguese pastries."
+   },
+   "kicker": {
+    "fr": "Differdange",
+    "de": "Differdingen",
+    "en": "Differdange"
+   }
+  },
+  {
+   "type": "rating",
+   "score": "4,2",
+   "count": 38,
+   "label": {
+    "fr": "Ce qu'en disent les clients",
+    "de": "Was die Gäste sagen",
+    "en": "What guests say"
+   },
+   "source": "https://www.google.com/maps/place/?q=place_id:ChIJadPQumnK6kcRgT64HjFK4-A"
+  },
+  {
+   "type": "special",
+   "kicker": {
+    "fr": "Tous les jours",
+    "de": "Jeden Tag",
+    "en": "Every day"
+   },
+   "title": {
+    "fr": "Pastéis de nata",
+    "de": "Pastéis de nata",
+    "en": "Pastéis de nata"
+   },
+   "body": {
+    "fr": "Sortis du four toute la journée, pas seulement le matin.\n\nLe four tourne à partir de 5h30, et la vitrine se remplit au fur et à mesure.",
+    "de": "Den ganzen Tag frisch aus dem Ofen, nicht nur morgens.\n\nDer Ofen läuft ab 5.30 Uhr, und die Vitrine füllt sich nach und nach.",
+    "en": "Out of the oven all day, not only in the morning.\n\nThe oven starts at 5.30 a.m., and the counter fills up as the day goes on."
+   }
+  },
+  {
+   "title": {
+    "fr": "À la vitrine",
+    "de": "In der Vitrine",
+    "en": "At the counter"
+   },
+   "note": {
+    "fr": "Exemple de carte — les plats et les prix sont à remplacer par les vôtres.",
+    "de": "Beispielkarte — Gerichte und Preise werden durch Ihre eigenen ersetzt.",
+    "en": "Sample menu — the dishes and prices are to be replaced by your own."
+   },
+   "groups": [
+    {
+     "name": {
+      "fr": "Pains",
+      "de": "Brot",
+      "en": "Bread"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Baguette",
+        "de": "Baguette",
+        "en": "Baguette"
+       },
+       "price": "1,20 €"
+      },
+      {
+       "name": {
+        "fr": "Pain de campagne",
+        "de": "Landbrot",
+        "en": "Country loaf"
+       },
+       "price": "3,50 €"
+      },
+      {
+       "name": {
+        "fr": "Broa, pain de maïs portugais",
+        "de": "Broa, portugiesisches Maisbrot",
+        "en": "Broa, Portuguese corn bread"
+       },
+       "price": "3,80 €"
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Viennoiseries",
+      "de": "Feingebäck",
+      "en": "Pastries"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Croissant",
+        "de": "Croissant",
+        "en": "Croissant"
+       },
+       "price": "1,30 €"
+      },
+      {
+       "name": {
+        "fr": "Pain au chocolat",
+        "de": "Schokobrötchen",
+        "en": "Pain au chocolat"
+       },
+       "price": "1,50 €"
+      },
+      {
+       "name": {
+        "fr": "Chausson aux pommes",
+        "de": "Apfeltasche",
+        "en": "Apple turnover"
+       },
+       "price": "2,00 €"
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Pâtisserie portugaise",
+      "de": "Portugiesische Patisserie",
+      "en": "Portuguese pastries"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Pastel de nata",
+        "de": "Pastel de nata",
+        "en": "Pastel de nata"
+       },
+       "price": "1,50 €"
+      },
+      {
+       "name": {
+        "fr": "Bola de Berlim",
+        "de": "Bola de Berlim",
+        "en": "Bola de Berlim"
+       },
+       "price": "2,20 €"
+      },
+      {
+       "name": {
+        "fr": "Travesseiro",
+        "de": "Travesseiro",
+        "en": "Travesseiro"
+       },
+       "price": "2,50 €"
+      },
+      {
+       "name": {
+        "fr": "Jésuite",
+        "de": "Jesuit",
+        "en": "Jesuíta"
+       },
+       "price": "2,20 €"
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Salé",
+      "de": "Herzhaft",
+      "en": "Savoury"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Bifana",
+        "de": "Bifana",
+        "en": "Bifana"
+       },
+       "price": "5,50 €"
+      },
+      {
+       "name": {
+        "fr": "Rissol aux crevettes",
+        "de": "Rissol mit Garnelen",
+        "en": "Prawn rissole"
+       },
+       "price": "1,80 €"
+      },
+      {
+       "name": {
+        "fr": "Croquette de bœuf",
+        "de": "Rindfleischkrokette",
+        "en": "Beef croquette"
+       },
+       "price": "1,80 €"
+      },
+      {
+       "name": {
+        "fr": "Hamburger",
+        "de": "Hamburger",
+        "en": "Hamburger"
+       },
+       "price": "6,50 €"
+      }
+     ]
+    },
+    {
+     "name": {
+      "fr": "Boissons",
+      "de": "Getränke",
+      "en": "Drinks"
+     },
+     "items": [
+      {
+       "name": {
+        "fr": "Galão",
+        "de": "Galão",
+        "en": "Galão"
+       },
+       "price": "2,80 €"
+      },
+      {
+       "name": {
+        "fr": "Café",
+        "de": "Kaffee",
+        "en": "Coffee"
+       },
+       "price": "1,40 €"
+      },
+      {
+       "name": {
+        "fr": "Jus d'orange pressé",
+        "de": "Frisch gepresster Orangensaft",
+        "en": "Freshly squeezed orange juice"
+       },
+       "price": "3,50 €"
+      }
+     ]
+    }
+   ],
+   "type": "menu"
+  },
+  {
+   "type": "booking",
+   "kicker": {
+    "fr": "Commande",
+    "de": "Bestellung",
+    "en": "Order"
+   },
+   "title": {
+    "fr": "Commander à l'avance",
+    "de": "Vorbestellen",
+    "en": "Order in advance"
+   },
+   "intro": {
+    "fr": "Un gâteau pour une fête, une commande à retirer : dites-nous quoi et quand.",
+    "de": "Eine Torte für ein Fest oder eine Bestellung zum Abholen: sagen Sie uns was und wann.",
+    "en": "A cake for a party, or an order to collect: tell us what and when."
+   },
+   "submit": {
+    "fr": "Envoyer la commande",
+    "de": "Bestellung senden",
+    "en": "Send the order"
+   },
+   "confirmation": {
+    "fr": "Votre commande",
+    "de": "Ihre Bestellung",
+    "en": "Your order"
+   },
+   "fields": [
+    {
+     "name": "choice",
+     "type": "select",
+     "required": true,
+     "label": {
+      "fr": "Ce que vous voulez",
+      "de": "Was Sie möchten",
+      "en": "What you would like"
+     },
+     "options": [
+      {
+       "value": "gateau",
+       "label": {
+        "fr": "Un gâteau sur mesure",
+        "de": "Eine Torte nach Wunsch",
+        "en": "A cake made to order"
+       }
+      },
+      {
+       "value": "pasteis",
+       "label": {
+        "fr": "Un plateau de pâtisseries",
+        "de": "Eine Platte mit Gebäck",
+        "en": "A tray of pastries"
+       }
+      },
+      {
+       "value": "pain",
+       "label": {
+        "fr": "Du pain en quantité",
+        "de": "Brot in größerer Menge",
+        "en": "Bread in quantity"
+       }
+      },
+      {
+       "value": "autre",
+       "label": {
+        "fr": "Autre chose",
+        "de": "Etwas anderes",
+        "en": "Something else"
+       }
+      }
+     ]
+    },
+    {
+     "name": "date",
+     "type": "date",
+     "required": true,
+     "label": {
+      "fr": "Jour du retrait",
+      "de": "Tag der Abholung",
+      "en": "Collection day"
+     }
+    },
+    {
+     "name": "time",
+     "type": "time",
+     "required": true,
+     "label": {
+      "fr": "Heure du retrait",
+      "de": "Uhrzeit der Abholung",
+      "en": "Collection time"
+     }
+    },
+    {
+     "name": "people",
+     "type": "number",
+     "min": 1,
+     "max": 200,
+     "label": {
+      "fr": "Pour combien de personnes ?",
+      "de": "Für wie viele Personen?",
+      "en": "For how many people?"
+     }
+    },
+    {
+     "name": "name",
+     "type": "text",
+     "required": true,
+     "label": {
+      "fr": "Votre nom",
+      "de": "Ihr Name",
+      "en": "Your name"
+     }
+    },
+    {
+     "name": "phone",
+     "type": "tel",
+     "required": true,
+     "label": {
+      "fr": "Téléphone",
+      "de": "Telefon",
+      "en": "Phone"
+     }
+    },
+    {
+     "name": "note",
+     "type": "textarea",
+     "label": {
+      "fr": "Précisions : parfum, inscription sur le gâteau, allergies…",
+      "de": "Details: Geschmack, Schriftzug auf der Torte, Allergien…",
+      "en": "Details: flavour, writing on the cake, allergies…"
+     }
+    }
+   ]
+  },
+  {
+   "type": "gallery",
+   "title": {
+    "fr": "En images",
+    "de": "In Bildern",
+    "en": "In pictures"
+   },
+   "images": [
+    {
+     "src": "img/gallery1.webp",
+     "alt": {
+      "fr": "Le comptoir",
+      "de": "Die Theke",
+      "en": "The counter"
+     }
+    },
+    {
+     "src": "img/gallery2.webp",
+     "alt": {
+      "fr": "Un café et un croissant",
+      "de": "Kaffee und Croissant",
+      "en": "Coffee and a croissant"
+     }
+    }
+   ]
+  },
+  {
+   "type": "hours",
+   "title": {
+    "fr": "Horaires",
+    "de": "Öffnungszeiten",
+    "en": "Opening hours"
+   }
+  },
+  {
+   "type": "faq",
+   "title": {
+    "fr": "Questions fréquentes",
+    "de": "Häufige Fragen",
+    "en": "Frequently asked questions"
+   },
+   "note": {
+    "fr": "Exemple de questions fréquentes — corrigez les réponses, elles sont à vous.",
+    "de": "Beispiel für häufige Fragen — korrigieren Sie die Antworten, sie gehören Ihnen.",
+    "en": "Sample frequently asked questions — correct the answers, they are yours."
+   },
+   "items": [
+    {
+     "q": {
+      "fr": "À partir de quelle heure êtes-vous ouverts ?",
+      "de": "Ab wann haben Sie geöffnet?",
+      "en": "What time do you open?"
+     },
+     "a": {
+      "fr": "5h30 en semaine, 7h30 le samedi et le dimanche. Le pain est chaud dès l'ouverture.",
+      "de": "5.30 Uhr werktags, 7.30 Uhr am Wochenende. Das Brot ist ab Öffnung warm.",
+      "en": "5.30 a.m. on weekdays, 7.30 a.m. at the weekend. The bread is warm from opening."
+     }
+    },
+    {
+     "q": {
+      "fr": "Combien de temps à l'avance pour un gâteau ?",
+      "de": "Wie lange im Voraus für eine Torte?",
+      "en": "How far ahead for a cake?"
+     },
+     "a": {
+      "fr": "Deux jours suffisent pour la plupart des gâteaux. Pour une grande pièce, comptez une semaine.",
+      "de": "Zwei Tage reichen für die meisten Torten. Für ein großes Stück rechnen Sie eine Woche.",
+      "en": "Two days is enough for most cakes. For a large one, allow a week."
+     }
+    },
+    {
+     "q": {
+      "fr": "Peut-on écrire un prénom sur le gâteau ?",
+      "de": "Kann ein Name auf die Torte geschrieben werden?",
+      "en": "Can you write a name on the cake?"
+     },
+     "a": {
+      "fr": "Oui, dites-le simplement dans la commande.",
+      "de": "Ja, geben Sie es einfach bei der Bestellung an.",
+      "en": "Yes, just say so with the order."
+     }
+    },
+    {
+     "q": {
+      "fr": "Servez-vous le petit-déjeuner sur place ?",
+      "de": "Gibt es Frühstück vor Ort?",
+      "en": "Do you serve breakfast?"
+     },
+     "a": {
+      "fr": "Oui, café, galão et viennoiseries, à emporter ou sur place.",
+      "de": "Ja, Kaffee, Galão und Gebäck, zum Mitnehmen oder vor Ort.",
+      "en": "Yes — coffee, galão and pastries, to take away or to eat in."
+     }
+    }
+   ]
+  },
+  {
+   "type": "contact",
+   "title": {
+    "fr": "Nous trouver",
+    "de": "So finden Sie uns",
+    "en": "Find us"
+   },
+   "showMap": true
+  }
+ ],
+ "legal": {
+  "operator": "Martins",
+  "address": "19, rue Émile Mark, L-4620 Differdange",
+  "email": "jorgemartins-f@hotmail.com",
+  "phone": "+352 26 58 12 06",
+  "rcs": "",
+  "tva": ""
+ }
 }
