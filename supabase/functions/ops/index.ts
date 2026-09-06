@@ -3,9 +3,10 @@
 // queue, and the cron check that pushes when one of them changes state.
 //
 // Deployed with --no-verify-jwt because the cron path authenticates with a
-// shared secret; every other action is gated by ownerFromRequest below.
+// shared secret; every other action is gated by siteOwnerFromRequest below
+// (Ian only — restart/stop must not inherit the wider studio allowlist).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { CORS, cleanString, json, ownerFromRequest } from "../_shared/studio.ts";
+import { CORS, cleanString, json, siteOwnerFromRequest } from "../_shared/studio.ts";
 import { evaluateAll, overallHealth, SERVICES } from "./health.ts";
 import { type LastAlert, MACHINE_KEY, type PendingAlert, planAlerts } from "./alerting.ts";
 import { sendTelegram, telegramConfigured } from "./telegram.ts";
@@ -191,7 +192,7 @@ Deno.serve(async (req) => {
     return await handleCheck();
   }
 
-  const owner = await ownerFromRequest(req);
+  const owner = await siteOwnerFromRequest(req);
   if (owner.response) return owner.response;
 
   if (payload?.action === "status") return await handleStatus();

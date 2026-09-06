@@ -265,7 +265,9 @@ function renderReactions(mid) {
   (reactMap[mid] || []).forEach((r) => { (byEmoji[r.emoji] = byEmoji[r.emoji] || []).push(r); });
   el.innerHTML = Object.keys(byEmoji).map((em) => {
     const rs = byEmoji[em], mineR = rs.some((r) => r.user_id === me);
-    return `<span class="react-chip ${mineR ? "mine-r" : ""}" data-em="${em}" title="${rs.map((r) => esc(r.username)).join(", ")}">${em} ${rs.length}</span>`;
+    /* `em` is free text from message_reactions (no CHECK constraint on the
+     * column), written by any group member — escape it like the username. */
+    return `<span class="react-chip ${mineR ? "mine-r" : ""}" data-em="${esc(em)}" title="${rs.map((r) => esc(r.username)).join(", ")}">${esc(em)} ${rs.length}</span>`;
   }).join("");
   el.querySelectorAll(".react-chip").forEach((c) => (c.onclick = () => toggleReaction(mid, c.dataset.em)));
 }

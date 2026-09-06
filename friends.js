@@ -165,7 +165,7 @@ function renderInvites(list) {
   $("invites").innerHTML = list.map(i => `
     <div class="row">
       <span class="name">🎮 <b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(GAMES[i.game] || i.game)}</b></span>
-      <button class="mini go" data-join="${i.game}|${esc(i.room)}|${i.id}">${T("btn.join")}</button>
+      <button class="mini go" data-join="${esc(i.game)}|${esc(i.room)}|${i.id}">${T("btn.join")}</button>
     </div>`).join("");
   $("invites").querySelectorAll("[data-join]").forEach(b => b.onclick = async () => {
     const [game, room, id] = b.dataset.join.split("|");

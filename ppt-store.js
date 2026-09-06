@@ -58,13 +58,13 @@ function engineValue(engine) {
   return engine === "mini" ? "mini" : "api";
 }
 
-function rowPayload(deck, style, engine) {
+function rowPayload(deck, style, engine, sourceText) {
   return {
     title: deck.title,
     subject: deck.subject,
     lang: deck.lang,
     presenters: [...deck.presenters],
-    source_text: activeSourceText.slice(0, MAX_SOURCE_TEXT) || null,
+    source_text: (sourceText || "").slice(0, MAX_SOURCE_TEXT) || null,
     slides: deck.slides.map((slide) => ({ ...slide })),
     style: styleValue(style, deck.tagline),
     engine: engineValue(engine),
@@ -136,19 +136,28 @@ export async function loadDeck(id) {
   return stored;
 }
 
-export async function saveDeck(deck, style, engine = activeEngine) {
+/* Writes to an EXPLICIT deck. Everything it needs is passed in, because
+ * `activeDeckId`/`activeSourceText`/`activeEngine` all move the moment another
+ * deck is opened — and a save already in flight must still land on the deck it
+ * was started for. */
+async function writeDeck(targetId, deck, style, engine, sourceText) {
   requireSession();
   const safeDeck = validateDeck(deck);
   const sb = await client();
-  activeEngine = engineValue(engine);
-  const payload = rowPayload(safeDeck, style, activeEngine);
-  const query = activeDeckId
-    ? sb.from(TABLE).update(payload).eq("id", activeDeckId)
+  const payload = rowPayload(safeDeck, style, engine, sourceText);
+  const query = targetId
+    ? sb.from(TABLE).update(payload).eq("id", targetId)
     : sb.from(TABLE).insert(payload);
   const { data, error } = await query.select(FULL_COLUMNS).single();
   if (error) throw readableError("D'Präsentatioun späicheren", error);
-  activeDeckId = data.id;
   return storedDeck(data);
+}
+
+export async function saveDeck(deck, style, engine = activeEngine) {
+  activeEngine = engineValue(engine);
+  const stored = await writeDeck(activeDeckId, deck, style, activeEngine, activeSourceText);
+  activeDeckId = stored.id;
+  return stored;
 }
 
 export async function deleteDeck(id) {
@@ -171,11 +180,20 @@ export function cancelAutosave() {
 export function scheduleAutosave(deck, style, onSaved = null, onError = null) {
   cancelAutosave();
   const revision = autosaveRevision;
+  /* Bind the deck, the text and the engine this save is FOR. Opening another
+   * deck moves the module-level versions, so without this an autosave scheduled
+   * for A and fired after B was opened wrote A's slides over B. */
+  const targetId = activeDeckId;
+  const targetSourceText = activeSourceText;
+  const targetEngine = activeEngine;
   autosaveTimer = setTimeout(async () => {
     if (revision !== autosaveRevision) return;
     autosaveTimer = null;
     try {
-      const stored = await saveDeck(deck, style);
+      const stored = await writeDeck(targetId, deck, style, targetEngine, targetSourceText);
+      /* Only adopt the new id if this autosave created the deck AND nothing else
+       * has been opened in the meantime. */
+      if (targetId === null && activeDeckId === null) activeDeckId = stored.id;
       if (typeof onSaved === "function") onSaved(stored);
     } catch (error) {
       const readable = error instanceof Error ? error : new Error("Späicherfeeler");

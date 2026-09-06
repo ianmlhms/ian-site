@@ -45,9 +45,9 @@ function engineValue(engine) {
   return engine === "mini" ? "mini" : "api";
 }
 
-function rowPayload(document, settings, engine) {
+function rowPayload(document, settings, engine, sourceText) {
   return { title: document.title, subject: document.subject, lang: document.lang, kind: document.kind,
-    source_text: activeSourceText.slice(0, MAX_SOURCE_TEXT) || null,
+    source_text: (sourceText || "").slice(0, MAX_SOURCE_TEXT) || null,
     blocks: document.blocks.map((block) => ({ ...block })), settings: { ...(settings || {}) },
     engine: engineValue(engine), updated_at: new Date().toISOString() };
 }
@@ -95,17 +95,26 @@ export async function loadDocument(id) {
   return stored;
 }
 
-export async function saveDocument(document, settings, engine = activeEngine) {
+/* Writes to an EXPLICIT row. Everything this needs is passed in, because the
+ * module-level `activeId`/`activeSourceText`/`activeEngine` all move the moment
+ * another document is opened — and a save already in flight must still land on
+ * the document it was started for. */
+async function writeDocument(targetId, document, settings, engine, sourceText) {
   requireSession();
   const safe = validateDocument(document);
   const sb = await client();
-  activeEngine = engineValue(engine);
-  const payload = rowPayload(safe, settings, activeEngine);
-  const query = activeId ? sb.from(TABLE).update(payload).eq("id", activeId) : sb.from(TABLE).insert(payload);
+  const payload = rowPayload(safe, settings, engine, sourceText);
+  const query = targetId ? sb.from(TABLE).update(payload).eq("id", targetId) : sb.from(TABLE).insert(payload);
   const { data, error } = await query.select(FULL_COLUMNS).single();
   if (error) throw readableError("D'Dokument späicheren", error);
-  activeId = data.id;
   return storedDocument(data);
+}
+
+export async function saveDocument(document, settings, engine = activeEngine) {
+  activeEngine = engineValue(engine);
+  const stored = await writeDocument(activeId, document, settings, activeEngine, activeSourceText);
+  activeId = stored.id;
+  return stored;
 }
 
 export async function deleteDocument(id) {
@@ -127,11 +136,20 @@ export function cancelAutosave() {
 export function scheduleAutosave(document, settings, onSaved = null, onError = null) {
   cancelAutosave();
   const revision = autosaveRevision;
+  /* Bind the row, the text and the engine this save is FOR. Opening another
+   * document moves the module-level versions, so without this an autosave
+   * scheduled for A and fired after B was opened wrote A's content over B. */
+  const targetId = activeId;
+  const targetSourceText = activeSourceText;
+  const targetEngine = activeEngine;
   autosaveTimer = setTimeout(async () => {
     if (revision !== autosaveRevision) return;
     autosaveTimer = null;
     try {
-      const stored = await saveDocument(document, settings);
+      const stored = await writeDocument(targetId, document, settings, targetEngine, targetSourceText);
+      /* Only adopt the new id if this autosave created the document AND nothing
+       * else has been opened in the meantime. */
+      if (targetId === null && activeId === null) activeId = stored.id;
       if (typeof onSaved === "function") onSaved(stored);
     } catch (error) {
       const readable = error instanceof Error ? error : new Error("Späicherfeeler");

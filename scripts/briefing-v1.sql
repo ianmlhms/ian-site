@@ -5,9 +5,14 @@
 -- fires 06:00 local — change '0 5 * * *' to
 -- '0 6 * * *' then.
 -- The secret must match:  supabase secrets set
--- BRIEFING_SECRET=...  (repo copy holds a placeholder
--- — the repo is public, never commit the real value;
--- rotated 15 Jul 2026 after the old one was committed).
+-- BRIEFING_SECRET=...
+--
+-- The repo is public, so the value below is an OBVIOUS
+-- placeholder — substitute the real one locally and
+-- never commit it. It was a random hex string until
+-- 6 Sep 2026, which no scanner (or human) could tell
+-- apart from a live secret. Rotated 15 Jul 2026 after
+-- the real one was committed.
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 select cron.unschedule(jobid) from cron.job
@@ -18,7 +23,6 @@ select cron.schedule(
   'select net.http_post(url := ''https://lvksqmgfw'
   'kfbblfsozfk.supabase.co/functions/v1/briefing'''
   ', headers := ''{"Content-Type": "application/js'
-  'on", "x-briefing-secret": "52659c4cfd31e5a0e990'
-  'a62445b57427861b421d131f616c"}''::jsonb, body :'
-  '= ''{}''::jsonb)'
+  'on", "x-briefing-secret": "REPLACE_WITH_BRIEFIN'
+  'G_SECRET"}''::jsonb, body := ''{}''::jsonb)'
 );

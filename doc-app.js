@@ -8,7 +8,7 @@ import { createHistory } from "./ppt-history.js?v=3";
 import { createDocumentEditor, esc } from "./doc-editor.js?v=1";
 import { createStudioShell, installStudioChrome } from "./studio-shell.js?v=2"; installStudioChrome();
 import { deleteDocument, listDocuments, loadDocument, saveDocument,
-  scheduleAutosave, startNewDocument } from "./doc-store.js?v=6";
+  scheduleAutosave, startNewDocument } from "./doc-store.js?v=7";
 
 const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"];
 const DEFAULT_WORDS = 500;

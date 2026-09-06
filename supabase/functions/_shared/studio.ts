@@ -6,6 +6,10 @@ const JOB_ID = /^[0-9a-f-]{36}$/i;
 /* Must stay in step with STUDIO_ALLOW in index.html, ppt-app.js and doc-app.js —
  * those only decide what is *shown*, this is what actually grants access. */
 const OWNER_EMAILS = new Set(["konto@ian.lu", "matthieugerouville@gmail.com"]);
+/* Ian alone. The studio allowlist above is deliberately wider because those are
+ * document tools shared with a classmate; anything that controls the server must
+ * NOT inherit that. Keep in step with OWNER in ops.js. */
+const SITE_OWNER_EMAIL = "konto@ian.lu";
 const LANGS = new Set(["lb", "de", "en", "fr"]);
 const SCHOOL_YEARS = new Set(["7e", "6e", "5e", "4e", "3e", "2e", "1ère"]);
 const admin = createClient(
@@ -80,9 +84,18 @@ export async function userFromRequest(req: Request): Promise<StudioUser | null> 
 
 /** Apply the identical anonymous and non-owner gates in every studio function. */
 export async function ownerFromRequest(req: Request): Promise<OwnerResult> {
+  return await gate(req, (email) => OWNER_EMAILS.has(email));
+}
+
+/** Stricter gate for anything that touches the server itself, not documents. */
+export async function siteOwnerFromRequest(req: Request): Promise<OwnerResult> {
+  return await gate(req, (email) => email === SITE_OWNER_EMAIL);
+}
+
+async function gate(req: Request, isAllowed: (email: string) => boolean): Promise<OwnerResult> {
   const user = await userFromRequest(req);
   if (!user) return { user: null, response: json({ error: "sign in first" }, 401) };
-  if (!OWNER_EMAILS.has(user.email)) {
+  if (!isAllowed(user.email)) {
     return { user: null, response: json({ error: "This tool is private." }, 403) };
   }
   return { user, response: null };
