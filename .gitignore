@@ -11,3 +11,6 @@ supabase/.temp/
 
 # Claude Code local state (agent worktrees live here)
 .claude/
+
+# Stray Chrome user-data dir from a tool passing an undefined path
+undefined/
