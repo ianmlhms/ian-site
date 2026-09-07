@@ -24,8 +24,11 @@
 </script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=18"></script>
+<script src="theme.js?v=19"></script>
 <style>
+:where(button.st,button.dep,button.lndep){appearance:none;width:100%;background:transparent;color:inherit;font:inherit;text-align:inherit;border:0;border-radius:0;margin:0}
+:where(button.st){display:block}
+button.st,button.dep,button.lndep{min-height:0}
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
@@ -355,8 +358,8 @@ function paintDeps(){
     if(train && d.num) bits.push(`Zuch ${esc(d.num)}`);
     if(d.platform) bits.push(`<span class="q">Quai ${esc(d.platform)}</span>`);
     const sub=bits.length?`<span class="sub">${bits.join(" · ")}</span>`:"";
-    return `<div class="dep ${train?"train":""} ${school?"school":""} ${d.cancelled?"canc":""}" data-i="${i}"><span class="line">${lab}</span>
-      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span><span class="dcaret">▾</span></div>
+    return `<button type="button" aria-expanded="false" class="dep ${train?"train":""} ${school?"school":""} ${d.cancelled?"canc":""}" data-i="${i}"><span class="line">${lab}</span>
+      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span><span class="dcaret">▾</span></button>
       <div class="depdetail" hidden></div>`;
   }).join("");
   $("deps").querySelectorAll(".dep").forEach(el=>el.onclick=()=>toggleDep(+el.dataset.i,el));
@@ -395,9 +398,9 @@ function toggleDep(i,el){
   const box=el.nextElementSibling;
   if(!box||!box.classList.contains("depdetail"))return;
   if(box.hasAttribute("hidden")){
-    el.classList.add("open"); box.removeAttribute("hidden");
+    el.classList.add("open"); el.setAttribute("aria-expanded","true"); box.removeAttribute("hidden");
     if(!box.dataset.done){ box.dataset.done="1"; loadDepDetail(i,box); }
-  }else{ box.setAttribute("hidden",""); el.classList.remove("open"); }
+  }else{ box.setAttribute("hidden",""); el.classList.remove("open"); el.setAttribute("aria-expanded","false"); }
 }
 async function loadBoard(){
   if(!curStop)return;
@@ -575,7 +578,7 @@ async function selectLineDir(i){
       const p=s.place||{}, real=p.departure||p.arrival, sched=p.scheduledDeparture||p.scheduledArrival;
       const dl=delayOf(real,sched);
       const dlt=dl?` <em>${dl>0?"+":""}${dl}</em>`:` <span class="ok">•</span>`;
-      return `<div class="lndep" data-k="${k}"><span class="lnt">${esc(clockOf(real||sched))}${dlt}</span><span class="dcaret">▾</span></div>
+      return `<button type="button" aria-expanded="false" class="lndep" data-k="${k}"><span class="lnt">${esc(clockOf(real||sched))}${dlt}</span><span class="dcaret">▾</span></button>
         <div class="depdetail" hidden></div>`;
     }).join("");
     $("lndeps").querySelectorAll(".lndep").forEach(el=>el.onclick=()=>toggleLnDep(+el.dataset.k,el));
@@ -586,9 +589,9 @@ async function selectLineDir(i){
 function toggleLnDep(k,el){
   const box=el.nextElementSibling; if(!box||!box.classList.contains("depdetail"))return;
   if(box.hasAttribute("hidden")){
-    el.classList.add("open"); box.removeAttribute("hidden");
+    el.classList.add("open"); el.setAttribute("aria-expanded","true"); box.removeAttribute("hidden");
     if(!box.dataset.done){ box.dataset.done="1"; loadLnDepDetail(k,box); }
-  }else{ box.setAttribute("hidden",""); el.classList.remove("open"); }
+  }else{ box.setAttribute("hidden",""); el.classList.remove("open"); el.setAttribute("aria-expanded","false"); }
 }
 async function loadLnDepDetail(k,box){
   const s=LNDEPS[k], tripId=s&&s.tripId;
@@ -609,7 +612,7 @@ function renderPlaces(places){
   const host=$("places");
   if(!places||!places.length){ host.innerHTML=""; return; }
   host.innerHTML=`<div class="rectitle">📍 Adressen &amp; Plazen</div>`+places.map((p,i)=>
-    `<div class="st" data-i="${i}"><span class="pname">${esc(p.name)}</span><span class="kind">${esc(p.kind)}</span></div>`
+    `<button type="button" class="st" data-i="${i}"><span class="pname">${esc(p.name)}</span><span class="kind">${esc(p.kind)}</span></button>`
   ).join("");
   host.querySelectorAll(".st").forEach(el=>el.onclick=()=>{
     const place=places[+el.dataset.i]; if(!place)return;
@@ -623,7 +626,7 @@ function renderStops(stops,nearPlace){
     : "";
   if(!stops||!stops.length){$("stops").innerHTML=note+'<div class="muted">Keng Arrêten fonnt.</div>';return;}
   $("stops").innerHTML=note+stops.map(s=>
-    `<div class="st" data-id="${esc(s.id)}"><span>${esc(s.name)}</span>${s.dist!=null?`<span class="dist">${s.dist<1000?Math.round(s.dist)+" m":(s.dist/1000).toFixed(1)+" km"}</span>`:""}</div>`
+    `<button type="button" class="st" data-id="${esc(s.id)}"><span>${esc(s.name)}</span>${s.dist!=null?`<span class="dist">${s.dist<1000?Math.round(s.dist)+" m":(s.dist/1000).toFixed(1)+" km"}</span>`:""}</button>`
   ).join("");
   $("stops").querySelectorAll(".st").forEach(el=>el.onclick=()=>{
     const s=stops.find(x=>String(x.id)===el.dataset.id); if(s)selectStop(s);
@@ -682,14 +685,16 @@ function wireStopPicker(inputId,listId,setPick){
   // themselves before they can ask for a route.
   const paint=(hits)=>{
     if(!hits.length){close();return;}
+    const focusedIndex=[...list.querySelectorAll(".st")].indexOf(document.activeElement);
     list.className="picklist";
     list.innerHTML=hits.map((h,i)=>
-      `<div class="st" data-i="${i}">${esc(h.name)}${h.kind?` <span class="kind">· ${esc(h.kind)}</span>`:""}</div>`
+      `<button type="button" class="st" data-i="${i}">${esc(h.name)}${h.kind?` <span class="kind">· ${esc(h.kind)}</span>`:""}</button>`
     ).join("");
     list.querySelectorAll(".st").forEach(el=>el.onclick=()=>{
       const hit=hits[+el.dataset.i];
       if(hit){ inp.value=hit.name; setPick(hit); close(); }
     });
+    if(focusedIndex>=0)list.querySelectorAll(".st")[focusedIndex]?.focus();
   };
   inp.addEventListener("input",()=>{
     setPick(null);
@@ -708,8 +713,12 @@ function wireStopPicker(inputId,listId,setPick){
       });
     },160);
   });
-  // long enough for a tap on the list to land before the list disappears
-  inp.addEventListener("blur",()=>setTimeout(close,180));
+  const PICKER_BLUR_DELAY_MS=180;
+  function closeOutsidePicker(){
+    if(document.activeElement!==inp&&!list.contains(document.activeElement))close();
+  }
+  inp.addEventListener("blur",()=>setTimeout(closeOutsidePicker,PICKER_BLUR_DELAY_MS));
+  list.addEventListener("focusout",()=>setTimeout(closeOutsidePicker,PICKER_BLUR_DELAY_MS));
 }
 const fmtClock=(iso)=>new Date(iso).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
 const MODEICON={WALK:"🚶",BUS:"🚌",COACH:"🚌",TRAM:"🚊",RAIL:"🚆",REGIONAL_RAIL:"🚆",REGIONAL_FAST_RAIL:"🚆",LONG_DISTANCE:"🚆",HIGHSPEED_RAIL:"🚄",SUBWAY:"🚇",FERRY:"⛴️"};

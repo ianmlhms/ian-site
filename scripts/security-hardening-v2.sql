@@ -103,3 +103,25 @@ create or replace function public.add_notification(
     where lower(p.username)
         = lower(btrim(p_to_username))
       and p.id <> auth.uid()';
+
+-- 5. exam-files was a PUBLIC bucket, so any attachment
+--    was retrievable by URL with no login and no class
+--    membership, even though its exam_notes row is
+--    class-scoped. The bucket was empty when this ran
+--    (0 objects), so nothing breaks.
+update storage.buckets set public = false
+ where id = 'exam-files';
+
+drop policy if exists exam_files_read
+  on storage.objects;
+create policy exam_files_read
+  on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'exam-files'
+    and (
+      owner = auth.uid()
+      or exists (
+        select 1 from public.exam_notes n
+         where n.file_url = storage.objects.name
+           and n.class = public.my_class())));

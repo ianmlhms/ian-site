@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=18"></script>
+<script src="theme.js?v=19"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
   *{box-sizing:border-box}
@@ -185,7 +185,7 @@ function bubble(role,html){
 }
 function push(role,text,imgs){
   history.push({role,text});
-  const ih=(imgs&&imgs.length)?`<div class="imgs">${imgs.map(u=>`<img src="${u}">`).join("")}</div>`:"";
+  const ih=(imgs&&imgs.length)?`<div class="imgs">${imgs.map(p=>`<img src="${p.dataUrl}" alt="${esc(p.name)}">`).join("")}</div>`:"";
   return bubble(role,ih+fmt(text));
 }
 function renderHistory(){
@@ -291,10 +291,10 @@ $("file").onchange=async()=>{
     try{
       if(f.type==="application/pdf"||/\.pdf$/i.test(f.name||"")){
         const {urls,total}=await pdfToDataUrls(f,MAX_IMG-pending.length);
-        for(const u of urls){ if(pending.length>=MAX_IMG){full=true;break;} pending.push({dataUrl:u}); }
+        for(const [i,u] of urls.entries()){ if(pending.length>=MAX_IMG){full=true;break;} pending=[...pending,{dataUrl:u,name:`${f.name} (${i+1})`}]; }
         if(total>urls.length)full=true;
       }else if(f.type.startsWith("image/")){
-        pending.push({dataUrl:await imgToDataUrl(f)});
+        pending=[...pending,{dataUrl:await imgToDataUrl(f),name:f.name}];
       }
       renderThumbs();
     }catch(e){ console.warn("[buddy attach]",f.name,e); attachHint("Konnt d'Datei net liesen."); }
@@ -306,7 +306,7 @@ function renderThumbs(){
   const el=$("thumbs");
   if(!pending.length){el.style.display="none";el.innerHTML="";return;}
   el.style.display="flex";
-  el.innerHTML=pending.map((p,i)=>`<span class="th"><img src="${p.dataUrl}"><span class="x" data-i="${i}">✕</span></span>`).join("");
+  el.innerHTML=pending.map((p,i)=>`<span class="th"><img src="${p.dataUrl}" alt="${esc(p.name)}"><span class="x" data-i="${i}">✕</span></span>`).join("");
   el.querySelectorAll(".x").forEach(x=>x.onclick=()=>{ pending.splice(+x.dataset.i,1); renderThumbs(); });
 }
 
@@ -322,7 +322,7 @@ async function send(){
   }
   busy=true; $("send").disabled=true;
   const n=dataUrls.length, utext=text||("📷 "+n+(n===1?" Bild":" Biller"));
-  push("user", utext, dataUrls);
+  push("user", utext, pending);
   $("input").value=""; $("input").style.height="auto";
   pending=[]; renderThumbs();
   const wait=push("assistant","…");

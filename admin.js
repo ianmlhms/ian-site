@@ -7,6 +7,9 @@ const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? "—" : d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
 const fileIcon = (name) => { const e = (name || "").split(".").pop().toLowerCase(); return ({ pdf: "📕", zip: "🗜", doc: "📘", docx: "📘", xls: "📗", xlsx: "📗", ppt: "📙", pptx: "📙", txt: "📄", mp3: "🎵", wav: "🎵" })[e] || "📎"; };
 
+function showList() { $("panel").classList.remove("detail-open"); }
+$("detailBack").onclick = showList;
+
 // Render a message's attachment. Handles every media_type the messenger can send
 // (image / video / audio / file) — previously only image/video, so voice notes and
 // file attachments showed a broken-image box.
@@ -53,6 +56,7 @@ function renderGroupList(list) {
 async function openGroup(id) {
   current = groups.find((g) => g.id === id);
   if (!current) return;
+  $("panel").classList.add("detail-open");
   document.querySelectorAll(".grow").forEach((li) => li.classList.toggle("active", +li.dataset.id === id));
   const [{ data: members }, { data: msgs }] = await Promise.all([
     sb.rpc("admin_members", { p_group_id: id }),
@@ -90,6 +94,7 @@ async function deleteGroup(id) {
   if (!confirm("Delete this entire group/DM and ALL its messages? This cannot be undone.")) return;
   const { error } = await sb.rpc("admin_delete_group", { p_group_id: id });
   if (error) return alert(error.message);
+  showList();
   current = null; $("detailH").innerHTML = "Select a group to inspect"; $("mlist").innerHTML = ""; loadGroups();
 }
 async function deleteMessage(mid, gid) {
@@ -135,6 +140,7 @@ function genPassword() {
 function openUser(uid) {
   current = users.find((u) => u.id === uid);
   if (!current) return;
+  $("panel").classList.add("detail-open");
   document.querySelectorAll(".grow").forEach((li) => li.classList.toggle("active", li.dataset.uid === uid));
   const u = current;
   $("detailH").innerHTML =
@@ -166,6 +172,7 @@ async function deleteUser(uid) {
   if (!confirm("Permanently delete this user and ALL their data (messages, scores, memberships)? This cannot be undone.")) return;
   const { error } = await sb.rpc("admin_delete_user", { p_user_id: uid });
   if (error) return alert(error.message);
+  showList();
   current = null; $("detailH").innerHTML = "Select a user"; $("mlist").innerHTML = ""; loadUsers();
 }
 async function setUserPassword(uid) {
@@ -186,7 +193,8 @@ async function loadFeedback() {
   renderFeedback(feedback);
 }
 function renderFeedback(list) {
-  $("glist").innerHTML = `<li class="empty">${list.length} submission(s)</li>`;
+  $("glist").innerHTML = `<li class="empty"><button type="button" id="viewFeedback" class="tab">${list.length} submission(s)</button></li>`;
+  $("viewFeedback").onclick = () => $("panel").classList.add("detail-open");
   const box = $("mlist");
   if (!list.length) { box.innerHTML = `<div class="empty">No feedback yet.</div>`; return; }
   box.innerHTML = "";
@@ -211,6 +219,7 @@ async function deleteFeedback(id) {
 /* ============================ SHARED ============================ */
 function setMode(m) {
   mode = m; current = null;
+  $("panel").classList.toggle("detail-open", m === "feedback");
   $("tabGroups").classList.toggle("active", m === "groups");
   $("tabUsers").classList.toggle("active", m === "users");
   $("tabFeedback").classList.toggle("active", m === "feedback");

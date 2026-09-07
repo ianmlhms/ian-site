@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=18"></script>
+<script src="theme.js?v=19"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
@@ -170,7 +170,7 @@ async function loadDetail(id){
   ]);
   const notesHtml=(notes||[]).map(n=>{
     const canDel=n.created_by===me;
-    const file=n.file_url?`<a class="file" href="${esc(n.file_url)}" target="_blank" rel="noopener">📎 ${esc(n.file_name||"Datei")}</a>`:"";
+    const file=n.file_url?`<a class="file" href="#" data-file="${esc(n.file_url)}">📎 ${esc(n.file_name||"Datei")}</a>`:"";
     return `<div class="n">${n.body?esc(n.body):""}
       <div class="meta">${file}${canDel?`<button class="del" data-dn="${n.id}" title="Läschen">✕</button>`:""}</div></div>`;
   }).join("")||`<div class="n" style="color:var(--muted)">Nach keng Notizen. Setz deng Resimee oder Fotoen bäi 👇</div>`;
@@ -193,6 +193,7 @@ async function loadDetail(id){
   box.querySelectorAll("[data-dn]").forEach(b=>b.onclick=async()=>{
     await sb.from("exam_notes").delete().eq("id",b.dataset.dn);loadDetail(id);
   });
+  box.querySelectorAll("[data-file]").forEach(a=>a.onclick=(ev)=>{ev.preventDefault();openFile(id,a.dataset.file);});
   $("an-"+id).onclick=()=>addNote(id,null,null);
   $("af-"+id).onclick=()=>$("fi-"+id).click();
   $("fi-"+id).onchange=(e)=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)uploadFile(id,f);};
@@ -222,9 +223,29 @@ async function uploadFile(id,file){
     const path=`${me}/${id}-${Date.now()}.${ext}`;
     const {error}=await sb.storage.from("exam-files").upload(path,file,{contentType:file.type||"application/octet-stream"});
     if(error)throw error;
-    const url=sb.storage.from("exam-files").getPublicUrl(path).data.publicUrl;
-    await addNote(id,url,file.name);
+    // Store the storage PATH. The bucket is private, so a link is minted on
+    // demand below — a public URL would be readable by anyone who saw it.
+    await addNote(id,path,file.name);
   }catch(e){console.warn(e);setMsg(id,"Upload feelgeschloen (Migratioun gelaf?).",true);}
+}
+
+// The bucket is private, so a link only exists for as long as it is needed.
+// The tab is opened synchronously — opening it after the await would be caught
+// by the popup blocker.
+const SIGNED_URL_TTL_S=60;
+async function openFile(id,pathOrUrl){
+  if(/^https?:\/\//i.test(pathOrUrl)){window.open(pathOrUrl,"_blank","noopener");return;}
+  const tab=window.open("","_blank");
+  try{
+    const {data,error}=await sb.storage.from("exam-files")
+      .createSignedUrl(pathOrUrl,SIGNED_URL_TTL_S);
+    if(error||!data?.signedUrl)throw error||new Error("no url");
+    if(tab)tab.location=data.signedUrl; else location.href=data.signedUrl;
+  }catch(e){
+    console.warn("[exams] signed url",e);
+    if(tab)tab.close();
+    setMsg(id,"Datei konnt net opgemaach ginn.",true);
+  }
 }
 
 function setMsg(id,t,err){

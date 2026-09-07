@@ -41,13 +41,20 @@ jobs:
           FTP_HOST: ${{ secrets.FTP_SERVER }}
           FTP_USER: ${{ secrets.FTP_USERNAME }}
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+        # verify-certificate was off, so a MITM could have presented any
+        # self-signed cert and captured these credentials. The chain is now
+        # verified. check-hostname stays off because the server presents a
+        # valid Let's Encrypt cert for its Plesk name
+        # (plesk-euc1-q67.eurodns.host), which does not match FTP_SERVER;
+        # point FTP_SERVER at that name to turn hostname checking on too.
         run: |
           lftp -c "
             set cmd:fail-exit yes;
             set ftp:ssl-allow true;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
-            set ssl:verify-certificate no;
+            set ssl:verify-certificate yes;
+            set ssl:check-hostname no;
             set net:timeout 20;
             set net:max-retries 3;
             set net:reconnect-interval-base 5;

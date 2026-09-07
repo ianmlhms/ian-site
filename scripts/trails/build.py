@@ -152,7 +152,7 @@ def gallery_html(images: list, lang: str, alt_base: str = "") -> str:
         # degrades to nothing instead of a broken-image icon.
         alt = esc(f"{alt_base} ({i})" if alt_base else "")
         figures.append(
-            f'      <figure><img src="{esc(img["src"])}" alt="{alt}" loading="lazy"'
+            f'      <figure><img src="{esc(img["src"])}" alt="{alt}" loading="lazy" style="aspect-ratio:4/3;object-fit:cover"'
             f' onerror="this.closest(&#39;figure&#39;).style.display=&#39;none&#39;" />'
             f"<figcaption>{credit}</figcaption></figure>"
         )

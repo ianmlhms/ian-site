@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Maze Runner - PixelBreak</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
-canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,255,200,0.15)}
+canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(0,255,200,0.15)}
 #hud{margin-bottom:10px;font-size:18px;display:flex;gap:20px}
+canvas{max-height:calc(100vh - 60px)}
+#hud{max-width:100%;flex-wrap:wrap;justify-content:center}
 </style>
 </head>
 <body>

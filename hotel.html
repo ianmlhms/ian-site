@@ -139,7 +139,7 @@
   .room .r-ico{font-size:19px;line-height:1;}
   .room .r-name{font-weight:600;margin-top:2px;line-height:1.05;}
   .room .r-size{font-size:10px;opacity:.85;}
-  .room .r-del{position:absolute;top:2px;right:3px;font-size:12px;opacity:0;background:rgba(0,0,0,.5);border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;}
+  .room .r-del{min-height:0;border:0;padding:0;color:inherit;font-family:inherit;position:absolute;top:2px;right:3px;font-size:12px;opacity:0;background:rgba(0,0,0,.5);border-radius:50%;width:17px;height:17px;display:flex;align-items:center;justify-content:center;}
   .room:hover .r-del{opacity:1;}
   .room .r-resize{position:absolute;right:1px;bottom:1px;width:14px;height:14px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,rgba(255,255,255,.85) 50%);border-radius:0 0 5px 0;}
   .room.shaft{border:2px dashed rgba(255,255,255,.92);box-shadow:0 0 0 2px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.45);}
@@ -180,6 +180,7 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--text);padding:11px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.25s;z-index:100;}
   .toast.show{opacity:1;}
   .hidden{display:none!important;}
+@media (hover:none) and (pointer:coarse){.bld-block .bb-edit{opacity:1;min-width:44px;min-height:44px}.room .r-del{opacity:1;width:44px;height:44px}}
 </style>
   <meta name="theme-color" content="#0d0d1a">
   <meta name="mobile-web-app-capable" content="yes">
@@ -620,14 +621,14 @@ function addEl(obj,isShaft){
     el.style.background='transparent';el.style.boxShadow='none';el.style.border='none';
     let html='';
     cells.forEach(c=>{html+=`<span class="r-tile" style="left:${(c.x-bb.minx)*CELL}px;top:${(c.y-bb.miny)*CELL}px;width:${CELL-2}px;height:${CELL-2}px;background:${p.color}"></span>`;});
-    html+=`<span class="r-label"><span class="r-ico">${p.ico}</span><span class="r-name">${p.name}</span></span><span class="r-del" title="Entfernen">✕</span>`;
+    html+=`<span class="r-label"><span class="r-ico">${p.ico}</span><span class="r-name">${p.name}</span></span><button type="button" class="r-del" title="Entfernen" aria-label="Entfernen">✕</button>`;
     el.innerHTML=html;
   }else{ // Rechteck
     el.style.background=p.color;const big=obj.w*obj.h>=2;
     el.innerHTML=`<span class="r-ico">${p.ico}</span>`
       +(big?`<span class="r-name">${p.name}</span>`:'')
       +(isShaft?`<span class="r-badge">↕ alle Etagen</span>`:(big?`<span class="r-size">${obj.w}×${obj.h}</span>`:''))
-      +`<span class="r-del" title="Entfernen">✕</span><span class="r-resize" title="Größe ändern"></span>`;
+      +`<button type="button" class="r-del" title="Entfernen" aria-label="Entfernen">✕</button><span class="r-resize" title="Größe ändern"></span>`;
     el.querySelector('.r-resize').addEventListener('mousedown',ev=>startResize(ev,obj,el));
   }
   el.querySelector('.r-del').onclick=ev=>{ev.stopPropagation();const arr=isShaft?curB().shafts:curFloor().rooms;const i=arr.indexOf(obj);if(i>-1)arr.splice(i,1);selectedRooms.delete(obj);updateMergeBtn();afterEdit();};

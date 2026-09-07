@@ -2,17 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pixel Painter - PixelBreak</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;gap:15px}
-canvas{border-radius:8px;border:2px solid #2a2a4a;cursor:crosshair;image-rendering:pixelated}
-#tools{display:flex;flex-direction:column;gap:8px;width:50px}
+canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:8px;border:2px solid #2a2a4a;cursor:crosshair;image-rendering:pixelated}
+#tools{flex:none;max-height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;width:50px}
+#tools>*{flex:none}
 .color-btn{width:40px;height:40px;border-radius:8px;border:3px solid transparent;cursor:pointer}
 .color-btn.active{border-color:#fff;transform:scale(1.1)}
 .tool-btn{width:40px;height:40px;border-radius:8px;border:2px solid #3a3a5a;cursor:pointer;background:#1a1a2e;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
 .tool-btn.active{border-color:#4de8ff;background:#2a2a4a}
 #size{width:40px;text-align:center;background:#1a1a2e;border:1px solid #3a3a5a;color:#fff;border-radius:4px;padding:4px}
+@media(max-width:720px){body{height:auto;min-height:100vh;flex-direction:column;padding:12px}canvas{order:-1;max-height:70vh}#tools{width:100%;flex-direction:row;flex-wrap:wrap;flex:none}#colors{display:flex;flex-wrap:wrap;gap:8px}.tool-btn,.color-btn{flex:none}}
 </style>
 </head>
 <body>
@@ -30,7 +33,7 @@ const C=document.getElementById('c'),X=C.getContext('2d');
 const PX=16,GRID=40;
 const PALETTE=['#000000','#ffffff','#ff4466','#ff8844','#ffcc00','#44ff88','#44aaff','#aa66ff','#ff66aa','#884422','#666666','#1a1a2e','#00cccc','#88cc44','#4444aa','#cc4488'];
 let grid=Array.from({length:GRID},()=>Array(GRID).fill(null));
-let color=PALETTE[2],tool='draw',brushSize=1,drawing=false;
+let color=PALETTE[2],tool='draw',brushSize=1,activePointer=null;
 
 // Render palette
 let ch='';PALETTE.forEach((c,i)=>{ch+=`<div class="color-btn ${i===2?'active':''}" style="background:${c}" onclick="setColor('${c}',this)"></div>`});
@@ -77,10 +80,12 @@ function render(){
   }
 }
 
-C.addEventListener('mousedown',e=>{drawing=true;paint(e.clientX,e.clientY)});
-C.addEventListener('mousemove',e=>{if(drawing)paint(e.clientX,e.clientY)});
-C.addEventListener('mouseup',()=>drawing=false);
-C.addEventListener('mouseleave',()=>drawing=false);
+C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId);paint(e.clientX,e.clientY)});
+C.addEventListener('pointermove',e=>{if(e.pointerId===activePointer)paint(e.clientX,e.clientY)});
+function endPaint(e){if(e.pointerId!==activePointer)return;activePointer=null;if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
+C.addEventListener('pointerup',endPaint);
+C.addEventListener('pointercancel',endPaint);
+C.addEventListener('lostpointercapture',endPaint);
 render();
 </script>
 </body>

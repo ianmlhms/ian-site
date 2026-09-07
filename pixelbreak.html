@@ -17,7 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <!-- Google AdSense (public pages only) -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6402871182747814" crossorigin="anonymous"></script>
-<script src="theme.js?v=18"></script>
+<script src="theme.js?v=19"></script>
 <style>
 :root{--brand1:#ff6b9d;--brand2:#4de8ff;--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
 html[data-theme="light"]{--brand1:#e23d78;--brand2:#0e7ec2}
@@ -50,7 +50,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .pb-about strong{color:var(--text)}
 .count{font-size:13px;color:var(--text2);margin-bottom:12px}
 .game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
-.game-card{background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;transition:transform 0.25s,box-shadow 0.25s,background 0.25s;position:relative;border:1px solid var(--border)}
+.game-card{appearance:none;display:block;width:100%;padding:0;font:inherit;color:inherit;text-align:inherit;background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;transition:transform 0.25s,box-shadow 0.25s,background 0.25s;position:relative;border:1px solid var(--border)}
 .game-card.online{border-color:rgba(77,232,255,0.22)}
 .game-card.online:hover{box-shadow:0 14px 40px rgba(0,0,0,0.45),0 0 26px rgba(77,232,255,0.14)}
 .game-card:hover{transform:translateY(-6px);box-shadow:0 14px 40px rgba(0,0,0,0.45);background:var(--card-hover)}
@@ -59,8 +59,8 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .game-card:hover .game-thumb .em{transform:scale(1.12)}
 .game-thumb::after{content:'\25B6';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);font-size:32px;color:#fff;opacity:0;transition:all 0.3s;text-shadow:0 0 20px rgba(0,0,0,0.8)}
 .game-card:hover .game-thumb::after{transform:translate(-50%,-50%) scale(1);opacity:0.8}
-.game-info{padding:10px 12px}
-.game-name{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
+.game-info{display:block;padding:10px 12px}
+.game-name{display:block;font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
 .game-tags{display:flex;gap:4px;flex-wrap:wrap}
 .tag{font-size:10px;padding:2px 7px;border-radius:7px;background:var(--card2);color:var(--text2)}
 .tag.mp{background:rgba(77,232,255,0.15);color:var(--accent2-text)}
@@ -69,7 +69,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .ext{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;padding:2px 6px;border-radius:5px}
 #overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
 #overlay.open{display:flex}
-#gh{display:flex;align-items:center;justify-content:space-between;width:100%;padding:6px 14px;color:#fff;background:#0d0d1a;flex:none}
+#gh{display:flex;align-items:center;justify-content:space-between;width:100%;padding:calc(6px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-right,0px)) 6px calc(14px + env(safe-area-inset-left,0px));gap:8px;flex-wrap:wrap;color:#fff;background:#0d0d1a;flex:none}
 #gh h2{font-family:'Fredoka',sans-serif;font-size:18px}
 #cb{background:var(--accent);border:none;color:var(--accent-foreground);width:34px;height:34px;border-radius:50%;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none}
 #cb:hover{transform:scale(1.1)}
@@ -97,6 +97,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 #om .x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
 footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
 @media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:12px 12px 35px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.game-thumb{height:90px;font-size:36px}}
+body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,body.game-open #pwaInstall,body.game-open #fbFab,body.game-open #fbPanel,body.game-open #appNav{display:none!important}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -218,9 +219,9 @@ var ext=g.url?'<span class="ext">External<\/span>':g.href?'<span class="ext">2 i
 var hue=hashStr(g.name)%360;
 var gIdx=GAMES.indexOf(g);
 var oc=g.src?'openGame('+gIdx+')':g.href?'openOnline('+gIdx+')':g.go?("location.href='"+g.go+"'"):("window.open('"+g.url+"','_blank')");
-return '<div class="game-card'+(g.href?' online':'')+'" onclick="'+oc+'" title="'+g.desc+'">'+ext+
-'<div class="game-thumb" style="background:radial-gradient(circle at 50% 38%,hsla('+hue+',70%,45%,0.32),transparent 72%),linear-gradient(135deg,hsl('+hue+',40%,17%),hsl('+(hue+40)+',35%,11%))"><span class="em">'+g.emoji+'<\/span><\/div>'+
-'<div class="game-info"><div class="game-name">'+g.name+'<\/div><div class="game-tags">'+tagHTML+'<\/div><\/div><\/div>';
+return '<button type="button" class="game-card'+(g.href?' online':'')+'" onclick="'+oc+'" title="'+g.desc+'">'+ext+
+'<span class="game-thumb" style="background:radial-gradient(circle at 50% 38%,hsla('+hue+',70%,45%,0.32),transparent 72%),linear-gradient(135deg,hsl('+hue+',40%,17%),hsl('+(hue+40)+',35%,11%))"><span class="em">'+g.emoji+'<\/span><\/span>'+
+'<span class="game-info"><span class="game-name">'+g.name+'<\/span><span class="game-tags">'+tagHTML+'<\/span><\/span><\/button>';
 }
 function applyFilters(){
 var q=document.getElementById('search').value.toLowerCase();
@@ -253,6 +254,7 @@ var frame=document.getElementById('gf');
 // iPad (and desktop) without having to tap the canvas first to "activate" it.
 frame.onload=function(){try{frame.contentWindow.focus();}catch(e){}};
 document.getElementById('overlay').classList.add('open');
+document.body.classList.add('game-open');
 document.body.style.overflow='hidden';
 fetch(g.src,{cache:'no-cache'}).then(function(r){
 if(!r.ok)throw new Error('HTTP '+r.status);
@@ -270,6 +272,7 @@ frame.srcdoc='<body style="margin:0;height:100vh;display:flex;align-items:center
 function closeGame(fromHistory){
 openSeq++;
 document.getElementById('overlay').classList.remove('open');
+document.body.classList.remove('game-open');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
 document.title='PixelBreak - Play Games';
@@ -358,7 +361,7 @@ applyFilters();
 </div>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="pixelbreak-records.js?v=9"></script>
+<script type="module" src="pixelbreak-records.js?v=11"></script>
 <script type="module">
 /* ---------- feedback box ---------- */
 import * as auth from "./auth.js?v=12";

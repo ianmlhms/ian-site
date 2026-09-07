@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fruit Slash - PixelBreak</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a0a2a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{border-radius:12px;box-shadow:0 0 30px rgba(200,50,255,0.2);cursor:crosshair}
+canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(200,50,255,0.2);cursor:crosshair}
 </style>
 </head>
 <body>
@@ -30,11 +31,14 @@ function spawn(){
 function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*4;
   particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*15,color:c})}}
 
-let mouseDown=false,lastMouse={x:0,y:0};
-C.addEventListener('mousedown',e=>{mouseDown=true;let r=C.getBoundingClientRect();lastMouse={x:(e.clientX-r.left)*C.width/r.width,y:(e.clientY-r.top)*C.height/r.height}});
-C.addEventListener('mouseup',()=>{mouseDown=false;mouseTrail=[]});
-C.addEventListener('mousemove',e=>{
-  if(!mouseDown)return;
+let activePointer=null,lastMouse={x:0,y:0};
+C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId);let r=C.getBoundingClientRect();lastMouse={x:(e.clientX-r.left)*C.width/r.width,y:(e.clientY-r.top)*C.height/r.height}});
+function endSlice(e){if(e.pointerId!==activePointer)return;activePointer=null;mouseTrail=[];if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
+C.addEventListener('pointerup',endSlice);
+C.addEventListener('pointercancel',endSlice);
+C.addEventListener('lostpointercapture',endSlice);
+C.addEventListener('pointermove',e=>{
+  if(e.pointerId!==activePointer)return;
   let r=C.getBoundingClientRect();
   let mx=(e.clientX-r.left)*C.width/r.width,my=(e.clientY-r.top)*C.height/r.height;
   mouseTrail.push({x:mx,y:my,life:10});

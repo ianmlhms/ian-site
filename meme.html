@@ -10,7 +10,7 @@
   <link rel="canonical" href="https://ian.lu/meme.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=18"></script>
+<script src="theme.js?v=19"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
@@ -88,11 +88,11 @@ const FALLBACK = [
 ];
 // ~300 templates fetched at runtime (memegen 211 + imgflip 100, both CORS-enabled);
 // falls back to the hardcoded list if the fetches fail.
-let POOL = FALLBACK.slice();
+let POOL = FALLBACK.slice(), templateNames = {};
 async function loadPool(){
   const urls=[];
-  try{ const d=await (await fetch("https://api.memegen.link/templates")).json(); (d||[]).forEach(t=>{ if(t&&t.blank) urls.push(t.blank); }); }catch(e){}
-  try{ const d=await (await fetch("https://api.imgflip.com/get_memes")).json(); ((d&&d.data&&d.data.memes)||[]).forEach(m=>{ if(m&&m.url) urls.push(m.url); }); }catch(e){}
+  try{ const d=await (await fetch("https://api.memegen.link/templates")).json(); (d||[]).forEach(t=>{ if(t&&t.blank){ urls.push(t.blank); templateNames={...templateNames,[t.blank]:t.name}; } }); }catch(e){}
+  try{ const d=await (await fetch("https://api.imgflip.com/get_memes")).json(); ((d&&d.data&&d.data.memes)||[]).forEach(m=>{ if(m&&m.url){ urls.push(m.url); templateNames={...templateNames,[m.url]:m.name}; } }); }catch(e){}
   if(urls.length>=30) POOL=urls;
 }
 loadPool();
@@ -153,7 +153,7 @@ async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
 function memeNode(url,top,bottom){
   const el=document.createElement("div"); el.className="meme";
-  const img=document.createElement("img"); img.src=url; img.loading="lazy";
+  const img=document.createElement("img"); img.src=url; img.loading="lazy"; img.alt=templateNames[url]||"Meme template";
   const t=document.createElement("div"); t.className="mtext top"; t.textContent=top||"";
   const b=document.createElement("div"); b.className="mtext bottom"; b.textContent=bottom||"";
   el.append(img,t,b); return el;

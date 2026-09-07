@@ -4,15 +4,15 @@
  *    Safe with the site's ?v= versioning: bumped asset URLs are cache misses and
  *    fetch fresh; navigations are network-first so pages are never stale online. */
 
-const CACHE = "ianlu-v4";
+const CACHE = "ianlu-v5";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
-  "skylens.html", "skylens.css?v=4", "skylens.js?v=2", "skylens.webmanifest",
+  "skylens.html", "skylens.css?v=4", "skylens.js?v=6", "skylens.webmanifest",
 ];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE).catch(() => {})));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE).catch((error) => console.warn("[SW] precache failed", error))));
 });
 
 self.addEventListener("activate", (event) => {
@@ -53,26 +53,32 @@ self.addEventListener("fetch", (event) => {
   const isNav = req.mode === "navigate" ||
     (req.headers.get("accept") || "").includes("text/html");
 
-  if (isNav) {
-    // network-first: fresh when online, cached copy (or Home) when offline
-    event.respondWith(
-      fetch(req).then((res) => {
+  const isMutable = /\.(?:m?js|css|json)$/i.test(url.pathname) && !url.searchParams.get("v");
+  function fetchAndCache() {
+    return fetch(req).then((res) => {
+      if (res.ok) {
         const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        return res;
-      }).catch(() => caches.match(req).then((r) => r || caches.match("index.html")))
-    );
-    return;
+        event.waitUntil(caches.open(CACHE).then((c) => c.put(req, copy))
+          .catch((error) => console.warn("[SW] cache write failed", error)));
+      }
+      return res;
+    });
+  }
+  async function networkFirst() {
+    try {
+      const res = await fetchAndCache();
+      if (res.ok) return res;
+      return await caches.match(req) || res;
+    } catch (error) {
+      const cached = await caches.match(req) || (isNav && await caches.match("index.html"));
+      if (cached) return cached;
+      throw error;
+    }
   }
 
-  // static assets: cache-first, then network (and cache it for next time)
-  event.respondWith(
-    caches.match(req).then((cached) => cached || fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-      return res;
-    }).catch(() => cached))
-  );
+  // Mutable code/data and pages refresh online; versioned assets remain cache-first.
+  event.respondWith(isNav || isMutable ? networkFirst() :
+    caches.match(req).then((cached) => cached || fetchAndCache()));
 });
 
 self.addEventListener("push", (event) => {

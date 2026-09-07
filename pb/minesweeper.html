@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mine Sweep - PixelBreak</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -21,6 +22,10 @@ body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:cente
 #diff button{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px;background:#3a3a5a;color:#fff}
 #diff button:hover{background:#5a5a7a}
 #diff button.active{background:#ff6b9d;color:#fff}
+body{height:auto;min-height:100vh;overflow:auto;padding:12px}
+#board-scroll{max-width:100%;overflow-x:auto;flex:none}
+#board{width:max-content}
+#hud,#diff{max-width:100%;flex-wrap:wrap;justify-content:center}
 </style>
 </head>
 <body>
@@ -30,7 +35,7 @@ body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:cente
 <button onclick="init(20,16,60)">Hard</button>
 </div>
 <div id="hud"><div class="stat">💣 <span id="mines">10</span></div><div class="stat" id="timer">⏱ 0s</div></div>
-<div id="board"></div>
+<div id="board-scroll" tabindex="0" role="region" aria-label="Minesweeper board"><div id="board"></div></div>
 <div id="msg"></div>
 <script>
 let W,H,MINES,grid,revealed,flagged,gameOver,firstClick,timerInt,seconds;

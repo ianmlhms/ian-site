@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Messenger">
 <meta name="theme-color" content="#0d0d1a">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<script src="theme.js?v=18"></script>
+<script src="theme.js?v=19"></script>
 <script src="i18n-dict.js?v=33"></script>
 <script src="i18n.js?v=2"></script>
 <style>
@@ -191,6 +191,7 @@
     body:has(#app.chat-open) header{display:none}
     #app.chat-open .chat-head{padding-top:max(14px,env(safe-area-inset-top))}
   }
+@media (hover:none) and (pointer:coarse){.react-btn{width:44px;height:44px;opacity:1;position:relative;bottom:auto;margin-top:4px}.msg:not(.mine) .react-btn{right:auto}.msg.mine .react-btn{left:auto}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count"

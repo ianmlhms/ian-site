@@ -12,7 +12,7 @@
   const HERE = new URL(".", document.currentScript ? document.currentScript.src : location.href);
   const asset = (path) => new URL(path, HERE).href;
   const SITE_GLASS_URL = asset("site-glass.css?v=3");
-  const MOBILE_CSS_URL = asset("mobile.css?v=1");
+  const MOBILE_CSS_URL = asset("mobile.css?v=2");
   const CONTRAST_MODULE_URL = "./glass-contrast.js?v=2";
   const ACCENTS = ["#6ea8fe", "#ff6b9d", "#3fb950", "#a371f7", "#ffb347", "#4de8ff"];
 
@@ -296,7 +296,7 @@
     { href: "friends.html", ic: "👥", label: "Frënn" },
     { href: "profile.html", ic: "🪪", label: "Profil" },
   ];
-  const NAV_SKIP = /(^|\/)(call|messenger|classchat|hotel|games|pixelbreak|kart)\.html$/;
+  const NAV_SKIP = /(^|\/)(call|messenger|classchat|hotel|games|pixelbreak|kart|skylens)\.html$/;
   function buildBottomNav() {
     if (!window.matchMedia("(max-width:760px)").matches) return;
     if (NAV_SKIP.test(location.pathname)) return;

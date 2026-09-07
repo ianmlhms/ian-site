@@ -106,15 +106,8 @@ let saveTimer = null, pendingSave = null, cloudSave;   // undefined = fetching, 
 const MAX_MESSAGE_SIZE = 256 * 1024, MAX_SAVE_DEPTH = 32, MAX_SCORE = Number.MAX_SAFE_INTEGER;
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 function isGameMessage(e) {
-  /* Identity of the sending window is the real control: only the game frame
-   * holds that reference. The origin is checked loosely on purpose — the games
-   * are srcdoc documents, so they report this origin while the sandbox keeps
-   * `allow-same-origin` and the opaque "null" if that is ever removed. Pinning
-   * it to location.origin would silently break every save the day the sandbox
-   * is tightened, without making a forged sender any harder. */
   const frame = document.getElementById("gf");
-  if (!frame || e.source !== frame.contentWindow || !isObject(e.data)) return false;
-  return e.origin === location.origin || e.origin === "null" || e.origin === "";
+  return !!frame?.contentWindow && e.source === frame.contentWindow && e.origin === location.origin && isObject(e.data);
 }
 function isSaveData(data) {
   const seen = new Set();

@@ -39,7 +39,7 @@ body a, body button { -webkit-tap-highlight-color: transparent; }
   body .bar .spacer, body > header .spacer { display: none; }
   body .bar .home, body > header .home { flex: none; white-space: nowrap; }
   body #langSw { flex: none; }
-  body #langSw button:not(.on) { display: none; }
+  body .bar, body > header { flex-wrap: wrap; }
   body #acctHost { flex: none; }
   /* auth.css deliberately makes its padding important, so this compact mobile
    * control must do the same to preserve the 44px hit target. */
@@ -65,4 +65,9 @@ body a, body button { -webkit-tap-highlight-color: transparent; }
   }
   body img, body video { max-width: 100%; }
   body input, body select, body textarea { font-size: 16px; }
+}
+
+@media (any-pointer: coarse) {
+  body .header-right .search-box input, body #flightSearch, body #om .jr input, body .pb-box input,
+  body .tcell input, body td input.cell, body .bld-row input.name { font-size: 16px; }
 }

@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Brick Blitz - PixelBreak</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{border-radius:12px;box-shadow:0 0 30px rgba(255,100,200,0.2)}
+canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(255,100,200,0.2)}
 </style>
 </head>
 <body>
@@ -84,7 +85,14 @@ function draw(){
   }
   requestAnimationFrame(draw);
 }
-C.addEventListener('mousemove',e=>{let r=C.getBoundingClientRect();paddle.x=Math.max(0,Math.min(C.width-paddle.w,(e.clientX-r.left)*(C.width/r.width)-paddle.w/2))});
+let activePointer=null;
+function movePaddle(e){let r=C.getBoundingClientRect();paddle.x=Math.max(0,Math.min(C.width-paddle.w,(e.clientX-r.left)*(C.width/r.width)-paddle.w/2))}
+C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId);movePaddle(e)});
+C.addEventListener('pointermove',e=>{if(e.pointerId===activePointer||(activePointer===null&&e.pointerType==='mouse'))movePaddle(e)});
+function endMove(e){if(e.pointerId!==activePointer)return;activePointer=null;if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
+C.addEventListener('pointerup',endMove);
+C.addEventListener('pointercancel',endMove);
+C.addEventListener('lostpointercapture',endMove);
 document.addEventListener('keydown',e=>{if(e.key===' '&&gameOver)start();e.preventDefault()});
 start();draw();   // kick the single draw loop once at boot (start() no longer calls it → no stacking on retry)
 </script>

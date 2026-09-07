@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Admin — Messenger</title>
 <meta name="robots" content="noindex">
-<script src="theme.js?v=18"></script>
+<script src="theme.js?v=19"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ffcc00;--accent2:#4de8ff;--dm:#ff6b9d}
   *{box-sizing:border-box}
@@ -69,6 +69,9 @@
   .am .when{color:var(--muted);font-size:11px;flex:none}
   .am .media{display:block;max-width:200px;max-height:200px;border-radius:8px;margin-top:4px}
   .empty{color:var(--muted);text-align:center;padding:40px}
+#detailBack{display:none}
+#viewFeedback{min-height:0;background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
+@media(max-width:760px){#panel .side{width:100%;border-right:0}#panel .detail{display:none}#panel.detail-open .side{display:none}#panel.detail-open .detail{display:flex}#detailBack{display:block;align-self:flex-start;min-height:44px;padding:8px 14px;margin:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;cursor:pointer}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
@@ -109,6 +112,7 @@
     <ul class="glist" id="glist"></ul>
   </aside>
   <section class="detail">
+    <button type="button" id="detailBack">‹ Back</button>
     <div class="detail-h" id="detailH">Select a group to inspect</div>
     <div class="mlist" id="mlist"></div>
   </section>
@@ -116,7 +120,7 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="admin.js?v=15"></script>
+<script type="module" src="admin.js?v=16"></script>
 <script type="module">
 import { client } from "./auth.js?v=12";
 

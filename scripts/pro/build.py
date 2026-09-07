@@ -196,6 +196,44 @@ def dimensions_attributes(data: dict, asset: str) -> str:
     return f' width="{esc(width)}" height="{esc(height)}"'
 
 
+RESPONSIVE_WIDTHS = (480, 800, 1200)
+RESPONSIVE_QUALITY = 82
+ABOUT_SIZES = "(min-width: 72rem) 34rem, (min-width: 48rem) calc((100vw - 4rem) / 2), calc(100vw - 2rem)"
+GALLERY_LEAD_SIZES = "(min-width: 72rem) 46.5rem, (min-width: 48rem) calc((100vw - 2.75rem) * 2 / 3), calc(100vw - 2rem)"
+GALLERY_SIZES = "(min-width: 72rem) 23rem, (min-width: 48rem) calc((100vw - 3.5rem) / 3), calc((100vw - 2.75rem) / 2)"
+
+
+@lru_cache(maxsize=None)
+def image_candidates(path: Path) -> tuple[tuple[Path, int], ...]:
+    """Create local responsive WebPs once per source during a build."""
+    dimensions = read_image_size(path)
+    if dimensions is None:
+        raise ValueError(f"Cannot create responsive images: {path}")
+    try:
+        from PIL import Image
+    except ImportError as error:
+        raise RuntimeError("Responsive Pro images require Pillow") from error
+    candidates = []
+    with Image.open(path) as source:
+        for width in RESPONSIVE_WIDTHS:
+            if width >= source.width:
+                continue
+            target = path.with_name(f"{path.stem}-{width}w.webp")
+            height = max(1, round(source.height * width / source.width))
+            source.resize((width, height), Image.Resampling.LANCZOS).save(
+                target, "WEBP", quality=RESPONSIVE_QUALITY)
+            candidates.append((target, width))
+    return (*candidates, (path, dimensions[0]))
+
+
+def responsive_attributes(data: dict, asset: str, language: str, sizes: str) -> str:
+    site_dir = OUT_DIR / data["slug"]
+    candidates = image_candidates(site_dir / asset)
+    srcset = ", ".join(f"{relative_asset(str(path.relative_to(site_dir)), data, language)} {width}w"
+                       for path, width in candidates)
+    return f' srcset="{esc(srcset)}" sizes="{esc(sizes)}"'
+
+
 def index_town(data: dict) -> str:
     """Return the final address line for the private preview index."""
     contact = data.get("contact") if isinstance(data.get("contact"), dict) else {}
@@ -379,7 +417,7 @@ def render_hero(section: dict, data: dict, language: str, ui: dict) -> str:
     image = section.get("image")
     image_html = relative_asset(image, data, language) if isinstance(image, str) else ""
     return load_template("section-hero.html").substitute(
-        image=esc(image_html), image_alt=esc(title), dimensions=dimensions_attributes(data, image), name=esc(data["name"]), title=esc(title), subtitle=subtitle,
+        responsive=responsive_attributes(data, image, language, "100vw"), image=esc(image_html), image_alt=esc(title), dimensions=dimensions_attributes(data, image), name=esc(data["name"]), title=esc(title), subtitle=subtitle,
         phone_href=esc(phone_href(data)), map_href=esc(map_url(data)), call_label=esc(ui["call"]), directions_label=esc(ui["directions"]),
     ) if image_html else ""
 
@@ -392,7 +430,7 @@ def render_about(section: dict, data: dict, language: str, ui: dict, ident: str)
     image_path = section.get("image")
     image = ""
     if isinstance(image_path, str):
-        image = f'<figure><img src="{esc(relative_asset(image_path, data, language))}" alt="{esc(title or data["name"])}"{dimensions_attributes(data, image_path)} loading="lazy"><figcaption>{esc(data["name"])}</figcaption></figure>'
+        image = f'<figure><img src="{esc(relative_asset(image_path, data, language))}" alt="{esc(title or data["name"])}"{dimensions_attributes(data, image_path)}{responsive_attributes(data, image_path, language, ABOUT_SIZES)} loading="lazy"><figcaption>{esc(data["name"])}</figcaption></figure>'
     return load_template("section-about.html").substitute(id=esc(ident), kicker=esc(section_kicker(section, data, language, ui["about"])), title=esc(title or data["name"]), body=body, image=image)
 
 
@@ -546,7 +584,7 @@ def render_gallery(section: dict, data: dict, language: str, ui: dict, ident: st
         if not isinstance(image, dict) or not isinstance(image.get("src"), str):
             continue
         alt = text(image.get("alt"), data, language) or data["name"]
-        images.append(f'<figure><img src="{esc(relative_asset(image["src"], data, language))}" alt="{esc(alt)}"{dimensions_attributes(data, image["src"])} loading="lazy"><figcaption>{esc(alt)}</figcaption></figure>')
+        images.append(f'<figure><img src="{esc(relative_asset(image["src"], data, language))}" alt="{esc(alt)}"{dimensions_attributes(data, image["src"])}{responsive_attributes(data, image["src"], language, GALLERY_SIZES if images else GALLERY_LEAD_SIZES)} loading="lazy"><figcaption>{esc(alt)}</figcaption></figure>')
     if not images:
         return ""
     title = text(section.get("title"), data, language) or ui["gallery"]
