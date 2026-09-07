@@ -90,6 +90,34 @@ const peerId=q.get("peer")||"";
 const peerName=q.get("name")||"…";
 $("peerName").textContent=peerName;
 
+const MAX_NAME=80, MAX_SDP=65536, MAX_CANDIDATE=4096, MAX_ICE=256, MAX_ICE_FIELD=256;
+const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const isText=(v,max)=>typeof v==="string"&&v.length<=max;
+const isUserId=(v)=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
+const isCallId=(v)=>typeof v==="string"&&/^[a-z0-9.-]{1,80}$/i.test(v);
+function isSignal(event,p){
+  if(!isObject(p)||ended||p.from!==peerId||p.to!==me||p.callId!==callId) return false;
+  const fields=["from","to","callId"];
+  if(event==="offer"||event==="answer"){
+    if(!isObject(p.sdp)||p.sdp.type!==event||!isText(p.sdp.sdp,MAX_SDP)||!p.sdp.sdp.startsWith("v=0")) return false;
+    return Object.keys(p).every(k=>[...fields,"sdp"].includes(k))&&Object.keys(p.sdp).every(k=>["type","sdp"].includes(k));
+  }
+  if(event==="ice"){
+    const c=p.c;
+    if(!isObject(c)||!isText(c.candidate,MAX_CANDIDATE)) return false;
+    if(c.sdpMid!=null&&!isText(c.sdpMid,MAX_ICE_FIELD)) return false;
+    if(c.sdpMLineIndex!=null&&(!Number.isInteger(c.sdpMLineIndex)||c.sdpMLineIndex<0||c.sdpMLineIndex>=MAX_ICE)) return false;
+    if(c.usernameFragment!=null&&!isText(c.usernameFragment,MAX_ICE_FIELD)) return false;
+    return Object.keys(p).every(k=>[...fields,"c"].includes(k))&&Object.keys(c).every(k=>["candidate","sdpMid","sdpMLineIndex","usernameFragment"].includes(k));
+  }
+  return ["ready","ping","bye"].includes(event)&&Object.keys(p).every(k=>fields.includes(k));
+}
+function onSignal(event,apply){ return async ({payload})=>{
+  if(!isSignal(event,payload)) return;
+  try{ await apply(payload); }catch(e){ console.warn("[call] signal rejected",event,e); }
+}; }
+function signal(event,extra={}){ return room.send({type:"broadcast",event,payload:{...extra,from:me,to:peerId,callId}}); }
+
 // STUN finds a direct path; TURN relays when the peers can't reach each other
 // directly (different NATs / mobile data). TURN creds are minted server-side by
 // the `turn` Edge Function (Metered secret stays off the client); fetched at
@@ -119,10 +147,10 @@ async function boot(){
   if(!auth.authConfigured){ fatal(T("call.signin")); return; }
   sb=await auth.client();
   if(!auth.session()){ fatal(`${T("call.signin")} <a class="home-link" href="index.html">${T("nav.home")}</a>`); return; }
-  if(!peerId){ fatal(T("call.badLink")); return; }
+  if(!isUserId(peerId)||!isText(peerName,MAX_NAME)){ fatal(T("call.badLink")); return; }
   me=auth.session().user.id; myName=auth.username()||"?";
   callId=isCallee ? (q.get("call")||"") : (crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());
-  if(isCallee && !callId){ fatal(T("call.badLink")); return; }
+  if(!isCallId(callId)){ fatal(T("call.badLink")); return; }
 
   try{ localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
   catch(e){ fatal(T("call.noMedia")); return; }
@@ -151,7 +179,7 @@ function buildPeer(){
   pc=new RTCPeerConnection(ICE);
   localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
   pc.onicecandidate=(e)=>{
-    if(e.candidate){ console.log("[call] local ICE", e.candidate.type, e.candidate.protocol); room && room.send({type:"broadcast",event:"ice",payload:{c:e.candidate}}); }
+    if(e.candidate){ console.log("[call] local ICE", e.candidate.type, e.candidate.protocol); room && signal("ice",{c:e.candidate.toJSON()}); }
   };
   pc.ontrack=(e)=>{ if(noAnswerTimer){ clearTimeout(noAnswerTimer); noAnswerTimer=null; } const r=$("remote"); if(r.srcObject!==e.streams[0]){ r.srcObject=e.streams[0]; } r.classList.remove("waiting"); $("center").classList.add("hidden"); };
   pc.oniceconnectionstatechange=()=>console.log("[call] iceConnectionState", pc.iceConnectionState);
@@ -166,40 +194,40 @@ function buildPeer(){
 function joinRoom(){
   room=sb.channel("call:"+callId,{config:{broadcast:{self:false}}});
   room
-    .on("broadcast",{event:"ready"},()=>{ if(!isCallee){ stopPing(); makeOffer(); } })
-    .on("broadcast",{event:"ping"},()=>{ if(isCallee) room.send({type:"broadcast",event:"ready",payload:{}}); })
-    .on("broadcast",{event:"offer"},async ({payload})=>{ if(isCallee) await onOffer(payload.sdp); })
-    .on("broadcast",{event:"answer"},async ({payload})=>{ if(!isCallee) await onAnswer(payload.sdp); })
-    .on("broadcast",{event:"ice"},({payload})=>addIce(payload.c))
-    .on("broadcast",{event:"bye"},()=>endCall(T("call.ended")))
+    .on("broadcast",{event:"ready"},onSignal("ready",async ()=>{ if(!isCallee){ stopPing(); await makeOffer(); } }))
+    .on("broadcast",{event:"ping"},onSignal("ping",()=>{ if(isCallee) return signal("ready"); }))
+    .on("broadcast",{event:"offer"},onSignal("offer",async p=>{ if(isCallee&&pc.signalingState==="stable"&&!remoteReady) await onOffer(p.sdp); }))
+    .on("broadcast",{event:"answer"},onSignal("answer",async p=>{ if(!isCallee&&pc.signalingState==="have-local-offer") await onAnswer(p.sdp); }))
+    .on("broadcast",{event:"ice"},onSignal("ice",p=>addIce(p.c)))
+    .on("broadcast",{event:"bye"},onSignal("bye",()=>endCall(T("call.ended"))))
     .subscribe((s)=>{
       if(s!=="SUBSCRIBED") return;
-      if(isCallee){ room.send({type:"broadcast",event:"ready",payload:{}}); }
+      if(isCallee){ signal("ready"); }
       else { startPing(); }   // ping until the callee is in the room, then offer
     });
 }
-function startPing(){ stopPing(); let n=0; pingTimer=setInterval(()=>{ if(++n>20){ stopPing(); return; } room.send({type:"broadcast",event:"ping",payload:{}}); },1000); room.send({type:"broadcast",event:"ping",payload:{}}); }
+function startPing(){ stopPing(); let n=0; pingTimer=setInterval(()=>{ if(++n>20){ stopPing(); return; } signal("ping"); },1000); signal("ping"); }
 function stopPing(){ if(pingTimer){ clearInterval(pingTimer); pingTimer=null; } }
 
 async function makeOffer(){
   if(offered||ended) return; offered=true;
   const o=await pc.createOffer(); await pc.setLocalDescription(o);
-  room.send({type:"broadcast",event:"offer",payload:{sdp:pc.localDescription}});
+  signal("offer",{sdp:pc.localDescription.toJSON()});
 }
 async function onOffer(sdp){
   await pc.setRemoteDescription(sdp); remoteReady=true; flushIce();
   const a=await pc.createAnswer(); await pc.setLocalDescription(a);
-  room.send({type:"broadcast",event:"answer",payload:{sdp:pc.localDescription}});
+  signal("answer",{sdp:pc.localDescription.toJSON()});
   setStatus(T("call.connecting"));
 }
 async function onAnswer(sdp){ await pc.setRemoteDescription(sdp); remoteReady=true; flushIce(); }
-function addIce(c){ if(!c) return; if(remoteReady){ pc.addIceCandidate(c).catch(()=>{}); } else pendingIce.push(c); }
-function flushIce(){ pendingIce.forEach(c=>pc.addIceCandidate(c).catch(()=>{})); pendingIce=[]; }
+function addIce(c){ if(remoteReady) return pc.addIceCandidate(c); if(pendingIce.length<MAX_ICE) pendingIce=[...pendingIce,c]; }
+function flushIce(){ pendingIce.forEach(c=>pc.addIceCandidate(c).catch(e=>console.warn("[call] ICE rejected",e))); pendingIce=[]; }
 
 // send a message to the peer's personal ring inbox (subscribe, send once)
 function ring(event){
   inbox=sb.channel("rtc:"+peerId,{config:{broadcast:{self:false}}});
-  inbox.subscribe((s)=>{ if(s==="SUBSCRIBED"){ inbox.send({type:"broadcast",event,payload:{callId,from:me,fromName:myName}}); } });
+  inbox.subscribe((s)=>{ if(s==="SUBSCRIBED"){ inbox.send({type:"broadcast",event,payload:{callId,from:me,to:peerId,fromName:myName}}); } });
 }
 
 // Fire a real Web Push so the callee gets a system notification even with the
@@ -230,7 +258,7 @@ function wireControls(){
 
 function endCall(reason,sendBye){
   if(ended) return; ended=true;
-  if(sendBye && room){ try{ room.send({type:"broadcast",event:"bye",payload:{}}); }catch{} }
+  if(sendBye && room){ try{ signal("bye"); }catch{} }
   setStatus(reason); cleanup();
   setTimeout(()=>{ location.href="friends.html"; },900);
 }

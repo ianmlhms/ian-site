@@ -1,11 +1,21 @@
 /* Ambient incoming-call listener (FaceTime mode). Drop on any signed-in page:
- *   <script type="module" src="rtc-ring.js?v=8"></script>
+ *   <script type="module" src="rtc-ring.js?v=9"></script>
  * Subscribes to the user's personal ring inbox (rtc:<uid>) and shows an
  * Answer/Decline banner when a friend calls. Answering opens call.html. */
 import * as auth from "./auth.js?v=12";
 
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 let subbed = false, sb = null, current = null, ringOsc = null, ringTimer = null, ringGain = null;
+
+const MAX_NAME = 80;
+const isUserId = (v) => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
+function isRing(p) {
+  return p !== null && typeof p === "object" && !Array.isArray(p) &&
+    Object.keys(p).every(k => ["callId", "from", "to", "fromName"].includes(k)) &&
+    typeof p.callId === "string" && /^[a-z0-9.-]{1,80}$/i.test(p.callId) && isUserId(p.from) &&
+    p.to === auth.session()?.user?.id && isUserId(p.to) && p.from !== p.to &&
+    typeof p.fromName === "string" && p.fromName.length <= MAX_NAME;
+}
 
 async function start() {
   if (subbed || !auth.authConfigured) return;
@@ -15,12 +25,12 @@ async function start() {
   subbed = true;
   sb.channel("rtc:" + uid, { config: { broadcast: { self: false } } })
     .on("broadcast", { event: "ring" }, ({ payload }) => showBanner(payload))
-    .on("broadcast", { event: "cancel" }, ({ payload }) => { if (current && current.callId === payload.callId) dismiss(); })
+    .on("broadcast", { event: "cancel" }, ({ payload }) => { if (isRing(payload) && current && current.callId === payload.callId && current.from === payload.from) dismiss(); })
     .subscribe();
 }
 
 function showBanner(p) {
-  if (current) return;              // already ringing for a call
+  if (!isRing(p) || current) return;              // already ringing for a call
   current = p;
   const wrap = document.createElement("div");
   wrap.id = "rtc-ring";
@@ -29,10 +39,11 @@ function showBanner(p) {
     "box-shadow:0 12px 40px rgba(0,0,0,.55);max-width:calc(100vw - 24px);font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#e8e8f0";
   wrap.innerHTML =
     `<div style="width:44px;height:44px;border-radius:50%;background:#1e1e35;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none">📹</div>
-     <div style="min-width:0"><div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.fromName || "?")}</div>
+     <div style="min-width:0"><div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="rtc-caller"></div>
        <div style="color:#9a9ab8;font-size:12.5px">${esc(T("ring.incoming"))}</div></div>
      <button id="rtc-decline" style="flex:none;width:42px;height:42px;border-radius:50%;border:none;background:#ff5d6c;color:#fff;font-size:18px;cursor:pointer">📵</button>
      <button id="rtc-answer" style="flex:none;width:42px;height:42px;border-radius:50%;border:none;background:#3fb950;color:#fff;font-size:18px;cursor:pointer">📞</button>`;
+  wrap.querySelector("#rtc-caller").textContent = p.fromName || "?";
   document.body.appendChild(wrap);
   document.getElementById("rtc-answer").onclick = answer;
   document.getElementById("rtc-decline").onclick = decline;
@@ -47,7 +58,7 @@ function answer() {
 }
 function decline() {
   const p = current;
-  try { const c = sb.channel("call:" + p.callId); c.subscribe((s) => { if (s === "SUBSCRIBED") { c.send({ type: "broadcast", event: "bye", payload: {} }); setTimeout(() => sb.removeChannel(c), 300); } }); } catch {}
+  try { const c = sb.channel("call:" + p.callId); c.subscribe((s) => { if (s === "SUBSCRIBED") { c.send({ type: "broadcast", event: "bye", payload: { from: auth.session()?.user?.id, to: p.from, callId: p.callId } }); setTimeout(() => sb.removeChannel(c), 300); } }); } catch (e) { console.warn("[call] decline failed", e); }
   dismiss();
 }
 function dismiss() {

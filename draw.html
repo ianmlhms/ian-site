@@ -84,13 +84,46 @@ const ch = sb.channel("draw:"+room, { config:{ broadcast:{self:false}, presence:
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+// Broadcasts (including the host's) are untrusted.
+const MAX_PLAYERS=64, MAX_NAME=80, MAX_SCORE=1000000;
+const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const isText=(v,max)=>typeof v==="string"&&v.length<=max;
+const isId=(v)=>typeof v==="string"&&/^[a-z0-9]{1,8}$/.test(v);
+const isNumber=(v,min,max)=>Number.isFinite(v)&&v>=min&&v<=max;
+const isInt=(v,min,max)=>Number.isInteger(v)&&isNumber(v,min,max);
+const isList=(v,max,check)=>Array.isArray(v)&&v.length<=max&&v.every(check);
+const isMap=(v,check)=>isObject(v)&&Object.keys(v).length<=MAX_PLAYERS&&Object.entries(v).every(([k,x])=>isId(k)&&check(x));
+const isScores=(v)=>isMap(v,x=>isInt(x,0,MAX_SCORE));
+const isPlayer=(p)=>isObject(p)&&isId(p.cid)&&isText(p.name,MAX_NAME);
+function onMessage(event,apply){ return ({payload})=>{ if(isMessage(event,payload)) apply(payload); }; }
+const MAX_SEGMENTS=256, MAX_WORD=40, MAX_CLOCK_SKEW_MS=300000;
+const isIds=(v)=>isList(v,MAX_PLAYERS,isId)&&new Set(v).size===v.length;
+const isWord=(v)=>typeof v==="string"&&WORDS.includes(v);
+const isEnd=(v)=>isInt(v,Date.now()-MAX_CLOCK_SKEW_MS,Date.now()+MAX_CLOCK_SKEW_MS);
+function isMessage(event,p){
+  if(!isObject(p)) return false;
+  switch(event){
+    case "turn": return isInt(p.totalTurns,1,MAX_PLAYERS*LAPS)&&isInt(p.round,1,p.totalTurns)&&isId(p.drawerCid)&&isScores(p.scores)&&isIds(p.order)&&p.order.includes(p.drawerCid)&&isList(p.choices,3,isWord)&&p.choices.length===3&&new Set(p.choices).size===3;
+    case "start": return isId(p.drawerCid)&&isText(p.mask,MAX_WORD*2)&&/^_( _)*$/.test(p.mask)&&isEnd(p.roundEnd)&&isInt(p.word_len,1,MAX_WORD);
+    case "correct": return isPlayer(p)&&isScores(p.scores)&&isIds(p.guessed);
+    case "chat": return isText(p.n,MAX_NAME)&&isText(p.t,MAX_WORD);
+    case "reveal": return isWord(p.word)&&isScores(p.scores);
+    case "final": return isScores(p.scores);
+    case "reset": case "clear": return Object.keys(p).length===0;
+    case "seg": return isList(p.a,MAX_SEGMENTS,s=>isList(s,4,x=>isNumber(x,-1,2))&&s.length===4)&&COLORS.includes(p.c)&&[3,6,7,16].includes(p.w);
+    case "pick": return isWord(p.word);
+    case "guess": return isPlayer(p)&&isText(p.text,MAX_WORD);
+    default: return false;
+  }
+}
+
 let name="Player", phase="lobby", drawerCid=null, round=0, totalTurns=0, hostHere=true;
 let scores={}, order=[], word="", mask="", roundEnd=0, guessed=new Set(), logLines=[];
 let endTimer=null, tick=null;
 const me=()=>cid, isDrawer=()=>drawerCid===cid;
 const norm=(s)=> s.toLowerCase().replace(/[^a-zäöüß]/g,"");
 
-function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
+function players(){ const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
 async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Your name:")||"Player").slice(0,16);} localStorage.setItem("playerName",n); return n; }
 
 /* ---------- render ---------- */
@@ -115,7 +148,7 @@ function render(){
   }
   // choosing / drawing / reveal
   const secsLeft = Math.max(0, Math.ceil((roundEnd-Date.now())/1000));
-  html += `<div class="topbar"><span class="rnd">Turn ${round}/${totalTurns}</span><span class="word" id="wordEl">${phase==="drawing"?(isDrawer()?esc(word):mask):""}</span><span class="timer" id="timerEl">${phase==="drawing"?secsLeft+"s":""}</span></div>`;
+  html += `<div class="topbar"><span class="rnd">Turn ${round}/${totalTurns}</span><span class="word" id="wordEl"></span><span class="timer" id="timerEl">${phase==="drawing"?secsLeft+"s":""}</span></div>`;
   html += `<canvas id="cv" width="600" height="600"></canvas>`;
   if(phase==="choosing"){
     html += isDrawer()
@@ -127,6 +160,7 @@ function render(){
   html += `<div class="log" id="log"></div>`;
   if(!isDrawer()) html += `<div class="guessrow"><input id="guessIn" placeholder="Type your guess…" autocomplete="off" maxlength="40"><button id="guessBtn">Guess</button></div>`;
   $("app").innerHTML=html;
+  $("wordEl").textContent=phase==="drawing"?(isDrawer()?word:mask):"";
   setupCanvas();
   renderLog();
   if(phase==="choosing" && isDrawer()) renderChoices();
@@ -216,24 +250,26 @@ function sendGuess(){ const inp=$("guessIn"); const t=(inp.value||"").trim(); if
   if(role==="host") hostGuess({cid,name,text:t});
   else { addLog({n:name,t}); ch.send({type:"broadcast",event:"guess",payload:{cid,name,text:t}}); }
 }
-function renderChoices(){ const c=$("choices"); const choices=window._choices||[]; c.innerHTML=choices.map(w=>`<button data-w="${w}">${w}</button>`).join("");
-  c.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{ if(role==="host") hostPick(b.dataset.w); else ch.send({type:"broadcast",event:"pick",payload:{word:b.dataset.w}}); }); }
+function renderChoices(){ const c=$("choices"); const choices=window._choices||[];
+  c.replaceChildren(...choices.map(w=>{ const b=document.createElement("button"); b.dataset.w=w; b.textContent=w;
+    b.onclick=()=>{ if(role==="host") hostPick(w); else ch.send({type:"broadcast",event:"pick",payload:{word:w}}); }; return b; })); }
+
 
 /* ---------- wire ---------- */
-ch.on("broadcast",{event:"turn"},({payload})=>applyTurn(payload))
-  .on("broadcast",{event:"start"},({payload})=>applyStart(payload))
-  .on("broadcast",{event:"correct"},({payload})=>applyCorrect(payload))
-  .on("broadcast",{event:"chat"},({payload})=>addLog({n:payload.n,t:payload.t}))
-  .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
-  .on("broadcast",{event:"final"},({payload})=>{ scores=payload.scores; phase="final"; clearTimeout(tick); render(); })
-  .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
-  .on("broadcast",{event:"seg"},({payload})=>{ if(isDrawer())return; payload.a.forEach(s=>seg(s[0],s[1],s[2],s[3],payload.c,payload.w)); })
-  .on("broadcast",{event:"clear"},()=>clearCanvas())
-  .on("broadcast",{event:"pick"},({payload})=>{ if(role==="host"&&phase==="choosing"&&isDrawerHost()) hostPick(payload.word); })
-  .on("broadcast",{event:"guess"},({payload})=>{ if(role==="host") hostGuess(payload); })
+ch.on("broadcast",{event:"turn"},onMessage("turn",payload=>applyTurn(payload)))
+  .on("broadcast",{event:"start"},onMessage("start",payload=>applyStart(payload)))
+  .on("broadcast",{event:"correct"},onMessage("correct",payload=>applyCorrect(payload)))
+  .on("broadcast",{event:"chat"},onMessage("chat",payload=>addLog({n:payload.n,t:payload.t})))
+  .on("broadcast",{event:"reveal"},onMessage("reveal",payload=>applyReveal(payload)))
+  .on("broadcast",{event:"final"},onMessage("final",payload=>{ scores=payload.scores; phase="final"; clearTimeout(tick); render(); }))
+  .on("broadcast",{event:"reset"},onMessage("reset",payload=>{ resetAll(); render(); }))
+  .on("broadcast",{event:"seg"},onMessage("seg",payload=>{ if(isDrawer())return; payload.a.forEach(s=>seg(s[0],s[1],s[2],s[3],payload.c,payload.w)); }))
+  .on("broadcast",{event:"clear"},onMessage("clear",payload=>clearCanvas()))
+  .on("broadcast",{event:"pick"},onMessage("pick",payload=>{ if(role==="host"&&phase==="choosing"&&isDrawerHost()) hostPick(payload.word); }))
+  .on("broadcast",{event:"guess"},onMessage("guess",payload=>{ if(role==="host") hostGuess(payload); }))
   .on("presence",{event:"sync"},()=>{
     const st=ch.presenceState();
-    const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+    const hh = role==="host" || Object.values(st).some(m=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
     // mid-round we only log (a re-render would wipe the canvas)
     if(hostHere&&!hh&&phase!=="lobby"&&phase!=="final") addLog({sys:true,t:"⚠️ The host left — the game can't continue until they rejoin."});
     hostHere=hh;
@@ -242,7 +278,7 @@ ch.on("broadcast",{event:"turn"},({payload})=>applyTurn(payload))
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 function isDrawerHost(){ return true; } // host validates picks regardless
 </script>
-  <script type="module" src="rtc-ring.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=9"></script>
   <script type="module" src="class-gate.js?v=10"></script>
 </body>
 </html>

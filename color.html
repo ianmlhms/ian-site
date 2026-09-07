@@ -116,6 +116,34 @@ const ch = sb.channel("col:"+room, { config:{ broadcast:{self:false}, presence:{
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+// Broadcasts (including the host's) are untrusted.
+const MAX_PLAYERS=64, MAX_NAME=80;
+const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const isText=(v,max)=>typeof v==="string"&&v.length<=max;
+const isId=(v)=>typeof v==="string"&&/^[a-z0-9]{1,8}$/.test(v);
+const isNumber=(v,min,max)=>Number.isFinite(v)&&v>=min&&v<=max;
+const isInt=(v,min,max)=>Number.isInteger(v)&&isNumber(v,min,max);
+const isList=(v,max,check)=>Array.isArray(v)&&v.length<=max&&v.every(check);
+const isMap=(v,check)=>isObject(v)&&Object.keys(v).length<=MAX_PLAYERS&&Object.entries(v).every(([k,x])=>isId(k)&&check(x));
+const isPlayer=(p)=>isObject(p)&&isId(p.cid)&&isText(p.name,MAX_NAME);
+function onMessage(event,apply){ return ({payload})=>{ if(isMessage(event,payload)) apply(payload); }; }
+const MAX_ROUNDS=15, MAX_RGB=255;
+const isRgb=(v)=>isObject(v)&&[v.r,v.g,v.b].every(x=>isInt(x,0,MAX_RGB));
+const isMode=(v)=>v==="visible"||v==="flash";
+const isRounds=(p)=>isInt(p.rounds,1,MAX_ROUNDS)&&isInt(p.round,1,p.rounds);
+const isResult=(r)=>isPlayer(r)&&(r.rgb===null||isRgb(r.rgb))&&isNumber(r.dist,0,MAXD)&&isInt(r.acc,0,100);
+function isMessage(event,p){
+  if(!isObject(p)) return false;
+  switch(event){
+    case "cfg": return isInt(p.rounds,1,MAX_ROUNDS)&&isMode(p.mode);
+    case "round": return isRounds(p)&&isRgb(p.target)&&isMode(p.mode);
+    case "guess": return isPlayer(p)&&isRgb(p.rgb);
+    case "reveal": return isRounds(p)&&isRgb(p.target)&&isList(p.results,MAX_PLAYERS,isResult)&&new Set(p.results.map(r=>r.cid)).size===p.results.length&&(p.winner===null||isId(p.winner)&&p.results.some(r=>r.cid===p.winner))&&isMap(p.wins,x=>isInt(x,0,MAX_ROUNDS))&&isMap(p.distTot,x=>isNumber(x,0,MAX_ROUNDS*MAXD))&&typeof p.isFinal==="boolean";
+    case "reset": return Object.keys(p).length===0;
+    default: return false;
+  }
+}
+
 let name="Player", phase="lobby", rounds=5, round=0, target=null, mode="visible";
 let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
 let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false, hostHere=true;
@@ -137,7 +165,7 @@ async function getName(){
   if(!n){ n=(prompt("Your name for the game:")||"Player").slice(0,20); }
   localStorage.setItem("playerName", n); return n;
 }
-function players(){ if(AI) return [{cid,name}, ...AI_BOTS.map(b=>({cid:b.cid,name:b.name}))]; const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
+function players(){ if(AI) return [{cid,name}, ...AI_BOTS.map(b=>({cid:b.cid,name:b.name}))]; const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
 const lockedCount=(ps)=>ps.filter(p=>guesses[p.cid]).length;
 
 function render(){
@@ -153,7 +181,7 @@ function drawApp(ps){
       <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
       <p class="muted center">Everyone sees the same colour, then dials in their best match with the R/G/B sliders. Closest match wins the round.</p>
       ${role==="host"
-        ? `<div class="rounds"><span class="muted">Best of</span><input id="rounds" type="number" min="1" max="15" value="${rounds}"><span class="muted">rounds</span></div>
+        ? `<div class="rounds"><span class="muted">Best of</span><input id="rounds" type="number" min="1" max="15"><span class="muted">rounds</span></div>
            <div class="modes">
              <button class="modebtn ${mode==="visible"?"on":""}" data-mode="visible">👁 Stays visible</button>
              <button class="modebtn ${mode==="flash"?"on":""}" data-mode="flash">⚡ Flash (memory)</button>
@@ -162,7 +190,8 @@ function drawApp(ps){
         : `<p class="center muted">Best of <b>${rounds}</b> rounds · ${mode==="flash"?"⚡ flash (from memory)":"👁 colour stays visible"} · waiting for the host…</p>`}
       ${standings(ps)}`;
     if(role==="host"){
-      $("rounds").onchange=()=>{ rounds=Math.max(1,Math.min(15,+$("rounds").value||5)); sendCfg(); };
+      $("rounds").value=rounds;
+      $("rounds").onchange=()=>{ rounds=Math.max(1,Math.min(MAX_ROUNDS,Math.round(+$("rounds").value)||5)); sendCfg(); };
       $("app").querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>{ mode=b.dataset.mode; sendCfg(); render(); });
       if($("startBtn")) $("startBtn").onclick=startRound;
     }
@@ -276,14 +305,14 @@ if(AI){
   name = localStorage.getItem("playerName") || window.__pbAuth?.session?.user?.user_metadata?.username || "Du";
   mountDiff(); phase="lobby"; render();
 } else {
-  ch.on("broadcast",{event:"cfg"},({payload})=>{ rounds=payload.rounds; if(payload.mode) mode=payload.mode; if(phase==="lobby") render(); })
-    .on("broadcast",{event:"round"},({payload})=>{ round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode||mode; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; beginPlay(); })
-    .on("broadcast",{event:"guess"},({payload})=>{ guesses[payload.cid]={name:payload.name,rgb:payload.rgb}; if(phase==="play") render(); if(role==="host") maybeReveal(); })
-    .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
-    .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
+  ch.on("broadcast",{event:"cfg"},onMessage("cfg",payload=>{ rounds=payload.rounds; if(payload.mode) mode=payload.mode; if(phase==="lobby") render(); }))
+    .on("broadcast",{event:"round"},onMessage("round",payload=>{ round=payload.round; target=payload.target; rounds=payload.rounds; mode=payload.mode||mode; guesses={}; locked=false; guess={r:128,g:128,b:128}; results=null; winner=null; isFinal=false; beginPlay(); }))
+    .on("broadcast",{event:"guess"},onMessage("guess",payload=>{ guesses={...guesses,[payload.cid]:{name:payload.name,rgb:{...payload.rgb}}}; if(phase==="play") render(); if(role==="host") maybeReveal(); }))
+    .on("broadcast",{event:"reveal"},onMessage("reveal",payload=>applyReveal(payload)))
+    .on("broadcast",{event:"reset"},onMessage("reset",payload=>{ resetAll(); render(); }))
     .on("presence",{event:"sync"},()=>{
       const st=ch.presenceState();
-      const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+      const hh = role==="host" || Object.values(st).some(m=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
       const hostChanged = hh!==hostHere; hostHere=hh;
       if(role==="host") sendCfg();
       if(phase==="lobby"||phase==="results"||hostChanged) render();
@@ -291,7 +320,7 @@ if(AI){
     .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 }
 </script>
-  <script type="module" src="rtc-ring.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=9"></script>
   <script type="module" src="class-gate.js?v=10"></script>
 </body>
 </html>

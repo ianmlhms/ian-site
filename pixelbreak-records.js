@@ -8,6 +8,8 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
+import * as auth from "./auth.js?v=12";
+
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
                      (cfg.anonKey || "").trim().length > 20;
@@ -101,11 +103,48 @@ PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; };
 const SAVE_PREFIX = "pb_save_";
 let saveTimer = null, pendingSave = null, cloudSave;   // undefined = fetching, null = none
 
+const MAX_MESSAGE_SIZE = 256 * 1024, MAX_SAVE_DEPTH = 32, MAX_SCORE = Number.MAX_SAFE_INTEGER;
+const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+function isGameMessage(e) {
+  /* Identity of the sending window is the real control: only the game frame
+   * holds that reference. The origin is checked loosely on purpose — the games
+   * are srcdoc documents, so they report this origin while the sandbox keeps
+   * `allow-same-origin` and the opaque "null" if that is ever removed. Pinning
+   * it to location.origin would silently break every save the day the sandbox
+   * is tightened, without making a forged sender any harder. */
+  const frame = document.getElementById("gf");
+  if (!frame || e.source !== frame.contentWindow || !isObject(e.data)) return false;
+  return e.origin === location.origin || e.origin === "null" || e.origin === "";
+}
+function isSaveData(data) {
+  const seen = new Set();
+  let size = 0;
+  const check = (value, depth) => {
+    if (depth > MAX_SAVE_DEPTH || ++size > MAX_MESSAGE_SIZE) return false;
+    if (value === null || typeof value === "boolean") return true;
+    if (typeof value === "number") return Number.isFinite(value);
+    if (typeof value === "string") { size += value.length; return size <= MAX_MESSAGE_SIZE; }
+    if (typeof value !== "object" || seen.has(value)) return false;
+    if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype) return false;
+    if (Array.isArray(value) && value.length > MAX_MESSAGE_SIZE) return false;
+    seen.add(value);
+    return Object.entries(value).every(([key, v]) => {
+      size += key.length;
+      return size <= MAX_MESSAGE_SIZE && check(v, depth + 1);
+    });
+  };
+  return isObject(data) && check(data, 0);
+}
+
 window.addEventListener("message", (e) => {
+  if (!isGameMessage(e)) return;
   const d = e.data;
   const g = PB.current; if (!g) return;
-  if (d && d.__pbSave === 1 && d.data) {
-    try { localStorage.setItem(SAVE_PREFIX + g.id, JSON.stringify(d.data)); } catch {}
+  if (d.__pbSave === 1) {
+    if (Object.keys(d).length !== 2 || !isSaveData(d.data)) return;
+    const json = JSON.stringify(d.data);
+    if (json.length > MAX_MESSAGE_SIZE) return;
+    try { localStorage.setItem(SAVE_PREFIX + g.id, json); } catch (e) { console.warn("[PB] local save failed", e); }
     pendingSave = { g, data: d.data };
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
@@ -205,10 +244,11 @@ async function loadCloudSave(g) {
 
 /* ---------------- receive scores from the game iframe ---------------- */
 window.addEventListener("message", (e) => {
+  if (!isGameMessage(e)) return;
   const d = e.data;
-  if (!d || d.__pb !== 1) return;
+  if (d.__pb !== 1 || Object.keys(d).length !== 2) return;
   const g = PB.current; if (!g) return;
-  const s = +d.score; if (!isFinite(s)) return;
+  const s = d.score; if (!Number.isFinite(s) || Math.abs(s) > MAX_SCORE) return;
   if (sessionMax == null || s > sessionMax) {
     sessionMax = s;
     setLocalBest(g.id, s);
@@ -229,14 +269,7 @@ async function getCreateClient() {
 
 async function initCloud() {
   if (!cloudEnabled) return;
-  // Reuse the site-wide client if auth.js already created one — two GoTrue
-  // clients on the same localStorage race on token refresh (see auth.js).
-  if (window.__pbAuth && window.__pbAuth.sb) {
-    sb = window.__pbAuth.sb;
-  } else {
-    const createClient = await getCreateClient();
-    sb = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey);
-  }
+  sb = await auth.client();
   const { data } = await sb.auth.getSession();
   applySession(data.session);
   sb.auth.onAuthStateChange((_e, s) => applySession(s));

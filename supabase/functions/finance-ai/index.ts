@@ -16,6 +16,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const MAX_ITEMS = 80;      // rows accepted per categorise call
+// Shares the ai_usage daily counter with ask and study-buddy. Without this an
+// ordinary account could spend Ian's model budget without limit: authentication
+// alone caps the size of one request, never how many are sent.
+const IAN_EMAILS = new Set(["konto@ian.lu"]);  // ian@ian.lu is the TEST account
+const DAILY_LIMIT = 40;
 // Generous output budget: a full batch's JSON answer must NEVER be truncated —
 // a cut-off reply fails to parse and silently drops the whole batch to "other".
 const MAX_TOKENS = 8000;
@@ -74,13 +79,13 @@ const SYS =
   "Return ONLY minified JSON of the form {\"cats\":[{\"id\":\"<id>\"," +
   "\"cat\":\"<slug>\"}]} with one entry per input id, no prose, no code fences.";
 
-async function userFromRequest(req: Request): Promise<{ id: string } | null> {
+async function userFromRequest(req: Request): Promise<{ id: string; email: string } | null> {
   const auth = req.headers.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) return null;
   const { data, error } = await admin.auth.getUser(token);
   if (error || !data?.user) return null;
-  return { id: data.user.id };
+  return { id: data.user.id, email: (data.user.email ?? "").toLowerCase() };
 }
 
 async function anthropic(sys: string, user: string): Promise<string> {
@@ -161,6 +166,14 @@ Deno.serve(async (req) => {
 
   const user = await userFromRequest(req);
   if (!user) return json({ error: "sign in first" }, 401);
+
+  const { data: used, error: capErr } = await admin.rpc("ai_usage_bump", {
+    p_user: user.id, p_limit: DAILY_LIMIT,
+  });
+  if (capErr) { console.error("ai_usage_bump", capErr.message); return json({ error: "usage check failed" }, 500); }
+  if (!IAN_EMAILS.has(user.email) && (used ?? 0) > DAILY_LIMIT) {
+    return json({ error: "daily limit reached" }, 429);
+  }
 
   let payload: any;
   try { payload = await req.json(); } catch { return json({ error: "bad json" }, 400); }

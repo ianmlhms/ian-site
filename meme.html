@@ -110,16 +110,54 @@ const ch = sb.channel("meme:"+room, { config:{ broadcast:{self:false}, presence:
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+// Broadcasts (including the host's) are untrusted.
+const MAX_PLAYERS=64, MAX_NAME=80, MAX_SCORE=1000000;
+const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const isText=(v,max)=>typeof v==="string"&&v.length<=max;
+const isId=(v)=>typeof v==="string"&&/^[a-z0-9]{1,8}$/.test(v);
+const isNumber=(v,min,max)=>Number.isFinite(v)&&v>=min&&v<=max;
+const isInt=(v,min,max)=>Number.isInteger(v)&&isNumber(v,min,max);
+const isList=(v,max,check)=>Array.isArray(v)&&v.length<=max&&v.every(check);
+const isMap=(v,check)=>isObject(v)&&Object.keys(v).length<=MAX_PLAYERS&&Object.entries(v).every(([k,x])=>isId(k)&&check(x));
+const isScores=(v)=>isMap(v,x=>isInt(x,0,MAX_SCORE));
+const isPlayer=(p)=>isObject(p)&&isId(p.cid)&&isText(p.name,MAX_NAME);
+function onMessage(event,apply){ return ({payload})=>{ if(isMessage(event,payload)) apply(payload); }; }
+const MAX_CAPTION=180, MAX_URL=2048, MAX_CLOCK_SKEW_MS=300000;
+const isTemplate=(v)=>isText(v,MAX_URL)&&/^https:\/\/[^\s<>"\\]+$/.test(v);
+const isEntry=(e)=>isPlayer(e)&&isText(e.top,MAX_CAPTION)&&isText(e.bottom,MAX_CAPTION)&&isTemplate(e.template);
+const isEntries=(v,check)=>isList(v,MAX_PLAYERS,check)&&new Set(v.map(e=>e.cid)).size===v.length;
+const isEnd=(v)=>isInt(v,Date.now()-MAX_CLOCK_SKEW_MS,Date.now()+MAX_CLOCK_SKEW_MS);
+function isMessage(event,p){
+  if(!isObject(p)) return false;
+  switch(event){
+    case "round": return p.totalRounds===ROUNDS&&isInt(p.round,1,ROUNDS)&&isTemplate(p.template)&&isEnd(p.end)&&isScores(p.scores);
+    case "votephase": return isEntries(p.entries,isEntry)&&p.entries.length>=2&&isEnd(p.end);
+    case "reveal": return isEntries(p.results,r=>isEntry(r)&&isInt(r.votes,0,MAX_PLAYERS)&&isInt(r.gain,0,MAX_PLAYERS*VOTE_POINTS))&&isScores(p.scores)&&isTemplate(p.template);
+    case "final": return isScores(p.scores);
+    case "progress": return ["caption","vote"].includes(p.phase)&&isInt(p.total,0,MAX_PLAYERS)&&isInt(p.done,0,p.total);
+    case "reset": return Object.keys(p).length===0;
+    case "caption": return isEntry(p);
+    case "castvote": return isId(p.voter)&&isId(p.choice);
+    default: return false;
+  }
+}
+
 let name="Player", phase="lobby", round=0, totalRounds=0, hostHere=true;
 let scores={}, template=null, roundEnd=0, entries=[], results=[], progress=null;
 let myCap=null, myVote=null, myTemplate=null, rerollsLeft=0;
 // host-only
 let captions={}, votes={}, capTimer=null, voteTimer=null, tick=null;
 
-function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
+function players(){ const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
 async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Your name:")||"Player").slice(0,16);} localStorage.setItem("playerName",n); return n; }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
-function memeHTML(url,top,bottom){ return `<div class="meme"><img src="${esc(url)}" loading="lazy"><div class="mtext top">${esc(top||"")}</div><div class="mtext bottom">${esc(bottom||"")}</div></div>`; }
+function memeNode(url,top,bottom){
+  const el=document.createElement("div"); el.className="meme";
+  const img=document.createElement("img"); img.src=url; img.loading="lazy";
+  const t=document.createElement("div"); t.className="mtext top"; t.textContent=top||"";
+  const b=document.createElement("div"); b.className="mtext bottom"; b.textContent=bottom||"";
+  el.append(img,t,b); return el;
+}
 function scoreChips(){ const ps=players(); const mx=Math.max(0,...ps.map(p=>scores[p.cid]||0));
   return `<div class="scores">${ps.map(p=>`<span class="pchip ${(scores[p.cid]||0)===mx&&mx>0?"lead":""}">${esc(p.name)} · ${scores[p.cid]||0}</span>`).join("")}</div>`; }
 function topbar(){ const s=Math.max(0,Math.ceil((roundEnd-Date.now())/1000));
@@ -152,13 +190,14 @@ function render(){
   }
   let html = scoreChips()+topbar();
   if(phase==="caption"){
-    html += `<div class="meme big" id="prev"><img src="${esc(myTemplate||template)}"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
+    html += `<div class="meme big" id="prev"><img><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
     if(myCap){ html += `<p class="center muted">✅ Meme sent! Waiting for the others…</p>`; }
     else html += `<button class="reroll" id="rrBtn">🔄 Change meme (${rerollsLeft})</button>
                   <input id="capT" class="cin" placeholder="Top text" maxlength="60" autocomplete="off">
                   <input id="capB" class="cin" placeholder="Bottom text" maxlength="60" autocomplete="off">
                   <button class="big" id="capBtn">Send meme</button>`;
     $("app").innerHTML=html;
+    $("prev").querySelector("img").src=myTemplate||template;
     if(myCap){ $("pt").textContent=myCap.top; $("pb").textContent=myCap.bottom; }
     else { const upd=()=>{ $("pt").textContent=$("capT").value.toUpperCase(); $("pb").textContent=$("capB").value.toUpperCase(); };
       $("capT").oninput=upd; $("capB").oninput=upd; $("capBtn").onclick=submitCaption;
@@ -166,22 +205,28 @@ function render(){
     startTick(); return;
   }
   if(phase==="vote"){
-    html += `<p class="center muted">Vote for the funniest 👇</p><div class="grid">`+entries.map(e=>{
-      const mine=e.cid===cid, voted=myVote===e.cid;
-      return `<div class="ventry ${mine?"mine":""} ${voted?"voted":""}" data-cid="${e.cid}">${memeHTML(e.template||template,e.top,e.bottom)}
-        <div class="mlabel">${mine?"Your meme":(voted?"✓ Voted":"Tap to vote")}</div></div>`;
-    }).join("")+`</div>`;
+    html += `<p class="center muted">Vote for the funniest 👇</p><div class="grid"></div>`;
     $("app").innerHTML=html;
-    $("app").querySelectorAll(".ventry:not(.mine)").forEach(el=>el.onclick=()=>castVote(el.dataset.cid));
+    $("app").querySelector(".grid").replaceChildren(...entries.map(e=>{
+      const isMine=e.cid===cid, isVoted=myVote===e.cid;
+      const el=document.createElement("div"); el.className=`ventry ${isMine?"mine":""} ${isVoted?"voted":""}`; el.dataset.cid=e.cid;
+      const label=document.createElement("div"); label.className="mlabel"; label.textContent=isMine?"Your meme":(isVoted?"✓ Voted":"Tap to vote");
+      el.append(memeNode(e.template||template,e.top,e.bottom),label);
+      if(!isMine) el.onclick=()=>castVote(e.cid); return el;
+    }));
     startTick(); return;
   }
   if(phase==="reveal"){
     const best=results.length?results[0].votes:0;
-    html = scoreChips()+`<h3 class="center">Results — round ${round}/${totalRounds}</h3><div class="grid">`+results.map(r=>{
-      return `<div class="ventry ${r.votes===best&&best>0?"won":""}">${memeHTML(r.template||template,r.top,r.bottom)}
-        <div class="mlabel">${r.votes===best&&best>0?"👑 ":""}${esc(r.name)} · ${r.votes} ${r.votes===1?"vote":"votes"}${r.gain?` (+${r.gain})`:""}</div></div>`;
-    }).join("")+`</div>`;
-    $("app").innerHTML=html; return;
+    $("app").innerHTML=scoreChips()+`<h3 class="center"></h3><div class="grid"></div>`;
+    $("app").querySelector("h3").textContent=`Results — round ${round}/${totalRounds}`;
+    $("app").querySelector(".grid").replaceChildren(...results.map(r=>{
+      const isWinner=r.votes===best&&best>0;
+      const el=document.createElement("div"); el.className=`ventry ${isWinner?"won":""}`;
+      const label=document.createElement("div"); label.className="mlabel";
+      label.textContent=`${isWinner?"👑 ":""}${r.name} · ${r.votes} ${r.votes===1?"vote":"votes"}${r.gain?` (+${r.gain})`:""}`;
+      el.append(memeNode(r.template||template,r.top,r.bottom),label); return el;
+    })); return;
   }
 }
 function updateProg(){ const el=$("prog"); if(el&&progress) el.textContent=progress.done+"/"+progress.total+" ready"; }
@@ -263,22 +308,22 @@ function applyFinal(p){ scores=p.scores; phase="final"; clearTimeout(tick); rend
 function resetAll(){ phase="lobby"; round=0; totalRounds=0; scores={}; template=null; myTemplate=null; rerollsLeft=0; entries=[]; results=[]; myCap=null; myVote=null; progress=null; captions={}; votes={}; }
 
 /* ---------- wire ---------- */
-ch.on("broadcast",{event:"round"},({payload})=>applyRound(payload))
-  .on("broadcast",{event:"votephase"},({payload})=>applyVote(payload))
-  .on("broadcast",{event:"reveal"},({payload})=>applyReveal(payload))
-  .on("broadcast",{event:"final"},({payload})=>applyFinal(payload))
-  .on("broadcast",{event:"progress"},({payload})=>{ progress=payload; updateProg(); })
-  .on("broadcast",{event:"reset"},()=>{ resetAll(); render(); })
-  .on("broadcast",{event:"caption"},({payload})=>{ if(role==="host") hostCaption(payload); })
-  .on("broadcast",{event:"castvote"},({payload})=>{ if(role==="host") hostVote(payload); })
+ch.on("broadcast",{event:"round"},onMessage("round",payload=>applyRound(payload)))
+  .on("broadcast",{event:"votephase"},onMessage("votephase",payload=>applyVote(payload)))
+  .on("broadcast",{event:"reveal"},onMessage("reveal",payload=>applyReveal(payload)))
+  .on("broadcast",{event:"final"},onMessage("final",payload=>applyFinal(payload)))
+  .on("broadcast",{event:"progress"},onMessage("progress",payload=>{ progress=payload; updateProg(); }))
+  .on("broadcast",{event:"reset"},onMessage("reset",payload=>{ resetAll(); render(); }))
+  .on("broadcast",{event:"caption"},onMessage("caption",payload=>{ if(role==="host") hostCaption(payload); }))
+  .on("broadcast",{event:"castvote"},onMessage("castvote",payload=>{ if(role==="host") hostVote(payload); }))
   .on("presence",{event:"sync"},()=>{
     const st=ch.presenceState();
-    hostHere = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+    hostHere = role==="host" || Object.values(st).some(m=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
     if(phase==="lobby"||phase==="final") render();
   })
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 </script>
-  <script type="module" src="rtc-ring.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=9"></script>
   <script type="module" src="class-gate.js?v=10"></script>
 </body>
 </html>

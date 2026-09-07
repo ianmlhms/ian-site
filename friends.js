@@ -48,6 +48,7 @@ const classTag = (name) => {
 };
 
 const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Dial", draw: "Molerei", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe", checkers: "Checkers", maumau: "Mau-Mau", "dice-duel": "Kniffel" };
+const GAME_PAGES = Object.freeze(Object.fromEntries(Object.keys(GAMES).map(id => [id, id + ".html"])));
 const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe", "checkers", "maumau", "dice-duel"]);
 
 async function refresh() {
@@ -169,8 +170,10 @@ function renderInvites(list) {
     </div>`).join("");
   $("invites").querySelectorAll("[data-join]").forEach(b => b.onclick = async () => {
     const [game, room, id] = b.dataset.join.split("|");
+    if (!Object.hasOwn(GAME_PAGES, game)) return;
+    const page = GAME_PAGES[game];
     try { await sb.from("game_invites").update({ status: "accepted" }).eq("id", +id); } catch {}
-    location.href = `${game}.html?room=${encodeURIComponent(room)}&role=guest`;
+    location.href = `${page}?room=${encodeURIComponent(room)}&role=guest`;
   });
 }
 
@@ -189,9 +192,11 @@ function chooseGame(uid, name) {
 }
 
 async function invite(uid, game) {
+  if (!Object.hasOwn(GAME_PAGES, game)) return;
+  const page = GAME_PAGES[game];
   const { data, error } = await sb.rpc("invite_game", { p_to: uid, p_game: game });
   if (error) return alert(error.message);
-  location.href = `${game}.html?room=${encodeURIComponent(data.room)}&role=host`;
+  location.href = `${page}?room=${encodeURIComponent(data.room)}&role=host`;
 }
 
 async function addFriend() {

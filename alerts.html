@@ -53,6 +53,11 @@ const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 let sb=null;
 const ICON={mention:"💬",exam:"⏳",homework:"📋",friend:"👋",game:"🎮"};
 
+function isSitePath(value){
+  if(typeof value!=="string"||!value||value!==value.trim()||/^[a-z][a-z0-9+.-]*:|^\/\/|[\\\u0000-\u0020\u007f]/i.test(value)) return false;
+  return new URL(value,location.href).origin===location.origin;
+}
+
 function ago(ts){
   const s=Math.floor((Date.now()-new Date(ts).getTime())/1000);
   if(s<60)return "elo grad";
@@ -86,7 +91,7 @@ async function render(){
         <div class="w">${ago(n.created_at)}</div>
       </div>
       <div class="go">
-        ${n.url?`<a href="${esc(n.url)}">Opmaachen ›</a>`:""}
+        ${n.url?(isSitePath(n.url)?`<a href="${esc(n.url)}">Opmaachen ›</a>`:"Opmaachen ›"):""}
         <button class="del" data-del="${n.id}" title="Läschen">✕</button>
       </div></div>`).join("");
   $("clr").onclick=async()=>{await sb.from("notifications").delete().neq("id","00000000-0000-0000-0000-000000000000");render();};
@@ -96,7 +101,7 @@ async function render(){
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=9"></script>
   <script type="module" src="class-gate.js?v=10"></script>
 </body>
 </html>

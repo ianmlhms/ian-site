@@ -106,6 +106,31 @@ const ch = sb.channel("slf:"+room, { config:{ broadcast:{self:false}, presence:{
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
+// Broadcasts (including the host's) are untrusted.
+const MAX_PLAYERS=64, MAX_NAME=80;
+const isObject=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v);
+const isText=(v,max)=>typeof v==="string"&&v.length<=max;
+const isId=(v)=>typeof v==="string"&&/^[a-z0-9]{1,8}$/.test(v);
+const isNumber=(v,min,max)=>Number.isFinite(v)&&v>=min&&v<=max;
+const isInt=(v,min,max)=>Number.isInteger(v)&&isNumber(v,min,max);
+const isList=(v,max,check)=>Array.isArray(v)&&v.length<=max&&v.every(check);
+const isPlayer=(p)=>isObject(p)&&isId(p.cid)&&isText(p.name,MAX_NAME);
+function onMessage(event,apply){ return ({payload})=>{ if(isMessage(event,payload)) apply(payload); }; }
+const MAX_ROUND=10000, MAX_ANSWER=200;
+const isCategory=(v)=>isInt(v,0,CATALOG.length-1);
+const isVerdictKey=(v)=>typeof v==="string"&&/^[a-z0-9]{1,8}\|[0-9]{1,2}$/.test(v)&&isCategory(Number(v.split("|")[1]));
+function isMessage(event,p){
+  if(!isObject(p)) return false;
+  switch(event){
+    case "start": return isInt(p.round,1,MAX_ROUND)&&isText(p.letter,1)&&p.letter.length===1&&LETTERS.includes(p.letter)&&isList(p.cats,CATALOG.length,isCategory)&&p.cats.length>=2&&new Set(p.cats).size===p.cats.length;
+    case "stop": return Object.keys(p).length===0;
+    case "answers": return isPlayer(p)&&isList(p.ans,CATALOG.length,x=>isText(x,MAX_ANSWER))&&p.ans.length===cats.length;
+    case "verdicts": return isObject(p.v)&&Object.keys(p.v).length<=MAX_PLAYERS*CATALOG.length&&Object.entries(p.v).every(([k,v])=>isVerdictKey(k)&&typeof v==="boolean");
+    case "override": return isVerdictKey(p.key);
+    default: return false;
+  }
+}
+
 let name="Player", phase="lobby", letter="", round=0, stopped=false, answers={}, totals={}, collectTimer=null, hostHere=true;
 let verdicts={}, verdictTimer=null;   // "cid|catIndex" -> false when Wikidata says the word isn't real
 let roundScores={}, roundPlayers=[];  // this round's scoring, kept so host overrides can re-score
@@ -167,7 +192,7 @@ async function getName(){
   if(!n){ n=(prompt("Your name for the game:")||"Player").slice(0,20); }
   localStorage.setItem("playerName", n); return n;
 }
-function players(){ const st=ch.presenceState(); return Object.keys(st).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
+function players(){ const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k, name:(st[k][0]||{}).name||"?"})); }
 // Shuffled-bag draw: every letter comes up once before any repeats, and the
 // same letter can never be picked twice in a row (guarded at bag refill).
 let letterBag = [];
@@ -202,18 +227,20 @@ function render(){
   } else if (phase==="play"){
     $("app").innerHTML = `
       <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}</span>`).join("")}</div>
-      <div class="letter">${letter}</div>
-      ${cats.map((c,i)=>`<div class="cat"><label>${esc(c.name)}</label><input id="c${i}" autocomplete="off" placeholder="${letter}…"></div>`).join("")}
+      <div class="letter"></div>
+      ${cats.map((c,i)=>`<div class="cat"><label>${esc(c.name)}</label><input id="c${i}" autocomplete="off" maxlength="200"></div>`).join("")}
       <button class="big stop" id="stopBtn">✋ Stop! (reveal)</button>`;
+    $("app").querySelector(".letter").textContent=letter;
+    cats.forEach((_,i)=>$("c"+i).placeholder=letter+"…");
     $("c0").focus();
     $("stopBtn").onclick=()=>{ ch.send({type:"broadcast",event:"stop",payload:{}}); doStop(); };
   } else if (phase==="checking"){
     $("app").innerHTML = `
-      <div class="letter" style="font-size:34px">Letter: ${letter}</div>
+      <div class="letter" style="font-size:34px"></div>
       <p class="center muted">🔎 Checking the answers on Wikidata…</p>`;
   } else if (phase==="results"){
     $("app").innerHTML = `
-      <div class="letter" style="font-size:34px">Letter: ${letter}</div>
+      <div class="letter" style="font-size:34px"></div>
       ${renderRound(ps)}
       ${renderTotals(ps)}
       ${role==="host" ? `<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`
@@ -224,6 +251,7 @@ function render(){
       $("app").querySelectorAll("[data-ov]").forEach(b=> b.onclick=()=>overrideVerdict(b.dataset.ov,true));
     }
   }
+  if(phase==="checking"||phase==="results") $("app").querySelector(".letter").textContent="Letter: "+letter;
 }
 function renderRound(ps){
   let rows = `<h3>Round ${round}</h3><table><tr><th>Category</th>${ps.map(p=>`<th>${esc(p.name)}</th>`).join("")}</tr>`;
@@ -318,21 +346,21 @@ function overrideVerdict(key, send){
   render();
 }
 
-ch.on("broadcast",{event:"start"},({payload})=>{ round=payload.round; letter=payload.letter;
-    cats=(Array.isArray(payload.cats)?payload.cats:DEFAULT_CATS).map(i=>CATALOG[i]).filter(Boolean); enterPlay(); })
-  .on("broadcast",{event:"stop"},()=>doStop())
-  .on("broadcast",{event:"answers"},({payload})=>{ answers[payload.cid]={name:payload.name,ans:payload.ans}; if(stopped) checkComplete(); })
-  .on("broadcast",{event:"verdicts"},({payload})=>applyVerdicts(payload.v||{}))
-  .on("broadcast",{event:"override"},({payload})=>overrideVerdict(payload.key,false))
+ch.on("broadcast",{event:"start"},onMessage("start",payload=>{ round=payload.round; letter=payload.letter;
+    cats=(Array.isArray(payload.cats)?payload.cats:DEFAULT_CATS).map(i=>CATALOG[i]).filter(Boolean); enterPlay(); }))
+  .on("broadcast",{event:"stop"},onMessage("stop",payload=>doStop()))
+  .on("broadcast",{event:"answers"},onMessage("answers",payload=>{ answers={...answers,[payload.cid]:{name:payload.name,ans:[...payload.ans]}}; if(stopped) checkComplete(); }))
+  .on("broadcast",{event:"verdicts"},onMessage("verdicts",payload=>applyVerdicts(payload.v||{})))
+  .on("broadcast",{event:"override"},onMessage("override",payload=>overrideVerdict(payload.key,false)))
   .on("presence",{event:"sync"},()=>{
     const st=ch.presenceState();
-    const hh = role==="host" || Object.values(st).some(m=>(m[0]||{}).role==="host");
+    const hh = role==="host" || Object.values(st).some(m=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
     const hostChanged = hh!==hostHere; hostHere=hh;
     if(phase==="lobby"||phase==="results"||hostChanged&&phase!=="play") render();
   })
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 </script>
-  <script type="module" src="rtc-ring.js?v=8"></script>
+  <script type="module" src="rtc-ring.js?v=9"></script>
   <script type="module" src="class-gate.js?v=10"></script>
 </body>
 </html>
