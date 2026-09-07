@@ -24,7 +24,7 @@
 </script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=19"></script>
+<script src="theme.js?v=20"></script>
 <style>
 :where(button.st,button.dep,button.lndep){appearance:none;width:100%;background:transparent;color:inherit;font:inherit;text-align:inherit;border:0;border-radius:0;margin:0}
 :where(button.st){display:block}
@@ -38,6 +38,7 @@ button.st,button.dep,button.lndep{min-height:0}
   .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:16px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}
   .muted{color:var(--muted);font-size:13px}
+  .retry{margin-left:8px;min-height:34px;padding:6px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font:inherit;font-size:13px;cursor:pointer}
   .card h3{margin:0 0 12px;font-size:16px}
   #tprow{display:flex;gap:8px;margin-bottom:4px}
   #stopq{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
@@ -239,7 +240,7 @@ button.st,button.dep,button.lndep{min-height:0}
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=12";
+import * as auth from "./auth.js?v=14";
 import { mountPicker } from "./datetime-picker.js?v=2";
 import { searchPlaces } from "./geocode.js?v=1";
 const $=(id)=>document.getElementById(id);
@@ -325,11 +326,20 @@ function renderFavs(){
 // the stop "Hollerich, Kierfecht" (the comma is optional).
 const norm=(s)=>(""+(s||"")).normalize("NFD").replace(/[\u0300-\u036f]/g,"")
   .toLowerCase().replace(/,/g," ").replace(/\s+/g," ").trim();
-async function tp(params){
+const TP_TIMEOUT_MS=12000;
+async function tp(params,signal){
   const u=new URL(`${PB_CONFIG.url}/functions/v1/transport`);
   Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
-  const r=await fetch(u,{headers:{apikey:PB_CONFIG.anonKey,Authorization:`Bearer ${PB_CONFIG.anonKey}`}});
-  return r.json();
+  // A hung request used to leave "Lueden…" on screen forever, and the status was
+  // never checked, so an error page was parsed as if it were a board.
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),TP_TIMEOUT_MS);
+  if(signal)signal.addEventListener("abort",()=>ctrl.abort(),{once:true});
+  try{
+    const r=await fetch(u,{signal:ctrl.signal,headers:{apikey:PB_CONFIG.anonKey,Authorization:`Bearer ${PB_CONFIG.anonKey}`}});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return await r.json();
+  }finally{ clearTimeout(timer); }
 }
 // rail categories the HAFAS board returns at stations (buses have cat "Bus"/"")
 const RAIL=new Set(["RB","RE","IC","IR","TER","TGV","ICE","EC","EN","CFL","TRAIN"]);
@@ -402,6 +412,14 @@ function toggleDep(i,el){
     if(!box.dataset.done){ box.dataset.done="1"; loadDepDetail(i,box); }
   }else{ box.setAttribute("hidden",""); el.classList.remove("open"); el.setAttribute("aria-expanded","false"); }
 }
+// Every board request carries a ticket. Picking stop B while A is still in
+// flight used to let A's late response render under B's name.
+let boardSeq=0;
+function boardFailed(msg){
+  $("deps").innerHTML='<div class="muted">'+msg+' <button class="retry" type="button" id="depRetry">Nach eng Kéier</button></div>';
+  const b=$("depRetry");
+  if(b)b.onclick=()=>{ $("deps").innerHTML='<div class="muted">Lueden…</div>'; loadBoard(); };
+}
 async function loadBoard(){
   if(!curStop)return;
   // don't collapse an itinerary the user is reading during the 45s auto-refresh
@@ -410,8 +428,16 @@ async function loadBoard(){
   // optional future moment: datetime-local gives "YYYY-MM-DDTHH:MM" in local time
   const when=$("depTime").value;
   if(when){ const [date,time]=when.split("T"); if(date)params.date=date; if(time)params.time=time.slice(0,5); }
-  const d=await tp(params);
-  if(d.error){$("deps").innerHTML='<div class="muted">Departuren net verfügbar.</div>';return;}
+  const ticket=++boardSeq, forStop=curStop.id;
+  let d;
+  try{ d=await tp(params); }
+  catch(e){
+    console.warn("[bus] board",e);
+    if(ticket===boardSeq&&forStop===curStop?.id)boardFailed("Departuren net erreechbar.");
+    return;
+  }
+  if(ticket!==boardSeq||forStop!==curStop?.id)return;   // a newer stop won
+  if(d.error){boardFailed("Departuren net verfügbar.");return;}
   renderDeps(d.departures);
 }
 
@@ -939,7 +965,7 @@ initTransport();
 
 auth.mountAccountButton($("acctHost"));
 </script>
-  <script type="module" src="rtc-ring.js?v=9"></script>
-  <script type="module" src="class-gate.js?v=10"></script>
+  <script type="module" src="rtc-ring.js?v=10"></script>
+  <script type="module" src="class-gate.js?v=11"></script>
 </body>
 </html>

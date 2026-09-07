@@ -150,12 +150,20 @@ async function initializeClient() {
 }
 
 export async function client() {
-  if (_g.sb) return _g.sb;
+  // Await initialisation whenever it has been started. `initializeClient` assigns
+  // `_g.sb` before it awaits the session, so returning on `_g.sb` alone handed a
+  // second caller a client whose `session()` was still empty — rtc-ring.js reads
+  // the session immediately after awaiting this and would see nobody signed in.
+  //
   // Caching the rejected promise left one bad boot — CDN blocked, offline for a
   // moment — reading as "signed out" for the rest of the page's life, which is how
   // the sign-in banner ended up in front of a signed-in user. Clear it so the next
   // caller (or the next onAuth pass) genuinely retries.
   if (!_g.ready) {
+    // An older copy of this module (different ?v=) may already have built the
+    // client without recording a promise. Reuse it rather than creating a second
+    // session-managing client, which is the race this cache exists to prevent.
+    if (_g.sb) return _g.sb;
     _g.ready = initializeClient().catch((error) => {
       _g.ready = null;
       throw error;

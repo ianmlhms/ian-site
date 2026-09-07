@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=12";
+import * as auth from "./auth.js?v=14";
 import { DEFAULT_STYLE, resolveTokens } from "./ppt-style-packs.js?v=6";
 import { ingestFiles, INGEST_LIMITS } from "./ppt-ingest.js?v=3";
 import { createDeckGeneration } from "./ppt-ai.js?v=11";

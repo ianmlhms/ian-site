@@ -1,5 +1,10 @@
-// Konkrete Persistenz-Implementierung über localStorage. Wird ausschließlich über
-// adapter.js angesprochen, damit sie sich später 1:1 durch einen ApiAdapter ersetzen lässt.
+// Konkrete Persistenz-Implementierung über localStorage.
+//
+// NICHT MEHR AKTIV: adapter.js exportiert seit der Supabase-Umstellung den
+// supabaseAdapter, dieses Modul wird von nichts mehr importiert. Es bleibt nur
+// erhalten, weil es die einzige Stelle ist, die alte lokale Projekte
+// ('housePlan_*' / 'housePlannerLibrary_v1') noch lesen kann — vor dem Löschen
+// also prüfen, ob jemand noch solche Speicherstände hat.
 
 import { migrateProject } from '../core/migrate.js';
 

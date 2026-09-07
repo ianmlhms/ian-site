@@ -1,5 +1,5 @@
 /* Messenger — group chat + DMs + media, on Supabase. Shared accounts with PixelBreak. */
-import * as auth from "./auth.js?v=12";
+import * as auth from "./auth.js?v=14";
 import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=10";
 
 const $ = (id) => document.getElementById(id);

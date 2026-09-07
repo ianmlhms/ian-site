@@ -218,8 +218,9 @@ Old full data was scrubbed from git history.
 - **AdSense**: script + `ads.txt` present on index/about/pixelbreak, **awaiting Google
   approval — do not remove**; after approval add real `<ins>` ad units (PixelBreak hub is the
   highest-session-time spot).
-- **Feedback reading UI**: submissions land in the `feedback` table (admin-only read); there's
-  no admin.html tab for it yet — read via Supabase Table Editor, or build a third admin tab.
+- ~~**Feedback reading UI**~~: **built** — `admin.js:183` selects the feedback rows and
+  `admin.js:243` wires the Feedback tab in `admin.html`. (This entry said no tab existed
+  until 7 Sep 2026; it had been built and the note was never updated.)
 
 ## 7b. Older status (Jun 2026)
 

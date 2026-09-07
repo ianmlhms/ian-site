@@ -9,7 +9,7 @@
   <meta name="description" content="Colour Dial — guess the colour together with a friend, or against an AI that reasons about hue." />
   <link rel="canonical" href="https://ian.lu/color.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=19"></script>
+<script src="theme.js?v=20"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
@@ -147,7 +147,17 @@ function isMessage(event,p){
 let name="Player", phase="lobby", rounds=5, round=0, target=null, mode="visible";
 let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
 let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false, hostHere=true;
-function recordResult(game,result){ try{ const a=window.__pbAuth; if(a&&a.session&&a.sb) a.sb.rpc("record_match",{p_game:game,p_result:result}); }catch{} }
+// Colour Dial does not load game-common.js (only its stylesheet), so this stays
+// a local copy — kept identical to the shared helper in game-common.js.
+async function recordResult(game,result){
+  const a=window.__pbAuth;
+  if(!a||!a.session||!a.sb)return false;
+  try{
+    const {error}=await a.sb.rpc("record_match",{p_game:game,p_result:result});
+    if(error)throw error;
+    return true;
+  }catch(e){ console.warn("[game] result not saved",e); return false; }
+}
 
 const MAXD = Math.sqrt(255*255*3);
 const FLASH_MS = 3000; // flash mode: how long the target is shown before it hides
@@ -320,7 +330,7 @@ if(AI){
     .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 }
 </script>
-  <script type="module" src="rtc-ring.js?v=9"></script>
-  <script type="module" src="class-gate.js?v=10"></script>
+  <script type="module" src="rtc-ring.js?v=10"></script>
+  <script type="module" src="class-gate.js?v=11"></script>
 </body>
 </html>

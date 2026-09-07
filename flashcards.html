@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=19"></script>
+<script src="theme.js?v=20"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
@@ -62,7 +62,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module">
-import * as auth from "./auth.js?v=12";
+import * as auth from "./auth.js?v=14";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const qs=new URLSearchParams(location.search);
@@ -208,20 +208,34 @@ function editView(){
     const id=r.dataset.id;
     r.querySelector(".cf").onchange=()=>saveCard(id,r);
     r.querySelector(".cb").onchange=()=>saveCard(id,r);
-    r.querySelector("[data-del]").onclick=async()=>{await sb.from("flashcards").delete().eq("id",id);openDeck(deck.id,true);};
+    r.querySelector("[data-del]").onclick=async()=>{
+      const {error}=await sb.from("flashcards").delete().eq("id",id);
+      if(error){console.warn("[cards] card delete",error);setEm("Net geläscht.",true);return;}
+      openDeck(deck.id,true);};
   });
   $("addCard").onclick=addCard;
   if($("study"))$("study").onclick=()=>{idx=0;flipped=false;studyView();};
-  $("delDeck").onclick=async()=>{if(!confirm("Ganz Këscht läschen?"))return;await sb.from("flashcard_decks").delete().eq("id",deck.id);deck=null;location.href="flashcards.html";};
+  $("delDeck").onclick=async()=>{
+    if(!confirm("Ganz Këscht läschen?"))return;
+    const {error}=await sb.from("flashcard_decks").delete().eq("id",deck.id);
+    if(error){console.warn("[cards] deck delete",error);setEm("Net geläscht.",true);return;}
+    deck=null;location.href="flashcards.html";};
 }
+// Supabase reports failure in {error}; it does not throw. Acknowledging a save
+// without reading that told the user their work was safe when it was not.
 async function saveDeck(){
-  deck.title=$("dTitle").value.trim()||deck.title;deck.shared=$("dShare").checked;
-  await sb.from("flashcard_decks").update({title:deck.title,shared:deck.shared}).eq("id",deck.id);
+  const title=$("dTitle").value.trim()||deck.title,shared=$("dShare").checked;
+  const {error}=await sb.from("flashcard_decks").update({title,shared}).eq("id",deck.id);
+  if(error){console.warn("[cards] deck save",error);setEm("Net gespäichert — nach eng Kéier probéieren.",true);return;}
+  deck.title=title;deck.shared=shared;
   setEm("Gespäichert ✓");
 }
 async function saveCard(id,r){
   const front=r.querySelector(".cf").value.trim(),back=r.querySelector(".cb").value.trim();
-  await sb.from("flashcards").update({front,back}).eq("id",id);
+  const {error}=await sb.from("flashcards").update({front,back}).eq("id",id);
+  // Only mirror into memory once the write actually landed, or a failed save
+  // stays convincing until the next reload.
+  if(error){console.warn("[cards] card save",error);setEm("Net gespäichert — nach eng Kéier probéieren.",true);return;}
   const c=cards.find(x=>x.id===id);if(c){c.front=front;c.back=back;}
   setEm("Gespäichert ✓");
 }
@@ -239,7 +253,7 @@ function setEm(t,err){const m=$("em");if(!m)return;m.textContent=t;m.style.color
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=9"></script>
-  <script type="module" src="class-gate.js?v=10"></script>
+  <script type="module" src="rtc-ring.js?v=10"></script>
+  <script type="module" src="class-gate.js?v=11"></script>
 </body>
 </html>

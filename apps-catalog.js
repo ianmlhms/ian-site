@@ -1,3 +1,6 @@
+// `admin: true` mirrors the `.admin-only` tiles on index.html. This file is the
+// single source of that fact — the homepage used to say Homework was admin-only
+// while this catalog said it was open, so ⌘K offered it to everyone.
 export const APPS = Object.freeze([
   { url: "grades.html", name: "Grades", icon: "🎓", group: "grp.school", locked: true,
     keywords: ["noten", "points", "moyenne", "average", "zensuren"] },
@@ -5,7 +8,7 @@ export const APPS = Object.freeze([
     keywords: ["stonneplang", "stundenplan", "horaire", "schedule"] },
   { url: "exams.html", name: "Tester", icon: "⏳", group: "grp.school", locked: true,
     keywords: ["prüfungen", "examens", "tests", "countdown", "notizen"] },
-  { url: "homework.html", name: "Hausaufgaben", icon: "📚", group: "grp.school", locked: false,
+  { url: "homework.html", admin: true, name: "Hausaufgaben", icon: "📚", group: "grp.school", locked: false,
     keywords: ["homework", "devoirs", "aufgaben", "webuntis"] },
   { url: "flashcards.html", name: "Kaarten", icon: "🃏", group: "grp.school", locked: true,
     keywords: ["flashcards", "karteikarten", "cartes", "lernen", "réviser"] },
@@ -62,18 +65,18 @@ export const APPS = Object.freeze([
     keywords: ["foto", "photo", "fotobuch", "photobook", "wëschen", "duell", "vote"] },
   { url: "money.html", name: "Sue", icon: "💶", group: "grp.personal", locked: true,
     keywords: ["geld", "argent", "suen", "ausgaben", "dépenses", "subscriptions"] },
-  { url: "me.html", name: "My Dashboard", icon: "📊", group: "grp.personal", locked: false,
+  { url: "me.html", admin: true, name: "My Dashboard", icon: "📊", group: "grp.personal", locked: false,
     keywords: ["stats", "traffic", "github", "analytics", "statistiken"] },
-  { url: "karts.html", name: "KartTracker", icon: "🏎️", group: "grp.personal", locked: false,
+  { url: "karts.html", admin: true, name: "KartTracker", icon: "🏎️", group: "grp.personal", locked: false,
     keywords: ["karting", "ronnen", "runden", "tours", "laps", "zeiten"] },
   { url: "hotel.html", name: "Hotel-Simulator", icon: "🏨", group: "grp.personal", locked: false,
     keywords: ["builder", "bauen", "simulateur", "building", "hotel"] },
   { url: "haus/", name: "Haus-Planer", icon: "🏠", group: "grp.personal", locked: true,
     keywords: ["haus", "house", "bauen", "builder", "grundriss", "floor plan"] },
 
-  { url: "factory.html", name: "Dashboard", icon: "📈", group: "grp.private", locked: false,
+  { url: "factory.html", admin: true, name: "Dashboard", icon: "📈", group: "grp.private", locked: false,
     keywords: ["shorts", "shortsfactory", "analytics", "video", "stats"] },
-  { url: "admin.html", name: "Admin", icon: "🛡", group: "grp.private", locked: false,
+  { url: "admin.html", admin: true, name: "Admin", icon: "🛡", group: "grp.private", locked: false,
     keywords: ["moderation", "verwaltung", "manage", "users", "benotzer"] },
   { url: "ppt.html", name: "PPT Builder", icon: "▣", group: "grp.private", locked: false,
     keywords: ["powerpoint", "presentation", "présentation", "slides", "folien"] },

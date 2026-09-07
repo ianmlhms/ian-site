@@ -35,8 +35,21 @@ window.GameCommon = (() => {
     return sb.channel(prefix + ":" + room, { config: { broadcast: { self: false }, presence: { key: presenceKey } } });
   }
 
-  function recordResult(game, result) {
-    try { const a = window.__pbAuth; if (a && a.session && a.sb) a.sb.rpc("record_match", { p_game: game, p_result: result }); } catch {}
+  // Awaited on purpose: the result used to be discarded, so a failed write was
+  // invisible and — with v2's lazy request builders — the request could go out
+  // late or not at all. Returns whether the result actually landed. No retry:
+  // duplicate submissions are not handled anywhere downstream.
+  async function recordResult(game, result) {
+    const a = window.__pbAuth;
+    if (!a || !a.session || !a.sb) return false;
+    try {
+      const { error } = await a.sb.rpc("record_match", { p_game: game, p_result: result });
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn("[game] result not saved", e);
+      return false;
+    }
   }
 
   /* Presence + state sync that survives refreshes:
