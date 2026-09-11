@@ -11,7 +11,7 @@
   <link rel="canonical" href="$canonical" />
 $alternates
   <title>$title</title>
-  <link rel="stylesheet" href="../trails.css?v=4" />
+  <link rel="stylesheet" href="../trails.css?v=5" />
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
   <!-- Google AdSense (public pages only) -->
@@ -30,6 +30,12 @@ $alternates
 $intro_html
     </div>
 
+    <div class="toolbar">
+      <input class="search" id="q" type="search" autocomplete="off"
+             placeholder="$search_placeholder" aria-label="$search_label" />
+      <a class="map-btn" href="https://ian.lu/kaart/">$map_button</a>
+    </div>
+
     <nav class="filters" aria-label="Filter">
       <button class="filter on" data-region="all">$filter_all</button>
 $filter_buttons
@@ -38,6 +44,7 @@ $filter_buttons
     <div class="cards">
 $cards_html
     </div>
+    <p class="no-results" id="none" hidden>$no_results</p>
 
     <p class="sister">$sister_html</p>
     <p class="sister">$map_link</p>
@@ -51,16 +58,49 @@ $cards_html
         try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
       });
     });
+    // Region buttons and the search box are two filters over one list, so
+    // neither may set display on its own — they'd undo each other.
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
+
+    // Accent-blind, so "pedestre" finds "Pédestre" and "eislek" finds "Éislek".
+    function fold(text) {
+      var lower = text.toLowerCase();
+      return lower.normalize ? lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : lower;
+    }
+
+    // Name + region + teaser only. The whole card would also carry the CTA
+    // text, which every card shares — every query would match everything.
+    var haystacks = cards.map(function (card) {
+      return fold(['h3', '.region', '.teaser'].map(function (sel) {
+        var el = card.querySelector(sel);
+        return el ? el.textContent : '';
+      }).join(' '));
+    });
+    var empty = document.getElementById('none');
+    var search = document.getElementById('q');
+    var region = 'all';
+
+    function apply() {
+      var needle = fold(search.value.trim());
+      var shown = 0;
+      cards.forEach(function (card, i) {
+        var hit = (region === 'all' || card.dataset.region === region) &&
+                  (needle === '' || haystacks[i].indexOf(needle) !== -1);
+        card.style.display = hit ? '' : 'none';
+        if (hit) { shown += 1; }
+      });
+      empty.hidden = shown > 0;
+    }
+
     document.querySelectorAll('.filter').forEach(function (btn) {
       btn.addEventListener('click', function () {
         document.querySelectorAll('.filter').forEach(function (b) { b.classList.remove('on'); });
         btn.classList.add('on');
-        var region = btn.dataset.region;
-        document.querySelectorAll('.card').forEach(function (card) {
-          card.style.display = (region === 'all' || card.dataset.region === region) ? '' : 'none';
-        });
+        region = btn.dataset.region;
+        apply();
       });
     });
+    search.addEventListener('input', apply);
   </script>
 </body>
 </html>

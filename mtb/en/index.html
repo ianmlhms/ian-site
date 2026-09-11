@@ -14,7 +14,7 @@
   <link rel="alternate" hreflang="en" href="https://ian.lu/mtb/en/" />
   <link rel="alternate" hreflang="x-default" href="https://ian.lu/mtb/" />
   <title>MTB Trails Luxembourg — every marked mountain-bike loop with map, GPX &amp; bus access</title>
-  <link rel="stylesheet" href="../trails.css?v=4" />
+  <link rel="stylesheet" href="../trails.css?v=5" />
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
   <!-- Google AdSense (public pages only) -->
@@ -32,6 +32,12 @@
     <div class="intro">
       <p>Luxembourg has a dense network of waymarked mountain-bike loops: national MTB tours, the RedRock trails on the former mining land of the south, and local circuits in the Éislek and the Mullerthal. Most are permanently signposted and start in villages you can reach by bus — free of charge nationwide.</p>
       <p>This site presents the tours one by one: interactive map, distance, elevation profile, approximate riding time, GPX download and the bus stops on the route. Route data comes from OpenStreetMap, stop data from Luxembourg&#x27;s official timetable feed.</p>
+    </div>
+
+    <div class="toolbar">
+      <input class="search" id="q" type="search" autocomplete="off"
+             placeholder="Search a place or trail …" aria-label="Search trails" />
+      <a class="map-btn" href="https://ian.lu/kaart/">🗺️ Open the map</a>
     </div>
 
     <nav class="filters" aria-label="Filter">
@@ -304,6 +310,7 @@
         <span class="cta">View tour ›</span>
       </a>
     </div>
+    <p class="no-results" id="none" hidden>No trail matches that search.</p>
 
     <p class="sister"><a href="../../trails/en/">🥾 Also worth exploring: Luxembourg&#x27;s Auto-Pédestre walks</a></p>
     <p class="sister"><a href="https://ian.lu/kaart/">🗺️ See every route on one map</a></p>
@@ -317,16 +324,49 @@
         try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
       });
     });
+    // Region buttons and the search box are two filters over one list, so
+    // neither may set display on its own — they'd undo each other.
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
+
+    // Accent-blind, so "pedestre" finds "Pédestre" and "eislek" finds "Éislek".
+    function fold(text) {
+      var lower = text.toLowerCase();
+      return lower.normalize ? lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : lower;
+    }
+
+    // Name + region + teaser only. The whole card would also carry the CTA
+    // text, which every card shares — every query would match everything.
+    var haystacks = cards.map(function (card) {
+      return fold(['h3', '.region', '.teaser'].map(function (sel) {
+        var el = card.querySelector(sel);
+        return el ? el.textContent : '';
+      }).join(' '));
+    });
+    var empty = document.getElementById('none');
+    var search = document.getElementById('q');
+    var region = 'all';
+
+    function apply() {
+      var needle = fold(search.value.trim());
+      var shown = 0;
+      cards.forEach(function (card, i) {
+        var hit = (region === 'all' || card.dataset.region === region) &&
+                  (needle === '' || haystacks[i].indexOf(needle) !== -1);
+        card.style.display = hit ? '' : 'none';
+        if (hit) { shown += 1; }
+      });
+      empty.hidden = shown > 0;
+    }
+
     document.querySelectorAll('.filter').forEach(function (btn) {
       btn.addEventListener('click', function () {
         document.querySelectorAll('.filter').forEach(function (b) { b.classList.remove('on'); });
         btn.classList.add('on');
-        var region = btn.dataset.region;
-        document.querySelectorAll('.card').forEach(function (card) {
-          card.style.display = (region === 'all' || card.dataset.region === region) ? '' : 'none';
-        });
+        region = btn.dataset.region;
+        apply();
       });
     });
+    search.addEventListener('input', apply);
   </script>
 </body>
 </html>

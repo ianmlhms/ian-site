@@ -14,7 +14,7 @@
   <link rel="alternate" hreflang="en" href="https://ian.lu/trails/en/" />
   <link rel="alternate" hreflang="x-default" href="https://ian.lu/trails/" />
   <title>Auto-Pédestres Luxembourg — toutes les boucles avec carte et accès en bus</title>
-  <link rel="stylesheet" href="../trails.css?v=4" />
+  <link rel="stylesheet" href="../trails.css?v=5" />
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../../apple-touch-icon.png">
   <!-- Google AdSense (public pages only) -->
@@ -32,6 +32,12 @@
     <div class="intro">
       <p>Les Auto-Pédestres sont les boucles de randonnée classiques du Luxembourg : plus de 100 circuits locaux dans tout le pays, balisés en permanence du symbole bleu et conçus pour ramener toujours au point de départ. Beaucoup furent créés il y a des décennies pour les excursionnistes en voiture — d&#x27;où le nom — mais aujourd&#x27;hui la plupart s&#x27;atteignent facilement en bus, les transports publics étant gratuits dans tout le Luxembourg.</p>
       <p>Ce site présente les circuits un par un — avec carte interactive, distance, durée approximative, difficulté et les arrêts de bus situés directement sur le parcours. Les tracés proviennent d&#x27;OpenStreetMap, les arrêts des données horaires officielles du Luxembourg.</p>
+    </div>
+
+    <div class="toolbar">
+      <input class="search" id="q" type="search" autocomplete="off"
+             placeholder="Rechercher une localité ou un circuit …" aria-label="Rechercher un circuit" />
+      <a class="map-btn" href="https://ian.lu/kaart/">🗺️ Ouvrir la carte</a>
     </div>
 
     <nav class="filters" aria-label="Filter">
@@ -780,6 +786,7 @@
         <span class="cta">Voir le circuit ›</span>
       </a>
     </div>
+    <p class="no-results" id="none" hidden>Aucun circuit ne correspond à cette recherche.</p>
 
     <p class="sister"><a href="../../mtb/fr/">🚵 À découvrir aussi : les circuits VTT du Luxembourg</a></p>
     <p class="sister"><a href="https://ian.lu/kaart/">🗺️ Voir tous les parcours sur une carte</a></p>
@@ -793,16 +800,49 @@
         try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
       });
     });
+    // Region buttons and the search box are two filters over one list, so
+    // neither may set display on its own — they'd undo each other.
+    var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
+
+    // Accent-blind, so "pedestre" finds "Pédestre" and "eislek" finds "Éislek".
+    function fold(text) {
+      var lower = text.toLowerCase();
+      return lower.normalize ? lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : lower;
+    }
+
+    // Name + region + teaser only. The whole card would also carry the CTA
+    // text, which every card shares — every query would match everything.
+    var haystacks = cards.map(function (card) {
+      return fold(['h3', '.region', '.teaser'].map(function (sel) {
+        var el = card.querySelector(sel);
+        return el ? el.textContent : '';
+      }).join(' '));
+    });
+    var empty = document.getElementById('none');
+    var search = document.getElementById('q');
+    var region = 'all';
+
+    function apply() {
+      var needle = fold(search.value.trim());
+      var shown = 0;
+      cards.forEach(function (card, i) {
+        var hit = (region === 'all' || card.dataset.region === region) &&
+                  (needle === '' || haystacks[i].indexOf(needle) !== -1);
+        card.style.display = hit ? '' : 'none';
+        if (hit) { shown += 1; }
+      });
+      empty.hidden = shown > 0;
+    }
+
     document.querySelectorAll('.filter').forEach(function (btn) {
       btn.addEventListener('click', function () {
         document.querySelectorAll('.filter').forEach(function (b) { b.classList.remove('on'); });
         btn.classList.add('on');
-        var region = btn.dataset.region;
-        document.querySelectorAll('.card').forEach(function (card) {
-          card.style.display = (region === 'all' || card.dataset.region === region) ? '' : 'none';
-        });
+        region = btn.dataset.region;
+        apply();
       });
     });
+    search.addEventListener('input', apply);
   </script>
 </body>
 </html>
