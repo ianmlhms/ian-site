@@ -147,7 +147,7 @@ def build_category(cat: dict) -> tuple:
     for trail in registry:
         slug = trail["slug"]
         entry = computed.get(slug)
-        if slug in excluded or not entry:
+        if slug in excluded or trail.get("retired") or not entry:
             continue
 
         geo_path = os.path.join(geo_root, f"{slug}.geojson")
@@ -170,7 +170,7 @@ def build_category(cat: dict) -> tuple:
             "gain": gain,
             "duration": duration_label(length_km, gain, cat["speed_kmh"], cat["climb_m_per_h"]),
             "difficulty": auto_difficulty(length_km, gain, cat["difficulty"]),
-            "natural": entry.get("natural_pct") or 0,
+            "natural": entry.get("natural_pct"),
             "center": entry.get("center"),
             "bbox": entry.get("bbox"),
             "bus": bus_summary(entry),

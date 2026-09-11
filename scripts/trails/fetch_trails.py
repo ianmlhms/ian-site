@@ -9,9 +9,10 @@ Reads data/trails/registry.json (from discover_trails.py) and writes:
                                     bus_stops [{id,name,lat,lon,dist_m,lines[]}]
 
 Existing computed entries are merged, so enrich.py additions (elevation,
-POIs, images) survive a re-fetch. Relations are fetched in chunks to keep
-Overpass happy; segments are chained into walking order where endpoints
-match, then Douglas-Peucker-simplified (~4 m tolerance).
+POIs, images) survive a re-fetch. Registry trails without an osm_rel come
+from fetch_official.py and are skipped here. Relations are fetched in chunks
+to keep Overpass happy; segments are chained into walking order where
+endpoints match, then Douglas-Peucker-simplified (~4 m tolerance).
 
 Usage:
     python3 scripts/trails/fetch_trails.py            # all trails
@@ -127,6 +128,17 @@ def rdp(points: list, eps: float) -> list:
     """Iterative Douglas-Peucker on [lon, lat] points (degree-space epsilon)."""
     if len(points) < 3:
         return points
+    # A closed ring defeats Douglas-Peucker: first and last point being equal
+    # makes the baseline zero-length, every perpendicular distance comes out 0,
+    # and the whole loop collapses to those two points. OSM relations arrive as
+    # separate chained ways so they never hit this, but the official circuits
+    # are single closed lines and five of them vanished. Cut the ring at its
+    # farthest vertex and simplify the two halves.
+    if points[0] == points[-1]:
+        start = points[0]
+        split = max(range(1, len(points) - 1),
+                    key=lambda i: math.hypot(points[i][0] - start[0], points[i][1] - start[1]))
+        return rdp(points[:split + 1], eps)[:-1] + rdp(points[split:], eps)
     keep = [False] * len(points)
     keep[0] = keep[-1] = True
     stack = [(0, len(points) - 1)]
@@ -268,8 +280,9 @@ def main() -> None:
         missing = wanted - {t["slug"] for t in trails}
         if missing:
             raise SystemExit(f"Unknown slugs: {', '.join(sorted(missing))}")
+    trails = [t for t in trails if t.get("osm_rel") is not None]
     if not trails:
-        raise SystemExit("No trails to fetch.")
+        raise SystemExit("No OSM trails to fetch.")
 
     stops = load_json(STOPS_JSON)
     line_index = build_line_index(load_json(LINES_JSON))

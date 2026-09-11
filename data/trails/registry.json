@@ -1,16 +1,29 @@
 {
  "trails": [
   {
-   "slug": "reimberg",
-   "osm_rel": 8032747,
-   "name": "Auto Pédestre Reimberg",
-   "place": "Reimberg"
-  },
-  {
    "slug": "abweiler",
    "osm_rel": 2680252,
    "name": "Auto-Pédestre Abweiler",
    "place": "Abweiler"
+  },
+  {
+   "slug": "wormeldange",
+   "osm_rel": 2121659,
+   "name": "Auto-Pédestre Ahn",
+   "place": "Ahn"
+  },
+  {
+   "slug": "altrier",
+   "osm_rel": 19183790,
+   "name": "Autopédestre Altrier",
+   "place": "Altrier"
+  },
+  {
+   "slug": "arsdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Arsdorf",
+   "place": "Arsdorf",
+   "source": "geoportail"
   },
   {
    "slug": "bascharage",
@@ -23,6 +36,13 @@
    "osm_rel": 15814976,
    "name": "Auto-Pédestre Baschleiden",
    "place": "Baschleiden"
+  },
+  {
+   "slug": "beaufort",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Beaufort",
+   "place": "Beaufort",
+   "source": "geoportail"
   },
   {
    "slug": "bech",
@@ -55,6 +75,13 @@
    "place": "Berbourg"
   },
   {
+   "slug": "berdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Berdorf",
+   "place": "Berdorf",
+   "source": "geoportail"
+  },
+  {
    "slug": "bereldange",
    "osm_rel": 7758982,
    "name": "Auto-Pédestre Bereldange",
@@ -71,6 +98,13 @@
    "osm_rel": 3558076,
    "name": "Auto-Pédestre Beringen",
    "place": "Beringen"
+  },
+  {
+   "slug": "berle",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Berlé",
+   "place": "Berlé",
+   "source": "geoportail"
   },
   {
    "slug": "bertrange",
@@ -91,10 +125,46 @@
    "place": "Bettel"
   },
   {
-   "slug": "bettendorf-1",
-   "osm_rel": 11664089,
-   "name": "Auto-Pédestre Bettendorf 1",
-   "place": "Bettendorf"
+   "slug": "bettendorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Bettendorf",
+   "place": "Bettendorf",
+   "source": "geoportail"
+  },
+  {
+   "slug": "betzdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Betzdorf",
+   "place": "Betzdorf",
+   "source": "geoportail"
+  },
+  {
+   "slug": "bigonville",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Bigonville",
+   "place": "Bigonville",
+   "source": "geoportail"
+  },
+  {
+   "slug": "binsfeld",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Binsfeld",
+   "place": "Binsfeld",
+   "source": "geoportail"
+  },
+  {
+   "slug": "boevange",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Boevange",
+   "place": "Boevange",
+   "source": "geoportail"
+  },
+  {
+   "slug": "bollendorf-pont",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Bollendorf-Pont",
+   "place": "Bollendorf-Pont",
+   "source": "geoportail"
   },
   {
    "slug": "bonnevoie",
@@ -121,16 +191,17 @@
    "place": "Bourglinster"
   },
   {
+   "slug": "bourscheid",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Bourscheid",
+   "place": "Bourscheid",
+   "source": "geoportail"
+  },
+  {
    "slug": "boxhorn",
    "osm_rel": 5907844,
    "name": "Auto-Pédestre Boxhorn",
    "place": "Boxhorn"
-  },
-  {
-   "slug": "brandenbourg",
-   "osm_rel": 6143987,
-   "name": "Auto-Pédestre Brandenbourg",
-   "place": "Brandenbourg"
   },
   {
    "slug": "bridel",
@@ -139,22 +210,38 @@
    "place": "Bridel"
   },
   {
+   "slug": "brouch",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Brouch",
+   "place": "Brouch",
+   "source": "geoportail"
+  },
+  {
+   "slug": "buschdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Buschdorf",
+   "place": "Buschdorf",
+   "source": "geoportail"
+  },
+  {
+   "slug": "buderscheid",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Büderscheid",
+   "place": "Büderscheid",
+   "source": "geoportail"
+  },
+  {
    "slug": "burden",
    "osm_rel": 2258462,
    "name": "Auto-Pédestre Burden",
    "place": "Burden"
   },
   {
-   "slug": "cessange",
-   "osm_rel": 2401772,
-   "name": "Auto-Pédestre Cessange",
-   "place": "Cessange"
-  },
-  {
-   "slug": "clemency-1",
-   "osm_rel": 6325760,
-   "name": "Auto-Pédestre Clemency 1",
-   "place": "Clemency"
+   "slug": "canach",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Canach",
+   "place": "Canach",
+   "source": "geoportail"
   },
   {
    "slug": "clemency-2",
@@ -163,16 +250,24 @@
    "place": "Clemency"
   },
   {
+   "slug": "colmar-berg",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Colmar-Berg",
+   "place": "Colmar-Berg",
+   "source": "geoportail"
+  },
+  {
+   "slug": "consdorf-mullerthal",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Consdorf-Müllerthal",
+   "place": "Consdorf-Müllerthal",
+   "source": "geoportail"
+  },
+  {
    "slug": "consthum",
    "osm_rel": 18732230,
    "name": "Auto-Pédestre Consthum",
    "place": "Consthum"
-  },
-  {
-   "slug": "contern",
-   "osm_rel": 4730822,
-   "name": "Auto-Pédestre Contern",
-   "place": "Contern"
   },
   {
    "slug": "dahl",
@@ -185,6 +280,13 @@
    "osm_rel": 2510500,
    "name": "Auto-Pédestre Dalheim",
    "place": "Dalheim"
+  },
+  {
+   "slug": "derenbach",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Derenbach",
+   "place": "Derenbach",
+   "source": "geoportail"
   },
   {
    "slug": "differdange",
@@ -211,6 +313,13 @@
    "place": "Dudelange Haard"
   },
   {
+   "slug": "echternach-lac",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Echternach / Lac",
+   "place": "Echternach / Lac",
+   "source": "geoportail"
+  },
+  {
    "slug": "echternach-gare",
    "osm_rel": 6619830,
    "name": "Auto-Pédestre Echternach 2 / Gare",
@@ -229,16 +338,11 @@
    "place": "Eischen"
   },
   {
-   "slug": "eischen-ii",
-   "osm_rel": 2639438,
-   "name": "Auto-Pédestre Eischen II",
-   "place": "Eischen"
-  },
-  {
-   "slug": "ellange",
-   "osm_rel": 1980635,
-   "name": "Auto-Pédestre Ellange",
-   "place": "Ellange"
+   "slug": "ermsdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Ermsdorf",
+   "place": "Ermsdorf",
+   "source": "geoportail"
   },
   {
    "slug": "esch-sur-alzette",
@@ -247,10 +351,18 @@
    "place": "Esch-sur-Alzette"
   },
   {
-   "slug": "ettelbruck-1",
-   "osm_rel": 8411454,
-   "name": "Auto-Pédestre Ettelbruck 1",
-   "place": "Ettelbruck"
+   "slug": "esch-sur-sure",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Esch-sur-Sûre",
+   "place": "Esch-sur-Sûre",
+   "source": "geoportail"
+  },
+  {
+   "slug": "eschweiler",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Eschweiler",
+   "place": "Eschweiler",
+   "source": "geoportail"
   },
   {
    "slug": "ettelbruck-2",
@@ -277,6 +389,13 @@
    "place": "Garnich"
   },
   {
+   "slug": "goesdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Goesdorf",
+   "place": "Goesdorf",
+   "source": "geoportail"
+  },
+  {
    "slug": "gostingen",
    "osm_rel": 3555535,
    "name": "Auto-Pédestre Gostingen",
@@ -289,10 +408,11 @@
    "place": "Gralingen"
   },
   {
-   "slug": "grevenmacher-ii",
-   "osm_rel": 2032397,
-   "name": "Auto-Pédestre Grevenmacher II",
-   "place": "Grevenmacher"
+   "slug": "grevenmacher",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Grevenmacher",
+   "place": "Grevenmacher",
+   "source": "geoportail"
   },
   {
    "slug": "grosbous",
@@ -301,16 +421,31 @@
    "place": "Grosbous"
   },
   {
+   "slug": "grundhof",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Grundhof",
+   "place": "Grundhof",
+   "source": "geoportail"
+  },
+  {
    "slug": "grengewald",
    "osm_rel": 18611422,
    "name": "Auto-Pédestre Gréngewald",
    "place": "Gréngewald"
   },
   {
-   "slug": "heinerscheid-1",
-   "osm_rel": 4251112,
-   "name": "Auto-Pédestre Heinerscheid 1",
-   "place": "Heinerscheid"
+   "slug": "harlange",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Harlange",
+   "place": "Harlange",
+   "source": "geoportail"
+  },
+  {
+   "slug": "heiderscheid",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Heiderscheid",
+   "place": "Heiderscheid",
+   "source": "geoportail"
   },
   {
    "slug": "heisdorf",
@@ -325,16 +460,59 @@
    "place": "Hesperange"
   },
   {
-   "slug": "insenborn",
-   "osm_rel": 7474232,
-   "name": "Auto-Pédestre Insenborn",
-   "place": "Insenborn"
+   "slug": "hobscheid",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Hobscheid",
+   "place": "Hobscheid",
+   "source": "geoportail"
+  },
+  {
+   "slug": "hoffelt",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Hoffelt",
+   "place": "Hoffelt",
+   "source": "geoportail"
+  },
+  {
+   "slug": "hollenfels",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Hollenfels",
+   "place": "Hollenfels",
+   "source": "geoportail"
+  },
+  {
+   "slug": "holtz",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Holtz",
+   "place": "Holtz",
+   "source": "geoportail"
+  },
+  {
+   "slug": "howald",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Howald",
+   "place": "Howald",
+   "source": "geoportail"
   },
   {
    "slug": "itzig",
    "osm_rel": 2442612,
    "name": "Auto-Pédestre Itzig",
    "place": "Itzig"
+  },
+  {
+   "slug": "junglinster",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Junglinster",
+   "place": "Junglinster",
+   "source": "geoportail"
+  },
+  {
+   "slug": "kaundorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Kaundorf",
+   "place": "Kaundorf",
+   "source": "geoportail"
   },
   {
    "slug": "kayl",
@@ -347,6 +525,12 @@
    "osm_rel": 1430571,
    "name": "Auto-Pédestre Kehlen",
    "place": "Kehlen"
+  },
+  {
+   "slug": "cessange",
+   "osm_rel": 2401772,
+   "name": "Auto-Pédestre Cessange",
+   "place": "Cessange"
   },
   {
    "slug": "koerich",
@@ -367,6 +551,13 @@
    "place": "Lamadelaine"
   },
   {
+   "slug": "larochette",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Larochette",
+   "place": "Larochette",
+   "source": "geoportail"
+  },
+  {
    "slug": "leudelange",
    "osm_rel": 1899955,
    "name": "Auto-Pédestre Leudelange",
@@ -377,6 +568,13 @@
    "osm_rel": 2353866,
    "name": "Auto-Pédestre Leudelange-Gare (anc.Roedgen)",
    "place": "Leudelange-Gare"
+  },
+  {
+   "slug": "lieler-ex-weiswampach-1",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Lieler < > (ex Weiswampach 1)",
+   "place": "Lieler < > (ex Weiswampach 1)",
+   "source": "geoportail"
   },
   {
    "slug": "limpertsberg",
@@ -391,16 +589,17 @@
    "place": "Lintgen"
   },
   {
-   "slug": "lorentzweiler",
-   "osm_rel": 3509341,
-   "name": "Auto-Pédestre Lorentzweiler",
-   "place": "Lorentzweiler"
-  },
-  {
    "slug": "luxembourg-centre",
    "osm_rel": 7755193,
    "name": "Auto-Pédestre Luxembourg-Centre",
    "place": "Luxembourg-Centre"
+  },
+  {
+   "slug": "machtum",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Machtum",
+   "place": "Machtum",
+   "source": "geoportail"
   },
   {
    "slug": "mamer-2",
@@ -415,10 +614,45 @@
    "place": "Mamer Thillsmillen"
   },
   {
+   "slug": "manternach",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Manternach",
+   "place": "Manternach",
+   "source": "geoportail"
+  },
+  {
    "slug": "mensdorf",
    "osm_rel": 2772076,
    "name": "Auto-Pédestre Mensdorf",
    "place": "Mensdorf"
+  },
+  {
+   "slug": "mertert",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Mertert",
+   "place": "Mertert",
+   "source": "geoportail"
+  },
+  {
+   "slug": "mertzig",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Mertzig",
+   "place": "Mertzig",
+   "source": "geoportail"
+  },
+  {
+   "slug": "moersdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Moersdorf",
+   "place": "Moersdorf",
+   "source": "geoportail"
+  },
+  {
+   "slug": "moesdorf",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Moesdorf",
+   "place": "Moesdorf",
+   "source": "geoportail"
   },
   {
    "slug": "mondercange",
@@ -433,22 +667,52 @@
    "place": "Mondorf"
   },
   {
+   "slug": "moutfort",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Moutfort",
+   "place": "Moutfort",
+   "source": "geoportail"
+  },
+  {
+   "slug": "munshausen",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Munshausen",
+   "place": "Munshausen",
+   "source": "geoportail"
+  },
+  {
+   "slug": "nommern",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Nommern",
+   "place": "Nommern",
+   "source": "geoportail"
+  },
+  {
    "slug": "nospelt",
    "osm_rel": 3144342,
    "name": "Auto-Pédestre Nospelt",
    "place": "Nospelt"
   },
   {
-   "slug": "nospelt-2",
-   "osm_rel": 9994617,
-   "name": "Auto-Pédestre Nospelt 2",
-   "place": "Nospelt"
+   "slug": "oberdonven",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Oberdonven",
+   "place": "Oberdonven",
+   "source": "geoportail"
   },
   {
-   "slug": "oetrange",
-   "osm_rel": 4283268,
-   "name": "Auto-Pédestre Oetrange",
-   "place": "Oetrange"
+   "slug": "oberpallen",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Oberpallen",
+   "place": "Oberpallen",
+   "source": "geoportail"
+  },
+  {
+   "slug": "osweiler",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Osweiler",
+   "place": "Osweiler",
+   "source": "geoportail"
   },
   {
    "slug": "petange",
@@ -457,16 +721,24 @@
    "place": "Pétange"
   },
   {
+   "slug": "rambrouch",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Rambrouch",
+   "place": "Rambrouch",
+   "source": "geoportail"
+  },
+  {
    "slug": "redange",
    "osm_rel": 2096380,
    "name": "Auto-Pédestre Redange",
    "place": "Redange"
   },
   {
-   "slug": "reisdorf",
-   "osm_rel": 4751957,
-   "name": "Auto-Pédestre Reisdorf",
-   "place": "Reisdorf"
+   "slug": "remerschen",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Remerschen",
+   "place": "Remerschen",
+   "source": "geoportail"
   },
   {
    "slug": "remich",
@@ -499,22 +771,43 @@
    "place": "Rosport"
   },
   {
-   "slug": "rumelange-1",
-   "osm_rel": 1970106,
-   "name": "Auto-Pédestre Rumelange 1",
-   "place": "Rumelange"
-  },
-  {
    "slug": "rumelange-2",
    "osm_rel": 2411876,
    "name": "Auto-Pédestre Rumelange 2",
    "place": "Rumelange"
   },
   {
+   "slug": "rumelange-1",
+   "osm_rel": 1970106,
+   "name": "Auto-Pédestre Rumelange 1",
+   "place": "Rumelange"
+  },
+  {
+   "slug": "saeul",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Saeul",
+   "place": "Saeul",
+   "source": "geoportail"
+  },
+  {
    "slug": "sandweiler",
    "osm_rel": 2982282,
    "name": "Auto-Pédestre Sandweiler",
    "place": "Sandweiler"
+  },
+  {
+   "slug": "scheidgen",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Scheidgen",
+   "place": "Scheidgen",
+   "source": "geoportail"
+  },
+  {
+   "slug": "schengen",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Schengen",
+   "place": "Schengen",
+   "source": "geoportail"
   },
   {
    "slug": "schieren",
@@ -529,10 +822,24 @@
    "place": "Schifflange"
   },
   {
+   "slug": "schimpach",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Schimpach",
+   "place": "Schimpach",
+   "source": "geoportail"
+  },
+  {
    "slug": "schlindermanderscheid",
    "osm_rel": 11664213,
    "name": "Auto-Pédestre Schlindermanderscheid",
    "place": "Schlindermanderscheid"
+  },
+  {
+   "slug": "schoenfels",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Schoenfels",
+   "place": "Schoenfels",
+   "source": "geoportail"
   },
   {
    "slug": "schuttrange",
@@ -553,6 +860,13 @@
    "place": "Senningerberg"
   },
   {
+   "slug": "septfontaines",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Septfontaines",
+   "place": "Septfontaines",
+   "source": "geoportail"
+  },
+  {
    "slug": "stadtbredimus",
    "osm_rel": 9060760,
    "name": "Auto-Pédestre Stadtbredimus",
@@ -565,16 +879,51 @@
    "place": "Steinfort"
   },
   {
+   "slug": "stolzembourg",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Stolzembourg",
+   "place": "Stolzembourg",
+   "source": "geoportail"
+  },
+  {
    "slug": "strassen",
    "osm_rel": 2251560,
    "name": "Auto-Pédestre Strassen",
    "place": "Strassen"
   },
   {
+   "slug": "surre",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Surré",
+   "place": "Surré",
+   "source": "geoportail"
+  },
+  {
+   "slug": "tadler",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Tadler",
+   "place": "Tadler",
+   "source": "geoportail"
+  },
+  {
    "slug": "tuntange",
    "osm_rel": 3087361,
    "name": "Auto-Pédestre Tuntange",
    "place": "Tuntange"
+  },
+  {
+   "slug": "useldange",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Useldange",
+   "place": "Useldange",
+   "source": "geoportail"
+  },
+  {
+   "slug": "vianden",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Vianden",
+   "place": "Vianden",
+   "source": "geoportail"
   },
   {
    "slug": "vichten",
@@ -595,6 +944,20 @@
    "place": "Walferdange"
   },
   {
+   "slug": "wasserbillig",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Wasserbillig",
+   "place": "Wasserbillig",
+   "source": "geoportail"
+  },
+  {
+   "slug": "weiswampach",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Weiswampach",
+   "place": "Weiswampach",
+   "source": "geoportail"
+  },
+  {
    "slug": "wellenstein",
    "osm_rel": 2417183,
    "name": "Auto-Pédestre Wellenstein",
@@ -607,28 +970,144 @@
    "place": "Wiltz"
   },
   {
-   "slug": "wormeldange",
-   "osm_rel": 2121659,
+   "slug": "wilwerwiltz",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Wilwerwiltz",
+   "place": "Wilwerwiltz",
+   "source": "geoportail"
+  },
+  {
+   "slug": "winseler",
+   "osm_rel": null,
+   "name": "Auto-Pédestre Winseler",
+   "place": "Winseler",
+   "source": "geoportail"
+  },
+  {
+   "slug": "wormeldange-2",
+   "osm_rel": null,
    "name": "Auto-Pédestre Wormeldange",
-   "place": "Wormeldange"
+   "place": "Wormeldange",
+   "source": "geoportail"
+  },
+  {
+   "slug": "bettendorf-1",
+   "osm_rel": 11664089,
+   "name": "Auto-Pédestre Bettendorf 1",
+   "place": "Bettendorf",
+   "retired": true
+  },
+  {
+   "slug": "brandenbourg",
+   "osm_rel": 6143987,
+   "name": "Auto-Pédestre Brandenbourg",
+   "place": "Brandenbourg",
+   "retired": true
+  },
+  {
+   "slug": "clemency-1",
+   "osm_rel": 6325760,
+   "name": "Auto-Pédestre Clemency 1",
+   "place": "Clemency",
+   "retired": true
+  },
+  {
+   "slug": "contern",
+   "osm_rel": 4730822,
+   "name": "Auto-Pédestre Contern",
+   "place": "Contern",
+   "retired": true
+  },
+  {
+   "slug": "eischen-ii",
+   "osm_rel": 2639438,
+   "name": "Auto-Pédestre Eischen II",
+   "place": "Eischen",
+   "retired": true
+  },
+  {
+   "slug": "ellange",
+   "osm_rel": 1980635,
+   "name": "Auto-Pédestre Ellange",
+   "place": "Ellange",
+   "retired": true
+  },
+  {
+   "slug": "ettelbruck-1",
+   "osm_rel": 8411454,
+   "name": "Auto-Pédestre Ettelbruck 1",
+   "place": "Ettelbruck",
+   "retired": true
+  },
+  {
+   "slug": "grevenmacher-ii",
+   "osm_rel": 2032397,
+   "name": "Auto-Pédestre Grevenmacher II",
+   "place": "Grevenmacher",
+   "retired": true
+  },
+  {
+   "slug": "heinerscheid-1",
+   "osm_rel": 4251112,
+   "name": "Auto-Pédestre Heinerscheid 1",
+   "place": "Heinerscheid",
+   "retired": true
+  },
+  {
+   "slug": "insenborn",
+   "osm_rel": 7474232,
+   "name": "Auto-Pédestre Insenborn",
+   "place": "Insenborn",
+   "retired": true
+  },
+  {
+   "slug": "lorentzweiler",
+   "osm_rel": 3509341,
+   "name": "Auto-Pédestre Lorentzweiler",
+   "place": "Lorentzweiler",
+   "retired": true
+  },
+  {
+   "slug": "nospelt-2",
+   "osm_rel": 9994617,
+   "name": "Auto-Pédestre Nospelt 2",
+   "place": "Nospelt",
+   "retired": true
+  },
+  {
+   "slug": "oetrange",
+   "osm_rel": 4283268,
+   "name": "Auto-Pédestre Oetrange",
+   "place": "Oetrange",
+   "retired": true
+  },
+  {
+   "slug": "reimberg",
+   "osm_rel": 8032747,
+   "name": "Auto Pédestre Reimberg",
+   "place": "Reimberg",
+   "retired": true
+  },
+  {
+   "slug": "reisdorf",
+   "osm_rel": 4751957,
+   "name": "Auto-Pédestre Reisdorf",
+   "place": "Reisdorf",
+   "retired": true
   },
   {
    "slug": "steinsel",
    "osm_rel": 3432372,
    "name": "Autopedestre Steinsel",
-   "place": "Steinsel"
-  },
-  {
-   "slug": "altrier",
-   "osm_rel": 19183790,
-   "name": "Autopédestre Altrier",
-   "place": "Altrier"
+   "place": "Steinsel",
+   "retired": true
   },
   {
    "slug": "troisvierges",
    "osm_rel": 9239943,
    "name": "Autopédestre Troisvierges",
-   "place": "Troisvierges"
+   "place": "Troisvierges",
+   "retired": true
   }
  ]
 }

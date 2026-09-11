@@ -74,6 +74,10 @@ def merge_trails() -> list:
     merged = []
     for base in registry:
         slug = base["slug"]
+        # Cut from the official network (fetch_official.py). Its pages are
+        # deleted by prune_removed() rather than merely left unlinked.
+        if base.get("retired"):
+            continue
         entry = computed.get(slug)
         if not entry or not os.path.exists(os.path.join(DATA_DIR, "geo", f"{slug}.geojson")):
             print(f"  ! {slug}: missing computed data/geometry — skipped", file=sys.stderr)
@@ -410,7 +414,8 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
             entry["length_km"], entry.get("elev_gain") or 0, CAT["speed_kmh"], CAT["climb_m_per_h"]))),
         difficulty=esc(DIFFICULTIES[trail["difficulty"]][lang]),
         map_title=esc(ui["map_title"]),
-        map_note=esc(ui["map_note"]),
+        map_note=esc(ui["map_note_official"] if entry.get("source") == "geoportail"
+                     else ui["map_note"]),
         profile_html=profile_svg(entry, lang),
         description_html="\n".join(f"      <p>{esc(p)}</p>" for p in texts["paragraphs"]),
         highlights_title=esc(ui["highlights_title"]),
@@ -453,7 +458,12 @@ def sister_html(lang: str) -> str:
 def render_index(tpl: Template, trails: list, lang: str) -> str:
     ui = UI[lang]
     canonical = f"{BASE_URL}/{lang}/"
-    intro_html = "\n".join(f"      <p>{esc(p)}</p>" for p in ui["index_intro"])
+    # {n} is the live trail count, so the intro can never drift from the list
+    # below it. Plain replace rather than str.format: the banks are prose and
+    # a stray brace in a future sentence should not raise.
+    intro_html = "\n".join(
+        f"      <p>{esc(p.replace('{n}', str(len(trails))))}</p>" for p in ui["index_intro"]
+    )
     regions_used = sorted({t["region"] for t in trails}, key=lambda r: REGIONS[r][lang])
     filter_buttons = "\n".join(
         f'      <button class="filter" data-region="{r}">{esc(REGIONS[r][lang])}</button>' for r in regions_used
@@ -498,6 +508,32 @@ def render_index(tpl: Template, trails: list, lang: str) -> str:
         footer_note=esc(ui["footer_note"]),
         privacy=privacy_link(lang),
     )
+
+
+def prune_removed(trails: list) -> int:
+    """Delete generated files for trails that are no longer published.
+
+    This generator only ever wrote files, so a trail dropped from the registry
+    used to leave its pages, GeoJSON and GPX behind — still live, still in
+    Google's index, just orphaned. The deploy mirrors with --delete, so
+    removing them here is what actually takes them off the server.
+    """
+    published = {trail["slug"] for trail in trails}
+    stale = []
+    for folder, suffix in [(lang, ".html") for lang in LANGS] + [("geo", ".geojson"), ("gpx", ".gpx")]:
+        directory = os.path.join(OUT_DIR, folder)
+        if not os.path.isdir(directory):
+            continue
+        for name in sorted(os.listdir(directory)):
+            if not name.endswith(suffix) or name == "index.html":
+                continue
+            if name[: -len(suffix)] not in published:
+                stale.append(os.path.join(directory, name))
+    for path in stale:
+        os.remove(path)
+    if stale:
+        print(f"Removed {len(stale)} files for trails no longer in the registry")
+    return len(stale)
 
 
 def write(path: str, content: str) -> None:
@@ -558,6 +594,7 @@ def main() -> None:
         write(os.path.join(OUT_DIR, "gpx", f"{trail['slug']}.gpx"),
               gpx_content(trail, load_geojson(trail["slug"])))
     shutil.copyfile(os.path.join(TEMPLATE_DIR, "trails.css"), os.path.join(OUT_DIR, "trails.css"))
+    prune_removed(trails)
 
     write(CAT["sitemap_file"], build_sitemap(trails))
 

@@ -14,3 +14,6 @@ supabase/.temp/
 
 # Stray Chrome user-data dir from a tool passing an undefined path
 undefined/
+
+# Cached Geoportail download (3.8 MB, re-fetchable with fetch_official.py --refresh)
+data/trails/official.geojson

@@ -426,15 +426,17 @@ def compose(trail: dict, entry: dict, region: str, lang: str, cat_key: str = "hi
     bank = BANKS[cat_key]
     slug, place = trail["slug"], trail["place"]
     gain = entry.get("elev_gain") or 0
-    natural = entry.get("natural_pct") or 0
+    natural = entry.get("natural_pct")
     band = "flat" if gain < bank["flat_gain"] else ("hilly" if gain >= bank["hilly_gain"] else "rolling")
-    nat_idx = 0 if natural >= 70 else (1 if natural >= 40 else 2)
+    nat_clause = "" if natural is None else bank["nature"][lang][
+        0 if natural >= 70 else (1 if natural >= 40 else 2)
+    ]
 
     opener = _pick(slug, f"open-{lang}", bank["openers"][lang][region]).format(p=place)
     length_s = _pick(slug, f"len-{lang}", bank["length"][lang]).format(
         l=_fmt_len(entry["length_km"], lang),
         d=duration_label(entry["length_km"], gain, speed_kmh, climb_m_per_h))
-    terrain_s = bank["terrain"][lang][band].format(g=gain, nat=bank["nature"][lang][nat_idx])
+    terrain_s = bank["terrain"][lang][band].format(g=gain, nat=nat_clause)
     paragraph1 = f"{opener} {length_s} {terrain_s}"
 
     pois = _sorted_pois(entry)
@@ -453,7 +455,7 @@ def compose(trail: dict, entry: dict, region: str, lang: str, cat_key: str = "hi
         highlights.append(labels["gain"].format(g=gain))
     elif gain and gain < 100:
         highlights.append(labels["flat"])
-    if natural >= 70:
+    if natural is not None and natural >= 70:
         highlights.append(labels["natural"])
     stops = entry.get("bus_stops") or []
     if stops and stops[0]["dist_m"] <= BUS_ON_ROUTE_M:
