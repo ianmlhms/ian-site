@@ -73,7 +73,13 @@ LUX_LAT_RANGE = (49.4, 50.3)
 BERDORF_EXPECTED_CENTER = (49.82, 6.35)
 BERDORF_MAX_ERROR_M = 5000
 PREFIX_RE = re.compile(r"^auto-?p[ée]destres?\s*:?\s*", re.IGNORECASE)
-SUFFIX_RE = re.compile(r"\s*<\s*>\s*$")
+# "< >" is an artefact of the Geoportail export and is not always trailing:
+# "Autopedestres : Lieler < > (ex Weiswampach 1)" carries it mid-name, which
+# shipped verbatim into that page's <title> and <h1>.
+MARKER_RE = re.compile(r"\s*<\s*>\s*")
+# Editorial notes about what a circuit used to be called. Useful provenance,
+# but not part of the walk's name, and they make an unreadable slug.
+ASIDE_RE = re.compile(r"\s*\((?:ex|anc\.?|ancien|ancienne)\b[^)]*\)", re.IGNORECASE)
 NO_PREFIX_RE = re.compile(r"(?!)")
 
 
@@ -193,7 +199,8 @@ def clean_place(raw_name: str) -> str:
     carry one ("Autopedestres :" or "Auto-Pédestre"), Oberpallen carries none.
     """
     place = PREFIX_RE.sub("", raw_name.strip(), count=1)
-    place = SUFFIX_RE.sub("", place).strip(" -–:")
+    place = ASIDE_RE.sub("", MARKER_RE.sub(" ", place)).strip(" -–:")
+    place = re.sub(r"\s{2,}", " ", place)
     if not place:
         raise ValueError(f"empty place after cleaning {raw_name!r}")
     return place

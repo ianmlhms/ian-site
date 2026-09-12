@@ -570,10 +570,10 @@
    "place": "Leudelange-Gare"
   },
   {
-   "slug": "lieler-ex-weiswampach-1",
+   "slug": "lieler",
    "osm_rel": null,
-   "name": "Auto-Pédestre Lieler < > (ex Weiswampach 1)",
-   "place": "Lieler < > (ex Weiswampach 1)",
+   "name": "Auto-Pédestre Lieler",
+   "place": "Lieler",
    "source": "geoportail"
   },
   {

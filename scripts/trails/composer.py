@@ -47,27 +47,27 @@ OPENERS = {
     "de": {
         "eislek": [
             "Rund um {p} zeigt sich das Éislek von seiner typischen Seite: tiefe Täler, bewaldete Kämme und weite Blicke über die Ardennenlandschaft im Norden Luxemburgs.",
-            "Diese Autopédestre erkundet die Umgebung von {p} im Éislek, dem hügeligen Norden Luxemburgs mit seinen stillen Wäldern und tief eingeschnittenen Flusstälern.",
+            "Auf dieser Runde erkundet man die Umgebung von {p} im Éislek, dem hügeligen Norden Luxemburgs mit seinen stillen Wäldern und tief eingeschnittenen Flusstälern.",
             "{p} liegt mitten im Éislek — die Runde führt durch die für den Luxemburger Norden typische Mischung aus Höhenrücken, Wald und offenen Weiden.",
         ],
         "mullerthal": [
             "Bei {p} wandert man am Rand der Müllerthal-Region, der „Kleinen Luxemburger Schweiz“ mit ihren Sandsteinfelsen und bewaldeten Bachtälern.",
-            "Diese Autopédestre erkundet die Gegend um {p} in der Müllerthal-Region, wo Sandstein, Wald und kleine Bäche die Landschaft prägen.",
+            "Auf dieser Runde erkundet man die Gegend um {p} in der Müllerthal-Region, wo Sandstein, Wald und kleine Bäche die Landschaft prägen.",
             "{p} gehört zur Müllerthal-Region im Osten Luxemburgs — felsige Abschnitte, schattige Wälder und ruhige Feldpassagen wechseln sich auf dieser Runde ab.",
         ],
         "moselle": [
             "Rund um {p} prägen Weinberge und weite Blicke über das Moseltal die Landschaft — die Runde verbindet Rebhänge, Plateauwege und stille Seitentäler.",
-            "Diese Autopédestre erkundet die Umgebung von {p} an der Luxemburger Mosel, zwischen Rebzeilen, Obstwiesen und Ausblicken zum deutschen Ufer.",
+            "Auf dieser Runde erkundet man die Umgebung von {p} an der Luxemburger Mosel, zwischen Rebzeilen, Obstwiesen und Ausblicken zum deutschen Ufer.",
             "{p} liegt in der Moselregion im Südosten Luxemburgs; die Runde wechselt zwischen Weinbergen, Feldern und kurzen Waldstücken.",
         ],
         "minett": [
             "Rund um {p} zeigt der Minett, der Süden Luxemburgs, seine grüne Seite: Auf ehemaligem Bergbaugelände sind Wälder und artenreiche Brachen entstanden.",
-            "Diese Autopédestre erkundet die Gegend um {p} in den Roten Erden, wo die Natur die Spuren des Eisenerzabbaus zurückerobert hat.",
+            "Auf dieser Runde erkundet man die Gegend um {p} in den Roten Erden, wo die Natur die Spuren des Eisenerzabbaus zurückerobert hat.",
             "{p} gehört zum Minett im Süden des Landes — die Runde verbindet Wald, offene Flur und Erinnerungen an die Industriegeschichte der Region.",
         ],
         "center": [
             "Rund um {p} im Zentrum Luxemburgs wandert man durchs Guttland: sanfte Hügel, Felder, Bachtäler und immer wieder Wald.",
-            "Diese Autopédestre erkundet die Umgebung von {p} im Guttland, der abwechslungsreichen Mitte des Landes zwischen Feldern und Wäldern.",
+            "Auf dieser Runde erkundet man die Umgebung von {p} im Guttland, der abwechslungsreichen Mitte des Landes zwischen Feldern und Wäldern.",
             "{p} liegt im Guttland — auf dieser Runde wechseln sich ruhige Feldwege, Waldstücke und Dorfränder ab.",
         ],
     },
@@ -129,9 +129,9 @@ OPENERS = {
 
 LENGTH_SENTENCES = {
     "de": [
-        "Die Schleife ist {l} km lang; mit normalem Tempo ist man etwa {d} Stunden unterwegs.",
-        "Mit {l} km Länge ist die Runde in rund {d} Stunden zu schaffen.",
-        "Der Rundweg misst {l} km — je nach Tempo etwa {d} Stunden Gehzeit.",
+        "Die Schleife ist {l} km lang; mit normalem Tempo ist man etwa {d} {h} unterwegs.",
+        "Mit {l} km Länge ist die Runde in rund {d} {h} zu schaffen.",
+        "Der Rundweg misst {l} km — je nach Tempo etwa {d} {h} Gehzeit.",
     ],
     "fr": [
         "La boucle fait {l} km ; comptez environ {d} h de marche à allure normale.",
@@ -139,9 +139,9 @@ LENGTH_SENTENCES = {
         "Le parcours mesure {l} km — soit environ {d} h de marche selon le rythme.",
     ],
     "en": [
-        "The loop is {l} km long; at a normal pace expect about {d} hours.",
-        "At {l} km, the circuit takes roughly {d} hours.",
-        "The route measures {l} km — about {d} hours of walking, depending on pace.",
+        "The loop is {l} km long; at a normal pace expect about {d} {h}.",
+        "At {l} km, the circuit takes roughly {d} {h}.",
+        "The route measures {l} km — about {d} {h} of walking, depending on pace.",
     ],
 }
 
@@ -199,7 +199,7 @@ LANDSCAPE_SENTENCES = {
 PRACTICAL_SENTENCES = {
     "de": ["Wie alle Autopédestres ist die Runde dauerhaft mit dem blauen Symbol markiert und lässt sich an jedem Punkt beginnen.",
            "Markiert ist die Schleife durchgehend mit dem blauen Autopédestre-Zeichen; als Rundweg hat sie keinen festen Startpunkt."],
-    "fr": ["Comme toutes les Auto-Pédestres, la boucle est balisée en permanence du symbole bleu et peut se commencer n'importe où.",
+    "fr": ["Comme tous les Auto-Pédestres, la boucle est balisée en permanence du symbole bleu et peut se commencer n'importe où.",
            "Le circuit est entièrement balisé du signe bleu des Auto-Pédestres ; en boucle, il n'a pas de départ imposé."],
     "en": ["Like every Auto-Pédestre, the loop is permanently waymarked with the blue symbol and can be started at any point.",
            "The circuit carries the blue Auto-Pédestre waymark throughout; being a loop, it has no fixed start."],
@@ -310,9 +310,9 @@ MTB_OPENERS = {
 
 MTB_LENGTH_SENTENCES = {
     "de": [
-        "Die Runde ist {l} km lang; mit normalem Tempo sitzt man etwa {d} Stunden im Sattel.",
-        "Mit {l} km Länge ist die Tour in rund {d} Stunden zu fahren.",
-        "Die Strecke misst {l} km — je nach Tempo etwa {d} Stunden Fahrzeit.",
+        "Die Runde ist {l} km lang; mit normalem Tempo sitzt man etwa {d} {h} im Sattel.",
+        "Mit {l} km Länge ist die Tour in rund {d} {h} zu fahren.",
+        "Die Strecke misst {l} km — je nach Tempo etwa {d} {h} Fahrzeit.",
     ],
     "fr": [
         "La boucle fait {l} km ; comptez environ {d} h de selle à allure normale.",
@@ -320,9 +320,9 @@ MTB_LENGTH_SENTENCES = {
         "Le parcours mesure {l} km — soit environ {d} h de VTT selon le rythme.",
     ],
     "en": [
-        "The loop is {l} km long; at a normal pace expect about {d} hours in the saddle.",
-        "At {l} km, the tour takes roughly {d} hours to ride.",
-        "The route measures {l} km — about {d} hours of riding, depending on pace.",
+        "The loop is {l} km long; at a normal pace expect about {d} {h} in the saddle.",
+        "At {l} km, the tour takes roughly {d} {h} to ride.",
+        "The route measures {l} km — about {d} {h} of riding, depending on pace.",
     ],
 }
 
@@ -411,13 +411,33 @@ BANKS = {
 }
 
 
+# Only a bare "1" is singular — "1½" takes the plural in both languages.
+HOUR_WORD = {"de": ("Stunde", "Stunden"), "fr": ("h", "h"), "en": ("hour", "hours")}
+
+
+def _hour_word(duration: str, lang: str) -> str:
+    singular, plural = HOUR_WORD[lang]
+    return singular if duration.strip() == "1" else plural
+
+
+# OSM sometimes names a feature with the bare common noun for what it is. As a
+# highlight that is worse than nothing — "Along the way you pass Schloss" — and
+# it can duplicate a properly named POI on the same route.
+GENERIC_POI_NAMES = frozenset({
+    "schloss", "burg", "château", "chateau", "kierch", "kirche", "église", "eglise",
+    "kapelle", "chapelle", "museum", "musée", "musee", "moulin", "millen",
+    "aussichtspunkt", "viewpoint", "panorama", "belvédère", "belvedere",
+})
+
+
 def _fmt_len(length_km: float, lang: str) -> str:
     return f"{length_km:g}".replace(".", "," if lang != "en" else ".")
 
 
 def _sorted_pois(entry: dict) -> list:
     pois = entry.get("pois") or []
-    return sorted(pois, key=lambda p: (KIND_PRIORITY.get(p["kind"], 9), p["dist_m"]))
+    named = [p for p in pois if p["name"].strip().casefold() not in GENERIC_POI_NAMES]
+    return sorted(named, key=lambda p: (KIND_PRIORITY.get(p["kind"], 9), p["dist_m"]))
 
 
 def compose(trail: dict, entry: dict, region: str, lang: str, cat_key: str = "hiking",
@@ -433,9 +453,9 @@ def compose(trail: dict, entry: dict, region: str, lang: str, cat_key: str = "hi
     ]
 
     opener = _pick(slug, f"open-{lang}", bank["openers"][lang][region]).format(p=place)
+    duration = duration_label(entry["length_km"], gain, speed_kmh, climb_m_per_h)
     length_s = _pick(slug, f"len-{lang}", bank["length"][lang]).format(
-        l=_fmt_len(entry["length_km"], lang),
-        d=duration_label(entry["length_km"], gain, speed_kmh, climb_m_per_h))
+        l=_fmt_len(entry["length_km"], lang), d=duration, h=_hour_word(duration, lang))
     terrain_s = bank["terrain"][lang][band].format(g=gain, nat=nat_clause)
     paragraph1 = f"{opener} {length_s} {terrain_s}"
 
