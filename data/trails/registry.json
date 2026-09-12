@@ -7,7 +7,7 @@
    "place": "Abweiler"
   },
   {
-   "slug": "wormeldange",
+   "slug": "ahn",
    "osm_rel": 2121659,
    "name": "Auto-Pédestre Ahn",
    "place": "Ahn"
@@ -984,7 +984,7 @@
    "source": "geoportail"
   },
   {
-   "slug": "wormeldange-2",
+   "slug": "wormeldange",
    "osm_rel": null,
    "name": "Auto-Pédestre Wormeldange",
    "place": "Wormeldange",
