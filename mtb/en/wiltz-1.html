@@ -46,7 +46,7 @@
 
     <nav class="actions">
       <a class="act" href="../gpx/wiltz-1.gpx" download>⬇ Download GPX</a>
-      <a class="act" href="https://www.komoot.com/plan/?sport=mtb&p%5B0%5D%5Bloc%5D=49.94893%2C5.88868&p%5B1%5D%5Bloc%5D=49.95419%2C5.91386&p%5B2%5D%5Bloc%5D=49.95366%2C5.93393&p%5B3%5D%5Bloc%5D=49.95595%2C5.95508&p%5B4%5D%5Bloc%5D=49.95368%2C5.96574&p%5B5%5D%5Bloc%5D=49.96372%2C5.96960&p%5B6%5D%5Bloc%5D=49.97690%2C5.96863&p%5B7%5D%5Bloc%5D=49.96705%2C5.96494&p%5B8%5D%5Bloc%5D=49.97555%2C5.94847&p%5B9%5D%5Bloc%5D=49.97740%2C5.93584&p%5B10%5D%5Bloc%5D=49.97163%2C5.94054&p%5B11%5D%5Bloc%5D=49.96631%2C5.93742&p%5B12%5D%5Bloc%5D=49.96334%2C5.91814&p%5B13%5D%5Bloc%5D=49.95887%2C5.89676&p%5B14%5D%5Bloc%5D=49.95235%2C5.88588&p%5B15%5D%5Bloc%5D=49.96513%2C5.92891&p%5B16%5D%5Bloc%5D=49.96513%2C5.92891&p%5B17%5D%5Bloc%5D=49.96582%2C5.96850&p%5B18%5D%5Bloc%5D=49.94893%2C5.88868" rel="noopener" target="_blank">Plan in Komoot</a>
+      <a class="act js-komoot" href="https://www.komoot.com/plan/?sport=mtb&p%5B0%5D%5Bloc%5D=49.94893%2C5.88868&p%5B1%5D%5Bloc%5D=49.95419%2C5.91386&p%5B2%5D%5Bloc%5D=49.95366%2C5.93393&p%5B3%5D%5Bloc%5D=49.95595%2C5.95508&p%5B4%5D%5Bloc%5D=49.95368%2C5.96574&p%5B5%5D%5Bloc%5D=49.96372%2C5.96960&p%5B6%5D%5Bloc%5D=49.97690%2C5.96863&p%5B7%5D%5Bloc%5D=49.96705%2C5.96494&p%5B8%5D%5Bloc%5D=49.97555%2C5.94847&p%5B9%5D%5Bloc%5D=49.97740%2C5.93584&p%5B10%5D%5Bloc%5D=49.97163%2C5.94054&p%5B11%5D%5Bloc%5D=49.96631%2C5.93742&p%5B12%5D%5Bloc%5D=49.96334%2C5.91814&p%5B13%5D%5Bloc%5D=49.95887%2C5.89676&p%5B14%5D%5Bloc%5D=49.95235%2C5.88588&p%5B15%5D%5Bloc%5D=49.96513%2C5.92891&p%5B16%5D%5Bloc%5D=49.96513%2C5.92891&p%5B17%5D%5Bloc%5D=49.96582%2C5.96850&p%5B18%5D%5Bloc%5D=49.94893%2C5.88868" rel="noopener" target="_blank">Plan in Komoot</a>
       <a class="act" href="https://maps.google.com/?q=49.94893,5.88868" rel="noopener" target="_blank">📍 Start point in Google Maps</a>
     </nav>
 
@@ -109,6 +109,50 @@
         try { localStorage.setItem('trails_lang', a.dataset.lang); } catch (e) { /* private mode */ }
       });
     });
+    // "Plan in Komoot" straight into the Komoot app, on iOS.
+    //
+    // Android needs nothing: komoot.com/.well-known/assetlinks.json delegates
+    // handle_all_urls to de.komoot.android, so the app already takes the link.
+    // iOS only honours the paths in Komoot's apple-app-site-association, and
+    // /plan is not among them — but the komoot:// scheme accepts the same URL
+    // and opens the planner with every waypoint intact.
+    //
+    // The catch is the visitor without the app: iOS answers an unhandled scheme
+    // with an error dialog. So a failed attempt is remembered and never repeated
+    // on that device, and the web planner still opens either way.
+    (function () {
+      var link = document.querySelector('.js-komoot');
+      if (!link || !/iPad|iPhone|iPod/.test(navigator.userAgent)) { return; }
+      var KEY = 'komoot_app';
+      var FALLBACK_MS = 1500;
+      var remember = function (value) {
+        try { localStorage.setItem(KEY, value); } catch (e) { /* private mode */ }
+      };
+      try { if (localStorage.getItem(KEY) === 'no') { return; } } catch (e) { return; }
+
+      link.addEventListener('click', function (event) {
+        event.preventDefault();
+        var web = link.href;
+        var timer = setTimeout(function () {
+          remember('no');
+          window.location.href = web;
+        }, FALLBACK_MS);
+        // The app taking over backgrounds this page; that is the only reliable
+        // signal that the scheme was handled.
+        var handled = function () {
+          clearTimeout(timer);
+          remember('yes');
+        };
+        window.addEventListener('pagehide', handled, { once: true });
+        document.addEventListener('visibilitychange', function once() {
+          if (!document.hidden) { return; }
+          document.removeEventListener('visibilitychange', once);
+          handled();
+        });
+        window.location.href = web.replace(/^https:/, 'komoot:');
+      });
+    })();
+
     window.addEventListener('DOMContentLoaded', function () {
       if (typeof L === 'undefined') { return; }
       var map = L.map('map', { scrollWheelZoom: false });

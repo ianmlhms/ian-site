@@ -300,7 +300,7 @@ def actions_html(trail: dict, geo: dict, lang: str) -> str:
     return (
         '    <nav class="actions">\n'
         f'      <a class="act" href="../gpx/{trail["slug"]}.gpx" download>⬇ {labels["dl_gpx"]}</a>\n'
-        f'      <a class="act" href="{komoot}" rel="noopener" target="_blank">{labels["open_komoot"]}</a>\n'
+        f'      <a class="act js-komoot" href="{komoot}" rel="noopener" target="_blank">{labels["open_komoot"]}</a>\n'
         f'      <a class="act" href="{gmaps}" rel="noopener" target="_blank">📍 {labels["open_start"]}</a>\n'
         "    </nav>"
     )
