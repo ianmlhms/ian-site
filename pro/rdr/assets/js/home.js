@@ -4,18 +4,70 @@
 (() => {
   const { flattenCatalogue, formatPrice, loadCatalogue, showDataError } = window.RdrCatalogue;
 
+  const SAMPLE_SIZE = 8;
+
+  /**
+   * Pick a showcase that stands up to scrutiny: nothing whose name is still
+   * unverified, nothing out of stock, nothing without a price — and spread
+   * across countries and categories so the strip shows the real breadth of
+   * the range rather than four arbitrary bottles.
+   */
   function sampleProducts(products) {
-    const criteria = [
-      (product) => product.country === "France" && product.category === "vin",
-      (product) => product.country === "Autriche",
+    // A name that still carries a run-together capital (PROMORêves) or no
+    // lower-case at all is an import artefact, not a wine worth showing.
+    const looksClean = (name) => (
+      typeof name === "string"
+      && name.length > 2
+      && !/[A-ZÀ-Þ]{2,}[a-zà-þ]/.test(name)
+      && /[a-zà-þ]/.test(name)
+    );
+
+    const sellable = products.filter((product) => (
+      !product.needsReview
+      && !product.outOfStock
+      && !product.priceOnRequest
+      && typeof product.priceEur === "number"
+      && Boolean(product.producerName)
+      && Boolean(product.country)
+      && looksClean(product.name)
+    ));
+
+    // The same wine in two formats is one wine as far as a showcase goes.
+    const seen = new Set();
+    const unique = sellable.filter((product) => {
+      const key = `${product.producerName}|${product.name}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // One per bucket first, in this order, so the mix is deliberate.
+    const buckets = [
+      (product) => product.country === "France" && product.colour === "rouge",
+      (product) => product.country === "France" && product.colour === "blanc",
+      (product) => product.country === "Luxembourg",
       (product) => product.country === "Italie",
-      (product) => product.producerId === "domaine-alice-hartmann" && !product.needsReview,
+      (product) => product.country === "Autriche",
+      (product) => product.category === "champagne",
       (product) => product.category === "gin",
+      (product) => product.category === "whisky",
     ];
-    return Object.freeze(criteria.reduce((samples, predicate) => {
-      const match = products.find((product) => predicate(product) && !samples.some((sample) => sample.id === product.id));
-      return match ? [...samples, match] : samples;
-    }, []));
+
+    const chosen = buckets.reduce((picked, matches) => {
+      const match = unique.find((product) => (
+        matches(product) && !picked.some((already) => already.id === product.id)
+      ));
+      return match ? [...picked, match] : picked;
+    }, []);
+
+    // Top up from whatever is left if a bucket came back empty.
+    const filled = unique.reduce((picked, product) => (
+      picked.length >= SAMPLE_SIZE || picked.some((already) => already.id === product.id)
+        ? picked
+        : [...picked, product]
+    ), chosen);
+
+    return Object.freeze(filled.slice(0, SAMPLE_SIZE));
   }
 
   function renderSamples(host, products) {
