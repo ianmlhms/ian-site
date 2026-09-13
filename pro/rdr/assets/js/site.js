@@ -59,7 +59,6 @@
         '<section><h2 class="footer-title" data-i18n="footer.legal">Informations</h2><ul class="footer-links"><li><a href="mentions-legales.html" data-i18n="footer.legalNotice">Mentions légales</a></li><li><a href="confidentialite.html" data-i18n="footer.privacy">Confidentialité</a></li></ul></section>' +
         '<section><ul class="footer-links"><li><a href="https://letzshop.lu/fr/vendors/les-reves-de-rasigueres" rel="external">Letzshop</a></li><li><a href="https://facebook.com/revesderasigueres" rel="external">Facebook</a></li><li><a href="https://instagram.com/les_reves_de_rasigueres" rel="external">Instagram</a></li></ul></section>' +
       '</div>' +
-      '<div class="footer-bottom"><p data-i18n="footer.alcohol">L’abus d’alcool est dangereux pour la santé. À consommer avec modération.</p><p data-i18n="footer.age">Vente d’alcool réservée aux personnes de 18 ans et plus.</p></div>' +
     '</div></footer>';
   }
 

@@ -19,8 +19,6 @@ window.I18N_DICT = {
   "footer.legalNotice": { fr: "Mentions légales", de: "Impressum", en: "Legal notice" },
   "footer.privacy": { fr: "Confidentialité", de: "Datenschutz", en: "Privacy" },
   "footer.shop": { fr: "Boutique Letzshop", de: "Letzshop-Shop", en: "Letzshop store" },
-  "footer.alcohol": { fr: "L’abus d’alcool est dangereux pour la santé. À consommer avec modération.", de: "Alkoholmissbrauch gefährdet die Gesundheit. Genießen Sie verantwortungsvoll.", en: "Alcohol abuse is dangerous to health. Please drink responsibly." },
-  "footer.age": { fr: "Vente d’alcool réservée aux personnes de 18 ans et plus.", de: "Alkoholverkauf nur an Personen ab 18 Jahren.", en: "Alcohol is sold only to people aged 18 and over." },
 
   "meta.home.title": { fr: "Rêves de Rasiguères | Vins à Schifflange, Luxembourg", de: "Rêves de Rasiguères | Wein in Schifflingen, Luxemburg", en: "Rêves de Rasiguères | Wine in Schifflange, Luxembourg" },
   "meta.home.description": { fr: "Vinothèque à Schifflange ouverte le samedi de 10.00 à 12.30. Vins, spiritueux et livraison gratuite au Luxembourg.", de: "Vinothek in Schifflingen, samstags von 10.00 bis 12.30 Uhr geöffnet. Wein, Spirituosen und kostenlose Lieferung in Luxemburg.", en: "Schifflange wine shop open Saturday 10.00–12.30, with wines, spirits and free delivery in Luxembourg." },
@@ -52,8 +50,6 @@ window.I18N_DICT = {
   "home.delivery": { fr: "Livraison gratuite", de: "Kostenlose Lieferung", en: "Free delivery" },
   "home.search": { fr: "Quel vin cherchez-vous?", de: "Welchen Wein suchen Sie?", en: "What wine are you looking for?" },
   "home.searchButton": { fr: "Chercher", de: "Suchen", en: "Search" },
-  "home.promoTitle": { fr: "Promo Rêve Rouge", de: "Rêve-Rouge-Angebot", en: "Rêve Rouge offer" },
-  "home.promoCopy": { fr: "12 bouteilles achetées, 6 bouteilles offertes. Contactez-nous pour vérifier la disponibilité et préparer votre commande.", de: "Beim Kauf von 12 Flaschen erhalten Sie 6 Flaschen gratis. Fragen Sie uns nach Verfügbarkeit und Bestellung.", en: "Buy 12 bottles and receive 6 free. Contact us to confirm availability and prepare your order." },
   "home.shopsTitle": { fr: "Deux lieux, une même table", de: "Zwei Orte, ein gemeinsamer Tisch", en: "Two places, one shared table" },
   "home.schifflangeTitle": { fr: "La vinothèque de Schifflange", de: "Die Vinothek in Schifflingen", en: "The Schifflange wine shop" },
   "home.schifflangeText": { fr: "Passez le samedi matin pour parcourir la sélection et demander conseil. En semaine, nous vous recevons sur rendez-vous.", de: "Kommen Sie am Samstagvormittag vorbei, entdecken Sie die Auswahl und lassen Sie sich beraten. Unter der Woche nach Vereinbarung.", en: "Visit Saturday morning to browse the range and ask for advice. During the week, visits are by appointment." },
@@ -162,8 +158,6 @@ window.I18N_DICT = {
   "news.title": { fr: "Nouveautés et promotions", de: "Neuigkeiten und Angebote", en: "News and offers" },
   "news.lede": { fr: "Les nouvelles de la vinothèque, sans bruit inutile.", de: "Neuigkeiten aus der Vinothek, ohne unnötigen Lärm.", en: "News from the wine shop, without the noise." },
   "news.now": { fr: "En ce moment", de: "Aktuell", en: "Current" },
-  "news.promoTitle": { fr: "Promo Rêve Rouge", de: "Rêve-Rouge-Angebot", en: "Rêve Rouge offer" },
-  "news.promoText": { fr: "Pour 12 bouteilles achetées, 6 bouteilles sont offertes. Confirmez la disponibilité directement auprès de la vinothèque.", de: "Beim Kauf von 12 Flaschen erhalten Sie 6 Flaschen gratis. Bitte Verfügbarkeit direkt bei der Vinothek bestätigen.", en: "Buy 12 bottles and receive 6 free. Please confirm availability directly with the shop." },
   "news.catalogueTitle": { fr: "La liste de prix de juin 2026", de: "Preisliste Juni 2026", en: "June 2026 price list" },
   "news.catalogueText": { fr: "La nouvelle liste est consultable et filtrable en ligne. Son extraction est encore en cours de vérification; les lignes concernées sont clairement signalées.", de: "Die neue Liste kann online durchsucht und gefiltert werden. Die Übernahme wird noch geprüft; betroffene Zeilen sind klar gekennzeichnet.", en: "The new list can be searched and filtered online. Its extraction is still being checked, and affected rows are clearly marked." },
 
@@ -237,4 +231,5 @@ window.I18N_DICT = {
   "form.emailInvalid": { fr: "Indiquez une adresse e-mail valide.", de: "Bitte geben Sie eine gültige E-Mail-Adresse an.", en: "Please enter a valid email address." },
   "form.successRef": { fr: "Votre référence de commande est", de: "Ihre Bestellnummer lautet", en: "Your order reference is" },
   "form.successBody": { fr: "Nous vous recontactons pour confirmer les produits, les prix et le retrait ou la livraison. Le paiement se fait à ce moment-là.", de: "Wir melden uns, um Produkte, Preise und Abholung oder Lieferung zu bestätigen. Bezahlt wird dann.", en: "We will get back to you to confirm the products, prices and collection or delivery. Payment happens then." },
+  "news.noPromos": { fr: "Aucune promotion en cours pour le moment.", de: "Zurzeit keine Angebote.", en: "No offers running at the moment." },
 };
