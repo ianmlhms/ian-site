@@ -12,4 +12,8 @@
 window.RDR_CONFIG = Object.freeze({
   supabaseUrl: "https://ntgfxsqzgxajkegxllro.supabase.co",
   supabaseAnonKey: "sb_publishable_zhlY4xkDxWlawKFVMRaVnQ_LSWOdZw2",
+  // DEMO ONLY. Skips the admin login. Requires supabase/demo_open.sql to be
+  // applied, and must be turned off together with supabase/relock.sql before
+  // the shop takes real orders.
+  adminOpenMode: true,
 });

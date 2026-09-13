@@ -71,3 +71,14 @@
   .admin-table td { border: 0; padding: 0.25rem 0; }
   .admin-table td::before { content: attr(data-label) ": "; color: var(--muted); font-size: 0.8rem; }
 }
+
+/* Demo mode banner — removed when the dashboard is re-locked. */
+.admin-openmode {
+  margin: 0 0 1.25rem;
+  padding: 0.7rem 0.9rem;
+  border-left: 4px solid var(--rouge);
+  background: #fdeceb;
+  color: var(--rouge-deep);
+  font-size: 0.9rem;
+  font-weight: 650;
+}

@@ -681,7 +681,7 @@
     const user = el("[data-admin-user]");
     user.hidden = false;
     user.textContent = email;
-    el("[data-sign-out]").hidden = false;
+    el("[data-sign-out]").hidden = window.RDR_CONFIG?.adminOpenMode === true;
     try {
       await loadReferenceData();
     } catch (error) {
@@ -690,7 +690,21 @@
     await renderOrders(el('[data-section="orders"]'));
   }
 
+  /** Demo mode: no login, and the page must say so unmistakably. */
+  function showOpenModeWarning() {
+    const banner = document.createElement("p");
+    banner.className = "admin-openmode";
+    banner.textContent = "Mode démo : ce tableau de bord n’est pas protégé par mot de passe. "
+      + "À reverrouiller avant la mise en service.";
+    document.querySelector(".admin-main")?.prepend(banner);
+  }
+
   async function checkAccess() {
+    if (window.RDR_CONFIG?.adminOpenMode === true) {
+      showOpenModeWarning();
+      await openWorkspace("mode démo");
+      return;
+    }
     const session = sb.readSession();
     if (!session) { el("[data-signin-panel]").hidden = false; return; }
     try {
