@@ -1,0 +1,73 @@
+/* Admin dashboard — French only; the content it edits is FR/DE/EN. */
+.admin-body { background: var(--paper); }
+
+.admin-header { border-bottom: 1px solid var(--rule); background: var(--white); }
+
+.admin-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0.9rem 1rem;
+}
+
+.admin-title { font-weight: 700; }
+.admin-user { margin-inline-start: auto; color: var(--muted); font-size: 0.85rem; }
+.admin-main { max-width: var(--max); margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+.admin-panel { max-width: 34rem; }
+
+.admin-form { display: grid; gap: 0.4rem; margin-top: 1rem; }
+.admin-form label { font-size: 0.85rem; font-weight: 700; }
+.admin-form input, .admin-form select, .admin-form textarea { min-height: 44px; }
+.admin-form .button { margin-top: 0.8rem; justify-self: start; }
+.admin-error { color: var(--rouge); min-height: 1.2em; }
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 1.25rem;
+}
+
+.admin-tab {
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+}
+
+.admin-tab.is-active { color: var(--ink); border-bottom-color: var(--rouge); }
+.admin-status { min-height: 1.4em; color: var(--rouge-deep); font-size: 0.9rem; }
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.admin-toolbar input, .admin-toolbar select { min-height: 44px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.admin-table th { text-align: left; border-bottom: 1px solid var(--ink); padding: 0.5rem 0.4rem; }
+.admin-table td { border-bottom: 1px solid var(--rule); padding: 0.45rem 0.4rem; vertical-align: top; }
+.admin-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.admin-table input, .admin-table select { min-height: 40px; width: 100%; }
+.admin-table .row-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.badge-review { color: var(--rouge-deep); font-size: 0.78rem; }
+.admin-danger { color: var(--rouge); }
+
+@media (max-width: 760px) {
+  .admin-table, .admin-table tbody, .admin-table tr, .admin-table td { display: block; width: 100%; }
+  .admin-table thead { display: none; }
+  .admin-table tr { border-bottom: 1px solid var(--ink); padding: 0.6rem 0; }
+  .admin-table td { border: 0; padding: 0.25rem 0; }
+  .admin-table td::before { content: attr(data-label) ": "; color: var(--muted); font-size: 0.8rem; }
+}

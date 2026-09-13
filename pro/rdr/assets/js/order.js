@@ -1,148 +1,227 @@
-// Wrapped in an IIFE: this file and catalogue-data.js are both classic
-// scripts sharing global scope, so top-level `const` here would collide
-// with the function declarations of the same name in catalogue-data.js.
+/**
+ * order.js — the Bon de Commande.
+ *
+ * Reads the basket, collects the customer's details, and records the order in
+ * Supabase. Payment is never taken here: an order is a reservation, settled at
+ * the shop or on delivery.
+ */
 (() => {
-  const { flattenCatalogue, formatPrice, loadCatalogue, showDataError } = window.RdrCatalogue;
+  const { flattenCatalogue, loadCatalogue, showDataError } = window.RdrCatalogue;
 
-  const REQUIRED_FIELDS = Object.freeze(["lastName", "firstName", "address", "postcode", "city", "gsm", "email"]);
-  const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const form = document.querySelector("[data-order-form]");
+  const itemsHost = document.querySelector("[data-order-items]");
+  const confirmation = document.querySelector("[data-order-confirmation]");
+  const itemError = document.querySelector("[data-item-error]");
 
-  function productOption(product) {
-    const option = document.createElement("option");
-    option.value = product.id;
-    const price = formatPrice(product, window.I18N.lang) || window.I18N.t("catalogue.onRequest");
-    option.textContent = `${product.name} — ${product.producerName} — ${product.format || "—"} — ${price}`;
-    option.disabled = product.outOfStock;
-    return option;
+  // Required for a delivery, ignored for a collection — matching the
+  // rdr_orders_address_ck constraint in the database.
+  const DELIVERY_FIELDS = ["address", "postcode", "city"];
+  const REQUIRED_FIELDS = ["firstName", "lastName", "email"];
+  const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+  let catalogueProducts = [];
+  let isSubmitting = false;
+
+  function text(key) {
+    return window.I18N ? window.I18N.t(key) : key;
   }
 
-  function createOrderRow(products, selectedId = "") {
-    const row = document.createElement("div");
-    row.className = "order-row";
-    const productField = document.createElement("div");
-    productField.className = "field";
-    const productLabel = document.createElement("label");
-    productLabel.textContent = window.I18N.t("form.product");
-    const select = document.createElement("select");
-    select.name = "product";
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = window.I18N.t("form.product");
-    select.append(placeholder, ...products.map(productOption));
-    select.value = selectedId;
-    productLabel.appendChild(select);
-    productField.appendChild(productLabel);
+  function money(value) {
+    const lang = window.I18N?.lang || "fr";
+    const locale = lang === "de" ? "de-LU" : lang === "en" ? "en-LU" : "fr-LU";
+    return new Intl.NumberFormat(locale, { style: "currency", currency: "EUR" }).format(value);
+  }
 
-    const quantityField = document.createElement("div");
-    quantityField.className = "field";
-    const quantityLabel = document.createElement("label");
-    quantityLabel.textContent = window.I18N.t("form.quantity");
-    const quantity = document.createElement("input");
-    quantity.type = "number";
-    quantity.name = "quantity";
-    quantity.min = "1";
-    quantity.max = "999";
-    quantity.value = "1";
-    quantityLabel.appendChild(quantity);
-    quantityField.appendChild(quantityLabel);
-
-    const remove = document.createElement("button");
-    remove.className = "remove-row";
-    remove.type = "button";
-    remove.dataset.removeOrderRow = "true";
-    remove.setAttribute("aria-label", window.I18N.t("form.remove"));
-    remove.title = window.I18N.t("form.remove");
-    remove.textContent = "×";
-    row.append(productField, quantityField, remove);
-    return row;
+  function chosenFulfilment() {
+    return form.querySelector('input[name="fulfilment"]:checked')?.value || "collect";
   }
 
   function setFieldError(control, message) {
-    const error = document.getElementById(`${control.id}-error`);
+    const holder = control.closest(".field") || control.parentElement;
+    const slot = holder?.querySelector(".field-error");
+    if (slot) slot.textContent = message || "";
     control.setAttribute("aria-invalid", message ? "true" : "false");
-    if (error) error.textContent = message;
   }
 
-  function validateForm(form) {
-    let isValid = true;
+  /** Address fields only exist as requirements when delivery is chosen. */
+  function syncDeliveryFields() {
+    const isDelivery = chosenFulfilment() === "delivery";
+    DELIVERY_FIELDS.forEach((name) => {
+      const control = form.elements[name];
+      if (!control) return;
+      const holder = control.closest(".field");
+      if (holder) holder.hidden = !isDelivery;
+      control.required = isDelivery;
+      if (!isDelivery) setFieldError(control, "");
+    });
+  }
+
+  function renderItems() {
+    const lines = window.RdrBasket.resolve(catalogueProducts);
+    if (lines.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "loading-state";
+      empty.textContent = text("order.basketEmpty");
+      const link = document.createElement("a");
+      link.href = "catalogue.html";
+      link.className = "link-button";
+      link.textContent = text("basket.browse");
+      itemsHost.replaceChildren(empty, link);
+      return;
+    }
+
+    const list = document.createElement("ul");
+    list.className = "order-summary-list";
+    lines.forEach((line) => {
+      const item = document.createElement("li");
+      const name = line.product ? `${line.product.name} — ${line.product.producerName}, ${line.product.format}` : text("basket.withdrawn");
+      const total = line.lineTotal === null ? text("catalogue.onRequest") : money(line.lineTotal);
+      item.textContent = `${line.quantity} × ${name} · ${total}`;
+      list.appendChild(item);
+    });
+
+    const total = document.createElement("p");
+    total.className = "basket-total";
+    total.textContent = `${text("basket.total")} ${money(window.RdrBasket.total(catalogueProducts))}`;
+
+    const edit = document.createElement("a");
+    edit.className = "link-button";
+    edit.href = "panier.html";
+    edit.textContent = text("order.editBasket");
+
+    itemsHost.replaceChildren(list, total, edit);
+  }
+
+  function validate() {
+    let firstInvalid = null;
+    const fail = (control, message) => {
+      setFieldError(control, message);
+      if (!firstInvalid) firstInvalid = control;
+    };
+
     REQUIRED_FIELDS.forEach((name) => {
-      const control = form.elements.namedItem(name);
-      const isEmpty = !control.value.trim();
-      setFieldError(control, isEmpty ? window.I18N.t("form.required") : "");
-      if (isEmpty) isValid = false;
+      const control = form.elements[name];
+      if (!control) return;
+      const value = String(control.value || "").trim();
+      if (!value) fail(control, text("form.required"));
+      else if (name === "email" && !EMAIL_PATTERN.test(value)) fail(control, text("form.emailInvalid"));
+      else setFieldError(control, "");
     });
-    const email = form.elements.namedItem("email");
-    if (email.value.trim() && !EMAIL_PATTERN.test(email.value.trim())) {
-      setFieldError(email, window.I18N.t("form.emailError"));
-      isValid = false;
-    }
-    const selectedProducts = [...form.querySelectorAll("select[name='product']")].filter((select) => select.value);
-    const itemError = document.querySelector("[data-item-error]");
-    if (itemError) itemError.textContent = selectedProducts.length ? "" : window.I18N.t("form.itemError");
-    return isValid && selectedProducts.length > 0;
-  }
 
-  function bindForm(form, itemsHost, products) {
-    const addButton = document.querySelector("[data-add-order-row]");
-    addButton?.addEventListener("click", () => itemsHost.appendChild(createOrderRow(products)));
-    itemsHost.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-remove-order-row]");
-      if (!button) return;
-      const rows = itemsHost.querySelectorAll(".order-row");
-      if (rows.length === 1) {
-        rows[0].querySelector("select").value = "";
-        rows[0].querySelector("input").value = "1";
-        return;
-      }
-      button.closest(".order-row")?.remove();
-    });
-    form.addEventListener("input", (event) => {
-      if (event.target.id) setFieldError(event.target, "");
-    });
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      // Demo only: intentionally no request, email, or other network submission is made.
-      if (!validateForm(form)) {
-        form.querySelector("[aria-invalid='true']")?.focus();
-        return;
-      }
-      const confirmation = document.querySelector("[data-order-confirmation]");
-      if (confirmation) {
-        confirmation.hidden = false;
-        confirmation.focus();
-        confirmation.scrollIntoView({ block: "center" });
-      }
-    });
-  }
-
-  async function boot() {
-    const form = document.querySelector("[data-order-form]");
-    const itemsHost = document.querySelector("[data-order-items]");
-    if (!form || !itemsHost) return;
-    try {
-      const catalogue = await loadCatalogue();
-      const products = flattenCatalogue(catalogue).slice().sort((left, right) => left.name.localeCompare(right.name, "fr", { sensitivity: "base" }));
-      const requestedProduct = new URLSearchParams(window.location.search).get("product") || "";
-      const safeProduct = products.some((product) => product.id === requestedProduct && !product.outOfStock) ? requestedProduct : "";
-      itemsHost.replaceChildren(createOrderRow(products, safeProduct));
-      bindForm(form, itemsHost, products);
-      document.addEventListener("i18n:change", () => {
-        const selections = [...itemsHost.querySelectorAll(".order-row")].map((row) => ({
-          product: row.querySelector("select").value,
-          quantity: row.querySelector("input").value,
-        }));
-        itemsHost.replaceChildren(...selections.map((selection) => {
-          const row = createOrderRow(products, selection.product);
-          row.querySelector("input").value = selection.quantity;
-          return row;
-        }));
+    if (chosenFulfilment() === "delivery") {
+      DELIVERY_FIELDS.forEach((name) => {
+        const control = form.elements[name];
+        if (!control) return;
+        if (!String(control.value || "").trim()) fail(control, text("form.required"));
+        else setFieldError(control, "");
       });
-    } catch (error) {
-      showDataError(itemsHost, error);
-      form.querySelector("button[type='submit']")?.setAttribute("disabled", "");
     }
+
+    const lines = window.RdrBasket.resolve(catalogueProducts);
+    const sellable = lines.filter((line) => line.isAvailable);
+    if (sellable.length === 0) {
+      itemError.textContent = text("order.needItems");
+      if (!firstInvalid) firstInvalid = itemsHost;
+    } else {
+      itemError.textContent = "";
+    }
+
+    return { firstInvalid, lines: sellable };
   }
 
-  boot();
+  function showConfirmation(reference) {
+    const heading = confirmation.querySelector("h2");
+    const body = confirmation.querySelector("p");
+    if (heading) heading.textContent = text("form.successTitle");
+    if (body) {
+      body.textContent = reference
+        ? `${text("form.successRef")} ${reference}. ${text("form.successBody")}`
+        : text("form.successBody");
+    }
+    confirmation.hidden = false;
+    confirmation.focus();
+  }
 
+  function showSubmitError(message) {
+    itemError.textContent = message;
+  }
+
+  /**
+   * The order goes through a SECURITY DEFINER function, not a direct insert:
+   * it writes the order and its items in one transaction, takes prices from
+   * the catalogue rather than from this form, and returns only the reference —
+   * the public can never read an order back.
+   */
+  async function submitOrder(lines) {
+    const data = new FormData(form);
+    const fulfilment = chosenFulfilment();
+    const payload = {
+      first_name: String(data.get("firstName") || "").trim(),
+      last_name: String(data.get("lastName") || "").trim(),
+      email: String(data.get("email") || "").trim(),
+      phone: String(data.get("phone") || data.get("gsm") || "").trim(),
+      fulfilment,
+      address: fulfilment === "delivery" ? String(data.get("address") || "").trim() : "",
+      postcode: fulfilment === "delivery" ? String(data.get("postcode") || "").trim() : "",
+      locality: fulfilment === "delivery" ? String(data.get("city") || "").trim() : "",
+      message: String(data.get("message") || "").trim(),
+      lang: window.I18N?.lang || "fr",
+      items: lines.map((line) => ({ product_id: line.productId, quantity: line.quantity })),
+    };
+    const reference = await window.RdrSupabase.rpc("rdr_place_order", { payload });
+    if (typeof reference !== "string" || !reference) throw new Error("The order was not confirmed.");
+    return reference;
+  }
+
+  function bind() {
+    form.addEventListener("change", (event) => {
+      if (event.target.name === "fulfilment") syncDeliveryFields();
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (isSubmitting) return;
+
+      const { firstInvalid, lines } = validate();
+      if (firstInvalid) {
+        firstInvalid.focus?.();
+        return;
+      }
+
+      if (!window.RdrSupabase.isConfigured()) {
+        showSubmitError(text("order.notConfigured"));
+        return;
+      }
+
+      const submitButton = form.querySelector('button[type="submit"]');
+      isSubmitting = true;
+      if (submitButton) submitButton.disabled = true;
+      showSubmitError("");
+
+      try {
+        const reference = await submitOrder(lines);
+        window.RdrBasket.clear();
+        form.hidden = true;
+        showConfirmation(reference);
+      } catch (error) {
+        console.error("The order could not be sent.", error);
+        showSubmitError(`${text("order.sendFailed")} ${error.message}`);
+      } finally {
+        isSubmitting = false;
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+  }
+
+  loadCatalogue().then((catalogue) => {
+    catalogueProducts = flattenCatalogue(catalogue);
+    renderItems();
+    syncDeliveryFields();
+    bind();
+    window.RdrBasket.subscribe(renderItems);
+    if (window.I18N) window.I18N.onChange(renderItems);
+  }).catch((error) => {
+    console.error("Catalogue could not be loaded.", error);
+    showDataError(itemsHost, error);
+  });
 })();

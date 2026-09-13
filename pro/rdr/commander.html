@@ -6,7 +6,12 @@
   <title data-i18n="meta.order.title">Bon de commande | Rêves de Rasiguères</title><meta name="description" content="Préparez votre commande de vins et spiritueux. Livraison gratuite et contact direct avec la vinothèque à Schifflange." data-i18n-attr="content:meta.order.description">
   <meta property="og:type" content="website"><meta property="og:site_name" content="Rêves de Rasiguères"><meta property="og:title" content="Bon de commande | Rêves de Rasiguères" data-i18n-attr="content:meta.order.title"><meta property="og:description" content="Préparez votre commande de vins et spiritueux. Livraison gratuite." data-i18n-attr="content:meta.order.description"><meta property="og:image" content="https://ian.lu/pro/rdr/assets/img/og-rdr.png"><meta property="og:url" content="https://ian.lu/pro/rdr/commander.html"><meta name="twitter:card" content="summary_large_image">
   <link rel="canonical" href="https://ian.lu/pro/rdr/commander.html"><link rel="alternate" hreflang="fr" href="https://ian.lu/pro/rdr/commander.html"><link rel="alternate" hreflang="de" href="https://ian.lu/pro/rdr/commander.html?lang=de"><link rel="alternate" hreflang="en" href="https://ian.lu/pro/rdr/commander.html?lang=en"><link rel="alternate" hreflang="x-default" href="https://ian.lu/pro/rdr/commander.html">
-  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/css/site.css"><script src="assets/js/i18n-dict.js"></script><script src="assets/js/i18n.js"></script><script src="assets/js/site.js"></script>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/css/site.css">
+  <script src="assets/js/rdr-config.js"></script>
+  <script src="assets/js/i18n-dict.js"></script>
+  <script src="assets/js/i18n.js"></script>
+  <script src="assets/js/basket.js"></script>
+  <script src="assets/js/site.js"></script>
 </head>
 <body>
 <aside class="preview" id="preview-banner" role="status"><div><p>Aperçu — ce site n&#x27;est pas encore le site officiel de Rêves de Rasiguères.</p><small>Vous souhaitez le modifier ou le retirer ? <a href="mailto:ian@mulheims.lu">Écrivez à Ian</a></small></div><button type="button" aria-label="Fermer l&#x27;aperçu" onclick="try{sessionStorage.setItem('pro-preview','dismissed')}catch(e){}this.parentElement.hidden=true">×</button></aside><script>try{if(sessionStorage.getItem("pro-preview")==="dismissed"){document.getElementById("preview-banner").hidden=true}}catch(e){}</script><div data-site-header></div><main id="main">
@@ -26,9 +31,18 @@
       </div>
       <h2 data-i18n="form.items">Articles</h2>
       <div class="order-items" data-order-items><p class="loading-state" data-i18n="catalogue.loading">Chargement du catalogue…</p></div><span class="field-error" data-item-error></span>
-      <p><button class="button button-secondary" type="button" data-add-order-row data-i18n="form.add">Ajouter un article</button></p><button class="button" type="submit" data-i18n="form.submit">Préparer la commande</button>
+      <fieldset class="order-fulfilment">
+        <legend data-i18n="order.fulfilmentTitle">Retrait ou livraison</legend>
+        <label class="radio-label"><input type="radio" name="fulfilment" value="collect" checked> <span data-i18n="order.collect">Retrait à la vinothèque, Schifflange</span></label>
+        <label class="radio-label"><input type="radio" name="fulfilment" value="delivery"> <span data-i18n="order.delivery">Livraison gratuite, partout au Luxembourg</span></label>
+        <p class="field-hint" data-i18n="order.paymentNote">Le paiement se fait sur place ou à la livraison. Rien n’est débité en ligne.</p>
+      </fieldset>
+      <button class="button" type="submit" data-i18n="form.submit">Envoyer la commande</button>
     </form>
     <aside><div class="address-block"><h2 data-i18n="catalogue.delivery">Livraison gratuite</h2><ul class="facts-list"><li><a href="mailto:commande@rdr.lu">commande@rdr.lu</a></li><li><a href="tel:+352621777057">+352 621 777 057</a></li><li data-i18n="find.hours">Tous les samedis de 10.00 à 12.30 heures, et sur rendez-vous en semaine.</li></ul></div><div class="confirmation" data-order-confirmation tabindex="-1" hidden><h2 data-i18n="form.successTitle">Votre demande est prête</h2><p data-i18n="form.success">Merci. Votre demande est prête pour commande@rdr.lu. L’équipe pourra ensuite confirmer les produits, les prix et la livraison avec vous.</p></div></aside>
   </div></section>
-</main><div data-site-footer></div><script src="assets/js/catalogue-data.js"></script><script src="assets/js/order.js"></script></body>
+</main><div data-site-footer></div>
+  <script src="assets/js/catalogue-data.js"></script>
+  <script src="assets/js/rdr-supabase.js"></script>
+  <script src="assets/js/order.js"></script></body>
 </html>

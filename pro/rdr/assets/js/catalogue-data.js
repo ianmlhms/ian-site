@@ -96,7 +96,74 @@ function loadCatalogueFromFrame() {
   });
 }
 
+/**
+ * Shape a row of rdr_catalogue_view like the JSON file, so every page that
+ * already consumes the catalogue keeps working unchanged.
+ */
+function catalogueFromRows(rows) {
+  const producers = new Map();
+  rows.forEach((row) => {
+    if (!producers.has(row.producer_id)) {
+      producers.set(row.producer_id, {
+        id: row.producer_id,
+        name: row.producer_name,
+        country: row.country_name || null,
+        region: row.region || null,
+        products: [],
+      });
+    }
+    const hasReduction = row.reduced_price_eur !== null && row.reduced_price_eur !== undefined;
+    producers.get(row.producer_id).products.push({
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      colour: row.colour,
+      format: row.format,
+      priceEur: hasReduction ? Number(row.reduced_price_eur) : (row.price_eur === null ? null : Number(row.price_eur)),
+      fullPriceEur: hasReduction && row.price_eur !== null ? Number(row.price_eur) : null,
+      reductionLabel: row.reduction_label || null,
+      priceOnRequest: Boolean(row.price_on_request),
+      outOfStock: Boolean(row.out_of_stock),
+      needsReview: Boolean(row.needs_review),
+    });
+  });
+  return {
+    source: "rdr_catalogue_view",
+    importedAt: new Date().toISOString(),
+    currency: "EUR",
+    priceNote: "Tous nos prix sont indiqués en TTC",
+    reliability: { status: "live", productNames: "edited in the admin dashboard" },
+    ordering: {
+      email: "commande@rdr.lu",
+      gsm: "+352 621 777 057",
+      telephone: "26 37 09 15 - 60",
+      deliveryNote: "Livraison gratuite",
+    },
+    producers: [...producers.values()],
+  };
+}
+
+/** Prefer the live database; fall back to the bundled JSON if it is unreachable. */
+function requestFromDatabase() {
+  return window.RdrSupabase.select("rdr_catalogue_view", {
+    select: "*", order: "sort_key.asc", limit: 2000,
+  }).then(catalogueFromRows);
+}
+
 function requestCatalogue() {
+  if (window.RdrSupabase?.isConfigured?.()) {
+    // Validate here too, so a shape problem falls back rather than failing the page.
+    return requestFromDatabase()
+      .then((payload) => { validateCatalogue(payload); return payload; })
+      .catch((error) => {
+        console.warn("Live catalogue unavailable; using the bundled copy.", error);
+        return requestCatalogueFromFile();
+      });
+  }
+  return requestCatalogueFromFile();
+}
+
+function requestCatalogueFromFile() {
   if (window.location.protocol === "file:") return loadCatalogueFromFrame();
   return fetch(CATALOGUE_URL).then((response) => {
     if (!response.ok) throw new Error(`Catalogue request failed with HTTP ${response.status}.`);
@@ -174,8 +241,14 @@ function createProductRow(product, options) {
   marker.title = colourLabel;
   colourCell.appendChild(marker);
 
+  // The product name is the way into the detail page from every listing on the
+  // site, so it is a link here rather than in each caller.
   const productCell = createCell("product-cell", text("catalogue.product"));
-  productCell.appendChild(document.createTextNode(product.name));
+  const productLink = document.createElement("a");
+  productLink.className = "product-link";
+  productLink.href = `vin.html?id=${encodeURIComponent(product.id)}`;
+  productLink.textContent = product.name;
+  productCell.appendChild(productLink);
   if (product.needsReview) productCell.appendChild(createReviewFlag());
 
   const producerCell = createCell("producer-cell", text("catalogue.producer"));

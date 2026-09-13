@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,follow">
+  <title data-i18n="meta.basket.title">Votre panier | Rêves de Rasiguères</title>
+  <meta name="description" content="Votre sélection de vins et spiritueux, à retirer à la vinothèque ou à faire livrer gratuitement." data-i18n-attr="content:meta.basket.description">
+  <meta name="theme-color" content="#fdfcfa">
+  <link rel="canonical" href="https://ian.lu/pro/rdr/panier.html">
+  <link rel="stylesheet" href="assets/css/site.css">
+  <script src="assets/js/rdr-config.js"></script>
+  <script src="assets/js/i18n-dict.js"></script>
+  <script src="assets/js/i18n.js"></script>
+  <script src="assets/js/basket.js"></script>
+  <script src="assets/js/site.js"></script>
+</head>
+<body>
+<aside class="preview" id="preview-banner" role="status"><div><p>Aperçu — ce site n&#x27;est pas encore le site officiel de Rêves de Rasiguères.</p><small>Vous souhaitez le modifier ou le retirer ? <a href="mailto:ian@mulheims.lu">Écrivez à Ian</a></small></div><button type="button" aria-label="Fermer l&#x27;aperçu" onclick="try{sessionStorage.setItem('pro-preview','dismissed')}catch(e){}this.parentElement.hidden=true">×</button></aside><script>try{if(sessionStorage.getItem("pro-preview")==="dismissed"){document.getElementById("preview-banner").hidden=true}}catch(e){}</script><div data-site-header></div><main id="main">
+  <header class="page-hero"><div class="container">
+    <h1 data-i18n="basket.title">Votre panier</h1>
+    <p class="lede" data-i18n="basket.lede">Vous réservez ici votre sélection. Le paiement se fait à la vinothèque ou à la livraison.</p>
+  </div></header>
+  <section class="section"><div class="container">
+    <div data-basket-host><p class="loading-state" data-i18n="catalogue.loading">Chargement du catalogue…</p></div>
+  </div></section>
+</main><div data-site-footer></div>
+  <script src="assets/js/rdr-supabase.js"></script>
+  <script src="assets/js/catalogue-data.js"></script>
+  <script src="assets/js/basket-page.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Administration — Rêves de Rasiguères</title>
+  <link rel="stylesheet" href="../assets/css/site.css">
+  <link rel="stylesheet" href="admin.css">
+  <script src="../assets/js/rdr-config.js"></script>
+  <script src="../assets/js/rdr-supabase.js"></script>
+</head>
+<body class="admin-body">
+  <header class="admin-header">
+    <div class="admin-bar">
+      <span class="brand-mark">RdR</span>
+      <span class="admin-title">Administration</span>
+      <span class="admin-user" data-admin-user hidden></span>
+      <button type="button" class="link-button" data-sign-out hidden>Se déconnecter</button>
+    </div>
+  </header>
+
+  <main id="main" class="admin-main">
+    <section class="admin-panel" data-setup-panel hidden>
+      <h1>Base de données non configurée</h1>
+      <p>Renseignez <code>supabaseUrl</code> et <code>supabaseAnonKey</code> dans
+        <code>assets/js/rdr-config.js</code>, puis exécutez
+        <code>supabase/schema.sql</code> dans l’éditeur SQL du projet.</p>
+    </section>
+
+    <section class="admin-panel" data-signin-panel hidden>
+      <h1>Connexion</h1>
+      <form data-signin-form class="admin-form" novalidate>
+        <label for="adminEmail">Adresse e-mail</label>
+        <input id="adminEmail" name="email" type="email" autocomplete="username" required>
+        <label for="adminPassword">Mot de passe</label>
+        <input id="adminPassword" name="password" type="password" autocomplete="current-password" required>
+        <button class="button" type="submit">Se connecter</button>
+        <p class="admin-error" data-signin-error role="alert"></p>
+      </form>
+    </section>
+
+    <section class="admin-panel" data-denied-panel hidden>
+      <h1>Accès refusé</h1>
+      <p>Ce compte n’est pas administrateur de la boutique. Ajoutez son adresse
+        dans la table <code>rdr_admins</code>.</p>
+      <button type="button" class="link-button" data-sign-out-2>Se déconnecter</button>
+    </section>
+
+    <div data-workspace hidden>
+      <nav class="admin-tabs" aria-label="Sections">
+        <button type="button" class="admin-tab is-active" data-tab="orders">Commandes</button>
+        <button type="button" class="admin-tab" data-tab="products">Produits</button>
+        <button type="button" class="admin-tab" data-tab="producers">Producteurs</button>
+        <button type="button" class="admin-tab" data-tab="countries">Pays</button>
+        <button type="button" class="admin-tab" data-tab="reductions">Réductions</button>
+        <button type="button" class="admin-tab" data-tab="promos">Promotions</button>
+        <button type="button" class="admin-tab" data-tab="import">Import</button>
+      </nav>
+      <p class="admin-status" data-status role="status" aria-live="polite"></p>
+      <div data-section="orders"></div>
+      <div data-section="products" hidden></div>
+      <div data-section="producers" hidden></div>
+      <div data-section="countries" hidden></div>
+      <div data-section="reductions" hidden></div>
+      <div data-section="promos" hidden></div>
+      <div data-section="import" hidden></div>
+    </div>
+  </main>
+  <script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,follow">
+  <title data-i18n="meta.wine.title">Fiche produit | Rêves de Rasiguères</title>
+  <meta name="description" content="Fiche détaillée d’un vin ou spiritueux de la vinothèque Rêves de Rasiguères à Schifflange." data-i18n-attr="content:meta.wine.description">
+  <meta name="theme-color" content="#fdfcfa">
+  <meta property="og:type" content="product">
+  <meta property="og:site_name" content="Rêves de Rasiguères">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://ian.lu/pro/rdr/vin.html">
+  <link rel="stylesheet" href="assets/css/site.css">
+  <script src="assets/js/rdr-config.js"></script>
+  <script src="assets/js/i18n-dict.js"></script>
+  <script src="assets/js/i18n.js"></script>
+  <script src="assets/js/basket.js"></script>
+  <script src="assets/js/site.js"></script>
+</head>
+<body>
+<aside class="preview" id="preview-banner" role="status"><div><p>Aperçu — ce site n&#x27;est pas encore le site officiel de Rêves de Rasiguères.</p><small>Vous souhaitez le modifier ou le retirer ? <a href="mailto:ian@mulheims.lu">Écrivez à Ian</a></small></div><button type="button" aria-label="Fermer l&#x27;aperçu" onclick="try{sessionStorage.setItem('pro-preview','dismissed')}catch(e){}this.parentElement.hidden=true">×</button></aside><script>try{if(sessionStorage.getItem("pro-preview")==="dismissed"){document.getElementById("preview-banner").hidden=true}}catch(e){}</script><div data-site-header></div><main id="main">
+  <div data-wine-error></div>
+  <div data-wine-content hidden>
+    <nav class="breadcrumb container" aria-label="Fil d’Ariane" data-i18n-attr="aria-label:wine.breadcrumb">
+      <a href="catalogue.html" data-i18n="nav.catalogue">Catalogue</a>
+      <span aria-hidden="true">/</span>
+      <a data-wine-producer-link href="producteurs.html"></a>
+    </nav>
+    <header class="page-hero"><div class="container wine-head">
+      <p class="wine-origin" data-wine-origin></p>
+      <h1 data-wine-title></h1>
+      <p class="wine-meta" data-wine-meta></p>
+    </div></header>
+    <section class="section"><div class="container wine-grid">
+      <div class="wine-facts">
+        <dl class="fact-list" data-wine-facts></dl>
+        <div class="wine-note" data-wine-note hidden></div>
+      </div>
+      <aside class="wine-buy" aria-labelledby="buyTitle">
+        <h2 id="buyTitle" class="visually-hidden" data-i18n="wine.buyTitle">Commander ce produit</h2>
+        <p class="wine-price" data-wine-price></p>
+        <p class="wine-status" data-wine-status></p>
+        <form class="buy-form" data-buy-form hidden>
+          <label class="quantity-label" for="wineQty" data-i18n="wine.quantity">Quantité</label>
+          <input id="wineQty" name="quantity" type="number" inputmode="numeric" min="1" max="99" step="1" value="1">
+          <button class="button" type="submit" data-i18n="wine.addToBasket">Ajouter au panier</button>
+        </form>
+        <p class="buy-feedback" data-buy-feedback role="status" aria-live="polite"></p>
+        <p class="buy-note" data-i18n="wine.paymentNote">Le paiement se fait à la vinothèque ou à la livraison. Rien n’est débité en ligne.</p>
+      </aside>
+    </div></section>
+    <section class="section section-rule"><div class="container">
+      <h2 class="section-heading" data-i18n="wine.siblings">Autres produits de ce producteur</h2>
+      <div data-sibling-table></div>
+    </div></section>
+  </div>
+</main><div data-site-footer></div>
+  <script src="assets/js/rdr-supabase.js"></script>
+  <script src="assets/js/catalogue-data.js"></script>
+  <script src="assets/js/wine.js"></script>
+</body>
+</html>

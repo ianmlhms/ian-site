@@ -34,6 +34,10 @@
             '<span class="brand-name">Rêves de Rasiguères</span>' +
           '</a>' +
           '<div class="header-actions">' +
+            '<a class="basket-link" href="panier.html" data-i18n-attr="aria-label:basket.open">' +
+              '<span data-i18n="basket.label">Panier</span>' +
+              '<span class="basket-count" id="basketCount" hidden>0</span>' +
+            '</a>' +
             '<a class="button header-order" href="commander.html" data-i18n="nav.order">Commander</a>' +
             '<div id="langSw"></div>' +
             '<button class="menu-toggle" type="button" aria-controls="site-nav" aria-expanded="false" data-i18n="nav.open">Menu</button>' +
@@ -181,4 +185,23 @@
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
+  /** Keep the header badge in step with the basket, on every page. */
+  function mountBasketCount() {
+    const badge = document.getElementById("basketCount");
+    if (!badge || !window.RdrBasket) return;
+    const paint = () => {
+      const count = window.RdrBasket.count();
+      badge.textContent = String(count);
+      badge.hidden = count === 0;
+    };
+    paint();
+    window.RdrBasket.subscribe(paint);
+    if (window.I18N) window.I18N.onChange(paint);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mountBasketCount);
+  } else {
+    mountBasketCount();
+  }
 })();

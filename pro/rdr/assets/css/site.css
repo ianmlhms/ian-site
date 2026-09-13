@@ -1071,6 +1071,164 @@ button.button:hover {
   .checkbox-label input[type="checkbox"] { width: 22px; height: 22px; }
 }
 
+/* ---- Product links, basket and product page ---------------------------- */
+.product-link {
+  color: var(--ink);
+  font-weight: 650;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 0.18em;
+}
+
+.product-link:hover { color: var(--rouge-deep); text-decoration-color: currentColor; }
+
+.basket-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding-inline: 0.2rem;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.basket-link:hover { color: var(--rouge-deep); }
+
+.basket-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  padding-inline: 0.35rem;
+  border-radius: 999px;
+  background: var(--rouge);
+  color: var(--white);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 1.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.wine-head .wine-origin { margin: 0 0 0.4rem; color: var(--muted); }
+
+.wine-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  color: var(--muted);
+}
+
+.wine-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.fact-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.55rem 1.5rem;
+  margin: 0;
+}
+
+.fact-list dt { color: var(--muted); font-size: 0.9rem; }
+.fact-list dd { margin: 0; font-weight: 600; }
+
+.wine-buy {
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  background: var(--white);
+}
+
+.wine-price {
+  margin: 0;
+  font-family: var(--display, "Fraunces"), Georgia, serif;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.wine-status { margin: 0.2rem 0 1rem; }
+
+.buy-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.buy-form input {
+  width: 5.5rem;
+  min-height: 44px;
+}
+
+.quantity-label { display: block; width: 100%; font-size: 0.85rem; font-weight: 700; }
+.buy-feedback { margin: 0.75rem 0 0; color: var(--rouge-deep); font-size: 0.9rem; min-height: 1.2em; }
+.buy-feedback.is-error { color: var(--rouge); }
+.buy-note { margin: 1rem 0 0; color: var(--muted); font-size: 0.85rem; }
+
+.basket-table .qty-cell input { width: 5rem; min-height: 44px; }
+.basket-producer { display: block; color: var(--muted); font-size: 0.85rem; }
+
+.basket-summary {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 2px solid var(--ink);
+}
+
+.basket-total {
+  margin: 0;
+  font-family: var(--display, "Fraunces"), Georgia, serif;
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.basket-note { margin: 0.35rem 0 1.25rem; color: var(--muted); font-size: 0.9rem; }
+
+.basket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.link-button {
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--rouge-deep);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.empty-state {
+  padding: var(--space-6) 0;
+  text-align: left;
+}
+
+.empty-state .button { margin-top: 1rem; }
+
+@media (max-width: 760px) {
+  .wine-grid { grid-template-columns: 1fr; gap: var(--space-5); }
+  .fact-list { grid-template-columns: 1fr; gap: 0.15rem; }
+  .fact-list dd { margin-bottom: 0.6rem; }
+  .basket-table tr { grid-template-columns: minmax(0, 1fr) auto; }
+  .basket-actions { flex-direction: column; align-items: stretch; }
+  .basket-actions .button { text-align: center; }
+}
+
 
 /* ---- /pro preview banner ----------------------------------------------
    Added by scripts/sync-to-ianlu.mjs. The banner markup is shared with the
