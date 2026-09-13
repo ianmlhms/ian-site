@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Rêves de Rasiguères</title>
+  <desc id="desc">Catalogue de vins et spiritueux à Schifflange. Samedi 10.00 à 12.30. Livraison gratuite.</desc>
+  <rect width="1200" height="630" fill="#fdfcfa"/>
+  <rect x="0" y="0" width="400" height="14" fill="#d7df23"/>
+  <rect x="400" y="0" width="400" height="14" fill="#f190ac"/>
+  <rect x="800" y="0" width="400" height="14" fill="#be1e2d"/>
+  <text x="82" y="120" fill="#231f20" font-family="Georgia,serif" font-size="58" font-weight="700">Rêves de Rasiguères</text>
+  <text x="82" y="190" fill="#961d1b" font-family="Arial,sans-serif" font-size="29" font-weight="700">LA LISTE, ENFIN LISIBLE</text>
+  <line x1="82" y1="234" x2="1118" y2="234" stroke="#231f20" stroke-width="3"/>
+  <circle cx="99" cy="298" r="10" fill="#d7df23" stroke="#231f20" stroke-opacity=".25"/>
+  <line x1="132" y1="298" x2="660" y2="298" stroke="#e3dfd8" stroke-width="16"/>
+  <line x1="826" y1="298" x2="1118" y2="298" stroke="#231f20" stroke-width="16"/>
+  <circle cx="99" cy="356" r="10" fill="#f190ac" stroke="#231f20" stroke-opacity=".25"/>
+  <line x1="132" y1="356" x2="760" y2="356" stroke="#e3dfd8" stroke-width="16"/>
+  <line x1="922" y1="356" x2="1118" y2="356" stroke="#231f20" stroke-width="16"/>
+  <circle cx="99" cy="414" r="10" fill="#be1e2d" stroke="#231f20" stroke-opacity=".25"/>
+  <line x1="132" y1="414" x2="704" y2="414" stroke="#e3dfd8" stroke-width="16"/>
+  <line x1="865" y1="414" x2="1118" y2="414" stroke="#231f20" stroke-width="16"/>
+  <line x1="82" y1="463" x2="1118" y2="463" stroke="#e3dfd8" stroke-width="2"/>
+  <text x="82" y="533" fill="#231f20" font-family="Arial,sans-serif" font-size="34" font-weight="700">Samedi 10.00–12.30</text>
+  <text x="1118" y="533" text-anchor="end" fill="#961d1b" font-family="Arial,sans-serif" font-size="34" font-weight="700">Livraison gratuite</text>
+  <text x="82" y="581" fill="#675f5d" font-family="Arial,sans-serif" font-size="25">Schifflange, Luxembourg</text>
+</svg>

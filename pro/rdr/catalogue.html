@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,follow">
+  <title data-i18n="meta.catalogue.title">Catalogue des vins et spiritueux | Rêves de Rasiguères</title>
+  <meta name="description" content="Recherchez tout le catalogue de Rêves de Rasiguères à Schifflange: vins, champagnes, gins, whiskies et autres spiritueux." data-i18n-attr="content:meta.catalogue.description">
+  <meta name="theme-color" content="#fdfcfa">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="Rêves de Rasiguères">
+  <meta property="og:title" content="Catalogue des vins et spiritueux | Rêves de Rasiguères" data-i18n-attr="content:meta.catalogue.title">
+  <meta property="og:description" content="Recherchez tout le catalogue de Rêves de Rasiguères à Schifflange." data-i18n-attr="content:meta.catalogue.description">
+  <meta property="og:image" content="https://ian.lu/pro/rdr/assets/img/og-rdr.png"><meta property="og:url" content="https://ian.lu/pro/rdr/catalogue.html"><meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://ian.lu/pro/rdr/catalogue.html">
+  <link rel="alternate" hreflang="fr" href="https://ian.lu/pro/rdr/catalogue.html"><link rel="alternate" hreflang="de" href="https://ian.lu/pro/rdr/catalogue.html?lang=de"><link rel="alternate" hreflang="en" href="https://ian.lu/pro/rdr/catalogue.html?lang=en"><link rel="alternate" hreflang="x-default" href="https://ian.lu/pro/rdr/catalogue.html">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/css/site.css">
+  <script src="assets/js/i18n-dict.js"></script><script src="assets/js/i18n.js"></script><script src="assets/js/site.js"></script>
+</head>
+<body>
+<aside class="preview" id="preview-banner" role="status"><div><p>Aperçu — ce site n&#x27;est pas encore le site officiel de Rêves de Rasiguères.</p><small>Vous souhaitez le modifier ou le retirer ? <a href="mailto:ian@mulheims.lu">Écrivez à Ian</a></small></div><button type="button" aria-label="Fermer l&#x27;aperçu" onclick="try{sessionStorage.setItem('pro-preview','dismissed')}catch(e){}this.parentElement.hidden=true">×</button></aside><script>try{if(sessionStorage.getItem("pro-preview")==="dismissed"){document.getElementById("preview-banner").hidden=true}}catch(e){}</script>
+  <div data-site-header></div>
+  <main id="main">
+    <header class="page-hero"><div class="container"><h1 data-i18n="catalogue.title">La liste, enfin lisible.</h1><p class="lede" data-i18n="catalogue.lede">Tous les vins et spiritueux de la maison, recherchables en quelques secondes.</p></div></header>
+    <div class="container">
+      <aside class="draft-notice" id="catalogue-notice" aria-labelledby="draft-title">
+        <h2 id="draft-title" data-i18n="catalogue.noticeTitle">Catalogue en cours de vérification</h2>
+        <p data-i18n="catalogue.notice">Cette liste de prix est une extraction provisoire. Les prix, formats, couleurs et disponibilités sont confirmés; de nombreux noms de produits doivent encore être vérifiés. Merci de confirmer votre choix et le prix auprès de la vinothèque avant toute commande.</p>
+        <button class="notice-close" type="button" data-dismiss="catalogue-notice" aria-label="Fermer l’avis" data-i18n-attr="aria-label:catalogue.closeNotice|title:catalogue.closeNotice" title="Fermer l’avis">×</button>
+      </aside>
+    </div>
+    <section class="section" aria-labelledby="filters-title">
+      <div class="container catalogue-layout">
+        <form class="filters" data-catalogue-filters>
+          <h2 id="filters-title" data-i18n="catalogue.filters">Affiner la liste</h2>
+          <div class="filter-grid">
+            <div class="field"><label for="filter-q" data-i18n="catalogue.search">Recherche</label><input id="filter-q" name="q" type="search" autocomplete="off" placeholder="Produit, producteur, pays, région" data-i18n-attr="placeholder:catalogue.searchPlaceholder"></div>
+            <div class="field"><label for="filter-category" data-i18n="catalogue.category">Catégorie</label><select id="filter-category" name="category"><option value="" data-i18n="catalogue.all">Tous</option></select></div>
+            <div class="field"><label for="filter-country" data-i18n="catalogue.country">Pays</label><select id="filter-country" name="country"><option value="" data-i18n="catalogue.all">Tous</option></select></div>
+            <div class="field"><label for="filter-producer" data-i18n="catalogue.producer">Producteur</label><select id="filter-producer" name="producer"><option value="" data-i18n="catalogue.all">Tous</option></select></div>
+            <div class="field"><label for="filter-colour" data-i18n="catalogue.colour">Couleur</label><select id="filter-colour" name="colour"><option value="" data-i18n="catalogue.all">Tous</option></select></div>
+            <div class="field"><label for="filter-format" data-i18n="catalogue.format">Format</label><select id="filter-format" name="format"><option value="" data-i18n="catalogue.all">Tous</option></select></div>
+            <div class="field-row">
+              <div class="field"><label for="filter-min" data-i18n="catalogue.priceMin">Prix minimum</label><input id="filter-min" name="priceMin" type="number" min="0" max="100000" step="0.01" inputmode="decimal"></div>
+              <div class="field"><label for="filter-max" data-i18n="catalogue.priceMax">Prix maximum</label><input id="filter-max" name="priceMax" type="number" min="0" max="100000" step="0.01" inputmode="decimal"></div>
+            </div>
+            <div class="field"><label class="checkbox-label"><input name="inStock" type="checkbox"> <span data-i18n="catalogue.inStock">Uniquement en stock</span></label></div>
+          </div>
+          <button class="button button-quiet" type="reset" data-i18n="catalogue.reset">Réinitialiser</button>
+        </form>
+        <div>
+          <div class="result-bar"><p class="result-count" data-result-count aria-live="polite"></p><p class="delivery-note" data-i18n="catalogue.delivery">Livraison gratuite</p></div>
+          <p class="loading-state" data-catalogue-loading data-i18n="catalogue.loading">Chargement du catalogue…</p>
+          <div data-product-table></div>
+          <p class="empty-state" data-empty-state hidden data-i18n="catalogue.empty">Aucun produit ne correspond à ces critères.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div data-site-footer></div>
+  <script src="assets/js/catalogue-data.js"></script><script src="assets/js/catalogue.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,follow">
+  <title data-i18n="meta.order.title">Bon de commande | Rêves de Rasiguères</title><meta name="description" content="Préparez votre commande de vins et spiritueux. Livraison gratuite et contact direct avec la vinothèque à Schifflange." data-i18n-attr="content:meta.order.description">
+  <meta property="og:type" content="website"><meta property="og:site_name" content="Rêves de Rasiguères"><meta property="og:title" content="Bon de commande | Rêves de Rasiguères" data-i18n-attr="content:meta.order.title"><meta property="og:description" content="Préparez votre commande de vins et spiritueux. Livraison gratuite." data-i18n-attr="content:meta.order.description"><meta property="og:image" content="https://ian.lu/pro/rdr/assets/img/og-rdr.png"><meta property="og:url" content="https://ian.lu/pro/rdr/commander.html"><meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://ian.lu/pro/rdr/commander.html"><link rel="alternate" hreflang="fr" href="https://ian.lu/pro/rdr/commander.html"><link rel="alternate" hreflang="de" href="https://ian.lu/pro/rdr/commander.html?lang=de"><link rel="alternate" hreflang="en" href="https://ian.lu/pro/rdr/commander.html?lang=en"><link rel="alternate" hreflang="x-default" href="https://ian.lu/pro/rdr/commander.html">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/css/site.css"><script src="assets/js/i18n-dict.js"></script><script src="assets/js/i18n.js"></script><script src="assets/js/site.js"></script>
+</head>
+<body>
+<aside class="preview" id="preview-banner" role="status"><div><p>Aperçu — ce site n&#x27;est pas encore le site officiel de Rêves de Rasiguères.</p><small>Vous souhaitez le modifier ou le retirer ? <a href="mailto:ian@mulheims.lu">Écrivez à Ian</a></small></div><button type="button" aria-label="Fermer l&#x27;aperçu" onclick="try{sessionStorage.setItem('pro-preview','dismissed')}catch(e){}this.parentElement.hidden=true">×</button></aside><script>try{if(sessionStorage.getItem("pro-preview")==="dismissed"){document.getElementById("preview-banner").hidden=true}}catch(e){}</script><div data-site-header></div><main id="main">
+  <header class="page-hero"><div class="container"><h1 data-i18n="order.title">Votre bon de commande</h1><p class="lede" data-i18n="order.lede">Composez votre demande à partir du catalogue. La livraison est gratuite.</p></div></header>
+  <section class="section"><div class="container form-layout">
+    <form class="order-form" data-order-form novalidate>
+      <div class="form-grid">
+        <div class="field"><label for="lastName" data-i18n="form.lastName">Nom</label><input id="lastName" name="lastName" autocomplete="family-name" required aria-describedby="lastName-error"><span class="field-error" id="lastName-error"></span></div>
+        <div class="field"><label for="firstName" data-i18n="form.firstName">Prénom</label><input id="firstName" name="firstName" autocomplete="given-name" required aria-describedby="firstName-error"><span class="field-error" id="firstName-error"></span></div>
+        <div class="field span-2"><label for="address" data-i18n="form.address">Adresse</label><input id="address" name="address" autocomplete="street-address" required aria-describedby="address-error"><span class="field-error" id="address-error"></span></div>
+        <div class="field"><label for="postcode" data-i18n="form.postcode">Code postal</label><input id="postcode" name="postcode" autocomplete="postal-code" required aria-describedby="postcode-error"><span class="field-error" id="postcode-error"></span></div>
+        <div class="field"><label for="city" data-i18n="form.city">Localité</label><input id="city" name="city" autocomplete="address-level2" required aria-describedby="city-error"><span class="field-error" id="city-error"></span></div>
+        <div class="field"><label for="gsm" data-i18n="form.gsm">GSM</label><input id="gsm" name="gsm" type="tel" autocomplete="tel" required aria-describedby="gsm-error"><span class="field-error" id="gsm-error"></span></div>
+        <div class="field"><label for="phone" data-i18n="form.phone">Téléphone</label><input id="phone" name="phone" type="tel" autocomplete="tel-national"><span class="field-error" id="phone-error"></span></div>
+        <div class="field span-2"><label for="email" data-i18n="form.email">E-mail</label><input id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-error"><span class="field-error" id="email-error"></span></div>
+        <div class="field span-2"><label for="message" data-i18n="form.message">Message</label><textarea id="message" name="message"></textarea></div>
+      </div>
+      <h2 data-i18n="form.items">Articles</h2>
+      <div class="order-items" data-order-items><p class="loading-state" data-i18n="catalogue.loading">Chargement du catalogue…</p></div><span class="field-error" data-item-error></span>
+      <p><button class="button button-secondary" type="button" data-add-order-row data-i18n="form.add">Ajouter un article</button></p><button class="button" type="submit" data-i18n="form.submit">Préparer la commande</button>
+    </form>
+    <aside><div class="address-block"><h2 data-i18n="catalogue.delivery">Livraison gratuite</h2><ul class="facts-list"><li><a href="mailto:commande@rdr.lu">commande@rdr.lu</a></li><li><a href="tel:+352621777057">+352 621 777 057</a></li><li data-i18n="find.hours">Tous les samedis de 10.00 à 12.30 heures, et sur rendez-vous en semaine.</li></ul></div><div class="confirmation" data-order-confirmation tabindex="-1" hidden><h2 data-i18n="form.successTitle">Votre demande est prête</h2><p data-i18n="form.success">Merci. Votre demande est prête pour commande@rdr.lu. L’équipe pourra ensuite confirmer les produits, les prix et la livraison avec vous.</p></div></aside>
+  </div></section>
+</main><div data-site-footer></div><script src="assets/js/catalogue-data.js"></script><script src="assets/js/order.js"></script></body>
+</html>
