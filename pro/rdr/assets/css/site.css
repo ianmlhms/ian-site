@@ -259,7 +259,8 @@ button.button:hover {
 }
 
 .langsw button {
-  min-width: 38px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0.45rem 0.55rem !important;
   color: var(--muted) !important;
   font-size: 0.75rem !important;
@@ -994,13 +995,19 @@ button.button:hover {
   .product-table .colour-cell { grid-column: 1; grid-row: 1; padding-top: 0.3rem; }
   .product-table .product-cell { grid-column: 2; grid-row: 1; }
   .product-table .producer-cell { grid-column: 2 / 4; grid-row: 2; color: var(--muted); font-size: 0.92rem; }
+  /* The producer link is the main way into a producer page from a row, so it
+     needs a tappable area rather than the bare height of one line of text. */
+  .product-table .producer-cell a { display: inline-block; min-height: 44px; padding: 0.6rem 0 0.4rem; }
   .product-table .format-cell { grid-column: 2; grid-row: 3; color: var(--muted); font-size: 0.9rem; }
   .product-table .price-cell { grid-column: 3; grid-row: 1; text-align: right; }
   .product-table .status-cell { grid-column: 3; grid-row: 3; font-size: 0.82rem; text-align: right; }
-  .product-table td[data-label]::before { content: attr(data-label) ": "; }
-  .product-table .product-cell::before,
-  .product-table .producer-cell::before,
-  .product-table .price-cell::before { content: none; }
+  /* Label only the cells that need naming once the row restacks. Colour,
+     product, producer and price read for themselves, and the colour dot
+     already carries an aria-label. (Adding the label to every [data-label]
+     cell and suppressing three of them does not work: the attribute selector
+     outscores a plain class selector, so the suppression never wins.) */
+  .product-table td.format-cell[data-label]::before,
+  .product-table td.status-cell[data-label]::before { content: attr(data-label) ": "; }
   .product-strip li { grid-template-columns: 20px minmax(0, 1fr) auto; }
   .product-strip .producer { grid-column: 2 / 4; color: var(--muted); }
   .form-grid { grid-template-columns: 1fr; }
@@ -1013,7 +1020,8 @@ button.button:hover {
   .container { width: min(calc(100% - 1.25rem), var(--max)); }
   .brand-name { display: none; }
   .header-actions { gap: 0.55rem; }
-  .langsw button { min-width: 32px; padding-inline: 0.35rem !important; }
+  /* Keep the 44px touch target on phones; trim only the horizontal padding. */
+  .langsw button { min-width: 44px; min-height: 44px; padding-inline: 0.3rem !important; }
   .filter-grid,
   .field-row { grid-template-columns: 1fr; }
   .order-row { grid-template-columns: minmax(0, 1fr) 72px 44px; }
@@ -1028,3 +1036,76 @@ button.button:hover {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* ---- Touch targets on phones -------------------------------------------
+   Anything a thumb has to hit gets at least 44px of height. Scoped to the
+   phone breakpoint and to specific link roles, so inline links inside running
+   prose keep their normal line spacing. */
+@media (max-width: 760px) {
+  /* The logo is the home link; on phones .brand-name is hidden so the mark
+     alone must still be a full-size target. */
+  .brand { display: inline-flex; align-items: center; min-height: 44px; }
+
+  /* Dismiss button on the draft-catalogue notice. */
+  .notice-close { min-width: 44px; min-height: 44px; }
+
+  /* Contact routes matter most on a phone: these are tap-to-call/mail. */
+  a[href^="tel:"],
+  a[href^="mailto:"],
+  .site-footer a,
+  .site-nav a {
+    display: inline-block;
+    min-height: 44px;
+    padding-block: 0.6rem;
+  }
+
+  /* The producer list is this page's only navigation. */
+  .producer-list a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* A 19px checkbox is hard to hit; grow the control and its label row. */
+  .checkbox-label { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; }
+  .checkbox-label input[type="checkbox"] { width: 22px; height: 22px; }
+}
+
+
+/* ---- /pro preview banner ----------------------------------------------
+   Added by scripts/sync-to-ianlu.mjs. The banner markup is shared with the
+   other ian.lu/pro previews; these rules give its controls a 44px touch
+   target. Do not edit here — edit the sync script. */
+.preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: #fff8e6;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.9rem;
+}
+
+.preview p { margin: 0 0 0.15rem; }
+.preview small { color: var(--muted); }
+
+.preview a {
+  display: inline-block;
+  min-height: 44px;
+  padding: 0.7rem 0 0.5rem;
+  color: var(--rouge-deep);
+}
+
+.preview button {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  margin-inline-start: auto;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.preview button:hover { background: var(--white); }
