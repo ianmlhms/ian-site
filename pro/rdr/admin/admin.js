@@ -175,6 +175,79 @@
     await paint();
   }
 
+  // -------------------------------------------------------- tasting requests
+  const TASTING_STATUSES = ["new", "contacted", "confirmed", "done", "cancelled"];
+  const TASTING_STATUS_LABELS = {
+    new: "Nouvelle", contacted: "Contactée", confirmed: "Confirmée",
+    done: "Terminée", cancelled: "Annulée",
+  };
+  const TASTING_KIND_LABELS = {
+    tasting: "Dégustation à Hagen",
+    appointment: "Rendez-vous en semaine",
+  };
+
+  async function renderTastings(host) {
+    host.replaceChildren();
+    const toolbar = document.createElement("div");
+    toolbar.className = "admin-toolbar";
+    const filter = document.createElement("select");
+    filter.innerHTML = '<option value="">Tous les statuts</option>'
+      + TASTING_STATUSES.map((s) => `<option value="${s}">${TASTING_STATUS_LABELS[s]}</option>`).join("");
+    toolbar.append(filter);
+    host.appendChild(toolbar);
+
+    const { table, body } = makeTable(
+      ["Référence", "Demande", "Personne", "Dates", "Pers.", "Statut", "Reçue le", "Message"]);
+    host.appendChild(table);
+
+    async function paint() {
+      const params = { select: "*", order: "created_at.desc", limit: 200 };
+      if (filter.value) params.status = `eq.${filter.value}`;
+      let rows;
+      try {
+        rows = await sb.select("rdr_tasting_requests", params);
+      } catch (error) {
+        fail("Impossible de charger les demandes", error);
+        return;
+      }
+      body.replaceChildren();
+      if (rows.length === 0) {
+        const row = document.createElement("tr");
+        cell(row, "", "Aucune demande pour le moment.");
+        body.appendChild(row);
+        return;
+      }
+      rows.forEach((request) => {
+        const row = document.createElement("tr");
+        cell(row, "Référence", request.reference);
+        cell(row, "Demande", TASTING_KIND_LABELS[request.kind] || request.kind);
+        cell(row, "Personne", `${request.first_name} ${request.last_name} · ${request.email}`
+          + (request.phone ? ` · ${request.phone}` : ""));
+        cell(row, "Dates", [request.preferred_on, request.alternative_on].filter(Boolean).join(" / ") || "—");
+        cell(row, "Pers.", request.guests ?? "—").className = "num";
+        const select = document.createElement("select");
+        select.innerHTML = TASTING_STATUSES.map((s) =>
+          `<option value="${s}"${s === request.status ? " selected" : ""}>${TASTING_STATUS_LABELS[s]}</option>`).join("");
+        select.addEventListener("change", async () => {
+          try {
+            await sb.update("rdr_tasting_requests", { id: `eq.${request.id}` }, { status: select.value });
+            say(`Demande ${request.reference} : ${TASTING_STATUS_LABELS[select.value]}.`);
+          } catch (error) {
+            fail("Statut non enregistré", error);
+            select.value = request.status;
+          }
+        });
+        cell(row, "Statut", select);
+        cell(row, "Reçue le", new Date(request.created_at).toLocaleString("fr-LU"));
+        cell(row, "Message", request.message || "—");
+        body.appendChild(row);
+      });
+    }
+
+    filter.addEventListener("change", paint);
+    await paint();
+  }
+
   // -------------------------------------------------------------- products
   async function renderProducts(host) {
     host.replaceChildren();
@@ -650,6 +723,7 @@
   // ------------------------------------------------------------- workspace
   const RENDERERS = {
     orders: renderOrders,
+    tastings: renderTastings,
     products: renderProducts,
     producers: renderProducers,
     countries: renderCountries,

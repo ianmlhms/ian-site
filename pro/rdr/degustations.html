@@ -6,14 +6,45 @@
   <title data-i18n="meta.tastings.title">Dégustations privées à Hagen | Rêves de Rasiguères</title><meta name="description" content="Réservez l’espace de Hagen pour une dégustation privée de vins au Luxembourg." data-i18n-attr="content:meta.tastings.description">
   <meta property="og:type" content="website"><meta property="og:site_name" content="Rêves de Rasiguères"><meta property="og:title" content="Dégustations privées à Hagen | Rêves de Rasiguères" data-i18n-attr="content:meta.tastings.title"><meta property="og:description" content="Réservez l’espace de Hagen pour une dégustation privée de vins au Luxembourg." data-i18n-attr="content:meta.tastings.description"><meta property="og:image" content="https://ian.lu/pro/rdr/assets/img/og-rdr.png"><meta property="og:url" content="https://ian.lu/pro/rdr/degustations.html"><meta name="twitter:card" content="summary_large_image">
   <link rel="canonical" href="https://ian.lu/pro/rdr/degustations.html"><link rel="alternate" hreflang="fr" href="https://ian.lu/pro/rdr/degustations.html"><link rel="alternate" hreflang="de" href="https://ian.lu/pro/rdr/degustations.html?lang=de"><link rel="alternate" hreflang="en" href="https://ian.lu/pro/rdr/degustations.html?lang=en"><link rel="alternate" hreflang="x-default" href="https://ian.lu/pro/rdr/degustations.html">
-  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/css/site.css"><script src="assets/js/i18n-dict.js"></script><script src="assets/js/i18n.js"></script><script src="assets/js/site.js"></script>
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="assets/css/site.css"><script src="assets/js/rdr-config.js"></script>
+  <script src="assets/js/i18n-dict.js"></script><script src="assets/js/i18n.js"></script><script src="assets/js/site.js"></script>
 </head>
 <body>
 <aside class="preview" id="preview-banner" role="status"><div><p>Aperçu — ce site n&#x27;est pas encore le site officiel de Rêves de Rasiguères.</p><small>Vous souhaitez le modifier ou le retirer ? <a href="mailto:ian@mulheims.lu">Écrivez à Ian</a></small></div><button type="button" aria-label="Fermer l&#x27;aperçu" onclick="try{sessionStorage.setItem('pro-preview','dismissed')}catch(e){}this.parentElement.hidden=true">×</button></aside><script>try{if(sessionStorage.getItem("pro-preview")==="dismissed"){document.getElementById("preview-banner").hidden=true}}catch(e){}</script><div data-site-header></div><main id="main">
   <header class="page-hero"><div class="container"><h1 data-i18n="tastings.title">Votre table de dégustation à Hagen</h1><p class="lede" data-i18n="tastings.lede">Un espace à part, sur rendez-vous, pour goûter, apprendre et passer un bon moment.</p></div></header>
   <section class="section"><div class="container two-column">
-    <article class="address-block"><h2 data-i18n="tastings.privateTitle">Dégustations privées</h2><p data-i18n="tastings.privateText">Réunissez vos amis, collègues ou clients autour d’une sélection préparée avec vous. L’espace est disponible à la location pour des dégustations privées.</p><p><strong data-i18n="tastings.appointment">Sur rendez-vous</strong><br><span data-i18n="tastings.address">51A, rue Principale, L-8367 Hagen</span></p><a class="button" href="mailto:info@rdr.lu?subject=D%C3%A9gustation%20priv%C3%A9e" data-i18n="tastings.ask">Parler de votre dégustation</a></article>
+    <article class="address-block"><h2 data-i18n="tastings.privateTitle">Dégustations privées</h2><p data-i18n="tastings.privateText">Réunissez vos amis, collègues ou clients autour d’une sélection préparée avec vous. L’espace est disponible à la location pour des dégustations privées.</p><p><strong data-i18n="tastings.appointment">Sur rendez-vous</strong><br><span data-i18n="tastings.address">51A, rue Principale, L-8367 Hagen</span></p><a class="button" href="#demande" data-i18n="tastings.ask">Demander une date</a></article>
     <div class="placeholder" role="img" aria-label="Emplacement réservé pour une photo de l’espace de Hagen" data-i18n-attr="aria-label:tastings.photoAlt"><p data-i18n="tastings.photoSlot">Photo de l’espace à venir — aucun visuel provisoire n’a été inventé.</p></div>
   </div></section>
-</main><div data-site-footer></div></body>
+  <section class="section section-rule" id="demande"><div class="container">
+    <h2 data-i18n="tasting.formTitle">Demander une date</h2>
+    <p class="lede" data-i18n="tasting.formLede">Dites-nous ce que vous avez en tête. Nous revenons vers vous pour fixer la date et préparer la sélection.</p>
+    <form class="order-form tasting-form" data-tasting-form novalidate>
+      <fieldset>
+        <legend data-i18n="tasting.kindTitle">Votre demande</legend>
+        <label class="radio-label"><input type="radio" name="kind" value="tasting" checked> <span data-i18n="tasting.kindTasting">Dégustation privée à Hagen</span></label>
+        <label class="radio-label"><input type="radio" name="kind" value="appointment"> <span data-i18n="tasting.kindAppointment">Rendez-vous en semaine à la vinothèque</span></label>
+      </fieldset>
+      <div class="form-grid">
+        <div class="field"><label for="tFirstName" data-i18n="form.firstName">Prénom</label><input id="tFirstName" name="firstName" autocomplete="given-name" required><span class="field-error"></span></div>
+        <div class="field"><label for="tLastName" data-i18n="form.lastName">Nom</label><input id="tLastName" name="lastName" autocomplete="family-name" required><span class="field-error"></span></div>
+        <div class="field"><label for="tEmail" data-i18n="form.email">E-mail</label><input id="tEmail" name="email" type="email" autocomplete="email" required><span class="field-error"></span></div>
+        <div class="field"><label for="tPhone" data-i18n="form.phone">Téléphone</label><input id="tPhone" name="phone" type="tel" autocomplete="tel"><span class="field-error"></span></div>
+        <div class="field" data-guests-field><label for="tGuests" data-i18n="tasting.guests">Nombre de personnes</label><input id="tGuests" name="guests" type="number" inputmode="numeric" min="1" max="200" step="1"><span class="field-error"></span></div>
+        <div class="field"><label for="tPreferred" data-i18n="tasting.preferred">Date souhaitée</label><input id="tPreferred" name="preferredOn" type="date"><span class="field-error"></span></div>
+        <div class="field"><label for="tAlternative" data-i18n="tasting.alternative">Date de remplacement</label><input id="tAlternative" name="alternativeOn" type="date"><span class="field-error"></span></div>
+        <div class="field span-2"><label for="tMessage" data-i18n="form.message">Message</label><textarea id="tMessage" name="message" rows="3"></textarea><span class="field-error"></span></div>
+      </div>
+      <p class="field-hint" data-i18n="tasting.noCharge">Une demande n’engage à rien et rien n’est débité.</p>
+      <button class="button" type="submit" data-i18n="tasting.submit">Envoyer la demande</button>
+      <p class="admin-error" data-tasting-error role="alert"></p>
+    </form>
+    <div class="confirmation" data-tasting-confirmation tabindex="-1" hidden>
+      <h2 data-i18n="tasting.successTitle">Votre demande est partie</h2>
+      <p data-tasting-success></p>
+    </div>
+  </div></section>
+</main><div data-site-footer></div>
+  <script src="assets/js/rdr-supabase.js"></script>
+  <script src="assets/js/tasting.js"></script></body>
 </html>
