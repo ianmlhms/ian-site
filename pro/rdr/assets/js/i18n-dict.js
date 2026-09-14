@@ -58,9 +58,7 @@ window.I18N_DICT = {
   "home.rangeTitle": { fr: "Un aperçu de la liste", de: "Ein Blick in die Liste", en: "A look at the list" },
   "home.rangeText": { fr: "Le catalogue va des domaines français, autrichiens, italiens et luxembourgeois jusqu’au gin et aux autres spiritueux.", de: "Der Katalog reicht von französischen, österreichischen, italienischen und luxemburgischen Weingütern bis zu Gin und weiteren Spirituosen.", en: "The catalogue runs from French, Austrian, Italian and Luxembourg producers through to gin and other spirits." },
   "home.fullCatalogue": { fr: "Voir tout le catalogue", de: "Gesamten Katalog ansehen", en: "View the full catalogue" },
-
-  "catalogue.title": { fr: "La liste, enfin lisible.", de: "Die Liste, endlich übersichtlich.", en: "The list, finally easy to use." },
-  "catalogue.lede": { fr: "Tous les vins et spiritueux de la maison, recherchables en quelques secondes.", de: "Alle Weine und Spirituosen des Hauses, in wenigen Sekunden durchsuchbar.", en: "Every wine and spirit in the range, searchable in seconds." },
+  "catalogue.title": { fr: "Catalogue", de: "Katalog", en: "Catalogue" },
   "catalogue.noticeTitle": { fr: "Catalogue en cours de vérification", de: "Katalog wird derzeit geprüft", en: "Catalogue currently being checked" },
   "catalogue.notice": { fr: "Cette liste de prix est une extraction provisoire. Les prix, formats, couleurs et disponibilités sont confirmés; de nombreux noms de produits doivent encore être vérifiés. Merci de confirmer votre choix et le prix auprès de la vinothèque avant toute commande.", de: "Diese Preisliste ist eine vorläufige Übernahme. Preise, Formate, Farben und Verfügbarkeit sind bestätigt; viele Produktnamen werden noch geprüft. Bitte bestätigen Sie Auswahl und Preis vor jeder Bestellung bei der Vinothek.", en: "This price list is a draft extraction. Prices, formats, colours and availability are confirmed; many product names still need checking. Please confirm your selection and price with the shop before ordering." },
   "catalogue.closeNotice": { fr: "Fermer l’avis", de: "Hinweis schließen", en: "Dismiss notice" },
