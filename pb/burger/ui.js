@@ -36,6 +36,7 @@ const ART_NAMES = Object.freeze([
   "fryer", "drink-machine", "counter", "floor",
   "coin", "star", "customer-1", "customer-2",
   "customer-3", "customer-4", "customer-5", "customer-6",
+  "deco-plants", "deco-chairs", "deco-tv", "deco-neon", "deco-music",
 ]);
 
 const ART_URLS = Object.freeze(Object.fromEntries(
@@ -57,6 +58,7 @@ const nodes = Object.freeze({
   modalLayer:byId("modalLayer"), modalTitle:byId("modalTitle"), modalStars:byId("modalStars"),
   modalMessage:byId("modalMessage"), modalDetail:byId("modalDetail"), shopButton:byId("shopButton"),
   startButton:byId("startButton"), shopLayer:byId("shopLayer"), shop:byId("shop"), toast:byId("toast"),
+  deco:byId("deco"), sceneFloor:byId("sceneFloor"),
 });
 
 const createSprite = (artId, className = "sprite") => {
@@ -107,6 +109,7 @@ let state = createGameState();
 let selectedDrink = "cola";
 let lastRenderAt = 0;
 let toastTimer = 0;
+let decoSignature = null;
 let persistence;
 
 const showToast = (message) => {
@@ -305,8 +308,33 @@ const renderModal = () => {
   nodes.startButton.textContent = result.hasPassed ? `Start day ${state.day}` : `Replay day ${state.day}`;
 };
 
+/* Each interior upgrade the player has bought appears in the dining room, so the
+ * Interior shop tab visibly changes the restaurant instead of only a number. */
+const DECO_IDS = Object.freeze(["plants", "chairs", "tv", "neon", "music"]);
+const DECO_MAX_LEVEL = 3;
+
+const renderDeco = () => {
+  const signature = DECO_IDS.map((id) => Number(state.int?.[id] || 0)).join("");
+  if (signature === decoSignature) return;
+  decoSignature = signature;
+  const layers = DECO_IDS.filter((id) => Number(state.int?.[id] || 0) > 0).map((id) => {
+    const level = Math.min(DECO_MAX_LEVEL, Number(state.int[id]));
+    const layer = document.createElement("img");
+    layer.className = `layer deco-layer deco-${id}`;
+    layer.src = `/pb/burger/art/deco-${id}.webp?v=3`;
+    layer.alt = "";
+    layer.decoding = "async";
+    // Higher levels read as "more of it" without needing a sprite per level.
+    layer.style.opacity = String(0.72 + 0.14 * level);
+    return layer;
+  });
+  nodes.deco.replaceChildren(...layers);
+  nodes.sceneFloor.hidden = Number(state.int?.floor || 0) === 0;
+};
+
 function render() {
   const nowMs = performance.now();
+  renderDeco();
   renderCustomers(nowMs);
   renderTray();
   renderHeatStation(nodes.grill, "grill");

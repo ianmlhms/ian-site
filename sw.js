@@ -4,7 +4,7 @@
  *    Safe with the site's ?v= versioning: bumped asset URLs are cache misses and
  *    fetch fresh; navigations are network-first so pages are never stale online. */
 
-const CACHE = "ianlu-v5";
+const CACHE = "ianlu-v6";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
   "skylens.html", "skylens.css?v=4", "skylens.js?v=6", "skylens.webmanifest",
