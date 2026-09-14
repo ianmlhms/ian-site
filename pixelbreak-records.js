@@ -142,6 +142,7 @@ window.addEventListener("message", (e) => {
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
   if (d && d.__pbWantSave === 1 && cloudSave !== undefined) sendCloudSave();
+  if (d && d.__pbRpc) rpcCall(d.__pbRpc);
   if (d && d.__pbNet) {
     const n = d.__pbNet;
     if (n.op === "open" && /^[a-z0-9]{4,10}$/.test(n.code || "") && (n.role === "host" || n.role === "guest"))
@@ -150,6 +151,36 @@ window.addEventListener("message", (e) => {
     else if (n.op === "close") netClose();
   }
 });
+
+/* ---------------- database bridge (PB.rpc) ----------------
+ * A game iframe cannot reach Supabase: the client and the auth session live out
+ * here. Games post {__pbRpc:{id,fn,args}} and get {__pbRpcRes:{id,data,error}}
+ * back. Only the functions named below can be called -- never proxy an
+ * arbitrary name, or a game becomes a general-purpose database console. */
+const RPC_WHITELIST = new Set([
+  "park_gallery", "park_layout", "publish_park", "unpublish_park", "like_park",
+]);
+const MAX_RPC_ARGS = 16;
+
+function rpcPost(id, data, error) {
+  const fr = document.getElementById("gf");
+  try { fr.contentWindow.postMessage({ __pbRpcRes: { id, data, error } }, "*"); } catch {}
+}
+
+async function rpcCall(call) {
+  const id = call && call.id;
+  if (typeof id !== "number" && typeof id !== "string") return;
+  if (!RPC_WHITELIST.has(call.fn)) { rpcPost(id, null, "forbidden"); return; }
+  const args = call.args === undefined ? {} : call.args;
+  if (!isObject(args) || Object.keys(args).length > MAX_RPC_ARGS || !isSaveData(args)) {
+    rpcPost(id, null, "bad-args"); return;
+  }
+  if (!sb) { rpcPost(id, null, "offline"); return; }
+  try {
+    const { data, error } = await sb.rpc(call.fn, args);
+    rpcPost(id, error ? null : data, error ? error.message : null);
+  } catch (err) { rpcPost(id, null, String(err && err.message || err)); }
+}
 
 /* ---------------- online play relay (PB.net) ----------------
  * Games post {__pbNet:{op:'open',code,role}} / {op:'send',d} / {op:'close'}.
