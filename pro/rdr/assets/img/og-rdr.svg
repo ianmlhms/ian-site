@@ -6,7 +6,7 @@
   <rect x="400" y="0" width="400" height="14" fill="#f190ac"/>
   <rect x="800" y="0" width="400" height="14" fill="#be1e2d"/>
   <text x="82" y="120" fill="#231f20" font-family="Georgia,serif" font-size="58" font-weight="700">Rêves de Rasiguères</text>
-  <text x="82" y="190" fill="#961d1b" font-family="Arial,sans-serif" font-size="29" font-weight="700">LA LISTE, ENFIN LISIBLE</text>
+  <text x="82" y="190" fill="#961d1b" font-family="Arial,sans-serif" font-size="29" font-weight="700">Notre Rêve, votre découverte…</text>
   <line x1="82" y1="234" x2="1118" y2="234" stroke="#231f20" stroke-width="3"/>
   <circle cx="99" cy="298" r="10" fill="#d7df23" stroke="#231f20" stroke-opacity=".25"/>
   <line x1="132" y1="298" x2="660" y2="298" stroke="#e3dfd8" stroke-width="16"/>
