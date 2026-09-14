@@ -439,7 +439,7 @@ PRIVACY_LABEL = {"de": "Datenschutz", "fr": "Confidentialité", "en": "Privacy"}
 
 
 def privacy_link(lang: str) -> str:
-    """Footer link to the privacy policy — required for AdSense and the GDPR."""
+    """Footer link to the privacy policy — required under the GDPR."""
     label = PRIVACY_LABEL.get(lang, PRIVACY_LABEL["en"])
     return f'<a href="https://ian.lu/privacy.html" rel="noopener">{label}</a>'
 

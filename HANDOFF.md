@@ -215,9 +215,10 @@ Old full data was scrubbed from git history.
   **9 July 2026 12:40**; confirm with him.
 - **Google Search Console**: suggested but not set up. Verify ian.lu (DNS record or HTML file
   in repo root) and submit `https://ian.lu/sitemap.xml` so the 31 game pages get crawled.
-- **AdSense**: script + `ads.txt` present on index/about/pixelbreak, **awaiting Google
-  approval — do not remove**; after approval add real `<ins>` ad units (PixelBreak hub is the
-  highest-session-time spot).
+- ~~**AdSense**~~: **removed site-wide on 14 Sep 2026** at Ian's request, after sitting at
+  "Maßnahme erforderlich" over thin templated content. The loader script is gone from every
+  page and template, `ads.txt` is deleted, and the privacy policy no longer claims ads are
+  served. Nothing needs re-adding; if it ever comes back it is a fresh application.
 - ~~**Feedback reading UI**~~: **built** — `admin.js:183` selects the feedback rows and
   `admin.js:243` wires the Feedback tab in `admin.html`. (This entry said no tab existed
   until 7 Sep 2026; it had been built and the note was never updated.)

@@ -1,4 +1,4 @@
-/* UI strings for the geoportal viewer. DE / FR / EN — no Luxembourgish (AdSense). */
+/* UI strings for the geoportal viewer. DE / FR / EN — no Luxembourgish source text. */
 window.GEO_I18N = {
   de: {
     title: 'Geoportal Luxemburg',

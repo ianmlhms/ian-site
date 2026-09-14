@@ -1,7 +1,8 @@
 """UI strings for the generated trail pages — DE / FR / EN.
 
-Luxembourgish is deliberately absent: AdSense only supports DE/FR/EN and the
-pages must render exactly the language their <html lang> declares.
+Luxembourgish is deliberately absent: these pages must render exactly the
+language their <html lang> declares, and there is no Luxembourgish source text
+for them. (The original reason was AdSense, which was dropped in Sep 2026.)
 """
 
 LANG_NAMES = {"de": "Deutsch", "fr": "Français", "en": "English"}

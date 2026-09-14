@@ -1,4 +1,4 @@
-/* UI strings for the trail map. DE / FR / EN only — no Luxembourgish (AdSense). */
+/* UI strings for the trail map. DE / FR / EN only — no Luxembourgish source text. */
 window.MAP_I18N = {
   de: {
     title: 'Wanderkarte Luxemburg',

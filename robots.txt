@@ -11,8 +11,7 @@ Disallow: /pb/
 # They all carry <meta name="robots" content="noindex">, and a noindex is only
 # obeyed if Google is allowed to CRAWL the page and read it. Blocking them here
 # as well meant Google never saw the noindex, so they could sit in the index as
-# bare URL entries indefinitely — the opposite of the intent, and thin entries
-# count against the site in an AdSense review.
+# bare URL entries indefinitely — the opposite of the intent.
 #
 # Crawling them leaks nothing: they are auth-gated and render almost no markup
 # to a signed-out crawler.

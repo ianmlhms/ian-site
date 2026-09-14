@@ -23,10 +23,10 @@
   var LANGS = ["lb", "de", "en"];
   // English is the default because the static markup's fallback text IS
   // English: a crawler with no JS sees English, so anything else would make
-  // <html lang> a lie — which is exactly the violation AdSense flagged in
-  // July ("nicht unterstützte Sprache"). AdSense supports neither Luxembourgish
-  // nor a mismatched declaration. Luxembourgish is still auto-selected for
-  // people whose browser asks for it, and any explicit choice is remembered.
+  // <html lang> a lie. (AdSense originally forced this; it was dropped in
+  // Sep 2026, but an honest lang declaration is still the right default.)
+  // Luxembourgish is still auto-selected for people whose browser asks for
+  // it, and any explicit choice is remembered.
   var DEFAULT_LANG = "en";
   var STORE_KEY = "site_lang";
   var DICT = window.I18N_DICT || {};
