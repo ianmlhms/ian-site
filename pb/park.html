@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#183e48">
+<title>Theme Park Tycoon · PixelBreak</title>
+<link rel="icon" href="data:,">
+<style>
+:root { color-scheme: light; --ink: #183e48; --muted: #536c70; --paper: #fffdf4;
+  --line: #dce4d5; --green: #236b54; --gold: #ffd786; --danger: #a52d42; }
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { font-family: ui-rounded, "Avenir Next", "Segoe UI", sans-serif; color: var(--ink); background: #b8dcdf; }
+button, input { font: inherit; }
+button { min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: 12px;
+  padding: 9px 13px; background: var(--paper); color: var(--ink); font-weight: 750; cursor: pointer; }
+button:hover { background: #eaf1df; }
+button:active { transform: translateY(1px); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, input:focus-visible { outline: 3px solid #e79b36; outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--green); color: white; border-color: var(--green); }
+[hidden] { display: none !important; }
+small { display: block; font-size: 11px; line-height: 1.5; color: var(--muted); }
+p { line-height: 1.55; }
+h2, h3, p { margin: 0; }
+h3 { margin: 20px 0 10px; font-size: 14px; }
+#shell { position: relative; width: 100%; height: 100%; isolation: isolate; }
+#parkCanvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+#top { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 14px; right: 14px; pointer-events: none; }
+.brand-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.brand { display: flex; gap: 10px; align-items: center; text-shadow: 0 1px #ffffff80; }
+.brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--gold); font-size: 25px; color: var(--ink); border: 2px solid var(--paper); }
+h1 { margin: 0; font-size: clamp(17px, 3vw, 23px); letter-spacing: -.7px; line-height: 1.1; }
+.eyebrow { font-size: 9px; letter-spacing: 2px; font-weight: 850; margin-bottom: 3px; }
+.top-actions { display: flex; gap: 6px; pointer-events: auto; }
+.glass { background: #fffdf4f2; border: 1px solid #ffffffbd; box-shadow: 0 8px 28px #24484b20; }
+#hud { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); max-width: 830px; border-radius: 16px; padding: 12px 3px; }
+.stat { text-align: center; border-right: 1px solid var(--line); min-width: 0; }
+.stat:last-child { border: 0; }
+.stat b { display: block; font-size: clamp(14px, 2.4vw, 20px); font-variant-numeric: tabular-nums; }
+.stat span { display: block; margin-top: 3px; font-size: 9px; font-weight: 750; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); }
+#cash { color: var(--green); }
+#dock { position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; padding: 8px; border-radius: 18px; max-width: calc(100% - 20px); }
+#dock button { white-space: nowrap; }
+.primary { background: var(--green); color: white; border-color: var(--green); }
+.primary:hover { background: #195540; }
+#dock .primary { min-width: 105px; }
+#panel { position: absolute; top: 142px; bottom: 92px; right: 14px; width: min(380px, calc(100% - 28px));
+  border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; }
+.panel-heading { display: flex; justify-content: space-between; align-items: center; padding: 10px 13px 8px 18px; border-bottom: 1px solid var(--line); }
+.panel-heading h2 { font-size: 18px; letter-spacing: -.4px; }
+.panel-body { padding: 15px 18px 20px; overflow: auto; overscroll-behavior: contain; flex: 1; }
+#categories { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+#categories button { padding: 8px 10px; font-size: 12px; }
+#catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.build-card { text-align: left; min-height: 101px; border-top: 4px solid #ed9a7e; padding: 10px; }
+.build-card strong { display: block; font-size: 13px; line-height: 1.25; }
+.build-card b { display: block; margin: 6px 0 3px; font-size: 16px; }
+.build-card.ride { border-top-color: #b491dc; }
+.build-card.scenery { border-top-color: #66a77a; }
+.build-card.facility { border-top-color: #8fa9b6; }
+#unlockHint { margin-top: 12px; }
+#buildBar { position: absolute; bottom: 92px; left: 14px; width: min(510px, calc(100% - 28px)); border-radius: 17px; padding: 13px; }
+#toolName { font-size: 16px; }
+#placementReason { margin: 5px 0 10px; font-size: 12px; min-height: 18px; }
+.button-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.button-row .primary { flex: 1; }
+#notice { position: absolute; left: 50%; top: 140px; transform: translateX(-50%); z-index: 5; max-width: min(550px, 92%);
+  padding: 11px 17px; border-radius: 14px; background: #183e48f5; color: white; font-size: 13px; text-align: center; pointer-events: none; }
+#bankrupt { position: absolute; top: 139px; left: 14px; max-width: min(340px, calc(100% - 28px)); padding: 12px 16px;
+  background: #a52d42; color: white; border-radius: 13px; pointer-events: none; }
+#bankrupt strong, #bankrupt span { display: block; }
+#bankrupt span { font-size: 12px; margin-top: 4px; }
+.danger-text { color: var(--danger) !important; }
+.danger { background: #fff0ee; border-color: #eab6b4; color: var(--danger); }
+.number-row { display: flex; align-items: end; gap: 8px; margin: 12px 0; }
+.number-row label { flex: 1; font-size: 12px; font-weight: 650; }
+.number-row label span { display: block; margin-bottom: 5px; }
+input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid #bbcdbf; border-radius: 10px; background: white; color: var(--ink); font-size: 16px; }
+.staff-row { display: flex; align-items: center; gap: 7px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.staff-row > div { flex: 1; font-size: 13px; }
+.staff-row > b { width: 23px; text-align: center; }
+.check-row { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 10px; font-size: 13px; }
+.check-row input { width: 25px; height: 25px; margin: 9px; accent-color: var(--green); }
+.objective { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.objective > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.objective b { color: var(--green); font-size: 11px; white-space: nowrap; }
+.objective p { font-size: 12px; margin: 6px 0; color: var(--muted); }
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 17px 0; }
+.metrics dt { font-size: 11px; color: var(--muted); }
+.metrics dd { margin: 3px 0 0; font-size: 17px; font-weight: 750; }
+#objectStatus { font-size: 13px; }
+.help-steps { padding-left: 22px; margin: 14px 0; font-size: 14px; line-height: 1.6; }
+.help-steps li { margin-bottom: 12px; }
+.note { font-size: 12px; color: var(--muted); }
+#bootStatus { position: absolute; z-index: 10; inset: 0; display: grid; place-content: center; text-align: center;
+  padding: 25px; background: #fffdf4f5; }
+#bootStatus h2 { margin-bottom: 12px; }
+#socialActions, #visitBar { position: absolute; top: 142px; left: 14px; max-width: calc(100% - 28px); }
+#visitBar { z-index: 4; padding: 8px; border-radius: 14px; }
+#visitLabel { display: block; margin: 0 4px 6px; overflow-wrap: anywhere; }
+#parkSocial { width: min(540px, calc(100% - 20px)); max-height: 85%; padding: 0; border: 1px solid var(--line);
+  border-radius: 20px; background: var(--paper); color: var(--ink); overflow: auto; }
+#parkSocial::backdrop { background: #183e4870; }
+#parkSocial p, #parkSocial label { display: block; margin-bottom: 12px; overflow-wrap: anywhere; }
+#parkSocial input { max-width: 100%; min-height: 44px; }
+@media (max-width: 600px) { #socialActions, #visitBar { top: 170px; left: 10px; } }
+@media (min-width: 1100px) { #top { left: 24px; right: 24px; } #panel { right: 24px; } #buildBar { left: 24px; } }
+@media (max-width: 600px) {
+  #top { top: max(8px, env(safe-area-inset-top)); left: 10px; right: 10px; }
+  .brand-row { margin-bottom: 7px; }
+  .brand-mark { display: none; }
+  .top-actions button { padding: 8px; font-size: 12px; }
+  #hud { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 10px; padding: 10px 3px; }
+  .stat:nth-child(3) { border: 0; }
+  .stat b { font-size: 16px; }
+  .stat span { font-size: 8px; }
+  #dock { gap: 4px; padding: 6px; bottom: max(8px, env(safe-area-inset-bottom)); }
+  #dock button { padding: 9px 8px; font-size: 12px; }
+  #dock .primary { min-width: 62px; }
+  #panel { top: auto; bottom: 80px; max-height: min(49%, 430px); right: 10px; width: calc(100% - 20px); }
+  #buildBar { left: 10px; width: calc(100% - 20px); bottom: 80px; }
+  #notice { top: 169px; width: max-content; }
+  #bankrupt { top: 168px; left: 10px; }
+  .panel-body { padding: 12px 14px 16px; }
+}
+@media (max-height: 500px) and (min-width: 601px) {
+  #top { top: 6px; } .brand-row { margin-bottom: 5px; }
+  #hud { padding: 6px 3px; max-width: 65%; } .stat b { font-size: 14px; }
+  #panel { top: 65px; bottom: 78px; width: 340px; }
+  #notice { top: 112px; } #buildBar { width: 330px; bottom: 78px; }
+}
+</style>
+</head>
+<body>
+<main id="shell">
+  <canvas id="parkCanvas" aria-label="Your 3D theme park. Drag to pan, pinch or scroll to zoom. Tap a tile to build or inspect."></canvas>
+  <header id="top">
+    <div class="brand-row">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><div class="eyebrow">PIXELBREAK PARKS</div><h1>Theme Park Tycoon</h1></div></div>
+      <div class="top-actions"><button data-action="home" aria-label="Center camera on entrance">Center</button><button data-panel="help">Help</button></div>
+    </div>
+    <div id="hud" class="glass" aria-label="Park statistics">
+      <div class="stat"><b id="cash">$5,000</b><span>Cash</span></div>
+      <div class="stat"><b id="rating">—</b><span>Rating</span></div>
+      <div class="stat"><b id="guests">0</b><span>Guests</span></div>
+      <div class="stat"><b id="parkValue">—</b><span>Park value</span></div>
+      <div class="stat"><b id="day">1</b><span>Day</span></div>
+      <div class="stat"><b id="profit">$0</b><span>Profit / day</span></div>
+    </div>
+  </header>
+  <div id="socialActions" class="button-row"><button data-action="publish">Publish</button><button data-action="gallery">Gallery</button></div>
+  <aside id="visitBar" class="glass" aria-label="Read-only park visit" hidden><strong id="visitLabel"></strong><button id="returnPark">Back to my park</button></aside>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <div id="bankrupt" role="status" hidden><strong>Park bankrupt</strong><span>New arrivals have stopped. Sell attractions or reduce staffing to recover.</span></div>
+  <section id="buildBar" class="glass" aria-label="Placement preview" hidden>
+    <strong id="toolName"></strong><p id="placementReason" role="status"></p>
+    <div class="button-row"><button id="rotateButton" data-action="rotate">Rotate 0°</button><button id="confirmButton" class="primary" data-action="confirm" disabled>Build here</button><button data-action="cancel">Done</button></div>
+  </section>
+  <aside id="panel" class="glass" aria-labelledby="panelTitle" hidden>
+    <div class="panel-heading"><h2 id="panelTitle">Build your park</h2><button data-action="close" aria-label="Close panel">✕</button></div>
+    <div class="panel-body">
+      <section data-section="build" hidden><div id="categories" aria-label="Build categories"></div><div id="catalog"></div><small id="unlockHint"></small></section>
+      <section data-section="manage" hidden>
+        <p id="parkHealth" class="note"></p><h3>Admission</h3><div id="ticketControl"></div>
+        <h3>Your team</h3><div id="staffControls"></div>
+        <label class="check-row"><input id="maintenance" type="checkbox">Preventive maintenance</label>
+        <p class="note">Mechanics repair broken rides and maintain healthy ones. Janitors reduce litter; entertainers lift guest happiness.</p>
+        <h3>Ride prices</h3><p class="note">Prices apply to every attraction of the same type.</p><div id="ridePrices"></div>
+      </section>
+      <section data-section="objectives" hidden><p class="note">Build a place people love. Goals use lifetime admissions and award cash automatically.</p><div id="milestones"></div><h3>Attraction unlocks</h3><div id="tiers"></div></section>
+      <section data-section="inspect" hidden>
+        <p id="objectStatus"></p>
+        <dl class="metrics"><div><dt>Health</dt><dd id="objectHealth"></dd></div><div><dt>Visitors served</dt><dd id="objectVisits"></dd></div>
+          <div><dt>Income earned</dt><dd id="objectIncome"></dd></div><div><dt>Running cost</dt><dd id="objectUpkeep"></dd></div><div><dt>In queue</dt><dd id="objectQueue"></dd></div></dl>
+        <div id="objectPrice"></div><div class="button-row"><button id="repairButton" class="primary" data-action="repair" hidden>Repair</button><button id="demolishButton" class="danger" data-action="demolish">Demolish</button></div>
+      </section>
+      <section data-section="help" hidden>
+        <p>A little land. A big imagination.</p>
+        <ol class="help-steps"><li>Choose <strong>Build → Paths</strong>. Extend a path from the golden entrance gate into the light green land.</li>
+          <li>Choose a ride, then tap an empty tile. Green means it fits; red explains what needs to change. Tap <strong>Build here</strong> to place it.</li>
+          <li>The white dot marks an attraction's entrance. Put a connected path directly beside it. Rotate before building to move the entrance.</li>
+          <li>Add food, drinks, toilets, and scenery. Tap any attraction to inspect, price, repair, or demolish it.</li>
+          <li>Use <strong>Manage</strong> to hire staff and change prices. Follow <strong>Goals</strong> for cash rewards and new rides.</li></ol>
+        <p class="note">Drag to pan. Pinch or scroll to zoom. Center returns to the gate. Pause gives you time to build. Use Paths → Expand land to buy a neighboring parcel.</p>
+      </section>
+    </div>
+  </aside>
+  <nav id="dock" class="glass" aria-label="Park controls">
+    <button class="primary" data-panel="build">＋ Build</button><button data-panel="manage">Manage</button><button data-panel="objectives">Goals</button>
+    <button id="speedButton" data-action="speed" aria-label="Change simulation speed">1×</button><button id="pauseButton" data-action="pause" aria-pressed="false">Pause</button>
+  </nav>
+  <div id="bootStatus" role="status"><h2>Opening the gates…</h2><p id="overlayText">Loading your 3D park.</p></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
+window.addEventListener("unhandledrejection",function(event){document.documentElement.dataset.bootError=String(event.reason||"promise-error")});
+if(!window.THREE){
+  document.documentElement.dataset.bootError="three-missing";
+  document.getElementById("overlayText").textContent="The 3D engine could not load. Check your connection and reload.";
+  throw new Error("three.js r160 failed to load");
+}
+</script>
+<script type="module" src="/pb/park/main.js?v=2"></script>
+</body>
+</html>
