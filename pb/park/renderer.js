@@ -2,9 +2,11 @@ import { TILE, PHASE, RULES } from "/pb/park/data.js";
 import { GRID, GATE, KINDS, isOwned, footprint } from "/pb/park/build.js";
 import { animateParkModel, createGuestGeometries, createModelLibrary, createParkModel,
   createPathGeometry, disposeModelLibrary } from "/pb/park/models.js?v=1";
+import { createParkWorld } from "/pb/park/world.js?v=1";
 
 const THREE = window.THREE;
 const GUEST_CAPACITY = 256;
+const CAMERA_PAN_MARGIN = 16;
 const MIN_VIEW = 7;
 const MAX_VIEW = 30;
 const DEFAULT_VIEW = 12.5;
@@ -145,6 +147,7 @@ export class ParkRenderer {
     });
     this.modelLibrary = createModelLibrary(KINDS, this.modelMaterial);
     this.createTerrain();
+    this.world = createParkWorld(this.scene);
     this.createMarkers();
     this.bindControls();
     this.observer = new ResizeObserver(() => this.resize());
@@ -188,7 +191,7 @@ export class ParkRenderer {
       color: 0xffffff, vertexColors: true, roughness: 0.96 });
     const ground = new THREE.Mesh(this.box, grassMaterial);
     ground.position.set(20, -0.42, 20);
-    ground.scale.set(150, 0.7, 150);
+    ground.scale.set(GRID.width + 2, 0.7, GRID.height + 2);
     ground.receiveShadow = true;
     this.scene.add(ground);
     this.land = new THREE.InstancedMesh(this.box, parcelMaterial, 16);
@@ -285,6 +288,7 @@ export class ParkRenderer {
   sync(state) {
     this.state = state;
     const { saved, derived } = state;
+    this.world.sync(saved.l);
     if (this.landMask !== saved.l) {
       for (let i = 0; i < 16; i++) {
         const x = i % 4 * RULES.parcelSize;
@@ -403,8 +407,12 @@ export class ParkRenderer {
   }
 
   updateCamera() {
-    this.target.x = clamp(this.target.x, 0, GRID.width);
-    this.target.z = clamp(this.target.z, 0, GRID.height);
+    // Panning used to stop dead at the grid edge, so at every zoom level the
+    // builder view showed nothing but the park -- the surrounding countryside was
+    // structurally unreachable from above. A margin lets you pan out over the
+    // hedge and see it, without shrinking the park by widening the zoom range.
+    this.target.x = clamp(this.target.x, -CAMERA_PAN_MARGIN, GRID.width + CAMERA_PAN_MARGIN);
+    this.target.z = clamp(this.target.z, -CAMERA_PAN_MARGIN, GRID.height + CAMERA_PAN_MARGIN);
     const half = this.view / 2;
     const aspect = this.width / this.height;
     this.builderCamera.left = -half * aspect;
@@ -504,6 +512,7 @@ export class ParkRenderer {
       this.canvas.releasePointerCapture(this.walkLookPointer.id);
     }
     this.isWalkMode = isActive;
+    this.world.setWalkMode(isActive);
     this.walkKeys.clear();
     this.resetWalkStick();
     this.walkLookPointer = null;
@@ -736,6 +745,7 @@ export class ParkRenderer {
     for (const item of this.objects.values()) {
       animateParkModel(item.model, this.visualTime);
     }
+    this.world.update(this.visualTime, this.camera);
     this.engine.render(this.scene, this.camera);
   }
 
@@ -749,6 +759,7 @@ export class ParkRenderer {
     this.isDisposed = true;
     window.removeEventListener("pagehide", this.onPageHide);
     this.observer.disconnect();
+    this.world.dispose();
     const geometries = new Set();
     const materials = new Set();
     this.scene.traverse(object => {
