@@ -3,7 +3,7 @@ import { GRID, KINDS, canPlace, place, remove, placePath, removePath, buyLand,
   footprint, inBounds } from "/pb/park/build.js";
 import { tick, setTicketPrice, setRidePrice, setStaff,
   setMaintenance, maintainRide } from "/pb/park/sim.js";
-import { ParkRenderer } from "/pb/park/renderer.js?v=3";
+import { ParkRenderer } from "/pb/park/renderer.js?v=4";
 import { ParkUI } from "/pb/park/ui.js?v=2";
 import { restoreSave, createPersistence } from "/pb/park/save.js?v=1";
 import { createSocial } from "/pb/park/social.js?v=1";

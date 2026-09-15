@@ -1,5 +1,7 @@
 import { TILE, PHASE, RULES } from "/pb/park/data.js";
 import { GRID, GATE, KINDS, isOwned, footprint } from "/pb/park/build.js";
+import { animateParkModel, createGuestGeometries, createModelLibrary, createParkModel,
+  createPathGeometry, disposeModelLibrary } from "/pb/park/models.js?v=1";
 
 const THREE = window.THREE;
 const GUEST_CAPACITY = 256;
@@ -18,19 +20,79 @@ const WALK_STEP = 0.12;
 const WALK_LOOK_SPEED = 0.004;
 const WALK_PITCH_LIMIT = Math.PI * 0.42;
 const WALK_PAD_RADIUS = 38;
-const RIDE_COLORS = [0xf26f91, 0x9c7ef0, 0x4cbaca, 0xffb953, 0x638af1, 0xec7360];
+const SHADOW_MAP_SIZE = 1024;
+const SKY_HORIZON = 0xcfe8df;
+const SKY_ZENITH = 0x76b9de;
+const GRASS_TEXTURE_SIZE = 128;
+const PATH_TEXTURE_SIZE = 96;
+const MAX_TEXTURE_RATIO = 1.75;
+const SKIN_TONES = [0x6f4432, 0x9a6247, 0xc98e68, 0xe2b184, 0xf2cba1];
+const CLOTHING_COLORS = [0x337da8, 0xe9616f, 0x62a957, 0x8067bd, 0xe59a3b, 0x2d9e9a, 0xd65791];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+function createCanvasTexture(size, painter) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas textures are not supported");
+  painter(context, size);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 2;
+  return texture;
+}
+
+function paintGrass(context, size) {
+  context.fillStyle = "#79a966";
+  context.fillRect(0, 0, size, size);
+  let seed = 0x2f6e2b1;
+  for (let index = 0; index < 520; index++) {
+    seed = seed * 1664525 + 1013904223 >>> 0;
+    const x = seed % size;
+    seed = seed * 1664525 + 1013904223 >>> 0;
+    const y = seed % size;
+    const lightness = 34 + seed % 18;
+    context.fillStyle = `hsla(${92 + seed % 18},35%,${lightness}%,.22)`;
+    context.fillRect(x, y, 1 + seed % 3, 1 + (seed >>> 4) % 3);
+  }
+}
+
+function paintPavers(context, size) {
+  context.fillStyle = "#d8c9aa";
+  context.fillRect(0, 0, size, size);
+  const course = 16;
+  context.lineWidth = 1;
+  context.strokeStyle = "rgba(101,92,77,.24)";
+  for (let y = 0; y <= size; y += course) {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(size, y);
+    context.stroke();
+    const offset = y / course % 2 ? course / 2 : 0;
+    for (let x = offset; x <= size; x += course) {
+      context.beginPath();
+      context.moveTo(x, y);
+      context.lineTo(x, Math.min(size, y + course));
+      context.stroke();
+    }
+  }
+  context.fillStyle = "rgba(255,255,255,.1)";
+  for (let index = 0; index < 38; index++) context.fillRect(index * 29 % size, index * 47 % size, 3, 2);
+}
 
 export class ParkRenderer {
   constructor(canvas, callbacks = {}) {
     this.canvas = canvas;
     this.callbacks = callbacks ?? {};
     this.engine = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.engine.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-    this.engine.setClearColor(0xb8dcdf);
+    this.engine.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_TEXTURE_RATIO));
+    this.engine.setClearColor(SKY_HORIZON);
+    this.engine.shadowMap.enabled = true;
+    this.engine.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xb8dcdf);
-    this.scene.fog = new THREE.Fog(0xb8dcdf, 34, 105);
+    this.scene.background = new THREE.Color(SKY_HORIZON);
+    this.scene.fog = new THREE.Fog(SKY_HORIZON, 38, 92);
     this.builderCamera = new THREE.OrthographicCamera(-20, 20, 20, -20, 0.1, 180);
     this.walkCamera = new THREE.PerspectiveCamera(WALK_FIELD_OF_VIEW, 1, 0.05, 140);
     this.walkCamera.rotation.order = "YXZ";
@@ -55,6 +117,7 @@ export class ParkRenderer {
     this.cone = new THREE.ConeGeometry(0.5, 1, 10);
     this.torus = new THREE.TorusGeometry(0.5, 0.055, 7, 18);
     this.materials = new Map();
+    this.textures = [];
     this.objects = new Map();
     this.pointers = new Map();
     this.guestKeys = new Map();
@@ -62,15 +125,34 @@ export class ParkRenderer {
     this.guestTo = new Float32Array(GUEST_CAPACITY * 2);
     this.guestCurrent = new Float32Array(GUEST_CAPACITY * 2);
     this.nextKeys = new Map();
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x647e59, 2.3));
-    const sun = new THREE.DirectionalLight(0xffefd4, 2.1);
-    sun.position.set(-15, 40, 20);
-    this.scene.add(sun);
+    this.visualTime = 0;
+    this.scene.add(new THREE.HemisphereLight(0xe9f7ff, 0x587052, 1.65));
+    this.sun = new THREE.DirectionalLight(0xffeed0, 2.35);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    this.sun.shadow.camera.near = 1;
+    this.sun.shadow.camera.far = 92;
+    this.sun.shadow.bias = -0.00035;
+    this.sun.shadow.normalBias = 0.025;
+    this.sunTarget = new THREE.Object3D();
+    this.scene.add(this.sun, this.sunTarget);
+    this.sun.target = this.sunTarget;
+    this.modelMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff, vertexColors: true, roughness: 0.72, metalness: 0.02, flatShading: true,
+    });
+    this.brokenMaterial = new THREE.MeshStandardMaterial({
+      color: 0x844650, vertexColors: true, roughness: 0.9, flatShading: true,
+    });
+    this.modelLibrary = createModelLibrary(KINDS, this.modelMaterial);
     this.createTerrain();
     this.createMarkers();
     this.bindControls();
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
+    this.onPageHide = event => {
+      if (!event.persisted) this.dispose();
+    };
+    window.addEventListener("pagehide", this.onPageHide);
     this.resize();
   }
 
@@ -84,17 +166,38 @@ export class ParkRenderer {
     const mesh = new THREE.Mesh(geometry, this.material(color));
     mesh.position.set(x, y, z);
     mesh.scale.set(width, height, depth);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
     parent.add(mesh);
     return mesh;
   }
 
   createTerrain() {
-    // The larger base keeps the horizon grounded without adding another scene or skybox.
-    this.part(this.scene, this.box, 0x64836d, 20, -0.42, 20, 150, 0.7, 150);
-    this.land = new THREE.InstancedMesh(this.box, this.material(0xffffff), 16);
+    const grassTexture = createCanvasTexture(GRASS_TEXTURE_SIZE, paintGrass);
+    grassTexture.repeat.set(18, 18);
+    const parcelGrassTexture = grassTexture.clone();
+    parcelGrassTexture.repeat.set(3, 3);
+    parcelGrassTexture.needsUpdate = true;
+    const pathTexture = createCanvasTexture(PATH_TEXTURE_SIZE, paintPavers);
+    pathTexture.repeat.set(1.5, 1.5);
+    this.textures.push(grassTexture, parcelGrassTexture, pathTexture);
+    const grassMaterial = new THREE.MeshStandardMaterial({ map: grassTexture, color: 0x6f9870, roughness: 1 });
+    const parcelMaterial = new THREE.MeshStandardMaterial({ map: parcelGrassTexture,
+      color: 0xffffff, roughness: 1, vertexColors: false });
+    const pathMaterial = new THREE.MeshStandardMaterial({ map: pathTexture,
+      color: 0xffffff, vertexColors: true, roughness: 0.96 });
+    const ground = new THREE.Mesh(this.box, grassMaterial);
+    ground.position.set(20, -0.42, 20);
+    ground.scale.set(150, 0.7, 150);
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+    this.land = new THREE.InstancedMesh(this.box, parcelMaterial, 16);
+    this.land.receiveShadow = true;
     this.scene.add(this.land);
-    this.paths = new THREE.InstancedMesh(this.box, this.material(0xf1dfb6), GRID.width * GRID.height);
+    this.pathGeometry = createPathGeometry();
+    this.paths = new THREE.InstancedMesh(this.pathGeometry, pathMaterial, GRID.width * GRID.height);
     this.paths.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.paths.receiveShadow = true;
     this.scene.add(this.paths);
     const grid = new THREE.GridHelper(40, 40, 0x689373, 0x83aa7c);
     grid.position.set(20, 0.014, 20);
@@ -105,14 +208,46 @@ export class ParkRenderer {
     this.part(this.scene, this.box, 0x285e69, gateX - 0.65, 0.85, 0.2, 0.15, 1.7, 0.2);
     this.part(this.scene, this.box, 0x285e69, gateX + 0.65, 0.85, 0.2, 0.15, 1.7, 0.2);
     this.part(this.scene, this.box, 0xffcf70, gateX, 1.6, 0.2, 1.5, 0.4, 0.3);
+    this.createSky();
+  }
+
+  createSky() {
+    const skyMaterial = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        horizon: { value: new THREE.Color(SKY_HORIZON) },
+        zenith: { value: new THREE.Color(SKY_ZENITH) },
+      },
+      vertexShader: "varying float skyHeight; void main(){skyHeight=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}",
+      fragmentShader: "uniform vec3 horizon;uniform vec3 zenith;varying float skyHeight;void main(){float mixAmount=smoothstep(-.12,.72,skyHeight);gl_FragColor=vec4(mix(horizon,zenith,mixAmount),1.0);}",
+    });
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(70, 20, 12), skyMaterial);
+    sky.position.set(20, -3, 20);
+    sky.frustumCulled = false;
+    this.scene.add(sky);
   }
 
   createMarkers() {
-    this.guests = new THREE.InstancedMesh(this.cylinder, this.material(0xffffff), GUEST_CAPACITY);
+    const guestGeometries = createGuestGeometries();
+    this.guestBodyGeometry = guestGeometries.body;
+    this.guestHeadGeometry = guestGeometries.head;
+    this.guests = new THREE.InstancedMesh(this.guestBodyGeometry, this.material(0xffffff), GUEST_CAPACITY);
+    this.guestHeads = new THREE.InstancedMesh(this.guestHeadGeometry, this.material(0xffffff), GUEST_CAPACITY);
     this.guests.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.guestHeads.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.guests.count = 0;
+    this.guestHeads.count = 0;
     this.guests.frustumCulled = false;
-    this.scene.add(this.guests);
+    this.guestHeads.frustumCulled = false;
+    this.guests.castShadow = true;
+    this.guestHeads.castShadow = true;
+    this.scene.add(this.guests, this.guestHeads);
+    this.objectEntrances = new THREE.InstancedMesh(this.cylinder, this.material(0xffffff), RULES.maxObjects);
+    this.objectEntrances.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.objectEntrances.count = 0;
+    this.objectEntrances.castShadow = true;
+    this.scene.add(this.objectEntrances);
     this.ghost = new THREE.Mesh(this.box, new THREE.MeshBasicMaterial({
       color: 0x41eba0, transparent: true, opacity: 0.55, depthWrite: false,
     }));
@@ -128,150 +263,11 @@ export class ParkRenderer {
     this.guestColor = new THREE.Color();
   }
 
-  createWheel(group, moving, color, width) {
-    const radius = Math.max(1.45, width * 0.58);
-    for (const side of [-0.34, 0.34]) {
-      const support = this.part(group, this.box, 0xf7efe0, side * 0.8, 1.35, 0, 0.16, 2.7, 0.16);
-      support.rotation.z = side * -0.34;
-    }
-    const wheel = new THREE.Group();
-    wheel.position.y = radius + 0.72;
-    moving.add(wheel);
-    this.part(wheel, this.torus, color, 0, 0, 0, radius * 2, radius * 2, radius * 2);
-    for (let i = 0; i < 4; i++) {
-      const angle = i * Math.PI / 2;
-      const spoke = this.part(wheel, this.box, 0xffe4a1, 0, 0, 0, radius * 1.9, 0.07, 0.07);
-      spoke.rotation.z = angle;
-      this.part(wheel, this.box, i % 2 ? 0xffffff : color,
-        Math.cos(angle) * radius, Math.sin(angle) * radius, 0, 0.36, 0.3, 0.42);
-    }
-  }
-
-  createCarousel(group, moving, color, width, depth) {
-    this.part(group, this.cylinder, 0xf7efe0, 0, 1.15, 0, 0.16, 2.25, 0.16);
-    this.part(moving, this.cylinder, color, 0, 0.36, 0, width * 0.9, 0.28, depth * 0.9);
-    this.part(moving, this.cone, color, 0, 2.05, 0, width * 0.98, 0.8, depth * 0.98);
-    for (let i = 0; i < 4; i++) {
-      const angle = i * Math.PI / 2;
-      this.part(moving, this.cylinder, 0xffefca, Math.cos(angle) * width * 0.3,
-        1.05, Math.sin(angle) * depth * 0.3, 0.06, 1.25, 0.06);
-      this.part(moving, this.box, i % 2 ? 0xffffff : 0xffd477,
-        Math.cos(angle) * width * 0.3, 0.72, Math.sin(angle) * depth * 0.3, 0.42, 0.3, 0.2);
-    }
-  }
-
-  createTowerRide(group, moving, kind, color, width, depth) {
-    const isDropTower = kind.id === "drop-tower";
-    const height = isDropTower ? 6.3 : 4.5;
-    this.part(group, this.cylinder, 0xf7efe0, 0, height / 2, 0, 0.24, height, 0.24);
-    this.part(group, this.cone, color, 0, height + 0.38, 0, 0.65, 0.75, 0.65);
-    if (isDropTower) {
-      this.part(moving, this.cylinder, color, 0, 3.7, 0, width * 0.8, 0.38, depth * 0.65);
-      return;
-    }
-    for (let level = 0; level < 4; level++) {
-      const ramp = this.part(group, this.torus, level % 2 ? 0xffe4a1 : color,
-        0, 0.85 + level * 0.85, 0, width * 0.72, width * 0.72, width * 0.72);
-      ramp.rotation.x = Math.PI / 2;
-    }
-    this.part(group, this.cone, color, 0, height, 0, width * 0.9, 0.95, depth * 0.9);
-  }
-
-  createCanopyRide(group, moving, kind, color, width, depth) {
-    const isSwing = kind.id === "swing";
-    const mastHeight = isSwing ? 4.2 : 1.7;
-    this.part(group, this.cylinder, 0xf7efe0, 0, mastHeight / 2, 0, 0.18, mastHeight, 0.18);
-    this.part(moving, this.cylinder, color, 0, isSwing ? 3.55 : 0.35, 0,
-      width * 0.9, 0.25, depth * 0.9);
-    this.part(moving, this.cone, color, 0, isSwing ? 4.15 : 1.9, 0,
-      width * 0.94, 0.72, depth * 0.94);
-    for (let i = 0; i < 4; i++) {
-      const angle = i * Math.PI / 2;
-      const radius = width * 0.31;
-      const seatY = isSwing ? 2.65 : 0.8;
-      if (isSwing) this.part(moving, this.cylinder, 0xffefca,
-        Math.cos(angle) * radius, 3.18, Math.sin(angle) * radius, 0.035, 1.05, 0.035);
-      this.part(moving, this.box, i % 2 ? 0xffffff : 0xffd477,
-        Math.cos(angle) * radius, seatY, Math.sin(angle) * radius, 0.38, 0.32, 0.38);
-    }
-  }
-
-  createTrackRide(group, moving, kind, color, width, depth) {
-    const isShip = kind.id === "pirate-ship";
-    if (isShip) {
-      for (const side of [-1, 1]) {
-        const support = this.part(group, this.box, 0xf7efe0, side * width * 0.32, 1.35, 0, 0.18, 2.8, 0.18);
-        support.rotation.z = side * -0.42;
-      }
-      const hull = this.part(moving, this.box, color, 0, 1.15, 0, width * 0.78, 0.55, depth * 0.62);
-      hull.rotation.z = 0.08;
-      this.part(moving, this.cylinder, 0xffefca, 0, 2.15, 0, 0.08, 2.5, 0.08);
-      return;
-    }
-    const railHeight = kind.id.includes("coaster") ? 2.8 : kind.id === "log-flume" ? 1.55 : 0.65;
-    for (const x of [-width * 0.34, width * 0.34]) {
-      for (const z of [-depth * 0.3, depth * 0.3]) {
-        this.part(group, this.box, 0xf7efe0, x, railHeight / 2, z, 0.12, railHeight, 0.12);
-      }
-    }
-    for (const z of [-depth * 0.32, depth * 0.32]) {
-      this.part(group, this.box, color, 0, railHeight, z, width * 0.86, 0.16, 0.16);
-    }
-    this.part(group, this.box, color, -width * 0.38, railHeight * 0.72, 0, 0.16, railHeight * 0.58, depth * 0.72);
-    this.part(moving, this.box, 0xffd477, 0, railHeight + 0.22, -depth * 0.3,
-      Math.min(1.35, width * 0.42), 0.34, 0.42);
-  }
-
-  createEnclosedRide(group, moving, kind, color, width, depth) {
-    const isDodgems = kind.id === "dodgems";
-    this.part(group, this.box, isDodgems ? 0xf1dfb6 : 0x4a4860, 0, 1.25, 0,
-      width * 0.9, 2.3, depth * 0.9);
-    this.part(group, this.cone, color, 0, 2.75, 0, width, 0.72, depth);
-    if (isDodgems) {
-      for (const x of [-0.65, 0.65]) this.part(moving, this.box, x < 0 ? 0x63cbd5 : 0xffd477,
-        x, 0.35, 0, 0.62, 0.3, 0.82);
-    } else {
-      this.part(group, this.box, 0x241f35, 0, 1.05, depth * 0.46, width * 0.45, 1.15, 0.08);
-    }
-  }
-
-  createRide(group, moving, kind, color, width, depth) {
-    if (kind.id === "wheel") { this.createWheel(group, moving, color, width); return; }
-    if (kind.id === "carousel") { this.createCarousel(group, moving, color, width, depth); return; }
-    if (["slide", "drop-tower"].includes(kind.id)) {
-      this.createTowerRide(group, moving, kind, color, width, depth); return;
-    }
-    if (["teacups", "swing"].includes(kind.id)) {
-      this.createCanopyRide(group, moving, kind, color, width, depth); return;
-    }
-    if (["dodgems", "ghost-train"].includes(kind.id)) {
-      this.createEnclosedRide(group, moving, kind, color, width, depth); return;
-    }
-    this.createTrackRide(group, moving, kind, color, width, depth);
-  }
-
   createObject(object) {
     const kind = KINDS[object.k];
-    const [w, d] = kind.footprint;
     const group = new THREE.Group();
-    const color = kind.type === "ride" ? RIDE_COLORS[object.k % RIDE_COLORS.length]
-      : kind.type === "stall" ? 0xe99859 : kind.type === "facility" ? 0xa7bac5 : 0x41966d;
-    this.part(group, this.box, 0xe9d6af, 0, 0.12, 0, w - 0.1, 0.2, d - 0.1);
-    const moving = new THREE.Group();
-    group.add(moving);
-    if (kind.type === "ride") {
-      this.createRide(group, moving, kind, color, w, d);
-    } else if (kind.type === "scenery") {
-      const low = kind.id === "flowers" || kind.id === "fountain";
-      this.part(group, this.cylinder, low ? 0x63cbd5 : 0x916b47, 0, 0.5, 0, low ? w * 0.8 : 0.2, low ? 0.4 : 0.9, low ? d * 0.8 : 0.2);
-      this.part(group, this.cone, kind.id === "flowers" ? 0xef8ba0 : color,
-        0, low ? 0.65 : 1.35, 0, w * 0.8, low ? 0.35 : 1.45, d * 0.8);
-    } else {
-      this.part(group, this.box, color, 0, 0.8, 0, w * 0.82, 1.35, d * 0.82);
-      this.part(group, this.cone, kind.type === "stall" ? 0xffd585 : 0xe7eef0,
-        0, 1.75, 0, w, 0.62, d);
-      this.part(group, this.box, 0x355568, 0, 0.92, d * 0.42, w * 0.5, 0.45, 0.04);
-    }
+    const model = createParkModel(this.modelLibrary, kind, object.id);
+    group.add(model);
     const warning = new THREE.Group();
     for (const angle of [-Math.PI / 4, Math.PI / 4]) {
       const bar = this.part(warning, this.box, 0xff243f, 0, 2.6, 0, 1.3, 0.24, 0.24);
@@ -281,13 +277,9 @@ export class ParkRenderer {
     const shape = footprint(kind, object.p % GRID.width, Math.floor(object.p / GRID.width), object.r);
     group.position.set(object.p % GRID.width + shape.width / 2, 0, Math.floor(object.p / GRID.width) + shape.height / 2);
     group.rotation.y = -object.r * Math.PI / 2;
-    const ex = shape.entrance % GRID.width + 0.5 - group.position.x;
-    const ez = Math.floor(shape.entrance / GRID.width) + 0.5 - group.position.z;
-    const angle = object.r * Math.PI / 2;
-    this.part(group, this.cylinder, 0xffffff, Math.cos(angle) * ex + Math.sin(angle) * ez,
-      0.27, -Math.sin(angle) * ex + Math.cos(angle) * ez, 0.38, 0.1, 0.38);
     this.scene.add(group);
-    return { group, moving, warning, signature: `${object.k}:${object.p}:${object.r}`, broken: false, active: false, wheel: kind.id === "wheel" };
+    return { group, model, moving: model.userData.model.moving, warning,
+      signature: `${object.k}:${object.p}:${object.r}`, broken: false };
   }
 
   sync(state) {
@@ -312,7 +304,8 @@ export class ParkRenderer {
       for (let p = 0; p < saved.g.length; p++) {
         if (saved.g[p] !== TILE.PATH) continue;
         this.dummy.position.set(p % GRID.width + 0.5, 0.055, Math.floor(p / GRID.width) + 0.5);
-        this.dummy.scale.set(0.96, 0.1, 0.96);
+        this.dummy.rotation.set(0, 0, 0);
+        this.dummy.scale.set(1, 1, 1);
         this.dummy.updateMatrix();
         this.paths.setMatrixAt(count++, this.dummy.matrix);
       }
@@ -333,19 +326,32 @@ export class ParkRenderer {
       const item = this.objects.get(object.id);
       if (item.broken !== (object.b > 0)) item.moving.traverse(mesh => {
         if (!mesh.isMesh) return;
-        mesh.userData.originalMaterial ??= mesh.material;
-        mesh.material = object.b ? this.material(0x7c434c) : mesh.userData.originalMaterial;
+        mesh.material = object.b ? this.brokenMaterial : this.modelMaterial;
       });
       item.broken = object.b > 0;
-      item.active = object.t > 0;
       item.warning.visible = item.broken;
     }
+    let entranceCount = 0;
+    for (const object of derived.objects) {
+      if (!object) continue;
+      const kind = KINDS[object.k];
+      const shape = footprint(kind, object.p % GRID.width, Math.floor(object.p / GRID.width), object.r);
+      this.dummy.position.set(shape.entrance % GRID.width + 0.5, 0.25,
+        Math.floor(shape.entrance / GRID.width) + 0.5);
+      this.dummy.rotation.set(0, 0, 0);
+      this.dummy.scale.set(0.38, 0.1, 0.38);
+      this.dummy.updateMatrix();
+      this.objectEntrances.setMatrixAt(entranceCount++, this.dummy.matrix);
+    }
+    this.objectEntrances.count = entranceCount;
+    this.objectEntrances.instanceMatrix.needsUpdate = true;
     this.syncGuests(state);
   }
 
   syncGuests(state) {
     this.nextKeys.clear();
     this.guests.count = Math.min(GUEST_CAPACITY, state.derived.guests.length);
+    this.guestHeads.count = this.guests.count;
     for (let i = 0; i < this.guests.count; i++) {
       const guest = state.derived.guests[i];
       const key = state.saved.t - guest.age;
@@ -359,13 +365,16 @@ export class ParkRenderer {
       this.guestTo[i * 2] = x;
       this.guestTo[i * 2 + 1] = z;
       this.nextKeys.set(key, i);
-      this.guests.setColorAt(i, this.guestColor.setHex(guest.phase === PHASE.LEAVE ? 0x697282
-        : guest.phase === PHASE.QUEUE ? 0xf4b842 : guest.phase === PHASE.USE ? 0xa57bf3 : 0x295d87));
+      const phaseOffset = guest.phase === PHASE.LEAVE ? 2 : guest.phase === PHASE.QUEUE ? 4
+        : guest.phase === PHASE.USE ? 6 : 0;
+      this.guests.setColorAt(i, this.guestColor.setHex(CLOTHING_COLORS[(i + phaseOffset) % CLOTHING_COLORS.length]));
+      this.guestHeads.setColorAt(i, this.guestColor.setHex(SKIN_TONES[i * 3 % SKIN_TONES.length]));
     }
     const oldKeys = this.guestKeys;
     this.guestKeys = this.nextKeys;
     this.nextKeys = oldKeys;
     if (this.guests.instanceColor) this.guests.instanceColor.needsUpdate = true;
+    if (this.guestHeads.instanceColor) this.guestHeads.instanceColor.needsUpdate = true;
   }
 
   preview(preview) {
@@ -407,6 +416,19 @@ export class ParkRenderer {
     this.builderCamera.lookAt(this.target);
     this.builderCamera.updateProjectionMatrix();
     this.builderCamera.updateMatrixWorld();
+    this.updateShadowCamera();
+  }
+
+  updateShadowCamera() {
+    const size = clamp(this.view * Math.max(0.62, this.width / this.height * 0.55), 7, 30);
+    this.sunTarget.position.set(this.target.x, 0, this.target.z);
+    this.sun.position.set(this.target.x - 18, 34, this.target.z + 16);
+    const shadowCamera = this.sun.shadow.camera;
+    shadowCamera.left = -size;
+    shadowCamera.right = size;
+    shadowCamera.top = size;
+    shadowCamera.bottom = -size;
+    shadowCamera.updateProjectionMatrix();
   }
 
   frameState(state) {
@@ -692,21 +714,52 @@ export class ParkRenderer {
 
   render(alpha, dt, walkDelta = dt) {
     this.updateWalker(walkDelta);
+    this.visualTime += Math.max(0, walkDelta);
     for (let i = 0; i < this.guests.count; i++) {
       const offset = i * 2;
       const x = this.guestFrom[offset] + (this.guestTo[offset] - this.guestFrom[offset]) * alpha;
       const z = this.guestFrom[offset + 1] + (this.guestTo[offset + 1] - this.guestFrom[offset + 1]) * alpha;
       this.guestCurrent[offset] = x;
       this.guestCurrent[offset + 1] = z;
-      this.dummy.position.set(x, 0.29, z);
-      this.dummy.scale.set(0.19, 0.42, 0.19);
+      const step = Math.sin(this.visualTime * 7 + i * 1.7) * 0.025;
+      const directionX = this.guestTo[offset] - this.guestFrom[offset];
+      const directionZ = this.guestTo[offset + 1] - this.guestFrom[offset + 1];
+      this.dummy.position.set(x, 0.02 + Math.abs(step), z);
+      this.dummy.rotation.set(0, Math.atan2(directionX, directionZ), step * 1.4);
+      this.dummy.scale.set(1, 1, 1);
       this.dummy.updateMatrix();
       this.guests.setMatrixAt(i, this.dummy.matrix);
+      this.guestHeads.setMatrixAt(i, this.dummy.matrix);
     }
     this.guests.instanceMatrix.needsUpdate = true;
+    this.guestHeads.instanceMatrix.needsUpdate = true;
     for (const item of this.objects.values()) {
-      if (!item.broken && item.active && !item.wheel) item.moving.rotation.y += dt * 0.65;
+      animateParkModel(item.model, this.visualTime);
     }
     this.engine.render(this.scene, this.camera);
+  }
+
+  performanceSnapshot() {
+    const { calls, triangles, points, lines } = this.engine.info.render;
+    return { calls, triangles, points, lines, objects: this.objects.size, guests: this.guests.count };
+  }
+
+  dispose() {
+    if (this.isDisposed) return;
+    this.isDisposed = true;
+    window.removeEventListener("pagehide", this.onPageHide);
+    this.observer.disconnect();
+    const geometries = new Set();
+    const materials = new Set();
+    this.scene.traverse(object => {
+      if (object.geometry) geometries.add(object.geometry);
+      if (Array.isArray(object.material)) object.material.forEach(material => materials.add(material));
+      else if (object.material) materials.add(object.material);
+    });
+    disposeModelLibrary(this.modelLibrary);
+    geometries.forEach(geometry => geometry.dispose());
+    materials.forEach(material => material.dispose());
+    this.textures.forEach(texture => texture.dispose());
+    this.engine.dispose();
   }
 }
