@@ -27,12 +27,17 @@ export class ParkUI {
     this.category = "ride";
     this.selectedId = null;
     this.tool = null;
+    this.isWalkMode = false;
     this.toastTimer = null;
     this.root = byId("shell");
     this.root.addEventListener("click", event => this.click(event));
     this.root.addEventListener("submit", event => this.submit(event));
     this.root.addEventListener("keydown", event => {
       if (event.key !== "Escape") return;
+      if (this.isWalkMode) {
+        this.callbacks.exitWalk();
+        return;
+      }
       this.closePanel();
       this.callbacks.cancel();
     });
@@ -88,6 +93,7 @@ export class ParkUI {
   }
 
   openPanel(name) {
+    if (this.isWalkMode) return;
     if (!["build", "manage", "objectives", "inspect", "help"].includes(name)) return;
     this.panel = name;
     byId("panel").hidden = false;
@@ -256,5 +262,16 @@ export class ParkUI {
     write("speedButton", `${speed}×`);
     write("pauseButton", paused ? "Resume" : "Pause");
     byId("pauseButton").setAttribute("aria-pressed", String(paused));
+  }
+
+  setWalk(isActive) {
+    this.isWalkMode = isActive;
+    this.root.dataset.walk = String(isActive);
+    write("walkButton", isActive ? "Exit walk" : "Walk");
+    byId("walkButton").setAttribute("aria-pressed", String(isActive));
+    byId("walkControls").hidden = !isActive;
+    for (const button of document.querySelectorAll("button[data-panel]")) button.disabled = isActive;
+    const centerButton = document.querySelector('button[data-action="home"]');
+    if (centerButton) centerButton.disabled = isActive;
   }
 }

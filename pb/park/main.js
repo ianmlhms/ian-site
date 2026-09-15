@@ -3,8 +3,8 @@ import { GRID, KINDS, canPlace, place, remove, placePath, removePath, buyLand,
   footprint, inBounds } from "/pb/park/build.js";
 import { tick, setTicketPrice, setRidePrice, setStaff,
   setMaintenance, maintainRide } from "/pb/park/sim.js";
-import { ParkRenderer } from "/pb/park/renderer.js";
-import { ParkUI } from "/pb/park/ui.js";
+import { ParkRenderer } from "/pb/park/renderer.js?v=3";
+import { ParkUI } from "/pb/park/ui.js?v=2";
 import { restoreSave, createPersistence } from "/pb/park/save.js?v=1";
 import { createSocial } from "/pb/park/social.js?v=1";
 
@@ -26,6 +26,7 @@ let anchored = false;
 let selectedId = null;
 let speed = 1;
 let paused = false;
+let isWalking = false;
 let accumulator = 0;
 let lastTime = null;
 let animationFrame = null;
@@ -57,7 +58,7 @@ function command(name, ...args) {
 }
 
 function setTool(next) {
-  if (visitState) return;
+  if (visitState || isWalking) return;
   if (!["path", "erase-path", "land"].includes(next) && !KINDS.some(kind => kind.id === next)) return;
   tool = next;
   rotation = 0;
@@ -104,7 +105,7 @@ function updatePreview() {
 }
 
 function onTap(point) {
-  if (visitState) return;
+  if (visitState || isWalking) return;
   if (!point) return;
   if (tool) { tile = point; anchored = true; updatePreview(); return; }
   if (!inBounds(point.x, point.y)) { ui.notify("Choose a tile inside the park."); return; }
@@ -122,7 +123,7 @@ function onTap(point) {
 }
 
 function confirm() {
-  if (visitState) return;
+  if (visitState || isWalking) return;
   if (!tool || !anchored || !tile) return;
   accept(buildResult(), tool === "erase-path" ? "Path removed." : tool === "land" ? "Land acquired." : "Built! Connect entrances to the gate with paths.");
 }
@@ -140,11 +141,24 @@ function frame(time) {
       sync();
     }
   }
-  renderer.render(accumulator / FIXED_STEP, paused || visitState ? 0 : delta * speed);
+  renderer.render(accumulator / FIXED_STEP, paused || visitState ? 0 : delta * speed, delta);
   animationFrame = requestAnimationFrame(frame);
 }
 
+function setWalk(isActive) {
+  if (isWalking === isActive || isActive && visitState) return;
+  cancel();
+  ui.closePanel();
+  isWalking = isActive;
+  renderer.setWalkMode(isActive, state);
+  ui.setWalk(isActive);
+  document.getElementById("parkCanvas").setAttribute("aria-label", isActive
+    ? "Walk through your theme park. Use W, A, S, D or arrow keys to move and drag to look. Press Escape to exit."
+    : "Your 3D theme park. Drag to pan, pinch or scroll to zoom. Tap a tile to build or inspect.");
+}
+
 function setVisit(next) {
+  setWalk(false);
   cancel();
   ui.closePanel();
   visitState = next;
@@ -157,6 +171,7 @@ function setVisit(next) {
     ? "Read-only park visit. Drag to pan, pinch or scroll to zoom. Use Back to my park to leave."
     : "Your 3D theme park. Drag to pan, pinch or scroll to zoom. Tap a tile to build or inspect.");
   sync();
+  renderer.frameState(next ?? state);
 }
 
 function boot() {
@@ -166,22 +181,36 @@ function boot() {
       tile = point;
       updatePreview();
     },
+    onExitWalk: () => setWalk(false),
   });
   ui = new ParkUI({ command, setTool, cancel, confirm,
     publish: () => social.showPublish(), gallery: () => social.showGallery(),
     rotate: () => { rotation = (rotation + 1) % 4; ui.setTool(tool, rotation); updatePreview(); },
     speed: () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; ui.setClock(speed, paused); },
     pause: () => { paused = !paused; ui.setClock(speed, paused); },
-    home: () => { renderer.target.set(20, 0, 9); renderer.view = 24; renderer.updateCamera(); },
+    walk: () => setWalk(!isWalking),
+    exitWalk: () => setWalk(false),
+    home: () => renderer.frameState(visitState ?? state),
   });
   persistence = createPersistence({ getState: () => state,
-    onState: next => { state = next; cancel(); ui.closePanel(); sync(); }, onError: message => ui.notify(message) });
+    onState: next => {
+      setWalk(false);
+      state = next;
+      cancel();
+      ui.closePanel();
+      sync();
+      renderer.frameState(state);
+    }, onError: message => ui.notify(message) });
   social = createSocial({ getState: () => state, onVisit: next => setVisit(next),
-    onReturn: () => setVisit(null), beforeOpen: () => { cancel(); ui.closePanel(); } });
+    onReturn: () => setVisit(null), beforeOpen: () => { setWalk(false); cancel(); ui.closePanel(); } });
   sync();
+  renderer.frameState(state);
   ui.setClock(speed, paused);
+  ui.setWalk(false);
   document.getElementById("bootStatus").hidden = true;
-  ui.notify("Start with a path from the golden gate, then add a ride. Help has the basics.");
+  // Beginners only: a restored park already has paths and rides, and telling its
+  // owner to "start with a path" on every load reads like the game forgot them.
+  if (!window.__pbSave) ui.notify("Start with a path from the golden gate, then add a ride. Help has the basics.");
   document.documentElement.dataset.booted = "true";
   document.addEventListener("visibilitychange", () => {
     lastTime = null;
@@ -196,7 +225,7 @@ function boot() {
   });
   if (new URLSearchParams(window.location.search).get("parkDebug") === "1") {
     window.parkDebug = Object.freeze({ snapshot: () => structuredClone(state),
-      command, setTool, tap: onTap, confirm, renderer });
+      command, setTool, tap: onTap, confirm, walk: setWalk, renderer });
   }
   animationFrame = requestAnimationFrame(frame);
 }

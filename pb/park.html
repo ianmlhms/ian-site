@@ -27,6 +27,9 @@ h2, h3, p { margin: 0; }
 h3 { margin: 20px 0 10px; font-size: 14px; }
 #shell { position: relative; width: 100%; height: 100%; isolation: isolate; }
 #parkCanvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+#shell[data-walk="true"] #parkCanvas { cursor: grab; }
+#shell[data-walk="true"] #parkCanvas:active { cursor: grabbing; }
+#shell[data-walk="true"] #socialActions { display: none; }
 #top { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 14px; right: 14px; pointer-events: none; }
 .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .brand { display: flex; gap: 10px; align-items: center; text-shadow: 0 1px #ffffff80; }
@@ -99,6 +102,16 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
 #bootStatus { position: absolute; z-index: 10; inset: 0; display: grid; place-content: center; text-align: center;
   padding: 25px; background: #fffdf4f5; }
 #bootStatus h2 { margin-bottom: 12px; }
+#walkControls { position: absolute; z-index: 3; inset: 0; pointer-events: none; }
+#walkHint { position: absolute; top: 145px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 28px);
+  padding: 8px 13px; border-radius: 12px; background: #183e48d9; color: white; font-size: 12px; font-weight: 700;
+  text-align: center; white-space: nowrap; }
+#walkPad { display: none; position: absolute; left: max(18px, env(safe-area-inset-left));
+  bottom: max(82px, calc(env(safe-area-inset-bottom) + 76px)); width: 116px; height: 116px; border: 2px solid #ffffffb8;
+  border-radius: 50%; background: #183e486b; pointer-events: auto; touch-action: none; place-items: center; }
+#walkKnob { width: 48px; height: 48px; border: 2px solid white; border-radius: 50%; background: #fffdf4dc;
+  box-shadow: 0 4px 14px #183e4855; }
+.touch-only { display: none; }
 #socialActions, #visitBar { position: absolute; top: 142px; left: 14px; max-width: calc(100% - 28px); }
 #visitBar { z-index: 4; padding: 8px; border-radius: 14px; }
 #visitLabel { display: block; margin: 0 4px 6px; overflow-wrap: anywhere; }
@@ -118,14 +131,20 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
   .stat:nth-child(3) { border: 0; }
   .stat b { font-size: 16px; }
   .stat span { font-size: 8px; }
-  #dock { gap: 4px; padding: 6px; bottom: max(8px, env(safe-area-inset-bottom)); }
-  #dock button { padding: 9px 8px; font-size: 12px; }
-  #dock .primary { min-width: 62px; }
+  #dock { gap: 4px; width: calc(100% - 16px); padding: 6px; bottom: max(8px, env(safe-area-inset-bottom)); }
+  #dock button { flex: 1 1 0; min-width: 44px; padding: 8px 2px; font-size: 10.5px; }
+  #dock .primary { min-width: 44px; }
   #panel { top: auto; bottom: 80px; max-height: min(49%, 430px); right: 10px; width: calc(100% - 20px); }
   #buildBar { left: 10px; width: calc(100% - 20px); bottom: 80px; }
   #notice { top: 169px; width: max-content; }
   #bankrupt { top: 168px; left: 10px; }
   .panel-body { padding: 12px 14px 16px; }
+  #walkHint { top: 169px; font-size: 11px; }
+}
+@media (pointer: coarse) {
+  #walkPad { display: grid; }
+  .desktop-only { display: none; }
+  .touch-only { display: inline; }
 }
 @media (max-height: 500px) and (min-width: 601px) {
   #top { top: 6px; } .brand-row { margin-bottom: 5px; }
@@ -141,7 +160,7 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
   <header id="top">
     <div class="brand-row">
       <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><div class="eyebrow">PIXELBREAK PARKS</div><h1>Theme Park Tycoon</h1></div></div>
-      <div class="top-actions"><button data-action="home" aria-label="Center camera on entrance">Center</button><button data-panel="help">Help</button></div>
+      <div class="top-actions"><button data-action="home" aria-label="Center camera on built park">Center</button><button data-panel="help">Help</button></div>
     </div>
     <div id="hud" class="glass" aria-label="Park statistics">
       <div class="stat"><b id="cash">$5,000</b><span>Cash</span></div>
@@ -160,6 +179,10 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
     <strong id="toolName"></strong><p id="placementReason" role="status"></p>
     <div class="button-row"><button id="rotateButton" data-action="rotate">Rotate 0°</button><button id="confirmButton" class="primary" data-action="confirm" disabled>Build here</button><button data-action="cancel">Done</button></div>
   </section>
+  <div id="walkControls" aria-label="Walk-through controls" hidden>
+    <div id="walkHint"><span class="desktop-only">WASD or arrows to move · drag to look · Esc to exit</span><span class="touch-only">Move with the stick · drag elsewhere to look</span></div>
+    <div id="walkPad" role="group" aria-label="Move"><span id="walkKnob" aria-hidden="true"></span></div>
+  </div>
   <aside id="panel" class="glass" aria-labelledby="panelTitle" hidden>
     <div class="panel-heading"><h2 id="panelTitle">Build your park</h2><button data-action="close" aria-label="Close panel">✕</button></div>
     <div class="panel-body">
@@ -185,13 +208,13 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
           <li>The white dot marks an attraction's entrance. Put a connected path directly beside it. Rotate before building to move the entrance.</li>
           <li>Add food, drinks, toilets, and scenery. Tap any attraction to inspect, price, repair, or demolish it.</li>
           <li>Use <strong>Manage</strong> to hire staff and change prices. Follow <strong>Goals</strong> for cash rewards and new rides.</li></ol>
-        <p class="note">Drag to pan. Pinch or scroll to zoom. Center returns to the gate. Pause gives you time to build. Use Paths → Expand land to buy a neighboring parcel.</p>
+        <p class="note">Drag to pan. Pinch or scroll to zoom. Center frames everything you built. Walk lets you explore at guest height. Pause gives you time to build. Use Paths → Expand land to buy a neighboring parcel.</p>
       </section>
     </div>
   </aside>
   <nav id="dock" class="glass" aria-label="Park controls">
     <button class="primary" data-panel="build">＋ Build</button><button data-panel="manage">Manage</button><button data-panel="objectives">Goals</button>
-    <button id="speedButton" data-action="speed" aria-label="Change simulation speed">1×</button><button id="pauseButton" data-action="pause" aria-pressed="false">Pause</button>
+    <button id="walkButton" data-action="walk" aria-pressed="false">Walk</button><button id="speedButton" data-action="speed" aria-label="Change simulation speed">1×</button><button id="pauseButton" data-action="pause" aria-pressed="false">Pause</button>
   </nav>
   <div id="bootStatus" role="status"><h2>Opening the gates…</h2><p id="overlayText">Loading your 3D park.</p></div>
 </main>
@@ -205,6 +228,6 @@ if(!window.THREE){
   throw new Error("three.js r160 failed to load");
 }
 </script>
-<script type="module" src="/pb/park/main.js?v=2"></script>
+<script type="module" src="/pb/park/main.js?v=3"></script>
 </body>
 </html>
