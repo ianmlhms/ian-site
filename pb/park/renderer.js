@@ -541,8 +541,11 @@ export class ParkRenderer {
     const sin = Math.sin(this.walkYaw);
     const cos = Math.cos(this.walkYaw);
     const distance = WALK_SPEED * delta;
-    this.moveWalker((sin * normalizedForward + cos * normalizedStrafe) * distance,
-      (cos * normalizedForward - sin * normalizedStrafe) * distance);
+    // The camera's forward is (sin yaw, cos yaw), so its right is
+    // cross(forward, up) = (-cos yaw, sin yaw). The strafe terms used the negative
+    // of that, which put D on the walker's left and A on their right.
+    this.moveWalker((sin * normalizedForward - cos * normalizedStrafe) * distance,
+      (cos * normalizedForward + sin * normalizedStrafe) * distance);
     this.updateWalkCamera();
   }
 
