@@ -15,13 +15,27 @@
   <link rel="canonical" href="https://ian.lu/" />
   <title>ian.lu — Ian Mulheims</title>
   <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="rentree.css?v=1" />
   <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <script>
+    // "Has this browser been here before?", for the rentrée story. It has to run
+    // above theme.js and the favApps seeding further down, both of which write on
+    // load -- read after them and a first-time visitor looks like a returning one.
+    // favApps is the signal that matters: it is seeded on the first homepage load,
+    // so it catches someone who just browsed, where the others only catch someone
+    // who changed a setting, played a game or signed in.
+    try {
+      window.__ianReturning = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).some((key) =>
+        typeof key === "string" && (key === "favApps" || key === "site_theme" || key === "site_lang" || key === "pb_muted" || key === "pwaInstallDismissed" || key.startsWith("pb_best_") || key.startsWith("pb_save_") || (key.startsWith("sb-") && key.includes("auth-token"))));
+    } catch (error) { window.__ianReturning = false; console.warn("Rentrée storage check failed", error); }
+  </script>
   <script src="theme.js?v=20"></script>
   <script src="i18n-dict.js?v=33"></script>
   <script src="i18n.js?v=3"></script>
+  <script defer src="rentree.js?v=1"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
     // unless the URL points at a specific section (#apps).

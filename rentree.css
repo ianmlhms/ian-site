@@ -1,0 +1,265 @@
+.rentree-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--accent) 28%, transparent), transparent 34%),
+    color-mix(in srgb, var(--bg) 94%, black);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.rentree-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 780px);
+  height: min(100%, 940px);
+  min-height: 0;
+  outline: none;
+}
+
+.rentree-progress {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  padding: 2px 2px 12px;
+}
+
+.rentree-progress-segment {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.rentree-progress-segment span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 220ms ease;
+}
+
+.rentree-progress-segment.is-complete span,
+.rentree-progress-segment.is-current span { width: 100%; }
+
+.rentree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 2px 12px;
+}
+
+.rentree-header p {
+  margin: 0;
+  font-size: clamp(14px, 2vw, 17px);
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.rentree-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  padding: 0 0 3px;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, var(--text));
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rentree-stage {
+  flex: 1;
+  min-height: 0;
+}
+
+.rentree-slide {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: clamp(12px, 2.5vw, 22px);
+  border: 1px solid color-mix(in srgb, var(--border) 82%, var(--text));
+  border-radius: clamp(22px, 4vw, 34px);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .34);
+  scrollbar-width: thin;
+}
+
+.rentree-slide[hidden] { display: none; }
+
+.rentree-media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  height: min(50vh, 480px);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--accent));
+  border-radius: clamp(16px, 3vw, 26px);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 22%, var(--card2)), var(--card2));
+}
+
+.rentree-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rentree-media img[hidden] { display: none; }
+
+.rentree-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(135deg, transparent 35%, color-mix(in srgb, var(--accent) 20%, transparent)),
+    repeating-linear-gradient(45deg, transparent 0 20px, color-mix(in srgb, var(--text) 4%, transparent) 20px 21px);
+}
+
+.rentree-fallback span {
+  font-size: clamp(72px, 15vw, 132px);
+  filter: drop-shadow(0 14px 24px rgba(0, 0, 0, .25));
+  transform: rotate(-5deg);
+}
+
+.rentree-tap {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 34%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.rentree-tap-back { left: 0; }
+.rentree-tap-next { right: 0; }
+.rentree-tap:disabled { cursor: default; }
+
+.rentree-copy {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: clamp(12px, 2.5vw, 20px);
+  padding: clamp(18px, 3vw, 28px) 4px 18px;
+}
+
+.rentree-emoji {
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1;
+}
+
+.rentree-copy h2 {
+  margin: 0;
+  font-size: clamp(25px, 5vw, 42px);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+
+.rentree-copy p {
+  max-width: 65ch;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: clamp(15px, 2.2vw, 18px);
+  line-height: 1.55;
+}
+
+.rentree-actions,
+.rentree-step-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rentree-actions {
+  justify-content: space-between;
+  padding: 0 4px 2px;
+}
+
+.rentree-button {
+  min-height: 46px;
+  padding: 11px 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.rentree-button-look {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-foreground, #07111f);
+}
+
+.rentree-button-next { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+.rentree-button:disabled { opacity: .38; cursor: default; }
+
+.rentree-button:focus-visible,
+.rentree-close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 3px;
+}
+
+.rentree-enter-forward { animation: rentree-enter-forward 260ms ease-out; }
+.rentree-enter-back { animation: rentree-enter-back 260ms ease-out; }
+
+@keyframes rentree-enter-forward {
+  from { opacity: 0; transform: translateX(28px); }
+}
+
+@keyframes rentree-enter-back {
+  from { opacity: 0; transform: translateX(-28px); }
+}
+
+.rentree-reduced-motion *,
+.rentree-reduced-motion *::before,
+.rentree-reduced-motion *::after {
+  scroll-behavior: auto !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+@media (max-width: 620px) {
+  .rentree-overlay { padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); }
+  .rentree-dialog { width: 100%; height: 100%; }
+  .rentree-progress { padding-bottom: 8px; }
+  .rentree-header { padding-bottom: 8px; }
+  .rentree-slide { border-radius: 22px; padding: 12px; }
+  .rentree-media { min-height: 190px; height: 43vh; border-radius: 16px; }
+  .rentree-copy { padding: 18px 2px 14px; }
+  .rentree-actions { align-items: stretch; }
+  .rentree-step-buttons { margin-left: auto; }
+  .rentree-button { padding-inline: 14px; }
+  .rentree-button-back span { display: none; }
+}
+
+@media (max-height: 670px) {
+  .rentree-media { min-height: 160px; height: 34vh; }
+  .rentree-copy { padding-block: 14px 10px; }
+  .rentree-copy p { margin-top: 8px; line-height: 1.4; }
+  .rentree-button { min-height: 42px; padding-block: 8px; }
+}
