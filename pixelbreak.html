@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>PixelBreak - Play Games</title>
-<meta name="description" content="PixelBreak — 40 free browser games: arcade mini-games plus online multiplayer for two iPads, with high scores and a global leaderboard.">
+<meta name="description" content="PixelBreak — 49 free browser games, from quick arcade breaks to bigger games with saved progress and multiplayer for two iPads.">
 <meta property="og:title" content="PixelBreak — ian.lu">
-<meta property="og:description" content="40 free browser games — arcade + online multiplayer.">
+<meta property="og:description" content="49 free browser games — big adventures, quick breaks and multiplayer.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <link rel="canonical" href="https://ian.lu/pixelbreak.html">
@@ -20,7 +20,7 @@
 :root{--brand1:#ff6b9d;--brand2:#4de8ff;--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
 html[data-theme="light"]{--brand1:#e23d78;--brand2:#0e7ec2}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;min-height:100vh;min-height:100svh}
+body{background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;min-height:100vh;min-height:100svh;overflow-x:hidden}
 ::selection{background:var(--accent);color:var(--accent-foreground)}
 header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
 .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
@@ -39,6 +39,14 @@ header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-ind
 .home-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:30px;border:2px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;font-weight:700;font-size:14px;font-family:'Nunito',sans-serif;white-space:nowrap;transition:all 0.2s}
 .home-btn:hover{border-color:var(--accent-border);color:var(--accent-text)}
 main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
+.browse{padding:22px 0 2px}
+.browse-label{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:9px}
+.genre-filters{display:flex;flex-wrap:wrap;gap:8px}
+.genre-filter{min-height:44px;padding:9px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--text2);font:700 14px 'Nunito',sans-serif;cursor:pointer;transition:border-color .2s,background .2s,color .2s}
+.genre-filter:hover{border-color:var(--accent-border);color:var(--text)}
+.genre-filter.active{background:var(--accent);border-color:var(--accent);color:var(--accent-foreground)}
+.genre-filter:focus-visible,.game-card:focus-visible{outline:3px solid var(--accent2);outline-offset:3px}
+.browse-status{color:var(--text2);font-size:13px;margin-top:9px;min-height:20px}
 .sec-title{font-family:'Fredoka',sans-serif;font-size:23px;margin:26px 0 2px;display:flex;align-items:center;gap:9px;letter-spacing:0.3px}
 .sec-sub{color:var(--text2);font-size:13px;margin:2px 0 16px}
 .pb-about{max-width:760px;margin:40px auto 0;padding:0 4px}
@@ -48,22 +56,28 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .pb-about strong{color:var(--text)}
 .count{font-size:13px;color:var(--text2);margin-bottom:12px}
 .game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.big-grid{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
 .game-card{appearance:none;display:block;width:100%;padding:0;font:inherit;color:inherit;text-align:inherit;background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;transition:transform 0.25s,box-shadow 0.25s,background 0.25s;position:relative;border:1px solid var(--border)}
+.game-card.big{border-color:rgba(255,107,157,.3)}
+.game-card.big:hover{box-shadow:0 16px 44px rgba(0,0,0,.48),0 0 28px rgba(255,107,157,.12)}
 .game-card.online{border-color:rgba(77,232,255,0.22)}
 .game-card.online:hover{box-shadow:0 14px 40px rgba(0,0,0,0.45),0 0 26px rgba(77,232,255,0.14)}
 .game-card:hover{transform:translateY(-6px);box-shadow:0 14px 40px rgba(0,0,0,0.45);background:var(--card-hover)}
 .game-thumb{height:126px;display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;overflow:hidden}
+.game-card.big .game-thumb{height:164px;font-size:68px}
 .game-thumb .em{filter:drop-shadow(0 8px 20px rgba(0,0,0,0.55));transition:transform 0.3s}
 .game-card:hover .game-thumb .em{transform:scale(1.12)}
 .game-thumb::after{content:'\25B6';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);font-size:32px;color:#fff;opacity:0;transition:all 0.3s;text-shadow:0 0 20px rgba(0,0,0,0.8)}
 .game-card:hover .game-thumb::after{transform:translate(-50%,-50%) scale(1);opacity:0.8}
 .game-info{display:block;padding:10px 12px}
 .game-name{display:block;font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
+.game-card.big .game-info{padding:14px 16px 16px}
+.game-card.big .game-name{font-size:18px;margin-bottom:4px}
+.game-desc{display:block;color:var(--text2);font-size:12.5px;line-height:1.4;margin:0 0 9px}
 .game-tags{display:flex;gap:4px;flex-wrap:wrap}
 .tag{font-size:10px;padding:2px 7px;border-radius:7px;background:var(--card2);color:var(--text2)}
 .tag.mp{background:rgba(77,232,255,0.15);color:var(--accent2-text)}
-.tag.hot{background:rgba(255,107,157,0.15);color:var(--text)}
-.tag.new{background:rgba(68,255,136,0.15);color:var(--accent4)}
+.tag.save{background:rgba(255,204,0,.14);color:var(--accent3)}
 .ext{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;padding:2px 6px;border-radius:5px}
 #overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
 #overlay.open{display:flex}
@@ -94,7 +108,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 #om .jr button{background:var(--accent2);color:var(--accent2-foreground);border:none;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
 #om .x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
 footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
-@media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:12px 12px 35px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.game-thumb{height:90px;font-size:36px}}
+@media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:0 12px 35px}.browse{padding-top:16px}.genre-filter{flex:1 0 auto;padding-inline:12px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.big-grid{grid-template-columns:1fr;gap:12px}.game-thumb{height:90px;font-size:36px}.game-card.big .game-thumb{height:138px;font-size:58px}}
 body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,body.game-open #pwaInstall,body.game-open #fbFab,body.game-open #fbPanel,body.game-open #appNav{display:none!important}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -123,32 +137,44 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
 </div>
 </header>
 <main>
-<section id="onlineSec">
-<h2 class="sec-title"><span aria-hidden="true">🌐</span> Play on two iPads</h2>
-<p class="sec-sub">Start on one iPad, join with the room code on the other &mdash; or play vs AI.</p>
-<div class="game-grid" id="gridOnline"></div>
+<nav class="browse" aria-label="Browse games by genre">
+<p class="browse-label">Browse by genre</p>
+<div class="genre-filters">
+<button class="genre-filter active" type="button" aria-pressed="true" data-genre="all" onclick="setGenre('all')">All games</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="puzzle" onclick="setGenre('puzzle')">Puzzle</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="action" onclick="setGenre('action')">Action</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="driving" onclick="setGenre('driving')">Driving</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="creative" onclick="setGenre('creative')">Creative</button>
+</div>
+<p class="browse-status" id="count" aria-live="polite"></p>
+</nav>
+<section id="bigSec">
+<h2 class="sec-title"><span aria-hidden="true">🏆</span> Big games</h2>
+<p class="sec-sub">Progress saves, so you can come back and keep going.</p>
+<div class="game-grid big-grid" id="gridBig"></div>
 </section>
-<section id="arcadeSec">
-<h2 class="sec-title"><span aria-hidden="true">🕹️</span> Arcade</h2>
-<p class="sec-sub" id="count"></p>
-<div class="game-grid" id="grid"></div>
+<section id="togetherSec">
+<h2 class="sec-title"><span aria-hidden="true">👥</span> Play together</h2>
+<p class="sec-sub">Play on two iPads, against AI, or side by side.</p>
+<div class="game-grid" id="gridTogether"></div>
+</section>
+<section id="quickSec">
+<h2 class="sec-title"><span aria-hidden="true">⚡</span> Quick games</h2>
+<p class="sec-sub">One sitting, no progress to lose.</p>
+<div class="game-grid" id="gridQuick"></div>
 </section>
 
 <section class="pb-about">
 <h2>About PixelBreak</h2>
-<p>PixelBreak is a small browser arcade I built myself. Every game runs directly in this page — there is
-nothing to download, no account to create and no launcher to install. Open it on a phone, an iPad, a school
-laptop or a desktop, pick a game, and it starts immediately. Your high scores are kept locally on the device
-you played on.</p>
+<p>PixelBreak is a small browser arcade I built myself. Its 49 games run in the browser — there is nothing
+to download and no launcher to install. Open it on a phone, an iPad, a school laptop or a desktop, pick a
+game, and it starts immediately. High scores and supported game progress are saved for you.</p>
 
 <h3>What's in it</h3>
-<p>There are just over thirty games, grouped so you can find something for the time you actually have.
-The <strong>action</strong> games are the quick, reflex-driven ones — a stunt-driving game with twelve
-levels, a space tunnel runner, an endless jumper, a snake, a brick breaker and a couple of space shooters.
-The <strong>puzzle</strong> games are slower: block-dropping, 2048, minesweeper, memory matching, a
-procedurally generated maze and a gravity puzzle where you change which way is down. The
-<strong>casual</strong> set is for a five-minute break — stacking towers, slicing fruit, whack-a-mole, a
-reaction-speed test, a typing race and a word scramble. There is also a pixel-art drawing board.</p>
+<p><strong>Big games</strong> save progress and are made for returning to, from Theme Park Tycoon to Tower
+Defense and Burger Rush. <strong>Play together</strong> collects online and local multiplayer in one place.
+<strong>Quick games</strong> are made for one sitting. You can also browse across those sections by puzzle,
+action, driving or creative games.</p>
 
 <h3>Playing against someone else</h3>
 <p>A handful of games are built for two people rather than one. Tank Wars, Neon Pong, Air Hockey and Pixel
@@ -184,53 +210,161 @@ or unfair, there is a feedback button at the top of the page and I do read it.</
 <div id="om"><div class="box"></div></div>
 <footer>PixelBreak &mdash; Made for fun. Built-in games are original creations inspired by popular concepts. · <a href="privacy.html">Datenschutz · Privacy</a></footer>
 <script>
-const GAMES=[{id:"drive-mad",name:"Road Rage",emoji:"🚗",desc:"3D stunt driving — 16 levels of see-saws, hammers and crushers",cats:["popular","action","driving"],tags:["hot","new"],src:"pb/drive-mad.html"},{id:"towerdefense",name:"Tower Defense",emoji:"🏰",desc:"Build towers, command a hero, survive 15 levels of waves",cats:["popular","action"],tags:["new"],src:"pb/towerdefense.html"},{id:"idle-empire",name:"Idle Empire",emoji:"💰",desc:"Business tycoon idle game — managers, milestones, prestige",cats:["popular","casual"],tags:["new"],src:"pb/idle-empire.html"},{id:"burger",name:"Burger Rush",emoji:"🍔",desc:"Cooking Fever-style burger restaurant — cook, serve, upgrade",cats:["popular","casual"],tags:["new"],src:"pb/burger.html"},{id:"chill-drive",name:"Chill Drive",emoji:"🛣️",desc:"True 3D cruising — 3 endless worlds + 20 levels",cats:["driving","casual"],tags:["new"],src:"pb/chill-drive.html"},{id:"run-3",name:"Space Sprint",emoji:"🚀",desc:"Run 3-style space tunnel runner",cats:["popular","action"],tags:["hot"],src:"pb/run-3.html"},{id:"doodle-jump",name:"Sky Hop",emoji:"🐸",desc:"Doodle Jump-style platformer",cats:["popular","action"],tags:["hot"],src:"pb/doodle-jump.html"},{id:"flappy",name:"Flappy Pixel",emoji:"🐤",desc:"Tap to fly through pipes",cats:["action","casual"],tags:[],src:"pb/flappy.html"},{id:"crossy-road",name:"Cross Rush",emoji:"🐔",desc:"20 levels + endless — dodge cars, trains and rivers",cats:["action","casual"],tags:["new"],src:"pb/crossy-road.html"},{id:"cookie-clicker",name:"Cookie Craze",emoji:"🍪",desc:"Cookie Clicker-style idle game",cats:["popular","casual"],tags:["hot"],src:"pb/cookie-clicker.html"},{id:"tank-wars",name:"Tank Wars",emoji:"💥",desc:"Tank battles — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/tank-wars.html"},{id:"pong",name:"Neon Pong",emoji:"🏓",desc:"Neon pong — 2 players, vs AI, or online on two iPads",cats:["2player","casual"],tags:["mp"],src:"pb/pong.html"},{id:"air-hockey",name:"Air Hockey",emoji:"🥅",desc:"Air hockey — 2 players, vs AI, or online on two iPads",cats:["2player","casual"],tags:["mp"],src:"pb/air-hockey.html"},{id:"fighters",name:"Pixel Fighters",emoji:"🥊",desc:"Platform fighting — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp","new"],src:"pb/fighters.html"},{id:"snake",name:"Neon Snake",emoji:"🐍",desc:"Classic snake with neon style",cats:["action","casual"],tags:[],src:"pb/snake.html"},{id:"tetris",name:"Block Drop",emoji:"🧱",desc:"Tetris-style block puzzle",cats:["puzzle","popular"],tags:[],src:"pb/tetris.html"},{id:"space-invaders",name:"Star Blaster",emoji:"👾",desc:"Space Invaders-style shooter",cats:["action"],tags:[],src:"pb/space-invaders.html"},{id:"asteroids",name:"Asteroid Storm",emoji:"☄️",desc:"Asteroids-style space shooter",cats:["action"],tags:[],src:"pb/asteroids.html"},{id:"breakout",name:"Brick Blitz",emoji:"🧱",desc:"Breakout brick breaker",cats:["action","casual"],tags:[],src:"pb/breakout.html"},{id:"2048",name:"2048",emoji:"🔢",desc:"Slide and merge numbers",cats:["puzzle","popular"],tags:[],src:"pb/2048.html"},{id:"minesweeper",name:"Mine Sweep",emoji:"💣",desc:"Classic minesweeper",cats:["puzzle"],tags:[],src:"pb/minesweeper.html"},{id:"memory",name:"Memory Match",emoji:"🃏",desc:"Card matching memory game",cats:["puzzle","casual"],tags:[],src:"pb/memory.html"},{id:"maze",name:"Maze Runner",emoji:"🏁",desc:"Procedural maze escape",cats:["puzzle"],tags:["new"],src:"pb/maze.html"},{id:"gravity-ball",name:"Gravity Ball",emoji:"🔮",desc:"Change gravity to reach the goal",cats:["puzzle"],tags:["new"],src:"pb/gravity-ball.html"},{id:"tower-stack",name:"Tower Stack",emoji:"🏗️",desc:"Stack blocks as high as you can",cats:["casual"],tags:[],src:"pb/tower-stack.html"},{id:"whack-a-mole",name:"Whack-a-Mole",emoji:"🐹",desc:"Whack moles for points!",cats:["casual"],tags:[],src:"pb/whack-a-mole.html"},{id:"fruit-slash",name:"Fruit Slash",emoji:"🍉",desc:"Slice fruit, avoid bombs",cats:["casual","action"],tags:[],src:"pb/fruit-slash.html"},{id:"reaction",name:"Reaction Test",emoji:"⚡",desc:"Test your reaction speed",cats:["casual"],tags:[],src:"pb/reaction.html"},{id:"color-clash",name:"Color Clash",emoji:"🎨",desc:"Fast color word matching",cats:["casual","puzzle"],tags:[],src:"pb/color-clash.html"},{id:"word-scramble",name:"Word Scramble",emoji:"📝",desc:"Unscramble words fast",cats:["puzzle","casual"],tags:[],src:"pb/word-scramble.html"},{id:"typing",name:"Type Racer",emoji:"⌨️",desc:"Typing speed test",cats:["casual"],tags:[],src:"pb/typing.html"},{id:"pixel-painter",name:"Pixel Painter",emoji:"🖌️",desc:"Draw pixel art creations",cats:["creative"],tags:[],src:"pb/pixel-painter.html"},{id:"tictactoe",name:"Tic Tac Toe",emoji:"❌",desc:"Classic X and O with AI",cats:["puzzle","casual","2player"],tags:[],src:"pb/tictactoe.html"},{id:"bubble-shooter",name:"Bubble Pop",emoji:"🫧",desc:"Shoot and match bubbles",cats:["puzzle","casual"],tags:[],src:"pb/bubble-shooter.html"},{id:"park",name:"Theme Park Tycoon",emoji:"🎢",desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["popular","casual"],tags:["new","hot"],src:"pb/park.html"}];
-/* online multiplayer pages (two devices) + Wordle — merged in from games.html */
-var ONLINE=[
+const GAMES=[
+{id:"park",name:"Theme Park Tycoon",emoji:"🎢",desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["creative"],tags:[],src:"pb/park.html"},
+{id:"drive-mad",name:"Road Rage",emoji:"🚗",desc:"3D stunt driving — 16 levels of see-saws, hammers and crushers",cats:["action","driving"],tags:[],src:"pb/drive-mad.html"},
+{id:"chill-drive",name:"Chill Drive",emoji:"🛣️",desc:"True 3D cruising — 3 endless worlds + 20 levels",cats:["driving"],tags:[],src:"pb/chill-drive.html"},
+{id:"cookie-clicker",name:"Cookie Craze",emoji:"🍪",desc:"Cookie Clicker-style idle game",cats:[],tags:[],src:"pb/cookie-clicker.html"},
+{id:"crossy-road",name:"Cross Rush",emoji:"🐔",desc:"20 levels + endless — dodge cars, trains and rivers",cats:["action"],tags:[],src:"pb/crossy-road.html"},
+{id:"burger",name:"Burger Rush",emoji:"🍔",desc:"Cooking Fever-style burger restaurant — cook, serve, upgrade",cats:[],tags:[],src:"pb/burger.html"},
+{id:"towerdefense",name:"Tower Defense",emoji:"🏰",desc:"Build towers, command a hero, survive 15 levels of waves",cats:["action"],tags:[],src:"pb/towerdefense.html"},
+{id:"idle-empire",name:"Idle Empire",emoji:"💰",desc:"Business tycoon idle game — managers, milestones, prestige",cats:[],tags:[],src:"pb/idle-empire.html"},
+{id:"tictactoe",name:"Tic Tac Toe",emoji:"❌",desc:"Classic X and O with AI",cats:["puzzle","2player"],tags:["mp"],src:"pb/tictactoe.html"},
+{id:"pong",name:"Neon Pong",emoji:"🏓",desc:"Neon pong — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/pong.html"},
 {id:"o-connect4",name:"Connect 4",emoji:"🔴",desc:"Drop discs, connect four — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"connect4.html",ai:true},
-{id:"o-slf",name:"Stadt-Land-Fluss",emoji:"🔤",desc:"Categories quiz — 2+ players join the same code",cats:["online"],tags:["mp"],href:"slf.html"},
+{id:"o-tictactoe",name:"Tic-Tac-Toe",emoji:"❌",desc:"Three in a row — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"tictactoe.html",ai:true},
+{id:"tank-wars",name:"Tank Wars",emoji:"💥",desc:"Tank battles — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/tank-wars.html"},
+{id:"fighters",name:"Pixel Fighters",emoji:"🥊",desc:"Platform fighting — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/fighters.html"},
 {id:"o-battleship",name:"Battleship",emoji:"🚢",desc:"Sink the fleet — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"battleship.html",ai:true},
-{id:"o-color",name:"Colour Dial",emoji:"🎨",desc:"Guess the colour together — online or vs AI",cats:["online","casual"],tags:["mp"],href:"color.html",ai:true},
-{id:"o-draw",name:"Molerei",emoji:"✏️",desc:"Draw & guess with a friend — online on two iPads",cats:["online","creative"],tags:["mp"],href:"draw.html"},
-{id:"o-intro",name:"Intro",emoji:"🎵",desc:"Guess the song from 1 second — then 3, then 5…",cats:["online","casual"],tags:["mp"],href:"intro.html"},
 {id:"o-reversi",name:"Reversi",emoji:"⚪",desc:"Flip the board — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"reversi.html",ai:true},
 {id:"o-dots",name:"Dots & Boxes",emoji:"🟦",desc:"Claim the boxes — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"dots.html",ai:true},
-{id:"o-tictactoe",name:"Tic-Tac-Toe",emoji:"❌",desc:"Three in a row — online on two iPads or vs AI",cats:["online","casual"],tags:["mp"],href:"tictactoe.html",ai:true},
-{id:"o-meme",name:"Meme Party",emoji:"😂",desc:"Caption the same meme, vote for the funniest — 3+ players",cats:["online","casual","creative"],tags:["mp","new"],href:"meme.html"},
-{id:"o-checkers",name:"Checkers",emoji:"🟠",desc:"Jump, chain captures, crown kings — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp","new"],href:"checkers.html",ai:true},
-{id:"o-maumau",name:"Mau-Mau",emoji:"🃏",desc:"Card battle — match suit or rank, 7 = +2, J wishes — online or vs AI",cats:["online","casual"],tags:["mp","new"],href:"maumau.html",ai:true},
-{id:"o-dice-duel",name:"Kniffel",emoji:"🎲",desc:"Kniffel/Yahtzee dice game — roll, hold, score — online or vs AI",cats:["online","casual"],tags:["mp","new"],href:"dice-duel.html",ai:true},
-{id:"o-wordle",name:"Wuertspill",emoji:"🟩",desc:"Daily Lëtzebuergesch Wordle",cats:["puzzle","casual"],tags:[],go:"wordle.html"}
+{id:"o-color",name:"Colour Dial",emoji:"🎨",desc:"Guess the colour together — online or vs AI",cats:["online"],tags:["mp"],href:"color.html",ai:true},
+{id:"o-draw",name:"Molerei",emoji:"✏️",desc:"Draw & guess with a friend — online on two iPads",cats:["online","creative"],tags:["mp"],href:"draw.html"},
+{id:"o-intro",name:"Intro",emoji:"🎵",desc:"Guess the song from 1 second — then 3, then 5…",cats:["online"],tags:["mp"],href:"intro.html"},
+{id:"o-meme",name:"Meme Party",emoji:"😂",desc:"Caption the same meme, vote for the funniest — 3+ players",cats:["online","creative"],tags:["mp"],href:"meme.html"},
+{id:"o-checkers",name:"Checkers",emoji:"🟠",desc:"Jump, chain captures, crown kings — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"checkers.html",ai:true},
+{id:"o-maumau",name:"Mau-Mau",emoji:"🃏",desc:"Card battle — match suit or rank, 7 = +2, J wishes — online or vs AI",cats:["online"],tags:["mp"],href:"maumau.html",ai:true},
+{id:"o-dice-duel",name:"Kniffel",emoji:"🎲",desc:"Kniffel/Yahtzee dice game — roll, hold, score — online or vs AI",cats:["online"],tags:["mp"],href:"dice-duel.html",ai:true},
+{id:"o-slf",name:"Stadt-Land-Fluss",emoji:"🔤",desc:"Categories quiz — 2+ players join the same code",cats:["online"],tags:["mp"],href:"slf.html"},
+{id:"air-hockey",name:"Air Hockey",emoji:"🥅",desc:"Air hockey — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/air-hockey.html"},
+{id:"flappy",name:"Flappy Pixel",emoji:"🐤",desc:"Tap to fly through pipes",cats:["action"],tags:[],src:"pb/flappy.html"},
+{id:"typing",name:"Type Racer",emoji:"⌨️",desc:"Typing speed test",cats:[],tags:[],src:"pb/typing.html"},
+{id:"doodle-jump",name:"Sky Hop",emoji:"🐸",desc:"Doodle Jump-style platformer",cats:["action"],tags:[],src:"pb/doodle-jump.html"},
+{id:"color-clash",name:"Color Clash",emoji:"🎨",desc:"Fast color word matching",cats:["puzzle"],tags:[],src:"pb/color-clash.html"},
+{id:"whack-a-mole",name:"Whack-a-Mole",emoji:"🐹",desc:"Whack moles for points!",cats:[],tags:[],src:"pb/whack-a-mole.html"},
+{id:"run-3",name:"Space Sprint",emoji:"🚀",desc:"Run 3-style space tunnel runner",cats:["action"],tags:[],src:"pb/run-3.html"},
+{id:"tetris",name:"Block Drop",emoji:"🧱",desc:"Tetris-style block puzzle",cats:["puzzle"],tags:[],src:"pb/tetris.html"},
+{id:"2048",name:"2048",emoji:"🔢",desc:"Slide and merge numbers",cats:["puzzle"],tags:[],src:"pb/2048.html"},
+{id:"snake",name:"Neon Snake",emoji:"🐍",desc:"Classic snake with neon style",cats:["action"],tags:[],src:"pb/snake.html"},
+{id:"bubble-shooter",name:"Bubble Pop",emoji:"🫧",desc:"Shoot and match bubbles",cats:["puzzle"],tags:[],src:"pb/bubble-shooter.html"},
+{id:"space-invaders",name:"Star Blaster",emoji:"👾",desc:"Space Invaders-style shooter",cats:["action"],tags:[],src:"pb/space-invaders.html"},
+{id:"breakout",name:"Brick Blitz",emoji:"🧱",desc:"Breakout brick breaker",cats:["action"],tags:[],src:"pb/breakout.html"},
+{id:"asteroids",name:"Asteroid Storm",emoji:"☄️",desc:"Asteroids-style space shooter",cats:["action"],tags:[],src:"pb/asteroids.html"},
+{id:"minesweeper",name:"Mine Sweep",emoji:"💣",desc:"Classic minesweeper",cats:["puzzle"],tags:[],src:"pb/minesweeper.html"},
+{id:"memory",name:"Memory Match",emoji:"🃏",desc:"Card matching memory game",cats:["puzzle"],tags:[],src:"pb/memory.html"},
+{id:"maze",name:"Maze Runner",emoji:"🏁",desc:"Procedural maze escape",cats:["puzzle"],tags:[],src:"pb/maze.html"},
+{id:"gravity-ball",name:"Gravity Ball",emoji:"🔮",desc:"Change gravity to reach the goal",cats:["puzzle"],tags:[],src:"pb/gravity-ball.html"},
+{id:"tower-stack",name:"Tower Stack",emoji:"🏗️",desc:"Stack blocks as high as you can",cats:[],tags:[],src:"pb/tower-stack.html"},
+{id:"fruit-slash",name:"Fruit Slash",emoji:"🍉",desc:"Slice fruit, avoid bombs",cats:["action"],tags:[],src:"pb/fruit-slash.html"},
+{id:"reaction",name:"Reaction Test",emoji:"⚡",desc:"Test your reaction speed",cats:[],tags:[],src:"pb/reaction.html"},
+{id:"word-scramble",name:"Word Scramble",emoji:"📝",desc:"Unscramble words fast",cats:["puzzle"],tags:[],src:"pb/word-scramble.html"},
+{id:"pixel-painter",name:"Pixel Painter",emoji:"🖌️",desc:"Draw pixel art creations",cats:["creative"],tags:[],src:"pb/pixel-painter.html"},
+{id:"o-wordle",name:"Wuertspill",emoji:"🟩",desc:"Daily Lëtzebuergesch Wordle",cats:["puzzle"],tags:[],go:"wordle.html"}
 ];
-for(var oi=0;oi<ONLINE.length;oi++)GAMES.push(ONLINE[oi]);
 
+const BIG_GAME_IDS=new Set(["park","towerdefense","burger","drive-mad","chill-drive","idle-empire","cookie-clicker","crossy-road"]);
+const VALID_GENRES=new Set(["all","puzzle","action","driving","creative"]);
+// Ranking by real play counts otherwise buries a game that has only just launched:
+// Theme Park Tycoon had 1 open against Chill Drive's 43 and sorted dead last, which
+// is the opposite of what it deserves. A pin is an explicit editorial override --
+// better than quietly weighting the sort, because it is obvious and easy to undo.
+const PINNED_GAME_IDS=new Set(["park"]);
+const PLAY_DATA_URL="data/game-plays.json";
+// Accepts a plain date or a full ISO timestamp. The generator writes a timestamp,
+// and a date-only pattern here rejected the file and silently fell back to the
+// authored order -- the ranking looked broken with nothing but a console warning.
+const PLAY_DATA_DATE_PATTERN=/^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?$/;
+const EMPTY_PLAY_COUNTS=Object.freeze(Object.create(null));
+const AUTHORED_ORDER_BY_ID=Object.freeze(GAMES.reduce(function(order,game,index){return Object.assign({},order,{[game.id]:index});},{}));
+let activeGenre="all";
+let playCounts=EMPTY_PLAY_COUNTS;
 
 function hashStr(s){var h=0;for(var i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);return Math.abs(h)}
-function cardHTML(g){
-var tagHTML='';
-if(g.tags){for(var t=0;t<g.tags.length;t++){
-if(g.tags[t]==='mp')tagHTML+='<span class="tag mp">Multiplayer<\/span>';
-if(g.tags[t]==='hot')tagHTML+='<span class="tag hot">Popular<\/span>';
-if(g.tags[t]==='new')tagHTML+='<span class="tag new">New<\/span>';
-}}
+function isBigGame(g){return BIG_GAME_IDS.has(g.id)}
+function isTogetherGame(g){return Boolean(g.href)||g.cats.indexOf('2player')>-1}
+function hasPlayCount(id){return Object.prototype.hasOwnProperty.call(playCounts,id)}
+function isPinned(g){return PINNED_GAME_IDS.has(g.id)}
+function rankedCopy(games){
+return games.slice().sort(function(a,b){
+var pinA=isPinned(a),pinB=isPinned(b);
+if(pinA!==pinB)return pinA?-1:1;
+var hasA=hasPlayCount(a.id),hasB=hasPlayCount(b.id);
+if(hasA&&hasB&&playCounts[a.id]!==playCounts[b.id])return playCounts[b.id]-playCounts[a.id];
+if(hasA!==hasB)return hasA?-1:1;
+return AUTHORED_ORDER_BY_ID[a.id]-AUTHORED_ORDER_BY_ID[b.id];
+});
+}
+function cardHTML(g,isBig){
+var tagHTML=isBig?'<span class="tag save">Progress saves<\/span>':'';
+if(g.tags&&g.tags.indexOf('mp')>-1)tagHTML+='<span class="tag mp">Multiplayer<\/span>';
 var ext=g.url?'<span class="ext">External<\/span>':g.href?'<span class="ext">2 iPads<\/span>':'';
 var hue=hashStr(g.name)%360;
 var gIdx=GAMES.indexOf(g);
 var oc=g.src?'openGame('+gIdx+')':g.href?'openOnline('+gIdx+')':g.go?("location.href='"+g.go+"'"):("window.open('"+g.url+"','_blank')");
-return '<button type="button" class="game-card'+(g.href?' online':'')+'" onclick="'+oc+'" title="'+g.desc+'">'+ext+
+var description=isBig?'<span class="game-desc">'+g.desc+'<\/span>':'';
+return '<button type="button" class="game-card'+(g.href?' online':'')+(isBig?' big':'')+'" onclick="'+oc+'" title="'+g.desc+'">'+ext+
 '<span class="game-thumb" style="background:radial-gradient(circle at 50% 38%,hsla('+hue+',70%,45%,0.32),transparent 72%),linear-gradient(135deg,hsl('+hue+',40%,17%),hsl('+(hue+40)+',35%,11%))"><span class="em">'+g.emoji+'<\/span><\/span>'+
-'<span class="game-info"><span class="game-name">'+g.name+'<\/span><span class="game-tags">'+tagHTML+'<\/span><\/span><\/button>';
+'<span class="game-info"><span class="game-name">'+g.name+'<\/span>'+description+'<span class="game-tags">'+tagHTML+'<\/span><\/span><\/button>';
+}
+function renderSection(sectionId,gridId,games,isBig){
+document.getElementById(gridId).innerHTML=rankedCopy(games).map(function(game){return cardHTML(game,isBig)}).join('');
+document.getElementById(sectionId).style.display=games.length?'':'none';
 }
 function applyFilters(){
-var q=document.getElementById('search').value.toLowerCase();
-var match=function(g){return !q||g.name.toLowerCase().indexOf(q)>-1||g.desc.toLowerCase().indexOf(q)>-1};
-var online=[],arcade=[];
-for(var i=0;i<GAMES.length;i++){var g=GAMES[i];if(!match(g))continue;(g.href?online:arcade).push(g)}
-document.getElementById('gridOnline').innerHTML=online.map(cardHTML).join('');
-document.getElementById('grid').innerHTML=arcade.map(cardHTML).join('');
-document.getElementById('onlineSec').style.display=online.length?'':'none';
-document.getElementById('arcadeSec').style.display=arcade.length?'':'none';
-document.getElementById('count').textContent=arcade.length+' games \u00b7 high scores save to your account';
+var q=document.getElementById('search').value.trim().toLowerCase();
+var visibleGames=GAMES.filter(function(game){
+var matchesText=!q||game.name.toLowerCase().indexOf(q)>-1||game.desc.toLowerCase().indexOf(q)>-1;
+var matchesGenre=activeGenre==='all'||game.cats.indexOf(activeGenre)>-1;
+return matchesText&&matchesGenre;
+});
+var bigGames=visibleGames.filter(isBigGame);
+var togetherGames=visibleGames.filter(function(game){return !isBigGame(game)&&isTogetherGame(game)});
+var quickGames=visibleGames.filter(function(game){return !isBigGame(game)&&!isTogetherGame(game)});
+renderSection('bigSec','gridBig',bigGames,true);
+renderSection('togetherSec','gridTogether',togetherGames,false);
+renderSection('quickSec','gridQuick',quickGames,false);
+var hasFilter=q||activeGenre!=='all';
+document.getElementById('count').textContent=visibleGames.length+(hasFilter?' of '+GAMES.length:'')+' games';
+}
+function setGenre(genre){
+if(!VALID_GENRES.has(genre))return;
+activeGenre=genre;
+document.querySelectorAll('.genre-filter').forEach(function(button){
+var isActive=button.getAttribute('data-genre')===genre;
+button.classList.toggle('active',isActive);
+button.setAttribute('aria-pressed',isActive?'true':'false');
+});
+applyFilters();
+}
+function validatePlayCounts(payload){
+if(!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('play data must be an object');
+// Only a date-only value needs a time appended; doing it unconditionally turned a
+// full ISO timestamp into '...ZT00:00:00Z', an Invalid Date, and the whole ranking
+// was discarded with nothing but a console warning to show for it.
+var generatedText=typeof payload.generated==='string'?payload.generated:'';
+var generatedDate=generatedText?new Date(generatedText.length===10?generatedText+'T00:00:00Z':generatedText):null;
+if(!generatedDate||!PLAY_DATA_DATE_PATTERN.test(payload.generated)||Number.isNaN(generatedDate.getTime())||generatedDate.toISOString().slice(0,10)!==payload.generated.slice(0,10))throw new Error('play data has an invalid generated date');
+if(!payload.plays||typeof payload.plays!=='object'||Array.isArray(payload.plays))throw new Error('play data must contain a plays object');
+var validated=Object.create(null);
+Object.keys(payload.plays).forEach(function(id){
+var count=payload.plays[id];
+if(!/^[a-z0-9-]+$/.test(id)||typeof count!=='number'||!Number.isSafeInteger(count)||count<0)throw new Error('play data contains an invalid entry');
+validated[id]=count;
+});
+return Object.freeze(validated);
+}
+function loadPlayCounts(){
+fetch(PLAY_DATA_URL,{cache:'no-cache'}).then(function(response){
+if(!response.ok)throw new Error('HTTP '+response.status);
+return response.json();
+}).then(function(payload){
+playCounts=validatePlayCounts(payload);
+applyFilters();
+}).catch(function(error){
+playCounts=EMPTY_PLAY_COUNTS;
+console.warn('[PixelBreak] Play ranking unavailable; using the authored order.',error);
+applyFilters();
+});
 }
 var openSeq=0;
 var _cnEl=document.querySelector('link[rel="canonical"]'),_mdEl=document.querySelector('meta[name="description"]');
@@ -304,7 +438,7 @@ if(i>=0)openGame(i,true);
 function goHome(){
 closeGame();
 document.getElementById('search').value='';
-applyFilters();
+setGenre('all');
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeGame()});
 
@@ -349,6 +483,7 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
 })();
 
 applyFilters();
+loadPlayCounts();
 </script>
 <!-- feedback box: suggest a game / report a bug -->
 <button id="fbFab" title="Feedback" style="position:fixed;bottom:18px;left:18px;z-index:900;width:48px;height:48px;border-radius:50%;border:1px solid var(--accent2);background:var(--card);color:var(--accent2-text);font-size:22px;cursor:pointer">💬</button>
@@ -388,7 +523,7 @@ document.getElementById('fbSend').onclick=async()=>{
     });
     if(error)throw error;
     document.getElementById('fbMsg').value='';
-    note.textContent='Merci! 🎉';
+    note.textContent='Thanks! 🎉';
     setTimeout(()=>{panel.style.display='none';note.textContent='';},1500);
   }catch(e){console.warn('[feedback]',e);note.textContent='Failed — try again';}
 };
@@ -410,7 +545,7 @@ document.getElementById('fbSend').onclick=async()=>{
     if(deferred){deferred.prompt();deferred=null;btn.style.display='none';return;}
     // iOS has no install prompt: explain the Share-menu route
     var tip=document.createElement('div');
-    tip.textContent='Op iOS: Deelen-Knäppchen ⬆️ → "Zum Home-Bildschierm"';
+    tip.textContent='On iOS: tap Share ⬆️, then “Add to Home Screen”';
     tip.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card-hover);border:1px solid var(--accent2);color:var(--text);padding:12px 18px;border-radius:12px;font-weight:700;z-index:9999;max-width:90vw;text-align:center';
     document.body.appendChild(tip);
     setTimeout(function(){tip.remove();},5000);
