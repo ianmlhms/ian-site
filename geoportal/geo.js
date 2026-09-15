@@ -28,7 +28,8 @@
       if (stored && window.GEO_I18N[stored]) return stored;
     } catch (e) { /* private mode */ }
     var nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
-    if (nav === 'lb' || nav === 'de') return 'de';
+    if (nav === 'lb') return 'lb';
+    if (nav === 'de') return 'de';
     if (nav === 'fr') return 'fr';
     return window.GEO_I18N[nav] ? nav : 'en';
   }

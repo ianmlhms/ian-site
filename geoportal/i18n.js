@@ -1,4 +1,4 @@
-/* UI strings for the geoportal viewer. DE / FR / EN — no Luxembourgish source text. */
+/* UI strings for the geoportal viewer. DE / FR / EN / LB. */
 window.GEO_I18N = {
   de: {
     title: 'Geoportal Luxemburg',
@@ -122,5 +122,46 @@ window.GEO_I18N = {
     loading: 'Loading …',
     error: 'The data could not be loaded.',
     busZoom: 'Zoom in further to show bus stops'
+  },
+  lb: {
+    title: 'Geoportal Lëtzebuerg',
+    subtitle: 'Kaarten, Loftbiller, Kadaster a Wanderweeër',
+    basemap: 'Hannergrondkaart',
+    overlays: 'Schichten',
+    trails: 'Wanderweeër',
+    tools: 'Geräter',
+    opacity: 'Transparenz',
+    bmTopo: 'Topografesch Kaart',
+    bmRoad: 'Hannergrondkaart',
+    bmTopo50: 'Topo 1:50.000',
+    bmOrtho: 'Loftbild (aktuellst)',
+    bmHybrid: 'Loftbild + Beschrëftung',
+    bmOrtho1967: 'Loftbild 1967',
+    bmLidar: 'Gelänmodell (LiDAR)',
+    bmOsm: 'OpenStreetMap',
+    ovCadastre: 'Kadaster',
+    ovParcels: 'Parzellennummeren',
+    ovBuildings: 'Gebaier',
+    ovAddresses: 'Adressen',
+    ovToponymes: 'Uertsnimm',
+    ovCommunes: 'Gemengegrenzen',
+    ovHiking: 'Auto-Pédestren (Wanderen)',
+    ovMtb: 'MTB-Ronnen',
+    ovBus: 'Busarrêten',
+    search: 'E Wee oder e Busarrêt sichen …',
+    measure: 'Distanz moossen',
+    measureHint: 'Punkte klicken · duebelklicken fir ofzeschléissen',
+    clear: 'Läschen',
+    locate: 'M\u00e4i Standuert',
+    total: 'Total',
+    coords: 'Koordinaten',
+    copy: 'Kopéieren',
+    copied: 'Kopéiert',
+    zoom: 'Zoom',
+    noResults: 'Näischt fonnt.',
+    openPage: 'Säit vum Wee opmaachen',
+    loading: 'Gëtt gelueden …',
+    error: 'D\u2019Date konnten net gelueden ginn.',
+    busZoom: 'Weider erazoomen fir d\u2019Busarrêten ze weisen'
   }
 };

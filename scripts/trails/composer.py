@@ -125,6 +125,33 @@ OPENERS = {
             "{p} lies in the Guttland — quiet farm tracks, woodland passages and village edges give this loop its rhythm.",
         ],
     },
+    "lb": {
+        "eislek": [
+            "Ronderëm {p} gesäit een déi typesch Landschaft vum Éislek: déif Däller, Bëscher a fräi Siichten iwwer d’Hiwwelen am Norde vu Lëtzebuerg.",
+            "Dës Ronn féiert duerch d’Géigend ronderëm {p} am Éislek, mat senge Bëscher an déiwen Däller.",
+            "{p} läit am Éislek. Op dëser Ronn geet et iwwer d’Hiwwelen, duerch de Bësch a laanscht d’Weeden."
+        ],
+        "mullerthal": [
+            "Bei {p} féiert d’Wanderung duerch de Mëllerdall, déi Kleng Lëtzebuerger Schwäiz mat hire Sandsteenfielsen a Bëscher laanscht d’Baachen.",
+            "Dës Ronn féiert duerch d’Géigend ronderëm {p} am Mëllerdall, wou Sandsteen, Bësch a kleng Baachen d’Landschaft prägen.",
+            "{p} läit an der Regioun Mëllerdall am Oste vu Lëtzebuerg. Op dëser Ronn geet et laanscht Fielsen, duerch de Bësch an iwwer d’Felder."
+        ],
+        "moselle": [
+            "Ronderëm {p} prägen d’Wéngerten an d’Siicht op de Museldall d’Landschaft. D’Ronn féiert iwwer d’Héichten an duerch roueg Säitendäller.",
+            "Dës Ronn féiert duerch d’Géigend ronderëm {p} un der Musel, laanscht Wéngerten an Uebstbeem, mat Blécker op déi däitsch Säit.",
+            "{p} läit an der Muselregioun am Südoste vu Lëtzebuerg. Op dëser Ronn geet et laanscht Wéngerten, iwwer d’Felder an duerch de Bësch."
+        ],
+        "minett": [
+            "Ronderëm {p} am Minett ass et gréng: Do, wou fréier Minett ofgebaut gouf, wuessen haut Beem a vill verschidde Planzen.",
+            "Dës Ronn féiert duerch d’Géigend ronderëm {p} am Minett, wou haut nees Planzen op de fréieren Ofbaugebidder wuessen.",
+            "{p} läit am Minett am Süde vum Land. D’Ronn féiert duerch de Bësch an iwwer oppe Flächen, laanscht Spuere vun der Industriegeschicht."
+        ],
+        "center": [
+            "Ronderëm {p} féiert d’Wanderung duerch d’Guttland: iwwer Hiwwelen a Felder, laanscht Baachen an duerch de Bësch.",
+            "Dës Ronn féiert duerch d’Géigend ronderëm {p} am Guttland, tëscht Felder a Bëscher an der Mëtt vum Land.",
+            "{p} läit am Guttland. Op dëser Ronn entdeckt een d’Géigend zu Fouss."
+        ]
+    },
 }
 
 LENGTH_SENTENCES = {
@@ -143,6 +170,11 @@ LENGTH_SENTENCES = {
         "At {l} km, the circuit takes roughly {d} {h}.",
         "The route measures {l} km — about {d} {h} of walking, depending on pace.",
     ],
+    "lb": [
+        "D’Ronn ass {l} km laang. Bei normalem Tempo ass een ongeféier {d} {h} ënnerwee.",
+        "Fir dës Ronn ({l} km) brauch een ongeféier {d} {h}.",
+        "De Wee ass {l} km laang. Jee nom Tempo dauert d’Wanderung ongeféier {d} {h}."
+    ],
 }
 
 NATURE_CLAUSES = {
@@ -155,6 +187,11 @@ NATURE_CLAUSES = {
     "en": [", and most of the way follows forest and field tracks",
            ", with about half the distance away from tarmac",
            ", mixing quiet lanes with field and forest paths"],
+    "lb": [
+        ", an de gréissten Deel vum Wee féiert duerch de Bësch an iwwer Feldweeër",
+        ", an ongeféier d’Hallschent vum Wee ass net asphaltéiert",
+        ", an d’Ronn féiert deels iwwer roueg Stroossen, deels iwwer Feldweeër a Bëschweeër"
+    ],
 }
 
 TERRAIN_SENTENCES = {
@@ -167,6 +204,11 @@ TERRAIN_SENTENCES = {
     "en": {"flat": "There is barely any climbing{nat}.",
            "rolling": "The route gathers about {g} m of ascent{nat}.",
            "hilly": "With some {g} m of climbing, the loop is distinctly hilly{nat}."},
+    "lb": {
+        "flat": "Et geet kaum biergop{nat}.",
+        "rolling": "Ënnerwee kommen ongeféier {g} Héichtemeter zesummen{nat}.",
+        "hilly": "Mat ongeféier {g} Héichtemeter geet et op dëser Ronn dacks biergop a biergof{nat}."
+    },
 }
 
 POI_SENTENCES = {
@@ -182,6 +224,17 @@ POI_SENTENCES = {
            "two": ["Along the way you pass {a} and {b}, among other sights.",
                     "On the route, among others: {a} and {b}.",
                     "Worth a look en route: {a} and {b}."]},
+    "lb": {
+        "one": [
+            "Ënnerwee ze gesinn: {a}.",
+            "Um Wee: {a}."
+        ],
+        "two": [
+            "Ënnerwee ze gesinn: {a} an {b}.",
+            "Um Wee, ënner anerem: {a} an {b}.",
+            "Op dëser Ronn ze gesinn: {a} an {b}."
+        ]
+    },
 }
 
 LANDSCAPE_SENTENCES = {
@@ -194,6 +247,11 @@ LANDSCAPE_SENTENCES = {
     "en": ["The route mostly follows near-natural paths through woods and open country.",
            "Field and forest tracks alternate with quiet back roads.",
            "On small paths, the loop links the prettiest corners around the village."],
+    "lb": [
+        "De Wee féiert virun allem duerch de Bësch an iwwer d’Felder.",
+        "Feldweeër a Bëschweeër wiessele sech mat rouegen Niewestroossen of.",
+        "Iwwer kleng Weeër entdeckt een op dëser Ronn d’Géigend ronderëm d’Uertschaft."
+    ],
 }
 
 PRACTICAL_SENTENCES = {
@@ -203,6 +261,10 @@ PRACTICAL_SENTENCES = {
            "Le circuit est entièrement balisé du signe bleu des Auto-Pédestres ; en boucle, il n'a pas de départ imposé."],
     "en": ["Like every Auto-Pédestre, the loop is permanently waymarked with the blue symbol and can be started at any point.",
            "The circuit carries the blue Auto-Pédestre waymark throughout; being a loop, it has no fixed start."],
+    "lb": [
+        "Wéi all Auto-Pédestre ass d’Ronn permanent mam bloe Symbol markéiert. Dir kënnt op all Punkt ufänken.",
+        "D’Ronn ass iwwerall mam bloen Auto-Pédestre-Symbol markéiert. Et gëtt kee feste Startpunkt."
+    ],
 }
 
 HIGHLIGHT_LABELS = {
@@ -212,6 +274,12 @@ HIGHLIGHT_LABELS = {
            "bus": "Arrêt de bus sur le parcours"},
     "en": {"gain": "{g} m of climbing", "flat": "Barely any climbing", "natural": "Mostly forest and field tracks",
            "bus": "Bus stop right on the route"},
+    "lb": {
+        "gain": "{g} Héichtemeter",
+        "flat": "Wéineg Héichtemeter",
+        "natural": "Virun allem Bëschweeër a Feldweeër",
+        "bus": "Busarrêt direkt um Wee"
+    },
 }
 
 REGION_HIGHLIGHT = {
@@ -221,6 +289,13 @@ REGION_HIGHLIGHT = {
            "minett": "Minett – Terres Rouges", "center": "Guttland"},
     "en": {"eislek": "Éislek landscape", "mullerthal": "Mullerthal region", "moselle": "Moselle region",
            "minett": "Minett – Red Rocks", "center": "Guttland"},
+    "lb": {
+        "eislek": "Landschaft vum Éislek",
+        "mullerthal": "Regioun Mëllerdall",
+        "moselle": "Muselregioun",
+        "minett": "Minett — Rout Äerd",
+        "center": "Guttland"
+    },
 }
 
 
@@ -306,6 +381,33 @@ MTB_OPENERS = {
             "{p} lies in the Guttland — the loop alternates between rolling farmland sections and short stretches of forest.",
         ],
     },
+    "lb": {
+        "eislek": [
+            "Ronderëm {p} féiert den Tour duerch den Éislek am Norde vu Lëtzebuerg: laang Stécker biergop a biergof duerch de Bësch a fräi Siichten iwwer d’Hiwwelen.",
+            "Dës MTB-Ronn féiert duerch d’Géigend ronderëm {p} am Éislek. Tëscht den déiwen Däller an den Héichte geet et ëmmer erëm biergop a biergof.",
+            "{p} läit am Éislek. D’Ronn verbënnt schmuel Weeër a breet Bëschweeër mat oppene Passagen op den Héichten."
+        ],
+        "mullerthal": [
+            "Bei {p} geet et mam Mountainbike duerch de Mëllerdall: iwwer sandege Buedem am Bësch, mat Fielsen an der Géigend an engem Wiessel tëscht Däller an Héichten.",
+            "Dës MTB-Ronn féiert duerch d’Géigend ronderëm {p} am Mëllerdall, tëscht Sandsteenfielsen an dichte Bëscher.",
+            "{p} läit an der Regioun Mëllerdall. Den Tour verbënnt schmuel Weeër am Bësch mat kuerze géie Stécker biergop."
+        ],
+        "moselle": [
+            "Ronderëm {p} féiert den Tour duerch d’Wéngerten un der Musel. Et geet biergop op d’Héichten, mat Siichten iwwer de Museldall.",
+            "Dës MTB-Ronn féiert duerch d’Géigend ronderëm {p} un der Musel: laanscht Wéngerten, iwwer Feldweeër op den Héichten an nees biergof a Richtung Floss.",
+            "{p} läit an der Muselregioun. Vum Dall geet et biergop bei d’Wéngerten, mat Siichten iwwer d’Musel, ier et nees biergof geet."
+        ],
+        "minett": [
+            "Ronderëm {p} geet et mam Mountainbike duerch de Minett: iwwer fréier Ofbaugebidder mat rouder Äerd an duerch e Netz vu schmuele Weeër a Bëschweeër.",
+            "Dës MTB-Ronn féiert duerch d’Géigend ronderëm {p} am Minett, wou haut Trails iwwer déi fréier Ofbaugebidder féieren.",
+            "{p} läit am Minett. Kuerz géi Passagen, Kéieren a Spuere vun der Industriegeschicht begleeden dësen Tour."
+        ],
+        "center": [
+            "Ronderëm {p} am Guttland féiert den Tour iwwer Feldweeër, duerch de Bësch an iwwer roueg Niewestroossen.",
+            "Dës MTB-Ronn féiert duerch d’Géigend ronderëm {p} am Guttland, tëscht Felder a Bëscher an der Mëtt vum Land.",
+            "{p} läit am Guttland. Op dëser Ronn wiesselen d’Passagen iwwer d’Felder mat kuerze Stécker duerch de Bësch of."
+        ]
+    },
 }
 
 MTB_LENGTH_SENTENCES = {
@@ -324,6 +426,11 @@ MTB_LENGTH_SENTENCES = {
         "At {l} km, the tour takes roughly {d} {h} to ride.",
         "The route measures {l} km — about {d} {h} of riding, depending on pace.",
     ],
+    "lb": [
+        "D’Ronn ass {l} km laang. Bei normalem Tempo ass ee mam Vëlo ongeféier {d} {h} ënnerwee.",
+        "Fir dësen Tour ({l} km) brauch ee mam Mountainbike ongeféier {d} {h}.",
+        "D’Streck ass {l} km laang. Jee nom Tempo dauert den Tour ongeféier {d} {h}."
+    ],
 }
 
 MTB_NATURE_CLAUSES = {
@@ -336,6 +443,11 @@ MTB_NATURE_CLAUSES = {
     "en": [", and most of it runs off-tarmac on forest and field tracks",
            ", with about half the distance unpaved",
            ", mixing quiet lanes with forest and field tracks"],
+    "lb": [
+        ", an de gréissten Deel vun der Streck féiert iwwer Bëschweeër a Feldweeër ouni Asphalt",
+        ", an ongeféier d’Hallschent vun der Streck ass net asphaltéiert",
+        ", an den Tour verbënnt roueg Stroosse mat Bëschweeër a Feldweeër"
+    ],
 }
 
 MTB_TERRAIN_SENTENCES = {
@@ -348,6 +460,11 @@ MTB_TERRAIN_SENTENCES = {
     "en": {"flat": "There are no big climbs — the loop rolls fast{nat}.",
            "rolling": "The route gathers about {g} m of climbing{nat}.",
            "hilly": "With some {g} m of climbing, the tour demands fitness{nat}."},
+    "lb": {
+        "flat": "Et geet nëmme wéineg biergop{nat}.",
+        "rolling": "Op der Streck kommen ongeféier {g} Héichtemeter zesummen{nat}.",
+        "hilly": "Mat ongeféier {g} Héichtemeter brauch een eng gutt Konditioun fir dësen Tour{nat}."
+    },
 }
 
 MTB_POI_SENTENCES = {
@@ -363,6 +480,17 @@ MTB_POI_SENTENCES = {
            "two": ["Along the way you pass {a} and {b}, among other sights.",
                     "On the route, among others: {a} and {b}.",
                     "Worth a look en route: {a} and {b}."]},
+    "lb": {
+        "one": [
+            "Ënnerwee ze gesinn: {a}.",
+            "Op der Streck: {a}."
+        ],
+        "two": [
+            "Ënnerwee ze gesinn: {a} an {b}.",
+            "Op der Streck, ënner anerem: {a} an {b}.",
+            "Op dësem Tour ze gesinn: {a} an {b}."
+        ]
+    },
 }
 
 MTB_LANDSCAPE_SENTENCES = {
@@ -375,6 +503,11 @@ MTB_LANDSCAPE_SENTENCES = {
     "en": ["Most of the riding is on natural-surface tracks through woods and open country.",
            "Forest and field tracks alternate with quiet back roads.",
            "On small tracks, the tour links the prettiest corners of the area."],
+    "lb": [
+        "Et geet virun allem iwwer Weeër ouni Asphalt duerch de Bësch an iwwer d’Felder.",
+        "Bëschweeër a Feldweeër wiessele sech mat rouegen Niewestroossen of.",
+        "Iwwer kleng Weeër entdeckt een op dësem Tour d’Géigend ronderëm d’Uertschaft."
+    ],
 }
 
 MTB_PRACTICAL_SENTENCES = {
@@ -384,6 +517,10 @@ MTB_PRACTICAL_SENTENCES = {
            "Boucle balisée, le parcours n'a pas de départ imposé ; on suit le sens des flèches."],
     "en": ["The tour is signposted as a loop and can be started anywhere — helmet on and off you go.",
            "As a waymarked loop the route has no fixed start; ride in the direction of the arrows."],
+    "lb": [
+        "Den Tour ass als Ronn markéiert. Dir kënnt op all Punkt ufänken. Vergiesst den Helm net.",
+        "Dës markéiert Ronn huet kee feste Startpunkt. Fuert an d’Richtung vun de Feiler."
+    ],
 }
 
 MTB_HIGHLIGHT_LABELS = {
@@ -393,6 +530,12 @@ MTB_HIGHLIGHT_LABELS = {
            "bus": "Arrêt de bus sur le parcours"},
     "en": {"gain": "{g} m of climbing", "flat": "Fast-rolling route", "natural": "Mostly unpaved tracks",
            "bus": "Bus stop right on the route"},
+    "lb": {
+        "gain": "{g} Héichtemeter",
+        "flat": "Wéineg Héichtemeter",
+        "natural": "Virun allem Weeër ouni Asphalt",
+        "bus": "Busarrêt direkt op der Streck"
+    },
 }
 
 BANKS = {
@@ -411,12 +554,14 @@ BANKS = {
 }
 
 
-# Only a bare "1" is singular — "1½" takes the plural in both languages.
-HOUR_WORD = {"de": ("Stunde", "Stunden"), "fr": ("h", "h"), "en": ("hour", "hours")}
+HOUR_WORD = {"de": ("Stunde", "Stunden"), "fr": ("h", "h"), "en": ("hour", "hours"),
+             "lb": ("Stonn", "Stonnen")}
 
 
 def _hour_word(duration: str, lang: str) -> str:
     singular, plural = HOUR_WORD[lang]
+    if lang == "lb" and duration.strip() == "½":
+        return singular
     return singular if duration.strip() == "1" else plural
 
 

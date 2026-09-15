@@ -1,24 +1,19 @@
-"""UI strings for the generated trail pages — DE / FR / EN.
+"""UI strings for the generated trail pages — DE / FR / EN / LB."""
 
-Luxembourgish is deliberately absent: these pages must render exactly the
-language their <html lang> declares, and there is no Luxembourgish source text
-for them. (The original reason was AdSense, which was dropped in Sep 2026.)
-"""
-
-LANG_NAMES = {"de": "Deutsch", "fr": "Français", "en": "English"}
+LANG_NAMES = {"de": "Deutsch", "fr": "Français", "en": "English", "lb": "Lëtzebuergesch"}
 
 REGIONS = {
-    "center": {"de": "Zentrum / Guttland", "fr": "Centre / Guttland", "en": "Centre / Guttland"},
-    "mullerthal": {"de": "Müllerthal – Kleine Luxemburger Schweiz", "fr": "Mullerthal – Petite Suisse", "en": "Mullerthal – Little Switzerland"},
-    "moselle": {"de": "Mosel", "fr": "Moselle", "en": "Moselle"},
-    "minett": {"de": "Minett – Rote Erde", "fr": "Minett – Terres Rouges", "en": "Minett – Red Rocks"},
-    "eislek": {"de": "Éislek – Ardennen", "fr": "Éislek – Ardennes", "en": "Éislek – Ardennes"},
+    "center": {"de": "Zentrum / Guttland", "fr": "Centre / Guttland", "en": "Centre / Guttland", "lb": "Zentrum / Guttland"},
+    "mullerthal": {"de": "Müllerthal – Kleine Luxemburger Schweiz", "fr": "Mullerthal – Petite Suisse", "en": "Mullerthal – Little Switzerland", "lb": "Mëllerdall – Kleng Lëtzebuerger Schwäiz"},
+    "moselle": {"de": "Mosel", "fr": "Moselle", "en": "Moselle", "lb": "Musel"},
+    "minett": {"de": "Minett – Rote Erde", "fr": "Minett – Terres Rouges", "en": "Minett – Red Rocks", "lb": "Minett – Rout Äerd"},
+    "eislek": {"de": "Éislek – Ardennen", "fr": "Éislek – Ardennes", "en": "Éislek – Ardennes", "lb": "Éislek – Ardennen"},
 }
 
 DIFFICULTIES = {
-    "easy": {"de": "leicht", "fr": "facile", "en": "easy"},
-    "moderate": {"de": "mittel", "fr": "moyenne", "en": "moderate"},
-    "hard": {"de": "anspruchsvoll", "fr": "exigeante", "en": "challenging"},
+    "easy": {"de": "leicht", "fr": "facile", "en": "easy", "lb": "einfach"},
+    "moderate": {"de": "mittel", "fr": "moyenne", "en": "moderate", "lb": "mëttelschwéier"},
+    "hard": {"de": "anspruchsvoll", "fr": "exigeante", "en": "challenging", "lb": "schwéier"},
 }
 
 EXTRA = {
@@ -55,6 +50,22 @@ EXTRA = {
            "search_placeholder": "Search a place or trail …",
            "search_label": "Search trails",
            "no_results": "No trail matches that search."},
+    "lb": {
+        "fact_gain": "Héichtemeter",
+        "photos_title": "Fotoe vum Wee",
+        "profile_title": "Héichteprofil",
+        "photo_via": "iwwer Wikimedia Commons",
+        "dl_gpx": "GPX-Datei eroflueden",
+        "open_komoot": "A Komoot plangen",
+        "open_start": "Startpunkt op Google Maps",
+        "sister_mtb": "🚵 Och kucken: MTB-Touren zu Lëtzebuerg",
+        "sister_hiking": "🥾 Och kucken: Auto-Pédestre-Weeër zu Lëtzebuerg",
+        "map_link": "🗺️ All d’Weeër op enger Kaart kucken",
+        "map_button": "🗺️ Kaart opmaachen",
+        "search_placeholder": "Eng Uertschaft oder e Wee sichen …",
+        "search_label": "Weeër sichen",
+        "no_results": "Kee Wee passt zu dëser Sich."
+    },
 }
 
 UI_MTB = {
@@ -175,6 +186,45 @@ UI_MTB = {
         "lang_switch_label": "Language",
         "card_cta": "View tour",
     },
+    "lb": {
+        "site_name": "MTB Trails Lëtzebuerg",
+        "index_title": "MTB Trails Lëtzebuerg — all d’Touren mat Kaart, GPX an Urees mam Bus",
+        "index_meta": "Déi markéiert MTB-Touren zu Lëtzebuerg: eng interaktiv Kaart, Héichteprofil, GPX-Datei an Urees mam gratis Bus fir all Tour.",
+        "index_h1": "MTB-Touren zu Lëtzebuerg",
+        "index_intro": [
+            "Zu Lëtzebuerg gëtt et vill markéiert MTB-Ronnen: national Circuiten, RedRock-Trails op de fréieren Ofbaugebidder am Süden a lokal Ronnen am Éislek an am Mëllerdall. Déi meescht si permanent markéiert a fänken an Uertschaften un, déi mam Bus erreechbar sinn. De Bus ass am ganze Land gratis.",
+            "Op dëser Säit gëtt all Tour eenzel virgestallt: mat enger interaktiver Kaart, der Längt, dem Héichteprofil, der geschater Fuerzäit, enger GPX-Datei an de Busarrêten op der Streck. D’Streckendate kommen aus OpenStreetMap. D’Busarrête kommen aus den offizielle Fuerplangdate vu Lëtzebuerg."
+        ],
+        "trail_title": "{name} — MTB-Tour ronderëm {commune} | MTB Trails Lëtzebuerg",
+        "trail_meta": "{name}: eng {length} km laang MTB-Ronn ronderëm {commune} ({region}). Kaart, Héichteprofil, GPX an Urees mam Bus.",
+        "photo_alt": "Foto vun der MTB-Tour {name} bei {commune}",
+        "nearby_title": "MTB-Touren an der Géigend",
+        "nearby_dist": "{d} km ewech",
+        "facts_title": "Op ee Bléck",
+        "fact_length": "Längt",
+        "fact_duration": "Fuerzäit",
+        "fact_difficulty": "Schwieregkeet",
+        "fact_region": "Regioun",
+        "fact_commune": "Gemeng",
+        "fact_type": "Typ",
+        "fact_type_value": "Ronn (MTB)",
+        "duration_fmt": "ongeféier {} h",
+        "highlights_title": "Wat et ënnerwee ze gesi gëtt",
+        "map_title": "Kaart",
+        "map_note": "De Verlaf vun der Streck kënnt aus OpenStreetMap. Op der Plaz si kleng Ofwäichunge méiglech. Follegt den MTB-Markéierungen op der Streck.",
+        "bus_title": "Urees mam Bus",
+        "bus_intro": "Den ëffentlechen Transport ass zu Lëtzebuerg gratis. Dës Busarrête leien op der Streck:",
+        "bus_dist": "{} m vun der Streck",
+        "bus_lines": "Linnen",
+        "bus_no_lines": "kuckt de Fuerplang",
+        "bus_live": "Aktuell Departen op alle Busarrêten: ian.lu/bus",
+        "all_trails": "All d’Touren",
+        "filter_all": "All d’Regiounen",
+        "footer_note": "E Projet vun ian.lu · Streckendaten © OpenStreetMap-Mataarbechter · Fuerplangdaten: data.public.lu",
+        "breadcrumb_home": "MTB Trails",
+        "lang_switch_label": "Sprooch",
+        "card_cta": "Den Tour kucken"
+    },
 }
 
 UI = {
@@ -185,7 +235,7 @@ UI = {
         "index_h1": "Autopédestre-Rundwanderwege in Luxemburg",
         "index_intro": [
             "Die Autopédestres sind Luxemburgs klassische Rundwanderwege: {n} lokale Schleifen im ganzen Land, dauerhaft mit dem blauen Symbol markiert und so angelegt, dass man immer wieder am Ausgangspunkt ankommt. Viele wurden vor Jahrzehnten für Ausflügler mit dem Auto geschaffen — daher der Name — aber heute erreicht man die meisten bequem mit dem Bus, denn der öffentliche Verkehr ist in ganz Luxemburg kostenlos.",
-            "Diese Seite stellt die Wege einzeln vor — mit interaktiver Karte, Länge, ungefährer Gehzeit, Schwierigkeit und den Bushaltestellen direkt am Weg. Die Liste folgt dem offiziellen Verzeichnis auf geoportail.lu, das von 201 auf heute {n} Rundwege gekürzt wurde — was hier steht, ist also tatsächlich noch markiert. Die Streckendaten stammen aus OpenStreetMap und aus den offenen Daten der Kataster- und Vermessungsverwaltung, die Haltestellen aus den offiziellen Fahrplandaten Luxemburgs.",
+            "Diese Seite stellt die Wege einzeln vor — mit interaktiver Karte, Länge, ungefährer Gehzeit, Schwierigkeit und den Bushaltestellen direkt am Weg. Die Liste folgt dem offiziellen Verzeichnis auf geoportail.lu, das von 201 auf heute {n} Rundwege gekürzt wurde — was hier steht, ist also tatsächlich noch markiert. Die Streckendaten stammen aus OpenStreetMap und aus den offenen Daten der Kataster- und Topografieverwaltung, die Haltestellen aus den offiziellen Fahrplandaten Luxemburgs.",
         ],
         "trail_title": "{name} — Rundwanderweg {commune} | Autopédestres Luxemburg",
         "trail_meta": "{name}: {length} km Rundwanderweg bei {commune} ({region}). Karte, Gehzeit, Schwierigkeit und Anreise mit dem Bus.",
@@ -297,6 +347,46 @@ UI = {
         "breadcrumb_home": "Auto-Pédestres",
         "lang_switch_label": "Language",
         "card_cta": "View trail",
+    },
+    "lb": {
+        "site_name": "Auto-Pédestres Lëtzebuerg",
+        "index_title": "Auto-Pédestres Lëtzebuerg — all d’Ronne mat Kaart an Urees mam Bus",
+        "index_meta": "D’Auto-Pédestre-Weeër zu Lëtzebuerg: eng interaktiv Kaart, Längt, Dauer, Schwieregkeet an Urees mam gratis Bus fir all Ronn.",
+        "index_h1": "Auto-Pédestre-Weeër zu Lëtzebuerg",
+        "index_intro": [
+            "D’Auto-Pédestres sinn déi klassesch Wanderweeër zu Lëtzebuerg: {n} Ronnen uechter d’Land, déi mat engem bloe Symbol markéiert sinn an ëmmer erëm op de Startpunkt zréckféieren. Vill dovu goufe viru Joerzéngte fir Leit ugeluecht, déi mam Auto wandere koumen — dohier den Numm. Haut kënnt ee bei déi meescht bequem mam Bus. Den ëffentlechen Transport ass am ganze Land gratis.",
+            "Op dëser Säit gëtt all Wee eenzel virgestallt: mat enger interaktiver Kaart, der Längt, der geschater Dauer, der Schwieregkeet an de Busarrêten direkt um Wee. D’Lëscht entsprécht dem offizielle Verzeechnes op geoportail.lu, dat vun 201 op {n} Ronne verkierzt gouf. D’Weeër op dëser Lëscht sinn also nach markéiert. D’Streckendate kommen aus OpenStreetMap an aus den oppenen Date vun der Kataster- an Topografieverwaltung. D’Busarrête kommen aus den offizielle Fuerplangdate vu Lëtzebuerg."
+        ],
+        "trail_title": "{name} — Wanderung ronderëm {commune} | Auto-Pédestres Lëtzebuerg",
+        "trail_meta": "{name}: eng {length} km laang Ronn ronderëm {commune} ({region}). Kaart, Dauer, Schwieregkeet an Urees mam Bus.",
+        "photo_alt": "Foto vum Wanderwee {name} bei {commune}",
+        "nearby_title": "Wanderweeër an der Géigend",
+        "nearby_dist": "{d} km ewech",
+        "facts_title": "Op ee Bléck",
+        "fact_length": "Längt",
+        "fact_duration": "Dauer vun der Wanderung",
+        "fact_difficulty": "Schwieregkeet",
+        "fact_region": "Regioun",
+        "fact_commune": "Gemeng",
+        "fact_type": "Typ",
+        "fact_type_value": "Ronn (Auto-Pédestre)",
+        "duration_fmt": "ongeféier {} h",
+        "highlights_title": "Wat et ënnerwee ze gesi gëtt",
+        "map_title": "Kaart",
+        "map_note": "De Verlaf vum Wee kënnt aus OpenStreetMap. Op der Plaz si kleng Ofwäichunge méiglech. Follegt de bloe Markéierungen um Wee.",
+        "map_note_official": "De Verlaf vum Wee kënnt aus den oppenen Date vun der Kataster- an Topografieverwaltung (data.public.lu / geoportail.lu, CC0). Op der Plaz si kleng Ofwäichunge méiglech. Follegt de bloe Markéierungen um Wee.",
+        "bus_title": "Urees mam Bus",
+        "bus_intro": "Den ëffentlechen Transport ass zu Lëtzebuerg gratis. Dës Busarrête leien um Wee:",
+        "bus_dist": "{} m vum Wee",
+        "bus_lines": "Linnen",
+        "bus_no_lines": "kuckt de Fuerplang",
+        "bus_live": "Aktuell Departen op alle Busarrêten: ian.lu/bus",
+        "all_trails": "All d’Weeër",
+        "filter_all": "All d’Regiounen",
+        "footer_note": "E Projet vun ian.lu · Streckendaten © OpenStreetMap-Mataarbechter · Fuerplangdaten: data.public.lu",
+        "breadcrumb_home": "Auto-Pédestres",
+        "lang_switch_label": "Sprooch",
+        "card_cta": "De Wee kucken"
     },
 }
 

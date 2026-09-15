@@ -12,8 +12,8 @@ Data flow (all under data/trails/):
 
 Trails without curated text get fact-driven descriptions from composer.py.
 
-Outputs: trails/** (chooser, 3×index, 3×N trail pages, geo, css) and
-sitemap-trails.xml at the repo root.
+Outputs: trails/** or mtb/** (chooser, 4×index, 4×N route pages, geo, css),
+the category sitemap and its URLs in sitemap.xml at the repo root.
 
 Usage: python3 scripts/trails/build.py
 """
@@ -22,6 +22,7 @@ from __future__ import annotations
 import html
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import date
@@ -40,12 +41,13 @@ CAT: dict = {}
 UI: dict = {}
 DATA_DIR = OUT_DIR = BASE_URL = ""
 
-LANGS = ("de", "fr", "en")
-GEAR_TITLES = {"de": "Ausrüstung", "fr": "Équipement", "en": "Gear"}
+LANGS = ("de", "fr", "en", "lb")
+GEAR_TITLES = {"de": "Ausrüstung", "fr": "Équipement", "en": "Gear", "lb": "Ausrëschtung"}
 AFFILIATE_DISCLOSURE = {
     "de": "Hinweis: Links können Partnerlinks sein.",
     "fr": "Remarque : certains liens peuvent être affiliés.",
     "en": "Note: links may be affiliate links.",
+    "lb": "Hiweis: Verschidde Linke kënne Partnerlinke sinn.",
 }
 PROFILE_W, PROFILE_H, PROFILE_PAD = 600, 130, 14
 
@@ -105,7 +107,8 @@ def merge_trails() -> list:
 
 
 def texts_for(trail: dict, lang: str) -> dict:
-    if trail["descriptions"] and trail["highlights"]:
+    if (trail["descriptions"] and trail["highlights"]
+            and trail["descriptions"].get(lang) and trail["highlights"].get(lang)):
         return {"paragraphs": trail["descriptions"][lang], "highlights": trail["highlights"][lang]}
     return compose({"slug": trail["slug"], "place": trail["place"]}, trail["entry"], trail["region"],
                    lang, CAT["key"], CAT["speed_kmh"], CAT["climb_m_per_h"])
@@ -435,7 +438,7 @@ def render_trail(tpl: Template, trail: dict, lang: str, affiliate: dict) -> str:
     )
 
 
-PRIVACY_LABEL = {"de": "Datenschutz", "fr": "Confidentialité", "en": "Privacy"}
+PRIVACY_LABEL = {"de": "Datenschutz", "fr": "Confidentialité", "en": "Privacy", "lb": "Dateschutz"}
 
 
 def privacy_link(lang: str) -> str:
@@ -584,6 +587,21 @@ def build_sitemap(trails: list) -> str:
     )
 
 
+def update_main_sitemap(sitemap: str) -> None:
+    path = os.path.join(REPO, "sitemap.xml")
+    with open(path, encoding="utf-8") as f:
+        current = f.read()
+    entries = "".join(re.findall(r"  <url>.*?</url>\n", sitemap, re.DOTALL))
+    category_urls = re.compile(
+        r"  <url>\s*<loc>" + re.escape(BASE_URL) + r"/[^<]*</loc>.*?</url>\n", re.DOTALL)
+    first = category_urls.search(current)
+    if not first:
+        write(path, current.replace("</urlset>", entries + "</urlset>"))
+        return
+    # Preserve unrelated sitemap entries byte for byte.
+    write(path, current[:first.start()] + entries + category_urls.sub("", current[first.start():]))
+
+
 def main() -> None:
     global CAT, UI, DATA_DIR, OUT_DIR, BASE_URL
     CAT, _ = pick_category(sys.argv[1:])
@@ -625,7 +643,9 @@ def main() -> None:
     prune_removed(trails)
     write_redirects(registry)
 
-    write(CAT["sitemap_file"], build_sitemap(trails))
+    sitemap = build_sitemap(trails)
+    write(CAT["sitemap_file"], sitemap)
+    update_main_sitemap(sitemap)
 
     with_photos = sum(1 for t in trails if t["entry"].get("images"))
     print(f"Built {len(trails) * len(LANGS) + len(LANGS) + 1} {CAT['key']} pages for {len(trails)} trails "

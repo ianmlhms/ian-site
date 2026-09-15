@@ -1,4 +1,4 @@
-/* UI strings for the trail map. DE / FR / EN only — no Luxembourgish source text. */
+/* UI strings for the trail map. DE / FR / EN / LB. */
 window.MAP_I18N = {
   de: {
     title: 'Wanderkarte Luxemburg',
@@ -101,13 +101,47 @@ window.MAP_I18N = {
     loading: 'Loading the map …',
     error: 'The map data could not be loaded.',
     backToList: 'Back to list'
+  },
+  lb: {
+    title: 'Wanderkaart Lëtzebuerg',
+    subtitle: '154 Auto-Pédestren an 37 Mountainbike-Ronnen op enger Kaart',
+    search: 'E Wee oder eng Uertschaft sichen …',
+    hiking: 'Wanderen',
+    mtb: 'Mountainbike',
+    filters: 'Filteren',
+    difficulty: 'Schwieregkeet',
+    region: 'Regioun',
+    maxLength: 'Max. Längt',
+    busOnly: 'Nëmme mat engem Busarrêt um Wee',
+    all: 'All',
+    easy: 'einfach',
+    moderate: 'mëttel',
+    hard: 'uspruchsvoll',
+    results: 'Weeër',
+    noResults: 'Kee Wee passt zu dëse Filteren.',
+    reset: 'Filteren zrécksetzen',
+    length: 'Längt',
+    gain: 'Héichtemeter',
+    duration: 'Dauer',
+    hours: 'Std.',
+    natural: 'Naturweeër',
+    bus: 'Bus',
+    onRoute: 'um Wee',
+    highlights: 'Geséinswäert',
+    openPage: 'All Infoen zum Wee',
+    gpx: 'GPX eroflueden',
+    locate: 'Mäi Standuert',
+    close: 'Zoumaachen',
+    loading: 'D\u2019Kaart gëtt gelueden …',
+    error: 'D\u2019Kaartendate konnten net gelueden ginn.',
+    backToList: 'Zréck op d\u2019Lëscht'
   }
 };
 
 window.MAP_REGIONS = {
-  center: { de: 'Zentrum / Guttland', fr: 'Centre / Guttland', en: 'Centre / Guttland' },
-  mullerthal: { de: 'Müllerthal', fr: 'Mullerthal', en: 'Mullerthal' },
-  moselle: { de: 'Mosel', fr: 'Moselle', en: 'Moselle' },
-  minett: { de: 'Minett – Rote Erde', fr: 'Minett – Terres Rouges', en: 'Minett – Red Rocks' },
-  eislek: { de: 'Éislek – Ardennen', fr: 'Éislek – Ardennes', en: 'Éislek – Ardennes' }
+  center: { de: 'Zentrum / Guttland', fr: 'Centre / Guttland', en: 'Centre / Guttland', lb: 'Zentrum / Guttland' },
+  mullerthal: { de: 'Müllerthal', fr: 'Mullerthal', en: 'Mullerthal', lb: 'Mëllerdall' },
+  moselle: { de: 'Mosel', fr: 'Moselle', en: 'Moselle', lb: 'Musel' },
+  minett: { de: 'Minett – Rote Erde', fr: 'Minett – Terres Rouges', en: 'Minett – Red Rocks', lb: 'Minett – Rout Äerd' },
+  eislek: { de: 'Éislek – Ardennen', fr: 'Éislek – Ardennes', en: 'Éislek – Ardennes', lb: 'Éislek – Ardennen' }
 };

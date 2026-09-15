@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="Luxembourg's Auto-Pédestre loop trails — maps, walking times and free-bus access. Available in Deutsch, Français and English." />
+  <meta name="description" content="Luxembourg's Auto-Pédestre loop trails — maps, walking times and free-bus access. Available in Deutsch, Français, English and Lëtzebuergesch." />
   <link rel="canonical" href="https://ian.lu/trails/" />
 $alternates
   <title>Auto-Pédestres Luxembourg — Wanderwege · Sentiers · Trails</title>
@@ -18,13 +18,13 @@ $alternates
     // switcher) wins; otherwise the browser language decides. The chooser
     // below stays as no-JS / crawler fallback.
     (function () {
-      var LANGS = ['de', 'fr', 'en'];
+      var LANGS = ['de', 'fr', 'en', 'lb'];
       var pref = null;
       try { pref = localStorage.getItem('trails_lang'); } catch (e) { /* private mode */ }
       if (LANGS.indexOf(pref) === -1) {
         var nav = (navigator.language || 'en').toLowerCase();
-        pref = (nav.indexOf('de') === 0 || nav.indexOf('lb') === 0) ? 'de'
-             : nav.indexOf('fr') === 0 ? 'fr' : 'en';
+        var lang = nav.split('-')[0];
+        pref = LANGS.indexOf(lang) !== -1 ? lang : 'en';
       }
       location.replace(pref + '/');
     })();
@@ -36,6 +36,7 @@ $alternates
       <a class="lang-card" href="de/" lang="de" data-lang="de"><strong>Deutsch</strong><span>Rundwanderwege mit Karte &amp; Busanreise</span></a>
       <a class="lang-card" href="fr/" lang="fr" data-lang="fr"><strong>Français</strong><span>Boucles de randonnée avec carte &amp; accès en bus</span></a>
       <a class="lang-card" href="en/" lang="en" data-lang="en"><strong>English</strong><span>Loop trails with maps &amp; bus access</span></a>
+      <a class="lang-card" href="lb/" lang="lb" data-lang="lb"><strong>Lëtzebuergesch</strong><span>Wanderronne mat Kaart an Urees mam Bus</span></a>
     </div>
     <script>
       document.querySelectorAll('[data-lang]').forEach(function (a) {

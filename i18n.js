@@ -21,13 +21,14 @@
   "use strict";
 
   var LANGS = ["lb", "de", "en"];
-  // English is the default because the static markup's fallback text IS
-  // English: a crawler with no JS sees English, so anything else would make
-  // <html lang> a lie. (AdSense originally forced this; it was dropped in
-  // Sep 2026, but an honest lang declaration is still the right default.)
-  // Luxembourgish is still auto-selected for people whose browser asks for
-  // it, and any explicit choice is remembered.
-  var DEFAULT_LANG = "en";
+  // Luxembourgish is the default again (it was forced to English in Jul 2026
+  // only because AdSense rejects the language; AdSense was dropped in Sep 2026).
+  // Both states stay honest about <html lang>: applyAll() below sets
+  // documentElement.lang to the active language, so a JS visitor gets lb text
+  // under lang="lb", while a no-JS crawler still sees the static English
+  // fallback markup under the static lang="en". An explicit choice wins over
+  // both, and de/en are still auto-selected from the browser.
+  var DEFAULT_LANG = "lb";
   var STORE_KEY = "site_lang";
   var DICT = window.I18N_DICT || {};
 
@@ -38,13 +39,10 @@
     } catch (e) {
       return DEFAULT_LANG;                   // private mode: no stored choice
     }
-    // No stored choice yet: follow the browser. Only "lb" and "de" are picked
-    // up automatically; everything else (including crawlers, which announce no
-    // useful preference) lands on English.
-    var nav = "";
-    try { nav = (navigator.language || "").slice(0, 2).toLowerCase(); } catch (e) {}
-    if (nav === "lb") return "lb";
-    if (nav === "de") return "de";
+    // No stored choice yet: Luxembourgish, the site's own language. Browser
+    // sniffing was only added in Jul 2026 to keep an AdSense reviewer off the
+    // Luxembourgish homepage; with AdSense gone the site speaks lb by default
+    // again, and the switcher remembers anything else you pick.
     return DEFAULT_LANG;
   }
 
