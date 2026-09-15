@@ -25,7 +25,18 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .layer{position:absolute;display:block;pointer-events:none}
 .scene-room{inset:0;width:100%;height:100%;object-fit:cover}
 .scene-guests{left:2%;width:46%;bottom:40%;opacity:.95}
-.scene-counter{left:-2%;width:104%;bottom:0;z-index:3}
+/* The counter art is a 1268x253 band stretched to 104% of the scene WIDTH, so its
+   height follows the scene's width and has nothing to do with the scene's height.
+   The customers and the tray used to sit at a percentage of the scene HEIGHT
+   (bottom:22% / bottom:8%), so on a short, wide scene the counter grew past both:
+   the customers ended up behind it with only a sliver of hair showing, and the tray
+   landed on the wood front panel instead of the counter top. Everything that has to
+   line up with the counter now lives inside this band, whose aspect-ratio keeps it
+   exactly as tall as the art at every size. min-height stops the counter becoming a
+   sliver on a narrow phone; object-fit:cover then crops the band's ends, which are
+   off-screen anyway at 104%, instead of stretching the art. */
+.counter-band{position:absolute;left:-2%;width:104%;bottom:0;aspect-ratio:1268/253;min-height:124px;z-index:3;pointer-events:none}
+.scene-counter{inset:0;width:100%;height:100%;object-fit:cover;object-position:center top;z-index:2}
 .deco-layer{position:absolute;pointer-events:none}
 .deco-plants{left:1%;bottom:25%;width:14%}
 .deco-chairs{right:21%;bottom:26%;width:13%}
@@ -34,11 +45,16 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .deco-music{right:2%;bottom:26%;width:14%}
 .scene-floor{left:0;right:0;bottom:22%;height:18%;width:100%;object-fit:cover;opacity:.55;mix-blend-mode:multiply}
 
-/* customers stand behind the counter */
-.customers{position:absolute;left:3%;right:3%;bottom:22%;z-index:2;min-height:70px;display:grid;grid-template-columns:repeat(var(--counter-slots,3),minmax(0,1fr));gap:4px;align-items:end}
+/* Customers stand behind the counter: their feet are hidden by it and the top edge
+   of the art crosses them at 82% of the counter's height, so head and torso always
+   read, on a tall desktop scene and a short phone one alike. */
+.customers{position:absolute;left:5%;right:5%;bottom:82%;z-index:1;min-height:70px;display:grid;grid-template-columns:repeat(var(--counter-slots,3),minmax(0,1fr));gap:4px;align-items:end}
 .customer{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:0}
 .customer.empty{visibility:hidden}
-.customer-art{width:min(96px,22vw);height:min(96px,22vw);filter:drop-shadow(0 4px 5px rgba(0,0,0,.45))}
+/* Qualified with .customer on purpose: the generic .sprite rule further down the
+   sheet sets 46px at the same specificity, and being later it used to win, so the
+   customers were rendered at sprite size on every phone. */
+.customer .customer-art{width:min(96px,22vw);height:min(96px,22vw);filter:drop-shadow(0 4px 5px rgba(0,0,0,.45))}
 .order-bubble{order:-1;min-height:34px;display:flex;align-items:center;justify-content:center;gap:1px;padding:3px 5px;margin-bottom:2px;border:2px solid #d8b98a;border-radius:11px;background:#fffdf5;color:#251d2d;box-shadow:0 3px 6px rgba(0,0,0,.35)}
 .order-item{width:28px;height:28px;display:grid;place-items:center}
 .order-bubble .sprite{width:26px;height:26px}
@@ -46,9 +62,10 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .patience{width:min(66px,15vw);height:7px;margin-bottom:2px;order:-2;border-radius:9px;background:#00000055;overflow:hidden;box-shadow:0 1px 2px #0006}
 .patience-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--red),var(--gold),var(--green));transform-origin:left}
 
-/* the tray sits on the counter top */
-.tray-zone{position:absolute;left:6%;right:6%;bottom:8%;z-index:4}
-.tray{min-height:54px;display:grid;grid-template-columns:repeat(var(--tray-slots,2),minmax(46px,1fr));gap:5px}
+/* The cream counter top is the upper 92 of the art's 253 rows (36%); below that is
+   the wood front. Anchoring the tray to the band's top keeps it on the cream. */
+.tray-zone{position:absolute;left:8%;right:8%;top:1%;z-index:3;pointer-events:auto}
+.tray{min-height:50px;display:grid;grid-template-columns:repeat(var(--tray-slots,2),minmax(46px,1fr));gap:5px}
 .tray-slot,.station-slot{position:relative;display:grid;place-items:center;min-width:var(--tap);min-height:44px;border:2px dashed #7a5a3a99;border-radius:12px;background:#ffffff1f}
 .tray-slot.filled{border-style:solid;border-color:#ffd977;background:#ffe9b833;animation:pop .18s ease-out}
 .tray-slot.shake{animation:shake .32s linear}
@@ -61,7 +78,9 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .station{min-height:124px;padding:6px;display:flex;flex-direction:column;gap:5px;border:1px solid #9a6a42;border-radius:14px;background:linear-gradient(160deg,#6b4a30e6,#412e1fe6);box-shadow:0 4px 0 #2a1c12}
 .station-title{display:flex;align-items:center;gap:5px;min-height:26px;font-size:13px;font-weight:900}
 .station-title .sprite{width:30px;height:30px}
-.station-slots{display:grid;grid-template-columns:repeat(2,minmax(44px,1fr));gap:5px;flex:1}
+/* One column per slot that actually exists. A hardcoded 2 left a single-slot grill,
+   fryer or drink tap filling half its station, which read as a broken empty panel. */
+.station-slots{display:grid;grid-template-columns:repeat(var(--slot-count,2),minmax(44px,1fr));gap:5px;flex:1}
 .station-slot{border-style:solid;border-color:#a9805288;overflow:hidden}
 .station-slot .state-label{position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:6px;background:rgba(10,8,14,.78);font-size:9px;text-transform:uppercase}
 .station-slot.ready{border-color:var(--green);box-shadow:inset 0 0 12px rgba(118,214,107,.3)}
@@ -109,7 +128,7 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 .boot-error{margin:auto;padding:18px;color:#ffaca4;text-align:center}
 @keyframes pop{0%{transform:scale(.75)}100%{transform:scale(1)}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-@media(min-width:600px){.stations{grid-template-columns:repeat(4,minmax(0,1fr))}.station{min-height:168px}.customer-art{width:82px;height:82px}.hud-value{font-size:16px}}
+@media(min-width:600px){.stations{grid-template-columns:repeat(4,minmax(0,1fr))}.station{min-height:168px}.customer .customer-art{width:82px;height:82px}.hud-value{font-size:16px}}
 @media(max-height:670px){.brand{display:none}.station{min-height:116px}.game-shell{gap:5px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -123,10 +142,12 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
       <img class="layer scene-floor" id="sceneFloor" src="/pb/burger/art/deco-floor.webp?v=3" alt="" decoding="async" hidden>
       <img class="layer scene-guests" src="/pb/burger/art/guests-seated.webp?v=3" alt="" decoding="async">
       <div class="deco" id="deco"></div>
-      <div class="customers" id="customers"></div>
-      <img class="layer scene-counter" src="/pb/burger/art/counter-persp.webp?v=3" alt="" decoding="async">
+      <div class="counter-band">
+        <div class="customers" id="customers"></div>
+        <img class="layer scene-counter" src="/pb/burger/art/counter-persp.webp?v=3" alt="" decoding="async">
+        <div class="tray-zone"><div class="tray" id="tray"></div></div>
+      </div>
       <div class="scene-status"><span id="queueStatus">Get ready!</span><span id="trayStatus">0 / 2</span></div>
-      <div class="tray-zone"><div class="tray" id="tray"></div></div>
     </div>
     <div class="kitchen">
       <section class="stations" aria-label="Kitchen stations">
@@ -171,6 +192,6 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
   window.addEventListener("unhandledrejection",showBootError);
 })();
 </script>
-<script type="module" src="/pb/burger/ui.js?v=3"></script>
+<script type="module" src="/pb/burger/ui.js?v=4"></script>
 </body>
 </html>

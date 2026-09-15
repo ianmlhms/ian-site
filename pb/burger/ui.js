@@ -222,6 +222,7 @@ const renderHeatStation = (element, station) => {
     button.append(label);
     return button;
   });
+  element.style.setProperty("--slot-count", buttons.length);
   element.replaceChildren(...buttons);
 };
 
@@ -251,6 +252,7 @@ const renderDrinks = () => {
     button.append(label);
     return button;
   });
+  nodes.drinks.style.setProperty("--slot-count", buttons.length);
   nodes.drinks.replaceChildren(...buttons);
 };
 
