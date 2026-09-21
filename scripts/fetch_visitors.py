@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Aggregate ian.lu's GoatCounter pageviews into public.site_traffic.
+
+GoatCounter's stats endpoints only ever return a pageview `count` -- there is no
+unique-visitor field on /api/v0/stats/total or /stats/hits. The export API does
+carry it: every individual pageview row has a Session and a FirstVisit flag, and
+counting the first visits gives the unique visitors the dashboard shows.
+
+Only aggregates are stored. The raw export (which contains session ids, user
+agents and coarse locations) is written to a temporary file and deleted.
+
+    python3 scripts/fetch_visitors.py
+
+Hourly by launchd (lu.ian.visitors). That agent runs a copy kept outside
+OneDrive, because launchd cannot read ~/Library/CloudStorage; this file is the
+source of truth, so reinstall after editing it:
+
+    cp scripts/fetch_visitors.py \
+       "$HOME/Library/Application Support/ian-visitors/fetch_visitors.py"
+
+The token is read from ~/.config/goatcounter/.env and never printed or passed as
+an argument. Rows go to Postgres, not to a file under data/, because the site is
+static and public -- a committed file would make the private page cosmetic.
+"""
+import csv
+import glob
+import gzip
+import io
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+SITE = "https://ianm.goatcounter.com"
+TOKEN_FILE = os.path.expanduser("~/.config/goatcounter/.env")
+TOKEN_KEY = "GOATCOUNTER_TOKEN"
+# Addressed by ref rather than by being run inside the repo: a launchd agent
+# cannot read ~/Library/CloudStorage (macOS refuses it with "Operation not
+# permitted"), so the hourly copy of this script lives outside OneDrive.
+PROJECT_REF = "lvksqmgfwkfbblfsozfk"
+EXPORT_POLL_SECONDS = 4
+EXPORT_MAX_POLLS = 45
+REQUEST_TIMEOUT = 120
+TOP_PAGES_PER_DAY = 10
+RATE_LIMITED_EXIT = 0   # a cron run that is rate limited is not a failure
+
+
+def read_token():
+    try:
+        with open(TOKEN_FILE, encoding="utf-8") as handle:
+            for line in handle:
+                key, separator, value = line.partition("=")
+                if separator and key.strip() == TOKEN_KEY and value.strip():
+                    return value.strip()
+    except FileNotFoundError:
+        pass
+    sys.exit("No GoatCounter token. Create one at %s/user/api and save it to %s"
+             % (SITE, TOKEN_FILE))
+
+
+def api(token, path, method="GET", payload=None):
+    body = json.dumps(payload).encode() if payload is not None else None
+    request = urllib.request.Request(
+        SITE + path, data=body, method=method,
+        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+        raw = response.read()
+        return json.loads(raw) if raw else {}
+
+
+def start_export(token):
+    """Kick off a full export, or None when the hourly rate limit is in force."""
+    try:
+        return api(token, "/api/v0/export", "POST",
+                   {"format": "csv", "start_from_hit_id": 0})
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", "replace")
+        if error.code == 429 or "rate limited" in detail.lower():
+            print("Rate limited (GoatCounter allows one export per hour); "
+                  "leaving the existing figures in place.")
+            return None
+        sys.exit("Export request failed: HTTP %d %s" % (error.code, detail[:200]))
+
+
+def wait_for_export(token, export_id):
+    for _ in range(EXPORT_MAX_POLLS):
+        status = api(token, "/api/v0/export/%s" % export_id)
+        if status.get("error"):
+            sys.exit("GoatCounter could not build the export: %s" % status["error"])
+        if status.get("finished_at"):
+            return status
+        time.sleep(EXPORT_POLL_SECONDS)
+    sys.exit("Export did not finish in %d seconds." % (EXPORT_POLL_SECONDS * EXPORT_MAX_POLLS))
+
+
+def download_rows(token, export_id):
+    """Yield the export's CSV rows as dicts, from a temp file that is removed."""
+    request = urllib.request.Request(
+        SITE + "/api/v0/export/%s/download" % export_id,
+        headers={"Authorization": "Bearer " + token})
+    handle, temp_path = tempfile.mkstemp(prefix="gc-export-", suffix=".csv.gz")
+    os.close(handle)
+    try:
+        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response, \
+                open(temp_path, "wb") as out:
+            out.write(response.read())
+        try:
+            with gzip.open(temp_path, "rt", encoding="utf-8", errors="replace") as text:
+                return list(csv.DictReader(text))
+        except (OSError, EOFError):
+            with open(temp_path, "rt", encoding="utf-8", errors="replace") as text:
+                return list(csv.DictReader(text))
+    finally:
+        os.remove(temp_path)
+
+
+def is_true(value):
+    return str(value).strip().lower() in {"true", "1", "yes", "t"}
+
+
+def column(row, *names):
+    """Fetch a column by any of its spellings; GoatCounter has renamed some."""
+    for name in names:
+        if name in row and row[name] not in (None, ""):
+            return row[name]
+    return ""
+
+
+def aggregate(rows):
+    """day -> {unique_visitors, pageviews, top_pages}."""
+    days = {}
+    for row in rows:
+        stamp = column(row, "Date", "date", "created_at")
+        if not stamp:
+            continue
+        day = stamp[:10]
+        if is_true(column(row, "Bot", "bot")):
+            continue
+        entry = days.setdefault(day, {"pageviews": 0, "sessions": set(),
+                                      "first_visits": 0, "paths": {}})
+        path = column(row, "Path", "path") or "/"
+        entry["pageviews"] += 1
+        entry["paths"][path] = entry["paths"].get(path, 0) + 1
+        session = column(row, "Session", "session")
+        if session:
+            entry["sessions"].add(session)
+        if is_true(column(row, "FirstVisit", "first_visit")):
+            entry["first_visits"] += 1
+
+    result = {}
+    for day, entry in days.items():
+        # FirstVisit is what the dashboard counts; distinct sessions is the
+        # fallback for exports that predate the flag.
+        unique = entry["first_visits"] or len(entry["sessions"])
+        top = sorted(entry["paths"].items(), key=lambda item: (-item[1], item[0]))
+        result[day] = {
+            "unique_visitors": unique,
+            "pageviews": entry["pageviews"],
+            "top_pages": [{"path": p, "views": n} for p, n in top[:TOP_PAGES_PER_DAY]],
+        }
+    return result
+
+
+def store(daily):
+    """Upsert into public.site_traffic through the Supabase CLI.
+
+    The payload is passed as one dollar-quoted JSON literal so that paths
+    containing quotes cannot break or inject into the statement.
+    """
+    payload = [{"day": day, **values} for day, values in sorted(daily.items())]
+    statement = (
+        "insert into public.site_traffic\n"
+        "  (day, unique_visitors, pageviews, top_pages, updated_at)\n"
+        "select (r->>'day')::date, (r->>'unique_visitors')::int,\n"
+        "       (r->>'pageviews')::int, r->'top_pages', now()\n"
+        "from jsonb_array_elements($gcpayload$%s$gcpayload$::jsonb) as r\n"
+        "on conflict (day) do update set\n"
+        "  unique_visitors = excluded.unique_visitors,\n"
+        "  pageviews = excluded.pageviews,\n"
+        "  top_pages = excluded.top_pages,\n"
+        "  updated_at = now();\n" % json.dumps(payload)
+    )
+    with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False,
+                                     encoding="utf-8") as handle:
+        handle.write(statement)
+        sql_path = handle.name
+    try:
+        result = subprocess.run(
+            ["supabase", "db", "query", "--linked",
+             "--project-ref", PROJECT_REF, "-f", sql_path],
+            capture_output=True, text=True, timeout=180)
+        if result.returncode != 0:
+            sys.exit("Writing to Supabase failed:\n%s" % (result.stderr or result.stdout)[:400])
+    finally:
+        os.remove(sql_path)
+
+
+def main():
+    token = read_token()
+    export = start_export(token)
+    if export is None:
+        return RATE_LIMITED_EXIT
+    export_id = export.get("id")
+    if not export_id:
+        sys.exit("GoatCounter did not return an export id: %s" % json.dumps(export)[:200])
+    wait_for_export(token, export_id)
+    rows = download_rows(token, export_id)
+    if not rows:
+        sys.exit("The export was empty - refusing to overwrite the stored figures.")
+    daily = aggregate(rows)
+    if not daily:
+        sys.exit("No dated rows in the export - refusing to overwrite.")
+    store(daily)
+    newest = max(daily)
+    print("Stored %d days from %d pageviews. Latest %s: %d unique, %d views."
+          % (len(daily), len(rows), newest,
+             daily[newest]["unique_visitors"], daily[newest]["pageviews"]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
