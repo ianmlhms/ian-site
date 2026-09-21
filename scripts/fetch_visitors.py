@@ -37,8 +37,13 @@ import urllib.parse
 import urllib.request
 
 SITE = "https://ianm.goatcounter.com"
-TOKEN_FILE = os.path.expanduser("~/.config/goatcounter/.env")
+# Checked in order, so a host can keep both keys in one file (brix) or the
+# GoatCounter token on its own (the Mac, which uses the Supabase CLI instead).
+CONFIG_FILES = (os.path.expanduser("~/.config/goatcounter/.env"),
+                os.path.expanduser("~/.config/ianlu/traffic.env"),
+                "/workspace/ian-traffic/.env")
 TOKEN_KEY = "GOATCOUNTER_TOKEN"
+DATABASE_URL_KEY = "TRAFFIC_DB_URL"
 # Addressed by ref rather than by being run inside the repo: a launchd agent
 # cannot read ~/Library/CloudStorage (macOS refuses it with "Operation not
 # permitted"), so the hourly copy of this script lives outside OneDrive.
@@ -47,20 +52,30 @@ EXPORT_POLL_SECONDS = 4
 EXPORT_MAX_POLLS = 45
 REQUEST_TIMEOUT = 120
 TOP_PAGES_PER_DAY = 10
-RATE_LIMITED_EXIT = 0   # a cron run that is rate limited is not a failure
+RATE_LIMITED_EXIT = 0   # a scheduled run that is rate limited is not a failure
+LOOP_DEFAULT_SECONDS = 3600  # GoatCounter's export limit; no point going faster
+
+
+def read_config(key):
+    """Look a key up in the env file, or return None. Values are never logged."""
+    for path in CONFIG_FILES:
+        try:
+            with open(path, encoding="utf-8") as handle:
+                for line in handle:
+                    name, separator, value = line.partition("=")
+                    if separator and name.strip() == key and value.strip():
+                        return value.strip()
+        except FileNotFoundError:
+            continue
+    return None
 
 
 def read_token():
-    try:
-        with open(TOKEN_FILE, encoding="utf-8") as handle:
-            for line in handle:
-                key, separator, value = line.partition("=")
-                if separator and key.strip() == TOKEN_KEY and value.strip():
-                    return value.strip()
-    except FileNotFoundError:
-        pass
+    token = os.environ.get(TOKEN_KEY) or read_config(TOKEN_KEY)
+    if token:
+        return token
     sys.exit("No GoatCounter token. Create one at %s/user/api and save it to %s"
-             % (SITE, TOKEN_FILE))
+             % (SITE, CONFIG_FILES[0]))
 
 
 def api(token, path, method="GET", payload=None):
@@ -190,17 +205,25 @@ def store(daily):
         handle.write(statement)
         sql_path = handle.name
     try:
-        result = subprocess.run(
-            ["supabase", "db", "query", "--linked",
-             "--project-ref", PROJECT_REF, "-f", sql_path],
-            capture_output=True, text=True, timeout=180)
+        # Two hosts, two clients. brix has psql but not the Supabase CLI, and it
+        # connects as `traffic_writer`, a role granted nothing beyond insert,
+        # select and update on this one table. The Mac has the CLI and no psql.
+        database_url = os.environ.get(DATABASE_URL_KEY) or read_config(DATABASE_URL_KEY)
+        if database_url:
+            command = ["psql", database_url, "--quiet", "--no-psqlrc",
+                       "-v", "ON_ERROR_STOP=1", "-f", sql_path]
+        else:
+            command = ["supabase", "db", "query", "--linked",
+                       "--project-ref", PROJECT_REF, "-f", sql_path]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=180)
         if result.returncode != 0:
-            sys.exit("Writing to Supabase failed:\n%s" % (result.stderr or result.stdout)[:400])
+            sys.exit("Writing to the database failed:\n%s"
+                     % (result.stderr or result.stdout)[:400])
     finally:
         os.remove(sql_path)
 
 
-def main():
+def run_once():
     token = read_token()
     export = start_export(token)
     if export is None:
@@ -223,5 +246,32 @@ def main():
     return 0
 
 
+def main(argv):
+    """One shot by default; --loop keeps running for the container on brix.
+
+    Looping in-process rather than adding cron or supercronic keeps the image to
+    python plus psql, and `restart: unless-stopped` already covers a crash.
+    """
+    if "--loop" not in argv:
+        return run_once()
+    index = argv.index("--loop")
+    interval = LOOP_DEFAULT_SECONDS
+    if index + 1 < len(argv):
+        try:
+            interval = max(60, int(argv[index + 1]))
+        except ValueError:
+            sys.exit("--loop takes a number of seconds")
+    while True:
+        try:
+            run_once()
+        except SystemExit as stop:
+            # One bad hour must not kill the daemon; the next run rebuilds
+            # every day from the full export anyway.
+            print("run failed: %s" % stop, flush=True)
+        except Exception as error:  # noqa: BLE001 - keep the loop alive
+            print("unexpected failure: %r" % error, flush=True)
+        time.sleep(interval)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

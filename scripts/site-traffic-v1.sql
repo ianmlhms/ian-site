@@ -28,3 +28,19 @@ create policy site_traffic_admin_read
 
 comment on table public.site_traffic is
   'Daily aggregate traffic from GoatCounter; admin-read only.';
+
+-- traffic_writer is a plain role, not the owner, so RLS applies to it too and
+-- the admin-read policy alone left every insert refused. These are scoped to
+-- that database role, so they widen nothing for anyone signing in to the site.
+drop policy if exists site_traffic_writer_select on public.site_traffic;
+create policy site_traffic_writer_select
+  on public.site_traffic for select to traffic_writer using (true);
+
+drop policy if exists site_traffic_writer_insert on public.site_traffic;
+create policy site_traffic_writer_insert
+  on public.site_traffic for insert to traffic_writer with check (true);
+
+drop policy if exists site_traffic_writer_update on public.site_traffic;
+create policy site_traffic_writer_update
+  on public.site_traffic for update to traffic_writer
+  using (true) with check (true);
