@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Aggregate ian.lu's GoatCounter pageviews into public.site_traffic.
 
-GoatCounter's stats endpoints only ever return a pageview `count` -- there is no
-unique-visitor field on /api/v0/stats/total or /stats/hits. The export API does
-carry it: every individual pageview row has a Session and a FirstVisit flag, and
-counting the first visits gives the unique visitors the dashboard shows.
+/api/v0/stats/total and /stats/hits return a single `count` per day or path, and
+that count is **unique visitors**, not pageviews -- verified against the export
+on seven consecutive days, where it matched the first-visit count exactly and
+was about half the row count. So the figure the API hands back has always been
+visitors; what it gives no way to reach is the pageview total.
+
+The export carries both: each row is one pageview, and rows flagged FirstVisit
+are the unique visitors. That is why this runs off the export rather than the
+much cheaper stats endpoint.
 
 Only aggregates are stored. The raw export (which contains session ids, user
 agents and coarse locations) is written to a temporary file and deleted.
