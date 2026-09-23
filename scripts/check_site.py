@@ -118,23 +118,41 @@ def js_referenced(pages: list) -> set:
 def check_i18n(pages: list, problems: list) -> None:
     """data-i18n keys must exist, or t() renders the raw key to the user.
 
-    Only pages that actually load i18n-dict.js are checked against it —
-    /geoportal/ and /kaart/ ship their own dictionaries.
+    Each page is checked against the dictionary it actually loads: the root
+    i18n-dict.js for the main site, or its own copy (the /pro/rdr/ client site
+    ships assets/js/i18n-dict.js). Matching the bare filename used to check
+    RDR's pages against the root dictionary and report ~145 false errors,
+    which buried any real one. /geoportal/ and /kaart/ load neither.
     """
-    dict_path = os.path.join(REPO, "i18n-dict.js")
-    if not os.path.exists(dict_path):
-        return
-    src = open(dict_path, encoding="utf-8").read()
-    keys = set(re.findall(r'"([\w.]+)"\s*:\s*\{', src))
+    script = re.compile(r'<script[^>]+src\s*=\s*["\']([^"\'?#]*i18n-dict\.js)')
     used = re.compile(r'data-i18n(?:-html)?\s*=\s*["\']([^"\']+)["\']')
+    key_cache: dict = {}
+
+    def dictionary_keys(path: str):
+        if path not in key_cache:
+            if not os.path.exists(path):
+                key_cache[path] = None
+            else:
+                src = open(path, encoding="utf-8").read()
+                key_cache[path] = set(re.findall(r'"([\w.]+)"\s*:\s*\{', src))
+        return key_cache[path]
 
     for page in pages:
         html = read(page)
-        if "i18n-dict.js" not in html:
+        match = script.search(html)
+        if not match:
+            continue
+        src = match.group(1)
+        base = REPO if src.startswith("/") else os.path.join(REPO, os.path.dirname(page))
+        dict_path = os.path.normpath(os.path.join(base, src.lstrip("/")))
+        keys = dictionary_keys(dict_path)
+        label = os.path.relpath(dict_path, REPO)
+        if keys is None:
+            problems.append(("error", "i18n", f"{page}: loads {src}, which does not exist"))
             continue
         for key in set(used.findall(html)):
             if key not in keys:
-                problems.append(("error", "i18n", f"{page}: '{key}' missing from i18n-dict.js"))
+                problems.append(("error", "i18n", f"{page}: '{key}' missing from {label}"))
 
 
 def check_sitemap(problems: list) -> set:
