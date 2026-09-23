@@ -14,20 +14,19 @@ _Last updated: 20 July 2026._
 | **Working repo** | `~/OneDrive - Mulheims/website` (= `/Users/ian/Library/CloudStorage/OneDrive-Mulheims/website`). It's a git repo synced via OneDrive. |
 | **GitHub** | `https://github.com/ianmlhms/ian-site` (public). `gh` authed as **ianmlhms**. Push needs `gh auth setup-git`. Pushing workflow files needs the `workflow` scope. |
 | **Live site** | **https://ian.lu** (EuroDNS **Plesk** hosting, server IP `185.11.137.140`) — valid Let's Encrypt SSL, HTTP→HTTPS redirect on. |
-| **Also live** | GitHub Pages mirror: `https://ianmlhms.github.io/ian-site/`. |
+| **Stale mirror** | `https://ianmlhms.github.io/ian-site/` still exists but is **no longer updated** — `pages.yml` was removed 6 Jul 2026. Plesk is the only deploy target. |
 | **Registrar** | EuroDNS. **DNS is hosted at Microsoft 365** (nameservers `*.bdm.microsoftonline.com`). The website A record (`@` + `www`) points to the Plesk IP; **email/MX stays on Outlook — never touch it**. |
 
 ## 2. Deploy (how changes go live)
 
-Every `git push` to `main` triggers **two** deploys automatically:
-1. **GitHub Pages** (builds from `main`).
-2. **Plesk via FTP** — GitHub Actions `.github/workflows/deploy.yml` uses **lftp FTPS**
+Every `git push` to `main` triggers **one** deploy automatically (the GitHub Pages mirror was dropped 6 Jul 2026):
+- **Plesk via FTP** — GitHub Actions `.github/workflows/deploy.yml` uses **lftp FTPS**
    (cert verification off — Plesk self-signed) to mirror the repo into `httpdocs/`.
 
 Standard loop:
 ```sh
 cd "~/OneDrive - Mulheims/website"
-git pull --rebase --autostash    # the Mac mini also pushes dashboard-data commits
+git pull --rebase --autostash    # other sessions/machines may have pushed (the Mini's dashboard publisher is off since the brix move)
 # edit files…
 git add -A && git commit -m "…" && git push
 ```
@@ -42,7 +41,7 @@ exposure — done ✓). `deploy.yml` has a `plesk-deploy` concurrency group so t
 run parallel FTP mirrors (that race once broke a deploy).
 
 ### ⚠️ Cache-busting (read this!)
-GitHub Pages/Plesk serve assets with `cache-control: max-age=600` (10 min). A normal reload
+Plesk serves assets with `cache-control: max-age=600` (10 min). A normal reload
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
