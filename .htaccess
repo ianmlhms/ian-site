@@ -15,6 +15,11 @@
 </IfModule>
 
 # --- Security headers ----------------------------------------------------------
+# NOT EFFECTIVE for pages/assets as of 23 Sep 2026 (verified from outside):
+# Plesk has nginx serve static files directly, so .html/.js/.css requests
+# never reach Apache and these lines don't apply to them. The real fix is in
+# Plesk: Apache & nginx Settings -> 'Additional nginx directives' (add_header
+# ... always;) and SSL It! -> HSTS. Kept here so they apply if that changes.
 <IfModule mod_headers.c>
   # Browsers must not guess content types (scripts/styles are served correctly).
   Header always set X-Content-Type-Options "nosniff"
