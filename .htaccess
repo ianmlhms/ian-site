@@ -1,0 +1,35 @@
+# ian.lu — transport security and response headers (added 23 Sep 2026).
+# Plesk serves through nginx -> Apache; these apply to what Apache answers.
+# Verify any change from OUTSIDE this Mac: after ~20 quick requests the host's
+# Imunify360 shield answers with a "One moment, please..." page instead.
+
+# --- Force HTTPS -------------------------------------------------------------
+# http://ian.lu served the whole site unencrypted (verified 23 Sep 2026), so a
+# network attacker could rewrite the sign-in page. The X-Forwarded-Proto check
+# keeps this from looping if nginx ever terminates TLS and proxies plain HTTP.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+# --- Security headers ----------------------------------------------------------
+<IfModule mod_headers.c>
+  # Browsers must not guess content types (scripts/styles are served correctly).
+  Header always set X-Content-Type-Options "nosniff"
+  # Pages may be framed only by ian.lu itself -- stops clickjacking of the
+  # messenger and admin pages. PixelBreak's srcdoc iframes are unaffected.
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  # HSTS starts SHORT (5 min) so a mistake can't lock visitors out. Once HTTPS
+  # is confirmed everywhere, raise it: max-age=31536000 (one year).
+  Header always set Strict-Transport-Security "max-age=300" "expr=%{HTTPS} == 'on'"
+</IfModule>
+
+AddType application/manifest+json .webmanifest
+
+# --- Removed pages -------------------------------------------------------------
+# Class chat was removed on 23 Sep 2026; send old bookmarks and the PWA
+# shortcut to the messenger instead of a 404.
+Redirect 301 /classchat.html /messenger.html
