@@ -16,13 +16,17 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # A normal deploy takes 2-3 min. Without this, a stalled FTP connection
+    # A full mirror takes 7-11 min; an incremental one well under a minute. Without this, a stalled FTP connection
     # hangs until GitHub's 6-hour limit — and because the concurrency group
     # queues with cancel-in-progress:false, that one hang blocks every later
     # deploy for hours (happened 23 Jul 2026). Fail fast instead.
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history, so the incremental deploy can diff against whatever
+          # commit is currently live.
+          fetch-depth: 0
 
       - name: Stage site files (web assets only)
         run: |
@@ -47,17 +51,64 @@ jobs:
         # valid Let's Encrypt cert for its Plesk name
         # (plesk-euc1-q67.eurodns.host), which does not match FTP_SERVER;
         # point FTP_SERVER at that name to turn hostname checking on too.
+        #
+        # Incremental: a fresh checkout stamps every file with the current
+        # time, so `mirror -R` saw all ~2000 files as newer and re-uploaded the
+        # whole site on every push (7-11 min, deleting each file just before
+        # replacing it). Instead, the live commit is recorded in
+        # httpdocs/.deploy-sha and only the files changed since then are sent.
+        # Anything unexpected -- no marker, a sha that is not an ancestor of
+        # HEAD (force-push), or a changed workflow -- falls back to the full
+        # mirror, which is always correct.
         run: |
-          lftp -c "
-            set cmd:fail-exit yes;
-            set ftp:ssl-allow true;
-            set ftp:ssl-force true;
-            set ftp:ssl-protect-data true;
-            set ssl:verify-certificate yes;
-            set ssl:check-hostname no;
-            set net:timeout 20;
-            set net:max-retries 3;
-            set net:reconnect-interval-base 5;
-            open -u \"$FTP_USER\",\"$FTP_PASS\" \"$FTP_HOST\";
-            mirror -R --delete --verbose --parallel=4 _site/ httpdocs/;
-          "
+          set -euo pipefail
+          SETTINGS="set cmd:fail-exit yes; set ftp:ssl-allow true; set ftp:ssl-force true;
+            set ftp:ssl-protect-data true; set ssl:verify-certificate yes; set ssl:check-hostname no;
+            set net:timeout 20; set net:max-retries 3; set net:reconnect-interval-base 5;"
+          OPEN="open -u \"$FTP_USER\",\"$FTP_PASS\" \"$FTP_HOST\";"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          echo "$HEAD_SHA" > _site/.deploy-sha
+
+          PREV_SHA="$(lftp -c "$SETTINGS $OPEN cat httpdocs/.deploy-sha" 2>/dev/null | tr -dc '0-9a-f' || true)"
+          MODE=full
+          if [ ${#PREV_SHA} -eq 40 ] && git merge-base --is-ancestor "$PREV_SHA" "$HEAD_SHA" 2>/dev/null \
+             && git diff --quiet "$PREV_SHA" "$HEAD_SHA" -- .github/; then
+            MODE=incremental
+          fi
+          echo "Live: ${PREV_SHA:-none}  ->  deploying $HEAD_SHA  ($MODE)"
+
+          if [ "$MODE" = full ]; then
+            lftp -c "$SETTINGS $OPEN mirror -R --delete --verbose --parallel=4 _site/ httpdocs/;"
+            exit 0
+          fi
+
+          # Same exclusions as the staging rsync: only paths that exist in
+          # _site/ are uploaded, and deletions skip the non-deployed folders.
+          python3 - "$PREV_SHA" "$HEAD_SHA" > deploy.lftp <<'PYEOF'
+          import os, subprocess, sys
+          prev, head = sys.argv[1], sys.argv[2]
+          EXCLUDED_DIRS = (".git/", ".github/", "scripts/", "supabase/", "_site/")
+          EXCLUDED_FILES = {"README.md", "HANDOFF.md", ".gitignore"}
+          def changed(flt):
+              out = subprocess.run(["git", "diff", "--name-only", "--no-renames", "-z",
+                                    f"--diff-filter={flt}", prev, head],
+                                   check=True, capture_output=True).stdout.decode()
+              return [p for p in out.split("\0") if p]
+          def deployable(path):
+              return (not path.startswith(EXCLUDED_DIRS) and path not in EXCLUDED_FILES
+                      and os.path.basename(path) != ".DS_Store")
+          def q(path):
+              return '"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"'
+          uploads = [p for p in changed("ACMRT") if deployable(p) and os.path.isfile("_site/" + p)]
+          deletes = [p for p in changed("D") if deployable(p)]
+          for d in sorted({os.path.dirname(p) for p in uploads if os.path.dirname(p)}):
+              print(f"mkdir -p -f {q('httpdocs/' + d)}")
+          for p in uploads:
+              print(f"put {q('_site/' + p)} -o {q('httpdocs/' + p)}")
+          for p in deletes:
+              print(f"rm -f {q('httpdocs/' + p)}")
+          print(f"put _site/.deploy-sha -o httpdocs/.deploy-sha")
+          print(f"# {len(uploads)} uploads, {len(deletes)} deletions", file=sys.stderr)
+          PYEOF
+          grep -c '^put ' deploy.lftp | xargs -I{} echo "{} files to upload (incl. marker)"
+          lftp -c "$SETTINGS $OPEN source deploy.lftp"
