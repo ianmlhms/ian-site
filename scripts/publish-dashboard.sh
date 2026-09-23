@@ -14,8 +14,8 @@
 # OneDrive source — the OneDrive .venv is a dataless stub and OneDrive can't be read
 # under launchd. The local copy imports `src` and reads the same state DB.
 #
-# It writes a SANITIZED public file (data/factory.json → stats.html) and pushes the
-# FULL data to Supabase dashboard_state (admin-only → factory.html).
+# It pushes the dashboard data to the admin-only dashboard_state table
+# (read by factory.html, me.html and the briefing Edge Function).
 #
 # Then run:  scripts/publish-dashboard.sh
 set -euo pipefail
@@ -31,15 +31,8 @@ cd "$REPO_DIR"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 git pull --quiet --rebase --autostash origin "$BRANCH" || true
 
-# 2) Build data: sanitized public file to the repo + full data to Supabase.
-PYTHONPATH="$SF_DIR" "$PY" "$SF_DIR/scripts/publish_factory.py" "$REPO_DIR/data/factory.json"
-
-# 3) Commit + push only if the public data actually changed.
-git add data/factory.json
-if git diff --cached --quiet; then
-  echo "dashboard: no change, nothing to publish"
-  exit 0
-fi
-git commit --quiet -m "stats: refresh dashboard data ($(date -u +%FT%TZ))"
-git push --quiet origin "$BRANCH"
-echo "dashboard: published to ian-site"
+# 2) Push the dashboard data to Supabase (admin-only dashboard_state).
+#    Nothing is written to the repo any more: the public data/factory.json
+#    was removed on 23 Sep 2026 because it exposed the channels' handles.
+PYTHONPATH="$SF_DIR" "$PY" "$SF_DIR/scripts/publish_factory.py"
+echo "dashboard: pushed to Supabase"

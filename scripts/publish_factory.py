@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Publish the ShortsFactory dashboard:
-  • write a SANITIZED, public-safe copy to the ian-site repo (for stats.html), and
-  • push the FULL data to Supabase `dashboard_state` (admin-only, for factory.html).
+  • push the FULL data to Supabase `dashboard_state` (admin-only; read by
+    factory.html, me.html and the briefing Edge Function). There is no public
+    copy any more -- data/factory.json was removed on 23 Sep 2026.
 
 Must live inside the ShortsFactory project (next to src/). Run with its venv.
 
@@ -24,26 +25,6 @@ from src.dashboard import _build_payload          # noqa: E402
 from src.core.config import load_settings         # noqa: E402
 
 
-def sanitize(f: dict) -> dict:
-    """Keep only the fields stats.html needs; drop niche/topics/paths/errors/etc."""
-    return {
-        "generated_at": f.get("generated_at"),
-        "channels": [{"id": c.get("id"), "display_name": c.get("display_name"), "enabled": c.get("enabled")}
-                     for c in f.get("channels", [])],
-        "videos": [{"id": v.get("id"), "channel_id": v.get("channel_id"), "status": v.get("status"),
-                    "youtube_id": v.get("youtube_id"), "duration_s": v.get("duration_s"),
-                    "language": v.get("language"), "title": v.get("title"), "created_at": v.get("created_at")}
-                   for v in f.get("videos", [])],
-        "social": {
-            "accounts": [{"channel_id": a.get("channel_id"), "platform": a.get("platform"),
-                          "handle": a.get("handle"), "url": a.get("url"), "followers": a.get("followers"),
-                          "likes": a.get("likes"), "videos": a.get("videos"), "posts": a.get("posts")}
-                         for a in (f.get("social", {}) or {}).get("accounts", [])],
-            "fetched_at": (f.get("social", {}) or {}).get("fetched_at"),
-        },
-    }
-
-
 def push_supabase(full: dict) -> None:
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
     key = os.environ.get("SUPABASE_SERVICE_KEY", "")
@@ -62,13 +43,11 @@ def push_supabase(full: dict) -> None:
 
 
 def main() -> None:
-    args = [a for a in sys.argv[1:] if not a.startswith("-")]
-    out = args[0] if args else "factory.json"
+    # Private only since 23 Sep 2026. The "sanitized public file" still listed
+    # every channel's social handles, so anyone could tie those accounts to
+    # ian.lu; me.html, factory.html and the briefing function all read the
+    # admin-only dashboard_state row instead. A path argument is ignored.
     full = _build_payload(load_settings(), fetch_social="--no-social" not in sys.argv)
-    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-    with open(out, "w", encoding="utf-8") as fh:
-        json.dump(sanitize(full), fh, ensure_ascii=False)
-    print("wrote sanitized public file:", out)
     push_supabase(full)
 
 

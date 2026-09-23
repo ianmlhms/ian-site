@@ -112,7 +112,12 @@ async function loadGoat(){
 
 async function loadShorts(){
   try{
-    const d=await (await fetch(`data/factory.json?t=${Date.now()}`)).json();
+    // Admin-only table, not the old public data/factory.json (which exposed every
+    // ShortsFactory account handle to anyone who fetched it).
+    const {data:row,error}=await sb.from("dashboard_state").select("data").eq("id",1).maybeSingle();
+    if(error)throw error;
+    const d=row?.data;
+    if(!d)throw new Error("no dashboard data");
     const vids=d.videos||d.published||[];
     const n=Array.isArray(vids)?vids.length:(d.count??d.total??"–");
     const followers=d.followers??d.subscribers;

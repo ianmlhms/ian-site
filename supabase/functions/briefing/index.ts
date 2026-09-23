@@ -92,7 +92,10 @@ async function countdownLines(uid: string): Promise<string[]> {
 
 async function shortsLine(): Promise<string | null> {
   try {
-    const d = await (await fetch("https://ian.lu/data/factory.json")).json();
+    // data/factory.json was public and has been removed; read the admin-only row.
+    const { data: row, error } = await admin.from("dashboard_state").select("data").eq("id", 1).maybeSingle();
+    if (error) throw error;
+    const d = row?.data;
     const vids = Array.isArray(d?.videos) ? d.videos : [];
     const dayAgo = Date.now() - 86400000;
     const fresh = vids.filter((v: any) =>
