@@ -19,8 +19,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script src="theme.js?v=20"></script>
-  <script src="i18n-dict.js?v=33"></script>
+  <script src="theme.js?v=21"></script>
+  <script src="i18n-dict.js?v=35"></script>
   <script src="i18n.js?v=3"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
@@ -116,9 +116,6 @@
           </a>
           <a class="tile friends" href="friends.html" data-app="friends.html">
             <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">👥</span><span class="tname" data-i18n="tile.friends">Friends</span><span class="tsub" data-i18n="tile.friends.sub">Add, chat &amp; play</span>
-          </a>
-          <a class="tile classchat" href="classchat.html" data-app="classchat.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗣️</span><span class="tname" data-i18n="tile.classchat">Klass-Chat</span><span class="tsub" data-i18n="tile.classchat.sub">Live chat with your class</span>
           </a>
           <a class="tile polls" href="polls.html" data-app="polls.html">
             <span class="ico" aria-hidden="true">🗳️</span><span class="tname" data-i18n="tile.polls">Ëmfroen</span><span class="tsub" data-i18n="tile.polls.sub">Class polls — vote!</span>
@@ -292,16 +289,16 @@
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="notify-ambient.js?v=10"></script>
-  <script type="module" src="rtc-ring.js?v=10"></script>
-  <script type="module" src="class-gate.js?v=11"></script>
+  <script type="module" src="notify-ambient.js?v=11"></script>
+  <script type="module" src="rtc-ring.js?v=11"></script>
+  <script type="module" src="class-gate.js?v=12"></script>
   <script type="module">
-    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=14";
+    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=15";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     const HOUSE_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Haus-Planer
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)
     const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"];   // PPT/Word studios; ian@ian.lu is the test account
-    const DEFAULT_FAVS = ["messenger.html", "grades.html", "timetable.html", "classchat.html", "pixelbreak.html", "bus.html"];
+    const DEFAULT_FAVS = ["messenger.html", "grades.html", "timetable.html", "pixelbreak.html", "bus.html"];
     const HALF_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
     const apps = document.getElementById("apps");
     const favTiles = document.getElementById("favTiles");

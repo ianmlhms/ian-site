@@ -1,4 +1,4 @@
-import { APPS } from "./apps-catalog.js?v=2";
+import { APPS } from "./apps-catalog.js?v=4";
 
 // Admin-only apps stay out of ⌘K until is_admin() actually says otherwise, so an
 // unresolved check errs towards hiding rather than offering them to everyone.
@@ -24,8 +24,8 @@ async function refreshAdmin() {
 const HALF_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
 const RESULT_LIMIT = 8;
 const FALLBACK_ORDER = [
-  "messenger.html", "grades.html", "timetable.html", "classchat.html",
-  "pixelbreak.html", "bus.html", "moien.html", "skylens.html",
+  "messenger.html", "grades.html", "timetable.html", "pixelbreak.html",
+  "bus.html", "moien.html", "skylens.html",
 ];
 const LOCAL_STRINGS = {
   "qo.placeholder": { lb: "App sichen…", de: "App suchen…", en: "Search apps…" },

@@ -9,8 +9,8 @@
 <meta name="description" content="Luxembourg grade calculator with per-year/section subjects and coefficients.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=20"></script>
-<script src="i18n-dict.js?v=33"></script>
+<script src="theme.js?v=21"></script>
+<script src="i18n-dict.js?v=35"></script>
 <script src="i18n.js?v=3"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--good:#3fb950;--bad:#ff6b6b;--accent2:#4de8ff}
@@ -103,7 +103,7 @@
 </div>
 
 <script type="module">
-import * as auth from "./auth.js?v=14";
+import * as auth from "./auth.js?v=15";
 
 // ---- Official coefficients (MEN grille horaire) ----
 const L = (c)=>[["Français",c],["Allemand",c],["Anglais",c],["Latin",c]]; // 4-language option group
@@ -279,8 +279,8 @@ function loadSheetLocalFirst(){ const ls=localStorage.getItem(lsKey()); rows = l
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="notify-ambient.js?v=10"></script>
-  <script type="module" src="rtc-ring.js?v=10"></script>
-  <script type="module" src="class-gate.js?v=11"></script>
+<script type="module" src="notify-ambient.js?v=11"></script>
+  <script type="module" src="rtc-ring.js?v=11"></script>
+  <script type="module" src="class-gate.js?v=12"></script>
 </body>
 </html>

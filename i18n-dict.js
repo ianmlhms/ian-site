@@ -132,8 +132,6 @@ window.I18N_DICT = {
   "tile.grades.sub":     { lb: "Moyenne-Rechner", de: "Durchschnittsrechner", en: "Average calculator" },
   "tile.board":          { lb: "Klass-Tafel", de: "Klassen-Tafel", en: "Class board" },
   "tile.board.sub":      { lb: "Hausaufgabe vun der Klass", de: "Hausaufgaben der Klasse", en: "Shared class homework" },
-  "tile.classchat":      { lb: "Klass-Chat", de: "Klassen-Chat", en: "Class chat" },
-  "tile.classchat.sub":  { lb: "Livechat mat denger Klass", de: "Live-Chat mit deiner Klasse", en: "Live chat with your class" },
   "tile.timetable":      { lb: "Stonneplang", de: "Stundenplan", en: "Timetable" },
   "tile.timetable.sub":  { lb: "Deng Woch op ee Bléck", de: "Deine Woche auf einen Blick", en: "Your weekly timetable" },
   "tile.hotel.sub":      { lb: "Bausimulator · privat", de: "Bausimulator · privat", en: "Builder · private" },

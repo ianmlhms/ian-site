@@ -28,8 +28,6 @@ export const APPS = Object.freeze([
     keywords: ["inbox", "noriichten", "messagen", "nachrichten", "messages", "whatsapp", "imessage", "mail", "email", "e-mail", "boîte de réception"] },
   { url: "friends.html", name: "Friends", icon: "👥", group: "grp.social", locked: true,
     keywords: ["frënn", "freunde", "amis", "contacts"] },
-  { url: "classchat.html", name: "Klass-Chat", icon: "🗣️", group: "grp.social", locked: true,
-    keywords: ["classe", "klassenchat", "classroom", "chat"] },
   { url: "polls.html", name: "Ëmfroen", icon: "🗳️", group: "grp.social", locked: false,
     keywords: ["umfragen", "sondages", "polls", "vote", "stëmmen"] },
   { url: "alerts.html", name: "Neiegkeeten", icon: "🔔", group: "grp.social", locked: true,
