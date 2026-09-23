@@ -17,6 +17,8 @@ let channel = null;          // current chat's realtime channel
 let allChannel = null;       // all-my-messages channel (drives unread badges)
 const seen = new Set();
 let memberSubbed = false;
+let memberChannel = null;     // group_members INSERTs for me (new chats)
+let onlineChannel = null;     // global presence channel
 let replyTo = null;          // {id, user, preview} when replying, else null
 let suppressClickUntil = 0;  // swallow the click that follows a gesture-reply
 let currentOthers = [];      // other members' user_ids in the open chat
@@ -57,7 +59,16 @@ let allChats = [];           // last loaded chats, for search filtering
 let lastTypingSent = 0, typingClear = null;
 let mediaRecorder = null, recChunks = [], recording = false;
 const REACT_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
-const mutedSet = () => new Set(JSON.parse(localStorage.getItem("mutedChats") || "[]"));
+// Runs on every chat-list render, so a corrupted value must not take the list down.
+const mutedSet = () => {
+  try {
+    const ids = JSON.parse(localStorage.getItem("mutedChats") || "[]");
+    return new Set(Array.isArray(ids) ? ids : []);
+  } catch (error) {
+    console.warn("[msgr] mutedChats unreadable, ignoring", error);
+    return new Set();
+  }
+};
 function toggleMute(gid) { const s = mutedSet(); s.has(gid) ? s.delete(gid) : s.add(gid); localStorage.setItem("mutedChats", JSON.stringify([...s])); }
 
 /* ---------- small prompt modal ---------- */
@@ -371,6 +382,7 @@ async function sendVoice(blob) {
 function startOnlinePresence() {
   if (onlineSubbed) return; onlineSubbed = true;
   const oc = sb.channel("online", { config: { presence: { key: auth.username() } } });
+  onlineChannel = oc;
   oc.on("presence", { event: "sync" }, () => {
     const st = oc.presenceState();
     onlineUsers = new Set(Object.keys(st).map((k) => (st[k][0] || {}).username).filter(Boolean));
@@ -670,6 +682,13 @@ async function boot() {
 function showGate() {
   current = null;
   if (channel) { sb.removeChannel(channel); channel = null; }
+  // The per-user subscriptions below are keyed to whoever WAS signed in. Left
+  // alive, a different account signing in on the same tab (a shared iPad) kept
+  // the previous user's new-chat feed, unread filter and presence name.
+  for (const ch of [memberChannel, allChannel, onlineChannel]) if (ch) sb.removeChannel(ch);
+  memberChannel = allChannel = onlineChannel = null;
+  memberSubbed = onlineSubbed = false;
+  onlineUsers = new Set();
   $("app").style.display = "none";
   $("gate").style.display = "flex";
   $("gate").innerHTML = `<div class="gate-box">
@@ -690,8 +709,8 @@ async function showApp() {
   $("lbX").onclick = closeLightbox;
   $("lightbox").onclick = (e) => { if (e.target.id === "lightbox") closeLightbox(); };
   $("micBtn").onclick = toggleRecording;
-  $("msgInput").addEventListener("input", sendTyping);
-  $("searchInput").addEventListener("input", () => renderChatList(applySearch(allChats)));
+  $("msgInput").oninput = sendTyping;
+  $("searchInput").oninput = () => renderChatList(applySearch(allChats));
   startOnlinePresence();
   setupNotifyButton();
   try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
@@ -700,7 +719,7 @@ async function showApp() {
   if (!memberSubbed) {
     memberSubbed = true;
     const uid = auth.session().user.id;
-    sb.channel("mem-" + uid)
+    memberChannel = sb.channel("mem-" + uid)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "group_members", filter: "user_id=eq." + uid }, () => loadChats())
       .subscribe();
     // Any new message in a chat I'm not currently in → refresh unread badges + ordering.
