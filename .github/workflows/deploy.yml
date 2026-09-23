@@ -16,11 +16,14 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # A full mirror takes 7-11 min; an incremental one well under a minute. Without this, a stalled FTP connection
+    # A full mirror takes 8-13+ min (it outgrew the old 12-min limit on
+    # 23 Sep 2026 and was cut off mid-upload); an incremental one takes
+    # well under a minute. 25 min still stops a hung connection long before
+    # GitHub's 6-hour default. Without this, a stalled FTP connection
     # hangs until GitHub's 6-hour limit — and because the concurrency group
     # queues with cancel-in-progress:false, that one hang blocks every later
     # deploy for hours (happened 23 Jul 2026). Fail fast instead.
-    timeout-minutes: 12
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
@@ -67,7 +70,11 @@ jobs:
             set net:timeout 20; set net:max-retries 3; set net:reconnect-interval-base 5;"
           OPEN="open -u \"$FTP_USER\",\"$FTP_PASS\" \"$FTP_HOST\";"
           HEAD_SHA="$(git rev-parse HEAD)"
-          echo "$HEAD_SHA" > _site/.deploy-sha
+          # The marker is written OUTSIDE _site and uploaded only after every
+          # other file has gone up: if the run dies part-way, the server must
+          # not claim a commit it never fully received, or later incremental
+          # runs would diff from it and skip the files that were missed.
+          echo "$HEAD_SHA" > deploy-sha.txt
 
           PREV_SHA="$(lftp -c "$SETTINGS $OPEN cat httpdocs/.deploy-sha" 2>/dev/null | tr -dc '0-9a-f' || true)"
           MODE=full
@@ -78,7 +85,7 @@ jobs:
           echo "Live: ${PREV_SHA:-none}  ->  deploying $HEAD_SHA  ($MODE)"
 
           if [ "$MODE" = full ]; then
-            lftp -c "$SETTINGS $OPEN mirror -R --delete --verbose --parallel=4 _site/ httpdocs/;"
+            lftp -c "$SETTINGS $OPEN mirror -R --delete --verbose --parallel=4 --exclude-glob .deploy-sha _site/ httpdocs/; put deploy-sha.txt -o httpdocs/.deploy-sha"
             exit 0
           fi
 
@@ -107,7 +114,7 @@ jobs:
               print(f"put {q('_site/' + p)} -o {q('httpdocs/' + p)}")
           for p in deletes:
               print(f"rm -f {q('httpdocs/' + p)}")
-          print(f"put _site/.deploy-sha -o httpdocs/.deploy-sha")
+          print("put deploy-sha.txt -o httpdocs/.deploy-sha")
           print(f"# {len(uploads)} uploads, {len(deletes)} deletions", file=sys.stderr)
           PYEOF
           grep -c '^put ' deploy.lftp | xargs -I{} echo "{} files to upload (incl. marker)"

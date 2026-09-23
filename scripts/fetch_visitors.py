@@ -143,11 +143,22 @@ def is_true(value):
     return str(value).strip().lower() in {"true", "1", "yes", "t"}
 
 
+def normalise_header(name):
+    """'2Path' -> 'path', 'First visit' -> 'firstvisit', 'created_at' -> 'createdat'.
+
+    GoatCounter prefixes the export's FIRST header with its format version, so
+    the path column is literally named "2Path". Matching exact spellings missed
+    it and every hit fell back to "/", leaving top_pages with a single entry.
+    """
+    return "".join(ch for ch in str(name).lstrip("0123456789").lower() if ch.isalnum())
+
+
 def column(row, *names):
-    """Fetch a column by any of its spellings; GoatCounter has renamed some."""
-    for name in names:
-        if name in row and row[name] not in (None, ""):
-            return row[name]
+    """Fetch a column by any of its spellings, ignoring version prefix/case/spacing."""
+    wanted = {normalise_header(name) for name in names}
+    for key, value in row.items():
+        if normalise_header(key) in wanted and value not in (None, ""):
+            return value
     return ""
 
 
