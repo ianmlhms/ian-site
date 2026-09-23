@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      full:
+        description: "Force a full mirror of the whole site (slow: 10-25 min)"
+        type: boolean
+        default: false
 
 # Never run two FTP mirrors at once — concurrent `mirror --delete` runs
 # against the same httpdocs collide and one fails. Queue instead.
@@ -16,10 +21,13 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # A full mirror takes 8-13+ min (it outgrew the old 12-min limit on
-    # 23 Sep 2026 and was cut off mid-upload); an incremental one takes
-    # well under a minute. 25 min still stops a hung connection long before
-    # GitHub's 6-hour default. Without this, a stalled FTP connection
+    # actions:read lets the job look up the last successful deploy (below).
+    permissions:
+      contents: read
+      actions: read
+    # A full mirror takes 7-11 min, an incremental one well under a minute.
+    # 25 min leaves room for a slow full mirror and still stops a hung
+    # connection long before GitHub's 6-hour default. Without this, a stalled FTP connection
     # hangs until GitHub's 6-hour limit — and because the concurrency group
     # queues with cancel-in-progress:false, that one hang blocks every later
     # deploy for hours (happened 23 Jul 2026). Fail fast instead.
@@ -48,6 +56,8 @@ jobs:
           FTP_HOST: ${{ secrets.FTP_SERVER }}
           FTP_USER: ${{ secrets.FTP_USERNAME }}
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+          FORCE_FULL: ${{ inputs.full }}
         # verify-certificate was off, so a MITM could have presented any
         # self-signed cert and captured these credentials. The chain is now
         # verified. check-hostname stays off because the server presents a
@@ -60,9 +70,9 @@ jobs:
         # whole site on every push (7-11 min, deleting each file just before
         # replacing it). Instead, the live commit is recorded in
         # httpdocs/.deploy-sha and only the files changed since then are sent.
-        # Anything unexpected -- no marker, a sha that is not an ancestor of
-        # HEAD (force-push), or a changed workflow -- falls back to the full
-        # mirror, which is always correct.
+        # With no usable marker it diffs from the last successful deploy run
+        # instead; only when neither exists (or on a manual run with full=true)
+        # does it fall back to the full mirror.
         run: |
           set -euo pipefail
           SETTINGS="set cmd:fail-exit yes; set ftp:ssl-allow true; set ftp:ssl-force true;
@@ -76,13 +86,28 @@ jobs:
           # runs would diff from it and skip the files that were missed.
           echo "$HEAD_SHA" > deploy-sha.txt
 
-          PREV_SHA="$(lftp -c "$SETTINGS $OPEN cat httpdocs/.deploy-sha" 2>/dev/null | tr -dc '0-9a-f' || true)"
-          MODE=full
-          if [ ${#PREV_SHA} -eq 40 ] && git merge-base --is-ancestor "$PREV_SHA" "$HEAD_SHA" 2>/dev/null \
-             && git diff --quiet "$PREV_SHA" "$HEAD_SHA" -- .github/; then
-            MODE=incremental
+          usable() {  # a full sha that HEAD descends from
+            [ ${#1} -eq 40 ] && git merge-base --is-ancestor "$1" "$HEAD_SHA" 2>/dev/null
+          }
+          # Bounded: on 23 Sep 2026 this read hung for the job's entire timeout
+          # while the marker did not exist yet (lftp kept retrying), three runs
+          # in a row, and the mirror never even started. Any failure here just
+          # means "no marker" and falls through to the last successful deploy.
+          PREV_SHA="$(timeout 45 lftp -c "$SETTINGS set net:max-retries 1; $OPEN cat httpdocs/.deploy-sha" 2>/dev/null | tr -dc '0-9a-f' || true)"
+          SOURCE=marker
+          if ! usable "$PREV_SHA"; then
+            # No usable marker (first run, or a run died before writing it):
+            # the last SUCCESSFUL run of this workflow is proof that its commit
+            # is fully live, whether it was a full or incremental deploy.
+            # Without this, a site too big to mirror inside the timeout could
+            # never get its first marker written (23 Sep 2026).
+            PREV_SHA="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow deploy.yml \
+              --status success --limit 1 --json headSha -q '.[0].headSha' 2>/dev/null || true)"
+            SOURCE="last successful deploy"
           fi
-          echo "Live: ${PREV_SHA:-none}  ->  deploying $HEAD_SHA  ($MODE)"
+          MODE=incremental
+          if [ "$FORCE_FULL" = "true" ] || ! usable "$PREV_SHA"; then MODE=full; fi
+          echo "Live: ${PREV_SHA:-none} (from $SOURCE)  ->  deploying $HEAD_SHA  ($MODE)"
 
           if [ "$MODE" = full ]; then
             lftp -c "$SETTINGS $OPEN mirror -R --delete --verbose --parallel=4 --exclude-glob .deploy-sha _site/ httpdocs/; put deploy-sha.txt -o httpdocs/.deploy-sha"
