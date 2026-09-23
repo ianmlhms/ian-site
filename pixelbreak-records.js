@@ -94,6 +94,11 @@ PB.instrument = (html) => {
 /* ---------------- open / close hooks ---------------- */
 PB.onOpenGame = (g) => { PB.current = g; sessionMax = null; renderGameBar(); loadCloudSave(g); };
 PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; };
+// Saves reach the cloud on a 3 s debounce; leaving the page inside that window
+// (closing the tab, swiping the PWA away) would otherwise drop them from the
+// cloud copy. Best effort -- the local copy is always written synchronously.
+window.addEventListener("pagehide", () => { if (pendingSave) flushSave(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && pendingSave) flushSave(); });
 
 /* ---------------- game-state saves (progress, not just score) ----------------
  * Games post {__pbSave:1,data:{...}} → stored in localStorage always, and
@@ -261,9 +266,13 @@ async function loadCloudSave(g) {
   try {
     const { data } = await sb.from("game_saves")
       .select("data").eq("user_id", session.user.id).eq("game_id", g.id).maybeSingle();
+    // A slow response for a game the player has already left must not land in
+    // cloudSave: the next game's {__pbWantSave} would be answered with it and
+    // could adopt another game's progress as its own.
+    if (PB.current !== g) return;
     cloudSave = (data && data.data) || null;
-  } catch { cloudSave = null; }
-  if (PB.current === g) sendCloudSave();
+  } catch { if (PB.current === g) cloudSave = null; return; }
+  sendCloudSave();
 }
 
 /* ---------------- receive scores from the game iframe ---------------- */

@@ -40,6 +40,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 SITE = "https://ianm.goatcounter.com"
 # Checked in order, so a host can keep both keys in one file (brix) or the
@@ -57,6 +59,7 @@ EXPORT_POLL_SECONDS = 4
 EXPORT_MAX_POLLS = 45
 REQUEST_TIMEOUT = 120
 TOP_PAGES_PER_DAY = 10
+SITE_TZ = ZoneInfo("Europe/Luxembourg")  # the day boundary traffic.html shows
 RATE_LIMITED_EXIT = 0   # a scheduled run that is rate limited is not a failure
 LOOP_DEFAULT_SECONDS = 3600  # GoatCounter's export limit; no point going faster
 
@@ -162,14 +165,33 @@ def column(row, *names):
     return ""
 
 
+def local_day(stamp):
+    """UTC export timestamp -> the Luxembourg calendar day it belongs to.
+
+    The export is in UTC, but traffic.html's "today" is the viewer's local
+    day. Slicing the UTC string put everything between 00:00 and 02:00 local
+    time (01:00 in winter) on the previous day, so "Today" read 0 for the
+    first two hours after midnight.
+    """
+    if not stamp:
+        return ""
+    try:
+        moment = datetime.fromisoformat(stamp.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return ""  # skip the row: a non-date key would fail the whole upsert
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(SITE_TZ).date().isoformat()
+
+
 def aggregate(rows):
     """day -> {unique_visitors, pageviews, top_pages}."""
     days = {}
     for row in rows:
         stamp = column(row, "Date", "date", "created_at")
-        if not stamp:
+        day = local_day(stamp)
+        if not day:
             continue
-        day = stamp[:10]
         if is_true(column(row, "Bot", "bot")):
             continue
         entry = days.setdefault(day, {"pageviews": 0, "sessions": set(),
