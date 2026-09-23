@@ -73,6 +73,16 @@
     return { table, body };
   }
 
+  // Every database value that goes into an innerHTML template must pass through
+  // esc(). The catalogue tables are writable by anyone while the demo policies
+  // are open, and this page is served from ian.lu itself, so an unescaped
+  // product name would run script with access to the main site's session.
+  // It also keeps quotes and '<' in real data from breaking the forms.
+  function esc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+
   function cell(row, label, content) {
     const td = document.createElement("td");
     td.dataset.label = label;
@@ -344,19 +354,19 @@
       form.className = "admin-form";
       const isNew = !existing;
       const producerOptions = producers.map((p) =>
-        `<option value="${p.id}"${existing?.producer_id === p.id ? " selected" : ""}>${p.name}</option>`).join("");
+        `<option value="${esc(p.id)}"${existing?.producer_id === p.id ? " selected" : ""}>${esc(p.name)}</option>`).join("");
       form.innerHTML = `
-        <label>Nom<input name="name" required value="${existing?.name?.replace(/"/g, "&quot;") || ""}"></label>
+        <label>Nom<input name="name" required value="${esc(existing?.name)}"></label>
         <label>Producteur<select name="producer_id" required>${producerOptions}</select></label>
         <label>Catégorie<select name="category">${CATEGORIES.map((c) =>
           `<option value="${c}"${existing?.category === c ? " selected" : ""}>${c}</option>`).join("")}</select></label>
         <label>Couleur<select name="colour">${COLOURS.map((c) =>
           `<option value="${c}"${(existing?.colour || "") === c ? " selected" : ""}>${c || "—"}</option>`).join("")}</select></label>
-        <label>Format<input name="format" required value="${existing?.format || "75 cl"}"></label>
-        <label>Prix (€)<input name="price_eur" type="number" step="0.01" min="0" value="${existing?.price_eur ?? ""}"></label>
+        <label>Format<input name="format" required value="${esc(existing?.format || "75 cl")}"></label>
+        <label>Prix (€)<input name="price_eur" type="number" step="0.01" min="0" value="${esc(existing?.price_eur)}"></label>
         <label><input name="price_on_request" type="checkbox"${existing?.price_on_request ? " checked" : ""}> Prix sur demande</label>
         <label><input name="out_of_stock" type="checkbox"${existing?.out_of_stock ? " checked" : ""}> Épuisé</label>
-        <label>Note de dégustation (FR)<textarea name="tasting_note_fr" rows="2">${existing?.tasting_note_fr || ""}</textarea></label>
+        <label>Note de dégustation (FR)<textarea name="tasting_note_fr" rows="2">${esc(existing?.tasting_note_fr)}</textarea></label>
         <button class="button" type="submit">${isNew ? "Créer" : "Enregistrer"}</button>`;
       const dialog = document.createElement("section");
       dialog.className = "admin-panel";
@@ -475,11 +485,11 @@
         { label: "Région", value: (r) => r.region || "—" },
       ],
       formHtml: (existing) => `
-        <label>Nom<input name="name" required value="${existing?.name?.replace(/"/g, "&quot;") || ""}"></label>
+        <label>Nom<input name="name" required value="${esc(existing?.name)}"></label>
         <label>Pays<select name="country_id"><option value="">—</option>${countries.map((c) =>
-          `<option value="${c.id}"${existing?.country_id === c.id ? " selected" : ""}>${c.name_fr}</option>`).join("")}</select></label>
-        <label>Région<input name="region" value="${existing?.region || ""}"></label>
-        <label>Histoire (FR)<textarea name="story_fr" rows="3">${existing?.story_fr || ""}</textarea></label>`,
+          `<option value="${esc(c.id)}"${existing?.country_id === c.id ? " selected" : ""}>${esc(c.name_fr)}</option>`).join("")}</select></label>
+        <label>Région<input name="region" value="${esc(existing?.region)}"></label>
+        <label>Histoire (FR)<textarea name="story_fr" rows="3">${esc(existing?.story_fr)}</textarea></label>`,
       toPayload: (data) => ({
         name: String(data.get("name")).trim(),
         country_id: data.get("country_id") || null,
@@ -501,9 +511,9 @@
         { label: "English", value: (r) => r.name_en || "—" },
       ],
       formHtml: (existing) => `
-        <label>Nom (FR)<input name="name_fr" required value="${existing?.name_fr || ""}"></label>
-        <label>Nom (DE)<input name="name_de" value="${existing?.name_de || ""}"></label>
-        <label>Nom (EN)<input name="name_en" value="${existing?.name_en || ""}"></label>`,
+        <label>Nom (FR)<input name="name_fr" required value="${esc(existing?.name_fr)}"></label>
+        <label>Nom (DE)<input name="name_de" value="${esc(existing?.name_de)}"></label>
+        <label>Nom (EN)<input name="name_en" value="${esc(existing?.name_en)}"></label>`,
       toPayload: (data) => ({
         name: String(data.get("name_fr")).trim(),
         name_fr: String(data.get("name_fr")).trim(),
@@ -525,7 +535,7 @@
     form.className = "admin-form";
     form.innerHTML = `
       <label>Produit<select name="product_id" required>${products.map((p) =>
-        `<option value="${p.id}">${p.name} — ${p.format}</option>`).join("")}</select></label>
+        `<option value="${esc(p.id)}">${esc(p.name)} — ${esc(p.format)}</option>`).join("")}</select></label>
       <label>Type<select name="kind"><option value="percent">Pourcentage</option><option value="amount">Montant fixe</option></select></label>
       <label>Valeur<input name="value" type="number" step="0.01" min="0.01" required></label>
       <label>Début<input name="starts_on" type="date"></label>
@@ -614,12 +624,12 @@
         { label: "Période", value: (r) => [r.starts_on, r.ends_on].filter(Boolean).join(" → ") || "permanente" },
       ],
       formHtml: (existing) => `
-        <label>Titre (FR)<input name="title_fr" required value="${existing?.title_fr?.replace(/"/g, "&quot;") || ""}"></label>
-        <label>Titre (DE)<input name="title_de" value="${existing?.title_de || ""}"></label>
-        <label>Titre (EN)<input name="title_en" value="${existing?.title_en || ""}"></label>
-        <label>Texte (FR)<textarea name="body_fr" rows="3">${existing?.body_fr || ""}</textarea></label>
-        <label>Début<input name="starts_on" type="date" value="${existing?.starts_on || ""}"></label>
-        <label>Fin<input name="ends_on" type="date" value="${existing?.ends_on || ""}"></label>
+        <label>Titre (FR)<input name="title_fr" required value="${esc(existing?.title_fr)}"></label>
+        <label>Titre (DE)<input name="title_de" value="${esc(existing?.title_de)}"></label>
+        <label>Titre (EN)<input name="title_en" value="${esc(existing?.title_en)}"></label>
+        <label>Texte (FR)<textarea name="body_fr" rows="3">${esc(existing?.body_fr)}</textarea></label>
+        <label>Début<input name="starts_on" type="date" value="${esc(existing?.starts_on)}"></label>
+        <label>Fin<input name="ends_on" type="date" value="${esc(existing?.ends_on)}"></label>
         <label><input name="is_active" type="checkbox"${existing?.is_active !== false ? " checked" : ""}> Active</label>`,
       toPayload: (data) => ({
         title_fr: String(data.get("title_fr")).trim(),
