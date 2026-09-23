@@ -103,7 +103,7 @@
 </div>
 
 <script type="module">
-import * as auth from "./auth.js?v=15";
+import * as auth from "./auth.js?v=16";
 
 // ---- Official coefficients (MEN grille horaire) ----
 const L = (c)=>[["Français",c],["Allemand",c],["Anglais",c],["Latin",c]]; // 4-language option group
@@ -278,9 +278,9 @@ document.addEventListener("i18n:change", render);
 function loadSheetLocalFirst(){ const ls=localStorage.getItem(lsKey()); rows = ls?JSON.parse(ls):template(); render(); }
 </script>
 <script src="pixelbreak-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="notify-ambient.js?v=11"></script>
-  <script type="module" src="rtc-ring.js?v=11"></script>
-  <script type="module" src="class-gate.js?v=12"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
+<script type="module" src="notify-ambient.js?v=12"></script>
+  <script type="module" src="rtc-ring.js?v=12"></script>
+  <script type="module" src="class-gate.js?v=13"></script>
 </body>
 </html>

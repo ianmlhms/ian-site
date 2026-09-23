@@ -123,6 +123,12 @@ const dayIndex = ()=>{
   const [y,m,d] = new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Luxembourg"}).format(new Date()).split("-").map(Number);
   return Math.floor(Date.UTC(y, m-1, d)/86400000);
 };
+// Saved state/stats are parsed on load; a corrupted or non-object value must
+// fall back to a fresh state instead of breaking the whole game.
+function readStored(key){
+  try{ const v=JSON.parse(localStorage.getItem(key)||"null"); return v&&typeof v==="object"?v:null; }
+  catch(error){ console.warn("[wordle] ignoring unreadable",key,error); return null; }
+}
 const stateKey = ()=> `wordle_${lang}_${dayIndex()}`;
 const statsKey = ()=> `wordleStats_${lang}`;
 
@@ -139,7 +145,7 @@ function pickPractice(){
 function load(){
   practice = false;
   answer = pickAnswer();
-  const s = JSON.parse(localStorage.getItem(stateKey()) || "null");
+  const s = readStored(stateKey());
   guesses = s?.guesses || []; current = ""; done = s?.done || false;
   render(); drawKeyboard(); renderStats();
   $("share").style.display = done ? "" : "none";
@@ -223,7 +229,7 @@ function finish(won){
   $("again").style.display="";
   if(practice) return;                                // free rounds: no stats, no share, no leaderboard
   $("share").style.display="";
-  const s=JSON.parse(localStorage.getItem(statsKey())||"null")||{played:0,wins:0,streak:0,max:0,dist:[0,0,0,0,0,0]};
+  const s=readStored(statsKey())||{played:0,wins:0,streak:0,max:0,dist:[0,0,0,0,0,0]};
   const day=dayIndex();
   // a daily streak only survives if yesterday was played too
   s.played++; if(won){ s.streak=(s.lastDay===day-1?s.streak:0)+1; s.wins++; s.max=Math.max(s.max,s.streak); s.dist[guesses.length-1]++; } else s.streak=0;
@@ -235,14 +241,14 @@ function finish(won){
 // streak shown as 0 once a day was skipped (finish() resets it on the next game)
 function liveStreak(s){ return s.lastDay===undefined||s.lastDay>=dayIndex()-1 ? s.streak : 0; }
 function renderStats(){
-  const s=JSON.parse(localStorage.getItem(statsKey())||"null")||{played:0,wins:0,streak:0,max:0};
+  const s=readStored(statsKey())||{played:0,wins:0,streak:0,max:0};
   $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b>🔥 ${liveStreak(s)}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
 }
 function shareResult(){
   const emo={correct:"🟩",present:"🟨",absent:"⬛"};
   const grid=guesses.map(g=>scoreGuess(g).map(s=>emo[s]).join("")).join("\n");
   const won=guesses.includes(answer);
-  const s=JSON.parse(localStorage.getItem(statsKey())||"null");
+  const s=readStored(statsKey());
   const streak=s?liveStreak(s):0;
   const txt=`ian.lu Wuertspill (${lang.toUpperCase()}) ${won?guesses.length:"X"}/6${streak>1?` · 🔥${streak}`:""}\n${grid}\nian.lu/wordle.html`;
   if(navigator.share){ navigator.share({text:txt}).catch(()=>{}); }
@@ -277,9 +283,9 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import * as auth from "./auth.js?v=15";
+  import * as auth from "./auth.js?v=16";
   let sb = null;
   const $ = (id) => document.getElementById(id);
   (async () => { if (!auth.authConfigured) return; auth.mountAccountButton($("acctHost")); sb = await auth.client(); })();
@@ -309,7 +315,7 @@ load();
   $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") $("lbModal").classList.remove("open"); };
   document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; document.querySelectorAll("[data-lb]").forEach(x => x.classList.toggle("on", x === b)); drawBoard(); });
 </script>
-  <script type="module" src="rtc-ring.js?v=11"></script>
-  <script type="module" src="class-gate.js?v=12"></script>
+  <script type="module" src="rtc-ring.js?v=12"></script>
+  <script type="module" src="class-gate.js?v=13"></script>
 </body>
 </html>

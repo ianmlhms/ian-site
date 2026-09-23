@@ -238,9 +238,9 @@ button.st,button.dep,button.lndep{min-height:0}
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=15";
+import * as auth from "./auth.js?v=16";
 import { mountPicker } from "./datetime-picker.js?v=2";
 import { searchPlaces } from "./geocode.js?v=1";
 const $=(id)=>document.getElementById(id);
@@ -956,7 +956,7 @@ async function initTransport(){
     const a=$("fromq").value; $("fromq").value=$("toq").value; $("toq").value=a;
     const t=tripFrom; tripFrom=tripTo; tripTo=t;
   };
-  const saved=JSON.parse(localStorage.getItem("moienStop")||"null");
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem("moienStop")||"null"); }catch(error){ console.warn("[bus] saved stop unreadable, ignoring",error); }
   if(saved&&saved.id){ selectStop(saved); }
   else $("tpNote").innerHTML='<span class="muted">Sich en Arrêt oder tipp 📍 fir déi no bei dir.</span>';
   renderRecents(); renderFavs(); updateFavStar(); updateFavLineStar();
@@ -965,7 +965,7 @@ initTransport();
 
 auth.mountAccountButton($("acctHost"));
 </script>
-  <script type="module" src="rtc-ring.js?v=11"></script>
-  <script type="module" src="class-gate.js?v=12"></script>
+  <script type="module" src="rtc-ring.js?v=12"></script>
+  <script type="module" src="class-gate.js?v=13"></script>
 </body>
 </html>

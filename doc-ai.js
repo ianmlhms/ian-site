@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=15";
+import * as auth from "./auth.js?v=16";
 import { validateDocument } from "./doc-schema.js?v=1";
 
 const DEFAULT_LANG = "de";

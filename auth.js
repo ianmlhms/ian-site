@@ -36,12 +36,12 @@ async function getCreateClient() {
   }
   try {
     const module = await import(
-      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+      "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/+esm"
     );
     return module.createClient;
   } catch {
     const module = await import(
-      "https://esm.sh/@supabase/supabase-js@2"
+      "https://esm.sh/@supabase/supabase-js@2.117.1"
     );
     return module.createClient;
   }

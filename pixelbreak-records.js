@@ -8,7 +8,7 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=15";
+import * as auth from "./auth.js?v=16";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -294,9 +294,9 @@ window.addEventListener("message", (e) => {
 async function getCreateClient() {
   if (window.supabase && window.supabase.createClient) return window.supabase.createClient;
   try {
-    return (await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm")).createClient;
+    return (await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/+esm")).createClient;
   } catch {
-    return (await import("https://esm.sh/@supabase/supabase-js@2")).createClient;
+    return (await import("https://esm.sh/@supabase/supabase-js@2.117.1")).createClient;
   }
 }
 

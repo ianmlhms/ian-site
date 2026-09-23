@@ -1,8 +1,8 @@
 /* game-common.js — shared plumbing for the two-player realtime games.
  * Load AFTER pixelbreak-config.js and the supabase-js UMD bundle:
  *   <script src="pixelbreak-config.js"></script>
- *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- *   <script src="game-common.js?v=1"></script>
+ *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-..." crossorigin="anonymous"></script>
+ *   <script src="game-common.js?v=3"></script>
  *
  * Provides (window.GameCommon):
  *   room / AI / role / other / clientId — parsed + sanitised URL context

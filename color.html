@@ -73,8 +73,8 @@
 <div class="wrap" id="app"><p class="muted">Connecting…</p></div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="notify-ambient.js?v=11"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
+<script type="module" src="notify-ambient.js?v=12"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const AI = params.get("ai")==="1";              // single-player vs computer bots
@@ -330,7 +330,7 @@ if(AI){
     .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 }
 </script>
-  <script type="module" src="rtc-ring.js?v=11"></script>
-  <script type="module" src="class-gate.js?v=12"></script>
+  <script type="module" src="rtc-ring.js?v=12"></script>
+  <script type="module" src="class-gate.js?v=13"></script>
 </body>
 </html>
