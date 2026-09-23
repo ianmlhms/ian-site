@@ -16,7 +16,9 @@ Watch health sync needs a one-time setup.
 Push Health data with an **Apple Shortcuts automation**. The phone only ever holds a
 per-user token; it maps to exactly one account and can only write that account's data.
 
-1. Run `scripts/personal-tools-v1.sql` (creates the tables + `get_health_token()`).
+1. Run `scripts/personal-tools-v1.sql` (creates the tables). The watch token is generated
+   in the browser by `health.html` (2× `crypto.randomUUID()`) and stored in
+   `user_integrations` — there is no `get_health_token()` function.
 2. Deploy the ingest function (must allow no-JWT so Shortcuts can call it):
    ```sh
    supabase functions deploy health-ingest --no-verify-jwt --project-ref lvksqmgfwkfbblfsozfk

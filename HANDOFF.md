@@ -21,7 +21,16 @@ _Last updated: 20 July 2026._
 
 Every `git push` to `main` triggers **one** deploy automatically (the GitHub Pages mirror was dropped 6 Jul 2026):
 - **Plesk via FTP** — GitHub Actions `.github/workflows/deploy.yml` uses **lftp FTPS**
-   (cert verification off — Plesk self-signed) to mirror the repo into `httpdocs/`.
+   (certificate chain verified; hostname check off because the cert names the Plesk host).
+- **Incremental since 23 Sep 2026: ~1–2 min instead of 7–11.** The live commit is recorded in
+   `httpdocs/.deploy-sha`; each run uploads only `git diff <live>..HEAD` (+ `rm -f` for deleted
+   files) and writes the marker **last**. With no usable marker it diffs from the **last
+   successful run** of the workflow. A full `mirror -R --delete` only happens when neither
+   exists, or on demand: *Actions → Deploy → Run workflow → full = true* (use it if a file was
+   ever changed on the server by hand — incremental mode can't see that).
+- Why it was slow before: a fresh checkout stamps every file "now", so `mirror` re-sent all
+  ~1,970 files on every push, deleting each one just before replacing it.
+- The workflow needs `fetch-depth: 0` and `permissions: actions: read` — keep both.
 
 Standard loop:
 ```sh
@@ -41,15 +50,21 @@ exposure — done ✓). `deploy.yml` has a `plesk-deploy` concurrency group so t
 run parallel FTP mirrors (that race once broke a deploy).
 
 ### ⚠️ Cache-busting (read this!)
-Plesk serves assets with `cache-control: max-age=600` (10 min). A normal reload
+Plesk serves assets with `cache-control: max-age=600` (10 min), and the service worker
+serves **versioned** JS/CSS **cache-first** — a changed file behind an unchanged `?v=` stays
+stale for returning visitors indefinitely. That includes files that only *import* a changed
+module: bump the importer too, all the way up the chain. A normal reload
 does **not** refetch JS — so after changing a `.js` file, **bump its `?v=N`** in the `<script>`
 tags that reference it (e.g. `messenger.js?v=4`), or the user keeps the old cached version.
 "Nothing changed after reload" = stale cache, not a bug. To test instantly: a **private window**.
-Current versions (15 Jul 2026): `theme.js?v=10`, `auth.js?v=5`, `i18n-dict.js?v=21` (same on ALL
-pages — keep it unified), `i18n.js?v=1`, `messenger.js?v=22`, `friends.js?v=18`,
-`pixelbreak-records.js?v=8`, `admin.js?v=8`, `factory-auth.js?v=5`, `notify.js?v=5`,
-`notify-ambient.js?v=5`, `class-gate.js?v=4`, `rtc-ring.js?v=2`,
-`game-common.js?v=1`, `game-common.css?v=3`, `style.css?v=10`
+Current versions (23 Sep 2026): `theme.js?v=21`, `auth.js?v=16`, `i18n-dict.js?v=35` (same on ALL
+pages — keep it unified), `i18n.js?v=3`, `messenger.js?v=34`, `friends.js?v=30`,
+`pixelbreak-records.js?v=16`, `admin.js?v=19`, `factory-auth.js?v=17`, `notify.js?v=12`,
+`notify-ambient.js?v=12`, `class-gate.js?v=13`, `rtc-ring.js?v=12`, `game-common.js?v=3`.
+Don't trust this list — `grep -o 'NAME.js?v=[0-9]*'` is the truth.
+`supabase-js` is **pinned** to `2.117.1` with an SRI hash on every page; to upgrade, change
+the version and recompute `sha384` of `dist/umd/supabase.js` (never hash the bare `@2` URL —
+jsdelivr rewrites it).
 (`sw.js` is registered, not query-versioned — it updates on its own SW lifecycle).
 
 ## 3. Supabase
