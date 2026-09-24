@@ -6,19 +6,19 @@
   <!-- Auth-gated app shell: almost no crawlable text, so it is kept out of the
        index rather than offered to Google as a near-empty page. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Klass-Tafel — ian.lu</title>
+<title>Hausaufgaben — ian.lu</title>
 <meta name="description" content="Klass-Hausaufgaben op ian.lu — deng Klass hält zesummen fest wat ze maache ass.">
 <link rel="canonical" href="https://ian.lu/board.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ian.lu">
-<meta property="og:title" content="Klass-Tafel — ian.lu">
+<meta property="og:title" content="Hausaufgaben — ian.lu">
 <meta property="og:description" content="Klass-Hausaufgaben — deng Klass hält zesummen fest wat ze maache ass.">
 <meta property="og:url" content="https://ian.lu/board.html">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=22"></script>
+<script src="theme.js?v=23"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--bad:#f87171}
   *{box-sizing:border-box}
@@ -58,7 +58,7 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>📋 Klass-Tafel<span id="classTag"></span></h1>
+  <h1>📋 Hausaufgaben<span id="classTag"></span></h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
@@ -76,7 +76,7 @@
     </div>
     <div class="msg" id="hwMsg"></div>
   </div>
-  <div class="gate" id="gate" style="display:none">🔒 <a href="#" id="gateBtn">Mell dech un</a> fir d'Klass-Tafel ze gesinn.</div>
+  <div class="gate" id="gate" style="display:none">🔒 <a href="#" id="gateBtn">Mell dech un</a> fir d'Hausaufgaben ze gesinn.</div>
   <div class="gate" id="noclass" style="display:none">🎓 Setz zeréischt deng Klass, da gesäis du d'Tafel vun denger Klass.</div>
   <div class="card" id="listCard" style="display:none"><div id="list"><p class="empty">Lueden…</p></div></div>
 </div>
@@ -84,7 +84,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=16";
+import * as auth from "./auth.js?v=17";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const DONE_KEY="classBoardDone";
@@ -183,7 +183,7 @@ $("hwTitle").addEventListener("keydown",e=>{if(e.key==="Enter")$("hwAdd").click(
   refresh();
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=12"></script>
-  <script type="module" src="class-gate.js?v=13"></script>
+  <script type="module" src="rtc-ring.js?v=13"></script>
+  <script type="module" src="class-gate.js?v=14"></script>
 </body>
 </html>

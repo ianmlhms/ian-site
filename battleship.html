@@ -9,7 +9,7 @@
   <meta name="description" content="Battleship on ian.lu — place your fleet and play against a friend on two devices, or against the computer." />
   <link rel="canonical" href="https://ian.lu/battleship.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=22"></script>
+<script src="theme.js?v=23"></script>
 <link rel="stylesheet" href="game-common.css?v=5">
 <style>
   :root{--ship:#5b6bbf;--hit:#ff5d6c;--miss:#33384f;--water:#10142e;--ok:#3fb950}
@@ -82,7 +82,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="game-common.js?v=3"></script>
-<script type="module" src="notify-ambient.js?v=12"></script>
+<script type="module" src="notify-ambient.js?v=13"></script>
 <script>
 const N=8, SHIPS=[4,3,3,2];
 const GC=window.GameCommon;
@@ -294,7 +294,7 @@ $("ready").onclick=()=>{ if(myReady||!allPlaced())return; myReady=true;
 function resetGame(send){ over=false; recorded=false; myReady=false; oppReady=false; phase="setup"; turn="host"; clearLocal(); clearAll(); enemy=empty(); aiBoard=null; aiHunt=[]; renderSetup(); if(send&&!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); }
 $("rematch").onclick=()=>resetGame(true);
 </script>
-  <script type="module" src="rtc-ring.js?v=12"></script>
-  <script type="module" src="class-gate.js?v=13"></script>
+  <script type="module" src="rtc-ring.js?v=13"></script>
+  <script type="module" src="class-gate.js?v=14"></script>
 </body>
 </html>

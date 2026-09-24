@@ -12,7 +12,7 @@ export const APPS = Object.freeze([
     keywords: ["homework", "devoirs", "aufgaben", "webuntis"] },
   { url: "flashcards.html", name: "Kaarten", icon: "🃏", group: "grp.school", locked: true,
     keywords: ["flashcards", "karteikarten", "cartes", "lernen", "réviser"] },
-  { url: "board.html", name: "Klass-Tafel", icon: "📋", group: "grp.school", locked: true,
+  { url: "board.html", onlyClass: "4C6", name: "Hausaufgaben", icon: "📋", group: "grp.school", locked: true,
     keywords: ["class board", "tafel", "tableau", "hausaufgaben", "devoirs"] },
   { url: "ask.html", name: "Frot deng Daten", icon: "🧠", group: "grp.school", locked: true,
     keywords: ["ai", "daten", "données", "fragen", "questions"] },

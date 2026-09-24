@@ -130,7 +130,7 @@ window.I18N_DICT = {
   "tile.bus.sub":        { lb: "Departuren & Weeër", de: "Abfahrten & Routen", en: "Departures & routes" },
   "tile.grades":         { lb: "Noten", de: "Noten", en: "Grades" },
   "tile.grades.sub":     { lb: "Moyenne-Rechner", de: "Durchschnittsrechner", en: "Average calculator" },
-  "tile.board":          { lb: "Klass-Tafel", de: "Klassen-Tafel", en: "Class board" },
+  "tile.board":          { lb: "Hausaufgaben", de: "Hausaufgaben", en: "Homework" },
   "tile.board.sub":      { lb: "Hausaufgabe vun der Klass", de: "Hausaufgaben der Klasse", en: "Shared class homework" },
   "tile.timetable":      { lb: "Stonneplang", de: "Stundenplan", en: "Timetable" },
   "tile.timetable.sub":  { lb: "Deng Woch op ee Bléck", de: "Deine Woche auf einen Blick", en: "Your weekly timetable" },

@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=22"></script>
+<script src="theme.js?v=23"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
@@ -63,7 +63,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=16";
+import * as auth from "./auth.js?v=17";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let sb=null,myClass=null,me=null,exams=[],decksByExam={},openId=null,timer=null;
@@ -235,7 +235,7 @@ function setMsg(id,t,err){
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=12"></script>
-  <script type="module" src="class-gate.js?v=13"></script>
+  <script type="module" src="rtc-ring.js?v=13"></script>
+  <script type="module" src="class-gate.js?v=14"></script>
 </body>
 </html>

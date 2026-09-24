@@ -1291,7 +1291,7 @@ boot();
   /* Only accounts with profiles.can_casino may use this page. The real
    * protection is server side: set_casino_balance is SECURITY DEFINER and keys
    * off auth.uid(), so hiding the UI is about who sees it, not about trust. */
-  import { client, session, onAuth, openAuthModal } from "./auth.js?v=16";
+  import { client, session, onAuth, openAuthModal } from "./auth.js?v=17";
   const gate = document.getElementById("gateBox");
   const message = document.getElementById("gateMsg");
   const signIn = document.getElementById("gateSignin");
@@ -1323,7 +1323,7 @@ boot();
 </script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-  <script type="module" src="rtc-ring.js?v=12"></script>
-  <script type="module" src="class-gate.js?v=13"></script>
+  <script type="module" src="rtc-ring.js?v=13"></script>
+  <script type="module" src="class-gate.js?v=14"></script>
 </body>
 </html>

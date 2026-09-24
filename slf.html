@@ -15,7 +15,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#0d0d1a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=22"></script>
+<script src="theme.js?v=23"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
@@ -65,7 +65,7 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=12"></script>
+<script type="module" src="notify-ambient.js?v=13"></script>
 <script>
 /* 15 categories to choose from. `check` is the Wikidata WHERE-fragment used to
    verify an answer; null = no online check (that category always counts). */
@@ -358,7 +358,7 @@ ch.on("broadcast",{event:"start"},onMessage("start",payload=>{ round=payload.rou
   })
   .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 </script>
-  <script type="module" src="rtc-ring.js?v=12"></script>
-  <script type="module" src="class-gate.js?v=13"></script>
+  <script type="module" src="rtc-ring.js?v=13"></script>
+  <script type="module" src="class-gate.js?v=14"></script>
 </body>
 </html>
