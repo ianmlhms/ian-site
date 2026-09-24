@@ -7,6 +7,7 @@
 // — the browser REST API (/api/homeworks/lessons) is blocked for LAML
 // (publicAppAccessAllowed:false), but the mobile API works: proven by the
 // DailyBriefing bot, which fetches the timetable the same way.
+// pg_cron calls it every 20 min, 04:00–20:40 UTC (scripts/class-homework-cleanup-v1.sql).
 //
 // Secrets (set with `supabase secrets set ...`, see scripts/WEBUNTIS-SETUP.md):
 //   WEBUNTIS_SERVER       https://laml.webuntis.com     (no trailing /WebUntis)
@@ -153,6 +154,7 @@ async function syncClassHomework(
   admin: ReturnType<typeof createClient>, homeworks: any[], lessons: Record<string, any>,
   subjectLong: Record<number, string>, classNames: Record<number, string>, end: Date,
 ): Promise<{ count: number; removed: number }> {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: LUX_TZ }).format(new Date());
   const rows = homeworks.map((h: any) => {
     const lesson = lessons?.[String(h.lessonId)] ?? {};
     const text = [h.text, h.remark].map((v) => String(v || "").trim()).filter(Boolean).join(" — ");
@@ -164,7 +166,9 @@ async function syncClassHomework(
       due: toDate(h.endDate ?? h.dueDate),
       created_by: null,
     };
-  }).filter((r: any) => typeof r.untis_id === "number" && r.class && r.title);
+  // Past-due items are deleted every morning (cron class-homework-cleanup), so
+  // never re-insert them from the lookback window.
+  }).filter((r: any) => typeof r.untis_id === "number" && r.class && r.title && !(r.due && r.due < today));
 
   if (rows.length) {
     const { error } = await admin.from("class_homework").upsert(rows, { onConflict: "untis_id" });
