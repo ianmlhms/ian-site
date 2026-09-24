@@ -48,19 +48,18 @@ const GAME_PAGES = Object.freeze(Object.fromEntries(Object.keys(GAMES).map(id =>
 const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe", "checkers", "maumau", "dice-duel"]);
 
 async function refresh() {
-  const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: dir }, { data: act }] = await Promise.all([
+  const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: act }] = await Promise.all([
     sb.rpc("my_friends"), sb.rpc("friend_requests"), sb.rpc("my_game_invites"),
-    sb.rpc("sent_requests"), sb.rpc("directory"), sb.rpc("friends_activity", { p_limit: 30 }),
+    sb.rpc("sent_requests"), sb.rpc("friends_activity", { p_limit: 30 }),
     loadClasses(),
   ]);
   const frF = vis(fr, "user_id", "username"), rqF = vis(rq, null, "username"),
         giF = vis(gi, null, "from_name"), sentF = vis(sent, null, "username"),
-        dirF = vis(dir, "user_id", "username"), actF = vis(act, null, "username");
+        actF = vis(act, null, "username");
   renderFriends(frF);
   renderRequests(rqF);
   renderInvites(giF);
   renderSent(sentF);
-  renderDirectory(dirF);
   renderActivity(actF);
   updateRequestsTab(rqF, giF, sentF);
 }
@@ -105,22 +104,6 @@ function renderSent(list) {
       <button class="mini x" data-cancel="${s.user_id}">${T("btn.cancel")}</button>
     </div>`).join("");
   $("sent").querySelectorAll("[data-cancel]").forEach(b => b.onclick = async () => { await sb.rpc("remove_friend", { p_other: b.dataset.cancel }); refresh(); });
-}
-
-function renderDirectory(list) {
-  const el = $("directory");
-  if (!list.length) { el.innerHTML = `<div class="empty">${T("friends.noUsers")}</div>`; return; }
-  el.innerHTML = list.map(u => {
-    let btn;
-    if (u.status === "friend") btn = `<span class="mini" style="opacity:.55">${T("friends.isFriend")}</span>`;
-    else if (u.status === "sent") btn = `<span class="mini" style="opacity:.55">${T("friends.requested")}</span>`;
-    else if (u.status === "incoming") btn = `<button class="mini go" data-add="${esc(u.username)}">${T("friends.accept")}</button>`;
-    else btn = `<button class="mini go" data-add="${esc(u.username)}">${T("friends.addPlus")}</button>`;
-    return `<div class="row"><span class="name"><span class="av">👤</span>${esc(u.username)}${classTag(u.username)}</span>${btn}</div>`;
-  }).join("");
-  el.querySelectorAll("[data-add]").forEach(b => b.onclick = async () => {
-    try { await sb.rpc("add_friend", { p_username: b.dataset.add }); refresh(); } catch (e) { alert(e.message); }
-  });
 }
 
 function renderFriends(list) {
