@@ -19,7 +19,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script src="theme.js?v=21"></script>
+  <script src="theme.js?v=22"></script>
   <script src="i18n-dict.js?v=35"></script>
   <script src="i18n.js?v=3"></script>
   <script>
@@ -81,6 +81,9 @@
           </a>
           <a class="tile timetable" href="timetable.html" data-app="timetable.html">
             <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🗓️</span><span class="tname" data-i18n="tile.timetable">Stonneplang</span><span class="tsub" data-i18n="tile.timetable.sub">Your weekly timetable</span>
+          </a>
+          <a class="tile exams class-4c6-only" style="display:none" href="exams.html" data-app="exams.html">
+            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.exams">Tester</span><span class="tsub" data-i18n="tile.exams.sub">Countdowns, notes &amp; flashcards</span>
           </a>
           <a class="tile hw admin-only" href="homework.html" data-app="homework.html" style="display:none">
             <span class="ico" aria-hidden="true">📚</span><span class="tname" data-i18n="tile.hw">Hausaufgaben</span><span class="tsub" data-i18n="tile.hw.sub">WebUntis homework</span>
@@ -144,6 +147,9 @@
           </a>
           <a class="tile bus" href="kaart/" data-app="kaart/">
             <span class="ico" aria-hidden="true">🗺️</span><span class="tname" data-i18n="tile.kaart">Wanderkaart</span><span class="tsub" data-i18n="tile.kaart.sub">All hiking &amp; MTB routes on one map</span>
+          </a>
+          <a class="tile bus" href="geoportal/" data-app="geoportal/">
+            <span class="ico" aria-hidden="true">🛰️</span><span class="tname">Geoportal</span><span class="tsub" data-i18n="tile.geoportal.sub">Official maps, aerial photos &amp; cadastre</span>
           </a>
         </div>
       </details>
@@ -271,6 +277,7 @@
     const HOUSE_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Haus-Planer
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)
     const STUDIO_ALLOW = ["konto@ian.lu", "matthieugerouville@gmail.com"];   // PPT/Word studios; ian@ian.lu is the test account
+    const TESTER_CLASS = "4C6";
     const DEFAULT_FAVS = ["messenger.html", "grades.html", "timetable.html", "pixelbreak.html", "bus.html"];
     const HALF_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
     const apps = document.getElementById("apps");
@@ -545,10 +552,17 @@
       const house = HOUSE_ALLOW.includes(email);
       document.querySelectorAll(".private-haus").forEach((e) => (e.style.display = house ? "" : "none"));
       // The studios key on an explicit allow-list rather than is_admin():
-      // ian@ian.lu is an admin but is the test account, and would get a tile
-      // that the studio itself then refuses.
+      // ian@ian.lu is the test account (no admin rights since 24 Sep 2026) and
+      // must never get a studio tile.
       const studio = STUDIO_ALLOW.includes(email);
       document.querySelectorAll(".owner-only").forEach((e) => (e.style.display = studio ? "" : "none"));
+      // Tester is fed from WebUntis for 4C6 only, so other classes would see an empty board.
+      let myClass = "";
+      try {
+        const uid = session()?.user?.id;
+        if (sb && uid) { const { data } = await sb.from("profiles").select("class").eq("id", uid).maybeSingle(); myClass = (data?.class || "").toUpperCase(); }
+      } catch {}
+      document.querySelectorAll(".class-4c6-only").forEach((e) => (e.style.display = myClass === TESTER_CLASS ? "" : "none"));
       refreshGroups();
       renderFavorites();
       orderAppsByUsage();

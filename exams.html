@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=21"></script>
+<script src="theme.js?v=22"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
@@ -42,7 +42,6 @@
   textarea{min-height:60px;resize:vertical}
   .row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
   .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:13px}
-  .newx{display:grid;grid-template-columns:1fr;gap:8px}
   .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
@@ -65,7 +64,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
 import * as auth from "./auth.js?v=16";
-import { mountPicker } from "./datetime-picker.js?v=2";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let sb=null,myClass=null,me=null,exams=[],decksByExam={},openId=null,timer=null;
@@ -83,29 +81,9 @@ async function boot(){
   if(!myClass){$("wrap").innerHTML=`<div class="gate">🎓 Setz zeréischt deng Klass (am <a href="profile.html">Profil</a>), da gesäis du d'Tester vun denger Klass.</div>`;return;}
   $("classTag").innerHTML=`<span class="deck" style="margin:0">${esc(myClass)}</span>`;
   $("wrap").innerHTML=`
-    <div class="card newx">
-      <input id="nSubj" maxlength="100" placeholder="Fach / Test (z.B. Mathe-Devoir)">
-      <input type="hidden" id="nDate"><input type="hidden" id="nTime" value="08:00">
-      <div id="nPicker"></div>
-      <input id="nNote" maxlength="200" placeholder="Notiz (optional, z.B. Kapitel 4–6)">
-      <button class="btn" id="nAdd">Test bäisetzen</button>
-      <div class="msg" id="nMsg"></div>
-    </div>
+    <div class="msg" style="margin:0 0 10px">📡 D'Tester kommen automatesch vu WebUntis (all Moien).</div>
     <div id="list"><div class="gate">Lueden…</div></div>`;
-  $("nAdd").onclick=addExam;
-  wirePicker();
   await refresh();
-}
-
-function wirePicker(){
-  const p=(n)=>String(n).padStart(2,"0");
-  const iso=(d)=>`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
-  const hm=(d)=>`${p(d.getHours())}:${p(d.getMinutes())}`;
-  const def=new Date();def.setHours(8,0,0,0);
-  $("nDate").value=iso(def);$("nTime").value=hm(def);
-  mountPicker($("nPicker"),{value:def,time:true,min:new Date(),lang:"lb",confirm:false,
-    onChange:(d)=>{if(d){$("nDate").value=iso(d);$("nTime").value=hm(d);}}});
-  ["nSubj","nNote"].forEach(id=>$(id).addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addExam();}}));
 }
 
 async function refresh(){
@@ -145,7 +123,7 @@ function render(){
     const nDecks=(decksByExam[e.id]||[]).length;
     return `<div class="card" style="margin-bottom:10px">
       <div class="exam${left<0?" past":""}" data-open="${e.id}">
-        <div><div class="subj">${esc(e.subject)}${nDecks?` <span class="caret">🃏 ${nDecks}</span>`:""}</div>
+        <div><div class="subj">${esc(e.subject)}${e.untis_id?` <span class="caret" title="Automatesch vu WebUntis">· WebUntis</span>`:""}${nDecks?` <span class="caret">🃏 ${nDecks}</span>`:""}</div>
           <div class="when">${when}</div>${e.note?`<div class="note">${esc(e.note)}</div>`:""}</div>
         <div class="cd${left<3*DAY&&left>0?" soon":""}" data-cd="${e.id}"><b>${cdText(left)}</b></div>
         <span class="caret">${openId===e.id?"▲":"▼"}</span>
@@ -252,19 +230,6 @@ function setMsg(id,t,err){
   const m=$("nm-"+id);if(!m)return;
   m.textContent=t;m.style.color=err?"#ff6b6b":"var(--accent2)";
   if(t&&!err&&/✓|gelueden|gespäichert/i.test(t))setTimeout(()=>{if(m)m.textContent="";},1500);
-}
-
-async function addExam(){
-  const subj=$("nSubj").value.trim(),date=$("nDate").value,time=$("nTime").value||"08:00";
-  if(!subj||!date){$("nMsg").textContent="Fach an Datum uginn.";return;}
-  $("nMsg").textContent="…";
-  try{
-    const {error}=await sb.from("exams").insert({subject:subj,note:$("nNote").value.trim()||null,at:new Date(date+"T"+time).toISOString(),class:myClass});
-    if(error)throw error;
-    $("nSubj").value="";$("nNote").value="";$("nMsg").textContent="Gespäichert ✓";
-    setTimeout(()=>$("nMsg").textContent="",1500);
-    refresh();
-  }catch(e){console.warn(e);$("nMsg").textContent="Feeler beim Späicheren.";}
 }
 
 auth.onAuth(boot);

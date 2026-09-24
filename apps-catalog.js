@@ -1,12 +1,12 @@
 // `admin: true` mirrors the `.admin-only` tiles on index.html. This file is the
-// single source of that fact — the homepage used to say Homework was admin-only
+// single source of that fact (`onlyClass` likewise mirrors `.class-4c6-only`) — the homepage used to say Homework was admin-only
 // while this catalog said it was open, so ⌘K offered it to everyone.
 export const APPS = Object.freeze([
   { url: "grades.html", name: "Grades", icon: "🎓", group: "grp.school", locked: true,
     keywords: ["noten", "points", "moyenne", "average", "zensuren"] },
   { url: "timetable.html", name: "Stonneplang", icon: "🗓️", group: "grp.school", locked: true,
     keywords: ["stonneplang", "stundenplan", "horaire", "schedule"] },
-  { url: "exams.html", name: "Tester", icon: "⏳", group: "grp.school", locked: true,
+  { url: "exams.html", onlyClass: "4C6", name: "Tester", icon: "⏳", group: "grp.school", locked: true,
     keywords: ["prüfungen", "examens", "tests", "countdown", "notizen"] },
   { url: "homework.html", admin: true, name: "Hausaufgaben", icon: "📚", group: "grp.school", locked: false,
     keywords: ["homework", "devoirs", "aufgaben", "webuntis"] },

@@ -1,4 +1,4 @@
-import { APPS } from "./apps-catalog.js?v=4";
+import { APPS } from "./apps-catalog.js?v=5";
 
 // Admin-only apps stay out of ⌘K until is_admin() actually says otherwise, so an
 // unresolved check errs towards hiding rather than offering them to everyone.
@@ -7,6 +7,7 @@ import { APPS } from "./apps-catalog.js?v=4";
 // rather than importing auth.js: theme.js pulls this module into 58 pages, and
 // importing auth would drag the 58 KB dictionary onto every one of them.
 let isAdmin = false;
+let myClass = "";
 let adminChecked = false;
 // Resolved when the panel opens, not at module load: auth has usually not
 // settled that early, and this is the first moment the answer is needed.
@@ -15,9 +16,16 @@ async function refreshAdmin() {
   if (!shared || !shared.sb || !shared.session) { adminChecked = false; return; }
   if (adminChecked) return;
   try {
-    const { data } = await shared.sb.rpc("is_admin");
+    const [{ data }, profile] = await Promise.all([
+      shared.sb.rpc("is_admin"),
+      shared.sb.from("profiles").select("class").eq("id", shared.session.user.id).maybeSingle(),
+    ]);
     adminChecked = true;
-    if (!!data !== isAdmin) { isAdmin = !!data; if (backdrop) render(); }
+    const nextClass = (profile?.data?.class || "").toUpperCase();
+    if (!!data !== isAdmin || nextClass !== myClass) {
+      isAdmin = !!data; myClass = nextClass;
+      if (backdrop) render();
+    }
   } catch (error) { console.warn("[qo] admin check", error); }
 }
 
@@ -136,7 +144,7 @@ function matchQuality(app, query) {
 function rankedApps(rawQuery) {
   const query = normalize(rawQuery);
   const usage = usageScores();
-  const visible = APPS.filter((app) => !app.admin || isAdmin);
+  const visible = APPS.filter((app) => (!app.admin || isAdmin) && (!app.onlyClass || app.onlyClass === myClass));
   const catalog = matchMedia("(max-width: 900px)").matches
     ? visible.filter((app) => app.url !== "haus/")
     : visible;
