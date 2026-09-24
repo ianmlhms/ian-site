@@ -36,6 +36,7 @@ const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SYNC_WINDOW_DAYS = 35;
 // Teachers enter tests for the whole term, so look much further ahead than homework.
 const EXAM_WINDOW_DAYS = 200;
+const HOMEWORK_LOOKBACK_DAYS = 14;
 const LUX_TZ = "Europe/Luxembourg";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -145,6 +146,42 @@ async function syncExams(
   return { count: rows.length, removed };
 }
 
+// Copies Untis homework into the class-shared board, class taken from the
+// lesson's klassenIds. Prunes future synced items Untis no longer lists (never
+// after an empty reply); manually added items (untis_id null) are never touched.
+async function syncClassHomework(
+  admin: ReturnType<typeof createClient>, homeworks: any[], lessons: Record<string, any>,
+  subjectLong: Record<number, string>, classNames: Record<number, string>, end: Date,
+): Promise<{ count: number; removed: number }> {
+  const rows = homeworks.map((h: any) => {
+    const lesson = lessons?.[String(h.lessonId)] ?? {};
+    const text = [h.text, h.remark].map((v) => String(v || "").trim()).filter(Boolean).join(" — ");
+    return {
+      untis_id: h.id,
+      class: classNames[(lesson.klassenIds ?? [])[0]] ?? null,
+      subject: subjectLong[lesson.subjectId] || null,
+      title: text.slice(0, 500),
+      due: toDate(h.endDate ?? h.dueDate),
+      created_by: null,
+    };
+  }).filter((r: any) => typeof r.untis_id === "number" && r.class && r.title);
+
+  if (rows.length) {
+    const { error } = await admin.from("class_homework").upsert(rows, { onConflict: "untis_id" });
+    if (error) throw new Error("class_homework upsert failed — " + error.message);
+  }
+  let removed = 0;
+  if (rows.length) {
+    const keep = rows.map((r: any) => r.untis_id);
+    const { data, error } = await admin.from("class_homework").delete()
+      .not("untis_id", "is", null).gte("due", isoDate(new Date())).lte("due", isoDate(end))
+      .not("untis_id", "in", `(${keep.join(",")})`).select("id");
+    if (error) throw new Error("class_homework prune failed — " + error.message);
+    removed = data?.length ?? 0;
+  }
+  return { count: rows.length, removed };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -185,7 +222,9 @@ Deno.serve(async (req) => {
     }
 
     // 3) Homework for the next SYNC_WINDOW_DAYS days.
+    // Start a little in the past: homework set last week can still be due.
     const start = new Date(), end = new Date();
+    start.setDate(start.getDate() - HOMEWORK_LOOKBACK_DAYS);
     end.setDate(end.getDate() + SYNC_WINDOW_DAYS);
     const hw = await callUntis("getHomeWork2017", {
       id: elemId, type: elemType, startDate: isoDate(start), endDate: isoDate(end),
@@ -218,11 +257,16 @@ Deno.serve(async (req) => {
       if (error) return json({ error: "db upsert failed — " + error.message });
     }
 
-    // 5) Tests. A failure here must not hide the homework result above.
+    // 5) Class board copy of the same homework. Its own failure is reported, not fatal.
+    let classHomework: { count: number; removed: number } | { error: string };
+    try { classHomework = await syncClassHomework(admin, homeworks, lessons, subjectLong, classNames, end); }
+    catch (e) { console.error("[webuntis-sync] class homework", e); classHomework = { error: String((e as Error)?.message || e) }; }
+
+    // 6) Tests. A failure here must not hide the homework result above.
     let exams: { count: number; removed: number } | { error: string };
     try { exams = await syncExams(admin, elemId, elemType, subjectLong, classNames); }
     catch (e) { console.error("[webuntis-sync] exams", e); exams = { error: String((e as Error)?.message || e) }; }
-    return json({ ok: true, count: rows.length, exams });
+    return json({ ok: true, count: rows.length, classHomework, exams });
   } catch (e) {
     console.error("[webuntis-sync]", e);
     return json({ error: String((e as Error)?.message || e) });

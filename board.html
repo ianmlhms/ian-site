@@ -124,7 +124,7 @@ async function refresh(){
 function show(id){for(const k of ["gate","noclass","listCard"])$(k).style.display=k===id?"":"none";}
 
 async function loadNames(){
-  const ids=[...new Set(rows.map(r=>r.created_by))].filter(id=>!(id in names));
+  const ids=[...new Set(rows.map(r=>r.created_by))].filter(id=>id&&!(id in names));
   if(!ids.length)return;
   const {data}=await sb.from("profiles").select("id,username").in("id",ids);
   for(const p of data||[])names[p.id]=p.username;
@@ -143,7 +143,7 @@ function render(){
         <div class="ttl">${r.subject?`<span class="subj">${esc(r.subject)}</span>`:""}${esc(r.title)}</div>
         <div class="meta">
           ${d?`<span class="due ${d.cls}">📅 ${d.label}</span>`:""}
-          <span>vun ${esc(names[r.created_by]||"?")}</span>
+          <span>${r.untis_id?"📡 vu WebUntis":`vun ${esc(names[r.created_by]||"?")}`}</span>
         </div>
       </div>
       ${canDel?`<button class="del" data-del="${r.id}" title="Läschen">✕</button>`:""}
