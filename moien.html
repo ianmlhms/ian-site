@@ -37,6 +37,7 @@
   .greet h2{margin:0;font-size:26px;font-weight:800}
   .greet .date{color:var(--muted);font-size:14px;margin-top:4px}
   .greet .clock{font-size:34px;font-weight:800;letter-spacing:.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+  .greet .clock .ms{font-size:.55em;font-weight:700;opacity:.6}
   /* weather */
   .wxtop{display:flex;align-items:center;gap:16px}
   .wxemoji{font-size:52px;line-height:1}
@@ -71,7 +72,7 @@
   <div class="greet">
     <h2 id="hi">Moien!</h2>
     <div class="date" id="date"></div>
-    <div class="clock" id="clock">--:--</div>
+    <div class="clock" id="clock"><span id="clockMain">--:--:--</span><span class="ms" id="clockMs">.000</span></div>
   </div>
 
   <div class="card" id="wx"><div class="muted">Wieder gëtt gelueden…</div></div>
@@ -95,9 +96,15 @@ function tick(){
   const h=d.getHours();
   $("hi").textContent=(h<11?"Moien":h<14?"Gudde Mëtteg":h<18?"Schéinen Nomëtteg":h<23?"Gudden Owend":"Gutt Nuecht")+"!";
   $("date").textContent=`${DAYS[d.getDay()]}, ${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`;
-  $("clock").textContent=`${pad(h)}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
-tick(); setInterval(tick,1000);
+// Clock with milliseconds, redrawn every frame (rAF pauses in background tabs).
+function tickClock(){
+  const d=new Date();
+  $("clockMain").textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  $("clockMs").textContent="."+String(d.getMilliseconds()).padStart(3,"0");
+  requestAnimationFrame(tickClock);
+}
+tick(); setInterval(tick,1000); requestAnimationFrame(tickClock);
 
 /* ---- weather (Open-Meteo, no key) ---- */
 function wmo(c,day){
