@@ -1,6 +1,6 @@
 import { layoutSlide, slideForLayout } from "./ppt-layout.js?v=5";
-import { validateDeck } from "./ppt-ai.js?v=14";
-import { safeExportFilename } from "./ppt-export-pptx.js?v=12";
+import { validateDeck } from "./ppt-ai.js?v=15";
+import { safeExportFilename } from "./ppt-export-pptx.js?v=13";
 import { drawPdfChart } from "./ppt-chart-pdf.js?v=5";
 
 const JSPDF_URL = "https://cdn.jsdelivr.net/npm/jspdf@2/+esm";

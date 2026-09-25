@@ -77,7 +77,7 @@ window.I18N_DICT = {
   "grp.done":       { lb: "Fäerdeg", de: "Fertig", en: "Done" },
   "grp.favHint":    { lb: "Tip op eng App, fir se bäizesetzen oder ewechzehuelen.", de: "Tippe auf eine App, um sie hinzuzufügen oder zu entfernen.", en: "Tap an app to add or remove it from your favorites." },
   "tile.exams":     { lb: "Tester", de: "Tests", en: "Tests" },
-  "tile.exams.sub": { lb: "Countdowns, Notizen & Kaarten", de: "Countdowns, Notizen & Karten", en: "Countdowns, notes & flashcards" },
+  "tile.exams.sub": { lb: "Vu WebUntis, mat Countdown", de: "Aus WebUntis, mit Countdown", en: "From WebUntis, with countdown" },
   "tile.cards":     { lb: "Kaarten", de: "Karten", en: "Flashcards" },
   "tile.cards.sub": { lb: "Kaarten fir ze léieren", de: "Karten zum Lernen", en: "Flashcards to study" },
   "tile.alerts":    { lb: "Neiegkeeten", de: "Neuigkeiten", en: "Alerts" },

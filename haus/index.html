@@ -99,7 +99,7 @@
   <script type="module">
     const mobile = matchMedia("(max-width: 900px), (pointer: coarse)");
     if (!mobile.matches) {
-      const auth = await import("../auth.js?v=17");
+      const auth = await import("../auth.js?v=18");
       const { hydrate } = await import("./src/storage/supabase.js?v=1");
       const ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];
       const gate = document.getElementById("hausGate");

@@ -84,7 +84,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=17";
+import * as auth from "./auth.js?v=18";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const DONE_KEY="classBoardDone";
@@ -183,7 +183,7 @@ $("hwTitle").addEventListener("keydown",e=>{if(e.key==="Enter")$("hwAdd").click(
   refresh();
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=13"></script>
-  <script type="module" src="class-gate.js?v=14"></script>
+  <script type="module" src="rtc-ring.js?v=14"></script>
+  <script type="module" src="class-gate.js?v=15"></script>
 </body>
 </html>
