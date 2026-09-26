@@ -356,7 +356,12 @@ function pendingNode(pending, onRetry) {
   row.className = `message mine ${pending.status === "sent" ? "settled" : "pending"}`;
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.append(textNode("p", "message-body", pending.body));
+  if (pending.body) bubble.append(textNode("p", "message-body", pending.body));
+  if (pending.mediaPath) {
+    const fallbackName = pending.mediaPath.split("/").pop() || "Fichier";
+    const icon = pending.isImage ? "📷" : "📎";
+    bubble.append(textNode("p", "message-body", `${icon} ${pending.fileName || fallbackName}`));
+  }
   const label = pending.status === "failed"
     ? `Feeler: ${pending.error || "Noriicht net geschéckt"}`
     : pending.status === "sent" ? "geschéckt" : "gëtt geschéckt…";

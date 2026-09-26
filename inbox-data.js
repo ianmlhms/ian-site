@@ -1,3 +1,8 @@
+import {
+  buildOutboxPath,
+  isAttachmentSizeAllowed,
+} from "./inbox-attach.js?v=1";
+
 const MESSAGE_LIMIT = 500;
 const SEARCH_LIMIT = 100;
 const SIGNED_URL_SECONDS = 60 * 60;
@@ -52,15 +57,36 @@ export async function searchMessages(supabase, term) {
   return data || [];
 }
 
-export async function queueOutbox(supabase, chat, body) {
-  const row = Object.freeze({ chat_id: chat.id, service: chat.service, body });
+export async function queueOutbox(supabase, chat, body, mediaPath = null) {
+  const row = Object.freeze({
+    chat_id: chat.id,
+    service: chat.service,
+    body,
+    media_path: mediaPath,
+  });
   const { data, error } = await supabase
     .from("bridge_outbox")
     .insert(row)
-    .select("id,chat_id,service,body,status,error,sent_remote_id,created_at")
+    .select("id,chat_id,service,body,media_path,status,error,sent_remote_id,created_at")
     .single();
   if (error) throw bridgeError("D'Noriicht konnt net an d'Waardschlaang gesat ginn.", error);
   return data;
+}
+
+export async function uploadOutboxFile(supabase, file) {
+  if (!isAttachmentSizeAllowed(file?.size)) {
+    throw new Error("Ze grouss (max. 64 MB)");
+  }
+  const uploadId = crypto.randomUUID().toLowerCase();
+  const path = buildOutboxPath(uploadId, file.name);
+  const { error } = await supabase.storage
+    .from("bridge-media")
+    .upload(path, file, {
+      contentType: file.type || "application/octet-stream",
+      upsert: false,
+    });
+  if (error) throw bridgeError("De Fichier konnt net eropgeluede ginn.", error);
+  return path;
 }
 
 export async function queueMediaRequest(supabase, messageId) {

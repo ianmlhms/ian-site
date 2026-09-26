@@ -9,7 +9,8 @@ import {
   queueOutbox,
   searchMessages,
   subscribeToBridge,
-} from "./inbox-data.js?v=2";
+  uploadOutboxFile,
+} from "./inbox-data.js?v=3";
 import {
   highlightMessage,
   renderAccounts,
@@ -20,7 +21,8 @@ import {
   renderMessagesLoading,
   renderSearchResults,
   showNotice,
-} from "./inbox-render.js?v=3";
+} from "./inbox-render.js?v=4";
+import { isAttachmentSizeAllowed } from "./inbox-attach.js?v=1";
 import {
   createMailBodyUrl,
   fetchMailAccounts,
@@ -37,7 +39,7 @@ import {
   renderMailHeader,
   renderMailList,
   renderMailLoading,
-} from "./inbox-mail-render.js?v=1";
+} from "./inbox-mail-render.js?v=2";
 
 const MODE_CHATS = "chats";
 const MODE_MAIL = "mail";
@@ -50,6 +52,7 @@ const REALTIME_ERROR_STATES = Object.freeze(["CHANNEL_ERROR", "TIMED_OUT", "CLOS
 
 let state = Object.freeze({
   accounts: [],
+  attachment: null,
   chats: [],
   filter: "all",
   mailAccounts: [],
@@ -71,6 +74,7 @@ let mailChannel = null;
 let searchTimer = null;
 let accountTimer = null;
 let noticeTimer = null;
+let isUploading = false;
 
 function setState(patch) {
   state = Object.freeze({ ...state, ...patch });
@@ -78,6 +82,95 @@ function setState(patch) {
 
 function currentChat() {
   return state.chats.find((chat) => chat.id === state.selectedChatId) || null;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toLocaleString("lb-LU", { maximumFractionDigits: 1 })} MB`;
+}
+
+function syncComposerAttachmentUi() {
+  const canAttach = state.mode === MODE_CHATS && currentChat()?.service === "whatsapp";
+  document.getElementById("attachButton").hidden = !canAttach;
+  document.getElementById("messageInput").placeholder = state.mode === MODE_MAIL
+    ? "Äntwert…"
+    : state.attachment ? "Beschreiwung (optional)…" : "Noriicht…";
+}
+
+function renderAttachmentPreview() {
+  const host = document.getElementById("attachmentPreview");
+  host.replaceChildren();
+  host.hidden = !state.attachment;
+  if (!state.attachment) {
+    syncComposerAttachmentUi();
+    return;
+  }
+
+  const { file, objectUrl } = state.attachment;
+  if (objectUrl) {
+    const image = document.createElement("img");
+    image.className = "attachment-thumb";
+    image.src = objectUrl;
+    image.alt = "Bildvirschau";
+    host.append(image);
+  } else {
+    const icon = document.createElement("span");
+    icon.className = "attachment-icon";
+    icon.textContent = "📎";
+    host.append(icon);
+  }
+
+  const details = document.createElement("span");
+  details.className = "attachment-details";
+  const name = document.createElement("span");
+  name.className = "attachment-name";
+  name.textContent = file.name || "file";
+  const size = document.createElement("span");
+  size.className = "attachment-size";
+  size.textContent = formatFileSize(file.size);
+  details.append(name, size);
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "attachment-remove";
+  remove.textContent = "Ewechhuelen";
+  remove.disabled = isUploading;
+  remove.onclick = clearAttachment;
+  host.append(details, remove);
+  syncComposerAttachmentUi();
+}
+
+function clearAttachment() {
+  if (state.attachment?.objectUrl) URL.revokeObjectURL(state.attachment.objectUrl);
+  setState({ attachment: null });
+  document.getElementById("attachmentInput").value = "";
+  renderAttachmentPreview();
+}
+
+function onAttachmentChange(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!isAttachmentSizeAllowed(file.size)) {
+    event.target.value = "";
+    showNotice("Ze grouss (max. 64 MB)", "error");
+    return;
+  }
+  if (state.attachment?.objectUrl) URL.revokeObjectURL(state.attachment.objectUrl);
+  const objectUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+  setState({ attachment: Object.freeze({ file, objectUrl }) });
+  renderAttachmentPreview();
+}
+
+function setUploading(uploading) {
+  isUploading = uploading;
+  const send = document.getElementById("sendButton");
+  send.disabled = uploading;
+  send.textContent = uploading ? "Gëtt eropgelueden…" : "Schécken";
+  document.getElementById("attachButton").disabled = uploading;
+  const remove = document.querySelector(".attachment-remove");
+  if (remove) remove.disabled = uploading;
+  document.getElementById("composer").setAttribute("aria-busy", String(uploading));
 }
 
 function chatsById() {
@@ -172,6 +265,7 @@ function setMailFilter(kind) {
 
 function setMode(mode) {
   if (state.mode === mode) return;
+  clearAttachment();
   setState({ mode, searchTerm: "", searchResults: [], mailSearchResults: [] });
   const isMail = mode === MODE_MAIL;
   document.querySelectorAll("[data-mode]").forEach((button) => {
@@ -185,10 +279,10 @@ function setMode(mode) {
   const search = document.getElementById("searchInput");
   search.value = "";
   search.placeholder = isMail ? "Mailen duerchsichen…" : "Noriichten duerchsichen…";
-  document.getElementById("messageInput").placeholder = isMail ? "Äntwert…" : "Noriicht…";
   document.getElementById("composer").hidden = isMail
     ? !state.selectedMailId
     : !state.selectedChatId;
+  syncComposerAttachmentUi();
   closeMobileChat();
   renderSidebar();
   renderConversation();
@@ -205,6 +299,7 @@ async function selectMail(mailId) {
     showNotice("Dës Mail ass net méi verfügbar.", "error");
     return;
   }
+  clearAttachment();
   setState({ mailAttachments: [], mailThread: [], selectedMailId: mailId });
   renderSidebar();
   renderMailHeader(mail, mailAccountsById()[mail.account_id], closeMobileChat);
@@ -243,7 +338,9 @@ async function selectChat(chatId, remoteId = null) {
     showNotice("Dëse Chat ass net méi verfügbar.", "error");
     return;
   }
+  clearAttachment();
   setState({ messages: [], selectedChatId: chatId });
+  syncComposerAttachmentUi();
   renderSidebar();
   renderChatHeader(chat, closeMobileChat);
   renderMessagesLoading();
@@ -263,13 +360,16 @@ async function selectChat(chatId, remoteId = null) {
   }
 }
 
-function createPending(chat, body) {
+function createPending(chat, body, mediaPath = null, file = null) {
   return Object.freeze({
     body,
     chatId: chat.id,
     createdAt: new Date().toISOString(),
     error: null,
+    fileName: file?.name || null,
+    isImage: Boolean(file?.type?.startsWith("image/")),
     localId: crypto.randomUUID(),
+    mediaPath,
     outboxId: null,
     sentRemoteId: null,
     status: "queued",
@@ -286,7 +386,7 @@ function replacePending(localId, patch) {
 
 async function enqueuePending(pending, chat) {
   try {
-    const outbox = await queueOutbox(supabase, chat, pending.body);
+    const outbox = await queueOutbox(supabase, chat, pending.body, pending.mediaPath);
     replacePending(pending.localId, {
       error: outbox.error,
       outboxId: outbox.id,
@@ -300,8 +400,65 @@ async function enqueuePending(pending, chat) {
   }
 }
 
+function removePending(localId) {
+  setState({ pending: state.pending.filter((item) => item.localId !== localId) });
+  renderConversation();
+}
+
+async function removeUploadedFile(path) {
+  try {
+    const { error } = await supabase.storage.from("bridge-media").remove([path]);
+    if (error) console.warn("Uploaded outbox file could not be removed:", error.message);
+  } catch (error) {
+    console.warn("Uploaded outbox file could not be removed:", error);
+  }
+}
+
+async function sendAttachment(chat, body, attachment) {
+  if (chat.service !== "whatsapp") return;
+  if (!isAttachmentSizeAllowed(attachment.file.size)) {
+    showNotice("Ze grouss (max. 64 MB)", "error");
+    return;
+  }
+
+  const input = document.getElementById("messageInput");
+  let mediaPath = null;
+  let pending = null;
+  setUploading(true);
+  try {
+    mediaPath = await uploadOutboxFile(supabase, attachment.file);
+    pending = createPending(chat, body || null, mediaPath, attachment.file);
+    setState({ pending: [...state.pending, pending] });
+    renderConversation();
+    let outbox;
+    try {
+      outbox = await queueOutbox(supabase, chat, pending.body, mediaPath);
+    } catch (error) {
+      removePending(pending.localId);
+      await removeUploadedFile(mediaPath);
+      showError(error);
+      return;
+    }
+    replacePending(pending.localId, {
+      error: outbox.error,
+      outboxId: outbox.id,
+      sentRemoteId: outbox.sent_remote_id,
+      status: outbox.status,
+    });
+    if (state.attachment === attachment) {
+      input.value = "";
+      clearAttachment();
+    }
+  } catch (error) {
+    showError(error);
+  } finally {
+    setUploading(false);
+  }
+}
+
 async function sendMessage(event) {
   event.preventDefault();
+  if (isUploading) return;
   const input = document.getElementById("messageInput");
   const body = input.value.trim();
   if (state.mode === MODE_MAIL) {
@@ -311,7 +468,11 @@ async function sendMessage(event) {
     return;
   }
   const chat = currentChat();
-  if (!chat || !body) return;
+  if (!chat || (!body && !state.attachment)) return;
+  if (state.attachment) {
+    void sendAttachment(chat, body, state.attachment);
+    return;
+  }
   input.value = "";
   const pending = createPending(chat, body);
   setState({ pending: [...state.pending, pending] });
@@ -383,11 +544,16 @@ function upsertById(items, incoming) {
 function onChatUpdate(chat) {
   setState({ chats: sortedChats(upsertById(state.chats, chat)) });
   renderSidebar();
-  if (chat.id === state.selectedChatId) renderChatHeader(currentChat(), closeMobileChat);
+  if (chat.id === state.selectedChatId) {
+    renderChatHeader(currentChat(), closeMobileChat);
+    syncComposerAttachmentUi();
+  }
 }
 
 function matchesPending(message, pending) {
-  if (pending.chatId !== message.chat_id || pending.body !== message.body) return false;
+  if (pending.chatId !== message.chat_id) return false;
+  if ((pending.body || null) !== (message.body || null)) return false;
+  if (pending.mediaPath && pending.mediaPath !== message.media_path) return false;
   if (pending.sentRemoteId && pending.sentRemoteId === message.remote_id) return true;
   const sentAt = new Date(message.sent_at).getTime();
   const queuedAt = new Date(pending.createdAt).getTime();
@@ -521,8 +687,11 @@ function stopAuthenticatedApp() {
   window.clearInterval(accountTimer);
   accountTimer = null;
   window.clearTimeout(searchTimer);
+  clearAttachment();
+  setUploading(false);
   setState({
     accounts: [],
+    attachment: null,
     chats: [],
     filter: "all",
     mailAccounts: [],
@@ -540,6 +709,7 @@ function stopAuthenticatedApp() {
   document.getElementById("app").classList.remove("chat-open");
   document.getElementById("composer").hidden = true;
   document.getElementById("searchInput").value = "";
+  syncComposerAttachmentUi();
   renderGate(true, openAuthModal);
 }
 
@@ -609,6 +779,10 @@ function openChatFromUrl() {
 function bindUi() {
   mountAccountButton(document.getElementById("acctHost"));
   document.getElementById("composer").addEventListener("submit", sendMessage);
+  document.getElementById("attachButton").addEventListener("click", () => {
+    document.getElementById("attachmentInput").click();
+  });
+  document.getElementById("attachmentInput").addEventListener("change", onAttachmentChange);
   document.getElementById("searchInput").addEventListener("input", onSearchInput);
   document.querySelectorAll("[data-service-filter]").forEach((button) => {
     button.addEventListener("click", () => setFilter(button.dataset.serviceFilter));
