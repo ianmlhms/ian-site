@@ -23,6 +23,10 @@ const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:konto@ian.lu";
 const NOTIFY_SECRET = Deno.env.get("NOTIFY_SECRET") ?? "";
 const PUSH_PREVIEW_LENGTH = 140;
+// A bridge row older than this is history (a backfill or a daemon catching up
+// after downtime), not a new message: pushing it would buzz the phone once per
+// old message.
+const STALE_BRIDGE_MESSAGE_MS = 10 * 60 * 1000;
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -65,6 +69,8 @@ type Plan = { recipients: string[]; title: string; body: string; url: string; ta
 async function planFor(table: string, rec: any): Promise<Plan[]> {
   if (table === "bridge_messages") {
     if (!rec?.chat_id || rec.is_from_me === true) return [];
+    const sentAt = Date.parse(rec.sent_at ?? "");
+    if (Number.isFinite(sentAt) && Date.now() - sentAt > STALE_BRIDGE_MESSAGE_MS) return [];
     const { data: chat, error: chatError } = await admin
       .from("bridge_chats")
       .select("owner,title,last_preview,muted")
