@@ -26,12 +26,24 @@
 //     (commands are created only by the admin on ian.lu/ianet.html; firmware commands carry a
 //      short-lived signed download URL; the board must verify payload.sha256 before installing)
 //   { "action": "done", "board", "command_id", "result" } → { "done": true }
+//
+// Admin actions for tools/push.py on Ian's Mac (v3) — header `x-ianet-admin-key` must equal
+// IANET_ADMIN_KEY; the boards' device key can NOT use these:
+//   { "action": "stage", "what": "sd"|"firmware", "sha256", "size" }
+//       → { "object", "upload_url"? }   (no upload_url when the object already exists)
+//   { "action": "enqueue", "board", "kind", "payload" } → { "id" }  (the SQL check validates payload)
+//   { "action": "state", "board" } → { "status", "commands": [last 30] }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SB_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const DEVICE_KEY = Deno.env.get("IANET_DEVICE_KEY") ?? "";
+const ADMIN_KEY = Deno.env.get("IANET_ADMIN_KEY") ?? "";
+const SHA_RE = /^[0-9a-f]{64}$/;
+const MAX_SD_BYTES = 20 * 1024 * 1024;
+const MAX_FIRMWARE_BYTES = 6 * 1024 * 1024;
+const STATE_COMMANDS = 30;
 
 const BUCKET = "ianet";
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -49,12 +61,13 @@ const MAX_RESULT_CHARS = 200;
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
-function sameKey(given: string): boolean {
-  if (!DEVICE_KEY || given.length !== DEVICE_KEY.length) return false;
+function matches(given: string, expected: string): boolean {
+  if (!expected || given.length !== expected.length) return false;
   let diff = 0;
-  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ DEVICE_KEY.charCodeAt(i);
+  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
   return diff === 0;
 }
+const sameKey = (given: string) => matches(given, DEVICE_KEY);
 
 const clean = (value: unknown, max: number): string =>
   String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max);
@@ -68,6 +81,13 @@ function safeName(value: unknown): string {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
+  const adminKey = req.headers.get("x-ianet-admin-key");
+  if (adminKey !== null) {
+    if (!matches(adminKey, ADMIN_KEY)) return json({ error: "forbidden" }, 403);
+    const adminBody = await req.json().catch(() => null);
+    if (!adminBody || typeof adminBody !== "object") return json({ error: "invalid json" }, 400);
+    return adminAction(createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } }), adminBody);
+  }
   if (!sameKey(req.headers.get("x-ianet-key") ?? "")) return json({ error: "forbidden" }, 403);
 
   const body = await req.json().catch(() => null);
@@ -167,8 +187,9 @@ async function manage(admin: any, board: string, body: Record<string, unknown>):
     }
     const commands = [];
     for (const command of data ?? []) {
-      if (command.kind === "firmware") {
-        const signed = await admin.storage.from(BUCKET).createSignedUrl(command.payload.path, FIRMWARE_URL_SECONDS);
+      if (command.kind === "firmware" || command.kind === "sdfile") {
+        const objectPath = command.kind === "firmware" ? command.payload.path : command.payload.object;
+        const signed = await admin.storage.from(BUCKET).createSignedUrl(objectPath, FIRMWARE_URL_SECONDS);
         if (signed.error || !signed.data) {
           console.error("ianet firmware url", command.id, signed.error?.message);
           continue;
@@ -198,4 +219,52 @@ async function manage(admin: any, board: string, body: Record<string, unknown>):
   }
   if (!data?.length) return json({ error: "unknown command" }, 404);
   return json({ done: true });
+}
+
+// deno-lint-ignore no-explicit-any
+async function adminAction(admin: any, body: Record<string, unknown>): Promise<Response> {
+  if (body.action === "stage") {
+    const sha256 = String(body.sha256 ?? "");
+    const size = Number(body.size);
+    const what = String(body.what ?? "");
+    const limit = what === "firmware" ? MAX_FIRMWARE_BYTES : MAX_SD_BYTES;
+    if (!SHA_RE.test(sha256) || !Number.isSafeInteger(size) || size < 0 || size > limit || !["sd", "firmware"].includes(what)) {
+      return json({ error: "invalid stage" }, 400);
+    }
+    const object = what === "sd" ? `sd/${sha256}` : `firmware/${Date.now()}-${sha256.slice(0, 12)}.bin`;
+    if (what === "sd") {
+      const { data: existing } = await admin.storage.from(BUCKET).list("sd", { search: sha256, limit: 1 });
+      if (existing?.some((item: { name: string }) => item.name === sha256)) return json({ object });
+    }
+    const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(object, { upsert: true });
+    if (error || !data) {
+      console.error("ianet stage", object, error?.message);
+      return json({ error: "stage failed" }, 500);
+    }
+    return json({ object, upload_url: data.signedUrl });
+  }
+
+  const board = String(body.board ?? "");
+  if (!BOARD_RE.test(board)) return json({ error: "invalid board" }, 400);
+
+  if (body.action === "enqueue") {
+    const kind = String(body.kind ?? "");
+    const payload = body.payload && typeof body.payload === "object" ? body.payload : {};
+    const { data, error } = await admin.from("ianet_commands").insert({ board, kind, payload }).select("id").single();
+    if (error) {
+      console.error("ianet enqueue", board, kind, error.message);
+      return json({ error: "rejected" }, 400);
+    }
+    return json({ id: data.id });
+  }
+
+  if (body.action === "state") {
+    const [{ data: status }, { data: commands }] = await Promise.all([
+      admin.from("ianet_status").select("*").eq("board", board).maybeSingle(),
+      admin.from("ianet_commands").select("id, kind, payload, delivered_at, done_at, result")
+        .eq("board", board).order("id", { ascending: false }).limit(STATE_COMMANDS),
+    ]);
+    return json({ status, commands });
+  }
+  return json({ error: "unknown action" }, 400);
 }
