@@ -17,6 +17,15 @@
 //     → guestbook: { "done": true }
 //     → photo/file: { "upload_url": "<signed PUT url>", "path": "…" }  (board PUTs the bytes there)
 //   { "action": "commit", "id": "…" } → { "done": true }   (after the PUT succeeded)
+//   kind "chat" works like "guestbook" (text only).
+//
+// Remote management (v2) — the board always initiates; nothing can connect into it:
+//   { "action": "status", "board", "version", "uptime_s", "online", "rssi", "sd_free_mb",
+//     "pending", "last_error" } → { "done": true }
+//   { "action": "poll", "board" } → { "commands": [ { "id", "kind", "payload", "url"? } ] }
+//     (commands are created only by the admin on ian.lu/ianet.html; firmware commands carry a
+//      short-lived signed download URL; the board must verify payload.sha256 before installing)
+//   { "action": "done", "board", "command_id", "result" } → { "done": true }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -31,7 +40,11 @@ const MAX_NAME_CHARS = 80;
 const MAX_AUTHOR_CHARS = 20;
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const BOARD_RE = /^[a-z0-9_-]{1,32}$/;
-const KINDS = new Set(["photo", "file", "guestbook"]);
+const KINDS = new Set(["photo", "file", "guestbook", "chat"]);
+const TEXT_KINDS = new Set(["guestbook", "chat"]);
+const MAX_COMMANDS_PER_POLL = 10;
+const FIRMWARE_URL_SECONDS = 600;
+const MAX_RESULT_CHARS = 200;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -59,10 +72,16 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") return json({ error: "invalid json" }, 400);
+  const admin = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
+
+  if (body.action === "status" || body.action === "poll" || body.action === "done") {
+    const board = String(body.board ?? "");
+    if (!BOARD_RE.test(board)) return json({ error: "invalid board" }, 400);
+    return manage(admin, board, body);
+  }
+
   const id = String(body.id ?? "");
   if (!ID_RE.test(id)) return json({ error: "invalid id" }, 400);
-
-  const admin = createClient(SB_URL, SB_SERVICE, { auth: { persistSession: false } });
 
   if (body.action === "commit") {
     const { error } = await admin.from("ianet_items")
@@ -82,14 +101,14 @@ Deno.serve(async (req) => {
   const createdMs = Number.isSafeInteger(body.created_ms) ? body.created_ms : null;
   const author = clean(body.author, MAX_AUTHOR_CHARS) || null;
 
-  if (kind === "guestbook") {
+  if (TEXT_KINDS.has(kind)) {
     const text = clean(body.text, MAX_TEXT_CHARS);
     if (!text) return json({ error: "empty text" }, 400);
     const { error } = await admin.from("ianet_items").upsert({
       id, board, kind, author, body: text, created_ms: createdMs, uploaded_at: new Date().toISOString(),
     });
     if (error) {
-      console.error("ianet guestbook", id, error.message);
+      console.error("ianet text item", kind, id, error.message);
       return json({ error: "save failed" }, 500);
     }
     return json({ done: true });
@@ -114,3 +133,69 @@ Deno.serve(async (req) => {
   }
   return json({ upload_url: data.signedUrl, path });
 });
+
+const int = (value: unknown): number | null => (Number.isSafeInteger(value) ? value as number : null);
+
+// deno-lint-ignore no-explicit-any
+async function manage(admin: any, board: string, body: Record<string, unknown>): Promise<Response> {
+  if (body.action === "status") {
+    const { error } = await admin.from("ianet_status").upsert({
+      board,
+      version: clean(body.version, 40) || null,
+      uptime_s: int(body.uptime_s),
+      online: int(body.online),
+      rssi: int(body.rssi),
+      sd_free_mb: int(body.sd_free_mb),
+      pending: int(body.pending),
+      last_error: clean(body.last_error, MAX_RESULT_CHARS) || null,
+      seen_at: new Date().toISOString(),
+    });
+    if (error) {
+      console.error("ianet status", board, error.message);
+      return json({ error: "status failed" }, 500);
+    }
+    return json({ done: true });
+  }
+
+  if (body.action === "poll") {
+    const { data, error } = await admin.from("ianet_commands")
+      .select("id, kind, payload").eq("board", board).is("done_at", null)
+      .order("id", { ascending: true }).limit(MAX_COMMANDS_PER_POLL);
+    if (error) {
+      console.error("ianet poll", board, error.message);
+      return json({ error: "poll failed" }, 500);
+    }
+    const commands = [];
+    for (const command of data ?? []) {
+      if (command.kind === "firmware") {
+        const signed = await admin.storage.from(BUCKET).createSignedUrl(command.payload.path, FIRMWARE_URL_SECONDS);
+        if (signed.error || !signed.data) {
+          console.error("ianet firmware url", command.id, signed.error?.message);
+          continue;
+        }
+        commands.push({ ...command, url: signed.data.signedUrl });
+      } else {
+        commands.push(command);
+      }
+    }
+    if (commands.length) {
+      const ids = commands.map((command) => command.id);
+      const { error: markError } = await admin.from("ianet_commands")
+        .update({ delivered_at: new Date().toISOString() }).in("id", ids).is("delivered_at", null);
+      if (markError) console.error("ianet delivered", board, markError.message);
+    }
+    return json({ commands });
+  }
+
+  const commandId = int(body.command_id);
+  if (commandId === null) return json({ error: "invalid command_id" }, 400);
+  const { data, error } = await admin.from("ianet_commands")
+    .update({ done_at: new Date().toISOString(), result: clean(body.result, MAX_RESULT_CHARS) || "ok" })
+    .eq("id", commandId).eq("board", board).select("id");
+  if (error) {
+    console.error("ianet done", board, commandId, error.message);
+    return json({ error: "done failed" }, 500);
+  }
+  if (!data?.length) return json({ error: "unknown command" }, 404);
+  return json({ done: true });
+}
