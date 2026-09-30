@@ -2,7 +2,7 @@
  * Load AFTER pixelbreak-config.js and the supabase-js UMD bundle:
  *   <script src="pixelbreak-config.js"></script>
  *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-..." crossorigin="anonymous"></script>
- *   <script src="game-common.js?v=3"></script>
+ *   <script src="game-common.js?v=4"></script>
  *
  * Provides (window.GameCommon):
  *   room / AI / role / other / clientId — parsed + sanitised URL context
@@ -100,6 +100,13 @@ window.GameCommon = (() => {
   function mountDifficulty(get, set) {
     const bar = document.querySelector(".bar");
     if (!bar || document.getElementById("diffPick")) return;
+    // The shared Arcade bar keeps one fixed layout, so extra controls live in the context row under it.
+    let host = document.querySelector(".arcade-context");
+    if (!host && bar.classList.contains("arcade-bar")) {
+      host = document.createElement("div");
+      host.className = "arcade-context";
+      bar.insertAdjacentElement("afterend", host);
+    }
     const wrap = document.createElement("div");
     wrap.id = "diffPick";
     wrap.style.cssText = "display:flex;gap:4px;margin-left:auto";
@@ -112,11 +119,11 @@ window.GameCommon = (() => {
       const b = document.createElement("button");
       b.textContent = label;
       b.dataset.d = d;
-      b.style.cssText = "background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
+      b.style.cssText = "background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 12px;min-height:44px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
       b.onclick = () => { set(d); paint(); };
       wrap.appendChild(b);
     });
-    bar.appendChild(wrap);
+    (host || bar).appendChild(wrap);
     paint();
   }
 

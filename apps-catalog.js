@@ -39,7 +39,7 @@ export const APPS = Object.freeze([
     keywords: ["arcade", "spiller", "spiele", "games", "2 ipad"] },
   { url: "partyspill.html", name: "Partyspill", icon: "🎉", group: "grp.fun", locked: false,
     keywords: ["partyspiele", "jeux", "fête", "gruppen", "handy"] },
-  { url: "wordle.html", name: "Luxembourgish Word Game", icon: "🟩", group: "grp.fun", locked: false,
+  { url: "wordle.html", name: "Wuertspill", icon: "🟩", group: "grp.fun", locked: false,
     keywords: ["wordle", "wörter", "wierder", "mots", "guess"] },
   { url: "countdowns.html", name: "Countdowns", icon: "⏳", group: "grp.fun", locked: false,
     keywords: ["timer", "zäit", "zeit", "compte à rebours", "dates"] },

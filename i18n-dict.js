@@ -109,7 +109,7 @@ window.I18N_DICT = {
   "index.appsGateTitle": { lb: "Verschidde Apps brauchen e gratis Kont", de: "Manche Apps brauchen ein kostenloses Konto", en: "Some apps need a free account" },
   "index.appsGateSub": { lb: "Alles ouni 🔒 geet direkt — mell dech un fir Messenger, Frënn, Noten a méi opzemaachen.", de: "Alles ohne 🔒 geht sofort — melde dich an, um Messenger, Freunde, Noten und mehr zu öffnen.", en: "Everything without a 🔒 works right away — sign in to unlock Messenger, Friends, Grades and more." },
 
-  "proj.pixelbreak.desc": { lb: "50 Arcade-Spiller, all am Browser spillbar — keng Installatioun, keng Reklammen.", de: "50 Arcade-Spiele, alle im Browser spielbar — keine Installation, keine Werbung.", en: "50 arcade games, all playable in the browser — no install, no ads." },
+  "proj.pixelbreak.desc": { lb: "53 Arcade-Spiller, all am Browser spillbar — keng Installatioun, keng Reklammen.", de: "53 Arcade-Spiele, alle im Browser spielbar — keine Installation, keine Werbung.", en: "53 arcade games, all playable in the browser — no install, no ads." },
   "proj.games.desc": { lb: "Véier gewënnt, Reversi, Schëffer versenken a méi — 1 géint 1 op zwee Apparater, oder géint eng KI mat dräi Schwieregkeetsgraden.", de: "Vier gewinnt, Reversi, Schiffe versenken und mehr — 1 gegen 1 auf zwei Geräten, oder gegen eine KI mit drei Schwierigkeitsgraden.", en: "Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels." },
   "proj.messenger.desc": { lb: "Echtzäit-Chat mat Gruppen, Sproochnoriichten, Fichieren, Äntwerten a Reaktiounen.", de: "Echtzeit-Chat mit Gruppen, Sprachnachrichten, Dateien, Antworten und Reaktionen.", en: "Real-time chat with groups, voice notes, file sharing, replies and reactions." },
   "proj.wordle.desc": { lb: "Wordle, awer op Lëtzebuergesch an Däitsch — esou wéi ech wierklech schwätzen.", de: "Wordle, aber auf Luxemburgisch und Deutsch — so wie ich wirklich spreche.", en: "Wordle, but in Luxembourgish and German — the way I actually speak." },
@@ -208,7 +208,7 @@ window.I18N_DICT = {
   "games.h1":     { lb: "🎲 Spiller", de: "🎲 Spiele", en: "🎲 Games" },
   "games.lb":     { lb: "🏆 Classement", de: "🏆 Bestenliste", en: "🏆 Leaderboard" },
   "games.intro": { lb: "Spill op zwee iPads: tipp <b>Start</b> op engem, deel de <b>Raumcode</b>, a <b>maach mat</b> um aneren. (Oder invitéier e Frënd mam Benotzernumm op der <a href=\"friends.html\">Frënn</a>-Säit.)", de: "Spiele auf zwei iPads: Tippe <b>Start</b> auf einem, teile den <b>Raumcode</b> und <b>tritt bei</b> auf dem anderen. (Oder lade einen Freund per Benutzername auf der <a href=\"friends.html\">Freunde</a>-Seite ein.)", en: "Play across two iPads: tap <b>Start</b> on one, share the <b>room code</b>, and <b>Join</b> on the other. (Or invite a friend by username from the <a href=\"friends.html\">Friends</a> page.)" },
-  "games.tip": { lb: "Categories Race ënnerstëtzt 2+ Spiller — jiddereen trëtt mam selwechte Code bäi.", de: "Categories Race unterstützt 2+ Spieler — alle treten mit demselben Code bei.", en: "Categories Race supports 2+ players — everyone joins the same code." },
+  "games.tip": { lb: "Stadt-Land-Fluss ënnerstëtzt 2+ Spiller — jiddereen trëtt mam selwechte Code bäi.", de: "Stadt-Land-Fluss unterstützt 2+ Spieler — alle treten mit demselben Code bei.", en: "Stadt-Land-Fluss supports 2+ players — everyone joins the same code." },
   "games.start":  { lb: "E Spill starten", de: "Spiel starten", en: "Start a game" },
   "games.vsAi":   { lb: "🤖 géint de Computer", de: "🤖 gegen Computer", en: "🤖 vs Computer" },
   "games.code":   { lb: "Raumcode", de: "Raumcode", en: "room code" },
@@ -222,7 +222,7 @@ window.I18N_DICT = {
   "g.tictactoe.desc":  { lb: "Dräi op enger Rei. E séiere Klassiker. 1 géint 1.", de: "Drei in einer Reihe. Schneller Klassiker. 1 gegen 1.", en: "Three in a row. Quick classic. 1 v 1." },
   "games.play":        { lb: "Spillen", de: "Spielen", en: "Play" },
   "g.wordle.desc":     { lb: "Rod dat geheimt Wuert vum Dag — op Lëtzebuergesch oder Däitsch.", de: "Errate das geheime Wort des Tages — auf Luxemburgisch oder Deutsch.", en: "Guess the secret word of the day — in Luxembourgish or German." },
-  "g.pixelbreak.desc": { lb: "50 Arcade-Minispiller mat Highscores a Leaderboard.", de: "50 Arcade-Minispiele mit Highscores und Bestenliste.", en: "50 arcade mini-games with high scores and a leaderboard." },
+  "g.pixelbreak.desc": { lb: "53 Arcade-Minispiller mat Highscores a Leaderboard.", de: "53 Arcade-Minispiele mit Highscores und Bestenliste.", en: "53 arcade mini-games with high scores and a leaderboard." },
 
   /* ---------- stats (ShortsFactory) ---------- */
   "stats.channels":     { lb: "Channeler", de: "Kanäle", en: "Channels" },

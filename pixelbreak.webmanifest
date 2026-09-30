@@ -1,7 +1,7 @@
 {
   "name": "Arcade — Games",
   "short_name": "Arcade",
-  "description": "50 free browser games — arcade and online multiplayer.",
+  "description": "53 free browser games — arcade and online multiplayer.",
   "start_url": "./pixelbreak.html",
   "scope": "./",
   "display": "standalone",

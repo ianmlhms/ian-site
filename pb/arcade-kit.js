@@ -200,8 +200,13 @@
     return Object.freeze({ bar, title, best, mute });
   }
 
+  function isEditableTarget(target) {
+    return target instanceof Element && target.closest("input,textarea,select,[contenteditable]") !== null;
+  }
+
   function reportKeyboardInput(event) {
-    if (!event.isTrusted || !CONTROL_KEYS.has(event.key)) return;
+    // Typing into a field (an on-screen keyboard included) says nothing about a hardware keyboard.
+    if (!event.isTrusted || !CONTROL_KEYS.has(event.key) || isEditableTarget(event.target)) return;
     lastKeyboardAt = Date.now();
     sessionSet(KEYBOARD_SESSION_KEY, String(lastKeyboardAt));
     if (!options.standalone) window.parent.postMessage({ __pbKeyboard: 1 }, "*");
@@ -209,7 +214,11 @@
   }
 
   function reportTouchInput(event) {
-    if (!event.isTrusted || event.pointerType !== "touch" || Date.now() - lastKeyboardAt < KEYBOARD_IDLE_MS) return;
+    if (!event.isTrusted || event.pointerType !== "touch") return;
+    // The hub shares this session key, so its keystrokes count too.
+    lastKeyboardAt = Math.max(lastKeyboardAt, Number(sessionGet(KEYBOARD_SESSION_KEY) || 0));
+    if (Date.now() - lastKeyboardAt < KEYBOARD_IDLE_MS) return;
+    lastKeyboardAt = 0;
     try { sessionStorage.removeItem(KEYBOARD_SESSION_KEY); }
     catch (error) { warn("Could not clear session storage.", error); }
     if (!options.standalone) window.parent.postMessage({ __pbTouch: 1 }, "*");
