@@ -270,15 +270,31 @@
   function fit(){
     if(vv.scale>1+ZOOM_EPSILON)return;
     // Measured on Ian's iPad (30 Sep 2026, ?debug): with a keyboard up, Safari
-    // shrinks BOTH vv.height and innerHeight (610 with the bar, 270 with the full
-    // keyboard). The layout viewport then already is the visible area, and a fixed
-    // shell needs no shift. Only when the layout viewport stays taller than the
-    // visual one (other iOS versions) is the shell moved down by the pan.
-    var layoutShrunk=Math.abs(window.innerHeight-vv.height)<2;
+    // reports the visible height correctly (610 with the bar, 270 with the full
+    // keyboard) but scrolls the page by offsetTop (68 / 408), and the fixed shell
+    // moves WITH that scroll. So: height = vv.height, shifted down by offsetTop,
+    // then measured and corrected so the shell's top sits exactly at the top of
+    // the visible area whatever this Safari version does with fixed elements.
+    var shift=vv.offsetTop;
     root.style.setProperty("--vvh", vv.height+"px");
-    root.style.setProperty("--vvt", (layoutShrunk?0:vv.offsetTop)+"px");
+    root.style.setProperty("--vvt", shift+"px");
+    var off=document.body?document.body.getBoundingClientRect().top:0;
+    if(Math.abs(off)>1)root.style.setProperty("--vvt", (shift-off)+"px");
   }
-  vv.addEventListener("resize",fit); vv.addEventListener("scroll",fit); fit();
+  vv.addEventListener("resize",fit); vv.addEventListener("scroll",fit);
+  window.addEventListener("scroll",fit,{passive:true}); fit();
+  // messenger.html?kbdtest shows the real chat layout with dummy messages and no
+  // sign-in, so the keyboard layout can be checked on an iPad/simulator.
+  if(/[?&]kbdtest\b/.test(location.search)){
+    var st=document.createElement("style");
+    st.textContent="#gate{display:none!important}#app{display:flex!important}.chat{display:flex!important}.composer{display:flex!important}";
+    document.head.appendChild(st);
+    document.addEventListener("DOMContentLoaded",function(){
+      var m=document.getElementById("messages"),html="";
+      for(var i=1;i<=40;i++)html+='<div style="align-self:'+(i%3?'flex-start':'flex-end')+';background:var(--card2);padding:8px 12px;border-radius:12px">Test message '+i+'</div>';
+      setTimeout(function(){m.innerHTML=html;m.scrollTop=m.scrollHeight;},800);
+    });
+  }
   // messenger.html?debug shows the live viewport numbers (for iPad keyboard issues).
   if(/[?&]debug\b/.test(location.search)){
     var box=document.createElement("div");
