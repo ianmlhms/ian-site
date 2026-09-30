@@ -22,7 +22,14 @@ function start(){
   snake=[{x:15,y:15},{x:14,y:15},{x:13,y:15}];dir={x:1,y:0};queue=[];score=0;gameOver=false;speed=100;lastTick=0;
   placeFood();setInt();update();
 }
-function placeFood(){food={x:Math.floor(Math.random()*W),y:Math.floor(Math.random()*H),type:Math.random()<0.15?'super':'normal'}}
+// Pick only among free cells, so food never spawns inside the snake.
+function placeFood(){
+  const taken=new Set(snake.map(s=>s.x+','+s.y)),free=[];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(!taken.has(x+','+y))free.push({x,y});
+  if(!free.length){food={x:-1,y:-1,type:'normal'};gameOver=true;return}   // board full: game won
+  const c=free[Math.floor(Math.random()*free.length)];
+  food={x:c.x,y:c.y,type:Math.random()<0.15?'super':'normal'};
+}
 function tick(){
   lastTick=performance.now();
   if(gameOver)return;
