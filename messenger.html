@@ -276,10 +276,14 @@
     // then measured and corrected so the shell's top sits exactly at the top of
     // the visible area whatever this Safari version does with fixed elements.
     var shift=vv.offsetTop;
+    // Keep the newest message in view when the keyboard shrinks the list.
+    var msgs=document.getElementById("messages");
+    var atBottom=msgs&&msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<40;
     root.style.setProperty("--vvh", vv.height+"px");
     root.style.setProperty("--vvt", shift+"px");
     var off=document.body?document.body.getBoundingClientRect().top:0;
     if(Math.abs(off)>1)root.style.setProperty("--vvt", (shift-off)+"px");
+    if(atBottom)msgs.scrollTop=msgs.scrollHeight;
   }
   vv.addEventListener("resize",fit); vv.addEventListener("scroll",fit);
   window.addEventListener("scroll",fit,{passive:true}); fit();
