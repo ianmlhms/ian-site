@@ -1,5 +1,5 @@
 import { WORDLE_COLS, WORDLE_ROWS, WORDS_LB } from "./content.js?v=1";
-import { UI } from "./copy.js?v=1";
+import { UI } from "./copy.js?v=2";
 
 const KEYBOARD_ROWS = Object.freeze([
   Object.freeze(["A", "Z", "E", "R", "T", "Y", "U", "I", "O", "P"]),

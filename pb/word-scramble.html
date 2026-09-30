@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Word Scramble - PixelBreak</title>
+<title>Word Unscramble - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
@@ -16,6 +16,7 @@ input:focus{border-color:#ff6b9d}
 #timer-fill{height:100%;background:#00ff88;transition:width 0.5s;border-radius:3px}
 button{margin-top:15px;padding:8px 20px;background:#3a3a5a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="word-scramble" data-arcade-title="Word Unscramble"></script>
 </head>
 <body>
 <div id="hud"><span>Score: <b id="sc">0</b></span><span>Streak: <b id="st">0</b>🔥</span><span>Level: <b id="lv">1</b></span><button id="langBtn" onclick="switchLang()" style="margin:0;padding:4px 12px;font-size:13px">🇬🇧 EN</button></div>
@@ -114,7 +115,7 @@ function next(){
   document.getElementById('feedback').textContent='';
   timeLeft=100;
 }
-function skip(){score=Math.max(0,score-5);streak=0;
+function skip(){score=Math.max(0,score-5);Arcade.score(score);streak=0;
   document.getElementById('feedback').innerHTML=`<span style="color:#ffcc00">It was: ${current.w}</span>`;
   document.getElementById('sc').textContent=score;document.getElementById('st').textContent=0;
   setTimeout(next,1000);
@@ -122,7 +123,7 @@ function skip(){score=Math.max(0,score-5);streak=0;
 document.getElementById('guess').addEventListener('input',e=>{
   let v=e.target.value.toUpperCase();
   if(v===current.w){
-    score+=10+streak*3;streak++;level=Math.floor(streak/3)+1;
+    score+=10+streak*3;Arcade.score(score);streak++;level=Math.floor(streak/3)+1;
     document.getElementById('feedback').innerHTML='<span style="color:#44ff88">✓ Correct!</span>';
     document.getElementById('sc').textContent=score;document.getElementById('st').textContent=streak;document.getElementById('lv').textContent=level;
     setTimeout(next,600);

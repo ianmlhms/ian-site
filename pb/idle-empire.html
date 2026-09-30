@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Idle Empire - PixelBreak</title>
+<title>Business Empire - Arcade</title>
 <style>
 :root{color-scheme:dark;--ink:#f8f3e7;--muted:#b9b2a3;--panel:#171b25;--panel2:#202636;--line:#394155;--gold:#ffcc4d;--green:#59e39a;--blue:#67c8ff;--danger:#ff7676}
 *{box-sizing:border-box}
@@ -31,12 +31,13 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
 @media (min-width:620px){.business{padding:13px}.actions{grid-template-columns:130px 1fr}.stats{gap:10px}.stat{padding:9px 11px}}
 @media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
 </head>
 <body>
 <main id="game">
   <header>
     <div class="topline">
-      <div class="brand"><h1>Idle Empire</h1><p>Build it. Automate it. Start bigger.</p></div>
+      <div class="brand"><h1>Business Empire</h1><p>Build it. Automate it. Start bigger.</p></div>
       <button id="prestige-button" type="button">Investors</button>
     </div>
     <div class="stats">
@@ -444,7 +445,7 @@ function requestCloudSave(){
   catch(error){reportError("Could not request cloud progress",error)}
 }
 
-function updateScore(){window.score=Math.floor(state.lifetime)}
+function updateScore(){window.score=Math.floor(state.lifetime);Arcade.score(window.score)}
 
 function boot(){
   buildBusinessCards();

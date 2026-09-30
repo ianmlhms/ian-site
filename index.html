@@ -23,8 +23,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script src="theme.js?v=23"></script>
-  <script src="i18n-dict.js?v=37"></script>
+  <script src="theme.js?v=24"></script>
+  <script src="i18n-dict.js?v=38"></script>
   <script src="i18n.js?v=3"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
@@ -116,10 +116,10 @@
         </summary>
         <div class="tiles">
           <a class="tile pixel" href="pixelbreak.html" data-app="pixelbreak.html">
-            <span class="ico" aria-hidden="true">🎮</span><span class="tname">PixelBreak</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
+            <span class="ico" aria-hidden="true">🎮</span><span class="tname">Arcade</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
           </a>
           <a class="tile wordle" href="wordle.html" data-app="wordle.html">
-            <span class="ico" aria-hidden="true">🟩</span><span class="tname">Wuertspill</span><span class="tsub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
+            <span class="ico" aria-hidden="true">🟩</span><span class="tname">Luxembourgish Word Game</span><span class="tsub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
           </a>
         </div>
       </details>
@@ -211,7 +211,7 @@
           rather than in a folder on my laptop.</p>
 
         <h3 data-i18n="intro.h2">What you can use without an account</h3>
-        <p data-i18n="intro.p2">Most of the site is open. You can play all of the PixelBreak arcade games in
+        <p data-i18n="intro.p2">Most of the site is open. You can play all of the Arcade games in
           the browser with nothing installed, look up live bus and train departures anywhere in Luxembourg,
           check the weather, follow aircraft overhead in SkyLens, and browse every hiking and mountain-bike
           route in the country. Only the things that are personal to you — messages, friends, grades, your
@@ -268,11 +268,11 @@
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-  <script type="module" src="notify-ambient.js?v=14"></script>
-  <script type="module" src="rtc-ring.js?v=14"></script>
-  <script type="module" src="class-gate.js?v=15"></script>
+  <script type="module" src="notify-ambient.js?v=15"></script>
+  <script type="module" src="rtc-ring.js?v=15"></script>
+  <script type="module" src="class-gate.js?v=16"></script>
   <script type="module">
-    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=18";
+    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=19";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     const HOUSE_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Haus-Planer
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)

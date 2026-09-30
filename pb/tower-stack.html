@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tower Stack - PixelBreak</title>
+<title>Tower Stacking - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a2e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(255,100,200,0.2)}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="tower-stack" data-arcade-title="Tower Stacking"></script>
 </head>
 <body>
 <canvas id="c" width="400" height="600"></canvas>
@@ -24,11 +25,11 @@ function place(){
   let top=blocks[blocks.length-1];
   let cx=current.x,cw=current.w;
   let overlap=Math.min(cx+cw,top.x+top.w)-Math.max(cx,top.x);
-  if(overlap<=0){gameOver=true;return}
+  if(overlap<=0){gameOver=true;Arcade.gameOver(score);return}
   let nx=Math.max(cx,top.x);
   blocks.push({x:nx,y:top.y-30,w:overlap});
   current.w=overlap;current.x=0;
-  score++;speed=Math.min(5,2+score*0.1);
+  score++;Arcade.score(score);speed=Math.min(5,2+score*0.1);
   if(blocks.length>5)cameraY+=(30-cameraY*0.1);
 }
 function draw(){

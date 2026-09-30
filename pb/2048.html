@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>2048 - PixelBreak</title>
+<title>2048 - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
@@ -14,6 +14,7 @@ body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:cente
 #msg{margin-top:15px;font-size:20px;min-height:30px}
 button{margin-top:10px;padding:8px 24px;background:#ffcc00;color:#0a0a1a;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="2048" data-arcade-title="2048"></script>
 </head>
 <body>
 <div id="hud"><div class="stat">Score: <b id="sc">0</b></div><div class="stat">Best: <b id="best">0</b></div></div>
@@ -26,7 +27,7 @@ const TXTC={0:'transparent',2:'#776e65',4:'#776e65',8:'#fff',16:'#fff',32:'#fff'
 let grid,score,best=0,over;
 function init(){
   grid=Array.from({length:4},()=>Array(4).fill(0));
-  score=0;over=false;document.getElementById('msg').textContent='';
+  score=0;Arcade.score(score);over=false;document.getElementById('msg').textContent='';
   addTile();addTile();render();
 }
 function addTile(){
@@ -38,7 +39,7 @@ function addTile(){
 }
 function slide(row){
   let a=row.filter(v=>v),merged=[];
-  for(let i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;score+=a[i];a.splice(i+1,1);merged.push(i)}}
+  for(let i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;score+=a[i];Arcade.score(score);a.splice(i+1,1);merged.push(i)}}
   while(a.length<4)a.push(0);
   return a;
 }
@@ -58,7 +59,7 @@ function checkOver(){
     if(c<3&&grid[r][c]===grid[r][c+1])return;
     if(r<3&&grid[r][c]===grid[r+1][c])return;
   }
-  over=true;document.getElementById('msg').textContent='Game Over! Press New Game';
+  over=true;Arcade.gameOver(score);document.getElementById('msg').textContent='Game Over! Press New Game';
 }
 function render(){
   let h='';

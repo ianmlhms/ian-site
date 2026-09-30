@@ -1,5 +1,5 @@
 import { GEOPORTAL_SRC } from "./content.js?v=1";
-import { COPY, UI } from "./copy.js?v=1";
+import { COPY, UI } from "./copy.js?v=2";
 
 export const meta = { badge: null };
 

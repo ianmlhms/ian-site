@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Star Blaster - PixelBreak</title>
+<title>Space Invaders - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(0,200,255,0.2)}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="space-invaders" data-arcade-title="Space Invaders"></script>
 </head>
 <body>
 <canvas id="c" width="600" height="600"></canvas>
@@ -58,7 +59,7 @@ function loop(){
       bullets[i].y+=bullets[i].vy;if(bullets[i].y<0){bullets.splice(i,1);continue}
       for(let a of aliens){if(!a.alive)continue;
         if(Math.abs(bullets[i].x-a.x)<20&&Math.abs(bullets[i].y-a.y)<18){
-          a.alive=false;score+=10*(a.type+1);addP(a.x,a.y,['#ff4466','#44ff88','#44aaff'][a.type],15);
+          a.alive=false;score+=10*(a.type+1);Arcade.score(score);addP(a.x,a.y,['#ff4466','#44ff88','#44aaff'][a.type],15);
           bullets.splice(i,1);break}}
     }
     for(let i=alienBullets.length-1;i>=0;i--){
@@ -66,10 +67,10 @@ function loop(){
       if(alienBullets[i].y>C.height){alienBullets.splice(i,1);continue}
       if(Math.abs(alienBullets[i].x-player.x)<20&&Math.abs(alienBullets[i].y-player.y)<15){
         lives--;addP(player.x,player.y,'#ff4444',20);alienBullets.splice(i,1);
-        if(lives<=0)gameOver=true}
+        if(lives<=0){gameOver=true;Arcade.gameOver(score)}}
     }
     // Check aliens reaching bottom
-    for(let a of aliens){if(a.alive&&a.y>520)gameOver=true}
+    for(let a of aliens){if(a.alive&&a.y>520){gameOver=true;Arcade.gameOver(score)}}
     // Wave complete
     if(aliens.every(a=>!a.alive)){wave++;spawnAliens()}
   }

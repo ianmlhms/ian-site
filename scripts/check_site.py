@@ -39,7 +39,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GENERATED = ("trails/", "mtb/", "pb/", "pro/")
 SKIP_DIRS = {".git", "node_modules", "scripts", "data"}
 
-EXTERNAL = re.compile(r"^(https?:)?//|^(mailto|tel|javascript|data):", re.I)
+EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.I)
 
 
 def html_files() -> list:

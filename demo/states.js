@@ -2,7 +2,7 @@
  *
  * They were copied into each module, which meant a retry button could quietly
  * differ between cards. One definition, used by all of them. */
-import { UI } from "./copy.js?v=1";
+import { UI } from "./copy.js?v=2";
 
 const SKELETON_ROWS = 3;
 

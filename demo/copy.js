@@ -25,7 +25,7 @@ export const COPY = Object.freeze({
     footer: "Dat ass just en Ausschnëtt. Op ian.lu ass nach vill méi.",
     cta: "Ganze Site opmaachen",
     cards: {
-      games:      { t: "Spill elo direkt",        s: "34 Spiller am PixelBreak. Dëst hei leeft direkt op der Säit." },
+      games:      { t: "Spill elo direkt",        s: "50 Spiller an der Arcade. Dëst hei leeft direkt op der Säit." },
       duo:        { t: "Zwee iPads, ee Spill",    s: "Déiselwecht Partie op zwee Bildschiermer. Spill hei op béide Säiten." },
       transit:    { t: "Bus & Zuch",              s: "Richteg Zäiten, elo. Klick op e Wee fir all Haltestellen." },
       sky:        { t: "Wat fléit iwwer eis?",    s: "All Fliger ronderëm Nidderaanwen op der Kaart, live." },
@@ -45,7 +45,7 @@ export const COPY = Object.freeze({
     footer: "Alles selwer gebaut: statesch Säiten, Supabase am Hannergrond, kee Build-Prozess.",
     cta: "Ganze Site opmaachen",
     cards: {
-      games:      { t: "PixelBreak Arcade",   s: "34 Spiller, all am Browser. Dëst hei leeft direkt op der Säit.",
+      games:      { t: "Arcade",   s: "50 Spiller, all am Browser. Dëst hei leeft direkt op der Säit.",
                     how: "All Spill ass eng eegestänneg HTML-Datei; Scores a Fortschrëtt ginn iwwer Supabase gespäichert." },
       duo:        { t: "Spiller op zwee Geräter", s: "Déiselwecht Partie op zwee Bildschiermer, live synchroniséiert.",
                     how: "Supabase Realtime Broadcast: zwee Fënsteren am selwechte Raum, ee als Host, een als Gaascht. Keng Donnéeën an der Datebank — nëmmen d'Zich ginn iwwerdroen." },
@@ -85,7 +85,7 @@ export const TOUR = Object.freeze({
   },
   nav: { next: "Weider", prev: "Zréck", step: "Schrëtt" },
   steps: Object.freeze([
-    { id: "games",      t: "34 Spiller",          n: "De PixelBreak Arcade. All Spill leeft am Browser, ouni Installatioun — dëst hei kanns du elo spillen." },
+    { id: "games",      t: "50 Spiller",          n: "D'Arcade. All Spill leeft am Browser, ouni Installatioun — dëst hei kanns du elo spillen." },
     { id: "duo",        t: "Zwee iPads",          n: "Vill Spiller ginn op zwee Geräter gespillt. Hei sinn déi zwou Säiten niewenteneen — spill lénks a kuck riets." },
     { id: "transit",    t: "Bus & Zuch",          n: "E kompletten Wee-Sicher fir Lëtzebuerg. D'Zäiten hei ënnendrënner ginn an dësem Moment gesicht." },
     { id: "sky",        t: "Fliger iwwer eis",    n: "Live-Radar op der Kaart. All Fliger an 40 Séimeile ronderëm Nidderaanwen — klick op ee fir Typ, Héicht a Geschwindegkeet." },

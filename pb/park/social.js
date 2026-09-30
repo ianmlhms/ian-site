@@ -54,10 +54,10 @@ export function createBridge({ timeout = RPC_TIMEOUT } = {}) {
 
 export function errorMessage(error) {
   const message = cleanText(error?.message, "request-failed", 240).toLowerCase();
-  if (message === "offline") return "Gallery unavailable offline. Open this game in PixelBreak and check your connection. Sign in to publish or like; browsing needs no account.";
+  if (message === "offline") return "Gallery unavailable offline. Open this game in Arcade and check your connection. Sign in to publish or like; browsing needs no account.";
   if (message === "timeout") return "The gallery did not reply in time. Please try again. A publish or like request may already have reached it; refresh before retrying.";
   if (message === "forbidden" || /permission|jwt|auth|sign.?in/.test(message)) {
-    return "This action needs a PixelBreak account and permission. Sign in to publish or like. You can browse signed out.";
+    return "This action needs an Arcade account and permission. Sign in to publish or like. You can browse signed out.";
   }
   if (message === "bad-args") return "The gallery rejected this request. Reopen the gallery and try again.";
   if (message === "invalid-layout") return "This park's layout is missing or damaged and cannot be visited.";
@@ -98,7 +98,7 @@ export function createSocial({ getState, onVisit, onReturn, beforeOpen }) {
   const close = button("Close", () => dialog.close());
   heading.append(title, close);
   const body = element("div", undefined, "panel-body");
-  const note = element("p", "Browse without an account. Publishing, removing a listing, and liking require signing in to PixelBreak.", "note");
+  const note = element("p", "Browse without an account. Publishing, removing a listing, and liking require signing in to Arcade.", "note");
   const status = element("p");
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");

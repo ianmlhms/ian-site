@@ -1,0 +1,77 @@
+/* Arcade — shared look for every built-in game (pb/*.html, geometrydash.html).
+ * Include with <link rel="stylesheet" href="/pb/arcade-ui.css?v=1"> (absolute: games load via srcdoc).
+ * Based on the Geometry Dash look; Apple-style type, materials and motion. */
+:root{
+  --bg:#0d0d1a; --bg2:#11111f; --card:#161625; --card2:#1e1e35; --border:#2a2a4a;
+  --text:#e8e8f0; --muted:#8888aa; --accent:#6ea8fe; --cyan:#4de8ff; --amber:#f5b942;
+  --danger:#ff6685; --good:#4ade80; --violet:#b48cff;
+  --radius-s:9px; --radius:14px; --radius-l:20px;
+  --font:-apple-system,"SF Pro Text",BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
+  --font-display:-apple-system,"SF Pro Display",BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --spring:cubic-bezier(.2,.8,.2,1); --glow:0 0 40px rgba(77,232,255,.15);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior:none;
+  -webkit-tap-highlight-color:transparent}
+canvas{display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+
+/* play area: centres the canvas/board under the shared top bar */
+.arcade-stage{position:relative;flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;
+  background:radial-gradient(120% 90% at 50% 0%,var(--bg2),var(--bg))}
+
+/* HUD: small uppercase stats floating over the game */
+.arcade-hud{position:absolute;inset:12px 14px auto;display:flex;justify-content:space-between;gap:12px;
+  pointer-events:none;font:800 12px/1 var(--font);letter-spacing:.06em;text-transform:uppercase;
+  text-shadow:0 1px 5px #000;z-index:2}
+.arcade-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--border);
+  border-radius:99px;background:rgba(22,22,37,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  font:750 13px/1 var(--font);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.arcade-pill b{color:var(--cyan);font-weight:800}
+
+/* start / pause / game-over overlay */
+.arcade-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:20px;
+  background:rgba(8,8,18,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);text-align:center;z-index:5}
+.arcade-overlay.show{display:flex;animation:arcade-fade .22s var(--spring)}
+.arcade-panel{width:min(380px,92vw);padding:26px 24px;border:1px solid rgba(77,232,255,.42);border-radius:var(--radius-l);
+  background:rgba(22,22,37,.94);box-shadow:var(--glow);animation:arcade-rise .32s var(--spring)}
+.arcade-panel h2{margin:0 0 6px;font:750 clamp(24px,5vw,30px)/1.08 var(--font-display);letter-spacing:-.02em}
+.arcade-panel p{margin:5px 0;color:var(--muted)}
+.arcade-panel strong,.arcade-big{color:var(--text)}
+.arcade-big{display:block;margin:10px 0 4px;font:800 clamp(40px,10vw,56px)/1 var(--font-display);
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.arcade-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
+
+/* buttons */
+.arcade-btn{min-height:44px;padding:0 20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1px solid transparent;border-radius:12px;background:var(--accent);color:#08101f;
+  font:750 15px/1 var(--font);letter-spacing:.01em;cursor:pointer;
+  transition:transform .18s var(--spring),filter .18s ease,background .18s ease}
+.arcade-btn:hover{filter:brightness(1.08)}
+.arcade-btn:active{transform:scale(.95)}
+.arcade-btn:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.arcade-btn.secondary{background:var(--card2);border-color:var(--border);color:var(--text)}
+.arcade-btn.danger{background:var(--danger);color:#1a0610}
+
+/* segmented control (difficulty, mode) */
+.arcade-seg{display:inline-flex;padding:3px;gap:3px;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.arcade-seg button{min-height:36px;padding:0 14px;border:0;border-radius:9px;background:transparent;color:var(--muted);
+  font:700 13px/1 var(--font);cursor:pointer;transition:background .18s ease,color .18s ease}
+.arcade-seg button[aria-pressed="true"],.arcade-seg button.on{background:var(--card2);color:var(--text)}
+
+.arcade-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);color:var(--muted);
+  font:700 12px/1 var(--font);white-space:nowrap;pointer-events:none;text-shadow:0 1px 4px #000;z-index:2}
+
+@keyframes arcade-fade{from{opacity:0}to{opacity:1}}
+@keyframes arcade-rise{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+@media (max-width:520px){.arcade-hud{inset:9px 10px auto}.arcade-panel{padding:22px 18px}}
+@media (prefers-reduced-motion:reduce){
+  .arcade-overlay.show,.arcade-panel{animation:none}
+  .arcade-btn{transition:filter .12s ease}.arcade-btn:active{transform:none}
+}
+@media (prefers-reduced-transparency:reduce){
+  .arcade-overlay,.arcade-pill{backdrop-filter:none;-webkit-backdrop-filter:none}
+  .arcade-panel{background:var(--card)}
+}

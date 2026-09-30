@@ -188,14 +188,14 @@ function storageGet(key){try{return localStorage.getItem(key);}catch(error){retu
 function storageSet(key,value){try{localStorage.setItem(key,String(value));return true;}catch(error){return false;}}
 const doneLvls=()=>+(storageGet('pb_dm_done')||0);
 const bestTime=(level)=>+(storageGet('pb_dm_bt_'+level)||0);
-window.score=doneLvls();
+window.score=doneLvls();window.Arcade?.score(window.score);
 
 /* cloud sync: preserve the established PixelBreak save round-trip */
 function dmSnapshot(){const bt={};for(let i=0;i<16;i++){const t=bestTime(i);if(t)bt[i]=t}return{v:1,done:doneLvls(),bt}}
 function dmApply(sv){if(!sv||sv.v!==1)return;
   if((sv.done||0)>doneLvls())storageSet('pb_dm_done',sv.done);
   for(const k in (sv.bt||{})){const t=+sv.bt[k],cur=bestTime(+k);if(t&&(!cur||t<cur))storageSet('pb_dm_bt_'+k,t)}
-  window.score=Math.max(window.score||0,doneLvls());}
+  window.score=Math.max(window.score||0,doneLvls());window.Arcade?.score(window.score);}
 function dmPush(){try{parent.postMessage({__pbSave:1,data:dmSnapshot()},'*')}catch(e){}}
 dmApply(window.__pbSave);
 window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1)dmApply(d.data)});
@@ -224,7 +224,7 @@ function startLevel(index){
 function crash(){if(state!=='play')return;state='dead';crashClock=0;$('hint').textContent='CRASHED — press gas, Space, or ↻ to retry';}
 function win(){
   if(state!=='play')return;state='won';winDelay=0;const previous=bestTime(levelIndex);if(!previous||ticks<previous)storageSet('pb_dm_bt_'+levelIndex,ticks);
-  if(levelIndex+1>doneLvls()){storageSet('pb_dm_done',levelIndex+1);window.score=levelIndex+1;}dmPush();$('hint').textContent='FINISH!';
+  if(levelIndex+1>doneLvls()){storageSet('pb_dm_done',levelIndex+1);window.score=levelIndex+1;window.Arcade?.score(window.score)}window.Arcade?.gameOver(levelIndex+1);dmPush();$('hint').textContent='FINISH!';
 }
 function showWin(){
   setPlayUI(false);overlay.classList.remove('hidden');message.textContent=`${C.LEVELS[levelIndex].name} complete in ${(ticks/60).toFixed(1)}s${bestTime(levelIndex)===ticks?' — new best!':''}`;playButton.textContent=levelIndex+1<C.LEVELS.length?'NEXT STAGE':'LEVEL SELECT';refreshLevels();

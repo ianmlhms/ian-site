@@ -35,11 +35,11 @@ export const APPS = Object.freeze([
   { url: "profile.html", name: "Profile", icon: "🪪", group: "grp.social", locked: true,
     keywords: ["profil", "account", "konto", "avatar", "stats"] },
 
-  { url: "pixelbreak.html", name: "PixelBreak", icon: "🎮", group: "grp.fun", locked: false,
+  { url: "pixelbreak.html", name: "Arcade", icon: "🎮", group: "grp.fun", locked: false,
     keywords: ["arcade", "spiller", "spiele", "games", "2 ipad"] },
   { url: "partyspill.html", name: "Partyspill", icon: "🎉", group: "grp.fun", locked: false,
     keywords: ["partyspiele", "jeux", "fête", "gruppen", "handy"] },
-  { url: "wordle.html", name: "Wuertspill", icon: "🟩", group: "grp.fun", locked: false,
+  { url: "wordle.html", name: "Luxembourgish Word Game", icon: "🟩", group: "grp.fun", locked: false,
     keywords: ["wordle", "wörter", "wierder", "mots", "guess"] },
   { url: "countdowns.html", name: "Countdowns", icon: "⏳", group: "grp.fun", locked: false,
     keywords: ["timer", "zäit", "zeit", "compte à rebours", "dates"] },

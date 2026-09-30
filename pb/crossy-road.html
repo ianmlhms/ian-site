@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cross Rush - PixelBreak</title>
+<title>Road Crossing - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a2a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{border-radius:12px;box-shadow:0 0 30px rgba(100,255,100,0.2);max-width:100vw;max-height:100vh}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="crossy-road" data-arcade-title="Road Crossing"></script>
 </head>
 <body>
 <canvas id="c" width="500" height="600"></canvas>
@@ -105,7 +106,7 @@ function drawMenu(){
   btns=[];
   X.fillStyle='#12210f';X.fillRect(0,0,C.width,C.height);
   X.textAlign='center';
-  X.fillStyle='#88ff88';X.font='bold 40px Segoe UI';X.fillText('🐔 Cross Rush',C.width/2,70);
+  X.fillStyle='#88ff88';X.font='bold 40px Segoe UI';X.fillText('🐔 Road Crossing',C.width/2,70);
   X.fillStyle='#9ab89a';X.font='14px Segoe UI';
   X.fillText('Arrows / WASD to hop. Don’t get splatted.',C.width/2,98);
   // endless button
@@ -265,7 +266,7 @@ document.addEventListener('keydown',e=>{
   if(state!=='play')return;
   if(k==='ArrowUp'||k==='w'){player.targetY--;
     const r=-player.targetY;
-    if(r>rows){rows=r;if(mode==='endless')window.score=Math.max(window.score||0,rows)}
+    if(r>rows){rows=r;if(mode==='endless'){window.score=Math.max(window.score||0,rows);Arcade.score(window.score)}}
     if(!getLane(Math.round(player.targetY)))lanes.push(genLane(Math.round(player.targetY)));}
   if(k==='ArrowDown'||k==='s')player.targetY=Math.min(player.targetY+1,Math.ceil(cameraY)+5);
   if(k==='ArrowLeft'||k==='a')player.targetX-=SZ;

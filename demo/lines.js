@@ -8,8 +8,8 @@
  * except the card it sits in: different data source, different lifecycle, and
  * together they made one 600-line file. */
 import { LINES_URL, LINE_RESULT_LIMIT } from "./content.js?v=1";
-import { UI } from "./copy.js?v=1";
-import { failedState, mutedLine } from "./states.js?v=1";
+import { UI } from "./copy.js?v=2";
+import { failedState, mutedLine } from "./states.js?v=2";
 import { attachExpandable, makeExpandableRow } from "./expand.js?v=1";
 
 const FETCH_TIMEOUT_MS = 9000;

@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Brick Blitz - PixelBreak</title>
+<title>Brick Breaker - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(255,100,200,0.2)}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="breakout" data-arcade-title="Brick Breaker"></script>
 </head>
 <body>
 <canvas id="c" width="600" height="500"></canvas>
@@ -45,12 +46,12 @@ function draw(){
       ball.vy=-Math.abs(ball.vy);ball.vx+=(ball.x-paddle.x-paddle.w/2)*0.1;addP(ball.x,ball.y,'#fff',5);
     }
     // Bottom
-    if(ball.y>C.height){lives--;if(lives<=0)gameOver=true;else{ball.x=paddle.x+paddle.w/2;ball.y=440;ball.vy=-4;ball.vx=3}}
+    if(ball.y>C.height){lives--;if(lives<=0){gameOver=true;Arcade.gameOver(score)}else{ball.x=paddle.x+paddle.w/2;ball.y=440;ball.vy=-4;ball.vx=3}}
     // Bricks
     for(let b of bricks){
       if(!b.alive)continue;
       if(ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){
-        ball.vy*=-1;b.hp--;if(b.hp<=0){b.alive=false;score+=10;addP(b.x+b.w/2,b.y+b.h/2,b.color,12)}
+        ball.vy*=-1;b.hp--;if(b.hp<=0){b.alive=false;score+=10;Arcade.score(score);addP(b.x+b.w/2,b.y+b.h/2,b.color,12)}
       }
     }
     if(bricks.every(b=>!b.alive)){level++;genBricks();ball.x=300;ball.y=440;ball.vx=3;ball.vy=-4}

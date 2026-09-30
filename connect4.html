@@ -9,7 +9,7 @@
   <meta name="description" content="Connect 4 on ian.lu — drop discs and connect four, online on two devices or against three AI difficulty levels." />
   <link rel="canonical" href="https://ian.lu/connect4.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=23"></script>
+<script src="theme.js?v=24"></script>
 <link rel="stylesheet" href="game-common.css?v=5">
 <style>
   :root{--red:#ff5d6c;--yellow:#ffcc4d;--board:#1b2150}
@@ -37,7 +37,7 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="pixelbreak.html">‹ Games</a>
+  <a class="home" href="pixelbreak.html">‹ Arcade</a>
   <h1>🔴 Connect 4</h1>
   <div class="spacer"></div>
 </header>
@@ -51,9 +51,10 @@
 </div>
 
 <script src="pixelbreak-config.js"></script>
+<script src="pb/arcade-kit.js?v=1" data-arcade-id="o-connect4" data-arcade-title="Connect 4" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="game-common.js?v=3"></script>
-<script type="module" src="notify-ambient.js?v=14"></script>
+<script type="module" src="notify-ambient.js?v=15"></script>
 <script>
 const COLS = 7, ROWS = 6;
 const GC = window.GameCommon;
@@ -213,7 +214,7 @@ function aiBestMove() {
   return bestCols[Math.floor(Math.random() * bestCols.length)];
 }
 </script>
-  <script type="module" src="rtc-ring.js?v=14"></script>
-  <script type="module" src="class-gate.js?v=15"></script>
+  <script type="module" src="rtc-ring.js?v=15"></script>
+  <script type="module" src="class-gate.js?v=16"></script>
 </body>
 </html>

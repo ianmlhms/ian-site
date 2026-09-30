@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maze Runner - PixelBreak</title>
+<title>Maze Escape - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
@@ -12,6 +12,7 @@ canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-r
 canvas{max-height:calc(100vh - 60px)}
 #hud{max-width:100%;flex-wrap:wrap;justify-content:center}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="maze" data-arcade-title="Maze Escape" data-arcade-lower-is-better></script>
 </head>
 <body>
 <div id="hud"><span>Level: <b id="lv">1</b></span><span>⏱ <b id="tm">0</b>s</span><span style="font-size:13px;opacity:0.5">Arrow keys / WASD to move</span></div>
@@ -52,7 +53,7 @@ function move(dx,dy){
   else if(dx===1&&dy===0&&!c.right){player.x++}
   else if(dx===0&&dy===1&&!c.bottom){player.y++}
   else if(dx===-1&&dy===0&&!c.left){player.x--}
-  if(player.x===goal.x&&player.y===goal.y){won=true;clearInterval(timerInt);
+  if(player.x===goal.x&&player.y===goal.y){won=true;clearInterval(timerInt);Arcade.gameOver(seconds);
     setTimeout(()=>init(level+1),1200)}
   draw();
 }

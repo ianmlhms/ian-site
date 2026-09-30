@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Memory Match - PixelBreak</title>
+<title>Memory Match - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
@@ -22,6 +22,7 @@ body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:cente
 body{height:auto;min-height:100vh;padding:12px}
 #hud{max-width:100%;flex-wrap:wrap;justify-content:center}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="memory" data-arcade-title="Memory Match" data-arcade-lower-is-better></script>
 </head>
 <body>
 <div id="diff">
@@ -59,7 +60,7 @@ function flip(i){
       if(cards[flipped[0]]===cards[flipped[1]]){
         matched.add(flipped[0]);matched.add(flipped[1]);pairs++;
         document.getElementById('pairs').textContent=pairs;
-        if(pairs===total){clearInterval(timerInt);document.getElementById('msg').textContent='🎉 Complete in '+moves+' moves, '+seconds+'s!'}
+        if(pairs===total){clearInterval(timerInt);Arcade.gameOver(moves);document.getElementById('msg').textContent='🎉 Complete in '+moves+' moves, '+seconds+'s!'}
       }
       flipped=[];locked=false;render();
     },700);

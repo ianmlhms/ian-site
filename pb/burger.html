@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>Burger Rush</title>
+<title>Burger Restaurant</title>
 <style>
 :root{color-scheme:light;--ink:#fff8e7;--muted:#c8bca2;--panel:#272136;--panel-2:#342b43;--line:#574967;--red:#ee5c4d;--gold:#ffc84c;--green:#76d66b;--blue:#63c7e8;--shadow:0 5px 0 #15111d;--tap:44px;--counter-top:64%}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -132,10 +132,11 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 @media(max-height:670px){.brand{display:none}.station{min-height:116px}.game-shell{gap:5px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="burger" data-arcade-title="Burger Restaurant"></script>
 </head>
 <body>
 <main class="game-shell" id="game">
-  <header class="brand"><h1>🍔 Burger Rush</h1><div class="brand-balance"><span id="coinBalance">🪙 0</span><span id="starBalance">⭐ 0</span></div></header>
+  <header class="brand"><h1>🍔 Burger Restaurant</h1><div class="brand-balance"><span id="coinBalance">🪙 0</span><span id="starBalance">⭐ 0</span></div></header>
   <div class="stage">
     <div class="scene">
       <img class="layer scene-room" src="/pb/burger/art/room-back.webp?v=3" alt="" decoding="async">
@@ -169,13 +170,13 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 </main>
 <div class="modal-layer" id="modalLayer">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <h2 id="modalTitle">Burger Rush</h2><div class="modal-stars" id="modalStars">🍔</div><p id="modalMessage">Cook fast, serve happy customers, and grow your restaurant.</p><p id="modalDetail"></p>
+    <h2 id="modalTitle">Burger Restaurant</h2><div class="modal-stars" id="modalStars">🍔</div><p id="modalMessage">Cook fast, serve happy customers, and grow your restaurant.</p><p id="modalDetail"></p>
     <div class="modal-actions"><button id="shopButton" type="button">Shop</button><button class="primary" id="startButton" type="button">Start day 1</button></div>
   </section>
 </div>
 <div class="shop-layer" id="shopLayer" hidden><section class="shop" id="shop"></section></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<div class="boot-error" id="bootError" hidden>Could not start Burger Rush. Reload the game and try again.</div>
+<div class="boot-error" id="bootError" hidden>Could not start Burger Restaurant. Reload the game and try again.</div>
 <script>
 (function(){
   function showBootError(event){
@@ -192,6 +193,6 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
   window.addEventListener("unhandledrejection",showBootError);
 })();
 </script>
-<script type="module" src="/pb/burger/ui.js?v=4"></script>
+<script type="module" src="/pb/burger/ui.js?v=5"></script>
 </body>
 </html>

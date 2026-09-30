@@ -1,5 +1,5 @@
 import { GAMES } from "./content.js?v=1";
-import { UI } from "./copy.js?v=1";
+import { UI } from "./copy.js?v=2";
 
 export const meta = { badge: null };
 

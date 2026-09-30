@@ -144,7 +144,7 @@ input[type="range"]::-moz-range-track {
 input[type="range"]::-moz-range-thumb { width: 1.6rem; height: 1.6rem; border: 0; }
 
 #themeFab, #pwaRefresh { min-height: var(--hit-target); }
-body :is(#fbFab, #themeFab) { color: var(--text); }
+body #themeFab { color: var(--text); }
 #pwaInstall, body .langsw button.on, body .pb-tab.active, body .pb-go {
   color: var(--accent-foreground);
 }

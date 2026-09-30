@@ -15,7 +15,7 @@ import {
   tick,
   toggleTopping,
 } from "/pb/burger/sim.js?v=1";
-import {createPersistence, snapshot} from "/pb/burger/save.js?v=1";
+import {createPersistence, snapshot} from "/pb/burger/save.js?v=2";
 import {createShop} from "/pb/burger/shop.js?v=1";
 
 const UI_REFRESH_MS = 100;
@@ -122,6 +122,7 @@ const showToast = (message) => {
 const setState = (nextState, shouldRender = true) => {
   state = nextState;
   window.score = state.lifetimeCoins;
+  window.Arcade?.score(window.score);
   if (shouldRender) render();
 };
 
@@ -386,6 +387,7 @@ const animationLoop = (nowMs) => {
   const didFinish = wasPlaying && next.screen === "summary";
   state = next;
   window.score = state.lifetimeCoins;
+  window.Arcade?.score(window.score);
   if (nowMs - lastRenderAt >= UI_REFRESH_MS || didFinish) {
     lastRenderAt = nowMs;
     render();

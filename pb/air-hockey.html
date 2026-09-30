@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Air Hockey - PixelBreak</title>
+<title>Air Hockey - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
@@ -18,6 +18,7 @@ canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,150,255,0.3);max-width:100v
 #mStatus{min-height:24px;font-size:16px;color:#7fc0e8;text-align:center}
 .hidden{display:none!important}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
 </head>
 <body>
 <div id="info">🔴 P1: WASD · 🔵 P2: Arrows · First to 7!</div>
@@ -149,7 +150,7 @@ function loop(ts){
       if(puck.x>C.width-puck.r-10){puck.x=C.width-puck.r-10;puck.vx*=-0.9;addP(puck.x,puck.y,'#fff')}
       let inGoalX=puck.x>C.width/2-GOAL_W/2&&puck.x<C.width/2+GOAL_W/2;
       if(puck.y<puck.r){if(inGoalX){p1.score++;addP(puck.x,puck.y,'#ff4466');
-        if(mode==='ai'&&p1.score>=7)window.score=(window.score||0)+1;reset()}else{puck.y=puck.r;puck.vy*=-0.9}}
+        if(mode==='ai'&&p1.score>=7){window.score=(window.score||0)+1;Arcade.gameOver(window.score)}reset()}else{puck.y=puck.r;puck.vy*=-0.9}}
       if(puck.y>C.height-puck.r){if(inGoalX){p2.score++;addP(puck.x,puck.y,'#4488ff');reset()}else{puck.y=C.height-puck.r;puck.vy*=-0.9}}
       for(let p of[p1,p2]){
         let dx=puck.x-p.x,dy=puck.y-p.y,d=Math.hypot(dx,dy);

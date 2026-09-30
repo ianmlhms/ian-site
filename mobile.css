@@ -53,7 +53,6 @@ body a, body button { -webkit-tap-highlight-color: transparent; }
   }
   body #acctHost .auth-btn::before { content: "👤"; font-size: 16px; }
 
-  body #fbFab, body #fbPanel { display: none !important; }
   body #themeFab, body #pwaRefresh { width: 44px; height: 44px; }
   body #themeFab {
     right: calc(12px + env(safe-area-inset-right, 0px));

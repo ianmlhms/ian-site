@@ -1,4 +1,4 @@
-/* PixelBreak — accounts + high-score records.
+/* Arcade — accounts + high-score records.
  *
  * - Captures a score from each game via a small reporter injected into the game iframe
  *   (games broadcast their score with postMessage; we keep the max as that play's result).
@@ -8,7 +8,7 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=18";
+import * as auth from "./auth.js?v=19";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -16,12 +16,31 @@ const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim
 
 const PB = (window.PB = {});
 PB.current = null;          // currently open game object {id,name,...}
-let sessionMax = null;      // best score reported during this play
+let sessionBest = null;     // best score reported during this play
 let sb = null, session = null, username = null;
 
 /* ---------------- local best (always on) ---------------- */
-const localBest = (id) => +(localStorage.getItem("pb_best_" + id) || 0);
-const setLocalBest = (id, v) => { if (v > localBest(id)) localStorage.setItem("pb_best_" + id, v); };
+function localBest(id) {
+  try {
+    const stored = localStorage.getItem("pb_best_" + id);
+    if (stored === null) return null;
+    const value = Number(stored);
+    return Number.isFinite(value) ? value : null;
+  } catch (error) {
+    console.warn("[Arcade] local best read failed", { id, error });
+    return null;
+  }
+}
+function isBetter(g, value, previous) {
+  return previous === null || previous === undefined || (g?.lowerIsBetter ? value < previous : value > previous);
+}
+function setLocalBest(g, value) {
+  const previous = localBest(g.id);
+  if (!isBetter(g, value, previous)) return false;
+  try { localStorage.setItem("pb_best_" + g.id, String(value)); }
+  catch (error) { console.warn("[Arcade] local best write failed", { id: g.id, error }); return false; }
+  return true;
+}
 
 /* ---------------- score reporter injected into each game ---------------- */
 const REPORTER = `<script>(function(){
@@ -92,8 +111,13 @@ PB.instrument = (html) => {
 };
 
 /* ---------------- open / close hooks ---------------- */
-PB.onOpenGame = (g) => { PB.current = g; sessionMax = null; renderGameBar(); loadCloudSave(g); };
+PB.onOpenGame = (g) => { PB.current = g; sessionBest = null; renderGameBar(); loadCloudSave(g); };
 PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; };
+PB.registerStandalone = (g) => {
+  PB.current = g;
+  sessionBest = null;
+  renderGameBar();
+};
 // Saves reach the cloud on a 3 s debounce; leaving the page inside that window
 // (closing the tab, swiping the PWA away) would otherwise drop them from the
 // cloud copy. Best effort -- the local copy is always written synchronously.
@@ -275,20 +299,25 @@ async function loadCloudSave(g) {
   sendCloudSave();
 }
 
-/* ---------------- receive scores from the game iframe ---------------- */
+/* ---------------- receive scores from iframe or standalone games ---------------- */
+function receiveScore(detail) {
+  const g = PB.current;
+  if (!g || g.noScore) return;
+  const score = detail?.score;
+  if (!Number.isFinite(score) || Math.abs(score) > MAX_SCORE) return;
+  if (!isBetter(g, score, sessionBest)) return;
+  sessionBest = score;
+  setLocalBest(g, score);
+  renderGameBar();
+  if (sb && session) saveCloud(g, score);
+}
 window.addEventListener("message", (e) => {
   if (!isGameMessage(e)) return;
   const d = e.data;
-  if (d.__pb !== 1 || Object.keys(d).length !== 2) return;
-  const g = PB.current; if (!g) return;
-  const s = d.score; if (!Number.isFinite(s) || Math.abs(s) > MAX_SCORE) return;
-  if (sessionMax == null || s > sessionMax) {
-    sessionMax = s;
-    setLocalBest(g.id, s);
-    renderGameBar();
-    if (sb && session) saveCloud(g, s);
-  }
+  if (d.__pb !== 1 || (Object.keys(d).length !== 2 && Object.keys(d).length !== 3)) return;
+  receiveScore(d);
 });
+window.addEventListener("arcade:score", (event) => receiveScore(event.detail));
 
 /* ---------------- cloud: auth + scores ---------------- */
 async function getCreateClient() {
@@ -318,18 +347,21 @@ async function saveCloud(g, s) {
     const uid = session.user.id;
     const { data: ex } = await sb.from("scores")
       .select("score").eq("user_id", uid).eq("game_id", g.id).maybeSingle();
-    if (ex && ex.score >= s) return;
+    if (ex && !isBetter(g, s, ex.score)) return;
     await sb.from("scores").upsert(
       { user_id: uid, username, game_id: g.id, game_name: g.name, score: s, updated_at: new Date().toISOString() },
       { onConflict: "user_id,game_id" });
   } catch (err) { console.warn("[PB] save score failed", err); }
 }
-async function fetchBoard(gid) {
+async function fetchBoard(g) {
   try {
     const { data } = await sb.from("scores")
-      .select("username,score").eq("game_id", gid).order("score", { ascending: false }).limit(10);
+      .select("username,score").eq("game_id", g.id).order("score", { ascending: Boolean(g.lowerIsBetter) }).limit(10);
     return data || [];
-  } catch { return []; }
+  } catch (error) {
+    console.warn("[Arcade] leaderboard load failed", { id: g.id, error });
+    return [];
+  }
 }
 
 /* ---------------- UI ---------------- */
@@ -338,9 +370,6 @@ function css() {
   s.textContent = `
   .pb-acct{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:30px;border:2px solid var(--border);background:var(--card2);color:var(--text);font-weight:700;font-size:14px;cursor:pointer;font-family:'Nunito',sans-serif;white-space:nowrap}
   .pb-acct:hover{border-color:var(--accent2);color:var(--accent2)}
-  .gbest{font-size:13px;color:var(--accent3);font-weight:700;margin-left:auto;white-space:nowrap}
-  .gboard-btn{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:4px 8px}
-  .gboard-btn:hover{color:var(--accent3)}
   .pb-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:3000;padding:18px}
   .pb-modal.open{display:flex}
   .pb-box{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:26px 24px;width:340px;max-width:100%;font-family:'Nunito',sans-serif}
@@ -374,6 +403,7 @@ function renderAccount() {
   let btn = document.getElementById("pbAcct");
   if (!btn) {
     const host = document.querySelector(".header-right") || document.querySelector(".header-inner");
+    if (!host) return;
     btn = document.createElement("button");
     btn.id = "pbAcct"; btn.className = "pb-acct";
     btn.onclick = openAuth;
@@ -397,7 +427,7 @@ function openAuth() {
   const draw = () => {
     authModal.querySelector(".pb-box").innerHTML = `
       <button class="pb-x">&times;</button>
-      <h3>PixelBreak</h3>
+      <h3>Arcade</h3>
       <div class="pb-tabs">
         <button class="pb-tab ${mode==='in'?'active':''}" data-m="in">Sign in</button>
         <button class="pb-tab ${mode==='up'?'active':''}" data-m="up">Create account</button>
@@ -435,42 +465,43 @@ function openAuth() {
   authModal.classList.add("open");
 }
 
-/* in-game bar: your best + leaderboard button */
+/* Shared in-game bar: back, title, best, leaderboard, restart, mute. */
+let mountedGameBar = null;
 function renderGameBar() {
   const gh = document.getElementById("gh");
-  if (!gh) return;
-  let best = document.getElementById("gbest");
-  if (!best) {
-    best = document.createElement("span"); best.id = "gbest"; best.className = "gbest";
-    const cb = document.getElementById("cb");
-    gh.insertBefore(best, cb);
-    const mb = document.createElement("button");
-    mb.className = "gboard-btn"; mb.title = "Sound"; mb.textContent = isMuted() ? "🔇" : "🔊";
-    mb.onclick = () => {
-      localStorage.setItem("pb_muted", isMuted() ? "0" : "1");
-      mb.textContent = isMuted() ? "🔇" : "🔊";
-      try { document.getElementById("gf").contentWindow.postMessage({ __pbSndMute: isMuted() }, "*"); } catch {}
-    };
-    gh.insertBefore(mb, cb);
-    if (cloudEnabled) {
-      const bb = document.createElement("button");
-      bb.className = "gboard-btn"; bb.title = "Leaderboard"; bb.textContent = "🏆";
-      bb.onclick = openBoard;
-      gh.insertBefore(bb, cb);
-    }
-  }
   const g = PB.current;
-  const b = g ? Math.max(localBest(g.id), sessionMax || 0) : 0;
-  best.textContent = b > 0 ? "Your best: " + b : "";
+  if (gh && g && window.Arcade) {
+    mountedGameBar = window.Arcade.mountBar({
+      host: gh,
+      title: g.name,
+      noScore: g.noScore || !cloudEnabled,
+      restart: true,
+      onBack: (event) => { event.preventDefault(); window.closeGame?.(); },
+      onLeaderboard: openBoard,
+      onRestart: () => {
+        try { document.getElementById("gf")?.contentWindow?.postMessage({ __pbCommand: "restart" }, "*"); }
+        catch (error) { console.warn("[Arcade] restart message failed", error); }
+      },
+      onMute: (muted) => {
+        try { document.getElementById("gf")?.contentWindow?.postMessage({ __pbSndMute: muted }, "*"); }
+        catch (error) { console.warn("[Arcade] mute message failed", error); }
+      },
+    });
+  }
+  const best = mountedGameBar?.best || document.getElementById("arcadeBest");
+  if (!best || !g || g.noScore) return;
+  const stored = localBest(g.id);
+  const value = sessionBest !== null && isBetter(g, sessionBest, stored) ? sessionBest : stored;
+  best.textContent = value === null ? "" : "Best: " + value;
 }
 
 async function openBoard() {
-  const g = PB.current; if (!g) return;
+  const g = PB.current; if (!g || g.noScore) return;
   boardModal.querySelector(".pb-box").innerHTML =
     `<button class="pb-x">&times;</button><h3>🏆 ${esc(g.name)}</h3><div id="pbBoardList" style="margin-top:12px;color:var(--text2)">Loading…</div>`;
   boardModal.querySelector(".pb-x").onclick = () => boardModal.classList.remove("open");
   boardModal.classList.add("open");
-  const rows = await fetchBoard(g.id);
+  const rows = await fetchBoard(g);
   const list = document.getElementById("pbBoardList");
   if (!rows.length) {
     list.innerHTML = session
@@ -482,6 +513,7 @@ async function openBoard() {
   list.innerHTML = rows.map((r, i) =>
     `<div class="pb-row"><span class="r">${i + 1}</span><span style="flex:1">${esc(r.username || "anon")}</span><b>${r.score}</b></div>`).join("");
 }
+PB.openBoard = openBoard;
 
 /* ---------------- helpers ---------------- */
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

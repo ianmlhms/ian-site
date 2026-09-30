@@ -1,12 +1,12 @@
-import { UI } from "/demo/copy.js?v=1";
+import { UI } from "/demo/copy.js?v=2";
 
 const MODULE_PATHS = Object.freeze({
-  games: "/demo/games.js?v=1",
+  games: "/demo/games.js?v=2",
   duo: "/demo/duo.js?v=1",
-  transit: "/demo/transit.js?v=1",
-  sky: "/demo/sky.js?v=1",
+  transit: "/demo/transit.js?v=2",
+  sky: "/demo/sky.js?v=2",
   chat: "/demo/chat.js?v=1",
-  buddy: "/demo/buddy.js?v=1",
+  buddy: "/demo/buddy.js?v=2",
 });
 
 let active = null;

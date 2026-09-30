@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fruit Slash - PixelBreak</title>
+<title>Fruit Slicer - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a0a2a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(200,50,255,0.2);cursor:crosshair}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="fruit-slash" data-arcade-title="Fruit Slicer"></script>
 </head>
 <body>
 <canvas id="c" width="600" height="600"></canvas>
@@ -47,8 +48,8 @@ C.addEventListener('pointermove',e=>{
     if(f.sliced)continue;
     if(Math.hypot(mx-f.x,my-f.y)<f.r+10){
       f.sliced=true;
-      if(f.bomb){lives--;addP(f.x,f.y,'#ff4444',20);if(lives<=0)gameOver=true}
-      else{score++;addP(f.x,f.y,'#ffcc00',15)}
+      if(f.bomb){lives--;addP(f.x,f.y,'#ff4444',20);if(lives<=0){gameOver=true;Arcade.gameOver(score)}}
+      else{score++;Arcade.score(score);addP(f.x,f.y,'#ffcc00',15)}
     }
   }
   lastMouse={x:mx,y:my};
@@ -67,7 +68,7 @@ function loop(){
   for(let i=fruits.length-1;i>=0;i--){
     let f=fruits[i];f.x+=f.vx;f.y+=f.vy;f.vy+=0.25;f.rot+=f.rv;
     if(f.y>C.height+50){
-      if(!f.sliced&&!f.bomb){lives--;if(lives<=0)gameOver=true}
+      if(!f.sliced&&!f.bomb){lives--;if(lives<=0){gameOver=true;Arcade.gameOver(score)}}
       fruits.splice(i,1);continue;
     }
     if(!f.sliced){

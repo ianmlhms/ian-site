@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Neon Pong - PixelBreak</title>
+<title>Pong - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
@@ -18,12 +18,13 @@ canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,255,200,0.2);max-width:100v
 #mStatus{min-height:24px;font-size:16px;color:#7fe8d0;text-align:center}
 .hidden{display:none!important}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="pong" data-arcade-title="Pong"></script>
 </head>
 <body>
 <div id="info">🟢 P1: W/S · 🔵 P2: ↑/↓ · First to 10 wins!</div>
 <canvas id="c" width="800" height="500"></canvas>
 <div id="menu">
-  <h1>NEON PONG</h1>
+  <h1>PONG</h1>
   <button id="mLocal">👥 2 Players — one device</button>
   <button id="mAI">🤖 vs Computer</button>
   <button id="mHost">🌐 Host online game</button>
@@ -159,7 +160,7 @@ function loop(ts){
       }
       if(ball.x<0){p2.score++;addP(50,p1.y,'#ff4444',20);resetBall(1)}
       if(ball.x>C.width){p1.score++;addP(C.width-50,p2.y,'#ff4444',20);resetBall(-1);
-        if(mode==='ai'&&p1.score>=10)window.score=(window.score||0)+1}
+        if(mode==='ai'&&p1.score>=10){window.score=(window.score||0)+1;Arcade.gameOver(window.score)}}
       if(mode==='host'&&++netFrame%5===0)
         NET.send({t:'s',p1y:Math.round(p1.y),p2y:Math.round(p2.y),bx:Math.round(ball.x),by:Math.round(ball.y),s1:p1.score,s2:p2.score});
     }

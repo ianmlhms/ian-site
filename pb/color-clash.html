@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Color Clash - PixelBreak</title>
+<title>Colour Word Match - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;user-select:none}
@@ -17,6 +17,7 @@ body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:cente
 #timer-bar{width:300px;height:8px;background:#2a2a4a;border-radius:4px;margin-bottom:10px;overflow:hidden}
 #timer-fill{height:100%;background:#00ff88;transition:width 0.1s;border-radius:4px}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="color-clash" data-arcade-title="Colour Word Match"></script>
 </head>
 <body>
 <div id="hud"><span>Score: <b id="score">0</b></span><span>Streak: <b id="streak">0</b>🔥</span><span>Level: <b id="level">1</b></span></div>
@@ -54,11 +55,11 @@ function newRound(){
 
 function answer(name){
   if(name===correct){
-    score+=10+streak*2;streak++;
+    score+=10+streak*2;Arcade.score(score);streak++;
     level=Math.floor(streak/5)+1;
     document.getElementById('feedback').innerHTML='<span style="color:#44ff88">✓ Correct!</span>';
   }else{
-    streak=0;score=Math.max(0,score-5);
+    streak=0;score=Math.max(0,score-5);Arcade.score(score);
     document.getElementById('feedback').innerHTML='<span style="color:#ff4466">✗ It was '+correct+'</span>';
   }
   document.getElementById('score').textContent=score;
@@ -69,7 +70,7 @@ function answer(name){
 
 setInterval(()=>{
   timeLeft-=1.5+level*0.3;
-  if(timeLeft<=0){streak=0;score=Math.max(0,score-3);
+  if(timeLeft<=0){streak=0;score=Math.max(0,score-3);Arcade.score(score);
     document.getElementById('feedback').innerHTML='<span style="color:#ffcc00">⏱ Too slow!</span>';
     document.getElementById('streak').textContent=0;document.getElementById('score').textContent=score;
     setTimeout(newRound,300);timeLeft=100}

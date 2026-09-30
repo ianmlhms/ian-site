@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>PixelBreak - Play Games</title>
-<meta name="description" content="PixelBreak — 49 free browser games, from quick arcade breaks to bigger games with saved progress and multiplayer for two iPads.">
-<meta property="og:title" content="PixelBreak — ian.lu">
-<meta property="og:description" content="49 free browser games — big adventures, quick breaks and multiplayer.">
+<title>Arcade - Play Games</title>
+<meta name="description" content="Arcade — 50 free browser games, from quick arcade breaks to bigger games with saved progress and multiplayer for two iPads.">
+<meta property="og:title" content="Arcade — ian.lu">
+<meta property="og:description" content="50 free browser games — big adventures, quick breaks and multiplayer.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <link rel="canonical" href="https://ian.lu/pixelbreak.html">
@@ -14,29 +14,28 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
-<script src="theme.js?v=23"></script>
+<script src="theme.js?v=24"></script>
 <style>
 :root{--brand1:#ff6b9d;--brand2:#4de8ff;--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
 html[data-theme="light"]{--brand1:#e23d78;--brand2:#0e7ec2}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'Nunito',sans-serif;min-height:100vh;min-height:100svh;overflow-x:hidden}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,"SF Pro Text","SF Pro Display",BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;min-height:100svh;overflow-x:hidden}
 ::selection{background:var(--accent);color:var(--accent-foreground)}
 header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
 .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer}
 .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--brand1),var(--brand2));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(255,107,157,0.3);animation:lp 3s ease-in-out infinite}
 @keyframes lp{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-.logo-text{font-family:'Fredoka',sans-serif;font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--brand1),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-text{font-size:28px;font-weight:750;letter-spacing:-.025em;background:linear-gradient(135deg,var(--brand1),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:11px;color:var(--text2);letter-spacing:2px;text-transform:uppercase}
 .search-box{display:flex;align-items:center;gap:8px;background:var(--card2);border:2px solid var(--border);border-radius:30px;padding:7px 16px;width:280px;transition:border-color 0.3s}
 .search-box:focus-within{border-color:var(--accent2-text)}
-.search-box input{background:none;border:none;color:var(--text);font-size:14px;outline:none;width:100%;font-family:'Nunito',sans-serif}
+.search-box input{background:none;border:none;color:var(--text);font-size:14px;outline:none;width:100%;font-family:inherit}
 .search-box input::placeholder{color:var(--muted)}
 .si{font-size:16px;opacity:0.4}
 .header-right{display:flex;align-items:center;gap:12px}
 .header-left{display:flex;align-items:center;gap:14px}
-.home-btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:30px;border:2px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;font-weight:700;font-size:14px;font-family:'Nunito',sans-serif;white-space:nowrap;transition:all 0.2s}
+.home-btn{display:inline-flex;align-items:center;gap:5px;min-height:44px;padding:8px 16px;border-radius:30px;border:2px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;font-weight:700;font-size:14px;font-family:inherit;white-space:nowrap;transition:transform .18s ease,border-color .18s ease,color .18s ease}
 .home-btn:hover{border-color:var(--accent-border);color:var(--accent-text)}
 main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .browse{padding:22px 0 2px}
@@ -63,11 +62,13 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .game-card.online{border-color:rgba(77,232,255,0.22)}
 .game-card.online:hover{box-shadow:0 14px 40px rgba(0,0,0,0.45),0 0 26px rgba(77,232,255,0.14)}
 .game-card:hover{transform:translateY(-6px);box-shadow:0 14px 40px rgba(0,0,0,0.45);background:var(--card-hover)}
-.game-thumb{height:126px;display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;overflow:hidden}
-.game-card.big .game-thumb{height:164px;font-size:68px}
+.game-thumb{aspect-ratio:16/10;height:auto;display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;overflow:hidden}
+.game-card.big .game-thumb{font-size:68px}
+.game-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+.game-thumb img.failed{display:none}
 .game-thumb .em{filter:drop-shadow(0 8px 20px rgba(0,0,0,0.55));transition:transform 0.3s}
 .game-card:hover .game-thumb .em{transform:scale(1.12)}
-.game-thumb::after{content:'\25B6';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);font-size:32px;color:#fff;opacity:0;transition:all 0.3s;text-shadow:0 0 20px rgba(0,0,0,0.8)}
+.game-thumb::after{content:'\25B6';position:absolute;top:50%;left:50%;z-index:2;transform:translate(-50%,-50%) scale(0);font-size:32px;color:#fff;opacity:0;transition:all 0.3s;text-shadow:0 0 20px rgba(0,0,0,0.8)}
 .game-card:hover .game-thumb::after{transform:translate(-50%,-50%) scale(1);opacity:0.8}
 .game-info{display:block;padding:10px 12px}
 .game-name{display:block;font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
@@ -81,10 +82,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .ext{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;padding:2px 6px;border-radius:5px}
 #overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
 #overlay.open{display:flex}
-#gh{display:flex;align-items:center;justify-content:space-between;width:100%;padding:calc(6px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-right,0px)) 6px calc(14px + env(safe-area-inset-left,0px));gap:8px;flex-wrap:wrap;color:#fff;background:#0d0d1a;flex:none}
-#gh h2{font-family:'Fredoka',sans-serif;font-size:18px}
-#cb{background:var(--accent);border:none;color:var(--accent-foreground);width:34px;height:34px;border-radius:50%;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform 0.2s;flex:none}
-#cb:hover{transform:scale(1.1)}
+#gh{width:100%;flex:none}
 #gf{flex:1;width:100%;border:none;border-radius:0;background:#000;min-height:0}
 /* on-screen touch controls (touch devices only) — float over the game, drive it via synthetic key events */
 #tc{display:none;position:absolute;bottom:14px;left:0;right:0;align-items:flex-end;justify-content:space-between;gap:14px;padding:0 16px;user-select:none;-webkit-user-select:none;touch-action:none;pointer-events:none;z-index:5}
@@ -96,6 +94,13 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 #tc .act{position:static;width:78px;height:78px;border-radius:50%;background:var(--accent);border:none;font-weight:800;font-size:24px;flex:none}
 #tc .tb.on{background:var(--accent2);color:var(--accent2-foreground)}
 @media (pointer:coarse){#tc{display:flex}}
+#tc.keyboard-hidden{display:none!important}
+.more-games{margin-top:34px;border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden}
+.more-games summary{min-height:56px;display:flex;align-items:center;gap:10px;padding:0 18px;cursor:pointer;font-weight:750;letter-spacing:-.01em;list-style:none;user-select:none}
+.more-games summary::-webkit-details-marker{display:none}.more-games summary::after{content:"⌄";margin-left:auto;color:var(--text2);font-size:20px;transition:transform .24s cubic-bezier(.2,.8,.2,1)}
+.more-games[open] summary::after{transform:rotate(180deg)}.more-games summary:active{background:var(--card2)}
+.more-content{padding:0 16px 18px}.more-group h3{margin:18px 0 10px;font-size:15px;letter-spacing:.01em;color:var(--text2)}
+@media(prefers-reduced-motion:reduce){.more-games summary::after{transition:none}.game-card,.game-thumb .em{transition:none}}
 #om{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
 #om.open{display:flex}
 #om .box{background:var(--glass-solid);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;width:330px;max-width:100%}
@@ -108,8 +113,8 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 #om .jr button{background:var(--accent2);color:var(--accent2-foreground);border:none;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
 #om .x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
 footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
-@media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:0 12px 35px}.browse{padding-top:16px}.genre-filter{flex:1 0 auto;padding-inline:12px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.big-grid{grid-template-columns:1fr;gap:12px}.game-thumb{height:90px;font-size:36px}.game-card.big .game-thumb{height:138px;font-size:58px}}
-body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,body.game-open #pwaInstall,body.game-open #fbFab,body.game-open #fbPanel,body.game-open #appNav{display:none!important}
+@media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:0 12px 35px}.browse{padding-top:16px}.genre-filter{flex:1 0 auto;padding-inline:12px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.big-grid{grid-template-columns:1fr;gap:12px}.game-thumb{font-size:36px}.game-card.big .game-thumb{font-size:58px}}
+body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,body.game-open #pwaInstall,body.game-open #appNav{display:none!important}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -124,7 +129,7 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
 <a class="home-btn" href="index.html">&#x2039; Home</a>
 <div class="logo" onclick="goHome()">
 <div class="logo-icon">&#x1F3AE;</div>
-<div><div class="logo-text">PixelBreak</div><div class="logo-sub">Games for Breaks</div></div>
+<div><div class="logo-text">Arcade</div><div class="logo-sub">Games for Breaks</div></div>
 </div>
 </div>
 <div class="header-right">
@@ -164,20 +169,25 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
 <div class="game-grid" id="gridQuick"></div>
 </section>
 
+<details class="more-games" id="moreGames">
+<summary>More games <span id="moreCount"></span></summary>
+<div class="more-content" id="moreContent"></div>
+</details>
+
 <section class="pb-about">
-<h2>About PixelBreak</h2>
-<p>PixelBreak is a small browser arcade I built myself. Its 49 games run in the browser — there is nothing
+<h2>About Arcade</h2>
+<p>Arcade is a small browser arcade I built myself. Its 50 games run in the browser — there is nothing
 to download and no launcher to install. Open it on a phone, an iPad, a school laptop or a desktop, pick a
 game, and it starts immediately. High scores and supported game progress are saved for you.</p>
 
 <h3>What's in it</h3>
 <p><strong>Big games</strong> save progress and are made for returning to, from Theme Park Tycoon to Tower
-Defense and Burger Rush. <strong>Play together</strong> collects online and local multiplayer in one place.
+Defense and Burger Restaurant. <strong>Play together</strong> collects online and local multiplayer in one place.
 <strong>Quick games</strong> are made for one sitting. You can also browse across those sections by puzzle,
 action, driving or creative games.</p>
 
 <h3>Playing against someone else</h3>
-<p>A handful of games are built for two people rather than one. Tank Wars, Neon Pong, Air Hockey and Pixel
+<p>A handful of games are built for two people rather than one. Tank Battles, Pong, Air Hockey and Platform
 Fighters can each be played three ways: two players sharing one keyboard, one player against the computer,
 or across two separate devices. For the two-device mode, one player starts a room and the other joins by
 typing the room code — useful when two people have an iPad each and are sitting in the same room. There is
@@ -190,12 +200,11 @@ action button appear underneath the game, so everything is playable without a ke
 <h3>Where the games come from</h3>
 <p>All of the built-in games were written from scratch for this site. Several are openly inspired by
 well-known arcade concepts — the kind of games most people have played some version of — but the code, the
-artwork and the level design are my own, and none of it is copied from another game. If something is buggy
-or unfair, there is a feedback button at the top of the page and I do read it.</p>
+artwork and the level design are my own, and none of it is copied from another game.</p>
 </section>
 </main>
 <div id="overlay">
-<div id="gh"><h2 id="gt">Game</h2><button id="cb" onclick="closeGame()">&#x2715;</button></div>
+<div id="gh"></div>
 <iframe id="gf" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
 <div id="tc">
 <div class="dpad">
@@ -208,59 +217,59 @@ or unfair, there is a feedback button at the top of the page and I do read it.</
 </div>
 </div>
 <div id="om"><div class="box"></div></div>
-<footer>PixelBreak &mdash; Made for fun. Built-in games are original creations inspired by popular concepts. · <a href="privacy.html">Datenschutz · Privacy</a></footer>
+<footer>Arcade &mdash; Made for fun. Built-in games are original creations inspired by popular concepts. · <a href="privacy.html">Datenschutz · Privacy</a></footer>
 <script>
 const GAMES=[
-{id:"park",name:"Theme Park Tycoon",emoji:"🎢",desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["creative"],tags:[],src:"pb/park.html"},
-{id:"geometrydash",name:"Geometry Dash",emoji:"🟧",desc:"Rhythm auto-runner — jump spikes and gaps to the beat",cats:["action"],tags:[],go:"geometrydash.html"},
-{id:"drive-mad",name:"Road Rage",emoji:"🚗",desc:"3D stunt driving — 16 levels of see-saws, hammers and crushers",cats:["action","driving"],tags:[],src:"pb/drive-mad.html"},
-{id:"chill-drive",name:"Chill Drive",emoji:"🛣️",desc:"True 3D cruising — 3 endless worlds + 20 levels",cats:["driving"],tags:[],src:"pb/chill-drive.html"},
-{id:"cookie-clicker",name:"Cookie Craze",emoji:"🍪",desc:"Cookie Clicker-style idle game",cats:[],tags:[],src:"pb/cookie-clicker.html"},
-{id:"crossy-road",name:"Cross Rush",emoji:"🐔",desc:"20 levels + endless — dodge cars, trains and rivers",cats:["action"],tags:[],src:"pb/crossy-road.html"},
-{id:"burger",name:"Burger Rush",emoji:"🍔",desc:"Cooking Fever-style burger restaurant — cook, serve, upgrade",cats:[],tags:[],src:"pb/burger.html"},
-{id:"towerdefense",name:"Tower Defense",emoji:"🏰",desc:"Build towers, command a hero, survive 15 levels of waves",cats:["action"],tags:[],src:"pb/towerdefense.html"},
-{id:"idle-empire",name:"Idle Empire",emoji:"💰",desc:"Business tycoon idle game — managers, milestones, prestige",cats:[],tags:[],src:"pb/idle-empire.html"},
-{id:"tictactoe",name:"Tic Tac Toe",emoji:"❌",desc:"Classic X and O with AI",cats:["puzzle","2player"],tags:["mp"],src:"pb/tictactoe.html"},
-{id:"pong",name:"Neon Pong",emoji:"🏓",desc:"Neon pong — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/pong.html"},
-{id:"o-connect4",name:"Connect 4",emoji:"🔴",desc:"Drop discs, connect four — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"connect4.html",ai:true},
-{id:"o-tictactoe",name:"Tic-Tac-Toe",emoji:"❌",desc:"Three in a row — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"tictactoe.html",ai:true},
-{id:"tank-wars",name:"Tank Wars",emoji:"💥",desc:"Tank battles — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/tank-wars.html"},
-{id:"fighters",name:"Pixel Fighters",emoji:"🥊",desc:"Platform fighting — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/fighters.html"},
-{id:"o-battleship",name:"Battleship",emoji:"🚢",desc:"Sink the fleet — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"battleship.html",ai:true},
-{id:"o-reversi",name:"Reversi",emoji:"⚪",desc:"Flip the board — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"reversi.html",ai:true},
-{id:"o-dots",name:"Dots & Boxes",emoji:"🟦",desc:"Claim the boxes — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"dots.html",ai:true},
-{id:"o-color",name:"Colour Dial",emoji:"🎨",desc:"Guess the colour together — online or vs AI",cats:["online"],tags:["mp"],href:"color.html",ai:true},
-{id:"o-draw",name:"Molerei",emoji:"✏️",desc:"Draw & guess with a friend — online on two iPads",cats:["online","creative"],tags:["mp"],href:"draw.html"},
-{id:"o-intro",name:"Intro",emoji:"🎵",desc:"Guess the song from 1 second — then 3, then 5…",cats:["online"],tags:["mp"],href:"intro.html"},
-{id:"o-meme",name:"Meme Party",emoji:"😂",desc:"Caption the same meme, vote for the funniest — 3+ players",cats:["online","creative"],tags:["mp"],href:"meme.html"},
-{id:"o-checkers",name:"Checkers",emoji:"🟠",desc:"Jump, chain captures, crown kings — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"checkers.html",ai:true},
-{id:"o-maumau",name:"Mau-Mau",emoji:"🃏",desc:"Card battle — match suit or rank, 7 = +2, J wishes — online or vs AI",cats:["online"],tags:["mp"],href:"maumau.html",ai:true},
-{id:"o-dice-duel",name:"Kniffel",emoji:"🎲",desc:"Kniffel/Yahtzee dice game — roll, hold, score — online or vs AI",cats:["online"],tags:["mp"],href:"dice-duel.html",ai:true},
-{id:"o-slf",name:"Stadt-Land-Fluss",emoji:"🔤",desc:"Categories quiz — 2+ players join the same code",cats:["online"],tags:["mp"],href:"slf.html"},
-{id:"air-hockey",name:"Air Hockey",emoji:"🥅",desc:"Air hockey — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/air-hockey.html"},
-{id:"flappy",name:"Flappy Pixel",emoji:"🐤",desc:"Tap to fly through pipes",cats:["action"],tags:[],src:"pb/flappy.html"},
-{id:"typing",name:"Type Racer",emoji:"⌨️",desc:"Typing speed test",cats:[],tags:[],src:"pb/typing.html"},
-{id:"doodle-jump",name:"Sky Hop",emoji:"🐸",desc:"Doodle Jump-style platformer",cats:["action"],tags:[],src:"pb/doodle-jump.html"},
-{id:"color-clash",name:"Color Clash",emoji:"🎨",desc:"Fast color word matching",cats:["puzzle"],tags:[],src:"pb/color-clash.html"},
-{id:"whack-a-mole",name:"Whack-a-Mole",emoji:"🐹",desc:"Whack moles for points!",cats:[],tags:[],src:"pb/whack-a-mole.html"},
-{id:"run-3",name:"Space Sprint",emoji:"🚀",desc:"Run 3-style space tunnel runner",cats:["action"],tags:[],src:"pb/run-3.html"},
-{id:"tetris",name:"Block Drop",emoji:"🧱",desc:"Tetris-style block puzzle",cats:["puzzle"],tags:[],src:"pb/tetris.html"},
-{id:"2048",name:"2048",emoji:"🔢",desc:"Slide and merge numbers",cats:["puzzle"],tags:[],src:"pb/2048.html"},
-{id:"snake",name:"Neon Snake",emoji:"🐍",desc:"Classic snake with neon style",cats:["action"],tags:[],src:"pb/snake.html"},
-{id:"bubble-shooter",name:"Bubble Pop",emoji:"🫧",desc:"Shoot and match bubbles",cats:["puzzle"],tags:[],src:"pb/bubble-shooter.html"},
-{id:"space-invaders",name:"Star Blaster",emoji:"👾",desc:"Space Invaders-style shooter",cats:["action"],tags:[],src:"pb/space-invaders.html"},
-{id:"breakout",name:"Brick Blitz",emoji:"🧱",desc:"Breakout brick breaker",cats:["action"],tags:[],src:"pb/breakout.html"},
-{id:"asteroids",name:"Asteroid Storm",emoji:"☄️",desc:"Asteroids-style space shooter",cats:["action"],tags:[],src:"pb/asteroids.html"},
-{id:"minesweeper",name:"Mine Sweep",emoji:"💣",desc:"Classic minesweeper",cats:["puzzle"],tags:[],src:"pb/minesweeper.html"},
-{id:"memory",name:"Memory Match",emoji:"🃏",desc:"Card matching memory game",cats:["puzzle"],tags:[],src:"pb/memory.html"},
-{id:"maze",name:"Maze Runner",emoji:"🏁",desc:"Procedural maze escape",cats:["puzzle"],tags:[],src:"pb/maze.html"},
-{id:"gravity-ball",name:"Gravity Ball",emoji:"🔮",desc:"Change gravity to reach the goal",cats:["puzzle"],tags:[],src:"pb/gravity-ball.html"},
-{id:"tower-stack",name:"Tower Stack",emoji:"🏗️",desc:"Stack blocks as high as you can",cats:[],tags:[],src:"pb/tower-stack.html"},
-{id:"fruit-slash",name:"Fruit Slash",emoji:"🍉",desc:"Slice fruit, avoid bombs",cats:["action"],tags:[],src:"pb/fruit-slash.html"},
-{id:"reaction",name:"Reaction Test",emoji:"⚡",desc:"Test your reaction speed",cats:[],tags:[],src:"pb/reaction.html"},
-{id:"word-scramble",name:"Word Scramble",emoji:"📝",desc:"Unscramble words fast",cats:["puzzle"],tags:[],src:"pb/word-scramble.html"},
-{id:"pixel-painter",name:"Pixel Painter",emoji:"🖌️",desc:"Draw pixel art creations",cats:["creative"],tags:[],src:"pb/pixel-painter.html"},
-{id:"o-wordle",name:"Wuertspill",emoji:"🟩",desc:"Daily Lëtzebuergesch Wordle",cats:["puzzle"],tags:[],go:"wordle.html"}
+{id:"park",name:"Theme Park Tycoon",emoji:"🎢",thumb:"pb/thumbs/park.webp",desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["creative"],tags:[],src:"pb/park.html"},
+{id:"geometrydash",name:"Rhythm Jumper",emoji:"🟧",thumb:"pb/thumbs/geometrydash.webp",desc:"Rhythm auto-runner — jump spikes and gaps to the beat",cats:["action"],tags:[],go:"geometrydash.html"},
+{id:"drive-mad",name:"Stunt Driver",emoji:"🚗",thumb:"pb/thumbs/drive-mad.webp",featured:true,desc:"3D stunt driving — 16 levels of see-saws, hammers and crushers",cats:["action","driving"],tags:[],src:"pb/drive-mad.html"},
+{id:"chill-drive",name:"3D Cruiser",emoji:"🛣️",thumb:"pb/thumbs/chill-drive.webp",featured:true,desc:"True 3D cruising — 3 endless worlds + 20 levels",cats:["driving"],tags:[],src:"pb/chill-drive.html"},
+{id:"cookie-clicker",name:"Cookie Clicker",emoji:"🍪",thumb:"pb/thumbs/cookie-clicker.webp",desc:"Build a cookie empire by clicking and buying upgrades",cats:[],tags:[],src:"pb/cookie-clicker.html"},
+{id:"crossy-road",name:"Road Crossing",emoji:"🐔",thumb:"pb/thumbs/crossy-road.webp",desc:"20 levels + endless — dodge cars, trains and rivers",cats:["action"],tags:[],src:"pb/crossy-road.html"},
+{id:"burger",name:"Burger Restaurant",emoji:"🍔",thumb:"pb/thumbs/burger.webp",desc:"Cook, serve and upgrade your burger restaurant",cats:[],tags:[],src:"pb/burger.html"},
+{id:"towerdefense",name:"Tower Defense",emoji:"🏰",thumb:"pb/thumbs/towerdefense.webp",desc:"Build towers, command a hero, survive 15 levels of waves",cats:["action"],tags:[],src:"pb/towerdefense.html"},
+{id:"idle-empire",name:"Business Empire",emoji:"💰",thumb:"pb/thumbs/idle-empire.webp",desc:"Business tycoon idle game — managers, milestones, prestige",cats:[],tags:[],src:"pb/idle-empire.html"},
+{id:"tictactoe",name:"Tic-Tac-Toe",emoji:"❌",thumb:"pb/thumbs/tictactoe.webp",noScore:true,desc:"Classic X and O with AI",cats:["puzzle","2player"],tags:["mp"],src:"pb/tictactoe.html"},
+{id:"pong",name:"Pong",emoji:"🏓",thumb:"pb/thumbs/pong.webp",desc:"Neon pong — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/pong.html"},
+{id:"o-connect4",name:"Connect 4",emoji:"🔴",thumb:"pb/thumbs/o-connect4.webp",featured:true,noScore:true,desc:"Drop discs, connect four — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"connect4.html",ai:true},
+{id:"o-tictactoe",name:"Tic-Tac-Toe Online",emoji:"❌",thumb:"pb/thumbs/o-tictactoe.webp",featured:true,noScore:true,desc:"Three in a row — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"tictactoe.html",ai:true},
+{id:"tank-wars",name:"Tank Battles",emoji:"💥",thumb:"pb/thumbs/tank-wars.webp",desc:"Tank battles — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/tank-wars.html"},
+{id:"fighters",name:"Platform Fighters",emoji:"🥊",thumb:"pb/thumbs/fighters.webp",desc:"Platform fighting — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/fighters.html"},
+{id:"o-battleship",name:"Battleship",emoji:"🚢",thumb:"pb/thumbs/o-battleship.webp",featured:true,noScore:true,desc:"Sink the fleet — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"battleship.html",ai:true},
+{id:"o-reversi",name:"Reversi",emoji:"⚪",thumb:"pb/thumbs/o-reversi.webp",noScore:true,desc:"Flip the board — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"reversi.html",ai:true},
+{id:"o-dots",name:"Dots & Boxes",emoji:"🟦",thumb:"pb/thumbs/o-dots.webp",featured:true,noScore:true,desc:"Claim the boxes — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"dots.html",ai:true},
+{id:"o-color",name:"Colour Guess",emoji:"🎨",thumb:"pb/thumbs/o-color.webp",featured:true,noScore:true,desc:"Guess the colour together — online or vs AI",cats:["online"],tags:["mp"],href:"color.html",ai:true},
+{id:"o-draw",name:"Draw & Guess",emoji:"✏️",thumb:"pb/thumbs/o-draw.webp",featured:true,noScore:true,desc:"Draw and guess with a friend — online on two iPads",cats:["online","creative"],tags:["mp"],href:"draw.html"},
+{id:"o-intro",name:"Guess the Song",emoji:"🎵",thumb:"pb/thumbs/o-intro.webp",noScore:true,desc:"Guess the song from 1 second — then 3, then 5…",cats:["online"],tags:["mp"],href:"intro.html"},
+{id:"o-meme",name:"Meme Caption Party",emoji:"😂",thumb:"pb/thumbs/o-meme.webp",featured:true,noScore:true,desc:"Caption the same meme, vote for the funniest — 3+ players",cats:["online","creative"],tags:["mp"],href:"meme.html"},
+{id:"o-checkers",name:"Checkers",emoji:"🟠",thumb:"pb/thumbs/o-checkers.webp",noScore:true,desc:"Jump, chain captures, crown kings — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"checkers.html",ai:true},
+{id:"o-maumau",name:"Mau-Mau Cards",emoji:"🃏",thumb:"pb/thumbs/o-maumau.webp",noScore:true,desc:"Card battle — match suit or rank, 7 = +2, J wishes — online or vs AI",cats:["online"],tags:["mp"],href:"maumau.html",ai:true},
+{id:"o-dice-duel",name:"Yahtzee Dice",emoji:"🎲",thumb:"pb/thumbs/o-dice-duel.webp",noScore:true,desc:"Roll, hold and score — online or vs AI",cats:["online"],tags:["mp"],href:"dice-duel.html",ai:true},
+{id:"o-slf",name:"Categories Race",emoji:"🔤",thumb:"pb/thumbs/o-slf.webp",featured:true,noScore:true,desc:"Categories quiz — 2+ players join the same code",cats:["online"],tags:["mp"],href:"slf.html"},
+{id:"air-hockey",name:"Air Hockey",emoji:"🥅",thumb:"pb/thumbs/air-hockey.webp",desc:"Air hockey — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/air-hockey.html"},
+{id:"flappy",name:"Flappy Bird",emoji:"🐤",thumb:"pb/thumbs/flappy.webp",featured:true,desc:"Tap to fly through pipes",cats:["action"],tags:[],src:"pb/flappy.html"},
+{id:"typing",name:"Typing Speed",emoji:"⌨️",thumb:"pb/thumbs/typing.webp",desc:"Test how many words you can type per minute",cats:[],tags:[],src:"pb/typing.html"},
+{id:"doodle-jump",name:"Platform Jumper",emoji:"🐸",thumb:"pb/thumbs/doodle-jump.webp",desc:"Jump upward from platform to platform",cats:["action"],tags:[],src:"pb/doodle-jump.html"},
+{id:"color-clash",name:"Colour Word Match",emoji:"🎨",thumb:"pb/thumbs/color-clash.webp",desc:"Match colour words against the clock",cats:["puzzle"],tags:[],src:"pb/color-clash.html"},
+{id:"whack-a-mole",name:"Whack-a-Mole",emoji:"🐹",thumb:"pb/thumbs/whack-a-mole.webp",desc:"Whack moles for points!",cats:[],tags:[],src:"pb/whack-a-mole.html"},
+{id:"run-3",name:"Space Tunnel Runner",emoji:"🚀",thumb:"pb/thumbs/run-3.webp",desc:"Run through a rotating space tunnel",cats:["action"],tags:[],src:"pb/run-3.html"},
+{id:"tetris",name:"Falling Blocks",emoji:"🧱",thumb:"pb/thumbs/tetris.webp",featured:true,desc:"Clear lines in a falling-block puzzle",cats:["puzzle"],tags:[],src:"pb/tetris.html"},
+{id:"2048",name:"2048",emoji:"🔢",thumb:"pb/thumbs/2048.webp",desc:"Slide and merge numbers",cats:["puzzle"],tags:[],src:"pb/2048.html"},
+{id:"snake",name:"Snake",emoji:"🐍",thumb:"pb/thumbs/snake.webp",desc:"Eat food and grow without hitting the walls",cats:["action"],tags:[],src:"pb/snake.html"},
+{id:"bubble-shooter",name:"Bubble Shooter",emoji:"🫧",thumb:"pb/thumbs/bubble-shooter.webp",desc:"Shoot and match bubbles",cats:["puzzle"],tags:[],src:"pb/bubble-shooter.html"},
+{id:"space-invaders",name:"Space Invaders",emoji:"👾",thumb:"pb/thumbs/space-invaders.webp",desc:"Defend Earth from descending alien waves",cats:["action"],tags:[],src:"pb/space-invaders.html"},
+{id:"breakout",name:"Brick Breaker",emoji:"🧱",thumb:"pb/thumbs/breakout.webp",desc:"Bounce the ball to break every brick",cats:["action"],tags:[],src:"pb/breakout.html"},
+{id:"asteroids",name:"Asteroids",emoji:"☄️",thumb:"pb/thumbs/asteroids.webp",desc:"Pilot a ship and blast incoming asteroids",cats:["action"],tags:[],src:"pb/asteroids.html"},
+{id:"minesweeper",name:"Minesweeper",emoji:"💣",thumb:"pb/thumbs/minesweeper.webp",lowerIsBetter:true,desc:"Clear the minefield as quickly as possible",cats:["puzzle"],tags:[],src:"pb/minesweeper.html"},
+{id:"memory",name:"Memory Match",emoji:"🃏",thumb:"pb/thumbs/memory.webp",lowerIsBetter:true,desc:"Match every pair in as few moves as possible",cats:["puzzle"],tags:[],src:"pb/memory.html"},
+{id:"maze",name:"Maze Escape",emoji:"🏁",thumb:"pb/thumbs/maze.webp",lowerIsBetter:true,desc:"Escape each procedural maze against the clock",cats:["puzzle"],tags:[],src:"pb/maze.html"},
+{id:"gravity-ball",name:"Gravity Switch",emoji:"🔮",thumb:"pb/thumbs/gravity-ball.webp",desc:"Change gravity to guide the ball to each goal",cats:["puzzle"],tags:[],src:"pb/gravity-ball.html"},
+{id:"tower-stack",name:"Tower Stacking",emoji:"🏗️",thumb:"pb/thumbs/tower-stack.webp",desc:"Stack blocks as high as you can",cats:[],tags:[],src:"pb/tower-stack.html"},
+{id:"fruit-slash",name:"Fruit Slicer",emoji:"🍉",thumb:"pb/thumbs/fruit-slash.webp",desc:"Slice fruit and avoid bombs",cats:["action"],tags:[],src:"pb/fruit-slash.html"},
+{id:"reaction",name:"Reaction Time",emoji:"⚡",thumb:"pb/thumbs/reaction.webp",lowerIsBetter:true,desc:"Measure your fastest reaction in milliseconds",cats:[],tags:[],src:"pb/reaction.html"},
+{id:"word-scramble",name:"Word Unscramble",emoji:"📝",thumb:"pb/thumbs/word-scramble.webp",desc:"Unscramble words before time runs out",cats:["puzzle"],tags:[],src:"pb/word-scramble.html"},
+{id:"pixel-painter",name:"Pixel Art Painter",emoji:"🖌️",thumb:"pb/thumbs/pixel-painter.webp",noScore:true,desc:"Draw pixel art creations",cats:["creative"],tags:[],src:"pb/pixel-painter.html"},
+{id:"o-wordle",name:"Luxembourgish Word Game",emoji:"🟩",thumb:"pb/thumbs/o-wordle.webp",noScore:true,desc:"Daily Lëtzebuergesch word puzzle",cats:["puzzle"],tags:[],go:"wordle.html"}
 ];
 
 const BIG_GAME_IDS=new Set(["park","towerdefense","burger","drive-mad","chill-drive","idle-empire","cookie-clicker","crossy-road"]);
@@ -303,13 +312,27 @@ var hue=hashStr(g.name)%360;
 var gIdx=GAMES.indexOf(g);
 var oc=g.src?'openGame('+gIdx+')':g.href?'openOnline('+gIdx+')':g.go?("location.href='"+g.go+"'"):("window.open('"+g.url+"','_blank')");
 var description=isBig?'<span class="game-desc">'+g.desc+'<\/span>':'';
+var preview='<img src="'+g.thumb+'" alt="" loading="lazy" decoding="async" onerror="this.classList.add(\'failed\')">';
 return '<button type="button" class="game-card'+(g.href?' online':'')+(isBig?' big':'')+'" onclick="'+oc+'" title="'+g.desc+'">'+ext+
-'<span class="game-thumb" style="background:radial-gradient(circle at 50% 38%,hsla('+hue+',70%,45%,0.32),transparent 72%),linear-gradient(135deg,hsl('+hue+',40%,17%),hsl('+(hue+40)+',35%,11%))"><span class="em">'+g.emoji+'<\/span><\/span>'+
+'<span class="game-thumb" style="background:radial-gradient(circle at 50% 38%,hsla('+hue+',70%,45%,0.32),transparent 72%),linear-gradient(135deg,hsl('+hue+',40%,17%),hsl('+(hue+40)+',35%,11%))"><span class="em">'+g.emoji+'<\/span>'+preview+'<\/span>'+
 '<span class="game-info"><span class="game-name">'+g.name+'<\/span>'+description+'<span class="game-tags">'+tagHTML+'<\/span><\/span><\/button>';
 }
 function renderSection(sectionId,gridId,games,isBig){
 document.getElementById(gridId).innerHTML=rankedCopy(games).map(function(game){return cardHTML(game,isBig)}).join('');
 document.getElementById(sectionId).style.display=games.length?'':'none';
+}
+function renderMore(games){
+var details=document.getElementById('moreGames');
+var groups=[
+{name:'Big games',games:games.filter(isBigGame),big:true},
+{name:'Play together',games:games.filter(function(game){return !isBigGame(game)&&isTogetherGame(game)}),big:false},
+{name:'Quick games',games:games.filter(function(game){return !isBigGame(game)&&!isTogetherGame(game)}),big:false}
+].filter(function(group){return group.games.length});
+document.getElementById('moreContent').innerHTML=groups.map(function(group){
+return '<section class="more-group"><h3>'+group.name+'<\/h3><div class="game-grid">'+rankedCopy(group.games).map(function(game){return cardHTML(game,false)}).join('')+'<\/div><\/section>';
+}).join('');
+document.getElementById('moreCount').textContent='('+games.length+')';
+details.style.display=games.length?'':'none';
 }
 function applyFilters(){
 var q=document.getElementById('search').value.trim().toLowerCase();
@@ -318,13 +341,17 @@ var matchesText=!q||game.name.toLowerCase().indexOf(q)>-1||game.desc.toLowerCase
 var matchesGenre=activeGenre==='all'||game.cats.indexOf(activeGenre)>-1;
 return matchesText&&matchesGenre;
 });
-var bigGames=visibleGames.filter(isBigGame);
-var togetherGames=visibleGames.filter(function(game){return !isBigGame(game)&&isTogetherGame(game)});
-var quickGames=visibleGames.filter(function(game){return !isBigGame(game)&&!isTogetherGame(game)});
+var featuredGames=visibleGames.filter(function(game){return game.featured});
+var moreGames=visibleGames.filter(function(game){return !game.featured});
+var bigGames=featuredGames.filter(isBigGame);
+var togetherGames=featuredGames.filter(function(game){return !isBigGame(game)&&isTogetherGame(game)});
+var quickGames=featuredGames.filter(function(game){return !isBigGame(game)&&!isTogetherGame(game)});
 renderSection('bigSec','gridBig',bigGames,true);
 renderSection('togetherSec','gridTogether',togetherGames,false);
 renderSection('quickSec','gridQuick',quickGames,false);
+renderMore(moreGames);
 var hasFilter=q||activeGenre!=='all';
+if(hasFilter&&moreGames.length)document.getElementById('moreGames').open=true;
 document.getElementById('count').textContent=visibleGames.length+(hasFilter?' of '+GAMES.length:'')+' games';
 }
 function setGenre(genre){
@@ -363,7 +390,7 @@ playCounts=validatePlayCounts(payload);
 applyFilters();
 }).catch(function(error){
 playCounts=EMPTY_PLAY_COUNTS;
-console.warn('[PixelBreak] Play ranking unavailable; using the authored order.',error);
+console.warn('[Arcade] Play ranking unavailable; using the authored order.',error);
 applyFilters();
 });
 }
@@ -377,11 +404,10 @@ var seq=++openSeq;
 // Each game gets its own URL (?g=<id>) so it can be reloaded, shared and
 // bookmarked; the back button returns to the hub.
 if(!fromHistory)history.pushState({g:g.id},'',location.pathname+'?g='+encodeURIComponent(g.id));
-document.title=g.name+' — PixelBreak';
+document.title=g.name+' — Arcade';
 if(_cnEl)_cnEl.href='https://ian.lu/pixelbreak.html?g='+encodeURIComponent(g.id);
-if(_mdEl)_mdEl.content=g.name+' — play free in your browser on PixelBreak. '+(g.desc||'');
+if(_mdEl)_mdEl.content=g.name+' — play free in your browser in Arcade. '+(g.desc||'');
 if(!fromHistory&&window.goatcounter&&goatcounter.count)goatcounter.count({path:'/pixelbreak.html?g='+g.id});
-document.getElementById('gt').textContent=g.name;
 var frame=document.getElementById('gf');
 // Give the game keyboard focus as soon as it loads, so arrow/space keys work on
 // iPad (and desktop) without having to tap the canvas first to "activate" it.
@@ -408,7 +434,7 @@ document.getElementById('overlay').classList.remove('open');
 document.body.classList.remove('game-open');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
-document.title='PixelBreak - Play Games';
+document.title='Arcade - Play Games';
 if(_cnEl)_cnEl.href=_cn0;
 if(_mdEl)_mdEl.content=_md0;
 if(!fromHistory&&/[?&]g=/.test(location.search))history.pushState(null,'',location.pathname);
@@ -461,6 +487,25 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
 // On-screen touch controls → synthetic key events into the open game (same-origin iframe).
 (function(){
   var CODE={'ArrowUp':'ArrowUp','ArrowDown':'ArrowDown','ArrowLeft':'ArrowLeft','ArrowRight':'ArrowRight',' ':'Space'};
+  var KEYBOARD_SESSION_KEY='pb_hardware_keyboard_at',KEYBOARD_IDLE_MS=10000;
+  var CONTROL_KEYS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D',' ','Enter']);
+  var lastKeyboardAt=0;
+  try{lastKeyboardAt=Number(sessionStorage.getItem(KEYBOARD_SESSION_KEY)||0)}catch(error){console.warn('[Arcade] Could not read keyboard session state.',error)}
+  function syncTouchControls(){
+    var tc=document.getElementById('tc');
+    if(tc)tc.classList.toggle('keyboard-hidden',lastKeyboardAt>0);
+  }
+  function rememberKeyboard(){
+    lastKeyboardAt=Date.now();
+    try{sessionStorage.setItem(KEYBOARD_SESSION_KEY,String(lastKeyboardAt))}catch(error){console.warn('[Arcade] Could not save keyboard session state.',error)}
+    syncTouchControls();
+  }
+  function rememberTouch(){
+    if(Date.now()-lastKeyboardAt<KEYBOARD_IDLE_MS)return;
+    lastKeyboardAt=0;
+    try{sessionStorage.removeItem(KEYBOARD_SESSION_KEY)}catch(error){console.warn('[Arcade] Could not clear keyboard session state.',error)}
+    syncTouchControls();
+  }
   function sendKey(type,key){
     var fr=document.getElementById('gf');
     var win=fr&&fr.contentWindow, doc=fr&&fr.contentDocument;
@@ -468,7 +513,7 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
     try{
       var KE=win.KeyboardEvent||window.KeyboardEvent;
       doc.dispatchEvent(new KE(type,{key:key,code:CODE[key]||'',bubbles:true,cancelable:true}));
-    }catch(e){}
+    }catch(error){console.warn('[Arcade] Could not send an on-screen control event.',error)}
   }
   var tc=document.getElementById('tc');
   if(!tc)return;
@@ -481,54 +526,23 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
     b.addEventListener('pointercancel',release);
     b.addEventListener('pointerleave',release);
   });
+  window.addEventListener('keydown',function(event){if(event.isTrusted&&CONTROL_KEYS.has(event.key))rememberKeyboard()},{capture:true});
+  window.addEventListener('message',function(event){
+    var frame=document.getElementById('gf');
+    if(!frame||event.source!==frame.contentWindow)return;
+    if(event.data&&event.data.__pbKeyboard===1)rememberKeyboard();
+    if(event.data&&event.data.__pbTouch===1)rememberTouch();
+  });
+  syncTouchControls();
 })();
 
 applyFilters();
 loadPlayCounts();
 </script>
-<!-- feedback box: suggest a game / report a bug -->
-<button id="fbFab" title="Feedback" style="position:fixed;bottom:18px;left:18px;z-index:900;width:48px;height:48px;border-radius:50%;border:1px solid var(--accent2);background:var(--card);color:var(--accent2-text);font-size:22px;cursor:pointer">💬</button>
-<div id="fbPanel" style="display:none;position:fixed;bottom:76px;left:18px;z-index:901;width:290px;max-width:calc(100vw - 36px);background:var(--glass-solid);border:1px solid var(--accent2);border-radius:14px;padding:14px;font-family:'Nunito',sans-serif">
-  <div style="font-weight:700;margin-bottom:8px">Feedback</div>
-  <select id="fbKind" style="width:100%;margin-bottom:8px;padding:8px;border-radius:8px;border:1px solid var(--card-hover);background:var(--bg);color:var(--text);font-family:inherit">
-    <option value="idea">💡 Suggest a game</option>
-    <option value="bug">🐛 Report a bug</option>
-    <option value="other">💬 Something else</option>
-  </select>
-  <textarea id="fbMsg" rows="3" maxlength="2000" placeholder="Tell me…" style="width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid var(--card-hover);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical"></textarea>
-  <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-    <button id="fbSend" style="flex:1;padding:9px;border-radius:8px;border:none;background:var(--accent2);color:var(--accent2-foreground);font-weight:800;cursor:pointer;font-family:inherit">Send</button>
-    <span id="fbNote" style="font-size:12px;color:var(--text2)"></span>
-  </div>
-</div>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="pixelbreak-records.js?v=18"></script>
-<script type="module">
-/* ---------- feedback box ---------- */
-import * as auth from "./auth.js?v=18";
-const fab=document.getElementById('fbFab'),panel=document.getElementById('fbPanel');
-fab.onclick=()=>{panel.style.display=panel.style.display==='none'?'':'none';};
-document.getElementById('fbSend').onclick=async()=>{
-  const msg=document.getElementById('fbMsg').value.trim();
-  const note=document.getElementById('fbNote');
-  if(msg.length<3){note.textContent='Too short';return;}
-  note.textContent='…';
-  try{
-    const sb=await auth.client();
-    const {error}=await sb.from('feedback').insert({
-      kind:document.getElementById('fbKind').value,
-      message:msg.slice(0,2000),
-      page:new URLSearchParams(location.search).get('g')||'pixelbreak',
-      username:auth.session()?auth.username():null,
-    });
-    if(error)throw error;
-    document.getElementById('fbMsg').value='';
-    note.textContent='Thanks! 🎉';
-    setTimeout(()=>{panel.style.display='none';note.textContent='';},1500);
-  }catch(e){console.warn('[feedback]',e);note.textContent='Failed — try again';}
-};
-</script>
+<script src="pb/arcade-kit.js?v=1"></script>
+<script type="module" src="pixelbreak-records.js?v=19"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){
@@ -553,7 +567,7 @@ document.getElementById('fbSend').onclick=async()=>{
   };
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=14"></script>
-  <script type="module" src="class-gate.js?v=15"></script>
+  <script type="module" src="rtc-ring.js?v=15"></script>
+  <script type="module" src="class-gate.js?v=16"></script>
 </body>
 </html>

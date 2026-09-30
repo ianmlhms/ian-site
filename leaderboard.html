@@ -19,7 +19,7 @@
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=23"></script>
+<script src="theme.js?v=24"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
@@ -49,7 +49,7 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="pixelbreak.html">‹ Games</a>
+  <a class="home" href="pixelbreak.html">‹ Arcade</a>
   <h1>🏆 Leaderboard</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
@@ -59,13 +59,13 @@
     <button data-g="" class="on">All games</button>
     <button data-g="connect4">🔴 Connect 4</button>
     <button data-g="battleship">🚢 Battleship</button>
-    <button data-g="color">🎨 Colour Dial</button>
+    <button data-g="color">🎨 Colour Guess</button>
     <button data-g="reversi">⚫ Reversi</button>
     <button data-g="dots">▦ Dots &amp; Boxes</button>
     <button data-g="tictactoe">✕ Tic-Tac-Toe</button>
     <button data-g="checkers">🟠 Checkers</button>
-    <button data-g="maumau">🃏 Mau-Mau</button>
-    <button data-g="diceduel">🎲 Kniffel</button>
+    <button data-g="maumau">🃏 Mau-Mau Cards</button>
+    <button data-g="diceduel">🎲 Yahtzee Dice</button>
   </div>
   <div class="tabs" id="periods" style="margin-top:8px">
     <button data-p="all" class="on">All-time</button>
@@ -77,9 +77,9 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=14"></script>
+<script type="module" src="notify-ambient.js?v=15"></script>
 <script type="module">
-import * as auth from "./auth.js?v=18";
+import * as auth from "./auth.js?v=19";
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 let sb=null, game="", period="all";
@@ -102,7 +102,7 @@ async function draw(){
 document.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>{ game=b.dataset.g; document.querySelectorAll("[data-g]").forEach(x=>x.classList.toggle("on",x===b)); draw(); });
 document.querySelectorAll("[data-p]").forEach(b=> b.onclick=()=>{ period=b.dataset.p; document.querySelectorAll("[data-p]").forEach(x=>x.classList.toggle("on",x===b)); draw(); });
 </script>
-  <script type="module" src="rtc-ring.js?v=14"></script>
-  <script type="module" src="class-gate.js?v=15"></script>
+  <script type="module" src="rtc-ring.js?v=15"></script>
+  <script type="module" src="class-gate.js?v=16"></script>
 </body>
 </html>

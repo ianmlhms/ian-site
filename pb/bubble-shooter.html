@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bubble Pop - PixelBreak</title>
+<title>Bubble Shooter - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a1a2a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(100,200,255,0.2)}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="bubble-shooter" data-arcade-title="Bubble Shooter"></script>
 </head>
 <body>
 <canvas id="c" width="480" height="600"></canvas>
@@ -132,7 +133,7 @@ function draw(){
       grid[s.row][s.col]=flying.color;
       let cluster=findCluster(s.row,s.col,flying.color);
       if(cluster.length>=3){for(let c of cluster)grid[c.row][c.col]=null;score+=cluster.length*10;
-        let floats=removeFloating();score+=floats*15}
+        let floats=removeFloating();score+=floats*15;Arcade.score(score)}
       flying=null;
     }
     // Check collision with grid
@@ -148,7 +149,7 @@ function draw(){
             grid[s.row][s.col]=flying.color;
             let cluster=findCluster(s.row,s.col,flying.color);
             if(cluster.length>=3){for(let cl of cluster)grid[cl.row][cl.col]=null;score+=cluster.length*10;
-              let floats=removeFloating();score+=floats*15}
+              let floats=removeFloating();score+=floats*15;Arcade.score(score)}
             flying=null;break;
           }
         }if(!flying)break;

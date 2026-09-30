@@ -24,6 +24,7 @@ let noticeTimer = 0;
 let resultShown = false;
 
 window.score = progress.kills;
+window.Arcade?.score(window.score);
 
 const view = new BattlefieldView($("battlefield"), {
   onTower: selectTower,
@@ -47,6 +48,7 @@ function applyIncomingSave(save) {
   if (!isStrictlyMoreProgress(save, progress)) return;
   progress = cleanProgress(save);
   window.score = progress.kills;
+  window.Arcade?.score(window.score);
   renderLevels();
   renderMeta();
   updateUi();
@@ -84,6 +86,7 @@ function consumeKills(nextGame) {
   countedRunKills += difference;
   progress = { ...progress, kills: progress.kills + difference };
   window.score = progress.kills;
+  window.Arcade?.score(window.score);
 }
 
 function updateGame(dt) {
@@ -100,6 +103,7 @@ function finishLevel() {
   const stars = starsForLives(game.lives, game.maxLives);
   progress = completeLevel(progress, game.level, stars, 0);
   window.score = progress.kills;
+  window.Arcade?.score(window.score);
   pushSave();
   renderLevels();
   renderMeta();
@@ -108,6 +112,7 @@ function finishLevel() {
 
 function showResult(won, stars) {
   resultShown = true;
+  window.Arcade?.gameOver(progress.kills);
   $("overlayTitle").textContent = won ? "Realm secured" : "Defenses breached";
   $("overlayText").textContent = won
     ? `${"★".repeat(stars)}${"☆".repeat(3 - stars)} · ${game.lives} lives remain · ${progress.kills} lifetime defeats`

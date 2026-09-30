@@ -1,77 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Tic Tac Toe - PixelBreak</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
-#mode{margin-bottom:20px;display:flex;gap:10px}
-#mode button{padding:8px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;background:#2a2a4a;color:#fff;font-size:14px}
-#mode button.active{background:#ff6b9d}
-#board{display:grid;grid-template-columns:repeat(3,100px);gap:8px}
-.cell{width:100px;height:100px;background:#1a1a2e;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px;cursor:pointer;transition:all 0.2s;border:2px solid #2a2a4a}
-.cell:hover{background:#2a2a4a;border-color:#4a4a6a}
-.cell.x{color:#ff6b9d;text-shadow:0 0 15px rgba(255,107,157,0.5)}
-.cell.o{color:#4de8ff;text-shadow:0 0 15px rgba(77,232,255,0.5)}
-.cell.win{border-color:#ffcc00;box-shadow:0 0 20px rgba(255,204,0,0.3)}
-#msg{margin-top:20px;font-size:22px;min-height:35px}
-#score{margin-top:10px;font-size:16px;color:#888}
-</style>
-</head>
-<body>
-<div id="mode">
-<button class="active" onclick="setMode('ai')">vs AI</button>
-<button onclick="setMode('2p')">2 Player</button>
-</div>
-<div id="board"></div>
-<div id="msg">X's turn</div>
-<div id="score">X: 0 | O: 0 | Draw: 0</div>
-<script>
-let board,turn,over,mode='ai',scores={X:0,O:0,D:0};
-const WINS=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-function setMode(m){mode=m;document.querySelectorAll('#mode button').forEach((b,i)=>b.classList.toggle('active',i===(m==='ai'?0:1)));reset()}
-function reset(){board=Array(9).fill('');turn='X';over=false;document.getElementById('msg').textContent="X's turn";render()}
-function checkWin(b,p){for(let w of WINS)if(w.every(i=>b[i]===p))return w;return null}
-function minimax(b,isMax,depth){
-  let wX=checkWin(b,'X'),wO=checkWin(b,'O');
-  if(wO)return 10-depth;if(wX)return depth-10;if(b.every(c=>c))return 0;
-  let best=isMax?-Infinity:Infinity;
-  for(let i=0;i<9;i++){if(b[i])continue;b[i]=isMax?'O':'X';
-    let s=minimax(b,!isMax,depth+1);b[i]='';best=isMax?Math.max(best,s):Math.min(best,s)}
-  return best;
-}
-function aiMove(){
-  let best=-Infinity,move=0;
-  for(let i=0;i<9;i++){if(board[i])continue;board[i]='O';let s=minimax(board,false,0);board[i]='';
-    if(s>best){best=s;move=i}}
-  board[move]='O';
-}
-function play(i){
-  if(board[i]||over)return;
-  board[i]=turn;
-  let w=checkWin(board,turn);
-  if(w){over=true;document.getElementById('msg').textContent=turn+' wins! (click to play again)';
-    scores[turn]++;render(w);return}
-  if(board.every(c=>c)){over=true;scores.D++;document.getElementById('msg').textContent='Draw! (click to play again)';render();return}
-  turn=turn==='X'?'O':'X';
-  if(mode==='ai'&&turn==='O'&&!over){aiMove();
-    let w2=checkWin(board,'O');
-    if(w2){over=true;scores.O++;document.getElementById('msg').textContent='O wins! (click to play again)';render(w2);return}
-    if(board.every(c=>c)){over=true;scores.D++;document.getElementById('msg').textContent='Draw! (click to play again)';render();return}
-    turn='X';
-  }
-  document.getElementById('msg').textContent=turn+"'s turn";render();
-}
-function render(winCells){
-  let h='';for(let i=0;i<9;i++){
-    let cls='cell';if(board[i])cls+=' '+board[i].toLowerCase();
-    if(winCells&&winCells.includes(i))cls+=' win';
-    h+=`<div class="${cls}" onclick="${over?'reset()':'play('+i+')'}">${board[i]}</div>`}
-  document.getElementById('board').innerHTML=h;
-  document.getElementById('score').textContent=`X: ${scores.X} | O: ${scores.O} | Draw: ${scores.D}`;
-}
-reset();
-</script>
-</body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>Tic-tac-toe</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#f8f9fa;color:#3c4043}body{display:grid;place-items:center;padding:6px}.card{width:min(94vw,520px);height:min(calc(100dvh - 12px),580px);padding:clamp(8px,3vh,24px) clamp(12px,5vw,26px);background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 2px 8px #3c404315;display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto;gap:clamp(5px,1.8vh,16px);overflow:hidden}.top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}.title{font-size:clamp(17px,6vw,24px);font-weight:500;white-space:nowrap}.selector{position:relative;min-width:0}select{appearance:none;border:0;border-bottom:2px solid #dadce0;background:#fff;max-width:100%;padding:8px 26px 7px 5px;color:#3c4043;font:500 clamp(11px,3.5vw,14px) inherit;outline:0}.selector:after{content:"▾";position:absolute;right:7px;top:8px;color:#777;pointer-events:none}.scorebar{margin:0 auto;display:flex;justify-content:center;align-items:center;gap:clamp(12px,6vw,25px)}.scorebox{text-align:center;min-width:clamp(48px,18vw,72px)}.mark{font-size:clamp(22px,7vw,30px);font-weight:700}.x{color:#4285f4}.o{color:#ea4335}.num{font-size:clamp(16px,5vw,20px)}.turn{text-align:center;font-size:clamp(12px,3.7vw,14px);color:#5f6368;min-height:18px;margin:0}.board{height:min(100%,390px);width:auto;max-width:100%;aspect-ratio:1;margin:auto;display:grid;grid-template-columns:repeat(3,1fr);position:relative}.cell{border:0;background:transparent;cursor:pointer;position:relative;padding:16%;touch-action:manipulation}.cell:nth-child(-n+6){border-bottom:5px solid #777}.cell:not(:nth-child(3n)){border-right:5px solid #777}.cell svg{width:100%;height:100%;overflow:visible}.cell path,.cell circle{fill:none;stroke-linecap:round;stroke-width:12;stroke-dasharray:190;stroke-dashoffset:190;animation:draw .28s ease-out forwards}.cell.x path{stroke:#4285f4}.cell.o circle{stroke:#ea4335;stroke-dasharray:250;stroke-dashoffset:250}@keyframes draw{to{stroke-dashoffset:0}}.win{position:absolute;height:6px;background:#fbbc04;border-radius:6px;transform-origin:left center;z-index:2;pointer-events:none;animation:grow .28s ease-out forwards}@keyframes grow{from{scale:0 1}}.actions{display:flex;justify-content:center;gap:10px;margin:0}button.action{border:0;border-radius:5px;padding:clamp(6px,1.8vh,10px) clamp(10px,4vw,18px);background:#f1f3f4;color:#3c4043;font-weight:600;cursor:pointer;white-space:nowrap}.primary{background:#4285f4!important;color:#fff!important}.message{position:fixed;inset:0;background:#ffffffee;display:none;place-items:center;z-index:3}.dialog{text-align:center}.dialog h2{font-size:34px;margin:0 0 8px;font-weight:500}.dialog p{color:#5f6368;margin:0 0 22px}@media(max-height:400px){body{padding:4px}.card{height:calc(100dvh - 8px);padding:6px 10px;gap:4px}.mark{font-size:20px}.scorebox{min-width:42px}.cell:nth-child(-n+6){border-bottom-width:3px}.cell:not(:nth-child(3n)){border-right-width:3px}.actions{gap:6px}button.action{padding:5px 8px;font-size:12px}}@media(prefers-reduced-motion:reduce){.cell path,.cell circle,.win{animation-duration:.01ms}}
+.cell.focus:after{content:"";position:absolute;inset:10%;border:2px solid #fbbc04;border-radius:8px;pointer-events:none}
+</style></head><body><main class="card"><div class="top"><div class="title">Tic-tac-toe</div><label class="selector"><select id="mode" aria-label="Game mode"><option value="easy">vs AI — Easy</option><option value="medium">vs AI — Medium</option><option value="hard">vs AI — Impossible</option><option value="friend">vs a friend</option></select></label></div><div class="scorebar"><div class="scorebox"><div class="mark x">X</div><div class="num" id="xs">0</div></div><div class="scorebox"><div style="color:#777;font-size:13px">DRAWS</div><div class="num" id="ds">0</div></div><div class="scorebox"><div class="mark o">O</div><div class="num" id="os">0</div></div></div><div class="turn" id="turn">Your turn — X</div><div class="board" id="board"></div><div class="actions"><button class="action" id="restart">Restart round</button><button class="action" id="reset">Reset score</button></div></main><div class="message" id="message"><div class="dialog"><h2 id="result">X wins</h2><p id="resultSub">Nice game.</p><button class="action primary" id="again">Play again</button></div></div><script src="/pb/arcade-kit.js?v=1" data-arcade-id="tictactoe" data-arcade-title="Tic-tac-toe" data-arcade-no-score></script><script>
+var score=0;
+(()=>{'use strict';const boardEl=document.querySelector('#board'),turnEl=document.querySelector('#turn'),modeEl=document.querySelector('#mode'),msg=document.querySelector('#message');let board=Array(9).fill(''),turn='X',done=false,thinking=false,cursor=4,tally={X:0,O:0,D:0},muted=false,audio=null;const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function tone(f,d=.08){if(muted)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),g=audio.createGain();o.frequency.value=f;g.gain.setValueAtTime(.05,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+d);o.connect(g).connect(audio.destination);o.start();o.stop(audio.currentTime+d)}catch(e){}}
+function cellSvg(v){return v==='X'?'<svg viewBox="0 0 100 100"><path d="M18 18L82 82M82 18L18 82"/></svg>':'<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="34"/></svg>'}
+function render(){boardEl.innerHTML='';board.forEach((v,i)=>{let b=document.createElement('button');b.className='cell '+(v?v.toLowerCase():'')+(i===cursor?' focus':'');b.setAttribute('aria-label',v?`Cell ${i+1}: ${v}`:`Cell ${i+1}: empty`);b.innerHTML=v?cellSvg(v):'';b.onclick=()=>{cursor=i;move(i)};boardEl.appendChild(b)});document.querySelector('#xs').textContent=tally.X;document.querySelector('#os').textContent=tally.O;document.querySelector('#ds').textContent=tally.D;turnEl.textContent=done?'Round over':modeEl.value==='friend'?`${turn}'s turn`:turn==='X'?'Your turn — X':'Thinking…'}
+function winner(b=board){for(const l of lines)if(b[l[0]]&&b[l[0]]===b[l[1]]&&b[l[0]]===b[l[2]])return {v:b[l[0]],line:l};return b.every(Boolean)?{v:'D'}:null}
+function move(i,ai=false){if(done||thinking||board[i]||(!ai&&modeEl.value!=='friend'&&turn==='O'))return;board[i]=turn;tone(turn==='X'?470:350);const w=winner();render();if(w){end(w);return}turn=turn==='X'?'O':'X';render();if(modeEl.value!=='friend'&&turn==='O'){thinking=true;setTimeout(()=>{thinking=false;const pick=choose();move(pick,true)},260)}}
+function choose(){const free=board.map((v,i)=>v?null:i).filter(v=>v!==null),m=modeEl.value;if(m==='easy')return free[Math.floor(Math.random()*free.length)];if(m==='medium'&&Math.random()<.38)return free[Math.floor(Math.random()*free.length)];let best=-Infinity,pick=free[0];for(const i of free){board[i]='O';let v=minimax(board,false,0);board[i]='';if(v>best){best=v;pick=i}}return pick}
+function minimax(b,max,depth){const w=winner(b);if(w)return w.v==='O'?10-depth:w.v==='X'?depth-10:0;let val=max?-Infinity:Infinity;for(let i=0;i<9;i++)if(!b[i]){b[i]=max?'O':'X';let n=minimax(b,!max,depth+1);b[i]='';val=max?Math.max(val,n):Math.min(val,n)}return val}
+function end(w){done=true;tally[w.v]++;if(w.line){drawWin(w.line);tone(w.v==='X'?720:190,.25)}else tone(260,.18);setTimeout(()=>{document.querySelector('#result').textContent=w.v==='D'?'Draw':`${w.v} wins`;document.querySelector('#resultSub').textContent=w.v==='D'?'Evenly matched.':modeEl.value==='friend'?'Good round.':w.v==='X'?'Nicely played!':'Try another round.';msg.style.display='grid'},500);render()}
+function drawWin(l){const cells=[...boardEl.children],a=cells[l[0]].getBoundingClientRect(),c=cells[l[2]].getBoundingClientRect(),p=boardEl.getBoundingClientRect(),x1=a.left+a.width/2-p.left,y1=a.top+a.height/2-p.top,x2=c.left+c.width/2-p.left,y2=c.top+c.height/2-p.top;let line=document.createElement('i');line.className='win';line.style.left=x1+'px';line.style.top=(y1-3)+'px';line.style.width=Math.hypot(x2-x1,y2-y1)+'px';line.style.transform=`rotate(${Math.atan2(y2-y1,x2-x1)}rad)`;boardEl.appendChild(line)}
+function restart(){board=Array(9).fill('');turn='X';done=false;thinking=false;cursor=4;msg.style.display='none';render()}document.querySelector('#restart').onclick=restart;document.querySelector('#again').onclick=restart;document.querySelector('#reset').onclick=()=>{tally={X:0,O:0,D:0};restart()};modeEl.onchange=()=>{tally={X:0,O:0,D:0};restart()};document.addEventListener('keydown',e=>{if(/^[1-9]$/.test(e.key)){cursor=+e.key-1;move(cursor);return}let x=cursor%3,y=Math.floor(cursor/3),handled=true;if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A')x=Math.max(0,x-1);else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D')x=Math.min(2,x+1);else if(e.key==='ArrowUp'||e.key==='w'||e.key==='W')y=Math.max(0,y-1);else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S')y=Math.min(2,y+1);else if(e.key===' '||e.key==='Enter'){if(done)restart();else move(cursor)}else handled=false;if(handled){cursor=y*3+x;render();e.preventDefault()}});addEventListener('message',e=>{if(e.data&&typeof e.data.__pbSndMute==='boolean')muted=e.data.__pbSndMute});render()})();
+</script></body></html>

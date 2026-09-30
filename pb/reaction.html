@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Reaction Test - PixelBreak</title>
+<title>Reaction Time - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden;cursor:pointer;user-select:none;transition:background 0.2s}
@@ -15,10 +15,11 @@ body.idle{background:#2244aa}
 #text p{font-size:20px;opacity:0.8}
 #times{margin-top:20px;font-size:16px;color:rgba(255,255,255,0.6)}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="reaction" data-arcade-title="Reaction Time" data-arcade-lower-is-better></script>
 </head>
 <body class="idle" onclick="handleClick()">
 <div id="text">
-<h1>⚡ Reaction Test</h1>
+<h1>⚡ Reaction Time</h1>
 <p>Click to start, then click when the screen turns GREEN!</p>
 <div id="times"></div>
 </div>
@@ -44,7 +45,7 @@ function handleClick(){
     state='idle';document.body.className='result';
     document.querySelector('h1').textContent=ms+'ms';
     let avg=Math.round(times.reduce((a,b)=>a+b)/times.length);
-    let best=Math.min(...times);
+    let best=Math.min(...times);Arcade.gameOver(ms);
     document.querySelector('p').textContent='Click to try again';
     document.getElementById('times').textContent=`Average: ${avg}ms · Best: ${best}ms · Attempts: ${times.length}`;
   }

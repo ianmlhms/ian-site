@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Tank Wars - PixelBreak</title>
+<title>Tank Battles - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
@@ -18,12 +18,13 @@ canvas{border-radius:12px;box-shadow:0 0 30px rgba(255,100,50,0.3);max-width:100
 #mStatus{min-height:24px;font-size:16px;color:#e8b07f;text-align:center}
 .hidden{display:none!important}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="tank-wars" data-arcade-title="Tank Battles"></script>
 </head>
 <body>
 <div id="info">🔴 P1: WASD + Space shoot · 🔵 P2: Arrows + Enter shoot</div>
 <canvas id="c" width="900" height="550"></canvas>
 <div id="menu">
-  <h1>TANK WARS</h1>
+  <h1>TANK BATTLES</h1>
   <button id="mLocal">👥 2 Players — one device</button>
   <button id="mAI">🤖 vs Computer</button>
   <button id="mHost">🌐 Host online game</button>
@@ -238,7 +239,7 @@ function loop(ts){
           if(Math.hypot(b.x-target.x,b.y-target.y)<20){
             target.hp--;addParticles(b.x,b.y,target.color,15);dead=true;
             if(target.hp<=0){b.owner.score++;addParticles(target.x,target.y,target.color,40);
-              if(mode==='ai'&&b.owner===p1)window.score=Math.max(window.score||0,p1.score);
+              if(mode==='ai'&&b.owner===p1){window.score=Math.max(window.score||0,p1.score);Arcade.gameOver(window.score)}
               resetPending=true;setTimeout(resetRoundNow,1000)}
           }
         }

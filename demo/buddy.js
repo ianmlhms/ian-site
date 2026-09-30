@@ -1,5 +1,5 @@
 import { BUDDY } from "./scripts.js?v=1";
-import { UI } from "./copy.js?v=1";
+import { UI } from "./copy.js?v=2";
 
 const QUESTION_PAUSE_MS = 1200;
 /* How long a finished answer stays up before the next turn replaces it. Long

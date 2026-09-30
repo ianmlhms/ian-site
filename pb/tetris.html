@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Block Drop - PixelBreak</title>
+<title>Falling Blocks - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
@@ -19,6 +19,7 @@ canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-r
 #c{max-height:100vh}
 @media(max-width:480px){body{height:auto;min-height:100vh;overflow:auto;padding:12px}#game{flex-direction:column;align-items:center;width:100%}#c{max-height:70vh}#side{width:100%}}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="tetris" data-arcade-title="Falling Blocks"></script>
 </head>
 <body>
 <div id="game">
@@ -53,7 +54,7 @@ function newPiece(){
   piece={shape:next||SHAPES[Math.floor(Math.random()*7)],x:3,y:0,rot:0};
   next=SHAPES[Math.floor(Math.random()*7)];
   let blocks=getBlocks(piece);
-  for(let b of blocks)if(grid[b.y]&&grid[b.y][b.x])gameOver=true;
+  for(let b of blocks)if(grid[b.y]&&grid[b.y][b.x]){gameOver=true;Arcade.gameOver(score)}
 }
 function getBlocks(p){
   let s=p.shape.blocks,r=p.rot%4,res=[];
@@ -76,7 +77,7 @@ function lock(){
   for(let y=ROWS-1;y>=0;y--){
     if(grid[y].every(c=>c)){grid.splice(y,1);grid.unshift(Array(COLS).fill(0));cleared++;y++}
   }
-  if(cleared){lines+=cleared;score+=[0,100,300,500,800][cleared]*level;level=Math.floor(lines/10)+1;
+  if(cleared){lines+=cleared;score+=[0,100,300,500,800][cleared]*level;Arcade.score(score);level=Math.floor(lines/10)+1;
     dropInterval=Math.max(50,500-level*40);
     document.getElementById('sc').textContent=score;
     document.getElementById('ln').textContent=lines;
@@ -137,9 +138,9 @@ document.addEventListener('keydown',e=>{
   if(gameOver){if(e.key===' ')start();e.preventDefault();return}
   if(e.key==='ArrowLeft'&&valid({...piece,x:piece.x-1}))piece.x--;
   if(e.key==='ArrowRight'&&valid({...piece,x:piece.x+1}))piece.x++;
-  if(e.key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++}
+  if(e.key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++;Arcade.score(score)}
   if(e.key==='ArrowUp'){let t={...piece,rot:piece.rot+1};if(valid(t))piece.rot++}
-  if(e.key===' '){while(valid({...piece,y:piece.y+1})){piece.y++;score+=2}lock()}
+  if(e.key===' '){while(valid({...piece,y:piece.y+1})){piece.y++;score+=2;Arcade.score(score)}lock()}
   e.preventDefault();
 });
 start();requestAnimationFrame(loop);

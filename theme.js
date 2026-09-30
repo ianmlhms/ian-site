@@ -1,5 +1,5 @@
 /* Site-wide theme: dark / light + custom accent. Sets CSS variables and injects
- * a floating 🎨 picker on every page that includes this script. Also injects a
+ * an appearance picker beside the language chooser. Also injects a
  * ↻ refresh button when launched from the home screen (standalone PWA), where
  * there is no browser toolbar to reload from. */
 (function () {
@@ -11,8 +11,8 @@
   // because module specifiers resolve against the importing module.)
   const HERE = new URL(".", document.currentScript ? document.currentScript.src : location.href);
   const asset = (path) => new URL(path, HERE).href;
-  const SITE_GLASS_URL = asset("site-glass.css?v=3");
-  const MOBILE_CSS_URL = asset("mobile.css?v=2");
+  const SITE_GLASS_URL = asset("site-glass.css?v=4");
+  const MOBILE_CSS_URL = asset("mobile.css?v=3");
   const CONTRAST_MODULE_URL = "./glass-contrast.js?v=2";
   const ACCENTS = ["#6ea8fe", "#ff6b9d", "#3fb950", "#a371f7", "#ffb347", "#4de8ff"];
 
@@ -36,6 +36,7 @@
     #themeFab{position:fixed;right:14px;bottom:14px;z-index:9000;width:44px;height:44px;border-radius:50%;
       border:1px solid var(--border);background:var(--glass-solid);color:var(--text);font-size:18px;cursor:pointer;
       box-shadow:0 4px 14px rgba(0,0,0,.3)}
+    #themeFab.theme-inline{position:static;display:inline-flex;align-items:center;justify-content:center;margin-left:8px;vertical-align:middle;box-shadow:none}
     #themePop{position:fixed;right:14px;bottom:66px;z-index:9000;background:var(--glass-solid);border:1px solid var(--border);
       border-radius:14px;padding:14px;width:230px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);font-family:system-ui,sans-serif}
     #themePop.open{display:block}
@@ -229,7 +230,13 @@
         ${ACCENTS.map(c=>`<button type="button" class="th-sw" data-acc="${esc(c)}" style="background:${esc(c)}" aria-label="Accent ${esc(c)}"></button>`).join("")}
         <input type="color" class="th-custom" title="Custom colour" aria-label="Custom accent colour" value="${esc(t.accent||'#6ea8fe')}">
       </div>`;
-    document.body.appendChild(fab);
+    const languageHost = document.querySelector("#langSw,[data-langsw]");
+    if (languageHost) {
+      fab.classList.add("theme-inline");
+      languageHost.insertAdjacentElement("afterend", fab);
+    } else {
+      document.body.appendChild(fab);
+    }
     document.body.appendChild(pop);
 
     function sync() {
@@ -237,7 +244,18 @@
       pop.querySelectorAll(".th-modes button").forEach(b=>b.classList.toggle("on",(cur.mode||"dark")===b.dataset.mode));
       pop.querySelectorAll(".th-sw").forEach(s=>s.classList.toggle("on", cur.accent===s.dataset.acc));
     }
-    fab.onclick = () => { pop.classList.toggle("open"); sync(); };
+    fab.onclick = () => {
+      const opening = !pop.classList.contains("open");
+      pop.classList.toggle("open", opening);
+      if (opening && fab.classList.contains("theme-inline")) {
+        const rect = fab.getBoundingClientRect();
+        pop.style.left = Math.max(10, Math.min(window.innerWidth - 240, rect.right - 230)) + "px";
+        pop.style.top = Math.min(window.innerHeight - 220, rect.bottom + 8) + "px";
+        pop.style.right = "auto";
+        pop.style.bottom = "auto";
+      }
+      sync();
+    };
     pop.querySelectorAll(".th-modes button").forEach(b=> b.onclick=()=>{ save({ ...get(), mode: b.dataset.mode }); sync(); });
     pop.querySelectorAll(".th-sw").forEach(s=> s.onclick=()=>{ save({ ...get(), accent: s.dataset.acc }); sync(); });
     pop.querySelector(".th-custom").oninput = (e)=>{ save({ ...get(), accent: e.target.value }); sync(); };
@@ -264,17 +282,6 @@
     btn.textContent = "↻";
     btn.onclick = () => { btn.classList.add("spin"); location.reload(); };
     document.body.appendChild(btn);
-  }
-
-  // ---- site-wide feedback widget ----
-  function loadFeedback() {
-    // pixelbreak has its own feedback box; skip loading a second one there
-    if (document.getElementById("fbFab") || document.getElementById("fbScript")) return;
-    // no feedback button on phones — keeps the small-screen UI uncluttered
-    if (window.matchMedia && window.matchMedia("(max-width: 760px)").matches) return;
-    const s = document.createElement("script");
-    s.id = "fbScript"; s.src = asset("feedback.js?v=1");
-    document.body.appendChild(s);
   }
 
   // ---- PWA: real-app feel (#20) ----
@@ -376,11 +383,11 @@
   }
 
   function boot() {
-    buildPicker(); buildRefresh(); loadFeedback(); serverSync(); registerSW(); buildBottomNav();
+    buildPicker(); buildRefresh(); serverSync(); registerSW(); buildBottomNav();
     if (isIosSafari()) showInstall();
   }
   if (document.body) boot();
   else document.addEventListener("DOMContentLoaded", boot);
 
-  import("./quick-open.js?v=6").catch((error) => console.error("quick open", error));
+  import("./quick-open.js?v=7").catch((error) => console.error("quick open", error));
 })();

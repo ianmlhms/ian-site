@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Type Racer - PixelBreak</title>
+<title>Typing Speed - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
@@ -23,6 +23,7 @@ body{height:auto;min-height:100vh;padding:12px}
 input,#progress,#text-display{max-width:100%}
 #hud{max-width:100%;flex-wrap:wrap;justify-content:center;gap:10px}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="typing" data-arcade-title="Typing Speed"></script>
 </head>
 <body>
 <div id="hud">
@@ -120,7 +121,7 @@ document.getElementById('inp').addEventListener('input',e=>{
     done=true;clearInterval(timerInt);
     let secs=(Date.now()-startTime)/1000;
     let wpm=Math.round((text.split(' ').length)/(secs/60));
-    window.score=Math.max(window.score||0,wpm);
+    window.score=Math.max(window.score||0,wpm);Arcade.gameOver(wpm);
     document.getElementById('result').innerHTML=`🎉 Done! <b style="color:#4de8ff">${wpm} WPM</b> with <b style="color:#44ff88">${acc}%</b> accuracy in <b>${secs.toFixed(1)}s</b>`;
   }
 });

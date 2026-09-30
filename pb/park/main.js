@@ -5,8 +5,8 @@ import { tick, setTicketPrice, setRidePrice, setStaff,
   setMaintenance, maintainRide } from "/pb/park/sim.js";
 import { ParkRenderer } from "/pb/park/renderer.js?v=5";
 import { ParkUI } from "/pb/park/ui.js?v=2";
-import { restoreSave, createPersistence } from "/pb/park/save.js?v=1";
-import { createSocial } from "/pb/park/social.js?v=1";
+import { restoreSave, createPersistence } from "/pb/park/save.js?v=2";
+import { createSocial } from "/pb/park/social.js?v=2";
 
 const FIXED_STEP = RULES.stepSeconds;
 const MAX_FRAME_DELTA = 0.25;

@@ -1,4 +1,4 @@
-import { COPY, SHOWCASE_ORDER, UI } from "/demo/copy.js?v=1";
+import { COPY, SHOWCASE_ORDER, UI } from "/demo/copy.js?v=2";
 
 const ICONS = Object.freeze({
   games: "🎮",
@@ -13,7 +13,7 @@ const ICONS = Object.freeze({
 });
 
 const MODULE_PATHS = Object.freeze(Object.fromEntries(
-  SHOWCASE_ORDER.map((id) => [id, `/demo/${id}.js?v=1`]),
+  SHOWCASE_ORDER.map((id) => [id, `/demo/${id}.js?v=2`]),
 ));
 const WIDE_CARDS = new Set(["games", "duo", "transit", "sky", "trails", "maps"]);
 const OBSERVER_MARGIN = "300px";

@@ -109,7 +109,7 @@ window.I18N_DICT = {
   "index.appsGateTitle": { lb: "Verschidde Apps brauchen e gratis Kont", de: "Manche Apps brauchen ein kostenloses Konto", en: "Some apps need a free account" },
   "index.appsGateSub": { lb: "Alles ouni 🔒 geet direkt — mell dech un fir Messenger, Frënn, Noten a méi opzemaachen.", de: "Alles ohne 🔒 geht sofort — melde dich an, um Messenger, Freunde, Noten und mehr zu öffnen.", en: "Everything without a 🔒 works right away — sign in to unlock Messenger, Friends, Grades and more." },
 
-  "proj.pixelbreak.desc": { lb: "31 Arcade-Spiller, all am Browser spillbar — keng Installatioun, keng Reklammen.", de: "31 Arcade-Spiele, alle im Browser spielbar — keine Installation, keine Werbung.", en: "31 arcade games, all playable in the browser — no install, no ads." },
+  "proj.pixelbreak.desc": { lb: "50 Arcade-Spiller, all am Browser spillbar — keng Installatioun, keng Reklammen.", de: "50 Arcade-Spiele, alle im Browser spielbar — keine Installation, keine Werbung.", en: "50 arcade games, all playable in the browser — no install, no ads." },
   "proj.games.desc": { lb: "Véier gewënnt, Reversi, Schëffer versenken a méi — 1 géint 1 op zwee Apparater, oder géint eng KI mat dräi Schwieregkeetsgraden.", de: "Vier gewinnt, Reversi, Schiffe versenken und mehr — 1 gegen 1 auf zwei Geräten, oder gegen eine KI mit drei Schwierigkeitsgraden.", en: "Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels." },
   "proj.messenger.desc": { lb: "Echtzäit-Chat mat Gruppen, Sproochnoriichten, Fichieren, Äntwerten a Reaktiounen.", de: "Echtzeit-Chat mit Gruppen, Sprachnachrichten, Dateien, Antworten und Reaktionen.", en: "Real-time chat with groups, voice notes, file sharing, replies and reactions." },
   "proj.wordle.desc": { lb: "Wordle, awer op Lëtzebuergesch an Däitsch — esou wéi ech wierklech schwätzen.", de: "Wordle, aber auf Luxemburgisch und Deutsch — so wie ich wirklich spreche.", en: "Wordle, but in Luxembourgish and German — the way I actually speak." },
@@ -119,7 +119,7 @@ window.I18N_DICT = {
   "tag.automation": { lb: "Automatisatioun", de: "Automatisierung", en: "Automation" },
 
   /* tile names + subtitles */
-  "tile.pixelbreak":     { lb: "PixelBreak", de: "PixelBreak", en: "PixelBreak" },
+  "tile.pixelbreak":     { lb: "Arcade", de: "Arcade", en: "Arcade" },
   "tile.pixelbreak.sub": { lb: "Arcade & 2-iPad-Spiller", de: "Arcade- & 2-iPad-Spiele", en: "Arcade & 2-iPad games" },
   "tile.messenger.sub":  { lb: "Chat & Gruppen", de: "Chat & Gruppen", en: "Chat & groups" },
   "tile.friends":        { lb: "Frënn", de: "Freunde", en: "Friends" },
@@ -208,7 +208,7 @@ window.I18N_DICT = {
   "games.h1":     { lb: "🎲 Spiller", de: "🎲 Spiele", en: "🎲 Games" },
   "games.lb":     { lb: "🏆 Classement", de: "🏆 Bestenliste", en: "🏆 Leaderboard" },
   "games.intro": { lb: "Spill op zwee iPads: tipp <b>Start</b> op engem, deel de <b>Raumcode</b>, a <b>maach mat</b> um aneren. (Oder invitéier e Frënd mam Benotzernumm op der <a href=\"friends.html\">Frënn</a>-Säit.)", de: "Spiele auf zwei iPads: Tippe <b>Start</b> auf einem, teile den <b>Raumcode</b> und <b>tritt bei</b> auf dem anderen. (Oder lade einen Freund per Benutzername auf der <a href=\"friends.html\">Freunde</a>-Seite ein.)", en: "Play across two iPads: tap <b>Start</b> on one, share the <b>room code</b>, and <b>Join</b> on the other. (Or invite a friend by username from the <a href=\"friends.html\">Friends</a> page.)" },
-  "games.tip": { lb: "Stadt-Land-Fluss ënnerstëtzt 2+ Spiller — jiddereen trëtt mam selwechte Code bäi.", de: "Stadt-Land-Fluss unterstützt 2+ Spieler — alle treten mit demselben Code bei.", en: "Stadt-Land-Fluss supports 2+ players — everyone joins the same code." },
+  "games.tip": { lb: "Categories Race ënnerstëtzt 2+ Spiller — jiddereen trëtt mam selwechte Code bäi.", de: "Categories Race unterstützt 2+ Spieler — alle treten mit demselben Code bei.", en: "Categories Race supports 2+ players — everyone joins the same code." },
   "games.start":  { lb: "E Spill starten", de: "Spiel starten", en: "Start a game" },
   "games.vsAi":   { lb: "🤖 géint de Computer", de: "🤖 gegen Computer", en: "🤖 vs Computer" },
   "games.code":   { lb: "Raumcode", de: "Raumcode", en: "room code" },
@@ -222,7 +222,7 @@ window.I18N_DICT = {
   "g.tictactoe.desc":  { lb: "Dräi op enger Rei. E séiere Klassiker. 1 géint 1.", de: "Drei in einer Reihe. Schneller Klassiker. 1 gegen 1.", en: "Three in a row. Quick classic. 1 v 1." },
   "games.play":        { lb: "Spillen", de: "Spielen", en: "Play" },
   "g.wordle.desc":     { lb: "Rod dat geheimt Wuert vum Dag — op Lëtzebuergesch oder Däitsch.", de: "Errate das geheime Wort des Tages — auf Luxemburgisch oder Deutsch.", en: "Guess the secret word of the day — in Luxembourgish or German." },
-  "g.pixelbreak.desc": { lb: "31 Arcade-Minispiller mat Highscores a Leaderboard.", de: "31 Arcade-Minispiele mit Highscores und Bestenliste.", en: "31 arcade mini-games with high scores and a leaderboard." },
+  "g.pixelbreak.desc": { lb: "50 Arcade-Minispiller mat Highscores a Leaderboard.", de: "50 Arcade-Minispiele mit Highscores und Bestenliste.", en: "50 arcade mini-games with high scores and a leaderboard." },
 
   /* ---------- stats (ShortsFactory) ---------- */
   "stats.channels":     { lb: "Channeler", de: "Kanäle", en: "Channels" },
@@ -319,7 +319,7 @@ window.I18N_DICT = {
   "msg.selectChat":  { lb: "Wiel e Chat ←", de: "Wähle einen Chat ←", en: "Select a chat ←" },
   "msg.notifyHelp":  { lb: "Wéi ee Notifikatiounen aschalt", de: "So aktivierst du Benachrichtigungen", en: "How to turn on notifications" },
   "msg.gateTitle":   { lb: "Mell dech un fir ze chatten, Gruppen ze maachen a Leit ze schreiwen.", de: "Melde dich an, um zu chatten, Gruppen zu erstellen und Leuten zu schreiben.", en: "Sign in to chat, create groups and DM people." },
-  "msg.gateSub":     { lb: "Selwechte Kont wéi PixelBreak.", de: "Gleiches Konto wie PixelBreak.", en: "Same account as PixelBreak." },
+  "msg.gateSub":     { lb: "Selwechte Kont wéi Arcade.", de: "Gleiches Konto wie Arcade.", en: "Same account as Arcade." },
   "msg.tip.attach":  { lb: "E Foto, Video oder Fichier schécken", de: "Foto, Video oder Datei senden", en: "Send a photo, video or file" },
   "msg.tip.voice":   { lb: "Eng Sproochnoriicht ophuelen", de: "Sprachnachricht aufnehmen", en: "Record a voice message" },
   "msg.tip.dm":      { lb: "Engem mam Benotzernumm schreiwen", de: "Jemandem per Benutzername schreiben", en: "Message someone by username" },
@@ -381,9 +381,9 @@ window.I18N_DICT = {
   },
   "intro.h2": { lb: "Wat ouni Kont geet", de: "Was ohne Konto funktioniert", en: "What you can use without an account" },
   "intro.p2": {
-    lb: "De gréissten Deel vun der Säit ass op. Du kanns all PixelBreak-Spiller direkt am Browser spillen, ouni eppes z'installéieren, live Bus- an Zuchdeparturen am ganze Land nokucken, d'Wieder kucken, mat SkyLens d'Fligeren iwwer dir verfollegen an all Wander- a Mountainbike-Tour vum Land duerchkucken. Nëmme wat perséinlech ass — Noriichten, Frënn, Noten, däi Stonneplang — brauch e gratis Kont, an dat ass mat engem Schlass markéiert.",
-    de: "Der größte Teil der Seite ist offen. Du kannst alle PixelBreak-Spiele direkt im Browser spielen, ohne etwas zu installieren, live Bus- und Zugabfahrten im ganzen Land nachsehen, das Wetter checken, mit SkyLens Flugzeuge über dir verfolgen und jede Wander- und Mountainbike-Tour des Landes durchstöbern. Nur was persönlich ist — Nachrichten, Freunde, Noten, dein Stundenplan — braucht ein kostenloses Konto, und das ist mit einem Schloss markiert.",
-    en: "Most of the site is open. You can play all of the PixelBreak arcade games in the browser with nothing installed, look up live bus and train departures anywhere in Luxembourg, check the weather, follow aircraft overhead in SkyLens, and browse every hiking and mountain-bike route in the country. Only the things that are personal to you — messages, friends, grades, your timetable — need a free account, and those are marked with a lock.",
+    lb: "De gréissten Deel vun der Säit ass op. Du kanns all Arcade-Spiller direkt am Browser spillen, ouni eppes z'installéieren, live Bus- an Zuchdeparturen am ganze Land nokucken, d'Wieder kucken, mat SkyLens d'Fligeren iwwer dir verfollegen an all Wander- a Mountainbike-Tour vum Land duerchkucken. Nëmme wat perséinlech ass — Noriichten, Frënn, Noten, däi Stonneplang — brauch e gratis Kont, an dat ass mat engem Schlass markéiert.",
+    de: "Der größte Teil der Seite ist offen. Du kannst alle Arcade-Spiele direkt im Browser spielen, ohne etwas zu installieren, live Bus- und Zugabfahrten im ganzen Land nachsehen, das Wetter checken, mit SkyLens Flugzeuge über dir verfolgen und jede Wander- und Mountainbike-Tour des Landes durchstöbern. Nur was persönlich ist — Nachrichten, Freunde, Noten, dein Stundenplan — braucht ein kostenloses Konto, und das ist mit einem Schloss markiert.",
+    en: "Most of the site is open. You can play all of the Arcade games in the browser with nothing installed, look up live bus and train departures anywhere in Luxembourg, check the weather, follow aircraft overhead in SkyLens, and browse every hiking and mountain-bike route in the country. Only the things that are personal to you — messages, friends, grades, your timetable — need a free account, and those are marked with a lock.",
   },
   "intro.h3": { lb: "Wanderen a Vëlofueren zu Lëtzebuerg", de: "Wandern und Radfahren in Luxemburg", en: "Walking and cycling in Luxembourg" },
   "intro.p3": {

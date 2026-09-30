@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Asteroid Storm - PixelBreak</title>
+<title>Asteroids - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#000;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="asteroids" data-arcade-title="Asteroids"></script>
 </head>
 <body>
 <canvas id="c" width="700" height="500"></canvas>
@@ -63,7 +64,7 @@ function loop(){
     for(let j=asteroids.length-1;j>=0;j--){
       if(Math.hypot(b.x-asteroids[j].x,b.y-asteroids[j].y)<asteroids[j].size*14){
         let a=asteroids[j];addP(a.x,a.y,'#ffcc00',10);
-        score+=a.size===3?20:a.size===2?50:100;
+score+=a.size===3?20:a.size===2?50:100;Arcade.score(score);
         if(a.size>1){spawnAsteroid(a.size-1,a.x,a.y);spawnAsteroid(a.size-1,a.x,a.y)}
         asteroids.splice(j,1);hit=true;break;
       }
@@ -78,7 +79,7 @@ function loop(){
     for(let a of asteroids){
       if(Math.hypot(ship.x-a.x,ship.y-a.y)<a.size*12+10){
         lives--;addP(ship.x,ship.y,'#ff4444',20);ship.invuln=90;
-        if(lives<=0){gameOver=true}break;
+if(lives<=0){gameOver=true;Arcade.gameOver(score)}break;
       }
     }
   }

@@ -3,12 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Flappy Pixel - PixelBreak</title>
+<title>Flappy Bird - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a2a3a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
 canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(255,200,0,0.2)}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="flappy" data-arcade-title="Flappy Bird"></script>
 </head>
 <body>
 <canvas id="c" width="400" height="600"></canvas>
@@ -46,12 +47,12 @@ function draw(){
     const pv=2.5-Math.min(assist()*0.08,0.7);
     for(let p of pipes){
       p.x-=pv;
-      if(!p.scored&&p.x+50<bird.x){p.scored=true;score++;window.score=Math.max(window.score||0,score);}
+      if(!p.scored&&p.x+50<bird.x){p.scored=true;score++;window.score=Math.max(window.score||0,score);Arcade.score(score)}
       if(bird.x+15>p.x&&bird.x-15<p.x+50&&(bird.y-15<p.top||bird.y+15>p.bot))gameOver=true;
     }
     pipes=pipes.filter(p=>p.x>-60);
     if(bird.y>C.height-55||bird.y<0)gameOver=true;
-    if(gameOver){if(score>=8)fails=Math.max(0,fails-2);else fails++;}
+    if(gameOver){Arcade.gameOver(score);if(score>=8)fails=Math.max(0,fails-2);else fails++;}
   }
 
   // Pipes
@@ -83,7 +84,7 @@ function draw(){
 
   if(!started&&!gameOver){
     X.fillStyle='rgba(0,0,0,0.3)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#f1c40f';X.font='bold 40px Segoe UI';X.fillText('Flappy Pixel',C.width/2,240);
+    X.fillStyle='#f1c40f';X.font='bold 40px Segoe UI';X.fillText('Flappy Bird',C.width/2,240);
     X.fillStyle='#fff';X.font='18px Segoe UI';X.fillText('Click or press SPACE to flap',C.width/2,290);
   }
   if(gameOver){

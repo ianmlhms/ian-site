@@ -3,11 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Geometry Dash — ian.lu</title>
+<title>Rhythm Jumper — ian.lu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=23"></script>
+<script src="theme.js?v=24"></script>
+<script src="pixelbreak-config.js"></script>
+<script src="pb/arcade-kit.js?v=1" data-arcade-id="geometrydash" data-arcade-title="Rhythm Jumper" data-arcade-replace=".bar" data-arcade-restart></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--cyan:#4de8ff;--amber:#f5b942}
   *{box-sizing:border-box}
@@ -38,13 +40,13 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="pixelbreak.html">‹ PixelBreak</a>
-  <h1>◼ Geometry Dash</h1>
+  <a class="home" href="pixelbreak.html">‹ Arcade</a>
+  <h1>◼ Rhythm Jumper</h1>
   <div class="spacer"></div>
   <button class="mute" id="mute" type="button" aria-label="Mute music">🔊</button>
 </header>
 <main class="game" id="game">
-  <canvas id="canvas" aria-label="Geometry Dash-style arcade game"></canvas>
+  <canvas id="canvas" aria-label="Rhythm Jumper arcade game"></canvas>
   <div class="hud">
     <div class="stats"><span id="attempts">Attempt 1</span><span id="progress">0% · Best 0%</span></div>
     <div class="track"><div class="fill" id="fill"></div></div>
@@ -96,14 +98,14 @@ const LEVEL=Object.freeze([
 
 /* State and storage */
 const canvas=document.getElementById("canvas"), game=document.getElementById("game");
-const ctx=canvas.getContext("2d"), ui={attempts:document.getElementById("attempts"),progress:document.getElementById("progress"),fill:document.getElementById("fill"),complete:document.getElementById("complete"),finalAttempts:document.getElementById("finalAttempts"),mute:document.getElementById("mute")};
+const ctx=canvas.getContext("2d"), ui={attempts:document.getElementById("attempts"),progress:document.getElementById("progress"),fill:document.getElementById("fill"),complete:document.getElementById("complete"),finalAttempts:document.getElementById("finalAttempts")};
 if(!ctx){
   console.error("[geometrydash] Canvas 2D is unavailable.");
   game.innerHTML='<div class="fallback">This browser cannot run the canvas game.</div>';
 }else{
   let W=0,H=0,DPR=1,groundY=0,lastGround=0,accumulator=0,lastTime=0,paused=false;
   let held=false,audioStarted=false,audioCtx=null,master=null,beatTimer=0,nextBeat=0;
-  let muted=readStore("gd-muted","0")==="1",best=clamp(Number(readStore("gd-best","0"))||0,0,100);
+  let muted=false,best=clamp(Number(readStore("gd-best","0"))||0,0,100);
   const state={phase:"playing",attempt:1,x:START_X,y:0,vy:0,angle:0,onGround:true,deathTimer:0,shake:0,trail:[],particles:[]};
 
   function readStore(key,fallback){
@@ -145,8 +147,6 @@ if(!ctx){
   canvas.addEventListener("pointerdown",event=>{event.preventDefault();canvas.setPointerCapture?.(event.pointerId);beginInput();});
   canvas.addEventListener("pointerup",endInput);canvas.addEventListener("pointercancel",endInput);
   ui.complete.addEventListener("pointerdown",event=>{event.preventDefault();beginInput();});
-  ui.mute.addEventListener("pointerdown",event=>event.stopPropagation());
-  ui.mute.addEventListener("click",event=>{event.stopPropagation();muted=!muted;writeStore("gd-muted",muted?"1":"0");updateMute();if(!muted)startAudio();});
 
   /* Physics and game update */
   function update(dt){
@@ -182,7 +182,7 @@ if(!ctx){
   }
   function die(){
     if(state.phase!=="playing")return;
-    state.phase="dead";state.deathTimer=DEATH_DELAY;state.shake=10;held=false;saveBest();burst();playDeath();
+    state.phase="dead";state.deathTimer=DEATH_DELAY;state.shake=10;held=false;saveBest();Arcade.gameOver(Math.floor(state.x/LEVEL_END*100));burst();playDeath();
   }
   function resetAttempt(){
     state.phase="playing";state.attempt+=1;state.x=START_X;state.y=groundY-CUBE;state.vy=0;state.angle=0;state.onGround=true;state.trail=[];updateProgress();
@@ -191,11 +191,11 @@ if(!ctx){
     ui.complete.classList.remove("show");state.phase="playing";state.attempt=1;state.x=START_X;state.y=groundY-CUBE;state.vy=0;state.angle=0;state.onGround=true;state.trail=[];state.particles=[];updateProgress();
   }
   function completeLevel(){
-    state.phase="complete";best=100;writeStore("gd-best","100");updateProgress();
+    state.phase="complete";best=100;writeStore("gd-best","100");Arcade.gameOver(100);updateProgress();
     ui.finalAttempts.textContent=`${state.attempt} attempt${state.attempt===1?"":"s"}`;ui.complete.classList.add("show");playComplete();
   }
   function updateProgress(){
-    const progress=clamp(state.x/LEVEL_END*100,0,100);if(progress>best)best=progress;
+    const progress=clamp(state.x/LEVEL_END*100,0,100);if(progress>best)best=progress;Arcade.score(Math.floor(progress));
     ui.attempts.textContent=`Attempt ${state.attempt}`;ui.progress.textContent=`${Math.floor(progress)}% · Best ${Math.floor(best)}%`;ui.fill.style.width=`${progress}%`;
   }
   function saveBest(){best=clamp(best,0,100);writeStore("gd-best",best.toFixed(2));}
@@ -284,7 +284,7 @@ if(!ctx){
   function playJump(){tone(420,.055,.12);}function playDeath(){tone(90,.22,.35);}
   function playComplete(){tone(660,.2,.25);window.setTimeout(()=>tone(880,.3,.25),170);}
   function stopAudioTimer(){if(beatTimer){clearInterval(beatTimer);beatTimer=0;}}
-  function updateMute(){ui.mute.textContent=muted?"🔇":"🔊";ui.mute.setAttribute("aria-label",muted?"Unmute music":"Mute music");if(master)master.gain.value=muted?0:.16;}
+  function updateMute(){if(master)master.gain.value=muted?0:.16;}
 
   /* Fixed-timestep animation loop and clean visibility pause. */
   function frame(now){
@@ -300,6 +300,8 @@ if(!ctx){
   window.addEventListener("resize",resize);
   window.addEventListener("pagehide",()=>{saveBest();stopAudioTimer();});
 
+  Arcade.onRestart(restartLevel);
+  Arcade.onMute((nextMuted)=>{muted=nextMuted;updateMute();if(!muted)startAudio();});
   resize();updateMute();updateProgress();requestAnimationFrame(frame);
 }
 </script>

@@ -8,17 +8,17 @@
  *                   notify-ambient.js on non-messenger pages.
  * Foreground notifications use the Notification API (no server). Closed-app push
  * is delivered by the Supabase Edge Function `notify` → the service worker. */
-import * as auth from "./auth.js?v=18";
+import * as auth from "./auth.js?v=19";
 
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;
 
 // Pretty game names — keep in sync with friends.js GAMES.
 const GAME_NAMES = {
-  connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship",
-  color: "Colour Dial", draw: "Molerei", reversi: "Reversi",
+  connect4: "Connect 4", slf: "Categories Race", battleship: "Battleship",
+  color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi",
   dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
-  checkers: "Checkers", maumau: "Mau-Mau", "dice-duel": "Kniffel",
+  checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Yahtzee Dice",
 };
 
 /* ---------- service worker ---------- */

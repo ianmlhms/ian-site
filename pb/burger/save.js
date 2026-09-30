@@ -58,6 +58,7 @@ export function createPersistence({getState, onState, onError = console.warn}) {
       const next = applySave(current, incoming);
       if (next === current) return false;
       window.score = next.lifetimeCoins;
+      window.Arcade?.score(window.score);
       onState(next);
       return true;
     } catch (error) {
@@ -70,6 +71,7 @@ export function createPersistence({getState, onState, onError = console.warn}) {
     try {
       const current = getState();
       window.score = current.lifetimeCoins;
+      window.Arcade?.score(window.score);
       parent.postMessage({__pbSave:1, data:snapshot(current)}, "*");
     } catch (error) {
       reportError("Could not send saved progress.", error);
@@ -84,6 +86,7 @@ export function createPersistence({getState, onState, onError = console.warn}) {
   window.addEventListener("message", receiveSave);
   applyIncoming(window.__pbSave);
   window.score = getState().lifetimeCoins;
+  window.Arcade?.score(window.score);
   try {
     parent.postMessage({__pbWantSave:1}, "*");
   } catch (error) {

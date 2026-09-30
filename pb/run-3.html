@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Space Sprint - PixelBreak</title>
+<title>Space Tunnel Runner - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
@@ -16,12 +16,13 @@ canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-r
 .hidden{display:none!important}
 #hud{position:absolute;top:15px;left:50%;transform:translateX(-50%);color:#7b68ee;font-size:24px;font-weight:bold;z-index:10;text-shadow:0 0 10px rgba(123,104,238,0.5)}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="run-3" data-arcade-title="Space Tunnel Runner"></script>
 </head>
 <body>
 <div id="hud">0m</div>
 <canvas id="c"></canvas>
 <div id="overlay">
-<h1>🚀 Space Sprint</h1>
+<h1>🚀 Space Tunnel Runner</h1>
 <p>Run through the space tunnel! Don't fall off!</p>
 <p style="font-size:14px">← → Move · ↑ / SPACE Jump · Run on walls!</p>
 <button onclick="startGame()">PLAY</button>
@@ -50,7 +51,7 @@ class Player{
         this.y=p.y-this.h;this.vy=0;this.onGround=true;this.jumping=false;
       }
     }
-    if(this.y>C.height+50)gameOver=true;
+    if(this.y>C.height+50){gameOver=true;Arcade.gameOver(dist)}
   }
   draw(){
     // Glow
@@ -126,7 +127,7 @@ function loop(ts){
     speed=4.2+Math.min(dist/1200,5.5);
     dist=Math.floor(cameraX/10);
     document.getElementById('hud').textContent=dist+'m';
-    window.score=dist;
+    window.score=dist;Arcade.score(dist);
     player.update(m);
   }
   

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#183e48">
-<title>Theme Park Tycoon · PixelBreak</title>
+<title>Theme Park Tycoon · Arcade</title>
 <link rel="icon" href="data:,">
 <style>
 :root { color-scheme: light; --ink: #183e48; --muted: #536c70; --paper: #fffdf4;
@@ -153,6 +153,7 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
   #notice { top: 112px; } #buildBar { width: 330px; bottom: 78px; }
 }
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="park" data-arcade-title="Theme Park Tycoon"></script>
 </head>
 <body>
 <main id="shell">
@@ -181,7 +182,7 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
   </section>
   <div id="walkControls" aria-label="Walk-through controls" hidden>
     <div id="walkHint"><span class="desktop-only">WASD or arrows to move · drag to look · Esc to exit</span><span class="touch-only">Move with the stick · drag elsewhere to look</span></div>
-    <div id="walkPad" role="group" aria-label="Move"><span id="walkKnob" aria-hidden="true"></span></div>
+    <div id="walkPad" role="group" aria-label="Move" data-arcade-touch-controls><span id="walkKnob" aria-hidden="true"></span></div>
   </div>
   <aside id="panel" class="glass" aria-labelledby="panelTitle" hidden>
     <div class="panel-heading"><h2 id="panelTitle">Build your park</h2><button data-action="close" aria-label="Close panel">✕</button></div>
@@ -228,6 +229,6 @@ if(!window.THREE){
   throw new Error("three.js r160 failed to load");
 }
 </script>
-<script type="module" src="/pb/park/main.js?v=5"></script>
+<script type="module" src="/pb/park/main.js?v=6"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
-import { TOUR, UI } from "/demo/copy.js?v=1";
+import { TOUR, UI } from "/demo/copy.js?v=2";
 
 const MODULE_PATHS = Object.freeze(Object.fromEntries(
-  TOUR.steps.map(({ id }) => [id, `/demo/${id}.js?v=1`]),
+  TOUR.steps.map(({ id }) => [id, `/demo/${id}.js?v=2`]),
 ));
 const FIRST_STEP = 0;
 const LAST_STEP = TOUR.steps.length - 1;

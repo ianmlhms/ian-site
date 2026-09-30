@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chill Drive 3D - PixelBreak</title>
+<title>3D Cruiser - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%}
@@ -36,6 +36,7 @@ canvas{display:block;width:100vw;height:100vh}
 #lvls button:disabled{opacity:.3;cursor:default}
 .hidden{display:none!important}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="chill-drive" data-arcade-title="3D Cruiser"></script>
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -50,7 +51,7 @@ canvas{display:block;width:100vw;height:100vh}
 <button id="mute" class="hidden">🔊</button>
 <button id="mm" class="hidden" title="Menu">☰</button>
 <div id="ov">
-<h1 id="ovh">🛣️ Chill Drive 3D</h1>
+<h1 id="ovh">🛣️ 3D Cruiser</h1>
 <div class="sub" id="ovp">Cruise, overtake, survive — 5 crashes end your run.<br>Close overtakes earn style points. ↑↓ speed · ←→ steer</div>
 <div id="modes">
 <button id="mTraffic" class="mode on">🚗 TRAFFIC</button>
@@ -532,7 +533,7 @@ function overlay(h,p,btn,menuMode){
 function menu(){
   state='menu';
   paintZen();
-  overlay('🛣️ Chill Drive 3D',
+  overlay('🛣️ 3D Cruiser',
     'Cruise, overtake, survive — 5 crashes end your run.<br>Pick your endless world · close overtakes earn style · ↑↓ speed · ←→ steer',
     null,true);
   $('lvlt').style.display='';$('lvls').style.display='';
@@ -544,6 +545,7 @@ function menu(){
 }
 function endRun(won){
   state='over';
+  Arcade.gameOver(Math.floor(pos/METER)+stylePts);
   $('lvlt').style.display='none';$('lvls').style.display='none';
   if(mode==='endless'){
     sfx.lose();

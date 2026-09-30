@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cookie Craze - PixelBreak</title>
+<title>Cookie Clicker - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#2a1810;font-family:'Segoe UI',sans-serif;color:#fff;overflow:hidden;height:100vh}
@@ -27,6 +27,7 @@ body{background:#2a1810;font-family:'Segoe UI',sans-serif;color:#fff;overflow:hi
 @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-80px)}}
 h2{color:#f4a460;font-size:18px;margin-bottom:15px;text-align:center}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="cookie-clicker" data-arcade-title="Cookie Clicker"></script>
 </head>
 <body>
 <div id="game">
@@ -74,7 +75,7 @@ function format(n){
 
 function clickCookie(e){
   cookies+=clickPower;totalBaked+=clickPower;totalClicks++;
-  window.score=Math.floor(totalBaked);
+  window.score=Math.floor(totalBaked);Arcade.score(window.score);
   let ft=document.createElement('div');ft.className='float-text';
   ft.textContent='+'+format(clickPower);
   ft.style.left=(e.clientX-30)+'px';ft.style.top=(e.clientY-20)+'px';
@@ -170,14 +171,14 @@ function applySave(sv){
   (sv.cu||[]).forEach((n,i)=>{if(clickUpgrades[i])clickUpgrades[i].count=n||0});
   cps=0;upgrades.forEach(u=>cps+=u.cps*u.count);
   clickPower=1;clickUpgrades.forEach(u=>clickPower+=u.power*u.count);
-  window.score=Math.floor(totalBaked);
+  window.score=Math.floor(totalBaked);Arcade.score(window.score);
   updateUI();
 }
 function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}catch(e){}}
 window.addEventListener('message',(e)=>{const d=e.data;if(d&&d.__pbLoadSave===1)applySave(d.data)});
 
 // Game loop
-setInterval(()=>{cookies+=cps/10;totalBaked+=cps/10;window.score=Math.floor(totalBaked);updateUI()},100);
+setInterval(()=>{cookies+=cps/10;totalBaked+=cps/10;window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},100);
 buildUpgrades();
 applySave(window.__pbSave);                       // local save (injected before load)
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}  // ask for the cloud save

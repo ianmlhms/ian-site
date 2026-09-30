@@ -1,5 +1,5 @@
 import { TRAILS } from "./content.js?v=1";
-import { UI } from "./copy.js?v=1";
+import { UI } from "./copy.js?v=2";
 import { loadLeaflet } from "./leaflet.js?v=1";
 
 const FETCH_TIMEOUT_MS = 9000;

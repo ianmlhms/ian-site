@@ -5,11 +5,11 @@
 <meta name="robots" content="noindex,follow">
 <!-- Game shell, no crawlable content. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Colour Dial — ian.lu</title>
-  <meta name="description" content="Colour Dial — guess the colour together with a friend, or against an AI that reasons about hue." />
+<title>Colour Guess — ian.lu</title>
+  <meta name="description" content="Colour Guess — guess the colour together with a friend, or against an AI that reasons about hue." />
   <link rel="canonical" href="https://ian.lu/color.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<script src="theme.js?v=23"></script>
+<script src="theme.js?v=24"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
@@ -65,16 +65,17 @@
 </head>
 <body>
 <header class="bar">
-  <a class="home" href="pixelbreak.html">‹ Games</a>
-  <h1>🎨 Colour Dial</h1>
+  <a class="home" href="pixelbreak.html">‹ Arcade</a>
+  <h1>🎨 Colour Guess</h1>
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
 </header>
 <div class="wrap" id="app"><p class="muted">Connecting…</p></div>
 
 <script src="pixelbreak-config.js"></script>
+<script src="pb/arcade-kit.js?v=1" data-arcade-id="o-color" data-arcade-title="Colour Guess" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=14"></script>
+<script type="module" src="notify-ambient.js?v=15"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const AI = params.get("ai")==="1";              // single-player vs computer bots
@@ -89,7 +90,7 @@ let difficulty=(params.get("diff")||"normal").toLowerCase();
 if(!["easy","normal","hard"].includes(difficulty)) difficulty="normal";
 const DIFF_MUL={easy:1.8,normal:1,hard:0.45};
 function mountDiff(){
-  const bar=document.querySelector(".bar");
+  const bar=document.querySelector(".arcade-context")||document.querySelector(".bar");
   if(!bar||document.getElementById("diffPick"))return;
   const w=document.createElement("div"); w.id="diffPick"; w.style.cssText="display:flex;gap:4px;margin-left:auto";
   [["easy","Easy"],["normal","Normal"],["hard","Hard"]].forEach(([d,lbl])=>{
@@ -311,7 +312,7 @@ function applyReveal(p){
 function resetAll(){ clearTimeout(peekTimer); peeking=false; recorded=false; phase="lobby"; round=0; wins={}; distTot={}; guesses={}; results=null; winner=null; isFinal=false; locked=false; }
 
 if(AI){
-  document.querySelector(".bar h1").textContent="🎨 Colour Dial — vs Computer";
+  document.querySelector(".bar h1").textContent="🎨 Colour Guess — vs Computer";
   name = localStorage.getItem("playerName") || window.__pbAuth?.session?.user?.user_metadata?.username || "Du";
   mountDiff(); phase="lobby"; render();
 } else {
@@ -330,7 +331,7 @@ if(AI){
     .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
 }
 </script>
-  <script type="module" src="rtc-ring.js?v=14"></script>
-  <script type="module" src="class-gate.js?v=15"></script>
+  <script type="module" src="rtc-ring.js?v=15"></script>
+  <script type="module" src="class-gate.js?v=16"></script>
 </body>
 </html>

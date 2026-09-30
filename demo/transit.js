@@ -6,10 +6,10 @@ import {
   SCHOOL_TERM_START,
   STOPS,
 } from "./content.js?v=1";
-import { UI } from "./copy.js?v=1";
-import { failedState, loadingState } from "./states.js?v=1";
+import { UI } from "./copy.js?v=2";
+import { failedState, loadingState } from "./states.js?v=2";
 import { attachExpandable, makeExpandableRow } from "./expand.js?v=1";
-import { mountLineSearch } from "./lines.js?v=1";
+import { mountLineSearch } from "./lines.js?v=2";
 
 const FETCH_TIMEOUT_MS = 9000;
 const LUXEMBOURG_TIME_ZONE = "Europe/Luxembourg";

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>Road Rage 3D - PixelBreak</title>
+<title>Stunt Driver - Arcade</title>
 <style>
 :root{color-scheme:dark;--mint:#4dffd2;--ink:#07121d;--glass:rgba(7,18,29,.72)}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -29,15 +29,16 @@ canvas{display:block;width:100%;height:100%}
 @media(max-width:620px){#hud{gap:5px}.pill{min-width:73px;padding:6px 7px;font-size:9px}.pill b{font-size:14px}#hint{left:8%;right:8%;top:66px}#levels{grid-template-columns:repeat(4,50px)}.card p{font-size:14px}.pedal{border-radius:24px}}
 @media(pointer:fine){.pedal{opacity:.55}}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="drive-mad" data-arcade-title="Stunt Driver"></script>
 </head>
 <body>
 <div id="hud" class="hidden"><div class="pill">Stage<b id="levelText">1 / 16</b></div><div class="pill">Time<b id="timeText">0.0s</b></div><div class="pill">Best<b id="bestText">—</b></div></div>
 <div id="hint"></div>
 <button id="restart" class="hidden" aria-label="Restart level" title="Restart level">↻</button>
-<div id="touch" class="hidden"><button id="brake" class="pedal" aria-label="Brake and reverse"><small>▼</small>BRAKE</button><button id="gas" class="pedal" aria-label="Accelerate"><small>▲</small>GAS</button></div>
-<div id="overlay"><div class="card"><h1>ROAD RAGE</h1><h2>3D STUNT TRIALS</h2><p id="message">Balance the throttle, work the suspension, and survive sixteen short obstacle courses.<br>WASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.</p><div id="levels"></div><button id="play">DRIVE</button></div></div>
+<div id="touch" class="hidden" data-arcade-touch-controls><button id="brake" class="pedal" aria-label="Brake and reverse"><small>▼</small>BRAKE</button><button id="gas" class="pedal" aria-label="Accelerate"><small>▲</small>GAS</button></div>
+<div id="overlay"><div class="card"><h1>STUNT DRIVER</h1><h2>3D STUNT TRIALS</h2><p id="message">Balance the throttle, work the suspension, and survive sixteen short obstacle courses.<br>WASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.</p><div id="levels"></div><button id="play">DRIVE</button></div></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/pb/drive-mad/core.js"></script>
-<script src="/pb/drive-mad/game.js"></script>
+<script src="/pb/drive-mad/game.js?v=1"></script>
 </body>
 </html>

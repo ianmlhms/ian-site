@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Pixel Fighters - PixelBreak</title>
+<title>Platform Fighters - Arcade</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
@@ -18,12 +18,13 @@ canvas{border-radius:12px;box-shadow:0 0 30px rgba(255,50,100,0.3);max-width:100
 #mStatus{min-height:24px;font-size:16px;color:#e87fa8;text-align:center}
 .hidden{display:none!important}
 </style>
+<script src="/pb/arcade-kit.js?v=1" data-arcade-id="fighters" data-arcade-title="Platform Fighters"></script>
 </head>
 <body>
 <div id="info">🔴 P1: WASD + F attack + G special · 🔵 P2: Arrows + K attack + L special</div>
 <canvas id="c" width="800" height="500"></canvas>
 <div id="menu">
-  <h1>PIXEL FIGHTERS</h1>
+  <h1>PLATFORM FIGHTERS</h1>
   <button id="mLocal">👥 2 Players — one device</button>
   <button id="mAI">🤖 vs Computer</button>
   <button id="mHost">🌐 Host online game</button>
@@ -233,7 +234,7 @@ function loop(ts){
         }
         if(p1.hp<=0){p2.score++;addP(p1.x,p1.y,'#ff4466',30);koPending=true;setTimeout(resetRound,1200)}
         else if(p2.hp<=0){p1.score++;addP(p2.x,p2.y,'#4488ff',30);koPending=true;
-          if(mode==='ai')window.score=Math.max(window.score||0,p1.score);
+          if(mode==='ai'){window.score=Math.max(window.score||0,p1.score);Arcade.gameOver(window.score)}
           setTimeout(resetRound,1200)}
       }
       if(mode==='host'&&++netFrame%5===0)

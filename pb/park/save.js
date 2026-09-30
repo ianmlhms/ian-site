@@ -145,6 +145,7 @@ export function createPersistence({ getState, onState, onError }) {
     clearTimers();
     try {
       window.score = getState().derived.parkValue;
+      window.Arcade?.score(window.score);
       const layout = serializeSave(getState());
       if (layout === lastPayload) return true;
       window.parent.postMessage({ __pbSave: 1, data: JSON.parse(layout) }, "*");
@@ -155,6 +156,7 @@ export function createPersistence({ getState, onState, onError }) {
   }
   function scheduleSave() {
     window.score = getState().derived.parkValue;
+    window.Arcade?.score(window.score);
     clearTimeout(timer);
     timer = setTimeout(pushSave, SAVE_DELAY);
     if (deadline === null) deadline = setTimeout(pushSave, MAX_SAVE_WAIT);
@@ -174,6 +176,7 @@ export function createPersistence({ getState, onState, onError }) {
   window.addEventListener("message", receiveSave);
   window.addEventListener("pagehide", pushSave);
   window.score = getState().derived.parkValue;
+  window.Arcade?.score(window.score);
   try { window.parent.postMessage({ __pbWantSave: 1 }, "*"); }
   catch { report("Could not request cloud progress. Your local park is still open."); }
   return { applyIncoming, pushSave, scheduleSave, destroy() {
