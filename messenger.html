@@ -20,7 +20,11 @@
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff}
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;height:100vh;height:100dvh;height:var(--vvh,100dvh);display:flex;flex-direction:column;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--text);
+  html{background:var(--bg)}
+  /* The shell is pinned to the VISUAL viewport (see the fit script): iOS pans the
+     page instead of resizing it when a keyboard opens, so follow that pan rather
+     than fighting it with scrollTo -- the fight caused the jumping/black screen. */
+  body{margin:0;position:fixed;left:0;right:0;top:0;height:100vh;height:100dvh;height:var(--vvh,100dvh);transform:translateY(var(--vvt,0px));display:flex;flex-direction:column;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--text);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   a{color:var(--accent2-text);text-decoration:none}
   header{display:flex;align-items:center;gap:14px;padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) 14px max(20px,env(safe-area-inset-left));border-bottom:1px solid var(--border);flex:none}
@@ -256,13 +260,15 @@
   var root=document.documentElement;
   // While zoomed (pinch or focus zoom) vv.height is measured in zoomed pixels, and
   // sizing the page to it squashes the app into the top of the screen with the
-  // rest left empty -- so keep the last unzoomed height instead. The app shell
-  // never scrolls, so undo the scroll iOS applies when it lifts a focused field.
+  // rest left empty -- so keep the last unzoomed height instead.
+  // The fixed body is moved down by vv.offsetTop so it always covers exactly the
+  // visible area. Never scrollTo(): iOS re-applies its own pan, and the two
+  // fought on every keystroke (jumping, black area, composer under the keyboard).
   var ZOOM_EPSILON=0.01;
   function fit(){
     if(vv.scale>1+ZOOM_EPSILON)return;
     root.style.setProperty("--vvh", vv.height+"px");
-    if(window.scrollY!==0)window.scrollTo(0,0);
+    root.style.setProperty("--vvt", vv.offsetTop+"px");
   }
   vv.addEventListener("resize",fit); vv.addEventListener("scroll",fit); fit();
   // when the keyboard opens on focus, keep the latest messages in view
