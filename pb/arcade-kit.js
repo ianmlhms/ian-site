@@ -23,7 +23,9 @@
   let muteHandler = null;
   let lastKeyboardAt = Number(sessionGet(KEYBOARD_SESSION_KEY) || 0);
   let pendingScore = null;
+  let pendingBoardId = "";
   let scoreTimer = 0;
+  let currentBoard = null; // optional sub-leaderboard chosen by the game, e.g. one per level
 
   function warn(message, error) {
     console.warn("[Arcade] " + message, error || "");
@@ -53,14 +55,49 @@
     return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= SCORE_LIMIT;
   }
 
-  function emitScore(value, final) {
-    const detail = Object.freeze({ score: value, final: Boolean(final) });
+  function emitScore(value, final, boardId) {
+    const board = boardId || "";
+    const detail = Object.freeze({ score: value, final: Boolean(final), ...(board ? { board } : {}) });
     if (!options.standalone) {
-      try { window.parent.postMessage({ __pb: 1, score: value, ...(final ? { final: true } : {}) }, "*"); }
+      try { window.parent.postMessage({ __pb: 1, score: value, ...(final ? { final: true } : {}), ...(board ? { board } : {}) }, "*"); }
       catch (error) { warn("Could not report the score to Arcade.", error); }
       return;
     }
     window.dispatchEvent(new CustomEvent("arcade:score", { detail }));
+  }
+
+  function flushPending() {
+    if (scoreTimer) window.clearTimeout(scoreTimer);
+    scoreTimer = 0;
+    const next = pendingScore;
+    pendingScore = null;
+    if (next !== null) emitScore(next, false, pendingBoardId);
+  }
+
+  /* A game with several leaderboards (one per level) names the active one. Scores that follow are saved under
+   * that id; ids must be the game's own id or start with it plus "-", which the records module double-checks. */
+  function setBoard(spec) {
+    if (spec === null) { flushPending(); currentBoard = null; announceBoard(null); return null; }
+    const valid = spec && typeof spec.id === "string" && spec.id.length > 0 && spec.id.length <= 48 && /^[a-z0-9-]+$/.test(spec.id) &&
+      typeof spec.name === "string" && spec.name.length > 0 && spec.name.length <= 80;
+    if (!valid) { warn("Ignored an invalid leaderboard: " + JSON.stringify(spec)); return currentBoard; }
+    if (options.id && spec.id !== options.id && !spec.id.startsWith(options.id + "-")) {
+      warn("Ignored a leaderboard that does not belong to " + options.id + ": " + spec.id);
+      return currentBoard;
+    }
+    flushPending();
+    currentBoard = Object.freeze({ id: spec.id, name: spec.name, format: typeof spec.format === "string" ? spec.format : "" });
+    announceBoard(currentBoard);
+    return currentBoard;
+  }
+
+  function announceBoard(board) {
+    if (!options.standalone) {
+      try { window.parent.postMessage({ __pbBoard: 1, board }, "*"); }
+      catch (error) { warn("Could not report the leaderboard to Arcade.", error); }
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("arcade:board", { detail: Object.freeze({ board }) }));
   }
 
   function report(value, final) {
@@ -68,20 +105,22 @@
       if (!options.noScore) warn("Ignored an invalid score: " + String(value));
       return;
     }
+    const boardId = currentBoard ? currentBoard.id : "";
     if (final) {
       if (scoreTimer) window.clearTimeout(scoreTimer);
       scoreTimer = 0;
       pendingScore = null;
-      emitScore(value, true);
+      emitScore(value, true, boardId);
       return;
     }
     pendingScore = value;
+    pendingBoardId = boardId;
     if (scoreTimer) return;
     scoreTimer = window.setTimeout(() => {
       scoreTimer = 0;
       const next = pendingScore;
       pendingScore = null;
-      if (next !== null) emitScore(next, false);
+      if (next !== null) emitScore(next, false, pendingBoardId);
     }, 250);
   }
 
@@ -237,7 +276,7 @@
       oldBar.insertAdjacentElement("afterend", context);
     }
     if (options.noScore || !options.id) return;
-    import("../pixelbreak-records.js?v=19").then(() => {
+    import("../pixelbreak-records.js?v=20").then(() => {
       window.PB?.registerStandalone?.({
         id: options.id,
         name: options.title,
@@ -250,6 +289,8 @@
   const Arcade = Object.freeze({
     score(value) { report(value, false); },
     gameOver(value) { report(value, true); },
+    setBoard,
+    getBoard() { return currentBoard; },
     onRestart(handler) { restartHandler = typeof handler === "function" ? handler : null; },
     onMute(handler) {
       muteHandler = typeof handler === "function" ? handler : null;
