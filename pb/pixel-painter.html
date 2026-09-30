@@ -2,52 +2,132 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pixel Art Painter - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;gap:15px}
-canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:8px;border:2px solid #2a2a4a;cursor:crosshair;image-rendering:pixelated}
-#tools{flex:none;max-height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;width:50px}
-#tools>*{flex:none}
-.color-btn{width:40px;height:40px;border-radius:8px;border:3px solid transparent;cursor:pointer}
-.color-btn.active{border-color:#fff;transform:scale(1.1)}
-.tool-btn{width:40px;height:40px;border-radius:8px;border:2px solid #3a3a5a;cursor:pointer;background:#1a1a2e;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
-.tool-btn.active{border-color:#4de8ff;background:#2a2a4a}
-#size{width:40px;text-align:center;background:#1a1a2e;border:1px solid #3a3a5a;color:#fff;border-radius:4px;padding:4px}
-@media(max-width:720px){body{height:auto;min-height:100vh;flex-direction:column;padding:12px}canvas{order:-1;max-height:70vh}#tools{width:100%;flex-direction:row;flex-wrap:wrap;flex:none}#colors{display:flex;flex-wrap:wrap;gap:8px}.tool-btn,.color-btn{flex:none}}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+/* creative tool: no start or game-over panel, no score */
+.arcade-stage{padding:12px}
+.paint{display:flex;gap:14px;width:100%;height:100%;align-items:stretch;justify-content:center}
+#fitArea{flex:1;min-width:0;min-height:0;display:grid;place-items:center}
+canvas{cursor:crosshair;image-rendering:pixelated}
+#tools{user-select:none;-webkit-user-select:none;flex:none;width:196px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:2px}
+.tool-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tool{min-height:44px;border:1px solid var(--border);border-radius:var(--radius-s);background:var(--card);color:var(--text);font-size:18px;cursor:pointer;
+  transition:transform .18s var(--spring),background .18s ease,border-color .18s ease}
+.tool:hover{background:var(--card2)}
+.tool:active{transform:scale(.94)}
+.tool[aria-pressed="true"]{border-color:var(--cyan);background:var(--card2)}
+.tool:focus-visible,.swatch:focus-visible,#sz:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.size{display:flex;flex-direction:column;gap:4px;color:var(--muted);font:700 12px/1 var(--font);letter-spacing:.04em;text-transform:uppercase}
+#sz{width:100%;min-height:44px;accent-color:var(--accent)}
+#colors{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.swatch{min-height:44px;border:3px solid transparent;border-radius:var(--radius-s);cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+  transition:transform .18s var(--spring),border-color .18s ease}
+.swatch:active{transform:scale(.92)}
+.swatch[aria-pressed="true"]{border-color:var(--text);transform:scale(1.06)}
+@media (max-width:720px){
+  .paint{flex-direction:column;gap:10px}
+  #tools{width:100%;flex:none;max-height:45%;gap:8px}
+  .tool-row{grid-template-columns:repeat(5,1fr)}
+  #colors{grid-template-columns:repeat(8,1fr);gap:4px}
+  .swatch{min-width:0}
+}
+@media (prefers-reduced-motion:reduce){.tool,.swatch{transition:none}.tool:active,.swatch:active,.swatch[aria-pressed="true"]{transform:none}}
 </style>
 <script src="/pb/arcade-kit.js?v=1" data-arcade-id="pixel-painter" data-arcade-title="Pixel Art Painter" data-arcade-no-score></script>
 </head>
 <body>
-<div id="tools">
-<div class="tool-btn active" onclick="setTool('draw')" title="Draw">✏️</div>
-<div class="tool-btn" onclick="setTool('erase')" title="Eraser">🧹</div>
-<div class="tool-btn" onclick="setTool('fill')" title="Fill">🪣</div>
-<div class="tool-btn" onclick="clearCanvas()" title="Clear">🗑️</div>
-<input type="range" id="sz" min="1" max="5" value="1" style="width:40px;margin:5px 0" oninput="brushSize=+this.value">
-<div id="colors"></div>
-</div>
-<canvas id="c" width="640" height="640"></canvas>
+<main class="arcade-stage" id="stage">
+  <div class="paint">
+    <div id="fitArea"><canvas id="c" aria-label="Pixel art canvas"></canvas></div>
+    <div id="tools">
+      <div class="tool-row" role="group" aria-label="Tools">
+        <button class="tool" type="button" data-tool="draw" title="Draw" aria-label="Draw" aria-pressed="true">✏️</button>
+        <button class="tool" type="button" data-tool="erase" title="Eraser" aria-label="Eraser" aria-pressed="false">🧹</button>
+        <button class="tool" type="button" data-tool="fill" title="Fill" aria-label="Fill" aria-pressed="false">🪣</button>
+        <button class="tool" type="button" id="undo" title="Undo" aria-label="Undo">↩︎</button>
+        <button class="tool" type="button" id="clear" title="Clear" aria-label="Clear canvas">🗑️</button>
+      </div>
+      <label class="size">Brush size <span id="szVal">1</span>
+        <input type="range" id="sz" min="1" max="5" value="1"></label>
+      <div id="colors" role="group" aria-label="Colours"></div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
-const PX=16,GRID=40;
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const COLOR={card:cssVar('--card','#161625'),text:cssVar('--text','#e8e8f0')};
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const PX=16,GRID=40,UNDO_LIMIT=20,DEFAULT_COLOR_IDX=2;
+const W=GRID*PX,H=GRID*PX;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+
 const PALETTE=['#000000','#ffffff','#ff4466','#ff8844','#ffcc00','#44ff88','#44aaff','#aa66ff','#ff66aa','#884422','#666666','#1a1a2e','#00cccc','#88cc44','#4444aa','#cc4488'];
-let grid=Array.from({length:GRID},()=>Array(GRID).fill(null));
-let color=PALETTE[2],tool='draw',brushSize=1,activePointer=null;
+const newGrid=()=>Array.from({length:GRID},()=>Array(GRID).fill(null));
+let grid=newGrid();
+let color=PALETTE[DEFAULT_COLOR_IDX],tool='draw',brushSize=1,activePointer=null;
+const undoStack=[];
 
-// Render palette
-let ch='';PALETTE.forEach((c,i)=>{ch+=`<div class="color-btn ${i===2?'active':''}" style="background:${c}" onclick="setColor('${c}',this)"></div>`});
-document.getElementById('colors').innerHTML=ch;
+/* ---------- palette + tools ---------- */
+const colorsEl=$('colors');
+PALETTE.forEach((c,i)=>{
+  const b=document.createElement('button');
+  b.type='button';b.className='swatch';b.style.background=c;b.setAttribute('aria-label','Colour '+c);
+  b.setAttribute('aria-pressed',String(i===DEFAULT_COLOR_IDX));
+  b.addEventListener('click',()=>setColor(c,b));
+  colorsEl.appendChild(b);
+});
+function setColor(c,el){color=c;colorsEl.querySelectorAll('.swatch').forEach(b=>b.setAttribute('aria-pressed',String(b===el)))}
+function setTool(t){tool=t;document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===t)))}
+document.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>setTool(b.dataset.tool)));
+$('sz').addEventListener('input',e=>{brushSize=+e.target.value;$('szVal').textContent=brushSize});
 
-function setColor(c,el){color=c;document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active')}
-function setTool(t){tool=t;document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tool-btn')[t==='draw'?0:t==='erase'?1:2].classList.add('active')}
-function clearCanvas(){grid=Array.from({length:GRID},()=>Array(GRID).fill(null));render()}
+/* ---------- undo (one snapshot per stroke / fill / clear) ---------- */
+function pushUndo(){
+  undoStack.push(grid.map(row=>row.slice()));
+  if(undoStack.length>UNDO_LIMIT)undoStack.shift();
+}
+function undo(){
+  const prev=undoStack.pop();
+  if(!prev)return;
+  grid=prev;render();
+}
+function clearCanvas(){pushUndo();grid=newGrid();render()}
+$('undo').addEventListener('click',undo);
+$('clear').addEventListener('click',clearCanvas);
 
-function paint(mx,my){
-  let r=C.getBoundingClientRect();
-  let x=Math.floor((mx-r.left)*C.width/r.width/PX);
-  let y=Math.floor((my-r.top)*C.height/r.height/PX);
+/* ---------- painting ---------- */
+function paint(e){
+  const b=toBoard(e);
+  const x=Math.floor(b.x/PX),y=Math.floor(b.y/PX);
   if(x<0||x>=GRID||y<0||y>=GRID)return;
   if(tool==='fill'){floodFill(x,y,grid[y][x],color);render();return}
   for(let dy=-brushSize+1;dy<brushSize;dy++)for(let dx=-brushSize+1;dx<brushSize;dx++){
@@ -56,7 +136,6 @@ function paint(mx,my){
   }
   render();
 }
-
 function floodFill(x,y,target,fill){
   if(target===fill)return;
   let stack=[[x,y]];
@@ -68,26 +147,31 @@ function floodFill(x,y,target,fill){
     stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]);
   }
 }
-
 function render(){
-  X.fillStyle='#1a1a2e';X.fillRect(0,0,C.width,C.height);
-  // Grid lines
-  X.strokeStyle='rgba(255,255,255,0.05)';X.lineWidth=0.5;
-  for(let i=0;i<=GRID;i++){X.beginPath();X.moveTo(i*PX,0);X.lineTo(i*PX,C.height);X.stroke();
-    X.beginPath();X.moveTo(0,i*PX);X.lineTo(C.width,i*PX);X.stroke()}
-  // Pixels
+  X.fillStyle=COLOR.card;X.fillRect(0,0,W,H);
   for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++){
     if(grid[y][x]){X.fillStyle=grid[y][x];X.fillRect(x*PX,y*PX,PX,PX)}
   }
+  X.strokeStyle='rgba(232,232,240,0.07)';X.lineWidth=0.5;
+  X.beginPath();
+  for(let i=0;i<=GRID;i++){X.moveTo(i*PX,0);X.lineTo(i*PX,H);X.moveTo(0,i*PX);X.lineTo(W,i*PX)}
+  X.stroke();
 }
+const onResize=render;
 
-C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId);paint(e.clientX,e.clientY)});
-C.addEventListener('pointermove',e=>{if(e.pointerId===activePointer)paint(e.clientX,e.clientY)});
+C.addEventListener('pointerdown',e=>{
+  if(activePointer!==null||e.button!==0)return;
+  activePointer=e.pointerId;C.setPointerCapture(e.pointerId);
+  pushUndo();paint(e);
+});
+C.addEventListener('pointermove',e=>{if(e.pointerId===activePointer)paint(e)});
 function endPaint(e){if(e.pointerId!==activePointer)return;activePointer=null;if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
 C.addEventListener('pointerup',endPaint);
 C.addEventListener('pointercancel',endPaint);
 C.addEventListener('lostpointercapture',endPaint);
-render();
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='z'){e.preventDefault();undo()}});
+Arcade.onRestart(clearCanvas);
+fitCanvas();
 </script>
 </body>
 </html>

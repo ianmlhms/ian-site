@@ -2,37 +2,137 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Maze Escape - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
-canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(0,255,200,0.15)}
-#hud{margin-bottom:10px;font-size:18px;display:flex;gap:20px}
-canvas{max-height:calc(100vh - 60px)}
-#hud{max-width:100%;flex-wrap:wrap;justify-content:center}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
 </style>
 <script src="/pb/arcade-kit.js?v=1" data-arcade-id="maze" data-arcade-title="Maze Escape" data-arcade-lower-is-better></script>
 </head>
 <body>
-<div id="hud"><span>Level: <b id="lv">1</b></span><span>⏱ <b id="tm">0</b>s</span><span style="font-size:13px;opacity:0.5">Arrow keys / WASD to move</span></div>
-<canvas id="c"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Maze Escape arcade game"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Level <b id="lv">1</b></span>
+    <span class="arcade-pill">Time <b id="tm">0</b>s</span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
-let maze,W,H,SZ,player,goal,level=1,seconds=0,timerInt,won;
-function init(lv){
-  level=lv;W=7+lv*2;H=7+lv*2;W=Math.min(W,25);H=Math.min(H,19);
-  SZ=Math.min(Math.floor(600/W),Math.floor(500/H));
-  C.width=W*SZ;C.height=H*SZ;
-  maze=Array.from({length:H},()=>Array.from({length:W},()=>({top:true,right:true,bottom:true,left:true,visited:false})));
-  // Generate maze using DFS
+const GAME_ID='maze',BEST_LOWER=true;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+let W=224,H=224;   // logical size, set per level from the maze dimensions
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+
+const CELL=32,MAX_COLS=25,MAX_ROWS=19,BASE_SIZE=7,SIZE_PER_LEVEL=2,TICK_MS=1000,DRAG_CELL_FRACTION=0.8;
+let maze,mazeW,mazeH,player,goal,level=1,seconds=0,timerInt=0,state='ready';
+
+function stopTimer(){if(timerInt)clearInterval(timerInt);timerInt=0}
+function startTimer(){stopTimer();timerInt=setInterval(()=>{if(state==='playing'){seconds++;$('tm').textContent=seconds}},TICK_MS)}
+function buildMaze(lv){
+  level=lv;
+  mazeW=Math.min(BASE_SIZE+lv*SIZE_PER_LEVEL,MAX_COLS);mazeH=Math.min(BASE_SIZE+lv*SIZE_PER_LEVEL,MAX_ROWS);
+  W=mazeW*CELL;H=mazeH*CELL;
+  maze=Array.from({length:mazeH},()=>Array.from({length:mazeW},()=>({top:true,right:true,bottom:true,left:true,visited:false})));
   let stack=[[0,0]];maze[0][0].visited=true;
   while(stack.length){
     let[cx,cy]=stack[stack.length-1];
     let neighbors=[];
     if(cy>0&&!maze[cy-1][cx].visited)neighbors.push([cx,cy-1,'top','bottom']);
-    if(cx<W-1&&!maze[cy][cx+1].visited)neighbors.push([cx+1,cy,'right','left']);
-    if(cy<H-1&&!maze[cy+1][cx].visited)neighbors.push([cx,cy+1,'bottom','top']);
+    if(cx<mazeW-1&&!maze[cy][cx+1].visited)neighbors.push([cx+1,cy,'right','left']);
+    if(cy<mazeH-1&&!maze[cy+1][cx].visited)neighbors.push([cx,cy+1,'bottom','top']);
     if(cx>0&&!maze[cy][cx-1].visited)neighbors.push([cx-1,cy,'left','right']);
     if(neighbors.length){
       let[nx,ny,w1,w2]=neighbors[Math.floor(Math.random()*neighbors.length)];
@@ -40,56 +140,75 @@ function init(lv){
       stack.push([nx,ny]);
     }else stack.pop();
   }
-  player={x:0,y:0};goal={x:W-1,y:H-1};won=false;
-  seconds=0;if(timerInt)clearInterval(timerInt);
-  timerInt=setInterval(()=>{if(!won){seconds++;document.getElementById('tm').textContent=seconds}},1000);
-  document.getElementById('lv').textContent=level;
-  draw();
+  player={x:0,y:0};goal={x:mazeW-1,y:mazeH-1};
+  seconds=0;$('tm').textContent=0;$('lv').textContent=level;
+  fitCanvas();
+}
+function startLevel(lv){hidePanel();buildMaze(lv);state='playing';startTimer()}
+function startGame(){startLevel(1)}
+function nextLevel(){startLevel(level+1)}
+function winLevel(){
+  state='won';stopTimer();Arcade.gameOver(seconds);
+  showPanel({title:'Level '+level+' complete',big:seconds+'s',body:'Ready for a bigger maze?',label:'Next level',action:nextLevel});
+}
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';
+  showPanel({title:'Paused',label:'Resume',action:()=>{state='playing'}});
 }
 function move(dx,dy){
-  if(won)return;
+  if(state!=='playing')return;
   let c=maze[player.y][player.x];
   if(dx===0&&dy===-1&&!c.top){player.y--}
   else if(dx===1&&dy===0&&!c.right){player.x++}
   else if(dx===0&&dy===1&&!c.bottom){player.y++}
   else if(dx===-1&&dy===0&&!c.left){player.x--}
-  if(player.x===goal.x&&player.y===goal.y){won=true;clearInterval(timerInt);Arcade.gameOver(seconds);
-    setTimeout(()=>init(level+1),1200)}
   draw();
+  if(player.x===goal.x&&player.y===goal.y)winLevel();
 }
 function draw(){
-  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
-  X.strokeStyle='#3a5a5a';X.lineWidth=2;
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-    let cx=x*SZ,cy=y*SZ,c=maze[y][x];
-    if(c.top){X.beginPath();X.moveTo(cx,cy);X.lineTo(cx+SZ,cy);X.stroke()}
-    if(c.right){X.beginPath();X.moveTo(cx+SZ,cy);X.lineTo(cx+SZ,cy+SZ);X.stroke()}
-    if(c.bottom){X.beginPath();X.moveTo(cx,cy+SZ);X.lineTo(cx+SZ,cy+SZ);X.stroke()}
-    if(c.left){X.beginPath();X.moveTo(cx,cy);X.lineTo(cx,cy+SZ);X.stroke()}
+  X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
+  X.strokeStyle=COLOR.muted;X.lineWidth=2;X.lineCap='round';
+  X.beginPath();
+  for(let y=0;y<mazeH;y++)for(let x=0;x<mazeW;x++){
+    let cx=x*CELL,cy=y*CELL,c=maze[y][x];
+    if(c.top){X.moveTo(cx,cy);X.lineTo(cx+CELL,cy)}
+    if(c.right){X.moveTo(cx+CELL,cy);X.lineTo(cx+CELL,cy+CELL)}
+    if(c.bottom){X.moveTo(cx,cy+CELL);X.lineTo(cx+CELL,cy+CELL)}
+    if(c.left){X.moveTo(cx,cy);X.lineTo(cx,cy+CELL)}
   }
-  // Goal
-  X.fillStyle='#ffcc00';X.shadowColor='#ffcc00';X.shadowBlur=12;
-  X.beginPath();X.arc(goal.x*SZ+SZ/2,goal.y*SZ+SZ/2,SZ/3,0,Math.PI*2);X.fill();
-  X.font=Math.floor(SZ*0.5)+'px serif';X.textAlign='center';X.textBaseline='middle';
-  X.fillText('⭐',goal.x*SZ+SZ/2,goal.y*SZ+SZ/2);
-  // Player
-  X.fillStyle='#00ffcc';X.shadowColor='#00ffcc';X.shadowBlur=15;
-  X.beginPath();X.arc(player.x*SZ+SZ/2,player.y*SZ+SZ/2,SZ/3,0,Math.PI*2);X.fill();
-  X.shadowBlur=0;
-  if(won){
-    X.fillStyle='rgba(0,0,0,0.5)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#00ffcc';X.font='bold 36px Segoe UI';X.textAlign='center';
-    X.fillText('Level Complete!',C.width/2,C.height/2);
-  }
+  X.stroke();
+  X.fillStyle=COLOR.amber;
+  X.beginPath();X.arc(goal.x*CELL+CELL/2,goal.y*CELL+CELL/2,CELL/3,0,Math.PI*2);X.fill();
+  X.fillStyle=COLOR.cyan;
+  X.beginPath();X.arc(player.x*CELL+CELL/2,player.y*CELL+CELL/2,CELL/3,0,Math.PI*2);X.fill();
 }
+function onResize(){if(maze)draw()}
+
+const KEY_MOVES={ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1],ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0]};
 document.addEventListener('keydown',e=>{
-  if(e.key==='ArrowUp'||e.key==='w')move(0,-1);
-  if(e.key==='ArrowDown'||e.key==='s')move(0,1);
-  if(e.key==='ArrowLeft'||e.key==='a')move(-1,0);
-  if(e.key==='ArrowRight'||e.key==='d')move(1,0);
+  const mv=KEY_MOVES[e.key];
+  if(!mv)return;
   e.preventDefault();
+  move(mv[0],mv[1]);
 });
-init(1);
+/* touch / mouse: drag across the maze, one step per cell dragged */
+let drag=null;
+C.addEventListener('pointerdown',e=>{if(e.button!==0)return;C.setPointerCapture(e.pointerId);drag={id:e.pointerId,x:e.clientX,y:e.clientY}});
+C.addEventListener('pointermove',e=>{
+  if(!drag||e.pointerId!==drag.id)return;
+  const step=C.getBoundingClientRect().width/mazeW*DRAG_CELL_FRACTION;
+  const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<step)return;
+  if(Math.abs(dx)>Math.abs(dy))move(dx<0?-1:1,0);else move(0,dy<0?-1:1);
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY};
+});
+const endDrag=e=>{if(drag&&e.pointerId===drag.id)drag=null};
+C.addEventListener('pointerup',endDrag);
+C.addEventListener('pointercancel',endDrag);
+Arcade.onRestart(startGame);
+buildMaze(1);
+showPanel({title:'Maze Escape',body:'Reach the gold dot. Use the arrow keys (or WASD), or drag across the maze with your finger. Each level is bigger.',label:'Play',action:startGame});
 </script>
 </body>
 </html>
