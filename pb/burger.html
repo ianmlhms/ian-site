@@ -4,23 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Burger Restaurant</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-:root{color-scheme:light;--ink:#fff8e7;--muted:#c8bca2;--panel:#272136;--panel-2:#342b43;--line:#574967;--red:#ee5c4d;--gold:#ffc84c;--green:#76d66b;--blue:#63c7e8;--shadow:0 5px 0 #15111d;--tap:44px;--counter-top:64%}
+:root{--ink:var(--text);--panel:var(--card);--panel-2:var(--card2);--line:var(--border);--red:var(--danger);--gold:var(--amber);--green:var(--good);--blue:var(--cyan);--tap:44px;--counter-top:64%}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;min-height:100%;background:#241a12;color:var(--ink);font-family:ui-rounded,"SF Pro Rounded",system-ui,sans-serif;overscroll-behavior:none}
-body{min-height:100svh;background:#241a12;touch-action:manipulation}
-button{min-width:var(--tap);min-height:var(--tap);border:1px solid #a9754a;border-radius:13px;background:linear-gradient(#8a5c39,#6b4429);color:var(--ink);font:700 14px/1.1 inherit;box-shadow:0 3px 0 #3a2415;cursor:pointer}
-button:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #3a2415}
-button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+body{display:flex;flex-direction:column;touch-action:manipulation}
+button{min-width:var(--tap);min-height:var(--tap);border:1px solid var(--border);border-radius:12px;background:var(--card2);color:var(--ink);font:750 14px/1.1 var(--font);letter-spacing:.01em;cursor:pointer;transition:transform .18s var(--spring),filter .18s ease,background .18s ease}
+button:hover:not(:disabled){filter:brightness(1.12)}
+button:active:not(:disabled){transform:scale(.95)}
+button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
 [hidden]{display:none!important}
-.game-shell{width:min(100%,760px);min-height:100svh;margin:auto;display:flex;flex-direction:column;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));gap:6px}
+.game-shell{width:min(100%,760px);flex:1;min-height:0;margin:0 auto;display:flex;flex-direction:column;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));gap:6px}
 .brand{height:32px;display:flex;align-items:center;justify-content:space-between;padding:0 4px}
-.brand h1{margin:0;font-size:19px;letter-spacing:.02em}
-.brand-balance{display:flex;gap:12px;font-weight:800;color:var(--gold);text-shadow:0 2px 3px #000a}
+.brand h1{margin:0;font:750 19px/1.1 var(--font-display);letter-spacing:-.02em}
+.brand-balance{display:flex;gap:12px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
 
 /* ---- the restaurant, drawn back to front ---- */
-.stage{position:relative;flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;border:2px solid #7b4f2e;border-radius:18px;overflow:hidden;background:#3a2a1c;box-shadow:0 8px 26px #0007}
+.stage{position:relative;flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;border:1px solid var(--border);border-radius:var(--radius-l);overflow:hidden;background:var(--card)}
 .scene{position:relative;min-height:0;overflow:hidden}
 .layer{position:absolute;display:block;pointer-events:none}
 .scene-room{inset:0;width:100%;height:100%;object-fit:cover}
@@ -66,71 +67,71 @@ button:disabled{cursor:not-allowed;filter:grayscale(.75);opacity:.48}
    the wood front. Anchoring the tray to the band's top keeps it on the cream. */
 .tray-zone{position:absolute;left:8%;right:8%;top:1%;z-index:3;pointer-events:auto}
 .tray{min-height:50px;display:grid;grid-template-columns:repeat(var(--tray-slots,2),minmax(46px,1fr));gap:5px}
-.tray-slot,.station-slot{position:relative;display:grid;place-items:center;min-width:var(--tap);min-height:44px;border:2px dashed #7a5a3a99;border-radius:12px;background:#ffffff1f}
-.tray-slot.filled{border-style:solid;border-color:#ffd977;background:#ffe9b833;animation:pop .18s ease-out}
+.tray-slot,.station-slot{position:relative;display:grid;place-items:center;min-width:var(--tap);min-height:44px;border:2px dashed rgba(136,136,170,.45);border-radius:12px;background:#ffffff1f}
+.tray-slot.filled{border-style:solid;border-color:var(--amber);background:rgba(245,185,66,.18);animation:pop .18s ease-out}
 .tray-slot.shake{animation:shake .32s linear}
 .scene-status{position:absolute;z-index:5;top:5px;left:8px;right:8px;display:flex;align-items:center;justify-content:space-between;color:#fff3d8;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;text-shadow:0 2px 3px #000b}
 
 /* ---- the kitchen the player works in ---- */
-.kitchen{position:relative;min-height:0;padding:7px 6px 6px;background:linear-gradient(#5b3d27,#3a2a1c 60%);border-top:3px solid #8a5c39;overflow:auto}
+.kitchen{position:relative;min-height:0;padding:7px 6px 6px;background:linear-gradient(var(--card2),var(--card) 60%);border-top:1px solid var(--border);overflow:auto}
 .kitchen::before{content:"";position:absolute;inset:0;background:url("/pb/burger/art/floor.webp?v=3") repeat;background-size:84px;opacity:.16;pointer-events:none}
 .stations{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-.station{min-height:124px;padding:6px;display:flex;flex-direction:column;gap:5px;border:1px solid #9a6a42;border-radius:14px;background:linear-gradient(160deg,#6b4a30e6,#412e1fe6);box-shadow:0 4px 0 #2a1c12}
-.station-title{display:flex;align-items:center;gap:5px;min-height:26px;font-size:13px;font-weight:900}
+.station{min-height:124px;padding:6px;display:flex;flex-direction:column;gap:5px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2)}
+.station-title{display:flex;align-items:center;gap:5px;min-height:26px;font-size:13px;font-weight:800;letter-spacing:.01em}
 .station-title .sprite{width:30px;height:30px}
 /* One column per slot that actually exists. A hardcoded 2 left a single-slot grill,
    fryer or drink tap filling half its station, which read as a broken empty panel. */
 .station-slots{display:grid;grid-template-columns:repeat(var(--slot-count,2),minmax(44px,1fr));gap:5px;flex:1}
-.station-slot{border-style:solid;border-color:#a9805288;overflow:hidden}
+.station-slot{border-style:solid;border-color:var(--border);overflow:hidden}
 .station-slot .state-label{position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:6px;background:rgba(10,8,14,.78);font-size:9px;text-transform:uppercase}
 .station-slot.ready{border-color:var(--green);box-shadow:inset 0 0 12px rgba(118,214,107,.3)}
-.station-slot.burnt{border-color:var(--red);background:#392327}
+.station-slot.burnt{border-color:var(--red);background:rgba(255,102,133,.14)}
 .station-slot.locked{opacity:.42}
 .drink-options,.toppings{display:flex;flex-wrap:wrap;gap:5px}
 .drink-choice,.topping{flex:1;padding:3px;min-width:44px;font-size:11px}
-.drink-choice.active,.topping.active{border-color:var(--gold);background:#8d6326}
+.drink-choice.active,.topping.active{border-color:var(--gold);background:rgba(245,185,66,.22)}
 .assembly{display:grid;grid-template-columns:minmax(62px,1fr) minmax(62px,1fr);gap:5px;flex:1}
-.assembly-preview{min-height:60px;display:grid;place-items:center;border:2px dashed #a9805288;border-radius:12px;background:#00000026}
+.assembly-preview{min-height:60px;display:grid;place-items:center;border:2px dashed rgba(136,136,170,.45);border-radius:12px;background:#00000026}
 .assembly-actions{display:flex;flex-direction:column;gap:5px}
-.plate-button{flex:1;background:linear-gradient(#e7814e,#b6493e);border-color:#ffb373}
+.plate-button{flex:1;background:var(--accent);border-color:transparent;color:#08101f}
 .sprite{position:relative;width:46px;height:46px;display:block;background-position:center;background-repeat:no-repeat;background-size:contain;pointer-events:none}
 .burger-stack{position:relative;width:50px;height:46px}
 .burger-layer{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;background-size:contain}
 
-.hud{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:6px;border:1px solid #9a6a42;border-radius:15px;background:#2c1f15f2}
+.hud{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:6px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
 .hud-cell{min-width:0;text-align:center}
-.hud-label{display:block;color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase}
-.hud-value{display:block;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:900;white-space:nowrap}
-.boost-button{grid-column:1/-1;min-height:44px;background:linear-gradient(#7d5adb,#4a36a0)}
-.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:rgba(10,8,14,.76);backdrop-filter:blur(5px)}
-.modal{width:min(94vw,430px);padding:20px;border:1px solid #b07f4f;border-radius:22px;background:linear-gradient(145deg,#5d4026,#31221a);box-shadow:0 16px 45px rgba(0,0,0,.5);text-align:center}
-.modal h2{margin:0 0 8px;font-size:27px}
+.hud-label{display:block;color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.hud-value{display:block;overflow:hidden;text-overflow:ellipsis;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.boost-button{grid-column:1/-1;min-height:44px;border-color:transparent;background:var(--violet);color:#14092a}
+.modal-layer,.shop-layer{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:14px;background:rgba(8,8,18,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.modal{width:min(94vw,430px);padding:20px;border:1px solid rgba(77,232,255,.42);border-radius:var(--radius-l);background:rgba(22,22,37,.94);box-shadow:var(--glow);text-align:center;animation:arcade-rise .32s var(--spring)}
+.modal h2{margin:0 0 8px;font:750 clamp(24px,5vw,30px)/1.08 var(--font-display);letter-spacing:-.02em}
 .modal p{margin:6px 0;color:var(--muted)}
 .modal-stars{min-height:42px;color:var(--gold);font-size:34px;letter-spacing:4px}
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-.modal-actions .primary{background:linear-gradient(#ee7558,#bb413e);border-color:#ff9e75}
+.modal-actions .primary{background:var(--accent);border-color:transparent;color:#08101f}
 .shop-layer{display:block;overflow:auto;padding:max(12px,env(safe-area-inset-top)) 10px max(12px,env(safe-area-inset-bottom))}
-.shop{width:min(100%,620px);min-height:calc(100svh - 24px);margin:auto;padding:12px;border:1px solid #b07f4f;border-radius:20px;background:#2c1f15}
+.shop{width:min(100%,620px);min-height:calc(100svh - 24px);margin:auto;padding:12px;border:1px solid var(--border);border-radius:var(--radius-l);background:var(--card)}
 .shop-header{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
 .shop-title{margin:0;font-size:22px}
 .shop-balance{grid-column:1/-1;color:var(--gold);font-size:13px;font-weight:800}
 .shop-close{grid-column:2;grid-row:1}
 .shop-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
-.shop-tab.active{border-color:var(--gold);background:#8d6326}
+.shop-tab.active{border-color:var(--gold);background:rgba(245,185,66,.22)}
 .shop-panel{display:flex;flex-direction:column;gap:7px}
-.upgrade-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:10px;border:1px solid #7d5a3a;border-radius:14px;background:#3d2b1d}
+.upgrade-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card2)}
 .upgrade-name{margin:0 0 2px;font-size:15px}
 .upgrade-description{margin:0;color:var(--muted);font-size:12px}
 .upgrade-level{display:block;margin-top:4px;color:var(--blue);font-size:11px;font-weight:800}
 .upgrade-buy{min-width:72px}
-.toast{position:fixed;z-index:40;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));max-width:90vw;transform:translate(-50%,12px);padding:9px 14px;border-radius:12px;background:#111018;color:#fff;box-shadow:0 5px 20px #000;opacity:0;transition:.18s;pointer-events:none;text-align:center;font-weight:800}
+.toast{position:fixed;z-index:40;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));max-width:90vw;transform:translate(-50%,12px);padding:9px 14px;border-radius:12px;background:var(--card2);border:1px solid var(--border);color:var(--text);box-shadow:0 5px 20px #0009;opacity:0;transition:.18s;pointer-events:none;text-align:center;font-weight:800}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.boot-error{margin:auto;padding:18px;color:#ffaca4;text-align:center}
+.boot-error{margin:auto;padding:18px;color:var(--danger);text-align:center}
 @keyframes pop{0%{transform:scale(.75)}100%{transform:scale(1)}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
 @media(min-width:600px){.stations{grid-template-columns:repeat(4,minmax(0,1fr))}.station{min-height:168px}.customer .customer-art{width:82px;height:82px}.hud-value{font-size:16px}}
 @media(max-height:670px){.brand{display:none}.station{min-height:116px}.game-shell{gap:5px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media(prefers-reduced-motion:reduce){.modal{animation:none}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="burger" data-arcade-title="Burger Restaurant"></script>
 </head>

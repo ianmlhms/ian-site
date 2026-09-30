@@ -4,32 +4,35 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Business Empire - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-:root{color-scheme:dark;--ink:#f8f3e7;--muted:#b9b2a3;--panel:#171b25;--panel2:#202636;--line:#394155;--gold:#ffcc4d;--green:#59e39a;--blue:#67c8ff;--danger:#ff7676}
+:root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{overflow:hidden;background:#090c13;color:var(--ink);font-family:ui-rounded,"SF Pro Rounded","Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
-button{min-height:44px;border:0;border-radius:12px;font:inherit;font-weight:800;color:#10131a;background:var(--gold);touch-action:manipulation}
+body{overflow:hidden;background:var(--bg);color:var(--ink)}
+button{min-height:44px;border:0;border-radius:12px;font:750 15px/1.1 var(--font);letter-spacing:.01em;color:#08101f;background:var(--gold);cursor:pointer;touch-action:manipulation;transition:transform .18s var(--spring),filter .18s ease}
+button:active:not(:disabled){transform:scale(.96)}button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 button:disabled{opacity:.4;filter:saturate(.4)}
-#game{height:100%;max-width:720px;margin:auto;display:flex;flex-direction:column;background:radial-gradient(circle at 90% 0,#263054 0,transparent 42%),linear-gradient(#111623,#090c13)}
-header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line);background:rgba(11,14,22,.92)}
+#game{height:100%;max-width:720px;margin:auto;display:flex;flex-direction:column;background:radial-gradient(120% 90% at 50% 0,var(--bg2),var(--bg))}
+header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}
 .topline{display:flex;align-items:center;gap:10px}
-.brand{flex:1;min-width:0}.brand h1{font-size:20px;line-height:1;margin:0;color:var(--gold);letter-spacing:.02em}.brand p{font-size:11px;color:var(--muted);margin:5px 0 0}
-#prestige-button{padding:0 13px;background:linear-gradient(135deg,#a98bff,#68c9ff)}
+.brand{flex:1;min-width:0}.brand h1{font-size:20px;line-height:1;margin:0;color:var(--text);font-family:var(--font-display);font-weight:750;letter-spacing:-.02em}.brand p{font-size:11px;color:var(--muted);margin:5px 0 0}
+#prestige-button{padding:0 14px;background:var(--violet)}
 .stats{display:grid;grid-template-columns:1.15fr .95fr .95fr .95fr;gap:7px;margin-top:10px}
-.stat{min-width:0;padding:8px 9px;border:1px solid var(--line);border-radius:10px;background:#111722}.stat span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.07em}.stat strong{display:block;overflow:hidden;margin-top:2px;color:var(--green);font-size:15px;white-space:nowrap;text-overflow:ellipsis}
+.stat{min-width:0;padding:8px 9px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--panel)}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}.stat strong{display:block;overflow:hidden;margin-top:2px;color:var(--cyan);font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap;text-overflow:ellipsis}
 #business-list{flex:1;min-height:0;overflow-y:auto;padding:10px 10px calc(16px + env(safe-area-inset-bottom));overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.business{margin-bottom:10px;padding:11px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,var(--panel2),var(--panel));box-shadow:0 7px 18px rgba(0,0,0,.2)}
-.business-head{display:flex;align-items:center;gap:9px}.icon{display:grid;width:42px;height:42px;flex:0 0 42px;place-items:center;border-radius:12px;background:#2b3347;font-size:23px}.business-title{flex:1;min-width:0}.business-title h2{overflow:hidden;margin:0;font-size:16px;white-space:nowrap;text-overflow:ellipsis}.business-title p{margin:3px 0 0;color:var(--muted);font-size:11px}.owned{min-width:48px;text-align:right;color:var(--gold);font-size:20px;font-weight:900}
-.progress{height:8px;overflow:hidden;margin:9px 0;border-radius:99px;background:#080b11}.progress-fill{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .06s linear}
+.business{margin-bottom:10px;padding:11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+.business-head{display:flex;align-items:center;gap:9px}.icon{display:grid;width:42px;height:42px;flex:0 0 42px;place-items:center;border-radius:12px;background:var(--panel2);font-size:23px}.business-title{flex:1;min-width:0}.business-title h2{overflow:hidden;margin:0;font-size:16px;white-space:nowrap;text-overflow:ellipsis}.business-title p{margin:3px 0 0;color:var(--muted);font-size:11px}.owned{min-width:48px;text-align:right;color:var(--gold);font-size:20px;font-weight:900}
+.progress{height:8px;overflow:hidden;margin:9px 0;border-radius:99px;background:var(--bg)}.progress-fill{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--cyan));transition:width .06s linear}
 .details{display:flex;justify-content:space-between;gap:8px;margin-bottom:9px;color:var(--muted);font-size:11px}.details strong{color:var(--ink)}
 .actions{display:grid;grid-template-columns:.8fr 1.2fr;gap:8px}.run{background:var(--green)}.buy{background:var(--gold)}
-.manager{width:100%;margin-top:8px;padding:6px 10px;border:1px solid #535d77;background:#2b3347;color:var(--ink);font-size:12px}.manager.hired{border-color:#287552;background:#173f30;color:var(--green)}
-.milestone{margin:8px 1px 0;color:#97a2b9;font-size:10px;text-align:center}
-.notice{display:none;margin:10px 10px 0;padding:11px 42px 11px 12px;position:relative;border:1px solid #3d8c69;border-radius:13px;background:#143526;color:#dfffee;font-size:12px}.notice.show{display:block}.notice strong{display:block;margin-bottom:2px;color:var(--green);font-size:14px}.notice button{position:absolute;top:4px;right:5px;min-width:36px;padding:0;background:transparent;color:var(--ink);font-size:18px}
-.modal{display:none;position:fixed;inset:0;z-index:20;align-items:center;justify-content:center;padding:18px;background:rgba(3,5,9,.78)}.modal.show{display:flex}.modal-card{width:min(430px,100%);padding:20px;border:1px solid #737fa1;border-radius:20px;background:#171c29;box-shadow:0 24px 70px #000}.modal-card h2{margin:0 0 8px;color:#bca8ff}.modal-card p{margin:7px 0;color:var(--muted);font-size:14px;line-height:1.45}.preview{margin:14px 0;padding:12px;border-radius:12px;background:#0e121b;color:var(--ink)}.warning{color:#ffb9b9!important}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.cancel{background:#353d51;color:var(--ink)}.confirm{background:linear-gradient(135deg,#a98bff,#68c9ff)}
+.manager{width:100%;margin-top:8px;padding:6px 10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:12px}.manager.hired{border-color:color-mix(in srgb,var(--good) 45%,transparent);background:color-mix(in srgb,var(--good) 14%,var(--bg));color:var(--good)}
+.milestone{margin:8px 1px 0;color:var(--muted);font-size:10px;text-align:center}
+.notice{display:none;margin:10px 10px 0;padding:11px 42px 11px 12px;position:relative;border:1px solid color-mix(in srgb,var(--good) 45%,transparent);border-radius:var(--radius);background:color-mix(in srgb,var(--good) 12%,var(--bg));color:var(--text);font-size:12px}.notice.show{display:block}.notice strong{display:block;margin-bottom:2px;color:var(--green);font-size:14px}.notice button{position:absolute;top:4px;right:5px;min-width:36px;padding:0;background:transparent;color:var(--ink);font-size:18px}
+.modal{display:none;position:fixed;inset:0;z-index:20;align-items:center;justify-content:center;padding:18px;background:rgba(8,8,18,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}.modal.show{display:flex}.modal-card{width:min(430px,100%);padding:20px;border:1px solid rgba(77,232,255,.42);border-radius:var(--radius-l);background:rgba(22,22,37,.94);box-shadow:var(--glow)}.modal-card h2{margin:0 0 8px;color:var(--text);font:750 26px/1.1 var(--font-display);letter-spacing:-.02em}.modal-card p{margin:7px 0;color:var(--muted);font-size:14px;line-height:1.45}.preview{margin:14px 0;padding:12px;border-radius:12px;background:var(--bg);color:var(--ink)}.warning{color:var(--danger)!important}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.cancel{background:var(--panel2);border:1px solid var(--line);color:var(--ink)}.confirm{background:var(--violet)}
 @media (min-width:620px){.business{padding:13px}.actions{grid-template-columns:130px 1fr}.stats{gap:10px}.stat{padding:9px 11px}}
 @media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
+@media (prefers-reduced-motion:reduce){button{transition:none}button:active:not(:disabled){transform:none}.progress-fill{transition:none}}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
 </head>

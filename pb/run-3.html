@@ -2,34 +2,70 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Space Tunnel Runner - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 40px rgba(100,100,255,0.3)}
-#overlay{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(0,0,0,0.8);z-index:20;color:#fff}
-#overlay h1{font-size:48px;color:#7b68ee;margin-bottom:10px}
-#overlay p{font-size:16px;margin-bottom:20px;opacity:0.7}
-#overlay button{padding:14px 40px;font-size:20px;background:#7b68ee;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
-#overlay button:hover{background:#6a5acd}
-.hidden{display:none!important}
-#hud{position:absolute;top:15px;left:50%;transform:translateX(-50%);color:#7b68ee;font-size:24px;font-weight:bold;z-index:10;text-shadow:0 0 10px rgba(123,104,238,0.5)}
+:root{--hud-h:54px;--pad:10px;--pad-b:10px}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{padding:var(--hud-h) var(--pad) var(--pad-b)}
+#c{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border)}
+.arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center}
+.arcade-pill{font-size:15px}
+.arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="run-3" data-arcade-title="Space Tunnel Runner"></script>
 </head>
 <body>
-<div id="hud">0m</div>
-<canvas id="c"></canvas>
-<div id="overlay">
-<h1>🚀 Space Tunnel Runner</h1>
-<p>Run through the space tunnel! Don't fall off!</p>
-<p style="font-size:14px">← → Move · ↑ / SPACE Jump · Run on walls!</p>
-<button onclick="startGame()">PLAY</button>
-</div>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Space tunnel runner playfield"></canvas>
+  <div class="arcade-hud"><span class="arcade-pill">Distance <b><span id="dist">0</span> m</b></span></div>
+
+  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
+    <h2>Space Tunnel Runner</h2>
+    <p>Run along the tunnel platforms and don't fall off. Left / right move, up or Space jumps. On touch use the D-pad and the A button.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
+    <h2>Paused</h2><p>The tunnel waits for you.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+    <h2>You fell</h2>
+    <span class="arcade-big"><span id="overBig">0</span> m</span>
+    <p>Best <strong id="overBest">0</strong> m</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
+  </div></div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
-C.width=800;C.height=500;
+const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
+const GW=800,GH=500,DPR_CAP=2,BEST_KEY='pb_best_run_3';
+const $=id=>document.getElementById(id);
+const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
+const PAL={bg:tok('--bg2'),text:tok('--text'),body:tok('--accent'),head:tok('--cyan'),legs:tok('--violet'),
+  plat:tok('--card2'),platTop:tok('--border'),platAccent:tok('--violet'),platAccentTop:tok('--danger')};
+let state='idle',paused=false,best=loadBest();
+function loadBest(){
+  try{return Number(localStorage.getItem(BEST_KEY))||0}
+  catch(error){console.warn('[Space Tunnel Runner] could not read best distance',error);return 0}
+}
+function saveBest(value){
+  try{localStorage.setItem(BEST_KEY,String(value))}
+  catch(error){console.warn('[Space Tunnel Runner] could not save best distance',error)}
+}
+function fit(){ // size the canvas to the stage, backing store at device resolution
+  const cs=getComputedStyle(stage);
+  const aw=stage.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const ah=stage.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const k=Math.max(0.1,Math.min(aw/GW,ah/GH));
+  const dpr=Math.min(window.devicePixelRatio||1,DPR_CAP);
+  C.style.width=Math.floor(GW*k)+'px';C.style.height=Math.floor(GH*k)+'px';
+  C.width=Math.round(GW*k*dpr);C.height=Math.round(GH*k*dpr);
+}
+new ResizeObserver(fit).observe(stage);fit();
 let player,platforms,speed,dist,gameOver,started=false,keys={},gravity;
 
 class Player{
@@ -43,7 +79,7 @@ class Player{
     this.x+=this.vx*m;
     this.y+=this.vy*m;
     if(this.x<0)this.x=0;
-    if(this.x>C.width-this.w)this.x=C.width-this.w;
+    if(this.x>GW-this.w)this.x=GW-this.w;
     this.onGround=false;
     for(let p of platforms){
       let px=p.x-cameraX;
@@ -51,27 +87,24 @@ class Player{
         this.y=p.y-this.h;this.vy=0;this.onGround=true;this.jumping=false;
       }
     }
-    if(this.y>C.height+50){gameOver=true;Arcade.gameOver(dist)}
+    if(this.y>GH+50){gameOver=true;Arcade.gameOver(dist);finish()}
   }
   draw(){
-    // Glow
-    X.shadowColor='#7b68ee';X.shadowBlur=15;
     // Body
-    X.fillStyle='#7b68ee';
+    X.fillStyle=PAL.body;
     X.fillRect(this.x,this.y,this.w,this.h);
     // Head
-    X.fillStyle='#9b88ff';
+    X.fillStyle=PAL.head;
     X.beginPath();X.arc(this.x+this.w/2,this.y-2,this.w/2,0,Math.PI*2);X.fill();
     // Eyes
-    X.fillStyle='#fff';
+    X.fillStyle=PAL.bg;
     X.fillRect(this.x+4,this.y-5,5,4);
     X.fillRect(this.x+12,this.y-5,5,4);
     // Legs animation
     let legOff=Math.sin(Date.now()/80)*4;
-    X.fillStyle='#6a5acd';
+    X.fillStyle=PAL.legs;
     X.fillRect(this.x+3,this.y+this.h,5,8+legOff);
     X.fillRect(this.x+12,this.y+this.h,5,8-legOff);
-    X.shadowBlur=0;
   }
 }
 
@@ -85,7 +118,7 @@ function generatePlatforms(){
     let gap=30+Math.random()*60+Math.min(i*0.5,40);
     let y=300+Math.sin(i*0.3)*80+(Math.random()-0.5)*60;
     y=Math.max(200,Math.min(420,y));
-    platforms.push({x,y,w,gap:false,color:i%10===0?'#ff4488':'#3a3a6a'});
+    platforms.push({x,y,w,gap:false,accent:i%10===0});
     // Add gaps
     if(i>5&&Math.random()<0.3){
       x+=w+gap;
@@ -96,20 +129,33 @@ function generatePlatforms(){
 }
 
 function drawStars(){
-  X.fillStyle='#fff';
+  X.fillStyle=PAL.text;
   for(let i=0;i<80;i++){
-    let sx=(i*173+cameraX*0.1*(1+(i%3)*0.5))%C.width;
-    let sy=(i*91)%C.height;
+    let sx=(i*173+cameraX*0.1*(1+(i%3)*0.5))%GW;
+    let sy=(i*91)%GH;
     X.globalAlpha=0.2+Math.sin(Date.now()/500+i)*0.2;
     X.fillRect(sx,sy,1.5,1.5);
   }
   X.globalAlpha=1;
 }
 
+function resetRun(){
+  player=new Player();speed=3;dist=0;gameOver=false;cameraX=0;
+  generatePlatforms();$('dist').textContent=0;
+}
 function startGame(){
-  document.getElementById('overlay').classList.add('hidden');
-  player=new Player();speed=3;dist=0;gameOver=false;started=true;cameraX=0;
-  generatePlatforms();
+  resetRun();started=true;state='playing';paused=false;
+  ['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
+}
+function finish(){
+  state='over';
+  if(dist>best){best=dist;saveBest(best)}
+  $('overBig').textContent=dist;$('overBest').textContent=best;
+  $('overOv').classList.add('show');
+}
+function setPaused(v){
+  if(v===paused||(v&&state!=='playing'))return;
+  paused=v;lastT=0;$('pauseOv').classList.toggle('show',v);
 }
 
 let lastT=0;
@@ -118,15 +164,15 @@ function loop(ts){
   // delta-time: the game runs at the same real speed on 30/60/120 Hz screens
   const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;
   lastT=ts;
-  if(!started)return;
-  X.fillStyle='#0a0a2a';X.fillRect(0,0,C.width,C.height);
+  X.setTransform(C.width/GW,0,0,C.height/GH,0,0);
+  X.fillStyle=PAL.bg;X.fillRect(0,0,GW,GH);
   drawStars();
-  
-  if(!gameOver){
+
+  if(state==='playing'&&!paused&&!gameOver){
     cameraX+=speed*m;
     speed=4.2+Math.min(dist/1200,5.5);
     dist=Math.floor(cameraX/10);
-    document.getElementById('hud').textContent=dist+'m';
+    $('dist').textContent=dist;
     window.score=dist;Arcade.score(dist);
     player.update(m);
   }
@@ -134,14 +180,11 @@ function loop(ts){
   // Draw platforms
   for(let p of platforms){
     let px=p.x-cameraX;
-    if(px<-200||px>C.width+100)continue;
-    X.fillStyle=p.color;
-    X.shadowColor=p.color==='#ff4488'?'#ff4488':'#5555aa';
-    X.shadowBlur=8;
+    if(px<-200||px>GW+100)continue;
+    X.fillStyle=p.accent?PAL.platAccent:PAL.plat;
     X.fillRect(px,p.y,p.w,15);
-    X.fillStyle=p.color==='#ff4488'?'#ff6699':'#4a4a7a';
+    X.fillStyle=p.accent?PAL.platAccentTop:PAL.platTop;
     X.fillRect(px,p.y,p.w,5);
-    X.shadowBlur=0;
     // Grid lines
     X.strokeStyle='rgba(255,255,255,0.1)';X.lineWidth=1;
     for(let gx=px;gx<px+p.w;gx+=20){X.beginPath();X.moveTo(gx,p.y);X.lineTo(gx,p.y+15);X.stroke()}
@@ -149,19 +192,17 @@ function loop(ts){
   
   player.draw();
   
-  if(gameOver){
-    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#ff4488';X.font='bold 44px Segoe UI';X.textAlign='center';
-    X.fillText('YOU FELL!',C.width/2,200);
-    X.fillStyle='#fff';X.font='22px Segoe UI';
-    X.fillText('Distance: '+dist+'m',C.width/2,255);
-    X.fillText('Press SPACE to retry',C.width/2,300);
-  }
 }
 
-document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '&&gameOver)startGame();e.preventDefault()});
+document.addEventListener('keydown',e=>{
+  keys[e.key]=true;
+  if(e.target.closest&&e.target.closest('button'))return;
+  if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat)startGame();
+  e.preventDefault()});
 document.addEventListener('keyup',e=>{keys[e.key]=false});
-loop();
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+$('playBtn').onclick=startGame;$('againBtn').onclick=startGame;$('resumeBtn').onclick=()=>setPaused(false);
+resetRun();loop();
 </script>
 </body>
 </html>

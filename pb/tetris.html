@@ -2,43 +2,59 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Falling Blocks - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-#game{display:flex;gap:20px;align-items:flex-start}
-canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:8px;border:2px solid #333}
-#side{color:#fff;width:140px}
-#side h3{color:#ff6b9d;margin-bottom:8px}
-#next{background:#111;border:2px solid #333;border-radius:8px;margin-bottom:15px}
-.stat{margin-bottom:10px}
-.stat label{font-size:12px;color:#888}
-.stat .val{font-size:24px;font-weight:bold;color:#ff6b9d}
-#game{max-width:100%;max-height:100vh;overflow:auto}
-#c{max-height:100vh}
-@media(max-width:480px){body{height:auto;min-height:100vh;overflow:auto;padding:12px}#game{flex-direction:column;align-items:center;width:100%}#c{max-height:70vh}#side{width:100%}}
+:root{--hud-h:54px;--pad:10px;--pad-b:10px}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{padding:var(--hud-h) var(--pad) var(--pad-b)}
+#c{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border)}
+.arcade-hud{inset:5px 14px auto;align-items:center}
+.next{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 12px;border-radius:var(--radius)}
+.arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
+#next{display:block;width:72px;height:36px}
+@media (max-width:520px){.arcade-pill{padding:7px 9px;font-size:12px}.next{padding:4px 8px}.next .lbl{display:none}}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="tetris" data-arcade-title="Falling Blocks"></script>
 </head>
 <body>
-<div id="game">
-<canvas id="c" width="300" height="600"></canvas>
-<div id="side">
-<h3>NEXT</h3>
-<canvas id="next" width="120" height="120"></canvas>
-<div class="stat"><label>SCORE</label><div class="val" id="sc">0</div></div>
-<div class="stat"><label>LINES</label><div class="val" id="ln">0</div></div>
-<div class="stat"><label>LEVEL</label><div class="val" id="lv">1</div></div>
-<div style="margin-top:20px;font-size:11px;color:#555">
-↑ Rotate<br>← → Move<br>↓ Soft Drop<br>Space Hard Drop
-</div>
-</div>
-</div>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Falling blocks board"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="sc">0</b></span>
+    <span class="arcade-pill">Lv <b id="lv">1</b> · <b id="ln">0</b> lines</span>
+    <span class="arcade-pill next"><span class="lbl">Next</span> <canvas id="next" aria-label="Next piece"></canvas></span>
+  </div>
+
+  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
+    <h2>Falling Blocks</h2>
+    <p>Stack the pieces and clear full lines. Left / right move, up rotates, down drops softly, Space drops hard.</p>
+    <p>On touch use the D-pad: up rotates, A drops hard.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
+    <h2>Paused</h2><p>Your stack is waiting.</p>
+    <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Resume</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+    <h2>Game over</h2>
+    <span class="arcade-big" id="overBig">0</span>
+    <p>Best <strong id="overBest">0</strong></p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
+  </div></div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
+const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
 const NC=document.getElementById('next'),NX=NC.getContext('2d');
-const COLS=10,ROWS=20,SZ=30;
+const COLS=10,ROWS=20,SZ=30,GW=COLS*SZ,GH=ROWS*SZ,DPR_CAP=2;
+const NEXT_CELL=18,NEXT_W=72,NEXT_H=36,MAX_DT=100,BEST_KEY='pb_best_tetris';
+const $=id=>document.getElementById(id);
+const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
+const PAL={bg:tok('--bg2'),grid:tok('--border')};
 const SHAPES=[
   {blocks:[[0,0],[1,0],[2,0],[3,0]],color:'#00e5ff'},
   {blocks:[[0,0],[1,0],[0,1],[1,1]],color:'#ffcc00'},
@@ -49,12 +65,33 @@ const SHAPES=[
   {blocks:[[1,0],[2,0],[0,1],[1,1]],color:'#ff4444'},
 ];
 let grid,piece,next,score,lines,level,gameOver,dropTimer,dropInterval;
+let state='idle',paused=false,best=loadBest();
+
+function loadBest(){
+  try{return Number(localStorage.getItem(BEST_KEY))||0}
+  catch(error){console.warn('[Falling Blocks] could not read best score',error);return 0}
+}
+function saveBest(value){
+  try{localStorage.setItem(BEST_KEY,String(value))}
+  catch(error){console.warn('[Falling Blocks] could not save best score',error)}
+}
+function fit(){ // board fills the stage at device resolution; the next-piece canvas follows the same ratio
+  const cs=getComputedStyle(stage);
+  const aw=stage.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const ah=stage.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const k=Math.max(0.1,Math.min(aw/GW,ah/GH));
+  const dpr=Math.min(window.devicePixelRatio||1,DPR_CAP);
+  C.style.width=Math.floor(GW*k)+'px';C.style.height=Math.floor(GH*k)+'px';
+  C.width=Math.round(GW*k*dpr);C.height=Math.round(GH*k*dpr);
+  NC.width=Math.round(NEXT_W*dpr);NC.height=Math.round(NEXT_H*dpr);
+}
+new ResizeObserver(fit).observe(stage);fit();
 
 function newPiece(){
   piece={shape:next||SHAPES[Math.floor(Math.random()*7)],x:3,y:0,rot:0};
   next=SHAPES[Math.floor(Math.random()*7)];
   let blocks=getBlocks(piece);
-  for(let b of blocks)if(grid[b.y]&&grid[b.y][b.x]){gameOver=true;Arcade.gameOver(score)}
+  for(let b of blocks)if(!gameOver&&grid[b.y]&&grid[b.y][b.x]){gameOver=true;Arcade.gameOver(score)}
 }
 function getBlocks(p){
   let s=p.shape.blocks,r=p.rot%4,res=[];
@@ -69,6 +106,9 @@ function valid(p){
   for(let b of blocks){if(b.x<0||b.x>=COLS||b.y>=ROWS)return false;if(b.y>=0&&grid[b.y][b.x])return false}
   return true;
 }
+function showStats(){
+  $('sc').textContent=score;$('ln').textContent=lines;$('lv').textContent=level;
+}
 function lock(){
   let blocks=getBlocks(piece);
   for(let b of blocks)if(b.y>=0)grid[b.y][b.x]=piece.shape.color;
@@ -79,22 +119,24 @@ function lock(){
   }
   if(cleared){lines+=cleared;score+=[0,100,300,500,800][cleared]*level;Arcade.score(score);level=Math.floor(lines/10)+1;
     dropInterval=Math.max(50,500-level*40);
-    document.getElementById('sc').textContent=score;
-    document.getElementById('ln').textContent=lines;
-    document.getElementById('lv').textContent=level;
+    showStats();
   }
   newPiece();
 }
+function drawCell(ctx,x,y,size,color){
+  ctx.fillStyle=color;
+  ctx.beginPath();ctx.roundRect(x+1,y+1,size-2,size-2,size>20?4:3);ctx.fill();
+}
 function draw(){
-  X.fillStyle='#111';X.fillRect(0,0,C.width,C.height);
+  X.setTransform(C.width/GW,0,0,C.height/GH,0,0);
+  X.fillStyle=PAL.bg;X.fillRect(0,0,GW,GH);
   // Grid
-  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
-    if(grid[y][x]){X.fillStyle=grid[y][x];X.shadowColor=grid[y][x];X.shadowBlur=5;
-      X.beginPath();X.roundRect(x*SZ+1,y*SZ+1,SZ-2,SZ-2,3);X.fill();X.shadowBlur=0}
-    else{X.strokeStyle='#1a1a2a';X.strokeRect(x*SZ,y*SZ,SZ,SZ)}
-  }
+  X.strokeStyle=PAL.grid;X.globalAlpha=0.45;X.lineWidth=1;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(!grid[y][x])X.strokeRect(x*SZ+.5,y*SZ+.5,SZ,SZ);
+  X.globalAlpha=1;
+  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(grid[y][x])drawCell(X,x*SZ,y*SZ,SZ,grid[y][x]);
   // Current piece
-  if(!gameOver){
+  if(!gameOver&&piece){
     let blocks=getBlocks(piece);
     // Ghost
     let ghost={...piece};while(valid({...ghost,y:ghost.y+1}))ghost.y++;
@@ -102,48 +144,67 @@ function draw(){
     X.globalAlpha=0.2;X.fillStyle=piece.shape.color;
     for(let b of gb){X.fillRect(b.x*SZ+2,b.y*SZ+2,SZ-4,SZ-4)}
     X.globalAlpha=1;
-    // Piece
-    X.fillStyle=piece.shape.color;X.shadowColor=piece.shape.color;X.shadowBlur=8;
-    for(let b of blocks)if(b.y>=0){X.beginPath();X.roundRect(b.x*SZ+1,b.y*SZ+1,SZ-2,SZ-2,3);X.fill()}
-    X.shadowBlur=0;
+    for(let b of blocks)if(b.y>=0)drawCell(X,b.x*SZ,b.y*SZ,SZ,piece.shape.color);
   }
-  // Next piece preview
-  NX.fillStyle='#111';NX.fillRect(0,0,120,120);
-  NX.fillStyle=next.color;NX.shadowColor=next.color;NX.shadowBlur=5;
-  for(let b of next.blocks){NX.beginPath();NX.roundRect(b[0]*25+20,b[1]*25+30,23,23,3);NX.fill()}
-  NX.shadowBlur=0;
-  if(gameOver){
-    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#ff6b9d';X.font='bold 36px Segoe UI';X.textAlign='center';
-    X.fillText('GAME OVER',C.width/2,C.height/2-20);
-    X.fillStyle='#fff';X.font='16px Segoe UI';X.fillText('Press SPACE',C.width/2,C.height/2+20);
-  }
+  drawNext();
+}
+function drawNext(){
+  NX.setTransform(NC.width/NEXT_W,0,0,NC.height/NEXT_H,0,0);
+  NX.clearRect(0,0,NEXT_W,NEXT_H);
+  if(!next)return;
+  const cols=Math.max(...next.blocks.map(b=>b[0]))+1,rows=Math.max(...next.blocks.map(b=>b[1]))+1;
+  const ox=(NEXT_W-cols*NEXT_CELL)/2,oy=(NEXT_H-rows*NEXT_CELL)/2;
+  for(let b of next.blocks)drawCell(NX,ox+b[0]*NEXT_CELL,oy+b[1]*NEXT_CELL,NEXT_CELL,next.color);
 }
 function start(){
   grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
-  score=0;lines=0;level=1;gameOver=false;dropInterval=500;dropTimer=0;
+  score=0;lines=0;level=1;gameOver=false;dropInterval=500;dropTimer=0;paused=false;
   next=SHAPES[Math.floor(Math.random()*7)];newPiece();
-  document.getElementById('sc').textContent=0;
-  document.getElementById('ln').textContent=0;
-  document.getElementById('lv').textContent=1;
+  showStats();
+  state='playing';lastTime=performance.now();
+  ['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
+}
+function finish(){
+  state='over';
+  if(score>best){best=score;saveBest(best)}
+  $('overBig').textContent=score;$('overBest').textContent=best;
+  $('overOv').classList.add('show');
+}
+function setPaused(v){
+  if(v===paused||(v&&state!=='playing'))return;
+  paused=v;lastTime=performance.now();$('pauseOv').classList.toggle('show',v);
 }
 let lastTime=0;
 function loop(t){
-  let dt=t-lastTime;lastTime=t;
-  if(!gameOver){dropTimer+=dt;if(dropTimer>dropInterval){dropTimer=0;
-    if(valid({...piece,y:piece.y+1}))piece.y++;else lock()}}
-  draw();requestAnimationFrame(loop);
+  let dt=Math.min(MAX_DT,t-lastTime);lastTime=t;
+  if(state==='playing'&&!paused){
+    if(gameOver)finish();
+    else{dropTimer+=dt;if(dropTimer>dropInterval){dropTimer=0;
+      if(valid({...piece,y:piece.y+1}))piece.y++;else lock()}
+      if(gameOver)finish()}
+  }
+  if(grid)draw();
+  requestAnimationFrame(loop);
 }
-document.addEventListener('keydown',e=>{
-  if(gameOver){if(e.key===' ')start();e.preventDefault();return}
+function handleKey(e){
+  if(e.target.closest&&e.target.closest('button'))return;
+  if(state!=='playing'){
+    if(e.key===' '||e.key==='Enter'){start();e.preventDefault()}
+    return;
+  }
+  if(paused)return;
   if(e.key==='ArrowLeft'&&valid({...piece,x:piece.x-1}))piece.x--;
   if(e.key==='ArrowRight'&&valid({...piece,x:piece.x+1}))piece.x++;
-  if(e.key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++;Arcade.score(score)}
+  if(e.key==='ArrowDown'&&valid({...piece,y:piece.y+1})){piece.y++;score++;Arcade.score(score);$('sc').textContent=score}
   if(e.key==='ArrowUp'){let t={...piece,rot:piece.rot+1};if(valid(t))piece.rot++}
-  if(e.key===' '){while(valid({...piece,y:piece.y+1})){piece.y++;score+=2;Arcade.score(score)}lock()}
-  e.preventDefault();
-});
-start();requestAnimationFrame(loop);
+  if(e.key===' '){while(valid({...piece,y:piece.y+1})){piece.y++;score+=2;Arcade.score(score)}$('sc').textContent=score;lock()}
+  if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' '].includes(e.key))e.preventDefault();
+}
+document.addEventListener('keydown',handleKey);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+$('playBtn').onclick=start;$('againBtn').onclick=start;$('resumeBtn').onclick=()=>setPaused(false);
+start();state='idle';$('startOv').classList.add('show');
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
