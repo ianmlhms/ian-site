@@ -271,6 +271,19 @@
     root.style.setProperty("--vvt", vv.offsetTop+"px");
   }
   vv.addEventListener("resize",fit); vv.addEventListener("scroll",fit); fit();
+  // messenger.html?debug shows the live viewport numbers (for iPad keyboard issues).
+  if(/[?&]debug\b/.test(location.search)){
+    var box=document.createElement("div");
+    box.style.cssText="position:fixed;top:0;left:0;z-index:99999;background:#ff0;color:#000;font:13px/1.35 monospace;padding:6px 8px;pointer-events:none;white-space:pre";
+    document.documentElement.appendChild(box);
+    var r=function(sel){var e=document.querySelector(sel);if(!e)return "-";var b=e.getBoundingClientRect();return Math.round(b.top)+".."+Math.round(b.bottom)};
+    setInterval(function(){
+      box.textContent="vv h "+Math.round(vv.height)+" top "+Math.round(vv.offsetTop)+" scale "+vv.scale.toFixed(2)+
+        "\ninner "+innerHeight+" scrollY "+Math.round(scrollY)+" dvh? "+getComputedStyle(document.body).height+
+        "\nbody "+r("body")+"  app "+r("#app")+"\nchat "+r(".chat")+"  msgs "+r(".messages")+"\ncomposer "+r(".composer")+
+        "\nua "+navigator.userAgent.slice(0,60);
+    },250);
+  }
   // when the keyboard opens on focus, keep the latest messages in view
   document.addEventListener("focusin",function(e){
     if(!e.target.closest||!e.target.closest(".composer"))return;
