@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Falling Blocks - Arcade</title>
+<title>Tetris - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
 :root{--hud-h:54px;--pad:10px;--pad-b:10px}
@@ -17,7 +17,7 @@ body{display:flex;flex-direction:column}
 #next{display:block;width:72px;height:36px}
 @media (max-width:520px){.arcade-pill{padding:7px 9px;font-size:12px}.next{padding:4px 8px}.next .lbl{display:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=2" data-arcade-id="tetris" data-arcade-title="Falling Blocks"></script>
+<script src="/pb/arcade-kit.js?v=2" data-arcade-id="tetris" data-arcade-title="Tetris"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -29,7 +29,7 @@ body{display:flex;flex-direction:column}
   </div>
 
   <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Falling Blocks</h2>
+    <h2>Tetris</h2>
     <p>Stack the pieces and clear full lines. Left / right move, up rotates, down drops softly, Space drops hard.</p>
     <p>On touch use the D-pad: up rotates, A drops hard.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
@@ -69,11 +69,11 @@ let state='idle',paused=false,best=loadBest();
 
 function loadBest(){
   try{return Number(localStorage.getItem(BEST_KEY))||0}
-  catch(error){console.warn('[Falling Blocks] could not read best score',error);return 0}
+  catch(error){console.warn('[Tetris] could not read best score',error);return 0}
 }
 function saveBest(value){
   try{localStorage.setItem(BEST_KEY,String(value))}
-  catch(error){console.warn('[Falling Blocks] could not save best score',error)}
+  catch(error){console.warn('[Tetris] could not save best score',error)}
 }
 function fit(){ // board fills the stage at device resolution; the next-piece canvas follows the same ratio
   const cs=getComputedStyle(stage);
