@@ -2,54 +2,113 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Reaction Time - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden;cursor:pointer;user-select:none;transition:background 0.2s}
-body.waiting{background:#cc2222}
-body.ready{background:#22aa22}
-body.result{background:#1a1a2e}
-body.idle{background:#2244aa}
-#text{color:#fff;text-align:center}
-#text h1{font-size:48px;margin-bottom:10px}
-#text p{font-size:20px;opacity:0.8}
-#times{margin-top:20px;font-size:16px;color:rgba(255,255,255,0.6)}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{display:block}
+.pad{position:absolute;inset:0;display:grid;place-items:center;padding:70px 20px 20px;text-align:center;cursor:pointer;
+  user-select:none;-webkit-user-select:none;touch-action:manipulation;outline:none;
+  background:radial-gradient(120% 90% at 50% 0%,var(--bg2),var(--bg));transition:background .2s ease}
+.pad.waiting{background:color-mix(in srgb,var(--danger) 62%,var(--bg))}
+.pad.ready{background:var(--good);color:#06210f}
+.pad h2{margin:0;font:800 clamp(34px,9vw,64px)/1.05 var(--font-display);letter-spacing:-.03em}
+.pad p{margin:10px 0 0;font:650 clamp(15px,3.6vw,19px)/1.35 var(--font);opacity:.85}
+.pad:not(.waiting):not(.ready) p{color:var(--muted)}
+.arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center;gap:10px}
+.arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 </style>
 <script src="/pb/arcade-kit.js?v=1" data-arcade-id="reaction" data-arcade-title="Reaction Time" data-arcade-lower-is-better></script>
 </head>
-<body class="idle" onclick="handleClick()">
-<div id="text">
-<h1>⚡ Reaction Time</h1>
-<p>Click to start, then click when the screen turns GREEN!</p>
-<div id="times"></div>
-</div>
+<body>
+<main class="arcade-stage" id="stage">
+  <div class="pad" id="pad" role="button" tabindex="0" aria-live="polite">
+    <div><h2 id="padTitle">Reaction Time</h2><p id="padSub"></p></div>
+  </div>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Average <b id="avg">–</b></span>
+    <span class="arcade-pill">Best <b id="bst">–</b></span>
+  </div>
+
+  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
+    <h2>Reaction Time</h2>
+    <p>The screen starts red. The moment it turns green, tap it, click it or press Space as fast as you can. Tapping too early costs the round.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="resultOv"><div class="arcade-panel">
+    <h2 id="resTitle">Your time</h2>
+    <span class="arcade-big" id="resBig">0 ms</span>
+    <p id="resNote"></p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
+  </div></div>
+</main>
 <script>
-let state='idle',startTime,timeout,times=[];
-function handleClick(){
-  if(state==='idle'){
-    state='waiting';document.body.className='waiting';
-    document.querySelector('h1').textContent='Wait...';
-    document.querySelector('p').textContent="Don't click yet!";
-    timeout=setTimeout(()=>{
-      state='ready';document.body.className='ready';
-      document.querySelector('h1').textContent='CLICK NOW!';
-      document.querySelector('p').textContent='';
-      startTime=Date.now();
-    },1500+Math.random()*3000);
-  }else if(state==='waiting'){
-    clearTimeout(timeout);state='idle';document.body.className='idle';
-    document.querySelector('h1').textContent='Too early! 😅';
-    document.querySelector('p').textContent='Click to try again';
-  }else if(state==='ready'){
-    let ms=Date.now()-startTime;times.push(ms);if(times.length>5)times.shift();
-    state='idle';document.body.className='result';
-    document.querySelector('h1').textContent=ms+'ms';
-    let avg=Math.round(times.reduce((a,b)=>a+b)/times.length);
-    let best=Math.min(...times);Arcade.gameOver(ms);
-    document.querySelector('p').textContent='Click to try again';
-    document.getElementById('times').textContent=`Average: ${avg}ms · Best: ${best}ms · Attempts: ${times.length}`;
-  }
+const MIN_WAIT_MS=1500,WAIT_SPREAD_MS=3000,MAX_TIMES=5;
+const $=id=>document.getElementById(id);
+const pad=$('pad');
+let state='idle',startTime=0,timeout=0,times=[];
+
+function setPad(cls,title,sub){
+  pad.className='pad'+(cls?' '+cls:'');
+  $('padTitle').textContent=title;
+  $('padSub').textContent=sub;
 }
+function hideOverlays(){$('startOv').classList.remove('show');$('resultOv').classList.remove('show')}
+function beginRound(){
+  clearTimeout(timeout);
+  hideOverlays();
+  state='waiting';
+  setPad('waiting','Wait for green','Don\'t tap yet');
+  timeout=setTimeout(()=>{
+    state='ready';
+    setPad('ready','Tap now!','');
+    startTime=performance.now();
+  },MIN_WAIT_MS+Math.random()*WAIT_SPREAD_MS);
+}
+function showResult(title,big,note){
+  state='result';
+  $('resTitle').textContent=title;$('resBig').textContent=big;$('resNote').textContent=note;
+  $('resultOv').classList.add('show');
+}
+function tooEarly(){
+  clearTimeout(timeout);
+  setPad('','Too early','');
+  showResult('Too early','–','You tapped before the screen turned green.');
+}
+function hit(){
+  const ms=Math.round(performance.now()-startTime);
+  times.push(ms);if(times.length>MAX_TIMES)times.shift();
+  const avg=Math.round(times.reduce((a,b)=>a+b)/times.length);
+  const best=Math.min(...times);
+  Arcade.gameOver(ms);
+  $('avg').textContent=avg+' ms';$('bst').textContent=best+' ms';
+  setPad('',ms+' ms','');
+  showResult('Your time',ms+' ms','Average '+avg+' ms · Best '+best+' ms · last '+times.length+' tries');
+}
+function tap(){
+  if(state==='waiting')tooEarly();
+  else if(state==='ready')hit();
+}
+function cancelRound(){ // tab hidden mid-round: drop it instead of timing a background tab
+  if(state!=='waiting'&&state!=='ready')return;
+  clearTimeout(timeout);state='idle';
+  setPad('','Reaction Time','');
+  $('startOv').classList.add('show');
+}
+pad.addEventListener('pointerdown',e=>{e.preventDefault();tap()});
+document.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('button'))return;
+  if(e.key!==' '&&e.key!=='Enter')return;
+  e.preventDefault();
+  if(e.repeat)return;
+  if(state==='waiting'||state==='ready')tap();else beginRound();
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelRound()});
+$('playBtn').onclick=beginRound;$('againBtn').onclick=beginRound;
+setPad('','Reaction Time','');
 </script>
 </body>
 </html>

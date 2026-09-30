@@ -2,76 +2,140 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Whack-a-Mole - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#2a1810;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;overflow:hidden}
-#hud{margin-bottom:15px;font-size:20px;display:flex;gap:30px}
-#board{display:grid;grid-template-columns:repeat(3,120px);gap:15px}
-.hole{width:120px;height:100px;background:radial-gradient(ellipse at center,#1a0a05 0%,#3a2010 100%);border-radius:50%;position:relative;overflow:hidden;cursor:pointer;border:3px solid #5a3a20}
-.mole{position:absolute;bottom:-60px;left:50%;transform:translateX(-50%);font-size:50px;transition:bottom 0.15s;pointer-events:none}
-.mole.up{bottom:10px}
-.mole.hit{bottom:10px;filter:grayscale(1)}
-#msg{margin-top:15px;font-size:22px;min-height:30px}
-button{padding:10px 30px;font-size:18px;background:#ff6b35;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;margin-top:10px}
-button:hover{background:#e55a25}
+:root{--hole:clamp(84px,min(27vw,21vh),150px)}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{padding:64px 14px 14px}
+.arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center;gap:8px}
+#board{display:grid;grid-template-columns:repeat(3,var(--hole));gap:calc(var(--hole)*.14)}
+.hole{width:var(--hole);height:calc(var(--hole)*.82);position:relative;overflow:hidden;cursor:pointer;border-radius:50%;
+  border:2px solid var(--border);background:radial-gradient(ellipse at center,var(--bg) 0%,var(--card2) 100%);
+  touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.hole:active{filter:brightness(1.25)}
+.mole{position:absolute;bottom:calc(var(--hole)*-.5);left:50%;transform:translateX(-50%);font-size:calc(var(--hole)*.42);line-height:1;
+  transition:bottom .15s var(--spring);pointer-events:none}
+.mole.up{bottom:calc(var(--hole)*.08)}
+.mole.hit{bottom:calc(var(--hole)*.08);filter:grayscale(1)}
+.arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
+@media (prefers-reduced-motion:reduce){.mole{transition:none}}
 </style>
 <script src="/pb/arcade-kit.js?v=1" data-arcade-id="whack-a-mole" data-arcade-title="Whack-a-Mole"></script>
 </head>
 <body>
-<div id="hud"><span>Score: <b id="score">0</b></span><span>⏱ <b id="timer">30</b>s</span><span>Combo: <b id="combo">0</b>x</span></div>
-<div id="board"></div>
-<div id="msg"></div>
-<button onclick="startGame()">START</button>
+<main class="arcade-stage" id="stage">
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill">Time <b><span id="timer">30</span> s</b></span>
+    <span class="arcade-pill">Combo <b><span id="combo">0</span>x</b></span>
+  </div>
+  <div id="board" aria-label="Mole holes"></div>
+
+  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
+    <h2>Whack-a-Mole</h2>
+    <p>Tap or click the moles as they pop up. Stars are worth 5, and a streak multiplies your points. You have 30 seconds.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
+    <h2>Paused</h2><p>The moles are holding still.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+    <h2>Time's up</h2>
+    <span class="arcade-big" id="overBig">0</span>
+    <p>Best <strong id="overBest">0</strong></p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
+  </div></div>
+</main>
 <script>
-let score,timeLeft,combo,moles,interval,timerInt,active;
+const ROUND_SECONDS=30,HOLES=9,POPUP_MS=800,VISIBLE_MS=1200,LATE_BONUS_MS=400,LATE_PHASE_SECONDS=15;
+const DOUBLE_CHANCE=0.3,STAR_CHANCE=0.1,STAR_POINTS=5,MAX_COMBO=5,HIT_LINGER_MS=200,BEST_KEY='pb_best_whack_a_mole';
+const $=id=>document.getElementById(id);
+let score=0,timeLeft=ROUND_SECONDS,combo=0,moles=[],interval=0,timerInt=0,active=false;
+let state='idle',paused=false,best=loadBest();
+
+function loadBest(){
+  try{return Number(localStorage.getItem(BEST_KEY))||0}
+  catch(error){console.warn('[Whack-a-Mole] could not read best score',error);return 0}
+}
+function saveBest(value){
+  try{localStorage.setItem(BEST_KEY,String(value))}
+  catch(error){console.warn('[Whack-a-Mole] could not save best score',error)}
+}
 function init(){
-  let b=document.getElementById('board');b.innerHTML='';
+  let b=$('board');b.innerHTML='';
   moles=[];
-  for(let i=0;i<9;i++){
+  for(let i=0;i<HOLES;i++){
     let h=document.createElement('div');h.className='hole';
     let m=document.createElement('div');m.className='mole';m.textContent='🐹';
-    h.appendChild(m);h.addEventListener('click',()=>whack(i));
+    h.appendChild(m);h.addEventListener('pointerdown',e=>{e.preventDefault();whack(i)});
     b.appendChild(h);moles.push({el:m,up:false,hit:false});
   }
 }
+function showCombo(){$('combo').textContent=combo}
 function startGame(){
-  init();score=0;timeLeft=30;combo=0;active=true;
-  document.getElementById('score').textContent=0;
-  document.getElementById('timer').textContent=30;
-  document.getElementById('combo').textContent=0;
-  document.getElementById('msg').textContent='';
+  init();score=0;timeLeft=ROUND_SECONDS;combo=0;active=true;paused=false;state='playing';
+  $('score').textContent=0;
+  $('timer').textContent=ROUND_SECONDS;
+  showCombo();
+  ['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
   if(interval)clearInterval(interval);
   if(timerInt)clearInterval(timerInt);
-  interval=setInterval(popup,800);
-  timerInt=setInterval(()=>{timeLeft--;document.getElementById('timer').textContent=timeLeft;
-    if(timeLeft<=0){clearInterval(interval);clearInterval(timerInt);active=false;
-      Arcade.gameOver(score);document.getElementById('msg').textContent='🎉 Final Score: '+score}},1000);
+  interval=setInterval(popup,POPUP_MS);
+  timerInt=setInterval(tick,1000);
+}
+function tick(){
+  if(paused)return;
+  timeLeft--;$('timer').textContent=timeLeft;
+  if(timeLeft<=0)endGame();
+}
+function endGame(){
+  clearInterval(interval);clearInterval(timerInt);active=false;state='over';
+  Arcade.gameOver(score);
+  if(score>best){best=score;saveBest(best)}
+  $('overBig').textContent=score;$('overBest').textContent=best;
+  $('overOv').classList.add('show');
 }
 function popup(){
+  if(paused)return;
   // Hide all first
   moles.forEach(m=>{m.el.className='mole';m.up=false;m.hit=false});
   // Show 1-2 moles
-  let count=Math.random()<0.3?2:1;
+  let count=Math.random()<DOUBLE_CHANCE?2:1;
   let indices=[];
-  while(indices.length<count){let i=Math.floor(Math.random()*9);if(!indices.includes(i))indices.push(i)}
+  while(indices.length<count){let i=Math.floor(Math.random()*HOLES);if(!indices.includes(i))indices.push(i)}
   for(let i of indices){moles[i].up=true;moles[i].el.className='mole up';
     // Golden mole
-    moles[i].el.textContent=Math.random()<0.1?'⭐':'🐹';
+    moles[i].el.textContent=Math.random()<STAR_CHANCE?'⭐':'🐹';
   }
-  setTimeout(()=>{for(let i of indices){if(!moles[i].hit){moles[i].el.className='mole';moles[i].up=false;combo=0;document.getElementById('combo').textContent=0}}},1200-Math.min(timeLeft<15?400:0,400));
+  setTimeout(()=>{for(let i of indices){if(!moles[i].hit){moles[i].el.className='mole';moles[i].up=false;combo=0;showCombo()}}},VISIBLE_MS-Math.min(timeLeft<LATE_PHASE_SECONDS?LATE_BONUS_MS:0,LATE_BONUS_MS));
 }
 function whack(i){
-  if(!active||!moles[i].up||moles[i].hit)return;
+  if(!active||paused||!moles[i].up||moles[i].hit)return;
   moles[i].hit=true;moles[i].el.className='mole hit';
-  let pts=moles[i].el.textContent==='⭐'?5:1;
-  combo++;pts*=Math.min(combo,5);
+  let pts=moles[i].el.textContent==='⭐'?STAR_POINTS:1;
+  combo++;pts*=Math.min(combo,MAX_COMBO);
   score+=pts;Arcade.score(score);
-  document.getElementById('score').textContent=score;
-  document.getElementById('combo').textContent=combo;
+  $('score').textContent=score;
+  showCombo();
   moles[i].el.textContent='💫';
-  setTimeout(()=>{moles[i].el.className='mole';moles[i].up=false},200);
+  setTimeout(()=>{moles[i].el.className='mole';moles[i].up=false},HIT_LINGER_MS);
 }
+function setPaused(v){
+  if(v===paused||(v&&state!=='playing'))return;
+  paused=v;$('pauseOv').classList.toggle('show',v);
+}
+document.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('button'))return;
+  if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat){e.preventDefault();startGame()}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+$('playBtn').onclick=startGame;$('againBtn').onclick=startGame;$('resumeBtn').onclick=()=>setPaused(false);
 init();
 </script>
 </body>
