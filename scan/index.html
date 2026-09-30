@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <title>Fiche scannen</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="scan.css" />
+  <!-- PDF library: async so it never blocks the camera (scan-pdf.js retries on demand). -->
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <main class="app" id="app">
+
+    <!-- No key: opened outside the Slack button -->
+    <section class="screen center" id="noKeyScreen" hidden>
+      <p class="message">Maach de Scanner iwwer de Knäppchen an #fiches op</p>
+    </section>
+
+    <!-- Camera / scanner -->
+    <section class="screen" id="cameraScreen" hidden>
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+        <div class="fallback-hint" id="fallbackHint" hidden>
+          <p id="fallbackText">Tipp op de groussen Knäppchen fir eng Fiche ze fotograféieren</p>
+        </div>
+        <div class="flash" id="flash"></div>
+      </div>
+
+      <header class="topbar">
+        <button type="button" class="auto-toggle" id="autoToggle" role="switch" aria-checked="true">
+          <span class="auto-dot" aria-hidden="true"></span>Auto
+        </button>
+        <span class="status" id="status" role="status"></span>
+      </header>
+
+      <footer class="bottom">
+        <div class="toast" id="toast" role="status" hidden></div>
+        <div class="thumbs" id="thumbs" aria-label="Säiten"></div>
+        <input class="hint-input" id="hintInput" type="text" maxlength="100"
+               placeholder="Fach / Notiz (optional)" autocomplete="off" autocapitalize="none"
+               enterkeyhint="done" hidden />
+        <div class="controls">
+          <span class="controls-left"></span>
+          <button type="button" class="shutter" id="shutter" aria-label="Fiche scannen"></button>
+          <button type="button" class="send-btn" id="sendBtn" disabled>Schécken</button>
+        </div>
+      </footer>
+    </section>
+
+    <!-- Page preview -->
+    <section class="screen overlay" id="previewScreen" hidden>
+      <div class="preview-wrap"><img id="previewImg" alt="" /></div>
+      <div class="preview-bar">
+        <button type="button" class="btn btn-danger" id="deleteBtn">Läschen</button>
+        <button type="button" class="btn" id="previewCloseBtn">Zréck</button>
+      </div>
+    </section>
+
+    <!-- Sending -->
+    <section class="screen overlay center" id="sendingScreen" hidden>
+      <p class="message" id="sendingText">PDF gëtt gemaach…</p>
+      <div class="progress" id="progress" hidden><div class="progress-bar" id="progressBar"></div></div>
+    </section>
+
+    <!-- Success -->
+    <section class="screen overlay center" id="doneScreen" hidden>
+      <p class="done-title">Geschéckt ✅</p>
+      <p class="message">FicheBot äntwert an #fiches</p>
+      <div class="done-actions">
+        <button type="button" class="btn btn-primary" id="newScanBtn">Nei scannen</button>
+        <a class="btn" id="backToSlack" href="slack://channel?team=T04QG4CRFCG&amp;id=C0C5F4VKP6E">Zréck op Slack</a>
+      </div>
+    </section>
+
+    <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+  </main>
+
+  <script src="scan-detect.js"></script>
+  <script src="scan-pdf.js"></script>
+  <script src="scan-camera.js"></script>
+  <script src="scan.js"></script>
+</body>
+</html>
