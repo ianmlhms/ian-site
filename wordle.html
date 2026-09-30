@@ -6,9 +6,9 @@
   <!-- Auth-gated app shell: almost no crawlable text, so it is kept out of the
        index rather than offered to Google as a near-empty page. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Luxembourgish Word Game | ian.lu</title>
+<title>Wordle op Lëtzebuergesch — Wuertspill | ian.lu</title>
 <meta name="description" content="Wordle op Lëtzebuergesch an Däitsch — all Dag e neit Wuert, mat Leaderboard.">
-<meta property="og:title" content="Luxembourgish Word Game">
+<meta property="og:title" content="Wordle op Lëtzebuergesch — Wuertspill">
 <meta property="og:description" content="Wordle op Lëtzebuergesch an Däitsch.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
@@ -16,7 +16,7 @@
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=24"></script>
+<script src="theme.js?v=25"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;
         --correct:#00c853;--present:#ffb300;--absent:#3a3a3c}
@@ -73,7 +73,7 @@
 <body>
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🟩 Luxembourgish Word Game</h1>
+  <h1>🟩 Wuertspill</h1>
   <div class="spacer"></div>
   <button class="lbbtn" id="lbBtn">🏆 Top</button>
   <span id="acctHost"></span>
@@ -250,7 +250,7 @@ function shareResult(){
   const won=guesses.includes(answer);
   const s=readStored(statsKey());
   const streak=s?liveStreak(s):0;
-  const txt=`ian.lu Luxembourgish Word Game (${lang.toUpperCase()}) ${won?guesses.length:"X"}/6${streak>1?` · 🔥${streak}`:""}\n${grid}\nian.lu/wordle.html`;
+  const txt=`ian.lu Wuertspill (${lang.toUpperCase()}) ${won?guesses.length:"X"}/6${streak>1?` · 🔥${streak}`:""}\n${grid}\nian.lu/wordle.html`;
   if(navigator.share){ navigator.share({text:txt}).catch(()=>{}); }
   else if(navigator.clipboard){ navigator.clipboard.writeText(txt).then(()=>flash("Kopéiert! 📋")).catch(()=>flash(txt)); }
   else flash("Konnt net kopéieren");
@@ -283,7 +283,7 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=1" data-arcade-id="o-wordle" data-arcade-title="Luxembourgish Word Game" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=4" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
   import * as auth from "./auth.js?v=19";

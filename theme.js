@@ -206,9 +206,13 @@
   }
   restrictionGuard();
 
+  // Arcade game pages load the shared kit and own the whole screen (their top bar has "‹ Arcade").
+  const isArcadeGamePage = () => !!document.querySelector('script[src*="arcade-kit.js"]');
+
   // ---- floating picker ----
   function buildPicker() {
     if (document.getElementById("themeFab")) return;
+    if (isArcadeGamePage() && !document.querySelector("#langSw,[data-langsw]")) return;
     const css = document.createElement("style");
     css.textContent = PICKER_CSS;
     document.head.appendChild(css);
@@ -307,6 +311,7 @@
   function buildBottomNav() {
     if (!window.matchMedia("(max-width:760px)").matches) return;
     if (NAV_SKIP.test(location.pathname)) return;
+    if (isArcadeGamePage()) return;
     if (document.getElementById("appNav")) return;
     const cur = location.pathname.split("/").pop() || "index.html";
     const css = document.createElement("style");

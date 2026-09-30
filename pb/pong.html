@@ -2,41 +2,86 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Pong - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,255,200,0.2);max-width:100vw;max-height:100vh}
-#info{position:absolute;top:15px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;z-index:10;background:rgba(0,0,0,0.4);padding:5px 14px;border-radius:12px}
-#menu{position:fixed;inset:0;background:rgba(6,6,22,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:30;color:#fff}
-#menu h1{font-size:34px;letter-spacing:2px;color:#00ffcc;text-shadow:0 0 18px rgba(0,255,204,0.6)}
-#menu button{width:280px;padding:13px;font-size:17px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;background:#16323a;color:#fff}
-#menu button:hover{background:#1e4a55}
-#menu .join{display:flex;gap:8px;width:280px}
-#menu .join input{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid #2a5a6a;background:#0e2228;color:#fff;font-size:17px;text-transform:lowercase;text-align:center}
-#menu .join button{width:auto;padding:12px 20px}
-#mStatus{min-height:24px;font-size:16px;color:#7fe8d0;text-align:center}
-.hidden{display:none!important}
+:root{--hud-h:54px;--pad:10px;--pad-b:36px;--p1:var(--cyan);--p2:var(--amber)}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{padding:var(--hud-h) var(--pad) var(--pad-b)}
+#c{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.p1{--c:var(--p1)}.p2{--c:var(--p2)}
+.arcade-hud{inset:5px 14px auto;align-items:center}
+.hud-btn{pointer-events:auto;min-height:44px}
+.menu-actions{flex-direction:column;align-items:stretch;gap:9px}
+.menu-actions .arcade-btn{width:100%}
+.join{display:flex;gap:8px}
+.menu-actions .join .arcade-btn{width:auto;flex:none}
+.join input{flex:1;min-width:0;min-height:44px;padding:0 14px;border:1px solid var(--border);border-radius:12px;background:var(--card);
+  color:var(--text);font:700 16px/1 var(--font);text-transform:lowercase;text-align:center;outline:none}
+.join input:focus-visible{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(77,232,255,.25)}
+.status{min-height:22px;margin:12px 0 0!important;color:var(--cyan)!important;font-weight:650}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="pong" data-arcade-title="Pong"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="pong" data-arcade-title="Pong"></script>
 </head>
 <body>
-<div id="info">🟢 P1: W/S · 🔵 P2: ↑/↓ · First to 10 wins!</div>
-<canvas id="c" width="800" height="500"></canvas>
-<div id="menu">
-  <h1>PONG</h1>
-  <button id="mLocal">👥 2 Players — one device</button>
-  <button id="mAI">🤖 vs Computer</button>
-  <button id="mHost">🌐 Host online game</button>
-  <div class="join"><input id="mCode" maxlength="5" placeholder="code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button id="mJoin">Join</button></div>
-  <div id="mStatus"></div>
-</div>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Pong court"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill p1"><i class="dot"></i><span id="n1">P1</span> <b id="s1">0</b></span>
+    <button class="arcade-btn secondary hud-btn" id="hudMenu" type="button">Menu</button>
+    <span class="arcade-pill p2"><span id="n2">P2</span> <b id="s2">0</b><i class="dot"></i></span>
+  </div>
+  <div class="arcade-hint" id="hint"></div>
+
+  <div class="arcade-overlay show" id="menu"><div class="arcade-panel">
+    <h2>Pong</h2>
+    <p>First to 10 wins. Move with W / S or the arrow keys; on touch use the on-screen D-pad.</p>
+    <div class="arcade-actions menu-actions">
+      <button class="arcade-btn" id="mAI" type="button">Play vs Computer</button>
+      <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
+      <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
+      <div class="join"><input id="mCode" maxlength="5" placeholder="room code" aria-label="Room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+    </div>
+    <p class="status" id="mStatus" role="status"></p>
+  </div></div>
+
+  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
+    <h2>Paused</h2><p>The game waits for you.</p>
+    <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Resume</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+    <h2 id="overTitle">You win</h2>
+    <span class="arcade-big" id="overBig">10 - 0</span>
+    <p id="overNote"></p>
+    <div class="arcade-actions">
+      <button class="arcade-btn" id="rematchBtn" type="button">Rematch</button>
+      <button class="arcade-btn secondary" id="menuBtn" type="button">Menu</button>
+    </div>
+  </div></div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
+const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
+const GW=800,GH=500,DPR_CAP=2,WIN_SCORE=10;
+const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
+const PAL={bg:tok('--bg2'),line:tok('--border'),text:tok('--text'),p1:tok('--cyan'),p2:tok('--amber'),hit:tok('--danger')};
+function fit(){ // size the canvas to the stage, backing store at device resolution
+  const cs=getComputedStyle(stage);
+  const aw=stage.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const ah=stage.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const k=Math.max(0.1,Math.min(aw/GW,ah/GH));
+  const dpr=Math.min(window.devicePixelRatio||1,DPR_CAP);
+  C.style.width=Math.floor(GW*k)+'px';C.style.height=Math.floor(GH*k)+'px';
+  C.width=Math.round(GW*k*dpr);C.height=Math.round(GH*k*dpr);
+}
+new ResizeObserver(fit).observe(stage);fit();
 let keys={},particles=[];
 let p1={y:250,score:0,h:80},p2={y:250,score:0,h:80};
 let ball={x:400,y:250,vx:5,vy:3,speed:5,trail:[]};
-const PW=12,PX1=30,PX2=C.width-30-PW;
+const PW=12,PX1=30,PX2=GW-30-PW;
 
 /* ---------- modes + online bridge ---------- */
 let mode=null,running=false,peerN=1,netFrame=0,lastT=0;
@@ -52,17 +97,35 @@ window.addEventListener('message',e=>{const d=e.data;if(!d)return;
 const menu=document.getElementById('menu'),mStatus=document.getElementById('mStatus');
 const status=(t)=>mStatus.textContent=t;
 const randCode=()=>Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,5).padEnd(5,'x');
-function begin(){p1.score=0;p2.score=0;p1.y=250;p2.y=250;resetBall(1);running=true;menu.classList.add('hidden');
-  document.getElementById('info').textContent=
-    mode==='local'?'🟢 P1: W/S · 🔵 P2: ↑/↓ · First to 10 wins!':
-    mode==='ai'?'🟢 You: W/S or ↑/↓ · First to 10 wins!':
-    '🟢 You are '+(mode==='host'?'GREEN (left)':'BLUE (right)')+' · W/S or ↑/↓ · First to 10!';}
-function backToMenu(msg){running=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
-  menu.classList.remove('hidden');status(msg||'')}
+const $=id=>document.getElementById(id);
+const pauseOv=$('pauseOv'),overOv=$('overOv');
+let paused=false,overShown=false;
+function names(){ // [left label, right label] for the current mode
+  if(mode==='ai')return['You','CPU'];
+  if(mode==='host')return['You','Them'];
+  if(mode==='guest')return['Them','You'];
+  return['P1','P2'];
+}
+function begin(){p1.score=0;p2.score=0;p1.y=250;p2.y=250;resetBall(1);running=true;paused=false;menu.classList.remove('show');
+  const[n1,n2]=names();$('n1').textContent=n1;$('n2').textContent=n2;
+  $('hint').textContent=
+    mode==='local'?'First to 10  ·  P1: W / S  ·  P2: ↑ / ↓':
+    mode==='ai'?'First to 10  ·  W / S or ↑ / ↓ to move':
+    'You are '+(mode==='host'?'left (cyan)':'right (amber)')+'  ·  first to 10';}
+function backToMenu(msg){running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
+  pauseOv.classList.remove('show');menu.classList.add('show');status(msg||'')}
+function setPaused(v){ // pause offline games when the tab is hidden; online rooms keep running
+  if(v===paused||(v&&(!running||mode==='host'||mode==='guest'||overShown)))return;
+  paused=v;pauseOv.classList.toggle('show',v);
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+$('resumeBtn').onclick=()=>{lastT=0;setPaused(false)};
+$('menuBtn').onclick=()=>backToMenu();
+$('hudMenu').onclick=()=>backToMenu();
 document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
 document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
 document.getElementById('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
-  status('Room code: '+c.toUpperCase()+' — waiting for the other iPad…')};
+  status('Room code: '+c.toUpperCase()+' — waiting for the other player…')};
 document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();
   if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
   mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'…')};
@@ -81,15 +144,15 @@ function sendKeys(){NET.send({t:'k',up:!!meUp(),down:!!meDown(),sp:!!keys[' ']})
 /* ---------- AI: predicts the intercept, then picks the return angle whose
  * landing point is furthest from the player's paddle ---------- */
 function foldY(y0,vy,frames){
-  const H=C.height;
+  const H=GH;
   const yu=y0+vy*frames;
   const f=((yu%(2*H))+2*H)%(2*H);
   return f>H?2*H-f:f;
 }
 function aiMove(){
-  let target=C.height/2;
+  let target=GH/2;
   if(ball.vx>0){
-    const H=C.height, frames=(PX2-ball.x)/ball.vx;
+    const H=GH, frames=(PX2-ball.x)/ball.vx;
     const fold=(((ball.y+ball.vy*frames)%(2*H))+2*H)%(2*H);
     let py,avy;                                  // arrival y + arrival vy (wall bounces flip it)
     if(fold>H){py=2*H-fold;avy=-ball.vy}else{py=fold;avy=ball.vy}
@@ -104,7 +167,7 @@ function aiMove(){
   }
   const d=target-p2.y;
   if(Math.abs(d)>6)p2.y+=Math.sign(d)*Math.min(5.4,Math.abs(d)*0.12);
-  p2.y=Math.max(p2.h/2,Math.min(C.height-p2.h/2,p2.y));
+  p2.y=Math.max(p2.h/2,Math.min(GH-p2.h/2,p2.y));
 }
 
 function resetBall(dir){
@@ -116,18 +179,17 @@ function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Ma
 function loop(ts){
   requestAnimationFrame(loop);
   const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;lastT=ts;
-  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
-  X.strokeStyle='rgba(255,255,255,0.03)';
-  for(let i=0;i<C.width;i+=40){X.beginPath();X.moveTo(i,0);X.lineTo(i,C.height);X.stroke()}
-  X.setLineDash([10,10]);X.strokeStyle='rgba(255,255,255,0.1)';X.lineWidth=2;
-  X.beginPath();X.moveTo(C.width/2,0);X.lineTo(C.width/2,C.height);X.stroke();X.setLineDash([]);
+  X.setTransform(C.width/GW,0,0,C.height/GH,0,0);
+  X.fillStyle=PAL.bg;X.fillRect(0,0,GW,GH);
+  X.setLineDash([10,12]);X.strokeStyle=PAL.line;X.lineWidth=2;
+  X.beginPath();X.moveTo(GW/2,0);X.lineTo(GW/2,GH);X.stroke();X.setLineDash([]);
 
-  const over=p1.score>=10||p2.score>=10;
-  if(running&&!over){
+  const over=p1.score>=WIN_SCORE||p2.score>=WIN_SCORE;
+  if(running&&!over&&!paused){
     if(mode==='guest'){
       // local prediction for my paddle; everything else lerps to the host state
       if(meUp())p2.y=Math.max(p2.h/2,p2.y-6*m);
-      if(meDown())p2.y=Math.min(C.height-p2.h/2,p2.y+6*m);
+      if(meDown())p2.y=Math.min(GH-p2.h/2,p2.y+6*m);
       if(guestTarget){
         p1.y+=(guestTarget.p1y-p1.y)*0.35;
         p2.y+=(guestTarget.p2y-p2.y)*0.15;
@@ -141,61 +203,68 @@ function loop(ts){
       const p1Up=mode==='local'?keys['w']||keys['W']:meUp();
       const p1Down=mode==='local'?keys['s']||keys['S']:meDown();
       if(p1Up)p1.y=Math.max(p1.h/2,p1.y-6*m);
-      if(p1Down)p1.y=Math.min(C.height-p1.h/2,p1.y+6*m);
+      if(p1Down)p1.y=Math.min(GH-p1.h/2,p1.y+6*m);
       if(mode==='ai')aiMove();
       else{
         const p2Up=mode==='host'?remoteKeys.up:keys['ArrowUp'];
         const p2Down=mode==='host'?remoteKeys.down:keys['ArrowDown'];
         if(p2Up)p2.y=Math.max(p2.h/2,p2.y-6*m);
-        if(p2Down)p2.y=Math.min(C.height-p2.h/2,p2.y+6*m);
+        if(p2Down)p2.y=Math.min(GH-p2.h/2,p2.y+6*m);
       }
       ball.trail.push({x:ball.x,y:ball.y});if(ball.trail.length>15)ball.trail.shift();
       ball.x+=ball.vx*m;ball.y+=ball.vy*m;
-      if(ball.y<8||ball.y>C.height-8){ball.vy*=-1;ball.y=Math.max(8,Math.min(C.height-8,ball.y));addP(ball.x,ball.y,'#fff',5)}
+      if(ball.y<8||ball.y>GH-8){ball.vy*=-1;ball.y=Math.max(8,Math.min(GH-8,ball.y));addP(ball.x,ball.y,PAL.text,5)}
       if(ball.x-8<PX1+PW&&ball.y>p1.y-p1.h/2&&ball.y<p1.y+p1.h/2&&ball.vx<0){
-        ball.vx=Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p1.y)*0.1;addP(ball.x,ball.y,'#00ff88',10);
+        ball.vx=Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p1.y)*0.1;addP(ball.x,ball.y,PAL.p1,10);
       }
       if(ball.x+8>PX2&&ball.y>p2.y-p2.h/2&&ball.y<p2.y+p2.h/2&&ball.vx>0){
-        ball.vx=-Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p2.y)*0.1;addP(ball.x,ball.y,'#4488ff',10);
+        ball.vx=-Math.abs(ball.vx)*1.05;ball.vy+=(ball.y-p2.y)*0.1;addP(ball.x,ball.y,PAL.p2,10);
       }
-      if(ball.x<0){p2.score++;addP(50,p1.y,'#ff4444',20);resetBall(1)}
-      if(ball.x>C.width){p1.score++;addP(C.width-50,p2.y,'#ff4444',20);resetBall(-1);
-        if(mode==='ai'&&p1.score>=10){window.score=(window.score||0)+1;Arcade.gameOver(window.score)}}
+      if(ball.x<0){p2.score++;addP(50,p1.y,PAL.hit,20);resetBall(1)}
+      if(ball.x>GW){p1.score++;addP(GW-50,p2.y,PAL.hit,20);resetBall(-1);
+        if(mode==='ai'&&p1.score>=WIN_SCORE){window.score=(window.score||0)+1;Arcade.gameOver(window.score)}}
       if(mode==='host'&&++netFrame%5===0)
         NET.send({t:'s',p1y:Math.round(p1.y),p2y:Math.round(p2.y),bx:Math.round(ball.x),by:Math.round(ball.y),s1:p1.score,s2:p2.score});
     }
   }
 
   for(let i=0;i<ball.trail.length;i++){
-    X.globalAlpha=i/ball.trail.length*0.3;X.fillStyle='#00ffcc';
+    X.globalAlpha=i/ball.trail.length*0.25;X.fillStyle=PAL.p1;
     X.beginPath();X.arc(ball.trail[i].x,ball.trail[i].y,6,0,Math.PI*2);X.fill();
   }
   X.globalAlpha=1;
-  X.fillStyle='#fff';X.shadowColor='#00ffcc';X.shadowBlur=20;
-  X.beginPath();X.arc(ball.x,ball.y,8,0,Math.PI*2);X.fill();X.shadowBlur=0;
-  X.fillStyle='#00ff88';X.shadowColor='#00ff88';X.shadowBlur=15;
+  X.fillStyle=PAL.text;
+  X.beginPath();X.arc(ball.x,ball.y,8,0,Math.PI*2);X.fill();
+  X.fillStyle=PAL.p1;
   X.beginPath();X.roundRect(PX1,p1.y-p1.h/2,PW,p1.h,6);X.fill();
-  X.fillStyle='#4488ff';X.shadowColor='#4488ff';
-  X.beginPath();X.roundRect(PX2,p2.y-p2.h/2,PW,p2.h,6);X.fill();X.shadowBlur=0;
-  X.font='bold 60px Segoe UI';X.textAlign='center';X.globalAlpha=0.2;
-  X.fillStyle='#00ff88';X.fillText(p1.score,C.width/4,80);
-  X.fillStyle='#4488ff';X.fillText(p2.score,C.width*3/4,80);X.globalAlpha=1;
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
+  X.fillStyle=PAL.p2;
+  X.beginPath();X.roundRect(PX2,p2.y-p2.h/2,PW,p2.h,6);X.fill();
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];if(!paused){p.x+=p.vx;p.y+=p.vy;p.life--}
     if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/30;X.fillStyle=p.color;
     X.fillRect(p.x-2,p.y-2,4,4);X.globalAlpha=1}
-  if(running&&over){
-    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
-    const p1w=p1.score>=10;
-    X.fillStyle=p1w?'#00ff88':'#4488ff';X.font='bold 48px Segoe UI';X.textAlign='center';
-    let name=p1w?'P1':'P2';
-    if(mode==='ai')name=p1w?'YOU':'COMPUTER';
-    if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'YOU':'THEY';
-    X.fillText(name+(name==='YOU'?' WIN!':' WINS!'),C.width/2,250);
-    X.fillStyle='#fff';X.font='20px Segoe UI';
-    X.fillText(mode==='guest'?'Host presses SPACE to rematch · M: menu':'Press SPACE to rematch · M: menu',C.width/2,300);
-    if(mode!=='guest'&&(keys[' ']||(mode==='host'&&remoteKeys.sp))){p1.score=0;p2.score=0;resetBall(1)}
-  }
+  syncHud(over);
+  if(running&&over&&!paused&&mode!=='guest'&&(keys[' ']||(mode==='host'&&remoteKeys.sp)))rematch();
 }
+let shown1=-1,shown2=-1;
+function syncHud(over){ // DOM HUD + result overlay, touched only when something changed
+  if(p1.score!==shown1){shown1=p1.score;$('s1').textContent=shown1}
+  if(p2.score!==shown2){shown2=p2.score;$('s2').textContent=shown2}
+  const showOver=running&&over;
+  if(showOver===overShown)return;
+  overShown=showOver;overOv.classList.toggle('show',showOver);
+  if(!showOver)return;
+  const p1w=p1.score>=WIN_SCORE;
+  let name=p1w?'P1':'P2';
+  if(mode==='ai')name=p1w?'You':'Computer';
+  if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'You':'They';
+  $('overTitle').textContent=name==='You'?'You win':name+' win'+(name==='They'?'':'s');
+  $('overBig').textContent=p1.score+' - '+p2.score;
+  $('overNote').textContent=mode==='guest'?'Waiting for the host to start a rematch.':
+    mode==='ai'?'Wins this session: '+(window.score||0):'Space or Rematch to play again.';
+  $('rematchBtn').hidden=mode==='guest';
+}
+function rematch(){p1.score=0;p2.score=0;resetBall(1)}
+$('rematchBtn').onclick=rematch;
 document.addEventListener('keydown',e=>{keys[e.key]=true;
   if(running&&(e.key==='m'||e.key==='M'))backToMenu();
   if((mode==='guest')&&['w','s','W','S','ArrowUp','ArrowDown',' '].includes(e.key))sendKeys();

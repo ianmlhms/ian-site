@@ -2,83 +2,209 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Colour Word Match - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff;user-select:none}
-#word{font-size:72px;font-weight:bold;margin:30px 0;text-shadow:0 0 20px rgba(255,255,255,0.2)}
-#prompt{font-size:20px;opacity:0.7;margin-bottom:20px}
-#buttons{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:500px}
-.btn{padding:16px 32px;font-size:20px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;color:#fff;min-width:100px;transition:transform 0.1s}
-.btn:hover{transform:scale(1.05)}
-.btn:active{transform:scale(0.95)}
-#hud{display:flex;gap:30px;font-size:20px;margin-bottom:20px}
-#feedback{font-size:28px;margin-top:20px;min-height:40px}
-#timer-bar{width:300px;height:8px;background:#2a2a4a;border-radius:4px;margin-bottom:10px;overflow:hidden}
-#timer-fill{height:100%;background:#00ff88;transition:width 0.1s;border-radius:4px}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+body{user-select:none;-webkit-user-select:none}
+.arcade-stage{overflow-y:auto}
+.clash{display:flex;flex-direction:column;align-items:center;gap:14px;width:min(100%,520px);margin:auto}
+.timer{width:100%;height:8px;border:1px solid var(--border);border-radius:99px;background:var(--card);overflow:hidden}
+#timerFill{height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--cyan))}
+#timerFill.low{background:var(--danger)}
+.prompt{margin:0;color:var(--muted);font-weight:700}
+#word{min-height:1.1em;margin:4px 0 6px;font:800 clamp(44px,14vw,84px)/1 var(--font-display);letter-spacing:-.03em;text-align:center}
+#buttons{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%}
+.opt{min-height:56px;border:0;border-radius:var(--radius);color:#08101f;font:800 16px/1 var(--font);letter-spacing:.04em;cursor:pointer;
+  transition:transform .18s var(--spring),filter .18s ease}
+.opt:hover{filter:brightness(1.08)}
+.opt:active{transform:scale(.95)}
+.opt:focus-visible{outline:3px solid var(--text);outline-offset:2px}
+#feedback{min-height:1.6em;margin:0;font:750 18px/1.3 var(--font)}
+#feedback.good{color:var(--good)}#feedback.bad{color:var(--danger)}#feedback.slow{color:var(--amber)}
+@media (prefers-reduced-motion:reduce){.opt{transition:filter .12s ease}.opt:active{transform:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="color-clash" data-arcade-title="Colour Word Match"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="color-clash" data-arcade-title="Colour Word Match"></script>
 </head>
 <body>
-<div id="hud"><span>Score: <b id="score">0</b></span><span>Streak: <b id="streak">0</b>🔥</span><span>Level: <b id="level">1</b></span></div>
-<div id="timer-bar"><div id="timer-fill" style="width:100%"></div></div>
-<div id="prompt">What COLOR is the text?</div>
-<div id="word">RED</div>
-<div id="buttons"></div>
-<div id="feedback"></div>
+<main class="arcade-stage" id="stage">
+  <div class="clash">
+    <div class="timer" role="progressbar" aria-label="Time left"><div id="timerFill"></div></div>
+    <p class="prompt">What colour is the text?</p>
+    <div id="word" aria-live="polite">RED</div>
+    <div id="buttons"></div>
+    <p id="feedback" role="status"></p>
+  </div>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill">Streak <b id="streak">0</b></span>
+    <span class="arcade-pill">Level <b id="level">1</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const COLORS=[
-  {name:'RED',hex:'#ff4466'},{name:'BLUE',hex:'#4488ff'},{name:'GREEN',hex:'#44cc44'},
-  {name:'YELLOW',hex:'#ffcc00'},{name:'PURPLE',hex:'#aa66ff'},{name:'ORANGE',hex:'#ff8844'},
-  {name:'PINK',hex:'#ff66aa'},{name:'CYAN',hex:'#44dddd'}
-];
-let score=0,streak=0,level=1,timeLeft=100,timer,correct;
+const GAME_ID='color-clash',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
 
+
+const COLORS=[
+  {name:'RED',hex:COLOR.danger},{name:'BLUE',hex:COLOR.accent},{name:'GREEN',hex:COLOR.good},
+  {name:'YELLOW',hex:COLOR.amber},{name:'PURPLE',hex:COLOR.violet},{name:'ORANGE',hex:'#ff9a5c'},
+  {name:'PINK',hex:'#ff7ac6'},{name:'CYAN',hex:COLOR.cyan}
+];
+const TICK_MS=100,ROUND_PAUSE_MS=400,SLOW_PAUSE_MS=300,LOW_TIME=30,FULL_TIME=100;
+let score=0,streak=0,level=1,timeLeft=FULL_TIME,correct='',locked=false,state='ready',roundTimer=0,tickTimer=0;
+
+function updateHud(){
+  $('score').textContent=score;$('streak').textContent=streak;$('level').textContent=level;
+}
+function setFeedback(kind,text){const f=$('feedback');f.className=kind;f.textContent=text}
 function newRound(){
-  let textColor=COLORS[Math.floor(Math.random()*COLORS.length)];
-  let wordColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+  const textColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+  const wordColor=COLORS[Math.floor(Math.random()*COLORS.length)];
   correct=textColor.name;
-  document.getElementById('word').textContent=wordColor.name;
-  document.getElementById('word').style.color=textColor.hex;
-  // Generate buttons - correct + 3 random
-  let opts=[textColor];
+  $('word').textContent=wordColor.name;
+  $('word').style.color=textColor.hex;
+  const opts=[textColor];
   while(opts.length<Math.min(4+Math.floor(level/3),6)){
-    let c=COLORS[Math.floor(Math.random()*COLORS.length)];
+    const c=COLORS[Math.floor(Math.random()*COLORS.length)];
     if(!opts.find(o=>o.name===c.name))opts.push(c);
   }
   opts.sort(()=>Math.random()-0.5);
-  let h='';
-  for(let o of opts)h+=`<button class="btn" style="background:${o.hex}" onclick="answer('${o.name}')">${o.name}</button>`;
-  document.getElementById('buttons').innerHTML=h;
-  timeLeft=100;
+  $('buttons').replaceChildren(...opts.map(o=>{
+    const b=document.createElement('button');
+    b.type='button';b.className='opt';b.textContent=o.name;b.style.background=o.hex;
+    b.addEventListener('click',()=>answer(o.name));
+    return b;
+  }));
+  timeLeft=FULL_TIME;locked=false;
 }
-
+function nextRoundSoon(ms){
+  locked=true;
+  clearTimeout(roundTimer);
+  roundTimer=setTimeout(()=>{if(state==='playing')newRound();else roundTimer=-1},ms);
+}
 function answer(name){
+  if(state!=='playing'||locked)return;
   if(name===correct){
     score+=10+streak*2;Arcade.score(score);streak++;
     level=Math.floor(streak/5)+1;
-    document.getElementById('feedback').innerHTML='<span style="color:#44ff88">✓ Correct!</span>';
+    setFeedback('good','Correct!');
   }else{
     streak=0;score=Math.max(0,score-5);Arcade.score(score);
-    document.getElementById('feedback').innerHTML='<span style="color:#ff4466">✗ It was '+correct+'</span>';
+    setFeedback('bad','It was '+correct.toLowerCase());
   }
-  document.getElementById('score').textContent=score;
-  document.getElementById('streak').textContent=streak;
-  document.getElementById('level').textContent=level;
-  setTimeout(newRound,400);
+  updateHud();
+  nextRoundSoon(ROUND_PAUSE_MS);
 }
-
-setInterval(()=>{
+function tick(){
+  if(state!=='playing'||locked)return;
   timeLeft-=1.5+level*0.3;
-  if(timeLeft<=0){streak=0;score=Math.max(0,score-3);Arcade.score(score);
-    document.getElementById('feedback').innerHTML='<span style="color:#ffcc00">⏱ Too slow!</span>';
-    document.getElementById('streak').textContent=0;document.getElementById('score').textContent=score;
-    setTimeout(newRound,300);timeLeft=100}
-  document.getElementById('timer-fill').style.width=timeLeft+'%';
-  document.getElementById('timer-fill').style.background=timeLeft>30?'#00ff88':'#ff4466';
-},100);
-
-newRound();
+  if(timeLeft<=0){
+    streak=0;score=Math.max(0,score-3);Arcade.score(score);
+    setFeedback('slow','Too slow!');
+    updateHud();
+    timeLeft=0;nextRoundSoon(SLOW_PAUSE_MS);
+  }
+  $('timerFill').style.width=timeLeft+'%';
+  $('timerFill').classList.toggle('low',timeLeft<=LOW_TIME);
+}
+function startGame(){
+  hidePanel();
+  clearTimeout(roundTimer);roundTimer=0;
+  score=0;streak=0;level=1;state='playing';
+  Arcade.score(score);updateHud();setFeedback('','');
+  newRound();
+  if(!tickTimer)tickTimer=setInterval(tick,TICK_MS);
+}
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';
+  showPanel({title:'Paused',label:'Resume',action:()=>{state='playing';if(roundTimer===-1){roundTimer=0;newRound()}}});
+}
+/* keyboard: 1-6 picks the matching button */
+document.addEventListener('keydown',e=>{
+  const n=Number(e.key);
+  if(!Number.isInteger(n)||n<1||e.repeat)return;
+  const btn=$('buttons').children[n-1];
+  if(btn)btn.click();
+});
+Arcade.onRestart(startGame);
+newRound();updateHud();
+showPanel({title:'Colour Word Match',body:'Tap the button that matches the colour of the word - not what it says. Keys 1-6 work too.',label:'Play',action:startGame});
 </script>
 </body>
 </html>

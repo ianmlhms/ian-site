@@ -16,7 +16,10 @@ const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim
 
 const PB = (window.PB = {});
 PB.current = null;          // currently open game object {id,name,...}
-let sessionBest = null;     // best score reported during this play
+let sessionBests = new Map();   // best score reported during this play, per board id
+let activeBoard = null;         // sub-leaderboard chosen by the game (e.g. one per level), or null
+const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board"]);
+const BOARD_ID_PATTERN = /^[a-z0-9-]{1,48}$/;
 let sb = null, session = null, username = null;
 
 /* ---------------- local best (always on) ---------------- */
@@ -40,6 +43,46 @@ function setLocalBest(g, value) {
   try { localStorage.setItem("pb_best_" + g.id, String(value)); }
   catch (error) { console.warn("[Arcade] local best write failed", { id: g.id, error }); return false; }
   return true;
+}
+
+/* ---------------- boards: a game may keep several leaderboards (one per level) ----------------
+ * The game names the active one through Arcade.setBoard({id,name,format}). Its id must be the game's own id or
+ * start with it plus "-" (geometrydash, geometrydash-2 …), so a game can only ever write to its own boards. */
+function ownsBoard(g, id) {
+  return !!g && typeof id === "string" && BOARD_ID_PATTERN.test(id) && (id === g.id || id.startsWith(g.id + "-"));
+}
+function cleanBoard(g, board) {
+  if (board === null) return null;
+  if (!board || typeof board !== "object" || !ownsBoard(g, board.id)) return undefined;
+  if (typeof board.name !== "string" || !board.name || board.name.length > 80) return undefined;
+  return Object.freeze({ id: board.id, name: board.name, format: typeof board.format === "string" ? board.format : "" });
+}
+function activeGame() {
+  const g = PB.current;
+  if (!g) return null;
+  return activeBoard ? { ...g, id: activeBoard.id, name: activeBoard.name, format: activeBoard.format } : g;
+}
+function setActiveBoard(board) {
+  const g = PB.current;
+  if (!g) return;
+  const clean = cleanBoard(g, board);
+  if (clean === undefined) { console.warn("[Arcade] ignored a leaderboard that is not this game's", board); return; }
+  activeBoard = clean;
+  renderGameBar();
+}
+
+/* Scores that need more than a bare number: the game names a format, we know how to print it. */
+const SCORE_FORMATS = {
+  // Geometry Dash: below 1000 a plain best %, from 1000 up a finished run (1000 + 999 - attempts).
+  gd(score) {
+    if (score < 1000) return score + " %";
+    const attempts = 1999 - score;
+    return score === 1000 ? "100 % · 999+ attempts" : "100 % · " + attempts + (attempts === 1 ? " attempt" : " attempts");
+  },
+};
+function formatScore(g, score) {
+  const format = SCORE_FORMATS[g?.format];
+  return format ? format(score) : String(score);
 }
 
 /* ---------------- score reporter injected into each game ---------------- */
@@ -111,11 +154,14 @@ PB.instrument = (html) => {
 };
 
 /* ---------------- open / close hooks ---------------- */
-PB.onOpenGame = (g) => { PB.current = g; sessionBest = null; renderGameBar(); loadCloudSave(g); };
-PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; };
+PB.onOpenGame = (g) => { PB.current = g; sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); };
+PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; activeBoard = null; };
 PB.registerStandalone = (g) => {
   PB.current = g;
-  sessionBest = null;
+  sessionBests = new Map();
+  activeBoard = null;
+  const chosen = window.Arcade?.getBoard?.();   // the game may have picked a board before this module loaded
+  if (chosen) activeBoard = cleanBoard(g, chosen) || null;
   renderGameBar();
 };
 // Saves reach the cloud on a 3 s debounce; leaving the page inside that window
@@ -301,12 +347,17 @@ async function loadCloudSave(g) {
 
 /* ---------------- receive scores from iframe or standalone games ---------------- */
 function receiveScore(detail) {
-  const g = PB.current;
-  if (!g || g.noScore) return;
+  const base = PB.current;
+  if (!base || base.noScore) return;
+  let g = activeGame();
+  if (detail?.board !== undefined) {   // a score tagged with its board: must be one this game owns
+    if (!ownsBoard(base, detail.board)) { console.warn("[Arcade] ignored a score for a board this game does not own", detail.board); return; }
+    g = detail.board === g.id ? g : { ...base, id: detail.board, name: base.name, format: activeBoard?.format || "" };
+  }
   const score = detail?.score;
   if (!Number.isFinite(score) || Math.abs(score) > MAX_SCORE) return;
-  if (!isBetter(g, score, sessionBest)) return;
-  sessionBest = score;
+  if (!isBetter(g, score, sessionBests.has(g.id) ? sessionBests.get(g.id) : null)) return;
+  sessionBests.set(g.id, score);
   setLocalBest(g, score);
   renderGameBar();
   if (sb && session) saveCloud(g, score);
@@ -314,10 +365,12 @@ function receiveScore(detail) {
 window.addEventListener("message", (e) => {
   if (!isGameMessage(e)) return;
   const d = e.data;
-  if (d.__pb !== 1 || (Object.keys(d).length !== 2 && Object.keys(d).length !== 3)) return;
+  if (d.__pbBoard === 1) { setActiveBoard(d.board); return; }
+  if (d.__pb !== 1 || !Object.keys(d).every((key) => GAME_MESSAGE_KEYS.has(key))) return;
   receiveScore(d);
 });
 window.addEventListener("arcade:score", (event) => receiveScore(event.detail));
+window.addEventListener("arcade:board", (event) => setActiveBoard(event.detail?.board ?? null));
 
 /* ---------------- cloud: auth + scores ---------------- */
 async function getCreateClient() {
@@ -489,14 +542,16 @@ function renderGameBar() {
     });
   }
   const best = mountedGameBar?.best || document.getElementById("arcadeBest");
-  if (!best || !g || g.noScore) return;
-  const stored = localBest(g.id);
-  const value = sessionBest !== null && isBetter(g, sessionBest, stored) ? sessionBest : stored;
-  best.textContent = value === null ? "" : "Best: " + value;
+  const shown = activeGame();
+  if (!best || !shown || shown.noScore) return;
+  const stored = localBest(shown.id);
+  const sessionBest = sessionBests.has(shown.id) ? sessionBests.get(shown.id) : null;
+  const value = sessionBest !== null && isBetter(shown, sessionBest, stored) ? sessionBest : stored;
+  best.textContent = value === null ? "" : "Best: " + formatScore(shown, value);
 }
 
 async function openBoard() {
-  const g = PB.current; if (!g || g.noScore) return;
+  const g = activeGame(); if (!g || g.noScore) return;
   boardModal.querySelector(".pb-box").innerHTML =
     `<button class="pb-x">&times;</button><h3>🏆 ${esc(g.name)}</h3><div id="pbBoardList" style="margin-top:12px;color:var(--text2)">Loading…</div>`;
   boardModal.querySelector(".pb-x").onclick = () => boardModal.classList.remove("open");
@@ -511,7 +566,7 @@ async function openBoard() {
     return;
   }
   list.innerHTML = rows.map((r, i) =>
-    `<div class="pb-row"><span class="r">${i + 1}</span><span style="flex:1">${esc(r.username || "anon")}</span><b>${r.score}</b></div>`).join("");
+    `<div class="pb-row"><span class="r">${i + 1}</span><span style="flex:1">${esc(r.username || "anon")}</span><b>${esc(formatScore(g, r.score))}</b></div>`).join("");
 }
 PB.openBoard = openBoard;
 

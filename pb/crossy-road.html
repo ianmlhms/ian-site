@@ -2,23 +2,139 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Road Crossing - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a2a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{border-radius:12px;box-shadow:0 0 30px rgba(100,255,100,0.2);max-width:100vw;max-height:100vh}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+.arcade-panel{max-height:100%;overflow-y:auto}
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.levels button{min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--card2);color:var(--text);
+  font:750 15px/1 var(--font);cursor:pointer;transition:transform .18s var(--spring)}
+.levels button:active:not([disabled]){transform:scale(.94)}
+.levels button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.levels button[disabled]{opacity:.4;cursor:not-allowed}
+.levels button.cleared{border-color:var(--good)}
+.levels button.next{background:var(--amber);border-color:transparent;color:#1a1204}
+.levels-title{margin:0 0 8px;color:var(--muted);font:800 12px/1 var(--font);letter-spacing:.06em;text-transform:uppercase}
+@media (prefers-reduced-motion:reduce){.levels button{transition:none}.levels button:active:not([disabled]){transform:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="crossy-road" data-arcade-title="Road Crossing"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="crossy-road" data-arcade-title="Road Crossing"></script>
 </head>
 <body>
-<canvas id="c" width="500" height="600"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Road Crossing arcade game"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill" id="hudMain"></span>
+    <span class="arcade-pill">Best <b id="bestHud">0</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d'),SZ=40;
+const GAME_ID='crossy-road',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const W=500,H=600;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+
+const SZ=40;
 const N_LEVELS=20;
-let state='menu';           // menu | play | dead | win
+const LANE_COLORS={grass:'#1d3a2b',road:COLOR.card2,river:'#1c4566',rail:'#2b2a33',finish:COLOR.amber};
+const CAR_COLORS=[COLOR.danger,COLOR.accent,COLOR.amber,COLOR.good,COLOR.violet];
+let state='menu';           // menu | play | paused | dead | win
 let mode='endless';         // endless | level
 let level=1;
-let player,lanes,rows,best=0,cameraY=0,rng=Math.random,levelLen=0,flash=0,lastT=0;
+let player,lanes,rows=0,cameraY=0,rng=Math.random,levelLen=0,flash=0,lastT=0;
 
 /* ---------- progress: unlocked levels + endless best, synced to the account ---------- */
 let prog={v:1,lvl:1,eb:0};
@@ -26,11 +142,10 @@ function applyProg(p){
   if(!p||p.v!==1)return;
   prog.lvl=Math.max(prog.lvl,Math.min(N_LEVELS+1,p.lvl||1));
   prog.eb=Math.max(prog.eb,p.eb||0);
-  best=prog.eb;
+  updateHud();
 }
 function pushProg(){try{parent.postMessage({__pbSave:1,data:prog},'*')}catch(e){}}
-applyProg(window.__pbSave);
-window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1)applyProg(d.data)});
+window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1){applyProg(d.data);if(state==='menu')showMenu()}});
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}
 
 /* ---------- seeded rng so every level is the same course every time ---------- */
@@ -65,22 +180,22 @@ function genLane(y){
   const spd=(0.5+rng()*0.8)*D.spd*dir;
   const l={y,type,spd,cars:[],logs:[],trees:[],phase:rng()*10};
   if(type==='road'){
-    // evenly slotted cars, car width capped so every slot keeps a ≥65px gap
+    // evenly slotted cars, car width capped so every slot keeps a >=65px gap
     const n=Math.max(2,Math.min(4,D.cars+(rng()<0.5?1:0)));
-    const slot=C.width/n;
+    const slot=W/n;
     for(let i=0;i<n;i++)l.cars.push({x:i*slot+rng()*(slot*0.3),w:30+rng()*Math.max(5,slot-65-30),
-      color:['#ff4444','#4488ff','#ffcc00','#44cc44','#ff88cc'][Math.floor(rng()*5)]});
+      color:CAR_COLORS[Math.floor(rng()*CAR_COLORS.length)]});
   }
   if(type==='river'){
     l.spd*=0.65;                                       // logs drift slower than traffic
     const n=2+Math.floor(rng()*2);
-    for(let i=0;i<n;i++)l.logs.push({x:i*(C.width/n)+rng()*40,w:85+rng()*35});
+    for(let i=0;i<n;i++)l.logs.push({x:i*(W/n)+rng()*40,w:85+rng()*35});
   }
-  if(type==='grass'&&rng()<0.5){for(let i=0;i<3;i++)l.trees.push({x:20+rng()*(C.width-60)})}
+  if(type==='grass'&&rng()<0.5){for(let i=0;i<3;i++)l.trees.push({x:20+rng()*(W-60)})}
   return l;
 }
 
-const SALT=[0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,2,0,2,0];   // per-level seed salt — every level verified beatable
+const SALT=[0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,2,0,2,0];   // per-level seed salt - every level verified beatable
 function begin(m,n,salt){
   mode=m;level=n||1;
   rng=mode==='level'?mulberry(987654+level*3131+(salt!==undefined?salt:SALT[level-1])*77777):Math.random;
@@ -88,115 +203,123 @@ function begin(m,n,salt){
   rows=0;cameraY=0;flash=0;hazardRun=0;lastType='grass';state='play';
   levelLen=mode==='level'?diff().len:Infinity;
   lanes=[];for(let i=6;i>=-14;i--)lanes.push(genLane(i));   // descending y keeps seeded gen deterministic
+  updateHud();
 }
 const getLane=y=>lanes.find(l=>l.y===y);
 
+/* ---------- HUD + panels ---------- */
+function updateHud(){
+  $('hudMain').innerHTML=mode==='endless'?'Score <b>'+rows+'</b>':'Level '+level+' <b>'+Math.min(rows,levelLen)+'/'+levelLen+'</b>';
+  $('bestHud').textContent=prog.eb;
+}
+function startEndless(){hidePanel();begin('endless')}
+function startLevel(n){hidePanel();begin('level',n)}
+function retry(){hidePanel();begin(mode,level)}
+function nextLevel(){if(level<N_LEVELS)startLevel(level+1)}
+function toMenu(){state='menu';showMenu()}
+function buildLevelGrid(){
+  const wrap=document.createElement('div');
+  const title=document.createElement('p');
+  title.className='levels-title';title.textContent='Levels';
+  const grid=document.createElement('div');
+  grid.className='levels';
+  for(let n=1;n<=N_LEVELS;n++){
+    const b=document.createElement('button');
+    b.type='button';
+    const unlocked=n<=prog.lvl;
+    b.textContent=unlocked?String(n):'🔒';
+    b.disabled=!unlocked;
+    b.setAttribute('aria-label',unlocked?'Level '+n:'Level '+n+' locked');
+    if(unlocked)b.className=n<prog.lvl?'cleared':'next';
+    if(unlocked)b.addEventListener('click',()=>{if(panelReady())startLevel(n)});
+    grid.appendChild(b);
+  }
+  wrap.append(title,grid);
+  return wrap;
+}
+function showMenu(){
+  showPanel({title:'Road Crossing',
+    body:'Hop with ← ↑ ↓ → (or WASD) or the on-screen pad. Dodge cars and trains, ride the logs.'+(prog.eb>0?' Best: '+prog.eb+'.':''),
+    extra:buildLevelGrid(),label:'Play endless',action:startEndless});
+}
 function die(){
-  state='dead';flash=1;
-  if(mode==='endless'&&rows>prog.eb){prog.eb=rows;best=rows;pushProg()}
+  state='dead';flash=REDUCED?0:1;
+  if(mode==='endless'){
+    if(rows>prog.eb){prog.eb=rows;pushProg()}
+    Arcade.gameOver(rows);
+    updateHud();
+    showPanel({title:'Splat!',big:rows,bestLine:'Best '+prog.eb,label:'Try again',action:retry,label2:'Menu',action2:toMenu});
+  }else{
+    showPanel({title:'Splat!',body:'Level '+level+' - '+Math.min(rows,levelLen)+' of '+levelLen+' rows.',label:'Try again',action:retry,label2:'Menu',action2:toMenu});
+  }
 }
 function winLevel(){
   state='win';
   if(level>=prog.lvl&&prog.lvl<=N_LEVELS){prog.lvl=level+1;pushProg()}
+  if(level<N_LEVELS)showPanel({title:'Level '+level+' clear',body:'Level '+(level+1)+' unlocked.',label:'Next level',action:nextLevel,label2:'Menu',action2:toMenu});
+  else showPanel({title:'Level '+level+' clear',body:'You beat every level!',label:'Menu',action:toMenu});
 }
-
-/* ---------- menu layout (tap/click) ---------- */
-let btns=[];
-function drawMenu(){
-  btns=[];
-  X.fillStyle='#12210f';X.fillRect(0,0,C.width,C.height);
-  X.textAlign='center';
-  X.fillStyle='#88ff88';X.font='bold 40px Segoe UI';X.fillText('🐔 Road Crossing',C.width/2,70);
-  X.fillStyle='#9ab89a';X.font='14px Segoe UI';
-  X.fillText('Arrows / WASD to hop. Don’t get splatted.',C.width/2,98);
-  // endless button
-  const eb={x:70,y:125,w:360,h:56,act:()=>begin('endless')};
-  X.fillStyle='#2d7a2d';X.beginPath();X.roundRect(eb.x,eb.y,eb.w,eb.h,14);X.fill();
-  X.fillStyle='#fff';X.font='bold 24px Segoe UI';X.fillText('▶ ENDLESS',C.width/2,eb.y+36);
-  if(best>0){X.font='13px Segoe UI';X.fillStyle='rgba(255,255,255,0.75)';X.fillText('best: '+best,C.width/2,eb.y+52)}
-  btns.push(eb);
-  X.fillStyle='#88ff88';X.font='bold 18px Segoe UI';X.fillText('LEVELS',C.width/2,225);
-  // 20 levels, 5 per row
-  for(let i=0;i<N_LEVELS;i++){
-    const col=i%5,row=Math.floor(i/5);
-    const b={x:55+col*80,y:245+row*80,w:66,h:66,lvl:i+1};
-    const unlocked=b.lvl<=prog.lvl;
-    X.fillStyle=unlocked?(b.lvl<prog.lvl?'#2d7a2d':'#c8a018'):'#26332a';
-    X.beginPath();X.roundRect(b.x,b.y,b.w,b.h,12);X.fill();
-    X.fillStyle=unlocked?'#fff':'#4a5a4e';X.font='bold 24px Segoe UI';
-    X.fillText(unlocked?b.lvl:'🔒',b.x+33,b.y+42);
-    if(unlocked){b.act=()=>begin('level',b.lvl);btns.push(b)}
-  }
-  X.fillStyle='#6a8a6a';X.font='12px Segoe UI';
-  X.fillText(prog.lvl>N_LEVELS?'All levels cleared! 🏆':'Beat a level to unlock the next',C.width/2,585);
+function pauseGame(){
+  if(state!=='play')return;
+  state='paused';
+  showPanel({title:'Paused',label:'Resume',action:()=>{state='play'}});
 }
-C.addEventListener('pointerdown',e=>{
-  const r=C.getBoundingClientRect();
-  const x=(e.clientX-r.left)*(C.width/r.width),y=(e.clientY-r.top)*(C.height/r.height);
-  if(state==='menu'){for(const b of btns)if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){b.act();return}}
-  else if(state==='dead')begin(mode,level);
-  else if(state==='win')state='menu';
-});
 
 /* ---------- main loop ---------- */
 function draw(ts){
   requestAnimationFrame(draw);
   const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;lastT=ts;
-  if(state==='menu'){drawMenu();return}
-  X.fillStyle='#1a2a1a';X.fillRect(0,0,C.width,C.height);
-  const offy=-cameraY*SZ+C.height*0.6;
+  X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
+  if(!lanes)return;
+  const offy=-cameraY*SZ+H*0.6;
   for(const l of lanes){
     const ly=l.y*SZ+offy;
-    if(ly>C.height+SZ||ly<-SZ*2)continue;
-    if(l.type==='road')X.fillStyle='#333';
-    else if(l.type==='river')X.fillStyle='#1e4a6e';
-    else if(l.type==='rail')X.fillStyle='#3a3228';
-    else if(l.type==='finish')X.fillStyle='#c8a018';
-    else X.fillStyle='#2d5a27';
-    X.fillRect(0,ly,C.width,SZ);
+    if(ly>H+SZ||ly<-SZ*2)continue;
+    X.fillStyle=LANE_COLORS[l.type]||LANE_COLORS.grass;
+    X.fillRect(0,ly,W,SZ);
     if(l.type==='finish'){
-      X.fillStyle='#fff';X.font='bold 20px Segoe UI';X.textAlign='center';
-      X.fillText('🏁 FINISH 🏁',C.width/2,ly+27);
+      X.fillStyle='#1a1204';X.font='800 18px '+FONT;X.textAlign='center';
+      X.fillText('🏁 FINISH 🏁',W/2,ly+26);
     }
     if(l.type==='road'){
-      X.strokeStyle='rgba(255,255,255,0.1)';X.setLineDash([10,10]);
-      X.beginPath();X.moveTo(0,ly+SZ/2);X.lineTo(C.width,ly+SZ/2);X.stroke();X.setLineDash([]);
+      X.strokeStyle='rgba(232,232,240,0.12)';X.lineWidth=1;X.setLineDash([10,10]);
+      X.beginPath();X.moveTo(0,ly+SZ/2);X.lineTo(W,ly+SZ/2);X.stroke();X.setLineDash([]);
       for(const c of l.cars){
         if(state==='play')c.x+=l.spd*m;
-        if(c.x>C.width+60)c.x=-c.w-10;if(c.x<-c.w-60)c.x=C.width+10;
-        X.fillStyle=c.color;X.shadowColor=c.color;X.shadowBlur=5;
-        X.beginPath();X.roundRect(c.x,ly+5,c.w,SZ-10,5);X.fill();X.shadowBlur=0;
-        X.fillStyle='rgba(255,255,255,0.4)';X.fillRect(l.spd>0?c.x+c.w-8:c.x+2,ly+10,6,4);
+        if(c.x>W+60)c.x=-c.w-10;if(c.x<-c.w-60)c.x=W+10;
+        X.fillStyle=c.color;
+        X.beginPath();X.roundRect(c.x,ly+5,c.w,SZ-10,5);X.fill();
+        X.fillStyle='rgba(255,255,255,0.45)';X.fillRect(l.spd>0?c.x+c.w-8:c.x+2,ly+10,6,4);
       }
     }
     if(l.type==='river'){
-      X.fillStyle='rgba(255,255,255,0.07)';
-      for(let i=0;i<4;i++)X.fillRect((i*140+(l.phase*40+performance.now()/40*Math.sign(l.spd)))%C.width,ly+8+i*7,26,2);
+      X.fillStyle='rgba(255,255,255,0.08)';
+      for(let i=0;i<4;i++)X.fillRect((i*140+(l.phase*40+performance.now()/40*Math.sign(l.spd)))%W,ly+8+i*7,26,2);
       for(const g of l.logs){
         if(state==='play')g.x+=l.spd*m;
-        if(g.x>C.width+40)g.x=-g.w-10;if(g.x<-g.w-40)g.x=C.width+10;
-        X.fillStyle='#7a5230';X.beginPath();X.roundRect(g.x,ly+7,g.w,SZ-14,10);X.fill();
-        X.strokeStyle='rgba(0,0,0,0.25)';X.beginPath();X.moveTo(g.x+8,ly+SZ/2);X.lineTo(g.x+g.w-8,ly+SZ/2);X.stroke();
+        if(g.x>W+40)g.x=-g.w-10;if(g.x<-g.w-40)g.x=W+10;
+        X.fillStyle='#8a5e38';X.beginPath();X.roundRect(g.x,ly+7,g.w,SZ-14,10);X.fill();
+        X.strokeStyle='rgba(0,0,0,0.25)';X.lineWidth=1;X.beginPath();X.moveTo(g.x+8,ly+SZ/2);X.lineTo(g.x+g.w-8,ly+SZ/2);X.stroke();
       }
     }
     if(l.type==='rail'){
-      X.fillStyle='#5a4a38';for(let i=0;i<13;i++)X.fillRect(i*40+8,ly+6,10,SZ-12);
-      X.fillStyle='#999';X.fillRect(0,ly+10,C.width,4);X.fillRect(0,ly+SZ-14,C.width,4);
+      X.fillStyle='#4a4338';for(let i=0;i<13;i++)X.fillRect(i*40+8,ly+6,10,SZ-12);
+      X.fillStyle=COLOR.muted;X.fillRect(0,ly+10,W,4);X.fillRect(0,ly+SZ-14,W,4);
       if(state==='play')l.phase+=m/60;
       const cyc=l.phase%6;                   // 0-4.4 idle, 4.4-5.4 warn, 5.4-6 train
       if(cyc>4.4&&cyc<5.4&&Math.floor(cyc*6)%2===0){
-        X.fillStyle='#ff4444';X.beginPath();X.arc(14,ly+SZ/2,7,0,Math.PI*2);X.fill();
+        X.fillStyle=COLOR.danger;X.beginPath();X.arc(14,ly+SZ/2,7,0,Math.PI*2);X.fill();
       }
       if(cyc>=5.4){
-        const tx=(cyc-5.4)/0.6*(C.width+300)-300;
+        const tx=(cyc-5.4)/0.6*(W+300)-300;
         X.fillStyle='#c0c8d0';X.beginPath();X.roundRect(tx,ly+4,280,SZ-8,6);X.fill();
         X.fillStyle='#2a3a4a';for(let i=0;i<6;i++)X.fillRect(tx+16+i*44,ly+11,26,SZ-22);
         l.trainX=tx;l.trainW=280;
       }else l.trainX=null;
     }
     for(const t of l.trees){
-      X.fillStyle='#3a2a1a';X.fillRect(t.x+5,ly+5,6,SZ-10);
-      X.fillStyle='#2a7a2a';X.beginPath();X.arc(t.x+8,ly+8,12,0,Math.PI*2);X.fill();
+      X.fillStyle='#4a3522';X.fillRect(t.x+5,ly+5,6,SZ-10);
+      X.fillStyle='#2f8a52';X.beginPath();X.arc(t.x+8,ly+8,12,0,Math.PI*2);X.fill();
     }
   }
   if(state==='play'){
@@ -212,8 +335,8 @@ function draw(ts){
         for(const g of lane.logs)if(player.targetX>g.x-6&&player.targetX<g.x+g.w+6){log=g;break}
         if(log){const dx=lane.spd*m;player.targetX+=dx;player.x+=dx;
           // pinned at the wall: a short grace window to hop off before the splat
-          if(player.targetX<12||player.targetX>C.width-12){
-            player.targetX=Math.max(12,Math.min(C.width-12,player.targetX));player.x=player.targetX;
+          if(player.targetX<12||player.targetX>W-12){
+            player.targetX=Math.max(12,Math.min(W-12,player.targetX));player.x=player.targetX;
             player.edgeT=(player.edgeT||0)+m/60;if(player.edgeT>0.7)die();
           }else player.edgeT=0;}
         else if(Math.abs(player.y-player.targetY)<0.25)die();   // landed in water
@@ -225,55 +348,42 @@ function draw(ts){
   }
   // player
   const py=player.y*SZ+offy;
-  X.fillStyle='#ffcc00';X.shadowColor='#ffcc00';X.shadowBlur=10;
+  X.fillStyle=COLOR.amber;
   X.beginPath();X.arc(player.x,py+SZ/2,14,0,Math.PI*2);X.fill();
-  X.fillStyle='#fff';X.beginPath();X.arc(player.x+4,py+SZ/2-3,4,0,Math.PI*2);X.fill();
-  X.fillStyle='#333';X.beginPath();X.arc(player.x+5,py+SZ/2-3,2,0,Math.PI*2);X.fill();
-  X.shadowBlur=0;
-  // HUD
-  X.fillStyle='#fff';X.font='bold 24px Segoe UI';X.textAlign='center';
-  X.fillText(mode==='endless'?rows:('Level '+level+'  ·  '+Math.min(rows,levelLen)+'/'+levelLen),C.width/2,35);
-  if(state==='dead'){
-    if(flash>0){X.fillStyle=`rgba(255,60,60,${flash*0.5})`;X.fillRect(0,0,C.width,C.height);flash-=0.04*m}
-    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#ff4444';X.font='bold 42px Segoe UI';X.fillText('SPLAT!',C.width/2,240);
-    X.fillStyle='#ffcc00';X.font='24px Segoe UI';
-    X.fillText(mode==='endless'?('Score: '+rows):('Level '+level),C.width/2,290);
-    if(mode==='endless'){X.fillStyle='#888';X.font='16px Segoe UI';X.fillText('Best: '+best,C.width/2,318)}
-    X.fillStyle='#fff';X.font='16px Segoe UI';
-    X.fillText('SPACE / tap: retry   ·   M: menu',C.width/2,360);
-  }
-  if(state==='win'){
-    X.fillStyle='rgba(0,0,0,0.65)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#88ff88';X.font='bold 40px Segoe UI';X.fillText('LEVEL '+level+' CLEAR! 🎉',C.width/2,250);
-    X.fillStyle='#fff';X.font='17px Segoe UI';
-    X.fillText(level<N_LEVELS?('Level '+(level+1)+' unlocked'):'You beat every level! 🏆',C.width/2,295);
-    X.fillText('SPACE / tap: menu'+(level<N_LEVELS?'   ·   N: next level':''),C.width/2,335);
-  }
+  X.fillStyle=COLOR.text;X.beginPath();X.arc(player.x+4,py+SZ/2-3,4,0,Math.PI*2);X.fill();
+  X.fillStyle=COLOR.bg;X.beginPath();X.arc(player.x+5,py+SZ/2-3,2,0,Math.PI*2);X.fill();
+  if(state==='dead'&&flash>0){X.fillStyle=`rgba(255,102,133,${flash*0.35})`;X.fillRect(0,0,W,H);flash-=0.04*m}
   // lane housekeeping
   let minY=Math.min(...lanes.map(l=>l.y));
   while(minY>cameraY-10){minY--;lanes.push(genLane(minY))}
   lanes=lanes.filter(l=>l.y<cameraY+20);
 }
 
+const GAME_KEYS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
 document.addEventListener('keydown',e=>{
-  const k=e.key;e.preventDefault();
-  if(state==='menu'){if(k===' '||k==='Enter')begin('endless');return}
-  if(state==='dead'){if(k===' ')begin(mode,level);if(k==='m'||k==='M')state='menu';return}
-  if(state==='win'){
-    if(k==='n'||k==='N'){if(level<N_LEVELS)begin('level',level+1);return}
-    if(k===' '||k==='m'||k==='M')state='menu';return}
+  const k=e.key;
+  if(GAME_KEYS.has(k))e.preventDefault();
+  if(state==='dead'||state==='win'){
+    if(!panelReady())return;
+    if(k==='m'||k==='M'){hidePanel();toMenu()}
+    else if(state==='win'&&(k==='n'||k==='N')&&level<N_LEVELS){hidePanel();nextLevel()}
+    return;
+  }
   if(state!=='play')return;
   if(k==='ArrowUp'||k==='w'){player.targetY--;
     const r=-player.targetY;
-    if(r>rows){rows=r;if(mode==='endless'){window.score=Math.max(window.score||0,rows);Arcade.score(window.score)}}
+    if(r>rows){rows=r;updateHud();if(mode==='endless'){window.score=Math.max(window.score||0,rows);Arcade.score(window.score)}}
     if(!getLane(Math.round(player.targetY)))lanes.push(genLane(Math.round(player.targetY)));}
   if(k==='ArrowDown'||k==='s')player.targetY=Math.min(player.targetY+1,Math.ceil(cameraY)+5);
   if(k==='ArrowLeft'||k==='a')player.targetX-=SZ;
   if(k==='ArrowRight'||k==='d')player.targetX+=SZ;
-  player.targetX=Math.max(20,Math.min(C.width-20,player.targetX));
+  player.targetX=Math.max(20,Math.min(W-20,player.targetX));
 });
 window.score=0;
+Arcade.onRestart(retry);
+updateHud();
+fitCanvas();
+showMenu();
 requestAnimationFrame(draw);
 </script>
 </body>

@@ -2,20 +2,132 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gravity Switch - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(200,100,255,0.2)}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="gravity-ball" data-arcade-title="Gravity Switch"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="gravity-ball" data-arcade-title="Gravity Switch"></script>
 </head>
 <body>
-<canvas id="c" width="600" height="500"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Gravity Switch arcade game"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Level <b id="level">1</b></span>
+    <span class="arcade-pill">Gravity <b id="grav">↓</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
-let ball,goal,walls,gravDir,level,particles=[],won,keys={};
+const GAME_ID='gravity-ball',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const W=600,H=500;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+/* ---------- fixed 60 Hz stepping: same speed on 60 / 120 / 144 Hz displays ---------- */
+const FRAME_MS=1000/60,FRAME_SLACK_MS=2,MAX_CATCHUP_MS=FRAME_MS*2;
+let frameAcc=FRAME_MS,lastTs=0;
+function tick(ts){
+  requestAnimationFrame(tick);
+  frameAcc=Math.min(frameAcc+(lastTs?ts-lastTs:FRAME_MS),MAX_CATCHUP_MS);lastTs=ts;
+  if(frameAcc<FRAME_MS-FRAME_SLACK_MS)return;
+  frameAcc-=FRAME_MS;
+  runFrame();
+}
+
+
+const GRAVITY_PULL=0.3,DRAG=0.98,BOUNCE=-0.5,GOAL_REACH=25,GRID_STEP=30;
 const LEVELS=[
   {walls:[{x:200,y:200,w:200,h:15},{x:100,y:350,w:250,h:15}],start:{x:50,y:100},end:{x:550,y:450}},
   {walls:[{x:0,y:250,w:400,h:15},{x:200,y:150,w:400,h:15},{x:0,y:380,w:350,h:15}],start:{x:50,y:50},end:{x:550,y:450}},
@@ -23,103 +135,102 @@ const LEVELS=[
   {walls:[{x:0,y:200,w:250,h:15},{x:350,y:200,w:250,h:15},{x:200,y:300,w:200,h:15},{x:100,y:100,w:15,h:200},{x:500,y:100,w:15,h:200}],start:{x:50,y:450},end:{x:550,y:50}},
   {walls:[{x:100,y:150,w:400,h:12},{x:100,y:250,w:400,h:12},{x:100,y:350,w:400,h:12},{x:100,y:150,w:12,h:100},{x:500,y:250,w:12,h:100}],start:{x:50,y:50},end:{x:550,y:450}},
 ];
-function addP(x,y,c){for(let i=0;i<10;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20,color:c})}}
+const DIRS={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}};
+let ball,goal,walls,gravDir=DIRS.down,level=0,particles=[],state='ready',keys={};
 
+const gravArrow=()=>gravDir.y<0?'↑':gravDir.y>0?'↓':gravDir.x<0?'←':'→';
+function updateHud(){
+  $('level').textContent=level+1;
+  $('grav').textContent=gravArrow();
+}
+function addP(x,y,c){
+  if(REDUCED)return;
+  for(let i=0;i<10;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20,color:c})}
+}
 function initLevel(n){
   level=n%LEVELS.length;
   let l=LEVELS[level];
   ball={x:l.start.x,y:l.start.y,vx:0,vy:0,r:10};
-  goal=l.end;walls=l.walls;gravDir={x:0,y:1};won=false;particles=[];
+  goal=l.end;walls=l.walls;gravDir=DIRS.down;particles=[];keys={};
+  updateHud();
+}
+function startGame(){hidePanel();initLevel(0);state='playing'}
+function nextLevel(){hidePanel();initLevel(level+1);state='playing'}
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';keys={};
+  showPanel({title:'Paused',label:'Resume',action:()=>{state='playing'}});
+}
+function winLevel(){
+  state='won';
+  Arcade.score(level+1);Arcade.gameOver(level+1);addP(goal.x,goal.y,COLOR.amber);
+  showPanel({title:'Level complete',body:'Level '+(level+1)+' done. Ready for the next one?',label:'Next level',action:nextLevel});
 }
 
-function loop(){
-  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
-  // Grid
-  X.strokeStyle='rgba(255,255,255,0.03)';
-  for(let i=0;i<C.width;i+=30){X.beginPath();X.moveTo(i,0);X.lineTo(i,C.height);X.stroke()}
-  for(let i=0;i<C.height;i+=30){X.beginPath();X.moveTo(0,i);X.lineTo(C.width,i);X.stroke()}
+function update(){
+  if(state==='paused')return;
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0)particles.splice(i,1)}
+  if(state!=='playing')return;
+  if(keys['ArrowUp']||keys['w'])gravDir=DIRS.up;
+  if(keys['ArrowDown']||keys['s'])gravDir=DIRS.down;
+  if(keys['ArrowLeft']||keys['a'])gravDir=DIRS.left;
+  if(keys['ArrowRight']||keys['d'])gravDir=DIRS.right;
+  if($('grav').textContent!==gravArrow())updateHud();
 
-  if(!won){
-    // Gravity controls
-    if(keys['ArrowUp']||keys['w'])gravDir={x:0,y:-1};
-    if(keys['ArrowDown']||keys['s'])gravDir={x:0,y:1};
-    if(keys['ArrowLeft']||keys['a'])gravDir={x:-1,y:0};
-    if(keys['ArrowRight']||keys['d'])gravDir={x:1,y:0};
-
-    ball.vx+=gravDir.x*0.3;ball.vy+=gravDir.y*0.3;
-    ball.vx*=0.98;ball.vy*=0.98;
-    ball.x+=ball.vx;ball.y+=ball.vy;
-
-    // Wall collision
-    for(let w of walls){
-      if(ball.x+ball.r>w.x&&ball.x-ball.r<w.x+w.w&&ball.y+ball.r>w.y&&ball.y-ball.r<w.y+w.h){
-        // Push out
-        let overlapX=Math.min(ball.x+ball.r-w.x,w.x+w.w-(ball.x-ball.r));
-        let overlapY=Math.min(ball.y+ball.r-w.y,w.y+w.h-(ball.y-ball.r));
-        if(overlapX<overlapY){
-          if(ball.x<w.x+w.w/2){ball.x=w.x-ball.r}else{ball.x=w.x+w.w+ball.r}
-          ball.vx*=-0.5;
-        }else{
-          if(ball.y<w.y+w.h/2){ball.y=w.y-ball.r}else{ball.y=w.y+w.h+ball.r}
-          ball.vy*=-0.5;
-        }
+  ball.vx+=gravDir.x*GRAVITY_PULL;ball.vy+=gravDir.y*GRAVITY_PULL;
+  ball.vx*=DRAG;ball.vy*=DRAG;
+  ball.x+=ball.vx;ball.y+=ball.vy;
+  for(let w of walls){
+    if(ball.x+ball.r>w.x&&ball.x-ball.r<w.x+w.w&&ball.y+ball.r>w.y&&ball.y-ball.r<w.y+w.h){
+      let overlapX=Math.min(ball.x+ball.r-w.x,w.x+w.w-(ball.x-ball.r));
+      let overlapY=Math.min(ball.y+ball.r-w.y,w.y+w.h-(ball.y-ball.r));
+      if(overlapX<overlapY){
+        if(ball.x<w.x+w.w/2){ball.x=w.x-ball.r}else{ball.x=w.x+w.w+ball.r}
+        ball.vx*=BOUNCE;
+      }else{
+        if(ball.y<w.y+w.h/2){ball.y=w.y-ball.r}else{ball.y=w.y+w.h+ball.r}
+        ball.vy*=BOUNCE;
       }
     }
-    // Borders
-    if(ball.x<ball.r){ball.x=ball.r;ball.vx*=-0.5}
-    if(ball.x>C.width-ball.r){ball.x=C.width-ball.r;ball.vx*=-0.5}
-    if(ball.y<ball.r){ball.y=ball.r;ball.vy*=-0.5}
-    if(ball.y>C.height-ball.r){ball.y=C.height-ball.r;ball.vy*=-0.5}
-
-    // Goal check
-    if(Math.hypot(ball.x-goal.x,ball.y-goal.y)<25){
-      won=true;Arcade.score(level+1);Arcade.gameOver(level+1);addP(goal.x,goal.y,'#ffcc00');
-      setTimeout(()=>initLevel(level+1),1200);
-    }
   }
+  if(ball.x<ball.r){ball.x=ball.r;ball.vx*=BOUNCE}
+  if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx*=BOUNCE}
+  if(ball.y<ball.r){ball.y=ball.r;ball.vy*=BOUNCE}
+  if(ball.y>H-ball.r){ball.y=H-ball.r;ball.vy*=BOUNCE}
+  if(Math.hypot(ball.x-goal.x,ball.y-goal.y)<GOAL_REACH)winLevel();
+}
 
-  // Draw walls
-  X.fillStyle='#4a3a6a';X.shadowColor='#8866cc';X.shadowBlur=8;
-  for(let w of walls){X.beginPath();X.roundRect(w.x,w.y,w.w,w.h,4);X.fill()}
-  X.shadowBlur=0;
-
-  // Goal
-  X.fillStyle='#ffcc00';X.shadowColor='#ffcc00';X.shadowBlur=15;
-  X.beginPath();X.arc(goal.x,goal.y,12+Math.sin(Date.now()/300)*3,0,Math.PI*2);X.fill();
-  X.shadowBlur=0;
-
-  // Ball
-  X.fillStyle='#cc66ff';X.shadowColor='#cc66ff';X.shadowBlur=12;
+function draw(){
+  X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
+  X.strokeStyle='rgba(232,232,240,0.04)';X.lineWidth=1;
+  for(let i=0;i<W;i+=GRID_STEP){X.beginPath();X.moveTo(i,0);X.lineTo(i,H);X.stroke()}
+  for(let i=0;i<H;i+=GRID_STEP){X.beginPath();X.moveTo(0,i);X.lineTo(W,i);X.stroke()}
+  X.fillStyle=COLOR.card2;X.strokeStyle=COLOR.violet;X.lineWidth=1.5;
+  for(let w of walls){X.beginPath();X.roundRect(w.x,w.y,w.w,w.h,4);X.fill();X.stroke()}
+  X.fillStyle=COLOR.amber;
+  X.beginPath();X.arc(goal.x,goal.y,12+(REDUCED?0:Math.sin(Date.now()/300)*3),0,Math.PI*2);X.fill();
+  X.fillStyle=COLOR.violet;
   X.beginPath();X.arc(ball.x,ball.y,ball.r,0,Math.PI*2);X.fill();
   X.fillStyle='rgba(255,255,255,0.3)';X.beginPath();X.arc(ball.x-3,ball.y-3,4,0,Math.PI*2);X.fill();
-  X.shadowBlur=0;
-
-  // Gravity indicator
-  X.fillStyle='rgba(255,255,255,0.15)';X.font='14px Segoe UI';X.textAlign='center';
-  X.fillText('Gravity: '+(gravDir.y<0?'↑':gravDir.y>0?'↓':gravDir.x<0?'←':'→'),C.width/2,C.height-15);
-
-  // Particles
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
-    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/20;X.fillStyle=p.color;
-    X.fillRect(p.x-2,p.y-2,4,4)}X.globalAlpha=1;
-
-  // HUD
-  X.fillStyle='#cc66ff';X.font='bold 20px Segoe UI';X.textAlign='left';
-  X.fillText('Level '+(level+1),15,30);
-  X.font='12px Segoe UI';X.fillStyle='rgba(255,255,255,0.4)';
-  X.fillText('Arrow keys change gravity direction',15,50);
-
-  if(won){
-    X.fillStyle='rgba(0,0,0,0.4)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#ffcc00';X.font='bold 36px Segoe UI';X.textAlign='center';
-    X.fillText('Level Complete!',C.width/2,C.height/2);
-  }
-
-  requestAnimationFrame(loop);
+  for(let p of particles){X.globalAlpha=Math.max(0,p.life/20);X.fillStyle=p.color;X.fillRect(p.x-2,p.y-2,4,4)}
+  X.globalAlpha=1;
 }
-document.addEventListener('keydown',e=>{keys[e.key]=true;e.preventDefault()});
+function runFrame(){update();draw()}
+
+const GAME_KEYS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(GAME_KEYS.has(e.key))e.preventDefault()});
 document.addEventListener('keyup',e=>{keys[e.key]=false});
-initLevel(0);loop();
+/* touch / mouse: tap where gravity should pull, relative to the ball */
+C.addEventListener('pointerdown',e=>{
+  if(state!=='playing'||e.button!==0)return;
+  const p=toBoard(e),dx=p.x-ball.x,dy=p.y-ball.y;
+  gravDir=Math.abs(dx)>Math.abs(dy)?(dx<0?DIRS.left:DIRS.right):(dy<0?DIRS.up:DIRS.down);
+});
+Arcade.onRestart(startGame);
+initLevel(0);
+fitCanvas();
+showPanel({title:'Gravity Switch',body:'Flip gravity with the arrow keys (or WASD), or tap the side of the ball you want to fall toward. Roll into the gold goal.',label:'Play',action:startGame});
+requestAnimationFrame(tick);
 </script>
 </body>
 </html>

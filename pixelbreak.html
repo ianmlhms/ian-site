@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Arcade - Play Games</title>
-<meta name="description" content="Arcade — 50 free browser games, from quick arcade breaks to bigger games with saved progress and multiplayer for two iPads.">
+<meta name="description" content="Arcade — 53 free browser games, from quick arcade breaks to bigger games with saved progress and multiplayer for two iPads.">
 <meta property="og:title" content="Arcade — ian.lu">
-<meta property="og:description" content="50 free browser games — big adventures, quick breaks and multiplayer.">
+<meta property="og:description" content="53 free browser games — big adventures, quick breaks and multiplayer.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <link rel="canonical" href="https://ian.lu/pixelbreak.html">
@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=24"></script>
+<script src="theme.js?v=25"></script>
 <style>
 :root{--brand1:#ff6b9d;--brand2:#4de8ff;--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
 html[data-theme="light"]{--brand1:#e23d78;--brand2:#0e7ec2}
@@ -85,7 +85,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 #gh{width:100%;flex:none}
 #gf{flex:1;width:100%;border:none;border-radius:0;background:#000;min-height:0}
 /* on-screen touch controls (touch devices only) — float over the game, drive it via synthetic key events */
-#tc{display:none;position:absolute;bottom:14px;left:0;right:0;align-items:flex-end;justify-content:space-between;gap:14px;padding:0 16px;user-select:none;-webkit-user-select:none;touch-action:none;pointer-events:none;z-index:5}
+#tc{display:none;position:relative;flex:none;align-items:center;justify-content:space-between;gap:14px;padding:10px max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));background:#000;user-select:none;-webkit-user-select:none;touch-action:none;pointer-events:none;z-index:5}
 #tc .tb{pointer-events:auto;opacity:0.82}
 #tc .dpad{position:relative;width:156px;height:156px;flex:none}
 #tc .tb{position:absolute;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:20px;border-radius:12px;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:pointer}
@@ -176,7 +176,7 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
 
 <section class="pb-about">
 <h2>About Arcade</h2>
-<p>Arcade is a small browser arcade I built myself. Its 50 games run in the browser — there is nothing
+<p>Arcade is a small browser arcade I built myself. Its 53 games run in the browser — there is nothing
 to download and no launcher to install. Open it on a phone, an iPad, a school laptop or a desktop, pick a
 game, and it starts immediately. High scores and supported game progress are saved for you.</p>
 
@@ -220,32 +220,32 @@ artwork and the level design are my own, and none of it is copied from another g
 <footer>Arcade &mdash; Made for fun. Built-in games are original creations inspired by popular concepts. · <a href="privacy.html">Datenschutz · Privacy</a></footer>
 <script>
 const GAMES=[
-{id:"park",name:"Theme Park Tycoon",emoji:"🎢",thumb:"pb/thumbs/park.webp",desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["creative"],tags:[],src:"pb/park.html"},
-{id:"geometrydash",name:"Rhythm Jumper",emoji:"🟧",thumb:"pb/thumbs/geometrydash.webp",desc:"Rhythm auto-runner — jump spikes and gaps to the beat",cats:["action"],tags:[],go:"geometrydash.html"},
+{id:"park",name:"Theme Park Tycoon",emoji:"🎢",thumb:"pb/thumbs/park.webp",featured:true,desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["creative"],tags:[],src:"pb/park.html"},
+{id:"geometrydash",name:"Geometry Dash",emoji:"🟧",thumb:"pb/thumbs/geometrydash.webp",featured:true,desc:"Rhythm auto-runner with 10 levels — jump spikes, gaps and orbs, flip gravity, fly a ship, all to the beat",cats:["action"],tags:[],go:"geometrydash.html"},
 {id:"drive-mad",name:"Stunt Driver",emoji:"🚗",thumb:"pb/thumbs/drive-mad.webp",featured:true,desc:"3D stunt driving — 16 levels of see-saws, hammers and crushers",cats:["action","driving"],tags:[],src:"pb/drive-mad.html"},
 {id:"chill-drive",name:"3D Cruiser",emoji:"🛣️",thumb:"pb/thumbs/chill-drive.webp",featured:true,desc:"True 3D cruising — 3 endless worlds + 20 levels",cats:["driving"],tags:[],src:"pb/chill-drive.html"},
-{id:"cookie-clicker",name:"Cookie Clicker",emoji:"🍪",thumb:"pb/thumbs/cookie-clicker.webp",desc:"Build a cookie empire by clicking and buying upgrades",cats:[],tags:[],src:"pb/cookie-clicker.html"},
+{id:"cookie-clicker",name:"Cookie Clicker",emoji:"🍪",thumb:"pb/thumbs/cookie-clicker.webp",featured:true,desc:"Build a cookie empire by clicking and buying upgrades",cats:[],tags:[],src:"pb/cookie-clicker.html"},
 {id:"crossy-road",name:"Road Crossing",emoji:"🐔",thumb:"pb/thumbs/crossy-road.webp",desc:"20 levels + endless — dodge cars, trains and rivers",cats:["action"],tags:[],src:"pb/crossy-road.html"},
 {id:"burger",name:"Burger Restaurant",emoji:"🍔",thumb:"pb/thumbs/burger.webp",desc:"Cook, serve and upgrade your burger restaurant",cats:[],tags:[],src:"pb/burger.html"},
 {id:"towerdefense",name:"Tower Defense",emoji:"🏰",thumb:"pb/thumbs/towerdefense.webp",desc:"Build towers, command a hero, survive 15 levels of waves",cats:["action"],tags:[],src:"pb/towerdefense.html"},
-{id:"idle-empire",name:"Business Empire",emoji:"💰",thumb:"pb/thumbs/idle-empire.webp",desc:"Business tycoon idle game — managers, milestones, prestige",cats:[],tags:[],src:"pb/idle-empire.html"},
-{id:"tictactoe",name:"Tic-Tac-Toe",emoji:"❌",thumb:"pb/thumbs/tictactoe.webp",noScore:true,desc:"Classic X and O with AI",cats:["puzzle","2player"],tags:["mp"],src:"pb/tictactoe.html"},
+{id:"idle-empire",name:"Business Empire",emoji:"💰",thumb:"pb/thumbs/idle-empire.webp",featured:true,desc:"Business tycoon idle game — managers, milestones, prestige",cats:[],tags:[],src:"pb/idle-empire.html"},
+{id:"tictactoe",name:"Tic-Tac-Toe",emoji:"❌",thumb:"pb/thumbs/tictactoe.webp",noScore:true,desc:"Three in a row — play the computer (Easy, Medium, Impossible) or a friend on the same screen",cats:["puzzle","2player"],tags:["mp"],src:"pb/tictactoe.html"},
 {id:"pong",name:"Pong",emoji:"🏓",thumb:"pb/thumbs/pong.webp",desc:"Neon pong — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/pong.html"},
-{id:"o-connect4",name:"Connect 4",emoji:"🔴",thumb:"pb/thumbs/o-connect4.webp",featured:true,noScore:true,desc:"Drop discs, connect four — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"connect4.html",ai:true},
-{id:"o-tictactoe",name:"Tic-Tac-Toe Online",emoji:"❌",thumb:"pb/thumbs/o-tictactoe.webp",featured:true,noScore:true,desc:"Three in a row — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"tictactoe.html",ai:true},
+{id:"o-connect4",name:"Connect 4",emoji:"🔴",thumb:"pb/thumbs/o-connect4.webp",noScore:true,desc:"Drop discs, connect four — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"connect4.html",ai:true},
+{id:"o-tictactoe",name:"Tic-Tac-Toe Online",emoji:"❌",thumb:"pb/thumbs/o-tictactoe.webp",noScore:true,desc:"Three in a row — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"tictactoe.html",ai:true},
 {id:"tank-wars",name:"Tank Battles",emoji:"💥",thumb:"pb/thumbs/tank-wars.webp",desc:"Tank battles — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/tank-wars.html"},
 {id:"fighters",name:"Platform Fighters",emoji:"🥊",thumb:"pb/thumbs/fighters.webp",desc:"Platform fighting — 2 players, vs AI, or online on two iPads",cats:["2player","action"],tags:["mp"],src:"pb/fighters.html"},
-{id:"o-battleship",name:"Battleship",emoji:"🚢",thumb:"pb/thumbs/o-battleship.webp",featured:true,noScore:true,desc:"Sink the fleet — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"battleship.html",ai:true},
+{id:"o-battleship",name:"Battleship",emoji:"🚢",thumb:"pb/thumbs/o-battleship.webp",noScore:true,desc:"Sink the fleet — online on two iPads or vs AI",cats:["online"],tags:["mp"],href:"battleship.html",ai:true},
 {id:"o-reversi",name:"Reversi",emoji:"⚪",thumb:"pb/thumbs/o-reversi.webp",noScore:true,desc:"Flip the board — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"reversi.html",ai:true},
 {id:"o-dots",name:"Dots & Boxes",emoji:"🟦",thumb:"pb/thumbs/o-dots.webp",featured:true,noScore:true,desc:"Claim the boxes — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"dots.html",ai:true},
-{id:"o-color",name:"Colour Guess",emoji:"🎨",thumb:"pb/thumbs/o-color.webp",featured:true,noScore:true,desc:"Guess the colour together — online or vs AI",cats:["online"],tags:["mp"],href:"color.html",ai:true},
+{id:"o-color",name:"Colour Guess",emoji:"🎨",thumb:"pb/thumbs/o-color.webp",noScore:true,desc:"Guess the colour together — online or vs AI",cats:["online"],tags:["mp"],href:"color.html",ai:true},
 {id:"o-draw",name:"Draw & Guess",emoji:"✏️",thumb:"pb/thumbs/o-draw.webp",featured:true,noScore:true,desc:"Draw and guess with a friend — online on two iPads",cats:["online","creative"],tags:["mp"],href:"draw.html"},
 {id:"o-intro",name:"Guess the Song",emoji:"🎵",thumb:"pb/thumbs/o-intro.webp",noScore:true,desc:"Guess the song from 1 second — then 3, then 5…",cats:["online"],tags:["mp"],href:"intro.html"},
 {id:"o-meme",name:"Meme Caption Party",emoji:"😂",thumb:"pb/thumbs/o-meme.webp",featured:true,noScore:true,desc:"Caption the same meme, vote for the funniest — 3+ players",cats:["online","creative"],tags:["mp"],href:"meme.html"},
 {id:"o-checkers",name:"Checkers",emoji:"🟠",thumb:"pb/thumbs/o-checkers.webp",noScore:true,desc:"Jump, chain captures, crown kings — online on two iPads or vs AI",cats:["online","puzzle"],tags:["mp"],href:"checkers.html",ai:true},
 {id:"o-maumau",name:"Mau-Mau Cards",emoji:"🃏",thumb:"pb/thumbs/o-maumau.webp",noScore:true,desc:"Card battle — match suit or rank, 7 = +2, J wishes — online or vs AI",cats:["online"],tags:["mp"],href:"maumau.html",ai:true},
-{id:"o-dice-duel",name:"Yahtzee Dice",emoji:"🎲",thumb:"pb/thumbs/o-dice-duel.webp",noScore:true,desc:"Roll, hold and score — online or vs AI",cats:["online"],tags:["mp"],href:"dice-duel.html",ai:true},
-{id:"o-slf",name:"Categories Race",emoji:"🔤",thumb:"pb/thumbs/o-slf.webp",featured:true,noScore:true,desc:"Categories quiz — 2+ players join the same code",cats:["online"],tags:["mp"],href:"slf.html"},
+{id:"o-dice-duel",name:"Kniffel",emoji:"🎲",thumb:"pb/thumbs/o-dice-duel.webp",noScore:true,desc:"Roll, hold and score — online or vs AI",cats:["online"],tags:["mp"],href:"dice-duel.html",ai:true},
+{id:"o-slf",name:"Stadt-Land-Fluss",emoji:"🔤",thumb:"pb/thumbs/o-slf.webp",featured:true,noScore:true,desc:"Name a city, country and river for each letter — 2+ players join the same code",cats:["online"],tags:["mp"],href:"slf.html"},
 {id:"air-hockey",name:"Air Hockey",emoji:"🥅",thumb:"pb/thumbs/air-hockey.webp",desc:"Air hockey — 2 players, vs AI, or online on two iPads",cats:["2player"],tags:["mp"],src:"pb/air-hockey.html"},
 {id:"flappy",name:"Flappy Bird",emoji:"🐤",thumb:"pb/thumbs/flappy.webp",featured:true,desc:"Tap to fly through pipes",cats:["action"],tags:[],src:"pb/flappy.html"},
 {id:"typing",name:"Typing Speed",emoji:"⌨️",thumb:"pb/thumbs/typing.webp",desc:"Test how many words you can type per minute",cats:[],tags:[],src:"pb/typing.html"},
@@ -253,14 +253,17 @@ const GAMES=[
 {id:"color-clash",name:"Colour Word Match",emoji:"🎨",thumb:"pb/thumbs/color-clash.webp",desc:"Match colour words against the clock",cats:["puzzle"],tags:[],src:"pb/color-clash.html"},
 {id:"whack-a-mole",name:"Whack-a-Mole",emoji:"🐹",thumb:"pb/thumbs/whack-a-mole.webp",desc:"Whack moles for points!",cats:[],tags:[],src:"pb/whack-a-mole.html"},
 {id:"run-3",name:"Space Tunnel Runner",emoji:"🚀",thumb:"pb/thumbs/run-3.webp",desc:"Run through a rotating space tunnel",cats:["action"],tags:[],src:"pb/run-3.html"},
-{id:"tetris",name:"Falling Blocks",emoji:"🧱",thumb:"pb/thumbs/tetris.webp",featured:true,desc:"Clear lines in a falling-block puzzle",cats:["puzzle"],tags:[],src:"pb/tetris.html"},
+{id:"tetris",name:"Tetris",emoji:"🧱",thumb:"pb/thumbs/tetris.webp",featured:true,desc:"Clear lines in a falling-block puzzle",cats:["puzzle"],tags:[],src:"pb/tetris.html"},
 {id:"2048",name:"2048",emoji:"🔢",thumb:"pb/thumbs/2048.webp",desc:"Slide and merge numbers",cats:["puzzle"],tags:[],src:"pb/2048.html"},
-{id:"snake",name:"Snake",emoji:"🐍",thumb:"pb/thumbs/snake.webp",desc:"Eat food and grow without hitting the walls",cats:["action"],tags:[],src:"pb/snake.html"},
+{id:"snake",name:"Snake",emoji:"🐍",thumb:"pb/thumbs/snake.webp",featured:true,desc:"Eat apples and grow — choose the speed, board size and mode: Classic, Walls, Portal or Borderless",cats:["action"],tags:[],src:"pb/snake.html"},
+{id:"pacman",name:"Pac-Man",emoji:"🟡",thumb:"pb/thumbs/pacman.webp",featured:true,desc:"Eat every dot, dodge the four ghosts and grab the power pellets",cats:["action"],tags:[],src:"pb/pacman.html"},
+{id:"dino",name:"Dino Run",emoji:"🦖",thumb:"pb/thumbs/dino.webp",featured:true,desc:"Jump the cacti and duck the birds — the offline-browser dinosaur",cats:["action"],tags:[],src:"pb/dino.html"},
+{id:"solitaire",name:"Solitaire",emoji:"♠️",thumb:"pb/thumbs/solitaire.webp",desc:"Klondike solitaire — Easy (draw 1) or Hard (draw 3), with undo",cats:["puzzle"],tags:[],src:"pb/solitaire.html"},
 {id:"bubble-shooter",name:"Bubble Shooter",emoji:"🫧",thumb:"pb/thumbs/bubble-shooter.webp",desc:"Shoot and match bubbles",cats:["puzzle"],tags:[],src:"pb/bubble-shooter.html"},
 {id:"space-invaders",name:"Space Invaders",emoji:"👾",thumb:"pb/thumbs/space-invaders.webp",desc:"Defend Earth from descending alien waves",cats:["action"],tags:[],src:"pb/space-invaders.html"},
 {id:"breakout",name:"Brick Breaker",emoji:"🧱",thumb:"pb/thumbs/breakout.webp",desc:"Bounce the ball to break every brick",cats:["action"],tags:[],src:"pb/breakout.html"},
 {id:"asteroids",name:"Asteroids",emoji:"☄️",thumb:"pb/thumbs/asteroids.webp",desc:"Pilot a ship and blast incoming asteroids",cats:["action"],tags:[],src:"pb/asteroids.html"},
-{id:"minesweeper",name:"Minesweeper",emoji:"💣",thumb:"pb/thumbs/minesweeper.webp",lowerIsBetter:true,desc:"Clear the minefield as quickly as possible",cats:["puzzle"],tags:[],src:"pb/minesweeper.html"},
+{id:"minesweeper",name:"Minesweeper",emoji:"💣",thumb:"pb/thumbs/minesweeper.webp",desc:"Flag the mines and clear the board — Easy, Medium or Hard, faster is better",cats:["puzzle"],tags:[],src:"pb/minesweeper.html"},
 {id:"memory",name:"Memory Match",emoji:"🃏",thumb:"pb/thumbs/memory.webp",lowerIsBetter:true,desc:"Match every pair in as few moves as possible",cats:["puzzle"],tags:[],src:"pb/memory.html"},
 {id:"maze",name:"Maze Escape",emoji:"🏁",thumb:"pb/thumbs/maze.webp",lowerIsBetter:true,desc:"Escape each procedural maze against the clock",cats:["puzzle"],tags:[],src:"pb/maze.html"},
 {id:"gravity-ball",name:"Gravity Switch",emoji:"🔮",thumb:"pb/thumbs/gravity-ball.webp",desc:"Change gravity to guide the ball to each goal",cats:["puzzle"],tags:[],src:"pb/gravity-ball.html"},
@@ -269,7 +272,7 @@ const GAMES=[
 {id:"reaction",name:"Reaction Time",emoji:"⚡",thumb:"pb/thumbs/reaction.webp",lowerIsBetter:true,desc:"Measure your fastest reaction in milliseconds",cats:[],tags:[],src:"pb/reaction.html"},
 {id:"word-scramble",name:"Word Unscramble",emoji:"📝",thumb:"pb/thumbs/word-scramble.webp",desc:"Unscramble words before time runs out",cats:["puzzle"],tags:[],src:"pb/word-scramble.html"},
 {id:"pixel-painter",name:"Pixel Art Painter",emoji:"🖌️",thumb:"pb/thumbs/pixel-painter.webp",noScore:true,desc:"Draw pixel art creations",cats:["creative"],tags:[],src:"pb/pixel-painter.html"},
-{id:"o-wordle",name:"Luxembourgish Word Game",emoji:"🟩",thumb:"pb/thumbs/o-wordle.webp",noScore:true,desc:"Daily Lëtzebuergesch word puzzle",cats:["puzzle"],tags:[],go:"wordle.html"}
+{id:"o-wordle",name:"Wuertspill",emoji:"🟩",thumb:"pb/thumbs/o-wordle.webp",noScore:true,desc:"Wordle in Lëtzebuergesch and German — a new word every day",cats:["puzzle"],tags:[],go:"wordle.html"}
 ];
 
 const BIG_GAME_IDS=new Set(["park","towerdefense","burger","drive-mad","chill-drive","idle-empire","cookie-clicker","crossy-road"]);
@@ -526,7 +529,11 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
     b.addEventListener('pointercancel',release);
     b.addEventListener('pointerleave',release);
   });
-  window.addEventListener('keydown',function(event){if(event.isTrusted&&CONTROL_KEYS.has(event.key))rememberKeyboard()},{capture:true});
+  window.addEventListener('keydown',function(event){
+    var target=event.target;
+    var isEditing=target instanceof Element&&target.closest('input,textarea,select,[contenteditable]')!==null;
+    if(event.isTrusted&&CONTROL_KEYS.has(event.key)&&!isEditing)rememberKeyboard();
+  },{capture:true});
   window.addEventListener('message',function(event){
     var frame=document.getElementById('gf');
     if(!frame||event.source!==frame.contentWindow)return;
@@ -541,8 +548,8 @@ loadPlayCounts();
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="pb/arcade-kit.js?v=1"></script>
-<script type="module" src="pixelbreak-records.js?v=19"></script>
+<script src="pb/arcade-kit.js?v=4"></script>
+<script type="module" src="pixelbreak-records.js?v=21"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){

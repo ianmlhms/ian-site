@@ -2,119 +2,259 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Asteroids - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+.lives b{color:var(--danger);letter-spacing:.12em}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="asteroids" data-arcade-title="Asteroids"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="asteroids" data-arcade-title="Asteroids"></script>
 </head>
 <body>
-<canvas id="c" width="700" height="500"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Asteroids arcade game"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill lives">Lives <b id="lives">♥♥♥</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
-let ship,asteroids,bullets,particles,score,lives,gameOver,keys={},frame=0;
-function start(){
-  ship={x:350,y:250,angle:0,vx:0,vy:0,invuln:60};
-  asteroids=[];bullets=[];particles=[];score=0;lives=3;gameOver=false;
+const GAME_ID='asteroids',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const W=700,H=500;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+/* ---------- fixed 60 Hz stepping: same speed on 60 / 120 / 144 Hz displays ---------- */
+const FRAME_MS=1000/60,FRAME_SLACK_MS=2,MAX_CATCHUP_MS=FRAME_MS*2;
+let frameAcc=FRAME_MS,lastTs=0;
+function tick(ts){
+  requestAnimationFrame(tick);
+  frameAcc=Math.min(frameAcc+(lastTs?ts-lastTs:FRAME_MS),MAX_CATCHUP_MS);lastTs=ts;
+  if(frameAcc<FRAME_MS-FRAME_SLACK_MS)return;
+  frameAcc-=FRAME_MS;
+  runFrame();
+}
+
+
+const TURN_RATE=0.05,THRUST=0.12,DRAG=0.99,BULLET_SPEED=7,FIRE_EVERY=8,BULLET_LIFE=50;
+const START_LIVES=3,INVULN_START=60,INVULN_HIT=90,STAR_COUNT=50,STAR_ALPHA=0.18;
+const GAME_KEYS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
+let ship,asteroids=[],bullets=[],particles=[],score=0,lives=START_LIVES,state='ready',keys={},frame=0;
+
+function updateHud(){
+  $('score').textContent=score;
+  $('lives').textContent=lives>0?'♥'.repeat(lives):'-';
+}
+function resetWorld(){
+  ship={x:W/2,y:H/2,angle:0,vx:0,vy:0,invuln:INVULN_START};
+  asteroids=[];bullets=[];particles=[];score=0;lives=START_LIVES;
   for(let i=0;i<5;i++)spawnAsteroid(3);
+  updateHud();Arcade.score(score);
 }
 function spawnAsteroid(size,x,y){
-  x=x||Math.random()*C.width;y=y||Math.random()*C.height;
-  if(Math.hypot(x-ship.x,y-ship.y)<100){x=(x+300)%C.width}
+  x=x||Math.random()*W;y=y||Math.random()*H;
+  if(Math.hypot(x-ship.x,y-ship.y)<100){x=(x+300)%W}
   let a=Math.random()*Math.PI*2,s=0.5+Math.random()*1.5;
   let verts=[];for(let i=0;i<8;i++){let ang=i/8*Math.PI*2;verts.push({r:size*12+Math.random()*size*8,a:ang})}
   asteroids.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,size,verts,rot:0,rv:(Math.random()-0.5)*0.02});
 }
-function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;
-  particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15+Math.random()*10,color:c})}}
+function addP(x,y,c,n){
+  if(REDUCED)return;
+  for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15+Math.random()*10,color:c})}
+}
 
-function loop(){
-  frame++;
-  X.fillStyle='#000';X.fillRect(0,0,C.width,C.height);
-  X.fillStyle='#fff';for(let i=0;i<50;i++){X.globalAlpha=0.15;X.fillRect((i*137)%C.width,(i*97)%C.height,1,1)}X.globalAlpha=1;
+function startGame(){
+  resetWorld();keys={};state='playing';
+}
+function endGame(){
+  state='over';Arcade.gameOver(score);
+  const isBest=recordBest(score);
+  showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),label:'Play again',action:startGame});
+}
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';keys={};
+  showPanel({title:'Paused',body:'Your ship is waiting.',label:'Resume',action:()=>{state='playing'}});
+}
 
-  if(!gameOver){
-    if(keys['ArrowLeft']||keys['a'])ship.angle-=0.05;
-    if(keys['ArrowRight']||keys['d'])ship.angle+=0.05;
-    if(keys['ArrowUp']||keys['w']){ship.vx+=Math.cos(ship.angle)*0.12;ship.vy+=Math.sin(ship.angle)*0.12;
-      addP(ship.x-Math.cos(ship.angle)*15,ship.y-Math.sin(ship.angle)*15,'#ff8800',1)}
-    if(keys[' ']&&frame%8===0)bullets.push({x:ship.x+Math.cos(ship.angle)*18,y:ship.y+Math.sin(ship.angle)*18,vx:Math.cos(ship.angle)*7,vy:Math.sin(ship.angle)*7,life:50});
-    ship.vx*=0.99;ship.vy*=0.99;ship.x=(ship.x+ship.vx+C.width)%C.width;ship.y=(ship.y+ship.vy+C.height)%C.height;
-    if(ship.invuln>0)ship.invuln--;
+function updateShip(){
+  if(keys['ArrowLeft']||keys['a'])ship.angle-=TURN_RATE;
+  if(keys['ArrowRight']||keys['d'])ship.angle+=TURN_RATE;
+  if(keys['ArrowUp']||keys['w']){ship.vx+=Math.cos(ship.angle)*THRUST;ship.vy+=Math.sin(ship.angle)*THRUST;
+    addP(ship.x-Math.cos(ship.angle)*15,ship.y-Math.sin(ship.angle)*15,COLOR.amber,1)}
+  if(keys[' ']&&frame%FIRE_EVERY===0)bullets.push({x:ship.x+Math.cos(ship.angle)*18,y:ship.y+Math.sin(ship.angle)*18,
+    vx:Math.cos(ship.angle)*BULLET_SPEED,vy:Math.sin(ship.angle)*BULLET_SPEED,life:BULLET_LIFE});
+  ship.vx*=DRAG;ship.vy*=DRAG;ship.x=(ship.x+ship.vx+W)%W;ship.y=(ship.y+ship.vy+H)%H;
+  if(ship.invuln>0)ship.invuln--;
+}
+function updateBullets(){
+  for(let i=bullets.length-1;i>=0;i--){
+    let b=bullets[i];b.x+=b.vx;b.y+=b.vy;b.life--;
+    if(b.life<=0||b.x<0||b.x>W||b.y<0||b.y>H){bullets.splice(i,1);continue}
+    for(let j=asteroids.length-1;j>=0;j--){
+      let a=asteroids[j];
+      if(Math.hypot(b.x-a.x,b.y-a.y)<a.size*14){
+        addP(a.x,a.y,COLOR.amber,10);
+        score+=a.size===3?20:a.size===2?50:100;Arcade.score(score);updateHud();
+        if(a.size>1){spawnAsteroid(a.size-1,a.x,a.y);spawnAsteroid(a.size-1,a.x,a.y)}
+        asteroids.splice(j,1);bullets.splice(i,1);break;
+      }
+    }
   }
-
-  // Asteroids
+}
+function checkShipHit(){
+  if(ship.invuln>0)return;
   for(let a of asteroids){
-    a.x=(a.x+a.vx+C.width)%C.width;a.y=(a.y+a.vy+C.height)%C.height;a.rot+=a.rv;
-    X.strokeStyle='#aaa';X.lineWidth=1.5;X.beginPath();
+    if(Math.hypot(ship.x-a.x,ship.y-a.y)<a.size*12+10){
+      lives--;addP(ship.x,ship.y,COLOR.danger,20);ship.invuln=INVULN_HIT;updateHud();
+      if(lives<=0)endGame();
+      break;
+    }
+  }
+}
+function update(){
+  if(state==='paused')return;
+  frame++;
+  if(state==='playing')updateShip();
+  for(let a of asteroids){a.x=(a.x+a.vx+W)%W;a.y=(a.y+a.vy+H)%H;a.rot+=a.rv}
+  if(state==='playing'){
+    updateBullets();
+    checkShipHit();
+    if(state==='playing'&&asteroids.length===0)for(let i=0;i<5+Math.floor(score/500);i++)spawnAsteroid(3);
+  }
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0)particles.splice(i,1)}
+}
+
+function drawStars(){
+  X.fillStyle=COLOR.text;X.globalAlpha=STAR_ALPHA;
+  for(let i=0;i<STAR_COUNT;i++)X.fillRect((i*137)%W,(i*97)%H,1,1);
+  X.globalAlpha=1;
+}
+function draw(){
+  X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
+  drawStars();
+  X.strokeStyle=COLOR.muted;X.lineWidth=1.5;X.lineJoin='round';
+  for(let a of asteroids){
+    X.beginPath();
     for(let j=0;j<a.verts.length;j++){
       let v=a.verts[j],px=a.x+Math.cos(v.a+a.rot)*v.r,py=a.y+Math.sin(v.a+a.rot)*v.r;
       j===0?X.moveTo(px,py):X.lineTo(px,py);
-    }X.closePath();X.stroke();
-  }
-
-  // Bullets
-  for(let i=bullets.length-1;i>=0;i--){
-    let b=bullets[i];b.x+=b.vx;b.y+=b.vy;b.life--;
-    if(b.life<=0||b.x<0||b.x>C.width||b.y<0||b.y>C.height){bullets.splice(i,1);continue}
-    let hit=false;
-    for(let j=asteroids.length-1;j>=0;j--){
-      if(Math.hypot(b.x-asteroids[j].x,b.y-asteroids[j].y)<asteroids[j].size*14){
-        let a=asteroids[j];addP(a.x,a.y,'#ffcc00',10);
-score+=a.size===3?20:a.size===2?50:100;Arcade.score(score);
-        if(a.size>1){spawnAsteroid(a.size-1,a.x,a.y);spawnAsteroid(a.size-1,a.x,a.y)}
-        asteroids.splice(j,1);hit=true;break;
-      }
     }
-    if(hit){bullets.splice(i,1);continue}
-    X.fillStyle='#0ff';X.shadowColor='#0ff';X.shadowBlur=6;
-    X.beginPath();X.arc(b.x,b.y,2.5,0,Math.PI*2);X.fill();X.shadowBlur=0;
+    X.closePath();X.stroke();
   }
-
-  // Ship-asteroid collision
-  if(ship.invuln<=0&&!gameOver){
-    for(let a of asteroids){
-      if(Math.hypot(ship.x-a.x,ship.y-a.y)<a.size*12+10){
-        lives--;addP(ship.x,ship.y,'#ff4444',20);ship.invuln=90;
-if(lives<=0){gameOver=true;Arcade.gameOver(score)}break;
-      }
-    }
-  }
-
-  // Respawn asteroids
-  if(asteroids.length===0&&!gameOver){for(let i=0;i<5+Math.floor(score/500);i++)spawnAsteroid(3)}
-
-  // Draw ship
-  if(!gameOver&&(ship.invuln<=0||frame%4<2)){
+  X.fillStyle=COLOR.cyan;
+  for(let b of bullets){X.beginPath();X.arc(b.x,b.y,2.5,0,Math.PI*2);X.fill()}
+  if((state==='playing'||state==='paused')&&(ship.invuln<=0||frame%4<2)){
     X.save();X.translate(ship.x,ship.y);X.rotate(ship.angle);
-    X.strokeStyle='#0ff';X.lineWidth=2;X.shadowColor='#0ff';X.shadowBlur=8;
+    X.strokeStyle=COLOR.cyan;X.lineWidth=2;X.lineJoin='round';
     X.beginPath();X.moveTo(18,0);X.lineTo(-12,-10);X.lineTo(-8,0);X.lineTo(-12,10);X.closePath();X.stroke();
-    X.shadowBlur=0;X.restore();
+    X.restore();
   }
-
-  // Particles
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
-    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/25;X.fillStyle=p.color;
-    X.fillRect(p.x-1.5,p.y-1.5,3,3)}X.globalAlpha=1;
-
-  // HUD
-  X.fillStyle='#fff';X.font='18px Segoe UI';X.textAlign='left';X.fillText('Score: '+score,15,30);
-  X.textAlign='right';X.fillText('❤️'.repeat(lives),C.width-15,30);
-
-  if(gameOver){
-    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
-    X.textAlign='center';X.fillStyle='#0ff';X.font='bold 42px Segoe UI';X.fillText('GAME OVER',C.width/2,220);
-    X.fillStyle='#fff';X.font='22px Segoe UI';X.fillText('Score: '+score,C.width/2,270);
-    X.fillText('Press SPACE',C.width/2,310);
-  }
-  requestAnimationFrame(loop);
+  for(let p of particles){X.globalAlpha=Math.max(0,p.life/25);X.fillStyle=p.color;X.fillRect(p.x-1.5,p.y-1.5,3,3)}
+  X.globalAlpha=1;
 }
-document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' '){if(gameOver)start();e.preventDefault()}});
+function runFrame(){update();draw()}
+
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(GAME_KEYS.has(e.key))e.preventDefault()});
 document.addEventListener('keyup',e=>{keys[e.key]=false});
-start();loop();
+Arcade.onRestart(startGame);
+resetWorld();
+fitCanvas();
+showPanel({title:'Asteroids',body:'Turn with ← → (or A D), thrust with ↑, fire with Space. On touch, use the on-screen pad: A fires.',label:'Play',action:startGame});
+requestAnimationFrame(tick);
 </script>
 </body>
 </html>

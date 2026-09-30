@@ -2,77 +2,148 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tower Stacking - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a2e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(255,100,200,0.2)}
+:root{--hud-h:54px;--pad:10px;--pad-b:36px}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{padding:var(--hud-h) var(--pad) var(--pad-b)}
+#c{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border);cursor:pointer}
+.arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center}
+.arcade-pill{font-size:15px}
+.arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="tower-stack" data-arcade-title="Tower Stacking"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="tower-stack" data-arcade-title="Tower Stacking"></script>
 </head>
 <body>
-<canvas id="c" width="400" height="600"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Tower stacking game. Tap or press Space to drop the moving block."></canvas>
+  <div class="arcade-hud"><span class="arcade-pill">Height <b id="hgt">0</b></span></div>
+  <div class="arcade-hint" id="hint">Tap or press Space to stack</div>
+
+  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
+    <h2>Tower Stacking</h2>
+    <p>Drop each sliding block onto the tower. Whatever hangs over is cut off, so time it well. Tap the board or press Space; on touch the D-pad's A button works too.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
+    <h2>Paused</h2><p>Your tower is waiting.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+    <h2>Tower collapsed</h2>
+    <span class="arcade-big" id="overBig">0</span>
+    <p>blocks high · Best <strong id="overBest">0</strong></p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
+  </div></div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
+const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
+const GW=400,GH=600,DPR_CAP=2,BLOCK_H=30,BLOCK_DRAW_H=28,START_W=100,BEST_KEY='pb_best_tower_stack';
+const $=id=>document.getElementById(id);
+const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
+const PAL={bgTop:tok('--bg'),bgBottom:tok('--card'),text:tok('--text')};
+const COLORS=[tok('--cyan'),tok('--accent'),tok('--violet'),tok('--amber'),tok('--good'),tok('--danger')];
+const REDUCED_MOTION=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let blocks,current,score,gameOver,speed,cameraY;
-const COLORS=['#ff6b9d','#ff8844','#ffcc00','#44ff88','#44aaff','#aa66ff','#ff4466'];
-function start(){
-  blocks=[{x:150,y:550,w:100}];current={x:0,y:0,w:100,dir:1};
-  score=0;gameOver=false;speed=2;cameraY=0;
+let state='idle',paused=false,best=loadBest();
+
+function loadBest(){
+  try{return Number(localStorage.getItem(BEST_KEY))||0}
+  catch(error){console.warn('[Tower Stacking] could not read best score',error);return 0}
+}
+function saveBest(value){
+  try{localStorage.setItem(BEST_KEY,String(value))}
+  catch(error){console.warn('[Tower Stacking] could not save best score',error)}
+}
+function fit(){ // size the canvas to the stage, backing store at device resolution
+  const cs=getComputedStyle(stage);
+  const aw=stage.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const ah=stage.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const k=Math.max(0.1,Math.min(aw/GW,ah/GH));
+  const dpr=Math.min(window.devicePixelRatio||1,DPR_CAP);
+  C.style.width=Math.floor(GW*k)+'px';C.style.height=Math.floor(GH*k)+'px';
+  C.width=Math.round(GW*k*dpr);C.height=Math.round(GH*k*dpr);
+}
+new ResizeObserver(fit).observe(stage);fit();
+
+function reset(){
+  blocks=[{x:150,y:550,w:START_W}];current={x:0,y:0,w:START_W,dir:1};
+  score=0;gameOver=false;speed=2;cameraY=0;$('hgt').textContent=0;
 }
 function place(){
   let top=blocks[blocks.length-1];
   let cx=current.x,cw=current.w;
   let overlap=Math.min(cx+cw,top.x+top.w)-Math.max(cx,top.x);
-  if(overlap<=0){gameOver=true;Arcade.gameOver(score);return}
+  if(overlap<=0){gameOver=true;Arcade.gameOver(score);finish();return}
   let nx=Math.max(cx,top.x);
-  blocks.push({x:nx,y:top.y-30,w:overlap});
+  blocks.push({x:nx,y:top.y-BLOCK_H,w:overlap});
   current.w=overlap;current.x=0;
   score++;Arcade.score(score);speed=Math.min(5,2+score*0.1);
-  if(blocks.length>5)cameraY+=(30-cameraY*0.1);
+  $('hgt').textContent=score;
+  if(blocks.length>5)cameraY+=(BLOCK_H-cameraY*0.1);
 }
 function draw(){
-  let hue=(score*20)%360;
-  let bg=X.createLinearGradient(0,0,0,C.height);
-  bg.addColorStop(0,`hsl(${hue},30%,8%)`);bg.addColorStop(1,`hsl(${hue+60},30%,15%)`);
-  X.fillStyle=bg;X.fillRect(0,0,C.width,C.height);
+  X.setTransform(C.width/GW,0,0,C.height/GH,0,0);
+  let bg=X.createLinearGradient(0,0,0,GH);
+  bg.addColorStop(0,PAL.bgTop);bg.addColorStop(1,PAL.bgBottom);
+  X.fillStyle=bg;X.fillRect(0,0,GW,GH);
   // Stars
-  X.fillStyle='#fff';for(let i=0;i<40;i++){X.globalAlpha=0.1+Math.sin(Date.now()/600+i)*0.1;
-    X.fillRect((i*97)%C.width,(i*53)%C.height,1.5,1.5)}X.globalAlpha=1;
-  
-  let offy=Math.max(0,(blocks.length-12)*30);
-  if(!gameOver){
+  X.fillStyle=PAL.text;for(let i=0;i<40;i++){
+    X.globalAlpha=REDUCED_MOTION?0.12:0.1+Math.sin(Date.now()/600+i)*0.1;
+    X.fillRect((i*97)%GW,(i*53)%GH,1.5,1.5)}X.globalAlpha=1;
+
+  let offy=Math.max(0,(blocks.length-12)*BLOCK_H);
+  if(state==='playing'&&!paused&&!gameOver){
     current.x+=current.dir*speed;
-    if(current.x>C.width-current.w||current.x<0)current.dir*=-1;
-    let cy=blocks[blocks.length-1].y-30+offy;
-    X.fillStyle=COLORS[score%COLORS.length];X.shadowColor=COLORS[score%COLORS.length];X.shadowBlur=10;
-    X.beginPath();X.roundRect(current.x,cy,current.w,28,4);X.fill();X.shadowBlur=0;
+    if(current.x>GW-current.w||current.x<0)current.dir*=-1;
+  }
+  if(!gameOver){
+    let cy=blocks[blocks.length-1].y-BLOCK_H+offy;
+    X.fillStyle=COLORS[(blocks.length)%COLORS.length]; // same colour the block keeps once placed
+    X.beginPath();X.roundRect(current.x,cy,current.w,BLOCK_DRAW_H,4);X.fill();
   }
   // Draw blocks
   for(let i=0;i<blocks.length;i++){
     let b=blocks[i],by=b.y+offy;
-    if(by>C.height+30||by<-30)continue;
-    X.fillStyle=COLORS[i%COLORS.length];X.shadowColor=COLORS[i%COLORS.length];X.shadowBlur=6;
-    X.beginPath();X.roundRect(b.x,by,b.w,28,4);X.fill();
+    if(by>GH+30||by<-30)continue;
+    X.fillStyle=COLORS[i%COLORS.length];
+    X.beginPath();X.roundRect(b.x,by,b.w,BLOCK_DRAW_H,4);X.fill();
     X.fillStyle='rgba(255,255,255,0.15)';X.fillRect(b.x+2,by+2,b.w-4,10);
-    X.shadowBlur=0;
   }
-  // Score
-  X.fillStyle='#fff';X.font='bold 36px Segoe UI';X.textAlign='center';
-  X.fillText(score,C.width/2,50);
-  if(score===0&&!gameOver){X.font='16px Segoe UI';X.fillStyle='rgba(255,255,255,0.5)';X.fillText('Click or SPACE to stack!',C.width/2,C.height-30)}
-  if(gameOver){
-    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#ff6b9d';X.font='bold 40px Segoe UI';X.fillText('Tower: '+score,C.width/2,270);
-    X.fillStyle='#fff';X.font='18px Segoe UI';X.fillText('Press SPACE to retry',C.width/2,320);
-  }
-  requestAnimationFrame(draw);
 }
-function act(){if(gameOver)start();else place()}
-document.addEventListener('keydown',e=>{if(e.key===' '){act();e.preventDefault()}});
-C.addEventListener('click',act);
-start();draw();
+function start(){
+  reset();state='playing';paused=false;
+  ['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'));
+  $('hint').hidden=false;
+}
+function finish(){
+  state='over';
+  if(score>best){best=score;saveBest(best)}
+  $('overBig').textContent=score;$('overBest').textContent=best;
+  $('overOv').classList.add('show');$('hint').hidden=true;
+}
+function setPaused(v){
+  if(v===paused||(v&&state!=='playing'))return;
+  paused=v;$('pauseOv').classList.toggle('show',v);
+}
+function loop(){draw();requestAnimationFrame(loop)}
+function act(){if(state==='playing'&&!paused)place()}
+document.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('button'))return;
+  if(e.key!==' '&&e.key!=='Enter')return;
+  e.preventDefault();
+  if(e.repeat)return; // holding the key must not drop several blocks
+  if(state==='playing')act();else start();
+});
+C.addEventListener('pointerdown',act);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+$('playBtn').onclick=start;$('againBtn').onclick=start;$('resumeBtn').onclick=()=>setPaused(false);
+reset();loop();
 </script>
 </body>
 </html>

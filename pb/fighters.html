@@ -2,37 +2,84 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Platform Fighters - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{border-radius:12px;box-shadow:0 0 30px rgba(255,50,100,0.3);max-width:100vw;max-height:100vh}
-#info{position:absolute;top:12px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;z-index:10;background:rgba(0,0,0,0.5);padding:5px 14px;border-radius:12px}
-#menu{position:fixed;inset:0;background:rgba(10,10,26,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:30;color:#fff}
-#menu h1{font-size:34px;letter-spacing:2px;color:#ff4477;text-shadow:0 0 18px rgba(255,68,119,0.6)}
-#menu button{width:280px;padding:13px;font-size:17px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;background:#3a2030;color:#fff}
-#menu button:hover{background:#552c44}
-#menu .join{display:flex;gap:8px;width:280px}
-#menu .join input{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid #6a2a4a;background:#280e1a;color:#fff;font-size:17px;text-transform:lowercase;text-align:center}
-#menu .join button{width:auto;padding:12px 20px}
-#mStatus{min-height:24px;font-size:16px;color:#e87fa8;text-align:center}
-.hidden{display:none!important}
+:root{--hud-h:54px;--pad:10px;--pad-b:36px;--p1:var(--cyan);--p2:var(--amber)}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{padding:var(--hud-h) var(--pad) var(--pad-b)}
+#c{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.p1{--c:var(--p1)}.p2{--c:var(--p2)}
+.arcade-hud{inset:5px 14px auto;align-items:center}
+.hud-btn{pointer-events:auto;min-height:44px}
+.menu-actions{flex-direction:column;align-items:stretch;gap:9px}
+.menu-actions .arcade-btn{width:100%}
+.join{display:flex;gap:8px}
+.menu-actions .join .arcade-btn{width:auto;flex:none}
+.join input{flex:1;min-width:0;min-height:44px;padding:0 14px;border:1px solid var(--border);border-radius:12px;background:var(--card);
+  color:var(--text);font:700 16px/1 var(--font);text-transform:lowercase;text-align:center;outline:none}
+.join input:focus-visible{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(77,232,255,.25)}
+.status{min-height:22px;margin:12px 0 0!important;color:var(--cyan)!important;font-weight:650}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="fighters" data-arcade-title="Platform Fighters"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="fighters" data-arcade-title="Platform Fighters"></script>
 </head>
 <body>
-<div id="info">🔴 P1: WASD + F attack + G special · 🔵 P2: Arrows + K attack + L special</div>
-<canvas id="c" width="800" height="500"></canvas>
-<div id="menu">
-  <h1>PLATFORM FIGHTERS</h1>
-  <button id="mLocal">👥 2 Players — one device</button>
-  <button id="mAI">🤖 vs Computer</button>
-  <button id="mHost">🌐 Host online game</button>
-  <div class="join"><input id="mCode" maxlength="5" placeholder="code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button id="mJoin">Join</button></div>
-  <div id="mStatus"></div>
-</div>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Fighting arena"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill p1"><i class="dot"></i><span id="n1">P1</span> <b id="s1">0</b></span>
+    <button class="arcade-btn secondary hud-btn" id="hudMenu" type="button">Menu</button>
+    <span class="arcade-pill p2"><span id="n2">P2</span> <b id="s2">0</b><i class="dot"></i></span>
+  </div>
+  <div class="arcade-hint" id="hint"></div>
+
+  <div class="arcade-overlay show" id="menu"><div class="arcade-panel">
+    <h2>Platform Fighters</h2>
+    <p>First to 5 round wins. Move with WASD or the arrows, attack with Space or F, special with G; on touch use the on-screen D-pad and A button.</p>
+    <div class="arcade-actions menu-actions">
+      <button class="arcade-btn" id="mAI" type="button">Play vs Computer</button>
+      <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
+      <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
+      <div class="join"><input id="mCode" maxlength="5" placeholder="room code" aria-label="Room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+    </div>
+    <p class="status" id="mStatus" role="status"></p>
+  </div></div>
+
+  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
+    <h2>Paused</h2><p>The game waits for you.</p>
+    <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Resume</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+    <h2 id="overTitle">You win</h2>
+    <span class="arcade-big" id="overBig">5 - 0</span>
+    <p id="overNote"></p>
+    <div class="arcade-actions">
+      <button class="arcade-btn" id="rematchBtn" type="button">Rematch</button>
+      <button class="arcade-btn secondary" id="menuBtn" type="button">Menu</button>
+    </div>
+  </div></div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
+const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
+const GW=800,GH=500,DPR_CAP=2,WIN_ROUNDS=5;
+const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
+const FONT=tok('--font');
+const PAL={bgTop:tok('--bg'),bgBottom:tok('--card'),plat:tok('--border'),platTop:tok('--muted'),text:tok('--text'),
+  p1:tok('--cyan'),p2:tok('--amber'),special:tok('--violet'),good:tok('--good'),hit:tok('--danger'),track:tok('--border')};
+function fit(){ // size the canvas to the stage, backing store at device resolution
+  const cs=getComputedStyle(stage);
+  const aw=stage.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const ah=stage.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const k=Math.max(0.1,Math.min(aw/GW,ah/GH));
+  const dpr=Math.min(window.devicePixelRatio||1,DPR_CAP);
+  C.style.width=Math.floor(GW*k)+'px';C.style.height=Math.floor(GH*k)+'px';
+  C.width=Math.round(GW*k*dpr);C.height=Math.round(GH*k*dpr);
+}
+new ResizeObserver(fit).observe(stage);fit();
 let keys={},particles=[];
 const PLATS=[{x:0,y:480,w:800,h:20},{x:200,y:360,w:150,h:12},{x:450,y:360,w:150,h:12},{x:300,y:250,w:200,h:12},{x:50,y:300,w:100,h:12},{x:650,y:300,w:100,h:12}];
 
@@ -40,7 +87,7 @@ function makePlayer(x,color,name){
   return{x,y:400,vx:0,vy:0,w:28,h:40,color,name,hp:100,maxHp:100,dir:1,onGround:false,
     attacking:0,special:0,cooldown:0,score:0,knockback:0,combo:0,shakeX:0};
 }
-let p1=makePlayer(200,'#ff4466','P1'),p2=makePlayer(600,'#4488ff','P2');
+let p1=makePlayer(200,PAL.p1,'P1'),p2=makePlayer(600,PAL.p2,'P2');
 
 function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*4;
   particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:12+Math.random()*10,color:c})}}
@@ -59,18 +106,36 @@ window.addEventListener('message',e=>{const d=e.data;if(!d)return;
 const menu=document.getElementById('menu'),mStatus=document.getElementById('mStatus');
 const status=(t)=>mStatus.textContent=t;
 const randCode=()=>Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,5).padEnd(5,'x');
-function begin(){p1=makePlayer(200,'#ff4466','P1');p2=makePlayer(600,'#4488ff','P2');
-  koPending=false;running=true;menu.classList.add('hidden');
-  document.getElementById('info').textContent=
-    mode==='local'?'🔴 P1: WASD + F/G · 🔵 P2: Arrows + K/L':
-    mode==='ai'?'🔴 You: move WASD/Arrows · attack Space/F · special G':
-    'You are '+(mode==='host'?'🔴 RED':'🔵 BLUE')+' · move WASD/Arrows · attack Space/F · special G';}
-function backToMenu(msg){running=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
-  menu.classList.remove('hidden');status(msg||'')}
+const $=id=>document.getElementById(id);
+const pauseOv=$('pauseOv'),overOv=$('overOv');
+let paused=false,overShown=false;
+function names(){ // [left label, right label] for the current mode
+  if(mode==='ai')return['You','CPU'];
+  if(mode==='host')return['You','Them'];
+  if(mode==='guest')return['Them','You'];
+  return['P1','P2'];
+}
+function begin(){p1=makePlayer(200,PAL.p1,'P1');p2=makePlayer(600,PAL.p2,'P2');
+  koPending=false;running=true;paused=false;menu.classList.remove('show');
+  const[n1,n2]=names();$('n1').textContent=n1;$('n2').textContent=n2;
+  $('hint').textContent=
+    mode==='local'?'P1: WASD + F / G  ·  P2: arrows + K / L':
+    mode==='ai'?'WASD or arrows to move  ·  Space or F to attack  ·  G special':
+    'You are '+(mode==='host'?'left (cyan)':'right (amber)')+'  ·  Space or F attack  ·  G special';}
+function backToMenu(msg){running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
+  pauseOv.classList.remove('show');menu.classList.add('show');status(msg||'')}
+function setPaused(v){ // pause offline games when the tab is hidden; online rooms keep running
+  if(v===paused||(v&&(!running||mode==='host'||mode==='guest'||overShown)))return;
+  paused=v;pauseOv.classList.toggle('show',v);
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+$('resumeBtn').onclick=()=>{lastT=0;setPaused(false)};
+$('menuBtn').onclick=()=>backToMenu();
+$('hudMenu').onclick=()=>backToMenu();
 document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
 document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
 document.getElementById('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
-  status('Room code: '+c.toUpperCase()+' — waiting for the other iPad…')};
+  status('Room code: '+c.toUpperCase()+' — waiting for the other player…')};
 document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();
   if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
   mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'…')};
@@ -140,8 +205,8 @@ function updatePlayer(p,inp,other,m){
       p.y=pl.y-p.h;p.vy=0;p.onGround=true;
     }
   }
-  if(p.x<0){p.x=0;p.vx=0}if(p.x>C.width-p.w){p.x=C.width-p.w;p.vx=0}
-  if(p.y>C.height+50){p.hp=0}
+  if(p.x<0){p.x=0;p.vx=0}if(p.x>GW-p.w){p.x=GW-p.w;p.vx=0}
+  if(p.y>GH+50){p.hp=0}
 
   if(inp.a&&p.attacking<=0&&p.cooldown<=0){p.attacking=12;p.cooldown=18}
   if(inp.s&&p.special<=0&&p.cooldown<5){p.special=20;p.cooldown=40}
@@ -160,7 +225,7 @@ function updatePlayer(p,inp,other,m){
     if(hitX<other.x+other.w&&hitX+50>other.x&&Math.abs(p.y-other.y)<50){
       let dmg=15+Math.floor(Math.random()*8);other.hp-=dmg;
       other.knockback=p.dir*12;other.vy=-6;other.shakeX=12;
-      addP(other.x+other.w/2,other.y+other.h/2,'#ffcc00',20);
+      addP(other.x+other.w/2,other.y+other.h/2,PAL.special,20);
       p.special=10;
     }
   }
@@ -171,26 +236,28 @@ function drawPlayer(p){
   let sx=p.x+(Math.random()-0.5)*p.shakeX;
   X.save();X.translate(sx+p.w/2,p.y+p.h/2);
   if(p.dir<0)X.scale(-1,1);
-  X.fillStyle=p.color;X.shadowColor=p.color;X.shadowBlur=8;
+  X.fillStyle=p.color;
   X.fillRect(-p.w/2,-p.h/2,p.w,p.h);
   X.fillStyle=p.color;
   X.beginPath();X.arc(0,-p.h/2-8,12,0,Math.PI*2);X.fill();
-  X.fillStyle='#fff';X.fillRect(2,-p.h/2-11,5,4);
-  X.fillStyle='#111';X.fillRect(4,-p.h/2-11,3,3);
+  X.fillStyle=PAL.text;X.fillRect(2,-p.h/2-11,5,4);
+  X.fillStyle=PAL.bgTop;X.fillRect(4,-p.h/2-11,3,3);
   if(p.attacking>6){
-    X.fillStyle='#fff';X.globalAlpha=0.6;
+    X.fillStyle=PAL.text;X.globalAlpha=0.6;
     X.fillRect(p.w/2,-5,25,10);X.globalAlpha=1;
   }
   if(p.special>10){
-    X.fillStyle='#ffcc00';X.globalAlpha=0.7;
+    X.fillStyle=PAL.special;X.globalAlpha=0.7;
     X.beginPath();X.arc(p.w/2+15,0,20,0,Math.PI*2);X.fill();X.globalAlpha=1;
   }
   let legOff=Math.abs(p.vx)>0.5?Math.sin(Date.now()/60)*5:0;
-  X.fillStyle=p.color==='#ff4466'?'#cc2244':'#2266cc';
+  X.fillStyle=p.color;
   X.fillRect(-8,p.h/2,7,10+legOff);X.fillRect(3,p.h/2,7,10-legOff);
-  X.shadowBlur=0;X.restore();
-  X.fillStyle='#333';X.fillRect(p.x-5,p.y-25,p.w+10,6);
-  X.fillStyle=p.hp>30?'#44ff88':'#ff4444';
+  X.fillStyle='rgba(0,0,0,0.3)';
+  X.fillRect(-8,p.h/2,7,10+legOff);X.fillRect(3,p.h/2,7,10-legOff);
+  X.restore();
+  X.fillStyle=PAL.track;X.fillRect(p.x-5,p.y-25,p.w+10,6);
+  X.fillStyle=p.hp>30?PAL.good:PAL.hit;
   X.fillRect(p.x-5,p.y-25,(p.w+10)*(Math.max(0,p.hp)/p.maxHp),6);
 }
 
@@ -203,18 +270,19 @@ function resetRound(){
 function loop(ts){
   requestAnimationFrame(loop);
   const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;lastT=ts;
-  let bg=X.createLinearGradient(0,0,0,C.height);
-  bg.addColorStop(0,'#0a0a2e');bg.addColorStop(1,'#1a1a3e');
-  X.fillStyle=bg;X.fillRect(0,0,C.width,C.height);
+  X.setTransform(C.width/GW,0,0,C.height/GH,0,0);
+  const bg=X.createLinearGradient(0,0,0,GH);
+  bg.addColorStop(0,PAL.bgTop);bg.addColorStop(1,PAL.bgBottom);
+  X.fillStyle=bg;X.fillRect(0,0,GW,GH);
 
   for(let pl of PLATS){
-    X.fillStyle='#2a2a4a';X.shadowColor='#4a4a6a';X.shadowBlur=5;
-    X.beginPath();X.roundRect(pl.x,pl.y,pl.w,pl.h,4);X.fill();X.shadowBlur=0;
-    X.fillStyle='#3a3a5a';X.fillRect(pl.x,pl.y,pl.w,3);
+    X.fillStyle=PAL.plat;
+    X.beginPath();X.roundRect(pl.x,pl.y,pl.w,pl.h,4);X.fill();
+    X.fillStyle=PAL.platTop;X.fillRect(pl.x,pl.y,pl.w,3);
   }
 
-  const over=p1.score>=5||p2.score>=5;
-  if(running&&!over){
+  const over=p1.score>=WIN_ROUNDS||p2.score>=WIN_ROUNDS;
+  if(running&&!over&&!paused){
     if(mode==='guest'){
       if(guestState){
         for(const[p,q] of [[p1,guestState.a],[p2,guestState.b]]){
@@ -232,8 +300,8 @@ function loop(ts){
           updatePlayer(p1,{u:meU(),l:meL(),r:meR(),a:meA(),s:meS()},p2,m);
           updatePlayer(p2,mode==='ai'?aiKeys():remoteKeys,p1,m);
         }
-        if(p1.hp<=0){p2.score++;addP(p1.x,p1.y,'#ff4466',30);koPending=true;setTimeout(resetRound,1200)}
-        else if(p2.hp<=0){p1.score++;addP(p2.x,p2.y,'#4488ff',30);koPending=true;
+        if(p1.hp<=0){p2.score++;addP(p1.x,p1.y,PAL.p1,30);koPending=true;setTimeout(resetRound,1200)}
+        else if(p2.hp<=0){p1.score++;addP(p2.x,p2.y,PAL.p2,30);koPending=true;
           if(mode==='ai'){window.score=Math.max(window.score||0,p1.score);Arcade.gameOver(window.score)}
           setTimeout(resetRound,1200)}
       }
@@ -246,29 +314,33 @@ function loop(ts){
 
   drawPlayer(p1);drawPlayer(p2);
 
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.life--;
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];if(!paused){p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.life--}
     if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/22;X.fillStyle=p.color;
     X.fillRect(p.x-2,p.y-2,4,4)}X.globalAlpha=1;
 
-  X.font='bold 28px Segoe UI';X.textAlign='left';
-  const n1=mode==='ai'?'You':(mode==='host'?'You':mode==='guest'?'Them':'P1');
-  const n2=mode==='ai'?'CPU':(mode==='guest'?'You':mode==='host'?'Them':'P2');
-  X.fillStyle='#ff4466';X.fillText(n1+': '+p1.score,20,35);
-  X.textAlign='right';X.fillStyle='#4488ff';X.fillText(n2+': '+p2.score,C.width-20,35);
-
-  if(running&&over){
-    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
-    const p1w=p1.score>=5;
-    X.textAlign='center';X.fillStyle=p1w?'#ff4466':'#4488ff';
-    let name=p1w?'P1':'P2';
-    if(mode==='ai')name=p1w?'YOU':'COMPUTER';
-    if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'YOU':'THEY';
-    X.font='bold 44px Segoe UI';X.fillText(name+(name==='YOU'?' WIN!':' WINS!'),C.width/2,C.height/2);
-    X.fillStyle='#fff';X.font='18px Segoe UI';
-    X.fillText(mode==='guest'?'Host presses SPACE to rematch · M: menu':'Press SPACE to rematch · M: menu',C.width/2,C.height/2+40);
-    if(mode!=='guest'&&(keys[' ']||(mode==='host'&&remoteKeys.sp))){p1.score=0;p2.score=0;resetRound()}
-  }
+  syncHud(over);
+  if(running&&over&&!paused&&mode!=='guest'&&(keys[' ']||(mode==='host'&&remoteKeys.sp)))rematch();
 }
+let shown1=-1,shown2=-1;
+function syncHud(over){ // DOM HUD + result overlay, touched only when something changed
+  if(p1.score!==shown1){shown1=p1.score;$('s1').textContent=shown1}
+  if(p2.score!==shown2){shown2=p2.score;$('s2').textContent=shown2}
+  const showOver=running&&over;
+  if(showOver===overShown)return;
+  overShown=showOver;overOv.classList.toggle('show',showOver);
+  if(!showOver)return;
+  const p1w=p1.score>=WIN_ROUNDS;
+  let name=p1w?'P1':'P2';
+  if(mode==='ai')name=p1w?'You':'Computer';
+  if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'You':'They';
+  $('overTitle').textContent=name==='You'?'You win':name+' win'+(name==='They'?'':'s');
+  $('overBig').textContent=p1.score+' - '+p2.score;
+  $('overNote').textContent=mode==='guest'?'Waiting for the host to start a rematch.':
+    mode==='ai'?'Best match vs computer: '+(window.score||0)+' rounds won':'Space or Rematch to play again.';
+  $('rematchBtn').hidden=mode==='guest';
+}
+function rematch(){p1.score=0;p2.score=0;resetRound()}
+$('rematchBtn').onclick=rematch;
 document.addEventListener('keydown',e=>{keys[e.key]=true;
   if(running&&(e.key==='m'||e.key==='M')&&mode!=='local')backToMenu();
   if(mode==='guest')sendKeys();

@@ -2,49 +2,156 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Air Hockey - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{border-radius:12px;box-shadow:0 0 30px rgba(0,150,255,0.3);max-width:100vw;max-height:100vh}
-#info{position:absolute;top:12px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;z-index:10;background:rgba(0,0,0,0.5);padding:5px 14px;border-radius:12px}
-#menu{position:fixed;inset:0;background:rgba(6,6,22,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:30;color:#fff}
-#menu h1{font-size:34px;letter-spacing:2px;color:#44aaff;text-shadow:0 0 18px rgba(68,170,255,0.6)}
-#menu button{width:280px;padding:13px;font-size:17px;font-weight:bold;border:none;border-radius:12px;cursor:pointer;background:#16283a;color:#fff}
-#menu button:hover{background:#1e3a55}
-#menu .join{display:flex;gap:8px;width:280px}
-#menu .join input{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid #2a4a6a;background:#0e1a28;color:#fff;font-size:17px;text-transform:lowercase;text-align:center}
-#menu .join button{width:auto;padding:12px 20px}
-#mStatus{min-height:24px;font-size:16px;color:#7fc0e8;text-align:center}
-.hidden{display:none!important}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+.arcade-hud{justify-content:center}
+.arcade-hud .arcade-pill{text-transform:none;letter-spacing:.01em}
+.menu-panel .arcade-actions{flex-direction:column;align-items:stretch;margin-top:16px}
+.menu-panel .arcade-btn{width:100%}
+.join{display:flex;gap:8px}
+.join input{flex:1;min-width:0;min-height:44px;padding:0 12px;border:1px solid var(--border);border-radius:12px;background:var(--card);
+  color:var(--text);font:700 16px/1 var(--font);text-align:center;text-transform:lowercase}
+.join input:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.join .arcade-btn{width:auto}
+#mStatus{min-height:22px;margin:12px 0 0;color:var(--cyan);font-size:14px}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
 </head>
 <body>
-<div id="info">🔴 P1: WASD · 🔵 P2: Arrows · First to 7!</div>
-<canvas id="c" width="500" height="700"></canvas>
-<div id="menu">
-  <h1>AIR HOCKEY</h1>
-  <button id="mLocal">👥 2 Players — one device</button>
-  <button id="mAI">🤖 vs Computer</button>
-  <button id="mHost">🌐 Host online game</button>
-  <div class="join"><input id="mCode" maxlength="5" placeholder="code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button id="mJoin">Join</button></div>
-  <div id="mStatus"></div>
-</div>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Air Hockey arcade game"></canvas>
+  <div class="arcade-hud"><span class="arcade-pill" id="info"></span></div>
+  <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+    <div class="arcade-panel menu-panel">
+      <h2 id="menuTitle">Air Hockey</h2>
+      <p>First to 7 wins. Move your mallet with WASD or the arrow keys, or the on-screen pad on touch.</p>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="mAI" type="button">Play the computer</button>
+        <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
+        <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
+        <div class="join"><input id="mCode" maxlength="5" placeholder="code" aria-label="Room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+      </div>
+      <p id="mStatus" role="status"></p>
+    </div>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
+const GAME_ID='air-hockey',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const W=500,H=700;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+
+const GOAL_W=140,SPD=5,WIN_SCORE=7,RINK_INSET=10,MALLET_R=28,PUCK_R=12;
+const RED=COLOR.danger,BLUE=COLOR.accent;
 let keys={},puck,p1,p2,particles=[];
 function reset(){
-  puck={x:250,y:350,vx:(Math.random()-0.5)*6,vy:(Math.random()>0.5?-3:3),r:12,trail:[]};
-  p1={x:250,y:600,r:28,score:p1?p1.score:0,color:'#ff4466'};
-  p2={x:250,y:100,r:28,score:p2?p2.score:0,color:'#4488ff'};
+  puck={x:W/2,y:H/2,vx:(Math.random()-0.5)*6,vy:(Math.random()>0.5?-3:3),r:PUCK_R,trail:[]};
+  p1={x:W/2,y:600,r:MALLET_R,score:p1?p1.score:0,color:RED};
+  p2={x:W/2,y:100,r:MALLET_R,score:p2?p2.score:0,color:BLUE};
 }
-function addP(x,y,c){for(let i=0;i<8;i++){let a=Math.random()*Math.PI*2,s=2+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15,color:c})}}
+function addP(x,y,c){
+  if(REDUCED)return;
+  for(let i=0;i<8;i++){let a=Math.random()*Math.PI*2,s=2+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15,color:c})}
+}
 reset();
-const GOAL_W=140,SPD=5;
 
 /* ---------- modes + online ---------- */
-let mode=null,running=false,netFrame=0,lastT=0;
+let mode=null,running=false,paused=false,matchShown=false,netFrame=0,lastT=0;
 const remoteKeys={u:0,d:0,l:0,r:0,sp:0};
 let guestTarget=null;
 const NET={open(code,role){parent.postMessage({__pbNet:{op:'open',code,role}},'*')},
@@ -54,27 +161,27 @@ window.addEventListener('message',e=>{const d=e.data;if(!d)return;
  if(d.__pbNetMsg&&NET.onMsg)NET.onMsg(d.__pbNetMsg.r,d.__pbNetMsg.d);
  if(d.__pbNetPeers&&NET.onPeers)NET.onPeers(d.__pbNetPeers);
  if(d.__pbNetErr&&NET.onErr)NET.onErr(d.__pbNetErr)});
-const menu=document.getElementById('menu'),mStatus=document.getElementById('mStatus');
+const menu=$('menu'),mStatus=$('mStatus'),info=$('info');
 const status=(t)=>mStatus.textContent=t;
 const randCode=()=>Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,5).padEnd(5,'x');
-function begin(){p1=null;p2=null;reset();p1.score=0;p2.score=0;running=true;menu.classList.add('hidden');
-  document.getElementById('info').textContent=
-    mode==='local'?'🔴 P1: WASD · 🔵 P2: Arrows · First to 7!':
-    mode==='ai'?'🔴 You: WASD or Arrows · First to 7!':
-    '🔴 You are '+(mode==='host'?'RED (bottom)':'BLUE (top)')+' · WASD or Arrows · First to 7!';}
-function backToMenu(msg){running=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
-  menu.classList.remove('hidden');status(msg||'')}
-document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
-document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
-document.getElementById('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
-  status('Room code: '+c.toUpperCase()+' — waiting for the other iPad…')};
-document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();
+function begin(){p1=null;p2=null;reset();p1.score=0;p2.score=0;running=true;paused=false;matchShown=false;menu.classList.remove('show');hidePanel();
+  info.textContent=
+    mode==='local'?'Red: WASD · Blue: arrows · First to 7':
+    mode==='ai'?'You are red · WASD or arrows · First to 7':
+    'You are '+(mode==='host'?'red (bottom)':'blue (top)')+' · WASD or arrows · First to 7';}
+function backToMenu(msg){running=false;paused=false;matchShown=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
+  hidePanel();info.textContent='';menu.classList.add('show');status(msg||'')}
+$('mLocal').onclick=()=>{mode='local';begin()};
+$('mAI').onclick=()=>{mode='ai';begin()};
+$('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
+  status('Room code: '+c.toUpperCase()+' - waiting for the other iPad...')};
+$('mJoin').onclick=()=>{const c=($('mCode').value||'').trim().toLowerCase();
   if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
-  mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'…')};
+  mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'...')};
 NET.onPeers=(p)=>{
   if(!running&&(mode==='host'||mode==='guest')&&p.n>=2)begin();
   if(running&&(mode==='host'||mode==='guest')&&p.n<2)backToMenu('Opponent left the game.')};
-NET.onErr=(e)=>{if(mode==='host'||mode==='guest')backToMenu(e==='offline'?'Online play needs the internet.':'Connection problem — try again.')};
+NET.onErr=(e)=>{if(mode==='host'||mode==='guest')backToMenu(e==='offline'?'Online play needs the internet.':'Connection problem - try again.')};
 NET.onMsg=(r,d)=>{
   if(mode==='host'&&d&&d.t==='k')Object.assign(remoteKeys,d.k);
   if(mode==='guest'&&d&&d.t==='s')guestTarget=d;
@@ -83,49 +190,75 @@ const meU=()=>keys['w']||keys['W']||keys['ArrowUp'],meD=()=>keys['s']||keys['S']
       meL=()=>keys['a']||keys['A']||keys['ArrowLeft'],meR=()=>keys['d']||keys['D']||keys['ArrowRight'];
 function sendKeys(){NET.send({t:'k',k:{u:+!!meU(),d:+!!meD(),l:+!!meL(),r:+!!meR(),sp:+!!keys[' ']}})}
 
+/* ---------- match end + pause panels ---------- */
+function rematch(){hidePanel();p1.score=0;p2.score=0;matchShown=false;reset()}
+function showMatchEnd(){
+  matchShown=true;
+  const p1w=p1.score>=WIN_SCORE;
+  let name=p1w?'Red':'Blue';
+  if(mode==='ai')name=p1w?'You':'Computer';
+  if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'You':'They';
+  const title=name+(name==='You'?' win!':' wins!');
+  const isGuest=mode==='guest';
+  showPanel({title,big:p1.score+' : '+p2.score,
+    bestLine:'Red : Blue',
+    body:isGuest?'Waiting for the host to start a rematch.':'',
+    label:'Rematch',action:isGuest?null:rematch,label2:'Menu',action2:()=>backToMenu()});
+}
+function pauseGame(){
+  if(!running||paused||matchShown||(mode!=='local'&&mode!=='ai'))return;
+  paused=true;keys={};
+  showPanel({title:'Paused',label:'Resume',action:()=>{paused=false},label2:'Menu',action2:()=>backToMenu()});
+}
+
 /* ---------- AI mallet (controls top/blue): defend the goal, strike loose pucks ---------- */
 function aiMove(m){
   let tx,ty;
-  if(puck.y<C.height/2+40&&puck.vy>-8){
-    // line up on the goal->puck line so the strike drives the puck at the goal
-    const gx=puck.x-C.width/2,gy=puck.y-(C.height-6),gl=Math.hypot(gx,gy)||1;
+  if(puck.y<H/2+40&&puck.vy>-8){
+    const gx=puck.x-W/2,gy=puck.y-(H-6),gl=Math.hypot(gx,gy)||1;
     tx=puck.x+gx/gl*(puck.r+8);ty=puck.y+gy/gl*(puck.r+8);
-    // mallet below the puck: swing around its side, never push through it
     if(p2.y>puck.y-4&&Math.abs(p2.x-puck.x)<p2.r+puck.r+14){
       tx=puck.x+(p2.x<puck.x?-1:1)*(p2.r+puck.r+20);ty=p2.y;
     }
-  }else{tx=C.width/2+(puck.x-C.width/2)*0.35;ty=100}
+  }else{tx=W/2+(puck.x-W/2)*0.35;ty=100}
   const dx=tx-p2.x,dy=ty-p2.y,d=Math.hypot(dx,dy);
   const s=Math.min(SPD*0.95*m,d);
   if(d>1){p2.x+=dx/d*s;p2.y+=dy/d*s}
-  p2.x=Math.max(p2.r+10,Math.min(C.width-p2.r-10,p2.x));
-  p2.y=Math.max(p2.r+10,Math.min(C.height/2-p2.r-10,p2.y));
+  p2.x=Math.max(p2.r+10,Math.min(W-p2.r-10,p2.x));
+  p2.y=Math.max(p2.r+10,Math.min(H/2-p2.r-10,p2.y));
 }
 function movePad(p,u,d,l,r,topHalf,m){
   if(u)p.y-=SPD*m;if(d)p.y+=SPD*m;if(l)p.x-=SPD*m;if(r)p.x+=SPD*m;
-  p.x=Math.max(p.r+10,Math.min(C.width-p.r-10,p.x));
-  if(topHalf)p.y=Math.max(p.r+10,Math.min(C.height/2-p.r-10,p.y));
-  else p.y=Math.max(C.height/2+p.r+10,Math.min(C.height-p.r-10,p.y));
+  p.x=Math.max(p.r+10,Math.min(W-p.r-10,p.x));
+  if(topHalf)p.y=Math.max(p.r+10,Math.min(H/2-p.r-10,p.y));
+  else p.y=Math.max(H/2+p.r+10,Math.min(H-p.r-10,p.y));
+}
+
+function drawTable(){
+  X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
+  X.fillStyle=COLOR.card;X.beginPath();X.roundRect(RINK_INSET,RINK_INSET,W-2*RINK_INSET,H-2*RINK_INSET,20);X.fill();
+  X.strokeStyle=COLOR.muted;X.lineWidth=2;X.globalAlpha=0.35;
+  X.beginPath();X.roundRect(RINK_INSET,RINK_INSET,W-2*RINK_INSET,H-2*RINK_INSET,20);X.stroke();
+  X.beginPath();X.moveTo(RINK_INSET,H/2);X.lineTo(W-RINK_INSET,H/2);X.stroke();
+  X.beginPath();X.arc(W/2,H/2,60,0,Math.PI*2);X.stroke();
+  X.globalAlpha=1;
+  X.fillStyle=BLUE;X.globalAlpha=0.5;X.fillRect(W/2-GOAL_W/2,0,GOAL_W,12);
+  X.fillStyle=RED;X.fillRect(W/2-GOAL_W/2,H-12,GOAL_W,12);
+  X.globalAlpha=1;
 }
 
 function loop(ts){
   requestAnimationFrame(loop);
   const m=lastT?Math.min(2.5,Math.max(0.4,(ts-lastT)/16.667)):1;lastT=ts;
-  X.fillStyle='#1a3a1a';X.fillRect(0,0,C.width,C.height);
-  X.fillStyle='#0a4a2a';X.beginPath();X.roundRect(10,10,C.width-20,C.height-20,20);X.fill();
-  X.strokeStyle='#fff';X.lineWidth=2;X.globalAlpha=0.3;
-  X.beginPath();X.roundRect(10,10,C.width-20,C.height-20,20);X.stroke();
-  X.beginPath();X.moveTo(10,C.height/2);X.lineTo(C.width-10,C.height/2);X.stroke();
-  X.beginPath();X.arc(C.width/2,C.height/2,60,0,Math.PI*2);X.stroke();
-  X.globalAlpha=1;
-  X.fillStyle='rgba(255,255,255,0.15)';
-  X.fillRect(C.width/2-GOAL_W/2,0,GOAL_W,12);
-  X.fillRect(C.width/2-GOAL_W/2,C.height-12,GOAL_W,12);
+  drawTable();
 
-  const over=p1.score>=7||p2.score>=7;
-  if(running&&!over){
+  const over=p1.score>=WIN_SCORE||p2.score>=WIN_SCORE;
+  if(running&&over&&!matchShown)showMatchEnd();
+  if(matchShown&&!over){matchShown=false;hidePanel()}   // guest: the host started a rematch
+  if(running&&over&&mode==='host'&&remoteKeys.sp&&panelReady())rematch();
+  if(running&&!over&&!paused){
     if(mode==='guest'){
-      movePad(p2,meU(),meD(),meL(),meR(),true,m);   // I am blue (top), predicted locally
+      movePad(p2,meU(),meD(),meL(),meR(),true,m);
       if(guestTarget){
         p1.x+=(guestTarget.p1x-p1.x)*0.35;p1.y+=(guestTarget.p1y-p1.y)*0.35;
         p2.x+=(guestTarget.p2x-p2.x)*0.15;p2.y+=(guestTarget.p2y-p2.y)*0.15;
@@ -146,12 +279,12 @@ function loop(ts){
       puck.trail.push({x:puck.x,y:puck.y});if(puck.trail.length>10)puck.trail.shift();
       puck.x+=puck.vx*m;puck.y+=puck.vy*m;
       const fr=Math.pow(0.998,m);puck.vx*=fr;puck.vy*=fr;
-      if(puck.x<puck.r+10){puck.x=puck.r+10;puck.vx*=-0.9;addP(puck.x,puck.y,'#fff')}
-      if(puck.x>C.width-puck.r-10){puck.x=C.width-puck.r-10;puck.vx*=-0.9;addP(puck.x,puck.y,'#fff')}
-      let inGoalX=puck.x>C.width/2-GOAL_W/2&&puck.x<C.width/2+GOAL_W/2;
-      if(puck.y<puck.r){if(inGoalX){p1.score++;addP(puck.x,puck.y,'#ff4466');
-        if(mode==='ai'&&p1.score>=7){window.score=(window.score||0)+1;Arcade.gameOver(window.score)}reset()}else{puck.y=puck.r;puck.vy*=-0.9}}
-      if(puck.y>C.height-puck.r){if(inGoalX){p2.score++;addP(puck.x,puck.y,'#4488ff');reset()}else{puck.y=C.height-puck.r;puck.vy*=-0.9}}
+      if(puck.x<puck.r+10){puck.x=puck.r+10;puck.vx*=-0.9;addP(puck.x,puck.y,COLOR.text)}
+      if(puck.x>W-puck.r-10){puck.x=W-puck.r-10;puck.vx*=-0.9;addP(puck.x,puck.y,COLOR.text)}
+      let inGoalX=puck.x>W/2-GOAL_W/2&&puck.x<W/2+GOAL_W/2;
+      if(puck.y<puck.r){if(inGoalX){p1.score++;addP(puck.x,puck.y,RED);
+        if(mode==='ai'&&p1.score>=WIN_SCORE){window.score=(window.score||0)+1;Arcade.gameOver(window.score)}reset()}else{puck.y=puck.r;puck.vy*=-0.9}}
+      if(puck.y>H-puck.r){if(inGoalX){p2.score++;addP(puck.x,puck.y,BLUE);reset()}else{puck.y=H-puck.r;puck.vy*=-0.9}}
       for(let p of[p1,p2]){
         let dx=puck.x-p.x,dy=puck.y-p.y,d=Math.hypot(dx,dy);
         if(d<puck.r+p.r&&d>0){
@@ -167,40 +300,31 @@ function loop(ts){
     }
   }
 
-  for(let i=0;i<puck.trail.length;i++){X.globalAlpha=i/puck.trail.length*0.2;X.fillStyle='#fff';
+  // faint score numerals behind the action
+  X.font='800 48px '+FONT;X.textAlign='center';X.globalAlpha=0.22;
+  X.fillStyle=p2.color;X.fillText(p2.score,W/2,H/2-30);
+  X.fillStyle=p1.color;X.fillText(p1.score,W/2,H/2+50);X.globalAlpha=1;
+  for(let i=0;i<puck.trail.length;i++){X.globalAlpha=i/puck.trail.length*0.2;X.fillStyle=COLOR.text;
     X.beginPath();X.arc(puck.trail[i].x,puck.trail[i].y,puck.r*0.7,0,Math.PI*2);X.fill()}X.globalAlpha=1;
-  X.fillStyle='#fff';X.shadowColor='#fff';X.shadowBlur=15;
-  X.beginPath();X.arc(puck.x,puck.y,puck.r,0,Math.PI*2);X.fill();X.shadowBlur=0;
+  X.fillStyle=COLOR.text;
+  X.beginPath();X.arc(puck.x,puck.y,puck.r,0,Math.PI*2);X.fill();
   for(let p of[p1,p2]){
-    X.fillStyle=p.color;X.shadowColor=p.color;X.shadowBlur=12;
+    X.fillStyle=p.color;
     X.beginPath();X.arc(p.x,p.y,p.r,0,Math.PI*2);X.fill();
-    X.fillStyle='rgba(255,255,255,0.2)';X.beginPath();X.arc(p.x-5,p.y-5,p.r*0.5,0,Math.PI*2);X.fill();
-    X.shadowBlur=0;
+    X.fillStyle='rgba(255,255,255,0.22)';X.beginPath();X.arc(p.x-5,p.y-5,p.r*0.5,0,Math.PI*2);X.fill();
   }
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];if(!paused){p.x+=p.vx;p.y+=p.vy;p.life--}
     if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/15;X.fillStyle=p.color;
     X.fillRect(p.x-2,p.y-2,4,4)}X.globalAlpha=1;
-  X.font='bold 48px Segoe UI';X.textAlign='center';X.globalAlpha=0.2;
-  X.fillStyle=p2.color;X.fillText(p2.score,C.width/2,C.height/2-30);
-  X.fillStyle=p1.color;X.fillText(p1.score,C.width/2,C.height/2+50);X.globalAlpha=1;
-  if(running&&over){
-    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
-    const p1w=p1.score>=7;
-    X.globalAlpha=1;X.fillStyle=p1w?p1.color:p2.color;X.font='bold 44px Segoe UI';
-    let name=p1w?'P1':'P2';
-    if(mode==='ai')name=p1w?'YOU':'COMPUTER';
-    if(mode==='host'||mode==='guest')name=(p1w===(mode==='host'))?'YOU':'THEY';
-    X.fillText(name+(name==='YOU'?' WIN!':' WINS!'),C.width/2,C.height/2);
-    X.fillStyle='#fff';X.font='18px Segoe UI';
-    X.fillText(mode==='guest'?'Host presses SPACE to rematch · M: menu':'Press SPACE to rematch · M: menu',C.width/2,C.height/2+40);
-    if(mode!=='guest'&&(keys[' ']||(mode==='host'&&remoteKeys.sp))){p1.score=0;p2.score=0;reset()}
-  }
 }
+const GAME_KEYS=new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
 document.addEventListener('keydown',e=>{keys[e.key]=true;
   if(running&&(e.key==='m'||e.key==='M'))backToMenu();
   if(mode==='guest')sendKeys();
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault()});
+  if(GAME_KEYS.has(e.key))e.preventDefault()});
 document.addEventListener('keyup',e=>{keys[e.key]=false;if(mode==='guest')sendKeys()});
+hidePanel();
+fitCanvas();
 requestAnimationFrame(loop);
 </script>
 </body>

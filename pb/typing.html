@@ -2,41 +2,69 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Typing Speed - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
-#text-display{font-size:22px;line-height:1.8;max-width:600px;text-align:center;margin:20px 0;padding:20px;background:#1a1a2e;border-radius:12px;border:2px solid #2a2a4a}
-.correct{color:#44ff88}.wrong{color:#ff4466;text-decoration:underline}.pending{color:#aaa}
-.current{background:rgba(255,255,255,0.1);border-radius:3px;padding:0 2px}
-input{background:#1a1a2e;border:2px solid #3a3a5a;color:#fff;font-size:20px;padding:12px 20px;border-radius:12px;width:400px;outline:none;text-align:center}
-input:focus{border-color:#4de8ff}
-#hud{display:flex;gap:30px;font-size:20px;margin-bottom:20px}
-.stat{background:#1a1a2e;padding:8px 18px;border-radius:10px}
-.stat b{color:#4de8ff}
-#progress{width:400px;height:6px;background:#2a2a4a;border-radius:3px;margin-top:15px;overflow:hidden}
-#prog-fill{height:100%;background:#4de8ff;transition:width 0.3s;border-radius:3px}
-#result{margin-top:20px;font-size:18px;min-height:25px}
-button{margin-top:15px;padding:10px 25px;background:#4de8ff;color:#0a0a1a;border:none;border-radius:8px;cursor:pointer;font-weight:bold}
-body{height:auto;min-height:100vh;padding:12px}
-input,#progress,#text-display{max-width:100%}
-#hud{max-width:100%;flex-wrap:wrap;justify-content:center;gap:10px}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+.arcade-stage{display:block;overflow-y:auto;padding:64px 14px 20px}
+.arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.typing{width:min(680px,100%);margin:0 auto;display:flex;flex-direction:column;gap:14px;min-height:100%;justify-content:center}
+#text-display{padding:20px;border:1px solid var(--border);border-radius:var(--radius-l);background:var(--card);
+  font:600 clamp(18px,4.2vw,24px)/1.7 var(--font);text-align:center;letter-spacing:.005em}
+.correct{color:var(--good)}.pending{color:var(--muted)}
+.wrong{color:var(--danger);text-decoration:underline}
+.current{background:rgba(255,255,255,.12);border-radius:4px;padding:0 1px;color:var(--text)}
+#inp{width:100%;min-height:52px;padding:0 18px;border:1px solid var(--border);border-radius:14px;background:var(--card2);color:var(--text);
+  font:650 20px/1 var(--font);text-align:center;outline:none}
+#inp:focus-visible{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(77,232,255,.25)}
+#progress{height:6px;border-radius:99px;background:var(--border);overflow:hidden}
+#prog-fill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--cyan));transition:width .3s var(--spring)}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
+.arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
+@media (prefers-reduced-motion:reduce){#prog-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=1" data-arcade-id="typing" data-arcade-title="Typing Speed"></script>
+<script src="/pb/arcade-kit.js?v=4" data-arcade-id="typing" data-arcade-title="Typing Speed"></script>
 </head>
 <body>
-<div id="hud">
-<div class="stat">WPM: <b id="wpm">0</b></div>
-<div class="stat">Accuracy: <b id="acc">100</b>%</div>
-<div class="stat">⏱ <b id="timer">0</b>s</div>
-</div>
-<div id="text-display"></div>
-<input id="inp" placeholder="Start typing..." autofocus autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
-<div id="progress"><div id="prog-fill" style="width:0%"></div></div>
-<div id="result"></div>
-<button onclick="newTest()">New Text</button>
-<button id="langBtn" onclick="switchLang()" style="margin-left:8px;background:#3a3a5a;color:#fff">🇬🇧 EN</button>
+<main class="arcade-stage" id="stage">
+  <div class="arcade-hud">
+    <span class="arcade-pill">WPM <b id="wpm">0</b></span>
+    <span class="arcade-pill">Accuracy <b><span id="acc">100</span>%</b></span>
+    <span class="arcade-pill">Time <b><span id="timer">0</span> s</b></span>
+  </div>
+  <div class="typing">
+    <div id="text-display" aria-live="off"></div>
+    <input id="inp" placeholder="Start typing..." aria-label="Type the text above" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
+    <div id="progress"><div id="prog-fill"></div></div>
+    <div class="row">
+      <div class="arcade-seg" role="group" aria-label="Language">
+        <button type="button" id="langEn" aria-pressed="true">EN</button>
+        <button type="button" id="langLb" aria-pressed="false">LB</button>
+      </div>
+      <button class="arcade-btn secondary" id="newBtn" type="button">New text</button>
+    </div>
+  </div>
+
+  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
+    <h2>Typing Speed</h2>
+    <p>Type the sentence exactly as shown. The timer starts with your first key. Use a keyboard; on touch the on-screen keyboard opens when you press Play.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
+    <h2>Paused</h2><p>Your timer stopped while you were away.</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
+  </div></div>
+
+  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+    <h2>Done</h2>
+    <span class="arcade-big"><span id="overBig">0</span> WPM</span>
+    <p><strong id="overAcc">100</strong>% accuracy in <strong id="overSecs">0</strong> s · Best <strong id="overBest">0</strong> WPM</p>
+    <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Next text</button></div>
+  </div></div>
+</main>
 <script>
 const TEXTS_LB=[
   "Moien alleguer haut ass e flotten Dag fir eppes Neies ze léieren",
@@ -64,41 +92,75 @@ const TEXTS=[
   "A creative mind finds solutions where others only see problems ahead",
   "The best way to predict the future is to create it yourself today",
 ];
+const TICK_MS=200,WRONG_FLASH_MS=300,BEST_KEY='pb_best_typing',MS_PER_MIN=60000;
+const $=id=>document.getElementById(id);
 let text,pos,errors,startTime,timerInt,done;
-let lang=localStorage.getItem('pb_typ_lang')||'en';
-function paintLang(){document.getElementById('langBtn').textContent=lang==='lb'?'🇱🇺 LB':'🇬🇧 EN';}
-function switchLang(){lang=lang==='lb'?'en':'lb';localStorage.setItem('pb_typ_lang',lang);paintLang();newTest();}
-paintLang();
+let state='idle',paused=false,pausedAt=0,best=loadBest();
+let lang=storageGet('pb_typ_lang')||'en';
+
+function storageGet(key){
+  try{return localStorage.getItem(key)}
+  catch(error){console.warn('[Typing Speed] could not read '+key,error);return null}
+}
+function storageSet(key,value){
+  try{localStorage.setItem(key,value)}
+  catch(error){console.warn('[Typing Speed] could not save '+key,error)}
+}
+function loadBest(){return Number(storageGet(BEST_KEY))||0}
+function paintLang(){
+  $('langEn').setAttribute('aria-pressed',String(lang!=='lb'));
+  $('langLb').setAttribute('aria-pressed',String(lang==='lb'));
+}
+function setLang(next){lang=next;storageSet('pb_typ_lang',lang);paintLang();newTest()}
+function focusInput(){try{$('inp').focus({preventScroll:true})}catch(error){console.warn('[Typing Speed] focus failed',error)}}
+function closeOverlays(){['startOv','overOv','pauseOv'].forEach(id=>$(id).classList.remove('show'))}
 function newTest(){
   const list=lang==='lb'?TEXTS_LB:TEXTS;
   text=list[Math.floor(Math.random()*list.length)];
-  pos=0;errors=0;done=false;startTime=null;
+  pos=0;errors=0;done=false;startTime=null;paused=false;
   if(timerInt)clearInterval(timerInt);
-  document.getElementById('inp').value='';document.getElementById('inp').focus();
-  document.getElementById('result').textContent='';
-  document.getElementById('wpm').textContent='0';
-  document.getElementById('acc').textContent='100';
-  document.getElementById('timer').textContent='0';
-  document.getElementById('prog-fill').style.width='0%';
+  $('inp').value='';
+  $('wpm').textContent='0';
+  $('acc').textContent='100';
+  $('timer').textContent='0';
+  $('prog-fill').style.width='0%';
   renderText();
+  if(state==='playing')focusInput();
 }
+function begin(){state='playing';closeOverlays();newTest();focusInput()}
 function renderText(){
   let h='';
   for(let i=0;i<text.length;i++){
     let cls=i<pos?'correct':i===pos?'current':'pending';
     h+=`<span class="${cls}">${text[i]}</span>`;
   }
-  document.getElementById('text-display').innerHTML=h;
+  $('text-display').innerHTML=h;
 }
-document.getElementById('inp').addEventListener('input',e=>{
-  if(done)return;
+function tick(){
+  let s=Math.floor((Date.now()-startTime)/1000);
+  $('timer').textContent=s;
+  let mins=(Date.now()-startTime)/MS_PER_MIN;
+  if(mins>0)$('wpm').textContent=Math.round((pos/5)/mins);
+}
+function finish(acc){
+  done=true;clearInterval(timerInt);state='over';
+  let secs=(Date.now()-startTime)/1000;
+  let wpm=Math.round((text.split(' ').length)/(secs/60));
+  window.score=Math.max(window.score||0,wpm);Arcade.gameOver(wpm);
+  if(wpm>best){best=wpm;storageSet(BEST_KEY,String(best))}
+  $('overBig').textContent=wpm;$('overAcc').textContent=acc;$('overSecs').textContent=secs.toFixed(1);$('overBest').textContent=best;
+  $('overOv').classList.add('show');
+}
+function setPaused(v){
+  if(v===paused||(v&&(state!=='playing'||!startTime||done)))return;
+  paused=v;$('pauseOv').classList.toggle('show',v);
+  if(v){clearInterval(timerInt);pausedAt=Date.now()}
+  else{startTime+=Date.now()-pausedAt;timerInt=setInterval(tick,TICK_MS);focusInput()}
+}
+$('inp').addEventListener('input',e=>{
+  if(done||paused||state!=='playing'){e.target.value='';return}
   let v=e.target.value;
-  if(!startTime){startTime=Date.now();timerInt=setInterval(()=>{
-    let s=Math.floor((Date.now()-startTime)/1000);
-    document.getElementById('timer').textContent=s;
-    let mins=(Date.now()-startTime)/60000;
-    if(mins>0)document.getElementById('wpm').textContent=Math.round((pos/5)/mins);
-  },200)}
+  if(!startTime){startTime=Date.now();timerInt=setInterval(tick,TICK_MS)}
   /* Process every char in the field (iPad predictive text can insert several at
    * once) and match case-insensitively — iPadOS auto-capitalizes the first key
    * into an empty field even on hardware keyboards, which used to lock the game
@@ -111,21 +173,23 @@ document.getElementById('inp').addEventListener('input',e=>{
   e.target.value='';
   if(hadError){
     let spans=document.querySelectorAll('#text-display .current');
-    spans.forEach(s=>{s.classList.add('wrong');setTimeout(()=>s.classList.remove('wrong'),300)});
+    spans.forEach(s=>{s.classList.add('wrong');setTimeout(()=>s.classList.remove('wrong'),WRONG_FLASH_MS)});
   }
   let acc=Math.round(((pos)/(pos+errors))*100)||100;
-  document.getElementById('acc').textContent=acc;
-  document.getElementById('prog-fill').style.width=(pos/text.length*100)+'%';
+  $('acc').textContent=acc;
+  $('prog-fill').style.width=(pos/text.length*100)+'%';
   renderText();
-  if(pos>=text.length){
-    done=true;clearInterval(timerInt);
-    let secs=(Date.now()-startTime)/1000;
-    let wpm=Math.round((text.split(' ').length)/(secs/60));
-    window.score=Math.max(window.score||0,wpm);Arcade.gameOver(wpm);
-    document.getElementById('result').innerHTML=`🎉 Done! <b style="color:#4de8ff">${wpm} WPM</b> with <b style="color:#44ff88">${acc}%</b> accuracy in <b>${secs.toFixed(1)}s</b>`;
-  }
+  if(pos>=text.length)finish(acc);
 });
-newTest();
+document.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('button'))return;
+  if(e.key==='Enter'&&state!=='playing'){e.preventDefault();begin()}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+$('playBtn').onclick=begin;$('againBtn').onclick=begin;$('newBtn').onclick=()=>{if(state==='playing')newTest();else begin()};
+$('resumeBtn').onclick=()=>setPaused(false);
+$('langEn').onclick=()=>setLang('en');$('langLb').onclick=()=>setLang('lb');
+paintLang();newTest();
 </script>
 </body>
 </html>

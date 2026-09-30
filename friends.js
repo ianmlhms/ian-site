@@ -43,7 +43,7 @@ const classTag = (name) => {
   return c ? ` <span class="class-tag">${esc(c)}</span>` : "";
 };
 
-const GAMES = { connect4: "Connect 4", slf: "Categories Race", battleship: "Battleship", color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe", checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Yahtzee Dice" };
+const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe", checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel" };
 const GAME_PAGES = Object.freeze(Object.fromEntries(Object.keys(GAMES).map(id => [id, id + ".html"])));
 const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe", "checkers", "maumau", "dice-duel"]);
 

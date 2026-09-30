@@ -37,10 +37,10 @@ const admin = createClient(
 
 // Pretty game names — keep in sync with friends.js GAMES.
 const GAME_NAMES: Record<string, string> = {
-  connect4: "Connect 4", slf: "Categories Race", battleship: "Battleship",
+  connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship",
   color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi",
   dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
-  checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Yahtzee Dice",
+  checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel",
 };
 
 const CORS = {
