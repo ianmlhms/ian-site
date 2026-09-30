@@ -153,6 +153,24 @@
     return element;
   }
 
+  // Pages that centre their game with a grid or flex-row body would centre the bar too.
+  // Move their content into a wrapper that keeps the body's layout, so the bar spans the top.
+  const LAYOUT_PROPS = Object.freeze(["display", "flexDirection", "placeItems", "alignItems", "justifyContent", "justifyItems", "gap"]);
+  function wrapNonColumnBody() {
+    const body = document.body;
+    const style = getComputedStyle(body);
+    const isColumn = style.display.includes("flex") && style.flexDirection.startsWith("column");
+    if (isColumn || !/grid|flex/.test(style.display)) return;
+    const main = document.createElement("div");
+    main.className = "arcade-standalone-main";
+    LAYOUT_PROPS.forEach((prop) => { main.style[prop] = style[prop]; });
+    Object.assign(main.style, { flex: "1", minHeight: "0", width: "100%", position: "relative" });
+    const movable = [...body.childNodes].filter((node) => node.nodeName !== "SCRIPT");
+    main.append(...movable);
+    Object.assign(body.style, { display: "flex", flexDirection: "column", alignItems: "stretch" });
+    body.prepend(main);
+  }
+
   function mountBar(config = {}) {
     barCss();
     const host = typeof config.host === "string" ? document.querySelector(config.host) : config.host;
@@ -195,7 +213,10 @@
     if (!host) {
       const replaceTarget = config.replace ? document.querySelector(config.replace) : null;
       if (replaceTarget) replaceTarget.replaceWith(bar);
-      else document.body.prepend(bar);
+      else {
+        wrapNonColumnBody();
+        document.body.prepend(bar);
+      }
     }
     return Object.freeze({ bar, title, best, mute });
   }
