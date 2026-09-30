@@ -2,100 +2,237 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Brick Breaker - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(255,100,200,0.2)}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+.lives b{color:var(--danger);letter-spacing:.12em}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="breakout" data-arcade-title="Brick Breaker"></script>
 </head>
 <body>
-<canvas id="c" width="600" height="500"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Brick Breaker arcade game"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill">Level <b id="level">1</b></span>
+    <span class="arcade-pill lives">Lives <b id="lives">♥♥♥</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
-let paddle,ball,bricks,score,lives,level,gameOver,particles=[];
-const COLS=10,ROWS=6,BW=55,BH=20,BP=3;
-const COLORS=['#ff4466','#ff8844','#ffcc00','#44ff88','#44aaff','#aa66ff'];
+const GAME_ID='breakout',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
 
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const W=600,H=500;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+/* ---------- fixed 60 Hz stepping: same speed on 60 / 120 / 144 Hz displays ---------- */
+const FRAME_MS=1000/60,FRAME_SLACK_MS=2,MAX_CATCHUP_MS=FRAME_MS*2;
+let frameAcc=FRAME_MS,lastTs=0;
+function tick(ts){
+  requestAnimationFrame(tick);
+  frameAcc=Math.min(frameAcc+(lastTs?ts-lastTs:FRAME_MS),MAX_CATCHUP_MS);lastTs=ts;
+  if(frameAcc<FRAME_MS-FRAME_SLACK_MS)return;
+  frameAcc-=FRAME_MS;
+  runFrame();
+}
+
+
+const COLS=10,ROWS=6,BW=55,BH=20,BP=3,MAX_EXTRA_ROWS=4;
+const START_LIVES=3,PADDLE_KEY_SPEED=8,MAX_BALL_VX=8,LAUNCH_VX=3,LAUNCH_VY=-4,LAUNCH_Y=440;
+// brick rows: shared family colours (danger, orange, amber, good, accent, violet)
+const COLORS=[COLOR.danger,'#ff9a5c',COLOR.amber,COLOR.good,COLOR.accent,COLOR.violet];
+let paddle,ball,bricks=[],score=0,lives=START_LIVES,level=1,state='ready',particles=[],keys={};
+
+function updateHud(){
+  $('score').textContent=score;
+  $('level').textContent=level;
+  $('lives').textContent=lives>0?'♥'.repeat(lives):'-';
+}
 function genBricks(){
   bricks=[];
-  for(let r=0;r<ROWS+Math.min(level,4);r++)for(let c=0;c<COLS;c++){
+  for(let r=0;r<ROWS+Math.min(level,MAX_EXTRA_ROWS);r++)for(let c=0;c<COLS;c++){
     bricks.push({x:c*(BW+BP)+20,y:r*(BH+BP)+40,w:BW,h:BH,color:COLORS[r%COLORS.length],hp:r<2?2:1,alive:true});
   }
 }
-function start(){
+function resetBall(x){ball={x,y:LAUNCH_Y,vx:LAUNCH_VX,vy:LAUNCH_VY,r:6}}
+function resetWorld(){
   paddle={x:250,y:460,w:80,h:12};
-  ball={x:300,y:440,vx:3,vy:-4,r:6};
-  score=0;lives=3;level=1;gameOver=false;particles=[];
-  genBricks();
+  resetBall(W/2);
+  score=0;lives=START_LIVES;level=1;particles=[];keys={};
+  genBricks();updateHud();Arcade.score(score);
 }
-function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15+Math.random()*10,color:c})}}
+function addP(x,y,c,n){
+  if(REDUCED)return;
+  for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*3;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:15+Math.random()*10,color:c})}
+}
+function startGame(){hidePanel();resetWorld();state='playing'}
+function endGame(){
+  state='over';Arcade.gameOver(score);
+  const isBest=recordBest(score);
+  showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),body:'You reached level '+level+'.',label:'Play again',action:startGame});
+}
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';keys={};
+  showPanel({title:'Paused',body:'The ball is waiting.',label:'Resume',action:()=>{state='playing'}});
+}
 
-function draw(){
-  X.fillStyle='#0a0a1a';X.fillRect(0,0,C.width,C.height);
-  if(!gameOver){
-    // Move paddle with mouse
-    ball.x+=ball.vx;ball.y+=ball.vy;
-    // Walls
-    if(ball.x<ball.r||ball.x>C.width-ball.r)ball.vx*=-1;
-    if(ball.y<ball.r)ball.vy*=-1;
-    // Paddle
-    if(ball.y+ball.r>paddle.y&&ball.y<paddle.y+paddle.h&&ball.x>paddle.x&&ball.x<paddle.x+paddle.w){
-      ball.vy=-Math.abs(ball.vy);ball.vx+=(ball.x-paddle.x-paddle.w/2)*0.1;addP(ball.x,ball.y,'#fff',5);
-    }
-    // Bottom
-    if(ball.y>C.height){lives--;if(lives<=0){gameOver=true;Arcade.gameOver(score)}else{ball.x=paddle.x+paddle.w/2;ball.y=440;ball.vy=-4;ball.vx=3}}
-    // Bricks
-    for(let b of bricks){
-      if(!b.alive)continue;
-      if(ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){
-        ball.vy*=-1;b.hp--;if(b.hp<=0){b.alive=false;score+=10;Arcade.score(score);addP(b.x+b.w/2,b.y+b.h/2,b.color,12)}
-      }
-    }
-    if(bricks.every(b=>!b.alive)){level++;genBricks();ball.x=300;ball.y=440;ball.vx=3;ball.vy=-4}
+function update(){
+  if(state!=='playing'){
+    if(state==='ready')ball.x=paddle.x+paddle.w/2;
+    return;
   }
-  // Draw bricks
+  if(keys['ArrowLeft']||keys['a'])paddle.x=Math.max(0,paddle.x-PADDLE_KEY_SPEED);
+  if(keys['ArrowRight']||keys['d'])paddle.x=Math.min(W-paddle.w,paddle.x+PADDLE_KEY_SPEED);
+  ball.x+=ball.vx;ball.y+=ball.vy;
+  if(ball.x<ball.r||ball.x>W-ball.r)ball.vx*=-1;
+  if(ball.y<ball.r)ball.vy*=-1;
+  if(ball.y+ball.r>paddle.y&&ball.y<paddle.y+paddle.h&&ball.x>paddle.x&&ball.x<paddle.x+paddle.w){
+    ball.vy=-Math.abs(ball.vy);
+    // the clamp stops repeated edge hits from building a speed the ball can tunnel through
+    ball.vx=Math.max(-MAX_BALL_VX,Math.min(MAX_BALL_VX,ball.vx+(ball.x-paddle.x-paddle.w/2)*0.1));
+    addP(ball.x,ball.y,COLOR.text,5);
+  }
+  if(ball.y>H){
+    lives--;updateHud();
+    if(lives<=0){endGame();return}
+    resetBall(paddle.x+paddle.w/2);
+  }
   for(let b of bricks){
     if(!b.alive)continue;
-    X.fillStyle=b.color;X.shadowColor=b.color;X.shadowBlur=6;
+    if(ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){
+      ball.vy*=-1;b.hp--;
+      if(b.hp<=0){b.alive=false;score+=10;Arcade.score(score);updateHud();addP(b.x+b.w/2,b.y+b.h/2,b.color,12)}
+    }
+  }
+  if(bricks.every(b=>!b.alive)){level++;genBricks();resetBall(W/2);ball.y=LAUNCH_Y;updateHud()}
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;if(p.life<=0)particles.splice(i,1)}
+}
+
+function draw(){
+  X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
+  for(let b of bricks){
+    if(!b.alive)continue;
+    X.fillStyle=b.color;
     X.beginPath();X.roundRect(b.x,b.y,b.w,b.h,4);X.fill();
     if(b.hp>1){X.fillStyle='rgba(255,255,255,0.3)';X.beginPath();X.roundRect(b.x,b.y,b.w,b.h/2,4);X.fill()}
-    X.shadowBlur=0;
   }
-  // Paddle
-  X.fillStyle='#fff';X.shadowColor='#fff';X.shadowBlur=10;
-  X.beginPath();X.roundRect(paddle.x,paddle.y,paddle.w,paddle.h,6);X.fill();X.shadowBlur=0;
-  // Ball
-  X.fillStyle='#fff';X.shadowColor='#ff66aa';X.shadowBlur=15;
-  X.beginPath();X.arc(ball.x,ball.y,ball.r,0,Math.PI*2);X.fill();X.shadowBlur=0;
-  // Particles
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.life--;
-    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/25;X.fillStyle=p.color;
-    X.fillRect(p.x-2,p.y-2,4,4);X.globalAlpha=1}
-  // HUD
-  X.fillStyle='#fff';X.font='16px Segoe UI';X.textAlign='left';X.fillText('Score: '+score,15,25);
-  X.textAlign='right';X.fillText('Lives: '+'❤️'.repeat(lives),C.width-15,25);
-  X.textAlign='center';X.fillText('Level '+level,C.width/2,25);
-  if(gameOver){
-    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#ff4466';X.font='bold 42px Segoe UI';X.fillText('GAME OVER',C.width/2,230);
-    X.fillStyle='#fff';X.font='22px Segoe UI';X.fillText('Score: '+score,C.width/2,280);
-    X.fillText('Press SPACE to retry',C.width/2,320);
-  }
-  requestAnimationFrame(draw);
+  X.fillStyle=COLOR.text;
+  X.beginPath();X.roundRect(paddle.x,paddle.y,paddle.w,paddle.h,6);X.fill();
+  X.beginPath();X.arc(ball.x,ball.y,ball.r,0,Math.PI*2);X.fill();
+  for(let p of particles){X.globalAlpha=Math.max(0,p.life/25);X.fillStyle=p.color;X.fillRect(p.x-2,p.y-2,4,4)}
+  X.globalAlpha=1;
 }
+function runFrame(){update();draw()}
+
 let activePointer=null;
-function movePaddle(e){let r=C.getBoundingClientRect();paddle.x=Math.max(0,Math.min(C.width-paddle.w,(e.clientX-r.left)*(C.width/r.width)-paddle.w/2))}
+function movePaddle(e){paddle.x=Math.max(0,Math.min(W-paddle.w,toBoard(e).x-paddle.w/2))}
 C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId);movePaddle(e)});
 C.addEventListener('pointermove',e=>{if(e.pointerId===activePointer||(activePointer===null&&e.pointerType==='mouse'))movePaddle(e)});
 function endMove(e){if(e.pointerId!==activePointer)return;activePointer=null;if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
 C.addEventListener('pointerup',endMove);
 C.addEventListener('pointercancel',endMove);
 C.addEventListener('lostpointercapture',endMove);
-document.addEventListener('keydown',e=>{if(e.key===' '&&gameOver)start();e.preventDefault()});
-start();draw();   // kick the single draw loop once at boot (start() no longer calls it → no stacking on retry)
+const GAME_KEYS=new Set(['ArrowLeft','ArrowRight',' ']);
+document.addEventListener('keydown',e=>{keys[e.key]=true;if(GAME_KEYS.has(e.key))e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[e.key]=false});
+Arcade.onRestart(startGame);
+resetWorld();
+fitCanvas();
+showPanel({title:'Brick Breaker',body:'Drag or move the mouse to steer the paddle (or use ← → / A D). Clear every brick and don\'t drop the ball.',label:'Play',action:startGame});
+requestAnimationFrame(tick);
 </script>
 </body>
 </html>

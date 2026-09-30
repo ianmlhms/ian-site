@@ -2,83 +2,200 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Memory Match - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
-#hud{margin-bottom:15px;display:flex;gap:25px;font-size:18px}
-#board{display:grid;gap:8px;max-width:100%}
-.card{width:100%;min-width:0;aspect-ratio:5/6;height:auto;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:36px;transition:transform 0.3s,background 0.3s;transform-style:preserve-3d;background:#2a2a4a;border:2px solid #3a3a5a;user-select:none}
-.card:hover{border-color:#5a5a8a}
-.card.flipped,.card.matched{background:#1a1a3a;border-color:#4de8ff;transform:rotateY(180deg)}
-.card.matched{border-color:#44ff88;opacity:0.7}
-.card .inner{transform:rotateY(180deg)}
-.card:not(.flipped):not(.matched) .inner{visibility:hidden}
-#msg{margin-top:15px;font-size:20px;min-height:30px}
-#diff{margin-bottom:15px;display:flex;gap:10px}
-#diff button{padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:bold;background:#2a2a4a;color:#fff;font-size:13px}
-#diff button.active{background:#4de8ff;color:#0a0a1a}
-body{height:auto;min-height:100vh;padding:12px}
-#hud{max-width:100%;flex-wrap:wrap;justify-content:center}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+.arcade-stage{container-type:size}
+#board{display:grid;gap:clamp(6px,1.6cqmin,10px);grid-template-columns:repeat(var(--cols),1fr);grid-template-rows:repeat(var(--rows),1fr);
+  width:min(100cqw,calc(100cqh * var(--ratio)),620px);aspect-ratio:var(--ratio);touch-action:manipulation}
+.card{position:relative;min-width:0;min-height:0;padding:0;border:0;background:none;cursor:pointer;perspective:600px;font:inherit;color:inherit}
+.card:focus-visible{outline:3px solid var(--cyan);outline-offset:2px;border-radius:var(--radius-s)}
+.face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--radius-s);
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;transition:transform .32s var(--spring),border-color .2s ease,opacity .2s ease}
+.back{background:linear-gradient(160deg,var(--card2),var(--card))}
+.card:hover .back{border-color:var(--muted)}
+.front{background:var(--card);transform:rotateY(180deg);font-size:clamp(20px,calc(min(100cqw / var(--cols),100cqh / var(--rows)) * .45),60px);line-height:1}
+.card.flipped .back,.card.matched .back{transform:rotateY(-180deg)}
+.card.flipped .front,.card.matched .front{transform:none}
+.card.flipped .front{border-color:var(--cyan)}
+.card.matched .front{border-color:var(--good);opacity:.72}
+@media (prefers-reduced-motion:reduce){.face{transition:opacity .15s ease,border-color .15s ease}
+  .card .front{transform:none;opacity:0}.card .back{transform:none}.card.flipped .front,.card.matched .front{opacity:1}
+  .card.flipped .back,.card.matched .back{transform:none;opacity:0}.card.matched .front{opacity:.72}}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="memory" data-arcade-title="Memory Match" data-arcade-lower-is-better></script>
 </head>
 <body>
-<div id="diff">
-<button class="active" onclick="init(4)">4x4</button>
-<button onclick="init(5)">5x4</button>
-<button onclick="init(6)">6x5</button>
-</div>
-<div id="hud"><span>Moves: <b id="moves">0</b></span><span>Pairs: <b id="pairs">0</b>/<b id="total">8</b></span><span>⏱ <b id="timer">0s</b></span></div>
-<div id="board"></div>
-<div id="msg"></div>
+<main class="arcade-stage" id="stage">
+  <div id="board" role="grid" aria-label="Memory cards"></div>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Moves <b id="moves">0</b></span>
+    <span class="arcade-pill">Pairs <b id="pairs">0</b>/<b id="total">8</b></span>
+    <span class="arcade-pill">Time <b id="timer">0s</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
+const GAME_ID='memory',BEST_LOWER=true;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+
 const EMOJIS=['🍎','🍋','🍇','🌸','🔥','⚡','🎮','🎵','🌙','🍕','🎯','🐱','🦊','🐸','🌈'];
-let cards,flipped,matched,moves,pairs,total,cols,rows,locked,timerInt,seconds;
-function init(c){
-  cols=c;rows=c<=4?4:c<=5?4:5;total=cols*rows/2;
-  let icons=EMOJIS.slice(0,total);
+const SIZES=[{label:'4 x 4',cols:4,rows:4},{label:'5 x 4',cols:5,rows:4},{label:'6 x 5',cols:6,rows:5}];
+const CARD_ASPECT=5/6,MISMATCH_DELAY_MS=700,TICK_MS=1000;
+let sizeIdx=0,cards=[],flipped=[],matched=new Set(),moves=0,pairs=0,total=8,locked=false,seconds=0,timerInt=0,state='ready';
+
+function updateHud(){
+  $('moves').textContent=moves;$('pairs').textContent=pairs;$('total').textContent=total;$('timer').textContent=seconds+'s';
+}
+function stopTimer(){if(timerInt)clearInterval(timerInt);timerInt=0}
+function startTimer(){stopTimer();timerInt=setInterval(()=>{seconds++;$('timer').textContent=seconds+'s'},TICK_MS)}
+function sizePicker(){
+  const seg=document.createElement('div');
+  seg.className='arcade-seg';seg.setAttribute('role','group');seg.setAttribute('aria-label','Board size');
+  SIZES.forEach((s,i)=>{
+    const b=document.createElement('button');
+    b.type='button';b.textContent=s.label;b.setAttribute('aria-pressed',String(i===sizeIdx));
+    b.addEventListener('click',()=>{sizeIdx=i;seg.querySelectorAll('button').forEach((x,j)=>x.setAttribute('aria-pressed',String(j===i)))});
+    seg.appendChild(b);
+  });
+  return seg;
+}
+function buildBoard(){
+  const {cols,rows}=SIZES[sizeIdx];
+  const board=$('board');
+  board.style.setProperty('--cols',cols);board.style.setProperty('--rows',rows);
+  board.style.setProperty('--ratio',(cols*CARD_ASPECT/rows).toFixed(4));
+  board.replaceChildren(...cards.map((emoji,i)=>{
+    const b=document.createElement('button');
+    b.type='button';b.className='card';b.dataset.i=i;b.setAttribute('aria-label','Card '+(i+1));
+    const back=document.createElement('span');back.className='face back';
+    const front=document.createElement('span');front.className='face front';front.textContent=emoji;
+    b.append(back,front);
+    return b;
+  }));
+}
+function startGame(){
+  hidePanel();
+  const {cols,rows}=SIZES[sizeIdx];
+  total=cols*rows/2;
+  const icons=EMOJIS.slice(0,total);
   cards=[...icons,...icons].sort(()=>Math.random()-0.5);
-  flipped=[];matched=new Set();moves=0;pairs=0;locked=false;seconds=0;
-  if(timerInt)clearInterval(timerInt);
-  timerInt=setInterval(()=>{seconds++;document.getElementById('timer').textContent=seconds+'s'},1000);
-  document.getElementById('moves').textContent=0;
-  document.getElementById('pairs').textContent=0;
-  document.getElementById('total').textContent=total;
-  document.getElementById('msg').textContent='';
-  document.querySelectorAll('#diff button').forEach((b,i)=>b.classList.toggle('active',(c===4&&i===0)||(c===5&&i===1)||(c===6&&i===2)));
-  render();
+  flipped=[];matched=new Set();moves=0;pairs=0;locked=false;seconds=0;state='playing';
+  buildBoard();updateHud();startTimer();
 }
+function cardEl(i){return $('board').children[i]}
 function flip(i){
-  if(locked||flipped.includes(i)||matched.has(i))return;
-  flipped.push(i);render();
-  if(flipped.length===2){
-    moves++;document.getElementById('moves').textContent=moves;
-    locked=true;
-    setTimeout(()=>{
-      if(cards[flipped[0]]===cards[flipped[1]]){
-        matched.add(flipped[0]);matched.add(flipped[1]);pairs++;
-        document.getElementById('pairs').textContent=pairs;
-        if(pairs===total){clearInterval(timerInt);Arcade.gameOver(moves);document.getElementById('msg').textContent='🎉 Complete in '+moves+' moves, '+seconds+'s!'}
-      }
-      flipped=[];locked=false;render();
-    },700);
-  }
+  if(state!=='playing'||locked||flipped.includes(i)||matched.has(i))return;
+  flipped.push(i);cardEl(i).classList.add('flipped');
+  if(flipped.length<2)return;
+  moves++;$('moves').textContent=moves;locked=true;
+  setTimeout(()=>{
+    const [a,b]=flipped;
+    if(cards[a]===cards[b]){
+      matched.add(a);matched.add(b);pairs++;
+      [a,b].forEach(k=>{cardEl(k).classList.remove('flipped');cardEl(k).classList.add('matched')});
+      $('pairs').textContent=pairs;
+      if(pairs===total){finish();return}
+    }else{
+      [a,b].forEach(k=>cardEl(k).classList.remove('flipped'));
+    }
+    flipped=[];locked=false;
+  },MISMATCH_DELAY_MS);
 }
-function render(){
-  let b=document.getElementById('board');
-  b.style.gridTemplateColumns=`repeat(${cols},minmax(0,75px))`;
-  let h='';
-  for(let i=0;i<cards.length;i++){
-    let cls='card';
-    if(flipped.includes(i))cls+=' flipped';
-    if(matched.has(i))cls+=' matched';
-    h+=`<div class="${cls}" onclick="flip(${i})"><span class="inner">${cards[i]}</span></div>`;
-  }
-  b.innerHTML=h;
+function finish(){
+  state='over';stopTimer();Arcade.gameOver(moves);
+  const isBest=recordBest(moves);
+  showPanel({title:'Complete!',big:moves,bestLine:isBest?'New best!':'Best '+bestText()+' moves',
+    body:'Moves - finished in '+seconds+'s.',extra:sizePicker(),label:'Play again',action:startGame});
 }
-init(4);
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';stopTimer();
+  showPanel({title:'Paused',label:'Resume',action:()=>{state='playing';startTimer()}});
+}
+$('board').addEventListener('click',e=>{
+  const card=e.target.closest('.card');
+  if(card)flip(+card.dataset.i);
+});
+Arcade.onRestart(startGame);
+cards=[...EMOJIS.slice(0,8),...EMOJIS.slice(0,8)];
+buildBoard();updateHud();
+showPanel({title:'Memory Match',body:'Tap two cards to flip them and find every pair in as few moves as you can.',extra:sizePicker(),label:'Play',action:startGame});
 </script>
 </body>
 </html>

@@ -2,108 +2,235 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Fruit Slicer - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a0a2a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{touch-action:none;flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(200,50,255,0.2);cursor:crosshair}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+canvas{cursor:crosshair}
+.lives b{color:var(--danger);letter-spacing:.12em}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="fruit-slash" data-arcade-title="Fruit Slicer"></script>
 </head>
 <body>
-<canvas id="c" width="600" height="600"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Fruit Slicer arcade game"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill lives">Lives <b id="lives">♥♥♥</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
+const GAME_ID='fruit-slash',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const W=600,H=600;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+/* ---------- fixed 60 Hz stepping: same speed on 60 / 120 / 144 Hz displays ---------- */
+const FRAME_MS=1000/60,FRAME_SLACK_MS=2,MAX_CATCHUP_MS=FRAME_MS*2;
+let frameAcc=FRAME_MS,lastTs=0;
+function tick(ts){
+  requestAnimationFrame(tick);
+  frameAcc=Math.min(frameAcc+(lastTs?ts-lastTs:FRAME_MS),MAX_CATCHUP_MS);lastTs=ts;
+  if(frameAcc<FRAME_MS-FRAME_SLACK_MS)return;
+  frameAcc-=FRAME_MS;
+  runFrame();
+}
+
+
 const FRUITS=['🍎','🍊','🍋','🍇','🍉','🍓','🥝','🍑'];
-let fruits=[],slashes=[],particles=[],score=0,lives=3,gameOver=false,mouseTrail=[],frame=0;
+const START_LIVES=3,SPAWN_EVERY=60,BOMB_CHANCE=0.1,GRAVITY=0.25,TRAIL_LIFE=10,FRUIT_R=25,SLICE_REACH=10,EMOJI_SIZE=40;
+let fruits=[],particles=[],score=0,lives=START_LIVES,state='ready',mouseTrail=[],frame=0;
+
+function updateHud(){
+  $('score').textContent=score;
+  $('lives').textContent=lives>0?'♥'.repeat(lives):'-';
+}
+function resetWorld(){
+  fruits=[];particles=[];mouseTrail=[];score=0;lives=START_LIVES;frame=0;
+  updateHud();Arcade.score(score);
+}
+function startGame(){hidePanel();resetWorld();state='playing'}
+function endGame(){
+  state='over';mouseTrail=[];Arcade.gameOver(score);
+  const isBest=recordBest(score);
+  showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),label:'Play again',action:startGame});
+}
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';mouseTrail=[];
+  showPanel({title:'Paused',label:'Resume',action:()=>{state='playing'}});
+}
+function loseLife(){
+  if(state!=='playing')return;
+  lives--;updateHud();
+  if(lives<=0)endGame();
+}
 
 function spawn(){
-  if(gameOver)return;
   let n=1+Math.floor(Math.random()*3);
   for(let i=0;i<n;i++){
-    let isBomb=Math.random()<0.1;
-    fruits.push({x:100+Math.random()*400,y:C.height+30,
+    let isBomb=Math.random()<BOMB_CHANCE;
+    fruits.push({x:100+Math.random()*400,y:H+30,
       vx:(Math.random()-0.5)*4,vy:-12-Math.random()*5,
       emoji:isBomb?'💣':FRUITS[Math.floor(Math.random()*FRUITS.length)],
-      r:25,sliced:false,bomb:isBomb,rot:0,rv:(Math.random()-0.5)*0.1});
+      r:FRUIT_R,sliced:false,bomb:isBomb,rot:0,rv:(Math.random()-0.5)*0.1});
   }
 }
-function addP(x,y,c,n){for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*4;
-  particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*15,color:c})}}
+function addP(x,y,c,n){
+  if(REDUCED)return;
+  for(let i=0;i<n;i++){let a=Math.random()*Math.PI*2,s=1+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*15,color:c})}
+}
 
-let activePointer=null,lastMouse={x:0,y:0};
-C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId);let r=C.getBoundingClientRect();lastMouse={x:(e.clientX-r.left)*C.width/r.width,y:(e.clientY-r.top)*C.height/r.height}});
+let activePointer=null;
+C.addEventListener('pointerdown',e=>{if(activePointer!==null||e.button!==0)return;activePointer=e.pointerId;C.setPointerCapture(e.pointerId)});
 function endSlice(e){if(e.pointerId!==activePointer)return;activePointer=null;mouseTrail=[];if(C.hasPointerCapture(e.pointerId))C.releasePointerCapture(e.pointerId)}
 C.addEventListener('pointerup',endSlice);
 C.addEventListener('pointercancel',endSlice);
 C.addEventListener('lostpointercapture',endSlice);
 C.addEventListener('pointermove',e=>{
-  if(e.pointerId!==activePointer)return;
-  let r=C.getBoundingClientRect();
-  let mx=(e.clientX-r.left)*C.width/r.width,my=(e.clientY-r.top)*C.height/r.height;
-  mouseTrail.push({x:mx,y:my,life:10});
-  // Check slice
+  if(e.pointerId!==activePointer||state!=='playing')return;
+  const {x:mx,y:my}=toBoard(e);
+  mouseTrail.push({x:mx,y:my,life:TRAIL_LIFE});
   for(let f of fruits){
     if(f.sliced)continue;
-    if(Math.hypot(mx-f.x,my-f.y)<f.r+10){
+    if(Math.hypot(mx-f.x,my-f.y)<f.r+SLICE_REACH){
       f.sliced=true;
-      if(f.bomb){lives--;addP(f.x,f.y,'#ff4444',20);if(lives<=0){gameOver=true;Arcade.gameOver(score)}}
-      else{score++;Arcade.score(score);addP(f.x,f.y,'#ffcc00',15)}
+      if(f.bomb){addP(f.x,f.y,COLOR.danger,20);loseLife()}
+      else{score++;Arcade.score(score);updateHud();addP(f.x,f.y,COLOR.amber,15)}
     }
   }
-  lastMouse={x:mx,y:my};
 });
 
-function loop(){
+function update(){
+  if(state==='paused')return;
   frame++;
-  X.fillStyle='#1a0a2a';X.fillRect(0,0,C.width,C.height);
-  // BG pattern
-  X.strokeStyle='rgba(255,255,255,0.02)';
-  for(let i=0;i<C.width;i+=40){X.beginPath();X.moveTo(i,0);X.lineTo(i,C.height);X.stroke()}
-
-  if(!gameOver&&frame%60===0)spawn();
-
-  // Update fruits
+  if(state==='playing'&&frame%SPAWN_EVERY===0)spawn();
   for(let i=fruits.length-1;i>=0;i--){
-    let f=fruits[i];f.x+=f.vx;f.y+=f.vy;f.vy+=0.25;f.rot+=f.rv;
-    if(f.y>C.height+50){
-      if(!f.sliced&&!f.bomb){lives--;if(lives<=0){gameOver=true;Arcade.gameOver(score)}}
-      fruits.splice(i,1);continue;
-    }
-    if(!f.sliced){
-      X.save();X.translate(f.x,f.y);X.rotate(f.rot);
-      X.font='40px serif';X.textAlign='center';X.textBaseline='middle';
-      X.fillText(f.emoji,0,0);X.restore();
+    let f=fruits[i];f.x+=f.vx;f.y+=f.vy;f.vy+=GRAVITY;f.rot+=f.rv;
+    if(f.y>H+50){
+      if(!f.sliced&&!f.bomb)loseLife();
+      fruits.splice(i,1);
     }
   }
-
-  // Slash trail
-  for(let i=mouseTrail.length-1;i>=0;i--){
-    mouseTrail[i].life--;if(mouseTrail[i].life<=0){mouseTrail.splice(i,1);continue}
-    X.globalAlpha=mouseTrail[i].life/10;X.fillStyle='#fff';
-    X.beginPath();X.arc(mouseTrail[i].x,mouseTrail[i].y,3,0,Math.PI*2);X.fill();
-  }
-  X.globalAlpha=1;
-  // Particles
-  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.life--;
-    if(p.life<=0){particles.splice(i,1);continue}X.globalAlpha=p.life/30;X.fillStyle=p.color;
-    X.fillRect(p.x-3,p.y-3,6,6)}X.globalAlpha=1;
-
-  // HUD
-  X.fillStyle='#fff';X.font='bold 28px Segoe UI';X.textAlign='left';X.fillText('Score: '+score,20,40);
-  X.textAlign='right';X.fillText('❤️'.repeat(Math.max(0,lives)),C.width-20,40);
-
-  if(gameOver){
-    X.fillStyle='rgba(0,0,0,0.7)';X.fillRect(0,0,C.width,C.height);
-    X.textAlign='center';X.fillStyle='#ff4466';X.font='bold 44px Segoe UI';X.fillText('GAME OVER',C.width/2,260);
-    X.fillStyle='#ffcc00';X.font='26px Segoe UI';X.fillText('Score: '+score,C.width/2,310);
-    X.fillStyle='#fff';X.font='16px Segoe UI';X.fillText('Press SPACE to retry',C.width/2,355);
-  }
-  requestAnimationFrame(loop);
+  for(let i=mouseTrail.length-1;i>=0;i--){mouseTrail[i].life--;if(mouseTrail[i].life<=0)mouseTrail.splice(i,1)}
+  for(let i=particles.length-1;i>=0;i--){let p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.1;p.life--;if(p.life<=0)particles.splice(i,1)}
 }
-document.addEventListener('keydown',e=>{if(e.key===' '&&gameOver){score=0;lives=3;gameOver=false;fruits=[];particles=[]}});
-loop();
+
+function draw(){
+  X.fillStyle=COLOR.bg;X.fillRect(0,0,W,H);
+  X.font=EMOJI_SIZE+'px '+FONT;X.textAlign='center';X.textBaseline='middle';
+  for(let f of fruits){
+    if(f.sliced)continue;
+    X.save();X.translate(f.x,f.y);X.rotate(f.rot);X.fillText(f.emoji,0,0);X.restore();
+  }
+  X.lineCap='round';X.lineWidth=4;X.strokeStyle=COLOR.cyan;
+  for(let i=1;i<mouseTrail.length;i++){
+    X.globalAlpha=mouseTrail[i].life/TRAIL_LIFE;
+    X.beginPath();X.moveTo(mouseTrail[i-1].x,mouseTrail[i-1].y);X.lineTo(mouseTrail[i].x,mouseTrail[i].y);X.stroke();
+  }
+  for(let p of particles){X.globalAlpha=Math.max(0,p.life/30);X.fillStyle=p.color;X.fillRect(p.x-3,p.y-3,6,6)}
+  X.globalAlpha=1;X.textBaseline='alphabetic';
+}
+function runFrame(){update();draw()}
+
+Arcade.onRestart(startGame);
+fitCanvas();
+updateHud();
+showPanel({title:'Fruit Slicer',body:'Swipe across the fruit with your finger or mouse to slice it. Dodge the bombs and don\'t let fruit drop.',label:'Play',action:startGame});
+requestAnimationFrame(tick);
 </script>
 </body>
 </html>

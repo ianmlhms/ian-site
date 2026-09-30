@@ -2,103 +2,234 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Flappy Bird - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a2a3a;display:flex;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;overflow:hidden}
-canvas{flex:none;max-width:100%;max-height:100vh;width:auto;height:auto;border-radius:12px;box-shadow:0 0 30px rgba(255,200,0,0.2)}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+canvas{cursor:pointer}
+.arcade-hint{transition:opacity .2s ease}
+.arcade-hint.off{opacity:0}
+@media (prefers-reduced-motion:reduce){.arcade-hint{transition:none}}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="flappy" data-arcade-title="Flappy Bird"></script>
 </head>
 <body>
-<canvas id="c" width="400" height="600"></canvas>
+<main class="arcade-stage" id="stage">
+  <canvas id="c" aria-label="Flappy Bird arcade game"></canvas>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="score">0</b></span>
+    <span class="arcade-pill">Best <b id="bestHud">0</b></span>
+  </div>
+  <div class="arcade-hint off" id="hint">Tap or press Space to flap</div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const C=document.getElementById('c'),X=C.getContext('2d');
-let bird,pipes,score,gameOver,started,frame=0,nextPipe=0,fails=0;
+const GAME_ID='flappy',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+const stage=$('stage'),C=$('c'),X=C.getContext('2d');
+const W=400,H=600;
+/* ---------- canvas: fit the logical W x H board into the stage, crisp on retina ---------- */
+const MAX_DPR=3,MIN_SCALE=.1;
+const fitArea=$('fitArea')||stage;
+function fitCanvas(){
+  const cs=getComputedStyle(fitArea);
+  const availW=fitArea.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=fitArea.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const scale=Math.max(MIN_SCALE,Math.min(availW/W,availH/H));
+  const cssW=Math.floor(W*scale),cssH=Math.floor(H*scale),dpr=Math.min(window.devicePixelRatio||1,MAX_DPR);
+  C.style.width=cssW+'px';C.style.height=cssH+'px';
+  C.width=Math.round(cssW*dpr);C.height=Math.round(cssH*dpr);
+  X.setTransform(C.width/W,0,0,C.height/H,0,0);
+  if(typeof onResize==='function')onResize();
+}
+function toBoard(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+new ResizeObserver(fitCanvas).observe(fitArea);
+window.addEventListener('resize',fitCanvas);
+
+/* ---------- fixed 60 Hz stepping: same speed on 60 / 120 / 144 Hz displays ---------- */
+const FRAME_MS=1000/60,FRAME_SLACK_MS=2,MAX_CATCHUP_MS=FRAME_MS*2;
+let frameAcc=FRAME_MS,lastTs=0;
+function tick(ts){
+  requestAnimationFrame(tick);
+  frameAcc=Math.min(frameAcc+(lastTs?ts-lastTs:FRAME_MS),MAX_CATCHUP_MS);lastTs=ts;
+  if(frameAcc<FRAME_MS-FRAME_SLACK_MS)return;
+  frameAcc-=FRAME_MS;
+  runFrame();
+}
+
+
+const GRAVITY=0.4,FLAP_VY=-7,BIRD_X=80,BIRD_R=15,PIPE_W=50,GROUND_H=40,BASE_PIPE_SPEED=2.5,BASE_GAP=150;
+const ASSIST_HINT_FROM=2;
+const PIPE_GREEN='#2f9e6b',PIPE_CAP='#277f58';
+let bird,pipes=[],score=0,state='ready',started=false,frame=0,nextPipe=0,fails=0;
 const assist=()=>Math.min(fails,10);   // dies stack up -> the game quietly gets easier
-function start(){
-  bird={x:80,y:300,vy:0,rot:0};pipes=[];score=0;gameOver=false;started=false;frame=0;nextPipe=0;
+
+function updateHud(){
+  $('score').textContent=score;
+  $('bestHud').textContent=best===null?0:best;
 }
+function resetWorld(){
+  bird={x:BIRD_X,y:H/2,vy:0,rot:0};pipes=[];score=0;started=false;frame=0;nextPipe=0;
+  updateHud();Arcade.score(score);
+  $('hint').classList.remove('off');$('hint').textContent='Tap or press Space to flap';
+}
+function startGame(){hidePanel();resetWorld();state='playing'}
 function addPipe(){
-  let gap=150-Math.min(score*2,40)+assist()*7;
-  let top=60+Math.random()*(C.height-gap-120);
-  pipes.push({x:C.width,top,bot:top+gap,scored:false});
+  let gap=BASE_GAP-Math.min(score*2,40)+assist()*7;
+  let top=60+Math.random()*(H-gap-120);
+  pipes.push({x:W,top,bot:top+gap,scored:false});
 }
-function draw(){
+function endGame(){
+  state='over';Arcade.gameOver(score);
+  if(score>=8)fails=Math.max(0,fails-2);else fails++;
+  const isBest=recordBest(score);updateHud();
+  $('hint').classList.add('off');
+  showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),label:'Play again',action:startGame});
+}
+function pauseGame(){
+  if(state!=='playing')return;
+  state='paused';
+  showPanel({title:'Paused',label:'Resume',action:()=>{state='playing'}});
+}
+
+function update(){
+  if(state==='ready'||(state==='playing'&&!started)){bird.y=H/2+Math.sin(frame*0.08)*6;frame++;return}
+  if(state!=='playing')return;
   frame++;
-  // Sky
-  let g=X.createLinearGradient(0,0,0,C.height);
-  g.addColorStop(0,'#4dc9f6');g.addColorStop(0.7,'#87CEEB');g.addColorStop(1,'#68b86a');
-  X.fillStyle=g;X.fillRect(0,0,C.width,C.height);
-  // Clouds
-  X.fillStyle='rgba(255,255,255,0.6)';
+  bird.vy+=GRAVITY;bird.y+=bird.vy;bird.rot=Math.min(bird.vy*3,90);
+  if(frame>=nextPipe){addPipe();nextPipe=frame+90+assist()*5}
+  const pv=BASE_PIPE_SPEED-Math.min(assist()*0.08,0.7);
+  let dead=false;
+  for(let p of pipes){
+    p.x-=pv;
+    if(!p.scored&&p.x+PIPE_W<bird.x){p.scored=true;score++;window.score=Math.max(window.score||0,score);Arcade.score(score);updateHud()}
+    if(bird.x+BIRD_R>p.x&&bird.x-BIRD_R<p.x+PIPE_W&&(bird.y-BIRD_R<p.top||bird.y+BIRD_R>p.bot))dead=true;
+  }
+  pipes=pipes.filter(p=>p.x>-60);
+  if(bird.y>H-GROUND_H-15||bird.y<0)dead=true;
+  if(dead)endGame();
+}
+
+function draw(){
+  const g=X.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,COLOR.bg2);g.addColorStop(1,COLOR.card2);
+  X.fillStyle=g;X.fillRect(0,0,W,H);
+  X.fillStyle='rgba(232,232,240,0.05)';
   for(let i=0;i<4;i++){
     let cx2=(i*120+frame*0.3)%500-50;
-    X.beginPath();X.ellipse(cx2,40+i*25,50,15,0,0,Math.PI*2);X.fill();
+    X.beginPath();X.ellipse(cx2,70+i*45,50,15,0,0,Math.PI*2);X.fill();
   }
-  // Ground
-  X.fillStyle='#5a8a3a';X.fillRect(0,C.height-40,C.width,40);
-  X.fillStyle='#6a9a4a';X.fillRect(0,C.height-40,C.width,8);
-
-  if(started&&!gameOver){
-    bird.vy+=0.4;bird.y+=bird.vy;bird.rot=Math.min(bird.vy*3,90);
-    if(frame>=nextPipe){addPipe();nextPipe=frame+90+assist()*5;}
-    const pv=2.5-Math.min(assist()*0.08,0.7);
-    for(let p of pipes){
-      p.x-=pv;
-      if(!p.scored&&p.x+50<bird.x){p.scored=true;score++;window.score=Math.max(window.score||0,score);Arcade.score(score)}
-      if(bird.x+15>p.x&&bird.x-15<p.x+50&&(bird.y-15<p.top||bird.y+15>p.bot))gameOver=true;
-    }
-    pipes=pipes.filter(p=>p.x>-60);
-    if(bird.y>C.height-55||bird.y<0)gameOver=true;
-    if(gameOver){Arcade.gameOver(score);if(score>=8)fails=Math.max(0,fails-2);else fails++;}
-  }
-
-  // Pipes
+  X.fillStyle=COLOR.card;X.fillRect(0,H-GROUND_H,W,GROUND_H);
+  X.fillStyle=COLOR.border;X.fillRect(0,H-GROUND_H,W,3);
   for(let p of pipes){
-    X.fillStyle='#2ecc71';X.fillRect(p.x,0,50,p.top);X.fillRect(p.x,p.bot,50,C.height-p.bot);
-    X.fillStyle='#27ae60';X.fillRect(p.x-3,p.top-20,56,20);X.fillRect(p.x-3,p.bot,56,20);
-    X.strokeStyle='#1a8a4a';X.lineWidth=2;X.strokeRect(p.x,0,50,p.top);X.strokeRect(p.x,p.bot,50,C.height-p.bot);
+    X.fillStyle=PIPE_GREEN;X.fillRect(p.x,0,PIPE_W,p.top);X.fillRect(p.x,p.bot,PIPE_W,H-p.bot);
+    X.fillStyle=PIPE_CAP;X.fillRect(p.x-3,p.top-20,PIPE_W+6,20);X.fillRect(p.x-3,p.bot,PIPE_W+6,20);
   }
-
-  // Bird
   X.save();X.translate(bird.x,bird.y);X.rotate(bird.rot*Math.PI/180);
-  X.fillStyle='#f1c40f';X.beginPath();X.ellipse(0,0,18,14,0,0,Math.PI*2);X.fill();
-  X.fillStyle='#e67e22';X.beginPath();X.moveTo(12,-3);X.lineTo(22,0);X.lineTo(12,4);X.fill();
-  X.fillStyle='#fff';X.beginPath();X.arc(6,-4,6,0,Math.PI*2);X.fill();
-  X.fillStyle='#333';X.beginPath();X.arc(8,-4,3,0,Math.PI*2);X.fill();
-  // Wing
+  X.fillStyle=COLOR.amber;X.beginPath();X.ellipse(0,0,18,14,0,0,Math.PI*2);X.fill();
+  X.fillStyle='#ff9a5c';X.beginPath();X.moveTo(12,-3);X.lineTo(22,0);X.lineTo(12,4);X.fill();
+  X.fillStyle=COLOR.text;X.beginPath();X.arc(6,-4,6,0,Math.PI*2);X.fill();
+  X.fillStyle=COLOR.bg;X.beginPath();X.arc(8,-4,3,0,Math.PI*2);X.fill();
   let wingY=Math.sin(frame*0.3)*4;
-  X.fillStyle='#e8b809';X.beginPath();X.ellipse(-5,5+wingY,12,6,-0.3,0,Math.PI*2);X.fill();
+  X.fillStyle='#d79b2b';X.beginPath();X.ellipse(-5,5+wingY,12,6,-0.3,0,Math.PI*2);X.fill();
   X.restore();
-
-  // Score
-  X.fillStyle='#fff';X.font='bold 48px Segoe UI';X.textAlign='center';
-  X.strokeStyle='rgba(0,0,0,0.3)';X.lineWidth=4;
-  X.strokeText(score,C.width/2,70);X.fillText(score,C.width/2,70);
-  if(assist()>2&&started&&!gameOver){
-    X.font='13px Segoe UI';X.fillStyle='rgba(255,255,255,0.55)';
-    X.fillText('💛 assist on — it gets harder again as you improve',C.width/2,95);
-  }
-
-  if(!started&&!gameOver){
-    X.fillStyle='rgba(0,0,0,0.3)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#f1c40f';X.font='bold 40px Segoe UI';X.fillText('Flappy Bird',C.width/2,240);
-    X.fillStyle='#fff';X.font='18px Segoe UI';X.fillText('Click or press SPACE to flap',C.width/2,290);
-  }
-  if(gameOver){
-    X.fillStyle='rgba(0,0,0,0.6)';X.fillRect(0,0,C.width,C.height);
-    X.fillStyle='#e74c3c';X.font='bold 42px Segoe UI';X.fillText('GAME OVER',C.width/2,250);
-    X.fillStyle='#f1c40f';X.font='26px Segoe UI';X.fillText('Score: '+score,C.width/2,300);
-    X.fillStyle='#fff';X.font='16px Segoe UI';X.fillText('Press SPACE to retry',C.width/2,345);
-  }
-  requestAnimationFrame(draw);
 }
-function flap(){if(gameOver){start();return}if(!started)started=true;bird.vy=-7}
-document.addEventListener('keydown',e=>{if(e.key===' '){flap();e.preventDefault()}});
-C.addEventListener('click',flap);
-start();draw();
+function runFrame(){update();draw()}
+
+function flap(){
+  if(state!=='playing')return;
+  if(!started){
+    started=true;
+    $('hint').textContent='Assist on - it gets harder again as you improve';
+    $('hint').classList.toggle('off',assist()<=ASSIST_HINT_FROM);
+  }
+  bird.vy=FLAP_VY;
+}
+C.addEventListener('pointerdown',e=>{if(e.button===0)flap()});
+document.addEventListener('keydown',e=>{
+  if(e.key!==' ')return;
+  e.preventDefault();
+  if(!e.repeat)flap();
+});
+Arcade.onRestart(startGame);
+resetWorld();
+fitCanvas();
+showPanel({title:'Flappy Bird',body:'Tap, click or press Space to flap. Slip through the gaps without touching a pipe.',label:'Play',action:startGame});
+requestAnimationFrame(tick);
 </script>
 </body>
 </html>

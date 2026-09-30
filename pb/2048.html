@@ -2,84 +2,219 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>2048 - Arcade</title>
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0a0a1a;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100vh;font-family:'Segoe UI',sans-serif;color:#fff}
-#hud{margin-bottom:15px;display:flex;gap:20px;font-size:18px}
-.stat{background:#1a1a2e;padding:8px 18px;border-radius:10px}
-.stat b{color:#ffcc00}
-#board{display:grid;grid-template-columns:repeat(4,80px);gap:8px;background:#1a1a2e;padding:10px;border-radius:14px;box-shadow:0 0 30px rgba(255,200,0,0.15)}
-.cell{width:80px;height:80px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:24px;transition:all 0.1s}
-#msg{margin-top:15px;font-size:20px;min-height:30px}
-button{margin-top:10px;padding:8px 24px;background:#ffcc00;color:#0a0a1a;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px}
+body{display:flex;flex-direction:column}
+[hidden]{display:none!important}
+/* top padding keeps the board clear of the HUD pills */
+.arcade-stage{padding:52px 10px 12px}
+canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
+.arcade-hud b{text-transform:none}
+.arcade-panel p:empty{display:none}
+#panelExtra:not(:empty){margin:14px 0 2px}
+.arcade-stage{container-type:size}
+#board{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);gap:clamp(6px,2cqmin,12px);
+  width:min(100cqw,100cqh,480px);aspect-ratio:1;padding:clamp(6px,2cqmin,12px);border:1px solid var(--border);border-radius:var(--radius-l);
+  background:var(--card);box-shadow:0 18px 48px rgba(0,0,0,.35);touch-action:none;user-select:none;-webkit-user-select:none}
+.cell{display:flex;align-items:center;justify-content:center;border-radius:var(--radius-s);background:rgba(255,255,255,.04);
+  font:800 clamp(18px,7cqmin,40px)/1 var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cell.big{font-size:clamp(15px,5.6cqmin,32px)}
+.cell.huge{font-size:clamp(12px,4.4cqmin,26px)}
+.cell.pop{animation:cell-pop .22s var(--spring)}
+@keyframes cell-pop{from{transform:scale(.6);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.cell.pop{animation:none}}
 </style>
 <script src="/pb/arcade-kit.js?v=2" data-arcade-id="2048" data-arcade-title="2048"></script>
 </head>
 <body>
-<div id="hud"><div class="stat">Score: <b id="sc">0</b></div><div class="stat">Best: <b id="best">0</b></div></div>
-<div id="board"></div>
-<div id="msg"></div>
-<button onclick="init()">New Game</button>
+<main class="arcade-stage" id="stage">
+  <div id="board" role="grid" aria-label="2048 board"></div>
+  <div class="arcade-hud">
+    <span class="arcade-pill">Score <b id="sc">0</b></span>
+    <span class="arcade-pill">Best <b id="bestHud">0</b></span>
+  </div>
+  <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
+    <div class="arcade-panel">
+      <h2 id="panelTitle"></h2>
+      <span class="arcade-big" id="panelBig" hidden></span>
+      <p id="panelBest" hidden></p>
+      <p id="panelBody" hidden></p>
+      <div id="panelExtra"></div>
+      <div class="arcade-actions">
+        <button class="arcade-btn" id="primary" type="button">Play</button>
+        <button class="arcade-btn secondary" id="secondary" type="button" hidden>Menu</button>
+      </div>
+    </div>
+  </div>
+</main>
 <script>
-const COLORS={0:'#2a2a3a',2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'};
-const TXTC={0:'transparent',2:'#776e65',4:'#776e65',8:'#fff',16:'#fff',32:'#fff',64:'#fff',128:'#fff',256:'#fff',512:'#fff',1024:'#fff',2048:'#fff'};
-let grid,score,best=0,over;
-function init(){
-  grid=Array.from({length:4},()=>Array(4).fill(0));
-  score=0;Arcade.score(score);over=false;document.getElementById('msg').textContent='';
+const GAME_ID='2048',BEST_LOWER=false;
+/* ---------- arcade shell: shared palette, best score, start / pause / game-over panel ---------- */
+const $=id=>document.getElementById(id);
+const ROOT_STYLE=getComputedStyle(document.documentElement);
+const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
+const FONT=cssVar('--font','system-ui,sans-serif');
+const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssVar('--card','#161625'),card2:cssVar('--card2','#1e1e35'),
+  border:cssVar('--border','#2a2a4a'),text:cssVar('--text','#e8e8f0'),muted:cssVar('--muted','#8888aa'),accent:cssVar('--accent','#6ea8fe'),
+  cyan:cssVar('--cyan','#4de8ff'),amber:cssVar('--amber','#f5b942'),danger:cssVar('--danger','#ff6685'),good:cssVar('--good','#4ade80'),
+  violet:cssVar('--violet','#b48cff')};
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
+const BEST_KEY='arcade_best_'+GAME_ID;
+function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+let best=readBest();
+/** Stores `score` when it beats the best; returns true for a new best. */
+function recordBest(score){
+  // a first-ever score of 0 is not worth celebrating
+  const better=best===null?(BEST_LOWER||score>0):(BEST_LOWER?score<best:score>best);
+  if(better){best=score;writeBest(score)}
+  return better;
+}
+const bestText=()=>best===null?'-':String(best);
+const overlay=$('overlay'),panelTitle=$('panelTitle'),panelBody=$('panelBody'),panelBig=$('panelBig'),panelBest=$('panelBest'),
+  panelExtra=$('panelExtra'),primary=$('primary'),secondary=$('secondary');
+let panelAction=null,panelAction2=null,overlayAt=0;
+function showPanel({title,body='',big=null,bestLine='',extra=null,label='Play',action=null,label2='',action2=null}){
+  panelTitle.textContent=title;
+  panelBody.textContent=body;panelBody.hidden=!body;
+  panelBig.textContent=big===null?'':String(big);panelBig.hidden=big===null;
+  panelBest.textContent=bestLine;panelBest.hidden=!bestLine;
+  panelExtra.replaceChildren(...(extra?[extra]:[]));
+  primary.textContent=label;primary.hidden=!action;panelAction=action;
+  secondary.textContent=label2;secondary.hidden=!action2;panelAction2=action2;
+  overlayAt=performance.now();
+  overlay.classList.add('show');
+}
+function hidePanel(){
+  overlay.classList.remove('show');panelAction=null;panelAction2=null;
+  if(overlay.contains(document.activeElement))document.activeElement.blur();
+}
+const panelReady=()=>overlay.classList.contains('show')&&performance.now()-overlayAt>=OVERLAY_INPUT_DELAY_MS;
+function runPanel(which){
+  if(!panelReady())return;
+  const run=which===2?panelAction2:panelAction;
+  if(!run)return;
+  hidePanel();run();
+}
+primary.addEventListener('click',()=>runPanel(1));
+secondary.addEventListener('click',()=>runPanel(2));
+document.addEventListener('keydown',e=>{
+  if((e.key===' '||e.key==='Enter')&&!e.repeat&&panelAction&&panelReady()){e.preventDefault();runPanel(1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof pauseGame==='function')pauseGame()});
+
+
+const SIZE=4,WIN_TILE=2048,SWIPE_MIN_PX=24,FOUR_CHANCE=0.1;
+// tile ramp: muted cards first, then the shared accent colours as the numbers grow
+const TILE_STYLE={
+  0:['rgba(255,255,255,.04)',COLOR.text],
+  2:['#26264a',COLOR.text],4:['#2f2f5c',COLOR.text],8:['#3d5a9c',COLOR.text],16:['#4a70c4',COLOR.text],
+  32:['#3fa9c9','#08101f'],64:[COLOR.cyan,'#08101f'],128:[COLOR.good,'#08101f'],256:[COLOR.violet,'#140a26'],
+  512:[COLOR.amber,'#1a1204'],1024:['#ff9a5c','#1f0e04'],2048:[COLOR.danger,'#1a0610']
+};
+const BEYOND_STYLE=[COLOR.text,'#08101f'];
+let grid,score=0,state='ready',won=false,newTile=null,swipeStart=null;
+
+function updateHud(){
+  $('sc').textContent=score;
+  $('bestHud').textContent=best===null?0:best;
+}
+function startGame(){
+  hidePanel();
+  grid=Array.from({length:SIZE},()=>Array(SIZE).fill(0));
+  score=0;won=false;state='playing';
+  Arcade.score(score);
   addTile();addTile();render();
 }
 function addTile(){
   let empty=[];
-  for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(!grid[r][c])empty.push([r,c]);
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++)if(!grid[r][c])empty.push([r,c]);
   if(!empty.length)return;
   let[r,c]=empty[Math.floor(Math.random()*empty.length)];
-  grid[r][c]=Math.random()<0.9?2:4;
+  grid[r][c]=Math.random()<1-FOUR_CHANCE?2:4;
+  newTile=r+','+c;
 }
 function slide(row){
-  let a=row.filter(v=>v),merged=[];
-  for(let i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;score+=a[i];Arcade.score(score);a.splice(i+1,1);merged.push(i)}}
-  while(a.length<4)a.push(0);
+  let a=row.filter(v=>v);
+  for(let i=0;i<a.length-1;i++){if(a[i]===a[i+1]){a[i]*=2;score+=a[i];Arcade.score(score);a.splice(i+1,1)}}
+  while(a.length<SIZE)a.push(0);
   return a;
 }
 function move(dir){
-  if(over)return;
-  let moved=false,prev=JSON.stringify(grid);
-  if(dir==='left')for(let r=0;r<4;r++)grid[r]=slide(grid[r]);
-  if(dir==='right')for(let r=0;r<4;r++)grid[r]=slide(grid[r].reverse()).reverse();
-  if(dir==='up'){for(let c=0;c<4;c++){let col=slide([grid[0][c],grid[1][c],grid[2][c],grid[3][c]]);for(let r=0;r<4;r++)grid[r][c]=col[r]}}
-  if(dir==='down'){for(let c=0;c<4;c++){let col=slide([grid[3][c],grid[2][c],grid[1][c],grid[0][c]]).reverse();for(let r=0;r<4;r++)grid[r][c]=col[r]}}
-  if(JSON.stringify(grid)!==prev){addTile();if(score>best)best=score;checkOver();render()}
+  if(state!=='playing')return;
+  const prev=JSON.stringify(grid);
+  if(dir==='left')for(let r=0;r<SIZE;r++)grid[r]=slide(grid[r]);
+  if(dir==='right')for(let r=0;r<SIZE;r++)grid[r]=slide(grid[r].reverse()).reverse();
+  if(dir==='up'){for(let c=0;c<SIZE;c++){let col=slide([grid[0][c],grid[1][c],grid[2][c],grid[3][c]]);for(let r=0;r<SIZE;r++)grid[r][c]=col[r]}}
+  if(dir==='down'){for(let c=0;c<SIZE;c++){let col=slide([grid[3][c],grid[2][c],grid[1][c],grid[0][c]]).reverse();for(let r=0;r<SIZE;r++)grid[r][c]=col[r]}}
+  if(JSON.stringify(grid)!==prev){addTile();render();checkState()}
 }
-function checkOver(){
-  for(let r=0;r<4;r++)for(let c=0;c<4;c++){
-    if(!grid[r][c])return;
-    if(grid[r][c]===2048){document.getElementById('msg').textContent='🎉 You reached 2048!';return}
-    if(c<3&&grid[r][c]===grid[r][c+1])return;
-    if(r<3&&grid[r][c]===grid[r+1][c])return;
+function canMove(){
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    if(!grid[r][c])return true;
+    if(c<SIZE-1&&grid[r][c]===grid[r][c+1])return true;
+    if(r<SIZE-1&&grid[r][c]===grid[r+1][c])return true;
   }
-  over=true;Arcade.gameOver(score);document.getElementById('msg').textContent='Game Over! Press New Game';
+  return false;
 }
+function checkState(){
+  if(!won&&grid.some(row=>row.includes(WIN_TILE))){
+    won=true;state='paused';
+    showPanel({title:'You made 2048!',body:'Keep going for a higher score?',big:score,label:'Keep going',action:()=>{state='playing'},label2:'New game',action2:startGame});
+    return;
+  }
+  if(!canMove())endGame();
+}
+function endGame(){
+  state='over';Arcade.gameOver(score);
+  const isBest=recordBest(score);updateHud();
+  showPanel({title:'Game over',big:score,bestLine:isBest?'New best!':'Best '+bestText(),label:'Play again',action:startGame});
+}
+
 function render(){
-  let h='';
-  for(let r=0;r<4;r++)for(let c=0;c<4;c++){
-    let v=grid[r][c],bg=COLORS[v]||'#3c3a32',tc=TXTC[v]||'#fff';
-    let fs=v>=1024?'18px':v>=128?'22px':'24px';
-    h+=`<div class="cell" style="background:${bg};color:${tc};font-size:${fs};${v>=128?'text-shadow:0 0 10px rgba(255,200,0,0.5)':''}">${v||''}</div>`;
+  const board=$('board');
+  const cells=board.children;
+  if(cells.length!==SIZE*SIZE){
+    board.replaceChildren(...Array.from({length:SIZE*SIZE},()=>{const d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');return d}));
   }
-  document.getElementById('board').innerHTML=h;
-  document.getElementById('sc').textContent=score;
-  document.getElementById('best').textContent=best;
+  for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
+    const v=grid[r][c],el=cells[r*SIZE+c];
+    const [bg,fg]=TILE_STYLE[v]||BEYOND_STYLE;
+    el.style.background=bg;el.style.color=fg;
+    el.textContent=v||'';
+    el.className='cell'+(v>=1024?' huge':v>=128?' big':'')+(newTile===r+','+c?' pop':'');
+  }
+  newTile=null;
+  $('sc').textContent=score;
+  if(best===null||score>best)$('bestHud').textContent=score;else $('bestHud').textContent=best;
 }
+
+const KEY_DIRS={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down'};
 document.addEventListener('keydown',e=>{
-  if(e.key==='ArrowLeft'||e.key==='a')move('left');
-  if(e.key==='ArrowRight'||e.key==='d')move('right');
-  if(e.key==='ArrowUp'||e.key==='w')move('up');
-  if(e.key==='ArrowDown'||e.key==='s')move('down');
+  const dir=KEY_DIRS[e.key];
+  if(!dir)return;
   e.preventDefault();
+  move(dir);
 });
-init();
+/* touch / mouse: swipe on the board */
+const boardEl=$('board');
+boardEl.addEventListener('pointerdown',e=>{swipeStart={x:e.clientX,y:e.clientY,id:e.pointerId}});
+function endSwipe(e){
+  if(!swipeStart||e.pointerId!==swipeStart.id)return;
+  const dx=e.clientX-swipeStart.x,dy=e.clientY-swipeStart.y;
+  swipeStart=null;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<SWIPE_MIN_PX)return;
+  move(Math.abs(dx)>Math.abs(dy)?(dx<0?'left':'right'):(dy<0?'up':'down'));
+}
+boardEl.addEventListener('pointerup',endSwipe);
+boardEl.addEventListener('pointercancel',()=>{swipeStart=null});
+Arcade.onRestart(startGame);
+grid=Array.from({length:SIZE},()=>Array(SIZE).fill(0));
+addTile();addTile();render();updateHud();
+showPanel({title:'2048',body:'Swipe or use the arrow keys (or WASD) to slide the tiles. Equal numbers merge - reach 2048.',label:'Play',action:startGame});
 </script>
 </body>
 </html>
