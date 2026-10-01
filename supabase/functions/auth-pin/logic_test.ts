@@ -1,5 +1,6 @@
 import {
   LOGIN_ERROR,
+  recoveryProven,
   isLocked,
   isPinLength,
   lockoutSeconds,
@@ -121,3 +122,15 @@ Deno.test("unknown and wrong users share an error", () => {
   equal(noSuchUser, LOGIN_ERROR);
   equal(Object.keys(noSuchUser), ["error"]);
 });
+
+Deno.test("recovery: amr recovery or a fresh otp after the reset mail", () => {
+  const sent = "2026-10-01T13:55:27Z";
+  const sentSec = Date.parse(sent) / 1000;
+  assert(recoveryProven([{ method: "recovery", timestamp: 1 }], null));
+  assert(recoveryProven([{ method: "otp", timestamp: sentSec + 60 }], sent));
+  assert(!recoveryProven([{ method: "otp", timestamp: sentSec - 60 }], sent));
+  assert(!recoveryProven([{ method: "otp", timestamp: sentSec + 3601 }], sent));
+  assert(!recoveryProven([{ method: "password", timestamp: sentSec + 60 }], sent));
+  assert(!recoveryProven([{ method: "otp", timestamp: sentSec + 60 }], null));
+});
+

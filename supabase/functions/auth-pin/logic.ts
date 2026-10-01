@@ -124,3 +124,28 @@ export function sameErrorShape(
 ): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
+
+/* Email recovery proof. GoTrue records the recovery-link sign-in as amr
+ * "otp" (not "recovery"), so an "otp" sign-in counts as recovery only when it
+ * happened after the reset mail was sent and within the link's lifetime. */
+export const RECOVERY_WINDOW_SECONDS = 3600; // = auth mailer_otp_exp
+
+export type AmrEntry = { method?: string; timestamp?: number };
+
+export function recoveryProven(
+  amr: readonly AmrEntry[],
+  recoverySentAt: string | null | undefined,
+  windowSeconds = RECOVERY_WINDOW_SECONDS,
+): boolean {
+  if (amr.some((entry) => entry.method === "recovery")) return true;
+  const sentMs = Date.parse(recoverySentAt ?? "");
+  if (!Number.isFinite(sentMs)) return false;
+  const sent = Math.floor(sentMs / 1000);
+  return amr.some((entry) =>
+    entry.method === "otp" &&
+    typeof entry.timestamp === "number" &&
+    entry.timestamp >= sent &&
+    entry.timestamp <= sent + windowSeconds
+  );
+}
+

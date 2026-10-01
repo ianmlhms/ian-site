@@ -14,6 +14,7 @@ import {
 
 import {
   Account,
+  AuthUser,
   accountFromUser,
   allowIp,
   callerIsAdmin,
@@ -178,11 +179,12 @@ async function pinProof(
 async function mayReplacePin(
   request: Request,
   body: Record<string, unknown>,
+  user: AuthUser,
   account: Account,
   record: PinRecord,
 ): Promise<boolean> {
   const recovery = body.recovery === true &&
-    isRecoverySession(request, account);
+    isRecoverySession(request, user);
   if (recovery) return true;
   const credential = cleanString(body.currentCredential, 1024);
   if (!credential) return false;
@@ -206,7 +208,7 @@ async function setPin(
     return json({ error: "set_failed" }, 500);
   }
   if (record &&
-      !await mayReplacePin(request, body, account, record)) {
+      !await mayReplacePin(request, body, user, account, record)) {
     return json({ error: "current_required" }, 403);
   }
   if (!await savePin(user.id, body.pin, length)) {

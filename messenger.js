@@ -1,6 +1,6 @@
 /* Messenger — group chat + DMs + media, on Supabase. Shared accounts with PixelBreak. */
-import * as auth from "./auth.js?v=20";
-import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=16";
+import * as auth from "./auth.js?v=21";
+import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=17";
 import { searchPeople, highlightMatch, attachPeopleSearch } from "./people-search.js?v=1";
 
 const $ = (id) => document.getElementById(id);
@@ -98,6 +98,67 @@ function promptModal(title, label, okText = "OK", { people = false } = {}) {
   });
 }
 
+/* One modal for "new group" (name + people) and "add people" (people only).
+ * Type part of a name, tap a suggestion → it becomes a chip; resolves
+ * { name, people: [{id, username}] } or null when cancelled. */
+function peoplePickerModal({ title, withName = false, okText, exclude = new Set() }) {
+  return new Promise((resolve) => {
+    const m = document.createElement("div");
+    m.className = "auth-modal open";
+    m.innerHTML = `<div class="auth-box pp-box">
+      <button class="auth-x">&times;</button><h3>${esc(title)}</h3>
+      ${withName ? `<input id="ppName" placeholder="${esc(T("msg.newGroup.label"))}" maxlength="60" autocomplete="off" style="margin-top:12px">` : ""}
+      <label class="pp-label" for="ppSearch">${esc(TI("grp.who"))}</label>
+      <input id="ppSearch" type="search" placeholder="${esc(TI("inv.ph"))}">
+      <div class="pp-chips" id="ppChips"></div>
+      <button class="auth-go" id="ppGo"></button></div>`;
+    document.body.appendChild(m);
+    const me = auth.session()?.user?.id;
+    let picked = [];
+    const chips = m.querySelector("#ppChips");
+    const go = m.querySelector("#ppGo");
+    const nameInput = m.querySelector("#ppName");
+    const search = m.querySelector("#ppSearch");
+    const paint = () => {
+      chips.innerHTML = picked.length
+        ? picked.map((u) => `<span class="pp-chip">${esc(u.username)}<button type="button" data-uid="${esc(u.id)}" aria-label="${esc(TI("grp.remove"))}">&times;</button></span>`).join("")
+        : `<span class="pp-empty">${esc(TI("grp.none"))}</span>`;
+      chips.querySelectorAll("button[data-uid]").forEach((b) =>
+        (b.onclick = () => { picked = picked.filter((u) => u.id !== b.dataset.uid); paint(); }));
+      go.textContent = withName ? okText : (picked.length ? TI("grp.addN").replace("{n}", picked.length) : okText);
+      go.disabled = !withName && !picked.length;
+    };
+    const detach = attachPeopleSearch(search, {
+      sb, emptyText: TI("inv.none"),
+      exclude: () => new Set([...exclude, ...picked.map((u) => u.id), ...(me ? [me] : [])]),
+      allow: restricted ? (n) => allowName.has(n.toLowerCase()) : null,
+      onPick: (u) => { picked = [...picked, { id: u.id, username: u.username }]; search.value = ""; paint(); search.focus(); },
+    });
+    const close = (val) => { detach(); m.remove(); resolve(val); };
+    const submit = () => {
+      const name = nameInput ? nameInput.value.trim() : "";
+      if (withName && !name) { nameInput.focus(); return; }
+      if (!withName && !picked.length) { search.focus(); return; }
+      close({ name, people: picked });
+    };
+    m.querySelector(".auth-x").onclick = () => close(null);
+    m.addEventListener("click", (e) => { if (e.target === m) close(null); });
+    go.onclick = submit;
+    nameInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); search.focus(); } });
+    paint();
+    (nameInput || search).focus();
+  });
+}
+// Add several people one after another; returns the names that failed.
+async function addPeople(groupId, people) {
+  const failed = [];
+  for (const u of people) {
+    const { error } = await sb.rpc("add_group_member", { p_group_id: groupId, p_user_id: u.id });
+    if (error) { console.warn("[msgr] add_group_member", u.username, error); failed.push(u.username); }
+  }
+  return failed;
+}
+
 /* ---------- chat list ---------- */
 async function loadChats(selectId) {
   const { data, error } = await sb.rpc("my_chats");
@@ -132,12 +193,13 @@ function renderChatList(chats) {
 }
 
 async function newGroup() {
-  const name = await promptModal(T("msg.newGroup.title"), T("msg.newGroup.label"), T("msg.newGroup.ok"));
-  if (!name) return;
-  const { data, error } = await sb.rpc("create_group", { p_name: name, p_username: auth.username() });
+  const res = await peoplePickerModal({ title: T("msg.newGroup.title"), withName: true, okText: T("msg.newGroup.ok") });
+  if (!res) return;
+  const { data, error } = await sb.rpc("create_group", { p_name: res.name, p_username: auth.username() });
   if (error) return alert(error.message);
+  const failed = await addPeople(data.id, res.people);
   await loadChats(data.id);
-  if (current?.id === data.id && !$("memberPanel").classList.contains("open")) { await toggleMembers(); $("invInput")?.focus(); }
+  if (failed.length) alert(T("msg.loadFail") + " " + failed.join(", "));
 }
 async function joinGroup() {
   const code = await promptModal(T("msg.join.title"), T("msg.join.label"), T("btn.join"));
@@ -173,12 +235,14 @@ async function selectChat(g) {
      ${g.is_dm ? "" : `<span class="invite" title="${esc(T("msg.tip.join"))}">code: <code>${esc(g.invite_code)}</code></span>`}
      <span class="head-actions">
        <button id="muteBtn" title="Mute">${mutedSet().has(g.id) ? "🔕" : "🔔"}</button>
+       ${g.is_dm ? "" : `<button id="addPeopleBtn" class="add-people" title="${esc(TI("grp.add"))}">${esc(TI("grp.addBtn"))}</button>`}
        <button id="membersBtn" title="${esc(T("msg.members"))}">👥</button>
        <button id="leaveBtn" title="Leave">🚪</button>
      </span>`;
   $("backBtn").onclick = goBackToList;
   $("muteBtn").onclick = () => { toggleMute(g.id); $("muteBtn").textContent = mutedSet().has(g.id) ? "🔕" : "🔔"; renderChatList(applySearch(allChats)); };
   $("membersBtn").onclick = toggleMembers;
+  if ($("addPeopleBtn")) $("addPeopleBtn").onclick = () => addPeopleToCurrent();
   $("leaveBtn").onclick = leaveChat;
   $("app").classList.add("chat-open");   // mobile: show the conversation full-screen
   $("composer").style.display = "flex";
@@ -221,6 +285,12 @@ const INVITE_STRINGS = {
   "inv.none":    { lb: "Keen fonnt.", de: "Niemand gefunden.", en: "Nobody found." },
   "inv.added":   { lb: "{name} ass elo am Grupp.", de: "{name} ist jetzt in der Gruppe.", en: "{name} is now in the group." },
   "dm.ph":       { lb: "Numm sichen, z.B. emm", de: "Namen suchen, z. B. emm", en: "Search a name, e.g. emm" },
+  "grp.add":     { lb: "Leit derbäisetzen", de: "Leute hinzufügen", en: "Add people" },
+  "grp.addBtn":  { lb: "＋ Leit", de: "＋ Leute", en: "＋ People" },
+  "grp.who":     { lb: "Wien soll derbäi sinn?", de: "Wer soll dabei sein?", en: "Who should be in it?" },
+  "grp.none":    { lb: "Nach keen ausgewielt — dat kanns du och méi spéit maachen.", de: "Noch niemand ausgewählt — geht auch später.", en: "Nobody picked yet — you can also do this later." },
+  "grp.remove":  { lb: "Ewechhuelen", de: "Entfernen", en: "Remove" },
+  "grp.addN":    { lb: "{n} derbäisetzen", de: "{n} hinzufügen", en: "Add {n}" },
 };
 const TI = (k) => { const e = INVITE_STRINGS[k]; return e[window.I18N?.lang] || e.en; };
 const INVITE_DEBOUNCE_MS = 180;
@@ -277,6 +347,16 @@ async function searchInvite(raw) {
     `<button class="inv-add" data-uid="${esc(u.id)}" data-name="${esc(u.username)}">
        <span class="mp-av">${avatarHtml(u.id)}</span><span class="inv-name">${highlightMatch(u.username, q)}</span><span class="inv-plus">＋</span></button>`).join("");
   box.querySelectorAll(".inv-add").forEach((b) => (b.onclick = () => addMember(b.dataset.uid, b.dataset.name, b)));
+}
+async function addPeopleToCurrent() {
+  const group = current;
+  const { data } = await sb.from("group_members").select("user_id").eq("group_id", group.id);
+  const res = await peoplePickerModal({ title: TI("grp.add"), okText: TI("inv.add"),
+    exclude: new Set((data || []).map((m) => m.user_id)) });
+  if (!res || !res.people.length) return;
+  const failed = await addPeople(group.id, res.people);
+  if (failed.length) alert(T("msg.loadFail") + " " + failed.join(", "));
+  if ($("memberPanel").classList.contains("open") && current?.id === group.id) await renderMemberList();
 }
 async function addMember(uid, name, btn) {
   btn.disabled = true;

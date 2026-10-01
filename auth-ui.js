@@ -263,7 +263,7 @@ function signupMarkup(length) {
     ))}</p>${lengthTabs(length)}${pinWarning(length)}
     ${pinGroup("pin.enter", "PIN aginn", "authPinHost")}
     ${pinGroup("pin.repeat", "PIN widderhuelen", "authPinAgain")}
-    <p class="pin-note">${esc(t("pin.recoveryAdvice", "Wann s de däi PIN vergëss, schreif dem Ian. En E-Mail-Reset kanns de och probéieren, mee en ass net garantéiert."))}</p>
+    <p class="pin-note">${esc(t("pin.recoveryAdvice", "Wanns du däi PIN vergiess hues, kanns du per E-Mail en neie setzen."))}</p>
     <button class="auth-go" id="authSubmit">${esc(t(
       "pin.signUp",
       "Kont erstellen",
@@ -378,13 +378,13 @@ function drawForgot(deps) {
     "Neie PIN setzen",
   ))}<p class="pin-note">${esc(t(
     "pin.forgotText",
-    "Déi sécher Method ass: Schreif dem Ian. En E-Mail-Link " +
-      "kanns du hei och probéieren, mee en ass net garantéiert.",
+    "Gëff d'E-Mail vun dengem Kont an. Mir schécken dir e " +
+      "Link, mat deem s du en neie PIN setze kanns.",
   ))}</p>${field("authEmail", "pin.email", "E-Mail",
     'type="email" autocomplete="email"')}
     <button class="auth-go" id="authSubmit">${esc(t(
       "pin.sendLink",
-      "E-Mail-Link probéieren",
+      "Link schécken",
     ))}</button><div class="auth-msg" id="authMsg"></div>`;
   wireClose();
   box().querySelector("#authSubmit").addEventListener("click", async () => {
@@ -398,14 +398,14 @@ function drawForgot(deps) {
       await deps.resetPin(email);
       setMessage(t(
         "pin.linkSent",
-        "Wann d'E-Mail ukënnt, benotz de Link. " +
-          "Wann net, schreif dem Ian.",
+        "Wann et e Kont mat dëser E-Mail gëtt, ass de Link " +
+          "ënnerwee. Kuck och am Spam.",
       ), "ok");
     } catch (error) {
       console.warn("PIN recovery failed", error);
       setMessage(t(
         "pin.linkError",
-        "Den E-Mail-Link geet hei net. Schreif dem Ian.",
+        "De Link konnt net geschéckt ginn. Probéier et méi spéit nach eng Kéier.",
       ), "err");
     }
   });

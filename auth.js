@@ -1,12 +1,12 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=40";
-import { openAuthDialog } from "./auth-ui.js?v=7";
+import "./i18n-dict.js?v=41";
+import { openAuthDialog } from "./auth-ui.js?v=8";
 import { esc } from "./pin-pad.js?v=4";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=6";
+} from "./pin-brief.js?v=7";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =

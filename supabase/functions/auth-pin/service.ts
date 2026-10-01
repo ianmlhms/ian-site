@@ -5,6 +5,7 @@ import {
   PinRecord,
   cleanString,
   normalizeIdentifier,
+  recoveryProven,
 } from "./logic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -34,6 +35,7 @@ export type AuthUser = {
   id: string;
   email?: string;
   created_at?: string;
+  recovery_sent_at?: string | null;
 };
 
 type JwtAmr = {
@@ -243,7 +245,7 @@ export function isRecoverySession(
   if (claims?.sub !== user.id || !Array.isArray(claims.amr)) {
     return false;
   }
-  return claims.amr.some((entry) => entry.method === "recovery");
+  return recoveryProven(claims.amr, user.recovery_sent_at);
 }
 
 function callerClient(request: Request) {
