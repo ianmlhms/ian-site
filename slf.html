@@ -145,6 +145,8 @@ const VERIFY_CONCURRENCY = 4;
 async function checkWord(term, check){
   if(!check) return null;                          // category has no online check → always valid
   const safe = term.trim().slice(0,60).replace(/[\\"]/g,"");
+  // EntitySearch matches prefixes ("Ber" finds Berlin), so the FILTERs require an exact label/alias match;
+  // all-caps aliases (codes like "BEL") only count when typed exactly, else "Bel" would pass as a country.
   const query = `SELECT ?item WHERE {
     SERVICE wikibase:mwapi {
       bd:serviceParam wikibase:endpoint "www.wikidata.org";
@@ -154,6 +156,9 @@ async function checkWord(term, check){
                       mwapi:limit "10".
       ?item wikibase:apiOutputItem mwapi:item.
     }
+    { ?item rdfs:label ?label. FILTER(LCASE(STR(?label)) = LCASE("${safe}")) }
+    UNION { ?item skos:altLabel ?label.
+            FILTER(STR(?label) = "${safe}" || (LCASE(STR(?label)) = LCASE("${safe}") && STR(?label) != UCASE(STR(?label)))) }
     ${check} } LIMIT 1`;
   const ctrl = new AbortController();
   const to = setTimeout(()=>ctrl.abort(), VERIFY_TIMEOUT_MS);
@@ -270,7 +275,8 @@ function renderTotals(ps){
   const sorted=[...ps].sort((a,b)=>(totals[b.cid]||0)-(totals[a.cid]||0));
   return `<div class="tot"><h3>Scores</h3><table>${sorted.map(p=>`<tr><td>👤 ${esc(p.name)}</td><td class="pts">${totals[p.cid]||0}</td></tr>`).join("")}</table></div>`;
 }
-function valid(a){ return a && a.trim() && a.trim()[0].toUpperCase()===letter; }
+const MIN_ANSWER_LEN = 2;                // a lone letter ("B") is never an answer
+function valid(a){ const t=(a||"").trim(); return t.length>=MIN_ANSWER_LEN && t[0].toUpperCase()===letter; }
 function scoreCell(i,pcid,ps){
   const a=(answers[pcid]?.ans?.[i])||"";
   if(!valid(a)) return 0;
