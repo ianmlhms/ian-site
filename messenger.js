@@ -1,6 +1,7 @@
 /* Messenger — group chat + DMs + media, on Supabase. Shared accounts with PixelBreak. */
 import * as auth from "./auth.js?v=19";
 import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=15";
+import { searchPeople, highlightMatch, attachPeopleSearch } from "./people-search.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -72,7 +73,7 @@ const mutedSet = () => {
 function toggleMute(gid) { const s = mutedSet(); s.has(gid) ? s.delete(gid) : s.add(gid); localStorage.setItem("mutedChats", JSON.stringify([...s])); }
 
 /* ---------- small prompt modal ---------- */
-function promptModal(title, label, okText = "OK") {
+function promptModal(title, label, okText = "OK", { people = false } = {}) {
   return new Promise((resolve) => {
     const m = document.createElement("div");
     m.className = "auth-modal open";
@@ -81,10 +82,16 @@ function promptModal(title, label, okText = "OK") {
       <input id="pmInput" placeholder="${esc(label)}" style="margin-top:12px" autocomplete="off">
       <button class="auth-go" id="pmGo">${esc(okText)}</button></div>`;
     document.body.appendChild(m);
-    const close = (val) => { m.remove(); resolve(val); };
+    const inp = m.querySelector("#pmInput");
+    // people: suggest usernames while typing ("emm" → every Emma); picking one submits
+    const me = auth.session()?.user?.id;
+    const detach = people ? attachPeopleSearch(inp, {
+      sb, onPick: (u) => close(u.username), exclude: () => new Set(me ? [me] : []),
+      allow: restricted ? (n) => allowName.has(n.toLowerCase()) : null, emptyText: TI("inv.none"),
+    }) : null;
+    const close = (val) => { detach?.(); m.remove(); resolve(val); };
     m.querySelector(".auth-x").onclick = () => close(null);
     m.addEventListener("click", (e) => { if (e.target === m) close(null); });
-    const inp = m.querySelector("#pmInput");
     m.querySelector("#pmGo").onclick = () => close(inp.value.trim() || null);
     inp.addEventListener("keydown", (e) => { if (e.key === "Enter") close(inp.value.trim() || null); });
     inp.focus();
@@ -130,6 +137,7 @@ async function newGroup() {
   const { data, error } = await sb.rpc("create_group", { p_name: name, p_username: auth.username() });
   if (error) return alert(error.message);
   await loadChats(data.id);
+  if (current?.id === data.id && !$("memberPanel").classList.contains("open")) { await toggleMembers(); $("invInput")?.focus(); }
 }
 async function joinGroup() {
   const code = await promptModal(T("msg.join.title"), T("msg.join.label"), T("btn.join"));
@@ -139,7 +147,7 @@ async function joinGroup() {
   await loadChats(data.id);
 }
 async function newDM() {
-  const uname = await promptModal(T("msg.dm.title"), T("msg.dm.label"), T("msg.dm.ok"));
+  const uname = await promptModal(T("msg.dm.title"), TI("dm.ph"), T("msg.dm.ok"), { people: true });
   if (!uname) return;
   if (restricted && !allowName.has(uname.trim().toLowerCase())) { alert("Dës Persoun ass net verfügbar."); return; }
   const { data, error } = await sb.rpc("start_dm", { p_username: uname, p_me_username: auth.username() });
@@ -205,16 +213,79 @@ async function leaveChat() {
 }
 
 /* ---------- members panel ---------- */
+// Invite strings live here (not in i18n-dict.js) so adding them doesn't bump auth.js everywhere.
+const INVITE_STRINGS = {
+  "inv.label":   { lb: "Een derbäisetzen", de: "Jemanden hinzufügen", en: "Add someone" },
+  "inv.ph":      { lb: "Numm sichen, z.B. emm", de: "Namen suchen, z. B. emm", en: "Search a name, e.g. emm" },
+  "inv.add":     { lb: "Derbäisetzen", de: "Hinzufügen", en: "Add" },
+  "inv.none":    { lb: "Keen fonnt.", de: "Niemand gefunden.", en: "Nobody found." },
+  "inv.added":   { lb: "{name} ass elo am Grupp.", de: "{name} ist jetzt in der Gruppe.", en: "{name} is now in the group." },
+  "dm.ph":       { lb: "Numm sichen, z.B. emm", de: "Namen suchen, z. B. emm", en: "Search a name, e.g. emm" },
+};
+const TI = (k) => { const e = INVITE_STRINGS[k]; return e[window.I18N?.lang] || e.en; };
+const INVITE_DEBOUNCE_MS = 180;
+
 async function toggleMembers() {
   const p = $("memberPanel");
   if (p.classList.contains("open")) return closeMembers();
   p.classList.add("open");
-  p.innerHTML = `<div class="mp-head">${T("msg.members")} <button id="mpX">&times;</button></div><div class="mp-list">${T("common.loading")}</div>`;
+  const invite = current.is_dm ? "" :
+    `<div class="mp-invite"><label for="invInput">${esc(TI("inv.label"))}</label>
+       <input id="invInput" type="search" placeholder="${esc(TI("inv.ph"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
+       <div class="inv-results" id="invResults"></div></div>`;
+  p.innerHTML = `<div class="mp-head">${T("msg.members")} <button id="mpX">&times;</button></div>${invite}<div class="mp-list">${T("common.loading")}</div>`;
   $("mpX").onclick = closeMembers;
+  if (!current.is_dm) wireInvite();
+  await renderMemberList();
+}
+async function renderMemberList() {
+  const list = $("memberPanel").querySelector(".mp-list");
   const { data, error } = await sb.from("group_members").select("username,user_id,joined_at").eq("group_id", current.id);
+  if (!list.isConnected) return;                     // panel closed meanwhile
   const me = auth.session().user.id;
-  p.querySelector(".mp-list").innerHTML = error || !data ? T("msg.loadFail") :
+  memberIds = new Set((data || []).map((m) => m.user_id));
+  list.innerHTML = error || !data ? T("msg.loadFail") :
     data.map((m) => `<div class="mp-row"><span class="mp-av">${avatarHtml(m.user_id)}</span> ${esc(m.username)}${classTag(m.user_id)}${adminTag(m.user_id)}${m.user_id === me ? ` <span class='you'>${T("msg.you")}</span>` : ""}</div>`).join("");
+}
+
+/* ---------- invite by name: type "emm" → every Emma shows up ---------- */
+let memberIds = new Set();   // user_ids already in the open group
+let inviteSeq = 0;           // ignore out-of-order search replies
+function wireInvite() {
+  const inp = $("invInput");
+  let timer = null;
+  inp.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => searchInvite(inp.value), INVITE_DEBOUNCE_MS); });
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("invResults").querySelector(".inv-add")?.click(); } });
+}
+async function searchInvite(raw) {
+  const box = $("invResults");
+  const q = raw.trim();
+  const seq = ++inviteSeq;
+  if (!q) { box.innerHTML = ""; return; }
+  let people;
+  try {
+    people = await searchPeople(sb, q, { exclude: memberIds, allow: restricted ? (n) => allowName.has(n.toLowerCase()) : null });
+  } catch (e) {
+    console.warn("[msgr] invite search", e);
+    if (seq === inviteSeq && box.isConnected) box.innerHTML = `<div class="inv-empty">${esc(T("msg.loadFail"))}</div>`;
+    return;
+  }
+  if (seq !== inviteSeq || !box.isConnected) return;
+  if (!people.length) { box.innerHTML = `<div class="inv-empty">${esc(TI("inv.none"))}</div>`; return; }
+  people.forEach((u) => { if (u.avatar && !avatarMap[u.id]) avatarMap = { ...avatarMap, [u.id]: u.avatar }; });
+  box.innerHTML = people.map((u) =>
+    `<button class="inv-add" data-uid="${esc(u.id)}" data-name="${esc(u.username)}">
+       <span class="mp-av">${avatarHtml(u.id)}</span><span class="inv-name">${highlightMatch(u.username, q)}</span><span class="inv-plus">＋</span></button>`).join("");
+  box.querySelectorAll(".inv-add").forEach((b) => (b.onclick = () => addMember(b.dataset.uid, b.dataset.name, b)));
+}
+async function addMember(uid, name, btn) {
+  btn.disabled = true;
+  const { error } = await sb.rpc("add_group_member", { p_group_id: current.id, p_user_id: uid });
+  if (error) { btn.disabled = false; console.warn("[msgr] add_group_member", error); return alert(error.message); }
+  btn.remove();
+  const box = $("invResults");
+  box.insertAdjacentHTML("afterbegin", `<div class="inv-done">✓ ${esc(TI("inv.added").replace("{name}", name))}</div>`);
+  await renderMemberList();
 }
 function closeMembers() { const p = $("memberPanel"); if (p) { p.classList.remove("open"); p.innerHTML = ""; } }
 

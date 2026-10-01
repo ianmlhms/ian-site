@@ -1,5 +1,6 @@
 /* Friends: add by username, list, message (DM) or invite to a game. */
 import * as auth from "./auth.js?v=19";
+import { attachPeopleSearch } from "./people-search.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -195,6 +196,15 @@ async function showApp() {
   $("gate").style.display = "none"; $("app").style.display = "";
   $("addBtn").onclick = addFriend;
   $("addInput").addEventListener("keydown", e => { if (e.key === "Enter") addFriend(); });
+  // suggest usernames while typing ("emm" → every Emma); picking one sends the request
+  if (!$("addInput").dataset.people) {
+    $("addInput").dataset.people = "1";
+    attachPeopleSearch($("addInput"), {
+      sb, onPick: () => addFriend(), emptyText: "—",
+      exclude: () => new Set([auth.session()?.user?.id].filter(Boolean)),
+      allow: (n) => !restricted || allowName.has(n.toLowerCase()),
+    });
+  }
   try { await sb.rpc("upsert_profile", { p_username: auth.username() }); } catch (e) { console.warn(e); }
   refresh();
   // live notify on new game invites — subscribe only once per page load

@@ -67,6 +67,18 @@
   .mp-list{padding:8px 14px}
   .mp-row{padding:6px 0;font-size:14px}
   .mp-row .you{color:var(--muted);font-size:12px}
+  .mp-invite{padding:10px 14px;border-bottom:1px solid var(--border)}
+  .mp-invite label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
+  .mp-invite input{width:100%;box-sizing:border-box;min-height:40px;padding:8px 10px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:16px}
+  .inv-results{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+  .inv-add{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 6px;border:0;border-radius:10px;background:none;color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+  .inv-add:hover,.inv-add:focus-visible{background:var(--card)}
+  .inv-add:disabled{opacity:.5}
+  .inv-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .inv-name b{color:var(--accent-text,var(--accent))}
+  .inv-plus{color:var(--accent-text,var(--accent));font-weight:800}
+  .inv-empty,.inv-done{font-size:13px;color:var(--muted);padding:6px 2px}
+  .inv-done{color:var(--good,#4ade80)}
   .media{max-width:240px;max-height:240px;border-radius:10px;display:block;margin-top:6px;cursor:pointer}
   .filechip{display:flex;align-items:center;gap:9px;margin-top:6px;max-width:240px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;text-decoration:none;color:var(--text)}
   .filechip:hover{border-color:var(--accent2-text)}
@@ -321,7 +333,7 @@
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="messenger.js?v=37"></script>
+<script type="module" src="messenger.js?v=38"></script>
   <script type="module" src="rtc-ring.js?v=15"></script>
   <script type="module" src="class-gate.js?v=16"></script>
 </body>
