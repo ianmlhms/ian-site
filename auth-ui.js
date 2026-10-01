@@ -166,7 +166,14 @@ function loginLinks(method) {
     <button class="auth-link" id="authForgot" type="button">
       ${esc(t("pin.forgot", "PIN vergiess?"))}
     </button>
-  </div>`;
+  </div>${checkLink()}`;
+}
+function checkLink() {
+  return `<div class="auth-links"><button class="auth-link" id="authCheck" type="button">
+      ${esc(t("pin.check", "Hunn ech e Kont?"))}</button></div>`;
+}
+function wireCheckLink(deps, prefill) {
+  box().querySelector("#authCheck")?.addEventListener("click", () => drawCheck(deps, prefill()));
 }
 function attachPinPad(length, onComplete) {
   const pad = createPinPad({
@@ -241,6 +248,7 @@ function drawSignIn(deps, length, method, values) {
     "click",
     () => drawForgot(deps),
   );
+  wireCheckLink(deps, () => value("authIdentifier"));
 }
 
 function signupMarkup(length) {
@@ -259,7 +267,7 @@ function signupMarkup(length) {
     <button class="auth-go" id="authSubmit">${esc(t(
       "pin.signUp",
       "Kont erstellen",
-    ))}</button><div class="auth-msg" id="authMsg"></div>`;
+    ))}</button><div class="auth-msg" id="authMsg"></div>${checkLink()}`;
 }
 
 async function submitSignUp(deps, first, second, length) {
@@ -309,6 +317,59 @@ function drawSignUp(deps, length, values) {
     "click",
     () => submitSignUp(deps, first, second, length),
   );
+  wireCheckLink(deps, () => value("authEmail") || value("authUser"));
+}
+
+/* "Do I have an account?" — yes/no for a username or e-mail, then one tap to
+ * sign in (yes) or to create the account with what was typed (no). */
+function drawCheck(deps, prefill = "") {
+  box().innerHTML = `${dialogHead(t("pin.checkTitle", "Hunn ech e Kont?"))}
+    <p class="pin-note">${esc(t("pin.checkText", "Gëff däi Benotzernumm oder deng E-Mail an."))}</p>
+    ${field("authCheckId", "pin.identifier", "Benotzernumm oder E-Mail",
+      'autocomplete="username" maxlength="254"')}
+    <button class="auth-go" id="authSubmit">${esc(t("pin.checkBtn", "Iwwerpréiwen"))}</button>
+    <div class="auth-msg" id="authMsg"></div>
+    <div id="authCheckNext"></div>
+    <div class="auth-links"><button class="auth-link" id="authBack" type="button">
+      ${esc(t("pin.back", "← Zréck"))}</button></div>`;
+  wireClose();
+  const input = box().querySelector("#authCheckId");
+  input.value = prefill;
+  const next = box().querySelector("#authCheckNext");
+  box().querySelector("#authBack").addEventListener("click",
+    () => drawSignIn(deps, DEFAULT_PIN_LENGTH, "pin", { authIdentifier: value("authCheckId") }));
+  const showNext = (labelKey, fallback, go) => {
+    next.innerHTML = `<button class="auth-go" type="button">${esc(t(labelKey, fallback))}</button>`;
+    next.querySelector("button").addEventListener("click", go);
+  };
+  const submit = async () => {
+    const id = value("authCheckId");
+    next.innerHTML = "";
+    if (id.length < 3) {
+      setMessage(t("pin.complete", "Fëll w.e.g. alles aus."), "err");
+      return;
+    }
+    setMessage("…");
+    try {
+      const exists = await deps.accountExists(id);
+      if (exists) {
+        setMessage(t("pin.checkYes", "Jo, et gëtt e Kont fir „{id}“.").replace("{id}", id), "ok");
+        showNext("pin.signIn", "Umellen",
+          () => drawSignIn(deps, DEFAULT_PIN_LENGTH, "pin", { authIdentifier: id }));
+      } else {
+        setMessage(t("pin.checkNo", "Nee, et gëtt nach kee Kont fir „{id}“.").replace("{id}", id), "err");
+        const isEmail = id.includes("@");
+        showNext("pin.signUp", "Kont erstellen",
+          () => drawSignUp(deps, DEFAULT_PIN_LENGTH, isEmail ? { authEmail: id } : { authUser: id }));
+      }
+    } catch (error) {
+      console.warn("account check failed", error);
+      setMessage(t("pin.checkError", "Konnt net iwwerpréiwen. Probéier nach eng Kéier."), "err");
+    }
+  };
+  box().querySelector("#authSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+  input.focus();
 }
 
 function drawForgot(deps) {

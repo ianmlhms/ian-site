@@ -1,12 +1,12 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=39";
-import { openAuthDialog } from "./auth-ui.js?v=6";
+import "./i18n-dict.js?v=40";
+import { openAuthDialog } from "./auth-ui.js?v=7";
 import { esc } from "./pin-pad.js?v=4";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=5";
+} from "./pin-brief.js?v=6";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =
@@ -334,6 +334,14 @@ export async function resetPin(email) {
   if (error) throw error;
 }
 
+/** Yes/no: does this username or e-mail belong to an account? (works signed out) */
+export async function accountExists(identifier) {
+  const sb = await client();
+  const { data, error } = await sb.rpc("account_exists", { p_identifier: identifier });
+  if (error) throw error;
+  return data === true;
+}
+
 export async function signOut() {
   const sb = await client();
   const { error } = await sb.auth.signOut();
@@ -351,6 +359,7 @@ const uiDeps = Object.freeze({
   setPin,
   pinStatus,
   resetPin,
+  accountExists,
   pinSetupPending: () => _g.pinSetupPending === true,
 });
 
