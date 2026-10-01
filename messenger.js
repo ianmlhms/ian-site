@@ -280,11 +280,11 @@ async function leaveChat() {
 // Invite strings live here (not in i18n-dict.js) so adding them doesn't bump auth.js everywhere.
 const INVITE_STRINGS = {
   "inv.label":   { lb: "Een derbäisetzen", de: "Jemanden hinzufügen", en: "Add someone" },
-  "inv.ph":      { lb: "Numm sichen, z.B. emm", de: "Namen suchen, z. B. emm", en: "Search a name, e.g. emm" },
+  "inv.ph":      { lb: "Numm sichen", de: "Namen suchen", en: "Search a name" },
   "inv.add":     { lb: "Derbäisetzen", de: "Hinzufügen", en: "Add" },
   "inv.none":    { lb: "Keen fonnt.", de: "Niemand gefunden.", en: "Nobody found." },
   "inv.added":   { lb: "{name} ass elo am Grupp.", de: "{name} ist jetzt in der Gruppe.", en: "{name} is now in the group." },
-  "dm.ph":       { lb: "Numm sichen, z.B. emm", de: "Namen suchen, z. B. emm", en: "Search a name, e.g. emm" },
+  "dm.ph":       { lb: "Numm sichen", de: "Namen suchen", en: "Search a name" },
   "grp.add":     { lb: "Leit derbäisetzen", de: "Leute hinzufügen", en: "Add people" },
   "grp.addBtn":  { lb: "＋ Leit", de: "＋ Leute", en: "＋ People" },
   "grp.who":     { lb: "Wien soll derbäi sinn?", de: "Wer soll dabei sein?", en: "Who should be in it?" },
