@@ -251,6 +251,7 @@ function setFilter(service) {
   setState({ filter: service });
   document.querySelectorAll("[data-service-filter]").forEach((button) => {
     button.classList.toggle("active", button.dataset.serviceFilter === service);
+    button.setAttribute("aria-pressed", String(button.dataset.serviceFilter === service));
   });
   renderSidebar();
 }
@@ -259,6 +260,7 @@ function setMailFilter(kind) {
   setState({ mailFilter: kind });
   document.querySelectorAll("[data-mail-filter]").forEach((button) => {
     button.classList.toggle("active", button.dataset.mailFilter === kind);
+    button.setAttribute("aria-pressed", String(button.dataset.mailFilter === kind));
   });
   renderSidebar();
 }
@@ -270,6 +272,7 @@ function setMode(mode) {
   const isMail = mode === MODE_MAIL;
   document.querySelectorAll("[data-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === mode);
+    button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
   });
   document.getElementById("chatFilters").hidden = isMail;
   document.getElementById("mailFilters").hidden = !isMail;

@@ -64,6 +64,7 @@ function mailRow(message, selectedId, onSelect, accountsById) {
 
   const button = document.createElement("button");
   button.type = "button";
+  if (message.id === selectedId) button.setAttribute("aria-current", "true");
   button.onclick = () => onSelect(message.id);
 
   const top = textNode("span", "chat-row-top", "");
@@ -100,6 +101,7 @@ export function renderMailHeader(message, account, onBack) {
   }
   const back = textNode("button", "back-btn", "‹");
   back.type = "button";
+  back.setAttribute("aria-label", "Zréck bei d'Mailléscht");
   back.onclick = onBack;
   const labels = document.createElement("div");
   labels.className = "chat-head-labels";

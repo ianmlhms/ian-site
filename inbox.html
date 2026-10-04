@@ -104,6 +104,9 @@
   .pending-state.failed{font-weight:800;color:#7a0010}
   .retry-btn{margin-top:7px;border:1px solid rgba(20,7,17,.35);border-radius:999px;padding:4px 9px;background:rgba(255,255,255,.25);color:inherit;font-size:11px;font-weight:800;cursor:pointer}
   .message.highlight .bubble{outline:2px solid var(--accent2);outline-offset:3px}
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+  .chat-row button:focus-visible,.search-result button:focus-visible{outline-offset:-2px}
+  .messages:focus-visible{outline:2px solid var(--accent2);outline-offset:-2px}
   .composer{display:flex;flex-direction:column;gap:8px;padding:12px max(18px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));border-top:1px solid var(--border);flex:none}
   .composer[hidden]{display:none}
   .composer-row{display:flex;align-items:center;gap:10px;min-width:0}
@@ -122,6 +125,11 @@
   .attachment-name{display:block;max-width:min(58vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:800}
   .attachment-size{display:block;color:var(--muted);font-size:10px}
   .attachment-remove{min-height:32px;border:0;border-radius:8px;padding:5px 8px;background:transparent;color:var(--accent2);font-size:11px;font-weight:800;cursor:pointer}
+  @media (pointer:coarse){
+    .filters button,.mode-switch button{min-height:44px}
+    .back-btn{min-width:44px;min-height:44px}
+    .attachment-remove,.media-chip,.retry-btn{min-height:44px}
+  }
   @media(max-width:700px){
     .connection-strip{grid-template-columns:1fr;padding:6px 8px}
     .account-state{grid-template-columns:auto auto 1fr;padding:5px 8px}
@@ -184,7 +192,7 @@
 <body>
 <header>
   <a class="home" href="index.html">‹ Start</a>
-  <h1>📥 Vereenegt Inbox</h1>
+  <h1><span aria-hidden="true">📥</span> Vereenegt Inbox</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
@@ -193,7 +201,7 @@
 
 <div id="gate">
   <div class="gate-box">
-    <h2>📥 Vereenegt Inbox</h2>
+    <h2><span aria-hidden="true">📥</span> Vereenegt Inbox</h2>
     <p>Mell dech un, fir deng WhatsApp-, iMessage- a Mail-Noriichten ze gesinn.</p>
     <button id="gateSignIn" class="primary-button" type="button">Umellen</button>
   </div>
@@ -204,34 +212,34 @@
   <section id="mailStrip" class="mail-strip" aria-label="Mail-Kontoen" hidden></section>
   <div class="messenger-layout">
     <aside class="sidebar">
-      <div class="mode-switch" role="tablist" aria-label="Moduse">
-        <button class="active" type="button" data-mode="chats">💬 Chats</button>
-        <button type="button" data-mode="mail">✉️ Mail</button>
+      <div class="mode-switch" role="group" aria-label="Moduse">
+        <button class="active" type="button" data-mode="chats" aria-pressed="true"><span aria-hidden="true">💬</span> Chats</button>
+        <button type="button" data-mode="mail" aria-pressed="false"><span aria-hidden="true">✉️</span> Mail</button>
       </div>
       <div class="sidebar-head">
         <strong id="sidebarTitle">All Chats</strong>
         <input id="searchInput" class="search-input" type="search" placeholder="Noriichten duerchsichen…" autocomplete="off" aria-label="Noriichten duerchsichen">
       </div>
-      <div id="chatFilters" class="filters" aria-label="Service filteren">
-        <button class="active" type="button" data-service-filter="all">All</button>
-        <button type="button" data-service-filter="whatsapp">💬 WhatsApp</button>
-        <button type="button" data-service-filter="imessage">🍎 iMessage</button>
+      <div id="chatFilters" class="filters" role="group" aria-label="Service filteren">
+        <button class="active" type="button" data-service-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-service-filter="whatsapp" aria-pressed="false"><span aria-hidden="true">💬</span> WhatsApp</button>
+        <button type="button" data-service-filter="imessage" aria-pressed="false"><span aria-hidden="true">🍎</span> iMessage</button>
       </div>
-      <div id="mailFilters" class="filters" aria-label="Mail filteren" hidden>
-        <button class="active" type="button" data-mail-filter="all">All</button>
-        <button type="button" data-mail-filter="people">👤 Perséinlech</button>
-        <button type="button" data-mail-filter="bulk">📰 Newsletter</button>
-        <button type="button" data-mail-filter="unread">● Ongelies</button>
+      <div id="mailFilters" class="filters" role="group" aria-label="Mail filteren" hidden>
+        <button class="active" type="button" data-mail-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-mail-filter="people" aria-pressed="false"><span aria-hidden="true">👤</span> Perséinlech</button>
+        <button type="button" data-mail-filter="bulk" aria-pressed="false"><span aria-hidden="true">📰</span> Newsletter</button>
+        <button type="button" data-mail-filter="unread" aria-pressed="false"><span aria-hidden="true">●</span> Ongelies</button>
       </div>
       <ul id="chatList"></ul>
     </aside>
     <section class="chat-pane" aria-label="Chat">
       <div id="chatHead" class="chat-head"><span>Wiel e Chat aus ←</span></div>
-      <div id="messages" class="messages"></div>
+      <div id="messages" class="messages" tabindex="0" role="region" aria-label="Noriichten"></div>
       <form id="composer" class="composer" hidden>
         <div id="attachmentPreview" class="attachment-preview" aria-live="polite" hidden></div>
         <div class="composer-row">
-          <button id="attachButton" class="attach-button" type="button" aria-label="Fichier bäifügen" title="Fichier bäifügen" hidden>📎</button>
+          <button id="attachButton" class="attach-button" type="button" aria-label="Fichier bäifügen" title="Fichier bäifügen" hidden><span aria-hidden="true">📎</span></button>
           <input id="attachmentInput" type="file" hidden>
           <input id="messageInput" autocomplete="off" placeholder="Noriicht…" aria-label="Noriicht">
           <button id="sendButton" class="send-button" type="submit">Schécken</button>

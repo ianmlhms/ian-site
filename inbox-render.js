@@ -85,6 +85,7 @@ function initialsOf(title) {
 function chatAvatar(chat, createMediaUrl) {
   const avatar = document.createElement("span");
   avatar.className = "chat-avatar";
+  avatar.setAttribute("aria-hidden", "true");
   avatar.textContent = initialsOf(chat.title);
   if (!chat.avatar_path || typeof createMediaUrl !== "function") return avatar;
 
@@ -105,7 +106,7 @@ function chatAvatar(chat, createMediaUrl) {
 function applyAvatarImage(host, url, title) {
   const image = document.createElement("img");
   image.src = url;
-  image.alt = title || "";
+  image.alt = "";
   image.loading = "lazy";
   image.onload = () => { host.textContent = ""; host.append(image); };
 }
@@ -116,7 +117,9 @@ export function renderChatList(chats, selectedChatId, onSelect, createMediaUrl) 
     list.append(textNode("li", "empty", "Keng Chats an dësem Filter."));
     return;
   }
+  const focusedId = list.contains(document.activeElement) ? document.activeElement.dataset.chatId : null;
   chats.forEach((chat) => list.append(chatRow(chat, selectedChatId, onSelect, createMediaUrl)));
+  if (focusedId) list.querySelector(`[data-chat-id="${CSS.escape(focusedId)}"]`)?.focus({ preventScroll: true });
 }
 
 function chatRow(chat, selectedChatId, onSelect, createMediaUrl) {
@@ -124,6 +127,8 @@ function chatRow(chat, selectedChatId, onSelect, createMediaUrl) {
   item.className = `chat-row${chat.unread ? " unread" : ""}${chat.id === selectedChatId ? " active" : ""}`;
   const button = document.createElement("button");
   button.type = "button";
+  button.dataset.chatId = chat.id;
+  if (chat.id === selectedChatId) button.setAttribute("aria-current", "true");
   button.onclick = () => onSelect(chat.id);
   const top = textNode("span", "chat-row-top", "");
   top.append(
