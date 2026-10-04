@@ -144,9 +144,19 @@
 
   /* ---------------- player setup ---------------- */
 
+  var ACCENT_FG_LUMA_CUTOFF = 0.4;
+  function readableOn(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return '#000';
+    var n = parseInt(m[1], 16);
+    var luma = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+    return luma > ACCENT_FG_LUMA_CUTOFF ? '#000' : '#fff';
+  }
+
   function openSetup(id) {
     game = GAMES.filter(function (g) { return g.id === id; })[0];
     document.documentElement.style.setProperty('--accent', game.accent);
+    document.documentElement.style.setProperty('--accent-foreground', readableOn(game.accent));
     $('pEm').textContent = game.emoji;
     $('pName').textContent = tx(game.name);
     $('pTag').textContent = tx(game.tag);
