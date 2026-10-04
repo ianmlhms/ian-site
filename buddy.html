@@ -46,9 +46,9 @@
   .conv{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .12s}
   .conv:hover{border-color:var(--accent2-text)}
   .conv .ci{font-size:20px;flex:none}
-  .conv .cmain{flex:1;min-width:0}
-  .conv .ct{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .conv .cs{color:var(--muted);font-size:11.5px;margin-top:2px}
+  .conv .cmain{flex:1;min-width:0;appearance:none;background:none;border:0;padding:0;margin:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+  .conv .ct{display:block;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .conv .cs{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
   .conv .cx{flex:none;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:6px;border-radius:8px}
   .conv .cx:hover{color:#f87171}
   /* ---- chat ---- */
@@ -87,8 +87,10 @@
   .thumbs{display:none;flex-wrap:wrap;gap:8px}
   .thumbs .th{position:relative}
   .thumbs .th img{width:52px;height:52px;object-fit:cover;border-radius:8px;display:block}
-  .thumbs .th .x{position:absolute;top:-6px;right:-6px;background:#f87171;color:#000;border-radius:50%;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800}
+  .thumbs .th .x{position:absolute;top:-19px;right:-19px;width:44px;height:44px;padding:0;background:none;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .thumbs .th .x span{background:#f87171;color:#000;border-radius:50%;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:800}
   .left{color:var(--muted);font-size:11.5px;text-align:right}
+  @media (prefers-reduced-motion:reduce){.mode,.card3d .inner,.conv{transition:none}.mode:hover,.mode:active{transform:none}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
@@ -99,7 +101,7 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>🤖 Study Buddy</h1>
+  <h1><span aria-hidden="true">🤖</span> Study Buddy</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
@@ -109,7 +111,7 @@
 
   <div id="picker" style="display:none">
     <div class="hero">
-      <div class="hi">🤖</div>
+      <div class="hi" aria-hidden="true">🤖</div>
       <h2>Wéi kann ech der hëllefen?</h2>
       <p>Wiel e Modus fir unzefänken — an all Modus kanns du och eng oder méi Fotoen eroplueden.</p>
     </div>
@@ -119,18 +121,18 @@
 
   <div class="chatwrap" id="chatwrap">
     <div class="subbar">
-      <button class="back" id="back">‹ Zréck</button>
+      <button class="back" id="back" type="button">‹ Zréck</button>
       <span class="tag" id="modeTag"></span>
-      <select id="subject"></select>
+      <select id="subject" aria-label="Fach"></select>
     </div>
-    <div class="stream" id="stream"></div>
+    <div class="stream" id="stream" role="log" aria-live="polite" aria-label="Chat"></div>
     <div class="thumbs" id="thumbs"></div>
     <div class="composer">
-      <button class="iconbtn" id="picBtn" title="Foto oder PDF eroplueden">📷</button>
-      <textarea id="input" rows="1" placeholder="Schreif deng Fro…"></textarea>
-      <button id="send">Schécken</button>
+      <button class="iconbtn" id="picBtn" type="button" title="Foto oder PDF eroplueden" aria-label="Foto oder PDF eroplueden"><span aria-hidden="true">📷</span></button>
+      <textarea id="input" rows="1" aria-label="Deng Fro" placeholder="Schreif deng Fro…"></textarea>
+      <button id="send" type="button">Schécken</button>
     </div>
-    <div class="left" id="left"></div>
+    <div class="left" id="left" role="status"></div>
     <input type="file" id="file" accept="image/*,application/pdf" multiple style="display:none">
   </div>
 </div>
@@ -156,14 +158,14 @@ let sb=null, mode=null, history=[], pending=[], busy=false, remaining=null, conv
 
 /* ---- mode picker ---- */
 $("modes").innerHTML=MODES.map(m=>
-  `<button class="mode" data-m="${m.id}" style="--m:${m.c}"><span class="ic">${m.ic}</span><b>${m.label}</b><span>${m.desc}</span></button>`).join("");
+  `<button type="button" class="mode" data-m="${m.id}" style="--m:${m.c}"><span class="ic" aria-hidden="true">${m.ic}</span><b>${m.label}</b><span>${m.desc}</span></button>`).join("");
 $("modes").querySelectorAll(".mode").forEach(b=>b.onclick=()=>openMode(b.dataset.m));
 $("subject").innerHTML=SUBJECTS.map(s=>`<option>${s}</option>`).join("");
 
 function enterChat(){
   $("picker").style.display="none"; $("chatwrap").style.display="flex";
   $("modeTag").textContent=mode.ic+" "+mode.label;
-  $("input").placeholder=mode.ph; renderThumbs(); renderLeft();
+  $("input").placeholder=mode.ph; $("input").setAttribute("aria-label",mode.ph.replace(/…$/,"")); renderThumbs(); renderLeft();
 }
 function openMode(id){
   mode=MODES.find(m=>m.id===id); history=[]; pending=[]; convId=null;
@@ -215,11 +217,14 @@ function makeDeck(cards){
   const wrap=el2("deck"), card=el2("card3d"), inner=el2("inner"),
         front=el2("face front"), back=el2("face back"), ctl=el2("deckctl");
   inner.append(front,back); card.append(inner);
-  const mk=(t)=>{const b=document.createElement("button");b.className="dbtn";b.textContent=t;return b;};
-  const prev=mk("‹"), count=el2("count"), next=mk("›"), sh=mk("🔀");
+  const mk=(t,label)=>{const b=document.createElement("button");b.type="button";b.className="dbtn";b.textContent=t;b.setAttribute("aria-label",label);return b;};
+  const prev=mk("‹","Vireg Kaart"), count=el2("count"), next=mk("›","Nächst Kaart"), sh=mk("🔀","Kaarten mëschen");
   ctl.append(prev,count,next,sh); wrap.append(card,ctl);
-  function show(){const c=cards[i];front.innerHTML=fmt(c.t);back.innerHTML=fmt(c.d);card.classList.remove("flip");count.textContent=(i+1)+" / "+cards.length;}
-  card.onclick=()=>card.classList.toggle("flip");
+  function show(){const c=cards[i];front.innerHTML=fmt(c.t);back.innerHTML=fmt(c.d);card.classList.remove("flip");card.setAttribute("aria-pressed","false");count.textContent=(i+1)+" / "+cards.length;}
+  card.setAttribute("role","button"); card.tabIndex=0; card.setAttribute("aria-label","Kaart ëmdréinen");
+  const flip=()=>{ card.classList.toggle("flip"); card.setAttribute("aria-pressed",String(card.classList.contains("flip"))); };
+  card.onclick=flip;
+  card.onkeydown=(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); flip(); } };
   prev.onclick=()=>{i=(i-1+cards.length)%cards.length;show();};
   next.onclick=()=>{i=(i+1)%cards.length;show();};
   sh.onclick=()=>{for(let k=cards.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[cards[k],cards[j]]=[cards[j],cards[k]];}i=0;show();};
@@ -277,7 +282,7 @@ async function pdfToDataUrls(file,limit){
 }
 function attachHint(msg){
   let t=$("atHint");
-  if(!t){ t=document.createElement("div"); t.id="atHint"; t.className="hint";
+  if(!t){ t=document.createElement("div"); t.id="atHint"; t.className="hint"; t.setAttribute("role","status");
     t.style.cssText="position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;z-index:60;max-width:90%;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.4)";
     document.body.appendChild(t); }
   t.textContent=msg; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>{t.style.display="none";},2600);
@@ -306,7 +311,7 @@ function renderThumbs(){
   const el=$("thumbs");
   if(!pending.length){el.style.display="none";el.innerHTML="";return;}
   el.style.display="flex";
-  el.innerHTML=pending.map((p,i)=>`<span class="th"><img src="${p.dataUrl}" alt="${esc(p.name)}"><span class="x" data-i="${i}">✕</span></span>`).join("");
+  el.innerHTML=pending.map((p,i)=>`<span class="th"><img src="${p.dataUrl}" alt="${esc(p.name)}"><button type="button" class="x" data-i="${i}" aria-label="Bild ewechhuelen"><span aria-hidden="true">✕</span></button></span>`).join("");
   el.querySelectorAll(".x").forEach(x=>x.onclick=()=>{ pending.splice(+x.dataset.i,1); renderThumbs(); });
 }
 
@@ -368,10 +373,10 @@ function renderRecent(){
   if(!convos.length){el.innerHTML="";return;}
   el.innerHTML=`<div class="rhead">Weiderfueren</div>`+convos.map(c=>{
     const m=MODES.find(x=>x.id===c.mode)||{ic:"💬"};
-    return `<div class="conv" data-id="${c.id}"><span class="ci">${m.ic}</span>
-      <div class="cmain"><div class="ct">${esc(c.title||"Chat")}</div>
-      <div class="cs">${esc(c.subject||"")} · ${rel(c.updated_at)}</div></div>
-      <button class="cx" data-del="${c.id}" title="Läschen">🗑</button></div>`;
+    return `<div class="conv" data-id="${c.id}"><span class="ci" aria-hidden="true">${m.ic}</span>
+      <button type="button" class="cmain"><span class="ct">${esc(c.title||"Chat")}</span>
+      <span class="cs">${esc(c.subject||"")} · ${rel(c.updated_at)}</span></button>
+      <button type="button" class="cx" data-del="${c.id}" title="Läschen" aria-label="Läschen: ${esc(c.title||"Chat")}"><span aria-hidden="true">🗑</span></button></div>`;
   }).join("");
   el.querySelectorAll(".conv").forEach(d=>d.onclick=(e)=>{ if(e.target.dataset.del)return; resumeConv(d.dataset.id); });
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); await deleteConv(b.dataset.del); });

@@ -179,13 +179,13 @@ button.st,button.dep,button.lndep{min-height:0}
     <div id="tproute" style="display:none">
       <div class="triprow">
         <div class="cols">
-          <div class="pickrow"><input id="fromq" placeholder="Vun … (z.B. Gare)" autocomplete="off"><div id="fromList"></div></div>
-          <div class="pickrow"><input id="toq" placeholder="Bis … (z.B. Kirchberg)" autocomplete="off"><div id="toList"></div></div>
+          <div class="pickrow"><input id="fromq" aria-label="Vun" placeholder="Vun … (z.B. Gare)" autocomplete="off"><div id="fromList"></div></div>
+          <div class="pickrow"><input id="toq" aria-label="Bis" placeholder="Bis … (z.B. Kirchberg)" autocomplete="off"><div id="toList"></div></div>
         </div>
-        <button id="tpSwap" title="Wiesselen">⇅</button>
+        <button id="tpSwap" type="button" title="Wiesselen" aria-label="Wiesselen"><span aria-hidden="true">⇅</span></button>
       </div>
       <div class="tpwhen">
-        <select id="tpMode" title="Depart oder Arrivée">
+        <select id="tpMode" title="Depart oder Arrivée" aria-label="Depart oder Arrivée">
           <option value="dep">Depart</option>
           <option value="arr">Arrivée</option>
         </select>
@@ -195,20 +195,20 @@ button.st,button.dep,button.lndep{min-height:0}
       <div id="tpPicker" style="display:none;margin-top:8px"></div>
       <button id="tpFind">Wee sichen</button>
       <div id="rectrips"></div>
-      <div id="trip"></div>
+      <div id="trip" aria-live="polite"></div>
     </div>
-    <div class="muted" id="tpRouteNote">Lueden…</div>
+    <div class="muted" id="tpRouteNote" role="status">Lueden…</div>
   </div>
   <div class="card">
     <h3>🚌 Nächst Departuren</h3>
     <div id="tprow" style="display:none">
-      <input id="stopq" placeholder="Arrêt, Uertschaft oder Adress sichen…" autocomplete="off">
-      <button class="tpbtn" id="tpGeo" title="Arrêten no bei mir">📍</button>
-      <button class="tpbtn favstar" id="favStar" title="Als Favorit späicheren" style="display:none">☆</button>
+      <input id="stopq" aria-label="Arrêt, Uertschaft oder Adress" placeholder="Arrêt, Uertschaft oder Adress sichen…" autocomplete="off">
+      <button class="tpbtn" id="tpGeo" type="button" title="Arrêten no bei mir" aria-label="Arrêten no bei mir"><span aria-hidden="true">📍</span></button>
+      <button class="tpbtn favstar" id="favStar" type="button" title="Als Favorit späicheren" aria-label="Als Favorit späicheren" aria-pressed="false" style="display:none">☆</button>
     </div>
     <div id="linerow" style="display:none;margin-top:8px">
-      <input id="lineq" placeholder="Linn filteren (z.B. 321)" autocomplete="off">
-      <button class="linex" id="lineClear" title="Läschen" style="display:none">✕</button>
+      <input id="lineq" aria-label="Linn filteren" placeholder="Linn filteren (z.B. 321)" autocomplete="off">
+      <button class="linex" id="lineClear" type="button" title="Läschen" aria-label="Läschen" style="display:none"><span aria-hidden="true">✕</span></button>
     </div>
     <div id="moderow" class="wrow" style="display:none;margin-top:8px">
       <button class="wchip" id="schoolOnly" type="button" aria-pressed="false">🎒 Nëmme Schoulbussen</button>
@@ -222,18 +222,18 @@ button.st,button.dep,button.lndep{min-height:0}
     <div id="recents"></div>
     <div id="places"></div>
     <div id="stops"></div>
-    <div id="deps"><div class="muted" id="tpNote">Lueden…</div></div>
+    <div id="deps" aria-live="polite"><div class="muted" id="tpNote">Lueden…</div></div>
   </div>
   <div class="card">
     <h3>🔎 Linn sichen</h3>
     <div id="lnrow">
-      <input id="lnq" placeholder="Buslinn (z.B. 321, 16, T1)" autocomplete="off" inputmode="text">
+      <input id="lnq" aria-label="Buslinn" placeholder="Buslinn (z.B. 321, 16, T1)" autocomplete="off" inputmode="text">
       <button class="tpbtn" id="lnGo">Sichen</button>
-      <button class="tpbtn favstar" id="favLineStar" title="Linn als Favorit" style="display:none">☆</button>
+      <button class="tpbtn favstar" id="favLineStar" type="button" title="Linn als Favorit" aria-label="Linn als Favorit" aria-pressed="false" style="display:none">☆</button>
     </div>
     <div id="favlines"></div>
     <div id="lndirs"></div>
-    <div id="lnout"><div class="muted">Tipp eng Buslinn fir hir Richtungen, nächst Departuren an all Arrêten ze gesinn.</div></div>
+    <div id="lnout" aria-live="polite"><div class="muted">Tipp eng Buslinn fir hir Richtungen, nächst Departuren an all Arrêten ze gesinn.</div></div>
   </div>
 </div>
 
@@ -298,6 +298,7 @@ function updateFavStar(){
   const on=curStop&&isFavStop(curStop.id);
   b.textContent=on?"⭐":"☆"; b.classList.toggle("on",!!on);
   b.title=on?"Favorit ewechhuelen":"Als Favorit späicheren";
+  b.setAttribute("aria-label",b.title); b.setAttribute("aria-pressed",String(!!on));
 }
 function updateFavLineStar(){
   const b=$("favLineStar"); if(!b)return;
@@ -305,6 +306,7 @@ function updateFavLineStar(){
   const on=lnLine&&isFavLine(lnLine);
   b.textContent=on?"⭐":"☆"; b.classList.toggle("on",!!on);
   b.title=on?"Favorit ewechhuelen":"Linn als Favorit";
+  b.setAttribute("aria-label",b.title); b.setAttribute("aria-pressed",String(!!on));
 }
 function renderFavs(){
   const hs=$("favstops");
@@ -369,7 +371,7 @@ function paintDeps(){
     if(d.platform) bits.push(`<span class="q">Quai ${esc(d.platform)}</span>`);
     const sub=bits.length?`<span class="sub">${bits.join(" · ")}</span>`:"";
     return `<button type="button" aria-expanded="false" class="dep ${train?"train":""} ${school?"school":""} ${d.cancelled?"canc":""}" data-i="${i}"><span class="line">${lab}</span>
-      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span><span class="dcaret">▾</span></button>
+      <span class="dir"><span class="dname">${esc(d.dir)}</span>${sub}</span><span class="time">${esc(d.time)}${dl}${d.cancelled?" ✖":""}</span><span class="dcaret" aria-hidden="true">▾</span></button>
       <div class="depdetail" hidden></div>`;
   }).join("");
   $("deps").querySelectorAll(".dep").forEach(el=>el.onclick=()=>toggleDep(+el.dataset.i,el));
@@ -565,7 +567,7 @@ function renderLineChoices(keys){
 }
 function renderLineDirs(){
   $("lndirs").innerHTML=lnDirs.map((d,i)=>
-    `<button class="lndir" data-i="${i}"><span class="lnl">${esc(lnLine)}</span>→ ${esc(d.h)}</button>`).join("");
+    `<button type="button" class="lndir" data-i="${i}" aria-pressed="false"><span class="lnl">${esc(lnLine)}</span>→ ${esc(d.h)}</button>`).join("");
   $("lndirs").querySelectorAll(".lndir").forEach(el=>el.onclick=()=>selectLineDir(+el.dataset.i));
 }
 // plain stop list (no times) — instant fallback from the static index
@@ -576,7 +578,7 @@ function renderStopList(names){
 let LNDEPS=[];
 async function selectLineDir(i){
   const d=lnDirs[i]; if(!d)return;
-  $("lndirs").querySelectorAll(".lndir").forEach((el,k)=>el.classList.toggle("on",k===i));
+  $("lndirs").querySelectorAll(".lndir").forEach((el,k)=>{ el.classList.toggle("on",k===i); el.setAttribute("aria-pressed",String(k===i)); });
   $("lnout").innerHTML=`<div class="lnsub">Nächst Departuren — klick fir de ganze Wee mat Zäiten</div><div id="lndeps"><div class="muted">Lueden…</div></div>`;
   try{
     // n is generous: an origin can be a busy hub where the target line is a small
@@ -604,7 +606,7 @@ async function selectLineDir(i){
       const p=s.place||{}, real=p.departure||p.arrival, sched=p.scheduledDeparture||p.scheduledArrival;
       const dl=delayOf(real,sched);
       const dlt=dl?` <em>${dl>0?"+":""}${dl}</em>`:` <span class="ok">•</span>`;
-      return `<button type="button" aria-expanded="false" class="lndep" data-k="${k}"><span class="lnt">${esc(clockOf(real||sched))}${dlt}</span><span class="dcaret">▾</span></button>
+      return `<button type="button" aria-expanded="false" class="lndep" data-k="${k}"><span class="lnt">${esc(clockOf(real||sched))}${dlt}</span><span class="dcaret" aria-hidden="true">▾</span></button>
         <div class="depdetail" hidden></div>`;
     }).join("");
     $("lndeps").querySelectorAll(".lndep").forEach(el=>el.onclick=()=>toggleLnDep(+el.dataset.k,el));
@@ -763,15 +765,19 @@ function renderTrip(data){
     const chain=legs.map(legLabel).join('<span class="arrow">›</span>');
     const chg=it.transfers>0?`${it.transfers}× ëmklammen`:"direkt";
     return `<div class="trip" data-i="${idx}">
-      <div class="thead">
+      <div class="thead" role="button" tabindex="0" aria-expanded="false">
         <span class="ttime">${fmtClock(it.startTime)} → ${fmtClock(it.endTime)}</span>
-        <span class="tmeta">${mins} min · ${chg} <span class="tcaret">▾</span></span>
+        <span class="tmeta">${mins} min · ${chg} <span class="tcaret" aria-hidden="true">▾</span></span>
       </div>
       <div class="legs">${chain||'<span class="leg walk">🚶 zu Fouss</span>'}</div>
       <div class="tripdetail" hidden></div>
     </div>`;
   }).join("");
-  $("trip").querySelectorAll(".trip").forEach(el=>el.onclick=()=>toggleTripDetail(+el.dataset.i,el));
+  $("trip").querySelectorAll(".trip").forEach(el=>{
+    el.onclick=()=>toggleTripDetail(+el.dataset.i,el);
+    const head=el.querySelector(".thead");
+    head.onkeydown=(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleTripDetail(+el.dataset.i,el); } };
+  });
 }
 // one leg of the itinerary, expanded: board time+stop, the ride, alight time+stop
 function legDetail(lg){
@@ -799,6 +805,7 @@ function toggleTripDetail(i,el){
     if(!box.dataset.done){ box.innerHTML=(TRIPS[i].legs||[]).map(legDetail).join(""); box.dataset.done="1"; }
     box.removeAttribute("hidden"); el.classList.add("open");
   }else{ box.setAttribute("hidden",""); el.classList.remove("open"); }
+  const head=el.querySelector(".thead"); if(head)head.setAttribute("aria-expanded",String(el.classList.contains("open")));
 }
 async function findTrip(){
   if(!tripFrom||!tripTo){$("trip").innerHTML='<div class="muted" style="margin-top:10px">Wiel en Depart an eng Destinatioun.</div>';return;}
@@ -884,12 +891,12 @@ function wireWhen(inputId, hostId, pickerId, onChange){
   const inp=$(inputId), host=$(hostId), phost=$(pickerId);
   const pad=(n)=>String(n).padStart(2,"0");
   const toLocal=(d)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const setActive=(k)=>host.querySelectorAll(".wchip").forEach(b=>b.classList.toggle("on",b.dataset.k===k));
+  const setActive=(k)=>host.querySelectorAll(".wchip").forEach(b=>{ const on=b.dataset.k===k; b.classList.toggle("on",on); b.setAttribute("aria-pressed",String(on)); });
   const fire=()=>{ try{ onChange&&onChange(); }catch(e){ console.warn("[when]",e); } };
   let picker=null;
   const presets=[["now","Elo"],["m15","+15′"],["m30","+30′"],["h1","+1 St."],["eve","Owend"],["tmr","Muer"]];
-  host.innerHTML=presets.map(([k,l])=>`<button type="button" class="wchip${k==="now"?" on":""}" data-k="${k}">${l}</button>`).join("")
-    +`<button type="button" class="wchip wcal" data-k="cal" title="Datum &amp; Zäit wielen">🗓</button>`;
+  host.innerHTML=presets.map(([k,l])=>`<button type="button" class="wchip${k==="now"?" on":""}" data-k="${k}" aria-pressed="${k==="now"}">${l}</button>`).join("")
+    +`<button type="button" class="wchip wcal" data-k="cal" title="Datum &amp; Zäit wielen" aria-label="Datum &amp; Zäit wielen"><span aria-hidden="true">🗓</span></button>`;
   const apply=(k)=>{
     const now=new Date();
     if(k==="now") inp.value="";

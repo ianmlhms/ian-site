@@ -58,23 +58,23 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>📋 Hausaufgaben<span id="classTag"></span></h1>
+  <h1><span aria-hidden="true">📋</span> Hausaufgaben<span id="classTag"></span></h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
 <div class="wrap">
   <div class="card newhw" id="newHw" style="display:none">
-    <input id="hwTitle" maxlength="200" placeholder="Wat ass ze maachen? z.B. Mathe S.42 Nr. 1–8">
+    <input id="hwTitle" maxlength="200" aria-label="Aufgab" placeholder="Wat ass ze maachen? z.B. Mathe S.42 Nr. 1–8">
     <div class="row2">
-      <input id="hwSubject" maxlength="40" placeholder="Fach (optionnel)" style="flex:1">
-      <input id="hwDue" type="date" style="flex:none;width:150px">
+      <input id="hwSubject" maxlength="40" aria-label="Fach" placeholder="Fach (optionnel)" style="flex:1">
+      <input id="hwDue" type="date" aria-label="Fällegkeetsdatum" style="flex:none;width:150px">
     </div>
     <div class="adminrow">
       <span class="spacer" style="flex:1"></span>
-      <button class="btn" id="hwAdd">Dobäisetzen</button>
+      <button class="btn" id="hwAdd" type="button">Dobäisetzen</button>
     </div>
-    <div class="msg" id="hwMsg"></div>
+    <div class="msg" id="hwMsg" role="status" aria-live="polite"></div>
   </div>
   <div class="gate" id="gate" style="display:none">🔒 <a href="#" id="gateBtn">Mell dech un</a> fir d'Hausaufgaben ze gesinn.</div>
   <div class="gate" id="noclass" style="display:none">🎓 Setz zeréischt deng Klass, da gesäis du d'Tafel vun denger Klass.</div>
@@ -138,15 +138,15 @@ function render(){
     const d=fmtDue(r.due);
     const canDel=isAdmin||r.created_by===myUid;
     return `<div class="hw${isDone?" done":""}">
-      <button class="chk${isDone?" on":""}" data-done="${r.id}" title="Erdeg">${isDone?"✓":""}</button>
+      <button type="button" class="chk${isDone?" on":""}" data-done="${r.id}" title="Erdeg" aria-label="Erdeg: ${esc(r.title)}" aria-pressed="${isDone}">${isDone?"✓":""}</button>
       <div class="body">
         <div class="ttl">${r.subject?`<span class="subj">${esc(r.subject)}</span>`:""}${esc(r.title)}</div>
         <div class="meta">
-          ${d?`<span class="due ${d.cls}">📅 ${d.label}</span>`:""}
+          ${d?`<span class="due ${d.cls}"><span aria-hidden="true">📅</span> ${d.label}</span>`:""}
           <span>${r.untis_id?"📡 vu WebUntis":`vun ${esc(names[r.created_by]||"?")}`}</span>
         </div>
       </div>
-      ${canDel?`<button class="del" data-del="${r.id}" title="Läschen">✕</button>`:""}
+      ${canDel?`<button type="button" class="del" data-del="${r.id}" title="Läschen" aria-label="Läschen: ${esc(r.title)}"><span aria-hidden="true">✕</span></button>`:""}
     </div>`;
   }).join("");
   $("list").querySelectorAll("[data-done]").forEach(b=>b.onclick=()=>toggleDone(b.dataset.done));
