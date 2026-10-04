@@ -7,7 +7,7 @@
 const CACHE = "ianlu-v10";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
-  "skylens.html", "skylens.css?v=4", "skylens.js?v=6", "skylens.webmanifest",
+  "skylens.html", "skylens.css?v=5", "skylens.js?v=7", "skylens.webmanifest",
 ];
 
 self.addEventListener("install", (event) => {
