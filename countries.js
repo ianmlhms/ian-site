@@ -275,7 +275,7 @@ function renderChips() {
     const chip = document.createElement("div");
     chip.className = "chip";
     chip.setAttribute("role", "listitem");
-    chip.innerHTML = `<span class="chip-flag">${esc(flagEmoji(country.code))}</span>`
+    chip.innerHTML = `<span class="chip-flag" aria-hidden="true">${esc(flagEmoji(country.code))}</span>`
       + `<span class="chip-name">${esc(name)}</span>`
       + `<button class="chip-remove" type="button" title="${esc(removeLabel)}"`
       + ` aria-label="${esc(removeLabel)}">✕</button>`;

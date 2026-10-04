@@ -37,6 +37,11 @@
   .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
   .emopick{display:flex;gap:4px;flex-wrap:wrap}
   .emopick button{background:var(--card2);border:1px solid var(--border);border-radius:9px;font-size:18px;width:44px;height:44px;cursor:pointer}
+  .btn:focus-visible,.ghost:focus-visible,.del:focus-visible,.emopick button:focus-visible,a:focus-visible{outline:2px solid var(--accent2-text);outline-offset:2px}
+  .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent2-text);text-decoration:underline;cursor:pointer}
+  .del{min-width:44px;min-height:44px}
+  .btn{min-height:44px}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
   .emopick button.on{border-color:var(--accent-border);background:rgba(110,168,254,.14)}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
@@ -86,21 +91,21 @@ async function boot(){
   if(!local)await migrateLocal();
   $("wrap").innerHTML=`
     <div class="card newx">
-      <input id="nTitle" maxlength="80" placeholder="Op wat waards du? (z.B. Vakanz a Spuenien)">
-      <div class="emopick" id="emo"></div>
+      <input id="nTitle" maxlength="80" aria-label="Titel vum Countdown" autocomplete="off" enterkeyhint="done" placeholder="Op wat waards du? (z.B. Vakanz a Spuenien)">
+      <div class="emopick" id="emo" role="group" aria-label="Emoji"></div>
       <div class="row">
-        <input id="nDate" type="date" style="flex:1;min-width:150px">
-        <input id="nTime" type="time" value="00:00" style="flex:1;min-width:120px">
+        <input id="nDate" type="date" aria-label="Datum" style="flex:1;min-width:150px">
+        <input id="nTime" type="time" value="00:00" aria-label="Auerzäit" style="flex:1;min-width:120px">
       </div>
       <button class="btn" id="add">Countdown bäisetzen</button>
-      <div class="msg" id="msg"></div>
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
     </div>
-    ${local?`<div class="gate" style="padding:6px 16px">Ouni Kont ginn deng Countdowns nëmmen op dësem Apparat gespäichert — <a href="#" id="si">mell dech un</a>, fir se iwwerall ze hunn.</div>`:""}
+    ${local?`<div class="gate" style="padding:6px 16px">Ouni Kont ginn deng Countdowns nëmmen op dësem Apparat gespäichert — <a href="#" id="si" role="button">mell dech un</a>, fir se iwwerall ze hunn.</div>`:""}
     <div id="list"><div class="gate">Lueden…</div></div>`;
   if(local)$("si").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
   const emo=$("emo");
-  EMOJIS.forEach((e,i)=>{const b=document.createElement("button");b.textContent=e;if(i===0)b.classList.add("on");
-    b.onclick=()=>{pickEmoji=e;emo.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.textContent===e));};emo.appendChild(b);});
+  EMOJIS.forEach((e,i)=>{const b=document.createElement("button");b.type="button";b.textContent=e;b.setAttribute("aria-pressed",String(i===0));if(i===0)b.classList.add("on");
+    b.onclick=()=>{pickEmoji=e;emo.querySelectorAll("button").forEach(x=>{const on=x.textContent===e;x.classList.toggle("on",on);x.setAttribute("aria-pressed",String(on));});};emo.appendChild(b);});
   $("add").onclick=add;
   $("nTitle").addEventListener("keydown",e=>{if(e.key==="Enter")add();});
   await refresh();
@@ -111,7 +116,7 @@ async function refresh(){
     items=localList().slice().sort((a,b)=>new Date(a.at)-new Date(b.at));
   }else{
     const {data,error}=await sb.from("countdowns").select("*").order("at");
-    if(error){$("list").innerHTML='<div class="gate">Feeler beim Lueden.</div>';return;}
+    if(error){$("list").innerHTML='<div class="gate" role="alert">Feeler beim Lueden.</div>';return;}
     items=data||[];
   }
   render();
@@ -144,10 +149,10 @@ function render(){
     const t=new Date(it.at),left=t.getTime()-Date.now();
     const when=t.toLocaleString("de-DE",{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
     return `<div class="card"><div class="cd${left<0?" past":""}">
-      <span class="emoji">${esc(it.emoji||"⏳")}</span>
+      <span class="emoji" aria-hidden="true">${esc(it.emoji||"⏳")}</span>
       <div><div class="title">${esc(it.title)}</div><div class="when">${when}</div></div>
       <div class="big${left<3*86400000&&left>0?" soon":""}" data-cd="${it.id}"><b>${left<0?"🎉 do!":big(left)}</b></div>
-      <button class="del" data-del="${it.id}" title="Läschen">✕</button>
+      <button class="del" data-del="${it.id}" title="Läschen" aria-label="Countdown läschen: ${esc(it.title)}"><span aria-hidden="true">✕</span></button>
     </div></div>`;
   }).join("");
   $("list").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{

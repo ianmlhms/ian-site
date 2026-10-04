@@ -21,6 +21,11 @@
   .board{display:grid;background:var(--board);padding:12px;border-radius:16px;touch-action:manipulation}
   .dot{display:flex;align-items:center;justify-content:center}
   .dot::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  button.edge{border:0;background:none;margin:0;font:inherit;color:inherit;-webkit-appearance:none;appearance:none;width:100%;height:100%;cursor:pointer}
+  button.edge:focus-visible{outline:2px solid var(--accent2-text);outline-offset:-2px;border-radius:6px}
+  button.edge:focus-visible i{background:var(--accent)}
+  .btn:focus-visible,.bar a:focus-visible{outline:2px solid var(--accent2-text);outline-offset:2px}
+  .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
   .hedge{display:flex;align-items:center;padding:0 1px}
   .hedge i{height:var(--lw);width:100%;border-radius:4px;background:#23234a}
   .vedge{display:flex;justify-content:center;padding:1px 0}
@@ -48,10 +53,10 @@
 </header>
 
 <div class="wrap">
-  <div class="status" id="status">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
   <div class="sub" id="sub"></div>
   <div class="scores" id="scores"></div>
-  <div class="board" id="board"></div>
+  <div class="board" id="board" role="group" aria-label="Dots and Boxes board"></div>
   <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
 </div>
 
@@ -67,7 +72,7 @@ const { AI, room, role } = GC;
 const me = role === "host" ? 1 : 2;          // 1 = blue (host, first), 2 = red
 const opp = me === 1 ? 2 : 1;
 const COL = { 1: "var(--p1)", 2: "var(--p2)" };
-let h = [], v = [], own = [], turn = 1, over = false, oppHere = false, recorded = false;
+let h = [], v = [], own = [], turn = 1, over = false, oppHere = false, recorded = false, kbIdx = null;
 const recordResult = GC.recordResult;
 
 /* ---------- difficulty (AI mode) ---------- */
@@ -88,49 +93,63 @@ function tally() { let a = 0, b = 0; for (let r = 0; r < N; r++) for (let c = 0;
 
 function render() {
   const mine = turn === me && !over && oppHere;
-  const b = $("board"); b.className = "board" + (mine ? " mine" : "");
+  const b = $("board");
+  const fa = document.activeElement;
+  if (fa && fa.parentNode === b) kbIdx = Array.prototype.indexOf.call(b.children, fa);
+  else if (fa && fa !== document.body) kbIdx = null;
+  b.className = "board" + (mine ? " mine" : "");
   b.style.gridTemplateColumns = `repeat(${N}, var(--th) var(--edge)) var(--th)`;
   b.style.gridTemplateRows = `repeat(${N}, var(--th) var(--edge)) var(--th)`;
   b.innerHTML = "";
   for (let gr = 0; gr <= 2 * N; gr++) for (let gc = 0; gc <= 2 * N; gc++) {
-    const d = document.createElement("div");
     const er = gr % 2 === 0, ec = gc % 2 === 0;
+    const isOpenEdge = mine && er !== ec && !(er ? h[gr / 2][(gc - 1) / 2] : v[(gr - 1) / 2][gc / 2]);
+    const d = document.createElement(isOpenEdge ? "button" : "div");
+    if (isOpenEdge) d.type = "button";
     if (er && ec) { d.className = "dot"; }
     else if (er && !ec) {            // horizontal edge
       const i = gr / 2, j = (gc - 1) / 2, set = h[i][j];
       d.className = "edge hedge " + (set ? "set" : (mine ? "open" : ""));
       if (set) d.style.setProperty("--ec", COL[set]);
       d.innerHTML = "<i></i>";
-      if (mine && !set) d.onclick = () => play("h", i, j, me, true);
+      if (mine && !set) { d.onclick = () => play("h", i, j, me, true); d.setAttribute("aria-label", `Horizontal line, row ${i + 1}, column ${j + 1}`); }
     } else if (!er && ec) {          // vertical edge
       const i = (gr - 1) / 2, j = gc / 2, set = v[i][j];
       d.className = "edge vedge " + (set ? "set" : (mine ? "open" : ""));
       if (set) d.style.setProperty("--ec", COL[set]);
       d.innerHTML = "<i></i>";
-      if (mine && !set) d.onclick = () => play("v", i, j, me, true);
+      if (mine && !set) { d.onclick = () => play("v", i, j, me, true); d.setAttribute("aria-label", `Vertical line, row ${i + 1}, column ${j + 1}`); }
     } else {                         // box
       const i = (gr - 1) / 2, j = (gc - 1) / 2, o = own[i][j];
       d.className = "box";
-      if (o) { d.style.background = o === 1 ? "rgba(110,168,254,.18)" : "rgba(255,93,108,.18)"; d.style.color = COL[o]; d.textContent = o === me ? "★" : "•"; }
+      if (o) { d.style.background = o === 1 ? "rgba(110,168,254,.18)" : "rgba(255,93,108,.18)"; d.style.color = COL[o]; d.textContent = o === me ? "★" : "•"; d.setAttribute("role", "img"); d.setAttribute("aria-label", `Box ${i + 1},${j + 1} claimed by ${o === me ? "you" : "your opponent"}`); }
     }
     b.appendChild(d);
+  }
+  if (kbIdx != null) {
+    const kids = Array.prototype.slice.call(b.children);
+    const next = kids.slice(kbIdx).find((el) => el.tagName === "BUTTON") || kids.find((el) => el.tagName === "BUTTON");
+    if (next) { next.focus(); kbIdx = kids.indexOf(next); }
   }
   const [s1, s2] = tally();
   const mine1 = me === 1;
   $("scores").innerHTML =
-    `<span class="s"><span class="swatch" style="background:var(--p1)"></span>${s1}${mine1 ? " (you)" : ""}</span>` +
-    `<span class="s"><span class="swatch" style="background:var(--p2)"></span>${s2}${!mine1 ? " (you)" : ""}</span>`;
+    `<span class="s"><span class="swatch" style="background:var(--p1)" aria-hidden="true"></span><span class="sr">Blue: </span>${s1}${mine1 ? " (you)" : ""}</span>` +
+    `<span class="s"><span class="swatch" style="background:var(--p2)" aria-hidden="true"></span><span class="sr">Red: </span>${s2}${!mine1 ? " (you)" : ""}</span>`;
   updateStatus();
 }
 function updateStatus() {
-  const dot = `<span class="me" style="background:${COL[me]}"></span>`;
+  const dot = `<span class="me" style="background:${COL[me]}" aria-hidden="true"></span><span class="sr">(${me === 1 ? "blue" : "red"})</span>`;
   if (over === "draw") return setStatus("It's a draw.");
   if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
   if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);
   setStatus(turn === me ? `Your turn ${dot}` : (AI ? "Computer thinking…" : "Opponent's turn"),
     "Complete a box to go again.");
 }
-function setStatus(hh, sub = "") { $("status").innerHTML = hh; $("sub").innerHTML = sub; }
+function setStatus(hh, sub = "") {
+  if ($("status").innerHTML !== hh) $("status").innerHTML = hh;
+  if ($("sub").innerHTML !== sub) $("sub").innerHTML = sub;
+}
 
 function play(t, i, j, player, local) {
   if (over || player !== turn) return;

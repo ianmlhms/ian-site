@@ -46,6 +46,11 @@
   .guessrow input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:22px;padding:11px 15px;font-size:14px;outline:none}
   .guessrow input:focus{border-color:var(--accent2-text)}
   .guessrow button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:22px;padding:0 18px;font-weight:800;cursor:pointer}
+  .sw{position:relative;padding:0;-webkit-appearance:none;appearance:none}
+  .sw::before{content:"";position:absolute;inset:-6px}
+  button:focus-visible,a:focus-visible,canvas:focus-visible{outline:2px solid var(--accent2-text);outline-offset:2px}
+  .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  @media(pointer:coarse){.tools{gap:10px}.sw{width:34px;height:34px}.tools .sz{width:44px;height:44px}.tools .clr{min-height:44px}.guessrow button{min-height:44px}.choices button{min-height:44px}}
   .muted{color:var(--muted)}.center{text-align:center}
   .win{background:linear-gradient(90deg,rgba(110,168,254,.2),transparent);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
 </style>
@@ -66,6 +71,7 @@
   <span class="muted">room <code id="roomc"></code></span>
 </header>
 <div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+<div class="sr" id="live" role="status" aria-live="polite"></div>
 
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=6" data-arcade-id="o-draw" data-arcade-title="Draw & Guess" data-arcade-no-score data-arcade-replace=".bar"></script>
@@ -150,7 +156,7 @@ function render(){
   // choosing / drawing / reveal
   const secsLeft = Math.max(0, Math.ceil((roundEnd-Date.now())/1000));
   html += `<div class="topbar"><span class="rnd">Turn ${round}/${totalTurns}</span><span class="word" id="wordEl"></span><span class="timer" id="timerEl">${phase==="drawing"?secsLeft+"s":""}</span></div>`;
-  html += `<canvas id="cv" width="600" height="600"></canvas>`;
+  html += `<canvas id="cv" width="600" height="600" role="img" aria-label="${isDrawer()?"Drawing canvas — draw the word here":"Drawing canvas — the drawing appears here as the drawer draws"}"></canvas>`;
   if(phase==="choosing"){
     html += isDrawer()
       ? `<p class="center muted">Pick a word to draw:</p><div class="choices" id="choices"></div>`
@@ -158,10 +164,11 @@ function render(){
   } else if(phase==="drawing" && isDrawer()){
     html += `<div class="tools" id="tools"></div>`;
   }
-  html += `<div class="log" id="log"></div>`;
-  if(!isDrawer()) html += `<div class="guessrow"><input id="guessIn" placeholder="Type your guess…" autocomplete="off" maxlength="40"><button id="guessBtn">Guess</button></div>`;
+  html += `<div class="log" id="log" role="log" aria-live="off" aria-label="Guesses and events"></div>`;
+  if(!isDrawer()) html += `<div class="guessrow"><input id="guessIn" placeholder="Type your guess…" aria-label="Your guess" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" maxlength="40"><button id="guessBtn">Guess</button></div>`;
   $("app").innerHTML=html;
   $("wordEl").textContent=phase==="drawing"?(isDrawer()?word:mask):"";
+  if(phase==="drawing"){ $("wordEl").setAttribute("role","img"); $("wordEl").setAttribute("aria-label",isDrawer()?`Your word: ${word}`:`Secret word with ${mask.split("_").length-1} letters`); }
   setupCanvas();
   renderLog();
   if(phase==="choosing" && isDrawer()) renderChoices();
@@ -171,7 +178,8 @@ function render(){
 function renderLog(){ const l=$("log"); if(!l) return; l.innerHTML=logLines.map(x=> x.sys?`<div class="sys">${esc(x.t)}</div>`:`<div class="g"><b>${esc(x.n)}:</b> ${esc(x.t)}</div>`).join(""); l.scrollTop=l.scrollHeight; }
 // Update just the score chips (so we never rebuild — and wipe — the canvas mid-round).
 function renderScores(){ const el=document.querySelector(".scores"); if(!el) return; const ps=players(); el.innerHTML=ps.map(p=>`<span class="pchip ${p.cid===drawerCid?"draw":""} ${guessed.has(p.cid)?"got":""}">${p.cid===drawerCid?"✏️ ":""}${esc(p.name)} · ${scores[p.cid]||0}${guessed.has(p.cid)?" ✓":""}</span>`).join(""); }
-function addLog(x){ logLines.push(x); if(logLines.length>60) logLines.shift(); renderLog(); }
+function announce(t){ const el=$("live"); if(el){ el.textContent=""; setTimeout(()=>{ el.textContent=t; },30); } }
+function addLog(x){ logLines.push(x); if(logLines.length>60) logLines.shift(); renderLog(); announce(x.sys?x.t:`${x.n}: ${x.t}`); }
 
 /* ---------- canvas ---------- */
 let ctx=null, drawing=false, last=null, curColor="#000000", curSize=6, sendBuf=[];
@@ -188,13 +196,17 @@ function setupCanvas(){
 function seg(x0,y0,x1,y1,color,size){ if(!ctx) return; ctx.strokeStyle=color; ctx.lineWidth=size; ctx.beginPath(); ctx.moveTo(x0*600,y0*600); ctx.lineTo(x1*600,y1*600); ctx.stroke(); }
 function flush(){ if(sendBuf.length){ ch.send({type:"broadcast",event:"seg",payload:{a:sendBuf,c:curColor,w:curSize}}); sendBuf=[]; } }
 setInterval(()=>{ if(isDrawer()) flush(); }, 60);
+const COLOR_NAMES={"#000000":"Black","#e53527":"Red","#1d72e8":"Blue","#2ca02c":"Green","#ffcc00":"Yellow","#8b5a2b":"Brown","#ff7ac0":"Pink","#ffffff":"White (eraser)"};
+const SIZE_NAMES={3:"Small",7:"Medium",16:"Large"};
 function renderTools(){
-  const t=$("tools"); t.innerHTML = COLORS.map(c=>`<span class="sw ${c===curColor?"on":""}" data-c="${c}" style="background:${c}"></span>`).join("")
-    + [3,7,16].map(s=>`<button class="sz ${s===curSize?"on":""}" data-s="${s}"><span style="width:${s}px;height:${s}px;border-radius:50%;background:var(--text);display:block"></span></button>`).join("")
-    + `<button class="clr" id="clrBtn">🗑 Clear</button>`;
+  const fa=document.activeElement, fSel=fa&&fa.dataset&&(fa.dataset.c?`[data-c="${fa.dataset.c}"]`:fa.dataset.s?`[data-s="${fa.dataset.s}"]`:fa.id==="clrBtn"?"#clrBtn":null);
+  const t=$("tools"); t.innerHTML = COLORS.map(c=>`<button type="button" class="sw ${c===curColor?"on":""}" data-c="${c}" style="background:${c}" aria-label="Colour: ${COLOR_NAMES[c]}" aria-pressed="${c===curColor}"></button>`).join("")
+    + [3,7,16].map(s=>`<button type="button" class="sz ${s===curSize?"on":""}" data-s="${s}" aria-label="Brush size: ${SIZE_NAMES[s]}" aria-pressed="${s===curSize}"><span aria-hidden="true" style="width:${s}px;height:${s}px;border-radius:50%;background:var(--text);display:block"></span></button>`).join("")
+    + `<button type="button" class="clr" id="clrBtn"><span aria-hidden="true">🗑</span> Clear</button>`;
   t.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{ curColor=b.dataset.c; renderTools(); });
   t.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{ curSize=+b.dataset.s; renderTools(); });
   $("clrBtn").onclick=()=>{ clearCanvas(); ch.send({type:"broadcast",event:"clear",payload:{}}); };
+  const rf=fSel&&t.querySelector(fSel); if(rf) rf.focus();
 }
 function clearCanvas(){ if(ctx){ ctx.fillStyle="#fff"; ctx.fillRect(0,0,600,600); } }
 

@@ -259,6 +259,7 @@ a:focus-visible {
 .chip-flag { font-size: 17px; }
 
 .chip-remove {
+  position: relative;
   display: grid;
   width: 24px;
   height: 24px;
@@ -271,6 +272,7 @@ a:focus-visible {
   cursor: pointer;
 }
 
+.chip-remove::after { content: ""; position: absolute; inset: -10px; }
 .chip-remove:hover { background: var(--card-hover); color: var(--text); }
 
 .metrics-grid {

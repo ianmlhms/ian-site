@@ -19,6 +19,11 @@
     display:flex;align-items:center;justify-content:center;border:2px solid transparent;cursor:default;user-select:none}
   .die.held{border-color:var(--accent-border);transform:translateY(6px);background:#dfe9ff}
   .die.can{cursor:pointer}
+  button.die{padding:0;font-family:inherit;-webkit-appearance:none;appearance:none}
+  .die:focus-visible,.pickbtn:focus-visible,.btn:focus-visible,.bar a:focus-visible{outline:2px solid var(--accent2-text);outline-offset:2px}
+  .pickbtn{display:block;width:100%;margin:0;padding:0;border:0;background:none;color:inherit;font:inherit;cursor:pointer}
+  .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  @media(prefers-reduced-motion:reduce){.die{transition:none}}
   .rollbtn{font-size:15px;padding:12px 26px}
   table{border-collapse:collapse;width:100%;font-size:13.5px}
   th,td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:center}
@@ -46,11 +51,11 @@
 </header>
 
 <div class="wrap">
-  <div class="status" id="status">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
   <div class="sub" id="sub"></div>
-  <div class="dice" id="dice"></div>
+  <div class="dice" id="dice" role="group" aria-label="Dice"></div>
   <button class="btn rollbtn" id="roll">🎲 Roll</button>
-  <table id="card"></table>
+  <table id="card" aria-label="Scorecard"></table>
   <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
 </div>
 
@@ -153,8 +158,19 @@ function pickCat(catId) {
 /* ---------- render ---------- */
 function render() {
   const myTurn = turn === me && !over && oppHere;
-  $("dice").innerHTML = dice.map((v, i) =>
-    `<div class="die${held[i] ? " held" : ""}${myTurn && rolls > 0 && rolls < 3 ? " can" : ""}" data-i="${i}">${rolls === 0 ? "🎲" : FACES[v]}</div>`).join("");
+  const fa = document.activeElement;
+  const faCat = fa && fa.closest ? fa.closest("#card [data-cat]") : null;
+  const focusSel = fa && fa.closest && fa.closest("#dice") ? `#dice [data-i="${fa.dataset.i}"]`
+    : faCat ? `#card [data-cat="${faCat.dataset.cat}"] button` : null;
+  $("dice").innerHTML = dice.map((v, i) => {
+    const can = myTurn && rolls > 0 && rolls < 3;
+    const base = `Die ${i + 1}: ${rolls === 0 ? "not rolled yet" : v}`;
+    const lbl = can ? base : base + (held[i] ? ", held" : "");
+    const face = `<span aria-hidden="true">${rolls === 0 ? "🎲" : FACES[v]}</span>`;
+    return can
+      ? `<button type="button" class="die${held[i] ? " held" : ""} can" data-i="${i}" aria-pressed="${held[i]}" aria-label="${lbl}">${face}</button>`
+      : `<div class="die${held[i] ? " held" : ""}" data-i="${i}" role="img" aria-label="${lbl}">${face}</div>`;
+  }).join("");
   $("dice").querySelectorAll(".can").forEach((el) => { el.onclick = () => toggleHold(+el.dataset.i); });
   const rb = $("roll");
   rb.disabled = !myTurn || rolls >= 3;
@@ -164,17 +180,19 @@ function render() {
   const row = (c) => {
     const meV = sc[me][c.id], opV = sc[opp][c.id];
     const canPick = myTurn && rolls > 0 && meV == null;
-    const meCell = meV != null ? meV : canPick ? `<td class="pick" data-cat="${c.id}">${c.f(dice)}</td>` : '<td class="open">–</td>';
+    const meCell = meV != null ? meV : canPick ? `<td class="pick" data-cat="${c.id}"><button type="button" class="pickbtn" aria-label="${c.n}: score ${c.f(dice)} points">${c.f(dice)}</button></td>` : '<td class="open">–</td>';
     const meTd = meV != null ? `<td>${meV}</td>` : meCell;
     return `<tr><td>${c.n}</td>${meTd}<td class="open">${opV != null ? opV : "–"}</td></tr>`;
   };
   $("card").innerHTML =
-    `<tr><th>Category</th><th class="colme">You</th><th>${AI ? "🤖" : "Opponent"}</th></tr>` +
+    `<tr><th scope="col">Category</th><th scope="col" class="colme">You</th><th scope="col"${AI ? ' aria-label="Computer"' : ""}>${AI ? "🤖" : "Opponent"}</th></tr>` +
     UPPER.map(row).join("") +
     `<tr><td style="color:var(--muted)">Bonus (63+)</td><td>${upperSum(me)}/63 ${bonus(me) ? "→ +35" : ""}</td><td class="open">${upperSum(opp)}/63 ${bonus(opp) ? "→ +35" : ""}</td></tr>` +
     LOWER.map(row).join("") +
     `<tr class="tot"><td>Total</td><td class="colme">${total(me)}</td><td>${total(opp)}</td></tr>`;
   $("card").querySelectorAll(".pick").forEach((el) => { el.onclick = () => pickCat(el.dataset.cat); });
+  const refocus = focusSel && document.querySelector(focusSel);
+  if (refocus) refocus.focus();
   updateStatus(myTurn);
 }
 function updateStatus(myTurn) {
@@ -187,7 +205,10 @@ function updateStatus(myTurn) {
   if (rolls === 0) return setStatus("Your turn", "Roll the dice!");
   setStatus("Your turn", rolls < 3 ? "Hold dice, roll again, or pick a category." : "Pick a category on the scorecard.");
 }
-function setStatus(h, sub = "") { $("status").innerHTML = h; $("sub").innerHTML = sub; }
+function setStatus(h, sub = "") {
+  if ($("status").innerHTML !== h) $("status").innerHTML = h;
+  if ($("sub").innerHTML !== sub) $("sub").innerHTML = sub;
+}
 $("roll").onclick = rollDice;
 $("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
 
