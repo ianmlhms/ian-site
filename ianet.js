@@ -58,6 +58,7 @@ function deleteButton(row) {
   const button = document.createElement("button");
   button.className = "del";
   button.title = "Läschen";
+  button.setAttribute("aria-label", "Läschen");
   button.textContent = "🗑️";
   button.onclick = (event) => { event.preventDefault(); remove(row); };
   return button;
@@ -244,7 +245,7 @@ async function loadBoards() {
     const card = document.createElement("div");
     card.className = "row";
     card.style.display = "block";
-    card.innerHTML = `<strong>${online ? "🟢" : "⚪️"} ${esc(board.board)}</strong>
+    card.innerHTML = `<strong><span aria-hidden="true">${online ? "🟢" : "⚪️"}</span> ${esc(board.board)} <span class="sr-only">${online ? "online" : "offline"}</span></strong>
       <div class="kv">
         <span>Gesinn</span><span>${esc(new Date(board.seen_at).toLocaleString("de-LU"))}</span>
         <span>Version</span><span>${esc(board.version || "—")}</span>
@@ -255,8 +256,8 @@ async function loadBoards() {
         ${board.last_error ? `<span>Feeler</span><span>${esc(board.last_error)}</span>` : ""}
       </div>
       <div class="actions">
-        <button class="btn ghost" data-act="restart">🔄 Neistart</button>
-        <label class="btn ghost">⬆️ Firmware<input type="file" accept=".bin" hidden></label>
+        <button class="btn ghost" data-act="restart"><span aria-hidden="true">🔄</span> Neistart</button>
+        <label class="btn ghost"><span aria-hidden="true">⬆️</span> Firmware<input type="file" accept=".bin" class="sr-only"></label>
       </div>`;
     const restart = card.querySelector('[data-act="restart"]');
     restart.onclick = () => confirm(`${board.board} nei starten?`) && sendCommand(board.board, "restart", {}, restart);
@@ -299,7 +300,10 @@ async function gate() {
   $("panel").hidden = false;
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.onclick = () => {
-      document.querySelectorAll(".tab").forEach((other) => other.classList.toggle("active", other === tab));
+      document.querySelectorAll(".tab").forEach((other) => {
+        other.classList.toggle("active", other === tab);
+        other.setAttribute("aria-pressed", String(other === tab));
+      });
       kind = tab.dataset.kind;
       load();
     };

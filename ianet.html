@@ -42,6 +42,13 @@
   .kv span:nth-child(odd){color:var(--muted)}
   .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .note{color:var(--muted);font-size:13px;margin-top:8px}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .tab,.btn,.auth-go,.del{min-height:44px}
+  .del{min-width:44px}
+  .ph .del{display:flex;align-items:center;justify-content:center}
+  .btn:has(.sr-only:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .ph:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
   <meta name="theme-color" content="#0d0d1a">
   <meta name="mobile-web-app-capable" content="yes">
@@ -53,21 +60,21 @@
 <body>
 <header>
   <a class="home" href="index.html">‹ ian.lu</a>
-  <h1>📡 IanNet</h1>
+  <h1><span aria-hidden="true">📡</span> IanNet</h1>
   <span class="spacer"></span>
   <span id="acctHost"></span>
 </header>
 <main>
-  <div id="msg">…</div>
+  <div id="msg" role="status">…</div>
   <div id="panel" hidden>
-    <div class="tabs">
-      <button class="tab active" data-kind="photo">📸 Fotoen</button>
-      <button class="tab" data-kind="file">📁 Dateien</button>
-      <button class="tab" data-kind="guestbook">✍️ Gäschtebuch</button>
-      <button class="tab" data-kind="chat">💬 Chat</button>
-      <button class="tab" data-kind="board">📡 Board</button>
+    <div class="tabs" role="group" aria-label="IanNet">
+      <button class="tab active" data-kind="photo" aria-pressed="true"><span aria-hidden="true">📸</span> Fotoen</button>
+      <button class="tab" data-kind="file" aria-pressed="false"><span aria-hidden="true">📁</span> Dateien</button>
+      <button class="tab" data-kind="guestbook" aria-pressed="false"><span aria-hidden="true">✍️</span> Gäschtebuch</button>
+      <button class="tab" data-kind="chat" aria-pressed="false"><span aria-hidden="true">💬</span> Chat</button>
+      <button class="tab" data-kind="board" aria-pressed="false"><span aria-hidden="true">📡</span> Board</button>
     </div>
-    <div id="list"></div>
+    <div id="list" aria-live="off"></div>
   </div>
 </main>
 <script type="module" src="ianet.js?v=5"></script>
