@@ -37,12 +37,12 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Home</a>
-  <h1>📊 My Dashboard</h1>
+  <h1><span aria-hidden="true">📊</span> My Dashboard</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Loading…</div></div>
+<main class="wrap" id="wrap"><div class="gate" role="status">Loading…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -64,10 +64,10 @@ async function boot(){
   if(!admin){$("wrap").innerHTML=`<div class="gate">This dashboard is private.</div>`;return;}
   $("wrap").innerHTML=`
     <div class="grid">
-      <div class="panel" id="pGh"><div class="h"><span class="ic">🐙</span>GitHub</div><div class="muted">Loading…</div></div>
-      <div class="panel" id="pGc"><div class="h"><span class="ic">📈</span>Site traffic</div><div class="muted">Loading…</div></div>
-      <div class="panel" id="pSf"><div class="h"><span class="ic">🎬</span>ShortsFactory</div><div class="muted">Loading…</div></div>
-      <div class="panel" id="pFit"><div class="h"><span class="ic">💪</span>This week</div><div class="muted">Loading…</div></div>
+      <div class="panel" id="pGh"><div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">🐙</span>GitHub</div><div class="muted">Loading…</div></div>
+      <div class="panel" id="pGc"><div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">📈</span>Site traffic</div><div class="muted">Loading…</div></div>
+      <div class="panel" id="pSf"><div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">🎬</span>ShortsFactory</div><div class="muted">Loading…</div></div>
+      <div class="panel" id="pFit"><div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">💪</span>This week</div><div class="muted">Loading…</div></div>
     </div>
     <h2>Recent GitHub activity</h2>
     <div class="panel" id="pEvents"><div class="muted">Loading…</div></div>`;
@@ -79,7 +79,7 @@ async function loadGithub(){
     const u=await (await fetch(`https://api.github.com/users/${GH_USER}`)).json();
     const repos=await (await fetch(`https://api.github.com/users/${GH_USER}/repos?per_page=100&sort=pushed`)).json();
     const stars=Array.isArray(repos)?repos.reduce((a,r)=>a+(r.stargazers_count||0),0):0;
-    $("pGh").innerHTML=`<div class="h"><span class="ic">🐙</span>GitHub</div>
+    $("pGh").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">🐙</span>GitHub</div>
       <div class="stat"><span>Public repos</span><b>${u.public_repos??"–"}</b></div>
       <div class="stat"><span>Followers</span><b>${u.followers??"–"}</b></div>
       <div class="stat"><span>Total stars</span><b>${stars}</b></div>`;
@@ -94,18 +94,18 @@ async function loadGithub(){
       }).join("")||'<div class="muted">No recent pushes.</div>';
       $("pEvents").insertAdjacentHTML("afterbegin",`<div class="big">${commits}</div><div class="sub" style="margin-bottom:8px">commits in the last ${push.length} pushes</div>`);
     }
-  }catch(e){console.warn(e);$("pGh").innerHTML=`<div class="h">🐙 GitHub</div><div class="muted">Couldn't load.</div>`;}
+  }catch(e){console.warn(e);$("pGh").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">🐙</span>GitHub</div><div class="muted">Couldn't load.</div>`;}
 }
 
 async function loadGoat(){
   try{
     const j=await (await fetch(`${GC}/counter/TOTAL.json`)).json();
     const count=(j.count||"").replace(/\s/g,"")||"–";
-    $("pGc").innerHTML=`<div class="h"><span class="ic">📈</span>Site traffic</div>
+    $("pGc").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">📈</span>Site traffic</div>
       <div class="big">${esc(count)}</div><div class="sub">total pageviews (GoatCounter)</div>
       <div class="stat" style="margin-top:8px"><span>Dashboard</span><b><a href="${GC}" target="_blank" rel="noopener">open →</a></b></div>`;
   }catch(e){
-    $("pGc").innerHTML=`<div class="h"><span class="ic">📈</span>Site traffic</div>
+    $("pGc").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">📈</span>Site traffic</div>
       <div class="muted">Public totals off — <a href="${GC}" target="_blank" rel="noopener">open dashboard →</a></div>`;
   }
 }
@@ -121,11 +121,11 @@ async function loadShorts(){
     const vids=d.videos||d.published||[];
     const n=Array.isArray(vids)?vids.length:(d.count??d.total??"–");
     const followers=d.followers??d.subscribers;
-    $("pSf").innerHTML=`<div class="h"><span class="ic">🎬</span>ShortsFactory</div>
+    $("pSf").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">🎬</span>ShortsFactory</div>
       <div class="big">${n}</div><div class="sub">videos published</div>
       ${followers!=null?`<div class="stat" style="margin-top:8px"><span>Followers</span><b>${followers}</b></div>`:""}
       <div class="stat"><span>Full dashboard</span><b><a href="factory.html">open →</a></b></div>`;
-  }catch(e){$("pSf").innerHTML=`<div class="h"><span class="ic">🎬</span>ShortsFactory</div><div class="muted">No data yet.</div>`;}
+  }catch(e){$("pSf").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">🎬</span>ShortsFactory</div><div class="muted">No data yet.</div>`;}
 }
 
 async function loadFitness(){
@@ -134,12 +134,12 @@ async function loadFitness(){
     const {data}=await sb.from("workouts").select("duration_min,distance_km,type").gte("at",weekAgo);
     const mins=(data||[]).reduce((a,w)=>a+(w.duration_min||0),0);
     const km=(data||[]).reduce((a,w)=>a+(+w.distance_km||0),0);
-    $("pFit").innerHTML=`<div class="h"><span class="ic">💪</span>This week</div>
+    $("pFit").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">💪</span>This week</div>
       <div class="stat"><span>Workouts</span><b>${(data||[]).length}</b></div>
       <div class="stat"><span>Active time</span><b>${Math.floor(mins/60)}h ${mins%60}m</b></div>
       <div class="stat"><span>Distance</span><b>${km.toFixed(1)} km</b></div>
       <div class="stat"><span>Details</span><b><a href="health.html">open →</a></b></div>`;
-  }catch(e){$("pFit").innerHTML=`<div class="h"><span class="ic">💪</span>This week</div><div class="muted"><a href="health.html">Set up →</a></div>`;}
+  }catch(e){$("pFit").innerHTML=`<div class="h" role="heading" aria-level="2"><span class="ic" aria-hidden="true">💪</span>This week</div><div class="muted"><a href="health.html">Set up →</a></div>`;}
 }
 
 auth.onAuth(boot);

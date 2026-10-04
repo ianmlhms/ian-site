@@ -46,6 +46,7 @@
   .wxmeta{margin-left:auto;text-align:right;font-size:12.5px;color:var(--muted);line-height:1.7}
   .wxday{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px}
   .hours{display:flex;gap:8px;overflow-x:auto;margin-top:14px;padding-bottom:2px}
+  .hours:focus-visible{outline:.2rem solid var(--focus-ring);outline-offset:.18rem;border-radius:8px}
   .hr{flex:none;text-align:center;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:8px 10px;min-width:56px}
   .hr .h{font-size:11px;color:var(--muted)}.hr .e{font-size:20px;margin:3px 0}.hr .t{font-size:13px;font-weight:700}
   /* link to the buses page */
@@ -63,22 +64,22 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>🌤️ Moien</h1>
+  <h1><span aria-hidden="true">🌤️</span> Moien</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap">
+<main class="wrap">
   <div class="greet">
     <h2 id="hi">Moien!</h2>
     <div class="date" id="date"></div>
-    <div class="clock" id="clock"><span id="clockMain">--:--:--</span><span class="ms" id="clockMs">.000</span></div>
+    <div class="clock" id="clock" role="timer"><span id="clockMain">--:--:--</span><span class="ms" id="clockMs">.000</span></div>
   </div>
 
-  <div class="card" id="wx"><div class="muted">Wieder gëtt gelueden…</div></div>
+  <section class="card" id="wx" aria-label="Wieder" aria-live="polite"><div class="muted">Wieder gëtt gelueden…</div></section>
 
-  <a class="card buslink" href="bus.html">🚌 <b>Nächst Bussen &amp; Zich</b> <span>›</span></a>
-</div>
+  <a class="card buslink" href="bus.html"><span aria-hidden="true">🚌</span> <b>Nächst Bussen &amp; Zich</b> <span aria-hidden="true">›</span></a>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -126,17 +127,17 @@ async function loadWeather(){
     let hours="";
     for(let i=idx;i<Math.min(idx+8,hr.time.length);i++){
       const hh=hr.time[i].slice(11,16), hw=wmo(hr.weather_code[i],1);
-      hours+=`<div class="hr"><div class="h">${hh}</div><div class="e">${hw.emoji}</div><div class="t">${Math.round(hr.temperature_2m[i])}°</div></div>`;
+      hours+=`<div class="hr"><div class="h">${hh}</div><div class="e" role="img" aria-label="${hw.text}">${hw.emoji}</div><div class="t">${Math.round(hr.temperature_2m[i])}°</div></div>`;
     }
     $("wx").innerHTML=`
       <div class="wxtop">
-        <div class="wxemoji">${w.emoji}</div>
+        <div class="wxemoji" aria-hidden="true">${w.emoji}</div>
         <div><div class="wxtemp">${Math.round(c.temperature_2m)}°</div><div class="wxdesc">${w.text}</div></div>
-        <div class="wxmeta">Gefillt ${Math.round(c.apparent_temperature)}°<br>💨 ${Math.round(c.wind_speed_10m)} km/h<br>💧 ${c.relative_humidity_2m}%</div>
+        <div class="wxmeta">Gefillt ${Math.round(c.apparent_temperature)}°<br><span role="img" aria-label="Wand">💨</span> ${Math.round(c.wind_speed_10m)} km/h<br><span role="img" aria-label="Loftfiichtegkeet">💧</span> ${c.relative_humidity_2m}%</div>
       </div>
-      <div class="wxday"><span>⬆ ${Math.round(dl.temperature_2m_max[0])}°</span><span>⬇ ${Math.round(dl.temperature_2m_min[0])}°</span>
-        <span>🌧 ${dl.precipitation_probability_max[0]}%</span><span>🌅 ${dl.sunrise[0].slice(11,16)}</span><span>🌇 ${dl.sunset[0].slice(11,16)}</span></div>
-      <div class="hours">${hours}</div>`;
+      <div class="wxday"><span><span role="img" aria-label="Héchsttemperatur">⬆</span> ${Math.round(dl.temperature_2m_max[0])}°</span><span><span role="img" aria-label="Niddregsttemperatur">⬇</span> ${Math.round(dl.temperature_2m_min[0])}°</span>
+        <span><span role="img" aria-label="Reenrisiko">🌧</span> ${dl.precipitation_probability_max[0]}%</span><span><span role="img" aria-label="Sonnenopgang">🌅</span> ${dl.sunrise[0].slice(11,16)}</span><span><span role="img" aria-label="Sonnenënnergang">🌇</span> ${dl.sunset[0].slice(11,16)}</span></div>
+      <div class="hours" role="group" aria-label="Déi nächst Stonnen" tabindex="0">${hours}</div>`;
   }catch(e){ $("wx").innerHTML='<div class="muted">Wieder konnt net gelueden ginn.</div>'; }
 }
 loadWeather();
