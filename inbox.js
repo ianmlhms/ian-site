@@ -21,7 +21,7 @@ import {
   renderMessagesLoading,
   renderSearchResults,
   showNotice,
-} from "./inbox-render.js?v=4";
+} from "./inbox-render.js?v=5";
 import { isAttachmentSizeAllowed } from "./inbox-attach.js?v=1";
 import {
   createMailBodyUrl,
@@ -39,7 +39,7 @@ import {
   renderMailHeader,
   renderMailList,
   renderMailLoading,
-} from "./inbox-mail-render.js?v=2";
+} from "./inbox-mail-render.js?v=3";
 
 const MODE_CHATS = "chats";
 const MODE_MAIL = "mail";
