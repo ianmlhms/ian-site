@@ -61,6 +61,15 @@
                de: "Brett zum Ausdrucken, danach die Lösungen pro Kategorie.",
                en: "Board to print, then the answer key per category." },
     wordBoard: { lb: "Spillbrett", de: "Spielbrett", en: "Game board" },
+    th_classic: { lb: "Klassesch", de: "Klassisch", en: "Classic" },
+    th_forest: { lb: "Bësch", de: "Wald", en: "Forest" },
+    th_crimson: { lb: "Karmesinrout", de: "Karmesinrot", en: "Crimson" },
+    th_paper: { lb: "Pabeier", de: "Papier", en: "Paper" },
+    addTeam: { lb: "Equipe derbäisetzen", de: "Team hinzufügen", en: "Add team" },
+    removeTeam: { lb: "Equipe ewechhuelen", de: "Team entfernen", en: "Remove team" },
+    played: { lb: "scho gespillt", de: "schon gespielt", en: "already played" },
+    editCat: { lb: "Kategorie änneren", de: "Kategorie bearbeiten", en: "Edit category" },
+    delCat: { lb: "Kategorie läschen", de: "Kategorie löschen", en: "Delete category" },
   };
 
   var lang = detect(), theme = loadTheme();
@@ -109,6 +118,8 @@
     $('tPick').textContent = t('pick');
     $('tTeams').textContent = t('teams');
     $('tInput').placeholder = t('teamName');
+    $('tInput').setAttribute('aria-label', t('teamName'));
+    $('tAdd').setAttribute('aria-label', t('addTeam'));
     $('start').textContent = t('start');
     $('toEdit').textContent = t('edit');
     $('toWord').textContent = t('word');
@@ -119,7 +130,7 @@
 
     $('themes').innerHTML = THEMES.map(function (th) {
       return '<button class="th" data-t="' + th + '" aria-pressed="' + (th === theme) +
-             '" style="background:' + themeSwatch(th) + '" aria-label="' + th + '"></button>';
+             '" style="background:' + themeSwatch(th) + '" aria-label="' + t('th_' + th) + '"></button>';
     }).join('');
     Array.prototype.forEach.call($('themes').children, function (b) {
       b.onclick = function () { setTheme(b.dataset.t); };
@@ -164,10 +175,16 @@
 
   function renderChips() {
     $('chips').innerHTML = teams.map(function (n, i) {
-      return '<span class="chip">' + esc(n) + '<button data-i="' + i + '">✕</button></span>';
+      return '<span class="chip">' + esc(n) + '<button data-i="' + i + '" aria-label="' +
+             t('removeTeam') + ': ' + esc(n) + '"><span aria-hidden="true">✕</span></button></span>';
     }).join('');
     Array.prototype.forEach.call($('chips').querySelectorAll('button'), function (b) {
-      b.onclick = function () { teams.splice(+b.dataset.i, 1); saveTeams(); renderChips(); };
+      b.onclick = function () {
+        var at = +b.dataset.i;
+        teams.splice(at, 1); saveTeams(); renderChips();
+        var left = $('chips').querySelectorAll('button');
+        if (left.length) left[Math.min(at, left.length - 1)].focus();
+      };
     });
     var ok = picked.length === PICK && teams.length >= MIN_TEAMS;
     $('start').disabled = !ok;
@@ -202,7 +219,8 @@
     for (var r = 0; r < VALUES.length; r++) {
       for (var col = 0; col < board.length; col++) {
         var key = col + ',' + r, gone = !!used[key];
-        html += '<button class="cellbtn" data-k="' + key + '"' + (gone ? ' disabled' : '') + '>' +
+        html += '<button class="cellbtn" data-k="' + key + '" aria-label="' + esc(tx(board[col].name)) + ', ' +
+                VALUES[r] + (gone ? ' (' + t('played') + ')' : '') + '"' + (gone ? ' disabled' : '') + '>' +
                 (gone ? '·' : VALUES[r]) + '</button>';
       }
     }
@@ -236,6 +254,7 @@
       '<button class="btn" id="reveal">' + t('showAnswer') + '</button>';
     $('reveal').onclick = function () { reveal(key, clue, val); };
     show('s-clue');
+    $('reveal').focus();
   }
 
   function reveal(key, clue, val) {
@@ -257,8 +276,12 @@
       b.onclick = function () {
         if (b.dataset.n && +b.dataset.d) scores[b.dataset.n] += val * (+b.dataset.d);
         used[key] = true; openCell = null; renderBoard();
+        var next = $('board').querySelector('.cellbtn:not(:disabled)');
+        if (next) next.focus();
       };
     });
+    var firstWho = $('clue').querySelector('.who button');
+    if (firstWho) firstWho.focus();
   }
 
   function endGame() {
@@ -295,8 +318,8 @@
     var mine = ED.load();
     $('mine').innerHTML = mine.length ? mine.map(function (c) {
       return '<div class="mine"><span>' + esc(c.name) + '</span><span>' +
-        '<button data-e="' + esc(c.id) + '">✎</button>' +
-        '<button data-d="' + esc(c.id) + '">🗑</button></span></div>';
+        '<button data-e="' + esc(c.id) + '" aria-label="' + t('editCat') + ': ' + esc(c.name) + '"><span aria-hidden="true">✎</span></button>' +
+        '<button data-d="' + esc(c.id) + '" aria-label="' + t('delCat') + ': ' + esc(c.name) + '"><span aria-hidden="true">🗑</span></button></span></div>';
     }).join('') : '<p class="hint">' + t('noneYet') + '</p>';
     Array.prototype.forEach.call($('mine').querySelectorAll('button'), function (b) {
       b.onclick = function () {
@@ -320,15 +343,15 @@
     for (var i = 0; i < 5; i++) {
       var cl = c.clues[i] || { q: '', a: '' };
       rows += '<div class="qrow"><b>' + VALUES[i] + '</b>' +
-        '<div class="field"><label>' + t('question') + '</label>' +
+        '<div class="field"><label for="q' + i + '">' + t('question') + '</label>' +
         '<textarea id="q' + i + '">' + esc(cl.q) + '</textarea></div>' +
-        '<div class="field"><label>' + t('answer') + '</label>' +
+        '<div class="field"><label for="a' + i + '">' + t('answer') + '</label>' +
         '<input id="a' + i + '" value="' + esc(cl.a) + '"></div></div>';
     }
     $('form').innerHTML =
-      '<div class="field"><label>' + t('catName') + '</label>' +
+      '<div class="field"><label for="cname">' + t('catName') + '</label>' +
       '<input id="cname" maxlength="28" value="' + esc(c.name) + '"></div>' + rows +
-      '<p class="hint" id="formWarn"></p>' +
+      '<p class="hint" id="formWarn" role="status"></p>' +
       '<button class="btn" id="saveCat">' + t('saveCat') + '</button>' +
       (editing ? '<button class="btn ghost small" id="newCat">' + t('newCat') + '</button>' : '');
 
@@ -368,6 +391,7 @@
     document.documentElement.lang = l;
     Array.prototype.forEach.call($('langs').children, function (b) {
       b.classList.toggle('on', b.dataset.l === l);
+      b.setAttribute('aria-pressed', String(b.dataset.l === l));
     });
     if ($('s-clue').classList.contains('on') && openCell) openClue(openCell);
     else if ($('s-board').classList.contains('on')) renderBoard();

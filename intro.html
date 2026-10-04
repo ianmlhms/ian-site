@@ -59,7 +59,7 @@
        background:var(--panel2);text-align:left;font-size:14.5px;line-height:1.35}
   .ans b{display:block;font-size:15px}
   .ans small{color:var(--muted)}
-  .ans.sel{border-color:var(--accent-border);background:#2e1f4d}
+  .ans.sel{border-color:var(--accent-border)}
   .ans:disabled{opacity:.6}
   /* scores */
   .sc{display:flex;justify-content:space-between;padding:9px 2px;
@@ -74,6 +74,12 @@
   .big{font-size:20px;font-weight:800;margin:6px 0}
   .art{width:120px;height:120px;border-radius:12px;margin:0 auto 10px;display:block;
        background:var(--panel2)}
+  /* site-glass.css gives every .note a frosted pill; here it is plain helper text */
+  .note{background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+        border-radius:0;padding:0}
+  .ans.sel{background:color-mix(in srgb,var(--accent) 22%,var(--panel2))}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--accent-text,var(--accent));outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){.disc.spin{animation:none}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -95,15 +101,15 @@
     <p class="sub">Éischt <b>1 Sekonn</b>, dann 3, dann 5 … wie fréi erkennt, kritt méi Punkten.</p>
 
     <div class="card" id="hostCfg">
-      <div class="lbl">Kategorie</div>
-      <div class="grid" id="cats"></div>
+      <div class="lbl" id="lblCats">Kategorie</div>
+      <div class="grid" id="cats" role="group" aria-labelledby="lblCats"></div>
 
-      <div class="lbl" style="margin-top:16px">Wéi vill Lidder</div>
-      <div class="row" id="counts"></div>
+      <div class="lbl" id="lblCounts" style="margin-top:16px">Wéi vill Lidder</div>
+      <div class="row" id="counts" role="group" aria-labelledby="lblCounts"></div>
 
-      <div class="lbl" style="margin-top:16px">Toun</div>
-      <div class="row" id="modes"></div>
-      <p class="note" id="modeNote"></p>
+      <div class="lbl" id="lblModes" style="margin-top:16px">Toun</div>
+      <div class="row" id="modes" role="group" aria-labelledby="lblModes"></div>
+      <p class="note" id="modeNote" role="status"></p>
     </div>
 
     <div class="card">
@@ -113,16 +119,16 @@
     </div>
 
     <button class="btn" id="startBtn">Starten</button>
-    <p class="note" id="lobbyNote"></p>
+    <p class="note" id="lobbyNote" role="status"></p>
   </section>
 
   <!-- ---------- play ---------- -->
   <section class="screen" id="s-play">
     <div class="card stage">
-      <div class="disc" id="disc">🎵</div>
+      <div class="disc" id="disc" aria-hidden="true">🎵</div>
       <div class="secs" id="secs">1s</div>
-      <div class="stepbar" id="stepbar"></div>
-      <div class="sub" id="playSub" style="margin:8px 0 0"></div>
+      <div class="stepbar" id="stepbar" aria-hidden="true"></div>
+      <div class="sub" id="playSub" style="margin:8px 0 0" role="status"></div>
     </div>
     <div class="answers" id="answers"></div>
     <button class="btn ghost" id="moreBtn">Méi héieren ▸</button>
@@ -136,9 +142,9 @@
   <section class="screen" id="s-reveal">
     <div class="card stage">
       <img class="art" id="revArt" alt="">
-      <div class="big" id="revTitle"></div>
+      <div class="big" id="revTitle" role="status"></div>
       <div class="sub" id="revArtist" style="margin:0"></div>
-      <div class="sub" id="revWho" style="margin-top:10px"></div>
+      <div class="sub" id="revWho" style="margin-top:10px" role="status"></div>
     </div>
     <div class="card">
       <div class="lbl">Punkten</div>
@@ -150,8 +156,8 @@
   <!-- ---------- final ---------- -->
   <section class="screen" id="s-final">
     <div class="card stage">
-      <div style="font-size:52px">🏆</div>
-      <div class="big" id="winner"></div>
+      <div style="font-size:52px" aria-hidden="true">🏆</div>
+      <div class="big" id="winner" role="status"></div>
     </div>
     <div class="card">
       <div class="lbl">Schlussstand</div>

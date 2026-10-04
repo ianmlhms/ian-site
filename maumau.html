@@ -12,7 +12,7 @@
 <script src="theme.js?v=25"></script>
 <link rel="stylesheet" href="game-common.css?v=5">
 <style>
-  :root{--redsuit:#ff5d6c;--cardbg:#f5f2ea;--cardink:#1a1a2e}
+  :root{--redsuit:#d12b3d;--cardbg:#f5f2ea;--cardink:#1a1a2e}
   body{display:flex;flex-direction:column}
   .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;gap:14px}
   .opp{display:flex;gap:4px;min-height:44px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:92vw}
@@ -35,6 +35,9 @@
   .wishbox{display:none;gap:10px}
   .wishbox button{font-size:26px;width:56px;height:56px;border-radius:12px;border:1px solid var(--border);background:var(--cardbg);cursor:pointer}
   .rules{color:var(--muted);font-size:12px;text-align:center;max-width:420px;line-height:1.5}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .card:focus-visible,.stock:focus-visible,.wishbox button:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid var(--accent-text,var(--accent));outline-offset:3px}
+  @media (prefers-reduced-motion:reduce){.hand .card{transition:none}.hand .card.ok:hover{transform:none}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -51,20 +54,20 @@
   <div class="spacer"></div>
 </header>
 
-<div class="wrap">
-  <div class="status" id="status">Connecting…</div>
-  <div class="sub" id="sub"></div>
+<main class="wrap">
+  <div class="status" id="status" role="status">Connecting…</div>
+  <div class="sub" id="sub" role="status"></div>
   <div class="opp" id="opp"></div>
   <div class="table">
-    <div class="stock" id="stock"><div class="card back">🂠</div><div class="n" id="stockN"></div></div>
+    <div class="stock" id="stock" role="button" tabindex="0" aria-label="Draw pile"><div class="card back" aria-hidden="true">🂠</div><div class="n" id="stockN"></div></div>
     <div id="top"></div>
   </div>
-  <div class="badges" id="badges"></div>
-  <div class="wishbox" id="wishbox"></div>
+  <div class="badges" id="badges" role="status"></div>
+  <div class="wishbox" id="wishbox" role="group" aria-label="Wish a suit"></div>
   <div class="hand" id="hand"></div>
   <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
   <div class="rules">Match suit or rank · 7 = opponent draws 2 (stack 7s to pass it on) · 8 = play again · J = any card + wish a suit · first empty hand wins</div>
-</div>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=6" data-arcade-id="o-maumau" data-arcade-title="Mau-Mau Cards" data-arcade-no-score data-arcade-replace=".bar"></script>
@@ -87,6 +90,8 @@ const RANKS = ["7", "8", "9", "10", "J", "Q", "K", "A"];
 const suitOf = (c) => Math.floor(c / 8);
 const rankOf = (c) => c % 8;               // 0=7 1=8 4=J
 const isRed = (c) => suitOf(c) === 1 || suitOf(c) === 3;
+const SUIT_NAMES = ["spades", "hearts", "clubs", "diamonds"];
+const cardName = (c) => `${RANKS[rankOf(c)]} of ${SUIT_NAMES[suitOf(c)]}`;
 
 let difficulty = GC.difficultyFromUrl();
 
@@ -148,21 +153,29 @@ function applyDraw(p) {
 
 /* ---------- render ---------- */
 function cardHTML(c, mini) {
-  return `<div class="card${isRed(c) ? " red" : ""}${mini ? " mini" : ""}"><div>${RANKS[rankOf(c)]}</div><div class="s">${SUITS[suitOf(c)]}</div></div>`;
+  return `<div class="card${isRed(c) ? " red" : ""}${mini ? " mini" : ""}" role="img" aria-label="Top card: ${cardName(c)}"><div>${RANKS[rankOf(c)]}</div><div class="s">${SUITS[suitOf(c)]}</div></div>`;
 }
 function render() {
-  $("opp").innerHTML = hands[opp].map(() => '<div class="card back mini"></div>').join("") +
-    `<span style="color:var(--muted);font-size:13px;margin-left:8px">${AI ? "🤖" : "Opponent"}: ${hands[opp].length}</span>`;
+  $("opp").innerHTML = hands[opp].map(() => '<div class="card back mini" aria-hidden="true"></div>').join("") +
+    `<span style="color:var(--muted);font-size:13px;margin-left:8px">${AI ? '<span aria-hidden="true">🤖</span><span class="sr-only">Computer</span>' : "Opponent"}: ${hands[opp].length}</span>`;
   $("top").innerHTML = dealt ? cardHTML(topCard()) : '<div class="card back"></div>';
   $("stockN").textContent = stock.length + " left";
+  $("stock").setAttribute("aria-label", `Draw pile, ${stock.length} left`);
   const badges = [];
   if (pending) badges.push(`<span class="badge">+${pending} draw</span>`);
   if (wish !== null) badges.push(`<span class="badge">Wish: ${SUITS[wish]}</span>`);
   $("badges").innerHTML = badges.join("");
   const myTurn = turn === me && !over && oppHere && dealt;
-  $("hand").innerHTML = hands[me].map((c) =>
-    `<div class="card${isRed(c) ? " red" : ""}${myTurn && canPlay(c) ? " ok" : ""}" data-c="${c}"><div>${RANKS[rankOf(c)]}</div><div class="s">${SUITS[suitOf(c)]}</div></div>`).join("");
-  $("hand").querySelectorAll(".ok").forEach((el) => { el.onclick = () => humanPlay(+el.dataset.c); });
+  const handHadFocus = $("hand").contains(document.activeElement);
+  $("hand").innerHTML = hands[me].map((c) => {
+    const ok = myTurn && canPlay(c);
+    return `<div class="card${isRed(c) ? " red" : ""}${ok ? " ok" : ""}" data-c="${c}" ${ok ? 'role="button" tabindex="0"' : 'role="img"'} aria-label="${cardName(c)}"><div>${RANKS[rankOf(c)]}</div><div class="s">${SUITS[suitOf(c)]}</div></div>`;
+  }).join("");
+  $("hand").querySelectorAll(".ok").forEach((el) => {
+    el.onclick = () => humanPlay(+el.dataset.c);
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); humanPlay(+el.dataset.c); } };
+  });
+  if (handHadFocus) { const first = $("hand").querySelector(".ok"); if (first) first.focus(); }
   updateStatus(myTurn);
 }
 function updateStatus(myTurn) {
@@ -188,8 +201,9 @@ function humanPlay(c) {
 function askWish(c) {
   const box = $("wishbox");
   box.style.display = "flex";
-  box.innerHTML = SUITS.map((s, i) => `<button data-w="${i}" style="color:${i === 1 || i === 3 ? "var(--redsuit)" : "#1a1a2e"}">${s}</button>`).join("");
+  box.innerHTML = SUITS.map((s, i) => `<button data-w="${i}" aria-label="Wish ${SUIT_NAMES[i]}" style="color:${i === 1 || i === 3 ? "var(--redsuit)" : "#1a1a2e"}">${s}</button>`).join("");
   box.querySelectorAll("button").forEach((b) => { b.onclick = () => { box.style.display = "none"; doPlay(me, c, +b.dataset.w); }; });
+  box.querySelector("button").focus();
 }
 function doPlay(p, c, wishSuit) {
   applyPlay(p, c, wishSuit);
@@ -205,6 +219,7 @@ function doDraw(p) {
   if (AI && !over && turn === opp) setTimeout(aiTurn, 800);
 }
 $("stock").onclick = () => { if (turn === me && !over && oppHere && dealt && !hands[me].some(canPlay)) doDraw(me); };
+$("stock").onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("stock").onclick(); } };
 
 /* ---------- AI opponent (seat 2) ---------- */
 function aiTurn() {

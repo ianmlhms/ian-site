@@ -14,6 +14,7 @@
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   a{color:var(--accent2-text);text-decoration:none}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--accent-text,var(--accent));outline-offset:2px}
   .bar{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid var(--border)}
   .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{max-width:760px;margin:0 auto;padding:22px 18px 80px}
@@ -27,7 +28,7 @@
   .sess .best{color:var(--best);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .sess .best small{display:block;color:var(--muted);font-weight:600;font-size:11px;text-align:right}
   .act{display:flex;gap:8px;flex:none}
-  .mini{border:1px solid var(--border);background:var(--card2);color:var(--text);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none}
+  .mini{border:1px solid var(--border);background:var(--card2);color:var(--text);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
   .mini:hover{border-color:var(--accent2-text);color:var(--accent2-text)}
   .mini.x{color:var(--muted)} .mini.x:hover{color:#ff6b6b;border-color:#ff6b6b}
 </style>
@@ -49,10 +50,10 @@
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap">
-  <div id="state" class="state" data-i18n="common.loading">Loading…</div>
+<main class="wrap">
+  <div id="state" class="state" role="status" data-i18n="common.loading">Loading…</div>
   <div id="list"></div>
-</div>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -88,8 +89,8 @@ async function load(){
       </div>
       <div class="best">${fmtLap(best)}<small>${T("karts.bestLap")}</small></div>
       <div class="act">
-        <a class="mini" href="kart.html?s=${encodeURIComponent(r.id)}" target="_blank" rel="noopener">${T("karts.view")}</a>
-        <button class="mini x" data-del="${esc(r.id)}">${T("karts.delete")}</button>
+        <a class="mini" href="kart.html?s=${encodeURIComponent(r.id)}" target="_blank" rel="noopener" aria-label="${esc(T("karts.view")+": "+(p.trackName || T("karts.session.title")))}">${T("karts.view")}</a>
+        <button class="mini x" data-del="${esc(r.id)}" aria-label="${esc(T("karts.delete")+": "+(p.trackName || T("karts.session.title")))}">${T("karts.delete")}</button>
       </div>
     </div>`;
   }).join("");

@@ -25,7 +25,8 @@
   .top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
   h1{font-size:22px;margin:0}
   .date{color:var(--muted);font-size:13px}
-  .home{color:var(--muted);font-weight:700;font-size:13px}
+  .home{color:var(--muted);font-weight:700;font-size:13px;display:inline-flex;align-items:center;min-height:44px;padding-right:12px}
+  a:focus-visible{outline:3px solid var(--accent-text,var(--accent));outline-offset:2px;border-radius:4px}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:18px 0 8px}
   .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
   .kpi .v{font-size:22px;font-weight:800;line-height:1.1}
@@ -56,10 +57,10 @@
   <link rel="manifest" href="site.webmanifest">
 </head>
 <body>
-<div class="wrap">
+<main class="wrap">
   <div style="margin-bottom:8px"><a class="home" href="index.html">‹ ian.lu</a></div>
-  <div id="content"><div class="state" id="state">Loading session…</div></div>
-</div>
+  <div id="content"><div class="state" id="state" role="status">Loading session…</div></div>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script>
@@ -94,7 +95,7 @@ function drawMap(canvas, track){
   const W = canvas.clientWidth, H = canvas.clientHeight;
   canvas.width = W*dpr; canvas.height = H*dpr; ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,W,H);
-  if(pts.length<2){ ctx.fillStyle="#8888aa"; ctx.font="13px system-ui"; ctx.textAlign="center"; ctx.fillText("No GPS track for this session.", W/2, H/2); return false; }
+  if(pts.length<2){ ctx.fillStyle=getComputedStyle(canvas).getPropertyValue("--muted").trim()||"#8888aa"; ctx.font="13px system-ui"; ctx.textAlign="center"; ctx.fillText("No GPS track for this session.", W/2, H/2); return false; }
 
   const lat0 = pts.reduce((a,p)=>a+p.lat,0)/pts.length;
   const k = Math.cos(lat0*Math.PI/180);
@@ -150,18 +151,18 @@ async function boot(){
   ];
   const lapHtml = s.laps.map((t,i)=>{
     const best = t===s.best;
-    return `<div class="lap${best?" best":""}"><span class="n">L${i+1}</span><span class="t">${fmtLap(t)}</span><span class="d">${fmtDelta(best?0:t-s.best)}</span></div>`;
+    return `<div class="lap${best?" best":""}" role="listitem"><span class="n">L${i+1}</span><span class="t">${fmtLap(t)}</span><span class="d">${fmtDelta(best?0:t-s.best)}</span></div>`;
   }).join("");
 
   $("content").innerHTML = `
-    <div class="top"><h1>🏎️ ${esc(name)}</h1></div>
+    <div class="top"><h1><span aria-hidden="true">🏎️</span> ${esc(name)}</h1></div>
     <div class="date">${esc(fmtDate(row.date))} ${row.avgHeartRate>0?`· <span class="pill">avg ${Math.round(row.avgHeartRate)} bpm</span>`:""}</div>
     <div class="kpis">${kpis.map(k=>`<div class="kpi"><div class="v" style="color:${k.c||"var(--text)"}">${k.v}</div><div class="l">${esc(k.l)}</div></div>`).join("")}</div>
     <h2>Racing line</h2>
-    <canvas id="map"></canvas>
+    <canvas id="map" role="img" aria-label="Racing line map, coloured by speed: slow is dim blue, fast is bright cyan"></canvas>
     <div class="maplegend"><span>slow</span><span class="bar"></span><span>fast</span></div>
     <h2>Lap times</h2>
-    <div class="laps">${lapHtml || '<span class="state">No laps recorded.</span>'}</div>
+    <div class="laps" role="list">${lapHtml || '<span class="state">No laps recorded.</span>'}</div>
     <footer>Recorded with <b>KartTracker</b> · <a href="index.html">ian.lu</a></footer>`;
 
   const canvas = $("map");

@@ -19,16 +19,16 @@
   /* Themes: each sets the same variable names, so nothing else changes. */
   body[data-jq="classic"]{--bg:#0b1d3a;--panel:#122b52;--cell:#15326b;--cellhi:#1b3f85;
     --accent:#ffd66b;--accent2:#ffc23d;--jq-text:#f2f5fb;--jq-muted:#93a6c7;--line:#23406f;--on-accent:#1a1200;
-    --jq-accent-text:#ffd66b;--jq-accent2-text:#ffc23d;--jq-accent-foreground:#1a1200}
+    --jq-accent-text:#ffd66b;--jq-accent2-text:#ffc23d;--jq-accent-foreground:#1a1200;--jq-neg:#ff7b80}
   body[data-jq="forest"]{--bg:#0f1c14;--panel:#16291d;--cell:#1d3a27;--cellhi:#27502f;
     --accent:#8fd694;--accent2:#b7e6a8;--jq-text:#eef5ee;--jq-muted:#93b39a;--line:#2a4a33;--on-accent:#08170c;
-    --jq-accent-text:#8fd694;--jq-accent2-text:#b7e6a8;--jq-accent-foreground:#08170c}
+    --jq-accent-text:#8fd694;--jq-accent2-text:#b7e6a8;--jq-accent-foreground:#08170c;--jq-neg:#ff8a8f}
   body[data-jq="crimson"]{--bg:#25060c;--panel:#3a0d15;--cell:#4d1119;--cellhi:#671720;
     --accent:#ffd166;--accent2:#ff9f45;--jq-text:#fdf1f1;--jq-muted:#c79a9a;--line:#5c1c24;--on-accent:#2a0a00;
-    --jq-accent-text:#ffd166;--jq-accent2-text:#ff9f45;--jq-accent-foreground:#2a0a00}
+    --jq-accent-text:#ffd166;--jq-accent2-text:#ff9f45;--jq-accent-foreground:#2a0a00;--jq-neg:#ffb3b3}
   body[data-jq="paper"]{--bg:#f4f1e8;--panel:#ffffff;--cell:#e9e4d4;--cellhi:#dcd5c0;
     --accent:#1d4ed8;--accent2:#1e40af;--jq-text:#1b2430;--jq-muted:#5f6b7a;--line:#d6cfbd;--on-accent:#ffffff;
-    --jq-accent-text:#1d4ed8;--jq-accent2-text:#1e40af;--jq-accent-foreground:#ffffff}
+    --jq-accent-text:#1d4ed8;--jq-accent2-text:#1e40af;--jq-accent-foreground:#ffffff;--jq-neg:#c4262b}
 
   *{box-sizing:border-box}
   html,body{height:100%}
@@ -43,7 +43,7 @@
   .bar .home{color:var(--jq-muted);font-weight:700;text-decoration:none;font-size:14px}
   .bar h1{font-size:15px;margin:0;font-weight:800;letter-spacing:.5px;color:var(--jq-accent-text)}
   .bar .spacer{flex:1}
-  .langs button{background:none;border:0;color:var(--jq-muted);font-weight:700;font-size:12px;padding:4px 15px}
+  .langs button{background:none;border:0;color:var(--jq-muted);font-weight:700;font-size:12px;padding:4px 15px;min-width:44px;min-height:44px}
   .langs button.on{color:var(--jq-accent-text)}
 
   .wrap{max-width:920px;margin:0 auto;padding:16px 14px 44px}
@@ -75,7 +75,7 @@
 
   .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
   .chip{background:var(--cell);border:1px solid var(--line);border-radius:20px;padding:6px 11px;font-size:14px;display:flex;align-items:center;gap:7px}
-  .chip button{background:none;border:0;color:var(--jq-muted);padding:0;font-size:15px;line-height:1}
+  .chip button{background:none;border:0;color:var(--jq-muted);padding:0;font-size:15px;line-height:1;min-width:44px;min-height:44px;margin:-12px -12px -12px -7px}
   .addrow{display:flex;gap:8px}
   .addrow input{flex:1;min-width:0;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--jq-text);font-size:15px}
   .addrow input:focus{outline:2px solid var(--accent);outline-offset:-1px}
@@ -93,7 +93,7 @@
   .scores{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
   .sc{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:7px 11px;font-size:13.5px;min-width:90px}
   .sc b{display:block;font-size:18px;font-variant-numeric:tabular-nums;color:var(--jq-accent-text)}
-  .sc.neg b{color:#e5484d}
+  .sc.neg b{color:var(--jq-neg)}
 
   .clue{text-align:center}
   .clue .val{color:var(--jq-accent-text);font-weight:800;font-size:13.5px;letter-spacing:.5px}
@@ -117,7 +117,9 @@
   .qrow b{color:var(--jq-accent-text);font-size:13px}
   .mine{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px}
   .mine:last-child{border-bottom:0}
-  .mine span button{background:none;border:0;color:var(--jq-muted);font-size:14px;padding:0 6px}
+  .mine span button{background:none;border:0;color:var(--jq-muted);font-size:14px;padding:0 6px;min-width:44px;min-height:44px}
+
+  a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--jq-accent-text);outline-offset:2px}
 
   @media (max-width:520px){
     .cat{font-size:9px;min-height:44px;padding:5px 2px}
@@ -134,9 +136,9 @@
   <h1>JEOPARDY</h1>
   <span class="spacer"></span>
   <nav class="langs" id="langs" aria-label="Sprooch">
-    <button type="button" data-l="lb" class="on">LB</button>
-    <button type="button" data-l="de">DE</button>
-    <button type="button" data-l="en">EN</button>
+    <button type="button" data-l="lb" class="on" lang="lb" aria-label="Lëtzebuergesch" aria-pressed="true">LB</button>
+    <button type="button" data-l="de" lang="de" aria-label="Deutsch" aria-pressed="false">DE</button>
+    <button type="button" data-l="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
   </nav>
 </header>
 
@@ -144,7 +146,7 @@
 
   <section class="screen on" id="s-setup">
     <h2 id="tTheme"></h2>
-    <div class="themes" id="themes"></div>
+    <div class="themes" id="themes" role="group" aria-labelledby="tTheme"></div>
 
     <h2 style="margin-top:18px" id="tPick"></h2>
     <p class="sub" id="tPickSub"></p>
@@ -154,9 +156,9 @@
     <div class="chips" id="chips"></div>
     <div class="addrow">
       <input id="tInput" type="text" maxlength="16" autocomplete="off">
-      <button class="btn" style="width:auto;padding:11px 17px;margin:0" id="tAdd">+</button>
+      <button class="btn" style="width:auto;padding:11px 17px;margin:0" id="tAdd"><span aria-hidden="true">+</span></button>
     </div>
-    <p class="hint" id="tWarn"></p>
+    <p class="hint" id="tWarn" role="status"></p>
     <button class="btn" id="start"></button>
     <div class="row" style="margin-top:9px">
       <button class="btn ghost small" id="toEdit"></button>

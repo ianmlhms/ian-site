@@ -104,8 +104,8 @@
 
   var COUNT_OPTIONS = [3, 5, 8, 10];
   var MODE_OPTIONS = [
-    { id: 'speaker', label: '📢 Ee Lautsprecher', note: 'Nëmmen den Host spillt de Toun of. Fir wann der all am selwechten Raum sidd — synchron a kee Widderhall.' },
-    { id: 'each', label: '🎧 All Handy', note: 'Jiddereen héiert op sengem eegenen Handy. Och op Distanz spillbar; am selwechte Raum hallt et awer.' }
+    { id: 'speaker', emoji: '📢', label: 'Ee Lautsprecher', note: 'Nëmmen den Host spillt de Toun of. Fir wann der all am selwechten Raum sidd — synchron a kee Widderhall.' },
+    { id: 'each', emoji: '🎧', label: 'All Handy', note: 'Jiddereen héiert op sengem eegenen Handy. Och op Distanz spillbar; am selwechte Raum hallt et awer.' }
   ];
 
   function renderLobby() {
@@ -115,16 +115,19 @@
 
     if (isHost) {
       $('cats').innerHTML = CATALOG.map(function (c, i) {
-        return '<button class="pick' + (i === catIdx ? ' on' : '') + '" data-cat="' + i + '">' +
-               c.emoji + ' ' + esc(c.name) + '<br><small style="opacity:.7">' +
+        return '<button class="pick' + (i === catIdx ? ' on' : '') + '" data-cat="' + i +
+               '" aria-pressed="' + (i === catIdx) + '"><span aria-hidden="true">' +
+               c.emoji + '</span> ' + esc(c.name) + '<br><small style="opacity:.7">' +
                c.songs.length + ' Lidder</small></button>';
       }).join('');
       $('counts').innerHTML = COUNT_OPTIONS.map(function (n) {
-        return '<button class="pick' + (n === songCount ? ' on' : '') + '" data-count="' + n + '">' + n + '</button>';
+        return '<button class="pick' + (n === songCount ? ' on' : '') + '" data-count="' + n +
+               '" aria-pressed="' + (n === songCount) + '">' + n + '</button>';
       }).join('');
       $('modes').innerHTML = MODE_OPTIONS.map(function (m) {
-        return '<button class="pick' + (m.id === audioMode ? ' on' : '') + '" data-mode="' + m.id + '">' +
-               m.label + '</button>';
+        return '<button class="pick' + (m.id === audioMode ? ' on' : '') + '" data-mode="' + m.id +
+               '" aria-pressed="' + (m.id === audioMode) + '"><span aria-hidden="true">' +
+               m.emoji + '</span> ' + m.label + '</button>';
       }).join('');
       var mo = MODE_OPTIONS.filter(function (m) { return m.id === audioMode; })[0];
       $('modeNote').textContent = mo ? mo.note : '';
@@ -150,17 +153,23 @@
     }
   }
 
+  /* renderLobby rebuilds the buttons, which would drop keyboard focus */
+  function refocus(selector) {
+    var b = document.querySelector(selector);
+    if (b) b.focus();
+  }
+
   $('cats').onclick = function (e) {
     var b = e.target.closest('[data-cat]'); if (!b) return;
-    catIdx = +b.dataset.cat; renderLobby(); sendCfg();
+    catIdx = +b.dataset.cat; renderLobby(); refocus('[data-cat="' + catIdx + '"]'); sendCfg();
   };
   $('counts').onclick = function (e) {
     var b = e.target.closest('[data-count]'); if (!b) return;
-    songCount = +b.dataset.count; renderLobby(); sendCfg();
+    songCount = +b.dataset.count; renderLobby(); refocus('[data-count="' + songCount + '"]'); sendCfg();
   };
   $('modes').onclick = function (e) {
     var b = e.target.closest('[data-mode]'); if (!b) return;
-    audioMode = b.dataset.mode; renderLobby(); sendCfg();
+    audioMode = b.dataset.mode; renderLobby(); refocus('[data-mode="' + audioMode + '"]'); sendCfg();
   };
   function sendCfg() { if (isHost) send('cfg', { catIdx: catIdx, songCount: songCount, audioMode: audioMode }); }
 
@@ -307,7 +316,7 @@
       var e = BY_ID[id];
       if (!e) return '';
       var sel = myAnswer === id ? ' sel' : '';
-      return '<button class="ans' + sel + '" data-id="' + id + '"' +
+      return '<button class="ans' + sel + '" data-id="' + id + '" aria-pressed="' + (myAnswer === id) + '"' +
              (myAnswer ? ' disabled' : '') + '><b>' + esc(e.song.t) + '</b>' +
              '<small>' + esc(e.song.a) + '</small></button>';
     }).join('');
