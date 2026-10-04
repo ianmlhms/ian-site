@@ -15,31 +15,12 @@
   <link rel="canonical" href="https://ian.lu/" />
   <title>ian.lu — Ian Mulheims</title>
   <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="site-ui.css?v=2" />
   <style>
   /* ian.lu home: personal launcher, "sticker sheet" look.
      Everything is scoped to body.home so the shared style.css (8 other pages) stays untouched,
      and all colour comes from the theme tokens (theme.js) so light/dark and every accent work. */
-  .home{
-    --font-display:ui-rounded,"SF Pro Rounded","SF Pro Display",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --r-tile:20px; --r-chip:14px; --r-panel:28px;
-    --ink:20 24 70;                                   /* shadow tint (navy), never pure black */
-    --tile-edge:color-mix(in srgb,var(--text) 9%,transparent);
-    --ease:cubic-bezier(.2,.8,.2,1);
-    background:
-      radial-gradient(58rem 30rem at 6% -8%,color-mix(in srgb,var(--accent) 15%,transparent),transparent 70%),
-      var(--bg);
-  }
-  /* fine grain so the flat navy/white is not sterile; fixed + pointer-events none, so it never repaints on scroll */
-  .home::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E")}
-  html[data-theme="light"] .home::before{opacity:.04;mix-blend-mode:multiply}
-
-  /* ---- top bar: flat, aligned to the page column ---- */
-  .home .bar{width:100%;max-width:1040px;margin:0 auto;padding:16px 28px 0;background:none;box-shadow:none;border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none}
-  .home .brand{font-family:var(--font-display);font-size:19px;font-weight:800;letter-spacing:-.02em}
-
   /* ---- hero: wordmark left, live clock right ---- */
-  .home .page{max-width:1040px;padding:0 28px 72px}
   .home .today-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:14px 40px;padding:clamp(28px,7vw,72px) 0 clamp(22px,4vw,40px)}
   .home .today-greet{display:flex;flex-direction:column;align-items:flex-start}
   .home .hero-kicker{margin:0 0 8px;font-size:17px;font-weight:650;color:var(--muted)}
@@ -51,8 +32,6 @@
   .home .hero-clock .ms{display:inline-block;min-width:2.3em;margin-left:.05em;text-align:left;font-size:.5em;font-weight:600;letter-spacing:0;color:var(--muted)}
   .home .hero-date{font-size:14px;font-weight:600;color:var(--muted)}
   @media (max-width:620px){
-    .home .bar{padding:12px 16px 0}
-    .home .page{padding:0 16px 56px}
     .home .today-hero{grid-template-columns:minmax(0,1fr);gap:18px}
     .home .hero-time{align-items:flex-start;text-align:left;padding-bottom:0}
     .home .home-foot{width:calc(100% - 32px)}
@@ -65,7 +44,6 @@
 
   /* ---- apps ---- */
   .home .section{margin-top:clamp(6px,2vw,22px)}
-  .home .sec-title{margin:0 0 6px;font-family:var(--font-display);font-size:clamp(24px,3.4vw,32px);font-weight:800;letter-spacing:-.03em;text-transform:none;color:var(--text)}
   .home .apps-gate{gap:18px;margin:12px 0 30px;padding:18px 20px 18px 18px;border:0;border-radius:var(--r-panel);backdrop-filter:none;-webkit-backdrop-filter:none;
     background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 18%,var(--card-opaque)),color-mix(in srgb,var(--accent) 6%,var(--card-opaque)));
     box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
@@ -92,12 +70,8 @@
   .home .group-edit[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-foreground)}
   .home .group-head p{color:var(--muted)}
 
-  .home #apps .tiles{max-width:none;grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr));gap:12px}
-  .home #apps #favTiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-  @media (min-width:700px){.home #apps #favTiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 
   /* one tint per category (hue on the sticker only; chrome stays on the theme accent) */
-  .home .tile{--h:var(--accent)}
   .home .tile[data-app="grades.html"],.home .tile[data-app="exams.html"],.home .tile[data-app="board.html"],.home .tile[data-app="countries.html"]{--h:#4fc37a}
   .home .tile[data-app="messenger.html"],.home .tile[data-app="friends.html"]{--h:#3cc4de}
   .home .tile[data-app="pixelbreak.html"],.home .tile[data-app="wordle.html"]{--h:#ff6f9f}
@@ -105,25 +79,6 @@
   .home .tile[data-app="buddy.html"],.home .tile[data-app="money.html"],.home .tile[data-app="me.html"],.home .tile[data-app="karts.html"],.home .tile[data-app="hotel.html"],.home .tile[data-app="haus/"]{--h:#f4a62a}
   .home .tile[data-app="factory.html"],.home .tile[data-app="admin.html"],.home .tile[data-app="ppt.html"],.home .tile[data-app="doc.html"]{--h:#a883ff}
 
-  .home .tile{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ico name" "ico sub";align-items:center;column-gap:14px;row-gap:1px;
-    min-height:84px;padding:14px 16px;border:0;border-radius:var(--r-tile);background:var(--card);backdrop-filter:none;-webkit-backdrop-filter:none;
-    box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35);
-    transition:transform .35s var(--ease),background-color .2s,box-shadow .35s var(--ease)}
-  .home .tile:hover{transform:translateY(-3px);background:var(--card-opaque);
-    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 48%,transparent),0 18px 34px -18px rgb(var(--ink)/.5)}
-  .home .tile:active{transform:scale(.985);transition-duration:.08s}
-  .home .tile .ico{grid-area:ico;display:grid;place-items:center;width:52px;height:52px;border-radius:var(--r-chip);font-size:27px;line-height:1;
-    background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));
-    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent);
-    transition:transform .45s var(--ease)}
-  .home .tile:hover .ico{transform:rotate(-5deg) scale(1.08)}
-  .home .tile .tname{grid-area:name;align-self:end;font-family:var(--font-display);font-size:16px;font-weight:750;letter-spacing:-.015em;line-height:1.2;color:var(--text)}
-  .home .tile .tsub{grid-area:sub;align-self:start;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:12.5px;line-height:1.35;color:var(--muted)}
-  .home .tile .lockb{top:12px;right:14px;font-size:12px;opacity:.55}
-  /* favourites are the big tiles: icon on top, like a home screen */
-  .home #favTiles .tile{grid-template-columns:minmax(0,1fr);grid-template-areas:"ico" "name" "sub";align-content:start;row-gap:3px;min-height:158px;padding:18px}
-  .home #favTiles .tile .ico{width:60px;height:60px;margin-bottom:16px;border-radius:18px;font-size:32px}
-  .home #favTiles .tile .tname{align-self:start;font-size:17px}
 
   /* ---- signed-out intro ---- */
   .home .about-compact{margin-top:clamp(48px,8vw,88px);padding:clamp(26px,5vw,46px);border-radius:var(--r-panel);text-align:left;
@@ -133,10 +88,6 @@
   .home .hero-name{margin:0;font-family:var(--font-display);font-size:clamp(40px,7.5vw,76px);font-weight:800;letter-spacing:-.045em;line-height:.95;color:var(--text);background:none;-webkit-text-fill-color:currentColor}
   .home .hero-tag{max-width:36rem;margin:18px 0 0;text-wrap:pretty}
   .home .hero-cta{justify-content:flex-start}
-  .home .btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:12px 24px;border:0;border-radius:var(--r-chip);font-family:var(--font-display);font-size:16px;font-weight:750;letter-spacing:-.01em;cursor:pointer;
-    box-shadow:0 10px 24px -12px color-mix(in srgb,var(--accent) 75%,transparent);transition:transform .3s var(--ease),filter .2s}
-  .home .btn-primary:hover{transform:translateY(-2px);filter:brightness(1.06)}
-  .home .btn-primary:active{transform:scale(.98)}
   .home .site-intro{max-width:46rem;margin:44px 0 0;padding:0}
   .home .site-intro h2{font-family:var(--font-display);font-size:26px;letter-spacing:-.03em}
   .home .site-intro h3{margin:28px 0 8px;font-size:17px;letter-spacing:-.01em}
@@ -172,16 +123,16 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
-<body class="home">
-  <header class="bar">
-    <a class="brand" href="/">ian.lu</a>
+<body class="home ui">
+  <header class="bar ui-header">
+    <a class="brand ui-brand" href="/">ian.lu</a>
     <span style="display:flex;align-items:center;gap:12px">
       <span id="langSw"></span>
       <span id="acctHost"></span>
     </span>
   </header>
 
-  <main class="page">
+  <main class="page ui-page">
     <section class="today-hero">
       <div class="today-greet">
         <span class="hero-kicker signed-in-only" id="todayHi">Moien</span>
@@ -196,14 +147,14 @@
 
     <!-- apps first -->
     <section class="section" id="apps">
-      <h2 class="sec-title" data-i18n="index.yourApps">Your apps</h2>
+      <h2 class="sec-title ui-title" data-i18n="index.yourApps">Your apps</h2>
       <div class="apps-gate" id="appsGate">
         <span class="ag-ico" aria-hidden="true">🔒</span>
         <div class="ag-text">
           <strong data-i18n="index.appsGateTitle">Some apps need a free account</strong>
           <span data-i18n="index.appsGateSub">Everything without a 🔒 works right away — sign in to unlock Messenger, Friends, Grades and more.</span>
         </div>
-        <button class="btn-primary" id="appsGateBtn" data-i18n="auth.signin">Sign in / Create account</button>
+        <button class="btn-primary ui-btn ui-btn--primary" id="appsGateBtn" data-i18n="auth.signin">Sign in / Create account</button>
       </div>
       <div class="tile-group" id="grpFav" hidden>
         <div class="group-head">
@@ -211,25 +162,25 @@
           <button class="group-edit" id="favEdit" type="button" data-i18n="grp.edit">Edit</button>
           <p data-i18n="grp.favHint">Tap an app to add or remove it from your favorites.</p>
         </div>
-        <div class="tiles" id="favTiles"></div>
+        <div class="tiles ui-tiles ui-tiles--big" id="favTiles"></div>
       </div>
 
       <details class="tile-group" data-group="grp.school" open>
         <summary class="group-head">
           <h3 class="group-title"><span data-i18n="grp.school">School</span><span class="group-count"><span class="group-count-number">0</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
         </summary>
-        <div class="tiles">
-          <a class="tile grades" href="grades.html" data-app="grades.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🎓</span><span class="tname" data-i18n="tile.grades">Grades</span><span class="tsub" data-i18n="tile.grades.sub">Average calculator</span>
+        <div class="tiles ui-tiles">
+          <a class="tile ui-tile grades" href="grades.html" data-app="grades.html">
+            <span class="lockb ui-tile__badge" aria-hidden="true">🔒</span><span class="ico ui-tile__ico" aria-hidden="true">🎓</span><span class="tname ui-tile__name" data-i18n="tile.grades">Grades</span><span class="tsub ui-tile__sub" data-i18n="tile.grades.sub">Average calculator</span>
           </a>
-          <a class="tile exams class-4c6-only" style="display:none" href="exams.html" data-app="exams.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">⏳</span><span class="tname" data-i18n="tile.exams">Tester</span><span class="tsub" data-i18n="tile.exams.sub">From WebUntis, with countdown</span>
+          <a class="tile ui-tile exams class-4c6-only" style="display:none" href="exams.html" data-app="exams.html">
+            <span class="lockb ui-tile__badge" aria-hidden="true">🔒</span><span class="ico ui-tile__ico" aria-hidden="true">⏳</span><span class="tname ui-tile__name" data-i18n="tile.exams">Tester</span><span class="tsub ui-tile__sub" data-i18n="tile.exams.sub">From WebUntis, with countdown</span>
           </a>
-          <a class="tile board class-4c6-only" style="display:none" href="board.html" data-app="board.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">📋</span><span class="tname" data-i18n="tile.board">Hausaufgaben</span><span class="tsub" data-i18n="tile.board.sub">Shared class homework</span>
+          <a class="tile ui-tile board class-4c6-only" style="display:none" href="board.html" data-app="board.html">
+            <span class="lockb ui-tile__badge" aria-hidden="true">🔒</span><span class="ico ui-tile__ico" aria-hidden="true">📋</span><span class="tname ui-tile__name" data-i18n="tile.board">Hausaufgaben</span><span class="tsub ui-tile__sub" data-i18n="tile.board.sub">Shared class homework</span>
           </a>
-          <a class="tile countries" href="countries.html" data-app="countries.html">
-            <span class="ico" aria-hidden="true">🌍</span><span class="tname" data-i18n="tile.countries">Country comparison</span><span class="tsub" data-i18n="tile.countries.sub">195 countries side by side</span>
+          <a class="tile ui-tile countries" href="countries.html" data-app="countries.html">
+            <span class="ico ui-tile__ico" aria-hidden="true">🌍</span><span class="tname ui-tile__name" data-i18n="tile.countries">Country comparison</span><span class="tsub ui-tile__sub" data-i18n="tile.countries.sub">195 countries side by side</span>
           </a>
         </div>
       </details>
@@ -238,12 +189,12 @@
         <summary class="group-head">
           <h3 class="group-title"><span data-i18n="grp.social">Chat &amp; Friends</span><span class="group-count"><span class="group-count-number">0</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
         </summary>
-        <div class="tiles">
-          <a class="tile msg" href="messenger.html" data-app="messenger.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💬</span><span class="tname">Messenger</span><span class="tsub" data-i18n="tile.messenger.sub">Chat &amp; groups</span>
+        <div class="tiles ui-tiles">
+          <a class="tile ui-tile msg" href="messenger.html" data-app="messenger.html">
+            <span class="lockb ui-tile__badge" aria-hidden="true">🔒</span><span class="ico ui-tile__ico" aria-hidden="true">💬</span><span class="tname ui-tile__name">Messenger</span><span class="tsub ui-tile__sub" data-i18n="tile.messenger.sub">Chat &amp; groups</span>
           </a>
-          <a class="tile friends" href="friends.html" data-app="friends.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">👥</span><span class="tname" data-i18n="tile.friends">Friends</span><span class="tsub" data-i18n="tile.friends.sub">Add, chat &amp; play</span>
+          <a class="tile ui-tile friends" href="friends.html" data-app="friends.html">
+            <span class="lockb ui-tile__badge" aria-hidden="true">🔒</span><span class="ico ui-tile__ico" aria-hidden="true">👥</span><span class="tname ui-tile__name" data-i18n="tile.friends">Friends</span><span class="tsub ui-tile__sub" data-i18n="tile.friends.sub">Add, chat &amp; play</span>
           </a>
         </div>
       </details>
@@ -252,12 +203,12 @@
         <summary class="group-head">
           <h3 class="group-title"><span data-i18n="grp.fun">Games</span><span class="group-count"><span class="group-count-number">0</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
         </summary>
-        <div class="tiles">
-          <a class="tile pixel" href="pixelbreak.html" data-app="pixelbreak.html">
-            <span class="ico" aria-hidden="true">🎮</span><span class="tname">Arcade</span><span class="tsub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
+        <div class="tiles ui-tiles">
+          <a class="tile ui-tile pixel" href="pixelbreak.html" data-app="pixelbreak.html">
+            <span class="ico ui-tile__ico" aria-hidden="true">🎮</span><span class="tname ui-tile__name">Arcade</span><span class="tsub ui-tile__sub" data-i18n="tile.pixelbreak.sub">Arcade &amp; 2-iPad games</span>
           </a>
-          <a class="tile wordle" href="wordle.html" data-app="wordle.html">
-            <span class="ico" aria-hidden="true">🟩</span><span class="tname">Wuertspill</span><span class="tsub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
+          <a class="tile ui-tile wordle" href="wordle.html" data-app="wordle.html">
+            <span class="ico ui-tile__ico" aria-hidden="true">🟩</span><span class="tname ui-tile__name">Wuertspill</span><span class="tsub ui-tile__sub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
           </a>
         </div>
       </details>
@@ -266,18 +217,18 @@
         <summary class="group-head">
           <h3 class="group-title"><span data-i18n="grp.maps">Maps &amp; Getting Around</span><span class="group-count"><span class="group-count-number">0</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
         </summary>
-        <div class="tiles">
-          <a class="tile bus" href="bus.html" data-app="bus.html">
-            <span class="ico" aria-hidden="true">🚌</span><span class="tname">Bus &amp; Zuch</span><span class="tsub" data-i18n="tile.bus.sub">Live departures &amp; routes</span>
+        <div class="tiles ui-tiles">
+          <a class="tile ui-tile bus" href="bus.html" data-app="bus.html">
+            <span class="ico ui-tile__ico" aria-hidden="true">🚌</span><span class="tname ui-tile__name">Bus &amp; Zuch</span><span class="tsub ui-tile__sub" data-i18n="tile.bus.sub">Live departures &amp; routes</span>
           </a>
-          <a class="tile bus skylens" href="skylens.html" data-app="skylens.html">
-            <span class="ico" aria-hidden="true">🛩️</span><span class="tname">SkyLens</span><span class="tsub">Live aircraft radar &amp; sky view</span>
+          <a class="tile ui-tile bus skylens" href="skylens.html" data-app="skylens.html">
+            <span class="ico ui-tile__ico" aria-hidden="true">🛩️</span><span class="tname ui-tile__name">SkyLens</span><span class="tsub ui-tile__sub">Live aircraft radar &amp; sky view</span>
           </a>
-          <a class="tile bus" href="kaart/" data-app="kaart/">
-            <span class="ico" aria-hidden="true">🗺️</span><span class="tname" data-i18n="tile.kaart">Wanderkaart</span><span class="tsub" data-i18n="tile.kaart.sub">All hiking &amp; MTB routes on one map</span>
+          <a class="tile ui-tile bus" href="kaart/" data-app="kaart/">
+            <span class="ico ui-tile__ico" aria-hidden="true">🗺️</span><span class="tname ui-tile__name" data-i18n="tile.kaart">Wanderkaart</span><span class="tsub ui-tile__sub" data-i18n="tile.kaart.sub">All hiking &amp; MTB routes on one map</span>
           </a>
-          <a class="tile bus" href="geoportal/" data-app="geoportal/">
-            <span class="ico" aria-hidden="true">🛰️</span><span class="tname">Geoportal</span><span class="tsub" data-i18n="tile.geoportal.sub">Official maps, aerial photos &amp; cadastre</span>
+          <a class="tile ui-tile bus" href="geoportal/" data-app="geoportal/">
+            <span class="ico ui-tile__ico" aria-hidden="true">🛰️</span><span class="tname ui-tile__name">Geoportal</span><span class="tsub ui-tile__sub" data-i18n="tile.geoportal.sub">Official maps, aerial photos &amp; cadastre</span>
           </a>
         </div>
       </details>
@@ -286,24 +237,24 @@
         <summary class="group-head">
           <h3 class="group-title"><span data-i18n="grp.personal">Personal</span><span class="group-count"><span class="group-count-number">0</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
         </summary>
-        <div class="tiles">
-          <a class="tile buddy" href="buddy.html" data-app="buddy.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">🤖</span><span class="tname">Study Buddy</span><span class="tsub" data-i18n="tile.buddy.sub">AI homework help</span>
+        <div class="tiles ui-tiles">
+          <a class="tile ui-tile buddy" href="buddy.html" data-app="buddy.html">
+            <span class="lockb ui-tile__badge" aria-hidden="true">🔒</span><span class="ico ui-tile__ico" aria-hidden="true">🤖</span><span class="tname ui-tile__name">Study Buddy</span><span class="tsub ui-tile__sub" data-i18n="tile.buddy.sub">AI homework help</span>
           </a>
-          <a class="tile money" href="money.html" data-app="money.html">
-            <span class="lockb" aria-hidden="true">🔒</span><span class="ico" aria-hidden="true">💶</span><span class="tname" data-i18n="tile.money">Sue</span><span class="tsub" data-i18n="tile.money.sub">Spending &amp; subscriptions</span>
+          <a class="tile ui-tile money" href="money.html" data-app="money.html">
+            <span class="lockb ui-tile__badge" aria-hidden="true">🔒</span><span class="ico ui-tile__ico" aria-hidden="true">💶</span><span class="tname ui-tile__name" data-i18n="tile.money">Sue</span><span class="tsub ui-tile__sub" data-i18n="tile.money.sub">Spending &amp; subscriptions</span>
           </a>
-          <a class="tile me admin-only" href="me.html" data-app="me.html" style="display:none">
-            <span class="ico" aria-hidden="true">📊</span><span class="tname">My Dashboard</span><span class="tsub" data-i18n="tile.me.sub">GitHub, traffic &amp; stats</span>
+          <a class="tile ui-tile me admin-only" href="me.html" data-app="me.html" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">📊</span><span class="tname ui-tile__name">My Dashboard</span><span class="tsub ui-tile__sub" data-i18n="tile.me.sub">GitHub, traffic &amp; stats</span>
           </a>
-          <a class="tile karts admin-only" href="karts.html" data-app="karts.html" style="display:none">
-            <span class="ico" aria-hidden="true">🏎️</span><span class="tname">KartTracker</span><span class="tsub" data-i18n="tile.karts.sub">All lap sessions</span>
+          <a class="tile ui-tile karts admin-only" href="karts.html" data-app="karts.html" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">🏎️</span><span class="tname ui-tile__name">KartTracker</span><span class="tsub ui-tile__sub" data-i18n="tile.karts.sub">All lap sessions</span>
           </a>
-          <a class="tile hotel private-hotel" href="hotel.html" data-app="hotel.html" style="display:none">
-            <span class="ico" aria-hidden="true">🏨</span><span class="tname">Hotel-Simulator</span><span class="tsub" data-i18n="tile.hotel.sub">Bausimulator · privat</span>
+          <a class="tile ui-tile hotel private-hotel" href="hotel.html" data-app="hotel.html" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">🏨</span><span class="tname ui-tile__name">Hotel-Simulator</span><span class="tsub ui-tile__sub" data-i18n="tile.hotel.sub">Bausimulator · privat</span>
           </a>
-          <a class="tile haus private-haus" href="haus/" data-app="haus/" style="display:none">
-            <span class="ico" aria-hidden="true">🏠</span><span class="tname">Haus-Planer</span><span class="tsub">Hausbau · privat</span>
+          <a class="tile ui-tile haus private-haus" href="haus/" data-app="haus/" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">🏠</span><span class="tname ui-tile__name">Haus-Planer</span><span class="tsub ui-tile__sub">Hausbau · privat</span>
           </a>
         </div>
       </details>
@@ -312,18 +263,18 @@
         <summary class="group-head">
           <h3 class="group-title"><span data-i18n="grp.private">Private</span><span class="group-count"><span class="group-count-number">0</span><span class="group-count-label" data-i18n="grp.apps"> apps</span></span></h3>
         </summary>
-        <div class="tiles">
-          <a class="tile dash admin-only" href="factory.html" data-app="factory.html" style="display:none">
-            <span class="ico" aria-hidden="true">📈</span><span class="tname">Dashboard</span><span class="tsub" data-i18n="tile.dash.sub">Full ShortsFactory</span>
+        <div class="tiles ui-tiles">
+          <a class="tile ui-tile dash admin-only" href="factory.html" data-app="factory.html" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">📈</span><span class="tname ui-tile__name">Dashboard</span><span class="tsub ui-tile__sub" data-i18n="tile.dash.sub">Full ShortsFactory</span>
           </a>
-          <a class="tile admin admin-only" href="admin.html" data-app="admin.html" style="display:none">
-            <span class="ico" aria-hidden="true">🛡</span><span class="tname">Admin</span><span class="tsub" data-i18n="tile.admin.sub">Moderation</span>
+          <a class="tile ui-tile admin admin-only" href="admin.html" data-app="admin.html" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">🛡</span><span class="tname ui-tile__name">Admin</span><span class="tsub ui-tile__sub" data-i18n="tile.admin.sub">Moderation</span>
           </a>
-          <a class="tile ppt owner-only" href="ppt.html" data-app="ppt.html" style="display:none">
-            <span class="ico" aria-hidden="true">▣</span><span class="tname">PPT Builder</span><span class="tsub">Presentatiounen aus dem Optrag</span>
+          <a class="tile ui-tile ppt owner-only" href="ppt.html" data-app="ppt.html" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">▣</span><span class="tname ui-tile__name">PPT Builder</span><span class="tsub ui-tile__sub">Presentatiounen aus dem Optrag</span>
           </a>
-          <a class="tile doc owner-only" href="doc.html" data-app="doc.html" style="display:none">
-            <span class="ico" aria-hidden="true">📄</span><span class="tname">Word Builder</span><span class="tsub">Dokumenter a mengem Stil</span>
+          <a class="tile ui-tile doc owner-only" href="doc.html" data-app="doc.html" style="display:none">
+            <span class="ico ui-tile__ico" aria-hidden="true">📄</span><span class="tname ui-tile__name">Word Builder</span><span class="tsub ui-tile__sub">Dokumenter a mengem Stil</span>
           </a>
         </div>
       </details>
@@ -334,7 +285,7 @@
       <p class="hero-name">Ian Mulheims</p>
       <p class="hero-tag" data-i18n-html="index.tag">A student from Luxembourg who builds <strong>apps, school tools and small web projects</strong> — in the browser, on iPhone and on Apple&nbsp;Watch.</p>
       <div class="hero-cta">
-        <a class="btn-primary" href="about.html" data-i18n="index.cta1">See what I've built</a>
+        <a class="btn-primary ui-btn ui-btn--primary" href="about.html" data-i18n="index.cta1">See what I've built</a>
       </div>
     </section>
 
