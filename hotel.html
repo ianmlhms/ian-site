@@ -159,7 +159,7 @@
   .fl-item{display:flex;align-items:center;gap:7px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--panel2);transition:.12s;}
   .fl-item.active{background:color-mix(in srgb,var(--accent) 25%,var(--panel2));border-left:3px solid var(--accent);}
   .fl-item:hover{filter:brightness(1.1);}
-  .fl-item .fl-name{font-size:13px;font-weight:600;flex:1;}
+  .fl-item .fl-name{font-size:13px;font-weight:600;flex:1;background:none;border:0;padding:0;color:inherit;font-family:inherit;text-align:left;cursor:pointer;}
   .fl-item .fl-count{font-size:11px;color:var(--muted);}
   .fl-item .fl-del{background:transparent;border:none;color:var(--muted);font-size:13px;border-radius:5px;padding:1px 5px;line-height:1;}
   .fl-item .fl-del:hover{color:#ef4444;background:color-mix(in srgb,#ef4444 15%,transparent);}
@@ -180,6 +180,10 @@
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--text);padding:11px 20px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.25s;z-index:100;}
   .toast.show{opacity:1;}
   .hidden{display:none!important;}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,.style-opt:focus-visible,.part:focus-visible{outline:3px solid var(--accent2);outline-offset:2px;}
+.bld-block .bb-edit:focus-visible,.out-block .ob-del:focus-visible,.room .r-del:focus-visible{opacity:1;}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}.style-opt:hover,.part:hover{transform:none;}}
+@media (pointer:coarse){.tbtn,.view-tab,.hotel-row button,.resume,.search,.fl-item .fl-del{min-height:44px;}.fl-item .fl-del,.fl-item .fl-name{min-width:44px;min-height:44px;}.ob-del{min-width:44px;min-height:44px;}}
 @media (hover:none) and (pointer:coarse){.bld-block .bb-edit{opacity:1;min-width:44px;min-height:44px}.room .r-del{opacity:1;width:44px;height:44px}}
 </style>
   <meta name="theme-color" content="#0d0d1a">
@@ -192,9 +196,9 @@
 <!-- ===================== ZUGANGS-SPERRE (privat) ===================== -->
 <div id="hotelGate" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 25%,#273449,#0f172a);padding:20px;">
   <div style="max-width:420px;width:100%;background:#1e293b;border:1px solid #334155;border-radius:18px;padding:34px 32px;text-align:center;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 30px 80px rgba(0,0,0,.5);">
-    <div style="font-size:44px;line-height:1;margin-bottom:10px">🏨</div>
+    <div style="font-size:44px;line-height:1;margin-bottom:10px" aria-hidden="true">🏨</div>
     <h1 style="margin:0 0 6px;font-size:24px">Hotel-Simulator</h1>
-    <p id="hotelGateMsg" style="color:#94a3b8;font-size:14px;margin:0 0 20px">Wird geladen…</p>
+    <p id="hotelGateMsg" role="status" style="color:#94a3b8;font-size:14px;margin:0 0 20px">Wird geladen…</p>
     <button id="hotelSignin" style="display:none;background:#38bdf8;color:#06283a;border:none;border-radius:10px;padding:11px 22px;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit">Anmelden</button>
     <p style="margin-top:18px;margin-bottom:0"><a href="/" style="color:#94a3b8;font-size:13px;text-decoration:none">&lsaquo; Zurück zu ian.lu</a></p>
   </div>
@@ -203,33 +207,33 @@
 <!-- ===================== STARTBILDSCHIRM ===================== -->
 <div id="start">
   <div class="start-card">
-    <h1>🏨 Hotel-Bausimulator</h1>
+    <h1><span aria-hidden="true">🏨</span> Hotel-Bausimulator</h1>
     <p class="sub">Plane dein eigenes Luxushotel: Stil wählen, Grundstück mit Gebäuden anlegen, Stockwerke einrichten und Räume per Drag-and-Drop einbauen.</p>
 
     <div class="section-title">1 · Stil wählen</div>
-    <div class="styles" id="styleOpts">
-      <div class="style-opt" data-style="playful">
-        <div class="swatch" style="background:linear-gradient(135deg,#ff7eb3,#ffd166,#06d6a0)"></div>
+    <div class="styles" id="styleOpts" role="radiogroup" aria-label="Stil wählen">
+      <div class="style-opt" data-style="playful" role="radio" aria-checked="false" tabindex="0">
+        <div class="swatch" aria-hidden="true" style="background:linear-gradient(135deg,#ff7eb3,#ffd166,#06d6a0)"></div>
         <strong>Bunt &amp; verspielt</strong><span>Farbig &amp; freundlich</span>
       </div>
-      <div class="style-opt" data-style="luxury">
-        <div class="swatch" style="background:linear-gradient(135deg,#1a1208,#caa84b,#3b2f1a)"></div>
+      <div class="style-opt" data-style="luxury" role="radio" aria-checked="false" tabindex="0">
+        <div class="swatch" aria-hidden="true" style="background:linear-gradient(135deg,#1a1208,#caa84b,#3b2f1a)"></div>
         <strong>Elegant &amp; luxuriös</strong><span>Gold &amp; Marmor</span>
       </div>
-      <div class="style-opt" data-style="minimal">
-        <div class="swatch" style="background:linear-gradient(135deg,#e2e8f0,#94a3b8,#475569)"></div>
+      <div class="style-opt" data-style="minimal" role="radio" aria-checked="false" tabindex="0">
+        <div class="swatch" aria-hidden="true" style="background:linear-gradient(135deg,#e2e8f0,#94a3b8,#475569)"></div>
         <strong>Schlicht &amp; modern</strong><span>Klar &amp; funktional</span>
       </div>
     </div>
 
     <div class="section-title">2 · Hotelname</div>
-    <div class="field"><input class="txt" id="hotelName" placeholder="z. B. Grand Palace Resort" value="Mein Luxushotel"></div>
+    <div class="field"><input class="txt" id="hotelName" aria-label="Hotelname" placeholder="z. B. Grand Palace Resort" value="Mein Luxushotel"></div>
 
     <div class="section-title">3 · Wie viele Gebäude?</div>
     <div class="stepper">
-      <button type="button" id="bldMinus">−</button>
-      <input id="numBld" type="number" value="2" min="1" max="8">
-      <button type="button" id="bldPlus">+</button>
+      <button type="button" id="bldMinus" aria-label="Ein Gebäude weniger">−</button>
+      <input id="numBld" type="number" value="2" min="1" max="8" aria-label="Anzahl Gebäude">
+      <button type="button" id="bldPlus" aria-label="Ein Gebäude mehr">+</button>
     </div>
 
     <div class="section-title">4 · Stockwerke pro Gebäude</div>
@@ -246,9 +250,9 @@
   <header class="topbar">
     <h2 id="hotelTitle">🏨 Hotel</h2>
     <div class="views">
-      <button class="view-tab" data-view="site">🗺️ Lageplan</button>
-      <button class="view-tab" data-view="floor">📐 Grundriss</button>
-      <button class="view-tab" data-view="front">🏢 Frontansicht</button>
+      <button class="view-tab" data-view="site" type="button" aria-pressed="false">🗺️ Lageplan</button>
+      <button class="view-tab" data-view="floor" type="button" aria-pressed="false">📐 Grundriss</button>
+      <button class="view-tab" data-view="front" type="button" aria-pressed="false">🏢 Frontansicht</button>
     </div>
     <div class="stats">
       <span>Gebäude <b id="stBld">0</b></span>
@@ -278,7 +282,7 @@
     <section class="view" id="viewFloor">
       <aside class="palette">
         <h3>Bauteile</h3>
-        <input class="search" id="search" placeholder="🔍 Bauteil suchen...">
+        <input class="search" id="search" type="search" aria-label="Bauteil suchen" placeholder="🔍 Bauteil suchen...">
         <div id="palette"></div>
       </aside>
       <div class="editor">
@@ -306,7 +310,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 /* ============ THEMES ============ */
@@ -414,10 +418,13 @@ function newBuilding(idx,name,nFlr){
 const THROUGH=new Set(['elevator','stairs']); // verlaufen durch alle Etagen
 
 /* ============ STARTBILDSCHIRM ============ */
-document.querySelectorAll('.style-opt').forEach(el=>el.addEventListener('click',()=>{
-  document.querySelectorAll('.style-opt').forEach(o=>o.classList.remove('selected'));
-  el.classList.add('selected');chosenStyle=el.dataset.style;applyTheme(chosenStyle);
-}));
+document.querySelectorAll('.style-opt').forEach(el=>{
+  el.addEventListener('click',()=>{
+    document.querySelectorAll('.style-opt').forEach(o=>{o.classList.remove('selected');o.setAttribute('aria-checked','false');});
+    el.classList.add('selected');el.setAttribute('aria-checked','true');chosenStyle=el.dataset.style;applyTheme(chosenStyle);
+  });
+  el.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();el.click();}});
+});
 document.querySelector('[data-style="minimal"]').click();
 
 function renderBldList(){
@@ -428,12 +435,12 @@ function renderBldList(){
   for(let i=0;i<n;i++){
     const row=document.createElement('div');row.className='bld-row';
     row.innerHTML=`<div class="idx">${i+1}</div>
-      <input class="name" value="${old[i]?old[i].name:'Gebäude '+(i+1)}">
+      <input class="name" aria-label="Name Gebäude ${i+1}" value="${old[i]?old[i].name:'Gebäude '+(i+1)}">
       <span class="flbl">Stockwerke:</span>
       <div class="stepper">
-        <button type="button" class="fm">−</button>
-        <input class="flr" type="number" min="1" max="40" value="${old[i]?old[i].fl:5}" style="width:48px;">
-        <button type="button" class="fp">+</button>
+        <button type="button" class="fm" aria-label="Ein Stockwerk weniger, Gebäude ${i+1}">−</button>
+        <input class="flr" type="number" min="1" max="40" aria-label="Stockwerke Gebäude ${i+1}" value="${old[i]?old[i].fl:5}" style="width:48px;">
+        <button type="button" class="fp" aria-label="Ein Stockwerk mehr, Gebäude ${i+1}">+</button>
       </div>`;
     const inp=row.querySelector('.flr');
     row.querySelector('.fm').onclick=()=>{inp.value=Math.max(1,(parseInt(inp.value)||1)-1);};
@@ -471,7 +478,7 @@ function enterApp(){
 document.querySelectorAll('.view-tab').forEach(t=>t.onclick=()=>setView(t.dataset.view));
 function setView(v){
   view=v;clearSel();
-  document.querySelectorAll('.view-tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  document.querySelectorAll('.view-tab').forEach(t=>{t.classList.toggle('active',t.dataset.view===v);t.setAttribute('aria-pressed',String(t.dataset.view===v));});
   document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
   document.getElementById('view'+v[0].toUpperCase()+v.slice(1)).classList.add('active');
   renderAll();
@@ -517,7 +524,7 @@ function renderSite(){
     const od=OUT[o.typeId];if(!od)return;const el=document.createElement('div');el.className='out-block';
     el.style.left=o.x+'px';el.style.top=o.y+'px';el.style.width=o.w+'px';el.style.height=o.h+'px';
     el.style.background='color-mix(in srgb,'+od.color+' 32%,var(--panel))';el.style.borderColor=od.color;
-    el.innerHTML=`<div class="ob-ico">${od.ico}</div><div class="ob-name">${od.name}</div><button class="ob-del" title="Entfernen">✕</button><div class="ob-resize"></div>`;
+    el.innerHTML=`<div class="ob-ico">${od.ico}</div><div class="ob-name">${od.name}</div><button class="ob-del" type="button" title="Entfernen" aria-label="Entfernen">✕</button><div class="ob-resize"></div>`;
     el.querySelector('.ob-del').onclick=ev=>{ev.stopPropagation();const i=state.outdoor.indexOf(o);if(i>-1)state.outdoor.splice(i,1);renderSite();save();};
     el.addEventListener('mousedown',ev=>startOutDrag(ev,el,o));
     plot.appendChild(el);
@@ -525,7 +532,7 @@ function renderSite(){
   state.buildings.forEach((b,i)=>{
     const el=document.createElement('div');el.className='bld-block'+(b.id===selBld?' sel':'');
     const rooms=b.floors.reduce((a,f)=>a+f.rooms.length,0);
-    el.innerHTML=`<button class="bb-edit">Bearbeiten ✎</button><div class="bb-ico">🏢</div><div class="bb-name">${b.name}</div><div class="bb-info">${b.floors.length} Stockw. · ${rooms} Räume</div><div class="bb-resize"></div>`;
+    el.innerHTML=`<button class="bb-edit" type="button" aria-label="Gebäude bearbeiten: ${b.name}">Bearbeiten ✎</button><div class="bb-ico" aria-hidden="true">🏢</div><div class="bb-name">${b.name}</div><div class="bb-info">${b.floors.length} Stockw. · ${rooms} Räume</div><div class="bb-resize"></div>`;
     posBld(el,b);
     el.querySelector('.bb-edit').onclick=ev=>{ev.stopPropagation();openBuilding(i);};
     el.addEventListener('dblclick',()=>openBuilding(i));
@@ -677,8 +684,8 @@ function renderFloorList(){
   const list=document.getElementById('floorList');list.innerHTML='';
   for(let f=b.floors.length-1;f>=0;f--){
     const fl=b.floors[f];const it=document.createElement('div');it.className='fl-item'+(f===state.curF?' active':'');
-    it.innerHTML=`<span class="fl-name">${fl.name}</span><span class="fl-count">${fl.rooms.length} 🚪</span><button class="fl-del" title="Stockwerk löschen">✕</button>`;
-    it.onclick=()=>{state.curF=f;clearSel();renderGrid();renderFloorList();document.getElementById('floorName').textContent=b.name+' · '+fl.name;flashGrid();};
+    it.innerHTML=`<button type="button" class="fl-name"${f===state.curF?' aria-current="true"':''}>${fl.name}</button><span class="fl-count">${fl.rooms.length} 🚪</span><button class="fl-del" type="button" title="Stockwerk löschen" aria-label="Stockwerk löschen: ${fl.name}">✕</button>`;
+    it.onclick=ev=>{state.curF=f;clearSel();renderGrid();renderFloorList();document.getElementById('floorName').textContent=b.name+' · '+fl.name;flashGrid();if(ev.detail===0)document.querySelector('.fl-item.active .fl-name')?.focus();};
     it.querySelector('.fl-del').onclick=ev=>{ev.stopPropagation();delFloor(f);};
     list.appendChild(it);
   }
@@ -787,7 +794,7 @@ function renderResumeList(){
   if(!lib.length){box.innerHTML='<div style="color:var(--muted);font-size:13px;padding:8px;">Noch keine gespeicherten Hotels.</div>';return;}
   lib.forEach(h=>{
     const row=document.createElement('div');row.className='hotel-row';const d=new Date(h.ts);
-    row.innerHTML=`<div class="h-info"><b>${h.name||'Hotel'}</b><small>${h.buildings} Gebäude · Stil: ${h.style} · ${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="h-open">Öffnen</button><button class="h-del" title="Löschen">🗑</button>`;
+    row.innerHTML=`<div class="h-info"><b>${h.name||'Hotel'}</b><small>${h.buildings} Gebäude · Stil: ${h.style} · ${d.toLocaleDateString('de-DE')} ${d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small></div><button class="h-open" type="button">Öffnen</button><button class="h-del" type="button" title="Löschen" aria-label="Hotel löschen: ${h.name||'Hotel'}"><span aria-hidden="true">🗑</span></button>`;
     row.querySelector('.h-open').onclick=()=>{if(loadHotel(h.id))enterApp();};
     row.querySelector('.h-del').onclick=()=>{if(confirm('Dieses Hotel löschen?')){deleteHotel(h.id);renderResumeList();checkResume();}};
     box.appendChild(row);
