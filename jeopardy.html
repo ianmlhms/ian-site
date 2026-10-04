@@ -119,6 +119,9 @@
   .mine:last-child{border-bottom:0}
   .mine span button{background:none;border:0;color:var(--jq-muted);font-size:14px;padding:0 6px;min-width:44px;min-height:44px}
 
+  /* site-glass.css frosts .field/.hint/.chip as if they were cards; here they are plain helper text and pills */
+  .field,.hint,.chip{background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .chip{background:var(--cell)}
   a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--jq-accent-text);outline-offset:2px}
 
   @media (max-width:520px){
@@ -193,6 +196,6 @@
 <script src="jeopardy-categories.js?v=3"></script>
 <script src="jeopardy-docx.js?v=1"></script>
 <script src="jeopardy-edit.js?v=2"></script>
-<script src="jeopardy.js?v=2"></script>
+<script src="jeopardy.js?v=3"></script>
 </body>
 </html>
