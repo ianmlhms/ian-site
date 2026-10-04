@@ -30,6 +30,10 @@
   .hw .txt{margin-top:5px;font-size:14px;line-height:1.4}
   .hw .rem{margin-top:4px;font-size:12.5px;color:var(--muted)}
   .empty{color:var(--muted);text-align:center;padding:34px 10px}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .btn{min-height:44px}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
   <meta name="theme-color" content="#0d0d1a">
   <meta name="mobile-web-app-capable" content="yes">
@@ -40,11 +44,11 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Home</a>
-  <h1>📚 Hausaufgaben</h1>
+  <h1><span aria-hidden="true">📚</span> Hausaufgaben</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
-<div class="wrap" id="wrap"><p class="empty">Loading…</p></div>
+<main class="wrap" id="wrap"><p class="empty">Loading…</p></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -70,8 +74,8 @@ async function render(){
 async function showApp(){
   $("wrap").innerHTML=`
     <div class="row">
-      <button class="btn" id="syncBtn">🔄 Sync now</button>
-      <span class="synced" id="synced"></span>
+      <button class="btn" id="syncBtn"><span aria-hidden="true">🔄</span> Sync now</button>
+      <span class="synced" id="synced" role="status"></span>
     </div>
     <div id="list"><p class="empty">Loading…</p></div>`;
   $("syncBtn").onclick=syncNow;
@@ -93,22 +97,23 @@ async function loadList(){
   list.innerHTML=data.map(h=>{
     const due=h.due_date; const days=due?Math.round((new Date(due)-new Date(today))/86400000):99;
     const cls=days<0?"over":days<=1?"soon":"";
+    const state=cls==="over"?"Overdue. ":cls==="soon"?"Due soon. ":"";
     return `<div class="hw ${cls}">
       <span class="due">${due?fmtDate(due):""}</span>
-      <span class="subj">${esc(h.subject||"—")}</span>
+      <span class="subj">${state?`<span class="sr-only">${state}</span>`:""}${esc(h.subject||"—")}</span>
       <div class="txt">${esc(h.text||h.remark||"(no text)")}</div>
       ${h.text&&h.remark?`<div class="rem">${esc(h.remark)}</div>`:""}
     </div>`;
   }).join("");
 }
 async function syncNow(){
-  const b=$("syncBtn"); b.disabled=true; b.textContent="🔄 Syncing…";
+  const b=$("syncBtn"); b.disabled=true; b.innerHTML='<span aria-hidden="true">🔄</span> Syncing…';
   try{
     const { data, error }=await sb.functions.invoke("webuntis-sync");
     if(error) throw error;
     $("synced").textContent = data?.ok ? `Synced ${data.count} item(s)` : (data?.error||"Sync failed");
   }catch(e){ $("synced").textContent="Sync failed: "+(e.message||e); }
-  b.disabled=false; b.textContent="🔄 Sync now";
+  b.disabled=false; b.innerHTML='<span aria-hidden="true">🔄</span> Sync now';
   loadList();
 }
 boot();
