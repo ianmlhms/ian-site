@@ -49,6 +49,21 @@ gh run list --repo ianmlhms/ian-site --workflow "Deploy to ian.lu (Plesk FTP)" -
 exposure — done ✓). `deploy.yml` has a `plesk-deploy` concurrency group so two pushes can't
 run parallel FTP mirrors (that race once broke a deploy).
 
+### Pre-deploy check: `node scripts/site_test.mjs` (run it before every push)
+Loads **every page** (root `*.html` + `pb/*.html`, minus the skip list shared with
+`check_overlap.mjs`) in headless Chrome at **iPad portrait 820×1180**, light + dark, signed out,
+and fails on anything **new**: uncaught JS errors / `console.error` (network failures are
+ignored — off-site calls are refused on purpose, see `scripts/audit/net.mjs`), horizontal
+overflow, and the `check_overlap` probes (offscreen, collision, clipped, contrast, hit-target).
+"New" = worse than `scripts/audit/site_test_baseline.json` (known errors + per-theme layout counts).
+~2 min for all 99 pages; no npm, just Node + Chrome over CDP (`scripts/audit/{cdp,probe,net}.mjs`).
+- `--pages a.html,pb/snake.html` limits it; `--shots DIR` saves `<page>.<theme>.png` per page/theme;
+  `--details` also lists the known findings; `--write-baseline` accepts the current state
+  (refused if any page failed to load — `BROKEN` always fails the run).
+- After a real fix, run `--write-baseline` so the lower counts become the new floor; commit the file.
+- Page dialogs (`prompt()` in `color.html`) are auto-cancelled — an open dialog would hang the page.
+- `check_overlap.mjs` (390/1280px, root pages only) still exists for phone/desktop widths.
+
 ### ⚠️ Cache-busting (read this!)
 Plesk serves assets with `cache-control: max-age=600` (10 min), and the service worker
 serves **versioned** JS/CSS **cache-first** — a changed file behind an unchanged `?v=` stays
