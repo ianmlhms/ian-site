@@ -18,7 +18,8 @@
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
-  button{font:inherit;color:inherit;cursor:pointer}
+  button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
   .bar{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
   .bar .home{color:var(--muted);font-weight:700;text-decoration:none;font-size:14px}
   .bar h1{font-size:15px;margin:0;font-weight:800;letter-spacing:.5px;color:var(--accent-text)}
@@ -63,8 +64,8 @@
     <h2>Fichier iwwer d'Liicht schécken</h2>
     <p class="sub">Ee Handy weist eng Serie vu QR-Codes, deen aneren filmt se a setzt de Fichier
       nees zesummen. Kee Wifi, kee Bluetooth, keen Internet — nëmmen d'Kamera.</p>
-    <button class="btn" id="beSender">📤 Schécken (weist QR-Codes)</button>
-    <button class="btn alt" id="beReceiver">📥 Empfänken (filmt deen aneren Ecran)</button>
+    <button type="button" class="btn" id="beSender"><span aria-hidden="true">📤</span> Schécken (weist QR-Codes)</button>
+    <button type="button" class="btn alt" id="beReceiver"><span aria-hidden="true">📥</span> Empfänken (filmt deen aneren Ecran)</button>
     <p class="note">Tipp: hal déi zwee Handyen roueg, ongeféier 15–25 cm auserneen, a stell den
       Ecran vum Sender esou hell wéi méiglech.</p>
     <p class="note"><b>Wéi séier?</b> Bis ongeféier 70 KB pro Sekonn, jee no
@@ -77,36 +78,36 @@
 
   <section class="screen" id="s-send">
     <div class="card">
-      <input type="file" id="file" style="width:100%">
+      <input type="file" id="file" aria-label="Fichier eraussichen" style="width:100%">
       <div class="stat"><span>Gréisst</span><b id="sSize">—</b></div>
       <div class="stat"><span>Blocken</span><b id="sK">—</b></div>
       <div class="stat"><span>Dauer</span><b id="sTime">—</b></div>
     </div>
     <div class="card">
       <div class="stat"><span>Dicht</span><b id="sDensity">—</b></div>
-      <input type="range" id="density" min="0" max="4" value="2">
+      <input type="range" id="density" min="0" max="4" value="2" aria-label="Dicht">
       <div class="stat"><span>Frame-Tempo</span><b id="sFps">20 / Sek.</b></div>
-      <input type="range" id="fps" min="2" max="30" value="20">
+      <input type="range" id="fps" min="2" max="30" value="20" aria-label="Frame-Tempo">
       <div class="stat"><span>Duerchsaz</span><b id="sRate">—</b></div>
       <p class="note">Méi Dicht = méi Daten pro Frame, mee och méi schwéier ze
         filmen. Wann näischt méi ukënnt, gëff eng Stuf erof. „Maximal“ ass QR v40
         mat 2943 Bytes — méi passt technesch net an ee QR-Code.</p>
     </div>
-    <div class="card" id="qrwrap"><span style="color:var(--muted)">QR</span></div>
+    <div class="card" id="qrwrap" role="img" aria-label="QR-Code"><span style="color:var(--muted)">QR</span></div>
     <div class="stat"><span>Frames geschéckt</span><b id="sSent">0</b></div>
-    <button class="btn" id="startSend" disabled>Start</button>
-    <button class="btn ghost" id="backSend">Zréck</button>
+    <button type="button" class="btn" id="startSend" disabled>Start</button>
+    <button type="button" class="btn ghost" id="backSend">Zréck</button>
   </section>
 
   <section class="screen" id="s-recv">
-    <video id="cam" playsinline muted></video>
-    <div class="prog"><i id="bar"></i></div>
+    <video id="cam" playsinline muted aria-label="Kamera"></video>
+    <div class="prog" aria-hidden="true"><i id="bar"></i></div>
     <div class="stat"><span>Frames gesammelt</span><b id="rBlocks">0 / ?</b></div>
     <div class="stat"><span>Kamerabiller gelies</span><b id="rFrames">0</b></div>
     <div class="stat"><span>Decoder</span><b id="rEngine">…</b></div>
-    <p class="note" id="rNote">Riicht d'Kamera op den anere Ecran.</p>
-    <button class="btn" id="saveFile" style="display:none">⬇ Fichier späicheren</button>
-    <button class="btn ghost" id="backRecv">Zréck</button>
+    <p class="note" id="rNote" role="status" aria-live="polite">Riicht d'Kamera op den anere Ecran.</p>
+    <button type="button" class="btn" id="saveFile" style="display:none">⬇ Fichier späicheren</button>
+    <button type="button" class="btn ghost" id="backRecv">Zréck</button>
   </section>
 
 </main>

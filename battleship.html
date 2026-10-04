@@ -18,6 +18,8 @@
   .label{align-self:flex-start;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:-6px}
   .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;width:100%;max-width:420px;background:var(--water);padding:8px;border-radius:12px;touch-action:manipulation}
   .cell{aspect-ratio:1;border-radius:6px;background:#1a2040;display:flex;align-items:center;justify-content:center;font-size:16px}
+  button.cell{border:0;padding:0;margin:0;font:inherit;font-size:16px;color:inherit;touch-action:manipulation}
+  button.cell:focus-visible,.btn:focus-visible,.seg-b:focus-visible,.bar a:focus-visible{outline:3px solid var(--accent2);outline-offset:2px;position:relative;z-index:1}
   .cell.ship{background:var(--ship)} .cell.hit{background:var(--hit)} .cell.miss{background:var(--miss);color:var(--muted)}
   .grid.place .cell{cursor:pointer}
   .grid.fire .cell:not(.hit):not(.miss){cursor:pointer}
@@ -51,32 +53,32 @@
   <span class="sub">room <code id="roomc"></code></span>
 </header>
 <div class="wrap">
-  <div class="status" id="status">Connecting…</div>
-  <div class="sub" id="sub"></div>
+  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
+  <div class="sub" id="sub" aria-live="polite"></div>
 
   <div id="setup" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
     <div class="label">Your fleet — place your ships</div>
-    <div class="fleet" id="fleet"></div>
-    <div class="grid place" id="own"></div>
+    <div class="fleet" id="fleet" aria-hidden="true"></div>
+    <div class="grid place" id="own" role="group" aria-label="Your fleet grid"></div>
     <div class="toolbar">
       <div class="seg">
-        <button id="orientH" class="seg-b active">→ Horizontal</button>
-        <button id="orientV" class="seg-b">↓ Vertical</button>
+        <button type="button" id="orientH" class="seg-b active" aria-pressed="true">→ Horizontal</button>
+        <button type="button" id="orientV" class="seg-b" aria-pressed="false">↓ Vertical</button>
       </div>
-      <button class="btn ghost" id="shuffle">🔀 Shuffle</button>
-      <button class="btn ghost" id="clear">Clear</button>
-      <button class="btn" id="ready" disabled>Ready</button>
+      <button type="button" class="btn ghost" id="shuffle"><span aria-hidden="true">🔀</span> Shuffle</button>
+      <button type="button" class="btn ghost" id="clear">Clear</button>
+      <button type="button" class="btn" id="ready" disabled>Ready</button>
     </div>
     <div class="sub">Pick a direction, tap a square to place · tap a ship to remove it.</div>
   </div>
 
   <div id="play" style="display:none;width:100%;flex-direction:column;align-items:center;gap:12px">
     <div class="label">Enemy waters — tap to fire</div>
-    <div class="grid fire" id="enemy"></div>
+    <div class="grid fire" id="enemy" role="group" aria-label="Enemy waters grid"></div>
     <div class="label">Your fleet</div>
-    <div class="grid" id="ownSmall"></div>
+    <div class="grid" id="ownSmall" role="group" aria-label="Your fleet grid"></div>
   </div>
-  <button class="btn ghost" id="rematch" style="display:none">↻ New game</button>
+  <button type="button" class="btn ghost" id="rematch" style="display:none"><span aria-hidden="true">↻</span> New game</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
@@ -153,15 +155,19 @@ function shuffle(){
 function clearAll(){ own=empty(); placed=[]; toPlace=[...SHIPS]; renderSetup(); }
 
 // ---------- rendering ----------
+const cellName=(r,c,v,reveal)=>String.fromCharCode(65+r)+(c+1)+": "+(v===2?"hit":v===3?"miss":v===1&&reveal?"ship":"water");
 function grid(el,board,reveal,onclick){
+  const kids=Array.from(el.children), focusIdx=kids.indexOf(document.activeElement);
   el.innerHTML="";
   for(let r=0;r<N;r++)for(let c=0;c<N;c++){
-    const d=document.createElement("div"); const v=board[r][c]; let cls="cell";
+    const d=document.createElement(onclick?"button":"div"); const v=board[r][c]; let cls="cell";
     if(v===2)cls+=" hit"; else if(v===3)cls+=" miss"; else if(v===1&&reveal)cls+=" ship";
     d.className=cls; d.textContent=v===2?"✶":v===3?"·":"";
-    if(onclick) d.onclick=()=>onclick(r,c);
+    d.setAttribute("aria-label",cellName(r,c,v,reveal));
+    if(onclick){ d.type="button"; d.onclick=()=>onclick(r,c); } else d.setAttribute("role","img");
     el.appendChild(d);
   }
+  if(focusIdx>=0&&onclick) el.children[focusIdx].focus();
 }
 function setStatus(h,s=""){ $("status").innerHTML=h; $("sub").innerHTML=s; }
 function renderFleet(){
@@ -179,6 +185,8 @@ function renderSetup(){
   $("ready").disabled = !allPlaced() || myReady;
   $("orientH").classList.toggle("active", orient==="h");
   $("orientV").classList.toggle("active", orient==="v");
+  $("orientH").setAttribute("aria-pressed", orient==="h");
+  $("orientV").setAttribute("aria-pressed", orient==="v");
   setStatus(myReady?"Waiting for opponent…":(allPlaced()?"Fleet ready — press Ready":"Place your ships"),
     oppHere?"":"Share room <code>"+room+"</code> so your opponent can join.");
 }

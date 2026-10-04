@@ -69,6 +69,9 @@
   .am .when{color:var(--muted);font-size:11px;flex:none}
   .am .media{display:block;max-width:200px;max-height:200px;border-radius:8px;margin-top:4px}
   .empty{color:var(--muted);text-align:center;padding:40px}
+  a:focus-visible,button:focus-visible,input:focus-visible,.grow:focus-visible{outline:3px solid var(--accent2-text,var(--accent2));outline-offset:2px}
+  button{touch-action:manipulation}
+  .chip-x{min-width:32px;min-height:32px}
 #detailBack{display:none}
 #viewFeedback{min-height:0;background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
 @media(max-width:760px){#panel .side{width:100%;border-right:0}#panel .detail{display:none}#panel.detail-open .side{display:none}#panel.detail-open .detail{display:flex}#detailBack{display:block;align-self:flex-start;min-height:44px;padding:8px 14px;margin:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;cursor:pointer}}
@@ -83,30 +86,29 @@
 <body>
 <header>
   <a class="home" href="index.html">‹ Home</a>
-  <h1>🛡 <span class="b">Admin</span> · Messenger</h1>
+  <h1><span aria-hidden="true">🛡</span> <span class="b">Admin</span> · Messenger</h1>
   <div class="spacer"></div>
   <a class="home-link" href="messenger.html" style="margin-right:14px;color:var(--muted)">Messenger</a>
   <span id="acctHost"></span>
 </header>
 
-<div id="msg">Loading…</div>
+<div id="msg" role="status" aria-live="polite">Loading…</div>
 
 <div id="panel">
-  <aside class="side">
+  <aside class="side" aria-label="Lëscht">
     <div class="side-h">
-      <div class="tabs"><button id="tabGroups" class="tab active">Groups</button><button id="tabUsers" class="tab">Users</button><button id="tabFeedback" class="tab">Feedback</button></div>
-      <input id="search" placeholder="Search…">
+      <div class="tabs"><button type="button" id="tabGroups" class="tab active">Groups</button><button type="button" id="tabUsers" class="tab">Users</button><button type="button" id="tabFeedback" class="tab">Feedback</button></div>
+      <input id="search" name="search" type="search" aria-label="Search" placeholder="Search…" autocomplete="off">
       <div class="uact">
         <h4>PIN zerécksetzen</h4>
         <div class="pwrow">
-          <input id="pinResetUser"
-            placeholder="Benotzernumm">
-          <button id="pinResetBtn">Zerécksetzen</button>
+          <input id="pinResetUser" name="username" aria-label="Benotzernumm" placeholder="Benotzernumm" autocomplete="off" autocapitalize="none" spellcheck="false">
+          <button type="button" id="pinResetBtn">Zerécksetzen</button>
         </div>
         <div class="hint">
           Erstellt e sécheren eemolege Link fir de Benotzer.
         </div>
-        <div class="pwresult" id="pinResetResult"></div>
+        <div class="pwresult" id="pinResetResult" role="status" aria-live="polite"></div>
       </div>
     </div>
     <ul class="glist" id="glist"></ul>
@@ -140,6 +142,7 @@ function showRecoveryLink(name, url) {
   const field = document.createElement("input");
   field.value = url;
   field.readOnly = true;
+  field.setAttribute("aria-label", "Recovery-Link");
   const copy = document.createElement("button");
   copy.type = "button";
   copy.textContent = "Kopéieren";

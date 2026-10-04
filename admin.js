@@ -7,6 +7,10 @@ const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? "—" : d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
 const fileIcon = (name) => { const e = (name || "").split(".").pop().toLowerCase(); return ({ pdf: "📕", zip: "🗜", doc: "📘", docx: "📘", xls: "📗", xlsx: "📗", ppt: "📙", pptx: "📙", txt: "📄", mp3: "🎵", wav: "🎵" })[e] || "📎"; };
 
+$("glist").addEventListener("keydown", (e) => {
+  const row = e.target.closest?.(".grow");
+  if (row && e.target === row && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); row.click(); }
+});
 function showList() { $("panel").classList.remove("detail-open"); }
 $("detailBack").onclick = showList;
 
@@ -47,7 +51,7 @@ function renderGroupList(list) {
   const ul = $("glist");
   if (!list.length) { ul.innerHTML = `<li class="empty">No groups yet.</li>`; return; }
   ul.innerHTML = list.map((g) =>
-    `<li class="grow ${current && current.id === g.id ? "active" : ""}" data-id="${g.id}">
+    `<li class="grow ${current && current.id === g.id ? "active" : ""}" data-id="${g.id}" tabindex="0" role="button">
        <div class="n">${esc(g.name)}${g.is_dm ? '<span class="tag">DM</span>' : ""}</div>
        <div class="meta">#${esc(g.invite_code)} · ${g.member_count} member(s) · ${g.message_count} msg · ${fmt(g.created_at)}</div>
      </li>`).join("");
@@ -63,7 +67,7 @@ async function openGroup(id) {
     sb.rpc("admin_messages", { p_group_id: id }),
   ]);
   const chips = (members || []).map((m) =>
-    `<span class="chip">${esc(m.username)}<button class="chip-x" data-uid="${m.user_id}" title="Remove from group">&times;</button></span>`).join("") || "<span class='muted'>no members</span>";
+    `<span class="chip">${esc(m.username)}<button class="chip-x" data-uid="${m.user_id}" title="Remove from group" aria-label="Remove ${esc(m.username)} from group">&times;</button></span>`).join("") || "<span class='muted'>no members</span>";
   $("detailH").innerHTML =
     `<div class="dh-top"><b>${esc(current.name)}</b>${current.is_dm ? '<span class="tag dm">DM</span>' : ""}
        <button class="danger" id="delGroup">Delete group</button></div>
@@ -83,7 +87,7 @@ async function openGroup(id) {
     // don't repeat it as text. Other media (image/video/audio) carry empty content.
     const txt = m.media_type === "file" ? "" : (m.content || "");
     el.innerHTML = `<span class="who">${esc(m.username)}</span><span class="txt">${esc(txt)}</span>
-      <button class="msg-del" title="Delete message">🗑</button><span class="when">${fmt(m.created_at)}</span>`;
+      <button class="msg-del" title="Delete message" aria-label="Delete message">🗑</button><span class="when">${fmt(m.created_at)}</span>`;
     if (m.media_url) appendMedia(el.querySelector(".txt"), m);
     el.querySelector(".msg-del").onclick = () => deleteMessage(m.id, id);
     box.appendChild(el);
@@ -127,7 +131,7 @@ function renderUserList(list) {
   const ul = $("glist");
   if (!list.length) { ul.innerHTML = `<li class="empty">No users.</li>`; return; }
   ul.innerHTML = list.map((u) =>
-    `<li class="grow ${current && current.id === u.id ? "active" : ""}" data-uid="${u.id}">
+    `<li class="grow ${current && current.id === u.id ? "active" : ""}" data-uid="${u.id}" tabindex="0" role="button">
        <div class="n">${esc(u.username || "(no username)")}</div>
        <div class="meta">${esc(u.email)} · joined ${fmt(u.created_at)}${u.confirmed ? "" : " · ⚠ unconfirmed"}</div>
      </li>`).join("");
@@ -145,7 +149,7 @@ function openUser(uid) {
   const u = current;
   $("detailH").innerHTML =
     `<div class="dh-top"><b>${esc(u.username || "(no username)")}</b>
-       <button class="danger" id="delUser">Delete user</button></div>`;
+       <button type="button" class="danger" id="delUser">Delete user</button></div>`;
   $("mlist").innerHTML =
     `<div class="uinfo">
        <div><span class="k">Email</span><br>${esc(u.email)}</div>
@@ -157,12 +161,12 @@ function openUser(uid) {
      <div class="uact">
        <h4>Reset password</h4>
        <div class="pwrow">
-         <input id="newPw" value="${genPassword()}">
-         <button class="pwgen" id="genPw" title="Generate new">🎲</button>
-         <button id="setPw">Set</button>
+         <input id="newPw" name="new-password" aria-label="New password" autocomplete="off" spellcheck="false" value="${genPassword()}">
+         <button type="button" class="pwgen" id="genPw" title="Generate new" aria-label="Generate new password">🎲</button>
+         <button type="button" id="setPw">Set</button>
        </div>
        <div class="hint">Passwords can't be viewed (they're encrypted). Set a new one here and share it — the user can change it later after signing in.</div>
-       <div class="pwresult" id="pwResult"></div>
+       <div class="pwresult" id="pwResult" role="status" aria-live="polite"></div>
      </div>`;
   $("delUser").onclick = () => deleteUser(uid);
   $("genPw").onclick = () => { $("newPw").value = genPassword(); };
@@ -203,7 +207,7 @@ function renderFeedback(list) {
     el.className = "am";
     el.innerHTML = `<span class="who">${KIND[f.kind] || "💬"}</span>
       <span class="txt">${esc(f.message)}<br><span class="muted">${esc(f.page || "?")}${f.username ? " · " + esc(f.username) : ""}</span></span>
-      <button class="msg-del" title="Delete">🗑</button><span class="when">${fmt(f.created_at)}</span>`;
+      <button class="msg-del" title="Delete" aria-label="Delete">🗑</button><span class="when">${fmt(f.created_at)}</span>`;
     el.querySelector(".msg-del").onclick = () => deleteFeedback(f.id);
     box.appendChild(el);
   });

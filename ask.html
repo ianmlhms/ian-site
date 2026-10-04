@@ -26,12 +26,14 @@
   .msg.think{align-self:flex-start;color:var(--muted);background:none;border:none;font-size:13px}
   .hint{color:var(--muted);font-size:12.5px;text-align:center;padding:4px 14px}
   .chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:6px 14px}
-  .chip{background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:7px 12px;font-size:12.5px;color:var(--muted);cursor:pointer;font-weight:700}
+  .chip{background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:10px 14px;min-height:44px;font-family:inherit;font-size:12.5px;color:var(--muted);cursor:pointer;font-weight:700;touch-action:manipulation}
   .chip:hover{border-color:var(--accent2-text);color:var(--text)}
   form{display:flex;gap:8px;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--border);flex:0 0 auto}
   form input{flex:1;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit;outline:none}
   form input:focus{border-color:var(--accent-border)}
-  form button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:0 18px;font-weight:800;cursor:pointer;font-size:15px}
+  form input:focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--accent-border,var(--accent));outline-offset:2px}
+  form button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:0 18px;min-width:48px;font-weight:800;cursor:pointer;font-size:15px;touch-action:manipulation}
   form button:disabled{opacity:.5;cursor:default}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
@@ -42,12 +44,12 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>🧠 Frot deng Daten</h1>
+  <h1><span aria-hidden="true">🧠</span> Frot deng Daten</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+<main class="wrap" id="wrap"><div class="gate">Lueden…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -67,10 +69,10 @@ const SUGGESTIONS=[
 
 function shell(){
   return `
-    <div id="chat"></div>
-    <div class="chips" id="chips">${SUGGESTIONS.map(s=>`<span class="chip">${s}</span>`).join("")}</div>
+    <div id="chat" role="log" aria-live="polite" aria-label="Gespréich"></div>
+    <div class="chips" id="chips">${SUGGESTIONS.map(s=>`<button type="button" class="chip">${s}</button>`).join("")}</div>
     <div class="hint">Äntwert baséiert op dénge Sue-, Gesondheets-, Abo-, Countdown- a Kart-Donnéeën.</div>
-    <form id="f"><input id="q" placeholder="Frot eppes iwwer deng Daten…" autocomplete="off"><button id="send">➤</button></form>`;
+    <form id="f"><input id="q" name="q" aria-label="Deng Fro" placeholder="Frot eppes iwwer deng Daten…" autocomplete="off" enterkeyhint="send"><button id="send" type="submit" aria-label="Schécken"><span aria-hidden="true">➤</span></button></form>`;
 }
 
 function addMsg(cls,text){
