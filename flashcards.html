@@ -14,7 +14,8 @@
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
   a{color:var(--accent2-text);text-decoration:none}
   .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700;cursor:pointer}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
+  .bar .home{color:var(--muted);font-weight:700;cursor:pointer}
+  button.home{background:none;border:0;font:inherit;font-weight:700;padding:0 8px}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
   .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
   .gate{text-align:center;color:var(--muted);padding:50px 16px}
   .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
@@ -43,6 +44,9 @@
   .del:hover{color:var(--warn)}
   .settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center;color:var(--muted);font-size:13px}
   .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .del{min-width:44px;min-height:44px}
+  @media (prefers-reduced-motion:reduce){.inner{transition:none}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -51,13 +55,13 @@
 </head>
 <body>
 <header class="bar">
-  <span class="home" id="back">‹ Zeréck</span>
-  <h1>🃏 Kaarten</h1>
+  <button type="button" class="home" id="back">‹ Zeréck</button>
+  <h1><span aria-hidden="true">🃏</span> Kaarten</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+<main class="wrap" id="wrap"><div class="gate">Lueden…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -66,7 +70,8 @@ import * as auth from "./auth.js?v=21";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const qs=new URLSearchParams(location.search);
-let sb=null,me=null,myClass=null,deck=null,cards=[],idx=0,flipped=false;
+let sb=null,me=null,myClass=null,deck=null,cards=[],idx=0,flipped=false,focusSel=null;
+const activateKey=(fn)=>(ev)=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();fn();}};
 
 async function boot(){
   sb=await auth.client();
@@ -92,16 +97,16 @@ async function listView(){
   for(const c of cc||[])counts[c.deck_id]=(counts[c.deck_id]||0)+1;
   const mine=(decks||[]).filter(d=>d.owner===me);
   const shared=(decks||[]).filter(d=>d.owner!==me);
-  const row=(d)=>`<div class="card"><div class="deckrow" data-open="${d.id}">
+  const row=(d)=>`<div class="card"><div class="deckrow" data-open="${d.id}" role="button" tabindex="0">
       <div><div class="t">${esc(d.title)}</div><div class="s">${d.shared?"👥 gedeelt · ":""}${d.class?esc(d.class):""}</div></div>
-      <div class="n">${counts[d.id]||0} 🃏</div></div></div>`;
+      <div class="n">${counts[d.id]||0} <span aria-hidden="true">🃏</span></div></div></div>`;
   $("wrap").innerHTML=`
     <div class="card">
       <div class="settings" style="gap:8px">
-        <input id="newTitle" placeholder="Nei Këscht (z.B. Vokabelen Englesch)" style="flex:1;min-width:180px">
+        <input id="newTitle" placeholder="Nei Këscht (z.B. Vokabelen Englesch)" aria-label="Numm vun der neier Këscht" style="flex:1;min-width:180px">
         <button class="btn" id="newBtn">Uleeën</button>
       </div>
-      <div class="msg" id="lm"></div>
+      <div class="msg" id="lm" role="status" aria-live="polite"></div>
     </div>
     <h2>Meng Këschten</h2>
     ${mine.length?mine.map(row).join(""):'<div class="gate">Nach keng — lee eng un 👆</div>'}
@@ -113,7 +118,10 @@ async function listView(){
     if(error){$("lm").textContent="Feeler (Migratioun gelaf?).";return;}
     openDeck(data.id);
   };
-  $("wrap").querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>openDeck(el.dataset.open));
+  $("wrap").querySelectorAll("[data-open]").forEach(el=>{
+    el.onclick=()=>openDeck(el.dataset.open);
+    el.onkeydown=activateKey(()=>openDeck(el.dataset.open));
+  });
 }
 
 async function newDeckForExam(examId,cls){
@@ -140,66 +148,71 @@ function studyView(){
       <div style="display:flex;align-items:center;gap:10px">
         <div style="font-weight:800;font-size:17px">${esc(deck.title)}</div>
         <div class="spacer" style="flex:1"></div>
-        ${mine?`<button class="ghost" id="editBtn">✏️ Änneren</button>`:""}
+        ${mine?`<button class="ghost" id="editBtn"><span aria-hidden="true">✏️</span> Änneren</button>`:""}
       </div>
     </div>
-    <div class="flip" id="flip"><div class="inner" id="inner">
+    <div class="flip" id="flip" role="button" tabindex="0"><div class="inner" id="inner" aria-hidden="true">
       <div class="face"><span class="side">Fro</span><span id="front"></span></div>
       <div class="face b"><span class="side">Äntwert</span><span id="back2"></span></div>
     </div></div>
+    <div class="sr" id="fcLive" role="status" aria-live="polite"></div>
     <div class="nav">
-      <button id="prev">‹</button>
+      <button id="prev" aria-label="Viregt Kaart">‹</button>
       <div class="prog" id="prog"></div>
-      <button id="next">›</button>
+      <button id="next" aria-label="Nächst Kaart">›</button>
     </div>
     <div class="tools">
-      <button class="ghost" id="shuf">🔀 Mëschen</button>
+      <button class="ghost" id="shuf"><span aria-hidden="true">🔀</span> Mëschen</button>
       ${deck.owner===me?`<button class="ghost" id="shareBtn"></button>`:""}
     </div>`;
-  $("flip").onclick=()=>{flipped=!flipped;$("inner").classList.toggle("back",flipped);};
+  $("flip").onclick=()=>{flipped=!flipped;$("inner").classList.toggle("back",flipped);labelFlip();announce(flipped?"Äntwert: "+cards[idx].back:"Fro: "+cards[idx].front);};
+  $("flip").onkeydown=(e)=>{if(e.key==="Enter"){e.preventDefault();$("flip").click();}};
   $("prev").onclick=()=>go(-1);$("next").onclick=()=>go(1);
   $("shuf").onclick=()=>{for(let i=cards.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cards[i],cards[j]]=[cards[j],cards[i]];}idx=0;flipped=false;paint();};
   if($("editBtn"))$("editBtn").onclick=editView;
   if($("shareBtn")){const upd=()=>$("shareBtn").textContent=deck.shared?"👥 Gedeelt mat der Klass":"🔒 Just fir mech";upd();
     $("shareBtn").onclick=async()=>{deck.shared=!deck.shared;await sb.from("flashcard_decks").update({shared:deck.shared}).eq("id",deck.id);upd();};}
-  document.onkeydown=(e)=>{if(e.key==="ArrowLeft")go(-1);else if(e.key==="ArrowRight")go(1);else if(e.key===" "){e.preventDefault();$("flip").click();}};
+  document.onkeydown=(e)=>{if(e.metaKey||e.ctrlKey||e.altKey)return;if(e.key==="ArrowLeft")go(-1);else if(e.key==="ArrowRight")go(1);else if(e.key===" "){if(e.target.closest&&e.target.closest("button,a,input,textarea,select"))return;e.preventDefault();$("flip").click();}};
   paint();
 }
-function go(d){ if(!cards.length)return; idx=(idx+d+cards.length)%cards.length; flipped=false; $("inner").classList.remove("back"); paint(); }
+function go(d){ if(!cards.length)return; idx=(idx+d+cards.length)%cards.length; flipped=false; $("inner").classList.remove("back"); paint(); announce((idx+1)+" / "+cards.length+". Fro: "+cards[idx].front); }
+function announce(t){const l=$("fcLive");if(l)l.textContent=t;}
+function labelFlip(){const f=$("flip");if(!f||!cards.length)return;const c=cards[idx];f.setAttribute("aria-label",flipped?"Äntwert: "+c.back+". Ëmdréinen fir d'Fro ze gesinn":"Fro: "+c.front+". Ëmdréinen fir d'Äntwert ze gesinn");}
 function paint(){
   if(!cards.length)return;
   const c=cards[idx];
   $("front").textContent=c.front;$("back2").textContent=c.back;
   $("prog").textContent=(idx+1)+" / "+cards.length;
   $("inner").classList.toggle("back",flipped);
+  labelFlip();
 }
 
 /* ---------- edit ---------- */
 function editView(){
   document.onkeydown=null;
   const rows=cards.map(c=>`<div class="crow" data-id="${c.id}">
-      <textarea class="cf" rows="2" placeholder="Fro">${esc(c.front)}</textarea>
-      <textarea class="cb" rows="2" placeholder="Äntwert">${esc(c.back)}</textarea>
-      <button class="del" data-del="${c.id}" title="Läschen">✕</button>
+      <textarea class="cf" rows="2" placeholder="Fro" aria-label="Fro">${esc(c.front)}</textarea>
+      <textarea class="cb" rows="2" placeholder="Äntwert" aria-label="Äntwert">${esc(c.back)}</textarea>
+      <button class="del" data-del="${c.id}" title="Läschen" aria-label="Kaart läschen"><span aria-hidden="true">✕</span></button>
     </div>`).join("");
   $("wrap").innerHTML=`
     <div class="card">
-      <input id="dTitle" value="${esc(deck.title)}" maxlength="80">
+      <input id="dTitle" value="${esc(deck.title)}" maxlength="80" aria-label="Titel vun der Këscht">
       <div class="settings" style="margin-top:10px">
         <label><input type="checkbox" id="dShare" ${deck.shared?"checked":""}> Mat der Klass deelen</label>
         ${deck.exam_id?`<span>· un en Test gebonnen</span>`:""}
       </div>
-      <div class="msg" id="em"></div>
+      <div class="msg" id="em" role="status" aria-live="polite"></div>
     </div>
     <h2>Kaarten</h2>
     <div id="rows">${rows||""}</div>
     <div class="crow">
-      <textarea class="nf" rows="2" placeholder="Nei Fro"></textarea>
-      <textarea class="nb" rows="2" placeholder="Nei Äntwert"></textarea>
-      <button class="del" id="addCard" title="Bäisetzen">＋</button>
+      <textarea class="nf" rows="2" placeholder="Nei Fro" aria-label="Nei Fro"></textarea>
+      <textarea class="nb" rows="2" placeholder="Nei Äntwert" aria-label="Nei Äntwert"></textarea>
+      <button class="del" id="addCard" title="Bäisetzen" aria-label="Kaart bäisetzen"><span aria-hidden="true">＋</span></button>
     </div>
     <div class="tools" style="justify-content:flex-start">
-      ${cards.length?`<button class="btn" id="study">▶︎ Léieren</button>`:""}
+      ${cards.length?`<button class="btn" id="study"><span aria-hidden="true">▶︎</span> Léieren</button>`:""}
       <button class="ghost" id="delDeck">Këscht läschen</button>
     </div>`;
   $("dTitle").onchange=()=>saveDeck();
@@ -211,7 +224,7 @@ function editView(){
     r.querySelector("[data-del]").onclick=async()=>{
       const {error}=await sb.from("flashcards").delete().eq("id",id);
       if(error){console.warn("[cards] card delete",error);setEm("Net geläscht.",true);return;}
-      openDeck(deck.id,true);};
+      focusSel="#dTitle";openDeck(deck.id,true);};
   });
   $("addCard").onclick=addCard;
   if($("study"))$("study").onclick=()=>{idx=0;flipped=false;studyView();};
@@ -220,6 +233,7 @@ function editView(){
     const {error}=await sb.from("flashcard_decks").delete().eq("id",deck.id);
     if(error){console.warn("[cards] deck delete",error);setEm("Net geläscht.",true);return;}
     deck=null;location.href="flashcards.html";};
+  if(focusSel){const el=$("wrap").querySelector(focusSel);focusSel=null;if(el)el.focus({preventScroll:true});}
 }
 // Supabase reports failure in {error}; it does not throw. Acknowledging a save
 // without reading that told the user their work was safe when it was not.
@@ -246,7 +260,7 @@ async function addCard(){
   const pos=(cards.reduce((m,c)=>Math.max(m,c.pos||0),0))+1;
   const {error}=await sb.from("flashcards").insert({deck_id:deck.id,front,back,pos});
   if(error){setEm("Feeler.",true);return;}
-  openDeck(deck.id,true);
+  focusSel=".nf";openDeck(deck.id,true);
 }
 function setEm(t,err){const m=$("em");if(!m)return;m.textContent=t;m.style.color=err?"#ff6b6b":"var(--accent2)";if(!err)setTimeout(()=>{if(m)m.textContent="";},1200);}
 

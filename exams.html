@@ -43,6 +43,8 @@
   .row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
   .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:13px}
   .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
+  .del{min-width:44px;min-height:44px}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -52,13 +54,13 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>⏳ Tester</h1>
+  <h1><span aria-hidden="true">⏳</span> Tester</h1>
   <div class="spacer"></div>
   <span id="classTag"></span>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+<main class="wrap" id="wrap"><div class="gate">Lueden…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -122,20 +124,26 @@ function render(){
     const when=t.toLocaleString("de-DE",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
     const nDecks=(decksByExam[e.id]||[]).length;
     return `<div class="card" style="margin-bottom:10px">
-      <div class="exam${left<0?" past":""}" data-open="${e.id}">
+      <div class="exam${left<0?" past":""}" data-open="${e.id}" role="button" tabindex="0" aria-expanded="${openId===e.id}" aria-controls="det-${e.id}">
         <div><div class="subj">${esc(e.subject)}${e.untis_id?` <span class="caret" title="Automatesch vu WebUntis">· WebUntis</span>`:""}${nDecks?` <span class="caret">🃏 ${nDecks}</span>`:""}</div>
           <div class="when">${when}</div>${e.note?`<div class="note">${esc(e.note)}</div>`:""}</div>
         <div class="cd${left<3*DAY&&left>0?" soon":""}" data-cd="${e.id}"><b>${cdText(left)}</b></div>
-        <span class="caret">${openId===e.id?"▲":"▼"}</span>
+        <span class="caret" aria-hidden="true">${openId===e.id?"▲":"▼"}</span>
       </div>
       <div class="detail${openId===e.id?" open":""}" id="det-${e.id}"></div>
     </div>`;
   }).join("");
-  $("list").querySelectorAll("[data-open]").forEach(el=>el.onclick=()=>toggle(el.dataset.open));
+  $("list").querySelectorAll("[data-open]").forEach(el=>{
+    el.onclick=()=>toggle(el.dataset.open);
+    el.onkeydown=(ev)=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();toggle(el.dataset.open);}};
+  });
   if(openId)loadDetail(openId);
 }
 
-function toggle(id){ openId=(openId===id)?null:id; render(); }
+function toggle(id){
+  openId=(openId===id)?null:id; render();
+  const head=document.querySelector(`[data-open="${id}"]`);if(head)head.focus({preventScroll:true});
+}
 
 async function loadDetail(id){
   const box=$("det-"+id);if(!box)return;
@@ -150,20 +158,20 @@ async function loadDetail(id){
     const canDel=n.created_by===me;
     const file=n.file_url?`<a class="file" href="#" data-file="${esc(n.file_url)}">📎 ${esc(n.file_name||"Datei")}</a>`:"";
     return `<div class="n">${n.body?esc(n.body):""}
-      <div class="meta">${file}${canDel?`<button class="del" data-dn="${n.id}" title="Läschen">✕</button>`:""}</div></div>`;
+      <div class="meta">${file}${canDel?`<button class="del" data-dn="${n.id}" title="Läschen" aria-label="Notiz läschen"><span aria-hidden="true">✕</span></button>`:""}</div></div>`;
   }).join("")||`<div class="n" style="color:var(--muted)">Nach keng Notizen. Setz deng Resimee oder Fotoen bäi 👇</div>`;
   const deckHtml=(decks||[]).map(d=>`<a class="deck" href="flashcards.html?deck=${d.id}">🃏 ${esc(d.title)}</a>`).join("");
   box.innerHTML=`
     <h3>Notizen & Resimee</h3>
     ${notesHtml}
-    <textarea id="nb-${id}" placeholder="Schreif eng Notiz / Resimee…"></textarea>
+    <textarea id="nb-${id}" placeholder="Schreif eng Notiz / Resimee…" aria-label="Notiz oder Resimee"></textarea>
     <div class="row2">
       <button class="btn" id="an-${id}">Notiz späicheren</button>
       <button class="ghost" id="af-${id}">📎 Datei / Foto</button>
       <input type="file" id="fi-${id}" accept="image/*,application/pdf" hidden>
-      <span class="msg" id="nm-${id}"></span>
+      <span class="msg" id="nm-${id}" role="status" aria-live="polite"></span>
     </div>
-    <h3 style="margin-top:16px">Kaartekëschten 🃏</h3>
+    <h3 style="margin-top:16px">Kaartekëschten <span aria-hidden="true">🃏</span></h3>
     <div class="deckwrap">${deckHtml}
       <a class="deck" href="flashcards.html?exam=${id}&class=${encodeURIComponent(myClass)}">＋ Nei Këscht</a>
     </div>
