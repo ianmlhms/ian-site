@@ -23,7 +23,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,"SF Pro Te
 ::selection{background:var(--accent);color:var(--accent-foreground)}
 header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
 .header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;cursor:pointer}
 .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--brand1),var(--brand2));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(255,107,157,0.3);animation:lp 3s ease-in-out infinite}
 @keyframes lp{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 .logo-text{font-size:28px;font-weight:750;letter-spacing:-.025em;background:linear-gradient(135deg,var(--brand1),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -68,7 +68,7 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 .game-thumb img.failed{display:none}
 .game-thumb .em{filter:drop-shadow(0 8px 20px rgba(0,0,0,0.55));transition:transform 0.3s}
 .game-card:hover .game-thumb .em{transform:scale(1.12)}
-.game-thumb::after{content:'\25B6';position:absolute;top:50%;left:50%;z-index:2;transform:translate(-50%,-50%) scale(0);font-size:32px;color:#fff;opacity:0;transition:all 0.3s;text-shadow:0 0 20px rgba(0,0,0,0.8)}
+.game-thumb::after{content:'\25B6';position:absolute;top:50%;left:50%;z-index:2;transform:translate(-50%,-50%) scale(0);font-size:32px;color:#fff;opacity:0;transition:opacity 0.3s,transform 0.3s;text-shadow:0 0 20px rgba(0,0,0,0.8)}
 .game-card:hover .game-thumb::after{transform:translate(-50%,-50%) scale(1);opacity:0.8}
 .game-info{display:block;padding:10px 12px}
 .game-name{display:block;font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
@@ -101,7 +101,12 @@ body.game-no-pad #tc{display:none!important}
 .more-games summary::-webkit-details-marker{display:none}.more-games summary::after{content:"⌄";margin-left:auto;color:var(--text2);font-size:20px;transition:transform .24s cubic-bezier(.2,.8,.2,1)}
 .more-games[open] summary::after{transform:rotate(180deg)}.more-games summary:active{background:var(--card2)}
 .more-content{padding:0 16px 18px}.more-group h3{margin:18px 0 10px;font-size:15px;letter-spacing:.01em;color:var(--text2)}
-@media(prefers-reduced-motion:reduce){.more-games summary::after{transition:none}.game-card,.game-thumb .em{transition:none}}
+@media(prefers-reduced-motion:reduce){.more-games summary::after{transition:none}.game-card,.game-thumb .em,.game-thumb::after{transition:none}.logo-icon{animation:none}.game-card:hover{transform:none}}
+button,.game-card,.genre-filter,.home-btn,.logo{touch-action:manipulation}
+.search-box input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.home-btn:focus-visible,.logo:focus-visible,#installBtn:focus-visible,#om button:focus-visible,#om input:focus-visible{outline:3px solid var(--accent2);outline-offset:3px}
+.game-info,.game-name{overflow-wrap:anywhere}
+.game-name,.count,.browse-status{text-wrap:balance}
 #om{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
 #om.open{display:flex}
 #om .box{background:var(--glass-solid);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;width:330px;max-width:100%}
@@ -128,21 +133,21 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
 <div class="header-inner">
 <div class="header-left">
 <a class="home-btn" href="index.html">&#x2039; Home</a>
-<div class="logo" onclick="goHome()">
-<div class="logo-icon">&#x1F3AE;</div>
-<div><div class="logo-text">Arcade</div><div class="logo-sub">Games for Breaks</div></div>
-</div>
+<a class="logo" href="pixelbreak.html" onclick="goHome();return false;">
+<div class="logo-icon" aria-hidden="true">&#x1F3AE;</div>
+<div><h1 class="logo-text">Arcade</h1><div class="logo-sub">Games for Breaks</div></div>
+</a>
 </div>
 <div class="header-right">
-<button id="installBtn" style="display:none;background:var(--card-hover);border:1px solid var(--accent2);color:var(--accent2-text);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit">📲 Install</button>
+<button id="installBtn" type="button" style="display:none;background:var(--card-hover);border:1px solid var(--accent2);color:var(--accent2-text);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit"><span aria-hidden="true">📲</span> Install</button>
 <div class="search-box">
-<span class="si">&#x1F50D;</span>
-<input type="text" id="search" placeholder="Search games..." oninput="applyFilters()">
+<span class="si" aria-hidden="true">&#x1F50D;</span>
+<input type="search" id="search" name="q" aria-label="Search games" placeholder="Search games…" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="applyFilters()">
 </div>
 </div>
 </div>
 </header>
-<main>
+<main id="main">
 <nav class="browse" aria-label="Browse games by genre">
 <p class="browse-label">Browse by genre</p>
 <div class="genre-filters">
@@ -204,9 +209,9 @@ well-known arcade concepts — the kind of games most people have played some ve
 artwork and the level design are my own, and none of it is copied from another game.</p>
 </section>
 </main>
-<div id="overlay">
+<div id="overlay" role="dialog" aria-modal="true" aria-label="Game">
 <div id="gh"></div>
-<iframe id="gf" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+<iframe id="gf" title="Game" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
 <div id="tc">
 <div class="dpad">
 <button class="tb up" data-k="ArrowUp" aria-label="Up">&#x25B2;</button>
@@ -217,7 +222,7 @@ artwork and the level design are my own, and none of it is copied from another g
 <button class="tb act" data-k=" " aria-label="Action">A</button>
 </div>
 </div>
-<div id="om"><div class="box"></div></div>
+<div id="om" role="dialog" aria-modal="true" aria-labelledby="omTitle"><div class="box"></div></div>
 <footer>Arcade &mdash; Made for fun. Built-in games are original creations inspired by popular concepts. · <a href="privacy.html">Datenschutz · Privacy</a></footer>
 <script>
 const GAMES=[
@@ -474,22 +479,36 @@ closeGame();
 document.getElementById('search').value='';
 setGenre('all');
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeGame()});
+document.addEventListener('keydown',function(e){
+if(e.key!=='Escape')return;
+// Escape closes the topmost layer: the room dialog first, then the open game.
+if(document.getElementById('om').classList.contains('open')){closeOnline();return}
+closeGame();
+});
 
 /* room modal for the online (two-device) games */
 function openOnline(idx){
 var g=GAMES[idx];if(!g||!g.href)return;
 var om=document.getElementById('om');
-om.querySelector('.box').innerHTML='<button class="x" onclick="document.getElementById(\'om\').classList.remove(\'open\')">&#x2715;</button>'+
-'<h3>'+g.emoji+' '+g.name+'</h3><p>'+g.desc+'</p>'+
+om.querySelector('.box').innerHTML='<button class="x" type="button" aria-label="Close" onclick="closeOnline()"><span aria-hidden="true">&#x2715;</span></button>'+
+'<h3 id="omTitle"><span aria-hidden="true">'+g.emoji+'</span> '+g.name+'</h3><p>'+g.desc+'</p>'+
 '<button class="go" onclick="startOnline(\''+g.href+'\')">&#x25B6; Start &mdash; get a room code</button>'+
 (g.ai?'<button class="go alt" onclick="location.href=\''+g.href+'?ai=1\'">&#x1F916; Play vs AI</button>':'')+
-'<div class="jr"><input id="omCode" placeholder="room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button onclick="joinOnline(\''+g.href+'\')">Join</button></div>';
+'<div class="jr"><input id="omCode" name="room" aria-label="Room code" placeholder="room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button type="button" onclick="joinOnline(\''+g.href+'\')">Join</button></div>';
 om.classList.add('open');
+_omOpener=document.activeElement;
+var first=om.querySelector('.go');if(first)first.focus();
+}
+var _omOpener=null;
+function closeOnline(){
+var om=document.getElementById('om');
+om.classList.remove('open');
+if(_omOpener&&_omOpener.isConnected)_omOpener.focus();
+_omOpener=null;
 }
 function startOnline(href){location.href=href+'?room='+Math.random().toString(36).slice(2,8)+'&role=host'}
 function joinOnline(href){var c=(document.getElementById('omCode').value||'').trim().toLowerCase();if(c)location.href=href+'?room='+encodeURIComponent(c)+'&role=guest'}
-document.getElementById('om').addEventListener('click',function(e){if(e.target.id==='om')e.target.classList.remove('open')});
+document.getElementById('om').addEventListener('click',function(e){if(e.target.id==='om')closeOnline()});
 
 // On-screen touch controls → synthetic key events into the open game (same-origin iframe).
 (function(){
@@ -588,6 +607,7 @@ loadPlayCounts();
     // iOS has no install prompt: explain the Share-menu route
     var tip=document.createElement('div');
     tip.textContent='On iOS: tap Share ⬆️, then “Add to Home Screen”';
+    tip.setAttribute('role','status');
     tip.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card-hover);border:1px solid var(--accent2);color:var(--text);padding:12px 18px;border-radius:12px;font-weight:700;z-index:9999;max-width:90vw;text-align:center';
     document.body.appendChild(tip);
     setTimeout(function(){tip.remove();},5000);

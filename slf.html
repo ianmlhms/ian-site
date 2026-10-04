@@ -45,6 +45,18 @@
   .catpick .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
   .chip{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:7px 13px;font-size:13px;cursor:pointer}
   .chip.on{background:var(--accent);border-color:var(--accent-border);color:var(--accent-foreground);font-weight:700}
+  /* design-pass: a11y + touch */
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  button,.chip,.ovr{touch-action:manipulation}
+  .big.stop{color:#000}                      /* fixed red background: the accent-foreground (white on a dark accent) failed contrast */
+  td.pts,.letter,.tot td{font-variant-numeric:tabular-nums}
+  html[data-theme="light"]{--good:#1a7f37}   /* #3fb950 on white is 2.5:1 */
+  .cat input:focus-visible,.big:focus-visible,.chip:focus-visible,.ovr:focus-visible{outline:2px solid var(--focus-ring,var(--accent2-text));outline-offset:2px}
+  .chip{min-height:var(--hit-target,2.75rem)}
+  .cat label{overflow-wrap:anywhere}
+  .catpick{margin-bottom:14px}
+  @media(max-width:420px){.cat{flex-wrap:wrap;gap:4px}.cat label{width:100%}}
+  @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
   <link rel="stylesheet" href="game-common.css?v=5">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -61,7 +73,8 @@
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
 </header>
-<div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+<div class="sr-only" id="srLive" role="status" aria-live="polite" aria-atomic="true"></div>
+<main class="wrap" id="app"><p class="muted">Connecting…</p></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=6" data-arcade-id="o-slf" data-arcade-title="Stadt-Land-Fluss" data-arcade-no-score data-arcade-replace=".bar"></script>
@@ -212,13 +225,20 @@ function pick(){
   return letterBag.pop();
 }
 
+let lastAnnounced="";
+function announce(text){
+  if(text===lastAnnounced) return; lastAnnounced=text;
+  const el=document.getElementById("srLive"); if(!el) return;
+  el.textContent=""; setTimeout(()=>{ el.textContent=text; },50);
+}
 function render(){
   const ps = players();
   if (phase==="lobby"){
+    announce(ps.length<2?"Lobby: waiting for players":"Lobby: ready");
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
+      <div class="players">${ps.map(p=>`<span class="pchip"><span aria-hidden="true">👤</span> ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
       <p class="muted">${ps.length<2?"Waiting for players — share the room code above.":"Ready!"}</p>
-      <p class="muted" style="font-size:12.5px">🔎 At the reveal, answers are checked against Wikidata — made-up words score 0.</p>
+      <p class="muted" style="font-size:12.5px"><span aria-hidden="true">🔎</span> At the reveal, answers are checked against Wikidata — made-up words score 0.</p>
       ${role==="host" ? renderCatPicker() : ""}
       ${role==="host" ? `<button class="big" id="startBtn" ${(ps.length<2||selIdx.length<2)?"disabled":""}>Start round ${round+1}</button>`
                       : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
@@ -230,19 +250,22 @@ function render(){
     }
   } else if (phase==="play"){
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}</span>`).join("")}</div>
+      <div class="players">${ps.map(p=>`<span class="pchip"><span aria-hidden="true">👤</span> ${esc(p.name)}</span>`).join("")}</div>
       <div class="letter"></div>
-      ${cats.map((c,i)=>`<div class="cat"><label>${esc(c.name)}</label><input id="c${i}" autocomplete="off" maxlength="200"></div>`).join("")}
-      <button class="big stop" id="stopBtn">✋ Stop! (reveal)</button>`;
+      ${cats.map((c,i)=>`<div class="cat"><label for="c${i}">${esc(c.name)}</label><input id="c${i}" name="answer-${i}" type="text" enterkeyhint="next" autocomplete="off" autocapitalize="words" spellcheck="false" maxlength="200"></div>`).join("")}
+      <button class="big stop" id="stopBtn" type="button"><span aria-hidden="true">✋</span> Stop! (reveal)</button>`;
     $("app").querySelector(".letter").textContent=letter;
     cats.forEach((_,i)=>$("c"+i).placeholder=letter+"…");
     $("c0").focus();
+    announce("Round "+round+": letter "+letter);
     $("stopBtn").onclick=()=>{ ch.send({type:"broadcast",event:"stop",payload:{}}); doStop(); };
   } else if (phase==="checking"){
+    announce("Checking the answers on Wikidata");
     $("app").innerHTML = `
       <div class="letter" style="font-size:34px"></div>
-      <p class="center muted">🔎 Checking the answers on Wikidata…</p>`;
+      <p class="center muted"><span aria-hidden="true">🔎</span> Checking the answers on Wikidata…</p>`;
   } else if (phase==="results"){
+    announce("Round "+round+" results are in");
     $("app").innerHTML = `
       <div class="letter" style="font-size:34px"></div>
       ${renderRound(ps)}
@@ -258,13 +281,13 @@ function render(){
   if(phase==="checking"||phase==="results") $("app").querySelector(".letter").textContent="Letter: "+letter;
 }
 function renderRound(ps){
-  let rows = `<h3>Round ${round}</h3><table><tr><th>Category</th>${ps.map(p=>`<th>${esc(p.name)}</th>`).join("")}</tr>`;
+  let rows = `<h3>Round ${round}</h3><table><tr><th scope="col">Category</th>${ps.map(p=>`<th scope="col">${esc(p.name)}</th>`).join("")}</tr>`;
   cats.forEach((cat,i)=>{
-    rows += `<tr><td class="muted">${esc(cat.name)}</td>` + ps.map(p=>{
+    rows += `<tr><th scope="row" class="muted" style="font-weight:400;font-size:14px">${esc(cat.name)}</th>` + ps.map(p=>{
       const a=(answers[p.cid]?.ans?.[i])||""; const pts=scoreCell(i,p.cid,ps);
       const isBad = verdicts[p.cid+"|"+i]===false;
-      const ovr = role==="host" ? ` <button class="ovr" data-ov="${p.cid}|${i}" title="Wikidata got it wrong? Count this answer anyway.">✓ count it</button>` : "";
-      const shown = !a ? "—" : isBad ? `<s style="color:var(--text)">${esc(a)}</s> ❌${ovr}` : esc(a);
+      const ovr = role==="host" ? ` <button class="ovr" type="button" data-ov="${p.cid}|${i}" title="Wikidata got it wrong? Count this answer anyway." aria-label="Count ${esc(a)} anyway (Wikidata got it wrong)">✓ count it</button>` : "";
+      const shown = !a ? "—" : isBad ? `<s style="color:var(--text)">${esc(a)}</s> <span aria-hidden="true">❌</span><span class="sr-only">(rejected by Wikidata)</span>${ovr}` : esc(a);
       return `<td>${shown} <span class="pts" style="color:var(--good)">${pts?("+"+pts):""}</span></td>`;
     }).join("") + `</tr>`;
   });
@@ -273,7 +296,7 @@ function renderRound(ps){
 function renderTotals(ps){
   if(!Object.keys(totals).length) return "";
   const sorted=[...ps].sort((a,b)=>(totals[b.cid]||0)-(totals[a.cid]||0));
-  return `<div class="tot"><h3>Scores</h3><table>${sorted.map(p=>`<tr><td>👤 ${esc(p.name)}</td><td class="pts">${totals[p.cid]||0}</td></tr>`).join("")}</table></div>`;
+  return `<div class="tot"><h3>Scores</h3><table>${sorted.map(p=>`<tr><td><span aria-hidden="true">👤</span> ${esc(p.name)}</td><td class="pts">${totals[p.cid]||0}</td></tr>`).join("")}</table></div>`;
 }
 const MIN_ANSWER_LEN = 2;                // a lone letter ("B") is never an answer
 function valid(a){ const t=(a||"").trim(); return t.length>=MIN_ANSWER_LEN && t[0].toUpperCase()===letter; }
@@ -303,7 +326,7 @@ function toggleCat(i){
 }
 function renderCatPicker(){
   return `<div class="catpick"><h3>Kategorien (${selIdx.length})</h3>
-    <div class="chips">${CATALOG.map((c,i)=>`<button class="chip${selIdx.includes(i)?" on":""}" data-ci="${i}">${esc(c.name)}</button>`).join("")}</div>
+    <div class="chips">${CATALOG.map((c,i)=>`<button class="chip${selIdx.includes(i)?" on":""}" type="button" aria-pressed="${selIdx.includes(i)}" data-ci="${i}">${esc(c.name)}</button>`).join("")}</div>
     ${selIdx.length<2?'<p class="muted" style="font-size:12px">Wähle mindestens 2 Kategorien.</p>':''}</div>`;
 }
 function enterPlay(){ phase="play"; stopped=false; answers={}; verdicts={}; roundScores={}; clearTimeout(verdictTimer); render(); }

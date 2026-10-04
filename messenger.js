@@ -70,6 +70,7 @@ const mutedSet = () => {
     return new Set();
   }
 };
+const muteLabel = (gid) => TA(mutedSet().has(gid) ? "unmute" : "mute");
 function toggleMute(gid) { const s = mutedSet(); s.has(gid) ? s.delete(gid) : s.add(gid); localStorage.setItem("mutedChats", JSON.stringify([...s])); }
 
 /* ---------- small prompt modal ---------- */
@@ -77,9 +78,9 @@ function promptModal(title, label, okText = "OK", { people = false } = {}) {
   return new Promise((resolve) => {
     const m = document.createElement("div");
     m.className = "auth-modal open";
-    m.innerHTML = `<div class="auth-box">
-      <button class="auth-x">&times;</button><h3>${esc(title)}</h3>
-      <input id="pmInput" placeholder="${esc(label)}" style="margin-top:12px" autocomplete="off">
+    m.innerHTML = `<div class="auth-box" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+      <button class="auth-x" type="button" aria-label="${esc(TA("close"))}">&times;</button><h3>${esc(title)}</h3>
+      <input id="pmInput" name="value" aria-label="${esc(label)}" placeholder="${esc(label)}" style="margin-top:12px" autocomplete="off">
       <button class="auth-go" id="pmGo">${esc(okText)}</button></div>`;
     document.body.appendChild(m);
     const inp = m.querySelector("#pmInput");
@@ -92,6 +93,7 @@ function promptModal(title, label, okText = "OK", { people = false } = {}) {
     const close = (val) => { detach?.(); m.remove(); resolve(val); };
     m.querySelector(".auth-x").onclick = () => close(null);
     m.addEventListener("click", (e) => { if (e.target === m) close(null); });
+    m.addEventListener("keydown", (e) => { if (e.key === "Escape") close(null); });
     m.querySelector("#pmGo").onclick = () => close(inp.value.trim() || null);
     inp.addEventListener("keydown", (e) => { if (e.key === "Enter") close(inp.value.trim() || null); });
     inp.focus();
@@ -105,11 +107,11 @@ function peoplePickerModal({ title, withName = false, okText, exclude = new Set(
   return new Promise((resolve) => {
     const m = document.createElement("div");
     m.className = "auth-modal open";
-    m.innerHTML = `<div class="auth-box pp-box">
-      <button class="auth-x">&times;</button><h3>${esc(title)}</h3>
-      ${withName ? `<input id="ppName" placeholder="${esc(T("msg.newGroup.label"))}" maxlength="60" autocomplete="off" style="margin-top:12px">` : ""}
+    m.innerHTML = `<div class="auth-box pp-box" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+      <button class="auth-x" type="button" aria-label="${esc(TA("close"))}">&times;</button><h3>${esc(title)}</h3>
+      ${withName ? `<input id="ppName" name="group-name" aria-label="${esc(T("msg.newGroup.label"))}" placeholder="${esc(T("msg.newGroup.label"))}" maxlength="60" autocomplete="off" style="margin-top:12px">` : ""}
       <label class="pp-label" for="ppSearch">${esc(TI("grp.who"))}</label>
-      <input id="ppSearch" type="search" placeholder="${esc(TI("inv.ph"))}">
+      <input id="ppSearch" name="people" type="search" placeholder="${esc(TI("inv.ph"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
       <div class="pp-chips" id="ppChips"></div>
       <button class="auth-go" id="ppGo"></button></div>`;
     document.body.appendChild(m);
@@ -121,7 +123,7 @@ function peoplePickerModal({ title, withName = false, okText, exclude = new Set(
     const search = m.querySelector("#ppSearch");
     const paint = () => {
       chips.innerHTML = picked.length
-        ? picked.map((u) => `<span class="pp-chip">${esc(u.username)}<button type="button" data-uid="${esc(u.id)}" aria-label="${esc(TI("grp.remove"))}">&times;</button></span>`).join("")
+        ? picked.map((u) => `<span class="pp-chip">${esc(u.username)}<button type="button" data-uid="${esc(u.id)}" aria-label="${esc(TI("grp.remove") + ": " + u.username)}">&times;</button></span>`).join("")
         : `<span class="pp-empty">${esc(TI("grp.none"))}</span>`;
       chips.querySelectorAll("button[data-uid]").forEach((b) =>
         (b.onclick = () => { picked = picked.filter((u) => u.id !== b.dataset.uid); paint(); }));
@@ -143,6 +145,7 @@ function peoplePickerModal({ title, withName = false, okText, exclude = new Set(
     };
     m.querySelector(".auth-x").onclick = () => close(null);
     m.addEventListener("click", (e) => { if (e.target === m) close(null); });
+    m.addEventListener("keydown", (e) => { if (e.key === "Escape") close(null); });
     go.onclick = submit;
     nameInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); search.focus(); } });
     paint();
@@ -157,6 +160,19 @@ async function addPeople(groupId, people) {
     if (error) { console.warn("[msgr] add_group_member", u.username, error); failed.push(u.username); }
   }
   return failed;
+}
+
+/* Labels for the static icon buttons whose text is not in the shared dictionary. */
+function applyStaticLabels() {
+  $("lbX")?.setAttribute("aria-label", TA("close"));
+  $("lbX")?.setAttribute("title", TA("close"));
+  $("lightbox")?.setAttribute("aria-label", TA("photo"));
+}
+/* Politely announce an incoming message to screen readers (not the initial history load). */
+function announce(text) {
+  const el = $("srLive"); if (!el) return;
+  el.textContent = "";
+  setTimeout(() => { el.textContent = text; }, 50);
 }
 
 /* ---------- chat list ---------- */
@@ -181,15 +197,19 @@ function renderChatList(chats) {
     const prev = g.last_preview
       ? `<span class="gprev">${g.last_sender ? esc(g.last_sender) + ": " : ""}${esc(g.last_preview)}</span>`
       : (g.is_dm ? "" : `<span class="gcode">#${esc(g.invite_code)}</span>`);
-    const online = g.is_dm && onlineUsers.has(g.display) ? '<span class="on-dot" title="online"></span>' : "";
+    const online = g.is_dm && onlineUsers.has(g.display) ? `<span class="on-dot" role="img" title="${esc(TA("online"))}" aria-label="${esc(TA("online"))}"></span>` : "";
     const muted = mutedSet().has(g.id) ? " 🔕" : "";
-    return `<li class="grp ${current && current.id === g.id ? "active" : ""} ${g.unread ? "unread" : ""}" data-id="${g.id}">
-       <span class="gtop"><span class="gname">${g.is_dm ? "💬 " : ""}${esc(g.display)}${online}${muted}</span>${g.unread ? '<span class="dot"></span>' : ""}</span>
-       ${prev}
+    const isCur = current && current.id === g.id;
+    return `<li class="grp ${isCur ? "active" : ""} ${g.unread ? "unread" : ""}" data-id="${g.id}">
+       <button type="button" class="grp-open"${isCur ? ' aria-current="true"' : ""}>
+         <span class="gtop"><span class="gname"><span aria-hidden="true">${g.is_dm ? "💬 " : ""}</span>${esc(g.display)}${online}${muted}</span>${g.unread ? '<span class="dot" aria-hidden="true"></span>' : ""}</span>
+         ${prev}
+       </button>
      </li>`;
   }).join("");
-  ul.querySelectorAll(".grp").forEach((li) =>
-    (li.onclick = () => { const g = allChats.find((x) => x.id === +li.dataset.id); selectChat(g); }));
+  ul.querySelectorAll(".grp").forEach((li) => {
+    li.querySelector(".grp-open").onclick = () => { const g = allChats.find((x) => x.id === +li.dataset.id); if (g) selectChat(g); };
+  });
 }
 
 async function newGroup() {
@@ -226,21 +246,29 @@ async function selectChat(g) {
   document.querySelectorAll(".grp").forEach((li) => {
     const on = +li.dataset.id === g.id;
     li.classList.toggle("active", on);
+    const open = li.querySelector(".grp-open");
+    if (open) { if (on) open.setAttribute("aria-current", "true"); else open.removeAttribute("aria-current"); }
     if (on) li.classList.remove("unread");           // clear the badge immediately
   });
   const onlineHead = g.is_dm && onlineUsers.has(g.display) ? `<span class="on-dot"></span><span class="presence">online</span>` : "";
   $("chatHead").innerHTML =
-    `<button class="back-btn" id="backBtn" title="${esc(T("msg.chats"))}">‹</button>
+    `<button class="back-btn" id="backBtn" type="button" title="${esc(TA("back"))}" aria-label="${esc(TA("back"))}"><span aria-hidden="true">‹</span></button>
      <b>${g.is_dm ? "💬 " : ""}${esc(g.display)}</b><span id="headPresence">${onlineHead}</span>
      ${g.is_dm ? "" : `<span class="invite" title="${esc(T("msg.tip.join"))}">code: <code>${esc(g.invite_code)}</code></span>`}
      <span class="head-actions">
-       <button id="muteBtn" title="Mute">${mutedSet().has(g.id) ? "🔕" : "🔔"}</button>
-       ${g.is_dm ? "" : `<button id="addPeopleBtn" class="add-people" title="${esc(TI("grp.add"))}">${esc(TI("grp.addBtn"))}</button>`}
-       <button id="membersBtn" title="${esc(T("msg.members"))}">👥</button>
-       <button id="leaveBtn" title="Leave">🚪</button>
+       <button id="muteBtn" type="button" title="${esc(muteLabel(g.id))}" aria-label="${esc(muteLabel(g.id))}" aria-pressed="${mutedSet().has(g.id)}">${mutedSet().has(g.id) ? "🔕" : "🔔"}</button>
+       ${g.is_dm ? "" : `<button id="addPeopleBtn" type="button" class="add-people" title="${esc(TI("grp.add"))}" aria-label="${esc(TI("grp.add"))}">${esc(TI("grp.addBtn"))}</button>`}
+       <button id="membersBtn" type="button" title="${esc(T("msg.members"))}" aria-label="${esc(T("msg.members"))}">👥</button>
+       <button id="leaveBtn" type="button" title="${esc(TA("leave"))}" aria-label="${esc(TA("leave"))}">🚪</button>
      </span>`;
   $("backBtn").onclick = goBackToList;
-  $("muteBtn").onclick = () => { toggleMute(g.id); $("muteBtn").textContent = mutedSet().has(g.id) ? "🔕" : "🔔"; renderChatList(applySearch(allChats)); };
+  $("muteBtn").onclick = () => {
+    toggleMute(g.id);
+    const b = $("muteBtn"), on = mutedSet().has(g.id);
+    b.textContent = on ? "🔕" : "🔔";
+    b.setAttribute("aria-pressed", String(on)); b.title = muteLabel(g.id); b.setAttribute("aria-label", muteLabel(g.id));
+    renderChatList(applySearch(allChats));
+  };
   $("membersBtn").onclick = toggleMembers;
   if ($("addPeopleBtn")) $("addPeopleBtn").onclick = () => addPeopleToCurrent();
   $("leaveBtn").onclick = leaveChat;
@@ -294,6 +322,23 @@ const INVITE_STRINGS = {
 };
 const TI = (k) => { const e = INVITE_STRINGS[k]; return e[window.I18N?.lang] || e.en; };
 const INVITE_DEBOUNCE_MS = 180;
+// Accessible names for icon-only controls. Page-local for the same reason as INVITE_STRINGS.
+const A11Y_STRINGS = {
+  "close":   { lb: "Zoumaachen", de: "Schließen", en: "Close" },
+  "back":    { lb: "Zréck bei d'Chatten", de: "Zurück zu den Chats", en: "Back to chats" },
+  "mute":    { lb: "Chat stommschalten", de: "Chat stummschalten", en: "Mute chat" },
+  "unmute":  { lb: "Stommschaltung ophiewen", de: "Stummschaltung aufheben", en: "Unmute chat" },
+  "leave":   { lb: "Chat verloossen", de: "Chat verlassen", en: "Leave chat" },
+  "reply":   { lb: "Äntweren", de: "Antworten", en: "Reply" },
+  "react":   { lb: "Reaktioun derbäisetzen", de: "Reaktion hinzufügen", en: "Add reaction" },
+  "edit":    { lb: "Noriicht änneren", de: "Nachricht bearbeiten", en: "Edit message" },
+  "del":     { lb: "Läschen (bannent 30 Sekonnen)", de: "Löschen (innerhalb von 30 Sekunden)", en: "Delete (within 30 seconds)" },
+  "photo":   { lb: "Foto am Vollbild", de: "Foto im Vollbild", en: "Photo, full screen" },
+  "jump":    { lb: "Zur Originalnoriicht sprangen", de: "Zur ursprünglichen Nachricht springen", en: "Jump to the original message" },
+  "stopRec": { lb: "Opnam stoppen a schécken", de: "Aufnahme stoppen und senden", en: "Stop and send recording" },
+  "online":  { lb: "online", de: "online", en: "online" },
+};
+const TA = (k) => { const e = A11Y_STRINGS[k]; return e[window.I18N?.lang] || e.en; };
 
 async function toggleMembers() {
   const p = $("memberPanel");
@@ -301,9 +346,9 @@ async function toggleMembers() {
   p.classList.add("open");
   const invite = current.is_dm ? "" :
     `<div class="mp-invite"><label for="invInput">${esc(TI("inv.label"))}</label>
-       <input id="invInput" type="search" placeholder="${esc(TI("inv.ph"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
-       <div class="inv-results" id="invResults"></div></div>`;
-  p.innerHTML = `<div class="mp-head">${T("msg.members")} <button id="mpX">&times;</button></div>${invite}<div class="mp-list">${T("common.loading")}</div>`;
+       <input id="invInput" name="invite" type="search" placeholder="${esc(TI("inv.ph"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
+       <div class="inv-results" id="invResults" aria-live="polite"></div></div>`;
+  p.innerHTML = `<div class="mp-head">${T("msg.members")} <button id="mpX" type="button" aria-label="${esc(TA("close"))}">&times;</button></div>${invite}<div class="mp-list">${T("common.loading")}</div>`;
   $("mpX").onclick = closeMembers;
   if (!current.is_dm) wireInvite();
   await renderMemberList();
@@ -405,6 +450,8 @@ function paintTick(el) {
   el.textContent = read ? "✓✓" : "✓";
   el.classList.toggle("read", read);
   el.title = read ? T("msg.read") : T("msg.sent");
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", el.title);
 }
 function updateTicks() { $("messages").querySelectorAll(".msg.mine .ticks").forEach(paintTick); }
 
@@ -425,7 +472,8 @@ function renderReactions(mid) {
     const rs = byEmoji[em], mineR = rs.some((r) => r.user_id === me);
     /* `em` is free text from message_reactions (no CHECK constraint on the
      * column), written by any group member — escape it like the username. */
-    return `<span class="react-chip ${mineR ? "mine-r" : ""}" data-em="${esc(em)}" title="${rs.map((r) => esc(r.username)).join(", ")}">${esc(em)} ${rs.length}</span>`;
+    const who = rs.map((r) => esc(r.username)).join(", ");
+    return `<button type="button" class="react-chip ${mineR ? "mine-r" : ""}" data-em="${esc(em)}" title="${who}" aria-label="${esc(em)} ${rs.length}: ${who}" aria-pressed="${mineR}">${esc(em)} ${rs.length}</button>`;
   }).join("");
   el.querySelectorAll(".react-chip").forEach((c) => (c.onclick = () => toggleReaction(mid, c.dataset.em)));
 }
@@ -455,12 +503,20 @@ function openReactPicker(mid, anchorEl) {
   closeReactPicker();
   const pop = document.createElement("div");
   pop.className = "react-pop"; pop.id = "reactPop";
-  pop.innerHTML = REACT_EMOJIS.map((e) => `<button data-e="${e}">${e}</button>`).join("");
+  pop.setAttribute("role", "group"); pop.setAttribute("aria-label", TA("react"));
+  pop.innerHTML = REACT_EMOJIS.map((e) => `<button type="button" data-e="${e}" aria-label="${e}">${e}</button>`).join("");
   anchorEl.closest(".bubble").appendChild(pop);
   pop.querySelectorAll("button").forEach((b) => (b.onclick = (ev) => { ev.stopPropagation(); toggleReaction(mid, b.dataset.e); closeReactPicker(); }));
   setTimeout(() => document.addEventListener("click", closeReactPicker, { once: true }), 0);
 }
 function closeReactPicker() { const p = $("reactPop"); if (p) p.remove(); }
+// Escape closes whatever is floating (external-keyboard iPad / desktop): lightbox, reaction picker, members panel.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if ($("lightbox")?.classList.contains("open")) { closeLightbox(); return; }
+  if ($("reactPop")) { closeReactPicker(); return; }
+  if ($("memberPanel")?.classList.contains("open")) closeMembers();
+});
 
 /* ---------- edit ---------- */
 async function editMessage(m) {
@@ -511,10 +567,12 @@ async function toggleRecording() {
     mediaRecorder.onstop = async () => { stream.getTracks().forEach((t) => t.stop()); await sendVoice(new Blob(recChunks, { type: mediaRecorder.mimeType || "audio/webm" })); };
     mediaRecorder.start();
     recording = true; $("micBtn").classList.add("rec"); $("micBtn").textContent = "⏹";
+    $("micBtn").setAttribute("aria-pressed", "true"); $("micBtn").setAttribute("aria-label", TA("stopRec"));
   } catch { alert(T("msg.micErr")); }
 }
 function stopRecording() {
-  if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎤"; try { mediaRecorder.stop(); } catch {} }
+  if (mediaRecorder && recording) { recording = false; $("micBtn").classList.remove("rec"); $("micBtn").textContent = "🎤";
+    $("micBtn").setAttribute("aria-pressed", "false"); $("micBtn").setAttribute("aria-label", T("msg.tip.voice")); try { mediaRecorder.stop(); } catch {} }
 }
 async function sendVoice(blob) {
   if (!current || !blob.size) return;
@@ -575,19 +633,27 @@ function startReply(m) {
 function cancelReply() { replyTo = null; const b = $("replyBar"); if (b) b.classList.remove("open"); }
 
 /* ---------- image lightbox ---------- */
+let lightboxReturnFocus = null;
 function openLightbox(src) {
   const lb = $("lightbox");
+  lightboxReturnFocus = document.activeElement;
   $("lbImg").src = src;
+  $("lbImg").alt = TA("photo");
   lb.classList.add("open");
+  $("lbX").focus();
 }
-function closeLightbox() { const lb = $("lightbox"); lb.classList.remove("open"); $("lbImg").src = ""; }
+function closeLightbox() {
+  const lb = $("lightbox"); lb.classList.remove("open"); $("lbImg").src = ""; $("lbImg").alt = "";
+  if (lightboxReturnFocus && lightboxReturnFocus.isConnected) lightboxReturnFocus.focus();
+  lightboxReturnFocus = null;
+}
 
 /* Attach swipe-to-reply + long-press-to-reply to a rendered message. */
 function attachReplyGestures(el, m) {
   const bubble = el.querySelector(".bubble");
   let startX = 0, startY = 0, dx = 0, dragging = false, lpTimer = null;
   const cue = document.createElement("span");
-  cue.className = "reply-cue"; cue.textContent = "↩"; bubble.appendChild(cue);
+  cue.className = "reply-cue"; cue.textContent = "↩"; cue.setAttribute("aria-hidden", "true"); bubble.appendChild(cue);
   const reset = () => { bubble.classList.remove("swiping"); bubble.style.transform = ""; cue.style.opacity = "0"; dx = 0; dragging = false; };
   const clearLp = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
   el.addEventListener("touchstart", (e) => {
@@ -635,6 +701,8 @@ function appendMessage(m) {
   const bubble = el.querySelector(".bubble");
   // tap a quoted reply to jump to the original
   const rq = el.querySelector(".reply-quote");
+  if (rq) { rq.setAttribute("role", "button"); rq.tabIndex = 0; rq.setAttribute("aria-label", TA("jump") + ": " + (m.reply_user || "") + " " + (m.reply_preview || ""));
+    rq.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); rq.click(); } }); }
   if (rq) rq.onclick = () => {
     const t = box.querySelector(`[data-mid="${rq.dataset.rid}"]`);
     if (!t) return;
@@ -664,12 +732,12 @@ function appendMessage(m) {
   }
   // desktop hover reply button
   const rbtn = document.createElement("button");
-  rbtn.className = "reply-btn"; rbtn.title = "Reply"; rbtn.textContent = "↩";
+  rbtn.className = "reply-btn"; rbtn.type = "button"; rbtn.title = TA("reply"); rbtn.setAttribute("aria-label", TA("reply")); rbtn.textContent = "↩";
   rbtn.onclick = (e) => { e.stopPropagation(); startReply(m); };
   bubble.appendChild(rbtn);
   // react button + picker
   const reactBtn = document.createElement("button");
-  reactBtn.className = "react-btn"; reactBtn.title = "React"; reactBtn.textContent = "🙂";
+  reactBtn.className = "react-btn"; reactBtn.type = "button"; reactBtn.title = TA("react"); reactBtn.setAttribute("aria-label", TA("react")); reactBtn.textContent = "🙂";
   reactBtn.onclick = (e) => { e.stopPropagation(); openReactPicker(m.id, reactBtn); };
   bubble.appendChild(reactBtn);
   attachReplyGestures(el, m);
@@ -677,7 +745,7 @@ function appendMessage(m) {
     let delRight = -8;
     if (m.content) {                                   // edit own text messages, anytime
       const ed = document.createElement("button");
-      ed.className = "del-btn"; ed.title = "Edit"; ed.textContent = "✏️";
+      ed.className = "del-btn"; ed.type = "button"; ed.title = TA("edit"); ed.setAttribute("aria-label", TA("edit")); ed.textContent = "✏️";
       ed.onclick = () => editMessage(m);
       bubble.appendChild(ed); delRight = 20;            // delete sits to the left of edit
     }
@@ -687,7 +755,7 @@ function appendMessage(m) {
     const age = Date.now() - new Date(m.created_at).getTime();
     if (age < DELETE_WINDOW) {
       const del = document.createElement("button");
-      del.className = "del-btn"; del.style.right = delRight + "px"; del.title = "Delete (within 30s)"; del.textContent = "🗑";
+      del.className = "del-btn"; del.type = "button"; del.style.right = delRight + "px"; del.title = TA("del"); del.setAttribute("aria-label", TA("del")); del.textContent = "🗑";
       del.onclick = () => deleteOwnMessage(m.id);
       bubble.appendChild(del);
       setTimeout(() => del.remove(), DELETE_WINDOW - age);
@@ -722,7 +790,11 @@ function subscribe(gid) {
   channel = sb.channel("grp-" + gid)
     .on("postgres_changes",
       { event: "INSERT", schema: "public", table: "messages", filter: "group_id=eq." + gid },
-      (payload) => { appendMessage(payload.new); markRead(gid); })   // chat is open → keep it read
+      (payload) => {
+        appendMessage(payload.new); markRead(gid);   // chat is open → keep it read
+        const nm = payload.new;
+        if (nm && nm.user_id !== auth.session()?.user?.id) announce(`${nm.username}: ${nm.content || snippet(nm)}`);
+      })
     .on("postgres_changes",
       { event: "DELETE", schema: "public", table: "messages", filter: "group_id=eq." + gid },
       (payload) => removeMessage(payload.old.id))
@@ -856,6 +928,7 @@ async function showApp() {
   $("composer").onsubmit = send;
   $("attachBtn").onclick = () => $("fileInput").click();
   $("fileInput").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; uploadAndSend(f); };
+  applyStaticLabels();
   $("rbX").onclick = cancelReply;
   $("lbX").onclick = closeLightbox;
   $("lightbox").onclick = (e) => { if (e.target.id === "lightbox") closeLightbox(); };
@@ -919,6 +992,7 @@ boot();
 
 // Re-render dynamic chrome when the site language changes.
 document.addEventListener("i18n:change", () => {
+  applyStaticLabels();
   if (!sb) return;
   if (auth.session()) { if (allChats.length) renderChatList(applySearch(allChats)); }
   else showGate();

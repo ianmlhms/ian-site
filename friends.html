@@ -53,6 +53,21 @@
   .act-text{flex:1;color:var(--muted)}
   .act-text b{color:var(--text);font-weight:700}
   .act-time{flex:none;color:var(--muted);font-size:12px}
+  /* design-pass: a11y + touch */
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  button,a.mini,.tab{touch-action:manipulation}
+  a.mini{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text)}
+  .mini{min-width:var(--hit-target,2.75rem);min-height:var(--hit-target,2.75rem)}
+  .row{flex-wrap:wrap}
+  .row .name{min-width:0;overflow-wrap:anywhere}
+  /* a friend row has four actions: on a phone the name gets its own line instead of being squeezed to a few letters */
+  @media(max-width:640px){.row:has(> .mini ~ .mini ~ .mini){row-gap:8px}.row:has(> .mini ~ .mini ~ .mini) .name{flex:1 1 100%}}
+  .tab:focus-visible{outline:2px solid var(--focus-ring,var(--accent2-text));outline-offset:-2px;border-radius:6px}
+  .add input:focus-visible{outline:2px solid var(--focus-ring,var(--accent2-text));outline-offset:2px}
+  html[data-theme="light"] .msgline.err{color:#c62828}
+  html[data-theme="light"] .msgline.ok{color:#1a7f37}
+  .act-time{font-variant-numeric:tabular-nums}
+  .tbadge{font-variant-numeric:tabular-nums}
   /* mobile: stop iOS focus-zoom + roomier touch targets */
   @media(max-width:640px){
     .add input{font-size:16px}
@@ -85,29 +100,29 @@
 
   <div id="app" style="display:none">
     <div class="add">
-      <input id="addInput" data-i18n-attr="placeholder:friends.addPlaceholder" placeholder="Add a friend by username" autocomplete="off">
-      <button id="addBtn" data-i18n="friends.add">Add</button>
+      <input id="addInput" name="username" type="text" enterkeyhint="send" data-i18n-attr="placeholder:friends.addPlaceholder|aria-label:friends.addPlaceholder" placeholder="Add a friend by username" aria-label="Add a friend by username" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button id="addBtn" type="button" data-i18n="friends.add">Add</button>
     </div>
-    <div class="msgline" id="addMsg"></div>
+    <div class="msgline" id="addMsg" role="status" aria-live="polite"></div>
 
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-tab="friends" data-i18n="friends.tab.friends">Friends</button>
-      <button class="tab" data-tab="requests"><span data-i18n="friends.tab.requests">Requests</span><span class="tbadge" id="badge-requests" style="display:none">0</span></button>
-      <button class="tab" data-tab="activity" data-i18n="friends.tab.activity">Activity</button>
+    <nav class="tabs" id="tabs" role="tablist">
+      <button class="tab active" type="button" role="tab" id="tab-friends" aria-selected="true" aria-controls="panel-friends" data-tab="friends" data-i18n="friends.tab.friends">Friends</button>
+      <button class="tab" type="button" role="tab" id="tab-requests" aria-selected="false" aria-controls="panel-requests" data-tab="requests"><span data-i18n="friends.tab.requests">Requests</span><span class="tbadge" id="badge-requests" style="display:none">0</span></button>
+      <button class="tab" type="button" role="tab" id="tab-activity" aria-selected="false" aria-controls="panel-activity" data-tab="activity" data-i18n="friends.tab.activity">Activity</button>
     </nav>
 
-    <section class="panel active" data-panel="friends">
+    <section class="panel active" id="panel-friends" role="tabpanel" aria-labelledby="tab-friends" data-panel="friends">
       <div id="friends"></div>
     </section>
 
-    <section class="panel" data-panel="requests">
+    <section class="panel" id="panel-requests" role="tabpanel" aria-labelledby="tab-requests" data-panel="requests">
       <div id="invitesWrap" style="display:none"><h2 data-i18n="friends.invites">🎮 Game invites</h2><div id="invites"></div></div>
       <div id="reqWrap" style="display:none"><h2 data-i18n="friends.requests">Friend requests</h2><div id="requests"></div></div>
       <div id="sentWrap" style="display:none"><h2 data-i18n="friends.sent">Requests you sent</h2><div id="sent"></div></div>
       <div class="empty" id="reqEmpty" style="display:none" data-i18n="friends.noReq">Nothing new right now.</div>
     </section>
 
-    <section class="panel" data-panel="activity">
+    <section class="panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" data-panel="activity">
       <div id="activityWrap"><h2 data-i18n="friends.activity">📊 Recent activity</h2><div id="activity"></div></div>
     </section>
   </div>
@@ -121,15 +136,25 @@
   tabs.addEventListener("click", (e) => {
     const b = e.target.closest(".tab"); if (!b) return;
     const name = b.dataset.tab;
-    tabs.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === b));
+    tabs.querySelectorAll(".tab").forEach((t) => { t.classList.toggle("active", t === b); t.setAttribute("aria-selected", String(t === b)); t.tabIndex = t === b ? 0 : -1; });
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === name));
+  });
+  // roving tabindex + arrow keys, as a tablist should behave with an external keyboard
+  tabs.querySelectorAll(".tab").forEach((t) => { t.tabIndex = t.classList.contains("active") ? 0 : -1; });
+  tabs.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
+    const list = [...tabs.querySelectorAll(".tab")];
+    const at = list.indexOf(document.activeElement); if (at < 0) return;
+    e.preventDefault();
+    const next = e.key === "Home" ? 0 : e.key === "End" ? list.length - 1 : (at + (e.key === "ArrowRight" ? 1 : list.length - 1)) % list.length;
+    list[next].focus(); list[next].click();
   });
 })();
 </script>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="friends.js?v=38"></script>
+<script type="module" src="friends.js?v=39"></script>
 <script type="module" src="notify-ambient.js?v=17"></script>
 <script type="module" src="rtc-ring.js?v=17"></script>
   <script type="module" src="class-gate.js?v=18"></script>
