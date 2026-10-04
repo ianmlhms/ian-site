@@ -101,12 +101,12 @@
 <body>
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>◼ Geometry Dash</h1>
+  <h1><span aria-hidden="true">◼</span> Geometry Dash</h1>
   <div class="spacer"></div>
   <button class="mute" id="mute" type="button" aria-label="Mute music">🔊</button>
 </header>
 <main class="game" id="game">
-  <canvas id="canvas" aria-label="Geometry Dash-style arcade game"></canvas>
+  <canvas id="canvas" role="img" aria-label="Geometry Dash-style arcade game. Press Space, Arrow Up or tap to jump."></canvas>
   <div class="hud" id="hud" hidden>
     <div class="stats">
       <span class="stats__left"><button class="chip" id="menuBtn" type="button" aria-label="Level select (Esc)">☰ Levels</button><span class="stats__name" id="levelName"></span><span id="attempts">Attempt 1</span></span>
@@ -135,7 +135,7 @@
     <div class="sr" id="live" aria-live="polite"></div>
   </section>
 
-  <div class="overlay" id="complete"><div class="panel">
+  <div class="overlay" id="complete"><div class="panel" role="dialog" aria-modal="true" aria-labelledby="completeTitle">
     <h2 id="completeTitle">Level Complete!</h2>
     <p id="completeText">Finished in <strong>1 attempt</strong></p>
     <p id="completeResult"></p>
