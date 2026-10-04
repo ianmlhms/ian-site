@@ -40,6 +40,11 @@
   .connect{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .stravabtn{background:var(--strava);color:#000;border:none;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;font-size:13px}
   .hint{color:var(--muted);font-size:12px;line-height:1.5}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .btn,.ghost,.stravabtn,input,select{min-height:44px}
+  .water button{width:44px;height:44px}
+  .del{min-width:44px;min-height:44px}
+  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -49,12 +54,12 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>💪 Health</h1>
+  <h1><span aria-hidden="true">💪</span> Health</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+<main class="wrap" id="wrap"><div class="gate">Lueden…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -80,30 +85,30 @@ async function boot(){
     <div class="card">
       <div class="day">
         <div class="metric"><b id="mWater">0</b><span>Waasser (Glieser)</span>
-          <div class="water"><button id="wMinus">−</button><button id="wPlus">＋</button></div></div>
+          <div class="water"><button id="wMinus" type="button" aria-label="Glas ewechhuelen">−</button><button id="wPlus" type="button" aria-label="Glas derbäisetzen">＋</button></div></div>
         <div class="metric"><b id="mSleep">–</b><span>Schlof (Stonnen)</span></div>
         <div class="metric"><b id="mWeight">–</b><span>Gewiicht (kg)</span></div>
       </div>
       <div class="field" style="margin-top:12px">
-        <input id="iSleep" type="number" step="0.5" min="0" max="24" placeholder="Schlof (h)">
-        <input id="iWeight" type="number" step="0.1" min="0" max="300" placeholder="Gewiicht (kg)">
-        <button class="btn" id="saveDay">Späicheren</button>
+        <input id="iSleep" type="number" step="0.5" min="0" max="24" placeholder="Schlof (h)" aria-label="Schlof (Stonnen)">
+        <input id="iWeight" type="number" step="0.1" min="0" max="300" placeholder="Gewiicht (kg)" aria-label="Gewiicht (kg)">
+        <button class="btn" id="saveDay" type="button">Späicheren</button>
       </div>
-      <div class="msg" id="dayMsg"></div>
+      <div class="msg" id="dayMsg" role="status"></div>
     </div>
 
     <h2>Training bäisetzen</h2>
     <div class="card">
       <div class="field">
-        <select id="wType">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
-        <input id="wDur" type="number" min="1" placeholder="Minutten">
-        <input id="wDist" type="number" step="0.1" min="0" placeholder="km (optional)">
+        <select id="wType" aria-label="Zort Training">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
+        <input id="wDur" type="number" min="1" placeholder="Minutten" aria-label="Dauer (Minutten)">
+        <input id="wDist" type="number" step="0.1" min="0" placeholder="km (optional)" aria-label="Distanz (km, optional)">
       </div>
       <div class="field" style="margin-top:8px">
-        <input id="wNote" placeholder="Notiz (optional)" style="flex:2">
+        <input id="wNote" placeholder="Notiz (optional)" aria-label="Notiz (optional)" style="flex:2">
         <button class="btn" id="addW">Bäisetzen</button>
       </div>
-      <div class="msg" id="wMsg"></div>
+      <div class="msg" id="wMsg" role="status"></div>
     </div>
 
     <h2>Trainingen</h2>
@@ -113,10 +118,10 @@ async function boot(){
     <div class="card">
       <p class="hint">Synchroniséier automatesch vun denger <b>Apple Watch</b> mat engem <b>Kuerzbefeel (Shortcut)</b> — kee Premium, keng App néideg. Dee leeft z.B. all Owend an schéckt Schrëtt, Schlof, Gewiicht an Trainingen op ian.lu.</p>
       <div class="field" style="margin-top:10px">
-        <input id="tok" readonly placeholder="Token lueden…" style="flex:2;font-family:monospace;font-size:13px">
+        <input id="tok" readonly aria-label="Token" placeholder="Token lueden…" style="flex:2;font-family:monospace;font-size:13px">
         <button class="ghost" id="copyTok">Kopéieren</button>
       </div>
-      <div class="hint" id="tokMsg" style="margin-top:6px"></div>
+      <div class="hint" id="tokMsg" role="status" style="margin-top:6px"></div>
       <details style="margin-top:10px">
         <summary class="hint" style="cursor:pointer">Wéi ariichten? (Kuerzbefeel)</summary>
         <ol class="hint" style="margin:8px 0 0 18px;padding:0">
@@ -193,11 +198,11 @@ function renderWorkouts(){
     const when=new Date(w.at).toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});
     const synced=w.source==="watch"?`<span class="tag">⌚ WATCH</span>`:"";
     const bits=[fmtDur(w.duration_min),w.distance_km?w.distance_km+" km":"",w.calories?w.calories+" kcal":""].filter(Boolean).join(" · ");
-    return `<div class="wk"><span class="ic">${ic}</span>
+    return `<div class="wk"><span class="ic" aria-hidden="true">${ic}</span>
       <div><div class="t">${esc((TYPES[w.type]||"Aneres").split(" ").slice(1).join(" "))}${synced}</div>
         <div class="s">${when}${w.note?" · "+esc(w.note):""}</div></div>
       <div class="r">${esc(bits)}</div>
-      ${w.source==="watch"?"":`<button class="del" data-del="${w.id}">✕</button>`}</div>`;
+      ${w.source==="watch"?"":`<button class="del" data-del="${w.id}" type="button" aria-label="Training läschen"><span aria-hidden="true">✕</span></button>`}</div>`;
   }).join("");
   $("wList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     await sb.from("workouts").delete().eq("id",b.dataset.del);loadWorkouts();
