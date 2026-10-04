@@ -26,6 +26,9 @@
   .cell .pc.w{background:radial-gradient(circle at 35% 30%,#fff,#cfcfda)}
   .board.mine .cell.legal{cursor:pointer}
   .board.mine .cell.legal::after{content:"";width:26%;height:26%;border-radius:50%;background:rgba(255,255,255,.28)}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .board:focus{outline:none}
+  .board:focus-visible{outline:.2rem solid var(--focus-ring,currentColor);outline-offset:.18rem}
   .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -39,17 +42,17 @@
 <body>
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>⚫ Reversi</h1>
+  <h1><span aria-hidden="true">⚫</span> Reversi</h1>
   <div class="spacer"></div>
 </header>
 
-<div class="wrap">
-  <div class="status" id="status">Connecting…</div>
+<main class="wrap">
+  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
   <div class="sub" id="sub"></div>
   <div class="scores" id="scores"></div>
-  <div class="board" id="board"></div>
-  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
-</div>
+  <div class="board" id="board" role="group" aria-label="Reversi board" tabindex="-1"></div>
+  <button type="button" class="btn" id="rematch" style="display:none"><span aria-hidden="true">↻</span> Rematch</button>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=6" data-arcade-id="o-reversi" data-arcade-title="Reversi" data-arcade-no-score data-arcade-replace=".bar"></script>
@@ -106,20 +109,29 @@ function render() {
   const legal = (turn === me && !over && oppHere) ? legalCells(board, me) : [];
   const lset = new Set(legal.map(([r, c]) => r * N + c));
   const b = $("board"); b.className = "board" + (legal.length ? " mine" : "");
+  const hadFocus = b.contains(document.activeElement);
   b.innerHTML = "";
   for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
     const d = document.createElement("div");
     d.className = "cell" + (lset.has(r * N + c) ? " legal" : "");
     if (board[r][c]) { const pc = document.createElement("div"); pc.className = "pc " + (board[r][c] === 1 ? "b" : "w"); d.appendChild(pc); }
-    if (lset.has(r * N + c)) d.onclick = () => play(r, c, me, true);
+    if (lset.has(r * N + c)) {
+      const act = () => play(r, c, me, true);
+      d.onclick = act;
+      d.setAttribute("role", "button"); d.tabIndex = 0;
+      d.setAttribute("aria-label", `Play row ${r + 1}, column ${c + 1}`);
+      d.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); } };
+    }
     b.appendChild(d);
   }
+  if (hadFocus) b.focus({ preventScroll: true });
   const [cb, cw] = counts(board);
-  $("scores").innerHTML = `<span class="s"><span class="disc b"></span>${cb}</span><span class="s"><span class="disc w"></span>${cw}</span>`;
+  b.setAttribute("aria-label", `Reversi board, 8 by 8. Black ${cb}, white ${cw}.`);
+  $("scores").innerHTML = `<span class="s"><span class="disc b" aria-hidden="true"></span><span class="sr-only">Black </span>${cb}</span><span class="s"><span class="disc w" aria-hidden="true"></span><span class="sr-only">White </span>${cw}</span>`;
   updateStatus();
 }
 function updateStatus() {
-  const dot = `<span class="me" style="background:${me === 1 ? "#1a1a1a" : "#f4f4f8"}"></span>`;
+  const dot = `<span class="me" aria-hidden="true" style="background:${me === 1 ? "#1a1a1a" : "#f4f4f8"}"></span><span class="sr-only">(${me === 1 ? "black" : "white"})</span>`;
   if (over === "draw") return setStatus("It's a draw.");
   if (over) return setStatus(over === me ? "You win! 🎉" : "You lost.");
   if (!oppHere) return setStatus("Waiting for opponent…", `Share room <code>${room}</code> or invite from Friends.`);

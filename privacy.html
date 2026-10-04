@@ -24,14 +24,14 @@
     .legal h3 { font-size: 16px; margin: 20px 0 6px; }
     .legal p, .legal li { font-size: 15.5px; }
     .legal ul { padding-left: 20px; }
-    .legal table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14.5px; display: block; overflow-x: auto; }
-    .legal th, .legal td { text-align: left; padding: 7px 9px; border-bottom: 1px solid rgba(128,128,128,.28); vertical-align: top; }
+    .legal table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14.5px; }
+    .legal th, .legal td { overflow-wrap: anywhere; text-align: left; padding: 7px 9px; border-bottom: 1px solid rgba(128,128,128,.28); vertical-align: top; }
     .legal th { font-weight: 700; }
     .updated { opacity: .72; font-size: 14px; }
     .langbar { display: flex; gap: 8px; margin: 14px 0 8px; flex-wrap: wrap; }
     .langbar button {
       border: 1px solid rgba(128,128,128,.4); background: transparent; color: inherit;
-      border-radius: 20px; padding: 5px 14px; cursor: pointer; font: inherit; font-size: 14px;
+      border-radius: 20px; padding: 5px 16px; min-height: 44px; cursor: pointer; font: inherit; font-size: 14px;
     }
     .langbar button.on { background: #1d6fce; border-color: #1d6fce; color: #fff; font-weight: 600; }
     .note { border-left: 3px solid #1d6fce; padding: 8px 0 8px 12px; margin: 14px 0; opacity: .92; }
@@ -42,16 +42,16 @@
 <body>
   <header class="bar">
     <span style="display:flex;align-items:center;gap:14px">
-      <a href="./" class="back">&lsaquo; Home</a>
+      <a href="./" class="back" id="backLink">&lsaquo; Home</a>
     </span>
   </header>
 
   <main class="legal">
 
-    <div class="langbar" id="langbar">
-      <button type="button" data-l="de">Deutsch</button>
-      <button type="button" data-l="fr">Français</button>
-      <button type="button" data-l="en">English</button>
+    <div class="langbar" id="langbar" role="group" aria-label="Language / Sprache / Langue">
+      <button type="button" data-l="de" lang="de" aria-pressed="false">Deutsch</button>
+      <button type="button" data-l="fr" lang="fr" aria-pressed="false">Français</button>
+      <button type="button" data-l="en" lang="en" aria-pressed="false">English</button>
     </div>
 
     <!-- ==================== DEUTSCH ==================== -->
@@ -101,7 +101,7 @@
       <p>Damit Karten, Bilder oder Live-Daten funktionieren, werden Inhalte von anderen Servern
         geladen. Dabei erfährt der jeweilige Anbieter deine IP-Adresse.</p>
       <table>
-        <tr><th>Dienst</th><th>Wofür</th></tr>
+        <tr><th scope="col">Dienst</th><th scope="col">Wofür</th></tr>
         <tr><td>Supabase</td><td>Konten, Datenbank, Dateien</td></tr>
         <tr><td>GoatCounter</td><td>anonyme Besucherstatistik</td></tr>
         <tr><td>OpenStreetMap, geoportail.lu</td><td>Kartenkacheln in den Karten-Seiten</td></tr>
@@ -181,7 +181,7 @@
       <p>Pour afficher cartes, images et données en direct, des contenus sont chargés depuis d'autres
         serveurs. Le fournisseur concerné reçoit alors ton adresse IP.</p>
       <table>
-        <tr><th>Service</th><th>Pour quoi</th></tr>
+        <tr><th scope="col">Service</th><th scope="col">Pour quoi</th></tr>
         <tr><td>Supabase</td><td>comptes, base de données, fichiers</td></tr>
         <tr><td>GoatCounter</td><td>statistiques de visite anonymes</td></tr>
         <tr><td>OpenStreetMap, geoportail.lu</td><td>fonds de carte</td></tr>
@@ -256,7 +256,7 @@
       <p>To show maps, images and live data, content is loaded from other servers. The provider in
         question then receives your IP address.</p>
       <table>
-        <tr><th>Service</th><th>What for</th></tr>
+        <tr><th scope="col">Service</th><th scope="col">What for</th></tr>
         <tr><td>Supabase</td><td>accounts, database, files</td></tr>
         <tr><td>GoatCounter</td><td>anonymous visitor statistics</td></tr>
         <tr><td>OpenStreetMap, geoportail.lu</td><td>map tiles on the map pages</td></tr>
@@ -294,11 +294,14 @@
     (function () {
       var sections = document.querySelectorAll('section[data-lang]');
       var buttons = document.querySelectorAll('#langbar button');
+      var backLink = document.getElementById('backLink');
+      var homeLabel = { de: 'Startseite', fr: 'Accueil', en: 'Home' };
 
       function show(lang) {
         sections.forEach(function (s) { s.hidden = s.dataset.lang !== lang; });
-        buttons.forEach(function (b) { b.classList.toggle('on', b.dataset.l === lang); });
+        buttons.forEach(function (b) { b.classList.toggle('on', b.dataset.l === lang); b.setAttribute('aria-pressed', String(b.dataset.l === lang)); });
         document.documentElement.lang = lang;
+        backLink.textContent = '\u2039 ' + homeLabel[lang];
         try { localStorage.setItem('privacy_lang', lang); } catch (e) { /* private mode */ }
       }
 
