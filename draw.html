@@ -46,11 +46,11 @@
   .guessrow input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:22px;padding:11px 15px;font-size:14px;outline:none}
   .guessrow input:focus{border-color:var(--accent2-text)}
   .guessrow button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:22px;padding:0 18px;font-weight:800;cursor:pointer}
-  .sw{position:relative;padding:0;-webkit-appearance:none;appearance:none}
-  .sw::before{content:"";position:absolute;inset:-6px}
-  button:focus-visible,a:focus-visible,canvas:focus-visible{outline:2px solid var(--accent2-text);outline-offset:2px}
+  .tools{gap:8px}
+  .sw{position:relative;width:28px;height:28px;min-height:0;padding:0;-webkit-appearance:none;appearance:none}
+  .sw::before{content:"";position:absolute;inset:-8px}
+  .tools .sz{width:34px;height:44px}
   .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  @media(pointer:coarse){.tools{gap:10px}.sw{width:34px;height:34px}.tools .sz{width:44px;height:44px}.tools .clr{min-height:44px}.guessrow button{min-height:44px}.choices button{min-height:44px}}
   .muted{color:var(--muted)}.center{text-align:center}
   .win{background:linear-gradient(90deg,rgba(110,168,254,.2),transparent);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
 </style>
