@@ -48,6 +48,10 @@
   .needrow label{font-size:13px;color:var(--muted)}
   .result{margin-top:14px;font-size:15px}
   .note{color:var(--muted);font-size:12px;margin-top:26px;line-height:1.5}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent2-text,var(--accent));outline-offset:2px}
+  @media (pointer:coarse){select,input,.btn{min-height:44px}}
+  @media (max-width:700px){select,input{font-size:16px}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -63,16 +67,16 @@
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap">
+<main class="wrap">
   <div class="controls">
     <label><span data-i18n="grades.year">Year</span> <select id="yearSel"></select></label>
     <label id="variantWrap"><span id="variantLabel" data-i18n="grades.section">Section</span> <select id="variantSel"></select></label>
     <button class="btn" id="resetBtn" data-i18n="grades.reset">Reset to template</button>
   </div>
-  <div class="syncline" id="syncLine"></div>
+  <div class="syncline" id="syncLine" role="status"></div>
 
   <table id="tbl">
-    <thead><tr><th data-i18n="grades.subject">Subject</th><th data-i18n="grades.coef">Coef.</th><th data-i18n="grades.marks">Your marks (comma-separated)</th><th style="text-align:right" data-i18n="grades.avg">Avg</th><th></th></tr></thead>
+    <thead><tr><th data-i18n="grades.subject">Subject</th><th data-i18n="grades.coef">Coef.</th><th data-i18n="grades.marks">Your marks (comma-separated)</th><th style="text-align:right" data-i18n="grades.avg">Avg</th><th><span class="sr-only" data-i18n="grades.remove">Remove</span></th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
   <div class="addrow"><button class="btn" id="addBtn" data-i18n="grades.addSubject">+ add subject</button></div>
@@ -91,7 +95,7 @@
       <label><span data-i18n="grades.counts">Next test counts as</span> <input id="needWeight" type="number" min="1" max="10" value="1" style="width:56px"> <span data-i18n="grades.marksWord">mark(s)</span></label>
       <button class="btn" id="needBtn" data-i18n="grades.calculate">Calculate</button>
     </div>
-    <div class="result" id="needResult"></div>
+    <div class="result" id="needResult" role="status"></div>
   </div>
 
   <p class="note" data-i18n-html="grades.note">
@@ -100,7 +104,7 @@
     combined branches collapsed into single rows — adjust to your exact choices. The weighted average is <b>indicative</b>;
     real promotion also depends on failing-subject/compensation rules. Sign in to sync your sheets across devices.
   </p>
-</div>
+</main>
 
 <script type="module">
 import * as auth from "./auth.js?v=21";
@@ -214,11 +218,11 @@ function render(){
   tb.innerHTML = rows.map((r,i)=>{
     const a=subjAvg(r), cls = a==null?"":(a>=30?"good":"bad");
     return `<tr>
-      <td><input data-i="${i}" data-f="name" value="${esc(r.name)}" style="width:100%;background:none;border:none;color:var(--text);font-weight:600"></td>
-      <td><input class="coef" data-i="${i}" data-f="coef" type="number" min="0" step="1" value="${r.coef}"></td>
-      <td><input class="marks" data-i="${i}" data-f="marks" value="${esc(r.marks)}" placeholder="${esc(T("grades.marksPlaceholder"))}"></td>
+      <td><input data-i="${i}" data-f="name" aria-label="${esc(T("grades.subject"))}" value="${esc(r.name)}" style="width:100%;background:none;border:none;color:var(--text);font-weight:600"></td>
+      <td><input class="coef" data-i="${i}" data-f="coef" type="number" min="0" step="1" aria-label="${esc(T("grades.coef")+": "+r.name)}" value="${r.coef}"></td>
+      <td><input class="marks" data-i="${i}" data-f="marks" aria-label="${esc(T("grades.marks").replace(/\s*\(.*$/,"")+": "+r.name)}" value="${esc(r.marks)}" placeholder="${esc(T("grades.marksPlaceholder"))}"></td>
       <td class="avg ${cls}">${a==null?"—":a.toFixed(1)}</td>
-      <td><button class="del" data-del="${i}" title="${esc(T("grades.remove"))}">✕</button></td>
+      <td><button class="del" type="button" data-del="${i}" title="${esc(T("grades.remove"))}" aria-label="${esc(T("grades.remove")+": "+r.name)}"><span aria-hidden="true">✕</span></button></td>
     </tr>`;
   }).join("");
   tb.querySelectorAll("input").forEach(inp=> inp.oninput=()=>{
@@ -226,7 +230,11 @@ function render(){
     rows[i][f] = f==="coef" ? (parseFloat(inp.value)||0) : inp.value;
     save(); if(f!=="name"){ updateSummary(); refreshAvg(i); }
   });
-  tb.querySelectorAll(".del").forEach(b=> b.onclick=()=>{ rows.splice(+b.dataset.del,1); save(); render(); });
+  tb.querySelectorAll(".del").forEach(b=> b.onclick=()=>{
+    const at=+b.dataset.del;
+    rows.splice(at,1); save(); render();
+    ($("rows").querySelectorAll(".del")[at] || $("rows").querySelectorAll(".del")[at-1] || $("addBtn")).focus();
+  });
   $("needSubj").innerHTML = rows.map((r,i)=>`<option value="${i}">${esc(r.name)}</option>`).join("");
   updateSummary(); syncMsg(signedIn?T("grades.synced"):"");
 }
@@ -260,7 +268,11 @@ function calcNeed(){
 $("yearSel").onchange=e=>{ year=e.target.value; variant=variants(year)[0]; loadSheet(); };
 $("variantSel").onchange=e=>{ variant=(e.target.value==="—"?"":e.target.value); loadSheet(); };
 $("resetBtn").onclick=()=>{ if(confirm(T("grades.resetConfirm"))){ rows=template(); save(); render(); } };
-$("addBtn").onclick=()=>{ rows.push({name:T("grades.newSubject"),coef:1,marks:""}); save(); render(); };
+$("addBtn").onclick=()=>{
+  rows.push({name:T("grades.newSubject"),coef:1,marks:""}); save(); render();
+  const added=[...$("rows").querySelectorAll('input[data-f="name"]')].pop();
+  if(added){ added.focus(); added.select(); added.scrollIntoView({block:"nearest"}); }
+};
 $("needBtn").onclick=calcNeed;
 document.addEventListener("i18n:change", render);
 
