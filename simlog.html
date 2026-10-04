@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171;--map-height:320px}
+  html[data-theme="light"]{--warn:#b91c1c}
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
   a{color:var(--accent2-text);text-decoration:none}
@@ -24,9 +25,9 @@
   .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:13px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
   input,select,textarea{padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit;width:100%}
-  textarea{min-height:74px;resize:vertical}select{color-scheme:dark}
+  textarea{min-height:74px;resize:vertical}
   label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px;font-weight:700}
-  .hint{min-height:14px;font-size:11px;font-weight:500}
+  .hint{min-height:14px;font-size:12px;font-weight:500}
   .newx{display:flex;flex-direction:column;gap:10px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.row label{flex:1;min-width:145px}
   .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -35,7 +36,7 @@
   .section-title{font-size:16px;margin:0 0 12px}
   .stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
   .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;min-width:0}
-  .stat small{display:block;color:var(--muted);font-weight:700;font-size:11px;margin-bottom:5px}
+  .stat small{display:block;color:var(--muted);font-weight:700;font-size:12px;margin-bottom:5px}
   .stat b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #map{height:var(--map-height);border-radius:10px;background:var(--card2)}
   .map-empty{height:var(--map-height);display:grid;place-items:center;color:var(--muted);background:var(--card2);border-radius:10px}
@@ -58,12 +59,12 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Home</a>
-  <h1>✈️ Flight Logbook</h1>
+  <h1><span aria-hidden="true">✈️</span> Flight Logbook</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Loading…</div></div>
+<main class="wrap" id="wrap"><div class="gate" role="status">Loading…</div></main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="pixelbreak-config.js"></script>
@@ -93,7 +94,7 @@ const airports=airportResult.data;
 
 function signedOut(){
   if(map){map.remove();map=null;}
-  $("wrap").innerHTML=`<div class="gate">Sign in to keep your flight logbook<br><button class="btn" id="signIn">Sign in</button></div>`;
+  $("wrap").innerHTML=`<div class="gate">Sign in to keep your flight logbook<br><button type="button" class="btn" id="signIn">Sign in</button></div>`;
   $("signIn").onclick=()=>auth.openAuthModal();
 }
 
@@ -102,25 +103,25 @@ function formMarkup(){
     <h2 class="section-title" id="formTitle">Add flight</h2>
     <div class="row">
       <label>Date<input id="flownOn" type="date" required></label>
-      <label>Departure ICAO<input id="dep" list="airportList" maxlength="4" placeholder="ELLX" autocomplete="off" required><span class="hint" id="depHint"></span></label>
-      <label>Arrival ICAO<input id="arr" list="airportList" maxlength="4" placeholder="ENGM" autocomplete="off" required><span class="hint" id="arrHint"></span></label>
+      <label>Departure ICAO<input id="dep" list="airportList" maxlength="4" placeholder="ELLX" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="depHint" required><span class="hint" id="depHint" aria-live="polite"></span></label>
+      <label>Arrival ICAO<input id="arr" list="airportList" maxlength="4" placeholder="ENGM" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="arrHint" required><span class="hint" id="arrHint" aria-live="polite"></span></label>
     </div>
     <div class="row">
-      <label>Aircraft<input id="aircraft" maxlength="80" placeholder="A320"></label>
-      <label>Registration<input id="registration" maxlength="40" placeholder="LX-LBA"></label>
-      <label>Duration (H:MM)<input id="duration" inputmode="numeric" placeholder="1:35" required></label>
+      <label>Aircraft<input id="aircraft" maxlength="80" placeholder="A320" autocomplete="off"></label>
+      <label>Registration<input id="registration" maxlength="40" placeholder="LX-LBA" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+      <label>Duration (H:MM)<input id="duration" placeholder="1:35" autocomplete="off" autocapitalize="none" spellcheck="false" required></label>
       <label>Network<select id="network"><option value="offline">Offline</option><option value="vatsim">VATSIM</option><option value="ivao">IVAO</option></select></label>
     </div>
-    <label>Notes<textarea id="notes" maxlength="2000" placeholder="Route, weather, approaches…"></textarea></label>
-    <div class="actions"><button class="btn" id="save">Save flight</button><button class="ghost" id="cancel" hidden>Cancel edit</button><div class="msg" id="msg"></div></div>
+    <label>Notes<textarea id="notes" maxlength="2000" autocomplete="off" placeholder="Route, weather, approaches…"></textarea></label>
+    <div class="actions"><button type="button" class="btn" id="save">Save flight</button><button type="button" class="ghost" id="cancel" hidden>Cancel edit</button><div class="msg" id="msg" role="status" aria-live="polite"></div></div>
     <datalist id="airportList"></datalist>
   </div>`;
 }
 
 function renderShell(){
-  $("wrap").innerHTML=`${formMarkup()}<div class="msg" id="loadMsg"></div><div class="stats" id="stats"></div>
-    <div class="card"><h2 class="section-title">Route map</h2><div id="mapHost"><div class="map-empty">Loading map…</div></div></div>
-    <section><h2 class="section-title">Logbook</h2><div class="flight-list" id="list"><div class="gate">Loading…</div></div></section>`;
+  $("wrap").innerHTML=`${formMarkup()}<div class="msg" id="loadMsg" role="status" aria-live="polite"></div><div class="stats" id="stats"></div>
+    <div class="card"><h2 class="section-title">Route map</h2><div id="mapHost" role="region" aria-label="Route map of your flights"><div class="map-empty">Loading map…</div></div></div>
+    <section><h2 class="section-title">Logbook</h2><div class="flight-list" id="list"><div class="gate" role="status">Loading…</div></div></section>`;
   $("flownOn").value=today();
   $("airportList").innerHTML=Object.entries(airports).map(([icao,value])=>`<option value="${esc(icao)}">${esc(icao)} — ${esc(value[2])}</option>`).join("");
   [["dep","depHint"],["arr","arrHint"]].forEach(([inputId,hintId])=>$(inputId).addEventListener("input",()=>updateAirportHint(inputId,hintId)));
@@ -216,6 +217,7 @@ function editFlight(id){
   $("duration").value=formatDuration(flight.duration_min);$("network").value=NETWORKS[flight.network]?flight.network:"offline";$("notes").value=flight.notes||"";
   updateAirportHint("dep","depHint");updateAirportHint("arr","arrHint");
   window.scrollTo({top:0,behavior:"smooth"});
+  $("dep").focus({preventScroll:true});
 }
 
 async function deleteFlight(id){
@@ -253,7 +255,7 @@ function renderList(){
       <div class="plane">${plane}</div><div class="duration">${formatDuration(flight.duration_min)}</div>
       <div class="network"><span class="badge">${esc(NETWORKS[flight.network]||flight.network||"offline")}</span></div>
       ${flight.notes?`<div class="notes">${esc(flight.notes)}</div>`:""}
-      <div class="flight-actions"><button class="ghost" data-edit="${esc(flight.id)}">Edit</button><button class="ghost danger" data-delete="${esc(flight.id)}">Delete</button></div></article>`;
+      <div class="flight-actions"><button type="button" class="ghost" data-edit="${esc(flight.id)}" aria-label="Edit flight ${dep} to ${arr}, ${esc(flight.flown_on)}">Edit</button><button type="button" class="ghost danger" data-delete="${esc(flight.id)}" aria-label="Delete flight ${dep} to ${arr}, ${esc(flight.flown_on)}">Delete</button></div></article>`;
   }).join("");
   $("list").querySelectorAll("[data-edit]").forEach(button=>button.onclick=()=>editFlight(button.dataset.edit));
   $("list").querySelectorAll("[data-delete]").forEach(button=>button.onclick=()=>deleteFlight(button.dataset.delete));

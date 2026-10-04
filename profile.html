@@ -44,6 +44,10 @@
   .stat b{display:block;font-size:22px}
   .stat span{font-size:12px;color:var(--muted)}
   .msg{min-height:18px;color:var(--accent2-text);font-weight:700;font-size:13px}
+  .msg.err{color:#ff6b6b}
+  html[data-theme="light"] .msg.err{color:#b91c1c}
+  html[data-theme="light"] .class-tag{color:#075985;background:rgba(14,116,144,.12);border-color:rgba(14,116,144,.4)}
+  html[data-theme="light"] .admin-tag{color:#854d0e;background:rgba(202,138,4,.14);border-color:rgba(161,98,7,.45)}
   .field{display:flex;gap:8px;flex-wrap:wrap}
   .field input{flex:1;min-width:150px;padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px}
   .field .btn{white-space:nowrap}
@@ -64,12 +68,12 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Home</a>
-  <h1>👤 Profile</h1>
+  <h1><span aria-hidden="true">👤</span> Profile</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Loading…</div></div>
+<main class="wrap" id="wrap"><div class="gate" role="status">Loading…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -81,7 +85,7 @@ const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","�
                "🦄","🐙","🐢","🦖","🐬","🦅","⚡","🔥","🌟","🍕","🎮","🏎️"];
 const BUCKET="avatars", AV_PX=256;
 const isUrl=(v)=>/^https?:\/\//.test(v||"");
-const avInner=(v)=>v?(isUrl(v)?`<img src="${esc(v)}" alt="avatar">`:esc(v)):"👤";
+const avInner=(v)=>v?(isUrl(v)?`<img src="${esc(v)}" alt="" width="64" height="64">`:`<span aria-hidden="true">${esc(v)}</span>`):'<span aria-hidden="true">👤</span>';
 let sb=null,myAvatar=null,myClass=null;
 // same specific-class rule as class-gate.js
 const normClass=(r)=>(""+(r??"")).trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
@@ -161,7 +165,7 @@ async function boot(){
   const viewU=qs.get("u");
   if(viewU && viewU.toLowerCase()!==(auth.username()||"").toLowerCase()){ return renderPublic(viewU); }
   if(!auth.session()){
-    $("wrap").innerHTML=`<div class="gate">Sign in to see your profile.<br><br><button class="btn" id="signin">Sign in</button></div>`;
+    $("wrap").innerHTML=`<div class="gate">Sign in to see your profile.<br><br><button type="button" class="btn" id="signin">Sign in</button></div>`;
     $("signin").onclick=auth.openAuthModal;
     return;
   }
@@ -182,40 +186,40 @@ async function boot(){
     <h2>Username</h2>
     <div class="card">
       <div class="field">
-        <input id="nameInp" maxlength="20" value="${esc(uname)}" placeholder="your name">
-        <button class="btn" id="nameSave">Save</button>
+        <input id="nameInp" maxlength="20" value="${esc(uname)}" placeholder="your name" aria-label="Username" aria-describedby="nameHint" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <button type="button" class="btn" id="nameSave">Save</button>
       </div>
-      <div class="hint">3–20 characters — letters, numbers and underscore. Must be unique.</div>
-      <div class="msg" id="nameMsg"></div>
+      <div class="hint" id="nameHint">3–20 characters — letters, numbers and underscore. Must be unique.</div>
+      <div class="msg" id="nameMsg" role="status" aria-live="polite"></div>
     </div>
     <h2>Class</h2>
     <div class="card">
       <div class="field">
-        <input id="classInp" maxlength="12" value="${esc(myClass||"")}" placeholder="e.g. 5C6">
-        <button class="btn" id="classSave">Save</button>
+        <input id="classInp" maxlength="12" value="${esc(myClass||"")}" placeholder="e.g. 5C6" aria-label="Class" aria-describedby="classHint" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button type="button" class="btn" id="classSave">Save</button>
       </div>
-      <div class="hint">A specific class in a year (5C6, 7C1, 2CG) — not just the year. Helps friends find you.</div>
-      <div class="msg" id="classMsg"></div>
+      <div class="hint" id="classHint">A specific class in a year (5C6, 7C1, 2CG) — not just the year. Helps friends find you.</div>
+      <div class="msg" id="classMsg" role="status" aria-live="polite"></div>
     </div>
     <h2>Profile picture</h2>
     <div class="card">
       <div class="upl">
-        <button class="uplbtn" id="uplBtn">📷 Upload a photo</button>
-        <button class="uplbtn ghost" id="rmBtn"${isUrl(myAvatar)?"":" hidden"}>Remove photo</button>
-        <input type="file" id="uplFile" accept="image/*" hidden>
+        <button type="button" class="uplbtn" id="uplBtn"><span aria-hidden="true">📷</span> Upload a photo</button>
+        <button type="button" class="uplbtn ghost" id="rmBtn"${isUrl(myAvatar)?"":" hidden"}>Remove photo</button>
+        <input type="file" id="uplFile" accept="image/*" hidden aria-label="Choose a photo">
       </div>
       <div class="upl-hint">Any image works — the whole photo is kept and stored small (256px). Or pick an emoji below.</div>
-      <div class="msg" id="uplMsg"></div>
+      <div class="msg" id="uplMsg" role="status" aria-live="polite"></div>
     </div>
     <h2>Or pick an emoji</h2>
-    <div class="card"><div class="grid" id="avGrid"></div><div class="msg" id="avMsg"></div></div>
+    <div class="card"><div class="grid" id="avGrid" role="group" aria-label="Emoji avatars"></div><div class="msg" id="avMsg" role="status" aria-live="polite"></div></div>
     <h2 data-i18n="pin.profileTitle">PIN</h2>
     <div class="card">
-      <button class="btn" id="pinChange" data-i18n="pin.change">Change PIN</button>
+      <button type="button" class="btn" id="pinChange" data-i18n="pin.change">Change PIN</button>
       <div class="hint" data-i18n="pin.changeHint">Use 4 or 6 digits. Six is recommended.</div>
     </div>
     <h2>Your stats</h2>
-    <div class="card stats" id="stats"><div class="gate">Loading…</div></div>
+    <div class="card stats" id="stats"><div class="gate" role="status">Loading…</div></div>
     <h2>Achievements</h2>
     <div class="card" id="ach"><div class="gate">Loading…</div></div>
     <div class="hint" style="margin-top:8px">Your public profile: <a id="shareLink" href="profile.html?u=${encodeURIComponent(uname)}">ian.lu/profile.html?u=${esc(uname)}</a></div>`;
@@ -227,15 +231,15 @@ async function boot(){
   const grid=$("avGrid");
   for(const a of AVATARS){
     const b=document.createElement("button");
-    b.className="avb"+(a===myAvatar?" on":"");b.textContent=a;
+    b.type="button";b.className="avb"+(a===myAvatar?" on":"");b.textContent=a;b.setAttribute("aria-pressed",String(a===myAvatar));
     b.onclick=async()=>{
       try{
         const {error}=await sb.rpc("set_avatar",{p_avatar:a});
         if(error)throw error;
         myAvatar=a;$("bigAv").innerHTML=avInner(a);$("rmBtn").hidden=true;
-        grid.querySelectorAll(".avb").forEach(x=>x.classList.toggle("on",x.textContent===a));
-        $("avMsg").textContent="Saved ✓";setTimeout(()=>$("avMsg").textContent="",1200);
-      }catch(e){console.warn(e);$("avMsg").textContent="Couldn't save (run the migration?)";}
+        grid.querySelectorAll(".avb").forEach(x=>{const on=x.textContent===a;x.classList.toggle("on",on);x.setAttribute("aria-pressed",String(on));});
+        $("avMsg").classList.remove("err");$("avMsg").textContent="Saved ✓";setTimeout(()=>$("avMsg").textContent="",1200);
+      }catch(e){console.warn(e);$("avMsg").textContent="Couldn't save (run the migration?)";$("avMsg").classList.add("err");}
     };
     grid.appendChild(b);
   }
@@ -244,7 +248,7 @@ async function boot(){
 
 function setMsg(id,t,err){
   const m=$(id);if(!m)return;
-  m.textContent=t;m.style.color=err?"#ff6b6b":"var(--accent2)";
+  m.textContent=t;m.classList.toggle("err",!!err);
   if(t&&!err&&/✓/.test(t))setTimeout(()=>{if($(id))$(id).textContent="";},1600);
 }
 
@@ -297,7 +301,7 @@ function wireClass(){
 
 function setUpl(t,err){
   const m=$("uplMsg");if(!m)return;
-  m.textContent=t;m.style.color=err?"#ff6b6b":"var(--accent2)";
+  m.textContent=t;m.classList.toggle("err",!!err);
   if(t&&!err&&/✓/.test(t))setTimeout(()=>{if($("uplMsg"))$("uplMsg").textContent="";},1600);
 }
 
