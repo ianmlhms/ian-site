@@ -62,7 +62,13 @@
   .lb-box th,.lb-box td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
   .lb-box th{color:var(--muted);font-size:12px}
   .lb-box td.n{text-align:right;font-variant-numeric:tabular-nums}
-  .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+  .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;margin:-10px -10px 0 0}
+  .bar .home:focus-visible,.langs button:focus-visible,.lbbtn:focus-visible,.share:focus-visible,.key:focus-visible,.lb-close:focus-visible,.lb-tabs button:focus-visible,.lb-box:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (pointer:coarse){
+    .langs button,.lbbtn{min-height:44px}
+    .bar .home{display:inline-flex;align-items:center;min-height:44px}
+    .lb-tabs button{min-height:44px}
+  }
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -73,21 +79,21 @@
 <body>
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🟩 Wuertspill</h1>
+  <h1><span aria-hidden="true">🟩</span> Wuertspill</h1>
   <div class="spacer"></div>
-  <button class="lbbtn" id="lbBtn">🏆 Top</button>
+  <button type="button" class="lbbtn" id="lbBtn" aria-haspopup="dialog"><span aria-hidden="true">🏆</span> Top</button>
   <span id="acctHost"></span>
-  <div class="langs"><button data-l="lb" class="on">🇱🇺 LB</button><button data-l="de">🇩🇪 DE</button></div>
+  <div class="langs" role="group" aria-label="Sprooch"><button type="button" data-l="lb" class="on" aria-pressed="true"><span aria-hidden="true">🇱🇺</span> LB</button><button type="button" data-l="de" aria-pressed="false"><span aria-hidden="true">🇩🇪</span> DE</button></div>
 </header>
 
-<div class="wrap">
-  <div class="msg" id="msg"></div>
-  <div class="board" id="board"></div>
-  <button class="share" id="share">📋 Resultat deelen</button>
-  <button class="share again" id="again">🎲 Nach eng Partie</button>
+<main class="wrap">
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  <div class="board" id="board" role="group" aria-label="Spillfeld"></div>
+  <button type="button" class="share" id="share"><span aria-hidden="true">📋</span> Resultat deelen</button>
+  <button type="button" class="share again" id="again"><span aria-hidden="true">🎲</span> Nach eng Partie</button>
   <div class="kb" id="kb"></div>
-  <div class="stats" id="stats"></div>
-</div>
+  <div class="stats" id="stats" role="group" aria-label="Statistik"></div>
+</main>
 
 <script>
 // ==== Word lists (5 letters, UPPERCASE) ====
@@ -113,6 +119,7 @@ const WORDS = {
 };
 const LABEL = { lb:"Lëtzebuergesch", de:"Deutsch" };
 const ROWS = 6, COLS = 5;
+const STATE_LABEL = { correct:"richteg Plaz", present:"am Wuert, aner Plaz", absent:"net am Wuert" };
 let lang = localStorage.getItem("wordleLang") || "lb";
 let answer = "", guesses = [], current = "", done = false;
 let practice = false;   // free rounds after the daily word — no stats, no leaderboard
@@ -172,13 +179,15 @@ function scoreGuess(g){
 function render(){
   const b=$("board"); b.innerHTML="";
   for(let r=0;r<ROWS;r++){
-    const row=document.createElement("div"); row.className="row";
+    const row=document.createElement("div"); row.className="row"; row.setAttribute("role","group"); row.setAttribute("aria-label","Versuch "+(r+1));
     const g=guesses[r];
     const score=g?scoreGuess(g):null;
     for(let c=0;c<COLS;c++){
-      const t=document.createElement("div"); t.className="tile";
-      if(g){ t.textContent=g[c]; t.classList.add(score[c]); }
-      else if(r===guesses.length && current[c]){ t.textContent=current[c]; t.classList.add("filled"); }
+      const t=document.createElement("div"); t.className="tile"; t.setAttribute("role","img");
+      let lbl="eidel";
+      if(g){ t.textContent=g[c]; t.classList.add(score[c]); lbl=g[c]+", "+STATE_LABEL[score[c]]; }
+      else if(r===guesses.length && current[c]){ t.textContent=current[c]; t.classList.add("filled"); lbl=current[c]; }
+      t.setAttribute("aria-label",lbl);
       row.appendChild(t);
     }
     b.appendChild(row);
@@ -200,9 +209,11 @@ function drawKeyboard(){
   for(const row of KB){
     const r=document.createElement("div"); r.className="krow";
     for(const k of row){
-      const b=document.createElement("button"); b.className="key"+(k==="ENT"||k==="DEL"?" wide":"");
+      const b=document.createElement("button"); b.type="button"; b.className="key"+(k==="ENT"||k==="DEL"?" wide":"");
       b.textContent = k==="ENT"?"Enter":k==="DEL"?"⌫":k;
-      if(st[k]) b.classList.add(st[k]);
+      if(k==="DEL") b.setAttribute("aria-label","Läschen");
+      if(st[k]){ b.classList.add(st[k]); b.setAttribute("aria-label",k+", "+STATE_LABEL[st[k]]); }
+      b.onmousedown=(e)=>e.preventDefault();   // keep focus off the keys so a hardware Enter/Space never re-presses the last tapped key
       b.onclick=()=> key(k==="ENT"?"Enter":k==="DEL"?"Backspace":k);
       r.appendChild(b);
     }
@@ -242,7 +253,7 @@ function finish(won){
 function liveStreak(s){ return s.lastDay===undefined||s.lastDay>=dayIndex()-1 ? s.streak : 0; }
 function renderStats(){
   const s=readStored(statsKey())||{played:0,wins:0,streak:0,max:0};
-  $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b>🔥 ${liveStreak(s)}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
+  $("stats").innerHTML=`<div><b>${s.played}</b>Gespillt</div><div><b>${s.played?Math.round(100*s.wins/s.played):0}%</b>Gewonn</div><div><b><span aria-hidden="true">🔥 </span>${liveStreak(s)}</b>Serie</div><div><b>${s.max}</b>Max</div>`;
 }
 function shareResult(){
   const emo={correct:"🟩",present:"🟨",absent:"⬛"};
@@ -257,28 +268,31 @@ function shareResult(){
 }
 
 document.addEventListener("keydown",(e)=>{
+  if(e.metaKey||e.ctrlKey) return;
+  if($("lbModal").classList.contains("open")){ if(e.key==="Escape") window.closeWordleBoard?.(); return; }
+  if(e.key==="Enter" && e.target.closest?.("button,a")) return;   // let a focused button/link handle its own Enter
   if(e.key==="Enter") key("Enter");
   else if(e.key==="Backspace") key("Backspace");
   else { const k=e.key.toUpperCase(); if(/^[A-ZÄÖÜËÉ]$/.test(k)) key(k); }
 });
 document.querySelectorAll(".langs button").forEach(b=> b.onclick=()=>{
   lang=b.dataset.l; localStorage.setItem("wordleLang",lang);
-  document.querySelectorAll(".langs button").forEach(x=>x.classList.toggle("on",x.dataset.l===lang));
+  document.querySelectorAll(".langs button").forEach(x=>{x.classList.toggle("on",x.dataset.l===lang);x.setAttribute("aria-pressed",x.dataset.l===lang);});
   flash(""); load();
 });
 $("share").onclick=shareResult;
 $("again").onclick=startPractice;
 $("lbBtn").onclick=()=>window.openWordleBoard?.(lang);
-document.querySelectorAll(".langs button").forEach(x=>x.classList.toggle("on",x.dataset.l===lang));
+document.querySelectorAll(".langs button").forEach(x=>{x.classList.toggle("on",x.dataset.l===lang);x.setAttribute("aria-pressed",x.dataset.l===lang);});
 load();
 </script>
 
 <div class="lb-modal" id="lbModal">
-  <div class="lb-box">
-    <button class="lb-close" id="lbClose">&times;</button>
-    <h2>🏆 Leaderboard</h2>
-    <div class="lb-tabs"><button data-lb="lb" class="on">🇱🇺 LB</button><button data-lb="de">🇩🇪 DE</button></div>
-    <div id="lbBody">…</div>
+  <div class="lb-box" role="dialog" aria-modal="true" aria-labelledby="lbTitle" tabindex="-1">
+    <button type="button" class="lb-close" id="lbClose" aria-label="Zoumaachen"><span aria-hidden="true">&times;</span></button>
+    <h2 id="lbTitle"><span aria-hidden="true">🏆</span> Leaderboard</h2>
+    <div class="lb-tabs" role="group" aria-label="Sprooch"><button type="button" data-lb="lb" class="on" aria-pressed="true"><span aria-hidden="true">🇱🇺</span> LB</button><button type="button" data-lb="de" aria-pressed="false"><span aria-hidden="true">🇩🇪</span> DE</button></div>
+    <div id="lbBody" aria-live="polite">…</div>
   </div>
 </div>
 
@@ -306,15 +320,18 @@ load();
       if (!data || !data.length) { body.innerHTML = `<p style="color:var(--muted)">Nach keng Resultater — spill a kommzréck!</p>`; return; }
       const esc = (s) => (""+(s??"")).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]));
       const tody = (t) => t == null ? "—" : t === 0 ? "✗" : t + "/6";
-      body.innerHTML = `<table><tr><th>#</th><th>Spiller</th><th class="n">Gewonn</th><th class="n">⌀</th><th class="n">Haut</th></tr>` +
+      body.innerHTML = `<table><tr><th scope="col">#</th><th scope="col">Spiller</th><th scope="col" class="n">Gewonn</th><th scope="col" class="n">⌀</th><th scope="col" class="n">Haut</th></tr>` +
         data.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.username)}</td><td class="n">${r.wins}/${r.played}</td><td class="n">${r.avg_guesses ?? "—"}</td><td class="n">${tody(r.today)}</td></tr>`).join("") +
         `</table>`;
     } catch (e) { body.innerHTML = "Feeler beim Lueden."; console.warn(e); }
   }
-  window.openWordleBoard = (lang) => { boardLang = lang || "lb"; $("lbModal").classList.add("open"); document.querySelectorAll("[data-lb]").forEach(b => b.classList.toggle("on", b.dataset.lb === boardLang)); drawBoard(); };
-  $("lbClose").onclick = () => $("lbModal").classList.remove("open");
-  $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") $("lbModal").classList.remove("open"); };
-  document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; document.querySelectorAll("[data-lb]").forEach(x => x.classList.toggle("on", x === b)); drawBoard(); });
+  const setLbTabs = () => document.querySelectorAll("[data-lb]").forEach(b => { b.classList.toggle("on", b.dataset.lb === boardLang); b.setAttribute("aria-pressed", b.dataset.lb === boardLang); });
+  let lbOpener = null;
+  window.openWordleBoard = (lang) => { boardLang = lang || "lb"; lbOpener = document.activeElement; $("lbModal").classList.add("open"); setLbTabs(); drawBoard(); $("lbClose").focus({ preventScroll: true }); };
+  window.closeWordleBoard = () => { $("lbModal").classList.remove("open"); if (lbOpener && lbOpener.focus) lbOpener.focus({ preventScroll: true }); lbOpener = null; };
+  $("lbClose").onclick = () => window.closeWordleBoard();
+  $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") window.closeWordleBoard(); };
+  document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; setLbTabs(); drawBoard(); });
 </script>
   <script type="module" src="rtc-ring.js?v=17"></script>
   <script type="module" src="class-gate.js?v=18"></script>
