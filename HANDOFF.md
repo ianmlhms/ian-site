@@ -64,6 +64,9 @@ overflow, and the `check_overlap` probes (offscreen, collision, clipped, contras
 - Page dialogs (`prompt()` in `color.html`) are auto-cancelled — an open dialog would hang the page.
 - `check_overlap.mjs` (390/1280px, root pages only) still exists for phone/desktop widths.
 
+### Shared look: `site-ui.css`
+The home-page design (tokens, header, title, card, tile, button, input) lives in `site-ui.css`; usage note at the top of the file. Opt in with `class="ui"` on `<body>` + `ui-*` classes. Only `index.html` uses it so far; other pages get it page by page. Bump `?v=` when it changes.
+
 ### ⚠️ Cache-busting (read this!)
 Plesk serves assets with `cache-control: max-age=600` (10 min), and the service worker
 serves **versioned** JS/CSS **cache-first** — a changed file behind an unchanged `?v=` stays
