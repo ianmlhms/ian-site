@@ -36,7 +36,7 @@
   .notice.success{border-color:var(--ok)}
   .notice.info{border-color:var(--accent2)}
   #app{flex:1;display:none;min-height:0;flex-direction:column}
-  .connection-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:rgba(22,22,37,.72);flex:none}
+  .connection-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--card) 72%,transparent);flex:none}
   .account-state{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:6px 10px;min-width:0;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card)}
   .account-state.fresh{border-color:rgba(83,209,139,.45)}
   .account-state.stale,.account-state.missing{border-color:rgba(255,107,107,.55)}
@@ -146,7 +146,7 @@
     .search-input,#messageInput{font-size:16px}
   }
 
-  .chat-row button{display:flex;align-items:center;gap:12px}
+  .chat-row button{display:flex;flex-direction:row;align-items:center;gap:12px}
   .chat-row-texts{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
   .chat-avatar{flex:none;width:44px;height:44px;border-radius:50%;overflow:hidden;
     display:grid;place-items:center;background:var(--border);color:var(--text);
@@ -162,7 +162,7 @@
   .mode-switch button.active{border-color:var(--accent2);color:var(--text);background:var(--card2)}
   .mail-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;
     padding:8px 12px;border-bottom:1px solid var(--border);
-    background:rgba(22,22,37,.72);flex:none}
+    background:color-mix(in srgb,var(--card) 72%,transparent);flex:none}
   .mail-strip .account-state{grid-template-columns:auto 1fr;gap:4px 8px}
   .mail-row .chat-row-bottom{align-items:baseline}
   .mail-account-badge{flex:none;border:1px solid var(--border);border-radius:999px;
@@ -194,6 +194,7 @@
   <a class="home" href="index.html">‹ Start</a>
   <h1><span aria-hidden="true">📥</span> Vereenegt Inbox</h1>
   <div class="spacer"></div>
+  <span id="langSw"></span>
   <span id="acctHost"></span>
 </header>
 
