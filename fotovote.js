@@ -87,9 +87,19 @@ function preload(paths) {
   });
 }
 
+let lastFocusId = "";
+document.addEventListener("focusin", (event) => {
+  if ($("screen").contains(event.target)) lastFocusId = event.target.id || "";
+});
+
 function showScreen(html, isWide = false) {
+  const hadFocus = lastFocusId !== "" && (
+    $("screen").contains(document.activeElement)
+    || document.activeElement === document.body);
   $("app").className = isWide ? "wrap wide" : "wrap";
   $("screen").innerHTML = html;
+  const keep = hadFocus ? $(lastFocusId) : null;
+  if (keep && !keep.disabled) keep.focus({ preventScroll: true });
 }
 
 function showGate() {

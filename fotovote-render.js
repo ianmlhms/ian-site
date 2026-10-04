@@ -15,7 +15,7 @@ export function homeMarkup(me, percent) {
     <h2 class="title">Moien, ${esc(me.name)}!</h2>
     <p class="muted">Deng Auswiel fir d'Skandinavien-Fotobuch.</p>
     <p><strong>Wëschen</strong> · ${me.swiped} / ${me.total}</p>
-    <div class="progress"><span style="width:${percent}%"></span></div>
+    <div class="progress" role="progressbar" aria-label="Wëschen" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><span style="width:${percent}%"></span></div>
     <div class="stats">
       <div class="stat"><strong>${me.kept}</strong><span>behalen</span></div>
       <div class="stat"><strong>${me.survivors}</strong><span>Iwwerliewender</span></div>
@@ -37,15 +37,15 @@ export function swipeMarkup(photo, me, canUndo, url) {
   <div class="photo-meta"><span>${me.swiped + 1} / ${me.total}</span><span>${esc(photo.day_label || "")}</span></div>
   <div class="photo-stage"><img src="${esc(url)}" alt="Foto fir ofzestëmmen" draggable="false"></div>
   <div class="swipe-actions">
-    <button class="btn skip" id="skipBtn">✕ Ewech</button>
-    <button class="btn keep" id="keepBtn">♥ Behalen</button>
+    <button class="btn skip" id="skipBtn" aria-keyshortcuts="ArrowLeft"><span aria-hidden="true">✕</span> Ewech</button>
+    <button class="btn keep" id="keepBtn" aria-keyshortcuts="ArrowRight"><span aria-hidden="true">♥</span> Behalen</button>
   </div>
   <button class="undo" id="undoBtn" ${canUndo ? "" : "disabled"}>Zréck</button>`;
 }
 
 export function finishedMarkup(canUndo) {
   return `<div class="card gate">
-    <h2 class="title">Fäerdeg! 🎉</h2>
+    <h2 class="title">Fäerdeg! <span aria-hidden="true">🎉</span></h2>
     <p>Du hues all d'Fotoe gekuckt.</p>
     <div class="actions"><button class="btn" id="finishedDuel">Bei d'Dueller</button></div>
     <button class="undo" id="finishedUndo" ${canUndo ? "" : "disabled"}>Zréck</button>
@@ -59,8 +59,8 @@ export function duelMarkup(pair, urlA, urlB, count, target) {
     <span class="muted">${count} Dueller · ${esc(target)}</span>
   </div>
   <div class="duel-grid">
-    <button class="duel-pick" id="pickA"><img src="${esc(urlA)}" alt="Lénkst Foto" draggable="false"></button>
-    <button class="duel-pick" id="pickB"><img src="${esc(urlB)}" alt="Rietst Foto" draggable="false"></button>
+    <button class="duel-pick" id="pickA" aria-label="Lénkst Foto wielen" aria-keyshortcuts="ArrowLeft"><img src="${esc(urlA)}" alt="Lénkst Foto" draggable="false"></button>
+    <button class="duel-pick" id="pickB" aria-label="Rietst Foto wielen" aria-keyshortcuts="ArrowRight"><img src="${esc(urlB)}" alt="Rietst Foto" draggable="false"></button>
   </div>`;
 }
 

@@ -61,7 +61,7 @@
 <body>
 <header class="bar" id="bar" hidden>
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>📷 Fotobuch</h1>
+  <h1><span aria-hidden="true">📷</span> Fotobuch</h1>
   <div class="spacer"></div>
   <span id="who"></span>
 </header>
@@ -69,7 +69,7 @@
 <div class="wrap" id="gateWrap">
   <!-- Starts neutral: the lock text is only swapped in once the token has
        actually been checked, so a valid voter never sees it flash by. -->
-  <div class="card gate" id="gateMsg">Lueden…</div>
+  <div class="card gate" id="gateMsg" role="status">Lueden…</div>
 </div>
 
 <main class="wrap" id="app" hidden>
