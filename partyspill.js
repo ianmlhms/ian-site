@@ -59,6 +59,9 @@
     reveal: { lb: "Opléisen", de: "Auflösen", en: "Reveal" },
     score: { lb: "Punkten", de: "Punkte", en: "Score" },
     rounds: { lb: "Ronn", de: "Runde", en: "Round" },
+    nameLabel: { lb: "Numm", de: "Name", en: "Name" },
+    addPlayer: { lb: "Spiller derbäisetzen", de: "Spieler hinzufügen", en: "Add player" },
+    removePlayer: { lb: "{n} ewechhuelen", de: "{n} entfernen", en: "Remove {n}" },
   };
 
   var lang = detectLang();
@@ -113,6 +116,7 @@
   /* Render a stage from an HTML string, then wire buttons by id. */
   function stage(html, wires) {
     $('stage').innerHTML = html;
+    $('stage').focus({ preventScroll: true });
     if (wires) Object.keys(wires).forEach(function (id) {
       var el = $(id);
       if (el) el.onclick = wires[id];
@@ -121,13 +125,13 @@
 
   /* ---------------- home ---------------- */
 
-  function renderHome() {
+  function renderHome(refocus) {
     stopTimer();
     $('lede').textContent = t('lede');
     $('barTitle').textContent = 'Partyspill';
     $('grid').innerHTML = GAMES.map(function (g) {
       return '<button class="tile" data-id="' + g.id + '" style="border-color:' + g.accent + '33">' +
-        '<span class="em">' + g.emoji + '</span>' +
+        '<span class="em" aria-hidden="true">' + g.emoji + '</span>' +
         '<span class="nm">' + esc(tx(g.name)) + '</span>' +
         '<span class="tg">' + esc(tx(g.tag)) + '</span></button>';
     }).join('');
@@ -135,6 +139,7 @@
       btn.onclick = function () { openSetup(btn.dataset.id); };
     });
     show('s-home');
+    if (refocus === true) $('lede').focus({ preventScroll: true });
   }
 
   /* ---------------- player setup ---------------- */
@@ -147,13 +152,17 @@
     $('pTag').textContent = tx(game.tag);
     $('pStart').textContent = t('start');
     $('pBack').textContent = t('back');
+    $('pInput').placeholder = t('nameLabel');
+    $('pInput').setAttribute('aria-label', t('nameLabel'));
+    $('pAdd').setAttribute('aria-label', t('addPlayer'));
     renderPlayers();
     show('s-players');
+    $('pName').focus({ preventScroll: true });
   }
 
   function renderPlayers() {
     $('plist').innerHTML = players.map(function (p, i) {
-      return '<span class="chip">' + esc(p) + '<button data-i="' + i + '" aria-label="x">✕</button></span>';
+      return '<span class="chip">' + esc(p) + '<button type="button" data-i="' + i + '" aria-label="' + esc(t('removePlayer', { n: p })) + '"><span aria-hidden="true">✕</span></button></span>';
     }).join('') || '<span class="tg" style="color:var(--muted);font-size:13px">—</span>';
     Array.prototype.forEach.call($('plist').querySelectorAll('button'), function (b) {
       b.onclick = function () { players.splice(+b.dataset.i, 1); savePlayers(); renderPlayers(); };
@@ -198,7 +207,7 @@
     return '<button class="btn" id="again">' + t('again') + '</button>' +
            '<button class="btn ghost" id="menu">' + t('menu') + '</button>';
   }
-  var endWires = { again: function () { nextRound(); }, menu: function () { stopTimer(); renderHome(); } };
+  var endWires = { again: function () { nextRound(); }, menu: function () { stopTimer(); renderHome(true); } };
 
   function scoreboard() {
     var names = Object.keys(R.scores);
@@ -343,7 +352,7 @@
       '<div class="card"><p class="tiny">' + t('category') + '</p>' +
       '<p class="big">' + esc(tx(R.cat)) + '</p>' +
       '<p class="timer" id="clock">' + game.seconds + '</p></div>' +
-      '<div class="card"><p class="big" id="cnt">0</p><p class="tiny">' + t('counted') + '</p></div>' +
+      '<div class="card"><p class="big" id="cnt" aria-live="polite">0</p><p class="tiny">' + t('counted') + '</p></div>' +
       '<button class="btn big" id="plus">+1</button>',
       { plus: function () { R.count++; $('cnt').textContent = R.count; } }
     );
@@ -375,7 +384,7 @@
       '<div class="card"><p class="tiny">' + t('handTo') + ': <b>' + esc(who) + '</b></p>' +
       '<p class="mid" style="margin-top:12px">' + esc(tx(R.item.q)) + '</p></div>' +
       '<div class="card"><p class="tiny">' + t('guess') + '</p>' +
-      '<input type="number" id="g" inputmode="numeric"></div>' +
+      '<input type="number" id="g" inputmode="numeric" aria-label="' + esc(t('guess')) + '"></div>' +
       '<button class="btn" id="ok">' + t('next') + '</button>',
       { ok: function () {
           var v = parseFloat($('g').value);
@@ -493,7 +502,7 @@
     stage(
       '<div class="card"><p class="tiny">' + t('clueFor') + '</p>' +
       '<div class="poles"><span>' + esc(tx(R.pair.a)) + '</span><span>' + esc(tx(R.pair.b)) + '</span></div>' +
-      '<input type="range" min="0" max="100" value="' + R.target + '" disabled>' +
+      '<input type="range" min="0" max="100" value="' + R.target + '" disabled aria-label="' + esc(tx(R.pair.a) + ' – ' + tx(R.pair.b)) + '">' +
       '<p class="tiny">' + t('secretPoint') + ': <b>' + R.target + '%</b></p>' +
       '<p class="tiny" style="margin-top:10px">' + t('giveClue') + '</p></div>' +
       '<button class="btn" id="go">' + t('hide') + '</button>', { go: spectrumGuess });
@@ -503,7 +512,7 @@
     stage(
       '<div class="card"><p class="tiny">' + t('guessNow') + '</p>' +
       '<div class="poles"><span>' + esc(tx(R.pair.a)) + '</span><span>' + esc(tx(R.pair.b)) + '</span></div>' +
-      '<input type="range" min="0" max="100" value="50" id="sl"></div>' +
+      '<input type="range" min="0" max="100" value="50" id="sl" aria-label="' + esc(tx(R.pair.a) + ' – ' + tx(R.pair.b)) + '"></div>' +
       '<button class="btn" id="ok">' + t('reveal') + '</button>',
       { ok: function () {
           var g = +$('sl').value, off = Math.abs(g - R.target);
@@ -565,6 +574,7 @@
     document.documentElement.lang = l;
     Array.prototype.forEach.call($('langs').children, function (b) {
       b.classList.toggle('on', b.dataset.l === l);
+      b.setAttribute('aria-pressed', String(b.dataset.l === l));
     });
     renderHome();
   }
@@ -575,7 +585,7 @@
   $('pAdd').onclick = addPlayer;
   $('pInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') addPlayer(); });
   $('pStart').onclick = startGame;
-  $('pBack').onclick = renderHome;
+  $('pBack').onclick = function () { renderHome(true); };
 
   setLang(lang);
 })();

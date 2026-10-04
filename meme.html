@@ -30,6 +30,7 @@
   .big{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:12px;padding:13px;font-weight:800;font-size:15px;cursor:pointer;margin-top:8px}
   .big:disabled{opacity:.45;cursor:default}
   .muted{color:var(--muted)}.center{text-align:center}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
   .win{background:linear-gradient(90deg,rgba(110,168,254,.2),transparent);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:18px;font-weight:800;text-align:center;margin-bottom:10px}
   /* meme */
   .meme{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#111;line-height:0}
@@ -43,6 +44,7 @@
   .reroll:disabled{opacity:.5;cursor:default}
   .cin{width:100%;margin-top:8px;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:15px;outline:none}
   .cin:focus{border-color:var(--accent2-text)}
+  .cin:focus-visible{outline:.2rem solid var(--focus-ring);outline-offset:.18rem}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
   .ventry{position:relative;border:2px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .12s}
   .ventry:not(.mine):hover{border-color:var(--accent2-text)}
@@ -67,7 +69,8 @@
   <div class="spacer"></div>
   <span class="muted">room <code id="roomc"></code></span>
 </header>
-<div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+<main class="wrap" id="app"><p class="muted">Connecting…</p></main>
+<div id="live" class="sr-only" role="status" aria-live="polite"></div>
 
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=6" data-arcade-id="o-meme" data-arcade-title="Meme Caption Party" data-arcade-no-score data-arcade-replace=".bar"></script>
@@ -151,6 +154,15 @@ let captions={}, votes={}, capTimer=null, voteTimer=null, tick=null;
 
 function players(){ const st=ch.presenceState(); return Object.keys(st).filter(k=>isId(k)&&Array.isArray(st[k])&&isObject(st[k][0])&&isText(st[k][0].name,MAX_NAME)).slice(0,MAX_PLAYERS).map(k=>({cid:k,name:(st[k][0]||{}).name||"?"})); }
 async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{ n=window.__pbAuth?.session?.user?.user_metadata?.username; }catch{} } if(!n){ n=(prompt("Your name:")||"Player").slice(0,16);} localStorage.setItem("playerName",n); return n; }
+function say(t){ const el=$("live"); if(!el) return; el.textContent=""; setTimeout(()=>{ el.textContent=t; },60); }
+let lastKey="";
+function announcePhase(){
+  const key=phase+":"+round; if(key===lastKey) return; lastKey=key;
+  if(phase==="caption") say(`Round ${round} of ${totalRounds}: write your caption`);
+  else if(phase==="vote") say("Vote for the funniest meme");
+  else if(phase==="reveal") say(`Results for round ${round}`);
+  else if(phase==="final") say("Game over");
+}
 function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
 function memeNode(url,top,bottom){
   const el=document.createElement("div"); el.className="meme";
@@ -166,36 +178,37 @@ function topbar(){ const s=Math.max(0,Math.ceil((roundEnd-Date.now())/1000));
 
 /* ---------- render ---------- */
 function render(){
+  announcePhase();
   if(phase==="lobby"){
     let html = `<p class="muted center">Everyone gets a meme — keep it or <b>change it up to ${MAX_REROLLS}×</b> — caption it, then vote for the funniest. Most votes over ${ROUNDS} rounds wins. 3+ players is best!</p>`;
     html += scoreChips();
-    html += `<div class="invite">🔗 <code>${esc(inviteURL)}</code><button id="cpy">Copy</button></div>`;
+    html += `<div class="invite"><span aria-hidden="true">🔗</span> <code>${esc(inviteURL)}</code><button id="cpy" aria-label="Copy invite link">Copy</button></div>`;
     const ps=players();
     html += role==="host" ? `<button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
                           : (hostHere ? `<p class="center muted">Waiting for the host to start…</p>`
-                                      : `<p class="center muted">⚠️ The host left — ask them to rejoin.</p>`);
+                                      : `<p class="center muted" role="alert"><span aria-hidden="true">⚠️</span> The host left — ask them to rejoin.</p>`);
     $("app").innerHTML=html;
-    if($("cpy")) $("cpy").onclick=()=>{ navigator.clipboard?.writeText(inviteURL); $("cpy").textContent="Copied ✓"; };
+    if($("cpy")) $("cpy").onclick=()=>{ navigator.clipboard?.writeText(inviteURL); $("cpy").textContent="Copied ✓"; say("Invite link copied"); };
     if(role==="host"&&$("startBtn")) $("startBtn").onclick=start;
     return;
   }
   if(phase==="final"){
     const ps=[...players()].sort((a,b)=>(scores[b.cid]||0)-(scores[a.cid]||0));
     const top=ps[0];
-    let html = `<div class="win">🏆 ${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+scoreChips();
+    let html = `<div class="win"><span aria-hidden="true">🏆</span> ${top?esc(top.name)+(top.cid===cid?" (you)":""):"-"} wins!</div>`+scoreChips();
     html += role==="host" ? `<button class="big" id="againBtn">Play again</button>`
-                          : (hostHere ? `<p class="center muted">Waiting for host…</p>` : `<p class="center muted">⚠️ The host left.</p>`);
+                          : (hostHere ? `<p class="center muted">Waiting for host…</p>` : `<p class="center muted" role="alert"><span aria-hidden="true">⚠️</span> The host left.</p>`);
     $("app").innerHTML=html;
     if(role==="host"&&$("againBtn")) $("againBtn").onclick=()=>{ ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
     return;
   }
   let html = scoreChips()+topbar();
   if(phase==="caption"){
-    html += `<div class="meme big" id="prev"><img><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
-    if(myCap){ html += `<p class="center muted">✅ Meme sent! Waiting for the others…</p>`; }
+    html += `<div class="meme big" id="prev"><img alt="Meme template"><div class="mtext top" id="pt"></div><div class="mtext bottom" id="pb"></div></div>`;
+    if(myCap){ html += `<p class="center muted"><span aria-hidden="true">✅</span> Meme sent! Waiting for the others…</p>`; }
     else html += `<button class="reroll" id="rrBtn">🔄 Change meme (${rerollsLeft})</button>
-                  <input id="capT" class="cin" placeholder="Top text" maxlength="60" autocomplete="off">
-                  <input id="capB" class="cin" placeholder="Bottom text" maxlength="60" autocomplete="off">
+                  <input id="capT" class="cin" placeholder="Top text" aria-label="Top text" maxlength="60" autocomplete="off">
+                  <input id="capB" class="cin" placeholder="Bottom text" aria-label="Bottom text" maxlength="60" autocomplete="off">
                   <button class="big" id="capBtn">Send meme</button>`;
     $("app").innerHTML=html;
     $("prev").querySelector("img").src=myTemplate||template;
@@ -206,14 +219,17 @@ function render(){
     startTick(); return;
   }
   if(phase==="vote"){
-    html += `<p class="center muted">Vote for the funniest 👇</p><div class="grid"></div>`;
+    html += `<p class="center muted">Vote for the funniest <span aria-hidden="true">👇</span></p><div class="grid"></div>`;
     $("app").innerHTML=html;
     $("app").querySelector(".grid").replaceChildren(...entries.map(e=>{
       const isMine=e.cid===cid, isVoted=myVote===e.cid;
       const el=document.createElement("div"); el.className=`ventry ${isMine?"mine":""} ${isVoted?"voted":""}`; el.dataset.cid=e.cid;
       const label=document.createElement("div"); label.className="mlabel"; label.textContent=isMine?"Your meme":(isVoted?"✓ Voted":"Tap to vote");
       el.append(memeNode(e.template||template,e.top,e.bottom),label);
-      if(!isMine) el.onclick=()=>castVote(e.cid); return el;
+      el.setAttribute("role","button"); el.tabIndex=isMine?-1:0;
+      el.setAttribute("aria-label",`${isMine?"Your meme":isVoted?"Voted":"Vote for this meme"}: ${[e.top,e.bottom].filter(Boolean).join(" / ")||"no caption"}`);
+      if(isMine||isVoted||myVote) el.setAttribute("aria-disabled","true");
+      if(!isMine){ el.onclick=()=>castVote(e.cid); el.onkeydown=(ev)=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); castVote(e.cid); } }; } return el;
     }));
     startTick(); return;
   }
@@ -246,6 +262,7 @@ function submitCaption(){
   if(!top && !bottom) return;
   const tpl=myTemplate||template;
   myCap={top,bottom,template:tpl};
+  say("Meme sent");
   if(role==="host") hostCaption({cid,name,top,bottom,template:tpl});
   else ch.send({type:"broadcast",event:"caption",payload:{cid,name,top,bottom,template:tpl}});
   render();
@@ -253,6 +270,7 @@ function submitCaption(){
 function castVote(choice){
   if(myVote||choice===cid) return;
   myVote=choice;
+  say("Vote cast");
   if(role==="host") hostVote({voter:cid,choice});
   else ch.send({type:"broadcast",event:"castvote",payload:{voter:cid,choice}});
   render();

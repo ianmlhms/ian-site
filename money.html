@@ -56,8 +56,8 @@
   .ai{background:linear-gradient(135deg,rgba(110,168,254,.12),rgba(77,232,255,.08));border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.55}
   details.acc>summary{cursor:pointer;list-style:none;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;padding:2px 0}
   details.acc>summary::-webkit-details-marker{display:none}
-  details.acc>summary::before{content:"▸ ";color:var(--accent-text)}
-  details.acc[open]>summary::before{content:"▾ "}
+  details.acc>summary::before{content:"▸ ";content:"▸ " / "";color:var(--accent-text)}
+  details.acc[open]>summary::before{content:"▾ ";content:"▾ " / ""}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -67,12 +67,12 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>💶 Sue</h1>
+  <h1><span aria-hidden="true">💶</span> Sue</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+<main class="wrap" id="wrap"><div class="gate" role="status">Lueden…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -142,11 +142,11 @@ async function boot(){
 
 function shell(){
   return `
-    <div class="seg" id="periodSeg">
-      <button data-p="month" class="on">Dëse Mount</button>
-      <button data-p="last">Läschte Mount</button>
-      <button data-p="year">Joer</button>
-      <button data-p="all">Alles</button>
+    <div class="seg" id="periodSeg" role="group" aria-label="Zäitraum">
+      <button type="button" data-p="month" class="on" aria-pressed="true">Dëse Mount</button>
+      <button type="button" data-p="last" aria-pressed="false">Läschte Mount</button>
+      <button type="button" data-p="year" aria-pressed="false">Joer</button>
+      <button type="button" data-p="all" aria-pressed="false">Alles</button>
     </div>
 
     <div class="card">
@@ -156,10 +156,10 @@ function shell(){
         <div class="metric"><b id="mNet">${CUR}0</b><span>Bilan</span></div>
         <div class="metric inv"><b id="mInv">${CUR}0</b><span>Investéiert</span></div>
       </div>
-      <div class="ai" id="aiBox" style="margin-top:12px;display:none"></div>
+      <div class="ai" id="aiBox" role="status" style="margin-top:12px;display:none"></div>
       <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
         <button class="ghost" id="aiInsight">✨ AI-Iwwerbléck</button>
-        <span class="msg" id="aiMsg" style="margin:0"></span>
+        <span class="msg" id="aiMsg" role="status" style="margin:0"></span>
       </div>
     </div>
 
@@ -179,39 +179,39 @@ function shell(){
       <button class="ghost" id="importBtn" style="margin-left:auto">📥 Importéieren</button>
       <input type="file" id="impFile" accept=".csv,.pdf,text/csv,application/pdf" hidden>
     </h2>
-    <div class="hint" id="impMsg" style="margin-top:-4px"></div>
+    <div class="hint" id="impMsg" role="status" style="margin-top:-4px"></div>
     <div style="margin-top:2px"><button class="ghost" id="delImp" style="font-size:12px;padding:6px 10px">🗑️ Importéiert Buchungen läschen</button></div>
     <div class="chips" id="filterChips"></div>
     <div class="card" id="txList"><div class="gate">Lueden…</div></div>
 
     <details class="acc"><summary>➕ Buchung vun Hand bäisetzen</summary>
       <div class="card" style="margin-top:8px">
-        <div class="seg" id="kindSeg">
-          <button data-k="out" class="on">− Ausginn</button><button data-k="in">＋ Rakomm</button>
+        <div class="seg" id="kindSeg" role="group" aria-label="Typ">
+          <button type="button" data-k="out" class="on" aria-pressed="true">− Ausginn</button><button type="button" data-k="in" aria-pressed="false">＋ Rakomm</button>
         </div>
         <div class="field">
-          <input id="tAmt" type="number" step="0.01" min="0" placeholder="Betrag (${CUR})" style="flex:.8">
-          <select id="tCat"></select>
+          <input id="tAmt" type="number" step="0.01" min="0" placeholder="Betrag (${CUR})" aria-label="Betrag" inputmode="decimal" style="flex:.8">
+          <select id="tCat" aria-label="Kategorie"></select>
         </div>
         <div class="field">
-          <input id="tNote" placeholder="Notiz (optional)" style="flex:2">
+          <input id="tNote" placeholder="Notiz (optional)" aria-label="Notiz" style="flex:2">
           <button class="btn" id="addTx">Bäisetzen</button>
         </div>
-        <div class="msg" id="txMsg"></div>
+        <div class="msg" id="txMsg" role="status"></div>
       </div></details>
 
     <h2>Abonnementer</h2>
     <div class="card">
       <div class="field">
-        <input id="sName" placeholder="Numm (z.B. Spotify)" style="flex:1.4">
-        <input id="sAmt" type="number" step="0.01" min="0" placeholder="${CUR}/Mount" style="flex:.7">
-        <select id="sCycle"><option value="monthly">Mount</option><option value="yearly">Joer</option><option value="weekly">Woch</option></select>
+        <input id="sName" placeholder="Numm (z.B. Spotify)" aria-label="Numm" style="flex:1.4">
+        <input id="sAmt" type="number" step="0.01" min="0" placeholder="${CUR}/Mount" aria-label="Betrag" inputmode="decimal" style="flex:.7">
+        <select id="sCycle" aria-label="Intervall"><option value="monthly">Mount</option><option value="yearly">Joer</option><option value="weekly">Woch</option></select>
       </div>
       <div class="field">
-        <input id="sNext" type="date" style="flex:1">
+        <input id="sNext" type="date" aria-label="Nächst Bezuelung" style="flex:1">
         <button class="btn" id="addSub">Bäisetzen</button>
       </div>
-      <div class="msg" id="subMsg"></div>
+      <div class="msg" id="subMsg" role="status"></div>
       <div id="subList" style="margin-top:6px"></div>
     </div>`;
 }
@@ -219,10 +219,10 @@ function shell(){
 let addKind="out";
 function wireShell(){
   $("periodSeg").querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{
-    period=b.dataset.p;$("periodSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.p===period));render();
+    period=b.dataset.p;$("periodSeg").querySelectorAll("button").forEach(x=>{x.classList.toggle("on",x.dataset.p===period);x.setAttribute("aria-pressed",String(x.dataset.p===period));});render();
   });
   $("kindSeg").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{
-    addKind=b.dataset.k;$("kindSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x.dataset.k===addKind));fillCats();
+    addKind=b.dataset.k;$("kindSeg").querySelectorAll("button").forEach(x=>{x.classList.toggle("on",x.dataset.k===addKind);x.setAttribute("aria-pressed",String(x.dataset.k===addKind));});fillCats();
   });
   fillCats();
   $("addTx").onclick=addTx;
@@ -356,14 +356,18 @@ function renderCats(s){
   const max=entries[0][1];
   $("catCard").innerHTML=entries.map(([c,v])=>{
     const pct=Math.round(v/s.out*100);const w=Math.max(3,Math.round(v/max*100));
-    return `<div class="catbar pick" data-cat="${c}">
-      <div class="lab">${catIc(c)} ${esc(catLbl(c))}</div>
+    return `<div class="catbar pick" data-cat="${c}" role="button" tabindex="0" aria-pressed="${catFilter===c}" aria-label="${esc(catLbl(c))}: ${CUR}${v.toFixed(0)} (${pct}%)">
+      <div class="lab"><span aria-hidden="true">${catIc(c)}</span> ${esc(catLbl(c))}</div>
       <div class="track"><div class="fill" style="width:${w}%"></div></div>
       <div class="val">${CUR}${v.toFixed(0)} · ${pct}%</div></div>`;
   }).join("");
-  $("catCard").querySelectorAll("[data-cat]").forEach(b=>b.onclick=()=>{
-    catFilter=catFilter===b.dataset.cat?null:b.dataset.cat;render();
-    document.getElementById("txList").scrollIntoView({behavior:"smooth",block:"start"});
+  $("catCard").querySelectorAll("[data-cat]").forEach(b=>{
+    const pickCat=()=>{
+      catFilter=catFilter===b.dataset.cat?null:b.dataset.cat;render();
+      document.getElementById("txList").scrollIntoView({behavior:"smooth",block:"start"});
+    };
+    b.onclick=pickCat;
+    b.onkeydown=(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pickCat();}};
   });
 }
 function renderAccounts(){
@@ -373,7 +377,7 @@ function renderAccounts(){
   if(!keys.length){$("acctCard").innerHTML='<div class="hint">Importéier e Kontoauszuch fir Kontoen ze gesinn.</div>';return;}
   $("acctCard").innerHTML=keys.map(k=>{
     const a=acc[k],net=a.in-a.out;
-    return `<div class="row"><span class="ic">🏦</span>
+    return `<div class="row"><span class="ic" aria-hidden="true">🏦</span>
       <div><div class="t">${esc(k)}</div><div class="s">${a.n} Buchungen</div></div>
       <div class="amt ${net>=0?"in":"out"}">${net<0?"−":"+"}${CUR}${Math.abs(net).toFixed(2)}</div></div>`;
   }).join("")+`<div class="hint" style="margin-top:8px">Netto-Floss (all Buchungen; keng Ufanksbilanz).</div>`;
@@ -390,11 +394,11 @@ function renderInvest(){
   const rows=Object.entries(hold).filter(([,v])=>Math.abs(v)>0.5).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const div=tx.filter(t=>effCat(t)==="dividend").reduce((a,t)=>a+(t.kind==="in"?+t.amount:0),0);
   $("invCard").innerHTML=
-    `<div class="row"><span class="ic">📈</span><div><div class="t">Netto investéiert</div>
+    `<div class="row"><span class="ic" aria-hidden="true">📈</span><div><div class="t">Netto investéiert</div>
        <div class="s">Käf − Verkaf, all Zäit</div></div><div class="amt in">${CUR}${net.toFixed(2)}</div></div>`+
-    (div>0?`<div class="row"><span class="ic">💰</span><div><div class="t">Dividenden & Zënsen</div>
+    (div>0?`<div class="row"><span class="ic" aria-hidden="true">💰</span><div><div class="t">Dividenden & Zënsen</div>
        <div class="s">agesammelt</div></div><div class="amt in">+${CUR}${div.toFixed(2)}</div></div>`:"")+
-    rows.map(([n,v])=>`<div class="row"><span class="ic">•</span>
+    rows.map(([n,v])=>`<div class="row"><span class="ic" aria-hidden="true">•</span>
       <div><div class="t" style="font-size:13px">${esc(n)}</div></div>
       <div class="amt mut">${CUR}${v.toFixed(2)}</div></div>`).join("");
 }
@@ -406,20 +410,20 @@ function renderTransfers(){
   if(!tr.length){return;}
   $("trCard").innerHTML=pairs.slice(0,60).map(t=>{
     const when=new Date(t.at).toLocaleDateString("de-DE",{day:"numeric",month:"short",year:"2-digit"});
-    return `<div class="row"><span class="ic">🔁</span>
+    return `<div class="row"><span class="ic" aria-hidden="true">🔁</span>
       <div><div class="t" style="font-size:13px">${esc((t.note||"Transfer").slice(0,44))}</div>
         <div class="s">${when} · ${esc(t.account||"")}</div></div>
       <div class="amt mut">${CUR}${(+t.amount).toFixed(2)}</div>
-      <button class="flip" title="Dat ass keen Transfer" data-untr="${t.id}">↩︎</button></div>`;
+      <button class="flip" title="Dat ass keen Transfer" aria-label="Dat ass keen Transfer: ${esc((t.note||"Transfer").slice(0,44))}" data-untr="${t.id}"><span aria-hidden="true">↩︎</span></button></div>`;
   }).join("")+`<div class="hint" style="margin-top:8px">Automatesch erkannt tëscht dénge Kontoen — aus Rakomm/Ausginn erausgerechent. ↩︎ = dach keen Transfer.</div>`;
   $("trCard").querySelectorAll("[data-untr]").forEach(b=>b.onclick=()=>markTransfer(b.dataset.untr,false));
 }
 function renderChips(){
   const chips=[];
-  if(catFilter)chips.push(`<span class="chip on" data-clr="cat">${catIc(catFilter)} ${esc(catLbl(catFilter))} ✕</span>`);
-  if(acctFilter)chips.push(`<span class="chip on" data-clr="acct">🏦 ${esc(acctFilter)} ✕</span>`);
+  if(catFilter)chips.push(`<button type="button" class="chip on" data-clr="cat" aria-label="Filter ewechhuelen: ${esc(catLbl(catFilter))}"><span aria-hidden="true">${catIc(catFilter)}</span> ${esc(catLbl(catFilter))} <span aria-hidden="true">✕</span></button>`);
+  if(acctFilter)chips.push(`<button type="button" class="chip on" data-clr="acct" aria-label="Filter ewechhuelen: ${esc(acctFilter)}"><span aria-hidden="true">🏦</span> ${esc(acctFilter)} <span aria-hidden="true">✕</span></button>`);
   const accts=[...new Set(tx.map(t=>t.account).filter(Boolean))];
-  for(const a of accts)if(a!==acctFilter)chips.push(`<span class="chip" data-acct="${esc(a)}">${esc(a)}</span>`);
+  for(const a of accts)if(a!==acctFilter)chips.push(`<button type="button" class="chip" data-acct="${esc(a)}" aria-pressed="false">${esc(a)}</button>`);
   $("filterChips").innerHTML=chips.join("");
   $("filterChips").querySelectorAll("[data-clr]").forEach(b=>b.onclick=()=>{if(b.dataset.clr==="cat")catFilter=null;else acctFilter=null;render();});
   $("filterChips").querySelectorAll("[data-acct]").forEach(b=>b.onclick=()=>{acctFilter=b.dataset.acct;render();});
@@ -435,12 +439,12 @@ function renderList(){
     const trTag=t.is_transfer?'<span class="tag">Transfer</span>':"";
     const acctTag=t.account?`<span class="tag">${esc(t.account)}</span>`:"";
     const amtCls=t.is_transfer?"mut":t.kind;
-    return `<div class="row"><span class="ic">${catIc(c)}</span>
+    return `<div class="row"><span class="ic" aria-hidden="true">${catIc(c)}</span>
       <div><div class="t">${esc((t.note||catLbl(c)).slice(0,60))}${trTag}</div>
         <div class="s">${when} · ${esc(catLbl(c))}${acctTag}</div></div>
       <div class="amt ${amtCls}">${t.is_transfer?"":t.kind==="in"?"+":"−"}${CUR}${(+t.amount).toFixed(2)}</div>
-      <button class="flip" title="${t.is_transfer?"Dach keen Transfer":"Als Transfer markéieren"}" data-tr="${t.id}">🔁</button>
-      <button class="del" data-del="${t.id}">✕</button></div>`;
+      <button class="flip" title="${t.is_transfer?"Dach keen Transfer":"Als Transfer markéieren"}" aria-label="${t.is_transfer?"Dach keen Transfer":"Als Transfer markéieren"}: ${esc((t.note||catLbl(c)).slice(0,60))}" data-tr="${t.id}"><span aria-hidden="true">🔁</span></button>
+      <button class="del" aria-label="Läschen: ${esc((t.note||catLbl(c)).slice(0,60))}" data-del="${t.id}"><span aria-hidden="true">✕</span></button></div>`;
   }).join("");
   $("txList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{await sb.from("finance_tx").delete().eq("id",b.dataset.del);tx=tx.filter(t=>t.id!==b.dataset.del);render();});
   $("txList").querySelectorAll("[data-tr]").forEach(b=>b.onclick=()=>{const t=tx.find(x=>x.id===b.dataset.tr);markTransfer(b.dataset.tr,!t.is_transfer);});
@@ -517,10 +521,10 @@ function loadSubsRender(){
     const days=Math.ceil((new Date(s.next_at).getTime()-Date.now())/DAY);
     const due=isNaN(days)?"":days<0?"iwwerfälleg":days===0?"haut":`an ${days} Deeg`;
     const cyc={monthly:"/Mount",yearly:"/Joer",weekly:"/Woch"}[s.cycle]||"";
-    return `<div class="row"><span class="ic">📱</span>
+    return `<div class="row"><span class="ic" aria-hidden="true">📱</span>
       <div><div class="t">${esc(s.name)}</div><div class="s">${CUR}${(+s.amount).toFixed(2)}${cyc}</div></div>
       <div class="due${days<=5?" soon":""}">${esc(due)}<br><span class="s">${new Date(s.next_at).toLocaleDateString("de-DE",{day:"numeric",month:"short"})}</span></div>
-      <button class="del" data-del="${s.id}">✕</button></div>`;
+      <button class="del" aria-label="Läschen: ${esc(s.name)}" data-del="${s.id}"><span aria-hidden="true">✕</span></button></div>`;
   }).join("")+`<div class="hint" style="margin-top:8px">≈ ${CUR}${perMonth.toFixed(2)} / Mount total</div>`;
   $("subList").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     await sb.from("subscriptions").delete().eq("id",b.dataset.del);subs=subs.filter(x=>x.id!==b.dataset.del);loadSubsRender();
@@ -740,7 +744,7 @@ async function previewImport(rows,account){
   const untouched=rows.length-fresh.length-backfill.length;
   const inSum=fresh.filter(r=>r.kind==="in").reduce((a,r)=>a+r.amount,0);
   const outSum=fresh.filter(r=>r.kind==="out").reduce((a,r)=>a+r.amount,0);
-  const list=fresh.slice(0,300).map(r=>`<div class="row"><span class="ic">${r.kind==="in"?"➕":"➖"}</span><div><div class="t" style="font-size:13px">${esc(r.note)}</div><div class="s">${r.at}</div></div><div class="amt ${r.kind}">${r.kind==="in"?"+":"−"}${CUR}${r.amount.toFixed(2)}</div></div>`).join("");
+  const list=fresh.slice(0,300).map(r=>`<div class="row"><span class="ic" aria-hidden="true">${r.kind==="in"?"➕":"➖"}</span><div><div class="t" style="font-size:13px">${esc(r.note)}</div><div class="s">${r.at}</div></div><div class="amt ${r.kind}">${r.kind==="in"?"+":"−"}${CUR}${r.amount.toFixed(2)}</div></div>`).join("");
   $("impModalBody").innerHTML=`
     <div class="hint" style="margin-bottom:8px">Konto: <b style="color:var(--text)">${esc(account)}</b><br>
       ${fresh.length} nei Buchungen${backfill.length?` · <span style="color:var(--accent2-text)">${backfill.length} kréien Konto/Kategorie</span>`:""}${untouched?` · ${untouched} onverännert`:""}<br>
@@ -774,11 +778,11 @@ auth.onAuth(boot);
 boot();
 </script>
 
-<div id="impModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:6000;align-items:center;justify-content:center;padding:16px">
+<div id="impModal" role="dialog" aria-modal="true" aria-labelledby="impModalTitle" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:6000;align-items:center;justify-content:center;padding:16px">
   <div style="background:var(--glass-solid);border:1px solid var(--border);border-radius:16px;padding:18px;max-width:480px;width:100%;max-height:82vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <b style="font-size:16px">Import — Virschau</b>
-      <button id="impModalX" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">&times;</button>
+      <b id="impModalTitle" style="font-size:16px">Import — Virschau</b>
+      <button id="impModalX" aria-label="Zoumaachen" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">&times;</button>
     </div>
     <div id="impModalBody" style="overflow:auto;flex:1"></div>
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -793,6 +797,17 @@ boot();
   const close=()=>c("impModal").classList.remove("open");
   c("impModalX").onclick=close;c("impModalCancel").onclick=close;
   c("impModal").addEventListener("click",e=>{if(e.target.id==="impModal")close();});
+  let opener=null;
+  new MutationObserver(()=>{
+    if(c("impModal").classList.contains("open")){
+      if(!opener)opener=document.activeElement;
+      if(!c("impModal").contains(document.activeElement))c("impModalCancel").focus();
+    }else if(opener){
+      if(document.contains(opener))opener.focus();
+      opener=null;
+    }
+  }).observe(c("impModal"),{attributes:true,attributeFilter:["class"]});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&c("impModal").classList.contains("open"))close();});
 </script>
 </body>
 </html>
