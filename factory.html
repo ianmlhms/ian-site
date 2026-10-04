@@ -105,7 +105,12 @@
   .gate-box button:hover{filter:brightness(1.08)}
   .gate-err{color:var(--failed);font-size:12.5px;margin-top:10px}
   .gate-box .home{display:inline-block;margin-top:14px;font-size:12.5px;color:var(--muted)}
-  .backlink{color:var(--muted);font-size:12.5px}
+  .backlink{color:var(--muted);font-size:12.5px;display:inline-flex;align-items:center;min-height:44px}
+  button.chip{font:inherit;font-size:12.5px;min-height:44px;padding:5px 14px}
+  th[data-k]{min-height:44px}
+  th[data-k]:focus-visible{outline:2px solid var(--accent-text,var(--accent));outline-offset:-2px}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  @media (prefers-reduced-motion:reduce){.bar-fill{transition:none}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
@@ -117,14 +122,14 @@
 <body>
 <div id="gate" class="gate" style="display:none">
   <div class="gate-box">
-    <div class="gate-icon">🔒</div>
+    <div class="gate-icon" aria-hidden="true">🔒</div>
     <h2>ShortsFactory — Full Dashboard</h2>
-    <p id="gateMsg">Admin access only.</p>
+    <p id="gateMsg" role="status">Admin access only.</p>
     <button id="signInBtn">Sign in</button>
     <a class="home" href="index.html">‹ back to ian.lu</a>
   </div>
 </div>
-<div class="wrap" id="dash" style="display:none">
+<main class="wrap" id="dash" style="display:none">
   <div style="margin-bottom:6px"><a class="backlink" href="index.html">‹ Home</a></div>
   <header>
     <div>
@@ -157,15 +162,15 @@
 
   <h2>Videos</h2>
   <div class="toolbar">
-    <input id="q" placeholder="Search title, topic, id…">
-    <span id="filters"></span>
+    <input id="q" type="search" placeholder="Search title, topic, id…" aria-label="Search videos by title, topic or id">
+    <span id="filters" role="group" aria-label="Filter by status"></span>
   </div>
   <div class="card" style="padding:6px 8px"><table id="tbl"><thead></thead><tbody></tbody></table>
     <div class="empty" id="tblEmpty" style="display:none">No videos match.</div>
   </div>
 
   <footer id="foot"></footer>
-</div>
+</main>
 
 <script>
 function renderDashboard(DATA){
@@ -279,7 +284,7 @@ function donut(items,size){
   for(const it of items){ if(!it.value)continue; const len=it.value/tot*c;
     arcs+=`<circle cx="${k}" cy="${k}" r="${r}" fill="none" stroke="${it.color}" stroke-width="20" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}" transform="rotate(-90 ${k} ${k})"/>`; off+=len; }
   if(!arcs) arcs=`<circle cx="${k}" cy="${k}" r="${r}" fill="none" stroke="var(--panel2)" stroke-width="20"/>`;
-  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">${arcs}<text x="${k}" y="${k-2}" text-anchor="middle" class="donut-num">${items.reduce((a,b)=>a+b.value,0)}</text><text x="${k}" y="${k+16}" text-anchor="middle" class="donut-lbl">videos</text></svg>`;
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Videos by status: ${items.filter(i=>i.value).map(i=>i.label+" "+i.value).join(", ")||"none"}">${arcs}<text x="${k}" y="${k-2}" text-anchor="middle" class="donut-num">${items.reduce((a,b)=>a+b.value,0)}</text><text x="${k}" y="${k+16}" text-anchor="middle" class="donut-lbl">videos</text></svg>`;
 }
 const statusItems = ORDER.filter(s=>byStatus[s]).map(s=>({label:STATUS[s].l,value:byStatus[s],color:STATUS[s].c}));
 document.getElementById('donut').innerHTML = donut(statusItems.length?statusItems:[{label:'',value:0,color:''}],150);
@@ -311,8 +316,10 @@ bars(document.getElementById('byLang'),
   V.forEach(v=>{const d=new Date(v.created_at); if(isNaN(d))return; d.setHours(0,0,0,0);
     const idx=Math.round((d-labels[0])/86400000); if(idx>=0&&idx<days)buckets[idx]++;});
   const max=Math.max(1,...buckets);
+  document.getElementById('spark').setAttribute('role','img');
+  document.getElementById('spark').setAttribute('aria-label','Videos produced per day over the last 30 days: '+buckets.reduce((a,b)=>a+b,0)+' in total');
   document.getElementById('spark').innerHTML = buckets.map((n,i)=>
-    `<div class="b" style="height:${n/max*100}%" title="${labels[i].toLocaleDateString()}: ${n}"></div>`).join('');
+    `<div class="b" aria-hidden="true" style="height:${n/max*100}%" title="${labels[i].toLocaleDateString()}: ${n}"></div>`).join('');
   document.getElementById('sparkX').innerHTML =
     `<span>${labels[0].toLocaleDateString([], {month:'short',day:'numeric'})}</span><span>today</span>`;
 })();
@@ -355,14 +362,14 @@ const COLS=[['created_at','When'],['channel_id','Channel'],['status','Status'],[
   ['duration_s','Len'],['title','Title / topic'],['platforms','Targets'],['views','Views'],['youtube_id','Link']];
 let sortKey='created_at', sortDir=-1, statusFilter='all', query='';
 document.querySelector('#tbl thead').innerHTML='<tr>'+COLS.map(([k,l])=>
-  `<th data-k="${k}">${l}</th>`).join('')+'</tr>';
-document.getElementById('filters').innerHTML='<span class="chip active" data-s="all">All</span>'+
-  ORDER.filter(s=>byStatus[s]).map(s=>`<span class="chip" data-s="${s}">${STATUS[s].l} ${byStatus[s]}</span>`).join('');
+  `<th data-k="${k}" tabindex="0" role="columnheader" aria-sort="none">${l}</th>`).join('')+'</tr>';
+document.getElementById('filters').innerHTML='<button type="button" class="chip active" data-s="all" aria-pressed="true">All</button>'+
+  ORDER.filter(s=>byStatus[s]).map(s=>`<button type="button" class="chip" data-s="${s}" aria-pressed="false">${STATUS[s].l} ${byStatus[s]}</button>`).join('');
 
 function badge(s){const m=STATUS[s]||{c:'var(--muted)',l:s};
   return `<span class="badge" style="color:${m.c};background:${m.c}22">${m.l}</span>`;}
 function ytLink(id){return id?`<a href="https://youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener">▶ open</a>`:'<span class="muted">—</span>';}
-function platDots(ps){return ps.map(p=>`<span class="plat" style="background:${PLAT[p]||'#888'}" title="${p}"></span>`).join('')||'<span class="muted">—</span>';}
+function platDots(ps){return ps.map(p=>`<span class="plat" style="background:${PLAT[p]||'#888'}" title="${p}" role="img" aria-label="${p}"></span>`).join('')||'<span class="muted">—</span>';}
 
 function render(){
   let rows=V.filter(v=>(statusFilter==='all'||v.status===statusFilter));
@@ -386,11 +393,17 @@ function render(){
     <td>${ytLink(v.youtube_id)}</td></tr>`).join('');
   document.getElementById('tblEmpty').style.display=rows.length?'none':'block';
 }
-document.querySelectorAll('#tbl thead th').forEach(th=>th.onclick=()=>{
-  const k=th.dataset.k; if(sortKey===k)sortDir*=-1; else{sortKey=k;sortDir=1;} render();});
-document.getElementById('filters').onclick=e=>{ if(!e.target.dataset.s)return;
-  statusFilter=e.target.dataset.s;
-  document.querySelectorAll('#filters .chip').forEach(c=>c.classList.toggle('active',c===e.target)); render();};
+function sortBy(th){
+  const k=th.dataset.k; if(sortKey===k)sortDir*=-1; else{sortKey=k;sortDir=1;} render();
+  document.querySelectorAll('#tbl thead th').forEach(h=>h.setAttribute('aria-sort',h.dataset.k===sortKey?(sortDir>0?'ascending':'descending'):'none'));
+}
+document.querySelectorAll('#tbl thead th').forEach(th=>{
+  th.onclick=()=>sortBy(th);
+  th.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sortBy(th);}};
+});
+document.getElementById('filters').onclick=e=>{ const chip=e.target.closest('.chip'); if(!chip)return;
+  statusFilter=chip.dataset.s;
+  document.querySelectorAll('#filters .chip').forEach(c=>{c.classList.toggle('active',c===chip);c.setAttribute('aria-pressed',String(c===chip));}); render();};
 document.getElementById('q').oninput=e=>{query=e.target.value; render();};
 render();
 
