@@ -45,6 +45,14 @@
   .gate{text-align:center;color:var(--muted);padding:14px}
   .rowbtns{display:flex;gap:8px;justify-content:center}
   .rowbtns button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .rowbtns button:focus-visible,.bar .home:focus-visible,.gate a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (pointer:coarse){
+    .rowbtns button{min-height:44px;min-width:44px;font-size:14px}
+    td input.cell{font-size:16px;min-height:44px}
+    .tcell input{font-size:16px;padding:6px 0}
+    .bar .home{display:inline-flex;align-items:center;min-height:44px}
+  }
   .rowbtns button:hover{border-color:var(--accent2-text);color:var(--accent2-text)}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -57,22 +65,22 @@
 <body>
 <header class="bar">
   <a class="home" href="index.html">‹ Heem</a>
-  <h1>🗓️ Stonneplang</h1>
+  <h1><span aria-hidden="true">🗓️</span> Stonneplang</h1>
   <div class="spacer"></div>
   <span id="acctHost"></span>
 </header>
 
-<div class="wrap">
+<main class="wrap">
   <div class="now" id="now" style="display:none"></div>
-  <div class="scroll"><table id="grid"></table></div>
+  <div class="scroll" role="region" aria-label="Stonneplang" tabindex="0"><table id="grid"></table></div>
   <div class="rowbtns">
-    <button id="addRow">+ Stonn</button>
-    <button id="delRow">− Stonn</button>
+    <button type="button" id="addRow" aria-label="Stonn derbäisetzen">+ Stonn</button>
+    <button type="button" id="delRow" aria-label="Lescht Stonn ewechhuelen">− Stonn</button>
   </div>
-  <div class="save" id="saveMsg"></div>
+  <div class="save" id="saveMsg" role="status" aria-live="polite"></div>
   <div class="hint" id="hint">Tipp op eng Zell fir d'Fach anzeginn (z.B. „Mathe · B12"). Ännerungen späichere sech automatesch.</div>
   <div class="gate" id="gate" style="display:none"></div>
-</div>
+</main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -98,12 +106,12 @@ function persistLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}c
 
 function render(){
   const g=$("grid");
-  let h="<thead><tr><th class='tcell'>Zäit</th>"+DAYS.map((d,i)=>`<th title="${d}">${DAYS_SHORT[i]}</th>`).join("")+"</tr></thead><tbody>";
+  let h="<thead><tr><th class='tcell' scope='col'>Zäit</th>"+DAYS.map((d,i)=>`<th scope="col" title="${d}"><span aria-hidden="true">${DAYS_SHORT[i]}</span><span class="sr-only">${d}</span></th>`).join("")+"</tr></thead><tbody>";
   data.times.forEach((t,p)=>{
-    h+=`<tr><td class="tcell"><input data-t="${p}-0" value="${t[0]||""}" placeholder="08:00"><br><input data-t="${p}-1" value="${t[1]||""}" placeholder="08:50"></td>`;
+    h+=`<tr><td class="tcell"><input data-t="${p}-0" value="${t[0]||""}" placeholder="08:00" aria-label="Stonn ${p+1}: Ufank" autocomplete="off"><br><input data-t="${p}-1" value="${t[1]||""}" placeholder="08:50" aria-label="Stonn ${p+1}: Enn" autocomplete="off"></td>`;
     for(let d=0;d<5;d++){
       const key=d+"-"+p;
-      h+=`<td data-cell="${key}"><input class="cell" data-c="${key}" value="${(data.cells[key]||"").replace(/"/g,"&quot;")}" placeholder="—"></td>`;
+      h+=`<td data-cell="${key}"><input class="cell" data-c="${key}" value="${(data.cells[key]||"").replace(/"/g,"&quot;")}" placeholder="—" aria-label="${DAYS[d]}, Stonn ${p+1}" autocomplete="off"></td>`;
     }
     h+="</tr>";
   });
@@ -115,16 +123,16 @@ function render(){
 
 function toMin(hhmm){const m=/^(\d{1,2}):(\d{2})$/.exec(hhmm||"");return m?(+m[1])*60+(+m[2]):null;}
 function highlight(){
-  document.querySelectorAll("td.here").forEach(td=>td.classList.remove("here"));
+  document.querySelectorAll("td.here").forEach(td=>{td.classList.remove("here");td.removeAttribute("aria-current");});
   const col=todayCol();
-  if(col<0){$("now").style.display="";$("now").innerHTML="🌴 Weekend — genéiss et!";return;}
+  if(col<0){$("now").style.display="";$("now").innerHTML="<span aria-hidden='true'>🌴</span> Weekend — genéiss et!";return;}
   const now=new Date().getHours()*60+new Date().getMinutes();
   let curP=-1;
   data.times.forEach((t,p)=>{const s=toMin(t[0]),e=toMin(t[1]);if(s!=null&&e!=null&&now>=s&&now<e)curP=p;});
   const label=(p)=>data.cells[col+"-"+p]||null;
   $("now").style.display="";
   if(curP>=0){
-    const td=document.querySelector(`td[data-cell="${col}-${curP}"]`);if(td)td.classList.add("here");
+    const td=document.querySelector(`td[data-cell="${col}-${curP}"]`);if(td){td.classList.add("here");td.setAttribute("aria-current","true");}
     const cur=label(curP);
     let nextTxt="";for(let p=curP+1;p<data.times.length;p++){if(label(p)){nextTxt=`<div class="next">Duerno: <b>${label(p)}</b> (${data.times[p][0]})</div>`;break;}}
     $("now").innerHTML=cur?`Elo: <b>${cur}</b>${nextTxt}`:`Elo keng Stonn agedroen.${nextTxt}`;
@@ -150,7 +158,7 @@ async function saveRemote(){
 }
 
 $("addRow").onclick=()=>{const last=data.times[data.times.length-1];data.times.push(last?[last[1]||"",""]:["",""]);render();scheduleSave();};
-$("delRow").onclick=()=>{if(data.times.length<=1)return;const p=data.times.length-1;data.times.pop();for(let d=0;d<5;d++)delete data.cells[d+"-"+p];render();scheduleSave();};
+$("delRow").onclick=()=>{if(data.times.length<=1)return;const p=data.times.length-1;if([0,1,2,3,4].some(d=>data.cells[d+"-"+p])&&!confirm("Déi lescht Stonn huet Androungen. Wierklech ewechhuelen?"))return;data.times.pop();for(let d=0;d<5;d++)delete data.cells[d+"-"+p];render();scheduleSave();};
 
 async function start(){
   sb=sb||await auth.client();
@@ -163,7 +171,7 @@ async function start(){
     $("gate").style.display="none";
   }else{
     $("gate").style.display="";
-    $("gate").innerHTML='💾 Deng Ännerunge bleiwen op dësem Apparat. <a href="#" id="gb">Mell dech un</a> fir se op all Apparat ze synchroniséieren.';
+    $("gate").innerHTML='<span aria-hidden="true">💾</span> Deng Ännerunge bleiwen op dësem Apparat. <a href="#" id="gb">Mell dech un</a> fir se op all Apparat ze synchroniséieren.';
     $("gb").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
   }
 }
