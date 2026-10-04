@@ -1,0 +1,149 @@
+{
+  "countries.html": {
+    "light": {
+      "hit-target": 4
+    },
+    "dark": {
+      "hit-target": 4
+    }
+  },
+  "fs.html": {
+    "light": {
+      "hit-target": 2
+    },
+    "dark": {
+      "hit-target": 2
+    }
+  },
+  "geometrydash.html": {
+    "light": {
+      "offscreen": 5,
+      "contrast": 2
+    },
+    "dark": {
+      "offscreen": 5
+    }
+  },
+  "jeopardy.html": {
+    "light": {
+      "contrast": 1
+    }
+  },
+  "pb/chill-drive.html": {
+    "light": {
+      "hit-target": 2
+    },
+    "dark": {
+      "hit-target": 2
+    }
+  },
+  "pb/cookie-clicker.html": {
+    "light": {
+      "collision": 14
+    },
+    "dark": {
+      "collision": 14
+    }
+  },
+  "pb/memory.html": {
+    "light": {
+      "hit-target": 3
+    },
+    "dark": {
+      "hit-target": 3
+    }
+  },
+  "pb/minesweeper.html": {
+    "light": {
+      "contrast": 1,
+      "hit-target": 3
+    },
+    "dark": {
+      "contrast": 1,
+      "hit-target": 3
+    }
+  },
+  "pb/pacman.html": {
+    "light": {
+      "hit-target": 1
+    },
+    "dark": {
+      "hit-target": 1
+    }
+  },
+  "pb/park.html": {
+    "light": {
+      "contrast": 1
+    },
+    "dark": {
+      "contrast": 1
+    }
+  },
+  "pb/snake.html": {
+    "light": {
+      "contrast": 6,
+      "hit-target": 14
+    },
+    "dark": {
+      "contrast": 6,
+      "hit-target": 14
+    }
+  },
+  "pb/solitaire.html": {
+    "light": {
+      "hit-target": 3
+    },
+    "dark": {
+      "hit-target": 3
+    }
+  },
+  "pb/tictactoe.html": {
+    "light": {
+      "contrast": 1,
+      "hit-target": 3
+    },
+    "dark": {
+      "contrast": 1,
+      "hit-target": 3
+    }
+  },
+  "pb/typing.html": {
+    "light": {
+      "hit-target": 2
+    },
+    "dark": {
+      "hit-target": 2
+    }
+  },
+  "pb/word-scramble.html": {
+    "light": {
+      "hit-target": 2
+    },
+    "dark": {
+      "hit-target": 2
+    }
+  },
+  "pixelbreak.html": {
+    "light": {
+      "contrast": 5
+    }
+  },
+  "skylens.html": {
+    "light": {
+      "offscreen": 1,
+      "hit-target": 155
+    },
+    "dark": {
+      "offscreen": 1,
+      "hit-target": 155
+    }
+  },
+  "wordle.html": {
+    "light": {
+      "hit-target": 31
+    },
+    "dark": {
+      "hit-target": 31
+    }
+  }
+}
