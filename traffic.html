@@ -19,6 +19,8 @@
 
     [hidden] { display: none !important; }
 
+    .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
     body { min-width: 0; }
 
     .traffic-bar {
@@ -404,7 +406,7 @@
 <body>
   <header class="bar traffic-bar">
     <a class="home" href="index.html">&lsaquo; Home</a>
-    <h1>📈 Traffic</h1>
+    <h1><span aria-hidden="true">📈</span> Traffic</h1>
   </header>
 
   <main class="traffic-shell">
@@ -819,6 +821,24 @@
         d: linePath(series, "uniqueVisitors", xScale, yScale),
       }));
       chart.appendChild(svg);
+
+      const table = document.createElement("table");
+      table.className = "sr-only";
+      const head = table.createTHead().insertRow();
+      ["Day", "Unique visitors", "Pageviews"].forEach((text) => {
+        const cell = document.createElement("th");
+        cell.scope = "col";
+        cell.textContent = text;
+        head.appendChild(cell);
+      });
+      const body = table.createTBody();
+      series.forEach((point) => {
+        const row = body.insertRow();
+        row.insertCell().textContent = formatShortDay(point.day);
+        row.insertCell().textContent = formatInteger(point.uniqueVisitors);
+        row.insertCell().textContent = formatInteger(point.pageviews);
+      });
+      chart.appendChild(table);
     }
 
     function renderTopPages(rows) {
