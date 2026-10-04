@@ -378,7 +378,7 @@ function renderRecent(){
       <span class="cs">${esc(c.subject||"")} · ${rel(c.updated_at)}</span></button>
       <button type="button" class="cx" data-del="${c.id}" title="Läschen" aria-label="Läschen: ${esc(c.title||"Chat")}"><span aria-hidden="true">🗑</span></button></div>`;
   }).join("");
-  el.querySelectorAll(".conv").forEach(d=>d.onclick=(e)=>{ if(e.target.dataset.del)return; resumeConv(d.dataset.id); });
+  el.querySelectorAll(".conv").forEach(d=>d.onclick=(e)=>{ if(e.target.closest("[data-del]"))return; resumeConv(d.dataset.id); });
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=async(e)=>{ e.stopPropagation(); await deleteConv(b.dataset.del); });
 }
 async function resumeConv(id){

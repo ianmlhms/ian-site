@@ -25,6 +25,7 @@
   .pc.p1{background:radial-gradient(circle at 35% 30%,#ff8b96,var(--red))}
   .pc.p2{background:radial-gradient(circle at 35% 30%,#9df2ff,var(--cyan));color:#0d0d1a}
   .pc.mine{cursor:pointer}
+  .sq[role=button],.pc[role=button]{min-height:0;min-width:0}
   .me{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin:0 4px}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -38,15 +39,15 @@
 <body>
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🟠 Checkers</h1>
+  <h1><span aria-hidden="true">🟠</span> Checkers</h1>
   <div class="spacer"></div>
 </header>
 
 <div class="wrap">
-  <div class="status" id="status">Connecting…</div>
+  <div class="status" id="status" role="status" aria-live="polite">Connecting…</div>
   <div class="sub" id="sub"></div>
-  <div class="board" id="board"></div>
-  <button class="btn" id="rematch" style="display:none">↻ Rematch</button>
+  <div class="board" id="board" role="group" aria-label="Checkers board"></div>
+  <button class="btn" id="rematch" type="button" style="display:none">↻ Rematch</button>
 </div>
 
 <script src="pixelbreak-config.js"></script>
@@ -141,18 +142,24 @@ function play(m, local) {
 }
 
 /* ---------- render ---------- */
+function makeKeyable(el, label, act, key) {
+  el.setAttribute("role", "button"); el.tabIndex = 0; el.setAttribute("aria-label", label); el.dataset.key = key;
+  el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); act(); } };
+}
 function render() {
   const legal = (turn === me && !over && oppHere) ? legalMoves(board, me, lock) : [];
   const targets = sel ? legal.filter((m) => m.fr === sel.r && m.fc === sel.c) : [];
   const canPick = new Set(legal.map((m) => m.fr + "," + m.fc));
-  const b = $("board"); b.innerHTML = "";
+  const b = $("board");
+  const focusKey = b.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+  b.innerHTML = "";
   for (let dr = 0; dr < 8; dr++) for (let dc = 0; dc < 8; dc++) {
     // guests see the board flipped so their pieces start at the bottom
     const r = me === 1 ? dr : 7 - dr, c = me === 1 ? dc : 7 - dc;
     const sq = document.createElement("div");
     sq.className = "sq" + ((r + c) % 2 === 1 ? " d" : "");
     const t = targets.find((m) => m.tr === r && m.tc === c);
-    if (t) { sq.classList.add("tgt"); sq.onclick = () => play(t, true); }
+    if (t) { sq.classList.add("tgt"); sq.onclick = () => play(t, true); makeKeyable(sq, `Move to row ${r + 1}, column ${c + 1}`, () => play(t, true), "t" + r + "," + c); }
     if (sel && sel.r === r && sel.c === c) sq.classList.add("sel");
     const v = board[r][c];
     if (v) {
@@ -161,12 +168,16 @@ function render() {
       if (isKing(v)) pc.textContent = "♛";
       if (owner(v) === me && canPick.has(r + "," + c)) {
         pc.classList.add("mine");
-        pc.onclick = (e) => { e.stopPropagation(); sel = (sel && sel.r === r && sel.c === c) ? null : { r, c }; render(); };
+        const pick = () => { sel = (sel && sel.r === r && sel.c === c) ? null : { r, c }; render(); };
+        pc.onclick = (e) => { e.stopPropagation(); pick(); };
+        makeKeyable(pc, `${isKing(v) ? "King" : "Piece"} at row ${r + 1}, column ${c + 1}`, pick, "p" + r + "," + c);
+        if (sel && sel.r === r && sel.c === c) pc.setAttribute("aria-pressed", "true"); else pc.setAttribute("aria-pressed", "false");
       }
       sq.appendChild(pc);
     }
     b.appendChild(sq);
   }
+  if (focusKey) { const again = b.querySelector(`[data-key="${focusKey}"]`); if (again) again.focus(); }
   updateStatus(legal);
 }
 function updateStatus(legal) {

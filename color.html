@@ -52,6 +52,8 @@
   h3{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:22px 0 10px}
   .muted{color:var(--muted)}.center{text-align:center}
   .rounds{display:flex;align-items:center;gap:10px;justify-content:center;margin:14px 0}
+  .srt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  @media (prefers-reduced-motion:reduce){.peekbar i{animation:none;width:100%}}
   .rounds input{width:70px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px;font-size:15px;text-align:center}
 </style>
 <link rel="stylesheet" href="game-common.css?v=5">
@@ -66,11 +68,12 @@
 <body>
 <header class="bar">
   <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1>🎨 Colour Guess</h1>
+  <h1><span aria-hidden="true">🎨</span> Colour Guess</h1>
   <div class="spacer"></div>
   <span class="code">room <code id="roomc"></code></span>
 </header>
 <div class="wrap" id="app"><p class="muted">Connecting…</p></div>
+<div id="sr" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"></div>
 
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=6" data-arcade-id="o-color" data-arcade-title="Colour Guess" data-arcade-no-score data-arcade-replace=".bar"></script>
@@ -94,7 +97,7 @@ function mountDiff(){
   if(!bar||document.getElementById("diffPick"))return;
   const w=document.createElement("div"); w.id="diffPick"; w.style.cssText="display:flex;gap:4px;margin-left:auto";
   [["easy","Easy"],["normal","Normal"],["hard","Hard"]].forEach(([d,lbl])=>{
-    const b=document.createElement("button"); b.textContent=lbl; b.dataset.d=d;
+    const b=document.createElement("button"); b.textContent=lbl; b.dataset.d=d; b.type="button";
     b.style.cssText="background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit";
     b.onclick=()=>{difficulty=d; paintDiff();};
     w.appendChild(b);
@@ -104,6 +107,7 @@ function mountDiff(){
 function paintDiff(){
   document.querySelectorAll("#diffPick button").forEach(b=>{
     const on=b.dataset.d===difficulty;
+    b.setAttribute("aria-pressed",String(on));
     b.style.background=on?"var(--accent)":"var(--card2)";
     b.style.color=on?"#fff":"var(--muted)";
   });
@@ -189,15 +193,15 @@ function render(){
 function drawApp(ps){
   if(phase==="lobby"){
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip">👤 ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
+      <div class="players">${ps.map(p=>`<span class="pchip"><span aria-hidden="true">👤</span> ${esc(p.name)}${p.cid===cid?" (you)":""}</span>`).join("")||'<span class="muted">…</span>'}</div>
       <p class="muted center">Everyone sees the same colour, then dials in their best match with the R/G/B sliders. Closest match wins the round.</p>
       ${role==="host"
-        ? `<div class="rounds"><span class="muted">Best of</span><input id="rounds" type="number" min="1" max="15"><span class="muted">rounds</span></div>
+        ? `<div class="rounds"><span class="muted">Best of</span><input id="rounds" type="number" min="1" max="15" aria-label="Number of rounds"><span class="muted">rounds</span></div>
            <div class="modes">
-             <button class="modebtn ${mode==="visible"?"on":""}" data-mode="visible">👁 Stays visible</button>
-             <button class="modebtn ${mode==="flash"?"on":""}" data-mode="flash">⚡ Flash (memory)</button>
+             <button type="button" class="modebtn ${mode==="visible"?"on":""}" data-mode="visible" aria-pressed="${mode==="visible"}">👁 Stays visible</button>
+             <button type="button" class="modebtn ${mode==="flash"?"on":""}" data-mode="flash" aria-pressed="${mode==="flash"}">⚡ Flash (memory)</button>
            </div>
-           <button class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
+           <button type="button" class="big" id="startBtn" ${ps.length<2?"disabled":""}>${ps.length<2?"Waiting for players…":"Start game"}</button>`
         : `<p class="center muted">Best of <b>${rounds}</b> rounds · ${mode==="flash"?"⚡ flash (from memory)":"👁 colour stays visible"} · waiting for the host…</p>`}
       ${standings(ps)}`;
     if(role==="host"){
@@ -208,21 +212,21 @@ function drawApp(ps){
     }
   } else if(phase==="play"){
     $("app").innerHTML = `
-      <div class="players">${ps.map(p=>`<span class="pchip ${guesses[p.cid]?"locked":""}">👤 ${esc(p.name)}${guesses[p.cid]?" ✓":""}</span>`).join("")}</div>
+      <div class="players">${ps.map(p=>`<span class="pchip ${guesses[p.cid]?"locked":""}"><span aria-hidden="true">👤</span> ${esc(p.name)}${guesses[p.cid]?'<span aria-hidden="true"> ✓</span><span class="srt"> (locked in)</span>':""}</span>`).join("")}</div>
       <p class="muted center">Round ${round} / ${rounds}</p>
       <div class="two">
         <div><div class="cap">${(mode==="flash"&&peeking)?"👀 Memorise!":"Match this"}</div>${targetSwatch()}</div>
-        <div><div class="cap">Your guess</div><div class="swatch" id="mySw" style="background:${rgbCss(guess)}"></div></div>
+        <div><div class="cap">Your guess</div><div class="swatch" id="mySw" role="img" aria-label="Your guess colour" style="background:${rgbCss(guess)}"></div></div>
       </div>
       <div class="sliders">
         ${["R","G","B"].map(ch2=>`<div class="srow ${ch2}"><b>${ch2}</b>
-          <input type="range" min="0" max="255" value="${guess[ch2.toLowerCase()]}" id="s${ch2}" ${locked?"disabled":""}>
+          <input type="range" min="0" max="255" value="${guess[ch2.toLowerCase()]}" id="s${ch2}" aria-label="${{R:"Red",G:"Green",B:"Blue"}[ch2]}" ${locked?"disabled":""}>
           <span class="v" id="v${ch2}">${guess[ch2.toLowerCase()]}</span></div>`).join("")}
       </div>
       ${locked
         ? `<p class="center muted">🔒 Locked — waiting for others (${lockedCount(ps)}/${ps.length})</p>
-           ${role==="host"?`<button class="big ghost" id="revealBtn">Reveal now</button>`:""}`
-        : `<button class="big" id="lockBtn">Lock in my colour</button>`}`;
+           ${role==="host"?`<button type="button" class="big ghost" id="revealBtn">Reveal now</button>`:""}`
+        : `<button type="button" class="big" id="lockBtn">Lock in my colour</button>`}`;
     if(!locked){
       ["R","G","B"].forEach(c=>{ $("s"+c).oninput=()=>{ guess[c.toLowerCase()]=+$("s"+c).value; $("v"+c).textContent=$("s"+c).value; $("mySw").style.background=rgbCss(guess); }; });
       $("lockBtn").onclick=lockIn;
@@ -231,16 +235,16 @@ function drawApp(ps){
     $("app").innerHTML = `
       ${isFinal?finalBanner(ps):`<p class="muted center">Round ${round} / ${rounds}</p>`}
       <div class="lbl">The colour was</div>
-      <div class="swatch" style="background:${rgbCss(target)}"></div>
+      <div class="swatch" role="img" aria-label="The target colour" style="background:${rgbCss(target)}"></div>
       <table><tr><th>Player</th><th>Match</th><th>Accuracy</th></tr>
         ${(results||[]).map(r=>`<tr><td>${winner===r.cid?"🏆 ":""}${esc(r.name)}${r.cid===cid?" (you)":""}</td>
-          <td><span class="swatch sm" style="background:${rgbCss(r.rgb)}"></span></td>
+          <td><span class="swatch sm" role="img" aria-label="${r.rgb?"Guess "+rgbCss(r.rgb):"No guess"}" style="background:${rgbCss(r.rgb)}"></span></td>
           <td class="pts">${r.acc}%</td></tr>`).join("")}
       </table>
       ${standings(ps)}
       ${role==="host"
-        ? (isFinal?`<button class="big" id="againBtn" style="margin-top:18px">Play again</button>`
-                  :`<button class="big" id="nextBtn" style="margin-top:18px">Next round</button>`)
+        ? (isFinal?`<button type="button" class="big" id="againBtn" style="margin-top:18px">Play again</button>`
+                  :`<button type="button" class="big" id="nextBtn" style="margin-top:18px">Next round</button>`)
         : `<p class="center muted">Waiting for host…</p>`}`;
     if(role==="host"){
       if(isFinal && $("againBtn")) $("againBtn").onclick=()=>{ if(!AI) ch.send({type:"broadcast",event:"reset",payload:{}}); resetAll(); render(); };
@@ -263,11 +267,13 @@ function finalBanner(ps){
 function sendCfg(){ if(AI) return; ch.send({type:"broadcast",event:"cfg",payload:{rounds,mode}}); }
 function targetSwatch(){
   if(mode!=="flash" || peeking)
-    return `<div class="swatch" style="background:${rgbCss(target)}"></div>${(mode==="flash"&&peeking)?'<div class="peekbar"><i></i></div>':""}`;
-  return `<div class="swatch covered">🙈 from memory</div>`;
+    return `<div class="swatch" role="img" aria-label="Target colour" style="background:${rgbCss(target)}"></div>${(mode==="flash"&&peeking)?'<div class="peekbar"><i></i></div>':""}`;
+  return `<div class="swatch covered"><span aria-hidden="true">🙈</span>&nbsp;from memory</div>`;
 }
+function announce(msg){ const el=$("sr"); if(el) el.textContent=msg; }
 function beginPlay(){
   phase="play"; clearTimeout(peekTimer);
+  announce(`Round ${round} of ${rounds}.`);
   peeking = (mode==="flash");
   if(peeking) peekTimer=setTimeout(()=>{ peeking=false; if(phase==="play") render(); }, FLASH_MS);
   render();
@@ -303,6 +309,8 @@ function applyReveal(p){
   clearTimeout(peekTimer); peeking=false;
   round=p.round; target=p.target; results=p.results; winner=p.winner; wins=p.wins; distTot=p.distTot; isFinal=p.isFinal; rounds=p.rounds;
   phase="results"; render();
+  const top=(results||[]).find(r=>r.cid===winner);
+  announce(isFinal?"Game over.":`Round ${round} result: ${top?(top.cid===cid?"you win":top.name+" wins"):"no winner"}.`);
   if(isFinal && !AI && !recorded){
     recorded=true;
     const sorted=[...players()].sort((a,b)=>(wins[b.cid]||0)-(wins[a.cid]||0)||(distTot[a.cid]||0)-(distTot[b.cid]||0));

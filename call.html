@@ -57,23 +57,23 @@
 
   <div class="topbar hidden" id="topbar">
     <span class="who" id="who"></span>
-    <span class="st" id="status"></span>
+    <span class="st" id="status" role="status" aria-live="polite"></span>
   </div>
 
   <div class="center" id="center">
-    <div class="avatar">📹</div>
+    <div class="avatar" aria-hidden="true">📹</div>
     <div class="nm" id="peerName">…</div>
-    <div class="sub" id="centerSub" data-i18n="call.calling">Calling…</div>
+    <div class="sub" id="centerSub" role="status" aria-live="polite" data-i18n="call.calling">Calling…</div>
   </div>
 
   <div class="controls hidden" id="controls">
-    <button class="cbtn" id="micBtn" title="Mic">🎙️</button>
-    <button class="cbtn answer hidden" id="answerBtn" title="Answer">📞</button>
-    <button class="cbtn hang" id="hangBtn" title="Hang up">📵</button>
-    <button class="cbtn" id="camBtn" title="Camera">🎥</button>
+    <button type="button" class="cbtn" id="micBtn" title="Mic" aria-label="Mic" aria-pressed="true">🎙️</button>
+    <button type="button" class="cbtn answer hidden" id="answerBtn" title="Answer" aria-label="Answer"><span aria-hidden="true">📞</span></button>
+    <button type="button" class="cbtn hang" id="hangBtn" title="Hang up" aria-label="Hang up"><span aria-hidden="true">📵</span></button>
+    <button type="button" class="cbtn" id="camBtn" title="Camera" aria-label="Camera" aria-pressed="true"><span aria-hidden="true">🎥</span></button>
   </div>
 
-  <div class="msg hidden" id="fatal"></div>
+  <div class="msg hidden" id="fatal" role="alert"></div>
 </div>
 
 <script src="pixelbreak-config.js"></script>
@@ -83,6 +83,23 @@ import * as auth from "./auth.js?v=21";
 const $=(id)=>document.getElementById(id);
 const T=(k)=>(window.I18N?window.I18N.t(k):k);
 const q=new URLSearchParams(location.search);
+
+// Control labels are page-local (i18n-dict.js is shared by ~50 pages).
+const CTRL_LABELS={
+  micBtn:{lb:"Mikro",de:"Mikrofon",en:"Microphone"},
+  answerBtn:{lb:"Ofhiewen",de:"Annehmen",en:"Answer"},
+  hangBtn:{lb:"Opleeën",de:"Auflegen",en:"Hang up"},
+  camBtn:{lb:"Kamera",de:"Kamera",en:"Camera"},
+};
+function labelControls(){
+  const lang=(window.I18N&&window.I18N.lang)||"lb";
+  for(const [id,l] of Object.entries(CTRL_LABELS)){
+    const b=$(id), text=l[lang]||l.en;
+    b.setAttribute("aria-label",text); b.title=text;
+  }
+}
+labelControls();
+document.addEventListener("i18n:change",labelControls);
 
 // caller: ?peer=<uid>&name=<name>   |   callee: ?call=<id>&peer=<uid>&name=<name>&answer=1
 const isCallee=q.get("answer")==="1";
@@ -248,11 +265,11 @@ function wireControls(){
   $("hangBtn").onclick=()=>{ if(!isCallee && !offered) ring("cancel"); endCall(T("call.ended"),true); };
   $("micBtn").onclick=()=>{
     const t=localStream.getAudioTracks()[0]; if(!t) return; t.enabled=!t.enabled;
-    $("micBtn").classList.toggle("off",!t.enabled); $("micBtn").textContent=t.enabled?"🎙️":"🔇";
+    $("micBtn").classList.toggle("off",!t.enabled); $("micBtn").textContent=t.enabled?"🎙️":"🔇"; $("micBtn").setAttribute("aria-pressed",String(t.enabled));
   };
   $("camBtn").onclick=()=>{
     const t=localStream.getVideoTracks()[0]; if(!t) return; t.enabled=!t.enabled;
-    $("camBtn").classList.toggle("off",!t.enabled); $("local").classList.toggle("off",!t.enabled);
+    $("camBtn").classList.toggle("off",!t.enabled); $("local").classList.toggle("off",!t.enabled); $("camBtn").setAttribute("aria-pressed",String(t.enabled));
   };
 }
 
