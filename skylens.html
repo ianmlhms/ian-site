@@ -56,7 +56,7 @@
     </div>
 
     <div class="header-actions">
-      <button class="icon-button ar-launch" id="openAr" type="button" title="Open camera view">
+      <button class="icon-button ar-launch" id="openAr" type="button" title="Open camera view" aria-label="Open camera view (sky view)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5 10 3h4l1.5 2H19a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h3.5ZM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0-2a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
         <span>Sky view</span>
       </button>
@@ -65,6 +65,7 @@
 
   <main class="sky-main">
     <section class="command-bar" aria-label="Aircraft controls">
+      <h1 class="sr-only">SkyLens live aircraft radar</h1>
       <label class="search-box" for="flightSearch">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 20-4.6-4.6a7.5 7.5 0 1 0-1 1L20 21l1-1ZM5.5 10.5a5 5 0 1 1 10 0 5 5 0 0 1-10 0Z"/></svg>
         <input id="flightSearch" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Flight, registration, aircraft…">
@@ -72,12 +73,12 @@
       </label>
 
       <div class="filter-scroller" id="filterBar" role="group" aria-label="Quick filters">
-        <button class="filter-chip is-active" data-filter="all" type="button">All <span id="countAll">0</span></button>
-        <button class="filter-chip" data-filter="interesting" type="button">★ Interesting <span id="countInteresting">0</span></button>
-        <button class="filter-chip" data-filter="military" type="button">Military</button>
-        <button class="filter-chip emergency-filter" data-filter="emergency" type="button">Emergency</button>
-        <button class="filter-chip" data-filter="cargo" type="button">Cargo</button>
-        <button class="filter-chip" data-filter="low" type="button">Low</button>
+        <button class="filter-chip is-active" data-filter="all" type="button" aria-pressed="true">All <span id="countAll">0</span></button>
+        <button class="filter-chip" data-filter="interesting" type="button" aria-pressed="false"><span aria-hidden="true">★</span> Interesting <span id="countInteresting">0</span></button>
+        <button class="filter-chip" data-filter="military" type="button" aria-pressed="false">Military</button>
+        <button class="filter-chip emergency-filter" data-filter="emergency" type="button" aria-pressed="false">Emergency</button>
+        <button class="filter-chip" data-filter="cargo" type="button" aria-pressed="false">Cargo</button>
+        <button class="filter-chip" data-filter="low" type="button" aria-pressed="false">Low</button>
       </div>
     </section>
 
@@ -113,7 +114,7 @@
 
       <section class="list-view" id="listView" hidden aria-label="Aircraft list">
         <div class="list-heading">
-          <div><span class="eyebrow">LIVE AIRSPACE</span><h1>Flights around you</h1></div>
+          <div><span class="eyebrow">LIVE AIRSPACE</span><h2>Flights around you</h2></div>
           <span id="listSummary">0 aircraft</span>
         </div>
         <div class="flight-table-head" aria-hidden="true">
@@ -127,7 +128,7 @@
         </div>
       </section>
 
-      <aside class="flight-drawer" id="flightDrawer" aria-label="Selected aircraft" aria-hidden="true">
+      <aside class="flight-drawer" id="flightDrawer" aria-label="Selected aircraft" aria-hidden="true" inert>
         <button class="drawer-close" id="closeDrawer" type="button" aria-label="Close flight details">×</button>
         <div class="drawer-hero">
           <span class="drawer-kicker" id="detailState">LIVE FLIGHT</span>

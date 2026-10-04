@@ -619,6 +619,7 @@
     if (options && options.follow) state.follow = true;
     renderDetails(aircraft);
     els.drawer.setAttribute("aria-hidden", "false");
+    els.drawer.inert = false;
     requestAnimationFrame(() => els.drawer.classList.add("is-open"));
     renderAll();
     drawSelectedTrail();
@@ -638,6 +639,7 @@
     state.selectedId = null;
     els.drawer.classList.remove("is-open");
     els.drawer.setAttribute("aria-hidden", "true");
+    els.drawer.inert = true;
     setTimeout(() => { if (!els.drawer.classList.contains("is-open")) els.drawer.scrollTop = 0; }, 280);
     if (state.trailLayer && state.map) {
       state.trailLayer.remove();
@@ -1047,7 +1049,7 @@
       const button = event.target.closest("[data-filter]");
       if (!button) return;
       state.activeFilter = button.dataset.filter;
-      for (const chip of els.filterBar.querySelectorAll("[data-filter]")) chip.classList.toggle("is-active", chip === button);
+      for (const chip of els.filterBar.querySelectorAll("[data-filter]")) { chip.classList.toggle("is-active", chip === button); chip.setAttribute("aria-pressed", String(chip === button)); }
       renderAll();
     });
     els.flightList.addEventListener("click", (event) => {
