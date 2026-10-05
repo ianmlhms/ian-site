@@ -38,6 +38,10 @@ const setBusy = (el, busy) => {
   }
 };
 
+const applyStaticText = () => {
+  document.querySelectorAll("[data-t]").forEach((el) => { el.textContent = T(el.dataset.t); });
+};
+
 const stateCard = (icon, text, slim = true) =>
   `<div class="ui-card state${slim ? " slim" : ""}"><div class="gate-ico" aria-hidden="true">${icon}</div><p>${esc(text)}</p></div>`;
 const initial = (name) => [...String(name || "?").trim()][0]?.toUpperCase() || "?";
@@ -372,7 +376,9 @@ async function gate() {
 }
 
 async function boot() {
+  applyStaticText();
   document.addEventListener("i18n:change", () => {
+    applyStaticText();
     if (renderMsg) renderMsg();
     else if (!$("panel").hidden) {
       $("list").textContent = "";
