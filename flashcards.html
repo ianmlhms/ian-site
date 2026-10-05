@@ -8,60 +8,118 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700;cursor:pointer}
-  button.home{background:none;border:0;font:inherit;font-weight:700;padding:0 8px}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
-  .gate{text-align:center;color:var(--muted);padding:50px 16px}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
-  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer;font-size:13px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
-  .deckrow{display:flex;align-items:center;gap:12px;cursor:pointer}
-  .deckrow .t{font-weight:800}
-  .deckrow .s{color:var(--muted);font-size:12.5px;margin-top:2px}
-  .deckrow .n{margin-left:auto;color:var(--muted);font-size:13px}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:6px 0 0}
-  input,textarea{padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit;width:100%}
-  /* study */
-  .flip{perspective:1200px;height:280px;cursor:pointer}
-  .inner{position:relative;width:100%;height:100%;transition:transform .5s;transform-style:preserve-3d}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent-text);text-decoration:none}
+  button,a,input,textarea,label{touch-action:manipulation}
+  button:focus-visible,[role="button"]:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+  .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .ui{--warn:#ef5b6b}
+  html[data-theme="light"] .ui{--warn:#c7283d}
+
+  /* ---- header + column (site-ui look) ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  .header-right{flex-wrap:wrap;justify-content:flex-end}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;cursor:pointer;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+
+  /* ---- gate (loading / sign-in / empty / error) ---- */
+  .gate{text-align:center;padding:clamp(30px,6vw,52px) 22px;color:var(--muted)}
+  .gate .gate-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .gate p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text)}
+  .gate .gate-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
+  .gate .ui-btn{margin-top:18px}
+  .gate.mini{padding:22px}
+
+  .sect{margin:10px 2px 0;font:750 13px var(--font-display);letter-spacing:.04em;color:var(--muted)}
+  .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  .row .grow{flex:1 1 12rem;min-width:0}
+  .msg{min-height:18px;margin-top:8px;color:var(--accent-text);font-weight:700;font-size:13px}
+  .msg:empty{margin-top:0;min-height:0}
+  .ui-btn.sm{min-height:44px;padding:9px 18px;font-size:15px}
+  .ui-btn.warn{color:var(--warn)}
+  .ui-btn.warn:hover{background:color-mix(in srgb,var(--warn) 10%,transparent);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+
+  /* ---- deck list ---- */
+  .ui-tiles{margin-top:2px}
+  .ui-tile.deck{width:100%;text-align:left;font:inherit;cursor:pointer;touch-action:manipulation}
+  .ui-tile.deck .ui-tile__name{overflow-wrap:anywhere}
+  .ui-tile.deck .ui-tile__sub{-webkit-line-clamp:1}
+
+  /* ---- study ---- */
+  .studyhead{display:flex;align-items:center;gap:12px;padding:14px 18px}
+  .studyhead .t{flex:1;min-width:0;font:800 clamp(17px,2.4vw,20px)/1.25 var(--font-display);letter-spacing:-.02em;overflow-wrap:anywhere}
+  .meter{height:6px;border-radius:99px;overflow:hidden;background:color-mix(in srgb,var(--text) 10%,transparent)}
+  .meter i{display:block;height:100%;width:100%;border-radius:99px;background:var(--accent);transform-origin:left;transform:scaleX(0);transition:transform .35s var(--ease)}
+  .flip{position:relative;isolation:isolate;perspective:1400px;height:clamp(260px,40vh,380px);margin:6px 0 22px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .flip::before,.flip::after{content:"";position:absolute;z-index:-1;height:100%;border-radius:var(--r-panel);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--tile-edge)}
+  .flip::before{left:14px;right:14px;top:10px;opacity:.8}
+  .flip::after{left:28px;right:28px;top:20px;opacity:.5}
+  .flip.single::before,.flip.single::after{display:none}
+  .inner{position:relative;width:100%;height:100%;transition:transform .55s var(--ease);transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
   .inner.back{transform:rotateY(180deg)}
-  .face{position:absolute;inset:0;backface-visibility:hidden;background:var(--card);border:1px solid var(--border);border-radius:18px;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-size:22px;font-weight:700}
-  .face.b{transform:rotateY(180deg);font-weight:500;color:var(--accent2-text)}
-  .face .side{position:absolute;top:12px;left:16px;font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;font-weight:700}
-  .nav{display:flex;align-items:center;gap:12px;justify-content:center;margin-top:6px}
-  .nav button{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:12px;width:52px;height:44px;font-size:20px;cursor:pointer}
-  .prog{color:var(--muted);font-size:13px;min-width:66px;text-align:center}
-  .tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-  /* edit */
-  .crow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:start}
-  .del{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer}
-  .del:hover{color:var(--warn)}
-  .settings{display:flex;flex-wrap:wrap;gap:10px;align-items:center;color:var(--muted);font-size:13px}
-  .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
-  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-  .del{min-width:44px;min-height:44px}
-  @media (prefers-reduced-motion:reduce){.inner{transition:none}}
+  .face{position:absolute;inset:0;-webkit-backface-visibility:hidden;backface-visibility:hidden;display:flex;padding:clamp(40px,7vw,52px) clamp(20px,5vw,40px) clamp(34px,6vw,44px);text-align:center;overflow-y:auto;border-radius:var(--r-panel);background:var(--card-opaque);color:var(--text);font:750 clamp(21px,3.6vw,30px)/1.3 var(--font-display);letter-spacing:-.02em;box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 24px 44px -26px rgb(var(--ink)/.5)}
+  .face>span:not(.side){margin:auto;overflow-wrap:anywhere;white-space:pre-line}
+  .face.b{transform:rotateY(180deg);font-weight:600;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 20%,var(--card-opaque)),color-mix(in srgb,var(--accent) 7%,var(--card-opaque)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 32%,transparent),0 24px 44px -26px rgb(var(--ink)/.5)}
+  .face .side{position:absolute;top:14px;left:16px;padding:3px 11px;border-radius:99px;font:700 12px/1.5 var(--font-display);letter-spacing:.02em;color:var(--muted);background:color-mix(in srgb,var(--text) 8%,transparent)}
+  .face.b .side{color:var(--text);background:color-mix(in srgb,var(--accent) 22%,transparent)}
+  .face .hint{position:absolute;bottom:12px;left:0;right:0;font:500 12px/1.2 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted);opacity:.85}
+  .nav{display:flex;align-items:center;gap:14px;justify-content:center}
+  .nav .ui-btn{min-width:72px;min-height:52px;padding:8px 18px;font-size:22px;line-height:1}
+  .prog{min-width:76px;text-align:center;font:750 15px var(--font-display);font-variant-numeric:tabular-nums;color:var(--muted)}
+  .tools{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .kbd{text-align:center;font-size:12px;color:var(--muted)}
+  @media (hover:none){.kbd{display:none}}
+
+  /* ---- edit ---- */
+  .switch{display:inline-flex;align-items:center;gap:10px;min-height:44px;color:var(--text);font-size:14.5px;cursor:pointer}
+  .switch input{width:22px;height:22px;margin:0;accent-color:var(--accent);cursor:pointer}
+  .settings{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;margin-top:8px;color:var(--muted);font-size:13.5px}
+  #rows{display:flex;flex-direction:column;gap:10px}
+  .crow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge)}
+  .crow textarea.ui-input{min-height:76px;border-radius:12px;padding:10px 14px}
+  .crow.new{grid-template-columns:minmax(0,1fr) minmax(0,1fr);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 14%,var(--card-opaque)),color-mix(in srgb,var(--accent) 5%,var(--card-opaque)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)}
+  .crow.new .ui-btn{grid-column:1/-1}
+  .del{display:grid;place-items:center;min-width:44px;min-height:44px;border:0;border-radius:var(--r-chip);background:transparent;color:var(--muted);font-size:17px;cursor:pointer;transition:background-color .2s,color .2s,transform .3s var(--ease)}
+  .del:hover{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+  .del:active{transform:scale(.94)}
+
+  @media(max-width:640px){
+    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+    body.ui .ui-header h1.ui-brand{font-size:18px}
+    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
+    .crow{grid-template-columns:minmax(0,1fr) auto;grid-auto-flow:row}
+    .crow .cf{grid-column:1;grid-row:1}
+    .crow .cb{grid-column:1;grid-row:2}
+    .crow .del{grid-column:2;grid-row:1/3;align-self:center}
+    .crow.new{grid-template-columns:minmax(0,1fr)}
+  }
+  @media (prefers-reduced-motion:reduce){.inner,.meter i,.del{transition:none}*{scroll-behavior:auto!important}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <button type="button" class="home" id="back">‹ Zeréck</button>
-  <h1><span aria-hidden="true">🃏</span> Kaarten</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <button type="button" class="home" id="back">‹ Zeréck</button>
+    <h1 class="ui-brand"><span aria-hidden="true">🃏</span> Kaarten</h1>
+  </div>
+  <div class="header-right">
+    <span id="acctHost"></span>
+  </div>
 </header>
 
-<main class="wrap" id="wrap"><div class="gate">Lueden…</div></main>
+<main class="ui-page" id="wrap"><div class="gate ui-card" role="status">Lueden…</div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -71,14 +129,16 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const qs=new URLSearchParams(location.search);
 let sb=null,me=null,myClass=null,deck=null,cards=[],idx=0,flipped=false,focusSel=null;
-const activateKey=(fn)=>(ev)=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();fn();}};
+const HUES=["#6ea8fe","#ff6b9d","#3fb950","#a371f7","#ffb347","#4de8ff"];
+const hueOf=(id)=>{let h=0;for(const ch of ""+id)h=(h*31+ch.charCodeAt(0))>>>0;return HUES[h%HUES.length];};
+const gate=(ico,title,sub,extra)=>`<div class="gate ui-card"><div class="gate-ico" aria-hidden="true">${ico}</div><p>${title}</p>${sub?`<div class="gate-sub">${sub}</div>`:""}${extra||""}</div>`;
 
 async function boot(){
   sb=await auth.client();
   auth.mountAccountButton($("acctHost"));
   $("back").onclick=()=>{ if(deck){deck=null;location.search="";} else history.length>1?history.back():location.href="index.html"; };
   if(!auth.session()){
-    $("wrap").innerHTML=`<div class="gate">Mell dech un, fir Kaarten ze léieren.<br><br><button class="btn" id="si">Umellen</button></div>`;
+    $("wrap").innerHTML=gate("🃏","Mell dech un, fir Kaarten ze léieren.","Deng Këschten sinn un däi Konto gebonnen.",`<button type="button" class="ui-btn ui-btn--primary" id="si">Umellen</button>`);
     $("si").onclick=auth.openAuthModal;return;
   }
   me=auth.session().user.id;
@@ -90,27 +150,29 @@ async function boot(){
 }
 
 async function listView(){
-  $("wrap").innerHTML=`<div class="gate">Lueden…</div>`;
+  $("wrap").innerHTML=`<div class="gate ui-card mini" role="status">Lueden…</div>`;
   const {data:decks}=await sb.from("flashcard_decks").select("id,title,owner,shared,class,exam_id,created_at").order("created_at",{ascending:false});
   const counts={};
   const {data:cc}=await sb.from("flashcards").select("deck_id");
   for(const c of cc||[])counts[c.deck_id]=(counts[c.deck_id]||0)+1;
   const mine=(decks||[]).filter(d=>d.owner===me);
   const shared=(decks||[]).filter(d=>d.owner!==me);
-  const row=(d)=>`<div class="card"><div class="deckrow" data-open="${d.id}" role="button" tabindex="0">
-      <div><div class="t">${esc(d.title)}</div><div class="s">${d.shared?"👥 gedeelt · ":""}${d.class?esc(d.class):""}</div></div>
-      <div class="n">${counts[d.id]||0} <span aria-hidden="true">🃏</span></div></div></div>`;
+  const row=(d)=>{const n=counts[d.id]||0;
+    return `<button type="button" class="ui-tile deck" data-open="${d.id}" style="--h:${hueOf(d.id)}">
+      <span class="ui-tile__ico" aria-hidden="true">🃏</span>
+      <span class="ui-tile__name">${esc(d.title)}</span>
+      <span class="ui-tile__sub">${n===1?"1 Kaart":n+" Kaarten"}${d.shared?" · 👥 gedeelt":""}${d.class?" · "+esc(d.class):""}</span></button>`;};
   $("wrap").innerHTML=`
-    <div class="card">
-      <div class="settings" style="gap:8px">
-        <input id="newTitle" placeholder="Nei Këscht (z.B. Vokabelen Englesch)" aria-label="Numm vun der neier Këscht" style="flex:1;min-width:180px">
-        <button class="btn" id="newBtn">Uleeën</button>
+    <div class="ui-card ui-card--accent">
+      <div class="row">
+        <input class="ui-input grow" id="newTitle" placeholder="Nei Këscht (z.B. Vokabelen Englesch)" aria-label="Numm vun der neier Këscht" maxlength="80">
+        <button type="button" class="ui-btn ui-btn--primary" id="newBtn">Uleeën</button>
       </div>
       <div class="msg" id="lm" role="status" aria-live="polite"></div>
     </div>
-    <h2>Meng Këschten</h2>
-    ${mine.length?mine.map(row).join(""):'<div class="gate">Nach keng — lee eng un 👆</div>'}
-    ${shared.length?`<h2>Klass-Këschten</h2>${shared.map(row).join("")}`:""}`;
+    <h2 class="sect">Meng Këschten</h2>
+    ${mine.length?`<div class="ui-tiles">${mine.map(row).join("")}</div>`:gate("✨","Nach keng Këscht","Gëff uewen en Numm an a leet deng éischt un.")}
+    ${shared.length?`<h2 class="sect">Klass-Këschten</h2><div class="ui-tiles">${shared.map(row).join("")}</div>`:""}`;
   $("newBtn").onclick=async()=>{
     const t=$("newTitle").value.trim();
     if(!t){return;}
@@ -118,22 +180,20 @@ async function listView(){
     if(error){$("lm").textContent="Feeler (Migratioun gelaf?).";return;}
     openDeck(data.id);
   };
-  $("wrap").querySelectorAll("[data-open]").forEach(el=>{
-    el.onclick=()=>openDeck(el.dataset.open);
-    el.onkeydown=activateKey(()=>openDeck(el.dataset.open));
-  });
+  $("newTitle").onkeydown=(e)=>{if(e.key==="Enter"){e.preventDefault();$("newBtn").click();}};
+  $("wrap").querySelectorAll("[data-open]").forEach(el=>{el.onclick=()=>openDeck(el.dataset.open);});
 }
 
 async function newDeckForExam(examId,cls){
   const {data,error}=await sb.from("flashcard_decks").insert({title:"Nei Këscht",class:cls||myClass,exam_id:examId,shared:true}).select("id").single();
-  if(error){$("wrap").innerHTML='<div class="gate">Feeler beim Uleeën (Migratioun gelaf?).</div>';return;}
+  if(error){$("wrap").innerHTML=gate("⚠️","Feeler beim Uleeën","Migratioun gelaf?");return;}
   history.replaceState(null,"","flashcards.html?deck="+data.id);
   openDeck(data.id,true);
 }
 
 async function openDeck(id,edit){
   const {data:d}=await sb.from("flashcard_decks").select("*").eq("id",id).maybeSingle();
-  if(!d){$("wrap").innerHTML='<div class="gate">Këscht net fonnt.</div>';return;}
+  if(!d){$("wrap").innerHTML=gate("🔍","Këscht net fonnt.","","");return;}
   deck=d;
   const {data:cs}=await sb.from("flashcards").select("*").eq("deck_id",id).order("pos").order("id");
   cards=cs||[];idx=0;flipped=false;
@@ -144,27 +204,26 @@ async function openDeck(id,edit){
 function studyView(){
   const mine=deck.owner===me;
   $("wrap").innerHTML=`
-    <div class="card">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-weight:800;font-size:17px">${esc(deck.title)}</div>
-        <div class="spacer" style="flex:1"></div>
-        ${mine?`<button class="ghost" id="editBtn"><span aria-hidden="true">✏️</span> Änneren</button>`:""}
-      </div>
+    <div class="ui-card studyhead">
+      <div class="t">${esc(deck.title)}</div>
+      ${mine?`<button type="button" class="ui-btn ui-btn--ghost sm" id="editBtn"><span aria-hidden="true">✏️</span>&nbsp;Änneren</button>`:""}
     </div>
+    <div class="meter" aria-hidden="true"><i id="bar"></i></div>
     <div class="flip" id="flip" role="button" tabindex="0"><div class="inner" id="inner" aria-hidden="true">
-      <div class="face"><span class="side">Fro</span><span id="front"></span></div>
+      <div class="face"><span class="side">Fro</span><span id="front"></span><span class="hint">Tipp fir ëmzedréinen</span></div>
       <div class="face b"><span class="side">Äntwert</span><span id="back2"></span></div>
     </div></div>
     <div class="sr" id="fcLive" role="status" aria-live="polite"></div>
     <div class="nav">
-      <button id="prev" aria-label="Viregt Kaart">‹</button>
+      <button type="button" class="ui-btn ui-btn--ghost" id="prev" aria-label="Viregt Kaart">‹</button>
       <div class="prog" id="prog"></div>
-      <button id="next" aria-label="Nächst Kaart">›</button>
+      <button type="button" class="ui-btn ui-btn--ghost" id="next" aria-label="Nächst Kaart">›</button>
     </div>
     <div class="tools">
-      <button class="ghost" id="shuf"><span aria-hidden="true">🔀</span> Mëschen</button>
-      ${deck.owner===me?`<button class="ghost" id="shareBtn"></button>`:""}
-    </div>`;
+      <button type="button" class="ui-btn ui-btn--ghost sm" id="shuf"><span aria-hidden="true">🔀</span>&nbsp;Mëschen</button>
+      ${deck.owner===me?`<button type="button" class="ui-btn ui-btn--ghost sm" id="shareBtn"></button>`:""}
+    </div>
+    <div class="kbd">← → blädderen · Espace ëmdréinen</div>`;
   $("flip").onclick=()=>{flipped=!flipped;$("inner").classList.toggle("back",flipped);labelFlip();announce(flipped?"Äntwert: "+cards[idx].back:"Fro: "+cards[idx].front);};
   $("flip").onkeydown=(e)=>{if(e.key==="Enter"){e.preventDefault();$("flip").click();}};
   $("prev").onclick=()=>go(-1);$("next").onclick=()=>go(1);
@@ -183,6 +242,8 @@ function paint(){
   const c=cards[idx];
   $("front").textContent=c.front;$("back2").textContent=c.back;
   $("prog").textContent=(idx+1)+" / "+cards.length;
+  $("bar").style.transform="scaleX("+(idx+1)/cards.length+")";
+  $("flip").classList.toggle("single",cards.length<2);
   $("inner").classList.toggle("back",flipped);
   labelFlip();
 }
@@ -191,29 +252,29 @@ function paint(){
 function editView(){
   document.onkeydown=null;
   const rows=cards.map(c=>`<div class="crow" data-id="${c.id}">
-      <textarea class="cf" rows="2" placeholder="Fro" aria-label="Fro">${esc(c.front)}</textarea>
-      <textarea class="cb" rows="2" placeholder="Äntwert" aria-label="Äntwert">${esc(c.back)}</textarea>
-      <button class="del" data-del="${c.id}" title="Läschen" aria-label="Kaart läschen"><span aria-hidden="true">✕</span></button>
+      <textarea class="cf ui-input" rows="2" placeholder="Fro" aria-label="Fro">${esc(c.front)}</textarea>
+      <textarea class="cb ui-input" rows="2" placeholder="Äntwert" aria-label="Äntwert">${esc(c.back)}</textarea>
+      <button type="button" class="del" data-del="${c.id}" title="Läschen" aria-label="Kaart läschen"><span aria-hidden="true">✕</span></button>
     </div>`).join("");
   $("wrap").innerHTML=`
-    <div class="card">
-      <input id="dTitle" value="${esc(deck.title)}" maxlength="80" aria-label="Titel vun der Këscht">
-      <div class="settings" style="margin-top:10px">
-        <label><input type="checkbox" id="dShare" ${deck.shared?"checked":""}> Mat der Klass deelen</label>
+    <div class="ui-card">
+      <input class="ui-input" id="dTitle" value="${esc(deck.title)}" maxlength="80" aria-label="Titel vun der Këscht">
+      <div class="settings">
+        <label class="switch"><input type="checkbox" id="dShare" ${deck.shared?"checked":""}> Mat der Klass deelen</label>
         ${deck.exam_id?`<span>· un en Test gebonnen</span>`:""}
       </div>
       <div class="msg" id="em" role="status" aria-live="polite"></div>
     </div>
-    <h2>Kaarten</h2>
+    <h2 class="sect">Kaarten</h2>
     <div id="rows">${rows||""}</div>
-    <div class="crow">
-      <textarea class="nf" rows="2" placeholder="Nei Fro" aria-label="Nei Fro"></textarea>
-      <textarea class="nb" rows="2" placeholder="Nei Äntwert" aria-label="Nei Äntwert"></textarea>
-      <button class="del" id="addCard" title="Bäisetzen" aria-label="Kaart bäisetzen"><span aria-hidden="true">＋</span></button>
+    <div class="crow new">
+      <textarea class="nf ui-input" rows="2" placeholder="Nei Fro" aria-label="Nei Fro"></textarea>
+      <textarea class="nb ui-input" rows="2" placeholder="Nei Äntwert" aria-label="Nei Äntwert"></textarea>
+      <button type="button" class="ui-btn ui-btn--primary" id="addCard"><span aria-hidden="true">＋</span>&nbsp;Kaart bäisetzen</button>
     </div>
     <div class="tools" style="justify-content:flex-start">
-      ${cards.length?`<button class="btn" id="study"><span aria-hidden="true">▶︎</span> Léieren</button>`:""}
-      <button class="ghost" id="delDeck">Këscht läschen</button>
+      ${cards.length?`<button type="button" class="ui-btn ui-btn--primary sm" id="study"><span aria-hidden="true">▶︎</span>&nbsp;Léieren</button>`:""}
+      <button type="button" class="ui-btn ui-btn--ghost warn sm" id="delDeck">Këscht läschen</button>
     </div>`;
   $("dTitle").onchange=()=>saveDeck();
   $("dShare").onchange=()=>saveDeck();
@@ -262,7 +323,7 @@ async function addCard(){
   if(error){setEm("Feeler.",true);return;}
   focusSel=".nf";openDeck(deck.id,true);
 }
-function setEm(t,err){const m=$("em");if(!m)return;m.textContent=t;m.style.color=err?"#ff6b6b":"var(--accent2)";if(!err)setTimeout(()=>{if(m)m.textContent="";},1200);}
+function setEm(t,err){const m=$("em");if(!m)return;m.textContent=t;m.style.color=err?"var(--warn)":"";if(!err)setTimeout(()=>{if(m)m.textContent="";},1200);}
 
 auth.onAuth(boot);
 boot();
