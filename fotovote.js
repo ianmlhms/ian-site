@@ -6,7 +6,7 @@ import {
   loadingMarkup,
   standingsMarkup,
   swipeMarkup,
-} from "./fotovote-render.js?v=3";
+} from "./fotovote-render.js?v=4";
 
 const BATCH_SIZE = 12;
 const PRELOAD_AHEAD = 3;
