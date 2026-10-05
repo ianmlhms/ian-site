@@ -109,7 +109,7 @@ body.ui .pb-x{min-width:44px;min-height:44px;margin:-8px -8px 0 0}
 .arc-title{margin:0;font-family:var(--font-display);font-size:clamp(56px,13vw,120px);font-weight:800;letter-spacing:-.05em;line-height:.9;color:var(--text)}
 .arc-title span{color:var(--accent-text)}
 .arc-sub{max-width:30rem;margin:18px 0 0;font-size:clamp(16px,2.2vw,19px);line-height:1.5;color:var(--muted);text-wrap:pretty}
-.arc-tools{display:grid;gap:14px}
+.arc-tools{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 .arc-search{position:relative;max-width:560px}
 .arc-search .si{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.55;pointer-events:none}
 .arc-search input{padding-left:46px;-webkit-appearance:none;appearance:none}
@@ -217,6 +217,10 @@ body.game-no-pad #tc{display:none!important}
 button,.game-card,.genre-filter,.home-btn,.logo{touch-action:manipulation}
 @media(max-width:700px){
 .arc-search{max-width:none}
+#installBtn [data-i18n]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#installBtn{padding-inline:12px}
+.header-right{gap:6px}
+.header-right .pb-acct{padding-inline:12px}
 .genre-filters{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding:2px 16px;scrollbar-width:none}
 .genre-filters::-webkit-scrollbar{display:none}
 .genre-filter{flex:none}
