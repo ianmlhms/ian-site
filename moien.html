@@ -22,38 +22,56 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:620px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:16px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}
-  .muted{color:var(--muted);font-size:13px}
-  /* greeting */
-  .greet{text-align:center;padding:8px 4px 2px}
-  .greet h2{margin:0;font-size:26px;font-weight:800}
-  .greet .date{color:var(--muted);font-size:14px;margin-top:4px}
-  .greet .clock{font-size:34px;font-weight:800;letter-spacing:.02em;margin-top:6px;font-variant-numeric:tabular-nums}
-  .greet .clock .ms{font-size:.55em;font-weight:700;opacity:.6}
-  /* weather */
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent-text);text-decoration:none}
+  button,a{touch-action:manipulation}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+
+  /* ---- header + column ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+  @media (max-width:620px){.ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+  .muted{color:var(--muted);font-size:14px}
+
+  /* ---- greeting + clock ---- */
+  .greet{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 24px}
+  .greet h2.ui-title{margin:0;font-size:clamp(30px,5.2vw,42px);line-height:1.08}
+  .greet .date{margin-top:6px;color:var(--muted);font-size:15px}
+  .greet .clock{font:800 clamp(34px,6vw,46px)/1 var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .greet .clock .ms{font-size:.5em;font-weight:700;letter-spacing:0;color:var(--muted)}
+
+  /* ---- weather ---- */
   .wxtop{display:flex;align-items:center;gap:16px}
-  .wxemoji{font-size:52px;line-height:1}
-  .wxtemp{font-size:40px;font-weight:800;line-height:1}
-  .wxdesc{color:var(--muted);font-size:14px;margin-top:2px}
-  .wxmeta{margin-left:auto;text-align:right;font-size:12.5px;color:var(--muted);line-height:1.7}
-  .wxday{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px}
-  .hours{display:flex;gap:8px;overflow-x:auto;margin-top:14px;padding-bottom:2px}
-  .hours:focus-visible{outline:.2rem solid var(--focus-ring);outline-offset:.18rem;border-radius:8px}
-  .hr{flex:none;text-align:center;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:8px 10px;min-width:56px}
-  .hr .h{font-size:11px;color:var(--muted)}.hr .e{font-size:20px;margin:3px 0}.hr .t{font-size:13px;font-weight:700}
-  /* link to the buses page */
-  .buslink{display:flex;align-items:center;gap:10px;color:var(--text);font-size:15px;text-decoration:none}
-  .buslink b{flex:1;font-weight:700}
-  .buslink span{color:var(--muted);font-size:20px}
-  .buslink:hover{border-color:var(--accent2-text)}
+  .wxemoji{display:grid;place-items:center;flex:none;width:84px;height:84px;border-radius:24px;font-size:48px;line-height:1;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .wxtemp{font:800 clamp(44px,8vw,58px)/1 var(--font-display);letter-spacing:-.04em}
+  .wxdesc{margin-top:4px;color:var(--muted);font-size:15px}
+  .wxmeta{display:grid;gap:3px;margin-left:auto;text-align:right;font-size:13.5px;color:var(--muted);white-space:nowrap}
+  .wxmeta span[role=img]{margin-right:2px}
+  .wxday{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .wxday > span{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:var(--r-chip);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--border);color:var(--text);font:700 13.5px var(--font-display);font-variant-numeric:tabular-nums}
+  .hours{display:flex;gap:8px;overflow-x:auto;margin:14px -4px 0;padding:2px 4px 6px;scrollbar-width:thin;overscroll-behavior-x:contain}
+  .hours:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px;border-radius:var(--r-chip)}
+  .hr{flex:1 0 62px;text-align:center;background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--border);border-radius:var(--r-chip);padding:10px 8px}
+  .hr .h{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .hr .e{font-size:24px;margin:4px 0}
+  .hr .t{font:800 15px var(--font-display)}
+  @media (max-width:420px){.wxemoji{width:64px;height:64px;font-size:36px;border-radius:20px}.wxtop{gap:12px}.wxmeta{font-size:12.5px}}
+
+  /* ---- bus link ---- */
+  .buslink.ui-tile{--h:#4fc37a;min-height:84px;grid-template-areas:"ico name";padding-right:44px}
+  .buslink.ui-tile .ui-tile__name{align-self:center;font-size:17px}
+  .buslink .ui-tile__go{position:absolute;top:50%;right:18px;transform:translateY(-50%);color:var(--muted);font-size:24px;line-height:1;transition:transform .3s var(--ease),color .2s}
+  .buslink:hover .ui-tile__go{color:var(--h);transform:translate(3px,-50%)}
+  @media (prefers-reduced-motion:reduce){body.ui .ui-header .home,.buslink .ui-tile__go{transition:none}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
@@ -61,24 +79,29 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html">‹ Heem</a>
-  <h1><span aria-hidden="true">🌤️</span> Moien</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="index.html">‹ Heem</a>
+    <h1 class="ui-brand"><span aria-hidden="true">🌤️</span> Moien</h1>
+  </div>
+  <div class="header-right">
+    <span id="acctHost"></span>
+  </div>
 </header>
 
-<main class="wrap">
-  <div class="greet">
-    <h2 id="hi">Moien!</h2>
-    <div class="date" id="date"></div>
+<main class="ui-page">
+  <section class="ui-card ui-card--accent greet">
+    <div>
+      <h2 class="ui-title" id="hi">Moien!</h2>
+      <div class="date" id="date"></div>
+    </div>
     <div class="clock" id="clock" role="timer"><span id="clockMain">--:--:--</span><span class="ms" id="clockMs">.000</span></div>
-  </div>
+  </section>
 
-  <section class="card" id="wx" aria-label="Wieder" aria-live="polite"><div class="muted">Wieder gëtt gelueden…</div></section>
+  <section class="ui-card" id="wx" aria-label="Wieder" aria-live="polite"><div class="muted">Wieder gëtt gelueden…</div></section>
 
-  <a class="card buslink" href="bus.html"><span aria-hidden="true">🚌</span> <b>Nächst Bussen &amp; Zich</b> <span aria-hidden="true">›</span></a>
+  <a class="ui-tile buslink" href="bus.html"><span class="ui-tile__ico" aria-hidden="true">🚌</span><span class="ui-tile__name">Nächst Bussen &amp; Zich</span><span class="ui-tile__go" aria-hidden="true">›</span></a>
 </main>
 
 <script src="pixelbreak-config.js"></script>
@@ -133,7 +156,7 @@ async function loadWeather(){
       <div class="wxtop">
         <div class="wxemoji" aria-hidden="true">${w.emoji}</div>
         <div><div class="wxtemp">${Math.round(c.temperature_2m)}°</div><div class="wxdesc">${w.text}</div></div>
-        <div class="wxmeta">Gefillt ${Math.round(c.apparent_temperature)}°<br><span role="img" aria-label="Wand">💨</span> ${Math.round(c.wind_speed_10m)} km/h<br><span role="img" aria-label="Loftfiichtegkeet">💧</span> ${c.relative_humidity_2m}%</div>
+        <div class="wxmeta"><div>Gefillt ${Math.round(c.apparent_temperature)}°</div><div><span role="img" aria-label="Wand">💨</span> ${Math.round(c.wind_speed_10m)} km/h</div><div><span role="img" aria-label="Loftfiichtegkeet">💧</span> ${c.relative_humidity_2m}%</div></div>
       </div>
       <div class="wxday"><span><span role="img" aria-label="Héchsttemperatur">⬆</span> ${Math.round(dl.temperature_2m_max[0])}°</span><span><span role="img" aria-label="Niddregsttemperatur">⬇</span> ${Math.round(dl.temperature_2m_min[0])}°</span>
         <span><span role="img" aria-label="Reenrisiko">🌧</span> ${dl.precipitation_probability_max[0]}%</span><span><span role="img" aria-label="Sonnenopgang">🌅</span> ${dl.sunrise[0].slice(11,16)}</span><span><span role="img" aria-label="Sonnenënnergang">🌇</span> ${dl.sunset[0].slice(11,16)}</span></div>
