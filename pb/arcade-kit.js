@@ -306,7 +306,7 @@
       oldBar.insertAdjacentElement("afterend", context);
     }
     if (options.noScore || !options.id) return;
-    import("../pixelbreak-records.js?v=23").then(() => {
+    import("../pixelbreak-records.js?v=24").then(() => {
       window.PB?.registerStandalone?.({
         id: options.id,
         name: options.title,
