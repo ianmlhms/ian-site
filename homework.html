@@ -118,7 +118,8 @@ async function showApp(){
   $("syncBtn").onclick=syncNow;
   loadList();
 }
-const uiLang=()=>window.I18N?.lang||undefined;
+// Luxembourgish is missing from some Intl builds; German is the closest fallback.
+const uiLang=()=>{ const l=window.I18N?.lang; if(!l) return undefined; try{ return Intl.DateTimeFormat.supportedLocalesOf([l]).length&&Intl.RelativeTimeFormat.supportedLocalesOf([l]).length?l:(l==="lb"?"de":l); }catch{ return undefined; } };
 function fmtDate(d){ if(!d) return ""; const dt=new Date(d+"T00:00:00"); return dt.toLocaleDateString(uiLang(),{weekday:"short",day:"numeric",month:"short"}); }
 // Today / tomorrow / yesterday come from Intl in the active language, so no new i18n keys are needed.
 function dueLabel(d,days){
