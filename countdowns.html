@@ -8,54 +8,105 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:640px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
-  .gate{text-align:center;color:var(--muted);padding:50px 16px}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
-  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;font-size:13px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
-  input{padding:11px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit;width:100%}
-  .newx{display:flex;flex-direction:column;gap:8px}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .cd{display:flex;align-items:center;gap:14px}
-  .cd .emoji{font-size:30px;flex:none}
-  .cd .title{font-weight:800;font-size:16px}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent-text);text-decoration:none}
+  button,a,input{touch-action:manipulation}
+  button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+  .ui{--warn:#ef5b6b}
+  html[data-theme="light"] .ui{--warn:#c7283d}
+
+  /* ---- header + column ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+
+  /* ---- empty state (loading / empty / error) ---- */
+  .cdempty{text-align:center;color:var(--muted);padding:clamp(28px,6vw,48px) 22px}
+  .cdempty .cdempty-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .cdempty p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text)}
+  .cdempty .cdempty-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
+  .cdempty.mini{padding:20px}
+  .ttgate{text-align:center;color:var(--muted);font-size:14px;line-height:1.5;padding:12px 16px;border-radius:var(--r-chip);background:color-mix(in srgb,var(--text) 5%,transparent)}
+  .ttgate a{text-decoration:underline;text-underline-offset:3px;padding:12px 2px}
+
+  /* ---- hero: next countdown ---- */
+  .hero{display:flex;flex-direction:column;gap:6px}
+  .hero .lbl{align-self:flex-start;display:inline-flex;align-items:center;min-height:28px;padding:3px 12px;border-radius:999px;font:750 12px var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--accent-text);background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .hero .hrow{display:flex;align-items:center;gap:16px;margin-top:6px}
+  .hero .emoji{display:grid;place-items:center;flex:none;width:64px;height:64px;border-radius:20px;font-size:34px;line-height:1;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .hero .title{font:800 clamp(20px,3.4vw,26px)/1.2 var(--font-display);letter-spacing:-.025em;overflow-wrap:anywhere}
+  .hero .when{color:var(--muted);font-size:13.5px;margin-top:3px}
+  .hero .big{margin-top:10px;font:800 clamp(34px,8vw,52px)/1.05 var(--font-display);letter-spacing:-.035em;font-variant-numeric:tabular-nums;color:var(--text)}
+  .hero .big small,.cd .big small{font:700 .5em var(--font-display);letter-spacing:0;color:var(--muted);margin:0 .3em 0 .08em}
+
+  /* ---- form ---- */
+  .newx{display:flex;flex-direction:column;gap:12px}
+  .newx h2{margin:0;font:800 17px var(--font-display);letter-spacing:-.02em}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .row .ui-input{flex:1 1 9rem;min-width:0;width:auto}
+  .emopick{display:flex;gap:6px;flex-wrap:wrap}
+  .emopick button{display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:var(--r-chip);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--border);font-size:21px;line-height:1;cursor:pointer;transition:transform .3s var(--ease),box-shadow .2s,background-color .2s}
+  .emopick button:hover{transform:translateY(-2px);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,var(--border))}
+  .emopick button:active{transform:scale(.94)}
+  .emopick button.on{background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 2px var(--accent)}
+  .newx .ui-btn{align-self:flex-start}
+  .msg{min-height:18px;color:var(--accent-text);font-weight:700;font-size:13px}
+  .msg:empty{min-height:0}
+
+  /* ---- list ---- */
+  .sect{margin:8px 2px 0;font:750 13px var(--font-display);letter-spacing:.04em;color:var(--muted)}
+  #list{display:flex;flex-direction:column;gap:10px}
+  .cd{display:flex;align-items:center;gap:14px;padding:14px 12px 14px 16px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35)}
+  .cd .emoji{display:grid;place-items:center;flex:none;width:52px;height:52px;border-radius:var(--r-chip);font-size:27px;line-height:1;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .cd .info{min-width:0;flex:1}
+  .cd .title{font:750 16px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
   .cd .when{color:var(--muted);font-size:12.5px;margin-top:2px}
-  .cd .big{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums}
-  .cd .big b{font-size:22px;display:block;line-height:1.1}
-  .cd .big.soon b{color:var(--warn)}
-  .cd .big small{color:var(--muted);font-size:11px}
-  .cd.past{opacity:.5}
-  .del{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:4px;flex:none}
-  .del:hover{color:var(--warn)}
-  .msg{min-height:16px;color:var(--accent2-text);font-weight:700;font-size:13px}
-  .emopick{display:flex;gap:4px;flex-wrap:wrap}
-  .emopick button{background:var(--card2);border:1px solid var(--border);border-radius:9px;font-size:18px;width:44px;height:44px;cursor:pointer}
-  .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent2-text);text-decoration:underline;cursor:pointer}
-  .del{min-width:44px}
+  .cd .big{flex:none;text-align:right;font:800 20px/1.1 var(--font-display);letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .cd .big.soon{color:var(--warn)}
+  .cd.past{opacity:.6}
+  .cd.past .emoji{filter:grayscale(.6)}
+  .del{display:grid;place-items:center;flex:none;min-width:44px;min-height:44px;padding:0;border:0;border-radius:var(--r-chip);background:none;color:var(--muted);font-size:16px;cursor:pointer;transition:background-color .2s,color .2s}
+  .del:hover{color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+  .linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent-text);text-decoration:underline;cursor:pointer}
+
+  @media(max-width:700px){
+    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+    body.ui .ui-header h1.ui-brand{font-size:18px}
+    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
+    .hero .emoji{width:52px;height:52px;font-size:28px;border-radius:var(--r-chip)}
+    .cd{gap:10px;padding-left:12px}
+    .cd .emoji{width:44px;height:44px;font-size:23px}
+    .cd .big{font-size:17px}
+  }
   @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-  .emopick button.on{border-color:var(--accent-border);background:rgba(110,168,254,.14)}
 </style>
+<script data-goatcounter="https://ianm.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html">‹ Heem</a>
-  <h1>⏳ Countdowns</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="index.html">‹ Heem</a>
+    <h1 class="ui-brand"><span aria-hidden="true">⏳</span> Countdowns</h1>
+  </div>
+  <div class="header-right">
+    <span id="acctHost"></span>
+  </div>
 </header>
 
-<div class="wrap" id="wrap"><div class="gate">Lueden…</div></div>
+<main class="ui-page" id="wrap"><div class="cdempty"><p>Lueden…</p></div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -88,18 +139,20 @@ async function boot(){
   me=auth.session()?.user?.id||null;
   if(!local)await migrateLocal();
   $("wrap").innerHTML=`
-    <div class="card newx">
-      <input id="nTitle" maxlength="80" aria-label="Titel vum Countdown" autocomplete="off" enterkeyhint="done" placeholder="Op wat waards du? (z.B. Vakanz a Spuenien)">
+    <div id="hero"></div>
+    <div class="ui-card newx">
+      <h2>Neie Countdown</h2>
+      <input class="ui-input" id="nTitle" maxlength="80" aria-label="Titel vum Countdown" autocomplete="off" enterkeyhint="done" placeholder="Op wat waards du? (z.B. Vakanz)">
       <div class="emopick" id="emo" role="group" aria-label="Emoji"></div>
       <div class="row">
-        <input id="nDate" type="date" aria-label="Datum" style="flex:1;min-width:150px">
-        <input id="nTime" type="time" value="00:00" aria-label="Auerzäit" style="flex:1;min-width:120px">
+        <input class="ui-input" id="nDate" type="date" aria-label="Datum">
+        <input class="ui-input" id="nTime" type="time" value="00:00" aria-label="Auerzäit">
       </div>
-      <button class="btn" id="add">Countdown bäisetzen</button>
+      <button type="button" class="ui-btn ui-btn--primary" id="add">Countdown bäisetzen</button>
       <div class="msg" id="msg" role="status" aria-live="polite"></div>
     </div>
-    ${local?`<div class="gate" style="padding:6px 16px">Ouni Kont ginn deng Countdowns nëmmen op dësem Apparat gespäichert — <a href="#" id="si" role="button">mell dech un</a>, fir se iwwerall ze hunn.</div>`:""}
-    <div id="list"><div class="gate">Lueden…</div></div>`;
+    ${local?`<div class="ttgate">Ouni Kont ginn deng Countdowns nëmmen op dësem Apparat gespäichert — <a href="#" id="si" role="button">mell dech un</a>, fir se iwwerall ze hunn.</div>`:""}
+    <div id="list"><div class="cdempty mini">Lueden…</div></div>`;
   if(local)$("si").onclick=(e)=>{e.preventDefault();auth.openAuthModal();};
   const emo=$("emo");
   EMOJIS.forEach((e,i)=>{const b=document.createElement("button");b.type="button";b.textContent=e;b.setAttribute("aria-pressed",String(i===0));if(i===0)b.classList.add("on");
@@ -114,7 +167,7 @@ async function refresh(){
     items=localList().slice().sort((a,b)=>new Date(a.at)-new Date(b.at));
   }else{
     const {data,error}=await sb.from("countdowns").select("*").order("at");
-    if(error){$("list").innerHTML='<div class="gate" role="alert">Feeler beim Lueden.</div>';return;}
+    if(error){$("list").innerHTML='<div class="cdempty mini" role="alert">Feeler beim Lueden.</div>';return;}
     items=data||[];
   }
   render();
@@ -137,23 +190,47 @@ function paint(){
     const el=document.querySelector(`.big[data-cd="${it.id}"]`);
     if(!el)continue;
     const left=new Date(it.at).getTime()-Date.now();
+    if(left<0&&el.closest(".hero")){render();continue;}
     el.querySelector("b").innerHTML=left<0?"🎉 do!":big(left);
-    el.classList.toggle("soon",left<3*86400000&&left>0);
+    el.classList.toggle("soon",isSoon(left));
   }
 }
-function render(){
-  if(!items.length){$("list").innerHTML='<div class="gate">Nach keng Countdowns — setz deen éischten bäi 👆</div>';return;}
-  $("list").innerHTML=items.map(it=>{
-    const t=new Date(it.at),left=t.getTime()-Date.now();
-    const when=t.toLocaleString("de-DE",{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-    return `<div class="card"><div class="cd${left<0?" past":""}">
+const fmtWhen=(t)=>t.toLocaleString("de-DE",{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+const isSoon=(left)=>left<3*86400000&&left>0;
+function delBtn(it){
+  return `<button type="button" class="del" data-del="${it.id}" title="Läschen" aria-label="Countdown läschen: ${esc(it.title)}"><span aria-hidden="true">✕</span></button>`;
+}
+function heroHtml(it){
+  const t=new Date(it.at),left=t.getTime()-Date.now();
+  return `<section class="hero ui-card ui-card--accent" aria-label="Nächste Countdown">
+    <span class="lbl">Als nächst</span>
+    <div class="hrow">
       <span class="emoji" aria-hidden="true">${esc(it.emoji||"⏳")}</span>
-      <div><div class="title">${esc(it.title)}</div><div class="when">${when}</div></div>
-      <div class="big${left<3*86400000&&left>0?" soon":""}" data-cd="${it.id}"><b>${left<0?"🎉 do!":big(left)}</b></div>
-      <button class="del" data-del="${it.id}" title="Läschen" aria-label="Countdown läschen: ${esc(it.title)}"><span aria-hidden="true">✕</span></button>
-    </div></div>`;
-  }).join("");
-  $("list").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
+      <div style="min-width:0;flex:1"><div class="title">${esc(it.title)}</div><div class="when">${fmtWhen(t)}</div></div>
+      ${delBtn(it)}
+    </div>
+    <div class="big${isSoon(left)?" soon":""}" data-cd="${it.id}"><b>${big(left)}</b></div>
+  </section>`;
+}
+function rowHtml(it){
+  const t=new Date(it.at),left=t.getTime()-Date.now();
+  return `<div class="cd${left<0?" past":""}">
+    <span class="emoji" aria-hidden="true">${esc(it.emoji||"⏳")}</span>
+    <div class="info"><div class="title">${esc(it.title)}</div><div class="when">${fmtWhen(t)}</div></div>
+    <div class="big${isSoon(left)?" soon":""}" data-cd="${it.id}"><b>${left<0?"🎉 do!":big(left)}</b></div>
+    ${delBtn(it)}
+  </div>`;
+}
+function render(){
+  const now=Date.now();
+  const next=items.find(it=>new Date(it.at).getTime()>now);
+  $("hero").innerHTML=next?heroHtml(next):"";
+  const rest=items.filter(it=>it!==next);
+  if(!items.length){$("list").innerHTML='<div class="cdempty"><div class="cdempty-ico" aria-hidden="true">⏳</div><p>Nach keng Countdowns</p><div class="cdempty-sub">Setz deen éischten uewen bäi.</div></div>';return;}
+  const upcoming=rest.filter(it=>new Date(it.at).getTime()>now),past=rest.filter(it=>new Date(it.at).getTime()<=now);
+  $("list").innerHTML=(upcoming.length?upcoming.map(rowHtml).join(""):"")
+    +(past.length?`<div class="sect">Scho virbei</div>`+past.map(rowHtml).join(""):"");
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     if(!confirm("Countdown läschen?"))return;
     if(local)localSave(localList().filter(x=>String(x.id)!==b.dataset.del));
     else await sb.from("countdowns").delete().eq("id",b.dataset.del);
