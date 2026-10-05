@@ -8,32 +8,51 @@
 <meta name="description" content="Wéi ee Messenger-Notifikatiounen uschalt.">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
-  a{color:var(--accent2-text);text-decoration:none}
-  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  header .home{color:var(--muted);font-weight:700}
-  header h1{font-size:18px;margin:0}
-  .wrap{max-width:640px;margin:0 auto;padding:22px 18px 60px}
-  .langs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
-  .lang{padding:8px 16px;border-radius:30px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-weight:700;font-size:14px;cursor:pointer}
-  .lang.active{background:var(--accent);border-color:var(--accent-border);color:var(--accent-foreground)}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+  a{color:var(--accent-text);text-decoration:none}
+  a,button{touch-action:manipulation}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:3px;border-radius:8px}
+
+  /* ---- header + column ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;justify-content:flex-start;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px}
+  .ui .ui-page{display:flex;flex-direction:column;gap:16px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+  @media (max-width:620px){.ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+
+  /* ---- language switch ---- */
+  .langs{display:flex;flex-wrap:wrap;gap:8px}
+  .lang{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 18px;border:0;border-radius:var(--r-chip);background:var(--card);color:var(--muted);box-shadow:inset 0 0 0 1px var(--tile-edge);font:700 14px var(--font-display);cursor:pointer;transition:transform .3s var(--ease),background-color .2s,color .2s,box-shadow .2s}
+  .lang:hover{color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,var(--border))}
+  .lang:active{transform:scale(.97)}
+  .lang.active{background:var(--accent);color:var(--accent-foreground);box-shadow:0 10px 24px -14px color-mix(in srgb,var(--accent) 75%,transparent)}
+
+  /* ---- docs ---- */
   .doc{display:none}
-  .doc.show{display:block}
-  .doc h2{font-size:22px;margin:0 0 6px}
-  .doc .lead{color:var(--muted);margin:0 0 22px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:16px}
-  .card.warn{border-left:3px solid #ffcc4d}
-  .card h3{margin:0 0 10px;font-size:16px}
-  .card ol{margin:0;padding-left:20px}
-  .card li{margin:7px 0}
-  .card .note{color:var(--muted);font-size:13px}
+  .doc.show{display:flex;flex-direction:column;gap:16px}
+  .doc h2.ui-title{margin:10px 0 0;font-size:clamp(28px,5vw,38px);line-height:1.1;text-wrap:balance}
+  .doc .lead{margin:0 0 6px;max-width:56ch;color:var(--muted);font-size:17px;text-wrap:pretty}
+  .card{--h:var(--accent)}
+  .card.warn{--h:#ffb938;background:linear-gradient(135deg,color-mix(in srgb,var(--h) 16%,var(--card-opaque)),color-mix(in srgb,var(--h) 5%,var(--card-opaque)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 40%,transparent)}
+  .card h3{display:flex;align-items:center;gap:12px;margin:0 0 12px;font:800 19px/1.2 var(--font-display);letter-spacing:-.02em}
+  .card h3 > [aria-hidden]{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:var(--r-chip);font-size:24px;line-height:1;background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .card p{margin:0 0 12px}
+  .card ol{margin:0 0 4px;padding:0;list-style:none;counter-reset:step}
+  .card li{position:relative;margin:0;padding:9px 0 9px 42px;counter-increment:step;text-wrap:pretty}
+  .card li::before{content:counter(step);position:absolute;left:0;top:8px;display:grid;place-items:center;width:28px;height:28px;border-radius:10px;background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent);font:800 13px var(--font-display);font-variant-numeric:tabular-nums}
+  .card .note{color:var(--muted);font-size:14px}
   /* site-glass.css gives every .note a frosted pill; here it is plain helper text */
   .note{background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0;padding:0}
-  .done{color:#44ff88;font-weight:700}
-  kbd{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:13px;font-family:inherit;color:var(--accent2-text)}
+  .card li.note{padding:9px 0 9px 42px}
+  .card p:last-child{margin-bottom:0}
+  .done{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:var(--r-chip);background:color-mix(in srgb,#2fcf75 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,#2fcf75 35%,transparent);color:color-mix(in srgb,#1f9d57 60%,var(--text));font:800 14px var(--font-display)}
+  kbd{display:inline-block;padding:2px 9px;border-radius:8px;background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--border);font:700 13.5px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent-text)}
+  @media (prefers-reduced-motion:reduce){body.ui .ui-header .home,.lang{transition:none}}
 </style>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
@@ -43,13 +62,13 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header>
+<body class="ui">
+<header class="ui-header">
   <a class="home" href="messenger.html">‹ Messenger</a>
-  <h1><span aria-hidden="true">🔔</span> Notifikatiounen — Hëllef</h1>
+  <h1 class="ui-brand"><span aria-hidden="true">🔔</span> Notifikatiounen — Hëllef</h1>
 </header>
 
-<main class="wrap">
+<main class="ui-page">
   <div class="langs" role="group" aria-label="Sprooch / Sprache / Language">
     <button class="lang active" data-l="lb" lang="lb" aria-pressed="true"><span aria-hidden="true">🇱🇺</span> Lëtzebuergesch</button>
     <button class="lang" data-l="de" lang="de" aria-pressed="false"><span aria-hidden="true">🇩🇪</span> Deutsch</button>
@@ -58,10 +77,10 @@
 
   <!-- ===================== Lëtzebuergesch ===================== -->
   <section class="doc show" data-l="lb">
-    <h2>Messenger-Notifikatioune uschalten</h2>
+    <h2 class="ui-title">Messenger-Notifikatioune uschalten</h2>
     <p class="lead">Esou kriss du eng Notifikatioun, wann der een eng Noriicht schéckt — och wann d'Säit zou ass.</p>
 
-    <div class="card">
+    <div class="ui-card card">
       <h3><span aria-hidden="true">📱</span> iPhone / iPad</h3>
       <p class="note">Du muss d'App fir d'éischt „installéieren“ — Apple erlaabt Notifikatiounen nëmme fir installéiert Web-Appen.</p>
       <ol>
@@ -73,7 +92,7 @@
       <p><span class="done">Fäerdeg <span aria-hidden="true">✅</span></span> — du kriss elo Notifikatiounen, och wann d'App zou ass.</p>
     </div>
 
-    <div class="card">
+    <div class="ui-card card">
       <h3><span aria-hidden="true">💻</span> Computer / Android</h3>
       <ol>
         <li>Maach <kbd>ian.lu/messenger</kbd> op a mell dech un.</li>
@@ -81,7 +100,7 @@
       </ol>
     </div>
 
-    <div class="card warn">
+    <div class="ui-card card warn">
       <h3><span aria-hidden="true">🔕</span> De Knäppchen weist „blocked“? (iPhone/iPad)</h3>
       <p class="note">Du hues virdru „Net erlaben“ gedréckt. Apple weist deen Dialog nëmmen <b>eemol</b> — du muss et an den Astellungen nei aschalten.</p>
       <ol>
@@ -95,10 +114,10 @@
 
   <!-- ===================== Deutsch ===================== -->
   <section class="doc" data-l="de">
-    <h2>Messenger-Benachrichtigungen einschalten</h2>
+    <h2 class="ui-title">Messenger-Benachrichtigungen einschalten</h2>
     <p class="lead">So bekommst du eine Benachrichtigung, wenn dir jemand schreibt — auch wenn die Seite geschlossen ist.</p>
 
-    <div class="card">
+    <div class="ui-card card">
       <h3><span aria-hidden="true">📱</span> iPhone / iPad</h3>
       <p class="note">Du musst die App zuerst „installieren“ — Apple erlaubt Benachrichtigungen nur für installierte Web-Apps.</p>
       <ol>
@@ -110,7 +129,7 @@
       <p><span class="done">Fertig <span aria-hidden="true">✅</span></span> — du bekommst jetzt Benachrichtigungen, auch wenn die App geschlossen ist.</p>
     </div>
 
-    <div class="card">
+    <div class="ui-card card">
       <h3><span aria-hidden="true">💻</span> Computer / Android</h3>
       <ol>
         <li>Öffne <kbd>ian.lu/messenger</kbd> und melde dich an.</li>
@@ -118,7 +137,7 @@
       </ol>
     </div>
 
-    <div class="card warn">
+    <div class="ui-card card warn">
       <h3><span aria-hidden="true">🔕</span> Knopf zeigt „blocked“? (iPhone/iPad)</h3>
       <p class="note">Du hast vorher „Nicht erlauben“ getippt. Apple zeigt diesen Dialog nur <b>einmal</b> — du musst es in den Einstellungen neu aktivieren.</p>
       <ol>
@@ -132,10 +151,10 @@
 
   <!-- ===================== English ===================== -->
   <section class="doc" data-l="en">
-    <h2>Turn on Messenger notifications</h2>
+    <h2 class="ui-title">Turn on Messenger notifications</h2>
     <p class="lead">This gets you a notification when someone messages you — even when the page is closed.</p>
 
-    <div class="card">
+    <div class="ui-card card">
       <h3><span aria-hidden="true">📱</span> iPhone / iPad</h3>
       <p class="note">You have to “install” the app first — Apple only allows notifications for installed web apps.</p>
       <ol>
@@ -147,7 +166,7 @@
       <p><span class="done">Done <span aria-hidden="true">✅</span></span> — you’ll get message notifications even when the app is closed.</p>
     </div>
 
-    <div class="card">
+    <div class="ui-card card">
       <h3><span aria-hidden="true">💻</span> Computer / Android</h3>
       <ol>
         <li>Open <kbd>ian.lu/messenger</kbd> and sign in.</li>
@@ -155,7 +174,7 @@
       </ol>
     </div>
 
-    <div class="card warn">
+    <div class="ui-card card warn">
       <h3><span aria-hidden="true">🔕</span> Button says “blocked”? (iPhone/iPad)</h3>
       <p class="note">You tapped “Don’t Allow” earlier. Apple only shows that prompt <b>once</b> — you have to re-enable it in Settings.</p>
       <ol>
