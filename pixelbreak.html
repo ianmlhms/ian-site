@@ -15,71 +15,170 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<script src="i18n-dict.js?v=41"></script>
+<script>
+/* Arcade strings (lb · de · en). Added to the shared dictionary here so the page stays self-contained. */
+Object.assign(window.I18N_DICT,{
+"arc.skip":{lb:"Direkt zum Inhalt",de:"Direkt zum Inhalt",en:"Skip to content"},
+"arc.kicker":{lb:"Spiller fir Pausen",de:"Spiele für die Pause",en:"Games for breaks"},
+"arc.sub":{lb:"Direkt am Browser, ouni Download. Op iPad, Handy a Laptop.",de:"Direkt im Browser, ohne Download. Auf iPad, Handy und Laptop.",en:"Right in your browser, no download. On iPad, phone and laptop."},
+"arc.install":{lb:"Installéieren",de:"Installieren",en:"Install"},
+"arc.search":{lb:"Spiller sichen…",de:"Spiele suchen…",en:"Search games…"},
+"arc.searchLabel":{lb:"Spiller sichen",de:"Spiele suchen",en:"Search games"},
+"arc.browse":{lb:"Spiller no Genre filteren",de:"Spiele nach Genre filtern",en:"Browse games by genre"},
+"arc.g.all":{lb:"All Spiller",de:"Alle Spiele",en:"All games"},
+"arc.g.puzzle":{lb:"Rätsel",de:"Rätsel",en:"Puzzle"},
+"arc.g.action":{lb:"Aktioun",de:"Action",en:"Action"},
+"arc.g.driving":{lb:"Fueren",de:"Fahren",en:"Driving"},
+"arc.g.creative":{lb:"Kreativ",de:"Kreativ",en:"Creative"},
+"arc.big":{lb:"Grouss Spiller",de:"Große Spiele",en:"Big games"},
+"arc.bigSub":{lb:"De Fortschrëtt gëtt gespäichert, du kanns also weiderspillen, wou s du opgehalen hues.",de:"Dein Fortschritt wird gespeichert, du machst also einfach dort weiter, wo du aufgehört hast.",en:"Progress saves, so you can come back and keep going."},
+"arc.together":{lb:"Zesumme spillen",de:"Zusammen spielen",en:"Play together"},
+"arc.togetherSub":{lb:"Op zwee iPads, géint d'KI oder niewenteneen.",de:"Auf zwei iPads, gegen die KI oder nebeneinander.",en:"Play on two iPads, against AI, or side by side."},
+"arc.quick":{lb:"Séier Spiller",de:"Schnelle Spiele",en:"Quick games"},
+"arc.quickSub":{lb:"Eng Ronn, näischt ze verléieren.",de:"Eine Runde, nichts zu verlieren.",en:"One sitting, no progress to lose."},
+"arc.more":{lb:"Méi Spiller",de:"Weitere Spiele",en:"More games"},
+"arc.saves":{lb:"Späichert Fortschrëtt",de:"Speichert Fortschritt",en:"Progress saves"},
+"arc.mp":{lb:"Multiplayer",de:"Multiplayer",en:"Multiplayer"},
+"arc.ext":{lb:"Extern",de:"Extern",en:"External"},
+"arc.twoPads":{lb:"2 iPads",de:"2 iPads",en:"2 iPads"},
+"arc.countAll":{lb:"{n} Spiller",de:"{n} Spiele",en:"{n} games"},
+"arc.countSome":{lb:"{n} vu {m} Spiller",de:"{n} von {m} Spielen",en:"{n} of {m} games"},
+"arc.emptyT":{lb:"Näischt fonnt",de:"Nichts gefunden",en:"Nothing found"},
+"arc.emptyS":{lb:"Probéier en anert Wuert oder en anert Genre.",de:"Versuch ein anderes Wort oder ein anderes Genre.",en:"Try another word or another genre."},
+"arc.emptyB":{lb:"All Spiller weisen",de:"Alle Spiele zeigen",en:"Show all games"},
+"arc.title":{lb:"Arcade – Spiller",de:"Arcade – Spiele",en:"Arcade - Play Games"},
+"arc.up":{lb:"Erop",de:"Hoch",en:"Up"},
+"arc.down":{lb:"Erof",de:"Runter",en:"Down"},
+"arc.left":{lb:"Lénks",de:"Links",en:"Left"},
+"arc.right":{lb:"Riets",de:"Rechts",en:"Right"},
+"arc.action":{lb:"Aktioun",de:"Aktion",en:"Action"},
+"arc.game":{lb:"Spill",de:"Spiel",en:"Game"},
+"arc.iosTip":{lb:"Op iOS: tipp op Deelen ⬆️, dann op „Zum Home-Bildschirm“",de:"Auf iOS: Teilen ⬆️ antippen, dann „Zum Home-Bildschirm“",en:"On iOS: tap Share ⬆️, then “Add to Home Screen”"},
+"arc.close":{lb:"Zoumaachen",de:"Schließen",en:"Close"},
+"arc.start":{lb:"Starten – Raumcode kréien",de:"Starten – Raumcode bekommen",en:"Start — get a room code"},
+"arc.vsAi":{lb:"Géint d'KI spillen",de:"Gegen die KI spielen",en:"Play vs AI"},
+"arc.roomCode":{lb:"Raumcode",de:"Raumcode",en:"Room code"},
+"arc.join":{lb:"Bäitrieden",de:"Beitreten",en:"Join"},
+"arc.aboutH":{lb:"Iwwer d'Arcade",de:"Über die Arcade",en:"About Arcade"},
+"arc.about1":{lb:"D'Arcade ass eng kleng Spillsammlung am Browser, déi ech selwer gebaut hunn. D'Spiller lafen direkt am Browser, et gëtt näischt erofzelueden an näischt z'installéieren. Op Handy, iPad, Schoul-Laptop oder Desktop opmaachen, e Spill eraussichen, a et geet direkt lass. Highscores an de Fortschrëtt vun deene Spiller, déi dat ënnerstëtzen, ginn automatesch gespäichert.",de:"Die Arcade ist eine kleine Spielesammlung im Browser, die ich selbst gebaut habe. Die Spiele laufen direkt im Browser, es gibt nichts herunterzuladen und nichts zu installieren. Auf Handy, iPad, Schul-Laptop oder Desktop öffnen, ein Spiel aussuchen, und es startet sofort. Highscores und der Fortschritt der Spiele, die das unterstützen, werden automatisch gespeichert.",en:"Arcade is a small browser arcade I built myself. Its games run in the browser — there is nothing to download and no launcher to install. Open it on a phone, an iPad, a school laptop or a desktop, pick a game, and it starts immediately. High scores and supported game progress are saved for you."},
+"arc.aboutH2":{lb:"Wat drun ass",de:"Was drin ist",en:"What's in it"},
+"arc.about2":{lb:"<strong>Grouss Spiller</strong> späicheren de Fortschrëtt a si fir ze weiderspillen, vun Theme Park Tycoon bis Tower Defense a Burger Restaurant. Ënner <strong>Zesumme spillen</strong> fënns du Online- a Lokal-Multiplayer op enger Plaz. <strong>Séier Spiller</strong> si fir eng Ronn tëscheduerch. Du kanns och no Genre filteren: Rätsel, Aktioun, Fueren oder Kreativ.",de:"<strong>Große Spiele</strong> speichern den Fortschritt und sind zum Weiterspielen gedacht, von Theme Park Tycoon bis Tower Defense und Burger Restaurant. Unter <strong>Zusammen spielen</strong> findest du Online- und Lokal-Multiplayer an einem Ort. <strong>Schnelle Spiele</strong> sind für eine Runde zwischendurch. Du kannst auch nach Genre filtern: Rätsel, Action, Fahren oder Kreativ.",en:"<strong>Big games</strong> save progress and are made for returning to, from Theme Park Tycoon to Tower Defense and Burger Restaurant. <strong>Play together</strong> collects online and local multiplayer in one place. <strong>Quick games</strong> are made for one sitting. You can also browse across those sections by puzzle, action, driving or creative games."},
+"arc.aboutH3":{lb:"Géint een anere spillen",de:"Gegen jemand anderen spielen",en:"Playing against someone else"},
+"arc.about3":{lb:"E puer Spiller si fir zwee gemaach. Tank Battles, Pong, Air Hockey a Platform Fighters kann een op dräi Weeër spillen: zu zweet op enger Tastatur, eleng géint de Computer oder op zwee Geräter. Fir zwee Geräter mécht een e Raum op an deen anere kënnt mam Raumcode bäi. Dat ass praktesch, wann zwee mat engem iPad niewenteneen am selwechte Raum sëtzen. Et gëtt keng Matchmaking a kee Chat; de Raumcode ass dat ganzt System.",de:"Ein paar Spiele sind für zwei gemacht. Tank Battles, Pong, Air Hockey und Platform Fighters kann man auf drei Arten spielen: zu zweit an einer Tastatur, allein gegen den Computer oder auf zwei Geräten. Für zwei Geräte öffnet einer einen Raum und der andere tritt mit dem Raumcode bei. Das ist praktisch, wenn zwei mit je einem iPad im selben Raum sitzen. Es gibt kein Matchmaking und keinen Chat; der Raumcode ist das ganze System.",en:"A handful of games are built for two people rather than one. Tank Battles, Pong, Air Hockey and Platform Fighters can each be played three ways: two players sharing one keyboard, one player against the computer, or across two separate devices. For the two-device mode, one player starts a room and the other joins by typing the room code — useful when two people have an iPad each and are sitting in the same room. There is no matchmaking and no chat; the room code is the whole system."},
+"arc.aboutH4":{lb:"Steierung",de:"Steuerung",en:"Controls"},
+"arc.about4":{lb:"Um Computer geet et mat de Pfeiltasten an der Leertaste. Um Touchscreen erschéngt ënnert dem Spill e Steierkräiz an en Aktiounsknäppchen, et geet also alles ouni Tastatur.",de:"Am Computer geht es mit den Pfeiltasten und der Leertaste. Auf einem Touchscreen erscheinen unter dem Spiel ein Steuerkreuz und ein Aktionsknopf, es geht also alles ohne Tastatur.",en:"On a computer the games use the arrow keys and the space bar. On a touchscreen an on-screen D-pad and action button appear underneath the game, so everything is playable without a keyboard."},
+"arc.aboutH5":{lb:"Wou d'Spiller hierkommen",de:"Woher die Spiele kommen",en:"Where the games come from"},
+"arc.about5":{lb:"All agebaut Spiller hunn ech vun Null un selwer geschriwwen. E puer si vu bekannte Arcade-Konzepter inspiréiert, déi wuel jiddereen schonn emol gespillt huet, awer de Code, d'Grafik an d'Level si meng eegen an näischt ass vun engem anere Spill kopéiert.",de:"Alle eingebauten Spiele habe ich von Grund auf selbst geschrieben. Einige sind von bekannten Arcade-Konzepten inspiriert, die wohl jeder schon einmal gespielt hat, aber der Code, die Grafik und die Level sind meine eigenen und nichts ist von einem anderen Spiel kopiert.",en:"All of the built-in games were written from scratch for this site. Several are openly inspired by well-known arcade concepts — the kind of games most people have played some version of — but the code, the artwork and the level design are my own, and none of it is copied from another game."},
+"arc.foot":{lb:"Arcade – fir de Spaass gemaach. D'Spiller si selwer geschriwwen a vu bekannte Konzepter inspiréiert.",de:"Arcade – zum Spaß gemacht. Die Spiele sind selbst geschrieben und von bekannten Konzepten inspiriert.",en:"Arcade — made for fun. Built-in games are original creations inspired by popular concepts."}
+});
+</script>
+<script src="i18n.js?v=3"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-:root{--brand1:#ff6b9d;--brand2:#4de8ff;--bg:#0d0d1a;--card:#161625;--card-hover:#1e1e35;--accent:#ff6b9d;--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--text:#e8e8f0;--text2:#8888aa;--radius:14px}
-html[data-theme="light"]{--brand1:#e23d78;--brand2:#0e7ec2}
+:root{--accent2:#4de8ff;--accent3:#ffcc00;--accent4:#44ff88;--radius:14px}
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,"SF Pro Text","SF Pro Display",BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;min-height:100svh;overflow-x:hidden}
+body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:-apple-system,"SF Pro Text","SF Pro Display",BlinkMacSystemFont,"Segoe UI",sans-serif}
 ::selection{background:var(--accent);color:var(--accent-foreground)}
-header{background:var(--card);padding:20px 30px 14px;position:sticky;top:0;z-index:100;border-bottom:1px solid var(--border)}
-.header-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;cursor:pointer}
-.logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--brand1),var(--brand2));border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(255,107,157,0.3);animation:lp 3s ease-in-out infinite}
-@keyframes lp{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
-.logo-text{font-size:28px;font-weight:750;letter-spacing:-.025em;background:linear-gradient(135deg,var(--brand1),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.logo-sub{font-size:11px;color:var(--text2);letter-spacing:2px;text-transform:uppercase}
-.search-box{display:flex;align-items:center;gap:8px;background:var(--card2);border:2px solid var(--border);border-radius:30px;padding:7px 16px;width:280px;transition:border-color 0.3s}
-.search-box:focus-within{border-color:var(--accent2-text)}
-.search-box input{background:none;border:none;color:var(--text);font-size:14px;outline:none;width:100%;font-family:inherit}
-.search-box input::placeholder{color:var(--muted)}
-.si{font-size:16px;opacity:0.4}
-.header-right{display:flex;align-items:center;gap:12px}
-.header-left{display:flex;align-items:center;gap:14px}
-.home-btn{display:inline-flex;align-items:center;gap:5px;min-height:44px;padding:8px 16px;border-radius:30px;border:2px solid var(--border);background:var(--card);color:var(--text);text-decoration:none;font-weight:700;font-size:14px;font-family:inherit;white-space:nowrap;transition:transform .18s ease,border-color .18s ease,color .18s ease}
-.home-btn:hover{border-color:var(--accent-border);color:var(--accent-text)}
-main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
-.browse{padding:22px 0 2px}
-.browse-label{font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:9px}
+.skip{position:absolute;left:12px;top:-60px;z-index:3000;padding:12px 18px;border-radius:var(--r-chip);background:var(--accent);color:var(--accent-foreground);font-weight:700;text-decoration:none}
+.skip:focus{top:12px}
+
+/* ---- header ---- */
+html body.ui .ui-header{flex-wrap:wrap;gap:10px 14px;padding-top:max(16px,env(safe-area-inset-top))}
+.header-left{display:flex;align-items:center;gap:12px;min-width:0}
+.home-btn{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);text-decoration:none;font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+.home-btn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+.home-btn:active{transform:scale(.97)}
+.logo{display:inline-flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.logo-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;font-size:19px;background:color-mix(in srgb,var(--accent) 22%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 32%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+.header-right{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px}
+#installBtn{min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--accent-border);background:transparent;color:var(--accent-text);font:700 14px var(--font-display);cursor:pointer;transition:background-color .2s,transform .3s var(--ease)}
+#installBtn:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+#installBtn:active{transform:scale(.97)}
+body.ui .pb-acct{min-height:44px;padding:8px 16px;border:1px solid var(--border);border-radius:var(--r-chip);background:transparent;color:var(--text);font:700 14px var(--font-display);transition:background-color .2s,border-color .2s}
+body.ui .pb-acct:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border);color:var(--text)}
+body.ui .pb-box{border-radius:var(--r-panel);border:0;background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--tile-edge),0 30px 60px -24px rgb(var(--ink)/.55)}
+body.ui .pb-box input{min-height:46px;border-radius:var(--r-chip);font-size:16px}
+body.ui .pb-go{min-height:46px;border-radius:var(--r-chip);font-family:var(--font-display)}
+body.ui .pb-tab{min-height:44px;border-radius:var(--r-chip)}
+body.ui .pb-x{min-width:44px;min-height:44px;margin:-8px -8px 0 0}
+
+/* ---- hero + tools ---- */
+.arc-hero{padding:clamp(22px,6vw,56px) 0 clamp(18px,3vw,28px)}
+.arc-kicker{margin:0 0 8px;font-size:17px;font-weight:650;color:var(--muted)}
+.arc-title{margin:0;font-family:var(--font-display);font-size:clamp(56px,13vw,120px);font-weight:800;letter-spacing:-.05em;line-height:.9;color:var(--text)}
+.arc-title span{color:var(--accent-text)}
+.arc-sub{max-width:30rem;margin:18px 0 0;font-size:clamp(16px,2.2vw,19px);line-height:1.5;color:var(--muted);text-wrap:pretty}
+.arc-tools{display:grid;gap:14px}
+.arc-search{position:relative;max-width:560px}
+.arc-search .si{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.55;pointer-events:none}
+.arc-search input{padding-left:46px;-webkit-appearance:none;appearance:none}
 .genre-filters{display:flex;flex-wrap:wrap;gap:8px}
-.genre-filter{min-height:44px;padding:9px 16px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--text2);font:700 14px 'Nunito',sans-serif;cursor:pointer;transition:border-color .2s,background .2s,color .2s}
-.genre-filter:hover{border-color:var(--accent-border);color:var(--text)}
+.genre-filter{min-height:44px;padding:9px 18px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);cursor:pointer;transition:border-color .2s,background-color .2s,color .2s,transform .3s var(--ease)}
+.genre-filter:hover{border-color:var(--accent-border);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.genre-filter:active{transform:scale(.97)}
 .genre-filter.active{background:var(--accent);border-color:var(--accent);color:var(--accent-foreground)}
-.genre-filter:focus-visible,.game-card:focus-visible{outline:3px solid var(--accent2);outline-offset:3px}
-.browse-status{color:var(--text2);font-size:13px;margin-top:9px;min-height:20px}
-.sec-title{font-family:'Fredoka',sans-serif;font-size:23px;margin:26px 0 2px;display:flex;align-items:center;gap:9px;letter-spacing:0.3px}
-.sec-sub{color:var(--text2);font-size:13px;margin:2px 0 16px}
-.pb-about{max-width:760px;margin:40px auto 0;padding:0 4px}
-.pb-about h2{font-family:'Fredoka',sans-serif;font-size:23px;margin:0 0 10px;letter-spacing:.3px}
-.pb-about h3{font-family:'Fredoka',sans-serif;font-size:16px;margin:22px 0 6px}
-.pb-about p{color:var(--text2);font-size:14.5px;line-height:1.7;margin:0}
-.pb-about strong{color:var(--text)}
-.count{font-size:13px;color:var(--text2);margin-bottom:12px}
-.game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
-.big-grid{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
-.game-card{appearance:none;display:block;width:100%;padding:0;font:inherit;color:inherit;text-align:inherit;background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;transition:transform 0.25s,box-shadow 0.25s,background 0.25s;position:relative;border:1px solid var(--border)}
-.game-card.big{border-color:rgba(255,107,157,.3)}
-.game-card.big:hover{box-shadow:0 16px 44px rgba(0,0,0,.48),0 0 28px rgba(255,107,157,.12)}
-.game-card.online{border-color:rgba(77,232,255,0.22)}
-.game-card.online:hover{box-shadow:0 14px 40px rgba(0,0,0,0.45),0 0 26px rgba(77,232,255,0.14)}
-.game-card:hover{transform:translateY(-6px);box-shadow:0 14px 40px rgba(0,0,0,0.45);background:var(--card-hover)}
-.game-thumb{aspect-ratio:16/10;height:auto;display:flex;align-items:center;justify-content:center;font-size:52px;position:relative;overflow:hidden}
-.game-card.big .game-thumb{font-size:68px}
+.browse-status{min-height:20px;margin-top:2px;font-size:13px;font-weight:600;color:var(--muted)}
+.genre-filter:focus-visible,.game-card:focus-visible,.home-btn:focus-visible,.logo:focus-visible,#installBtn:focus-visible,#om button:focus-visible,#om input:focus-visible,.more-games summary:focus-visible,.pb-acct:focus-visible,.arc-empty button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* ---- sections ---- */
+.arc-sec{margin-top:clamp(26px,5vw,42px)}
+.sec-title{display:flex;align-items:center;gap:12px}
+.sec-ico{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:12px;font-size:21px;line-height:1;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
+.sec-sub{margin:2px 0 16px;font-size:14px;color:var(--muted);text-wrap:pretty}
+.game-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,10.5rem),1fr));gap:14px}
+.big-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,15rem),1fr));gap:16px}
+
+/* ---- game cards ---- */
+.game-card{--h:var(--accent);appearance:none;display:flex;flex-direction:column;width:100%;padding:8px;font:inherit;color:var(--text);text-align:left;background:var(--card);border:0;border-radius:var(--r-tile);cursor:pointer;position:relative;box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35);transition:transform .35s var(--ease),background-color .2s,box-shadow .35s var(--ease)}
+.game-card:hover{transform:translateY(-4px);background:var(--card-opaque);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 55%,transparent),0 18px 34px -18px rgb(var(--ink)/.5)}
+.game-card:active{transform:scale(.985);transition-duration:.08s}
+.game-thumb{position:relative;display:flex;align-items:center;justify-content:center;flex:none;aspect-ratio:16/10;overflow:hidden;border-radius:14px;font-size:48px;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--h) 38%,transparent),transparent 72%),color-mix(in srgb,var(--h) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 22%,transparent)}
+.game-card.big .game-thumb{font-size:62px}
 .game-thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
 .game-thumb img.failed{display:none}
-.game-thumb .em{filter:drop-shadow(0 8px 20px rgba(0,0,0,0.55));transition:transform 0.3s}
-.game-card:hover .game-thumb .em{transform:scale(1.12)}
-.game-thumb::after{content:'\25B6';position:absolute;top:50%;left:50%;z-index:2;transform:translate(-50%,-50%) scale(0);font-size:32px;color:#fff;opacity:0;transition:opacity 0.3s,transform 0.3s;text-shadow:0 0 20px rgba(0,0,0,0.8)}
-.game-card:hover .game-thumb::after{transform:translate(-50%,-50%) scale(1);opacity:0.8}
-.game-info{display:block;padding:10px 12px}
-.game-name{display:block;font-family:'Fredoka',sans-serif;font-size:14px;font-weight:600;margin-bottom:3px}
-.game-card.big .game-info{padding:14px 16px 16px}
-.game-card.big .game-name{font-size:18px;margin-bottom:4px}
-.game-desc{display:block;color:var(--text2);font-size:12.5px;line-height:1.4;margin:0 0 9px}
-.game-tags{display:flex;gap:4px;flex-wrap:wrap}
-.tag{font-size:10px;padding:2px 7px;border-radius:7px;background:var(--card2);color:var(--text2)}
-.tag.mp{background:rgba(77,232,255,0.15);color:var(--accent2-text)}
-.tag.save{background:rgba(255,204,0,.14);color:var(--accent3)}
-.ext{position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.6);color:#fff;font-size:9px;padding:2px 6px;border-radius:5px}
+.game-thumb .em{filter:drop-shadow(0 8px 16px rgb(var(--ink)/.4));transition:transform .45s var(--ease)}
+.game-card:hover .game-thumb .em{transform:scale(1.1) rotate(-4deg)}
+.game-thumb::after{content:'\25B6';position:absolute;right:10px;bottom:10px;z-index:2;display:grid;place-items:center;width:34px;height:34px;padding-left:2px;border-radius:50%;background:var(--accent);color:var(--accent-foreground);font-size:13px;opacity:0;transform:scale(.7);transition:opacity .25s,transform .35s var(--ease)}
+.game-card:hover .game-thumb::after,.game-card:focus-visible .game-thumb::after{opacity:1;transform:none}
+.game-info{display:flex;flex:1;flex-direction:column;gap:3px;padding:10px 6px 6px;overflow-wrap:anywhere}
+.game-name{display:block;font-family:var(--font-display);font-size:15px;font-weight:750;letter-spacing:-.015em;line-height:1.2;text-wrap:balance}
+.game-card.big .game-info{padding:12px 8px 8px}
+.game-card.big .game-name{font-size:18px}
+.game-desc{display:block;margin:0 0 6px;font-size:13px;line-height:1.4;color:var(--muted)}
+.game-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:auto;padding-top:4px}
+.game-tags:empty{display:none}
+.tag{padding:3px 9px;border-radius:8px;font-size:11px;font-weight:700;background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--muted)}
+.tag.mp{background:color-mix(in srgb,var(--accent2) 20%,transparent);color:var(--text)}
+.tag.save{background:color-mix(in srgb,#f4a62a 26%,transparent);color:var(--text)}
+.ext{position:absolute;top:16px;right:16px;z-index:3;padding:3px 9px;border-radius:8px;background:color-mix(in srgb,var(--card-opaque) 88%,transparent);color:var(--text);font-size:11px;font-weight:700;box-shadow:inset 0 0 0 1px var(--tile-edge)}
+
+.arc-empty{display:grid;justify-items:center;gap:6px;margin-top:30px;padding:44px 20px;text-align:center}
+.arc-empty[hidden]{display:none}
+.arc-empty .ico{font-size:40px;line-height:1;margin-bottom:6px}
+.arc-empty h2{font-family:var(--font-display);font-size:20px;font-weight:750;letter-spacing:-.02em}
+.arc-empty p{margin-bottom:12px;color:var(--muted)}
+
+.more-games{margin-top:clamp(26px,5vw,42px);overflow:hidden;padding:0}
+.more-games summary{min-height:60px;display:flex;align-items:center;gap:10px;padding:0 20px;cursor:pointer;font-family:var(--font-display);font-size:19px;font-weight:750;letter-spacing:-.02em;list-style:none;user-select:none;-webkit-user-select:none}
+.more-games summary::-webkit-details-marker{display:none}
+.more-games summary #moreCount{font-size:14px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.more-games summary::after{content:"";flex:none;width:9px;height:9px;margin:0 6px 0 auto;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);transition:transform .3s var(--ease)}
+.more-games[open] summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
+.more-games summary:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
+.more-content{padding:0 18px 22px}
+.more-group h3{margin:20px 0 12px;font-family:var(--font-display);font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--muted)}
+
+.pb-about{max-width:760px;margin:clamp(34px,6vw,56px) 0 0}
+.pb-about h2{margin-bottom:12px}
+.pb-about h3{margin:22px 0 6px;font-family:var(--font-display);font-size:16px;font-weight:750;letter-spacing:-.015em}
+.pb-about p{margin:0;font-size:15px;line-height:1.7;color:var(--muted);text-wrap:pretty}
+.pb-about strong{color:var(--text)}
+.arc-foot{width:100%;max-width:1040px;margin:34px auto 0;padding:22px 28px calc(36px + env(safe-area-inset-bottom));border-top:1px solid var(--border);font-size:13px;line-height:1.6;color:var(--muted)}
+.arc-foot a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted)}
+.arc-foot a:hover{color:var(--text)}
+
+/* ---- game overlay (the games bring their own top bar) ---- */
 #overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
 #overlay.open{display:flex}
 #gh{width:100%;flex:none}
@@ -96,134 +195,162 @@ main{max-width:1200px;margin:0 auto;padding:8px 30px 50px}
 @media (pointer:coarse){#tc{display:flex}}
 #tc.keyboard-hidden{display:none!important}
 body.game-no-pad #tc{display:none!important}
-.more-games{margin-top:34px;border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden}
-.more-games summary{min-height:56px;display:flex;align-items:center;gap:10px;padding:0 18px;cursor:pointer;font-weight:750;letter-spacing:-.01em;list-style:none;user-select:none}
-.more-games summary::-webkit-details-marker{display:none}.more-games summary::after{content:"⌄";margin-left:auto;color:var(--text2);font-size:20px;transition:transform .24s cubic-bezier(.2,.8,.2,1)}
-.more-games[open] summary::after{transform:rotate(180deg)}.more-games summary:active{background:var(--card2)}
-.more-content{padding:0 16px 18px}.more-group h3{margin:18px 0 10px;font-size:15px;letter-spacing:.01em;color:var(--text2)}
-@media(prefers-reduced-motion:reduce){.more-games summary::after{transition:none}.game-card,.game-thumb .em,.game-thumb::after{transition:none}.logo-icon{animation:none}.game-card:hover{transform:none}}
-button,.game-card,.genre-filter,.home-btn,.logo{touch-action:manipulation}
-.search-box input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
-.home-btn:focus-visible,.logo:focus-visible,#installBtn:focus-visible,#om button:focus-visible,#om input:focus-visible{outline:3px solid var(--accent2);outline-offset:3px}
-.game-info,.game-name{overflow-wrap:anywhere}
-.game-name,.count,.browse-status{text-wrap:balance}
-#om{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
+
+/* ---- room dialog for the online (two-device) games ---- */
+#om{position:fixed;inset:0;background:rgba(8,10,30,.6);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
 #om.open{display:flex}
-#om .box{background:var(--glass-solid);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;width:330px;max-width:100%}
-#om h3{font-family:'Fredoka',sans-serif;font-size:20px;margin-bottom:4px}
-#om p{color:var(--text2);font-size:13px;margin-bottom:14px}
-#om .go{width:100%;background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px;font-family:'Nunito',sans-serif}
-#om .go.alt{background:var(--card-hover);border:1px solid rgba(255,255,255,0.15)}
-#om .jr{display:flex;gap:8px;margin-top:4px}
-#om .jr input{flex:1;min-width:0;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px;font-size:14px;text-transform:lowercase;font-family:'Nunito',sans-serif}
-#om .jr button{background:var(--accent2);color:var(--accent2-foreground);border:none;border-radius:10px;padding:11px 16px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
-#om .x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
-footer{text-align:center;padding:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--border)}
-@media(max-width:700px){header{padding:12px 15px 8px}.header-right{width:100%;order:3}.search-box{flex:1;width:auto;order:0}main{padding:0 12px 35px}.browse{padding-top:16px}.genre-filter{flex:1 0 auto;padding-inline:12px}.game-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.big-grid{grid-template-columns:1fr;gap:12px}.game-thumb{font-size:36px}.game-card.big .game-thumb{font-size:58px}}
+#om .box{width:360px;max-width:100%;padding:24px;border-radius:var(--r-panel);background:var(--card-opaque);color:var(--text);box-shadow:inset 0 0 0 1px var(--tile-edge),0 30px 60px -24px rgb(var(--ink)/.6)}
+#om h3{font-family:var(--font-display);font-size:21px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px}
+#om p{color:var(--muted);font-size:14px;line-height:1.45;margin-bottom:16px}
+#om .go{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin-bottom:8px;padding:12px;border:0;border-radius:var(--r-chip);background:var(--accent);color:var(--accent-foreground);font:750 15px var(--font-display);cursor:pointer;transition:transform .3s var(--ease),filter .2s}
+#om .go:hover{filter:brightness(1.06);transform:translateY(-1px)}
+#om .go:active{transform:scale(.98)}
+#om .go.alt{background:transparent;color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+#om .go.alt:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);filter:none}
+#om .jr{display:flex;gap:8px;margin-top:6px}
+#om .jr input{flex:1;min-width:0;min-height:46px;padding:11px 14px;border:0;border-radius:var(--r-chip);background:var(--bg);color:var(--text);box-shadow:inset 0 0 0 1px var(--border);font:inherit;font-size:16px;text-transform:lowercase}
+#om .jr input:focus{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+#om .jr button{min-height:46px;padding:0 20px;border:0;border-radius:var(--r-chip);background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));color:var(--text);font:750 15px var(--font-display);cursor:pointer;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 35%,transparent)}
+#om .x{float:right;display:grid;place-items:center;width:44px;height:44px;margin:-10px -10px 0 0;background:none;border:none;border-radius:50%;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+#om .x:hover{background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--text)}
+
+button,.game-card,.genre-filter,.home-btn,.logo{touch-action:manipulation}
+@media(max-width:700px){
+.arc-search{max-width:none}
+.genre-filters{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding:2px 16px;scrollbar-width:none}
+.genre-filters::-webkit-scrollbar{display:none}
+.genre-filter{flex:none}
+.game-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.big-grid{grid-template-columns:minmax(0,1fr);gap:12px}
+.game-thumb{font-size:38px}
+.game-card.big{flex-direction:row;gap:10px}
+.game-card.big .game-thumb{width:118px;aspect-ratio:1;font-size:46px}
+.game-card.big .game-info{padding:6px 4px 4px 0}
+.game-card.big .game-name{font-size:17px}
+.ext{top:12px;right:12px}
+.more-content{padding:0 12px 18px}
+.arc-foot{padding-inline:16px;padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:no-preference){
+.arc-hero>*{animation:arc-rise .75s var(--ease) both}
+.arc-title{animation-delay:.05s}.arc-sub{animation-delay:.13s}
+}
+@keyframes arc-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.game-card,.game-thumb .em,.game-thumb::after,.more-games summary::after,.genre-filter,.home-btn,#installBtn,#om .go{transition:none}.game-card:hover,.game-card:active{transform:none}}
+@media(prefers-contrast:more){.game-card,.arc-empty{box-shadow:0 0 0 2px var(--text)}}
 body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,body.game-open #pwaInstall,body.game-open #appNav{display:none!important}
 </style>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
-<body>
-<header>
-<div class="header-inner">
+<body class="ui">
+<a class="skip" href="#main" data-i18n="arc.skip">Skip to content</a>
+<header class="ui-header">
 <div class="header-left">
-<a class="home-btn" href="index.html">&#x2039; Home</a>
-<a class="logo" href="pixelbreak.html" onclick="goHome();return false;">
-<div class="logo-icon" aria-hidden="true">&#x1F3AE;</div>
-<div><h1 class="logo-text">Arcade</h1><div class="logo-sub">Games for Breaks</div></div>
-</a>
+<a class="home-btn" href="index.html" data-i18n="nav.home">&#x2039; Home</a>
+<a class="logo ui-brand" href="pixelbreak.html" onclick="goHome();return false;"><span class="logo-icon" aria-hidden="true">&#x1F3AE;</span>Arcade</a>
 </div>
 <div class="header-right">
-<button id="installBtn" type="button" style="display:none;background:var(--card-hover);border:1px solid var(--accent2);color:var(--accent2-text);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer;font-family:inherit"><span aria-hidden="true">📲</span> Install</button>
-<div class="search-box">
-<span class="si" aria-hidden="true">&#x1F50D;</span>
-<input type="search" id="search" name="q" aria-label="Search games" placeholder="Search games…" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="applyFilters()">
-</div>
-</div>
+<button id="installBtn" type="button" style="display:none"><span aria-hidden="true">📲</span> <span data-i18n="arc.install">Install</span></button>
+<span id="langSw"></span>
 </div>
 </header>
-<main id="main">
-<nav class="browse" aria-label="Browse games by genre">
-<p class="browse-label">Browse by genre</p>
-<div class="genre-filters">
-<button class="genre-filter active" type="button" aria-pressed="true" data-genre="all" onclick="setGenre('all')">All games</button>
-<button class="genre-filter" type="button" aria-pressed="false" data-genre="puzzle" onclick="setGenre('puzzle')">Puzzle</button>
-<button class="genre-filter" type="button" aria-pressed="false" data-genre="action" onclick="setGenre('action')">Action</button>
-<button class="genre-filter" type="button" aria-pressed="false" data-genre="driving" onclick="setGenre('driving')">Driving</button>
-<button class="genre-filter" type="button" aria-pressed="false" data-genre="creative" onclick="setGenre('creative')">Creative</button>
+<main class="ui-page" id="main">
+<section class="arc-hero">
+<p class="arc-kicker" data-i18n="arc.kicker">Games for breaks</p>
+<h1 class="arc-title">Arcade<span>.</span></h1>
+<p class="arc-sub" data-i18n="arc.sub">Right in your browser, no download. On iPad, phone and laptop.</p>
+</section>
+<div class="arc-tools">
+<div class="arc-search">
+<span class="si" aria-hidden="true">&#x1F50D;</span>
+<input class="ui-input" type="search" id="search" name="q" aria-label="Search games" data-i18n-attr="aria-label:arc.searchLabel|placeholder:arc.search" placeholder="Search games…" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" oninput="applyFilters()">
 </div>
-<p class="browse-status" id="count" aria-live="polite"></p>
+<nav class="browse" aria-label="Browse games by genre" data-i18n-attr="aria-label:arc.browse">
+<div class="genre-filters">
+<button class="genre-filter active" type="button" aria-pressed="true" data-genre="all" data-i18n="arc.g.all" onclick="setGenre('all')">All games</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="puzzle" data-i18n="arc.g.puzzle" onclick="setGenre('puzzle')">Puzzle</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="action" data-i18n="arc.g.action" onclick="setGenre('action')">Action</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="driving" data-i18n="arc.g.driving" onclick="setGenre('driving')">Driving</button>
+<button class="genre-filter" type="button" aria-pressed="false" data-genre="creative" data-i18n="arc.g.creative" onclick="setGenre('creative')">Creative</button>
+</div>
 </nav>
-<section id="bigSec">
-<h2 class="sec-title"><span aria-hidden="true">🏆</span> Big games</h2>
-<p class="sec-sub">Progress saves, so you can come back and keep going.</p>
+<p class="browse-status" id="count" aria-live="polite"></p>
+</div>
+<section class="arc-sec" id="bigSec">
+<h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">🏆</span><span data-i18n="arc.big">Big games</span></h2>
+<p class="sec-sub" data-i18n="arc.bigSub">Progress saves, so you can come back and keep going.</p>
 <div class="game-grid big-grid" id="gridBig"></div>
 </section>
-<section id="togetherSec">
-<h2 class="sec-title"><span aria-hidden="true">👥</span> Play together</h2>
-<p class="sec-sub">Play on two iPads, against AI, or side by side.</p>
+<section class="arc-sec" id="togetherSec">
+<h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">👥</span><span data-i18n="arc.together">Play together</span></h2>
+<p class="sec-sub" data-i18n="arc.togetherSub">Play on two iPads, against AI, or side by side.</p>
 <div class="game-grid" id="gridTogether"></div>
 </section>
-<section id="quickSec">
-<h2 class="sec-title"><span aria-hidden="true">⚡</span> Quick games</h2>
-<p class="sec-sub">One sitting, no progress to lose.</p>
+<section class="arc-sec" id="quickSec">
+<h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">⚡</span><span data-i18n="arc.quick">Quick games</span></h2>
+<p class="sec-sub" data-i18n="arc.quickSub">One sitting, no progress to lose.</p>
 <div class="game-grid" id="gridQuick"></div>
 </section>
 
-<details class="more-games" id="moreGames">
-<summary>More games <span id="moreCount"></span></summary>
+<details class="more-games ui-card" id="moreGames">
+<summary><span data-i18n="arc.more">More games</span> <span id="moreCount"></span></summary>
 <div class="more-content" id="moreContent"></div>
 </details>
 
-<section class="pb-about">
-<h2>About Arcade</h2>
-<p>Arcade is a small browser arcade I built myself. Its 53 games run in the browser — there is nothing
+<div class="arc-empty ui-card" id="emptyMsg" hidden>
+<span class="ico" aria-hidden="true">🕹️</span>
+<h2 data-i18n="arc.emptyT">Nothing found</h2>
+<p data-i18n="arc.emptyS">Try another word or another genre.</p>
+<button class="ui-btn ui-btn--primary" type="button" data-i18n="arc.emptyB" onclick="goHome()">Show all games</button>
+</div>
+
+<section class="pb-about ui-card">
+<h2 class="ui-title" data-i18n="arc.aboutH">About Arcade</h2>
+<p data-i18n="arc.about1">Arcade is a small browser arcade I built myself. Its games run in the browser — there is nothing
 to download and no launcher to install. Open it on a phone, an iPad, a school laptop or a desktop, pick a
 game, and it starts immediately. High scores and supported game progress are saved for you.</p>
 
-<h3>What's in it</h3>
-<p><strong>Big games</strong> save progress and are made for returning to, from Theme Park Tycoon to Tower
+<h3 data-i18n="arc.aboutH2">What's in it</h3>
+<p data-i18n-html="arc.about2"><strong>Big games</strong> save progress and are made for returning to, from Theme Park Tycoon to Tower
 Defense and Burger Restaurant. <strong>Play together</strong> collects online and local multiplayer in one place.
 <strong>Quick games</strong> are made for one sitting. You can also browse across those sections by puzzle,
 action, driving or creative games.</p>
 
-<h3>Playing against someone else</h3>
-<p>A handful of games are built for two people rather than one. Tank Battles, Pong, Air Hockey and Platform
+<h3 data-i18n="arc.aboutH3">Playing against someone else</h3>
+<p data-i18n="arc.about3">A handful of games are built for two people rather than one. Tank Battles, Pong, Air Hockey and Platform
 Fighters can each be played three ways: two players sharing one keyboard, one player against the computer,
 or across two separate devices. For the two-device mode, one player starts a room and the other joins by
 typing the room code — useful when two people have an iPad each and are sitting in the same room. There is
 no matchmaking and no chat; the room code is the whole system.</p>
 
-<h3>Controls</h3>
-<p>On a computer the games use the arrow keys and the space bar. On a touchscreen an on-screen D-pad and
+<h3 data-i18n="arc.aboutH4">Controls</h3>
+<p data-i18n="arc.about4">On a computer the games use the arrow keys and the space bar. On a touchscreen an on-screen D-pad and
 action button appear underneath the game, so everything is playable without a keyboard.</p>
 
-<h3>Where the games come from</h3>
-<p>All of the built-in games were written from scratch for this site. Several are openly inspired by
+<h3 data-i18n="arc.aboutH5">Where the games come from</h3>
+<p data-i18n="arc.about5">All of the built-in games were written from scratch for this site. Several are openly inspired by
 well-known arcade concepts — the kind of games most people have played some version of — but the code, the
 artwork and the level design are my own, and none of it is copied from another game.</p>
 </section>
 </main>
-<div id="overlay" role="dialog" aria-modal="true" aria-label="Game">
+<div id="overlay" role="dialog" aria-modal="true" aria-label="Game" data-i18n-attr="aria-label:arc.game">
 <div id="gh"></div>
-<iframe id="gf" title="Game" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+<iframe id="gf" title="Game" data-i18n-attr="title:arc.game" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
 <div id="tc">
 <div class="dpad">
-<button class="tb up" data-k="ArrowUp" aria-label="Up">&#x25B2;</button>
-<button class="tb left" data-k="ArrowLeft" aria-label="Left">&#x25C0;</button>
-<button class="tb down" data-k="ArrowDown" aria-label="Down">&#x25BC;</button>
-<button class="tb right" data-k="ArrowRight" aria-label="Right">&#x25B6;</button>
+<button class="tb up" data-k="ArrowUp" aria-label="Up" data-i18n-attr="aria-label:arc.up">&#x25B2;</button>
+<button class="tb left" data-k="ArrowLeft" aria-label="Left" data-i18n-attr="aria-label:arc.left">&#x25C0;</button>
+<button class="tb down" data-k="ArrowDown" aria-label="Down" data-i18n-attr="aria-label:arc.down">&#x25BC;</button>
+<button class="tb right" data-k="ArrowRight" aria-label="Right" data-i18n-attr="aria-label:arc.right">&#x25B6;</button>
 </div>
-<button class="tb act" data-k=" " aria-label="Action">A</button>
+<button class="tb act" data-k=" " aria-label="Action" data-i18n-attr="aria-label:arc.action">A</button>
 </div>
 </div>
 <div id="om" role="dialog" aria-modal="true" aria-labelledby="omTitle"><div class="box"></div></div>
-<footer>Arcade &mdash; Made for fun. Built-in games are original creations inspired by popular concepts. · <a href="privacy.html">Datenschutz · Privacy</a></footer>
+<footer class="arc-foot"><span data-i18n="arc.foot">Arcade — made for fun. Built-in games are original creations inspired by popular concepts.</span> · <a href="privacy.html">Datenschutz · Privacy</a></footer>
 <script>
 const GAMES=[
 {id:"park",name:"Theme Park Tycoon",emoji:"🎢",thumb:"pb/thumbs/park.webp",featured:true,desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["creative"],tags:[],src:"pb/park.html"},
@@ -281,6 +408,7 @@ const GAMES=[
 {id:"o-wordle",name:"Wuertspill",emoji:"🟩",thumb:"pb/thumbs/o-wordle.webp",noScore:true,desc:"Wordle in Lëtzebuergesch and German — a new word every day",cats:["puzzle"],tags:[],go:"wordle.html"}
 ];
 
+const DESC_I18N={"park":{"lb":"Baut Fahrgeschäfter, Weeër a Stänn, looss e Park wuessen a besich d'Parke vun anere Spiller","de":"Baue Fahrgeschäfte, Wege und Stände, lass einen Park wachsen und besuche die Parks anderer"},"geometrydash":{"lb":"Rhythmus-Runner mat 10 Level: sprang iwwer Spikes, Lächer an Orben, dréi d'Schwéierkraaft ëm a fléi mat engem Schëff, alles am Takt","de":"Rhythmus-Runner mit 10 Leveln: spring über Stacheln, Lücken und Orbs, dreh die Schwerkraft um und flieg mit einem Schiff, alles im Takt"},"drive-mad":{"lb":"3D-Stunt-Fueren: 16 Level mat Wippen, Hummeren a Pressen","de":"3D-Stunt-Fahren: 16 Level mit Wippen, Hämmern und Pressen"},"chill-drive":{"lb":"Richteg 3D-Cruisen: 3 endlos Welten + 20 Level","de":"Echtes 3D-Cruisen: 3 Endlos-Welten + 20 Level"},"cookie-clicker":{"lb":"Bau en Cookie-Räich duerch Klicken a Verbesserungen kafen","de":"Baue ein Cookie-Imperium durch Klicken und Upgrades"},"crossy-road":{"lb":"20 Level + endlos: weich Autoen, Zich a Flëss aus","de":"20 Level + endlos: weiche Autos, Zügen und Flüssen aus"},"burger":{"lb":"Kach, servéier a verbessert däi Burger-Restaurant","de":"Koche, serviere und verbessere dein Burger-Restaurant"},"towerdefense":{"lb":"Bau Tierm, kommandéier en Held a stoh 15 Level vu Wellen duer","de":"Baue Türme, befehlige einen Helden und überstehe 15 Level voller Wellen"},"idle-empire":{"lb":"Business-Tycoon-Idle-Spill: Manager, Etappen, Prestige","de":"Business-Tycoon-Idle-Spiel: Manager, Meilensteine, Prestige"},"tictactoe":{"lb":"Dräi an enger Rei: spill géint de Computer (Einfach, Mëttel, Onméiglech) oder géint e Frënd um selwechte Schierm","de":"Drei in einer Reihe: spiel gegen den Computer (Leicht, Mittel, Unmöglich) oder gegen einen Freund am selben Bildschirm"},"pong":{"lb":"Neon-Pong: zu zweet, géint d'KI oder online op zwee iPads","de":"Neon-Pong: zu zweit, gegen die KI oder online auf zwei iPads"},"o-connect4":{"lb":"Looss Scheiwen falen, verbann véier: online op zwee iPads oder géint d'KI","de":"Wirf Scheiben ein, verbinde vier: online auf zwei iPads oder gegen die KI"},"o-tictactoe":{"lb":"Dräi an enger Rei: online op zwee iPads oder géint d'KI","de":"Drei in einer Reihe: online auf zwei iPads oder gegen die KI"},"tank-wars":{"lb":"Panzerschluechten: zu zweet, géint d'KI oder online op zwee iPads","de":"Panzerschlachten: zu zweit, gegen die KI oder online auf zwei iPads"},"fighters":{"lb":"Plattform-Kämpfer: zu zweet, géint d'KI oder online op zwee iPads","de":"Plattform-Kämpfer: zu zweit, gegen die KI oder online auf zwei iPads"},"o-battleship":{"lb":"Versenk d'Flott: online op zwee iPads oder géint d'KI","de":"Versenke die Flotte: online auf zwei iPads oder gegen die KI"},"o-reversi":{"lb":"Dréi d'Steng ëm: online op zwee iPads oder géint d'KI","de":"Wende die Steine: online auf zwei iPads oder gegen die KI"},"o-dots":{"lb":"Hol der d'Këschten: online op zwee iPads oder géint d'KI","de":"Sichere dir die Kästchen: online auf zwei iPads oder gegen die KI"},"o-color":{"lb":"Errot zesumme d'Faarf: online oder géint d'KI","de":"Errate gemeinsam die Farbe: online oder gegen die KI"},"o-draw":{"lb":"Zeechne a roden: mat engem Frënd online op zwee iPads","de":"Zeichne und rate: mit einem Freund online auf zwei iPads"},"o-intro":{"lb":"Errot d'Lidd no 1 Sekonn, dann no 3, dann no 5…","de":"Errate den Song nach 1 Sekunde, dann nach 3, dann nach 5…"},"o-meme":{"lb":"Schreif eng Ënnerschrëft zum selwechte Meme a vot fir déi lëschtegst: 3+ Spiller","de":"Schreibe eine Bildunterschrift zum selben Meme und stimme für die lustigste ab: 3+ Spieler"},"o-checkers":{"lb":"Sprang, schlag méi Steng hannereneen a kroun Kinneken: online op zwee iPads oder géint d'KI","de":"Springe, schlage mehrere Steine hintereinander und kröne Könige: online auf zwei iPads oder gegen die KI"},"o-maumau":{"lb":"Kaartespill: Faarf oder Wäert bedingen, 7 = +2, Bauer wënscht eppes: online oder géint d'KI","de":"Kartenspiel: Farbe oder Wert bedienen, 7 = +2, Bube wünscht sich etwas: online oder gegen die KI"},"o-dice-duel":{"lb":"Würfel, haal a punkt: online oder géint d'KI","de":"Würfeln, halten und punkten: online oder gegen die KI"},"o-slf":{"lb":"Nenn fir all Buschtaf eng Stad, e Land an e Floss: 2+ Spiller am selwechte Code","de":"Nenne zu jedem Buchstaben eine Stadt, ein Land und einen Fluss: 2+ Spieler im selben Code"},"air-hockey":{"lb":"Air Hockey: zu zweet, géint d'KI oder online op zwee iPads","de":"Air Hockey: zu zweit, gegen die KI oder online auf zwei iPads"},"flappy":{"lb":"Tipp, fir duerch d'Päifen ze fléien","de":"Tippe, um durch die Rohre zu fliegen"},"typing":{"lb":"Test, wéi vill Wierder s du pro Minutt tippe kanns","de":"Teste, wie viele Wörter du pro Minute tippen kannst"},"doodle-jump":{"lb":"Sprang vu Plattform zu Plattform no uewen","de":"Spring von Plattform zu Plattform nach oben"},"color-clash":{"lb":"Passt Faarfwierder géint d'Auer zesummen","de":"Ordne Farbwörter gegen die Uhr zu"},"whack-a-mole":{"lb":"Schlag d'Maulwërf fir Punkten","de":"Hau die Maulwürfe für Punkte"},"run-3":{"lb":"Lafe duerch en dréienden Weltraumtunnel","de":"Renne durch einen rotierenden Weltraumtunnel"},"tetris":{"lb":"Läsch Reien an engem Puzzle mat falende Bléck","de":"Lösche Reihen in einem Puzzle mit fallenden Blöcken"},"2048":{"lb":"Schief a fusionéier Zuelen","de":"Schiebe und verschmelze Zahlen"},"snake":{"lb":"Iess Äppel a wuess: wiel d'Geschwindegkeet, d'Brettgréisst an de Modus: Classic, Walls, Portal oder Borderless","de":"Iss Äpfel und wachse: wähle Tempo, Spielfeldgröße und Modus: Classic, Walls, Portal oder Borderless"},"pacman":{"lb":"Iess all Punkt, weich de véier Geeschter aus a schnapp d'Power-Pellets","de":"Iss jeden Punkt, weiche den vier Geistern aus und schnapp dir die Power-Pellets"},"dino":{"lb":"Sprang iwwer d'Kaktusen a bück dech virun de Vullen: den Offline-Dino aus dem Browser","de":"Spring über Kakteen und duck dich vor den Vögeln: der Offline-Dino aus dem Browser"},"solitaire":{"lb":"Klondike-Solitaire: Einfach (1 Kaart zéien) oder Schwéier (3 Kaarten), mat Réckgängeg","de":"Klondike-Solitaire: Leicht (1 Karte ziehen) oder Schwer (3 Karten), mit Rückgängig"},"bubble-shooter":{"lb":"Schéiss a passt Bubbelen zesummen","de":"Schieße und ordne Blasen zusammen"},"space-invaders":{"lb":"Verdeedeg d'Äerd géint erofkommend Auslänner-Wellen","de":"Verteidige die Erde gegen anrückende Alien-Wellen"},"breakout":{"lb":"Looss de Ball sprangen a briech all Steng","de":"Lass den Ball springen und zerbrich alle Steine"},"asteroids":{"lb":"Fléi e Schëff a schéiss op d'Asteroiden","de":"Steuere ein Schiff und schieße auf die Asteroiden"},"minesweeper":{"lb":"Markéier d'Minen a raum d'Feld: Einfach, Mëttel oder Schwéier, séier ass besser","de":"Markiere die Minen und räume das Feld: Leicht, Mittel oder Schwer, schneller ist besser"},"memory":{"lb":"Fann all Pär mat sou wéineg Zich wéi méiglech","de":"Finde alle Paare mit möglichst wenigen Zügen"},"maze":{"lb":"Entkomm all zoufälleg Labyrinth géint d'Auer","de":"Entkomme jedem zufälligen Labyrinth gegen die Uhr"},"gravity-ball":{"lb":"Wiessel d'Schwéierkraaft a féier de Ball an all Zil","de":"Wechsle die Schwerkraft und führe den Ball zu jedem Ziel"},"tower-stack":{"lb":"Stapel Bléck sou héich wéi s du kanns","de":"Stapele Blöcke so hoch du kannst"},"fruit-slash":{"lb":"Schneid Uebst a weich de Bomben aus","de":"Schneide Obst und weiche den Bomben aus"},"reaction":{"lb":"Moss deng séierst Reaktioun a Millisekonnen","de":"Miss deine schnellste Reaktion in Millisekunden"},"word-scramble":{"lb":"Bréng d'Wierder an d'Rei, ier d'Zäit eriwwer ass","de":"Entwirre die Wörter, bevor die Zeit abläuft"},"pixel-painter":{"lb":"Zeechent Pixel-Konscht","de":"Zeichne Pixel-Art"},"o-wordle":{"lb":"Wordle op Lëtzebuergesch an Däitsch: all Dag en neit Wuert","de":"Wordle auf Luxemburgisch und Deutsch: jeden Tag ein neues Wort"}};
 const BIG_GAME_IDS=new Set(["park","towerdefense","burger","drive-mad","chill-drive","idle-empire","cookie-clicker","crossy-road"]);
 const VALID_GENRES=new Set(["all","puzzle","action","driving","creative"]);
 // Ranking by real play counts otherwise buries a game that has only just launched:
@@ -298,6 +426,11 @@ const AUTHORED_ORDER_BY_ID=Object.freeze(GAMES.reduce(function(order,game,index)
 let activeGenre="all";
 let playCounts=EMPTY_PLAY_COUNTS;
 
+function tr(key){return window.I18N?I18N.t(key):key}
+function trN(key,vars){return tr(key).replace(/\{(\w+)\}/g,function(m,k){return vars[k]})}
+function curLang(){return window.I18N?I18N.lang:'en'}
+function gdesc(g){var l=curLang();return l==='en'?g.desc:((DESC_I18N[g.id]||{})[l]||g.desc)}
+function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function hashStr(s){var h=0;for(var i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);return Math.abs(h)}
 function isBigGame(g){return BIG_GAME_IDS.has(g.id)}
 function isTogetherGame(g){return Boolean(g.href)||g.cats.indexOf('2player')>-1}
@@ -314,16 +447,17 @@ return AUTHORED_ORDER_BY_ID[a.id]-AUTHORED_ORDER_BY_ID[b.id];
 });
 }
 function cardHTML(g,isBig){
-var tagHTML=isBig?'<span class="tag save">Progress saves<\/span>':'';
-if(g.tags&&g.tags.indexOf('mp')>-1)tagHTML+='<span class="tag mp">Multiplayer<\/span>';
-var ext=g.url?'<span class="ext">External<\/span>':g.href?'<span class="ext">2 iPads<\/span>':'';
+var tagHTML=isBig?'<span class="tag save">'+esc(tr('arc.saves'))+'<\/span>':'';
+if(g.tags&&g.tags.indexOf('mp')>-1)tagHTML+='<span class="tag mp">'+esc(tr('arc.mp'))+'<\/span>';
+var ext=g.url?'<span class="ext">'+esc(tr('arc.ext'))+'<\/span>':g.href?'<span class="ext">'+esc(tr('arc.twoPads'))+'<\/span>':'';
 var hue=hashStr(g.name)%360;
 var gIdx=GAMES.indexOf(g);
 var oc=g.src?'openGame('+gIdx+')':g.href?'openOnline('+gIdx+')':g.go?("location.href='"+g.go+"'"):("window.open('"+g.url+"','_blank')");
-var description=isBig?'<span class="game-desc">'+g.desc+'<\/span>':'';
+var d=esc(gdesc(g));
+var description=isBig?'<span class="game-desc">'+d+'<\/span>':'';
 var preview='<img src="'+g.thumb+'" alt="" loading="lazy" decoding="async" onerror="this.classList.add(\'failed\')">';
-return '<button type="button" class="game-card'+(g.href?' online':'')+(isBig?' big':'')+'" onclick="'+oc+'" title="'+g.desc+'">'+ext+
-'<span class="game-thumb" style="background:radial-gradient(circle at 50% 38%,hsla('+hue+',70%,45%,0.32),transparent 72%),linear-gradient(135deg,hsl('+hue+',40%,17%),hsl('+(hue+40)+',35%,11%))"><span class="em">'+g.emoji+'<\/span>'+preview+'<\/span>'+
+return '<button type="button" class="game-card'+(g.href?' online':'')+(isBig?' big':'')+'" style="--h:hsl('+hue+' 68% 52%)" onclick="'+oc+'" title="'+d+'">'+ext+
+'<span class="game-thumb"><span class="em" aria-hidden="true">'+g.emoji+'<\/span>'+preview+'<\/span>'+
 '<span class="game-info"><span class="game-name">'+g.name+'<\/span>'+description+'<span class="game-tags">'+tagHTML+'<\/span><\/span><\/button>';
 }
 function renderSection(sectionId,gridId,games,isBig){
@@ -333,12 +467,12 @@ document.getElementById(sectionId).style.display=games.length?'':'none';
 function renderMore(games){
 var details=document.getElementById('moreGames');
 var groups=[
-{name:'Big games',games:games.filter(isBigGame),big:true},
-{name:'Play together',games:games.filter(function(game){return !isBigGame(game)&&isTogetherGame(game)}),big:false},
-{name:'Quick games',games:games.filter(function(game){return !isBigGame(game)&&!isTogetherGame(game)}),big:false}
+{name:tr('arc.big'),games:games.filter(isBigGame),big:true},
+{name:tr('arc.together'),games:games.filter(function(game){return !isBigGame(game)&&isTogetherGame(game)}),big:false},
+{name:tr('arc.quick'),games:games.filter(function(game){return !isBigGame(game)&&!isTogetherGame(game)}),big:false}
 ].filter(function(group){return group.games.length});
 document.getElementById('moreContent').innerHTML=groups.map(function(group){
-return '<section class="more-group"><h3>'+group.name+'<\/h3><div class="game-grid">'+rankedCopy(group.games).map(function(game){return cardHTML(game,false)}).join('')+'<\/div><\/section>';
+return '<section class="more-group"><h3>'+esc(group.name)+'<\/h3><div class="game-grid">'+rankedCopy(group.games).map(function(game){return cardHTML(game,false)}).join('')+'<\/div><\/section>';
 }).join('');
 document.getElementById('moreCount').textContent='('+games.length+')';
 details.style.display=games.length?'':'none';
@@ -346,7 +480,7 @@ details.style.display=games.length?'':'none';
 function applyFilters(){
 var q=document.getElementById('search').value.trim().toLowerCase();
 var visibleGames=GAMES.filter(function(game){
-var matchesText=!q||game.name.toLowerCase().indexOf(q)>-1||game.desc.toLowerCase().indexOf(q)>-1;
+var matchesText=!q||game.name.toLowerCase().indexOf(q)>-1||game.desc.toLowerCase().indexOf(q)>-1||gdesc(game).toLowerCase().indexOf(q)>-1;
 var matchesGenre=activeGenre==='all'||game.cats.indexOf(activeGenre)>-1;
 return matchesText&&matchesGenre;
 });
@@ -361,7 +495,8 @@ renderSection('quickSec','gridQuick',quickGames,false);
 renderMore(moreGames);
 var hasFilter=q||activeGenre!=='all';
 if(hasFilter&&moreGames.length)document.getElementById('moreGames').open=true;
-document.getElementById('count').textContent=visibleGames.length+(hasFilter?' of '+GAMES.length:'')+' games';
+document.getElementById('count').textContent=hasFilter?trN('arc.countSome',{n:visibleGames.length,m:GAMES.length}):trN('arc.countAll',{n:visibleGames.length});
+document.getElementById('emptyMsg').hidden=visibleGames.length>0;
 }
 function setGenre(genre){
 if(!VALID_GENRES.has(genre))return;
@@ -446,7 +581,7 @@ document.body.classList.remove('game-open');
 document.body.classList.remove('game-no-pad');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
-document.title='Arcade - Play Games';
+document.title=tr('arc.title');
 if(_cnEl)_cnEl.href=_cn0;
 if(_mdEl)_mdEl.content=_md0;
 if(!fromHistory&&/[?&]g=/.test(location.search))history.pushState(null,'',location.pathname);
@@ -490,11 +625,12 @@ closeGame();
 function openOnline(idx){
 var g=GAMES[idx];if(!g||!g.href)return;
 var om=document.getElementById('om');
-om.querySelector('.box').innerHTML='<button class="x" type="button" aria-label="Close" onclick="closeOnline()"><span aria-hidden="true">&#x2715;</span></button>'+
-'<h3 id="omTitle"><span aria-hidden="true">'+g.emoji+'</span> '+g.name+'</h3><p>'+g.desc+'</p>'+
-'<button class="go" onclick="startOnline(\''+g.href+'\')">&#x25B6; Start &mdash; get a room code</button>'+
-(g.ai?'<button class="go alt" onclick="location.href=\''+g.href+'?ai=1\'">&#x1F916; Play vs AI</button>':'')+
-'<div class="jr"><input id="omCode" name="room" aria-label="Room code" placeholder="room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button type="button" onclick="joinOnline(\''+g.href+'\')">Join</button></div>';
+var d=esc(gdesc(g));
+om.querySelector('.box').innerHTML='<button class="x" type="button" aria-label="'+esc(tr('arc.close'))+'" onclick="closeOnline()"><span aria-hidden="true">&#x2715;</span></button>'+
+'<h3 id="omTitle"><span aria-hidden="true">'+g.emoji+'</span> '+g.name+'</h3><p>'+d+'</p>'+
+'<button class="go" type="button" onclick="startOnline(\''+g.href+'\')">&#x25B6; '+esc(tr('arc.start'))+'</button>'+
+(g.ai?'<button class="go alt" type="button" onclick="location.href=\''+g.href+'?ai=1\'"><span aria-hidden="true">&#x1F916;</span>&nbsp;'+esc(tr('arc.vsAi'))+'</button>':'')+
+'<div class="jr"><input id="omCode" name="room" aria-label="'+esc(tr('arc.roomCode'))+'" placeholder="'+esc(tr('arc.roomCode').toLowerCase())+'" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button type="button" onclick="joinOnline(\''+g.href+'\')">'+esc(tr('arc.join'))+'</button></div>';
 om.classList.add('open');
 _omOpener=document.activeElement;
 var first=om.querySelector('.go');if(first)first.focus();
@@ -582,7 +718,13 @@ document.getElementById('om').addEventListener('click',function(e){if(e.target.i
   syncTouchControls();
 })();
 
+if(window.I18N)I18N.onChange(function(){
 applyFilters();
+if(!document.body.classList.contains('game-open'))document.title=tr('arc.title');
+var om=document.getElementById('om');
+if(om.classList.contains('open'))closeOnline();
+});
+else applyFilters();
 loadPlayCounts();
 </script>
 <script src="pixelbreak-config.js"></script>
@@ -606,9 +748,9 @@ loadPlayCounts();
     if(deferred){deferred.prompt();deferred=null;btn.style.display='none';return;}
     // iOS has no install prompt: explain the Share-menu route
     var tip=document.createElement('div');
-    tip.textContent='On iOS: tap Share ⬆️, then “Add to Home Screen”';
+    tip.textContent=(window.I18N?I18N.t('arc.iosTip'):'On iOS: tap Share ⬆️, then “Add to Home Screen”');
     tip.setAttribute('role','status');
-    tip.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card-hover);border:1px solid var(--accent2);color:var(--text);padding:12px 18px;border-radius:12px;font-weight:700;z-index:9999;max-width:90vw;text-align:center';
+    tip.style.cssText='position:fixed;bottom:calc(24px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--accent-border),0 20px 40px -16px rgba(20,24,70,.5);color:var(--text);padding:14px 20px;border-radius:var(--r-chip);font-weight:700;z-index:9999;max-width:90vw;text-align:center';
     document.body.appendChild(tip);
     setTimeout(function(){tip.remove();},5000);
   };
