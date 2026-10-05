@@ -8,43 +8,78 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--warn:#f87171}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:560px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:10px}
-  .gate{text-align:center;color:var(--muted);padding:50px 16px}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 18px;font-weight:800;cursor:pointer;font-size:14px}
-  .a{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
-  .a.unseen{border-color:var(--accent-border)}
-  .a .ic{font-size:22px}
-  .a .t{font-weight:800;font-size:15px}
-  .a .b{color:var(--muted);font-size:13.5px;margin-top:2px;word-break:break-word}
-  .a .w{color:var(--muted);font-size:11.5px;margin-top:5px}
-  .a .go{margin-left:auto;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
-  .del{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;min-width:44px;min-height:44px;margin:-8px -8px -8px 0;touch-action:manipulation}
-  .del:hover{color:var(--warn)}
-  .clear{align-self:flex-end;background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:9px;padding:7px 12px;min-height:44px;font-size:12.5px;cursor:pointer;touch-action:manipulation}
-  a:focus-visible,button:focus-visible{outline:3px solid var(--accent-border,var(--accent));outline-offset:2px}
-  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent-text);text-decoration:none}
+  button,a{touch-action:manipulation}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+  .sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* ---- header + column ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:12px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+  @media (max-width:620px){.ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+
+  /* ---- toolbar: summary + clear ---- */
+  .bar2{display:flex;align-items:center;justify-content:space-between;gap:10px 14px;flex-wrap:wrap;padding:0 2px}
+  .sum{display:flex;align-items:center;gap:8px;margin:0;color:var(--muted);font:700 13px var(--font-display)}
+  .sum .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.5}
+  .sum.has-new{color:var(--text)}
+  .sum.has-new .dot{background:var(--accent);opacity:1;box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .clear{min-height:44px;padding:8px 16px;font-size:14px}
+  .clear:hover{border-color:color-mix(in srgb,var(--warn) 60%,var(--border));background:color-mix(in srgb,var(--warn) 10%,transparent)}
+
+  /* ---- notification cards ---- */
+  .list{display:flex;flex-direction:column;gap:10px}
+  .a{--h:var(--accent);position:relative;display:flex;gap:14px;align-items:flex-start;padding:14px 8px 14px 16px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -20px rgb(var(--ink)/.35)}
+  .a .ic{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:var(--r-chip);font-size:24px;line-height:1;background:color-mix(in srgb,var(--h) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 28%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 20%,transparent)}
+  .a .main{flex:1;min-width:0;padding-top:1px}
+  .a .t{font:750 16px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
+  .a .b{margin-top:3px;color:var(--muted);font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+  .a .meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;margin-top:6px;color:var(--muted);font-size:12.5px}
+  .a .meta a,.a .meta .nolink{display:inline-flex;align-items:center;min-height:44px;margin:-10px 0;padding:0 2px;font:750 14px var(--font-display);letter-spacing:-.01em}
+  .a .meta .nolink{color:var(--muted)}
+  .a .meta a:hover{text-decoration:underline;text-underline-offset:3px}
+  .a.unseen{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 16%,var(--card-opaque)),color-mix(in srgb,var(--accent) 5%,var(--card-opaque)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),0 14px 30px -20px rgb(var(--ink)/.4)}
+  .a.unseen::after{content:"";position:absolute;top:14px;right:56px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+  .del{flex:none;display:grid;place-items:center;min-width:44px;min-height:44px;border:0;border-radius:var(--r-chip);background:none;color:var(--muted);font-size:16px;cursor:pointer;transition:color .2s,background-color .2s,transform .3s var(--ease)}
+  .del:hover{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+  .del:active{transform:scale(.92)}
+
+  /* ---- empty / loading / sign-in ---- */
+  .gate{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;color:var(--muted);padding:clamp(34px,8vw,64px) 22px}
+  .gate .big{display:grid;place-items:center;width:72px;height:72px;margin-bottom:4px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
+  .gate p{margin:0;max-width:30ch;line-height:1.4}
+  .gate .gt{color:var(--text);font:800 clamp(20px,3vw,24px) var(--font-display);letter-spacing:-.02em}
+  .gate .ui-btn{margin-top:8px}
+
+  @media (prefers-reduced-motion:reduce){.del,body.ui .ui-header .home{transition:none}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html">‹ Heem</a>
-  <h1><span aria-hidden="true">🔔</span> Neiegkeeten</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="index.html">‹ Heem</a>
+    <h1 class="ui-brand"><span aria-hidden="true">🔔</span> Neiegkeeten</h1>
+  </div>
+  <div class="header-right">
+    <span id="acctHost"></span>
+  </div>
 </header>
 
-<main class="wrap" id="wrap" aria-live="polite"><div class="gate">Lueden…</div></main>
+<main class="ui-page" id="wrap" aria-live="polite"><div class="gate"><div class="big" aria-hidden="true">🔔</div><p>Lueden…</p></div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -54,6 +89,7 @@ const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let sb=null;
 const ICON={mention:"💬",exam:"⏳",homework:"📋",friend:"👋",game:"🎮"};
+const TINT={mention:"#6ea8fe",exam:"#f0a04b",homework:"#4fc37a",friend:"#e86fb0",game:"#a78bfa"};
 
 function isSitePath(value){
   if(typeof value!=="string"||!value||value!==value.trim()||/^[a-z][a-z0-9+.-]*:|^\/\/|[\\\u0000-\u0020\u007f]/i.test(value)) return false;
@@ -72,7 +108,7 @@ async function boot(){
   sb=await auth.client();
   auth.mountAccountButton($("acctHost"));
   if(!auth.session()){
-    $("wrap").innerHTML=`<div class="gate">Mell dech un fir deng Neiegkeeten.<br><br><button class="btn" id="si">Umellen</button></div>`;
+    $("wrap").innerHTML=`<div class="gate"><div class="big" aria-hidden="true">🔔</div><p class="gt">Neiegkeeten</p><p>Mell dech un fir deng Neiegkeeten.</p><button class="ui-btn ui-btn--primary" id="si" type="button">Umellen</button></div>`;
     $("si").onclick=auth.openAuthModal;return;
   }
   await render();
@@ -81,21 +117,20 @@ async function boot(){
 
 async function render(){
   const {data,error}=await sb.from("notifications").select("*").order("created_at",{ascending:false}).limit(100);
-  if(error){$("wrap").innerHTML='<div class="gate">Feeler beim Lueden (Migratioun gelaf?).</div>';return;}
-  if(!(data||[]).length){$("wrap").innerHTML='<div class="gate">Näischt Neies <span aria-hidden="true">🎉</span></div>';return;}
+  if(error){$("wrap").innerHTML='<div class="gate"><div class="big" aria-hidden="true">⚠️</div><p>Feeler beim Lueden (Migratioun gelaf?).</p></div>';return;}
+  if(!(data||[]).length){$("wrap").innerHTML='<div class="gate"><div class="big" aria-hidden="true">🎉</div><p class="gt">Näischt Neies</p><p>Du bass um neiste Stand.</p></div>';return;}
+  const fresh=data.filter(n=>!n.seen).length;
   $("wrap").innerHTML=
-    `<button class="clear" id="clr">Alles läschen</button>`+
-    data.map(n=>`<div class="a${n.seen?"":" unseen"}">
+    `<div class="bar2"><p class="sum${fresh?" has-new":""}"><span class="dot" aria-hidden="true"></span>${fresh?fresh+" nei":"Alles gesinn"}</p><button class="ui-btn ui-btn--ghost clear" id="clr" type="button">Alles läschen</button></div><div class="list">`+
+    data.map(n=>`<article class="a${n.seen?"":" unseen"}" style="--h:${TINT[n.kind]||"#6ea8fe"}">
       <div class="ic" aria-hidden="true">${ICON[n.kind]||"🔔"}</div>
-      <div style="flex:1">
+      <div class="main">
         <div class="t">${n.seen?"":'<span class="sr">Neit: </span>'}${esc(n.title)}</div>
         ${n.body?`<div class="b">${esc(n.body)}</div>`:""}
-        <div class="w">${ago(n.created_at)}</div>
+        <div class="meta"><span>${ago(n.created_at)}</span>${n.url?(isSitePath(n.url)?`<a href="${esc(n.url)}">Opmaachen ›</a>`:`<span class="nolink">Opmaachen ›</span>`):""}</div>
       </div>
-      <div class="go">
-        ${n.url?(isSitePath(n.url)?`<a href="${esc(n.url)}">Opmaachen ›</a>`:"Opmaachen ›"):""}
-        <button class="del" data-del="${n.id}" title="Läschen" aria-label="Läschen">✕</button>
-      </div></div>`).join("");
+      <button class="del" data-del="${n.id}" type="button" title="Läschen" aria-label="Läschen"><span aria-hidden="true">✕</span></button>
+      </article>`).join("")+`</div>`;
   $("clr").onclick=async()=>{await sb.from("notifications").delete().neq("id","00000000-0000-0000-0000-000000000000");render();};
   $("wrap").querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{await sb.from("notifications").delete().eq("id",b.dataset.del);render();});
 }
