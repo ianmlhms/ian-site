@@ -51,7 +51,7 @@
   .now .next b{color:var(--text)}
 
   /* ---- grid ---- */
-  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:clamp(6px,1.2vw,10px);border-radius:var(--r-panel)}
+  .scroll{min-width:0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:clamp(6px,1.2vw,10px);border-radius:var(--r-panel)}
   .scroll:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
   table{border-collapse:separate;border-spacing:4px;width:100%;min-width:600px}
   th,td{padding:0}
@@ -73,9 +73,9 @@
   .rowbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
   .rowbtns .ui-btn{min-height:46px;padding:10px 20px;font-size:15px}
   .save{color:var(--accent-text);font-size:13px;font-weight:700;min-height:18px;text-align:center}
-  .hint{color:var(--muted);font-size:13px;text-align:center;line-height:1.5;max-width:60ch;margin:0 auto;text-wrap:pretty}
-  .gate{text-align:center;color:var(--muted);font-size:14px;padding:12px 16px;border-radius:var(--r-chip);background:color-mix(in srgb,var(--text) 5%,transparent)}
-  .gate a{text-decoration:underline;text-underline-offset:3px;display:inline-block;padding:10px 4px}
+  .tthint{color:var(--muted);font-size:13px;text-align:center;line-height:1.5;max-width:60ch;margin:0 auto;text-wrap:pretty}
+  .ttgate{text-align:center;color:var(--muted);font-size:14px;padding:12px 16px;border-radius:var(--r-chip);background:color-mix(in srgb,var(--text) 5%,transparent)}
+  .ttgate a{text-decoration:underline;text-underline-offset:3px;display:inline-block;padding:10px 4px}
 
   @media (pointer:coarse){
     td input.cell{font-size:16px;min-height:48px}
@@ -114,8 +114,8 @@
     <button type="button" class="ui-btn ui-btn--ghost" id="delRow" aria-label="Lescht Stonn ewechhuelen">− Stonn</button>
   </div>
   <div class="save" id="saveMsg" role="status" aria-live="polite"></div>
-  <div class="hint" id="hint">Tipp op eng Zell fir d'Fach anzeginn (z.B. „Mathe · B12"). Ännerungen späichere sech automatesch.</div>
-  <div class="gate" id="gate" style="display:none"></div>
+  <div class="tthint" id="hint">Tipp op eng Zell fir d'Fach anzeginn (z.B. „Mathe · B12"). Ännerungen späichere sech automatesch.</div>
+  <div class="ttgate" id="gate" style="display:none"></div>
 </main>
 
 <script src="pixelbreak-config.js"></script>
