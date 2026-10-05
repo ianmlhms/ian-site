@@ -14,15 +14,15 @@ canvas{display:block;width:100vw;height:100vh}
 #hud .l{font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:1px}
 #hud .v.st{color:#ffcc66}
 #hud .v.lv{color:#ff8888;letter-spacing:2px}
-#mm{position:absolute;top:10px;left:12px;z-index:11;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:17px;width:36px;height:36px;border-radius:10px;cursor:pointer}
-#mute{position:absolute;top:10px;right:12px;z-index:11;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:17px;width:36px;height:36px;border-radius:10px;cursor:pointer}
+#mm{position:absolute;top:10px;left:12px;z-index:11;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:17px;width:44px;height:44px;border-radius:10px;cursor:pointer}
+#mute{position:absolute;top:10px;right:12px;z-index:11;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:17px;width:44px;height:44px;border-radius:10px;cursor:pointer}
 #pop{position:absolute;top:38%;left:0;right:0;text-align:center;font-size:min(5vw,30px);font-weight:bold;z-index:12;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,.5);transition:opacity .2s}
 #flash{position:absolute;inset:0;background:#ff5050;opacity:0;z-index:9;pointer-events:none}
 #ov{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;background:rgba(8,14,26,.82);z-index:20;color:#fff;text-align:center;padding:16px;overflow-y:auto}
 #ov h1{font-size:min(10vw,40px);color:#66ccff;margin-bottom:8px}
 #ov .sub{font-size:15px;opacity:.85;margin-bottom:16px;line-height:1.55}
 #modes{display:flex;gap:8px;justify-content:center;margin-bottom:12px}
-#modes .mode{padding:9px 20px;font-size:14px;font-weight:bold;border-radius:24px;cursor:pointer;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff}
+#modes .mode{min-height:44px;padding:9px 20px;font-size:14px;font-weight:bold;border-radius:24px;cursor:pointer;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff}
 #modes .mode.on{background:#9be89b;color:#0e1a2a;border-color:transparent}
 #envs{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
 #envs button,#ov button.big{padding:13px 24px;font-size:16px;border:none;border-radius:10px;cursor:pointer;font-weight:bold;color:#0e1a2a}
@@ -35,11 +35,17 @@ canvas{display:block;width:100vw;height:100vh}
 #lvls button.done{background:rgba(102,204,255,.28);border-color:#66ccff}
 #lvls button:disabled{opacity:.3;cursor:default}
 .hidden{display:none!important}
+button{touch-action:manipulation}
+#ov button:focus-visible,#mm:focus-visible,#mute:focus-visible{outline:3px solid #fff;outline-offset:2px}
+/* standalone: the shared top bar covers the top 57px, so keep the HUD and its buttons below it and let the canvas fill the whole screen */
+.arcade-bar ~ canvas{position:fixed;top:0;left:0}
+.arcade-bar ~ #hud{top:69px}
+.arcade-bar ~ #mm,.arcade-bar ~ #mute{top:67px}
 </style>
 <script src="/pb/arcade-kit.js?v=6" data-arcade-id="chill-drive" data-arcade-title="3D Cruiser"></script>
 </head>
 <body>
-<canvas id="c"></canvas>
+<canvas id="c" role="img" aria-label="3D Cruiser game view"></canvas>
 <div id="hud">
 <div><div class="v" id="spd">0</div><div class="l">km/h</div></div>
 <div><div class="v" id="dist">0</div><div class="l">meters</div></div>
@@ -48,22 +54,22 @@ canvas{display:block;width:100vw;height:100vh}
 <div><div class="v" id="prog">—</div><div class="l" id="progl">mode</div></div>
 </div>
 <div id="pop"></div><div id="flash"></div>
-<button id="mute" class="hidden">🔊</button>
-<button id="mm" class="hidden" title="Menu">☰</button>
-<div id="ov">
+<button id="mute" class="hidden" type="button" aria-label="Mute">🔊</button>
+<button id="mm" class="hidden" type="button" title="Menu" aria-label="Menu">☰</button>
+<div id="ov" role="dialog" aria-modal="true" aria-labelledby="ovh">
 <h1 id="ovh">🛣️ 3D Cruiser</h1>
 <div class="sub" id="ovp">Cruise, overtake, survive — 5 crashes end your run.<br>Close overtakes earn style points. ↑↓ speed · ←→ steer</div>
 <div id="modes">
-<button id="mTraffic" class="mode on">🚗 TRAFFIC</button>
-<button id="mZen" class="mode">🧘 ZEN — no traffic</button>
+<button id="mTraffic" class="mode on" type="button" aria-pressed="true"><span aria-hidden="true">🚗</span> TRAFFIC</button>
+<button id="mZen" class="mode" type="button" aria-pressed="false"><span aria-hidden="true">🧘</span> ZEN — no traffic</button>
 </div>
 <div id="envs">
-<button id="e0">🌄 MEADOWS</button>
-<button id="e1">🏜️ DESERT SUNSET</button>
-<button id="e2">🌃 NEON NIGHT</button>
+<button id="e0" type="button"><span aria-hidden="true">🌄</span> MEADOWS</button>
+<button id="e1" type="button"><span aria-hidden="true">🏜️</span> DESERT SUNSET</button>
+<button id="e2" type="button"><span aria-hidden="true">🌃</span> NEON NIGHT</button>
 </div>
-<button class="big" id="go" style="display:none">DRIVE AGAIN</button>
-<button class="big" id="goMenu" style="margin-top:10px;background:rgba(255,255,255,.18);color:#fff">🏠 MAIN MENU</button>
+<button class="big" id="go" type="button" style="display:none">DRIVE AGAIN</button>
+<button class="big" id="goMenu" type="button" style="margin-top:10px;background:rgba(255,255,255,.18);color:#fff"><span aria-hidden="true">🏠</span> MAIN MENU</button>
 <div id="lvlt">— or race 20 levels (reach the finish, max 5 crashes) —</div>
 <div id="lvls"></div>
 </div>
@@ -253,7 +259,7 @@ const sfx={
   win:()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>blip(f,0.22,0.14,'triangle'),i*110));},
   lose:()=>{[392,330,262,196].forEach((f,i)=>setTimeout(()=>blip(f,0.3,0.14,'triangle'),i*140));},
 };
-$('mute').onclick=()=>{muted=!muted;$('mute').textContent=muted?'🔇':'🔊';if(engG)engG.gain.value=0;if(padG)padG.gain.value=muted?0:0.05;};
+$('mute').onclick=()=>{muted=!muted;$('mute').textContent=muted?'🔇':'🔊';$('mute').setAttribute('aria-label',muted?'Unmute':'Mute');if(engG)engG.gain.value=0;if(padG)padG.gain.value=muted?0:0.05;};
 
 /* ---------- three.js scene ---------- */
 const C=$('c');
@@ -540,7 +546,7 @@ function menu(){
   const u=unlocked(), box=$('lvls');
   let html='';
   for(let i=1;i<=N_LEVELS;i++)
-    html+=`<button data-l="${i}" ${i>u?'disabled':''} class="${i<u?'done':''}">${i}</button>`;
+    html+=`<button type="button" data-l="${i}" aria-label="Level ${i}" ${i>u?'disabled':''} class="${i<u?'done':''}">${i}</button>`;
   box.innerHTML=html;
 }
 function endRun(won){
@@ -576,6 +582,8 @@ let zenSel=false;
 function paintZen(){
   $('mTraffic').classList.toggle('on',!zenSel);
   $('mZen').classList.toggle('on',zenSel);
+  $('mTraffic').setAttribute('aria-pressed',String(!zenSel));
+  $('mZen').setAttribute('aria-pressed',String(zenSel));
 }
 $('mTraffic').onclick=()=>{zenSel=false;paintZen();};
 $('mZen').onclick=()=>{zenSel=true;paintZen();};
@@ -595,7 +603,9 @@ document.addEventListener('keydown',(e)=>{
   if(KEY[e.key])keys[KEY[e.key]]=true;
   if((e.key===' '||e.key==='Enter')&&state!=='play'&&state!=='menu')$('go').click();
   if(e.key==='Escape'&&state==='play'){menu();return;}
-  if(e.key!=='Escape')e.preventDefault();
+  // menus stay operable by keyboard: Tab, and Enter/Space on a focused button
+  const native=state!=='play'&&(e.key==='Tab'||(state==='menu'&&(e.key==='Enter'||e.key===' ')));
+  if(e.key!=='Escape'&&!native)e.preventDefault();
 });
 document.addEventListener('keyup',(e)=>{if(KEY[e.key])keys[KEY[e.key]]=false;});
 
