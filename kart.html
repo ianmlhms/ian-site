@@ -23,7 +23,7 @@ Object.assign(window.I18N_DICT, {
   "kart.avgHr":   { lb: "Ø Puls", de: "Ø Puls", en: "avg HR" },
   "kart.avgLap":  { lb: "Duerchschnëttsronn", de: "Durchschnittsrunde", en: "Average lap" },
   "kart.consistency": { lb: "Konstanz", de: "Konstanz", en: "Consistency" },
-  "kart.topSpeed":{ lb: "Héchstgeschwindegkeet", de: "Höchstgeschwindigkeit", en: "Top speed" },
+  "kart.topSpeed":{ lb: "Héchsttempo", de: "Höchsttempo", en: "Top speed" },
   "kart.maxHr":   { lb: "Max. Puls", de: "Max. Puls", en: "Max HR" },
   "kart.racingLine": { lb: "Rennlinn", de: "Ideallinie", en: "Racing line" },
   "kart.lapTimes":{ lb: "Ronnenzäiten", de: "Rundenzeiten", en: "Lap times" },
@@ -44,7 +44,7 @@ Object.assign(window.I18N_DICT, {
   *{box-sizing:border-box}
   body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   .ui{--best:#5ad88a;--hr:#ff6b9d;--map-slow:#3a4a6a;--map-fast:#4de8ff;--map-edge:#2a2a4a}
-  html[data-theme="light"] .ui{--best:#157a42;--hr:#c2255c;--map-slow:#a9b4d0;--map-fast:#0b66a8;--map-edge:#e3e6f4}
+  html[data-theme="light"] .ui{--best:#157a42;--hr:#c2255c;--map-slow:#8f9cc0;--map-fast:#0b66a8;--map-edge:#e3e6f4}
   a{color:var(--accent-text,var(--accent));text-decoration:none}
   a,button{touch-action:manipulation}
   a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px;border-radius:6px}
@@ -77,13 +77,13 @@ Object.assign(window.I18N_DICT, {
   .pill{display:inline-block;padding:2px 10px;border-radius:999px;font:700 12px/1.6 var(--font-display);color:var(--text);background:color-mix(in srgb,var(--hr) 15%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--hr) 30%,transparent)}
   .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
   .kpi{--h:var(--accent);padding:14px 16px 15px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35)}
-  .kpi .l{color:var(--muted);font-size:12.5px;line-height:1.3;overflow-wrap:anywhere}
+  .kpi .l{color:var(--muted);font-size:12.5px;line-height:1.3;hyphens:auto}
   .kpi .v{margin-top:6px;font:800 clamp(21px,3.4vw,27px)/1.1 var(--font-display);letter-spacing:-.025em;font-variant-numeric:tabular-nums;color:var(--c,var(--text));overflow-wrap:anywhere}
   .kpi.is-best{background:linear-gradient(135deg,color-mix(in srgb,var(--best) 18%,var(--card-opaque)),color-mix(in srgb,var(--best) 6%,var(--card-opaque)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--best) 34%,transparent)}
   h2.sec{margin:0 0 14px;font:800 18px/1.2 var(--font-display);letter-spacing:-.02em;text-transform:none;color:var(--text)}
   #map{width:100%;height:clamp(260px,52vw,380px);border-radius:var(--r-chip);display:block;background:color-mix(in srgb,var(--text) 4%,var(--card-opaque));box-shadow:inset 0 0 0 1px var(--tile-edge)}
   .maplegend{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:12.5px;margin-top:12px}
-  .maplegend .bar{width:110px;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--map-slow),var(--map-fast))}
+  .maplegend .grad{width:110px;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--map-slow),var(--map-fast))}
   .laps{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:10px}
   .lap{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:baseline;gap:2px 10px;padding:11px 14px 14px;border-radius:var(--r-chip);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--tile-edge);overflow:hidden}
   .lap .n{color:var(--muted);font-size:12px;font-weight:700;min-width:26px}
@@ -94,7 +94,7 @@ Object.assign(window.I18N_DICT, {
   .lap.best .t,.lap.best .d{color:var(--best)}
   .lap.best .pace{background:var(--best)}
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .empty{margin:0;padding:18px 8px;text-align:center;color:var(--muted)}
+  .no-laps{margin:0;padding:18px 8px;text-align:center;color:var(--muted)}
   footer{margin-top:10px;color:var(--muted);font-size:12.5px;text-align:center}
   @media(max-width:640px){
     html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
@@ -132,7 +132,11 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const T = (k) => (window.I18N ? window.I18N.t(k) : k);
 const LOCALES = { lb:"lb-LU", de:"de-DE", en:"en-GB" };
-const locale = () => LOCALES[window.I18N && window.I18N.lang] || undefined;
+const locale = () => {
+  const l = LOCALES[window.I18N && window.I18N.lang];
+  if (!l) return undefined;
+  return Intl.DateTimeFormat.supportedLocalesOf(l).length ? l : "de-LU";
+};
 
 // ---- formatting ----
 function fmtLap(s){
@@ -233,11 +237,11 @@ function renderSession(){
     <section class="ui-card rise" style="--i:7">
       <h2 class="sec">${esc(T("kart.racingLine"))}</h2>
       <canvas id="map" role="img" aria-label="${esc(T("kart.mapAria"))}"></canvas>
-      <div class="maplegend" aria-hidden="true"><span>${esc(T("kart.slow"))}</span><span class="bar"></span><span>${esc(T("kart.fast"))}</span></div>
+      <div class="maplegend" aria-hidden="true"><span>${esc(T("kart.slow"))}</span><span class="grad"></span><span>${esc(T("kart.fast"))}</span></div>
     </section>
     <section class="ui-card rise" style="--i:8">
       <h2 class="sec">${esc(T("kart.lapTimes"))}</h2>
-      ${lapHtml ? `<div class="laps" role="list">${lapHtml}</div>` : `<p class="empty">${esc(T("kart.noLaps"))}</p>`}
+      ${lapHtml ? `<div class="laps" role="list">${lapHtml}</div>` : `<p class="no-laps">${esc(T("kart.noLaps"))}</p>`}
     </section>
     <footer>${esc(T("kart.recorded"))} <b>KartTracker</b> · <a href="index.html">ian.lu</a></footer>`;
 
@@ -262,7 +266,7 @@ async function boot(){
     data = await r.json();
     if(!data){ setState("🔍", `<p>${esc(T("kart.notFound"))}</p>`); return; }
   }catch(e){
-    setState("⚠️", `<p>${esc(T("kart.loadErr"))} (${esc(String(e))})</p><button class="ui-btn ui-btn--ghost" type="button" id="retry">${esc(T("kart.retry"))}</button>`, true);
+    setState("⚠️", `<p>${esc(T("kart.loadErr"))} (${esc(e && e.message || String(e))})</p><button class="ui-btn ui-btn--ghost" type="button" id="retry">${esc(T("kart.retry"))}</button>`, true);
     $("retry").onclick = () => { setState("🏎️", `<p>${esc(T("common.loading"))}</p>`); boot(); };
     return;
   }
