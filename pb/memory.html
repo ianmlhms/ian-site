@@ -36,7 +36,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <div id="board" role="grid" aria-label="Memory cards"></div>
+  <div id="board" role="group" aria-label="Memory cards"></div>
   <div class="arcade-hud">
     <span class="arcade-pill">Moves <b id="moves">0</b></span>
     <span class="arcade-pill">Pairs <b id="pairs">0</b>/<b id="total">8</b></span>
@@ -142,7 +142,7 @@ function buildBoard(){
   board.style.setProperty('--ratio',(cols*CARD_ASPECT/rows).toFixed(4));
   board.replaceChildren(...cards.map((emoji,i)=>{
     const b=document.createElement('button');
-    b.type='button';b.className='card';b.dataset.i=i;b.setAttribute('aria-label','Card '+(i+1));
+    b.type='button';b.className='card';b.dataset.i=i;b.setAttribute('aria-label','Card '+(i+1)+', face down');
     const back=document.createElement('span');back.className='face back';
     const front=document.createElement('span');front.className='face front';front.textContent=emoji;
     b.append(back,front);
@@ -159,20 +159,24 @@ function startGame(){
   buildBoard();updateHud();startTimer();
 }
 function cardEl(i){return $('board').children[i]}
+function labelCard(i){
+  const el=cardEl(i),n='Card '+(i+1);
+  el.setAttribute('aria-label',matched.has(i)?n+', '+cards[i]+', matched':el.classList.contains('flipped')?n+', '+cards[i]:n+', face down');
+}
 function flip(i){
   if(state!=='playing'||locked||flipped.includes(i)||matched.has(i))return;
-  flipped.push(i);cardEl(i).classList.add('flipped');
+  flipped.push(i);cardEl(i).classList.add('flipped');labelCard(i);
   if(flipped.length<2)return;
   moves++;$('moves').textContent=moves;locked=true;
   setTimeout(()=>{
     const [a,b]=flipped;
     if(cards[a]===cards[b]){
       matched.add(a);matched.add(b);pairs++;
-      [a,b].forEach(k=>{cardEl(k).classList.remove('flipped');cardEl(k).classList.add('matched')});
+      [a,b].forEach(k=>{cardEl(k).classList.remove('flipped');cardEl(k).classList.add('matched');labelCard(k)});
       $('pairs').textContent=pairs;
       if(pairs===total){finish();return}
     }else{
-      [a,b].forEach(k=>cardEl(k).classList.remove('flipped'));
+      [a,b].forEach(k=>{cardEl(k).classList.remove('flipped');labelCard(k)});
     }
     flipped=[];locked=false;
   },MISMATCH_DELAY_MS);

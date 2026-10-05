@@ -206,7 +206,7 @@ function buildBusinessCards(){
     const card=createElement("article","business");
     card.dataset.id=business.id;
     const head=createElement("div","business-head");
-    head.append(createElement("div","icon",business.icon));
+    const icon=createElement("div","icon",business.icon);icon.setAttribute("aria-hidden","true");head.append(icon);
     const title=createElement("div","business-title");
     title.append(createElement("h2","",business.name),createElement("p","business-meta"));
     const owned=createElement("div","owned");
@@ -332,9 +332,9 @@ function refreshBusiness(business,now){
   refs.payout.textContent=`Payout: $${format(payout)}`;
   refs.cycle.textContent=`Cycle: ${format(duration/MILLISECONDS_PER_SECOND)}s`;
   refs.run.textContent=hasManager?"Automated":isRunning?"Running…":"Run cycle";
-  refs.run.disabled=owned<=0||hasManager||isRunning;
+  refs.run.disabled=owned<=0||hasManager||isRunning;refs.run.setAttribute("aria-label",`${refs.run.textContent}: ${business.name}`);
   refs.buy.textContent=`Buy 1 · $${format(cost)}`;
-  refs.buy.disabled=state.cash<cost||owned>=MAX_OWNED;
+  refs.buy.disabled=state.cash<cost||owned>=MAX_OWNED;refs.buy.setAttribute("aria-label",`${refs.buy.textContent}: ${business.name}`);
   refs.manager.textContent=hasManager?`✓ ${business.manager} is managing`:`Hire ${business.manager} · $${format(business.managerCost)}`;
   refs.manager.disabled=hasManager||owned<=0||state.cash<business.managerCost;
   refs.manager.classList.toggle("hired",hasManager);
@@ -366,7 +366,9 @@ function openPrestige(){
   const confirm=document.getElementById("prestige-confirm");
   confirm.disabled=claimable===0;
   confirm.textContent=claimable>0?`Reset for ${format(claimable)}`:"Nothing to claim";
+  prestigeOpener=document.activeElement;
   document.getElementById("prestige-modal").classList.add("show");
+  document.getElementById(claimable>0?"prestige-confirm":"prestige-cancel").focus();
 }
 
 function nextInvestorTarget(){
@@ -374,7 +376,15 @@ function nextInvestorTarget(){
   return nextTotal*nextTotal*PRESTIGE_EARNINGS_UNIT;
 }
 
-function closePrestige(){document.getElementById("prestige-modal").classList.remove("show")}
+let prestigeOpener=null;
+function closePrestige(){
+  document.getElementById("prestige-modal").classList.remove("show");
+  if(prestigeOpener&&prestigeOpener.focus)prestigeOpener.focus();
+  prestigeOpener=null;
+}
+document.addEventListener("keydown",(event)=>{
+  if(event.key==="Escape"&&document.getElementById("prestige-modal").classList.contains("show"))closePrestige();
+});
 
 function confirmPrestige(){
   const claimable=getClaimableInvestors();

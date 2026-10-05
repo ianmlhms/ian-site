@@ -157,13 +157,13 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
 </head>
 <body>
 <main id="shell">
-  <canvas id="parkCanvas" aria-label="Your 3D theme park. Drag to pan, pinch or scroll to zoom. Tap a tile to build or inspect."></canvas>
+  <canvas id="parkCanvas" role="img" aria-label="Your 3D theme park. Drag to pan, pinch or scroll to zoom. Tap a tile to build or inspect."></canvas>
   <header id="top">
     <div class="brand-row">
       <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><div><div class="eyebrow">PIXELBREAK PARKS</div><h1>Theme Park Tycoon</h1></div></div>
       <div class="top-actions"><button data-action="home" aria-label="Center camera on built park">Center</button><button data-panel="help">Help</button></div>
     </div>
-    <div id="hud" class="glass" aria-label="Park statistics">
+    <div id="hud" class="glass" role="group" aria-label="Park statistics">
       <div class="stat"><b id="cash">$5,000</b><span>Cash</span></div>
       <div class="stat"><b id="rating">—</b><span>Rating</span></div>
       <div class="stat"><b id="guests">0</b><span>Guests</span></div>
@@ -180,14 +180,14 @@ input[type="number"] { width: 100%; min-height: 44px; padding: 9px 12px; border:
     <strong id="toolName"></strong><p id="placementReason" role="status"></p>
     <div class="button-row"><button id="rotateButton" data-action="rotate">Rotate 0°</button><button id="confirmButton" class="primary" data-action="confirm" disabled>Build here</button><button data-action="cancel">Done</button></div>
   </section>
-  <div id="walkControls" aria-label="Walk-through controls" hidden>
+  <div id="walkControls" role="group" aria-label="Walk-through controls" hidden>
     <div id="walkHint"><span class="desktop-only">WASD or arrows to move · drag to look · Esc to exit</span><span class="touch-only">Move with the stick · drag elsewhere to look</span></div>
     <div id="walkPad" role="group" aria-label="Move" data-arcade-touch-controls><span id="walkKnob" aria-hidden="true"></span></div>
   </div>
   <aside id="panel" class="glass" aria-labelledby="panelTitle" hidden>
     <div class="panel-heading"><h2 id="panelTitle">Build your park</h2><button data-action="close" aria-label="Close panel">✕</button></div>
     <div class="panel-body">
-      <section data-section="build" hidden><div id="categories" aria-label="Build categories"></div><div id="catalog"></div><small id="unlockHint"></small></section>
+      <section data-section="build" hidden><div id="categories" role="group" aria-label="Build categories"></div><div id="catalog"></div><small id="unlockHint"></small></section>
       <section data-section="manage" hidden>
         <p id="parkHealth" class="note"></p><h3>Admission</h3><div id="ticketControl"></div>
         <h3>Your team</h3><div id="staffControls"></div>
