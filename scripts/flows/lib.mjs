@@ -175,6 +175,23 @@ export async function mockSupabase(context, backend) {
   });
 }
 
+/* realtime-js (vsn 2.0.0) sends JSON broadcasts as a binary "user broadcast push":
+ * [kind=3, joinRefLen, refLen, topicLen, eventLen, metaLen, encoding] + strings + payload. */
+function decodeBinaryPush(buffer) {
+  const bytes = Buffer.from(buffer);
+  if (bytes[0] !== 3) return null;
+  const [joinRefLen, refLen, topicLen, eventLen, metaLen] = [bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]];
+  let at = 7;
+  const take = (len) => { const text = bytes.subarray(at, at + len).toString("utf8"); at += len; return text; };
+  const joinRef = take(joinRefLen) || null;
+  const ref = take(refLen) || null;
+  const topic = take(topicLen);
+  const event = take(eventLen);
+  take(metaLen);
+  const payload = bytes[6] === 1 ? JSON.parse(bytes.subarray(at).toString("utf8")) : null;
+  return [joinRef, ref, topic, "broadcast", { type: "broadcast", event, payload }];
+}
+
 /* ---------- mocked Supabase Realtime (Phoenix protocol v2) ----------
  * options.presence(topic, state) → { key: meta } of OTHER people present on that channel
  * options.onBroadcast({ topic, event, payload, state, send }) → react to a client broadcast;
@@ -192,9 +209,8 @@ export async function mockRealtime(context, options = {}) {
       emit(state.joinRef, null, topic, "presence_state", all);
     };
     ws.onMessage((message) => {
-      if (typeof message !== "string") return;
       let frame;
-      try { frame = JSON.parse(message); } catch { return; }
+      try { frame = typeof message === "string" ? JSON.parse(message) : decodeBinaryPush(message); } catch { return; }
       if (!Array.isArray(frame)) return;
       const [joinRef, ref, topic, event, payload] = frame;
       const reply = (response = {}) => ref && emit(joinRef, ref, topic, "phx_reply", { status: "ok", response });
@@ -240,7 +256,12 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
     hasTouch: !!flow.touch, isMobile: !!flow.touch,
     recordVideo: { dir: tmpVideos, size: VIEWPORT },
   });
-  const backend = createBackend(flow.backend || {});
+  const base = flow.backend || {};
+  const backend = createBackend({
+    rpc: { has_pin: () => true, is_view_restricted: () => false, ...base.rpc },
+    tables: { profiles: profilesTable, ...base.tables },
+    functions: { "auth-pin": () => ({ hasPin: true, isLegacy: false }), ...base.functions },
+  });
   await mockSupabase(context, backend);
   await mockRealtime(context, flow.realtime || {});
   const page = await context.newPage();

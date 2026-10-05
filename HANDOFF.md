@@ -64,6 +64,20 @@ overflow, and the `check_overlap` probes (offscreen, collision, clipped, contras
 - Page dialogs (`prompt()` in `color.html`) are auto-cancelled — an open dialog would hang the page.
 - `check_overlap.mjs` (390/1280px, root pages only) still exists for phone/desktop widths.
 
+### Flow tests + videos: `node scripts/flows/run_all.mjs` (next to `site_test`)
+Plain-Playwright user flows at iPad 820×1180 against a local server with **all Supabase mocked**
+(REST `/rest/v1`, auth, `/functions/v1`, and the Realtime WebSocket incl. a fake second player) — never a real
+account. Flows: `messenger-new-group` (name search «emm» → pick 2 → create), `messenger-add-member` (＋ button on an
+existing group; members are hidden from suggestions), `friends-add` («emm» → tap → request), `slf-round`
+(Stadt-Land-Fluss: a single-letter answer scores 0, shared word 5, unique 10), `arcade-pad` (Solitaire has no D-pad;
+Snake shows it on touch and hides it after a key press, remembered across reloads). Each asserts its result and records
+`<flow>.webm` (to `$FLOW_VIDEO_DIR`, default the overnight `videos/` folder, else a temp dir). `run_all.mjs foo` runs
+flows whose name contains `foo`; `FLOW_SHOTS_DIR=/tmp/x` also saves step screenshots; each flow also runs alone
+(`node scripts/flows/slf_round.mjs`). Playwright isn't a repo dependency — it's found via `$PLAYWRIGHT_DIR`, a normal
+`playwright` import, or the global playwright-cli install; shared mock code is `scripts/flows/lib.mjs`
+(`createBackend` handlers per rpc/table, `mockRealtime` presence/broadcast hooks). Add a flow = new file exporting
+`flow` + one line in `run_all.mjs`.
+
 ### Shared look: `site-ui.css`
 The home-page design (tokens, header, title, card, tile, button, input) lives in `site-ui.css`; usage note at the top of the file. Opt in with `class="ui"` on `<body>` + `ui-*` classes. Only `index.html` uses it so far; other pages get it page by page. Bump `?v=` when it changes.
 
