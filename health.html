@@ -31,14 +31,15 @@
   .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
 
   /* ---- gate (loading / sign-in / empty / error) ---- */
-  .gate{text-align:center;padding:clamp(26px,5vw,44px) 22px;color:var(--muted)}
-  .gate .gate-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
-  .gate p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text);text-wrap:balance}
-  .gate .gate-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
+  .gate,.state{text-align:center;color:var(--muted)}
+  .gate{padding:clamp(26px,5vw,44px) 22px}
+  .gate .gate-ico,.state .gate-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .gate p,.state p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text);text-wrap:balance}
+  .gate .gate-sub,.state .gate-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
   .gate .ui-btn{margin-top:18px}
-  .gate.slim{padding:22px 10px}
-  .gate.slim .gate-ico{width:52px;height:52px;margin-bottom:10px;border-radius:var(--r-chip);font-size:27px}
-  .gate.slim p{font-size:16px}
+  .state{padding:22px 10px}
+  .state .gate-ico{width:52px;height:52px;margin-bottom:10px;border-radius:var(--r-chip);font-size:27px}
+  .state p{font-size:16px}
 
   /* ---- section titles ---- */
   h2.sec{display:flex;align-items:center;gap:10px;margin:10px 2px 0;font:800 clamp(19px,2.8vw,23px)/1.15 var(--font-display);letter-spacing:-.025em;text-transform:none;color:var(--text)}
@@ -58,20 +59,20 @@
   .stepper button:active{transform:scale(.92)}
 
   /* ---- forms ---- */
-  .field{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .field + .field{margin-top:10px}
-  .field .ui-input{flex:1 1 120px;width:auto;min-width:0}
-  .field .ui-btn{flex:0 0 auto}
+  .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .frow + .frow{margin-top:10px}
+  .frow .ui-input{flex:1 1 120px;width:auto;min-width:0}
+  .frow .ui-btn{flex:0 0 auto}
   select.ui-input{appearance:none;-webkit-appearance:none;padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238a8fa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 15px center}
   .ui-btn:disabled{opacity:.55;cursor:default;transform:none}
   .msg{min-height:18px;margin-top:8px;color:var(--accent-text);font-weight:700;font-size:13px}
   .msg:empty{min-height:0;margin-top:0}
-  .hint{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
-  .hint b{color:var(--text)}
+  .htxt{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+  .htxt b{color:var(--text)}
 
   /* ---- workouts ---- */
   .wlist{padding:8px clamp(14px,3vw,22px)}
-  .wlist .gate{padding-left:0;padding-right:0}
+  .wlist .state{padding-left:0;padding-right:0}
   .wk{--h:var(--accent);display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--tile-edge)}
   .wk:last-child{border-bottom:0}
   .wk .ic{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:var(--r-chip);font-size:23px;line-height:1;background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
@@ -106,7 +107,7 @@
     .metric{padding:14px 4px 12px}
     .metric .m-ico{width:38px;height:38px;font-size:20px}
     .wk .r{font-size:12.5px;max-width:34%}
-    .field .ui-btn{flex:1 1 100%}
+    .frow .ui-btn{flex:1 1 100%}
   }
   @media(max-width:360px){.day{grid-template-columns:1fr}.metric{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px 12px;text-align:left}}
   @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.stepper button,.del,details.how summary::after,body.ui .ui-header .home{transition:none}}
@@ -157,7 +158,7 @@ async function boot(){
         <div class="metric sleep"><span class="m-ico" aria-hidden="true">😴</span><b id="mSleep">–</b><span class="lbl">Schlof (Stonnen)</span></div>
         <div class="metric weight"><span class="m-ico" aria-hidden="true">⚖️</span><b id="mWeight">–</b><span class="lbl">Gewiicht (kg)</span></div>
       </div>
-      <div class="field" style="margin-top:16px">
+      <div class="frow" style="margin-top:16px">
         <input class="ui-input" id="iSleep" type="number" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Schlof (h)" aria-label="Schlof (Stonnen)">
         <input class="ui-input" id="iWeight" type="number" step="0.1" min="0" max="300" inputmode="decimal" placeholder="Gewiicht (kg)" aria-label="Gewiicht (kg)">
         <button class="ui-btn ui-btn--primary" id="saveDay" type="button">Späicheren</button>
@@ -167,12 +168,12 @@ async function boot(){
 
     <h2 class="sec"><span class="sec-ico" aria-hidden="true">🏃</span>Training bäisetzen</h2>
     <section class="ui-card">
-      <div class="field">
+      <div class="frow">
         <select class="ui-input" id="wType" aria-label="Zort Training">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
         <input class="ui-input" id="wDur" type="number" min="1" inputmode="numeric" placeholder="Minutten" aria-label="Dauer (Minutten)">
         <input class="ui-input" id="wDist" type="number" step="0.1" min="0" inputmode="decimal" placeholder="km (optional)" aria-label="Distanz (km, optional)">
       </div>
-      <div class="field">
+      <div class="frow">
         <input class="ui-input" id="wNote" placeholder="Notiz (optional)" aria-label="Notiz (optional)" style="flex:2 1 180px">
         <button class="ui-btn ui-btn--primary" id="addW" type="button">Bäisetzen</button>
       </div>
@@ -180,15 +181,15 @@ async function boot(){
     </section>
 
     <h2 class="sec"><span class="sec-ico" aria-hidden="true">📋</span>Trainingen</h2>
-    <section class="ui-card wlist" id="wList"><div class="gate slim"><p>Lueden…</p></div></section>
+    <section class="ui-card wlist" id="wList"><div class="state"><p>Lueden…</p></div></section>
 
     <h2 class="sec"><span class="sec-ico" aria-hidden="true">⌚</span>Apple Watch / Health Sync</h2>
     <section class="ui-card">
       <div class="sync-head">
         <span class="m-ico" aria-hidden="true">⌚</span>
-        <p class="hint">Synchroniséier automatesch vun denger <b>Apple Watch</b> mat engem <b>Kuerzbefeel (Shortcut)</b> — kee Premium, keng App néideg. Dee leeft z.B. all Owend an schéckt Schrëtt, Schlof, Gewiicht an Trainingen op ian.lu.</p>
+        <p class="htxt">Synchroniséier automatesch vun denger <b>Apple Watch</b> mat engem <b>Kuerzbefeel (Shortcut)</b> — kee Premium, keng App néideg. Dee leeft z.B. all Owend an schéckt Schrëtt, Schlof, Gewiicht an Trainingen op ian.lu.</p>
       </div>
-      <div class="field tokrow">
+      <div class="frow tokrow">
         <input class="ui-input" id="tok" readonly aria-label="Token" placeholder="Token lueden…">
         <button class="ui-btn ui-btn--ghost" id="copyTok" type="button">Kopéieren</button>
       </div>
@@ -258,12 +259,12 @@ async function saveDay(){
 /* ---------------- workouts ---------------- */
 async function loadWorkouts(){
   const {data,error}=await sb.from("workouts").select("*").order("at",{ascending:false}).limit(60);
-  if(error){$("wList").innerHTML='<div class="gate slim"><div class="gate-ico" aria-hidden="true">⚠️</div><p>Feeler beim Lueden.</p></div>';return;}
+  if(error){$("wList").innerHTML='<div class="state"><div class="gate-ico" aria-hidden="true">⚠️</div><p>Feeler beim Lueden.</p></div>';return;}
   workouts=data||[];renderWorkouts();
 }
 function fmtDur(m){ if(m==null)return""; const h=Math.floor(m/60); return h?`${h}h ${m%60}m`:`${m}m`; }
 function renderWorkouts(){
-  if(!workouts.length){$("wList").innerHTML='<div class="gate slim"><div class="gate-ico" aria-hidden="true">🏃</div><p>Nach keng Trainingen.</p><div class="gate-sub">Setz uewen däin éischt Training bäi.</div></div>';return;}
+  if(!workouts.length){$("wList").innerHTML='<div class="state"><div class="gate-ico" aria-hidden="true">🏃</div><p>Nach keng Trainingen.</p><div class="gate-sub">Setz uewen däin éischt Training bäi.</div></div>';return;}
   $("wList").innerHTML=workouts.map(w=>{
     const ic=(TYPES[w.type]||"⭐ Aneres").split(" ")[0];
     const when=new Date(w.at).toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});
