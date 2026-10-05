@@ -21,10 +21,10 @@ canvas{cursor:crosshair}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Fruit Slicer arcade game"></canvas>
+  <canvas id="c" role="img" aria-label="Fruit Slicer arcade game"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="score">0</b></span>
-    <span class="arcade-pill lives">Lives <b id="lives">♥♥♥</b></span>
+    <span class="arcade-pill lives">Lives <b id="lives" role="img" aria-label="3 lives">♥♥♥</b></span>
   </div>
   <div class="arcade-overlay show" id="overlay" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
     <div class="arcade-panel">
@@ -135,7 +135,7 @@ let fruits=[],particles=[],score=0,lives=START_LIVES,state='ready',mouseTrail=[]
 
 function updateHud(){
   $('score').textContent=score;
-  $('lives').textContent=lives>0?'♥'.repeat(lives):'-';
+  $('lives').textContent=lives>0?'♥'.repeat(lives):'-';$('lives').setAttribute('aria-label',lives+(lives===1?' life':' lives'));
 }
 function resetWorld(){
   fruits=[];particles=[];mouseTrail=[];score=0;lives=START_LIVES;frame=0;

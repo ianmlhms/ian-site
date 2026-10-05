@@ -211,7 +211,7 @@ function updateAudio(){if(!audioContext||!engineOsc)return;engineOsc.frequency.v
 function setPlayUI(active){$('hud').classList.toggle('hidden',!active);$('restart').classList.toggle('hidden',!active);$('touch').classList.toggle('hidden',!active);}
 function refreshLevels(){
   levelsBox.replaceChildren();const done=doneLvls();
-  C.LEVELS.forEach((level,index)=>{const button=document.createElement('button');button.textContent=String(index+1);button.disabled=index>done;if(index<done)button.classList.add('done');button.title=level.name;button.addEventListener('click',()=>startLevel(index));levelsBox.appendChild(button);});
+  C.LEVELS.forEach((level,index)=>{const button=document.createElement('button');button.type='button';button.textContent=String(index+1);button.setAttribute('aria-label','Stage '+(index+1)+(index>done?' locked':''));button.disabled=index>done;if(index<done)button.classList.add('done');button.title=level.name;button.addEventListener('click',()=>startLevel(index));levelsBox.appendChild(button);});
 }
 function showMenu(){
   state='menu';setPlayUI(false);overlay.classList.remove('hidden');message.textContent='Balance the throttle, work the suspension, and survive sixteen short obstacle courses.\nWASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.';playButton.textContent='DRIVE';refreshLevels();

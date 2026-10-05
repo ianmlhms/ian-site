@@ -28,7 +28,7 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Fighting arena"></canvas>
+  <canvas id="c" role="img" aria-label="Fighting arena"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill p1"><i class="dot"></i><span id="n1">P1</span> <b id="s1">0</b></span>
     <button class="arcade-btn secondary hud-btn" id="hudMenu" type="button">Menu</button>
@@ -36,24 +36,24 @@ body{display:flex;flex-direction:column}
   </div>
   <div class="arcade-hint" id="hint"></div>
 
-  <div class="arcade-overlay show" id="menu"><div class="arcade-panel">
-    <h2>Platform Fighters</h2>
+  <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle"><div class="arcade-panel">
+    <h2 id="menuTitle">Platform Fighters</h2>
     <p>First to 5 round wins. Move with WASD or the arrows, attack with Space or F, special with G; on touch use the on-screen D-pad and A button.</p>
     <div class="arcade-actions menu-actions">
       <button class="arcade-btn" id="mAI" type="button">Play vs Computer</button>
       <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
       <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
-      <div class="join"><input id="mCode" maxlength="5" placeholder="room code" aria-label="Room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+      <div class="join"><input id="mCode" name="room-code" maxlength="5" placeholder="room code" aria-label="Room code" enterkeyhint="go" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
     </div>
     <p class="status" id="mStatus" role="status"></p>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>The game waits for you.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseTitle"><div class="arcade-panel">
+    <h2 id="pauseTitle">Paused</h2><p>The game waits for you.</p>
     <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="arcade-panel">
     <h2 id="overTitle">You win</h2>
     <span class="arcade-big" id="overBig">5 - 0</span>
     <p id="overNote"></p>
@@ -136,6 +136,7 @@ document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
 document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
 document.getElementById('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
   status('Room code: '+c.toUpperCase()+' — waiting for the other player…')};
+document.getElementById('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('mJoin').click()});
 document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();
   if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
   mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'…')};
