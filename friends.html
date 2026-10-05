@@ -13,68 +13,98 @@
 <script src="theme.js?v=25"></script>
 <script src="i18n-dict.js?v=42"></script>
 <script src="i18n.js?v=3"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:max(16px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) 16px max(22px,env(safe-area-inset-left));border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{max-width:680px;margin:0 auto;padding:22px 18px 80px}
-  #gate{text-align:center;color:var(--muted);padding:50px 20px}
-  .auth-go{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:12px 18px;font-weight:800;cursor:pointer;margin-top:12px}
-  .add{display:flex;gap:10px;margin-bottom:8px}
-  .add input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px 13px;font-size:14px}
-  .add button{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:0 18px;font-weight:800;cursor:pointer}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:26px 0 10px}
-  .tabs{display:flex;gap:4px;margin:16px 0 18px;border-bottom:1px solid var(--border);overflow-x:auto}
-  .tab{appearance:none;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:14px;font-weight:700;padding:9px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
-  .tab:hover{color:var(--text)}
-  .tab.active{color:var(--text);border-bottom-color:var(--accent-text)}
-  .tbadge{background:var(--accent);color:var(--accent-foreground);font-size:11px;font-weight:800;border-radius:999px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
-  .panel{display:none}
-  .panel.active{display:block}
-  .panel h2:first-child,.panel>div:first-child h2{margin-top:6px}
-  .row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 14px;margin-bottom:8px}
-  .row .name{font-weight:700;flex:1}
-  .row .name .av{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--card2);align-items:center;justify-content:center;margin-right:8px}
-  .admin-tag{display:inline-block;font-size:10px;font-weight:800;color:#ffcf4d;background:rgba(255,207,77,.14);border:1px solid rgba(255,207,77,.45);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
-  .class-tag{display:inline-block;font-size:10px;font-weight:800;color:#5cc8ff;background:rgba(92,200,255,.14);border:1px solid rgba(92,200,255,.45);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
-  .mini{border:1px solid var(--border);background:var(--card2);color:var(--text);border-radius:8px;padding:7px 11px;font-size:13px;font-weight:700;cursor:pointer}
-  .mini:hover{border-color:var(--accent2-text);color:var(--accent2-text)}
-  .mini.go{background:var(--accent);color:var(--accent-foreground);border-color:var(--accent-border)}
-  .mini.x{color:var(--muted)} .mini.x:hover{color:#ff6b6b;border-color:#ff6b6b}
-  .empty{color:var(--muted);font-size:13.5px;padding:6px 2px}
-  .msgline{font-size:12.5px;margin:4px 0 0;min-height:16px}
-  .msgline.err{color:#ff6b6b}.msgline.ok{color:#3fb950}
-  .act-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);font-size:13.5px}
-  .act-row:last-child{border-bottom:none}
-  .act-emoji{flex:none;font-size:16px}
-  .act-text{flex:1;color:var(--muted)}
-  .act-text b{color:var(--text);font-weight:700}
-  .act-time{flex:none;color:var(--muted);font-size:12px}
-  /* design-pass: a11y + touch */
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  button,a.mini,.tab{touch-action:manipulation}
-  a.mini{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:var(--text)}
-  .mini{min-width:var(--hit-target,2.75rem);min-height:var(--hit-target,2.75rem)}
-  .row{flex-wrap:wrap}
-  .row .name{min-width:0;overflow-wrap:anywhere}
-  /* a friend row has four actions: on a phone the name gets its own line instead of being squeezed to a few letters */
-  @media(max-width:640px){.row:has(> .mini ~ .mini ~ .mini){row-gap:8px}.row:has(> .mini ~ .mini ~ .mini) .name{flex:1 1 100%}}
-  .tab:focus-visible{outline:2px solid var(--focus-ring,var(--accent2-text));outline-offset:-2px;border-radius:6px}
-  .add input:focus-visible{outline:2px solid var(--focus-ring,var(--accent2-text));outline-offset:2px}
+  button,a.mini,.tab,a.home{touch-action:manipulation}
+
+  /* ---- header + column (site-ui look) ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  .header-right{flex-wrap:wrap;justify-content:flex-end}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+
+  /* ---- sign-in gate ---- */
+  #gate{text-align:center;padding:clamp(30px,6vw,52px) 22px;margin-top:10px}
+  #gate::before{content:"👥";display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
+  #gate h3{margin:0 0 6px;font:800 clamp(20px,3vw,24px)/1.2 var(--font-display);letter-spacing:-.02em}
+  #gate .ui-btn{margin-top:14px}
+
+  /* ---- add a friend ---- */
+  .add{display:flex;gap:10px}
+  .add .ui-input{flex:1;min-width:0}
+  .add .ui-btn{flex:none;padding-inline:22px}
+  .msgline{font-size:13px;margin:8px 4px 0;min-height:18px}
+  .msgline.err{color:#ff6b6b}.msgline.ok{color:#3fb950}
   html[data-theme="light"] .msgline.err{color:#c62828}
   html[data-theme="light"] .msgline.ok{color:#1a7f37}
-  .act-time{font-variant-numeric:tabular-nums}
-  .tbadge{font-variant-numeric:tabular-nums}
-  /* mobile: stop iOS focus-zoom + roomier touch targets */
+
+  /* ---- tabs: segmented control ---- */
+  .tabs{display:flex;gap:4px;margin:14px 0 20px;padding:5px;overflow-x:auto;border-radius:calc(var(--r-chip) + 5px);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge)}
+  .tab{appearance:none;flex:1 1 0;justify-content:center;min-height:44px;border:0;border-radius:var(--r-chip);background:none;color:var(--muted);font:750 15px var(--font-display);letter-spacing:-.01em;padding:8px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;transition:background-color .2s,color .2s,box-shadow .2s}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--text);background:var(--card-opaque);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 38%,transparent),0 6px 14px -8px rgb(var(--ink)/.4)}
+  .tab:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:-2px}
+  .tbadge{background:var(--accent);color:var(--accent-foreground);font-size:11px;font-weight:800;border-radius:999px;min-width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;font-variant-numeric:tabular-nums}
+  .panel{display:none;background:none;border:0;box-shadow:none;padding:0;margin:0;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .panel.active{display:block}
+  h2{margin:26px 4px 12px;font:800 17px var(--font-display);letter-spacing:-.02em;text-transform:none;color:var(--text)}
+  .panel h2:first-child,.panel>div:first-child h2{margin-top:4px}
+
+  /* ---- friend / request rows ---- */
+  .row{--h:var(--accent);display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;margin-bottom:10px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -20px rgb(var(--ink)/.35);transition:background-color .2s,box-shadow .3s var(--ease)}
+  .row:hover{background:var(--card-opaque);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 40%,transparent),0 14px 30px -20px rgb(var(--ink)/.45)}
+  #friends>.row:nth-child(5n+2){--h:#4fc37a}
+  #friends>.row:nth-child(5n+3){--h:#ff6b9d}
+  #friends>.row:nth-child(5n+4){--h:#ffb347}
+  #friends>.row:nth-child(5n+5){--h:#a371f7}
+  .row .name{flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:2px 0;font:750 16px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
+  .row .name .av{flex:none;display:inline-grid;place-items:center;width:44px;height:44px;margin-right:12px;border-radius:var(--r-chip);font-size:22px;background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .admin-tag,.class-tag{display:inline-block;font:800 10px var(--font-display);border-radius:8px;padding:2px 7px;margin-left:8px;vertical-align:middle;letter-spacing:.3px}
+  .admin-tag{color:#ffcf4d;background:rgba(255,207,77,.14);box-shadow:inset 0 0 0 1px rgba(255,207,77,.45)}
+  .class-tag{color:#5cc8ff;background:rgba(92,200,255,.14);box-shadow:inset 0 0 0 1px rgba(92,200,255,.45)}
+  html[data-theme="light"] .admin-tag{color:#7a5200;background:rgba(255,190,40,.2);box-shadow:inset 0 0 0 1px rgba(160,110,0,.4)}
+  html[data-theme="light"] .class-tag{color:#0a5f8c;background:rgba(10,120,180,.1);box-shadow:inset 0 0 0 1px rgba(10,120,180,.4)}
+  .mini{display:inline-flex;align-items:center;justify-content:center;min-width:var(--hit-target,2.75rem);min-height:var(--hit-target,2.75rem);padding:8px 14px;border:0;border-radius:var(--r-chip);background:var(--card2-opaque);color:var(--text);font:700 14px var(--font-display);text-decoration:none;cursor:pointer;box-shadow:inset 0 0 0 1px var(--border);transition:transform .25s var(--ease),filter .2s,background-color .2s,box-shadow .2s,color .2s}
+  .mini:hover{transform:translateY(-2px);box-shadow:inset 0 0 0 1px var(--accent-border,var(--accent))}
+  .mini:active{transform:scale(.97)}
+  .mini.go{background:var(--accent);color:var(--accent-foreground);box-shadow:0 8px 18px -10px color-mix(in srgb,var(--accent) 80%,transparent)}
+  .mini.go:hover{filter:brightness(1.07)}
+  .mini.x{color:var(--muted)}
+  .mini.x:hover{color:#ff6b6b;box-shadow:inset 0 0 0 1px #ff6b6b}
+  html[data-theme="light"] .mini.x:hover{color:#c62828;box-shadow:inset 0 0 0 1px #c62828}
+  .mini:focus-visible,.ui-input:focus-visible,.ui-btn:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+  /* a friend row has four actions: on a phone the name gets its own line */
+  @media(max-width:640px){.row:has(> .mini ~ .mini ~ .mini){row-gap:8px}.row:has(> .mini ~ .mini ~ .mini) .name{flex:1 1 100%}}
+
+  /* ---- empty states + activity ---- */
+  .empty{color:var(--muted);font-size:14.5px;line-height:1.45;text-align:center;padding:26px 18px;border-radius:var(--r-tile);box-shadow:inset 0 0 0 1px var(--tile-edge);background:color-mix(in srgb,var(--card) 60%,transparent)}
+  .empty::before{content:"🫶";display:block;font-size:32px;line-height:1;margin-bottom:8px}
+  #activity{padding:6px 16px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge)}
+  #activity:has(> .empty){padding:0;background:none;box-shadow:none}
+  .act-row{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--tile-edge);font-size:14px}
+  .act-row:last-child{border-bottom:none}
+  .act-emoji{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:12px;font-size:17px;background:color-mix(in srgb,var(--accent) 14%,var(--card-opaque))}
+  .act-text{flex:1;min-width:0;color:var(--muted);overflow-wrap:anywhere}
+  .act-text b{color:var(--text);font-weight:700}
+  .act-time{flex:none;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+
   @media(max-width:640px){
-    .add input{font-size:16px}
-    .tab{padding:11px 12px;font-size:14.5px}
-    .mini{padding:9px 13px;font-size:14px}
-    body{padding-bottom:env(safe-area-inset-bottom)}
+    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+    body.ui .ui-header h1.ui-brand{font-size:18px}
+    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
+    .tab{padding:8px 10px;font-size:14.5px}
+    .add .ui-btn{padding-inline:18px}
   }
+  @media(prefers-reduced-motion:reduce){.row,.mini,.tab{transition:none}.mini:hover,.mini:active{transform:none}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -83,29 +113,32 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
-  <h1 data-i18n="friends.h1">👥 Friends</h1>
-  <div class="spacer"></div>
-  <span id="langSw"></span>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+    <h1 class="ui-brand" data-i18n="friends.h1">👥 Friends</h1>
+  </div>
+  <div class="header-right">
+    <span id="langSw"></span>
+    <span id="acctHost"></span>
+  </div>
 </header>
 
-<div class="wrap">
-  <div id="gate" style="display:none">
+<main class="ui-page">
+  <div id="gate" class="ui-card" style="display:none">
     <h3 data-i18n="friends.gateTitle">Sign in to manage friends</h3>
-    <button class="auth-go" id="gateBtn" data-i18n="auth.signin">Sign in / Create account</button>
+    <button class="ui-btn ui-btn--primary" id="gateBtn" type="button" data-i18n="auth.signin">Sign in / Create account</button>
   </div>
 
   <div id="app" style="display:none">
-    <div class="add">
-      <input id="addInput" name="username" type="text" enterkeyhint="send" data-i18n-attr="placeholder:friends.addPlaceholder|aria-label:friends.addPlaceholder" placeholder="Add a friend by username" aria-label="Add a friend by username" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
-      <button id="addBtn" type="button" data-i18n="friends.add">Add</button>
+    <div class="add ui-card ui-card--accent">
+      <input class="ui-input" id="addInput" name="username" type="text" enterkeyhint="send" data-i18n-attr="placeholder:friends.addPlaceholder|aria-label:friends.addPlaceholder" placeholder="Add a friend by username" aria-label="Add a friend by username" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button class="ui-btn ui-btn--primary" id="addBtn" type="button" data-i18n="friends.add">Add</button>
     </div>
     <div class="msgline" id="addMsg" role="status" aria-live="polite"></div>
 
-    <nav class="tabs" id="tabs" role="tablist">
+    <nav class="tabs" id="tabs" role="tablist" data-i18n-attr="aria-label:friends.h1" aria-label="Friends">
       <button class="tab active" type="button" role="tab" id="tab-friends" aria-selected="true" aria-controls="panel-friends" data-tab="friends" data-i18n="friends.tab.friends">Friends</button>
       <button class="tab" type="button" role="tab" id="tab-requests" aria-selected="false" aria-controls="panel-requests" data-tab="requests"><span data-i18n="friends.tab.requests">Requests</span><span class="tbadge" id="badge-requests" style="display:none">0</span></button>
       <button class="tab" type="button" role="tab" id="tab-activity" aria-selected="false" aria-controls="panel-activity" data-tab="activity" data-i18n="friends.tab.activity">Activity</button>
@@ -126,7 +159,7 @@
       <div id="activityWrap"><h2 data-i18n="friends.activity">📊 Recent activity</h2><div id="activity"></div></div>
     </section>
   </div>
-</div>
+</main>
 
 <script>
 // Segmented-tab controller (pure UI; friends.js still renders into the same IDs).
