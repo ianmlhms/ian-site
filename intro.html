@@ -6,86 +6,131 @@
 <title>Guess the Song — Rot d'Lidd | ian.lu</title>
 <meta name="description" content="Eng Sekonn vun engem Lidd, dann dräi, dann fënnef — wie et fréi erkennt, kritt méi Punkten. Op e puer Handyen gläichzäiteg spillbar.">
 <link rel="canonical" href="https://ian.lu/intro.html">
-<meta name="theme-color" content="#120c1e">
+<meta name="theme-color" content="#0d0d1a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#120c1e;--panel:#1c1430;--panel2:#241a3d;--line:#352a55;--text:#f0ecfa;
-        --muted:#9b8fc0;--accent:#c06bff;--accent2:#ff6bb5;--good:#3fb950;--bad:#e5484d}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    -webkit-text-size-adjust:100%}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+  a,button{touch-action:manipulation}
   button{font:inherit;color:inherit;cursor:pointer}
-  .bar{display:flex;align-items:center;gap:10px;padding:11px 14px;
-       border-bottom:1px solid var(--line);background:var(--panel)}
-  .bar a{color:var(--muted);font-weight:700;text-decoration:none;font-size:14px}
-  .bar h1{font-size:15px;margin:0;font-weight:800;letter-spacing:1px;color:var(--accent-text)}
-  .bar .code{margin-left:auto;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
-  .wrap{max-width:620px;margin:0 auto;padding:16px 14px 48px}
-  .screen{display:none}.screen.on{display:block}
-  h2{font-size:19px;margin:0 0 4px}
-  .sub{color:var(--muted);font-size:13.5px;line-height:1.6;margin:0 0 14px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-        padding:15px;margin-bottom:12px}
-  .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
-       font-weight:700;margin-bottom:8px}
-  .btn{display:block;width:100%;padding:15px;border-radius:12px;border:0;
-       background:var(--accent);color:var(--accent-foreground);font-weight:800;font-size:16px;margin-top:10px}
-  .btn.alt{background:var(--accent2);color:var(--accent2-foreground)}
-  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-  .btn:disabled{opacity:.45}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
-  .pick{padding:12px 10px;border-radius:11px;border:1px solid var(--line);
-        background:var(--panel2);text-align:center;font-weight:700;font-size:14px}
-  .pick.on{background:var(--accent);color:var(--accent-foreground);border-color:var(--accent-border)}
-  .row{display:flex;gap:8px}
-  .row .pick{flex:1}
-  /* play */
-  .stage{text-align:center;padding:22px 14px}
-  .disc{width:130px;height:130px;border-radius:50%;margin:0 auto 14px;
-        background:radial-gradient(circle at 50% 50%,#2a1f47 0 24%,#160f28 25% 100%);
-        border:1px solid var(--line);display:flex;align-items:center;justify-content:center;
-        font-size:44px}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:3px}
+  .ui{--bad:#e5484d}
+  html[data-theme="light"] .ui{--bad:#c4262b}
+
+  /* ---- room code row (the arcade bar moves it here) ---- */
+  .ui .arcade-context{width:100%;max-width:700px;margin:0 auto;min-height:0;padding:14px max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left));border:0;background:none}
+  .code{display:inline-flex;align-items:center;min-height:32px;padding:4px 14px;border-radius:var(--r-chip);background:var(--card-opaque);
+    box-shadow:inset 0 0 0 1px var(--border);color:var(--text);font:700 13px var(--font-display);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .code:empty{display:none}
+
+  /* ---- column + screens ---- */
+  .ui .ui-page{max-width:700px;padding-top:18px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+  @media (max-width:620px){.ui .ui-page,.ui .arcade-context{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+  .screen{display:none}
+  .screen.on{display:flex;flex-direction:column;gap:14px;animation:rise .45s var(--ease) both}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}}
+  .ui-card.card{margin:0}
+
+  /* ---- lobby ---- */
+  .hero{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px clamp(14px,3vw,22px)}
+  .hero .ava{grid-row:span 2;display:grid;place-items:center;width:clamp(64px,10vw,84px);height:clamp(64px,10vw,84px);border-radius:clamp(20px,3vw,26px);font-size:clamp(34px,5vw,44px);line-height:1;
+    background:color-mix(in srgb,var(--accent) 24%,var(--card-opaque));
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 24%,transparent),0 16px 30px -18px rgb(var(--ink)/.5);transform:rotate(-4deg)}
+  .hero h2.ui-title{margin:0;align-self:end;font-size:clamp(28px,5vw,40px);line-height:1.05;letter-spacing:-.04em}
+  .hero .sub{margin:0;align-self:start}
+  .sub{color:var(--muted);font-size:14.5px;line-height:1.55;margin:0;text-wrap:pretty}
+  .sub b{color:var(--text)}
+  .lbl{margin:0 0 10px;font:800 12px var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .lbl.gap{margin-top:20px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
+  .row{display:flex;flex-wrap:wrap;gap:10px}
+  .row .pick{flex:1 1 0;min-width:84px}
+  .pick{min-height:52px;padding:11px 14px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--text);
+    font:700 15px/1.3 var(--font-display);letter-spacing:-.01em;text-align:center;box-shadow:inset 0 0 0 1px var(--border);
+    transition:transform .3s var(--ease),background-color .2s,box-shadow .2s}
+  .grid .pick{text-align:left}
+  .pick small{font:500 12.5px var(--font-display);letter-spacing:0}
+  .pick:hover{transform:translateY(-2px);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,var(--border))}
+  .pick:active{transform:scale(.98)}
+  .pick.on{background:var(--accent);color:var(--accent-foreground);box-shadow:0 10px 24px -12px color-mix(in srgb,var(--accent) 75%,transparent)}
+  .pick.on small{opacity:.85!important}
+  .note{margin:10px 0 0;font-size:13px;line-height:1.55;color:var(--muted);
+    background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0;padding:0}
+  .note:empty{display:none}
+  .note.warn,.warn{color:var(--bad)}
+  #joinHint b{display:block;margin-top:8px;padding:10px 12px;border-radius:var(--r-chip);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--border);
+    color:var(--text);font:600 13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+  .tag{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:11px;background:color-mix(in srgb,var(--accent) 16%,var(--card-opaque));
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent);color:var(--text);font:700 11px var(--font-display)}
+
+  /* ---- buttons ---- */
+  .btn{width:100%}
+  .btn:disabled{opacity:.45;cursor:default;transform:none;filter:none}
+  .btn.ui-btn--primary:disabled{box-shadow:none}
+  a.btn{text-align:center}
+
+  /* ---- play ---- */
+  .stage{text-align:center;padding:clamp(22px,4vw,34px) 18px}
+  .disc{position:relative;display:grid;place-items:center;width:clamp(120px,22vw,150px);height:clamp(120px,22vw,150px);margin:0 auto 18px;border-radius:50%;
+    background:repeating-radial-gradient(circle at 50% 50%,#1b1426 0 2px,#0f0a18 2px 4px);
+    box-shadow:0 0 0 1px rgb(255 255 255/.08),0 22px 36px -18px rgb(var(--ink)/.7),inset 0 0 0 6px #0d0814}
+  .disc::before{content:"";position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 20deg,transparent 0 18%,rgb(255 255 255/.12) 25%,transparent 32% 68%,rgb(255 255 255/.1) 75%,transparent 82%)}
+  .disc span{position:relative;display:grid;place-items:center;width:46%;height:46%;border-radius:50%;font-size:clamp(22px,4.4vw,30px);line-height:1;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 0 3px #0d0814}
   .disc.spin{animation:sp 3s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
-  .secs{font-size:34px;font-weight:900;color:var(--accent-text);font-variant-numeric:tabular-nums}
-  .stepbar{display:flex;gap:5px;justify-content:center;margin:12px 0 4px}
-  .stepbar i{width:26px;height:5px;border-radius:3px;background:var(--line)}
-  .stepbar i.done{background:var(--accent)}
-  .answers{display:grid;gap:8px;margin-top:14px}
-  .ans{padding:13px 14px;border-radius:12px;border:1px solid var(--line);
-       background:var(--panel2);text-align:left;font-size:14.5px;line-height:1.35}
-  .ans b{display:block;font-size:15px}
-  .ans small{color:var(--muted)}
-  .ans.sel{border-color:var(--accent-border)}
-  .ans:disabled{opacity:.6}
-  /* scores */
-  .sc{display:flex;justify-content:space-between;padding:9px 2px;
-      border-bottom:1px solid var(--line);font-size:14px}
-  .sc:last-child{border-bottom:0}
-  .sc b{font-variant-numeric:tabular-nums}
-  .sc.me{color:var(--accent-text)}
-  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:20px;
-       background:var(--panel2);color:var(--muted);margin-left:6px}
-  .note{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.55}
-  .warn{color:var(--bad)}
-  .big{font-size:20px;font-weight:800;margin:6px 0}
-  .art{width:120px;height:120px;border-radius:12px;margin:0 auto 10px;display:block;
-       background:var(--panel2)}
-  /* site-glass.css gives every .note a frosted pill; here it is plain helper text */
-  .note{background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
-        border-radius:0;padding:0}
-  .ans.sel{background:color-mix(in srgb,var(--accent) 22%,var(--panel2))}
-  a:focus-visible,button:focus-visible{outline:3px solid var(--accent-text,var(--accent));outline-offset:2px}
-  @media (prefers-reduced-motion:reduce){.disc.spin{animation:none}}
+  .secs{font:900 clamp(40px,8vw,56px)/1 var(--font-display);letter-spacing:-.04em;color:var(--accent-text);font-variant-numeric:tabular-nums}
+  .stepbar{display:flex;gap:6px;justify-content:center;margin:16px 0 6px}
+  .stepbar i{width:34px;height:6px;border-radius:3px;background:var(--border);transition:background-color .3s}
+  .stepbar i.done{background:var(--accent);box-shadow:0 0 12px -2px color-mix(in srgb,var(--accent) 70%,transparent)}
+  #playSub{margin:10px 0 0}
+  #revWho{margin-top:10px}
+  .answers{display:grid;gap:10px}
+  .ans{display:block;width:100%;min-height:60px;padding:14px 18px;border:0;border-radius:var(--r-tile);background:var(--card);color:var(--text);
+    text-align:left;font-size:14px;line-height:1.35;
+    box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35);
+    transition:transform .3s var(--ease),background-color .2s,box-shadow .3s var(--ease)}
+  .ans b{display:block;font:750 16.5px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
+  .ans small{display:block;margin-top:2px;font-size:13px;color:var(--muted)}
+  .ans:hover:not(:disabled){transform:translateY(-3px);background:var(--card-opaque);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 48%,transparent),0 18px 34px -18px rgb(var(--ink)/.5)}
+  .ans:active:not(:disabled){transform:scale(.985);transition-duration:.08s}
+  .ans.sel,.ans.sel:disabled{background:color-mix(in srgb,var(--accent) 22%,var(--card-opaque));opacity:1;box-shadow:inset 0 0 0 2px var(--accent)}
+  .ans:disabled{opacity:.6;cursor:default}
+
+  /* ---- scores ---- */
+  .sc{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--r-chip);font-size:15px}
+  .sc + .sc{margin-top:2px}
+  .sc b{font:800 16px var(--font-display);font-variant-numeric:tabular-nums}
+  .sc span{overflow-wrap:anywhere}
+  .sc.me{background:color-mix(in srgb,var(--accent) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent);font-weight:700}
+
+  /* ---- reveal + final ---- */
+  .big{margin:6px 0;font:800 clamp(22px,4vw,28px)/1.15 var(--font-display);letter-spacing:-.025em;overflow-wrap:anywhere}
+  .art{display:block;width:140px;height:140px;margin:0 auto 14px;border-radius:24px;background:var(--card-opaque);
+    box-shadow:inset 0 0 0 1px var(--tile-edge),0 22px 34px -18px rgb(var(--ink)/.6);object-fit:cover}
+  .art[src=""],.art:not([src]){display:none}
+  #revArtist{font-size:16px}
+  .trophy{display:grid;place-items:center;width:84px;height:84px;margin:0 auto 12px;border-radius:26px;font-size:46px;line-height:1;
+    background:color-mix(in srgb,var(--accent) 22%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 32%,transparent);transform:rotate(-4deg)}
+
+  @media (prefers-reduced-motion:reduce){
+    .disc.spin{animation:none}
+    .screen.on{animation:none}
+    .pick,.ans,.stepbar i{transition:none}
+    .hero .ava,.trophy{transform:none}
+  }
+  @media (prefers-contrast:more){.pick,.ans,.code,.sc.me{box-shadow:0 0 0 2px var(--text)}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
+<body class="ui">
 
 <header class="bar">
   <a class="home-link" href="pixelbreak.html">‹ Arcade</a>
@@ -93,46 +138,49 @@
   <span class="code" id="roomCode"></span>
 </header>
 
-<main class="wrap">
+<main class="ui-page">
 
   <!-- ---------- lobby ---------- -->
   <section class="screen on" id="s-lobby">
-    <h2>Rot d'Lidd</h2>
-    <p class="sub">Éischt <b>1 Sekonn</b>, dann 3, dann 5 … wie fréi erkennt, kritt méi Punkten.</p>
+    <div class="card ui-card ui-card--accent hero">
+      <div class="ava" aria-hidden="true">🎵</div>
+      <h2 class="ui-title">Rot d'Lidd</h2>
+      <p class="sub">Éischt <b>1 Sekonn</b>, dann 3, dann 5 … wie fréi erkennt, kritt méi Punkten.</p>
+    </div>
 
-    <div class="card" id="hostCfg">
+    <div class="card ui-card" id="hostCfg">
       <div class="lbl" id="lblCats">Kategorie</div>
       <div class="grid" id="cats" role="group" aria-labelledby="lblCats"></div>
 
-      <div class="lbl" id="lblCounts" style="margin-top:16px">Wéi vill Lidder</div>
+      <div class="lbl gap" id="lblCounts">Wéi vill Lidder</div>
       <div class="row" id="counts" role="group" aria-labelledby="lblCounts"></div>
 
-      <div class="lbl" id="lblModes" style="margin-top:16px">Toun</div>
+      <div class="lbl gap" id="lblModes">Toun</div>
       <div class="row" id="modes" role="group" aria-labelledby="lblModes"></div>
       <p class="note" id="modeNote" role="status"></p>
     </div>
 
-    <div class="card">
+    <div class="card ui-card">
       <div class="lbl">Spiller</div>
       <div id="lobbyPlayers"></div>
       <p class="note" id="joinHint"></p>
     </div>
 
-    <button class="btn" id="startBtn">Starten</button>
+    <button class="btn ui-btn ui-btn--primary" id="startBtn">Starten</button>
     <p class="note" id="lobbyNote" role="status"></p>
   </section>
 
   <!-- ---------- play ---------- -->
   <section class="screen" id="s-play">
-    <div class="card stage">
-      <div class="disc" id="disc" aria-hidden="true">🎵</div>
+    <div class="card ui-card stage">
+      <div class="disc" id="disc" aria-hidden="true"><span>🎵</span></div>
       <div class="secs" id="secs">1s</div>
       <div class="stepbar" id="stepbar" aria-hidden="true"></div>
-      <div class="sub" id="playSub" style="margin:8px 0 0" role="status"></div>
+      <div class="sub" id="playSub" role="status"></div>
     </div>
     <div class="answers" id="answers"></div>
-    <button class="btn ghost" id="moreBtn">Méi héieren ▸</button>
-    <div class="card" style="margin-top:12px">
+    <button class="btn ui-btn ui-btn--ghost" id="moreBtn">Méi héieren ▸</button>
+    <div class="card ui-card">
       <div class="lbl">Punkten</div>
       <div id="playScores"></div>
     </div>
@@ -140,31 +188,31 @@
 
   <!-- ---------- reveal ---------- -->
   <section class="screen" id="s-reveal">
-    <div class="card stage">
+    <div class="card ui-card stage">
       <img class="art" id="revArt" alt="">
       <div class="big" id="revTitle" role="status"></div>
-      <div class="sub" id="revArtist" style="margin:0"></div>
-      <div class="sub" id="revWho" style="margin-top:10px" role="status"></div>
+      <div class="sub" id="revArtist"></div>
+      <div class="sub" id="revWho" role="status"></div>
     </div>
-    <div class="card">
+    <div class="card ui-card">
       <div class="lbl">Punkten</div>
       <div id="revScores"></div>
     </div>
-    <button class="btn" id="nextBtn">Weider ▸</button>
+    <button class="btn ui-btn ui-btn--primary" id="nextBtn">Weider ▸</button>
   </section>
 
   <!-- ---------- final ---------- -->
   <section class="screen" id="s-final">
-    <div class="card stage">
-      <div style="font-size:52px" aria-hidden="true">🏆</div>
+    <div class="card ui-card stage">
+      <div class="trophy" aria-hidden="true">🏆</div>
       <div class="big" id="winner" role="status"></div>
     </div>
-    <div class="card">
+    <div class="card ui-card">
       <div class="lbl">Schlussstand</div>
       <div id="finalScores"></div>
     </div>
-    <button class="btn" id="againBtn">Nach eng Kéier</button>
-    <a class="btn ghost" href="pixelbreak.html" style="text-align:center;text-decoration:none">Zréck bei d'Spiller</a>
+    <button class="btn ui-btn ui-btn--primary" id="againBtn">Nach eng Kéier</button>
+    <a class="btn ui-btn ui-btn--ghost" href="pixelbreak.html">Zréck bei d'Spiller</a>
   </section>
 
 </main>
