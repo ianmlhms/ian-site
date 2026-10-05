@@ -5,78 +5,195 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>IanNet — ian.lu</title>
 <meta name="robots" content="noindex">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<script src="i18n-dict.js?v=42"></script>
+<script>
+Object.assign(window.I18N_DICT, {
+  "ianet.notConfigured": { lb: "Net konfiguréiert.", de: "Nicht konfiguriert.", en: "Not configured." },
+  "ianet.signInMsg":     { lb: "Mell dech un, fir IanNet ze gesinn.", de: "Melde dich an, um IanNet zu sehen.", en: "Sign in to see IanNet." },
+  "ianet.signIn":        { lb: "Umellen", de: "Anmelden", en: "Sign in" },
+  "ianet.denied":        { lb: "Net erlaabt.", de: "Nicht erlaubt.", en: "Not allowed." },
+  "ianet.kicker":        { lb: "Uplink", de: "Uplink", en: "Uplink" },
+  "ianet.heroSub":       { lb: "Fotoen, Dateien, Gäschtebuch a Chat vun de Boards an der Schoul.", de: "Fotos, Dateien, Gästebuch und Chat von den Boards in der Schule.", en: "Photos, files, guestbook and chat from the boards at school." },
+  "ianet.tabPhoto":      { lb: "Fotoen", de: "Fotos", en: "Photos" },
+  "ianet.tabFile":       { lb: "Dateien", de: "Dateien", en: "Files" },
+  "ianet.tabGuestbook":  { lb: "Gäschtebuch", de: "Gästebuch", en: "Guestbook" },
+  "ianet.tabChat":       { lb: "Chat", de: "Chat", en: "Chat" },
+  "ianet.tabBoard":      { lb: "Board", de: "Board", en: "Boards" },
+  "ianet.del":           { lb: "Läschen", de: "Löschen", en: "Delete" },
+  "ianet.delConfirm":    { lb: "Läschen?", de: "Löschen?", en: "Delete?" },
+  "ianet.delFail":       { lb: "Konnt net geläscht ginn.", de: "Konnte nicht gelöscht werden.", en: "Could not delete." },
+  "ianet.loadErr":       { lb: "Konnt net gelueden ginn.", de: "Konnte nicht geladen werden.", en: "Could not load." },
+  "ianet.nothing":       { lb: "Nach näischt.", de: "Noch nichts.", en: "Nothing yet." },
+  "ianet.chatPlaceholder": { lb: "Schreif eppes…", de: "Schreib etwas…", en: "Write something…" },
+  "ianet.send":          { lb: "Schécken", de: "Senden", en: "Send" },
+  "ianet.sendFail":      { lb: "Konnt net geschéckt ginn.", de: "Konnte nicht gesendet werden.", en: "Could not send." },
+  "ianet.chatNote":      { lb: "Kënnt op IanNet un, soubal d'Board sech mellt (e puer Sekonnen).", de: "Kommt auf IanNet an, sobald sich das Board meldet (ein paar Sekunden).", en: "Shows up on IanNet as soon as the board checks in (a few seconds)." },
+  "ianet.noBoards":      { lb: "Nach keen Board gemellt.", de: "Noch kein Board gemeldet.", en: "No board has reported in yet." },
+  "ianet.online":        { lb: "online", de: "online", en: "online" },
+  "ianet.offline":       { lb: "offline", de: "offline", en: "offline" },
+  "ianet.kvSeen":        { lb: "Gesinn", de: "Zuletzt gesehen", en: "Last seen" },
+  "ianet.kvVersion":     { lb: "Version", de: "Version", en: "Version" },
+  "ianet.kvOnline":      { lb: "Online", de: "Online", en: "Online" },
+  "ianet.kvWifi":        { lb: "WLAN", de: "WLAN", en: "Wi-Fi" },
+  "ianet.kvSd":          { lb: "SD fräi", de: "SD frei", en: "SD free" },
+  "ianet.kvPending":     { lb: "Waart op Upload", de: "Wartet auf Upload", en: "Waiting to upload" },
+  "ianet.kvError":       { lb: "Feeler", de: "Fehler", en: "Error" },
+  "ianet.restart":       { lb: "Neistart", de: "Neustart", en: "Restart" },
+  "ianet.restartConfirm": { lb: "{b} nei starten?", de: "{b} neu starten?", en: "Restart {b}?" },
+  "ianet.firmware":      { lb: "Firmware", de: "Firmware", en: "Firmware" },
+  "ianet.firmwareBad":   { lb: "firmware.bin (max. 6 MB)", de: "firmware.bin (max. 6 MB)", en: "firmware.bin (max. 6 MB)" },
+  "ianet.cmdLog":        { lb: "Lescht Befeeler", de: "Letzte Befehle", en: "Recent commands" }
+});
+</script>
+<script src="i18n.js?v=3"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent);text-decoration:none}
-  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:2}
-  header .home{color:var(--muted);font-weight:700}
-  header h1{font-size:18px;margin:0}
-  header .spacer{flex:1}
-  main{max-width:1100px;margin:0 auto;padding:18px 20px 60px}
-  #msg{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);text-align:center}
-  .auth-go{background:var(--accent);color:#000;border:none;border-radius:10px;padding:12px 18px;font-size:15px;font-weight:800;cursor:pointer;margin-top:14px}
-  .tabs{display:flex;gap:8px;margin-bottom:16px}
-  .tab{background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer}
-  .tab.active{color:var(--text);border-color:var(--accent);background:var(--card2)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-  .ph{position:relative;border-radius:12px;overflow:hidden;background:var(--card);border:1px solid var(--border);aspect-ratio:1}
-  .ph img{width:100%;height:100%;object-fit:cover;display:block}
-  .ph .cap{position:absolute;left:0;right:0;bottom:0;padding:6px 8px;font-size:12px;background:linear-gradient(transparent,#000c)}
-  .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card);margin-bottom:8px}
-  .row .grow{flex:1;min-width:0}
-  .row .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
-  .row p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
-  .del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px}
-  .del:hover{color:#ff6b6b}
-  .ph .del{position:absolute;top:6px;right:6px;background:#000a;border-radius:8px;padding:2px 6px}
-  .empty{color:var(--muted);padding:30px 0;text-align:center}
-  .send{display:flex;gap:8px;margin-bottom:14px}
-  .send input{flex:1;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;font-size:15px}
-  .btn{background:var(--accent);color:#000;border:none;border-radius:10px;padding:10px 14px;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer}
-  .btn.ghost{background:var(--card2);color:var(--text);border:1px solid var(--border)}
-  .btn:disabled{opacity:.5;cursor:default}
-  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin:8px 0 12px}
-  .kv span:nth-child(odd){color:var(--muted)}
-  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .note{color:var(--muted);font-size:13px;margin-top:8px}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .ui{--bad:#ef5b6b;--ok:#5ad88a}
+  html[data-theme="light"] .ui{--bad:#c42b3d;--ok:#157a42}
+  a{color:var(--accent-text);text-decoration:none}
+  a,button{touch-action:manipulation}
+  button{font:inherit;color:inherit}
+  a:focus-visible,button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  [hidden]{display:none!important}
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .tab,.btn,.auth-go,.del{min-height:44px}
-  .del{min-width:44px}
-  .ph .del{display:flex;align-items:center;justify-content:center}
-  .btn:has(.sr-only:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
-  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .ph:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---- header + column (site-ui look) ---- */
+  html body.ui .ui-header{max-width:1040px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:14px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+  @media (max-width:620px){.ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+
+  /* ---- states (loading / sign-in / denied / empty) ---- */
+  .state{padding:clamp(26px,5vw,44px) 22px;text-align:center;color:var(--muted)}
+  .state .gate-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .state p{margin:0;font:800 clamp(20px,2.8vw,24px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text);text-wrap:balance}
+  .state .ui-btn{margin-top:18px}
+  .state.slim{padding:26px 18px}
+  .state.slim .gate-ico{width:56px;height:56px;margin-bottom:12px;border-radius:18px;font-size:28px}
+  .state.slim p{font-size:16px;font-weight:700;color:var(--muted)}
+
+  /* ---- hero ---- */
+  .hero .kicker{margin:0 0 6px;font:800 12px var(--font-display);letter-spacing:.08em;text-transform:uppercase;color:var(--accent-text)}
+  .hero .ui-title{margin:0 0 4px}
+  .hero p.sub{margin:0;color:var(--muted);font-size:15px;line-height:1.45}
+
+  /* ---- tabs ---- */
+  .tabs{display:flex;flex-wrap:wrap;gap:8px}
+  .tab{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:8px 16px;border:0;border-radius:var(--r-chip);background:var(--card);color:var(--muted);font:750 15px var(--font-display);letter-spacing:-.01em;cursor:pointer;box-shadow:inset 0 0 0 1px var(--tile-edge);transition:transform .3s var(--ease),background-color .2s,box-shadow .2s,color .2s}
+  .tab:hover{color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+  .tab:active{transform:scale(.97)}
+  .tab.active{color:var(--accent-foreground);background:var(--accent);box-shadow:0 10px 24px -12px color-mix(in srgb,var(--accent) 75%,transparent)}
+  .tab span{font-size:18px;line-height:1}
+  .tab b{font:inherit}
+  #panel{display:flex;flex-direction:column;gap:14px;min-width:0}
+  #list{min-width:0}
+
+  /* ---- photos ---- */
+  .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:12px}
+  .ph{position:relative;aspect-ratio:1;overflow:hidden;border-radius:var(--r-tile);background:color-mix(in srgb,var(--text) 7%,var(--card-opaque));box-shadow:inset 0 0 0 1px var(--tile-edge),0 14px 30px -20px rgb(var(--ink)/.45);transition:transform .35s var(--ease),box-shadow .35s var(--ease)}
+  .ph:hover{transform:translateY(-3px);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 48%,transparent),0 18px 34px -18px rgb(var(--ink)/.5)}
+  .ph a{position:absolute;inset:0;display:block;border-radius:inherit}
+  .ph a:focus-visible{outline-offset:-3px}
+  .ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .ph .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 10px 8px;font-size:12px;line-height:1.35;color:#fff;background:linear-gradient(transparent,rgb(0 0 0/.72));pointer-events:none;overflow-wrap:anywhere}
+  .ph .del{position:absolute;top:6px;right:6px;background:rgb(0 0 0/.55);color:#fff;border-radius:var(--r-chip);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .ph .del:hover{background:var(--bad);color:#fff}
+
+  /* ---- item cards (files, guestbook, chat) ---- */
+  .items{display:flex;flex-direction:column;gap:10px}
+  .item{display:flex;align-items:flex-start;gap:14px;padding:14px 8px 14px 16px;border-radius:var(--r-tile);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -20px rgb(var(--ink)/.35)}
+  .item .ic{flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:var(--r-chip);font:800 19px/1 var(--font-display);color:var(--accent-text);background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .item .ic.emoji{font-size:23px}
+  .item .grow{flex:1;min-width:0;padding-top:1px}
+  .item .t{font:750 16px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
+  .item a.t{display:inline-block;color:var(--text)}
+  .item a.t:hover{color:var(--accent-text);text-decoration:underline;text-underline-offset:3px}
+  .item .sub{margin-top:3px;color:var(--muted);font-size:12.5px;line-height:1.4}
+  .item p{margin:6px 0 0;font-size:15px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+  .del{flex:none;display:grid;place-items:center;min-width:44px;min-height:44px;border:0;border-radius:var(--r-chip);background:none;font-size:16px;color:var(--muted);cursor:pointer;transition:color .2s,background-color .2s,transform .3s var(--ease)}
+  .item .del:hover{color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+  .del:active{transform:scale(.92)}
+
+  /* ---- chat send box ---- */
+  .send{display:flex;gap:8px;align-items:stretch}
+  .send select.ui-input{width:auto;flex:none;padding-right:34px;font-weight:700;cursor:pointer}
+  .send input.ui-input{flex:1;min-width:0}
+  .send .ui-btn{flex:none;padding:12px 22px}
+  .send .ui-btn:disabled,.ui-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .hint{margin:-4px 2px 4px;color:var(--muted);font-size:13px;line-height:1.45}
+  @media (max-width:520px){.send{flex-wrap:wrap}.send select.ui-input{flex:1 1 100%}.send .ui-btn{flex:none}}
+
+  /* ---- boards ---- */
+  .boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));gap:14px;align-items:start}
+  .board{display:flex;flex-direction:column;gap:14px;padding:clamp(16px,2.6vw,22px);border-radius:var(--r-panel);background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -20px rgb(var(--ink)/.35)}
+  .board .head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .board h2{margin:0;font:800 20px var(--font-display);letter-spacing:-.02em;overflow-wrap:anywhere}
+  .status{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;font:700 13px var(--font-display);color:var(--muted);background:color-mix(in srgb,var(--text) 8%,var(--card-opaque));box-shadow:inset 0 0 0 1px var(--tile-edge);white-space:nowrap}
+  .status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted);opacity:.6}
+  .status.on{color:var(--text);background:color-mix(in srgb,var(--ok) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ok) 38%,transparent)}
+  .status.on::before{background:var(--ok);opacity:1;box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
+  .kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0}
+  .kv div{padding:10px 12px;border-radius:var(--r-chip);background:color-mix(in srgb,var(--text) 5%,var(--card-opaque));box-shadow:inset 0 0 0 1px var(--tile-edge);min-width:0}
+  .kv dt{margin:0;color:var(--muted);font-size:12px}
+  .kv dd{margin:2px 0 0;font:750 15px var(--font-display);letter-spacing:-.01em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .kv .wide{grid-column:1/-1}
+  .kv .err{background:color-mix(in srgb,var(--bad) 14%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bad) 38%,transparent)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .actions .ui-btn{min-height:46px;padding:10px 18px;font-size:15px;gap:8px}
+  .actions label.ui-btn:has(.sr-only:focus-visible){outline:2px solid var(--accent);outline-offset:3px}
+  .actions label.ui-btn.busy{opacity:.5;cursor:not-allowed}
+  .cmdlog{padding:16px 20px}
+  .cmdlog h2{margin:0 0 8px;font:800 14px var(--font-display);letter-spacing:.02em;color:var(--muted)}
+  .cmdlog ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}
+  .cmdlog li{overflow-wrap:anywhere}
+  .cmdlog b{color:var(--text);font-weight:700}
+
+  @media (prefers-reduced-motion:reduce){.tab,.ph,.del,body.ui .ui-header .home{transition:none}.ph:hover{transform:none}}
 </style>
-  <meta name="theme-color" content="#0d0d1a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header>
-  <a class="home" href="index.html">‹ ian.lu</a>
-  <h1><span aria-hidden="true">📡</span> IanNet</h1>
-  <span class="spacer"></span>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="index.html" data-i18n="nav.home">‹ Heem</a>
+    <h1 class="ui-brand"><span aria-hidden="true">📡</span> IanNet</h1>
+  </div>
+  <div class="header-right">
+    <span id="langSw"></span>
+    <span id="acctHost"></span>
+  </div>
 </header>
-<main>
-  <div id="msg" role="status">…</div>
+<main class="ui-page">
+  <div class="ui-card state" id="msg" role="status"><div class="gate-ico" aria-hidden="true">📡</div><p>…</p></div>
   <div id="panel" hidden>
+    <section class="ui-card ui-card--accent hero" aria-labelledby="heroTitle">
+      <p class="kicker" data-i18n="ianet.kicker">Uplink</p>
+      <h2 class="ui-title" id="heroTitle">IanNet</h2>
+      <p class="sub" data-i18n="ianet.heroSub">Fotoen, Dateien, Gäschtebuch a Chat vun de Boards an der Schoul.</p>
+    </section>
     <div class="tabs" role="group" aria-label="IanNet">
-      <button class="tab active" data-kind="photo" aria-pressed="true"><span aria-hidden="true">📸</span> Fotoen</button>
-      <button class="tab" data-kind="file" aria-pressed="false"><span aria-hidden="true">📁</span> Dateien</button>
-      <button class="tab" data-kind="guestbook" aria-pressed="false"><span aria-hidden="true">✍️</span> Gäschtebuch</button>
-      <button class="tab" data-kind="chat" aria-pressed="false"><span aria-hidden="true">💬</span> Chat</button>
-      <button class="tab" data-kind="board" aria-pressed="false"><span aria-hidden="true">📡</span> Board</button>
+      <button class="tab active" type="button" data-kind="photo" aria-pressed="true"><span aria-hidden="true">📸</span><b data-i18n="ianet.tabPhoto">Fotoen</b></button>
+      <button class="tab" type="button" data-kind="file" aria-pressed="false"><span aria-hidden="true">📁</span><b data-i18n="ianet.tabFile">Dateien</b></button>
+      <button class="tab" type="button" data-kind="guestbook" aria-pressed="false"><span aria-hidden="true">✍️</span><b data-i18n="ianet.tabGuestbook">Gäschtebuch</b></button>
+      <button class="tab" type="button" data-kind="chat" aria-pressed="false"><span aria-hidden="true">💬</span><b data-i18n="ianet.tabChat">Chat</b></button>
+      <button class="tab" type="button" data-kind="board" aria-pressed="false"><span aria-hidden="true">📡</span><b data-i18n="ianet.tabBoard">Board</b></button>
     </div>
     <div id="list"></div>
   </div>
 </main>
-<script type="module" src="ianet.js?v=7"></script>
+<script type="module" src="ianet.js?v=8"></script>
 </body>
 </html>
