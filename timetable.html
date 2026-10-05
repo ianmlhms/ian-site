@@ -19,41 +19,74 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:820px;margin:0 auto;padding:16px 12px 40px;display:flex;flex-direction:column;gap:14px}
-  .now{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-size:14px}
-  .now b{color:var(--accent2-text)}
-  .now .next{color:var(--muted);font-size:13px;margin-top:2px}
-  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:14px;background:var(--card)}
-  table{border-collapse:collapse;width:100%;min-width:560px}
-  th,td{border:1px solid var(--border);padding:0}
-  thead th{background:var(--card2);font-size:12px;font-weight:800;color:var(--muted);padding:8px 4px;text-align:center;position:sticky;top:0}
-  .tcell{text-align:center;width:78px;background:var(--card2)}
-  .tcell input{width:64px;border:none;background:transparent;color:var(--muted);font-size:11px;text-align:center;padding:3px 0}
-  td input.cell{width:100%;min-width:88px;border:none;background:transparent;color:var(--text);font-size:13px;padding:9px 6px;text-align:center;font-weight:600}
-  td input.cell::placeholder{color:#3a3a58}
-  td.here{background:rgba(110,168,254,.15);outline:2px solid var(--accent);outline-offset:-2px}
-  input:focus{outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
-  .hint{color:var(--muted);font-size:12px;text-align:center}
-  .save{color:var(--accent2-text);font-size:12px;font-weight:700;min-height:16px;text-align:center}
-  .gate{text-align:center;color:var(--muted);padding:14px}
-  .rowbtns{display:flex;gap:8px;justify-content:center}
-  .rowbtns button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent-text);text-decoration:none}
+  button,a,input{touch-action:manipulation}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .rowbtns button:focus-visible,.bar .home:focus-visible,.gate a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .ui{--good:#3fb950}
+  html[data-theme="light"] .ui{--good:#1c8a38}
+
+  /* ---- header + column ---- */
+  html body.ui .ui-header{max-width:860px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:860px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+
+  /* ---- now card ---- */
+  .now{display:flex;flex-direction:column;gap:4px;font-size:16px;line-height:1.4}
+  .now .lbl{align-self:flex-start;display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:3px 12px;border-radius:999px;font:750 12px var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--accent-text);background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .now .lbl.live::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 55%,transparent);animation:ttpulse 2s infinite}
+  @keyframes ttpulse{70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .now .big{font:800 clamp(22px,3.6vw,28px)/1.2 var(--font-display);letter-spacing:-.025em;margin-top:6px}
+  .now .big.idle{color:var(--muted);font-weight:700;font-size:clamp(18px,3vw,22px)}
+  .now .next{color:var(--muted);font-size:14px;margin-top:2px}
+  .now .next b{color:var(--text)}
+
+  /* ---- grid ---- */
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:clamp(6px,1.2vw,10px);border-radius:var(--r-panel)}
+  .scroll:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+  table{border-collapse:separate;border-spacing:4px;width:100%;min-width:600px}
+  th,td{padding:0}
+  thead th{font:750 12px var(--font-display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:8px 4px 6px;text-align:center}
+  thead th.today{color:var(--accent-text)}
+  thead th.today span[aria-hidden]{display:inline-block;padding:4px 12px;border-radius:999px;background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .tcell{text-align:center;width:74px;position:sticky;left:0;z-index:1;background:var(--card-opaque);border-radius:var(--r-chip);box-shadow:inset 0 0 0 1px var(--tile-edge)}
+  thead th.tcell{background:none;box-shadow:none}
+  .tcell input{width:62px;border:none;background:transparent;color:var(--muted);font:600 12px system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:center;padding:3px 0;border-radius:8px}
+  .tcell input:first-child{color:var(--text);font-weight:750}
+  td input.cell{display:block;width:100%;min-width:92px;min-height:48px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--tile-edge);color:var(--text);font:650 14px system-ui,-apple-system,sans-serif;padding:9px 6px;text-align:center;transition:box-shadow .2s,background-color .2s}
+  td input.cell::placeholder{color:var(--muted);opacity:.45}
+  td input.cell:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,var(--border))}
+  td input.cell.filled{background:color-mix(in srgb,var(--accent) 9%,var(--card-opaque))}
+  td.today input.cell{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent)}
+  td.here input.cell{background:color-mix(in srgb,var(--accent) 22%,var(--card-opaque));box-shadow:inset 0 0 0 2px var(--accent)}
+  td input.cell:focus,.tcell input:focus{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}
+
+  .rowbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .rowbtns .ui-btn{min-height:46px;padding:10px 20px;font-size:15px}
+  .save{color:var(--accent-text);font-size:13px;font-weight:700;min-height:18px;text-align:center}
+  .hint{color:var(--muted);font-size:13px;text-align:center;line-height:1.5;max-width:60ch;margin:0 auto;text-wrap:pretty}
+  .gate{text-align:center;color:var(--muted);font-size:14px;padding:12px 16px;border-radius:var(--r-chip);background:color-mix(in srgb,var(--text) 5%,transparent)}
+  .gate a{text-decoration:underline;text-underline-offset:3px;display:inline-block;padding:10px 4px}
+
   @media (pointer:coarse){
-    .rowbtns button{min-height:44px;min-width:44px;font-size:14px}
-    td input.cell{font-size:16px;min-height:44px}
+    td input.cell{font-size:16px;min-height:48px}
     .tcell input{font-size:16px;padding:6px 0}
-    .bar .home{display:inline-flex;align-items:center;min-height:44px}
   }
-  .rowbtns button:hover{border-color:var(--accent2-text);color:var(--accent2-text)}
+  @media(max-width:700px){
+    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+    body.ui .ui-header h1.ui-brand{font-size:18px}
+    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
+  }
+  @media (prefers-reduced-motion:reduce){.now .lbl.live::before{animation:none}td input.cell{transition:none}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -62,20 +95,23 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html">‹ Heem</a>
-  <h1><span aria-hidden="true">🗓️</span> Stonneplang</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="index.html">‹ Heem</a>
+    <h1 class="ui-brand"><span aria-hidden="true">🗓️</span> Stonneplang</h1>
+  </div>
+  <div class="header-right">
+    <span id="acctHost"></span>
+  </div>
 </header>
 
-<main class="wrap">
-  <div class="now" id="now" style="display:none"></div>
-  <div class="scroll" role="region" aria-label="Stonneplang" tabindex="0"><table id="grid"></table></div>
+<main class="ui-page">
+  <div class="now ui-card ui-card--accent" id="now" style="display:none"></div>
+  <div class="scroll ui-card" role="region" aria-label="Stonneplang" tabindex="0"><table id="grid"></table></div>
   <div class="rowbtns">
-    <button type="button" id="addRow" aria-label="Stonn derbäisetzen">+ Stonn</button>
-    <button type="button" id="delRow" aria-label="Lescht Stonn ewechhuelen">− Stonn</button>
+    <button type="button" class="ui-btn ui-btn--ghost" id="addRow" aria-label="Stonn derbäisetzen">+ Stonn</button>
+    <button type="button" class="ui-btn ui-btn--ghost" id="delRow" aria-label="Lescht Stonn ewechhuelen">− Stonn</button>
   </div>
   <div class="save" id="saveMsg" role="status" aria-live="polite"></div>
   <div class="hint" id="hint">Tipp op eng Zell fir d'Fach anzeginn (z.B. „Mathe · B12"). Ännerungen späichere sech automatesch.</div>
@@ -92,6 +128,7 @@ const DAYS=["Méindeg","Dënschdeg","Mëttwoch","Donneschdeg","Freideg"];
 const DAYS_SHORT=["Méi","Dën","Mët","Don","Fre"];
 // weekday (0=Mon..4=Fri) or -1 at the weekend
 const todayCol=()=>{const d=new Date().getDay();return d===0?-1:d-1>4?-1:d-1;};
+const esc=(v)=>String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const DEFAULT_TIMES=[["08:00","08:50"],["08:50","09:40"],["10:00","10:50"],["10:50","11:40"],["11:40","12:30"],["13:30","14:20"],["14:20","15:10"],["15:10","16:00"]];
 
 let sb=null,me=null,saveT=null;
@@ -106,17 +143,19 @@ function persistLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}c
 
 function render(){
   const g=$("grid");
-  let h="<thead><tr><th class='tcell' scope='col'>Zäit</th>"+DAYS.map((d,i)=>`<th scope="col" title="${d}"><span aria-hidden="true">${DAYS_SHORT[i]}</span><span class="sr-only">${d}</span></th>`).join("")+"</tr></thead><tbody>";
+  const tc=todayCol();
+  let h="<thead><tr><th class='tcell' scope='col'>Zäit</th>"+DAYS.map((d,i)=>`<th scope="col" title="${d}"${i===tc?' class="today"':''}><span aria-hidden="true">${DAYS_SHORT[i]}</span><span class="sr-only">${d}</span></th>`).join("")+"</tr></thead><tbody>";
   data.times.forEach((t,p)=>{
-    h+=`<tr><td class="tcell"><input data-t="${p}-0" value="${t[0]||""}" placeholder="08:00" aria-label="Stonn ${p+1}: Ufank" autocomplete="off"><br><input data-t="${p}-1" value="${t[1]||""}" placeholder="08:50" aria-label="Stonn ${p+1}: Enn" autocomplete="off"></td>`;
+    h+=`<tr><td class="tcell"><input data-t="${p}-0" value="${esc(t[0])}" placeholder="08:00" aria-label="Stonn ${p+1}: Ufank" autocomplete="off"><br><input data-t="${p}-1" value="${esc(t[1])}" placeholder="08:50" aria-label="Stonn ${p+1}: Enn" autocomplete="off"></td>`;
     for(let d=0;d<5;d++){
       const key=d+"-"+p;
-      h+=`<td data-cell="${key}"><input class="cell" data-c="${key}" value="${(data.cells[key]||"").replace(/"/g,"&quot;")}" placeholder="—" aria-label="${DAYS[d]}, Stonn ${p+1}" autocomplete="off"></td>`;
+      const val=data.cells[key]||"";
+      h+=`<td data-cell="${key}"${d===tc?' class="today"':''}><input class="cell${val?" filled":""}" data-c="${key}" value="${esc(val)}" placeholder="—" aria-label="${DAYS[d]}, Stonn ${p+1}" autocomplete="off"></td>`;
     }
     h+="</tr>";
   });
   g.innerHTML=h+"</tbody>";
-  g.querySelectorAll("input[data-c]").forEach(inp=>inp.oninput=()=>{const v=inp.value.trim();if(v)data.cells[inp.dataset.c]=v;else delete data.cells[inp.dataset.c];scheduleSave();});
+  g.querySelectorAll("input[data-c]").forEach(inp=>inp.oninput=()=>{const v=inp.value.trim();if(v)data.cells[inp.dataset.c]=v;else delete data.cells[inp.dataset.c];inp.classList.toggle("filled",!!v);scheduleSave();highlight();});
   g.querySelectorAll("input[data-t]").forEach(inp=>inp.oninput=()=>{const[p,i]=inp.dataset.t.split("-").map(Number);data.times[p][i]=inp.value.trim();scheduleSave();highlight();});
   highlight();
 }
@@ -125,20 +164,21 @@ function toMin(hhmm){const m=/^(\d{1,2}):(\d{2})$/.exec(hhmm||"");return m?(+m[1
 function highlight(){
   document.querySelectorAll("td.here").forEach(td=>{td.classList.remove("here");td.removeAttribute("aria-current");});
   const col=todayCol();
-  if(col<0){$("now").style.display="";$("now").innerHTML="<span aria-hidden='true'>🌴</span> Weekend — genéiss et!";return;}
+  const box=$("now");
+  box.style.display="";
+  if(col<0){box.innerHTML="<span class='lbl'>Haut</span><div class='big idle'><span aria-hidden='true'>🌴</span> Weekend — genéiss et!</div>";return;}
   const now=new Date().getHours()*60+new Date().getMinutes();
   let curP=-1;
   data.times.forEach((t,p)=>{const s=toMin(t[0]),e=toMin(t[1]);if(s!=null&&e!=null&&now>=s&&now<e)curP=p;});
   const label=(p)=>data.cells[col+"-"+p]||null;
-  $("now").style.display="";
   if(curP>=0){
     const td=document.querySelector(`td[data-cell="${col}-${curP}"]`);if(td){td.classList.add("here");td.setAttribute("aria-current","true");}
     const cur=label(curP);
-    let nextTxt="";for(let p=curP+1;p<data.times.length;p++){if(label(p)){nextTxt=`<div class="next">Duerno: <b>${label(p)}</b> (${data.times[p][0]})</div>`;break;}}
-    $("now").innerHTML=cur?`Elo: <b>${cur}</b>${nextTxt}`:`Elo keng Stonn agedroen.${nextTxt}`;
+    let nextTxt="";for(let p=curP+1;p<data.times.length;p++){if(label(p)){nextTxt=`<div class="next">Duerno: <b>${esc(label(p))}</b> (${esc(data.times[p][0])})</div>`;break;}}
+    box.innerHTML=cur?`<span class="lbl live">Elo</span><div class="big">${esc(cur)}</div>${nextTxt}`:`<span class="lbl live">Elo</span><div class="big idle">Elo keng Stonn agedroen.</div>${nextTxt}`;
   }else{
-    let nextTxt="";for(let p=0;p<data.times.length;p++){const s=toMin(data.times[p][0]);if(s!=null&&s>now&&label(p)){nextTxt=`Nächst: <b>${label(p)}</b> (${data.times[p][0]})`;break;}}
-    $("now").innerHTML=nextTxt||"Haut näischt méi agedroen.";
+    let nextTxt="";for(let p=0;p<data.times.length;p++){const s=toMin(data.times[p][0]);if(s!=null&&s>now&&label(p)){nextTxt=`<span class="lbl">Nächst</span><div class="big">${esc(label(p))}</div><div class="next">${esc(data.times[p][0])}</div>`;break;}}
+    box.innerHTML=nextTxt||"<div class='big idle'>Haut näischt méi agedroen.</div>";
   }
 }
 
