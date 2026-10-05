@@ -8,58 +8,126 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<script src="i18n-dict.js?v=42"></script>
+<script src="i18n.js?v=3"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--ok:#3fb950;--warn:#f87171;--strava:#fc4c02}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{flex:1;width:100%;max-width:680px;margin:0 auto;padding:18px 14px 40px;display:flex;flex-direction:column;gap:14px}
-  .gate{text-align:center;color:var(--muted);padding:50px 16px}
-  .btn{background:var(--accent);color:var(--accent-foreground);border:none;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;font-size:14px}
-  .ghost{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:9px 13px;font-weight:700;cursor:pointer;font-size:13px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:4px 0 0}
-  input,select{padding:10px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:16px;font-family:inherit}
-  .day{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .metric{flex:1;min-width:120px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
-  .metric b{display:block;font-size:22px}
-  .metric span{font-size:11.5px;color:var(--muted)}
-  .water{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:6px}
-  .water button{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:16px;font-weight:800;cursor:pointer}
-  .field{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .field input,.field select{flex:1;min-width:90px}
-  .wk{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
-  .wk .ic{font-size:20px}
-  .wk .t{font-weight:700}.wk .s{color:var(--muted);font-size:12px}
-  .wk .r{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
-  .tag{display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;background:rgba(110,168,254,.16);color:var(--accent-text);margin-left:6px}
-  .del{background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer}.del:hover{color:var(--warn)}
-  .msg{min-height:15px;color:var(--accent2-text);font-weight:700;font-size:12.5px}
-  .connect{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .stravabtn{background:var(--strava);color:#000;border:none;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;font-size:13px}
-  .hint{color:var(--muted);font-size:12px;line-height:1.5}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent-text);text-decoration:none}
+  button,a,summary{touch-action:manipulation}
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .btn,.ghost,.stravabtn,input,select{min-height:44px}
-  .water button{width:44px;height:44px}
-  .del{min-width:44px;min-height:44px}
-  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ---- header + column (site-ui look) ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  .header-right{flex-wrap:wrap;justify-content:flex-end}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+
+  /* ---- gate (loading / sign-in / empty / error) ---- */
+  .gate{text-align:center;padding:clamp(26px,5vw,44px) 22px;color:var(--muted)}
+  .gate .gate-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .gate p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text);text-wrap:balance}
+  .gate .gate-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
+  .gate .ui-btn{margin-top:18px}
+  .gate.slim{padding:22px 10px}
+  .gate.slim .gate-ico{width:52px;height:52px;margin-bottom:10px;border-radius:var(--r-chip);font-size:27px}
+  .gate.slim p{font-size:16px}
+
+  /* ---- section titles ---- */
+  h2.sec{display:flex;align-items:center;gap:10px;margin:10px 2px 0;font:800 clamp(19px,2.8vw,23px)/1.15 var(--font-display);letter-spacing:-.025em;text-transform:none;color:var(--text)}
+  h2.sec:first-child{margin-top:0}
+  h2.sec .sec-ico{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;font-size:18px;background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)}
+
+  /* ---- today: metric tiles ---- */
+  .day{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .metric{--h:var(--accent);position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding:16px 8px 14px;border-radius:var(--r-tile);background:color-mix(in srgb,var(--h) 9%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 26%,transparent)}
+  .metric .m-ico{display:grid;place-items:center;width:44px;height:44px;margin-bottom:6px;border-radius:var(--r-chip);font-size:23px;line-height:1;background:color-mix(in srgb,var(--h) 22%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 32%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .metric b{display:block;font:800 clamp(30px,6vw,40px)/1 var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+  .metric span.lbl{font-size:12.5px;line-height:1.3;color:var(--muted)}
+  .metric.water{--h:#4aa8ff}.metric.sleep{--h:#9b8cff}.metric.weight{--h:#4fc37a}
+  .stepper{display:flex;align-items:center;gap:8px;justify-content:center;margin-top:8px}
+  .stepper button{display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--card-opaque);color:var(--text);font:800 20px/1 var(--font-display);cursor:pointer;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 40%,var(--border));transition:transform .3s var(--ease),background-color .2s}
+  .stepper button:hover{background:color-mix(in srgb,var(--h) 18%,var(--card-opaque))}
+  .stepper button:active{transform:scale(.92)}
+
+  /* ---- forms ---- */
+  .field{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .field + .field{margin-top:10px}
+  .field .ui-input{flex:1 1 120px;width:auto;min-width:0}
+  .field .ui-btn{flex:0 0 auto}
+  select.ui-input{appearance:none;-webkit-appearance:none;padding-right:38px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238a8fa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 15px center}
+  .ui-btn:disabled{opacity:.55;cursor:default;transform:none}
+  .msg{min-height:18px;margin-top:8px;color:var(--accent-text);font-weight:700;font-size:13px}
+  .msg:empty{min-height:0;margin-top:0}
+  .hint{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+  .hint b{color:var(--text)}
+
+  /* ---- workouts ---- */
+  .wlist{padding:8px clamp(14px,3vw,22px)}
+  .wlist .gate{padding-left:0;padding-right:0}
+  .wk{--h:var(--accent);display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--tile-edge)}
+  .wk:last-child{border-bottom:0}
+  .wk .ic{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:var(--r-chip);font-size:23px;line-height:1;background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .wk .mid{min-width:0;flex:1 1 auto}
+  .wk .t{font:750 16px/1.25 var(--font-display);letter-spacing:-.015em}
+  .wk .s{margin-top:1px;color:var(--muted);font-size:12.5px;line-height:1.35;overflow-wrap:anywhere}
+  .wk .r{flex:none;margin-left:auto;text-align:right;font-variant-numeric:tabular-nums;font-size:13px;line-height:1.35;color:var(--text)}
+  .wk.t-run{--h:#ef7b4a}.wk.t-ride{--h:#4fc37a}.wk.t-swim{--h:#4aa8ff}.wk.t-gym{--h:#9b8cff}.wk.t-walk{--h:#f4a62a}.wk.t-kart{--h:#ef5b6b}
+  .tag{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;font:700 10.5px/1.6 var(--font-display);letter-spacing:.04em;vertical-align:1px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-text)}
+  .del{display:grid;place-items:center;flex:none;min-width:44px;min-height:44px;padding:0;border:0;border-radius:var(--r-chip);background:none;color:var(--muted);font-size:15px;cursor:pointer;transition:background-color .2s,color .2s}
+  .del:hover{background:color-mix(in srgb,#ef5b6b 14%,transparent);color:#ef5b6b}
+
+  /* ---- watch sync ---- */
+  .sync-head{display:flex;align-items:flex-start;gap:14px}
+  .sync-head .m-ico{display:grid;place-items:center;flex:none;width:46px;height:46px;border-radius:var(--r-chip);font-size:24px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent)}
+  .tokrow{margin-top:14px}
+  #tok{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;flex:2 1 200px}
+  details.how{margin-top:14px;border-radius:var(--r-chip);background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--border)}
+  details.how summary{display:flex;align-items:center;min-height:46px;padding:10px 16px;cursor:pointer;font:700 14px var(--font-display);color:var(--text);list-style:none}
+  details.how summary::-webkit-details-marker{display:none}
+  details.how summary::after{content:"›";margin-left:auto;font-size:22px;line-height:1;color:var(--muted);transition:transform .3s var(--ease)}
+  details.how[open] summary::after{transform:rotate(90deg)}
+  details.how ol{margin:0;padding:0 16px 16px 36px}
+  details.how li{margin-top:8px;color:var(--muted);font-size:13.5px;line-height:1.55}
+  details.how code{display:inline-block;max-width:100%;padding:1px 6px;border-radius:7px;background:color-mix(in srgb,var(--text) 8%,transparent);color:var(--text);font-size:12.5px;overflow-wrap:anywhere}
+
+  @media(max-width:640px){
+    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+    body.ui .ui-header h1.ui-brand{font-size:18px}
+    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
+    .day{gap:8px}
+    .metric{padding:14px 4px 12px}
+    .metric .m-ico{width:38px;height:38px;font-size:20px}
+    .wk .r{font-size:12.5px;max-width:34%}
+    .field .ui-btn{flex:1 1 100%}
+  }
+  @media(max-width:360px){.day{grid-template-columns:1fr}.metric{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px 12px;text-align:left}}
+  @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.stepper button,.del,details.how summary::after,body.ui .ui-header .home{transition:none}}
 </style>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="index.html">‹ Heem</a>
-  <h1><span aria-hidden="true">💪</span> Health</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="index.html" data-i18n="nav.home">‹ Heem</a>
+    <h1 class="ui-brand"><span aria-hidden="true">💪</span> Health</h1>
+  </div>
+  <div class="header-right">
+    <span id="acctHost"></span>
+  </div>
 </header>
 
-<main class="wrap" id="wrap"><div class="gate">Lueden…</div></main>
+<main class="ui-page" id="wrap"><div class="gate ui-card"><p>Lueden…</p></div></main>
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
@@ -76,61 +144,64 @@ async function boot(){
   sb=await auth.client();
   auth.mountAccountButton($("acctHost"));
   if(!auth.session()){
-    $("wrap").innerHTML=`<div class="gate">Mell dech un fir deng Gesondheet ze verfollegen.<br><br><button class="btn" id="si">Umellen</button></div>`;
+    $("wrap").innerHTML=`<div class="gate ui-card"><div class="gate-ico" aria-hidden="true">💪</div><p>Mell dech un fir deng Gesondheet ze verfollegen.</p><button class="ui-btn ui-btn--primary" id="si" type="button">Umellen</button></div>`;
     $("si").onclick=auth.openAuthModal;return;
   }
   me=auth.session().user.id;
   $("wrap").innerHTML=`
-    <h2>Haut</h2>
-    <div class="card">
+    <h2 class="sec"><span class="sec-ico" aria-hidden="true">☀️</span>Haut</h2>
+    <section class="ui-card">
       <div class="day">
-        <div class="metric"><b id="mWater">0</b><span>Waasser (Glieser)</span>
-          <div class="water"><button id="wMinus" type="button" aria-label="Glas ewechhuelen">−</button><button id="wPlus" type="button" aria-label="Glas derbäisetzen">＋</button></div></div>
-        <div class="metric"><b id="mSleep">–</b><span>Schlof (Stonnen)</span></div>
-        <div class="metric"><b id="mWeight">–</b><span>Gewiicht (kg)</span></div>
+        <div class="metric water"><span class="m-ico" aria-hidden="true">💧</span><b id="mWater">0</b><span class="lbl">Waasser (Glieser)</span>
+          <div class="stepper"><button id="wMinus" type="button" aria-label="Glas ewechhuelen">−</button><button id="wPlus" type="button" aria-label="Glas derbäisetzen">＋</button></div></div>
+        <div class="metric sleep"><span class="m-ico" aria-hidden="true">😴</span><b id="mSleep">–</b><span class="lbl">Schlof (Stonnen)</span></div>
+        <div class="metric weight"><span class="m-ico" aria-hidden="true">⚖️</span><b id="mWeight">–</b><span class="lbl">Gewiicht (kg)</span></div>
       </div>
-      <div class="field" style="margin-top:12px">
-        <input id="iSleep" type="number" step="0.5" min="0" max="24" placeholder="Schlof (h)" aria-label="Schlof (Stonnen)">
-        <input id="iWeight" type="number" step="0.1" min="0" max="300" placeholder="Gewiicht (kg)" aria-label="Gewiicht (kg)">
-        <button class="btn" id="saveDay" type="button">Späicheren</button>
+      <div class="field" style="margin-top:16px">
+        <input class="ui-input" id="iSleep" type="number" step="0.5" min="0" max="24" inputmode="decimal" placeholder="Schlof (h)" aria-label="Schlof (Stonnen)">
+        <input class="ui-input" id="iWeight" type="number" step="0.1" min="0" max="300" inputmode="decimal" placeholder="Gewiicht (kg)" aria-label="Gewiicht (kg)">
+        <button class="ui-btn ui-btn--primary" id="saveDay" type="button">Späicheren</button>
       </div>
       <div class="msg" id="dayMsg" role="status"></div>
-    </div>
+    </section>
 
-    <h2>Training bäisetzen</h2>
-    <div class="card">
+    <h2 class="sec"><span class="sec-ico" aria-hidden="true">🏃</span>Training bäisetzen</h2>
+    <section class="ui-card">
       <div class="field">
-        <select id="wType" aria-label="Zort Training">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
-        <input id="wDur" type="number" min="1" placeholder="Minutten" aria-label="Dauer (Minutten)">
-        <input id="wDist" type="number" step="0.1" min="0" placeholder="km (optional)" aria-label="Distanz (km, optional)">
+        <select class="ui-input" id="wType" aria-label="Zort Training">${Object.entries(TYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select>
+        <input class="ui-input" id="wDur" type="number" min="1" inputmode="numeric" placeholder="Minutten" aria-label="Dauer (Minutten)">
+        <input class="ui-input" id="wDist" type="number" step="0.1" min="0" inputmode="decimal" placeholder="km (optional)" aria-label="Distanz (km, optional)">
       </div>
-      <div class="field" style="margin-top:8px">
-        <input id="wNote" placeholder="Notiz (optional)" aria-label="Notiz (optional)" style="flex:2">
-        <button class="btn" id="addW">Bäisetzen</button>
+      <div class="field">
+        <input class="ui-input" id="wNote" placeholder="Notiz (optional)" aria-label="Notiz (optional)" style="flex:2 1 180px">
+        <button class="ui-btn ui-btn--primary" id="addW" type="button">Bäisetzen</button>
       </div>
       <div class="msg" id="wMsg" role="status"></div>
-    </div>
+    </section>
 
-    <h2>Trainingen</h2>
-    <div class="card" id="wList"><div class="gate">Lueden…</div></div>
+    <h2 class="sec"><span class="sec-ico" aria-hidden="true">📋</span>Trainingen</h2>
+    <section class="ui-card wlist" id="wList"><div class="gate slim"><p>Lueden…</p></div></section>
 
-    <h2>Apple Watch / Health Sync</h2>
-    <div class="card">
-      <p class="hint">Synchroniséier automatesch vun denger <b>Apple Watch</b> mat engem <b>Kuerzbefeel (Shortcut)</b> — kee Premium, keng App néideg. Dee leeft z.B. all Owend an schéckt Schrëtt, Schlof, Gewiicht an Trainingen op ian.lu.</p>
-      <div class="field" style="margin-top:10px">
-        <input id="tok" readonly aria-label="Token" placeholder="Token lueden…" style="flex:2;font-family:monospace;font-size:13px">
-        <button class="ghost" id="copyTok">Kopéieren</button>
+    <h2 class="sec"><span class="sec-ico" aria-hidden="true">⌚</span>Apple Watch / Health Sync</h2>
+    <section class="ui-card">
+      <div class="sync-head">
+        <span class="m-ico" aria-hidden="true">⌚</span>
+        <p class="hint">Synchroniséier automatesch vun denger <b>Apple Watch</b> mat engem <b>Kuerzbefeel (Shortcut)</b> — kee Premium, keng App néideg. Dee leeft z.B. all Owend an schéckt Schrëtt, Schlof, Gewiicht an Trainingen op ian.lu.</p>
       </div>
-      <div class="hint" id="tokMsg" role="status" style="margin-top:6px"></div>
-      <details style="margin-top:10px">
-        <summary class="hint" style="cursor:pointer">Wéi ariichten? (Kuerzbefeel)</summary>
-        <ol class="hint" style="margin:8px 0 0 18px;padding:0">
+      <div class="field tokrow">
+        <input class="ui-input" id="tok" readonly aria-label="Token" placeholder="Token lueden…">
+        <button class="ui-btn ui-btn--ghost" id="copyTok" type="button">Kopéieren</button>
+      </div>
+      <div class="msg" id="tokMsg" role="status"></div>
+      <details class="how">
+        <summary>Wéi ariichten? (Kuerzbefeel)</summary>
+        <ol>
           <li>Kuerzbefeeler-App → <b>Automatioun</b> → <b>Auerzäit</b> (z.B. 22:00, all Dag).</li>
           <li>Aktioun <b>„Gesondheetsprouwen fannen"</b> fir Schrëtt / Schlof / Gewiicht (haut).</li>
-          <li>Aktioun <b>„Inhalt vun URL huelen"</b> → POST op<br><code style="word-break:break-all">${cfg.url}/functions/v1/health-ingest</code><br>mat JSON: <code>{"token":"…","steps":…,"sleep_h":…,"weight_kg":…}</code> (däin Token uewen).</li>
+          <li>Aktioun <b>„Inhalt vun URL huelen"</b> → POST op<br><code>${cfg.url}/functions/v1/health-ingest</code><br>mat JSON: <code>{"token":"…","steps":…,"sleep_h":…,"weight_kg":…}</code> (däin Token uewen).</li>
         </ol>
       </details>
-    </div>`;
+    </section>`;
 
   $("wPlus").onclick=()=>bumpWater(1);
   $("wMinus").onclick=()=>bumpWater(-1);
@@ -187,19 +258,20 @@ async function saveDay(){
 /* ---------------- workouts ---------------- */
 async function loadWorkouts(){
   const {data,error}=await sb.from("workouts").select("*").order("at",{ascending:false}).limit(60);
-  if(error){$("wList").innerHTML='<div class="gate">Feeler beim Lueden.</div>';return;}
+  if(error){$("wList").innerHTML='<div class="gate slim"><div class="gate-ico" aria-hidden="true">⚠️</div><p>Feeler beim Lueden.</p></div>';return;}
   workouts=data||[];renderWorkouts();
 }
 function fmtDur(m){ if(m==null)return""; const h=Math.floor(m/60); return h?`${h}h ${m%60}m`:`${m}m`; }
 function renderWorkouts(){
-  if(!workouts.length){$("wList").innerHTML='<div class="gate">Nach keng Trainingen.</div>';return;}
+  if(!workouts.length){$("wList").innerHTML='<div class="gate slim"><div class="gate-ico" aria-hidden="true">🏃</div><p>Nach keng Trainingen.</p><div class="gate-sub">Setz uewen däin éischt Training bäi.</div></div>';return;}
   $("wList").innerHTML=workouts.map(w=>{
     const ic=(TYPES[w.type]||"⭐ Aneres").split(" ")[0];
     const when=new Date(w.at).toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});
     const synced=w.source==="watch"?`<span class="tag">⌚ WATCH</span>`:"";
     const bits=[fmtDur(w.duration_min),w.distance_km?w.distance_km+" km":"",w.calories?w.calories+" kcal":""].filter(Boolean).join(" · ");
-    return `<div class="wk"><span class="ic" aria-hidden="true">${ic}</span>
-      <div><div class="t">${esc((TYPES[w.type]||"Aneres").split(" ").slice(1).join(" "))}${synced}</div>
+    const tcls=TYPES[w.type]?" t-"+w.type:"";
+    return `<div class="wk${tcls}"><span class="ic" aria-hidden="true">${ic}</span>
+      <div class="mid"><div class="t">${esc((TYPES[w.type]||"Aneres").split(" ").slice(1).join(" "))}${synced}</div>
         <div class="s">${when}${w.note?" · "+esc(w.note):""}</div></div>
       <div class="r">${esc(bits)}</div>
       ${w.source==="watch"?"":`<button class="del" data-del="${w.id}" type="button" aria-label="Training läschen"><span aria-hidden="true">✕</span></button>`}</div>`;
