@@ -44,14 +44,14 @@
   /* ---- filters ---- */
   .filters{display:flex;flex-direction:column;gap:10px}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 16px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--muted);font:700 14px var(--font-display);letter-spacing:-.01em;cursor:pointer;box-shadow:inset 0 0 0 1px var(--border);transition:box-shadow .2s,background-color .2s,color .2s,transform .3s var(--ease)}
-  .chip:hover{color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,var(--border))}
-  .chip:active{transform:scale(.97)}
-  .chip.on{background:var(--accent);color:var(--accent-foreground);box-shadow:0 8px 20px -12px color-mix(in srgb,var(--accent) 80%,transparent)}
+  .lbchip{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 16px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--muted);font:700 14px var(--font-display);letter-spacing:-.01em;cursor:pointer;box-shadow:inset 0 0 0 1px var(--border);transition:box-shadow .2s,background-color .2s,color .2s,transform .3s var(--ease)}
+  .lbchip:hover{color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,var(--border))}
+  .lbchip:active{transform:scale(.97)}
+  .lbchip.on{background:var(--accent);color:var(--accent-foreground);box-shadow:0 8px 20px -12px color-mix(in srgb,var(--accent) 80%,transparent)}
   .periods{display:inline-flex;align-self:flex-start;gap:4px;padding:4px;border-radius:calc(var(--r-chip) + 4px);background:color-mix(in srgb,var(--text) 6%,transparent)}
-  .periods .chip{min-height:40px;padding:6px 18px;background:transparent;box-shadow:none}
-  .periods .chip:hover{box-shadow:none;color:var(--text)}
-  .periods .chip.on{background:var(--accent);color:var(--accent-foreground)}
+  .periods .lbchip{min-height:40px;padding:6px 18px;background:transparent;box-shadow:none}
+  .periods .lbchip:hover{box-shadow:none;color:var(--text)}
+  .periods .lbchip.on{background:var(--accent);color:var(--accent-foreground)}
 
   /* ---- board ---- */
   .board{padding:clamp(10px,2.4vw,18px) clamp(8px,2.4vw,18px) clamp(12px,2.4vw,18px)}
@@ -71,7 +71,7 @@
   .lb .who .meter{display:block;height:5px;margin-top:6px;border-radius:99px;background:color-mix(in srgb,var(--text) 9%,transparent);overflow:hidden}
   .lb .who .meter i{display:block;height:100%;border-radius:99px;background:var(--good);opacity:.85}
   .lb .pct{color:var(--good);font-weight:800;white-space:nowrap}
-  .lb tr.top1 td{padding-top:14px;padding-bottom:14px;font-size:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--gold) 24%,var(--card-opaque)),color-mix(in srgb,var(--gold) 8%,var(--card-opaque)))}
+  .lb tr.top1 td{padding-top:14px;padding-bottom:14px;font-size:16px;background:color-mix(in srgb,var(--gold) 20%,var(--card-opaque))}
   .lb tr.top2 td{background:color-mix(in srgb,var(--silver) 15%,var(--card-opaque))}
   .lb tr.top3 td{background:color-mix(in srgb,var(--bronze) 15%,var(--card-opaque))}
   .lb tr.top1 .who .name{font-family:var(--font-display);font-size:17px;font-weight:800;letter-spacing:-.01em}
@@ -81,13 +81,13 @@
   .lbempty .lbempty-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
   .lbempty p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text)}
   .lbempty .lbempty-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
-  .note{margin:4px 4px 0;color:var(--muted);font-size:12.5px;line-height:1.5;text-align:center}
+  .lbnote{margin:4px 4px 0;color:var(--muted);font-size:12.5px;line-height:1.5;text-align:center}
 
   @media(max-width:700px){
     html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
     body.ui .ui-header h1.ui-brand{font-size:18px}
     .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
-    .chip{padding:8px 13px;font-size:13.5px}
+    .lbchip{padding:8px 13px;font-size:13.5px}
     .lb{font-size:14px}
     .lb th,.lb td{padding-left:7px;padding-right:7px}
     .lb .rank{width:40px}
@@ -113,25 +113,25 @@
 </header>
 <main class="ui-page">
   <div class="filters">
-    <div class="chips" id="tabs" role="group" aria-label="Spill" data-t-aria="game">
-      <button type="button" class="chip on" data-g="" aria-pressed="true" data-t="all">All Spiller</button>
-      <button type="button" class="chip" data-g="connect4" aria-pressed="false"><span aria-hidden="true">🔴</span> <span data-t="g.connect4">Connect 4</span></button>
-      <button type="button" class="chip" data-g="battleship" aria-pressed="false"><span aria-hidden="true">🚢</span> <span data-t="g.battleship">Battleship</span></button>
-      <button type="button" class="chip" data-g="color" aria-pressed="false"><span aria-hidden="true">🎨</span> <span data-t="g.color">Colour Guess</span></button>
-      <button type="button" class="chip" data-g="reversi" aria-pressed="false"><span aria-hidden="true">⚫</span> <span data-t="g.reversi">Reversi</span></button>
-      <button type="button" class="chip" data-g="dots" aria-pressed="false"><span aria-hidden="true">▦</span> <span data-t="g.dots">Dots &amp; Boxes</span></button>
-      <button type="button" class="chip" data-g="tictactoe" aria-pressed="false"><span aria-hidden="true">✕</span> <span data-t="g.tictactoe">Tic-Tac-Toe</span></button>
-      <button type="button" class="chip" data-g="checkers" aria-pressed="false"><span aria-hidden="true">🟠</span> <span data-t="g.checkers">Checkers</span></button>
-      <button type="button" class="chip" data-g="maumau" aria-pressed="false"><span aria-hidden="true">🃏</span> <span data-t="g.maumau">Mau-Mau</span></button>
-      <button type="button" class="chip" data-g="diceduel" aria-pressed="false"><span aria-hidden="true">🎲</span> <span data-t="g.diceduel">Kniffel</span></button>
+    <div class="lbchips" id="tabs" role="group" aria-label="Spill" data-t-aria="game">
+      <button type="button" class="lbchip on" data-g="" aria-pressed="true" data-t="all">All Spiller</button>
+      <button type="button" class="lbchip" data-g="connect4" aria-pressed="false"><span aria-hidden="true">🔴</span> <span data-t="g.connect4">Connect 4</span></button>
+      <button type="button" class="lbchip" data-g="battleship" aria-pressed="false"><span aria-hidden="true">🚢</span> <span data-t="g.battleship">Battleship</span></button>
+      <button type="button" class="lbchip" data-g="color" aria-pressed="false"><span aria-hidden="true">🎨</span> <span data-t="g.color">Colour Guess</span></button>
+      <button type="button" class="lbchip" data-g="reversi" aria-pressed="false"><span aria-hidden="true">⚫</span> <span data-t="g.reversi">Reversi</span></button>
+      <button type="button" class="lbchip" data-g="dots" aria-pressed="false"><span aria-hidden="true">▦</span> <span data-t="g.dots">Dots &amp; Boxes</span></button>
+      <button type="button" class="lbchip" data-g="tictactoe" aria-pressed="false"><span aria-hidden="true">✕</span> <span data-t="g.tictactoe">Tic-Tac-Toe</span></button>
+      <button type="button" class="lbchip" data-g="checkers" aria-pressed="false"><span aria-hidden="true">🟠</span> <span data-t="g.checkers">Checkers</span></button>
+      <button type="button" class="lbchip" data-g="maumau" aria-pressed="false"><span aria-hidden="true">🃏</span> <span data-t="g.maumau">Mau-Mau</span></button>
+      <button type="button" class="lbchip" data-g="diceduel" aria-pressed="false"><span aria-hidden="true">🎲</span> <span data-t="g.diceduel">Kniffel</span></button>
     </div>
     <div class="periods" id="periods" role="group" aria-label="Zäitraum" data-t-aria="period">
-      <button type="button" class="chip on" data-p="all" aria-pressed="true" data-t="pAll">All Zäit</button>
-      <button type="button" class="chip" data-p="7" aria-pressed="false" data-t="pWeek">Dës Woch</button>
+      <button type="button" class="lbchip on" data-p="all" aria-pressed="true" data-t="pAll">All Zäit</button>
+      <button type="button" class="lbchip" data-p="7" aria-pressed="false" data-t="pWeek">Dës Woch</button>
     </div>
   </div>
   <section class="ui-card board" id="board" aria-live="polite" aria-busy="true"><div id="body"></div></section>
-  <p class="note" data-t="note">Nëmmen Partien, déi du ugemellt gespillt hues, zielen. Sieg an Néierlag mellt de Spiller selwer.</p>
+  <p class="lbnote" data-t="note">Nëmmen Partien, déi du ugemellt gespillt hues, zielen. Sieg an Néierlag mellt de Spiller selwer.</p>
 </main>
 
 <script src="pixelbreak-config.js"></script>
@@ -191,7 +191,7 @@ function paint(){
     return `<tr class="top${i+1}"><td class="rank">${rank}</td><td class="who"><span class="name">${esc(r.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${r.wins}</td><td class="n">${r.losses}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
   }).join("");
   const sum=data.length===1?t("sum1"):t("sumN").replace("{n}",data.length);
-  body.innerHTML=`<p class="board-sum"><span class="dot" aria-hidden="true"></span>${esc(sum)} · ${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</p>`+
+  body.innerHTML=`<p class="board-sum"><span class="dot" aria-hidden="true"></span>${esc([sum,...(game?[label()]:[]),period==="all"?t("pAll"):t("pWeek")].join(" · "))}</p>`+
     `<table class="lb"><caption class="sr-only">${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</caption><thead><tr><th scope="col" class="rank"><span aria-hidden="true">#</span><span class="sr-only">${esc(t("rank"))}</span></th><th scope="col">${esc(t("player"))}</th><th scope="col" class="n"><span aria-hidden="true">${esc(t("w"))}</span><span class="sr-only">${esc(t("wf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("l"))}</span><span class="sr-only">${esc(t("lf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("pct"))}</span><span class="sr-only">${esc(t("pctf"))}</span></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
