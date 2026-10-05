@@ -83,9 +83,9 @@
   .opt .pct{flex:none;text-align:right;font:800 15px var(--font-display);font-variant-numeric:tabular-nums}
   .opt .cnt{display:block;font:500 11.5px system-ui,-apple-system,sans-serif;color:var(--muted)}
   .meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:var(--muted);font-size:12.5px}
-  .chip{display:inline-flex;align-items:center;min-height:26px;padding:2px 11px;border-radius:999px;font:750 12px var(--font-display);background:color-mix(in srgb,var(--text) 7%,transparent)}
-  .chip.closed{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
-  .chip.live{color:var(--accent-text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
+  .pchip{display:inline-flex;align-items:center;min-height:26px;padding:2px 11px;border-radius:999px;font:750 12px var(--font-display);background:color-mix(in srgb,var(--text) 7%,transparent)}
+  .pchip.closed{color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent)}
+  .pchip.live{color:var(--accent-text);background:color-mix(in srgb,var(--accent) 16%,transparent)}
 
   @media(prefers-reduced-motion:no-preference){.opt .fill{transition:transform .5s var(--ease)}}
   @media(max-width:700px){
@@ -182,7 +182,7 @@ function render(){
       <button type="button" class="ui-btn ui-btn--ghost abtn" data-close="${p.id}" data-open="${p.is_open?0:1}" aria-label="${p.is_open?"Zoumaachen":"Opmaachen"}: ${esc(p.question)}">${p.is_open?"Zoumaachen":"Opmaachen"}</button>
       <button type="button" class="ui-btn ui-btn--ghost abtn danger" data-del="${p.id}" aria-label="Läschen: ${esc(p.question)}">Läschen</button></div>`:"";
     return `<section class="ui-card poll${p.is_open?"":" closedp"}" aria-labelledby="q-${p.id}"><div class="phead"><span class="pico" aria-hidden="true">${p.is_open?"🗳️":"🔒"}</span><h2 class="q" id="q-${p.id}">${esc(p.question)}</h2></div><div class="opts">${opts}</div>
-      <div class="meta"><span class="chip">${total} Stëmmen</span>${p.is_open?"":'<span class="chip closed">zou</span>'}</div>${admin}</section>`;
+      <div class="meta"><span class="pchip">${total} Stëmmen</span>${p.is_open?"":'<span class="pchip closed">zou</span>'}</div>${admin}</section>`;
   }).join("");
   $("list").querySelectorAll(".opt:not([disabled])").forEach(b=>b.onclick=()=>vote(b.dataset.p,+b.dataset.i));
   $("list").querySelectorAll("[data-close]").forEach(b=>b.onclick=async()=>{
@@ -213,7 +213,7 @@ function addOptInput(){
   const n=$("npOpts").children.length;
   if(n>=6)return;
   const inp=document.createElement("input");
-  inp.maxLength=80;inp.placeholder="Optioun "+(n+1);inp.setAttribute("aria-label","Optioun "+(n+1));inp.autocomplete="off";
+  inp.maxLength=80;inp.placeholder="Optioun "+(n+1);inp.setAttribute("aria-label","Optioun "+(n+1));inp.autocomplete="off";inp.className="ui-input";
   $("npOpts").appendChild(inp);
 }
 $("npAdd").onclick=addOptInput;
