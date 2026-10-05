@@ -88,8 +88,8 @@
   .search-input::placeholder{color:var(--muted);opacity:1}
   .search-input:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,var(--border))}
   .search-input:focus{box-shadow:inset 0 0 0 2px var(--accent)}
-  .filters{display:flex;flex-wrap:wrap;gap:6px;padding:2px 14px 10px}
-  .filters button{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:44px;padding:6px 12px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--muted);font:700 13px var(--font-display);letter-spacing:-.01em;white-space:nowrap;cursor:pointer;box-shadow:inset 0 0 0 1px var(--border);transition:background-color .2s,color .2s,box-shadow .2s,transform .3s var(--ease)}
+  .filters{display:flex;flex-wrap:wrap;gap:6px;padding:2px 12px 10px}
+  .filters button{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:6px 9px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--muted);font:700 12.5px var(--font-display);letter-spacing:-.01em;white-space:nowrap;cursor:pointer;box-shadow:inset 0 0 0 1px var(--border);transition:background-color .2s,color .2s,box-shadow .2s,transform .3s var(--ease)}
   .filters button:hover{color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,var(--border))}
   .filters button:active{transform:scale(.97)}
   .filters button.active{background:color-mix(in srgb,var(--accent) 18%,var(--card-opaque));color:var(--text);box-shadow:inset 0 0 0 1.5px var(--accent)}
@@ -116,6 +116,8 @@
   .chat-avatar img{width:100%;height:100%;object-fit:cover;display:block}
   .empty{color:var(--muted);font-size:14px;text-align:center;padding:28px 14px;line-height:1.5;text-wrap:balance}
   .mail-strip .account-state{grid-template-columns:auto 1fr;gap:2px 8px}
+  .mail-strip .account-heading{min-width:0;overflow-wrap:anywhere}
+  .mail-strip .account-seen{grid-column:1/-1;text-align:left}
   .mail-strip>.empty{grid-column:1/-1;padding:8px}
   .mail-row .chat-row-bottom{align-items:baseline}
   .mail-account-badge{flex:none;border-radius:999px;padding:2px 8px;font-size:10.5px;font-weight:750;color:var(--accent-text);background:color-mix(in srgb,var(--accent) 14%,transparent)}
@@ -176,7 +178,7 @@
   .mail-body{margin:10px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;font-size:15px;line-height:1.5}
 
   /* ---- composer: one rounded bar with attach, text and send ---- */
-  .composer{display:flex;flex-direction:column;gap:8px;margin:6px 14px calc(14px + env(safe-area-inset-bottom) * 0);flex:none}
+  .composer{display:flex;flex-direction:column;gap:8px;margin:6px 14px 14px;flex:none}
   .composer[hidden]{display:none}
   .composer-row{display:flex;align-items:center;gap:6px;min-width:0;padding:6px;border-radius:22px;background:var(--card-opaque);box-shadow:inset 0 0 0 1px var(--border);transition:box-shadow .2s}
   .composer-row:hover{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,var(--border))}
@@ -209,7 +211,7 @@
   @media(max-width:900px){
     html body.ui .ui-header{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
     #app{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
-    .sidebar{width:280px}
+    .sidebar{width:300px}
     .mail-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
     .chat-head{padding-left:16px;padding-right:12px}
   }
