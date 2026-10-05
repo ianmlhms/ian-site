@@ -10,10 +10,58 @@
   <meta property="og:image" content="https://ian.lu/apple-touch-icon.png" />
   <link rel="canonical" href="https://ian.lu/about.html" />
   <title>About — Ian Mulheims</title>
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="site-ui.css?v=2" />
   <style>
-    .hero-tag{margin-left:0}
-    a.proj-card:focus-visible,.bar a:focus-visible,footer a:focus-visible{outline:3px solid var(--accent-border,var(--accent));outline-offset:2px;border-radius:8px}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    a{color:var(--accent-text);text-decoration:none}
+    a,button{touch-action:manipulation}
+    a:focus-visible,button:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:3px;border-radius:8px}
+
+    /* ---- header + column ---- */
+    html body.ui .ui-header{flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+    .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+    .header-left{flex:1 1 auto}
+    .header-right{flex-wrap:wrap;justify-content:flex-end;gap:12px}
+    body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+    body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+    body.ui .ui-header .home:active{transform:scale(.97)}
+    .ui .ui-page{display:flex;flex-direction:column;gap:34px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(56px,calc(36px + env(safe-area-inset-bottom)))}
+    @media (max-width:620px){.ui .ui-page{gap:28px;padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
+
+    /* ---- hero ---- */
+    .about-hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:clamp(16px,3vw,28px);align-items:start;padding:clamp(22px,4vw,38px);overflow:hidden}
+    .about-hero .ava{display:grid;place-items:center;width:clamp(72px,11vw,104px);height:clamp(72px,11vw,104px);border-radius:clamp(22px,3.4vw,32px);font-size:clamp(38px,6vw,56px);line-height:1;background:color-mix(in srgb,var(--accent) 24%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 24%,transparent),0 16px 30px -18px rgb(var(--ink)/.5);transform:rotate(-4deg)}
+    .about-hero h1.ui-title{margin:2px 0 10px;font-size:clamp(34px,6vw,52px);line-height:1.04;letter-spacing:-.04em}
+    .about-hero .bio{margin:0;max-width:62ch;font-size:clamp(16px,2vw,18px);line-height:1.6;color:var(--text);text-wrap:pretty}
+    .about-hero .acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+    .about-hero .ui-btn{padding:12px 22px}
+    @media (max-width:560px){.about-hero{grid-template-columns:minmax(0,1fr);row-gap:16px}.about-hero .acts{margin-top:18px}}
+
+    /* ---- projects ---- */
+    .ui-title.sec{margin-bottom:14px}
+    .proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,17rem),1fr));gap:14px}
+    .proj-grid .ui-tile{grid-template-columns:minmax(0,1fr);grid-template-areas:"ico" "name" "sub" "tags";align-content:start;row-gap:4px;min-height:0;padding:20px}
+    .proj-grid .ui-tile .ui-tile__ico{width:60px;height:60px;margin-bottom:14px;border-radius:18px;font-size:32px}
+    .proj-grid .ui-tile .ui-tile__name{align-self:start;font-size:18px}
+    .proj-grid .ui-tile .ui-tile__sub{display:block;-webkit-line-clamp:unset;overflow:visible;font-size:14px;line-height:1.5}
+    .proj-grid .ptags{grid-area:tags;display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+    .proj-grid .ptag{display:inline-flex;align-items:center;min-height:26px;padding:3px 11px;border-radius:13px;background:color-mix(in srgb,var(--h) 16%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 28%,transparent);color:var(--text);font:700 12px var(--font-display);letter-spacing:.01em}
+    .proj-grid .ui-tile__go{position:absolute;top:22px;right:20px;color:var(--muted);font-size:24px;line-height:1;transition:transform .3s var(--ease),color .2s}
+    .proj-grid a.ui-tile:hover .ui-tile__go{color:var(--h);transform:translateX(3px)}
+    .proj-grid div.ui-tile{cursor:default}
+    .proj-grid div.ui-tile:hover{transform:none;background:var(--card);box-shadow:inset 0 0 0 1px var(--tile-edge),0 1px 2px rgb(var(--ink)/.05),0 14px 30px -18px rgb(var(--ink)/.35)}
+    .proj-grid div.ui-tile:hover .ui-tile__ico{transform:none}
+
+    /* ---- footer ---- */
+    .about-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 28px;width:calc(100% - 56px);max-width:984px;margin:0 auto;padding:20px 0 calc(36px + env(safe-area-inset-bottom));border-top:1px solid var(--border);color:var(--muted);font-size:13px}
+    .about-foot .foot-links{display:flex;flex-wrap:wrap;gap:0 2px;margin-inline:-10px}
+    .about-foot .foot-link{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;border-radius:10px;color:var(--muted)}
+    .about-foot .foot-link:hover{color:var(--text)}
+    @media (max-width:760px){.about-foot{width:calc(100% - 32px);padding-bottom:calc(88px + env(safe-area-inset-bottom))}}
+
+    @media (prefers-reduced-motion:reduce){body.ui .ui-header .home,.proj-grid .ui-tile__go{transition:none}.about-hero .ava{transform:none}}
+    @media (prefers-contrast:more){.about-hero .ava,.proj-grid .ptag{box-shadow:0 0 0 2px var(--text)}}
   </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -27,74 +75,88 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="site.webmanifest">
 </head>
-<body>
-  <header class="bar">
-    <span style="display:flex;align-items:center;gap:14px">
-      <a class="brand" href="/">ian.lu</a>
-      <a class="home" href="index.html" data-i18n="nav.home" style="color:var(--muted);font-weight:700;text-decoration:none">‹ Home</a>
-    </span>
-    <span style="display:flex;align-items:center;gap:12px">
+<body class="ui">
+  <header class="bar ui-header">
+    <div class="header-left">
+      <a class="brand ui-brand" href="/">ian.lu</a>
+      <a class="home" href="index.html" data-i18n="nav.home">‹ Home</a>
+    </div>
+    <div class="header-right">
       <span id="langSw"></span>
       <span id="acctHost"></span>
-    </span>
+    </div>
   </header>
 
-  <main class="page">
+  <main class="page ui-page">
     <!-- about me -->
-    <section class="section">
-      <h1 class="hero-name" data-i18n="about.title">About me</h1>
-      <p class="hero-tag" data-i18n="about.bio">I'm Ian, a student from Luxembourg who loves building games, real-time apps and small tools — on the web with plain JavaScript and Supabase, and on iPhone and Apple Watch with SwiftUI. Most of the projects below started as a quick "can I build this?" and ended up being used by my friends and family.</p>
+    <section class="about-hero ui-card ui-card--accent">
+      <div class="ava" aria-hidden="true">🧑‍💻</div>
+      <div>
+        <h1 class="hero-name ui-title" data-i18n="about.title">About me</h1>
+        <p class="hero-tag bio" data-i18n="about.bio">I'm Ian, a student from Luxembourg who loves building games, real-time apps and small tools — on the web with plain JavaScript and Supabase, and on iPhone and Apple Watch with SwiftUI. Most of the projects below started as a quick "can I build this?" and ended up being used by my friends and family.</p>
+        <div class="acts">
+          <a class="ui-btn ui-btn--primary" href="#projects"><span data-i18n="index.projects">Projects</span></a>
+          <a class="ui-btn ui-btn--ghost" href="https://github.com/ianmlhms" rel="noopener">GitHub</a>
+        </div>
+      </div>
     </section>
 
     <!-- projects showcase -->
-    <section class="section" id="projects">
-      <h2 class="sec-title" data-i18n="index.projects">Projects</h2>
+    <section id="projects" aria-labelledby="projTitle">
+      <h2 class="sec-title ui-title sec" id="projTitle" data-i18n="index.projects">Projects</h2>
       <div class="proj-grid">
-        <a class="proj-card" href="pixelbreak.html">
-          <span class="pico" aria-hidden="true">🎮</span>
-          <span class="ptitle">Arcade</span>
-          <span class="pdesc" data-i18n="proj.pixelbreak.desc">53 arcade games, all playable in the browser — no install, no ads.</span>
+        <a class="proj-card ui-tile" style="--h:#f0a04b" href="pixelbreak.html">
+          <span class="pico ui-tile__ico" aria-hidden="true">🎮</span>
+          <span class="ptitle ui-tile__name">Arcade</span>
+          <span class="pdesc ui-tile__sub" data-i18n="proj.pixelbreak.desc">53 arcade games, all playable in the browser — no install, no ads.</span>
           <span class="ptags"><span class="ptag">Web</span><span class="ptag">JavaScript</span></span>
+          <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <a class="proj-card" href="pixelbreak.html">
-          <span class="pico" aria-hidden="true">🎲</span>
-          <span class="ptitle">Multiplayer Games</span>
-          <span class="pdesc" data-i18n="proj.games.desc">Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels.</span>
+        <a class="proj-card ui-tile" style="--h:#a78bfa" href="pixelbreak.html">
+          <span class="pico ui-tile__ico" aria-hidden="true">🎲</span>
+          <span class="ptitle ui-tile__name">Multiplayer Games</span>
+          <span class="pdesc ui-tile__sub" data-i18n="proj.games.desc">Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels.</span>
           <span class="ptags"><span class="ptag" data-i18n="tag.realtime">Realtime</span><span class="ptag">Supabase</span></span>
+          <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <a class="proj-card" href="messenger.html">
-          <span class="pico" aria-hidden="true">💬</span>
-          <span class="ptitle">Messenger</span>
-          <span class="pdesc" data-i18n="proj.messenger.desc">Real-time chat with groups, voice notes, file sharing, replies and reactions.</span>
+        <a class="proj-card ui-tile" style="--h:#6ea8fe" href="messenger.html">
+          <span class="pico ui-tile__ico" aria-hidden="true">💬</span>
+          <span class="ptitle ui-tile__name">Messenger</span>
+          <span class="pdesc ui-tile__sub" data-i18n="proj.messenger.desc">Real-time chat with groups, voice notes, file sharing, replies and reactions.</span>
           <span class="ptags"><span class="ptag" data-i18n="tag.realtime">Realtime</span><span class="ptag">PWA</span></span>
+          <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <a class="proj-card" href="wordle.html">
-          <span class="pico" aria-hidden="true">🟩</span>
-          <span class="ptitle">Wuertspill</span>
-          <span class="pdesc" data-i18n="proj.wordle.desc">Wordle, but in Luxembourgish and German — the way I actually speak.</span>
+        <a class="proj-card ui-tile" style="--h:#4fc37a" href="wordle.html">
+          <span class="pico ui-tile__ico" aria-hidden="true">🟩</span>
+          <span class="ptitle ui-tile__name">Wuertspill</span>
+          <span class="pdesc ui-tile__sub" data-i18n="proj.wordle.desc">Wordle, but in Luxembourgish and German — the way I actually speak.</span>
           <span class="ptags"><span class="ptag">Web</span><span class="ptag">Lëtzebuergesch</span></span>
+          <span class="ui-tile__go" aria-hidden="true">›</span>
         </a>
-        <div class="proj-card static">
-          <span class="pico" aria-hidden="true">🏎️</span>
-          <span class="ptitle">KartTracker</span>
-          <span class="pdesc" data-i18n="proj.kart.desc">A go-kart lap timer for iPhone + Apple Watch — live lap times, best-lap tracking and session history.</span>
+        <div class="proj-card static ui-tile" style="--h:#ef6a6a">
+          <span class="pico ui-tile__ico" aria-hidden="true">🏎️</span>
+          <span class="ptitle ui-tile__name">KartTracker</span>
+          <span class="pdesc ui-tile__sub" data-i18n="proj.kart.desc">A go-kart lap timer for iPhone + Apple Watch — live lap times, best-lap tracking and session history.</span>
           <span class="ptags"><span class="ptag">SwiftUI</span><span class="ptag">watchOS</span></span>
         </div>
-        <div class="proj-card static">
-          <span class="pico" aria-hidden="true">🎬</span>
-          <span class="ptitle">ShortsFactory</span>
-          <span class="pdesc" data-i18n="proj.shorts.desc">An automated pipeline that generates faceless short videos and uploads them — with a Telegram approval step.</span>
+        <div class="proj-card static ui-tile" style="--h:#e879a9">
+          <span class="pico ui-tile__ico" aria-hidden="true">🎬</span>
+          <span class="ptitle ui-tile__name">ShortsFactory</span>
+          <span class="pdesc ui-tile__sub" data-i18n="proj.shorts.desc">An automated pipeline that generates faceless short videos and uploads them — with a Telegram approval step.</span>
           <span class="ptags"><span class="ptag">Python</span><span class="ptag" data-i18n="tag.automation">Automation</span></span>
         </div>
       </div>
     </section>
   </main>
 
-  <footer>
-    <span id="year"></span> · Ian Mulheims ·
-    <a href="index.html" class="foot-link" data-i18n="nav.home">‹ Home</a> ·
-    <a href="https://github.com/ianmlhms" rel="noopener" class="foot-link">GitHub</a>
-   · <a href="privacy.html" class="foot-link">Datenschutz · Privacy</a></footer>
+  <footer class="about-foot">
+    <span class="foot-id"><span id="year"></span> Ian Mulheims</span>
+    <nav class="foot-links" aria-label="Ian Mulheims">
+      <a href="index.html" class="foot-link" data-i18n="nav.home">‹ Home</a>
+      <a href="https://github.com/ianmlhms" rel="noopener" class="foot-link">GitHub</a>
+      <a href="privacy.html" class="foot-link" data-i18n="footer.privacy">Datenschutz</a>
+    </nav>
+  </footer>
 
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
