@@ -4,7 +4,7 @@ export const esc = (s) => ("" + (s ?? "")).replace(
     '"': "&quot;" })[c],
 );
 
-const KEY_HINT = '<p class="hint">Mat de Pfeiltaste <strong>←</strong> / <strong>→</strong> geet et nach méi séier.</p>';
+const KEY_HINT = '<p class="fv-hint">Mat de Pfeiltaste <strong>←</strong> / <strong>→</strong> geet et nach méi séier.</p>';
 
 export function loadingMarkup(text) {
   return `<div class="ui-card state" role="status"><div class="gate-ico" aria-hidden="true">📷</div><p class="big">${esc(text)}</p></div>`;
@@ -118,5 +118,5 @@ export function standingsMarkup(rows, urlForRow) {
     <button class="ui-btn ui-btn--ghost" id="overviewBtn"><span aria-hidden="true">‹</span>&nbsp;Iwwersiicht</button>
     <div class="spacer"></div><h2>Ranglëscht</h2>
   </div>
-  <div class="standings">${cards || '<p class="ui-card state empty">Nach keng Iwwerliewender.</p>'}</div>`;
+  <div class="standings">${cards || '<p class="ui-card state fv-empty">Nach keng Iwwerliewender.</p>'}</div>`;
 }

@@ -36,6 +36,7 @@
   .ui .ui-page.is-wide{max-width:1040px}
   html body.ui[data-width=photo] .ui-header{max-width:760px}
   html body.ui[data-width=wide] .ui-header{max-width:1040px}
+  #gateWrap{padding-top:max(56px,calc(24px + env(safe-area-inset-top)))}
   #screen{display:flex;flex-direction:column;gap:14px;min-width:0}
 
   /* ---- messages + states ---- */
@@ -68,7 +69,7 @@
   button.ui-tile:disabled{cursor:not-allowed;opacity:.5;transform:none;box-shadow:inset 0 0 0 1px var(--tile-edge)}
   button.ui-tile:disabled:hover .ui-tile__ico{transform:none}
   .ui-tile .ui-tile__badge{font-size:20px;opacity:.5}
-  .hint{margin:0 2px;font-size:13px;line-height:1.45;color:var(--muted)}
+  .fv-hint{margin:0 2px;font-size:13px;line-height:1.45;color:var(--muted)}
 
   /* ---- swipe + duel ---- */
   .stage-head{display:flex;align-items:center;gap:12px}
@@ -79,7 +80,7 @@
   .photo-meta{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 2px;color:var(--muted);font-size:13.5px}
   .photo-meta strong{color:var(--text);font-variant-numeric:tabular-nums}
   .photo-stage,.duel-pick{background:color-mix(in srgb,var(--text) 7%,var(--card-opaque));box-shadow:inset 0 0 0 1px var(--tile-edge),0 14px 34px -20px rgb(var(--ink)/.45)}
-  .photo-stage{height:clamp(280px,calc(100svh - 440px),980px);display:flex;align-items:center;justify-content:center;border-radius:var(--r-panel);overflow:hidden}
+  .photo-stage{height:clamp(280px,calc(100svh - 460px),980px);display:flex;align-items:center;justify-content:center;border-radius:var(--r-panel);overflow:hidden}
   .photo-stage img{width:100%;height:100%;object-fit:contain;-webkit-user-select:none;user-select:none}
   .swipe-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .swipe-actions .ui-btn{min-height:58px;font-size:18px;gap:8px;border-radius:var(--r-tile)}
@@ -104,7 +105,7 @@
   .standing img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;background:color-mix(in srgb,var(--text) 7%,var(--card-opaque))}
   .standing p{margin:9px 6px 0;font-size:12.5px;line-height:1.5;color:var(--muted)}
   .standing .rank{display:inline-block;margin-bottom:2px;padding:1px 10px;border-radius:999px;font:800 13px var(--font-display);color:var(--accent-foreground);background:var(--accent)}
-  .standings .empty{grid-column:1/-1}
+  .standings .fv-empty{grid-column:1/-1}
 
   @media(max-width:680px){
     html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
@@ -112,10 +113,10 @@
     .stats{gap:8px}
     .stat{padding:14px 6px}
     .duel-grid{height:auto;grid-template-columns:1fr}
-    .duel-pick{height:calc(50svh - 130px);min-height:200px}
-    .photo-stage{height:clamp(260px,calc(100svh - 400px),700px)}
+    .duel-pick{height:calc(50svh - 175px);min-height:190px}
+    .photo-stage{height:clamp(260px,calc(100svh - 485px),700px)}
     .ui .ui-page{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
-    .hint{display:none}
+    .fv-hint{display:none}
     .swipe-actions .ui-btn{min-height:54px;font-size:17px}
   }
   @media(max-width:380px){.ui-header h1.ui-brand{font-size:17px}.who{max-width:36%}}
