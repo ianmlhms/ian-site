@@ -16,6 +16,7 @@ body{display:flex;flex-direction:column}
 .pad.ready{background:var(--good);color:#06210f}
 .pad h2{margin:0;font:800 clamp(34px,9vw,64px)/1.05 var(--font-display);letter-spacing:-.03em}
 .pad p{margin:10px 0 0;font:650 clamp(15px,3.6vw,19px)/1.35 var(--font);opacity:.85}
+.pad:focus-visible{outline:3px solid var(--cyan);outline-offset:-8px}
 .pad:not(.waiting):not(.ready) p{color:var(--muted)}
 .arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center;gap:10px}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
@@ -24,7 +25,7 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <div class="pad" id="pad" role="button" tabindex="0" aria-live="polite">
+  <div class="pad" id="pad" role="button" tabindex="0" aria-live="polite" aria-label="Reaction pad">
     <div><h2 id="padTitle">Reaction Time</h2><p id="padSub"></p></div>
   </div>
   <div class="arcade-hud">
@@ -32,13 +33,13 @@ body{display:flex;flex-direction:column}
     <span class="arcade-pill">Best <b id="bst">–</b></span>
   </div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Reaction Time</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startTitle"><div class="arcade-panel">
+    <h2 id="startTitle">Reaction Time</h2>
     <p>The screen starts red. The moment it turns green, tap it, click it or press Space as fast as you can. Tapping too early costs the round.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="resultOv"><div class="arcade-panel">
+  <div class="arcade-overlay" id="resultOv" role="dialog" aria-modal="true" aria-labelledby="resTitle"><div class="arcade-panel">
     <h2 id="resTitle">Your time</h2>
     <span class="arcade-big" id="resBig">0 ms</span>
     <p id="resNote"></p>
@@ -48,6 +49,7 @@ body{display:flex;flex-direction:column}
 <script>
 const MIN_WAIT_MS=1500,WAIT_SPREAD_MS=3000,MAX_TIMES=5;
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const pad=$('pad');
 let state='idle',startTime=0,timeout=0,times=[];
 
@@ -72,6 +74,7 @@ function showResult(title,big,note){
   state='result';
   $('resTitle').textContent=title;$('resBig').textContent=big;$('resNote').textContent=note;
   $('resultOv').classList.add('show');
+  focusDialog('resultOv');
 }
 function tooEarly(){
   clearTimeout(timeout);
@@ -97,6 +100,7 @@ function cancelRound(){ // tab hidden mid-round: drop it instead of timing a bac
   clearTimeout(timeout);state='idle';
   setPad('','Reaction Time','');
   $('startOv').classList.add('show');
+  focusDialog('startOv');
 }
 pad.addEventListener('pointerdown',e=>{e.preventDefault();tap()});
 document.addEventListener('keydown',e=>{

@@ -21,27 +21,27 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Falling blocks board"></canvas>
+  <canvas id="c" role="img" aria-label="Falling blocks board"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="sc">0</b></span>
     <span class="arcade-pill">Lv <b id="lv">1</b> · <b id="ln">0</b> lines</span>
-    <span class="arcade-pill next"><span class="lbl">Next</span> <canvas id="next" aria-label="Next piece"></canvas></span>
+    <span class="arcade-pill next"><span class="lbl">Next</span> <canvas id="next" role="img" aria-label="Next piece"></canvas></span>
   </div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Tetris</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startTitle"><div class="arcade-panel">
+    <h2 id="startTitle">Tetris</h2>
     <p>Stack the pieces and clear full lines. Left / right move, up rotates, down drops softly, Space drops hard.</p>
     <p>On touch use the D-pad: up rotates, A drops hard.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>Your stack is waiting.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseTitle"><div class="arcade-panel">
+    <h2 id="pauseTitle">Paused</h2><p>Your stack is waiting.</p>
     <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
-    <h2>Game over</h2>
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="arcade-panel">
+    <h2 id="overTitle">Game over</h2>
     <span class="arcade-big" id="overBig">0</span>
     <p>Best <strong id="overBest">0</strong></p>
     <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
@@ -53,6 +53,7 @@ const NC=document.getElementById('next'),NX=NC.getContext('2d');
 const COLS=10,ROWS=20,SZ=30,GW=COLS*SZ,GH=ROWS*SZ,DPR_CAP=2;
 const NEXT_CELL=18,NEXT_W=72,NEXT_H=36,MAX_DT=100,BEST_KEY='pb_best_tetris';
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
 const PAL={bg:tok('--bg2'),grid:tok('--border')};
 const SHAPES=[
@@ -169,10 +170,12 @@ function finish(){
   if(score>best){best=score;saveBest(best)}
   $('overBig').textContent=score;$('overBest').textContent=best;
   $('overOv').classList.add('show');
+  focusDialog('overOv');
 }
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
   paused=v;lastTime=performance.now();$('pauseOv').classList.toggle('show',v);
+  if(v)focusDialog('pauseOv');
 }
 let lastTime=0;
 function loop(t){

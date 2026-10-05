@@ -20,26 +20,26 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Space invaders playfield"></canvas>
+  <canvas id="c" role="img" aria-label="Space invaders playfield"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="pts">0</b></span>
     <span class="arcade-pill">Wave <b id="wv">1</b></span>
-    <span class="arcade-pill lives" id="lives" aria-label="Lives">♥♥♥</span>
+    <span class="arcade-pill lives" id="lives" role="img" aria-label="Lives: 3">♥♥♥</span>
   </div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Space Invaders</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startTitle"><div class="arcade-panel">
+    <h2 id="startTitle">Space Invaders</h2>
     <p>Shoot the invaders before they reach the bottom. Left / right move, Space fires. On touch use the D-pad and the A button.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>The invaders wait for you.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseTitle"><div class="arcade-panel">
+    <h2 id="pauseTitle">Paused</h2><p>The invaders wait for you.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
-    <h2>Game over</h2>
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="arcade-panel">
+    <h2 id="overTitle">Game over</h2>
     <span class="arcade-big" id="overBig">0</span>
     <p>Wave <strong id="overWave">1</strong> · Best <strong id="overBest">0</strong></p>
     <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
@@ -49,6 +49,7 @@ body{display:flex;flex-direction:column}
 const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
 const GW=600,GH=600,DPR_CAP=2,BEST_KEY='pb_best_space_invaders';
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
 const FONT=tok('--font');
 const PAL={bg:tok('--bg2'),text:tok('--text'),ship:tok('--cyan'),shipDark:tok('--accent'),shot:tok('--cyan'),enemyShot:tok('--danger'),
@@ -81,7 +82,7 @@ function start(){
 }
 function showHud(){
   $('pts').textContent=score;$('wv').textContent=wave;
-  $('lives').textContent=lives>0?'♥'.repeat(lives):'–';
+  $('lives').textContent=lives>0?'♥'.repeat(lives):'–';$('lives').setAttribute('aria-label','Lives: '+Math.max(0,lives));
 }
 function begin(){
   start();state='playing';paused=false;
@@ -92,10 +93,12 @@ function finish(){
   if(score>best){best=score;saveBest(best)}
   $('overBig').textContent=score;$('overWave').textContent=wave;$('overBest').textContent=best;
   $('overOv').classList.add('show');
+  focusDialog('overOv');
 }
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
   paused=v;$('pauseOv').classList.toggle('show',v);
+  if(v)focusDialog('pauseOv');
 }
 function spawnAliens(){
   aliens=[];dir=1;dropTimer=0;

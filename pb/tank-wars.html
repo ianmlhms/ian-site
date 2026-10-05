@@ -28,28 +28,28 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Tank battlefield"></canvas>
+  <canvas id="c" role="img" aria-label="Tank battlefield"></canvas>
   <div class="arcade-hud">
     <span class="arcade-pill p1"><i class="dot"></i><span id="n1">P1</span> <b id="s1">0</b></span>
     <button class="arcade-btn secondary hud-btn" id="hudMenu" type="button">Menu</button>
     <span class="arcade-pill p2"><span id="n2">P2</span> <b id="s2">0</b><i class="dot"></i></span>
   </div>
-  <div class="arcade-hint" id="hint"></div>
+  <div class="arcade-hint" id="hint" role="status"></div>
 
-  <div class="arcade-overlay show" id="menu"><div class="arcade-panel">
-    <h2>Tank Battles</h2>
+  <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle"><div class="arcade-panel">
+    <h2 id="menuTitle">Tank Battles</h2>
     <p>Bounce shots off the walls and empty the other tank's armour. Drive with WASD or the arrow keys, Space to fire; on touch use the on-screen D-pad and A button.</p>
     <div class="arcade-actions menu-actions">
       <button class="arcade-btn" id="mAI" type="button">Play vs Computer</button>
       <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
       <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
-      <div class="join"><input id="mCode" maxlength="5" placeholder="room code" aria-label="Room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+      <div class="join"><input id="mCode" name="room-code" maxlength="5" placeholder="room code" aria-label="Room code" enterkeyhint="go" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
     </div>
     <p class="status" id="mStatus" role="status"></p>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>The battle waits for you.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseTitle"><div class="arcade-panel">
+    <h2 id="pauseTitle">Paused</h2><p>The battle waits for you.</p>
     <div class="arcade-actions"><button class="arcade-btn" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 </main>
@@ -98,6 +98,7 @@ const menu=document.getElementById('menu'),mStatus=document.getElementById('mSta
 const status=(t)=>mStatus.textContent=t;
 const randCode=()=>Math.random().toString(36).replace(/[^a-z0-9]/g,'').slice(0,5).padEnd(5,'x');
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const pauseOv=$('pauseOv');
 let paused=false;
 function names(){ // [left label, right label] for the current mode
@@ -109,6 +110,7 @@ function names(){ // [left label, right label] for the current mode
 function setPaused(v){ // pause offline games when the tab is hidden; online rooms keep running
   if(v===paused||(v&&(!running||mode==='host'||mode==='guest')))return;
   paused=v;pauseOv.classList.toggle('show',v);
+  if(v)focusDialog('pauseOv');
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('resumeBtn').onclick=()=>{lastT=0;setPaused(false)};
@@ -122,7 +124,7 @@ function begin(){
     mode==='ai'?'WASD or arrows to drive  ·  Space to fire':
     'You are '+(mode==='host'?'left (cyan)':'right (amber)')+'  ·  WASD or arrows  ·  Space to fire';}
 function backToMenu(msg){running=false;paused=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
-  pauseOv.classList.remove('show');menu.classList.add('show');status(msg||'')}
+  pauseOv.classList.remove('show');menu.classList.add('show');status(msg||'');$('mAI').focus({preventScroll:true})}
 document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
 document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
 document.getElementById('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
@@ -329,10 +331,11 @@ function syncHud(){ // DOM scores, touched only when something changed
   if(p1.score!==shown1){shown1=p1.score;$('s1').textContent=shown1}
   if(p2.score!==shown2){shown2=p2.score;$('s2').textContent=shown2}
 }
+$('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('mJoin').click()});
 document.addEventListener('keydown',e=>{keys[e.key]=true;
   if(running&&(e.key==='m'||e.key==='M'))backToMenu();
   if(mode==='guest')sendKeys();
-  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault()});
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)&&!(e.target.closest&&e.target.closest('button,input')))e.preventDefault()});
 document.addEventListener('keyup',e=>{keys[e.key]=false;if(mode==='guest')sendKeys()});
 requestAnimationFrame(loop);
 </script>

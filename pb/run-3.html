@@ -19,22 +19,22 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Space tunnel runner playfield"></canvas>
+  <canvas id="c" role="img" aria-label="Space tunnel runner playfield"></canvas>
   <div class="arcade-hud"><span class="arcade-pill">Distance <b><span id="dist">0</span> m</b></span></div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Space Tunnel Runner</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startTitle"><div class="arcade-panel">
+    <h2 id="startTitle">Space Tunnel Runner</h2>
     <p>Run along the tunnel platforms and don't fall off. Left / right move, up or Space jumps. On touch use the D-pad and the A button.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>The tunnel waits for you.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseTitle"><div class="arcade-panel">
+    <h2 id="pauseTitle">Paused</h2><p>The tunnel waits for you.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
-    <h2>You fell</h2>
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overTitle"><div class="arcade-panel">
+    <h2 id="overTitle">You fell</h2>
     <span class="arcade-big"><span id="overBig">0</span> m</span>
     <p>Best <strong id="overBest">0</strong> m</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
@@ -44,6 +44,7 @@ body{display:flex;flex-direction:column}
 const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
 const GW=800,GH=500,DPR_CAP=2,BEST_KEY='pb_best_run_3';
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
 const PAL={bg:tok('--bg2'),text:tok('--text'),body:tok('--accent'),head:tok('--cyan'),legs:tok('--violet'),
   plat:tok('--card2'),platTop:tok('--border'),platAccent:tok('--violet'),platAccentTop:tok('--danger')};
@@ -152,10 +153,12 @@ function finish(){
   if(dist>best){best=dist;saveBest(best)}
   $('overBig').textContent=dist;$('overBest').textContent=best;
   $('overOv').classList.add('show');
+  focusDialog('overOv');
 }
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
   paused=v;lastT=0;$('pauseOv').classList.toggle('show',v);
+  if(v)focusDialog('pauseOv');
 }
 
 let lastT=0;
@@ -198,7 +201,7 @@ document.addEventListener('keydown',e=>{
   keys[e.key]=true;
   if(e.target.closest&&e.target.closest('button'))return;
   if((e.key===' '||e.key==='Enter')&&state!=='playing'&&!e.repeat)startGame();
-  e.preventDefault()});
+  if(e.key!=='Tab'&&!e.metaKey&&!e.ctrlKey&&!e.altKey)e.preventDefault()});
 document.addEventListener('keyup',e=>{keys[e.key]=false});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('playBtn').onclick=startGame;$('againBtn').onclick=startGame;$('resumeBtn').onclick=()=>setPaused(false);
