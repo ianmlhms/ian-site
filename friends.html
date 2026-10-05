@@ -66,8 +66,10 @@
   #friends>.row:nth-child(5n+3){--h:#ff6b9d}
   #friends>.row:nth-child(5n+4){--h:#ffb347}
   #friends>.row:nth-child(5n+5){--h:#a371f7}
-  .row .name{flex:1;min-width:0;display:flex;align-items:center;flex-wrap:wrap;gap:2px 0;font:750 16px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
-  .row .name .av{flex:none;display:inline-grid;place-items:center;width:44px;height:44px;margin-right:12px;border-radius:var(--r-chip);font-size:22px;background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .row .name{flex:1;min-width:0;font:750 16px/1.25 var(--font-display);letter-spacing:-.015em;overflow-wrap:anywhere}
+  .row .name:has(> .av){position:relative;padding-left:56px;min-height:44px}
+  .row .name:has(> .av)::before{content:"";display:inline-block;height:44px;vertical-align:middle}
+  .row .name .av{position:absolute;left:0;top:0;display:grid;place-items:center;width:44px;height:44px;border-radius:var(--r-chip);font-size:22px;background:color-mix(in srgb,var(--h) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--h) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
   .admin-tag,.class-tag{display:inline-block;font:800 10px var(--font-display);border-radius:8px;padding:2px 7px;margin-left:8px;vertical-align:middle;letter-spacing:.3px}
   .admin-tag{color:#ffcf4d;background:rgba(255,207,77,.14);box-shadow:inset 0 0 0 1px rgba(255,207,77,.45)}
   .class-tag{color:#5cc8ff;background:rgba(92,200,255,.14);box-shadow:inset 0 0 0 1px rgba(92,200,255,.45)}
@@ -102,7 +104,9 @@
     body.ui .ui-header h1.ui-brand{font-size:18px}
     .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
     .tab{padding:8px 10px;font-size:14.5px}
-    .add .ui-btn{padding-inline:18px}
+    .add{flex-wrap:wrap}
+    .add .ui-input{flex:1 1 100%}
+    .add .ui-btn{flex:1 1 100%}
   }
   @media(prefers-reduced-motion:reduce){.row,.mini,.tab{transition:none}.mini:hover,.mini:active{transform:none}}
 </style>
