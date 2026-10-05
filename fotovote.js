@@ -1,10 +1,12 @@
 import {
   duelMarkup,
+  emptyDuelMarkup,
   finishedMarkup,
   homeMarkup,
+  loadingMarkup,
   standingsMarkup,
   swipeMarkup,
-} from "./fotovote-render.js?v=2";
+} from "./fotovote-render.js?v=3";
 
 const BATCH_SIZE = 12;
 const PRELOAD_AHEAD = 3;
@@ -92,18 +94,19 @@ document.addEventListener("focusin", (event) => {
   if ($("screen").contains(event.target)) lastFocusId = event.target.id || "";
 });
 
-function showScreen(html, isWide = false) {
+function showScreen(html, size = "") {
   const hadFocus = lastFocusId !== "" && (
     $("screen").contains(document.activeElement)
     || document.activeElement === document.body);
-  $("app").className = isWide ? "wrap wide" : "wrap";
+  $("app").className = size ? `ui-page is-${size}` : "ui-page";
+  document.body.dataset.width = size;
   $("screen").innerHTML = html;
   const keep = hadFocus ? $(lastFocusId) : null;
   if (keep && !keep.disabled) keep.focus({ preventScroll: true });
 }
 
 function showGate() {
-  $("gateMsg").textContent = "🔒 Du brauchs däi perséinleche Link.";
+  $("gateMsg").innerHTML = '<div class="gate-ico" aria-hidden="true">🔒</div><p class="big">Du brauchs däi perséinleche Link.</p><p>Frot den Ian no deem Link fir d\'Fotobuch.</p>';
   $("bar").hidden = true;
   $("app").hidden = true;
   $("gateWrap").hidden = false;
@@ -179,7 +182,7 @@ function renderSwipe() {
   const photo = state.swipeQueue[0];
   if (!photo) {
     if (state.me.swiped >= state.me.total) showSwipeFinished();
-    else showScreen('<div class="card gate">Fotoe gi gelueden…</div>');
+    else showScreen(loadingMarkup("Fotoe gi gelueden…"));
     return;
   }
   preload(state.swipeQueue.slice(1, PRELOAD_AHEAD + 1)
@@ -187,7 +190,7 @@ function renderSwipe() {
   showScreen(swipeMarkup(
     photo, state.me, state.swipeHistory.length > 0,
     photoUrl(photo.storage_path),
-  ), true);
+  ), "photo");
   $("overviewBtn").onclick = returnHome;
   $("skipBtn").onclick = () => saveSwipe(false);
   $("keepBtn").onclick = () => saveSwipe(true);
@@ -198,7 +201,7 @@ async function openSwipe() {
   setState({ view: "swipe", swipeQueue: [],
     swipeHistory: [], isBusy: false });
   setMessage();
-  showScreen('<div class="card gate">Fotoe gi gelueden…</div>');
+  showScreen(loadingMarkup("Fotoe gi gelueden…"));
   const ok = await refillSwipes();
   if (ok) renderSwipe();
 }
@@ -287,14 +290,14 @@ function renderDuel() {
   showScreen(duelMarkup(
     pair, photoUrl(pair.a_path), photoUrl(pair.b_path),
     state.me.my_duels, duelTargetText(),
-  ), true);
+  ), "wide");
   $("overviewBtn").onclick = returnHome;
   $("pickA").onclick = () => saveDuel(pair.a_id);
   $("pickB").onclick = () => saveDuel(pair.b_id);
 }
 
 async function loadDuel() {
-  showScreen('<div class="card gate">Nächsten Duell gëtt gelueden…</div>');
+  showScreen(loadingMarkup("Nächsten Duell gëtt gelueden…"));
   const result = await callRpc(
     "pv_next_duel",
     { p_token: token },
@@ -304,9 +307,7 @@ async function loadDuel() {
   const pair = result.data?.[0] || null;
   setState({ duel: pair, isBusy: false });
   if (!pair) {
-    showScreen(`<div class="card gate"><h2>Keen Duell fräi</h2>
-      <p>Et gëtt elo kee passenden neie Foto-Puer.</p>
-      <button class="btn secondary" id="overviewBtn">Iwwersiicht</button></div>`);
+    showScreen(emptyDuelMarkup());
     $("overviewBtn").onclick = returnHome;
     return;
   }
@@ -348,7 +349,7 @@ async function openStandings() {
   if (!state.me.is_owner) return;
   setState({ view: "standings" });
   setMessage();
-  showScreen('<div class="card gate">Ranglëscht gëtt gelueden…</div>');
+  showScreen(loadingMarkup("Ranglëscht gëtt gelueden…"));
   const result = await callRpc(
     "pv_standings",
     { p_token: token, p_limit: STANDINGS_LIMIT },
@@ -357,7 +358,7 @@ async function openStandings() {
   if (!result.ok) return;
   showScreen(standingsMarkup(
     result.data || [], (row) => photoUrl(row.thumb_path),
-  ), true);
+  ), "wide");
   $("overviewBtn").onclick = returnHome;
 }
 
