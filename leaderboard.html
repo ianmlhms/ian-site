@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="lb">
 <head>
 <meta charset="utf-8">
   <meta name="robots" content="noindex,follow" />
   <!-- Auth-gated app shell: almost no crawlable text, so it is kept out of the
        index rather than offered to Google as a near-empty page. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Leaderboard — ian.lu</title>
-<meta name="description" content="Cross-game rankings for the multiplayer games on ian.lu — wins, losses and win rate per player.">
+<title>Ranglëscht — ian.lu</title>
+<meta name="description" content="Ranglëscht fir d'Multiplayer-Spiller op ian.lu — Siegen, Néierlagen a Gewënnquote pro Spiller.">
 <link rel="canonical" href="https://ian.lu/leaderboard.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ian.lu">
-<meta property="og:title" content="Leaderboard — ian.lu">
-<meta property="og:description" content="Cross-game rankings for the multiplayer games on ian.lu — wins, losses and win rate per player.">
+<meta property="og:title" content="Ranglëscht — ian.lu">
+<meta property="og:description" content="Ranglëscht fir d'Multiplayer-Spiller op ian.lu — Siegen, Néierlagen a Gewënnquote pro Spiller.">
 <meta property="og:url" content="https://ian.lu/leaderboard.html">
 <meta property="og:image" content="https://ian.lu/apple-touch-icon.png">
 <meta name="twitter:card" content="summary">
@@ -20,33 +20,80 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=25"></script>
+<link rel="stylesheet" href="site-ui.css?v=2">
 <style>
-  :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;min-height:100svh;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  a{color:var(--accent2-text);text-decoration:none}
-  .bar{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border)}
-  .bar .home{color:var(--muted);font-weight:700}.bar h1{font-size:18px;margin:0}.bar .spacer{flex:1}
-  .wrap{max-width:620px;margin:0 auto;padding:22px 16px 60px}
-  .tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
-  .tabs button{padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-weight:800;cursor:pointer;font-size:13px}
-  .tabs button.on{background:var(--accent);color:var(--accent-foreground);border-color:var(--accent-border)}
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{padding:9px 8px;border-bottom:1px solid var(--border);text-align:left}
-  th{color:var(--muted);font-size:12px}
-  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-  .rank{color:var(--muted);width:28px}
-  .top1 .rank{color:#ffd54a}.top2 .rank{color:#cbd5e1}.top3 .rank{color:#d9a066}
-  .rank{font-weight:800}
-  .pct{color:var(--good);font-weight:800}
-  html[data-theme="light"] .top1 .rank{color:#9a6b00}
-  html[data-theme="light"] .top2 .rank{color:#52607a}
-  html[data-theme="light"] .top3 .rank{color:#9a5a22}
-  html[data-theme="light"] .pct{color:#1a7f37}
-  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  a:focus-visible,button:focus-visible{outline:3px solid var(--accent-text,var(--accent));outline-offset:2px}
-  .muted{color:var(--muted)}
-  .empty{color:var(--muted);text-align:center;padding:34px 10px}
+  body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  a{color:var(--accent-text);text-decoration:none}
+  button,a{touch-action:manipulation}
+  button:focus-visible,a:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px}
+  .ui{--good:#3fb950;--gold:#ffd54a;--silver:#cbd5e1;--bronze:#d9a066}
+  html[data-theme="light"] .ui{--good:#1a7f37;--gold:#d99a00;--silver:#8c97ab;--bronze:#b3743a}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+  /* ---- header + column ---- */
+  html body.ui .ui-header{max-width:720px;flex-wrap:wrap;gap:8px 14px;padding:max(16px,env(safe-area-inset-top)) max(28px,env(safe-area-inset-right)) 0 max(28px,env(safe-area-inset-left))}
+  .header-left,.header-right{display:flex;align-items:center;gap:10px;min-width:0}
+  .header-left{flex:1 1 auto}
+  body.ui .ui-header .home{display:inline-flex;align-items:center;min-height:44px;padding:8px 16px;border-radius:var(--r-chip);border:1px solid var(--border);background:transparent;color:var(--text);font:700 14px var(--font-display);white-space:nowrap;transition:background-color .2s,border-color .2s,transform .3s var(--ease)}
+  body.ui .ui-header .home:hover{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent-border)}
+  body.ui .ui-header .home:active{transform:scale(.97)}
+  body.ui .ui-header h1.ui-brand{margin:0;display:flex;align-items:center;gap:10px;font-size:19px;white-space:nowrap}
+  .ui .ui-page{display:flex;flex-direction:column;gap:14px;max-width:720px;padding-top:22px;padding-left:max(28px,env(safe-area-inset-left));padding-right:max(28px,env(safe-area-inset-right));padding-bottom:max(72px,calc(40px + env(safe-area-inset-bottom)))}
+
+  /* ---- filters ---- */
+  .filters{display:flex;flex-direction:column;gap:10px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:8px 16px;border:0;border-radius:var(--r-chip);background:var(--card-opaque);color:var(--muted);font:700 14px var(--font-display);letter-spacing:-.01em;cursor:pointer;box-shadow:inset 0 0 0 1px var(--border);transition:box-shadow .2s,background-color .2s,color .2s,transform .3s var(--ease)}
+  .chip:hover{color:var(--text);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,var(--border))}
+  .chip:active{transform:scale(.97)}
+  .chip.on{background:var(--accent);color:var(--accent-foreground);box-shadow:0 8px 20px -12px color-mix(in srgb,var(--accent) 80%,transparent)}
+  .periods{display:inline-flex;align-self:flex-start;gap:4px;padding:4px;border-radius:calc(var(--r-chip) + 4px);background:color-mix(in srgb,var(--text) 6%,transparent)}
+  .periods .chip{min-height:40px;padding:6px 18px;background:transparent;box-shadow:none}
+  .periods .chip:hover{box-shadow:none;color:var(--text)}
+  .periods .chip.on{background:var(--accent);color:var(--accent-foreground)}
+
+  /* ---- board ---- */
+  .board{padding:clamp(10px,2.4vw,18px) clamp(8px,2.4vw,18px) clamp(12px,2.4vw,18px)}
+  .board-sum{display:flex;align-items:center;gap:8px;margin:0;padding:4px 10px 8px;color:var(--muted);font:700 13px var(--font-display)}
+  .board-sum .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  table.lb{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:15px}
+  .lb th{padding:2px 10px 4px;color:var(--muted);font:700 12px var(--font-display);text-align:left;letter-spacing:.02em}
+  .lb td{padding:10px;vertical-align:middle;background:color-mix(in srgb,var(--text) 4%,transparent)}
+  .lb td:first-child{border-radius:var(--r-chip) 0 0 var(--r-chip)}
+  .lb td:last-child{border-radius:0 var(--r-chip) var(--r-chip) 0}
+  .lb .n{text-align:right;font-variant-numeric:tabular-nums}
+  .lb td.n{font-weight:700;font-family:var(--font-display)}
+  .lb .rank{width:52px;text-align:center;font:800 15px var(--font-display);color:var(--muted)}
+  .lb .rank .medal{font-size:24px;line-height:1}
+  .lb .who{min-width:0;overflow-wrap:anywhere;font-weight:700}
+  .lb .who .name{display:block;line-height:1.25}
+  .lb .who .meter{display:block;height:5px;margin-top:6px;border-radius:99px;background:color-mix(in srgb,var(--text) 9%,transparent);overflow:hidden}
+  .lb .who .meter i{display:block;height:100%;border-radius:99px;background:var(--good);opacity:.85}
+  .lb .pct{color:var(--good);font-weight:800;white-space:nowrap}
+  .lb tr.top1 td{padding-top:14px;padding-bottom:14px;font-size:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--gold) 24%,var(--card-opaque)),color-mix(in srgb,var(--gold) 8%,var(--card-opaque)))}
+  .lb tr.top2 td{background:color-mix(in srgb,var(--silver) 15%,var(--card-opaque))}
+  .lb tr.top3 td{background:color-mix(in srgb,var(--bronze) 15%,var(--card-opaque))}
+  .lb tr.top1 .who .name{font-family:var(--font-display);font-size:17px;font-weight:800;letter-spacing:-.01em}
+
+  /* ---- empty / loading / error ---- */
+  .lbempty{text-align:center;color:var(--muted);padding:clamp(28px,6vw,48px) 22px}
+  .lbempty .lbempty-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:36px;background:color-mix(in srgb,var(--accent) 20%,var(--card-opaque));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent)}
+  .lbempty p{margin:0;font:800 clamp(18px,2.6vw,22px)/1.25 var(--font-display);letter-spacing:-.02em;color:var(--text)}
+  .lbempty .lbempty-sub{margin-top:6px;font:500 14px/1.4 system-ui,-apple-system,sans-serif;letter-spacing:0;color:var(--muted)}
+  .note{margin:4px 4px 0;color:var(--muted);font-size:12.5px;line-height:1.5;text-align:center}
+
+  @media(max-width:700px){
+    html body.ui .ui-header{padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+    body.ui .ui-header h1.ui-brand{font-size:18px}
+    .ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));padding-top:16px}
+    .chip{padding:8px 13px;font-size:13.5px}
+    .lb{font-size:14px}
+    .lb th,.lb td{padding-left:7px;padding-right:7px}
+    .lb .rank{width:40px}
+    .lb .rank .medal{font-size:21px}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <script data-goatcounter="https://ianm.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
@@ -54,32 +101,37 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 </head>
-<body>
-<header class="bar">
-  <a class="home" href="pixelbreak.html">‹ Arcade</a>
-  <h1><span aria-hidden="true">🏆</span> Leaderboard</h1>
-  <div class="spacer"></div>
-  <span id="acctHost"></span>
+<body class="ui">
+<header class="ui-header">
+  <div class="header-left">
+    <a class="home" href="pixelbreak.html">‹ Arcade</a>
+    <h1 class="ui-brand"><span aria-hidden="true">🏆</span> <span data-t="title">Ranglëscht</span></h1>
+  </div>
+  <div class="header-right">
+    <span id="acctHost"></span>
+  </div>
 </header>
-<main class="wrap">
-  <div class="tabs" id="tabs" role="group" aria-label="Game">
-    <button data-g="" class="on" aria-pressed="true">All games</button>
-    <button data-g="connect4" aria-pressed="false"><span aria-hidden="true">🔴</span> Connect 4</button>
-    <button data-g="battleship" aria-pressed="false"><span aria-hidden="true">🚢</span> Battleship</button>
-    <button data-g="color" aria-pressed="false"><span aria-hidden="true">🎨</span> Colour Guess</button>
-    <button data-g="reversi" aria-pressed="false"><span aria-hidden="true">⚫</span> Reversi</button>
-    <button data-g="dots" aria-pressed="false"><span aria-hidden="true">▦</span> Dots &amp; Boxes</button>
-    <button data-g="tictactoe" aria-pressed="false"><span aria-hidden="true">✕</span> Tic-Tac-Toe</button>
-    <button data-g="checkers" aria-pressed="false"><span aria-hidden="true">🟠</span> Checkers</button>
-    <button data-g="maumau" aria-pressed="false"><span aria-hidden="true">🃏</span> Mau-Mau Cards</button>
-    <button data-g="diceduel" aria-pressed="false"><span aria-hidden="true">🎲</span> Kniffel</button>
+<main class="ui-page">
+  <div class="filters">
+    <div class="chips" id="tabs" role="group" aria-label="Spill" data-t-aria="game">
+      <button type="button" class="chip on" data-g="" aria-pressed="true" data-t="all">All Spiller</button>
+      <button type="button" class="chip" data-g="connect4" aria-pressed="false"><span aria-hidden="true">🔴</span> <span data-t="g.connect4">Connect 4</span></button>
+      <button type="button" class="chip" data-g="battleship" aria-pressed="false"><span aria-hidden="true">🚢</span> <span data-t="g.battleship">Battleship</span></button>
+      <button type="button" class="chip" data-g="color" aria-pressed="false"><span aria-hidden="true">🎨</span> <span data-t="g.color">Colour Guess</span></button>
+      <button type="button" class="chip" data-g="reversi" aria-pressed="false"><span aria-hidden="true">⚫</span> <span data-t="g.reversi">Reversi</span></button>
+      <button type="button" class="chip" data-g="dots" aria-pressed="false"><span aria-hidden="true">▦</span> <span data-t="g.dots">Dots &amp; Boxes</span></button>
+      <button type="button" class="chip" data-g="tictactoe" aria-pressed="false"><span aria-hidden="true">✕</span> <span data-t="g.tictactoe">Tic-Tac-Toe</span></button>
+      <button type="button" class="chip" data-g="checkers" aria-pressed="false"><span aria-hidden="true">🟠</span> <span data-t="g.checkers">Checkers</span></button>
+      <button type="button" class="chip" data-g="maumau" aria-pressed="false"><span aria-hidden="true">🃏</span> <span data-t="g.maumau">Mau-Mau</span></button>
+      <button type="button" class="chip" data-g="diceduel" aria-pressed="false"><span aria-hidden="true">🎲</span> <span data-t="g.diceduel">Kniffel</span></button>
+    </div>
+    <div class="periods" id="periods" role="group" aria-label="Zäitraum" data-t-aria="period">
+      <button type="button" class="chip on" data-p="all" aria-pressed="true" data-t="pAll">All Zäit</button>
+      <button type="button" class="chip" data-p="7" aria-pressed="false" data-t="pWeek">Dës Woch</button>
+    </div>
   </div>
-  <div class="tabs" id="periods" role="group" aria-label="Period" style="margin-top:8px">
-    <button data-p="all" class="on" aria-pressed="true">All-time</button>
-    <button data-p="7" aria-pressed="false">This week</button>
-  </div>
-  <div id="body" aria-live="polite"><p class="muted">Loading…</p></div>
-  <p class="muted" style="font-size:12.5px;margin-top:18px">Only games played while <b>signed in</b> count. Win/loss is self-reported per player.</p>
+  <section class="ui-card board" id="board" aria-live="polite" aria-busy="true"><div id="body"></div></section>
+  <p class="note" data-t="note">Nëmmen Partien, déi du ugemellt gespillt hues, zielen. Sieg an Néierlag mellt de Spiller selwer.</p>
 </main>
 
 <script src="pixelbreak-config.js"></script>
@@ -88,29 +140,81 @@
 <script type="module">
 import * as auth from "./auth.js?v=22";
 const $ = (id)=>document.getElementById(id);
-const esc=(s)=>(""+(s??"")).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
-let sb=null, game="", period="all";
-(async()=>{ if(auth.authConfigured){ auth.mountAccountButton($("acctHost")); sb=await auth.client(); } draw(); })();
+const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const T={
+  title:{lb:"Ranglëscht",de:"Bestenliste",en:"Leaderboard"},
+  all:{lb:"All Spiller",de:"Alle Spiele",en:"All games"},
+  game:{lb:"Spill",de:"Spiel",en:"Game"},
+  period:{lb:"Zäitraum",de:"Zeitraum",en:"Period"},
+  pAll:{lb:"All Zäit",de:"Gesamt",en:"All-time"},
+  pWeek:{lb:"Dës Woch",de:"Diese Woche",en:"This week"},
+  note:{lb:"Nëmmen Partien, déi du ugemellt gespillt hues, zielen. Sieg an Néierlag mellt de Spiller selwer.",de:"Nur Partien zählen, die du angemeldet gespielt hast. Sieg und Niederlage meldet jeder Spieler selbst.",en:"Only games played while signed in count. Win/loss is self-reported per player."},
+  "g.color":{lb:"Faarf roden",de:"Farbe raten",en:"Colour Guess"},
+  "g.maumau":{lb:"Mau-Mau",de:"Mau-Mau",en:"Mau-Mau Cards"},
+  "g.dots":{lb:"Pëntelen a Këschten",de:"Käsekästchen",en:"Dots & Boxes"},
+  loading:{lb:"Lueden…",de:"Lädt…",en:"Loading…"},
+  emptyT:{lb:"Nach keng Partien.",de:"Noch keine Partien.",en:"No games yet."},
+  emptyS:{lb:"Spill eng Partie, während du ugemellt bass, a du stees hei.",de:"Spiel eine Partie, während du angemeldet bist, und du stehst hier.",en:"Play a match while signed in and you'll show up here."},
+  errT:{lb:"Feeler beim Lueden.",de:"Fehler beim Laden.",en:"Couldn't load the leaderboard."},
+  errS:{lb:"Probéier et gläich nach eng Kéier.",de:"Versuch es gleich noch einmal.",en:"Try again in a moment."},
+  player:{lb:"Spiller",de:"Spieler",en:"Player"},
+  w:{lb:"G",de:"S",en:"W"}, wf:{lb:"Gewonnen",de:"Siege",en:"Wins"},
+  l:{lb:"V",de:"N",en:"L"}, lf:{lb:"Verluer",de:"Niederlagen",en:"Losses"},
+  pct:{lb:"%",de:"%",en:"Win%"}, pctf:{lb:"Gewënnquote",de:"Siegquote",en:"Win rate"},
+  rank:{lb:"Plaz",de:"Platz",en:"Rank"},
+  sum1:{lb:"1 Spiller",de:"1 Spieler",en:"1 player"},
+  sumN:{lb:"{n} Spiller",de:"{n} Spieler",en:"{n} players"},
+};
+const MEDALS=["🥇","🥈","🥉"];
+const readLang=()=>{ try{ const v=localStorage.getItem("site_lang"); if(v==="lb"||v==="de"||v==="en") return v; }catch{} return "lb"; };
+let lang=readLang();
+const t=(k)=>{ const e=T[k]; return e?(e[lang]||e.en):k; };
+let sb=null, game="", period="all", last=null;
 
-const label=()=>{ const b=document.querySelector("[data-g].on"); return b?b.lastChild.textContent.trim():"All games"; };
+function applyStatic(){
+  document.documentElement.lang=lang;
+  document.title=t("title")+" — ian.lu";
+  document.querySelectorAll("[data-t]").forEach(el=>{ if(T[el.dataset.t]) el.textContent=t(el.dataset.t); });
+  document.querySelectorAll("[data-t-aria]").forEach(el=>{ el.setAttribute("aria-label",t(el.dataset.tAria)); });
+}
+const emptyHtml=(ico,msg,sub)=>`<div class="lbempty"><div class="lbempty-ico" aria-hidden="true">${ico}</div><p>${esc(msg)}</p><div class="lbempty-sub">${esc(sub)}</div></div>`;
+const label=()=>{ const b=document.querySelector("[data-g].on"); const n=b&&(b.matches("[data-t]")?b:b.querySelector("[data-t]")); return n?n.textContent.trim():t("all"); };
+
+function paint(){
+  const body=$("body"), data=last;
+  if(data==="loading"){ body.innerHTML=emptyHtml("⏳",t("loading"),""); return; }
+  if(data==="error"){ body.innerHTML=emptyHtml("⚠️",t("errT"),t("errS")); return; }
+  if(!data||!data.length){ body.innerHTML=emptyHtml("🏆",t("emptyT"),t("emptyS")); return; }
+  const rows=data.map((r,i)=>{
+    const pct=r.winpct==null?null:+r.winpct;
+    const rank=i<3?`<span class="medal" aria-hidden="true">${MEDALS[i]}</span><span class="sr-only">${i+1}</span>`:i+1;
+    return `<tr class="top${i+1}"><td class="rank">${rank}</td><td class="who"><span class="name">${esc(r.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${r.wins}</td><td class="n">${r.losses}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
+  }).join("");
+  const sum=data.length===1?t("sum1"):t("sumN").replace("{n}",data.length);
+  body.innerHTML=`<p class="board-sum"><span class="dot" aria-hidden="true"></span>${esc(sum)} · ${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</p>`+
+    `<table class="lb"><caption class="sr-only">${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</caption><thead><tr><th scope="col" class="rank"><span aria-hidden="true">#</span><span class="sr-only">${esc(t("rank"))}</span></th><th scope="col">${esc(t("player"))}</th><th scope="col" class="n"><span aria-hidden="true">${esc(t("w"))}</span><span class="sr-only">${esc(t("wf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("l"))}</span><span class="sr-only">${esc(t("lf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("pct"))}</span><span class="sr-only">${esc(t("pctf"))}</span></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 
 async function draw(){
-  const body=$("body"); body.innerHTML=`<p class="muted">Loading…</p>`;
+  const board=$("board");
+  board.setAttribute("aria-busy","true"); last="loading"; paint();
   try{
     if(!sb) sb=await auth.client();
     const { data, error }=period==="all"
       ? await sb.rpc("game_leaderboard",{ p_game: game||null })
       : await sb.rpc("game_leaderboard_window",{ p_game: game||null, p_days: +period });
     if(error) throw error;
-    if(!data||!data.length){ body.innerHTML=`<div class="empty">No games recorded yet — play a match while signed in!</div>`; return; }
-    body.innerHTML=`<table><caption class="sr-only">${esc(label())} · ${period==='all'?'all-time':'this week'}</caption><tr><th scope="col" class="rank">#</th><th scope="col">Player</th><th scope="col" class="n">W</th><th scope="col" class="n">L</th><th scope="col" class="n">Win%</th></tr>`+
-      data.map((r,i)=>`<tr class="top${i+1}"><td class="rank">${i+1}</td><td>${esc(r.username)}</td><td class="n">${r.wins}</td><td class="n">${r.losses}</td><td class="n pct">${r.winpct==null?"—":r.winpct+"%"}</td></tr>`).join("")+
-      `</table>`;
-  }catch(e){ body.innerHTML=`<div class="empty">Couldn't load the leaderboard.</div>`; console.warn(e); }
+    last=data||[];
+  }catch(e){ last="error"; console.warn(e); }
+  board.setAttribute("aria-busy","false"); paint();
 }
 function mark(sel, active){ document.querySelectorAll(sel).forEach(x=>{ x.classList.toggle("on",x===active); x.setAttribute("aria-pressed",String(x===active)); }); }
 document.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>{ game=b.dataset.g; mark("[data-g]",b); draw(); });
 document.querySelectorAll("[data-p]").forEach(b=> b.onclick=()=>{ period=b.dataset.p; mark("[data-p]",b); draw(); });
+window.addEventListener("storage",e=>{ if(e.key==="site_lang"){ lang=readLang(); applyStatic(); paint(); } });
+
+applyStatic();
+(async()=>{ if(auth.authConfigured){ auth.mountAccountButton($("acctHost")); sb=await auth.client(); } draw(); })();
 </script>
   <script type="module" src="rtc-ring.js?v=18"></script>
   <script type="module" src="class-gate.js?v=19"></script>
