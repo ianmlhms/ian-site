@@ -28,11 +28,12 @@
   @media (max-width:620px){.ui .ui-page{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}html body.ui .ui-header{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}}
 
   /* ---- search field ---- */
-  .field{position:relative}
-  .field .mag{position:absolute;left:18px;top:50%;transform:translateY(-50%);font-size:20px;line-height:1;pointer-events:none}
+  .sfield{position:relative}
+  .sfield .mag{position:absolute;left:18px;top:50%;transform:translateY(-50%);font-size:20px;line-height:1;pointer-events:none}
   #q.ui-input{min-height:56px;padding:14px 18px 14px 52px;border-radius:var(--r-tile);font:600 17px var(--font-display);letter-spacing:-.01em;-webkit-appearance:none;appearance:none}
+  #q.ui-input:focus-visible{outline:none}
   #q.ui-input::placeholder{font-weight:500}
-  #q::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;cursor:pointer;background:color-mix(in srgb,var(--muted) 35%,transparent)}
+  #q::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;cursor:pointer;background:color-mix(in srgb,var(--muted) 35%,transparent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Cpath d='M7 7l8 8M15 7l-8 8' stroke='%23fff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/100% no-repeat}
 
   /* ---- results ---- */
   #out{display:flex;flex-direction:column;gap:6px}
@@ -73,7 +74,7 @@
 </header>
 
 <main class="ui-page">
-  <div class="field">
+  <div class="sfield">
     <span class="mag" aria-hidden="true">🔎</span>
     <input id="q" class="ui-input" type="search" enterkeyhint="search" spellcheck="false" aria-label="Sichen" aria-controls="out" placeholder="Sich no Leit, Hausaufgaben, Tester, Kaarten…" autocomplete="off">
   </div>
