@@ -121,7 +121,15 @@ function showResult(won, stars) {
   $("resultActions").classList.remove("hidden");
   $("continueBtn").textContent = won && game.level < MAX_LEVEL ? "Next level" : "Retry level";
   $("overlay").classList.remove("hidden");
+  focusDialog("overlay");
   updateUi();
+}
+
+function focusDialog(id) {
+  const panel = $(id).firstElementChild;
+  panel.tabIndex = -1;
+  panel.style.outline = "none";
+  panel.focus({ preventScroll: true });
 }
 
 function showMenu() {
@@ -137,6 +145,7 @@ function showMenu() {
   $("branchSheet").classList.add("hidden");
   renderLevels();
   renderMeta();
+  focusDialog("overlay");
   updateUi();
 }
 
@@ -212,6 +221,7 @@ function showBranchChoices(tower) {
   });
   $("branchCost").textContent = `${upgradeCost(game, tower)} gold`;
   $("branchSheet").classList.remove("hidden");
+  focusDialog("branchSheet");
 }
 
 function chooseBranch(branch) {
@@ -272,6 +282,7 @@ function renderTowerButtons() {
     const price = document.createElement("span");
     button.className = `towerCard${selectedBuild === type ? " selected" : ""}`;
     button.dataset.type = type;
+    button.setAttribute("aria-pressed", String(selectedBuild === type));
     button.setAttribute("aria-label", `${definition.name}, ${definition.role}, ${towerPrice(type, progress.meta)} gold`);
     name.textContent = definition.short;
     price.textContent = `${towerPrice(type, progress.meta)}g`;
@@ -315,7 +326,9 @@ function updateUi() {
   $("kills").textContent = progress.kills;
   $("shards").textContent = progress.meta.shards;
   $("speedBtn").textContent = `${speed}×`;
+  $("speedBtn").setAttribute("aria-label", `Game speed ${speed}×, change`);
   $("pauseBtn").textContent = paused ? "▶" : "Ⅱ";
+  $("pauseBtn").setAttribute("aria-label", paused ? "Resume game" : "Pause game");
   const canWave = game?.status === "build";
   $("waveBtn").disabled = !canWave || paused;
   $("waveBtn").textContent = canWave ? `Start early +${Math.ceil(game.buildRemaining) * RULES.earlyGoldPerSecond}g` : "Wave active";
@@ -337,6 +350,7 @@ function renderLevels() {
     button.dataset.level = String(level);
     label.textContent = String(level);
     detail.textContent = stars ? "★".repeat(stars) : level > progress.level ? "Locked" : "Ready";
+    button.setAttribute("aria-label", `Battlefield ${level}: ${stars ? `${stars} of 3 stars` : level > progress.level ? "locked" : "ready"}`);
     button.append(label, detail);
     grid.appendChild(button);
   }
@@ -406,7 +420,7 @@ $("branchB").onclick = () => chooseBranch("B");
 $("branchCancel").onclick = () => $("branchSheet").classList.add("hidden");
 $("continueBtn").onclick = () => startLevel(game.status === "won" && game.level < MAX_LEVEL ? game.level + 1 : game.level);
 $("resultMenuBtn").onclick = showMenu;
-$("helpBtn").onclick = () => $("helpPanel").classList.toggle("hidden");
+$("helpBtn").onclick = () => $("helpBtn").setAttribute("aria-expanded", String(!$("helpPanel").classList.toggle("hidden")));
 window.addEventListener("resize", () => view.resize());
 window.addEventListener("message", (event) => {
   if (event.data?.__pbLoadSave === 1) applyIncomingSave(event.data.data);

@@ -13,29 +13,30 @@ body{display:flex;flex-direction:column}
 #c{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border);cursor:pointer}
 .arcade-hud{inset:5px 14px auto;align-items:center;justify-content:center}
 .arcade-pill{font-size:15px}
+.arcade-btn:focus-visible{outline-offset:3px}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 </style>
 <script src="/pb/arcade-kit.js?v=6" data-arcade-id="tower-stack" data-arcade-title="Tower Stacking"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <canvas id="c" aria-label="Tower stacking game. Tap or press Space to drop the moving block."></canvas>
-  <div class="arcade-hud"><span class="arcade-pill">Height <b id="hgt">0</b></span></div>
+  <canvas id="c" role="img" aria-label="Tower stacking game. Tap or press Space to drop the moving block."></canvas>
+  <div class="arcade-hud"><span class="arcade-pill" role="status">Height <b id="hgt">0</b></span></div>
   <div class="arcade-hint" id="hint">Tap or press Space to stack</div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Tower Stacking</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startOvT"><div class="arcade-panel">
+    <h2 id="startOvT">Tower Stacking</h2>
     <p>Drop each sliding block onto the tower. Whatever hangs over is cut off, so time it well. Tap the board or press Space; on touch the D-pad's A button works too.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>Your tower is waiting.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseOvT"><div class="arcade-panel">
+    <h2 id="pauseOvT">Paused</h2><p>Your tower is waiting.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
-    <h2>Tower collapsed</h2>
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overOvT"><div class="arcade-panel">
+    <h2 id="overOvT">Tower collapsed</h2>
     <span class="arcade-big" id="overBig">0</span>
     <p>blocks high · Best <strong id="overBest">0</strong></p>
     <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
@@ -45,6 +46,7 @@ body{display:flex;flex-direction:column}
 const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
 const GW=400,GH=600,DPR_CAP=2,BLOCK_H=30,BLOCK_DRAW_H=28,START_W=100,BEST_KEY='pb_best_tower_stack';
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
 const PAL={bgTop:tok('--bg'),bgBottom:tok('--card'),text:tok('--text')};
 const COLORS=[tok('--cyan'),tok('--accent'),tok('--violet'),tok('--amber'),tok('--good'),tok('--danger')];
@@ -125,11 +127,12 @@ function finish(){
   state='over';
   if(score>best){best=score;saveBest(best)}
   $('overBig').textContent=score;$('overBest').textContent=best;
-  $('overOv').classList.add('show');$('hint').hidden=true;
+  $('overOv').classList.add('show');$('hint').hidden=true;focusDialog('overOv');
 }
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
   paused=v;$('pauseOv').classList.toggle('show',v);
+  if(v)focusDialog('pauseOv');
 }
 function loop(){draw();requestAnimationFrame(loop)}
 function act(){if(state==='playing'&&!paused)place()}
@@ -143,7 +146,7 @@ document.addEventListener('keydown',e=>{
 C.addEventListener('pointerdown',act);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('playBtn').onclick=start;$('againBtn').onclick=start;$('resumeBtn').onclick=()=>setPaused(false);
-reset();loop();
+reset();loop();focusDialog('startOv');
 </script>
 </body>
 </html>

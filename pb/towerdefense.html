@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Tower Defense - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <style>
 :root{--ink:var(--text);--panel:rgba(22,22,37,.92);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
-*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{overflow:hidden;background:var(--bg);color:var(--ink);touch-action:manipulation}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0}body{height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--ink);touch-action:manipulation}
 button{min-width:44px;min-height:44px;border:1px solid var(--border);border-radius:11px;background:var(--card2);color:var(--ink);font:750 13px var(--font);letter-spacing:.01em;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform .18s var(--spring),filter .18s ease}
 button:hover:not(:disabled){filter:brightness(1.12)}button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
 button:active{transform:scale(.95)}button:disabled{opacity:.38;cursor:default;transform:none}.hidden{display:none!important}
-#shell{position:relative;width:100%;height:100dvh;max-width:980px;margin:auto;display:flex;flex-direction:column;background:var(--bg2);isolation:isolate}
+#shell{position:relative;width:100%;flex:1;min-height:0;max-width:980px;margin:0 auto;display:flex;flex-direction:column;background:var(--bg2);isolation:isolate}
 #hud{z-index:5;display:grid;grid-template-columns:repeat(6,1fr);gap:2px;min-height:54px;padding:5px max(6px,env(safe-area-inset-right)) 5px max(6px,env(safe-area-inset-left));background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border-bottom:1px solid var(--line)}
-.stat{text-align:center;min-width:0}.stat b{display:block;color:var(--cyan);font-variant-numeric:tabular-nums;font-size:clamp(14px,3vw,18px);line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stat span{display:block;color:var(--muted);font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.stat{text-align:center;min-width:0}.stat b{display:block;color:var(--cyan);font-variant-numeric:tabular-nums;font-size:clamp(14px,3vw,18px);line-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stat span{display:block;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
 #stage{position:relative;min-height:220px;flex:1;overflow:hidden;background:#8bc4dd}#battlefield{display:block;width:100%;height:100%;touch-action:none}
 #notice{position:absolute;z-index:7;top:12px;left:50%;max-width:88%;padding:8px 14px;border:1px solid var(--border);border-radius:18px;background:rgba(22,22,37,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 5px 18px #0008;font-size:12px;font-weight:750;text-align:center;opacity:0;pointer-events:none;transform:translate(-50%,-8px);transition:.18s ease}#notice.show{opacity:1;transform:translate(-50%,0)}
 #targetMode{position:absolute;z-index:6;top:10px;right:10px;padding:7px 11px;border-radius:16px;background:var(--danger);color:#1a0610;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;pointer-events:none}
@@ -32,14 +32,14 @@ button:active{transform:scale(.95)}button:disabled{opacity:.38;cursor:default;tr
 #branchSheet{position:absolute;z-index:30;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:14px;background:rgba(8,8,18,.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}.sheet{width:min(100%,520px);padding:15px;border:1px solid var(--border);border-radius:var(--radius-l);background:rgba(22,22,37,.96);box-shadow:0 15px 50px #000b;text-align:center}.sheet h2{margin:0 0 4px;font:750 20px var(--font-display);letter-spacing:-.01em}.sheet>p{margin:0 0 10px;color:var(--gold);font-size:12px}.branchGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.branch{min-height:78px;padding:9px;background:var(--card2)}.branch strong,.branch span{display:block}.branch strong{color:var(--good);font-size:13px}.branch span{margin-top:5px;color:var(--muted);font-size:10px;line-height:13px}#branchCancel{width:100%;margin-top:8px;background:var(--card)}
 @media(min-width:700px){#dock{display:grid;grid-template-columns:1.05fr 1.3fr;column-gap:8px}#skillRow{grid-column:1;margin:0}#actionRow{grid-column:2;margin:0}#towerTray,#inspectPanel{grid-column:1/-1;margin-top:6px}.skill{height:51px}}
 @media(max-height:650px){#hud{min-height:46px}.stat b{font-size:13px;line-height:18px}#dock{padding-top:4px}.skill{height:42px}.towerCard{height:46px;min-height:46px}.panel{padding:13px}.panel h1{font-size:27px}.panel>p{margin-bottom:8px}.menuTitle{margin-top:8px}}
-@media(max-width:390px){#hud{grid-template-columns:repeat(3,1fr);min-height:78px}.stat b{line-height:17px}.stat span{font-size:7px}#towerTray{gap:3px}.towerCard strong{font-size:9px}.towerCard span{font-size:9px}#metaGrid{grid-template-columns:1fr}.panel{padding:13px}#levelGrid{gap:5px}.levelButton{height:46px}}
+@media(max-width:390px){#hud{grid-template-columns:repeat(3,1fr);min-height:78px}.stat b{line-height:17px}.stat span{font-size:9px}#towerTray{gap:3px}.towerCard strong{font-size:9px}.towerCard span{font-size:9px}#metaGrid{grid-template-columns:1fr}.panel{padding:13px}#levelGrid{gap:5px}.levelButton{height:46px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}button:active{transform:none}#overlay,.panel{animation:none}}
 </style>
 <script src="/pb/arcade-kit.js?v=6" data-arcade-id="towerdefense" data-arcade-title="Tower Defense"></script>
 </head>
 <body>
 <main id="shell">
-  <header id="hud" aria-label="Battle statistics">
+  <header id="hud" role="group" aria-label="Battle statistics">
     <div class="stat"><b id="gold">—</b><span>Gold</span></div>
     <div class="stat"><b id="lives">—</b><span>Lives</span></div>
     <div class="stat"><b id="wave">—</b><span>Wave</span></div>
@@ -48,40 +48,40 @@ button:active{transform:scale(.95)}button:disabled{opacity:.38;cursor:default;tr
     <div class="stat"><b id="shards">0</b><span>Shards</span></div>
   </header>
   <section id="stage">
-    <canvas id="battlefield" aria-label="3D tower defense battlefield. Drag to pan, pinch or scroll to zoom, and tap to interact."></canvas>
+    <canvas id="battlefield" role="img" aria-label="3D tower defense battlefield. Drag to pan, pinch or scroll to zoom, and tap to interact."></canvas>
     <div id="notice" role="status" aria-live="polite"></div>
-    <div id="targetMode" class="hidden">Choose meteor target</div>
+    <div id="targetMode" class="hidden" role="status">Choose meteor target</div>
   </section>
-  <section id="dock" aria-label="Battle controls">
+  <section id="dock" role="group" aria-label="Battle controls">
     <div id="skillRow">
-      <button class="skill" id="skill-meteor" aria-label="Meteor strike"><span>☄</span><small>Meteor</small></button>
-      <button class="skill" id="skill-freeze" aria-label="Freeze pulse"><span>❄</span><small>Freeze</small></button>
-      <button class="skill" id="skill-rally" aria-label="Rally damage boost"><span>⚔</span><small>Rally</small></button>
-      <button class="skill" id="skill-heal" aria-label="Repair base"><span>♥</span><small>Repair</small></button>
+      <button class="skill" id="skill-meteor" aria-label="Meteor strike"><span aria-hidden="true">☄</span><small>Meteor</small></button>
+      <button class="skill" id="skill-freeze" aria-label="Freeze pulse"><span aria-hidden="true">❄</span><small>Freeze</small></button>
+      <button class="skill" id="skill-rally" aria-label="Rally damage boost"><span aria-hidden="true">⚔</span><small>Rally</small></button>
+      <button class="skill" id="skill-heal" aria-label="Repair base"><span aria-hidden="true">♥</span><small>Repair</small></button>
     </div>
     <div id="actionRow">
       <button id="waveBtn">Start wave</button>
-      <button id="speedBtn" aria-label="Change game speed">1×</button>
+      <button id="speedBtn" aria-label="Game speed 1×, change">1×</button>
       <button id="pauseBtn" aria-label="Pause game">Ⅱ</button>
       <button id="menuBtn" aria-label="Open level menu">☰</button>
     </div>
-    <div id="towerTray" aria-label="Tower types"></div>
+    <div id="towerTray" role="group" aria-label="Tower types"></div>
     <div id="inspectPanel" class="hidden">
       <div id="inspectText"></div>
       <button id="upgradeBtn">Upgrade</button>
       <button id="sellBtn">Sell</button>
     </div>
   </section>
-  <section id="overlay">
+  <section id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlayTitle">
     <div class="panel">
       <h1 id="overlayTitle">Tower Defense 3D</h1>
       <p id="overlayText">Command the battlefield, trigger skills, and forge permanent realm upgrades.</p>
       <div id="menuSections">
         <div class="menuTitle"><span>Battlefields</span><span class="pill"><span id="starTotal">0</span> stars</span></div>
         <div id="levelGrid"></div>
-        <div class="menuTitle"><span>Permanent upgrades</span><span class="pill">◆ <span id="metaShardLabel">Spend shards</span></span></div>
+        <div class="menuTitle"><span>Permanent upgrades</span><span class="pill"><span aria-hidden="true">◆</span> <span id="metaShardLabel">Spend shards</span></span></div>
         <div id="metaGrid"></div>
-        <button id="helpBtn">How to command</button>
+        <button id="helpBtn" aria-expanded="false" aria-controls="helpPanel">How to command</button>
         <div id="helpPanel" class="hidden">Build on glowing pads. During battle, tap open terrain to move your commander; nearby towers gain an aura bonus. Tap Meteor, then choose a target. Freeze, Rally, and Repair activate immediately. Starting a wave before the timer expires earns bonus gold. At tower level 3, choose one of two permanent branches for that tower.</div>
       </div>
       <div id="resultActions" class="hidden">
@@ -90,7 +90,7 @@ button:active{transform:scale(.95)}button:disabled{opacity:.38;cursor:default;tr
       </div>
     </div>
   </section>
-  <section id="branchSheet" class="hidden" aria-modal="true" role="dialog">
+  <section id="branchSheet" class="hidden" role="dialog" aria-modal="true" aria-labelledby="branchTitle">
     <div class="sheet">
       <h2 id="branchTitle">Choose upgrade path</h2>
       <p id="branchCost">0 gold</p>
@@ -112,6 +112,6 @@ if(!window.THREE){
   throw new Error("three.js r160 failed to load");
 }
 </script>
-<script type="module" src="/pb/towerdefense/main.js?v=1"></script>
+<script type="module" src="/pb/towerdefense/main.js?v=2"></script>
 </body>
 </html>

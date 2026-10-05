@@ -22,6 +22,8 @@ body{display:flex;flex-direction:column}
 #progress{height:6px;border-radius:99px;background:var(--border);overflow:hidden}
 #prog-fill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--cyan));transition:width .3s var(--spring)}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
+.arcade-btn:focus-visible{outline-offset:3px}
+.arcade-seg button{min-height:44px}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (prefers-reduced-motion:reduce){#prog-fill{transition:none}}
 </style>
@@ -29,7 +31,7 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <div class="arcade-hud">
+  <div class="arcade-hud" role="group" aria-label="Words per minute, accuracy and time">
     <span class="arcade-pill">WPM <b id="wpm">0</b></span>
     <span class="arcade-pill">Accuracy <b><span id="acc">100</span>%</b></span>
     <span class="arcade-pill">Time <b><span id="timer">0</span> s</b></span>
@@ -37,7 +39,7 @@ body{display:flex;flex-direction:column}
   <div class="typing">
     <div id="text-display" aria-live="off"></div>
     <input id="inp" placeholder="Start typing..." aria-label="Type the text above" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
-    <div id="progress"><div id="prog-fill"></div></div>
+    <div id="progress" aria-hidden="true"><div id="prog-fill"></div></div>
     <div class="row">
       <div class="arcade-seg" role="group" aria-label="Language">
         <button type="button" id="langEn" aria-pressed="true">EN</button>
@@ -47,19 +49,19 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Typing Speed</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startOvT"><div class="arcade-panel">
+    <h2 id="startOvT">Typing Speed</h2>
     <p>Type the sentence exactly as shown. The timer starts with your first key. Use a keyboard; on touch the on-screen keyboard opens when you press Play.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>Your timer stopped while you were away.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseOvT"><div class="arcade-panel">
+    <h2 id="pauseOvT">Paused</h2><p>Your timer stopped while you were away.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
-    <h2>Done</h2>
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overOvT"><div class="arcade-panel">
+    <h2 id="overOvT">Done</h2>
     <span class="arcade-big"><span id="overBig">0</span> WPM</span>
     <p><strong id="overAcc">100</strong>% accuracy in <strong id="overSecs">0</strong> s · Best <strong id="overBest">0</strong> WPM</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Next text</button></div>
@@ -94,6 +96,7 @@ const TEXTS=[
 ];
 const TICK_MS=200,WRONG_FLASH_MS=300,BEST_KEY='pb_best_typing',MS_PER_MIN=60000;
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 let text,pos,errors,startTime,timerInt,done;
 let state='idle',paused=false,pausedAt=0,best=loadBest();
 let lang=storageGet('pb_typ_lang')||'en';
@@ -149,12 +152,12 @@ function finish(acc){
   window.score=Math.max(window.score||0,wpm);Arcade.gameOver(wpm);
   if(wpm>best){best=wpm;storageSet(BEST_KEY,String(best))}
   $('overBig').textContent=wpm;$('overAcc').textContent=acc;$('overSecs').textContent=secs.toFixed(1);$('overBest').textContent=best;
-  $('overOv').classList.add('show');
+  $('overOv').classList.add('show');focusDialog('overOv');
 }
 function setPaused(v){
   if(v===paused||(v&&(state!=='playing'||!startTime||done)))return;
   paused=v;$('pauseOv').classList.toggle('show',v);
-  if(v){clearInterval(timerInt);pausedAt=Date.now()}
+  if(v){focusDialog('pauseOv');clearInterval(timerInt);pausedAt=Date.now()}
   else{startTime+=Date.now()-pausedAt;timerInt=setInterval(tick,TICK_MS);focusInput()}
 }
 $('inp').addEventListener('input',e=>{
@@ -189,7 +192,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(t
 $('playBtn').onclick=begin;$('againBtn').onclick=begin;$('newBtn').onclick=()=>{if(state==='playing')newTest();else begin()};
 $('resumeBtn').onclick=()=>setPaused(false);
 $('langEn').onclick=()=>setLang('en');$('langLb').onclick=()=>setLang('lb');
-paintLang();newTest();
+paintLang();newTest();focusDialog('startOv');
 </script>
 </body>
 </html>

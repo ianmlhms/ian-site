@@ -20,6 +20,7 @@ body{display:flex;flex-direction:column}
   transition:bottom .15s var(--spring);pointer-events:none}
 .mole.up{bottom:calc(var(--hole)*.08)}
 .mole.hit{bottom:calc(var(--hole)*.08);filter:grayscale(1)}
+.arcade-btn:focus-visible{outline-offset:3px}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (prefers-reduced-motion:reduce){.mole{transition:none}}
 </style>
@@ -27,26 +28,26 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <div class="arcade-hud">
+  <div class="arcade-hud" role="group" aria-label="Score, time and combo">
     <span class="arcade-pill">Score <b id="score">0</b></span>
     <span class="arcade-pill">Time <b><span id="timer">30</span> s</b></span>
     <span class="arcade-pill">Combo <b><span id="combo">0</span>x</b></span>
   </div>
-  <div id="board" aria-label="Mole holes"></div>
+  <div id="board" role="group" aria-label="Mole holes. Tap or click a mole to whack it."></div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Whack-a-Mole</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startOvT"><div class="arcade-panel">
+    <h2 id="startOvT">Whack-a-Mole</h2>
     <p>Tap or click the moles as they pop up. Stars are worth 5, and a streak multiplies your points. You have 30 seconds.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>The moles are holding still.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseOvT"><div class="arcade-panel">
+    <h2 id="pauseOvT">Paused</h2><p>The moles are holding still.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="overOv"><div class="arcade-panel">
-    <h2>Time's up</h2>
+  <div class="arcade-overlay" id="overOv" role="dialog" aria-modal="true" aria-labelledby="overOvT"><div class="arcade-panel">
+    <h2 id="overOvT">Time's up</h2>
     <span class="arcade-big" id="overBig">0</span>
     <p>Best <strong id="overBest">0</strong></p>
     <div class="arcade-actions"><button class="arcade-btn play" id="againBtn" type="button">Play again</button></div>
@@ -56,6 +57,7 @@ body{display:flex;flex-direction:column}
 const ROUND_SECONDS=30,HOLES=9,POPUP_MS=800,VISIBLE_MS=1200,LATE_BONUS_MS=400,LATE_PHASE_SECONDS=15;
 const DOUBLE_CHANCE=0.3,STAR_CHANCE=0.1,STAR_POINTS=5,MAX_COMBO=5,HIT_LINGER_MS=200,BEST_KEY='pb_best_whack_a_mole';
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 let score=0,timeLeft=ROUND_SECONDS,combo=0,moles=[],interval=0,timerInt=0,active=false;
 let state='idle',paused=false,best=loadBest();
 
@@ -72,7 +74,7 @@ function init(){
   moles=[];
   for(let i=0;i<HOLES;i++){
     let h=document.createElement('div');h.className='hole';
-    let m=document.createElement('div');m.className='mole';m.textContent='🐹';
+    let m=document.createElement('div');m.className='mole';m.setAttribute('aria-hidden','true');m.textContent='🐹';
     h.appendChild(m);h.addEventListener('pointerdown',e=>{e.preventDefault();whack(i)});
     b.appendChild(h);moles.push({el:m,up:false,hit:false});
   }
@@ -99,7 +101,7 @@ function endGame(){
   Arcade.gameOver(score);
   if(score>best){best=score;saveBest(best)}
   $('overBig').textContent=score;$('overBest').textContent=best;
-  $('overOv').classList.add('show');
+  $('overOv').classList.add('show');focusDialog('overOv');
 }
 function popup(){
   if(paused)return;
@@ -129,6 +131,7 @@ function whack(i){
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
   paused=v;$('pauseOv').classList.toggle('show',v);
+  if(v)focusDialog('pauseOv');
 }
 document.addEventListener('keydown',e=>{
   if(e.target.closest&&e.target.closest('button'))return;
@@ -136,7 +139,7 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('playBtn').onclick=startGame;$('againBtn').onclick=startGame;$('resumeBtn').onclick=()=>setPaused(false);
-init();
+init();focusDialog('startOv');
 </script>
 </body>
 </html>

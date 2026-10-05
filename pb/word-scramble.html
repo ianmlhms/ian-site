@@ -22,6 +22,8 @@ body{display:flex;flex-direction:column}
 #feedback{min-height:30px;font:750 20px/1.3 var(--font)}
 .ok{color:var(--good)}.bad{color:var(--danger)}.reveal{color:var(--amber)}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
+.arcade-btn:focus-visible{outline-offset:3px}
+.arcade-seg button{min-height:44px}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (prefers-reduced-motion:reduce){#timer-fill{transition:none}}
 </style>
@@ -29,7 +31,7 @@ body{display:flex;flex-direction:column}
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <div class="arcade-hud">
+  <div class="arcade-hud" role="group" aria-label="Score, streak and level">
     <span class="arcade-pill">Score <b id="sc">0</b></span>
     <span class="arcade-pill">Streak <b id="st">0</b></span>
     <span class="arcade-pill">Level <b id="lv">1</b></span>
@@ -38,7 +40,7 @@ body{display:flex;flex-direction:column}
     <div id="hint"></div>
     <div id="scrambled" aria-live="polite"></div>
     <input id="guess" placeholder="Type your answer..." aria-label="Your answer" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false">
-    <div id="timer-bar"><div id="timer-fill"></div></div>
+    <div id="timer-bar" aria-hidden="true"><div id="timer-fill"></div></div>
     <div id="feedback" role="status"></div>
     <div class="row">
       <div class="arcade-seg" role="group" aria-label="Language">
@@ -49,14 +51,14 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
 
-  <div class="arcade-overlay show" id="startOv"><div class="arcade-panel">
-    <h2>Word Unscramble</h2>
+  <div class="arcade-overlay show" id="startOv" role="dialog" aria-modal="true" aria-labelledby="startOvT"><div class="arcade-panel">
+    <h2 id="startOvT">Word Unscramble</h2>
     <p>Put the scrambled letters in the right order before the bar runs out. Streaks earn bonus points and speed things up. Type on a keyboard; on touch the on-screen keyboard opens when you press Play.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="playBtn" type="button">Play</button></div>
   </div></div>
 
-  <div class="arcade-overlay" id="pauseOv"><div class="arcade-panel">
-    <h2>Paused</h2><p>The timer is stopped.</p>
+  <div class="arcade-overlay" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseOvT"><div class="arcade-panel">
+    <h2 id="pauseOvT">Paused</h2><p>The timer is stopped.</p>
     <div class="arcade-actions"><button class="arcade-btn play" id="resumeBtn" type="button">Resume</button></div>
   </div></div>
 </main>
@@ -124,6 +126,7 @@ const WORDS=[
 const TIMER_TICK_MS=100,TIMER_FULL=100,TIMER_BASE_DRAIN=0.8,TIMER_LEVEL_DRAIN=0.2,LOW_TIME=25,SKIP_PENALTY=5;
 const CORRECT_DELAY_MS=600,SKIP_DELAY_MS=1000,TIMEOUT_DELAY_MS=1200,BASE_POINTS=10,STREAK_BONUS=3,STREAK_PER_LEVEL=3;
 const $=id=>document.getElementById(id);
+function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 let score=0,streak=0,level=1,current,timeLeft=TIMER_FULL,used=new Set(),nextTimer=0;
 let state='idle',paused=false;
 let lang=storageGet('pb_ws_lang')||'en';
@@ -192,7 +195,7 @@ function begin(){
 function setPaused(v){
   if(v===paused||(v&&state!=='playing'))return;
   paused=v;$('pauseOv').classList.toggle('show',v);
-  if(!v)focusGuess();
+  if(v)focusDialog('pauseOv');else focusGuess();
 }
 $('guess').addEventListener('input',e=>{
   if(state!=='playing'||paused){e.target.value='';return}
@@ -220,7 +223,7 @@ document.addEventListener('keydown',e=>{
 document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
 $('playBtn').onclick=begin;$('resumeBtn').onclick=()=>setPaused(false);$('skipBtn').onclick=skip;
 $('langEn').onclick=()=>setLang('en');$('langLb').onclick=()=>setLang('lb');
-paintLang();next();
+paintLang();next();focusDialog('startOv');
 </script>
 </body>
 </html>
