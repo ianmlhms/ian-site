@@ -30,7 +30,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 </head>
 <body>
 <main class="arcade-stage" id="stage">
-  <div id="board" role="grid" aria-label="2048 board"></div>
+  <div id="board" role="group" aria-label="2048 board"></div>
   <div class="arcade-hud">
     <span class="arcade-pill">Score <b id="sc">0</b></span>
     <span class="arcade-pill">Best <b id="bestHud">0</b></span>
@@ -178,7 +178,7 @@ function render(){
   const board=$('board');
   const cells=board.children;
   if(cells.length!==SIZE*SIZE){
-    board.replaceChildren(...Array.from({length:SIZE*SIZE},()=>{const d=document.createElement('div');d.className='cell';d.setAttribute('role','gridcell');return d}));
+    board.replaceChildren(...Array.from({length:SIZE*SIZE},()=>{const d=document.createElement('div');d.className='cell';return d}));
   }
   for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++){
     const v=grid[r][c],el=cells[r*SIZE+c];

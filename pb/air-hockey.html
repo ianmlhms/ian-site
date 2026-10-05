@@ -39,7 +39,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
         <button class="arcade-btn" id="mAI" type="button">Play the computer</button>
         <button class="arcade-btn secondary" id="mLocal" type="button">2 players, one device</button>
         <button class="arcade-btn secondary" id="mHost" type="button">Host online game</button>
-        <div class="join"><input id="mCode" maxlength="5" placeholder="code" aria-label="Room code" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
+        <div class="join"><input id="mCode" name="room-code" maxlength="5" placeholder="code" aria-label="Room code" enterkeyhint="go" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"><button class="arcade-btn secondary" id="mJoin" type="button">Join</button></div>
       </div>
       <p id="mStatus" role="status"></p>
     </div>
@@ -171,6 +171,7 @@ function begin(){p1=null;p2=null;reset();p1.score=0;p2.score=0;running=true;paus
     'You are '+(mode==='host'?'red (bottom)':'blue (top)')+' · WASD or arrows · First to 7';}
 function backToMenu(msg){running=false;paused=false;matchShown=false;mode=null;parent.postMessage({__pbNet:{op:'close'}},'*');
   hidePanel();info.textContent='';menu.classList.add('show');status(msg||'')}
+$('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('mJoin').click()});
 $('mLocal').onclick=()=>{mode='local';begin()};
 $('mAI').onclick=()=>{mode='ai';begin()};
 $('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
