@@ -212,7 +212,7 @@ async function renderChat(list, data) {
       return true;
     }));
     const note = document.createElement("div");
-    note.className = "hint";
+    note.className = "chat-note";
     note.textContent = T("ianet.chatNote");
     list.append(note);
     items = document.createElement("div");
