@@ -76,7 +76,7 @@
   .home .tile[data-app="messenger.html"],.home .tile[data-app="friends.html"]{--h:#3cc4de}
   .home .tile[data-app="pixelbreak.html"],.home .tile[data-app="wordle.html"]{--h:#ff6f9f}
   .home .tile[data-app="bus.html"],.home .tile[data-app="skylens.html"],.home .tile[data-app="kaart/"],.home .tile[data-app="geoportal/"]{--h:#5b9bff}
-  .home .tile[data-app="buddy.html"],.home .tile[data-app="money.html"],.home .tile[data-app="me.html"],.home .tile[data-app="karts.html"],.home .tile[data-app="hotel.html"],.home .tile[data-app="haus/"]{--h:#f4a62a}
+  .home .tile[data-app="buddy.html"],.home .tile[data-app="money.html"],.home .tile[data-app="me.html"],.home .tile[data-app="kart-account.html"],.home .tile[data-app="karts.html"],.home .tile[data-app="hotel.html"],.home .tile[data-app="haus/"]{--h:#f4a62a}
   .home .tile[data-app="factory.html"],.home .tile[data-app="admin.html"],.home .tile[data-app="traffic.html"],.home .tile[data-app="ppt.html"],.home .tile[data-app="doc.html"]{--h:#a883ff}
 
 
@@ -250,6 +250,9 @@
           <a class="tile ui-tile karts admin-only" href="karts.html" data-app="karts.html" style="display:none">
             <span class="ico ui-tile__ico" aria-hidden="true">🏎️</span><span class="tname ui-tile__name">KartTracker</span><span class="tsub ui-tile__sub" data-i18n="tile.karts.sub">All lap sessions</span>
           </a>
+          <a class="tile ui-tile" href="kart-account.html" data-app="kart-account.html">
+            <span class="ico ui-tile__ico" aria-hidden="true">🏁</span><span class="tname ui-tile__name">Karting</span><span class="tsub ui-tile__sub">Mäi KartTracker-Kont</span>
+          </a>
           <a class="tile ui-tile hotel private-hotel" href="hotel.html" data-app="hotel.html" style="display:none">
             <span class="ico ui-tile__ico" aria-hidden="true">🏨</span><span class="tname ui-tile__name">Hotel-Simulator</span><span class="tsub ui-tile__sub" data-i18n="tile.hotel.sub">Bausimulator · privat</span>
           </a>
@@ -378,11 +381,11 @@
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-  <script type="module" src="notify-ambient.js?v=18"></script>
-  <script type="module" src="rtc-ring.js?v=18"></script>
-  <script type="module" src="class-gate.js?v=19"></script>
+  <script type="module" src="notify-ambient.js?v=19"></script>
+  <script type="module" src="rtc-ring.js?v=19"></script>
+  <script type="module" src="class-gate.js?v=20"></script>
   <script type="module">
-    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=22";
+    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=23";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     const HOUSE_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Haus-Planer
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)

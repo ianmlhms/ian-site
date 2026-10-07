@@ -1,12 +1,12 @@
 /* Shared Supabase auth for ian.lu. ES module. */
 import "./i18n-dict.js?v=42";
-import { openAuthDialog } from "./auth-ui.js?v=8";
+import { openAuthDialog } from "./auth-ui.js?v=9";
 import { esc } from "./pin-pad.js?v=4";
 import {
   openProfilePinDialog,
   resetPinBriefing,
   startPinBriefing,
-} from "./pin-brief.js?v=7";
+} from "./pin-brief.js?v=8";
 
 const cfg = window.PB_CONFIG || {};
 const PASSWORD_ALPHABET =
@@ -15,6 +15,12 @@ const PASSWORD_ALPHABET =
   "0123456789-_";
 const RANDOM_PASSWORD_LENGTH = 32;
 const PIN_FUNCTION = "auth-pin";
+const KART_ALLOWED_PAGES = new Set([
+  "kart-account.html",
+  "kart-link.html",
+  "kart.html",
+  "privacy.html",
+]);
 
 export const authConfigured =
   /^https:\/\/.+\.supabase\.co\/?$/.test(
@@ -77,6 +83,24 @@ function markSignedIn(current) {
   document.documentElement.classList.toggle("auth-in", Boolean(current));
 }
 
+export function isKartAccount(current = _g.session) {
+  return current?.user?.user_metadata?.account_kind === "kart";
+}
+
+function pageName() {
+  return location.pathname.split("/").filter(Boolean).pop() || "index.html";
+}
+
+function guardKartAccount(current) {
+  if (!isKartAccount(current) || KART_ALLOWED_PAGES.has(pageName())) return false;
+  location.replace(`${location.origin}/kart-account.html`);
+  return true;
+}
+
+// Most pages import auth.js before they ask for the asynchronous client. Use the
+// stored session as an immediate guard, then verify again when GoTrue is ready.
+guardKartAccount(_g.session || storedSession());
+
 async function recoverSession(sb, data) {
   if (data.session) return data;
   const stored = storedSession();
@@ -95,6 +119,7 @@ async function recoverSession(sb, data) {
 function notifyAuth(event, current) {
   _g.session = current;
   markSignedIn(current);
+  if (guardKartAccount(current)) return;
   const userId = current?.user?.id || null;
   const changed = userId !== _g.lastUid;
   if (changed && current) {
@@ -112,7 +137,7 @@ function notifyAuth(event, current) {
 async function ensureProfile() {
   const current = _g.session;
   const name = current?.user?.user_metadata?.username;
-  if (!_g.sb || !current || !name) return;
+  if (!_g.sb || !current || !name || isKartAccount(current)) return;
   const { error } = await _g.sb.rpc("upsert_profile", {
     p_username: String(name).slice(0, 24),
   });
@@ -120,6 +145,10 @@ async function ensureProfile() {
 }
 
 function schedulePinBriefing() {
+  if (isKartAccount() || pageName() === "kart-account.html") {
+    resetPinBriefing();
+    return;
+  }
   injectCss();
   if (document.body) {
     void startPinBriefing(uiDeps);
@@ -144,6 +173,7 @@ async function initializeClient() {
   markSignedIn(data.session);
   _g.lastUid = data.session?.user?.id || null;
   _g.sb.auth.onAuthStateChange(notifyAuth);
+  if (guardKartAccount(data.session)) return _g.sb;
   await ensureProfile();
   schedulePinBriefing();
   return _g.sb;
@@ -351,6 +381,7 @@ export async function signOut() {
 
 const uiDeps = Object.freeze({
   session,
+  isKartAccount,
   username,
   signOut,
   loginPin: loginWithPin,
@@ -385,6 +416,7 @@ export function openPinSetup() {
     openAuthModal();
     return;
   }
+  if (isKartAccount()) return;
   void openProfilePinDialog(uiDeps);
 }
 

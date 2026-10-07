@@ -1,4 +1,4 @@
-import { validateDeck } from "./ppt-ai.js?v=19";
+import { validateDeck } from "./ppt-ai.js?v=20";
 
 const DEFAULT_LAYOUT = "bullets";
 const LAYOUTS = new Set([

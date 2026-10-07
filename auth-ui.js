@@ -467,6 +467,7 @@ function pinSetupMarkup(length, title, needsProof) {
 }
 
 export function openPinDialog(deps, options = {}) {
+  if (deps.isKartAccount?.()) return;
   const length = options.length === 6 ? 6 : DEFAULT_PIN_LENGTH;
   const needsProof = options.hasPin === true && !options.recovery;
   modalLocked = Boolean(options.required);

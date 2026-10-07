@@ -1,10 +1,10 @@
 /* Class gate. Drop on any signed-in page:
- *   <script type="module" src="class-gate.js?v=19"></script>
+ *   <script type="module" src="class-gate.js?v=20"></script>
  * The first time a signed-in user is seen without a school class on their
  * profile, a required modal asks for it (new users at sign-up, existing users
  * the next time they open the site). Saved via the set_class RPC; the class is
  * then shown next to their name everywhere (see friends.js / messenger.js). */
-import * as auth from "./auth.js?v=22";
+import * as auth from "./auth.js?v=23";
 
 // Use i18n when the key exists; otherwise fall back to the Luxembourgish default
 // (t() returns the key unchanged when it's missing — treat that as "not found").
@@ -37,7 +37,9 @@ const validClass = (raw) => { const v = normClass(raw); return CLASS_SHAPE.test(
 
 async function start() {
   if (done || shown || checking || !auth.authConfigured) return;
-  const uid = auth.session()?.user?.id;
+  const current = auth.session();
+  if (current?.user?.user_metadata?.account_kind === "kart") return;
+  const uid = current?.user?.id;
   if (!uid) return;                       // wait for sign-in (onAuth re-calls)
   if (hasSkipped(uid)) { done = true; return; }   // opted out of the class tag
   checking = true;

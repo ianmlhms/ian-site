@@ -1,4 +1,4 @@
-import { openPinDialog } from "./auth-ui.js?v=8";
+import { openPinDialog } from "./auth-ui.js?v=9";
 import { esc, translate } from "./pin-pad.js?v=4";
 
 const SKIP_PREFIX = "pinBriefSkip:";
@@ -12,6 +12,14 @@ let checking = false;
 let checkedMarker = "";
 let brief = null;
 let recoveryPending = RECOVERY_AT_LOAD;
+
+function isKartAccountPage() {
+  return window.location.pathname.endsWith("/kart-account.html");
+}
+
+function isKartSession(current) {
+  return current?.user?.user_metadata?.account_kind === "kart";
+}
 
 function t(key, fallback) {
   return translate(key, fallback);
@@ -149,6 +157,7 @@ function showRequiredPin(deps, recovery) {
 }
 
 async function inspectSession(deps, current) {
+  if (isKartAccountPage() || isKartSession(current)) return;
   const status = await deps.pinStatus();
   if (recoveryRequested()) {
     showRequiredPin(deps, true);
@@ -163,6 +172,10 @@ async function inspectSession(deps, current) {
 }
 
 export async function startPinBriefing(deps) {
+  if (isKartAccountPage() || isKartSession(deps.session())) {
+    resetPinBriefing();
+    return;
+  }
   if (deps.pinSetupPending?.()) return;
   const current = deps.session();
   const marker = sessionMarker(current);
@@ -191,6 +204,7 @@ export function resetPinBriefing() {
 }
 
 export async function openProfilePinDialog(deps) {
+  if (isKartSession(deps.session())) return;
   try {
     const status = await deps.pinStatus();
     openPinDialog(deps, {

@@ -1,5 +1,5 @@
-import { validateDeck } from "./ppt-ai.js?v=19";
-import { safeExportFilename } from "./ppt-export-pptx.js?v=17";
+import { validateDeck } from "./ppt-ai.js?v=20";
+import { safeExportFilename } from "./ppt-export-pptx.js?v=19";
 import { bodyFont, countParagraph, createDocument, docxLibrary, DOCX_BODY_HALF_POINTS,
   normalParagraph, packAndDownload, textParagraphs, titleParagraph } from "./docx-primitives.js?v=1";
 
