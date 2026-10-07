@@ -15,6 +15,7 @@
       --traffic-visitors: #6ea8fe;
       --traffic-pageviews: #ff6b9d;
       --traffic-good: #4de8ff;
+      --traffic-accounts: #4de8ff;
     }
 
     [hidden] { display: none !important; }
@@ -135,6 +136,29 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .accounts-intro { margin-top: 40px; }
+
+    .accounts-intro h2 { font-size: clamp(24px, 5vw, 32px); }
+
+    .accounts-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+    .accounts-grid .metric-card { padding: 16px 14px; }
+
+    .accounts-grid .metric-kind { color: var(--traffic-accounts); }
+
+    .account-error {
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .account-error p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .account-error .state-action { margin-top: 12px; }
+
     .dashboard-grid {
       display: grid;
       grid-template-columns: minmax(0, 1.7fr) minmax(240px, 0.8fr);
@@ -180,6 +204,7 @@
 
     .legend .visitors { background: var(--traffic-visitors); }
     .legend .pageviews { background: var(--traffic-pageviews); }
+    .legend .accounts { background: var(--traffic-accounts); }
 
     .chart-wrap {
       width: 100%;
@@ -216,6 +241,7 @@
 
     .chart-line.visitors { stroke: var(--traffic-visitors); }
     .chart-line.pageviews { stroke: var(--traffic-pageviews); }
+    .chart-line.accounts { stroke: var(--traffic-accounts); }
 
     .top-pages {
       display: grid;
@@ -362,7 +388,9 @@
       .traffic-shell { padding: 18px 14px max(36px, env(safe-area-inset-bottom)); }
       .traffic-intro { align-items: flex-start; flex-direction: column; gap: 10px; }
       .freshness { text-align: left; }
-      .summary-grid { grid-template-columns: 1fr; }
+      .summary-grid,
+      .accounts-grid { grid-template-columns: 1fr; }
+      .accounts-intro { margin-top: 28px; }
       .metric-card {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -495,6 +523,61 @@
             </div>
           </div>
           <p id="comparisonNote" class="comparison-note"></p>
+        </section>
+      </div>
+
+      <div class="traffic-intro accounts-intro">
+        <div>
+          <h2>Accounts</h2>
+          <p>Registered ian.lu accounts. Counts only, no personal details.</p>
+        </div>
+        <p id="accountsFreshness" class="freshness"></p>
+      </div>
+
+      <section class="summary-grid accounts-grid" aria-label="Account summary">
+        <article class="metric-card">
+          <span class="metric-label">Total accounts</span>
+          <strong id="accTotal" class="metric-primary">—</strong>
+          <span class="metric-kind">registered</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">New (7 days)</span>
+          <strong id="accNew7" class="metric-primary">—</strong>
+          <span class="metric-kind">signed up</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">New (30 days)</span>
+          <strong id="accNew30" class="metric-primary">—</strong>
+          <span class="metric-kind">signed up</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Active (7 days)</span>
+          <strong id="accActive7" class="metric-primary">—</strong>
+          <span class="metric-kind">signed in</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Active (30 days)</span>
+          <strong id="accActive30" class="metric-primary">—</strong>
+          <span class="metric-kind">signed in</span>
+        </article>
+      </section>
+
+      <div class="dashboard-grid">
+        <section class="panel panel-wide" aria-labelledby="accountsChartTitle">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">Last 30 days</span>
+              <h3 id="accountsChartTitle">New accounts per day</h3>
+            </div>
+            <div class="legend" aria-hidden="true">
+              <span><i class="accounts"></i>New accounts</span>
+            </div>
+          </div>
+          <div id="accountsChart" class="chart-wrap"></div>
+          <div id="accountsError" class="account-error" role="alert" hidden>
+            <p>Couldn't load account stats.</p>
+            <button id="accountsRetry" class="state-action" type="button">Try again</button>
+          </div>
         </section>
       </div>
     </div>
@@ -761,24 +844,27 @@
       }).join(" ");
     }
 
-    function renderChart(series) {
-      const chart = byId("chart");
-      chart.replaceChildren();
+    // Shared line-chart renderer. `lines` = [{ key, className }] drawn in order;
+    // `table` = [{ label, key }] columns for the screen-reader data table.
+    function renderLineChart(target, series, { lines, table, ariaLabel, titleText, descText, evenMax = false }) {
+      target.replaceChildren();
       const svg = svgElement("svg", {
         class: "traffic-chart",
         viewBox: `0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`,
         role: "img",
-        "aria-label": "Line chart of unique visitors and pageviews for the last 30 days",
+        "aria-label": ariaLabel,
       });
       const title = svgElement("title");
-      title.textContent = "Daily traffic over the last 30 days";
+      title.textContent = titleText;
       const description = svgElement("desc");
-      description.textContent = "Blue shows unique visitors and pink shows pageviews.";
+      description.textContent = descText;
       svg.append(title, description);
 
       const plotWidth = CHART_WIDTH - CHART_MARGIN.left - CHART_MARGIN.right;
       const plotHeight = CHART_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom;
-      const maximum = Math.max(1, ...series.flatMap((point) => [point.uniqueVisitors, point.pageviews]));
+      const peak = Math.max(1, ...series.flatMap((point) => lines.map((line) => point[line.key])));
+      // Small counts: round the top up to an even number so the half-way gridline is a whole number.
+      const maximum = evenMax ? Math.max(2, Math.ceil(peak / 2) * 2) : peak;
       const xScale = (index) => CHART_MARGIN.left + (index / Math.max(1, series.length - 1)) * plotWidth;
       const yScale = (value) => CHART_MARGIN.top + plotHeight - (value / maximum) * plotHeight;
 
@@ -812,33 +898,49 @@
         svg.appendChild(label);
       });
 
-      svg.appendChild(svgElement("path", {
-        class: "chart-line pageviews",
-        d: linePath(series, "pageviews", xScale, yScale),
-      }));
-      svg.appendChild(svgElement("path", {
-        class: "chart-line visitors",
-        d: linePath(series, "uniqueVisitors", xScale, yScale),
-      }));
-      chart.appendChild(svg);
+      lines.forEach((line) => {
+        svg.appendChild(svgElement("path", {
+          class: `chart-line ${line.className}`,
+          d: linePath(series, line.key, xScale, yScale),
+        }));
+      });
+      target.appendChild(svg);
 
-      const table = document.createElement("table");
-      table.className = "sr-only";
-      const head = table.createTHead().insertRow();
-      ["Day", "Unique visitors", "Pageviews"].forEach((text) => {
+      const dataTable = document.createElement("table");
+      dataTable.className = "sr-only";
+      const head = dataTable.createTHead().insertRow();
+      [{ label: "Day" }, ...table].forEach(({ label }) => {
         const cell = document.createElement("th");
         cell.scope = "col";
-        cell.textContent = text;
+        cell.textContent = label;
         head.appendChild(cell);
       });
-      const body = table.createTBody();
+      const body = dataTable.createTBody();
       series.forEach((point) => {
         const row = body.insertRow();
         row.insertCell().textContent = formatShortDay(point.day);
-        row.insertCell().textContent = formatInteger(point.uniqueVisitors);
-        row.insertCell().textContent = formatInteger(point.pageviews);
+        table.forEach(({ key }) => {
+          row.insertCell().textContent = formatInteger(point[key]);
+        });
       });
-      chart.appendChild(table);
+      target.appendChild(dataTable);
+    }
+
+    function renderChart(series) {
+      renderLineChart(byId("chart"), series, {
+        // Pageviews first so the visitors line sits on top.
+        lines: [
+          { key: "pageviews", className: "pageviews" },
+          { key: "uniqueVisitors", className: "visitors" },
+        ],
+        table: [
+          { label: "Unique visitors", key: "uniqueVisitors" },
+          { label: "Pageviews", key: "pageviews" },
+        ],
+        ariaLabel: "Line chart of unique visitors and pageviews for the last 30 days",
+        titleText: "Daily traffic over the last 30 days",
+        descText: "Blue shows unique visitors and pink shows pageviews.",
+      });
     }
 
     function renderTopPages(rows) {
@@ -917,6 +1019,62 @@
       dashboardView.hidden = false;
     }
 
+    const ACCOUNT_STAT_FIELDS = Object.freeze({
+      total: "accTotal",
+      new_7d: "accNew7",
+      new_30d: "accNew30",
+      active_7d: "accActive7",
+      active_30d: "accActive30",
+    });
+    let accountLoadId = 0;
+
+    function validateAccountStats(value) {
+      const isValid = isRecord(value) &&
+        Object.keys(ACCOUNT_STAT_FIELDS).every((key) => isCount(value[key])) &&
+        Array.isArray(value.daily) &&
+        value.daily.length > 0 &&
+        value.daily.every((entry) => isRecord(entry) && parseDateKey(entry.day) && isCount(entry.count));
+      if (!isValid) throw new TypeError("account_stats response had an unexpected shape");
+      return {
+        totals: Object.fromEntries(Object.keys(ACCOUNT_STAT_FIELDS).map((key) => [key, value[key]])),
+        daily: value.daily.map((entry) => ({ day: entry.day, accounts: entry.count })),
+      };
+    }
+
+    function renderAccountStats({ totals, daily }) {
+      Object.entries(ACCOUNT_STAT_FIELDS).forEach(([key, id]) => {
+        byId(id).textContent = formatInteger(totals[key]);
+      });
+      byId("accountsError").hidden = true;
+      renderLineChart(byId("accountsChart"), daily, {
+        lines: [{ key: "accounts", className: "accounts" }],
+        table: [{ label: "New accounts", key: "accounts" }],
+        ariaLabel: `Line chart of new accounts per day for the last ${daily.length} days`,
+        titleText: `New accounts per day over the last ${daily.length} days`,
+        descText: "Each point is the number of accounts created that day.",
+        evenMax: true,
+      });
+    }
+
+    function showAccountError() {
+      Object.values(ACCOUNT_STAT_FIELDS).forEach((id) => { byId(id).textContent = "—"; });
+      byId("accountsChart").replaceChildren();
+      byId("accountsError").hidden = false;
+    }
+
+    async function loadAccountStats(supabase) {
+      const loadId = ++accountLoadId;
+      try {
+        const { data, error } = await supabase.rpc("account_stats", { p_days: VISIBLE_DAY_COUNT });
+        if (error) throw error;
+        const stats = validateAccountStats(data);
+        if (loadId === accountLoadId) renderAccountStats(stats);
+      } catch (error) {
+        console.error("account_stats failed", error);
+        if (loadId === accountLoadId) showAccountError();
+      }
+    }
+
     async function loadTraffic() {
       showLoading();
       const supabase = await auth.client();
@@ -961,6 +1119,7 @@
         return;
       }
       renderDashboard(rows);
+      await loadAccountStats(supabase);
     }
 
     function queueLoad() {
@@ -973,6 +1132,9 @@
       return loadQueue;
     }
 
+    byId("accountsRetry").addEventListener("click", async () => {
+      loadAccountStats(await auth.client());
+    });
     auth.onAuth(queueLoad);
     await queueLoad();
     window.setInterval(queueLoad, AUTO_REFRESH_MS);
