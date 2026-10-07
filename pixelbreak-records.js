@@ -23,9 +23,9 @@ const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board"]);
 const BOARD_ID_PATTERN = /^[a-z0-9-]{1,48}$/;
 const BOARD_LANGUAGES = new Set(["lb", "de", "en"]);
 const PINNED_TEXT = Object.freeze({
-  lb: Object.freeze({ label: "📌 Ugepinnt", title: "Ugepinnt: dem Admin säi beschte Resultat" }),
-  de: Object.freeze({ label: "📌 Angeheftet", title: "Angeheftet: das beste Ergebnis des Admins" }),
-  en: Object.freeze({ label: "📌 Pinned", title: "Pinned: the admin's best result" }),
+  lb: Object.freeze({ title: "Ugepinnt: dem Admin säi beschte Resultat" }),
+  de: Object.freeze({ title: "Angeheftet: das beste Ergebnis des Admins" }),
+  en: Object.freeze({ title: "Pinned: the admin's best result" }),
 });
 let sb = null, session = null, username = null;
 
@@ -470,7 +470,6 @@ function css() {
   .pb-row{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
   .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);white-space:nowrap}
   .pb-pinned{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:4px 8px;margin-bottom:8px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--accent3) 45%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--accent3) 9%,transparent)}
-  .pb-pin{grid-column:1/-1;justify-self:start;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--accent3) 18%,transparent);color:var(--text);font-size:10px;font-weight:800;line-height:1.5;letter-spacing:.2px}
   .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}`;
   document.head.appendChild(s);
 }
@@ -631,7 +630,7 @@ function boardRowHtml(g, row, index, tagData) {
 function pinnedRowHtml(g, owner, scoreRow) {
   const copy = PINNED_TEXT[boardLanguage()];
   const ownerName = scoreRow.username || owner.username || "anon";
-  return `<div class="pb-row pb-pinned" title="${esc(copy.title)}"><span class="pb-pin" aria-label="${esc(copy.title)}">${esc(copy.label)}</span><span class="pb-name">${esc(ownerName)}${tagsHtml(owner)}</span><b>${esc(formatScore(g, scoreRow.score))}</b></div>`;
+  return `<div class="pb-row pb-pinned"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">${esc(copy.title)}</span><span class="pb-name">${esc(ownerName)}${tagsHtml(owner)}</span><b>${esc(formatScore(g, scoreRow.score))}</b></div>`;
 }
 
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

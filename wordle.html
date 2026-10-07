@@ -69,10 +69,8 @@
   .tagged-board .lb-player{overflow-wrap:anywhere;word-break:break-word}
   .tagged-board .lb-player .admin-tag,.tagged-board .lb-player .class-tag{margin-top:3px;white-space:nowrap}
   .pinned-row td{background:rgba(255,207,77,.08);border-top:1px solid rgba(255,207,77,.48);border-bottom:1px solid rgba(255,207,77,.48)}
-  .pin-label{display:inline-block;color:#ffe08a;font-size:10px;font-weight:850;line-height:1.2;letter-spacing:.2px;overflow-wrap:anywhere}
   .pin-gap td{height:6px;padding:0;border:0}
   :root[data-theme="light"] .pinned-row td{background:rgba(133,88,0,.09);border-color:rgba(111,74,0,.55)}
-  :root[data-theme="light"] .pin-label{color:#6b4700}
   .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;margin:-10px -10px 0 0}
   .bar .home:focus-visible,.langs button:focus-visible,.lbbtn:focus-visible,.share:focus-visible,.key:focus-visible,.lb-close:focus-visible,.lb-tabs button:focus-visible,.lb-box:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (max-width:430px){
@@ -80,7 +78,6 @@
     .lb-box .tagged-board th,.lb-box .tagged-board td{padding:7px 3px}
     .lb-box .tagged-board th:first-child,.lb-box .tagged-board td:first-child{width:68px}
     .lb-box .tagged-board th:nth-child(n+3),.lb-box .tagged-board td:nth-child(n+3){width:43px}
-    .pin-label{font-size:9px}
   }
   @media (pointer:coarse){
     .langs button,.lbbtn{min-height:44px}
@@ -315,7 +312,7 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=9" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=10" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
   import * as auth from "./auth.js?v=23";
@@ -331,9 +328,9 @@ load();
 
   let boardLang = "lb";
   const PINNED_TEXT = Object.freeze({
-    lb: Object.freeze({ label: "📌 Ugepinnt", title: "Ugepinnt: dem Admin säi beschte Resultat" }),
-    de: Object.freeze({ label: "📌 Angeheftet", title: "Angeheftet: das beste Ergebnis des Admins" }),
-    en: Object.freeze({ label: "📌 Pinned", title: "Pinned: the admin's best result" }),
+    lb: Object.freeze({ title: "Ugepinnt: dem Admin säi beschte Resultat" }),
+    de: Object.freeze({ title: "Angeheftet: das beste Ergebnis des Admins" }),
+    en: Object.freeze({ title: "Pinned: the admin's best result" }),
   });
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;",
@@ -371,7 +368,7 @@ load();
     const row = data.find((entry) => String(entry.username ?? "").toLowerCase() === ownerName);
     if (!row) return "";
     const copy = pinnedText();
-    return `<tr class="pinned-row"><td><span class="pin-label" title="${esc(copy.title)}" aria-label="${esc(copy.title)}">${esc(copy.label)}</span></td><td class="lb-player">${esc(row.username)}${tagsHtml(owner)}</td>${resultCells(row)}</tr><tr class="pin-gap" aria-hidden="true"><td colspan="5"></td></tr>`;
+    return `<tr class="pinned-row"><td><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">${esc(copy.title)}</span></td><td class="lb-player">${esc(row.username)}${tagsHtml(owner)}</td>${resultCells(row)}</tr><tr class="pin-gap" aria-hidden="true"><td colspan="5"></td></tr>`;
   }
 
   async function boardTags() {

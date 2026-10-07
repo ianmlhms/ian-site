@@ -80,7 +80,6 @@
   .lb tr.pinned td{background:color-mix(in srgb,var(--gold) 11%,var(--card-opaque));border-top:1px solid color-mix(in srgb,var(--gold) 48%,transparent);border-bottom:1px solid color-mix(in srgb,var(--gold) 32%,transparent)}
   .lb tr.pinned td:first-child{border-left:2px solid color-mix(in srgb,var(--gold) 70%,transparent)}
   .lb tr.pinned+tr td{border-top:4px solid transparent;background-clip:padding-box}
-  .pinned-label{display:inline-block;font-size:20px;line-height:1}
 
   /* ---- empty / loading / error ---- */
   .lbempty{text-align:center;color:var(--muted);padding:clamp(28px,6vw,48px) 22px}
@@ -170,7 +169,6 @@ const T={
   l:{lb:"V",de:"N",en:"L"}, lf:{lb:"Verluer",de:"Niederlagen",en:"Losses"},
   pct:{lb:"%",de:"%",en:"Win%"}, pctf:{lb:"Gewënnquote",de:"Siegquote",en:"Win rate"},
   rank:{lb:"Plaz",de:"Platz",en:"Rank"},
-  pinned:{lb:"📌 Ugepinnt",de:"📌 Angeheftet",en:"📌 Pinned"},
   pinnedTitle:{lb:"Ugepinnt: dem Admin säi beschte Resultat",de:"Angeheftet: das beste Ergebnis des Admins",en:"Pinned: the admin's best result"},
   sum1:{lb:"1 Spiller",de:"1 Spieler",en:"1 player"},
   sumN:{lb:"{n} Spiller",de:"{n} Spieler",en:"{n} players"},
@@ -200,11 +198,11 @@ function rowHtml(row,index){
   const pinned=index==null;
   const pinTitle=esc(t("pinnedTitle"));
   const rank=pinned
-    ? `<span class="pinned-label" aria-hidden="true">📌</span><span class="sr-only">${esc(t("pinned"))}</span>`
+    ? `<span class="sr-only">${pinTitle}</span>`
     : index<3
       ? `<span class="medal" aria-hidden="true">${MEDALS[index]}</span><span class="sr-only">${index+1}</span>`
       : index+1;
-  const attrs=pinned?`class="pinned" title="${pinTitle}" aria-label="${pinTitle}"`:`class="top${index+1}"`;
+  const attrs=pinned?`class="pinned"`:`class="top${index+1}"`;
   return `<tr ${attrs}><td class="rank">${rank}</td><td class="who"><span class="name">${esc(row.username)}${playerTags(row.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${row.wins}</td><td class="n">${row.losses}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
 }
 

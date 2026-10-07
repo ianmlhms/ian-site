@@ -39,11 +39,16 @@ async function setTheme(h, mode) {
 }
 
 async function checkTable(h, rowsSel, label) {
-  const info = await h.page.$$eval(rowsSel, (rows) => rows.map((r) => r.textContent.replace(/\s+/g, " ").trim()));
+  const info = await h.page.$$eval(rowsSel, (rows) => rows.map((r) =>
+    (r.matches(".pinned, .pinned-row, .pb-pinned") ? "[pinned] " : "") + r.innerText.replace(/\s+/g, " ").trim()));
   h.expect(info.length >= 4, `${label}: board has rows (got ${info.length})`);
-  h.expect(/📌/.test(info[0] || "") && /Ian/.test(info[0]) && /Admin/.test(info[0]), `${label}: first row is the pinned admin row (${info[0]})`);
-  const ianRanked = info.slice(1).filter((t) => /Ian/.test(t) && !/📌/.test(t));
+  h.expect(/^\[pinned\]/.test(info[0] || "") && /Ian/.test(info[0]) && /Admin/.test(info[0]), `${label}: first row is the pinned admin row (${info[0]})`);
+  const ianRanked = info.slice(1).filter((t) => /Ian/.test(t) && !/^\[pinned\]/.test(t));
   h.expect(ianRanked.length === 1, `${label}: Ian also stays in the ranked list`);
+  const visibleLabel = await h.page.$$eval(rowsSel, (rows) => [...rows[0].querySelectorAll("*")].some((el) =>
+    /Ugepinnt|📌/.test([...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("")) &&
+    el.getBoundingClientRect().width > 2));
+  h.expect(!visibleLabel, `${label}: no visible pinned label`);
   h.expect(info.some((t) => /Emma/.test(t) && /4C6/.test(t)), `${label}: class tag next to Emma`);
   h.expect(!info.slice(1).some((t) => /Emma/.test(t) && /Admin/.test(t)), `${label}: no admin tag on Emma`);
   const overflow = await h.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
