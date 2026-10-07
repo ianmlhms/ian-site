@@ -21,15 +21,13 @@
 --     profiles gets a restrictive SELECT policy: kart accounts are invisible
 --     to everybody except themselves and the admin, and a kart account sees
 --     only its own profile.
---  4) Functions: every public function that `authenticated` can execute is
---     recreated (exact live body preserved, grants kept) with a guard that
---     raises 'not available for karting accounts' (42501) for kart accounts —
---     except kart_*, the account basics (account_exists, has_pin, is_admin,
---     set_username, set_theme, upsert_profile), and the boolean/id helpers
---     that RLS policies call (is_group_member, is_ip, is_vip, ...).
---     LANGUAGE sql functions become plpgsql (`return query`/`return`) so the
---     guard runs before anything else; `#variable_conflict use_column`
---     keeps SQL-function name resolution identical.
+--  4) Functions: every public function that `authenticated` can execute (all
+--     SECURITY DEFINER) gets one leading statement, public.assert_not_kart(),
+--     which raises 'not available for karting accounts' (42501) for kart
+--     accounts. Bodies, language and grants are otherwise unchanged. Exempt:
+--     kart_*, the account basics (account_exists, has_pin, is_admin,
+--     set_username, set_theme, upsert_profile) and the helpers RLS policies
+--     call (is_group_member, is_ip, is_vip, ...).
 --  5) directory() (people list) skips kart accounts.
 --  6) Kart accounts must never be a TARGET of social features either
 --     (add_friend / start_dm / invite_game / add_group_member /
@@ -212,26 +210,41 @@ begin
 end $$;
 
 -- ---- 9) gate every function `authenticated` can execute ---------------------
+-- All of them are SECURITY DEFINER (they bypass RLS, so the table policies above
+-- don't reach them). The original body is kept exactly; one statement is added
+-- in front: SQL functions get `select public.assert_not_kart();` as their first
+-- statement (language stays sql), plpgsql functions get
+-- `perform public.assert_not_kart();` right after the line-leading BEGIN.
+create or replace function public.assert_not_kart()
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if public.is_kart_only() then
+    raise exception 'not available for karting accounts' using errcode = '42501';
+  end if;
+end $$;
+revoke all on function public.assert_not_kart() from public;
+grant execute on function public.assert_not_kart() to anon, authenticated, service_role;
+
 do $$
 declare
-  guard constant text :=
-    'if public.is_kart_only() then raise exception ''not available for karting accounts'' '
-    || 'using errcode = ''42501''; end if;';
-  -- account basics + helpers that RLS / the UI call; everything else is gated.
   allow constant text[] := array[
     'account_exists', 'has_pin', 'is_admin', 'set_username', 'set_theme',
-    'upsert_profile', 'is_kart_only', 'admin_set_account_kind',
+    'upsert_profile', 'is_kart_only', 'assert_not_kart', 'admin_set_account_kind',
     'is_group_member', 'is_ip', 'is_vip', 'is_view_restricted',
     'owner_user_id', 'admin_user_ids', 'ip_user_ids', 'vip_user_ids',
     'visible_user_ids'];
   r record;
   m text[];
-  hdr text; body text; tail text; lang text; res text; fixed text;
+  body text; fixed text;
   gated text[] := '{}';
 begin
   for r in
-    select p.oid, p.proname, pg_get_functiondef(p.oid) as def,
-           pg_get_function_result(p.oid) as res, l.lanname
+    select p.oid, p.proname, pg_get_functiondef(p.oid) as def, l.lanname
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     join pg_language l on l.oid = p.prolang
@@ -242,35 +255,20 @@ begin
       and pg_get_function_result(p.oid) <> 'trigger'
     order by p.proname
   loop
-    if r.def like '%is_kart_only()%' then continue; end if;   -- already gated
+    if r.def like '%assert_not_kart()%' then continue; end if;   -- already gated
     m := regexp_match(r.def, '^(.*?AS \$function\$)(.*)(\$function\$\s*)$');
-    if m is null then
-      raise exception 'cannot parse definition of %', r.proname;
-    end if;
-    hdr := m[1]; body := m[2]; tail := m[3]; res := r.res;
+    if m is null then raise exception 'cannot parse definition of %', r.proname; end if;
+    body := m[2];
     if r.lanname = 'plpgsql' then
-      if body !~* '\mbegin\M' then
-        raise exception 'no BEGIN found in %', r.proname;
-      end if;
-      body := regexp_replace(body, '\mbegin\M', 'begin ' || guard, 'i');
+      fixed := regexp_replace(body, '(^|\n)(\s*begin)\M', '\1\2 perform public.assert_not_kart();', 'i');
     elsif r.lanname = 'sql' then
-      body := regexp_replace(btrim(body, E' \t\r\n'), ';\s*$', '');
-      hdr := replace(hdr, E'\n LANGUAGE sql', E'\n LANGUAGE plpgsql');
-      if hdr not like '%LANGUAGE plpgsql%' then
-        raise exception 'cannot switch language of %', r.proname;
-      end if;
-      if res = 'void' then
-        body := E'\n#variable_conflict use_column\nbegin\n  ' || guard || E'\n  ' || body || E';\nend;\n';
-      elsif res like 'TABLE(%' or res like 'SETOF %' then
-        body := E'\n#variable_conflict use_column\nbegin\n  ' || guard || E'\n  return query ' || body || E';\nend;\n';
-      else
-        body := E'\n#variable_conflict use_column\nbegin\n  ' || guard || E'\n  return (' || body || E');\nend;\n';
-      end if;
+      fixed := E'\n  select public.assert_not_kart();' || body;
     else
       raise exception 'unsupported language % in %', r.lanname, r.proname;
     end if;
-    execute hdr || body || tail;
+    if fixed = body then raise exception 'no line-leading BEGIN in %', r.proname; end if;
+    execute m[1] || fixed || m[3];
     gated := gated || r.proname::text;
   end loop;
-  raise notice 'gated functions: %', gated;
+  raise notice 'gated functions (%): %', cardinality(gated), gated;
 end $$;
