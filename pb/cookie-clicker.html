@@ -77,6 +77,12 @@ const upgrades=[
   {name:'Cookie Wizard',desc:'Conjures cookies magically',baseCost:1000000,cps:2000,count:0,icon:'🧙'},
   {name:'Cookie Portal',desc:'Opens dimensional cookie rifts',baseCost:5000000,cps:8000,count:0,icon:'🌀'},
   {name:'Cookie Planet',desc:'An entire planet of cookies',baseCost:50000000,cps:50000,count:0,icon:'🪐'},
+  {name:'Cookie Galaxy',desc:'Billions of cookie stars',baseCost:500000000,cps:300000,count:0,icon:'🌌'},
+  {name:'Time Machine',desc:'Brings back cookies from the past',baseCost:5000000000,cps:2000000,count:0,icon:'⏳'},
+  {name:'Antimatter Oven',desc:'Turns antimatter into cookies',baseCost:75000000000,cps:15000000,count:0,icon:'⚛️'},
+  {name:'Cookie Multiverse',desc:'Every universe bakes for you',baseCost:1000000000000,cps:120000000,count:0,icon:'🔮'},
+  {name:'Cookie Singularity',desc:'Infinite cookie density',baseCost:20000000000000,cps:1000000000,count:0,icon:'🕳️'},
+  {name:'Cookie God',desc:'The cookie is all',baseCost:500000000000000,cps:10000000000,count:0,icon:'👑'},
 ];
 
 const clickUpgrades=[
@@ -84,11 +90,16 @@ const clickUpgrades=[
   {name:'Double Click',desc:'+5 click power',baseCost:500,power:5,count:0,icon:'✌️'},
   {name:'Golden Touch',desc:'+25 click power',baseCost:5000,power:25,count:0,icon:'✨'},
   {name:'Cookie Storm',desc:'+100 click power',baseCost:50000,power:100,count:0,icon:'⚡'},
+  {name:'Cookie Quake',desc:'+1K click power',baseCost:1000000,power:1000,count:0,icon:'🌋'},
+  {name:'Cosmic Finger',desc:'+20K click power',baseCost:50000000,power:20000,count:0,icon:'🌠'},
 ];
 
 function getCost(u){return Math.floor(u.baseCost*Math.pow(COST_GROWTH,u.count))}
 
 function format(n){
+  if(n>=1e21)return(n/1e21).toFixed(1)+'Sx';
+  if(n>=1e18)return(n/1e18).toFixed(1)+'Qi';
+  if(n>=1e15)return(n/1e15).toFixed(1)+'Qa';
   if(n>=1e12)return(n/1e12).toFixed(1)+'T';
   if(n>=1e9)return(n/1e9).toFixed(1)+'B';
   if(n>=1e6)return(n/1e6).toFixed(1)+'M';
