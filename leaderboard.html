@@ -58,11 +58,13 @@
   .board-sum{display:flex;align-items:center;gap:8px;margin:0;padding:4px 10px 8px;color:var(--muted);font:700 13px var(--font-display)}
   .board-sum .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
   table.lb{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:15px}
+  table.lb.tagged{table-layout:fixed}
   .lb th{padding:2px 10px 4px;color:var(--muted);font:700 12px var(--font-display);text-align:left;letter-spacing:.02em}
   .lb td{padding:10px;vertical-align:middle;background:color-mix(in srgb,var(--text) 4%,transparent)}
   .lb td:first-child{border-radius:var(--r-chip) 0 0 var(--r-chip)}
   .lb td:last-child{border-radius:0 var(--r-chip) var(--r-chip) 0}
   .lb .n{text-align:right;font-variant-numeric:tabular-nums}
+  .lb.tagged .n{width:56px}
   .lb td.n{font-weight:700;font-family:var(--font-display)}
   .lb .rank{width:52px;text-align:center;font:800 15px var(--font-display);color:var(--muted)}
   .lb .rank .medal{font-size:24px;line-height:1}
@@ -75,6 +77,10 @@
   .lb tr.top2 td{background:color-mix(in srgb,var(--silver) 15%,var(--card-opaque))}
   .lb tr.top3 td{background:color-mix(in srgb,var(--bronze) 15%,var(--card-opaque))}
   .lb tr.top1 .who .name{font-family:var(--font-display);font-size:17px;font-weight:800;letter-spacing:-.01em}
+  .lb tr.pinned td{background:color-mix(in srgb,var(--gold) 11%,var(--card-opaque));border-top:1px solid color-mix(in srgb,var(--gold) 48%,transparent);border-bottom:1px solid color-mix(in srgb,var(--gold) 32%,transparent)}
+  .lb tr.pinned td:first-child{border-left:2px solid color-mix(in srgb,var(--gold) 70%,transparent)}
+  .lb tr.pinned+tr td{border-top:4px solid transparent;background-clip:padding-box}
+  .pinned-label{display:inline-block;font-size:20px;line-height:1}
 
   /* ---- empty / loading / error ---- */
   .lbempty{text-align:center;color:var(--muted);padding:clamp(28px,6vw,48px) 22px}
@@ -91,6 +97,7 @@
     .lb{font-size:14px}
     .lb th,.lb td{padding-left:7px;padding-right:7px}
     .lb .rank{width:40px}
+    .lb.tagged .n{width:44px}
     .lb .rank .medal{font-size:21px}
   }
   @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -139,6 +146,7 @@
 <script type="module" src="notify-ambient.js?v=19"></script>
 <script type="module">
 import * as auth from "./auth.js?v=23";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const T={
@@ -162,6 +170,8 @@ const T={
   l:{lb:"V",de:"N",en:"L"}, lf:{lb:"Verluer",de:"Niederlagen",en:"Losses"},
   pct:{lb:"%",de:"%",en:"Win%"}, pctf:{lb:"Gewënnquote",de:"Siegquote",en:"Win rate"},
   rank:{lb:"Plaz",de:"Platz",en:"Rank"},
+  pinned:{lb:"📌 Ugepinnt",de:"📌 Angeheftet",en:"📌 Pinned"},
+  pinnedTitle:{lb:"Ugepinnt: dem Admin säi beschte Resultat",de:"Angeheftet: das beste Ergebnis des Admins",en:"Pinned: the admin's best result"},
   sum1:{lb:"1 Spiller",de:"1 Spieler",en:"1 player"},
   sumN:{lb:"{n} Spiller",de:"{n} Spieler",en:"{n} players"},
 };
@@ -169,7 +179,7 @@ const MEDALS=["🥇","🥈","🥉"];
 const readLang=()=>{ try{ const v=localStorage.getItem("site_lang"); if(v==="lb"||v==="de"||v==="en") return v; }catch{} return "lb"; };
 let lang=readLang();
 const t=(k)=>{ const e=T[k]; return e?(e[lang]||e.en):k; };
-let sb=null, game="", period="all", last=null;
+let sb=null, game="", period="all", last=null, tagData=null;
 
 function applyStatic(){
   document.documentElement.lang=lang;
@@ -179,20 +189,53 @@ function applyStatic(){
 }
 const emptyHtml=(ico,msg,sub)=>`<div class="lbempty"><div class="lbempty-ico" aria-hidden="true">${ico}</div><p>${esc(msg)}</p><div class="lbempty-sub">${esc(sub)}</div></div>`;
 const label=()=>{ const b=document.querySelector("[data-g].on"); const n=b&&(b.matches("[data-t]")?b:b.querySelector("[data-t]")); return n?n.textContent.trim():t("all"); };
+const lower=(value)=>String(value??"").toLowerCase();
+const playerTags=(username)=>{
+  const row=tagData?.byUsername[lower(username)];
+  return row?tagsHtml(row):"";
+};
+
+function rowHtml(row,index){
+  const pct=row.winpct==null?null:+row.winpct;
+  const pinned=index==null;
+  const pinTitle=esc(t("pinnedTitle"));
+  const rank=pinned
+    ? `<span class="pinned-label" aria-hidden="true">📌</span><span class="sr-only">${esc(t("pinned"))}</span>`
+    : index<3
+      ? `<span class="medal" aria-hidden="true">${MEDALS[index]}</span><span class="sr-only">${index+1}</span>`
+      : index+1;
+  const attrs=pinned?`class="pinned" title="${pinTitle}" aria-label="${pinTitle}"`:`class="top${index+1}"`;
+  return `<tr ${attrs}><td class="rank">${rank}</td><td class="who"><span class="name">${esc(row.username)}${playerTags(row.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${row.wins}</td><td class="n">${row.losses}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
+}
+
+function pinnedHtml(data){
+  const owner=tagData?.owner;
+  if(!owner) return "";
+  const row=data.find((entry)=>lower(entry.username)===lower(owner.username));
+  return row?rowHtml(row,null):"";
+}
+
+async function visibleTags(){
+  if(!auth.session()) return null;
+  try{
+    const result=await loadTags(sb);
+    return auth.session()?result:null;
+  }catch(error){
+    console.warn("[leaderboard] tags",error);
+    return null;
+  }
+}
 
 function paint(){
   const body=$("body"), data=last;
   if(data==="loading"){ body.innerHTML=emptyHtml("⏳",t("loading"),""); return; }
   if(data==="error"){ body.innerHTML=emptyHtml("⚠️",t("errT"),t("errS")); return; }
   if(!data||!data.length){ body.innerHTML=emptyHtml("🏆",t("emptyT"),t("emptyS")); return; }
-  const rows=data.map((r,i)=>{
-    const pct=r.winpct==null?null:+r.winpct;
-    const rank=i<3?`<span class="medal" aria-hidden="true">${MEDALS[i]}</span><span class="sr-only">${i+1}</span>`:i+1;
-    return `<tr class="top${i+1}"><td class="rank">${rank}</td><td class="who"><span class="name">${esc(r.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${r.wins}</td><td class="n">${r.losses}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
-  }).join("");
+  const rows=data.map((row,index)=>rowHtml(row,index)).join("");
+  const pinned=pinnedHtml(data);
   const sum=data.length===1?t("sum1"):t("sumN").replace("{n}",data.length);
   body.innerHTML=`<p class="board-sum"><span class="dot" aria-hidden="true"></span>${esc([sum,...(game?[label()]:[]),period==="all"?t("pAll"):t("pWeek")].join(" · "))}</p>`+
-    `<table class="lb"><caption class="sr-only">${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</caption><thead><tr><th scope="col" class="rank"><span aria-hidden="true">#</span><span class="sr-only">${esc(t("rank"))}</span></th><th scope="col">${esc(t("player"))}</th><th scope="col" class="n"><span aria-hidden="true">${esc(t("w"))}</span><span class="sr-only">${esc(t("wf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("l"))}</span><span class="sr-only">${esc(t("lf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("pct"))}</span><span class="sr-only">${esc(t("pctf"))}</span></th></tr></thead><tbody>${rows}</tbody></table>`;
+    `<table class="lb${tagData?" tagged":""}"><caption class="sr-only">${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</caption><thead><tr><th scope="col" class="rank"><span aria-hidden="true">#</span><span class="sr-only">${esc(t("rank"))}</span></th><th scope="col">${esc(t("player"))}</th><th scope="col" class="n"><span aria-hidden="true">${esc(t("w"))}</span><span class="sr-only">${esc(t("wf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("l"))}</span><span class="sr-only">${esc(t("lf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("pct"))}</span><span class="sr-only">${esc(t("pctf"))}</span></th></tr></thead><tbody>${pinned}${rows}</tbody></table>`;
 }
 
 async function draw(){
@@ -200,11 +243,13 @@ async function draw(){
   board.setAttribute("aria-busy","true"); last="loading"; paint();
   try{
     if(!sb) sb=await auth.client();
-    const { data, error }=period==="all"
-      ? await sb.rpc("game_leaderboard",{ p_game: game||null })
-      : await sb.rpc("game_leaderboard_window",{ p_game: game||null, p_days: +period });
+    const boardRequest=period==="all"
+      ? sb.rpc("game_leaderboard",{ p_game: game||null })
+      : sb.rpc("game_leaderboard_window",{ p_game: game||null, p_days: +period });
+    const [{ data, error },nextTags]=await Promise.all([boardRequest,visibleTags()]);
     if(error) throw error;
     last=data||[];
+    tagData=nextTags;
   }catch(e){ last="error"; console.warn(e); }
   board.setAttribute("aria-busy","false"); paint();
 }
@@ -212,6 +257,7 @@ function mark(sel, active){ document.querySelectorAll(sel).forEach(x=>{ x.classL
 document.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>{ game=b.dataset.g; mark("[data-g]",b); draw(); });
 document.querySelectorAll("[data-p]").forEach(b=> b.onclick=()=>{ period=b.dataset.p; mark("[data-p]",b); draw(); });
 window.addEventListener("storage",e=>{ if(e.key==="site_lang"){ lang=readLang(); applyStatic(); paint(); } });
+auth.onAuth(()=>{ tagData=null; draw(); });
 
 applyStatic();
 (async()=>{ if(auth.authConfigured){ auth.mountAccountButton($("acctHost")); sb=await auth.client(); } draw(); })();

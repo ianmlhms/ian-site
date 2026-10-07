@@ -61,9 +61,27 @@
   .lb-box table{width:100%;border-collapse:collapse;font-size:14px}
   .lb-box th,.lb-box td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
   .lb-box th{color:var(--muted);font-size:12px}
+  .lb-box table.tagged-board{table-layout:fixed}
+  .lb-box .tagged-board th:first-child,.lb-box .tagged-board td:first-child{width:80px}
+  .lb-box .tagged-board th:nth-child(n+3),.lb-box .tagged-board td:nth-child(n+3){width:50px}
   .lb-box td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .lb-box .tagged-board td.n{white-space:nowrap}
+  .tagged-board .lb-player{overflow-wrap:anywhere;word-break:break-word}
+  .tagged-board .lb-player .admin-tag,.tagged-board .lb-player .class-tag{margin-top:3px;white-space:nowrap}
+  .pinned-row td{background:rgba(255,207,77,.08);border-top:1px solid rgba(255,207,77,.48);border-bottom:1px solid rgba(255,207,77,.48)}
+  .pin-label{display:inline-block;color:#ffe08a;font-size:10px;font-weight:850;line-height:1.2;letter-spacing:.2px;overflow-wrap:anywhere}
+  .pin-gap td{height:6px;padding:0;border:0}
+  :root[data-theme="light"] .pinned-row td{background:rgba(133,88,0,.09);border-color:rgba(111,74,0,.55)}
+  :root[data-theme="light"] .pin-label{color:#6b4700}
   .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;margin:-10px -10px 0 0}
   .bar .home:focus-visible,.langs button:focus-visible,.lbbtn:focus-visible,.share:focus-visible,.key:focus-visible,.lb-close:focus-visible,.lb-tabs button:focus-visible,.lb-box:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (max-width:430px){
+    .lb-box .tagged-board{font-size:12px}
+    .lb-box .tagged-board th,.lb-box .tagged-board td{padding:7px 3px}
+    .lb-box .tagged-board th:first-child,.lb-box .tagged-board td:first-child{width:68px}
+    .lb-box .tagged-board th:nth-child(n+3),.lb-box .tagged-board td:nth-child(n+3){width:43px}
+    .pin-label{font-size:9px}
+  }
   @media (pointer:coarse){
     .langs button,.lbbtn{min-height:44px}
     .bar .home{display:inline-flex;align-items:center;min-height:44px}
@@ -297,10 +315,11 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=8" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=9" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
   import * as auth from "./auth.js?v=23";
+  import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
   let sb = null;
   const $ = (id) => document.getElementById(id);
   (async () => { if (!auth.authConfigured) return; auth.mountAccountButton($("acctHost")); sb = await auth.client(); })();
@@ -311,22 +330,78 @@ load();
   };
 
   let boardLang = "lb";
+  const PINNED_TEXT = Object.freeze({
+    lb: Object.freeze({ label: "📌 Ugepinnt", title: "Ugepinnt: dem Admin säi beschte Resultat" }),
+    de: Object.freeze({ label: "📌 Angeheftet", title: "Angeheftet: das beste Ergebnis des Admins" }),
+    en: Object.freeze({ label: "📌 Pinned", title: "Pinned: the admin's best result" }),
+  });
+  const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;",
+  })[character]);
+  const tody = (today) => today == null ? "—" : today === 0 ? "✗" : today + "/6";
+
+  function pinnedText() {
+    let current = window.I18N?.lang;
+    if (!current) {
+      try { current = localStorage.getItem("site_lang"); }
+      catch (error) { console.warn("[wordle] site language", error); }
+    }
+    return Object.hasOwn(PINNED_TEXT, current) ? PINNED_TEXT[current] : PINNED_TEXT.lb;
+  }
+
+  function tagsFor(tagData, username) {
+    return tagData?.byUsername[String(username ?? "").toLowerCase()] || null;
+  }
+
+  function resultCells(row) {
+    return `<td class="n">${row.wins}/${row.played}</td><td class="n">${row.avg_guesses ?? "—"}</td><td class="n">${tody(row.today)}</td>`;
+  }
+
+  function rankedRow(row, index, tagData) {
+    const tag = tagsFor(tagData, row.username);
+    const tagMarkup = tag ? tagsHtml(tag) : "";
+    const playerClass = tagData ? ` class="lb-player"` : "";
+    return `<tr><td>${index + 1}</td><td${playerClass}>${esc(row.username)}${tagMarkup}</td>${resultCells(row)}</tr>`;
+  }
+
+  function pinnedRow(data, tagData) {
+    const owner = tagData?.owner;
+    if (!owner) return "";
+    const ownerName = String(owner.username ?? "").toLowerCase();
+    const row = data.find((entry) => String(entry.username ?? "").toLowerCase() === ownerName);
+    if (!row) return "";
+    const copy = pinnedText();
+    return `<tr class="pinned-row"><td><span class="pin-label" title="${esc(copy.title)}" aria-label="${esc(copy.title)}">${esc(copy.label)}</span></td><td class="lb-player">${esc(row.username)}${tagsHtml(owner)}</td>${resultCells(row)}</tr><tr class="pin-gap" aria-hidden="true"><td colspan="5"></td></tr>`;
+  }
+
+  async function boardTags() {
+    if (!auth.session()) return null;
+    try {
+      const result = await loadTags(sb);
+      return auth.session() ? result : null;
+    } catch (error) { console.warn("[wordle] leaderboard tags", error); return null; }
+  }
+
   async function drawBoard() {
     const body = $("lbBody"); body.innerHTML = "Lueden…";
     try {
       if (!sb) sb = await auth.client();
-      const { data, error } = await sb.rpc("wordle_leaderboard", { p_lang: boardLang });
+      const [{ data, error }, tagData] = await Promise.all([
+        sb.rpc("wordle_leaderboard", { p_lang: boardLang }),
+        boardTags(),
+      ]);
       if (error) throw error;
       if (!data || !data.length) { body.innerHTML = `<p style="color:var(--muted)">Nach keng Resultater — spill a kommzréck!</p>`; return; }
-      const esc = (s) => (""+(s??"")).replace(/[&<>]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c]));
-      const tody = (t) => t == null ? "—" : t === 0 ? "✗" : t + "/6";
-      body.innerHTML = `<table><tr><th scope="col">#</th><th scope="col">Spiller</th><th scope="col" class="n">Gewonn</th><th scope="col" class="n">⌀</th><th scope="col" class="n">Haut</th></tr>` +
-        data.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.username)}</td><td class="n">${r.wins}/${r.played}</td><td class="n">${r.avg_guesses ?? "—"}</td><td class="n">${tody(r.today)}</td></tr>`).join("") +
+      const tableClass = tagData ? ` class="tagged-board"` : "";
+      body.innerHTML = `<table${tableClass}><tr><th scope="col">#</th><th scope="col">Spiller</th><th scope="col" class="n">Gewonn</th><th scope="col" class="n">⌀</th><th scope="col" class="n">Haut</th></tr>` +
+        pinnedRow(data, tagData) +
+        data.map((row, index) => rankedRow(row, index, tagData)).join("") +
         `</table>`;
-    } catch (e) { body.innerHTML = "Feeler beim Lueden."; console.warn(e); }
+    } catch (error) { body.innerHTML = "Feeler beim Lueden."; console.warn("[wordle] leaderboard", error); }
   }
   const setLbTabs = () => document.querySelectorAll("[data-lb]").forEach(b => { b.classList.toggle("on", b.dataset.lb === boardLang); b.setAttribute("aria-pressed", b.dataset.lb === boardLang); });
   let lbOpener = null;
+  auth.onAuth(() => { if ($("lbModal").classList.contains("open")) drawBoard(); });
   window.openWordleBoard = (lang) => { boardLang = lang || "lb"; lbOpener = document.activeElement; $("lbModal").classList.add("open"); setLbTabs(); drawBoard(); $("lbClose").focus({ preventScroll: true }); };
   window.closeWordleBoard = () => { $("lbModal").classList.remove("open"); if (lbOpener && lbOpener.focus) lbOpener.focus({ preventScroll: true }); lbOpener = null; };
   $("lbClose").onclick = () => window.closeWordleBoard();

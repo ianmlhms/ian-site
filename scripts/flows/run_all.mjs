@@ -13,8 +13,9 @@ import { flow as addMember } from "./messenger_add_member.mjs";
 import { flow as friendsAdd } from "./friends_add.mjs";
 import { flow as slfRound } from "./slf_round.mjs";
 import { flow as arcadePad } from "./arcade_pad.mjs";
+import { flow as leaderboardTags } from "./leaderboard_tags.mjs";
 
-const ALL = [newGroup, addMember, friendsAdd, slfRound, arcadePad];
+const ALL = [newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

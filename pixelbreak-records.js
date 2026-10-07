@@ -9,6 +9,7 @@
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
 import * as auth from "./auth.js?v=23";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -20,6 +21,12 @@ let sessionBests = new Map();   // best score reported during this play, per boa
 let activeBoard = null;         // sub-leaderboard chosen by the game (e.g. one per level), or null
 const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board"]);
 const BOARD_ID_PATTERN = /^[a-z0-9-]{1,48}$/;
+const BOARD_LANGUAGES = new Set(["lb", "de", "en"]);
+const PINNED_TEXT = Object.freeze({
+  lb: Object.freeze({ label: "📌 Ugepinnt", title: "Ugepinnt: dem Admin säi beschte Resultat" }),
+  de: Object.freeze({ label: "📌 Angeheftet", title: "Angeheftet: das beste Ergebnis des Admins" }),
+  en: Object.freeze({ label: "📌 Pinned", title: "Pinned: the admin's best result" }),
+});
 let sb = null, session = null, username = null;
 
 /* ---------------- local best (always on) ---------------- */
@@ -408,12 +415,36 @@ async function saveCloud(g, s) {
 }
 async function fetchBoard(g) {
   try {
-    const { data } = await sb.from("scores")
-      .select("username,score").eq("game_id", g.id).order("score", { ascending: Boolean(g.lowerIsBetter) }).limit(10);
+    const { data, error } = await sb.from("scores")
+      .select("user_id,username,score").eq("game_id", g.id).order("score", { ascending: Boolean(g.lowerIsBetter) }).limit(10);
+    if (error) throw error;
     return data || [];
   } catch (error) {
     console.warn("[Arcade] leaderboard load failed", { id: g.id, error });
-    return [];
+    return null;
+  }
+}
+
+async function fetchBoardTags() {
+  if (!sb || !session) return null;
+  try {
+    return await loadTags(sb);
+  } catch (error) {
+    console.warn("[Arcade] leaderboard tags unavailable", error);
+    return null;
+  }
+}
+
+async function fetchOwnerScore(g, owner) {
+  if (!sb || !session || !owner) return null;
+  try {
+    const { data, error } = await sb.from("scores")
+      .select("username,score").eq("game_id", g.id).eq("user_id", owner.user_id).maybeSingle();
+    if (error) throw error;
+    return data || null;
+  } catch (error) {
+    console.warn("[Arcade] pinned admin score unavailable", { id: g.id, error });
+    return null;
   }
 }
 
@@ -436,8 +467,10 @@ function css() {
   .pb-msg{font-size:12.5px;margin-top:10px;min-height:16px}
   .pb-msg.err{color:#ff6b6b}.pb-msg.ok{color:var(--accent4)}
   .pb-x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
-  .pb-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
-  .pb-row .r{color:var(--text2);width:26px}.pb-row b{color:var(--accent3)}
+  .pb-row{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
+  .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);white-space:nowrap}
+  .pb-pinned{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:4px 8px;margin-bottom:8px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--accent3) 45%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--accent3) 9%,transparent)}
+  .pb-pin{grid-column:1/-1;justify-self:start;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--accent3) 18%,transparent);color:var(--text);font-size:10px;font-weight:800;line-height:1.5;letter-spacing:.2px}
   .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}`;
   document.head.appendChild(s);
 }
@@ -556,8 +589,14 @@ async function openBoard() {
     `<button class="pb-x">&times;</button><h3>🏆 ${esc(g.name)}</h3><div id="pbBoardList" style="margin-top:12px;color:var(--text2)">Loading…</div>`;
   boardModal.querySelector(".pb-x").onclick = () => boardModal.classList.remove("open");
   boardModal.classList.add("open");
-  const rows = await fetchBoard(g);
+  const [rows, tagData] = await Promise.all([fetchBoard(g), fetchBoardTags()]);
+  const ownerScore = rows && tagData?.owner ? await fetchOwnerScore(g, tagData.owner) : null;
   const list = document.getElementById("pbBoardList");
+  if (!list) return;
+  if (rows === null) {
+    list.textContent = "Leaderboard unavailable right now. Please try again.";
+    return;
+  }
   if (!rows.length) {
     list.innerHTML = session
       ? "No scores yet — be the first!"
@@ -565,12 +604,36 @@ async function openBoard() {
     const si = document.getElementById("pbSignin"); if (si) si.onclick = () => { boardModal.classList.remove("open"); openAuth(); };
     return;
   }
-  list.innerHTML = rows.map((r, i) =>
-    `<div class="pb-row"><span class="r">${i + 1}</span><span style="flex:1">${esc(r.username || "anon")}</span><b>${esc(formatScore(g, r.score))}</b></div>`).join("");
+  const visibleTagData = session ? tagData : null;
+  const pinned = ownerScore && visibleTagData?.owner ? pinnedRowHtml(g, visibleTagData.owner, ownerScore) : "";
+  list.innerHTML = pinned + rows.map((r, i) => boardRowHtml(g, r, i, visibleTagData)).join("");
 }
 PB.openBoard = openBoard;
 
 /* ---------------- helpers ---------------- */
+function boardLanguage() {
+  if (BOARD_LANGUAGES.has(window.I18N?.lang)) return window.I18N.lang;
+  try {
+    const saved = localStorage.getItem("site_lang");
+    if (BOARD_LANGUAGES.has(saved)) return saved;
+  } catch (error) {
+    console.warn("[Arcade] leaderboard language read failed", error);
+  }
+  return "lb";
+}
+
+function boardRowHtml(g, row, index, tagData) {
+  const tagRow = tagData?.byUserId?.[row.user_id];
+  const tagMarkup = tagRow ? tagsHtml(tagRow) : "";
+  return `<div class="pb-row"><span class="r">${index + 1}</span><span class="pb-name">${esc(row.username || "anon")}${tagMarkup}</span><b>${esc(formatScore(g, row.score))}</b></div>`;
+}
+
+function pinnedRowHtml(g, owner, scoreRow) {
+  const copy = PINNED_TEXT[boardLanguage()];
+  const ownerName = scoreRow.username || owner.username || "anon";
+  return `<div class="pb-row pb-pinned" title="${esc(copy.title)}"><span class="pb-pin" aria-label="${esc(copy.title)}">${esc(copy.label)}</span><span class="pb-name">${esc(ownerName)}${tagsHtml(owner)}</span><b>${esc(formatScore(g, scoreRow.score))}</b></div>`;
+}
+
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const val = (id) => (document.getElementById(id)?.value || "").trim();
 
