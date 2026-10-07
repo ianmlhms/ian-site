@@ -372,19 +372,22 @@
     const standalone = window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
     if (standalone) return;
     try { if (localStorage.getItem("pwaInstallDismissed")) return; } catch (e) {}
+    // Only on the home page, inside its footer: a floating chip covered page content.
+    const slot = document.querySelector("[data-install-slot]");
+    if (!slot) return;
     const ios = !deferredPrompt && isIosSafari();
     const b = document.createElement("button");
+    b.type = "button";
     b.id = "pwaInstall"; b.textContent = ios ? "📲 Als App" : "⬇︎ Install";
-    b.style.cssText = "position:fixed;left:14px;z-index:9001;bottom:calc(72px + env(safe-area-inset-bottom,0px));" +
-      "background:var(--accent);color:var(--accent-foreground);border:none;border-radius:20px;padding:10px 15px;font-weight:800;" +
-      "font-size:13px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3)";
+    b.style.cssText = "background:var(--accent);color:var(--accent-foreground);border:none;border-radius:20px;" +
+      "padding:8px 14px;min-height:44px;font-weight:800;font-size:13px;cursor:pointer";
     b.onclick = async () => {
       b.remove();
       try { localStorage.setItem("pwaInstallDismissed", "1"); } catch (e) {}
       if (deferredPrompt) { deferredPrompt.prompt(); try { await deferredPrompt.userChoice; } catch (e) {} deferredPrompt = null; }
       else if (ios) showIosGuide();
     };
-    document.body.appendChild(b);
+    slot.appendChild(b);
   }
 
   function boot() {
