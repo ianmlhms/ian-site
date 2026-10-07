@@ -162,7 +162,9 @@ function achievements(s){
 
 // Read-only view of another player: profile.html?u=<username>.
 async function renderPublic(username){
-  const {data:p}=await sb.from("profiles").select("id,avatar,class,username").ilike("username",username).maybeSingle();
+  // Signed-out visitors may only read id/username/avatar (school class is for signed-in accounts).
+  const cols=auth.session()?"id,avatar,class,username":"id,avatar,username";
+  const {data:p}=await sb.from("profiles").select(cols).ilike("username",username).maybeSingle();
   if(!p){$("wrap").innerHTML=`<div class="gate ui-card"><div class="gate-ico" aria-hidden="true">🔍</div>No player called “${esc(username)}”.<br><a class="ui-btn ui-btn--ghost" href="profile.html">‹ Your profile</a></div>`;return;}
   let isAdmin=false;
   try{const {data}=await sb.rpc("admin_user_ids");isAdmin=(data||[]).some(r=>r.user_id===p.id);}catch{}
