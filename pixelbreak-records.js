@@ -21,12 +21,6 @@ let sessionBests = new Map();   // best score reported during this play, per boa
 let activeBoard = null;         // sub-leaderboard chosen by the game (e.g. one per level), or null
 const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board"]);
 const BOARD_ID_PATTERN = /^[a-z0-9-]{1,48}$/;
-const BOARD_LANGUAGES = new Set(["lb", "de", "en"]);
-const PINNED_TEXT = Object.freeze({
-  lb: Object.freeze({ title: "Ugepinnt: dem Admin säi beschte Resultat" }),
-  de: Object.freeze({ title: "Angeheftet: das beste Ergebnis des Admins" }),
-  en: Object.freeze({ title: "Pinned: the admin's best result" }),
-});
 let sb = null, session = null, username = null;
 
 /* ---------------- local best (always on) ---------------- */
@@ -441,18 +435,6 @@ async function fetchBoardTags() {
   }
 }
 
-async function fetchOwnerScore(g, owner) {
-  if (!sb || !session || !owner) return null;
-  try {
-    const { data, error } = await sb.from("scores")
-      .select("username,score").eq("game_id", g.id).eq("user_id", owner.user_id).maybeSingle();
-    if (error) throw error;
-    return data || null;
-  } catch (error) {
-    console.warn("[Arcade] pinned admin score unavailable", { id: g.id, error });
-    return null;
-  }
-}
 
 /* ---------------- UI ---------------- */
 function css() {
@@ -475,7 +457,6 @@ function css() {
   .pb-x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
   .pb-row{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
   .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);white-space:nowrap}
-  .pb-pinned{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:4px 8px;margin-bottom:8px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--accent3) 45%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--accent3) 9%,transparent)}
   .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}`;
   document.head.appendChild(s);
 }
@@ -595,7 +576,6 @@ async function openBoard() {
   boardModal.querySelector(".pb-x").onclick = () => boardModal.classList.remove("open");
   boardModal.classList.add("open");
   const [rows, tagData] = await Promise.all([fetchBoard(g), fetchBoardTags()]);
-  const ownerScore = rows && tagData?.owner ? await fetchOwnerScore(g, tagData.owner) : null;
   const list = document.getElementById("pbBoardList");
   if (!list) return;
   if (rows === null) {
@@ -610,22 +590,11 @@ async function openBoard() {
     return;
   }
   const visibleTagData = session ? tagData : null;
-  const pinned = ownerScore && visibleTagData?.owner ? pinnedRowHtml(g, visibleTagData.owner, ownerScore) : "";
-  list.innerHTML = pinned + rows.map((r, i) => boardRowHtml(g, r, i, visibleTagData)).join("");
+  list.innerHTML = rows.map((r, i) => boardRowHtml(g, r, i, visibleTagData)).join("");
 }
 PB.openBoard = openBoard;
 
 /* ---------------- helpers ---------------- */
-function boardLanguage() {
-  if (BOARD_LANGUAGES.has(window.I18N?.lang)) return window.I18N.lang;
-  try {
-    const saved = localStorage.getItem("site_lang");
-    if (BOARD_LANGUAGES.has(saved)) return saved;
-  } catch (error) {
-    console.warn("[Arcade] leaderboard language read failed", error);
-  }
-  return "lb";
-}
 
 function boardRowHtml(g, row, index, tagData) {
   const tagRow = tagData?.byUserId?.[row.user_id];
@@ -633,11 +602,6 @@ function boardRowHtml(g, row, index, tagData) {
   return `<div class="pb-row"><span class="r">${index + 1}</span><span class="pb-name">${esc(row.username || "anon")}${tagMarkup}</span><b>${esc(formatScore(g, row.score))}</b></div>`;
 }
 
-function pinnedRowHtml(g, owner, scoreRow) {
-  const copy = PINNED_TEXT[boardLanguage()];
-  const ownerName = scoreRow.username || owner.username || "anon";
-  return `<div class="pb-row pb-pinned"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">${esc(copy.title)}</span><span class="pb-name">${esc(ownerName)}${tagsHtml(owner)}</span><b>${esc(formatScore(g, scoreRow.score))}</b></div>`;
-}
 
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const val = (id) => (document.getElementById(id)?.value || "").trim();

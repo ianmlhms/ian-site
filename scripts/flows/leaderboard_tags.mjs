@@ -1,6 +1,5 @@
 /* Flow 6 — Leaderboard tags: signed in, every board shows 👑 Admin + class tags
- * and a pinned admin row (the owner's real result, no rank number), while the
- * owner's ranked row stays at its real position. */
+ * next to names; no pinned admin row (removed 8 Oct 2026). */
 import { runIfMain } from "./lib.mjs";
 
 const OWNER = { user_id: "o1", username: "Ian", class: "4C6", is_admin: true, is_owner: true };
@@ -39,18 +38,14 @@ async function setTheme(h, mode) {
 }
 
 async function checkTable(h, rowsSel, label) {
-  const info = await h.page.$$eval(rowsSel, (rows) => rows.map((r) =>
-    (r.matches(".pinned, .pinned-row, .pb-pinned") ? "[pinned] " : "") + r.innerText.replace(/\s+/g, " ").trim()));
-  h.expect(info.length >= 4, `${label}: board has rows (got ${info.length})`);
-  h.expect(/^\[pinned\]/.test(info[0] || "") && /Ian/.test(info[0]) && /Admin/.test(info[0]), `${label}: first row is the pinned admin row (${info[0]})`);
-  const ianRanked = info.slice(1).filter((t) => /Ian/.test(t) && !/^\[pinned\]/.test(t));
-  h.expect(ianRanked.length === 1, `${label}: Ian also stays in the ranked list`);
-  const visibleLabel = await h.page.$$eval(rowsSel, (rows) => [...rows[0].querySelectorAll("*")].some((el) =>
-    /Ugepinnt|📌/.test([...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("")) &&
-    el.getBoundingClientRect().width > 2));
-  h.expect(!visibleLabel, `${label}: no visible pinned label`);
+  const info = await h.page.$$eval(rowsSel, (rows) => rows.map((r) => r.innerText.replace(/\s+/g, " ").trim()));
+  const pinnedRows = await h.page.$$eval(".pinned, .pinned-row, .pb-pinned", (rows) => rows.length);
+  h.expect(info.length >= 3, `${label}: board has its normal rows (got ${info.length})`);
+  h.expect(pinnedRows === 0, `${label}: no pinned row`);
+  h.expect(info.filter((t) => /Ian/.test(t)).length === 1, `${label}: Ian appears once, at his real place`);
+  h.expect(info.some((t) => /Ian/.test(t) && /Admin/.test(t) && /4C6/.test(t)), `${label}: Ian has the 👑 Admin + class tags`);
   h.expect(info.some((t) => /Emma/.test(t) && /4C6/.test(t)), `${label}: class tag next to Emma`);
-  h.expect(!info.slice(1).some((t) => /Emma/.test(t) && /Admin/.test(t)), `${label}: no admin tag on Emma`);
+  h.expect(!info.some((t) => /Emma/.test(t) && /Admin/.test(t)), `${label}: no admin tag on Emma`);
   const overflow = await h.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   h.expect(!overflow, `${label}: no horizontal scroll`);
 }
@@ -76,7 +71,7 @@ export const flow = {
       await h.goto("/leaderboard.html");
       await setTheme(h, mode);
       await h.goto("/leaderboard.html");
-      await page.waitForSelector("table.lb tr.pinned", { timeout: 8000 });
+      await page.waitForSelector("table.lb.tagged .admin-tag", { timeout: 8000 });
       await checkTable(h, "table.lb tbody tr", `wins table ${mode}`);
       await h.shot(`wins-${mode}`);
 
@@ -84,8 +79,8 @@ export const flow = {
       await h.goto("/wordle.html");
       await page.waitForFunction(() => typeof window.openWordleBoard === "function", null, { timeout: 8000 });
       await page.evaluate(() => window.openWordleBoard("lb"));   // the 🏆 button lives in the Arcade bar
-      await page.waitForSelector("#lbBody tr.pinned-row", { timeout: 8000 });
-      await checkTable(h, "#lbBody tr:not(:first-child):not(.pin-gap)", `wordle ${mode}`);
+      await page.waitForSelector("#lbBody .admin-tag", { timeout: 8000 });
+      await checkTable(h, "#lbBody tr:not(:first-child)", `wordle ${mode}`);
       await h.shot(`wordle-${mode}`);
 
       h.step(`arcade board (${mode})`);
@@ -93,7 +88,7 @@ export const flow = {
       await page.waitForFunction(() => typeof window.PB?.openBoard === "function", null, { timeout: 8000 });
       await h.pause(1500);
       await page.evaluate(() => window.PB.openBoard());
-      await page.waitForSelector("#pbBoardList .pb-pinned", { timeout: 8000 });
+      await page.waitForSelector("#pbBoardList .admin-tag", { timeout: 8000 });
       await checkTable(h, "#pbBoardList .pb-row", `arcade ${mode}`);
       await h.shot(`arcade-${mode}`);
     }

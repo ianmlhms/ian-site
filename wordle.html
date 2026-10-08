@@ -68,9 +68,6 @@
   .lb-box .tagged-board td.n{white-space:nowrap}
   .tagged-board .lb-player{overflow-wrap:anywhere;word-break:break-word}
   .tagged-board .lb-player .admin-tag,.tagged-board .lb-player .class-tag{margin-top:3px;white-space:nowrap}
-  .pinned-row td{background:rgba(255,207,77,.08);border-top:1px solid rgba(255,207,77,.48);border-bottom:1px solid rgba(255,207,77,.48)}
-  .pin-gap td{height:6px;padding:0;border:0}
-  :root[data-theme="light"] .pinned-row td{background:rgba(133,88,0,.09);border-color:rgba(111,74,0,.55)}
   .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;margin:-10px -10px 0 0}
   .bar .home:focus-visible,.langs button:focus-visible,.lbbtn:focus-visible,.share:focus-visible,.key:focus-visible,.lb-close:focus-visible,.lb-tabs button:focus-visible,.lb-box:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   @media (max-width:430px){
@@ -312,7 +309,7 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=11" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=12" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
   import * as auth from "./auth.js?v=23";
@@ -327,24 +324,11 @@ load();
   };
 
   let boardLang = "lb";
-  const PINNED_TEXT = Object.freeze({
-    lb: Object.freeze({ title: "Ugepinnt: dem Admin säi beschte Resultat" }),
-    de: Object.freeze({ title: "Angeheftet: das beste Ergebnis des Admins" }),
-    en: Object.freeze({ title: "Pinned: the admin's best result" }),
-  });
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
     "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;",
   })[character]);
   const tody = (today) => today == null ? "—" : today === 0 ? "✗" : today + "/6";
 
-  function pinnedText() {
-    let current = window.I18N?.lang;
-    if (!current) {
-      try { current = localStorage.getItem("site_lang"); }
-      catch (error) { console.warn("[wordle] site language", error); }
-    }
-    return Object.hasOwn(PINNED_TEXT, current) ? PINNED_TEXT[current] : PINNED_TEXT.lb;
-  }
 
   function tagsFor(tagData, username) {
     return tagData?.byUsername[String(username ?? "").toLowerCase()] || null;
@@ -361,15 +345,6 @@ load();
     return `<tr><td>${index + 1}</td><td${playerClass}>${esc(row.username)}${tagMarkup}</td>${resultCells(row)}</tr>`;
   }
 
-  function pinnedRow(data, tagData) {
-    const owner = tagData?.owner;
-    if (!owner) return "";
-    const ownerName = String(owner.username ?? "").toLowerCase();
-    const row = data.find((entry) => String(entry.username ?? "").toLowerCase() === ownerName);
-    if (!row) return "";
-    const copy = pinnedText();
-    return `<tr class="pinned-row"><td><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">${esc(copy.title)}</span></td><td class="lb-player">${esc(row.username)}${tagsHtml(owner)}</td>${resultCells(row)}</tr><tr class="pin-gap" aria-hidden="true"><td colspan="5"></td></tr>`;
-  }
 
   async function boardTags() {
     if (!auth.session()) return null;
@@ -391,7 +366,6 @@ load();
       if (!data || !data.length) { body.innerHTML = `<p style="color:var(--muted)">Nach keng Resultater — spill a kommzréck!</p>`; return; }
       const tableClass = tagData ? ` class="tagged-board"` : "";
       body.innerHTML = `<table${tableClass}><tr><th scope="col">#</th><th scope="col">Spiller</th><th scope="col" class="n">Gewonn</th><th scope="col" class="n">⌀</th><th scope="col" class="n">Haut</th></tr>` +
-        pinnedRow(data, tagData) +
         data.map((row, index) => rankedRow(row, index, tagData)).join("") +
         `</table>`;
     } catch (error) { body.innerHTML = "Feeler beim Lueden."; console.warn("[wordle] leaderboard", error); }
