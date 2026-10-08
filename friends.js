@@ -1,5 +1,5 @@
 /* Friends: add by username, list, message (DM) or invite to a game. */
-import * as auth from "./auth.js?v=23";
+import * as auth from "./auth.js?v=24";
 import { attachPeopleSearch } from "./people-search.js?v=1";
 
 const $ = (id) => document.getElementById(id);

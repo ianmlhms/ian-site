@@ -309,10 +309,10 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=12" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=13" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import * as auth from "./auth.js?v=23";
+  import * as auth from "./auth.js?v=24";
   import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
   let sb = null;
   const $ = (id) => document.getElementById(id);
@@ -379,7 +379,7 @@ load();
   $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") window.closeWordleBoard(); };
   document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; setLbTabs(); drawBoard(); });
 </script>
-  <script type="module" src="rtc-ring.js?v=19"></script>
-  <script type="module" src="class-gate.js?v=20"></script>
+  <script type="module" src="rtc-ring.js?v=21"></script>
+  <script type="module" src="class-gate.js?v=22"></script>
 </body>
 </html>

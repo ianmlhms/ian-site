@@ -1,6 +1,6 @@
 /* IanNet uplink viewer — photos / files / guestbook entries the IanNet boards uploaded.
  * Admin-only: ianet_items and the ianet bucket are guarded server-side by is_admin(). */
-import * as auth from "./auth.js?v=23";
+import * as auth from "./auth.js?v=24";
 
 const BUCKET = "ianet";
 const SIGNED_URL_SECONDS = 3600;

@@ -97,6 +97,34 @@ function guardKartAccount(current) {
   return true;
 }
 
+function parentHandlesPresence() {
+  if (window.top === window) return false;
+  try {
+    return Boolean(window.parent.__pbAuth);
+  } catch {
+    return false;
+  }
+}
+
+function startPresencePing() {
+  if (!_g.sb || parentHandlesPresence()) return;
+  if (!_g.presenceModule) {
+    _g.presenceModule = import("./presence-ping.js?v=1");
+  }
+  void _g.presenceModule
+    .then(({ startPresence }) => startPresence(_g.sb, () => _g.session))
+    .catch((error) => {
+      if (_g.presenceImportWarned) return;
+      _g.presenceImportWarned = true;
+      console.warn("[presence] module failed to load", error);
+    });
+  if (!_g.session?.user?.id) return;
+  if (!_g.noticeModule) _g.noticeModule = import("./site-notice.js?v=1");
+  void _g.noticeModule
+    .then(({ showNotices }) => showNotices(_g.sb, () => _g.session))
+    .catch((error) => console.warn("[notice] module failed to load", error));
+}
+
 // Most pages import auth.js before they ask for the asynchronous client. Use the
 // stored session as an immediate guard, then verify again when GoTrue is ready.
 guardKartAccount(_g.session || storedSession());
@@ -119,6 +147,7 @@ async function recoverSession(sb, data) {
 function notifyAuth(event, current) {
   _g.session = current;
   markSignedIn(current);
+  startPresencePing();
   if (guardKartAccount(current)) return;
   const userId = current?.user?.id || null;
   const changed = userId !== _g.lastUid;
@@ -173,6 +202,7 @@ async function initializeClient() {
   markSignedIn(data.session);
   _g.lastUid = data.session?.user?.id || null;
   _g.sb.auth.onAuthStateChange(notifyAuth);
+  startPresencePing();
   if (guardKartAccount(data.session)) return _g.sb;
   await ensureProfile();
   schedulePinBriefing();
@@ -193,13 +223,17 @@ export async function client() {
     // An older copy of this module (different ?v=) may already have built the
     // client without recording a promise. Reuse it rather than creating a second
     // session-managing client, which is the race this cache exists to prevent.
-    if (_g.sb) return _g.sb;
+    if (_g.sb) {
+      startPresencePing();
+      return _g.sb;
+    }
     _g.ready = initializeClient().catch((error) => {
       _g.ready = null;
       throw error;
     });
   }
   await _g.ready;
+  startPresencePing();
   return _g.sb;
 }
 

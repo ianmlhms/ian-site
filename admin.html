@@ -23,7 +23,7 @@
   .side-h{padding:12px 14px;border-bottom:1px solid var(--border)}
   .side-h input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 11px;font-size:13px}
   .tabs{display:flex;gap:6px;margin-bottom:10px}
-  .tab{flex:1;background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px;font-size:13px;font-weight:700;cursor:pointer}
+  .tab{flex:1;min-width:0;background:var(--card);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 4px;font-size:13px;font-weight:700;cursor:pointer}
   .tab.active{background:var(--card2);color:var(--text);border-color:var(--accent2-text)}
   .uinfo{display:flex;flex-direction:column;gap:6px;font-size:13.5px;margin-top:10px}
   .uinfo .k{color:var(--muted);font-size:12px}
@@ -69,12 +69,32 @@
   .am .when{color:var(--muted);font-size:11px;flex:none}
   .am .media{display:block;max-width:200px;max-height:200px;border-radius:8px;margin-top:4px}
   .empty{color:var(--muted);text-align:center;padding:40px}
+  #panel.online-mode .side{width:100%;border-right:0}
+  #panel.online-mode .detail,#panel.online-mode .side-h>.uact{display:none}
+  #panel.online-mode .glist{padding:14px 18px 24px}
+  .online-section{width:min(760px,100%);margin:0 auto 18px}
+  .online-section h2{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:14px}
+  .online-count{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 7px;border-radius:999px;background:var(--card2);color:var(--muted);font-size:11px}
+  .online-list{overflow:hidden;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+  .online-row{display:grid;grid-template-columns:10px 42px minmax(0,1fr);align-items:center;gap:11px;padding:11px 13px}
+  .online-row+.online-row{border-top:1px solid var(--border)}
+  .presence-dot{width:9px;height:9px;border-radius:50%;background:#3fb950;box-shadow:0 0 0 3px color-mix(in srgb,#3fb950 18%,transparent)}
+  .presence-dot.recent{visibility:hidden}
+  .online-avatar{display:flex;width:42px;height:42px;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;background:var(--card2);font-size:24px}
+  .online-avatar img{width:100%;height:100%;object-fit:cover}
+  .online-person{min-width:0}
+  .online-name{font-size:14px;font-weight:750;overflow-wrap:anywhere}
+  .kart-tag{display:inline-block;margin-inline-start:5px;padding:0 6px;border-radius:6px;background:color-mix(in srgb,var(--accent) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 42%,transparent);color:var(--accent-text);font-size:10px;font-weight:800;line-height:1.7;letter-spacing:.3px;vertical-align:middle;white-space:nowrap}
+  .online-meta{display:flex;flex-wrap:wrap;gap:3px 8px;margin-top:4px;color:var(--muted);font-size:12px}
+  .online-page{color:var(--text);overflow-wrap:anywhere}
+  .online-empty{color:var(--muted);padding:22px 14px;text-align:center;font-size:13px}
   a:focus-visible,button:focus-visible,input:focus-visible,.grow:focus-visible{outline:3px solid var(--accent2-text,var(--accent2));outline-offset:2px}
   button{touch-action:manipulation}
   .chip-x{min-width:32px;min-height:32px}
 #detailBack{display:none}
 #viewFeedback{min-height:0;background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
 @media(max-width:760px){#panel .side{width:100%;border-right:0}#panel .detail{display:none}#panel.detail-open .side{display:none}#panel.detail-open .detail{display:flex}#detailBack{display:block;align-self:flex-start;min-height:44px;padding:8px 14px;margin:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font:inherit;cursor:pointer}}
+@media(max-width:460px){#panel.online-mode .glist{padding:12px}.tabs{gap:4px}.tab{padding-inline:2px;font-size:11.5px}.online-row{grid-template-columns:9px 38px minmax(0,1fr);gap:9px;padding:10px}.online-avatar{width:38px;height:38px;font-size:22px}.online-meta{flex-direction:column;gap:2px}}
 </style>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
@@ -97,7 +117,7 @@
 <div id="panel">
   <aside class="side" aria-label="Lëscht">
     <div class="side-h">
-      <div class="tabs"><button type="button" id="tabGroups" class="tab active">Groups</button><button type="button" id="tabUsers" class="tab">Users</button><button type="button" id="tabFeedback" class="tab">Feedback</button></div>
+      <div class="tabs"><button type="button" id="tabGroups" class="tab active">Groups</button><button type="button" id="tabUsers" class="tab">Users</button><button type="button" id="tabFeedback" class="tab">Feedback</button><button type="button" id="tabOnline" class="tab">🟢 Online</button></div>
       <input id="search" name="search" type="search" aria-label="Search" placeholder="Search…" autocomplete="off">
       <div class="uact">
         <h4>PIN zerécksetzen</h4>
@@ -122,9 +142,9 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="admin.js?v=28"></script>
+<script type="module" src="admin.js?v=29"></script>
 <script type="module">
-import { client } from "./auth.js?v=23";
+import { client } from "./auth.js?v=24";
 
 const username = document.getElementById("pinResetUser");
 const reset = document.getElementById("pinResetBtn");
@@ -190,7 +210,7 @@ username.addEventListener("keydown", (event) => {
   if (event.key === "Enter") resetPin();
 });
 </script>
-  <script type="module" src="rtc-ring.js?v=19"></script>
-  <script type="module" src="class-gate.js?v=20"></script>
+  <script type="module" src="rtc-ring.js?v=21"></script>
+  <script type="module" src="class-gate.js?v=22"></script>
 </body>
 </html>

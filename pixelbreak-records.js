@@ -8,7 +8,7 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=23";
+import * as auth from "./auth.js?v=24";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
 
 const cfg = window.PB_CONFIG || {};

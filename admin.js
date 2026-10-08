@@ -1,11 +1,14 @@
 /* Admin panel — moderate groups/messages AND manage registered users.
  * All privileged actions are guarded server-side by is_admin(). */
-import * as auth from "./auth.js?v=23";
+import * as auth from "./auth.js?v=24";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? "—" : d.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
 const fileIcon = (name) => { const e = (name || "").split(".").pop().toLowerCase(); return ({ pdf: "📕", zip: "🗜", doc: "📘", docx: "📘", xls: "📗", xlsx: "📗", ppt: "📙", pptx: "📙", txt: "📄", mp3: "🎵", wav: "🎵" })[e] || "📎"; };
+const ONLINE_MINUTES = 15;
+const ONLINE_REFRESH_MS = 15_000;
 
 $("glist").addEventListener("keydown", (e) => {
   const row = e.target.closest?.(".grow");
@@ -34,6 +37,8 @@ function appendMedia(container, m) {
 }
 
 let sb = null, mode = "groups", groups = [], users = [], current = null;
+let onlineRows = [], onlineTags = null, onlineLoaded = false;
+let onlineRefreshTimer = null, onlineGeneration = 0;
 
 async function signedUrl(path) {
   try { const { data, error } = await sb.storage.from("chat-media").createSignedUrl(path, 3600); return error ? null : data.signedUrl; }
@@ -220,22 +225,176 @@ async function deleteFeedback(id) {
   loadFeedback();
 }
 
+/* ============================ ONLINE ============================ */
+function avatarHtml(avatar) {
+  const value = String(avatar || "");
+  if (/^https?:\/\//i.test(value)) {
+    return `<img src="${esc(value)}" alt="" loading="lazy">`;
+  }
+  return esc(value || "👤");
+}
+
+function pageLabel(page) {
+  const raw = String(page || "/");
+  try {
+    const url = new URL(raw, location.origin);
+    if (url.pathname === "/" || url.pathname === "/index.html") return "Home";
+    if (url.pathname === "/pixelbreak.html" && url.searchParams.get("g")) {
+      return `Arcade · ${url.searchParams.get("g")}`;
+    }
+    const file = url.pathname.split("/").filter(Boolean).pop() || "Home";
+    try {
+      return decodeURIComponent(file).replace(/\.html$/i, "");
+    } catch (error) {
+      console.warn("[admin] presence page could not be decoded", raw, error);
+      return file.replace(/\.html$/i, "");
+    }
+  } catch (error) {
+    console.warn("[admin] invalid presence page", raw, error);
+    return raw.split("?")[0].split("/").filter(Boolean).pop()?.replace(/\.html$/i, "") || "Home";
+  }
+}
+
+function elapsedMinutes(iso) {
+  const time = new Date(iso).getTime();
+  if (!Number.isFinite(time)) return null;
+  return Math.max(0, Math.floor((Date.now() - time) / 60_000));
+}
+
+function presenceStatus(row) {
+  const minutes = elapsedMinutes(row.online ? row.started_at : row.last_seen);
+  if (row.online) return minutes === null ? "online now" : `online for ${minutes < 1 ? "<1" : minutes} min`;
+  if (minutes === null) return "seen recently";
+  return minutes < 1 ? "seen just now" : `seen ${minutes} min ago`;
+}
+
+function onlineRowHtml(row) {
+  const tagRow = onlineTags?.byUserId?.[String(row.user_id)] || null;
+  const identityTags = tagsHtml({
+    class: row.class,
+    is_admin: tagRow?.is_admin === true,
+  });
+  const kartTag = row.account_kind === "kart"
+    ? ` <span class="kart-tag">🏁 Kart</span>`
+    : "";
+  return `<div class="online-row">
+    <span class="presence-dot${row.online ? "" : " recent"}" aria-hidden="true"></span>
+    <span class="online-avatar" aria-hidden="true">${avatarHtml(row.avatar)}</span>
+    <div class="online-person">
+      <div class="online-name">${esc(row.username || "(no username)")}${identityTags}${kartTag}</div>
+      <div class="online-meta"><span class="online-page">${esc(pageLabel(row.page))}</span><span>${esc(presenceStatus(row))}</span></div>
+    </div>
+  </div>`;
+}
+
+function onlineSectionHtml(title, rows, emptyHtml, showCount = false) {
+  const count = showCount ? `<span class="online-count">${rows.length}</span>` : "";
+  const content = rows.length
+    ? rows.map(onlineRowHtml).join("")
+    : `<div class="online-empty">${emptyHtml}</div>`;
+  return `<li class="online-section"><h2>${title}${count}</h2><div class="online-list">${content}</div></li>`;
+}
+
+function filteredOnlineRows() {
+  const query = $("search").value.trim().toLowerCase();
+  if (!query) return onlineRows;
+  return onlineRows.filter((row) => String(row.username || "").toLowerCase().includes(query));
+}
+
+function renderOnline(list) {
+  const searching = Boolean($("search").value.trim());
+  if (searching && !list.length) {
+    $("glist").innerHTML = `<li class="online-section"><div class="online-list"><div class="online-empty">No matching people.</div></div></li>`;
+    return;
+  }
+  const online = list.filter((row) => row.online === true);
+  const recent = list.filter((row) => row.online !== true);
+  const onlineEmpty = onlineRows.length
+    ? "Nobody online right now."
+    : "Keen ass grad online.";
+  $("glist").innerHTML =
+    onlineSectionHtml("Online now", online, onlineEmpty, true) +
+    onlineSectionHtml("Recently", recent, "Nobody seen recently.");
+}
+
+async function loadOnline(generation) {
+  if (!onlineLoaded && generation === onlineGeneration && mode === "online") {
+    $("glist").innerHTML = `<li class="empty">Loading online activity…</li>`;
+  }
+  try {
+    const [onlineResult, tagData] = await Promise.all([
+      sb.rpc("admin_online", { p_minutes: ONLINE_MINUTES }),
+      loadTags(sb),
+    ]);
+    if (onlineResult.error) throw onlineResult.error;
+    if (generation !== onlineGeneration || mode !== "online") return;
+    onlineRows = Array.isArray(onlineResult.data)
+      ? onlineResult.data.map((row) => ({ ...row }))
+      : [];
+    onlineTags = tagData;
+    onlineLoaded = true;
+    renderOnline(filteredOnlineRows());
+  } catch (error) {
+    console.error("[admin] online activity failed to load", error);
+    if (generation !== onlineGeneration || mode !== "online") return;
+    $("glist").innerHTML = `<li class="empty">Couldn’t load online activity. Try again shortly.</li>`;
+  }
+}
+
+async function refreshOnline(generation) {
+  const startedAt = Date.now();
+  await loadOnline(generation);
+  if (generation !== onlineGeneration || mode !== "online" || document.visibilityState !== "visible") return;
+  const delay = Math.max(0, ONLINE_REFRESH_MS - (Date.now() - startedAt));
+  onlineRefreshTimer = setTimeout(
+    () => void refreshOnline(generation),
+    delay,
+  );
+}
+
+function stopOnlineRefresh() {
+  if (onlineRefreshTimer !== null) clearTimeout(onlineRefreshTimer);
+  onlineRefreshTimer = null;
+  onlineGeneration += 1;
+}
+
+function startOnlineRefresh() {
+  if (mode !== "online" || document.visibilityState !== "visible") return;
+  const generation = onlineGeneration;
+  void refreshOnline(generation);
+}
+
+document.addEventListener("visibilitychange", () => {
+  stopOnlineRefresh();
+  if (document.visibilityState === "visible" && mode === "online") startOnlineRefresh();
+});
+
 /* ============================ SHARED ============================ */
 function setMode(m) {
+  stopOnlineRefresh();
   mode = m; current = null;
   $("panel").classList.toggle("detail-open", m === "feedback");
+  $("panel").classList.toggle("online-mode", m === "online");
   $("tabGroups").classList.toggle("active", m === "groups");
   $("tabUsers").classList.toggle("active", m === "users");
   $("tabFeedback").classList.toggle("active", m === "feedback");
+  $("tabOnline").classList.toggle("active", m === "online");
   $("search").value = "";
-  $("search").placeholder = m === "groups" ? "Search groups / DMs…" : m === "users" ? "Search users…" : "Search feedback…";
-  $("detailH").innerHTML = m === "groups" ? "Select a group to inspect" : m === "users" ? "Select a user" : "💬 Feedback";
+  $("search").placeholder = m === "groups" ? "Search groups / DMs…" : m === "users" ? "Search users…" : m === "feedback" ? "Search feedback…" : "Search online…";
+  $("detailH").innerHTML = m === "groups" ? "Select a group to inspect" : m === "users" ? "Select a user" : m === "feedback" ? "💬 Feedback" : "🟢 Online";
   $("mlist").innerHTML = "";
   $("glist").innerHTML = "";
-  if (m === "groups") loadGroups(); else if (m === "users") loadUsers(); else loadFeedback();
+  if (m === "groups") loadGroups();
+  else if (m === "users") loadUsers();
+  else if (m === "feedback") loadFeedback();
+  else {
+    if (onlineLoaded) renderOnline(filteredOnlineRows());
+    startOnlineRefresh();
+  }
 }
 
 function showDenied() {
+  stopOnlineRefresh();
   $("panel").style.display = "none";
   $("msg").style.display = "flex";
   $("msg").innerHTML = auth.session()
@@ -254,11 +413,13 @@ async function gate() {
   $("tabGroups").onclick = () => setMode("groups");
   $("tabUsers").onclick = () => setMode("users");
   $("tabFeedback").onclick = () => setMode("feedback");
+  $("tabOnline").onclick = () => setMode("online");
   $("search").oninput = (e) => {
     const q = e.target.value.toLowerCase();
     if (mode === "groups") renderGroupList(groups.filter((g) => (g.name + " " + g.invite_code).toLowerCase().includes(q)));
     else if (mode === "users") renderUserList(users.filter((u) => ((u.email || "") + " " + (u.username || "")).toLowerCase().includes(q)));
-    else renderFeedback(feedback.filter((f) => ((f.message || "") + " " + (f.username || "") + " " + (f.page || "")).toLowerCase().includes(q)));
+    else if (mode === "feedback") renderFeedback(feedback.filter((f) => ((f.message || "") + " " + (f.username || "") + " " + (f.page || "")).toLowerCase().includes(q)));
+    else renderOnline(filteredOnlineRows());
   };
   setMode("groups");
 }
