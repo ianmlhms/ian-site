@@ -397,10 +397,16 @@ async function initCloud() {
   sb.auth.onAuthStateChange((_e, s) => applySession(s));
 }
 function applySession(s) {
+  const previousUserId = session?.user?.id || null;
   session = s || null;
   username = s ? (s.user.user_metadata?.username || s.user.email) : null;
   renderAccount();
   renderGameBar();
+  // Signed in while a game is open (e.g. opened it signed out on a new device):
+  // fetch that account's cloud save now, so the game adopts it instead of the
+  // fresh local progress. The server also refuses saves with less progress.
+  const userId = session?.user?.id || null;
+  if (userId && userId !== previousUserId && PB.current) loadCloudSave(PB.current);
 }
 async function saveCloud(g, s) {
   try {
