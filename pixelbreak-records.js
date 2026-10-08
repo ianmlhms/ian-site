@@ -156,7 +156,7 @@ PB.instrument = (html) => {
 
 /* ---------------- open / close hooks ---------------- */
 PB.onOpenGame = (g) => { PB.current = g; sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); };
-PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; activeBoard = null; };
+PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; activeBoard = null; updateSaveHint(); };
 PB.registerStandalone = (g) => {
   PB.current = g;
   sessionBests = new Map();
@@ -215,6 +215,8 @@ window.addEventListener("message", (e) => {
     if (json.length > MAX_MESSAGE_SIZE) return;
     try { localStorage.setItem(SAVE_PREFIX + g.id, json); } catch (e) { console.warn("[PB] local save failed", e); }
     pendingSave = { g, data: d.data };
+    savingGameId = g.id;
+    updateSaveHint();
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
   if (d && d.__pbWantSave === 1 && cloudSave !== undefined) sendCloudSave();
@@ -396,6 +398,7 @@ function applySession(s) {
   username = s ? (s.user.user_metadata?.username || s.user.email) : null;
   renderAccount();
   renderGameBar();
+  updateSaveHint();
   // Signed in while a game is open (e.g. opened it signed out on a new device):
   // fetch that account's cloud save now, so the game adopts it instead of the
   // fresh local progress. The server also refuses saves with less progress.
@@ -457,7 +460,10 @@ function css() {
   .pb-x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
   .pb-row{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
   .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);white-space:nowrap}
-  .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}`;
+  .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}
+  .pb-save-hint{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2500;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 24px);padding:8px 8px 8px 14px;border-radius:14px;background:var(--card,#161625);color:var(--text,#e8e8f0);border:1px solid var(--border,rgba(255,255,255,.14));box-shadow:0 10px 30px rgba(0,0,0,.4);font:600 13.5px/1.35 'Nunito',system-ui,sans-serif}
+  .pb-save-hint__go{flex:none;min-height:40px;padding:0 14px;border:0;border-radius:10px;background:var(--accent,#6c5ce7);color:#fff;font:inherit;font-weight:800;cursor:pointer}
+  .pb-save-hint__x{flex:none;min-width:40px;min-height:40px;border:0;background:none;color:var(--text2,#9a9ab8);font-size:20px;cursor:pointer}`;
   document.head.appendChild(s);
 }
 
@@ -593,6 +599,45 @@ async function openBoard() {
   list.innerHTML = rows.map((r, i) => boardRowHtml(g, r, i, visibleTagData)).join("");
 }
 PB.openBoard = openBoard;
+
+/* ---------------- sign-in hint ----------------
+ * A game that saves progress while nobody is signed in keeps it on this device
+ * only, so a player on a new device sees 0 and thinks it is gone. Say so. */
+const SAVE_HINT_TEXT = Object.freeze({
+  lb: Object.freeze({ msg: "Mell dech un, fir däi Spillstand ze lueden an op all Apparat ze späicheren.", go: "Umellen" }),
+  de: Object.freeze({ msg: "Melde dich an, um deinen Spielstand zu laden und auf allen Geräten zu speichern.", go: "Anmelden" }),
+  en: Object.freeze({ msg: "Sign in to load your progress and keep it on every device.", go: "Sign in" }),
+});
+let saveHintDismissed = false;
+let savingGameId = null;   // the open game has posted a progress save
+
+function hintLanguage() {
+  const langs = ["lb", "de", "en"];
+  if (langs.includes(window.I18N?.lang)) return window.I18N.lang;
+  try {
+    const saved = localStorage.getItem("site_lang");
+    if (langs.includes(saved)) return saved;
+  } catch (error) {
+    console.warn("[Arcade] hint language", error);
+  }
+  return "lb";
+}
+
+function updateSaveHint() {
+  const show = cloudEnabled && !session && !!PB.current && PB.current.id === savingGameId && !saveHintDismissed;
+  let hint = document.getElementById("pbSaveHint");
+  if (!show) { hint?.remove(); return; }
+  if (hint) return;
+  const copy = SAVE_HINT_TEXT[hintLanguage()];
+  hint = document.createElement("div");
+  hint.id = "pbSaveHint";
+  hint.className = "pb-save-hint";
+  hint.setAttribute("role", "status");
+  hint.innerHTML = `<span>💾 ${esc(copy.msg)}</span><button type="button" class="pb-save-hint__go">${esc(copy.go)}</button><button type="button" class="pb-save-hint__x" aria-label="OK">&times;</button>`;
+  hint.querySelector(".pb-save-hint__go").onclick = () => openAuth();
+  hint.querySelector(".pb-save-hint__x").onclick = () => { saveHintDismissed = true; hint.remove(); };
+  document.body.appendChild(hint);
+}
 
 /* ---------------- helpers ---------------- */
 
