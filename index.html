@@ -74,7 +74,7 @@
   /* one tint per category (hue on the sticker only; chrome stays on the theme accent) */
   .home .tile[data-app="grades.html"],.home .tile[data-app="exams.html"],.home .tile[data-app="board.html"],.home .tile[data-app="countries.html"]{--h:#4fc37a}
   .home .tile[data-app="messenger.html"],.home .tile[data-app="friends.html"]{--h:#3cc4de}
-  .home .tile[data-app="pixelbreak.html"],.home .tile[data-app="wordle.html"]{--h:#ff6f9f}
+  .home .tile[data-app="pixelbreak.html"],.home .tile[data-app="wordle.html"],.home .tile[data-app="leaderboard.html"]{--h:#ff6f9f}
   .home .tile[data-app="bus.html"],.home .tile[data-app="skylens.html"],.home .tile[data-app="kaart/"],.home .tile[data-app="geoportal/"]{--h:#5b9bff}
   .home .tile[data-app="buddy.html"],.home .tile[data-app="money.html"],.home .tile[data-app="me.html"],.home .tile[data-app="kart-account.html"],.home .tile[data-app="karts.html"],.home .tile[data-app="hotel.html"],.home .tile[data-app="haus/"]{--h:#f4a62a}
   .home .tile[data-app="factory.html"],.home .tile[data-app="admin.html"],.home .tile[data-app="traffic.html"],.home .tile[data-app="ppt.html"],.home .tile[data-app="doc.html"]{--h:#a883ff}
@@ -109,8 +109,8 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="theme-color" content="#0d0d1a">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <script src="theme.js?v=26"></script>
-  <script src="i18n-dict.js?v=42"></script>
+  <script src="theme.js?v=27"></script>
+  <script src="i18n-dict.js?v=43"></script>
   <script src="i18n.js?v=3"></script>
   <script>
     // Land at the top of the landing page (not a restored scroll position),
@@ -209,6 +209,9 @@
           </a>
           <a class="tile ui-tile wordle" href="wordle.html" data-app="wordle.html">
             <span class="ico ui-tile__ico" aria-hidden="true">🟩</span><span class="tname ui-tile__name">Wuertspill</span><span class="tsub ui-tile__sub" data-i18n="tile.wordle.sub">Wordle · LB &amp; DE</span>
+          </a>
+          <a class="tile ui-tile leaderboard" href="leaderboard.html" data-app="leaderboard.html">
+            <span class="ico ui-tile__ico" aria-hidden="true">🏆</span><span class="tname ui-tile__name" data-i18n="tile.leaderboard">Ranglëscht</span><span class="tsub ui-tile__sub" data-i18n="tile.leaderboard.sub">Siegen &amp; Gewënnquote</span>
           </a>
         </div>
       </details>
@@ -381,11 +384,11 @@
   <script src="main.js"></script>
   <script src="pixelbreak-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-  <script type="module" src="notify-ambient.js?v=20"></script>
-  <script type="module" src="rtc-ring.js?v=21"></script>
-  <script type="module" src="class-gate.js?v=22"></script>
+  <script type="module" src="notify-ambient.js?v=21"></script>
+  <script type="module" src="rtc-ring.js?v=22"></script>
+  <script type="module" src="class-gate.js?v=23"></script>
   <script type="module">
-    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=24";
+    import { mountAccountButton, openAuthModal, client, session, onAuth, hasStoredSession } from "./auth.js?v=25";
     const HOTEL_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Hotel-Simulator
     const HOUSE_ALLOW = ["konto@ian.lu", "quinn@mulheims.lu"];   // private Haus-Planer
     const HOTEL_ONLY = [];                                       // accounts limited to ONLY the hotel builder (none currently)

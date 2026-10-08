@@ -1,6 +1,6 @@
 /* Admin panel — moderate groups/messages AND manage registered users.
  * All privileged actions are guarded server-side by is_admin(). */
-import * as auth from "./auth.js?v=24";
+import * as auth from "./auth.js?v=25";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
 
 const $ = (id) => document.getElementById(id);

@@ -397,5 +397,5 @@
   if (document.body) boot();
   else document.addEventListener("DOMContentLoaded", boot);
 
-  import("./quick-open.js?v=7").catch((error) => console.error("quick open", error));
+  import("./quick-open.js?v=8").catch((error) => console.error("quick open", error));
 })();

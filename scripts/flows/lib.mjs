@@ -139,6 +139,7 @@ export async function mockSupabase(context, backend) {
 
     if (p.startsWith("/auth/v1/user")) return json(fakeUser());
     if (p.startsWith("/auth/v1/token")) return json(fakeSession());
+    if (p.startsWith("/auth/v1/verify")) return json(fakeSession());   // verifyOtp (PIN login)
     if (p.startsWith("/auth/v1/logout")) return route.fulfill({ status: 204, headers: CORS });
     if (p.startsWith("/auth/v1/")) return json({});
 
@@ -338,6 +339,7 @@ export function profilesTable({ url }) {
     const re = ilikeRegExp(username);
     return PEOPLE.filter((p) => re.test(p.username)).sort((a, b) => a.username.localeCompare(b.username));
   }
-  if ((url.searchParams.get("select") || "").includes("class")) return [{ class: "4C6", class_confirmed: "2026-09", username: ME_NAME }];
+  // account_checked_at is set so the one-time account-check card (account-check.js) stays out of other flows.
+  if ((url.searchParams.get("select") || "").includes("class")) return [{ class: "4C6", class_confirmed: "2026-09", username: ME_NAME, account_checked_at: "2026-10-01T00:00:00Z" }];
   return [];
 }

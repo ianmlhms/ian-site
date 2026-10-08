@@ -41,6 +41,8 @@ export const APPS = Object.freeze([
     keywords: ["partyspiele", "jeux", "fête", "gruppen", "handy"] },
   { url: "wordle.html", name: "Wuertspill", icon: "🟩", group: "grp.fun", locked: false,
     keywords: ["wordle", "wörter", "wierder", "mots", "guess"] },
+  { url: "leaderboard.html", name: "Ranglëscht", icon: "🏆", group: "grp.fun", locked: false,
+    keywords: ["leaderboard", "ranking", "rangliste", "classement", "highscore"] },
   { url: "countdowns.html", name: "Countdowns", icon: "⏳", group: "grp.fun", locked: false,
     keywords: ["timer", "zäit", "zeit", "compte à rebours", "dates"] },
 

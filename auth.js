@@ -1,5 +1,5 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=42";
+import "./i18n-dict.js?v=43";
 import { openAuthDialog } from "./auth-ui.js?v=9";
 import { esc } from "./pin-pad.js?v=4";
 import {
@@ -123,6 +123,19 @@ function startPresencePing() {
   void _g.noticeModule
     .then(({ showNotices }) => showNotices(_g.sb, () => _g.session))
     .catch((error) => console.warn("[notice] module failed to load", error));
+  startAccountCheck();
+}
+
+/* One-time "is your username and class still right?" popup. Top-level pages
+ * only (never the arcade iframes), and never for kart accounts. */
+function startAccountCheck() {
+  if (window.top !== window || isKartAccount()) return;
+  if (!_g.accountCheckModule) {
+    _g.accountCheckModule = import("./account-check.js?v=2");
+  }
+  void _g.accountCheckModule
+    .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))
+    .catch((error) => console.warn("[account-check] module failed to load", error));
 }
 
 // Most pages import auth.js before they ask for the asynchronous client. Use the
@@ -296,6 +309,95 @@ export async function loginWithPin(identifier, pin) {
   });
   if (result.error) throw result.error;
   return result.data;
+}
+
+const MERGE_PROOF_STORAGE_KEY = "ianlu-merge-proof";
+const PROOF_ERROR = Object.freeze({
+  wrong: "wrong_credentials",
+  unavailable: "unavailable",
+  cannotMerge: "cannot_merge",
+});
+const INSUFFICIENT_PRIVILEGE = "42501";
+
+function proofError(code, message, cause) {
+  return Object.assign(new Error(message), { code, cause });
+}
+
+/** auth-pin answers a PIN login with a magic-link hash, a password login with a session. */
+async function openProofSession(proof, data) {
+  const accessToken = data.session?.access_token;
+  const refreshToken = data.session?.refresh_token;
+  if (accessToken && refreshToken) {
+    const { error } = await proof.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) throw error;
+    return;
+  }
+  if (!data.hashed_token) throw proofError(PROOF_ERROR.wrong, "no session returned");
+  const { error } = await proof.auth.verifyOtp({
+    type: "email",
+    token_hash: data.hashed_token,
+  });
+  if (error) throw error;
+}
+
+async function requestMergeTicket(data) {
+  const createClient = await getCreateClient();
+  const proof = createClient(cfg.url.replace(/\/$/, ""), cfg.anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: MERGE_PROOF_STORAGE_KEY,
+    },
+  });
+  try {
+    await openProofSession(proof, data);
+    const { data: ticket, error } = await proof.rpc("issue_merge_ticket");
+    if (error) throw error;
+    return ticket;
+  } finally {
+    const { error } = await proof.auth.signOut({ scope: "local" });
+    if (error) console.warn("[merge] could not clear the proof session", error);
+  }
+}
+
+/** Proves ownership of ANOTHER account (PIN or password) without touching the
+ *  main session, and resolves to a one-time merge ticket issued as that account. */
+export async function proveOtherAccount(identifier, secret) {
+  const proofSecret = String(secret ?? "");
+  if (!identifier || !proofSecret) {
+    throw proofError(PROOF_ERROR.wrong, "missing credentials");
+  }
+  const credential = /^\d+$/.test(proofSecret)
+    ? { pin: proofSecret }
+    : { password: proofSecret };
+  let data;
+  try {
+    data = await invokePin({ action: "login", identifier, ...credential });
+  } catch (error) {
+    const down = error instanceof PinServiceDown;
+    throw proofError(
+      down ? PROOF_ERROR.unavailable : PROOF_ERROR.wrong,
+      down ? "PIN service unavailable" : "wrong PIN or password",
+      error,
+    );
+  }
+  try {
+    const ticket = await requestMergeTicket(data);
+    if (!ticket) throw new Error("no merge ticket returned");
+    return ticket;
+  } catch (error) {
+    if (Object.values(PROOF_ERROR).includes(error?.code)) throw error;
+    const blocked = error?.code === INSUFFICIENT_PRIVILEGE;
+    throw proofError(
+      blocked ? PROOF_ERROR.cannotMerge : PROOF_ERROR.unavailable,
+      blocked ? "this account cannot be merged" : "merge ticket request failed",
+      error,
+    );
+  }
 }
 
 export async function loginWithPassword(

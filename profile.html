@@ -10,8 +10,8 @@
 <meta name="description" content="Your ian.lu player profile — avatar and game stats.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=26"></script>
-<script src="i18n-dict.js?v=42"></script>
+<script src="theme.js?v=27"></script>
+<script src="i18n-dict.js?v=43"></script>
 <script src="i18n.js?v=3"></script>
 <link rel="stylesheet" href="site-ui.css?v=2">
 <style>
@@ -130,7 +130,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=24";
+import * as auth from "./auth.js?v=25";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","🦁","🐯","🐵",
@@ -278,6 +278,11 @@ async function boot(){
       <button type="button" class="ui-btn ui-btn--ghost" id="pinChange" data-i18n="pin.change">Change PIN</button>
       <div class="hint" data-i18n="pin.changeHint">Use 4 or 6 digits. Six is recommended.</div>
     </div>
+    <h2 data-i18n="acct.mergeTitle">Merge accounts</h2>
+    <div class="ui-card">
+      <button type="button" class="ui-btn ui-btn--ghost" id="acctMerge" data-i18n="acct.profileMerge">🔗 Konten zesummeleeën</button>
+      <div class="msg" id="acctMergeMsg" role="status" aria-live="polite"></div>
+    </div>
     <h2>Your stats</h2>
     <div class="stats" id="stats"><div class="gate ui-card" role="status">Loading…</div></div>
     <h2>Achievements</h2>
@@ -287,6 +292,7 @@ async function boot(){
   wireName();
   wireClass();
   $("pinChange").onclick=auth.openPinSetup;
+  $("acctMerge").onclick=openMerge;
   window.I18N?.apply($("wrap"));
   const grid=$("avGrid");
   for(const a of AVATARS){
@@ -304,6 +310,17 @@ async function boot(){
     grid.appendChild(b);
   }
   loadStats(uname);
+}
+
+// Lazy: the account-check card (and its people search) only loads when asked for.
+async function openMerge(){
+  try{
+    const m=await import("./account-check.js?v=2");
+    await m.openAccountCheck({startWithMerge:true});
+  }catch(e){
+    console.error("account merge dialog failed to open",e);
+    setMsg("acctMergeMsg","Couldn't open this — try again.",true);
+  }
 }
 
 function setMsg(id,t,err){
@@ -426,7 +443,7 @@ async function loadStats(uname){
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=21"></script>
-  <script type="module" src="class-gate.js?v=22"></script>
+  <script type="module" src="rtc-ring.js?v=22"></script>
+  <script type="module" src="class-gate.js?v=23"></script>
 </body>
 </html>
