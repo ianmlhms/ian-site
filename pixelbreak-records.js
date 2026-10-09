@@ -8,11 +8,11 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=27";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=4";
+import * as auth from "./auth.js?v=28";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=5";
 
-import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=2";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=2";
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=3";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=3";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -718,7 +718,7 @@ function halloweenVisible() {
   const day = `${date.year}-${date.month}-${date.day}`;
   return new URLSearchParams(location.search).get("halloween") === "1" || (day >= "2026-10-24" && day <= "2026-11-02");
 }
-function eventGame(game) { return game?.id === "cookie-clicker" || game?.id === "idle-empire"; }
+function eventGame(game) { return game?.id === "cookie-clicker" || game?.id === "idle-empire" || game?.id === "bus-tycoon"; }
 function renderEventChip() {
   const host = document.getElementById("gh");
   document.getElementById("pbEventChip")?.remove();

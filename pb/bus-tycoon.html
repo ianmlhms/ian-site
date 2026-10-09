@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bus Tycoon 🚌 - Arcade</title>
+<meta name="description" content="Build your Luxembourg transport network, welcome passengers and grow from Schoulbus to Hyperloop.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/idle-extras.css?v=2">
+<link rel="stylesheet" href="/pb/bus-tycoon.css?v=1">
+<script src="/pb/idle-extras.js?v=2"></script>
+<script src="/pb/arcade-kit.js?v=18" data-arcade-id="bus-tycoon" data-arcade-title="Bus Tycoon 🚌"></script>
+<script src="/pb/bus-tycoon.js?v=1" defer></script>
+</head>
+<body>
+<main id="game">
+  <header id="rewards-host">
+    <div class="brand"><span class="flag" aria-hidden="true">🇱🇺</span><div><p>LËTZEBUERG · TRANSPORT NETWORK</p><h1>Bus Tycoon 🚌</h1></div><span class="fare">Free rides.<br>Happy passengers.</span></div>
+  </header>
+  <section class="depot" aria-label="Your transport network">
+    <div class="stats">
+      <div><span>Passengers to invest</span><strong id="passengers">0 🧍</strong></div>
+      <div><span>Per second</span><strong id="income">0</strong></div>
+      <div><span>Lifetime passengers</span><strong id="lifetime">0</strong></div>
+    </div>
+    <div class="route" aria-hidden="true"><div class="skyline">🏰 &nbsp; 🏘️ &nbsp; 🏢 &nbsp; 🏗️ &nbsp; ✈️</div><div class="road" id="road"></div><div class="stops"><span>Schoul</span><span>Gare</span><span>Kirchberg</span><span>Findel</span></div></div>
+    <button id="wave" type="button"><span aria-hidden="true">👋 🚌</span> Wave a bus <small id="tap-power">+1 passenger</small></button>
+    <p id="welcome" role="status">Moien! Welcome 15 passengers to open your first Schoulbus.</p>
+  </section>
+  <section class="shop" aria-labelledby="lines-title"><div class="section-head"><h2 id="lines-title">Your lines</h2><span>Every line runs automatically</span></div><div id="lines"></div></section>
+  <section class="shop" aria-labelledby="upgrades-title"><div class="section-head"><h2 id="upgrades-title">Make every journey better</h2></div><div id="upgrades"></div></section>
+  <footer>🧍 Passengers are your only currency. Invest them in lines and upgrades; your lifetime total always stays on the leaderboard. Public transport is free — no tickets to sell!</footer>
+</main>
+</body>
+</html>

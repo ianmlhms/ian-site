@@ -1,4 +1,4 @@
-import { APPS } from "./apps-catalog.js?v=8";
+import { APPS } from "./apps-catalog.js?v=9";
 
 // Admin-only apps stay out of ⌘K until is_admin() actually says otherwise, so an
 // unresolved check errs towards hiding rather than offering them to everyone.

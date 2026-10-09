@@ -36,7 +36,7 @@ export const APPS = Object.freeze([
     keywords: ["profil", "account", "konto", "avatar", "stats"] },
 
   { url: "pixelbreak.html", name: "Arcade", icon: "🎮", group: "grp.fun", locked: false,
-    keywords: ["arcade", "spiller", "spiele", "games", "2 ipad"] },
+    keywords: ["arcade", "spiller", "spiele", "games", "2 ipad", "bus tycoon", "idle", "passengers"] },
   { url: "partyspill.html", name: "Partyspill", icon: "🎉", group: "grp.fun", locked: false,
     keywords: ["partyspiele", "jeux", "fête", "gruppen", "handy"] },
   { url: "wordle.html", name: "Wuertspill", icon: "🟩", group: "grp.fun", locked: false,

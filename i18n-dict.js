@@ -4,7 +4,8 @@
  * Keys are namespaced by page. Keep proper names / brands untranslated.
  * ========================================================================== */
 window.I18N_DICT = {
-  "arc.halloweenBanner": { lb: "🎃 Halloween-Event: fang Kürbissen am Cookie Clicker a Business Empire — 50 = Badge", de: "🎃 Halloween-Event: Fang Kürbisse in Cookie Clicker und Business Empire — 50 = Badge", en: "🎃 Halloween event: catch pumpkins in Cookie Clicker and Business Empire — 50 = badge" },
+  "arc.g.idle": { lb: "Idle & Strategie", de: "Idle & Strategie", en: "Idle & strategy" },
+  "arc.halloweenBanner": { lb: "🎃 Halloween-Event: fang Kürbissen am Cookie Clicker, Business Empire a Bus Tycoon — 50 = Badge", de: "🎃 Halloween-Event: Fang Kürbisse in Cookie Clicker, Business Empire und Bus Tycoon — 50 = Badge", en: "🎃 Halloween event: catch pumpkins in Cookie Clicker, Business Empire and Bus Tycoon — 50 = badge" },
   "arc.halloweenSignin": { lb: "🎃 Mell dech un fir de Badge", de: "🎃 Melde dich für das Badge an", en: "🎃 Sign in to earn the badge" },
   "arc.halloweenEarned": { lb: "🎃 Halloween-Badge verdéngt!", de: "🎃 Halloween-Badge verdient!", en: "🎃 Halloween badge earned!" },
   /* ---------- arcade weekly boards and score display ---------- */
@@ -138,7 +139,7 @@ window.I18N_DICT = {
   "index.appsGateTitle": { lb: "Verschidde Apps brauchen e gratis Kont", de: "Manche Apps brauchen ein kostenloses Konto", en: "Some apps need a free account" },
   "index.appsGateSub": { lb: "Alles ouni 🔒 geet direkt — mell dech un fir Messenger, Frënn, Noten a méi opzemaachen.", de: "Alles ohne 🔒 geht sofort — melde dich an, um Messenger, Freunde, Noten und mehr zu öffnen.", en: "Everything without a 🔒 works right away — sign in to unlock Messenger, Friends, Grades and more." },
 
-  "proj.pixelbreak.desc": { lb: "53 Arcade-Spiller, all am Browser spillbar — keng Installatioun, keng Reklammen.", de: "53 Arcade-Spiele, alle im Browser spielbar — keine Installation, keine Werbung.", en: "53 arcade games, all playable in the browser — no install, no ads." },
+  "proj.pixelbreak.desc": { lb: "54 Arcade-Spiller, all am Browser spillbar — keng Installatioun, keng Reklammen.", de: "54 Arcade-Spiele, alle im Browser spielbar — keine Installation, keine Werbung.", en: "54 arcade games, all playable in the browser — no install, no ads." },
   "proj.games.desc": { lb: "Véier gewënnt, Reversi, Schëffer versenken a méi — 1 géint 1 op zwee Apparater, oder géint eng KI mat dräi Schwieregkeetsgraden.", de: "Vier gewinnt, Reversi, Schiffe versenken und mehr — 1 gegen 1 auf zwei Geräten, oder gegen eine KI mit drei Schwierigkeitsgraden.", en: "Connect 4, Reversi, Battleship and more — 1v1 across two devices, or against an AI with three difficulty levels." },
   "proj.messenger.desc": { lb: "Echtzäit-Chat mat Gruppen, Sproochnoriichten, Fichieren, Äntwerten a Reaktiounen.", de: "Echtzeit-Chat mit Gruppen, Sprachnachrichten, Dateien, Antworten und Reaktionen.", en: "Real-time chat with groups, voice notes, file sharing, replies and reactions." },
   "proj.wordle.desc": { lb: "Wordle, awer op Lëtzebuergesch an Däitsch — esou wéi ech wierklech schwätzen.", de: "Wordle, aber auf Luxemburgisch und Deutsch — so wie ich wirklich spreche.", en: "Wordle, but in Luxembourgish and German — the way I actually speak." },
@@ -251,7 +252,7 @@ window.I18N_DICT = {
   "g.tictactoe.desc":  { lb: "Dräi op enger Rei. E séiere Klassiker. 1 géint 1.", de: "Drei in einer Reihe. Schneller Klassiker. 1 gegen 1.", en: "Three in a row. Quick classic. 1 v 1." },
   "games.play":        { lb: "Spillen", de: "Spielen", en: "Play" },
   "g.wordle.desc":     { lb: "Rod dat geheimt Wuert vum Dag — op Lëtzebuergesch oder Däitsch.", de: "Errate das geheime Wort des Tages — auf Luxemburgisch oder Deutsch.", en: "Guess the secret word of the day — in Luxembourgish or German." },
-  "g.pixelbreak.desc": { lb: "53 Arcade-Minispiller mat Highscores a Leaderboard.", de: "53 Arcade-Minispiele mit Highscores und Bestenliste.", en: "53 arcade mini-games with high scores and a leaderboard." },
+  "g.pixelbreak.desc": { lb: "54 Arcade-Minispiller mat Highscores a Leaderboard.", de: "54 Arcade-Minispiele mit Highscores und Bestenliste.", en: "54 arcade mini-games with high scores and a leaderboard." },
 
   /* ---------- stats (ShortsFactory) ---------- */
   "stats.channels":     { lb: "Channeler", de: "Kanäle", en: "Channels" },

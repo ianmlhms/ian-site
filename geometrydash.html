@@ -7,9 +7,9 @@
 <meta name="robots" content="noindex">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
-<script src="theme.js?v=27"></script>
+<script src="theme.js?v=28"></script>
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=17" data-arcade-id="geometrydash" data-arcade-title="Geometry Dash" data-arcade-replace=".bar" data-arcade-restart></script>
+<script src="pb/arcade-kit.js?v=18" data-arcade-id="geometrydash" data-arcade-title="Geometry Dash" data-arcade-replace=".bar" data-arcade-restart></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--cyan:#4de8ff;--amber:#f5b942;--lv:#6ea8fe;--lv-bg0:#0d0d1a;--lv-bg1:#111126}
   *{box-sizing:border-box}
@@ -413,6 +413,29 @@ const P_DEMON=[
   ["spike",4],["rest",3],["gap",210],["rest",3],["spike",4],["rest",3],["spike",4],["rest",3],
 ];
 
+/* Encore courses keep the Demon Drop vocabulary and add a different final exam.
+ * Rest spacing shrinks gently; the exact replays in scripts/gd_replays.json
+ * verify every course at the same 120 Hz as play. */
+const P_AFTERGLOW=[...P_DEMON,["rest",3],...orbRow(7,84,2),["rest",3],["spike",4],["rest",3]];
+const P_PRISM=[...P_DEMON,["rest",3],["corStart"],["rest",3],["grav",-1],["rest",3],
+  ["hspike",4],["rest",3],["grav",1],["rest",3],["spike",4],["rest",3],["corEnd"]];
+const P_VOLTAGE=[...P_PRISM,["rest",3],...padTower(4),["rest",3],...orbGap(230,60,2),["rest",3]];
+const P_ECLIPSE=[...P_VOLTAGE,["rest",3],["corStart"],["rest",3],["mode","ship"],["rest",4],
+  ["pillar",48,4],["rest",1.4],["hpillar",48,3],["rest",1.4],["pillar",48,3],
+  ["rest",1.4],["hpillar",48,4],["rest",4],["mode","cube"],["rest",3],["corEnd"]];
+const P_ABYSS=[...P_ECLIPSE,["rest",3],...orbRow(7,84,2),["rest",3],...padTower(4),
+  ["rest",3],["spike",4],["rest",2.5],["gap",210],["rest",2.5],["spike",4],["rest",3]];
+
+/* Keep the ship's reversal distance at Demon Drop's proven spacing while
+ * cube rests tighten. Extra gauntlets increase the sustained flight challenge. */
+function shipSpacing(program,bpm,tight){
+  let ship=false;
+  return program.map(command=>{
+    if(command[0]==="mode")ship=command[1]==="ship";
+    return ship&&command[0]==="rest"?["rest",command[1]*bpm/tight*.9/168]:[...command];
+  });
+}
+
 const theme=(bg0,bg1,ground,line,block,danger)=>Object.freeze({bg0,bg1,ground,line,block,danger});
 const music=(root,riff,wave)=>Object.freeze({root,riff:Object.freeze(riff),wave});
 
@@ -435,8 +458,18 @@ const LEVELS=Object.freeze([
     theme:theme("#200a12","#2c0e18","#35121d","#ff5577","#4d1626","#ffd0da"),music:music(46,[0,0,1,0,7,0,6,0],"sawtooth")},P_STORM),
   programLevel({id:"geometrydash-9",name:"Redline",tip:"Fast, dense and unforgiving.",tight:0.75,difficulty:"Insane",bpm:158,
     theme:theme("#0f1a08","#162410","#1b2e14","#c8ff3d","#2b4414","#ff5577"),music:music(59,[0,7,0,7,3,7,0,10],"square")},P_REDLINE),
-  programLevel({id:"geometrydash-10",name:"Demon Drop",tip:"The final test. Everything, at full speed.",tight:0.9,difficulty:"Demon",bpm:168,
+  programLevel({id:"geometrydash-10",name:"Demon Drop",tip:"Everything, at full speed. The demon trials begin.",tight:0.9,difficulty:"Demon",bpm:168,
     theme:theme("#12050a","#1c070e","#240a12","#ff3355","#3a0f1c","#ffffff"),music:music(44,[0,1,0,1,7,6,0,1],"sawtooth")},P_DEMON),
+  programLevel({id:"geometrydash-11",name:"Afterglow",tip:"A faster demon rhythm. Save a tap for the last orb.",tight:0.89,difficulty:"Demon",bpm:169,
+    theme:theme("#1c0c16","#2a1220","#361829","#ff82bc","#4b2038","#ffffff"),music:music(47,[0,1,7,1,0,6,7,1],"sawtooth")},P_AFTERGLOW),
+  programLevel({id:"geometrydash-12",name:"Prism Rift",tip:"The ceiling has one more surprise. Read every flip.",tight:0.87,difficulty:"Demon",bpm:171,
+    theme:theme("#100b24","#1b1239","#251a49","#c495ff","#342463","#fff0ff"),music:music(51,[0,3,1,7,0,6,3,1],"square")},P_PRISM),
+  programLevel({id:"geometrydash-13",name:"Voltage",tip:"Charged pads, tall towers and a final orb crossing.",tight:0.85,difficulty:"Demon",bpm:173,
+    theme:theme("#071e19","#0c2c24","#11392f","#5dffc5","#184d40","#ff91ae"),music:music(54,[0,7,1,7,6,3,0,1],"sawtooth")},shipSpacing(P_VOLTAGE,173,.85)),
+  programLevel({id:"geometrydash-14",name:"Eclipse Engine",tip:"A second ship gauntlet. Feather the thrust between pillars.",tight:0.83,difficulty:"Demon",bpm:175,
+    theme:theme("#201308","#301e0d","#3d2811","#ffbf59","#553717","#fff3dc"),music:music(43,[0,1,6,7,0,1,10,7],"square")},shipSpacing(P_ECLIPSE,175,.83)),
+  programLevel({id:"geometrydash-15",name:"Abyss Crown",tip:"The hardest demon: tight flights, flips and one last sprint.",tight:0.81,difficulty:"Demon",bpm:177,
+    theme:theme("#1b0611","#2b0a1b","#390e25","#ff427d","#501132","#ffffff"),music:music(41,[0,1,0,6,7,1,6,0],"sawtooth")},shipSpacing(P_ABYSS,177,.81)),
 ]);
 
 
