@@ -270,6 +270,8 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
       weekly_board: () => [{ week: "2026-10-05", game_id: "reaction", ends_at: "2026-10-12T00:00:00+02:00", rank: null, user_id: null, username: null, score: null }],
       submit_weekly_score: () => true,
       touch_streak: () => ({ streak: 1, best: 1, is_new_day: false }),
+      event_status: () => ({ event: "halloween-2026", active: false, count: 0, goal: 50, badge: false }),
+      add_event_progress: () => ({ event: "halloween-2026", active: false, count: 0, goal: 50, badge: false }),
       leaderboard_tags: () => [],
       ...base.rpc,
     },

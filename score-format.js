@@ -1,5 +1,5 @@
 /* Shared numeric score display. Keep exact server strings for titles and expansion. */
-import "./i18n-dict.js?v=44";
+import "./i18n-dict.js?v=45";
 
 const COMPACT_MIN = 10_000;
 const SUFFIXES = Object.freeze(["", "K", "M", "B", "T", "Qa", "Qi", "Sx"]);

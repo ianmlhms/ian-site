@@ -4,6 +4,9 @@
  * Keys are namespaced by page. Keep proper names / brands untranslated.
  * ========================================================================== */
 window.I18N_DICT = {
+  "arc.halloweenBanner": { lb: "🎃 Halloween-Event: fang Kürbissen am Cookie Clicker a Business Empire — 50 = Badge", de: "🎃 Halloween-Event: Fang Kürbisse in Cookie Clicker und Business Empire — 50 = Badge", en: "🎃 Halloween event: catch pumpkins in Cookie Clicker and Business Empire — 50 = badge" },
+  "arc.halloweenSignin": { lb: "🎃 Mell dech un fir de Badge", de: "🎃 Melde dich für das Badge an", en: "🎃 Sign in to earn the badge" },
+  "arc.halloweenEarned": { lb: "🎃 Halloween-Badge verdéngt!", de: "🎃 Halloween-Badge verdient!", en: "🎃 Halloween badge earned!" },
   /* ---------- arcade weekly boards and score display ---------- */
   "score.key": { lb: "K = Dausend · M = Millioun · B = Milliard · T = Billioun", de: "K = Tausend · M = Million · B = Milliarde · T = Billion", en: "K = thousand · M = million · B = billion · T = trillion" },
   "score.toggle": { lb: "Exakt Zuel weisen oder verstoppen", de: "Genaue Zahl anzeigen oder verbergen", en: "Show or hide the exact number" },

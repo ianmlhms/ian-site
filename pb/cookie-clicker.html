@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Cookie Clicker - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/idle-extras.css?v=2">
+<script src="/pb/idle-extras.js?v=2"></script>
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -48,7 +50,7 @@ body{display:flex;flex-direction:column}
   @keyframes floatFade{0%{opacity:1}100%{opacity:0}}
 }
 </style>
-<script src="/pb/arcade-kit.js?v=16" data-arcade-id="cookie-clicker" data-arcade-title="Cookie Clicker"></script>
+<script src="/pb/arcade-kit.js?v=17" data-arcade-id="cookie-clicker" data-arcade-title="Cookie Clicker"></script>
 </head>
 <body>
 <main class="arcade-stage cc" id="stage">
@@ -65,7 +67,9 @@ const ROOT_STYLE=getComputedStyle(document.documentElement);
 const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
 const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const COOKIE_SIZE=250,COOKIE_R=95,MAX_DPR=3,FLOAT_MS=1000,TICK_MS=100,SAVE_EVERY_MS=5000,COST_GROWTH=1.15,SWAY=0.05;
-let cookies=0,cps=0,clickPower=1,totalClicks=0,totalBaked=0;
+const REBIRTH_THRESHOLD=1e12;
+let cookies=0,cps=0,clickPower=1,totalClicks=0,totalBaked=0,roundBaked=0,stars=0,rebirthCount=0,giftDay='',loaded=false;
+let rewards=null;
 const upgrades=[
   {name:'Auto Clicker',desc:'Clicks once per second',baseCost:15,cps:0.1,count:0,icon:'👆'},
   {name:'Grandma',desc:'Bakes cookies slowly',baseCost:100,cps:1,count:0,icon:'👵'},
@@ -83,6 +87,7 @@ const upgrades=[
   {name:'Cookie Multiverse',desc:'Every universe bakes for you',baseCost:1000000000000,cps:120000000,count:0,icon:'🔮'},
   {name:'Cookie Singularity',desc:'Infinite cookie density',baseCost:20000000000000,cps:1000000000,count:0,icon:'🕳️'},
   {name:'Cookie God',desc:'The cookie is all',baseCost:500000000000000,cps:10000000000,count:0,icon:'👑'},
+  {name:'Haunted Oven',desc:'🎃 Halloween only',baseCost:300e9,cps:40e6,count:0,icon:'👻',halloween:true},
 ];
 
 const clickUpgrades=[
@@ -108,7 +113,7 @@ function format(n){
 }
 
 function clickCookie(e){
-  cookies+=clickPower;totalBaked+=clickPower;totalClicks++;
+  earnCookies(clickPower);totalClicks++;
   window.score=Math.floor(totalBaked);Arcade.score(window.score);
   // a keyboard "click" has no pointer position: float from the cookie's centre instead
   const r=$('cookie').getBoundingClientRect();
@@ -124,11 +129,11 @@ $('cookie').addEventListener('click',clickCookie);
 
 function buyUpgrade(i,type){
   let u=type==='cps'?upgrades[i]:clickUpgrades[i];
+  if(!u||(u.halloween&&!IdleExtras.halloween()))return;
   let cost=getCost(u);
   if(cookies>=cost){
     cookies-=cost;u.count++;
-    if(type==='cps'){cps=0;upgrades.forEach(u2=>cps+=u2.cps*u2.count)}
-    else{clickPower=1;clickUpgrades.forEach(u2=>clickPower+=u2.power*u2.count)}
+    recalculate();
     updateUI();pushSave();
   }
 }
@@ -158,12 +163,13 @@ function refreshUpgrades(){
   document.querySelectorAll('#upgrades .upgrade').forEach(row=>{
     const u=row.dataset.type==='cps'?upgrades[+row.dataset.i]:clickUpgrades[+row.dataset.i];
     const cost=getCost(u);
-    const locked=cookies<cost;
+    const eventLocked=u.halloween&&!IdleExtras.halloween();
+    const locked=cookies<cost||eventLocked;
     row.classList.toggle('locked',locked);
     row.setAttribute('aria-disabled',String(locked));
     row.querySelector('.cost').textContent=format(cost)+' 🍪';
     row.querySelector('.name').textContent=`${u.icon} ${u.name} (${u.count})`;
-    if(row.dataset.type==='cps')row.querySelector('.desc').textContent=`${u.desc} [${format(u.cps*u.count)}/s]`;
+    if(row.dataset.type==='cps')row.querySelector('.desc').textContent=`${u.halloween?(eventLocked?'🎃 Halloween only':'Limited Halloween building'):u.desc} [${format(u.cps*u.count*IdleExtras.multiplier(stars))}/s]`;
   });
 }
 
@@ -171,6 +177,7 @@ function updateUI(){
   $('count').textContent=format(cookies)+' cookies';
   $('persec').textContent='per second: '+format(cps)+' | click power: '+format(clickPower);
   refreshUpgrades();
+  rewards?.refresh();
 }
 
 // Draw cookie (backing store sized for the screen's pixel ratio, drawn in 250 x 250 units)
@@ -201,24 +208,54 @@ drawCookie();
  * via postMessage; whichever has more total cookies baked wins ---------- */
 function snapshot(){
   return {v:1,c:Math.floor(cookies),tb:Math.floor(totalBaked),tc:totalClicks,
+    rb:roundBaked,st:stars,rbc:rebirthCount,gd:giftDay,savedAt:Date.now(),
     u:upgrades.map(u=>u.count),cu:clickUpgrades.map(u=>u.count)};
 }
+function safeNumber(value,fallback=0){return typeof value==='number'&&Number.isFinite(value)&&value>=0?value:fallback}
+function recalculate(){
+  cps=upgrades.reduce((sum,u)=>sum+u.cps*u.count,0)*IdleExtras.multiplier(stars);
+  clickPower=1+clickUpgrades.reduce((sum,u)=>sum+u.power*u.count,0);
+}
+function earnCookies(amount){cookies+=amount;totalBaked+=amount;roundBaked+=amount}
+function rebirth(){
+  const earned=Math.floor(Math.sqrt(roundBaked/REBIRTH_THRESHOLD));
+  if(earned<1)return;
+  cookies=0;roundBaked=0;totalClicks=0;stars+=earned;rebirthCount++;
+  upgrades.forEach(u=>{if(!u.halloween)u.count=0});
+  clickUpgrades.forEach(u=>{u.count=0});
+  recalculate();updateUI();
+}
 function applySave(sv){
-  if(!sv||sv.v!==1||!(sv.tb>totalBaked))return;
-  cookies=sv.c||0;totalBaked=sv.tb||0;totalClicks=sv.tc||0;
-  (sv.u||[]).forEach((n,i)=>{if(upgrades[i])upgrades[i].count=n||0});
-  (sv.cu||[]).forEach((n,i)=>{if(clickUpgrades[i])clickUpgrades[i].count=n||0});
-  cps=0;upgrades.forEach(u=>cps+=u.cps*u.count);
-  clickPower=1;clickUpgrades.forEach(u=>clickPower+=u.power*u.count);
+  if(!sv||sv.v!==1||!Number.isFinite(sv.tb)||sv.tb<0)return;
+  const incomingRebirth=Math.floor(safeNumber(sv.rbc));
+  if(incomingRebirth<rebirthCount){
+    if(sv.tb>totalBaked){totalBaked=sv.tb;window.score=Math.floor(totalBaked);Arcade.score(window.score);pushSave()}
+    return;
+  }
+  if(incomingRebirth===rebirthCount&&(sv.tb<totalBaked||(loaded&&sv.tb===totalBaked)))return;
+  loaded=true;
+  cookies=safeNumber(sv.c);totalBaked=Math.max(totalBaked,sv.tb);totalClicks=safeNumber(sv.tc);
+  roundBaked=safeNumber(sv.rb,sv.tb);stars=Math.max(stars,Math.floor(safeNumber(sv.st)));rebirthCount=incomingRebirth;
+  if(typeof sv.gd==='string'&&sv.gd>giftDay)giftDay=sv.gd;
+  upgrades.forEach((u,i)=>{u.count=Math.floor(safeNumber(sv.u?.[i]))});
+  clickUpgrades.forEach((u,i)=>{u.count=Math.floor(safeNumber(sv.cu?.[i]))});
+  recalculate();
+  const result=IdleExtras.offline(stars,sv.savedAt,cps);
+  earnCookies(result.credited);rewards?.notice(result);
   window.score=Math.floor(totalBaked);Arcade.score(window.score);
   updateUI();
+  pushSave();
 }
-function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}catch(e){}}
-window.addEventListener('message',(e)=>{const d=e.data;if(d&&d.__pbLoadSave===1)applySave(d.data)});
+function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}catch(error){console.warn('[Cookie Clicker] Save failed',error)}}
+window.addEventListener('message',(e)=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1)applySave(d.data)});
 
 // Game loop
-setInterval(()=>{cookies+=cps/10;totalBaked+=cps/10;window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},TICK_MS);
+setInterval(()=>{earnCookies(cps/10);window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},TICK_MS);
 buildUpgrades();
+rewards=IdleExtras.mount({host:$('shop'),threshold:REBIRTH_THRESHOLD,read:()=>({rb:roundBaked,st:stars,gd:giftDay}),format,
+  resets:'cookies, all buildings (including gifted Time Machines) except Haunted Ovens, click upgrades and round clicks.',
+  keeps:'Haunted Ovens if owned.',production:()=>cps,currency:'🍪',rebirth,save:pushSave,earn:earnCookies,
+  gift:(day,amount)=>{giftDay=day;earnCookies(amount);updateUI()}});
 applySave(window.__pbSave);                       // local save (injected before load)
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}  // ask for the cloud save
 setInterval(pushSave,SAVE_EVERY_MS);

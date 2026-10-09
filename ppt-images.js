@@ -1,5 +1,5 @@
-import * as auth from "./auth.js?v=26";
-import { validateDeck } from "./ppt-ai.js?v=23";
+import * as auth from "./auth.js?v=27";
+import { validateDeck } from "./ppt-ai.js?v=24";
 
 const MAX_CONCURRENCY = 4;
 const SEARCH_COUNT = 1;

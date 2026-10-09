@@ -1,8 +1,15 @@
 /* Shared leaderboard identity tags. The RPC is available to signed-in full accounts only. */
 
-import { arcadeText } from "./score-format.js?v=1";
+import { arcadeText } from "./score-format.js?v=2";
 
 const STYLE_ID = "leaderboard-tag-styles";
+export const EVENT_BADGES = Object.freeze({ "halloween-2026": Object.freeze({ icon: "🎃", title: "Halloween 2026" }) });
+export function eventBadgesHtml(badges, className = "event-tag", full = false) {
+  return (Array.isArray(badges) ? badges : []).filter((id) => Object.hasOwn(EVENT_BADGES, id)).map((id) => {
+    const badge = EVENT_BADGES[id];
+    return ` <span class="${esc(className)}" title="${esc(badge.title)}">${badge.icon}${full ? " " + esc(badge.title) : ""}</span>`;
+  }).join("");
+}
 const emptyLookup = Object.freeze(Object.create(null));
 const EMPTY_TAGS = Object.freeze({
   byUserId: emptyLookup,
@@ -23,7 +30,7 @@ function injectTagCss() {
   style.id = STYLE_ID;
   style.textContent = `
     body .admin-tag,
-    body :is(.class-tag,.streak-tag,.champion-tag) {
+    body :is(.class-tag,.streak-tag,.champion-tag,.event-tag) {
       display: inline-block;
       margin-inline-start: 5px;
       padding: 0 6px;
@@ -40,7 +47,7 @@ function injectTagCss() {
       background: color-mix(in srgb, #ffcf4d 14%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffcf4d 45%, transparent);
     }
-    body :is(.class-tag,.streak-tag,.champion-tag) {
+    body :is(.class-tag,.streak-tag,.champion-tag,.event-tag) {
       color: #5cc8ff;
       background: color-mix(in srgb, #5cc8ff 14%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #5cc8ff 45%, transparent);
@@ -50,7 +57,7 @@ function injectTagCss() {
       background: color-mix(in srgb, #c48700 14%, var(--card-opaque, #fff));
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #8a5e00 45%, transparent);
     }
-    :root[data-theme="light"] body :is(.class-tag,.streak-tag,.champion-tag) {
+    :root[data-theme="light"] body :is(.class-tag,.streak-tag,.champion-tag,.event-tag) {
       color: #005878;
       background: color-mix(in srgb, #087da8 13%, var(--card-opaque, #fff));
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #00678c 45%, transparent);
@@ -61,7 +68,7 @@ function injectTagCss() {
         background: color-mix(in srgb, #c48700 14%, var(--card-opaque, #fff));
         box-shadow: inset 0 0 0 1px color-mix(in srgb, #8a5e00 45%, transparent);
       }
-      :root:not([data-theme="dark"]) body :is(.class-tag,.streak-tag,.champion-tag) {
+      :root:not([data-theme="dark"]) body :is(.class-tag,.streak-tag,.champion-tag,.event-tag) {
         color: #005878;
         background: color-mix(in srgb, #087da8 13%, var(--card-opaque, #fff));
         box-shadow: inset 0 0 0 1px color-mix(in srgb, #00678c 45%, transparent);
@@ -80,6 +87,7 @@ function normalizedRow(row) {
     is_owner: row?.is_owner === true,
     streak: Math.max(0, Number(row?.streak) || 0),
     weekly_champion: row?.weekly_champion === true,
+    badges: Object.freeze(Array.isArray(row?.badges) ? row.badges.filter((badge) => typeof badge === "string") : []),
   });
 }
 
@@ -138,6 +146,6 @@ export function tagsHtml(row) {
   const schoolClass = row.class ? ` <span class="class-tag">${esc(row.class)}</span>` : "";
   const streak = row.streak >= 3 ? ` <span class="streak-tag" title="${esc(arcadeText("arc.streakTag", { n: row.streak }))}">🔥${esc(row.streak)}</span>` : "";
   const champion = row.weekly_champion ? ` <span class="champion-tag" title="${esc(arcadeText("arc.championTag"))}">🏆</span>` : "";
-  return admin + schoolClass + streak + champion;
+  return admin + schoolClass + streak + champion + eventBadgesHtml(row.badges);
 }
 

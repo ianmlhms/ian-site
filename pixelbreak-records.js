@@ -8,11 +8,11 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=26";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=3";
+import * as auth from "./auth.js?v=27";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=4";
 
-import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=1";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=1";
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=2";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=2";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -155,16 +155,17 @@ PB.instrument = (html) => {
   // hand the game its locally saved state (page must call onOpenGame BEFORE instrument)
   const g = PB.current;
   if (g) {
+    inject += `<script>window.__pbHalloween=${halloweenVisible()};<\/script>`;
     if (window.__pbStreak) inject += `<script>window.__pbStreak=${JSON.stringify(window.__pbStreak)};<\/script>`;
     const sv = localStorage.getItem(SAVE_PREFIX + g.id);
     if (sv) inject += `<script>window.__pbSave=${sv.replace(/</g, "\\u003c")};<\/script>`;
   }
-  return html.indexOf("</body>") >= 0 ? html.replace("</body>", inject + "</body>") : html + inject;
+  return html.includes("<head>") ? html.replace("<head>", "<head>" + inject) : inject + html;
 };
 
 /* ---------------- open / close hooks ---------------- */
-PB.onOpenGame = (g) => { PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); };
-PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; activeBoard = null; updateSaveHint(); };
+PB.onOpenGame = (g) => { PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); loadEventStatus(); };
+PB.onCloseGame = () => { flushSave(); flushEvent(); netClose(); PB.current = null; activeBoard = null; updateSaveHint(); };
 PB.registerStandalone = (g) => {
   PB.current = g;
   weeklyFinals = new Set();
@@ -230,6 +231,13 @@ window.addEventListener("message", (e) => {
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
   if (d && d.__pbWantSave === 1 && cloudSave !== undefined) sendCloudSave();
+  if (d.__pbEvent && eventGame(g) && halloweenVisible() && fullAccount()) {
+    const event = d.__pbEvent;
+    if (event.event === HALLOWEEN_EVENT && Number.isSafeInteger(event.count) && event.count > 0 && event.count <= 5) {
+      eventQueued += event.count;
+      scheduleEventFlush();
+    }
+  }
   if (d && d.__pbRpc) rpcCall(d.__pbRpc);
   if (d && d.__pbNet) {
     const n = d.__pbNet;
@@ -415,7 +423,15 @@ function applySession(s) {
   // fetch that account's cloud save now, so the game adopts it instead of the
   // fresh local progress. The server also refuses saves with less progress.
   const userId = session?.user?.id || null;
-  if (userId !== previousUserId) delete window.__pbStreak;
+  if (userId !== previousUserId) {
+    delete window.__pbStreak;
+    try { document.getElementById("gf")?.contentWindow?.postMessage({ __pbStreak: null }, location.origin); }
+    catch (error) { console.warn("[Arcade] streak clear failed", error); }
+    eventQueued = 0; eventStatus = null;
+    if (eventTimer) clearTimeout(eventTimer);
+    eventTimer = null;
+    loadEventStatus();
+  }
   if (userId && userId !== previousUserId && PB.current) loadCloudSave(PB.current);
   if (PB.current) touchStreak();
   loadWeeklyHome();
@@ -683,6 +699,7 @@ function renderGameBar() {
       },
     });
   }
+  renderEventChip();
   const best = mountedGameBar?.best || document.getElementById("arcadeBest");
   const shown = activeGame();
   if (!best || !shown || shown.noScore) return;
@@ -691,6 +708,64 @@ function renderGameBar() {
   const value = sessionBest !== null && isBetter(shown, sessionBest, stored) ? sessionBest : stored;
   best.innerHTML = value === null ? "" : "Best: " + (SCORE_FORMATS[shown.format] ? esc(formatScore(shown, value)) : scoreHtml(value));
 }
+
+/* Halloween preview affects the visuals; the server decides whether catches count. */
+const HALLOWEEN_EVENT = "halloween-2026", EVENT_FLUSH_MS = 6000, EVENT_BATCH_MAX = 5;
+let eventStatus = null, eventQueued = 0, eventTimer = null, eventBusy = false, eventLastCall = 0;
+function halloweenVisible() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Luxembourg", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const date = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const day = `${date.year}-${date.month}-${date.day}`;
+  return new URLSearchParams(location.search).get("halloween") === "1" || (day >= "2026-10-24" && day <= "2026-11-02");
+}
+function eventGame(game) { return game?.id === "cookie-clicker" || game?.id === "idle-empire"; }
+function renderEventChip() {
+  const host = document.getElementById("gh");
+  document.getElementById("pbEventChip")?.remove();
+  const banner = document.getElementById("halloweenBanner");
+  if (banner) { banner.hidden = !halloweenVisible(); banner.textContent = arcadeText("arc.halloweenBanner"); }
+  if (!host || !eventGame(PB.current) || !halloweenVisible() || (fullAccount() && eventStatus?.active === false && new URLSearchParams(location.search).get("halloween") !== "1")) return;
+  const chip = document.createElement("div");
+  chip.id = "pbEventChip"; chip.className = "arcade-context"; chip.setAttribute("role", "status");
+  chip.textContent = fullAccount() ? `🎃 ${eventStatus?.count ?? 0} / ${eventStatus?.goal ?? 50}` : arcadeText("arc.halloweenSignin");
+  host.append(chip);
+}
+async function loadEventStatus() {
+  renderEventChip();
+  if (!sb || !fullAccount() || !halloweenVisible()) return;
+  const userId = session.user.id;
+  try {
+    const { data, error } = await sb.rpc("event_status", { p_event: HALLOWEEN_EVENT });
+    if (error) throw error;
+    if (session?.user?.id !== userId) return;
+    eventStatus = data; renderEventChip();
+  } catch (error) { console.warn("[Arcade] event status unavailable", error); }
+}
+function scheduleEventFlush() {
+  if (eventTimer || eventBusy || !eventQueued) return;
+  eventTimer = setTimeout(() => { eventTimer = null; flushEvent(); }, Math.max(0, EVENT_FLUSH_MS - (Date.now() - eventLastCall)));
+}
+async function flushEvent() {
+  if (!eventQueued || eventBusy || !sb || !fullAccount()) return;
+  if (Date.now() - eventLastCall < EVENT_FLUSH_MS) { scheduleEventFlush(); return; }
+  if (eventTimer) clearTimeout(eventTimer);
+  eventTimer = null;
+  const count = Math.min(EVENT_BATCH_MAX, eventQueued), userId = session.user.id;
+  eventQueued -= count; eventBusy = true; eventLastCall = Date.now();
+  try {
+    const { data, error } = await sb.rpc("add_event_progress", { p_event: HALLOWEEN_EVENT, p_count: count });
+    if (error) throw error;
+    if (session?.user?.id !== userId) return;
+    if (data?.badge && !eventStatus?.badge) showStreakToast(arcadeText("arc.halloweenEarned"));
+    eventStatus = data; renderEventChip();
+  } catch (error) {
+    if (session?.user?.id === userId) eventQueued += count;
+    console.warn("[Arcade] event progress failed", error);
+  } finally { eventBusy = false; scheduleEventFlush(); }
+}
+document.addEventListener("i18n:change", renderEventChip);
+window.addEventListener("pagehide", flushEvent);
+document.addEventListener("DOMContentLoaded", renderEventChip);
 
 async function openBoard() {
   const g = activeGame(); if (!g || g.noScore) return;

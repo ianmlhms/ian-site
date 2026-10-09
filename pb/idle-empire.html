@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Business Empire - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
+<link rel="stylesheet" href="/pb/idle-extras.css?v=2">
+<script src="/pb/idle-extras.js?v=2"></script>
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
@@ -34,7 +36,7 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
 @media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
 @media (prefers-reduced-motion:reduce){button{transition:none}button:active:not(:disabled){transform:none}.progress-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=16" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
+<script src="/pb/arcade-kit.js?v=17" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
 </head>
 <body>
 <main id="game">
@@ -75,7 +77,8 @@ const SAVE_VERSION=1;
 const STARTING_CASH=10;
 const SAVE_INTERVAL_MS=5000;
 const GAME_TICK_MS=50;
-const OFFLINE_CAP_SECONDS=2*60*60;
+// Oil costs $25.8B initially; three purchases cost ~$88.3B. Rebirth starts at $100B.
+const REBIRTH_THRESHOLD=100e9;
 const OFFLINE_NOTICE_MIN_SECONDS=5;
 const PRESTIGE_EARNINGS_UNIT=1e9;
 const INVESTOR_BONUS=0.1;
@@ -106,7 +109,7 @@ const BUSINESSES=Object.freeze([
 const emptyOwned=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,0]));
 const emptyManagers=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,false]));
 const emptyRuntime=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,{startedAt:0,endsAt:0}]));
-const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now()});
+const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now(),savedAt:Date.now()});
 
 let state=initialState();
 let runtime=emptyRuntime();
@@ -114,6 +117,7 @@ let isBooted=false;
 let pendingIncomingSave=null;
 let lastOfflineResult={elapsedSeconds:0,credited:0,wasCapped:false,clockWentBackwards:false};
 let cardRefs={};
+let rewards=null,loaded=false;
 
 function reportError(context,error){
   const detail=error instanceof Error?error.message:String(error);
@@ -181,7 +185,7 @@ function getCyclePayout(business,sourceState=state){
   const owned=sourceState.owned[business.id]||0;
   const base=safeMultiply(business.payout,owned);
   const milestoneProfit=safeMultiply(base,getMilestoneMultiplier(owned));
-  return safeMultiply(milestoneProfit,getInvestorMultiplier(sourceState.investors));
+  return safeMultiply(safeMultiply(milestoneProfit,getInvestorMultiplier(sourceState.investors)),IdleExtras.multiplier(sourceState.st));
 }
 
 function getAutomaticIncome(sourceState=state){
@@ -275,7 +279,7 @@ function buyManager(business){
 
 function applyEarnings(amount){
   if(!(amount>0))return;
-  state={...state,cash:safeAdd(state.cash,amount),lifetime:safeAdd(state.lifetime,amount)};
+  state={...state,cash:safeAdd(state.cash,amount),lifetime:safeAdd(state.lifetime,amount),rb:safeAdd(state.rb,amount)};
   updateScore();
 }
 
@@ -313,6 +317,7 @@ function refreshAll(now=Date.now()){
   document.getElementById("income").textContent="$"+format(getAutomaticIncome());
   document.getElementById("investors").textContent=`${format(state.investors)} · ${format(getInvestorMultiplier())}×`;
   BUSINESSES.forEach((business)=>refreshBusiness(business,now));
+  rewards?.refresh();
 }
 
 function refreshBusiness(business,now){
@@ -389,7 +394,7 @@ document.addEventListener("keydown",(event)=>{
 function confirmPrestige(){
   const claimable=getClaimableInvestors();
   if(claimable<=0)return;
-  state={v:SAVE_VERSION,cash:STARTING_CASH,lifetime:state.lifetime,owned:emptyOwned(),managers:emptyManagers(),investors:state.investors+claimable,ts:Date.now()};
+  state={...state,cash:STARTING_CASH,owned:emptyOwned(),managers:emptyManagers(),investors:state.investors+claimable,ts:Date.now(),savedAt:Date.now()};
   runtime=emptyRuntime();
   closePrestige();refreshAll();pushSave();
 }
@@ -399,34 +404,41 @@ function normalizeSave(raw){
   const cash=safeNumber(raw.cash,STARTING_CASH);
   const lifetime=safeNumber(raw.lifetime,0);
   const investors=Math.floor(safeNumber(raw.investors,0));
-  const ts=safeNumber(raw.ts,Date.now());
+  const savedAt=safeNumber(raw.savedAt,safeNumber(raw.ts,Date.now()));
+  const ts=savedAt;
   const owned=Object.fromEntries(BUSINESSES.map((business)=>{
     const count=Math.min(MAX_OWNED,Math.floor(safeNumber(raw.owned[business.id],0)));
     return[business.id,count];
   }));
   const managers=Object.fromEntries(BUSINESSES.map((business)=>[business.id,raw.managers[business.id]===true]));
-  return{v:SAVE_VERSION,cash,lifetime,owned,managers,investors,ts};
+  return{v:SAVE_VERSION,cash,lifetime,owned,managers,investors,ts,savedAt,
+    rb:safeNumber(raw.rb,lifetime),st:Math.floor(safeNumber(raw.st)),rbc:Math.floor(safeNumber(raw.rbc)),gd:typeof raw.gd==='string'?raw.gd:''};
 }
 
 function calculateOffline(save,now){
-  const rawElapsed=(now-save.ts)/MILLISECONDS_PER_SECOND;
-  const clockWentBackwards=rawElapsed<0;
-  const elapsedSeconds=Math.min(Math.max(rawElapsed,0),OFFLINE_CAP_SECONDS);
-  const credited=safeMultiply(getAutomaticIncome(save),elapsedSeconds);
-  return{elapsedSeconds,credited,wasCapped:rawElapsed>OFFLINE_CAP_SECONDS,clockWentBackwards};
+  const result=IdleExtras.offline(save.st,save.savedAt,getAutomaticIncome(save),now);
+  return{...result,elapsedSeconds:result.seconds,wasCapped:(now-save.savedAt)/1000>result.capHours*3600,clockWentBackwards:now<save.savedAt};
 }
 
 function applySave(raw){
   const save=normalizeSave(raw);
-  if(!save||!(save.lifetime>state.lifetime))return false;
+  if(!save)return false;
+  if(save.rbc<state.rbc){
+    if(save.lifetime>state.lifetime){state={...state,lifetime:save.lifetime};updateScore();if(isBooted)refreshAll();pushSave()}
+    return false;
+  }
+  if(save.rbc===state.rbc&&(save.lifetime<state.lifetime||(loaded&&save.lifetime===state.lifetime)))return false;
+  loaded=true;
   const now=Date.now();
   lastOfflineResult=calculateOffline(save,now);
-  state={...save,cash:safeAdd(save.cash,lastOfflineResult.credited),lifetime:safeAdd(save.lifetime,lastOfflineResult.credited),ts:now};
+  state={...save,st:Math.max(state.st,save.st),gd:save.gd>state.gd?save.gd:state.gd,
+    cash:safeAdd(save.cash,lastOfflineResult.credited),lifetime:safeAdd(Math.max(state.lifetime,save.lifetime),lastOfflineResult.credited),rb:safeAdd(save.rb,lastOfflineResult.credited),ts:now,savedAt:now};
   runtime=emptyRuntime();
   startManagedCycles(now);
   updateScore();
   if(lastOfflineResult.elapsedSeconds>=OFFLINE_NOTICE_MIN_SECONDS)showOfflineNotice(lastOfflineResult);
   if(isBooted)refreshAll(now);
+  pushSave();
   return true;
 }
 
@@ -439,13 +451,17 @@ function startManagedCycles(now){
 }
 
 function showOfflineNotice(result){
-  const capCopy=result.wasCapped?" (2-hour cap reached)":"";
-  document.getElementById("offline-copy").textContent=`Your managers earned $${format(result.credited)} across ${format(result.elapsedSeconds)} seconds${capCopy}.`;
-  document.getElementById("offline-notice").classList.add("show");
+  rewards?.notice(result);
 }
 
 function snapshot(){
-  return{v:SAVE_VERSION,cash:state.cash,lifetime:state.lifetime,owned:{...state.owned},managers:{...state.managers},investors:state.investors,ts:Date.now()};
+  return{...state,tb:state.lifetime,owned:{...state.owned},managers:{...state.managers},ts:Date.now(),savedAt:Date.now()};
+}
+function rebirth(){
+  const earned=Math.floor(Math.sqrt(state.rb/REBIRTH_THRESHOLD));
+  if(earned<1)return;
+  state={...state,cash:STARTING_CASH,rb:0,st:state.st+earned,rbc:state.rbc+1,owned:emptyOwned(),managers:emptyManagers(),ts:Date.now(),savedAt:Date.now()};
+  runtime=emptyRuntime();refreshAll();updateScore();
 }
 
 function pushSave(){
@@ -463,6 +479,10 @@ function updateScore(){window.score=Math.floor(state.lifetime);Arcade.score(wind
 function boot(){
   buildBusinessCards();
   isBooted=true;
+  rewards=IdleExtras.mount({host:document.querySelector('header'),threshold:REBIRTH_THRESHOLD,read:()=>state,format,
+    resets:'cash (back to $10), businesses including gifted ones, managers and running cycles. This game has no click upgrades.',
+    keeps:'existing investors.',production:()=>getAutomaticIncome(),currency:'💵',rebirth,save:pushSave,earn:applyEarnings,
+    gift:(day,amount)=>{state={...state,gd:day};applyEarnings(amount);refreshAll()}});
   applySave(window.__pbSave);
   if(pendingIncomingSave)applySave(pendingIncomingSave);
   pendingIncomingSave=null;
@@ -473,7 +493,7 @@ function boot(){
 
 window.addEventListener("message",(event)=>{
   const data=event.data;
-  if(!data||data.__pbLoadSave!==1)return;
+  if(event.source!==parent||!data||data.__pbLoadSave!==1)return;
   if(!isBooted){
     const pendingLifetime=safeNumber(pendingIncomingSave&&pendingIncomingSave.lifetime,0);
     if(safeNumber(data.data&&data.data.lifetime,0)>pendingLifetime)pendingIncomingSave=data.data;

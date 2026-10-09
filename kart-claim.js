@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=26";
+import * as auth from "./auth.js?v=27";
 
 const STRINGS = {
   prompt: { lb: "Späicher dës Sessioun an dengem Karting-Kont.", de: "Speichere diese Sitzung in deinem Karting-Konto.", en: "Save this session to your karting account." },

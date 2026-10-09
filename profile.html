@@ -11,7 +11,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=27"></script>
-<script src="i18n-dict.js?v=44"></script>
+<script src="i18n-dict.js?v=45"></script>
 <script src="i18n.js?v=3"></script>
 <link rel="stylesheet" href="site-ui.css?v=2">
 <style>
@@ -130,9 +130,9 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=26";
-import { loadTags } from "./leaderboard-tags.js?v=3";
-import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=1";
+import * as auth from "./auth.js?v=27";
+import { loadTags, eventBadgesHtml } from "./leaderboard-tags.js?v=4";
+import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=2";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","🦁","🐯","🐵",
@@ -187,7 +187,7 @@ async function renderPublic(username){
     ${scoreKeyHtml([stats.wins,stats.losses])}
     <p class="hint" id="arcadeStreak" role="status"></p>
     <h2>Achievements</h2>
-    <div class="ui-card ach-card">${achievements(stats)}</div>
+    <div class="ui-card ach-card">${achievements(stats)}<span id="eventBadges"></span></div>
     <div class="share"><a class="ui-btn ui-btn--ghost" href="profile.html">‹ Your profile</a></div>`;
   await loadProfileStreak(p.id);
 }
@@ -322,7 +322,7 @@ async function boot(){
 // Lazy: the account-check card (and its people search) only loads when asked for.
 async function openMerge(){
   try{
-    const m=await import("./account-check.js?v=3");
+    const m=await import("./account-check.js?v=4");
     await m.openAccountCheck({startWithMerge:true});
   }catch(e){
     console.error("account merge dialog failed to open",e);
@@ -445,16 +445,25 @@ async function loadStats(uname){
     <div class="stat"><b>${scoreHtml(lb.wins+de.wins)}/${scoreHtml(lb.played+de.played)}</b><span>Wordle wins</span></div>
     <div class="stat"><b>${scoreHtml(wordleMax)}</b><span>Best streak</span></div>`;
   $("stats").insertAdjacentHTML("afterend", scoreKeyHtml([wins,losses,lb.wins+de.wins,lb.played+de.played,wordleMax]));
-  if($("ach"))$("ach").innerHTML=achievements({wins,losses,pct,total,wordleMax});
+  if($("ach"))$("ach").innerHTML=achievements({wins,losses,pct,total,wordleMax})+'<span id="eventBadges"></span>';
+  paintProfileBadges();
 }
 
 let viewedStreak = null;
+let viewedBadges = [];
+function paintProfileBadges(){
+  const node=$("eventBadges");
+  if(!node)return;
+  node.innerHTML=eventBadgesHtml(viewedBadges,"ach",true);
+  if(viewedBadges.length)node.parentElement.querySelector(".ach-none")?.remove();
+}
 function paintProfileStreak(){
   const node=$("arcadeStreak");
   if(node && viewedStreak) node.textContent=arcadeText("arc.streakProfile",{n:viewedStreak.streak});
 }
 async function loadProfileStreak(uid){
   viewedStreak=null;
+  viewedBadges=[];
   if(!auth.session() || auth.isKartAccount()) return;
   try{
     const tags=await loadTags(sb);
@@ -464,6 +473,8 @@ async function loadProfileStreak(uid){
       return;
     }
     viewedStreak={streak:row.streak};
+    viewedBadges=row.badges;
+    paintProfileBadges();
     paintProfileStreak();
   }catch(error){
     console.warn("[profile] arcade streak unavailable",error);
@@ -474,7 +485,7 @@ document.addEventListener("i18n:change",paintProfileStreak);
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=23"></script>
-  <script type="module" src="class-gate.js?v=24"></script>
+  <script type="module" src="rtc-ring.js?v=24"></script>
+  <script type="module" src="class-gate.js?v=25"></script>
 </body>
 </html>
