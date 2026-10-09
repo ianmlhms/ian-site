@@ -47,7 +47,7 @@ export const flow = {
     });
     await h.goto('/pixelbreak.html');
     await page.locator('[data-genre="idle"]').tap();
-    h.expect(await page.locator('.game-card img[src="pb/thumbs/bus-tycoon.svg"]').count() === 1, 'Bus Tycoon appears in idle category');
+    h.expect(await page.locator('.game-card img[src="pb/thumbs/bus-tycoon.webp"]').count() === 1, 'Bus Tycoon appears in idle category');
     await page.evaluate(save => localStorage.setItem('pb_save_bus-tycoon', JSON.stringify(save)), seed());
     await h.goto('/pixelbreak.html?g=bus-tycoon');
     let game = await frame(h);
