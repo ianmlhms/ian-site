@@ -15,7 +15,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=27"></script>
-<script src="i18n-dict.js?v=43"></script>
+<script src="i18n-dict.js?v=44"></script>
 <script src="i18n.js?v=3"></script>
 <link rel="stylesheet" href="site-ui.css?v=2">
 <style>
@@ -230,6 +230,7 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
 </nav>
 <p class="browse-status" id="count" aria-live="polite"></p>
 </div>
+<section id="weeklyCard" class="ui-card weekly-card" hidden aria-live="polite"></section>
 <section class="arc-sec" id="bigSec">
 <h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">🏆</span><span data-i18n="arc.big">Big games</span></h2>
 <p class="sec-sub" data-i18n="arc.bigSub">Progress saves, so you can come back and keep going.</p>
@@ -399,6 +400,7 @@ return AUTHORED_ORDER_BY_ID[a.id]-AUTHORED_ORDER_BY_ID[b.id];
 }
 function cardHTML(g,isBig){
 var tagHTML=isBig?'<span class="tag save">'+esc(tr('arc.saves'))+'<\/span>':'';
+if(window.__pbWeeklyGame===g.id)tagHTML+='<span class="tag weekly-badge">'+esc(tr('arc.weeklyBadge'))+'<\/span>';
 if(g.tags&&g.tags.indexOf('mp')>-1)tagHTML+='<span class="tag mp">'+esc(tr('arc.mp'))+'<\/span>';
 var ext=g.url?'<span class="ext">'+esc(tr('arc.ext'))+'<\/span>':g.href?'<span class="ext">'+esc(tr('arc.twoPads'))+'<\/span>':'';
 var hue=hashStr(g.name)%360;
@@ -538,6 +540,8 @@ if(_mdEl)_mdEl.content=_md0;
 if(!fromHistory&&/[?&]g=/.test(location.search))history.pushState(null,'',location.pathname);
 if(window.PB&&PB.onCloseGame)PB.onCloseGame();
 }
+window.arcadeGameIndex=gameIdxById;
+window.arcadeGameById=function(id){return GAMES.find(function(g){return g.id===id})};
 function gameIdxById(id){
 for(var i=0;i<GAMES.length;i++)if(GAMES[i].id===id&&GAMES[i].src)return i;
 return -1;
@@ -680,8 +684,8 @@ loadPlayCounts();
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="pb/arcade-kit.js?v=15"></script>
-<script type="module" src="pixelbreak-records.js?v=33"></script>
+<script src="pb/arcade-kit.js?v=16"></script>
+<script type="module" src="pixelbreak-records.js?v=34"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){
@@ -707,7 +711,7 @@ loadPlayCounts();
   };
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=22"></script>
-  <script type="module" src="class-gate.js?v=23"></script>
+  <script type="module" src="rtc-ring.js?v=23"></script>
+  <script type="module" src="class-gate.js?v=24"></script>
 </body>
 </html>

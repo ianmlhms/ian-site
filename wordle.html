@@ -65,7 +65,7 @@
   .lb-box .tagged-board th:first-child,.lb-box .tagged-board td:first-child{width:80px}
   .lb-box .tagged-board th:nth-child(n+3),.lb-box .tagged-board td:nth-child(n+3){width:50px}
   .lb-box td.n{text-align:right;font-variant-numeric:tabular-nums}
-  .lb-box .tagged-board td.n{white-space:nowrap}
+  .lb-box .tagged-board td.n{overflow-wrap:anywhere}
   .tagged-board .lb-player{overflow-wrap:anywhere;word-break:break-word}
   .tagged-board .lb-player .admin-tag,.tagged-board .lb-player .class-tag{margin-top:3px;white-space:nowrap}
   .lb-close{float:right;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;min-width:44px;min-height:44px;margin:-10px -10px 0 0}
@@ -309,11 +309,12 @@ load();
 </div>
 
 <script src="pixelbreak-config.js"></script>
-<script src="pb/arcade-kit.js?v=15" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
+<script src="pb/arcade-kit.js?v=16" data-arcade-id="o-wordle" data-arcade-title="Wuertspill" data-arcade-no-score data-arcade-leaderboard-target="#lbBtn" data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-  import * as auth from "./auth.js?v=25";
-  import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
+  import * as auth from "./auth.js?v=26";
+  import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=3";
+  import { scoreHtml, scoreKeyHtml } from "./score-format.js?v=1";
   let sb = null;
   const $ = (id) => document.getElementById(id);
   (async () => { if (!auth.authConfigured) return; auth.mountAccountButton($("acctHost")); sb = await auth.client(); })();
@@ -335,7 +336,7 @@ load();
   }
 
   function resultCells(row) {
-    return `<td class="n">${row.wins}/${row.played}</td><td class="n">${row.avg_guesses ?? "—"}</td><td class="n">${tody(row.today)}</td>`;
+    return `<td class="n">${scoreHtml(row.wins)}/${scoreHtml(row.played)}</td><td class="n">${row.avg_guesses == null ? "—" : scoreHtml(row.avg_guesses)}</td><td class="n">${tody(row.today)}</td>`;
   }
 
   function rankedRow(row, index, tagData) {
@@ -347,7 +348,7 @@ load();
 
 
   async function boardTags() {
-    if (!auth.session()) return null;
+    if (!auth.session() || auth.isKartAccount()) return null;
     try {
       const result = await loadTags(sb);
       return auth.session() ? result : null;
@@ -367,7 +368,7 @@ load();
       const tableClass = tagData ? ` class="tagged-board"` : "";
       body.innerHTML = `<table${tableClass}><tr><th scope="col">#</th><th scope="col">Spiller</th><th scope="col" class="n">Gewonn</th><th scope="col" class="n">⌀</th><th scope="col" class="n">Haut</th></tr>` +
         data.map((row, index) => rankedRow(row, index, tagData)).join("") +
-        `</table>`;
+        `</table>` + scoreKeyHtml(data.flatMap(row=>[row.wins,row.played,row.avg_guesses]));
     } catch (error) { body.innerHTML = "Feeler beim Lueden."; console.warn("[wordle] leaderboard", error); }
   }
   const setLbTabs = () => document.querySelectorAll("[data-lb]").forEach(b => { b.classList.toggle("on", b.dataset.lb === boardLang); b.setAttribute("aria-pressed", b.dataset.lb === boardLang); });
@@ -379,7 +380,7 @@ load();
   $("lbModal").onclick = (e) => { if (e.target.id === "lbModal") window.closeWordleBoard(); };
   document.querySelectorAll("[data-lb]").forEach(b => b.onclick = () => { boardLang = b.dataset.lb; setLbTabs(); drawBoard(); });
 </script>
-  <script type="module" src="rtc-ring.js?v=22"></script>
-  <script type="module" src="class-gate.js?v=23"></script>
+  <script type="module" src="rtc-ring.js?v=23"></script>
+  <script type="module" src="class-gate.js?v=24"></script>
 </body>
 </html>

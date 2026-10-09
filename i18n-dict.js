@@ -4,6 +4,24 @@
  * Keys are namespaced by page. Keep proper names / brands untranslated.
  * ========================================================================== */
 window.I18N_DICT = {
+  /* ---------- arcade weekly boards and score display ---------- */
+  "score.key": { lb: "K = Dausend · M = Millioun · B = Milliard · T = Billioun", de: "K = Tausend · M = Million · B = Milliarde · T = Billion", en: "K = thousand · M = million · B = billion · T = trillion" },
+  "score.toggle": { lb: "Exakt Zuel weisen oder verstoppen", de: "Genaue Zahl anzeigen oder verbergen", en: "Show or hide the exact number" },
+  "arc.streakTag": { lb: "{n} Deeg hannereneen gespillt", de: "{n} Tage hintereinander gespielt", en: "Played {n} days in a row" },
+  "arc.championTag": { lb: "Gewënner vum Spill vun der Woch", de: "Gewinner des Spiels der Woche", en: "Game of the Week winner" },
+  "arc.weeklyTitle": { lb: "🏆 Spill vun der Woch", de: "🏆 Spiel der Woche", en: "🏆 Game of the Week" },
+  "arc.weeklyTab": { lb: "Woch", de: "Woche", en: "Week" },
+  "arc.weeklyBadge": { lb: "🏆 Woch", de: "🏆 Woche", en: "🏆 Week" },
+  "arc.weeklyCountdown": { lb: "nach {d} D {h} St", de: "noch {d} T {h} Std", en: "{d} d {h} h left" },
+  "arc.weeklySignin": { lb: "Mell dech un fir matzemaachen", de: "Melde dich an, um mitzumachen", en: "Sign in to take part" },
+  "arc.weeklyPlay": { lb: "Spillen", de: "Spielen", en: "Play" },
+  "arc.weeklyEmpty": { lb: "Nach keng Resultater — spill mat!", de: "Noch keine Ergebnisse — mach mit!", en: "No results yet — join in!" },
+  "arc.weeklyOwn": { lb: "Deng Plaz", de: "Dein Platz", en: "Your rank" },
+  "arc.weeklyError": { lb: "D'Ranglëscht konnt net geluede ginn. Probéier nach eng Kéier.", de: "Die Bestenliste konnte nicht geladen werden. Versuch es nochmal.", en: "Could not load the board. Please try again." },
+  "arc.streakDay": { lb: "🔥 Dag {n}!", de: "🔥 Tag {n}!", en: "🔥 Day {n}!" },
+  "arc.streakNew": { lb: "🔥 Neie Streak!", de: "🔥 Neue Serie!", en: "🔥 New streak!" },
+  "arc.streakProfile": { lb: "🔥 Streak: {n} Deeg", de: "🔥 Serie: {n} Tage", en: "🔥 Streak: {n} days" },
+  "arc.streakError": { lb: "De Streak konnt net geluede ginn.", de: "Die Serie konnte nicht geladen werden.", en: "Could not load the streak." },
   /* ---------- shared chrome ---------- */
   "nav.home":        { lb: "‹ Heem",   de: "‹ Start",  en: "‹ Home" },
   "auth.signin":     { lb: "Umellen / Kont erstellen", de: "Anmelden / Konto erstellen", en: "Sign in / Create account" },

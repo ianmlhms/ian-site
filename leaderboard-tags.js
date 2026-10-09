@@ -1,5 +1,7 @@
 /* Shared leaderboard identity tags. The RPC is available to signed-in full accounts only. */
 
+import { arcadeText } from "./score-format.js?v=1";
+
 const STYLE_ID = "leaderboard-tag-styles";
 const emptyLookup = Object.freeze(Object.create(null));
 const EMPTY_TAGS = Object.freeze({
@@ -21,7 +23,7 @@ function injectTagCss() {
   style.id = STYLE_ID;
   style.textContent = `
     body .admin-tag,
-    body .class-tag {
+    body :is(.class-tag,.streak-tag,.champion-tag) {
       display: inline-block;
       margin-inline-start: 5px;
       padding: 0 6px;
@@ -38,7 +40,7 @@ function injectTagCss() {
       background: color-mix(in srgb, #ffcf4d 14%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #ffcf4d 45%, transparent);
     }
-    body .class-tag {
+    body :is(.class-tag,.streak-tag,.champion-tag) {
       color: #5cc8ff;
       background: color-mix(in srgb, #5cc8ff 14%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #5cc8ff 45%, transparent);
@@ -48,7 +50,7 @@ function injectTagCss() {
       background: color-mix(in srgb, #c48700 14%, var(--card-opaque, #fff));
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #8a5e00 45%, transparent);
     }
-    :root[data-theme="light"] body .class-tag {
+    :root[data-theme="light"] body :is(.class-tag,.streak-tag,.champion-tag) {
       color: #005878;
       background: color-mix(in srgb, #087da8 13%, var(--card-opaque, #fff));
       box-shadow: inset 0 0 0 1px color-mix(in srgb, #00678c 45%, transparent);
@@ -59,7 +61,7 @@ function injectTagCss() {
         background: color-mix(in srgb, #c48700 14%, var(--card-opaque, #fff));
         box-shadow: inset 0 0 0 1px color-mix(in srgb, #8a5e00 45%, transparent);
       }
-      :root:not([data-theme="dark"]) body .class-tag {
+      :root:not([data-theme="dark"]) body :is(.class-tag,.streak-tag,.champion-tag) {
         color: #005878;
         background: color-mix(in srgb, #087da8 13%, var(--card-opaque, #fff));
         box-shadow: inset 0 0 0 1px color-mix(in srgb, #00678c 45%, transparent);
@@ -76,6 +78,8 @@ function normalizedRow(row) {
     class: row?.class == null ? null : String(row.class),
     is_admin: row?.is_admin === true,
     is_owner: row?.is_owner === true,
+    streak: Math.max(0, Number(row?.streak) || 0),
+    weekly_champion: row?.weekly_champion === true,
   });
 }
 
@@ -92,6 +96,7 @@ async function fetchTags(sb) {
       return EMPTY_TAGS;
     }
 
+    if (authData.session.user?.user_metadata?.account_kind === "kart") return EMPTY_TAGS;
     const { data, error } = await sb.rpc("leaderboard_tags");
     if (error) throw error;
     const byUserId = Object.create(null);
@@ -131,6 +136,8 @@ export function tagsHtml(row) {
   if (!row) return "";
   const admin = row.is_admin ? ` <span class="admin-tag">👑 Admin</span>` : "";
   const schoolClass = row.class ? ` <span class="class-tag">${esc(row.class)}</span>` : "";
-  return admin + schoolClass;
+  const streak = row.streak >= 3 ? ` <span class="streak-tag" title="${esc(arcadeText("arc.streakTag", { n: row.streak }))}">🔥${esc(row.streak)}</span>` : "";
+  const champion = row.weekly_champion ? ` <span class="champion-tag" title="${esc(arcadeText("arc.championTag"))}">🏆</span>` : "";
+  return admin + schoolClass + streak + champion;
 }
 

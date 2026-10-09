@@ -19,10 +19,13 @@
 <link rel="manifest" href="site.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
+<script src="i18n-dict.js?v=44"></script>
+<script src="i18n.js?v=3"></script>
 <script src="theme.js?v=27"></script>
 <link rel="stylesheet" href="site-ui.css?v=2">
 <style>
   *{box-sizing:border-box}
+  [hidden]{display:none!important}
   body{margin:0;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   a{color:var(--accent-text);text-decoration:none}
   button,a{touch-action:manipulation}
@@ -117,6 +120,7 @@
 <main class="ui-page">
   <div class="filters">
     <div class="lbchips" id="tabs" role="group" aria-label="Spill" data-t-aria="game">
+      <button type="button" class="lbchip" data-g="weekly" aria-pressed="false" data-i18n="arc.weeklyTab">Woch</button>
       <button type="button" class="lbchip on" data-g="" aria-pressed="true" data-t="all">All Spiller</button>
       <button type="button" class="lbchip" data-g="connect4" aria-pressed="false"><span aria-hidden="true">🔴</span> <span data-t="g.connect4">Connect 4</span></button>
       <button type="button" class="lbchip" data-g="battleship" aria-pressed="false"><span aria-hidden="true">🚢</span> <span data-t="g.battleship">Battleship</span></button>
@@ -139,10 +143,13 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=21"></script>
+<script type="module" src="notify-ambient.js?v=22"></script>
 <script type="module">
-import * as auth from "./auth.js?v=25";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
+import * as auth from "./auth.js?v=26";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=3";
+import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=1";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=1";
+installWeeklyUi();
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const T={
@@ -173,7 +180,7 @@ const MEDALS=["🥇","🥈","🥉"];
 const readLang=()=>{ try{ const v=localStorage.getItem("site_lang"); if(v==="lb"||v==="de"||v==="en") return v; }catch{} return "lb"; };
 let lang=readLang();
 const t=(k)=>{ const e=T[k]; return e?(e[lang]||e.en):k; };
-let sb=null, game="", period="all", last=null, tagData=null;
+let sb=null, game="", period="all", last=null, tagData=null, weekly=null;
 
 function applyStatic(){
   document.documentElement.lang=lang;
@@ -194,7 +201,7 @@ function rowHtml(row,index){
   const rank=index<3
     ? `<span class="medal" aria-hidden="true">${MEDALS[index]}</span><span class="sr-only">${index+1}</span>`
     : index+1;
-  return `<tr class="top${index+1}"><td class="rank">${rank}</td><td class="who"><span class="name">${esc(row.username)}${playerTags(row.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${row.wins}</td><td class="n">${row.losses}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
+  return `<tr class="top${index+1}"><td class="rank">${rank}</td><td class="who"><span class="name">${esc(row.username)}${playerTags(row.username)}</span><span class="meter" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,pct||0))}%"></i></span></td><td class="n">${scoreHtml(row.wins)}</td><td class="n">${scoreHtml(row.losses)}</td><td class="n pct">${pct==null?"—":pct+"%"}</td></tr>`;
 }
 
 
@@ -213,11 +220,15 @@ function paint(){
   const body=$("body"), data=last;
   if(data==="loading"){ body.innerHTML=emptyHtml("⏳",t("loading"),""); return; }
   if(data==="error"){ body.innerHTML=emptyHtml("⚠️",t("errT"),t("errS")); return; }
+  if(game==="weekly" && weekly){
+    body.innerHTML=weeklyHeadingHtml(weekly)+(auth.session()?weeklyRowsHtml(weekly):`<p>${esc(arcadeText("arc.weeklySignin"))}</p>`);
+    return;
+  }
   if(!data||!data.length){ body.innerHTML=emptyHtml("🏆",t("emptyT"),t("emptyS")); return; }
   const rows=data.map((row,index)=>rowHtml(row,index)).join("");
   const sum=data.length===1?t("sum1"):t("sumN").replace("{n}",data.length);
   body.innerHTML=`<p class="board-sum"><span class="dot" aria-hidden="true"></span>${esc([sum,...(game?[label()]:[]),period==="all"?t("pAll"):t("pWeek")].join(" · "))}</p>`+
-    `<table class="lb${tagData?" tagged":""}"><caption class="sr-only">${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</caption><thead><tr><th scope="col" class="rank"><span aria-hidden="true">#</span><span class="sr-only">${esc(t("rank"))}</span></th><th scope="col">${esc(t("player"))}</th><th scope="col" class="n"><span aria-hidden="true">${esc(t("w"))}</span><span class="sr-only">${esc(t("wf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("l"))}</span><span class="sr-only">${esc(t("lf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("pct"))}</span><span class="sr-only">${esc(t("pctf"))}</span></th></tr></thead><tbody>${rows}</tbody></table>`;
+    `<table class="lb${tagData?" tagged":""}"><caption class="sr-only">${esc(label())} · ${esc(period==="all"?t("pAll"):t("pWeek"))}</caption><thead><tr><th scope="col" class="rank"><span aria-hidden="true">#</span><span class="sr-only">${esc(t("rank"))}</span></th><th scope="col">${esc(t("player"))}</th><th scope="col" class="n"><span aria-hidden="true">${esc(t("w"))}</span><span class="sr-only">${esc(t("wf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("l"))}</span><span class="sr-only">${esc(t("lf"))}</span></th><th scope="col" class="n"><span aria-hidden="true">${esc(t("pct"))}</span><span class="sr-only">${esc(t("pctf"))}</span></th></tr></thead><tbody>${rows}</tbody></table>` + scoreKeyHtml(data.flatMap(row=>[row.wins,row.losses]));
 }
 
 async function draw(){
@@ -225,6 +236,12 @@ async function draw(){
   board.setAttribute("aria-busy","true"); last="loading"; paint();
   try{
     if(!sb) sb=await auth.client();
+    if(game==="weekly"){
+      weekly=await loadWeekly(sb,auth.session());
+      if(!weekly) throw new Error("Weekly board unavailable for this account");
+      last=weekly.rows;
+      board.setAttribute("aria-busy","false"); paint(); return;
+    }
     const boardRequest=period==="all"
       ? sb.rpc("game_leaderboard",{ p_game: game||null })
       : sb.rpc("game_leaderboard_window",{ p_game: game||null, p_days: +period });
@@ -236,15 +253,16 @@ async function draw(){
   board.setAttribute("aria-busy","false"); paint();
 }
 function mark(sel, active){ document.querySelectorAll(sel).forEach(x=>{ x.classList.toggle("on",x===active); x.setAttribute("aria-pressed",String(x===active)); }); }
-document.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>{ game=b.dataset.g; mark("[data-g]",b); draw(); });
+document.querySelectorAll("[data-g]").forEach(b=> b.onclick=()=>{ game=b.dataset.g; $("periods").hidden=game==="weekly"; mark("[data-g]",b); draw(); });
 document.querySelectorAll("[data-p]").forEach(b=> b.onclick=()=>{ period=b.dataset.p; mark("[data-p]",b); draw(); });
+document.addEventListener("i18n:change",()=>{lang=window.I18N.lang;applyStatic();paint();});
 window.addEventListener("storage",e=>{ if(e.key==="site_lang"){ lang=readLang(); applyStatic(); paint(); } });
 auth.onAuth(()=>{ tagData=null; draw(); });
 
 applyStatic();
 (async()=>{ if(auth.authConfigured){ auth.mountAccountButton($("acctHost")); sb=await auth.client(); } draw(); })();
 </script>
-  <script type="module" src="rtc-ring.js?v=22"></script>
-  <script type="module" src="class-gate.js?v=23"></script>
+  <script type="module" src="rtc-ring.js?v=23"></script>
+  <script type="module" src="class-gate.js?v=24"></script>
 </body>
 </html>

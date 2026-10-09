@@ -1,5 +1,5 @@
-import * as auth from "./auth.js?v=25";
-import { validateDeck } from "./ppt-ai.js?v=22";
+import * as auth from "./auth.js?v=26";
+import { validateDeck } from "./ppt-ai.js?v=23";
 
 const TABLE = "decks";
 const DEFAULT_ENGINE = "api";

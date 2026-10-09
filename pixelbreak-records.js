@@ -8,8 +8,11 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=25";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=2";
+import * as auth from "./auth.js?v=26";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=3";
+
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=1";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=1";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -19,7 +22,7 @@ const PB = (window.PB = {});
 PB.current = null;          // currently open game object {id,name,...}
 let sessionBests = new Map();   // best score reported during this play, per board id
 let activeBoard = null;         // sub-leaderboard chosen by the game (e.g. one per level), or null
-const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board"]);
+const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board", "run"]);
 const BOARD_ID_PATTERN = /^[a-z0-9-]{1,48}$/;
 let sb = null, session = null, username = null;
 
@@ -83,7 +86,7 @@ const SCORE_FORMATS = {
 };
 function formatScore(g, score) {
   const format = SCORE_FORMATS[g?.format];
-  return format ? format(score) : String(score);
+  return format ? format(score) : compactScore(score);
 }
 
 /* ---------------- score reporter injected into each game ---------------- */
@@ -144,10 +147,15 @@ const SOUND = `<script>(function(){
 const isMuted = () => localStorage.getItem("pb_muted") === "1";
 
 PB.instrument = (html) => {
-  let inject = REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
+  let inject = `<script>window.addEventListener('message',function(event){
+    if(event.source===parent&&event.data&&event.data.__pbStreak){
+      window.__pbStreak=event.data.__pbStreak;
+    }
+  });<\/script>` + REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
   // hand the game its locally saved state (page must call onOpenGame BEFORE instrument)
   const g = PB.current;
   if (g) {
+    if (window.__pbStreak) inject += `<script>window.__pbStreak=${JSON.stringify(window.__pbStreak)};<\/script>`;
     const sv = localStorage.getItem(SAVE_PREFIX + g.id);
     if (sv) inject += `<script>window.__pbSave=${sv.replace(/</g, "\\u003c")};<\/script>`;
   }
@@ -155,10 +163,12 @@ PB.instrument = (html) => {
 };
 
 /* ---------------- open / close hooks ---------------- */
-PB.onOpenGame = (g) => { PB.current = g; sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); };
+PB.onOpenGame = (g) => { PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); };
 PB.onCloseGame = () => { flushSave(); netClose(); PB.current = null; activeBoard = null; updateSaveHint(); };
 PB.registerStandalone = (g) => {
   PB.current = g;
+  weeklyFinals = new Set();
+  touchStreak();
   sessionBests = new Map();
   activeBoard = null;
   const chosen = window.Arcade?.getBoard?.();   // the game may have picked a board before this module loaded
@@ -359,6 +369,8 @@ function receiveScore(detail) {
   }
   const score = detail?.score;
   if (!Number.isFinite(score) || Math.abs(score) > MAX_SCORE) return;
+  if (detail.run !== undefined && (!Number.isSafeInteger(detail.run) || detail.run < 0)) return;
+  if (detail.final === true) submitWeeklyRun(base, detail);
   if (!isBetter(g, score, sessionBests.has(g.id) ? sessionBests.get(g.id) : null)) return;
   sessionBests.set(g.id, score);
   setLocalBest(g, score);
@@ -403,17 +415,22 @@ function applySession(s) {
   // fetch that account's cloud save now, so the game adopts it instead of the
   // fresh local progress. The server also refuses saves with less progress.
   const userId = session?.user?.id || null;
+  if (userId !== previousUserId) delete window.__pbStreak;
   if (userId && userId !== previousUserId && PB.current) loadCloudSave(PB.current);
+  if (PB.current) touchStreak();
+  loadWeeklyHome();
 }
 async function saveCloud(g, s) {
   try {
     const uid = session.user.id;
-    const { data: ex } = await sb.from("scores")
+    const { data: ex, error: readError } = await sb.from("scores")
       .select("score").eq("user_id", uid).eq("game_id", g.id).maybeSingle();
+    if (readError && readError.code !== "PGRST116") throw readError;
     if (ex && !isBetter(g, s, ex.score)) return;
-    await sb.from("scores").upsert(
+    const { error } = await sb.from("scores").upsert(
       { user_id: uid, username, game_id: g.id, game_name: g.name, score: s, updated_at: new Date().toISOString() },
       { onConflict: "user_id,game_id" });
+    if (error) throw error;
   } catch (err) { console.warn("[PB] save score failed", err); }
 }
 async function fetchBoard(g) {
@@ -439,6 +456,106 @@ async function fetchBoardTags() {
 }
 
 
+/* ---------------- weekly runs and daily streak ---------------- */
+let weeklyFinals = new Set();
+const streakResults = new Map();
+let homeWeekly = null;
+const fullAccount = () => !!session && session.user.user_metadata?.account_kind !== "kart";
+
+async function submitWeeklyRun(game, detail) {
+  if (!sb || !fullAccount() || !Number.isSafeInteger(detail.score) || detail.score < 0) return;
+  // Arcade supplies a run token. Retain the fallback for older cached game reporters.
+  const key = `${session.user.id}:${game.id}:${detail.run ?? "legacy-" + detail.score}`;
+  if (weeklyFinals.has(key)) return;
+  weeklyFinals.add(key);
+  const account = session;
+  try {
+    const weekly = await loadWeekly(sb, account);
+    if (weekly?.gameId !== game.id || session?.user.id !== account.user.id) return;
+    const { error } = await sb.rpc("submit_weekly_score", { p_game: game.id, p_score: detail.score });
+    if (error) throw error;
+  } catch (error) { console.warn("[Arcade] weekly score failed", error); }
+}
+
+function showStreakToast(copy) {
+  document.getElementById("pbStreakToast")?.remove();
+  const toast = document.createElement("div");
+  toast.id = "pbStreakToast";
+  toast.className = "pb-save-hint";
+  toast.style.pointerEvents = "none";
+  toast.setAttribute("role", "status");
+  toast.textContent = copy;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function sendStreak() {
+  if (!window.__pbStreak || !PB.current) return;
+  try { document.getElementById("gf")?.contentWindow?.postMessage({ __pbStreak: window.__pbStreak }, location.origin); }
+  catch (error) { console.warn("[Arcade] streak delivery failed", error); }
+}
+
+async function touchStreak() {
+  if (!sb || !fullAccount() || !PB.current) return;
+  const userId = session.user.id;
+  if (streakResults.has(userId)) {
+    const cached = streakResults.get(userId);
+    if (cached) { window.__pbStreak = cached; sendStreak(); }
+    return;
+  }
+  streakResults.set(userId, null);
+  try {
+    const { data, error } = await sb.rpc("touch_streak");
+    if (error) throw error;
+    if (!data || !Number.isFinite(data.streak) || !Number.isFinite(data.best)) throw new Error("Invalid streak result");
+    const result = Object.freeze({ streak: data.streak, best: data.best });
+    streakResults.set(userId, result);
+    if (session?.user.id !== userId) return;
+    window.__pbStreak = result;
+    sendStreak();
+    if (data.is_new_day) showStreakToast(arcadeText(data.streak === 1 && data.best > 1 ? "arc.streakNew" : "arc.streakDay", { n: data.streak }));
+  } catch (error) {
+    console.warn("[Arcade] streak unavailable", error);
+    showStreakToast(arcadeText("arc.streakError"));
+  }
+}
+
+document.getElementById("gf")?.addEventListener("load", sendStreak);
+
+function renderWeeklyHome() {
+  const card = document.getElementById("weeklyCard");
+  if (!card || !homeWeekly) return;
+  const joined = fullAccount();
+  card.innerHTML = weeklyHeadingHtml(homeWeekly) + (joined ? weeklyRowsHtml(homeWeekly, 5) : `<p>${esc(arcadeText("arc.weeklySignin"))}</p>`) +
+    `<button type="button" class="ui-btn ui-btn--primary weekly-play">${esc(arcadeText("arc.weeklyPlay"))}</button>`;
+  card.querySelector(".weekly-play").onclick = () => {
+    const game = window.arcadeGameById?.(homeWeekly.gameId);
+    if (game) window.openGame(window.arcadeGameIndex?.(game.id));
+  };
+  card.hidden = false;
+  window.__pbWeeklyGame = homeWeekly.gameId;
+  window.applyFilters?.();
+}
+
+async function loadWeeklyHome() {
+  const card = document.getElementById("weeklyCard");
+  if (!card || !sb) return;
+  const account = session;
+  try {
+    installWeeklyUi();
+    const weekly = await loadWeekly(sb, account);
+    if (session?.user.id !== account?.user.id) return;
+    if (weekly && !window.arcadeGameById?.(weekly.gameId)) throw new Error("Unknown weekly game: " + weekly.gameId);
+    homeWeekly = weekly;
+    card.hidden = !weekly;
+    renderWeeklyHome();
+  } catch (error) {
+    card.hidden = true;
+    console.warn("[Arcade] weekly card unavailable", error);
+  }
+}
+document.addEventListener("i18n:change", renderWeeklyHome);
+
 /* ---------------- UI ---------------- */
 function css() {
   const s = document.createElement("style");
@@ -459,7 +576,7 @@ function css() {
   .pb-msg.err{color:#ff6b6b}.pb-msg.ok{color:var(--accent4)}
   .pb-x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
   .pb-row{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
-  .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);white-space:nowrap}
+  .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);text-align:right;font-variant-numeric:tabular-nums;max-width:45%;min-width:0}
   .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}
   .pb-save-hint{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2500;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 24px);padding:8px 8px 8px 14px;border-radius:14px;background:var(--card,#161625);color:var(--text,#e8e8f0);border:1px solid var(--border,rgba(255,255,255,.14));box-shadow:0 10px 30px rgba(0,0,0,.4);font:600 13.5px/1.35 'Nunito',system-ui,sans-serif}
   .pb-save-hint__go{flex:none;min-height:40px;padding:0 14px;border:0;border-radius:10px;background:var(--accent,#6c5ce7);color:#fff;font:inherit;font-weight:800;cursor:pointer}
@@ -572,7 +689,7 @@ function renderGameBar() {
   const stored = localBest(shown.id);
   const sessionBest = sessionBests.has(shown.id) ? sessionBests.get(shown.id) : null;
   const value = sessionBest !== null && isBetter(shown, sessionBest, stored) ? sessionBest : stored;
-  best.textContent = value === null ? "" : "Best: " + formatScore(shown, value);
+  best.innerHTML = value === null ? "" : "Best: " + (SCORE_FORMATS[shown.format] ? esc(formatScore(shown, value)) : scoreHtml(value));
 }
 
 async function openBoard() {
@@ -596,7 +713,8 @@ async function openBoard() {
     return;
   }
   const visibleTagData = session ? tagData : null;
-  list.innerHTML = rows.map((r, i) => boardRowHtml(g, r, i, visibleTagData)).join("");
+  list.innerHTML = rows.map((r, i) => boardRowHtml(g, r, i, visibleTagData)).join("") +
+    (SCORE_FORMATS[g.format] ? "" : scoreKeyHtml(rows.map((row) => row.score)));
 }
 PB.openBoard = openBoard;
 
@@ -644,7 +762,7 @@ function updateSaveHint() {
 function boardRowHtml(g, row, index, tagData) {
   const tagRow = tagData?.byUserId?.[row.user_id];
   const tagMarkup = tagRow ? tagsHtml(tagRow) : "";
-  return `<div class="pb-row"><span class="r">${index + 1}</span><span class="pb-name">${esc(row.username || "anon")}${tagMarkup}</span><b>${esc(formatScore(g, row.score))}</b></div>`;
+  return `<div class="pb-row"><span class="r">${index + 1}</span><span class="pb-name">${esc(row.username || "anon")}${tagMarkup}</span><b>${SCORE_FORMATS[g.format] ? esc(formatScore(g, row.score)) : scoreHtml(row.score)}</b></div>`;
 }
 
 

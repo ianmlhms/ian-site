@@ -17,7 +17,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 canvas{cursor:crosshair}
 .lives b{color:var(--danger);letter-spacing:.12em}
 </style>
-<script src="/pb/arcade-kit.js?v=15" data-arcade-id="fruit-slash" data-arcade-title="Fruit Slicer"></script>
+<script src="/pb/arcade-kit.js?v=16" data-arcade-id="fruit-slash" data-arcade-title="Fruit Slicer"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -141,7 +141,7 @@ function resetWorld(){
   fruits=[];particles=[];mouseTrail=[];score=0;lives=START_LIVES;frame=0;
   updateHud();Arcade.score(score);
 }
-function startGame(){hidePanel();resetWorld();state='playing'}
+function startGame(){Arcade.startRun();hidePanel();resetWorld();state='playing'}
 function endGame(){
   state='over';mouseTrail=[];Arcade.gameOver(score);
   const isBest=recordBest(score);

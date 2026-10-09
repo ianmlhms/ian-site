@@ -17,7 +17,7 @@ body{display:flex;flex-direction:column}
 #next{display:block;width:72px;height:36px}
 @media (max-width:520px){.arcade-pill{padding:7px 9px;font-size:12px}.next{padding:4px 8px}.next .lbl{display:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=15" data-arcade-id="tetris" data-arcade-title="Tetris"></script>
+<script src="/pb/arcade-kit.js?v=16" data-arcade-id="tetris" data-arcade-title="Tetris"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -157,7 +157,7 @@ function drawNext(){
   const ox=(NEXT_W-cols*NEXT_CELL)/2,oy=(NEXT_H-rows*NEXT_CELL)/2;
   for(let b of next.blocks)drawCell(NX,ox+b[0]*NEXT_CELL,oy+b[1]*NEXT_CELL,NEXT_CELL,next.color);
 }
-function start(){
+function start(){Arcade.startRun();
   grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));
   score=0;lines=0;level=1;gameOver=false;dropInterval=500;dropTimer=0;paused=false;
   next=SHAPES[Math.floor(Math.random()*7)];newPiece();

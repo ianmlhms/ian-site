@@ -3,6 +3,8 @@
  * Every flow runs in headless Chromium at iPad portrait (820x1180) against a
  * local static server, with ALL Supabase traffic mocked — REST (/rest/v1),
  * auth (/auth/v1), edge functions (/functions/v1) and the Realtime WebSocket.
+ * FLOW_OFFLINE_SUPABASE=/path/to/pinned-umd.js also blocks all off-site assets
+ * and serves local pages by interception when loopback sockets are unavailable.
  * Nothing ever reaches a real account or the live site. Each run records a
  * video to <video dir>/<flow>.webm.
  *
@@ -74,6 +76,9 @@ export async function launchBrowser() {
 }
 
 export function startServer(root = REPO) {
+  // Restricted sandboxes may refuse even loopback sockets. Offline flows serve
+  // these URLs through Playwright interception instead of opening a socket.
+  if (process.env.FLOW_OFFLINE_SUPABASE) return Promise.resolve({ server: { close() {} }, origin: "http://127.0.0.1:8765" });
   const server = http.createServer((req, res) => {
     let rel = decodeURIComponent((req.url || "/").split("?")[0]);
     if (rel.endsWith("/")) rel += "index.html";
@@ -259,10 +264,39 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
   });
   const base = flow.backend || {};
   const backend = createBackend({
-    rpc: { has_pin: () => true, is_view_restricted: () => false, ...base.rpc },
+    rpc: {
+      has_pin: () => true, is_view_restricted: () => false,
+      weekly_game: () => "reaction",
+      weekly_board: () => [{ week: "2026-10-05", game_id: "reaction", ends_at: "2026-10-12T00:00:00+02:00", rank: null, user_id: null, username: null, score: null }],
+      submit_weekly_score: () => true,
+      touch_streak: () => ({ streak: 1, best: 1, is_new_day: false }),
+      leaderboard_tags: () => [],
+      ...base.rpc,
+    },
     tables: { profiles: profilesTable, ...base.tables },
     functions: { "auth-pin": () => ({ hasPin: true, isLegacy: false }), ...base.functions },
   });
+  // Optional offline run: serve the pinned UMD from a local, SRI-checked cache
+  // and refuse every other off-site request. Supabase routes below stay mocked.
+  if (process.env.FLOW_OFFLINE_SUPABASE) {
+    const supabaseUmd = fs.readFileSync(process.env.FLOW_OFFLINE_SUPABASE);
+    await context.route("**/*", (route) => {
+      const url = new URL(route.request().url());
+      if (["127.0.0.1", "localhost"].includes(url.hostname)) {
+        let rel = decodeURIComponent(url.pathname);
+        if (rel.endsWith("/")) rel += "index.html";
+        const file = path.normalize(path.join(REPO, rel));
+        if (!file.startsWith(REPO + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+          return route.fulfill({ status: 404, body: "not found" });
+        }
+        return route.fulfill({ contentType: MIME[path.extname(file).slice(1)] || "application/octet-stream", body: fs.readFileSync(file) });
+      }
+      if (url.hostname === "cdn.jsdelivr.net" && url.pathname === "/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js") {
+        return route.fulfill({ contentType: "application/javascript", body: supabaseUmd, headers: CORS });
+      }
+      return route.abort();
+    });
+  }
   await mockSupabase(context, backend);
   await mockRealtime(context, flow.realtime || {});
   const page = await context.newPage();

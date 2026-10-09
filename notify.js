@@ -8,7 +8,7 @@
  *                   notify-ambient.js on non-messenger pages.
  * Foreground notifications use the Notification API (no server). Closed-app push
  * is delivered by the Supabase Edge Function `notify` → the service worker. */
-import * as auth from "./auth.js?v=25";
+import * as auth from "./auth.js?v=26";
 
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;

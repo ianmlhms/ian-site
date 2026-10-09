@@ -25,6 +25,7 @@
   let pendingScore = null;
   let pendingBoardId = "";
   let scoreTimer = 0;
+  let runNumber = 0, finalSent = false;
   let currentBoard = null; // optional sub-leaderboard chosen by the game, e.g. one per level
 
   function warn(message, error) {
@@ -57,9 +58,9 @@
 
   function emitScore(value, final, boardId) {
     const board = boardId || "";
-    const detail = Object.freeze({ score: value, final: Boolean(final), ...(board ? { board } : {}) });
+    const detail = Object.freeze({ score: value, final: Boolean(final), ...(board ? { board } : {}), ...(final ? { run: runNumber } : {}) });
     if (!options.standalone) {
-      try { window.parent.postMessage({ __pb: 1, score: value, ...(final ? { final: true } : {}), ...(board ? { board } : {}) }, "*"); }
+      try { window.parent.postMessage({ __pb: 1, score: value, ...(final ? { final: true, run: runNumber } : {}), ...(board ? { board } : {}) }, "*"); }
       catch (error) { warn("Could not report the score to Arcade.", error); }
       return;
     }
@@ -100,13 +101,24 @@
     window.dispatchEvent(new CustomEvent("arcade:board", { detail: Object.freeze({ board }) }));
   }
 
+  function startRun() {
+    runNumber += 1;
+    finalSent = false;
+    if (scoreTimer) window.clearTimeout(scoreTimer);
+    scoreTimer = 0;
+    pendingScore = null;
+  }
+
   function report(value, final) {
     if (options.noScore || !validScore(value)) {
       if (!options.noScore) warn("Ignored an invalid score: " + String(value));
       return;
     }
+    if (!final && finalSent) startRun();
     const boardId = currentBoard ? currentBoard.id : "";
     if (final) {
+      if (finalSent) return;
+      finalSent = true;
       if (scoreTimer) window.clearTimeout(scoreTimer);
       scoreTimer = 0;
       pendingScore = null;
@@ -305,8 +317,8 @@
       context.append(...contextItems);
       oldBar.insertAdjacentElement("afterend", context);
     }
-    if (options.noScore || !options.id) return;
-    import("../pixelbreak-records.js?v=33").then(() => {
+    if (!options.id) return;
+    import("../pixelbreak-records.js?v=34").then(() => {
       window.PB?.registerStandalone?.({
         id: options.id,
         name: options.title,
@@ -317,6 +329,7 @@
   }
 
   const Arcade = Object.freeze({
+    startRun,
     score(value) { report(value, false); },
     gameOver(value) { report(value, true); },
     setBoard,

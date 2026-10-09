@@ -8,7 +8,7 @@
  * Views of the one card: main -> edit (username + class), or
  * search -> prove -> pick -> done (merge a second account into this one).
  * Escape / the close button mean "later": the card closes without stamping. */
-import * as auth from "./auth.js?v=25";
+import * as auth from "./auth.js?v=26";
 import { avatarHtml, searchPeople } from "./people-search.js?v=1";
 
 const STYLE_ID = "account-check-style";

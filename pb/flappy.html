@@ -19,7 +19,7 @@ canvas{cursor:pointer}
 .arcade-hint.off{opacity:0}
 @media (prefers-reduced-motion:reduce){.arcade-hint{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=15" data-arcade-id="flappy" data-arcade-title="Flappy Bird"></script>
+<script src="/pb/arcade-kit.js?v=16" data-arcade-id="flappy" data-arcade-title="Flappy Bird"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -147,7 +147,7 @@ function resetWorld(){
   updateHud();Arcade.score(score);
   $('hint').classList.remove('off');$('hint').textContent='Tap or press Space to flap';
 }
-function startGame(){hidePanel();resetWorld();state='playing'}
+function startGame(){Arcade.startRun();hidePanel();resetWorld();state='playing'}
 function addPipe(){
   let gap=BASE_GAP-Math.min(score*2,40)+assist()*7;
   let top=60+Math.random()*(H-gap-120);

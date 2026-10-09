@@ -134,7 +134,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=25";
+import * as auth from "./auth.js?v=26";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const emptyHtml=(ico,msg,sub)=>`<div class="pollempty" role="status"><div class="pollempty-ico" aria-hidden="true">${ico}</div><p>${esc(msg)}</p><div class="pollempty-sub">${esc(sub)}</div></div>`;
@@ -246,7 +246,7 @@ addOptInput();addOptInput();
   refresh();
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=22"></script>
-  <script type="module" src="class-gate.js?v=23"></script>
+  <script type="module" src="rtc-ring.js?v=23"></script>
+  <script type="module" src="class-gate.js?v=24"></script>
 </body>
 </html>

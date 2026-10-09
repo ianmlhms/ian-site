@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=25";
+import * as auth from "./auth.js?v=26";
 
 const USERNAME_SHAPE = /^[A-Za-z0-9_.-]{3,20}$/;
 const TOKEN_SHAPE = /^[0-9a-f]{32}$/i;

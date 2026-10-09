@@ -18,7 +18,9 @@ import { flow as adminOnlineNotice } from "./admin_online_notice.mjs";
 import { flow as ccSigninHint } from "./cc_signin_hint.mjs";
 import { flow as accountCheck } from "./account_check.mjs";
 
-const ALL = [newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck];
+import { flow as arcadeWeeklyStreak } from "./arcade_weekly_streak.mjs";
+
+const ALL = [newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }
