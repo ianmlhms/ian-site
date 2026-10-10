@@ -93,7 +93,7 @@ export const flow = {
     await h.goto('/pixelbreak.html?g=bus-tycoon&halloween=1'); game = await frame(h);
     await game.locator('.idle-away:not([hidden])').waitFor();
     const offline = await saved(h);
-    h.expect(offline.tb >= 7300 && offline.tb < 7310, 'offline credits eight hours at 50%');
+    h.expect(offline.tb >= 3700 && offline.tb < 3710, 'offline credits eight hours at 25%');
     await game.locator('.idle-gift:not([hidden])').waitFor();
     await game.locator('.idle-gift').tap(); await h.pause(100);
     const gifted = await saved(h);

@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Business Empire - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
-<link rel="stylesheet" href="/pb/idle-extras.css?v=2">
-<script src="/pb/idle-extras.js?v=2"></script>
+<link rel="stylesheet" href="/pb/idle-extras.css?v=3">
+<script src="/pb/idle-extras.js?v=3"></script>
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
@@ -297,7 +297,7 @@ function settleProduction(now){
     }
     const duration=getCycleDurationMs(business);
     const completed=1+Math.floor((now-cycle.endsAt)/duration);
-    earnings=safeAdd(earnings,getCyclePayout(business)*completed);
+    earnings=safeAdd(earnings,getCyclePayout(business)*completed*IdleExtras.activityRate(state.st));
     const endsAt=cycle.endsAt+completed*duration;
     nextRuntime={...nextRuntime,[business.id]:{startedAt:endsAt-duration,endsAt}};
   });

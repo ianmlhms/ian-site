@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Cookie Clicker - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
-<link rel="stylesheet" href="/pb/idle-extras.css?v=2">
-<script src="/pb/idle-extras.js?v=2"></script>
+<link rel="stylesheet" href="/pb/idle-extras.css?v=3">
+<script src="/pb/idle-extras.js?v=3"></script>
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -250,7 +250,7 @@ function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}cat
 window.addEventListener('message',(e)=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1)applySave(d.data)});
 
 // Game loop
-setInterval(()=>{earnCookies(cps/10);window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},TICK_MS);
+setInterval(()=>{earnCookies(cps/10*IdleExtras.activityRate(stars));window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},TICK_MS);
 buildUpgrades();
 rewards=IdleExtras.mount({host:$('shop'),threshold:REBIRTH_THRESHOLD,read:()=>({rb:roundBaked,st:stars,gd:giftDay}),format,
   resets:'cookies, all buildings (including gifted Time Machines) except Haunted Ovens, click upgrades and round clicks.',

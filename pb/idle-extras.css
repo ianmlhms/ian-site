@@ -9,3 +9,5 @@
 .idle-float{position:fixed;z-index:16;pointer-events:none;color:var(--amber);font:800 20px/1 var(--font);animation:idleFloat 1s ease-out forwards}
 @keyframes idleDrift{to{transform:translateY(-10px) rotate(15deg)}}@keyframes idleFloat{to{opacity:0;transform:translateY(-60px)}}
 @media(prefers-reduced-motion:reduce){.idle-pumpkin,.idle-float{animation:none}}
+
+.idle-sleep{flex-basis:100%;margin:2px 0 0;padding:6px 10px;border-radius:10px;background:color-mix(in srgb,var(--amber,#f4bc52) 16%,transparent);color:inherit;font-size:13px;font-weight:650}

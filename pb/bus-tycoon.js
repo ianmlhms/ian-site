@@ -59,7 +59,7 @@
     if (elapsed > 10) {
       const result = IdleExtras.offline(state.st, lastTick, production(), now);
       earn(result.credited); rewards?.notice(result);
-    } else earn(elapsed * production());
+    } else earn(elapsed * production() * IdleExtras.activityRate(state.st));
     lastTick = Math.max(now, lastTick);
   }
   function snapshot() {

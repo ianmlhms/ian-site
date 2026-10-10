@@ -1,6 +1,6 @@
 /* Shared idle-game rewards. All calendar decisions use Luxembourg time. */
 (function(){
-  const HOUR=3600,STAR_BONUS=0.1,MIN_SPAWN_MS=45000,SPAWN_RANGE_MS=45000,PUMPKIN_MS=8000;
+  const HOUR=3600,STAR_BONUS=0.1,ACTIVE_MS=15*60*1000,AWAY_BASE_RATE=0.25,AWAY_STAR_RATE=0.0375,MIN_SPAWN_MS=45000,SPAWN_RANGE_MS=45000,PUMPKIN_MS=8000;
   const dayFormat=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Luxembourg',year:'numeric',month:'2-digit',day:'2-digit'});
   function day(now=Date.now()){
     const parts=Object.fromEntries(dayFormat.formatToParts(now).map(part=>[part.type,part.value]));
@@ -8,14 +8,34 @@
   }
   function halloween(){const today=day();return window.__pbHalloween===true||(today>='2026-10-24'&&today<='2026-11-02')}
   function multiplier(stars){return 1+stars*STAR_BONUS}
+  // Away (tab closed) and inactive (open but untouched) earn the same reduced rate,
+  // so leaving a tab running all night is no better than closing it.
+  function awayRate(stars){return Math.min(1,AWAY_BASE_RATE+AWAY_STAR_RATE*stars)}
+  function capHoursFor(stars){return Math.min(12,8+0.25*stars)}
   function offline(stars,savedAt,production,now=Date.now()){
-    const capHours=Math.min(12,8+0.25*stars);
+    const capHours=capHoursFor(stars);
     const seconds=Number.isFinite(savedAt)?Math.min(capHours*HOUR,Math.max(0,(now-savedAt)/1000)):0;
-    return {seconds,capHours,credited:seconds*production*Math.min(1,0.5+0.025*stars)};
+    return {seconds,capHours,credited:seconds*production*awayRate(stars)};
+  }
+  let lastInput=Date.now();
+  const sleepListeners=new Set();
+  function markActive(){
+    const wasIdle=!isActive();
+    lastInput=Date.now();
+    if(wasIdle)sleepListeners.forEach(fn=>fn());
+  }
+  ['pointerdown','keydown','touchstart'].forEach(type=>document.addEventListener(type,markActive,{capture:true,passive:true}));
+  function isActive(now=Date.now()){return now-lastInput<ACTIVE_MS}
+  /** Passive production factor: 1 while playing, the away rate when untouched for 15 min, 0 after the away cap. */
+  function activityRate(stars,now=Date.now()){
+    const idleMs=now-lastInput;
+    if(idleMs<ACTIVE_MS)return 1;
+    if(idleMs>capHoursFor(stars)*HOUR*1000)return 0;
+    return awayRate(stars);
   }
   function mount(options){
     const box=document.createElement('div');box.className='idle-rewards';
-    box.innerHTML='<span class="idle-stars"></span><button type="button" class="idle-rebirth">⭐ Rebirth</button><span class="idle-progress"></span><button type="button" class="idle-gift" hidden></button><p class="idle-away" role="status" hidden></p>';
+    box.innerHTML='<span class="idle-stars"></span><button type="button" class="idle-rebirth">⭐ Rebirth</button><span class="idle-progress"></span><button type="button" class="idle-gift" hidden></button><p class="idle-away" role="status" hidden></p><p class="idle-sleep" role="status" hidden></p>';
     options.host.prepend(box);
     const dialog=document.createElement('dialog');dialog.className='idle-dialog';
     dialog.setAttribute('aria-label','Confirm rebirth');
@@ -25,6 +45,9 @@
     let streak=window.__pbStreak,noticeShown=false;
     function refresh(){
       const save=options.read(),earned=Math.floor(Math.sqrt(save.rb/options.threshold));
+      const sleep=find('.idle-sleep'),rate=activityRate(save.st);
+      sleep.hidden=rate===1;
+      if(rate<1)sleep.textContent=rate===0?'💤 Inactive too long · production paused · tap to play':`💤 Inactive · ${Math.round(rate*100)}% production · tap to play`;
       find('.idle-stars').textContent=`⭐ ${options.format(save.st)} · +${options.format(save.st*10)}%`;
       find('.idle-rebirth').disabled=earned<1;
       find('.idle-progress').textContent=earned<1?`${options.format(save.rb)} / ${options.format(options.threshold)} this round`:`+${options.format(earned)} stars ready`;
@@ -84,5 +107,5 @@
     if(halloween())schedulePumpkin();
     refresh();return Object.freeze({refresh,notice});
   }
-  window.IdleExtras=Object.freeze({day,halloween,multiplier,offline,mount});
+  window.IdleExtras=Object.freeze({day,halloween,multiplier,offline,awayRate,activityRate,isActive,mount});
 })();

@@ -69,7 +69,7 @@ export const flow = {
     await h.goto("/pixelbreak.html?g=cookie-clicker&halloween=1");
     game = await frame(h);
     const offline = await game.evaluate(() => snapshot());
-    h.expect(offline.tb >= 14500 && offline.tb < 14510 && offline.rb >= 14500, "offline grants eight hours at 50% into lifetime and round");
+    h.expect(offline.tb >= 7300 && offline.tb < 7310 && offline.rb >= 7300, "offline grants eight hours at 25% into lifetime and round");
     h.expect((await game.locator(".idle-away").innerText()).includes("8 h max"), "offline notice shows cap");
     await game.locator(".idle-gift:not([hidden])").waitFor();
     h.expect((await game.locator(".idle-gift").innerText()).includes("1.4× · 🔥 5"), "gift displays streak multiplier");
@@ -137,6 +137,10 @@ export const flow = {
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow(h, game, `${mode} Empire`);
     }
+
+    h.step("inactive tabs produce less");
+    const rates = await game.evaluate(() => [IdleExtras.activityRate(0), IdleExtras.activityRate(0, Date.now() + 10 * 60000), IdleExtras.activityRate(0, Date.now() + 16 * 60000), IdleExtras.activityRate(0, Date.now() + 9 * 3600 * 1000), IdleExtras.activityRate(10, Date.now() + 16 * 60000)]);
+    h.eq(rates, [1, 1, 0.25, 0, 0.625], "active 100% (still at 10 min), inactive after 15 min 25%, paused after 8 h, stars raise the inactive rate");
 
     h.step("permanent badge identity and profile");
     await h.goto("/profile.html");
