@@ -131,6 +131,30 @@ export function createBackend({ rpc = {}, tables = {}, functions = {} } = {}) {
   return { rpc, tables, functions, calls: [], callsTo(name) { return this.calls.filter((c) => c.name === name); } };
 }
 
+/* Stateful command endpoint; repeat=true deliberately redelivers IDs to test
+ * client deduplication. A null cursor always establishes a fresh baseline. */
+let nextClientCommandId = 1;
+export function createClientCommandsMock({ repeat = false } = {}) {
+  const commands = [];
+  let clock = Date.now();
+  const now = () => new Date(++clock).toISOString();
+  const add = (action, game = null, reason = null) => {
+    const command = { id: nextClientCommandId++, created_at: now(), action, game_id: game, reason };
+    commands.push(command);
+    return { ...command };
+  };
+  return {
+    add,
+    rpc: {
+      client_commands_since: ({ p_since }) => ({
+        now: now(), commands: p_since === null ? [] : commands
+          .filter((command) => repeat || command.created_at > p_since).map((command) => ({ ...command })),
+      }),
+      issue_client_command: ({ p_action, p_game, p_reason }) => add(p_action, p_game, p_reason).id,
+    },
+  };
+}
+
 export async function mockSupabase(context, backend) {
   await context.route(/\.supabase\.co\//, async (route) => {
     const request = route.request();
@@ -273,6 +297,8 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
       event_status: () => ({ event: "halloween-2026", active: false, count: 0, goal: 50, badge: false }),
       add_event_progress: () => ({ event: "halloween-2026", active: false, count: 0, goal: 50, badge: false }),
       leaderboard_tags: () => [],
+      client_commands_since: () => ({ now: new Date().toISOString(), commands: [] }),
+      issue_client_command: () => 1,
       ...base.rpc,
     },
     tables: { profiles: profilesTable, ...base.tables },

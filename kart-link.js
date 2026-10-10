@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=28";
+import * as auth from "./auth.js?v=29";
 
 const TOKEN_SHAPE = /^[0-9a-f]{32}$/i;
 const STRINGS = {

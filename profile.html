@@ -11,7 +11,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=28"></script>
-<script src="i18n-dict.js?v=46"></script>
+<script src="i18n-dict.js?v=47"></script>
 <script src="i18n.js?v=3"></script>
 <link rel="stylesheet" href="site-ui.css?v=2">
 <style>
@@ -130,9 +130,9 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import * as auth from "./auth.js?v=28";
-import { loadTags, eventBadgesHtml } from "./leaderboard-tags.js?v=6";
-import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=4";
+import * as auth from "./auth.js?v=29";
+import { loadTags, eventBadgesHtml } from "./leaderboard-tags.js?v=7";
+import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=5";
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const AVATARS=["😀","😎","🤖","👾","🐱","🐶","🦊","🐸","🐼","🦁","🐯","🐵",
@@ -322,7 +322,7 @@ async function boot(){
 // Lazy: the account-check card (and its people search) only loads when asked for.
 async function openMerge(){
   try{
-    const m=await import("./account-check.js?v=5");
+    const m=await import("./account-check.js?v=6");
     await m.openAccountCheck({startWithMerge:true});
   }catch(e){
     console.error("account merge dialog failed to open",e);
@@ -485,7 +485,7 @@ document.addEventListener("i18n:change",paintProfileStreak);
 auth.onAuth(boot);
 boot();
 </script>
-  <script type="module" src="rtc-ring.js?v=25"></script>
-  <script type="module" src="class-gate.js?v=26"></script>
+  <script type="module" src="rtc-ring.js?v=26"></script>
+  <script type="module" src="class-gate.js?v=27"></script>
 </body>
 </html>

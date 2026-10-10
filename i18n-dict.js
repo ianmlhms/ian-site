@@ -4,6 +4,16 @@
  * Keys are namespaced by page. Keep proper names / brands untranslated.
  * ========================================================================== */
 window.I18N_DICT = {
+  "commands.reloading": { lb: "🔄 ian.lu gëtt aktualiséiert…", de: "🔄 ian.lu wird aktualisiert…", en: "🔄 ian.lu is updating…" },
+  "commands.closed": { lb: "Spill zougemaach", de: "Spiel geschlossen", en: "Game closed" },
+  "commands.reload": { lb: "🔄 Reload", de: "🔄 Neu laden", en: "🔄 Reload" },
+  "commands.close": { lb: "⏏️ Spill zou", de: "⏏️ Spiel schließen", en: "⏏️ Close game" },
+  "commands.reloadAll": { lb: "🔄 Alles nei lueden", de: "🔄 Alles neu laden", en: "🔄 Reload everyone" },
+  "commands.confirmReload": { lb: "Déi oppe Säite vun {name} nei lueden?", de: "Die offenen Seiten von {name} neu laden?", en: "Reload {name}'s open pages?" },
+  "commands.confirmClose": { lb: "D'Spill {game} bei {name} zoumaachen?", de: "Das Spiel {game} bei {name} schließen?", en: "Close {game} for {name}?" },
+  "commands.confirmAll": { lb: "Déi oppe Säite vu jidderengem nei lueden?", de: "Die offenen Seiten aller Benutzer neu laden?", en: "Reload everyone's open pages?" },
+  "commands.sent": { lb: "Kommando geschéckt. Oppe Säite reagéiere beim nächste Ping, wa se prett sinn.", de: "Befehl gesendet. Offene Seiten reagieren beim nächsten Ping, sobald sie bereit sind.", en: "Command sent. Open pages act on the next ping when ready." },
+  "commands.error": { lb: "De Kommando konnt net geschéckt ginn. Probéier nach eng Kéier.", de: "Der Befehl konnte nicht gesendet werden. Versuch es nochmal.", en: "Could not send the command. Please try again." },
   "arc.g.idle": { lb: "Idle & Strategie", de: "Idle & Strategie", en: "Idle & strategy" },
   "arc.halloweenBanner": { lb: "🎃 Halloween-Event: fang Kürbissen am Cookie Clicker, Business Empire a Bus Tycoon — 50 = Badge", de: "🎃 Halloween-Event: Fang Kürbisse in Cookie Clicker, Business Empire und Bus Tycoon — 50 = Badge", en: "🎃 Halloween event: catch pumpkins in Cookie Clicker, Business Empire and Bus Tycoon — 50 = badge" },
   "arc.halloweenSignin": { lb: "🎃 Mell dech un fir de Badge", de: "🎃 Melde dich für das Badge an", en: "🎃 Sign in to earn the badge" },

@@ -1,7 +1,7 @@
 /* Admin panel — moderate groups/messages AND manage registered users.
  * All privileged actions are guarded server-side by is_admin(). */
-import * as auth from "./auth.js?v=28";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=6";
+import * as auth from "./auth.js?v=29";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=7";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -9,6 +9,58 @@ const fmt = (iso) => { const d = new Date(iso); return isNaN(d) ? "—" : d.toLo
 const fileIcon = (name) => { const e = (name || "").split(".").pop().toLowerCase(); return ({ pdf: "📕", zip: "🗜", doc: "📘", docx: "📘", xls: "📗", xlsx: "📗", ppt: "📙", pptx: "📙", txt: "📄", mp3: "🎵", wav: "🎵" })[e] || "📎"; };
 const ONLINE_MINUTES = 15;
 const ONLINE_REFRESH_MS = 15_000;
+const tr = (key) => window.I18N?.t(key) || window.I18N_DICT?.[key]?.lb || key;
+let issuingCommand = false;
+
+function arcadeGameId(page) {
+  try {
+    const url = new URL(String(page || "/"), location.origin);
+    return url.origin === location.origin && url.pathname === "/pixelbreak.html" ? url.searchParams.get("g") || null : null;
+  } catch (error) {
+    console.warn("[admin] invalid command target page", error);
+    return null;
+  }
+}
+
+async function issueCommand(action, row = null) {
+  if (issuingCommand) return;
+  const game = action === "close_game" ? arcadeGameId(row?.page) : null;
+  if (action === "close_game" && !game) return;
+  const key = !row ? "commands.confirmAll" : action === "reload" ? "commands.confirmReload" : "commands.confirmClose";
+  const question = tr(key).replace("{name}", () => row?.username || "?").replace("{game}", () => game || "");
+  if (!confirm(question)) return;
+  issuingCommand = true;
+  $("commandStatus").textContent = "";
+  setCommandBusy(true);
+  try {
+    const { error } = await sb.rpc("issue_client_command", {
+      p_action: action, p_user: row?.user_id || null, p_game: game, p_reason: null, p_minutes: 60,
+    });
+    if (error) throw error;
+    $("commandStatus").textContent = tr("commands.sent");
+  } catch (error) {
+    console.error("[admin] command failed", error);
+    $("commandStatus").textContent = tr("commands.error");
+  } finally {
+    issuingCommand = false;
+    setCommandBusy(false);
+  }
+}
+
+function setCommandBusy(busy) {
+  document.querySelectorAll("[data-client-command], #reloadAll").forEach((button) => { button.disabled = busy; });
+}
+
+$("reloadAll").onclick = () => void issueCommand("reload");
+$("glist").addEventListener("click", (event) => {
+  const button = event.target.closest?.("[data-client-command]");
+  if (!button || mode !== "online") return;
+  const row = onlineRows.find((item) => String(item.user_id) === button.dataset.user);
+  if (row) void issueCommand(button.dataset.clientCommand, row);
+});
+document.addEventListener("i18n:change", () => {
+  if (mode === "online" && onlineLoaded) renderOnline(filteredOnlineRows());
+});
 
 $("glist").addEventListener("keydown", (e) => {
   const row = e.target.closest?.(".grow");
@@ -269,6 +321,8 @@ function presenceStatus(row) {
 }
 
 function onlineRowHtml(row) {
+  const game = arcadeGameId(row.page);
+  const user = esc(String(row.user_id));
   const tagRow = onlineTags?.byUserId?.[String(row.user_id)] || null;
   const identityTags = tagsHtml({
     class: row.class,
@@ -283,6 +337,7 @@ function onlineRowHtml(row) {
     <div class="online-person">
       <div class="online-name">${esc(row.username || "(no username)")}${identityTags}${kartTag}</div>
       <div class="online-meta"><span class="online-page">${esc(pageLabel(row.page))}</span><span>${esc(presenceStatus(row))}</span></div>
+      <div class="online-actions"><button type="button" data-client-command="reload" data-user="${user}">${esc(tr("commands.reload"))}</button>${game ? `<button type="button" data-client-command="close_game" data-user="${user}">${esc(tr("commands.close"))}</button>` : ""}</div>
     </div>
   </div>`;
 }
@@ -315,6 +370,7 @@ function renderOnline(list) {
   $("glist").innerHTML =
     onlineSectionHtml("Online now", online, onlineEmpty, true) +
     onlineSectionHtml("Recently", recent, "Nobody seen recently.");
+  setCommandBusy(issuingCommand);
 }
 
 async function loadOnline(generation) {

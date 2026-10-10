@@ -1,5 +1,5 @@
 /* Shared Supabase auth for ian.lu. ES module. */
-import "./i18n-dict.js?v=46";
+import "./i18n-dict.js?v=47";
 import { openAuthDialog } from "./auth-ui.js?v=9";
 import { esc } from "./pin-pad.js?v=4";
 import {
@@ -109,7 +109,7 @@ function parentHandlesPresence() {
 function startPresencePing() {
   if (!_g.sb || parentHandlesPresence()) return;
   if (!_g.presenceModule) {
-    _g.presenceModule = import("./presence-ping.js?v=1");
+    _g.presenceModule = import("./presence-ping.js?v=2");
   }
   void _g.presenceModule
     .then(({ startPresence }) => startPresence(_g.sb, () => _g.session))
@@ -131,7 +131,7 @@ function startPresencePing() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=5");
+    _g.accountCheckModule = import("./account-check.js?v=6");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))

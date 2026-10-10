@@ -8,11 +8,11 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=28";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=6";
+import * as auth from "./auth.js?v=29";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=7";
 
-import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=4";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=4";
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=5";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=5";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -345,11 +345,37 @@ async function flushSave() {
   const p = pendingSave; pendingSave = null;
   if (!p || !sb || !session) return;
   try {
-    await sb.from("game_saves").upsert(
+    const { error } = await sb.from("game_saves").upsert(
       { user_id: session.user.id, game_id: p.g.id, data: p.data, updated_at: new Date().toISOString() },
       { onConflict: "user_id,game_id" });
-  } catch (err) { console.warn("[PB] save state failed", err); }
+    if (error) throw error;
+  } catch (err) {
+    if (!pendingSave && PB.current === p.g) pendingSave = p;
+    console.warn("[PB] save state failed", err);
+  }
 }
+
+// Remote reload/close must also flush when the usual debounce already ran.
+// Every validated __pbSave message writes localStorage before scheduling cloud work.
+window.__pbFlushSave = async () => {
+  const game = PB.current;
+  if (!game || !sb || !session) return;
+  if (pendingSave?.g !== game) {
+    try {
+      const json = localStorage.getItem(SAVE_PREFIX + game.id);
+      const data = json ? JSON.parse(json) : null;
+      if (json?.length <= MAX_MESSAGE_SIZE && isSaveData(data)) pendingSave = { g: game, data };
+    } catch (error) { console.warn("[PB] remote save read failed", error); }
+  }
+  const board = activeGame();
+  const scores = new Map(sessionBests);
+  const best = localBest(board.id);
+  if (!game.noScore && best !== null) scores.set(board.id, best);
+  await Promise.all([
+    flushSave(),
+    ...Array.from(scores, ([id, score]) => saveCloud(id === board.id ? board : { ...game, id }, score)),
+  ]);
+};
 
 async function loadCloudSave(g) {
   cloudSave = undefined;
