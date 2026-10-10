@@ -50,7 +50,7 @@ body{display:flex;flex-direction:column}
   @keyframes floatFade{0%{opacity:1}100%{opacity:0}}
 }
 </style>
-<script src="/pb/arcade-kit.js?v=18" data-arcade-id="cookie-clicker" data-arcade-title="Cookie Clicker"></script>
+<script src="/pb/arcade-kit.js?v=19" data-arcade-id="cookie-clicker" data-arcade-title="Cookie Clicker"></script>
 </head>
 <body>
 <main class="arcade-stage cc" id="stage">
@@ -163,7 +163,7 @@ function refreshUpgrades(){
   document.querySelectorAll('#upgrades .upgrade').forEach(row=>{
     const u=row.dataset.type==='cps'?upgrades[+row.dataset.i]:clickUpgrades[+row.dataset.i];
     const cost=getCost(u);
-    const eventLocked=u.halloween&&!IdleExtras.halloween();
+    const eventLocked=Boolean(u.halloween)&&!IdleExtras.halloween();
     const locked=cookies<cost||eventLocked;
     row.classList.toggle('locked',locked);
     row.setAttribute('aria-disabled',String(locked));

@@ -9,10 +9,10 @@
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
 import * as auth from "./auth.js?v=28";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=5";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=6";
 
-import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=3";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=3";
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=4";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=4";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -591,7 +591,7 @@ function css() {
   .pb-msg{font-size:12.5px;margin-top:10px;min-height:16px}
   .pb-msg.err{color:#ff6b6b}.pb-msg.ok{color:var(--accent4)}
   .pb-x{float:right;background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1}
-  .pb-row{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
+  .pb-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}
   .pb-row .r{width:26px;flex:none;color:var(--text2)}.pb-row .pb-name{min-width:0;flex:1;overflow-wrap:anywhere}.pb-row b{flex:none;margin-left:6px;color:var(--accent3);text-align:right;font-variant-numeric:tabular-nums;max-width:45%;min-width:0}
   .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}
   .pb-save-hint{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2500;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 24px);padding:8px 8px 8px 14px;border-radius:14px;background:var(--card,#161625);color:var(--text,#e8e8f0);border:1px solid var(--border,rgba(255,255,255,.14));box-shadow:0 10px 30px rgba(0,0,0,.4);font:600 13.5px/1.35 'Nunito',system-ui,sans-serif}

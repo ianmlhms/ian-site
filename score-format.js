@@ -33,6 +33,13 @@ export function compactScore(value) {
   return scaled + SUFFIXES[unit];
 }
 
+/** "185468747281" → "185 468 747 281" (thin spaces), for the expanded/full view. */
+function groupDigits(value) {
+  const [integer, fraction] = String(value ?? "").split(".");
+  if (!/^-?\d+$/.test(integer)) return String(value ?? "");
+  return integer.replace(/\B(?=(\d{3})+(?!\d))/g, "\u2009") + (fraction ? "." + fraction : "");
+}
+
 export function isCompactScore(value) {
   return Number.isFinite(Number(value)) && Math.abs(Number(value)) >= COMPACT_MIN;
 }
@@ -42,7 +49,7 @@ function installScoreUi() {
   const style = document.createElement("style");
   style.id = "score-format-styles";
   style.textContent = `.score-number{font-variant-numeric:tabular-nums;text-align:right}
-    button.score-number{border:0;background:none;color:inherit;font:inherit;font-variant-numeric:tabular-nums;padding:2px 0;cursor:pointer;max-width:100%;overflow-wrap:anywhere}
+    button.score-number{all:unset;box-sizing:border-box;display:inline;color:inherit;font:inherit;line-height:inherit;font-variant-numeric:tabular-nums;text-align:right;cursor:pointer;white-space:nowrap;border-radius:4px}
     button.score-number:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     .score-key{color:var(--muted,var(--text2));font:400 11px/1.5 system-ui;margin:8px 0 0;overflow-wrap:anywhere}`;
   document.head.appendChild(style);
@@ -57,7 +64,7 @@ function installScoreUi() {
 
 export function scoreHtml(value) {
   installScoreUi();
-  const exact = escapeHtml(value);
+  const exact = escapeHtml(groupDigits(value));
   const compact = escapeHtml(compactScore(value));
   if (!isCompactScore(value)) return `<span class="score-number" title="${exact}">${compact}</span>`;
   return `<button type="button" class="score-number" title="${exact}" aria-label="${escapeHtml(arcadeText("score.toggle"))}: ${exact}" aria-pressed="false" data-score-full="${exact}" data-score-compact="${compact}">${compact}</button>`;

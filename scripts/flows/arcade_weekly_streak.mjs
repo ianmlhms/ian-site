@@ -68,10 +68,11 @@ export const flow = {
       h.eq(await page.locator(".weekly-badge").count(), 1, "weekly game tile has its badge");
       h.expect(await page.locator("#weeklyCard .streak-tag").count() > 0, "🔥 tags render");
       h.eq(await page.locator("#weeklyCard .champion-tag").count(), 1, "🏆 champion tag renders");
-      const score = page.locator(`#weeklyCard button[title="${BIG_SCORE}"]`);
+      const GROUPED = String(BIG_SCORE).replace(/\B(?=(\d{3})+(?!\d))/g, "\u2009");
+      const score = page.locator(`#weeklyCard button[title="${GROUPED}"]`);
       h.eq(await score.innerText(), "1.23T", "trillion score compacts with full exact title");
       await score.tap();
-      h.eq(await score.innerText(), String(BIG_SCORE), "tap expands to the exact number");
+      h.eq(await score.innerText(), GROUPED, "tap expands to the exact number, grouped");
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow(h, `${mode} expanded home at 390px`);
       await score.focus(); await page.keyboard.press("Enter");

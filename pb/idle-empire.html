@@ -36,7 +36,7 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
 @media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
 @media (prefers-reduced-motion:reduce){button{transition:none}button:active:not(:disabled){transform:none}.progress-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=18" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
+<script src="/pb/arcade-kit.js?v=19" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
 </head>
 <body>
 <main id="game">
@@ -342,7 +342,7 @@ function refreshBusiness(business,now){
   refs.buy.disabled=state.cash<cost||owned>=MAX_OWNED;refs.buy.setAttribute("aria-label",`${refs.buy.textContent}: ${business.name}`);
   refs.manager.textContent=hasManager?`✓ ${business.manager} is managing`:`Hire ${business.manager} · $${format(business.managerCost)}`;
   refs.manager.disabled=hasManager||owned<=0||state.cash<business.managerCost;
-  refs.manager.classList.toggle("hired",hasManager);
+  refs.manager.classList.toggle("hired",Boolean(hasManager));
   refs.milestone.textContent=getMilestoneCopy(owned);
 }
 
