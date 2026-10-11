@@ -2,9 +2,10 @@
 -- The arcade now syncs scores at most once a minute and caches the last cloud
 -- score instead of reading it before every save (Supabase egress), so a stale
 -- tab or a second device could send a lower score. The server keeps the better one.
+-- security definer: players may not execute merge_score_is_better themselves.
 
 create or replace function public.scores_keep_best()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
   if not public.merge_score_is_better(new.game_id, new.score, old.score)
      and new.score is distinct from old.score then
