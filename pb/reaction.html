@@ -47,7 +47,7 @@ body{display:flex;flex-direction:column}
   </div></div>
 </main>
 <script>
-const MIN_WAIT_MS=1500,WAIT_SPREAD_MS=3000,MAX_TIMES=5;
+const MIN_WAIT_MS=1500,WAIT_SPREAD_MS=3000,MAX_TIMES=5,MIN_HUMAN_MS=100;
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const pad=$('pad');
@@ -83,6 +83,7 @@ function tooEarly(){
 }
 function hit(){
   const ms=Math.round(performance.now()-startTime);
+  if(ms<MIN_HUMAN_MS){tooEarly();return} // faster than any human: a lucky guess, not a reaction
   times.push(ms);if(times.length>MAX_TIMES)times.shift();
   const avg=Math.round(times.reduce((a,b)=>a+b)/times.length);
   const best=Math.min(...times);
