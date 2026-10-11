@@ -24,12 +24,14 @@ import { flow as idleRebirthHalloween } from "./idle_rebirth_halloween.mjs";
 
 import { flow as busTycoon } from "./bus_tycoon.mjs";
 
-const ALL = [clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween];
+import { flow as paketExpress } from "./paket_express.mjs";
+
+const ALL = [paketExpress, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }
 
-const [browser, { server, origin }] = await Promise.all([launchBrowser(), startServer()]);
+const [browser, { server, origin }] = await Promise.all([launchBrowser({ fullChromium: flows.some(flow => flow.fullChromium) }), startServer()]);
 const results = [];
 try {
   for (const flow of flows) results.push(await runFlow(flow, { browser, origin }));

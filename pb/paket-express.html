@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Paket Express 📦 – Arcade</title>
+<link rel="stylesheet" href="/pb/paket-express.css?v=2">
+<script src="/pb/arcade-kit.js?v=23" data-arcade-id="paket-express" data-arcade-title="Paket Express 📦"></script>
+</head>
+<body>
+<main id="game">
+  <canvas id="world" aria-label="3D"></canvas>
+  <div id="hud" hidden>
+    <div id="topline">
+      <div class="glass stats"><span data-t="points">Punkten</span><b id="points">0</b><small><span id="deliveries">0</span> <span data-t="deliveries">Liwwerungen</span> · <span data-t="best">Rekord</span> <span id="best">0</span></small><strong id="walletHud">0 €</strong></div>
+      <div id="comboHud"><b id="combo">×1</b><progress id="comboBar" max="20" value="0"></progress></div><div class="glass clock"><span id="dayClock">08:00</span><b id="shiftTimer">5:00</b></div>
+    </div>
+    <div class="glass job" id="jobCard"><span id="jobKind"></span><b id="jobPlace"></b><div class="job-meta"><span id="distance"></span><span id="jobTime"></span></div><progress id="jobBar" max="1" value="1"></progress><small id="jobHint"></small><div id="dropChoices"></div></div>
+    <canvas id="minimap" width="360" height="360" role="button" tabindex="0" aria-expanded="false" aria-controls="mapScreen"></canvas>
+    <span id="streetName" class="glass"></span>
+    <div class="glass speed"><b id="speed">0</b><span>km/h</span><span id="speedLimit" class="limit">50</span><small id="vehicleLabel">Auto</small></div>
+    <div class="utilities"><button id="pause" data-t="pause">Ⅱ Paus</button><button id="camera" data-t="camera">Kamera</button><button id="reset" data-t="reset">↻ Strooss</button><button id="horn" data-t="horn">Hup</button><button id="mute" data-t="mute">Toun</button><button id="quality">Qualitéit: Mëttel</button><button id="finish" data-t="finish" hidden>Tour ophalen</button></div>
+    <p id="keyboardHint" data-t="controls"></p>
+    <div id="touch" data-arcade-touch-controls>
+      <div><button data-input="left" aria-label="Lénks">◀</button><button data-input="right" aria-label="Riets">▶</button></div>
+      <button class="drift" data-input="drift" data-t="drift">Drift</button>
+      <div><button class="brake" data-input="brake" data-t="brake">Brems</button><button class="gas" data-input="gas" data-t="gas">Gas</button></div>
+    </div>
+  </div>
+  <div id="mapScreen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="mapTitle" hidden><section class="map-card"><header><h2 id="mapTitle">Luxembourg · Kaart</h2><button id="closeMap">Zoumaachen</button></header><canvas id="fullMap" width="900" height="900" aria-label="Luxembourg GPS"></canvas></section></div>
+  <div id="notice" role="status" aria-live="polite"></div>
+  <div id="menu" class="overlay">
+    <section class="menu-card" aria-labelledby="title">
+      <header><span class="stamp">📦 PAKET EXPRESS</span><div class="languages" aria-label="Language"><button data-lang="lb">LB</button><button data-lang="de">DE</button><button data-lang="en">EN</button></div></header>
+      <p class="eyebrow" data-t="eyebrow">LËTZEBUERG · ZËNTER 08:00</p>
+      <h1 id="title" data-t="title">Eng Stad.<br>Deng Tour.</h1>
+      <p id="intro" class="intro" data-t="intro">Kleng Stroossen, grouss Missioun. Huel d'Päck op a bréng se pünktlech un d'Dier.</p>
+      <p class="career-strip"><b id="rank"></b><strong id="walletMenu">0 €</strong></p>
+      <div class="traffic-settings"><label for="trafficSetting" data-t="traffic">Verkéier</label><select id="trafficSetting"><option value="off">Aus · ×0.6</option><option value="low">Wéineg · ×0.85</option><option value="normal" selected>Normal · ×1.0</option><option value="rush">Rush hour · ×1.3</option></select></div><small id="weatherPreview"></small>
+      <div class="modes"><button id="startShift" class="primary"><b data-t="shift">Schicht · 5 min</b><small data-t="shiftDesc">Géint d'Auer. Fir de Rekord.</small><span>↗</span></button><button id="startFree"><b data-t="free">Fräi fueren</b><small data-t="freeDesc">Ouni Drock · hallef Punkten</small><span>→</span></button></div>
+      <section class="daily-card"><div><b data-t="daily">Dagestour</b><small id="dailyDate"></small></div><p data-t="dailyDesc"></p><small id="dailyWeather"></small><button id="startDaily" data-t="dailyStart"></button><ol id="dailyBoard"></ol><small id="dailyStatus" role="status"></small><button id="retryDaily" data-t="retry" hidden></button></section>
+      <details class="mission-panel" open><summary data-t="dailyMissions"></summary><ul id="missions"></ul></details>
+      <details class="garage-panel"><summary><span data-t="garage"></span><span id="starCount"></span></summary>
+      <div class="garage-heading"><b id="lifetime">0</b> <span data-t="lifetime"></span></div>
+      <div id="garage"></div><h2 data-t="upgrades"></h2><div id="upgrades"></div><h2 data-t="districts"></h2><div id="districts"></div></details>
+      <p class="menu-note" data-t="startHint">Stop kuerz am giele Krees fir ofzehuelen oder ze liwweren. D'Garage wiessels du tëscht den Touren.</p>
+      <p id="bootStatus" role="status" data-t="loading">D'Stad gëtt opgebaut…</p>
+    </section>
+  </div>
+  <div id="pauseScreen" class="overlay" hidden><section class="small-card"><span class="stamp">📦 PAKET EXPRESS</span><h2 data-t="paused">Kuerz Paus.</h2><p data-t="pausedDesc">Deng Tour waart op dech.</p><button id="resume" class="primary" data-t="resume">Weiderfueren</button></section></div>
+  <div id="endScreen" class="overlay" hidden><section class="small-card"><span class="stamp">📦 PAKET EXPRESS</span><h2 id="endTitle" data-t="ended">Schicht fäerdeg!</h2><b id="endPoints" class="end-points">0</b><p id="endStats"></p><p id="endBest"></p><p id="endTraffic"></p><p id="endCash"></p><button id="again" class="primary" data-t="again">Nach eng Kéier</button><button id="toGarage" data-t="garage">Deng Garage</button></section></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="/pb/paket-express/assets.js?v=1"></script>
+<script src="/pb/paket-express/city.js?v=3"></script>
+<script src="/pb/paket-express/vehicles.js?v=3"></script>
+<script src="/pb/paket-express/traffic.js?v=2"></script>
+<script src="/pb/paket-express/driving.js?v=3"></script>
+<script src="/pb/paket-express/navigation.js?v=3"></script>
+<script src="/pb/paket-express/audio.js?v=2"></script>
+<script src="/pb/paket-express/config.js?v=1"></script>
+<script src="/pb/paket-express/copy.js?v=1"></script>
+<script src="/pb/paket-express/career.js?v=1"></script>
+<script src="/pb/paket-express/jobs.js?v=1"></script>
+<script src="/pb/paket-express/missions.js?v=1"></script>
+<script src="/pb/paket-express/daily.js?v=1"></script>
+<script src="/pb/paket-express/shop.js?v=1"></script>
+<script src="/pb/paket-express/lux.js?v=1"></script>
+<script src="/pb/paket-express.js?v=3"></script>
+</body>
+</html>

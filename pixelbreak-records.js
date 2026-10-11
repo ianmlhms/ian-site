@@ -8,11 +8,11 @@
  *
  * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=29";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=7";
+import * as auth from "./auth.js?v=30";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=8";
 
-import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=5";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=5";
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=6";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=6";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -147,11 +147,13 @@ const SOUND = `<script>(function(){
 const isMuted = () => localStorage.getItem("pb_muted") === "1";
 
 PB.instrument = (html) => {
+  // Paket Express reports only completed shifts; DOM polling would submit free-drive points.
+  const automaticFeedback = PB.current?.id === "paket-express" ? "" : REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
   let inject = `<script>window.addEventListener('message',function(event){
     if(event.source===parent&&event.data&&event.data.__pbStreak){
       window.__pbStreak=event.data.__pbStreak;
     }
-  });<\/script>` + REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
+  });<\/script>` + automaticFeedback;
   // hand the game its locally saved state (page must call onOpenGame BEFORE instrument)
   const g = PB.current;
   if (g) {
@@ -255,6 +257,7 @@ window.addEventListener("message", (e) => {
  * arbitrary name, or a game becomes a general-purpose database console. */
 const RPC_WHITELIST = new Set([
   "park_gallery", "park_layout", "publish_park", "unpublish_park", "like_park",
+  "submit_daily_score", "daily_board",
 ]);
 const MAX_RPC_ARGS = 16;
 
@@ -271,6 +274,7 @@ async function rpcCall(call) {
   if (!isObject(args) || Object.keys(args).length > MAX_RPC_ARGS || !isSaveData(args)) {
     rpcPost(id, null, "bad-args"); return;
   }
+  if (["submit_daily_score", "daily_board"].includes(call.fn) && !fullAccount()) { rpcPost(id, null, "not signed in"); return; }
   if (!sb) { rpcPost(id, null, "offline"); return; }
   try {
     const { data, error } = await sb.rpc(call.fn, args);

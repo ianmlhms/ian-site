@@ -53,22 +53,28 @@ async function importPlaywright() {
   throw new Error("Playwright not found — set PLAYWRIGHT_DIR to a playwright package folder.");
 }
 
-function cachedChromiumPaths() {
+function cachedChromiumPaths(fullChromium = false) {
   const base = path.join(os.homedir(), "Library/Caches/ms-playwright");
   if (!fs.existsSync(base)) return [];
   const found = [];
   for (const dir of fs.readdirSync(base).sort().reverse()) {
-    if (dir.startsWith("chromium_headless_shell-")) {
+    if (fullChromium && dir.startsWith("chromium-")) {
+      found.push(path.join(base, dir, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"));
+    } else if (!fullChromium && dir.startsWith("chromium_headless_shell-")) {
       found.push(path.join(base, dir, "chrome-headless-shell-mac-arm64/chrome-headless-shell"));
     }
   }
   return found.filter((file) => fs.existsSync(file));
 }
 
-export async function launchBrowser() {
+export async function launchBrowser({ fullChromium = false } = {}) {
   const { chromium } = await importPlaywright();
   const errors = [];
-  const attempts = [{}, ...cachedChromiumPaths().map((executablePath) => ({ executablePath })), { channel: "chrome" }];
+  // WebGL flows need Chromium's full headless compositor. Headless Shell forces
+  // SwiftShader on macOS and can stall rendering/input for tens of seconds.
+  const attempts = fullChromium
+    ? [...cachedChromiumPaths(true).map(executablePath => ({ executablePath })), { channel: "chromium" }, { channel: "chrome" }]
+    : [{}, ...cachedChromiumPaths().map(executablePath => ({ executablePath })), { channel: "chrome" }];
   for (const opts of attempts) {
     try { return await chromium.launch(opts); } catch (error) { errors.push(String(error.message).split("\n")[0]); }
   }
@@ -128,7 +134,25 @@ export function ilikeRegExp(filter) {
  *   calls: [] // filled in: { kind: "rpc"|"table"|"function", name, method, body }
  * } */
 export function createBackend({ rpc = {}, tables = {}, functions = {} } = {}) {
-  return { rpc, tables, functions, calls: [], callsTo(name) { return this.calls.filter((c) => c.name === name); } };
+  const dailyScores = new Map();
+  const luxDay = () => new Intl.DateTimeFormat('sv-SE', { timeZone:'Europe/Luxembourg', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+  const dailyRpc = {
+    submit_daily_score: ({ p_game, p_score }) => {
+      if(p_game !== 'paket-express-daily' || !Number.isSafeInteger(p_score) || p_score < 0 || p_score > 1000000) return false;
+      const key = luxDay(), previous = dailyScores.get(key);
+      if(previous !== undefined && p_score <= previous) return false;
+      dailyScores.set(key,p_score);return true;
+    },
+    daily_board: ({ p_game, p_day }) => {
+      if(p_game !== 'paket-express-daily') return [];
+      const day = p_day || luxDay(), score = dailyScores.get(day);
+      const next = new Date(day+'T00:00:00Z'); next.setUTCDate(next.getUTCDate()+1);
+      const offsetHours = Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Luxembourg',hour:'2-digit',hourCycle:'h23'}).format(next));
+      const ends_at = new Date(next.getTime()-offsetHours*3600000).toISOString();
+      return [{day,game_id:p_game,ends_at,rank:score === undefined ? null : 1,user_id:score === undefined ? null : ME,username:ME_NAME,score:score ?? null,is_self:score !== undefined}];
+    },
+  };
+  return { rpc: {...dailyRpc,...rpc}, tables, functions, calls: [], callsTo(name) { return this.calls.filter((c) => c.name === name); } };
 }
 
 /* Stateful command endpoint; repeat=true deliberately redelivers IDs to test
@@ -277,7 +301,7 @@ const failuresOf = (h) => h.failures;
  * h = { page, context, origin, backend, expect, eq, step, pause, shot, signIn, goto } */
 export async function runFlow(flow, { browser, origin, shotsDir = process.env.FLOW_SHOTS_DIR } = {}) {
   const ownBrowser = !browser;
-  const own = ownBrowser ? await Promise.all([launchBrowser(), startServer()]) : null;
+  const own = ownBrowser ? await Promise.all([launchBrowser({ fullChromium: !!flow.fullChromium }), startServer()]) : null;
   const theBrowser = browser || own[0];
   const theOrigin = origin || own[1].origin;
   const tmpVideos = fs.mkdtempSync(path.join(os.tmpdir(), "flow-video-"));

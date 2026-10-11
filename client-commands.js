@@ -1,5 +1,5 @@
 /* Remote actions share the presence timer; returning false defers to its next ping. */
-import "./i18n-dict.js?v=47";
+import "./i18n-dict.js?v=48";
 const FLUSH_TIMEOUT_MS = 3_000;
 const RELOAD_TOAST_MS = 2_000;
 const CLOSE_TOAST_MS = 5_000;
