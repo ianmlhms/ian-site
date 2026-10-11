@@ -21,6 +21,12 @@ const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim
 const PB = (window.PB = {});
 PB.current = null;          // currently open game object {id,name,...}
 let sessionBests = new Map();   // best score reported during this play, per board id
+// Idle games raise their score every tick. Scores reach the cloud at most once a
+// minute per board (immediately for the first one, a final one and on leaving),
+// and the last known cloud score is cached so each sync is a single request.
+const SCORE_SYNC_MS = 60_000;
+const cloudBests = new Map();   // "userId:boardId" -> best score known in the cloud (null = none)
+let pendingScores = new Map(), scoreTimer = null;
 let activeBoard = null;         // sub-leaderboard chosen by the game (e.g. one per level), or null
 const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board", "run"]);
 const BOARD_ID_PATTERN = /^[a-z0-9-]{1,48}$/;
@@ -166,8 +172,8 @@ PB.instrument = (html) => {
 };
 
 /* ---------------- open / close hooks ---------------- */
-PB.onOpenGame = (g) => { PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); loadEventStatus(); };
-PB.onCloseGame = () => { flushSave(); flushEvent(); netClose(); PB.current = null; activeBoard = null; updateSaveHint(); };
+PB.onOpenGame = (g) => { flushScores(); PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); loadEventStatus(); };
+PB.onCloseGame = () => { flushScores(); flushSave(); flushEvent(); netClose(); PB.current = null; activeBoard = null; updateSaveHint(); };
 PB.registerStandalone = (g) => {
   PB.current = g;
   weeklyFinals = new Set();
@@ -181,8 +187,8 @@ PB.registerStandalone = (g) => {
 // Saves reach the cloud on a 3 s debounce; leaving the page inside that window
 // (closing the tab, swiping the PWA away) would otherwise drop them from the
 // cloud copy. Best effort -- the local copy is always written synchronously.
-window.addEventListener("pagehide", () => { if (pendingSave) flushSave(); });
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && pendingSave) flushSave(); });
+window.addEventListener("pagehide", () => { flushScores(); if (pendingSave) flushSave(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState !== "hidden") return; flushScores(); if (pendingSave) flushSave(); });
 
 /* ---------------- game-state saves (progress, not just score) ----------------
  * Games post {__pbSave:1,data:{...}} → stored in localStorage always, and
@@ -376,6 +382,7 @@ window.__pbFlushSave = async () => {
   const best = localBest(board.id);
   if (!game.noScore && best !== null) scores.set(board.id, best);
   await Promise.all([
+    flushScores(),
     flushSave(),
     ...Array.from(scores, ([id, score]) => saveCloud(id === board.id ? board : { ...game, id }, score)),
   ]);
@@ -413,7 +420,7 @@ function receiveScore(detail) {
   sessionBests.set(g.id, score);
   setLocalBest(g, score);
   renderGameBar();
-  if (sb && session) saveCloud(g, score);
+  if (sb && session) queueCloudScore(g, score, detail.final === true);
 }
 window.addEventListener("message", (e) => {
   if (!isGameMessage(e)) return;
@@ -466,17 +473,36 @@ function applySession(s) {
   if (PB.current) touchStreak();
   loadWeeklyHome();
 }
+function queueCloudScore(g, s, isFinal) {
+  pendingScores.set(g.id, { g, s });
+  const isFirst = !cloudBests.has(`${session.user.id}:${g.id}`);
+  if (isFinal || isFirst) { flushScores(); return; }
+  if (!scoreTimer) scoreTimer = setTimeout(flushScores, SCORE_SYNC_MS);
+}
+function flushScores() {
+  if (scoreTimer) { clearTimeout(scoreTimer); scoreTimer = null; }
+  if (!pendingScores.size || !sb || !session) return Promise.resolve();
+  const batch = [...pendingScores.values()];
+  pendingScores = new Map();
+  return Promise.all(batch.map(({ g, s }) => saveCloud(g, s)));
+}
 async function saveCloud(g, s) {
   try {
     const uid = session.user.id;
-    const { data: ex, error: readError } = await sb.from("scores")
-      .select("score").eq("user_id", uid).eq("game_id", g.id).maybeSingle();
-    if (readError && readError.code !== "PGRST116") throw readError;
-    if (ex && !isBetter(g, s, ex.score)) return;
+    const key = `${uid}:${g.id}`;
+    if (!cloudBests.has(key)) {
+      const { data: ex, error: readError } = await sb.from("scores")
+        .select("score").eq("user_id", uid).eq("game_id", g.id).maybeSingle();
+      if (readError && readError.code !== "PGRST116") throw readError;
+      cloudBests.set(key, ex ? ex.score : null);
+    }
+    const known = cloudBests.get(key);
+    if (known !== null && !isBetter(g, s, known)) return;
+    cloudBests.set(key, s);   // the server keeps the better score if another device got further
     const { error } = await sb.from("scores").upsert(
       { user_id: uid, username, game_id: g.id, game_name: g.name, score: s, updated_at: new Date().toISOString() },
       { onConflict: "user_id,game_id" });
-    if (error) throw error;
+    if (error) { cloudBests.delete(key); throw error; }
   } catch (err) { console.warn("[PB] save score failed", err); }
 }
 async function fetchBoard(g) {
