@@ -25,9 +25,9 @@ import { flow as idleRebirthHalloween } from "./idle_rebirth_halloween.mjs";
 import { flow as busTycoon } from "./bus_tycoon.mjs";
 
 import { flow as paketExpress } from "./paket_express.mjs";
-import { flow as trainSim } from "./train_sim.mjs";
+// Lokféierer is offline for now (12 Oct 2026); re-add `trainSim` from "./train_sim.mjs" when it returns.
 
-const ALL = [trainSim, paketExpress, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween];
+const ALL = [paketExpress, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }
