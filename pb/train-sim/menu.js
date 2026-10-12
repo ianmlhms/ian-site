@@ -1,5 +1,5 @@
 /* Lokféierer: start screen / garage / upgrades. Pure DOM, no framework.
-   TS.menu.render(container, { save, lang, onStart(mode, routeId, trainId), onBuy(kind, id, extra), onSelect(trainId), onLang(lang) })
+   TS.menu.render(container, { save, lang, onStart(mode, routeId, trainId), onBuy(kind, id, extra), onSelect(trainId), onCareer(careerId), onLang(lang) })
    kind of onBuy: 'train' | 'route' | 'upgrade' (id = upgrade kind, extra = trainId).
    Callbacks may return the new save; otherwise call TS.menu.update({ save }) after persisting.
    Styles are injected once as <style id="ts-menu-style"> and scoped under .ts-menu. */
@@ -61,6 +61,18 @@
 .ts-menu__mode:disabled{opacity:.55;filter:saturate(.5)}
 .ts-menu__order{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--soft);margin-top:-6px}
 .ts-menu__order span.chip{padding:3px 9px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:650}
+.ts-menu__careers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ts-menu__career{display:flex;align-items:center;gap:14px;text-align:left;padding:14px 18px;border-radius:18px;border:2px solid var(--line);background:var(--card);min-height:76px;transition:transform .15s,background .15s,border-color .15s}
+.ts-menu__career .ico{font-size:34px;line-height:1}
+.ts-menu__career .txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.ts-menu__career .txt b{font-size:22px;font-weight:850;letter-spacing:-.01em}
+.ts-menu__career small{font-size:12px;color:var(--soft)}
+.ts-menu__career .cash{display:flex;flex-direction:column;align-items:flex-end}
+.ts-menu__career .cash b{font-size:18px;font-weight:800;color:var(--gold2)}
+.ts-menu__career[aria-selected="true"]{border-color:var(--gold);background:linear-gradient(135deg,rgba(255,188,66,.22),rgba(255,188,66,.06));box-shadow:0 8px 24px rgba(255,170,50,.18)}
+.ts-menu__career[data-career="tram"][aria-selected="true"]{border-color:var(--green);background:linear-gradient(135deg,rgba(79,209,139,.24),rgba(79,209,139,.06));box-shadow:0 8px 24px rgba(79,209,139,.16)}
+.ts-menu__career:not([aria-selected="true"]):hover{background:var(--card2)}
+.ts-menu__careerNote{grid-column:1/-1;margin-top:-2px}
 .ts-menu__sec{display:flex;flex-direction:column;gap:12px}
 .ts-menu__sec>h2{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--soft);font-weight:800;display:flex;align-items:center;gap:10px}
 .ts-menu__sec>h2::after{content:"";height:1px;flex:1;background:var(--line)}
@@ -126,6 +138,7 @@
 }
 @media (max-width:780px){
   .ts-menu__up,.ts-menu__help,.ts-menu__modes{grid-template-columns:1fr}
+  .ts-menu__career{padding:12px 14px;gap:10px}.ts-menu__career .ico{font-size:28px}.ts-menu__career .txt b{font-size:19px}
 }
 @media (max-height:700px){.ts-menu__titlebox{min-height:170px}.ts-menu__wallet{font-size:32px}}
 @media (prefers-reduced-motion:reduce){.ts-menu__heroTrain,.ts-menu__toast{animation:none}.ts-menu *{transition:none!important}.ts-menu{scroll-behavior:auto}}
@@ -174,7 +187,6 @@
     south: { name: { lb: 'Lëtzebuerg – Esch – Rodange', de: 'Luxemburg – Esch – Rodange', en: 'Luxembourg – Esch – Rodange' }, n: 9, km: 38, kind: 'rail' },
     east: { name: { lb: 'Lëtzebuerg – Waasserbëlleg', de: 'Luxemburg – Wasserbillig', en: 'Luxembourg – Wasserbillig' }, n: 7, km: 28, kind: 'rail' },
     north: { name: { lb: 'Lëtzebuerg – Ettelbréck – Clierf', de: 'Luxemburg – Ettelbrück – Clervaux', en: 'Luxembourg – Ettelbruck – Clervaux' }, n: 9, km: 63, kind: 'rail' },
-    tram: { name: { lb: 'Luxtram: Luxexpo – Cloche d’Or', de: 'Luxtram: Luxexpo – Cloche d’Or', en: 'Luxtram: Luxexpo – Cloche d’Or' }, n: 8, km: 8, kind: 'tram' },
     trier: { name: { lb: 'Lëtzebuerg – Tréier – Koblenz', de: 'Luxemburg – Trier – Koblenz', en: 'Luxembourg – Trier – Koblenz' }, n: 7, km: 190, kind: 'rail' },
     metz: { name: { lb: 'Lëtzebuerg – Metz – Nancy', de: 'Luxemburg – Metz – Nancy', en: 'Luxembourg – Metz – Nancy' }, n: 6, km: 150, kind: 'rail' },
     brussels: { name: { lb: 'Lëtzebuerg – Arlon – Bréissel', de: 'Luxemburg – Arlon – Brüssel', en: 'Luxembourg – Arlon – Brussels' }, n: 6, km: 220, kind: 'rail' },
@@ -202,9 +214,9 @@
       return null;
     }
   }
-  const KIND_ICON = { rail: '🚆', tram: '🚊', hst: '🚄' };
+  const KIND_ICON = { rail: '🚆', tram: '🚋', hst: '🚄' };
   const KIND_KEY = { rail: 'kindRail', tram: 'kindTram', hst: 'kindHst' };
-  const RANK_ICON = ['🔰', '🚆', '⭐', '🎖️', '👑'];
+  const RANK_ICON = { rail: ['🔰', '🚆', '⭐', '🎖️', '👑'], tram: ['🔰', '🚋', '⭐', '🎖️', '👑'] };
 
   /* -------------------------------------------------- train silhouettes */
   const SVG_W = 300;
@@ -264,7 +276,39 @@
       .join(' ');
   }
 
+  /* Tram silhouette: low floor, rounded cab ends, continuous glazing, one door per module, bellows between modules, roof pantographs. */
+  function tramSvg(liv, opts) {
+    const uid = ++svgUid;
+    const L = liv || { body: '#f1f1ee', accent: '#d6342e', stripe: '#8a8d93' };
+    const widths = [58, 46, 46, 46, 58], gap = 5, h = 32, bottom = BASE_Y - 4, top = bottom - h;
+    const total = widths.reduce((a, w) => a + w, 0) + gap * (widths.length - 1);
+    let x = (SVG_W - total) / 2;
+    const out = [`<defs><linearGradient id="tsg${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".4"/><stop offset=".5" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#000" stop-opacity=".3"/></linearGradient></defs>`];
+    out.push(`<rect x="4" y="${BASE_Y + 1}" width="${SVG_W - 8}" height="2.5" rx="1" fill="#78848b"/>`, `<rect x="4" y="${BASE_Y + 4}" width="${SVG_W - 8}" height="2" fill="#3a2f28" opacity=".6"/>`);
+    widths.forEach((w, i) => {
+      const first = i === 0, last = i === widths.length - 1;
+      const rl = first ? 12 : 3, rr = last ? 12 : 3;
+      out.push(`<path d="M${x + rl},${top} H${x + w - rr} Q${x + w},${top} ${x + w},${top + rr} V${bottom} H${x} V${top + rl} Q${x},${top} ${x + rl},${top} Z" fill="${L.body}"/>`);
+      out.push(`<rect x="${x}" y="${bottom - 7}" width="${w}" height="7" fill="${L.accent}" opacity=".92"/>`, `<rect x="${x}" y="${bottom - 9}" width="${w}" height="1.6" fill="${L.stripe}"/>`);
+      const gx0 = x + (first ? 14 : 4), gx1 = x + w - (last ? 14 : 4);
+      out.push(`<rect x="${gx0}" y="${top + 5}" width="${gx1 - gx0}" height="12" rx="2" fill="#16262f" opacity=".93"/>`);
+      for (let k = 1; k < Math.round((gx1 - gx0) / 14); k++) out.push(`<rect x="${gx0 + (k * (gx1 - gx0)) / Math.round((gx1 - gx0) / 14) - 0.6}" y="${top + 5}" width="1.2" height="12" fill="${L.body}"/>`);
+      const dx = x + w / 2 - 6;
+      out.push(`<rect x="${dx}" y="${top + 5}" width="12" height="${h - 12}" rx="1.5" fill="${L.accent}" opacity=".88"/>`, `<rect x="${dx + 5.4}" y="${top + 5}" width="1.2" height="${h - 12}" fill="#16262f" opacity=".5"/>`);
+      if (first) out.push(`<path d="M${x + 3},${top + 6} Q${x + 3},${top + 4} ${x + 8},${top + 4} L${x + 14},${top + 4} V${top + 17} H${x + 3} Z" fill="#0d1a22" opacity=".95"/>`, `<circle cx="${x + 3.5}" cy="${bottom - 11}" r="1.8" fill="#fff6c8"/>`);
+      if (last) out.push(`<path d="M${x + w - 3},${top + 6} Q${x + w - 3},${top + 4} ${x + w - 8},${top + 4} L${x + w - 14},${top + 4} V${top + 17} H${x + w - 3} Z" fill="#0d1a22" opacity=".95"/>`, `<circle cx="${x + w - 3.5}" cy="${bottom - 11}" r="1.8" fill="#ff5a4a"/>`);
+      out.push(`<rect x="${x}" y="${top}" width="${w}" height="${h}" fill="url(#tsg${uid})"/>`);
+      if (i === 1 || i === 3) out.push(`<path d="M${x + w / 2 - 10},${top} L${x + w / 2 - 2},${top - 9} L${x + w / 2 + 7},${top} M${x + w / 2 - 6},${top - 9} H${x + w / 2 + 3}" stroke="#2a2d30" stroke-width="1.6" fill="none" stroke-linecap="round"/>`);
+      [0.2, 0.8].forEach((f) => out.push(`<circle cx="${(x + w * f).toFixed(1)}" cy="${BASE_Y - 1.5}" r="3.2" fill="#1a1c1f" stroke="#555d63" stroke-width="1"/>`));
+      if (!last) out.push(`<rect x="${x + w}" y="${top + 6}" width="${gap}" height="${h - 9}" fill="#1d2326"/>`);
+      x += w + gap;
+    });
+    const label = opts && opts.label ? ` role="img" aria-label="${String(opts.label).replace(/[<>&"]/g, '')}"` : ' aria-hidden="true"';
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SVG_W} ${SVG_H}" preserveAspectRatio="xMidYMax meet"${label}>${out.join('')}</svg>`;
+  }
+
   function trainSvg(modelId, liv, opts) {
+    if (modelId === 'tram') return tramSvg(liv, opts);
     const segs = MODELS[modelId] || MODELS.emu;
     const uid = ++svgUid;
     const total = segs.reduce((a, s) => a + s.w, 0) + SEG_GAP * (segs.length - 1);
@@ -328,11 +372,15 @@
   }
 
   /* --------------------------------------------------------------- state */
-  const ctx = { container: null, root: null, opts: {}, save: null, routeId: 'west', trainId: 'railcar', toast: null, toastTimer: 0, heroTrain: null };
+  const ctx = { container: null, root: null, opts: {}, save: null, career: 'rail', routeId: 'west', trainId: 'railcar', toast: null, toastTimer: 0, heroTrain: null };
 
   function setSave(save) {
     ctx.save = K.normalize(save);
   }
+  /* The state of the career shown right now (wallet, rank, garage, routes, upgrades). */
+  const cs = () => ctx.save[ctx.career];
+  const careerRoutes = () => C.routeOrder.filter((id) => K.careerOfRoute(id) === ctx.career);
+  const careerTrains = () => C.trains.filter((tr) => K.careerOfTrain(tr) === ctx.career);
 
   function callHost(name, ...args) {
     const fn = ctx.opts[name];
@@ -344,7 +392,7 @@
       return undefined;
     }
   }
-  const isSave = (x) => x && typeof x === 'object' && typeof x.wallet === 'number' && Array.isArray(x.owned);
+  const isSave = (x) => x && typeof x === 'object' && !!x.rail && !!x.tram && typeof x.tb === 'number';
 
   function showToast(text, bad) {
     ctx.toast = { text, bad: !!bad };
@@ -359,14 +407,14 @@
   function doBuy(kind, id, extra) {
     const check = K.canBuy(ctx.save, kind, id, extra);
     if (!check.ok) {
-      showToast(t(check.reason === 'needsTrain' ? 'needsRoute' : check.reason === 'needsMoney' ? 'needsMoney' : 'locked'), true);
+      showToast(t(check.reason === 'needsTrain' ? 'needsRoute' : check.reason === 'needsSections' ? 'needsSections' : check.reason === 'needsMoney' ? 'needsMoney' : 'locked'), true);
       paint();
       return;
     }
     const res = callHost('onBuy', kind, id, extra);
     if (isSave(res)) {
       setSave(res);
-      if (kind === 'train') ctx.trainId = ctx.save.train;
+      if (kind === 'train') ctx.trainId = cs().train;
     }
     showToast(t(kind === 'upgrade' ? 'upgraded' : 'bought'), false);
     paint();
@@ -380,14 +428,25 @@
   function doSelectRoute(id) {
     ctx.routeId = id;
     // Switch to the cheapest owned train that can drive it, so the career button just works.
-    if (ctx.save.routes.includes(id) && !K.trainCompatible(ctx.trainId, id)) {
-      const fit = ctx.save.owned.find((tid) => K.trainCompatible(tid, id));
+    if (cs().routes.includes(id) && !K.trainCompatible(ctx.trainId, id)) {
+      const fit = cs().owned.find((tid) => K.trainCompatible(tid, id));
       if (fit) {
         ctx.trainId = fit;
         const res = callHost('onSelect', fit);
         if (isSave(res)) setSave(res);
       }
     }
+    paint();
+  }
+  /* Switch between the Zuch and the Tram career (remembered in the save). */
+  function doCareer(cid) {
+    if (cid === ctx.career) return;
+    ctx.career = cid;
+    const res = callHost('onCareer', cid);
+    if (isSave(res)) setSave(res);
+    ctx.routeId = cs().route;
+    ctx.trainId = cs().train;
+    ctx.heroTrain = null;
     paint();
   }
   function doStart(mode) {
@@ -422,26 +481,46 @@
       title: t('hintsInfo'), text: '💡 ' + t('hintsLabel') + ': ' + t(ctx.save.hints ? 'on' : 'off') });
   }
 
+  function careerSwitch() {
+    const tab = (cid) => {
+      const c = ctx.save[cid];
+      const info = K.rankInfo(c.lifetime, cid);
+      const on = ctx.career === cid;
+      return h('button', { type: 'button', class: 'ts-menu__career', role: 'tab', 'aria-selected': String(on), 'data-career': cid, 'data-fid': 'career-' + cid, 'data-test': 'career-' + cid, on: { click: () => doCareer(cid) } },
+        h('span', { class: 'ico', 'aria-hidden': 'true', text: C.careers[cid].icon }),
+        h('span', { class: 'txt' }, h('b', { text: t(cid === 'tram' ? 'careerTram' : 'careerRail') }), h('small', { text: t('rank_' + info.id) })),
+        h('span', { class: 'cash' }, h('small', { text: t('wallet') }), h('b', { 'data-test': 'wallet-' + cid, text: money(c.wallet) })));
+    };
+    return h('div', { class: 'ts-menu__careers', role: 'tablist', 'aria-label': t('careerSwitch') }, C.careers.order.map(tab), h('p', { class: 'ts-menu__small ts-menu__careerNote', text: t('careerNote') }));
+  }
+
   function hero() {
-    const s = ctx.save;
-    const info = K.rankInfo(s.lifetime);
+    const s = cs();
+    const info = K.rankInfo(s.lifetime, ctx.career);
     const train = trainById(ctx.trainId) || C.trains[0];
-    const eff = K.applyUpgrades(train, s);
+    const eff = K.applyUpgrades(train, ctx.save);
     const animate = ctx.heroTrain !== ctx.trainId;
     ctx.heroTrain = ctx.trainId;
     const toNext = info.next === null ? t('maxRank') : t('nextRank', { n: money(info.next).replace(' €', '') });
     return h('div', { class: 'ts-menu__hero' },
       h('div', { class: 'ts-menu__titlebox' },
-        h('div', {}, h('p', { class: 'ts-menu__eyebrow', text: 'Lëtzebuerg · LUX RAIL' }), h('h1', { class: 'ts-menu__title', id: 'ts-menu-title', text: t('title') }), h('p', { class: 'ts-menu__tag', text: t('tagline') })),
+        h('div', {}, h('p', { class: 'ts-menu__eyebrow', text: ctx.career === 'tram' ? 'Lëtzebuerg · LUXTRAM' : 'Lëtzebuerg · LUX RAIL' }), h('h1', { class: 'ts-menu__title', id: 'ts-menu-title', text: t('title') }), h('p', { class: 'ts-menu__tag', text: t(ctx.career === 'tram' ? 'taglineTram' : 'tagline') })),
         h('div', { class: 'ts-menu__heroTrain' + (animate ? ' anim' : '') }, svgNode(train.model, eff.livery, 'ts-menu__svg', pick(train.name))),
         h('div', { class: 'ts-menu__rails' })),
       h('div', { class: 'ts-menu__player' },
-        h('div', { class: 'ts-menu__rank' }, h('span', { class: 'ts-menu__badge', 'aria-hidden': 'true', text: RANK_ICON[info.index] }),
+        h('div', { class: 'ts-menu__rank' }, h('span', { class: 'ts-menu__badge', 'aria-hidden': 'true', text: RANK_ICON[ctx.career][info.index] }),
           h('div', {}, h('div', { text: t('rank') }), h('div', { class: 'ts-menu__rankName', text: t('rank_' + info.id) }))),
         h('div', { class: 'ts-menu__bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(info.progress * 100)) }, h('i', { style: `width:${Math.round(info.progress * 100)}%` })),
         h('p', { class: 'ts-menu__small', text: toNext }),
         h('div', { class: 'ts-menu__walletRow' }, h('div', {}, h('div', { class: 'ts-menu__small', text: t('wallet') }), h('div', { class: 'ts-menu__wallet', 'data-test': 'wallet', text: money(s.wallet) })),
           h('div', {}, h('div', { class: 'ts-menu__small', text: t('lifetime') }), h('b', { text: money(s.lifetime) })))));
+  }
+
+  /* Short name for the endless order chips: the terminus for rail lines, the section name for the Luxtram. */
+  function chipLabel(id) {
+    const name = routeInfo(id).name;
+    if (K.careerOfRoute(id) === 'tram') return name.replace(/^Luxtram T1:\s*/, '');
+    return name.split(' – ')[name.includes(' – ') ? 1 : 0];
   }
 
   function modes() {
@@ -453,23 +532,23 @@
     return [
       h('div', { class: 'ts-menu__modes' },
         h('button', { type: 'button', class: 'ts-menu__mode ts-menu__mode--career', disabled: !avail.ok, 'data-fid': 'mode-career', 'data-test': 'mode-career', on: { click: () => doStart('career') } },
-          h('span', { class: 'go', 'aria-hidden': 'true', text: '▶' }), h('b', { text: t('modeCareer') }), h('small', { text: t('modeCareerDesc') }), h('span', { class: 'sub', text: careerSub })),
+          h('span', { class: 'go', 'aria-hidden': 'true', text: '▶' }), h('b', { text: t('modeCareer') }), h('small', { text: t(ctx.career === 'tram' ? 'modeCareerDescTram' : 'modeCareerDesc') }), h('span', { class: 'sub', text: careerSub })),
         h('button', { type: 'button', class: 'ts-menu__mode ts-menu__mode--endless', disabled: !endlessList.length, 'data-fid': 'mode-endless', 'data-test': 'mode-endless', on: { click: () => doStart('endless') } },
-          h('span', { class: 'go', 'aria-hidden': 'true', text: '∞' }), h('b', { text: t('modeEndless') }), h('small', { text: t('modeEndlessDesc') }), h('span', { class: 'sub', text: pick(train.name) + ' · ×' + C.economy.endlessMultiplier }))),
+          h('span', { class: 'go', 'aria-hidden': 'true', text: '∞' }), h('b', { text: t('modeEndless') }), h('small', { text: t(ctx.career === 'tram' ? 'modeEndlessDescTram' : 'modeEndlessDesc') }), h('span', { class: 'sub', text: pick(train.name) + ' · ×' + C.economy.endlessMultiplier }))),
       h('div', { class: 'ts-menu__order', 'aria-label': t('endlessRoutes') }, h('span', { text: t('endlessRoutes') }),
-        endlessList.map((id, i) => h('span', { class: 'chip' }, (i ? '→ ' : '') + routeInfo(id).name.split(' – ')[routeInfo(id).name.includes(' – ') ? 1 : 0]))),
+        endlessList.map((id, i) => h('span', { class: 'chip' }, (i ? '→ ' : '') + chipLabel(id)))),
     ];
   }
 
   function routeCard(id) {
-    const s = ctx.save;
+    const s = cs();
     const rule = C.routeRules[id];
     const info = routeInfo(id);
     const owned = s.routes.includes(id);
     const selected = ctx.routeId === id;
     const needNames = K.trainsForRoute(id).map((tid) => pick(trainById(tid).name));
     const needsLabel = needNames.length > 1 ? t('needsTrainOrBetter', { name: needNames[0] }) : t('needsTrain', { name: needNames[0] || '?' });
-    const check = K.canBuy(s, 'route', id);
+    const check = K.canBuy(ctx.save, 'route', id);
     const ownsFit = s.owned.some((tid) => K.trainCompatible(tid, id));
     const badge = owned
       ? (ownsFit ? h('span', { class: 'ts-menu__badge2', text: '✓ ' + t('unlocked') }) : h('span', { class: 'ts-menu__badge2 ts-menu__badge2--warn', text: needsLabel }))
@@ -478,12 +557,12 @@
       ? null
       : h('div', { class: 'ts-menu__foot' },
         h('button', { type: 'button', class: 'ts-menu__btn ts-menu__btn--buy', disabled: !check.ok, 'data-fid': 'buy-route-' + id, 'data-test': 'buy-route-' + id, on: { click: () => doBuy('route', id) },
-          title: check.reason === 'needsTrain' ? needsLabel : '' }, check.reason === 'needsTrain' ? needsLabel : t('unlock') + ' · ' + money(rule.price)));
+          title: check.reason === 'needsTrain' ? needsLabel : '' }, check.reason === 'needsTrain' ? needsLabel : check.reason === 'needsSections' ? t('needsSections') : t('unlock') + ' · ' + money(rule.price)));
     return h('article', { class: 'ts-menu__card', 'data-selected': String(selected && owned), 'data-locked': String(!owned), 'data-route': id },
       h('button', { type: 'button', class: 'ts-menu__pick', disabled: !owned, 'aria-pressed': String(selected && owned), 'data-fid': 'route-' + id, 'data-test': 'route-' + id, on: { click: () => doSelectRoute(id) } },
         h('div', { class: 'ts-menu__rowHead' }, h('span', { class: 'ts-menu__kind', 'aria-hidden': 'true', text: KIND_ICON[info.kind] || '🚆' }), h('h3', { text: info.name })),
         h('div', { class: 'ts-menu__meta' }, h('span', { text: t('stationsN', { n: info.stops }) }), info.km ? h('span', { text: Math.round(info.km) + ' km' }) : null, h('span', { text: t(KIND_KEY[info.kind] || 'kindRail') }),
-          h('span', { class: 'ts-menu__price', text: owned ? '' : money(rule.price) }), owned && ctx.save.best[id] ? h('span', { text: '★ ' + ctx.save.best[id] }) : null),
+          h('span', { class: 'ts-menu__price', text: owned ? '' : money(rule.price) }), owned && s.best[id] ? h('span', { text: '★ ' + s.best[id] }) : null),
         badge),
       foot);
   }
@@ -494,11 +573,11 @@
   }
 
   function trainCard(train) {
-    const s = ctx.save;
+    const s = cs();
     const owned = s.owned.includes(train.id);
     const selected = ctx.trainId === train.id;
-    const eff = K.applyUpgrades(train, s);
-    const check = K.canBuy(s, 'train', train.id);
+    const eff = K.applyUpgrades(train, ctx.save);
+    const check = K.canBuy(ctx.save, 'train', train.id);
     const maxSpeed = 320, maxCap = 750, maxAccel = 1.3, maxBrake = 1.4;
     const stats = h('div', { class: 'ts-menu__stats' },
       statRow(t('statSpeed'), eff.maxKmh, maxSpeed, eff.maxKmh + ' km/h'),
@@ -522,15 +601,15 @@
   }
 
   function upgradesPanel() {
-    const s = ctx.save;
+    const s = cs();
     const train = trainById(ctx.trainId);
     if (!train || !s.owned.includes(train.id)) return null;
     const levels = s.upgrades[train.id];
     const rows = C.upgradeKinds.map((kind) => {
       const max = K.MAX_LEVELS[kind];
       const lv = levels[kind];
-      const price = K.upgradePrice(s, train.id, kind);
-      const check = K.canBuy(s, 'upgrade', kind, train.id);
+      const price = K.upgradePrice(ctx.save, train.id, kind);
+      const check = K.canBuy(ctx.save, 'upgrade', kind, train.id);
       const isMax = price === undefined;
       const infoKey = kind === 'capacity' && C.extraCarTrains.includes(train.id) ? 'up_capacity_info_car' : 'up_' + kind + '_info';
       const liveries = train.liveries || [train.livery];
@@ -566,19 +645,20 @@
     const active = document.activeElement;
     const fid = active && ctx.root && ctx.root.contains(active) ? active.getAttribute('data-fid') : null;
     const scroll = ctx.root ? ctx.root.scrollTop : 0;
-    const s = ctx.save;
+    const s = cs();
     if (!s.routes.includes(ctx.routeId)) ctx.routeId = s.route;
     if (!s.owned.includes(ctx.trainId)) ctx.trainId = s.train;
 
     const root = h('div', { class: 'ts-menu', lang: TS.lang, role: 'main', 'aria-labelledby': 'ts-menu-title' });
     const inner = h('div', { class: 'ts-menu__inner' },
-      h('div', { class: 'ts-menu__top' }, h('span', { class: 'ts-menu__stamp', text: '🚆 LUX RAIL · SIM' }), h('div', { class: 'ts-menu__topR' }, hintsToggle(), langBar())),
+      h('div', { class: 'ts-menu__top' }, h('span', { class: 'ts-menu__stamp', text: C.careers[ctx.career].icon + (ctx.career === 'tram' ? ' LUXTRAM · SIM' : ' LUX RAIL · SIM') }), h('div', { class: 'ts-menu__topR' }, hintsToggle(), langBar())),
+      careerSwitch(),
       hero(),
       modes(),
       h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-routes' }, h('h2', { id: 'ts-menu-routes', text: t('routes') }),
-        h('div', { class: 'ts-menu__grid ts-menu__grid--routes' }, C.routeOrder.map(routeCard))),
+        h('div', { class: 'ts-menu__grid ts-menu__grid--routes' }, careerRoutes().map(routeCard))),
       h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-garage' }, h('h2', { id: 'ts-menu-garage', text: t('garage') }),
-        h('div', { class: 'ts-menu__grid ts-menu__grid--trains' }, C.trains.map(trainCard))),
+        h('div', { class: 'ts-menu__grid ts-menu__grid--trains' }, careerTrains().map(trainCard))),
       upgradesPanel(),
       helpPanel(),
       h('p', { class: 'ts-menu__footer', text: 'ian.lu · Lokféierer' }),
@@ -604,8 +684,9 @@
     ctx.opts = { ...(opts || {}) };
     if (ctx.opts.lang) TS.setLang(ctx.opts.lang);
     setSave(ctx.opts.save);
-    ctx.routeId = ctx.save.route;
-    ctx.trainId = ctx.save.train;
+    ctx.career = ctx.save.career;
+    ctx.routeId = cs().route;
+    ctx.trainId = cs().train;
     ctx.toast = null;
     ctx.root = null;
     ctx.heroTrain = null;
@@ -619,8 +700,9 @@
     if (p.save) {
       setSave(p.save);
       ctx.opts = { ...ctx.opts, save: ctx.save };
-      ctx.trainId = ctx.save.train;
-      if (ctx.save.routes.includes(ctx.save.route)) ctx.routeId = ctx.save.route;
+      ctx.career = ctx.save.career;
+      ctx.trainId = cs().train;
+      if (cs().routes.includes(cs().route)) ctx.routeId = cs().route;
     }
     paint();
   }

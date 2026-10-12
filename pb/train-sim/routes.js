@@ -170,31 +170,6 @@
     ]
   );
 
-  /* ---------------------------------------------------------------- 5 tram */
-  const tram = makeRoute(
-    {
-      id: 'tram', kind: 'tram', region: 'Stad', cruise: 50, biomes: ['tramcity'],
-      name: { lb: 'Luxtram: Luxexpo – Cloche d\'Or', de: 'Luxtram: Luxexpo – Cloche d\'Or', en: 'Luxtram: Luxexpo – Cloche d\'Or' },
-    },
-    [
-      station('Luxexpo', 2, 'right', 'tramcity'),
-      ...leg(450, 's100:v50 r150/110 s*:v50 l120/90 s60:v25'),
-      station('Kierchbierg', 2, 'left', 'tramcity'),
-      ...leg(450, 's80:v50 l200/130 s* r180/110 s60:v25'),
-      station('Rout Bréck', 1, 'right', 'tramcity'),
-      ...leg(750, 's100:v50 s300:Bs,30,w l100/100:v25 s*:v40 r80/90:v20 s60:v25'),
-      station('Hamilius', 3, 'left', 'tramcity'),
-      ...leg(380, 's60:v30 r70/90:v20 s* l70/90 s40:v20'),
-      station('Stäreplaz', 2, 'right', 'tramcity'),
-      ...leg(600, 's80:v40 l150/120 s* r160/110 s100:v50'),
-      station('Gare Centrale', 3, 'left', 'tramcity'),
-      ...leg(450, 's80:v30 r60/100:v20 s* l60/100 s50:v25'),
-      station('Lycée Bouneweg', 1, 'right', 'tramcity'),
-      ...leg(700, 's100:v50 l200/130 s*:v50 r220/130 s100:v40'),
-      station('Cloche d\'Or', 2, 'left', 'tramcity', true),
-    ]
-  );
-
   /* --------------------------------------------------------------- 6 trier */
   const trier = makeRoute(
     {
@@ -277,7 +252,7 @@
     ]
   );
 
-  const list = [west, south, east, north, tram, trier, metz, brussels, paris];
+  const list = [west, south, east, north, trier, metz, brussels, paris];
   const byId = list.reduce((acc, r) => Object.assign(acc, { [r.id]: r }), {});
 
   window.TS.routes = Object.freeze({

@@ -45,11 +45,11 @@
   const SECTIONS = [
     { id: 'luxtram-kierchbierg', from: 0, to: 9, price: 10000, fareBase: 14,
       name: { lb: 'Luxtram T1: Findel – Kierchbierg', de: 'Luxtram T1: Findel – Kirchberg', en: 'Luxtram T1: Findel – Kirchberg' } },
-    { id: 'luxtram-stad', from: 9, to: 16, price: 12000, fareBase: 14,
+    { id: 'luxtram-stad', from: 9, to: 16, price: 0, fareBase: 14,
       name: { lb: 'Luxtram T1: Kierchbierg – Gare', de: 'Luxtram T1: Kirchberg – Hauptbahnhof', en: 'Luxtram T1: Kirchberg – Central Station' } },
     { id: 'luxtram-sud', from: 16, to: 23, price: 14000, fareBase: 14,
       name: { lb: 'Luxtram T1: Gare – Stadion', de: 'Luxtram T1: Hauptbahnhof – Stadion', en: 'Luxtram T1: Central Station – Stadium' } },
-    { id: 'luxtram', from: 0, to: 23, price: 30000, fareBase: 16,
+    { id: 'luxtram', from: 0, to: 23, price: 40000, fareBase: 16, requires: ['luxtram-kierchbierg', 'luxtram-sud'],
       name: { lb: 'Luxtram T1: Findel – Stadion (ganzt Linn)', de: 'Luxtram T1: Findel – Stadion (ganze Linie)', en: 'Luxtram T1: Findel – Stadium (full line)' } },
   ];
 
@@ -577,18 +577,19 @@
     if (TS.luxtram && TS.luxtram.registered) return;
     if (!TS.routes || !TS.config || !TS.track) { console.warn(TAG + 'routes/config/track missing, not registering'); return; }
     const defs = SECTIONS.map(makeRouteDef);
-    const baseList = TS.routes.list.slice();
-    const at = baseList.findIndex((r) => r.id === 'tram');
-    const list = at >= 0 ? baseList.slice(0, at + 1).concat(defs, baseList.slice(at + 1)) : baseList.concat(defs);
+    const list = TS.routes.list.filter((r) => r.id !== 'tram').concat(defs);   // the generic fictional tram line is gone: only the real Luxtram
     const byId = list.reduce((acc, r) => Object.assign(acc, { [r.id]: r }), {});
     TS.routes = Object.freeze({ list, get: (id) => byId[id] || null });
 
+    // Tram career: sections are bought with tram money (stad is free, the full line needs the other sections first).
     const rules = {};
-    SECTIONS.forEach((s) => { rules[s.id] = Object.freeze({ price: s.price, needs: Object.freeze(['tram']), fareBase: s.fareBase }); });
-    const order = TS.config.routeOrder.slice();
-    const oi = order.indexOf('tram');
-    const newOrder = oi >= 0 ? order.slice(0, oi + 1).concat(SECTIONS.map((s) => s.id), order.slice(oi + 1)) : order.concat(SECTIONS.map((s) => s.id));
-    TS.config = Object.freeze(Object.assign({}, TS.config, { routeRules: Object.freeze(Object.assign({}, TS.config.routeRules, rules)), routeOrder: Object.freeze(newOrder) }));
+    SECTIONS.forEach((s) => {
+      rules[s.id] = Object.freeze({ price: s.price, needs: Object.freeze(['tram']), fareBase: s.fareBase, requires: Object.freeze(s.requires || []) });
+    });
+    const order = TS.config.routeOrder.filter((id) => id !== 'tram').concat(SECTIONS.map((s) => s.id));
+    const cleanRules = Object.assign({}, TS.config.routeRules);
+    delete cleanRules.tram;
+    TS.config = Object.freeze(Object.assign({}, TS.config, { routeRules: Object.freeze(Object.assign(cleanRules, rules)), routeOrder: Object.freeze(order) }));
 
     const baseBuild = TS.track.build;
     TS.track = Object.assign({}, TS.track, {

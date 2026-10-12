@@ -1,58 +1,124 @@
 /* Lokféierer: career, pure functions over a save object. Never mutates inputs.
-   Save shape: { v, tb (lifetime EUR, monotonic, the server compares this), lifetime, wallet, savedAt,
-                 owned:[trainId], routes:[routeId], train, route, upgrades:{[trainId]:{motor,brakes,comfort,capacity,paint}},
-                 best:{[routeId]:points}, services, endlessBest } */
+   Two separate careers live in one save: 'rail' (Zuch) and 'tram' (the Luxtram). Each has its own wallet, lifetime EUR,
+   rank, services, bests, owned vehicles, routes and upgrades. Money earned in one career can't be spent in the other.
+   Save shape (v2):
+     { v:2, tb, savedAt, career:'rail'|'tram' (last chosen), hints, hintsSet,
+       rail: CareerState, tram: CareerState }
+     CareerState = { lifetime, wallet, owned:[trainId], routes:[routeId], train, route,
+                     upgrades:{[trainId]:{motor,brakes,comfort,capacity,paint}}, best:{[routeId]:points}, services, endlessBest }
+   tb = rail.lifetime + tram.lifetime: monotonic (the server drops saves with a lower tb) and what the arcade compares.
+   Old flat saves (v1: lifetime/wallet/owned/... at the top level) become the rail career unchanged; tram vehicles/routes they
+   owned move to the tram career, which otherwise starts fresh (see normalize). */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
   const C = TS.config;
   const MAX = Number.MAX_SAFE_INTEGER;
-  const FREE_TRAIN = 'railcar';
-  const FREE_ROUTE = 'west';
+  const CAREERS = C.careers.order;
+  const DEFAULT_CAREER = 'rail';
+  const TEST_MODE_EUROS = 5000000;
   const MAX_LEVELS = Object.freeze(Object.fromEntries(C.upgradeKinds.map((k) => [k, C.upgrades.railcar[k].length])));
 
   const num = (n) => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(MAX, Math.floor(n))) : 0);
+  const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   const trainById = (id) => C.trains.find((t) => t.id === id) || null;
   const rule = (routeId) => C.routeRules[routeId] || null;
   const unique = (list, allowed) => [...new Set(Array.isArray(list) ? list.filter((x) => allowed.includes(x)) : [])];
-  const allRouteIds = () => Object.keys(C.routeRules);
 
-  function emptyUpgrades() {
-    return Object.fromEntries(C.trains.map((t) => [t.id, Object.fromEntries(C.upgradeKinds.map((k) => [k, 0]))]));
+  // ---- which career does a vehicle / route belong to
+  const careerOfTrain = (trainOrId) => {
+    const train = typeof trainOrId === 'string' ? trainById(trainOrId) : trainOrId;
+    return train ? (train.kind === 'tram' ? 'tram' : 'rail') : null;
+  };
+  const careerOfRoute = (routeId) => {
+    const r = rule(routeId);
+    return r ? (r.needs.includes('tram') ? 'tram' : 'rail') : null;
+  };
+  const trainIdsOf = (cid) => C.trains.filter((t) => careerOfTrain(t) === cid).map((t) => t.id);
+  const routeIdsOf = (cid) => C.routeOrder.filter((id) => careerOfRoute(id) === cid);
+  const freeTrainsOf = (cid) => C.trains.filter((t) => careerOfTrain(t) === cid && t.price === 0).map((t) => t.id);
+  const freeRoutesOf = (cid) => routeIdsOf(cid).filter((id) => C.routeRules[id].price === 0);
+
+  function normalizeCareer(cid, input) {
+    const d = isObj(input) ? input : {};
+    const trainIds = trainIdsOf(cid);
+    const routeIds = routeIdsOf(cid);
+    const freeTrains = freeTrainsOf(cid);
+    const freeRoutes = freeRoutesOf(cid);
+    const lifetime = num(d.lifetime);
+    const owned = unique([...freeTrains, ...(Array.isArray(d.owned) ? d.owned : [])], trainIds);
+    const routes = unique([...freeRoutes, ...(Array.isArray(d.routes) ? d.routes : [])], routeIds);
+    const upgrades = {};
+    for (const id of trainIds) {
+      upgrades[id] = {};
+      for (const k of C.upgradeKinds) upgrades[id][k] = Math.min(MAX_LEVELS[k], num(d.upgrades && d.upgrades[id] && d.upgrades[id][k]));
+    }
+    const best = {};
+    if (isObj(d.best)) for (const id of routeIds) if (num(d.best[id])) best[id] = num(d.best[id]);
+    return {
+      lifetime, wallet: Math.min(lifetime, num(d.wallet)), owned, routes,
+      train: owned.includes(d.train) ? d.train : freeTrains[0], route: routes.includes(d.route) ? d.route : freeRoutes[0],
+      upgrades, best, services: num(d.services), endlessBest: num(d.endlessBest),
+    };
+  }
+
+  /* Old flat save -> { rail, tram, career }. Rail keeps everything unchanged (normalizeCareer drops what isn't rail);
+     tram vehicles/routes/upgrades the old save already owned move to the tram career, whose money starts at zero.
+     Routes that no longer exist (the old fictional `tram` line) are ignored. */
+  function migrateLegacy(d) {
+    const lifetime = Math.max(num(d.lifetime), num(d.tb));
+    const shared = { owned: d.owned, routes: d.routes, train: d.train, route: d.route, upgrades: d.upgrades, best: d.best };
+    return {
+      rail: normalizeCareer('rail', { ...shared, lifetime, wallet: d.wallet, services: d.services, endlessBest: d.endlessBest }),
+      tram: normalizeCareer('tram', { ...shared, lifetime: 0, wallet: 0 }),
+      career: careerOfTrain(d.train) === 'tram' ? 'tram' : DEFAULT_CAREER,
+    };
   }
 
   function normalize(data) {
-    const d = data && typeof data === 'object' ? data : {};
-    const lifetime = Math.max(num(d.lifetime), num(d.tb));
-    const owned = unique([FREE_TRAIN, ...(Array.isArray(d.owned) ? d.owned : [])], C.trains.map((t) => t.id));
-    const freeRoutes = allRouteIds().filter((id) => C.routeRules[id].price === 0);
-    const routes = unique([...freeRoutes, ...(Array.isArray(d.routes) ? d.routes : [])], allRouteIds());
-    const upgrades = emptyUpgrades();
-    for (const t of C.trains) {
-      for (const k of C.upgradeKinds) {
-        upgrades[t.id][k] = Math.min(MAX_LEVELS[k], num(d.upgrades && d.upgrades[t.id] && d.upgrades[t.id][k]));
-      }
-    }
-    const best = {};
-    if (d.best && typeof d.best === 'object') for (const id of allRouteIds()) if (num(d.best[id])) best[id] = num(d.best[id]);
+    const d = isObj(data) ? data : {};
+    const nested = isObj(d.rail) || isObj(d.tram);
+    const parts = nested
+      ? { rail: normalizeCareer('rail', d.rail), tram: normalizeCareer('tram', d.tram), career: CAREERS.includes(d.career) ? d.career : DEFAULT_CAREER }
+      : migrateLegacy(d);
     return {
-      v: C.saveVersion, tb: lifetime, lifetime, wallet: Math.min(lifetime, num(d.wallet)), savedAt: num(d.savedAt),
-      owned, routes, train: owned.includes(d.train) ? d.train : FREE_TRAIN, route: routes.includes(d.route) ? d.route : FREE_ROUTE,
-      upgrades, best, services: num(d.services), endlessBest: num(d.endlessBest),
+      v: C.saveVersion, tb: parts.rail.lifetime + parts.tram.lifetime, savedAt: num(d.savedAt), career: parts.career,
+      rail: parts.rail, tram: parts.tram,
       hints: d.hints !== false, hintsSet: d.hintsSet === true,
     };
   }
 
   const defaults = () => normalize({});
 
-  /* Whole-save winner: higher lifetime wins; tie -> newer savedAt. Spent euros can't be resurrected. */
+  /* A career's state inside a save (default: the one last chosen). */
+  function of(save, cid) {
+    const s = normalize(save);
+    return s[CAREERS.includes(cid) ? cid : s.career];
+  }
+
+  /* Whole-save winner: higher total progress (tb) wins; tie -> newer savedAt. Spent euros can't be resurrected. */
   function merge(local, cloud) {
     const a = normalize(local);
     const b = normalize(cloud);
-    return b.lifetime > a.lifetime || (b.lifetime === a.lifetime && b.savedAt > a.savedAt) ? b : a;
+    return b.tb > a.tb || (b.tb === a.tb && b.savedAt > a.savedAt) ? b : a;
   }
 
-  const withSave = (save, patch) => normalize({ ...save, ...patch });
+  const withTop = (save, patch) => normalize({ ...save, ...patch });
+  function withCareer(save, cid, patch) {
+    const s = normalize(save);
+    return normalize({ ...s, [cid]: { ...s[cid], ...patch } });
+  }
+  const setHints = (save, on) => withTop(normalize(save), { hints: !!on, hintsSet: true });
+  const setCareer = (save, cid) => (CAREERS.includes(cid) ? withTop(normalize(save), { career: cid }) : null);
+
+  /* Everything unlocked, lots of EUR, in both careers. Only for the arcade test mode: never persist the result. */
+  function unlockedAll() {
+    const everything = (cid) => ({
+      lifetime: TEST_MODE_EUROS, wallet: TEST_MODE_EUROS, owned: trainIdsOf(cid), routes: routeIdsOf(cid),
+      upgrades: Object.fromEntries(trainIdsOf(cid).map((id) => [id, { ...MAX_LEVELS }])),
+    });
+    return normalize({ career: DEFAULT_CAREER, rail: everything('rail'), tram: everything('tram') });
+  }
 
   // ---- compatibility
   function trainMatches(train, token) {
@@ -77,53 +143,64 @@
     const s = normalize(save);
     const r = rule(routeId);
     if (!r) return { ok: false, reason: 'unknownRoute', needs: [] };
-    if (!s.routes.includes(routeId)) return { ok: false, reason: 'needsRoute', needs: trainsForRoute(routeId) };
-    const id = trainId || s.train;
+    const cid = careerOfRoute(routeId);
+    const c = s[cid];
+    if (!c.routes.includes(routeId)) return { ok: false, reason: 'needsRoute', needs: trainsForRoute(routeId) };
+    const id = trainId || c.train;
     if (!trainById(id)) return { ok: false, reason: 'unknownTrain', needs: trainsForRoute(routeId) };
-    if (!s.owned.includes(id)) return { ok: false, reason: 'trainNotOwned', needs: [] };
-    if (!trainCompatible(id, routeId)) return { ok: false, reason: 'wrongTrainKind', needs: trainsForRoute(routeId) };
+    if (careerOfTrain(id) !== cid || !trainCompatible(id, routeId)) return { ok: false, reason: 'wrongTrainKind', needs: trainsForRoute(routeId) };
+    if (!c.owned.includes(id)) return { ok: false, reason: 'trainNotOwned', needs: [] };
     return { ok: true, reason: '', needs: [] };
   }
 
-  // ---- purchases (return new save or null)
+  const hasRequired = (c, routeId) => (rule(routeId).requires || []).every((id) => c.routes.includes(id));
+
+  // ---- purchases (return new save or null). Each one spends the wallet of the career the item belongs to.
   function buyTrain(save, id) {
     const s = normalize(save);
     const t = trainById(id);
-    if (!t || s.owned.includes(id) || s.wallet < t.price) return null;
-    return withSave(s, { owned: [...s.owned, id], train: id, wallet: s.wallet - t.price });
+    if (!t) return null;
+    const cid = careerOfTrain(t);
+    const c = s[cid];
+    if (c.owned.includes(id) || c.wallet < t.price) return null;
+    return withCareer(s, cid, { owned: [...c.owned, id], train: id, wallet: c.wallet - t.price });
   }
   function upgradePrice(save, trainId, kind) {
     const s = normalize(save);
     const table = C.upgrades[trainId] && C.upgrades[trainId][kind];
-    if (!table) return undefined;
-    return table[s.upgrades[trainId][kind]];
+    const cid = careerOfTrain(trainId);
+    if (!table || !cid) return undefined;
+    return table[s[cid].upgrades[trainId][kind]];
   }
   function buyUpgrade(save, trainId, kind) {
     const s = normalize(save);
-    if (!s.owned.includes(trainId) || !C.upgradeKinds.includes(kind)) return null;
+    const cid = careerOfTrain(trainId);
+    if (!cid || !s[cid].owned.includes(trainId) || !C.upgradeKinds.includes(kind)) return null;
+    const c = s[cid];
     const price = upgradePrice(s, trainId, kind);
-    if (price === undefined || s.wallet < price) return null;
-    const upgrades = { ...s.upgrades, [trainId]: { ...s.upgrades[trainId], [kind]: s.upgrades[trainId][kind] + 1 } };
-    return withSave(s, { upgrades, wallet: s.wallet - price });
+    if (price === undefined || c.wallet < price) return null;
+    const upgrades = { ...c.upgrades, [trainId]: { ...c.upgrades[trainId], [kind]: c.upgrades[trainId][kind] + 1 } };
+    return withCareer(s, cid, { upgrades, wallet: c.wallet - price });
   }
   function buyRoute(save, routeId) {
     const s = normalize(save);
     const r = rule(routeId);
-    if (!r || s.routes.includes(routeId) || s.wallet < r.price) return null;
-    if (!s.owned.some((id) => trainCompatible(id, routeId))) return null; // no point buying a line you can't drive
-    return withSave(s, { routes: [...s.routes, routeId], wallet: s.wallet - r.price });
+    if (!r) return null;
+    const cid = careerOfRoute(routeId);
+    const c = s[cid];
+    if (c.routes.includes(routeId) || c.wallet < r.price || !hasRequired(c, routeId)) return null;
+    if (!c.owned.some((id) => trainCompatible(id, routeId))) return null; // no point buying a line you can't drive
+    return withCareer(s, cid, { routes: [...c.routes, routeId], wallet: c.wallet - r.price });
   }
   function select(save, trainId) {
     const s = normalize(save);
-    return s.owned.includes(trainId) ? withSave(s, { train: trainId }) : null;
-  }
-  /* Player choice for the coach hints ("Hiweiser"); remembered so the automatic retirement stops. */
-  function setHints(save, on) {
-    return withSave(normalize(save), { hints: !!on, hintsSet: true });
+    const cid = careerOfTrain(trainId);
+    return cid && s[cid].owned.includes(trainId) ? withCareer(s, cid, { train: trainId }) : null;
   }
   function selectRoute(save, routeId) {
     const s = normalize(save);
-    return s.routes.includes(routeId) ? withSave(s, { route: routeId }) : null;
+    const cid = careerOfRoute(routeId);
+    return cid && s[cid].routes.includes(routeId) ? withCareer(s, cid, { route: routeId }) : null;
   }
   /* Why can't I buy? -> { ok, reason, price }. */
   function canBuy(save, kind, id, extra) {
@@ -131,22 +208,26 @@
     if (kind === 'train') {
       const t = trainById(id);
       if (!t) return { ok: false, reason: 'unknownTrain', price: 0 };
-      if (s.owned.includes(id)) return { ok: false, reason: 'owned', price: t.price };
-      return { ok: s.wallet >= t.price, reason: s.wallet >= t.price ? '' : 'needsMoney', price: t.price };
+      const c = s[careerOfTrain(t)];
+      if (c.owned.includes(id)) return { ok: false, reason: 'owned', price: t.price };
+      return { ok: c.wallet >= t.price, reason: c.wallet >= t.price ? '' : 'needsMoney', price: t.price };
     }
     if (kind === 'route') {
       const r = rule(id);
       if (!r) return { ok: false, reason: 'unknownRoute', price: 0 };
-      if (s.routes.includes(id)) return { ok: false, reason: 'owned', price: r.price };
-      if (!s.owned.some((tid) => trainCompatible(tid, id))) return { ok: false, reason: 'needsTrain', price: r.price };
-      return { ok: s.wallet >= r.price, reason: s.wallet >= r.price ? '' : 'needsMoney', price: r.price };
+      const c = s[careerOfRoute(id)];
+      if (c.routes.includes(id)) return { ok: false, reason: 'owned', price: r.price };
+      if (!c.owned.some((tid) => trainCompatible(tid, id))) return { ok: false, reason: 'needsTrain', price: r.price };
+      if (!hasRequired(c, id)) return { ok: false, reason: 'needsSections', price: r.price };
+      return { ok: c.wallet >= r.price, reason: c.wallet >= r.price ? '' : 'needsMoney', price: r.price };
     }
     if (kind === 'upgrade') {
-      const trainId = extra || s.train;
-      if (!s.owned.includes(trainId)) return { ok: false, reason: 'trainNotOwned', price: 0 };
+      const trainId = extra || s[s.career].train;
+      const cid = careerOfTrain(trainId);
+      if (!cid || !s[cid].owned.includes(trainId)) return { ok: false, reason: 'trainNotOwned', price: 0 };
       const price = upgradePrice(s, trainId, id);
       if (price === undefined) return { ok: false, reason: 'maxLevel', price: 0 };
-      return { ok: s.wallet >= price, reason: s.wallet >= price ? '' : 'needsMoney', price };
+      return { ok: s[cid].wallet >= price, reason: s[cid].wallet >= price ? '' : 'needsMoney', price };
     }
     return { ok: false, reason: 'unknown', price: 0 };
   }
@@ -154,9 +235,10 @@
   // ---- upgrades -> effective train config
   function applyUpgrades(trainConfig, save) {
     const s = normalize(save);
-    const base = trainConfig || trainById(s.train);
+    const base = trainConfig || trainById(s[s.career].train);
     if (!base) return null;
-    const lv = s.upgrades[base.id] || Object.fromEntries(C.upgradeKinds.map((k) => [k, 0]));
+    const cs = s[careerOfTrain(base) || s.career];
+    const lv = cs.upgrades[base.id] || Object.fromEntries(C.upgradeKinds.map((k) => [k, 0]));
     const fx = C.upgradeEffects;
     const atMaxCapacity = lv.capacity >= MAX_LEVELS.capacity;
     const extraCar = atMaxCapacity && fx.capacity.extraCarAtMax && C.extraCarTrains.includes(base.id);
@@ -204,16 +286,17 @@
     return routeOrder().filter((id) => trainDrivesClass(train, routeClass(id)));
   }
 
-  // ---- ranks
-  function rank(lifetime) {
+  // ---- ranks (per career)
+  function rank(lifetime, cid) {
     const n = num(lifetime);
-    return C.ranks.reduce((best, threshold, i) => (n >= threshold ? i : best), 0);
+    return C.careers[CAREERS.includes(cid) ? cid : DEFAULT_CAREER].ranks.reduce((best, threshold, i) => (n >= threshold ? i : best), 0);
   }
-  function rankInfo(lifetime) {
-    const index = rank(lifetime);
-    const next = index + 1 < C.ranks.length ? C.ranks[index + 1] : null;
-    const from = C.ranks[index];
-    return { index, id: C.rankIds[index], next, progress: next === null ? 1 : (num(lifetime) - from) / (next - from) };
+  function rankInfo(lifetime, cid) {
+    const career = C.careers[CAREERS.includes(cid) ? cid : DEFAULT_CAREER];
+    const index = rank(lifetime, career.id);
+    const next = index + 1 < career.ranks.length ? career.ranks[index + 1] : null;
+    const from = career.ranks[index];
+    return { index, id: career.rankIds[index], next, progress: next === null ? 1 : (num(lifetime) - from) / (next - from) };
   }
 
   // ---- reward
@@ -281,25 +364,33 @@
     };
   }
 
-  /* Apply a finished service to the save. wallet += cash, tb/lifetime += cash (never decreases). */
+  /* Apply a finished service to the save: the career of the vehicle that drove it gets wallet += cash and
+     lifetime += cash (so tb never decreases). */
   function completeService(save, result, mode) {
     const s = normalize(save);
+    const cid = careerOfTrain(result && result.trainId) || s.career;
+    const c = s[cid];
     const rw = reward(result, mode, s);
-    const lifetime = Math.min(MAX, s.lifetime + rw.cash);
+    const lifetime = Math.min(MAX, c.lifetime + rw.cash);
     const routeId = result && result.routeId;
-    const best = { ...s.best };
-    if (mode !== 'endless' && rule(routeId) && rw.points > (best[routeId] || 0)) best[routeId] = rw.points;
-    const next = withSave(s, {
-      lifetime, tb: lifetime, wallet: Math.min(lifetime, s.wallet + rw.cash), services: s.services + 1, best,
-      endlessBest: mode === 'endless' ? Math.max(s.endlessBest, rw.points) : s.endlessBest, savedAt: Date.now(),
-      hints: s.hintsSet ? s.hints : s.services + 1 < C.coachServices,   // the coach retires itself after the first few services unless the player chose
+    const best = { ...c.best };
+    if (mode !== 'endless' && careerOfRoute(routeId) === cid && rw.points > (best[routeId] || 0)) best[routeId] = rw.points;
+    const totalServices = s.rail.services + s.tram.services + 1;
+    const next = normalize({
+      ...s, savedAt: Date.now(),
+      hints: s.hintsSet ? s.hints : totalServices < C.coachServices,   // the coach retires itself after the first few services unless the player chose
+      [cid]: {
+        ...c, lifetime, wallet: Math.min(lifetime, c.wallet + rw.cash), services: c.services + 1, best,
+        endlessBest: mode === 'endless' ? Math.max(c.endlessBest, rw.points) : c.endlessBest,
+      },
     });
-    return { save: next, reward: rw, rankUp: rank(next.lifetime) > rank(s.lifetime) ? rank(next.lifetime) : -1 };
+    return { save: next, reward: rw, rankUp: rank(next[cid].lifetime, cid) > rank(c.lifetime, cid) ? rank(next[cid].lifetime, cid) : -1, career: cid };
   }
 
   TS.career = {
-    defaults, normalize, merge, setHints, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
+    defaults, normalize, merge, of, setCareer, setHints, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
     applyUpgrades, routeAvailable, endlessOrder, routeClass, trainCompatible, trainsForRoute, requiredTrain,
+    careerOfTrain, careerOfRoute, trainIdsOf, routeIdsOf, unlockedAll, CAREERS,
     rank, rankInfo, reward, completeService, punctualityScore, accuracyScore, MAX_LEVELS,
   };
 })();

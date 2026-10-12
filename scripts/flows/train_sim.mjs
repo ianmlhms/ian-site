@@ -1,5 +1,7 @@
 /* Lokféierer (train-sim): real arcade iframe, keyboard driving, doors/interlock, SPAD, passenger exchange,
  * service end -> score + monotonic save, endless order, purchase, phone block and iPad keyboard notice.
+ * Two separate careers (Zuch + Tram, the Luxtram only): wallets, purchases, tb monotonic, endless per career,
+ * old-format save migration, merge, and the arcade-wide test mode (everything unlocked, nothing saved or scored).
  * Supabase is mocked; no real account. */
 import { runIfMain } from './lib.mjs';
 
@@ -15,6 +17,20 @@ async function gameFrame(h) {
   return frame;
 }
 const key = (h, k) => h.page.keyboard.press(k);
+const LUXTRAM_ORDER = ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'];
+/* Ian's real save before the two-career split (flat v1 shape). */
+const OLD_SAVE = { v: 1, tb: 6800, lifetime: 6800, wallet: 3300, savedAt: 1700000000000, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west',
+  upgrades: { railcar: { motor: 2, brakes: 1, comfort: 1, capacity: 0, paint: 1 } }, best: { west: 292 }, services: 4, endlessBest: 0, hints: false, hintsSet: true };
+const savePosts = (h) => h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pbSave).map((m) => m.data));
+const scoreMessages = (h) => h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pb === 1).length);
+const gameSaveWrites = (h) => h.backend.callsTo('game_saves').filter((c) => c.method !== 'GET').length;
+
+/* The owner (konto@ian.lu) is asked Normal / Test on every open: this flow plays Normal. */
+async function gotoNormal(h, url) {
+  await h.goto(url);
+  const choice = h.page.locator('.pb-mode__box [data-mode="normal"]');
+  await choice.waitFor({ state: 'visible', timeout: 15000 }).then(() => choice.click()).catch(() => {});
+}
 
 export const flow = {
   name: 'train-sim', touch: true, fullChromium: true,
@@ -32,13 +48,17 @@ export const flow = {
         if (sess && sess.user) { sess.user.email = 'konto@ian.lu'; localStorage.setItem(k, JSON.stringify(sess)); }
       } catch (_) { /* ignore */ }
     });
+    // Arcade test mode (simulated): the arcade injects window.__pbTestMode before the game scripts run; here a localStorage flag does it.
+    await h.context.addInitScript(() => {
+      try { if (localStorage.getItem('__flowPbTestMode') === '1') window.__pbTestMode = true; } catch (_) { /* ignore */ }
+    });
     await h.context.addInitScript(() => {
       window.__tsMessages = [];
       window.addEventListener('message', (event) => {
         if (event.source === document.getElementById('gf')?.contentWindow && (event.data?.__pb || event.data?.__pbSave)) window.__tsMessages.push(JSON.parse(JSON.stringify(event.data)));
       });
     });
-    await h.goto('/pixelbreak.html?g=train-sim&test=1');
+    await gotoNormal(h, '/pixelbreak.html?g=train-sim&test=1');
     let frame = await gameFrame(h);
 
     h.step('start screen: both modes, iPad keyboard notice');
@@ -56,10 +76,23 @@ export const flow = {
     h.expect(!(await S(frame)).kbNoticeVisible, 'notice auto-hides on the first key press');
     h.expect(await frame.evaluate(() => !!document.querySelector('.ts-menu')), 'D2 menu rendered');
 
+    h.step('fresh save: two careers, the tram is playable immediately');
+    let s = await S(frame);
+    h.eq(s.career, 'rail', 'the menu starts on the Zuch career');
+    h.eq([s.careers.rail.owned, s.careers.rail.routes], [['railcar'], ['west']], 'Zuch career: railcar + west line');
+    h.eq([s.careers.tram.owned, s.careers.tram.routes], [['tram'], ['luxtram-stad']], 'Tram career: the Luxtram + the free Luxtram section from the start');
+    h.eq([s.careers.rail.wallet, s.careers.tram.wallet, s.tb], [0, 0, 0], 'both wallets and tb start at 0');
+    h.expect(await frame.locator('[data-test="career-rail"]').isVisible() && await frame.locator('[data-test="career-tram"]').isVisible(), 'career switch (Zuch | Tram) shown at the top');
+    h.expect(await frame.evaluate(() => !TS.routes.get('tram') && !TS.config.routeRules.tram && !TS.config.routeOrder.includes('tram')), 'the fictional tram line is gone');
+    h.expect(await frame.evaluate(() => TS.config.trains.filter((tr) => tr.kind === 'tram').length === 1 && TS.config.trains.find((tr) => tr.id === 'tram').price === 0), 'exactly one tram vehicle (the Luxtram), free');
+    h.eq(await frame.locator('[data-test="route-tram"]').count(), 0, 'no fictional tram route card in the menu');
+    h.expect(await frame.evaluate(() => TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram-kierchbierg').price < TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram-sud').price
+      && TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram-sud').price < TS.career.canBuy(TS.career.defaults(), 'route', 'luxtram').price), 'Luxtram prices rise: first section < last section < full line');
+
     h.step('career service starts in the cab');
     await frame.locator('[data-test="mode-career"]').click();
     await waitState(frame, () => window.__tsTest.state().phase === 'running');
-    let s = await S(frame);
+    s = await S(frame);
     h.eq(s.camMode, 'cab', 'starts in cab view');
     h.eq(s.routeId, 'west', 'first career route is the free west line');
     h.expect(s.stations.length >= 4, 'route has stations');
@@ -186,8 +219,15 @@ export const flow = {
     await frame.evaluate(() => { __tsTest.setGrade(null); __tsTest.setSpeed(0); });
 
     h.step('braking guide: "Brems elo!" before the stop, "Ze spéit" when it is almost too late');
-    await frame.evaluate(() => { const st = __tsTest.state(); __tsTest.press('x'); __tsTest.release('x'); const i = st.nextStationIndex; __tsTest.placeAt(st.stations[i].s - 440, 80); __tsTest.forceSimStep(0.05, 0); });
-    await waitState(frame, () => /Brems/.test(window.__tsTest.state().guideText), null, 8000);
+    // A random red signal in the 440 m run-up would trigger a SPAD emergency stop instead of the guide: let it clear and place again.
+    for (let attempt = 0; ; attempt++) {
+      await frame.evaluate(() => { const st = __tsTest.state(); __tsTest.press('x'); __tsTest.release('x'); const i = st.nextStationIndex; __tsTest.placeAt(st.stations[i].s - 440, 80); __tsTest.forceSimStep(0.05, 0); });
+      try { await waitState(frame, () => /Brems/.test(window.__tsTest.state().guideText), null, 5000); break; } catch (e) {
+        if (attempt >= 3) throw e;
+        await waitState(frame, () => !window.__tsTest.state().spadActive, null, 30000);
+        await frame.evaluate(() => { __tsTest.setSpeed(0); });
+      }
+    }
     s = await S(frame);
     h.expect(s.guide.state === 'brake' && s.guideText.includes('Brems elo'), 'brake hint shown: ' + s.guideText);
     await h.shot('guide-brake');
@@ -303,7 +343,7 @@ export const flow = {
     const saves = await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pbSave).map((m) => m.data.tb));
     h.expect(saves.length > 0, 'save posted at service end');
     h.expect(saves.every((tb, i) => i === 0 || tb >= saves[i - 1]), 'tb never decreases across saves: ' + saves.join(','));
-    h.expect(s.wallet > 0 && s.tb === s.lifetime, 'wallet earned and tb equals lifetime');
+    h.expect(s.wallet > 0 && s.tb === s.careers.rail.lifetime + s.careers.tram.lifetime && s.career === 'rail', 'rail wallet earned; tb = rail lifetime + tram lifetime');
     const savesBeforeMenu = saves.length;
 
     h.step('back to the menu, hints toggle, buying a train spends wallet only');
@@ -323,6 +363,7 @@ export const flow = {
     const emuPrice = await frame.evaluate(() => TS.config.trains.find((tr) => tr.id === 'emu').price);
     h.eq(s.wallet, before.wallet - emuPrice, 'train price leaves the wallet');
     h.eq(s.tb, before.tb, 'purchase leaves tb (lifetime) untouched');
+    h.eq([s.careers.tram.wallet, s.careers.tram.lifetime], [0, 0], 'the Zuch purchase did not touch the tram career');
     h.expect((await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pbSave).length)) > savesBeforeMenu, 'purchase saves');
 
     h.step('endless mode plays all compatible routes in order, then loops');
@@ -353,6 +394,98 @@ export const flow = {
     h.expect(scoreWrites(h).length >= scoresBefore, 'the records module only writes improved scores');
     await h.shot('endless');
 
+
+    h.step('tram career: switch, separate wallet, playable immediately, remembered');
+    await frame.evaluate(() => __tsTest.toMenu());
+    await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+    const railBefore = (await S(frame)).careers.rail;
+    const tbBeforeTram = (await S(frame)).tb;
+    await frame.locator('[data-test="career-tram"]').click();
+    await waitState(frame, () => window.__tsTest.state().career === 'tram');
+    h.eq(await frame.locator('[data-test="route-west"]').count(), 0, 'the Zuch routes are not listed in the Tram career');
+    h.eq(await frame.locator('[data-test="route-luxtram-stad"]').count(), 1, 'the free Luxtram section is listed');
+    h.eq(await frame.locator('[data-test="buy-train-emu"]').count(), 0, 'the Zuch garage is not shown in the Tram career');
+    h.expect(await frame.locator('[data-test="mode-career"]').isEnabled(), 'Karriär is playable right away in the Tram career');
+    h.expect((await frame.locator('[data-test="wallet"]').innerText()).startsWith('0'), 'the hero shows the tram wallet (0 €), not the Zuch wallet');
+    await h.shot('menu-tram');
+    await frame.locator('[data-test="mode-career"]').click();
+    await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+    s = await S(frame);
+    h.eq([s.routeId, s.trainId], ['luxtram-stad', 'tram'], 'Tram Karriär drives the Luxtram on the free section');
+    await frame.evaluate(() => { __tsTest.finishRoute(); });
+    await waitState(frame, () => window.__tsTest.state().atStationIndex >= 0 && window.__tsTest.state().nextStationIndex === window.__tsTest.state().stations.length - 1);
+    await key(h, 'd');
+    await waitState(frame, () => window.__tsTest.state().doorPhase === 'open');
+    await waitState(frame, () => window.__tsTest.state().phase === 'summary', null, 90000);
+    s = await S(frame);
+    h.expect(s.lastReward.cash > 0, 'the tram service earned real money');
+    h.expect(s.careers.tram.services === 1 && s.careers.tram.lifetime === s.lastReward.cash && s.careers.tram.wallet === s.lastReward.cash, 'the tram service paid into the tram career (' + s.lastReward.cash + ' €)');
+    h.eq(s.careers.rail, railBefore, 'earning in tram leaves the whole rail career untouched (wallet ' + railBefore.wallet + ')');
+    h.eq(s.tb, tbBeforeTram + s.careers.tram.lifetime, 'tb = rail lifetime + tram lifetime');
+    await frame.locator('#sumMenu').click();
+    await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+    h.eq((await S(frame)).career, 'tram', 'the menu stays on the last chosen career');
+
+    h.step('tram purchases spend tram money only; the full line comes last');
+    await frame.evaluate(() => __tsTest.grant(30000, 'tram'));
+    s = await S(frame);
+    const tramA = { wallet: s.careers.tram.wallet, tb: s.tb, rail: s.careers.rail };
+    const priceKb = await frame.evaluate(() => TS.config.routeRules['luxtram-kierchbierg'].price);
+    await frame.locator('[data-test="buy-route-luxtram-kierchbierg"]').click();
+    await waitState(frame, () => window.__tsTest.state().careers.tram.routes.includes('luxtram-kierchbierg'));
+    s = await S(frame);
+    h.eq(s.careers.tram.wallet, tramA.wallet - priceKb, 'the section price leaves the tram wallet');
+    h.eq(s.careers.rail, tramA.rail, 'rail wallet and rail career unchanged by the tram purchase');
+    h.eq(s.tb, tramA.tb, 'tb untouched by a purchase');
+    h.expect(await frame.locator('[data-test="buy-route-luxtram"]').isDisabled(), 'the full line is locked until the other sections are owned');
+    await frame.evaluate(() => __tsTest.grant(60000, 'tram'));
+    await frame.locator('[data-test="buy-route-luxtram"]').click({ force: true });
+    h.expect(!(await S(frame)).careers.tram.routes.includes('luxtram'), 'the full line cannot be bought before the sections');
+    await frame.locator('[data-test="buy-route-luxtram-sud"]').click();
+    await waitState(frame, () => window.__tsTest.state().careers.tram.routes.includes('luxtram-sud'));
+    await frame.locator('[data-test="buy-route-luxtram"]').click();
+    await waitState(frame, () => window.__tsTest.state().careers.tram.routes.includes('luxtram'));
+    h.eq((await S(frame)).careers.rail, tramA.rail, 'rail career still untouched after buying the whole line');
+    const upBefore = (await S(frame)).careers.tram;
+    await frame.locator('[data-test="up-comfort"]').click();
+    await waitState(frame, (n) => window.__tsTest.state().careers.tram.upgrades.tram.comfort === n, upBefore.upgrades.tram.comfort + 1);
+    h.expect((await S(frame)).careers.tram.wallet < upBefore.wallet && (await S(frame)).careers.rail.wallet === tramA.rail.wallet, 'a tram upgrade is paid with tram money only');
+    const kissBuy = await frame.evaluate(() => __tsTest.buy('train', 'kiss'));
+    h.eq([kissBuy, (await S(frame)).careers.rail.owned.includes('kiss')], [undefined, false], 'tram money cannot buy a Zuch (rail wallet too small)');
+    await frame.evaluate(() => __tsTest.grant(500000, 'rail'));
+    h.expect((await S(frame)).careers.tram.wallet < 100000, 'a rail grant does not change the tram wallet');
+    await h.shot('menu-tram-bought');
+
+    h.step('tram endless covers all Luxtram routes in order, then loops');
+    await frame.locator('[data-test="mode-endless"]').click();
+    await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().mode === 'endless', null, 90000);
+    const tramOrder = (await S(frame)).endless.order;
+    h.eq(tramOrder, LUXTRAM_ORDER, 'tram endless = all Luxtram routes, in order');
+    h.eq(tramOrder, await frame.evaluate(() => __tsTest.career().endlessOrder('tram')), 'endlessOrder(tram) agrees');
+    const tramPlayed = [];
+    for (let i = 0; i < tramOrder.length; i++) {
+      s = await S(frame);
+      tramPlayed.push(s.routeId);
+      await frame.evaluate(() => { __tsTest.finishRoute(); });
+      await frame.evaluate(() => { __tsTest.completeNow(); });
+      await waitState(frame, (n) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().endless.index === n, (i + 1) % tramOrder.length, 120000);
+      await h.pause(300);
+    }
+    h.eq(tramPlayed, tramOrder, 'the Luxtram routes were played in order');
+    h.eq((await S(frame)).routeId, tramOrder[0], 'loops back to the first Luxtram route');
+    h.eq((await S(frame)).careers.rail.wallet, railBefore.wallet + 500000, 'tram endless earned nothing in the rail career');
+    await frame.evaluate(() => __tsTest.toMenu());
+    await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+    await frame.locator('[data-test="career-rail"]').click();
+    await waitState(frame, () => window.__tsTest.state().career === 'rail');
+    h.expect(await frame.locator('[data-test="route-west"]').count() === 1, 'switching back shows the Zuch career again');
+    await h.shot('menu-rail');
+    await h.pause(300);
+    const allSaves = await savePosts(h);
+    h.eq(allSaves[allSaves.length - 1].career, 'rail', 'the last chosen career is saved');
+    h.expect(allSaves.every((d, i) => i === 0 || d.tb >= allSaves[i - 1].tb), 'tb never decreases across ALL saves (services, purchases, career switches): ' + allSaves.map((d) => d.tb).join(','));
+    h.expect(allSaves.every((d) => d.v === 2 && d.tb === d.rail.lifetime + d.tram.lifetime), 'every posted save is v2 with tb = rail + tram lifetime');
+
     h.step('phone viewport blocks, iPad does not');
     await h.page.setViewportSize({ width: 390, height: 844 });
     await h.pause(500);
@@ -361,6 +494,78 @@ export const flow = {
     await h.page.setViewportSize({ width: 820, height: 1180 });
     await h.pause(500);
     h.expect(!(await S(frame)).phoneBlocked, 'iPad is not blocked');
+
+
+    h.step('an old-format save migrates: rail keeps everything, tram starts fresh');
+    const pure = await frame.evaluate((old) => {
+      const deepFreeze = (o) => { Object.values(o).forEach((v) => { if (v && typeof v === 'object') deepFreeze(v); }); return Object.freeze(o); };
+      const K = TS.career, frozen = deepFreeze(JSON.parse(JSON.stringify(old)));
+      const m = K.normalize(frozen);
+      const withTram = K.normalize({ ...JSON.parse(JSON.stringify(old)), owned: ['railcar', 'tram'], routes: ['west', 'tram', 'luxtram-sud'], upgrades: { ...old.upgrades, tram: { motor: 2 } }, train: 'tram', route: 'luxtram-sud' });
+      const a = deepFreeze(K.normalize({ ...old, lifetime: 5000, tb: 5000, wallet: 100 }));
+      const b = deepFreeze(K.normalize({ rail: { lifetime: 100 }, tram: { lifetime: 6000, wallet: 50 } }));
+      return { m, again: K.normalize(m), withTram, mergeAB: K.merge(a, b).tb, mergeBA: K.merge(b, a).tb, tie: K.merge(a, { ...a, savedAt: a.savedAt + 5 }).savedAt === a.savedAt + 5 };
+    }, OLD_SAVE);
+    h.eq([pure.m.rail.lifetime, pure.m.rail.wallet, pure.m.tb], [6800, 3300, 6800], 'rail keeps lifetime 6800 / wallet 3300; tb stays 6800');
+    h.eq([pure.m.rail.owned, pure.m.rail.routes, pure.m.rail.services, pure.m.rail.best], [['railcar'], ['west'], 4, { west: 292 }], 'rail keeps owned, routes, services, bests');
+    h.eq(pure.m.rail.upgrades.railcar, OLD_SAVE.upgrades.railcar, 'rail keeps its upgrades');
+    h.eq([pure.m.tram.lifetime, pure.m.tram.wallet, pure.m.tram.services, pure.m.tram.owned, pure.m.tram.routes], [0, 0, 0, ['tram'], ['luxtram-stad']], 'tram starts fresh');
+    h.eq(pure.again, pure.m, 'normalizing twice changes nothing');
+    h.eq([pure.withTram.career, pure.withTram.tram.routes.includes('luxtram-sud'), pure.withTram.tram.routes.includes('tram'), pure.withTram.tram.upgrades.tram.motor, pure.withTram.rail.owned], ['tram', true, false, 2, ['railcar']],
+      'an old save that owned tram things moves them to the tram career (the fictional line is dropped)');
+    h.eq([pure.mergeAB, pure.mergeBA], [6100, 6100], 'merge picks the save with the higher TOTAL (tram progress counts), in both directions, inputs frozen');
+    h.expect(pure.tie, 'equal totals: the newer savedAt wins');
+    await h.page.evaluate((old) => localStorage.setItem('pb_save_train-sim', JSON.stringify(old)), OLD_SAVE);
+    await gotoNormal(h, '/pixelbreak.html?g=train-sim&test=1');
+    frame = await gameFrame(h);
+    s = await S(frame);
+    h.eq([s.career, s.careers.rail.lifetime, s.careers.rail.wallet, s.tb], ['rail', 6800, 3300, 6800], 'the loaded game shows Ian\'s old save as the rail career');
+    h.eq([s.careers.tram.wallet, s.careers.tram.owned, s.careers.tram.routes], [0, ['tram'], ['luxtram-stad']], 'and a fresh tram career');
+    h.expect((await frame.locator('[data-test="wallet-rail"]').innerText()).replace(/\D/g, '') === '3300', 'the Zuch tab shows the 3 300 wallet');
+    await frame.evaluate((d) => __tsTest.mergeSave(d), { ...OLD_SAVE, tb: 100, lifetime: 100, wallet: 100, savedAt: 1 });
+    h.eq((await S(frame)).tb, 6800, 'a cloud save with lower progress does not replace the local one');
+    await frame.evaluate((d) => __tsTest.mergeSave(d), { v: 2, savedAt: 5, career: 'tram', rail: { lifetime: 6800, wallet: 3300 }, tram: { lifetime: 9000, wallet: 9000 } });
+    s = await S(frame);
+    h.eq([s.tb, s.careers.tram.wallet, s.career], [15800, 9000, 'tram'], 'a cloud save with more total progress wins');
+
+    h.step('arcade test mode: everything unlocked in memory, nothing saved, no scores');
+    await h.page.evaluate(() => localStorage.setItem('__flowPbTestMode', '1'));
+    await gotoNormal(h, '/pixelbreak.html?g=train-sim&test=1');
+    frame = await gameFrame(h);
+    // (the page we just left saved itself on unload and the arcade mirrored that locally: start from an empty local store)
+    await h.page.evaluate(() => localStorage.removeItem('pb_save_train-sim'));
+    await h.pause(300);
+    const scoreRowsBefore = scoreWrites(h).length, gameSaveBefore = gameSaveWrites(h);
+    s = await S(frame);
+    h.expect(s.arcadeTest, 'the game recognised window.__pbTestMode');
+    const everything = await frame.evaluate(() => {
+      const K = TS.career, st = __tsTest.state().careers, out = {};
+      for (const cid of ['rail', 'tram']) {
+        out[cid] = { trains: K.trainIdsOf(cid).every((id) => st[cid].owned.includes(id)), routes: K.routeIdsOf(cid).every((id) => st[cid].routes.includes(id)),
+          upgrades: K.trainIdsOf(cid).every((id) => TS.config.upgradeKinds.every((k) => st[cid].upgrades[id][k] === K.MAX_LEVELS[k])), money: st[cid].wallet >= 1000000 };
+      }
+      return out;
+    });
+    h.eq(everything, { rail: { trains: true, routes: true, upgrades: true, money: true }, tram: { trains: true, routes: true, upgrades: true, money: true } }, 'both careers: all vehicles, routes and upgrades unlocked, plenty of €');
+    await frame.locator('[data-test="career-tram"]').click();
+    h.eq(await frame.locator('[data-test="route-luxtram"]').isEnabled(), true, 'the full Luxtram line is selectable');
+    await h.shot('menu-test-mode');
+    await frame.locator('[data-test="mode-career"]').click();
+    await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+    await frame.evaluate(() => { __tsTest.finishRoute(); });
+    await frame.evaluate(() => { __tsTest.completeNow(); });
+    await waitState(frame, () => window.__tsTest.state().phase === 'summary', null, 60000);
+    await frame.locator('#sumMenu').click();
+    await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+    await frame.locator('[data-test="career-rail"]').click();
+    await frame.evaluate(() => __tsTest.toMenu());
+    await h.page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+    await h.pause(800);
+    h.eq((await savePosts(h)).length, 0, 'test mode posted no save to the arcade');
+    h.eq(await scoreMessages(h), 0, 'test mode reported no score');
+    h.eq([scoreWrites(h).length, gameSaveWrites(h)], [scoreRowsBefore, gameSaveBefore], 'and nothing reached the scores or game_saves tables');
+    h.expect(await frame.evaluate(() => localStorage.getItem('pb_save_train-sim') === null), 'and nothing was written to the local save either: ' + String(await frame.evaluate(() => localStorage.getItem('pb_save_train-sim'))).slice(0, 200));
+    await h.page.evaluate(() => localStorage.removeItem('__flowPbTestMode'));
 
     h.expect(errors.length === 0, 'no console errors: ' + errors.slice(0, 3).join(' | '));
     h.expect((await S(frame)).errors === 0, 'no frame errors');

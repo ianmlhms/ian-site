@@ -1,6 +1,7 @@
 /* Lokféierer: single balance source. Metres, seconds, m/s internally; euros for money.
-   Frozen data only, no logic. Prices are tuned so the first purchase (emu) comes after ~3 west services
-   and the full content (6 trains, upgrades, 9 routes) takes roughly 3 weeks of regular play. */
+   Frozen data only, no logic. Two separate careers share one save: Zuch (rail) and Tram (the Luxtram only).
+   Rail prices: the first purchase (emu) comes after ~3 west services. Tram prices: the first Luxtram section after ~2
+   Luxtram services (one stad service pays roughly 5 000 EUR with the 420-seat tram). */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
@@ -23,7 +24,7 @@
     paint: { liveryPerLevel: 1 },
   });
   const EXTRA_CAR_TRAINS = Object.freeze(['kiss', 'ic', 'hst']);
-  const REFERENCE_PRICE = Object.freeze({ railcar: 9000 }); // free train: upgrade prices scale off this
+  const REFERENCE_PRICE = Object.freeze({ railcar: 9000, tram: 40000 }); // free trains: upgrade prices scale off this
 
   const livery = (body, accent, stripe) => Object.freeze({ body, accent, stripe });
   const trainDef = (t) =>
@@ -48,7 +49,7 @@
       liveries: [['#e7e8ea', '#c8312b', '#1b3a6b'], ['#dfe6ea', '#1b6e8f', '#e7b32c'], ['#cfd4d8', '#2f7d4f', '#e7e8ea'], ['#262a32', '#c8312b', '#e7e8ea']],
     }),
     trainDef({
-      id: 'tram', name: { lb: 'Tram', de: 'Straßenbahn', en: 'Tram' }, kind: 'tram', price: 30000,
+      id: 'tram', name: { lb: 'Luxtram', de: 'Luxtram', en: 'Luxtram' }, kind: 'tram', price: 0,
       maxKmh: 70, accel: 1.2, brake: 1.3, emergency: 2.4, massT: 55, cars: 5, capacity: 420, doorsPerSide: 1, carLength: 8.6,
       cab: 'tram', model: 'tram', sound: 'tram',
       liveries: [['#f1f1ee', '#d6342e', '#8a8d93'], ['#f1f1ee', '#1f7a5c', '#8a8d93'], ['#2b2f38', '#e9b83a', '#f1f1ee'], ['#f1f1ee', '#2b64b0', '#e9b83a']],
@@ -93,14 +94,13 @@
     south: Object.freeze({ price: 1800, needs: Object.freeze(['rail']), fareBase: 26 }),
     east: Object.freeze({ price: 9000, needs: Object.freeze(['rail']), fareBase: 24 }),
     north: Object.freeze({ price: 16000, needs: Object.freeze(['rail']), fareBase: 32 }),
-    tram: Object.freeze({ price: 8000, needs: Object.freeze(['tram']), fareBase: 18 }),
     trier: Object.freeze({ price: 38000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 55 }),
     metz: Object.freeze({ price: 52000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 50 }),
     brussels: Object.freeze({ price: 72000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 65 }),
     paris: Object.freeze({ price: 140000, needs: Object.freeze(['hst']), fareBase: 120 }),
   });
-  /* Fallback order if TS.routes isn't loaded. */
-  const routeOrder = Object.freeze(['west', 'south', 'east', 'north', 'tram', 'trier', 'metz', 'brussels', 'paris']);
+  /* Fallback order if TS.routes isn't loaded. The Luxtram routes are appended by luxtram.js (tram career). */
+  const routeOrder = Object.freeze(['west', 'south', 'east', 'north', 'trier', 'metz', 'brussels', 'paris']);
 
   const economy = Object.freeze({
     farePerPassengerKm: 3, // plus routeRules[route].fareBase per delivered passenger
@@ -115,12 +115,18 @@
     startWallet: 0,
   });
 
-  /* Lifetime-euro thresholds for ranks 0..4 (Praktikant, Lokféierer, Senior, Chef-Lokféierer, Legend). */
-  const ranks = Object.freeze([0, 15000, 80000, 250000, 600000]);
-  const rankIds = Object.freeze(['praktikant', 'lokfeierer', 'senior', 'chef', 'legend']);
+  /* Lifetime-euro thresholds for ranks 0..4, per career (copy keys rank_<id>).
+     Rail: Praktikant, Lokféierer, Senior, Chef-Lokféierer, Legend. Tram: Tram-Praktikant, Wattman, Senior-Wattman, Chef-Wattman, Tram-Legend. */
+  const careers = Object.freeze({
+    order: Object.freeze(['rail', 'tram']),
+    rail: Object.freeze({ id: 'rail', icon: '🚆', ranks: Object.freeze([0, 15000, 80000, 250000, 600000]), rankIds: Object.freeze(['praktikant', 'lokfeierer', 'senior', 'chef', 'legend']) }),
+    tram: Object.freeze({ id: 'tram', icon: '🚋', ranks: Object.freeze([0, 10000, 50000, 150000, 400000]), rankIds: Object.freeze(['tram_praktikant', 'wattman', 'tram_senior', 'tram_chef', 'tram_legend']) }),
+  });
+  const ranks = careers.rail.ranks;
+  const rankIds = careers.rail.rankIds;
 
   TS.config = Object.freeze({
     trains, upgrades, upgradeKinds: UPGRADE_KINDS, upgradeEffects: UPGRADE_EFFECTS, extraCarTrains: EXTRA_CAR_TRAINS,
-    routeRules, routeOrder, economy, ranks, rankIds, saveVersion: 1, coachServices: 3,
+    routeRules, routeOrder, economy, ranks, rankIds, careers, saveVersion: 2, coachServices: 3,
   });
 })();

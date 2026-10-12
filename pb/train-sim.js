@@ -3,6 +3,9 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const SAVE_KEY = 'pb_save_train-sim';
+  /* Arcade-wide test mode: the arcade injects window.__pbTestMode = true before the game scripts run. Everything is unlocked
+     in memory (both careers), nothing is ever saved or posted, no scores are reported. Without the flag nothing changes. */
+  const ARCADE_TEST = window.__pbTestMode === true;
   const HOST_ORIGIN = new URL(document.baseURI).origin;
   const SIM_STEP = 1 / 60, MAX_SIM_STEPS = 16, MAX_FRAME_S = 0.25;
   const LEVER_REPEAT_MS = 180, LEVER_MIN = -8, LEVER_MAX = 5, LEVER_EB = -8, LEVER_BRAKE_MAX = -7;
@@ -80,7 +83,8 @@
   if (!QUALITIES.includes(quality)) quality = isTouch ? 'medium' : 'high';
   let phase = 'boot';            // boot | menu | loading | running | paused | summary | transition
   let mode = 'career';           // career | endless
-  let save = safe('career defaults', () => TS.career.defaults(), { hints: true, tb: 0, lifetime: 0, wallet: 0, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west', upgrades: {}, best: {}, services: 0, endlessBest: 0 });
+  const EMPTY_CAREER = { lifetime: 0, wallet: 0, owned: [], routes: [], train: '', route: '', upgrades: {}, best: {}, services: 0, endlessBest: 0 };
+  let save = safe('career defaults', () => (ARCADE_TEST ? TS.career.unlockedAll() : TS.career.defaults()), { hints: true, tb: 0, career: 'rail', rail: { ...EMPTY_CAREER, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west' }, tram: { ...EMPTY_CAREER, owned: ['tram'], routes: ['luxtram-stad'], train: 'tram', route: 'luxtram-stad' } });
   let muted = readStore('pb_muted') === '1';
   let paused = false, wasRunningBeforeHide = false;
   let renderer = null, scene = null, camera = null, clock = null;
@@ -169,6 +173,11 @@
   const trainDef = (id) => safe('train def', () => TS.config.trains.find((tr) => tr.id === id), null) || safe('train def', () => TS.config.trains[0], null);
   function routeList() { return safe('routes', () => TS.routes.list, []) || []; }
   function routeDefOf(id) { return safe('route get', () => TS.routes.get(id), null) || routeList().find((r) => r.id === id) || routeList()[0] || null; }
+  /* The career state (wallet, services, ...) of the career a vehicle belongs to; default: the one selected in the menu. */
+  function careerState(trainId) {
+    const cid = trainId ? safe('career of train', () => TS.career.careerOfTrain(trainId), null) : null;
+    return save[cid || save.career] || save[save.career] || EMPTY_CAREER;
+  }
   function effectiveTrain(trainId) {
     const base = trainDef(trainId) || { id: 'railcar', kind: 'rail', maxKmh: 90, accel: 0.55, brake: 0.8, emergency: 1.2, massT: 45, cars: 1, capacity: 90, doorsPerSide: 2, carLength: 22, cab: 'railcar', model: 'railcar', sound: 'diesel', livery: { body: '#a82a26', accent: '#e9dcc0', stripe: '#e9dcc0' } };
     return safe('applyUpgrades', () => TS.career.applyUpgrades(base, save), null) || base;
@@ -181,7 +190,8 @@
   }
   let lastPersisted = '';
   function persist() {
-    const tb = Math.max(Number(save.tb) || 0, Number(save.lifetime) || 0);
+    if (ARCADE_TEST) return;   // test mode: the unlocked-everything state must never reach any store
+    const tb = Math.max(Number(save.tb) || 0, (Number(save.rail && save.rail.lifetime) || 0) + (Number(save.tram && save.tram.lifetime) || 0));
     const signature = safe('save sig', () => JSON.stringify({ ...save, tb, savedAt: 0 }), '');
     if (signature && signature === lastPersisted) return;     // nothing changed: never spend cloud egress on it
     lastPersisted = signature;
@@ -192,6 +202,7 @@
     else postToHost({ __pbSave: 1, data: clean });
   }
   function mergeIncoming(data) {
+    if (ARCADE_TEST) return;   // never mix a real save into the unlocked test state
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
     const merged = safe('career merge', () => TS.career.merge(save, data), null);
     if (!merged) return;
@@ -282,7 +293,7 @@
     const startS = keepState && keepState.warmS !== undefined ? keepState.warmS : (track.stations && track.stations[0] ? track.stations[0].s : 0);
     safe('landscape warm', () => landscape && landscape.warm && landscape.warm(startS));
     const clockStart = Math.floor(environment.hour * 4) * 900;
-    const plan = sim ? sim.plan : demo ? null : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: save.services || 0 }), null));
+    const plan = sim ? sim.plan : demo ? null : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: careerState(trainId).services || 0 }), null));
     forcedPlan = null;
     const simulation = sim || TS.sim.create({ train: cfg, track, options: { clockStart, seed: Math.floor(rand() * 1e9), plan: plan || undefined } });
     safe('temp boards', () => { if (infra && infra.addTempBoard && simulation.plan) simulation.plan.tsr.forEach((r) => infra.addTempBoard(r.s0, r.kmh, r.s1)); });
@@ -1183,7 +1194,7 @@
     $('pauseScreen').hidden = true; $('helpScreen').hidden = true;
     safe('audio resume', () => audio && audio.setMuted(muted));
   }
-  function showSummary(res, reward, rankUp) {
+  function showSummary(res, reward, rankUp, careerPlayed) {
     const rows = $('sumRows');
     rows.replaceChildren();
     const addRow = (label, value, cls) => {
@@ -1204,7 +1215,7 @@
     $('sumCash').textContent = t('sumEarned') + ' ' + fmtInt(reward.cash) + ' €';
     $('sumPoints').textContent = fmtInt(reward.points) + ' ' + t('sumPoints');
     const notes = [];
-    if (rankUp >= 0) notes.push(t('sumRankUp', { name: t('rank_' + (TS.config && TS.config.rankIds ? TS.config.rankIds[rankUp] : '')) }));
+    if (rankUp >= 0) notes.push(t('sumRankUp', { name: t('rank_' + (TS.config && TS.config.careers && TS.config.careers[careerPlayed || 'rail'] ? TS.config.careers[careerPlayed || 'rail'].rankIds[rankUp] : '')) }));
     $('sumNote').textContent = notes.join(' · ');
     $('summary').hidden = false;
     $('hud').hidden = true;
@@ -1221,22 +1232,24 @@
     w.finished = true;
     finalizeExchange();
     const res = buildResult();
-    let reward = null, rankUp = -1;
+    let reward = null, rankUp = -1, careerPlayed = save.career;
     const done = safe('completeService', () => TS.career.completeService(save, res, mode), null);
-    if (done) { save = done.save; reward = done.reward; rankUp = done.rankUp; }
+    if (done) { save = done.save; reward = done.reward; rankUp = done.rankUp; careerPlayed = done.career || careerPlayed; }
     else {
       reward = fallbackReward(res);
-      const lifetime = (save.lifetime || 0) + reward.cash;
-      save = { ...save, lifetime, tb: lifetime, wallet: (save.wallet || 0) + reward.cash, services: (save.services || 0) + 1 };
+      const cid = safe('career of train', () => TS.career.careerOfTrain(w.trainId), null) || save.career;
+      const c = save[cid] || EMPTY_CAREER, lifetime = (c.lifetime || 0) + reward.cash;
+      const next = { ...save, [cid]: { ...c, lifetime, wallet: (c.wallet || 0) + reward.cash, services: (c.services || 0) + 1 } };
+      save = { ...next, tb: (next.rail.lifetime || 0) + (next.tram.lifetime || 0) };
     }
     persist();
     w.lastReward = reward; w.lastResult = res;
-    safe('Arcade score', () => { window.Arcade.score(reward.points); window.Arcade.gameOver(reward.points); });
+    if (!ARCADE_TEST) safe('Arcade score', () => { window.Arcade.score(reward.points); window.Arcade.gameOver(reward.points); });
     scorePosted += 1;
     events.push('serviceEnd');
     if (mode === 'endless') { advanceEndless(reward); return; }
     phase = 'summary';
-    showSummary(res, reward, rankUp);
+    showSummary(res, reward, rankUp, careerPlayed);
   }
   async function startService(routeId, trainId, startMode, opts = {}) {
     if (!initRenderer()) return false;
@@ -1320,7 +1333,8 @@
     disposeWorld();
     if (phase !== 'menu') return;
     try {
-      const trainId = save.train, routeId = save.route && (TS.routes ? true : true) ? save.route : 'west';
+      const current = save[save.career] || EMPTY_CAREER;
+      const trainId = current.train, routeId = current.route || 'west';
       await buildWorld({ routeId, trainId, demo: true, env: { weather: 'clear', hour: 16.5 } });
       if (token !== demoToken || phase !== 'menu') { disposeWorld(); return; }
       world.state = world.sim.step(0, { lever: 0 });
@@ -1335,12 +1349,14 @@
   function startFromMenu(modeIn, routeId, trainId) {
     if (phase !== 'menu') return;
     const m = /endl/i.test(String(modeIn)) ? 'endless' : 'career';
-    const tid = trainId || save.train, rid = routeId || save.route;
+    const current = save[save.career] || EMPTY_CAREER;
+    const tid = trainId || current.train, rid = routeId || current.route;
     if (m === 'endless') { startEndless(tid); return; }
     const ok = safe('routeAvailable', () => TS.career.routeAvailable(save, rid, tid), { ok: true });
     if (!ok.ok) { toast(t(ok.reason || 'noRoute'), 'bad'); return; }
     save = safe('select', () => TS.career.select(save, tid), null) || save;
-    save = { ...save, route: rid };
+    save = safe('selectRoute', () => TS.career.selectRoute(save, rid), null) || save;
+    persist();   // remembers the chosen vehicle/route per career
     startService(rid, tid, 'career');
   }
   function handleBuy(kind, id, extra) {
@@ -1353,7 +1369,7 @@
       else if (/upgrade/.test(k)) {
         const kinds = (TS.config && TS.config.upgradeKinds) || [];
         const extraId = extra && typeof extra === 'object' ? extra.trainId || extra.train : extra;
-        if (kinds.includes(id)) next = C.buyUpgrade(save, extraId || save.train, id);
+        if (kinds.includes(id)) next = C.buyUpgrade(save, extraId || careerState().train, id);
         else if (kinds.includes(extra)) next = C.buyUpgrade(save, id, extra);
         else next = C.buyUpgrade(save, id, extraId);
       }
@@ -1371,6 +1387,15 @@
     refreshDemoSoon();
     return save;
   }
+  /* Career switch in the menu (Zuch | Tram): remembered in the save. */
+  function handleCareer(cid) {
+    const next = safe('setCareer', () => TS.career.setCareer(save, cid), null);
+    if (!next) return undefined;
+    save = next;
+    persist();
+    refreshDemoSoon();
+    return save;
+  }
   function handleHints(on) {
     const next = safe('setHints', () => TS.career.setHints(save, on), null);
     if (!next) return undefined;
@@ -1380,7 +1405,7 @@
   }
   function renderMenu() {
     const host = $('menuHost');
-    const opts = { save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onLang: setLanguage, onHints: handleHints };
+    const opts = { save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onCareer: handleCareer, onLang: setLanguage, onHints: handleHints };
     try {
       if (!TS.menu || typeof TS.menu.render !== 'function') throw new Error('TS.menu missing');
       TS.menu.render(host, opts);
@@ -1509,7 +1534,8 @@
           clock: s ? clockText(s.clockSec) : '', simT: s ? s.t : 0, onboard: w ? liveOnboard() : 0, exchange: ex, exchStation: w && w.exch ? w.exch.index : -1,
           cash: s ? s.cash : 0, liveCash: w ? w.liveCash : 0, totals: s ? s.totals : null, spadActive: s ? s.spadActive : false, finished: w ? w.finished : false, endTimer: w ? w.endTimer : -1,
           delivered: w ? w.delivered : 0, passengerKm: w ? w.passengerKm : 0,
-          events: [...events], wallet: save.wallet, tb: save.tb, lifetime: save.lifetime, owned: save.owned, routes: save.routes, saveTrain: save.train, services: save.services,
+          events: [...events], career: save.career, careers: JSON.parse(JSON.stringify({ rail: save.rail, tram: save.tram })), arcadeTest: ARCADE_TEST,
+          wallet: careerState().wallet, tb: save.tb, lifetime: careerState().lifetime, owned: careerState().owned, routes: careerState().routes, saveTrain: careerState().train, services: careerState().services,
           endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null,
           draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,
           hudSpeed: $('speedNum').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, kbNoticeVisible: !$('kbNotice').hidden, phoneBlocked: !$('phoneBlock').hidden,
@@ -1586,8 +1612,9 @@
       },
       spadTest() { const w = world; if (!w || phase !== 'running') return false; input.lever = 0; return w.sim.forceRedAhead(220, 15); },
       completeNow() { const w = world; if (!w || phase !== 'running') return false; finishService(); return true; },
-      setRoute(id) { save = { ...save, route: id }; if (phase === 'menu') refreshDemoSoon(); return startService(id, save.train, 'career'); },
-      grant(cash) { const lifetime = save.lifetime + cash; save = { ...save, lifetime, tb: Math.max(save.tb, lifetime), wallet: save.wallet + cash }; if (phase === 'menu') renderMenu(); persist(); },
+      setRoute(id) { save = TS.career.selectRoute(save, id) || save; if (phase === 'menu') refreshDemoSoon(); return startService(id, TS.career.of(save, TS.career.careerOfRoute(id)).train, 'career'); },
+      grant(cash, cid) { const c = save[cid || save.career]; save = TS.career.normalize({ ...save, [cid || save.career]: { ...c, lifetime: c.lifetime + cash, wallet: c.wallet + cash } }); if (phase === 'menu') renderMenu(); persist(); },
+      setCareer: (cid) => handleCareer(cid),
       mergeSave: (d) => mergeIncoming(d),
       toMenu: () => returnToMenu(),
       setCamera, setQuality(q) { if (QUALITIES.includes(q) && q !== quality) { quality = q; applyQuality(); rebuildWorld(); } },
@@ -1652,7 +1679,7 @@
     $('sumMenu').addEventListener('click', returnToMenu);
     try { window.Arcade.onMute((value) => applyMute(value)); window.Arcade.onRestart(() => { if (world && !world.demo && (phase === 'running' || phase === 'summary')) startService(world.routeId, world.trainId, mode); else if (phase === 'menu') { renderMenu(); refreshDemoSoon(); } }); }
     catch (error) { warn('Arcade kit hooks', error); }
-    postToHost({ __pbWantSave: 1 });
+    if (!ARCADE_TEST) postToHost({ __pbWantSave: 1 });
     try {
       const search = new URL(location.href).searchParams;
       testMode = search.get('test') === '1' || (parent !== window && new URL(parent.location.href).searchParams.get('test') === '1');
