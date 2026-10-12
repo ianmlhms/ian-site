@@ -24,6 +24,9 @@
 .ts-menu__top{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .ts-menu__stamp{font-size:12px;font-weight:850;letter-spacing:.14em;padding:7px 12px;border:2px solid var(--gold);color:var(--gold);border-radius:8px;transform:rotate(-1.5deg);text-transform:uppercase;background:rgba(255,188,66,.07)}
 .ts-menu__langs{display:flex;gap:6px}
+.ts-menu__topR{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.ts-menu__hints{min-height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:750;font-size:13px}
+.ts-menu__hints[aria-pressed="true"]{background:rgba(79,209,139,.18);border-color:var(--green);color:var(--green)}
 .ts-menu__langs button{min-width:46px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:750;font-size:13px;letter-spacing:.04em}
 .ts-menu__langs button[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:#2a2112}
 .ts-menu__hero{display:grid;grid-template-columns:1.35fr 1fr;gap:22px;align-items:stretch}
@@ -397,6 +400,11 @@
     if (!K.routeAvailable(ctx.save, ctx.routeId, ctx.trainId).ok) return;
     callHost('onStart', 'career', ctx.routeId, ctx.trainId);
   }
+  function doHints() {
+    const res = callHost('onHints', !ctx.save.hints);
+    if (isSave(res)) setSave(res);
+    paint();
+  }
   function doLang(lang) {
     TS.setLang(lang);
     callHost('onLang', lang);
@@ -407,6 +415,11 @@
   function langBar() {
     return h('div', { class: 'ts-menu__langs', role: 'group', 'aria-label': t('language') },
       TS.langs.map((l) => h('button', { type: 'button', 'aria-pressed': String(TS.lang === l), 'data-fid': 'lang-' + l, on: { click: () => doLang(l) }, text: l.toUpperCase() })));
+  }
+
+  function hintsToggle() {
+    return h('button', { type: 'button', class: 'ts-menu__hints', 'aria-pressed': String(!!ctx.save.hints), 'data-fid': 'hints', 'data-test': 'hints-toggle', on: { click: doHints },
+      title: t('hintsInfo'), text: '💡 ' + t('hintsLabel') + ': ' + t(ctx.save.hints ? 'on' : 'off') });
   }
 
   function hero() {
@@ -486,7 +499,7 @@
     const selected = ctx.trainId === train.id;
     const eff = K.applyUpgrades(train, s);
     const check = K.canBuy(s, 'train', train.id);
-    const maxSpeed = 320, maxCap = 750, maxAccel = 1.2, maxBrake = 1.3;
+    const maxSpeed = 320, maxCap = 750, maxAccel = 1.3, maxBrake = 1.4;
     const stats = h('div', { class: 'ts-menu__stats' },
       statRow(t('statSpeed'), eff.maxKmh, maxSpeed, eff.maxKmh + ' km/h'),
       statRow(t('statCapacity'), eff.capacity, maxCap, String(eff.capacity)),
@@ -535,7 +548,7 @@
   }
 
   const KEYS = [
-    [['W', '↑'], 'keyPower'], [['S', '↓'], 'keyBrake'], [['X', '⌫'], 'keyEB'], [['D'], 'keyDoors'],
+    [['W', '↑'], 'keyPower'], [['S', '↓'], 'keyBrake'], [['X', '⌫'], 'keyEB'], [['D'], 'keyDoors'], [['B'], 'keyParking'],
     [['H', 'Space'], 'keyHorn'], [['L'], 'keyLights'], [['A'], 'keyAnnounce'], [['C', '1–4'], 'keyCamera'],
     [['T'], 'keyTimetable'], [['M'], 'keyMute'], [['P', 'Esc'], 'keyPause'], [['F1', '?'], 'keyHelp'],
   ];
@@ -559,7 +572,7 @@
 
     const root = h('div', { class: 'ts-menu', lang: TS.lang, role: 'main', 'aria-labelledby': 'ts-menu-title' });
     const inner = h('div', { class: 'ts-menu__inner' },
-      h('div', { class: 'ts-menu__top' }, h('span', { class: 'ts-menu__stamp', text: '🚆 LUX RAIL · SIM' }), langBar()),
+      h('div', { class: 'ts-menu__top' }, h('span', { class: 'ts-menu__stamp', text: '🚆 LUX RAIL · SIM' }), h('div', { class: 'ts-menu__topR' }, hintsToggle(), langBar())),
       hero(),
       modes(),
       h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-routes' }, h('h2', { id: 'ts-menu-routes', text: t('routes') }),

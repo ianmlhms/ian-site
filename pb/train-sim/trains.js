@@ -2,7 +2,8 @@
  * TS.trains.create(trainConfig, { quality, livery, upgrades }) -> TrainModel (see CONTRACT.md).
  * Car frame: forward = -Z, right = +X, origin = body centre at rail-top height.
  * Extras: TS.trains.specs, TS.trains.frontCarLength(cfg), TS.trains.PANTO_WIRE_Y,
- *         model.setWheelDistance(m), model.wheelRadius, car.bogies, car.nose. */
+ *         model.setWheelDistance(m), model.wheelRadius, car.bogies, car.nose,
+ *         model.setExhaust(level01) (diesel smoke; no-op on electric trains). */
 (function () {
   'use strict';
   window.TS = window.TS || {};
@@ -774,11 +775,36 @@
         bmesh.rotation.set(Math.atan(capRake), front ? Math.PI : 0, 0);
         bmesh.userData.disposeGeo = true; group.add(bmesh);
       }
-      // coupler cover / pilot
-      const cy = S.yb + 0.14;
+      if (S.diesel) { // diesel look: radiator grille above the lights, DIESEL plate below it, builder plates on the flanks
+        const gy = 1.64, gw = Math.min(1.2, hw * sh.sx * 1.1), gh = 0.34, gz = zAt(gy) + sign * 0.02;
+        B.box('trim', gw + 0.1, gh + 0.1, 0.05, 0, gy, gz, '#17191b');
+        B.box('trim', gw, gh, 0.02, 0, gy, gz + sign * 0.03, '#0d0e10');
+        for (let q = 0; q < 6; q++) B.box('m', gw - 0.06, 0.028, 0.03, 0, gy - gh / 2 + 0.04 + (q * (gh - 0.08)) / 5, gz + sign * 0.045, '#c3c7ca');
+        B.box('m', 0.03, gh, 0.03, 0, gy, gz + sign * 0.05, '#9ea3a7');
+        if (mid) {
+          const pm = new T.MeshStandardMaterial({ map: dieselPlateTexture(), roughness: 0.45, metalness: 0.2, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+          pm.userData.perTrain = true; ownMats.push(pm);
+          const noseTag = new T.Mesh(new T.PlaneGeometry(0.46, 0.46 / PLATE_ASPECT), pm);
+          noseTag.position.set(0, 1.33, zAt(1.33) + sign * 0.018);
+          noseTag.rotation.set(Math.atan(capRake), sign < 0 ? Math.PI : 0, 0);
+          noseTag.userData.disposeGeo = true; group.add(noseTag);
+          for (const sd of [-1, 1]) {
+            const side = new T.Mesh(new T.PlaneGeometry(0.5, 0.5 / PLATE_ASPECT), pm);
+            side.position.set(sd * (hw + 0.016), 1.12, zEnd - sign * 1.75);
+            side.rotation.y = sd > 0 ? Math.PI / 2 : -Math.PI / 2;
+            side.userData.disposeGeo = true; group.add(side);
+          }
+        }
+      }
+      // buffers + screw-coupling hook (buffer-fitted units only). Units without buffers (EMU, double-decker, tram,
+      // high-speed) carry no separate coupler box: a floating pilot block under the nose looked detached.
       if (S.buffers) {
         for (const s of [-1, 1]) { B.cyl('m', 0.1, 0.12, 0.42, s * 0.86, S.yb + 0.3, zEnd + sign * (0.18 + apD), '#383b3e', 'z', 10); B.cyl('m', 0.16, 0.16, 0.05, s * 0.86, S.yb + 0.3, zEnd + sign * (0.41 + apD), '#bfc3c6', 'z', 14); }
-        B.cyl('m', 0.07, 0.07, 0.7, 0, S.yb + 0.12, zEnd + sign * (0.3 + apD), '#2c2f31', 'z', 8);
+        if (!apD) { // railcar: hook bolted flush to the nose face (mount plate buried in the cap), shank + hook head
+          B.box('trim', 0.24, 0.14, 0.16, 0, S.yb + 0.14, zEnd + sign * 0.02, '#2c2f31');
+          B.cyl('m', 0.04, 0.04, 0.3, 0, S.yb + 0.14, zEnd + sign * 0.2, '#2c2f31', 'z', 8);
+          B.box('m', 0.09, 0.09, 0.06, 0, S.yb + 0.12, zEnd + sign * 0.36, '#2c2f31');
+        }
         if (apD) { // loco: apron (front break), buffer beam, coupler hook, steps + handrails
           const ag = rbox(hw * 2 * sh.sx * 0.97, 1.0, apD * 2, 0.08); if (!front) ag.rotateY(Math.PI); ag.translate(0, S.yb + 0.45, zEnd);
           B.geo('paint', ag, C.nose);
@@ -790,9 +816,6 @@
             B.box('trim', 0.3, 0.04, 0.22, s * (hw * sh.sx * 0.9), S.yb + 0.3, zEnd + sign * (apD + 0.12), '#43484c');
           }
         }
-      } else if (mid) {
-        B.geo('trim', (() => { const g = rbox(0.5, 0.22, 0.34, 0.06); if (!front) g.rotateY(Math.PI); g.translate(0, S.yb + 0.02, zEnd + sign * 0.15); return g; })(), '#2b2e31');
-        B.cyl('m', 0.05, 0.035, 0.3, 0, S.yb + 0.02, zEnd + sign * 0.36, '#a0a4a8', 'z', 8);
       }
       if (S.tram) { // front skirt (apron)
         const g = rbox(S.W * 0.62, 0.34, 0.12, 0.06); if (!front) g.rotateY(Math.PI); g.translate(0, S.yb - 0.02, zEnd + sign * 0.05);
@@ -944,13 +967,21 @@
     const yt = S.ytop;
     const roofBox = (w, h, d, x, y, z, col) => { const g = rbox(w, h, d, 0.06); g.rotateX(0); g.translate(x, y, z); B.geo('trim', g, col); };
     const panto = [];
+    const smokeSpots = [];
     if (K.diesel || S.diesel) {
-      for (const z of [-L * 0.28, L * 0.1]) {
-        B.cyl('trim', 0.09, 0.07, 0.55, 0.0, yt + 0.25, z, '#262a2d', null, 10);
-        B.cyl('trim', 0.12, 0.09, 0.08, 0.0, yt + 0.55, z, '#3c4044', null, 10);
+      for (const z of [-L * 0.28, L * 0.1]) { // exhaust stacks: flange, pipe, collar, angled rain cap, soot ring
+        B.cyl('trim', 0.14, 0.14, 0.1, 0.0, yt + 0.05, z, '#3a3e42', null, 14);
+        B.cyl('trim', 0.095, 0.095, 0.72, 0.0, yt + 0.42, z, '#25292c', null, 14);
+        B.cyl('trim', 0.12, 0.12, 0.06, 0.0, yt + 0.55, z, '#5b6064', null, 14);
+        B.cyl('trim', 0.12, 0.12, 0.05, 0.0, yt + 0.8, z, '#5b6064', null, 14);
+        const cap = new T.CylinderGeometry(0.17, 0.17, 0.025, 14); cap.rotateX(-0.35); cap.translate(0, yt + 0.94, z - 0.03); B.geo('trim', cap, '#2f3336');
+        const ring = new T.TorusGeometry(0.1, 0.012, 5, 14); ring.rotateX(Math.PI / 2); ring.translate(0, yt + 0.79, z); B.geo('trim', ring, '#0e0f10');
+        smokeSpots.push({ x: 0, y: yt + 0.85, z });
       }
-      roofBox(1.2, 0.3, 2.4, 0, yt + 0.05, L * 0.3, '#8d9396');
-      B.cyl('trim', 0.45, 0.45, 0.05, 0, yt + 0.22, L * 0.3, '#2d3134', null, 18);
+      roofBox(1.5, 0.4, 2.4, 0, yt + 0.08, L * 0.3, '#8d9396'); // radiator / cooling pack
+      for (const sd of [-1, 1]) for (let q = 0; q < 6; q++) B.box('trim', 0.03, 0.024, 2.1, sd * 0.76, yt + 0.0 + q * 0.055, L * 0.3, '#2d3134');
+      B.cyl('trim', 0.55, 0.55, 0.05, 0, yt + 0.3, L * 0.3, '#1b1e20', null, 20);
+      B.box('trim', 1.0, 0.03, 0.06, 0, yt + 0.34, L * 0.3, '#6f757a'); B.box('trim', 0.06, 0.03, 1.0, 0, yt + 0.34, L * 0.3, '#6f757a');
     } else if (!K.pcar && !K.loco) {
       const nAC = S.tram ? 2 : 2;
       for (let a = 0; a < nAC; a++) {
@@ -1055,9 +1086,13 @@
     const glassMesh = glassB.bake(mats, { noShadow: true });
     if (glassMesh) { glassMesh.userData.disposeGeo = true; glassMesh.renderOrder = 2; group.add(glassMesh); }
 
+    // ----- diesel exhaust smoke (medium/high only; hidden until setExhaust > 0)
+    let exhaust = null;
+    if (smokeSpots.length && mid) { exhaust = buildExhaust(smokeSpots, hi ? 14 : 8); group.add(exhaust); }
+
     // ----- lights
     return {
-      ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
+      exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
       noseFront: noseF, noseRear: noseR, S,
     };
   }
@@ -1092,6 +1127,40 @@
     x.font = 'italic 800 52px Helvetica, Arial, sans-serif'; x.fillText('LUX RAIL', 128, 42);
     x.font = '700 38px Helvetica, Arial, sans-serif'; x.fillText(num.replace('No ', ''), 128, 92);
     const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; badgeCache.set(num, t); return t;
+  }
+
+  const PLATE_ASPECT = 4;
+  let dieselPlateTex = null;
+  function dieselPlateTexture() { // enamel "DIESEL" plate (shared canvas texture)
+    if (dieselPlateTex) return dieselPlateTex;
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
+    const x = cv.getContext('2d');
+    x.fillStyle = '#16191b'; x.fillRect(0, 0, 256, 64);
+    x.strokeStyle = '#d8d3c0'; x.lineWidth = 3; x.strokeRect(4, 4, 248, 56);
+    x.fillStyle = '#f1ecd8'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = '800 40px Helvetica, Arial, sans-serif'; x.fillText('DIESEL', 128, 34);
+    dieselPlateTex = new T.CanvasTexture(cv); dieselPlateTex.colorSpace = T.SRGBColorSpace; dieselPlateTex.anisotropy = 4;
+    return dieselPlateTex;
+  }
+
+  /* Exhaust smoke: one Points object per car, animated entirely in the vertex shader (no per-frame JS but a uniform). */
+  function buildExhaust(stacks, perStack) {
+    const n = stacks.length * perStack, pos = new Float32Array(n * 3), seed = new Float32Array(n);
+    stacks.forEach((st, k) => { for (let i = 0; i < perStack; i++) { const o = (k * perStack + i); pos.set([st.x, st.y, st.z], o * 3); seed[o] = (i + (k * 0.37)) / perStack; } });
+    const geo = new T.BufferGeometry();
+    geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('aSeed', new T.BufferAttribute(seed, 1));
+    const mat = new T.ShaderMaterial({
+      transparent: true, depthWrite: false, fog: false,
+      uniforms: { uTime: { value: 0 }, uLevel: { value: 0 }, uPx: { value: 360 } },
+      vertexShader: 'uniform float uTime,uLevel,uPx;attribute float aSeed;varying float vA;void main(){float ph=fract(uTime*0.6+aSeed);vec3 p=position;p.y+=ph*(0.9+0.7*uLevel);p.z+=ph*ph*(0.6+2.4*uLevel);p.x+=sin(aSeed*40.0+ph*3.0)*0.1*ph;vA=(1.0-ph)*smoothstep(0.0,0.1,ph)*uLevel*0.6;vec4 mv=modelViewMatrix*vec4(p,1.0);gl_PointSize=(0.22+ph*0.95)*uPx*projectionMatrix[1][1]/max(0.1,-mv.z);gl_Position=projectionMatrix*mv;}',
+      fragmentShader: 'varying float vA;void main(){float d=length(gl_PointCoord-0.5);float a=smoothstep(0.5,0.08,d)*vA;if(a<0.004)discard;gl_FragColor=vec4(vec3(0.34,0.35,0.37),a);}',
+    });
+    const pts = new T.Points(geo, mat);
+    pts.frustumCulled = false; pts.visible = false; pts.renderOrder = 3; pts.name = 'exhaust';
+    const sz = new T.Vector2();
+    pts.onBeforeRender = (renderer) => { renderer.getDrawingBufferSize(sz); mat.uniforms.uTime.value = performance.now() / 1000; mat.uniforms.uPx.value = sz.y * 0.5; };
+    pts.userData.disposeGeo = true;
+    return pts;
   }
 
   /* ---------------------------------------------------------------- pantograph */
@@ -1205,6 +1274,12 @@
         for (const m of built[0].fwdLinings) { if (Array.isArray(m.material)) m.material[0] = on ? mats.ghost : mats.insideFwd; else m.material = on ? mats.ghost : mats.insideFwd; }
       },
       setPantograph(up01) { for (const p of pantoAll) p.set(up01); },
+      /* Diesel exhaust smoke strength 0..1 (0 = off/hidden). No-op on electric models. */
+      setExhaust(level01) {
+        const v = clamp(Number(level01) || 0, 0, 1);
+        for (const b of built) if (b.exhaust) { b.exhaust.material.uniforms.uLevel.value = v; b.exhaust.visible = v > 0.01; }
+      },
+      hasExhaust: built.some((b) => !!b.exhaust),
       setWheelSpin(radians) { for (const w of wheelsets) w.mesh.rotation.x = -radians * REF_WHEEL_R / w.R; },
       setWheelDistance(m) { for (const w of wheelsets) w.mesh.rotation.x = -m / w.R; },
       setWipers(t) {
@@ -1213,7 +1288,8 @@
       },
       dispose() {
         group.traverse((o) => {
-          if (o.isMesh && o.userData.disposeGeo && o.geometry) o.geometry.dispose();
+          if ((o.isMesh || o.isPoints) && o.userData.disposeGeo && o.geometry) o.geometry.dispose();
+          if (o.isPoints && o.material) o.material.dispose();
           if (o.isInstancedMesh) o.dispose();
         });
         for (const m of mats.own) m.dispose();

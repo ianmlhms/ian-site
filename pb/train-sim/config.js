@@ -37,37 +37,37 @@
   const trains = Object.freeze([
     trainDef({
       id: 'railcar', name: { lb: 'Schinnebus', de: 'Schienenbus', en: 'Railbus' }, kind: 'rail', price: 0,
-      maxKmh: 90, accel: 0.55, brake: 0.8, emergency: 1.2, massT: 45, cars: 1, capacity: 90, doorsPerSide: 2, carLength: 22,
+      maxKmh: 90, accel: 0.9, brake: 1.1, emergency: 1.6, massT: 45, cars: 1, capacity: 90, doorsPerSide: 2, carLength: 22,
       cab: 'railcar', model: 'railcar', sound: 'diesel',
       liveries: [['#a82a26', '#e9dcc0', '#e9dcc0'], ['#2e5d4b', '#e9dcc0', '#d8b24a'], ['#1f4f86', '#f0f0ec', '#c8312b'], ['#2a2a2e', '#d8b24a', '#d8b24a']],
     }),
     trainDef({
       id: 'emu', name: { lb: 'Regionalzuch', de: 'Regionalzug', en: 'Regional EMU' }, kind: 'rail', price: 12000,
-      maxKmh: 140, accel: 0.85, brake: 0.95, emergency: 1.4, massT: 110, cars: 2, capacity: 220, doorsPerSide: 3, carLength: 26,
+      maxKmh: 140, accel: 1.0, brake: 1.15, emergency: 1.7, massT: 110, cars: 2, capacity: 220, doorsPerSide: 3, carLength: 26,
       cab: 'emu', model: 'emu', sound: 'electric',
       liveries: [['#e7e8ea', '#c8312b', '#1b3a6b'], ['#dfe6ea', '#1b6e8f', '#e7b32c'], ['#cfd4d8', '#2f7d4f', '#e7e8ea'], ['#262a32', '#c8312b', '#e7e8ea']],
     }),
     trainDef({
       id: 'tram', name: { lb: 'Tram', de: 'Straßenbahn', en: 'Tram' }, kind: 'tram', price: 30000,
-      maxKmh: 70, accel: 1.1, brake: 1.2, emergency: 2.2, massT: 55, cars: 5, capacity: 420, doorsPerSide: 1, carLength: 8.6,
+      maxKmh: 70, accel: 1.2, brake: 1.3, emergency: 2.4, massT: 55, cars: 5, capacity: 420, doorsPerSide: 1, carLength: 8.6,
       cab: 'tram', model: 'tram', sound: 'tram',
       liveries: [['#f1f1ee', '#d6342e', '#8a8d93'], ['#f1f1ee', '#1f7a5c', '#8a8d93'], ['#2b2f38', '#e9b83a', '#f1f1ee'], ['#f1f1ee', '#2b64b0', '#e9b83a']],
     }),
     trainDef({
       id: 'kiss', name: { lb: 'Duebeldecker-Zuch', de: 'Doppelstock-Triebzug', en: 'Double-decker EMU' }, kind: 'rail', price: 55000,
-      maxKmh: 160, accel: 0.8, brake: 1.0, emergency: 1.3, massT: 300, cars: 4, capacity: 600, doorsPerSide: 2, carLength: 26,
+      maxKmh: 160, accel: 0.95, brake: 1.15, emergency: 1.65, massT: 300, cars: 4, capacity: 600, doorsPerSide: 2, carLength: 26,
       cab: 'kiss', model: 'kiss', sound: 'electric',
       liveries: [['#dedfe2', '#c8312b', '#2a2d34'], ['#dedfe2', '#1b4f9c', '#e7b32c'], ['#c9ced3', '#e9742c', '#2a2d34'], ['#2a2d34', '#c8312b', '#dedfe2']],
     }),
     trainDef({
       id: 'ic', name: { lb: 'Intercity', de: 'Intercity', en: 'Intercity' }, kind: 'rail', price: 100000,
-      maxKmh: 200, accel: 0.6, brake: 0.9, emergency: 1.2, massT: 420, cars: 7, capacity: 520, doorsPerSide: 2, carLength: 25,
+      maxKmh: 200, accel: 0.75, brake: 1.0, emergency: 1.5, massT: 420, cars: 7, capacity: 520, doorsPerSide: 2, carLength: 25,
       cab: 'ic', model: 'ic', sound: 'electric',
       liveries: [['#c8312b', '#dcdcdc', '#2a2a2e'], ['#1b4f9c', '#dcdcdc', '#e7b32c'], ['#e8e6df', '#c8312b', '#2a2a2e'], ['#2a2d34', '#e7b32c', '#dcdcdc']],
     }),
     trainDef({
       id: 'hst', name: { lb: 'Héichgeschwindegkeetszuch', de: 'Hochgeschwindigkeitszug', en: 'High-speed train' }, kind: 'rail', price: 180000,
-      maxKmh: 320, accel: 0.5, brake: 0.85, emergency: 1.2, massT: 420, cars: 8, capacity: 750, doorsPerSide: 2, carLength: 21.5,
+      maxKmh: 320, accel: 0.65, brake: 0.95, emergency: 1.35, massT: 420, cars: 8, capacity: 750, doorsPerSide: 2, carLength: 21.5,
       cab: 'hst', model: 'hst', sound: 'hst',
       liveries: [['#e8eaee', '#1b3a6b', '#c8312b'], ['#2a3a6b', '#d8dce2', '#c8312b'], ['#d8dce2', '#2a2d34', '#e7b32c'], ['#2a2d34', '#c8312b', '#d8dce2']],
     }),
@@ -90,7 +90,7 @@
   /* needs: tokens matched against the train's id OR kind ('rail' | 'tram') */
   const routeRules = Object.freeze({
     west: Object.freeze({ price: 0, needs: Object.freeze(['rail']), fareBase: 20 }),
-    south: Object.freeze({ price: 6000, needs: Object.freeze(['rail']), fareBase: 26 }),
+    south: Object.freeze({ price: 1800, needs: Object.freeze(['rail']), fareBase: 26 }),
     east: Object.freeze({ price: 9000, needs: Object.freeze(['rail']), fareBase: 24 }),
     north: Object.freeze({ price: 16000, needs: Object.freeze(['rail']), fareBase: 32 }),
     tram: Object.freeze({ price: 8000, needs: Object.freeze(['tram']), fareBase: 18 }),
@@ -121,6 +121,6 @@
 
   TS.config = Object.freeze({
     trains, upgrades, upgradeKinds: UPGRADE_KINDS, upgradeEffects: UPGRADE_EFFECTS, extraCarTrains: EXTRA_CAR_TRAINS,
-    routeRules, routeOrder, economy, ranks, rankIds, saveVersion: 1,
+    routeRules, routeOrder, economy, ranks, rankIds, saveVersion: 1, coachServices: 3,
   });
 })();

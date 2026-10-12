@@ -39,6 +39,7 @@
       v: C.saveVersion, tb: lifetime, lifetime, wallet: Math.min(lifetime, num(d.wallet)), savedAt: num(d.savedAt),
       owned, routes, train: owned.includes(d.train) ? d.train : FREE_TRAIN, route: routes.includes(d.route) ? d.route : FREE_ROUTE,
       upgrades, best, services: num(d.services), endlessBest: num(d.endlessBest),
+      hints: d.hints !== false, hintsSet: d.hintsSet === true,
     };
   }
 
@@ -115,6 +116,10 @@
   function select(save, trainId) {
     const s = normalize(save);
     return s.owned.includes(trainId) ? withSave(s, { train: trainId }) : null;
+  }
+  /* Player choice for the coach hints ("Hiweiser"); remembered so the automatic retirement stops. */
+  function setHints(save, on) {
+    return withSave(normalize(save), { hints: !!on, hintsSet: true });
   }
   function selectRoute(save, routeId) {
     const s = normalize(save);
@@ -287,12 +292,13 @@
     const next = withSave(s, {
       lifetime, tb: lifetime, wallet: Math.min(lifetime, s.wallet + rw.cash), services: s.services + 1, best,
       endlessBest: mode === 'endless' ? Math.max(s.endlessBest, rw.points) : s.endlessBest, savedAt: Date.now(),
+      hints: s.hintsSet ? s.hints : s.services + 1 < C.coachServices,   // the coach retires itself after the first few services unless the player chose
     });
     return { save: next, reward: rw, rankUp: rank(next.lifetime) > rank(s.lifetime) ? rank(next.lifetime) : -1 };
   }
 
   TS.career = {
-    defaults, normalize, merge, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
+    defaults, normalize, merge, setHints, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
     applyUpgrades, routeAvailable, endlessOrder, routeClass, trainCompatible, trainsForRoute, requiredTrain,
     rank, rankInfo, reward, completeService, punctualityScore, accuracyScore, MAX_LEVELS,
   };

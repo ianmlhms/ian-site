@@ -1,6 +1,7 @@
-/* Lokféierer: driver's cab interior (TS.cab). Procedural, no assets. Not clickable.
+/* Lokféierer: driver's cab interior (TS.cab). Procedural, no assets. Controls are clickable via hitTest().
    cab.group lives in the FRONT car's local frame: x right, y up, forward = -Z, y = 0 at rail top.
-   Public: TS.cab.create(trainConfig, { quality }) -> { group, update(state), snap(), dispose() }
+   Public: TS.cab.create(trainConfig, { quality }) -> { group, update(state), snap(), dispose(),
+     hitTest(raycaster), pickNotch(raycaster), setHover(id|null), getControlWorldPoint(id, notch?), controlIds }
    group.userData: eye (Vector3), eyeLookAt (Vector3), frame { zF, floor, ... }. */
 (function () {
   'use strict';
@@ -21,6 +22,10 @@
   const FONT = '"Helvetica Neue", Helvetica, Arial, sans-serif';
   const GLASS_OPACITY = 0.14;
   const SIGN_FONT_SCALE = 0.62;
+  const HOVER_TINT = '#ffd27a';          // emissive tint of a hovered control
+  const HOVER_EMISSIVE = 0.75;           // emissive floor of a hovered control
+  const HIT_W = 0.092;                   // width of a button hit box (m), a bit larger than the button + sticker
+  const CONTROL_IDS = ['lever', 'doorLeft', 'doorRight', 'horn', 'lights', 'eb', 'parking', 'wipers', 'announce'];
 
   /* Fallback geometry per model when TS.trains.specs is not there. */
   const FALLBACK = {
@@ -374,7 +379,8 @@
   }
 
   /* ---------------------------------------------------------------- sticker atlas (key labels) */
-  const STICKER_LABELS = ['W/S', 'D', 'H', 'L', 'X'];
+  const STICKER_LABELS = ['W/S', 'D', 'H', 'L', 'X', 'B', 'A'];
+  const STK = { lever: 0, door: 1, horn: 2, lights: 3, eb: 4, parking: 5, announce: 6 };
   const STICKER_CELL = 128;
 
   function drawStickerAtlas(canvas, cell) {
@@ -447,6 +453,13 @@
       white: { color: '#8a8f94', emissive: '#f4f8ff' },
     };
     const lampMat = (name, intensity) => mat(new T.MeshStandardMaterial({ color: lampDefs[name].color, emissive: lampDefs[name].emissive, emissiveIntensity: intensity, roughness: 0.35, metalness: 0.1 }));
+
+    /* ---- hover highlight: per control id the materials that glow (their own materials, never shared ones) */
+    const hoverable = {};
+    const hoverFloor = new Map();
+    const baseEm = new Map();
+    const hoverMat = (id, m, floor) => { (hoverable[id] = hoverable[id] || []).push({ m, floor: floor == null ? HOVER_EMISSIVE : floor }); baseEm.set(m, m.emissiveIntensity); return m; };
+    const metalOwn = (id, floor) => hoverMat(id, mat(new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.34, metalness: 0.75, emissive: HOVER_TINT, emissiveIntensity: 0 })), floor);
 
     /* ---- buckets of static geometry */
     const buckets = { matte: [], metal: [], glass: [], sticker: [], lampStatic: [] };
@@ -711,7 +724,7 @@
         parts.push(colorize(box(0.052, 0.014, 0.044).translate(0, L - 0.02, 0), S.accent));
         parts.push(colorize(box(0.046, 0.012, 0.038).translate(0, L - 0.115, 0), '#2d3138'));
       }
-      leverPivot.add(new T.Mesh(geo(mergeGeos(parts)), matMetal));
+      leverPivot.add(new T.Mesh(geo(mergeGeos(parts)), metalOwn('lever', 0.16)));
       // W/S sticker on the grip face toward the driver
       const gripY = S.joystick ? L - 0.012 : S.old ? L - 0.002 : L - 0.062;
       const gripZ = S.joystick ? 0.034 : S.old ? 0.031 : 0.0225;
@@ -733,18 +746,20 @@
     const lightX = ebX + 0.2;
     const hornX = lightX + 0.28;
     const wiperX = hornX + 0.14;
+    const parkingX = (ebX + lightX) / 2;
+    const announceX = (lightX + hornX) / 2;
 
     // door buttons (square, lit)
     const doorMats = {}, doorMeshes = {};
     for (const side of ['left', 'right']) {
       const x = side === 'left' ? doorLX : doorX;
       deskBox('matte', 0.074, 0.01, 0.062, x, btnU, S.trim, 0);
-      const m = mat(new T.MeshStandardMaterial({ color: '#2a8a4c', emissive: '#55ff8a', emissiveIntensity: 0.05, roughness: 0.3 }));
+      const m = hoverMat(side === 'left' ? 'doorLeft' : 'doorRight', mat(new T.MeshStandardMaterial({ color: '#2a8a4c', emissive: '#55ff8a', emissiveIntensity: 0.05, roughness: 0.3 })));
       doorMats[side] = m;
       const lens = new T.Mesh(geo(box(0.054, 0.016, 0.044)), m);
       lens.position.set(x, 0.018, btnU);
       deskGroup.add(lens);
-      deskSticker(1, x, stickerU, 0.0025);
+      deskSticker(STK.door, x, stickerU, 0.0025);
       // direction arrow marker: small triangle on the plate edge
       const dir = side === 'left' ? -1 : 1;
       const tri = new T.CircleGeometry(0.012, 3).rotateZ(side === 'left' ? Math.PI : 0).rotateX(-Math.PI / 2);
@@ -753,15 +768,15 @@
 
     // horn (round, black with ring)
     deskCyl('metal', 0.038, 0.04, 0.008, hornX, btnU, S.metal, 0, 24);
-    const hornMat = mat(new T.MeshStandardMaterial({ color: '#202428', emissive: '#ffb347', emissiveIntensity: 0, roughness: 0.4 }));
+    const hornMat = hoverMat('horn', mat(new T.MeshStandardMaterial({ color: '#202428', emissive: '#ffb347', emissiveIntensity: 0, roughness: 0.4 })));
     const hornCap = new T.Mesh(geo(cyl(0.029, 0.033, 0.016, 24)), hornMat);
     hornCap.position.set(hornX, 0.016, btnU);
     deskGroup.add(hornCap);
-    deskSticker(2, hornX, stickerU);
+    deskSticker(STK.horn, hornX, stickerU);
 
     // light switch: rotary knob + indicator
     deskCyl('metal', 0.03, 0.03, 0.006, lightX, btnU, S.metal, 0, 20);
-    const knobMat = matMetal;
+    const knobMat = metalOwn('lights', 0.4);
     const knobGeo = geo(mergeGeos([
       colorize(cyl(0.021, 0.024, 0.02, 18).translate(0, 0.01, 0), '#1c1f24'),
       colorize(box(0.006, 0.004, 0.022).translate(0, 0.021, -0.008), '#f4f4ee'),
@@ -769,27 +784,33 @@
     const lightKnob = new T.Mesh(knobGeo, knobMat);
     lightKnob.position.set(lightX, 0.006, btnU);
     deskGroup.add(lightKnob);
-    deskSticker(3, lightX, stickerU);
+    deskSticker(STK.lights, lightX, stickerU);
 
     // emergency brake mushroom
     deskCyl('matte', 0.044, 0.046, 0.012, ebX, btnU, '#e6b800', 0, 28);
     deskCyl('matte', 0.038, 0.038, 0.012, ebX, btnU, '#1a1a1a', 0.012, 28);
-    const ebMat = mat(new T.MeshStandardMaterial({ color: '#b4160f', emissive: '#ff2a1a', emissiveIntensity: 0.12, roughness: 0.28, metalness: 0.1 }));
+    const ebMat = hoverMat('eb', mat(new T.MeshStandardMaterial({ color: '#b4160f', emissive: '#ff2a1a', emissiveIntensity: 0.12, roughness: 0.28, metalness: 0.1 })), 0.7);
     const ebCap = new T.Mesh(geo(new T.SphereGeometry(0.036, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.62, 1)), ebMat);
     ebCap.position.set(ebX, 0.024, btnU);
     deskGroup.add(ebCap);
     {
-      const g = stickerGeo(4, 0.05, 0.05 * (128 / 120)).rotateX(-Math.PI / 2);
+      const g = stickerGeo(STK.eb, 0.05, 0.05 * (128 / 120)).rotateX(-Math.PI / 2);
       addTo('sticker', g, deskM(ebX, btnU, 0.0505), '#ffffff');
     }
 
     // wiper rotary + extra dummy switches (non-low only)
     deskCyl('metal', 0.022, 0.022, 0.005, wiperX, btnU, S.metal, 0, 16);
-    deskCyl('matte', 0.016, 0.018, 0.016, wiperX, btnU, '#1c1f24', 0.005, 14);
+    const wiperKnob = new T.Mesh(geo(mergeGeos([
+      colorize(cyl(0.016, 0.018, 0.016, 14).translate(0, 0.008, 0), '#1c1f24'),
+      colorize(box(0.004, 0.003, 0.016).translate(0, 0.0165, -0.006), '#f4f4ee'),
+    ])), metalOwn('wipers', 0.4));
+    wiperKnob.position.set(wiperX, 0.005, btnU);
+    deskGroup.add(wiperKnob);
     if (!isLow) {
       for (let i = 0; i < 4; i++) {
         const x = lightX + 0.1 + i * 0.045;
         if (x > hornX - 0.07) break;
+        if (Math.abs(x - announceX) < 0.065) continue;
         deskBox('matte', 0.026, 0.008, 0.022, x, btnU - 0.02, S.trim, 0);
         deskBox('metal', 0.012, 0.016, 0.006, x, btnU - 0.02, i % 2 ? '#d8d8d0' : '#9aa2ac', 0.004);
       }
@@ -810,7 +831,7 @@
     const lampX0 = ebX - 0.04;
     const lampStep = 0.05;
     const dynLamps = {};
-    const lampSlots = [['green', 'traction'], ['amber', 'brake'], ['red', 'eb'], ['blue', 'head'], ['white', 'door'], ['blue', 'wiper'], ['amber', null], ['green', null], ['red', null]];
+    const lampSlots = [['green', 'traction'], ['amber', 'brake'], ['red', 'eb'], ['blue', 'head'], ['white', 'door'], ['blue', 'wiper'], ['amber', null], ['green', null], ['red', 'parking']];
     deskBox('matte', lampSlots.length * lampStep + 0.02, 0.008, 0.045, lampX0 + (lampSlots.length - 1) * lampStep / 2, lampU, S.trim, 0);
     lampSlots.forEach(([color, role], i) => {
       const x = lampX0 + i * lampStep;
@@ -824,6 +845,78 @@
         deskCyl('matte', 0.014, 0.016, 0.012, x, lampU, i === 6 ? '#4a3a12' : i === 7 ? '#14402a' : '#4a1612', 0.0, 14);
       }
     });
+
+    /* ---- parking brake + announcement buttons ------------------------------------------------- */
+    const parkMat = hoverMat('parking', mat(new T.MeshStandardMaterial({ color: '#8a2a1a', emissive: '#ff5a2a', emissiveIntensity: 0.05, roughness: 0.3 })), 0.7);
+    deskCyl('metal', 0.036, 0.038, 0.008, parkingX, btnU, S.metal, 0, 24);
+    const parkCap = new T.Mesh(geo(cyl(0.027, 0.03, 0.016, 22)), parkMat);
+    parkCap.position.set(parkingX, 0.016, btnU);
+    deskGroup.add(parkCap);
+    deskSticker(STK.parking, parkingX, stickerU);
+    const announceMat = hoverMat('announce', mat(new T.MeshStandardMaterial({ color: '#2a5fa8', emissive: '#5aa8ff', emissiveIntensity: 0.05, roughness: 0.3 })), 0.7);
+    deskBox('matte', 0.07, 0.01, 0.06, announceX, btnU, S.trim, 0);
+    const announceLens = new T.Mesh(geo(box(0.05, 0.016, 0.042)), announceMat);
+    announceLens.position.set(announceX, 0.018, btnU);
+    deskGroup.add(announceLens);
+    deskSticker(STK.announce, announceX, stickerU);
+
+    /* ---- clickable controls: invisible hit meshes (a bit larger than the controls) + hover halos --- */
+    const ctrlAt = {};                 // id -> desk-local point { x, y, u } (centre of the control)
+    const hitMeshes = [];
+    const halos = {};
+    const hitMat = mat(new T.MeshBasicMaterial({ visible: false }));
+    const addHit = (id, w, h, d, x, y, u, parent, extra) => {
+      const m = new T.Mesh(geo(box(w, h, d)), hitMat);
+      m.position.set(x, y, u);
+      m.name = 'hit-' + id;
+      m.userData = { ctrl: id, ...(extra || {}) };
+      (parent || deskGroup).add(m);
+      hitMeshes.push(m);
+      return m;
+    };
+    const haloCanvas = makeCanvas(64, 64);
+    {
+      const c = haloCanvas.getContext('2d');
+      c.shadowColor = '#ffffff'; c.shadowBlur = 10; c.fillStyle = '#ffffff';
+      roundRect(c, 14, 14, 36, 36, 9); c.fill();
+    }
+    const haloMat = mat(new T.MeshBasicMaterial({
+      map: tex(canvasTexture(haloCanvas, 1)), color: HOVER_TINT, transparent: true, opacity: 0.75,
+      blending: T.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+    }));
+    const gateHaloMat = mat(haloMat.clone());
+    gateHaloMat.opacity = 0.2;                 // the gate carries printed labels: keep its halo faint
+    const addHalo = (id, w, d, x, y, u) => {
+      const m = new T.Mesh(geo(new T.PlaneGeometry(w, d).rotateX(-Math.PI / 2)), id === 'lever' ? gateHaloMat : haloMat);
+      m.position.set(x, y, u);
+      m.visible = false;
+      m.renderOrder = 6;
+      deskGroup.add(m);
+      halos[id] = m;
+    };
+    const btnHitU = (btnU + stickerU) / 2, btnHitD = stickerU - btnU + 0.075;
+    const buttonCtl = [['doorLeft', doorLX], ['doorRight', doorX], ['horn', hornX], ['lights', lightX], ['eb', ebX], ['parking', parkingX], ['announce', announceX], ['wipers', wiperX]];
+    for (const [id, x] of buttonCtl) {
+      const withSticker = id !== 'wipers';
+      const uC = withSticker ? btnHitU : btnU, d = withSticker ? btnHitD : 0.075;
+      addHit(id, HIT_W, 0.07, d, x, 0.035, uC);
+      addHalo(id, 0.09, d + 0.012, x, 0.012, uC);
+      ctrlAt[id] = { x, y: 0.03, u: btnU };
+    }
+    // the gate (notch plate + slot) and the lever grip: one control, picks a notch
+    {
+      const hu0 = plateU0 - 0.025, hu1 = plateU1 + 0.025;
+      const hx0 = leverX - 0.045, hx1 = plateX + plateW / 2 + 0.02;
+      addHit('lever', hx1 - hx0, 0.02, hu1 - hu0, (hx0 + hx1) / 2, 0.012, (hu0 + hu1) / 2, deskGroup, { gate: true });
+      addHit('lever', 0.09, 0.16, 0.09, 0, lk.len - 0.07, 0, leverPivot, { grip: true });
+      addHalo('lever', plateW + 0.05, plateU1 - plateU0 + 0.05, plateX, 0.0055, (plateU0 + plateU1) / 2);
+      ctrlAt.lever = { x: plateX, y: 0.003, u: tipU(0) };
+    }
+    const notchAtU = (u) => {
+      let best = 0, bestD = Infinity;
+      for (let n = LEVER_MIN; n <= LEVER_MAX; n++) { const dd = Math.abs(tipU(n) - u); if (dd < bestD) { bestD = dd; best = n; } }
+      return best;
+    };
 
     /* ---- pillars, seals, visor (all follow the raked cap plane) ---------------------------------- */
     {
@@ -935,7 +1028,11 @@
     };
     const palette = S.retro ? PAL_RETRO : PAL_MODERN;
 
-    const setEmissive = (m, v) => { if (m.emissiveIntensity !== v) m.emissiveIntensity = v; };
+    const setEmissive = (m, v) => {
+      baseEm.set(m, v);
+      const e = Math.max(v, hoverFloor.get(m) || 0);
+      if (m.emissiveIntensity !== e) m.emissiveIntensity = e;
+    };
 
     function snapshotForMfd(state) {
       const speed = Math.round(Math.max(0, num(state.speedKmh, 0)));
@@ -1025,6 +1122,10 @@
       setEmissive(dynLamps.door, num(s.doorsOpen01, 0) < 0.02 && !s.doorsReleased ? 1.6 : 0.04);
       setEmissive(dynLamps.wiper, s.wiper ? 1.6 : 0.04);
       setEmissive(hornMat, s.horn ? 1.3 : 0);
+      setEmissive(parkMat, s.parkingBrake ? 1.8 : 0.05);
+      setEmissive(dynLamps.parking, s.parkingBrake ? 1.9 : 0.04);
+      setEmissive(announceMat, s.announce ? 1.6 : 0.05);
+      wiperKnob.rotation.y = s.wiper ? -0.9 : 0;
       hornCap.position.y = s.horn ? 0.011 : 0.016;
 
       refreshMfds(s, now, snap);
@@ -1041,8 +1142,82 @@
       own.geos.length = 0; own.mats.length = 0; own.texs.length = 0;
     }
 
+    /* ---------------------------------------------------------------- clicking / hovering */
+    let hovered = null;
+    const tmpA = new T.Vector3(), tmpB = new T.Vector3();
+    const tmpPlane = new T.Plane();
+    const chainVisible = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+
+    function applyHover() {
+      for (const id of Object.keys(hoverable)) {
+        for (const { m, floor } of hoverable[id]) {
+          const f = id === hovered ? floor : 0;
+          hoverFloor.set(m, f);
+          m.emissiveIntensity = Math.max(baseEm.get(m) || 0, f);
+        }
+      }
+      for (const id of Object.keys(halos)) halos[id].visible = id === hovered;
+    }
+
+    /* Subtle emissive highlight + halo on one control (id from controlIds) or none (null). */
+    function setHover(id) {
+      const next = CONTROL_IDS.includes(id) ? id : null;
+      if (next === hovered) return;
+      hovered = next;
+      applyHover();
+    }
+
+    /* Raycaster -> { id, notch? } | null. notch (-8..5) only for 'lever'. */
+    function hitTest(raycaster) {
+      if (!raycaster || !chainVisible(group)) return null;
+      try {
+        group.updateWorldMatrix(true, true);
+        const hits = raycaster.intersectObjects(hitMeshes, false);
+        if (!hits.length) return null;
+        const h = hits[0], id = h.object.userData.ctrl;
+        if (id !== 'lever') return { id };
+        if (h.object.userData.grip) return { id, notch: clamp(Math.round(rt.leverDisp), LEVER_MIN, LEVER_MAX) };
+        // the notch comes from the ray's point on the plate itself (not the taller hit box), so it matches the printed labels
+        const n = notchOnPlate(raycaster);
+        return { id, notch: n == null ? notchAtU(deskGroup.worldToLocal(tmpA.copy(h.point)).z) : n };
+      } catch (e) {
+        console.warn('[Lokféierer] cab: hitTest failed', e);
+        return null;
+      }
+    }
+
+    function notchOnPlate(raycaster) {
+      tmpA.set(0, 1, 0).transformDirection(deskGroup.matrixWorld);
+      tmpB.set(0, 0.003, 0).applyMatrix4(deskGroup.matrixWorld);
+      tmpPlane.setFromNormalAndCoplanarPoint(tmpA, tmpB);
+      const p = raycaster.ray.intersectPlane(tmpPlane, tmpA);
+      return p ? notchAtU(deskGroup.worldToLocal(tmpA).z) : null;
+    }
+
+    /* Raycaster -> nearest notch (-8..5) along the gate, for dragging: intersects the ray with the gate plane
+       (clamped to the ends), so it keeps working when the pointer leaves the hit mesh. null if the ray misses the plane. */
+    function pickNotch(raycaster) {
+      if (!raycaster || !chainVisible(group)) return null;
+      try {
+        group.updateWorldMatrix(true, true);
+        return notchOnPlate(raycaster);
+      } catch (e) {
+        console.warn('[Lokféierer] cab: pickNotch failed', e);
+        return null;
+      }
+    }
+
+    /* World position of a control's centre (for tests / pointer hints). Lever: the notch's spot on the gate. */
+    function getControlWorldPoint(id, notch) {
+      const c = ctrlAt[id];
+      if (!c) return null;
+      group.updateWorldMatrix(true, true);
+      const u = id === 'lever' && typeof notch === 'number' ? tipU(clamp(Math.round(notch), LEVER_MIN, LEVER_MAX)) : c.u;
+      return deskGroup.localToWorld(new T.Vector3(c.x, c.y, u));
+    }
+
     update({});
-    return { group, update, snap: snapNow, dispose };
+    return { group, update, snap: snapNow, dispose, hitTest, pickNotch, setHover, getControlWorldPoint, controlIds: CONTROL_IDS.slice() };
   }
 
   TS.cab = { create, STYLES, FALLBACK };

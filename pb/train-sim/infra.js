@@ -261,6 +261,34 @@
     }, { clampU: true, clampV: true });
   }
 
+  /* Temporary speed restriction board: yellow plate, black number; the end board is the same plate with a diagonal bar. */
+  function tsrTexture(kmh, isEnd) {
+    return canvasTex('tsr:' + (isEnd ? 'end' : kmh), 128, 160, (c, w, h) => {
+      c.fillStyle = '#f2b600';
+      c.fillRect(0, 0, w, h);
+      c.strokeStyle = '#111';
+      c.lineWidth = 8;
+      c.strokeRect(4, 4, w - 8, h - 8);
+      c.fillStyle = '#111';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      if (isEnd) {
+        c.font = '800 70px "Helvetica Neue", Arial, sans-serif';
+        c.fillText('E', w / 2, 80);
+        c.lineWidth = 10;
+        c.beginPath();
+        c.moveTo(14, h - 14);
+        c.lineTo(w - 14, 14);
+        c.stroke();
+      } else {
+        c.font = '800 ' + (kmh >= 100 ? 62 : 80) + 'px "Helvetica Neue", Arial, sans-serif';
+        c.fillText(String(kmh), w / 2, 78);
+        c.font = '700 20px Arial';
+        c.fillText('km/h', w / 2, 130);
+      }
+    }, { clampU: true, clampV: true });
+  }
+
   function stopTexture() {
     return canvasTex('stopboard', 128, 192, (c, w, h) => {
       c.fillStyle = '#f2a600';
@@ -1722,7 +1750,46 @@
       const o = env.crossingObjs.get(index);
       if (o) o.setClosed(!!closed);
     }
+    /* Temporary speed restriction boards (yellow). addTempBoard(s, kmh, endS?) puts a start board at s and, when endS is given, an end board. */
+    const tempBoards = [];
+    function makeTempBoard(s, kmh, isEnd) {
+      const sd = lateralFree(track, s);
+      const lat = sd * (isTram ? 4.7 : 3.2);
+      const f = track.frameAt(s);
+      const group = new T.Group();
+      const map = tsrTexture(kmh, isEnd);
+      const plate = new T.Mesh(new T.PlaneGeometry(1.1, 1.38), new T.MeshBasicMaterial({ map, side: T.DoubleSide }));
+      plate.position.y = 2.7;
+      const post = new T.Mesh(new T.BoxGeometry(0.09, 2.5, 0.09), new T.MeshStandardMaterial({ color: 0x6c7075 }));
+      post.position.y = 1.2;
+      group.add(post, plate);
+      const p = posAt(track, s, lat, isTram ? 0.14 : -0.2);
+      group.position.set(p[0], p[1], p[2]);
+      group.rotation.y = Math.atan2(-f.tangent.x, -f.tangent.z);
+      group.userData = { s, kmh, isEnd };
+      root.add(group);
+      tempBoards.push(group);
+      return group;
+    }
+    function addTempBoard(s, kmh, endS) {
+      if (!Number.isFinite(s) || !Number.isFinite(kmh)) return false;
+      try {
+        makeTempBoard(s, Math.round(kmh), false);
+        if (Number.isFinite(endS)) makeTempBoard(endS, Math.round(kmh), true);
+        return true;
+      } catch (err) {
+        console.warn('[Lokféierer] temp board failed', err);
+        return false;
+      }
+    }
+    function clearTempBoards() {
+      tempBoards.splice(0).forEach((g) => {
+        root.remove(g);
+        g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });   // textures are shared via the cache
+      });
+    }
     function dispose() {
+      clearTempBoards();
       Array.from(chunks.keys()).forEach(unloadChunk);
       track.stations.forEach((st, i) => unloadStation(i));
       scene.remove(root);
@@ -1733,7 +1800,7 @@
 
     update(0);
     return {
-      update, dispose, setSignalAspect, setCrossing, platformHeight, stationObjects,
+      update, dispose, setSignalAspect, setCrossing, addTempBoard, clearTempBoards, platformHeight, stationObjects,
       quality: qualityName,
       debug: { chunks, env },
     };

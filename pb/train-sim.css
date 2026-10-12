@@ -2,7 +2,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0f14;color:var(--ink);font-family:var(--font);display:flex;flex-direction:column}
 #game{position:relative;flex:1;min-height:0;width:100%;overflow:hidden;background:linear-gradient(#27394d,#0b0f14)}
-#world{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none}
+#world{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}
 button{font:inherit;color:inherit;cursor:pointer}
 .glass{background:var(--glass);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:0 6px 28px rgba(0,0,0,.28)}
 .muted{color:var(--soft)}
@@ -75,6 +75,21 @@ button.chipbtn:hover{color:var(--ink)}
 #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:12;transition:opacity .6s ease}
 #fade.on{opacity:1}
 
+/* parking brake lamp, braking guide, coach line */
+.parklamp{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:99px;background:rgba(255,90,77,.18);color:#ff9a90;border:1px solid rgba(255,90,77,.55);white-space:nowrap}
+.guide{margin-top:6px;text-align:center;font-size:15px;font-weight:800;letter-spacing:.01em;padding:4px 10px;border-radius:10px;font-variant-numeric:tabular-nums}
+.guide.brake{background:rgba(255,194,74,.2);color:var(--amber);border:1px solid rgba(255,194,74,.55);animation:blink 1s steps(2) infinite}
+.guide.late{background:rgba(255,90,77,.22);color:#ffb3ab;border:1px solid rgba(255,90,77,.65)}
+.guide.ok{background:rgba(61,220,132,.12);color:#a7f0c6;border:1px solid rgba(61,220,132,.35);font-size:12px;font-weight:650}
+.guide.eb{background:rgba(255,90,77,.22);color:#ffb3ab;border:1px solid rgba(255,90,77,.65)}
+.guide.subtle{font-size:12px;font-weight:650;background:transparent;border-color:transparent;opacity:.85;animation:none}
+.guide.subtle.late{background:rgba(255,90,77,.14)}
+.hint.coach{color:#bff2ec}
+#stripDots i.pass{width:6px;height:6px;margin-left:-3px;top:20px;background:transparent;border-style:dashed;opacity:.8}
+#stripDots i.pass.done{opacity:.4}
+#stripDots b.tsr{position:absolute;top:21px;height:4px;border-radius:2px;background:var(--yellow);opacity:.9}
+#ttBody tr.pass td{color:var(--soft);font-style:italic}
+
 /* ---------- overlays ---------- */
 .overlay{position:absolute;inset:0;z-index:20;display:flex}
 .overlay.center{align-items:center;justify-content:center;background:rgba(5,8,12,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:16px}
@@ -135,3 +150,6 @@ body[data-cam="cab"] .hint{margin-top:0;font-size:12px}
 body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 150px)}
 body[data-cam="cab"] #banner{top:34%}
 @media(max-width:900px){body[data-cam="cab"] .hud-util{display:none}}
+
+/* portrait (iPad): the slim cab info strip sits below the clock box so nothing overlaps */
+@media(max-aspect-ratio:5/4){body[data-cam="cab"] #hud .hud-bottom{top:calc(max(10px,env(safe-area-inset-top)) + 96px)}body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 215px)}}

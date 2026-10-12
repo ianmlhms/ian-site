@@ -15,6 +15,8 @@
   const BOARD_BASE = { 1: 9, 2: 20, 3: 36 }, ALIGHT_RANGE = [0.22, 0.55];
   const CHASE_UP = 3.9, CHASE_SIDE = 3.4;
   const DEMO_ORBIT_RATE = 0.12;
+  const TOAST_MAX = 2, CAB_FOV = 66, CAB_FOV_PORTRAIT_MAX = 100, CAB_FOV_FIT_HALF_DEG = 44, CAB_EYE_BACK_PORTRAIT_M = 0.18, CAB_PITCH_PORTRAIT = -0.2, CAB_DRAG_PX_PER_NOTCH = 18, SPAD_TOAST_COOLDOWN_MS = 1200;
+  const GUIDE_KIND_KEYS = { stop: 'guideStop', limit: 'guideLimit', signal: 'guideSignal' };
 
   /* ------------------------------------------------------------ helpers */
   const $ = (id) => document.getElementById(id);
@@ -78,7 +80,7 @@
   if (!QUALITIES.includes(quality)) quality = isTouch ? 'medium' : 'high';
   let phase = 'boot';            // boot | menu | loading | running | paused | summary | transition
   let mode = 'career';           // career | endless
-  let save = safe('career defaults', () => TS.career.defaults(), { tb: 0, lifetime: 0, wallet: 0, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west', upgrades: {}, best: {}, services: 0, endlessBest: 0 });
+  let save = safe('career defaults', () => TS.career.defaults(), { hints: true, tb: 0, lifetime: 0, wallet: 0, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west', upgrades: {}, best: {}, services: 0, endlessBest: 0 });
   let muted = readStore('pb_muted') === '1';
   let paused = false, wasRunningBeforeHide = false;
   let renderer = null, scene = null, camera = null, clock = null;
@@ -86,12 +88,12 @@
   let audio = null, audioFailed = false;
   let camMode = 'cab', camSmooth = { pos: null, look: null };
   const orbit = { yaw: 0.7, pitch: 0.28, dist: 30 }, look = { yaw: 0, pitch: 0 };
-  const input = { lever: 0, doorPress: false, hornHeld: false, lights: null, held: { up: false, down: false }, lastRepeat: 0 };
+  const input = { lever: 0, doorPress: false, parkingToggle: false, hornHeld: false, lights: null, held: { up: false, down: false }, lastRepeat: 0 };
   const events = [];             // recent event log for tests
   const endless = { order: [], index: 0, loops: 0, total: { cash: 0, points: 0 }, active: false };
   let frameHandle = 0, lastFrame = 0, hudClock = 0, todClock = 0, accum = 0, elapsedReal = 0;
   let toastWait = 0, demoAngle = 0, demoTimer = 0, scorePosted = 0, serviceStartedAt = 0;
-  let testMode = false, errorsSeen = 0;
+  let testMode = false, errorsSeen = 0, forcedPlan = null, lastSpadToast = 0;
 
   /* ------------------------------------------------------------ device */
   function isPhone() {
@@ -135,6 +137,16 @@
     new ResizeObserver(resize).observe($('game'));
     return true;
   }
+  /* Cab view: in portrait the vertical FOV grows so the whole desk (lever gate and both door buttons) stays in frame. */
+  const isPortrait = () => !!camera && camera.aspect < 1.25;
+  function applyCabFov() {
+    if (!camera) return;
+    if (camMode === 'cab') {
+      const fit = (2 * Math.atan(Math.tan((CAB_FOV_FIT_HALF_DEG * Math.PI) / 180) / Math.max(0.3, camera.aspect)) * 180) / Math.PI;
+      camera.fov = camera.aspect < 1.4 ? clamp(fit, CAB_FOV, CAB_FOV_PORTRAIT_MAX) : CAB_FOV;
+    } else camera.fov = camMode === 'chase' ? 58 : 54;
+    camera.updateProjectionMatrix();
+  }
   function applyQuality() {
     if (!renderer) return;
     const cap = quality === 'high' ? 1.5 : 1;
@@ -148,7 +160,7 @@
     const w = Math.max(2, Math.floor(box.width)), h = Math.max(2, Math.floor(box.height));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    applyCabFov();
     checkDevice();
   }
   function showError(text) { $('errorText').textContent = text; $('errorScreen').hidden = false; }
@@ -270,19 +282,29 @@
     const startS = keepState && keepState.warmS !== undefined ? keepState.warmS : (track.stations && track.stations[0] ? track.stations[0].s : 0);
     safe('landscape warm', () => landscape && landscape.warm && landscape.warm(startS));
     const clockStart = Math.floor(environment.hour * 4) * 900;
-    const simulation = sim || TS.sim.create({ train: cfg, track, options: { clockStart, seed: Math.floor(rand() * 1e9) } });
+    const plan = sim ? sim.plan : demo ? null : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: save.services || 0 }), null));
+    forcedPlan = null;
+    const simulation = sim || TS.sim.create({ train: cfg, track, options: { clockStart, seed: Math.floor(rand() * 1e9), plan: plan || undefined } });
+    safe('temp boards', () => { if (infra && infra.addTempBoard && simulation.plan) simulation.plan.tsr.forEach((r) => infra.addTempBoard(r.s0, r.kmh, r.s1)); });
     const nightish = environment.hour < 6.3 || environment.hour > 19.3;
     world = {
       routeId, trainId, routeDef, cfg, track, landscape, infra, obstacleRoots, model, cab, passengers, sim: simulation, env: environment,
       state: null, demo, exch: null, plans: {}, spawned: new Set(), onboard: 0, delivered: 0, boardedTotal: 0, passengerKm: 0,
       aspects: new Map(), crossingClosed: new Map(), wheelAngle: 0, lights: nightish || environment.weather !== 'clear',
       userLights: null, endTimer: -1, finished: false, departedAt: new Map(), announcedFor: -1, lastDoorSent: -1, lastDoorSide: '', lastBeacon: 0,
-      stopLog: [], carFrames: [], platformCam: null, tracksideCam: null, welcomed: false, liveCash: 0, lastTod: environment.hour, spawnedFor: -1,
+      stopLog: [], stops: {}, carFrames: [], platformCam: null, tracksideCam: null, welcomed: false, liveCash: 0, lastTod: environment.hour, spawnedFor: -1,
     };
     if (keepState) Object.assign(world, keepState);
     safe('lights', () => model && model.setLights && model.setLights({ head: world.lights, tail: true, cabin: true }));
     buildStrip();
     return world;
+  }
+
+  const passIndices = () => (world && world.sim && world.sim.plan ? world.sim.plan.pass : []);
+  const stopCount = () => stationsOf().length - passIndices().length;
+  function patternText() {
+    const w = world, pattern = w && w.sim.plan ? w.sim.plan.pattern : 'RB';
+    return t('pattern' + pattern) + ' · ' + t('stationsN', { n: stopCount() });
   }
 
   function setLoading(title, sub) {
@@ -347,7 +369,8 @@
     camSmooth = { pos: null, look: null };
     sideSpot = null;
     look.yaw = look.pitch = 0;
-    if (camera) { camera.near = next === 'cab' ? 0.06 : 0.25; camera.fov = next === 'cab' ? 66 : next === 'chase' ? 58 : 54; camera.updateProjectionMatrix(); }
+    setCabHover(null);
+    if (camera) { camera.near = next === 'cab' ? 0.06 : 0.25; applyCabFov(); }
     safe('cab visibility', () => { if (world && world.cab) world.cab.group.visible = true; });
     safe('interior view', () => world && world.model && world.model.setCabView && world.model.setCabView(next === 'cab'));
     const names = { cab: 'cam1', chase: 'cam2', platform: 'cam3', orbit: 'cam4' };
@@ -388,7 +411,7 @@
       if (!car0) return;
       car0.group.updateMatrixWorld(true);
       const eyeLocal = w.cab && w.cab.group.userData && w.cab.group.userData.eye;
-      if (eyeLocal) { w.cab.group.updateMatrixWorld(true); camTmp.eye.copy(eyeLocal); w.cab.group.localToWorld(camTmp.eye); }
+      if (eyeLocal) { w.cab.group.updateMatrixWorld(true); camTmp.eye.copy(eyeLocal); if (isPortrait()) camTmp.eye.z += CAB_EYE_BACK_PORTRAIT_M; w.cab.group.localToWorld(camTmp.eye); }
       else { camTmp.eye.set(0.45, 2.55, -car0.length / 2 + 1.5); car0.group.localToWorld(camTmp.eye); }
       const speed = state ? clamp(state.v / 28, 0, 1) : 0, tt = elapsedReal;
       camTmp.eye.y += Math.sin(tt * 13.1) * 0.0015 * speed;
@@ -397,7 +420,7 @@
       look.yaw *= dragging ? 1 : 1 - Math.min(1, dt * 1.6);
       look.pitch *= dragging ? 1 : 1 - Math.min(1, dt * 1.6);
       camera.position.copy(camTmp.eye);
-      camTmp.e.set(look.pitch + swayPitch, look.yaw + swayYaw, 0, 'YXZ');
+      camTmp.e.set(look.pitch + swayPitch + (isPortrait() ? CAB_PITCH_PORTRAIT : 0), look.yaw + swayYaw, 0, 'YXZ');
       camTmp.q.setFromEuler(camTmp.e);
       camera.quaternion.copy(car0.group.quaternion).multiply(camTmp.q);
       return;
@@ -493,15 +516,82 @@
     camera.lookAt(mid.x, mid.y + 1.7, mid.z);
   }
 
-  /* pointer: cab head look, free orbit drag + wheel */
+  /* pointer: clickable cab controls (cab view), cab head look, free orbit drag + wheel */
   let dragging = false, dragX = 0, dragY = 0;
+  let cabPress = null, cabHover = null;           // { id, y0, n0 } while a control is held / the id under the cursor
+  const cabRay = new THREE.Raycaster(), cabNdc = new THREE.Vector2();
+  function cabHit(e) {
+    const w = world;
+    if (!w || !w.cab || typeof w.cab.hitTest !== 'function' || camMode !== 'cab' || phase !== 'running' || paused || !camera) return null;
+    const rect = $('world').getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    cabNdc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    camera.updateMatrixWorld(true);
+    cabRay.setFromCamera(cabNdc, camera);
+    return safe('cab.hitTest', () => w.cab.hitTest(cabRay), null) || null;
+  }
+  /* nearest notch along the lever gate for dragging (keeps working outside the hit mesh) */
+  function cabPickNotch(e) {
+    const w = world;
+    if (!w || !w.cab) return null;
+    const hit = cabHit(e);                                  // also sets the ray
+    if (typeof w.cab.pickNotch === 'function') { const n = safe('cab.pickNotch', () => w.cab.pickNotch(cabRay), null); if (Number.isFinite(n)) return n; }
+    return hit && hit.id === 'lever' && Number.isFinite(hit.notch) ? hit.notch : null;
+  }
+  function setCabHover(id) {
+    if (id === cabHover) return;
+    cabHover = id;
+    safe('cab.setHover', () => world && world.cab && world.cab.setHover && world.cab.setHover(id));
+    $('world').style.cursor = id ? 'pointer' : '';
+  }
+  function cabDown(hit) {
+    cabPress = { id: hit.id, y0: 0, n0: input.lever };
+    switch (hit.id) {
+      case 'lever': if (Number.isFinite(hit.notch)) setLeverNotch(hit.notch); break;
+      case 'doorLeft': case 'doorRight': case 'doors': input.doorPress = true; break;
+      case 'horn': if (!input.hornHeld) { input.hornHeld = true; sfx('horn', true); } break;
+      case 'lights': toggleLights(); break;
+      case 'eb': input.lever = LEVER_EB; break;
+      case 'parking': input.parkingToggle = true; break;
+      case 'announce': announceNext(false); break;
+      default: break;
+    }
+  }
+  function cabRelease() {
+    if (cabPress && cabPress.id === 'horn' && input.hornHeld) { input.hornHeld = false; sfx('horn', false); }
+    cabPress = null;
+  }
   function bindPointer() {
     const el = $('world');
-    el.addEventListener('pointerdown', (e) => { if (phase !== 'running') return; dragging = true; dragX = e.clientX; dragY = e.clientY; try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } });
-    const end = () => { dragging = false; };
+    el.addEventListener('pointerdown', (e) => {
+      if (phase !== 'running') return;
+      const hit = cabHit(e);
+      if (hit && hit.id) {
+        cabDown(hit);
+        cabPress.y0 = e.clientY; cabPress.n0 = input.lever;
+        try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+        e.preventDefault();
+        return;
+      }
+      dragging = true; dragX = e.clientX; dragY = e.clientY;
+      try { el.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    });
+    const end = () => { dragging = false; cabRelease(); };
     el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); el.addEventListener('lostpointercapture', end);
+    el.addEventListener('pointerleave', () => setCabHover(null));
     el.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
+      if (cabPress) {
+        if (cabPress.id === 'lever') {
+          const picked = cabPickNotch(e);
+          if (Number.isFinite(picked)) setLeverNotch(picked);
+          else setLeverNotch(cabPress.n0 + Math.round((cabPress.y0 - e.clientY) / CAB_DRAG_PX_PER_NOTCH));
+        }
+        return;
+      }
+      if (!dragging) {
+        if (e.pointerType === 'mouse' || e.pointerType === 'pen') { const hit = cabHit(e); setCabHover(hit && hit.id ? hit.id : null); }
+        return;
+      }
       const dx = e.clientX - dragX, dy = e.clientY - dragY; dragX = e.clientX; dragY = e.clientY;
       if (camMode === 'orbit') { orbit.yaw -= dx * 0.006; orbit.pitch = clamp(orbit.pitch + dy * 0.005, 0.03, 1.35); }
       else if (camMode === 'cab') { look.yaw = clamp(look.yaw - dx * 0.004, -1.2, 1.2); look.pitch = clamp(look.pitch - dy * 0.003, -0.6, 0.5); }
@@ -510,13 +600,16 @@
   }
 
   /* ------------------------------------------------------------ toasts */
-  function toast(text, kind = 'info', ms = 3000) {
+  /* At most TOAST_MAX at once; a new toast replaces an older one of the same group (or with the same text). */
+  function toast(text, kind = 'info', ms = 3000, group = '') {
     const box = $('toasts');
+    [...box.children].forEach((old) => { if (old.textContent === text || (group && old.dataset.group === group)) old.remove(); });
     const el = document.createElement('div');
     el.className = 'toast ' + kind;
     el.textContent = text;
+    if (group) el.dataset.group = group;
     box.appendChild(el);
-    while (box.children.length > 3) box.firstChild.remove();
+    while (box.children.length > TOAST_MAX) box.firstChild.remove();
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 450); }, ms);
   }
   function banner(text, sub, ms = 2600) {
@@ -537,7 +630,8 @@
     const last = i === stationsOf().length - 1;
     const scale = clamp(Math.sqrt((w.cfg.capacity || 90) / 90), 1, 2.4);
     const size = BOARD_BASE[st.size] ? st.size : 2;
-    w.plans[i] = { boarding: last ? 0 : Math.max(2, Math.round(BOARD_BASE[size] * scale * (0.7 + rand() * 0.7))) };
+    const crowd = ((w.sim.plan && w.sim.plan.incidents) || []).find((x) => x.kind === 'crowd' && x.station === i);
+    w.plans[i] = { boarding: last ? 0 : Math.max(2, Math.round(BOARD_BASE[size] * scale * (0.7 + rand() * 0.7) * (crowd ? crowd.factor || 1.8 : 1))) };
     return w.plans[i];
   }
   function spawnWaiting(i) {
@@ -572,40 +666,61 @@
   }
   const exchangeStats = () => safe('passengers.stats', () => (world.passengers && world.passengers.stats ? world.passengers.stats() : null), null) || { waiting: 0, boarded: 0, alighted: 0, boardingTotal: 0, alightingTotal: 0, done: true };
 
+  /* One exchange per station stop. Reopening the doors at the same station only lets the people who had not finished boarding continue:
+     nobody gets off again and the totals never change (w.stops[i] keeps the cumulative record). */
   function beginExchange(e) {
     const w = world, i = e.stationIndex, st = stationsOf()[i];
     if (!st) return;
     const last = i === stationsOf().length - 1, plan = planFor(i), size = BOARD_BASE[st.size] ? st.size : 2;
-    let alighting = i === 0 ? 0 : last ? w.onboard : Math.round(w.onboard * lerp(ALIGHT_RANGE[0], ALIGHT_RANGE[1], rand()) * (size === 3 ? 1.2 : size === 1 ? 0.8 : 1));
-    alighting = clamp(alighting, 0, w.onboard);
-    const room = Math.max(0, (w.cfg.capacity || 90) - (w.onboard - alighting));
-    const boarding = Math.min(plan.boarding, room);
+    const rec = w.stops[i];
+    let alighting = 0, boarding = 0, base = { alighted: 0, boarded: 0 }, alightingTotal, boardingTotal;
+    if (rec) {                                                  // reopen
+      base = { alighted: rec.alighted, boarded: rec.boarded };
+      alightingTotal = rec.alightingTotal; boardingTotal = rec.boardingTotal;
+      const room = Math.max(0, (w.cfg.capacity || 90) - w.onboard);
+      boarding = Math.min(Math.max(0, rec.boardingTotal - rec.boarded), room);
+    } else {
+      alighting = i === 0 ? 0 : last ? w.onboard : Math.round(w.onboard * lerp(ALIGHT_RANGE[0], ALIGHT_RANGE[1], rand()) * (size === 3 ? 1.2 : size === 1 ? 0.8 : 1));
+      alighting = clamp(alighting, 0, w.onboard);
+      const room = Math.max(0, (w.cfg.capacity || 90) - (w.onboard - alighting));
+      boarding = Math.min(plan.boarding, room);
+      alightingTotal = alighting; boardingTotal = boarding;
+    }
     if (w.spawnedFor !== i) spawnWaiting(i);
-    w.exch = { index: i, side: e.side, onboardBefore: w.onboard, alighting, boarding, startedAt: w.sim.now.t, finalized: false, boardedFinal: 0, alightedFinal: 0 };
+    w.exch = { index: i, side: e.side, startedAt: w.sim.now.t, finalized: false, boardedFinal: 0, alightedFinal: 0, alighting, boarding, base, alightingTotal, boardingTotal, reopen: !!rec };
     const doors = doorsWorld(e.side);
-    if (w.passengers && w.passengers.startExchange) safe('startExchange', () => w.passengers.startExchange({ doorsWorld: doors, boarding, alighting }));
+    if (!alighting && !boarding) w.exch.fixed = true;
+    else if (w.passengers && w.passengers.startExchange) safe('startExchange', () => w.passengers.startExchange({ doorsWorld: doors, boarding, alighting }));
     else w.exch.simulated = { t: 0 };
-    if (e.terminus) { w.endTimer = 0; toast(t('evTerminus'), 'info', 3600); sfx('gong'); safe('announce', () => audio && audio.announce && audio.announce(t('annTerminus', { name: st.name }), lang)); }
+    if (e.terminus) { if (w.endTimer < 0) w.endTimer = 0; toast(t('evTerminus'), 'info', 3600); sfx('gong'); safe('announce', () => audio && audio.announce && audio.announce(t('annTerminus', { name: st.name }), lang)); }
   }
-  function currentExchangeCounts() {
+  /* counts of the current door phase only */
+  function phaseCounts() {
     const w = world, ex = w.exch;
     if (!ex) return null;
-    if (ex.finalized) return { alighted: ex.alightedFinal, boarded: ex.boardedFinal, alightingTotal: ex.alighting, boardingTotal: ex.boarding, done: true };
+    if (ex.finalized) return { alighted: ex.alightedFinal, boarded: ex.boardedFinal, done: true };
+    if (ex.fixed) return { alighted: 0, boarded: 0, done: true };
     if (ex.simulated) {
       const dt = w.sim.now.t - ex.startedAt;
       const alighted = Math.min(ex.alighting, Math.floor(dt / 0.6)), boarded = dt > 3 ? Math.min(ex.boarding, Math.floor((dt - 3) / 0.7)) : 0;
-      return { alighted, boarded, alightingTotal: ex.alighting, boardingTotal: ex.boarding, done: alighted >= ex.alighting && boarded >= ex.boarding };
+      return { alighted, boarded, done: alighted >= ex.alighting && boarded >= ex.boarding };
     }
     const s = exchangeStats();
-    return { alighted: s.alighted, boarded: s.boarded, alightingTotal: s.alightingTotal ?? ex.alighting, boardingTotal: s.boardingTotal ?? ex.boarding, done: !!s.done };
+    return { alighted: Math.min(s.alighted, ex.alighting), boarded: Math.min(s.boarded, ex.boarding), done: !!s.done };
+  }
+  /* cumulative counts for this station stop (what the HUD shows) */
+  function currentExchangeCounts() {
+    const w = world, ex = w.exch, c = ex && phaseCounts();
+    if (!c) return null;
+    return { alighted: ex.base.alighted + c.alighted, boarded: ex.base.boarded + c.boarded, alightingTotal: ex.alightingTotal, boardingTotal: ex.boardingTotal, done: c.done };
   }
   function finalizeExchange() {
     const w = world, ex = w && w.exch;
     if (!ex || ex.finalized) return;
-    const counts = currentExchangeCounts();
+    const counts = phaseCounts();
     safe('stopExchange', () => w.passengers && w.passengers.stopExchange && w.passengers.stopExchange());
     ex.finalized = true;
-    ex.alightedFinal = Math.min(counts.alighted, ex.onboardBefore);
+    ex.alightedFinal = Math.min(counts.alighted, w.onboard);
     ex.boardedFinal = counts.boarded;
     const sNow = w.sim.now.s;
     let remaining = ex.alightedFinal;
@@ -620,13 +735,16 @@
     w.onboard = w.onboard - ex.alightedFinal + ex.boardedFinal;
     w.delivered += ex.alightedFinal;
     w.boardedTotal += ex.boardedFinal;
-    w.sim.recordExchange(ex.index, ex.boardedFinal, ex.alightedFinal);
-    w.stopLog.push({ index: ex.index, boarded: ex.boardedFinal, alighted: ex.alightedFinal });
+    const rec = { alighted: ex.base.alighted + ex.alightedFinal, boarded: ex.base.boarded + ex.boardedFinal, alightingTotal: ex.alightingTotal, boardingTotal: ex.boardingTotal };
+    w.stops = { ...w.stops, [ex.index]: rec };
+    w.sim.recordExchange(ex.index, rec.boarded, rec.alighted);
+    const entry = { index: ex.index, boarded: rec.boarded, alighted: rec.alighted };
+    w.stopLog = w.stopLog.some((l) => l.index === ex.index) ? w.stopLog.map((l) => (l.index === ex.index ? entry : l)) : [...w.stopLog, entry];
     refreshLiveCash();
   }
   function liveOnboard() {
-    const w = world, c = w.exch && !w.exch.finalized ? currentExchangeCounts() : null;
-    return c ? w.exch.onboardBefore - c.alighted + c.boarded : w.onboard;
+    const w = world, c = w.exch && !w.exch.finalized ? phaseCounts() : null;
+    return c ? w.onboard - c.alighted + c.boarded : w.onboard;
   }
   function buildResult() {
     const w = world, sum = w.sim.summary();
@@ -646,13 +764,13 @@
     w.liveCash = r ? r.cash : Math.max(0, Math.round(w.sim.now ? w.state && w.state.cash : 0));
   }
 
-  const REASON_TEXT = { moving: 'evDoorInterlockMoving', noPlatform: 'evDoorNoPlatform' };
+  const REASON_TEXT = { moving: 'evDoorInterlockMoving', noPlatform: 'evDoorNoPlatform', expressPass: 'evDoorExpress', held: 'evDoorsHeldWait' };
   function handleEvent(e) {
     const w = world;
     events.push(e.type);
     if (events.length > 80) events.shift();
     switch (e.type) {
-      case 'doorsRefused': toast(t(REASON_TEXT[e.reason] || 'evDoorNoPlatform'), 'bad', 2200); break;
+      case 'doorsRefused': toast(t(REASON_TEXT[e.reason] || 'evDoorNoPlatform'), 'bad', 2200, 'doors'); break;
       case 'doorsOpening': sfx('doorOpen'); break;
       case 'doorsOpened': beginExchange(e); toast(t('evDoorsOpened'), 'info', 1400); break;
       case 'doorWarning': sfx('doorChime'); toast(t('evDoorsClosing'), 'info', 2200); break;
@@ -668,6 +786,14 @@
       case 'emergency': toast(t('evEmergencyBrake'), 'bad', 1600); sfx('brakeSqueal', 1); break;
       case 'buffer': toast(t('evOverrun'), 'bad', 2400); break;
       case 'terminus': break;
+      case 'parkingApplied': toast(t(e.auto ? 'evParkingAuto' : 'evParkingOn'), 'info', e.auto ? 1600 : 1400, 'parking'); break;
+      case 'parkingReleased': toast(t('evParkingOff'), 'info', 1200, 'parking'); break;
+      case 'parkingRefused': toast(t('evParkingMoving'), 'bad', 1800, 'parking'); break;
+      case 'parkingBlocked': toast(t('evParkingBlocked'), 'bad', 2600, 'parking'); break;
+      case 'doorsHeld': toast(t('evDoorsHeld'), 'info', 3200); break;
+      case 'tsrAhead': toast(t('evTsrAhead', { n: e.kmh }), 'info', 3600); break;
+      case 'crowdAhead': { const inc = (w.sim.plan.incidents || []).find((x) => x.kind === 'crowd' && x.station === e.stationIndex); const st = stationsOf()[e.stationIndex]; if (st) toast(t('evCrowd' + (inc ? inc.reason : 0), { name: st.name }), 'info', 4200); break; }
+      case 'signalHeld': toast(t(e.reason === 'connection' ? 'evConnection' : 'evTraffic'), 'info', 3600); break;
       default: break;
     }
   }
@@ -693,16 +819,41 @@
   }
 
   /* ------------------------------------------------------------ per-frame world update */
+  function spadHoldToast() {
+    const now = performance.now();
+    if (now - lastSpadToast < SPAD_TOAST_COOLDOWN_MS) return;
+    lastSpadToast = now;
+    const st = world && world.state;
+    toast(st && st.v < 0.05 ? t('evSpadHold', { n: Math.ceil(st.spadHoldSec) }) : t('evSpadHoldMoving'), 'bad', 1400, 'spad');
+  }
+  /* The forced emergency stop after a red signal stays until the train has stood still for a few seconds; a driver-applied one can always be released. */
+  function releaseEmergency() {
+    if (world && world.state && world.state.spadActive) { spadHoldToast(); return false; }
+    input.lever = LEVER_BRAKE_MAX;
+    toast(t('evEbReleased'), 'info', 1400, 'lever');
+    return true;
+  }
   function applyLever(delta) {
     if (!world || !world.state) return;
     const cur = input.lever;
+    if (world.state.spadActive) { spadHoldToast(); return; }
     if (delta > 0) {
-      if (cur === LEVER_EB) { input.lever = LEVER_BRAKE_MAX; return; }
+      if (cur === LEVER_EB) { releaseEmergency(); return; }
       input.lever = Math.min(LEVER_MAX, cur + 1);
-      if (world.state.doorsLocked && input.lever > 0) toast(t('evDoorInterlockPower'), 'bad', 1600);
+      if (world.state.doorsLocked && input.lever > 0) toast(t('evDoorInterlockPower'), 'bad', 1600, 'lever');
     } else {
       input.lever = Math.max(LEVER_BRAKE_MAX, cur === LEVER_EB ? LEVER_EB : cur - 1);
     }
+  }
+  /* absolute lever position (cab clicks): same rules as the keys */
+  function setLeverNotch(n) {
+    if (!world || !world.state || !Number.isFinite(n)) return;
+    const target = clamp(Math.round(n), LEVER_EB, LEVER_MAX);
+    if (world.state.spadActive) { spadHoldToast(); return; }
+    if (target === input.lever) return;
+    if (input.lever === LEVER_EB && target > LEVER_EB) { if (!releaseEmergency()) return; if (target > LEVER_BRAKE_MAX) input.lever = target; }
+    else input.lever = target;
+    if (target > 0 && world.state.doorsLocked) toast(t('evDoorInterlockPower'), 'bad', 1600, 'lever');
   }
   function leverRepeat(now) {
     if (now - input.lastRepeat < LEVER_REPEAT_MS) return;
@@ -714,8 +865,8 @@
     accum += dt;
     let n = 0;
     while (accum >= SIM_STEP && n < MAX_SIM_STEPS) {
-      const st = w.sim.step(SIM_STEP, { lever: input.lever, doorPress: input.doorPress, passengers: w.onboard });
-      input.doorPress = false;
+      const st = w.sim.step(SIM_STEP, { lever: input.lever, doorPress: input.doorPress, parkingToggle: input.parkingToggle, passengers: w.onboard });
+      input.doorPress = false; input.parkingToggle = false;
       w.state = st;
       for (const e of st.events) handleEvent(e);
       accum -= SIM_STEP; n++;
@@ -759,7 +910,7 @@
     return {
       lever: state.lever, speedKmh: state.v * 3.6, limitKmh: state.limitKmh, targetKmh: state.nextLimit && state.nextLimit.distance < 400 ? Math.min(state.limitKmh, state.nextLimit.kmh) : state.limitKmh,
       signalAspect: state.signalAspect, doorsOpen01: state.doorsOpen01, doorsReleased: state.doorsReleased, doorSide: state.doorSide || (st && st.side) || 'right',
-      headlights: !!w.lights, horn: input.hornHeld, nextStationName: st ? st.name : '', distanceToStopM: state.distanceToHeading ?? state.distanceToStop, delaySec: state.delaySec,
+      headlights: !!w.lights, horn: input.hornHeld, parkingBrake: !!state.parkingBrake, nextStationName: st ? st.name : '', distanceToStopM: state.distanceToHeading ?? state.distanceToStop, delaySec: state.delaySec,
       clock: clockText(state.clockSec), powerKw: state.powerKw, brakePct: Math.round(state.brakePct * 100), wiper: w.env.weather === 'rain' || w.env.weather === 'snow',
     };
   }
@@ -849,13 +1000,27 @@
     stations.forEach((st, i) => {
       const x = ((st.s - s0) / span) * 100;
       const dot = document.createElement('i');
-      dot.style.left = x + '%'; dot.dataset.i = String(i); dot.title = st.name;
+      dot.style.left = x + '%'; dot.dataset.i = String(i); dot.title = st.name + (passIndices().includes(i) ? ' · ' + t('ttPass') : '');
       dots.appendChild(dot);
       if (i === 0 || i === stations.length - 1) {
         const label = document.createElement('span');
         label.style.left = x + '%'; label.textContent = st.name;
         dots.appendChild(label);
       }
+    });
+    buildStripTsr();
+  }
+  function buildStripTsr() {
+    const w = world, dots = $('stripDots'), stations = stationsOf();
+    if (!w || !w.sim.plan || !stations.length) return;
+    const s0 = stations[0].s, span = Math.max(1, stations[stations.length - 1].s - s0);
+    w.sim.plan.tsr.forEach((r) => {
+      const bar = document.createElement('b');
+      bar.className = 'tsr';
+      bar.style.left = clamp(((r.s0 - s0) / span) * 100, 0, 100) + '%';
+      bar.style.width = Math.max(0.8, ((r.s1 - r.s0) / span) * 100) + '%';
+      bar.title = r.kmh + ' km/h';
+      dots.appendChild(bar);
     });
   }
   let lastStripNext = -2;
@@ -869,34 +1034,48 @@
       lastStripNext = heading;
       $('stripDots').querySelectorAll('i').forEach((dot) => {
         const i = Number(dot.dataset.i);
-        dot.className = i < heading ? 'done' : i === heading ? 'next' : '';
+        dot.className = (i < heading ? 'done' : i === heading ? 'next' : '') + (passIndices().includes(i) ? ' pass' : '');
       });
     }
   }
   const fmtDist = (m) => (m >= 1000 ? t('distanceKm', { n: (m / 1000).toFixed(1) }) : t('distanceM', { n: Math.max(0, Math.round(m / 10) * 10) }));
   function kbd(key) { return '<kbd>' + key + '</kbd>'; }
+  /* short contextual coach (save.hints): the same steps as the plain hints, but with the why */
   function hintFor(state) {
-    const w = world, st = state.nextStation;
+    const w = world, st = state.nextStation, coach = !!save.hints;
     if (!st) return '';
     const atPlatform = state.platformIndex >= 0 && state.v < 0.3;
     const vis = state.doorPhase;
     if (vis === 'open' || vis === 'opening') {
       const c = currentExchangeCounts();
       if (w.endTimer >= 0) return t('hintTerminus');
+      if (coach && c && !c.done) return t('coachBoarding');
       return kbd('D') + ' ' + t('hintClose') + (c && !c.done ? ' · ' + t('hintWait') : '');
     }
     if (vis === 'warning' || vis === 'closing') return t('evDoorsClosing');
     if (atPlatform && state.nextStationIndex === state.platformIndex) {
       const visited = (w.stopLog || []).some((l) => l.index === state.platformIndex) || (w.exch && w.exch.index === state.platformIndex && w.exch.finalized);
-      if (!visited) return kbd('D') + ' ' + t('hintOpen');
-      if (state.departureWaitSec > 0) return t('hudWaitDepart', { time: clockText(state.clockSec + state.departureWaitSec) });
+      if (!visited) return coach ? t('coachOpen') : kbd('D') + ' ' + t('hintOpen');
+      if (state.departureWaitSec > 0) return (coach ? t('coachWait') + ' ' : '') + t('hudWaitDepart', { time: clockText(state.clockSec + state.departureWaitSec) });
       if (state.signalAspect === 'red' && state.nextSignalDistance < 300) return t('hintSignalRed');
-      return kbd('W') + ' ' + t('hintDepart');
+      return coach ? t('coachDepart') : kbd('W') + ' ' + t('hintDepart');
     }
     if (state.signalAspect === 'red' && state.nextSignalDistance < 700) return t('hintSignalRed');
-    if (state.distanceToStop < 500 && state.distanceToStop > -20) return t('hintStop') + ' · ' + fmtDist(state.distanceToStop);
+    if (state.distanceToStop < 500 && state.distanceToStop > -20) return (coach ? t(state.distanceToStop < 120 ? 'coachStopHere' : 'coachStopSoon') : t('hintStop')) + ' · ' + fmtDist(state.distanceToStop);
     if (state.t < 25 && state.v < 1) return t('welcomeHint');
+    if (coach && state.v > 1) return t('coachCruise');
     return '';
+  }
+  function guideView(s) {
+    if (s.spadActive) {
+      return { cls: 'eb', text: s.v < 0.05 ? t('evSpadHold', { n: Math.ceil(s.spadHoldSec) }) : t('evSpadHoldMoving') };
+    }
+    const g = s.guide;
+    if (!g || g.state === 'none') return null;
+    if (g.state === 'ok' && !save.hints) return null;
+    const label = t(GUIDE_KIND_KEYS[g.kind] || 'guideStop', { n: g.targetKmh });
+    const head = g.state === 'brake' ? t('guideBrake') : g.state === 'late' ? t('guideLate') : t('guideOk');
+    return { cls: g.state + (save.hints ? '' : ' subtle'), text: head + ' · ' + label + ' ' + fmtDist(g.distance) };
   }
   function updateHud(force) {
     const w = world;
@@ -907,7 +1086,7 @@
     sign.textContent = String(Math.round(s.limitKmh));
     sign.classList.toggle('over', s.overspeed);
     const nl = s.nextLimit;
-    $('nextLimit').textContent = nl && nl.distance < 3000 ? '→ ' + Math.round(nl.kmh) + ' · ' + fmtDist(nl.distance) : '';
+    $('nextLimit').textContent = nl && nl.distance < 3000 ? (nl.tsr ? '⚠ ' : '→ ') + Math.round(nl.kmh) + ' · ' + fmtDist(nl.distance) : '';
     $('nextName').textContent = st ? st.name : '–';
     $('nextDist').textContent = st ? fmtDist(Math.abs(s.distanceToHeading ?? s.distanceToStop)) : '–';
     $('nextSide').textContent = st ? t('platformShort') + ' ' + t(st.side === 'left' ? 'sideLeft' : 'sideRight') : '';
@@ -919,7 +1098,7 @@
     d.className = 'delay' + (s.delaySec > 120 ? ' late' : s.delaySec > 30 ? ' warn' : '');
     $('onboard').textContent = String(liveOnboard());
     $('cashHud').textContent = fmtInt(w.liveCash || 0);
-    $('svcLabel').textContent = mode === 'endless' ? t('endlessLine', { n: endless.index + 1, total: endless.order.length }) : nameOf(w.routeDef.name);
+    $('svcLabel').textContent = (mode === 'endless' ? t('endlessLine', { n: endless.index + 1, total: endless.order.length }) : nameOf(w.routeDef.name)) + ' · ' + patternText();
     const lab = $('leverLabel');
     lab.textContent = TS.sim.leverLabel(s.lever);
     lab.className = s.lever === 0 ? 'neutral' : s.lever > 0 ? '' : s.lever <= LEVER_EB ? 'eb' : 'brake';
@@ -939,14 +1118,20 @@
       $('xchgIn').textContent = '↑ ' + t('exchangeIn') + ' ' + counts.boarded + '/' + counts.boardingTotal;
       $('xchgOn').textContent = t('hudOnBoard', { n: liveOnboard() });
     }
-    const hintHtml = hintFor(s);
+    const pk = $('parkLamp');
+    pk.hidden = !s.parkingBrake;
+    if (s.parkingBrake) pk.textContent = 'P · ' + t('hudParking');
+    const hintHtml = hintFor(s), gv = guideView(s), gEl = $('guide');
     $('hint').innerHTML = hintHtml;
-    $('centerBox').classList.toggle('empty', !hintHtml && xc.hidden);
+    $('hint').classList.toggle('coach', !!save.hints && !!hintHtml);
+    gEl.hidden = !gv;
+    if (gv) { gEl.className = 'guide ' + gv.cls; gEl.textContent = gv.text; }
+    $('centerBox').classList.toggle('empty', !hintHtml && xc.hidden && !gv);
     updateStrip(s);
   }
 
   /* ------------------------------------------------------------ overlays */
-  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–4', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit']];
+  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–4', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
   function buildHelp() {
     const body = $('helpBody');
     body.replaceChildren();
@@ -977,7 +1162,8 @@
       const tr = document.createElement('tr');
       if (w.state && i === w.state.nextStationIndex) tr.className = 'cur';
       const rec = sum.stops[i];
-      const cells = [stop.name, clockText(tt.clockStart + stop.arr), i === tt.stops.length - 1 ? '–' : clockText(tt.clockStart + stop.dep), rec && rec.visited ? delayText(rec.arrDelaySec) : '·'];
+      if (stop.pass) tr.className = 'pass';
+      const cells = stop.pass ? [stop.name, t('ttPass') + ' ' + clockText(tt.clockStart + stop.arr), '–', '·'] : [stop.name, clockText(tt.clockStart + stop.arr), i === tt.stops.length - 1 ? '–' : clockText(tt.clockStart + stop.dep), rec && rec.visited ? delayText(rec.arrDelaySec) : '·'];
       for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
       table.appendChild(tr);
     });
@@ -1071,7 +1257,7 @@
       returnToMenu();
       return false;
     }
-    input.lever = 0; input.doorPress = false; input.hornHeld = false; input.held.up = input.held.down = false; input.lights = null;
+    input.lever = 0; input.doorPress = false; input.parkingToggle = false; input.hornHeld = false; input.held.up = input.held.down = false; input.lights = null;
     accum = 0; elapsedReal = 0; todClock = 0; lastStripNext = -2;
     world.state = world.sim.step(0, { lever: 0 });
     placeTrain(world.state.s);
@@ -1086,7 +1272,7 @@
     serviceStartedAt = performance.now();
     phase = 'running';
     updateHud(true);
-    banner(nameOf(route.name), mode === 'endless' ? t('endlessLine', { n: endless.index + 1, total: endless.order.length }) : nameOf(world.cfg.name || trainId), 2800);
+    banner(nameOf(route.name), patternText() + ' · ' + (mode === 'endless' ? t('endlessLine', { n: endless.index + 1, total: endless.order.length }) : nameOf(world.cfg.name || trainId)), 3600);
     return true;
   }
   async function advanceEndless(reward) {
@@ -1185,9 +1371,16 @@
     refreshDemoSoon();
     return save;
   }
+  function handleHints(on) {
+    const next = safe('setHints', () => TS.career.setHints(save, on), null);
+    if (!next) return undefined;
+    save = next;
+    persist();
+    return save;
+  }
   function renderMenu() {
     const host = $('menuHost');
-    const opts = { save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onLang: setLanguage };
+    const opts = { save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onLang: setLanguage, onHints: handleHints };
     try {
       if (!TS.menu || typeof TS.menu.render !== 'function') throw new Error('TS.menu missing');
       TS.menu.render(host, opts);
@@ -1217,7 +1410,7 @@
     if (rebuilding || !world) return;
     rebuilding = true;
     const w = world, wasPaused = paused, wasRunning = phase === 'running';
-    const keep = { warmS: w.state ? w.state.s : 0, plans: w.plans, onboard: w.onboard, delivered: w.delivered, boardedTotal: w.boardedTotal, passengerKm: w.passengerKm, riders: w.riders, stopLog: w.stopLog, welcomed: true, liveCash: w.liveCash, pendingAnn: w.pendingAnn };
+    const keep = { warmS: w.state ? w.state.s : 0, plans: w.plans, onboard: w.onboard, delivered: w.delivered, boardedTotal: w.boardedTotal, passengerKm: w.passengerKm, riders: w.riders, stopLog: w.stopLog, stops: w.stops, welcomed: true, liveCash: w.liveCash, pendingAnn: w.pendingAnn };
     const demo = w.demo;
     if (wasRunning) paused = true;
     disposeWorld();
@@ -1250,6 +1443,7 @@
       case 'w': case 'ArrowUp': if (!repeat) { applyLever(1); input.held.up = true; input.lastRepeat = performance.now(); } return true;
       case 's': case 'ArrowDown': if (!repeat) { applyLever(-1); input.held.down = true; input.lastRepeat = performance.now(); } return true;
       case 'x': case 'Backspace': input.lever = LEVER_EB; return true;
+      case 'b': if (!repeat) input.parkingToggle = true; return true;
       case 'd': if (!repeat) input.doorPress = true; return true;
       case 'h': case ' ': if (!repeat) { input.hornHeld = true; sfx('horn', true); } return true;
       case 'l': if (!repeat) toggleLights(); return true;
@@ -1276,7 +1470,7 @@
     if (phase === 'menu' && (e.key === 'Tab' || e.key === 'Enter' || e.key === ' ')) return;
     if (handleKey(normKey(e), e.repeat)) e.preventDefault();
   }
-  function releaseAll() { input.held.up = input.held.down = false; if (input.hornHeld) { input.hornHeld = false; sfx('horn', false); } }
+  function releaseAll() { input.held.up = input.held.down = false; cabPress = null; if (input.hornHeld) { input.hornHeld = false; sfx('horn', false); } }
 
   /* ------------------------------------------------------------ main loop */
   function frame(now) {
@@ -1319,6 +1513,9 @@
           endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null,
           draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,
           hudSpeed: $('speedNum').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, kbNoticeVisible: !$('kbNotice').hidden, phoneBlocked: !$('phoneBlock').hidden,
+          parkingBrake: !!(s && s.parkingBrake), guide: s ? s.guide : null, guideText: $('guide').hidden ? '' : $('guide').textContent, hintText: $('hint').textContent, parkLampVisible: !$('parkLamp').hidden,
+          pattern: w && w.sim.plan ? w.sim.plan.pattern : '', passIndices: w && w.sim.plan ? [...w.sim.plan.pass] : [], tsr: w && w.sim.plan ? w.sim.plan.tsr.map((x) => ({ ...x })) : [], incidents: w && w.sim.plan ? w.sim.plan.incidents.map((x) => ({ ...x })) : [],
+          spadHoldSec: s ? s.spadHoldSec : 0, hints: !!save.hints, svcLabel: $('svcLabel').textContent, cabHitTest: !!(w && w.cab && typeof w.cab.hitTest === 'function'), stopsRecord: w ? { ...w.stops } : {},
           signalsHeld: w ? w.sim.signals.filter((x) => x.hold).length : 0, timetable: w ? w.sim.timetable.stops.map((x) => ({ ...x })) : [],
         };
       },
@@ -1343,6 +1540,34 @@
         return true;
       },
       setSpeed(kmh) { if (world) world.sim.setSpeed(kmh / 3.6); },
+      setGrade(g) { if (world) world.sim.setGradeOverride(g); },
+      placeAt(s, kmh = 0) { const w = world; if (!w || phase !== 'running') return false; w.sim.place(s, kmh / 3.6); w.state = w.sim.step(0, { lever: input.lever, passengers: w.onboard }); return true; },
+      forcePlan(plan) { forcedPlan = plan ? { pattern: 'RB', pass: [], tsr: [], incidents: [], ...plan } : null; },
+      setHints(on) { handleHints(!!on); },
+      /* scans the screen for a cab control (uses the same hit test the pointer uses): { id, notch, x, y } in client coordinates */
+      findCab(id, notchWanted) {
+        const w = world; if (!w || !w.cab || !w.cab.hitTest || !camera) return null;
+        const rect = $('world').getBoundingClientRect(); let fallback = null;
+        const wp = w.cab.getControlWorldPoint ? w.cab.getControlWorldPoint(id, notchWanted) : null;
+        if (wp) {
+          camera.updateMatrixWorld(true);
+          const v = wp.clone().project(camera);
+          const x = rect.left + ((v.x + 1) / 2) * rect.width, y = rect.top + ((1 - v.y) / 2) * rect.height;
+          const hit = cabHit({ clientX: x, clientY: y });
+          if (hit && hit.id === id) return { id, notch: hit.notch, x, y };
+        }
+        for (let j = 1; j < 48; j++) for (let i = 1; i < 80; i++) {
+          const x = rect.left + (rect.width * i) / 80, y = rect.top + (rect.height * j) / 48;
+          const hit = cabHit({ clientX: x, clientY: y });
+          if (hit && hit.id === id) {
+            const out = { id, notch: hit.notch, x, y };
+            if (notchWanted === undefined || hit.notch === notchWanted) return out;
+            fallback = fallback || out;
+          }
+        }
+        return fallback;
+      },
+      pointerAction(kind, x, y) { const hit = cabHit({ clientX: x, clientY: y }); return hit ? { ...hit } : null; },
       press(key) { return handleKey(key.length === 1 ? key.toLowerCase() : key, false); },
       release(key) { handleKeyUp(key.length === 1 ? key.toLowerCase() : key); },
       finishRoute() {
@@ -1366,7 +1591,7 @@
       mergeSave: (d) => mergeIncoming(d),
       toMenu: () => returnToMenu(),
       setCamera, setQuality(q) { if (QUALITIES.includes(q) && q !== quality) { quality = q; applyQuality(); rebuildWorld(); } },
-      forceSimStep: (seconds, lever) => { const w = world; if (!w) return null; if (lever !== undefined) input.lever = lever; for (let i = 0; i < Math.ceil(seconds * 60); i++) { const st = w.sim.step(SIM_STEP, { lever: input.lever, doorPress: i === 0 && input.doorPress, passengers: w.onboard }); input.doorPress = false; w.state = st; for (const e of st.events) handleEvent(e); } return w.state.s; },
+      forceSimStep: (seconds, lever) => { const w = world; if (!w) return null; if (lever !== undefined) input.lever = lever; for (let i = 0; i < Math.ceil(seconds * 60); i++) { const st = w.sim.step(SIM_STEP, { lever: input.lever, doorPress: i === 0 && input.doorPress, parkingToggle: i === 0 && input.parkingToggle, passengers: w.onboard }); input.doorPress = false; input.parkingToggle = false; w.state = st; for (const e of st.events) handleEvent(e); } return w.state.s; },
       career: () => TS.career, buy: (kind, id, extra) => handleBuy(kind, id, extra),
     });
   }

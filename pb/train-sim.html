@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <title>Lokféierer 🚆 – Arcade</title>
 <script>/* Offline for now: owner account (or ?preview=1) only */(()=>{let ok=/[?&]preview=1\b/.test(location.search);try{const s=JSON.parse(localStorage.getItem("sb-lvksqmgfwkfbblfsozfk-auth-token")||"null");ok=ok||String(s?.user?.email||"").toLowerCase()==="konto@ian.lu"}catch{}if(!ok)(window.top||window).location.replace("/pixelbreak.html")})();</script>
-<link rel="stylesheet" href="/pb/train-sim.css?v=1">
+<link rel="stylesheet" href="/pb/train-sim.css?v=2">
 <script src="/pb/arcade-kit.js?v=24" data-arcade-id="train-sim" data-arcade-title="Lokféierer 🚆"></script>
 </head>
 <body>
@@ -35,7 +35,8 @@
         <div id="xchg" class="xchg" hidden>
           <span id="xchgOut" class="out"></span><span id="xchgIn" class="in"></span><span id="xchgOn" class="on"></span>
         </div>
-        <div class="lever-row"><b id="leverLabel">0</b><div id="leverBar" aria-hidden="true"></div><span id="doorState" class="doorstate"></span></div>
+        <div class="lever-row"><b id="leverLabel">0</b><div id="leverBar" aria-hidden="true"></div><span id="parkLamp" class="parklamp" hidden></span><span id="doorState" class="doorstate"></span></div>
+        <div id="guide" class="guide" hidden></div>
         <div id="hint" class="hint"></div>
       </div>
       <div class="glass signalbox">
@@ -66,20 +67,20 @@
   <div id="errorScreen" class="overlay center" hidden><section class="card"><h2>&#9888;</h2><p id="errorText"></p></section></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="/pb/train-sim/config.js?v=1"></script>
-<script src="/pb/train-sim/copy.js?v=1"></script>
+<script src="/pb/train-sim/config.js?v=2"></script>
+<script src="/pb/train-sim/copy.js?v=2"></script>
 <script src="/pb/train-sim/track.js?v=1"></script>
 <script src="/pb/train-sim/routes.js?v=1"></script>
-<script src="/pb/train-sim/infra.js?v=1"></script>
+<script src="/pb/train-sim/infra.js?v=2"></script>
 <script src="/pb/train-sim/landscape.js?v=1"></script>
-<script src="/pb/train-sim/trains.js?v=1"></script>
-<script src="/pb/train-sim/cab.js?v=1"></script>
+<script src="/pb/train-sim/trains.js?v=2"></script>
+<script src="/pb/train-sim/cab.js?v=2"></script>
 <script src="/pb/train-sim/passengers.js?v=1"></script>
 <script src="/pb/train-sim/audio.js?v=1"></script>
-<script src="/pb/train-sim/sim.js?v=2"></script>
-<script src="/pb/train-sim/career.js?v=1"></script>
-<script src="/pb/train-sim/menu.js?v=1"></script>
+<script src="/pb/train-sim/sim.js?v=3"></script>
+<script src="/pb/train-sim/career.js?v=2"></script>
+<script src="/pb/train-sim/menu.js?v=2"></script>
 <script src="/pb/train-sim/fallback.js?v=1"></script>
-<script src="/pb/train-sim.js?v=2"></script>
+<script src="/pb/train-sim.js?v=3"></script>
 </body>
 </html>
