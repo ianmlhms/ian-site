@@ -697,7 +697,7 @@
     if (!world || !world.state) return;
     const cur = input.lever;
     if (delta > 0) {
-      if (cur === LEVER_EB) { if (world.state.v < 0.3) input.lever = LEVER_BRAKE_MAX; else toast(t('evEmergencyBrake'), 'bad', 900); return; }
+      if (cur === LEVER_EB) { input.lever = LEVER_BRAKE_MAX; return; }
       input.lever = Math.min(LEVER_MAX, cur + 1);
       if (world.state.doorsLocked && input.lever > 0) toast(t('evDoorInterlockPower'), 'bad', 1600);
     } else {

@@ -198,8 +198,10 @@
       const grade = frameGrade(s - len / 2);
       const gradeN = mass * G * grade;
       let acc = (tractionN - resist - gradeN) / mass;
-      if (v > 0) acc -= brakeDecel; else if (acc < 0) acc = 0;
-      if (v <= STANDSTILL && tractionN < resist + gradeN && acc < 0) acc = 0;
+      if (v > 0) acc -= brakeDecel;
+      // Standstill: brakes hold the train against gravity (no creep either way); below STANDSTILL a decelerating train simply stops.
+      if (v === 0 && acc <= brakeDecel) acc = 0;
+      else if (v <= STANDSTILL && acc <= 0) { acc = 0; v = 0; }
       const vNew = Math.max(0, v + acc * dt);
       if (vNew <= 0 && v <= STANDSTILL) { v = 0; a = 0; } else { a = (vNew - v) / Math.max(dt, 1e-6); v = vNew; }
       const ds = v * dt; s += ds; distance += ds;
@@ -239,7 +241,7 @@
         if (!nextSignal && sg.s > s - 1 && !sg.passed) nextSignal = sg;
       }
       if (spadActive) {
-        if (v === 0) { spadStill += dt; if (spadStill >= SPAD_RESET_S) { spadActive = false; const sg = signals[spadSignal]; if (sg) sg.cleared = true; spadSignal = -1; events.push({ type: 'spadCleared' }); } }
+        if (v < 0.05) { spadStill += dt; if (spadStill >= SPAD_RESET_S) { spadActive = false; const sg = signals[spadSignal]; if (sg) sg.cleared = true; spadSignal = -1; events.push({ type: 'spadCleared' }); } }
         else spadStill = 0;
       }
       const signalAspect = nextSignal ? aspectOf(nextSignal, s) : 'green';
