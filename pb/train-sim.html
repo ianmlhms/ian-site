@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Lokféierer 🚆 – Arcade</title>
+<link rel="stylesheet" href="/pb/train-sim.css?v=1">
+<script src="/pb/arcade-kit.js?v=24" data-arcade-id="train-sim" data-arcade-title="Lokféierer 🚆"></script>
+</head>
+<body>
+<main id="game">
+  <canvas id="world" aria-label="3D"></canvas>
+  <div id="hud" hidden>
+    <div class="hud-top">
+      <div class="glass nextbox">
+        <span class="lbl" id="nextLbl">Nächsten Arrêt</span>
+        <b id="nextName">–</b>
+        <div class="row"><span id="nextDist">–</span><span id="nextSide" class="chip"></span><span id="nextWhen" class="when"></span></div>
+      </div>
+      <div class="glass strip" id="strip" aria-hidden="true"><div class="line"></div><div id="stripDots"></div><i id="stripTrain"></i></div>
+      <div class="glass statsbox">
+        <div class="clockrow"><b id="clock">08:00</b><small id="clockSec">:00</small><span id="delay" class="delay">+0:00</span></div>
+        <div class="statline"><span class="pax" title="Passagéier">&#128101; <b id="onboard">0</b></span><span class="eur">&euro; <b id="cashHud">0</b></span></div>
+        <small id="svcLabel"></small>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div class="glass speedbox">
+        <div class="speed"><b id="speedNum">0</b><small>km/h</small></div>
+        <div class="limits"><span id="limitSign" class="limit-sign">80</span><span id="nextLimit" class="nextlimit"></span></div>
+      </div>
+      <div class="glass centerbox" id="centerBox">
+        <div id="xchg" class="xchg" hidden>
+          <span id="xchgOut" class="out"></span><span id="xchgIn" class="in"></span><span id="xchgOn" class="on"></span>
+        </div>
+        <div class="lever-row"><b id="leverLabel">0</b><div id="leverBar" aria-hidden="true"></div><span id="doorState" class="doorstate"></span></div>
+        <div id="hint" class="hint"></div>
+      </div>
+      <div class="glass signalbox">
+        <span class="sig" id="sigLight" aria-hidden="true"><i class="r"></i><i class="y"></i><i class="g"></i></span>
+        <span id="sigText" class="sigtext"></span>
+      </div>
+    </div>
+    <div class="hud-util">
+      <span id="camName" class="glass chipbtn"></span>
+      <button id="btnQuality" class="glass chipbtn" type="button"></button>
+      <button id="btnPause" class="glass chipbtn" type="button">P</button>
+      <button id="btnHelp" class="glass chipbtn" type="button">?</button>
+    </div>
+  </div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <div id="banner" hidden></div>
+  <div id="fade"></div>
+  <div id="menu" class="overlay">
+    <div class="menu-scroll"><div id="menuHost"></div><p id="bootStatus" role="status"></p></div>
+  </div>
+  <div id="loading" class="overlay center" hidden><div class="loadcard"><div class="spinner"></div><b id="loadingTitle"></b><small id="loadingSub"></small></div></div>
+  <div id="pauseScreen" class="overlay center" hidden><section class="card"><h2 data-t="paused">Paus</h2><p data-t="pausedDesc"></p><div class="btns"><button id="resume" class="primary" data-t="resume"></button><button id="pauseQuality" type="button"></button><button id="quit" data-t="quit"></button></div></section></div>
+  <div id="helpScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="helpTitle">Steierung</h2><div id="helpBody"></div><p class="muted" data-t="helpHint"></p><button id="helpClose" class="primary" data-t="continue"></button></section></div>
+  <div id="ttScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="timetable">Fuerplang</h2><div id="ttBody"></div><p class="muted">T</p></section></div>
+  <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp">&#128646; LOKF&Eacute;IERER</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><table id="sumRows"></table><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumMenu" class="primary"></button></div></section></div>
+  <div id="kbNotice" hidden><span id="kbText"></span><button id="kbClose" type="button"></button></div>
+  <div id="phoneBlock" class="overlay center" hidden><section class="card"><div class="bigemoji">&#128646;</div><h2 id="phoneTitle"></h2><p id="phoneText"></p><p id="phoneHint" class="muted"></p></section></div>
+  <div id="errorScreen" class="overlay center" hidden><section class="card"><h2>&#9888;</h2><p id="errorText"></p></section></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="/pb/train-sim/config.js?v=1"></script>
+<script src="/pb/train-sim/copy.js?v=1"></script>
+<script src="/pb/train-sim/track.js?v=1"></script>
+<script src="/pb/train-sim/routes.js?v=1"></script>
+<script src="/pb/train-sim/infra.js?v=1"></script>
+<script src="/pb/train-sim/landscape.js?v=1"></script>
+<script src="/pb/train-sim/trains.js?v=1"></script>
+<script src="/pb/train-sim/cab.js?v=1"></script>
+<script src="/pb/train-sim/passengers.js?v=1"></script>
+<script src="/pb/train-sim/audio.js?v=1"></script>
+<script src="/pb/train-sim/sim.js?v=1"></script>
+<script src="/pb/train-sim/career.js?v=1"></script>
+<script src="/pb/train-sim/menu.js?v=1"></script>
+<script src="/pb/train-sim/fallback.js?v=1"></script>
+<script src="/pb/train-sim.js?v=1"></script>
+</body>
+</html>
