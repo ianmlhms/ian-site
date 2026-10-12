@@ -13,7 +13,7 @@
     lb: {
       eyebrow: 'LËTZEBUERG · ZËNTER 08:00', title: 'Eng Stad.\nDeng Tour.', intro: "Kleng Stroossen, grouss Missioun. Huel d'Päck op a bréng se pünktlech un d'Dier.",
       shift: 'Schicht · 5 min', shiftDesc: "Géint d'Auer. Fir de Rekord.", free: 'Fräi fueren', freeDesc: 'Ouni Drock · hallef Punkten', garage: 'Deng Garage', lifetime: 'Liewenszäit-Punkten',
-      startHint: "Stop kuerz am giele Krees fir ofzehuelen oder ze liwweren. D'Garage wiessels du tëscht den Touren.", loading: "D'Stad gëtt opgebaut…", edge: "Dir verloosst d'Stad · Dréi w.e.g. ëm", ready: '36 Adressen. Eng nei Tour bei all Start.',
+      startHint: "Stop kuerz am giele Krees fir ofzehuelen oder ze liwweren. D'Garage wiessels du tëscht den Touren.", loading: "D'Stad gëtt opgebaut…", loadingWait: 'Gëtt gelueden, e Moment Gedold… Op méi alen iPads ka dat bis zu 20 Sekonnen daueren.', edge: "Dir verloosst d'Stad · Dréi w.e.g. ëm", ready: '36 Adressen. Eng nei Tour bei all Start.',
       points: 'Punkten', deliveries: 'Liwwerungen', best: 'Rekord', pause: 'Ⅱ Paus', paused: 'Kuerz Paus.', pausedDesc: 'Deng Tour waart op dech.', resume: 'Weiderfueren',
       camera: 'Kamera', reset: '↻ Strooss', horn: 'Hup', mute: 'Toun', finish: 'Tour ophalen', drift: 'Drift', brake: 'Brems', gas: 'Gas', again: 'Nach eng Kéier', ended: 'Schicht fäerdeg!', freeEnded: 'Flott Tour!',
       controls: 'WASD / ↑↓←→ fueren · Space Drift · H Hup · C Kamera · R Strooss · P Paus · N Kaart · M Toun',
@@ -24,13 +24,13 @@
     },
     de: {
       eyebrow: 'LUXEMBURG · SEIT 08:00', title: 'Deine Stadt.\nDeine Tour.', intro: 'Kleine Straßen, große Mission. Hole Pakete ab und bring sie pünktlich an die Tür.',
-      shift: 'Schicht · 5 Min.', shiftDesc: 'Gegen die Uhr. Für den Rekord.', free: 'Freie Fahrt', freeDesc: 'Ohne Zeitdruck · halbe Punkte', garage: 'Deine Garage', lifetime: 'Gesamtpunkte', startHint: 'Halte kurz im gelben Kreis zum Abholen oder Ausliefern. Fahrzeuge wechselst du zwischen Touren.', loading: 'Die Stadt entsteht…', edge: 'Du verlässt die Stadt · Bitte umdrehen', ready: '36 Adressen. Bei jedem Start eine neue Tour.',
+      shift: 'Schicht · 5 Min.', shiftDesc: 'Gegen die Uhr. Für den Rekord.', free: 'Freie Fahrt', freeDesc: 'Ohne Zeitdruck · halbe Punkte', garage: 'Deine Garage', lifetime: 'Gesamtpunkte', startHint: 'Halte kurz im gelben Kreis zum Abholen oder Ausliefern. Fahrzeuge wechselst du zwischen Touren.', loading: 'Die Stadt entsteht…', loadingWait: 'Wird geladen, einen Moment Geduld… Auf älteren iPads kann das bis zu 20 Sekunden dauern.', edge: 'Du verlässt die Stadt · Bitte umdrehen', ready: '36 Adressen. Bei jedem Start eine neue Tour.',
       points: 'Punkte', deliveries: 'Lieferungen', best: 'Rekord', pause: 'Ⅱ Pause', paused: 'Kurze Pause.', pausedDesc: 'Deine Tour wartet auf dich.', resume: 'Weiterfahren', camera: 'Kamera', reset: '↻ Straße', horn: 'Hupe', mute: 'Ton', finish: 'Tour beenden', drift: 'Drift', brake: 'Bremse', gas: 'Gas', again: 'Noch einmal', ended: 'Schicht geschafft!', freeEnded: 'Gute Fahrt!',
       controls: 'WASD / ↑↓←→ fahren · Leertaste Drift · H Hupe · C Kamera · R Straße · P Pause · N Karte · M Ton', pickup: 'Abholen bei:', dropoff: 'Liefern an:', boarding: 'Fahrgäste bei:', busStop: 'Nächster Halt:', stop: 'Im gelben Kreis anhalten', loadingParcel: 'Wird eingeladen…', unloading: 'Wird abgegeben…', picked: 'An Bord! Auf zur nächsten Adresse.', delivered: 'Tour geschafft', failed: 'Zeit abgelaufen. Eine neue Tour wartet!', crash: 'Rempler! −12 Punkte auf dieser Tour', resetDone: 'Zurück auf der Straße', unlocked: 'Freigeschaltet', selected: 'Ausgewählt', needed: 'noch', autoDesc: 'Schnell · 1 Paket', vanDesc: '2 Pakete pro Tour', busDesc: '3 Fahrgasthalte', earn: 'Punkte', soundOn: 'Ton an', soundOff: 'Ton aus', left: 'Links lenken', right: 'Rechts lenken',
       engineError: 'Die 3D-Engine konnte nicht starten. Prüfe deine Verbindung und lade die Seite neu.', saveError: 'Speichern nicht möglich. Lass diese Seite für deinen Fortschritt offen.', audioError: 'Ton nicht verfügbar. Du kannst weiterspielen.',
     },
     en: {
-      eyebrow: 'LUXEMBOURG · SINCE 08:00', title: 'Your town.\nYour route.', intro: 'Little streets, big mission. Pick up parcels and bring them to the door on time.', shift: 'Shift · 5 min', shiftDesc: 'Beat the clock. Set a record.', free: 'Free drive', freeDesc: 'No pressure · half the points', garage: 'Your garage', lifetime: 'Lifetime points', startHint: 'Stop briefly in the yellow circle to pick up or deliver. Change vehicles between runs.', loading: 'Building the town…', edge: 'Leaving town · Please turn around', ready: '36 addresses. A new route with every start.',
+      eyebrow: 'LUXEMBOURG · SINCE 08:00', title: 'Your town.\nYour route.', intro: 'Little streets, big mission. Pick up parcels and bring them to the door on time.', shift: 'Shift · 5 min', shiftDesc: 'Beat the clock. Set a record.', free: 'Free drive', freeDesc: 'No pressure · half the points', garage: 'Your garage', lifetime: 'Lifetime points', startHint: 'Stop briefly in the yellow circle to pick up or deliver. Change vehicles between runs.', loading: 'Building the town…', loadingWait: 'Loading, please wait… On older iPads this can take up to 20 seconds.', edge: 'Leaving town · Please turn around', ready: '36 addresses. A new route with every start.',
       points: 'Points', deliveries: 'Deliveries', best: 'Best', pause: 'Ⅱ Pause', paused: 'Taking a break.', pausedDesc: 'Your route is waiting for you.', resume: 'Keep driving', camera: 'Camera', reset: '↻ Road', horn: 'Horn', mute: 'Sound', finish: 'End drive', drift: 'Drift', brake: 'Brake', gas: 'Gas', again: 'Drive again', ended: 'Shift complete!', freeEnded: 'Nice drive!',
       controls: 'WASD / ↑↓←→ drive · Space drift · H horn · C camera · R reset · P pause · N map · M sound', pickup: 'Pick up at:', dropoff: 'Deliver to:', boarding: 'Passengers at:', busStop: 'Next stop:', stop: 'Stop in the yellow circle', loadingParcel: 'Loading…', unloading: 'Dropping off…', picked: 'On board! Head to the next address.', delivered: 'Route complete', failed: 'Time up. A new route is waiting!', crash: 'Bump! −12 points on this route', resetDone: 'Back on the road', unlocked: 'Unlocked', selected: 'Selected', needed: 'more', autoDesc: 'Nimble · 1 parcel', vanDesc: '2 parcels per route', busDesc: '3 passenger stops', earn: 'points', soundOn: 'Sound on', soundOff: 'Sound off', left: 'Steer left', right: 'Steer right',
       engineError: 'The 3D engine could not start. Check your connection and reload the page.', saveError: 'Could not save. Keep this page open to retain your progress.', audioError: 'Sound is unavailable. You can keep playing.',
@@ -483,7 +483,18 @@
   const storedLang = readStore('site_lang'); if (TEXT[storedLang]) lang = storedLang;
   try { mergeSave(window.__pbSave || JSON.parse(readStore(SAVE_KEY) || 'null')); }
   catch (error) { warn('Progress restore failed', error); notify(text('saveError')); }
-  theme(); translate(); init3D();trafficSystem?.configure(trafficSetting);loadBoard();
+  // Building the town blocks the main thread for several seconds on iPads: show the loading screen first, then build.
+  function setBooting(isBooting) {
+    $('loadingScreen').hidden = !isBooting;
+    for (const id of ['startShift', 'startFree', 'startDaily']) $(id).disabled = isBooting || engineFailed;
+  }
+  function boot() {
+    init3D(); trafficSystem?.configure(trafficSetting);
+    try { if (renderer && scene && camera) renderer.compile(scene, camera); } catch (error) { warn('Shader warm-up failed', error); }
+    requestAnimationFrame(() => requestAnimationFrame(() => setBooting(false)));
+  }
+  theme(); translate(); setBooting(true); loadBoard();
+  requestAnimationFrame(() => setTimeout(boot, 30));
   post({ __pbWantSave: 1 });
   // Debug access is explicitly opt-in, including when launched inside the hub's srcdoc frame.
   try {
