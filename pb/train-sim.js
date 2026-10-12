@@ -1618,7 +1618,9 @@
     TS.lang = lang;
     buildLeverBar();
     translateStatic();
-    try { mergeIncoming(window.__pbSave || JSON.parse(readStore(SAVE_KEY) || 'null')); } catch (error) { warn('restore save', error); }
+    // Merge BOTH the save the arcade injected at open time and the newer local copy: after an in-frame reload the injected one is stale.
+    try { mergeIncoming(window.__pbSave); } catch (error) { warn('restore injected save', error); }
+    try { mergeIncoming(JSON.parse(readStore(SAVE_KEY) || 'null')); } catch (error) { warn('restore local save', error); }
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', (e) => handleKeyUp(normKey(e)));
     window.addEventListener('blur', releaseAll);
@@ -1648,7 +1650,7 @@
     $('camName').addEventListener('click', cycleCamera);
     $('camName').style.pointerEvents = 'auto';
     $('sumMenu').addEventListener('click', returnToMenu);
-    try { window.Arcade.onMute((value) => applyMute(value)); window.Arcade.onRestart(() => { if (world && !world.demo && (phase === 'running' || phase === 'summary')) startService(world.routeId, world.trainId, mode); else location.reload(); }); }
+    try { window.Arcade.onMute((value) => applyMute(value)); window.Arcade.onRestart(() => { if (world && !world.demo && (phase === 'running' || phase === 'summary')) startService(world.routeId, world.trainId, mode); else if (phase === 'menu') { renderMenu(); refreshDemoSoon(); } }); }
     catch (error) { warn('Arcade kit hooks', error); }
     postToHost({ __pbWantSave: 1 });
     try {

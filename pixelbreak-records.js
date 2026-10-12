@@ -234,6 +234,10 @@ window.addEventListener("message", (e) => {
     if (json.length > MAX_MESSAGE_SIZE) return;
     try { localStorage.setItem(SAVE_PREFIX + g.id, json); } catch (e) { console.warn("[PB] local save failed", e); }
     pendingSave = { g, data: d.data };
+    // Keep the cached cloud copy current: a game that reloads inside the frame asks again ({__pbWantSave})
+    // and must get its latest progress, not the copy fetched when it was opened (its saves would then be
+    // older than the server's and silently rejected by the keep-progress trigger).
+    if (cloudSave !== undefined) cloudSave = d.data;
     savingGameId = g.id;
     updateSaveHint();
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
