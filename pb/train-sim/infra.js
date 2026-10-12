@@ -609,8 +609,20 @@
     ctx.instanced.push(inst);
   }
 
+  // LUXTRAM: rails only (same profile as the street version below); used when track.noStreet is set
+  function addTramRailsOnly(ctx) {
+    const { sets, frames } = ctx;
+    const marks = sets.get('mark', mark);
+    const steel = sets.get('steel', M.steel);
+    [-RAIL_X, RAIL_X].forEach((x) => {
+      sweep(steel, frames, shifted(RAIL_PROFILE, x), RAIL_COLORS, { closed: true });
+      sweep(marks, frames, [[x - Math.sign(x) * 0.075, -0.012], [x - Math.sign(x) * 0.036, -0.012]].sort((a, b) => a[0] - b[0]), [col('#222426')], { uvU: 1, uvV: 1 });
+    });
+  }
+
   function addTramStreet(ctx) {
     const { sets, frames } = ctx;
+    if (ctx.track.noStreet) return addTramRailsOnly(ctx); // LUXTRAM: the real route draws its own bed/roads (luxtram-world.js)
     const asphalt = sets.get('asphalt', () => M.tex('asphalt', tex.asphalt()));
     sweep(asphalt, frames, [[-4.6, -0.03], [4.6, -0.03]], WHITE, { uvU: 1 / 4, uvV: 1 / 4 });
     const pave = sets.get('tramPave', () => M.tex('tramPave', tex.tramPave()));
@@ -719,6 +731,7 @@
     for (let k = k0; k <= k1; k++) {
       const s = k * spacing;
       if (s > track.length + 10) break;
+      if (track.noOcs && track.noOcs(s)) continue; // LUXTRAM: catenary-free stretches have no masts or wires
       const sign = k % 2 === 0 ? 1 : -1;
       const base = posAt(track, s, sign * 5.0, 0.14);
       const f = track.frameAt(s);

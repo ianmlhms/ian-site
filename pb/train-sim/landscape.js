@@ -914,7 +914,7 @@ window.TS = window.TS || {};
 
       /* ---- city blocks ---- */
       const cityBiomes = bMid === 'city' || bMid === 'tramcity';
-      if (cityBiomes) {
+      if (cityBiomes && !track.ownScenery) { // LUXTRAM: routes with ownScenery draw their own city (luxtram-world.js)
         const tram = bMid === 'tramcity';
         for (const side of [-1, 1]) {
           const rows = tram ? [{ l: 14.5, dep: 14, fl: [3, 7] }, { l: 40, dep: 18, fl: [5, 10] }] : [{ l: 25, dep: 18, fl: [4, 9] }, { l: 62, dep: 20, fl: [6, 12] }];
@@ -1147,7 +1147,7 @@ window.TS = window.TS || {};
         if (mb.empty) return null;
         const mesh = new T.Mesh(mb.build(), mat); mesh.castShadow = !!cast; mesh.receiveShadow = recv !== false; group.add(mesh); return mesh;
       };
-      const terrain = terrainMesh(k, s0), terr = addMesh(terrain, matTerrain, false, true);
+      const terrain = track.ownScenery ? new MB() : terrainMesh(k, s0), terr = addMesh(terrain, matTerrain, false, true); // LUXTRAM: ownScenery = no procedural near ground
       addMesh(fieldMB.rows, matFieldRows, false, true); addMesh(fieldMB.vines, matFieldVines, quality !== 'low', true); addMesh(fieldMB.meadow, matFieldMeadow, false, true);
       addMesh(mbHouse, matHouse, true, true); addMesh(mbBlock, matBlock, true, true); addMesh(mbRoof, matRoof, true, true);
       addMesh(mbRoad, matRoad, false, true);
