@@ -1,12 +1,14 @@
 /* Shared idle-game rewards. All calendar decisions use Luxembourg time. */
 (function(){
   const HOUR=3600,STAR_BONUS=0.1,ACTIVE_MS=15*60*1000,AWAY_BASE_RATE=0.25,AWAY_STAR_RATE=0.0375,MIN_SPAWN_MS=45000,SPAWN_RANGE_MS=45000,PUMPKIN_MS=8000;
+  // Arcade test mode: everything unlocked, nothing counts (the games refill their own balances).
+  const TEST_MODE=window.__pbTestMode===true;
   const dayFormat=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Luxembourg',year:'numeric',month:'2-digit',day:'2-digit'});
   function day(now=Date.now()){
     const parts=Object.fromEntries(dayFormat.formatToParts(now).map(part=>[part.type,part.value]));
     return `${parts.year}-${parts.month}-${parts.day}`;
   }
-  function halloween(){const today=day();return window.__pbHalloween===true||(today>='2026-10-24'&&today<='2026-11-02')}
+  function halloween(){const today=day();return TEST_MODE||window.__pbHalloween===true||(today>='2026-10-24'&&today<='2026-11-02')}
   function multiplier(stars){return 1+stars*STAR_BONUS}
   // Away (tab closed) and inactive (open but untouched) earn the same reduced rate,
   // so leaving a tab running all night is no better than closing it.
@@ -35,7 +37,7 @@
   }
   function mount(options){
     const box=document.createElement('div');box.className='idle-rewards';
-    box.innerHTML='<span class="idle-stars"></span><button type="button" class="idle-rebirth">⭐ Rebirth</button><span class="idle-progress"></span><button type="button" class="idle-gift" hidden></button><p class="idle-away" role="status" hidden></p><p class="idle-sleep" role="status" hidden></p>';
+    box.innerHTML=(TEST_MODE?'<span class="idle-test" style="font-weight:800;font-size:12px">🧪 TEST</span>':'')+'<span class="idle-stars"></span><button type="button" class="idle-rebirth">⭐ Rebirth</button><span class="idle-progress"></span><button type="button" class="idle-gift" hidden></button><p class="idle-away" role="status" hidden></p><p class="idle-sleep" role="status" hidden></p>';
     options.host.prepend(box);
     const dialog=document.createElement('dialog');dialog.className='idle-dialog';
     dialog.setAttribute('aria-label','Confirm rebirth');
@@ -43,6 +45,8 @@
     document.body.append(dialog);
     const find=selector=>box.querySelector(selector);
     let streak=window.__pbStreak,noticeShown=false;
+    // Test mode: the gift is always claimable (and repeatable), whatever the real streak is.
+    const giftDays=()=>TEST_MODE?Math.max(1,Number.isFinite(streak?.streak)?streak.streak:1):streak?.streak;
     function refresh(){
       const save=options.read(),earned=Math.floor(Math.sqrt(save.rb/options.threshold));
       const sleep=find('.idle-sleep'),rate=activityRate(save.st);
@@ -51,9 +55,10 @@
       find('.idle-stars').textContent=`⭐ ${options.format(save.st)} · +${options.format(save.st*10)}%`;
       find('.idle-rebirth').disabled=earned<1;
       find('.idle-progress').textContent=earned<1?`${options.format(save.rb)} / ${options.format(options.threshold)} this round`:`+${options.format(earned)} stars ready`;
-      const gift=find('.idle-gift'),known=Number.isFinite(streak?.streak)&&streak.streak>=1;
-      gift.hidden=!known||save.gd===day();
-      if(known)gift.textContent=`🎁 Daily gift · ${Math.min(2,1+0.1*(streak.streak-1)).toFixed(1)}× · 🔥 ${streak.streak}`;
+      const gift=find('.idle-gift'),known=TEST_MODE||(Number.isFinite(streak?.streak)&&streak.streak>=1);
+      const days=giftDays();
+      gift.hidden=!known||(!TEST_MODE&&save.gd===day());
+      if(known)gift.textContent=`🎁 Daily gift · ${Math.min(2,1+0.1*(days-1)).toFixed(1)}× · 🔥 ${days}`;
     }
     find('.idle-rebirth').addEventListener('click',()=>{
       const earned=Math.floor(Math.sqrt(options.read().rb/options.threshold));
@@ -70,8 +75,8 @@
     });
     find('.idle-gift').addEventListener('click',()=>{
       const today=day();
-      if(!Number.isFinite(streak?.streak)||streak.streak<1||options.read().gd===today)return;
-      options.gift(today,600*options.production()*Math.min(2,1+0.1*(streak.streak-1)));
+      if(!TEST_MODE&&(!Number.isFinite(streak?.streak)||streak.streak<1||options.read().gd===today))return;
+      options.gift(today,600*options.production()*Math.min(2,1+0.1*(giftDays()-1)));
       options.save();refresh();
     });
     window.addEventListener('message',event=>{
@@ -98,6 +103,7 @@
         const floating=document.createElement('span');floating.className='idle-float';floating.textContent='+'+options.format(amount);
         floating.style.left=Math.min(rect.left,Math.max(0,innerWidth-100))+'px';floating.style.top=rect.top+'px';
         document.body.append(floating);setTimeout(()=>floating.remove(),1000);
+        if(TEST_MODE)return; // test pumpkins never count towards the real Halloween event
         try{parent.postMessage({__pbEvent:{event:'halloween-2026',count:1}},'*')}
         catch(error){console.warn('[Idle rewards] Pumpkin delivery failed',error)}
       },{once:true});

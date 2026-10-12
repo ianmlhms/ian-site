@@ -42,7 +42,7 @@ button{touch-action:manipulation}
 .arcade-bar ~ #hud{top:69px}
 .arcade-bar ~ #mm,.arcade-bar ~ #mute{top:67px}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="chill-drive" data-arcade-title="3D Cruiser"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="chill-drive" data-arcade-title="3D Cruiser"></script>
 </head>
 <body>
 <canvas id="c" role="img" aria-label="3D Cruiser game view"></canvas>
@@ -177,8 +177,9 @@ function pointAt(s,lat){
 }
 
 /* ---------- modes ---------- */
-const unlocked=()=>+(localStorage.getItem('pb_cd_lvl')||1);
-function cdApply(sv){if(sv&&sv.v===1&&(sv.lvl||0)>unlocked())localStorage.setItem('pb_cd_lvl',Math.min(sv.lvl,N_LEVELS));}
+const TEST_MODE=window.__pbTestMode===true; // arcade test mode: all 20 levels open, pb_cd_lvl never touched
+const unlocked=()=>TEST_MODE?N_LEVELS:+(localStorage.getItem('pb_cd_lvl')||1);
+function cdApply(sv){if(!TEST_MODE&&sv&&sv.v===1&&(sv.lvl||0)>unlocked())localStorage.setItem('pb_cd_lvl',Math.min(sv.lvl,N_LEVELS));}
 function cdPush(){try{parent.postMessage({__pbSave:1,data:{v:1,lvl:unlocked()}},'*')}catch(e){}}
 cdApply(window.__pbSave);
 window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1)cdApply(d.data)});
@@ -546,7 +547,7 @@ function menu(){
   const u=unlocked(), box=$('lvls');
   let html='';
   for(let i=1;i<=N_LEVELS;i++)
-    html+=`<button type="button" data-l="${i}" aria-label="Level ${i}" ${i>u?'disabled':''} class="${i<u?'done':''}">${i}</button>`;
+    html+=`<button type="button" data-l="${i}" aria-label="Level ${i}" ${i>u?'disabled':''} class="${!TEST_MODE&&i<u?'done':''}">${i}</button>`;
   box.innerHTML=html;
 }
 function endRun(won){
@@ -560,7 +561,7 @@ function endRun(won){
       'DRIVE AGAIN');
   }else if(won){
     sfx.win();
-    if(lvl+1>unlocked()&&lvl<N_LEVELS){localStorage.setItem('pb_cd_lvl',lvl+1);cdPush();}
+    if(!TEST_MODE&&lvl+1>unlocked()&&lvl<N_LEVELS){localStorage.setItem('pb_cd_lvl',lvl+1);cdPush();}
     overlay('🏁 Level '+lvl+' done!',
       `Crashes used: <b>${crashes}/${MAX_CRASH}</b> · Style <b>${stylePts}</b>`,
       lvl<N_LEVELS?'NEXT LEVEL ▶':'BACK TO MENU');

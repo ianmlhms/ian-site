@@ -6,7 +6,7 @@
 <title>Cookie Clicker - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <link rel="stylesheet" href="/pb/idle-extras.css?v=3">
-<script src="/pb/idle-extras.js?v=3"></script>
+<script src="/pb/idle-extras.js?v=4"></script>
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -50,7 +50,7 @@ body{display:flex;flex-direction:column}
   @keyframes floatFade{0%{opacity:1}100%{opacity:0}}
 }
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="cookie-clicker" data-arcade-title="Cookie Clicker"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="cookie-clicker" data-arcade-title="Cookie Clicker"></script>
 </head>
 <body>
 <main class="arcade-stage cc" id="stage">
@@ -68,6 +68,9 @@ const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback
 const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const COOKIE_SIZE=250,COOKIE_R=95,MAX_DPR=3,FLOAT_MS=1000,TICK_MS=100,SAVE_EVERY_MS=5000,COST_GROWTH=1.15,SWAY=0.05;
 const REBIRTH_THRESHOLD=1e12;
+/* Arcade test mode: everything affordable, rebirth always ready. Saves go to the isolated test store (platform). */
+const TEST_MODE=window.__pbTestMode===true;
+const TEST_COOKIES=1e21;
 let cookies=0,cps=0,clickPower=1,totalClicks=0,totalBaked=0,roundBaked=0,stars=0,rebirthCount=0,giftDay='',loaded=false;
 let rewards=null;
 const upgrades=[
@@ -212,6 +215,14 @@ function snapshot(){
     u:upgrades.map(u=>u.count),cu:clickUpgrades.map(u=>u.count)};
 }
 function safeNumber(value,fallback=0){return typeof value==='number'&&Number.isFinite(value)&&value>=0?value:fallback}
+function testUnlockAll(save){
+  return TEST_MODE?{...save,c:Math.max(save.c,TEST_COOKIES),rb:Math.max(save.rb,REBIRTH_THRESHOLD)}:save;
+}
+function testRefill(){
+  if(!TEST_MODE)return;
+  const unlocked=testUnlockAll({c:cookies,rb:roundBaked});
+  cookies=unlocked.c;roundBaked=unlocked.rb;
+}
 function recalculate(){
   cps=upgrades.reduce((sum,u)=>sum+u.cps*u.count,0)*IdleExtras.multiplier(stars);
   clickPower=1+clickUpgrades.reduce((sum,u)=>sum+u.power*u.count,0);
@@ -250,8 +261,8 @@ function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}cat
 window.addEventListener('message',(e)=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1)applySave(d.data)});
 
 // Game loop
-setInterval(()=>{earnCookies(cps/10*IdleExtras.activityRate(stars));window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},TICK_MS);
-buildUpgrades();
+setInterval(()=>{earnCookies(cps/10*IdleExtras.activityRate(stars));testRefill();window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},TICK_MS);
+buildUpgrades();testRefill();
 rewards=IdleExtras.mount({host:$('shop'),threshold:REBIRTH_THRESHOLD,read:()=>({rb:roundBaked,st:stars,gd:giftDay}),format,
   resets:'cookies, all buildings (including gifted Time Machines) except Haunted Ovens, click upgrades and round clicks.',
   keeps:'Haunted Ovens if owned.',production:()=>cps,currency:'🍪',rebirth,save:pushSave,earn:earnCookies,

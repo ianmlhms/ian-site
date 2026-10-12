@@ -1,19 +1,33 @@
-import { RULES } from "/pb/park/data.js";
+import { RULES, UNLOCKS } from "/pb/park/data.js";
 import { GRID, KINDS, canPlace, place, remove, placePath, removePath, buyLand,
   footprint, inBounds } from "/pb/park/build.js";
 import { tick, setTicketPrice, setRidePrice, setStaff,
   setMaintenance, maintainRide } from "/pb/park/sim.js";
 import { ParkRenderer } from "/pb/park/renderer.js?v=5";
 import { ParkUI } from "/pb/park/ui.js?v=2";
-import { restoreSave, createPersistence } from "/pb/park/save.js?v=2";
-import { createSocial } from "/pb/park/social.js?v=2";
+import { restoreSave, createPersistence } from "/pb/park/save.js?v=3";
+import { createSocial } from "/pb/park/social.js?v=3";
 
 const FIXED_STEP = RULES.stepSeconds;
 const MAX_FRAME_DELTA = 0.25;
 const SPEEDS = [1, 2, 4];
 const COMMANDS = { ticket: setTicketPrice, price: setRidePrice, staff: setStaff,
   maintenance: setMaintenance, repair: maintainRide, remove };
-let state = restoreSave(window.__pbSave);
+/* Arcade test mode: every attraction tier and land parcel unlocked, plenty of cash. Saves go to the isolated test
+ * store (platform); the helper returns a new state and never touches the real save. */
+const TEST_MODE = window.__pbTestMode === true;
+const TEST_CASH = 50000000;
+const ALL_TIERS = (1 << UNLOCKS.length) - 1;
+const ALL_PARCELS = (1 << (GRID.width * GRID.height / RULES.parcelSize ** 2)) - 1;
+function testUnlockAll(current) {
+  if (!TEST_MODE) return current;
+  const { c, u, l } = current.saved;
+  const needsCash = c < TEST_CASH / 2;
+  if (!needsCash && (u & ALL_TIERS) === ALL_TIERS && (l & ALL_PARCELS) === ALL_PARCELS) return current;
+  return tick({ ...current, saved: { ...current.saved, c: needsCash ? TEST_CASH : c, u: u | ALL_TIERS, l: l | ALL_PARCELS },
+    derived: { ...current.derived, dirty: true } }, 0);
+}
+let state = testUnlockAll(restoreSave(window.__pbSave));
 let visitState = null;
 let persistence;
 let social;
@@ -45,7 +59,7 @@ function accept(result, message) {
     ui.notify(`Command refused: ${result?.reason ?? "invalid-command"}`);
     return false;
   }
-  state = tick(result, 0);
+  state = testUnlockAll(tick(result, 0));
   sync();
   if (message) ui.notify(message);
   return true;
@@ -136,7 +150,7 @@ function frame(time) {
   if (!paused && !visitState) {
     accumulator += delta * speed;
     while (accumulator >= FIXED_STEP) {
-      state = tick(state, FIXED_STEP);
+      state = testUnlockAll(tick(state, FIXED_STEP));
       accumulator -= FIXED_STEP;
       sync();
     }
@@ -195,7 +209,7 @@ function boot() {
   persistence = createPersistence({ getState: () => state,
     onState: next => {
       setWalk(false);
-      state = next;
+      state = testUnlockAll(next);
       cancel();
       ui.closePanel();
       sync();

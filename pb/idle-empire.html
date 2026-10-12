@@ -6,7 +6,7 @@
 <title>Business Empire - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <link rel="stylesheet" href="/pb/idle-extras.css?v=3">
-<script src="/pb/idle-extras.js?v=3"></script>
+<script src="/pb/idle-extras.js?v=4"></script>
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
@@ -36,7 +36,7 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
 @media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
 @media (prefers-reduced-motion:reduce){button{transition:none}button:active:not(:disabled){transform:none}.progress-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
 </head>
 <body>
 <main id="game">
@@ -92,6 +92,9 @@ const MAX_SUFFIX_GROUP=102;
 const MILLISECONDS_PER_SECOND=1000;
 const DIGITS_PER_SUFFIX=3;
 const MILESTONES=Object.freeze([25,50,100,200]);
+/* Arcade test mode: everything affordable, both prestige systems ready. Saves go to the isolated test store (platform). */
+const TEST_MODE=window.__pbTestMode===true;
+const TEST_CASH=1e60;
 
 const BUSINESSES=Object.freeze([
   {id:"lemonade",name:"Lemonade Stand",icon:"🍋",baseCost:4,costGrowth:1.07,cycleSeconds:1,payout:1,managerCost:100,manager:"Lucy Squeezer"},
@@ -110,6 +113,15 @@ const emptyOwned=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,
 const emptyManagers=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,false]));
 const emptyRuntime=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,{startedAt:0,endsAt:0}]));
 const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now(),savedAt:Date.now()});
+
+/** Test mode only: a copy of the state with huge cash, one of every business and both resets ready. */
+function testUnlockAll(save){
+  if(!TEST_MODE)return save;
+  const nextInvestor=save.investors+1;
+  return{...save,cash:Math.max(save.cash,TEST_CASH),rb:Math.max(save.rb,REBIRTH_THRESHOLD),
+    lifetime:Math.max(save.lifetime,nextInvestor*nextInvestor*PRESTIGE_EARNINGS_UNIT),
+    owned:Object.fromEntries(BUSINESSES.map((business)=>[business.id,Math.max(1,save.owned[business.id])]))};
+}
 
 let state=initialState();
 let runtime=emptyRuntime();
@@ -307,6 +319,7 @@ function settleProduction(now){
 
 function gameTick(){
   const now=Date.now();
+  if(TEST_MODE&&state.cash<TEST_CASH/2)state=testUnlockAll(state);
   settleProduction(now);
   refreshAll(now);
 }
@@ -486,6 +499,7 @@ function boot(){
   applySave(window.__pbSave);
   if(pendingIncomingSave)applySave(pendingIncomingSave);
   pendingIncomingSave=null;
+  state=testUnlockAll(state);
   updateScore();refreshAll();requestCloudSave();
   setInterval(gameTick,GAME_TICK_MS);
   setInterval(pushSave,SAVE_INTERVAL_MS);

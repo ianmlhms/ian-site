@@ -413,7 +413,7 @@ if(g.tags&&g.tags.indexOf('mp')>-1)tagHTML+='<span class="tag mp">'+esc(tr('arc.
 var ext=g.url?'<span class="ext">'+esc(tr('arc.ext'))+'<\/span>':g.href?'<span class="ext">'+esc(tr('arc.twoPads'))+'<\/span>':'';
 var hue=hashStr(g.name)%360;
 var gIdx=GAMES.indexOf(g);
-var oc=g.src?'openGame('+gIdx+')':g.href?'openOnline('+gIdx+')':g.go?("location.href='"+g.go+"'"):("window.open('"+g.url+"','_blank')");
+var oc=g.src?'openGame('+gIdx+')':g.href?'openOnline('+gIdx+')':g.go?('openGo('+gIdx+')'):("window.open('"+g.url+"','_blank')");
 var d=esc(gdesc(g));
 var description=isBig?'<span class="game-desc">'+d+'<\/span>':'';
 var preview='<img src="'+g.thumb+'" alt="" loading="lazy" decoding="async" onerror="this.classList.add(\'failed\')">';
@@ -522,18 +522,35 @@ document.body.classList.add('game-open');
 // Arrows only for games steered with keys; tap/drag games (Solitaire, Minesweeper…) don't need them.
 document.body.classList.toggle('game-no-pad',!g.pad);
 document.body.style.overflow='hidden';
-fetch(g.src,{cache:'no-cache'}).then(function(r){
+// The owner is asked "Test mode or Normal?" while the game downloads (PB.chooseMode); everyone else resolves false at once.
+var pick=(window.PB&&PB.chooseMode)?PB.chooseMode(g):Promise.resolve(false);
+var load=fetch(g.src,{cache:'no-cache'}).then(function(r){
 if(!r.ok)throw new Error('HTTP '+r.status);
 return r.text();
-}).then(function(src){
+});
+Promise.all([load.then(function(src){return {src:src}},function(error){return {error:error}}),pick]).then(function(res){
 if(seq!==openSeq)return; // user closed or opened another game meanwhile
-if(window.PB&&PB.onOpenGame)PB.onOpenGame(g);   // before instrument: save injection needs PB.current
-frame.srcdoc=(window.PB&&PB.instrument)?PB.instrument(src):src;
+if(res[1]===null){closeGame();return;} // the prompt was cancelled
+if(res[0].error)throw res[0].error;
+if(window.PB&&PB.onOpenGame)PB.onOpenGame(g,{testMode:res[1]===true});   // before instrument: save injection needs PB.current
+frame.srcdoc=(window.PB&&PB.instrument)?PB.instrument(res[0].src):res[0].src;
 try{frame.focus();}catch(e){}
 }).catch(function(){
 if(seq!==openSeq)return;
 frame.srcdoc='<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#0d0d1a;color:#e8e8f0;font-family:system-ui;text-align:center;padding:20px">Could not load the game &mdash; check your connection and try again.';
 });
+}
+// Pages that are not shown in the arcade frame (Geometry Dash): the owner picks the mode here, then the page opens
+// and picks the choice up from arcade-kit.js (sessionStorage hand-over).
+function openGo(idx){
+var g=GAMES[idx];
+if(!g||!g.go)return;
+var go=function(test){
+if(window.PB&&PB.setStandaloneTest)PB.setStandaloneTest(g.id,test===true);
+location.href=g.go;
+};
+if(window.PB&&PB.chooseMode)PB.chooseMode(g).then(function(test){if(test!==null)go(test)});
+else go(false);
 }
 function closeGame(fromHistory){
 openSeq++;
@@ -692,8 +709,8 @@ loadPlayCounts();
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="pb/arcade-kit.js?v=25"></script>
-<script type="module" src="pixelbreak-records.js?v=43"></script>
+<script src="pb/arcade-kit.js?v=26"></script>
+<script type="module" src="pixelbreak-records.js?v=44"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){

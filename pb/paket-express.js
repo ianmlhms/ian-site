@@ -6,6 +6,8 @@
   const CRASH_COOLDOWN = PX.config.crashCooldown, FREE_RATE = PX.config.freeRate, SAVE_KEY = 'pb_save_paket-express';
   // srcdoc's location has an opaque URL; its base URI inherits the arcade's real origin.
   const HOST_ORIGIN = new URL(document.baseURI).origin;
+  // Arcade test mode: every vehicle and district owned, plenty of euros; no local storage writes, no daily score, no bests.
+  const TEST_MODE = window.__pbTestMode === true, TEST_WALLET = 1e9;
   const LIMIT = Number.MAX_SAFE_INTEGER, ROADS = Object.freeze(PX.roads);
   const VEHICLES = PX.config.vehicles;
   const PLACES = PX.places;
@@ -20,20 +22,20 @@
       pickup: 'Ofhuelen bei:', dropoff: 'Liwweren un:', boarding: 'Passagéier bei:', busStop: 'Nächsten Arrêt:', stop: 'Stop am giele Krees', loadingParcel: 'Gëtt agelueden…', unloading: 'Gëtt ofginn…',
       picked: 'U Bord! Op bei déi nächst Adress.', delivered: 'Tour fäerdeg', failed: "Zäit eriwwer. Eng nei Tour waart!", crash: 'Bump! −12 Punkten op dëser Tour', resetDone: 'Zréck op der Strooss', unlocked: 'Fräigeschalt', selected: 'Ausgewielt', needed: 'nach',
       autoDesc: 'Séier · 1 Pak', vanDesc: '2 Päck pro Tour', busDesc: '3 Passagéier-Arrêten', earn: 'Punkten', soundOn: 'Toun un', soundOff: 'Toun aus', left: 'Lénks steieren', right: 'Riets steieren',
-      engineError: "Den 3D-Motor konnt net starten. Kontrolléier deng Verbindung an lued d'Säit nei.", saveError: 'Späicheren net méiglech. Halt dës Säit op fir däi Fortschrëtt.', audioError: 'Den Toun ass net disponibel. Du kanns weiderspillen.',
+      engineError: "Den 3D-Motor konnt net starten. Kontrolléier deng Verbindung an lued d'Säit nei.", testNoScore: 'Test-Modus: zielt net', saveError: 'Späicheren net méiglech. Halt dës Säit op fir däi Fortschrëtt.', audioError: 'Den Toun ass net disponibel. Du kanns weiderspillen.',
     },
     de: {
       eyebrow: 'LUXEMBURG · SEIT 08:00', title: 'Deine Stadt.\nDeine Tour.', intro: 'Kleine Straßen, große Mission. Hole Pakete ab und bring sie pünktlich an die Tür.',
       shift: 'Schicht · 5 Min.', shiftDesc: 'Gegen die Uhr. Für den Rekord.', free: 'Freie Fahrt', freeDesc: 'Ohne Zeitdruck · halbe Punkte', garage: 'Deine Garage', lifetime: 'Gesamtpunkte', startHint: 'Halte kurz im gelben Kreis zum Abholen oder Ausliefern. Fahrzeuge wechselst du zwischen Touren.', loading: 'Die Stadt entsteht…', loadingWait: 'Wird geladen, einen Moment Geduld… Auf älteren iPads kann das bis zu 20 Sekunden dauern.', edge: 'Du verlässt die Stadt · Bitte umdrehen', ready: '36 Adressen. Bei jedem Start eine neue Tour.',
       points: 'Punkte', deliveries: 'Lieferungen', best: 'Rekord', pause: 'Ⅱ Pause', paused: 'Kurze Pause.', pausedDesc: 'Deine Tour wartet auf dich.', resume: 'Weiterfahren', camera: 'Kamera', reset: '↻ Straße', horn: 'Hupe', mute: 'Ton', finish: 'Tour beenden', drift: 'Drift', brake: 'Bremse', gas: 'Gas', again: 'Noch einmal', ended: 'Schicht geschafft!', freeEnded: 'Gute Fahrt!',
       controls: 'WASD / ↑↓←→ fahren · Leertaste Drift · H Hupe · C Kamera · R Straße · P Pause · N Karte · M Ton', pickup: 'Abholen bei:', dropoff: 'Liefern an:', boarding: 'Fahrgäste bei:', busStop: 'Nächster Halt:', stop: 'Im gelben Kreis anhalten', loadingParcel: 'Wird eingeladen…', unloading: 'Wird abgegeben…', picked: 'An Bord! Auf zur nächsten Adresse.', delivered: 'Tour geschafft', failed: 'Zeit abgelaufen. Eine neue Tour wartet!', crash: 'Rempler! −12 Punkte auf dieser Tour', resetDone: 'Zurück auf der Straße', unlocked: 'Freigeschaltet', selected: 'Ausgewählt', needed: 'noch', autoDesc: 'Schnell · 1 Paket', vanDesc: '2 Pakete pro Tour', busDesc: '3 Fahrgasthalte', earn: 'Punkte', soundOn: 'Ton an', soundOff: 'Ton aus', left: 'Links lenken', right: 'Rechts lenken',
-      engineError: 'Die 3D-Engine konnte nicht starten. Prüfe deine Verbindung und lade die Seite neu.', saveError: 'Speichern nicht möglich. Lass diese Seite für deinen Fortschritt offen.', audioError: 'Ton nicht verfügbar. Du kannst weiterspielen.',
+      engineError: 'Die 3D-Engine konnte nicht starten. Prüfe deine Verbindung und lade die Seite neu.', testNoScore: 'Testmodus: zählt nicht', saveError: 'Speichern nicht möglich. Lass diese Seite für deinen Fortschritt offen.', audioError: 'Ton nicht verfügbar. Du kannst weiterspielen.',
     },
     en: {
       eyebrow: 'LUXEMBOURG · SINCE 08:00', title: 'Your town.\nYour route.', intro: 'Little streets, big mission. Pick up parcels and bring them to the door on time.', shift: 'Shift · 5 min', shiftDesc: 'Beat the clock. Set a record.', free: 'Free drive', freeDesc: 'No pressure · half the points', garage: 'Your garage', lifetime: 'Lifetime points', startHint: 'Stop briefly in the yellow circle to pick up or deliver. Change vehicles between runs.', loading: 'Building the town…', loadingWait: 'Loading, please wait… On older iPads this can take up to 20 seconds.', edge: 'Leaving town · Please turn around', ready: '36 addresses. A new route with every start.',
       points: 'Points', deliveries: 'Deliveries', best: 'Best', pause: 'Ⅱ Pause', paused: 'Taking a break.', pausedDesc: 'Your route is waiting for you.', resume: 'Keep driving', camera: 'Camera', reset: '↻ Road', horn: 'Horn', mute: 'Sound', finish: 'End drive', drift: 'Drift', brake: 'Brake', gas: 'Gas', again: 'Drive again', ended: 'Shift complete!', freeEnded: 'Nice drive!',
       controls: 'WASD / ↑↓←→ drive · Space drift · H horn · C camera · R reset · P pause · N map · M sound', pickup: 'Pick up at:', dropoff: 'Deliver to:', boarding: 'Passengers at:', busStop: 'Next stop:', stop: 'Stop in the yellow circle', loadingParcel: 'Loading…', unloading: 'Dropping off…', picked: 'On board! Head to the next address.', delivered: 'Route complete', failed: 'Time up. A new route is waiting!', crash: 'Bump! −12 points on this route', resetDone: 'Back on the road', unlocked: 'Unlocked', selected: 'Selected', needed: 'more', autoDesc: 'Nimble · 1 parcel', vanDesc: '2 parcels per route', busDesc: '3 passenger stops', earn: 'points', soundOn: 'Sound on', soundOff: 'Sound off', left: 'Steer left', right: 'Steer right',
-      engineError: 'The 3D engine could not start. Check your connection and reload the page.', saveError: 'Could not save. Keep this page open to retain your progress.', audioError: 'Sound is unavailable. You can keep playing.',
+      engineError: 'The 3D engine could not start. Check your connection and reload the page.', testNoScore: "Test mode: doesn't count", saveError: 'Could not save. Keep this page open to retain your progress.', audioError: 'Sound is unavailable. You can keep playing.',
     },
   };
   const $ = id => document.getElementById(id);
@@ -61,9 +63,17 @@
   if (!['high', 'medium', 'low'].includes(quality)) quality = 'medium';
   const QUALITY = { lb: ['Qualitéit', 'Héich', 'Mëttel', 'Niddreg'], de: ['Qualität', 'Hoch', 'Mittel', 'Niedrig'], en: ['Quality', 'High', 'Medium', 'Low'] };
   const MAP_TEXT = { lb: ['Kaart', 'Zoumaachen'], de: ['Karte', 'Schließen'], en: ['Map', 'Close'] };
+  /** Test mode only: a copy of the save with all vehicles and districts owned and a full wallet (upgrades and paints stay buyable). */
+  function testUnlockAll(save) {
+    if (!TEST_MODE) return save;
+    const lifetime = Math.max(save.lifetime, TEST_WALLET);
+    return { ...save, lifetime, tb: lifetime, wallet: Math.max(save.wallet, TEST_WALLET),
+      owned: PX.config.vehicles.map(v => v.id), districts: Object.keys(PX.config.districts) };
+  }
   function warn(context, error) { console.warn('[Paket Express] ' + context, error); }
   function text(key) { return PX.copy[lang][key] || TEXT[lang][key] || key; }
   function readStore(key) {
+    if (TEST_MODE && key === SAVE_KEY) return null;
     try { return localStorage.getItem(key); }
     catch (error) { warn('Storage read failed', error); return null; }
   }
@@ -74,7 +84,8 @@
   }
   function notify(message) { $('notice').textContent = message; noticeUntil = performance.now() + 2600; }
   function save() {
-    progress = { ...progress, tb: progress.lifetime, savedAt: Date.now() };
+    progress = testUnlockAll({ ...progress, tb: progress.lifetime, savedAt: Date.now() });
+    if (TEST_MODE && parent === window) return;
     if (parent === window) {
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(progress)); }
       catch (error) { warn('Progress save failed', error); notify(text('saveError')); }
@@ -82,7 +93,7 @@
   }
   function mergeSave(data) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
-    progress=PX.career.merge(progress,data);if(phase==='menu')weather=forecast();refreshGarage();updateHUD();
+    progress=testUnlockAll(PX.career.merge(progress,data));if(phase==='menu')weather=forecast();refreshGarage();updateHUD();
   }
   function purchase(kind,id){
     if(phase==='running')return;
@@ -124,7 +135,7 @@
     renderBoard();
   }
   async function submitDaily(){
-    if(!pendingDaily)return;
+    if(TEST_MODE||!pendingDaily)return;
     if(pendingDaily.day!==PX.missions.day()){pendingDaily=null;notify(text('dailySaveError'));return;}
     $('retryDaily').hidden=true;
     try{await PX.daily.submit(pendingDaily.score);pendingDaily=null;notify(text('dailySaved'));await loadBoard();}
@@ -296,8 +307,9 @@
     if (phase !== 'running') return;
     phase = 'end'; paused = false; bigMap = false; $('mapScreen').hidden = true; clearInput(); $('hud').hidden = true; $('pauseScreen').hidden = true; $('endScreen').hidden = false;
     if(mode==='shift'&&elapsed>=SHIFT_SECONDS&&crashes===0)mission('clean');
-    if(mode==='daily'&&runDay===PX.missions.day()){const final=Math.floor(score*runMultiplier());progress={...progress,dailyBest:{[runDay]:Math.max(validNumber(progress.dailyBest[runDay]),final)}};pendingDaily={score:final,day:runDay};submitDaily();}
-    if (mode === 'shift') { const final=Math.floor(score*runMultiplier()); progress = { ...progress, best: Math.max(progress.best, final) }; Arcade.score(final); Arcade.gameOver(final); }
+    if(TEST_MODE&&mode==='daily')notify(text('testNoScore'));
+    if(!TEST_MODE&&mode==='daily'&&runDay===PX.missions.day()){const final=Math.floor(score*runMultiplier());progress={...progress,dailyBest:{[runDay]:Math.max(validNumber(progress.dailyBest[runDay]),final)}};pendingDaily={score:final,day:runDay};submitDaily();}
+    if (mode === 'shift') { const final=Math.floor(score*runMultiplier()); if (!TEST_MODE) progress = { ...progress, best: Math.max(progress.best, final) }; Arcade.score(final); Arcade.gameOver(final); }
     save(); updateEnd();
   }
   function updateEnd() {
@@ -453,12 +465,12 @@
     button.addEventListener('pointerup', release); button.addEventListener('pointercancel', release); button.addEventListener('lostpointercapture', release);
   });
   $('startDaily').addEventListener('click',()=>start('daily'));$('retryDaily').addEventListener('click',submitDaily);
-  $('trafficSetting').addEventListener('change',event=>{trafficSetting=event.target.value;runTraffic=trafficSetting;try{localStorage.setItem('px_traffic',trafficSetting);}catch(error){warn('Traffic preference save failed',error);}trafficSystem.configure(trafficSetting);refreshGarage();});
+  $('trafficSetting').addEventListener('change',event=>{trafficSetting=event.target.value;runTraffic=trafficSetting;try{if(!TEST_MODE)localStorage.setItem('px_traffic',trafficSetting);}catch(error){warn('Traffic preference save failed',error);}trafficSystem.configure(trafficSetting);refreshGarage();});
   $('startShift').addEventListener('click', () => start('shift')); $('startFree').addEventListener('click', () => start('free'));
   $('again').addEventListener('click', () => start(mode)); $('finish').addEventListener('click', end); $('pause').addEventListener('click', pauseToggle); $('resume').addEventListener('click', pauseToggle);
   $('camera').addEventListener('click', () => actions('c')); $('reset').addEventListener('click', () => actions('r')); $('horn').addEventListener('pointerdown', event => { if (phase !== 'running' || paused) return; event.preventDefault(); $('horn').setPointerCapture(event.pointerId); horn(true); });
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(event => $('horn').addEventListener(event, () => { if (audio) audio.horn(false, activeVehicle()); })); $('mute').addEventListener('click', muteToggle);
-  $('quality').addEventListener('click', () => { quality = ['high', 'medium', 'low'][(['high', 'medium', 'low'].indexOf(quality) + 1) % 3]; try { localStorage.setItem('px_quality', quality); } catch (error) { warn('Quality save failed', error); } updateQuality(); });
+  $('quality').addEventListener('click', () => { quality = ['high', 'medium', 'low'][(['high', 'medium', 'low'].indexOf(quality) + 1) % 3]; try { if (!TEST_MODE) localStorage.setItem('px_quality', quality); } catch (error) { warn('Quality save failed', error); } updateQuality(); });
   $('minimap').addEventListener('click', mapToggle); $('minimap').addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); mapToggle(); } }); $('closeMap').addEventListener('click', mapToggle);
   $('toGarage').addEventListener('click', () => { phase = 'menu'; $('endScreen').hidden = true; $('menu').hidden = false; beacon.visible = false; beaconRing.visible = false; weather=forecast();refreshGarage();loadBoard(); });
   document.querySelectorAll('[data-lang]').forEach(button => button.addEventListener('click', () => {
@@ -483,6 +495,7 @@
   const storedLang = readStore('site_lang'); if (TEXT[storedLang]) lang = storedLang;
   try { mergeSave(window.__pbSave || JSON.parse(readStore(SAVE_KEY) || 'null')); }
   catch (error) { warn('Progress restore failed', error); notify(text('saveError')); }
+  if (TEST_MODE) { progress = testUnlockAll(progress); refreshGarage(); updateHUD(); }
   // Building the town blocks the main thread for several seconds on iPads: show the loading screen first, then build.
   function setBooting(isBooting) {
     $('loadingScreen').hidden = !isBooting;

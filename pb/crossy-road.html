@@ -26,7 +26,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 .levels-title{margin:0 0 8px;color:var(--muted);font:800 12px/1 var(--font);letter-spacing:.06em;text-transform:uppercase}
 @media (prefers-reduced-motion:reduce){.levels button{transition:none}.levels button:active:not([disabled]){transform:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="crossy-road" data-arcade-title="Road Crossing"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="crossy-road" data-arcade-title="Road Crossing"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -138,13 +138,14 @@ let player,lanes,rows=0,cameraY=0,rng=Math.random,levelLen=0,flash=0,lastT=0;
 
 /* ---------- progress: unlocked levels + endless best, synced to the account ---------- */
 let prog={v:1,lvl:1,eb:0};
+const TEST_MODE=window.__pbTestMode===true;   // arcade test mode: all levels open, progress stays in memory
 function applyProg(p){
-  if(!p||p.v!==1)return;
+  if(TEST_MODE||!p||p.v!==1)return;
   prog.lvl=Math.max(prog.lvl,Math.min(N_LEVELS+1,p.lvl||1));
   prog.eb=Math.max(prog.eb,p.eb||0);
   updateHud();
 }
-function pushProg(){try{parent.postMessage({__pbSave:1,data:prog},'*')}catch(e){}}
+function pushProg(){if(TEST_MODE)return;try{parent.postMessage({__pbSave:1,data:prog},'*')}catch(e){}}
 window.addEventListener('message',e=>{const d=e.data;if(d&&d.__pbLoadSave===1){applyProg(d.data);if(state==='menu')showMenu()}});
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}
 
@@ -226,7 +227,7 @@ function buildLevelGrid(){
   for(let n=1;n<=N_LEVELS;n++){
     const b=document.createElement('button');
     b.type='button';
-    const unlocked=n<=prog.lvl;
+    const unlocked=TEST_MODE||n<=prog.lvl;
     b.textContent=unlocked?String(n):'🔒';
     b.disabled=!unlocked;
     b.setAttribute('aria-label',unlocked?'Level '+n:'Level '+n+' locked');

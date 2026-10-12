@@ -27,7 +27,7 @@ body{display:flex;flex-direction:column}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (prefers-reduced-motion:reduce){#timer-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="word-scramble" data-arcade-title="Word Unscramble"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="word-scramble" data-arcade-title="Word Unscramble"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -129,6 +129,7 @@ const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 let score=0,streak=0,level=1,current,timeLeft=TIMER_FULL,used=new Set(),nextTimer=0;
 let state='idle',paused=false;
+const TEST_MODE=window.__pbTestMode===true; // arcade test mode: nothing is saved
 let lang=storageGet('pb_ws_lang')||'en';
 const list=()=>lang==='lb'?WORDS_LB:WORDS;
 
@@ -137,6 +138,7 @@ function storageGet(key){
   catch(error){console.warn('[Word Unscramble] could not read '+key,error);return null}
 }
 function storageSet(key,value){
+  if(TEST_MODE)return;
   try{localStorage.setItem(key,value)}
   catch(error){console.warn('[Word Unscramble] could not save '+key,error)}
 }

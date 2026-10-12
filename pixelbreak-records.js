@@ -6,7 +6,8 @@
  * - If Supabase is configured (pixelbreak-config.js) and you're signed in, it also syncs
  *   your best to the cloud and shows a global per-game leaderboard.
  *
- * The page calls: PB.instrument(html), PB.onOpenGame(game), PB.onCloseGame().
+ * The page calls: PB.chooseMode(game) (owner prompt: true = test, false = normal, null = cancelled),
+ * PB.onOpenGame(game, {testMode}), PB.instrument(html), PB.onCloseGame().
  */
 import * as auth from "./auth.js?v=30";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=8";
@@ -30,7 +31,26 @@ let pendingScores = new Map(), scoreTimer = null;
 let activeBoard = null;         // sub-leaderboard chosen by the game (e.g. one per level), or null
 const GAME_MESSAGE_KEYS = new Set(["__pb", "score", "final", "board", "run"]);
 const BOARD_ID_PATTERN = /^[a-z0-9-]{1,48}$/;
-let sb = null, session = null, username = null;
+let sb = null, session = null, username = null, sessionKnown = false;
+
+/* ---------------- test mode (owner only) ----------------
+ * The arcade owner is asked "Test mode or Normal?" whenever a game opens. In test mode the game gets
+ * window.__pbTestMode=true before any of its scripts run, and this module guarantees that nothing the game does
+ * reaches a leaderboard, a counter, the cloud or the real saved progress:
+ *   - scores (scores, weekly runs, daily scores, streaks, Halloween progress) are dropped,
+ *   - {__pbSave} goes to localStorage "pb_testsave_<gameId>" only (never pb_save_*, never game_saves),
+ *   - {__pbWantSave} is not answered, so no cloud save is delivered,
+ *   - the game bar shows a "TEST" badge instead of the best score. */
+const OWNER_EMAIL = "konto@ian.lu";
+const TEST_SAVE_PREFIX = "pb_testsave_";
+const MODE_LAST_KEY = "pb_mode_last";          // last choice, used only as the default focus of the prompt
+const TEST_TOKEN_KEY = "pb_testmode_game";     // sessionStorage: hands the choice to an href game page (see arcade-kit.js)
+let testMode = false;
+Object.defineProperty(PB, "testMode", { get: () => testMode, enumerable: true });
+function setTestMode(on) {
+  testMode = on === true;
+  document.body?.classList.toggle("pb-test-mode", testMode);
+}
 
 /* ---------------- local best (always on) ---------------- */
 function localBest(id) {
@@ -155,7 +175,9 @@ const isMuted = () => localStorage.getItem("pb_muted") === "1";
 PB.instrument = (html) => {
   // Paket Express reports only completed shifts; DOM polling would submit free-drive points.
   const automaticFeedback = PB.current?.id === "paket-express" ? "" : REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
-  let inject = `<script>window.addEventListener('message',function(event){
+  // Test mode: the flag and the storage redirect come first, ahead of every other script of the game.
+  let inject = testMode ? testModeInject(PB.current) : "";
+  inject += `<script>window.addEventListener('message',function(event){
     if(event.source===parent&&event.data&&event.data.__pbStreak){
       window.__pbStreak=event.data.__pbStreak;
     }
@@ -164,17 +186,36 @@ PB.instrument = (html) => {
   const g = PB.current;
   if (g) {
     inject += `<script>window.__pbHalloween=${halloweenVisible()};<\/script>`;
-    if (window.__pbStreak) inject += `<script>window.__pbStreak=${JSON.stringify(window.__pbStreak)};<\/script>`;
-    const sv = localStorage.getItem(SAVE_PREFIX + g.id);
+    if (window.__pbStreak && !testMode) inject += `<script>window.__pbStreak=${JSON.stringify(window.__pbStreak)};<\/script>`;
+    const sv = localStorage.getItem((testMode ? TEST_SAVE_PREFIX : SAVE_PREFIX) + g.id);
     if (sv) inject += `<script>window.__pbSave=${sv.replace(/</g, "\\u003c")};<\/script>`;
   }
   return html.includes("<head>") ? html.replace("<head>", "<head>" + inject) : inject + html;
 };
 
+/* The script that puts a game frame into test mode: the flag, then the storage redirect (arcade-kit.js owns its source). */
+function testModeInject(game) {
+  const shim = window.Arcade?.testStorageShim;
+  let inject = `<script>window.__pbTestMode=true;<\/script>`;
+  if (typeof shim === "function" && game) inject += `<script>(${shim.toString()})(${JSON.stringify(game.id)});<\/script>`;
+  else console.warn("[Arcade] test mode storage redirect unavailable");
+  return inject;
+}
+
 /* ---------------- open / close hooks ---------------- */
-PB.onOpenGame = (g) => { flushScores(); PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); loadEventStatus(); };
-PB.onCloseGame = () => { flushScores(); flushSave(); flushEvent(); netClose(); PB.current = null; activeBoard = null; updateSaveHint(); };
+PB.onOpenGame = (g, options = {}) => {
+  flushScores();                          // the previous game's scores go out before the mode flips
+  dismissModeDialog(null);
+  setTestMode(options.testMode === true);
+  PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); loadEventStatus();
+};
+PB.onCloseGame = () => {
+  dismissModeDialog(null);
+  flushScores(); flushSave(); flushEvent(); netClose();
+  PB.current = null; activeBoard = null; setTestMode(false); updateSaveHint();
+};
 PB.registerStandalone = (g) => {
+  setTestMode(window.__pbTestMode === true);   // set by arcade-kit.js from the arcade's choice
   PB.current = g;
   weeklyFinals = new Set();
   touchStreak();
@@ -232,6 +273,10 @@ window.addEventListener("message", (e) => {
     if (Object.keys(d).length !== 2 || !isSaveData(d.data)) return;
     const json = JSON.stringify(d.data);
     if (json.length > MAX_MESSAGE_SIZE) return;
+    if (testMode) {   // test saves stay on this device under their own key: no pb_save_*, no game_saves
+      try { localStorage.setItem(TEST_SAVE_PREFIX + g.id, json); } catch (e) { console.warn("[PB] test save failed", e); }
+      return;
+    }
     try { localStorage.setItem(SAVE_PREFIX + g.id, json); } catch (e) { console.warn("[PB] local save failed", e); }
     pendingSave = { g, data: d.data };
     // Keep the cached cloud copy current: a game that reloads inside the frame asks again ({__pbWantSave})
@@ -242,8 +287,8 @@ window.addEventListener("message", (e) => {
     updateSaveHint();
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
-  if (d && d.__pbWantSave === 1 && cloudSave !== undefined) sendCloudSave();
-  if (d.__pbEvent && eventGame(g) && halloweenVisible() && fullAccount()) {
+  if (d && d.__pbWantSave === 1 && !testMode && cloudSave !== undefined) sendCloudSave();
+  if (d.__pbEvent && !testMode && eventGame(g) && halloweenVisible() && fullAccount()) {
     const event = d.__pbEvent;
     if (event.event === HALLOWEEN_EVENT && Number.isSafeInteger(event.count) && event.count > 0 && event.count <= 5) {
       eventQueued += event.count;
@@ -269,6 +314,8 @@ const RPC_WHITELIST = new Set([
   "park_gallery", "park_layout", "publish_park", "unpublish_park", "like_park",
   "submit_daily_score", "daily_board",
 ]);
+// Writes (scores, publishing or liking a park) are refused in test mode; the read-only functions still work.
+const TEST_MODE_BLOCKED_RPC = new Set(["submit_daily_score", "publish_park", "unpublish_park", "like_park"]);
 const MAX_RPC_ARGS = 16;
 
 function rpcPost(id, data, error) {
@@ -280,6 +327,7 @@ async function rpcCall(call) {
   const id = call && call.id;
   if (typeof id !== "number" && typeof id !== "string") return;
   if (!RPC_WHITELIST.has(call.fn)) { rpcPost(id, null, "forbidden"); return; }
+  if (testMode && TEST_MODE_BLOCKED_RPC.has(call.fn)) { rpcPost(id, null, "test-mode"); return; }
   const args = call.args === undefined ? {} : call.args;
   if (!isObject(args) || Object.keys(args).length > MAX_RPC_ARGS || !isSaveData(args)) {
     rpcPost(id, null, "bad-args"); return;
@@ -373,7 +421,7 @@ async function flushSave() {
 // Every validated __pbSave message writes localStorage before scheduling cloud work.
 window.__pbFlushSave = async () => {
   const game = PB.current;
-  if (!game || !sb || !session) return;
+  if (!game || !sb || !session || testMode) return;
   if (pendingSave?.g !== game) {
     try {
       const json = localStorage.getItem(SAVE_PREFIX + game.id);
@@ -394,7 +442,7 @@ window.__pbFlushSave = async () => {
 
 async function loadCloudSave(g) {
   cloudSave = undefined;
-  if (!sb || !session) { cloudSave = null; return; }
+  if (testMode || !sb || !session) { cloudSave = null; return; }
   try {
     const { data } = await sb.from("game_saves")
       .select("data").eq("user_id", session.user.id).eq("game_id", g.id).maybeSingle();
@@ -410,7 +458,7 @@ async function loadCloudSave(g) {
 /* ---------------- receive scores from iframe or standalone games ---------------- */
 function receiveScore(detail) {
   const base = PB.current;
-  if (!base || base.noScore) return;
+  if (!base || base.noScore || testMode) return;   // test mode never counts
   let g = activeGame();
   if (detail?.board !== undefined) {   // a score tagged with its board: must be one this game owns
     if (!ownsBoard(base, detail.board)) { console.warn("[Arcade] ignored a score for a board this game does not own", detail.board); return; }
@@ -456,6 +504,7 @@ async function initCloud() {
 function applySession(s) {
   const previousUserId = session?.user?.id || null;
   session = s || null;
+  sessionKnown = true;
   username = s ? (s.user.user_metadata?.username || s.user.email) : null;
   renderAccount();
   renderGameBar();
@@ -478,6 +527,7 @@ function applySession(s) {
   loadWeeklyHome();
 }
 function queueCloudScore(g, s, isFinal) {
+  if (testMode) return;
   pendingScores.set(g.id, { g, s });
   const isFirst = !cloudBests.has(`${session.user.id}:${g.id}`);
   if (isFinal || isFirst) { flushScores(); return; }
@@ -491,6 +541,7 @@ function flushScores() {
   return Promise.all(batch.map(({ g, s }) => saveCloud(g, s)));
 }
 async function saveCloud(g, s) {
+  if (testMode) return;
   try {
     const uid = session.user.id;
     const key = `${uid}:${g.id}`;
@@ -539,7 +590,7 @@ let homeWeekly = null;
 const fullAccount = () => !!session && session.user.user_metadata?.account_kind !== "kart";
 
 async function submitWeeklyRun(game, detail) {
-  if (!sb || !fullAccount() || !Number.isSafeInteger(detail.score) || detail.score < 0) return;
+  if (testMode || !sb || !fullAccount() || !Number.isSafeInteger(detail.score) || detail.score < 0) return;
   // Arcade supplies a run token. Retain the fallback for older cached game reporters.
   const key = `${session.user.id}:${game.id}:${detail.run ?? "legacy-" + detail.score}`;
   if (weeklyFinals.has(key)) return;
@@ -566,13 +617,13 @@ function showStreakToast(copy) {
 }
 
 function sendStreak() {
-  if (!window.__pbStreak || !PB.current) return;
+  if (!window.__pbStreak || !PB.current || testMode) return;
   try { document.getElementById("gf")?.contentWindow?.postMessage({ __pbStreak: window.__pbStreak }, location.origin); }
   catch (error) { console.warn("[Arcade] streak delivery failed", error); }
 }
 
 async function touchStreak() {
-  if (!sb || !fullAccount() || !PB.current) return;
+  if (testMode || !sb || !fullAccount() || !PB.current) return;
   const userId = session.user.id;
   if (streakResults.has(userId)) {
     const cached = streakResults.get(userId);
@@ -656,6 +707,17 @@ function css() {
   .pb-link{color:var(--accent2);cursor:pointer;font-size:12.5px}
   .pb-save-hint{position:fixed;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2500;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100vw - 24px);padding:8px 8px 8px 14px;border-radius:14px;background:var(--card,#161625);color:var(--text,#e8e8f0);border:1px solid var(--border,rgba(255,255,255,.14));box-shadow:0 10px 30px rgba(0,0,0,.4);font:600 13.5px/1.35 'Nunito',system-ui,sans-serif}
   .pb-save-hint__go{flex:none;min-height:40px;padding:0 14px;border:0;border-radius:10px;background:var(--accent,#6c5ce7);color:#fff;font:inherit;font-weight:800;cursor:pointer}
+  .pb-mode{z-index:3100}
+  .pb-mode__box{text-align:center}
+  .pb-mode__box h3{margin-bottom:2px}
+  .pb-mode__ask{margin:0 0 14px;color:var(--text2,#9a9ab8);font-size:14px}
+  .pb-mode__box .pb-go{display:block;width:100%;margin:0 0 8px;min-height:46px;font-family:inherit}
+  .pb-mode__box .pb-go kbd{margin-left:6px;padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.2);font:700 11px/1.4 inherit;vertical-align:1px}
+  .pb-mode__box .pb-mode__test{background:transparent;color:var(--text,#e8e8f0);box-shadow:inset 0 0 0 2px #ffcc00}
+  .pb-mode__box .pb-mode__test kbd{background:rgba(255,204,0,.22)}
+  .pb-mode__box .pb-go:focus-visible,.pb-mode__back:focus-visible{outline:3px solid var(--accent2,#4de8ff);outline-offset:2px}
+  .pb-mode__note{margin:2px 0 12px;font-size:12.5px;line-height:1.4;color:var(--text2,#9a9ab8)}
+  .pb-mode__back{display:inline-block;min-height:44px;padding:0 12px;background:none;border:0;font:inherit;font-size:13px}
   .pb-save-hint__x{flex:none;min-width:40px;min-height:40px;border:0;background:none;color:var(--text2,#9a9ab8);font-size:20px;cursor:pointer}`;
   document.head.appendChild(s);
 }
@@ -746,6 +808,7 @@ function renderGameBar() {
       host: gh,
       title: g.name,
       noScore: g.noScore || !cloudEnabled,
+      badge: testMode,
       restart: true,
       onBack: (event) => { event.preventDefault(); window.closeGame?.(); },
       onLeaderboard: openBoard,
@@ -763,6 +826,7 @@ function renderGameBar() {
   const best = mountedGameBar?.best || document.getElementById("arcadeBest");
   const shown = activeGame();
   if (!best || !shown || shown.noScore) return;
+  if (testMode) { best.textContent = ""; return; }   // a test play has no best
   const stored = localBest(shown.id);
   const sessionBest = sessionBests.has(shown.id) ? sessionBests.get(shown.id) : null;
   const value = sessionBest !== null && isBetter(shown, sessionBest, stored) ? sessionBest : stored;
@@ -784,7 +848,7 @@ function renderEventChip() {
   document.getElementById("pbEventChip")?.remove();
   const banner = document.getElementById("halloweenBanner");
   if (banner) { banner.hidden = !halloweenVisible(); banner.textContent = arcadeText("arc.halloweenBanner"); }
-  if (!host || !eventGame(PB.current) || !halloweenVisible() || (fullAccount() && eventStatus?.active === false && new URLSearchParams(location.search).get("halloween") !== "1")) return;
+  if (!host || testMode || !eventGame(PB.current) || !halloweenVisible() || (fullAccount() && eventStatus?.active === false && new URLSearchParams(location.search).get("halloween") !== "1")) return;
   const chip = document.createElement("div");
   chip.id = "pbEventChip"; chip.className = "arcade-context"; chip.setAttribute("role", "status");
   chip.textContent = fullAccount() ? `🎃 ${eventStatus?.count ?? 0} / ${eventStatus?.goal ?? 50}` : arcadeText("arc.halloweenSignin");
@@ -852,6 +916,107 @@ async function openBoard() {
     (SCORE_FORMATS[g.format] ? "" : scoreKeyHtml(rows.map((row) => row.score)));
 }
 PB.openBoard = openBoard;
+
+/* ---------------- mode prompt: Test mode or Normal (owner only) ---------------- */
+const MODE_COPY = Object.freeze({
+  lb: Object.freeze({ ask: "Wéi wëlls du spillen?", normal: "Normal spillen", test: "🧪 Test-Modus", back: "‹ Zréck",
+    note: "Alles fräigeschalt, zielt net fir d'Leaderboard, däi richtege Spillstand bleift onberéiert." }),
+  de: Object.freeze({ ask: "Wie möchtest du spielen?", normal: "Normal spielen", test: "🧪 Test-Modus", back: "‹ Zurück",
+    note: "Alles freigeschaltet, zählt nicht fürs Leaderboard, dein echter Spielstand bleibt unberührt." }),
+  en: Object.freeze({ ask: "How do you want to play?", normal: "Play normally", test: "🧪 Test mode", back: "‹ Back",
+    note: "Everything unlocked, doesn't count for any leaderboard, your real progress stays untouched." }),
+});
+let modeDialog = null;   // { el, game, resolve, cleanup }
+
+/* The arcade owner is the account signed in as OWNER_EMAIL. The live session wins; until it has loaded, the session
+ * Supabase stored on this device answers (same approach as the owner preview in pixelbreak.html). */
+function storedSessionEmail() {
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!/^sb-.+-auth-token$/.test(key)) continue;
+      return JSON.parse(localStorage.getItem(key) || "null")?.user?.email || "";
+    }
+  } catch (error) { console.warn("[Arcade] stored session unreadable", error); }
+  return "";
+}
+PB.isOwner = () => String((sessionKnown ? session?.user?.email : storedSessionEmail()) || "").toLowerCase() === OWNER_EMAIL;
+
+function lastMode() {
+  try { return localStorage.getItem(MODE_LAST_KEY) === "test" ? "test" : "normal"; }
+  catch (error) { console.warn("[Arcade] last mode unreadable", error); return "normal"; }
+}
+
+function dismissModeDialog(result) {
+  const dialog = modeDialog;
+  if (!dialog) return;
+  modeDialog = null;
+  dialog.cleanup();
+  dialog.resolve(result);
+}
+
+/* Resolves true = test mode, false = normal, null = cancelled (Back or Escape). Non-owners resolve false at once. */
+function askMode(game) {
+  dismissModeDialog(null);
+  return new Promise((resolve) => {
+    const copy = MODE_COPY[hintLanguage()];
+    const opener = document.activeElement;
+    const el = document.createElement("div");
+    el.className = "pb-modal open pb-mode";
+    el.innerHTML = `<div class="pb-box pb-mode__box" role="dialog" aria-modal="true" aria-labelledby="pbModeT" aria-describedby="pbModeN">
+      <h3 id="pbModeT">${esc(game.name)}</h3>
+      <p class="pb-mode__ask">${esc(copy.ask)}</p>
+      <button type="button" class="pb-go pb-mode__normal" data-mode="normal">${esc(copy.normal)} <kbd>Enter</kbd></button>
+      <button type="button" class="pb-go pb-mode__test" data-mode="test">${esc(copy.test)} <kbd>T</kbd></button>
+      <p class="pb-mode__note" id="pbModeN">${esc(copy.note)}</p>
+      <button type="button" class="pb-link pb-mode__back" data-mode="back">${esc(copy.back)}</button>
+    </div>`;
+    const buttons = [...el.querySelectorAll("button")];
+    const choose = (mode) => {
+      if (mode === "back") { dismissModeDialog(null); opener?.isConnected && opener.focus?.(); return; }
+      try { localStorage.setItem(MODE_LAST_KEY, mode); } catch (error) { console.warn("[Arcade] last mode not saved", error); }
+      dismissModeDialog(mode === "test");
+    };
+    const onClick = (event) => {
+      const button = event.target.closest("button[data-mode]");
+      if (!button) return;
+      choose(button.dataset.mode);
+    };
+    const onKey = (event) => {
+      // Enter held down on the game card repeats into the dialog: only a fresh press may choose.
+      if (event.repeat && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); return; }
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); choose("back"); return; }
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.key === "t" || event.key === "T") { event.preventDefault(); event.stopPropagation(); choose("test"); return; }
+      if (event.key === "n" || event.key === "N") { event.preventDefault(); event.stopPropagation(); choose("normal"); return; }
+      if (event.key === "Tab") {   // keep focus inside the dialog
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        else if (!el.contains(document.activeElement)) { event.preventDefault(); first.focus(); }
+      }
+    };
+    el.addEventListener("click", onClick);
+    window.addEventListener("keydown", onKey, true);
+    document.body.appendChild(el);
+    const preferred = el.querySelector(lastMode() === "test" ? ".pb-mode__test" : ".pb-mode__normal");
+    preferred.focus();
+    modeDialog = {
+      game, resolve,
+      cleanup() { window.removeEventListener("keydown", onKey, true); el.remove(); },
+    };
+  });
+}
+
+PB.chooseMode = (game) => (game && PB.isOwner() ? askMode(game) : Promise.resolve(false));
+PB.setStandaloneTest = (id, on) => {
+  try {
+    if (on) sessionStorage.setItem(TEST_TOKEN_KEY, id);
+    else sessionStorage.removeItem(TEST_TOKEN_KEY);
+  } catch (error) { console.warn("[Arcade] test mode hand-over failed", error); }
+};
+// Back on the hub: a hand-over token from an earlier href game must not outlive its visit.
+if (document.getElementById("gf")) PB.setStandaloneTest("", false);
 
 /* ---------------- sign-in hint ----------------
  * A game that saves progress while nobody is signed in keeps it on this device

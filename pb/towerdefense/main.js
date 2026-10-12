@@ -11,7 +11,12 @@ const NOTICE_MS = 1700;
 const $ = (id) => document.getElementById(id);
 const safeText = (value) => String(value ?? "");
 
-let progress = cleanProgress(window.__pbSave);
+// Arcade test mode: every battlefield open and plenty of shards, kept in memory only (no saves in or out).
+const TEST_MODE = window.__pbTestMode === true;
+const TEST_SHARDS = 9999;
+let progress = TEST_MODE
+  ? cleanProgress({ level: MAX_LEVEL, meta: { shards: TEST_SHARDS } })
+  : cleanProgress(window.__pbSave);
 let game = null;
 let selectedBuild = "rapid";
 let selectedTowerId = null;
@@ -37,6 +42,7 @@ function snapshot() {
 }
 
 function pushSave() {
+  if (TEST_MODE) return;
   try {
     parent.postMessage({ __pbSave: 1, data: snapshot() }, "*");
   } catch (error) {
@@ -45,6 +51,7 @@ function pushSave() {
 }
 
 function applyIncomingSave(save) {
+  if (TEST_MODE) return;
   if (!isStrictlyMoreProgress(save, progress)) return;
   progress = cleanProgress(save);
   window.score = progress.kills;

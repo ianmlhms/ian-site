@@ -27,7 +27,7 @@ body{display:flex;flex-direction:column}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (prefers-reduced-motion:reduce){#prog-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="typing" data-arcade-title="Typing Speed"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="typing" data-arcade-title="Typing Speed"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -98,6 +98,7 @@ const TICK_MS=200,WRONG_FLASH_MS=300,BEST_KEY='pb_best_typing',MS_PER_MIN=60000;
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 let text,pos,errors,startTime,timerInt,done;
+const TEST_MODE=window.__pbTestMode===true; // arcade test mode: nothing is saved
 let state='idle',paused=false,pausedAt=0,best=loadBest();
 let lang=storageGet('pb_typ_lang')||'en';
 
@@ -106,10 +107,11 @@ function storageGet(key){
   catch(error){console.warn('[Typing Speed] could not read '+key,error);return null}
 }
 function storageSet(key,value){
+  if(TEST_MODE)return;
   try{localStorage.setItem(key,value)}
   catch(error){console.warn('[Typing Speed] could not save '+key,error)}
 }
-function loadBest(){return Number(storageGet(BEST_KEY))||0}
+function loadBest(){return TEST_MODE?0:Number(storageGet(BEST_KEY))||0}
 function paintLang(){
   $('langEn').setAttribute('aria-pressed',String(lang!=='lb'));
   $('langLb').setAttribute('aria-pressed',String(lang==='lb'));

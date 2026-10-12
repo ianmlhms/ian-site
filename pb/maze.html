@@ -15,7 +15,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 .arcade-panel p:empty{display:none}
 #panelExtra:not(:empty){margin:14px 0 2px}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="maze" data-arcade-title="Maze Escape" data-arcade-lower-is-better></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="maze" data-arcade-title="Maze Escape" data-arcade-lower-is-better></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -52,8 +52,9 @@ const COLOR={bg:cssVar('--bg','#0d0d1a'),bg2:cssVar('--bg2','#11111f'),card:cssV
 const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const OVERLAY_INPUT_DELAY_MS=500;   // ignores the tap / held key that was still going when the panel appeared
 const BEST_KEY='arcade_best_'+GAME_ID;
-function readBest(){try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
-function writeBest(v){try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
+const TEST_MODE=window.__pbTestMode===true; // arcade test mode: local best is neither read nor written
+function readBest(){if(TEST_MODE)return null;try{const v=parseFloat(localStorage.getItem(BEST_KEY));return Number.isFinite(v)?v:null}catch(err){console.warn('[Arcade] best score unavailable',err);return null}}
+function writeBest(v){if(TEST_MODE)return;try{localStorage.setItem(BEST_KEY,String(v))}catch(err){console.warn('[Arcade] best score not saved',err)}}
 let best=readBest();
 /** Stores `score` when it beats the best; returns true for a new best. */
 function recordBest(score){

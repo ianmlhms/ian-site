@@ -25,6 +25,17 @@ const MILLISECONDS_PER_SECOND = 1_000;
 const BURGER_LAYER_OFFSET_PX = 2.2;
 const TEST_PROGRESS_GAIN = 321;
 
+/* Arcade test mode: the last day (every recipe, side and drink unlocked) and plenty of coins and stars
+ * for every shop upgrade. Saves go to the isolated test store (platform); lifetimeCoins is never touched. */
+const ARCADE_TEST_MODE = window.__pbTestMode === true;
+const ARCADE_TEST_DAY = 20;
+const ARCADE_TEST_FUNDS = 1_000_000;
+const testUnlockAll = (save) => {
+  if (!ARCADE_TEST_MODE) return save;
+  if (save.day >= ARCADE_TEST_DAY && save.coins >= ARCADE_TEST_FUNDS / 2 && save.stars >= ARCADE_TEST_FUNDS / 2) return save;
+  return {...save, day:Math.max(save.day, ARCADE_TEST_DAY), coins:Math.max(save.coins, ARCADE_TEST_FUNDS), stars:Math.max(save.stars, ARCADE_TEST_FUNDS)};
+};
+
 /* Sprites are generated once by scripts/gen_burger_art.py and committed.
  * Absolute paths are required: inside the arcade this game runs in a srcdoc
  * iframe whose base URL is the parent page at the site root. */
@@ -105,7 +116,7 @@ addStationTitle("fryerTitle", "fryer", "Fryer");
 addStationTitle("drinksTitle", "drink-machine", "Drinks");
 addStationTitle("toppingsTitle", "counter", "Assembly");
 
-let state = createGameState();
+let state = testUnlockAll(createGameState());
 let selectedDrink = "cola";
 let lastRenderAt = 0;
 let toastTimer = 0;
@@ -120,7 +131,7 @@ const showToast = (message) => {
 };
 
 const setState = (nextState, shouldRender = true) => {
-  state = nextState;
+  state = testUnlockAll(nextState);
   window.score = state.lifetimeCoins;
   window.Arcade?.score(window.score);
   if (shouldRender) render();
@@ -383,7 +394,7 @@ nodes.boostButton.addEventListener("click", () => setState(activateBoost(state))
 
 const animationLoop = (nowMs) => {
   const wasPlaying = state.screen === "playing";
-  const next = tick(state, nowMs);
+  const next = testUnlockAll(tick(state, nowMs));
   const didFinish = wasPlaying && next.screen === "summary";
   state = next;
   window.score = state.lifetimeCoins;

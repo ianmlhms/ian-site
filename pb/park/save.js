@@ -162,6 +162,9 @@ export function createPersistence({ getState, onState, onError }) {
     if (deadline === null) deadline = setTimeout(pushSave, MAX_SAVE_WAIT);
   }
   function applyIncoming(incoming) {
+    // Arcade test mode: the injected test save is already loaded; a later cloud save must not replace the unlocked test park
+    // (park value includes cash, so the comparison below would be meaningless there).
+    if (window.__pbTestMode === true) return false;
     const current = getState();
     const next = applySave(current, incoming);
     if (next === current) return false;

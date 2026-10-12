@@ -184,8 +184,10 @@ function updateParticles(dt){
   for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;p.vy-=4.5*dt;p.mesh.position.x+=p.vx*dt;p.mesh.position.y+=p.vy*dt;p.mesh.position.z+=p.vz*dt;p.mesh.material.opacity=Math.max(0,p.life);if(p.life<=0){fxRoot.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();particles.splice(i,1);}}
 }
 
-function storageGet(key){try{return localStorage.getItem(key);}catch(error){return null;}}
-function storageSet(key,value){try{localStorage.setItem(key,String(value));return true;}catch(error){return false;}}
+/* Arcade test mode: every stage open, progress kept in memory only (never touches pb_dm_* in localStorage). */
+const TEST_MODE=window.__pbTestMode===true,testStore=new Map();
+function storageGet(key){if(TEST_MODE)return testStore.has(key)?testStore.get(key):null;try{return localStorage.getItem(key);}catch(error){return null;}}
+function storageSet(key,value){if(TEST_MODE){testStore.set(key,String(value));return true;}try{localStorage.setItem(key,String(value));return true;}catch(error){return false;}}
 const doneLvls=()=>+(storageGet('pb_dm_done')||0);
 const bestTime=(level)=>+(storageGet('pb_dm_bt_'+level)||0);
 window.score=doneLvls();window.Arcade?.score(window.score);
@@ -210,8 +212,8 @@ function updateAudio(){if(!audioContext||!engineOsc)return;engineOsc.frequency.v
 
 function setPlayUI(active){$('hud').classList.toggle('hidden',!active);$('restart').classList.toggle('hidden',!active);$('touch').classList.toggle('hidden',!active);}
 function refreshLevels(){
-  levelsBox.replaceChildren();const done=doneLvls();
-  C.LEVELS.forEach((level,index)=>{const button=document.createElement('button');button.type='button';button.textContent=String(index+1);button.setAttribute('aria-label','Stage '+(index+1)+(index>done?' locked':''));button.disabled=index>done;if(index<done)button.classList.add('done');button.title=level.name;button.addEventListener('click',()=>startLevel(index));levelsBox.appendChild(button);});
+  levelsBox.replaceChildren();const done=doneLvls(),reach=TEST_MODE?C.LEVELS.length:done;
+  C.LEVELS.forEach((level,index)=>{const button=document.createElement('button');button.type='button';button.textContent=String(index+1);button.setAttribute('aria-label','Stage '+(index+1)+(index>reach?' locked':''));button.disabled=index>reach;if(index<done)button.classList.add('done');button.title=level.name;button.addEventListener('click',()=>startLevel(index));levelsBox.appendChild(button);});
 }
 function showMenu(){
   state='menu';setPlayUI(false);overlay.classList.remove('hidden');message.textContent='Balance the throttle, work the suspension, and survive sixteen short obstacle courses.\nWASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.';playButton.textContent='DRIVE';refreshLevels();

@@ -19,6 +19,15 @@
     restart: SCRIPT?.hasAttribute("data-arcade-restart") || false,
     leaderboardTarget: SCRIPT?.dataset.arcadeLeaderboardTarget || "",
   });
+  /* Test mode (arcade owner only). The arcade injects window.__pbTestMode=true into a game frame before any game
+   * script runs. A game that is opened as its own page (href games such as geometrydash.html) gets the same flag
+   * from a sessionStorage token the arcade sets when the owner picks "Test mode" for that game. */
+  const TEST_TOKEN_KEY = "pb_testmode_game";
+  if (window.__pbTestMode !== true && window.parent === window && options.id) {
+    try { if (sessionStorage.getItem(TEST_TOKEN_KEY) === options.id) window.__pbTestMode = true; }
+    catch (error) { warn("Could not read the test mode token.", error); }
+  }
+  const testMode = window.__pbTestMode === true;
   let restartHandler = null;
   let muteHandler = null;
   let lastKeyboardAt = Number(sessionGet(KEYBOARD_SESSION_KEY) || 0);
@@ -57,6 +66,7 @@
   }
 
   function emitScore(value, final, boardId) {
+    if (testMode) return;   // test mode never reports a score
     const board = boardId || "";
     const detail = Object.freeze({ score: value, final: Boolean(final), ...(board ? { board } : {}), ...(final ? { run: runNumber } : {}) });
     if (!options.standalone) {
@@ -179,6 +189,7 @@
       .arcade-bar__back:active,.arcade-bar__button:active{transform:scale(.94)}
       .arcade-bar__back:focus-visible,.arcade-bar__button:focus-visible{outline:3px solid var(--accent,#6ea8fe);outline-offset:2px}
       .arcade-bar__title{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;line-height:1.15;font-weight:700;letter-spacing:-.012em}
+      .arcade-bar__badge{flex:none;padding:4px 9px;border-radius:999px;background:#ffcc00;color:#2a1d00;font:800 11px/1 -apple-system,"SF Pro Text",BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.06em;white-space:nowrap}
       .arcade-bar__spacer{flex:1;min-width:4px}.arcade-bar__best{color:var(--muted,var(--text2,#9b9bb8));font-size:12px;font-weight:650;white-space:nowrap}
       .arcade-context{box-sizing:border-box;min-height:44px;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:4px 14px;
         border-bottom:1px solid var(--border,#2a2a4a);background:var(--bg,#0d0d1a);color:var(--muted,var(--text2,#9b9bb8));
@@ -242,7 +253,16 @@
     const best = document.createElement("span");
     best.className = "arcade-bar__best";
     best.id = config.bestId || "arcadeBest";
-    bar.append(back, title, spacer, best);
+    bar.append(back, title);
+    if (testMode || config.badge) {
+      const badge = document.createElement("span");
+      badge.className = "arcade-bar__badge";
+      badge.setAttribute("role", "status");
+      badge.setAttribute("aria-label", "Test mode");
+      badge.textContent = "🧪 TEST";
+      bar.append(badge);
+    }
+    bar.append(spacer, best);
 
     if (!config.noScore) {
       const board = button("arcade-bar__button arcade-bar__leaderboard", "Leaderboard", "🏆", config.onLeaderboard || (() => window.PB?.openBoard?.()));
@@ -297,6 +317,44 @@
     document.documentElement.classList.remove("arcade-hardware-keyboard");
   }
 
+  /* Test mode keeps a game away from the player's real storage. The function is self-contained on purpose: the
+   * arcade injects its source into the game frame (see pixelbreak-records.js) and the kit runs it for href games.
+   * It redirects this window's localStorage so nothing the game writes lands on a real key:
+   *   pb_save_<id>  -> pb_testsave_<id>     pb_best_<id> -> pb_testbest_<id>     anything else -> pb_testls_<game>_<key>
+   * Reads see only test data (a clean sandbox). Login, language, theme and sound keys pass through untouched.
+   * Only getItem/setItem/removeItem/clear are covered; key(), length and property access are not. */
+  function testStorageShim(gameId) {
+    var store;
+    try { store = window.localStorage; } catch (error) { return; }
+    if (!store || window.__pbTestStorage) return;
+    window.__pbTestStorage = true;
+    var proto = Storage.prototype, getItem = proto.getItem, setItem = proto.setItem, removeItem = proto.removeItem;
+    var PASS = /^(sb-.+-auth-token|site_.+|pb_muted|pb_input_mode|pb_hardware_keyboard_at|playerName|pb_mode_last|pb_test.*)$/;
+    var LS_PREFIX = "pb_testls_" + gameId + "_";
+    function map(key) {
+      var k = String(key);
+      if (PASS.test(k)) return k;
+      if (k.indexOf("pb_save_") === 0) return "pb_testsave_" + k.slice(8);
+      if (k.indexOf("pb_best_") === 0) return "pb_testbest_" + k.slice(8);
+      return LS_PREFIX + k;
+    }
+    proto.getItem = function (key) { return getItem.call(this, this === store ? map(key) : key); };
+    proto.setItem = function (key, value) { return setItem.call(this, this === store ? map(key) : key, value); };
+    proto.removeItem = function (key) { return removeItem.call(this, this === store ? map(key) : key); };
+    proto.clear = (function (clear) {
+      return function () {
+        if (this !== store) return clear.call(this);
+        var doomed = [];
+        for (var i = 0; i < store.length; i += 1) {
+          var k = store.key(i);
+          if (k && (k.indexOf(LS_PREFIX) === 0 || k === "pb_testsave_" + gameId || k === "pb_testbest_" + gameId)) doomed.push(k);
+        }
+        doomed.forEach(function (k) { removeItem.call(store, k); });
+      };
+    })(proto.clear);
+  }
+  if (testMode && options.standalone && options.id) testStorageShim(options.id);
+
   function bootStandalone() {
     const oldBar = options.replace ? document.querySelector(options.replace) : null;
     const leaderboardTarget = options.leaderboardTarget ? document.querySelector(options.leaderboardTarget) : null;
@@ -318,7 +376,7 @@
       oldBar.insertAdjacentElement("afterend", context);
     }
     if (!options.id) return;
-    import("../pixelbreak-records.js?v=43").then(() => {
+    import("../pixelbreak-records.js?v=44").then(() => {
       window.PB?.registerStandalone?.({
         id: options.id,
         name: options.title,
@@ -341,6 +399,9 @@
     },
     mountBar,
     options,
+    testMode,
+    // internal: the arcade injects this function's source into game frames when the owner plays in test mode
+    testStorageShim,
   });
   window.Arcade = Arcade;
 

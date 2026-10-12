@@ -16,7 +16,7 @@ body{display:flex;flex-direction:column}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (max-width:520px){.arcade-pill{padding:7px 9px;font-size:12px}}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="space-invaders" data-arcade-title="Space Invaders"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="space-invaders" data-arcade-title="Space Invaders"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -48,6 +48,7 @@ body{display:flex;flex-direction:column}
 <script>
 const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElementById('stage');
 const GW=600,GH=600,DPR_CAP=2,BEST_KEY='pb_best_space_invaders';
+const TEST_MODE=window.__pbTestMode===true; // arcade test mode: local best is neither read nor written
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
@@ -56,10 +57,12 @@ const PAL={bg:tok('--bg2'),text:tok('--text'),ship:tok('--cyan'),shipDark:tok('-
   burst:[tok('--danger'),tok('--good'),tok('--accent')]};
 let state='idle',paused=false,best=loadBest();
 function loadBest(){
+  if(TEST_MODE)return 0;
   try{return Number(localStorage.getItem(BEST_KEY))||0}
   catch(error){console.warn('[Space Invaders] could not read best score',error);return 0}
 }
 function saveBest(value){
+  if(TEST_MODE)return;
   try{localStorage.setItem(BEST_KEY,String(value))}
   catch(error){console.warn('[Space Invaders] could not save best score',error)}
 }

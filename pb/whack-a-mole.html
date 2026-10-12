@@ -24,7 +24,7 @@ body{display:flex;flex-direction:column}
 .arcade-btn.play{min-width:min(220px,100%);min-height:52px;font-size:17px}
 @media (prefers-reduced-motion:reduce){.mole{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="whack-a-mole" data-arcade-title="Whack-a-Mole"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="whack-a-mole" data-arcade-title="Whack-a-Mole"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -56,16 +56,19 @@ body{display:flex;flex-direction:column}
 <script>
 const ROUND_SECONDS=30,HOLES=9,POPUP_MS=800,VISIBLE_MS=1200,LATE_BONUS_MS=400,LATE_PHASE_SECONDS=15;
 const DOUBLE_CHANCE=0.3,STAR_CHANCE=0.1,STAR_POINTS=5,MAX_COMBO=5,HIT_LINGER_MS=200,BEST_KEY='pb_best_whack_a_mole';
+const TEST_MODE=window.__pbTestMode===true; // arcade test mode: local best is neither read nor written
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 let score=0,timeLeft=ROUND_SECONDS,combo=0,moles=[],interval=0,timerInt=0,active=false;
 let state='idle',paused=false,best=loadBest();
 
 function loadBest(){
+  if(TEST_MODE)return 0;
   try{return Number(localStorage.getItem(BEST_KEY))||0}
   catch(error){console.warn('[Whack-a-Mole] could not read best score',error);return 0}
 }
 function saveBest(value){
+  if(TEST_MODE)return;
   try{localStorage.setItem(BEST_KEY,String(value))}
   catch(error){console.warn('[Whack-a-Mole] could not save best score',error)}
 }

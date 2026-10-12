@@ -4,6 +4,8 @@
   const SAVE_VERSION = 1, SAVE_MS = 5000, TICK_MS = 250;
   const REBIRTH_THRESHOLD = 1e12, COST_GROWTH = 1.15, MAX_OWNED = 1000;
   const LIMIT = Number.MAX_SAFE_INTEGER, DRIVER_LIMIT = 18;
+  // Arcade test mode: everything affordable, rebirth ready, nothing stored in the normal save slot.
+  const TEST_MODE = window.__pbTestMode === true, TEST_PASSENGERS = 4e15;
   const MILESTONES = Object.freeze([10, 25, 50, 100, 200]);
   const LINES = Object.freeze([
     { id: 'school', name: 'Schoulbus', icon: '🚌', cost: 15, rate: .5 },
@@ -31,6 +33,12 @@
   const zeroOwned = () => Object.fromEntries(LINES.map(line => [line.id, 0]));
   const initial = () => ({ v: SAVE_VERSION, p: 0, tb: 0, rb: 0, st: 0, rbc: 0, gd: '',
     savedAt: Date.now(), owned: zeroOwned(), upgrades: [], drivers: 0 });
+  /** Test mode only: a copy of the state with huge funds, rebirth ready and one of every line (drivers/upgrades stay buyable). */
+  function testUnlockAll(save) {
+    if (!TEST_MODE) return save;
+    return { ...save, p: Math.max(save.p, TEST_PASSENGERS), rb: Math.max(save.rb, REBIRTH_THRESHOLD),
+      owned: Object.fromEntries(LINES.map(line => [line.id, Math.max(1, save.owned[line.id])])) };
+  }
   let state = initial(), loaded = false, rewards = null, lastTick = Date.now(), busCount = -1;
   const lineRefs = new Map(), upgradeRefs = new Map();
 
@@ -55,6 +63,7 @@
     score();
   }
   function settle(now = Date.now()) {
+    if (TEST_MODE && state.p < TEST_PASSENGERS / 2) state = testUnlockAll(state);
     const elapsed = Math.max(0, (now - lastTick) / 1000);
     if (elapsed > 10) {
       const result = IdleExtras.offline(state.st, lastTick, production(), now);
@@ -73,7 +82,7 @@
     settle();
     const save = snapshot();
     // Standalone play also persists; the Arcade parent owns cloud saves in an iframe.
-    if (parent === window) {
+    if (parent === window && !TEST_MODE) {
       try { localStorage.setItem('pb_save_bus-tycoon', JSON.stringify(save)); }
       catch (error) { warn('Could not store local progress', error); }
     }
@@ -187,7 +196,7 @@
     production, currency: '🧍', rebirth, save: pushSave, earn: amount => { earn(amount); refresh(); },
     gift: (day, amount) => { state = { ...state, gd: day }; earn(amount); refresh(); } });
   let local = window.__pbSave;
-  if (parent === window && !local) {
+  if (parent === window && !local && !TEST_MODE) {
     try { local = JSON.parse(localStorage.getItem('pb_save_bus-tycoon') || 'null'); }
     catch (error) { warn('Could not restore progress', error); }
   }

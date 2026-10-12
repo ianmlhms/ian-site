@@ -17,7 +17,7 @@ body{display:flex;flex-direction:column}
 #next{display:block;width:72px;height:36px}
 @media (max-width:520px){.arcade-pill{padding:7px 9px;font-size:12px}.next{padding:4px 8px}.next .lbl{display:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=25" data-arcade-id="tetris" data-arcade-title="Tetris"></script>
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="tetris" data-arcade-title="Tetris"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
@@ -52,6 +52,7 @@ const C=document.getElementById('c'),X=C.getContext('2d'),stage=document.getElem
 const NC=document.getElementById('next'),NX=NC.getContext('2d');
 const COLS=10,ROWS=20,SZ=30,GW=COLS*SZ,GH=ROWS*SZ,DPR_CAP=2;
 const NEXT_CELL=18,NEXT_W=72,NEXT_H=36,MAX_DT=100,BEST_KEY='pb_best_tetris';
+const TEST_MODE=window.__pbTestMode===true; // arcade test mode: local best is neither read nor written
 const $=id=>document.getElementById(id);
 function focusDialog(id){const p=$(id).firstElementChild;p.tabIndex=-1;p.style.outline='none';p.focus({preventScroll:true})}
 const ROOT=getComputedStyle(document.documentElement),tok=n=>ROOT.getPropertyValue(n).trim();
@@ -69,10 +70,12 @@ let grid,piece,next,score,lines,level,gameOver,dropTimer,dropInterval;
 let state='idle',paused=false,best=loadBest();
 
 function loadBest(){
+  if(TEST_MODE)return 0;
   try{return Number(localStorage.getItem(BEST_KEY))||0}
   catch(error){console.warn('[Tetris] could not read best score',error);return 0}
 }
 function saveBest(value){
+  if(TEST_MODE)return;
   try{localStorage.setItem(BEST_KEY,String(value))}
   catch(error){console.warn('[Tetris] could not save best score',error)}
 }

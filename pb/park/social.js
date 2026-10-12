@@ -1,4 +1,4 @@
-import { serializeSave, readLayout } from "./save.js?v=2";
+import { serializeSave, readLayout } from "./save.js?v=3";
 
 export const RPC_TIMEOUT = 8000;
 const LAYOUT_LIMIT = 8000;
@@ -6,6 +6,9 @@ const GALLERY_LIMIT = 24;
 const NAME_LIMIT = 32;
 const SORTS = ["value", "likes", "recent"];
 const FUNCTIONS = new Set(["publish_park", "unpublish_park", "park_gallery", "park_layout", "like_park"]);
+// Arcade test mode: a test park must never be published, unpublished or liked on the real gallery (reads stay allowed).
+const TEST_MODE = window.__pbTestMode === true;
+const TEST_BLOCKED = new Set(["publish_park", "unpublish_park", "like_park"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const cleanText = (value, fallback, limit = 80) => typeof value === "string" ? value.slice(0, limit) : fallback;
@@ -30,6 +33,7 @@ export function createBridge({ timeout = RPC_TIMEOUT } = {}) {
   function rpc(fn, args = {}) {
     return new Promise((resolve, reject) => {
       if (!FUNCTIONS.has(fn)) { reject(new Error("forbidden")); return; }
+      if (TEST_MODE && TEST_BLOCKED.has(fn)) { reject(new Error("test-mode")); return; }
       if (window.parent === window) { reject(new Error("offline")); return; }
       const id = `${prefix}${++nextId}`;
       const timer = setTimeout(() => {
@@ -55,6 +59,7 @@ export function createBridge({ timeout = RPC_TIMEOUT } = {}) {
 export function errorMessage(error) {
   const message = cleanText(error?.message, "request-failed", 240).toLowerCase();
   if (message === "offline") return "Gallery unavailable offline. Open this game in Arcade and check your connection. Sign in to publish or like; browsing needs no account.";
+  if (message === "test-mode") return "Test mode: publishing and liking are switched off, so nothing here reaches the real gallery.";
   if (message === "timeout") return "The gallery did not reply in time. Please try again. A publish or like request may already have reached it; refresh before retrying.";
   if (message === "forbidden" || /permission|jwt|auth|sign.?in/.test(message)) {
     return "This action needs an Arcade account and permission. Sign in to publish or like. You can browse signed out.";
@@ -89,6 +94,8 @@ function cleanRow(row) {
 
 export function createSocial({ getState, onVisit, onReturn, beforeOpen }) {
   const bridge = createBridge();
+  // Test mode: nothing can be published, unpublished or liked, so those controls are not offered at all.
+  if (TEST_MODE) document.querySelector('[data-action="publish"]')?.setAttribute("hidden", "");
   const dialog = element("dialog");
   dialog.id = "parkSocial";
   dialog.setAttribute("aria-labelledby", "socialTitle");
@@ -211,7 +218,7 @@ export function createSocial({ getState, onVisit, onReturn, beforeOpen }) {
       element("small", `Updated: ${row.updated}`));
     const actions = element("div", undefined, "button-row");
     const openButton = button("Visit park", () => visit(row, openButton));
-    actions.append(openButton, likeControl(row));
+    actions.append(openButton, ...(TEST_MODE ? [] : [likeControl(row)]));
     node.append(actions);
     return node;
   }
@@ -226,7 +233,7 @@ export function createSocial({ getState, onVisit, onReturn, beforeOpen }) {
       control.setAttribute("aria-pressed", String(option === sort));
       controls.append(control);
     }
-    controls.append(button("Refresh", () => showGallery()), button("Publish my park", showPublish));
+    controls.append(button("Refresh", () => showGallery()), ...(TEST_MODE ? [] : [button("Publish my park", showPublish)]));
     const cards = element("div");
     content.append(controls, cards);
     status.textContent = "Loading parks…";
