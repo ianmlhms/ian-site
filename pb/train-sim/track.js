@@ -183,7 +183,43 @@
     });
     const sorted = shifted.slice().sort((a, b) => a.s - b.s);
     sorted[0] = { s: 0, kmh: sorted[0].kmh };
-    return sorted.filter((e, i) => i === 0 || (e.s - sorted[i - 1].s > 25 && e.kmh !== sorted[i - 1].kmh));
+    return tidyLimits(sorted.filter((e, i) => i === 0 || (e.s - sorted[i - 1].s > 25 && e.kmh !== sorted[i - 1].kmh)), kind);
+  }
+
+  /* Real lines: limits in steps of 10 km/h and no zone shorter than MIN_ZONE_M (Ian: boards close together, e.g. 110 for 30 m, then 80).
+     A too-short zone is merged into the neighbour with the closer speed and takes the lower of the two (never faster than before).
+     The Luxtram keeps its own hand-tuned limits (luxtram.js). */
+  const MIN_ZONE_M = { rail: 400, hst: 800 };
+  function tidyLimits(limits, kind) {
+    const minZone = MIN_ZONE_M[kind];
+    if (!minZone || !limits.length) return limits;
+    let zones = limits.map((l) => ({ s: l.s, kmh: Math.max(10, Math.floor(l.kmh / 10) * 10) }));
+    const dedupe = (list) => list.filter((z, i) => i === 0 || z.kmh !== list[i - 1].kmh);
+    zones = dedupe(zones);
+    for (let guard = 0; guard < 200 && zones.length > 1; guard++) {
+      // shortest zone that is not the last one (the last runs to the end of the line)
+      let k = -1;
+      let shortest = minZone;
+      for (let i = 0; i < zones.length - 1; i++) {
+        const len = zones[i + 1].s - zones[i].s;
+        if (len < shortest) { shortest = len; k = i; }
+      }
+      if (k < 0) break;
+      const prev = zones[k - 1];
+      const next = zones[k + 1];
+      const intoPrev = prev && (!next || Math.abs(prev.kmh - zones[k].kmh) <= Math.abs(next.kmh - zones[k].kmh));
+      if (intoPrev) {
+        prev.kmh = Math.min(prev.kmh, zones[k].kmh);
+        zones.splice(k, 1);
+      } else {
+        next.s = zones[k].s;
+        next.kmh = Math.min(next.kmh, zones[k].kmh);
+        zones.splice(k, 1);
+      }
+      zones = dedupe(zones);
+    }
+    zones[0] = { s: 0, kmh: zones[0].kmh };
+    return zones;
   }
 
   function buildSignals(stations, tunnels, bridges, kind, length) {
@@ -648,7 +684,7 @@
       }
       out.push({ s: i === 0 ? 0 : s, kmh: z.kmh });
     });
-    return out.filter((e, i) => i === 0 || e.kmh !== out[i - 1].kmh);
+    return tidyLimits(out.filter((e, i) => i === 0 || e.kmh !== out[i - 1].kmh), kind);
   }
 
   /* nearest point of a frame function sampled every STEP m (same contract as Track.nearest) */
