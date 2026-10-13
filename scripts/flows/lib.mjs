@@ -76,7 +76,8 @@ export async function launchBrowser({ fullChromium = false } = {}) {
     ? [...cachedChromiumPaths(true).map(executablePath => ({ executablePath })), { channel: "chromium" }, { channel: "chrome" }]
     : [{}, ...cachedChromiumPaths().map(executablePath => ({ executablePath })), { channel: "chrome" }];
   for (const opts of attempts) {
-    try { return await chromium.launch(opts); } catch (error) { errors.push(String(error.message).split("\n")[0]); }
+    // --mute-audio: the games' sound must never play on the machine running the tests
+    try { return await chromium.launch({ ...opts, args: [...(opts.args || []), "--mute-audio"] }); } catch (error) { errors.push(String(error.message).split("\n")[0]); }
   }
   throw new Error("Could not launch Chromium:\n" + errors.join("\n"));
 }
