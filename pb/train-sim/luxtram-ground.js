@@ -325,13 +325,16 @@
     '  vec2 wp = vWP.xz; vec2 dx = dFdx(wp); vec2 dy = dFdy(wp);',
     '  float m1 = lvn(wp * 0.035); float m2 = lvn(wp * 0.21); float m3 = lvn(wp * 1.3);',
     '  vec3 col = classMix(a, b, wp, dx, dy, m1, m2, m3);',
-    '  float steep = 1.0 - smoothstep(0.55, 0.9, vSlopeY);',
+    '  float steep = 1.0 - smoothstep(0.68, 0.92, vSlopeY);',
     '  if (steep > 0.01) {',
     '    vec2 sw = vec2(vWP.x + vWP.z, vWP.y * 1.25); vec2 sdx = dFdx(sw); vec2 sdy = dFdy(sw);',
     '    float hard = a.x + a.y + b.z;',                      // asphalt / paving / setts above a drop = a retaining wall: pale concrete with form-work joints
     '    vec3 bank = classMix(a, b, sw, sdx, sdy, m1, m2, m3) * 0.9;',
     '    vec3 wall = vec3(0.56, 0.55, 0.52) * (0.9 + 0.2 * lvn(vec2(sw.x * 0.5, vWP.y * 2.0))) * (0.94 + 0.06 * step(0.5, fract(sw.x * 0.25)));',
-    '    col = mix(col, mix(bank, wall, clamp(hard * 1.4, 0.0, 1.0)), steep);',
+    /* concrete only where the surface is a hard class (asphalt / paving / setts) above a drop; steep grass and earth stay grass, projected from the side (no streaks).
+       Retaining walls of tunnel approaches are real geometry (luxtram-world.js), not a texture on terrain triangles. */
+    '    float wallK = clamp(hard * 1.4, 0.0, 1.0);',
+    '    col = mix(col, mix(bank, wall, wallK), steep);',
     '  }',
     '  return col;',
     '}',
@@ -344,7 +347,7 @@
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + SPLAT_FRAG_COMMON)
         .replace('#include <map_fragment>', 'diffuseColor.rgb *= groundAlbedo();');
     };
-    mat.customProgramCacheKey = () => 'lt-splat-v2';
+    mat.customProgramCacheKey = () => 'lt-splat-v3';
     return mat;
   }
 

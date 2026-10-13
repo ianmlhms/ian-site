@@ -15,7 +15,7 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
 <script src="theme.js?v=30"></script>
-<script src="i18n-dict.js?v=49"></script>
+<script src="i18n-dict.js?v=50"></script>
 <script src="i18n.js?v=3"></script>
 <link rel="stylesheet" href="site-ui.css?v=2">
 <style>
@@ -113,6 +113,8 @@ body.ui .pb-x{min-width:44px;min-height:44px;margin:-8px -8px 0 0}
 .more-games[open] summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
 .more-games summary:hover{background:color-mix(in srgb,var(--text) 5%,transparent)}
 .more-content{padding:0 18px 22px}
+.big-group h3{margin:22px 0 12px;font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:-.01em;color:var(--muted);display:flex;align-items:center;gap:8px}
+.big-group:first-child h3{margin-top:6px}
 .more-group h3{margin:20px 0 12px;font-family:var(--font-display);font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--muted)}
 
 .pb-about{max-width:760px;margin:clamp(34px,6vw,56px) 0 0}
@@ -236,7 +238,7 @@ body.game-open #themeFab,body.game-open #themePop,body.game-open #pwaRefresh,bod
 <section class="arc-sec" id="bigSec">
 <h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">🏆</span><span data-i18n="arc.big">Big games</span></h2>
 <p class="sec-sub" data-i18n="arc.bigSub">Progress saves, so you can come back and keep going.</p>
-<div class="game-grid big-grid" id="gridBig"></div>
+<div class="big-groups" id="gridBig"></div>
 </section>
 <section class="arc-sec" id="togetherSec">
 <h2 class="sec-title ui-title"><span class="sec-ico" aria-hidden="true">👥</span><span data-i18n="arc.together">Play together</span></h2>
@@ -390,6 +392,14 @@ function gdesc(g){var l=curLang();return l==='en'?g.desc:((DESC_I18N[g.id]||{})[
 function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function hashStr(s){var h=0;for(var i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);return Math.abs(h)}
 function isBigGame(g){return BIG_GAME_IDS.has(g.id)}
+/* Big games in sub-sections (same names as the genre filters); a big game in no list lands in the last one */
+const BIG_GROUPS=[
+{key:"arc.bg.sim",ico:"🚆",ids:["train-sim","paket-express","bus-tycoon","park","burger"]},
+{key:"arc.bg.idle",ico:"⏳",ids:["cookie-clicker","idle-empire"]},
+{key:"arc.bg.drive",ico:"🏎️",ids:["drive-mad","chill-drive"]},
+{key:"arc.bg.action",ico:"⚔️",ids:["towerdefense","crossy-road"]}
+];
+const BIG_LEAD_IDS=new Set(["train-sim"]);   // shown first in its sub-section
 function isTogetherGame(g){return Boolean(g.href)||g.cats.indexOf('2player')>-1}
 function hasPlayCount(id){return Object.prototype.hasOwnProperty.call(playCounts,id)}
 function isPinned(g){return PINNED_GAME_IDS.has(g.id)}
@@ -404,7 +414,7 @@ return AUTHORED_ORDER_BY_ID[a.id]-AUTHORED_ORDER_BY_ID[b.id];
 });
 }
 function cardHTML(g,isBig){
-var tagHTML=isBig?'<span class="tag save">'+esc(tr('arc.saves'))+'<\/span>':'';
+var tagHTML='';   // every big game saves progress (the section says so), no badge per card
 if(window.__pbWeeklyGame===g.id)tagHTML+='<span class="tag weekly-badge">'+esc(tr('arc.weeklyBadge'))+'<\/span>';
 if(g.tags&&g.tags.indexOf('mp')>-1)tagHTML+='<span class="tag mp">'+esc(tr('arc.mp'))+'<\/span>';
 var ext=g.url?'<span class="ext">'+esc(tr('arc.ext'))+'<\/span>':g.href?'<span class="ext">'+esc(tr('arc.twoPads'))+'<\/span>':'';
@@ -414,12 +424,24 @@ var oc=g.src?'openGame('+gIdx+')':g.href?'openOnline('+gIdx+')':g.go?('openGo('+
 var d=esc(gdesc(g));
 var description=isBig?'<span class="game-desc">'+d+'<\/span>':'';
 var preview='<img src="'+g.thumb+'" alt="" loading="lazy" decoding="async" onerror="this.classList.add(\'failed\')">';
-return '<button type="button" class="game-card'+(g.href?' online':'')+(isBig?' big':'')+'" style="--h:hsl('+hue+' 68% 52%)" onclick="'+oc+'" title="'+d+'">'+ext+
+return '<button type="button" class="game-card'+(g.href?' online':'')+(isBig?' big':'')+'" style="--h:hsl('+hue+' 68% 52%)" onclick="'+oc+'">'+ext+
 '<span class="game-thumb"><span class="em" aria-hidden="true">'+g.emoji+'<\/span>'+preview+'<\/span>'+
 '<span class="game-info"><span class="game-name">'+g.name+'<\/span>'+description+'<span class="game-tags">'+tagHTML+'<\/span><\/span><\/button>';
 }
+function bigGroupsHTML(games){
+var known=new Set();BIG_GROUPS.forEach(function(g){g.ids.forEach(function(id){known.add(id)})});
+var groups=BIG_GROUPS.map(function(group){return {key:group.key,ico:group.ico,games:games.filter(function(game){return group.ids.indexOf(game.id)>-1})}});
+var rest=games.filter(function(game){return !known.has(game.id)});
+if(rest.length)groups[groups.length-1].games=groups[groups.length-1].games.concat(rest);
+return groups.filter(function(group){return group.games.length}).map(function(group){
+var ranked=rankedCopy(group.games);
+var lead=ranked.filter(function(game){return BIG_LEAD_IDS.has(game.id)});
+var ordered=lead.concat(ranked.filter(function(game){return !BIG_LEAD_IDS.has(game.id)}));
+return '<div class="big-group"><h3><span aria-hidden="true">'+group.ico+'<\/span>'+esc(tr(group.key))+'<\/h3><div class="game-grid big-grid">'+ordered.map(function(game){return cardHTML(game,true)}).join('')+'<\/div><\/div>';
+}).join('');
+}
 function renderSection(sectionId,gridId,games,isBig){
-document.getElementById(gridId).innerHTML=rankedCopy(games).map(function(game){return cardHTML(game,isBig)}).join('');
+document.getElementById(gridId).innerHTML=isBig?bigGroupsHTML(games):rankedCopy(games).map(function(game){return cardHTML(game,isBig)}).join('');
 document.getElementById(sectionId).style.display=games.length?'':'none';
 }
 function renderMore(games){
@@ -706,8 +728,8 @@ loadPlayCounts();
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="pb/arcade-kit.js?v=27"></script>
-<script type="module" src="pixelbreak-records.js?v=45"></script>
+<script src="pb/arcade-kit.js?v=28"></script>
+<script type="module" src="pixelbreak-records.js?v=46"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){
@@ -733,7 +755,7 @@ loadPlayCounts();
   };
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=28"></script>
-  <script type="module" src="class-gate.js?v=29"></script>
+  <script type="module" src="rtc-ring.js?v=29"></script>
+  <script type="module" src="class-gate.js?v=30"></script>
 </body>
 </html>

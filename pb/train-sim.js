@@ -43,6 +43,8 @@
   const pick = (list) => list[Math.floor(rand() * list.length)];
   const pad2 = (n) => String(Math.floor(n)).padStart(2, '0');
   const clockText = (sec) => { const s = ((Math.floor(sec) % 86400) + 86400) % 86400; return pad2(s / 3600) + ':' + pad2((s % 3600) / 60); };
+  /* clock shown to the player: the timetable clock plus the shift from an in-game time-of-day change (the timetable itself is relative and stays untouched) */
+  const shownClock = (sec) => clockText(sec + (world && world.clockShift ? world.clockShift : 0));
   const delayText = (sec) => { const d = Math.round(sec), a = Math.abs(d); return (d < 0 ? '−' : '+') + Math.floor(a / 60) + ':' + pad2(a % 60); };
   const fmtInt = (n) => Math.round(n).toLocaleString(lang === 'en' ? 'en' : lang === 'de' ? 'de' : 'fr-LU').replace(/ | /g, ' ');
 
@@ -67,6 +69,8 @@
     document.querySelectorAll('[data-t]').forEach((n) => { n.textContent = t(n.dataset.t); });
     $('nextLbl').textContent = t('hudNextStop');
     $('sumMenu').textContent = t('backToMenu');
+    $('sumAgain').textContent = t('sumAgain');
+    $('btnMenu').textContent = t('menuBtn'); $('btnMenu').title = t('menuBtnTitle');
     $('kbText').textContent = t('deviceKeyboardOnly');
     $('kbClose').textContent = t('deviceDismiss');
     $('phoneTitle').textContent = t('devicePhoneTitle');
@@ -76,6 +80,7 @@
     $('btnQuality').textContent = 'Q · ' + qualityName();
     $('btnFast').title = t('fastTitle'); $('btnRev').title = t('reverseTitle');
     buildHelp();
+    buildWxPop();
   }
   const qualityKey = (q) => (q === 'high' ? 'qualityHigh' : q === 'medium' ? 'qualityMedium' : 'qualityLow');
   const qualityName = () => t(qualityKey(quality));
@@ -89,6 +94,13 @@
   const EMPTY_CAREER = { lifetime: 0, wallet: 0, owned: [], routes: [], train: '', route: '', upgrades: {}, best: {}, services: 0, endlessBest: 0 };
   let save = safe('career defaults', () => (ARCADE_TEST ? TS.career.unlockedAll() : TS.career.defaults()), { hints: true, tb: 0, career: 'rail', rail: { ...EMPTY_CAREER, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west' }, tram: { ...EMPTY_CAREER, owned: ['tram'], routes: ['luxtram-stad'], train: 'tram', route: 'luxtram-stad' } });
   let muted = readStore('pb_muted') === '1';
+  /* weather + time-of-day choice (menu and in-game popover), remembered per player in localStorage; 'random' = pick per service */
+  const WX_IDS = TS.envChoices ? TS.envChoices.weather.map((o) => o.id) : ['random', 'clear', 'rain', 'fog', 'snow'];
+  const TOD_IDS = TS.envChoices ? TS.envChoices.tod.map((o) => o.id) : ['random', 'morning', 'noon', 'evening', 'night'];
+  const TOD_HOURS = { morning: 8, noon: 13, evening: 19.5, night: 22.5 };
+  const WX_CYCLE = ['clear', 'rain', 'fog', 'snow'];
+  const readChoice = (key, ids) => { const v = readStore(key); return ids.includes(v) ? v : 'random'; };
+  let wxPref = readChoice('ts_weather', WX_IDS), todPref = readChoice('ts_tod', TOD_IDS);
   let paused = false, wasRunningBeforeHide = false;
   let renderer = null, scene = null, camera = null, clock = null;
   let world = null;              // { track, routeDef, cfg, trainId, routeId, infra, landscape, model, cab, passengers, sim, ... }
@@ -249,13 +261,20 @@
     return null;
   }
   const frameDelay = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-  function pickEnvironment() {
-    const params = new URLSearchParams(location.search);
+  /* the random draw (weather and start hour) when the player chose "Zoufall" */
+  function rollEnvironment() {
     const month = new Date().getMonth();
     const r = rand();
-    let weather = r < 0.68 ? 'clear' : r < 0.82 ? 'rain' : r < 0.93 ? 'fog' : (month >= 10 || month <= 2 ? 'snow' : 'clear');
-    let hour = rand() < 0.1 ? pick([21.2, 22.1, 5.4]) : 7 + rand() * 11;
-    if (params.has('weather')) weather = params.get('weather');
+    const weather = r < 0.68 ? 'clear' : r < 0.82 ? 'rain' : r < 0.93 ? 'fog' : (month >= 10 || month <= 2 ? 'snow' : 'clear');
+    const hour = rand() < 0.1 ? pick([21.2, 22.1, 5.4]) : 7 + rand() * 11;
+    return { weather, hour };
+  }
+  function pickEnvironment() {
+    const params = new URLSearchParams(location.search);
+    let { weather, hour } = rollEnvironment();
+    if (wxPref !== 'random') weather = wxPref;                       // the player's choice (menu / popover)
+    if (todPref !== 'random') hour = TOD_HOURS[todPref];
+    if (params.has('weather')) weather = params.get('weather');      // test URL parameters win
     if (params.has('hour')) hour = parseFloat(params.get('hour')) || hour;
     return { weather, hour: Math.round(hour * 4) / 4 };
   }
@@ -278,14 +297,15 @@
     const environment = env || pickEnvironment();
     const isLux = /^luxtram/.test(routeId);
     const waitTiles = isLux && !demo && !keepState;   // the menu demo and quality rebuilds do not hold the screen for tiles
-    loaderStart(isLux ? 'tram' : 'line', nameOf(routeDef.name));
+    // the menu backdrop (demo) loads silently: the loading banner is only for a real service
+    if (!demo) loaderStart(isLux ? 'tram' : 'line', nameOf(routeDef.name));
     await frameDelay();
     if (isLux && TS.luxtram && TS.luxtram.preload) await safe('luxtram preload', () => TS.luxtram.preload((f) => loaderSet(f * 0.14)), Promise.resolve());   // track, world and landmark data: real byte progress
     loaderSet(isLux ? 0.16 : 0.15);
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
     loaderSet(isLux ? 0.22 : 0.3);
-    const landscape = build('landscape', 'create', [scene, track.base || track, { quality, reverse: !!track.reverse }]);   // the return direction shares the forward track's scenery
+    const landscape = build('landscape', 'create', [scene, track.base || track, { quality, reverse: !!track.reverse, renderer }]);   // the return direction shares the forward track's scenery
     loaderSet(isLux ? 0.32 : 0.55);
     await frameDelay();
     const rootsBefore = new Set(scene.children);
@@ -293,9 +313,9 @@
     const obstacleRoots = scene.children.filter((c) => !rootsBefore.has(c));
     loaderSet(isLux ? 0.42 : 0.75);
     await frameDelay();
-    const model = build('trains', 'create', [cfg, { quality, livery: cfg.livery, upgrades: cfg.upgradeLevels || {} }]);
+    const model = build('trains', 'create', [cfg, { quality, livery: cfg.livery, upgrades: cfg.upgradeLevels || {}, headlight: true }]);
     safe('destination', () => { const last = track.stations && track.stations[track.stations.length - 1]; if (model && model.setDestination && last) model.setDestination(typeof last.name === 'string' ? last.name : nameOf(last.name)); });   // terminus on the front display
-    if (model) scene.add(model.group);
+    if (model) { model.group.userData.noRainOcc = true; scene.add(model.group); }   // the train does not shelter the rain
     const cab = demo ? null : build('cab', 'create', [cfg, { quality }]);
     if (cab && model && model.cars[0]) model.cars[0].group.add(cab.group);
     const passengers = build('passengers', 'create', [scene, { quality }]);
@@ -317,12 +337,12 @@
     world = {
       routeId, trainId, routeDef, cfg, track, landscape, infra, obstacleRoots, model, cab, passengers, sim: simulation, env: environment,
       state: null, demo, exch: null, plans: {}, spawned: new Set(), onboard: 0, delivered: 0, boardedTotal: 0, passengerKm: 0,
-      aspects: new Map(), crossingClosed: new Map(), wheelAngle: 0, lights: nightish || environment.weather !== 'clear',
-      userLights: null, endTimer: -1, finished: false, departedAt: new Map(), announcedFor: -1, lastDoorSent: -1, lastDoorSide: '', lastBeacon: 0,
+      aspects: new Map(), crossingClosed: new Map(), wheelAngle: 0, lights: nightish || environment.weather !== 'clear', 
+      lightMode: null, lightLevel: 0, darkK: 0, tunnelK: 0, wipe: { cycles: 0, wet: 0 }, endTimer: -1, finished: false, departedAt: new Map(), announcedFor: -1, lastDoorSent: -1, lastDoorSide: '', lastBeacon: 0,
       stopLog: [], stops: {}, carFrames: [], platformCam: null, tracksideCam: null, welcomed: false, liveCash: 0, lastTod: environment.hour, spawnedFor: -1,
     };
     if (keepState) Object.assign(world, keepState);
-    safe('lights', () => model && model.setLights && model.setLights({ head: world.lights, tail: true, cabin: true }));
+    safe('lights', () => model && model.setLights && model.setLights({ head: world.lights ? 2 : 0, tail: true, cabin: true }));
     buildStrip();
     return world;
   }
@@ -992,15 +1012,45 @@
     }
     if (n === MAX_SIM_STEPS) accum = 0;
   }
-  function autoLights(state) {
-    const w = world, hours = w.env.hour + w.sim.now.t / 3600;
-    const dark = hours > 19.3 || hours < 6.3 || w.env.weather === 'fog' || w.env.weather === 'rain' || w.env.weather === 'snow';
-    const tunnel = (w.track.tunnels || []).some((tn) => state.s > tn.s0 - 20 && state.s - trainLength() < tn.s1);
-    return w.userLights !== null ? w.userLights : dark || tunnel;
+  /* Headlight level 0 off / 1 dipped / 2 full. Auto: full at night, dipped at dusk, in fog, rain, snow and in tunnels; the L key (or the cab knob) picks a level by hand until the weather or the hour changes. */
+  function nearTunnel(s, margin) {   // no closure: runs every frame
+    const list = world.track.tunnels, len = trainLength();
+    if (!list) return false;
+    for (let i = 0; i < list.length; i++) if (s > list[i].s0 - margin && s - len < list[i].s1) return true;
+    return false;
+  }
+  function lookOf() { const w = world; return w && w.landscape && w.landscape.getLook ? w.landscape.getLook() : null; }
+  function autoLights(state, look) {
+    const w = world;
+    if (w.lightMode !== null) return w.lightMode;
+    const hours = w.env.hour + w.sim.now.t / 3600;
+    const dark = look ? look.dark : (hours > 19.3 || hours < 6.3 ? 1 : w.env.weather !== 'clear' ? 0.5 : 0);
+    const tunnel = nearTunnel(state.s, 20);
+    return dark > 0.6 ? 2 : dark > 0.18 || tunnel ? 1 : 0;
+  }
+  /* wipers + wet glass + the light environment of the model, every frame (dt is 0 while paused) */
+  function updateLightFx(dt, state, look) {
+    const w = world, m = w.model;
+    const tun = nearTunnel(state.s, 6);
+    w.tunnelK += ((tun ? 1 : 0) - w.tunnelK) * (1 - Math.exp(-dt * 2.5));
+    const dark = Math.max(look ? look.dark : 0, w.tunnelK), haze = look ? look.haze : 0;
+    w.darkK = dark;
+    safe('light env', () => m.setLightEnv && m.setLightEnv(dark, haze));
+    const wx = w.env.weather, raining = wx === 'rain' || wx === 'snow', wp = w.wipe;
+    const covered = look ? look.covered > 0.5 : false;
+    const wetTarget = raining && !covered ? 1 : 0;
+    wp.wet += (wetTarget - wp.wet) * (1 - Math.exp(-dt / (wetTarget ? 1.2 : 6)));
+    const running = raining || wp.wet > 0.04 || wp.cycles % 1 > 0.0001;
+    if (running && dt > 0) {
+      const next = wp.cycles + dt / (wx === 'snow' ? 1.5 : 1.25);
+      wp.cycles = raining || wp.wet > 0.04 || Math.floor(next) === Math.floor(wp.cycles) ? next : Math.floor(next);   // after the rain: finish the stroke, then park
+    }
+    safe('wipers', () => m.setWipers && m.setWipers(wp.cycles, wp.wet, wx === 'snow'));
   }
   function updateVisuals(dt, state, running) {
     const w = world;
     placeTrain(state.s);
+    stepTodFade();
     if (w.model) {
       w.wheelAngle += (state.v * dt) / WHEEL_RADIUS;
       w.wheelDist = (w.wheelDist || 0) + state.v * dt;
@@ -1010,9 +1060,10 @@
         w.lastDoorSent = state.doorsOpen01; w.lastDoorSide = doorSide;
       }
       safe('wheels', () => (w.model.setWheelDistance ? w.model.setWheelDistance(w.wheelDist) : w.model.setWheelSpin && w.model.setWheelSpin(w.wheelAngle)));
-      const lights = autoLights(state);
-      if (lights !== w.lights) { w.lights = lights; safe('setLights', () => w.model.setLights && w.model.setLights({ head: lights, tail: true, cabin: true })); }
-      safe('wipers', () => w.model.setWipers && w.model.setWipers(w.env.weather === 'rain' || w.env.weather === 'snow' ? (elapsedReal * 0.7) % 1 : 0));
+      const look = lookOf();
+      const level = autoLights(state, look);
+      if (level !== w.lightLevel || (level > 0) !== w.lights) { w.lightLevel = level; w.lights = level > 0; safe('setLights', () => w.model.setLights && w.model.setLights({ head: level, tail: true, cabin: true })); }
+      updateLightFx(dt, state, look);
     }
     safe('infra.update', () => w.infra && w.infra.update && w.infra.update(state.s, camera));
     safe('landscape.update', () => w.landscape && w.landscape.update && w.landscape.update(w.track.baseS ? w.track.baseS(state.s) : state.s, camera, dt));
@@ -1029,8 +1080,8 @@
     return {
       lever: state.lever, speedKmh: state.v * 3.6, limitKmh: state.limitKmh, targetKmh: state.nextLimit && state.nextLimit.distance < 400 ? Math.min(state.limitKmh, state.nextLimit.kmh) : state.limitKmh,
       signalAspect: state.signalAspect, doorsOpen01: state.doorsOpen01, doorsReleased: state.doorsReleased, doorSide: state.doorSide || (st && st.side) || 'right',
-      headlights: !!w.lights, horn: input.hornHeld, parkingBrake: !!state.parkingBrake, nextStationName: st ? st.name : '', distanceToStopM: state.distanceToHeading ?? state.distanceToStop, delaySec: state.delaySec,
-      clock: clockText(state.clockSec), powerKw: state.powerKw, brakePct: Math.round(state.brakePct * 100), wiper: w.env.weather === 'rain' || w.env.weather === 'snow',
+      headlights: w.lightLevel, night: w.darkK, horn: input.hornHeld, parkingBrake: !!state.parkingBrake, nextStationName: st ? st.name : '', distanceToStopM: state.distanceToHeading ?? state.distanceToStop, delaySec: state.delaySec,
+      clock: shownClock(state.clockSec), powerKw: state.powerKw, brakePct: Math.round(state.brakePct * 100), wiper: w.env.weather === 'rain' || w.env.weather === 'snow',
     };
   }
   function updateAudio(state) {
@@ -1089,7 +1140,7 @@
     if (!w.welcomed && st.t > 1.2) { w.welcomed = true; announceWelcome(); }
     updateVisuals(dt, st, true);
     todClock += dt;
-    if (todClock > TOD_INTERVAL_S) { todClock = 0; safe('time of day', () => w.landscape && w.landscape.setTimeOfDay && w.landscape.setTimeOfDay(w.env.hour + w.sim.now.t / 3600)); }
+    if (todClock > TOD_INTERVAL_S) { todClock = 0; if (!w.todFade) safe('time of day', () => w.landscape && w.landscape.setTimeOfDay && w.landscape.setTimeOfDay(w.env.hour + w.sim.now.t / 3600)); }
   }
   function announceWelcome() {
     const w = world, last = stationsOf()[stationsOf().length - 1];
@@ -1124,6 +1175,7 @@
       if (i === 0 || i === stations.length - 1) {
         const label = document.createElement('span');
         label.style.left = x + '%'; label.textContent = st.name;
+        label.className = i === 0 ? 'first' : 'last';   // the end names stay inside the strip
         dots.appendChild(label);
       }
     });
@@ -1147,7 +1199,8 @@
     const stations = stationsOf();
     if (!stations.length) return;
     const s0 = stations[0].s, span = Math.max(1, stations[stations.length - 1].s - s0);
-    $('stripTrain').style.left = 'calc(' + clamp(((state.s - s0) / span) * 100, 0, 100) + '% + 0px)';
+    // same frame as the dots: #stripDots is inset 18 px on both sides of .strip, the marker is positioned in .strip itself
+    $('stripTrain').style.left = 'calc(18px + (100% - 36px) * ' + clamp((state.s - s0) / span, 0, 1).toFixed(4) + ')';
     const heading = state.headingIndex ?? state.nextStationIndex;
     if (lastStripNext !== heading) {
       lastStripNext = heading;
@@ -1175,7 +1228,7 @@
     if (atPlatform && state.nextStationIndex === state.platformIndex) {
       const visited = (w.stopLog || []).some((l) => l.index === state.platformIndex) || (w.exch && w.exch.index === state.platformIndex && w.exch.finalized);
       if (!visited) return coach ? t('coachOpen') : kbd('D') + ' ' + t('hintOpen');
-      if (state.departureWaitSec > 0) return (coach ? t('coachWait') + ' ' : '') + t('hudWaitDepart', { time: clockText(state.clockSec + state.departureWaitSec) });
+      if (state.departureWaitSec > 0) return (coach ? t('coachWait') + ' ' : '') + t('hudWaitDepart', { time: shownClock(state.clockSec + state.departureWaitSec) });
       if (state.signalAspect === 'red' && state.nextSignalDistance < 300) return t('hintSignalRed');
       return coach ? t('coachDepart') : kbd('W') + ' ' + t('hintDepart');
     }
@@ -1210,9 +1263,9 @@
     $('nextName').textContent = st ? st.name : '–';
     $('nextDist').textContent = st ? fmtDist(Math.abs(s.distanceToHeading ?? s.distanceToStop)) : '–';
     $('nextSide').textContent = st ? t('platformShort') + ' ' + t(st.side === 'left' ? 'sideLeft' : 'sideRight') : '';
-    $('nextWhen').textContent = st ? clockText(w.sim.timetable.clockStart + w.sim.timetable.stops[hIdx][s.platformIndex === hIdx && s.v < 0.3 ? 'dep' : 'arr']) : '';
-    $('clock').textContent = clockText(s.clockSec);
-    $('clockSec').textContent = ':' + pad2(s.clockSec % 60);
+    $('nextWhen').textContent = st ? shownClock(w.sim.timetable.clockStart + w.sim.timetable.stops[hIdx][s.platformIndex === hIdx && s.v < 0.3 ? 'dep' : 'arr']) : '';
+    $('clock').textContent = shownClock(s.clockSec);
+    $('clockSec').textContent = ':' + pad2((((s.clockSec + (w.clockShift || 0)) % 60) + 60) % 60);
     const d = $('delay');
     d.textContent = delayText(s.delaySec);
     d.className = 'delay' + (s.delaySec > 120 ? ' late' : s.delaySec > 30 ? ' warn' : '');
@@ -1253,7 +1306,7 @@
   }
 
   /* ------------------------------------------------------------ overlays */
-  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['R', 'keyReverse'], ['F', 'keyFast'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–4', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
+  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['R', 'keyReverse'], ['F', 'keyFast'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['V', 'keyWeather'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–4', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
   function buildHelp() {
     const body = $('helpBody');
     body.replaceChildren();
@@ -1267,6 +1320,7 @@
   }
   function toggleHelp(force) {
     const open = force !== undefined ? force : $('helpScreen').hidden;
+    if (open) closeWxPop();
     $('helpScreen').hidden = !open;
     if (phase === 'running') { if (open && !paused) pauseGame(false, true); else if (!open && paused && pauseByHelp) resumeGame(); }
   }
@@ -1285,7 +1339,7 @@
       if (w.state && i === w.state.nextStationIndex) tr.className = 'cur';
       const rec = sum.stops[i];
       if (stop.pass) tr.className = 'pass';
-      const cells = stop.pass ? [stop.name, t('ttPass') + ' ' + clockText(tt.clockStart + stop.arr), '–', '·'] : [stop.name, clockText(tt.clockStart + stop.arr), i === tt.stops.length - 1 ? '–' : clockText(tt.clockStart + stop.dep), rec && rec.visited ? delayText(rec.arrDelaySec) : '·'];
+      const cells = stop.pass ? [stop.name, t('ttPass') + ' ' + shownClock(tt.clockStart + stop.arr), '–', '·'] : [stop.name, shownClock(tt.clockStart + stop.arr), i === tt.stops.length - 1 ? '–' : shownClock(tt.clockStart + stop.dep), rec && rec.visited ? delayText(rec.arrDelaySec) : '·'];
       for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
       table.appendChild(tr);
     });
@@ -1295,6 +1349,7 @@
   function pauseGame(silent, byHelp) {
     if (phase !== 'running' || paused) return;
     paused = true; pauseByHelp = !!byHelp;
+    closeWxPop();
     safe('audio pause', () => audio && audio.setMuted(true));
     if (!byHelp && !silent) { $('pauseQuality').textContent = t('quality') + ': ' + qualityName(); $('pauseScreen').hidden = false; }
     else if (silent) { $('pauseScreen').hidden = false; }
@@ -1371,6 +1426,7 @@
     paused = false;
     $('menu').hidden = true; $('summary').hidden = true; $('pauseScreen').hidden = true; $('helpScreen').hidden = true;
     wakeAudio();
+    closeWxPop();
     disposeWorld();
     try {
       await buildWorld({ routeId, trainId });
@@ -1430,6 +1486,7 @@
     startService(order[0], trainId, 'endless');
   }
   function returnToMenu() {
+    closeWxPop();
     phase = 'menu';
     endless.active = false;
     paused = false;
@@ -1455,7 +1512,8 @@
     try {
       const current = save[save.career] || EMPTY_CAREER;
       const trainId = current.train, routeId = current.route || 'west';
-      await buildWorld({ routeId, trainId, demo: true, env: { weather: 'clear', hour: 16.5 } });
+      demoKey = demoKeyOf();
+      await buildWorld({ routeId, trainId, demo: true, env: demoEnvironment() });
       if (token !== demoToken || phase !== 'menu') { disposeWorld(); return; }
       world.state = world.sim.step(0, { lever: 0 });
       placeTrain(world.state.s);
@@ -1463,7 +1521,14 @@
     } catch (error) { warn('demo world failed', error); hideLoading(); }
   }
   let demoDebounce = 0;
-  function refreshDemoSoon() { clearTimeout(demoDebounce); demoDebounce = setTimeout(() => { if (phase === 'menu') buildDemo(); }, 450); }
+  // the menu backdrop only rebuilds when what it shows changes (career, vehicle, line): buying an upgrade or paying for something
+  // else no longer reloads it (Ian: 'D'Streck gëtt gelueden' popped up after every upgrade purchase)
+  let demoKey = '';
+  const demoKeyOf = () => { const c = save[save.career] || EMPTY_CAREER; return [save.career, c.train, c.route || 'west'].join('|'); };
+  function refreshDemoSoon() {
+    clearTimeout(demoDebounce);
+    demoDebounce = setTimeout(() => { if (phase === 'menu' && (!world || demoKeyOf() !== demoKey)) buildDemo(); }, 450);
+  }
 
   /* ------------------------------------------------------------ menu glue */
   function startFromMenu(modeIn, routeId, trainId) {
@@ -1525,7 +1590,7 @@
   }
   function renderMenu() {
     const host = $('menuHost');
-    const opts = { save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onCareer: handleCareer, onLang: setLanguage, onHints: handleHints };
+    const opts = { save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onCareer: handleCareer, onLang: setLanguage, onHints: handleHints, onEnv: handleEnvChoice, env: { weather: wxPref, tod: todPref } };
     try {
       if (!TS.menu || typeof TS.menu.render !== 'function') throw new Error('TS.menu missing');
       TS.menu.render(host, opts);
@@ -1555,7 +1620,7 @@
     if (rebuilding || !world) return;
     rebuilding = true;
     const w = world, wasPaused = paused, wasRunning = phase === 'running';
-    const keep = { warmS: w.state ? w.state.s : 0, plans: w.plans, onboard: w.onboard, delivered: w.delivered, boardedTotal: w.boardedTotal, passengerKm: w.passengerKm, riders: w.riders, stopLog: w.stopLog, stops: w.stops, welcomed: true, liveCash: w.liveCash, pendingAnn: w.pendingAnn };
+    const keep = { warmS: w.state ? w.state.s : 0, plans: w.plans, onboard: w.onboard, delivered: w.delivered, boardedTotal: w.boardedTotal, passengerKm: w.passengerKm, riders: w.riders, stopLog: w.stopLog, stops: w.stops, welcomed: true, liveCash: w.liveCash, pendingAnn: w.pendingAnn, clockShift: w.clockShift || 0 };
     const demo = w.demo;
     if (wasRunning) paused = true;
     disposeWorld();
@@ -1572,15 +1637,154 @@
   }
   function toggleLights() {
     if (!world) return;
-    const cur = world.lights;
-    world.userLights = !cur;
+    const w = world, next = ((w.lightLevel || 0) + 1) % 3;   // off -> dipped -> full -> off
+    w.lightMode = next;
+    toast(({ lb: ['Luuchten aus', 'Ofgeblend Luucht', 'Fernluucht'], de: ['Licht aus', 'Abblendlicht', 'Fernlicht'], en: ['Lights off', 'Dipped headlights', 'Full beam'] }[lang] || ['', '', ''])[next] || '', 'info', 1400, 'lights');
+  }
+
+  /* ------------------------------------------------------------ weather + time of day (menu choice, in-game popover, V) */
+  const normHour = (h) => ((h % 24) + 24) % 24;
+  const TOD_FADE_MS = 1600;
+  const choiceLabel = (kind, id) => { const o = TS.envChoices && TS.envChoices[kind].find((x) => x.id === id); return o ? t(o.key) : id; };
+  const weatherIcon = (id) => { const o = TS.envChoices && TS.envChoices.weather.find((x) => x.id === id); return o ? o.icon : '☀️'; };
+  const demoEnvironment = () => ({ weather: wxPref === 'random' ? 'clear' : wxPref, hour: todPref === 'random' ? 16.5 : TOD_HOURS[todPref] });
+  function setWxPref(id) { if (WX_IDS.includes(id)) { wxPref = id; writeStore('ts_weather', id); } }
+  function setTodPref(id) { if (TOD_IDS.includes(id)) { todPref = id; writeStore('ts_tod', id); } }
+  /* Changes the weather and/or the hour of the running world. Lights, wipers, passenger rain and the rain sound follow w.env on the next frame;
+     the landscape eases the weather (setWeather(w, false)) and the light fades over TOD_FADE_MS. The timetable is relative, so only the shown clock shifts. */
+  function applyEnvironment(next) {
+    const w = world;
+    if (!w) return;
+    const env = { ...w.env };
+    const nowT = w.sim && w.sim.now ? w.sim.now.t : 0;
+    if (next.weather && next.weather !== env.weather) {
+      env.weather = next.weather;
+      safe('weather', () => w.landscape && w.landscape.setWeather && w.landscape.setWeather(env.weather, false));
+      safe('passengers rain', () => w.passengers && w.passengers.setRain && w.passengers.setRain(env.weather === 'rain'));
+    }
+    if (next.hour !== undefined) {
+      const from = normHour(env.hour + nowT / 3600), target = normHour(next.hour);
+      env.hour = normHour(target - nowT / 3600);
+      if (!w.demo && w.sim && w.sim.timetable) w.clockShift = Math.round(target * 3600 - w.sim.timetable.clockStart - nowT);
+      let delta = target - from;
+      if (delta > 12) delta -= 24; else if (delta < -12) delta += 24;
+      w.todFade = { from, delta, start: performance.now() };
+    }
+    w.env = env;
+    if (!w.demo) { w.lights = null; w.lightMode = null; syncWxPop(); }
+  }
+  /* the landscape light follows the fade each frame (also while paused) */
+  function stepTodFade() {
+    const w = world, f = w && w.todFade;
+    if (!f) return;
+    const k = clamp((performance.now() - f.start) / TOD_FADE_MS, 0, 1), e = k * k * (3 - 2 * k);
+    safe('time of day fade', () => w.landscape && w.landscape.setTimeOfDay && w.landscape.setTimeOfDay(normHour(f.from + f.delta * e)));
+    if (k >= 1) w.todFade = null;
+  }
+  function previewMenuEnvironment() {
+    if (phase !== 'menu' || !world || !world.demo) return;
+    const d = demoEnvironment();
+    applyEnvironment({ weather: d.weather, hour: d.hour });
+  }
+  function handleEnvChoice(kind, id) {   // from the start menu
+    if (kind === 'weather') setWxPref(id); else if (kind === 'tod') setTodPref(id);
+    previewMenuEnvironment();
+  }
+  function chooseWeather(id) {   // in-game
+    if (!world || world.demo || phase !== 'running' || !WX_IDS.includes(id)) return;
+    setWxPref(id);
+    const real = id === 'random' ? rollEnvironment().weather : id;
+    applyEnvironment({ weather: real });
+    toast(t('evWeather', { name: choiceLabel('weather', real) }), 'info', 1600, 'wx');
+  }
+  function chooseTimeOfDay(id) {   // in-game
+    if (!world || world.demo || phase !== 'running' || !TOD_IDS.includes(id)) return;
+    setTodPref(id);
+    const hour = id === 'random' ? Math.round(rollEnvironment().hour * 4) / 4 : TOD_HOURS[id];
+    applyEnvironment({ hour });
+    toast(t('evTimeOfDay', { name: id === 'random' ? clockText(hour * 3600) : choiceLabel('tod', id) }), 'info', 1600, 'wx');
+  }
+  function cycleWeather() {
+    if (!world || world.demo) return;
+    const i = WX_CYCLE.indexOf(world.env.weather);
+    chooseWeather(WX_CYCLE[(i + 1) % WX_CYCLE.length]);
+  }
+  /* compact popover next to the HUD buttons */
+  function buildWxPop() {
+    const pop = $('wxPop');
+    if (!pop || !TS.envChoices) return;
+    const group = (kind, label) => {
+      const g = document.createElement('div'); g.className = 'wxpop__grp';
+      const l = document.createElement('span'); l.className = 'wxpop__lbl'; l.id = 'wxLbl-' + kind; l.textContent = label;
+      const row = document.createElement('div'); row.className = 'wxpop__opts'; row.setAttribute('role', 'radiogroup'); row.setAttribute('aria-labelledby', l.id);
+      for (const o of TS.envChoices[kind]) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'wxopt'; b.setAttribute('role', 'radio'); b.dataset.kind = kind; b.dataset.id = o.id; b.dataset.test = 'wxpop-' + (kind === 'tod' ? 'tod-' : 'wx-') + o.id;
+        const i = document.createElement('span'); i.setAttribute('aria-hidden', 'true'); i.textContent = o.icon;
+        const tx = document.createElement('span'); tx.textContent = t(o.key);
+        b.append(i, tx);
+        b.addEventListener('click', (e) => {
+          if (kind === 'weather') chooseWeather(o.id); else chooseTimeOfDay(o.id);
+          if (e.detail !== 0) b.blur();   // a pointer click must not keep the focus (Space = horn)
+        });
+        row.append(b);
+      }
+      g.append(l, row);
+      return g;
+    };
+    pop.replaceChildren(group('weather', t('weather')), group('tod', t('timeOfDay')));
+    syncWxPop();
+  }
+  function syncWxPop() {
+    const pop = $('wxPop');
+    if (!pop) return;
+    pop.querySelectorAll('.wxopt').forEach((b) => b.setAttribute('aria-checked', String((b.dataset.kind === 'weather' ? wxPref : todPref) === b.dataset.id)));
+    const btn = $('btnWx');
+    btn.textContent = weatherIcon(world ? world.env.weather : 'clear');
+    btn.title = t('envTitle'); btn.setAttribute('aria-label', t('envTitle'));
+  }
+  function openWxPop(viaKeyboard) {
+    const pop = $('wxPop');
+    syncWxPop();
+    pop.hidden = false;
+    $('btnWx').setAttribute('aria-expanded', 'true'); $('btnWx').classList.add('on'); document.body.classList.add('wx-open');
+    if (viaKeyboard) (pop.querySelector('.wxopt[aria-checked="true"]') || pop.querySelector('.wxopt')).focus();
+  }
+  function closeWxPop() {
+    const pop = $('wxPop');
+    if (!pop || pop.hidden) return false;
+    pop.hidden = true;
+    $('btnWx').setAttribute('aria-expanded', 'false'); $('btnWx').classList.remove('on'); document.body.classList.remove('wx-open');
+    const a = document.activeElement;
+    if (a && (pop.contains(a) || a === $('btnWx')) && a.blur) a.blur();
+    return true;
+  }
+  function toggleWxPop(viaKeyboard) { if ($('wxPop').hidden) openWxPop(viaKeyboard); else closeWxPop(); }
+  /* keys while the focus sits in the popover (or on its button): arrows move, Enter/Space activate, Esc closes; everything else drives the train as usual */
+  function wxPopKey(e) {
+    if (e.key === 'Escape') { closeWxPop(); return true; }
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab') return 'native';
+    if (e.key.startsWith('Arrow') && e.target.classList && e.target.classList.contains('wxopt')) {
+      const all = [...$('wxPop').querySelectorAll('.wxopt')], i = all.indexOf(e.target);
+      const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
+      all[(i + step + all.length) % all.length].focus();
+      return true;
+    }
+    return false;
   }
   function handleKey(key, repeat) {
     if (key === 'Escape' || key === 'p' || key === 'P') {
+      if (key === 'Escape' && closeWxPop()) return true;
       if (!$('helpScreen').hidden) { toggleHelp(false); return true; }
       if (!$('ttScreen').hidden) { $('ttScreen').hidden = true; return true; }
+      if (phase === 'summary' && key === 'Escape') { returnToMenu(); return true; }
       if (phase === 'running') { if (paused) resumeGame(); else pauseGame(); return true; }
       return false;
+    }
+    if (key === 'Backspace' && !repeat) {   // back one level (while driving, Backspace stays the emergency brake)
+      if (!$('helpScreen').hidden) { toggleHelp(false); return true; }
+      if (phase === 'summary') { returnToMenu(); return true; }
+      if (phase === 'running' && paused) { resumeGame(); return true; }
     }
     if (key === 'F1' || key === '?') { if (phase === 'running' || phase === 'menu') { toggleHelp(); return true; } return false; }
     if (phase !== 'running' || paused) return false;
@@ -1594,6 +1798,7 @@
       case 'd': if (!repeat) input.doorPress = true; return true;
       case 'h': case ' ': if (!repeat) { input.hornHeld = true; sfx('horn', true); } return true;
       case 'l': if (!repeat) toggleLights(); return true;
+      case 'v': if (!repeat) cycleWeather(); return true;
       case 'a': if (!repeat) announceNext(false); return true;
       case 'c': if (!repeat) cycleCamera(); return true;
       case '1': case '2': case '3': case '4': setCamera(CAMERAS[Number(key) - 1]); return true;
@@ -1614,6 +1819,11 @@
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     dismissNotice();
     wakeAudio();
+    if (e.target && e.target.closest && e.target.closest('#wxPop,#btnWx')) {
+      const r = wxPopKey(e);
+      if (r === 'native') return;
+      if (r) { e.preventDefault(); return; }
+    }
     if (phase === 'menu' && (e.key === 'Tab' || e.key === 'Enter' || e.key === ' ')) return;
     if (handleKey(normKey(e), e.repeat)) e.preventDefault();
   }
@@ -1659,7 +1869,7 @@
         const ex = w ? currentExchangeCounts() : null;
         return {
           phase, mode, paused, fast: fastForward, reverse: !!(s && s.reverse), backedM: s ? s.backedM : 0, quality, lang, camMode, muted, moduleStatus: { ...moduleStatus },
-          routeId: w ? w.routeId : null, trainId: w ? w.trainId : null, demo: !!(w && w.demo), weather: w ? w.env.weather : null, hour: w ? w.env.hour : null,
+          routeId: w ? w.routeId : null, trainId: w ? w.trainId : null, demo: !!(w && w.demo), weather: w ? w.env.weather : null, hour: w ? w.env.hour : null, wxPref, todPref, shownClock: w && w.state ? shownClock(w.state.clockSec) : null,
           stations: w ? stationsOf().map((x) => ({ name: x.name, s: x.s, side: x.side })) : [],
           s: s ? s.s : 0, kmh: s ? s.v * 3.6 : 0, v: s ? s.v : 0, lever: s ? s.lever : 0, leverTarget: input.lever, doorPhase: s ? s.doorPhase : '', doorsOpen01: s ? s.doorsOpen01 : 0, doorSide: s ? s.doorSide : null, doorsReleased: !!(s && s.doorsReleased),
           atStationIndex: s ? s.atStationIndex : -1, platformIndex: s ? s.platformIndex : -1, nextStationIndex: s ? s.nextStationIndex : -1, stoppedAtMarkerError: s ? s.stoppedAtMarkerError : 0,
@@ -1820,12 +2030,17 @@
     $('btnFast').addEventListener('click', () => toggleFast());
     $('btnRev').addEventListener('click', () => { if (phase === 'running' && !paused) input.reverseToggle = true; });
     $('btnHelp').addEventListener('click', () => toggleHelp());
+    $('btnWx').addEventListener('click', (e) => { toggleWxPop(e.detail === 0); if (e.detail !== 0 && $('wxPop').hidden) $('btnWx').blur(); });
+    document.addEventListener('pointerdown', (e) => { if (!$('wxPop').hidden && !e.target.closest('#wxPop,#btnWx')) closeWxPop(); }, true);
     $('helpClose').addEventListener('click', () => toggleHelp(false));
     $('btnQuality').addEventListener('click', cycleQuality);
     $('pauseQuality').addEventListener('click', cycleQuality);
     $('camName').addEventListener('click', cycleCamera);
     $('camName').style.pointerEvents = 'auto';
     $('sumMenu').addEventListener('click', returnToMenu);
+    $('sumAgain').addEventListener('click', () => { if (phase === 'summary' && world && !world.demo) startService(world.routeId, world.trainId, mode); });
+    $('ttClose').addEventListener('click', () => { $('ttScreen').hidden = true; });
+    $('btnMenu').addEventListener('click', (e) => { if (phase === 'running' && !paused) pauseGame(); if (e.detail !== 0) $('btnMenu').blur(); });
     try { window.Arcade.onMute((value) => applyMute(value)); window.Arcade.onRestart(() => { if (world && !world.demo && (phase === 'running' || phase === 'summary')) startService(world.routeId, world.trainId, mode); else if (phase === 'menu') { renderMenu(); refreshDemoSoon(); } }); }
     catch (error) { warn('Arcade kit hooks', error); }
     if (!ARCADE_TEST) postToHost({ __pbWantSave: 1 });

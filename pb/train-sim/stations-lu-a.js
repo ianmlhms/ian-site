@@ -309,15 +309,10 @@
 
   /* ---------------------------------------------------------------- extra tracks + platforms (visual only) */
   // a track at lateral position lat from z0 to z1 (ballast bed with sleepers + two rails)
+  // extra station track: declared to infra.js (helpers.addSiding) which joins it to the next track with a turnout at both ends (a ladder), or ends it in
+  // a buffer stop at a terminus. lat -4.5 is the second main track (drawn along the whole line by infra.js), so it is skipped there.
   function addTrack(k, lat, z0, z1) {
-    const bed = k.tex('bed', 256, 256, bedTex);
-    const len = Math.abs(z1 - z0);
-    const a = Math.min(z0, z1);
-    const b = Math.max(z0, z1);
-    const v = len / 2.6;
-    k.quadL(bed, [lat - 2.1, -0.245, a], [lat + 2.1, -0.245, a], [lat + 2.1, -0.245, b], [lat - 2.1, -0.245, b], [0, 1, 0], k.WHITE, [[0, 0], [1.4, 0], [1.4, v], [0, v]]);
-    const steel = k.sets.get('steel', k.M.steel);
-    [-0.7175, 0.7175].forEach((o) => k.box(steel, lat + o, -0.075, (a + b) / 2, 0.075, 0.15, len, k.col('#8b8680')));
+    k.helpers.addSiding({ lat });
   }
 
   /* platform slab (+ tactile edge) at lateral range [l0,l1] (positive away from our track on the far side use negative sign) */
@@ -988,6 +983,13 @@
     k.box(vc, o.latA, yb / 2 - 0.3, o.z, 1.6, yb + 0.5, o.width, col(o.pier || '#9a9ea3'));
     k.box(vc, o.latB, yb / 2 - 0.3, o.z, 1.6, yb + 0.5, o.width, col(o.pier || '#9a9ea3'));
     [-1, 1].forEach((d) => k.box(vc, lm, yb + 1.5, o.z + d * (o.width / 2 - 0.05), span, 0.9, 0.08, col('#2f3b45')));
+    roadLanding(k, o, yb + 1.0);
+  }
+  // road surface on the deck + an abutment, a retaining-wall ramp and a short road at both ends (nothing ends in the air; infra.js helpers)
+  function roadLanding(k, o, yTop) {
+    const h = k.helpers;
+    h.addBridgeDeck({ lat0: o.latA, lat1: o.latB, z: o.z, width: o.width, yTop, kind: 'road', inset: 0.9 });
+    [[o.latA, Math.sign(o.latA - o.latB)], [o.latB, Math.sign(o.latB - o.latA)]].forEach(([lat, out]) => h.addBridgeApproach({ lat, out, z: o.z, width: o.width, yTop, kind: 'road', slope: o.slope || 0.2 }));
   }
 
 
@@ -1042,6 +1044,7 @@
       k.box(vc, l + dir * 0.1, (o.yBot + 2.4) / 2 - 0.3, o.z, 2.6, o.yBot + 2.4 + 0.5, o.width + 0.6, col(o.tower || '#d9dcde'));
       if (o.fins) for (let z = o.z - o.width / 2; z <= o.z + o.width / 2; z += 0.6) k.box(vc, l - dir * 1.45, (o.yBot + 2.4) / 2 - 0.3, z, 0.08, o.yBot + 2.4 + 0.5, 0.2, col(o.fins));
       k.box(k.glass, l - dir * 1.35, o.yBot / 2, o.z, 0.04, o.yBot, o.width, k.WHITE);
+      k.helpers.registerBridgeEnd({ lat: l + dir * 0.1, out: dir, z: o.z, y: o.yBot + 2.46, kind: 'tower' });
     });
   }
 
@@ -1108,6 +1111,7 @@
       for (let i = 1; i < n; i++) k.between(vc, [pts[i][0], pts[i][1], zz], [pts[i][0], yDeck, zz], 0.06, col('#e8eaec'), 0.06);
       k.box(vc, lm, yDeck + 0.5, zz, span, 0.9, 0.08, col('#cfd3d6'));
     });
+    roadLanding(k, o, yDeck);
   }
 
   /* ---------------------------------------------------------------- the small stations */
@@ -1160,7 +1164,7 @@
     furnish(k, { totems: [6], voie: [['Voie 1', -40], ['Voie 1', 34]], benches: [-30, 20], bins: [0] });
     otherPlatform(k, { width: 5.2, variant: 'grey', shelterAt: [-16, 14], shelterCol: MAROON });
     yardTracks(k, [-13.4, -17.9, -22.4], k.zB - 40, k.zA + 40);
-    archBridge(k, { z: -150, width: 11, latA: -17, latB: 14, yBot: 8.6, rise: 16 });
+    archBridge(k, { z: -150, width: 11, latA: -27.5, latB: 13, yBot: 8.6, rise: 16 });
   }
 
   // Esch-Uelzecht: new station of dark panel and glass with orange accents, long canopies on slim dark iron columns, pale striped-tactile slabs,
@@ -1179,7 +1183,7 @@
     const op = otherPlatform(k, { width: 6, variant: 'slab', shelter: false });
     canopy(k, { lat0: op.e1 + 0.4, lat1: op.e0 - 1.0, hIn: 5.0, hOut: 4.4, z0: -90, z1: 90, colLat: (op.e0 + op.e1) / 2, col: '#4a413b', roof: '#d9dcde', fascia: '#5b4b43', spacing: 8, colSize: 0.24 });
     yardTracks(k, [-13.9, -18.4, -22.9], k.zB - 40, k.zA + 40);
-    footBridge(k, { z: -70, latA: BACK + 2.2, latB: -17, yBot: 6.9, width: 3.2, deck: '#e9ecee' });
+    footBridge(k, { z: -70, latA: BACK + 2.2, latB: -27, yBot: 6.9, width: 3.2, deck: '#e9ecee' });
     furnish(k, { totems: [-8], voie: [['Voie 1', -60], ['Voie 1', 60]], benches: [-30, 30, 70], bins: [10, -50] });
   }
 

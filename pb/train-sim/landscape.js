@@ -504,8 +504,8 @@ window.TS = window.TS || {};
 
   /* ---------- sky / light palettes (keyed by sine of the sun elevation) ---------- */
   const SKY_KEYS = [
-    { e: -0.32, top: '#03060f', hor: '#0b1426', hemiSky: '#4a62a0', hemiGnd: '#1a2030', hemiI: 1.15, sun: '#8899cc' },
-    { e: -0.09, top: '#0a1230', hor: '#1e2a4c', hemiSky: '#4a5f9a', hemiGnd: '#1c2230', hemiI: 1.15, sun: '#8899cc' },
+    { e: -0.32, top: '#0c1a3e', hor: '#22345f', hemiSky: '#4a62a0', hemiGnd: '#1a2030', hemiI: 1.15, sun: '#8899cc' },
+    { e: -0.09, top: '#12214c', hor: '#2c3c6a', hemiSky: '#4a5f9a', hemiGnd: '#1c2230', hemiI: 1.15, sun: '#8899cc' },
     { e: -0.01, top: '#26356a', hor: '#8a5a62', hemiSky: '#6a6f98', hemiGnd: '#3a3238', hemiI: 0.9, sun: '#ff9a5a' },
     { e: 0.05, top: '#4468ab', hor: '#f0a66e', hemiSky: '#aeb9d2', hemiGnd: '#7a6a58', hemiI: 1.15, sun: '#ffb070' },
     { e: 0.2, top: '#4f88cf', hor: '#d6cdb9', hemiSky: '#cfe0f2', hemiGnd: '#8b8065', hemiI: 1.4, sun: '#ffe2b8' },
@@ -526,7 +526,7 @@ window.TS = window.TS || {};
 
   const SKY_VERT = `varying vec3 vDir; void main(){ vDir = position; mat4 mv = modelViewMatrix; mv[3] = vec4(0.0, 0.0, 0.0, 1.0); /* always centred on the eye: no translucent dome when a camera sits far from the sky mesh */ vec4 p = projectionMatrix * mv * vec4(position, 1.0); gl_Position = p.xyww; gl_Position.z = p.w * 0.99999; }`;
   const SKY_FRAG = `
-    uniform vec3 uTop, uHor, uSunDir, uSunCol, uMoonDir, uCloudLit, uCloudDark; uniform float uNight, uCloud, uTime, uSunVis, uMoonVis;
+    uniform vec3 uTop, uHor, uSunDir, uSunCol, uMoonDir, uCloudLit, uCloudDark; uniform float uNight, uCloud, uTime, uSunVis, uMoonVis, uGlow; uniform vec3 uGlowCol;
     varying vec3 vDir;
     float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -535,6 +535,13 @@ window.TS = window.TS || {};
       vec3 d = normalize(vDir); float h = d.y;
       vec3 col = mix(uHor, uTop, smoothstep(0.0, 1.0, pow(clamp(h, 0.0, 1.0), 0.55)));
       if (h < 0.0) col = mix(uHor, uHor * 0.85, clamp(-h * 5.0, 0.0, 1.0));
+      // distant city glow: a warm, low band that is stronger towards a few directions (towns), reflected a little by cloud
+      if (uGlow > 0.001) {
+        float az = atan(d.z, d.x);
+        float dirK = 0.45 + 0.35 * sin(az * 2.0 + 0.9) + 0.2 * sin(az * 5.0 + 2.3);
+        float band = exp(-max(h, 0.0) * 5.5) * (1.0 - smoothstep(-0.12, 0.0, -h) * 0.0);
+        col += uGlowCol * band * dirK * uGlow * (1.0 + 0.6 * uCloud);
+      }
       // stars
       if (h > 0.0 && uNight > 0.01) {
         vec3 q = d * 420.0; vec3 id = floor(q); float r = fract(sin(dot(id, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
@@ -560,29 +567,47 @@ window.TS = window.TS || {};
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
     }`;
+  /* top-down "roof map" (see the occlusion block in create()): R+G = height of the highest surface above each 0.94 m cell, packed (0..120 m above uOccC.y - 60), A = something is there. 1 = this point lies under a roof. */
+  const OCC_HALF = 60, OCC_SIZE = 128;
+  const OCC_GLSL = `
+    float roofAt(vec3 p){
+      vec2 uv = vec2(0.5 + (p.x - uOccC.x) / ${(OCC_HALF * 2).toFixed(1)}, 0.5 - (p.z - uOccC.z) / ${(OCC_HALF * 2).toFixed(1)});
+      vec4 oc = texture2D(uOcc, uv);
+      float ceilY = uOccC.y - ${OCC_HALF.toFixed(1)} + (oc.x + oc.y / 255.0) * ${(OCC_HALF * 2).toFixed(1)};
+      float inside = step(abs(p.x - uOccC.x), ${(OCC_HALF - 1).toFixed(1)}) * step(abs(p.z - uOccC.z), ${(OCC_HALF - 1).toFixed(1)});
+      return inside * step(0.5, oc.a) * step(p.y, ceilY - 0.4);
+    }`;
+  const OCC_VERT = 'varying float vV; void main(){\n#include <begin_vertex>\n#include <project_vertex>\n vV = clamp((mvPosition.z + ' + (OCC_HALF * 2).toFixed(1) + ') / ' + (OCC_HALF * 2).toFixed(1) + ', 0.0, 1.0); }';
+  const OCC_FRAG = 'varying float vV; void main(){ float s = vV * 255.0; gl_FragColor = vec4(floor(s) / 255.0, fract(s), 0.0, 1.0); }';
   const RAIN_VERT = `
     attribute vec4 aSeed; uniform vec3 uCam, uBox, uRel; uniform float uTime, uLen;
+    uniform sampler2D uOcc; uniform vec3 uOccC;
     varying float vA;
+    ${OCC_GLSL}
     void main(){
       vec3 p = aSeed.xyz * uBox + vec3(0.0, -13.0, 0.0) * uTime;
       p = mod(p - uCam + uBox * 0.5, uBox) - uBox * 0.5 + uCam;
+      float roof = roofAt(p);
       vec3 dir = normalize(uRel);
       p -= dir * aSeed.w * uLen;
       vec4 mv = viewMatrix * vec4(p, 1.0);
-      vA = (1.0 - aSeed.w * 0.9) * smoothstep(0.4, 3.0, -mv.z);
+      vA = (1.0 - aSeed.w * 0.9) * smoothstep(0.4, 3.0, -mv.z) * (1.0 - roof);
       gl_Position = projectionMatrix * mv;
     }`;
   const RAIN_FRAG = `uniform vec3 uCol; uniform float uAlpha; varying float vA; void main(){ gl_FragColor = vec4(uCol, uAlpha * vA); }`;
   const SNOW_VERT = `
     attribute vec4 aSeed; uniform vec3 uCam, uBox; uniform float uTime, uSize;
+    uniform sampler2D uOcc; uniform vec3 uOccC;
     varying float vA;
+    ${OCC_GLSL}
     void main(){
       vec3 p = aSeed.xyz * uBox + vec3(0.0, -1.4, 0.0) * uTime;
       p.x += sin(uTime * 0.7 + aSeed.w * 30.0) * 0.8; p.z += cos(uTime * 0.5 + aSeed.w * 20.0) * 0.8;
       p = mod(p - uCam + uBox * 0.5, uBox) - uBox * 0.5 + uCam;
+      float roof = roofAt(p);
       vec4 mv = viewMatrix * vec4(p, 1.0);
       gl_PointSize = clamp(uSize * (0.5 + aSeed.w) / max(-mv.z, 0.5), 1.0, 14.0);
-      vA = smoothstep(0.3, 2.0, -mv.z);
+      vA = smoothstep(0.3, 2.0, -mv.z) * (1.0 - roof);
       gl_Position = projectionMatrix * mv;
     }`;
   const SNOW_FRAG = `varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(1.0, 1.0, 1.0, vA * smoothstep(0.5, 0.15, d) * 0.9); }`;
@@ -1251,9 +1276,9 @@ window.TS = window.TS || {};
     /* ================= sky, lights, weather ================= */
     const skyMat = new T.ShaderMaterial({
       vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: T.BackSide, depthWrite: false, fog: false,
-      uniforms: { uTop: { value: new T.Color() }, uHor: { value: new T.Color() }, uSunDir: { value: new T.Vector3(0, 1, 0) }, uSunCol: { value: new T.Color() }, uMoonDir: { value: new T.Vector3(0, -1, 0) }, uCloudLit: { value: new T.Color() }, uCloudDark: { value: new T.Color() }, uNight: { value: 0 }, uCloud: { value: 0.4 }, uTime: { value: 0 }, uSunVis: { value: 1 }, uMoonVis: { value: 0 } }
+      uniforms: { uTop: { value: new T.Color() }, uHor: { value: new T.Color() }, uSunDir: { value: new T.Vector3(0, 1, 0) }, uSunCol: { value: new T.Color() }, uMoonDir: { value: new T.Vector3(0, -1, 0) }, uCloudLit: { value: new T.Color() }, uCloudDark: { value: new T.Color() }, uNight: { value: 0 }, uCloud: { value: 0.4 }, uTime: { value: 0 }, uSunVis: { value: 1 }, uMoonVis: { value: 0 }, uGlow: { value: 0 }, uGlowCol: { value: new T.Color('#e08a46') } }
     });
-    const sky = new T.Mesh(new T.SphereGeometry(100, 32, 16), skyMat); sky.frustumCulled = false; sky.renderOrder = 999; root.add(sky);
+    const sky = new T.Mesh(new T.SphereGeometry(100, 32, 16), skyMat); sky.userData.noRainOcc = true; sky.frustumCulled = false; sky.renderOrder = 999; root.add(sky);
     const hemi = new T.HemisphereLight('#dfeaf1', '#8b8065', 1.5); root.add(hemi);
     const sun = new T.DirectionalLight('#fff0d6', 3.1); sun.name = 'ls-sun'; root.add(sun); root.add(sun.target);
     const moon = new T.DirectionalLight('#9db4e8', 0); root.add(moon); root.add(moon.target);
@@ -1285,7 +1310,7 @@ window.TS = window.TS || {};
       skyMat.uniforms.uTop.value.copy(top); skyMat.uniforms.uHor.value.copy(hor);
       const night = smooth(0.0, -0.22, sinE), day = smooth(-0.08, 0.28, sinE);
       skyMat.uniforms.uSunDir.value.copy(sunDir); skyMat.uniforms.uMoonDir.value.copy(moonDir); skyMat.uniforms.uSunCol.value.copy(k.sun);
-      skyMat.uniforms.uNight.value = night; skyMat.uniforms.uCloud.value = wx.cloud; skyMat.uniforms.uSunVis.value = smooth(-0.1, 0.0, sinE); skyMat.uniforms.uMoonVis.value = night;
+      skyMat.uniforms.uGlow.value = night * 0.2; skyMat.uniforms.uNight.value = night; skyMat.uniforms.uCloud.value = wx.cloud; skyMat.uniforms.uSunVis.value = smooth(-0.1, 0.0, sinE); skyMat.uniforms.uMoonVis.value = night;
       const litBase = mixColor(C('#06080f'), mixColor(C('#fbfbf8'), k.sun, 0.28 * (1 - day * 0.6)), day);
       skyMat.uniforms.uCloudLit.value.copy(mixColor(mixColor(litBase, greyOf(litBase).multiplyScalar(0.92), wx.dark), hor, fogAmt * 0.8));
       skyMat.uniforms.uCloudDark.value.copy(mixColor(mixColor(litBase.clone().multiplyScalar(0.5), hor, 0.45).multiplyScalar(1 - 0.35 * wx.dark), hor, fogAmt * 0.85));
@@ -1293,6 +1318,11 @@ window.TS = window.TS || {};
       sun.color.copy(k.sun); sun.intensity = sunI;
       moon.intensity = 1.25 * smooth(0.04, -0.2, sinE) * (1 - 0.5 * wx.dark);
       hemi.color.copy(mixColor(k.hemiSky, greyOf(k.hemiSky), mixAmt * 0.7)); hemi.groundColor.copy(k.hemiGnd); hemi.intensity = k.hemiI * (1 - 0.28 * wx.dark) * (0.92 + 0.08 * (1 - wx.cloud)) + 0.12 * night;
+      { // what the lights and the wipers of the train need to know (read through getLook(), no allocation)
+        const dusk = smooth(0.2, -0.06, sinE);
+        look.night = night; look.dark = clamp(Math.max(dusk * 0.8, night, wx.dark * 0.75, fogAmt * 0.45), 0, 1);
+        look.haze = clamp(Math.max(night * 0.18, dusk * 0.08, fogAmt * 0.7, wx.rain * 0.4, wx.snow * 0.5), 0, 1);
+      }
       if (scene.fog !== ownFog) scene.fog = ownFog;
       ownFog.color.copy(hor); ownFog.density = 2.15 / Math.max(Math.min(wx.vis, visCap), 120);
       matHouse.emissiveIntensity = matBlock.emissiveIntensity = Math.max(smooth(0.06, -0.1, sinE), wx.dark * 0.45 * day) * 1.3;
@@ -1303,9 +1333,70 @@ window.TS = window.TS || {};
       matWater.color.copy(mixColor(C('#244f5a'), hor, 0.2)); matWater.opacity = 0.9;
       hills[0].material.color.copy(mixColor(C('#ffffff'), hor, 0.0)); hills[1].material.color.copy(mixColor(C('#ffffff'), hor, 0.0));
     }
+    const look = { night: 0, dark: 0, haze: 0, covered: 0 };
     let wetFactor = 1, visCap = 1e9;
     let currentBiome = bMidInit();
     function bMidInit() { return biomeAt(0); }
+
+    /* ---- roof map: no rain or snow under roofs, station halls, canopies, bridges or in tunnels.
+       A small top-down orthographic render of the whole scene (flat height shader, one cheap pass) around the camera, redone every ~0.5 s or after 10 m while it rains or snows.
+       The rain / snow shaders discard drops that lie below the surface above them. Lines (wires), points, sprites, additive effects, the sky and the train itself (userData.noRainOcc) are left out.
+       A 3x3 read-back of the cells at the camera (asynchronous, WebGL2 pixel buffer) tells the windscreen whether the cab itself is covered (look.covered). */
+    const occ = (function makeOcc() {
+      const empty = new T.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, T.RGBAFormat, T.UnsignedByteType); empty.needsUpdate = true;
+      const o = { texture: empty, centre: new T.Vector3(1e9, 0, 1e9), ok: false, update() {}, dispose() { empty.dispose(); } };
+      const renderer = opts && opts.renderer;
+      if (!renderer || !renderer.getContext) return o;
+      const gl = renderer.getContext();
+      const rt = new T.WebGLRenderTarget(OCC_SIZE, OCC_SIZE, { minFilter: T.NearestFilter, magFilter: T.NearestFilter, format: T.RGBAFormat, type: T.UnsignedByteType, depthBuffer: true, generateMipmaps: false });
+      rt.texture.colorSpace = T.NoColorSpace;
+      const cam = new T.OrthographicCamera(-OCC_HALF, OCC_HALF, OCC_HALF, -OCC_HALF, 0.1, OCC_HALF * 2 + 0.5); cam.up.set(0, 0, -1);
+      const hmat = new T.ShaderMaterial({ vertexShader: OCC_VERT, fragmentShader: OCC_FRAG, side: T.DoubleSide, blending: T.NoBlending, fog: false });
+      const hidden = [], clearCol = new T.Color(), cpos = new T.Vector3();
+      const isAsync = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+      let pbo = null, fence = null; const px = new Uint8Array(36);
+      if (isAsync) { pbo = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, 36, gl.STREAM_READ); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); }
+      let age = 99, valid = false;
+      const hide = (obj) => {
+        if (obj.isLine || obj.isPoints || obj.isSprite || obj.userData.noRainOcc || (obj.material && obj.material.blending === T.AdditiveBlending)) { obj.visible = false; hidden.push(obj); }
+      };
+      o.texture = rt.texture; o.ok = true;
+      /* wants: rain or snow is falling. Returns nothing; look.covered is set from the previous read-back. */
+      o.update = function (camPos, dt, wants) {
+        age += dt;
+        if (fence) {
+          const st = gl.clientWaitSync(fence, 0, 0);
+          if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) {
+            gl.deleteSync(fence); fence = null;
+            gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, px); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+            let n = 0; for (let i = 0; i < 9; i++) if (px[i * 4 + 3] > 127) { const v = (px[i * 4] + px[i * 4 + 1] / 255) / 255; if (v * OCC_HALF * 2 - OCC_HALF > 1.6) n++; }
+            look.covered = n >= 7 ? 1 : 0;
+          } else if (st === gl.WAIT_FAILED) { gl.deleteSync(fence); fence = null; }
+        }
+        if (!wants) { if (valid) { valid = false; o.centre.set(1e9, 0, 1e9); look.covered = 0; } return; }
+        const moved = Math.hypot(camPos.x - cpos.x, camPos.z - cpos.z) > 10 || Math.abs(camPos.y - cpos.y) > 6;
+        if (valid && !moved && age < 0.5) return;
+        age = 0; valid = true; cpos.copy(camPos);
+        o.centre.set(camPos.x, camPos.y, camPos.z);
+        cam.position.set(camPos.x, camPos.y + OCC_HALF, camPos.z); cam.lookAt(camPos.x, camPos.y, camPos.z); cam.updateMatrixWorld(true);
+        scene.traverseVisible(hide);
+        const prevRT = renderer.getRenderTarget(), prevAlpha = renderer.getClearAlpha(), prevAuto = renderer.shadowMap.autoUpdate, prevOv = scene.overrideMaterial;
+        renderer.getClearColor(clearCol);
+        renderer.shadowMap.autoUpdate = false; scene.overrideMaterial = hmat;
+        renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 0); renderer.clear();
+        renderer.render(scene, cam);
+        if (isAsync && !fence) {
+          gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.readPixels(OCC_SIZE / 2 - 1, OCC_SIZE / 2 - 1, 3, 3, gl.RGBA, gl.UNSIGNED_BYTE, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+          fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush();
+        }
+        scene.overrideMaterial = prevOv; renderer.shadowMap.autoUpdate = prevAuto;
+        renderer.setRenderTarget(prevRT); renderer.setClearColor(clearCol, prevAlpha);
+        for (let i = 0; i < hidden.length; i++) hidden[i].visible = true;
+        hidden.length = 0;
+      };
+      o.dispose = () => { rt.dispose(); hmat.dispose(); empty.dispose(); if (fence) gl.deleteSync(fence); if (pbo) gl.deleteBuffer(pbo); };
+      return o;
+    })();
 
     /* rain & snow */
     const BOX = new T.Vector3(46, 30, 46);
@@ -1320,7 +1411,7 @@ window.TS = window.TS || {};
       g.setAttribute('aSeed', new T.BufferAttribute(seeds, 4));
       const mat = new T.ShaderMaterial({
         vertexShader: isSnow ? SNOW_VERT : RAIN_VERT, fragmentShader: isSnow ? SNOW_FRAG : RAIN_FRAG, transparent: true, depthWrite: false, fog: false,
-        uniforms: { uCam: { value: new T.Vector3() }, uBox: { value: BOX }, uTime: { value: 0 }, uRel: { value: new T.Vector3(0, -13, 0) }, uLen: { value: 0.9 }, uCol: { value: new T.Color('#c3ccd6') }, uAlpha: { value: 0.4 }, uSize: { value: 55 } }
+        uniforms: { uCam: { value: new T.Vector3() }, uBox: { value: BOX }, uTime: { value: 0 }, uRel: { value: new T.Vector3(0, -13, 0) }, uLen: { value: 0.9 }, uCol: { value: new T.Color('#c3ccd6') }, uAlpha: { value: 0.4 }, uSize: { value: 55 }, uOcc: { value: occ.texture }, uOccC: { value: occ.centre } }
       });
       const m = isSnow ? new T.Points(g, mat) : new T.LineSegments(g, mat);
       m.frustumCulled = false; m.renderOrder = 5; m.visible = false; root.add(m); return m;
@@ -1440,6 +1531,7 @@ window.TS = window.TS || {};
       updateSunFollow(camPos, camDir.y > 0.9 ? new T.Vector3(f.tx, 0, f.tz) : camDir.clone().setY(0).normalize());
       // particles
       const rainOn = wx.rain > 0.02, snowOn = wx.snow > 0.02; rainMesh.visible = rainOn; snowMesh.visible = snowOn;
+      occ.update(camPos, dt, rainOn || snowOn);
       if (rainOn) {
         const u = rainMesh.material.uniforms; u.uCam.value.copy(camPos); u.uTime.value = elapsed; u.uRel.value.set(-camVel.x, -13 - camVel.y, -camVel.z);
         u.uLen.value = 0.7 + Math.min(camVel.length() * 0.035, 3.2); u.uAlpha.value = 0.42 * wx.rain; u.uCol.value.copy(mixColor(C('#b9c4cf'), ownFog.color, 0.35));
@@ -1469,13 +1561,13 @@ window.TS = window.TS || {};
       chunks.clear(); roadsAll.clear();
       scene.remove(root);
       root.traverse(o => { if (o.isMesh || o.isPoints || o.isLine) { if (!o.isInstancedMesh || o === carMesh) { if (o.geometry && o.geometry !== carGeo) o.geometry.dispose(); } if (o.material && o.material.isShaderMaterial) o.material.dispose(); } });
-      carGeo.dispose(); Object.keys(treeKit).forEach(n => treeKit[n].dispose()); carMesh.dispose();
+      occ.dispose(); carGeo.dispose(); Object.keys(treeKit).forEach(n => treeKit[n].dispose()); carMesh.dispose();
       mats.forEach(m => m.dispose()); skyMat.dispose(); sun.shadow && sun.shadow.map && sun.shadow.map.dispose();
       if (scene.fog === ownFog) scene.fog = prevFog || null;
     }
 
     setWeather('clear', true); setTimeOfDay(12);
-    return { update, setTimeOfDay, setWeather, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay };
+    return { update, setTimeOfDay, setWeather, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
   }
 
   TS.landscape = { create, CHUNK };

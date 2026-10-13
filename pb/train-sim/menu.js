@@ -1,5 +1,5 @@
 /* Lokféierer: start screen / garage / upgrades. Pure DOM, no framework.
-   TS.menu.render(container, { save, lang, onStart(mode, routeId, trainId), onBuy(kind, id, extra), onSelect(trainId), onCareer(careerId), onLang(lang) })
+   TS.menu.render(container, { save, lang, onStart(mode, routeId, trainId), onBuy(kind, id, extra), onSelect(trainId), onCareer(careerId), onLang(lang), onEnv(kind 'weather'|'tod', id), env: { weather, tod } })
    kind of onBuy: 'train' | 'route' | 'upgrade' (id = upgrade kind, extra = trainId).
    Callbacks may return the new save; otherwise call TS.menu.update({ save }) after persisting.
    Styles are injected once as <style id="ts-menu-style"> and scoped under .ts-menu. */
@@ -63,6 +63,14 @@
 .ts-menu__mode:disabled{opacity:.55;filter:saturate(.5)}
 .ts-menu__order{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--soft);margin-top:-6px}
 .ts-menu__order span.chip{padding:3px 9px;border-radius:99px;background:var(--card);border:1px solid var(--line);color:var(--ink);font-weight:650}
+.ts-menu__env{border:1px solid var(--line);border-radius:22px;padding:16px 20px;background:var(--card);display:flex;flex-direction:column;gap:12px}
+.ts-menu__envRow{display:grid;grid-template-columns:130px 1fr;gap:10px 14px;align-items:center}
+.ts-menu__envLbl{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--soft)}
+.ts-menu__envOpts{display:flex;gap:8px;flex-wrap:wrap}
+.ts-menu__envOpt{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);font-weight:750;font-size:14px;display:inline-flex;align-items:center;gap:7px}
+.ts-menu__envOpt:hover{background:var(--card2)}
+.ts-menu__envOpt[aria-checked="true"]{background:var(--gold);border-color:var(--gold);color:#2a2112}
+.ts-menu__env .ts-menu__small{margin-top:-2px}
 .ts-menu__careers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ts-menu__career{display:flex;align-items:center;gap:14px;text-align:left;padding:14px 18px;border-radius:18px;border:2px solid var(--line);background:var(--card);min-height:76px;transition:transform .15s,background .15s,border-color .15s}
 .ts-menu__career .ico{font-size:34px;line-height:1}
@@ -136,6 +144,7 @@
 @keyframes tsm-pop{from{transform:translateY(10px) scale(.96);opacity:0}to{transform:none;opacity:1}}
 .ts-menu__footer{text-align:center;font-size:12px;color:var(--soft)}
 @media (max-width:980px){
+  .ts-menu__envRow{grid-template-columns:1fr}
   .ts-menu__inner{padding:16px 18px 48px;gap:18px}
   .ts-menu__hero{grid-template-columns:1fr}
   .ts-menu__grid--routes,.ts-menu__grid--trains{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -378,7 +387,7 @@
   }
 
   /* --------------------------------------------------------------- state */
-  const ctx = { reverse: {}, container: null, root: null, opts: {}, save: null, career: 'rail', routeId: 'west', trainId: 'railcar', toast: null, toastTimer: 0, heroTrain: null };
+  const ctx = { reverse: {}, container: null, root: null, opts: {}, save: null, career: 'rail', routeId: 'west', trainId: 'railcar', toast: null, toastTimer: 0, heroTrain: null, env: { weather: 'random', tod: 'random' } };
 
   function setSave(save) {
     ctx.save = K.normalize(save);
@@ -477,6 +486,11 @@
     if (isSave(res)) setSave(res);
     paint();
   }
+  function doEnv(kind, id) {
+    ctx.env = Object.assign({}, ctx.env, { [kind]: id });
+    callHost('onEnv', kind, id);
+    paint();
+  }
   function doLang(lang) {
     TS.setLang(lang);
     callHost('onLang', lang);
@@ -551,6 +565,16 @@
       h('div', { class: 'ts-menu__order', 'aria-label': t('endlessRoutes') }, h('span', { text: t('endlessRoutes') }),
         endlessList.map((id, i) => h('span', { class: 'chip' }, (i ? '→ ' : '') + chipLabel(id)))),
     ];
+  }
+
+  /* Weather + time of day: remembered per player by the host (localStorage), used by career and endless on every route. */
+  function envPanel() {
+    const row = (kind, label) => h('div', { class: 'ts-menu__envRow' },
+      h('span', { class: 'ts-menu__envLbl', id: 'ts-menu-env-' + kind, text: label }),
+      h('div', { class: 'ts-menu__envOpts', role: 'radiogroup', 'aria-labelledby': 'ts-menu-env-' + kind },
+        TS.envChoices[kind].map((o) => h('button', { type: 'button', class: 'ts-menu__envOpt', role: 'radio', 'aria-checked': String(ctx.env[kind] === o.id), 'data-fid': 'env-' + kind + '-' + o.id, 'data-test': (kind === 'tod' ? 'tod-' : 'wx-') + o.id, on: { click: () => doEnv(kind, o.id) } },
+          h('span', { 'aria-hidden': 'true', text: o.icon }), h('span', { text: t(o.key) })))));
+    return h('section', { class: 'ts-menu__env', 'aria-label': t('weather') + ' / ' + t('timeOfDay') }, row('weather', t('weather')), row('tod', t('timeOfDay')), h('p', { class: 'ts-menu__small', text: t('envInfo') }));
   }
 
   function routeCard(id) {
@@ -642,7 +666,7 @@
 
   const KEYS = [
     [['W', '↑'], 'keyPower'], [['S', '↓'], 'keyBrake'], [['X', '⌫'], 'keyEB'], [['D'], 'keyDoors'], [['B'], 'keyParking'],
-    [['H', 'Space'], 'keyHorn'], [['L'], 'keyLights'], [['A'], 'keyAnnounce'], [['C', '1–4'], 'keyCamera'],
+    [['H', 'Space'], 'keyHorn'], [['L'], 'keyLights'], [['V'], 'keyWeather'], [['A'], 'keyAnnounce'], [['C', '1–4'], 'keyCamera'],
     [['T'], 'keyTimetable'], [['M'], 'keyMute'], [['P', 'Esc'], 'keyPause'], [['F1', '?'], 'keyHelp'],
   ];
   function helpPanel() {
@@ -669,6 +693,7 @@
       careerSwitch(),
       hero(),
       modes(),
+      envPanel(),
       h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-routes' }, h('h2', { id: 'ts-menu-routes', text: t('routes') }),
         h('div', { class: 'ts-menu__grid ts-menu__grid--routes' }, careerRoutes().map(routeCard))),
       h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-garage' }, h('h2', { id: 'ts-menu-garage', text: t('garage') }),
@@ -701,6 +726,7 @@
     ctx.career = ctx.save.career;
     ctx.routeId = cs().route;
     ctx.trainId = cs().train;
+    ctx.env = Object.assign({ weather: 'random', tod: 'random' }, ctx.opts.env || {});
     ctx.toast = null;
     ctx.root = null;
     ctx.heroTrain = null;
@@ -711,6 +737,7 @@
     if (!ctx.container) return;
     const p = patch || {};
     if (p.lang) TS.setLang(p.lang);
+    if (p.env) ctx.env = Object.assign({}, ctx.env, p.env);
     if (p.save) {
       setSave(p.save);
       ctx.opts = { ...ctx.opts, save: ctx.save };

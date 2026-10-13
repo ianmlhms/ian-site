@@ -21,6 +21,7 @@
   const FORM_RAIL = 0.55;
   const FORM_TRAM = 0.06;
   const D0_BASE = 7.5; // flat formation half-width
+  const D0_RAIL = 10.5; // rail: the second main track + its ballast and masts need the formation to reach 8 m on one side
   const D0_STATION = 26;
   const STATION_MASK_PAD = 14;
   const GRADE_SCALE = 2.4; // authored grades are scaled so the hills read in a short compressed route
@@ -255,6 +256,65 @@
     return all.filter((sig) => sig.s > 30 && sig.s < length - 30).sort((a, b) => a.s - b.s);
   }
 
+  /* ---------------------------------------------------- second main track (rail + hst)
+   * Every rail line is double track: the player's track plus a second main SECOND_LAT m beside it, on the side OPPOSITE the platform of the
+   * nearest station (the platform side is the outer side of the pair). Stations with platforms on different sides are joined by a FLIP: the
+   * second track swings across the player's track in a smoothstep over FLIP_LEN m (a flat diamond crossing), always placed on open line
+   * (never in a tunnel / on a bridge / at a level crossing / inside a station throat).  track.second = { lat(s), side(s), flips, SECOND_LAT }:
+   * lat = signed lateral offset of the second track's centre (+ = right of the direction of travel). */
+  const SECOND_LAT = 4.5;
+  const FLIP_LEN = 160;
+  const FLIP_MARGIN = 125;
+  function planSecond(stations, tunnels, bridges, crossings, signals, kappa, length) {
+    if (!stations.length) return null;
+    const sideOf = (st) => (st.side === 'right' ? -1 : 1);
+    const kmax = (a, b) => {
+      let m = 0;
+      for (let i = Math.max(0, Math.floor(a / STEP)); i <= Math.min(kappa.length - 1, Math.ceil(b / STEP)); i++) m = Math.max(m, Math.abs(kappa[i]));
+      return m;
+    };
+    const flips = [];
+    for (let i = 0; i + 1 < stations.length; i++) {
+      const a = stations[i];
+      const b = stations[i + 1];
+      if (sideOf(a) === sideOf(b)) continue;
+      let lo = a.platformEnd + FLIP_MARGIN + FLIP_LEN / 2;
+      let hi = b.platformStart - FLIP_MARGIN - FLIP_LEN / 2;
+      if (hi < lo) { lo = hi = (a.platformEnd + b.platformStart) / 2; }
+      let best = null;
+      for (let c = lo; c <= hi + 0.01; c += 20) {
+        const z0 = c - FLIP_LEN / 2 - 30;
+        const z1 = c + FLIP_LEN / 2 + 30;
+        let cost = Math.abs(c - (lo + hi) / 2) / 800 + kmax(z0, z1) * 400;
+        tunnels.forEach((t) => { if (t.s1 > z0 && t.s0 < z1) cost += 1000; });
+        bridges.forEach((br) => { if (br.s1 > z0 && br.s0 < z1) cost += 1000; });
+        crossings.forEach((cr) => { if (cr.s > z0 - 15 && cr.s < z1 + 15) cost += 200; });
+        signals.forEach((sg) => { if (sg.s > z0 && sg.s < z1) cost += 8; });
+        if (!best || cost < best.cost) best = { c, cost };
+      }
+      flips.push({ c: best.c, s0: best.c - FLIP_LEN / 2, s1: best.c + FLIP_LEN / 2, from: sideOf(a), to: sideOf(b) });
+    }
+    const first = sideOf(stations[0]);
+    const smooth = (t) => t * t * (3 - 2 * t);
+    const latAt = (s) => {
+      let side = first;
+      for (let k = 0; k < flips.length; k++) {
+        const f = flips[k];
+        if (s <= f.s0) break;
+        if (s < f.s1) return SECOND_LAT * (f.from + (f.to - f.from) * smooth((s - f.s0) / FLIP_LEN));
+        side = f.to;
+      }
+      return SECOND_LAT * side;
+    };
+    return { SECOND_LAT, FLIP_LEN, flips, lat: latAt, side: (s) => (latAt(s) < 0 ? -1 : 1), length };
+  }
+  function mirrorSecond(base, L) {
+    if (!base) return null;
+    const flips = base.flips.map((f) => ({ c: L - f.c, s0: L - f.s1, s1: L - f.s0, from: -f.to, to: -f.from })).sort((a, b) => a.s0 - b.s0);
+    const lat = (s) => -base.lat(L - s);
+    return { SECOND_LAT: base.SECOND_LAT, FLIP_LEN: base.FLIP_LEN, flips, lat, side: (s) => (lat(s) < 0 ? -1 : 1), length: L };
+  }
+
   /* ------------------------------------------------------------- build */
   function build(def) {
     if (def && def.reverse && def.base) return reverse(build(def.base), { id: def.id, def });
@@ -373,6 +433,8 @@
       const waterY = b.water ? heightAtS(mid) - formationDrop - b.h + 1.2 : null;
       return Object.assign({}, b, { waterY });
     });
+
+    const second = kind === 'tram' ? null : planSecond(stations, comp.tunnels, bridges, comp.crossings, signals, kappa, length);
 
     /* ---- biome lookup */
     const biomeKeys = comp.biomes;
@@ -570,6 +632,8 @@
       let h = formY + nz * amp;
       h += valley * smooth01(q.d / width) * (0.6 + 0.4 * (nz * 0.5 + 0.5));
       if (cov > 0.01) h += cov * (1 - smooth01(q.d / (30 + cov * 1.6)));
+      // the ground over a tunnel never dips into the (double-track) tube: crown 7.5 m above the formation + 0.7 m of cover, tapering off beside the tunnel
+      if (cov > 0.01 && kind !== 'tram') h = Math.max(h, formY + 8.2 * smooth01(cov / 4) * (1 - smooth01((q.d - 8) / 7)));
       if (dep > 0.01) h -= dep * (1 - smooth01((q.d - (6 + dep * 0.35)) / (dep * 1.5 + 14)));
 
       const river = arrAt(riverArr, fi);
@@ -579,7 +643,8 @@
         if (h > base) h = lerp(h, base, amount);
       }
 
-      const d0 = D0_BASE + (D0_STATION - D0_BASE) * mask;
+      const d0Base = kind === 'tram' ? D0_BASE : D0_RAIL;
+      const d0 = d0Base + (D0_STATION - d0Base) * mask;
       const blend = 3 + Math.abs(h - formY) * 2.2 + 18 * mask;
       let w = 1 - smooth01((q.d - d0) / blend);
       w *= 1 - smooth01(cov / 5);
@@ -597,12 +662,15 @@
     function corridorHalfWidth(s, side) {
       const base = kind === 'tram' ? 8 : 6;
       const idx = stations.findIndex((st) => s >= st.platformStart - 24 && s <= st.platformEnd + 24);
+      // double track: the side of the second main track is wider (its centre + ballast + mast + margin)
+      const secLat = second ? second.lat(s) : 0;
+      const secW = !second ? 0 : Math.abs(secLat) < 3.5 ? 12 : side === (secLat < 0 ? -1 : 1) ? Math.abs(secLat) + 4.5 : 0;
       if (idx >= 0 && !(kind === 'tram')) {
         const platformSide = stations[idx].side === 'right' ? 1 : -1;
-        return side === platformSide ? (stations[idx].name === 'Lëtzebuerg' && idx === 0 ? 34 : 26) : 10;
+        return side === platformSide ? (stations[idx].name === 'Lëtzebuerg' && idx === 0 ? 34 : 26) : Math.max(10, secW + 2);
       }
       if (idx >= 0) return 9;
-      return base;
+      return Math.max(base, secW);
     }
     function isReserved(x, z) {
       const q = nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 });
@@ -658,6 +726,7 @@
       corridorHalfWidth,
       isReserved,
       platformInfo,
+      second,
     };
   }
 
@@ -768,6 +837,7 @@
       nearest, nearestS: (x, z) => nearest(x, z).s, distanceToTrack: (x, z) => nearest(x, z).d,
       water: (s) => { const w = base.water ? base.water(L - s) : null; return w ? Object.assign({}, w, { side: -w.side }) : null; },
       corridorHalfWidth: (s, side) => base.corridorHalfWidth(L - s, -side),
+      second: mirrorSecond(base.second, L),
     });
     if (base.noOcs) out.noOcs = (s) => base.noOcs(L - s);
     return out;

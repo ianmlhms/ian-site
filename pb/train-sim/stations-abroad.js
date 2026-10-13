@@ -208,12 +208,8 @@
     }
     /* a plain rail: sleepers + two steel rails, as a flat visual extra track at lateral dT (negative = away from the platform) */
     function track(dT, z0, z1) {
-      const bal = colB('ballast', { roughness: 1, metalness: 0 }, false);
-      const xx = X(dT);
-      bal.box(xx, FORM_Y + 0.12, (z0 + z1) / 2, 4.2, 0.28, z1 - z0, col('#8a8782'));
-      const len = z1 - z0, n = Math.floor(len / 0.9);
-      for (let i = 0; i < n; i += 1) bal.box(xx, FORM_Y + 0.3, z0 + i * 0.9 + 0.45, 2.4, 0.14, 0.26, col('#5f5a52'));
-      [-0.72, 0.72].forEach((o) => bal.box(xx + o, FORM_Y + 0.42, (z0 + z1) / 2, 0.07, 0.15, len, col('#7d7871')));
+      // declared to infra.js (helpers.addSiding): turnouts at both ends, or a buffer stop at a terminus; -4.6 is the second main track (drawn by infra.js)
+      helpers.addSiding({ lat: dT });
     }
     k = { dbPaving, deckB, bldg, canopy, furnish, paving, track, X, vc, glow, BACK, texB, colB, glassB, box, quadO, triO, wallD, wallZ, frustum, gableZ, gableD, clockD, clockZ, ctex, col, shade, WHITE, FORM_Y, sx, pf, H, W, edge, L, zA, zB, sets, M, mat, T, helpers };
     return k;
@@ -738,6 +734,9 @@
     box(cb, -17, edge + W + 6, zc - 5, zc + 5, 7.2, 12.4, col('#9aa0a4'));
     box(cb, -17, edge + W + 6, zc - 5.1, zc + 5.1, 9.2, 10.2, col('#2f3a44'));
     [-16.5, edge + W + 5.5].forEach((d) => box(cb, d - 0.6, d + 0.6, zc - 4, zc + 4, FORM_Y, 7.2, col('#8f959a')));
+    // the concourse stands on solid support walls at both ends (registered for the landing check)
+    helpers.registerBridgeEnd({ lat: -16.5, out: -1, z: zc, y: 12.4, kind: 'tower' });
+    helpers.registerBridgeEnd({ lat: edge + W + 5.5, out: 1, z: zc, y: 12.4, kind: 'tower' });
     // Tour du Midi: the dark glass high-rise
     const towB = texB('midi-tower', () => ctex('ab-midi-tower', 64, 128, (c, w, h) => {
       const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#2a4a6e'); g.addColorStop(1, '#1b3550');
@@ -795,9 +794,12 @@
     // glazed footbridge across the tracks with its stair/lift towers
     const zf = -L * 0.2;
     const conc = colB('cat-conc', { roughness: 0.9, metalness: 0.02 });
-    box(conc, -11, edge + W + 6, zf - 1.8, zf + 1.8, 7.4, 10.4, col('#bfc2c4'));
-    box(conc, -11.2, edge + W + 6.2, zf - 1.82, zf + 1.82, 8.2, 9.6, col('#3a5668'));
-    [-10, edge + W + 5].forEach((d) => box(conc, d - 0.45, d + 0.45, zf - 0.6, zf + 0.6, FORM_Y, 7.4, col('#aeb1b3')));
+    box(conc, -15.2, edge + W + 6, zf - 1.8, zf + 1.8, 7.4, 10.4, col('#bfc2c4'));
+    box(conc, -15.4, edge + W + 6.2, zf - 1.82, zf + 1.82, 8.2, 9.6, col('#3a5668'));
+    [-14.6, edge + W + 5].forEach((d) => box(conc, d - 0.45, d + 0.45, zf - 0.6, zf + 0.6, FORM_Y, 7.4, col('#aeb1b3')));
+    box(conc, -15.6, -13.6, zf - 1.5, zf + 1.5, FORM_Y, 10.4, col('#bfc2c4'));
+    helpers.registerBridgeEnd({ lat: -14.6, out: -1, z: zf, y: 10.4, kind: 'tower' });
+    helpers.registerBridgeEnd({ lat: edge + W + 5, out: 1, z: zf, y: 10.4, kind: 'tower' });
     box(conc, edge + W + 3.6, edge + W + 6.4, zf - 1.5, zf + 1.5, FORM_Y, 10.4, col('#bfc2c4'));
     // grass slope + low fence line is the landscape's; add the second platform and track
     k.track(-4.6, -L * 0.6, L * 0.6);
@@ -901,7 +903,7 @@
       box(vc, d - 1.2, d + 1.2, zBuf - term * 0.1, zBuf + term * 0.3, 0.55, 0.95, col('#43484d'));
       [-0.9, 0.9].forEach((o) => box(vc, d + o - 0.2, d + o + 0.2, zBuf - term * 0.3, zBuf - term * 0.1, 0.55, 0.95, col('#d12a20')));
     };
-    [-4.6, -10.4, edge + W + 2.3].forEach((d) => { k.track(d, Math.min(zBuf, zOpen), Math.max(zBuf, zOpen)); buffer(d); });
+    [-4.6, -10.4, edge + W + 2.3].forEach((d) => { k.track(d, Math.min(zBuf, zOpen), Math.max(zBuf, zOpen)); void buffer; });   // infra.js ends every declared track in a buffer stop at the terminus
     // station floor between the walls (hides the yard ground; the city road and its cars run just outside the walls)
     box(plat, -a, a, zLo, zEnd, -0.62, -0.46, col('#6f7275'));
   }

@@ -517,23 +517,64 @@
       for (let i = 0; i < slots.length; i++) { const u = slots[i]; if (s >= u.s0 && s <= u.s1) return u; }
       return null;
     }
+    /* The ground beside a tunnel approach / tunnel box.  The LiDAR ground on either side of the real cutting is a ramp of 1-3 m (and spiky), so a wall that
+       follows it, or a terrain triangle that spans the wall, shows as a tilted slab.  Instead the ground has a clean SHELF: at the wall line it is as high as the
+       ground SHELF_W m further out (never lower than the clearance above the rail), and it blends into the raw ground over SHELF_W m. */
+    const SHELF_W = 4.0; const SLOT_EXT = 2.6; const SLOT_TAPER = 14;
+    const WALL_MAX = 2.8;      // retaining wall of an approach: at most this high above the rail; above it the ground is a graded slope (widened below)
+    const slotShelf = (sl, s, side) => {      // height of the ground shelf at the wall of the slot at route position s (side -1 = left wall, +1 = right wall)
+      const sc = clamp(s, sl.s0, sl.s1);
+      // the raw ground beside the cutting averaged along the line: a straight, calm coping instead of the zig-zag of the LiDAR
+      let sum = 0; let n = 0;
+      for (let k = -2; k <= 2; k++) {
+        const ss = clamp(sc + k * 4.5, sl.s0, sl.s1); const g = frame(ss);
+        const lat = (side < 0 ? slotLatL(ss) : SLOT_IN_R) + side * SHELF_W;
+        sum += rawG(g.pos.x + g.right.x * lat, g.pos.z + g.right.z * lat); n++;
+      }
+      const f = frame(sc);
+      let h = Math.max(sum / n, f.pos.y + 0.9);
+      if (sl.kind === 'open') h = Math.min(h, f.pos.y + WALL_MAX);
+      // the free end of an approach tapers: the wall (and the ground shelf on it) sinks to 0.9 m over the last SLOT_TAPER m, like the wing walls of a real trench
+      const free = sl.kind !== 'open' ? 1e9 : sl.dir === 'in' ? s - sl.s0 : sl.s1 - s;
+      return lerp(f.pos.y + 0.9, h, smooth(0, SLOT_TAPER, free));
+    };
+    const shelfBlend = (hs, h, d) => lerp(hs, h, smooth(0, clamp(1.8 * Math.max(0, h - hs), SHELF_W, 14), d));   // ground beside the wall: the slope up to the raw ground is at most ~1:1.8
+    function shelfHeight(sl, q, h) {         // ground height beside the walls of `sl` for a point at nearest-record q with raw height h; NaN when the point is not on a shelf
+      const L = slotLatL(q.s);
+      const side = q.lat < L ? -1 : q.lat > SLOT_IN_R ? 1 : 0;
+      if (!side) return NaN;
+      const d = side < 0 ? L - q.lat : q.lat - SLOT_IN_R;
+      if (d >= 14) return NaN;
+      return shelfBlend(slotShelf(sl, q.s, side), h, d);
+    }
     function blendTrack(x, z, h) {
       const q = nearest(x, z);
       if (q.d > 40) return h;
       const formY = q.y - 0.06;
       const sl = slotAt(q.s);
       if (sl) {
-        const inside = q.lat > slotLatL(q.s) - 0.05 && q.lat < SLOT_IN_R + 0.05;
-        if (sl.kind === 'cover') return inside ? q.y - 2.0 : h;     // a hole under the roof cap (buildCapsFor draws the ground above the tunnel at its real height)
+        const inside = q.lat > slotLatL(q.s) - SLOT_EXT && q.lat < SLOT_IN_R + SLOT_EXT;     // the band just outside the walls sinks with the floor: no terrain slope inside the trench, the wall hides the rest
+        if (sl.kind === 'cover') return inside ? q.y - 2.0 : shelfOr(sl, q, h);     // a hole under the roof cap (buildCapsFor draws the ground above the tunnel at its real height)
         if (inside && sl.kind === 'open' && ((sl.dir === 'in' && q.s > sl.s1 - 4.5) || (sl.dir === 'out' && q.s < sl.s0 + 4.5))) return formY - 2.0;   // under the portal floor strip
-        return inside ? formY : h;
+        return inside ? formY : shelfOr(sl, q, h);
       }
       const sep = -oppLatAt(q.s);
       const dOut = q.lat >= 0 ? q.lat : Math.max(0, -q.lat - sep);
-      let w = 1 - smooth(4.2, 12, dOut);
+      // the bank between the formation and the raw ground is at most ~1:1.8 (a fixed 8 m ramp made 45-60 degree faces wherever the cutting is deep)
+      let w = 1 - smooth(4.2, 4.2 + clamp(1.8 * Math.abs(h - formY), 7.8, 30), dOut);
       w *= (1 - structMask(track.bridges, q.s, 6)) * (1 - structMask(track.tunnels, q.s, 5));
       return w > 0 ? lerp(h, formY, w) : h;
     }
+    const coverSlots = [];       // filled by initStructures
+    function nodeInTunnelBox(x, z) {
+      const q = nearest(x, z);
+      if (q.d > 16) return 0;
+      const sl = slotAt(q.s);
+      if (!sl || sl.kind === 'deck' || !(q.lat > slotLatL(q.s) - SLOT_EXT && q.lat < SLOT_IN_R + SLOT_EXT)) return 0;
+      if (sl.kind === 'cover') return 2;
+      return 1;
+    }
+    const shelfOr = (sl, q, h) => { if (sl.kind === 'deck') return h; const e = shelfHeight(sl, q, h); return e === e ? e : h; };
     const underpasses = slots;
     function gy(x, z) {
       const h = demAt(x, z);
@@ -554,6 +595,25 @@
 
     const counted = (x) => { NET.bytes += x && x.byteLength !== undefined ? x.byteLength : x && x.size !== undefined ? x.size : 0; return x; };   // ArrayBuffer / Blob size (parsed JSON: not counted)
     const MAX_LOADS = 4;
+    /* ONE request queue for every world / ground / facade / tree tile file: at most FETCH_MAX in flight (a 16 km line asked for dozens at once and the browser
+       answered ERR_INSUFFICIENT_RESOURCES), nearest-to-the-train first, tiles that left the window are skipped, a failed file is retried once after a pause. */
+    const FETCH_MAX = 6; const FETCH_RETRY_MS = 600;
+    let qFocusS = 0; let qInflight = 0; const qWait = [];
+    const qCancelled = (e) => !!(e && e.cancelled);
+    function qPump() {
+      while (qInflight < FETCH_MAX && qWait.length) {
+        let bi = 0;
+        const pri = (j) => (j.info.s !== undefined ? Math.abs(j.info.s - qFocusS) : 4000);      // far-ring tiles after the near world
+        for (let i = 1; i < qWait.length; i++) if (pri(qWait[i]) < pri(qWait[bi])) bi = i;
+        const job = qWait.splice(bi, 1)[0];
+        if (job.owner.disposed) { const e = new Error('cancelled'); e.cancelled = true; job.reject(e); continue; }
+        qInflight++;
+        const attempt = (n) => fetch(job.url).then((r) => { if (!r.ok) { const e = new Error('HTTP ' + r.status + ' ' + job.url); e.status = r.status; throw e; } return job.kind === 'buf' ? r.arrayBuffer() : job.kind === 'blob' ? r.blob() : r.json(); })
+          .catch((e) => { if (n === 0 && !job.owner.disposed && e.status !== 404) return new Promise((res) => setTimeout(res, FETCH_RETRY_MS)).then(() => attempt(1)); throw e; });
+        attempt(0).then((v) => { qInflight--; job.resolve(counted(v)); qPump(); }, (e) => { qInflight--; job.reject(e); qPump(); });
+      }
+    }
+    const qGet = (owner, info, url, kind) => new Promise((resolve, reject) => { qWait.push({ owner, info, url, kind, resolve, reject }); qPump(); });
     let loading = 0;
     function startLoad(info) {
       const key = info.key;
@@ -561,16 +621,16 @@
       tiles.set(key, t);
       loading++;
       const ver = geo.v || 1;
-      const get = (url, kind) => fetch(GEO_BASE + url + '?v=' + ver).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + url); return kind === 'buf' ? r.arrayBuffer() : kind === 'blob' ? r.blob() : r.json(); }).then(counted);
+      const get = (url, kind) => qGet(t, info, GEO_BASE + url + '?v=' + ver, kind);
       const pH = get('h/' + key + '.bin', 'buf').then(decodeHeights);
       const pB = geo.bld[key] ? get('bf/' + key + '.bin', 'buf').then(fx.parseTile).catch(() => []) : Promise.resolve([]);
       const pO = get('g/' + key + '.bin', 'buf').then((b) => ground.fetchTile(b));    // painted ground: class map + AO + vector layers (luxtram-ground.js)
       const pT = info.meta.trees ? get('t/' + key + '.bin', 'buf').catch(() => null) : Promise.resolve(null);
-      Promise.all([pH, pB, pO.catch((e) => { console.warn(TAG + 'ground ' + key, e); return null; }), pT]).then(([dem, bld, gnd, trees]) => {
+      Promise.all([pH, pB, pO.catch((e) => { if (!qCancelled(e)) console.warn(TAG + 'ground ' + key, e); return null; }), pT]).then(([dem, bld, gnd, trees]) => {
         loading--;
         if (t.disposed) return;
         t.dem = regularizeDem(dem, info.meta.step); t.bld = bld; t.ground = gnd; t.trees = trees; t.state = 'ready';
-      }).catch((e) => { loading--; t.state = 'failed'; console.warn(TAG + 'tile ' + key + ' failed', e); });
+      }).catch((e) => { loading--; t.state = 'failed'; if (!qCancelled(e) && !t.disposed) console.warn(TAG + 'tile ' + key + ' failed', e); });
     }
 
     /* terrain mesh of one tile (stride = node skip), painted by the splat shader (luxtram-ground.js: the ground has no uv, it works from world position),
@@ -585,6 +645,7 @@
       const nor = new Float32Array((nv + 4 * m) * 3);
       const col = new Float32Array((nv + 4 * m) * 3).fill(1);
       const edge = [];
+      const inTunnelBox = new Uint8Array(nv);
       for (let r = 0; r < m; r++) {
         for (let c = 0; c < m; c++) {
           const k = r * m + c;
@@ -592,6 +653,7 @@
           const x = x0 + xl; const z = z0 + zl;
           const y = blendTrack(x, z, t.dem.h[(r * stride) * n + c * stride] - oy);
           pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z;
+          if (coverSlots.length) inTunnelBox[k] = nodeInTunnelBox(x, z);
         }
       }
       for (let r = 0; r < m; r++) {
@@ -611,6 +673,14 @@
       for (let r = 0; r < m - 1; r++) {
         for (let c = 0; c < m - 1; c++) {
           const a = r * m + c; const b = a + 1; const c2 = a + m; const d = c2 + 1;
+          // (cells beside a tunnel wall are NOT culled: the band outside the wall sinks with the floor, so the ramp up to the ground shelf lies behind the wall and under the ground collar)
+          // a cell with a node in a tunnel box would be a tilted slab over / inside the opening: cull it, the cap / collar (buildCapsFor) closes the ground there
+          // (open approaches: only the steep cells straddling the wall; the ground collar closes them)
+          if (inTunnelBox[a] | inTunnelBox[b] | inTunnelBox[c2] | inTunnelBox[d]) {
+            if (inTunnelBox[a] === 2 || inTunnelBox[b] === 2 || inTunnelBox[c2] === 2 || inTunnelBox[d] === 2) continue;
+            const ya = pos[a * 3 + 1]; const yb = pos[b * 3 + 1]; const yc = pos[c2 * 3 + 1]; const yd = pos[d * 3 + 1];
+            if (Math.max(ya, yb, yc, yd) - Math.min(ya, yb, yc, yd) > 0.8) continue;
+          }
           idx.push(a, c2, b, b, c2, d);
         }
       }
@@ -883,7 +953,7 @@
       farTiles.set(info.key, f);
       farLoading++;
       const ver = geo.v || 1;
-      const get = (url, kind) => fetch(GEO_BASE + url + '?v=' + ver).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return kind === 'buf' ? r.arrayBuffer() : kind === 'blob' ? r.blob() : r.json(); }).then(counted);
+      const get = (url, kind) => qGet(f, info, GEO_BASE + url + '?v=' + ver, kind);
       const pH = get('f/h_' + info.key + '.bin', 'buf').then(decodeHeights);
       const pO = get('f/c_' + info.key + '.png', 'buf').then((b) => ground.fetchFarClass(b)).catch(() => null);
       const pB = info.b ? get('f/b_' + info.key + '.json', 'json').catch(() => []) : Promise.resolve([]);   // only tiles that have far buildings
@@ -891,7 +961,7 @@
         farLoading--;
         if (f.disposed) return;
         f.dem = dem; f.cls = cls; f.bl = bl; f.state = 'ready';
-      }).catch((e) => { farLoading--; f.state = 'failed'; console.warn(TAG + 'far tile ' + info.key + ' failed', e); });
+      }).catch((e) => { farLoading--; f.state = 'failed'; if (!qCancelled(e) && !f.disposed) console.warn(TAG + 'far tile ' + info.key + ' failed', e); });
     }
     function buildFar(f) {
       const info = f.info; const n = f.dem.n;
@@ -1119,7 +1189,19 @@
       const col = SURF_COL[surf] || SURF_COL[1];
       const pts = [];
       for (let i = 0; i <= n; i++) { const f = getFrame(a + ((b - a) * i) / n); pts.push({ x: f.pos.x, y: f.pos.y + (grass ? -0.11 : -0.02), z: f.pos.z }); }
-      ribbon(batch.bed, pts, grass ? 1.75 : 1.65, col, { vScale: 3, u0: 0, u1: 1 });
+      if (grass) {
+        /* the grass track is the SAME painted lawn as the terrain around it (ground surface material, same colours at every distance), lying 3 cm ABOVE
+           the terrain mesh: it can never z-fight with it, so there is no light/dark band that follows the camera */
+        const S = batch.surf; const base = S.count;
+        for (let i = 0; i < pts.length; i++) {
+          const q0 = pts[Math.max(0, i - 1)]; const q1 = pts[Math.min(pts.length - 1, i + 1)];
+          const dl = Math.hypot(q1.x - q0.x, q1.z - q0.z) || 1; const nx = -(q1.z - q0.z) / dl; const nz = (q1.x - q0.x) / dl;
+          const y = pts[i].y + 0.08;
+          S.vert(pts[i].x - nx * 1.75, y, pts[i].z - nz * 1.75, 0, 1, 0, ground.MAT.LAWN, 1, 1, 1);
+          S.vert(pts[i].x + nx * 1.75, y, pts[i].z + nz * 1.75, 0, 1, 0, ground.MAT.LAWN, 1, 1, 1);
+        }
+        for (let i = 0; i < pts.length - 1; i++) { const a = base + i * 2; S.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+      } else ribbon(batch.bed, pts, 1.65, col, { vScale: 3, u0: 0, u1: 1 });
       if (grass) {
         [-1, 1].forEach((sd) => {
           const edge = pts.map((p, i) => { const q0 = pts[Math.max(0, i - 1)]; const q1 = pts[Math.min(pts.length - 1, i + 1)]; const dl = Math.hypot(q1.x - q0.x, q1.z - q0.z) || 1; return { x: p.x + (-(q1.z - q0.z) / dl) * 1.78 * sd, z: p.z + ((q1.x - q0.x) / dl) * 1.78 * sd, y: p.y - 0.06 + 0.11 }; });
@@ -1156,7 +1238,7 @@
         const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat;
         if (prev) dist += Math.hypot(x - prev[0], z - prev[1]);
         prev = [x, z];
-        const yb = yBot(f, x, z); const yt = yTop(f, x, z);
+        const yb = yBot(f, x, z, s); const yt = yTop(f, x, z, s);
         const k = 0.97 + 0.06 * hash2(i, Math.round(sA));
         const c = jit(col, k);
         m.vert(x, yb, z, f.right.x * towards, 0, f.right.z * towards, dist / 4, 0, c);
@@ -1173,7 +1255,7 @@
         const s = sA + ((sB - sA) * i) / n;
         const f = frame(s);
         const l0 = typeof lat0 === 'function' ? lat0(s) : lat0; const l1 = typeof lat1 === 'function' ? lat1(s) : lat1;
-        const y = yFn(f);
+        const y = yFn(f, s);
         m.vert(f.pos.x + f.right.x * l0, y, f.pos.z + f.right.z * l0, 0, up ? 1 : -1, 0, 0, i, col);
         m.vert(f.pos.x + f.right.x * l1, y, f.pos.z + f.right.z * l1, 0, up ? 1 : -1, 0, 1, i, col);
       }
@@ -1191,6 +1273,7 @@
     function buildTunnel(sl, batch) {
       const CEIL = 5.7;
       const sA = sl.s0; const sB = sl.s1;
+      // (the sides above the roof slab up to the cap are built with the cap in buildCapsFor)
       wallStrip(batch.misc, sA, sB, slotLatL, (f) => f.pos.y - 0.45, (f) => f.pos.y + CEIL, TUN_WALL, 1);
       wallStrip(batch.misc, sA, sB, () => SLOT_IN_R, (f) => f.pos.y - 0.45, (f) => f.pos.y + CEIL, TUN_WALL, -1);
       flatStrip(batch.misc, sA, sB, (s) => slotLatL(s) - 0.4, SLOT_IN_R + 0.4, (f) => f.pos.y + CEIL, TUN_CEIL, false);
@@ -1235,19 +1318,18 @@
     }
     function buildSlotWalls(sl, batch) {
       const open = sl.kind === 'open';
+      // wall tops lie exactly on the ground shelf (slotShelf), so wall, coping and the ground collar (buildCapsFor) are one clean edge
       const topFn = open
-        ? (f, x, z, side) => Math.max(f.pos.y + 0.9, rawG(x + f.right.x * 0.7 * side, z + f.right.z * 0.7 * side) + 0.05)
+        ? (f, x, z, side, s) => slotShelf(sl, s, side)
         : (f, x, z) => sl.deckUnder(x, z);
-      wallStrip(batch.misc, sl.s0, sl.s1, slotLatL, (f) => f.pos.y - 0.5, (f, x, z) => topFn(f, x, z, -1), CONC, 1);
-      wallStrip(batch.misc, sl.s0, sl.s1, () => SLOT_IN_R, (f) => f.pos.y - 0.5, (f, x, z) => topFn(f, x, z, 1), CONC, -1);
+      if (!open) { // underpass walls under a deck (open approaches: walls + coping are built with the ground collar in buildCapsFor, from the same ground heights)
+        wallStrip(batch.misc, sl.s0, sl.s1, slotLatL, (f) => f.pos.y - 0.5, (f, x, z, s) => topFn(f, x, z, -1, s), CONC, 1);
+        wallStrip(batch.misc, sl.s0, sl.s1, () => SLOT_IN_R, (f) => f.pos.y - 0.5, (f, x, z, s) => topFn(f, x, z, 1, s), CONC, -1);
+      }
       if (open) { // concrete floor of the portal approach (the terrain sinks under it)
         const f0 = sl.dir === 'in' ? Math.max(sl.s0, sl.s1 - 5) : sl.s0;
         const f1 = sl.dir === 'in' ? sl.s1 : Math.min(sl.s1, sl.s0 + 5);
-        flatStrip(batch.misc, f0, f1 + (sl.dir === 'in' ? 0.6 : 0), slotLatL, SLOT_IN_R, (f) => f.pos.y - 0.28, [0.46, 0.46, 0.44], true, { step: 1 });
-      }
-      if (open) { // coping along the top of the walls
-        flatStrip(batch.misc, sl.s0, sl.s1, (s) => slotLatL(s) - 0.45, (s) => slotLatL(s), (f) => { const lat = slotLatL(sl.s0); return topFn(f, f.pos.x + f.right.x * lat, f.pos.z + f.right.z * lat, -1) + 0.02; }, CONC_L, true);
-        flatStrip(batch.misc, sl.s0, sl.s1, SLOT_IN_R, SLOT_IN_R + 0.45, (f) => topFn(f, f.pos.x + f.right.x * SLOT_IN_R, f.pos.z + f.right.z * SLOT_IN_R, 1) + 0.02, CONC_L, true);
+        flatStrip(batch.misc, f0, f1 + (sl.dir === 'in' ? 1.2 : 0), slotLatL, SLOT_IN_R, (f) => f.pos.y - 0.28, [0.46, 0.46, 0.44], true, { step: 1 });
       }
     }
     /* concrete box-girder deck with parapets, piers and abutments (the named Pont Rouge / Pont Adolphe leave their detail to the landmarks) */
@@ -1332,8 +1414,8 @@
           const f = frame(se); const l0 = lL(se); const sg = k === 0 ? -1 : 1;
           const a = batch.misc.vert(f.pos.x + f.right.x * l0, f.pos.y - depth, f.pos.z + f.right.z * l0, f.tangent.x * sg, 0, f.tangent.z * sg, 0, 0, CONC);
           const b = batch.misc.vert(f.pos.x + f.right.x * lR, f.pos.y - depth, f.pos.z + f.right.z * lR, f.tangent.x * sg, 0, f.tangent.z * sg, 0, 0, CONC);
-          const c = batch.misc.vert(f.pos.x + f.right.x * lR, f.pos.y + 1.05, f.pos.z + f.right.z * lR, f.tangent.x * sg, 0, f.tangent.z * sg, 0, 0, CONC);
-          const d = batch.misc.vert(f.pos.x + f.right.x * l0, f.pos.y + 1.05, f.pos.z + f.right.z * l0, f.tangent.x * sg, 0, f.tangent.z * sg, 0, 0, CONC);
+          const c = batch.misc.vert(f.pos.x + f.right.x * lR, f.pos.y - 0.1, f.pos.z + f.right.z * lR, f.tangent.x * sg, 0, f.tangent.z * sg, 0, 0, CONC);   // top = just under the deck surface: nothing may stand across the track
+          const d = batch.misc.vert(f.pos.x + f.right.x * l0, f.pos.y - 0.1, f.pos.z + f.right.z * l0, f.tangent.x * sg, 0, f.tangent.z * sg, 0, 0, CONC);
           batch.misc.quad(a, b, c, d);
         });
         flatStrip(batch.misc, sA, sB, (s) => lL(s) - 0.25, (s) => lL(s), (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
@@ -1407,7 +1489,7 @@
       const toR = (so) => lt.toRoute(lt.absFromOrig(so));
       const lo = 0; const hi = L;
       track.tunnels.forEach((tn) => {
-        slots.push({ s0: tn.s0, s1: tn.s1, kind: 'cover' });
+        slots.push({ s0: tn.s0, s1: tn.s1, kind: 'cover' }); coverSlots.push(tn);
       });
       // open approaches in front of / behind a tunnel (never across a platform)
       const stationsAvoid = (a, b) => track.stations.some((st) => b > st.platformStart - 3 && a < st.platformEnd + 3);
@@ -1421,6 +1503,8 @@
       });
       (sd.over || []).forEach((o) => {
         const d = { o, s0: toR(o.s0), s1: toR(o.s1), local: o.poly, plane: o.plane, built: false };
+        // a "deck" beside / over a platform is the stop's own canopy (LiDAR sees the roof): the station module draws that, no walls and no second roof
+        if (track.stations.some((st) => d.s1 > st.platformStart - 30 && d.s0 < st.platformEnd + 30)) return;
         decks.push(d);
         if (o.w >= 7 && d.s1 > d.s0) {
           const [a, b, c] = o.plane;
@@ -1493,36 +1577,61 @@
     }
     initStructures();
 
-    /* the ground above a cut-and-cover tunnel: a cap at the real LiDAR height, painted like the tile (the terrain mesh has a hole there) */
+    /* The ground that closes the terrain mesh around the tunnel structures (the terrain triangles that span a wall are culled in buildTerrain):
+       - a cap above every cut-and-cover tunnel, between the two ground shelves (planar between them, never below the roof),
+       - a collar COLLAR_W m wide along the outside of every wall (tunnel boxes and open approaches), following the shelf blend of blendTrack exactly.
+       Painted like the tile (terrain splat material), 3 cm above the (culled) terrain. */
+    const COLLAR_W = 16;
+    const COLLAR_D = [0, 0.5, 1, 1.5, 2, 3, 4, 5, 6.5, 8, 10, 12, 14, COLLAR_W];
+    const capY = (sl, s, lat) => { const L = slotLatL(s); const u = clamp((lat - L) / (SLOT_IN_R - L), 0, 1); return Math.max(lerp(slotShelf(sl, s, -1), slotShelf(sl, s, 1), u), frame(s).pos.y + 6.45); };
+    const collarY = (sl, s, side, d, x, z) => shelfBlend(slotShelf(sl, s, side), rawG(x, z), d);
     function buildCapsFor(t, group) {
       const pos = []; const idx = [];
+      const wm = new Mesher();       // concrete: approach walls with coping, tunnel box sides up to the cap
+      const addStrip = (rows) => {          // rows = list of lateral rows (arrays of [x, y, z]) along the line; a quad belongs to the tile that holds its centre (the splat uv is per tile)
+        const nLat = rows[0].length; const base = pos.length / 3;
+        rows.forEach((row) => row.forEach((v) => { pos.push(v[0], v[1], v[2]); }));
+        for (let r = 0; r < rows.length - 1; r++) for (let k = 0; k < nLat - 1; k++) {
+          const a = base + r * nLat + k; const b = a + 1; const c2 = a + nLat; const d = c2 + 1;
+          const cx = (rows[r][k][0] + rows[r + 1][k + 1][0]) / 2 + ox; const cz = (rows[r][k][2] + rows[r + 1][k + 1][2]) / 2 + oz;
+          if (Math.floor(cx / TS_) !== t.info.i || Math.floor(cz / TS_) !== t.info.j) continue;
+          // wound counter-clockwise seen from above (a double-sided material shades the BACK face with a flipped normal: a clockwise quad would render black)
+          const ux = pos[c2 * 3] - pos[a * 3]; const uz = pos[c2 * 3 + 2] - pos[a * 3 + 2]; const vx = pos[b * 3] - pos[a * 3]; const vz = pos[b * 3 + 2] - pos[a * 3 + 2];
+          if (uz * vx - ux * vz >= 0) idx.push(a, c2, b, b, c2, d); else idx.push(a, b, c2, b, d, c2);
+        }
+      };
       slots.forEach((sl) => {
-        if (sl.kind !== 'cover') return;
+        if (sl.kind !== 'cover' && sl.kind !== 'open') return;
         const step = 3;
-        const nLat = 7;
-        for (let s = sl.s0; s < sl.s1; s += step) {
-          const sa = s; const sb = Math.min(sl.s1, s + step);
+        const ext = sl.kind === 'open' ? 6 : 0;      // the collar runs on 6 m past the ends of an approach: it closes the terrain cells that were cut at the ends
+        for (let s = sl.s0 - ext; s < sl.s1 + ext; s += step) {
+          const sa = s; const sb = Math.min(sl.s1 + ext, s + step);
           const fm = frame((sa + sb) / 2);
-          const cxl = fm.pos.x + ox; const czl = fm.pos.z + oz;
-          if (Math.floor(cxl / TS_) !== t.info.i || Math.floor(czl / TS_) !== t.info.j) continue;
-          const rows = [sa, sb].map((ss) => {
-            const f = frame(ss);
-            const lo = slotLatL(ss) - 2.7; const hi = SLOT_IN_R + 2.7;
-            const row = [];
-            for (let k = 0; k < nLat; k++) {
-              const lat = lo + ((hi - lo) * k) / (nLat - 1);
-              const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat;
-              let y = rawG(x, z);
-              if (lat > slotLatL(ss) - 0.1 && lat < SLOT_IN_R + 0.1) y = Math.max(y, f.pos.y + 6.45);
-              row.push([x, y + 0.03, z]);
-            }
-            return row;
+          if (Math.abs(fm.pos.x + ox - (t.info.i + 0.5) * TS_) > TS_ * 0.5 + 14 || Math.abs(fm.pos.z + oz - (t.info.j + 0.5) * TS_) > TS_ * 0.5 + 14) continue;
+          const mk = (fn) => [sa, sb].map((ss) => { const f = frame(ss); return fn(f, ss); });
+          const P = (f, lat, y) => [f.pos.x + f.right.x * lat, y, f.pos.z + f.right.z * lat];
+          // left collar (outermost first), right collar
+          addStrip(mk((f, ss) => { const L = slotLatL(ss); return COLLAR_D.slice().reverse().map((d) => { const x = f.pos.x + f.right.x * (L - d); const z = f.pos.z + f.right.z * (L - d); return [x, collarY(sl, ss, -1, d, x, z) + 0.03, z]; }); }));
+          addStrip(mk((f, ss) => COLLAR_D.map((d) => { const lat = SLOT_IN_R + d; const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat; return [x, collarY(sl, ss, 1, d, x, z) + 0.03, z]; })));
+          // walls + coping, from exactly the shelf heights the collar starts at
+          const wallQuad = (side, yBot, yTop, col) => {
+            const rows = [sa, sb].map((ss) => { const f = frame(ss); const lat = side < 0 ? slotLatL(ss) : SLOT_IN_R; return { x: f.pos.x + f.right.x * lat, z: f.pos.z + f.right.z * lat, yb: yBot(f, ss), yt: yTop(f, ss), nx: -f.right.x * side, nz: -f.right.z * side }; });
+            const v = rows.map((r) => [wm.vert(r.x, r.yb, r.z, r.nx, 0, r.nz, 0, 0, col), wm.vert(r.x, r.yt, r.z, r.nx, 0, r.nz, 0, 1, col)]);
+            wm.quad(v[0][0], v[1][0], v[1][1], v[0][1]);
+          };
+          const mine = sa >= sl.s0 - 1e-6 && sb <= sl.s1 + 1e-6 && Math.floor((fm.pos.x + ox) / TS_) === t.info.i && Math.floor((fm.pos.z + oz) / TS_) === t.info.j;   // walls: once, by the tile that holds the segment
+          if (mine) [-1, 1].forEach((side) => {
+            if (sl.kind === 'open') {
+              wallQuad(side, (f) => f.pos.y - 0.5, (f, ss) => slotShelf(sl, ss, side), CONC);
+              const cop = mk((f, ss) => { const L = slotLatL(ss); const l0 = side < 0 ? L - 0.45 : SLOT_IN_R; const l1 = side < 0 ? L : SLOT_IN_R + 0.45; return [P(f, l0, slotShelf(sl, ss, side) + 0.02), P(f, l1, slotShelf(sl, ss, side) + 0.02)]; });
+              const b0 = wm.count; cop.forEach((row) => row.forEach((v) => wm.vert(v[0], v[1], v[2], 0, 1, 0, 0, 0, CONC_L)));
+              wm.quad(b0, b0 + 1, b0 + 3, b0 + 2);
+            } else wallQuad(side, (f) => f.pos.y + 5.6, (f, ss) => Math.max(f.pos.y + 5.7, capY(sl, ss, side < 0 ? slotLatL(ss) : SLOT_IN_R)), TUN_WALL);
           });
-          const base = pos.length / 3;
-          rows.forEach((row) => row.forEach((v) => { pos.push(v[0], v[1], v[2]); }));
-          for (let k = 0; k < nLat - 1; k++) { const a = base + k; const b = a + 1; const c2 = a + nLat; const d = c2 + 1; idx.push(a, c2, b, b, c2, d); }
+          if (sl.kind === 'cover') addStrip(mk((f, ss) => { const L = slotLatL(ss); const out = []; for (let k = 0; k <= 6; k++) { const lat = L + ((SLOT_IN_R - L) * k) / 6; out.push(P(f, lat, capY(sl, ss, lat) + 0.03)); } return out; }));
         }
       });
+      { const wmesh = wm.mesh(matMisc, {}); if (wmesh) group.add(wmesh); }
       if (!pos.length) return;
       const g = new T.BufferGeometry();
       g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
@@ -1638,14 +1747,14 @@
       return fu + fv <= 1 ? ya + (yb - ya) * fu + (yc - ya) * fv : yd + (yc - yd) * (1 - fu) + (yb - yd) * (1 - fv);
     }
     const tileOf = (x, z) => tiles.get(Math.floor((x + ox) / TS_) + '_' + Math.floor((z + oz) / TS_));
-    /* above a cut-and-cover tunnel the terrain mesh has a hole; the visible ground there is the cap (buildCapsFor): the painted ground is draped on it */
+    /* beside / above the tunnel structures the terrain mesh has a hole; the visible ground there is the cap / collar (buildCapsFor): the painted ground is draped on it */
     let coverBoxes = null;
     function coverHeight(x, z) {
       if (!coverBoxes) {
         coverBoxes = [];
         slots.forEach((sl) => {
-          if (sl.kind !== 'cover') return;
-          for (let s = sl.s0; s <= sl.s1 + 10; s += 10) { const f = frame(Math.min(s, sl.s1)); coverBoxes.push([f.pos.x - 14, f.pos.z - 14, f.pos.x + 14, f.pos.z + 14]); }
+          if (sl.kind !== 'cover' && sl.kind !== 'open') return;
+          for (let s = sl.s0; s <= sl.s1 + 10; s += 10) { const f = frame(Math.min(s, sl.s1)); coverBoxes.push([f.pos.x - 26, f.pos.z - 26, f.pos.x + 26, f.pos.z + 26]); }
         });
       }
       if (!coverBoxes.length) return NaN;
@@ -1653,11 +1762,13 @@
       for (let i = 0; i < coverBoxes.length; i++) { const b = coverBoxes[i]; if (x > b[0] && x < b[2] && z > b[1] && z < b[3]) { near = true; break; } }
       if (!near) return NaN;
       const q = nearest(x, z);
-      if (!q || q.d > 12) return NaN;
+      if (!q || q.d > 24) return NaN;
       const sl = slotAt(q.s);
-      if (!sl || sl.kind !== 'cover') return NaN;
-      if (q.lat > slotLatL(q.s) - 0.1 && q.lat < SLOT_IN_R + 0.1) return Math.max(rawG(x, z), q.y + 6.45) + 0.03;
-      return NaN;
+      if (!sl || (sl.kind !== 'cover' && sl.kind !== 'open')) return NaN;
+      const L = slotLatL(q.s);
+      if (q.lat > L - 0.1 && q.lat < SLOT_IN_R + 0.1) return sl.kind === 'cover' ? capY(sl, q.s, q.lat) + 0.03 : NaN;
+      const side = q.lat < L ? -1 : 1; const d = side < 0 ? L - q.lat : q.lat - SLOT_IN_R;
+      return d < COLLAR_W ? collarY(sl, q.s, side, d, x, z) + 0.03 : NaN;
     }
     const surfY = (t, x, z) => { const c = coverHeight(x, z); if (c === c) return c; const y = meshY(t, x, z); return y === y ? y : gy(x, z); };
     function normalAt(t, x, z) {
@@ -1697,6 +1808,7 @@
       return [lo, hi];
     }
     function ensureTiles(s, all) {
+      qFocusS = s;
       const ahead = Q.ahead; const behind = Q.behind;
       // load / keep: tiles whose nearest line position lies in the window (plus a margin for their size)
       const want = [];
@@ -1832,7 +1944,7 @@
       nightK = 1 - smooth(0.2, 1.4, sun);
       fx.setNight(nightK * 1.25);
       if (lm && lm.update) { try { lm.update(sc, camera); } catch (e) { console.warn(TAG + 'landmark update', e); } }
-      lastS = s;
+      lastS = s; qFocusS = s;
     }
     let warmS = null;   // where the opening warm-up was asked for (progress() measures that window)
     function warm(s) {
@@ -1903,7 +2015,8 @@
       lamps: Array.from(lampsByChunk.values()).flat().map((l) => ({ x: l[0], z: l[1] })),
       posts: traffic ? traffic.posts() : [],
     });
-    return { debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
+    const debugSlot = (s) => { const sl = slotAt(s); if (!sl) return null; const f = frame(s); const L = slotLatL(s); return { kind: sl.kind, s0: sl.s0, s1: sl.s1, y: f.pos.y, HsL: slotShelf(sl, s, -1), HsR: slotShelf(sl, s, 1), L, R: SLOT_IN_R, left: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (L - d); const z = f.pos.z + f.right.z * (L - d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, -1, d, x, z).toFixed(1)]; }), right: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (SLOT_IN_R + d); const z = f.pos.z + f.right.z * (SLOT_IN_R + d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, 1, d, x, z).toFixed(1)]; }) }; };
+    return { debugSlot, debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
   }
 
   TS.luxtramWorld = { create, QUALITY, prefetchData };

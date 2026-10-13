@@ -161,6 +161,134 @@
     x.fillStyle = g; x.fillRect(0, 0, 64, 64);
     const t = new T.CanvasTexture(cv); t.colorSpace = T.SRGBColorSpace; glowCache.set(col, t); return t;
   }
+  /* ---------------------------------------------------------------- wipers + windscreen rain
+   * Tandem (parallel) wipers: both arms park along the lower edge pointing to the driver's left, sweep together up to ~90 degrees and back,
+   * with a short pause at both ends. One cycle = phase 0..1: up stroke, pause, down stroke, pause (parked at phase 0). */
+  const WIPER_SWEEP = 1.55, WIPER_DWELL = 0.09;
+  const WIPER_STROKE = (1 - 2 * WIPER_DWELL) / 2;
+  function wiperAngle(phase) {
+    const p = phase - Math.floor(phase), s = WIPER_STROKE;
+    if (p < s) return WIPER_SWEEP * (0.5 - 0.5 * Math.cos(Math.PI * (p / s)));
+    if (p < s + WIPER_DWELL) return WIPER_SWEEP;
+    if (p < 2 * s + WIPER_DWELL) return WIPER_SWEEP * (0.5 + 0.5 * Math.cos(Math.PI * ((p - s - WIPER_DWELL) / s)));
+    return 0;
+  }
+  const RAIN_VERT = 'varying vec2 vG; void main(){ vG = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  const RAIN_FRAG = `
+    uniform float uCycles, uC0, uWet, uSnow, uLight, uSweep, uDwell, uPeriod, uL, uH, uHW, uTop;
+    uniform vec2 uPx;
+    varying vec2 vG;
+    float hsh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float swept(vec2 piv){
+      vec2 d = vG - piv; float r = length(d);
+      if (r > uL + 0.02 || r < 0.02) return 1e3;
+      float phi = atan(d.y, -d.x);
+      if (phi < -0.03 || phi > uSweep + 0.03) return 1e3;
+      float s = (1.0 - 2.0 * uDwell) * 0.5, f = clamp(phi / uSweep, 0.0, 1.0);
+      float u = acos(clamp(1.0 - 2.0 * f, -1.0, 1.0)) / 3.14159265;
+      float P = fract(uCycles);
+      float a1 = mod(P - s * u, 1.0), a2 = mod(P - (s + uDwell + s * (1.0 - u)), 1.0);
+      return min(a1, a2);
+    }
+    vec4 layer(float cell, float seed, float dens, float rmin, float rmax, float ageS, float born){
+      vec2 g = vG / cell; vec2 id = floor(g); vec2 f = fract(g) - 0.5;
+      float h1 = hsh(id + seed), h2 = hsh(id * 1.7 + seed + 3.1), h3 = hsh(id * 2.3 + seed + 7.7);
+      if (h1 > dens * uWet) return vec4(0.0);
+      vec2 c = (vec2(h2, h3) - 0.5) * 0.45;
+      float r = mix(rmin, rmax, h3 * h3);
+      float grow = smoothstep(h2 * born, h2 * born + 0.7, ageS);
+      vec2 q = (f - c) / (r * grow + 1e-4);
+      float d = length(q);
+      if (d > 1.0 || grow < 0.02) return vec4(0.0);
+      float body = 1.0 - smoothstep(0.78, 1.0, d);
+      float hl = smoothstep(0.62, 0.0, length(q - vec2(-0.36, 0.4)));
+      float rim = smoothstep(0.45, 0.95, d);
+      vec3 rain = mix(vec3(0.07, 0.09, 0.11), vec3(0.8, 0.86, 0.93) * (0.35 + 0.65 * uLight), hl);
+      vec3 snow = vec3(0.9, 0.93, 0.98) * (0.45 + 0.55 * uLight);
+      vec3 col = mix(rain, snow, uSnow);
+      float a = mix(0.26 + 0.42 * hl + 0.2 * rim, 0.85, uSnow) * body;
+      return vec4(col, a);
+    }
+    void main(){
+      float hw = mix(uHW, uHW - uTop, clamp(vG.y / uH, 0.0, 1.0));
+      float edge = smoothstep(hw, hw - 0.025, abs(vG.x)) * smoothstep(-0.02, 0.03, vG.y) * smoothstep(uH + 0.02, uH - 0.03, vG.y);
+      if (edge < 0.01 || uWet < 0.01) discard;
+      float cap = max(uCycles - uC0, 0.0);
+      float age = min(min(swept(vec2(uPx.x, 0.0)), swept(vec2(uPx.y, 0.0))), cap) * uPeriod;
+      float born = mix(9.0, 4.0, uWet);
+      vec4 a = layer(mix(0.05, 0.07, uSnow), 0.0, mix(0.7, 0.3, uSnow), 0.07, 0.2, age, born);
+      vec4 b = layer(mix(0.021, 0.04, uSnow), 11.0, mix(0.85, 0.0, uSnow), 0.16, 0.34, age, born * 0.8);
+      vec4 c = mix(b, a, step(0.001, a.a));
+      gl_FragColor = vec4(c.rgb, c.a * edge);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`;
+  /* the drops: one transparent quad just inside the windscreen (child of the wiper frame: x right, y up along the glass, origin on the pivot line) */
+  function makeRainGlass(hwG, H, topInset, L, px0, px1) {
+    const g = new T.BufferGeometry(), x = hwG + 0.03, y0 = -0.03, y1 = H + 0.03;
+    g.setAttribute('position', new T.Float32BufferAttribute([-x, y0, 0, x, y0, 0, -x, y1, 0, x, y1, 0], 3));
+    g.setIndex([0, 1, 2, 1, 3, 2]);
+    const m = new T.ShaderMaterial({
+      vertexShader: RAIN_VERT, fragmentShader: RAIN_FRAG, transparent: true, depthWrite: false, side: T.DoubleSide, fog: false,
+      uniforms: {
+        uCycles: { value: 0 }, uC0: { value: 0 }, uWet: { value: 0 }, uSnow: { value: 0 }, uLight: { value: 1 }, uSweep: { value: WIPER_SWEEP }, uDwell: { value: WIPER_DWELL },
+        uPeriod: { value: 1.25 }, uL: { value: L }, uH: { value: H }, uHW: { value: hwG }, uTop: { value: topInset }, uPx: { value: new T.Vector2(px0, px1) },
+      },
+    });
+    const mesh = new T.Mesh(g, m); mesh.frustumCulled = false; mesh.renderOrder = 4; mesh.visible = false; mesh.name = 'windscreen-rain';
+    mesh.userData.disposeGeo = true; mesh.userData.ownMat = m;
+    return mesh;
+  }
+
+  /* ---------------------------------------------------------------- head / tail light beams (additive cones, visible in haze, fog, rain, snow and at night) */
+  const BEAM_VERT = `
+    uniform vec3 uDir; uniform float uLen, uTan, uR0;
+    attribute vec3 aApex; attribute vec2 aSeg; attribute vec3 aCol;
+    varying float vT; varying vec3 vN; varying vec3 vV; varying vec3 vC; varying float vZ;
+    void main(){
+      vec3 d = normalize(uDir); vec3 u = normalize(cross(d, vec3(0.0, 1.0, 0.0))); vec3 v = cross(u, d);
+      vec3 rad = u * cos(aSeg.x) + v * sin(aSeg.x);
+      float t = aSeg.y;
+      vec3 p = aApex + d * (t * uLen) + rad * (uR0 * (1.0 - t) + t * uLen * uTan);
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      vN = normalize(mat3(modelViewMatrix) * normalize(rad - d * uTan)); vV = normalize(-mv.xyz);
+      vT = t; vC = aCol; vZ = -mv.z;
+      gl_Position = projectionMatrix * mv;
+    }`;
+  const BEAM_FRAG = `
+    uniform float uAmt, uNear;
+    varying float vT; varying vec3 vN; varying vec3 vV; varying vec3 vC; varying float vZ;
+    void main(){
+      float f = abs(dot(normalize(vN), normalize(vV)));
+      float a = uAmt * pow(f, 1.7) * pow(1.0 - vT, 1.5) * smoothstep(0.0, 0.06, vT) * smoothstep(uNear, uNear * 4.0, vZ);
+      gl_FragColor = vec4(vC, a);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`;
+  function makeBeamMaterial(dir, len, tan) {
+    return new T.ShaderMaterial({
+      vertexShader: BEAM_VERT, fragmentShader: BEAM_FRAG, transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, fog: false,
+      uniforms: { uDir: { value: new T.Vector3(dir[0], dir[1], dir[2]) }, uLen: { value: len }, uTan: { value: tan }, uR0: { value: 0.12 }, uAmt: { value: 0 }, uNear: { value: 2.0 } },
+    });
+  }
+  const BEAM_SEGS = 14;
+  /* cones for the given lamp apexes ([x, y, z] in car space); tint = [r, g, b] */
+  function beamGeometry(apexes, tint) {
+    const pos = [], ap = [], sg = [], cl = [], idx = [];
+    apexes.forEach((a) => {
+      const base = pos.length / 3;
+      for (let ring = 0; ring < 2; ring++) for (let i = 0; i < BEAM_SEGS; i++) {
+        pos.push(a[0], a[1], a[2]); ap.push(a[0], a[1], a[2]); sg.push((i / BEAM_SEGS) * Math.PI * 2, ring); cl.push(tint[0], tint[1], tint[2]);
+      }
+      for (let i = 0; i < BEAM_SEGS; i++) { const j = (i + 1) % BEAM_SEGS; idx.push(base + i, base + j, base + BEAM_SEGS + i, base + j, base + BEAM_SEGS + j, base + BEAM_SEGS + i); }
+    });
+    const g = new T.BufferGeometry();
+    g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setAttribute('aApex', new T.Float32BufferAttribute(ap, 3));
+    g.setAttribute('aSeg', new T.Float32BufferAttribute(sg, 2)); g.setAttribute('aCol', new T.Float32BufferAttribute(cl, 3));
+    g.setIndex(idx);
+    return g;
+  }
+
   function trainMats() {
     const s = sharedMats();
     const m = Object.assign({}, s);
@@ -177,8 +305,9 @@
     m.glowHead = new T.SpriteMaterial({ map: glowTexture('#fff2cf'), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     m.glowTail = new T.SpriteMaterial({ map: glowTexture('#ff3a24'), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     m.insideFwd = m.inside.clone(); m.insideFwd.userData.shared = false;
+    m.beamHead = makeBeamMaterial([0, -0.03, -1], 100, 0.1); m.beamTail = makeBeamMaterial([0, -0.05, 1], 16, 0.3);
     m.ghost = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false }); // invisible but still casts shadows
-    m.own = [m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail];
+    m.own = [m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail, m.beamHead, m.beamTail];
     return m;
   }
 
@@ -572,6 +701,8 @@
     const B = makeBuilder();
     const doorsOut = [];
     const wiperPivots = [];
+    const headApex = [], tailApex = [], glowHeads = [], glowTails = [], lampPos = {};
+    let rainMesh = null;
     const lensRoles = [];
     const surfX = (z, y) => hw; // sides vertical at hw for straight part
 
@@ -791,6 +922,8 @@
       };
       if (!S.tram) for (const s of [-1, 1]) {
         const headKey = front ? 'headF' : 'lensOff', tailKey = front ? 'lensOff' : 'tailR';
+        (front ? headApex : tailApex).push([s * lensX, lensY + (front ? 0.12 : -0.07), zAt(lensY + (front ? 0.12 : -0.07)) + sign * 0.06]);
+        lampPos[front ? 'front' : 'rear'] = { y: lensY + (front ? 0.12 : -0.07), z: zAt(lensY + 0.1) + sign * 0.06 };
         rb(0.34, 0.12, s * lensX, lensY + 0.12, 'trim', '#17191b');
         rb(0.28, 0.09, s * lensX, lensY + 0.12, headKey, '#fff6dc');
         rb(0.34, 0.11, s * lensX, lensY - 0.07, 'trim', '#17191b');
@@ -798,7 +931,7 @@
         if (hi) rb(0.12, 0.07, s * (lensX - 0.3), lensY + 0.04, headKey, '#fff6dc');
         if (mid) {
           const sp = new T.Sprite(front ? mats.glowHead : mats.glowTail); const gy = lensY + (front ? 0.12 : -0.07);
-          sp.scale.set(front ? 0.8 : 0.5, front ? 0.8 : 0.5, 1); sp.position.set(s * lensX, gy, zAt(gy) + sign * 0.15); group.add(sp);
+          sp.scale.set(front ? 0.8 : 0.5, front ? 0.8 : 0.5, 1); sp.position.set(s * lensX, gy, zAt(gy) + sign * 0.15); group.add(sp); (front ? glowHeads : glowTails).push(sp);
         }
       }
       if (S.tram) { // Urbos face: black lower front panel, white C-shaped LED lights, dark roof visor with the amber destination display
@@ -807,12 +940,14 @@
         slab(hw * 2 * sh.sx * 0.93, yHi - yLo, 0, yM, 'lensOff', '#0a0c0f', 0.012, 0.12);
         const ledKey = front ? 'lit' : 'tailR', ledCol = front ? '#ffffff' : '#ff4a38', lx = hw * sh.sx * 0.6, ly = yM - 0.02;
         for (const s of [-1, 1]) {
+          (front ? headApex : tailApex).push([s * lx, ly, zAt(ly) + sign * 0.06]);
+          lampPos[front ? 'front' : 'rear'] = { y: ly, z: zAt(ly) + sign * 0.06 };
           slab(0.05, 0.3, s * lx, ly, ledKey, ledCol, 0.03, 0.025);
           slab(0.14, 0.05, s * (lx - 0.045), ly + 0.15, ledKey, ledCol, 0.03, 0.02);
           slab(0.09, 0.05, s * (lx - 0.02), ly - 0.15, ledKey, ledCol, 0.03, 0.02);
           if (mid) {
             const sp = new T.Sprite(front ? mats.glowHead : mats.glowTail);
-            sp.scale.set(front ? 0.7 : 0.45, front ? 0.7 : 0.45, 1); sp.position.set(s * lx, ly, zAt(ly) + sign * 0.15); group.add(sp);
+            sp.scale.set(front ? 0.7 : 0.45, front ? 0.7 : 0.45, 1); sp.position.set(s * lx, ly, zAt(ly) + sign * 0.15); group.add(sp); (front ? glowHeads : glowTails).push(sp);
           }
         }
         if (mid) { // destination display behind the glass, at the top of the windscreen
@@ -887,41 +1022,53 @@
           B.box('metal', 0.012, 0.22, 0.05, s * (mx + 0.31), my, mz + sign * -0.0 + 0.0, '#9fb3bf');
         }
       }
-      // wipers (animated)
-      if (sc && sc.kind === 'roof' && nose.roofScr) {
-        const kA = front ? nose.roofScr.k0 : zList.length - 1 - nose.roofScr.k0, kB = front ? nose.roofScr.k1 + 1 : zList.length - 1 - (nose.roofScr.k1 + 1);
-        const P0 = rows[kA][nR], P1 = rows[kB][nR];
-        const dy = P1.y - P0.y, dzz = P1.z - P0.z, len = Math.hypot(dy, dzz);
-        const wg = new T.Group();
-        wg.position.set(0, P0.y + 0.03 + (dy / len) * 0.35, P0.z + (dzz / len) * 0.35);
-        wg.rotation.x = Math.atan(dzz / dy);
-        if (!front) wg.rotation.y = Math.PI;
-        const arm = memo('wiperArm', () => { const b = makeBuilder(); b.box('m', 0.62, 0.016, 0.01, 0.31, 0, 0, '#1b1d1f'); b.box('m', 0.54, 0.022, 0.012, 0.35, 0.02, 0.004, '#0f1011'); return mergeInto(b.raw); });
-        for (const sg of [-1, 1]) {
-          const p = new T.Group(); p.position.set(sg * 0.3, 0, 0);
-          const m = new T.Mesh(arm, mats.metal); m.castShadow = false; p.add(m); if (sg > 0) m.scale.x = -1;
-          wg.add(p); wiperPivots.push({ p, s: sg });
+      // wipers (animated): tandem pair, pivots on the lower edge of the glass; the front cab of the first car also gets the rain-drop glass
+      const addWipers = (wg, hwW, H, inset, hwGlass) => {
+        const Lw = clamp(H * 0.56, 0.45, 0.82), L = Math.min(Lw, hwW * 0.95);
+        const xl = -hwW + L + 0.03, xr = Math.min(xl + hwW * 0.95, hwW - inset * 0.6 - 0.07);
+        const arm = memo('wiperArm2:' + L.toFixed(2), () => {
+          const b = makeBuilder();
+          b.box('m', L, 0.016, 0.01, -L / 2, 0, 0.012, '#1b1d1f');
+          b.box('m', L * 0.9, 0.022, 0.012, -(0.1 + L * 0.45), 0, 0.025, '#0f1011');
+          b.cyl('m', 0.02, 0.02, 0.03, 0, 0, 0.01, '#2a2d30', 'z', 10);
+          return mergeInto(b.raw);
+        });
+        for (const x of [xl, xr]) {
+          const p = new T.Group(); p.position.set(x, 0, 0);
+          const m = new T.Mesh(arm, mats.metal); m.castShadow = false; p.add(m);
+          wg.add(p); wiperPivots.push({ p });
         }
+        if (front && isFront && !rainMesh) {
+          rainMesh = makeRainGlass(hwGlass, H, inset, L, xl, xr);
+          rainMesh.position.z = 0.075; wg.add(rainMesh);
+        }
+      };
+      if (sc && sc.kind === 'roof') { // long sloped roof screen (high-speed nose): the wipers and drops sit on the plane of the cab window (cabFrame), where the driver looks through
+        const cf = S.cabFrame || { dz: 0, rake: 0 }, rk = (front ? 1 : -1) * cf.rake, yw = sc.y0 + 0.05;
+        const wg = new T.Group();
+        wg.position.set(0, yw, zEnd + (front ? cf.dz : -cf.dz) + rk * (yw - S.yb) + sign * 0.02);
+        wg.rotation.x = Math.atan(rk);
+        if (!front) wg.rotation.y = Math.PI;
+        addWipers(wg, sc.hw + 0.05, sc.y1 - sc.y0 - 0.1, 0, sc.hw + 0.07);
         group.add(wg);
       }
       if (sc && sc.kind !== 'roof') {
         const wg = new T.Group();
-        const yw = sc.y0 + 0.02;
+        const yw = sc.y0 + 0.05;
         wg.position.set(0, yw, zEnd + capRake * (yw - S.yb) + sign * 0.03);
         wg.rotation.x = Math.atan(capRake);
         if (!front) wg.rotation.y = Math.PI;
-        const arm = memo('wiperArm', () => { const b = makeBuilder(); b.box('m', 0.62, 0.016, 0.01, 0.31, 0, 0, '#1b1d1f'); b.box('m', 0.54, 0.022, 0.012, 0.35, 0.02, 0.004, '#0f1011'); return mergeInto(b.raw); });
-        const pivots = [];
-        for (const s of [-1, 1]) {
-          const p = new T.Group(); p.position.set(s * sc.hw * 0.52, 0, 0);
-          const m = new T.Mesh(arm, mats.metal); m.castShadow = false; p.add(m);
-          if (s > 0) m.scale.x = -1;
-          wg.add(p); pivots.push({ p, s });
-        }
-        group.add(wg); wiperPivots.push(...pivots);
+        addWipers(wg, sc.hw - 0.1, sc.y1 - sc.y0 - 0.08, tIn, sc.hw - 0.03);
+        group.add(wg);
       }
     };
     buildNose(true); buildNose(false);
+    const mkBeam = (apexes, mat, tint, name) => {
+      if (!apexes.length) return null;
+      const m = new T.Mesh(beamGeometry(apexes, tint), mat); m.frustumCulled = false; m.visible = false; m.renderOrder = 3; m.name = name; m.userData.disposeGeo = true;
+      group.add(m); return m;
+    };
+    const beamHeadMesh = mkBeam(headApex, mats.beamHead, [1, 0.93, 0.78], 'beam-head'), beamTailMesh = mkBeam(tailApex, mats.beamTail, [1, 0.12, 0.06], 'beam-tail');
 
     // sliding/pillar details at the saloon: end bulkhead cab wall
     const cabWall = (front) => {
@@ -1150,7 +1297,7 @@
     // ----- lights
     return {
       exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
-      noseFront: noseF, noseRear: noseR, S,
+      noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
     };
   }
 
@@ -1316,6 +1463,58 @@
     const pantoAll = built.flatMap((b) => b.pantos);
     const wipers = built.flatMap((b) => b.wipers);
     const wheelsets = built.flatMap((b) => b.wheelsets);
+    const rainMesh = built[0].rain;
+    let wipersAng = -1;
+    const light = { level: 0, tail: false, dark: 0, haze: 0 };
+    const headBeams = built[0].beamHead, tailBeams = built[built.length - 1].beamTail;
+    const glowHeadAll = built.flatMap((b) => b.glowHeads), glowTailAll = built.flatMap((b) => b.glowTails);
+    /* the one real light of the player's train (opts.headlight): a spot on the nose, so the track, ballast, platforms, signs and the world around really get lit */
+    const BEAM_LEVELS = [
+      { I: 0, ang: 0.4, pen: 0.5, dist: 60, pitch: 0.03, len: 60, tan: 0.2, amt: 0 },
+      { I: 70, ang: 0.62, pen: 0.8, dist: 75, pitch: 0.075, len: 55, tan: 0.2, amt: 0.55 },
+      { I: 240, ang: 0.34, pen: 0.55, dist: 190, pitch: 0.02, len: 120, tan: 0.1, amt: 1 },
+    ];
+    let spot = null;
+    const lampF = built[0].lampPos && built[0].lampPos.front;
+    if (opts.headlight && lampF && quality !== 'low') {
+      spot = new T.SpotLight(0xfff0d8, 0, 100, 0.4, 0.5, 1.15); spot.name = 'train-headlight'; spot.castShadow = false;
+      spot.position.set(0, lampF.y, lampF.z - 0.25); spot.target.position.set(0, lampF.y - 2, lampF.z - 100);
+      built[0].group.add(spot); built[0].group.add(spot.target);
+    }
+    /* low quality: no real light, a flat additive light pool on the track ahead instead (assumes level track; one extra draw) */
+    let pool = null;
+    if (opts.headlight && !spot && lampF) {
+      const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128;
+      const cx = cv.getContext('2d'), gr = cx.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,240,205,0.95)'); gr.addColorStop(1, 'rgba(255,240,205,0)');
+      cx.fillStyle = gr; cx.fillRect(0, 0, 64, 128);
+      const mk = cx.createLinearGradient(0, 0, 64, 0); mk.addColorStop(0, 'rgba(0,0,0,1)'); mk.addColorStop(0.5, 'rgba(0,0,0,0)'); mk.addColorStop(1, 'rgba(0,0,0,1)');
+      cx.globalCompositeOperation = 'destination-out'; cx.fillStyle = mk; cx.fillRect(0, 0, 64, 128);
+      const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace;
+      pool = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: tex, transparent: true, blending: T.AdditiveBlending, depthWrite: false, opacity: 0, fog: false }));
+      pool.rotation.x = -Math.PI / 2; pool.position.set(0, 0.04, lampF.z - 2); pool.renderOrder = 3; pool.visible = false; pool.name = 'headlight-pool';
+      pool.userData.disposeGeo = true; pool.userData.noRainOcc = true;
+      built[0].group.add(pool);
+    }
+    function applyLightFx() {
+      if (pool) { const lv = BEAM_LEVELS[light.level]; pool.visible = light.level > 0 && light.dark > 0.05; pool.material.opacity = 0.5 * light.dark * (light.level === 2 ? 1 : 0.7); const len = light.level === 2 ? 70 : 38; pool.scale.set(light.level === 2 ? 7 : 11, len, 1); pool.position.z = lampF.z - len * 0.5 - 1.5; void lv; }
+      const lv = BEAM_LEVELS[light.level], on = light.level > 0;
+      if (spot) {
+        spot.intensity = lv.I * (S0.tram ? 0.3 : 1) * (0.1 + 0.9 * light.dark); spot.angle = lv.ang; spot.penumbra = lv.pen; spot.distance = lv.dist;
+        spot.target.position.y = lampF.y - lv.pitch * 100;
+        spot.visible = true;
+      }
+      const amt = on ? lv.amt * light.haze : 0;
+      if (headBeams) {
+        const u = headBeams.material.uniforms; u.uAmt.value = amt * 0.5; u.uLen.value = lv.len; u.uTan.value = lv.tan; u.uDir.value.y = -lv.pitch;
+        headBeams.visible = amt > 0.01; headBeams.userData.noRainOcc = true;
+      }
+      if (tailBeams) { tailBeams.material.uniforms.uAmt.value = light.tail ? light.haze * 0.5 : 0; tailBeams.visible = light.tail && light.haze > 0.02; }
+      const hv = on ? (0.3 + 0.7 * light.dark) * (light.level === 2 ? 1 : 0.65) : 0;
+      mats.glowHead.opacity = hv * 0.8;
+      for (const sp of glowHeadAll) { sp.visible = on; sp.scale.setScalar(0.8 + 1.6 * light.dark * (light.level === 2 ? 1 : 0.6)); }
+      mats.glowTail.opacity = light.tail ? 0.35 + 0.35 * light.dark : 0;
+      for (const sp of glowTailAll) { sp.visible = light.tail; sp.scale.setScalar(0.5 + 0.7 * light.dark); }
+    }
     const totalLength = cars.reduce((a, c) => a + c.length, 0);
 
     const api = {
@@ -1331,20 +1530,48 @@
           d.leaf.position.z = d.baseZ + d.e * d.travel * slide;
         }
       },
+      /* l.head: 0/false off, 1 dipped (wide, short), 2/true full beam; l.tail, l.cabin: booleans */
       setLights(l) {
         l = l || {};
-        mats.headF.emissiveIntensity = l.head ? 3.2 : 0;
+        light.level = l.head === true ? 2 : clamp(Math.round(Number(l.head) || 0), 0, 2);
+        mats.headF.emissiveIntensity = light.level === 2 ? 3.2 : light.level === 1 ? 1.5 : 0;
         mats.tailR.emissiveIntensity = l.tail ? 2.6 : 0;
+        light.tail = !!l.tail;
         const cab = !!l.cabin;
         mats.lamp.color.setHex(cab ? 0xffffff : 0xdad6c6);
         cabinOn = cab; applyGlass();
         mats.glassD.opacity = cab ? GLASS_D_CAB : GLASS_D_DAY;
         mats.inside.emissive.setHex(cab ? emitOn : emitOff); mats.insideFwd.emissive.setHex(cab ? emitOn : emitOff);
         mats.seat.emissive.setHex(cab ? SEAT_EMIT_ON : SEAT_EMIT);
-        mats.glowHead.opacity = l.head ? 0.7 : 0; mats.glowTail.opacity = l.tail ? 0.6 : 0;
+        applyLightFx();
+      },
+      /* dark 0..1 (how dark the surroundings are: night 1, dusk / dull weather in between, bright day 0, tunnel 1), haze 0..1 (how much the beams scatter: fog, rain, snow, night air) */
+      setLightEnv(dark, haze) {
+        const d = clamp(Number(dark) || 0, 0, 1), h = clamp(Number(haze) || 0, 0, 1);
+        if (Math.abs(d - light.dark) < 0.004 && Math.abs(h - light.haze) < 0.004) return;
+        light.dark = d; light.haze = h; applyLightFx();
+      },
+      /* windscreen: cycles = running wiper cycle count (fraction = phase, parked at an integer); wet 0..1 how wet the glass is (0 = no drops); snow: flakes instead of drops */
+      setWipers(cycles, wet, snow) {
+        const c = Number(cycles) || 0, w = clamp(Number(wet) || 0, 0, 1), a = wiperAngle(c);
+        if (wipersAng !== a) { wipersAng = a; for (const wp of wipers) wp.p.rotation.z = -a; }
+        if (rainMesh) {
+          const u = rainMesh.material.uniforms;
+          if (w > 0.01 && u.uWet.value <= 0.01) u.uC0.value = c;           // the glass starts to get wet now
+          u.uCycles.value = c; u.uWet.value = w; u.uSnow.value = snow ? 1 : 0; u.uLight.value = 1 - 0.72 * light.dark;
+          rainMesh.visible = cabViewOn && w > 0.01;
+        }
+      },
+      /* Hook for models that are baked or moved by someone else (oncoming trams): takes the lamp effects (beams + glow sprites) out of the front / rear car and returns
+         { head, tail } groups with matrixAutoUpdate off. The caller adds them to the scene and sets their .matrix to the matrix of the first / last car every frame
+         (the baked car matrices work as they are). setLights / setLightEnv keep driving them. */
+      detachFx() {
+        const mk = (name, meshes) => { const g = new T.Group(); g.name = name; g.matrixAutoUpdate = false; for (const m of meshes) if (m) { if (m.parent) m.parent.remove(m); g.add(m); } return g; };
+        return { head: mk('lampfx-head', [headBeams, ...glowHeadAll]), tail: mk('lampfx-tail', [tailBeams, ...glowTailAll]) };
       },
       setCabView(on) { // cab camera: hide the outside skin of the front car's nose (keeps lining + shadows) so the track stays visible
         cabViewOn = !!on; applyGlass();
+        if (rainMesh) rainMesh.visible = cabViewOn && rainMesh.material.uniforms.uWet.value > 0.01;
         for (const m of built[0].paintMeshes) m.material = on ? mats.ghost : mats.paint;
         for (const m of built[0].fwdLinings) { if (Array.isArray(m.material)) m.material[0] = on ? mats.ghost : mats.insideFwd; else m.material = on ? mats.ghost : mats.insideFwd; }
       },
@@ -1359,10 +1586,6 @@
       hasExhaust: built.some((b) => !!b.exhaust),
       setWheelSpin(radians) { for (const w of wheelsets) w.mesh.rotation.x = -radians * REF_WHEEL_R / w.R; },
       setWheelDistance(m) { for (const w of wheelsets) w.mesh.rotation.x = -m / w.R; },
-      setWipers(t) {
-        const v = clamp(t, 0, 1), ang = smooth(v) * 1.35;
-        for (const w of wipers) w.p.rotation.z = w.s > 0 ? -ang : ang;
-      },
       dispose() {
         group.traverse((o) => {
           if ((o.isMesh || o.isPoints) && o.userData.disposeGeo && o.geometry) o.geometry.dispose();
@@ -1371,6 +1594,9 @@
         });
         if (mats.dest && mats.dest.map) mats.dest.map.dispose();
         for (const m of mats.own) m.dispose();
+        if (rainMesh && rainMesh.material) rainMesh.material.dispose();
+        if (spot) { spot.dispose && spot.dispose(); }
+        if (pool) { pool.material.map.dispose(); pool.material.dispose(); }
         for (const b of built) { const dm = b.group.userData.decalMat; if (dm) dm.dispose(); for (const m of b.ownMats) m.dispose(); }
         if (group.parent) group.parent.remove(group);
       },

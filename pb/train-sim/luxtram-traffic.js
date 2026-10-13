@@ -471,7 +471,8 @@
         const groups = Array.isArray(o.material) ? geo.groups : [{ start: 0, count: geo.index ? geo.index.count : posA.count, materialIndex: 0 }];
         const nA = geo.attributes.normal; const cA = geo.attributes.color;
         groups.forEach((gr) => {
-          const mat = mats0[gr.materialIndex]; const cls = bakeClass(mat); if (!cls) return;
+          const mat = mats0[gr.materialIndex]; if (!mat || !mat.color) return;   // shader effects (lamp beams, windscreen drops) are not baked
+          const cls = bakeClass(mat); if (!cls) return;
           let b = buckets.get(cls); if (!b) { b = { rep: mat, pos: [], nor: [], col: [], car: [], door: [], idx: [], uv: [] }; buckets.set(cls, b); }
           const remap = new Map();
           const mc = mat.color; const bake = cls === 'glass' || !mat.vertexColors || (mc.r !== 1 || mc.g !== 1 || mc.b !== 1);

@@ -294,8 +294,23 @@
     const train = trainById(trainId);
     // endless: every route in both directions, chained so that each service starts where the previous one ended
     // (rail: there and back, route after route; Luxtram: Findel -> Rout Bréck -> Gare -> Stadion and back, then the whole line)
-    const ids = routeOrder().filter((id) => trainDrivesClass(train, routeClass(id)));
+    const all = routeOrder().filter((id) => trainDrivesClass(train, routeClass(id)));
+    // a route that is only a stretch of a longer one (Luxtram Kierchbierg / Stad / Süd inside the whole line) is left out:
+    // endless then drives Findel -> Stadion in one go instead of stopping at Rout Bréck and the Gare
+    const ids = all.filter((id) => !all.some((other) => other !== id && isStretchOf(id, other)));
     return chainRoutes(ids.flatMap((id) => [id, id + REV]));
+  }
+  function stationsOf(routeId) {
+    const list = TS.routes && Array.isArray(TS.routes.list) ? TS.routes.list : [];
+    const def = list.find((r) => r.id === baseOf(routeId));
+    return def && Array.isArray(def.stations) ? def.stations : [];
+  }
+  function isStretchOf(id, other) {
+    const a = stationsOf(id);
+    const b = stationsOf(other);
+    if (a.length < 2 || b.length <= a.length) return false;
+    const start = b.indexOf(a[0]);
+    return start >= 0 && a.every((name, i) => b[start + i] === name);
   }
   function endsOf(routeId) {
     const list = TS.routes && Array.isArray(TS.routes.list) ? TS.routes.list : [];

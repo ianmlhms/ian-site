@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>Zuchsimulator Lëtzebuerg 🚆 – Arcade</title>
-<link rel="stylesheet" href="/pb/train-sim.css?v=4">
-<script src="/pb/arcade-kit.js?v=27" data-arcade-id="train-sim" data-arcade-title="Zuchsimulator Lëtzebuerg 🚆"></script>
+<link rel="stylesheet" href="/pb/train-sim.css?v=5">
+<script src="/pb/arcade-kit.js?v=28" data-arcade-id="train-sim" data-arcade-title="Zuchsimulator Lëtzebuerg 🚆"></script>
 </head>
 <body>
 <main id="game">
@@ -45,13 +45,16 @@
       </div>
     </div>
     <div id="aheadLoad" class="glass aheadload" role="status" hidden></div>
+    <button id="btnMenu" class="glass chipbtn" type="button" data-test="btn-menu"></button>
     <div class="hud-util">
       <span id="camName" class="glass chipbtn"></span>
       <button id="btnQuality" class="glass chipbtn" type="button"></button>
       <button id="btnRev" class="glass chipbtn" type="button" aria-pressed="false">R</button>
+      <button id="btnWx" class="glass chipbtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wxPop" data-test="btn-wx">☀️</button>
       <button id="btnFast" class="glass chipbtn" type="button" aria-pressed="false">2×</button>
       <button id="btnPause" class="glass chipbtn" type="button">P</button>
       <button id="btnHelp" class="glass chipbtn" type="button">?</button>
+      <div id="wxPop" class="glass wxpop" role="dialog" aria-label="Wieder / Dageszäit" hidden></div>
     </div>
   </div>
   <div id="toasts" role="status" aria-live="polite"></div>
@@ -62,39 +65,39 @@
   </div>
   <div id="loading" class="overlay center" hidden><div class="loadcard"><div class="spinner"></div><b id="loadingTitle"></b><div class="loadbar" id="loadBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="loadFill"></i></div><small id="loadingSub"></small></div></div>
   <div id="pauseScreen" class="overlay center" hidden><section class="card"><h2 data-t="paused">Paus</h2><p data-t="pausedDesc"></p><div class="btns"><button id="resume" class="primary" data-t="resume"></button><button id="pauseQuality" type="button"></button><button id="quit" data-t="quit"></button></div></section></div>
-  <div id="helpScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="helpTitle">Steierung</h2><div id="helpBody"></div><p class="muted" data-t="helpHint"></p><button id="helpClose" class="primary" data-t="continue"></button></section></div>
-  <div id="ttScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="timetable">Fuerplang</h2><div id="ttBody"></div><p class="muted">T</p></section></div>
-  <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp">&#128646; ZUCHSIMULATOR L&Euml;TZEBUERG</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><table id="sumRows"></table><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumMenu" class="primary"></button></div></section></div>
+  <div id="helpScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="helpTitle">Steierung</h2><div id="helpBody"></div><p class="muted" data-t="helpHint"></p><button id="helpClose" class="primary" data-t="backBtn"></button></section></div>
+  <div id="ttScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="timetable">Fuerplang</h2><div id="ttBody"></div><p class="muted">T</p><button id="ttClose" class="primary" data-t="backBtn"></button></section></div>
+  <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp">&#128646; ZUCHSIMULATOR L&Euml;TZEBUERG</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><table id="sumRows"></table><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumAgain" class="primary"></button><button id="sumMenu"></button></div></section></div>
   <div id="kbNotice" hidden><span id="kbText"></span><button id="kbClose" type="button"></button></div>
   <div id="phoneBlock" class="overlay center" hidden><section class="card"><div class="bigemoji">&#128646;</div><h2 id="phoneTitle"></h2><p id="phoneText"></p><p id="phoneHint" class="muted"></p></section></div>
   <div id="errorScreen" class="overlay center" hidden><section class="card"><h2>&#9888;</h2><p id="errorText"></p></section></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/pb/train-sim/config.js?v=5"></script>
-<script src="/pb/train-sim/copy.js?v=5"></script>
-<script src="/pb/train-sim/track.js?v=3"></script>
+<script src="/pb/train-sim/copy.js?v=6"></script>
+<script src="/pb/train-sim/track.js?v=4"></script>
 <script src="/pb/train-sim/routes.js?v=5"></script>
-<script src="/pb/train-sim/infra.js?v=6"></script>
+<script src="/pb/train-sim/infra.js?v=7"></script>
 <script src="/pb/train-sim/stations-real.js?v=1"></script>
-<script src="/pb/train-sim/stations-lu-a.js?v=3"></script>
-<script src="/pb/train-sim/stations-lu-b.js?v=1"></script>
-<script src="/pb/train-sim/stations-abroad.js?v=1"></script>
+<script src="/pb/train-sim/stations-lu-a.js?v=4"></script>
+<script src="/pb/train-sim/stations-lu-b.js?v=2"></script>
+<script src="/pb/train-sim/stations-abroad.js?v=2"></script>
 <script src="/pb/train-sim/stations-luxtram.js?v=1"></script>
-<script src="/pb/train-sim/landscape.js?v=3"></script>
+<script src="/pb/train-sim/landscape.js?v=4"></script>
 <script src="/pb/train-sim/luxtram-landmarks.js?v=5"></script><!-- LUXTRAM: hand-built landmarks (photo-checked) -->
-<script src="/pb/train-sim/luxtram-traffic.js?v=3"></script><!-- LUXTRAM: road traffic + oncoming trams -->
+<script src="/pb/train-sim/luxtram-traffic.js?v=4"></script><!-- LUXTRAM: road traffic + oncoming trams -->
 <script src="/pb/train-sim/luxtram-facades.js?v=2"></script><!-- LUXTRAM: building facades + roofs (typology atlas) -->
-<script src="/pb/train-sim/luxtram-ground.js?v=3"></script><!-- LUXTRAM: painted ground (splat shader, roads, sidewalks, markings) -->
-<script src="/pb/train-sim/luxtram-world.js?v=8"></script><!-- LUXTRAM: real Luxtram T1 routes (new files, see luxtram.js) -->
+<script src="/pb/train-sim/luxtram-ground.js?v=4"></script><!-- LUXTRAM: painted ground (splat shader, roads, sidewalks, markings) -->
+<script src="/pb/train-sim/luxtram-world.js?v=9"></script><!-- LUXTRAM: real Luxtram T1 routes (new files, see luxtram.js) -->
 <script src="/pb/train-sim/luxtram.js?v=4"></script><!-- LUXTRAM -->
-<script src="/pb/train-sim/trains.js?v=3"></script>
-<script src="/pb/train-sim/cab.js?v=3"></script>
-<script src="/pb/train-sim/passengers.js?v=1"></script>
+<script src="/pb/train-sim/trains.js?v=4"></script>
+<script src="/pb/train-sim/cab.js?v=4"></script>
+<script src="/pb/train-sim/passengers.js?v=2"></script>
 <script src="/pb/train-sim/audio.js?v=1"></script>
 <script src="/pb/train-sim/sim.js?v=5"></script>
-<script src="/pb/train-sim/career.js?v=5"></script>
-<script src="/pb/train-sim/menu.js?v=5"></script>
+<script src="/pb/train-sim/career.js?v=6"></script>
+<script src="/pb/train-sim/menu.js?v=6"></script>
 <script src="/pb/train-sim/fallback.js?v=2"></script>
-<script src="/pb/train-sim.js?v=8"></script>
+<script src="/pb/train-sim.js?v=10"></script>
 </body>
 </html>

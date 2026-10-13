@@ -26,7 +26,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 #stripDots i.done{background:var(--teal);border-color:var(--teal)}
 #stripDots i.next{background:var(--amber);border-color:var(--amber);box-shadow:0 0 10px var(--amber)}
 #stripDots span{position:absolute;top:30px;font-size:9px;color:var(--soft);transform:translateX(-50%);white-space:nowrap;max-width:70px;overflow:hidden;text-overflow:ellipsis}
-#stripTrain{position:absolute;top:8px;width:0;height:0;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #fff;filter:drop-shadow(0 1px 2px #000)}
+#stripDots span.first{transform:translateX(-5px)}#stripDots span.last{transform:translateX(calc(-100% + 5px))}
+#stripTrain{position:absolute;top:7px;width:0;height:0;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #fff;filter:drop-shadow(0 1px 2px #000)}
 .statsbox{padding:8px 14px;min-width:150px;text-align:right}
 .clockrow{display:flex;gap:10px;align-items:baseline;justify-content:flex-end}
 .clockrow b{font-size:24px;font-weight:700;letter-spacing:.02em;margin-right:-6px}
@@ -106,7 +107,7 @@ button.chipbtn.on{color:#ffd36a;background:rgba(255,196,58,.22);box-shadow:inset
 .card h2{margin:0 0 6px;font-size:26px;letter-spacing:-.02em}
 .card p{margin:8px 0}
 .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.btns button,.card>button,button.primary{padding:11px 20px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-weight:650;font-size:15px}
+.btns button,.card>button,button.primary{min-height:44px;padding:11px 20px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);font-weight:650;font-size:15px}
 .btns button:hover{background:rgba(255,255,255,.16)}
 button.primary{background:var(--amber);color:#1a1405;border-color:transparent}
 button.primary:hover{background:#ffd070}
@@ -159,7 +160,25 @@ body[data-cam="cab"] .xchg{margin-bottom:4px;padding-bottom:4px;font-size:15px}
 body[data-cam="cab"] .hint{margin-top:0;font-size:12px}
 body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 150px)}
 body[data-cam="cab"] #banner{top:34%}
-@media(max-width:900px){body[data-cam="cab"] .hud-util{display:none}}
+@media(max-width:900px){body[data-cam="cab"] .hud-util>:not(#btnWx):not(#wxPop){display:none}}
 
 /* portrait (iPad): the slim cab info strip sits below the clock box so nothing overlaps */
 @media(max-aspect-ratio:5/4){body[data-cam="cab"] #hud .hud-bottom{top:calc(max(10px,env(safe-area-inset-top)) + 96px)}body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 215px)}}
+
+/* ---------- weather + time of day button and popover ---------- */
+body.wx-open #hud{z-index:10}
+#btnWx{padding:5px 10px;font-size:15px;line-height:1}
+@media(pointer:coarse){#btnWx{min-width:44px;min-height:44px;justify-content:center;font-size:20px}}
+.wxpop{position:absolute;right:0;top:calc(100% + 8px);width:min(344px,calc(100vw - 24px));padding:12px 14px 14px;border-radius:18px;display:flex;flex-direction:column;gap:12px;z-index:8;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.wxpop[hidden]{display:none}
+.wxpop__lbl{display:block;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);margin-bottom:6px}
+.wxpop__opts{display:flex;flex-wrap:wrap;gap:6px}
+.wxopt{min-height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--ink);font:inherit;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.wxopt:hover{background:rgba(255,255,255,.16)}
+.wxopt[aria-checked="true"]{background:var(--amber);border-color:transparent;color:#1a1405}
+.wxopt:focus-visible,#btnWx:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+/* back to the menu while driving (top left, below the next-stop box) */
+#btnMenu{position:absolute;left:max(12px,env(safe-area-inset-left));top:calc(max(10px,env(safe-area-inset-top)) + 84px);pointer-events:auto;color:var(--ink);font-weight:650;font-size:13px;padding:5px 14px}
+@media(pointer:coarse){#btnMenu{min-height:44px;min-width:44px}}
+@media(max-height:560px){#btnMenu{top:calc(max(10px,env(safe-area-inset-top)) + 70px)}}

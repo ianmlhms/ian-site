@@ -22,6 +22,8 @@
   const FONT = '"Helvetica Neue", Helvetica, Arial, sans-serif';
   const GLASS_OPACITY = 0.14;
   const SIGN_FONT_SCALE = 0.62;
+  const NIGHT_MATTE0 = new THREE.Color('#171a1f'), NIGHT_MATTE1 = new THREE.Color('#2b3544'), NIGHT_METAL0 = new THREE.Color('#0d0f12'), NIGHT_METAL1 = new THREE.Color('#1c2430');
+  const NIGHT_DIAL = new THREE.Color('#ffe7c2'), NIGHT_ONE = new THREE.Color(1, 1, 1);
   const HOVER_TINT = '#ffd27a';          // emissive tint of a hovered control
   const HOVER_EMISSIVE = 0.75;           // emissive floor of a hovered control
   const HIT_W = 0.092;                   // width of a button hit box (m), a bit larger than the button + sticker
@@ -1024,7 +1026,7 @@
     /* ---------------------------------------------------------------- update */
     const rt = {
       last: 0, leverDisp: 0, needle: 0, mfdAt: 0, snapNext: true, hornLit: 0, powerMax: 500,
-      applied: { lever: null, head: null, horn: null, door: {}, lamp: {} },
+      night: -1, applied: { lever: null, head: null, horn: null, door: {}, lamp: {} },
     };
     const palette = S.retro ? PAL_RETRO : PAL_MODERN;
 
@@ -1113,12 +1115,19 @@
       // buttons / lamps
       applyDoorLamps(s, now);
       setEmissive(ebMat, target <= NOTCH_EB ? 1.7 : 0.12);
-      const head = !!s.headlights;
-      lightKnob.rotation.y = head ? -0.9 : 0;
+      const hl = s.headlights === true ? 2 : clamp(Math.round(num(s.headlights, 0)), 0, 2);   // 0 off, 1 dipped, 2 full beam
+      lightKnob.rotation.y = -0.45 * hl;
+      const night = Math.round(clamp(num(s.night, 0), 0, 1) * 50) / 50;
+      if (night !== rt.night) {   // instrument glow: the desk, labels and dial faces pick up a dim cool backlight when it is dark
+        rt.night = night;
+        matMatte.emissive.copy(NIGHT_MATTE0).lerp(NIGHT_MATTE1, night); matMetal.emissive.copy(NIGHT_METAL0).lerp(NIGHT_METAL1, night);
+        matSticker.emissiveIntensity = 0.38 + 0.7 * night; gateMat.emissiveIntensity = 0.4 + 0.6 * night;
+        dialFaceMat.color.setScalar(1 - 0.22 * night).multiply(NIGHT_DIAL.clone().lerp(NIGHT_ONE, 1 - night));
+      }
       setEmissive(dynLamps.eb, target <= NOTCH_EB ? 1.9 : 0.04);
       setEmissive(dynLamps.traction, target > 0 ? 1.6 : 0.04);
       setEmissive(dynLamps.brake, target < 0 && target > NOTCH_EB ? 1.6 : 0.04);
-      setEmissive(dynLamps.head, head ? 1.6 : 0.04);
+      setEmissive(dynLamps.head, hl === 2 ? 1.7 : hl === 1 ? 0.75 : 0.04);
       setEmissive(dynLamps.door, num(s.doorsOpen01, 0) < 0.02 && !s.doorsReleased ? 1.6 : 0.04);
       setEmissive(dynLamps.wiper, s.wiper ? 1.6 : 0.04);
       setEmissive(hornMat, s.horn ? 1.3 : 0);

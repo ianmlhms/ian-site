@@ -1,6 +1,6 @@
 /* Weekly board reads are cached per account for this page view. */
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=9";
-import { arcadeText, escapeHtml as esc, scoreHtml, scoreKeyHtml } from "./score-format.js?v=7";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=10";
+import { arcadeText, escapeHtml as esc, scoreHtml, scoreKeyHtml } from "./score-format.js?v=8";
 
 const GAMES = Object.freeze({
   tetris: ["Tetris", "🧱"], flappy: ["Flappy Bird", "🐦"], "crossy-road": ["Crossy Road", "🐔"],

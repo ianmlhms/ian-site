@@ -631,15 +631,313 @@
     });
   }
 
-  function addBed(ctx) {
-    const { sets, frames, kind } = ctx;
-    if (kind === 'tram') return addTramStreet(ctx);
-    sweep(sets.get('ballast', () => M.tex('ballast', tex.ballast())), frames,
-      [[-3.5, -0.52], [-2.0, -0.25], [2.0, -0.25], [3.5, -0.52]], WHITE, { uvU: 1 / 3, uvV: 1 / 3 });
+  /* ====================================================================== RAIL PAIR (double track, rail + hst only)
+     Every rail line is double track: the player's track at lateral 0 and the second main at track.second.lat(s) (track.js: the side opposite
+     the platform of the nearest station, swinging across the player's track in a flat diamond crossing between stations of different sides).
+     Everything below is drawn from the player's frames, so a tunnel / bridge / crossing sees one constant offset and a flip never lies in one. */
+  const smoothStep = (t) => { const c = clamp(t, 0, 1); return c * c * (3 - 2 * c); };
+  const secLatAt = (track, s) => (track.second ? track.second.lat(s) : 0);
+  /* a lineside object that always stands on the RIGHT of the player's track: `outer` when the right side is free, `inner` (between the two tracks)
+     when the second main is on the right, beyond the second track while it swings across */
+  function railRightLat(track, s, outer, inner) {
+    const L = secLatAt(track, s);
+    if (L > 0) return L >= 4.0 ? inner : L + outer;
+    return outer;
+  }
+  /* arc-length range in which rails are drawn: a terminus buffer stop ends the track */
+  function railRange(track) {
+    const n = track.stations.length;
+    let a = 0;
+    let b = track.length;
+    if (n > 1 && track.stations[0].terminus) a = 1.6;
+    if (n > 1 && track.stations[n - 1].terminus) b = Math.min(b, Math.min(track.length - 8, track.stations[n - 1].platformEnd + 28) + 1.0);
+    return [a, b];
+  }
+  /* sweep with a per-frame profile: ptsAt(i) -> [[lat, dy], ...] (same length for every frame). opts.uLat = [scale, offset]: u = lat * scale + offset
+     (instead of the running profile length) so a texture stays centred when the profile width changes. */
+  function sweepP(batch, frames, ptsAt, color, o) {
+    const opts = o || {};
+    const closed = !!opts.closed;
+    const uvU = opts.uvU || 1;
+    const uvV = opts.uvV || 1;
+    const flip = opts.flip ? -1 : 1;
+    const prof = frames.map((_, i) => ptsAt(i));
+    const n = prof[0].length;
+    const edges = closed ? n : n - 1;
+    const cums = prof.map((pts) => {
+      const c = [0];
+      for (let k = 0; k < edges; k++) {
+        const p0 = pts[k];
+        const p1 = pts[(k + 1) % n];
+        c.push(c[k] + (Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1));
+      }
+      return c;
+    });
+    const uOf = (i, k, p) => (opts.uLat ? p[0] * opts.uLat[0] + opts.uLat[1] : cums[i][k] * uvU);
+    for (let k = 0; k < edges; k++) {
+      const c = Array.isArray(color[0]) ? color[k % color.length] : color;
+      for (let i = 0; i < frames.length - 1; i++) {
+        const fa = frames[i];
+        const fb = frames[i + 1];
+        const pa = prof[i];
+        const pb = prof[i + 1];
+        const a0 = pa[k];
+        const a1 = pa[(k + 1) % n];
+        const b0 = pb[k];
+        const b1 = pb[(k + 1) % n];
+        const dx = a1[0] - a0[0];
+        const dy = a1[1] - a0[1];
+        const el = Math.hypot(dx, dy) || 1;
+        const nl = [(-dy / el) * flip, (dx / el) * flip];
+        const nrm = [fa.rx * nl[0], nl[1], fa.rz * nl[0]];
+        batch.quad(worldPt(fa, a0[0], a0[1]), worldPt(fa, a1[0], a1[1]), worldPt(fb, b1[0], b1[1]), worldPt(fb, b0[0], b0[1]), nrm, c,
+          [[uOf(i, k, a0), fa.s * uvV], [uOf(i, k + 1, a1), fa.s * uvV], [uOf(i + 1, k + 1, b1), fb.s * uvV], [uOf(i + 1, k, b0), fb.s * uvV]]);
+      }
+    }
+  }
+  /* the chunk's frames of the second main track: the player's frames shifted by the second track's lateral offset */
+  function makePair(ctx) {
+    const { track, frames } = ctx;
+    if (!track.second || track.kind === 'tram') return null;
+    const lat = frames.map((f) => track.second.lat(f.s));
+    const frames2 = frames.map((f, i) => ({ s: f.s, x: f.x + f.rx * lat[i], y: f.y, z: f.z + f.rz * lat[i], rx: f.rx, rz: f.rz, tx: f.tx, ty: f.ty, tz: f.tz }));
+    return { lat, frames2 };
+  }
+
+  function addRailBed(ctx) {
+    const { sets, frames, pair } = ctx;
+    const ballast = sets.get('ballast', () => M.tex('ballast', tex.ballast()));
     const steel = sets.get('steel', M.steel);
-    [-RAIL_X, RAIL_X].forEach((x) => sweep(steel, frames, shifted(RAIL_PROFILE, x), RAIL_COLORS, { closed: true }));
     const trough = sets.get('vc', M.vc);
-    [-1, 1].forEach((sd) => sweep(trough, frames, [[sd * 2.4, -0.1], [sd * 2.75, -0.1], [sd * 2.75, -0.45], [sd * 2.4, -0.45]].map((p) => p), [col('#a9a69f'), col('#908d87'), col('#908d87'), col('#908d87')], { closed: sd > 0 ? true : true, flip: sd < 0 }));
+    const troughCols = [col('#a9a69f'), col('#908d87'), col('#908d87'), col('#908d87')];
+    if (!pair) {
+      sweep(ballast, frames, [[-3.5, -0.52], [-2.0, -0.25], [2.0, -0.25], [3.5, -0.52]], WHITE, { uvU: 1 / 3, uvV: 1 / 3 });
+      [-RAIL_X, RAIL_X].forEach((x) => sweep(steel, frames, shifted(RAIL_PROFILE, x), RAIL_COLORS, { closed: true }));
+      [-1, 1].forEach((sd) => sweep(trough, frames, [[sd * 2.4, -0.1], [sd * 2.75, -0.1], [sd * 2.75, -0.45], [sd * 2.4, -0.45]], troughCols, { closed: true, flip: sd < 0 }));
+      return;
+    }
+    // one ballast bed for the pair (its width follows the second track, also while it swings across), rails of both tracks, cable troughs on the outer sides
+    const lo = (i) => Math.min(0, pair.lat[i]);
+    const hi = (i) => Math.max(0, pair.lat[i]);
+    sweepP(ballast, frames, (i) => [[lo(i) - 3.5, -0.52], [lo(i) - 2.0, -0.25], [hi(i) + 2.0, -0.25], [hi(i) + 3.5, -0.52]], WHITE, { uvU: 1 / 3, uvV: 1 / 3 });
+    [-RAIL_X, RAIL_X].forEach((x) => {
+      sweep(steel, frames, shifted(RAIL_PROFILE, x), RAIL_COLORS, { closed: true });
+      sweep(steel, pair.frames2, shifted(RAIL_LITE, x), RAIL_LITE_COLORS, { closed: true });   // the second main uses the 8-edge rail profile (fewer triangles)
+    });
+    [-1, 1].forEach((sd) => sweepP(trough, frames, (i) => {
+      const b = sd < 0 ? lo(i) : hi(i);
+      return [[b + sd * 2.4, -0.1], [b + sd * 2.75, -0.1], [b + sd * 2.75, -0.45], [b + sd * 2.4, -0.45]];
+    }, troughCols, { closed: true, flip: sd < 0 }));
+    addFlipFrogs(ctx);
+  }
+
+  /* flat diamond crossing where the second track swings across the player's: crossing noses where a rail of one track meets a rail of the other */
+  function addFlipFrogs(ctx) {
+    const { track, sets, s0, s1 } = ctx;
+    const sec = track.second;
+    if (!sec || !sec.flips.length) return;
+    const steel = sets.get('steel', M.steel);
+    const A = sec.SECOND_LAT;
+    sec.flips.forEach((f) => {
+      [0, 1.435, -1.435].forEach((Lt) => {
+        const S = (Lt / A - f.from) / (f.to - f.from);
+        if (S <= 0.02 || S >= 0.98) return;
+        let lo = 0;
+        let hi = 1;
+        for (let i = 0; i < 24; i++) {
+          const m = (lo + hi) / 2;
+          if (smoothStep(m) < S) lo = m; else hi = m;
+        }
+        const s = f.s0 + ((lo + hi) / 2) * (f.s1 - f.s0);
+        if (s < s0 || s >= s1) return;
+        const fr = track.frameAt(s);
+        const yaw = -Math.atan2(fr.tangent.x, -fr.tangent.z);
+        const rails = Lt === 0 ? [-RAIL_X, RAIL_X] : [Lt > 0 ? RAIL_X : -RAIL_X];
+        rails.forEach((lat) => {
+          const p = posAt(track, s, lat, 0);
+          steel.box(p[0], p[1] - 0.04, p[2], 0.17, 0.1, 1.5, col('#6f6a62'), yaw);
+          [-1, 1].forEach((d) => { const c = posAt(track, s, lat + d * 0.2, 0); steel.box(c[0], c[1] - 0.05, c[2], 0.06, 0.09, 2.6, col('#8f8a82'), yaw); });
+        });
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------ rail catenary (both tracks) */
+  function addRailCatenary(ctx) {
+    const { track, sets, q, s0, s1 } = ctx;
+    const dark = sets.get('mast', M.vc, true);
+    const wire = sets.get('wire', M.vc);
+    const sec = track.second;
+    const [rA, rB] = ctx.railRange;
+    const spacing = q.mastSpacing;
+    const k0 = Math.ceil(Math.max(s0, rA) / spacing);
+    const k1 = Math.ceil(Math.min(s1, rB) / spacing) - 1;
+    const concrete = col('#a7a49e');
+    const steelCol = col('#7d8286');
+    const insul = col('#d8d3c4');
+    const wireCol = col('#66605a');
+    const copper = col('#8a6a48');
+    const nearFlip = (s) => !!sec && sec.flips.some((f) => s > f.s0 - 6 && s < f.s1 + 6);
+    const segs = 6;
+    for (let k = k0; k <= k1; k++) {
+      const s = k * spacing;
+      if (s > rB) break;
+      const L = secLatAt(track, s);
+      const tunnelMast = track.inTunnel(s);
+      const f = track.frameAt(s);
+      const theta = Math.atan2(f.tangent.x, -f.tangent.z);
+      const onSteel = inSteelBridge(track, s);
+      const crossing = track.crossings.some((c) => Math.abs(c.s - s) < 7);
+      const stag = 0.2 * (k % 2 === 0 ? 1 : -1);
+      if (!tunnelMast && !onSteel && !crossing) {
+        if (nearFlip(s)) {
+          // portal over the diamond crossing: two columns outside both tracks and a cross girder carrying both contact wires
+          [-1, 1].forEach((sd) => {
+            const b = posAt(track, s, sd * 7.3, 0);
+            dark.box(b[0], b[1] - 0.3, b[2], 0.62, 0.5, 0.62, concrete, -theta);
+            dark.box(b[0], b[1] - 0.05 + MAST_H / 2, b[2], 0.3, MAST_H, 0.3, steelCol, -theta);
+          });
+          dark.between(posAt(track, s, -7.3, 6.75), posAt(track, s, 7.3, 6.75), 0.2, steelCol, 0.34);
+          dark.between(posAt(track, s, -7.3, 6.2), posAt(track, s, 7.3, 6.2), 0.08, steelCol);
+          [0, L].forEach((tc) => {
+            dark.between(posAt(track, s, tc, 6.75), posAt(track, s, tc, CONTACT_H + 0.02), 0.05, steelCol);
+            dark.between(posAt(track, s, tc - 0.5, 6.2), posAt(track, s, tc + 0.5, 6.75), 0.04, steelCol);
+          });
+        } else {
+          // one mast between the two tracks with a cantilever arm to each contact wire
+          const mp = (L < 0 ? -1 : 1) * 2.5;
+          const base = posAt(track, s, mp, 0);
+          dark.box(base[0], base[1] - 0.3, base[2], 0.5, 0.5, 0.5, concrete, -theta);
+          dark.box(base[0], base[1] - 0.05 + MAST_H / 2, base[2], 0.2, MAST_H, 0.3, steelCol, -theta);
+          [0, L].forEach((tc, ti) => {
+            const dir = tc > mp ? 1 : -1;
+            dark.between(posAt(track, s, mp, 6.55), posAt(track, s, tc - dir * 0.1, 6.4), 0.07, steelCol);
+            dark.between(posAt(track, s, mp, 5.5), posAt(track, s, tc - dir * 1.2, 6.4), 0.05, steelCol);
+            dark.between(posAt(track, s, mp + dir * 0.3, 6.4), posAt(track, s, mp + dir * 0.3, 6.7), 0.1, insul);
+            dark.between(posAt(track, s, tc - dir * 0.1, 6.3), posAt(track, s, tc + (ti === 0 ? stag : -stag), CONTACT_H + 0.02), 0.04, steelCol);
+          });
+        }
+      }
+      // wires of the span [s, s+spacing], one contact wire + messenger per track
+      [0, 1].forEach((ti) => {
+        const sg = ti === 0 ? stag : -stag;
+        let prevC = null;
+        let prevM = null;
+        for (let j = 0; j <= segs; j++) {
+          const u = j / segs;
+          const sj = s + u * spacing;
+          if (sj > rB + 0.001) break;
+          const bl = ti === 0 ? 0 : secLatAt(track, sj);
+          const c = posAt(track, sj, bl + sg * (1 - 2 * u), CONTACT_H);
+          const mY = MESSENGER_H - 1.05 * 4 * u * (1 - u);
+          const m = posAt(track, sj, bl, mY);
+          if (prevC) {
+            wire.between(prevC, c, 0.035, copper);
+            const spanTunnel = tunnelMast || track.inTunnel(s + spacing) || inSteelBridge(track, s) || inSteelBridge(track, s + spacing);
+            if (q.messenger && !spanTunnel) wire.between(prevM, m, 0.03, wireCol);
+            if (q.droppers && !spanTunnel && j < segs) wire.between(c, posAt(track, sj, bl, mY - 0.02), 0.012, wireCol);
+          }
+          prevC = c;
+          prevM = m;
+        }
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------ double-track tunnel + portals */
+  const RT_R = 4.6;
+  const RT_CY = 2.1;
+  function railPortalGeometry(env) {
+    if (env.railPortalGeo) return env.railPortalGeo;
+    const depth = 2.2;
+    const hw = RT_R + 3.4;
+    const wall = new T.Shape();
+    wall.moveTo(-hw, FORM_Y);
+    wall.lineTo(hw, FORM_Y);
+    wall.lineTo(hw, 11.6);
+    wall.lineTo(-hw, 11.6);
+    wall.closePath();
+    const hole = new T.Path();
+    hole.moveTo(-(RT_R + 0.2), FORM_Y);
+    hole.lineTo(-(RT_R + 0.2), RT_CY);
+    hole.absarc(0, RT_CY, RT_R + 0.2, Math.PI, 0, true);
+    hole.lineTo(RT_R + 0.2, FORM_Y);
+    hole.closePath();
+    wall.holes.push(hole);
+    const wallGeo = new T.ExtrudeGeometry(wall, { depth, bevelEnabled: false, curveSegments: 16 });
+    wallGeo.translate(0, 0, -depth);
+    const ring = new T.Shape();
+    ring.moveTo(RT_R + 0.2, FORM_Y);
+    ring.lineTo(RT_R + 0.85, FORM_Y);
+    ring.lineTo(RT_R + 0.85, RT_CY);
+    ring.absarc(0, RT_CY, RT_R + 0.85, 0, Math.PI, false);
+    ring.lineTo(-(RT_R + 0.85), FORM_Y);
+    ring.lineTo(-(RT_R + 0.2), FORM_Y);
+    ring.lineTo(-(RT_R + 0.2), RT_CY);
+    ring.absarc(0, RT_CY, RT_R + 0.2, Math.PI, 0, true);
+    ring.closePath();
+    const ringGeo = new T.ExtrudeGeometry(ring, { depth: 0.4, bevelEnabled: false, curveSegments: 16 });
+    ringGeo.translate(0, 0, 0.35 - 0.4 + 0.05);
+    env.railPortalGeo = { wallGeo, ringGeo };
+    return env.railPortalGeo;
+  }
+  function addRailPortal(ctx, s, entry, C) {
+    const { track, sets, env } = ctx;
+    const f = track.frameAt(s);
+    const th = Math.atan2(f.tangent.x, -f.tangent.z);
+    const yaw = entry ? -th : -th + Math.PI;
+    const { wallGeo, ringGeo } = railPortalGeometry(env);
+    const m = new T.Matrix4().compose(new T.Vector3(f.pos.x + f.right.x * C, f.pos.y, f.pos.z + f.right.z * C), new T.Quaternion().setFromEuler(new T.Euler(0, yaw, 0)), new T.Vector3(1, 1, 1));
+    const concrete = sets.get('concrete', () => M.tex('concrete', tex.concrete()), true);
+    concrete.geom(wallGeo, m, col('#b4b1aa'), 0.2);
+    const stone = sets.get('stone', () => M.tex('stone', tex.stone()), true);
+    stone.geom(ringGeo, m, col('#e6dcc4'), 0.25);
+    const dirOut = entry ? -1 : 1;
+    [-1, 1].forEach((sd) => {
+      const a = posAt(track, s, C + sd * (RT_R + 3.3), 0);
+      const bOff = posAt(track, s + dirOut * 7, C + sd * (RT_R + 9.4), 0);
+      concrete.between([a[0], a[1] + 4.2, a[2]], [bOff[0], bOff[1] + 3.5, bOff[2]], 0.9, col('#a9a69f'), 8.4);
+    });
+    const glow = sets.get('glow', M.glow);
+    const lamp = posAt(track, s + (entry ? -0.2 : 0.2), C, RT_CY + RT_R + 0.9);
+    glow.box(lamp[0], lamp[1], lamp[2], 0.3, 0.3, 0.3, col('#ffe9b0'));
+  }
+  function addRailTunnel(ctx, tn) {
+    const { track, sets, q, s0, s1 } = ctx;
+    const a = Math.max(s0, tn.s0);
+    const b = Math.min(s1, tn.s1);
+    if (b <= a) return;
+    const L = secLatAt(track, (tn.s0 + tn.s1) / 2);   // one offset all along (track.js keeps the flips out of tunnels)
+    const C = L / 2;
+    const frames = makeFrames(track, a, b, q.sweepStep);
+    const prof = [[C + RT_R, FORM_Y], [C + RT_R, RT_CY]];
+    for (let i = 1; i <= 14; i++) {
+      const t = (i / 14) * Math.PI;
+      prof.push([C + RT_R * Math.cos(t), RT_CY + RT_R * Math.sin(t)]);
+    }
+    prof.push([C - RT_R, FORM_Y]);
+    sweep(sets.get('lining', M.lining), frames, prof, WHITE, { uvU: 1 / 3, uvV: 1 / 3 });
+    const glow = sets.get('glow', M.glow);
+    const hang = sets.get('wire', M.vc);
+    const first = Math.ceil(a / 14) * 14;
+    for (let s = first; s < b - 1; s += 14) {
+      [-1, 1].forEach((sd) => {
+        const p = posAt(track, s, C + sd * (RT_R - 0.12), 3.4);
+        const f = track.frameAt(s);
+        glow.box(p[0], p[1], p[2], 0.1, 0.14, 1.4, col('#ffe7b2'), -Math.atan2(f.tangent.x, -f.tangent.z));
+      });
+      [0, L].forEach((tc) => {
+        const crown = RT_CY + Math.sqrt(Math.max(1, RT_R * RT_R - (tc - C) * (tc - C))) - 0.05;
+        hang.between(posAt(track, s, tc, crown), posAt(track, s, tc, CONTACT_H), 0.05, col('#5b5d60'));
+      });
+    }
+    if (tn.s0 >= s0 && tn.s0 < s1) addRailPortal(ctx, tn.s0, true, C);
+    if (tn.s1 > s0 && tn.s1 <= s1) addRailPortal(ctx, tn.s1, false, C);
+  }
+
+  function addBed(ctx) {
+    if (ctx.kind === 'tram') return addTramStreet(ctx);
+    return addRailBed(ctx);
   }
 
   function addSleepers(ctx) {
@@ -648,15 +946,25 @@
     const step = q.sleeperStep;
     const count = Math.floor((s1 - s0) / step);
     if (count < 1) return;
-    const inst = new T.InstancedMesh(ctx.env.sleeperGeo, ctx.env.sleeperMat, count);
+    const twin = !!track.second;   // double track: a second row of sleepers for the second main (same draw call)
+    const inst = new T.InstancedMesh(ctx.env.sleeperGeo, ctx.env.sleeperMat, twin ? count * 2 : count);
     const f = track.frameAt(s0);
     const dummy = new T.Object3D();
     for (let i = 0; i < count; i++) {
-      track.frameAt(s0 + (i + 0.5) * step, f);
+      const sm = s0 + (i + 0.5) * step;
+      track.frameAt(sm, f);
       dummy.position.set(f.pos.x - origin.x, f.pos.y - 0.27 - origin.y, f.pos.z - origin.z);
       dummy.rotation.set(0, -Math.atan2(f.tangent.x, -f.tangent.z), 0);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
+      if (twin) {
+        const L = track.second.lat(sm);
+        const slope = (track.second.lat(sm + 0.5) - track.second.lat(sm - 0.5));
+        dummy.position.set(f.pos.x + f.right.x * L - origin.x, f.pos.y - 0.27 - origin.y, f.pos.z + f.right.z * L - origin.z);
+        dummy.rotation.set(0, -(Math.atan2(f.tangent.x, -f.tangent.z) + Math.atan(slope)), 0);
+        dummy.updateMatrix();
+        inst.setMatrixAt(count + i, dummy.matrix);
+      }
     }
     inst.position.copy(origin);
     inst.receiveShadow = true;
@@ -726,65 +1034,11 @@
   }
 
   function addCatenary(ctx) {
-    const { track, sets, q, s0, s1, kind } = ctx;
-    const dark = sets.get('mast', M.vc, true);
-    const wire = sets.get('wire', M.vc);
+    const { kind } = ctx;
+    const dark = ctx.sets.get('mast', M.vc, true);
+    const wire = ctx.sets.get('wire', M.vc);
     if (kind === 'tram') return addTramOcs(ctx, dark, wire);
-    const spacing = q.mastSpacing;
-    const k0 = Math.ceil(s0 / spacing);
-    const k1 = Math.ceil(s1 / spacing) - 1;
-    const concrete = col('#a7a49e');
-    const steelCol = col('#7d8286');
-    const insul = col('#d8d3c4');
-    const wireCol = col('#66605a');
-    const copper = col('#8a6a48');
-    for (let k = k0; k <= k1; k++) {
-      const s = k * spacing;
-      if (s > track.length + 20) break;
-      const tunnelMast = track.inTunnel(s);
-      const stIdx = inStation(track, s, 14);
-      let sign = k % 2 === 0 ? 1 : -1;
-      if (stIdx >= 0) sign = track.stations[stIdx].side === 'right' ? -1 : 1;
-      const f = track.frameAt(s);
-      const theta = Math.atan2(f.tangent.x, -f.tangent.z);
-      const onSteel = inSteelBridge(track, s);
-      const crossing = track.crossings.some((c) => Math.abs(c.s - s) < 7);
-      if (!tunnelMast && !onSteel && !crossing) {
-        const base = posAt(track, s, sign * MAST_X, 0);
-        dark.box(base[0], base[1] - 0.3, base[2], 0.62, 0.5, 0.62, concrete, -theta);
-        dark.box(base[0], base[1] - 0.05 + MAST_H / 2, base[2], 0.2, MAST_H, 0.3, steelCol, -theta);
-        const top = posAt(track, s, sign * MAST_X, 6.55);
-        const tip = posAt(track, s, sign * 0.1, 6.4);
-        dark.between(top, tip, 0.07, steelCol);
-        dark.between(posAt(track, s, sign * MAST_X, 5.5), posAt(track, s, sign * 1.5, 6.4), 0.05, steelCol);
-        const i1 = posAt(track, s, sign * (MAST_X - 0.3), 6.4);
-        const i2 = posAt(track, s, sign * (MAST_X - 0.3), 6.7);
-        dark.between(i1, i2, 0.1, insul);
-        const stag = 0.2 * (k % 2 === 0 ? 1 : -1);
-        dark.between(posAt(track, s, sign * 0.1, 6.3), posAt(track, s, stag, CONTACT_H + 0.02), 0.04, steelCol);
-      }
-      // wires of the span [s, s+spacing]
-      const segs = 6;
-      const stagA = 0.2 * (k % 2 === 0 ? 1 : -1);
-      let prevC = null;
-      let prevM = null;
-      for (let j = 0; j <= segs; j++) {
-        const u = j / segs;
-        const sj = s + u * spacing;
-        const lat = stagA * (1 - 2 * u);
-        const c = posAt(track, sj, lat, CONTACT_H);
-        const mY = MESSENGER_H - 1.05 * 4 * u * (1 - u);
-        const m = posAt(track, sj, 0, mY);
-        if (prevC) {
-          wire.between(prevC, c, 0.035, copper);
-          const spanTunnel = tunnelMast || track.inTunnel(s + spacing) || inSteelBridge(track, s) || inSteelBridge(track, s + spacing);
-          if (q.messenger && !spanTunnel) wire.between(prevM, m, 0.03, wireCol);
-          if (q.droppers && !spanTunnel && j < segs) wire.between(c, posAt(track, sj, 0, mY - 0.02), 0.012, wireCol);
-        }
-        prevC = c;
-        prevM = m;
-      }
-    }
+    return addRailCatenary(ctx);
   }
 
   /* LUXTRAM overhead line, one contact wire per track. The wire polyline uses the very sample points of the rails (ctx.frames /
@@ -887,8 +1141,8 @@
     const post = sets.get('mast', M.vc, true);
     track.limits.forEach((lim) => {
       if (lim.s < s0 || lim.s >= s1) return;
-      const sd = ctx.kind === 'tram' ? 1 : lateralFree(track, lim.s);   // tram: right of the track (the left side is the opposite track)
-      let lat = sd * (ctx.kind === 'tram' ? 4.7 : 2.95);
+      const sd = 1;   // right of the track (tram: the left side is the opposite track; rail: the second main may be on the right, see railRightLat)
+      let lat = sd * (ctx.kind === 'tram' ? 4.7 : railRightLat(track, lim.s, 2.95, 2.8));
       if (ctx.kind === 'tram') { const si = inStation(track, lim.s, 4); if (si >= 0 && track.stations[si].side === 'right' && track.stations[si].kind !== 'island') lat = track.stations[si].edge + track.stations[si].width + 0.45; }
       lat = roadSafeLat(track, lim.s, lat, null, ctx.kind === 'tram' && inStation(track, lim.s, 4) >= 0);
       const f = track.frameAt(lim.s);
@@ -918,8 +1172,7 @@
     track.signals.forEach((sig) => {
       const s = sig.s - 320;
       if (s < s0 || s >= s1 || s < 5 || track.inTunnel(s) || track.bridgeAt(s)) return;
-      const sd = lateralFree(track, s);
-      const base = posAt(track, s, sd * 3.5, -0.2);
+      const base = posAt(track, s, railRightLat(track, s, 3.5, 2.75), -0.2);
       const f = track.frameAt(s);
       const th = -Math.atan2(f.tangent.x, -f.tangent.z);
       post.box(base[0], base[1] + 1.1, base[2], 0.08, 2.3, 0.08, col('#6c7075'), th);
@@ -938,8 +1191,10 @@
     for (let s = Math.ceil(s0 / step) * step; s < s1; s += step) {
       if (track.inTunnel(s) || track.bridgeAt(s) || inStation(track, s, 30) >= 0) continue;
       [-1, 1].forEach((sd) => {
-        const a = posAt(track, s, sd * 5.4, -0.45);
-        const b = posAt(track, s + step, sd * 5.4, -0.45);
+        const L2 = secLatAt(track, s);
+        const L2b = secLatAt(track, s + step);
+        const a = posAt(track, s, (sd < 0 ? Math.min(0, L2) : Math.max(0, L2)) + sd * 5.4, -0.45);
+        const b = posAt(track, s + step, (sd < 0 ? Math.min(0, L2b) : Math.max(0, L2b)) + sd * 5.4, -0.45);
         const f = track.frameAt(s);
         post.box(a[0], a[1] + 0.9, a[2], 0.1, 1.8, 0.1, col('#6e757b'), -Math.atan2(f.tangent.x, -f.tangent.z));
         [0.35, 0.8, 1.3, 1.7].forEach((h) => panel.between([a[0], a[1] + h, a[2]], [b[0], b[1] + h, b[2]], 0.025, col('#9aa0a6')));
@@ -954,9 +1209,10 @@
     for (let k = first; k * 500 < s1; k++) {
       const s = k * 500;
       if (s > track.length || track.inTunnel(s) || track.bridgeAt(s)) continue;
-      const sd = ctx.kind === 'tram' ? 1 : -lateralFree(track, s);
+      const L2 = ctx.kind === 'tram' ? 0 : secLatAt(track, s);
+      const sd = ctx.kind === 'tram' ? 1 : L2 > 3 ? -1 : 1;   // rail: on the free outer side (right, or left while the second main is on the right)
       const si = ctx.kind === 'tram' ? inStation(track, s, 4) : -1;
-      const kmLat = sd * (ctx.kind === 'tram' ? (si >= 0 && track.stations[si].kind !== 'island' ? track.stations[si].edge + track.stations[si].width + 0.9 : 5.6) : 3.1);
+      const kmLat = sd * (ctx.kind === 'tram' ? (si >= 0 && track.stations[si].kind !== 'island' ? track.stations[si].edge + track.stations[si].width + 0.9 : 5.6) : L2 > 0 && L2 <= 3 ? L2 + 3.4 : 3.4);
       const p = posAt(track, s, ctx.kind === 'tram' ? roadSafeLat(track, s, kmLat, null, si >= 0) : kmLat, ctx.kind === 'tram' ? 0.14 : -0.3);
       const f = track.frameAt(s);
       const th = -Math.atan2(f.tangent.x, -f.tangent.z);
@@ -976,8 +1232,8 @@
   function buildSignal(env, track, sig, index, aspect) {
     const f = track.frameAt(sig.s);
     const group = new T.Group();
-    const sd = lateralFree(track, sig.s);
-    const lat = Math.abs(roadSafeLat(track, sig.s, 3.9, null, false));
+    const sd = 1;
+    const lat = track.kind === 'tram' ? Math.abs(roadSafeLat(track, sig.s, 3.9, null, false)) : railRightLat(track, sig.s, 3.9, 2.6);
     group.position.set(f.pos.x + f.right.x * lat * sd, f.pos.y, f.pos.z + f.right.z * lat * sd);
     logPole('signal', sig.s, [group.position.x, 0, group.position.z]);
     group.rotation.y = -Math.atan2(f.tangent.x, -f.tangent.z);
@@ -1087,6 +1343,7 @@
   }
 
   function addTunnel(ctx, tn) {
+    if (ctx.kind !== 'tram') return addRailTunnel(ctx, tn);
     const { track, sets, q, s0, s1 } = ctx;
     const a = Math.max(s0, tn.s0);
     const b = Math.min(s1, tn.s1);
@@ -1146,21 +1403,29 @@
     const frames = makeFrames(track, a, b, q.sweepStep);
     const isTram = kind === 'tram';
     const half = br.kind === 'steel' ? (isTram ? 7.4 : 3.65) : isTram ? 7.4 : 3.85;
+    // double track: the deck carries both tracks (the second main keeps one offset along a bridge, track.js keeps the flips out)
+    const L2 = isTram ? 0 : secLatAt(track, (br.s0 + br.s1) / 2);
+    const lo = Math.min(0, L2) - half;
+    const hi = Math.max(0, L2) + half;
     const stone = sets.get('stone', () => M.tex('stone', tex.stone()), true);
     const steel = sets.get('steel', M.steel);
     if (br.kind === 'steel') {
-      sweep(steel, frames, [[-half, -0.5], [half, -0.5], [half, -1.6], [-half, -1.6]], [col('#7a1814'), col('#7a1814'), col('#5c110e'), col('#7a1814')], { closed: true });
-      addSteelTruss(ctx, br, a, b, isTram ? 7.45 : 3.75, isTram ? 6.2 : 7.2);
+      sweep(steel, frames, [[lo, -0.5], [hi, -0.5], [hi, -1.6], [lo, -1.6]], [col('#7a1814'), col('#7a1814'), col('#5c110e'), col('#7a1814')], { closed: true });
+      addSteelTruss(ctx, br, a, b, isTram ? 7.45 : 3.75, isTram ? 6.2 : 7.2, isTram ? null : { lo: lo - 0.1, hi: hi + 0.1, L2 });
     } else {
       const body = br.kind === 'viaduct' ? stone : sets.get('concrete', () => M.tex('concrete', tex.concrete()), true);
-      sweep(body, frames, [[-half, -0.5], [half, -0.5], [half, -1.7], [-half, -1.7]], br.kind === 'viaduct' ? [col('#f0e6cf')] : [col('#c9c6bf')], { closed: true, uvU: 1 / 3, uvV: 1 / 3 });
-      [[-half - 0.05, -half + 0.28], [half - 0.28, half + 0.05]].forEach(([l, r]) => sweep(body, frames, [[l, 0.6], [r, 0.6], [r, -0.5], [l, -0.5]], [col('#efe3c8')], { closed: true, uvU: 1 / 3, uvV: 1 / 3 }));
-      addBridgePiers(ctx, br, half);
+      sweep(body, frames, [[lo, -0.5], [hi, -0.5], [hi, -1.7], [lo, -1.7]], br.kind === 'viaduct' ? [col('#f0e6cf')] : [col('#c9c6bf')], { closed: true, uvU: 1 / 3, uvV: 1 / 3 });
+      [[lo - 0.05, lo + 0.28], [hi - 0.28, hi + 0.05]].forEach(([l, r]) => sweep(body, frames, [[l, 0.6], [r, 0.6], [r, -0.5], [l, -0.5]], [col('#efe3c8')], { closed: true, uvU: 1 / 3, uvV: 1 / 3 }));
+      addBridgePiers(ctx, br, half, { lo, hi });
     }
   }
 
-  function addBridgePiers(ctx, br, half) {
+  function addBridgePiers(ctx, br, half, pair) {
     const { track, sets, s0, s1, env } = ctx;
+    const isTram = ctx.kind === 'tram';
+    const W = isTram || !pair ? 7.6 : pair.hi - pair.lo - 0.1;
+    const C = isTram || !pair ? 0 : (pair.lo + pair.hi) / 2;
+    const probe = isTram ? 4 : Math.max(2, W / 2 - 0.5);
     const len = br.s1 - br.s0;
     const body = br.kind === 'viaduct' ? sets.get('stone', () => M.tex('stone', tex.stone()), true) : sets.get('concrete', () => M.tex('concrete', tex.concrete()), true);
     const spans = Math.max(1, Math.round(len / (br.kind === 'viaduct' ? 22 : 18)));
@@ -1172,48 +1437,53 @@
       const th = Math.atan2(f.tangent.x, -f.tangent.z);
       // pier at s (interior piers only)
       if (i > 0 && i < spans && s >= s0 && s < s1) {
-        const x = f.pos.x;
-        const z = f.pos.z;
-        const foot = Math.min(groundBelow(track, x, z, 1.2), groundBelow(track, x + f.right.x * 4, z + f.right.z * 4, 1.2));
+        const x = f.pos.x + f.right.x * C;
+        const z = f.pos.z + f.right.z * C;
+        const foot = Math.min(groundBelow(track, x, z, 1.2), groundBelow(track, x + f.right.x * probe, z + f.right.z * probe, 1.2), isTram ? 1e9 : groundBelow(track, x - f.right.x * probe, z - f.right.z * probe, 1.2));
         const top = f.pos.y - 1.7 - (br.kind === 'viaduct' ? archGeometry(env, pitch).h : 0);
         if (top > foot + 0.5) {
-          body.box(x, (top + foot) / 2, z, br.kind === 'viaduct' ? 3.0 : 1.1, top - foot, br.kind === 'viaduct' ? 7.6 : 5.6, br.kind === 'viaduct' ? STONE : col('#aeaba4'), -th + Math.PI / 2);
+          body.box(x, (top + foot) / 2, z, br.kind === 'viaduct' ? 3.0 : 1.1, top - foot, br.kind === 'viaduct' ? W : isTram ? 5.6 : Math.max(5.6, W - 2), br.kind === 'viaduct' ? STONE : col('#aeaba4'), -th + Math.PI / 2);
         }
       }
       if (br.kind === 'viaduct' && center !== null && center >= s0 && center < s1) {
         const { geo, h } = archGeometry(env, pitch);
         const fc = track.frameAt(center);
         const thc = Math.atan2(fc.tangent.x, -fc.tangent.z);
-        const m = new T.Matrix4().compose(new T.Vector3(fc.pos.x, fc.pos.y - 1.7 - h, fc.pos.z), new T.Quaternion().setFromEuler(new T.Euler(0, Math.PI / 2 - thc, 0)), new T.Vector3(1, 1, 1));
+        const m = new T.Matrix4().compose(new T.Vector3(fc.pos.x + fc.right.x * C, fc.pos.y - 1.7 - h, fc.pos.z + fc.right.z * C), new T.Quaternion().setFromEuler(new T.Euler(0, Math.PI / 2 - thc, 0)), new T.Vector3(1, 1, isTram ? 1 : W / 7.6));
         body.geom(geo, m, STONE, 0.25);
       }
     }
   }
 
-  function addSteelTruss(ctx, br, a, b, lat, topH) {
+  /* pair = { lo, hi, L2 } for a double-track steel bridge (girders on both outer edges, a dropper for each contact wire), null = legacy symmetric (tram) */
+  function addSteelTruss(ctx, br, a, b, lat, topH, pair) {
     const { track, sets, q } = ctx;
     const steel = sets.get('truss', () => mat('truss', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.25 })));
     const len = br.s1 - br.s0;
     const panels = Math.max(2, Math.round(len / 7));
     const pitch = len / panels;
     const bot = -0.95;
+    const lats = pair ? [pair.lo, pair.hi] : [-lat, lat];
+    const wires = pair ? [0, pair.L2] : [0];
+    const Cc = pair ? (pair.lo + pair.hi) / 2 : 0;
+    const Wd = pair ? pair.hi - pair.lo : 2 * lat;
     for (let i = 0; i <= panels; i++) {
       const s = br.s0 + i * pitch;
       if (s < a - pitch || s > b + 0.01) continue;
       if (s >= a - 0.001) {
-        [-1, 1].forEach((sd) => steel.between(posAt(track, s, sd * lat, bot), posAt(track, s, sd * lat, topH), 0.3, RED, 0.34));
-        steel.between(posAt(track, s, -lat, topH), posAt(track, s, lat, topH), 0.34, RED_DARK, 0.36);
-        steel.between(posAt(track, s, -lat, bot), posAt(track, s, lat, bot), 0.4, RED_DARK, 0.5);
-        if (!ctx.isTramKind && q.droppers) steel.between(posAt(track, s, 0, topH), posAt(track, s, 0, CONTACT_H + 0.05), 0.04, col('#555'));
+        lats.forEach((l) => steel.between(posAt(track, s, l, bot), posAt(track, s, l, topH), 0.3, RED, 0.34));
+        steel.between(posAt(track, s, lats[0], topH), posAt(track, s, lats[1], topH), 0.34, RED_DARK, 0.36);
+        steel.between(posAt(track, s, lats[0], bot), posAt(track, s, lats[1], bot), 0.4, RED_DARK, 0.5);
+        if (!ctx.isTramKind && q.droppers) wires.forEach((w) => steel.between(posAt(track, s, w, topH), posAt(track, s, w, CONTACT_H + 0.05), 0.04, col('#555')));
       }
       if (i < panels) {
         const s2 = s + pitch;
         if (s2 < a - 0.001 || s > b) continue;
-        [-1, 1].forEach((sd) => {
-          steel.between(posAt(track, s, sd * lat, topH), posAt(track, s2, sd * lat, topH), 0.44, RED);
-          steel.between(posAt(track, s, sd * lat, bot), posAt(track, s2, sd * lat, bot), 0.44, RED);
+        lats.forEach((l) => {
+          steel.between(posAt(track, s, l, topH), posAt(track, s2, l, topH), 0.44, RED);
+          steel.between(posAt(track, s, l, bot), posAt(track, s2, l, bot), 0.44, RED);
           const up = i % 2 === 0;
-          steel.between(posAt(track, s, sd * lat, up ? bot : topH), posAt(track, s2, sd * lat, up ? topH : bot), 0.26, RED_DARK);
+          steel.between(posAt(track, s, l, up ? bot : topH), posAt(track, s2, l, up ? topH : bot), 0.26, RED_DARK);
         });
       }
     }
@@ -1226,8 +1496,9 @@
       const th = Math.atan2(f.tangent.x, -f.tangent.z);
       const yTop = f.pos.y - 1.5;
       const legs = [];
+      const legHalf = pair ? Wd / 2 - 1.3 : 2.4;
       [-1, 1].forEach((sl) => [-1, 1].forEach((sa) => {
-        const topP = posAt(track, s + sa * 1.2, sl * 2.4, -1.5);
+        const topP = posAt(track, s + sa * 1.2, Cc + sl * legHalf, -1.5);
         const gx = topP[0] + f.right.x * sl * 3.2 + f.tangent.x * sa * 3.4;
         const gz = topP[2] + f.right.z * sl * 3.2 + f.tangent.z * sa * 3.4;
         const foot = groundBelow(track, gx, gz, 1.0);
@@ -1244,7 +1515,8 @@
         const pts2 = legs.map((l) => [l.top[0] + (l.foot[0] - l.top[0]) * Math.min(1, t2), l.top[1] + (l.foot[1] - l.top[1]) * Math.min(1, t2), l.top[2] + (l.foot[2] - l.top[2]) * Math.min(1, t2)]);
         [[0, 3], [1, 2]].forEach(([i, j]) => steel.between(pts[i], pts2[j], 0.3, RED_DARK));
       }
-      steel.box(f.pos.x, yTop - 0.3, f.pos.z, 2.2, 0.8, 8.4, RED_DARK, -th + Math.PI / 2);
+      const cp = posAt(track, s, Cc, 0);
+      steel.box(cp[0], yTop - 0.3, cp[2], 2.2, 0.8, pair ? Wd + 0.9 : 8.4, RED_DARK, -th + Math.PI / 2);
     });
   }
 
@@ -1270,9 +1542,12 @@
     group.position.copy(f.pos);
     group.rotation.y = -Math.atan2(f.tangent.x, -f.tangent.z);
     const local = new BatchSet(new T.Vector3());
-    // road with ramp profile (lateral = local x)
+    // double track: the road crosses both tracks (rails stay visible through the road)
+    const X2 = track.kind === 'tram' ? 0 : secLatAt(track, cr.s);
+    const xLo = Math.min(0, X2);
+    const xHi = Math.max(0, X2);
     const road = local.get('asphalt', () => M.tex('asphalt', tex.asphalt()));
-    const prof = [[-CROSSING_ROAD_HALF, FORM_Y + 0.03], [-12, FORM_Y + 0.03], [-4.6, -0.05], [4.6, -0.05], [12, FORM_Y + 0.03], [CROSSING_ROAD_HALF, FORM_Y + 0.03]];
+    const prof = [[xLo - CROSSING_ROAD_HALF, FORM_Y + 0.03], [xLo - 12, FORM_Y + 0.03], [xLo - 4.6, -0.05], [xHi + 4.6, -0.05], [xHi + 12, FORM_Y + 0.03], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.03]];
     for (let i = 0; i < prof.length - 1; i++) {
       const p = prof[i];
       const n2 = prof[i + 1];
@@ -1280,14 +1555,14 @@
     }
     const marks = local.get('mark', mark);
     [-1, 1].forEach((sd) => {
-      marks.quad([-CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [-CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [0, 1, 0], [0.9, 0.9, 0.86]);
+      marks.quad([xLo - CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [xLo - CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [0, 1, 0], [0.9, 0.9, 0.86]);
     });
     const vc = local.get('vc', M.vc, true);
     const lampsA = new Batch();
     const lampsB = new Batch();
     const discGeo = new T.CircleGeometry(0.19, 14);
     [[1, -1], [1, 1], [-1, -1], [-1, 1]].forEach(([sx, sz]) => {
-      const px = sx * 3.9;
+      const px = sx > 0 ? xHi + 3.9 : xLo - 3.9;
       const pz = sz * 3.4;
       vc.box(px, 1.1, pz, 0.16, 3.0, 0.16, col('#e9e6dc'));
       vc.box(px, 0.5, pz, 0.17, 0.5, 0.17, col('#c8242b'));
@@ -1319,7 +1594,7 @@
     [[1, -1], [1, 1], [-1, -1], [-1, 1]].forEach(([sx, sz]) => {
       const dir = -sz; // arm reaches towards the road centre line
       const arm = new T.Mesh(armGeometry(env, dir), M.vc());
-      arm.position.set(sx * 3.9, 1.15, sz * 3.4);
+      arm.position.set(sx > 0 ? xHi + 3.9 : xLo - 3.9, 1.15, sz * 3.4);
       arm.userData.shared = true;
       group.add(arm);
       arms.push({ mesh: arm, dir, angle: 0 });
@@ -1327,7 +1602,7 @@
     // waiting cars
     const rnd = mulberry(Math.floor(cr.s));
     const carB = new Batch();
-    [[10, -1.4, 1], [-11, 1.4, -1]].forEach(([x, z, dirX]) => {
+    [[xHi + 10, -1.4, 1], [xLo - 11, 1.4, -1]].forEach(([x, z, dirX]) => {
       const c = col(CAR_COLORS[Math.floor(rnd() * CAR_COLORS.length)]);
       carB.box(x, FORM_Y + 0.75, z, 4.3, 0.75, 1.8, c);
       carB.box(x - dirX * 0.2, FORM_Y + 1.4, z, 2.3, 0.62, 1.7, c);
@@ -1644,18 +1919,24 @@
     // fences
     if (!isTram) {
       addFence(vc, pf(edge + W + 0.45), zB - 5, zA + 5, 1.2, '#6d7378', 3);
-      addFence(vc, -pf(7.4), zB - 5, zA + 5, 1.4, '#6d7378', 3);
+      if (!real) addFence(vc, -pf(9.6), zB - 5, zA + 5, 1.4, '#6d7378', 3);   // real station models place their own far-side fences
     }
 
     // station building
     const extra = [];
     if (real) {
       try {
-        real.build({
+        const api = {
           T, THREE: T, sets, M, mat, col, shade, WHITE, FORM_Y, hashStr, q, st, idx, track, isTram, opposite: oppPlat, variant,
-          sx, pf, spot, place, curved, H, W, edge, L, sMid, zA, zB, zOf, gapX: edge + W + 3.2, extra,
-          helpers: { addBuilding, addPyramid, addFence, addBench, addLampPost, textQuad, facadeTexture, signTexture, clockMat, canvasTex, addTrainShed, buildGare, buildModern, addBufferStop, stopTexture },
-        });
+          sx, pf, spot, place, curved, H, W, edge, L, sMid, zA, zB, zOf, gapX: edge + W + 3.2, extra, helpers: null,
+        };
+        api.helpers = Object.assign({ addBuilding, addPyramid, addFence, addBench, addLampPost, textQuad, facadeTexture, signTexture, clockMat, canvasTex, addTrainShed, buildGare, buildModern, addBufferStop, stopTexture },
+          isTram ? {} : railHelpers(api), isTram ? {} : bridgeHelpers(api));
+        real.build(api);
+        if (!isTram) {
+          try { finishStationRail(api); } catch (err) { console.warn('[Lokféierer] station tracks failed', st.name, err); }
+          extra.bridgeEnds = api.bridges || [];
+        }
       } catch (err) {
         console.warn('[Lokféierer] real station build failed', st.name, err);
       }
@@ -1682,21 +1963,369 @@
     }
 
     const out = sets.meshes(q.castStations).concat(extra);
+    out.bridgeEnds = extra.bridgeEnds || [];
     // lit windows on the main building are part of the facade texture; platform is solid
     return out;
   }
 
-  function addBufferStop(vc, z, dir) {
+  function addBufferStop(vc, z, dir, x0) {
     const steelC = col('#43484d');
-    vc.box(0, -0.25, z + dir * 0.4, 3.2, 0.5, 1.2, col('#8f8b84'));
-    vc.box(0, 0.8, z, 2.7, 0.35, 0.35, steelC);
+    const X0 = x0 || 0;
+    vc.box(X0, -0.25, z + dir * 0.4, 3.2, 0.5, 1.2, col('#8f8b84'));
+    vc.box(X0, 0.8, z, 2.7, 0.35, 0.35, steelC);
     [-0.9, 0.9].forEach((x) => {
-      vc.box(x, 0.8, z - dir * 0.25, 0.5, 0.5, 0.2, col('#d12a20'));
-      vc.box(x, 0.3, z + dir * 0.3, 0.2, 1.0, 0.2, steelC);
+      vc.box(X0 + x, 0.8, z - dir * 0.25, 0.5, 0.5, 0.2, col('#d12a20'));
+      vc.box(X0 + x, 0.3, z + dir * 0.3, 0.2, 1.0, 0.2, steelC);
     });
-    vc.box(0, 0.1, z + dir * 0.5, 0.5, 0.1, 1.2, steelC);
-    [-1.3, 1.3].forEach((x) => vc.between([x, 0.8, z + dir * 0.1], [x * 1.1, -0.45, z + dir * 1.6], 0.2, steelC));
+    vc.box(X0, 0.1, z + dir * 0.5, 0.5, 0.1, 1.2, steelC);
+    [-1.3, 1.3].forEach((x) => vc.between([X0 + x, 0.8, z + dir * 0.1], [X0 + x * 1.1, -0.45, z + dir * 1.6], 0.2, steelC));
   }
+
+  /* ================================================================ STATION TRACK HELPERS
+     Exposed to the station builders as api.helpers.addSiding / addTurnout / addCrossover (+ addBufferStop). Everything is placed along the REAL
+     track frames (api.place), so a lead that runs past the straight station zone still follows the curve of the line.
+     Station laterals: negative = away from the platform (the second main track is at -4.5), positive = platform side.
+       addSiding({ lat, ends? })   a parallel track at `lat`; it joins the next track towards the player's track with a turnout at BOTH ends
+                                   (a ladder when several are declared) or, at a terminus / when ends = ['buffer', ...], stops in a buffer stop
+       addTurnout({ sE, out, Lt?, latC, latP, ... })  one lead (switch blades, stretcher bars, point machine, frog, check rails, longer timbers)
+       addCrossover()              a crossover between the two main tracks at each open end of the station
+     The player's train never leaves its own track: this is scenery. */
+  const BED_HW = 2.1;
+  const SECOND_ST_LAT = -4.5;
+  const RAIL_LITE = [[-0.034, 0], [0.034, 0], [0.036, -0.03], [0.0095, -0.12], [0.075, -0.17], [-0.075, -0.17], [-0.0095, -0.12], [-0.036, -0.03]];
+  const RAIL_LITE_COLORS = [col('#e6e3dc'), col('#a8a298'), col('#948e84'), col('#867f75'), col('#6f6a62'), col('#867f75'), col('#948e84'), col('#a8a298')];
+  const railBedTex = () => canvasTex('railbed2', 256, 256, (c, w, h) => {
+    speckle(c, w, h, '#85837f', 150, 3400, 4);
+    const rnd = mulberry(5);
+    for (let i = 0; i < 380; i++) {
+      c.fillStyle = 'rgba(' + (rnd() > 0.5 ? '40,38,36' : '200,196,188') + ',0.32)';
+      c.beginPath();
+      c.ellipse(rnd() * w, rnd() * h, 1.5 + rnd() * 2.5, 1 + rnd() * 2, rnd() * 3, 0, 6.3);
+      c.fill();
+    }
+    // four sleepers per 2.4 m tile (0.6 m pitch), 2.6 m long, centred in a 5.6 m wide tile (plain ballast either side, repeats sideways)
+    for (let k = 0; k < 4; k++) {
+      const y = k * 64 + 18;
+      c.fillStyle = '#6a645c';
+      c.fillRect(w * 0.2679, y, w * 0.4643, 26);
+      c.fillStyle = 'rgba(255,255,255,0.10)';
+      c.fillRect(w * 0.2679, y, w * 0.4643, 3);
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.fillRect(w * 0.2679, y + 23, w * 0.4643, 3);
+    }
+  });
+  const railBedMat = () => mat('railbed2', () => new T.MeshStandardMaterial({ map: railBedTex(), vertexColors: true, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  const leadLength = (gap) => clamp(gap * 9.5, 38, 90);
+
+  function stationRailKit(api) {
+    const { sets, place, sMid, pf } = api;
+    const bed = sets.get('railbed', railBedMat);
+    const steel = sets.get('steel', M.steel);
+    const vc = sets.get('vc', M.vc, true);
+    const wireB = vc;   // same batch as the masts: no extra draw call
+    const fr = (s, lat) => {
+      const p = place(s, api.sx * lat);
+      return { s, x: p.x, y: p.y, z: p.z, rx: Math.cos(p.yaw), rz: -Math.sin(p.yaw), yaw: p.yaw };
+    };
+    const at = (s, lat, dy) => { const f = fr(s, lat); return [f.x, f.y + (dy || 0), f.z, f.yaw]; };
+    const frames = (sa, sb, latOf, step) => {
+      const n = Math.max(1, Math.ceil(Math.abs(sb - sa) / step));
+      const out = [];
+      for (let i = 0; i <= n; i++) { const s = sa + ((sb - sa) * i) / n; out.push(fr(s, latOf(s))); }
+      return out;
+    };
+    /* ballast bed + two rails of a track whose lateral position is latOf(s) over [sa, sb]; hw(s) = half width of the bed (wider at a turnout) */
+    function run(sa, sb, latOf, o) {
+      const opt = o || {};
+      if (Math.abs(sb - sa) < 0.5) return;
+      const lo = Math.min(sa, sb);
+      const hi = Math.max(sa, sb);
+      const fs = frames(lo, hi, latOf, opt.step || 4);
+      sweepP(bed, fs, (i) => {
+        const hw = opt.hw ? opt.hw(fs[i].s) : BED_HW;
+        return [[-hw - 0.9, -0.52], [-hw, -0.245], [-BED_HW, -0.245], [BED_HW, -0.245], [hw, -0.245], [hw + 0.9, -0.52]];
+      }, WHITE, { uLat: [1 / 5.6, 0.5], uvV: 1 / 2.4 });
+      [-RAIL_X, RAIL_X].forEach((x) => sweep(steel, fs, shifted(RAIL_LITE, x), RAIL_LITE_COLORS, { closed: true }));
+    }
+    /* contact wire along a path + a mast every 50 m on the outer side (wire follows leads as well) */
+    function wire(sa, sb, latOf, outerSide, opt) {
+      const lo = Math.min(sa, sb);
+      const hi = Math.max(sa, sb);
+      const n = Math.max(1, Math.ceil((hi - lo) / 9));
+      let prev = null;
+      for (let i = 0; i <= n; i++) {
+        const s = lo + ((hi - lo) * i) / n;
+        const p = at(s, latOf(s), 5.3);
+        if (prev) wireB.between(prev, p, 0.035, col('#8a6a48'));
+        prev = p;
+      }
+      if (opt && opt.noMasts) return;
+      for (let s = Math.ceil(lo / 50) * 50 + 17; s < hi - 8; s += 50) {
+        const l = latOf(s);
+        const b = at(s, l + outerSide * 2.6, 0);
+        vc.box(b[0], b[1] - 0.3, b[2], 0.5, 0.5, 0.5, col('#a7a49e'), b[3]);
+        vc.box(b[0], b[1] + 3.2, b[2], 0.2, 7, 0.3, col('#7d8286'), b[3]);
+        vc.between(at(s, l + outerSide * 2.6, 6.55), at(s, l + outerSide * 0.1, 6.4), 0.07, col('#7d8286'));
+        vc.between(at(s, l + outerSide * 0.1, 6.3), at(s, l, 5.32), 0.04, col('#7d8286'));
+      }
+    }
+    /* one lead: from the inner end sE of a parallel track at latC, running OUT (+1 ahead / -1 behind) over Lt metres to the toe on the track at latP.
+       toeC: also a turnout toe at the child end (crossover between two mains). lateral at u (from sE) = latC + (latP - latC) * S(u / Lt) */
+    function lead(o) {
+      const gap = Math.abs(o.latP - o.latC);
+      const Lt = o.Lt || leadLength(gap);
+      const out = o.out;
+      const side = Math.sign(o.latC - o.latP) || -1;       // the side of the parent track the lead leaves to
+      const latAt = (u) => o.latC + (o.latP - o.latC) * smoothStep(u / Lt);
+      const sOf = (u) => o.sE + out * u;
+      const hw = (s) => {
+        const u = Math.abs(s - o.sE);
+        // ballast widening around each turnout: a smooth bulge over the 30 m before the toe
+        const bump = (d) => (d > 0 && d < 30 ? Math.sin((Math.PI * d) / 30) : 0);
+        return BED_HW + 0.85 * (bump(Lt - u) + (o.toeC ? bump(u) : 0));
+      };
+      const sa = o.sE;
+      const sb = o.sE + out * Lt;
+      run(sa, sb, (s) => latAt(Math.abs(s - o.sE)), { step: 2.5, hw });
+      if (o.wire !== false) wire(sa, sb, (s) => latAt(Math.abs(s - o.sE)), side, { noMasts: true });
+      toe(sOf(Lt), -out, o.latP, side, gap, Lt);
+      if (o.toeC) toe(o.sE, out, o.latC, -side, gap, Lt);
+      return { Lt, sFar: sb };
+    }
+    /* switch blades + frog of a turnout: the toe at arc sT on the track at lat, the lead goes into direction dirIn (+1 / -1 along s) to `side` */
+    function toe(sT, dirIn, latT, side, gap, Lt) {
+      const D = (v) => gap * smoothStep(v / Lt);
+      const sAt = (v) => sT + dirIn * v;
+      // frog: the lead's inner rail meets the near rail of the parent where D = 1.435 m
+      const target = 1.435 / gap;
+      if (target < 0.98) {
+        let lo = 0;
+        let hi = 1;
+        for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (smoothStep(m) < target) lo = m; else hi = m; }
+        const vf = ((lo + hi) / 2) * Lt;
+        const f0 = at(sAt(vf), latT + side * RAIL_X, 0);
+        steel.box(f0[0], f0[1] - 0.035, f0[2], 0.2, 0.1, 2.3, col('#6a655e'), f0[3]);
+        const c1 = at(sAt(vf), latT - side * (RAIL_X - 0.1), 0);
+        steel.box(c1[0], c1[1] - 0.05, c1[2], 0.07, 0.1, 3.4, col('#8f8a82'), c1[3]);
+        const lat2 = latT + side * (D(vf) + RAIL_X - 0.1);
+        const c2 = at(sAt(vf + dirIn * 0), lat2, 0);
+        steel.box(c2[0], c2[1] - 0.05, c2[2], 0.07, 0.1, 3.0, col('#8f8a82'), c2[3]);
+      }
+      // switch timbers: longer sleepers over the first 9 m
+      for (let v = 0.5; v < 9.2; v += 0.6) {
+        const d = D(v);
+        const b = at(sAt(v), latT + side * (d / 2), -0.27);
+        vc.box(b[0], b[1], b[2], 2.7 + d, 0.2, 0.26, col('#8e8b86'), b[3]);
+      }
+      // stretcher bars, rods and the point machine beside the toe
+      [1.3, 4.6].forEach((v) => {
+        const a = at(sAt(v), latT - side * 0.8, -0.085);
+        const b = at(sAt(v), latT + side * (0.8 + D(v)), -0.085);
+        steel.between([a[0], a[1], a[2]], [b[0], b[1], b[2]], 0.05, col('#5d5953'), 0.04);
+      });
+      const mP = at(sAt(3.2), latT + side * 2.45, 0.05);
+      vc.box(mP[0], mP[1], mP[2], 0.55, 0.6, 0.95, col('#3c4650'), mP[3]);
+      vc.box(mP[0], mP[1] + 0.33, mP[2], 0.62, 0.07, 1.02, col('#d9b13a'), mP[3]);
+      const rod = at(sAt(3.2), latT + side * 1.1, -0.08);
+      steel.between([mP[0], mP[1] - 0.12, mP[2]], [rod[0], rod[1], rod[2]], 0.05, col('#5d5953'), 0.04);
+    }
+
+    function buffer(lat, s, dirOut) {
+      const z = sMid - s;
+      addBufferStop(vc, z, dirOut > 0 ? 1 : -1, pf(lat));
+    }
+    return { fr, at, run, wire, lead, toe, buffer, vc, steel };
+  }
+
+  /* orchestration, after the station model has declared its tracks (api.rail.tracks) */
+  function finishStationRail(api) {
+    const R = api.rail;
+    if (!R) return;
+    const { st, idx, track } = api;
+    const K = stationRailKit(api);
+    const n = track.stations.length;
+    const firstTerm = idx === 0;
+    const lastTerm = st.terminus && idx === n - 1 && idx > 0;
+    const A = { ahead: st.platformEnd + 19, back: st.platformStart - 19 };
+    const BUF = { ahead: lastTerm ? Math.min(track.length - 8, st.platformEnd + 28) : null, back: firstTerm ? 2.5 : null };
+    const isMain = (l) => Math.abs(Math.abs(l) - 4.5) < 0.45;
+    const tracks = R.tracks.filter((t) => Math.abs(t.lat) > 0.5 && !isMain(t.lat)).map((t) => Object.assign({ ends: { ahead: 'lead', back: 'lead' } }, t));
+    // keep one track per lateral
+    const uniq = [];
+    tracks.forEach((t) => { if (!uniq.some((u) => Math.abs(u.lat - t.lat) < 0.8)) uniq.push(t); });
+    const sides = [uniq.filter((t) => t.lat < 0).sort((a, b) => b.lat - a.lat), uniq.filter((t) => t.lat > 0).sort((a, b) => a.lat - b.lat)];
+    const ends = ['ahead', 'back'];
+    const sEnd = new Map();   // track -> { ahead: arc of the inner end of its parallel run, back: ... }
+    uniq.forEach((t) => sEnd.set(t, {}));
+    ends.forEach((e) => {
+      const out = e === 'ahead' ? 1 : -1;
+      const buf = BUF[e];
+      let base = A[e];
+      if (buf === null && R.crossover) {
+        // crossover between the two main tracks (S-lead, a turnout at each end)
+        K.lead({ sE: base, out, Lt: 46, latC: SECOND_ST_LAT, latP: 0, toeC: true, wire: true });
+        base += out * 54;
+      }
+      sides.forEach((list, si) => {
+        const parentOf = (k) => (k === 0 ? (si === 0 ? SECOND_ST_LAT : 0) : list[k - 1].lat);
+        let off = 0;
+        for (let k = list.length - 1; k >= 0; k--) {
+          const t = list[k];
+          if (buf !== null || t.ends[e] === 'buffer') { sEnd.get(t)[e] = buf !== null ? buf : A[e] + out * 6; continue; }
+          const gap = Math.abs(t.lat - parentOf(k));
+          const Lt = leadLength(gap);
+          K.lead({ sE: base + out * off, out, Lt, latC: t.lat, latP: parentOf(k) });
+          sEnd.get(t)[e] = base + out * off;
+          off += Lt + 7;
+        }
+      });
+    });
+    uniq.forEach((t) => {
+      const e = sEnd.get(t);
+      const sa = Math.min(e.back, e.ahead);
+      const sb = Math.max(e.back, e.ahead);
+      K.run(sa, sb, () => t.lat, { step: 12 });
+      if (t.poles !== false) K.wire(sa, sb, () => t.lat, Math.sign(t.lat) || -1);
+      if (e.ahead === BUF.ahead && BUF.ahead !== null) K.buffer(t.lat, e.ahead, 1);
+      else if (t.ends.ahead === 'buffer') K.buffer(t.lat, e.ahead, 1);
+      if (e.back === BUF.back && BUF.back !== null) K.buffer(t.lat, e.back, -1);
+      else if (t.ends.back === 'buffer') K.buffer(t.lat, e.back, -1);
+    });
+    // buffer stop of the second main track at a terminus (the player's own is added by buildStation)
+    if (BUF.ahead !== null) K.buffer(SECOND_ST_LAT, BUF.ahead, 1);
+    if (BUF.back !== null) K.buffer(SECOND_ST_LAT, BUF.back, -1);
+  }
+
+  /* api.helpers entries (bound to one station's api) */
+  function railHelpers(api) {
+    api.rail = { tracks: [], crossover: false };
+    return {
+      addSiding(o) {
+        const lat = o && Number.isFinite(o.lat) ? o.lat : null;
+        if (lat === null) return false;
+        const t = { lat };
+        if (o.ends) t.ends = { ahead: o.ends[0] || 'lead', back: o.ends[1] || 'lead' };
+        if (o.poles === false) t.poles = false;
+        api.rail.tracks.push(t);
+        return true;
+      },
+      addCrossover() { api.rail.crossover = true; return true; },
+      addTurnout(o) { return stationRailKit(api).lead(o); },
+      addBufferStop,
+    };
+  }
+
+  /* ================================================================ BRIDGE LANDINGS (helpers.addBridgeApproach / addBridgeDeck / registerBridgeEnd)
+     Every over-bridge a station model adds lands on a solid abutment with a ramp (road bridge: retaining walls + asphalt ramp down to the ground
+     + a short road that tapers into the terrain; foot bridge: a stair flight with railings) so nothing ends in the air.  Each end is registered in
+     api.bridges, which the automated landing check (scripts / __tsTest) reads: a ray cast straight down just beyond the end of the deck must hit
+     the abutment, ramp or ground within ~1 m.  Local frame of the station group; `lat` = station lateral (pf mirrored), z along the track. */
+  function bridgeHelpers(api) {
+    api.bridges = [];
+    const { sets, pf } = api;
+    const vc = () => sets.get('vc', M.vc, true);
+    const P = (l, y, z) => [pf(l), y, z];
+    const sxs = api.sx;
+    return {
+      /* o = { lat (end of the deck), out (+1 / -1: away from the tracks, station lateral), z (centre), width, yTop (deck road level), kind: 'road' | 'foot', slope?, tail? } */
+      addBridgeApproach(o) {
+        const b = vc();
+        const out = o.out >= 0 ? 1 : -1;
+        const W = o.width;
+        const yTop = o.yTop;
+        const yG = FORM_Y + 0.02;
+        const rise = Math.max(0.5, yTop - yG);
+        const foot = o.kind === 'foot';
+        const slope = o.slope || (foot ? 0.62 : 0.11);
+        const Lr = o.len || Math.max(8, rise / slope);
+        const n = Math.max(2, Math.ceil(Lr / (foot ? 1.6 : 5)));
+        const l0 = o.lat + out * 1.0;                       // outer face of the pier / abutment under the deck end
+        const lAt = (i) => l0 + out * ((i / n) * Lr);
+        const yAt = (i) => yTop - rise * (i / n);
+        const conc = col('#b4b1aa');
+        const coping = col('#9d9a94');
+        const road = foot ? col('#a9adb1') : col('#4b4d50');
+        const z0 = o.z - W / 2;
+        const z1 = o.z + W / 2;
+        // abutment block
+        b.box(pf(o.lat + out * 0.55), (yTop + FORM_Y) / 2 - 0.3, o.z, 1.7, yTop - FORM_Y - 0.6, W + 0.8, conc);
+        b.box(pf(o.lat + out * 0.55), yTop - 0.35, o.z, 1.9, 0.3, W + 1.0, coping);
+        // wing / retaining walls along both edges
+        [[z0, -1], [z1, 1]].forEach(([zs, dz]) => {
+          const zi = zs - dz * 0.4;
+          for (let i = 0; i < n; i++) {
+            const la = lAt(i);
+            const lb = lAt(i + 1);
+            const ya = yAt(i) + (foot ? 0.95 : 0.9);
+            const yb = yAt(i + 1) + (foot ? 0.95 : 0.9);
+            b.quad(P(la, yG - 0.3, zs), P(lb, yG - 0.3, zs), P(lb, yb, zs), P(la, ya, zs), [0, 0, dz], conc);
+            b.quad(P(la, yG - 0.3, zi), P(lb, yG - 0.3, zi), P(lb, yb, zi), P(la, ya, zi), [0, 0, -dz], conc);
+            b.quad(P(la, ya, zs), P(lb, yb, zs), P(lb, yb, zi), P(la, ya, zi), [0, 1, 0], coping);
+          }
+        });
+        if (foot) {
+          // stair flight: treads + risers, a hand rail on both sides
+          const steps = Math.max(4, Math.round(rise / 0.17));
+          for (let j = 0; j < steps; j++) {
+            const ta = (j / steps) * Lr;
+            const tb = ((j + 1) / steps) * Lr;
+            const y = yTop - rise * ((j + 1) / steps);
+            const yUp = yTop - rise * (j / steps);
+            const la = l0 + out * ta;
+            const lb = l0 + out * tb;
+            b.quad(P(la, y, z0 + 0.4), P(lb, y, z0 + 0.4), P(lb, y, z1 - 0.4), P(la, y, z1 - 0.4), [0, 1, 0], j % 2 ? col('#9a9ea3') : col('#a9adb1'));
+            b.quad(P(la, y, z0 + 0.4), P(la, yUp, z0 + 0.4), P(la, yUp, z1 - 0.4), P(la, y, z1 - 0.4), [-out * sxs, 0, 0], col('#7d8286'));
+          }
+          [z0 + 0.2, z1 - 0.2].forEach((zr) => {
+            b.between(P(l0, yTop + 1.05, zr), P(l0 + out * Lr, yG + 1.05, zr), 0.06, col('#2f6f5e'), 0.06);
+            for (let i = 0; i <= n; i += 2) b.box(pf(lAt(i)), yAt(i) + 0.55, zr, 0.05, 1.0, 0.05, col('#2f6f5e'));
+          });
+        } else {
+          // asphalt ramp + a short road that tapers into the terrain
+          const edge = col('#e6e3da');
+          for (let i = 0; i < n; i++) {
+            const la = lAt(i);
+            const lb = lAt(i + 1);
+            b.quad(P(la, yAt(i) + 0.01, z0 + 0.4), P(lb, yAt(i + 1) + 0.01, z0 + 0.4), P(lb, yAt(i + 1) + 0.01, z1 - 0.4), P(la, yAt(i) + 0.01, z1 - 0.4), [0, 1, 0], road);
+            [z0 + 0.8, z1 - 0.8].forEach((zl) => b.quad(P(la, yAt(i) + 0.02, zl - 0.06), P(lb, yAt(i + 1) + 0.02, zl - 0.06), P(lb, yAt(i + 1) + 0.02, zl + 0.06), P(la, yAt(i) + 0.02, zl + 0.06), [0, 1, 0], edge));
+          }
+          const tail = o.tail === undefined ? 14 : o.tail;
+          if (tail > 0) {
+            const lEnd = lAt(n);
+            const seg = 4;
+            for (let i = 0; i < seg; i++) {
+              const ta = (i / seg) * tail;
+              const tb = ((i + 1) / seg) * tail;
+              const wa = (W - 0.8) / 2 * (1 - 0.65 * (i / seg));
+              const wb = (W - 0.8) / 2 * (1 - 0.65 * ((i + 1) / seg));
+              b.quad(P(lEnd + out * ta, yG + 0.012, o.z - wa), P(lEnd + out * tb, yG + 0.012, o.z - wb), P(lEnd + out * tb, yG + 0.012, o.z + wb), P(lEnd + out * ta, yG + 0.012, o.z + wa), [0, 1, 0], road);
+            }
+          }
+        }
+        api.bridges.push({ lat: o.lat, out, z: o.z, yTop, kind: foot ? 'foot' : 'road', dist: 1.4, startY: yTop + 0.3 });
+        return true;
+      },
+      /* asphalt (road) or paving (foot) on top of a bridge deck: o = { lat0, lat1, z, width, yTop, kind } */
+      addBridgeDeck(o) {
+        const b = vc();
+        const col1 = o.kind === 'foot' ? col('#a9adb1') : col('#4b4d50');
+        const z0 = o.z - o.width / 2 + (o.inset === undefined ? 0.4 : o.inset);
+        const z1 = o.z + o.width / 2 - (o.inset === undefined ? 0.4 : o.inset);
+        b.quad(P(o.lat0, o.yTop + 0.01, z0), P(o.lat1, o.yTop + 0.01, z0), P(o.lat1, o.yTop + 0.01, z1), P(o.lat0, o.yTop + 0.01, z1), [0, 1, 0], col1);
+        if (o.kind !== 'foot') {
+          [z0 + 0.4, z1 - 0.4].forEach((zl) => b.quad(P(o.lat0, o.yTop + 0.02, zl - 0.06), P(o.lat1, o.yTop + 0.02, zl - 0.06), P(o.lat1, o.yTop + 0.02, zl + 0.06), P(o.lat0, o.yTop + 0.02, zl + 0.06), [0, 1, 0], col('#e6e3da')));
+          for (let l = Math.min(o.lat0, o.lat1) + 1; l < Math.max(o.lat0, o.lat1) - 2; l += 6) b.quad(P(l, o.yTop + 0.02, o.z - 0.06), P(l + 3, o.yTop + 0.02, o.z - 0.06), P(l + 3, o.yTop + 0.02, o.z + 0.06), P(l, o.yTop + 0.02, o.z + 0.06), [0, 1, 0], col('#e6e3da'));
+        }
+        return true;
+      },
+      /* a deck end that stands on a tower / pier / abutment built by the model itself: o = { lat, out, z, y (top of the support) } */
+      registerBridgeEnd(o) {
+        api.bridges.push({ lat: o.lat, out: o.out >= 0 ? 1 : -1, z: o.z, yTop: o.y, kind: o.kind || 'tower', dist: o.dist === undefined ? 0 : o.dist, startY: o.y + 0.3 });
+        return true;
+      },
+    };
+  }
+
 
   function buildGare(sets, sx, gapX, zA, zB, st) {
     const pf = (v) => sx * v;
@@ -1797,14 +2426,17 @@
 
   function buildChunkContent(env, index) {
     const { track, q } = env;
-    const s0 = index * CHUNK;
-    const bedEnd = Math.min(s0 + CHUNK, track.length);
+    const isRail = track.kind !== 'tram';
+    const [rA, rB] = isRail ? railRange(track) : [0, track.length];   // rail: a terminus buffer stop ends the rails
+    const s0 = Math.max(index * CHUNK, rA);
+    const bedEnd = Math.min(index * CHUNK + CHUNK, track.length, rB);
     if (bedEnd - s0 < 0.5) return null;
     const origin = track.frameAt((s0 + bedEnd) / 2).pos.clone();
     const sets = new BatchSet(origin);
     const group = new T.Group();
     const step = track.kind === 'tram' ? TRAM_SWEEP_STEP : q.sweepStep;
-    const ctx = { env, track, q, kind: track.kind, s0, s1: bedEnd, origin, sets, group, instanced: [], frames: makeFrames(track, s0, bedEnd, step), frames2: null };
+    const ctx = { env, track, q, kind: track.kind, s0, s1: bedEnd, origin, sets, group, instanced: [], frames: makeFrames(track, s0, bedEnd, step), frames2: null, railRange: [rA, rB], pair: null };
+    if (isRail) ctx.pair = makePair(ctx);
     if (track.kind === 'tram' && track.opposite) {   // the opposite (left-hand) track exists along the real line only
       const a2 = Math.max(s0, track.opposite.from);
       const b2 = Math.min(bedEnd, track.opposite.to);
@@ -1882,6 +2514,7 @@
       if (obj.group.userData.built) return;
       try {
         let meshes = buildStation(env, track, i);
+        obj.group.userData.bridgeEnds = meshes.bridgeEnds || [];
         meshes.forEach((m) => { m.userData.platformOf = 'player'; });
         const pi = track.platformInfo(i);
         if (track.kind === 'tram' && pi.kind !== 'island' && track.opposite && Number.isFinite(pi.oppLat)) {

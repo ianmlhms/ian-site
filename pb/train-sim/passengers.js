@@ -11,7 +11,7 @@
   const DEFAULT_EDGE = 1.75, DEFAULT_WIDTH = 4.5, DEFAULT_PLAT_H = 0.9;
   const SINK_DEPTH = 1.7;
   const HIP_Y = 0.88, KNEE_DROP = 0.44, SHOULDER_Y = 1.36, SHOULDER_X = 0.255, NECK_Y = 1.4;
-  const WALK_SPEED = [1.15, 1.55], RUN_SPEED = 4.6;
+  const WALK_SPEED = [1.15, 1.55], RUN_SPEED = 4.6, RUNNER_CHANCE = 0.2;
   const ALIGHT_GAP = 0.8, BOARD_GAP = 1.2;
   const ALIGHT_MAX_S = 16, BOARD_MAX_S = 22;
   const QUEUE_LATERAL = [-0.85, 0.85, -1.5, 1.5, -2.15, 2.15];
@@ -348,7 +348,8 @@
       if (!doors.length) { console.warn('[Lokféierer] passengers: no doors given'); return; }
       const alighting = Math.max(0, Math.round(spec.alighting || 0)), boarding = Math.max(0, Math.round(spec.boarding || 0));
       counters.alighted = 0; counters.boarded = 0; counters.alightingTotal = alighting; counters.boardingTotal = boarding;
-      const runners = boarding >= 10 ? (chance(0.55) ? 1 : 2) : boarding >= 5 && chance(0.5) ? 1 : 0;
+      // a late runner is a rare treat, not a fixture of every stop (Ian: 'always one passenger ~25 s after the others')
+      const runners = boarding >= 8 && chance(RUNNER_CHANCE) ? 1 : 0;
       ex = {
         active: true, stopped: false, doors, t: 0, alightLeft: alighting, runnersLeft: runners, toBoard: boarding - runners, go: false, releaseAt: -1, inflowLeft: 0, inflowT: 0, completed: false,
       };
@@ -400,7 +401,9 @@
       setPath(p, entry.slice(1).concat([spot]), 'queue');
     }
     function spawnRunner() {
-      const e = plat.exits[Math.random() < 0.5 ? 0 : 1];
+      // from the platform access closest to a door, so the sprint takes seconds, not half a minute
+      const dist = (e2) => { const en = exitEntry(e2)[1]; return Math.min(...ex.doors.map((d) => Math.abs(d.s - en.s))); };
+      const e = plat.exits.slice().sort((a, b) => dist(a) - dist(b))[0];
       const entry = exitEntry(e);
       const p = makePerson('runner', entry[0].s, entry[0].o);
       const di = nearestDoorIdx(entry[1].s, entry[1].o, 0.2);
@@ -466,7 +469,7 @@
       if (ex.go && leftA === 0 && ex.releaseAt < 0) ex.releaseAt = ex.t + 1.6;
       const open = ex.go && leftA === 0 && ex.releaseAt >= 0 && ex.t >= ex.releaseAt;
       if (open) {
-        if (ex.runnersLeft > 0 && counters.boarded >= counters.boardingTotal * 0.7 - 1) { ex.runnersLeft--; spawnRunner(); }
+        if (ex.runnersLeft > 0 && counters.boarded >= counters.boardingTotal * 0.3 - 1) { ex.runnersLeft--; spawnRunner(); }
         doors.forEach((d) => {
           d.tB -= dt;
           if (d.tB <= 0 && releaseFromQueue(d)) d.tB = d.intB * rnd(0.8, 1.3);

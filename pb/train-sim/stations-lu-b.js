@@ -495,21 +495,8 @@
 
     /* ---- extra track (visual): ballast, sleepers, two rails; l = lateral position of its centre, along z0..z1 ---- */
     function track(l, z0, z1, opt) {
-      const o = opt || {};
-      const len = z1 - z0;
-      const zm = (z0 + z1) / 2;
-      const ballast = sets.get('lubballast', () => api.mat('lub:ballast', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 1 })));
-      ballast.box(X(l), -0.42, zm, 3.6, 0.36, len, col('#8e8b86'));
-      const sl = col('#6d655c');
-      for (let z = z0; z <= z1; z += 0.75) vc.box(X(l), -0.2, z, 2.6, 0.18, 0.26, sl);
-      const rl = col('#7c6a58');
-      [-0.7175, 0.7175].forEach((d) => vc.box(X(l) + d, -0.06, zm, 0.07, 0.14, len, rl));
-      if (o.pole) {
-        for (let z = z0 + 10; z < z1; z += 50) {
-          vc.box(X(l + 2.3), 3.2, z, 0.2, 7, 0.28, col('#7e8286'));
-          vc.box(X(l + 1.2), 6.3, z, 2.4, 0.12, 0.12, col('#7e8286'));
-        }
-      }
+      // declared to infra.js (helpers.addSiding): turnouts at both ends (a ladder), ballast, sleepers, rails and catenary come from there
+      api.helpers.addSiding({ lat: l });
     }
     /* A side platform for a visual track: surface at H, edge facing the track at lateral lEdge, extending away by w (towards `dir`: +1 platform-side, -1 far side). */
     function platformBox(lEdge, w, dir, z0, z1) {
@@ -683,6 +670,9 @@
       [lFrom, lTo].forEach((l) => {
         if (Math.abs(l) > 9) texBox(stone, l - 1.2, l + 1.2, FORM_Y, yD, z - 1.6, z + 1.6, 3, WHITE);
       });
+      // paved deck + a stair flight down to the ground at both ends (infra.js helpers): nothing ends in the air
+      api.helpers.addBridgeDeck({ lat0: lFrom, lat1: lTo, z, width: 3.2, yTop: yD + 0.45, kind: 'foot', inset: 0.2 });
+      [[lFrom, Math.sign(lFrom - lTo)], [lTo, Math.sign(lTo - lFrom)]].forEach(([l, out]) => api.helpers.addBridgeApproach({ lat: l + out * 0.2, out, z, width: 3.2, yTop: yD + 0.45, kind: 'foot' }));
     }
 
     // generic house: walls + roof + eaves band. o = { l0, dep, z0, z1, floors, FL, spec, specBack, specEnd, key, kind, mat, rise, ov, wall, eaveCol, base, gab }
@@ -796,7 +786,13 @@
         vc.between([X(d * 18), 55.5, rz - 8], [X(d * 52), -1, rz - 8], 4.2, col('#a63a2c'), 4.8);
         vc.between([X(d * 18), 55.5, rz + 8], [X(d * 52), -1, rz + 8], 4.2, col('#a63a2c'), 4.8);
         vc.between([X(d * 18), 55.5, rz - 8], [X(d * 18), 55.5, rz + 8], 3.4, col('#a63a2c'), 3.4);
+        // abutment: the deck ends on a solid concrete block standing on the valley side and the road continues over it (nothing ends in the air)
+        vc.box(X(d * 92.5), 58, rz, 15, 5.4, 26, col('#b3402f'));
+        vc.box(X(d * 92.5), 61, rz, 15, 0.5, 26.5, col('#d9d7d0'));
+        vc.box(X(d * 92.5), (55.3 + FORM_Y) / 2, rz, 15, 55.3 - FORM_Y, 24, col('#a9a69f'));
+        api.helpers.registerBridgeEnd({ lat: d * 98, out: d, z: rz, y: 60.7, kind: 'abutment' });
       });
+      api.helpers.addBridgeDeck({ lat0: -100, lat1: 100, z: rz, width: 26, yTop: 60.7, kind: 'road', inset: 1.5 });
     },
   });
 
@@ -1134,6 +1130,9 @@
       const bz = 128;
       vc.box(X(0), 7.4, bz, 64, 1.3, 9, col('#9a978f'));
       [-1, 1].forEach((d) => vc.box(X(0), 8.5, bz + d * 4.3, 64, 0.8, 0.25, col('#7a2a2a')));
+      // road on the deck, abutments + ramps at both ends (nothing ends in the air)
+      api.helpers.addBridgeDeck({ lat0: -32, lat1: 32, z: bz, width: 9, yTop: 8.05, kind: 'road', inset: 0.5 });
+      [[-32, -1], [32, 1]].forEach(([lat, out]) => api.helpers.addBridgeApproach({ lat, out, z: bz, width: 9, yTop: 8.05, kind: 'road', slope: 0.2 }));
       k.cars(lB + 8.5, -30, 10, 8, 5);
     },
   });

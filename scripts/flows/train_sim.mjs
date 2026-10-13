@@ -29,8 +29,8 @@ async function cabPoint(h, frame, id, notch) {
 }
 const key = (h, k) => h.page.keyboard.press(k);
 /* endless: every route there and back (forward, then the return direction '~r'), then the next route */
-// endless follows the line: Findel -> Rout Bréck -> Gare -> Stadion, back the same way, then the whole line there and back
-const LUXTRAM_ORDER = ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram-sud~r', 'luxtram-stad~r', 'luxtram-kierchbierg~r', 'luxtram', 'luxtram~r'];
+// tram endless drives the whole line Findel -> Stadion without a stop at Rout Bréck, then back (the sub-stretches are not part of endless)
+const LUXTRAM_ORDER = ['luxtram', 'luxtram~r'];
 /* Ian's real save before the two-career split (flat v1 shape). */
 const OLD_SAVE = { v: 1, tb: 6800, lifetime: 6800, wallet: 3300, savedAt: 1700000000000, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west',
   upgrades: { railcar: { motor: 2, brakes: 1, comfort: 1, capacity: 0, paint: 1 } }, best: { west: 292 }, services: 4, endlessBest: 0, hints: false, hintsSet: true };
@@ -218,6 +218,105 @@ async function luxtramNormalChecks(h, frame) {
 }
 
 /* Return direction, reverse gear, 2x fast-forward and real (natural) endless hand-over. TS_LUXTRAM_ONLY=1 runs these too. */
+/* Weather + time of day: menu choice (remembered), in-game popover and V key. Neutral for rewards: only lighting, wipers, rain sound and the shown clock change. */
+async function weatherChecks(h, frame) {
+  h.step('weather: choose Reen + Moies in the menu, the service starts with them, change it in-game (popover, V), the menu remembers the choice after a reload');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await frame.locator('[data-test="career-rail"]').click();
+  h.eq(await frame.locator('[data-test="wx-random"]').getAttribute('aria-checked'), 'true', 'the weather defaults to Zoufall');
+  await frame.locator('[data-test="wx-rain"]').click();
+  await frame.locator('[data-test="tod-morning"]').click();
+  h.eq((await S(frame)).wxPref + '/' + (await S(frame)).todPref, 'rain/morning', 'the menu choice is stored');
+  await h.shot('wx-menu');
+  await frame.locator('[data-test="mode-career"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+  let s = await S(frame);
+  h.eq(s.weather, 'rain', 'the service starts in the rain');
+  h.expect(Math.abs(s.hour - 8) < 0.01 && s.shownClock.startsWith('08:'), 'and in the morning (hour ' + s.hour + ', clock ' + s.shownClock + ')');
+  h.expect(await frame.evaluate(() => __tsTest.internals().world.landscape.getWeather() === 'rain'), 'the landscape shows rain');
+  await frame.locator('#btnWx').click();
+  h.expect(await frame.locator('#wxPop').isVisible(), 'the HUD button opens the popover');
+  const small = await frame.evaluate(() => [...document.querySelectorAll('#wxPop .wxopt')].filter((b) => b.getBoundingClientRect().height < 43.5).length);
+  h.eq(small, 0, 'every popover option is at least 44 px high');
+  await h.shot('wx-popover');
+  await frame.locator('[data-test="wxpop-wx-fog"]').click();
+  await frame.locator('[data-test="wxpop-tod-night"]').click();
+  await h.pause(2200);
+  s = await S(frame);
+  h.eq(s.weather, 'fog', 'in-game: Niwwel');
+  h.expect(s.shownClock.startsWith('22:'), 'in-game: Nuets shows the clock at night (' + s.shownClock + ')');
+  const look = await frame.evaluate(() => { const w = __tsTest.internals().world; return { wx: w.landscape.getWeather(), tod: w.landscape.getTimeOfDay(), lights: w.lights }; });
+  h.expect(look.wx === 'fog' && Math.abs(look.tod - 22.5) < 0.2 && look.lights === true, 'the landscape and the headlights follow (' + JSON.stringify(look) + ')');
+  await key(h, 'v');
+  h.eq((await S(frame)).weather, 'snow', 'V cycles the weather (Niwwel to Schnéi)');
+  await key(h, 'Escape');
+  h.eq(await frame.locator('#wxPop').isVisible(), false, 'Esc closes the popover');
+  h.eq((await S(frame)).phase, 'running', 'and does not pause');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await h.page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await gotoNormal(h, '/pixelbreak.html?g=train-sim&test=1');
+  frame = await gameFrame(h);
+  s = await S(frame);
+  h.eq(s.wxPref + '/' + s.todPref, 'snow/night', 'after a reload the choice is remembered');
+  h.eq([await frame.locator('[data-test="wx-snow"]').getAttribute('aria-checked'), await frame.locator('[data-test="tod-night"]').getAttribute('aria-checked')], ['true', 'true'], 'and the menu shows it selected');
+  await frame.locator('[data-test="wx-random"]').click();
+  await frame.locator('[data-test="tod-random"]').click();
+  h.eq((await S(frame)).wxPref + '/' + (await S(frame)).todPref, 'random/random', 'back to Zoufall');
+  return frame;
+}
+
+/* Back navigation: the HUD "‹ Menü" button + pause sheet, "‹ Zréck" on the help and timetable screens, summary "Nach eng Fahrt" / menu, Esc and Backspace go back one level. */
+async function backNavChecks(h, frame) {
+  h.step('back navigation: ‹ Menü while driving, ‹ Zréck on sub-screens, summary next / menu, Esc and Backspace');
+  const vis = (sel) => frame.locator(sel).isVisible();
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await frame.locator('[data-test="career-rail"]').click();
+  await frame.locator('[data-test="mode-career"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+  h.expect(await vis('#btnMenu'), 'the ‹ Menü button is shown while driving');
+  const box = await frame.locator('#btnMenu').boundingBox();
+  h.expect(box.height >= 29, 'and it is a real button (' + Math.round(box.height) + ' px high; 44 on touch screens)');
+  await frame.locator('#btnMenu').click();
+  h.expect(await vis('#pauseScreen') && await vis('#resume') && await vis('#quit'), 'it opens the sheet with Weiderfueren and Zréck an de Menü');
+  await h.shot('back-sheet');
+  await frame.locator('#resume').click();
+  h.expect(!(await vis('#pauseScreen')) && (await S(frame)).phase === 'running', 'Weiderfueren closes the sheet and drives on');
+  await key(h, 't');
+  h.expect(await vis('#ttScreen') && await vis('#ttClose'), 'the timetable shows a ‹ Zréck button');
+  await frame.locator('#ttClose').click();
+  h.expect(!(await vis('#ttScreen')), '‹ Zréck closes the timetable');
+  await key(h, 'F1');
+  h.expect(await vis('#helpScreen'), 'help opens');
+  await key(h, 'Backspace');
+  h.expect(!(await vis('#helpScreen')), 'Backspace goes back out of the help');
+  await key(h, 'F1');
+  await frame.locator('#helpClose').click();
+  h.expect(!(await vis('#helpScreen')), '‹ Zréck closes the help');
+  await frame.evaluate(() => __tsTest.finishRoute());
+  await frame.evaluate(() => __tsTest.completeNow());
+  await waitState(frame, () => window.__tsTest.state().phase === 'summary', null, 60000);
+  h.expect(await vis('#sumAgain') && await vis('#sumMenu'), 'the summary offers Nach eng Fahrt and Zréck zum Menü');
+  await frame.locator('#sumAgain').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+  h.expect(!(await vis('#summary')), 'Nach eng Fahrt starts the next service');
+  await frame.evaluate(() => __tsTest.finishRoute());
+  await frame.evaluate(() => __tsTest.completeNow());
+  await waitState(frame, () => window.__tsTest.state().phase === 'summary', null, 60000);
+  await key(h, 'Escape');
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  h.expect(true, 'Esc on the summary goes back to the menu');
+  await frame.locator('[data-test="mode-career"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+  await frame.locator('#btnMenu').click();
+  await frame.locator('#quit').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  h.expect(await vis('[data-test="mode-career"]') && !(await vis('#hud')), '‹ Menü then Zréck an de Menü ends in the menu');
+  return frame;
+}
+
 async function directionAndGearChecks(h, frame) {
   h.step('return direction: every route also runs the other way (rail + Luxtram), same length, first stop = old last stop, sides agree');
   const dirs = await frame.evaluate(() => {
@@ -419,7 +518,7 @@ async function directionAndGearChecks(h, frame) {
     await key(h, 'd');
     await waitState(frame, (r) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId !== r && !window.__tsTest.state().finished, s0.routeId, 90000);
   }
-  h.eq(seen.slice(0, 3), ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud'], 'Findel - Rout Bréck, then on to the Gare, then Stadion (the first one ended by an overrun into the end of the line) - no summary in between');
+  h.eq(seen.slice(0, 3), ['luxtram', 'luxtram~r', 'luxtram'], 'the whole line there and back, then there again (the first one ended by an overrun into the end of the line) - no summary in between');
   await frame.evaluate(() => __tsTest.toMenu());
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');
 }
@@ -445,7 +544,7 @@ export const flow = {
   async run(h) {
     const errors = [];
     let sA = 0;
-    h.page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    h.page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text() + ' @ ' + (m.location().url || '').slice(-60)); });
     await h.signIn();
     // Lokféierer is owner-only for now (catalog entry + page gate): sign in as the owner account.
     await h.context.addInitScript(() => {
@@ -938,6 +1037,8 @@ export const flow = {
 
     await luxtramNormalChecks(h, frame);
     await directionAndGearChecks(h, frame);
+    frame = await weatherChecks(h, frame);
+    frame = await backNavChecks(h, frame);
 
     h.step('arcade test mode: everything unlocked in memory, nothing saved, no scores');
     await h.page.evaluate(() => localStorage.setItem('__flowPbTestMode', '1'));

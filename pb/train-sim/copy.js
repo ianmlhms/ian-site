@@ -164,7 +164,11 @@
     ['paused', 'Paus', 'Pause', 'Paused'],
     ['pausedDesc', 'Den Zuch steet. Huel Loft.', 'Der Zug steht. Hol Luft.', 'The train waits. Take a breath.'],
     ['resume', 'Weiderfueren', 'Weiterfahren', 'Resume'],
-    ['quit', 'Ofbriechen', 'Abbrechen', 'Quit service'],
+    ['quit', 'Zréck an de Menü', 'Zurück zum Menü', 'Back to the menu'],
+    ['menuBtn', '‹ Menü', '‹ Menü', '‹ Menu'],
+    ['menuBtnTitle', 'Zréck an de Menü (Esc)', 'Zurück zum Menü (Esc)', 'Back to the menu (Esc)'],
+    ['backBtn', '‹ Zréck', '‹ Zurück', '‹ Back'],
+    ['sumAgain', 'Nach eng Fahrt', 'Noch eine Fahrt', 'Another service'],
     ['quitConfirm', 'Fuert ofbriechen? Den Fortschrëtt vun dëser Fuert geet verluer.', 'Fahrt abbrechen? Der Fortschritt dieser Fahrt geht verloren.', 'Quit this service? Progress of this run is lost.'],
     // ---- controls help
     ['helpTitle', 'Steierung', 'Steuerung', 'Controls'],
@@ -357,6 +361,24 @@
     ['evCrowd2', 'Voll Quai zu {name}: et ass Maartdag.', 'Voller Bahnsteig in {name}: Markttag.', 'Crowded platform at {name}: market day.'],
     ['evConnection', 'Rout Signal: mir waarden op en Uschlosszuch.', 'Rotes Signal: wir warten auf einen Anschlusszug.', 'Red signal: waiting for a connecting train.'],
     ['evTraffic', 'Rout Signal: en aneren Zuch ass viraus.', 'Rotes Signal: ein anderer Zug ist voraus.', 'Red signal: another train is ahead.'],
+    // ---- weather + time of day (menu and in-game popover)
+    ['weather', 'Wieder', 'Wetter', 'Weather'],
+    ['timeOfDay', 'Dageszäit', 'Tageszeit', 'Time of day'],
+    ['wxRandom', 'Zoufall', 'Zufall', 'Random'],
+    ['wxClear', 'Sonneg', 'Sonnig', 'Sunny'],
+    ['wxRain', 'Reen', 'Regen', 'Rain'],
+    ['wxFog', 'Niwwel', 'Nebel', 'Fog'],
+    ['wxSnow', 'Schnéi', 'Schnee', 'Snow'],
+    ['todRandom', 'Zoufall', 'Zufall', 'Random'],
+    ['todMorning', 'Moies', 'Morgens', 'Morning'],
+    ['todNoon', 'Mëttes', 'Mittags', 'Midday'],
+    ['todEvening', 'Owes', 'Abends', 'Evening'],
+    ['todNight', 'Nuets', 'Nachts', 'Night'],
+    ['envInfo', 'Gëllt fir all Linnen a béid Modi. Keen Ënnerscheed bei de Punkten oder beim Geld.', 'Gilt für alle Strecken und beide Modi. Kein Unterschied bei Punkten oder Geld.', 'Applies to every route and both modes. No effect on points or money.'],
+    ['envTitle', 'Wieder an Dageszäit änneren (V)', 'Wetter und Tageszeit ändern (V)', 'Change weather and time of day (V)'],
+    ['keyWeather', 'Wieder wiesselen (Sonneg, Reen, Niwwel, Schnéi)', 'Wetter wechseln (sonnig, Regen, Nebel, Schnee)', 'Change the weather (sunny, rain, fog, snow)'],
+    ['evWeather', 'Wieder: {name}', 'Wetter: {name}', 'Weather: {name}'],
+    ['evTimeOfDay', 'Dageszäit: {name}', 'Tageszeit: {name}', 'Time of day: {name}'],
     ['welcomeHint', 'W = fueren · D = Dieren · F1 = Hëllef', 'W = fahren · D = Türen · F1 = Hilfe', 'W = drive · D = doors · F1 = help'],
   ];
 
@@ -367,6 +389,17 @@
       copy[lang][key] = row[i + 1];
     });
   }
+  /* Weather / time-of-day choices shared by the menu and the in-game popover. hour = start hour (null: random as before). */
+  TS.envChoices = Object.freeze({
+    weather: Object.freeze([
+      { id: 'random', icon: '🎲', key: 'wxRandom' }, { id: 'clear', icon: '☀️', key: 'wxClear' }, { id: 'rain', icon: '🌧️', key: 'wxRain' },
+      { id: 'fog', icon: '🌫️', key: 'wxFog' }, { id: 'snow', icon: '❄️', key: 'wxSnow' },
+    ]),
+    tod: Object.freeze([
+      { id: 'random', icon: '🎲', key: 'todRandom', hour: null }, { id: 'morning', icon: '🌅', key: 'todMorning', hour: 8 }, { id: 'noon', icon: '☀️', key: 'todNoon', hour: 13 },
+      { id: 'evening', icon: '🌇', key: 'todEvening', hour: 19.5 }, { id: 'night', icon: '🌙', key: 'todNight', hour: 22.5 },
+    ]),
+  });
   TS.copy = copy;
   TS.langs = LANGS;
   if (!LANGS.includes(TS.lang)) TS.lang = 'lb';
