@@ -6,15 +6,19 @@
  *   - wraps TS.track.build  (builds a Track-compatible object from data/luxtram-track.json),
  *   - wraps TS.infra.create (hides the generic street/bridge, catenary-free stretches have no wires),
  *   - wraps TS.landscape.create (sky/sun/weather/horizon stay procedural, the near world is TS.luxtramWorld).
- * Data: © OpenStreetMap contributors (ODbL). Rebuild with scripts/fetch_luxtram_osm.py + scripts/build_luxtram.py.
+ * Also here: the OPPOSITE (left-hand) track (track.opposite, from the OSM second-track ways in data/luxtram-track2.json, same sample indices as the
+ * player's right-hand track), the platform side / kind of every stop (from the real OSM platform geometry), the 70 km/h cap on every limit,
+ * and the vertical alignment fixes (Héienhaff trench, motorway bridge before Luxexpo) unless the data says `elevReal` (LiDAR rail levels).
+ * Data: © OpenStreetMap contributors (ODbL). Rebuild with scripts/fetch_luxtram_osm.py + scripts/build_luxtram.py + scripts/build_luxtram_track2.py.
  * Must be loaded after routes.js, infra.js and landscape.js and before career.js / menu.js. */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
   const T = THREE;
   const TAG = '[Lokféierer] luxtram: ';
-  const TRACK_URL = '/pb/train-sim/data/luxtram-track.json?v=1';
-  const CREDIT = '© OpenStreetMap contributors';
+  const TRACK_URL = '/pb/train-sim/data/luxtram-track.json?v=2';
+  const TRACK2_URL = '/pb/train-sim/data/luxtram-track2.json?v=1';   // opposite track + platform sides (scripts/build_luxtram_track2.py)
+  const CREDIT = '© OpenStreetMap contributors · Geodata © ACT Luxembourg (geoportail.lu)';
 
   const STEP = 2;                    // m between samples (same as track.js)
   const EXT_BEFORE = 90;             // straight extension before the first / after the last real point
@@ -24,12 +28,33 @@
   const TRAIN_LEN = 43;              // 5 x 8.6 m: the platform is cut to it
   const PLATFORM_LEN = 48;
   const MARKER_AHEAD = TRAIN_LEN / 2; // stop marker = OSM stop position + half a train
-  const APPROACH_BEFORE = 10;
+  const APPROACH_BEFORE = 45;        // symmetrical with APPROACH_AFTER: the return direction has the same room behind its last stop
   const APPROACH_AFTER = 45;
-  const LATERAL_ACCEL = 1.0;         // m/s2 used for curve speed limits
   const BRAKE_LEAD = [0.8, 120];
-  const STATION_LIMIT = 25;
-  const GRADE_MAX = 0.07;
+  /* Limit profile: calm and readable (Ian: "speed limits change weirdly often"). */
+  const MIN_ZONE = 150;              // m: shortest limit zone
+  const MIN_ZONE_CENTRE = 80;        // m: ... in the city centre (Theater .. Gare Centrale)
+  const CENTRE_PAD = 150;
+  const CURVE_R_25 = 45;             // m: curves tighter than this are limited to 25 km/h, tighter than CURVE_R_30 to 30 km/h
+  const CURVE_R_30 = 70;
+  const FAST_END_STOP = 2;           // Findel -> Héienhaff -> Luxexpo (stop index 2): 70 km/h all the way, stops included ...
+  const BRIDGE_LIMIT = 50;           // ... except on the motorway bridge before Luxexpo
+  const BRIDGE_LIMIT_PAD = 60;       // m of the lower limit before / after the bridge deck
+  const GRADE_MAX = 0.08;
+  const MAX_KMH = 70;                // the real Luxtram top speed: no limit board, curve or timetable ever shows more
+  const OPP_DEFAULT_LAT = -3.45;     // spacing to the opposite track where OSM has no second way (the tracks are 3.0-4.5 m apart on the line)
+  const OPP_LAT_MIN = -12;
+  const OPP_LAT_MAX = -2.6;
+  const OPP_SEARCH = 15;             // m: search radius for the opposite track around a sample
+  const OPP_GRID = 40;
+  /* Vertical alignment fixes on top of the (smoothed DEM) ground profile, in the order of the line:
+     the line dips under the roads at Héienhaff (OSM tunnel=yes, layer=-1) and crosses the motorway on a bridge before Luxexpo
+     (OSM bridge=yes). Ramps stay below ~7 % (cosine eased: peak grade = 1.5 * height / length). */
+  const TUNNEL_DEPTH = 6.2;          // rail level below the ground over a tunnel group
+  const TUNNEL_GROUP_GAP = 200;      // tunnels closer than this share one trench
+  const BRIDGE_RISE = 6.3;           // deck above the ground profile for a plain (unnamed, short) bridge over a motorway
+  const RAMP_GRADE = 0.05;           // ramps out of the trench / onto the bridge (the ground profile adds up to ~3 % on top)
+  const RISE_BRIDGE_MAX_S = 4000;    // only the bridge before Luxexpo is raised (the big named / railway bridges keep their level decks)
   const LAND_DROP = 80;              // see wrapLandscape
   const CELL = 40;
   const COARSE = 4;
@@ -59,26 +84,33 @@
 
   /* ------------------------------------------------------------ data loading */
   let rawData = null;
+  let rawData2 = null;               // opposite track + platform sides (optional: the line still builds without it)
   let loading = null;
   let model = null;
 
   function prefetch() {
     if (rawData || loading) return loading;
     if (typeof fetch !== 'function') return null;
-    loading = fetch(TRACK_URL).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then((d) => { rawData = d; return d; })
-      .catch((e) => { console.warn(TAG + 'prefetch failed', e); loading = null; return null; });
+    const get = (url, optional) => fetch(url).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .catch((e) => { console.warn(TAG + 'prefetch failed ' + url, e); if (!optional) throw e; return null; });
+    loading = Promise.all([get(TRACK_URL, false), get(TRACK2_URL, true)])
+      .then(([d, d2]) => { rawData = d; rawData2 = d2; return d; })
+      .catch(() => { loading = null; return null; });
     return loading;
   }
-  function loadSync() {
-    if (rawData) return rawData;
+  function syncGet(url) {
     try { // the route is built synchronously by the game: fall back to a blocking request if the prefetch is still running
       const xhr = new XMLHttpRequest();
-      xhr.open('GET', TRACK_URL, false);
+      xhr.open('GET', url, false);
       xhr.send();
-      if (xhr.status >= 200 && xhr.status < 300) rawData = JSON.parse(xhr.responseText);
-    } catch (e) { console.warn(TAG + 'sync load failed', e); }
+      if (xhr.status >= 200 && xhr.status < 300) return JSON.parse(xhr.responseText);
+    } catch (e) { console.warn(TAG + 'sync load failed ' + url, e); }
+    return null;
+  }
+  function loadSync() {
+    if (!rawData) rawData = syncGet(TRACK_URL);
     if (!rawData) throw new Error('Luxtram data missing');
+    if (!rawData2) rawData2 = syncGet(TRACK2_URL);
     return rawData;
   }
 
@@ -239,29 +271,190 @@
     const toNew = (sOrig) => interp(mapOrig, mapNew, sOrig);
     const toOrig = (sNew) => interp(mapNew, mapOrig, sNew);
 
-    // elevation (absolute metres) along the new path
-    const elevKeys = data.elev.map((e) => [toNew(e[0]), e[1]]);
-    const f = pchip(elevKeys.map((e) => e[0]), elevKeys.map((e) => e[1]));
-    let Yabs = new Float64Array(n);
-    for (let i = 0; i < n; i++) Yabs[i] = f(i * STEP);
-    Yabs = boxBlur(boxBlur(Yabs, 6), 4);
-    // grade limit (relaxation)
-    for (let pass = 0; pass < 30; pass++) {
-      for (let i = 1; i < n; i++) { const d = Yabs[i] - Yabs[i - 1]; if (Math.abs(d) > GRADE_MAX * STEP) Yabs[i] = Yabs[i - 1] + Math.sign(d) * GRADE_MAX * STEP; }
-      for (let i = n - 2; i >= 0; i--) { const d = Yabs[i] - Yabs[i + 1]; if (Math.abs(d) > GRADE_MAX * STEP) Yabs[i] = Yabs[i + 1] + Math.sign(d) * GRADE_MAX * STEP; }
-    }
-
-    // data -> new-s structures
-    const stops = data.stops.map((st, i) => ({ i, name: STOP_NAMES[i] || st.name, side: st.side, sMid: toNew(st.s) }));
+    // data -> new-s structures (stop sides come from the real OSM platform geometry, scripts/build_luxtram_track2.py)
+    const t2stops = rawData2 && Array.isArray(rawData2.stops) ? rawData2.stops : [];
+    const stops = data.stops.map((st, i) => {
+      const p2 = t2stops[i] && t2stops[i].name === (STOP_NAMES[i] || st.name) ? t2stops[i] : null;
+      return {
+        i, name: STOP_NAMES[i] || st.name, side: p2 ? p2.side : st.side, sMid: toNew(st.s),
+        kind: p2 ? p2.kind : 'side', edge: p2 ? p2.edge : 1.5, width: p2 ? p2.width : 3, oppLat: p2 && p2.oppLat != null ? p2.oppLat : null,
+      };
+    });
     const segs = data.segs.map((s) => ({ s0: toNew(s[0]), s1: toNew(s[1]), speed: s[2], surf: s[3], flags: s[4], elec: s[5] }));
     segs[0].s0 = 0;
     segs[segs.length - 1].s1 = n * STEP;
     const bridges = data.bridges.map((b) => ({ s0: toNew(b.s0), s1: toNew(b.s1), name: b.name }));
     const tunnels = data.tunnels.map((b) => ({ s0: toNew(b[0]), s1: toNew(b[1]) }));
 
+    // elevation (absolute metres) along the new path: smoothed ground profile, then the cut / rise fixes, then the grade limit
+    const elevKeys = data.elev.map((e) => [toNew(e[0]), e[1]]);
+    const f = pchip(elevKeys.map((e) => e[0]), elevKeys.map((e) => e[1]));
+    let Yabs = new Float64Array(n);
+    for (let i = 0; i < n; i++) Yabs[i] = f(i * STEP);
+    let Yground;
+    let fixes;
+    if (data.elevReal === true) {
+      // real LiDAR rail levels (DTM outside structures, deck level on bridges, linear in tunnels) + bare-earth ground: no synthetic fixes
+      Yabs = boxBlur(Yabs, 2);
+      const gKeys = (Array.isArray(data.ground) && data.ground.length > 1 ? data.ground : data.elev).map((e) => [toNew(e[0]), e[1]]);
+      const g = pchip(gKeys.map((e) => e[0]), gKeys.map((e) => e[1]));
+      Yground = new Float64Array(n);
+      for (let i = 0; i < n; i++) Yground[i] = g(i * STEP);
+      Yground = boxBlur(Yground, 2);
+      const mid = (a, b) => clamp(Math.round((a + b) / 2 / STEP), 0, n - 1);
+      fixes = {
+        adj: new Float64Array(n),
+        tunnels: tunnels.map((tn) => ({ ...tn, depth: Math.max(0, Yground[mid(tn.s0, tn.s1)] - Yabs[mid(tn.s0, tn.s1)]) })),
+        bridges: bridges.map((b) => ({ ...b, rise: Math.max(0, Yabs[mid(b.s0, b.s1)] - Yground[mid(b.s0, b.s1)]) })),
+      };
+    } else {
+      Yabs = boxBlur(boxBlur(Yabs, 6), 4);
+      Yground = Float64Array.from(Yabs);
+      fixes = alignmentFixes(n, stops, tunnels, bridges);
+    }
+    for (let i = 0; i < n; i++) Yabs[i] += fixes.adj[i];
+    for (let pass = 0; pass < 30; pass++) {
+      for (let i = 1; i < n; i++) { const d = Yabs[i] - Yabs[i - 1]; if (Math.abs(d) > GRADE_MAX * STEP) Yabs[i] = Yabs[i - 1] + Math.sign(d) * GRADE_MAX * STEP; }
+      for (let i = n - 2; i >= 0; i--) { const d = Yabs[i] - Yabs[i + 1]; if (Math.abs(d) > GRADE_MAX * STEP) Yabs[i] = Yabs[i + 1] + Math.sign(d) * GRADE_MAX * STEP; }
+    }
+
+    // the opposite track: lateral spacing to the player's (right-hand) track at every sample
+    const realFrom = 0;                              // the second track runs along the whole path, including the straight extensions at both ends
+    const realTo = n * STEP;
+    const opp = oppositeTrack(X, Z, TH, n, rawData2, realFrom / STEP, realTo / STEP);
+
     // terrain relief grid (half-metre ints) -> rows keyed by new s
     const demRows = data.dem.rows.map((row, i) => ({ s: toNew(i * data.dem.step), v: row.map((v) => v / 2) }));
-    return { n, X, Z, TH, kappa, Yabs, stops, segs, bridges, tunnels, demRows, demOffsets: data.dem.offsets, toNew, toOrig, dataLength: data.length };
+    return {
+      n, X, Z, TH, kappa, Yabs, Yground, stops, segs, bridges: fixes.bridges, tunnels: fixes.tunnels, demRows, demOffsets: data.dem.offsets, toNew, toOrig,
+      dataLength: data.length, opp, oppRange: [realFrom, realTo],
+    };
+  }
+
+  /* Tunnel dips and bridge rises (new-s units). Returns { adj[] (metres to add to the ground profile), tunnels[], bridges[] with depth / rise }. */
+  function alignmentFixes(n, stops, tunnels, bridges) {
+    const adj = new Float64Array(n);
+    const rampLen = (h, grade) => (1.5 * h) / grade;   // cosine ease: peak grade = 1.5 * h / length
+    const outTunnels = tunnels.map((tn) => ({ ...tn, depth: 0 }));
+    const outBridges = bridges.map((b) => ({ ...b, rise: 0 }));
+    // tunnel groups -> one trench: ramps down after the previous platform, back up behind the last portal
+    const groups = [];
+    tunnels.slice().sort((a, b) => a.s0 - b.s0).forEach((tn) => {
+      const g = groups[groups.length - 1];
+      if (g && tn.s0 - g.b < TUNNEL_GROUP_GAP) { g.b = Math.max(g.b, tn.s1); g.list.push(tn); } else groups.push({ a: tn.s0, b: tn.s1, list: [tn] });
+    });
+    groups.forEach((g) => {
+      const D = TUNNEL_DEPTH;
+      const lrUp = rampLen(D, RAMP_GRADE);
+      const platEnd = stops.reduce((m, st) => { const e = st.sMid + MARKER_AHEAD + 4 + 3; return e < g.a + 1 && e > m ? e : m; }, 0);
+      const sd0 = Math.max(g.a - lrUp, platEnd);
+      const lrDown = Math.max(g.a - sd0, rampLen(D, 0.075));   // the ramp after the Héienhaff platform may be steeper (no room)
+      const iA = Math.max(0, Math.floor(sd0 / STEP));
+      const iB = Math.min(n - 1, Math.ceil((g.b + lrUp) / STEP));
+      for (let i = iA; i <= iB; i++) {
+        const s = i * STEP;
+        const down = smooth01((s - sd0) / lrDown);
+        const up = 1 - smooth01((s - g.b) / lrUp);
+        adj[i] -= D * Math.min(down, up);
+      }
+      g.list.forEach((tn) => { const o = outTunnels.find((x) => x.s0 === tn.s0 && x.s1 === tn.s1); if (o) o.depth = D * Math.min(smooth01((tn.s1 - sd0) / lrDown), 1); });
+    });
+    // the plain bridge over the motorway before Luxexpo: the deck rises above the ground
+    outBridges.forEach((b) => {
+      if (b.name || b.s1 - b.s0 > 200 || b.s0 > RISE_BRIDGE_MAX_S) return;
+      const R = BRIDGE_RISE;
+      const lr = rampLen(R, RAMP_GRADE);
+      const iA = Math.max(0, Math.floor((b.s0 - lr) / STEP));
+      const iB = Math.min(n - 1, Math.ceil((b.s1 + lr) / STEP));
+      for (let i = iA; i <= iB; i++) {
+        const s = i * STEP;
+        adj[i] += R * Math.min(smooth01((s - (b.s0 - lr)) / lr), 1 - smooth01((s - b.s1) / lr));
+      }
+      b.rise = R;
+    });
+    return { adj, tunnels: outTunnels, bridges: outBridges };
+  }
+
+  /* The opposite track from the OSM second track ways (data2.opp, decimetre delta coded polylines): for every sample of the player's
+     smoothed centreline the signed lateral distance (negative = left) to the nearest parallel opposite way. Gaps are interpolated
+     (<= 200 m) or filled with the standard spacing; the result is smoothed. src[i] = 1 where the position comes from OSM. */
+  function oppositeTrack(X, Z, TH, n, data2, iFrom, iTo) {
+    const lat = new Float64Array(n).fill(NaN);
+    const src = new Uint8Array(n);
+    if (data2 && Array.isArray(data2.opp)) {
+      const segsA = [];
+      data2.opp.forEach((flat) => {
+        const pts = decodeFlat(flat);
+        for (let k = 0; k + 1 < pts.length; k++) segsA.push([pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1]]);
+      });
+      const grid = new Map();
+      const key = (cx, cz) => cx * 73856 + cz * 19349;
+      segsA.forEach((sg, idx) => {
+        const len = Math.hypot(sg[2] - sg[0], sg[3] - sg[1]);
+        const steps = Math.max(1, Math.ceil(len / (OPP_GRID / 2)));
+        for (let k = 0; k <= steps; k++) {
+          const cx = Math.floor((sg[0] + (sg[2] - sg[0]) * (k / steps)) / OPP_GRID);
+          const cz = Math.floor((sg[1] + (sg[3] - sg[1]) * (k / steps)) / OPP_GRID);
+          const kk = key(cx, cz);
+          const list = grid.get(kk);
+          if (!list) grid.set(kk, [idx]); else if (list[list.length - 1] !== idx) list.push(idx);
+        }
+      });
+      for (let i = 0; i < n; i++) {
+        const th = TH[i];
+        const rx = Math.cos(th);
+        const rz = Math.sin(th);
+        const tx = Math.sin(th);
+        const tz = -Math.cos(th);
+        const cx0 = Math.floor(X[i] / OPP_GRID);
+        const cz0 = Math.floor(Z[i] / OPP_GRID);
+        let best = Infinity;
+        let bestLat = NaN;
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            const list = grid.get(key(cx0 + dx, cz0 + dz));
+            if (!list) continue;
+            for (let k = 0; k < list.length; k++) {
+              const sg = list[k] >= 0 ? segsA[list[k]] : null;
+              if (!sg) continue;
+              const vx = sg[2] - sg[0];
+              const vz = sg[3] - sg[1];
+              const l2 = vx * vx + vz * vz;
+              if (l2 < 1e-6) continue;
+              const ll = Math.sqrt(l2);
+              if (Math.abs((vx * tx + vz * tz) / ll) < 0.82) continue;   // not running along the player's track
+              const u = clamp(((X[i] - sg[0]) * vx + (Z[i] - sg[1]) * vz) / l2, 0, 1);
+              const px = sg[0] + vx * u - X[i];
+              const pz = sg[1] + vz * u - Z[i];
+              const l = px * rx + pz * rz;
+              const d = Math.hypot(px, pz);
+              if (l < OPP_LAT_MIN || l > -1.4 || d > OPP_SEARCH) continue;
+              if (d < best) { best = d; bestLat = l; }
+            }
+          }
+        }
+        if (Number.isFinite(bestLat)) { lat[i] = bestLat; src[i] = 1; }
+      }
+    }
+    // fill gaps: interpolate short ones, default spacing for long ones
+    let i = 0;
+    while (i < n) {
+      if (Number.isFinite(lat[i])) { i++; continue; }
+      let j = i;
+      while (j < n && !Number.isFinite(lat[j])) j++;
+      const a = i > 0 ? lat[i - 1] : NaN;
+      const b = j < n ? lat[j] : NaN;
+      const gapM = (j - i) * STEP;
+      for (let k = i; k < j; k++) {
+        if (gapM <= 200 && Number.isFinite(a) && Number.isFinite(b)) lat[k] = lerp(a, b, (k - i + 1) / (j - i + 1));
+        else if ((gapM <= 60 || i === 0 || j === n) && (Number.isFinite(a) || Number.isFinite(b))) lat[k] = Number.isFinite(a) ? a : b;   // short gaps and the line ends: keep the neighbour's spacing
+        else lat[k] = OPP_DEFAULT_LAT;
+      }
+      i = j;
+    }
+    let sm = boxBlur(boxBlur(lat, 3), 3);
+    sm = Float64Array.from(sm, (v) => clamp(v, OPP_LAT_MIN, OPP_LAT_MAX));
+    return { lat: sm, src, iFrom: Math.max(0, Math.floor(iFrom)), iTo: Math.min(n - 1, Math.ceil(iTo)) };
   }
   const norm2 = (x, z) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l]; };
 
@@ -271,31 +464,57 @@
   }
 
   /* ------------------------------------------------------------ Track for one route */
-  function curveLimit(radius) {
-    const kmh = 3.6 * Math.sqrt(LATERAL_ACCEL * radius);
-    return Math.max(15, Math.floor(kmh / 5) * 5);
-  }
-
-  function buildLimits(raw) {
-    const merged = raw.reduce((acc, e) => {
-      const prev = acc[acc.length - 1];
-      if (prev && prev.kmh === e.kmh) return acc;
-      return acc.concat([{ s: e.s, kmh: e.kmh }]);
-    }, []);
-    const shifted = merged.map((e, i) => {
-      const prev = merged[i - 1];
-      if (!prev || e.kmh >= prev.kmh) return e;
-      const v1 = prev.kmh / 3.6;
-      const v2 = e.kmh / 3.6;
-      const lead = Math.min(BRAKE_LEAD[1], (v1 * v1 - v2 * v2) / (2 * BRAKE_LEAD[0]), (e.s - prev.s) * 0.85);
-      return { s: Math.max(prev.s + 20, e.s - lead), kmh: e.kmh };
+  /* limit zones from 10 m samples v[i] (km/h): zones shorter than the minimum are merged (a short zone higher than a neighbour takes the lower value,
+     a short slow zone is widened to the minimum, so speed values only ever go down); the boards of drops are moved ahead by the braking lead
+     without making the zone before them shorter than the minimum. */
+  function buildLimits(v, minLenAt, noShiftBefore, totalLen) {
+    const n = v.length;
+    const runs = () => {
+      const out = [];
+      for (let i = 0; i < n; i++) { const r = out[out.length - 1]; if (r && r.v === v[i]) r.b = i + 1; else out.push({ a: i, b: i + 1, v: v[i] }); }
+      return out;
+    };
+    for (let guard = 0; guard < 4000; guard++) {
+      const rs = runs();
+      const lenOf = (r) => (r.b >= n ? totalLen - r.a * 10 : (r.b - r.a) * 10);
+      const k = rs.findIndex((r) => lenOf(r) < minLenAt(((r.a + r.b) / 2) * 10));
+      if (k < 0) break;
+      const r = rs[k];
+      const pv = k > 0 ? rs[k - 1].v : Infinity;
+      const nv = k + 1 < rs.length ? rs[k + 1].v : Infinity;
+      if (pv === Infinity && nv === Infinity) break;
+      if (r.v < pv && r.v < nv) {   // short slow zone between / at the end of faster ones: widen it to the minimum
+        const need = Math.ceil((minLenAt(((r.a + r.b) / 2) * 10) - lenOf(r)) / 10);
+        const before = pv === Infinity ? 0 : Math.ceil(need / 2);
+        const after = nv === Infinity ? 0 : need - before;
+        const lo = Math.max(0, r.a - (pv === Infinity ? 0 : before));
+        const hi = Math.min(n, r.b + (nv === Infinity ? need : after));
+        for (let i = lo; i < hi; i++) v[i] = Math.min(v[i], r.v);
+        if (lo === r.a && hi === r.b) break;
+      } else {
+        const to = Math.min(pv, nv);
+        for (let i = r.a; i < r.b; i++) v[i] = to;
+      }
+    }
+    const zones = runs().map((r) => ({ s: r.a * 10, kmh: r.v }));
+    const out = [];
+    zones.forEach((z, i) => {
+      const prev = zones[i - 1];
+      let s = z.s;
+      if (prev && z.kmh < prev.kmh) {
+        const v1 = prev.kmh / 3.6;
+        const v2 = z.kmh / 3.6;
+        const prevStart = out[out.length - 1].s;
+        const room = z.s - prevStart - minLenAt(z.s);
+        const lead = Math.max(0, Math.min(BRAKE_LEAD[1], (v1 * v1 - v2 * v2) / (2 * BRAKE_LEAD[0]), room));
+        s = Math.max(z.s - lead, noShiftBefore && z.s >= noShiftBefore ? noShiftBefore : 0);   // (no board ahead of the always-70 stretch's end)
+      }
+      out.push({ s: i === 0 ? 0 : s, kmh: z.kmh });
     });
-    const sorted = shifted.slice().sort((a, b) => a.s - b.s);
-    sorted[0] = { s: 0, kmh: sorted[0].kmh };
-    return sorted.filter((e, i) => i === 0 || (e.s - sorted[i - 1].s > 25 && e.kmh !== sorted[i - 1].kmh));
+    return out;
   }
 
-  function build(def) {
+  function buildForward(def) {
     const m = getModel();
     const spec = def.luxtram;
     const stopA = m.stops[spec.from];
@@ -310,19 +529,41 @@
     const oy = m.Yabs[i0];
     const X = new Float64Array(n);
     const Y = new Float64Array(n);
+    const YG = new Float64Array(n);          // ground profile (no tunnel dip / bridge rise)
     const Z = new Float64Array(n);
     const TH = new Float64Array(n);
     const kappa = new Float64Array(n);
     const grade = new Float64Array(n);
+    const LAT2 = new Float64Array(n);        // lateral position of the opposite track (negative = left of the player's track)
+    const SRC2 = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       X[i] = m.X[i0 + i] - ox;
       Z[i] = m.Z[i0 + i] - oz;
       Y[i] = m.Yabs[i0 + i] - oy;
+      YG[i] = m.Yground[i0 + i] - oy;
       TH[i] = m.TH[i0 + i];
       kappa[i] = m.kappa[i0 + i];
+      LAT2[i] = m.opp.lat[i0 + i];
+      SRC2[i] = m.opp.src[i0 + i];
     }
     for (let i = 0; i < n; i++) grade[i] = (Y[Math.min(n - 1, i + 1)] - Y[Math.max(0, i - 1)]) / ((Math.min(n - 1, i + 1) - Math.max(0, i - 1)) * STEP);
     const length = (n - 1) * STEP;
+    // opposite track samples (same indices as the player's track, so rails and wires share their sample points)
+    const X2 = new Float64Array(n);
+    const Z2 = new Float64Array(n);
+    const TH2 = new Float64Array(n);
+    const kappa2 = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      X2[i] = X[i] + Math.cos(TH[i]) * LAT2[i];
+      Z2[i] = Z[i] + Math.sin(TH[i]) * LAT2[i];
+    }
+    for (let i = 0; i < n; i++) {
+      const a = Math.max(0, i - 1);
+      const b = Math.min(n - 1, i + 1);
+      TH2[i] = Math.atan2(X2[b] - X2[a], -(Z2[b] - Z2[a]));
+    }
+    for (let i = 1; i < n; i++) { while (TH2[i] - TH2[i - 1] > Math.PI) TH2[i] -= 2 * Math.PI; while (TH2[i] - TH2[i - 1] < -Math.PI) TH2[i] += 2 * Math.PI; }
+    for (let i = 1; i < n - 1; i++) kappa2[i] = (TH2[i + 1] - TH2[i - 1]) / (2 * STEP);
 
     /* ---- stations */
     const stations = [];
@@ -331,7 +572,8 @@
       const marker = st.sMid + MARKER_AHEAD - sStart;
       stations.push({
         id: 'st' + stations.length, name: st.name, s: marker, platformStart: marker + 4 - PLATFORM_LEN, platformEnd: marker + 4,
-        side: st.side, size: CROWD[st.name] || 1, terminus: k === spec.from || k === spec.to,
+        side: st.side, kind: st.kind, size: CROWD[st.name] || 1, terminus: k === spec.from || k === spec.to,
+        edge: st.edge, width: st.width, oppLat: st.oppLat,
       });
     }
 
@@ -343,47 +585,58 @@
     const segs = m.segs.filter((q) => q.s1 > sStart && q.s0 < sEnd).map((q) => ({ s0: Math.max(0, q.s0 - sStart), s1: Math.min(length, q.s1 - sStart), speed: q.speed, surf: q.surf, flags: q.flags, elec: q.elec }));
     const noPower = segs.filter((q) => q.elec !== 1 && !(q.flags & 2));
 
-    /* ---- limits */
-    const raw = [];
+    /* ---- limits (rounded to multiples of 10, 25 only where really needed; no artificial stop zones: braking for a stop is the driver's job) */
+    const roundLimit = (kmh) => (kmh <= 27 ? 25 : Math.min(MAX_KMH, Math.max(30, Math.round((kmh - 0.1) / 10) * 10)));
+    const fastEndAbs = m.stops[FAST_END_STOP].sMid + MARKER_AHEAD + 4;   // end of the Luxexpo platform, absolute path coordinates
+    const motorway = m.bridges.find((b) => !b.name && b.s0 < RISE_BRIDGE_MAX_S && b.s1 - b.s0 < 200) || null;
+    const centre = [Math.max(0, m.stops[10].sMid - CENTRE_PAD - sStart), Math.max(0, m.stops[16].sMid + CENTRE_PAD - sStart)];
+    const minLenAt = (s) => (s >= centre[0] && s <= centre[1] ? MIN_ZONE_CENTRE : MIN_ZONE);
+    const samples = [];
     for (let s = 0; s <= length; s += 10) {
-      const q = segAt(s + sStart);
+      const abs = s + sStart;
+      if (abs <= fastEndAbs) {   // the whole Findel - Luxexpo stretch is 70, only the motorway bridge is slower
+        const onBridge = motorway && abs >= motorway.s0 - BRIDGE_LIMIT_PAD && abs <= motorway.s1 + BRIDGE_LIMIT_PAD;
+        samples.push(onBridge ? BRIDGE_LIMIT : MAX_KMH);
+        continue;
+      }
+      const q = segAt(abs);
       let v = q.speed > 0 ? q.speed : 40;
-      if (q.surf === 0 && v === 50) v = 70; // dedicated grass track: the full 70 km/h
+      if (q.surf === 0 && v === 50) v = MAX_KMH; // dedicated grass track: the full 70 km/h
       const ia = clamp(Math.round(s / STEP), 0, n - 1);
-      // tightest radius within +-10 m
-      let kmax = 0;
+      let kmax = 0;   // tightest curve within +-10 m
       for (let d = -5; d <= 5; d++) kmax = Math.max(kmax, Math.abs(kappa[clamp(ia + d, 0, n - 1)]));
-      if (kmax > 1 / 400) v = Math.min(v, curveLimit(1 / kmax));
-      stations.forEach((st) => { if (s > st.platformStart - 28 && s < st.platformEnd + 14) v = Math.min(v, STATION_LIMIT); });
-      raw.push({ s, kmh: Math.max(15, Math.floor(v / 5) * 5) });
+      if (kmax > 1 / CURVE_R_30) v = Math.min(v, kmax > 1 / CURVE_R_25 ? 25 : 30);
+      samples.push(roundLimit(v));
     }
-    const limits = buildLimits(raw);
+    const limits = buildLimits(samples, minLenAt, fastEndAbs - sStart, length);
 
     /* ---- bridges / tunnels in route coordinates */
-    const bridges = m.bridges.filter((b) => b.s1 > sStart && b.s0 < sEnd).map((b) => ({ s0: Math.max(0, b.s0 - sStart), s1: Math.min(length, b.s1 - sStart), kind: 'steel', h: b.name ? 60 : 12, water: false, waterY: null, name: b.name }));
-    const tunnels = m.tunnels.filter((b) => b.s1 > sStart && b.s0 < sEnd).map((b) => ({ s0: Math.max(0, b.s0 - sStart), s1: Math.min(length, b.s1 - sStart) }));
+    // `rise` = deck height above the ground profile (the motorway bridge before Luxexpo), `depth` = rail level below the ground (Héienhaff tunnels);
+    // the real OSM extents (tunnel=yes / bridge=yes) are s0..s1, the ramps lie outside them (see groundYAt / cutAt)
+    const bridges = m.bridges.filter((b) => b.s1 > sStart && b.s0 < sEnd).map((b) => ({ s0: Math.max(0, b.s0 - sStart), s1: Math.min(length, b.s1 - sStart), kind: 'steel', h: b.rise > 0 ? b.rise + 6 : b.name ? 60 : 12, rise: b.rise, over: b.rise > 0 ? 'motorway' : '', water: false, waterY: null, name: b.name }));
+    const tunnels = m.tunnels.filter((b) => b.s1 > sStart && b.s0 < sEnd).map((b) => ({ s0: Math.max(0, b.s0 - sStart), s1: Math.min(length, b.s1 - sStart), depth: b.depth }));
 
-    /* ---- frames */
-    const frameAt = (s, out) => {
+    /* ---- frames (the opposite track has its own x/z/heading at the same sample indices; same elevation and grade) */
+    const makeFrameAt = (PX, PY, PZ, PTH, PGRADE, PKAPPA) => (s, out) => {
       const f = out || { pos: new T.Vector3(), tangent: new T.Vector3(), right: new T.Vector3(), up: new T.Vector3(0, 1, 0), grade: 0, curvature: 0 };
       let theta;
       let g;
       let k;
       if (s <= 0) {
-        theta = TH[0]; g = grade[0]; k = 0;
-        f.pos.set(X[0] + Math.sin(theta) * s, Y[0] + g * s, Z[0] - Math.cos(theta) * s);
+        theta = PTH[0]; g = PGRADE[0]; k = 0;
+        f.pos.set(PX[0] + Math.sin(theta) * s, PY[0] + g * s, PZ[0] - Math.cos(theta) * s);
       } else if (s >= (n - 1) * STEP) {
         const over = s - (n - 1) * STEP;
-        theta = TH[n - 1]; g = grade[n - 1]; k = 0;
-        f.pos.set(X[n - 1] + Math.sin(theta) * over, Y[n - 1] + g * over, Z[n - 1] - Math.cos(theta) * over);
+        theta = PTH[n - 1]; g = PGRADE[n - 1]; k = 0;
+        f.pos.set(PX[n - 1] + Math.sin(theta) * over, PY[n - 1] + g * over, PZ[n - 1] - Math.cos(theta) * over);
       } else {
         const fi = s / STEP;
         const i = Math.floor(fi);
         const t = fi - i;
-        theta = lerp(TH[i], TH[i + 1], t);
-        g = lerp(grade[i], grade[i + 1], t);
-        k = lerp(kappa[i], kappa[i + 1], t);
-        f.pos.set(lerp(X[i], X[i + 1], t), lerp(Y[i], Y[i + 1], t), lerp(Z[i], Z[i + 1], t));
+        theta = lerp(PTH[i], PTH[i + 1], t);
+        g = lerp(PGRADE[i], PGRADE[i + 1], t);
+        k = lerp(PKAPPA[i], PKAPPA[i + 1], t);
+        f.pos.set(lerp(PX[i], PX[i + 1], t), lerp(PY[i], PY[i + 1], t), lerp(PZ[i], PZ[i + 1], t));
       }
       const cp = 1 / Math.sqrt(1 + g * g);
       f.tangent.set(Math.sin(theta) * cp, g * cp, -Math.cos(theta) * cp);
@@ -393,6 +646,12 @@
       f.curvature = k;
       return f;
     };
+    const frameAt = makeFrameAt(X, Y, Z, TH, grade, kappa);
+    const oppFrameAt = makeFrameAt(X2, Y, Z2, TH2, grade, kappa2);
+    const oppFrom = Math.max(0, m.oppRange[0] - sStart);
+    const oppTo = Math.min(length, m.oppRange[1] - sStart);
+    const oppLatAt = (s) => { const fi = clamp(s / STEP, 0, n - 1); const i = Math.floor(fi); return lerp(LAT2[i], LAT2[Math.min(n - 1, i + 1)], fi - i); };
+    const groundYAt = (s) => { const fi = clamp(s / STEP, 0, n - 1); const i = Math.floor(fi); return lerp(YG[i], YG[Math.min(n - 1, i + 1)], fi - i); };
 
     /* ---- nearest point (spatial hash) */
     const grid = new Map();
@@ -505,24 +764,31 @@
     }
     function terrainHeightAt(x, z) {
       const q = nearest(x, z, scratch);
+      const i0 = clamp(Math.floor(q.i), 0, n - 2);
+      const u = clamp(q.i - i0, 0, 1);
+      const dY = lerp(YG[i0] - Y[i0], YG[i0 + 1] - Y[i0 + 1], u);   // ground above (+) / below (-) the rails
       const formY = q.y - FORMATION_DROP;
       const bm = bridgeMask(q.s);
-      let h = formY + relief(q.s, q.lat);
+      let h = formY + dY + relief(q.s, q.lat);
       const cov = coverAt(q.s);
-      if (cov > 0.01) h += cov * (1 - smooth01(q.d / 34));
-      const w = (1 - smooth01((q.d - 3.2) / 7)) * (1 - bm);
-      h = lerp(h, formY, w);
-      return h;
+      if (cov > 0.01) h = Math.max(h, formY + cov * (1 - smooth01(Math.max(0, q.d - 4) / 30)));   // the ground closes over a tunnel
+      const delta = Math.abs(dY);
+      // distance outside the double-track corridor (both tracks stay level), then the trench / embankment slope
+      const sep = -oppLatAt(q.s);
+      const dOut = q.lat >= 0 ? q.lat : (-q.lat > sep ? -q.lat - sep : 0);
+      const w = (1 - smooth01((dOut - (2.6 + 0.5 * delta)) / (7 + 1.6 * delta))) * (1 - bm) * (1 - Math.min(1, cov / 6));
+      return lerp(h, formY, w);
     }
 
     /* ---- platforms, helpers */
     const platformInfo = (i) => {
       const st = stations[i];
       if (!st) return null;
-      const edge = 1.5;
-      const width = 3.0;
+      const edge = st.edge || 1.5;
+      const width = st.width || 3.0;
       return {
-        edge, width, backEdge: edge + width, height: 0.3, sideSign: st.side === 'right' ? 1 : -1,
+        edge, width, backEdge: edge + width, height: 0.3, sideSign: st.side === 'right' ? 1 : -1, kind: st.kind || 'side',
+        oppLat: st.oppLat != null ? st.oppLat : oppLatAt(st.s),
         s0: st.platformStart, s1: st.platformEnd, sMarker: st.s,
         exits: [{ s: st.platformStart - 14, lat: edge + width / 2 }, { s: st.platformEnd + 14, lat: edge + width / 2 }],
       };
@@ -544,8 +810,16 @@
       water: () => null, inTunnel, bridgeAt, stationAt, corridorHalfWidth, isReserved, platformInfo,
       // flags read by the small hooks in infra.js / landscape.js
       noStreet: true, ownScenery: true, noOcs,
+      // second (opposite, left-hand) track: same sample indices as the player's track; frameAt(s) returns the opposite track's frame at the same s
+      opposite: {
+        frameAt: oppFrameAt, latAt: oppLatAt, from: oppFrom, to: oppTo, source: SRC2, lat: LAT2, sample: STEP,
+        has: (s) => s >= oppFrom && s <= oppTo,
+      },
+      // vertical alignment: ground profile (no tunnel dip / bridge rise) and the cut (+) / fill (-) of the rails below / above it
+      groundYAt, cutAt: (s) => groundYAt(s) - frameAt(s).pos.y,
       luxtram: {
-        sStart, sEnd, origin: { x: ox, y: oy, z: oz }, segs, credit: CREDIT,
+        sStart, sEnd, origin: { x: ox, y: oy, z: oz }, segs, credit: CREDIT, centre, minZone: MIN_ZONE, minZoneCentre: MIN_ZONE_CENTRE,
+        fastEnd: fastEndAbs - sStart, motorwayBridge: motorway ? [motorway.s0 - sStart, motorway.s1 - sStart] : null,
         toRoute: (sAbs) => sAbs - sStart,
         absFromOrig: (sOrig) => m.toNew(sOrig),
         origFromAbs: (sAbs) => m.toOrig(sAbs),
@@ -553,12 +827,59 @@
     };
   }
 
+  /* The return direction runs on the OTHER (left-hand) track: the OSM second track becomes the player's track and the forward track the
+     opposite one. Same ground, same coordinates (origin), same platforms; every platform is on the right of the travel direction. The scenery
+     (landscape / TS.luxtramWorld) is always built from the forward track (`track.base`) and fed track.baseS(s). */
+  function buildReversed(def) {
+    const base = buildForward(def.base);
+    const L = base.length;
+    const o = base.opposite;
+    const centre = [L - base.luxtram.centre[1], L - base.luxtram.centre[0]];
+    const minLenAt = (s) => (s >= centre[0] && s <= centre[1] ? MIN_ZONE_CENTRE : MIN_ZONE);
+    const rev = TS.track.reverse(base, { id: def.id, def, sides: 'right', playerFrameAt: o.frameAt, minLenAt });
+    const flip = (f) => { f.tangent.negate(); f.right.negate(); f.grade = -f.grade; f.curvature = -f.curvature; return f; };
+    const sepAt = (s) => -o.latAt(s);
+    // platforms: the reversed player's platform is the opposite track's side platform of the forward direction (or the same island)
+    rev.stations.forEach((st) => {
+      const sMid = (st.platformStart + st.platformEnd) / 2;
+      const fwd = base.stations[base.stations.length - 1 - rev.stations.indexOf(st)];
+      const sep = Math.max(2.6, sepAt(L - sMid));
+      if (fwd.kind === 'island') { st.kind = 'island'; st.width = fwd.width; st.edge = Math.max(1.25, sep - (fwd.edge + fwd.width)); }
+      st.oppLat = -sep;
+    });
+    const basePlatform = rev.platformInfo;
+    rev.platformInfo = (j) => {
+      const p = basePlatform(j);
+      const st = rev.stations[j];
+      if (!p || !st) return p;
+      return Object.assign({}, p, { edge: st.edge || p.edge, width: st.width || p.width, backEdge: (st.edge || p.edge) + (st.width || p.width), kind: st.kind || 'side', oppLat: st.oppLat, sideSign: 1,
+        exits: p.exits.map((e) => ({ s: e.s, lat: (st.edge || p.edge) + (st.width || p.width) / 2 })) });
+    };
+    const rA = (arr) => Float64Array.from(arr).reverse();
+    rev.opposite = {
+      frameAt: (s, out) => flip(base.frameAt(L - s, out)),
+      latAt: (s) => o.latAt(L - s),
+      from: L - o.to, to: L - o.from, sample: o.sample,
+      has: (s) => o.has(L - s),
+      source: Uint8Array.from(o.source).reverse(), lat: rA(o.lat),
+    };
+    const lt = base.luxtram;
+    rev.luxtram = Object.assign({}, lt, {
+      reversed: true, centre, segs: lt.segs.map((q) => Object.assign({}, q, { s0: L - q.s1, s1: L - q.s0 })).sort((a, b) => a.s0 - b.s0),
+      toRoute: (sAbs) => L - (sAbs - lt.sStart), fastEnd: null, motorwayBridge: lt.motorwayBridge ? [L - lt.motorwayBridge[1], L - lt.motorwayBridge[0]] : null,
+    });
+    rev.groundYAt = (s) => base.groundYAt(L - s);
+    rev.cutAt = (s) => base.cutAt(L - s);
+    return rev;
+  }
+  function build(def) { return def && def.reverse && def.base ? buildReversed(def) : buildForward(def); }
+
   /* ------------------------------------------------------------ registries */
   function makeRouteDef(sec) {
     const names = STOP_NAMES.slice(sec.from, sec.to + 1);
     const def = {
       id: sec.id, kind: 'tram', region: 'Stad', cruise: 70, biomes: ['tramcity'], name: sec.name, stations: names,
-      luxtram: { from: sec.from, to: sec.to }, stationDefaults: { platformLen: PLATFORM_LEN, approachBefore: APPROACH_BEFORE, approachAfter: APPROACH_AFTER, stationLimit: STATION_LIMIT },
+      luxtram: { from: sec.from, to: sec.to }, stationDefaults: { platformLen: PLATFORM_LEN, approachBefore: APPROACH_BEFORE, approachAfter: APPROACH_AFTER },
       layout: [], credit: CREDIT,
     };
     Object.defineProperty(def, 'length', {
@@ -579,7 +900,7 @@
     const defs = SECTIONS.map(makeRouteDef);
     const list = TS.routes.list.filter((r) => r.id !== 'tram').concat(defs);   // the generic fictional tram line is gone: only the real Luxtram
     const byId = list.reduce((acc, r) => Object.assign(acc, { [r.id]: r }), {});
-    TS.routes = Object.freeze({ list, get: (id) => byId[id] || null });
+    TS.routes = TS.routeDir ? TS.routeDir.makeRoutes(list) : Object.freeze({ list, get: (id) => byId[id] || null });
 
     // Tram career: sections are bought with tram money (stad is free, the full line needs the other sections first).
     const rules = {};
@@ -609,7 +930,8 @@
       create(scene, track, options) {
         if (!track || !track.luxtram) return base.apply(this, arguments);
         // the generic tram street and bridge are replaced by the real thing (TS.luxtramWorld)
-        const proxy = Object.create(track, { bridges: { value: [], enumerable: true } });
+        // (the world draws the bridges and the tunnel / underpass structures; infra only adds rails, wires, platforms and furniture)
+        const proxy = Object.create(track, { bridges: { value: [], enumerable: true }, tunnels: { value: [], enumerable: true } });
         return base.call(this, scene, proxy, options);
       },
     });
@@ -640,6 +962,7 @@
           stats() { const a = land.stats ? land.stats() : {}; return Object.assign({}, a, { world: world.stats() }); },
           dispose() { world.dispose(); land.dispose(); },
           luxtramWorld: world,
+          groundAt: (x, z) => (typeof world.groundAt === 'function' ? world.groundAt(x, z) : NaN),   // real DTM (chase camera clearance)
         });
       },
     });

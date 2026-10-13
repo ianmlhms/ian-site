@@ -7,7 +7,7 @@
      in memory (both careers), nothing is ever saved or posted, no scores are reported. Without the flag nothing changes. */
   const ARCADE_TEST = window.__pbTestMode === true;
   const HOST_ORIGIN = new URL(document.baseURI).origin;
-  const SIM_STEP = 1 / 60, MAX_SIM_STEPS = 16, MAX_FRAME_S = 0.25;
+  const SIM_STEP = 1 / 60, MAX_SIM_STEPS = 40, MAX_FRAME_S = 0.25;
   const LEVER_REPEAT_MS = 180, LEVER_MIN = -8, LEVER_MAX = 5, LEVER_EB = -8, LEVER_BRAKE_MAX = -7;
   const CAMERAS = ['cab', 'chase', 'platform', 'orbit'];
   const QUALITIES = ['high', 'medium', 'low'];
@@ -72,6 +72,7 @@
     $('phoneHint').textContent = t('devicePhoneHint');
     $('pauseQuality').textContent = t('quality') + ': ' + t(qualityKey(quality));
     $('btnQuality').textContent = 'Q · ' + qualityName();
+    $('btnFast').title = t('fastTitle'); $('btnRev').title = t('reverseTitle');
     buildHelp();
   }
   const qualityKey = (q) => (q === 'high' ? 'qualityHigh' : q === 'medium' ? 'qualityMedium' : 'qualityLow');
@@ -92,7 +93,8 @@
   let audio = null, audioFailed = false;
   let camMode = 'cab', camSmooth = { pos: null, look: null };
   const orbit = { yaw: 0.7, pitch: 0.28, dist: 30 }, look = { yaw: 0, pitch: 0 };
-  const input = { lever: 0, doorPress: false, parkingToggle: false, hornHeld: false, lights: null, held: { up: false, down: false }, lastRepeat: 0 };
+  let fastForward = false;       // 2x fast-forward (F): physics, timetable clock and passengers run twice as fast
+  const input = { lever: 0, doorPress: false, parkingToggle: false, reverseToggle: false, hornHeld: false, lights: null, held: { up: false, down: false }, lastRepeat: 0 };
   const events = [];             // recent event log for tests
   const endless = { order: [], index: 0, loops: 0, total: { cash: 0, points: 0 }, active: false };
   let frameHandle = 0, lastFrame = 0, hudClock = 0, todClock = 0, accum = 0, elapsedReal = 0;
@@ -275,7 +277,7 @@
     await frameDelay();
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
-    const landscape = build('landscape', 'create', [scene, track, { quality }]);
+    const landscape = build('landscape', 'create', [scene, track.base || track, { quality }]);   // the return direction shares the forward track's scenery
     await frameDelay();
     const rootsBefore = new Set(scene.children);
     const infra = build('infra', 'create', [scene, track, { quality }]);
@@ -291,7 +293,7 @@
     safe('weather', () => landscape && landscape.setWeather && landscape.setWeather(environment.weather, true));
     safe('time of day', () => landscape && landscape.setTimeOfDay && landscape.setTimeOfDay(environment.hour));
     const startS = keepState && keepState.warmS !== undefined ? keepState.warmS : (track.stations && track.stations[0] ? track.stations[0].s : 0);
-    safe('landscape warm', () => landscape && landscape.warm && landscape.warm(startS));
+    safe('landscape warm', () => landscape && landscape.warm && landscape.warm(track.baseS ? track.baseS(startS) : startS));
     const clockStart = Math.floor(environment.hour * 4) * 900;
     const plan = sim ? sim.plan : demo ? null : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: careerState(trainId).services || 0 }), null));
     forcedPlan = null;
@@ -447,6 +449,7 @@
       chaseTimer -= dt;
       if (chaseTimer <= 0) { chaseTimer = 0.25; chaseChoice = pickChaseCandidate(f0, carLen, camTmp.look, chaseChoice); }
       chasePosition(f0, carLen, chaseChoice, camTmp.p);
+      keepChaseInWorld(f0, carLen, camTmp.p);
       smoothTo(camTmp.p, camTmp.look, k);
     } else if (camMode === 'platform') {
       const st = state && state.nextStation;
@@ -475,6 +478,25 @@
   const CHASE_CANDIDATES = [[1, 0, 0.9], [-1, 0, 0.9], [1, 3.5, 1.5], [-1, 3.5, 1.5], [1, 7, 2.2]];   // side (relative to the preferred one), extra height, back factor
   let chaseChoice = 0, chaseTimer = 0;
   const chaseRay = new THREE.Raycaster();
+  const CHASE_GROUND_CLEARANCE = 2.0, CHASE_CUTTING_DEPTH = 1.8, CHASE_TUNNEL_AHEAD = 14;
+  /* never inside a hill: in tunnels sit low behind the train inside the bore, elsewhere stay above the terrain */
+  function keepChaseInWorld(f0, carLen, p) {
+    const w = world;
+    const sNow = w && w.state ? w.state.s : 0;
+    const inTunnel = safe('chase tunnel', () => !!(w.track && w.track.inTunnel && w.track.inTunnel(sNow)), false);
+    if (inTunnel) { p.copy(f0.pos).addScaledVector(f0.fwd, CHASE_TUNNEL_AHEAD).addScaledVector(f0.up, 2.4); return; }   // ahead of the nose, looking back along the bore
+    const gy = safe('chase ground', () => {
+      if (w.landscape && typeof w.landscape.groundAt === 'function') return w.landscape.groundAt(p.x, p.z);
+      if (w.track && typeof w.track.terrainHeightAt === 'function') return w.track.terrainHeightAt(p.x, p.z);
+      return NaN;
+    }, NaN);
+    const sideGround = safe('chase cutting', () => Math.max(...[-8, 8].map((lat) => w.landscape.groundAt(f0.pos.x + f0.right.x * lat, f0.pos.z + f0.right.z * lat))), NaN);
+    if (Number.isFinite(sideGround) && sideGround - f0.pos.y > CHASE_CUTTING_DEPTH) {   // deep cutting: side spots sit in the slope and behind may be a tunnel, so look down from above
+      p.copy(f0.pos).addScaledVector(f0.fwd, -carLen * 0.4).addScaledVector(f0.up, sideGround - f0.pos.y + 9);
+      return;
+    }
+    if (Number.isFinite(gy) && p.y < gy + CHASE_GROUND_CLEARANCE) p.y = gy + CHASE_GROUND_CLEARANCE;
+  }
   function chasePosition(f0, carLen, choice, out) {
     const [side, extraUp, back] = CHASE_CANDIDATES[choice] || CHASE_CANDIDATES[0];
     return out.copy(f0.pos).addScaledVector(f0.fwd, -carLen * back).addScaledVector(f0.up, CHASE_UP + extraUp).addScaledVector(f0.right, chaseSign * side * (CHASE_SIDE + 4.4 + carLen * 0.1));
@@ -492,7 +514,7 @@
     let blocked = false;
     const check = (obj) => {
       if (blocked || !obj.visible) return;
-      if (obj.isMesh && !(obj.isInstancedMesh && obj.count > 150) && !obj.isSkinnedMesh && obj.geometry && !(obj.material && !Array.isArray(obj.material) && obj.material.transparent && obj.material.opacity < 0.5)) {
+      if (obj.isMesh && (obj.userData.camObstacle || !(obj.isInstancedMesh && obj.count > 150)) && !obj.isSkinnedMesh && obj.geometry && !(obj.material && !Array.isArray(obj.material) && obj.material.transparent && obj.material.opacity < 0.5)) {
         try { if (chaseRay.intersectObject(obj, false).length) blocked = true; } catch (e) { /* mesh type the raycaster cannot test: ignore */ }
       }
       for (const child of obj.children) check(child);
@@ -800,6 +822,10 @@
       case 'parkingApplied': toast(t(e.auto ? 'evParkingAuto' : 'evParkingOn'), 'info', e.auto ? 1600 : 1400, 'parking'); break;
       case 'parkingReleased': toast(t('evParkingOff'), 'info', 1200, 'parking'); break;
       case 'parkingRefused': toast(t('evParkingMoving'), 'bad', 1800, 'parking'); break;
+      case 'reverser': toast(t(e.reverse ? 'evReverseOn' : 'evReverseOff'), 'info', 1800, 'reverser'); break;
+      case 'reverserRefused': toast(t(e.reason === 'moving' ? 'evReverseMoving' : e.reason === 'doors' ? 'evReverseDoors' : 'evReverseLever'), 'bad', 2200, 'reverser'); break;
+      case 'reverseBlocked': toast(t(e.reason === 'signal' ? 'evReverseSignal' : 'evReverseStart'), 'bad', 2600, 'reverser'); break;
+      case 'reverseFine': toast(t('evReverseFine', { n: e.fine }), 'bad', 2600); break;
       case 'parkingBlocked': toast(t('evParkingBlocked'), 'bad', 2600, 'parking'); break;
       case 'doorsHeld': toast(t('evDoorsHeld'), 'info', 3200); break;
       case 'tsrAhead': toast(t('evTsrAhead', { n: e.kmh }), 'info', 3600); break;
@@ -871,13 +897,20 @@
     if (input.held.up) { applyLever(1); input.lastRepeat = now; }
     else if (input.held.down) { applyLever(-1); input.lastRepeat = now; }
   }
+  function toggleFast(force) {
+    fastForward = force !== undefined ? !!force : !fastForward;
+    const b = $('btnFast');
+    b.classList.toggle('on', fastForward);
+    b.setAttribute('aria-pressed', String(fastForward));
+    toast(t(fastForward ? 'evFastOn' : 'evFastOff'), 'info', 1400, 'fast');
+  }
   function simulate(dt) {
     const w = world;
     accum += dt;
     let n = 0;
     while (accum >= SIM_STEP && n < MAX_SIM_STEPS) {
-      const st = w.sim.step(SIM_STEP, { lever: input.lever, doorPress: input.doorPress, parkingToggle: input.parkingToggle, passengers: w.onboard });
-      input.doorPress = false; input.parkingToggle = false;
+      const st = w.sim.step(SIM_STEP, { lever: input.lever, doorPress: input.doorPress, parkingToggle: input.parkingToggle, reverseToggle: input.reverseToggle, passengers: w.onboard });
+      input.doorPress = false; input.parkingToggle = false; input.reverseToggle = false;
       w.state = st;
       for (const e of st.events) handleEvent(e);
       accum -= SIM_STEP; n++;
@@ -907,7 +940,7 @@
       safe('wipers', () => w.model.setWipers && w.model.setWipers(w.env.weather === 'rain' || w.env.weather === 'snow' ? (elapsedReal * 0.7) % 1 : 0));
     }
     safe('infra.update', () => w.infra && w.infra.update && w.infra.update(state.s, camera));
-    safe('landscape.update', () => w.landscape && w.landscape.update && w.landscape.update(state.s, camera, dt));
+    safe('landscape.update', () => w.landscape && w.landscape.update && w.landscape.update(w.track.baseS ? w.track.baseS(state.s) : state.s, camera, dt));
     if (running) {
       updateSignals(state);
       updateCrossings(state);
@@ -1073,6 +1106,7 @@
     }
     if (state.signalAspect === 'red' && state.nextSignalDistance < 700) return t('hintSignalRed');
     if (state.distanceToStop < 500 && state.distanceToStop > -20) return (coach ? t(state.distanceToStop < 120 ? 'coachStopHere' : 'coachStopSoon') : t('hintStop')) + ' · ' + fmtDist(state.distanceToStop);
+    if (state.distanceToStop < -3 && state.distanceToStop > -160 && state.v < 1 && !state.reverse) return t('hintReverse');
     if (state.t < 25 && state.v < 1) return t('welcomeHint');
     if (coach && state.v > 1) return t('coachCruise');
     return '';
@@ -1129,6 +1163,8 @@
       $('xchgIn').textContent = '↑ ' + t('exchangeIn') + ' ' + counts.boarded + '/' + counts.boardingTotal;
       $('xchgOn').textContent = t('hudOnBoard', { n: liveOnboard() });
     }
+    $('revLamp').hidden = !s.reverse;
+    $('btnRev').classList.toggle('on', !!s.reverse);
     const pk = $('parkLamp');
     pk.hidden = !s.parkingBrake;
     if (s.parkingBrake) pk.textContent = 'P · ' + t('hudParking');
@@ -1137,12 +1173,12 @@
     $('hint').classList.toggle('coach', !!save.hints && !!hintHtml);
     gEl.hidden = !gv;
     if (gv) { gEl.className = 'guide ' + gv.cls; gEl.textContent = gv.text; }
-    $('centerBox').classList.toggle('empty', !hintHtml && xc.hidden && !gv);
+    $('centerBox').classList.toggle('empty', !hintHtml && xc.hidden && !gv && !s.reverse);
     updateStrip(s);
   }
 
   /* ------------------------------------------------------------ overlays */
-  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–4', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
+  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['R', 'keyReverse'], ['F', 'keyFast'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–4', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
   function buildHelp() {
     const body = $('helpBody');
     body.replaceChildren();
@@ -1266,6 +1302,7 @@
     } catch (error) {
       warn('service build failed', error);
       hideLoading();
+      if (opts.keepOnFail) return false;   // endless: the caller retries / skips to the next route instead of dropping to the menu
       toast(t('startFailed'), 'bad');
       returnToMenu();
       return false;
@@ -1299,9 +1336,17 @@
     banner(t('endlessNextLine', { name: nextRoute ? nameOf(nextRoute.name) : nextId }), '+' + fmtInt(reward.cash) + ' € · ' + fmtInt(reward.points) + ' ' + t('sumPoints'), 3200);
     $('fade').classList.add('on');
     await new Promise((r) => setTimeout(r, 900));
-    if (phase !== 'transition') return;
-    const ok = await startService(nextId, w.trainId, 'endless');
-    if (!ok) endless.active = false;
+    if (!endless.active) return;   // (the player left to the menu during the transition)
+    /* Endless never stops by itself: if the next route cannot be built (e.g. a lost WebGL context or a failed data load) it is retried,
+       then the following route is tried, and only when nothing at all works the player lands in the menu with a message. */
+    let ok = false;
+    for (let attempt = 0; attempt < 2 + endless.order.length && !ok && endless.active; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 700));
+      let id = nextId;
+      if (attempt >= 2) { endless.index = (endless.index + 1) % endless.order.length; id = endless.order[endless.index]; }
+      ok = await startService(id, w.trainId, 'endless', { keepOnFail: true });
+    }
+    if (!ok && endless.active) { toast(t('startFailed'), 'bad'); returnToMenu(); }
   }
   function startEndless(trainId) {
     const order = safe('endlessOrder', () => TS.career.endlessOrder(trainId), []) || [];
@@ -1469,6 +1514,8 @@
       case 's': case 'ArrowDown': if (!repeat) { applyLever(-1); input.held.down = true; input.lastRepeat = performance.now(); } return true;
       case 'x': case 'Backspace': input.lever = LEVER_EB; return true;
       case 'b': if (!repeat) input.parkingToggle = true; return true;
+      case 'r': if (!repeat) input.reverseToggle = true; return true;
+      case 'f': if (!repeat) toggleFast(); return true;
       case 'd': if (!repeat) input.doorPress = true; return true;
       case 'h': case ' ': if (!repeat) { input.hornHeld = true; sfx('horn', true); } return true;
       case 'l': if (!repeat) toggleLights(); return true;
@@ -1505,7 +1552,7 @@
     lastFrame = now;
     try {
       if (world && !rebuilding) {
-        if (phase === 'running' && !paused) { tickService(dt); updateCamera(dt, world.state); hudClock += dt; if (hudClock > HUD_INTERVAL_S) { hudClock = 0; updateHud(); } }
+        if (phase === 'running' && !paused) { tickService(fastForward ? dt * 2 : dt); updateCamera(dt, world.state); hudClock += dt; if (hudClock > HUD_INTERVAL_S) { hudClock = 0; updateHud(); } }
         else if (phase === 'running' || phase === 'summary' || phase === 'transition') { if (world.state) { updateVisuals(0, world.state, false); updateCamera(dt, world.state); } }
         else if (world.state) { updateVisuals(dt, world.state, false); demoCamera(dt); }
       }
@@ -1524,7 +1571,7 @@
         const w = world, s = w && w.state;
         const ex = w ? currentExchangeCounts() : null;
         return {
-          phase, mode, paused, quality, lang, camMode, muted, moduleStatus: { ...moduleStatus },
+          phase, mode, paused, fast: fastForward, reverse: !!(s && s.reverse), backedM: s ? s.backedM : 0, quality, lang, camMode, muted, moduleStatus: { ...moduleStatus },
           routeId: w ? w.routeId : null, trainId: w ? w.trainId : null, demo: !!(w && w.demo), weather: w ? w.env.weather : null, hour: w ? w.env.hour : null,
           stations: w ? stationsOf().map((x) => ({ name: x.name, s: x.s, side: x.side })) : [],
           s: s ? s.s : 0, kmh: s ? s.v * 3.6 : 0, v: s ? s.v : 0, lever: s ? s.lever : 0, leverTarget: input.lever, doorPhase: s ? s.doorPhase : '', doorsOpen01: s ? s.doorsOpen01 : 0, doorSide: s ? s.doorSide : null, doorsReleased: !!(s && s.doorsReleased),
@@ -1538,7 +1585,7 @@
           wallet: careerState().wallet, tb: save.tb, lifetime: careerState().lifetime, owned: careerState().owned, routes: careerState().routes, saveTrain: careerState().train, services: careerState().services,
           endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null,
           draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,
-          hudSpeed: $('speedNum').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, kbNoticeVisible: !$('kbNotice').hidden, phoneBlocked: !$('phoneBlock').hidden,
+          hudSpeed: $('speedNum').textContent, hudSide: $('nextSide').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, kbNoticeVisible: !$('kbNotice').hidden, phoneBlocked: !$('phoneBlock').hidden,
           parkingBrake: !!(s && s.parkingBrake), guide: s ? s.guide : null, guideText: $('guide').hidden ? '' : $('guide').textContent, hintText: $('hint').textContent, parkLampVisible: !$('parkLamp').hidden,
           pattern: w && w.sim.plan ? w.sim.plan.pattern : '', passIndices: w && w.sim.plan ? [...w.sim.plan.pass] : [], tsr: w && w.sim.plan ? w.sim.plan.tsr.map((x) => ({ ...x })) : [], incidents: w && w.sim.plan ? w.sim.plan.incidents.map((x) => ({ ...x })) : [],
           spadHoldSec: s ? s.spadHoldSec : 0, hints: !!save.hints, svcLabel: $('svcLabel').textContent, cabHitTest: !!(w && w.cab && typeof w.cab.hitTest === 'function'), stopsRecord: w ? { ...w.stops } : {},
@@ -1566,6 +1613,9 @@
         return true;
       },
       setSpeed(kmh) { if (world) world.sim.setSpeed(kmh / 3.6); },
+      stationReport() { return world && world.infra && world.infra.stationReport ? world.infra.stationReport() : null; },
+      trackInfo() { return world ? world.track : null; },
+      internals() { return { scene, camera, renderer, world, THREE }; },   // test-only: automated scenery checks (scripts/flows, tour)
       setGrade(g) { if (world) world.sim.setGradeOverride(g); },
       placeAt(s, kmh = 0) { const w = world; if (!w || phase !== 'running') return false; w.sim.place(s, kmh / 3.6); w.state = w.sim.step(0, { lever: input.lever, passengers: w.onboard }); return true; },
       forcePlan(plan) { forcedPlan = plan ? { pattern: 'RB', pass: [], tsr: [], incidents: [], ...plan } : null; },
@@ -1670,6 +1720,8 @@
     $('resume').addEventListener('click', resumeGame);
     $('quit').addEventListener('click', quitService);
     $('btnPause').addEventListener('click', () => (paused ? resumeGame() : pauseGame()));
+    $('btnFast').addEventListener('click', () => toggleFast());
+    $('btnRev').addEventListener('click', () => { if (phase === 'running' && !paused) input.reverseToggle = true; });
     $('btnHelp').addEventListener('click', () => toggleHelp());
     $('helpClose').addEventListener('click', () => toggleHelp(false));
     $('btnQuality').addEventListener('click', cycleQuality);

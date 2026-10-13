@@ -530,6 +530,18 @@
     }
     return out;
   }
+  // same for any frameAt function (the opposite track)
+  function makeFramesF(frameAt, s0, s1, step) {
+    const out = [];
+    const f = frameAt(s0);
+    const count = Math.max(1, Math.ceil((s1 - s0) / step));
+    for (let i = 0; i <= count; i++) {
+      const s = Math.min(s1, s0 + (i * (s1 - s0)) / count);
+      frameAt(s, f);
+      out.push({ s, x: f.pos.x, y: f.pos.y, z: f.pos.z, rx: f.right.x, rz: f.right.z, tx: f.tangent.x, ty: f.tangent.y, tz: f.tangent.z });
+    }
+    return out;
+  }
   // profile points [lat, dy]; open polyline left->right (normal = (-dy, dx)) or closed clockwise polygon.
   function sweep(batch, frames, pts, color, o) {
     const opts = o || {};
@@ -574,6 +586,51 @@
     return profile.map((p) => [p[0] + dx, p[1]]);
   }
 
+  /* LUXTRAM rails: embedded grooved rails must stay visible where a road crosses (the road surface sits a few cm above the track
+     formation), so the tram rails sit RAIL_LIFT above the track height and use strong negative polygon offsets; the crossing / street
+     paving strip lies between the road surface and the rails. */
+  const RAIL_LIFT = 0.05;
+  const PAVE_LIFT = 0.035;
+  const tramSteel = () => mat('steelTram', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.72, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 }));
+  const tramGroove = () => mat('grooveTram', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }));
+  const tramPaveMat = () => mat('paveTram', () => new T.MeshStandardMaterial({ map: tex.tramPave(), vertexColors: true, roughness: 0.9, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+  const lifted = (profile, dx) => profile.map((p) => [p[0] + dx, p[1] + RAIL_LIFT]);
+
+  /* Rails (and the street paving) of the player's track and of the opposite track. Both tracks sweep the chunk's own frames, so the
+     rails and the wires of addTramOcs share their sample points. */
+  function addTramRails(ctx) {
+    const { sets, track } = ctx;
+    const steel = sets.get('steelTram', tramSteel);
+    const groove = sets.get('grooveTram', tramGroove);
+    const dark = [col('#222426')];
+    const one = (frames) => {
+      if (!frames || frames.length < 2) return;
+      [-RAIL_X, RAIL_X].forEach((x) => {
+        sweep(steel, frames, lifted(RAIL_PROFILE, x), RAIL_COLORS, { closed: true });
+        sweep(groove, frames, [[x - Math.sign(x) * 0.075, RAIL_LIFT - 0.012], [x - Math.sign(x) * 0.036, RAIL_LIFT - 0.012]].sort((a, b) => a[0] - b[0]), dark, { uvU: 1, uvV: 1 });
+      });
+    };
+    one(ctx.frames);
+    one(ctx.frames2);
+    // street paving between / beside the rails wherever the line runs embedded in a road (not on the grass track)
+    const lt = track.luxtram;
+    if (!lt || !lt.segs) return;
+    const pave = sets.get('paveTram', tramPaveMat);
+    const strip = (frames) => { if (frames && frames.length > 1) sweep(pave, frames, [[-1.75, PAVE_LIFT], [1.75, PAVE_LIFT]], WHITE, { uvU: 1 / 2, uvV: 1 / 2 }); };
+    lt.segs.forEach((sg) => {
+      if (sg.surf === 0) return;
+      const a = Math.max(ctx.s0, sg.s0);
+      const b = Math.min(ctx.s1, sg.s1);
+      if (b - a < 1) return;
+      strip(makeFrames(track, a, b, TRAM_SWEEP_STEP));
+      if (track.opposite) {
+        const a2 = Math.max(a, track.opposite.from);
+        const b2 = Math.min(b, track.opposite.to);
+        if (b2 - a2 >= 1) strip(makeFramesF(track.opposite.frameAt, a2, b2, TRAM_SWEEP_STEP));
+      }
+    });
+  }
+
   function addBed(ctx) {
     const { sets, frames, kind } = ctx;
     if (kind === 'tram') return addTramStreet(ctx);
@@ -609,20 +666,9 @@
     ctx.instanced.push(inst);
   }
 
-  // LUXTRAM: rails only (same profile as the street version below); used when track.noStreet is set
-  function addTramRailsOnly(ctx) {
-    const { sets, frames } = ctx;
-    const marks = sets.get('mark', mark);
-    const steel = sets.get('steel', M.steel);
-    [-RAIL_X, RAIL_X].forEach((x) => {
-      sweep(steel, frames, shifted(RAIL_PROFILE, x), RAIL_COLORS, { closed: true });
-      sweep(marks, frames, [[x - Math.sign(x) * 0.075, -0.012], [x - Math.sign(x) * 0.036, -0.012]].sort((a, b) => a[0] - b[0]), [col('#222426')], { uvU: 1, uvV: 1 });
-    });
-  }
-
   function addTramStreet(ctx) {
     const { sets, frames } = ctx;
-    if (ctx.track.noStreet) return addTramRailsOnly(ctx); // LUXTRAM: the real route draws its own bed/roads (luxtram-world.js)
+    if (ctx.track.noStreet) return addTramRails(ctx); // LUXTRAM: the real route draws its own bed/roads (luxtram-world.js); we add both tracks' rails
     const asphalt = sets.get('asphalt', () => M.tex('asphalt', tex.asphalt()));
     sweep(asphalt, frames, [[-4.6, -0.03], [4.6, -0.03]], WHITE, { uvU: 1 / 4, uvV: 1 / 4 });
     const pave = sets.get('tramPave', () => M.tex('tramPave', tex.tramPave()));
@@ -720,40 +766,95 @@
     }
   }
 
+  /* LUXTRAM overhead line, one contact wire per track. The wire polyline uses the very sample points of the rails (ctx.frames /
+     ctx.frames2, 2 m apart) so it always runs exactly above the track's centreline (only the +-0.12 m zig-zag stagger of a real
+     contact wire is added). Masts stand beside the outer edge of each track (behind the platform at stops) and carry a cantilever
+     arm + steady arm to the wire; a thin messenger wire with droppers hangs between the masts. No wire where the line is
+     catenary-free (track.noOcs). */
+  const TRAM_WIRE_H = 5.6;
+  const TRAM_MAST_SPACING = 36;
+  const TRAM_STAGGER = 0.12;
+  function tramStagger(s) {
+    const k = Math.floor(s / TRAM_MAST_SPACING + 1e-9);
+    const u = s / TRAM_MAST_SPACING - k;
+    return (k % 2 === 0 ? 1 : -1) * TRAM_STAGGER * (1 - 2 * u);
+  }
+  function tramMastLat(track, s, side) {
+    // side +1 = right of the player's track, -1 = left of the opposite track (outer side of the double track)
+    const idx = inStation(track, s, 8);
+    if (idx >= 0) {
+      const st = track.stations[idx];
+      if (st.kind === 'island') return 3.45;   // the island lies between the tracks: the masts keep to the outer sides
+      const ours = st.side === 'right' ? 1 : -1;
+      if (side === 1 && ours === 1) return st.edge + st.width + 0.55;
+      if (side === -1 && st.kind !== 'island' && ours === 1) return st.edge + st.width + 0.55;   // the opposite track's own side platform
+    }
+    return 3.45;
+  }
   function addTramOcs(ctx, dark, wire) {
-    const { track, s0, s1 } = ctx;
-    const spacing = 36;
-    const k0 = Math.ceil(s0 / spacing);
-    const k1 = Math.ceil(s1 / spacing) - 1;
+    const { track, s0, s1, q } = ctx;
     const poleCol = col('#4f565c');
     const copper = col('#8a6a48');
-    const H = 5.6;
-    for (let k = k0; k <= k1; k++) {
-      const s = k * spacing;
-      if (s > track.length + 10) break;
-      if (track.noOcs && track.noOcs(s)) continue; // LUXTRAM: catenary-free stretches have no masts or wires
-      const sign = k % 2 === 0 ? 1 : -1;
-      const base = posAt(track, s, sign * 5.0, 0.14);
-      const f = track.frameAt(s);
+    const messCol = col('#66605a');
+    const noOcs = (s) => !!(track.noOcs && track.noOcs(s));
+    const H = TRAM_WIRE_H;
+
+    const wireRun = (frames, label) => {
+      if (!frames || frames.length < 2) return;
+      const pt = (f, dy) => { const st = tramStagger(f.s); return [f.x + f.rx * st, f.y + dy, f.z + f.rz * st]; };
+      for (let i = 0; i + 1 < frames.length; i++) {
+        const a = frames[i];
+        const b = frames[i + 1];
+        if (noOcs(a.s) || noOcs(b.s)) continue;
+        wire.between(pt(a, H), pt(b, H), 0.035, copper);
+        if (ctx.env.ocsLog) ctx.env.ocsLog.push({ kind: 'wire', track: label, s: a.s, p: pt(a, H), c: [a.x, a.y, a.z] });
+        if (q.messenger) {
+          // messenger wire: high at the masts, close to the contact wire mid-span; droppers every 6 m
+          const mY = (f) => { const u = (f.s / TRAM_MAST_SPACING) - Math.floor(f.s / TRAM_MAST_SPACING + 1e-9); return H + 0.12 + 0.6 * Math.pow(Math.abs(1 - 2 * u), 2); };
+          wire.between(pt(a, mY(a)), pt(b, mY(b)), 0.022, messCol);
+          if (q.droppers && Math.round(a.s) % 6 === 0) wire.between(pt(a, H), pt(a, mY(a) - 0.02), 0.012, messCol);
+        }
+      }
+    };
+    wireRun(ctx.frames, 'player');
+    wireRun(ctx.frames2, 'opposite');
+
+    const mast = (frameAt, s, side) => {
+      const f = frameAt(s);
+      const lat = side * tramMastLat(track, s, side);
       const theta = Math.atan2(f.tangent.x, -f.tangent.z);
+      const P = (l, dy) => [f.pos.x + f.right.x * l, f.pos.y + dy, f.pos.z + f.right.z * l];
+      const st = tramStagger(s);
+      const base = P(lat, 0.14);
+      if (ctx.env.ocsLog) ctx.env.ocsLog.push({ kind: 'mast', track: side === 1 ? 'player' : 'opposite', s, lat: Math.abs(lat), p: base, c: [f.pos.x, f.pos.y, f.pos.z] });
       dark.box(base[0], base[1] + 3.6, base[2], 0.22, 7.4, 0.22, poleCol, -theta);
-      const top = posAt(track, s, sign * 5.0, 6.9);
-      const tip = posAt(track, s, sign * 0.0, 6.2);
-      dark.between(top, tip, 0.07, poleCol);
-      dark.between(posAt(track, s, sign * 5.0, 5.6), posAt(track, s, sign * 1.8, 6.15), 0.045, poleCol);
-      dark.between(tip, posAt(track, s, 0, H + 0.02), 0.04, poleCol);
-      let prev = null;
-      for (let j = 0; j <= 4; j++) {
-        const u = j / 4;
-        const c = posAt(track, s + u * spacing, 0.15 * (k % 2 === 0 ? 1 : -1) * (1 - 2 * u), H);
-        if (prev) wire.between(prev, c, 0.035, copper);
-        prev = c;
+      dark.box(base[0], base[1] + 0.2, base[2], 0.5, 0.4, 0.5, col('#a7a49e'), -theta);
+      const top = P(lat, 6.75);
+      const tip = P(st, H + 0.65);
+      dark.between(top, tip, 0.07, poleCol);                                  // cantilever arm
+      dark.between(P(lat, 5.75), P(lat + (st - lat) * 0.55, H + 0.55), 0.045, poleCol);   // brace
+      dark.between(tip, P(st, H + 0.04), 0.04, poleCol);                     // steady arm down to the contact wire
+    };
+    const k0 = Math.ceil(s0 / TRAM_MAST_SPACING);
+    const k1 = Math.ceil(s1 / TRAM_MAST_SPACING) - 1;
+    for (let k = k0; k <= k1; k++) {
+      const s = k * TRAM_MAST_SPACING;
+      if (s <= track.length + 10 && !noOcs(s) && !track.inTunnel(s)) mast(track.frameAt, s, 1);
+    }
+    if (track.opposite) {
+      const opp = track.opposite;
+      const j0 = Math.ceil((s0 - TRAM_MAST_SPACING / 2) / TRAM_MAST_SPACING);
+      const j1 = Math.ceil((s1 - TRAM_MAST_SPACING / 2) / TRAM_MAST_SPACING) - 1;
+      for (let k = j0; k <= j1; k++) {
+        const s = k * TRAM_MAST_SPACING + TRAM_MAST_SPACING / 2;
+        if (s >= s0 && s < s1 && opp.has(s) && !noOcs(s) && !track.inTunnel(s)) mast(opp.frameAt, s, -1);
       }
     }
   }
 
   /* ============================================================== boards */
   function lateralFree(track, s) {
+    if (track.kind === 'tram') return 1;   // the left side of a tram track is the opposite track: boards and signals stand on the right
     const idx = inStation(track, s, 22);
     if (idx >= 0) return track.stations[idx].side === 'right' ? -1 : 1;
     return 1;
@@ -764,8 +865,9 @@
     const post = sets.get('mast', M.vc, true);
     track.limits.forEach((lim) => {
       if (lim.s < s0 || lim.s >= s1) return;
-      const sd = lateralFree(track, lim.s);
-      const lat = sd * (ctx.kind === 'tram' ? 4.7 : 2.95);
+      const sd = ctx.kind === 'tram' ? 1 : lateralFree(track, lim.s);   // tram: right of the track (the left side is the opposite track)
+      let lat = sd * (ctx.kind === 'tram' ? 4.7 : 2.95);
+      if (ctx.kind === 'tram') { const si = inStation(track, lim.s, 4); if (si >= 0 && track.stations[si].side === 'right' && track.stations[si].kind !== 'island') lat = track.stations[si].edge + track.stations[si].width + 0.45; }
       const f = track.frameAt(lim.s);
       const th = [f.tangent.x, 0, f.tangent.z];
       const tl = Math.hypot(th[0], th[2]) || 1;
@@ -828,8 +930,9 @@
     for (let k = first; k * 500 < s1; k++) {
       const s = k * 500;
       if (s > track.length || track.inTunnel(s) || track.bridgeAt(s)) continue;
-      const sd = -lateralFree(track, s);
-      const p = posAt(track, s, sd * (ctx.kind === 'tram' ? 5.4 : 3.1), ctx.kind === 'tram' ? 0.14 : -0.3);
+      const sd = ctx.kind === 'tram' ? 1 : -lateralFree(track, s);
+      const si = ctx.kind === 'tram' ? inStation(track, s, 4) : -1;
+      const p = posAt(track, s, sd * (ctx.kind === 'tram' ? (si >= 0 && track.stations[si].kind !== 'island' ? track.stations[si].edge + track.stations[si].width + 0.9 : 5.6) : 3.1), ctx.kind === 'tram' ? 0.14 : -0.3);
       const f = track.frameAt(s);
       const th = -Math.atan2(f.tangent.x, -f.tangent.z);
       post.box(p[0], p[1] + 0.5, p[2], 0.14, 1.0, 0.1, col('#e8e6de'), th);
@@ -1351,11 +1454,15 @@
     return mat('clockm' + t.getHours() + ':' + t.getMinutes(), () => new T.MeshStandardMaterial({ map: clockTexture(), alphaTest: 0.5, vertexColors: true, roughness: 0.5 }));
   }
 
-  function buildStation(env, track, idx) {
+  /* variant = { opposite: true, lat } builds the platform of the OPPOSITE track (side platform on the far left of the double track,
+     lat = the opposite track's lateral position at the stop); without it the platform of the player's track (its side = st.side). */
+  function buildStation(env, track, idx, variant) {
     const st = track.stations[idx];
     const q = env.q;
     const isTram = track.kind === 'tram';
-    const sx = st.side === 'right' ? 1 : -1;
+    const oppPlat = !!(variant && variant.opposite);
+    const sx = oppPlat ? -1 : st.side === 'right' ? 1 : -1;
+    const off = oppPlat ? variant.lat : 0;
     const pinfo = track.platformInfo(idx);
     const H = pinfo.height;
     const W = pinfo.width;
@@ -1366,7 +1473,7 @@
     const zA = zOf(st.platformStart); // + (behind)
     const zB = zOf(st.platformEnd); // - (ahead)
     const sets = new BatchSet(new T.Vector3());
-    const pf = (lat) => sx * lat;
+    const pf = (lat) => off + sx * lat;
     const meshes = [];
     const glow = sets.get('glow', M.glow);
     const vc = sets.get('vc', M.vc, true);
@@ -1375,36 +1482,79 @@
     const modern = /TGV|Belval/.test(st.name);
     const style = pickStyle(st.name);
 
-    // platform body
-    const midX = pf(edge + W / 2);
-    concrete.box(midX, (H + FORM_Y) / 2 - 0.005, 0, W, H - FORM_Y - 0.01, L, col('#b9b6af'));
-    concrete.box(pf(edge - 0.06), H - 0.3, 0, 0.12, 0.6, L, col('#8f8c85'));
+    /* LUXTRAM: the platform follows the curve of ITS track (place(s, lateral) maps a point of the track at arc length s into the station
+       group's local frame; yaw = heading difference). Rail stations are straight and keep the plain box layout. */
+    const curved = isTram && !!track.noStreet;
+    const frameOf = oppPlat && track.opposite ? track.opposite.frameAt : track.frameAt;
+    const cF = track.frameAt(sMid);
+    const thm = Math.atan2(cF.tangent.x, -cF.tangent.z);
+    const place = (s, l) => {
+      const f = frameOf(s);
+      const wx = f.pos.x + f.right.x * l - cF.pos.x;
+      const wz = f.pos.z + f.right.z * l - cF.pos.z;
+      return { x: wx * Math.cos(thm) + wz * Math.sin(thm), y: f.pos.y - cF.pos.y, z: -wx * Math.sin(thm) + wz * Math.cos(thm), yaw: -(Math.atan2(f.tangent.x, -f.tangent.z) - thm) };
+    };
+    // a point of the platform at local z (z = -(s - sMid)) and lateral distance `lat` from the track centre, on the platform side
+    const spot = (z, lat) => (curved ? place(sMid - z, sx * lat) : { x: pf(lat), y: 0, z, yaw: 0 });
     const plat = sets.get('platform', () => M.tex('platform', tex.platform()));
     const xe = pf(edge);
     const xb = pf(edge + W);
-    plat.quad([xe, H + 0.001, zA], [xb, H + 0.001, zA], [xb, H + 0.001, zB], [xe, H + 0.001, zB], [0, 1, 0], WHITE, [[0, zA / 4], [1, zA / 4], [1, zB / 4], [0, zB / 4]]);
+    if (curved) {
+      const n = Math.max(1, Math.ceil(L / 3));
+      for (let k = 0; k < n; k++) {
+        const sa = st.platformStart + (k * L) / n;
+        const sb = st.platformStart + ((k + 1) * L) / n;
+        const mid = (sa + sb) / 2;
+        const len = L / n + 0.1;
+        const body = place(mid, sx * (edge + W / 2));
+        concrete.box(body.x, body.y + (H + FORM_Y) / 2 - 0.005, body.z, W, H - FORM_Y - 0.01, len, col('#b9b6af'), body.yaw);
+        const lip = place(mid, sx * (edge - 0.06));
+        concrete.box(lip.x, lip.y + H - 0.3, lip.z, 0.12, 0.6, len, col('#8f8c85'), lip.yaw);
+        const A = place(sa, sx * edge);
+        const B = place(sa, sx * (edge + W));
+        const C = place(sb, sx * (edge + W));
+        const D = place(sb, sx * edge);
+        const v = (p) => [p.x, p.y + H + 0.001, p.z];
+        const uv = [[0, sa / 4], [1, sa / 4], [1, sb / 4], [0, sb / 4]];
+        if (sx > 0) plat.quad(v(A), v(B), v(C), v(D), [0, 1, 0], WHITE, uv);
+        else plat.quad(v(A), v(D), v(C), v(B), [0, 1, 0], WHITE, [uv[0], uv[3], uv[2], uv[1]]);
+      }
+    } else {
+      const midX = pf(edge + W / 2);
+      concrete.box(midX, (H + FORM_Y) / 2 - 0.005, 0, W, H - FORM_Y - 0.01, L, col('#b9b6af'));
+      concrete.box(pf(edge - 0.06), H - 0.3, 0, 0.12, 0.6, L, col('#8f8c85'));
+      plat.quad([xe, H + 0.001, zA], [xb, H + 0.001, zA], [xb, H + 0.001, zB], [xe, H + 0.001, zB], [0, 1, 0], WHITE, [[0, zA / 4], [1, zA / 4], [1, zB / 4], [0, zB / 4]]);
+    }
     // ramps
     [[zA, 1], [zB, -1]].forEach(([z, dir]) => {
       const rampLen = isTram ? 3.5 : 14;
       const ang = Math.atan2(H, rampLen);
-      concrete.box(midX, H / 2 - 0.3, z + dir * rampLen / 2, W, 0.25, Math.hypot(rampLen, H), col('#b2afa8'), 0, dir * -ang);
+      const rp = spot(z + dir * rampLen / 2, edge + W / 2);
+      concrete.box(rp.x, rp.y + H / 2 - 0.3, rp.z, W, 0.25, Math.hypot(rampLen, H), col('#b2afa8'), rp.yaw, dir * -ang);
     });
     // stop marker
     const zm = zOf(st.s);
     const markBatch = sets.get('mark', mark);
-    markBatch.quad([xe, H + 0.012, zm + 0.12], [xb, H + 0.012, zm + 0.12], [xb, H + 0.012, zm - 0.12], [xe, H + 0.012, zm - 0.12], [0, 1, 0], col('#f58a00'));
+    if (curved) {
+      const mk = (s, lat) => { const p = place(s, sx * lat); return [p.x, p.y + H + 0.012, p.z]; };
+      if (sx > 0) markBatch.quad(mk(st.s - 0.12, edge), mk(st.s - 0.12, edge + W), mk(st.s + 0.12, edge + W), mk(st.s + 0.12, edge), [0, 1, 0], col('#f58a00'));
+      else markBatch.quad(mk(st.s - 0.12, edge), mk(st.s + 0.12, edge), mk(st.s + 0.12, edge + W), mk(st.s - 0.12, edge + W), [0, 1, 0], col('#f58a00'));
+    } else {
+      markBatch.quad([xe, H + 0.012, zm + 0.12], [xb, H + 0.012, zm + 0.12], [xb, H + 0.012, zm - 0.12], [xe, H + 0.012, zm - 0.12], [0, 1, 0], col('#f58a00'));
+    }
     const stopB = sets.get('stop', () => M.sign('stop', stopTexture()));
-    const bx = pf(edge + 0.45);
-    vc.box(bx, H + 1.2, zm + 0.02, 0.08, 2.4, 0.08, col('#40464b'));
-    textQuad(stopB, [bx, H + 2.3, zm + 0.1], 0.8, 1.2, [0, 0, 1], [1, 0, 0], [0, 1, 0]);
-    vc.box(bx, H + 2.3, zm - 0.02, 0.86, 1.26, 0.04, col('#202226'));
+    const sp = spot(zm, edge + 0.45);
+    const bx = sp.x;
+    vc.box(bx, sp.y + H + 1.2, sp.z + 0.02, 0.08, 2.4, 0.08, col('#40464b'));
+    textQuad(stopB, [bx, sp.y + H + 2.3, sp.z + 0.1], 0.8, 1.2, [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+    vc.box(bx, sp.y + H + 2.3, sp.z - 0.02, 0.86, 1.26, 0.04, col('#202226'));
 
     // canopy
     const canopyLen = isTram ? 14 : st.size >= 3 ? L * 0.86 : st.size === 2 ? L * 0.5 : 18;
     const cz = isTram ? 0 : 0;
     const roofH = isTram ? 2.9 : 3.5;
     const roofW = isTram ? 2.8 : W + 0.4;
-    const colX = pf(edge + (isTram ? 2.6 : W - 0.9));
+    const colX = pf(edge + (isTram ? Math.min(2.6, W - 0.4) : W - 0.9));
     if (!gare) {
       vc.box(pf(edge + (isTram ? 1.4 : W / 2 + 0.2)), roofH + 0.1, cz, roofW, 0.16, canopyLen, col(isTram ? '#2f6b57' : '#c5c9cb'), 0, 0, sx * 0.05);
       vc.box(pf(edge + (isTram ? 0.05 : 0.1)), roofH - 0.05, cz, 0.08, 0.34, canopyLen, col(isTram ? '#1e4b3d' : '#17406e'));
@@ -1414,18 +1564,20 @@
         vc.box(colX, H + (roofH - H) / 2, z, 0.18, roofH - H, 0.18, col('#7f868b'));
         glow.box(pf(edge + (isTram ? 1.2 : W / 2)), roofH - 0.12, z + canopyLen / cols / 2, 0.6, 0.05, 0.3, col('#fff3d0'));
       }
-      if (isTram) {
+      if (isTram && pinfo.kind !== 'island') {
         // glass shelter back wall
         const g = sets.get('glass', M.glass);
-        g.box(pf(edge + 2.7), H + 1.1, cz, 0.04, 2.0, canopyLen - 1, WHITE);
+        g.box(pf(edge + Math.min(2.7, W - 0.3)), H + 1.1, cz, 0.04, 2.0, canopyLen - 1, WHITE);
       }
     }
     // benches, bins, lamps, timetable boards
     for (let z = cz - canopyLen / 2 + 4; z < cz + canopyLen / 2 - 3; z += isTram ? 8 : 16) {
-      addBench(vc, pf(edge + (isTram ? 2.3 : W - 0.45)), H, z);
+      const bp = spot(z, edge + (isTram ? Math.min(2.3, W - 0.7) : W - 0.45));
+      addBench(vc, bp.x, H + bp.y, bp.z);
     }
     for (let z = zB + 8; z < zA - 8; z += isTram ? 14 : 22) {
-      addLampPost(sets, pf(edge + (isTram ? 0.7 : W * 0.55)), H, z);
+      const lp = spot(z, edge + (isTram ? 0.7 : W * 0.55));
+      addLampPost(sets, lp.x, H + lp.y, lp.z);
     }
     if (!isTram) {
       for (let z = cz - canopyLen / 2 + 9; z < cz + canopyLen / 2; z += 24) {
@@ -1452,11 +1604,13 @@
       vc.box(signX + sx * 0.04, signH, z, 0.03, 0.52, 3.0, col('#1b1d20'));
       [-1.35, 1.35].forEach((dz) => vc.box(signX + sx * 0.04, (H + signH) / 2, z + dz, 0.07, signH - H, 0.07, col('#5a6066')));
     });
-    // totem facing the driver
-    const totemZ = zA - 5;
-    textQuad(signB, [pf(edge + 1.1), H + 2.7, totemZ], 2.6, 0.5, [0, 0, 1], [1, 0, 0], [0, 1, 0]);
-    vc.box(pf(edge + 1.1), H + 2.7, totemZ - 0.03, 2.7, 0.56, 0.04, col('#1b1d20'));
-    [-1, 1].forEach((d) => vc.box(pf(edge + 1.1) + d * 1.2, H + 1.35, totemZ - 0.03, 0.07, 2.7, 0.07, col('#5a6066')));
+    // totem facing the driver (the opposite track's trains come from the other end: no totem)
+    if (!oppPlat) {
+      const tp = spot(zA - 5, edge + 1.1);
+      textQuad(signB, [tp.x, tp.y + H + 2.7, tp.z], 2.6, 0.5, [0, 0, 1], [1, 0, 0], [0, 1, 0]);
+      vc.box(tp.x, tp.y + H + 2.7, tp.z - 0.03, 2.7, 0.56, 0.04, col('#1b1d20'));
+      [-1, 1].forEach((d) => vc.box(tp.x + d * 1.2, tp.y + H + 1.35, tp.z - 0.03, 0.07, 2.7, 0.07, col('#5a6066')));
+    }
     // fences
     if (!isTram) {
       addFence(vc, pf(edge + W + 0.45), zB - 5, zA + 5, 1.2, '#6d7378', 3);
@@ -1481,7 +1635,7 @@
       }
     }
     // terminus buffer stop
-    if (st.terminus) {
+    if (st.terminus && !oppPlat) {
       const sBuf = idx === 0 ? 2.5 : Math.min(track.length - 8, st.platformEnd + 28);
       addBufferStop(vc, zOf(sBuf), idx === 0 ? -1 : 1);
     }
@@ -1609,7 +1763,12 @@
     const sets = new BatchSet(origin);
     const group = new T.Group();
     const step = track.kind === 'tram' ? TRAM_SWEEP_STEP : q.sweepStep;
-    const ctx = { env, track, q, kind: track.kind, s0, s1: bedEnd, origin, sets, group, instanced: [], frames: makeFrames(track, s0, bedEnd, step) };
+    const ctx = { env, track, q, kind: track.kind, s0, s1: bedEnd, origin, sets, group, instanced: [], frames: makeFrames(track, s0, bedEnd, step), frames2: null };
+    if (track.kind === 'tram' && track.opposite) {   // the opposite (left-hand) track exists along the real line only
+      const a2 = Math.max(s0, track.opposite.from);
+      const b2 = Math.min(bedEnd, track.opposite.to);
+      if (b2 - a2 >= 1) ctx.frames2 = makeFramesF(track.opposite.frameAt, a2, b2, step);
+    }
     addBed(ctx);
     addSleepers(ctx);
     addCatenary(ctx);
@@ -1657,6 +1816,7 @@
       crossingState: track.crossings.map(() => false),
       crossingObjs: new Map(),
       portalGeo: null,
+      ocsLog: options && options.debugOcs ? [] : null,   // test hook: contact wire sample points + masts of the tram overhead line
     };
     const root = new T.Group();
     root.name = 'train-sim-infra';
@@ -1680,7 +1840,14 @@
       const obj = stationObjects[i];
       if (obj.group.userData.built) return;
       try {
-        const meshes = buildStation(env, track, i);
+        let meshes = buildStation(env, track, i);
+        meshes.forEach((m) => { m.userData.platformOf = 'player'; });
+        const pi = track.platformInfo(i);
+        if (track.kind === 'tram' && pi.kind !== 'island' && track.opposite && Number.isFinite(pi.oppLat)) {
+          const other = buildStation(env, track, i, { opposite: true, lat: pi.oppLat });
+          other.forEach((m) => { m.userData.platformOf = 'opposite'; });
+          meshes = meshes.concat(other);
+        }
         meshes.forEach((m) => obj.group.add(m));
         obj.group.userData.meshes = meshes;
         obj.group.userData.built = true;
@@ -1811,9 +1978,49 @@
       env.geoCache.forEach((v) => { if (v && v.dispose) v.dispose(); else if (v && v.geo) v.geo.dispose(); });
     }
 
+    /* Test / debug: builds every platform and reports on which side of the player's track the player's platform was really built
+       (lateral centre of its meshes in the station group, + = right of the direction of travel) and where the opposite platform is. */
+    function stationReport() {
+      return track.stations.map((st, i) => {
+        loadStation(i);
+        const group = stationObjects[i].group;
+        const span = { player: [Infinity, -Infinity], opposite: [Infinity, -Infinity] };
+        group.children.forEach((m) => {
+          if (!m.geometry) return;
+          if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+          const b = m.geometry.boundingBox;
+          const key = m.userData.platformOf === 'opposite' ? 'opposite' : 'player';
+          span[key][0] = Math.min(span[key][0], b.min.x + m.position.x);
+          span[key][1] = Math.max(span[key][1], b.max.x + m.position.x);
+        });
+        const mid = (a) => (Number.isFinite(a[0]) ? (a[0] + a[1]) / 2 : null);
+        // the same in world space: median lateral position (track.nearest: + = right of the direction of travel) of the platform meshes' vertices
+        group.updateMatrixWorld(true);
+        const medianLat = (key) => {
+          const lats = [];
+          const v = new T.Vector3();
+          group.children.forEach((m) => {
+            if (!m.geometry || !m.geometry.attributes.position || (m.userData.platformOf === 'opposite' ? 'opposite' : 'player') !== key) return;
+            const pos = m.geometry.attributes.position;
+            const stride = Math.max(1, Math.floor(pos.count / 120));
+            for (let k = 0; k < pos.count; k += stride) {
+              v.fromBufferAttribute(pos, k).applyMatrix4(m.matrixWorld);
+              if (v.y > track.frameAt(st.s).pos.y + 0.1 && v.y < track.frameAt(st.s).pos.y + 0.5 && track.nearest) { const nq = track.nearest(v.x, v.z); if (nq && nq.d < 12) lats.push(nq.lat); }   // platform top / body vertices only
+            }
+          });
+          lats.sort((a, b) => a - b);
+          return lats.length ? lats[Math.floor(lats.length / 2)] : null;
+        };
+        return {
+          name: st.name, side: st.side, kind: track.platformInfo(i).kind || 'side', playerMidX: mid(span.player), oppositeMidX: mid(span.opposite), playerSpan: span.player,
+          playerWorldLat: medianLat('player'), oppositeWorldLat: medianLat('opposite'), built: group.userData.built,
+        };
+      });
+    }
+
     update(0);
     return {
-      update, dispose, setSignalAspect, setCrossing, addTempBoard, clearTempBoards, platformHeight, stationObjects,
+      update, dispose, setSignalAspect, setCrossing, addTempBoard, clearTempBoards, platformHeight, stationObjects, stationReport,
       quality: qualityName,
       debug: { chunks, env },
     };

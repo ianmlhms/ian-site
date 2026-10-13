@@ -253,10 +253,45 @@
   );
 
   const list = [west, south, east, north, trier, metz, brussels, paris];
-  const byId = list.reduce((acc, r) => Object.assign(acc, { [r.id]: r }), {});
 
-  window.TS.routes = Object.freeze({
-    list,
-    get: (id) => byId[id] || null,
-  });
+  /* Return direction: every route can also be driven the other way. The id of that direction is `<routeId>~r`; it is derived here (same
+     ownership / price / career as the forward route, see TS.routeDir). TS.track.build(def) understands def.reverse + def.base. */
+  const REV = '~r';
+  const baseId = (id) => (typeof id === 'string' && id.endsWith(REV) ? id.slice(0, -REV.length) : id);
+  const isReverse = (id) => typeof id === 'string' && id.endsWith(REV);
+  function reverseName(def) {
+    const names = def.stations || [];
+    const first = names[0];
+    const last = names[names.length - 1];
+    const out = {};
+    ['lb', 'de', 'en'].forEach((lang) => {
+      const src = (def.name && def.name[lang]) || (def.name && def.name.en) || def.id;
+      const prefix = (src.match(/^(.*?:\s*|TGV\s+)/) || ['', ''])[1];
+      out[lang] = first && last ? prefix + last + ' → ' + first : src + ' ←';
+    });
+    return Object.freeze(out);
+  }
+  const reversed = new Map();
+  function reverseDef(def) {
+    if (!reversed.has(def.id)) {
+      const r = Object.create(def);   // everything else (layout, length getter, luxtram spec, defaults) is inherited from the forward route
+      Object.defineProperties(r, {
+        id: { value: def.id + REV, enumerable: true }, name: { value: reverseName(def), enumerable: true },
+        stations: { value: Object.freeze((def.stations || []).slice().reverse()), enumerable: true },
+        reverse: { value: true, enumerable: true }, base: { value: def, enumerable: true },
+      });
+      reversed.set(def.id, Object.freeze(r));
+    }
+    return reversed.get(def.id);
+  }
+  function makeRoutes(routeList) {
+    const byId = routeList.reduce((acc, r) => Object.assign(acc, { [r.id]: r }), {});
+    return Object.freeze({
+      list: routeList,
+      get: (id) => byId[id] || (isReverse(id) && byId[baseId(id)] ? reverseDef(byId[baseId(id)]) : null),
+    });
+  }
+
+  window.TS.routeDir = Object.freeze({ REV, baseId, isReverse, makeRoutes, reverseDef });
+  window.TS.routes = makeRoutes(list);
 })();

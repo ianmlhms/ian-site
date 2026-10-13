@@ -22,7 +22,10 @@
   const num = (n) => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(MAX, Math.floor(n))) : 0);
   const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
   const trainById = (id) => C.trains.find((t) => t.id === id) || null;
-  const rule = (routeId) => C.routeRules[routeId] || null;
+  /* Return direction: route id + '~r'. It belongs to the same career, price and ownership as the forward route; only the records (best) are per direction. */
+  const REV = '~r';
+  const baseOf = (routeId) => (typeof routeId === 'string' && routeId.endsWith(REV) ? routeId.slice(0, -REV.length) : routeId);
+  const rule = (routeId) => C.routeRules[baseOf(routeId)] || null;
   const unique = (list, allowed) => [...new Set(Array.isArray(list) ? list.filter((x) => allowed.includes(x)) : [])];
 
   // ---- which career does a vehicle / route belong to
@@ -54,7 +57,7 @@
       for (const k of C.upgradeKinds) upgrades[id][k] = Math.min(MAX_LEVELS[k], num(d.upgrades && d.upgrades[id] && d.upgrades[id][k]));
     }
     const best = {};
-    if (isObj(d.best)) for (const id of routeIds) if (num(d.best[id])) best[id] = num(d.best[id]);
+    if (isObj(d.best)) for (const id of routeIds) for (const key of [id, id + REV]) if (num(d.best[key])) best[key] = num(d.best[key]);
     return {
       lifetime, wallet: Math.min(lifetime, num(d.wallet)), owned, routes,
       train: owned.includes(d.train) ? d.train : freeTrains[0], route: routes.includes(d.route) ? d.route : freeRoutes[0],
@@ -145,7 +148,7 @@
     if (!r) return { ok: false, reason: 'unknownRoute', needs: [] };
     const cid = careerOfRoute(routeId);
     const c = s[cid];
-    if (!c.routes.includes(routeId)) return { ok: false, reason: 'needsRoute', needs: trainsForRoute(routeId) };
+    if (!c.routes.includes(baseOf(routeId))) return { ok: false, reason: 'needsRoute', needs: trainsForRoute(routeId) };
     const id = trainId || c.train;
     if (!trainById(id)) return { ok: false, reason: 'unknownTrain', needs: trainsForRoute(routeId) };
     if (careerOfTrain(id) !== cid || !trainCompatible(id, routeId)) return { ok: false, reason: 'wrongTrainKind', needs: trainsForRoute(routeId) };
@@ -200,7 +203,7 @@
   function selectRoute(save, routeId) {
     const s = normalize(save);
     const cid = careerOfRoute(routeId);
-    return cid && s[cid].routes.includes(routeId) ? withCareer(s, cid, { route: routeId }) : null;
+    return cid && s[cid].routes.includes(baseOf(routeId)) ? withCareer(s, cid, { route: baseOf(routeId) }) : null;
   }
   /* Why can't I buy? -> { ok, reason, price }. */
   function canBuy(save, kind, id, extra) {
@@ -245,9 +248,15 @@
     const cars = base.cars + (extraCar ? 1 : 0);
     const capacity = Math.round(base.capacity * (1 + fx.capacity.capacityPerLevel * lv.capacity) * (cars / base.cars));
     const liveries = base.liveries || [base.livery];
+    // The Luxtram is capped at its real top speed (motor upgrade = acceleration only); arcade test mode lets it scout faster, fine-free.
+    const isTram = base.kind === 'tram';
+    const scout = isTram && typeof window !== 'undefined' && window.__pbTestMode === true;
+    const capKmh = isTram ? (scout ? C.speedCaps.tramScoutKmh : C.speedCaps.tramKmh) : 0;
     return {
       ...base,
-      maxKmh: Math.round(base.maxKmh * (1 + fx.motor.speedPerLevel * lv.motor)),
+      maxKmh: isTram ? capKmh : Math.round(base.maxKmh * (1 + fx.motor.speedPerLevel * lv.motor)),
+      hardCapKmh: capKmh,
+      scout,
       accel: +(base.accel * (1 + fx.motor.accelPerLevel * lv.motor)).toFixed(3),
       brake: +(base.brake * (1 + fx.brakes.brakePerLevel * lv.brakes)).toFixed(3),
       emergency: +(base.emergency * (1 + fx.brakes.emergencyPerLevel * lv.brakes)).toFixed(3),
@@ -283,7 +292,8 @@
   /* All routes the train can drive in endless mode (regardless of purchase), in route-list order. */
   function endlessOrder(trainId) {
     const train = trainById(trainId);
-    return routeOrder().filter((id) => trainDrivesClass(train, routeClass(id)));
+    // endless: every route there and back (forward, then the return direction), then the next route
+    return routeOrder().filter((id) => trainDrivesClass(train, routeClass(id))).flatMap((id) => [id, id + REV]);
   }
 
   // ---- ranks (per career)
@@ -390,7 +400,7 @@
   TS.career = {
     defaults, normalize, merge, of, setCareer, setHints, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
     applyUpgrades, routeAvailable, endlessOrder, routeClass, trainCompatible, trainsForRoute, requiredTrain,
-    careerOfTrain, careerOfRoute, trainIdsOf, routeIdsOf, unlockedAll, CAREERS,
+    baseRouteId: baseOf, careerOfTrain, careerOfRoute, trainIdsOf, routeIdsOf, unlockedAll, CAREERS,
     rank, rankInfo, reward, completeService, punctualityScore, accuracyScore, MAX_LEVELS,
   };
 })();

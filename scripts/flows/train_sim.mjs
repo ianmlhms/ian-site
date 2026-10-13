@@ -17,7 +17,8 @@ async function gameFrame(h) {
   return frame;
 }
 const key = (h, k) => h.page.keyboard.press(k);
-const LUXTRAM_ORDER = ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'];
+/* endless: every route there and back (forward, then the return direction '~r'), then the next route */
+const LUXTRAM_ORDER = ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'].flatMap((id) => [id, id + '~r']);
 /* Ian's real save before the two-career split (flat v1 shape). */
 const OLD_SAVE = { v: 1, tb: 6800, lifetime: 6800, wallet: 3300, savedAt: 1700000000000, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west',
   upgrades: { railcar: { motor: 2, brakes: 1, comfort: 1, capacity: 0, paint: 1 } }, best: { west: 292 }, services: 4, endlessBest: 0, hints: false, hintsSet: true };
@@ -30,6 +31,394 @@ async function gotoNormal(h, url) {
   await h.goto(url);
   const choice = h.page.locator('.pb-mode__box [data-mode="normal"]');
   await choice.waitFor({ state: 'visible', timeout: 15000 }).then(() => choice.click()).catch(() => {});
+}
+
+/* Luxtram checks (normal mode): speed cap, second track, catenary, platform sides. TS_LUXTRAM_ONLY=1 runs only these. */
+async function luxtramNormalChecks(h, frame) {
+
+  h.step('Luxtram: top speed 70 km/h in normal mode, even with every upgrade (motor = acceleration only)');
+  const speed = await frame.evaluate(() => {
+    const base = TS.config.trains.find((tr) => tr.id === 'tram');
+    const maxed = TS.career.applyUpgrades(base, TS.career.unlockedAll());
+    const plain = TS.career.applyUpgrades(base, TS.career.defaults());
+    const track = TS.track.build(TS.routes.get('luxtram-kierchbierg'));
+    const run = (train, startKmh, seconds) => {
+      const sim = TS.sim.create({ train, track, options: { seed: 7 } });
+      sim.setSpeed(startKmh / 3.6);
+      let vmax = 0, st = null;
+      for (let i = 0; i < 60 * seconds; i++) { st = sim.step(1 / 60, { lever: 5 }); vmax = Math.max(vmax, st.v * 3.6); }
+      sim.setSpeed(150 / 3.6); st = sim.step(1 / 60, { lever: 5 });   // even a forced 150 km/h is pulled back to the cap
+      return { vmax, forced: st.v * 3.6, fines: st.totals.overspeedFine };
+    };
+    const downhill = (() => {   // a 7 % descent with the motor off: gravity must not push the tram past the cap either
+      const sim = TS.sim.create({ train: maxed, track, options: { seed: 7 } });
+      sim.setGradeOverride(-0.07); sim.setSpeed(60 / 3.6);
+      let vmax = 0;
+      for (let i = 0; i < 60 * 90; i++) { const st = sim.step(1 / 60, { lever: 0 }); vmax = Math.max(vmax, st.v * 3.6); }
+      return vmax;
+    })();
+    const limits = TS.config.trains.length ? ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'].map((id) => Math.max(...TS.track.build(TS.routes.get(id)).limits.map((l) => l.kmh))) : [];
+    return { maxedKmh: maxed.maxKmh, plainKmh: plain.maxKmh, maxedAccel: maxed.accel, plainAccel: plain.accel, scout: maxed.scout, run: run(maxed, 30, 60), downhill, limits,
+      railMotor: TS.career.applyUpgrades(TS.config.trains.find((tr) => tr.id === 'emu'), TS.career.unlockedAll()).maxKmh > TS.config.trains.find((tr) => tr.id === 'emu').maxKmh };
+  });
+  h.eq([speed.maxedKmh, speed.plainKmh, speed.scout], [70, 70, false], 'tram top speed is 70 km/h with and without upgrades, no scout mode in normal mode');
+  h.expect(speed.maxedAccel > speed.plainAccel, 'the motor upgrade still improves the tram\'s acceleration (' + speed.plainAccel + ' -> ' + speed.maxedAccel + ')');
+  h.expect(speed.run.vmax <= 70.01 && speed.run.forced <= 70.01, 'maxed tram under full power never exceeds 70 km/h (max ' + speed.run.vmax.toFixed(1) + ', forced 150 -> ' + speed.run.forced.toFixed(1) + ')');
+  h.expect(speed.downhill <= 70.01, 'not even on a 7 % descent (' + speed.downhill.toFixed(1) + ' km/h)');
+  h.expect(speed.limits.every((l) => l <= 70), 'no Luxtram limit board / curve / timetable speed above 70: ' + speed.limits.join(','));
+  h.expect(speed.railMotor, 'rail trains keep their motor top-speed bonus');
+
+  h.step('Luxtram: calm limit profile (zones >= 150 m, >= 80 m in the centre, multiples of 10, no stop zones), Findel - Luxexpo is 70 except the motorway bridge');
+  const lim = await frame.evaluate(() => {
+    const out = {};
+    for (const id of ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram']) {
+      const tr = TS.track.build(TS.routes.get(id));
+      const lt = tr.luxtram;
+      const L = tr.limits;
+      let shortest = Infinity, bad = [], values = new Set(), dup = 0;
+      for (let i = 0; i < L.length; i++) {
+        const end = i + 1 < L.length ? L[i + 1].s : tr.length;
+        const len = end - L[i].s;
+        const mid = (L[i].s + end) / 2;
+        const min = mid >= lt.centre[0] && mid <= lt.centre[1] ? lt.minZoneCentre : lt.minZone;
+        if (len < min - 1) bad.push(Math.round(L[i].s) + ':' + L[i].kmh + ' ' + Math.round(len) + 'm<' + min);
+        shortest = Math.min(shortest, len);
+        values.add(L[i].kmh);
+        if (i && L[i].kmh === L[i - 1].kmh) dup++;
+      }
+      // never a higher limit squeezed between two lower ones over a short distance
+      let squeezed = 0;
+      for (let i = 1; i + 1 < L.length; i++) if (L[i].kmh > L[i - 1].kmh && L[i].kmh > L[i + 1].kmh && (L[i + 1].s - L[i].s) < 150) squeezed++;
+      const limAt = (s) => { let k = L[0].kmh; for (const l of L) { if (l.s <= s) k = l.kmh; else break; } return k; };
+      const o = { zones: L.length, bad, shortest, values: [...values].sort((a, b) => a - b), dup, squeezed, stationLimitZones: 0 };
+      if (id === 'luxtram-kierchbierg') {
+        const mb = lt.motorwayBridge;
+        const seen = new Set();
+        let outsideBridge = 0;
+        for (let s = 0; s <= lt.fastEnd; s += 5) {
+          const k = limAt(s);
+          seen.add(k);
+          const inBridge = s >= mb[0] - 60 - 125 && s <= mb[1] + 71;
+          if (k !== 70 && !(inBridge && k === 50)) outsideBridge++;
+        }
+        o.fast = { values: [...seen], outsideBridge, bridgeMid: limAt((mb[0] + mb[1]) / 2), atLuxexpoPlatform: limAt(tr.stations[2].platformStart + 10), atPlatformEnd: limAt(tr.stations[2].platformEnd - 1), atHeienhaff: limAt(tr.stations[1].s) };
+      }
+      out[id] = o;
+    }
+    return out;
+  });
+  for (const [id, o] of Object.entries(lim)) {
+    h.expect(o.bad.length === 0, id + ': ' + o.zones + ' limit zones, none shorter than the minimum (shortest ' + Math.round(o.shortest) + ' m)' + (o.bad.length ? ' ' + o.bad.slice(0, 4).join(', ') : ''));
+    h.expect(o.values.every((v) => [25, 30, 40, 50, 60, 70].includes(v)) && o.dup === 0 && o.squeezed === 0, id + ': limits ' + o.values.join('/') + ' (multiples of 10, 25 only where needed), boards only where the value changes, nothing squeezed');
+  }
+  const fast = lim['luxtram-kierchbierg'].fast;
+  h.expect(fast.outsideBridge === 0 && fast.values.every((v) => v === 70 || v === 50), 'Findel - Héienhaff - Luxexpo: 70 km/h the whole way except the motorway bridge (values ' + fast.values.join('/') + ')');
+  h.eq([fast.bridgeMid, fast.atLuxexpoPlatform, fast.atPlatformEnd, fast.atHeienhaff], [50, 70, 70, 70], 'the bridge is 50; Héienhaff and the Luxexpo platform stay at 70');
+
+  h.step('Luxtram: the second (opposite) track exists along the whole line');
+  const dbl = await frame.evaluate(() => {
+    const out = {};
+    for (const id of ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram']) {
+      const tr = TS.track.build(TS.routes.get(id));
+      const o = tr.opposite;
+      let missing = 0, osm = 0, total = 0, minGap = 99, maxGap = 0, jump = 0, prev = null;
+      for (let s = o.from; s <= o.to; s += 2) {
+        total++;
+        if (!o.has(s)) missing++;
+        const i = Math.round(s / 2);
+        if (o.source[i]) osm++;
+        const gap = -o.lat[i];
+        minGap = Math.min(minGap, gap); maxGap = Math.max(maxGap, gap);
+        if (prev !== null) jump = Math.max(jump, Math.abs(gap - prev));
+        prev = gap;
+      }
+      // the opposite track really lies to the LEFT of the player's, parallel, in world space
+      let leftOk = true, par = 0;
+      for (let s = o.from; s <= o.to; s += 25) {
+        const a = tr.frameAt(s), b = o.frameAt(s);
+        const lat = (b.pos.x - a.pos.x) * a.right.x + (b.pos.z - a.pos.z) * a.right.z;
+        if (!(lat < -2.5 && lat > -12.5)) leftOk = false;
+        par = Math.max(par, 1 - Math.abs(a.tangent.x * b.tangent.x + a.tangent.z * b.tangent.z));
+      }
+      out[id] = { missing, osmShare: osm / total, minGap, maxGap, jump, leftOk, par, coversRoute: o.from <= tr.stations[0].s && o.to >= tr.stations[tr.stations.length - 1].s, len: tr.length };
+    }
+    return out;
+  });
+  for (const [id, d] of Object.entries(dbl)) {
+    h.expect(d.missing === 0 && d.leftOk, id + ': opposite track present everywhere, always on the left (' + Math.round(d.len) + ' m)');
+    h.expect(d.coversRoute, id + ': it spans the route from the first stop to the last stop');
+    h.expect(d.osmShare > 0.95, id + ': ' + Math.round(d.osmShare * 100) + ' % of its centreline comes from the real OSM second track');
+    h.expect(d.minGap >= 2.6 && d.maxGap <= 12.1 && d.jump < 0.9, id + ': spacing ' + d.minGap.toFixed(1) + '..' + d.maxGap.toFixed(1) + ' m, smooth (max step ' + d.jump.toFixed(2) + ' m per 2 m), parallel ' + d.par.toExponential(1));
+  }
+
+  h.step('Luxtram: catenary above each track\'s centreline (same sample points as the rails), masts beside the tracks, none in the catenary-free section');
+  const cat = await frame.evaluate(() => {
+    const track = TS.track.build(TS.routes.get('luxtram'));
+    const infra = TS.infra.create(new THREE.Scene(), track, { quality: 'medium', debugOcs: true });
+    const log = infra.debug.env.ocsLog;
+    for (let s = 0; s < track.length + 400; s += 400) infra.update(s);
+    const wires = log.filter((e) => e.kind === 'wire');
+    const masts = log.filter((e) => e.kind === 'mast');
+    let worst = 0, noOcsHits = 0, dyBad = 0, freeSamples = 0;
+    for (const e of wires) {
+      const f = (e.track === 'player' ? track.frameAt : track.opposite.frameAt)(e.s);
+      worst = Math.max(worst, Math.hypot(e.p[0] - f.pos.x, e.p[2] - f.pos.z));
+      if (track.noOcs(e.s)) noOcsHits++;
+      if (Math.abs(e.p[1] - f.pos.y - 5.6) > 0.05) dyBad++;
+    }
+    for (let s = 0; s < track.length; s += 2) if (track.noOcs(s)) freeSamples++;
+    const lateral = masts.map((m) => m.lat);
+    const bySide = (k) => wires.filter((w) => w.track === k).length;
+    infra.dispose();
+    return { wires: wires.length, player: bySide('player'), opposite: bySide('opposite'), worst, noOcsHits, dyBad, freeM: freeSamples * 2, masts: masts.length, mastMin: Math.min(...lateral), mastMax: Math.max(...lateral), noMastInFree: masts.every((m) => !track.noOcs(m.s)) };
+  });
+  h.expect(cat.player > 500 && cat.opposite > 500, 'wires drawn for both tracks (' + cat.player + ' + ' + cat.opposite + ' samples)');
+  h.expect(cat.worst <= 0.3, 'every contact-wire sample is within 0.3 m of its track centre (worst ' + cat.worst.toFixed(2) + ' m) and 5.6 m up (' + cat.dyBad + ' off)');
+  h.expect(cat.freeM > 2500 && cat.noOcsHits === 0 && cat.noMastInFree, 'the catenary-free section (' + Math.round(cat.freeM) + ' m, Rout Bréck to Gare) has no wire and no mast');
+  h.expect(cat.masts > 100 && cat.mastMin >= 2.4 && cat.mastMax <= 9, 'masts stand beside the tracks (' + cat.masts + ' masts, ' + cat.mastMin.toFixed(1) + '..' + cat.mastMax.toFixed(1) + ' m from their track)');
+
+  h.step('Luxtram: every stop\'s platform side, HUD "Quai riets/lénks" and door side agree with the real geometry');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+  const built = await frame.evaluate(() => __tsTest.stationReport());
+  h.eq(built.length, 24, 'the full line has 24 stops');
+  const rows = [];
+  for (let i = 0; i < built.length; i++) {
+    await frame.evaluate((k) => { __tsTest.teleport(k); __tsTest.stopAtMarker(-0.5); }, i);
+    await waitState(frame, (k) => { const q = window.__tsTest.state(); return q.hudSide !== '' && q.hudNext === q.stations[k].name; }, i, 8000).catch(() => {});
+    await frame.evaluate(() => { __tsTest.press('d'); });
+    await waitState(frame, () => window.__tsTest.state().doorsReleased, null, 8000).catch(() => {});
+    const q = await S(frame);
+    const wanted = await frame.evaluate((side) => TS.t('platformShort') + ' ' + TS.t(side === 'left' ? 'sideLeft' : 'sideRight'), q.stations[i].side);
+    const b = built[i];
+    rows.push({ name: b.name, side: b.side, hud: q.hudSide === wanted && q.hudNext === b.name, door: q.doorSide === b.side,
+      built: b.playerWorldLat !== null && Math.sign(b.playerWorldLat) === (b.side === 'right' ? 1 : -1),
+      oppBuilt: b.kind === 'island' ? b.oppositeWorldLat === null : b.oppositeWorldLat !== null && Math.sign(b.oppositeWorldLat) === -1 });
+  }
+  console.log('  stop sides (name side kind | HUD door built-platform opposite-platform):\n' + rows.map((r, i) => '   ' + String(i).padStart(2) + ' ' + r.name.padEnd(20) + r.side.padEnd(6) + (built[i].kind || 'side').padEnd(7) + '| ' + [r.hud, r.door, r.built, r.oppBuilt].map((v) => (v ? 'ok' : 'FAIL')).join(' ')).join('\n'));
+  h.expect(rows.every((r) => r.built), 'the platform built for the player\'s track lies on the stop\'s side in world space at all 24 stops');
+  h.expect(rows.every((r) => r.hud), 'the HUD text "Quai riets/lénks" matches the stop\'s side at all 24 stops');
+  h.expect(rows.every((r) => r.door), 'the doors open on the stop\'s side at all 24 stops');
+  h.expect(rows.every((r) => r.oppBuilt), 'the opposite track\'s own platform is built on its far side (none where the stop has an island platform)');
+  h.eq(rows.filter((r) => r.side === 'left').map((r) => r.name), ['Findel-Aéroport', 'Rout Bréck', 'Stäreplaz'], 'the three island-platform stops (platform between the tracks) are the only left-hand ones');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+}
+
+/* Return direction, reverse gear, 2x fast-forward and real (natural) endless hand-over. TS_LUXTRAM_ONLY=1 runs these too. */
+async function directionAndGearChecks(h, frame) {
+  h.step('return direction: every route also runs the other way (rail + Luxtram), same length, first stop = old last stop, sides agree');
+  const dirs = await frame.evaluate(() => {
+    const out = [];
+    for (const def of TS.routes.list) {
+      const f = TS.track.build(def);
+      const r = TS.track.build(TS.routes.get(def.id + '~r'));
+      const fs = f.stations, rs = r.stations;
+      const sc = new THREE.Scene();
+      const inf = TS.infra.create(sc, r, { quality: 'low' });
+      const rep = inf.stationReport();
+      inf.dispose();
+      const sideOk = rep.every((b, i) => b.playerWorldLat !== null && Math.sign(b.playerWorldLat) === (rs[i].side === 'right' ? 1 : -1));
+      const rail = def.kind !== 'tram';
+      // rail: platform sides flip with the direction of travel; Luxtram: every platform is on the right (the OTHER track)
+      const flips = rail ? rs.every((s, i) => s.side !== fs[fs.length - 1 - i].side) : rs.every((s) => s.side === 'right');
+      let other = true, minLat = 99, maxLat = -99;
+      if (!rail) {
+        for (let s = 0; s <= r.length; s += 50) {
+          const p = r.frameAt(s).pos;
+          const q = r.base.nearest(p.x, p.z);   // lateral of the reversed player's position on the forward track
+          minLat = Math.min(minLat, q.lat); maxLat = Math.max(maxLat, q.lat);
+        }
+        other = maxLat < -2.5 && minLat > -12.5;
+      }
+      out.push({
+        id: def.id, rail, lenEqual: Math.abs(f.length - r.length) < 0.01, firstIsLast: rs[0].name === fs[fs.length - 1].name && rs[rs.length - 1].name === fs[0].name,
+        names: rs.map((s) => s.name).join('|') === fs.map((s) => s.name).reverse().join('|'), count: rs.length === fs.length, flips, sideOk, other, minLat, maxLat,
+        baseScenery: r.base && r.base.length === f.length && typeof r.baseS === 'function' && Math.abs(r.baseS(10) - (f.length - 10)) < 1e-6,
+        title: TS.routes.get(def.id + '~r').name.en, terminus: rs[0].terminus && rs[rs.length - 1].terminus && !rs[1].terminus === true,
+        sameStart: Math.hypot(r.frameAt(r.length).pos.x - f.frameAt(0).pos.x, r.frameAt(r.length).pos.z - f.frameAt(0).pos.z),
+      });
+    }
+    return out;
+  });
+  for (const d of dirs) {
+    h.expect(d.lenEqual && d.firstIsLast && d.names && d.count, d.id + '~r: same length, its first stop is the forward route\'s last stop and the stops run in reverse (' + d.title + ')');
+    h.expect(d.flips && d.sideOk, d.id + '~r: ' + (d.rail ? 'platform sides flip with the direction of travel' : 'every platform on the right, on the OTHER track') + ' and the built platforms agree');
+    h.expect(d.baseScenery, d.id + '~r: the scenery stays the forward route\'s (track.base / baseS)');
+    if (!d.rail) h.expect(d.other, d.id + '~r: runs on the other track (' + d.minLat.toFixed(1) + '..' + d.maxLat.toFixed(1) + ' m left of the forward track)');
+  }
+  const revLimits = await frame.evaluate(() => {
+    const out = {};
+    for (const id of ['luxtram-kierchbierg~r', 'luxtram-stad~r', 'luxtram-sud~r', 'luxtram~r']) {
+      const tr = TS.track.build(TS.routes.get(id));
+      const lt = tr.luxtram, L = tr.limits;
+      const bad = [];
+      for (let i = 0; i < L.length; i++) {
+        const end = i + 1 < L.length ? L[i + 1].s : tr.length, len = end - L[i].s, mid = (L[i].s + end) / 2;
+        const min = mid >= lt.centre[0] && mid <= lt.centre[1] ? lt.minZoneCentre : lt.minZone;
+        if (len < min - 1) bad.push(Math.round(L[i].s) + ':' + L[i].kmh + ' ' + Math.round(len) + 'm');
+      }
+      out[id] = { zones: L.length, bad };
+    }
+    const f = TS.track.build(TS.routes.get('luxtram-kierchbierg~r'));
+    const L = f.limits; const limAt = (s) => { let k = L[0].kmh; for (const l of L) { if (l.s <= s) k = l.kmh; else break; } return k; };
+    const fwd = TS.track.build(TS.routes.get('luxtram-kierchbierg'));
+    const seen = new Set();
+    for (let s = 0; s <= f.length; s += 5) { const abs = f.length - s; if (abs <= fwd.luxtram.fastEnd) seen.add(limAt(s)); }
+    out.fast = [...seen];
+    return out;
+  });
+  for (const id of ['luxtram-kierchbierg~r', 'luxtram-stad~r', 'luxtram-sud~r', 'luxtram~r']) h.expect(revLimits[id].bad.length === 0, id + ': ' + revLimits[id].zones + ' limit zones, none below the minimum length' + (revLimits[id].bad.length ? ' ' + revLimits[id].bad.join(', ') : ''));
+  h.expect(revLimits.fast.every((v) => v === 70 || v === 50), 'Luxexpo - Héienhaff - Findel (return): 70 km/h except the motorway bridge (' + revLimits.fast.join('/') + ')');
+
+  h.step('return direction in the cab: HUD side, door side and the stop marker at every stop of both directions (Luxtram full line + west)');
+  for (const id of ['luxtram~r', 'west~r']) {
+    await frame.evaluate((r) => { __tsTest.setRoute(r); }, id);
+    await waitState(frame, (r) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === r, id, 90000);
+    const n = (await S(frame)).stations.length;
+    const rows = [];
+    for (let i = 0; i < n; i++) {
+      await frame.evaluate((k) => { __tsTest.teleport(k); __tsTest.stopAtMarker(-0.5); }, i);
+      await waitState(frame, (k) => { const q = window.__tsTest.state(); return q.hudSide !== '' && q.hudNext === q.stations[k].name; }, i, 8000).catch(() => {});
+      await frame.evaluate(() => { __tsTest.press('d'); });
+      await waitState(frame, () => window.__tsTest.state().doorsReleased, null, 8000).catch(() => {});
+      const q = await S(frame);
+      const wanted = await frame.evaluate((side) => TS.t('platformShort') + ' ' + TS.t(side === 'left' ? 'sideLeft' : 'sideRight'), q.stations[i].side);
+      rows.push(q.hudSide === wanted && q.doorSide === q.stations[i].side && q.hudNext === q.stations[i].name);
+    }
+    h.expect(rows.every(Boolean), id + ': HUD "Quai riets/lénks", door side and next-stop name agree at all ' + n + ' stops (' + rows.filter(Boolean).length + ' ok)');
+    await frame.evaluate(() => __tsTest.toMenu());
+    await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  }
+
+  h.step('menu: ⇄ direction toggle on every route card, shared ownership, direction shown in the name');
+  await frame.locator('[data-test="career-rail"]').click();
+  await waitState(frame, () => window.__tsTest.state().career === 'rail');
+  await frame.locator('[data-test="dir-west"]').click();
+  await frame.locator('[data-test="mode-career"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running');
+  let q = await S(frame);
+  h.eq(q.routeId, 'west~r', 'the return direction of the owned west line starts without buying anything');
+  h.expect(/→/.test(q.svcLabel), 'the service label shows the direction (' + q.svcLabel + ')');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+
+  h.step('reverse gear: R at standstill only, 10 km/h, back up to the stop board, doors open, stop rated again');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram-stad'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram-stad', null, 90000);
+  await frame.evaluate(() => { __tsTest.teleport(1); });
+  const st1 = (await S(frame)).stations[1];
+  await frame.evaluate(() => { __tsTest.setSpeed(15); });
+  await key(h, 'r');
+  await h.pause(250);
+  q = await S(frame);
+  h.expect(!q.reverse && q.events.includes('reverserRefused'), 'R is refused while moving');
+  await frame.evaluate((s) => { __tsTest.setSpeed(0); __tsTest.placeAt(s + 25, 0); }, st1.s);   // 25 m past the stop board
+  await h.pause(300);
+  await key(h, 'w');
+  await key(h, 'r');
+  await h.pause(250);
+  q = await S(frame);
+  h.expect(!q.reverse && q.events.includes('reverserRefused'), 'R is refused while the lever is in power');
+  await key(h, 's');
+  await key(h, 's');
+  await h.pause(300);
+  await key(h, 'r');
+  await waitState(frame, () => window.__tsTest.state().reverse, null, 4000);
+  await h.pause(300);
+  h.expect(await frame.locator('#revLamp').isVisible(), 'the HUD shows the "◀ R" indicator');
+  for (let k = 0; k < 4; k++) await key(h, 'w');
+  let vmax = 0;
+  for (let k = 0; k < 160; k++) { q = await S(frame); vmax = Math.max(vmax, q.kmh); if (q.s <= st1.s + 1.5) break; await h.pause(150); }
+  h.expect(vmax > 3 && vmax <= 10.05, 'reverse speed is capped at 10 km/h (max ' + vmax.toFixed(1) + ')');
+  h.expect(q.s - st1.s <= 6, 'the train backed up to the stop board (' + (q.s - st1.s).toFixed(1) + ' m past it)');
+  for (let k = 0; k < 8; k++) await key(h, 's');
+  await waitState(frame, () => window.__tsTest.state().kmh < 0.2, null, 8000);
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorsReleased, null, 6000).catch(() => {});
+  q = await S(frame);
+  h.expect(q.doorsReleased, 'doors open at the platform after backing up');
+  h.expect(q.totals.overruns === 0 && q.totals.perfect + q.totals.ok + q.totals.fair >= 1, 'the stop is rated at the new position, not as the 25 m overrun (perfect/ok/fair ' + [q.totals.perfect, q.totals.ok, q.totals.fair].join('/') + ', overruns ' + q.totals.overruns + ')');
+  h.eq(q.totals.reverseFines, 1, 'backing up more than 20 m costs the small reverse fine');
+  // switching back and the limits of the gear
+  await frame.evaluate(() => { __tsTest.press('d'); });
+  await h.pause(300);
+  h.step('reverse gear: not past the start of the route (toast), not at speed');
+  await frame.evaluate(() => { __tsTest.toMenu(); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram-stad'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+  await frame.evaluate(() => { __tsTest.placeAt(__tsTest.state().stations[0].s, 0); });
+  await key(h, 's'); await key(h, 's');
+  await key(h, 'r');
+  await waitState(frame, () => window.__tsTest.state().reverse, null, 4000);
+  for (let k = 0; k < 3; k++) await key(h, 'w');
+  await waitState(frame, () => window.__tsTest.state().events.includes('reverseBlocked'), null, 15000).catch(() => {});
+  q = await S(frame);
+  h.expect(q.events.includes('reverseBlocked') && q.s >= q.stations[0].s - 0.01, 'it cannot back up past the start of the route (blocked at ' + q.s.toFixed(1) + ')');
+
+  h.step('2x fast-forward: F / button, physics + clock run twice as fast, highlighted when on');
+  await key(h, 's'); await key(h, 's'); await key(h, 's'); await key(h, 's'); await key(h, 's'); await key(h, 's'); await key(h, 's'); await key(h, 's');
+  await key(h, 'r');
+  await frame.evaluate(() => { __tsTest.setSpeed(0); __tsTest.placeAt(__tsTest.state().stations[0].s, 0); });
+  const rate = async () => {
+    const a = await S(frame); const t0 = Date.now();
+    await h.pause(2500);
+    const b = await S(frame);
+    return (b.simT - a.simT) / ((Date.now() - t0) / 1000);
+  };
+  await key(h, 'w'); await key(h, 'w'); await key(h, 'w');
+  const normal = await rate();
+  await key(h, 'f');
+  h.expect((await S(frame)).fast && (await frame.locator('#btnFast').getAttribute('class')).includes('on'), 'F switches the 2x button on (highlighted)');
+  const fast = await rate();
+  h.expect(fast / normal > 1.7 && fast / normal < 2.3, 'the simulation and its clock run at 2x (' + normal.toFixed(2) + ' -> ' + fast.toFixed(2) + ' sim s per real s)');
+  await frame.evaluate(() => document.getElementById('btnFast').click());
+  h.expect(!(await S(frame)).fast, 'the HUD button switches it off again');
+  await frame.evaluate(() => document.getElementById('btnFast').click());
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram-kierchbierg'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+  h.expect((await S(frame)).fast, '2x stays as the player set it (also in the next service)');
+  await key(h, 'f');
+  h.expect(await frame.evaluate(() => document.getElementById('helpBody').textContent.includes('R') && document.getElementById('helpBody').innerHTML.includes('<kbd>F</kbd>') && document.getElementById('helpBody').innerHTML.includes('<kbd>R</kbd>')), 'the controls help lists R and F');
+
+  h.step('endless hands over seamlessly: a real service end (doors, terminus exchange) continues with the next route, tram career');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await frame.locator('[data-test="career-tram"]').click();
+  await frame.locator('[data-test="mode-endless"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().mode === 'endless', null, 90000);
+  const seen = [];
+  for (let k = 0; k < 3; k++) {
+    const s0 = await S(frame);
+    seen.push(s0.routeId);
+    await frame.evaluate(() => { __tsTest.finishRoute(); });
+    await h.pause(300);
+    await frame.evaluate(() => { __tsTest.stopAtMarker(-0.5); });
+    await h.pause(300);
+    await key(h, 'd');
+    await waitState(frame, (r) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId !== r && !window.__tsTest.state().finished, s0.routeId, 90000);
+  }
+  h.eq(seen.slice(0, 3), ['luxtram-kierchbierg', 'luxtram-kierchbierg~r', 'luxtram-stad'], 'Findel - Kierchbierg, then back, then the next route - no summary in between');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+}
+
+/* Luxtram test mode (window.__pbTestMode): the tram may scout faster than 70 km/h, without overspeed fines. */
+async function luxtramScoutChecks(h, frame) {
+  const scout = await frame.evaluate(() => {
+    const maxed = TS.career.applyUpgrades(TS.config.trains.find((tr) => tr.id === 'tram'), TS.career.unlockedAll());
+    const track = TS.track.build(TS.routes.get('luxtram-kierchbierg'));
+    const sim = TS.sim.create({ train: maxed, track, options: { seed: 7 } });
+    sim.setSpeed(30 / 3.6);
+    let vmax = 0, st = null;
+    for (let i = 0; i < 60 * 60; i++) { st = sim.step(1 / 60, { lever: 5 }); vmax = Math.max(vmax, st.v * 3.6); }
+    return { maxKmh: maxed.maxKmh, scout: maxed.scout, vmax, fine: st.totals.overspeedFine, sec: st.totals.overspeedSec };
+  });
+  h.expect(scout.scout && scout.maxKmh > 70 && scout.vmax > 90, 'test mode: the tram may scout faster than 70 km/h (top ' + scout.maxKmh + ', reached ' + scout.vmax.toFixed(0) + ' km/h)');
+  h.eq([scout.fine, scout.sec], [0, 0], 'test mode: no overspeed fines');
 }
 
 export const flow = {
@@ -60,6 +449,7 @@ export const flow = {
     });
     await gotoNormal(h, '/pixelbreak.html?g=train-sim&test=1');
     let frame = await gameFrame(h);
+    if (process.env.TS_LUXTRAM_ONLY) { await luxtramNormalChecks(h, frame); await directionAndGearChecks(h, frame); return; }
 
     h.step('start screen: both modes, iPad keyboard notice');
     h.expect(await frame.locator('[data-test="mode-career"]').isVisible() && await frame.locator('[data-test="mode-endless"]').isVisible(), 'career and endless modes shown');
@@ -374,6 +764,7 @@ export const flow = {
     const expected = await frame.evaluate(() => __tsTest.career().endlessOrder('railcar'));
     h.eq(order, expected, 'endless order = all compatible routes');
     h.expect(order.length >= 3, 'several routes in the endless cycle');
+    await frame.evaluate(() => { window.__sawSummary = false; clearInterval(window.__sumTimer); window.__sumTimer = setInterval(() => { if (!document.getElementById('summary').hidden) window.__sawSummary = true; }, 50); });
     const played = [];
     const scoresBefore = scoreWrites(h).length;
     const finalsBefore = await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pb === 1 && m.final).length);
@@ -387,6 +778,8 @@ export const flow = {
       await h.pause(300);
     }
     h.eq(played.slice(0, order.length), order, 'routes played in order');
+    h.expect(order.slice(0, 4).every((id, i) => (i % 2 === 0 ? !id.endsWith('~r') : id === order[i - 1] + '~r')), 'every route is played there and back (forward, then ~r), then the next route');
+    h.expect(!(await frame.evaluate(() => window.__sawSummary)), 'rail endless ran through more than all routes and wrapped around without ever showing a summary');
     h.eq(played[order.length], order[0], 'loops back to the first route');
     await h.pause(800);
     const finals = await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pb === 1 && m.final).length);
@@ -462,6 +855,7 @@ export const flow = {
     const tramOrder = (await S(frame)).endless.order;
     h.eq(tramOrder, LUXTRAM_ORDER, 'tram endless = all Luxtram routes, in order');
     h.eq(tramOrder, await frame.evaluate(() => __tsTest.career().endlessOrder('tram')), 'endlessOrder(tram) agrees');
+    await frame.evaluate(() => { window.__sawSummary = false; clearInterval(window.__sumTimer); window.__sumTimer = setInterval(() => { if (!document.getElementById('summary').hidden) window.__sawSummary = true; }, 50); });
     const tramPlayed = [];
     for (let i = 0; i < tramOrder.length; i++) {
       s = await S(frame);
@@ -471,7 +865,8 @@ export const flow = {
       await waitState(frame, (n) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().endless.index === n, (i + 1) % tramOrder.length, 120000);
       await h.pause(300);
     }
-    h.eq(tramPlayed, tramOrder, 'the Luxtram routes were played in order');
+    h.eq(tramPlayed, tramOrder, 'the Luxtram routes were played in order, each there and back');
+    h.expect(!(await frame.evaluate(() => window.__sawSummary)), 'tram endless ran through all routes (both directions) and wrapped around without ever showing a summary');
     h.eq((await S(frame)).routeId, tramOrder[0], 'loops back to the first Luxtram route');
     h.eq((await S(frame)).careers.rail.wallet, railBefore.wallet + 500000, 'tram endless earned nothing in the rail career');
     await frame.evaluate(() => __tsTest.toMenu());
@@ -528,6 +923,9 @@ export const flow = {
     s = await S(frame);
     h.eq([s.tb, s.careers.tram.wallet, s.career], [15800, 9000, 'tram'], 'a cloud save with more total progress wins');
 
+    await luxtramNormalChecks(h, frame);
+    await directionAndGearChecks(h, frame);
+
     h.step('arcade test mode: everything unlocked in memory, nothing saved, no scores');
     await h.page.evaluate(() => localStorage.setItem('__flowPbTestMode', '1'));
     await gotoNormal(h, '/pixelbreak.html?g=train-sim&test=1');
@@ -547,6 +945,7 @@ export const flow = {
       return out;
     });
     h.eq(everything, { rail: { trains: true, routes: true, upgrades: true, money: true }, tram: { trains: true, routes: true, upgrades: true, money: true } }, 'both careers: all vehicles, routes and upgrades unlocked, plenty of €');
+    await luxtramScoutChecks(h, frame);
     await frame.locator('[data-test="career-tram"]').click();
     h.eq(await frame.locator('[data-test="route-luxtram"]').isEnabled(), true, 'the full Luxtram line is selectable');
     await h.shot('menu-test-mode');

@@ -18,6 +18,8 @@
   const PERFECT_BONUS = 50, OK_BONUS = 25, FAIR_BONUS = 10, ON_TIME_S = 30, ON_TIME_BONUS = 20, LATE_FINE_PER_MIN = 10;
   const FIRST_DEPARTURE_S = 75, DWELL_MIN = 30, DWELL_MAX = 45, TIMETABLE_SPEED_SHARE = 0.8;
   const SPAD_RESET_S = 4, POWER_MARGIN = 2.4;
+  /* reverse gear: only at a standstill with the lever at 0 or braking, 10 km/h at most; backing up more than BACK_FREE_M before the doors open costs REVERSE_FINE */
+  const REVERSE_MAX_MS = 10 / KMH, REVERSE_SWITCH_V = 0.3, BACK_FREE_M = 20, REVERSE_FINE = 15;
   /* braking guide: distance needed at notch B4 (of 7), plus a short reaction lag */
   const GUIDE_NOTCH = 4, GUIDE_LAG_S = 0.6, GUIDE_MIN_V = 4, GUIDE_SIGNAL_M = 1200, GUIDE_SIGNAL_MARGIN_M = 10;
   /* variation: service patterns, temporary speed restrictions (TSR), random events */
@@ -155,6 +157,7 @@
     const len = trainLength(train);
     const baseMass = (train.massT || 80) * 1000;
     const maxMs = (train.maxKmh || 100) / KMH;
+    const hardCapMs = train.hardCapKmh > 0 ? train.hardCapKmh / KMH : 0;
     const fMax = (train.accel || 0.8) * baseMass;
     const kneeV = Math.max(10, maxMs * 0.42);
     const cdA = train.model === 'hst' ? 5.5 : train.kind === 'tram' ? 6 : 7 + (train.cars || 1) * 0.6;
@@ -181,9 +184,11 @@
     const tsrWarned = new Set(), crowdWarned = new Set(), heldFired = new Set();
 
     const visits = stations.map(() => ({ arrived: false, departed: false, skipped: false, opened: false, arriveT: 0, errorM: 0, rating: '', arrDelay: 0, depDelay: 0, boarded: 0, alighted: 0 }));
-    const totals = { overspeedSec: 0, overspeedFine: 0, spads: 0, harsh: 0, ebs: 0, early: 0, overruns: 0, shorts: 0, perfect: 0, ok: 0, fair: 0, missed: 0, bufferHits: 0 };
+    const totals = { reverseFines: 0, overspeedSec: 0, overspeedFine: 0, spads: 0, harsh: 0, ebs: 0, early: 0, overruns: 0, shorts: 0, perfect: 0, ok: 0, fair: 0, missed: 0, bufferHits: 0 };
 
     let s = stations.length ? stations[0].s : 0, v = 0, a = 0, t = 0, distance = 0;
+    const startS = s;
+    let dir = 1, backedM = 0, reverseBlockedNow = false;   // dir -1 = reverse gear (v stays the speed magnitude, s moves backwards)
     let lever = 0, tractionFrac = 0, brakeDecel = 0, passengers = 0;
     let doorPhase = 'closed', doorTimer = 0, doorsOpen01 = 0, doorsReleased = false, doorSide = null, doorStation = -1;
     let parking = false, parkingAuto = false, heldUntil = -1, parkHintAt = -99, gradeOverride = null;
@@ -239,6 +244,14 @@
       const wantLever = clamp(Math.round(input.lever ?? lever), LEVER_MIN, LEVER_MAX);
       lever = spadActive ? LEVER_EB : wantLever;
 
+      /* --- reverser --- */
+      if (input.reverseToggle) {
+        if (v > REVERSE_SWITCH_V) events.push({ type: 'reverserRefused', reason: 'moving' });
+        else if (lever > 0) events.push({ type: 'reverserRefused', reason: 'lever' });
+        else if (doorPhase !== 'closed' || doorsOpen01 > 0) events.push({ type: 'reverserRefused', reason: 'doors' });
+        else { dir = -dir; v = 0; events.push({ type: 'reverser', reverse: dir < 0 }); }
+      }
+
       /* --- doors --- */
       const platformIdx = stationOverlap();
       if (input.parkingToggle) {
@@ -255,12 +268,16 @@
           else {
             doorPhase = 'opening'; doorsReleased = true; doorStation = platformIdx; doorSide = stations[platformIdx].side || 'right';
             const vis = visits[platformIdx];
-            if (!vis.opened) {
+            const reRate = vis.opened && backedM > 0.5;   // backed up after the first opening: the stop is rated again at the new position
+            if (!vis.opened || reRate) {
+              if (reRate) unrateStop(vis);
               vis.opened = true; vis.errorM = s - stations[platformIdx].s;
               vis.rating = classify(vis.errorM);
-              vis.arrDelay = platformIdx === 0 ? 0 : Math.round(t - timetable.stops[platformIdx].arr);
+              if (!reRate) vis.arrDelay = platformIdx === 0 ? 0 : Math.round(t - timetable.stops[platformIdx].arr);
               applyStopResult(platformIdx, vis, events);
             }
+            if (backedM > BACK_FREE_M) { totals.reverseFines++; cash -= REVERSE_FINE; events.push({ type: 'reverseFine', fine: REVERSE_FINE, metres: backedM }); }
+            backedM = 0;
             events.push({ type: 'doorsOpening', stationIndex: platformIdx, side: doorSide });
           }
         } else if (doorPhase === 'open') { doorPhase = 'warning'; doorTimer = 0; events.push({ type: 'doorWarning' }); }
@@ -296,11 +313,12 @@
       if (parking) brakeTarget = Math.max(brakeTarget, brakeMax);
       brakeDecel = approach(brakeDecel, brakeTarget, ebNow ? EB_UP : BRAKE_UP, BRAKE_DOWN, dt);
 
-      const speedFade = clamp((maxMs - v) / (maxMs * 0.06), 0, 1);
+      const topMs = dir < 0 ? REVERSE_MAX_MS : maxMs;
+      const speedFade = clamp((topMs - v) / (topMs * (dir < 0 ? 0.25 : 0.06)), 0, 1);
       const tractionN = tractionFrac * Math.min(fMax, power / Math.max(v, 1)) * speedFade;
       const resist = mass * G * (ROLL_A + ROLL_B * v) + 0.5 * AIR_RHO * cdA * v * v;
       const grade = frameGrade(s - len / 2);
-      const gradeN = mass * G * grade;
+      const gradeN = mass * G * grade * dir;
       let acc = (tractionN - resist - gradeN) / mass;
       if (v > 0) acc -= brakeDecel;
       /* standstill: the train holds exactly unless traction is really applied (brake, doors, parking brake: no creep on any grade) */
@@ -308,9 +326,24 @@
       if (v < HOLD_V && !wantsMove) { v = 0; a = 0; acc = 0; }
       else if (v === 0 && acc <= brakeDecel) acc = 0;
       else if (v <= STANDSTILL && acc <= 0) { acc = 0; v = 0; }
-      const vNew = Math.max(0, v + acc * dt);
+      let vNew = Math.max(0, v + acc * dt);
+      if (hardCapMs > 0 && vNew > hardCapMs) vNew = hardCapMs;
+      if (dir < 0 && vNew > REVERSE_MAX_MS) vNew = REVERSE_MAX_MS;   // reverse gear: 10 km/h   // Luxtram: never above its real top speed, not even downhill
       if (vNew <= 0 && v <= STANDSTILL) { v = 0; a = 0; } else { a = (vNew - v) / Math.max(dt, 1e-6); v = vNew; }
-      const ds = v * dt; s += ds; distance += ds;
+      const ds = v * dt; s += ds * dir; distance += ds;
+      if (dir < 0) {
+        backedM += ds;
+        // reversing is limited by the start of the route and by every signal already passed (the train never backs through a signal)
+        let floorS = startS, why = 'start';
+        for (const sg of signals) if (sg.passed && sg.s + 0.5 > floorS && sg.s + 0.5 <= s + ds + 1e-6) { floorS = sg.s + 0.5; why = 'signal'; }
+        if (s < floorS) { s = floorS; v = 0; a = 0; if (!reverseBlockedNow) events.push({ type: 'reverseBlocked', reason: why }); reverseBlockedNow = true; }
+        else reverseBlockedNow = false;
+        // a stop given up as missed counts again once the train is back within the missed distance
+        stations.forEach((st, i) => {
+          const vis = visits[i];
+          if (vis.skipped && !vis.opened && s <= st.s + MISSED_AFTER_M) { vis.skipped = false; totals.missed = Math.max(0, totals.missed - 1); cash += OVERRUN_FINE * 2; }
+        });
+      }
       if (v < 0.02 && tractionN === 0) v = 0;
 
       /* --- buffer stop at the end of the line --- */
@@ -324,7 +357,7 @@
       const limitKmh = Math.min(effectiveLimit(limits, s - len, s, train.maxKmh || 100), train.maxKmh || 999);
       const nextLimit = nextLimitAhead(limits, s, limitAt(limits, s, train.maxKmh || 100));
       const vKmh = v * KMH, over = vKmh - (limitKmh + OVERSPEED_TOL_KMH);
-      if (over > 0 && !spadActive) {
+      if (over > 0 && !spadActive && !train.scout && dir > 0) {   // scout (arcade test mode, tram): no overspeed fines
         const fine = (OVERSPEED_FINE_BASE + OVERSPEED_FINE_PER_KMH * over) * dt;
         totals.overspeedSec += dt; totals.overspeedFine += fine; cash -= fine;
         if (!overspeedWasOn) events.push({ type: 'overspeed', limitKmh, kmh: vKmh });
@@ -412,7 +445,7 @@
         delaySec, clockSec: timetable.clockStart + t, events, score: Math.round(cash), cash, spadActive, finished,
         scheduledDep: stNext ? timetable.stops[ni].dep : 0, departureWaitSec: stNext ? Math.max(0, timetable.stops[ni].dep - t) : 0,
         overspeed: over > 0, totals: { ...totals },
-        parkingBrake: parking, parkingAuto, spadHoldSec: spadActive ? Math.max(0, SPAD_RESET_S - spadStill) : 0, heldDoorsSec: Math.max(0, heldUntil - t),
+        reverse: dir < 0, backedM, parkingBrake: parking, parkingAuto, spadHoldSec: spadActive ? Math.max(0, SPAD_RESET_S - spadStill) : 0, heldDoorsSec: Math.max(0, heldUntil - t),
         guide, pattern: plan.pattern || 'RB', passIndices: [...passSet],
       };
     }
@@ -449,6 +482,14 @@
       if (e <= OK_M) return 'ok';
       if (e <= OVERRUN_M) return 'fair';
       return 'short';
+    }
+    function unrateStop(vis) {
+      const r = vis.rating;
+      if (r === 'perfect') { totals.perfect--; cash -= PERFECT_BONUS; }
+      else if (r === 'ok') { totals.ok--; cash -= OK_BONUS; }
+      else if (r === 'fair') { totals.fair--; cash -= FAIR_BONUS; }
+      else if (r === 'overrun') { totals.overruns--; cash += OVERRUN_FINE; }
+      else if (r === 'short') { totals.shorts--; cash += SHORT_FINE; }
     }
     function applyStopResult(i, vis, events) {
       const r = vis.rating;

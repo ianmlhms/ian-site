@@ -82,6 +82,10 @@
 .ts-menu__card{position:relative;border:1px solid var(--line);border-radius:20px;background:var(--card);display:flex;flex-direction:column;overflow:hidden;transition:border-color .15s,background .15s}
 .ts-menu__card[data-selected="true"]{border-color:var(--gold);background:linear-gradient(180deg,rgba(255,188,66,.14),rgba(255,188,66,.04));box-shadow:0 0 0 1px var(--gold) inset}
 .ts-menu__card[data-locked="true"] .ts-menu__pick{opacity:.62}
+.ts-menu__dir{all:unset;position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:99px;display:grid;place-items:center;font-size:18px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--ink,#fff);z-index:2}
+.ts-menu__dir[aria-pressed="true"]{background:var(--gold,#f4b942);color:#1b1b1b}
+.ts-menu__dir:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.ts-menu__rowHead h3{padding-right:42px}
 .ts-menu__pick{all:unset;display:flex;flex-direction:column;gap:6px;padding:16px 16px 12px;cursor:pointer;flex:1;box-sizing:border-box}
 .ts-menu__pick:focus-visible{outline:3px solid var(--gold);outline-offset:-3px;border-radius:20px}
 .ts-menu__card h3{font-size:17px;line-height:1.2;font-weight:800}
@@ -195,7 +199,7 @@
   function routeInfo(id) {
     const live = TS.routes && typeof TS.routes.get === 'function' ? safeGet(id) : null;
     const fb = FALLBACK_ROUTES[id] || { name: id, n: 0, km: 0, kind: 'rail' };
-    const rule = C.routeRules[id];
+    const rule = C.routeRules[K.baseRouteId ? K.baseRouteId(id) : id];
     const kindFromRule = rule && rule.needs.includes('tram') ? 'tram' : rule && rule.needs.every((x) => x === 'hst') ? 'hst' : 'rail';
     const km = live && Number.isFinite(live.lengthKm) ? live.lengthKm : live && Number.isFinite(live.length) ? live.length / 1000 : null;
     return {
@@ -372,7 +376,7 @@
   }
 
   /* --------------------------------------------------------------- state */
-  const ctx = { container: null, root: null, opts: {}, save: null, career: 'rail', routeId: 'west', trainId: 'railcar', toast: null, toastTimer: 0, heroTrain: null };
+  const ctx = { reverse: {}, container: null, root: null, opts: {}, save: null, career: 'rail', routeId: 'west', trainId: 'railcar', toast: null, toastTimer: 0, heroTrain: null };
 
   function setSave(save) {
     ctx.save = K.normalize(save);
@@ -425,6 +429,13 @@
     if (isSave(res)) setSave(res);
     paint();
   }
+  /* direction of a route card: the id with '~r' appended when the return direction is chosen (same ownership and price, see TS.routeDir) */
+  const routeKey = (id) => (ctx.reverse[id] ? id + '~r' : id);
+  function doToggleDir(id) {
+    ctx.reverse = Object.assign({}, ctx.reverse, { [id]: !ctx.reverse[id] });
+    if (cs().routes.includes(id)) ctx.routeId = id;
+    paint();
+  }
   function doSelectRoute(id) {
     ctx.routeId = id;
     // Switch to the cheapest owned train that can drive it, so the career button just works.
@@ -457,7 +468,7 @@
       return;
     }
     if (!K.routeAvailable(ctx.save, ctx.routeId, ctx.trainId).ok) return;
-    callHost('onStart', 'career', ctx.routeId, ctx.trainId);
+    callHost('onStart', 'career', routeKey(ctx.routeId), ctx.trainId);
   }
   function doHints() {
     const res = callHost('onHints', !ctx.save.hints);
@@ -526,7 +537,7 @@
   function modes() {
     const avail = K.routeAvailable(ctx.save, ctx.routeId, ctx.trainId);
     const endlessList = K.endlessOrder(ctx.trainId);
-    const route = routeInfo(ctx.routeId);
+    const route = routeInfo(routeKey(ctx.routeId));
     const train = trainById(ctx.trainId);
     const careerSub = avail.ok ? `${route.name} · ${pick(train.name)}` : t(avail.reason === 'needsRoute' ? 'needsRoute' : avail.reason);
     return [
@@ -543,7 +554,7 @@
   function routeCard(id) {
     const s = cs();
     const rule = C.routeRules[id];
-    const info = routeInfo(id);
+    const info = routeInfo(routeKey(id));
     const owned = s.routes.includes(id);
     const selected = ctx.routeId === id;
     const needNames = K.trainsForRoute(id).map((tid) => pick(trainById(tid).name));
@@ -562,8 +573,9 @@
       h('button', { type: 'button', class: 'ts-menu__pick', disabled: !owned, 'aria-pressed': String(selected && owned), 'data-fid': 'route-' + id, 'data-test': 'route-' + id, on: { click: () => doSelectRoute(id) } },
         h('div', { class: 'ts-menu__rowHead' }, h('span', { class: 'ts-menu__kind', 'aria-hidden': 'true', text: KIND_ICON[info.kind] || '🚆' }), h('h3', { text: info.name })),
         h('div', { class: 'ts-menu__meta' }, h('span', { text: t('stationsN', { n: info.stops }) }), info.km ? h('span', { text: Math.round(info.km) + ' km' }) : null, h('span', { text: t(KIND_KEY[info.kind] || 'kindRail') }),
-          h('span', { class: 'ts-menu__price', text: owned ? '' : money(rule.price) }), owned && s.best[id] ? h('span', { text: '★ ' + s.best[id] }) : null),
+          h('span', { class: 'ts-menu__price', text: owned ? '' : money(rule.price) }), owned && s.best[routeKey(id)] ? h('span', { text: '★ ' + s.best[routeKey(id)] }) : null),
         badge),
+      h('button', { type: 'button', class: 'ts-menu__dir', 'aria-pressed': String(!!ctx.reverse[id]), title: t('dirToggle'), 'aria-label': t('dirToggle'), 'data-fid': 'dir-' + id, 'data-test': 'dir-' + id, text: '⇄', on: { click: () => doToggleDir(id) } }),
       foot);
   }
 
@@ -611,7 +623,7 @@
       const price = K.upgradePrice(ctx.save, train.id, kind);
       const check = K.canBuy(ctx.save, 'upgrade', kind, train.id);
       const isMax = price === undefined;
-      const infoKey = kind === 'capacity' && C.extraCarTrains.includes(train.id) ? 'up_capacity_info_car' : 'up_' + kind + '_info';
+      const infoKey = kind === 'capacity' && C.extraCarTrains.includes(train.id) ? 'up_capacity_info_car' : kind === 'motor' && train.kind === 'tram' ? 'up_motor_info_tram' : 'up_' + kind + '_info';
       const liveries = train.liveries || [train.livery];
       return h('div', { class: 'ts-menu__upRow', 'data-upgrade': kind },
         h('h3', { text: t('up_' + kind) + '  ' }, h('span', { class: 'ts-menu__small', text: t('level', { n: lv, max }) })),

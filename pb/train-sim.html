@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <title>Lokféierer 🚆 – Arcade</title>
 <script>/* Offline for now: owner account (or ?preview=1) only */(()=>{let ok=/[?&]preview=1\b/.test(location.search);try{const s=JSON.parse(localStorage.getItem("sb-lvksqmgfwkfbblfsozfk-auth-token")||"null");ok=ok||String(s?.user?.email||"").toLowerCase()==="konto@ian.lu"}catch{}if(!ok)(window.top||window).location.replace("/pixelbreak.html")})();</script>
-<link rel="stylesheet" href="/pb/train-sim.css?v=2">
+<link rel="stylesheet" href="/pb/train-sim.css?v=3">
 <script src="/pb/arcade-kit.js?v=26" data-arcade-id="train-sim" data-arcade-title="Lokféierer 🚆"></script>
 </head>
 <body>
@@ -32,6 +32,7 @@
         <div class="limits"><span id="limitSign" class="limit-sign">80</span><span id="nextLimit" class="nextlimit"></span></div>
       </div>
       <div class="glass centerbox" id="centerBox">
+        <span id="revLamp" class="parklamp revlamp" hidden>◀ R</span>
         <div id="xchg" class="xchg" hidden>
           <span id="xchgOut" class="out"></span><span id="xchgIn" class="in"></span><span id="xchgOn" class="on"></span>
         </div>
@@ -47,6 +48,8 @@
     <div class="hud-util">
       <span id="camName" class="glass chipbtn"></span>
       <button id="btnQuality" class="glass chipbtn" type="button"></button>
+      <button id="btnRev" class="glass chipbtn" type="button" aria-pressed="false">R</button>
+      <button id="btnFast" class="glass chipbtn" type="button" aria-pressed="false">2×</button>
       <button id="btnPause" class="glass chipbtn" type="button">P</button>
       <button id="btnHelp" class="glass chipbtn" type="button">?</button>
     </div>
@@ -67,22 +70,23 @@
   <div id="errorScreen" class="overlay center" hidden><section class="card"><h2>&#9888;</h2><p id="errorText"></p></section></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="/pb/train-sim/config.js?v=3"></script>
-<script src="/pb/train-sim/copy.js?v=3"></script>
-<script src="/pb/train-sim/track.js?v=1"></script>
-<script src="/pb/train-sim/routes.js?v=2"></script>
-<script src="/pb/train-sim/infra.js?v=3"></script>
+<script src="/pb/train-sim/config.js?v=4"></script>
+<script src="/pb/train-sim/copy.js?v=4"></script>
+<script src="/pb/train-sim/track.js?v=2"></script>
+<script src="/pb/train-sim/routes.js?v=3"></script>
+<script src="/pb/train-sim/infra.js?v=4"></script>
 <script src="/pb/train-sim/landscape.js?v=2"></script>
-<script src="/pb/train-sim/luxtram-world.js?v=1"></script><!-- LUXTRAM: real Luxtram T1 routes (new files, see luxtram.js) -->
-<script src="/pb/train-sim/luxtram.js?v=2"></script><!-- LUXTRAM -->
+<script src="/pb/train-sim/luxtram-landmarks.js?v=1"></script><!-- LUXTRAM: hand-built landmarks (photo-checked) -->
+<script src="/pb/train-sim/luxtram-world.js?v=2"></script><!-- LUXTRAM: real Luxtram T1 routes (new files, see luxtram.js) -->
+<script src="/pb/train-sim/luxtram.js?v=3"></script><!-- LUXTRAM -->
 <script src="/pb/train-sim/trains.js?v=2"></script>
 <script src="/pb/train-sim/cab.js?v=2"></script>
 <script src="/pb/train-sim/passengers.js?v=1"></script>
 <script src="/pb/train-sim/audio.js?v=1"></script>
-<script src="/pb/train-sim/sim.js?v=3"></script>
-<script src="/pb/train-sim/career.js?v=3"></script>
-<script src="/pb/train-sim/menu.js?v=3"></script>
+<script src="/pb/train-sim/sim.js?v=4"></script>
+<script src="/pb/train-sim/career.js?v=4"></script>
+<script src="/pb/train-sim/menu.js?v=4"></script>
 <script src="/pb/train-sim/fallback.js?v=1"></script>
-<script src="/pb/train-sim.js?v=4"></script>
+<script src="/pb/train-sim.js?v=5"></script>
 </body>
 </html>

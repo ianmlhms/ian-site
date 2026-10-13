@@ -221,6 +221,7 @@
 
   /* ------------------------------------------------------------- build */
   function build(def) {
+    if (def && def.reverse && def.base) return reverse(build(def.base), { id: def.id, def });
     if (!def || !def.layout) throw new Error('[Lokféierer] TS.track.build: bad route definition');
     const kind = def.kind;
     const formationDrop = kind === 'tram' ? FORM_TRAM : FORM_RAIL;
@@ -624,5 +625,117 @@
     };
   }
 
-  window.TS.track = { build, STEP };
+  /* ------------------------------------------------------------- reverse direction
+   * reverse(base, opts) -> Track driven the other way: s' = length - s, the same ground, so the world (landscape) is built from `track.base`
+   * (the forward track) and fed baseS(s'). Stations / signals / tunnels / bridges / crossings / limits are mirrored, the platform sides flip
+   * (opts.sides: 'flip' | 'right' = every platform on the right of the travel direction, e.g. the Luxtram on its OTHER track).
+   * opts.playerFrameAt: frames of the track the reversed train really runs on (default: the same track backwards);
+   * opts.minLenAt(s): shortest limit zone (the brake lead of a mirrored drop never shortens the zone before it below it). */
+  function mirrorLimits(limits, L, kind, minLenAt) {
+    const zones = limits.map((l, i) => ({ s0: l.s, s1: i + 1 < limits.length ? limits[i + 1].s : L, kmh: l.kmh }));
+    const mirrored = zones.map((z) => ({ s: L - z.s1, kmh: z.kmh })).sort((a, b) => a.s - b.s);
+    mirrored[0] = { s: 0, kmh: mirrored[0].kmh };
+    const lead = BRAKE_LEAD[kind] || BRAKE_LEAD.rail;
+    const out = [];
+    mirrored.forEach((z, i) => {
+      let s = z.s;
+      const prev = mirrored[i - 1];
+      if (prev && z.kmh < prev.kmh) {
+        const v1 = prev.kmh / 3.6;
+        const v2 = z.kmh / 3.6;
+        const room = z.s - out[out.length - 1].s - (minLenAt ? minLenAt(z.s) : 0);
+        s = z.s - Math.max(0, Math.min(lead[1], (v1 * v1 - v2 * v2) / (2 * lead[0]), minLenAt ? room : (z.s - out[out.length - 1].s) * 0.85));
+      }
+      out.push({ s: i === 0 ? 0 : s, kmh: z.kmh });
+    });
+    return out.filter((e, i) => i === 0 || e.kmh !== out[i - 1].kmh);
+  }
+
+  /* nearest point of a frame function sampled every STEP m (same contract as Track.nearest) */
+  function frameNearest(frameAt, L) {
+    const n = Math.floor(L / STEP) + 1;
+    const X = new Float64Array(n);
+    const Z = new Float64Array(n);
+    const Y = new Float64Array(n);
+    const TH = new Float64Array(n);
+    const f = frameAt(0);
+    for (let i = 0; i < n; i++) { frameAt(i * STEP, f); X[i] = f.pos.x; Z[i] = f.pos.z; Y[i] = f.pos.y; TH[i] = Math.atan2(f.tangent.x, -f.tangent.z); }
+    const grid = new Map();
+    const key = (ix, iz) => ix * 73856 + iz * 19349;
+    for (let c = 0; c * COARSE < n; c++) {
+      const i = Math.min(n - 1, c * COARSE);
+      const k = key(Math.floor(X[i] / CELL), Math.floor(Z[i] / CELL));
+      const b = grid.get(k);
+      if (b) b.push(i); else grid.set(k, [i]);
+    }
+    return (x, z) => {
+      const ix = Math.floor(x / CELL);
+      const iz = Math.floor(z / CELL);
+      let best = Infinity;
+      let bi = -1;
+      const scan = (cx, cz) => { const b = grid.get(key(cx, cz)); if (!b) return; for (const i of b) { const d2 = (X[i] - x) ** 2 + (Z[i] - z) ** 2; if (d2 < best) { best = d2; bi = i; } } };
+      for (let r = 0; r <= MAX_RING; r++) {
+        if (r === 0) scan(ix, iz);
+        else { for (let a = -r; a <= r; a++) { scan(ix + a, iz - r); scan(ix + a, iz + r); } for (let b = -r + 1; b <= r - 1; b++) { scan(ix - r, iz + b); scan(ix + r, iz + b); } }
+        if (bi >= 0 && best <= (r * CELL) * (r * CELL)) break;
+      }
+      if (bi < 0) { for (let i = 0; i < n; i += 16) { const d2 = (X[i] - x) ** 2 + (Z[i] - z) ** 2; if (d2 < best) { best = d2; bi = i; } } }
+      for (let i = Math.max(0, bi - COARSE - 1); i <= Math.min(n - 1, bi + COARSE + 1); i++) { const d2 = (X[i] - x) ** 2 + (Z[i] - z) ** 2; if (d2 < best) { best = d2; bi = i; } }
+      let bt = 0, bs = bi, bd2 = Infinity;
+      for (let sg = Math.max(0, bi - 1); sg <= Math.min(n - 2, bi); sg++) {
+        const ax = X[sg], az = Z[sg], bx = X[sg + 1] - ax, bz = Z[sg + 1] - az;
+        const u = clamp(((x - ax) * bx + (z - az) * bz) / (bx * bx + bz * bz || 1), 0, 1);
+        const px = ax + bx * u - x, pz = az + bz * u - z, d2 = px * px + pz * pz;
+        if (d2 < bd2) { bd2 = d2; bs = sg; bt = u; }
+      }
+      const sg1 = Math.min(n - 1, bs + 1);
+      const th = lerp(TH[bs], TH[sg1], bt);
+      const cx = lerp(X[bs], X[sg1], bt);
+      const cz = lerp(Z[bs], Z[sg1], bt);
+      const fi = Math.min(bs + bt, n - 1);
+      return { s: fi * STEP, d: Math.sqrt(bd2 === Infinity ? best : bd2), lat: (x - cx) * Math.cos(th) + (z - cz) * Math.sin(th), y: lerp(Y[bs], Y[sg1], bt), i: fi };
+    };
+  }
+
+  function reverse(base, opts) {
+    const o = opts || {};
+    const L = base.length;
+    const n = base.stations.length;
+    const right = o.sides === 'right';
+    const flipFrame = (f) => { f.tangent.negate(); f.right.negate(); f.grade = -f.grade; f.curvature = -f.curvature; return f; };
+    const srcFrame = o.playerFrameAt || base.frameAt;
+    const frameAt = (s, out) => flipFrame(srcFrame(L - s, out));
+    const stations = base.stations.slice().reverse().map((st, j) => Object.assign({}, st, {
+      id: 'st' + j, s: L - st.platformStart - (st.platformEnd - st.s), platformStart: L - st.platformEnd, platformEnd: L - st.platformStart,
+      side: right ? 'right' : st.side === 'right' ? 'left' : 'right', terminus: j === 0 || j === n - 1,
+    }));
+    const flipRole = (r) => (r === 'home' ? 'exit' : r === 'exit' ? 'home' : r);
+    const signals = base.signals.map((sg) => Object.assign({}, sg, { s: L - sg.s, role: flipRole(sg.role), stationIndex: Number.isFinite(sg.stationIndex) ? n - 1 - sg.stationIndex : sg.stationIndex })).sort((a, b) => a.s - b.s);
+    const mirrorRange = (r) => Object.assign({}, r, { s0: L - r.s1, s1: L - r.s0 });
+    const tunnels = base.tunnels.map(mirrorRange).sort((a, b) => a.s0 - b.s0);
+    const bridges = base.bridges.map(mirrorRange).sort((a, b) => a.s0 - b.s0);
+    const crossings = base.crossings.map((c) => Object.assign({}, c, { s: L - c.s })).sort((a, b) => a.s - b.s);
+    const inTunnel = (s) => tunnels.some((t) => s >= t.s0 && s <= t.s1);
+    const bridgeAt = (s) => bridges.find((b) => s >= b.s0 && s <= b.s1) || null;
+    const stationAt = (s) => stations.findIndex((st) => s >= st.platformStart && s <= st.platformEnd);
+    const nearest = o.playerFrameAt ? frameNearest(frameAt, L) : (x, z) => { const q = base.nearest(x, z); return Object.assign({}, q, { s: L - q.s, lat: -q.lat, i: q.i !== undefined ? (L - q.s) / STEP : undefined }); };
+    const platformInfo = (j) => {
+      const st = stations[j];
+      const p = base.platformInfo(n - 1 - j);
+      if (!st || !p) return null;
+      return Object.assign({}, p, { sideSign: st.side === 'right' ? 1 : -1, s0: st.platformStart, s1: st.platformEnd, sMarker: st.s, exits: p.exits.map((e) => ({ s: L - e.s, lat: e.lat })) });
+    };
+    const out = Object.assign({}, base, {
+      id: o.id || base.id, def: o.def || base.def, base, reverse: true, baseS: (s) => L - s, frameAt, stations, signals, tunnels, bridges, crossings, inTunnel, bridgeAt, stationAt,
+      limits: mirrorLimits(base.limits, L, base.kind, o.minLenAt), platformInfo,
+      biomeAt: (s) => base.biomeAt(L - s),
+      nearest, nearestS: (x, z) => nearest(x, z).s, distanceToTrack: (x, z) => nearest(x, z).d,
+      water: (s) => { const w = base.water ? base.water(L - s) : null; return w ? Object.assign({}, w, { side: -w.side }) : null; },
+      corridorHalfWidth: (s, side) => base.corridorHalfWidth(L - s, -side),
+    });
+    if (base.noOcs) out.noOcs = (s) => base.noOcs(L - s);
+    return out;
+  }
+
+  window.TS.track = { build, STEP, reverse, mirrorLimits };
 })();

@@ -66,6 +66,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .hud-util{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 84px);display:flex;gap:6px;pointer-events:auto}
 .chipbtn{padding:5px 11px;font-size:12px;border-radius:99px;color:var(--soft);min-height:30px;display:inline-flex;align-items:center}
 button.chipbtn:hover{color:var(--ink)}
+button.chipbtn.on{color:#ffd36a;background:rgba(255,196,58,.22);box-shadow:inset 0 0 0 1px rgba(255,196,58,.6)}
+.revlamp{background:rgba(255,196,58,.28);color:#ffd36a;font-weight:800;letter-spacing:.04em;box-shadow:inset 0 0 0 1px rgba(255,196,58,.7)}
+.revlamp[hidden]{display:none}
+.revlamp{display:inline-block;align-self:flex-start;margin-bottom:4px;font-size:14px;padding:3px 12px}
 #toasts{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 100px);transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;z-index:6;pointer-events:none;width:min(560px,92vw)}
 .toast{padding:9px 16px;border-radius:12px;background:var(--glass-strong);border:1px solid var(--line);font-size:14px;font-weight:600;animation:toast .25s ease-out;text-align:center}
 .toast.bad{border-color:rgba(255,90,77,.6);color:#ffb3ab}.toast.good{border-color:rgba(61,220,132,.55);color:#a7f0c6}.toast.info{color:var(--ink)}

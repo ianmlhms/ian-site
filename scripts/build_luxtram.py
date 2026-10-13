@@ -447,6 +447,17 @@ def relation_rings(el):
     return rings
 
 
+def _covered_osm():
+    path = os.path.join(os.environ.get("LUXTRAM_WORK", "/Users/Ian/Library/Caches/luxtram-work"), "geo", "osm_covered.json")
+    if os.path.exists(path):
+        with open(path) as fh:
+            return set(json.load(fh))
+    return set()
+
+
+COVERED_OSM = _covered_osm()
+
+
 def build_buildings(raw, line):
     els = load_many(raw, "bld")
     items = []
@@ -472,7 +483,8 @@ def build_buildings(raw, line):
             area = abs(ring_area(ring))
             if area < 14 or (area < 30 and near[1] > 30):
                 continue
-            items.append({"tags": tags, "ring": ring, "c": (cx, cz), "near": near, "area": area, "part": "building:part" in tags and "building" not in tags})
+            items.append({"tags": tags, "ring": ring, "c": (cx, cz), "near": near, "area": area, "part": "building:part" in tags and "building" not in tags,
+                          "id": el["type"][0] + str(el["id"])})
     for el in load_many(raw, "land"):
         t = el.get("tags", {})
         if el["type"] == "way" and t.get("leisure") == "stadium":
@@ -541,6 +553,8 @@ def build_buildings(raw, line):
                 break
         if lm is None and (b in ("train_station",) or t.get("railway") == "station" or t.get("public_transport") == "station"):
             lm = "gare"
+        if it.get("id") in COVERED_OSM:      # the LOD2 3D building (scripts/build_luxtram_geo.py) replaces this footprint
+            continue
         out.append({"s": it["near"][0], "d": it["near"][1], "kind": kind, "roof": roof, "h": h, "min": parse_height(t.get("min_height")) or 0.0,
                     "col": hex_color(t.get("building:colour")), "rcol": hex_color(t.get("roof:colour")), "ring": simp, "lm": lm, "name": name})
     return out
@@ -836,8 +850,16 @@ def main():
         else:
             merged.append(b)
     big = [b for b in merged if b[1] - b[0] > 90]     # Pont Rouge, Pont Adolphe, the Gare bridge: level decks
-    keys, base, dem = elevation_profile(raw, line, big)
-    deltas = ground_deltas(dem, keys, big)
+    geo_profile = os.path.join(os.environ.get("LUXTRAM_WORK", "/Users/Ian/Library/Caches/luxtram-work"), "geo", "profile.json")
+    if os.path.exists(geo_profile):
+        # real rail level + bare earth from the LiDAR 2024 models (scripts/build_luxtram_geo.py profile)
+        gp = json.load(open(geo_profile))
+        keys, ground_keys, lidar_dem = gp["elev"], gp["ground"], gp["dem"]
+        deltas = None
+        print("elevation: LiDAR profile,", len(keys), "keys")
+    else:
+        keys, base, dem = elevation_profile(raw, line, big)
+        deltas = ground_deltas(dem, keys, big)
     path = douglas_peucker(tr["pts"], 0.12)
     track = {
         "v": 1,
@@ -850,8 +872,12 @@ def main():
         "elev": keys,
         "bridges": [{"s0": r1(a), "s1": r1(b), "name": bridge_name(line, a, b)} for a, b in merged],
         "tunnels": tunnels,
-        "dem": {"step": 40, "offsets": dem["offsets"], "rows": deltas},
+        "dem": {"step": 40, "offsets": dem["offsets"], "rows": deltas} if deltas is not None else lidar_dem,
     }
+    if deltas is None:
+        track["elevReal"] = True        # elev = real rail level (LiDAR), ground = bare earth along the line (no structures)
+        track["ground"] = ground_keys
+        track["attribution"] = "© OpenStreetMap contributors (ODbL). Heights: LiDAR 2024 © ACT Luxembourg (geoportail.lu, CC0)."
     write_json(os.path.join(out, "luxtram-track.json"), track)
     chunks = build_world(raw, tr)
     n_b = sum(len(c["b"]) for c in chunks.values())

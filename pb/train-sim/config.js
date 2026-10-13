@@ -17,12 +17,15 @@
   });
   /* Effect per level (applied by TS.career.applyUpgrades). */
   const UPGRADE_EFFECTS = Object.freeze({
-    motor: { accelPerLevel: 0.07, speedPerLevel: 0.025 }, // +7 % accel, +2.5 % top speed per level
+    motor: { accelPerLevel: 0.07, speedPerLevel: 0.025 }, // +7 % accel, +2.5 % top speed per level (rail only: the Luxtram is capped, see SPEED_CAPS)
     brakes: { brakePerLevel: 0.08, emergencyPerLevel: 0.05 },
     comfort: { fareMultPerLevel: 0.05, complaintsPerLevel: 0.2 }, // +5 % fares; -20 % harsh-event penalty per level (min 0)
     capacity: { capacityPerLevel: 0.08, extraCarAtMax: true }, // +8 % seats; +1 car at max level for kiss/ic/hst
     paint: { liveryPerLevel: 1 },
   });
+  /* The real Luxtram never exceeds 70 km/h, whatever the upgrades: its motor upgrade improves acceleration only.
+     In the owner's arcade test mode (window.__pbTestMode) the tram may go faster to scout the scenery, without overspeed fines. */
+  const SPEED_CAPS = Object.freeze({ tramKmh: 70, tramScoutKmh: 110 });
   const EXTRA_CAR_TRAINS = Object.freeze(['kiss', 'ic', 'hst']);
   const REFERENCE_PRICE = Object.freeze({ railcar: 9000, tram: 40000 }); // free trains: upgrade prices scale off this
 
@@ -126,7 +129,7 @@
   const rankIds = careers.rail.rankIds;
 
   TS.config = Object.freeze({
-    trains, upgrades, upgradeKinds: UPGRADE_KINDS, upgradeEffects: UPGRADE_EFFECTS, extraCarTrains: EXTRA_CAR_TRAINS,
+    trains, upgrades, upgradeKinds: UPGRADE_KINDS, upgradeEffects: UPGRADE_EFFECTS, speedCaps: SPEED_CAPS, extraCarTrains: EXTRA_CAR_TRAINS,
     routeRules, routeOrder, economy, ranks, rankIds, careers, saveVersion: 2, coachServices: 3,
   });
 })();
