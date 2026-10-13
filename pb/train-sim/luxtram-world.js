@@ -269,7 +269,7 @@
   let geoIndex = null;
   let structData = null;
   function loadStructures() { if (!structData) { try { structData = syncJson(GEO_BASE + 'structures.json?v=1'); } catch (e) { structData = { over: [] }; } } return structData; }
-  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=3'); return geoIndex; }
+  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=4'); return geoIndex; }
   /* Fetches the three data files the world needs at build time asynchronously (with a byte count) so that create() finds them in memory instead of
      blocking on synchronous requests. Resolves when all are in (or failed: create() then falls back to the blocking request). */
   function prefetchData() {
@@ -277,7 +277,7 @@
     const jobs = [];
     if (!worldData) jobs.push(getJson(WORLD_URL).then((d) => { if (!worldData) worldData = d; }));
     if (!structData) jobs.push(getJson(GEO_BASE + 'structures.json?v=1').then((d) => { if (!structData) structData = d; }).catch(() => { /* optional: loadStructures() falls back */ }));
-    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=3').then((d) => { if (!geoIndex) geoIndex = d; }));
+    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=4').then((d) => { if (!geoIndex) geoIndex = d; }));
     return Promise.all(jobs).then(() => true, (e) => { console.warn(TAG + 'data prefetch failed, loading synchronously', e); return false; });
   }
 
@@ -307,6 +307,66 @@
       }
     }
     return { n, h: out };
+  }
+
+  /* Cuttings, embankments and retaining walls in the LiDAR ground model are full of single-node spikes and folded triangles (the point cloud thins out on a
+     wall and the TIN zig-zags): on steep cells the heights are despiked with a 3x3 median and rounded with a binomial blur, so a cutting is a clean slope
+     (or a clean wall) instead of crumpled paper.  Flat ground, and the two outer node rings of the tile (shared with the neighbour), are not touched. */
+  function regularizeDem(dem, step) {
+    const n = dem.n; const h = dem.h;
+    if (n < 9) return dem;
+    const g = new Float32Array(n * n);
+    for (let r = 1; r < n - 1; r++) {
+      for (let c = 1; c < n - 1; c++) {
+        const k = r * n + c;
+        const dx = (h[k + 1] - h[k - 1]) / (2 * step); const dz = (h[k + n] - h[k - n]) / (2 * step);
+        g[k] = Math.hypot(dx, dz);
+      }
+    }
+    const STEEP = 0.8;
+    // zone = steep cells and their 2-node surroundings
+    const zone = new Uint8Array(n * n);
+    let any = false;
+    for (let r = 2; r < n - 2; r++) {
+      for (let c = 2; c < n - 2; c++) {
+        if (g[r * n + c] > STEEP) {
+          any = true;
+          for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) zone[(r + dr) * n + c + dc] = 1;
+        }
+      }
+    }
+    if (!any) return dem;
+    let cur = Float32Array.from(h);
+    const med = new Float32Array(9);
+    for (let pass = 0; pass < 2; pass++) {          // despike: 3x3 median
+      const nxt = Float32Array.from(cur);
+      for (let r = 2; r < n - 2; r++) {
+        for (let c = 2; c < n - 2; c++) {
+          const k = r * n + c;
+          if (!zone[k]) continue;
+          let m = 0;
+          for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) med[m++] = cur[k + dr * n + dc];
+          med.sort();
+          const md = med[4];
+          if (Math.abs(cur[k] - md) > 0.15 * step) nxt[k] = md;
+        }
+      }
+      cur = nxt;
+    }
+    for (let pass = 0; pass < 2; pass++) {          // round: binomial blur, weight by steepness
+      const nxt = Float32Array.from(cur);
+      for (let r = 2; r < n - 2; r++) {
+        for (let c = 2; c < n - 2; c++) {
+          const k = r * n + c;
+          if (!zone[k]) continue;
+          const bl = (cur[k - n - 1] + 2 * cur[k - n] + cur[k - n + 1] + 2 * cur[k - 1] + 4 * cur[k] + 2 * cur[k + 1] + cur[k + n - 1] + 2 * cur[k + n] + cur[k + n + 1]) / 16;
+          const w = Math.min(1, Math.max(0.35, (g[k] - 0.4) / 1.2));
+          nxt[k] = cur[k] + (bl - cur[k]) * w;
+        }
+      }
+      cur = nxt;
+    }
+    return { n, h: cur };
   }
 
   /* ------------------------------------------------------------ main factory */
@@ -509,7 +569,7 @@
       Promise.all([pH, pB, pO.catch((e) => { console.warn(TAG + 'ground ' + key, e); return null; }), pT]).then(([dem, bld, gnd, trees]) => {
         loading--;
         if (t.disposed) return;
-        t.dem = dem; t.bld = bld; t.ground = gnd; t.trees = trees; t.state = 'ready';
+        t.dem = regularizeDem(dem, info.meta.step); t.bld = bld; t.ground = gnd; t.trees = trees; t.state = 'ready';
       }).catch((e) => { loading--; t.state = 'failed'; console.warn(TAG + 'tile ' + key + ' failed', e); });
     }
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Build the painted ground of the Luxtram world (replaces the orthophoto textures).
+"""Build the painted ground of the Luxtram world (no photograph is read, shipped or shown).
 
-  /Users/Ian/Library/Caches/luxtram-work/.venv/bin/python scripts/build_luxtram_ground.py [tiles] [far] [debug]
+  /Users/Ian/Library/Caches/luxtram-work/.venv/bin/python scripts/build_luxtram_ground.py [tiles] [far] [debug] [<i>_<j> ...]
 
-Reads   raw OSM (road_/land_/ground_/bld_/poi_/tram_ways), the LiDAR DTM / DSM (luxtram-work/geo/h), the *raw* orthophoto tiles (luxtram-work/geo/ortho,
-        only to tell vegetation from hard ground in places OSM does not describe; the photo is never shipped or shown)
-Writes  pb/train-sim/data/luxtram/g/<i>_<j>.bin   per detailed tile:  'LG1' u32 pngLen u32 jsonLen | class map PNG (256x256, 0.5 m/px, palette index = class)
-                                                                      | JSON (vector layers, see layers() below; cm integers relative to the tile corner)
+Reads   raw OSM (road_/land_/ground_/bld_/poi_/tram_ways), the LiDAR DTM / DSM (luxtram-work/geo/h, far/h_*): canopy stands from the nDSM, nothing from colour;
+        context defaults from the building density (dense blocks = paving, open land = lawn / meadow patchwork, built-up landuse = asphalt yards + paved aprons).
+Writes  pb/train-sim/data/luxtram/g/<i>_<j>.bin   per detailed tile:  'LG2' u32 pngLen u32 shadeLen u32 jsonLen | class map PNG (256x256, 0.5 m/px, grey = class * 32)
+                                                                      | AO PNG | JSON (vector layers incl. "pk" = parked-car stalls; cm integers relative to the tile corner)
         pb/train-sim/data/luxtram/f/c_<i>_<j>.png   far ring class maps (640 m tiles, 4 m/px)
 Classes: 0 asphalt 1 paving 2 lawn 3 meadow 4 forest floor 5 gravel/soil 6 sett (stone setts) 7 water
 """
@@ -41,11 +41,12 @@ N = 256
 FAR_TILE = 640.0
 FAR_N = 160
 ASPH, PAVE, LAWN, MEADOW, FOREST, GRAVEL, SETT, WATER = range(8)
+GRASS = 12          # OSM landuse=grass: lawn in town / small verges, meadow when large and rural (decided per pixel from the building density)
 PALETTE = [(70, 72, 76), (190, 186, 176), (118, 168, 70), (160, 170, 90), (42, 82, 42), (178, 160, 120), (150, 140, 130), (60, 100, 140)]
 HARD = (ASPH, PAVE, SETT)
 
 VEG_LAND = {
-    ("landuse", "grass"): MEADOW, ("landuse", "meadow"): MEADOW, ("landuse", "village_green"): LAWN, ("landuse", "recreation_ground"): LAWN,
+    ("landuse", "grass"): GRASS, ("landuse", "meadow"): MEADOW, ("landuse", "village_green"): LAWN, ("landuse", "recreation_ground"): LAWN,
     ("landuse", "cemetery"): LAWN, ("landuse", "allotments"): MEADOW, ("landuse", "farmland"): MEADOW, ("landuse", "orchard"): MEADOW,
     ("landuse", "greenfield"): MEADOW, ("landuse", "forest"): FOREST, ("landuse", "flowerbed"): LAWN, ("landuse", "plant_nursery"): MEADOW,
     ("leisure", "park"): LAWN, ("leisure", "garden"): LAWN, ("leisure", "playground"): GRAVEL, ("leisure", "golf_course"): LAWN,
@@ -55,6 +56,9 @@ VEG_LAND = {
     ("landuse", "brownfield"): GRAVEL, ("landuse", "construction"): GRAVEL, ("landuse", "railway"): GRAVEL, ("landuse", "quarry"): GRAVEL,
     ("landuse", "garages"): ASPH, ("landuse", "industrial"): None, ("landuse", "depot"): GRAVEL,
 }
+LANDCTX = {"residential": "res", "commercial": "com", "retail": "com", "industrial": "ind", "garages": "ind", "depot": "ind", "port": "ind", "military": "ind",
+           "education": "inst", "institutional": "inst", "religious": "inst", "farmyard": "ind"}
+RESIDENTIAL_B = ("house", "detached", "semidetached_house", "terrace", "residential", "apartments", "garage", "garages", "shed", "carport", "roof", "farm", "greenhouse", "cabin", "hut", "static_caravan", "dormitory", "bungalow", "allotment_house")
 PITCH = {"asphalt": ASPH, "concrete": PAVE, "tartan": ASPH, "clay": GRAVEL, "sand": GRAVEL, "grass": LAWN, "artificial_turf": LAWN, "gravel": GRAVEL, "paved": ASPH}
 
 
@@ -62,51 +66,11 @@ def log(*a):
     print(*a, flush=True)
 
 
-# ----------------------------------------------------------------------------------------------------------------------------- ortho classification
-def classify_ortho(rgb, blob_area_px, px_m, ndsm=None, bld=None):
-    """rgb uint8 HxWx3 -> class map (HxW) with only PAVE / LAWN / MEADOW / FOREST / GRAVEL (vegetation vs hard ground; hard = paving).
-    ndsm (surface - terrain height, same grid) marks tree cover independent of its colour (shadowed canopy); bld = footprint mask."""
-    r, g, b = [rgb[..., i].astype(np.float32) for i in range(3)]
-    lum = 0.3 * r + 0.55 * g + 0.15 * b
-    exg = 2 * g - r - b
-    veg = (exg > 10) & (g > b)
-    tan = (~veg) & (r > g + 4) & (g > b + 16) & ((r - b) > 36) & (lum > 70)      # bare soil / gravel (warm-grey paving has r - b of only ~15-25)
-    cls = np.full(r.shape, PAVE, np.uint8)
-    cls[tan] = GRAVEL
-    if ndsm is not None:
-        canopy = (ndsm > 2.2) & ~(bld if bld is not None else False)
-        canopy = ndi.binary_opening(canopy, iterations=1) if canopy.any() else canopy
-    else:
-        k = 7
-        lum2 = np.sqrt(np.maximum(ndi.uniform_filter(lum ** 2, k) - ndi.uniform_filter(lum, k) ** 2, 0))
-        canopy = veg & ((lum < 80) | (lum2 > 18))
-    meadow = veg & (r > g * 0.88) & (lum >= 80)
-    cls[veg] = LAWN
-    cls[meadow] = MEADOW
-    cls[canopy & (veg | (lum < 115))] = FOREST
-    # smooth (mode filter)
-    sc = np.stack([ndi.uniform_filter((cls == c).astype(np.float32), 5) for c in range(8)])
-    cls = np.argmax(sc, 0).astype(np.uint8)
-    # unlit grass between trees: hard-looking pixels deep inside vegetation are vegetation too
-    vegm = np.isin(cls, (LAWN, MEADOW, FOREST))
-    dens = ndi.uniform_filter(vegm.astype(np.float32), 13)
-    fix = (~vegm) & (dens > 0.62) & (cls != GRAVEL)
-    if fix.any() and vegm.any():
-        idx = ndi.distance_transform_edt(~vegm, return_distances=False, return_indices=True)
-        cls = np.where(fix, cls[idx[0], idx[1]], cls)
-    # trees over streets / lawns: only big canopy blobs are forest floor, small ones take the class of their surroundings
-    can = cls == FOREST
-    lab, n = ndi.label(ndi.binary_closing(can, iterations=6) if can.any() else can)      # crowns with small gaps count as one stand
-    if n:
-        areas = ndi.sum(can, lab, index=np.arange(1, n + 1))
-        small = np.zeros(n + 1, bool)
-        small[1:] = areas * px_m * px_m < blob_area_px
-        sm = small[lab] & can
-        if sm.any() and (~sm).any():
-            idx = ndi.distance_transform_edt(sm, return_distances=False, return_indices=True)
-            cls = cls[idx[0], idx[1]]
-            cls[(cls == FOREST) & sm] = LAWN
-    return cls
+# ----------------------------------------------------------------------------------------------------------------------------- base classes (no photo)
+# The class map comes from OSM geometry + LiDAR heights + context defaults only.  Nothing here looks at a photograph.
+CTX_CELL = 4.0
+CTX_X0, CTX_Z0, CTX_X1, CTX_Z1 = -6800.0, -6800.0, 6800.0, 6200.0
+NDSM_TREE = 2.6          # m: crowns (parked vans / buses stay below this; hedges and bushes are lawn anyway)
 
 
 def tile_ndsm(H_dtm, H_dsm, i, j, n=N):
@@ -119,26 +83,95 @@ def tile_ndsm(H_dtm, H_dsm, i, j, n=N):
     return ndi.map_coordinates(nd, [vv, uu], order=1, mode="nearest")
 
 
-def load_ortho_class(key, meta, big_area=600.0, dtm=None, dsm=None, bld_layer=None):
-    p = os.path.join(G.RAW_GEO, "ortho", key + ".png")
-    if not os.path.exists(p):
-        return None
-    im = Image.open(p).convert("RGB")
-    w = im.size[0]
-    im = im.crop((1, 1, w - 1, w - 1)).resize((N, N), Image.LANCZOS)
-    i, j = map(int, key.split("_"))
-    nd = tile_ndsm(dtm, dsm, i, j) if dtm is not None else None
-    bm = None
-    if nd is not None and bld_layer is not None:
-        x0, z0 = i * TILE, j * TILE
-        bx = box(x0, z0, x0 + TILE, z0 + TILE)
-        shapes = [(g.intersection(bx), 1) for g in bld_layer.query(bx)]
-        shapes = [(g, v) for g, v in shapes if not g.is_empty]
-        bm = np.zeros((N, N), np.uint8)
+def mode_filter(cls, ncls, k):
+    sc = np.stack([ndi.uniform_filter((cls == c).astype(np.float32), k) for c in range(ncls)])
+    return np.argmax(sc, 0).astype(np.uint8)
+
+
+def drop_small(cls, protect, min_px, ncls=8):
+    """components of one class smaller than min_px (and not protected) take the class of their surroundings (clean, calm areas: no speckle)"""
+    out = cls.copy()
+    for c in range(ncls):
+        m = out == c
+        if not m.any():
+            continue
+        lab, n = ndi.label(m)
+        if not n:
+            continue
+        areas = ndi.sum(m, lab, index=np.arange(1, n + 1))
+        small = np.zeros(n + 1, bool)
+        small[1:] = areas < min_px
+        sm = small[lab] & m & ~protect
+        if sm.any():
+            keep = ~sm
+            if keep.any():
+                idx = ndi.distance_transform_edt(sm, return_distances=False, return_indices=True)
+                out = np.where(sm, out[idx[0], idx[1]], out)
+    return out
+
+
+class Context:
+    """Building density (the 'how urban is it here' signal) on a 4 m grid over the whole frame, from the OSM footprints of the corridor + the far-ring footprints."""
+
+    def __init__(self, polys):
+        self.nx = int((CTX_X1 - CTX_X0) / CTX_CELL)
+        self.nz = int((CTX_Z1 - CTX_Z0) / CTX_CELL)
+        m = np.zeros((self.nz, self.nx), np.uint8)
+        tr = Affine(CTX_CELL, 0, CTX_X0, 0, CTX_CELL, CTX_Z0)
+        shapes = [(p, 1) for p in polys if p is not None and not p.is_empty]
         if shapes:
-            rasterio.features.rasterize(shapes, out=bm, transform=Affine(RES, 0, x0, 0, RES, z0))
-        bm = ndi.binary_dilation(bm.astype(bool), iterations=2)
-    return classify_ortho(np.asarray(im), big_area, RES, nd, bm)
+            rasterio.features.rasterize(shapes, out=m, transform=tr, all_touched=True)
+        f = m.astype(np.float32)
+        self.fine = ndi.gaussian_filter(f, 22.0 / CTX_CELL)        # ~ 40 m neighbourhood
+        self.wide = ndi.gaussian_filter(f, 90.0 / CTX_CELL)        # ~ 150 m neighbourhood
+
+    def at(self, X, Z, which="fine"):
+        g = self.fine if which == "fine" else self.wide
+        u = (np.asarray(X, float) - CTX_X0) / CTX_CELL - 0.5
+        v = (np.asarray(Z, float) - CTX_Z0) / CTX_CELL - 0.5
+        return ndi.map_coordinates(g, [v, u], order=1, mode="nearest")
+
+
+def far_building_polys():
+    out = []
+    d = os.path.join(OUT, "f")
+    for f in os.listdir(d):
+        if f.startswith("b_") and f.endswith(".json"):
+            try:
+                for e in json.load(open(os.path.join(d, f))):
+                    fl = e[2]
+                    if len(fl) >= 6:
+                        pg = Polygon([(fl[i], fl[i + 1]) for i in range(0, len(fl) - 1, 2)])
+                        out.append(pg if pg.is_valid else pg.buffer(0))
+            except Exception as ex:
+                print("far buildings", f, ex)
+    return out
+
+
+def lattice_noise(X, Z, cell, seed):
+    """smooth 0..1 value noise of world coordinates (so neighbouring tiles agree)"""
+    gx, gz = np.asarray(X, float) / cell, np.asarray(Z, float) / cell
+    ix, iz = np.floor(gx).astype(np.int64), np.floor(gz).astype(np.int64)
+    fx, fz = gx - ix, gz - iz
+
+    def hv(a, b):
+        v = (a * 374761393 + b * 668265263 + seed * 2147483629) & 0xFFFFFFFF
+        v = ((v ^ (v >> 13)) * 1274126177) & 0xFFFFFFFF
+        v = v ^ (v >> 16)
+        return (v & 0xFFFF) / 65535.0
+
+    sx, sz = fx * fx * (3 - 2 * fx), fz * fz * (3 - 2 * fz)
+    a = hv(ix, iz) * (1 - sx) + hv(ix + 1, iz) * sx
+    b = hv(ix, iz + 1) * (1 - sx) + hv(ix + 1, iz + 1) * sx
+    return a * (1 - sz) + b * sz
+
+
+def value_noise(h, w, cell, seed):
+    """smooth 0..1 noise (cell = px per lattice step)"""
+    rng = np.random.RandomState(seed)
+    gh, gw = h // cell + 3, w // cell + 3
+    g = rng.rand(gh, gw).astype(np.float32)
+    return ndi.zoom(g, cell, order=1)[:h, :w]
 
 
 # ----------------------------------------------------------------------------------------------------------------------------- world model
@@ -149,7 +182,9 @@ class World:
         self.far = list(idx["far"].keys())
         self.tile_meta = idx["tiles"]
         self.idx = idx
-        self.base = {}                    # tile key -> ortho class map
+        self.ctx = None                   # building-density context (see Context)
+        self.landctx = []                 # (kind, polygon) built-up landuse for the untagged-ground defaults
+        self.pspaces = []                 # amenity=parking_space polygons (single stalls)
         self.load_osm()
 
     # ------------------------------------------------------------------------- OSM
@@ -206,10 +241,15 @@ class World:
         self.tram_corr = unary_union([l.buffer(2.0) for l in lines]) if lines else Polygon()
         # buildings
         bl = []
+        self.big_bld = []             # large non-residential buildings: stadiums, halls, malls, terminals (they get a paved forecourt)
         for el in M.load_all_elements("bld"):
-            if el.get("tags", {}).get("building") is None and el.get("tags", {}).get("building:part") is None:
+            tg = el.get("tags", {})
+            if tg.get("building") is None and tg.get("building:part") is None:
                 continue
-            bl += M.el_polygons(el)
+            pgs = M.el_polygons(el)
+            bl += pgs
+            if tg.get("building") not in RESIDENTIAL_B and tg.get("building:part") is None:
+                self.big_bld += [q for q in pgs if q.area > 1500]
         self.bld = unary_union([b for b in bl if not b.is_empty])
         log("  buildings", len(bl), "water", len(self.water_polys), "veg polys", len(self.veg), "rails", len(self.rails), "parking", len(self.parking))
 
@@ -252,6 +292,9 @@ class World:
         if t.get("amenity") == "parking" or t.get("amenity") == "parking_space":
             if t.get("parking") in ("underground", "multi-storey", "rooftop") or t.get("location") in ("underground", "rooftop"):
                 return
+            if t.get("amenity") == "parking_space":
+                self.pspaces += M.el_polygons(el)
+                return
             self.parking += M.el_polygons(el)
             return
         # hard areas
@@ -275,6 +318,10 @@ class World:
                 return
             self.veg.append((c, M.el_polygons(el), 5))
             return
+        lu = t.get("landuse")
+        if lu in LANDCTX:
+            for pg in M.el_polygons(el):
+                self.landctx.append((LANDCTX[lu], pg))
         for k in ("landuse", "leisure", "natural"):
             if k in t and (k, t[k]) in VEG_LAND:
                 c = VEG_LAND[(k, t[k])]
@@ -287,24 +334,148 @@ class World:
         if t.get("natural") == "cliff" or t.get("natural") == "tree_row":
             return
 
-    # ------------------------------------------------------------------------- base classes from the photo
+    # ------------------------------------------------------------------------- base classes (OSM + LiDAR + context; no photo)
     def load_base(self, dtm=None, dsm=None):
-        log("ortho classification ...")
-        bl = Layer(poly_list(self.bld))
-        for k in self.tiles:
-            c = load_ortho_class(k, self.tile_meta[k], dtm=dtm, dsm=dsm, bld_layer=bl)
-            if c is not None:
-                self.base[k] = c
+        log("context (building density) ...")
+        polys = poly_list(self.bld) + far_building_polys()
+        self.ctx = Context(polys)
+        self.dtm, self.dsm = dtm, dsm
+        self.bld_layer = Layer(poly_list(self.bld) + far_building_polys())
+        aprons = []
+        for g in self.big_bld:
+            aprons.append(g.buffer(20 if g.area > 6000 else 11))
+        for pl in self.platforms:
+            if isinstance(pl, Polygon):
+                aprons.append(pl.buffer(7))
+        self.apron_layer = Layer(aprons)
+        self.landctx_layer = Layer([pg for k, pg in self.landctx])
+        self.landctx_kind = {id(pg): k for k, pg in self.landctx}
+        self.veg_sorted = sorted([(c, p, force) for c, polys_, force in self.veg for p in polys_ if not p.is_empty], key=lambda e: -e[1].area)
+        self.veg_layer = Layer([e[1] for e in self.veg_sorted])
+        self.veg_info = {id(e[1]): e for e in self.veg_sorted}
 
     def base_at(self, x, z):
-        i, j = int(math.floor(x / TILE)), int(math.floor(z / TILE))
-        c = self.base.get("%d_%d" % (i, j))
-        if c is None:
-            return PAVE
-        u = min(N - 1, max(0, int((x - i * TILE) / RES)))
-        v = min(N - 1, max(0, int((z - j * TILE) / RES)))
-        return int(c[v, u])
+        """default ground class at a point (only used to decide sidewalks of untagged streets): paving in built-up blocks, lawn elsewhere"""
+        return PAVE if float(self.ctx.at([x], [z])[0]) > 0.13 else LAWN
 
+    def veg_raster(self, bx, x0, z0, n, res, urb=None):
+        """OSM vegetation polygons rasterised (255 = none); big polygons first so the small ones sit on top.  landuse=grass is lawn in town, meadow in the open."""
+        tr = Affine(res, 0, x0, 0, res, z0)
+        ov = np.full((n, n), 255, np.uint8)
+        forced = np.zeros((n, n), bool)
+        for g in sorted(self.veg_layer.query(bx.buffer(2.0)), key=lambda q: -q.area):
+            c, _, force = self.veg_info[id(g)]
+            tmp = np.zeros((n, n), np.uint8)
+            gi = g.intersection(bx.buffer(2.0))
+            if gi.is_empty:
+                continue
+            rasterio.features.rasterize([(gi, 1)], out=tmp, transform=tr)
+            sel = tmp.astype(bool)
+            if c == GRASS:
+                if g.area > 6000 and urb is not None:
+                    ov[sel] = np.where(urb[sel] < 0.07, MEADOW, LAWN)
+                else:
+                    ov[sel] = LAWN
+            else:
+                ov[sel] = c
+            if force:
+                forced[sel] = True
+        return ov, forced
+
+    def default_classes(self, bx, x0, z0, n, res, nd=None, far=False):
+        """the ground where OSM says nothing: lawn / meadow in the open, paving in dense blocks and around buildings of built-up land, asphalt in industrial yards,
+        forest floor under LiDAR canopy stands"""
+        u = x0 + (np.arange(n) + 0.5) * res
+        v = z0 + (np.arange(n) + 0.5) * res
+        UU, VV = np.meshgrid(u, v)
+        urb = self.ctx.at(UU, VV, "fine")
+        arr = np.full((n, n), LAWN, np.uint8)
+        tr = Affine(res, 0, x0, 0, res, z0)
+        # land-use context
+        ctxm = np.zeros((n, n), np.uint8)       # 1 res 2 commercial 3 industrial 4 institutional
+        code = {"res": 1, "com": 2, "ind": 3, "inst": 4}
+        order = sorted(self.landctx_layer.query(bx.buffer(1.0)), key=lambda g: -g.area)
+        for g in order:
+            gi = g.intersection(bx.buffer(1.0))
+            if gi.is_empty:
+                continue
+            tmp = np.zeros((n, n), np.uint8)
+            rasterio.features.rasterize([(gi, 1)], out=tmp, transform=tr)
+            ctxm[tmp.astype(bool)] = code[self.landctx_kind[id(g)]]
+        # buildings (footprints) and the apron around them
+        bm = np.zeros((n, n), bool)
+        shapes = [(g.intersection(bx.buffer(8.0)), 1) for g in self.bld_layer.query(bx.buffer(8.0))]
+        shapes = [(g, vv) for g, vv in shapes if not g.is_empty]
+        if shapes:
+            tmp = np.zeros((n, n), np.uint8)
+            rasterio.features.rasterize(shapes, out=tmp, transform=tr)
+            bm = tmp.astype(bool)
+        dist_b = ndi.distance_transform_edt(~bm) * res if bm.any() else np.full((n, n), 99.0)
+        dense = urb > 0.36
+        arr[dense] = PAVE
+        # open land: patchwork of mown lawn and long-grass meadow (~35 m patches), deterministic in world coordinates
+        open_ = (urb < 0.07) & (arr == LAWN)
+        nz_ = lattice_noise(UU, VV, 34.0 if not far else 150.0, 7) * 0.7 + lattice_noise(UU, VV, 11.0 if not far else 50.0, 19) * 0.3
+        arr[open_ & (nz_ > 0.56)] = MEADOW
+        com = ctxm == 2
+        arr[com] = np.where((urb[com] > 0.2) & (dist_b[com] < 6.0), PAVE, ASPH)        # commercial / retail land: paved apron by the buildings, yards and lots beyond
+        arr[(ctxm == 3)] = ASPH
+        apron = (dist_b < (1.8 if not far else 0.0)) & ((urb > 0.2) | (ctxm == 2) | (ctxm == 3))
+        arr[apron & (arr == LAWN)] = PAVE
+        if not far:             # forecourts of big buildings, tram / rail platforms and bus stops
+            ap = np.zeros((n, n), np.uint8)
+            shp = [(g.intersection(bx.buffer(1.0)), 1) for g in self.apron_layer.query(bx.buffer(1.0))]
+            shp = [(g, vv) for g, vv in shp if not g.is_empty]
+            if shp:
+                rasterio.features.rasterize(shp, out=ap, transform=tr)
+                arr[ap.astype(bool) & (arr == LAWN)] = PAVE
+        # canopy stands from the LiDAR (no colour): tall + rough crowns, not roofs
+        if nd is not None and far:
+            roof = ndi.binary_dilation(bm, iterations=2) if bm.any() else bm
+            can = (nd > 4.0) & ~roof
+            can = ndi.gaussian_filter(can.astype(np.float32), 1.0) > 0.5
+            return arr, can, urb, ctxm
+        if nd is not None:
+            roof = ndi.binary_dilation(bm, iterations=int(round(2.5 / res))) if bm.any() else bm
+            win = max(3, int(round(3.5 / res)) | 1)
+            m1 = ndi.uniform_filter(nd, win); m2 = ndi.uniform_filter(nd * nd, win)
+            rough = np.sqrt(np.maximum(m2 - m1 * m1, 0.0))
+            can = (nd > NDSM_TREE) & ~roof & ((rough > 0.35) | (nd > 8.0))
+            can = ndi.binary_opening(can, iterations=max(1, int(round(0.8 / res)))) if can.any() else can
+            can = ndi.gaussian_filter(can.astype(np.float32), 1.6 / res * 0.6) > 0.5      # calm outlines
+            can = ndi.binary_closing(can, iterations=int(round(2.0 / res))) if can.any() else can
+            return arr, can, urb, ctxm
+        return arr, None, urb, ctxm
+
+    def base_tile(self, key, nd):
+        i, j = map(int, key.split("_"))
+        x0, z0 = i * TILE, j * TILE
+        bx = box(x0, z0, x0 + TILE, z0 + TILE)
+        arr, can, urb, ctxm = self.default_classes(bx, x0, z0, N, RES, nd)
+        ov, forced = self.veg_raster(bx, x0, z0, N, RES, urb)
+        osm_soft = ov != 255
+        arr = np.where(osm_soft, ov, arr)
+        # canopy stands (>= 100 m2; in dense town only real stands >= 150 m2) become forest floor; single trees keep the class around them (the 3D tree is the tree)
+        if can is not None and can.any():
+            lab, nlab = ndi.label(can)
+            areas = ndi.sum(can, lab, index=np.arange(1, nlab + 1)) * RES * RES if nlab else []
+            keep = np.zeros(nlab + 1, bool)
+            for k in range(nlab):
+                a = areas[k]
+                keep[k + 1] = a >= 100.0
+            stand = keep[lab]
+            town = np.isin(arr, (PAVE, ASPH, SETT))
+            if town.any():
+                big = np.zeros(nlab + 1, bool)
+                big[1:] = areas >= 150.0
+                stand = stand & (~town | big[lab])
+            arr = np.where(stand & ~forced & ~(np.isin(arr, (ASPH, SETT)) & ~osm_soft), FOREST, arr)
+        # calm, clean areas: mode filter on what OSM did not draw, then drop speckle below ~12 m2
+        osm_geom = osm_soft
+        sm = mode_filter(arr, 8, 7)
+        arr = np.where(osm_geom, arr, sm)
+        arr = drop_small(arr, osm_geom, int(12.0 / (RES * RES)))
+        return arr
 
 # ----------------------------------------------------------------------------------------------------------------------------- geometry
 def side_sign_for(tag):
@@ -405,7 +576,7 @@ class Geo:
             if sides is not None:
                 pieces += line_sides_polys(r.line, r.hw, sw, sides[0], sides[1])
                 continue
-            # untagged: infer from the photo classification + existing separate OSM sidewalks
+            # untagged: infer from the building density (built-up = sidewalks) + existing separate OSM sidewalks
             L = r.line.length
             n = max(1, int(L // 8))
             for k in range(n):
@@ -702,52 +873,146 @@ class Geo:
 
     # ---------------------------------------------------------------------
     def make_parking(self):
+        """Painted stalls of every parking area: double-loaded rows (5 m bays, 6 m aisles) along the dominant direction of the lot, clipped to the lot minus
+        carriageways / buildings / the tram corridor; single parking_space ways are drawn as they are.  self.bays = paint lines, self.slots = (x, z, heading deg)
+        for the parked cars (runtime picks ~55 % of them)."""
+        import shapely.affinity as SA
         W = self.W
-        self.bays = []
-        for p in W.parking:
-            if p.area < 40 or p.area > 12000:
+        self.bays, self.slots = [], []
+        excl = unary_union([self.carriage.buffer(0.25), W.bld.buffer(0.3), W.tram_corr.buffer(0.5)])
+        excl_prep = prep(excl) if not excl.is_empty else None
+        BAY_W, BAY_D, AISLE = 2.5, 5.0, 6.0
+        lots = [p for p in W.parking if 40 <= p.area <= 90000]
+        spaces = [q for q in W.pspaces if 6 <= q.area <= 30]
+        sp_tree = STRtree([q.centroid for q in spaces]) if spaces else None
+        gen_lots = []
+        for p in lots:
+            n_sp = []
+            if sp_tree is not None:
+                n_sp = [i for i in sp_tree.query(p) if p.contains(spaces[i].centroid)]
+            if len(n_sp) >= 6:
+                continue        # mapped stall by stall: drawn from those below
+            inner = p.buffer(-0.3)
+            if inner.is_empty:
+                continue
+            if excl_prep is not None:
+                inner = inner.difference(excl)
+                if inner.is_empty:
+                    continue
+            # dominant edge direction of the lot (length-weighted, mod 90 deg)
+            hist = np.zeros(90)
+            ext = list(p.exterior.coords)
+            for a, b in zip(ext[:-1], ext[1:]):
+                dx, dz = b[0] - a[0], b[1] - a[1]
+                ln = math.hypot(dx, dz)
+                if ln < 1.0:
+                    continue
+                hist[int(math.degrees(math.atan2(dz, dx)) % 90) % 90] += ln
+            hist = np.convolve(np.concatenate([hist[-2:], hist, hist[:2]]), np.ones(5) / 5, "valid")
+            th = int(np.argmax(hist))
+            gen_lots.append(p)
+            for polys_ in polys_of(inner):
+                if polys_.area < 15:
+                    continue
+                self._bays_for(polys_, th, SA, BAY_W, BAY_D, AISLE)
+        # stall-by-stall parking_space ways (those inside a lot that got a generated layout are skipped)
+        lot_gen = prep(unary_union(gen_lots)) if gen_lots else None
+        for q in spaces:
+            if lot_gen is not None and lot_gen.contains(q.centroid):
                 continue
             try:
-                rect = p.minimum_rotated_rectangle
+                rect = q.minimum_rotated_rectangle
                 c = list(rect.exterior.coords)[:4]
             except Exception:
                 continue
-            e0 = (c[1][0] - c[0][0], c[1][1] - c[0][1])
-            e1 = (c[2][0] - c[1][0], c[2][1] - c[1][1])
+            e0 = (c[1][0] - c[0][0], c[1][1] - c[0][1]); e1 = (c[2][0] - c[1][0], c[2][1] - c[1][1])
             l0, l1 = math.hypot(*e0), math.hypot(*e1)
-            if l0 >= l1:
-                long_v, lenL, wid = (e0[0] / l0, e0[1] / l0), l0, l1
-            else:
-                long_v, lenL, wid = (e1[0] / l1, e1[1] / l1), l1, l0
-            if wid < 2.2:
+            if min(l0, l1) < 1.6 or max(l0, l1) > 8.5:
                 continue
-            short_v = (-long_v[1], long_v[0])
-            origin = (c[0][0], c[0][1]) if l0 >= l1 else (c[1][0], c[1][1])
-            # normalise the origin to the corner with min coordinates along the axes
-            xs = [(q[0] - c[0][0]) * long_v[0] + (q[1] - c[0][1]) * long_v[1] for q in c]
-            ys = [(q[0] - c[0][0]) * short_v[0] + (q[1] - c[0][1]) * short_v[1] for q in c]
-            u0, v0 = min(xs), min(ys)
-            o = (c[0][0] + long_v[0] * u0 + short_v[0] * v0, c[0][1] + long_v[1] * u0 + short_v[1] * v0)
-            inner = p.buffer(-0.25)
-            if inner.is_empty:
+            ax = e0 if l0 >= l1 else e1
+            cx = sum(v[0] for v in c) / 4; cz = sum(v[1] for v in c) / 4
+            if excl_prep is not None and excl_prep.contains(Point(cx, cz)):
                 continue
-            bay_len = min(5.0, wid / 2 if wid > 11 else wid)
-            k = 0
-            u = 0.0
-            spacing = 2.6 if wid >= 2.4 else 5.2
-            while u <= lenL + 0.01:
-                rows = [(0.0, bay_len)] if wid <= 11 else [(0.0, bay_len), (wid - bay_len, wid)]
-                for v_a, v_b in rows:
-                    a = (o[0] + long_v[0] * u + short_v[0] * v_a, o[1] + long_v[1] * u + short_v[1] * v_a)
-                    b = (o[0] + long_v[0] * u + short_v[0] * v_b, o[1] + long_v[1] * u + short_v[1] * v_b)
-                    seg = LineString([a, b]).intersection(inner)
-                    for s in lines_of(seg):
-                        if s.length > 1.0:
-                            self.bays.append(s)
-                u += spacing
-                k += 1
-                if k > 400:
-                    break
+            self.bays.append(LineString(list(q.exterior.coords)))
+            self.slots.append((cx, cz, math.degrees(math.atan2(ax[1], ax[0])) % 360))
+        log("  parking: %d lots, %d stalls, %d paint lines" % (len(lots), len(self.slots), len(self.bays)))
+
+    def _bays_for(self, poly, th, SA, BAY_W, BAY_D, AISLE):
+        t = math.radians(th)
+        ca, sa = math.cos(t), math.sin(t)
+        to_l = [ca, sa, -sa, ca, 0, 0]          # (x, z) -> (u, v)
+        to_w = [ca, -sa, sa, ca, 0, 0]          # (u, v) -> (x, z)
+        loc = SA.affine_transform(poly, to_l)
+        u0, v0, u1, v1 = loc.bounds
+        swap = False
+        if (v1 - v0) > (u1 - u0) * 1.05:       # rows run along the long dimension
+            th2 = th + 90
+            t = math.radians(th2); ca, sa = math.cos(t), math.sin(t)
+            to_l = [ca, sa, -sa, ca, 0, 0]; to_w = [ca, -sa, sa, ca, 0, 0]
+            loc = SA.affine_transform(poly, to_l)
+            u0, v0, u1, v1 = loc.bounds
+        wv = v1 - v0
+        lp = prep(loc)
+        shrink = loc.buffer(-0.12)
+        shrink_p = prep(shrink) if not shrink.is_empty else lp
+        out_lines, out_slots = [], []
+        def fits(rc):
+            if not shrink_p.intersects(rc):
+                return False
+            if shrink_p.contains(rc):
+                return True
+            return shrink.intersection(rc).area >= 0.82 * rc.area
+        parallel = wv < 4.6
+        if parallel:
+            va = (v0 + v1) / 2 - 1.15; vb = va + 2.3
+            u = u0 + 0.2
+            while u + 5.4 <= u1:
+                if fits(box(u + 0.15, va + 0.15, u + 5.25, vb - 0.15)):
+                    out_lines.append(LineString([(u, va), (u, vb)]))
+                    out_slots.append((u + 2.7, (va + vb) / 2, 0.0))
+                    out_lines.append(LineString([(u + 5.4, va), (u + 5.4, vb)]))
+                u += 5.6
+        else:
+            best = None
+            for off in range(0, 16, 2):
+                bands = []
+                pos = v0 - off
+                cyc = [("a", AISLE), ("b", BAY_D), ("b", BAY_D)]
+                k = 0
+                while pos < v1:
+                    kind, ln = cyc[k % 3]
+                    if kind == "b":
+                        bands.append((pos, pos + ln))
+                    pos += ln
+                    k += 1
+                cnt = 0
+                lines, slots = [], []
+                for va, vb in bands:
+                    vva, vvb = max(va, v0), min(vb, v1)
+                    if vvb - vva < 3.2:
+                        continue
+                    depth = vvb - vva
+                    for kk in range(int((u1 - u0) / BAY_W) + 1):
+                        uu = u0 + 0.3 + kk * BAY_W
+                        if uu + BAY_W > u1:
+                            break
+                        if depth >= 4.2 and fits(box(uu + 0.1, vva + 0.1, uu + BAY_W - 0.1, vva + min(depth, BAY_D) - 0.1)):
+                            slots.append((uu + BAY_W / 2, (vva + vvb) / 2 if depth <= BAY_D + 0.1 else vva + BAY_D / 2, 90.0))
+                        ln_ = LineString([(uu, vva), (uu, vvb)]).intersection(loc.buffer(-0.2))
+                        for q in lines_of(ln_):
+                            if q.length > 1.2:
+                                lines.append(q)
+                if best is None or len(slots) > len(best[1]):
+                    best = (lines, slots)
+            if best:
+                out_lines, out_slots = best
+        for l in out_lines:
+            self.bays.append(SA.affine_transform(l, to_w))
+        th_w = math.degrees(math.atan2(to_w[2], to_w[0]))        # world angle of the local u axis
+        for (uc, vc, a) in out_slots:
+            x = to_w[0] * uc + to_w[1] * vc
+            z = to_w[2] * uc + to_w[3] * vc
+            self.slots.append((x, z, (th_w + a) % 360))
 
     # ---------------------------------------------------------------------
     def make_rails(self):
@@ -757,7 +1022,7 @@ class Geo:
             if t.get("railway") == "funicular":
                 continue
             self.rail_lines.append(ln)
-        # the CFL Pfaffenthal line is missing in the OSM extract (measured on the orthophoto, see luxtram_decks.py)
+        # the CFL Pfaffenthal line is missing in the OSM extract (surveyed once, see luxtram_decks.py)
         self.rail_lines.append(LineString([(-2247.0, -1560.0), (-2247.0, -1180.0)]))
         self.ballast = unary_union([l.buffer(2.6, cap_style=2) for l in self.rail_lines]) if self.rail_lines else Polygon()
 
@@ -927,6 +1192,7 @@ def build_tiles(W, Gm, only=None, dtm_at=None):
         "plat": Layer(sum([poly_list(p) for p in W.platforms if not isinstance(p, LineString)], [])),
         "veg": Layer([]),
     }
+    slots_arr = np.array(Gm.slots, float).reshape(-1, 3)
     path_layers = {c: Layer(v) for c, v in Gm.paths.items()}
     water_layer = Layer(poly_list(Gm.water))
     # dashes and solid marks
@@ -982,32 +1248,14 @@ def build_tiles(W, Gm, only=None, dtm_at=None):
         x0, z0 = i * TILE, j * TILE
         bx = box(x0, z0, x0 + TILE, z0 + TILE)
         bxm = bx.buffer(2.0)
-        base = W.base.get(key)
-        arr = base.copy() if base is not None else np.full((N, N), PAVE, np.uint8)
         tr = Affine(RES, 0, x0, 0, RES, z0)
+        arr = W.base_tile(key, tile_ndsm(W.dtm, W.dsm, i, j))
         # hide the real ground below high decks
         foot = [g.intersection(bx) for g in deck_foot_layer.query(bx)]
         if foot:
             m = np.zeros((N, N), np.uint8)
             rasterio.features.rasterize([(g, 1) for g in foot if not g.is_empty], out=m, transform=tr)
             arr = inpaint(arr, m.astype(bool))
-        # OSM vegetation (does not replace hard ground seen in the photo, except where forced)
-        ov = np.full((N, N), 255, np.uint8)
-        forced = np.zeros((N, N), np.uint8)
-        for g in veg_layer.query(bxm):
-            c, _, force = veg_info[id(g)]
-            tmp = np.zeros((N, N), np.uint8)
-            rasterio.features.rasterize([(g, 1)], out=tmp, transform=tr)
-            sel = tmp.astype(bool)
-            ov[sel] = c
-            if force:
-                forced[sel] = 1
-        soft = np.isin(arr, (LAWN, MEADOW, FOREST, GRAVEL))
-        keep_forest = (arr == FOREST) & np.isin(ov, (LAWN, MEADOW, GRAVEL)) & (forced == 0)      # LiDAR tree cover beats an OSM "park" polygon
-        apply = (ov != 255) & (soft | (forced == 1)) & ~keep_forest
-        # an OSM lawn also wins over photo-"paving" when the photo class is the default for shadowed grass: only where a veg polygon is lawn-like and
-        # the photo shows paving in a small speck (<=1 m wide) -> handled by the mode filter below
-        arr = np.where(apply, ov, arr)
         # hard areas, parking, ballast, platforms, water
         hs = [(g.intersection(bx), hard_info[id(g)][0]) for g in hard_layer.query(bxm)]
         rasterize_into(arr, hs, tr)
@@ -1075,6 +1323,13 @@ def build_tiles(W, Gm, only=None, dtm_at=None):
             q_out.extend([int(round(v)) for xz in list(g.exterior.coords)[:4] for v in ((xz[0] - x0) * 100, (xz[1] - z0) * 100)])
         if q_out:
             V["q"] = q_out
+        if len(slots_arr):
+            sel = (slots_arr[:, 0] >= x0) & (slots_arr[:, 0] < x0 + TILE) & (slots_arr[:, 1] >= z0) & (slots_arr[:, 1] < z0 + TILE)
+            pk = []
+            for sx, sz, sa in slots_arr[sel]:
+                pk += [int(round((sx - x0) * 100)), int(round((sz - z0) * 100)), int(round(sa)) % 360]
+            if pk:
+                V["pk"] = pk
         w_out = []
         for g in water_layer.query(bx):
             for p in poly_list(g.intersection(bx)):
@@ -1141,14 +1396,24 @@ def build_tiles(W, Gm, only=None, dtm_at=None):
     log("tiles done", n_done, "%.2f MB" % (total_bytes / 1e6))
 
 
+def far_ndsm(key, n):
+    p = os.path.join(G.RAW_GEO, "far", "h_%s.npz" % key)
+    if not os.path.exists(p):
+        return None
+    f = np.load(p)
+    nd = np.nan_to_num(f["dsm"] - f["dtm"], nan=0.0)
+    m = nd.shape[0]
+    u = (np.arange(n) + 0.5) * ((m - 1) / n)
+    uu, vv = np.meshgrid(u, u)
+    return ndi.map_coordinates(nd, [vv, uu], order=1, mode="nearest")
+
+
 def build_far(W, Gm):
-    """Far ring class maps (640 m tiles, 4 m/px): photo classification + the OSM vegetation / water / main roads where OSM data exists."""
+    """Far ring class maps (640 m tiles, 4 m/px): the same recipe as the near tiles at lower resolution: context defaults + LiDAR canopy stands + OSM
+    vegetation / water / main roads where OSM data exists.  No photo."""
     os.makedirs(os.path.join(OUT, "f"), exist_ok=True)
     FN = FAR_N
     px_m = FAR_TILE / FN
-    veg_items = [(c, p, force) for c, polys, force in W.veg for p in polys if not p.is_empty]
-    veg_items.sort(key=lambda e: -e[1].area)
-    veg_layer = Layer([e[1] for e in veg_items]); veg_info = {id(e[1]): e for e in veg_items}
     water_layer = Layer(poly_list(Gm.water))
     road_layer = Layer([r.line.buffer(max(r.hw, 2.2), cap_style=2) for r in Gm.ground_roads if r.cls <= 3])
     hard_items = [(c, p) for c, polys in W.hard for p in polys if not p.is_empty]
@@ -1159,24 +1424,23 @@ def build_far(W, Gm):
         i, j = map(int, key.split("_"))
         x0, z0 = i * FAR_TILE, j * FAR_TILE
         bx = box(x0, z0, x0 + FAR_TILE, z0 + FAR_TILE)
-        path = os.path.join(G.RAW_GEO, "far", "o_%s.png" % key)
-        if os.path.exists(path):
-            im = Image.open(path).convert("RGB")
-            w = im.size[0]
-            im = im.crop((1, 1, w - 1, w - 1)).resize((FN, FN), Image.LANCZOS)
-            arr = classify_ortho(np.asarray(im), 600.0, px_m)
-        else:
-            arr = np.full((FN, FN), LAWN, np.uint8)
+        nd = far_ndsm(key, FN)
+        arr, can, urb, ctxm = W.default_classes(bx, x0, z0, FN, px_m, nd, far=True)
+        ov, forced = W.veg_raster(bx, x0, z0, FN, px_m, urb)
+        osm_soft = ov != 255
+        arr = np.where(osm_soft, ov, arr)
+        if can is not None and can.any():
+            lab, nlab = ndi.label(can)
+            if nlab:
+                areas = ndi.sum(can, lab, index=np.arange(1, nlab + 1)) * px_m * px_m
+                keep = np.zeros(nlab + 1, bool)
+                keep[1:] = areas >= 500.0
+                stand = keep[lab]
+                arr = np.where(stand & ~forced & ~(np.isin(arr, (ASPH, SETT)) & ~osm_soft), FOREST, arr)
+        sm = mode_filter(arr, 8, 3)
+        arr = np.where(osm_soft, arr, sm)
+        arr = drop_small(arr, osm_soft, 6)
         tr = Affine(px_m, 0, x0, 0, px_m, z0)
-        ov = np.full((FN, FN), 255, np.uint8)
-        for g in veg_layer.query(bx):
-            c, _, force = veg_info[id(g)]
-            tmp = np.zeros((FN, FN), np.uint8)
-            rasterio.features.rasterize([(g.intersection(bx), 1)], out=tmp, transform=tr)
-            sel = tmp.astype(bool)
-            ov[sel] = c
-        soft = np.isin(arr, (LAWN, MEADOW, FOREST, GRAVEL))
-        arr = np.where((ov != 255) & soft, ov, arr)
         rasterize_into(arr, [(g.intersection(bx), hard_info[id(g)][0]) for g in hard_layer.query(bx)], tr)
         rasterize_into(arr, [(g.intersection(bx), ASPH) for g in park_layer.query(bx)], tr)
         rasterize_into(arr, [(g.intersection(bx), WATER) for g in water_layer.query(bx)], tr)

@@ -157,6 +157,73 @@
     }
   }
 
+
+  /* ------------------------------------------------------------ parked cars (low-poly, merged into the tile's surface mesh: no extra draw call)
+     The build script lays out every parking area with painted stalls (vec.m kind 5) and lists the stall centres + headings (vec.pk, cm integers + degrees).
+     About half of the stalls get a car; which ones is a hash of the stall position, so the picture is the same on every visit and no state is kept. */
+  const CAR_PAINT = [
+    [0.9, 0.9, 0.9, 22], [0.07, 0.07, 0.08, 22], [0.62, 0.64, 0.66, 17], [0.33, 0.35, 0.38, 17], [0.12, 0.22, 0.46, 6], [0.55, 0.08, 0.08, 5],
+    [0.42, 0.36, 0.28, 3], [0.1, 0.3, 0.18, 2], [0.45, 0.58, 0.7, 3], [0.85, 0.6, 0.12, 2],
+  ];
+  const CAR_PAINT_TOT = CAR_PAINT.reduce((a, c) => a + c[3], 0);
+  const CAR_TYPES = [   // L, W, belt (top of the lower body), roof, cabin base (back .. front, fraction of L), cabin top (back .. front), weight
+    { L: 4.2, W: 1.78, belt: 0.86, roof: 1.46, cb: [-0.38, 0.15], ct: [-0.31, 0.02], w: 34 },
+    { L: 4.7, W: 1.82, belt: 0.88, roof: 1.45, cb: [-0.38, 0.12], ct: [-0.27, -0.02], w: 18 },
+    { L: 4.6, W: 1.9, belt: 1.1, roof: 1.72, cb: [-0.42, 0.18], ct: [-0.38, 0.1], w: 24 },
+    { L: 4.7, W: 1.83, belt: 0.88, roof: 1.5, cb: [-0.44, 0.12], ct: [-0.42, 0.0], w: 12 },
+    { L: 5.3, W: 2.0, belt: 1.05, roof: 2.2, cb: [-0.5, 0.3], ct: [-0.5, 0.24], w: 8 },
+  ];
+  const CAR_W_TOT = CAR_TYPES.reduce((a, c) => a + c.w, 0);
+  const GLASS = [0.1, 0.13, 0.17]; const TYRE = [0.05, 0.05, 0.06]; const HEAD = [0.88, 0.88, 0.8]; const TAIL = [0.62, 0.06, 0.06];
+  function hash32(a, b, c) {
+    let h = Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul(b | 0, 0x165667b1) ^ Math.imul(c | 0, 0x9e3779b1);
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  /* one parked car: placement (cx, cy, cz), forward direction (fx, fz), plane slopes sp (along) / sr (across); colour pt; AO factor ao */
+  function pushCar(S, ty, cx, cy, cz, fx, fz, sp, sr, pt, ao) {
+    const L = ty.L; const W = ty.W; const hw = W / 2; const hl = L / 2;
+    const rx = -fz; const rz = fx;                 // across (right)
+    const P = (lx, y, lz) => [cx + rx * lx + fx * lz, cy + y + sp * lz + sr * lx, cz + rz * lx + fz * lz];
+    const N3 = (a, b, c) => { const ux = b[0] - a[0]; const uy = b[1] - a[1]; const uz = b[2] - a[2]; const vx = c[0] - a[0]; const vy = c[1] - a[1]; const vz = c[2] - a[2]; let nx = uy * vz - uz * vy; let ny = uz * vx - ux * vz; let nz = ux * vy - uy * vx; const l = Math.hypot(nx, ny, nz) || 1; return [nx / l, ny / l, nz / l]; };
+    const quad = (a, b, c, d, col, out) => {          // a, b, c, d around the face; out = a point the normal should face away from... (hint vector)
+      let n = N3(a, b, c);
+      if (n[0] * out[0] + n[1] * out[1] + n[2] * out[2] < 0) { n = [-n[0], -n[1], -n[2]]; const tmp = b; b = d; d = tmp; }      // keep the winding counter-clockwise seen from outside
+      const base = S.count; const k = ao;
+      [a, b, c, d].forEach((v) => S.vert(v[0], v[1], v[2], n[0], n[1], n[2], 8, col[0] * k, col[1] * k, col[2] * k));
+      S.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    };
+    const dir = (lx, y, lz) => [rx * lx + fx * lz, y, rz * lx + fz * lz];       // outward hint in world axes
+    const y0 = 0.3; const yb = ty.belt; const yr = ty.roof;
+    // lower body (hood, flanks, nose, tail)
+    const A = [P(-hw, y0, -hl), P(hw, y0, -hl), P(hw, y0, hl), P(-hw, y0, hl)];
+    const B = [P(-hw, yb, -hl), P(hw, yb, -hl), P(hw, yb, hl), P(-hw, yb, hl)];
+    quad(A[1], A[2], B[2], B[1], pt, dir(1, 0, 0)); quad(A[0], A[3], B[3], B[0], pt, dir(-1, 0, 0));
+    quad(A[2], A[3], B[3], B[2], pt, dir(0, 0, 1)); quad(A[0], A[1], B[1], B[0], pt, dir(0, 0, -1));
+    quad(B[0], B[1], B[2], B[3], pt, [0, 1, 0]);
+    // cabin: glass all round, painted roof
+    const cw = hw * 0.92; const tw = hw * 0.8;
+    const c0 = ty.cb[0] * L; const c1 = ty.cb[1] * L; const t0 = ty.ct[0] * L; const t1 = ty.ct[1] * L;
+    const CB = [P(-cw, yb, c0), P(cw, yb, c0), P(cw, yb, c1), P(-cw, yb, c1)];
+    const CT = [P(-tw, yr, t0), P(tw, yr, t0), P(tw, yr, t1), P(-tw, yr, t1)];
+    quad(CB[1], CB[2], CT[2], CT[1], GLASS, dir(1, 0, 0)); quad(CB[0], CB[3], CT[3], CT[0], GLASS, dir(-1, 0, 0));
+    quad(CB[2], CB[3], CT[3], CT[2], GLASS, dir(0, 0.5, 1)); quad(CB[0], CB[1], CT[1], CT[0], GLASS, dir(0, 0.5, -1));
+    quad(CT[0], CT[1], CT[2], CT[3], pt, [0, 1, 0]);
+    // wheels (four dark blocks) + lamps
+    const wb = L * 0.62; const wr = 0.34; const wx = hw - 0.12; const ww = 0.22;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+      const lx0 = sx * wx - ww / 2; const lx1 = sx * wx + ww / 2; const lz0 = sz * wb / 2 - wr; const lz1 = sz * wb / 2 + wr;
+      const w00 = P(lx0, 0, lz0); const w10 = P(lx1, 0, lz0); const w11 = P(lx1, 0, lz1); const w01 = P(lx0, 0, lz1);
+      const t00 = P(lx0, wr * 2, lz0); const t10 = P(lx1, wr * 2, lz0); const t11 = P(lx1, wr * 2, lz1); const t01 = P(lx0, wr * 2, lz1);
+      quad(w10, w11, t11, t10, TYRE, dir(sx, 0, 0)); quad(w00, w01, t01, t00, TYRE, dir(sx, 0, 0));
+      quad(w00, w10, t10, t00, TYRE, dir(0, 0, -1)); quad(w01, w11, t11, t01, TYRE, dir(0, 0, 1));
+    });
+    [-1, 1].forEach((sx) => {
+      quad(P(sx * hw * 0.78 - 0.17, 0.62, hl + 0.006), P(sx * hw * 0.78 + 0.17, 0.62, hl + 0.006), P(sx * hw * 0.78 + 0.17, 0.74, hl + 0.006), P(sx * hw * 0.78 - 0.17, 0.74, hl + 0.006), HEAD, dir(0, 0, 1));
+      quad(P(sx * hw * 0.8 - 0.13, 0.7, -hl - 0.006), P(sx * hw * 0.8 + 0.13, 0.7, -hl - 0.006), P(sx * hw * 0.8 + 0.13, 0.82, -hl - 0.006), P(sx * hw * 0.8 - 0.13, 0.82, -hl - 0.006), TAIL, dir(0, 0, -1));
+    });
+  }
+
   /* ------------------------------------------------------------ data parsing */
   const dec = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
   function decodePngGray(buf, n) {
@@ -236,11 +303,8 @@
     'varying vec2 vTerrUv; varying vec3 vWP; varying float vSlopeY;',
     'uniform sampler2D uCtrl0; uniform sampler2D uCtrl1; uniform sampler2D uAtlas; uniform float uFar;',
     GLSL_CORE,
-    'vec3 groundAlbedo() {',
-    '  vec4 a = texture2D(uCtrl0, vTerrUv); vec4 b = texture2D(uCtrl1, vTerrUv);',
-    '  float tot = dot(a, vec4(1.0)) + dot(b, vec4(1.0)); a /= tot; b /= tot;',
-    '  vec2 wp = vWP.xz; vec2 dx = dFdx(wp); vec2 dy = dFdy(wp);',
-    '  float m1 = lvn(wp * 0.035); float m2 = lvn(wp * 0.21); float m3 = lvn(wp * 1.3);',
+    /* the class mix at a (projected) position: planar (x, z) on the flat ground, side projection on steep banks so the texture does not streak */
+    'vec3 classMix(vec4 a, vec4 b, vec2 wp, vec2 dx, vec2 dy, float m1, float m2, float m3) {',
     '  vec3 col = vec3(0.0);',
     '  for (int k = 0; k < 8; k++) {',
     '    float w = k < 4 ? (k == 0 ? a.x : k == 1 ? a.y : k == 2 ? a.z : a.w) : (k == 4 ? b.x : k == 5 ? b.y : k == 6 ? b.z : b.w);',
@@ -253,8 +317,22 @@
     '    else c *= 0.92 + 0.14 * m2;',
     '    col += c * w;',
     '  }',
+    '  return col;',
+    '}',
+    'vec3 groundAlbedo() {',
+    '  vec4 a = texture2D(uCtrl0, vTerrUv); vec4 b = texture2D(uCtrl1, vTerrUv);',
+    '  float tot = dot(a, vec4(1.0)) + dot(b, vec4(1.0)); a /= tot; b /= tot;',
+    '  vec2 wp = vWP.xz; vec2 dx = dFdx(wp); vec2 dy = dFdy(wp);',
+    '  float m1 = lvn(wp * 0.035); float m2 = lvn(wp * 0.21); float m3 = lvn(wp * 1.3);',
+    '  vec3 col = classMix(a, b, wp, dx, dy, m1, m2, m3);',
     '  float steep = 1.0 - smoothstep(0.55, 0.9, vSlopeY);',
-    '  if (steep > 0.01) { vec2 sw = vec2(vWP.x + vWP.z, vWP.y * 1.25); vec2 sdx = dFdx(sw); vec2 sdy = dFdy(sw); vec3 earth = (uFar > 0.5 ? FARC[5] : gcell(5, sw, sdx, sdy)) * vec3(0.78, 0.68, 0.56) * (0.9 + 0.2 * lvn(sw * 0.3)); col = mix(col, earth, steep * 0.8); }',   // side projection: a planar (x, z) texture streaks on steep cuttings
+    '  if (steep > 0.01) {',
+    '    vec2 sw = vec2(vWP.x + vWP.z, vWP.y * 1.25); vec2 sdx = dFdx(sw); vec2 sdy = dFdy(sw);',
+    '    float hard = a.x + a.y + b.z;',                      // asphalt / paving / setts above a drop = a retaining wall: pale concrete with form-work joints
+    '    vec3 bank = classMix(a, b, sw, sdx, sdy, m1, m2, m3) * 0.9;',
+    '    vec3 wall = vec3(0.56, 0.55, 0.52) * (0.9 + 0.2 * lvn(vec2(sw.x * 0.5, vWP.y * 2.0))) * (0.94 + 0.06 * step(0.5, fract(sw.x * 0.25)));',
+    '    col = mix(col, mix(bank, wall, clamp(hard * 1.4, 0.0, 1.0)), steep);',
+    '  }',
     '  return col;',
     '}',
   ].join('\n');
@@ -266,7 +344,7 @@
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + SPLAT_FRAG_COMMON)
         .replace('#include <map_fragment>', 'diffuseColor.rgb *= groundAlbedo();');
     };
-    mat.customProgramCacheKey = () => 'lt-splat-v1';
+    mat.customProgramCacheKey = () => 'lt-splat-v2';
     return mat;
   }
 
@@ -539,6 +617,31 @@
       });
       iMark = mark('rail', iMark);
       decorateDecks(t, S);
+      // parked cars on the painted stalls (vec.pk: x, z in cm from the tile corner, heading in degrees)
+      const pk = vec.pk;
+      if (pk && pk.length) {
+        const occK = quality === 'low' ? 0.5 : 1;
+        for (let i = 0; i + 2 < pk.length; i += 3) {
+          const sx = pk[i]; const sz = pk[i + 1]; const sa = pk[i + 2];
+          const lot = hash32(Math.floor(sx / 3000) + 77, Math.floor(sz / 3000) - 31, 5);          // ~30 m clusters: some lots fuller than others
+          if (hash32(sx, sz, 11) > (0.38 + 0.34 * lot) * occK) continue;
+          let ty = hash32(sx, sz, 23) * CAR_W_TOT; let k = 0;
+          while (k < CAR_TYPES.length - 1 && ty > CAR_TYPES[k].w) { ty -= CAR_TYPES[k].w; k++; }
+          let pc = hash32(sx, sz, 31) * CAR_PAINT_TOT; let q = 0;
+          while (q < CAR_PAINT.length - 1 && pc > CAR_PAINT[q][3]) { pc -= CAR_PAINT[q][3]; q++; }
+          const ang = (sa + (hash32(sx, sz, 41) < 0.5 ? 180 : 0) + (hash32(sx, sz, 43) - 0.5) * 5) * Math.PI / 180;
+          const fx = Math.cos(ang); const fz = Math.sin(ang);
+          const cx = x0 + sx / 100 + (hash32(sx, sz, 47) - 0.5) * 0.22 - fz * 0.0; const cz = z0 + sz / 100 + (hash32(sx, sz, 53) - 0.5) * 0.22;
+          const ty0 = CAR_TYPES[k];
+          const hwb = ty0.L * 0.31;
+          const yF = surfY(t, cx + fx * hwb, cz + fz * hwb); const yR = surfY(t, cx - fx * hwb, cz - fz * hwb);
+          const yL = surfY(t, cx - fz * 0.8, cz + fx * 0.8); const yRt = surfY(t, cx + fz * 0.8, cz - fx * 0.8);
+          const sp = clamp((yF - yR) / (2 * hwb), -0.15, 0.15); const sr = clamp((yL - yRt) / 1.6, -0.15, 0.15);
+          const cy = (yF + yR + yL + yRt) / 4 + aT;
+          const ao = shadeAt(t, cx, cz);
+          pushCar(S, ty0, cx, cy, cz, fx, fz, sp, sr, CAR_PAINT[q], ao);
+        }
+      }
       const m = S.mesh(T, matSurface, 0);
       if (m) grp.add(m);
       if (window.__lgDebug) console.log('lg tile', t.key, 'verts', S.count, 'tris', S.i.length / 3, 'ms', (performance.now() - tStart).toFixed(1), JSON.stringify(dbg));

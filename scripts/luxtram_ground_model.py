@@ -2,8 +2,7 @@
 
 Frame: the local equirectangular frame of build_luxtram.py (x east, z south, metres; shapely treats (x, z) as the plane's (x, y)).
 Everything here is vector: carriageways (merged, with proper junctions), sidewalks, kerb lines, paths, markings, zebra crossings, parking,
-water, rails, bridge decks.  The raster class map is made from these plus an orthophoto *classification* (vegetation vs. hard ground only;
-the photo itself is never shipped).
+water, rails, bridge decks.  The raster class map is made from these plus OSM landuse, LiDAR canopy and context defaults (no photograph is read).
 """
 import math
 import os
