@@ -1,6 +1,6 @@
 /* Shared leaderboard identity tags. The RPC is available to signed-in full accounts only. */
 
-import { arcadeText } from "./score-format.js?v=6";
+import { arcadeText } from "./score-format.js?v=7";
 
 const STYLE_ID = "leaderboard-tag-styles";
 export const EVENT_BADGES = Object.freeze({ "halloween-2026": Object.freeze({ icon: "🎃", title: "Halloween 2026" }) });

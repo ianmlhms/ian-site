@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=30";
+import * as auth from "./auth.js?v=31";
 import { validateDeck, validateSlide } from "./ppt-ai-schema.js?v=5";
 export { validateDeck } from "./ppt-ai-schema.js?v=5";
 
