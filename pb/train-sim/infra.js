@@ -1481,6 +1481,8 @@
     const gare = idx === 0 && st.name === 'Lëtzebuerg';
     const modern = /TGV|Belval/.test(st.name);
     const style = pickStyle(st.name);
+    // REAL STATIONS: a photo-modelled builder for this station name (pb/train-sim/stations-*.js) replaces the generic building/canopy
+    const real = window.TS.realStations ? window.TS.realStations.get(st.name, isTram ? 'tram' : 'rail') : null;
 
     /* LUXTRAM: the platform follows the curve of ITS track (place(s, lateral) maps a point of the track at arc length s into the station
        group's local frame; yaw = heading difference). Rail stations are straight and keep the plain box layout. */
@@ -1555,7 +1557,7 @@
     const roofH = isTram ? 2.9 : 3.5;
     const roofW = isTram ? 2.8 : W + 0.4;
     const colX = pf(edge + (isTram ? Math.min(2.6, W - 0.4) : W - 0.9));
-    if (!gare) {
+    if (!gare && !(real && real.canopy === false)) {
       vc.box(pf(edge + (isTram ? 1.4 : W / 2 + 0.2)), roofH + 0.1, cz, roofW, 0.16, canopyLen, col(isTram ? '#2f6b57' : '#c5c9cb'), 0, 0, sx * 0.05);
       vc.box(pf(edge + (isTram ? 0.05 : 0.1)), roofH - 0.05, cz, 0.08, 0.34, canopyLen, col(isTram ? '#1e4b3d' : '#17406e'));
       const cols = Math.max(2, Math.round(canopyLen / 9));
@@ -1570,16 +1572,17 @@
         g.box(pf(edge + Math.min(2.7, W - 0.3)), H + 1.1, cz, 0.04, 2.0, canopyLen - 1, WHITE);
       }
     }
+    const furniture = !(real && real.furniture === false);
     // benches, bins, lamps, timetable boards
-    for (let z = cz - canopyLen / 2 + 4; z < cz + canopyLen / 2 - 3; z += isTram ? 8 : 16) {
+    if (furniture) for (let z = cz - canopyLen / 2 + 4; z < cz + canopyLen / 2 - 3; z += isTram ? 8 : 16) {
       const bp = spot(z, edge + (isTram ? Math.min(2.3, W - 0.7) : W - 0.45));
       addBench(vc, bp.x, H + bp.y, bp.z);
     }
-    for (let z = zB + 8; z < zA - 8; z += isTram ? 14 : 22) {
+    if (furniture) for (let z = zB + 8; z < zA - 8; z += isTram ? 14 : 22) {
       const lp = spot(z, edge + (isTram ? 0.7 : W * 0.55));
       addLampPost(sets, lp.x, H + lp.y, lp.z);
     }
-    if (!isTram) {
+    if (!isTram && furniture) {
       for (let z = cz - canopyLen / 2 + 9; z < cz + canopyLen / 2; z += 24) {
         vc.cyl(pf(edge + W - 0.5), H + 0.38, z, 0.22, 0.76, col('#3b5a47'));
         vc.box(colX, H + 1.5, z + 1.2, 0.04, 1.3, 0.8, col('#1d3555'));
@@ -1587,7 +1590,7 @@
     }
     // clocks (double faced)
     const clockB = sets.get('clock', clockMat);
-    const clockZ = isTram ? [] : [-L * 0.22, L * 0.22];
+    const clockZ = isTram || !furniture ? [] : [-L * 0.22, L * 0.22];
     clockZ.forEach((z) => {
       const cx = colX;
       vc.box(cx, H + 2.9, z, 0.06, 0.6, 0.06, col('#4b5258'));
@@ -1618,7 +1621,18 @@
     }
 
     // station building
-    if (!isTram) {
+    const extra = [];
+    if (real) {
+      try {
+        real.build({
+          T, THREE: T, sets, M, mat, col, shade, WHITE, FORM_Y, hashStr, q, st, idx, track, isTram, opposite: oppPlat, variant,
+          sx, pf, spot, place, curved, H, W, edge, L, sMid, zA, zB, zOf, gapX: edge + W + 3.2, extra,
+          helpers: { addBuilding, addPyramid, addFence, addBench, addLampPost, textQuad, facadeTexture, signTexture, clockMat, canvasTex, addTrainShed, buildGare, buildModern, addBufferStop, stopTexture },
+        });
+      } catch (err) {
+        console.warn('[Lokféierer] real station build failed', st.name, err);
+      }
+    } else if (!isTram) {
       const gapX = edge + W + 3.2;
       if (gare) {
         buildGare(sets, sx, gapX, zA, zB, st);
@@ -1640,7 +1654,7 @@
       addBufferStop(vc, zOf(sBuf), idx === 0 ? -1 : 1);
     }
 
-    const out = sets.meshes(q.castStations);
+    const out = sets.meshes(q.castStations).concat(extra);
     // lit windows on the main building are part of the facade texture; platform is solid
     return out;
   }

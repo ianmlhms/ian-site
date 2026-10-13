@@ -151,8 +151,8 @@
     },
     [
       station('Lëtzebuerg', 3, 'right', 'city'),
-      ...leg(780, 's90:v50:bcity r400/140 s280:Bs,36,w:v50 l500/120 s*:v60'),
-      station('Pafendall-Kierchbierg', 1, 'left', 'city'),
+      ...leg(780, 's90:v50:bcity r400/140 s280:Bs,36,w:v50 l500/120:bforest s*:v60'),
+      station('Pafendall-Kierchbierg', 1, 'left', 'forest'),
       ...leg(1300, 's200:v70:bsuburb l600/260:g1.2 s*:v90 r800/260:g1.0 s220'),
       station('Walfer', 1, 'right', 'suburb'),
       ...leg(1400, 's250:v100:bfarmland r900/300:g0.8 s*:X l1000/300:g-0.3 s200'),

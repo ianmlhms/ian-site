@@ -529,6 +529,15 @@
     const frame = (s) => track.frameAt(s);
     const nearest = (x, z) => track.nearest(x, z);
     const sceneToLonLat = (x, z) => ({ lat: LAT0 - (z + oz) / M_LAT, lon: LON0 + (x + ox) / M_LON });
+    // small structures at a stop (OSM/LOD2 tram shelters, kiosks) are replaced by the photo-modelled stops (stations-luxtram.js)
+    const STOP_CLEAR_H = 6;
+    const STOP_CLEAR_LAT = 14;
+    const STOP_CLEAR_PAD = 12;
+    const atStop = (x, z) => {
+      const n = nearest(x, z);
+      if (!n || n.d > STOP_CLEAR_LAT) return false;
+      return (track.stations || []).some((st) => n.s >= st.platformStart - STOP_CLEAR_PAD && n.s <= st.platformEnd + STOP_CLEAR_PAD);
+    };
     const hasOpp = !!(track.opposite && track.opposite.frameAt);
     const oppLatAt = (s) => (hasOpp && track.opposite.has(s) ? track.opposite.latAt(s) : -3.45);
 
@@ -751,6 +760,7 @@
         if (replacedBy(cx, cz, Array.from({ length: Math.min(nv, 6) }, (_, i) => [px[i], pz[i]]))) return;
         // keep clear of the tram (a few buildings stand over the right of way in OSM-less spots)
         const H = ymax - ymin;
+        if (H <= STOP_CLEAR_H && atStop(cx, cz)) return;
         const bottom = new Set(B);
         const terr = new Float32Array(nv);
         B.forEach((i) => { terr[i] = gy(px[i], pz[i]); });
@@ -1169,6 +1179,7 @@
       for (let i = 0; i < ring.length; i++) if (nearest(ring[i][0], ring[i][1]).d < 3.4) return false;
       const cc = ring.reduce((a, p) => [a[0] + p[0] / ring.length, a[1] + p[1] / ring.length], [0, 0]);
       if (replacedBy(cc[0], cc[1], ring)) return false;
+      if (H <= STOP_CLEAR_H && atStop(cc[0], cc[1])) return false;
       const rng = mulberry(hash2(ci * 977 + idx, 17) * 4294967296);
       let gMin = 1e9; let gSum = 0;
       ring.forEach((p) => { const g = gy(p[0], p[1]); gMin = Math.min(gMin, g); gSum += g; });
