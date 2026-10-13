@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build the shipped Luxtram geodata (orthophoto tiles, LiDAR terrain, LOD2 buildings, trees, rail-level profile).
+"""Build the shipped Luxtram geodata (LiDAR terrain, LOD2 buildings, trees, rail-level profile).
+
+NOTE (painted-ground round): the orthophoto outputs (o/ tiles, f/o_ far tiles, the `deckortho` step) are OBSOLETE: the game no longer loads or ships any photograph.
+The painted ground comes from scripts/fetch_luxtram_ground.py + scripts/build_luxtram_ground.py (which only *classifies* the raw photo tiles in
+luxtram-work/geo/ortho to tell vegetation from hard ground; the photo itself is never shipped).
 
 Run after scripts/fetch_luxtram_geo.py and scripts/luxtram_lod2.py, with the venv python:
   /Users/Ian/Library/Caches/luxtram-work/.venv/bin/python scripts/build_luxtram_geo.py [profile] [tiles] [buildings] [trees] [far] [index]

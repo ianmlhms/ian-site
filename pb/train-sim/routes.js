@@ -180,16 +180,16 @@
       station('Lëtzebuerg', 3, 'right', 'city'),
       ...leg(2400, 's300:v60:bcity r600/260 s*:v120:bsuburb l1200/320:g-0.8 s500:bfarmland:v140 r1500/300 s*:X'),
       station('Wasserbëlleg', 2, 'left', 'river'),
-      ...leg(1800, 's300:v100:briver r1400/300 s*:v140 s140:Br,9,w l1300/300 s200:v100'),
-      station('Tréier Hbf', 3, 'right', 'river'),
-      ...leg(1600, 's300:v100:briver l1200/320 s*:v140 r1400/300:bvineyard s*:v120'),
+      ...leg(1800, 's300:v100:briver r1400/300 s*:v140 s140:Br,9,w l1300/300:bsuburb s200:v100:bcity'),
+      station('Tréier Hbf', 3, 'right', 'city'),
+      ...leg(1600, 's300:v100:bcity l1200/320:bsuburb s*:v140:briver r1400/300:bvineyard s*:v120'),
       station('Schweich', 1, 'left', 'vineyard'),
       ...leg(2000, 's300:v120:bvineyard r1100/320 s*:v140 l1000/320 s200:X:v120'),
       station('Wittlich', 2, 'right', 'farmland'),
       ...leg(2200, 's300:v120:bvineyard l1000/300:g-0.5 s*:v140 s560:T:v120 r900/320 s*'),
       station('Cochem', 2, 'left', 'vineyard'),
-      ...leg(1800, 's300:v120:briver r1000/320 s*:v140 l1100/300 s200:v100'),
-      station('Koblenz Hbf', 3, 'right', 'river', true),
+      ...leg(1800, 's300:v120:briver r1000/320 s*:v140 l1100/300:bsuburb s200:v100:bcity'),
+      station('Koblenz Hbf', 3, 'right', 'city', true),
     ]
   );
 
@@ -228,9 +228,9 @@
       station('Arlon', 2, 'right', 'forest'),
       ...leg(3200, 's300:v120:bforest r1000/300:g0.8 s*:v140 l1100/300:bardennes:g-0.4 s500:T:v120 r900/300:g0.6 s*:Bv,22,w'),
       station('Libramont', 2, 'left', 'ardennes'),
-      ...leg(3400, 's300:v120:bardennes l900/300:g-0.8 s*:Br,10,w r1000/320 s500:T:v120 l1100/300:bforest s*:X'),
-      station('Namur', 3, 'right', 'river'),
-      ...leg(2800, 's300:v100:briver r1200/300 s*:v140:bfarmland l1500/300:g0.3 s*:X r1400/300 s300:v100:bsuburb'),
+      ...leg(3400, 's300:v120:bardennes l900/300:g-0.8 s*:Br,10,w r1000/320 s500:T:v120 l1100/300:bforest s*:X:bsuburb s150:bcity'),
+      station('Namur', 3, 'right', 'city'),
+      ...leg(2800, 's300:v100:bcity r1200/300:briver s*:v140:bfarmland l1500/300:g0.3 s*:X r1400/300 s300:v100:bsuburb'),
       station('Bruxelles-Midi', 3, 'left', 'city', true),
     ]
   );

@@ -1120,7 +1120,11 @@
     const BACK = k.edge + k.W;
     platformSurface(k, 'grey');
     building(k, { lat0: BACK + 3.2, lat1: BACK + 12.6, z0: 6, z1: 34, floors: 2, floorH: 3.7, cfg: { wall: '#d2d9bd', trim: '#efe2c4', frame: '#efe9d6', glass: '#5a4038', arch: true, ww: 0.4, band: 'rgba(214,160,140,0.55)', plinth: '#c8a98c', seed: 4 }, trim: '#e9d4b4', roof: { type: 'hip', h: 3.2, col: '#444b54', chimney: [14, 26] } });
-    k.box(k.vc, BACK + 4.5, 2.0, 46, 3.6, 4.2, 4.2, k.col('#1d2023'));
+    // black technical cube: charcoal body (never a pure-black void), pale roof cap, service door and vent on the platform face
+    k.box(k.vc, BACK + 4.5, 2.0, 46, 3.6, 4.2, 4.2, k.col('#2b2f34'));
+    k.box(k.vc, BACK + 4.5, 4.28, 46, 3.9, 0.22, 4.5, k.col('#6a7076'));
+    k.box(k.vc, BACK + 2.66, 1.05, 45.2, 0.08, 2.1, 1.1, k.col('#575d63'));
+    k.box(k.vc, BACK + 2.66, 3.3, 47.2, 0.08, 0.5, 1.4, k.col('#454a50'));
     shelter(k, k.edge + 3.2, -12, 6, 2.0, '#a8262e', true);
     stairCanopy(k, { lat: k.edge + 3.4, z: -34, col: '#7a2430', w: 2.6, len: 5.5 });
     furnish(k, { totems: [4], voie: [['Voie 1', -22], ['Voie 1', 28]], benches: [20, -45], bins: [10] });

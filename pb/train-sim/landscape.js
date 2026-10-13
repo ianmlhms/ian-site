@@ -9,6 +9,7 @@ window.TS = window.TS || {};
   const CHUNK = 250;               // metres of track per streamed chunk
   const ROW_STEP = 10;             // terrain row spacing along the track
   const CORRIDOR_FLAT = 5.5;       // formation half-width under the track
+  const TREE_CLEAR_LAT = 17.5;     // no tree trunks closer than this to the track axis: the chase camera sits ~10 m to the side, ~4 m up and used to end up inside a crown
   const FLAT_UV = 0.03;            // uv pointing at a plain patch of every facade texture
 
   const TUFTS = { high: 800, medium: 400, low: 0 };
@@ -169,7 +170,7 @@ window.TS = window.TS || {};
 
   /* ---------- merged-geometry builder (vertex colours baked, uv in metres) ---------- */
   class MB {
-    constructor() { this.p = []; this.n = []; this.u = []; this.c = []; this.i = []; }
+    constructor(faceUp) { this.p = []; this.n = []; this.u = []; this.c = []; this.i = []; this.faceUp = !!faceUp; }   // faceUp: roof builder, surfaces that point downwards are flipped (the shadow normal bias pushes along the vertex normal, so inward normals turned roofs black)
     get count() { return this.p.length / 3; }
     get empty() { return this.p.length === 0; }
     addGeo(geo, m, color, flat) {
@@ -187,8 +188,9 @@ window.TS = window.TS || {};
     }
     /* a,b,c,d: THREE.Vector3 in local space (any winding, materials are double sided). uvs [[u,v]*4] */
     quad(m, a, b, c, d, uvs, color) {
-      const pts = [a, b, c, d].map(q => q.clone().applyMatrix4(m));
+      let pts = [a, b, c, d].map(q => q.clone().applyMatrix4(m));
       const n = new T.Vector3().subVectors(pts[1], pts[0]).cross(new T.Vector3().subVectors(pts[2], pts[0])).normalize();
+      if (this.faceUp && n.y < -0.001) { pts = [pts[0], pts[3], pts[2], pts[1]]; n.negate(); if (uvs) uvs = [uvs[0], uvs[3], uvs[2], uvs[1]]; }
       const base = this.count;
       for (let k = 0; k < 4; k++) {
         this.p.push(pts[k].x, pts[k].y, pts[k].z); this.n.push(n.x, n.y, n.z); this.c.push(color.r, color.g, color.b);
@@ -197,8 +199,9 @@ window.TS = window.TS || {};
       this.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
     tri(m, a, b, c, uvs, color) {
-      const pts = [a, b, c].map(q => q.clone().applyMatrix4(m));
+      let pts = [a, b, c].map(q => q.clone().applyMatrix4(m));
       const n = new T.Vector3().subVectors(pts[1], pts[0]).cross(new T.Vector3().subVectors(pts[2], pts[0])).normalize();
+      if (this.faceUp && n.y < -0.001) { pts = [pts[0], pts[2], pts[1]]; n.negate(); if (uvs) uvs = [uvs[0], uvs[2], uvs[1]]; }
       const base = this.count;
       for (let k = 0; k < 3; k++) {
         this.p.push(pts[k].x, pts[k].y, pts[k].z); this.n.push(n.x, n.y, n.z); this.c.push(color.r, color.g, color.b);
@@ -367,7 +370,7 @@ window.TS = window.TS || {};
         const a = corners[k], b = corners[(k + 1) % 4], ai = [Math.sign(a[0]) * (hw - inset), Math.sign(a[1]) * (hd - inset)], bi = [Math.sign(b[0]) * (hw - inset), Math.sign(b[1]) * (hd - inset)];
         rb.quad(m, P(a[0], H, a[1]), P(b[0], H, b[1]), P(bi[0], H + mh, bi[1]), P(ai[0], H + mh, ai[1]), [[0, 0], [Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.5, 0], [Math.hypot(bi[0] - ai[0], bi[1] - ai[1]) / 1.5, mh / 1.5], [0, mh / 1.5]], col);
       }
-      rb.quad(m, P(-hw + inset, H + mh, -hd + inset), P(hw - inset, H + mh, -hd + inset), P(hw - inset, H + mh, hd - inset), P(-hw + inset, H + mh, hd - inset), null, col);
+      rb.quad(m, P(-hw + inset, H + mh, -hd + inset), P(hw - inset, H + mh, -hd + inset), P(hw - inset, H + mh, hd - inset), P(-hw + inset, H + mh, hd - inset), [[0, 0], [(w - 2 * inset) / 1.5, 0], [(w - 2 * inset) / 1.5, (d - 2 * inset) / 1.5], [0, (d - 2 * inset) / 1.5]], col);
       for (let k = 0; k < Math.floor(w / 6); k++) wb.addGeo(new T.BoxGeometry(1.4, 1.6, 1.2), at(-w / 2 + 3 + k * 6, H + 1.2, d / 2 - 1.5), tint, true);
     } else {
       wb.addGeo(new T.BoxGeometry(w + 0.5, 0.6, d + 0.5), at(0, H + 0.3, 0), C('#a8a49a'), true);
@@ -521,7 +524,7 @@ window.TS = window.TS || {};
     return { top: mixColor(a.top, b.top, t), hor: mixColor(a.hor, b.hor, t), hemiSky: mixColor(a.hemiSky, b.hemiSky, t), hemiGnd: mixColor(a.hemiGnd, b.hemiGnd, t), hemiI: lerp(a.hemiI, b.hemiI, t), sun: mixColor(a.sun, b.sun, t) };
   }
 
-  const SKY_VERT = `varying vec3 vDir; void main(){ vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; gl_Position.z = p.w * 0.99999; }`;
+  const SKY_VERT = `varying vec3 vDir; void main(){ vDir = position; mat4 mv = modelViewMatrix; mv[3] = vec4(0.0, 0.0, 0.0, 1.0); /* always centred on the eye: no translucent dome when a camera sits far from the sky mesh */ vec4 p = projectionMatrix * mv * vec4(position, 1.0); gl_Position = p.xyww; gl_Position.z = p.w * 0.99999; }`;
   const SKY_FRAG = `
     uniform vec3 uTop, uHor, uSunDir, uSunCol, uMoonDir, uCloudLit, uCloudDark; uniform float uNight, uCloud, uTime, uSunVis, uMoonVis;
     varying vec3 vDir;
@@ -858,7 +861,7 @@ window.TS = window.TS || {};
       const occ = [], woods = [], chunkRoads = [];
       const isOcc = (sa, sb, la, lb) => occ.some(o => sa < o.s1 && sb > o.s0 && Math.min(la, lb) < o.l1 && Math.max(la, lb) > o.l0);
       const markOcc = (sa, sb, la, lb) => occ.push({ s0: sa, s1: sb, l0: Math.min(la, lb), l1: Math.max(la, lb) });
-      const mbHouse = new MB(), mbBlock = new MB(), mbRoof = new MB(), mbRoad = new MB(), mbWater = new MB(), mbSmoke = new MB();
+      const mbHouse = new MB(), mbBlock = new MB(), mbRoof = new MB(true), mbRoad = new MB(), mbWater = new MB(), mbSmoke = new MB();
       const fieldMB = { rows: new MB(), vines: new MB(), meadow: new MB() };
       const trees = { oak: [], beech: [], birch: [], spruce: [], poplar: [], bush: [], tuft: [], cow: [], sheep: [], lampPole: [], lampHead: [] };
       const bMid = biomeAt(sMid), bStart = biomeAt(s0 + 5), bEnd = biomeAt(s1 - 5);
@@ -1086,7 +1089,7 @@ window.TS = window.TS || {};
       const nAttempt = Math.round((wild ? 1150 : 600) * Q.trees);
       for (let n = 0; n < nAttempt; n++) {
         const s = s0 + rng() * CHUNK, side = rng() < 0.5 ? -1 : 1;
-        const lmin = nearStation(s, 25) ? 18 : 9.5, lat = side * (lmin + (W - 8 - lmin) * Math.pow(rng(), 1.3));
+        const lmin = nearStation(s, 25) ? 18 : TREE_CLEAR_LAT, lat = side * (lmin + (W - 8 - lmin) * Math.pow(rng(), 1.3));
         const info = rowInfo(s), pal = PAL[info.biome] || PAL.farmland;
         if (inTunnel(s, 15)) continue;
         let accept = pal.trees;
@@ -1104,7 +1107,7 @@ window.TS = window.TS || {};
       // tree belt right beside the track in open country (gives depth to the cab view)
       if (!cityBiomes && !wild && bMid !== 'industrial') for (let s = s0 + 4; s < s1; s += 7 + rng() * 8) {
         if (rng() > 0.45 * Q.trees + 0.15 || nearStation(s, 30) || inTunnel(s, 20) || inBridge(s, 30)) continue;
-        const side = rng() < 0.5 ? -1 : 1, p = place(s, side * (11 + rng() * 6)), nm = pickSpecies('def', rng()), sc = SPECIES_SCALE[nm];
+        const side = rng() < 0.5 ? -1 : 1, p = place(s, side * (TREE_CLEAR_LAT + 1 + rng() * 6)), nm = pickSpecies('def', rng()), sc = SPECIES_SCALE[nm];
         addTree(nm, p.x, p.y - 0.15, p.z, lerp(sc[0], sc[1], rng()), rng);
       }
 
@@ -1227,6 +1230,7 @@ window.TS = window.TS || {};
       farMeshes.push(level); return level;
     }
     const farL1 = makeFarLevel(24, 64, 0, 2), farL2 = makeFarLevel(96, 64, 720, 4);
+    let flatY = null;
     const flat = new T.Mesh(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshLambertMaterial({ color: '#6f8f48' }));
     flat.scale.set(80000, 1, 80000); flat.frustumCulled = false; flat.renderOrder = -3; root.add(flat);
     // soften far-away white: the flat plane takes the average far colour
@@ -1414,7 +1418,11 @@ window.TS = window.TS || {};
       const moved1 = farL1.update(camPos.x, camPos.z, firstUpdate), moved2 = farL2.update(camPos.x, camPos.z, firstUpdate);
       void moved1; void moved2;
       farL1.mat.color.copy(farTint).multiplyScalar(wetFactor); farL2.mat.color.copy(farTint).multiplyScalar(wetFactor);
-      flat.position.set(camPos.x, baseY - 12.5, camPos.z); flat.material.color.copy(farTint).multiplyScalar(0.42);
+      // safety plane under the far terrain: 12.5 m below the track, but well below the valley floor on bridges and viaducts (it used to hang between the deck and the valley and hid it)
+      let flatTarget = baseY - 12.5;
+      for (const br of (track.bridges || [])) if (s > br.s0 - 140 && s < br.s1 + 140 && Number.isFinite(br.h)) flatTarget = Math.min(flatTarget, baseY - br.h - 6);
+      flatY = flatY === null || firstUpdate ? flatTarget : flatY + (flatTarget - flatY) * (1 - Math.exp(-dt * 2.5));
+      flat.position.set(camPos.x, flatY, camPos.z); flat.material.color.copy(farTint).multiplyScalar(0.42);
       const farPlane = camera && camera.far ? camera.far : 6000, capChanged = Math.abs(visCap - farPlane * 0.8) > 1; if (capChanged) visCap = farPlane * 0.8;
       // weather easing
       const k = 1 - Math.exp(-dt * (firstUpdate ? 100 : 0.8)), tw = wxTarget;

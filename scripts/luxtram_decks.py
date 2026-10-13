@@ -1,4 +1,7 @@
-"""Orthophoto clean-up under the big named Luxtram bridges (Pont Grande-Duchesse Charlotte / "Red Bridge", Pont Adolphe).
+"""OBSOLETE since the painted-ground round (no orthophoto is shipped any more; the bridge decks are meshed from the LiDAR deck profile, see
+scripts/build_luxtram_ground.py and pb/train-sim/luxtram-ground.js).  Kept for reference only.
+
+Orthophoto clean-up under the big named Luxtram bridges (Pont Grande-Duchesse Charlotte / "Red Bridge", Pont Adolphe).
 
 The national orthophoto is a true ortho: the bridge deck (carriageways, cycle path, parapets) is photographed where the deck is, 40-70 m above
 the valley.  Draped on the terrain that image paints the deck's road lanes on the valley floor, and the real valley road / river / forest below

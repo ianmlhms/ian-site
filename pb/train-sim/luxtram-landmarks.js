@@ -46,11 +46,12 @@
    * 2048 x 1024, 8 x 4 cells of 256 px. Cell index -> uv rectangle; day atlas + a half-size emissive atlas (lit windows at night). */
   const CELL = 256;
   const COLS = 8;
-  const ROWS = 6;
+  const ROWS = 11;
   const CELL_NAMES = ['plain', 'curtain0', 'curtain1', 'curtain2', 'curtain3', 'punched0', 'punched1', 'punched2', 'punched3',
     'ribbon0', 'ribbon1', 'ribbon2', 'ribbon3', 'gold0', 'gold1', 'ashlar', 'slate', 'roofGrey', 'diamond', 'glassroof', 'columns',
     'corrug', 'pave', 'glow', 'greenroof', 'shell', 'clock', 'curtainLo', 'punchedLo', 'ribbonLo', 'goldLo', 'brick', 'plaza', 'panel', 'metal', 'flags', 'fins', 'blinds',
-    'balust', 'hexfrieze', 'schist', 'lights', 'awning', 'sign'];
+    'balust', 'hexfrieze', 'schist', 'lights', 'awning', 'sign',
+    'stonewin0', 'stonewin1', 'stonewin2', 'stonewin3', 'rust0', 'rust1', 'shop0', 'shop1', 'shop2', 'parkdeck', 'cladpanel0', 'cladpanel1', 'brickwin0', 'brickwin1', 'brickwin2', 'hotelbal0', 'hotelbal1', 'hotelbal2', 'louvre', 'concretebd', 'tiles', 'copper', 'terra0', 'terra1', 'bnlbase', 'txt0', 'txt1', 'txt2', 'txt3', 'txt4', 'txt5', 'txt6', 'txt7', 'timber', 'lace', 'hexwin', 'churchwin0', 'churchwin1', 'churchwin2', 'slatespire', 'corten', 'darkfin', 'goldblack', 'sandblock'];
   const CELL_INDEX = {};
   CELL_NAMES.forEach((n, i) => { CELL_INDEX[n] = i; });
   const UV_PAD = 3 / 2048; // keeps bilinear/mip sampling inside the cell
@@ -260,17 +261,17 @@
       }
       noise(g, x, y, CELL, CELL, 700, 0.05, 2, 132);
     },
-    schist(g, x, y, lit) { // grey-green slate rubble masonry
+    schist(g, x, y, lit) { // grey-green slate rubble masonry: many small stones in close tones (large high-contrast blobs read as camouflage from the tram)
       if (lit) return;
-      g.fillStyle = '#6f7a7d'; g.fillRect(x, y, CELL, CELL);
+      g.fillStyle = '#6a7578'; g.fillRect(x, y, CELL, CELL);
       const r = mulberry(141);
-      for (let i = 0; i < 70; i++) {
-        const cx = x + r() * CELL; const cy = y + r() * CELL; const rw = 14 + r() * 24; const rh = 8 + r() * 14;
-        const v = 92 + r() * 54; g.fillStyle = 'rgb(' + (v | 0) + ',' + ((v + 6) | 0) + ',' + ((v + 8) | 0) + ')';
+      for (let i = 0; i < 190; i++) {
+        const cx = x + r() * CELL; const cy = y + r() * CELL; const rw = 6 + r() * 9; const rh = 3.5 + r() * 5;
+        const v = 104 + r() * 30; g.fillStyle = 'rgb(' + (v | 0) + ',' + ((v + 5) | 0) + ',' + ((v + 7) | 0) + ')';
         g.beginPath(); g.moveTo(cx - rw, cy); g.lineTo(cx - rw * 0.4, cy - rh); g.lineTo(cx + rw * 0.6, cy - rh * 0.8); g.lineTo(cx + rw, cy + rh * 0.2); g.lineTo(cx + rw * 0.2, cy + rh); g.lineTo(cx - rw * 0.7, cy + rh * 0.7); g.fill();
       }
-      g.strokeStyle = 'rgba(30,36,38,0.35)'; g.lineWidth = 1.5;
-      for (let i = 0; i < 40; i++) { const yy = y + r() * CELL; g.beginPath(); g.moveTo(x + r() * 40, yy); g.lineTo(x + 180 + r() * 76, yy + (r() - 0.5) * 6); g.stroke(); }
+      g.strokeStyle = 'rgba(30,36,38,0.18)'; g.lineWidth = 1;
+      for (let i = 0; i < 14; i++) { const yy = y + 4 + i * 9 + r() * 3; g.beginPath(); g.moveTo(x, yy); g.lineTo(x + CELL, yy + (r() - 0.5) * 2); g.stroke(); }
     },
     lights(g, x, y, lit) { // 4 x 4 solid colour swatches (bulbs / neon): emissive at night
       const cs = ['#ff2a2a', '#ff7a1a', '#ffd21a', '#c6ff2a', '#2aff5a', '#1affd8', '#2ab4ff', '#2a4aff', '#8a2aff', '#ff2ae6', '#ff7aa8', '#ffffff', '#fff0b0', '#ffb347', '#7fffd4', '#b0b0ff'];
@@ -390,6 +391,248 @@
       }
     },
   };
+  /* ---- P-LANDMARK additions: historic stone, shopfronts, car parks, clad panels, brick, hotel balconies, louvres, cast concrete, tiles, copper */
+  const winGlass = (g, wx, wy, ww, wh, tint) => {
+    const grd = g.createLinearGradient(wx, wy, wx + ww, wy + wh);
+    grd.addColorStop(0, tint ? tint[0] : '#7a93a3'); grd.addColorStop(0.5, tint ? tint[1] : '#34495b'); grd.addColorStop(1, tint ? tint[2] : '#1e2c38');
+    g.fillStyle = grd; g.fillRect(wx, wy, ww, wh);
+    g.fillStyle = 'rgba(255,255,255,0.2)';
+    g.beginPath(); g.moveTo(wx, wy + wh * 0.62); g.lineTo(wx + ww * 0.62, wy); g.lineTo(wx + ww, wy); g.lineTo(wx, wy + wh * 0.96); g.fill();
+  };
+  PAINT.stonewin = function (g, x, y, lit, v) { // 19th-century stone bay: tall window with architrave + sill (v1 iron balcony, v2 shutters, v3 pediment)
+    const ww = 100; const wh = 156; const wx = x + 78; const wy = y + 54;
+    if (lit) { g.fillStyle = v === 2 ? '#ffe6b0' : '#ffd88a'; if (v !== 0 || ((x * 7 + y) >> 8) % 3 !== 0) g.fillRect(wx, wy, ww, wh); return; }
+    g.fillStyle = '#ece3cd'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 1100, 0.045, 2, 150 + v);
+    g.fillStyle = 'rgba(120,100,60,0.16)'; for (let k = 32; k < CELL; k += 64) g.fillRect(x, y + k, CELL, 2); // faint ashlar joints
+    g.fillStyle = '#f7f1e0'; g.fillRect(x, y + CELL - 16, CELL, 8); g.fillStyle = 'rgba(70,56,30,0.35)'; g.fillRect(x, y + CELL - 8, CELL, 8); // string course
+    g.fillStyle = '#f7f1e2'; g.fillRect(wx - 12, wy - 10, ww + 24, wh + 14); // architrave
+    g.fillStyle = 'rgba(80,64,34,0.3)'; g.fillRect(wx + ww + 8, wy - 8, 4, wh + 12);
+    g.fillStyle = '#f3ecd9'; g.fillRect(wx - 20, wy - 22, ww + 40, 14); g.fillStyle = 'rgba(80,64,34,0.35)'; g.fillRect(wx - 20, wy - 10, ww + 40, 3); // lintel
+    g.fillStyle = '#e4d9bf'; g.fillRect(wx + ww / 2 - 7, wy - 24, 14, 12); // keystone
+    if (v === 3) { g.fillStyle = '#f5eed8'; g.beginPath(); g.moveTo(wx - 24, wy - 22); g.lineTo(wx + ww / 2, wy - 50); g.lineTo(wx + ww + 24, wy - 22); g.fill(); g.fillStyle = 'rgba(80,64,34,0.3)'; g.beginPath(); g.moveTo(wx - 8, wy - 24); g.lineTo(wx + ww / 2, wy - 42); g.lineTo(wx + ww + 8, wy - 24); g.fill(); }
+    if (v === 2) { [-1, 1].forEach((sd) => { const sx = sd < 0 ? wx - 38 : wx + ww + 14; g.fillStyle = '#3f5a40'; g.fillRect(sx, wy - 6, 24, wh + 6); g.fillStyle = 'rgba(0,0,0,0.25)'; for (let k = 0; k < 16; k++) g.fillRect(sx, wy - 4 + k * 10, 24, 2); }); }
+    winGlass(g, wx, wy, ww, wh);
+    g.fillStyle = '#f2efe6'; g.fillRect(wx + ww / 2 - 3, wy, 6, wh); g.fillRect(wx, wy + wh * 0.3, ww, 5); g.fillRect(wx, wy, ww, 4); g.fillRect(wx, wy + wh - 4, ww, 4); g.fillRect(wx, wy, 4, wh); g.fillRect(wx + ww - 4, wy, 4, wh);
+    g.fillStyle = '#d2c5a6'; g.fillRect(wx - 18, wy + wh, ww + 36, 12); g.fillStyle = 'rgba(60,46,22,0.4)'; g.fillRect(wx - 18, wy + wh + 12, ww + 36, 5); // sill
+    if (v === 1) { // wrought-iron balcony in front of the lower sash
+      g.fillStyle = '#d9cdb2'; g.fillRect(wx - 30, wy + wh - 4, ww + 60, 12);
+      g.fillStyle = '#25282b'; g.fillRect(wx - 30, wy + wh - 58, ww + 60, 4);
+      for (let k = 0; k <= 15; k++) g.fillRect(wx - 30 + k * ((ww + 56) / 15), wy + wh - 56, 3, 52);
+      g.fillRect(wx - 30, wy + wh - 30, ww + 60, 3);
+    }
+  };
+  PAINT.rust = function (g, x, y, lit, v) { // rusticated stone base storey with an arched opening (v0 window, v1 door)
+    if (lit) { if (v === 0) { g.fillStyle = '#ffd88a'; g.fillRect(x + 88, y + 90, 80, 130); } return; }
+    g.fillStyle = '#e1d6bc'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 1300, 0.06, 2, 160 + v);
+    g.strokeStyle = 'rgba(90,72,40,0.5)'; g.lineWidth = 3;
+    for (let row = 0; row < 8; row++) { const yy = y + row * 32; g.beginPath(); g.moveTo(x, yy); g.lineTo(x + CELL, yy); g.stroke(); const off = (row % 2) * 48; for (let bx = off; bx < CELL; bx += 96) { g.beginPath(); g.moveTo(x + bx, yy); g.lineTo(x + bx, yy + 32); g.stroke(); } }
+    const ax = x + 78; const aw = 100; const top = y + 60; const bot = y + CELL;
+    g.fillStyle = '#efe6cf'; g.beginPath(); g.moveTo(ax - 10, bot); g.lineTo(ax - 10, top + aw / 2); g.arc(ax + aw / 2, top + aw / 2, aw / 2 + 10, Math.PI, 0); g.lineTo(ax + aw + 10, bot); g.fill();
+    if (v === 1) { g.fillStyle = '#3a2418'; g.beginPath(); g.moveTo(ax, bot); g.lineTo(ax, top + aw / 2); g.arc(ax + aw / 2, top + aw / 2, aw / 2, Math.PI, 0); g.lineTo(ax + aw, bot); g.fill(); g.fillStyle = '#c8a24c'; g.fillRect(ax + aw / 2 - 2, top + 40, 4, bot - top - 60); g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(ax + 8, top + aw / 2 + 4, aw / 2 - 12, bot - top - aw / 2 - 10); }
+    else { g.fillStyle = '#2a3b4a'; g.beginPath(); g.moveTo(ax, bot - 40); g.lineTo(ax, top + aw / 2); g.arc(ax + aw / 2, top + aw / 2, aw / 2, Math.PI, 0); g.lineTo(ax + aw, bot - 40); g.fill(); g.fillStyle = '#ece4d0'; g.fillRect(ax + aw / 2 - 2, top, 4, bot - 40 - top); g.fillRect(ax, top + aw / 2 + 6, aw, 4); g.fillStyle = '#c9bd9e'; g.fillRect(ax - 14, bot - 40, aw + 28, 12); g.fillStyle = '#2c2a26'; g.fillRect(ax, bot - 28, aw, 28); for (let k = 0; k < 8; k++) { g.fillStyle = '#4a4a46'; g.fillRect(ax + 6 + k * 12, bot - 26, 3, 26); } }
+  };
+  PAINT.shop = function (g, x, y, lit, v) { // ground-floor retail: sign band on top, big display windows (v0 two windows, v1 door right, v2 dark glazing + awning)
+    if (lit) { g.fillStyle = v === 2 ? '#ffe9bd' : '#fff2cf'; g.fillRect(x + 12, y + 64, v === 1 ? 140 : CELL - 24, 150); if (v === 1) { g.fillStyle = '#fff6dc'; g.fillRect(x + 168, y + 64, 74, 190); } return; }
+    g.fillStyle = '#d9d5cc'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 600, 0.04, 2, 170 + v);
+    g.fillStyle = v === 2 ? '#202a34' : '#2e3338'; g.fillRect(x, y + 6, CELL, 46); // sign board
+    g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(x + 20, y + 20, CELL - 40, 18);
+    if (v === 2) { g.fillStyle = '#b6342f'; for (let k = 0; k < 8; k++) if (k % 2 === 0) g.fillRect(x + k * 32, y + 52, 32, 14); g.fillStyle = '#f2ede2'; for (let k = 0; k < 8; k++) if (k % 2) g.fillRect(x + k * 32, y + 52, 32, 14); }
+    const gw = v === 1 ? 140 : CELL - 24;
+    winGlass(g, x + 12, y + 68, gw, 148, v === 2 ? ['#55697a', '#273746', '#18222b'] : ['#9bb4c3', '#5c7a8d', '#33495a']);
+    g.fillStyle = '#4c5258'; for (let k = 0; k <= (v === 1 ? 2 : 3); k++) g.fillRect(x + 10 + k * (gw / (v === 1 ? 2 : 3)), y + 66, 5, 152);
+    g.fillRect(x + 10, y + 66, gw + 4, 5);
+    g.fillStyle = '#80868b'; g.fillRect(x, y + 218, CELL, 38); // plinth
+    if (v === 1) { g.fillStyle = '#3d4348'; g.fillRect(x + 164, y + 60, 82, 196); winGlass(g, x + 172, y + 70, 66, 180, ['#a8bfcd', '#58788c', '#2f4556']); g.fillStyle = '#ccd0d2'; g.fillRect(x + 228, y + 150, 4, 30); }
+  };
+  PAINT.parkdeck = function (g, x, y, lit) { // open car park: concrete slabs, dark openings with a steel safety rail, posts
+    if (lit) return;
+    g.fillStyle = '#bdbab2'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 900, 0.05, 2, 180);
+    g.fillStyle = '#d3d0c8'; g.fillRect(x, y, CELL, 30); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x, y + 30, CELL, 8);
+    const grd = g.createLinearGradient(x, y + 40, x, y + 216); grd.addColorStop(0, '#2c2d2f'); grd.addColorStop(1, '#515255'); g.fillStyle = grd; g.fillRect(x, y + 40, CELL, 176);
+    g.fillStyle = '#f0f0ee'; g.fillRect(x, y + 150, CELL, 6); g.fillStyle = '#4d4f52'; g.fillRect(x, y + 156, CELL, 5);
+    for (let k = 0; k < 8; k++) { g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(x + k * 32 + 4, y + 48, 4, 98); }
+    g.fillStyle = '#c9c6be'; g.fillRect(x, y + 20, 40, 196); g.fillRect(x + CELL - 40, y + 20, 40, 196); // posts
+    g.fillStyle = '#d3d0c8'; g.fillRect(x, y + 216, CELL, 40); g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x, y + 216, CELL, 6);
+  };
+  PAINT.cladpanel = function (g, x, y, lit, v) { // light cladding panels with two tall slot windows (Kirchberg 2000s offices)
+    if (lit) { if (v !== 1) return; g.fillStyle = '#ffe0a0'; g.fillRect(x + 54, y + 36, 38, 170); g.fillRect(x + 164, y + 36, 38, 170); return; }
+    g.fillStyle = '#dcdedd'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 600, 0.03, 2, 190 + v);
+    g.strokeStyle = 'rgba(70,76,80,0.45)'; g.lineWidth = 3; g.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2); g.beginPath(); g.moveTo(x + CELL / 2, y); g.lineTo(x + CELL / 2, y + CELL); g.stroke();
+    [x + 54, x + 164].forEach((wx) => { winGlass(g, wx, y + 36, 38, 170, ['#8fa9b8', '#41596b', '#26384a']); g.fillStyle = '#c4c8c8'; g.fillRect(wx - 4, y + 206, 46, 8); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(wx - 4, y + 28, 46, 8); });
+  };
+  PAINT.brickwin = function (g, x, y, lit, v) { // brick facade, white-framed windows
+    if (lit) { if (v === 2) return; g.fillStyle = '#ffd68a'; g.fillRect(x + 84, y + 60, 88, 130); return; }
+    g.fillStyle = '#a95f47'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(200 + v);
+    for (let row = 0; row < 24; row++) for (let k = 0; k < 8; k++) { const q = 0.82 + r() * 0.3; g.fillStyle = 'rgb(' + ((176 * q) | 0) + ',' + ((98 * q) | 0) + ',' + ((76 * q) | 0) + ')'; g.fillRect(x + k * 32 + (row % 2) * 16 - 16 + 1, y + row * 10.7 + 1, 30, 8.7); }
+    g.fillStyle = '#efece4'; g.fillRect(x + 76, y + 52, 104, 146); winGlass(g, x + 84, y + 60, 88, 130); g.fillStyle = '#efece4'; g.fillRect(x + 124, y + 60, 8, 130); g.fillRect(x + 84, y + 110, 88, 6); g.fillRect(x + 66, y + 198, 124, 10);
+    if (v === 1) { g.fillStyle = '#e3dfd4'; g.fillRect(x, y + CELL - 14, CELL, 14); }
+  };
+  PAINT.hotelbal = function (g, x, y, lit, v) { // balcony facade: slab band, glazed door + glass balustrade, painted render
+    if (lit) { g.fillStyle = '#ffe2a6'; g.fillRect(x + 70, y + 40, 116, 170); return; }
+    g.fillStyle = v === 1 ? '#d9d4c8' : '#e9e6df'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 700, 0.04, 2, 210 + v);
+    g.fillStyle = '#c9c6bf'; g.fillRect(x, y + 214, CELL, 42); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x, y + 256 - 6, CELL, 6); // balcony slab
+    winGlass(g, x + 70, y + 40, 116, 170, ['#9db6c4', '#456276', '#2a3d4d']);
+    g.fillStyle = '#eceeed'; g.fillRect(x + 124, y + 40, 8, 170); g.fillRect(x + 70, y + 40, 116, 6);
+    g.fillStyle = 'rgba(200,225,235,0.55)'; g.fillRect(x + 40, y + 150, 176, 64); g.fillStyle = '#9aa4a8'; g.fillRect(x + 40, y + 148, 176, 4); // glass balustrade
+    if (v === 2) { g.fillStyle = '#7c5f48'; g.fillRect(x, y + 214, CELL, 6); }
+  };
+  PAINT.louvre = function (g, x, y, lit) { // glass wall behind slim aluminium fins (subtle: pale fins, soft shadows)
+    if (lit) { g.fillStyle = '#ffe8b8'; g.fillRect(x + 8, y + 20, CELL - 16, 150); return; }
+    g.fillStyle = '#d4d9db'; g.fillRect(x, y, CELL, CELL);
+    winGlass(g, x + 8, y + 20, CELL - 16, 150, ['#8aa3b3', '#4a6377', '#2f4254']);
+    for (let k = 0; k < 8; k++) { g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x + 8 + k * 31 + 5, y + 20, 3, 150); g.fillStyle = '#e9edef'; g.fillRect(x + 8 + k * 31, y + 20, 5, 150); }
+    g.fillStyle = '#a9b1b5'; g.fillRect(x, y + 170, CELL, 5); g.fillStyle = '#e3e7e8'; g.fillRect(x, y + 175, CELL, 81);
+  };
+  PAINT.concretebd = function (g, x, y, lit) { // board-marked concrete with a deep ribbon window
+    if (lit) { g.fillStyle = '#ffe3a6'; g.fillRect(x + 6, y + 82, CELL - 12, 90); return; }
+    g.fillStyle = '#c4c2bb'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 1400, 0.05, 2, 220);
+    g.fillStyle = 'rgba(70,66,58,0.18)'; for (let k = 0; k < 16; k++) g.fillRect(x, y + k * 16, CELL, 2);
+    g.fillStyle = '#9d9b94'; g.fillRect(x, y + 70, CELL, 14); winGlass(g, x + 6, y + 84, CELL - 12, 88, ['#7e95a3', '#3b5163', '#243443']);
+    g.fillStyle = '#d4d2cb'; for (let k = 0; k <= 3; k++) g.fillRect(x + 4 + k * 82, y + 84, 6, 88); g.fillStyle = '#a5a39b'; g.fillRect(x, y + 172, CELL, 12);
+  };
+  PAINT.tiles = function (g, x, y, lit) { // red clay roof tiles
+    if (lit) return;
+    g.fillStyle = '#9c4c36'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(230);
+    for (let row = 0; row < 16; row++) for (let k = 0; k < 10; k++) { const q = 0.8 + r() * 0.35; g.fillStyle = 'rgb(' + ((170 * q) | 0) + ',' + ((84 * q) | 0) + ',' + ((58 * q) | 0) + ')'; g.fillRect(x + k * 26 + (row % 2) * 13 - 13 + 1, y + row * 16 + 1, 24, 14); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x + k * 26 + (row % 2) * 13 - 13 + 1, y + row * 16 + 13, 24, 2); }
+  };
+  PAINT.copper = function (g, x, y, lit) { // verdigris standing-seam copper
+    if (lit) return;
+    g.fillStyle = '#5f9c8a'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 1500, 0.06, 2, 240);
+    for (let k = 0; k < 16; k++) { g.fillStyle = 'rgba(30,70,58,0.35)'; g.fillRect(x + k * 16, y, 2, CELL); g.fillStyle = 'rgba(190,225,210,0.18)'; g.fillRect(x + k * 16 + 2, y, 2, CELL); }
+  };
+  PAINT.terra = function (g, x, y, lit, v) { // BnL: terracotta-red rainscreen of irregular panels; FEW large deep-set windows in white frames (a cell spans ~3 storeys x 1 bay, mostly blank wall)
+    const wins = v === 0 ? [[22, 56, 46, 40]] : [[60, 22, 52, 30], [18, 92, 28, 24]];   // x, y, w, h inside the 128 cell
+    if (lit) { g.fillStyle = '#ffdc9a'; wins.forEach((w, i) => { if (i === 0 || v === 1) g.fillRect(x + w[0], y + w[1], w[2], w[3]); }); return; }
+    const r = mulberry(300 + v);
+    g.fillStyle = '#7d3222'; g.fillRect(x, y, CELL, CELL);
+    // staggered rainscreen panels in several terracotta / brick-red tones
+    const rowsY = [0, 42, 86, 128];
+    for (let j = 0; j < 3; j++) {
+      let px = -((r() * 40) | 0);
+      while (px < CELL) { const w = 40 + ((r() * 46) | 0); const q = 0.84 + r() * 0.34; g.fillStyle = 'rgb(' + ((214 * q) | 0) + ',' + ((106 * q) | 0) + ',' + ((78 * q) | 0) + ')'; g.fillRect(x + px + 1.5, y + rowsY[j] + 1.5, w - 3, rowsY[j + 1] - rowsY[j] - 3); px += w; }
+    }
+    noise(g, x, y, CELL, CELL, 500, 0.03, 2, 301);
+    wins.forEach((w) => {
+      g.fillStyle = '#f3ece0'; g.fillRect(x + w[0] - 7, y + w[1] - 7, w[2] + 14, w[3] + 14);                // thick white frame
+      g.fillStyle = '#9a9488'; g.fillRect(x + w[0] - 2, y + w[1] - 2, w[2] + 4, w[3] + 4);                    // reveal
+      winGlass(g, x + w[0] + 3, y + w[1] + 3, w[2] - 6, w[3] - 6, ['#6f8896', '#2d4252', '#1a2832']);
+      g.fillStyle = 'rgba(0,0,0,0.38)'; g.fillRect(x + w[0] - 2, y + w[1] - 2, w[2] + 4, 7); g.fillRect(x + w[0] - 2, y + w[1] - 2, 5, w[3] + 4);   // deep-set shadow (top / left)
+      g.fillStyle = 'rgba(60,20,12,0.28)'; g.fillRect(x + w[0] - 7, y + w[1] + w[3] + 7, w[2] + 14, 4);       // drip shadow under the frame
+    });
+  };
+  PAINT.bnlbase = function (g, x, y, lit) { // cream stone-slab frieze (multi-colour vertical tiles) above dark-framed glazing
+    if (lit) { g.fillStyle = '#ffe6b0'; g.fillRect(x + 10, y + 120, CELL - 20, 120); return; }
+    g.fillStyle = '#efe7d6'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(310); const cs = ['#2b2d31', '#6b6f75', '#c9a77a', '#8a6a4c', '#e8dcc6', '#a4a7ab', '#3a3f48', '#b88a5a'];
+    for (let k = 0; k < 12; k++) { for (let j = 0; j < 3; j++) { g.fillStyle = cs[(r() * cs.length) | 0]; g.fillRect(x + k * 21.3 + 1, y + 8 + j * 34, 19, 31); } }
+    g.fillStyle = '#d9d0bb'; g.fillRect(x, y + 114, CELL, 8);
+    winGlass(g, x + 10, y + 122, CELL - 20, 126, ['#5f7d8f', '#2d4252', '#1c2a35']);
+    g.fillStyle = '#4a3c2c'; for (let k = 0; k <= 4; k++) g.fillRect(x + 8 + k * 60, y + 120, 6, 134);
+    g.fillRect(x + 8, y + 120, CELL - 16, 6);
+  };
+  const TEXTS = [['AUCHAN', '#d6232a', '#ffffff'], ['KINEPOLIS', '#0d2c66', '#ffffff'], ['SOFITEL', '#1b2a52', '#d8b878'], ['NOVOTEL', '#1d3e8c', '#ffffff'], ['BIBLIOTHEQUE NATIONALE', '#efe7d6', '#8a6532'],
+    ['SPUERKEESS', '#e8e6e0', '#c8102e'], ['POST', '#fcd116', '#1a1a1a'], ['MARRIOTT', '#7b1426', '#ffffff']];
+  PAINT.txt = function (g, x, y, lit, v) { // wide name board drawn 4x narrow so a 4:1 quad reads undistorted
+    const t = TEXTS[v] || TEXTS[0];
+    g.save(); g.translate(x, y); g.scale(0.25, 1);
+    if (!lit) { g.fillStyle = t[1]; g.fillRect(0, 0, 1024, 256); }
+    g.fillStyle = lit ? '#ffffff' : t[2]; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = 150; g.font = 'bold ' + fs + 'px Arial, Helvetica, sans-serif';
+    while (g.measureText(t[0]).width > 940 && fs > 40) { fs -= 8; g.font = 'bold ' + fs + 'px Arial, Helvetica, sans-serif'; }
+    g.fillText(t[0], 512, 136);
+    g.restore();
+  };
+  PAINT.timber = function (g, x, y, lit) { // weathered larch boards (silver-grey brown, fine vertical grain) over a glazed lower band (CFL workshop halls, ref compare/p-landmark/cflat.jpg)
+    if (lit) return;
+    g.fillStyle = '#8f8068'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(320);
+    for (let k = 0; k < 32; k++) { const q = 0.86 + r() * 0.26; g.fillStyle = 'rgb(' + ((150 * q) | 0) + ',' + ((130 * q) | 0) + ',' + ((104 * q) | 0) + ')'; g.fillRect(x + k * 8, y, 7, CELL); g.fillStyle = 'rgba(50,40,28,0.28)'; g.fillRect(x + k * 8 + 7, y, 1, CELL); }
+    for (let k = 0; k < 60; k++) { g.fillStyle = 'rgba(60,46,30,0.14)'; g.fillRect(x + ((r() * 32) | 0) * 8, y + r() * CELL, 7, 1.2); }
+    // horizontal shadow lines every ~storey so the 18 m facade is not a plain wall
+    g.fillStyle = 'rgba(40,30,20,0.22)'; g.fillRect(x, y + 126, CELL, 2);
+  };
+  PAINT.lace = function (g, x, y, lit) { // Waassertuerm: white shell perforated with irregular lace-like cut-outs (grey-blue behind)
+    if (lit) return;
+    g.fillStyle = '#fbfaf6'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(331);
+    for (let i = 0; i < 22; i++) { const cx = x + r() * CELL; const cy = y + r() * CELL; const rw = 12 + r() * 16; const rh = 26 + r() * 44; const ang = (r() - 0.5) * 0.9; const col = r() > 0.6 ? '#7f8c96' : '#bcc6ce'; [[0, 0], [CELL, 0], [-CELL, 0], [0, CELL], [0, -CELL]].forEach((o) => { g.fillStyle = col; g.beginPath(); g.ellipse(cx + o[0], cy + o[1], rw, rh, ang, 0, 6.3); g.fill(); }); }
+  };
+  PAINT.hexwin = function (g, x, y, lit) { // 1970s bay: pale precast frame with a hexagonal window (Boulevard Royal 35-37)
+    const hex = (cx, cy, w, h) => { g.beginPath(); g.moveTo(cx - w, cy - h * 0.3); g.lineTo(cx - w * 0.5, cy - h); g.lineTo(cx + w * 0.5, cy - h); g.lineTo(cx + w, cy - h * 0.3); g.lineTo(cx + w, cy + h * 0.3); g.lineTo(cx + w * 0.5, cy + h); g.lineTo(cx - w * 0.5, cy + h); g.lineTo(cx - w, cy + h * 0.3); g.closePath(); };
+    if (lit) { g.fillStyle = '#ffe2a6'; hex(x + 128, y + 128, 62, 74); g.fill(); return; }
+    g.fillStyle = '#d9d2bd'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 1000, 0.05, 2, 340);
+    g.fillStyle = '#c9c1a8'; hex(x + 128, y + 128, 78, 92); g.fill();
+    g.fillStyle = '#9fb0b4'; hex(x + 128, y + 128, 62, 74); g.fill();
+    g.save(); hex(x + 128, y + 128, 62, 74); g.clip(); const grd = g.createLinearGradient(x, y, x + CELL, y + CELL); grd.addColorStop(0, '#86a2ae'); grd.addColorStop(1, '#2f4958'); g.fillStyle = grd; g.fillRect(x, y, CELL, CELL); g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(x + 40, y + 20, 60, 220); g.restore();
+    g.strokeStyle = '#f3efe2'; g.lineWidth = 6; hex(x + 128, y + 128, 62, 74); g.stroke();
+  };
+  PAINT.churchwin = function (g, x, y, lit, v) { // church bay: v0 pointed (Gothic) window on ashlar, v1 round-arched (Romanesque) pair on render, v2 blank buttress bay with a small lancet
+    const arch = (cx, top, w, bot, pointed) => { g.beginPath(); g.moveTo(cx - w / 2, bot); g.lineTo(cx - w / 2, top + w * 0.6); if (pointed) { g.quadraticCurveTo(cx - w / 2, top + w * 0.1, cx, top); g.quadraticCurveTo(cx + w / 2, top + w * 0.1, cx + w / 2, top + w * 0.6); } else g.arc(cx, top + w / 2, w / 2, Math.PI, 0); g.lineTo(cx + w / 2, bot); g.closePath(); };
+    if (lit) { g.fillStyle = '#ffcf80'; if (v === 0) { arch(x + 128, y + 40, 64, y + 220, true); g.fill(); } else if (v === 1) { arch(x + 80, y + 70, 52, y + 200, false); g.fill(); arch(x + 176, y + 70, 52, y + 200, false); g.fill(); } return; }
+    g.fillStyle = v === 1 ? '#efe8d8' : '#d3bf94'; g.fillRect(x, y, CELL, CELL);
+    noise(g, x, y, CELL, CELL, 1400, 0.06, 2, 350 + v);
+    if (v !== 1) { g.strokeStyle = 'rgba(90,70,40,0.35)'; g.lineWidth = 2; for (let r = 0; r < 8; r++) { g.beginPath(); g.moveTo(x, y + r * 32); g.lineTo(x + CELL, y + r * 32); g.stroke(); } }
+    const glass = (cx, top, w, bot, pointed) => { g.fillStyle = v === 1 ? '#f5efe0' : '#e3d3ac'; arch(cx, top - 10, w + 20, bot + 6, pointed); g.fill(); const grd = g.createLinearGradient(cx - w / 2, top, cx + w / 2, bot); grd.addColorStop(0, '#5a7488'); grd.addColorStop(1, '#1f2c3a'); g.fillStyle = grd; arch(cx, top, w, bot, pointed); g.fill(); g.strokeStyle = 'rgba(210,215,220,0.65)'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, top + 6); g.lineTo(cx, bot); g.moveTo(cx - w / 2, top + (bot - top) * 0.45); g.lineTo(cx + w / 2, top + (bot - top) * 0.45); g.stroke(); };
+    if (v === 0) glass(x + 128, y + 34, 76, y + 226, true);
+    else if (v === 1) { glass(x + 80, y + 64, 56, y + 206, false); glass(x + 176, y + 64, 56, y + 206, false); g.fillStyle = '#d9cfb8'; g.fillRect(x, y + 214, CELL, 10); }
+    else { g.fillStyle = '#c4ae82'; g.fillRect(x + 100, y, 56, CELL); glass(x + 128, y + 70, 22, y + 150, true); }
+  };
+  PAINT.slatespire = function (g, x, y, lit) { // dark slate shingles in diamond bands (spires, mansards)
+    if (lit) return;
+    g.fillStyle = '#3d424a'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(360);
+    for (let row = 0; row < 20; row++) for (let k = 0; k < 10; k++) { const q = 0.8 + r() * 0.4; g.fillStyle = 'rgb(' + ((72 * q) | 0) + ',' + ((78 * q) | 0) + ',' + ((88 * q) | 0) + ')'; g.fillRect(x + k * 26 + (row % 2) * 13 - 13 + 1, y + row * 13 + 1, 24, 11); }
+  };
+  PAINT.corten = function (g, x, y, lit) { // KPMG: weathering-steel lattice of diamond openings over dark glass
+    if (lit) { g.fillStyle = '#ffd890'; g.fillRect(x + 40, y + 40, 176, 176); return; }
+    g.fillStyle = '#1d2630'; g.fillRect(x, y, CELL, CELL);
+    const grd = g.createLinearGradient(x, y, x + CELL, y + CELL); grd.addColorStop(0, '#46606f'); grd.addColorStop(1, '#202f3a'); g.fillStyle = grd; g.fillRect(x + 30, y + 30, 196, 196);
+    g.fillStyle = '#9a4a26'; // lattice: two diagonal families of bars
+    for (let k = -4; k <= 6; k++) { g.beginPath(); g.moveTo(x + k * 64, y); g.lineTo(x + k * 64 + 22, y); g.lineTo(x + k * 64 + 22 + CELL, y + CELL); g.lineTo(x + k * 64 + CELL, y + CELL); g.fill(); g.beginPath(); g.moveTo(x + k * 64 + CELL, y); g.lineTo(x + k * 64 + CELL + 22, y); g.lineTo(x + k * 64 + 22, y + CELL); g.lineTo(x + k * 64, y + CELL); g.fill(); }
+    g.fillStyle = '#b25a2e'; g.fillRect(x, y, CELL, 22); g.fillRect(x, y + CELL - 22, CELL, 22); g.fillRect(x, y, 22, CELL); g.fillRect(x + CELL - 22, y, 22, CELL);
+    noise(g, x, y, CELL, CELL, 1500, 0.07, 2, 370);
+  };
+  PAINT.darkfin = function (g, x, y, lit) { // Infinity tower: dark glass behind slender vertical white fins
+    if (lit) { g.fillStyle = '#ffe2a8'; for (let k = 0; k < 6; k++) g.fillRect(x + 8 + k * 40, y + 20, 26, 150); return; }
+    g.fillStyle = '#e8eaeb'; g.fillRect(x, y, CELL, CELL);
+    const grd = g.createLinearGradient(x, y, x + CELL, y + 190); grd.addColorStop(0, '#3a4c5c'); grd.addColorStop(1, '#161e27'); g.fillStyle = grd; g.fillRect(x, y + 14, CELL, 160);
+    for (let k = 0; k < 12; k++) { g.fillStyle = '#d8dcde'; g.fillRect(x + k * 21.3, y + 14, 4, 160); g.fillStyle = 'rgba(120,150,170,0.25)'; g.fillRect(x + k * 21.3 + 4, y + 14, 6, 160); }
+    g.fillStyle = '#f2f3f3'; g.fillRect(x, y + 174, CELL, 82); g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(x, y + 174, CELL, 6);
+  };
+  PAINT.goldblack = function (g, x, y, lit) { // Cloche d'Or: pale champagne / cream vertical panels (c. 1.1 m) with thin dark joints and a few black ones, black base storeys (ref compare/p-landmark/cloche.jpg)
+    if (lit) { g.fillStyle = '#ffd890'; g.fillRect(x + 20, y + 150, CELL - 40, 36); return; }
+    g.fillStyle = '#6d6652'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(380); const cols = ['#ece0bd', '#f1e7cb', '#dfd0a4', '#f4edd6', '#e4d6ae'];
+    let px = 1;
+    while (px < CELL - 6) {
+      const w = 20 + ((r() * 7) | 0);
+      if (r() > 0.1) {
+        for (let f = 0; f < 2; f++) { const y0 = f * 64 + 2 + ((r() * 4) | 0); g.fillStyle = cols[(r() * cols.length) | 0]; g.fillRect(x + px, y + y0, w, 58 - ((r() * 6) | 0)); }
+      }
+      else { g.fillStyle = '#26272b'; g.fillRect(x + px, y, w, CELL); }
+      px += w + 2;
+    }
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x, y + 61, CELL, 3);
+  };
+  PAINT.sandblock = function (g, x, y, lit) { // 1950s sandstone ashlar in ochre and brown courses (Bonnevoie church tower)
+    if (lit) return;
+    g.fillStyle = '#c9a468'; g.fillRect(x, y, CELL, CELL);
+    const r = mulberry(390); const cs = ['#d4b277', '#c19a5c', '#a98150', '#8e6a44', '#dcbd86', '#b98f56'];
+    for (let row = 0; row < 8; row++) { let bx = -((r() * 40) | 0); while (bx < CELL) { const w = 40 + ((r() * 60) | 0); g.fillStyle = cs[(r() * cs.length) | 0]; g.fillRect(x + bx + 1, y + row * 32 + 1, w - 2, 30); bx += w; } }
+    g.fillStyle = 'rgba(60,36,14,0.22)'; g.fillRect(x, y + 94, CELL, 6); g.fillRect(x, y + 222, CELL, 4);
+    noise(g, x, y, CELL, CELL, 900, 0.05, 2, 391);
+  };
   function paintMulti(kind, lit) { // 4 x 4 bays in one cell (far LOD facades)
     return (g, x, y) => {
       const r = mulberry(kind === 'curtainLo' ? 5 : kind === 'punchedLo' ? 6 : kind === 'ribbonLo' ? 7 : 8);
@@ -424,7 +667,7 @@
     };
   }
   function paintCell(g, name, x, y, lit) {
-    const m = /^(curtain|punched|ribbon|gold)(\d)$/.exec(name);
+    const m = /^(curtain|punched|ribbon|gold|stonewin|rust|shop|cladpanel|brickwin|hotelbal|terra|txt|churchwin)(\d)$/.exec(name);
     if (m) return PAINT[m[1]](g, x, y, lit, +m[2]);
     if (name === 'curtainLo' || name === 'punchedLo' || name === 'ribbonLo' || name === 'goldLo') return paintMulti(name, lit)(g, x, y);
     return PAINT[name](g, x, y, lit);
@@ -444,7 +687,7 @@
       t.wrapS = t.wrapT = T.ClampToEdgeWrapping;
       return t;
     };
-    atlas = { day: mk(false, 1), lit: mk(true, 0.5) };
+    atlas = { day: mk(false, 0.75), lit: mk(true, 0.375) };
     return atlas;
   }
 
@@ -495,8 +738,8 @@
   }
 
   /* wall style: { cell: 'curtain'|'punched'|'ribbon'|'gold'|'ashlar'|'plain'|'diamond'|'corrug'|'columns'|'brick'|'shell'|'slate'|'greenroof'|'pave'|..., bay, floor, color, jitter } */
-  const LO_CELL = { curtain: 'curtainLo', punched: 'punchedLo', ribbon: 'ribbonLo', gold: 'goldLo' };
-  const VARIANTS = { curtain: 4, punched: 4, ribbon: 4, gold: 2 };
+  const LO_CELL = { curtain: 'curtainLo', punched: 'punchedLo', ribbon: 'ribbonLo', gold: 'goldLo', stonewin: 'punchedLo', shop: 'punchedLo', rust: 'punchedLo', cladpanel: 'punchedLo', brickwin: 'punchedLo', hotelbal: 'ribbonLo', terra: 'punchedLo', hexwin: 'punchedLo', corten: 'punchedLo', darkfin: 'curtainLo', louvre: 'curtainLo', concretebd: 'ribbonLo', parkdeck: 'ribbonLo' };
+  const VARIANTS = { curtain: 4, punched: 4, ribbon: 4, gold: 2, stonewin: 4, rust: 2, shop: 3, cladpanel: 2, brickwin: 3, hotelbal: 3, terra: 2 };
   let tileSeed = 1;
   function wall(g, ax, az, bx, bz, y0, y1, st, hi, flip) {
     const dx = bx - ax; const dz = bz - az; const L = Math.hypot(dx, dz);
@@ -680,6 +923,7 @@
     return o;
   })();
   FP.theatre = { a: [49.6177108, 6.1273391], p: [{ id: 9653796, role: 'hall', r: [78, 348, 757, 195, 677, -159, 849, -197, 784, -488, 610, -449, 599, -500, -78, -347, -6, -24, -55, -13, -9, 188, 39, 177, 62, 278], h: 13, hm: 13 }, { id: -1, role: 'forecourt', r: THEATRE_COURT, h: 3, hm: 3 }], ad: null, a0: 0 };
+  /*FP2-BEGIN*/Object.assign(FP,{"bcee":{"a":[49.605681,6.130101],"p":[{"id":2169074,"role":"main","r":[424,201,94,378,105,398,71,416,-39,475,-81,497,-170,330,-160,325,-217,217,-271,117,-312,42,-389,-103,-405,-94,-484,-243,-440,-267,-330,-326,-303,-340,-298,-331,-45,-468,-50,-476,51,-544,179,-353,169,-347,282,-180,378,-36,389,-44,521,153,487,176,432,213],"lv":2,"holes":[[-131,-182,73,-298,81,-286,94,-295,181,-173,199,-178,216,-172,235,-146,255,-118,254,-98,242,-83,306,12,291,22,313,54,65,187]],"hm":23.3,"hx":26.4,"g":-0.1},{"id":12537923,"role":"wing","r":[-1504,621,-1553,539,-2028,820,-2044,792,-2144,851,-2348,506,-2251,448,-2272,413,-2011,260,-1898,193,-1840,159,-1908,44,-1727,-63,-1549,239,-1370,542,-1312,640,-1321,676,-1404,724,-1439,726],"lv":4,"holes":[[-2125,482,-1762,258,-1655,431,-2018,655]],"hm":21.5,"hx":29.3,"g":-0.3},{"id":210509856,"role":"rue","r":[-2358,-932,-2299,-837,-2413,-766,-2433,-798,-2460,-781,-2500,-844],"lv":2,"hm":16.2,"hx":17.2,"g":-0.1},{"id":889184148,"role":"tower","r":[-1140,-1923,-1146,-1938,-1147,-1954,-1142,-1969,-1132,-1981,-1119,-1990,-1103,-1993,-1088,-1991,-1074,-1983,-1063,-1971,-1057,-1957,-1057,-1941,-1062,-1926,-1072,-1913,-1085,-1905,-1101,-1902,-1116,-1904,-1130,-1912],"hm":44.1,"hx":47.5,"g":1.8}],"a0":291.54,"ad":291.54,"lg":[[191,-348,180,-340,277,-198,284,-202,307,-170,300,-165,396,-24,407,-32,531,150,436,216,429,206,104,383,109,392,40,430,40,431,-5,455,-6,455,-74,493,-104,437,-106,437,-125,401,-124,401,-154,346,-143,339,-234,171,-240,174,-264,131,-287,89,-281,85,-372,-83,-384,-77,-413,-131,-414,-130,-416,-130,-426,-148,-436,-167,-435,-168,-433,-169,-463,-224,-395,-262,-395,-263,-396,-263,-352,-287,-351,-286,-351,-286,-280,-324,-275,-314,-22,-452,-28,-460,1,-480,0,-482,36,-507,37,-505,68,-527],[-2006,243,-1992,234,-2012,202,-2006,186,-2014,174,-2012,172,-2001,165,-1993,137,-2003,120,-2014,104,-2010,102,-1962,71,-1935,115,-1938,117,-1941,119,-1935,124,-1930,130,-1927,137,-1926,144,-1924,144,-1921,142,-1919,145,-1917,139,-1916,134,-1914,128,-1912,123,-1909,118,-1907,113,-1904,108,-1901,103,-1898,98,-1895,93,-1892,88,-1888,84,-1884,79,-1881,75,-1873,67,-1878,59,-1866,52,-1865,50,-1864,47,-1863,45,-1862,42,-1861,39,-1859,37,-1858,34,-1856,32,-1854,30,-1852,27,-1850,25,-1848,23,-1846,21,-1844,19,-1841,18,-1839,16,-1837,15,-1834,13,-1831,12,-1829,11,-1826,10,-1823,9,-1820,8,-1818,8,-1815,7,-1812,7,-1809,7,-1806,7,-1803,7,-1800,7,-1797,8,-1795,8,-1786,2,-1762,40,-1739,78,-1694,50,-1581,231,-1580,231,-1569,241,-1558,255,-1553,268,-1552,277,-1538,301,-1388,543,-1392,546,-1403,553,-1397,562,-1394,560,-1364,567,-1318,641,-1325,671,-1403,719,-1432,712,-1435,708,-1449,718,-1491,651,-1494,647,-1502,633,-1518,608,-1936,850,-1988,772,-2001,780,-2035,801,-2049,777,-2079,796,-2155,843,-2356,519,-2280,472,-2249,452,-2261,432,-2193,389,-2206,368,-2147,331,-2149,329,-2140,323,-2131,317,-2121,311,-2111,305,-2103,300,-2101,302,-2051,271,-2052,268,-2008,241],[-2348,-925,-2335,-926,-2316,-895,-2321,-881,-2296,-840,-2404,-773,-2421,-762,-2445,-798,-2455,-792,-2490,-848,-2441,-879,-2444,-885,-2420,-900,-2395,-915,-2391,-909,-2353,-933],[-1046,-1520,-1038,-1505,-1028,-1487,-1043,-1479,-1057,-1471,-1118,-1439,-1178,-1407,-1195,-1439,-1193,-1440,-1255,-1558,-1263,-1553,-1287,-1598,-1311,-1642,-1309,-1643,-1340,-1698,-1327,-1704,-1299,-1719,-1271,-1734,-1270,-1733,-1252,-1747,-1235,-1762,-1218,-1778,-1203,-1796,-1189,-1814,-1177,-1834,-1165,-1854,-1156,-1874,-1161,-1876,-1152,-1905,-1144,-1931,-1140,-1930,-1140,-1930,-1145,-1947,-1143,-1964,-1135,-1979,-1121,-1990,-1105,-1995,-1088,-1993,-1073,-1984,-1063,-1972,-1062,-1973,-1058,-1974,-1053,-1973,-1052,-1972,-1050,-1975,-1035,-1964,-1019,-1953,-1006,-1943,-1005,-1945,-989,-1933,-991,-1930,-893,-1857,-891,-1856,-888,-1859,-879,-1851,-877,-1853,-859,-1837,-862,-1834,-859,-1832,-856,-1835,-853,-1832,-849,-1828,-845,-1825,-842,-1821,-839,-1818,-841,-1815,-838,-1812,-836,-1815,-819,-1799,-822,-1796,-819,-1793,-816,-1796,-813,-1792,-809,-1789,-806,-1785,-803,-1781,-800,-1778,-803,-1775,-800,-1771,-797,-1774,-781,-1756,-784,-1753,-782,-1750,-781,-1751,-780,-1752,-772,-1743,-763,-1734,-765,-1733,-766,-1732,-760,-1726,-762,-1724,-755,-1715,-752,-1718,-735,-1695,-739,-1693,-732,-1684,-842,-1605,-897,-1565,-896,-1557,-900,-1537,-903,-1526,-912,-1515,-925,-1508,-940,-1505,-952,-1505,-978,-1514,-989,-1520,-1001,-1529,-1009,-1536,-1021,-1551,-1031,-1564,-1039,-1578,-1043,-1587,-1046,-1600,-1048,-1611,-1048,-1622,-1074,-1634,-1077,-1633,-1083,-1632,-1089,-1633,-1091,-1635,-1094,-1636,-1098,-1641,-1100,-1646,-1100,-1650,-1107,-1655,-1108,-1655,-1143,-1633,-1130,-1608,-1096,-1627,-1068,-1575,-1041,-1523]]},"bnl":{"a":[49.629784,6.165199],"p":[{"id":470049068,"role":"bnl","r":[-706,-315,-687,-328,-589,-391,-289,-720,475,81,577,110,678,138,755,204,628,254,539,402,343,724,-277,107,-310,79,-428,-20],"lv":5,"hm":25.0,"hx":29.1,"g":-0.1}],"a0":341.08,"ad":341.08,"lg":[[-300,88,-436,-31,-438,-33,-419,-51,-570,-212,-589,-193,-701,-312,-688,-321,-695,-331,-587,-403,-581,-393,-579,-394,-553,-424,-555,-426,-558,-428,-489,-506,-492,-508,-468,-535,-444,-561,-442,-560,-403,-604,-397,-599,-390,-606,-400,-615,-310,-715,-301,-707,-288,-721,-176,-601,-179,-598,487,108,538,121,687,160,694,165,746,222,629,278,345,730,296,679,279,660,96,467,90,460,-142,247,-147,252]]},"kinepolis":{"a":[49.633592,6.172661],"p":[{"id":8603558,"role":"cine","r":[579,-881,-712,341,-660,396,-494,572,-462,606,-427,642,198,51,534,-267,864,-580],"lv":5,"hm":16.6,"hx":18.8,"g":0.4}],"a0":353.28,"ad":353.28,"lg":[[-679,443,-720,400,-686,368,-709,343,580,-880,864,-580,-426,643,-427,642,-451,664,-465,670,-480,672,-495,669,-508,661,-519,650,-525,636,-527,621,-525,608,-507,591,-628,462,-661,426]]},"auchan":{"a":[49.633631,6.169198],"p":[{"id":839636547,"role":"mall","r":[-878,-328,-851,-354,-870,-375,-561,-664,-508,-611,-475,-635,-140,-290,135,-541,145,-531,265,-641,547,-348,163,33,1117,1037,1066,1070,1108,1108,793,1410,-10,575,-170,409],"hm":29.0,"hx":36.0,"g":-2.2},{"id":8603699,"role":"dc","r":[1167,989,1304,1142,1387,1234,1417,1206,1437,1228,1455,1248,1772,948,1735,906,1769,876,1723,828,1679,781,1652,752,1544,638,597,-365,563,-332,547,-348,407,-494,265,-641,195,-714,231,-749,-91,-1084,-708,-491,-851,-354,-878,-328,-170,409,-10,575,793,1410,962,1247,1108,1108,1077,1075,1117,1037],"lv":5,"hm":29.3,"hx":36.0,"g":-4.9}],"a0":357.7,"ad":357.7,"lg":[[1304,1141,1134,961,1080,1012,1086,1019,1107,1041,1076,1070,1107,1103,1107,1104,1104,1106,1100,1111,1094,1116,1088,1122,1015,1191,991,1214,965,1238,939,1263,913,1287,889,1310,885,1314,818,1423,793,1396,763,1424,730,1389,597,1248,595,1246,580,1230,538,1186,521,1167,246,876,235,864,193,819,177,802,-72,538,-79,531,-87,522,-136,568,-318,375,-325,383,-342,365,-286,311,-306,290,-557,23,-571,8,-613,-36,-628,-52,-629,-54,-667,-31,-719,-116,-773,-206,-794,-228,-764,-256,-854,-352,-562,-629,-555,-635,-550,-640,-545,-644,-543,-647,-542,-648,-525,-630,-500,-654,-514,-669,-116,-1045,-30,-954,5,-987,67,-921,32,-889,111,-804,118,-811,112,-816,132,-835,138,-829,147,-838,149,-835,152,-832,156,-827,161,-822,166,-817,188,-793,220,-760,230,-749,196,-718,201,-712,205,-708,238,-673,-6,-443,-2,-439,-35,-408,-38,-412,-76,-376,-101,-352,-103,-354,-158,-302,-86,-225,-71,-239,-121,-293,138,-538,151,-524,274,-641,350,-560,468,-436,556,-342,174,20,122,-35,107,-20,179,56,234,4,297,-55,293,-59,326,-91,330,-86,574,-317,578,-322,573,-328,593,-346,598,-340,607,-349,610,-346,613,-343,617,-338,622,-333,627,-328,649,-304,680,-271,688,-263,690,-261,952,17,953,18,955,20,958,23,962,28,967,33,972,38,994,62,1025,95,1030,100,1035,106,1298,384,1298,385,1300,387,1304,390,1308,395,1312,400,1317,405,1340,429,1371,462,1378,470,1381,473,1534,634,1538,639,1678,787,1679,789,1681,791,1682,792,1686,796,1690,801,1695,806,1718,830,1760,875,1727,907,1736,916,1768,950,1523,1181,1526,1184,1492,1216,1490,1213,1459,1242,1428,1208,1418,1198,1384,1230,1342,1186,1320,1162,1315,1157,1310,1152,1307,1148,1304,1145,1302,1143]]},"serra":{"a":[49.636068,6.175005],"p":[{"id":539469130,"role":"serra","r":[-229,-658,-141,-580,320,-169,430,-71,489,-19,508,-2,520,7,616,97,593,126,453,305,425,276,410,260,373,309,429,337,335,576,252,554,128,500,152,444,142,437,126,444,102,418,106,409,59,361,20,321,-3,297,-20,289,-353,-84,-486,-227,-551,-295,-517,-322,-539,-349,-569,-332,-586,-367,-512,-409,-507,-403,-502,-398,-487,-413,-465,-433,-300,-591],"lv":9,"hm":40.1,"hx":41.1,"g":0.2}],"a0":360.32,"ad":360.32,"lg":[[419,261,380,312,397,320,396,324,435,342,346,580,258,556,132,492,158,441,139,432,136,436,112,410,115,406,4,282,-14,298,-139,161,-130,153,-402,-146,-412,-137,-551,-289,-515,-323,-536,-345,-547,-339,-560,-331,-579,-364,-553,-380,-504,-408,-204,-684,-52,-547,263,-265,352,-187,515,-43,621,99,463,307,432,274]]},"kpmg":{"a":[49.630533,6.16736],"p":[{"id":235058664,"role":"kpmg","r":[46,-380,-384,24,-124,300,-8,421,426,16],"lv":6,"rs":"flat","hm":28.5,"hx":29.5,"g":0.4},{"id":377837066,"role":"arendt","r":[589,-140,844,-386,862,-522,998,-638,1072,-609,1368,-887,1382,-971,1559,-1115,1644,-1145,1725,-1227,1626,-1350,1201,-1045,1180,-940,1035,-826,978,-883,598,-608,662,-519,573,-456,422,-478,300,-398,327,-367,354,-339,440,-247],"lv":6,"rs":"flat","hm":24.7,"hx":27.0,"g":4.0},{"id":51770515,"role":"state","r":[4795,-4657,5258,-5097,5532,-4809,5361,-4647,5336,-4674,5287,-4627,5251,-4593,5213,-4556,5236,-4532,5066,-4370,5041,-4396,4944,-4304,4929,-4290,4955,-4262,4781,-4097,4652,-4233,4626,-4208,4586,-4250,4612,-4274,4508,-4383,4680,-4547,4819,-4401,4842,-4377,4958,-4487,4929,-4517],"lv":4,"hm":21.5,"hx":23.7,"g":15.7}],"a0":340.95,"ad":340.95,"lg":[[314,-400,315,-401,415,-476,418,-478,421,-479,424,-479,427,-479,574,-457,577,-457,581,-458,584,-459,587,-460,589,-462,655,-515,656,-516,657,-518,657,-520,658,-522,658,-523,657,-525,657,-527,656,-528,605,-602,604,-604,603,-606,603,-608,603,-610,604,-612,605,-613,606,-615,607,-616,970,-876,972,-878,975,-879,978,-879,981,-878,984,-877,987,-876,1033,-830,1034,-829,1035,-828,1036,-828,1037,-828,1039,-828,1040,-829,1041,-829,1179,-941,1179,-943,1180,-946,1201,-1037,1203,-1042,1205,-1046,1208,-1050,1212,-1054,1615,-1342,1617,-1343,1620,-1344,1622,-1344,1625,-1344,1627,-1343,1629,-1342,1631,-1341,1679,-1290,1719,-1234,1720,-1231,1721,-1228,1721,-1225,1720,-1222,1719,-1219,1718,-1217,1716,-1215,1640,-1146,1566,-1120,1380,-969,1373,-901,1373,-895,1371,-890,1368,-886,1365,-882,1081,-615,1080,-613,1078,-612,1075,-611,1073,-610,1071,-610,1068,-610,1000,-639,863,-525,861,-523,860,-521,859,-519,858,-516,845,-396,844,-391,841,-386,838,-381,834,-377,594,-152,592,-150,590,-149,587,-148,585,-147,582,-148,580,-148,578,-149,447,-249,433,-261,412,-283,314,-385,313,-387,312,-389,311,-390,311,-392,311,-394,312,-396,313,-398],[419,16,-13,425,-204,223,-395,20,37,-389,228,-187],[5357,-4642,5331,-4670,5212,-4557,5238,-4529,5064,-4364,5038,-4391,4927,-4285,4952,-4258,4781,-4096,4509,-4384,4507,-4386,4678,-4548,4839,-4378,4950,-4484,4789,-4654,4963,-4819,5044,-4895,5258,-5098,5532,-4808]]},"jfk":{"a":[49.625687,6.159917],"p":[{"id":321781594,"role":"jfk","r":[26,18,37,8,55,28,231,-127,196,-166,222,-189,167,-252,140,-228,128,-242,-11,-118,-9,-153,-177,-4,-168,7,-218,51,-434,242,-325,365,-13,88,-29,70,-19,61,-11,67,-2,71,8,72,18,69,26,64,32,55,35,46,35,36,32,26],"lv":5,"hm":21.5,"hx":24.2,"g":0.2}],"a0":336.52,"ad":336.52,"lg":[[-14,62,-19,58,-32,70,-15,90,-300,344,-334,305,-360,327,-405,277,-411,269,-438,239,-125,-24,-140,-41,-11,-150,-12,-119,129,-237,141,-223,153,-235,167,-247,219,-188,193,-165,227,-126,54,28,37,8,24,20,29,26,31,34,32,43,29,51,25,58,18,64,10,67,2,68,-7,66]]},"sofitel":{"a":[49.620529,6.144272],"p":[{"id":51768389,"role":"sofitel","r":[124,277,79,340,2,282,-61,227,-119,167,-171,102,-216,33,-252,-40,-281,-116,-301,-196,-257,-196,-253,-241,-230,-280,-212,-293,-193,-306,-148,-313,-105,-300,-88,-342,-18,-299,47,-249,106,-192,158,-129,203,-60,240,12,270,89,303,183,238,202,240,232,230,259,210,280,183,292,154,291],"h":21.0,"lv":6,"hm":22.9,"hx":23.9,"g":-0.0},{"id":51768388,"role":"novotel","r":[625,-158,613,-149,581,-193,531,-262,455,-365,563,-444,549,-463,504,-525,185,-294,137,-360,117,-345,79,-398,99,-412,69,-453,822,-1001,936,-843,682,-658,742,-576,853,-657,835,-682,1061,-846,1078,-823,1138,-740,1159,-711,1092,-662,1170,-554,998,-429,867,-334,823,-302,747,-247],"h":15.0,"hm":20.5,"hx":23.9,"g":1.5}],"a0":325.11,"ad":325.11,"lg":[[89,-206,119,-173,147,-138,174,-101,199,-63,221,-24,242,16,260,57,276,99,290,142,299,176,289,178,228,196,229,221,223,244,209,265,189,279,165,286,140,285,117,276,82,331,78,338,41,314,5,288,-30,259,-63,229,-95,198,-124,165,-152,130,-179,94,-203,57,-226,18,-246,-21,-265,-62,-281,-103,-296,-146,-305,-178,-295,-181,-296,-184,-262,-193,-266,-223,-260,-254,-245,-282,-223,-304,-195,-318,-163,-323,-132,-318,-110,-307,-91,-338,-86,-334,-80,-344,-48,-323,-11,-297,24,-268,57,-238],[641,-141,628,-159,614,-148,454,-366,565,-448,508,-526,185,-287,133,-358,113,-343,76,-394,96,-408,63,-452,273,-607,819,-1010,835,-980,854,-951,862,-939,903,-969,915,-954,926,-938,885,-908,894,-896,916,-870,940,-845,683,-655,742,-576,852,-658,834,-682,992,-798,1060,-849,1158,-716,1090,-665,1168,-558,826,-305,839,-287,852,-269,654,-123]]},"mama":{"a":[49.621059,6.143884],"p":[{"id":788248913,"role":"mama","r":[-167,232,47,75,68,59,62,51,321,-138,229,-264,105,-173,73,-217,-297,54,-272,89],"h":15.0,"hm":30.9,"hx":32.3,"g":-0.3},{"id":92711489,"role":"suites","r":[475,1152,1183,942,1103,892,933,789,896,817,747,927,391,1041],"h":21.0,"lv":6,"hm":21.8,"hx":27.4,"g":6.0}],"a0":322.67,"ad":322.67,"lg":[[-219,180,-224,185,-313,65,70,-217,102,-174,223,-264,269,-201,316,-138,60,51,70,65,-172,243],[747,928,936,791,1008,834,1093,885,1182,938,473,1161,388,1041]]},"findel":{"a":[49.634218,6.216418],"p":[{"id":87845533,"role":"termA","r":[-637,-415,-618,-383,-555,-273,-479,-139,-453,-94,-416,-29,-285,200,-483,313,-435,397,-393,471,-313,611,-280,668,-252,652,-8,523,360,302,743,84,992,-59,1010,-69,985,-112,805,-427,612,-318,475,-559,262,-930],"lv":2,"rs":"skillion","hm":24.9,"hx":28.4,"g":0.1},{"id":901350249,"role":"roofA","r":[262,-930,252,-947,203,-1032,-244,-776,-481,-640,-695,-517,-686,-498,-656,-446,-648,-434,-643,-425,-637,-415],"hm":17.4,"hx":18.9,"g":9.1},{"id":105759915,"role":"roofB","r":[-390,-925,-801,-1651,-722,-1695,-716,-1699,-305,-973,-345,-951],"hm":4.0,"hx":4.1,"g":10.2},{"id":1451392925,"role":"small","r":[432,-966,554,-1037,674,-831,552,-760],"hm":0.0,"hx":0.0,"g":0.3}],"a0":374.77,"ad":374.77,"lg":[[802,-434,1007,-75,-284,666,-490,306,-290,192,-325,130,-408,-14,-504,-184,-595,-344,-695,-518,198,-1030,298,-855,389,-696,486,-526,568,-381,603,-320],[-327,-969,-327,-970,-333,-967,-342,-962,-352,-955,-361,-951,-370,-945,-378,-941,-377,-939,-397,-928,-810,-1651,-790,-1663,-782,-1667,-773,-1672,-765,-1677,-754,-1684,-745,-1688,-740,-1692,-719,-1704,-306,-981]]},"heienhaff":{"a":[49.637107,6.219901],"p":[{"id":753687484,"role":"h3","r":[29,-588,15,-598,-8,-598,-64,-581,-72,-573,-73,-557,-36,-285,-31,-157,-41,-144,-64,82,-42,84,-65,174,-95,174,-157,398,-158,411,-155,426,-140,439,265,561,247,465,205,453,-12,390,4,315,-53,295,-48,281,-38,285,-28,239,5,248,48,96,130,105,86,-305,101,-305,115,-314,116,-326],"lv":5,"hm":22.7,"hx":25.0,"g":0.0},{"id":410213011,"role":"h5","r":[388,923,394,881,385,839,363,803,330,776,290,762,250,761,212,774,190,790,-188,675,-193,693,-222,684,-257,806,-229,815,-234,830,135,939,152,927,159,946,166,954,146,969,104,1141,111,1176,82,1183,76,1157,-93,1104,-98,1118,-125,1110,-160,1233,-132,1241,-137,1256,-2,1296,-2,1338,14,1382,43,1419,83,1444,128,1455,174,1451,216,1432,250,1401,272,1360,280,1315,273,1270,268,1259,307,1246,313,1228,402,927],"lv":5,"hm":31.8,"hx":33.8,"g":-5.6},{"id":1028769636,"role":"h0","r":[130,105,152,107,220,115,215,5,206,-135,182,-241,147,-369,67,-595,59,-607,38,-612,-8,-598,15,-598,29,-588,116,-326,115,-314,101,-305,86,-305],"hm":20.7,"hx":22.3,"g":-0.0},{"id":31542941,"role":"nh","r":[-1087,-192,-1212,-6,-1072,88,-1008,-6,-961,-77,-929,-67,-744,-10,-720,-87,-709,-120,-675,-110,-648,-197,-755,-230,-750,-244,-819,-265,-817,-371,-813,-551,-878,-552,-963,-554,-1080,-556,-1083,-408],"hm":22.2,"hx":24.3,"g":4.6},{"id":1028769635,"role":"h4","r":[205,453,179,249,171,249,152,107,130,105,48,96,5,248,-28,239,-38,285,-48,281,-53,295,4,315,-12,390],"lv":4,"hm":20.6,"hx":22.3,"g":0.0}],"a0":382.99,"ad":382.99,"lg":[[86,1146,91,1154,114,1142,109,1133,158,962,161,961,142,955,147,936,146,937,-147,851,-147,853,-191,840,-226,829,-221,810,-258,799,-224,682,-186,693,-181,674,-145,684,-102,697,-102,699,192,783,194,778,199,775,204,772,210,769,216,766,222,764,228,762,235,760,242,759,248,758,255,757,262,756,269,756,276,757,284,757,291,759,298,760,305,762,311,764,318,767,325,770,331,773,337,777,343,781,348,785,353,789,358,794,363,799,367,804,371,809,375,814,378,819,381,825,384,830,386,836,389,841,391,848,393,854,394,860,395,867,396,874,397,881,397,888,397,895,396,902,395,909,394,916,392,923,392,923,411,928,319,1246,297,1253,300,1261,302,1269,304,1277,306,1286,307,1295,307,1304,307,1313,307,1323,306,1332,304,1341,302,1351,299,1360,296,1370,292,1379,287,1388,282,1396,277,1405,270,1413,264,1420,257,1427,250,1434,242,1440,234,1445,226,1450,218,1455,210,1459,202,1462,193,1465,185,1468,177,1470,168,1471,160,1472,152,1473,144,1473,135,1473,127,1472,118,1471,109,1469,100,1467,91,1464,82,1461,73,1457,65,1453,56,1448,48,1442,40,1436,33,1430,25,1423,19,1415,13,1407,7,1399,2,1391,-3,1382,-7,1373,-11,1365,-13,1355,-16,1346,-18,1337,-19,1328,-20,1320,-20,1311,-20,1302,-19,1294,-19,1286,-114,1258,-108,1238,-145,1227,-132,1183,-132,1183,-137,1171,-142,1170,-139,1160,-123,1152,-123,1153,-111,1110,-74,1121,-68,1100],[-1115,-150,-1113,-152,-1198,-195,-1183,-254,-1085,-243,-1086,-251,-1083,-266,-1086,-279,-1083,-302,-1085,-313,-1085,-329,-1082,-339,-1084,-350,-1084,-365,-1081,-375,-1084,-384,-1083,-405,-1080,-411,-1083,-420,-1082,-437,-1080,-446,-1082,-460,-1081,-475,-1079,-482,-1080,-491,-1081,-509,-1078,-519,-1080,-528,-1080,-545,-1078,-554,-1078,-557,-1067,-558,-1055,-556,-1041,-558,-1031,-556,-1019,-557,-1008,-555,-983,-554,-973,-556,-961,-555,-949,-556,-938,-555,-927,-556,-915,-553,-915,-552,-814,-549,-819,-261,-828,-233,-716,-196,-715,-200,-703,-196,-695,-192,-694,-191,-688,-209,-649,-197,-676,-111,-714,-123,-721,-98,-721,-91,-724,-81,-727,-73,-727,-69,-731,-60,-733,-56,-734,-48,-738,-39,-740,-36,-741,-36,-750,-7,-965,-75,-970,-71,-976,-57,-989,-40,-992,-35,-1000,-20,-1011,-9,-1012,-6,-1022,11,-1029,18,-1034,28,-1040,40,-1050,49,-1056,64,-1062,72,-1067,77,-1071,82,-1206,-9,-1201,-22,-1194,-33,-1185,-42,-1183,-48,-1175,-61,-1167,-69,-1165,-73,-1161,-82,-1155,-91,-1147,-98,-1146,-100,-1143,-108,-1139,-115,-1133,-124,-1126,-130,-1122,-140],[-83,-462,-97,-555,-98,-557,-98,-560,-98,-563,-98,-565,-98,-568,-97,-571,-96,-574,-95,-576,-94,-579,-92,-581,-91,-584,-89,-586,-87,-587,-84,-589,-82,-590,-80,-591,1,-619,6,-619,11,-618,15,-617,20,-615,24,-612,28,-609,32,-606,34,-602,77,-496,118,-373,141,-285,158,-210,161,-195,193,-199,269,332,222,339,238,447,242,448,259,559,-3,481,7,449,-29,438,-29,439,-30,442,-31,445,-32,448,-34,451,-36,454,-38,457,-41,459,-44,461,-48,463,-51,464,-55,465,-58,465,-62,465,-65,465,-68,464,-71,463,-143,442,-146,441,-149,439,-151,437,-154,434,-157,431,-159,428,-161,425,-162,421,-163,418,-164,414,-164,410,-164,406,-164,403,-163,399,-162,396,-161,393,-97,168,-90,170,-65,81,-65,81,-57,-34,-53,-138,-58,-263,-65,-336]]},"treves":{"a":[49.639385,6.217418],"p":[{"id":645101068,"role":"ferrero","r":[342,574,-342,514,-316,200,-272,-316,-265,-401,-189,-404,-32,-410,-25,-189,-22,-114,401,-130,382,99],"lv":4,"hm":29.7,"hx":31.6,"g":-0.3},{"id":124352031,"role":"jpm","r":[595,756,584,891,574,1015,725,1028,798,1034,820,775],"lv":5,"hm":29.6,"hx":32.9,"g":3.1},{"id":124352027,"role":"moonar","r":[677,1506,817,1518,847,1144,711,1133,705,1208,631,1202,613,1425,683,1431],"lv":5,"hm":26.1,"hx":28.0,"g":3.6},{"id":31543187,"role":"moonD","r":[382,1741,400,1488,252,1477,246,1569,90,1557,78,1720],"hm":27.2,"hx":27.5,"g":6.1},{"id":124352028,"role":"moonC","r":[-413,1479,-266,1492,-277,1613,28,1641,41,1497,-98,1485,-87,1359,-399,1331],"hm":27.2,"hx":27.9,"g":6.1},{"id":124352026,"role":"moonB","r":[148,845,138,982,285,993,277,1103,438,1115,455,881,456,867],"hm":28.5,"hx":29.8,"g":5.8},{"id":124352032,"role":"moonA","r":[-364,1130,-58,1149,-51,1029,110,1039,119,897,-197,877,-205,1004,-356,994],"hm":27.3,"hx":28.3,"g":6.0},{"id":31543186,"role":"atoz","r":[-468,1785,508,2092,508,2236,474,2230,454,2253,427,2254,432,2325,390,2313,171,2246,78,2217,16,2198,-117,2158,-209,2289,-230,2319,-421,2184,-349,2082,-465,2045,-465,2035,-502,2023,-466,2003,-466,1960,-504,1950,-467,1845],"hm":24.9,"hx":27.7,"g":5.3}],"a0":382.99,"ad":382.99,"lg":[[704,1133,844,1144,815,1516,675,1505,681,1428,615,1423,621,1352,618,1349,615,1345,613,1341,611,1337,609,1333,608,1328,607,1324,606,1319,606,1314,606,1309,607,1304,609,1299,610,1295,612,1291,615,1287,617,1283,620,1280,623,1277,627,1274,632,1203,699,1208],[91,902,79,1041,-64,1029,-75,1155,-375,1130,-363,990,-221,1002,-210,876],[720,1037,650,1031,650,1036,568,1029,591,760,671,767,670,771,742,777,742,773,824,780,801,1048,720,1042],[277,1099,286,992,143,980,154,841,454,865,434,1112],[433,2253,425,2252,423,2252,424,2297,424,2327,-116,2156,-230,2316,-415,2183,-343,2084,-470,2044,-470,2014,-471,1957,-501,1947,-472,1858,-473,1788,501,2096,502,2179,502,2245,474,2236,473,2238,466,2243,458,2247,450,2250,442,2252],[-350,710,-334,522,-336,522,-318,299,-485,286,-473,129,-305,121,-272,-309,-331,-307,-324,-414,-298,-415,-292,-516,-181,-520,-177,-402,-80,-406,-80,-407,-37,-408,-25,-112,-18,-112,355,-126,395,-128,340,574,295,570,-163,535,-182,771,-215,769,-209,702,-211,702,-211,702,-299,695,-300,714],[247,1467,404,1481,383,1728,82,1702,94,1563,237,1575],[42,1493,31,1633,-270,1608,-259,1482,-403,1471,-391,1331,-91,1355,-101,1482]]},"liberte63":{"a":[49.601814,6.132831],"p":[{"id":167863619,"role":"b63","r":[-153,-79,-41,-101,97,-133,102,-81,118,137,47,158,-15,178],"lv":7,"hm":30.3,"hx":31.1,"g":-0.0}],"a0":287.56,"ad":287.56,"lg":[[99,-137,118,137,-15,179,-155,-80,-141,-83,85,-134]]},"post":{"a":[49.59923,6.132081],"p":[{"id":949957682,"role":"post","r":[-419,84,-560,30,-511,-115,204,-32,217,-36,225,-41,258,-124,273,-118,435,-62,296,337],"lv":8,"hm":37.8,"hx":39.2,"g":0.1},{"id":1289589204,"role":"cfl","r":[1691,-1790,1824,-1744,1842,-1795,2049,-2390,1909,-2437,1876,-2329,1845,-2237,1747,-1954,1700,-1816],"hm":40.2,"hx":41.6,"g":0.9},{"id":201399433,"role":"marriott","r":[391,-1564,367,-1731,353,-1827,395,-1834,572,-1858,710,-1931,736,-1808,751,-1809,767,-1799,771,-1769,762,-1754,746,-1752,776,-1553,791,-1555,806,-1540,810,-1510,802,-1494,787,-1492,799,-1398,645,-1399,583,-1411,538,-1419,539,-1488,488,-1488,456,-1498,467,-1537],"lv":7,"hm":30.1,"hx":32.0,"g":1.5},{"id":229706520,"role":"sg","r":[-13,-1065,-162,-638,393,-447,429,-556,587,-503,696,-828,225,-985,75,-1036],"lv":5,"hm":29.6,"hx":31.3,"g":-0.8},{"id":203080271,"role":"bld3","r":[-213,-1208,-271,-1226,-217,-1388,5,-1317,761,-1069,755,-1054,765,-1051,770,-1047,770,-1039,728,-924,696,-828,225,-985,248,-1058,10,-1137,-13,-1065,-162,-638,-509,-758,-478,-847,-451,-910,-324,-866],"lv":5,"hm":28.3,"hx":31.0,"g":1.7}],"a0":283.08,"ad":283.08,"lg":[[1825,-1757,1823,-1751,1822,-1746,1698,-1790,1699,-1795,1701,-1800,1693,-1803,1699,-1820,1572,-1864,1445,-1909,1493,-2045,1619,-2000,1746,-1956,1842,-2229,1782,-2250,1760,-2231,1661,-2125,1582,-2086,1515,-2110,1523,-2134,1614,-2187,1707,-2287,1770,-2355,1805,-2343,1874,-2318,1878,-2331,1886,-2332,1890,-2333,1925,-2434,2048,-2390,2012,-2288,2019,-2281,1875,-1873,1910,-1861,1899,-1828,1887,-1795,1852,-1808,1833,-1754],[9,-1149,-15,-1072,-16,-1072,-43,-1081,-132,-806,-106,-798,-149,-673,-158,-646,-501,-764,-491,-791,-462,-877,-451,-908,-402,-892,-379,-885,-346,-985,-291,-967,-208,-1220,-263,-1238,-255,-1261,-238,-1314,-221,-1368,-214,-1390,-47,-1336,-44,-1344,467,-1178,465,-1170,550,-1142,584,-1241,678,-1208,644,-1111,750,-1077,748,-1067,761,-1062,766,-1059,770,-1055,772,-1050,773,-1048,698,-828,661,-844,659,-839,543,-877,407,-926,277,-973,225,-990,177,-1006,179,-1014,182,-1022,230,-1006,251,-1070],[225,-990,277,-973,413,-924,543,-877,659,-839,661,-844,698,-828,678,-773,682,-771,687,-770,608,-547,604,-549,600,-550,584,-507,546,-519,530,-524,521,-527,520,-527,481,-543,479,-538,438,-553,426,-519,425,-519,417,-494,401,-449,205,-519,-158,-646,-149,-673,-106,-798,-105,-797,-98,-819,-119,-826,-98,-890,-77,-883,-61,-933,-41,-996,-61,-1002,-48,-1043,-29,-1037,-16,-1072,28,-1057],[782,-1555,793,-1544,794,-1533,795,-1521,789,-1512,782,-1504,799,-1406,790,-1404,780,-1402,690,-1398,686,-1422,638,-1417,612,-1411,578,-1409,537,-1408,535,-1455,534,-1475,532,-1495,534,-1534,510,-1533,509,-1536,466,-1530,465,-1541,418,-1556,410,-1556,370,-1829,414,-1837,429,-1825,443,-1827,452,-1840,490,-1846,490,-1848,504,-1850,556,-1859,557,-1854,592,-1860,592,-1858,603,-1860,600,-1874,695,-1930,712,-1940,741,-1814,748,-1807,755,-1801,757,-1777,750,-1767,773,-1616,811,-1622,814,-1601,816,-1602,819,-1582,799,-1579,779,-1576],[-654,-22,-660,-6,-741,-34,-828,-66,-671,-508,-585,-477,-460,-432,-406,-413,-409,-406,-276,-357,-277,-352,-279,-347,-280,-341,-274,-339,-77,-270,-77,-263,-37,-248,15,-228,43,-307,64,-367,83,-422,85,-429,108,-421,111,-424,113,-425,117,-426,190,-401,186,-391,177,-364,116,-191,167,-173,199,-160,200,-160,236,-256,249,-289,268,-340,273,-355,262,-359,270,-380,326,-361,318,-339,438,-301,463,-290,478,-278,486,-259,486,-247,479,-214,473,-216,424,-74,355,113,318,209,280,329,214,303,208,301,11,231,13,227,12,226,-4,221,-7,219,-10,215,-12,211,-12,207,-11,201,-45,190,-45,192,-48,196,-52,199,-56,200,-61,200,-509,39,-550,24,-554,19,-556,13]]},"gareav":{"a":[49.602464,6.134061],"p":[{"id":167863695,"role":"h8","r":[-605,68,-256,-12,-281,-114,-155,-144,89,-202,173,-222,290,-181,363,-150,594,-70,548,74,500,223,186,123,-259,231,-585,308],"lv":8,"hm":27.9,"hx":30.1,"g":2.1},{"id":167863625,"role":"o32","r":[-461,1520,-479,1419,-498,1332,-482,1300,-267,1263,-249,1377,-239,1431,-234,1458,-230,1478,-247,1481,-286,1488,-343,1499],"lv":9,"hm":31.3,"hx":31.8,"g":-0.1},{"id":174547316,"role":"p32","r":[-158,1478,-165,1394,-41,1333,38,1302,99,1460,68,1556,26,1679,-142,1635,-223,1624,-247,1481,-230,1478,-234,1458],"lv":6,"hm":31.2,"hx":32.0,"g":-1.5},{"id":54435223,"role":"p26","r":[-1187,3367,-1220,3453,-1169,3472,-1154,3478,-992,3534,-934,3388,-927,3370,-923,3347,-929,3324,-943,3305,-963,3293,-975,3288,-1142,3235],"lv":7,"hm":28.5,"hx":28.9,"g":-3.0},{"id":148214483,"role":"hotel","r":[-1159,1286,-1193,1157,-1070,1110,-1043,1100,-1029,1098,-1016,1104,-1006,1114,-970,1184],"lv":6,"hm":25.6,"hx":26.2,"g":0.0}],"a0":286.37,"ad":286.37,"lg":[[-1184,1146,-1159,1137,-1147,1132,-1089,1111,-1088,1115,-1048,1100,-1048,1100,-1034,1096,-1019,1099,-1010,1103,-998,1126,-992,1123,-962,1178,-968,1181,-971,1183,-972,1184,-979,1187,-1046,1224,-1080,1242,-1088,1220,-1091,1222,-1105,1222,-1124,1228,-1115,1261,-1128,1268,-1145,1278,-1156,1285,-1169,1244,-1194,1161,-1189,1159,-1191,1154,-1190,1152,-1187,1148],[-265,1284,-269,1261,-15,1162,-12,1170,-7,1184,36,1294,43,1313,98,1457,97,1462,88,1486,75,1524,66,1551,60,1569,44,1613,30,1654,21,1679,-39,1661,-100,1646,-162,1633,-224,1624,-229,1597,-240,1525,-248,1481,-231,1478,-235,1457,-236,1457,-242,1424,-245,1403],[-443,283,-544,303,-557,306,-574,309,-591,58,-562,54,-484,43,-465,38,-434,31,-434,28,-249,-14,-271,-112,-207,-127,-151,-140,-69,-160,-67,-151,-23,-161,-24,-167,179,-220,292,-178,407,-135,485,-106,596,-64,500,228,337,174,199,128,167,136,125,146,-413,277],[-262,1302,-252,1362,-246,1396,-245,1403,-242,1424,-236,1457,-235,1457,-231,1478,-248,1481,-248,1481,-305,1491,-305,1495,-382,1508,-459,1522,-496,1309,-419,1296,-342,1282,-342,1281,-305,1275,-268,1268,-265,1284]]},"bil":{"a":[49.60298,6.131904],"p":[{"id":174008807,"role":"bil","r":[-237,-163,-218,-184,168,-110,178,30,85,22,31,14,33,-10,16,-12,19,-46,-51,-65,90,181,115,226,5,282],"lv":4,"hm":24.7,"hx":25.5,"g":0.0}],"a0":289.17,"ad":289.17,"lg":[[-59,165,-92,105,-57,85,24,40,55,24,66,71,68,84,100,143,85,151,50,169,56,180,9,205,-24,223,-26,224],[-58,-153,-18,-146,10,-141,62,-132,60,-121,53,-82,47,-41,54,20,55,24,24,40,-28,-55,-30,-59,-41,-53,-66,-99,-68,-102,-68,-104,-66,-113,-60,-143],[-75,95,-92,105,-172,-41,-154,-51,-137,-60,-66,-99,-41,-53,-30,-59,24,40,-57,85],[53,-82,60,-121,62,-132,77,-129,92,-126,122,-121,164,-113,165,-102,168,-61,168,-60,172,-19,176,41,177,47,170,46,168,62,112,53,105,53,98,55,93,60,89,67,88,74,91,81,142,169,128,178,132,185,123,185,68,84,66,71,55,24,54,20,47,-41],[-231,-175,-227,-179,-225,-182,-224,-184,-222,-186,-58,-153,-66,-113,-68,-102,-66,-99,-137,-60,-172,-41,-239,-163,-237,-166,-236,-167,-234,-170],[93,60,98,55,105,53,112,53,168,62,170,46,177,47,176,41,176,33,175,27,172,-19,170,-39,168,-60,166,-86,164,-112,164,-113,164,-116,205,-109,239,-103,242,-76,245,-43,249,-6,253,21,250,21,254,92,257,135,259,176,188,181,132,185,128,178,142,169,91,81,88,74,89,67],[56,180,50,169,85,151,100,143,123,185,109,194,125,225,44,270,9,289,-26,224,-24,223,9,205]]},"sacre":{"a":[49.60446,6.131397],"p":[{"id":681138451,"role":"church","r":[46,-283,56,-276,59,-280,91,-257,85,-249,99,-239,112,-255,142,-236,148,-242,194,-210,190,-204,212,-187,195,-166,213,-151,219,-157,257,-127,252,-121,265,-110,85,137,116,158,112,165,103,167,51,238,18,243,-2,229,-10,206,-2,195,-11,189,-14,194,-42,174,-93,247,-81,256,-114,298,-228,216,-194,171,-187,176,-140,111,-162,93,-158,86,-167,80,-172,85,-197,88,-215,74,-224,52,-218,44,-245,30,-195,-34,-178,-54,-142,-33,38,-279],"hm":32.2,"hx":41.5,"g":-0.2}],"a0":291.19,"ad":291.19,"lg":[[-224,73,-227,59,-231,33,-223,22,-160,-65,-126,-41,51,-285,70,-271,89,-257,91,-260,115,-242,128,-261,179,-224,230,-187,216,-168,242,-150,244,-153,274,-131,270,-125,278,-119,243,-71,101,125,133,149,70,236,57,227,26,232,16,224,3,214,0,185,-1,184,-2,186,-28,167,-77,234,-69,240,-90,268,-110,296,-123,286,-159,346,-167,311,-143,271,-224,212,-204,183,-246,152,-201,90]]},"saintspierre":{"a":[49.614225,6.119509],"p":[{"id":299671448,"role":"church","r":[-36,-24,-31,15,-37,18,-41,24,-42,31,-41,38,-37,44,-41,54,-19,74,-7,71,0,78,9,82,20,82,29,77,35,69,38,60,48,58,63,33,50,24,52,17,51,10,48,4,42,-1,36,-3,22,-39,29,-44,32,-51,32,-59,28,-66,22,-71,14,-72,6,-69,0,-63,-26,-57,-34,-60,-42,-59,-49,-54,-53,-47,-54,-39,-51,-31,-44,-26],"hm":9.8,"hx":11.4,"g":-0.0}],"a0":300.01,"ad":300.01,"lg":[[53,47,49,53,36,56,34,65,27,73,17,77,6,75,-4,69,-6,65,-20,69,-43,53,-34,43,-39,38,-41,31,-40,24,-36,18,-31,15,-36,-29,-37,-29,-44,-31,-50,-37,-52,-45,-51,-52,-46,-58,-39,-61,-31,-61,-30,-60,1,-67,4,-71,12,-73,19,-72,26,-67,29,-60,28,-52,24,-45,21,-43,36,-2,37,-3,45,-1,50,5,53,13,52,21,50,23,62,28]]},"institut":{"a":[49.615042,6.120639],"p":[{"id":426145704,"role":"inst","r":[185,213,179,223,153,206,-41,509,-199,408,-188,392,-462,216,-382,91,-369,99,-177,223,-200,258,-120,309,-123,312,-83,338,46,137,-9,103,-14,110,-61,80,-55,72,-220,-34,-224,-27,-273,-59,-180,-204,-130,-172,-135,-164,33,-57,38,-66,84,-36,80,-29,124,-1,248,-194,198,-225,191,-214,-76,-386,-70,-396,-91,-410,-55,-466,-33,-453,17,-531,282,-361,265,-334,424,-232,244,48,277,69,262,94,265,111,198,212],"lv":3,"hm":18.3,"hx":20.0,"g":-0.5},{"id":31692949,"role":"pesc","r":[5119,-1080,5316,-1140,5326,-1107,5356,-1116,5362,-1095,5397,-1106,5432,-1117,5427,-1136,5453,-1144,5442,-1181,5652,-1245,5700,-1086,5733,-1096,5739,-1074,5811,-1096,5805,-1116,5851,-1130,5830,-1200,5820,-1197,5786,-1309,5807,-1342,5792,-1393,5758,-1403,5703,-1583,5658,-1569,5651,-1580,5641,-1587,5628,-1588,5616,-1584,5607,-1576,5602,-1564,5603,-1552,5561,-1539,5622,-1337,5491,-1298,5486,-1398,5462,-1392,5431,-1497,5377,-1481,5342,-1595,5342,-1669,5326,-1759,5288,-1841,5235,-1902,5500,-1983,5484,-2034,5496,-2040,5504,-2051,5507,-2065,5503,-2078,5493,-2087,5480,-2092,5467,-2090,5452,-2137,4779,-1930,4794,-1884,4781,-1878,4772,-1867,4770,-1853,4774,-1840,4784,-1830,4797,-1826,4811,-1828,4827,-1776,5081,-1854,5079,-1764,5100,-1674,5129,-1606,5177,-1540,5210,-1430,5140,-1409,5181,-1273,5267,-1299,5286,-1235,5083,-1174,5018,-1392,4973,-1460,4903,-1494,4824,-1494,4441,-1378,4457,-1327,4439,-1305,4450,-1269,4477,-1259,4492,-1209,4844,-1316,4838,-1336,4871,-1347,4931,-1151,4912,-1119,4924,-1080,4958,-1060,5014,-874,4627,-757,4639,-717,4625,-698,4636,-664,4658,-655,4673,-603,5079,-726,5067,-765,5160,-793,5124,-912,5157,-922,5136,-993,5127,-991,5107,-1058],"hm":20.1,"hx":32.7,"g":6.0}],"a0":304.87,"ad":304.87,"lg":[[4930,-1160,4940,-1163,4909,-1263,4900,-1260,4877,-1334,4887,-1337,4884,-1348,4880,-1356,4868,-1352,4869,-1349,4839,-1340,4839,-1343,4836,-1342,4843,-1318,4777,-1298,4767,-1286,4753,-1291,4737,-1286,4726,-1273,4712,-1278,4706,-1277,4701,-1275,4701,-1275,4697,-1274,4686,-1260,4672,-1266,4666,-1264,4666,-1264,4660,-1263,4660,-1262,4656,-1261,4645,-1248,4630,-1253,4625,-1251,4625,-1252,4620,-1250,4620,-1250,4616,-1249,4605,-1236,4590,-1241,4585,-1239,4584,-1240,4580,-1238,4575,-1237,4565,-1224,4550,-1229,4545,-1228,4492,-1212,4478,-1260,4453,-1268,4443,-1302,4459,-1322,4444,-1371,4496,-1386,4496,-1387,4502,-1389,4511,-1401,4527,-1397,4531,-1398,4532,-1397,4532,-1397,4536,-1399,4536,-1400,4541,-1401,4551,-1414,4568,-1409,4571,-1410,4572,-1409,4577,-1411,4577,-1412,4582,-1414,4592,-1427,4609,-1422,4612,-1423,4613,-1422,4617,-1423,4617,-1424,4622,-1426,4632,-1439,4648,-1434,4652,-1435,4653,-1434,4658,-1436,4658,-1436,4658,-1436,4664,-1438,4673,-1450,4688,-1446,4693,-1447,4693,-1446,4698,-1448,4698,-1448,4698,-1449,4704,-1450,4713,-1462,4728,-1458,4733,-1459,4733,-1458,4795,-1477,4797,-1470,4818,-1476,4815,-1483,4856,-1495,4891,-1497,4916,-1492,4953,-1474,4966,-1466,4997,-1432,5005,-1417,5013,-1396,5009,-1394,5014,-1376,5021,-1378,5043,-1303,5038,-1302,5057,-1240,5062,-1242,5083,-1174,5287,-1236,5264,-1311,5198,-1291,5196,-1298,5195,-1302,5192,-1312,5176,-1308,5163,-1351,5150,-1395,5165,-1399,5163,-1408,5161,-1412,5160,-1418,5208,-1433,5182,-1522,5193,-1527,5188,-1541,5178,-1537,5140,-1588,5112,-1644,5093,-1705,5085,-1768,5088,-1831,5086,-1838,5097,-1842,5093,-1855,4827,-1774,4811,-1827,4800,-1823,4792,-1823,4783,-1826,4776,-1832,4771,-1839,4768,-1848,4769,-1857,4772,-1866,4778,-1872,4783,-1877,4795,-1880,4779,-1932,4801,-1939,4809,-1950,4823,-1946,4839,-1951,4848,-1963,4863,-1958,4879,-1963,4890,-1976,4906,-1972,4919,-1976,4930,-1989,4945,-1984,4961,-1988,4970,-2000,4985,-1996,5001,-2001,5011,-2013,5025,-2008,5042,-2013,5051,-2025,5066,-2021,5085,-2027,5093,-2036,5133,-2048,5146,-2045,5161,-2050,5171,-2062,5186,-2058,5201,-2062,5212,-2075,5227,-2070,5242,-2075,5252,-2087,5267,-2083,5283,-2087,5293,-2100,5308,-2095,5319,-2099,5323,-2100,5334,-2113,5350,-2108,5356,-2110,5363,-2112,5373,-2125,5389,-2120,5404,-2125,5415,-2138,5430,-2133,5451,-2139,5468,-2082,5473,-2083,5478,-2084,5484,-2084,5490,-2082,5494,-2078,5498,-2074,5501,-2069,5502,-2063,5502,-2057,5500,-2052,5497,-2047,5493,-2043,5488,-2040,5486,-2039,5482,-2038,5499,-1980,5234,-1899,5238,-1884,5247,-1888,5286,-1837,5316,-1779,5335,-1717,5343,-1653,5341,-1592,5563,-1660,5583,-1597,5583,-1596,5593,-1563,5593,-1563,5596,-1553,5607,-1556,5607,-1560,5609,-1566,5613,-1572,5618,-1577,5624,-1580,5630,-1582,5637,-1582,5644,-1580,5649,-1577,5654,-1572,5655,-1571,5703,-1585,5725,-1511,5720,-1509,5750,-1409,5755,-1411,5760,-1397,5771,-1401,5793,-1388,5805,-1344,5792,-1322,5783,-1319,5788,-1305,5782,-1303,5812,-1203,5818,-1205,5841,-1131,5804,-1120,5811,-1098,5738,-1075,5732,-1098,5697,-1087,5675,-1161,5678,-1162,5663,-1211,5659,-1225,5657,-1232,5651,-1235,5644,-1240,5446,-1179,5456,-1144,5427,-1135,5433,-1115,5428,-1114,5397,-1104,5366,-1095,5362,-1093,5356,-1114,5327,-1105,5316,-1140,5118,-1080,5115,-1072,5111,-1066,5132,-996,5136,-997,5158,-923,5124,-913,5130,-890,5123,-888,5125,-880,5126,-877,5145,-813,5060,-787,5058,-793,5038,-788,5032,-779,5024,-772,5011,-768,5027,-715,4966,-697,4966,-695,4961,-694,4950,-683,4937,-687,4931,-685,4930,-686,4925,-684,4926,-683,4921,-682,4910,-670,4896,-674,4890,-672,4890,-674,4885,-672,4885,-671,4881,-670,4870,-657,4855,-662,4850,-660,4849,-661,4844,-660,4844,-658,4840,-657,4829,-645,4814,-649,4809,-648,4808,-649,4803,-647,4804,-646,4800,-645,4788,-633,4774,-637,4768,-636,4768,-637,4763,-635,4764,-634,4759,-633,4748,-621,4734,-625,4728,-623,4728,-624,4676,-609,4661,-657,4637,-665,4626,-699,4643,-719,4628,-768,4680,-784,4679,-784,4685,-786,4694,-798,4711,-794,4715,-795,4715,-794,4720,-796,4720,-797,4725,-799,4734,-811,4751,-806,4755,-808,4755,-806,4761,-808,4760,-810,4766,-811,4775,-824,4792,-819,4796,-820,4796,-819,4801,-820,4800,-822,4806,-823,4815,-836,4832,-831,4836,-832,4836,-831,4841,-833,4841,-833,4847,-835,4856,-847,4872,-843,4876,-844,4877,-843,4877,-843,4881,-845,4881,-845,4887,-847,4896,-859,4913,-855,4917,-855,4979,-874,4988,-843,5004,-848,5006,-845,5015,-848,5024,-820,5039,-825,5041,-820,5049,-824,5040,-855,5073,-865,5070,-872,5057,-868,5051,-890,5015,-879,4992,-953,5002,-956,4972,-1057,4962,-1054,4958,-1068,4949,-1065,4926,-1077,4912,-1120,4923,-1143,4934,-1146],[-79,338,45,138,10,116,6,122,-276,-53,-175,-216,-119,-180,-108,-197,58,-94,48,-77,106,-41,103,-35,137,-14,137,-14,138,-14,247,-189,206,-214,199,-203,-86,-380,12,-540,298,-363,283,-338,430,-247,246,52,278,71,184,226,151,206,-33,504,-71,481,-94,517,-183,462,-174,448,-230,413,-206,374,-360,279,-360,278,-412,246,-464,214,-432,163,-401,113,-395,117,-382,96,-166,231,-179,251,-105,297,-116,315]]},"louvigny":{"a":[49.611182,6.122679],"p":[{"id":9067663,"role":"villa","r":[-370,-271,-493,-152,-327,8,-309,-10,-283,11,-301,29,-166,160,-151,145,44,281,90,225,127,229,128,196,147,169,185,206,250,203,407,34,318,-53,368,-104,357,-191,268,-278,183,-196,123,-250,-61,-67,-155,-65],"hm":44.3,"hx":47.5,"g":-0.7}],"a0":300.05,"ad":300.05,"lg":[[-24,288,-41,288,-102,287,-196,215,-164,172,-154,159,-160,155,-174,169,-313,30,-310,28,-443,-104,-445,-102,-447,-100,-497,-150,-496,-152,-383,-266,-170,-54,-171,-62,-148,-63,-148,-59,-148,-59,-147,-59,-146,-58,-145,-58,-144,-58,-143,-57,-142,-57,-141,-57,-141,-56,-140,-56,-139,-56,-138,-56,-137,-55,-136,-55,-135,-55,-134,-55,-133,-55,-132,-55,-131,-55,-130,-55,-129,-55,-128,-54,-127,-54,-126,-54,-125,-54,-124,-54,-123,-54,-122,-55,-121,-55,-120,-55,-119,-55,-118,-55,-117,-55,-116,-55,-115,-55,-114,-56,-113,-56,-112,-56,-111,-56,-110,-57,-109,-57,-109,-57,-108,-57,-107,-58,-106,-58,-105,-58,-104,-59,-103,-59,-102,-60,-101,-60,-101,-63,-79,-63,-79,-57,-72,-64,109,-246,164,-191,255,-283,338,-200,337,-151,316,-131,350,-97,307,-54,395,34,147,284,12,287]]},"royal":{"a":[49.610311,6.126616],"p":[{"id":494699307,"role":"zenith","r":[-194,-251,164,-332,192,-316,272,359,93,365,92,354,79,150,-144,168,-166,-15,-193,-237],"lv":6,"hm":31.8,"hx":33.4,"g":0.1},{"id":157773979,"role":"r41","r":[-710,-1987,-730,-1985,-736,-2061,-835,-2069,-836,-2098,-917,-2107,-918,-2117,-1055,-2131,-1067,-1986,-1082,-1768,-689,-1802,-699,-1907,-706,-1970],"lv":6,"hm":40.5,"hx":43.3,"g":5.9},{"id":157773967,"role":"r41b","r":[-841,-1567,-700,-1580,-663,-1580,-689,-1802,-1082,-1768,-1086,-1739,-1150,-1742,-1149,-1595,-845,-1616],"lv":8,"hm":31.2,"hx":33.1,"g":5.0},{"id":157773923,"role":"r37","r":[-805,-331,-549,-388,-557,-450,-581,-646,-747,-633,-864,-616,-840,-501],"lv":1,"rs":"flat","hm":35.1,"hx":35.9,"g":0.9},{"id":157773998,"role":"lr","r":[-617,-976,-793,-962,-793,-988,-900,-980,-1100,-964,-1100,-938,-1075,-587,-864,-616,-747,-633,-741,-648,-598,-660,-583,-677],"lv":8,"rs":"quadruple_saltbox","hm":33.3,"hx":41.1,"g":1.5},{"id":169622599,"role":"banque","r":[-972,-2470,-960,-2699,-927,-2698,-917,-2772,-707,-2767,-724,-2357,-769,-2312,-780,-2312,-1010,-2335,-1037,-2335,-1029,-2474],"lv":5,"hm":27.7,"hx":28.4,"g":6.1},{"id":53785176,"role":"agir","r":[797,-3632,887,-3346,325,-3168,74,-3089,51,-3163,-10,-3144,-77,-3356,235,-3455],"h":45.7,"lv":14,"rs":"flat","hm":49.4,"hx":53.0,"g":8.9},{"id":52094223,"role":"schoetter","r":[79,150,-144,168,-139,215,-136,215,-134,233,-122,232,-119,267,-134,276,-125,369,-32,366,-25,351,-5,350,-5,356,17,355,18,364,36,363,37,355,92,354],"lv":8,"rs":"flat","hm":31.9,"hx":32.7,"g":-0.6}],"a0":298.01,"ad":298.01,"lg":[[-554,-458,-547,-380,-757,-335,-831,-319,-849,-407,-857,-446,-865,-480,-892,-611,-739,-625,-705,-628,-615,-636,-578,-639,-571,-561,-554,-563,-545,-459],[-754,-2071,-747,-2003,-725,-2005,-718,-1932,-706,-1933,-678,-1649,-681,-1648,-675,-1579,-707,-1576,-801,-1566,-837,-1563,-842,-1616,-917,-1608,-918,-1619,-1105,-1601,-1158,-1595,-1172,-1741,-1092,-1748,-1086,-1882,-1078,-1973,-1075,-1973,-1075,-1978,-1061,-2121,-850,-2101,-852,-2080],[187,-318,264,350,265,354,18,366,17,350,-12,352,-16,367,-125,372,-135,262,-123,255,-125,233,-134,234,-187,-258,161,-333],[-614,-980,-614,-977,-612,-977,-582,-677,-584,-677,-584,-675,-587,-674,-586,-672,-744,-657,-745,-659,-747,-658,-747,-661,-750,-660,-751,-662,-765,-660,-761,-623,-892,-611,-1063,-586,-1076,-720,-1065,-721,-1002,-764,-1007,-808,-1076,-838,-1087,-837,-1099,-965,-798,-995,-794,-958,-778,-960,-778,-963,-775,-963,-775,-965,-617,-981,-617,-980],[-6,-3144,-28,-3213,-74,-3355,440,-3521,485,-3380,531,-3238,76,-3091,52,-3163],[791,-3635,837,-3494,882,-3352,531,-3238,485,-3380,440,-3521]]},"cflat":{"a":[49.592072,6.136178],"p":[{"id":407762259,"role":"h123","r":[-893,-556,-832,-597,-745,-655,-700,-685,-457,-320,-402,-356,-333,-403,-259,-452,-193,-496,-391,-792,-189,-926,-175,-905,-85,-966,-77,-954,-17,-995,8,-959,22,-968,365,-454,281,-398,303,-364,336,-386,1028,651,906,732,836,779,764,827,632,915,557,966,481,1016,418,1058,308,894,275,917,195,970,131,1013,44,882,20,898,-18,923,-459,263,-415,234,-381,211],"hm":16.3,"hx":19.5,"g":0.0},{"id":1130993577,"role":"h4","r":[649,-834,1011,26,972,42,884,81,837,101,480,-762],"hm":12.4,"hx":14.5,"g":0.0}],"a0":284.46,"ad":284.46,"lg":[[-383,-722,-358,-739,-332,-699,-357,-682,-382,-665,-409,-706],[1002,49,976,60,950,71,946,61,942,52,923,60,907,66,914,85,859,108,851,90,837,96,770,-65,729,-47,697,-109,638,-251,685,-271,679,-286,656,-276,633,-266,572,-411,512,-556,535,-566,559,-575,480,-764,539,-788,531,-807,558,-818,586,-829,593,-811,653,-836,829,-410,1009,24,994,30,998,40],[334,-396,1025,658,968,696,886,749,712,864,706,868,424,1054,423,1051,406,1062,371,1007,387,997,361,957,350,964,339,971,319,939,311,928,286,944,261,961,248,941,226,956,239,976,187,1010,174,990,141,1012,56,881,-12,926,-186,661,-213,679,-257,612,-301,545,-274,527,-448,260,-380,215,-878,-545,-687,-671,-448,-305,-425,-320,-436,-337,-385,-371,-374,-354,-352,-368,-358,-377,-363,-385,-312,-419,-306,-411,-300,-402,-278,-417,-289,-434,-264,-451,-239,-467,-227,-450,-221,-455,-315,-599,-276,-625,-345,-730,-385,-791,-187,-922,-176,-904,-89,-962,-60,-918,22,-973,188,-719,205,-730,250,-662,233,-651,363,-452,261,-384,278,-359]]},"cflbus":{"a":[49.593806,6.134881],"p":[{"id":1023443476,"role":"garage","r":[22,-322,251,-408,314,-432,350,-445,548,76,512,90,473,105,-211,367,-372,432,-392,439,-413,384,-511,130,-596,-90],"hm":12.2,"hx":13.6,"g":-0.0},{"id":642662328,"role":"admin","r":[-211,367,-372,432,-351,490,-172,615,-118,594,-108,623,83,550,33,418,-162,491],"hm":11.7,"hx":12.0,"g":0.1}],"a0":284.29,"ad":284.29,"lg":[[445,-343,399,-325,364,-416,410,-434],[-495,177,-497,171,-593,-80,-596,-88,340,-448,343,-439,439,-189,441,-182,537,69,539,73,636,327,635,327,637,331,70,549,72,554,74,559,-88,622,-90,616,-92,611,-113,619,-115,615,-124,592,-151,602,-178,612,-182,603,-189,606,-272,545,-279,548,-287,526,-294,529,-347,491,-352,493,-378,426,-397,433,-399,428]]},"bonnchurch":{"a":[49.596467,6.138506],"p":[{"id":9248510,"role":"church","r":[-289,-180,-218,-236,-146,-292,-130,-271,-82,-311,-28,-244,-81,-203,69,-10,117,-50,145,-13,181,34,136,71,198,148,170,170,184,189,175,266,81,252,66,234,9,163,-61,219,-125,139,-74,100],"hm":17.2,"hx":18.0,"g":NaN}],"a0":276.16,"ad":null,"lg":[[62,232,53,239,2,174,-63,225,-69,218,-126,145,-80,109,-233,-86,-252,-69,-295,-125,-276,-142,-297,-169,-158,-278,-139,-254,-91,-291,-41,-227,-59,-214,14,-121,89,-24,106,-37,168,43,132,72,161,110,176,129,193,148,160,177,175,199,167,268,125,262,81,255,78,254]]},"howald":{"a":[49.578968,6.132549],"p":[{"id":29225736,"role":"cactus","r":[-433,-358,145,-84,167,-73,365,21,548,108,312,605,-669,139],"lv":3,"hm":16.3,"hx":17.5,"g":NaN},{"id":1475649487,"role":"office","r":[2104,-2322,2195,-2280,2293,-2482,2572,-2172,2229,-1422,1784,-1627],"lv":6,"hm":0.0,"hx":15.3,"g":NaN}],"a0":289.93,"ad":null,"lg":[[-434,-356,144,-84,181,-161,229,-138,443,-596,539,-551,325,-93,398,-59,362,19,548,107,433,353,316,601,-208,354,-213,365,-299,325,-294,314,-666,138,-550,-110]]},"vauban":{"a":[49.583921,6.127171],"p":[{"id":470030953,"role":"school","r":[1087,177,990,193,1001,258,966,265,1027,617,-91,812,-193,829,-198,802,-204,765,-184,761,-235,469,-348,488,-366,491,-389,495,-427,279,-834,350,-862,188,-1037,218,-1058,101,-1064,66,-1145,80,-1180,-120,-1184,-148,-1247,-506,-827,-579,-341,-664,-322,-667,36,-729,268,-769,281,-693,357,-706,430,-719,417,-795,597,-826,706,-195,842,-218,849,-174,890,-181,936,-94,968,-100],"lv":4,"rs":"flat","hm":23.9,"hx":30.0,"g":5.7}],"a0":288.17,"ad":288.17,"lg":[[82,157,87,186,236,160,231,131,150,-345,148,-345,2,-320,-69,-308,-69,-308,-42,-147,-14,14,-871,161,-884,85,-1031,110,-1046,26,-1073,-135,-1179,-117,-1192,-193,-1246,-511,-1154,-527,-1062,-543,-964,-559,-866,-576,-908,-519,-974,-508,-969,-479,-570,-548,-583,-625,-469,-645,-398,-657,-251,-682,-158,-698,-66,-714,8,-727,81,-739,266,-771,279,-694,426,-719,413,-797,505,-812,598,-828,632,-631,666,-434,714,-152,735,-156,930,-189,968,-101,1088,172,988,189,1000,257,966,263,1026,614,414,720,-199,825,-209,767,-186,763,-236,471,-389,497,-432,245,-250,214,-245,243,-95,217,-100,188]]},"melius":{"a":[49.583836,6.122824],"p":[{"id":561750077,"role":"melius","r":[-36,-328,421,93,54,491,-402,70],"lv":18,"rs":"flat","hm":64.4,"hx":65.8,"g":0.5},{"id":778106111,"role":"intesa","r":[-667,501,-269,862,-401,1015,-812,652],"lv":9,"hm":40.7,"hx":41.4,"g":2.5},{"id":1105063858,"role":"spaces","r":[716,-526,566,-360,412,-206,491,-151,575,-75,722,-236,876,-392,815,-435],"lv":6,"rs":"flat","hm":26.6,"hx":26.9,"g":0.2}],"a0":292.91,"ad":292.91,"lg":[[876,-392,722,-236,575,-74,491,-151,412,-206,566,-360,641,-443,716,-526,815,-435],[-719,436,-691,462,-664,487,-444,687,-425,705,-406,722,-264,851,-407,1009,-371,1042,-411,1087,-451,1131,-944,682,-903,638,-863,593,-862,595],[194,-115,423,94,278,254,206,333,62,493,-397,75,-252,-85,-180,-164,-35,-324]]},"pwc":{"a":[49.580646,6.121903],"p":[{"id":379951375,"role":"pwc","r":[-73,-420,143,-333,297,-720,462,-579,396,-422,271,-127,180,87,142,177,144,194,184,507,67,558,36,572,7,585,-17,595,-49,326,-62,224,-71,147,-133,124,-212,94,-319,482,-504,366,-280,-417,-362,-738,-181,-858],"lv":7,"rs":"flat","hm":25.8,"hx":28.6,"g":0.0}],"a0":298.43,"ad":298.43,"lg":[[149,167,187,497,-8,585,-61,136,-69,133,-80,166,-214,119,-312,474,-492,358,-272,-428,-354,-749,-173,-859,-60,-423,-46,-418,-34,-452,142,-390,130,-355,145,-350,305,-722,468,-584]]},"wtower":{"a":[49.578351,6.119681],"p":[{"id":470030948,"role":"tower","r":[-82,-8,-75,-35,-59,-59,-36,-76,-9,-85,20,-85,47,-75,69,-57,84,-33,91,-5,88,24,76,50,56,70,31,84,3,88,-25,83,-50,69,-69,47,-80,21],"hm":0.0,"hx":0.0,"g":-0.1}],"a0":296.56,"ad":296.56,"lg":[[54,68,50,71,46,73,43,75,39,77,35,79,31,80,27,82,23,83,18,83,14,84,10,84,6,85,2,85,-2,85,-6,84,-10,84,-13,83,-17,82,-21,81,-24,80,-28,78,-32,77,-35,75,-39,73,-42,71,-46,69,-49,66,-52,63,-55,60,-58,57,-61,54,-64,51,-66,47,-68,43,-71,40,-72,36,-74,32,-76,28,-77,23,-78,19,-79,15,-79,11,-80,7,-80,3,-80,-1,-80,-5,-80,-9,-79,-13,-78,-17,-77,-20,-76,-24,-75,-28,-74,-31,-72,-35,-71,-38,-69,-42,-66,-46,-64,-49,-62,-52,-59,-56,-56,-59,-53,-62,-50,-64,-46,-67,-43,-70,-39,-72,-35,-74,-31,-76,-27,-78,-23,-79,-19,-80,-15,-82,-11,-82,-7,-83,-3,-83,1,-84,6,-84,10,-83,13,-83,17,-83,21,-82,25,-81,28,-80,32,-79,35,-77,39,-76,43,-74,46,-72,50,-70,53,-68,56,-65,60,-62,63,-59,66,-56,69,-53,71,-50,74,-46,76,-42,78,-38,80,-35,82,-31,83,-27,84,-22,86,-18,86,-14,87,-10,87,-6,88,-2,88,2,87,6,87,10,87,14,86,18,85,21,84,25,83,29,81,32,80,36,78,40,76,43,74,47,72,50,69,53,66,57,63,60,60,63,57,66]]},"bbhotel":{"a":[49.581846,6.122682],"p":[{"id":1410719082,"role":"hotel","r":[86,-197,210,-83,-134,296,-250,180],"lv":7,"hm":0.0,"hx":0.0,"g":0.1}],"a0":294.27},"prstade":{"a":[49.577345,6.110884],"p":[{"id":1012582990,"role":"pr","r":[660,-484,571,210,565,256,613,262,591,434,444,415,-21,355,-67,349,-606,279,-600,234,-639,229,-562,-369,-550,-461,-534,-581,-527,-637],"hm":18.9,"hx":19.8,"g":0.0},{"id":645999441,"role":"sport","r":[4750,225,5325,295,5338,297,5256,863,5236,1001,5136,988,4945,962,4912,958,4659,924],"hm":12.9,"hx":15.7,"g":-4.1}],"a0":300.62,"ad":300.62,"lg":[[5328,290,5236,999,4651,923,4742,214],[621,479,-610,318,-605,280,-599,230,-641,225,-625,102,-625,102,-619,53,-619,53,-585,-204,-530,-633,-416,-618,-416,-620,-391,-617,-367,-614,-368,-612,-153,-584,-152,-586,-48,-572,-49,-570,176,-541,176,-543,280,-529,279,-527,494,-499,494,-500,544,-494,544,-493,657,-478,601,-49,568,209,570,210,564,258,562,258,562,258,612,264,649,268]]},"infinity":{"a":[49.620125,6.142438],"p":[{"id":480792009,"role":"shop","r":[616,-295,456,-136,-57,98,-257,418,-379,570,-539,620,-347,371,-550,214,-302,-35,-94,-128,17,-334,319,-596,496,-473],"h":15.0,"hm":14.2,"hx":93.9,"g":-0.7},{"id":664452467,"role":"tower","r":[319,-596,496,-473,616,-295,823,-476,663,-637,691,-661,545,-821],"h":55.0,"lv":24,"hm":91.2,"hx":95.1,"g":2.0},{"id":664452464,"role":"t2","r":[-539,620,-347,371,-550,214,-769,497],"h":50.0,"hm":46.2,"hx":47.5,"g":-1.2},{"id":51768387,"role":"t3","r":[1100,24,544,171,578,299,737,256,765,295,1285,151,1160,-20],"h":22.0,"lv":5,"hm":21.9,"hx":70.6,"g":4.7}],"a0":320.72,"ad":320.72,"lg":[[210,-262,19,-344,344,-628,513,-788,662,-629,682,-568,792,-450,592,-261,460,-137],[605,410,394,465,295,84,506,29,544,176,1101,19,1158,-23,1283,148,768,294,737,255,576,300],[-657,555,-771,498,-543,203,-301,-48,-94,-135,19,-344,210,-262,460,-137,-56,106,-257,425,-369,571,-593,641]]}});/*FP2-END*/
   const DEFS = [];
   const decode = (flat) => { const o = []; for (let i = 0; i < flat.length; i += 2) o.push([flat[i] / 10, flat[i + 1] / 10]); return o; };
   let LOD = null; // key -> { b: [ { role, id, roofs: [flat x,z,y dm], walls: [...], zmax, ... } ] } (data/luxtram-landmarks.json)
@@ -877,6 +1121,20 @@
         const emit = (A, B, Cc, D, st) => {
         const Lw = Math.hypot(B[0] - A[0], B[2] - A[2]); const Hh = ((Cc[1] + D[1]) - (A[1] + B[1])) / 2;
         if (Lw < 0.2 || Hh < 0.2) return;
+        const BBd = hi && !st._nb ? (st.baseBand !== undefined ? st.baseBand : o.baseBand) : null; // ground-floor band (shopfronts, rusticated base, lobby glazing); skirt below ground stays plain
+        if (BBd) {
+          const glY = o.gy ? o.gy((A[0] + B[0]) / 2, (A[2] + B[2]) / 2) : (typeof b.gmin === 'number' ? b.gmin : 0) + dy; const yb = Math.min(A[1], B[1]);
+          if (yb + sk < glY + 2.2 && Hh > glY - yb + BBd.h * 1.6) {
+            const mx3 = (p, q, t) => [lerp(p[0], q[0], t), lerp(p[1], q[1], t), lerp(p[2], q[2], t)];
+            const cut = (yy) => [mx3(A, D, clamp((yy - A[1]) / ((D[1] - A[1]) || 1), 0, 1)), mx3(B, Cc, clamp((yy - B[1]) / ((Cc[1] - B[1]) || 1), 0, 1))];
+            let lowA = A; let lowB = B;
+            if (glY - yb > 0.4) { const c1 = cut(glY); quadTiled(g, A, B, c1[1], c1[0], 1, 1, () => 'plain', mul(BBd.st.color || WHITE, 0.74), 0); lowA = c1[0]; lowB = c1[1]; }
+            const c2 = cut(glY + BBd.h); const bs = BBd.st; const bcn = bs.cell || 'plain'; const bm = VARIANTS[bcn];
+            quadTiled(g, lowA, lowB, c2[1], c2[0], Math.max(1, Math.round(Lw / (bs.bay || 3.6))), 1, (bb, ff) => (bm ? bcn + ((hash2(bb * 11 + ff, tileSeed + 2) * bm) | 0) : bcn), bs.color || WHITE, bs.jitter);
+            emit(c2[0], c2[1], Cc, D, Object.assign({}, st, { _nb: true }));
+            return;
+          }
+        }
         const TBd = st.topBand || o.topBand;
         if (TBd && Hh > TBd.h * 2.2 && !(st.noBand && !st.topBand)) { // grey metal top storey: split the wall at (top - h)
           const f = (Hh - TBd.h) / Hh; const mix = (p, q, t) => [lerp(p[0], q[0], t), lerp(p[1], q[1], t), lerp(p[2], q[2], t)];
@@ -917,12 +1175,27 @@
       const slope = (Math.acos(Math.min(1, Math.abs(nm[1]) / l)) * 180) / Math.PI;
       let rs = (o.roofFn && o.roofFn(ring, slope)) || (slope > steepDeg ? o.roofSteep : o.roofFlat) || { cell: 'roofGrey', color: C_ROOF };
       polyFace(g, ring, rs.color, rs.cell, [0, 1, 0], dy);
+      if (slope < 9 && hi && (o.parapet || o.plant) && ring.length >= 4) roofExtras(g, ring, o, dy);
     });
+  }
+  /* flat-roof furniture on a LOD2 roof face: dark parapet rim, one louvred plant enclosure + a lift head (o.parapet = { h, color }, o.plant = { h, st }) */
+  function roofExtras(g, ring, o, dy) {
+    const pts = ring.map((p) => [p[0], p[1]]);
+    const ar = Math.abs(area2(pts)) / 2;
+    if (ar < 40) return;
+    const yTop = ring.reduce((m, p) => m + p[2], 0) / ring.length + dy;
+    const oo = orient(pts, true);
+    if (o.parapet) for (let i = 0; i < oo.length; i++) { const p = oo[i]; const q = oo[(i + 1) % oo.length]; wall(g, p[0], p[1], q[0], q[1], yTop, yTop + o.parapet.h, { cell: 'plain', color: o.parapet.color, bay: 12, floor: 12, jitter: 0 }, false, false); }
+    if (o.plant && ar > 110) {
+      const bb = bbox(oo); const mn = Math.min(bb[2] - bb[0], bb[3] - bb[1]);
+      const ins = insetRing(oo, Math.max(2.5, mn * 0.28));
+      if (area2(ins) !== 0 && Math.abs(area2(ins)) / 2 > 12 && Math.abs(area2(ins)) / 2 < ar * 0.6) prism(g, ins, null, yTop, yTop + o.plant.h, o.plant.st, { cell: 'roofGrey', color: [0.62, 0.63, 0.62] }, false);
+    }
   }
   /* LOD2 where available, otherwise the OSM footprint extruded to the measured (LiDAR) height */
   function lodOr(g, L, role, hi, o, fallback) {
     const bl = L.lod(role);
-    if (bl.length) { bl.forEach((b) => drawLod2(g, b, o, hi, L.dy)); return true; }
+    if (bl.length) { const oo = o.gy || !L.gy || o.noGy ? o : Object.assign({ gy: L.gy }, o); bl.forEach((b) => drawLod2(g, b, oo, hi, L.dy)); return true; }
     if (fallback) fallback();
     return false;
   }
@@ -1202,8 +1475,9 @@
 
   /* ---- Cloche d'Or shopping centre */
   def('cloche', "Cloche d'Or", { radius: 150, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
-    const mall = { cell: 'ribbon', color: col('#4a4f55'), bay: 4, floor: 4.2 };
-    const tower = { cell: 'punched', color: [0.7, 0.7, 0.58], bay: 3.4, floor: 3.6 }; // Sky Cloche: olive-gold grid facade
+    const BLK = { cell: 'plain', color: [0.1, 0.1, 0.12], bay: 12, floor: 12, jitter: 0 };
+    const mall = { cell: 'goldblack', color: WHITE, bay: 6, floor: 6, jitter: 0.05, baseBand: { h: 7, st: BLK } }; // champagne panels over black base storeys (ref Commons c_vauban 1 / 4 / 5)
+    const tower = { cell: 'goldblack', color: [1, 0.97, 0.9], bay: 6, floor: 6, jitter: 0.05, baseBand: { h: 7, st: BLK } }; // Sky Cloche
     lodOr(g, L, 'mall', hi, {
       wall: mall, skirt: 8,
       wallFn: (ring3) => (ringTop(ring3) > 35 ? tower : null),
@@ -1655,7 +1929,8 @@
       const fc = loc(-19, 0); const R = 7.5; const seg = hi ? 28 : 14;
       cylinder(g, fc[0], fc[1], 0.04, 0.45, R, R, seg, { cell: 'plain', color: [0.86, 0.85, 0.82], floor: 5, jitter: 0 }, { cell: 'plain', color: [0.62, 0.7, 0.74] }, false);
       cylinder(g, fc[0], fc[1], 0.44, 0.5, R - 0.5, R - 0.5, seg, { cell: 'plain', color: [0.5, 0.62, 0.68], floor: 5, jitter: 0 }, { cell: 'plain', color: [0.55, 0.68, 0.74] }, false);
-      if (hi) [[2.2, 8, 1.3], [4.6, 12, 1.0], [6.6, 16, 0.7]].forEach(([rr, n, hh]) => { for (let k = 0; k < n; k++) { const an = (k / n) * Math.PI * 2; cone(g, fc[0] + Math.cos(an) * rr, fc[1] + Math.sin(an) * rr, 0.5, 0.045, hh, 4, 'plain', [0.95, 0.97, 1], 0.02); } });
+      // no solid jets (they read as grey poles): white ripple rings on the turquoise basin water instead (stacked flat discs, 1 cm steps)
+      if (hi) [[5.6, 0.508, [0.9, 0.95, 0.97]], [5.2, 0.512, [0.5, 0.62, 0.68]], [3.4, 0.516, [0.9, 0.95, 0.97]], [3.0, 0.52, [0.5, 0.62, 0.68]], [1.2, 0.524, [0.95, 0.98, 1]]].forEach(([rr, yy, cc]) => cylinder(g, fc[0], fc[1], yy - 0.004, yy, rr, rr, seg, { cell: 'plain', color: cc, floor: 5, jitter: 0 }, { cell: 'plain', color: cc }, false));
       [[-1, 0], [1, 0], [0, 1]].forEach(([ox, oz]) => { const bx = fc[0] + ox * (R + 1.5); const bz = fc[1] + oz * (R + 1.5); box(g, bx, 0.3, bz, 2.4, 0.5, 0.9, 0, { cell: 'plain', color: [0.9, 0.9, 0.87], bay: 9, floor: 9, jitter: 0 }, { cell: 'plain', color: [0.92, 0.92, 0.9] }, false); });
     }
     const bodyAt = (d0, d1, a0, a1, y0, y1, fn, roof) => slabRing(rect(d0, d1, a0, a1), y0, y1, fn, roof);
@@ -1956,6 +2231,314 @@
     box(g, 0, H + 0.5, 0, w + 1.2, 1.0, w + 1.2, 0, { cell: 'plain', color: col('#eeeeec'), bay: 8, floor: 8 }, RF('#e2e4e4', 'plain'), false);
   });
 
+  /*PL-DEFS-BEGIN*/
+  /* ================================================================== P-LANDMARK helpers */
+  function signBoard(g, cx, y0, cz, nx, nz, w, idx, hgt) { // 4:1 name board (atlas cell txtN) centred on (cx, cz), bottom at y0, facing the outward unit normal (nx, nz)
+    const h = hgt || w / 4; const rx = nz; const rz = -nx;
+    const A = [cx - rx * w / 2, y0, cz - rz * w / 2]; const B = [cx + rx * w / 2, y0, cz + rz * w / 2]; const Cc = [B[0], y0 + h, B[2]]; const D = [A[0], y0 + h, A[2]];
+    quadP(g, A, B, Cc, D, 'txt' + idx, WHITE);
+  }
+  function slab(g, ring, y0, y1, color, cellName) { // thin horizontal plate (canopy / balcony / parapet band) with visible edges
+    const o = orient(ring, true);
+    for (let i = 0; i < o.length; i++) { const p = o[i]; const q = o[(i + 1) % o.length]; wall(g, p[0], p[1], q[0], q[1], y0, y1, { cell: cellName || 'plain', color, bay: 20, floor: 20, jitter: 0 }, false, false); }
+    flatPoly(g, o, null, y1, cellName || 'plain', color, false);
+    flatPoly(g, o, null, y0, cellName || 'plain', mul(color, 0.8), true);
+  }
+  const ROOF_PAR = { h: 0.8, color: [0.42, 0.43, 0.45] };
+  const PLANT = (c) => ({ h: 2.6, st: { cell: 'louvre', color: c || [0.8, 0.82, 0.84], bay: 3, floor: 2.6, jitter: 0.03 } });
+  const FLATROOF = (c) => ({ cell: 'roofGrey', color: c || [0.7, 0.71, 0.7] });
+  const GLASSROOF = { cell: 'glassroof', color: [0.7, 0.85, 0.95] };
+
+  /* name board on the LOD2 wall of `role` that faces `dir` (x, z) best: width w, bottom at terrain + yOff; skips walls shorter than w */
+  function signOnFacade(g, L, role, dir, idx, w, yOff, opts) {
+    const o = opts || {}; let best = null; let bs = -1e9;
+    const dl = Math.hypot(dir[0], dir[1]) || 1; const dx = dir[0] / dl; const dz = dir[1] / dl;
+    L.lod(role).forEach((b) => b.walls.forEach((ring) => {
+      if (ring.length !== 4) return;
+      const nm = newell(ring); const l = Math.hypot(nm[0], nm[1], nm[2]) || 1; if (Math.abs(nm[1]) / l > 0.3) return;
+      const idxs = [0, 1, 2, 3].sort((i, j) => ring[i][2] - ring[j][2]); const A = ring[idxs[0]]; const B = ring[idxs[1]];
+      const len = Math.hypot(A[0] - B[0], A[1] - B[1]); if (len < w * 0.9) return;
+      let nx = nm[0] / l; let nz = nm[2] / l; const nl = Math.hypot(nx, nz) || 1; nx /= nl; nz /= nl;
+      let wx = 0; let wz = 0; ring.forEach((p) => { wx += p[0]; wz += p[1]; });
+      // outward normal: away from the building's centroid is not known here, so trust the facing test both ways and keep the better-facing sign
+      const sc = Math.abs(nx * dx + nz * dz) * 100 + len * (o.preferLong ? 0.3 : 0.05) + (o.minTop ? Math.min(ringTop(ring), o.minTop) : 0);
+      if (sc > bs) { bs = sc; best = { A, B, nx, nz, mx: (A[0] + B[0]) / 2, mz: (A[1] + B[1]) / 2, wx: wx / 4, wz: wz / 4 }; }
+    }));
+    if (!best) return false;
+    let { nx, nz } = best; if (nx * dx + nz * dz < 0) { nx = -nx; nz = -nz; }
+    const gyv = L.gy ? L.gy(best.mx, best.mz) : 0;
+    signBoard(g, best.mx + nx * 0.12, gyv + yOff, best.mz + nz * 0.12, nx, nz, w, idx, o.h);
+    return true;
+  }
+
+  /* generic dressed LOD2 block: o = { cell, color, bay, floor, base: {h, st}, top: {h, st}, roofC, plantC, wallFn, steep: { cell, color }, parapet:false, plant:false } */
+  function office(g, hi, L, role, o) {
+    const wall = { cell: o.cell, color: o.color || WHITE, bay: o.bay || 3.6, floor: o.floor || 3.8, jitter: o.jitter === undefined ? 0.03 : o.jitter };
+    if (o.base) wall.baseBand = o.base;
+    if (o.top) wall.topBand = o.top;
+    return lodOr(g, L, role, hi, {
+      wall, skirt: o.skirt === undefined ? 6 : o.skirt, parapet: o.parapet === false ? null : (o.parapet || ROOF_PAR), plant: o.plant === false ? null : PLANT(o.plantC),
+      roofFlat: FLATROOF(o.roofC), roofSteep: o.steep || { cell: 'roofGrey', color: [0.45, 0.46, 0.48] }, steepDeg: o.steepDeg || 30, wallFn: o.wallFn,
+    }, () => { const p = L.one(role); if (p) prism(g, p.r, p.holes, -5, p.hm || p.h || 20, wall, FLATROOF(o.roofC), hi); });
+  }
+  const shopBase = (h, c) => ({ h: h || 4.4, st: { cell: 'shop', color: c || WHITE, bay: 3.8, jitter: 0.03 } });
+  const SHOWM = { high: 800, medium: 600, low: 420 };
+
+  /* ---- BCEE / Spuerkeess (Place de Metz, 1911-1920, Dutch-Moselle neo-Renaissance): sandstone block, dark mansard roofs full of dormers, round clock tower under a green copper cap.
+   * Refs (Commons, refs lm3/bcee_*): ochre sandstone with rusticated base, tall cross-window rows, steep slate roofs, pointed corner turrets, 49 m tower with four dials. */
+  const SAND = [0.98, 0.9, 0.7];
+  const SLATE_C = [0.8, 0.84, 0.92];
+  def('bcee', 'BCEE Spuerkeess (Place de Metz)', { radius: 120, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const stone = { cell: 'stonewin', color: SAND, bay: 3.5, floor: 3.9, jitter: 0.05, baseBand: { h: 4.6, st: { cell: 'rust', color: [0.9, 0.8, 0.62], bay: 3.5, jitter: 0.05 } } };
+    const roofFn = (ring, slope) => (slope > 38 ? (ringTop(ring) > 34 && ringTop(ring) > 36 ? { cell: 'copper', color: WHITE } : { cell: 'slate', color: SLATE_C }) : { cell: 'roofGrey', color: [0.55, 0.56, 0.58] });
+    ['main', 'wing', 'rue'].forEach((role) => lodOr(g, L, role, hi, { wall: stone, roofFn, skirt: 5, steepDeg: 38 }, () => { const p = L.one(role); if (p) prism(g, p.r, null, -4, p.hm || 20, stone, roofS(), hi); }));
+    const towerSt = { cell: 'stonewin', color: [0.9, 0.8, 0.6], bay: 2.4, floor: 4.0, jitter: 0.05 };
+    lodOr(g, L, 'tower', hi, { wall: towerSt, roofFn, skirt: 5, steepDeg: 38 }, () => {});
+    let top = null;
+    L.lod('tower').forEach((b) => b.roofs.forEach((r) => r.forEach((p) => { if (!top || p[2] > top[2]) top = p; })));
+    if (top && hi) { // four clock dials under the copper cap
+      const ty = top[2] - 19 + L.dy; const off = 4.3;
+      [[0, -1], [0, 1], [1, 0], [-1, 0]].forEach((d) => {
+        const px = top[0] + d[0] * off; const pz = top[1] + d[1] * off; const s = 1.9; const tx = -d[1]; const tz = d[0];
+        const A = [px - tx * s, ty - s, pz - tz * s]; const B = [px + tx * s, ty - s, pz + tz * s]; const Cc = [px + tx * s, ty + s, pz + tz * s]; const D = [px - tx * s, ty + s, pz - tz * s];
+        const nn = cross(sub(B, A), sub(D, A)); if (nn[0] * d[0] + nn[2] * d[1] < 0) quadP(g, B, A, D, Cc, 'clock', WHITE); else quadP(g, A, B, Cc, D, 'clock', WHITE);
+      });
+    }
+  });
+
+  /* ---- Bibliothèque nationale du Luxembourg (BnL, Kirchberg, 2019): terracotta-red upper volume with irregular punched windows over a cream stone-slab frieze and a glazed ground floor.
+   * Refs (Commons refs lm3/bnl_*): red rainscreen tower block, multicoloured vertical stone tiles under the lettering "BIBLIOTHEQUE NATIONALE", dark bronze glazing, white soffit. */
+  def('bnl', 'Bibliothèque nationale (BnL)', { radius: 100, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const terra = { cell: 'terra', color: [1, 0.96, 0.93], bay: 11.5, floor: 11.7, jitter: 0.04, baseBand: { h: 6, st: { cell: 'bnlbase', color: WHITE, bay: 6, jitter: 0.02 } } };
+    const cream = { cell: 'plain', color: [0.93, 0.9, 0.82], bay: 8, floor: 8, jitter: 0.03, baseBand: { h: 6, st: { cell: 'bnlbase', color: WHITE, bay: 6, jitter: 0.02 } } };
+    lodOr(g, L, 'bnl', hi, {
+      wall: cream, skirt: 6, parapet: ROOF_PAR, plant: PLANT([0.85, 0.7, 0.66]),
+      wallFn: (ring) => (ringTop(ring) > 13.5 ? terra : cream),
+      roofFn: (ring, slope) => (slope > 5 ? GLASSROOF : (ringTop(ring) > 13.5 ? FLATROOF([0.62, 0.45, 0.4]) : FLATROOF([0.72, 0.72, 0.7]))),
+    }, () => { const p = L.one('bnl'); prism(g, p.r, null, -5, p.hm || 26, terra, FLATROOF(), hi); });
+    if (hi) signOnFacade(g, L, 'bnl', [0.7, 0.7], 4, 9, 3.2, { preferLong: true });
+  });
+
+  /* ================================================================== Kirchberg / Findel */
+  /* ---- Findel Terminal A (2008): long glazed landside front under a flat white canopy roof, steel columns, grey standing-seam fascia (ref lm3/findel_01: tram stop with the terminal behind) */
+  def('findel', 'Findel Airport Terminal A', { radius: 130, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'termA', { cell: 'curtain', color: [0.72, 0.84, 0.9], bay: 5.2, floor: 6, top: { h: 1.4, st: { cell: 'metal', color: [0.9, 0.92, 0.94], bay: 6, floor: 1.4 } }, roofC: [0.78, 0.79, 0.78], plantC: [0.8, 0.82, 0.84] });
+    ['roofA', 'roofB'].forEach((r) => office(g, hi, L, r, { cell: 'plain', color: [0.95, 0.96, 0.96], bay: 8, floor: 8, parapet: false, plant: false, roofC: [0.9, 0.92, 0.93] }));
+    office(g, hi, L, 'small', { cell: 'cladpanel', color: [0.9, 0.92, 0.94], bay: 4, floor: 4 });
+  });
+  /* ---- Héienhaff business park beside the Findel stop: white five-storey office blocks with ribbon windows and the NH hotel */
+  def('heienhaff', 'Héienhaff offices + NH hotel', { showR: SHOWM, radius: 90, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const ribbon = { cell: 'ribbon', color: [0.96, 0.96, 0.95], bay: 3.8, floor: 3.7 };
+    office(g, hi, L, 'h3', Object.assign({}, ribbon, { base: shopBase(4.2, [0.85, 0.9, 0.92]) }));
+    office(g, hi, L, 'h5', Object.assign({}, ribbon, { color: [0.9, 0.93, 0.95], base: shopBase(4.2, [0.85, 0.9, 0.92]) }));
+    office(g, hi, L, 'h4', Object.assign({}, ribbon, { color: [0.93, 0.95, 0.96] }));
+    office(g, hi, L, 'h0', { cell: 'cladpanel', color: [0.95, 0.95, 0.95], bay: 3.6, floor: 3.7 });
+    office(g, hi, L, 'nh', { cell: 'hotelbal', color: [0.97, 0.94, 0.88], bay: 3.7, floor: 3.4, base: shopBase(4.2, [0.9, 0.88, 0.82]) });
+  });
+  /* ---- Route de Trèves offices (Ferrero, J. P. Morgan, Moonar): grey-blue glass boxes with louvres and a pale stone podium */
+  def('treves', 'Route de Trèves offices', { showR: SHOWM, radius: 90, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'ferrero', { cell: 'louvre', color: [0.88, 0.92, 0.95], bay: 3.4, floor: 3.9, base: shopBase(4.6, [0.9, 0.9, 0.88]) });
+    office(g, hi, L, 'jpm', { cell: 'curtain', color: [0.62, 0.72, 0.78], bay: 3.4, floor: 3.9 });
+    office(g, hi, L, 'moonar', { cell: 'cladpanel', color: [0.95, 0.95, 0.96], bay: 3.8, floor: 3.9 });
+    ['moonD', 'moonC', 'moonB', 'moonA'].forEach((r, i) => office(g, hi, L, r, { cell: i % 2 ? 'cladpanel' : 'curtain', color: i % 2 ? [0.93, 0.94, 0.95] : [0.7, 0.8, 0.86], bay: 3.6, floor: 3.9 }));
+    office(g, hi, L, 'atoz', { cell: 'louvre', color: [0.9, 0.92, 0.94], bay: 3.4, floor: 3.9 });
+  });
+  /* ---- Pôle d'échange Serra (P+R at Luxexpo): multi-storey car park with open decks */
+  def('serra', 'Pôle d\'échange Serra (P+R)', { showR: SHOWM, radius: 80, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'serra', { cell: 'parkdeck', color: WHITE, bay: 6.4, floor: 3, parapet: { h: 1.1, color: [0.62, 0.62, 0.6] }, plant: false, roofC: [0.6, 0.6, 0.58] });
+  });
+  /* ---- Auchan Kirchberg + Stadtteilzentrum (Kirchberg District Center): light aluminium-clad blocks with blue and red accents */
+  def('auchan', 'Auchan Kirchberg', { showR: SHOWM, radius: 100, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'mall', { cell: 'cladpanel', color: [0.93, 0.95, 0.97], bay: 4.4, floor: 4.2, top: { h: 2, st: { cell: 'metal', color: [0.8, 0.84, 0.88], bay: 6, floor: 2 } } });
+    if (hi) signOnFacade(g, L, 'mall', [0.7, 0.7], 0, 14, 12, { preferLong: true });
+  });
+  /* ---- Kinepolis Kirchberg: white panel box with the blue sign */
+  def('kinepolis', 'Kinepolis Kirchberg', { showR: SHOWM, radius: 60, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'cine', { cell: 'concretebd', color: [1, 1, 1], bay: 7, floor: 5, parapet: { h: 0.6, color: [0.8, 0.8, 0.8] }, plant: false });
+    if (hi) signOnFacade(g, L, 'cine', [-0.7, 0.7], 1, 12, 8, { preferLong: true });
+  });
+  /* ---- Arendt House, KPMG and State Street on Avenue J.F. Kennedy */
+  def('kpmg', 'KPMG / Arendt House / State Street', { showR: SHOWM, radius: 100, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'arendt', { cell: 'louvre', color: [0.92, 0.94, 0.95], bay: 3.4, floor: 3.9 });
+    office(g, hi, L, 'kpmg', { cell: 'corten', color: WHITE, bay: 5.4, floor: 5.4, jitter: 0.03, plant: false, parapet: { h: 0.6, color: [0.5, 0.28, 0.16] } });
+    office(g, hi, L, 'state', { cell: 'cladpanel', color: [0.82, 0.85, 0.88], bay: 3.6, floor: 3.9 });
+  });
+  /* ---- Université du Luxembourg, JFK building: 1970s concrete block, ribbon windows */
+  def('jfk', 'Université JFK building', { showR: SHOWM, radius: 70, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'jfk', { cell: 'concretebd', color: [0.95, 0.95, 0.93], bay: 5, floor: 4.2 });
+  });
+  /* ---- Sofitel + Novotel (Rue du Fort Niedergrünewald) */
+  def('sofitel', 'Sofitel + Novotel Kirchberg', { showR: SHOWM, radius: 80, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'sofitel', { cell: 'punched', color: [0.94, 0.88, 0.76], bay: 3.4, floor: 3.5, base: shopBase(4.6, [0.88, 0.86, 0.8]) });
+    office(g, hi, L, 'novotel', { cell: 'hotelbal', color: [0.9, 0.92, 0.96], bay: 3.6, floor: 3.4, base: shopBase(4.6, [0.88, 0.9, 0.94]) });
+  });
+  def('mama', 'Mama Shelter + Novotel Suites', { showR: SHOWM, radius: 80, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'mama', { cell: 'cladpanel', color: [0.9, 0.93, 0.95], bay: 3.6, floor: 3.5, base: shopBase(4.6, [0.88, 0.9, 0.94]) });
+    office(g, hi, L, 'suites', { cell: 'hotelbal', color: [0.82, 0.84, 0.86], bay: 3.7, floor: 3.5, base: shopBase(4.2, [0.86, 0.87, 0.88]) });
+  });
+
+  /* ---- Infinity (Kirchberg): sweeping white shopping-centre bands under dark glass towers with vertical white fins (refs lm3 c_infinity 5 / 6 / 7 / 9) */
+  def('infinity', 'Infinity Shopping + towers', { radius: 100, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const podium = { cell: 'plain', color: [0.97, 0.97, 0.96], bay: 8, floor: 8, jitter: 0.01, baseBand: shopBase(5.4, [0.55, 0.6, 0.64]) };
+    const tower = { cell: 'darkfin', color: WHITE, bay: 3.0, floor: 3.8, jitter: 0.02 };
+    lodOr(g, L, 'shop', hi, { wall: podium, wallFn: (ring) => (ringTop(ring) > 24 ? tower : null), skirt: 6, parapet: { h: 0.5, color: [0.96, 0.96, 0.95] }, roofFlat: FLATROOF([0.96, 0.96, 0.95]), roofSteep: GLASSROOF, steepDeg: 12 }, () => { const p = L.one('shop'); if (p) prism(g, p.r, p.holes, -4, p.hm || 14, podium, FLATROOF([0.96, 0.96, 0.95]), hi); });
+    office(g, hi, L, 'tower', { cell: 'darkfin', color: WHITE, bay: 3.0, floor: 3.8 });
+    office(g, hi, L, 't3', { cell: 'darkfin', color: WHITE, bay: 3.0, floor: 3.8 });
+  });
+  /* ================================================================== City: Gare quarter, Place de Metz / Boulevard Royal, Stäreplaz */
+  const HIST = (c, base) => ({ cell: 'stonewin', color: c || [0.98, 0.9, 0.72], bay: 3.5, floor: 3.9, jitter: 0.05, base: base || shopBase(4.6, [0.88, 0.84, 0.74]) });
+  const SLATE_ROOF = { cell: 'slate', color: [0.8, 0.84, 0.92] };
+  /* ---- Spuerkeess branch, Avenue de la Liberté 63 (1960s): eight storeys of pale precast grid with paired windows over a dark glazed base (Commons lm3 c_bldgliberte 0 / 4) */
+  def('liberte63', 'Spuerkeess, Av. de la Liberté 63', { showR: SHOWM, radius: 50, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'b63', { cell: 'punched', color: [0.92, 0.9, 0.84], bay: 3.0, floor: 3.35, base: { h: 4.6, st: { cell: 'shop', color: [0.38, 0.33, 0.3], bay: 3.8, jitter: 0.03 } }, top: { h: 3.3, st: { cell: 'plain', color: [0.86, 0.85, 0.8], bay: 6, floor: 3.3 } } });
+    if (hi) signOnFacade(g, L, 'b63', [1, 0], 5, 11, 4.6, { preferLong: true });
+  });
+  /* ---- Place de la Gare: Espace POST, CFL headquarters, Marriott, Société Générale */
+  def('post', 'Place de la Gare (POST, CFL, Marriott)', { showR: SHOWM, radius: 100, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'post', { cell: 'curtain', color: [0.78, 0.86, 0.9], bay: 3.4, floor: 3.9, base: shopBase(5, [0.86, 0.88, 0.9]) });
+    if (hi) signOnFacade(g, L, 'post', [0, 1], 6, 8, 5.6, { preferLong: true });
+    office(g, hi, L, 'cfl', { cell: 'punched', color: [0.94, 0.88, 0.76], bay: 3.4, floor: 3.9 });
+    office(g, hi, L, 'marriott', { cell: 'punched', color: [0.9, 0.86, 0.78], bay: 3.4, floor: 3.5, base: shopBase(4.6, [0.7, 0.66, 0.6]) });
+    if (hi) signOnFacade(g, L, 'marriott', [0, 1], 7, 9, 5.3, { preferLong: true });
+    office(g, hi, L, 'sg', { cell: 'ribbon', color: [0.88, 0.9, 0.92], bay: 3.8, floor: 3.9, base: shopBase(4.6, [0.85, 0.86, 0.88]) });
+    office(g, hi, L, 'bld3', { cell: 'cladpanel', color: [0.92, 0.92, 0.9], bay: 3.8, floor: 3.9, base: shopBase(4.6, [0.85, 0.86, 0.88]) });
+  });
+  /* ---- Avenue de la Gare corner blocks (Belle Époque, sandstone, mansard slate roofs with turrets; refs lm3 c_bldggare 3 / 4 / 7, gare_av) */
+  def('gareav', 'Avenue de la Gare corner blocks', { showR: SHOWM, radius: 120, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    ['h8', 'o32', 'p32', 'p26', 'hotel'].forEach((role) => {
+      const st = HIST(role === 'p26' ? [0.96, 0.9, 0.78] : [0.99, 0.91, 0.72]);
+      lodOr(g, L, role, hi, { wall: Object.assign({ baseBand: st.base }, st), skirt: 5, roofSteep: SLATE_ROOF, roofFlat: FLATROOF([0.5, 0.5, 0.52]), steepDeg: 36 }, () => { const p = L.one(role); if (p) prism(g, p.r, null, -4, p.hm || 22, st, roofS(), hi); });
+    });
+  });
+  def('bil', 'BIL Boulevard Royal', { showR: SHOWM, radius: 50, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'bil', { cell: 'louvre', color: [0.9, 0.93, 0.95], bay: 3.4, floor: 3.9, base: shopBase(5, [0.88, 0.9, 0.92]) });
+  });
+  /* ---- Institut national des langues + Fondation Pescatore (Boulevard de la Foire) */
+  def('institut', 'Institut national des langues / Fondation Pescatore', { showR: SHOWM, radius: 90, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'inst', { cell: 'ribbon', color: [0.92, 0.9, 0.84], bay: 3.8, floor: 3.8 });
+    office(g, hi, L, 'pesc', { cell: 'brickwin', color: [1, 0.96, 0.92], bay: 3.6, floor: 3.1 });
+  });
+  /* ---- Villa Louvigny (1930s, former Radio Luxembourg): white neoclassical villa */
+  def('louvigny', 'Villa Louvigny', { showR: SHOWM, radius: 70, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const st = { cell: 'stonewin', color: [1, 0.98, 0.94], bay: 3.8, floor: 4.2, jitter: 0.03, baseBand: { h: 4.8, st: { cell: 'rust', color: [0.98, 0.95, 0.88], bay: 3.8, jitter: 0.03 } } };
+    lodOr(g, L, 'villa', hi, { wall: st, skirt: 5, roofSteep: SLATE_ROOF, roofFlat: FLATROOF([0.5, 0.5, 0.52]), steepDeg: 32 }, () => { const p = L.one('villa'); if (p) prism(g, p.r, null, -4, p.hm || 20, st, roofS(), hi); });
+  });
+  /* ---- Boulevard Royal block: 1970s hexagonal-window offices, bank towers (refs lm3 c_bldgblvdroyal 0 / 1 / 5) */
+  def('royal', 'Boulevard Royal offices', { showR: SHOWM, radius: 110, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const hex = (c) => ({ cell: 'hexwin', color: c || WHITE, bay: 3.4, floor: 3.2, jitter: 0.04, base: shopBase(4.6, [0.78, 0.8, 0.8]) });
+    office(g, hi, L, 'r41', hex([1, 0.97, 0.88]));
+    office(g, hi, L, 'r41b', hex([0.96, 0.94, 0.86]));
+    office(g, hi, L, 'r37', hex([1, 0.96, 0.86]));
+    office(g, hi, L, 'zenith', { cell: 'curtain', color: [0.62, 0.74, 0.8], bay: 3.3, floor: 3.9, base: shopBase(5, [0.85, 0.86, 0.88]) });
+    office(g, hi, L, 'lr', HIST());
+    office(g, hi, L, 'banque', { cell: 'punched', color: [0.95, 0.92, 0.84], bay: 3.3, floor: 3.9, base: shopBase(5, [0.8, 0.8, 0.78]) });
+    office(g, hi, L, 'agir', { cell: 'hexwin', color: [0.95, 0.93, 0.88], bay: 3.4, floor: 3.2, base: shopBase(4.6, [0.78, 0.8, 0.8]) });
+    office(g, hi, L, 'schoetter', { cell: 'ribbon', color: [0.9, 0.9, 0.9], bay: 3.8, floor: 3.4, base: shopBase(4.6, [0.78, 0.8, 0.8]) });
+  });
+
+  /* ================================================================== South: Bonnevoie, Howald, Gasperich */
+  /* ---- CFL Atelier central (Bonnevoie): timber-clad barrel-vaulted workshop halls behind the tram (ref lm3 c_lycbou 10) */
+  def('cflat', 'CFL Atelier central', { showR: SHOWM, radius: 150, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    ['h123', 'h4'].forEach((role) => office(g, hi, L, role, { cell: 'timber', color: WHITE, bay: 8, floor: 6, jitter: 0.04, base: { h: 5, st: { cell: 'curtain', color: [0.5, 0.58, 0.6], bay: 4, floor: 5, jitter: 0.02 } }, parapet: false, plant: false, roofC: [0.6, 0.62, 0.64], steep: { cell: 'metal', color: [0.74, 0.76, 0.78] }, steepDeg: 5 }));
+  });
+  def('cflbus', 'CFL bus depot', { showR: SHOWM, radius: 80, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'garage', { cell: 'corrug', color: [0.92, 0.94, 0.95], bay: 8, floor: 6, plant: false });
+    office(g, hi, L, 'admin', { cell: 'cladpanel', color: [0.9, 0.92, 0.94], bay: 3.6, floor: 3.6 });
+  });
+  /* ---- Église Marie Reine de la Paix (Bonnevoie, 1950s): ochre / brown sandstone, tall clock tower with a dark louvred belfry, green copper porch roof (ref lm3 c_mrp 0) */
+  def('bonnchurch', 'Église Marie Reine de la Paix', { showR: SHOWM, radius: 50, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const sand = { cell: 'sandblock', color: WHITE, bay: 5, floor: 5, jitter: 0.06 };
+    const tower = { cell: 'sandblock', color: [0.95, 0.9, 0.85], bay: 5, floor: 5, jitter: 0.05, topBand: { h: 7.5, st: { cell: 'corrug', color: [0.22, 0.25, 0.27], bay: 6, floor: 7.5 } } };
+    lodOr(g, L, 'church', hi, { wall: sand, wallFn: (ring) => (ringTop(ring) > 30 ? tower : null), skirt: 5, roofSteep: { cell: 'copper', color: [0.8, 0.95, 0.9] }, roofFlat: FLATROOF([0.45, 0.5, 0.48]), steepDeg: 12 }, () => { const p = L.one('church'); if (p) prism(g, p.r, null, -4, p.hm || 14, sand, roofS(), hi); });
+    let ymax = -1e9; L.lod('church').forEach((b) => b.roofs.forEach((r) => r.forEach((p) => { ymax = Math.max(ymax, p[2]); })));
+    const tp = []; L.lod('church').forEach((b) => b.roofs.forEach((r) => r.forEach((p) => { if (p[2] > ymax - 0.6) tp.push(p); })));
+    if (tp.length && hi) { // clock dials on the belfry, centred on the highest roof vertices
+      const bb = bbox(tp.map((p) => [p[0], p[1]])); const top = [(bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2, ymax];
+      const ty = top[2] - 5.2 + L.dy; const off = Math.max(bb[2] - bb[0], bb[3] - bb[1]) / 2 + 0.15;
+      [[0, -1], [0, 1], [1, 0], [-1, 0]].forEach((d) => {
+        const px = top[0] + d[0] * off; const pz = top[1] + d[1] * off; const s = 1.7; const tx = -d[1]; const tz = d[0];
+        const A = [px - tx * s, ty - s, pz - tz * s]; const B = [px + tx * s, ty - s, pz + tz * s]; const Cc = [px + tx * s, ty + s, pz + tz * s]; const D = [px - tx * s, ty + s, pz - tz * s];
+        const nn = cross(sub(B, A), sub(D, A)); if (nn[0] * d[0] + nn[2] * d[1] < 0) quadP(g, B, A, D, Cc, 'clock', WHITE); else quadP(g, A, B, Cc, D, 'clock', WHITE);
+      });
+    }
+  });
+  def('howald', 'Howald: Cactus + offices', { showR: SHOWM, radius: 90, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'cactus', { cell: 'cladpanel', color: [0.95, 0.96, 0.95], bay: 5, floor: 4.5, base: shopBase(4.5, [0.8, 0.82, 0.84]) });
+    office(g, hi, L, 'office', { cell: 'curtain', color: [0.66, 0.76, 0.82], bay: 3.4, floor: 3.9 });
+  });
+  def('vauban', 'Lycée Vauban / Rue A. Einstein school', { showR: SHOWM, radius: 120, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'school', { cell: 'cladpanel', color: [0.96, 0.94, 0.9], bay: 3.8, floor: 3.9 });
+  });
+  /* ---- Cloche d'Or glass towers: Melius, Intesa Sanpaolo, Spaces (ref lm3 c_bldgsgasperich 11: blue grid curtain wall with a white side) */
+  def('melius', 'Gasperich towers (Melius)', { radius: 100, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'melius', { cell: 'curtain', color: [0.56, 0.66, 0.84], bay: 3.0, floor: 3.9, top: { h: 4, st: { cell: 'plain', color: [0.9, 0.92, 0.94], bay: 6, floor: 4 } } });
+    office(g, hi, L, 'intesa', { cell: 'curtain', color: [0.7, 0.8, 0.86], bay: 3.3, floor: 3.9, base: shopBase(5, [0.85, 0.86, 0.88]) });
+    office(g, hi, L, 'spaces', { cell: 'ribbon', color: [0.9, 0.92, 0.9], bay: 3.8, floor: 3.9 });
+  });
+  def('pwc', 'PwC Gasperich', { showR: SHOWM, radius: 70, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'pwc', { cell: 'ribbon', color: [0.72, 0.88, 0.8], bay: 3.8, floor: 3.9 });
+  });
+  /* ---- Waassertuerm (Gasperich): the white water tower, a cylinder perforated with lace-like cut-outs (ref lm3 c_waass 4 / 5 / 9) */
+  def('wtower', 'Waassertuerm', { radius: 40, showR: { high: 1500, medium: 1200, low: 900 }, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const lace = { cell: 'lace', color: WHITE, bay: 1.9, floor: 7, jitter: 0.01 };
+    lodOr(g, L, 'tower', hi, { wall: lace, skirt: 4, roofFlat: FLATROOF([0.85, 0.85, 0.83]), roofSteep: FLATROOF([0.85, 0.85, 0.83]) }, () => {
+      const p = L.one('tower'); if (!p) return; const c = centroid(p.r); const R = Math.sqrt(Math.abs(area2(p.r)) / 2 / Math.PI);
+      cylinder(g, c[0], c[1], -4, 52, R, R * 0.97, hi ? 20 : 10, lace, { cell: 'roofGrey', color: [0.85, 0.85, 0.83] }, hi);
+    });
+  });
+  def('bbhotel', 'B&B Hotel Cloche d\'Or', { showR: SHOWM, radius: 50, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'hotel', { cell: 'hotelbal', color: [0.95, 0.93, 0.88], bay: 3.6, floor: 3.2, base: shopBase(4, [0.7, 0.75, 0.8]) });
+  });
+  def('prstade', 'P+R Stade + sports hall', { showR: SHOWM, radius: 90, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    office(g, hi, L, 'pr', { cell: 'parkdeck', color: WHITE, bay: 6.4, floor: 3, parapet: { h: 1.1, color: [0.62, 0.62, 0.6] }, plant: false });
+    office(g, hi, L, 'sport', { cell: 'corrug', color: [0.9, 0.92, 0.92], bay: 6, floor: 5 });
+  });
+
+  /* ---- Churches along the line */
+  const SPIRE_ROOF = { cell: 'slatespire', color: [0.9, 0.92, 1] };
+  /* Sacré-Cœur (Place de Paris / Gare, 1930s): cream-rendered Romanesque church with a square tower under a dark pyramid roof and slate side roofs (refs lm3 c_sacre 0 / 1 / 4) */
+  def('sacre', 'Église du Sacré-Cœur', { radius: 60, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const nave = { cell: 'churchwin1', color: [0.96, 0.93, 0.84], bay: 4.8, floor: 7.5, jitter: 0.03 };
+    lodOr(g, L, 'church', hi, { wall: nave, skirt: 5, roofSteep: SPIRE_ROOF, roofFlat: FLATROOF([0.5, 0.5, 0.52]), steepDeg: 22 }, () => { const p = L.one('church'); if (p) prism(g, p.r, null, -4, p.hm || 16, nave, roofS(), hi); });
+  });
+  /* Saints-Apôtres-Pierre-et-Paul (Rue Jean-Pierre Probst, Limpertsberg): the Russian-Orthodox church (OSM way 299671448; the earlier model of a neo-Gothic "Hollerich" church with a slate spire
+   * was the wrong building: Hollerich is not on the line).  Refs (Commons Category:Russian-Orthodox Church (Luxembourg)): small white rendered church of round towers, a wooden door,
+   * a golden onion dome over the middle and four blue onion domes with golden crosses on white drums. */
+  def('saintspierre', 'Saints-Apôtres-Pierre-et-Paul (Russian Orthodox)', { showR: SHOWM, radius: 50, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    const p = L.one('church'); if (!p) return;
+    const wallW = { cell: 'plain', color: [1.22, 1.22, 1.2], bay: 12, floor: 12, jitter: 0.01 };
+    const base = { cell: 'plain', color: [0.62, 0.62, 0.64], bay: 12, floor: 12, jitter: 0 };
+    const blue = { cell: 'plain', color: [0.1, 0.17, 0.62], floor: 4, jitter: 0 };
+    const gold = { cell: 'plain', color: [1.3, 0.98, 0.28], floor: 4, jitter: 0 };
+    const dark = { cell: 'plain', color: [0.22, 0.23, 0.25], floor: 4, jitter: 0 };
+    const hm = Math.min(p.hm || 8, 9);
+    prism(g, p.r, null, -4, 1.1, base, false, hi);
+    prism(g, p.r, null, 1.1, hm, wallW, { cell: 'plain', color: [0.3, 0.3, 0.32] }, hi);
+    const c = centroid(orient(p.r, true));
+    let x0 = 1e9; let x1 = -1e9; let z0 = 1e9; let z1 = -1e9;
+    p.r.forEach((q) => { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); });
+    const seg = hi ? 10 : 6;
+    const PROFILE = [[0.78, 0], [1, 0.28], [1.04, 0.7], [0.86, 1.2], [0.52, 1.7], [0.2, 2.1], [0.07, 2.45]];   // onion: (radius factor, height factor)
+    const onion = (cx, cz, y0, r, k, st, crossH) => {
+      for (let i = 0; i + 1 < PROFILE.length; i++) cylinder(g, cx, cz, y0 + PROFILE[i][1] * k, y0 + PROFILE[i + 1][1] * k, PROFILE[i][0] * r, PROFILE[i + 1][0] * r, seg, st, i + 2 === PROFILE.length ? gold : false, false);
+      const ty = y0 + PROFILE[PROFILE.length - 1][1] * k;
+      box(g, cx, ty + crossH / 2, cz, 0.1, crossH, 0.1, 0, gold, false, false);
+      box(g, cx, ty + crossH * 0.62, cz, 0.55, 0.1, 0.1, 0, gold, false, false);
+    };
+    // central drum + golden dome
+    cylinder(g, c[0], c[1], hm, hm + 2.1, 2.5, 2.5, seg, wallW, dark, false);
+    onion(c[0], c[1], hm + 2.1, 2.7, 2.0, gold, 1.4);
+    // four corner turrets: round white drums with blue domes
+    const ex = (x1 - x0) * 0.3; const ez = (z1 - z0) * 0.3;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+      const tx = c[0] + sx * ex; const tz = c[1] + sz * ez;
+      cylinder(g, tx, tz, hm - 0.4, hm + 1.2, 1.5, 1.4, seg, wallW, dark, false);
+      onion(tx, tz, hm + 1.2, 1.55, 1.25, blue, 0.9);
+    });
+  });
+
+  /*PL-DEFS-END*/
+
   /* ================================================================== generic fallback for any landmark without its own model */
   Object.keys(FP).forEach((key) => {
     if (DEFS.some((d) => d.key === key)) return;
@@ -1971,7 +2554,7 @@
   });
 
   /* ================================================================== runtime */
-  const DATA_URL = '/pb/train-sim/data/luxtram-landmarks.json?v=1';
+  const DATA_URL = '/pb/train-sim/data/luxtram-landmarks.json?v=2';
   let lodState = 0; // 0 idle, 1 loading, 2 ready, 3 failed
   const lodWaiters = [];
   let lodPromise = null;

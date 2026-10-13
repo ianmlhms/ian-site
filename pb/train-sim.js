@@ -285,7 +285,7 @@
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
     loaderSet(isLux ? 0.22 : 0.3);
-    const landscape = build('landscape', 'create', [scene, track.base || track, { quality }]);   // the return direction shares the forward track's scenery
+    const landscape = build('landscape', 'create', [scene, track.base || track, { quality, reverse: !!track.reverse }]);   // the return direction shares the forward track's scenery
     loaderSet(isLux ? 0.32 : 0.55);
     await frameDelay();
     const rootsBefore = new Set(scene.children);
