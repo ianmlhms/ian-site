@@ -347,7 +347,12 @@
       if (v < 0.02 && tractionN === 0) v = 0;
 
       /* --- buffer stop at the end of the line --- */
-      const endS = Math.min(track.length - 3, (stations[lastIndex] ? stations[lastIndex].s + 70 : track.length));
+      // the end of the line stays inside the last stop's arrival zone and door overlap, so a train that overran into it can still open
+      // its doors and finish the service (before, it stood a few metres outside both and the run, endless included, never ended)
+      const lastSt = stations[lastIndex];
+      const endS = lastSt
+        ? Math.min(track.length - 3, lastSt.s + 70, (lastSt.platformEnd ?? lastSt.s + 20) + len - 6, lastSt.s + STOP_ZONE_AHEAD + Math.max(0, (lastSt.platformEnd ?? lastSt.s) - lastSt.s) - 1)
+        : track.length;
       if (s > endS) {
         if (v > 3) { totals.bufferHits++; cash -= BUFFER_FINE; events.push({ type: 'buffer', fine: BUFFER_FINE }); }
         s = endS; v = 0; a = 0;

@@ -29,7 +29,8 @@ async function cabPoint(h, frame, id, notch) {
 }
 const key = (h, k) => h.page.keyboard.press(k);
 /* endless: every route there and back (forward, then the return direction '~r'), then the next route */
-const LUXTRAM_ORDER = ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram'].flatMap((id) => [id, id + '~r']);
+// endless follows the line: Findel -> Rout Bréck -> Gare -> Stadion, back the same way, then the whole line there and back
+const LUXTRAM_ORDER = ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram-sud~r', 'luxtram-stad~r', 'luxtram-kierchbierg~r', 'luxtram', 'luxtram~r'];
 /* Ian's real save before the two-career split (flat v1 shape). */
 const OLD_SAVE = { v: 1, tb: 6800, lifetime: 6800, wallet: 3300, savedAt: 1700000000000, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west',
   upgrades: { railcar: { motor: 2, brakes: 1, comfort: 1, capacity: 0, paint: 1 } }, best: { west: 292 }, services: 4, endlessBest: 0, hints: false, hintsSet: true };
@@ -405,14 +406,20 @@ async function directionAndGearChecks(h, frame) {
   for (let k = 0; k < 3; k++) {
     const s0 = await S(frame);
     seen.push(s0.routeId);
-    await frame.evaluate(() => { __tsTest.finishRoute(); });
-    await h.pause(300);
-    await frame.evaluate(() => { __tsTest.stopAtMarker(-0.5); });
+    if (k === 0) {
+      // overrun the last stop into the end of the line: the doors must still open there and the service must still end
+      const end = await frame.evaluate(() => { const len = __tsTest.trackInfo().length; __tsTest.placeAt(len - 70, 25); __tsTest.forceSimStep(20, 0); const st = __tsTest.state(); return { s: st.s, len, kmh: st.kmh, plat: st.platformIndex, last: st.stations.length - 1 }; });
+      h.expect(end.kmh < 0.5 && end.s > end.len - 20 && end.plat === end.last, 'overran into the end of the line: stopped there and still at the last platform (' + JSON.stringify(end) + ')');
+    } else {
+      await frame.evaluate(() => { __tsTest.finishRoute(); });
+      await h.pause(300);
+      await frame.evaluate(() => { __tsTest.stopAtMarker(-0.5); });
+    }
     await h.pause(300);
     await key(h, 'd');
     await waitState(frame, (r) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId !== r && !window.__tsTest.state().finished, s0.routeId, 90000);
   }
-  h.eq(seen.slice(0, 3), ['luxtram-kierchbierg', 'luxtram-kierchbierg~r', 'luxtram-stad'], 'Findel - Kierchbierg, then back, then the next route - no summary in between');
+  h.eq(seen.slice(0, 3), ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud'], 'Findel - Rout Bréck, then on to the Gare, then Stadion (the first one ended by an overrun into the end of the line) - no summary in between');
   await frame.evaluate(() => __tsTest.toMenu());
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');
 }

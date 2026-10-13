@@ -292,8 +292,34 @@
   /* All routes the train can drive in endless mode (regardless of purchase), in route-list order. */
   function endlessOrder(trainId) {
     const train = trainById(trainId);
-    // endless: every route there and back (forward, then the return direction), then the next route
-    return routeOrder().filter((id) => trainDrivesClass(train, routeClass(id))).flatMap((id) => [id, id + REV]);
+    // endless: every route in both directions, chained so that each service starts where the previous one ended
+    // (rail: there and back, route after route; Luxtram: Findel -> Rout Bréck -> Gare -> Stadion and back, then the whole line)
+    const ids = routeOrder().filter((id) => trainDrivesClass(train, routeClass(id)));
+    return chainRoutes(ids.flatMap((id) => [id, id + REV]));
+  }
+  function endsOf(routeId) {
+    const list = TS.routes && Array.isArray(TS.routes.list) ? TS.routes.list : [];
+    const def = list.find((r) => r.id === baseOf(routeId));
+    const names = def && Array.isArray(def.stations) ? def.stations : [];
+    if (!names.length) return null;
+    const first = names[0];
+    const last = names[names.length - 1];
+    return routeId.endsWith(REV) ? { from: last, to: first } : { from: first, to: last };
+  }
+  function chainRoutes(candidates) {
+    const left = candidates.slice();
+    const out = [];
+    let at = null;
+    while (left.length) {
+      const startsHere = (id) => { const e = endsOf(id); return !!e && e.from === at; };
+      const fwd = at === null ? -1 : left.findIndex((id) => !id.endsWith(REV) && startsHere(id));   // carry on along the line first
+      const k = fwd >= 0 ? fwd : at === null ? -1 : left.findIndex(startsHere);
+      const id = left.splice(k >= 0 ? k : 0, 1)[0];
+      out.push(id);
+      const e = endsOf(id);
+      at = e ? e.to : null;
+    }
+    return out;
   }
 
   // ---- ranks (per career)
