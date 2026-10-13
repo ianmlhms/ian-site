@@ -695,6 +695,27 @@
     const f = track.frameAt(s, frameTmp);
     return [f.pos.x + f.right.x * lat, f.pos.y + dy, f.pos.z + f.right.z * lat];
   }
+  /* test hook (scripts / pole sweep): window.__tsPoleLog = [] before the page loads collects every pole the infra builds ({ kind, s, x, z }) */
+  function logPole(kind, s, p) {
+    const log = typeof window !== 'undefined' ? window.__tsPoleLog : null;
+    if (log) log.push({ kind, s, x: p[0], z: p[2] });
+  }
+  /* LUXTRAM street running: a pole's default spot (mast 3.45 m, signal 3.9 m, limit board 4.7 m, km post 5.6 m beside the track) can be a traffic lane.
+     luxtram-world.js publishes TS.luxRoadMargin(x, z) = metres to the nearest carriageway edge (negative = inside a lane).  Returns the lateral offset
+     of the first spot outside every lane: first inwards (between track and lane, never closer than 2.3 m to the axis; not at stops, where the platform is),
+     then outwards onto the pavement (at most `maxOut` m, default 10: a mast with its cantilever arm gets 6 so it never stands far out in a wide plaza).  `frameAt` = frame function of the track the offset refers to. */
+  function roadSafeLat(track, s, lat, frameAt, atStop, maxOut) {
+    const margin = window.TS.luxRoadMargin;
+    if (track.kind !== 'tram' || typeof margin !== 'function') return lat;
+    const f = (frameAt || track.frameAt)(s);
+    const sd = lat < 0 ? -1 : 1;
+    const a = Math.abs(lat);
+    const ok = (l) => margin(f.pos.x + f.right.x * l * sd, f.pos.z + f.right.z * l * sd) > 0.35;
+    if (ok(a)) return lat;
+    if (!atStop) for (let l = a - 0.3; l >= 2.3; l -= 0.3) if (ok(l)) return sd * l;
+    for (let l = a + 0.5; l <= a + (maxOut || 10); l += 0.5) if (ok(l)) return sd * l;
+    return lat;
+  }
   function inStation(track, s, pad) {
     const idx = track.stations.findIndex((st) => s >= st.platformStart - pad && s <= st.platformEnd + pad);
     return idx;
@@ -821,11 +842,12 @@
 
     const mast = (frameAt, s, side) => {
       const f = frameAt(s);
-      const lat = side * tramMastLat(track, s, side);
+      const lat = roadSafeLat(track, s, side * tramMastLat(track, s, side), frameAt, inStation(track, s, 8) >= 0, 6);
       const theta = Math.atan2(f.tangent.x, -f.tangent.z);
       const P = (l, dy) => [f.pos.x + f.right.x * l, f.pos.y + dy, f.pos.z + f.right.z * l];
       const st = tramStagger(s);
       const base = P(lat, 0.14);
+      logPole('mast', s, base);
       if (ctx.env.ocsLog) ctx.env.ocsLog.push({ kind: 'mast', track: side === 1 ? 'player' : 'opposite', s, lat: Math.abs(lat), p: base, c: [f.pos.x, f.pos.y, f.pos.z] });
       dark.box(base[0], base[1] + 3.6, base[2], 0.22, 7.4, 0.22, poleCol, -theta);
       dark.box(base[0], base[1] + 0.2, base[2], 0.5, 0.4, 0.5, col('#a7a49e'), -theta);
@@ -868,11 +890,13 @@
       const sd = ctx.kind === 'tram' ? 1 : lateralFree(track, lim.s);   // tram: right of the track (the left side is the opposite track)
       let lat = sd * (ctx.kind === 'tram' ? 4.7 : 2.95);
       if (ctx.kind === 'tram') { const si = inStation(track, lim.s, 4); if (si >= 0 && track.stations[si].side === 'right' && track.stations[si].kind !== 'island') lat = track.stations[si].edge + track.stations[si].width + 0.45; }
+      lat = roadSafeLat(track, lim.s, lat, null, ctx.kind === 'tram' && inStation(track, lim.s, 4) >= 0);
       const f = track.frameAt(lim.s);
       const th = [f.tangent.x, 0, f.tangent.z];
       const tl = Math.hypot(th[0], th[2]) || 1;
       const nrm = [-th[0] / tl, 0, -th[2] / tl];
       const base = posAt(track, lim.s, lat, ctx.kind === 'tram' ? 0.14 : -0.2);
+      logPole('limit', lim.s, base);
       post.box(base[0], base[1] + 1.2, base[2], 0.09, 2.5, 0.09, col('#6c7075'), -Math.atan2(f.tangent.x, -f.tangent.z));
       const batch = sets.get('limit:' + lim.kmh, () => M.tex('limit' + lim.kmh, limitTexture(lim.kmh), {}));
       const r = [f.right.x, 0, f.right.z];
@@ -932,9 +956,11 @@
       if (s > track.length || track.inTunnel(s) || track.bridgeAt(s)) continue;
       const sd = ctx.kind === 'tram' ? 1 : -lateralFree(track, s);
       const si = ctx.kind === 'tram' ? inStation(track, s, 4) : -1;
-      const p = posAt(track, s, sd * (ctx.kind === 'tram' ? (si >= 0 && track.stations[si].kind !== 'island' ? track.stations[si].edge + track.stations[si].width + 0.9 : 5.6) : 3.1), ctx.kind === 'tram' ? 0.14 : -0.3);
+      const kmLat = sd * (ctx.kind === 'tram' ? (si >= 0 && track.stations[si].kind !== 'island' ? track.stations[si].edge + track.stations[si].width + 0.9 : 5.6) : 3.1);
+      const p = posAt(track, s, ctx.kind === 'tram' ? roadSafeLat(track, s, kmLat, null, si >= 0) : kmLat, ctx.kind === 'tram' ? 0.14 : -0.3);
       const f = track.frameAt(s);
       const th = -Math.atan2(f.tangent.x, -f.tangent.z);
+      logPole('km', s, p);
       post.box(p[0], p[1] + 0.5, p[2], 0.14, 1.0, 0.1, col('#e8e6de'), th);
       post.box(p[0], p[1] + 0.92, p[2], 0.15, 0.2, 0.11, col('#1a1b1d'), th);
     }
@@ -950,9 +976,10 @@
   function buildSignal(env, track, sig, index, aspect) {
     const f = track.frameAt(sig.s);
     const group = new T.Group();
-    const lat = 3.9;
     const sd = lateralFree(track, sig.s);
+    const lat = Math.abs(roadSafeLat(track, sig.s, 3.9, null, false));
     group.position.set(f.pos.x + f.right.x * lat * sd, f.pos.y, f.pos.z + f.right.z * lat * sd);
+    logPole('signal', sig.s, [group.position.x, 0, group.position.z]);
     group.rotation.y = -Math.atan2(f.tangent.x, -f.tangent.z);
     const local = new Batch(new T.Vector3());
     local.box(0, 1.9, 0, 0.17, 4.9, 0.17, col('#7b8086'));

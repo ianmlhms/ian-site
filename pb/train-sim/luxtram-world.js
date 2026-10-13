@@ -293,7 +293,7 @@
   let geoIndex = null;
   let structData = null;
   function loadStructures() { if (!structData) { try { structData = syncJson(GEO_BASE + 'structures.json?v=1'); } catch (e) { structData = { over: [] }; } } return structData; }
-  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=1'); return geoIndex; }
+  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=2'); return geoIndex; }
   /* Fetches the three data files the world needs at build time asynchronously (with a byte count) so that create() finds them in memory instead of
      blocking on synchronous requests. Resolves when all are in (or failed: create() then falls back to the blocking request). */
   function prefetchData() {
@@ -301,7 +301,7 @@
     const jobs = [];
     if (!worldData) jobs.push(getJson(WORLD_URL).then((d) => { if (!worldData) worldData = d; }));
     if (!structData) jobs.push(getJson(GEO_BASE + 'structures.json?v=1').then((d) => { if (!structData) structData = d; }).catch(() => { /* optional: loadStructures() falls back */ }));
-    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=1').then((d) => { if (!geoIndex) geoIndex = d; }));
+    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=2').then((d) => { if (!geoIndex) geoIndex = d; }));
     return Promise.all(jobs).then(() => true, (e) => { console.warn(TAG + 'data prefetch failed, loading synchronously', e); return false; });
   }
 
@@ -475,6 +475,7 @@
     scene.add(root);
     const chunks = new Map();
     const roadsByChunk = new Map();
+    const lampsByChunk = new Map();   // road lamp positions per chunk (test hook: debugRoadFurniture)
     let disposed = false;
     let nightK = 0;
     const firstCi = Math.max(0, Math.floor(lt.origFromAbs(lt.sStart) / data.chunk) - 1);
@@ -522,6 +523,59 @@
     const matLampGlow = new T.MeshBasicMaterial({ side: T.DoubleSide, vertexColors: true });
     const mats = [matWall, matRoof, matBed, matRoad, matPave, matMisc, matSteel, matLeaf, matLampGlow];
     const treeTpl = [treeTemplate(0), treeTemplate(1)];
+
+    /* ---- static road index of the whole line (scene metres) for the pole placement rules: TS.luxRoadMargin(x, z) = distance from (x, z) to the nearest
+       carriageway edge of a ground-level road (negative = inside the carriageway).  infra.js keeps masts, boards, signals and km posts out of lanes with it. */
+    const ROAD_CELL = 40;
+    const roadCells = new Map();
+    let roadIndexBuilt = false;
+    function indexRoads() {
+      if (roadIndexBuilt) return;
+      roadIndexBuilt = true;
+      Object.keys(data.chunks).forEach((k) => (data.chunks[k].r || []).forEach((rd) => {
+        const cls = rd[0]; const flags = rd[1]; const hw = rd[3] / 20;
+        if ((flags & 3) || cls > 4) return;                    // bridges / underground / service lanes
+        const pts = decodeFlat(rd[4]).map(toScene);
+        for (let i = 0; i + 1 < pts.length; i++) {
+          const a = pts[i]; const b = pts[i + 1];
+          const seg = [a[0], a[1], b[0], b[1], hw];
+          const x0 = Math.floor((Math.min(a[0], b[0]) - hw) / ROAD_CELL); const x1 = Math.floor((Math.max(a[0], b[0]) + hw) / ROAD_CELL);
+          const z0 = Math.floor((Math.min(a[1], b[1]) - hw) / ROAD_CELL); const z1 = Math.floor((Math.max(a[1], b[1]) + hw) / ROAD_CELL);
+          for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) { const key = cx + ',' + cz; const l = roadCells.get(key); if (l) l.push(seg); else roadCells.set(key, [seg]); }
+        }
+      }));
+    }
+    function roadMargin(x, z) {
+      indexRoads();
+      const near = roadCells.get(Math.floor(x / ROAD_CELL) + ',' + Math.floor(z / ROAD_CELL));
+      let best = Infinity;
+      if (!near) return best;
+      for (let i = 0; i < near.length; i++) {
+        const g = near[i];
+        const dx = g[2] - g[0]; const dz = g[3] - g[1]; const l2 = dx * dx + dz * dz || 1;
+        const t = clamp(((x - g[0]) * dx + (z - g[1]) * dz) / l2, 0, 1);
+        const m = Math.hypot(x - (g[0] + dx * t), z - (g[1] + dz * t)) - g[4];
+        if (m < best) best = m;
+      }
+      return best;
+    }
+    TS.luxRoadMargin = roadMargin;
+    /* margin to every road except `own` (a runtime road record { pts, hw }): the post of a crossing stands at the kerb of its own road */
+    function roadMarginExcept(x, z, own) {
+      indexRoads();
+      const near = roadCells.get(Math.floor(x / ROAD_CELL) + ',' + Math.floor(z / ROAD_CELL));
+      let best = Infinity;
+      if (!near) return best;
+      for (let i = 0; i < near.length; i++) {
+        const g = near[i];
+        const dx = g[2] - g[0]; const dz = g[3] - g[1]; const l2 = dx * dx + dz * dz || 1;
+        const t = clamp(((x - g[0]) * dx + (z - g[1]) * dz) / l2, 0, 1);
+        const m = Math.hypot(x - (g[0] + dx * t), z - (g[1] + dz * t)) - g[4];
+        if (m < best && !segOnRoad(g, own)) best = m;
+      }
+      return best;
+    }
+    const segOnRoad = (g, rd) => rd.pts.some((p) => Math.hypot(p.x - g[0], p.z - g[1]) < 0.05) && rd.pts.some((p) => Math.hypot(p.x - g[2], p.z - g[3]) < 0.05);
 
     /* ---- coordinates: scene = local frame - route origin (x, z); y = absolute height - route origin height */
     const toScene = (p) => [p[0] - ox, p[1] - oz];
@@ -1283,7 +1337,7 @@
               const dl = seg || 1; const nxv = -(pts[i].z - pts[i - 1].z) / dl; const nzv = (pts[i].x - pts[i - 1].x) / dl;
               const side = (lampOut.n++ % 2) ? 1 : -1;
               const lx = pts[i].x + nxv * side * (width / 2 + 1.2); const lz = pts[i].z + nzv * side * (width / 2 + 1.2);
-              if (nearest(lx, lz).d > 5.5) lampOut.list.push([lx, lz, -nxv * side, -nzv * side]);
+              if (nearest(lx, lz).d > 5.5 && roadMargin(lx, lz) > 0.4) lampOut.list.push([lx, lz, -nxv * side, -nzv * side]);   // never in another lane
             }
           }
         }
@@ -1438,6 +1492,54 @@
       }
     }
     /* concrete box-girder deck with parapets, piers and abutments (the named Pont Rouge / Pont Adolphe leave their detail to the landmarks) */
+    /* The two big named bridges carry the real road: the tram next to the carriageways, cycle / foot paths on the outer edges.  The national orthophoto
+       shows the deck on the valley floor (build_luxtram_geo.py paints the valley back in), so the deck top has to be meshed here, at deck level, with the
+       real lane layout.  Lateral offsets are metres to the right of the tram track, measured from the LiDAR deck footprint and the OSM carriageways:
+         Pont Grande-Duchesse Charlotte  deck -23.0 .. +5.0   (tram on the north side, 2 + 2 lanes and the cycle path to the south, footway on the north edge)
+         Pont Adolphe                    deck  -8.0 .. +11.5  (tram, 2-lane carriageway, footways both sides) */
+    const DECK_PROFILES = {
+      Charlotte: { fascia: '#a8352e', under: '#7a2420', rail: '#d9d6cf', parts: [['pave', -23.0, -19.4], ['road', -19.4, -12.3], ['road', -12.3, -5.4], ['tram', -5.4, 1.6], ['pave', 1.6, 5.0]] },
+      Adolphe: { fascia: '#cdbf9f', under: '#a99978', rail: '#d8cfba', noParapet: true, parts: [['pave', -8.0, -5.6], ['tram', -5.6, 1.6], ['road', 1.6, 8.4], ['pave', 8.4, 11.5]] },
+    };
+    const DECK_DROP = 0.04;       // road surface just below the rail head (the tram bed ribbons sit on top of it)
+    function deckStrip(m, sA, sB, lat0, lat1, col, u0, u1, vScale) {
+      const n = Math.max(1, Math.ceil((sB - sA) / 3));
+      const base = m.count; let dist = 0; let prev = null;
+      for (let i = 0; i <= n; i++) {
+        const s = sA + ((sB - sA) * i) / n;
+        const f = frame(s);
+        const y = f.pos.y - DECK_DROP;
+        const ax = f.pos.x + f.right.x * lat0; const az = f.pos.z + f.right.z * lat0;
+        if (prev) dist += Math.hypot(ax - prev[0], az - prev[1]);
+        prev = [ax, az];
+        m.vert(ax, y, az, 0, 1, 0, u0, dist / vScale, col);
+        m.vert(f.pos.x + f.right.x * lat1, y, f.pos.z + f.right.z * lat1, 0, 1, 0, u1, dist / vScale, col);
+      }
+      for (let i = 0; i < n; i++) { const a = base + i * 2; m.quad(a, a + 1, a + 3, a + 2); }
+    }
+    function buildNamedDeck(br, batch, ca, cb) {
+      const key = /Charlotte/.test(br.name || '') ? 'Charlotte' : 'Adolphe';
+      const P = DECK_PROFILES[key];
+      // the part of the deck inside this chunk (the deck is longer than a chunk and chunks stream in and out on their own)
+      const sA = Math.max(br.s0 - 0.5, ca); const sB = Math.min(br.s1 + 0.5, cb);
+      if (sB - sA < 0.5) return;
+      const l0 = P.parts[0][1]; const l1 = P.parts[P.parts.length - 1][2];
+      P.parts.forEach(([kind, a, b]) => {
+        if (kind === 'road') deckStrip(batch.road, sA, sB, a, b, [1, 1, 1], 0.5, 1, 8);
+        else if (kind === 'tram') deckStrip(batch.road, sA, sB, a, b, [1.28, 1.28, 1.3], 0, 0.5, 8);
+        else deckStrip(batch.pave, sA, sB, a, b, [0.95, 0.94, 0.92], 0, 1, 4);
+      });
+      const fas = C(P.fascia); const und = C(P.under); const rail = C(P.rail);
+      const yTop = (f) => f.pos.y - DECK_DROP;
+      wallStrip(batch.misc, sA, sB, () => l0, (f) => yTop(f) - 1.35, (f) => yTop(f) + 0.12, fas, -1);
+      wallStrip(batch.misc, sA, sB, () => l1, (f) => yTop(f) - 1.35, (f) => yTop(f) + 0.12, fas, 1);
+      flatStrip(batch.misc, sA, sB, l0, l1, (f) => yTop(f) - 1.35, und, false, { step: 3 });
+      // parapets: low wall + handrail on both outer edges (Pont Adolphe: the landmark draws its stone balustrade)
+      if (!P.noParapet) [[l0 + 0.18, -1], [l1 - 0.18, 1]].forEach(([lat, sd]) => {
+        wallStrip(batch.misc, sA, sB, () => lat, (f) => yTop(f) + 0.1, (f) => yTop(f) + 1.0, rail, -sd, { step: 3 });
+        flatStrip(batch.misc, sA, sB, lat - 0.1, lat + 0.1, (f) => yTop(f) + 1.0, rail, true, { step: 3 });
+      });
+    }
     function buildBridge(br, batch) {
       const named = /Charlotte|Adolphe/.test(br.name || '');
       if (named && hasLandmarkFor(br.name)) return;
@@ -1445,11 +1547,13 @@
       const lL = (s) => slotLatL(s) - 0.9; const lR = SLOT_IN_R + 0.9;
       const depth = named ? 2.4 : 1.5;
       const deckCol = named ? C('#a9a69f') : CONC;
-      wallStrip(batch.misc, sA, sB, lL, (f) => f.pos.y - depth, (f) => f.pos.y + 1.05, deckCol, 1);
-      wallStrip(batch.misc, sA, sB, () => lR, (f) => f.pos.y - depth, (f) => f.pos.y + 1.05, deckCol, -1);
-      flatStrip(batch.misc, sA, sB, lL, lR, (f) => f.pos.y - depth, CONC_D, false, { step: 3 });
-      flatStrip(batch.misc, sA, sB, (s) => lL(s) - 0.25, (s) => lL(s), (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
-      flatStrip(batch.misc, sA, sB, lR, lR + 0.25, (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
+      if (!named) {
+        wallStrip(batch.misc, sA, sB, lL, (f) => f.pos.y - depth, (f) => f.pos.y + 1.05, deckCol, 1);
+        wallStrip(batch.misc, sA, sB, () => lR, (f) => f.pos.y - depth, (f) => f.pos.y + 1.05, deckCol, -1);
+        flatStrip(batch.misc, sA, sB, lL, lR, (f) => f.pos.y - depth, CONC_D, false, { step: 3 });
+        flatStrip(batch.misc, sA, sB, (s) => lL(s) - 0.25, (s) => lL(s), (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
+        flatStrip(batch.misc, sA, sB, lR, lR + 0.25, (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
+      }
       // piers / abutments to the ground
       const len = sB - sA;
       const np = Math.max(0, Math.floor(len / 30));
@@ -1546,7 +1650,11 @@
         if (mid >= sa && mid < sb) { buildTunnel({ s0: tn.s0, s1: tn.s1 }, batch); buildPortal(tn.s0, -1, batch); buildPortal(tn.s1, 1, batch); }
       });
       slots.forEach((sl) => { if (sl.kind !== 'cover') { const mid = (sl.s0 + sl.s1) / 2; if (mid >= sa && mid < sb) buildSlotWalls(sl, batch); } });
-      track.bridges.forEach((br) => { const mid = (br.s0 + br.s1) / 2; if (mid >= sa && mid < sb) buildBridge(br, batch); });
+      track.bridges.forEach((br) => {
+        const mid = (br.s0 + br.s1) / 2;
+        if (mid >= sa && mid < sb) buildBridge(br, batch);
+        if (/Charlotte|Adolphe/.test(br.name || '') && br.s1 > sa && br.s0 < sb) buildNamedDeck(br, batch, sa, sb);
+      });
     }
     function buildDecksFor(t, group) {
       decks.forEach((d) => {
@@ -1716,6 +1824,7 @@
       const roadsOut = [];
       buildRoads(ci, d, batch, lampOut, roadsOut);
       lampOut.list.forEach((p) => addLamp(batch, p));
+      lampsByChunk.set(ci, lampOut.list);
       buildTram(ci, sa, sb, batch);
       structuresInChunk(sa, sb, batch);
       buildTrees(ci, d, batch);
@@ -1768,6 +1877,7 @@
     lampPosts.frustumCulled = false; lampPosts.count = 0;
     root.add(lampPosts);
     let carList = [];
+    let crossPosts = [];             // traffic-signal post positions of the tram crossings (test hook)
     let carDirty = true;
     const RED = new T.Color('#ff2a18'); const GREEN = new T.Color('#33e06c');
     function rebuildCars() {
@@ -1776,19 +1886,30 @@
       crossings.length = 0;
       const lm = new T.Matrix4();
       let lampN = 0;
+      crossPosts = [];
       roadsByChunk.forEach((roads) => roads.forEach((rd) => {
         if (rd.cross && rd.cross.length) {
           rd.cross.forEach((c) => {
             const rec = { rd, c, red: false };
             crossings.push(rec);
             // signal posts on the right of both approaches (one each side of the tram corridor)
-            [c.t0 - 3.2, c.t1 + 3.2].forEach((tt, side) => {
+            [c.t0 - 3.2, c.t1 + 3.2].forEach((tt0, side) => {
               if (lampN >= 160) return;
-              const p = roadPoint(rd, tt);
-              const nx = -p.dz; const nz = p.dx;
               const sgn = side === 0 ? 1 : -1;
-              const lx = p.x + nx * sgn * (rd.hw + 0.7); const lz = p.z + nz * sgn * (rd.hw + 0.7);
+              // the post stands at the kerb of its own road, but at a junction that spot can be another road's lane (or the other track): slide it away from the tram until it is clear
+              let lx = 0; let lz = 0; let clear = false;
+              for (let k = 0; k < 7 && !clear; k++) {
+                const tt = tt0 + (side === 0 ? -1 : 1) * k * 2.5;
+                if (tt < 0 || tt > rd.len) break;
+                const p = roadPoint(rd, tt);
+                const nx = -p.dz; const nz = p.dx;
+                lx = p.x + nx * sgn * (rd.hw + 0.7); lz = p.z + nz * sgn * (rd.hw + 0.7);
+                const nq = nearest(lx, lz);
+                clear = roadMarginExcept(lx, lz, rd) > 0.35 && nq.d > 4.4 && (!hasOpp || Math.abs(nq.lat - oppLatAt(nq.s)) > 2.6);
+              }
+              if (!clear) return;
               const ly = rawG(lx, lz);
+              crossPosts.push({ x: lx, z: lz });
               lm.makeTranslation(lx, ly + 1.7, lz); lampPosts.setMatrixAt(lampN, lm);
               rec.lamps = rec.lamps || []; rec.lamps.push([lampN, lx, ly + 3.2, lz]);
               lampN++;
@@ -1935,7 +2056,7 @@
       chunks.delete(k);
       root.remove(c.group);
       c.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
-      roadsByChunk.delete(k); carDirty = true;
+      roadsByChunk.delete(k); lampsByChunk.delete(k); carDirty = true;
     }
 
     /* ---- landmark models (luxtram-landmarks.js) */
@@ -2039,10 +2160,17 @@
       treeTplDec.dispose(); treeTplCon.dispose(); treeTplBoth.dispose();
       treeTpl.length = 0;
       activeOrigin = null;
+      if (TS.luxRoadMargin === roadMargin) TS.luxRoadMargin = null;
     }
     ensureTiles(0, false);
     void lastS;
-    return { update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, tiles, underpasses, far: farTiles };
+    /* test hook: the road carriageways (scene metres, half width) and road lamps of the loaded chunks, to check that no pole stands in a lane */
+    const debugRoadFurniture = () => ({
+      roads: Array.from(roadsByChunk.values()).flat().map((r) => ({ cls: r.cls, hw: r.hw, pts: r.pts.map((p) => [p.x, p.z]) })),
+      lamps: Array.from(lampsByChunk.values()).flat().map((l) => ({ x: l[0], z: l[1] })),
+      posts: crossPosts.slice(),
+    });
+    return { debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, tiles, underpasses, far: farTiles };
   }
 
   TS.luxtramWorld = { create, QUALITY, prefetchData };

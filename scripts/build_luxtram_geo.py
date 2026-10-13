@@ -3,6 +3,8 @@
 
 Run after scripts/fetch_luxtram_geo.py and scripts/luxtram_lod2.py, with the venv python:
   /Users/Ian/Library/Caches/luxtram-work/.venv/bin/python scripts/build_luxtram_geo.py [profile] [tiles] [buildings] [trees] [far] [index]
+  ... or only `deckortho` to re-write the orthophoto tiles under the Red Bridge / Pont Adolphe (luxtram_decks.py: the valley instead of the deck lanes)
+  (the shipped tiles of the named bridges were re-written that way; bump "v" in index.json / the ?v= in luxtram-world.js when they change)
 
 Writes pb/train-sim/data/luxtram/:
   index.json        tile table (resolution, node step, building / tree counts), far tiles, credits
@@ -339,12 +341,60 @@ def inpaint_bridges(im, i, j, res, masks):
     return Image.fromarray(arr)
 
 
-def build_tiles(tiles, dtm):
+def deck_context(meta):
+    """Footprints of the named bridges (Red Bridge, Pont Adolphe), the raw orthophoto sampler and the valley roads under them (luxtram_decks.py)."""
+    import build_luxtram as B
+    import luxtram_decks as D
+    dsm, dtm = HGrid("dsm"), HGrid("dtm")
+    decks = D.find_decks(B, dsm, dtm)
+    for dk in decks:
+        print("deck %s (way %s): len %.0f m, lateral %.1f .. %.1f m" % (dk["name"], dk["id"], dk["len"], dk["lat0"], dk["lat1"]))
+    return {"D": D, "decks": decks, "src": D.OrthoSrc(meta), "roads": D._local_roads(B, decks), "dsm": dsm, "dtm": dtm}
+
+
+def paint_decks(im, i, j, res, ctx):
+    """The valley below the named bridges instead of their deck (the ortho is a true ortho: the deck lanes would be painted on the valley floor)."""
+    if not ctx or not ctx["decks"]:
+        return im, False
+    return ctx["D"].inpaint_decks(im, i, j, res, ctx["decks"], ctx["src"], ctx["roads"], ctx["dsm"], ctx["dtm"])
+
+
+def _hits_deck(mask_geom, dk):
+    """True when an old tram-line bridge mask lies on a named bridge deck (its 10 m grey strip is replaced by the valley)."""
+    from shapely.geometry import Polygon
+    c = [dk["A"] + dk["d"] * a + dk["r"] * l for a, l in ((0, dk["lat0"]), (dk["len"], dk["lat0"]), (dk["len"], dk["lat1"]), (0, dk["lat1"]))]
+    return Polygon([tuple(p) for p in c]).buffer(4).intersects(mask_geom)
+
+
+def build_deck_ortho(tiles):
+    """Only re-write the orthophoto tiles under the named bridges (after changing luxtram_decks.py)."""
+    from shapely import wkt as _wkt
+    meta = json.load(open(os.path.join(G.RAW_GEO, "tiles_meta.json")))
+    mp = os.path.join(G.RAW_GEO, "bridge_masks.json")
+    masks = [_wkt.loads(w) for w in json.load(open(mp))] if os.path.exists(mp) else []
+    dctx = deck_context(meta)
+    n = 0
+    for (i, j, d, res) in tiles:
+        src = os.path.join(G.RAW_GEO, "ortho", "%d_%d.png" % (i, j))
+        im = Image.open(src).convert("RGB")
+        im, painted = paint_decks(im, i, j, res, dctx)
+        if not painted:
+            continue
+        im = inpaint_bridges(im, i, j, res, [m for m in masks if not any(_hits_deck(m, dk) for dk in dctx["decks"])])
+        im.save(out("o", "%d_%d.webp" % (i, j)), "WEBP", quality=WEBP_Q, method=6)
+        n += 1
+        print("deck ortho written", i, j, im.size)
+    print("deck ortho tiles:", n)
+
+
+def build_tiles(tiles, dtm, meta_in=None):
     total_o = total_h = 0
     meta = {}
     from shapely import wkt as _wkt
     mp = os.path.join(G.RAW_GEO, "bridge_masks.json")
     masks = [_wkt.loads(w) for w in json.load(open(mp))] if os.path.exists(mp) else []
+    tm = os.path.join(G.RAW_GEO, "tiles_meta.json")
+    dctx = deck_context(meta_in or (json.load(open(tm)) if os.path.exists(tm) else {}))
     for c, (i, j, d, res) in enumerate(tiles):
         step = 2 if d <= G.R_MID else 4
         grid = dtm.tile(i, j)
@@ -358,7 +408,8 @@ def build_tiles(tiles, dtm):
         total_h += len(hb)
         src = os.path.join(G.RAW_GEO, "ortho", "%d_%d.png" % (i, j))
         im = Image.open(src).convert("RGB")
-        im = inpaint_bridges(im, i, j, res, masks)
+        im, painted = paint_decks(im, i, j, res, dctx)
+        im = inpaint_bridges(im, i, j, res, masks if not painted else [m for m in masks if not any(_hits_deck(m, dk) for dk in dctx["decks"])])
         im.save(out("o", "%d_%d.webp" % (i, j)), "WEBP", quality=WEBP_Q, method=6)
         total_o += os.path.getsize(out("o", "%d_%d.webp" % (i, j)))
         meta["%d_%d" % (i, j)] = {"res": round(res, 4), "px": im.size[0], "step": step, "d": round(d)}
@@ -857,6 +908,8 @@ def main():
             json.dump({"elev": prof["elev"], "ground": prof["ground"], "dem": dem}, fh)
         print("profile keys", len(prof["elev"]))
     meta = {}
+    if "deckortho" in steps:
+        build_deck_ortho(tiles)
     if "tiles" in steps:
         meta = build_tiles(tiles, dtm)
         with open(os.path.join(G.RAW_GEO, "tiles_meta.json"), "w") as fh:
@@ -883,7 +936,7 @@ def main():
         bdir = os.path.join(OUT, "b")
         if not bcount and os.path.isdir(bdir):
             bcount = {f[:-4]: struct.unpack("<H", open(os.path.join(bdir, f), "rb").read(2))[0] for f in os.listdir(bdir) if f.endswith(".bin")}
-        idx = {"v": 1, "tile": G.TILE, "origin": [G.LAT0, G.LON0], "tiles": meta, "bld": bcount, "far": far, "farTile": FAR_TILE, "farNode": FAR_NODE,
+        idx = {"v": 2, "tile": G.TILE, "origin": [G.LAT0, G.LON0], "tiles": meta, "bld": bcount, "far": far, "farTile": FAR_TILE, "farNode": FAR_NODE,
                "credit": "Geodata © ACT Luxembourg (geoportail.lu), CC0"}
         with open(out("index.json"), "w") as fh:
             json.dump(idx, fh, separators=(",", ":"))
