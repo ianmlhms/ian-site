@@ -132,6 +132,9 @@ jobs:
           def q(path):
               return '"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"'
           uploads = [p for p in changed("ACMRT") if deployable(p) and os.path.isfile("_site/" + p)]
+          # Pages last: an .html that references new ?v= assets must not go live before those assets
+          # (13 Oct 2026: the train game's page was live ~20 min while its new scripts still returned 404).
+          uploads.sort(key=lambda p: (p.endswith(".html"), p))
           deletes = [p for p in changed("D") if deployable(p)]
           for d in sorted({os.path.dirname(p) for p in uploads if os.path.dirname(p)}):
               print(f"mkdir -p -f {q('httpdocs/' + d)}")
