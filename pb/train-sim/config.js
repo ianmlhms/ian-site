@@ -29,7 +29,7 @@
   const EXTRA_CAR_TRAINS = Object.freeze(['kiss', 'ic', 'hst']);
   const REFERENCE_PRICE = Object.freeze({ railcar: 9000, tram: 40000 }); // free trains: upgrade prices scale off this
 
-  const livery = (body, accent, stripe) => Object.freeze({ body, accent, stripe });
+  const livery = (body, accent, stripe, doors) => Object.freeze(doors ? { body, accent, stripe, doors: Object.freeze([...doors]) } : { body, accent, stripe });
   const trainDef = (t) =>
     Object.freeze({
       ...t,
@@ -53,9 +53,16 @@
     }),
     trainDef({
       id: 'tram', name: { lb: 'Luxtram', de: 'Luxtram', en: 'Luxtram' }, kind: 'tram', price: 0,
-      maxKmh: 70, accel: 1.2, brake: 1.3, emergency: 2.4, massT: 55, cars: 5, capacity: 420, doorsPerSide: 1, carLength: 8.6,
+      maxKmh: 70, accel: 1.2, brake: 1.3, emergency: 2.4, massT: 55, cars: 5, capacity: 420, doorsPerSide: 1, carLength: 9,
       cab: 'tram', model: 'tram', sound: 'tram',
-      liveries: [['#f1f1ee', '#d6342e', '#8a8d93'], ['#f1f1ee', '#1f7a5c', '#8a8d93'], ['#2b2f38', '#e9b83a', '#f1f1ee'], ['#f1f1ee', '#2b64b0', '#e9b83a']],
+      /* Luxtram (CAF Urbos): body = light metallic silver (cab shell + roof fairings), accent = seat / cab colour, stripe = silver sill line,
+      doors = the glazed door leaves, one colour per car (cycled). The real trams are black-glazed along the sides with silver ends. */
+      liveries: [
+        ['#d0d4d8', '#19a9c4', '#9aa0a6', ['#19a9c4', '#7cc242', '#d6338a', '#f28c1e']],
+        ['#e8eaec', '#d6338a', '#aab0b5', ['#d6338a', '#f28c1e', '#d6338a', '#f28c1e']],
+        ['#4a5159', '#f2b632', '#9aa0a6', ['#f2b632', '#f1f1ee', '#f2b632', '#f1f1ee']],
+        ['#d0d4d8', '#2b64b0', '#9aa0a6', ['#2b64b0', '#2b64b0', '#2b64b0', '#2b64b0']],
+      ],
     }),
     trainDef({
       id: 'kiss', name: { lb: 'Duebeldecker-Zuch', de: 'Doppelstock-Triebzug', en: 'Double-decker EMU' }, kind: 'rail', price: 55000,

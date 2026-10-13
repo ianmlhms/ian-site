@@ -58,7 +58,7 @@
       mfds: [{ x: 0.1, w: 0.28, h: 0.18, role: 'main' }],
     },
     tram: {
-      hw: 0.8, top: '#aeb4ba', body: '#3b4047', ramp: '#262a30', metal: '#c3c9cf', trim: '#181b1f', accent: '#d6342e',
+      hw: 0.8, top: '#5a6068', body: '#2c3036', ramp: '#1c1f24', metal: '#aab1b8', trim: '#14171a', accent: '#19a9c4',
       leverX: -0.52, joystick: true, seat: 'modern', low: true,
       dials: [{ kind: 'speedo', x: 0.27, r: 0.06 }],
       mfds: [{ x: -0.04, w: 0.32, h: 0.2, role: 'main' }],

@@ -284,6 +284,7 @@
     const obstacleRoots = scene.children.filter((c) => !rootsBefore.has(c));
     await frameDelay();
     const model = build('trains', 'create', [cfg, { quality, livery: cfg.livery, upgrades: cfg.upgradeLevels || {} }]);
+    safe('destination', () => { const last = track.stations && track.stations[track.stations.length - 1]; if (model && model.setDestination && last) model.setDestination(typeof last.name === 'string' ? last.name : nameOf(last.name)); });   // terminus on the front display
     if (model) scene.add(model.group);
     const cab = demo ? null : build('cab', 'create', [cfg, { quality }]);
     if (cab && model && model.cars[0]) model.cars[0].group.add(cab.group);

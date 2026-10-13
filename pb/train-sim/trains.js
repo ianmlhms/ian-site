@@ -22,6 +22,7 @@
   /* ------------------------------------------------------------------ specs */
   const INSIDE_EMIT = 0x45443f, INSIDE_EMIT_ON = 0x80796a, SEAT_EMIT = 0x4a4a50, SEAT_EMIT_ON = 0x62626a;
   const WIN_DARK = '#161d23';
+  const GLASS_D_DAY = 0.9, GLASS_D_CAB = 0.84; // tram side glass opacity (day / cab lights on)
   const SEAT_COL = { railcar: '#8c3a30', emu: '#2d6aa6', tram: '#d4582f', kiss: '#2f8466', ic: '#a02b3b', hst: '#2b4e9a' };
   const SPECS = {
     railcar: {
@@ -41,12 +42,13 @@
       kinds: { cabF: { body: 25.0, bogie: 8.6, front: true, doors: 3 }, mid: { body: 25.0, bogie: 8.6, doors: 3 }, cabR: { body: 25.0, bogie: 8.6, rear: true, doors: 3, panto: [5.8] } },
     },
     tram: {
-      W: 2.4, yb: 0.3, floor: 0.4, sill: 0.98, head: 2.45, ytop: 3.5, wheelR: 0.3, wb: 1.8, gap: 0.55,
-      pillar: '#2a3036', bay: 1.5, doorW: 1.3, doorY0: 0.42, doorMargin: 2.4, bellows: true, bellowsFull: true, buffers: false, tram: true,
-      recipe: { lower: 'accent', mid: 'body', upper: 'body', nose: 'body', doorLower: 'accent', doorUpper: 'body', stripeCol: 'stripe', roof: '#d7dadc' },
-      nose: { len: 1.5, N: 6, capSx: 0.86, a: 2, b: 2, drop: 0.45, lift: 0.0, rake: 0.1, pd: 2, pl: 2, pr: 1, sideWin: [1, 4] },
-      scr: { kind: 'single', hw: 0.95, y0: 1.4, y1: 2.75 }, cabFloor: 0.62, mirror: 0.22,
-      kinds: { cabF: { body: 8.8, bogie: 2.6, front: true, doors: 1 }, mid: { body: 7.6, bogie: 2.4, doors: 1 }, midP: { body: 7.6, bogie: 2.4, doors: 1, panto: [0.4] }, cabR: { body: 8.8, bogie: 2.6, rear: true, doors: 1 } },
+      W: 2.4, yb: 0.3, floor: 0.4, sill: 0.95, head: 2.45, ytop: 3.35, wheelR: 0.3, wb: 1.8, gap: 0.55,
+      pillar: '#10141a', bay: 1.5, doorW: 1.3, doorY0: 0.42, doorMargin: 2.4, bellows: true, bellowsFull: true, buffers: false, tram: true,
+      /* CAF Urbos as run by Luxtram: black glazed sides and skirt, silver cab shell and roof fairings, coloured glazed doors. */
+      recipe: { lower: '#14181d', mid: '#14181d', upper: '#1d2329', nose: 'body', doorLower: 'accent', doorUpper: 'body', stripeCol: 'stripe', roof: 'body' },
+      nose: { len: 2.1, N: 9, capSx: 0.8, a: 2, b: 2, drop: 0.62, lift: 0.0, rake: 0.2, pd: 2, pl: 2, pr: 1, sideWin: [1, 6] },
+      scr: { kind: 'single', hw: 0.92, y0: 1.24, y1: 2.6, topInset: 0.28 }, cabFloor: 0.62, mirror: 0.22,
+      kinds: { cabF: { body: 9.2, bogie: 2.6, front: true, doors: 1 }, mid: { body: 8.0, bogie: 2.4, doors: 1 }, midP: { body: 8.0, bogie: 2.4, doors: 1, panto: [0.4] }, cabR: { body: 9.2, bogie: 2.6, rear: true, doors: 1 } },
     },
     kiss: {
       W: 2.8, yb: 0.6, floor: 1.0, sill: 1.15, head: 2.05, sill2: 2.95, head2: 3.85, ytop: 4.6, wheelR: 0.43, wb: 2.5, gap: 0.8,
@@ -134,6 +136,22 @@
     vestTex = new T.CanvasTexture(cv); vestTex.colorSpace = T.SRGBColorSpace; vestTex.anisotropy = 4;
     return vestTex;
   }
+  /* Destination display (amber LED text on black), one canvas texture per train so setDestination only touches that train. */
+  function drawDest(tex, text) {
+    const cv = tex.image, x = cv.getContext('2d'), w = cv.width, h = cv.height;
+    x.fillStyle = '#07090b'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#ffa23a'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    let px = Math.round(h * 0.62); x.font = '600 ' + px + 'px Helvetica, Arial, sans-serif';
+    while (x.measureText(text).width > w * 0.92 && px > 12) { px -= 2; x.font = '600 ' + px + 'px Helvetica, Arial, sans-serif'; }
+    x.shadowColor = '#ff8a1e'; x.shadowBlur = h * 0.18; x.fillText(text, w / 2, h * 0.54);
+    tex.needsUpdate = true;
+  }
+  function destTexture(text) {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
+    const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+    drawDest(tex, text);
+    return tex;
+  }
   const glowCache = new Map();
   function glowTexture(col) {
     if (glowCache.has(col)) return glowCache.get(col);
@@ -151,13 +169,16 @@
     m.lamp = new T.MeshBasicMaterial({ vertexColors: true, color: 0xdad6c6 });
     m.glass = shared.glass.clone();
     m.glass.userData.shared = false;
+    m.glassD = shared.glass.clone(); // tinted side glazing (Luxtram: near-black, continuous band)
+    m.glassD.userData.shared = false; m.glassD.color.set(0x0c1319); m.glassD.opacity = GLASS_D_DAY; m.glassD.roughness = 0.04; m.glassD.metalness = 0.65;
+    m.dest = new T.MeshBasicMaterial({ map: destTexture('Luxexpo'), toneMapped: false });
     m.inside = shared.inside.clone(); m.inside.userData.shared = false; m.inside.emissive = new T.Color(INSIDE_EMIT);
     m.seat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: new T.Color(SEAT_EMIT) });
     m.glowHead = new T.SpriteMaterial({ map: glowTexture('#fff2cf'), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     m.glowTail = new T.SpriteMaterial({ map: glowTexture('#ff3a24'), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     m.insideFwd = m.inside.clone(); m.insideFwd.userData.shared = false;
     m.ghost = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false }); // invisible but still casts shadows
-    m.own = [m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.inside, m.seat, m.glowHead, m.glowTail];
+    m.own = [m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail];
     return m;
   }
 
@@ -380,7 +401,8 @@
   function recipeColors(S, livery) {
     const map = { body: livery.body, accent: livery.accent, stripe: livery.stripe };
     const r = S.recipe, g = (k) => map[k] || k;
-    return { lower: g(r.lower), mid: g(r.mid), upper: g(r.upper), nose: g(r.nose), doorLower: g(r.doorLower), doorUpper: g(r.doorUpper), stripe: g(r.stripeCol), roof: r.roof, skirt: '#2a2e32', body: livery.body, accent: livery.accent };
+    const doors = livery.doors && livery.doors.length ? livery.doors : null;
+    return { doors, lower: g(r.lower), mid: g(r.mid), upper: g(r.upper), nose: g(r.nose), doorLower: g(r.doorLower), doorUpper: g(r.doorUpper), stripe: g(r.stripeCol), roof: g(r.roof), skirt: S.tram ? '#0d1013' : '#2a2e32', body: livery.body, accent: livery.accent };
   }
   function buildBands(S, C, win) {
     const bands = [];
@@ -579,7 +601,7 @@
           addBandQuad(rows[k], rows[k + 1], i, 0, 1, 0, 'glass', null, glassB);
           continue;
         }
-        addBandQuad(rows[k], rows[k + 1], i, 0, 1, -0.03, 'glass', null, glassB);
+        addBandQuad(rows[k], rows[k + 1], i, 0, 1, -0.03, S.tram ? 'glassD' : 'glass', null, glassB);
         addBandQuad(rows[k], rows[k + 1], i, 0, 0.07, 0.006, 'trim', S.pillar, B);
         addBandQuad(rows[k], rows[k + 1], i, 0.93, 1, 0.006, 'trim', S.pillar, B);
       }
@@ -621,6 +643,7 @@
         { const pg = new T.PlaneGeometry(dw, dh); pg.rotateY(s > 0 ? Math.PI / 2 : -Math.PI / 2); pg.translate(s * (hw + 0.009), (h0 + h1) / 2, dz); B.geo('vest', pg, null); }
         B.box('trim', 0.14, 0.05, dw * 0.9, s * (hw + 0.07), h0 + 0.02, dz, '#5a5f64'); // sill / step nosing
         B.box('trim', 0.1, 0.06, dw * 0.9, s * (hw + 0.05), h0 + 0.2, dz, '#3a3e42'); // second step
+        if (S.tram) B.box('trim', 0.1, 0.014, dw * 0.9, s * (hw + 0.075), h0 + 0.052, dz, '#e8c52e'); // yellow sill edge
         for (const e of [-1, 1]) B.cyl('m', 0.02, 0.02, dh - 0.12, s * (hw + 0.03), (h0 + h1) / 2, dz + e * (dw / 2 - 0.12), '#e3b92c', null, 6);
         B.box('trim', 0.2, 0.05, dw * 0.96, s * (hw - 0.08), h0 + 0.01, dz, '#4b4f53'); // step
         // open button + frame
@@ -635,6 +658,17 @@
           const g0 = rbox(leafW, split, 0.07, 0.02).rotateY(Math.PI / 2); g0.translate(0, -lh / 2 + split / 2, 0);
           const g1 = rbox(leafW, lh - split, 0.07, 0.02).rotateY(Math.PI / 2); g1.translate(0, -lh / 2 + split + (lh - split) / 2, 0);
           const pb = makeBuilder();
+          if (S.tram) { // glazed leaf: black frame, big coloured panes (the door colour of this car), silver grab handle
+            const dcol = (C.doors || [upCol])[idx % (C.doors || [upCol]).length];
+            pb.push('trim', rbox(leafW, lh, 0.07, 0.02).rotateY(Math.PI / 2), '#101418');
+            const py0 = -lh / 2 + split + 0.09, py1 = lh / 2 - 0.08, lowY0 = -lh / 2 + 0.08, lowY1 = -lh / 2 + split - 0.07;
+            pb.box('lit', 0.012, py1 - py0, leafW - 0.1, 0.04, (py0 + py1) / 2, 0, dcol);
+            pb.box('lit', 0.012, lowY1 - lowY0, leafW - 0.1, 0.04, (lowY0 + lowY1) / 2, 0, dcol);
+            pb.box('trim', 0.006, py1 - py0 - 0.1, 0.02, 0.047, (py0 + py1) / 2 + 0.04, e * (leafW * 0.2), '#ffffff'); // glass glint
+            pb.box('rubber', 0.05, lh, 0.025, 0.02, 0, -e * (leafW / 2) + e * 0.012, '#111');
+            pb.box('rubber', 0.05, lh, 0.025, 0.02, 0, e * (leafW / 2) - e * 0.012, '#111');
+            pb.cyl('m', 0.014, 0.014, 0.5, 0.05, split * 0.1, e * (leafW / 2 - 0.1), '#d7d9db', null, 6);
+          } else {
           pb.push('paint', g0, lowerCol); pb.push('paint', g1, upCol);
           // window
           const wy0 = -lh / 2 + split + 0.1, wy1 = lh / 2 - 0.14;
@@ -646,6 +680,7 @@
           pb.box('rubber', 0.05, lh, 0.025, 0.02, 0, e * (leafW / 2) - e * 0.012, '#111');
           pb.cyl('m', 0.014, 0.014, 0.5, 0.05, split * 0.1 + 0.0, e * (leafW / 2 - 0.1), '#d7d9db', null, 6); // handle
           pb.box('trim', 0.01, 0.06, leafW - 0.1, 0.038, -lh / 2 + split * 0.75, 0, C.stripe);
+          }
           // glass sits inside dedicated mats key
           const mesh = pb.bake(mats);
           mesh.castShadow = false;
@@ -666,8 +701,8 @@
       const tex = decalTexture(numberText, C, S);
       const dm = new T.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, depthWrite: false });
       dm.userData.perTrain = true;
-      const decalW = Math.min(5.6, L * 0.3), decalH = decalW / 5.6 * 0.9;
-      const yLow = S.yb + 0.12 + (S.sill - S.yb - 0.12) * 0.5;
+      const decalW = S.tram ? 2.6 : Math.min(5.6, L * 0.3), decalH = decalW / 5.6 * 0.9;
+      const yLow = S.tram ? S.yb + 0.3 : S.yb + 0.12 + (S.sill - S.yb - 0.12) * 0.5;
       for (const s of [-1, 1]) {
         const free = hasWin ? carDoors : [];
         let zc = 0;
@@ -708,15 +743,16 @@
       const capRake = isNose ? sh.rake : 0;
       const sc = S.scr;
       const hole = isNose && sc && sc.kind !== 'roof';
+      const tIn = sc && sc.topInset !== undefined ? sc.topInset : 0.1; // windscreen narrows towards the top by this much per side
       const flipRear = !front;
       const place = (sapes, off, color, flip) => planeShape(sapes, zEnd, capRake, S.yb, off, color, flip);
       let capShape = shape;
       let glassPoly = null;
       if (hole) {
-        const hp = roundedPoly(sc.hw + 0.02, sc.y0 - 0.02, sc.y1 + 0.02, 0.14, 0.1);
+        const hp = roundedPoly(sc.hw + 0.02, sc.y0 - 0.02, sc.y1 + 0.02, 0.14, tIn);
         const hole2 = new T.Path(hp.slice().reverse());
         capShape = new T.Shape(o); capShape.holes.push(hole2);
-        glassPoly = roundedPoly(sc.hw - 0.03, sc.y0 + 0.03, sc.y1 - 0.03, 0.12, 0.1);
+        glassPoly = roundedPoly(sc.hw - 0.03, sc.y0 + 0.03, sc.y1 - 0.03, 0.12, tIn);
       }
       // cap mesh (outer + inner lining)
       const cg = planeShape(capShape, zEnd, capRake, S.yb, 0, null, front);
@@ -735,7 +771,7 @@
       const side = front ? 1 : -1;
       const frontFrame = new T.Group();
       if (hole && glassPoly) {
-        const outerP = roundedPoly(sc.hw + 0.02, sc.y0 - 0.02, sc.y1 + 0.02, 0.14, 0.1);
+        const outerP = roundedPoly(sc.hw + 0.02, sc.y0 - 0.02, sc.y1 + 0.02, 0.14, tIn);
         const frame = new T.Shape(outerP); frame.holes.push(new T.Path(glassPoly.slice().reverse()));
         B.geo('rubber', planeShape(frame, zEnd - (front ? 0.008 : -0.008), capRake, S.yb, 0, '#101214', front), null);
         const glassShape = new T.Shape(glassPoly);
@@ -753,7 +789,7 @@
         g.translate(x, y, zAt(y) + sign * 0.012);
         (role ? B : B).geo(key, g, col);
       };
-      for (const s of [-1, 1]) {
+      if (!S.tram) for (const s of [-1, 1]) {
         const headKey = front ? 'headF' : 'lensOff', tailKey = front ? 'lensOff' : 'tailR';
         rb(0.34, 0.12, s * lensX, lensY + 0.12, 'trim', '#17191b');
         rb(0.28, 0.09, s * lensX, lensY + 0.12, headKey, '#fff6dc');
@@ -765,7 +801,27 @@
           sp.scale.set(front ? 0.8 : 0.5, front ? 0.8 : 0.5, 1); sp.position.set(s * lensX, gy, zAt(gy) + sign * 0.15); group.add(sp);
         }
       }
-      if (mid) { // made-up badge + number plate on the nose
+      if (S.tram) { // Urbos face: black lower front panel, white C-shaped LED lights, dark roof visor with the amber destination display
+        const tilt = Math.atan(capRake), yLo = S.yb + 0.17, yHi = sc.y0 - 0.05, yM = (yLo + yHi) / 2;
+        const slab = (w, h, x, y, key, col, off, r) => { const g = rbox(w, h, 0.05, r); g.rotateX(tilt); g.translate(x, y, zAt(y) + sign * off); B.geo(key, g, col); };
+        slab(hw * 2 * sh.sx * 0.93, yHi - yLo, 0, yM, 'lensOff', '#0a0c0f', 0.012, 0.12);
+        const ledKey = front ? 'lit' : 'tailR', ledCol = front ? '#ffffff' : '#ff4a38', lx = hw * sh.sx * 0.6, ly = yM - 0.02;
+        for (const s of [-1, 1]) {
+          slab(0.05, 0.3, s * lx, ly, ledKey, ledCol, 0.03, 0.025);
+          slab(0.14, 0.05, s * (lx - 0.045), ly + 0.15, ledKey, ledCol, 0.03, 0.02);
+          slab(0.09, 0.05, s * (lx - 0.02), ly - 0.15, ledKey, ledCol, 0.03, 0.02);
+          if (mid) {
+            const sp = new T.Sprite(front ? mats.glowHead : mats.glowTail);
+            sp.scale.set(front ? 0.7 : 0.45, front ? 0.7 : 0.45, 1); sp.position.set(s * lx, ly, zAt(ly) + sign * 0.15); group.add(sp);
+          }
+        }
+        if (mid) { // destination display behind the glass, at the top of the windscreen
+          const dy = sc.y1 - 0.14, dm = new T.Mesh(new T.PlaneGeometry(sc.hw * 1.5, sc.hw * 1.5 / 8), mats.dest);
+          dm.position.set(0, dy, zAt(dy) + (front ? 0.045 : -0.045));
+          dm.rotation.set(front ? tilt : tilt, front ? Math.PI : 0, 0); dm.userData.disposeGeo = true; group.add(dm);
+        }
+      }
+      if (mid && !S.tram) { // made-up badge + number plate on the nose
         const bt = badgeTexture(numberText);
         const bm = new T.MeshStandardMaterial({ map: bt, transparent: true, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
         bm.userData.perTrain = true; ownMats.push(bm);
@@ -817,10 +873,10 @@
           }
         }
       }
-      if (S.tram) { // front skirt (apron)
-        const g = rbox(S.W * 0.62, 0.34, 0.12, 0.06); if (!front) g.rotateY(Math.PI); g.translate(0, S.yb - 0.02, zEnd + sign * 0.05);
+      if (S.tram) { // front skirt (apron): slim silver bib across the whole face, like the real Urbos
+        const g = rbox(hw * 2 * sh.sx * 0.97, 0.26, 0.1, 0.08); if (!front) g.rotateY(Math.PI); g.translate(0, S.yb + 0.03, zEnd + sign * 0.03);
         B.geo('paint', g, C.nose);
-        B.box('trim', S.W * 0.56, 0.05, 0.14, 0, S.yb - 0.2, zEnd + sign * 0.07, '#232629');
+        B.box('trim', hw * 2 * sh.sx * 0.5, 0.05, 0.14, 0, S.yb - 0.12, zEnd + sign * 0.06, '#232629');
       }
       // mirrors
       if (mid) {
@@ -874,8 +930,9 @@
       const g = new T.PlaneGeometry(S.W * 0.95 * sxw, S.head - cabFloorY + 0.3); g.translate(0, (S.head + 0.3 + cabFloorY) / 2, zEnd - sign * (d + nz));
       return g;
     };
-    if (noseF) B.geo('floor', cabWall(true), '#b9b6ac');
-    if (noseR) B.geo('floor', cabWall(false), '#b9b6ac');
+    const cabWallCol = S.tram ? '#2b3138' : '#b9b6ac';
+    if (noseF) B.geo('floor', cabWall(true), cabWallCol);
+    if (noseR) B.geo('floor', cabWall(false), cabWallCol);
 
     // ----- floors (cab + saloon), seats, lamps
     const wallA = noseF ? zF + 2.75 : zF + 0.3, wallB = noseR ? zR - 2.75 : zR - 0.3;
@@ -987,9 +1044,9 @@
       for (let a = 0; a < nAC; a++) {
         const z = (a - (nAC - 1) / 2) * (L * 0.34) + (K.panto ? -1.2 : 0) + (K.front ? 1.0 : 0) - (K.rear ? 1.0 : 0);
         if (K.panto && a === 0) continue;
-        roofBox(S.tram ? 1.3 : 1.7, 0.34, S.tram ? 2.2 : 2.6, 0, yt + 0.04, z, '#c3c8cb');
-        B.box('trim', S.tram ? 0.9 : 1.3, 0.02, 0.5, 0, yt + 0.23, z + 0.5, '#2e3337');
-        B.box('trim', S.tram ? 0.9 : 1.3, 0.02, 0.5, 0, yt + 0.23, z - 0.5, '#2e3337');
+        roofBox(S.tram ? 1.5 : 1.7, S.tram ? 0.16 : 0.34, S.tram ? 2.6 : 2.6, 0, S.tram ? yt + 0.02 : yt + 0.04, z, S.tram ? C.roof : '#c3c8cb');
+        B.box('trim', S.tram ? 0.9 : 1.3, 0.02, 0.5, 0, S.tram ? yt + 0.1 : yt + 0.23, z + 0.5, '#2e3337');
+        B.box('trim', S.tram ? 0.9 : 1.3, 0.02, 0.5, 0, S.tram ? yt + 0.1 : yt + 0.23, z - 0.5, '#2e3337');
       }
     }
     if (K.loco) {
@@ -1100,12 +1157,22 @@
   /* ---------------------------------------------------------------- decals */
   const decalCache = new Map();
   function decalTexture(numberText, C, S) {
-    const key = numberText + C.lower + C.mid;
+    const key = numberText + C.lower + C.mid + (S && S.tram ? 'T' : '');
     if (decalCache.has(key)) return decalCache.get(key);
     const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 164;
     const x = cv.getContext('2d');
     const bg = lum(C.lower) > 0.45 ? '#16202b' : '#f4f1ea';
     x.clearRect(0, 0, 1024, 164);
+    if (S && S.tram) { // Luxtram: four-colour dot mark + plain wordmark + unit number, light on the black lower side
+      x.textBaseline = 'middle';
+      [['#19a9c4', 0, 0], ['#7cc242', 1, 0], ['#d6338a', 0, 1], ['#f28c1e', 1, 1]].forEach(([c, i, j]) => { x.fillStyle = c; x.beginPath(); x.arc(46 + i * 44, 52 + j * 44, 19, 0, Math.PI * 2); x.fill(); });
+      x.fillStyle = bg; x.font = '700 84px Helvetica, Arial, sans-serif'; x.fillText('LUXTRAM', 128, 62);
+      x.font = '600 36px Helvetica, Arial, sans-serif'; x.fillText(numberText, 700, 62);
+      const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+      tex.userData = { shared: true };
+      decalCache.set(key, tex);
+      return tex;
+    }
     x.fillStyle = bg; x.textBaseline = 'middle';
     x.font = 'italic 800 78px Helvetica, Arial, sans-serif'; x.fillText('LUX RAIL', 40, 62);
     x.fillRect(40, 108, 260, 6); x.fillRect(318, 108, 70, 6);
@@ -1228,6 +1295,12 @@
     if (!S0) { warn('unknown model ' + model); return create({ ...cfg, model: 'emu' }, opts); }
     const livery = { body: '#e7e8ea', accent: '#c8312b', stripe: '#1b3a6b', ...(cfg && cfg.livery), ...(opts.livery || {}) };
     const mats = trainMats();
+    const tramLook = model === 'tram'; // tram: darker windscreen tint and a dark cab lining (seen through the glass), like the real thing
+    if (tramLook) { mats.glass.color.setHex(0x33434f); mats.glass.envMapIntensity = 0.2; mats.glass.metalness = 0.15; mats.glassD.envMapIntensity = 0.45; mats.inside.color.setHex(0x4a4f56); mats.insideFwd.color.setHex(0x4a4f56); }
+    const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x2c3035 : INSIDE_EMIT_ON;
+    let cabViewOn = false, cabinOn = false;
+    // tram windscreen: tinted and fairly opaque seen from outside, clear (like the other models) from the cab camera
+    const applyGlass = () => { mats.glass.opacity = tramLook ? (cabViewOn ? 0.2 : 0.58) : (cabinOn ? 0.26 : 0.34); };
     const count = (cfg && cfg.cars) || { railcar: 1, emu: 2, tram: 5, kiss: 4, ic: 7, hst: 8 }[model];
     const comp = composition(model, count);
     const group = new T.Group(); group.name = 'train:' + model;
@@ -1264,15 +1337,19 @@
         mats.tailR.emissiveIntensity = l.tail ? 2.6 : 0;
         const cab = !!l.cabin;
         mats.lamp.color.setHex(cab ? 0xffffff : 0xdad6c6);
-        mats.glass.opacity = cab ? 0.26 : 0.34;
-        mats.inside.emissive.setHex(cab ? INSIDE_EMIT_ON : INSIDE_EMIT); mats.insideFwd.emissive.setHex(cab ? INSIDE_EMIT_ON : INSIDE_EMIT);
+        cabinOn = cab; applyGlass();
+        mats.glassD.opacity = cab ? GLASS_D_CAB : GLASS_D_DAY;
+        mats.inside.emissive.setHex(cab ? emitOn : emitOff); mats.insideFwd.emissive.setHex(cab ? emitOn : emitOff);
         mats.seat.emissive.setHex(cab ? SEAT_EMIT_ON : SEAT_EMIT);
         mats.glowHead.opacity = l.head ? 0.7 : 0; mats.glowTail.opacity = l.tail ? 0.6 : 0;
       },
       setCabView(on) { // cab camera: hide the outside skin of the front car's nose (keeps lining + shadows) so the track stays visible
+        cabViewOn = !!on; applyGlass();
         for (const m of built[0].paintMeshes) m.material = on ? mats.ghost : mats.paint;
         for (const m of built[0].fwdLinings) { if (Array.isArray(m.material)) m.material[0] = on ? mats.ghost : mats.insideFwd; else m.material = on ? mats.ghost : mats.insideFwd; }
       },
+      /* Destination text on the cab displays (trams only; no-op elsewhere). */
+      setDestination(text) { if (mats.dest && mats.dest.map) drawDest(mats.dest.map, String(text || '')); },
       setPantograph(up01) { for (const p of pantoAll) p.set(up01); },
       /* Diesel exhaust smoke strength 0..1 (0 = off/hidden). No-op on electric models. */
       setExhaust(level01) {
@@ -1292,6 +1369,7 @@
           if (o.isPoints && o.material) o.material.dispose();
           if (o.isInstancedMesh) o.dispose();
         });
+        if (mats.dest && mats.dest.map) mats.dest.map.dispose();
         for (const m of mats.own) m.dispose();
         for (const b of built) { const dm = b.group.userData.decalMat; if (dm) dm.dispose(); for (const m of b.ownMats) m.dispose(); }
         if (group.parent) group.parent.remove(group);
