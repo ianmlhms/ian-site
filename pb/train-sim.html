@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Lokféierer 🚆 – Arcade</title>
+<title>Zuchsimulator Lëtzebuerg 🚆 – Arcade</title>
 <script>/* Offline for now: owner account (or ?preview=1) only */(()=>{let ok=/[?&]preview=1\b/.test(location.search);try{const s=JSON.parse(localStorage.getItem("sb-lvksqmgfwkfbblfsozfk-auth-token")||"null");ok=ok||String(s?.user?.email||"").toLowerCase()==="konto@ian.lu"}catch{}if(!ok)(window.top||window).location.replace("/pixelbreak.html")})();</script>
-<link rel="stylesheet" href="/pb/train-sim.css?v=3">
-<script src="/pb/arcade-kit.js?v=26" data-arcade-id="train-sim" data-arcade-title="Lokféierer 🚆"></script>
+<link rel="stylesheet" href="/pb/train-sim.css?v=4">
+<script src="/pb/arcade-kit.js?v=26" data-arcade-id="train-sim" data-arcade-title="Zuchsimulator Lëtzebuerg 🚆"></script>
 </head>
 <body>
 <main id="game">
@@ -45,6 +45,7 @@
         <span id="sigText" class="sigtext"></span>
       </div>
     </div>
+    <div id="aheadLoad" class="glass aheadload" role="status" hidden></div>
     <div class="hud-util">
       <span id="camName" class="glass chipbtn"></span>
       <button id="btnQuality" class="glass chipbtn" type="button"></button>
@@ -60,33 +61,33 @@
   <div id="menu" class="overlay">
     <div class="menu-scroll"><div id="menuHost"></div><p id="bootStatus" role="status"></p></div>
   </div>
-  <div id="loading" class="overlay center" hidden><div class="loadcard"><div class="spinner"></div><b id="loadingTitle"></b><small id="loadingSub"></small></div></div>
+  <div id="loading" class="overlay center" hidden><div class="loadcard"><div class="spinner"></div><b id="loadingTitle"></b><div class="loadbar" id="loadBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="loadFill"></i></div><small id="loadingSub"></small></div></div>
   <div id="pauseScreen" class="overlay center" hidden><section class="card"><h2 data-t="paused">Paus</h2><p data-t="pausedDesc"></p><div class="btns"><button id="resume" class="primary" data-t="resume"></button><button id="pauseQuality" type="button"></button><button id="quit" data-t="quit"></button></div></section></div>
   <div id="helpScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="helpTitle">Steierung</h2><div id="helpBody"></div><p class="muted" data-t="helpHint"></p><button id="helpClose" class="primary" data-t="continue"></button></section></div>
   <div id="ttScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="timetable">Fuerplang</h2><div id="ttBody"></div><p class="muted">T</p></section></div>
-  <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp">&#128646; LOKF&Eacute;IERER</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><table id="sumRows"></table><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumMenu" class="primary"></button></div></section></div>
+  <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp">&#128646; ZUCHSIMULATOR L&Euml;TZEBUERG</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><table id="sumRows"></table><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumMenu" class="primary"></button></div></section></div>
   <div id="kbNotice" hidden><span id="kbText"></span><button id="kbClose" type="button"></button></div>
   <div id="phoneBlock" class="overlay center" hidden><section class="card"><div class="bigemoji">&#128646;</div><h2 id="phoneTitle"></h2><p id="phoneText"></p><p id="phoneHint" class="muted"></p></section></div>
   <div id="errorScreen" class="overlay center" hidden><section class="card"><h2>&#9888;</h2><p id="errorText"></p></section></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/pb/train-sim/config.js?v=5"></script>
-<script src="/pb/train-sim/copy.js?v=4"></script>
+<script src="/pb/train-sim/copy.js?v=5"></script>
 <script src="/pb/train-sim/track.js?v=2"></script>
 <script src="/pb/train-sim/routes.js?v=3"></script>
 <script src="/pb/train-sim/infra.js?v=4"></script>
 <script src="/pb/train-sim/landscape.js?v=2"></script>
-<script src="/pb/train-sim/luxtram-landmarks.js?v=1"></script><!-- LUXTRAM: hand-built landmarks (photo-checked) -->
-<script src="/pb/train-sim/luxtram-world.js?v=2"></script><!-- LUXTRAM: real Luxtram T1 routes (new files, see luxtram.js) -->
-<script src="/pb/train-sim/luxtram.js?v=3"></script><!-- LUXTRAM -->
+<script src="/pb/train-sim/luxtram-landmarks.js?v=2"></script><!-- LUXTRAM: hand-built landmarks (photo-checked) -->
+<script src="/pb/train-sim/luxtram-world.js?v=3"></script><!-- LUXTRAM: real Luxtram T1 routes (new files, see luxtram.js) -->
+<script src="/pb/train-sim/luxtram.js?v=4"></script><!-- LUXTRAM -->
 <script src="/pb/train-sim/trains.js?v=3"></script>
 <script src="/pb/train-sim/cab.js?v=3"></script>
 <script src="/pb/train-sim/passengers.js?v=1"></script>
 <script src="/pb/train-sim/audio.js?v=1"></script>
 <script src="/pb/train-sim/sim.js?v=4"></script>
 <script src="/pb/train-sim/career.js?v=4"></script>
-<script src="/pb/train-sim/menu.js?v=4"></script>
-<script src="/pb/train-sim/fallback.js?v=1"></script>
-<script src="/pb/train-sim.js?v=6"></script>
+<script src="/pb/train-sim/menu.js?v=5"></script>
+<script src="/pb/train-sim/fallback.js?v=2"></script>
+<script src="/pb/train-sim.js?v=7"></script>
 </body>
 </html>

@@ -91,12 +91,29 @@
   function prefetch() {
     if (rawData || loading) return loading;
     if (typeof fetch !== 'function') return null;
-    const get = (url, optional) => fetch(url).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    const net = (TS.net = TS.net || { bytes: 0 });   // shared download counter (the loading bar reads it)
+    const get = (url, optional) => fetch(url).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then((txt) => { net.bytes += txt.length; return JSON.parse(txt); })
       .catch((e) => { console.warn(TAG + 'prefetch failed ' + url, e); if (!optional) throw e; return null; });
     loading = Promise.all([get(TRACK_URL, false), get(TRACK2_URL, true)])
       .then(([d, d2]) => { rawData = d; rawData2 = d2; return d; })
       .catch(() => { loading = null; return null; });
     return loading;
+  }
+  /* Everything the Luxtram needs before the world can be built, fetched asynchronously so the loading screen can show real progress:
+     the track data, the world data (roads, buildings index) and the landmark detail. onProgress(fraction 0..1) after each part.
+     Never rejects: a part that fails is simply loaded by the blocking fallback later. */
+  const PRELOAD_PARTS = [   // approximate sizes in kB: they weight the parts of the bar
+    { kb: 130, run: () => (rawData ? Promise.resolve() : prefetch() || Promise.resolve()) },
+    { kb: 420, run: () => (TS.luxtramWorld && TS.luxtramWorld.prefetchData ? TS.luxtramWorld.prefetchData() : Promise.resolve()) },
+    { kb: 600, run: () => (TS.luxLandmarks && TS.luxLandmarks.preload ? TS.luxLandmarks.preload() : Promise.resolve()) },
+  ];
+  function preload(onProgress) {
+    const total = PRELOAD_PARTS.reduce((a, p) => a + p.kb, 0);
+    let done = 0;
+    const report = () => { try { if (onProgress) onProgress(done / total); } catch (e) { /* ignore */ } };
+    report();
+    return Promise.all(PRELOAD_PARTS.map((p) => Promise.resolve().then(p.run).catch(() => null).then(() => { done += p.kb; report(); }))).then(() => true);
   }
   function syncGet(url) {
     try { // the route is built synchronously by the game: fall back to a blocking request if the prefetch is still running
@@ -919,7 +936,7 @@
 
     wrapInfra();
     wrapLandscape();
-    TS.luxtram = { registered: true, sections: SECTIONS.map((s) => s.id), build, prefetch, credit: CREDIT, getModel };
+    TS.luxtram = { registered: true, sections: SECTIONS.map((s) => s.id), build, prefetch, preload, credit: CREDIT, getModel };
     prefetch();
   }
 
@@ -960,6 +977,8 @@
           setWeather(w, instant) { land.setWeather(w, instant); world.setWeather(w, instant); },
           warm(s) { land.warm(s); world.warm(s); },
           stats() { const a = land.stats ? land.stats() : {}; return Object.assign({}, a, { world: world.stats() }); },
+          progress: () => world.progress(),            // real download progress of the opening tiles (loading bar)
+          pendingAhead: () => world.pendingAhead(),    // detailed tiles ahead that have not arrived yet ("Lueden" indicator)
           dispose() { world.dispose(); land.dispose(); },
           luxtramWorld: world,
           groundAt: (x, z) => (typeof world.groundAt === 'function' ? world.groundAt(x, z) : NaN),   // real DTM (chase camera clearance)

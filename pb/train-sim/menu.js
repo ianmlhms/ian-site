@@ -30,10 +30,12 @@
 .ts-menu__langs button{min-width:46px;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:750;font-size:13px;letter-spacing:.04em}
 .ts-menu__langs button[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:#2a2112}
 .ts-menu__hero{display:grid;grid-template-columns:1.35fr 1fr;gap:22px;align-items:stretch}
-.ts-menu__titlebox{position:relative;border:1px solid var(--line);border-radius:26px;padding:26px 28px 20px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.03));overflow:hidden;min-height:250px;display:flex;flex-direction:column;justify-content:space-between}
+.ts-menu__titlebox{position:relative;border:1px solid var(--line);border-radius:26px;padding:26px 28px 20px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.03));overflow:hidden;min-height:300px;display:flex;flex-direction:column;justify-content:space-between}
 .ts-menu__eyebrow{font-size:12px;font-weight:800;letter-spacing:.2em;color:var(--gold);text-transform:uppercase}
-.ts-menu__title{font-size:clamp(46px,7.4vw,84px);line-height:.95;font-weight:900;letter-spacing:-.025em;margin-top:6px;background:linear-gradient(180deg,#fff,#cfe0e6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ts-menu__title span{display:block}.ts-menu__title2{font-size:.46em;line-height:1.2;letter-spacing:.02em;margin-top:.08em;font-weight:800}
+.ts-menu__title{font-size:clamp(42px,5.6vw,72px);line-height:.95;font-weight:900;letter-spacing:-.025em;margin-top:6px;padding-bottom:.08em;background:linear-gradient(180deg,#fff,#cfe0e6);-webkit-background-clip:text;background-clip:text;color:transparent}
 .ts-menu__tag{color:var(--soft);font-size:15px;margin-top:8px;max-width:30ch}
+.ts-menu__title+.ts-menu__tag{margin-top:14px}
 .ts-menu__heroTrain{position:absolute;right:14px;bottom:6px;width:min(72%,580px);pointer-events:none;opacity:.96}
 .ts-menu__heroTrain.anim{animation:tsm-roll .9s cubic-bezier(.2,.8,.2,1) both}
 .ts-menu__heroTrain svg{display:block;width:100%;height:auto;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
@@ -137,7 +139,7 @@
   .ts-menu__inner{padding:16px 18px 48px;gap:18px}
   .ts-menu__hero{grid-template-columns:1fr}
   .ts-menu__grid--routes,.ts-menu__grid--trains{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .ts-menu__titlebox{min-height:230px}
+  .ts-menu__titlebox{min-height:290px}
   .ts-menu__heroTrain{width:min(54%,430px)}
 }
 @media (max-width:780px){
@@ -515,7 +517,7 @@
     const toNext = info.next === null ? t('maxRank') : t('nextRank', { n: money(info.next).replace(' €', '') });
     return h('div', { class: 'ts-menu__hero' },
       h('div', { class: 'ts-menu__titlebox' },
-        h('div', {}, h('p', { class: 'ts-menu__eyebrow', text: ctx.career === 'tram' ? 'Lëtzebuerg · LUXTRAM' : 'Lëtzebuerg · LUX RAIL' }), h('h1', { class: 'ts-menu__title', id: 'ts-menu-title', text: t('title') }), h('p', { class: 'ts-menu__tag', text: t(ctx.career === 'tram' ? 'taglineTram' : 'tagline') })),
+        h('div', {}, h('p', { class: 'ts-menu__eyebrow', text: ctx.career === 'tram' ? 'LUXTRAM' : 'LUX RAIL' }), h('h1', { class: 'ts-menu__title', id: 'ts-menu-title', 'aria-label': t('title') }, h('span', { class: 'ts-menu__title1', text: t('title').split(' ')[0] }), h('span', { class: 'ts-menu__title2', text: t('title').split(' ').slice(1).join(' ') })), h('p', { class: 'ts-menu__tag', text: t(ctx.career === 'tram' ? 'taglineTram' : 'tagline') })),
         h('div', { class: 'ts-menu__heroTrain' + (animate ? ' anim' : '') }, svgNode(train.model, eff.livery, 'ts-menu__svg', pick(train.name))),
         h('div', { class: 'ts-menu__rails' })),
       h('div', { class: 'ts-menu__player' },
@@ -673,7 +675,7 @@
         h('div', { class: 'ts-menu__grid ts-menu__grid--trains' }, careerTrains().map(trainCard))),
       upgradesPanel(),
       helpPanel(),
-      h('p', { class: 'ts-menu__footer', text: 'ian.lu · Lokféierer' }),
+      h('p', { class: 'ts-menu__footer', text: 'ian.lu · Zuchsimulator Lëtzebuerg' }),
       ctx.toast ? h('div', { class: 'ts-menu__toast' + (ctx.toast.bad ? ' ts-menu__toast--bad' : ''), role: 'status', text: ctx.toast.text }) : null);
     root.append(inner);
     ctx.container.replaceChildren(root);

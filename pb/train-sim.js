@@ -13,6 +13,7 @@
   const QUALITIES = ['high', 'medium', 'low'];
   const MODULES = ['config', 'copy', 'track', 'routes', 'infra', 'landscape', 'trains', 'cab', 'passengers', 'audio', 'career', 'menu'];
   const PHONE_MIN_SIDE = 600, PHONE_MIN_VIEW = 560;
+  const TILE_WAIT_MAX_MS = 25000, AHEAD_LOAD_SHOW_S = 0.8;
   const WHEEL_RADIUS = 0.46, HUD_INTERVAL_S = 0.1, TOD_INTERVAL_S = 3;
   const PLATFORM_SPAWN_M = 650, PLATFORM_CLEAR_M = 120, END_EXCHANGE_MIN_S = 5, END_EXCHANGE_MAX_S = 34;
   const BOARD_BASE = { 1: 9, 2: 20, 3: 36 }, ALIGHT_RANGE = [0.22, 0.55];
@@ -37,7 +38,8 @@
   const has = (path) => path.split('.').reduce((o, k) => (o ? o[k] : undefined), TS) !== undefined;
   const readStore = (key) => safe('storage read ' + key, () => localStorage.getItem(key), null);
   const writeStore = (key, value) => safe('storage write ' + key, () => localStorage.setItem(key, value));
-  const rand = Math.random;
+  let randSource = Math.random;   // test hook only: __tsTest.setSeed swaps in a seeded generator
+  const rand = () => randSource();
   const pick = (list) => list[Math.floor(rand() * list.length)];
   const pad2 = (n) => String(Math.floor(n)).padStart(2, '0');
   const clockText = (sec) => { const s = ((Math.floor(sec) % 86400) + 86400) % 86400; return pad2(s / 3600) + ':' + pad2((s % 3600) / 60); };
@@ -99,7 +101,8 @@
   const endless = { order: [], index: 0, loops: 0, total: { cash: 0, points: 0 }, active: false };
   let frameHandle = 0, lastFrame = 0, hudClock = 0, todClock = 0, accum = 0, elapsedReal = 0;
   let toastWait = 0, demoAngle = 0, demoTimer = 0, scorePosted = 0, serviceStartedAt = 0;
-  let testMode = false, errorsSeen = 0, forcedPlan = null, lastSpadToast = 0;
+  let testMode = false, errorsSeen = 0, forcedPlan = null, lastSpadToast = 0, calmServices = false;
+  const settle = { sig: '', stable: 0 };   // test hook only: how many frames the camera has not moved
 
   /* ------------------------------------------------------------ device */
   function isPhone() {
@@ -273,15 +276,22 @@
     if (!routeDef) throw new Error('Unknown route ' + routeId);
     const cfg = effectiveTrain(trainId);
     const environment = env || pickEnvironment();
-    setLoading(t('loading'), nameOf(routeDef.name));
+    const isLux = /^luxtram/.test(routeId);
+    const waitTiles = isLux && !demo && !keepState;   // the menu demo and quality rebuilds do not hold the screen for tiles
+    loaderStart(isLux ? 'tram' : 'line', nameOf(routeDef.name));
     await frameDelay();
+    if (isLux && TS.luxtram && TS.luxtram.preload) await safe('luxtram preload', () => TS.luxtram.preload((f) => loaderSet(f * 0.14)), Promise.resolve());   // track, world and landmark data: real byte progress
+    loaderSet(isLux ? 0.16 : 0.15);
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
+    loaderSet(isLux ? 0.22 : 0.3);
     const landscape = build('landscape', 'create', [scene, track.base || track, { quality }]);   // the return direction shares the forward track's scenery
+    loaderSet(isLux ? 0.32 : 0.55);
     await frameDelay();
     const rootsBefore = new Set(scene.children);
     const infra = build('infra', 'create', [scene, track, { quality }]);
     const obstacleRoots = scene.children.filter((c) => !rootsBefore.has(c));
+    loaderSet(isLux ? 0.42 : 0.75);
     await frameDelay();
     const model = build('trains', 'create', [cfg, { quality, livery: cfg.livery, upgrades: cfg.upgradeLevels || {} }]);
     safe('destination', () => { const last = track.stations && track.stations[track.stations.length - 1]; if (model && model.setDestination && last) model.setDestination(typeof last.name === 'string' ? last.name : nameOf(last.name)); });   // terminus on the front display
@@ -290,15 +300,18 @@
     if (cab && model && model.cars[0]) model.cars[0].group.add(cab.group);
     const passengers = build('passengers', 'create', [scene, { quality }]);
     safe('passengers rain', () => passengers && passengers.setRain && passengers.setRain(environment.weather === 'rain'));
+    loaderSet(isLux ? 0.5 : 0.88);
     await frameDelay();
     safe('weather', () => landscape && landscape.setWeather && landscape.setWeather(environment.weather, true));
     safe('time of day', () => landscape && landscape.setTimeOfDay && landscape.setTimeOfDay(environment.hour));
     const startS = keepState && keepState.warmS !== undefined ? keepState.warmS : (track.stations && track.stations[0] ? track.stations[0].s : 0);
-    safe('landscape warm', () => landscape && landscape.warm && landscape.warm(track.baseS ? track.baseS(startS) : startS));
+    const warmS = track.baseS ? track.baseS(startS) : startS;
+    safe('landscape warm', () => landscape && landscape.warm && landscape.warm(warmS));
+    if (waitTiles) await waitForStartTiles(landscape, warmS, 0.52, 0.96);
     const clockStart = Math.floor(environment.hour * 4) * 900;
-    const plan = sim ? sim.plan : demo ? null : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: careerState(trainId).services || 0 }), null));
+    const plan = sim ? sim.plan : demo ? null : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: careerState(trainId).services || 0, rng: rand, varied: !calmServices }), null));
     forcedPlan = null;
-    const simulation = sim || TS.sim.create({ train: cfg, track, options: { clockStart, seed: Math.floor(rand() * 1e9), plan: plan || undefined } });
+    const simulation = sim || TS.sim.create({ train: cfg, track, options: { clockStart, seed: Math.floor(rand() * 1e9), plan: plan || undefined, ...(calmServices ? { holdChance: 0 } : {}) } });
     safe('temp boards', () => { if (infra && infra.addTempBoard && simulation.plan) simulation.plan.tsr.forEach((r) => infra.addTempBoard(r.s0, r.kmh, r.s1)); });
     const nightish = environment.hour < 6.3 || environment.hour > 19.3;
     world = {
@@ -321,12 +334,73 @@
     return t('pattern' + pattern) + ' · ' + t('stationsN', { n: stopCount() });
   }
 
-  function setLoading(title, sub) {
-    $('loading').hidden = false;
-    $('loadingTitle').textContent = title || '';
-    $('loadingSub').textContent = sub || '';
+  /* Loading bar. Real progress where it can be measured (Luxtram: the data files and the start section's tiles, with the MB fetched); the build
+     steps move it elsewhere, and between steps an eased fake creep keeps it alive. It never shows 100 % before the world is really ready. */
+  const loader = { active: false, kind: 'line', route: '', target: 0, shown: 0, bytes0: 0, t0: 0, last: 0, timer: 0, fake: true, mb: false };
+  const mbText = (bytes) => (bytes / 1048576).toFixed(1).replace('.', lang === 'en' ? '.' : ',');
+  function renderLoader() {
+    const pct = Math.min(99, Math.floor(loader.shown * 100));
+    $('loadingTitle').textContent = t(loader.kind === 'tram' ? 'loadingTram' : 'loadingLine') + ' ' + t('loadingPct', { n: pct });
+    const bytes = loader.mb && TS.net ? Math.max(0, TS.net.bytes - loader.bytes0) : 0;
+    $('loadingSub').textContent = loader.route + (bytes > 50000 ? ' · ' + t('loadingMb', { n: mbText(bytes) }) : '');
+    $('loadFill').style.width = (loader.shown * 100).toFixed(1) + '%';
+    $('loadBar').setAttribute('aria-valuenow', String(pct));
   }
-  const hideLoading = () => { $('loading').hidden = true; };
+  function loaderTick() {
+    const now = performance.now(), dt = Math.min(0.25, (now - loader.last) / 1000);
+    loader.last = now;
+    const fakeGoal = loader.fake ? 0.9 * (1 - Math.exp(-(now - loader.t0) / 3500)) : 0;   // eased creep, asymptotic to 90 %
+    const goal = Math.min(0.99, Math.max(loader.target, fakeGoal));
+    if (goal > loader.shown) loader.shown = Math.min(goal, loader.shown + Math.max(0.002, (goal - loader.shown) * (1 - Math.exp(-dt * 7))));
+    renderLoader();
+  }
+  function loaderStart(kind, route) {
+    clearInterval(loader.timer);
+    Object.assign(loader, { active: true, kind, route: route || '', target: 0, shown: 0, bytes0: TS.net ? TS.net.bytes : 0, t0: performance.now(), last: performance.now(), fake: kind !== 'tram', mb: kind === 'tram' });
+    $('loading').hidden = false;
+    renderLoader();
+    loader.timer = setInterval(loaderTick, 60);
+  }
+  const loaderSet = (target) => { if (loader.active) loader.target = Math.max(loader.target, clamp(target, 0, 0.99)); };
+  function hideLoading(finished) {
+    clearInterval(loader.timer);
+    const wasActive = loader.active;
+    loader.active = false;
+    if (!(finished && wasActive)) { $('loading').hidden = true; return; }
+    loader.shown = 1;   // really done: show 100 % for a moment
+    $('loadingTitle').textContent = t(loader.kind === 'tram' ? 'loadingTram' : 'loadingLine') + ' ' + t('loadingPct', { n: 100 });
+    $('loadFill').style.width = '100%'; $('loadBar').setAttribute('aria-valuenow', '100');
+    setTimeout(() => { if (!loader.active) $('loading').hidden = true; }, 180);
+  }
+  /* Keeps the loading screen up until the start section's tiles have arrived (real count), then builds them, so the player does not start in an
+     empty world. Gives up after TILE_WAIT_MAX_MS. */
+  async function waitForStartTiles(landscape, startS, from, to) {
+    if (!landscape || typeof landscape.progress !== 'function') return;
+    const t0 = performance.now();
+    for (;;) {
+      const p = safe('landscape progress', () => landscape.progress(), null);
+      if (!p) return;
+      loaderSet(from + (to - from) * (p.total ? p.ready / p.total : 1));
+      if (p.done || performance.now() - t0 > TILE_WAIT_MAX_MS) break;
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    safe('landscape warm (tiles in)', () => landscape.warm && landscape.warm(startS));
+  }
+  /* "Loading ahead" pill while the tiles in front of a driving tram have not arrived yet (slow network). */
+  let aheadClock = 0, aheadPending = 0, aheadShown = false;
+  function updateAheadLoad(dt) {
+    aheadClock += dt;
+    if (aheadClock < 0.25) return;
+    const step = aheadClock; aheadClock = 0;
+    const w = world;
+    const n = w && w.landscape && typeof w.landscape.pendingAhead === 'function' ? safe('pendingAhead', () => w.landscape.pendingAhead(), 0) : 0;
+    aheadPending = n > 0 ? aheadPending + step : 0;
+    const show = aheadPending >= AHEAD_LOAD_SHOW_S;
+    if (show === aheadShown) return;
+    aheadShown = show;
+    $('aheadLoad').textContent = show ? t('loadingAhead') : '';
+    $('aheadLoad').hidden = !show;
+  }
 
   /* ------------------------------------------------------------ train placement */
   const tmp = { a: new THREE.Vector3(), b: new THREE.Vector3(), mid: new THREE.Vector3(), fwd: new THREE.Vector3(), up: new THREE.Vector3(), right: new THREE.Vector3(), m: new THREE.Matrix4(), q: new THREE.Quaternion() };
@@ -1316,7 +1390,7 @@
     safe('cab snap', () => { if (world.cab) { world.cab.update(cabInfo(world.state)); if (world.cab.snap) world.cab.snap(); } });
     setCamera(opts.camera || 'cab');
     refreshLiveCash();
-    hideLoading();
+    hideLoading(true);
     $('fade').classList.remove('on');
     $('hud').hidden = false;
     safe('Arcade.startRun', () => window.Arcade.startRun());
@@ -1553,10 +1627,11 @@
     lastFrame = now;
     try {
       if (world && !rebuilding) {
-        if (phase === 'running' && !paused) { tickService(fastForward ? dt * 2 : dt); updateCamera(dt, world.state); hudClock += dt; if (hudClock > HUD_INTERVAL_S) { hudClock = 0; updateHud(); } }
+        if (phase === 'running' && !paused) { tickService(fastForward ? dt * 2 : dt); updateCamera(dt, world.state); updateAheadLoad(dt); hudClock += dt; if (hudClock > HUD_INTERVAL_S) { hudClock = 0; updateHud(); } }
         else if (phase === 'running' || phase === 'summary' || phase === 'transition') { if (world.state) { updateVisuals(0, world.state, false); updateCamera(dt, world.state); } }
         else if (world.state) { updateVisuals(dt, world.state, false); demoCamera(dt); }
       }
+      if (testMode) trackSettle();
       renderer.render(scene, camera);
     } catch (error) {
       errorsSeen += 1;
@@ -1565,6 +1640,17 @@
   }
 
   /* ------------------------------------------------------------ test hook */
+  function trackSettle() {
+    if (!camera) return;
+    camera.updateMatrixWorld(true);
+    const sig = camera.matrixWorld.elements.map((x) => x.toFixed(5)).join(',');
+    settle.stable = sig === settle.sig ? settle.stable + 1 : 0;
+    settle.sig = sig;
+  }
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let x = Math.imul(a ^ (a >>> 15), 1 | a); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
   function installTestHook() {
     const stationIndexSafe = (i) => clamp(Math.floor(i), 0, Math.max(0, stationsOf().length - 1));
     window.__tsTest = Object.freeze({
@@ -1592,6 +1678,16 @@
           spadHoldSec: s ? s.spadHoldSec : 0, hints: !!save.hints, svcLabel: $('svcLabel').textContent, cabHitTest: !!(w && w.cab && typeof w.cab.hitTest === 'function'), stopsRecord: w ? { ...w.stops } : {},
           signalsHeld: w ? w.sim.signals.filter((x) => x.hold).length : 0, timetable: w ? w.sim.timetable.stops.map((x) => ({ ...x })) : [],
         };
+      },
+      /* deterministic test runs: a seeded generator for everything random in the shell, the plan and the simulation (null = back to Math.random) */
+      loadState() { return { active: loader.active, shown: loader.shown, target: loader.target, kind: loader.kind, title: $('loadingTitle').textContent, sub: $('loadingSub').textContent, visible: !$('loading').hidden, fill: $('loadFill').style.width, ahead: aheadShown }; },
+      setSeed(seed) { randSource = Number.isFinite(seed) ? mulberry32(seed) : Math.random; return true; },
+      /* services started from now on are calm: no random red-signal holds, no temporary speed restrictions, no incidents (forcePlan and spadTest still work) */
+      setCalm(on) { calmServices = !!on; return calmServices; },
+      /* true once the cab view is up, the train stands still, no emergency stop is active and the camera has not moved for a few frames */
+      cabSettled(minFrames = 8) {
+        const w = world, s = w && w.state;
+        return !!(w && s && phase === 'running' && !paused && camMode === 'cab' && $('loading').hidden && !s.spadActive && s.v < 0.01 && settle.stable >= minFrames);
       },
       start: (m, routeId, trainId) => startFromMenu(m, routeId, trainId),
       startService: (routeId, trainId, m) => startService(routeId, trainId, m || 'career'),

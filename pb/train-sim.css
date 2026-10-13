@@ -112,8 +112,14 @@ button.primary{background:var(--amber);color:#1a1405;border-color:transparent}
 button.primary:hover{background:#ffd070}
 .stamp{display:inline-block;font-size:11px;letter-spacing:.16em;color:var(--amber);font-weight:700;margin-bottom:4px}
 .bigemoji{font-size:54px}
-.loadcard{display:flex;flex-direction:column;gap:8px;align-items:center;padding:26px 36px;border-radius:20px;background:var(--glass-strong);border:1px solid var(--line)}
+.loadcard{display:flex;flex-direction:column;gap:10px;min-width:min(420px,86vw);align-items:center;padding:26px 36px;border-radius:20px;background:var(--glass-strong);border:1px solid var(--line)}
 .loadcard b{font-size:18px}.loadcard small{color:var(--soft)}
+@keyframes loadstripe{to{background-position:28px 0}}
+.loadbar{width:100%;height:10px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid var(--line);overflow:hidden}
+.loadbar i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--amber),#ffe3a0);box-shadow:0 0 12px rgba(255,194,74,.55);transition:width .12s linear;position:relative}
+.loadbar i::after{content:"";position:absolute;inset:0;border-radius:inherit;background:repeating-linear-gradient(115deg,rgba(255,255,255,.28) 0 7px,transparent 7px 14px);background-size:28px 100%;animation:loadstripe .8s linear infinite}
+.loadcard b{font-variant-numeric:tabular-nums}
+.aheadload{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 92px);padding:5px 12px;border-radius:99px;font-size:12px;font-weight:650;color:var(--soft);opacity:.88;pointer-events:none;z-index:5}
 #loading{background:radial-gradient(circle at 50% 40%,rgba(30,50,70,.82),rgba(5,8,12,.94))}
 .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:var(--amber);animation:spin .9s linear infinite}
 #helpBody{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:14px}
@@ -142,7 +148,7 @@ button.primary:hover{background:#ffd070}
   .strip{display:none}.nextbox{min-width:0;max-width:200px}.speed b{font-size:44px}.centerbox{max-width:none}.signalbox{min-width:0}
 }
 @media(max-height:560px){.speed b{font-size:38px}.hud-util{top:calc(max(10px,env(safe-area-inset-top)) + 70px)}}
-@media(prefers-reduced-motion:reduce){.spinner{animation-duration:2.4s}.toast{animation:none}#fade{transition-duration:.01s}}
+@media(prefers-reduced-motion:reduce){.loadbar i::after{animation:none}.loadbar i{transition:none}.spinner{animation-duration:2.4s}.toast{animation:none}#fade{transition-duration:.01s}}
 
 /* ---------- cab view: the desk already shows speed, limit and signal, so only a slim info strip stays ---------- */
 body[data-cam="cab"] #hud .hud-bottom{position:absolute;left:50%;transform:translateX(-50%);top:calc(max(10px,env(safe-area-inset-top)) + 62px);width:min(520px,calc(100vw - 460px));min-width:280px;display:block}

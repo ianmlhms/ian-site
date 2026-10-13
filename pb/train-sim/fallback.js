@@ -75,7 +75,7 @@
       container.replaceChildren();
       const box = document.createElement('div');
       box.style.cssText = 'max-width:420px;padding:24px';
-      const h = document.createElement('h1'); h.textContent = 'Lokféierer';
+      const h = document.createElement('h1'); h.textContent = 'Zuchsimulator Lëtzebuerg';
       const mk = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = 'display:block;margin:8px 0;padding:12px 18px;font-size:16px'; b.addEventListener('click', fn); return b; };
       box.append(h, mk('Karriär', () => o.onStart('career', o.save.route, o.save.train)), mk('Endlos fueren', () => o.onStart('endless', o.save.route, o.save.train)));
       container.appendChild(box);

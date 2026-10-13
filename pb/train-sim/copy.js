@@ -7,7 +7,7 @@
 
   const ROWS = [
     // ---- general / menu
-    ['title', 'Lokféierer', 'Lokführer', 'Train Driver'],
+    ['title', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg'],   // the game's name, the same in every language
         ['tagline', 'Vu Lëtzebuerg bis op Paräis.', 'Von Luxemburg bis nach Paris.', 'From Luxembourg all the way to Paris.'],
     ['language', 'Sprooch', 'Sprache', 'Language'],
     ['taglineTram', 'Mat der Luxtram vum Findel bis an de Stadion.', 'Mit der Luxtram vom Findel bis zum Stadion.', 'By Luxtram from Findel to the Stadium.'],
@@ -66,6 +66,11 @@
     ['continue', 'Weider', 'Weiter', 'Continue'],
     ['restart', 'Nei starten', 'Neu starten', 'Restart'],
     ['loading', 'D’Streck gëtt opgebaut …', 'Die Strecke wird aufgebaut …', 'Building the line …'],
+    ['loadingTram', 'Luxtram gëtt erofgelueden …', 'Luxtram wird heruntergeladen …', 'Downloading Luxtram …'],
+    ['loadingLine', 'D’Streck gëtt gelueden …', 'Die Strecke wird geladen …', 'Loading the line …'],
+    ['loadingPct', '{n} %', '{n} %', '{n}%'],
+    ['loadingMb', '{n} MB geluede', '{n} MB geladen', '{n} MB loaded'],
+    ['loadingAhead', '⏳ Lueden …', '⏳ Lädt …', '⏳ Loading …'],
     ['saved', 'Gespäichert', 'Gespeichert', 'Saved'],
     ['saveFailed', 'Späicheren net méiglech', 'Speichern nicht möglich', 'Could not save'],
     ['quality', 'Qualitéit', 'Qualität', 'Quality'],
@@ -188,7 +193,7 @@
     // ---- devices
     ['deviceKeyboardOnly', 'Nëmme mat ugeschlossener Tastatur spillbar', 'Nur mit angeschlossener Tastatur spielbar', 'Only playable with a connected keyboard'],
     ['deviceDismiss', 'Verstanen', 'Verstanden', 'Got it'],
-    ['devicePhoneTitle', 'Lokféierer', 'Lokführer', 'Train Driver'],
+    ['devicePhoneTitle', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg'],
     ['devicePhoneBlock', 'Dëst Spill gëtt et nëmmen op iPad a Laptop.', 'Dieses Spiel gibt es nur auf iPad und Laptop.', 'This game is only available on iPad and laptop.'],
     ['devicePhoneHint', 'Maach et op engem gréissere Bildschierm op.', 'Öffne es auf einem größeren Bildschirm.', 'Open it on a larger screen.'],
     ['deviceRotate', 'Dréi däin iPad op d’Säit (Querformat) fir de beschten Androck.', 'Drehe dein iPad ins Querformat für das beste Erlebnis.', 'Rotate your iPad to landscape for the best view.'],

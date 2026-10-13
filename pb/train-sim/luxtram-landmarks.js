@@ -1419,13 +1419,20 @@
   const DATA_URL = '/pb/train-sim/data/luxtram-landmarks.json?v=1';
   let lodState = 0; // 0 idle, 1 loading, 2 ready, 3 failed
   const lodWaiters = [];
+  let lodPromise = null;
   function loadLod(url) {
-    if (lodState === 2 || lodState === 1) return;
+    if (lodPromise) return lodPromise;
     lodState = 1;
     const done = (j) => { LOD = j; lodState = j ? 2 : 3; Object.keys(lodCache).forEach((k) => delete lodCache[k]); lodWaiters.splice(0).forEach((f) => f()); };
-    try {
-      fetch(url || DATA_URL).then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))).then(done).catch((e) => { console.warn(TAG + 'detail data failed, using footprints only', e); done(null); });
-    } catch (e) { done(null); }
+    lodPromise = new Promise((resolve) => {
+      const finish = (j) => { done(j); if (!j) lodPromise = null; resolve(); };   // a failed load may be retried by the next build
+      try {
+        const net = (TS.net = TS.net || { bytes: 0 });   // shared download counter (the loading bar reads it)
+        fetch(url || DATA_URL).then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))).then((txt) => { net.bytes += txt.length; return JSON.parse(txt); }).then(finish)
+          .catch((e) => { console.warn(TAG + 'detail data failed, using footprints only', e); finish(null); });
+      } catch (e) { finish(null); }
+    });
+    return lodPromise;
   }
   function build(scene, ctx) {
     ctx = ctx || {};
@@ -1585,6 +1592,7 @@
 
   TS.luxLandmarks = {
     version: 1,
+    preload: (url) => loadLod(url),   // detail data, resolves when loaded (or failed): the loading bar waits for it
     build,
     replaces,
     footprints,

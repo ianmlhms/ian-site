@@ -288,11 +288,22 @@
     if (xhr.status < 200 || xhr.status >= 300) throw new Error('HTTP ' + xhr.status + ' ' + url);
     return JSON.parse(xhr.responseText);
   }
+  const NET = (TS.net = TS.net || { bytes: 0 });   // shared download counter: bytes of every data file fetched (the loading bar reads it)
   function loadWorld() { if (!worldData) worldData = syncJson(WORLD_URL); return worldData; }
   let geoIndex = null;
   let structData = null;
   function loadStructures() { if (!structData) { try { structData = syncJson(GEO_BASE + 'structures.json?v=1'); } catch (e) { structData = { over: [] }; } } return structData; }
   function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=1'); return geoIndex; }
+  /* Fetches the three data files the world needs at build time asynchronously (with a byte count) so that create() finds them in memory instead of
+     blocking on synchronous requests. Resolves when all are in (or failed: create() then falls back to the blocking request). */
+  function prefetchData() {
+    const getJson = (url) => fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))).then((txt) => { NET.bytes += txt.length; return JSON.parse(txt); });
+    const jobs = [];
+    if (!worldData) jobs.push(getJson(WORLD_URL).then((d) => { if (!worldData) worldData = d; }));
+    if (!structData) jobs.push(getJson(GEO_BASE + 'structures.json?v=1').then((d) => { if (!structData) structData = d; }).catch(() => { /* optional: loadStructures() falls back */ }));
+    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=1').then((d) => { if (!geoIndex) geoIndex = d; }));
+    return Promise.all(jobs).then(() => true, (e) => { console.warn(TAG + 'data prefetch failed, loading synchronously', e); return false; });
+  }
 
   /* ------------------------------------------------------------ facade atlas for the LOD2 buildings
    * 8 columns (4 styles x 2 variants) x 2 rows (ground floor / upper floor), each cell = one bay (BAY_W m) x one floor.
@@ -584,6 +595,7 @@
     const tileByKey = new Map(tileInfo.map((t) => [t.key, t]));
     void tileByKey;
 
+    const counted = (x) => { NET.bytes += x && x.byteLength !== undefined ? x.byteLength : x && x.size !== undefined ? x.size : 0; return x; };   // ArrayBuffer / Blob size (parsed JSON: not counted)
     const MAX_LOADS = 4;
     let loading = 0;
     function startLoad(info) {
@@ -592,7 +604,7 @@
       tiles.set(key, t);
       loading++;
       const ver = geo.v || 1;
-      const get = (url, kind) => fetch(GEO_BASE + url + '?v=' + ver).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + url); return kind === 'buf' ? r.arrayBuffer() : kind === 'blob' ? r.blob() : r.json(); });
+      const get = (url, kind) => fetch(GEO_BASE + url + '?v=' + ver).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + url); return kind === 'buf' ? r.arrayBuffer() : kind === 'blob' ? r.blob() : r.json(); }).then(counted);
       const pH = get('h/' + key + '.bin', 'buf').then(decodeHeights);
       const pB = geo.bld[key] ? get('b/' + key + '.bin', 'buf').then(parseBuildings).catch(() => []) : Promise.resolve([]);
       const pO = get('o/' + key + '.webp', 'blob').then((b) => (typeof createImageBitmap === 'function' ? createImageBitmap(b) : new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(b); })));
@@ -999,7 +1011,7 @@
       farTiles.set(info.key, f);
       farLoading++;
       const ver = geo.v || 1;
-      const get = (url, kind) => fetch(GEO_BASE + url + '?v=' + ver).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return kind === 'buf' ? r.arrayBuffer() : kind === 'blob' ? r.blob() : r.json(); });
+      const get = (url, kind) => fetch(GEO_BASE + url + '?v=' + ver).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return kind === 'buf' ? r.arrayBuffer() : kind === 'blob' ? r.blob() : r.json(); }).then(counted);
       const pH = get('f/h_' + info.key + '.bin', 'buf').then(decodeHeights);
       const pO = get('f/o_' + info.key + '.webp', 'blob').then((b) => createImageBitmap(b)).catch(() => null);
       const pB = info.b ? get('f/b_' + info.key + '.json', 'json').catch(() => []) : Promise.resolve([]);   // only tiles that have far buildings
@@ -1959,11 +1971,43 @@
       if (lm && lm.update) { try { lm.update(sc, camera); } catch (e) { console.warn(TAG + 'landmark update', e); } }
       lastS = s;
     }
+    let warmS = null;   // where the opening warm-up was asked for (progress() measures that window)
     function warm(s) {
       const sc = clamp(s === undefined ? 0 : s, 0, L);
+      if (warmS === null) warmS = sc;
       ensureTiles(sc, true);
       ensureChunks(sc, true);
       ensureFar(sc, null, true);
+    }
+    /* the detailed tiles of the window around s (same rule as ensureTiles) and the far tiles within the far radius (same rule as ensureFar) */
+    function windowTiles(s) {
+      return tileInfo.filter((info) => { const ds = info.s - s; return ds > -Q.behind - 90 && ds < Q.ahead + 90; });
+    }
+    function windowFar(s) {
+      const f0 = frame(s);
+      return farInfo.filter((info) => {
+        const dx = Math.max(Math.abs(info.cx - f0.pos.x) - FAR_T / 2, 0); const dz = Math.max(Math.abs(info.cz - f0.pos.z) - FAR_T / 2, 0);
+        return Math.hypot(dx, dz) < FAR_R;
+      });
+    }
+    /* Real download progress of the opening warm-up: how many of the start section's tiles (detailed + far) have arrived. */
+    function progress() {
+      if (warmS === null) return { ready: 0, total: 0, done: false, bytes: NET.bytes };
+      let ready = 0; let total = 0;
+      for (const info of windowTiles(warmS)) { total++; const t = tiles.get(info.key); if (t && t.state !== 'loading') ready++; }
+      for (const info of windowFar(warmS)) { total++; const f = farTiles.get(info.key); if (f && f.state !== 'loading') ready++; }
+      return { ready, total, done: ready >= total, bytes: NET.bytes };
+    }
+    /* While driving: how many detailed tiles ahead of the tram (up to the draw distance) have not arrived yet. */
+    function pendingAhead() {
+      let n = 0;
+      for (const info of tileInfo) {
+        const ds = info.s - tramS;
+        if (ds < -40 || ds > Q.ahead) continue;
+        const t = tiles.get(info.key);
+        if (!t || t.state === 'loading') n++;
+      }
+      return n;
     }
     const noop = () => {};
     function stats() {
@@ -1987,8 +2031,8 @@
     }
     ensureTiles(0, false);
     void lastS;
-    return { update, setTimeOfDay: noop, setWeather: noop, warm, stats, dispose, root, groundAt: gy, tiles, underpasses, far: farTiles };
+    return { update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, tiles, underpasses, far: farTiles };
   }
 
-  TS.luxtramWorld = { create, QUALITY };
+  TS.luxtramWorld = { create, QUALITY, prefetchData };
 })();

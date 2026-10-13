@@ -14,7 +14,18 @@ async function gameFrame(h) {
   const frame = h.page.frames().find((f) => f.parentFrame());
   await frame.waitForFunction(() => window.__tsTest.state().phase === 'menu' && !document.getElementById('bootStatus').textContent, null, { timeout: 60000 });
   await frame.evaluate(() => window.focus());
+  /* Deterministic run: a fixed seed and calm services (no random red-signal holds, speed restrictions or incidents). The plan/variation checks call the pure planner directly. */
+  await frame.evaluate(() => { __tsTest.setSeed(20261013); __tsTest.setCalm(true); });
   return frame;
+}
+/* Waits until the cab view is up, the train stands, no emergency stop runs and the camera has not moved for a few frames. */
+const waitCabSettled = (frame) => frame.waitForFunction(() => window.__tsTest.cabSettled(), null, { timeout: 20000, polling: 100 });
+/* Moves onto a cab control and clicks it, always from a settled camera and the control's projected world point. */
+async function cabPoint(h, frame, id, notch) {
+  await waitCabSettled(frame);
+  const target = await frame.evaluate(([i, n]) => __tsTest.findCab(i, n), [id, notch]);
+  const box = await (await frame.frameElement()).boundingBox();
+  return target ? { ...target, px: box.x + target.x, py: box.y + target.y } : null;
 }
 const key = (h, k) => h.page.keyboard.press(k);
 /* endless: every route there and back (forward, then the return direction '~r'), then the next route */
@@ -609,15 +620,9 @@ export const flow = {
     await frame.evaluate(() => { __tsTest.setGrade(null); __tsTest.setSpeed(0); });
 
     h.step('braking guide: "Brems elo!" before the stop, "Ze spéit" when it is almost too late');
-    // A random red signal in the 440 m run-up would trigger a SPAD emergency stop instead of the guide: let it clear and place again.
-    for (let attempt = 0; ; attempt++) {
-      await frame.evaluate(() => { const st = __tsTest.state(); __tsTest.press('x'); __tsTest.release('x'); const i = st.nextStationIndex; __tsTest.placeAt(st.stations[i].s - 440, 80); __tsTest.forceSimStep(0.05, 0); });
-      try { await waitState(frame, () => /Brems/.test(window.__tsTest.state().guideText), null, 5000); break; } catch (e) {
-        if (attempt >= 3) throw e;
-        await waitState(frame, () => !window.__tsTest.state().spadActive, null, 30000);
-        await frame.evaluate(() => { __tsTest.setSpeed(0); });
-      }
-    }
+    // Services are calm (no random red signal in the run-up), so the guide, not a SPAD emergency stop, is what shows.
+    await frame.evaluate(() => { const st = __tsTest.state(); __tsTest.press('x'); __tsTest.release('x'); const i = st.nextStationIndex; __tsTest.placeAt(st.stations[i].s - 440, 80); __tsTest.forceSimStep(0.05, 0); });
+    await waitState(frame, () => /Brems/.test(window.__tsTest.state().guideText), null, 8000);
     s = await S(frame);
     h.expect(s.guide.state === 'brake' && s.guideText.includes('Brems elo'), 'brake hint shown: ' + s.guideText);
     await h.shot('guide-brake');
@@ -639,26 +644,27 @@ export const flow = {
     h.step('clicking the cab controls (lever, parking brake) with the mouse');
     await frame.evaluate(() => { __tsTest.setSpeed(0); __tsTest.forceSimStep(0.1, 0); });
     h.expect((await S(frame)).cabHitTest, 'cab exposes hitTest');
-    const box = await (await frame.frameElement()).boundingBox();
-    const lever = await frame.evaluate(() => __tsTest.findCab('lever', 3));
+    const lever = await cabPoint(h, frame, 'lever', 3);
     h.expect(!!lever, 'the lever is found on screen');
-    await h.page.mouse.move(box.x + lever.x, box.y + lever.y);
-    await h.pause(150);
+    await h.page.mouse.move(lever.px, lever.py);
+    await frame.waitForFunction(() => document.getElementById('world').style.cursor === 'pointer', null, { timeout: 5000 }).catch(() => {});
     h.eq(await frame.evaluate(() => document.getElementById('world').style.cursor), 'pointer', 'cursor turns into a pointer over the lever');
-    await h.page.mouse.click(box.x + lever.x, box.y + lever.y);
-    await h.pause(250);
+    await h.page.mouse.click(lever.px, lever.py);
+    await waitState(frame, (n) => window.__tsTest.state().leverTarget === n, lever.notch, 3000).catch(() => {});
     s = await S(frame);
     h.eq(s.leverTarget, lever.notch, 'clicking the lever sets its notch (P' + lever.notch + ')');
     await h.shot('cab-click');
-    const brake = await frame.evaluate(() => __tsTest.findCab('lever', -4));
-    await h.page.mouse.click(box.x + brake.x, box.y + brake.y);
-    await h.pause(250);
+    await frame.evaluate(() => { __tsTest.forceSimStep(0.1, 0); __tsTest.setSpeed(0); });   // stand still again so the camera settles for the next click
+    const brake = await cabPoint(h, frame, 'lever', -4);
+    await h.page.mouse.click(brake.px, brake.py);
+    await waitState(frame, (n) => window.__tsTest.state().leverTarget === n, brake.notch, 3000).catch(() => {});
     h.eq((await S(frame)).leverTarget, brake.notch, 'clicking lower on the gate brakes (B' + (-brake.notch) + ')');
-    const park = await frame.evaluate(() => __tsTest.findCab('parking'));
+    await frame.evaluate(() => { __tsTest.forceSimStep(0.1, 0); __tsTest.setSpeed(0); });   // lever back to 0 before the parking-brake button
+    const park = await cabPoint(h, frame, 'parking');
     h.expect(!!park, 'the parking-brake button is found on screen');
-    await h.page.mouse.click(box.x + park.x, box.y + park.y);
+    await h.page.mouse.click(park.px, park.py);
     await waitState(frame, () => window.__tsTest.state().parkingBrake === true, null, 5000);
-    await h.page.mouse.click(box.x + park.x, box.y + park.y);
+    await h.page.mouse.click(park.px, park.py);
     await waitState(frame, () => window.__tsTest.state().parkingBrake === false, null, 5000);
     h.expect(true, 'clicking the parking-brake button toggles it');
     await h.page.mouse.move(2, 2);
@@ -668,7 +674,7 @@ export const flow = {
     await frame.evaluate(() => { __tsTest.press('x'); __tsTest.release('x'); __tsTest.teleport(2); });
     const spadBefore = (await S(frame)).totals.spads;
     h.expect(await frame.evaluate(() => __tsTest.spadTest()), 'a signal ahead was forced red');
-    await waitState(frame, () => window.__tsTest.state().totals.spads >= 1, null, 40000);
+    await waitState(frame, (n) => window.__tsTest.state().totals.spads >= n + 1, spadBefore, 40000);
     await waitState(frame, () => window.__tsTest.state().spadActive === true || window.__tsTest.state().kmh < 30, null, 20000);
     s = await S(frame);
     h.eq(s.totals.spads, spadBefore + 1, 'SPAD counted once');
