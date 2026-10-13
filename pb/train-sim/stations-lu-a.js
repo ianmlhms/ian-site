@@ -1260,21 +1260,836 @@
     furnish(k, { totems: [-10], voie: [['Voie 1', -70], ['Voie 1', 60]], benches: [-20, 25, 60], bins: [8], bikebox: [[BACK + 3.2, 20]] });
   }
 
-  // Bartreng (Bertrange-Strassen): white flat-roofed modernist cubes with dark-red window frames, dark-red steel shelters, brick-paver platform,
-  // concrete road bridge across the tracks, three platform tracks
+  /* ================================================================== Bartreng (Bertrange-Strassen)
+   * Real station: grey-roughcast 1950s cube (two storeys, strongly overhanging white flat roof slab over a low grey zinc hip, wide dark-red
+   * ribbon window + beige roller-shutter box, row of small slit windows, barred ground-floor windows, dark-red doors in deep recesses,
+   * low annex), grey/cream paving with a cream tactile strip, dark-red open steel shelters with glass panes and red perforated seats,
+   * dark-red lamp posts, big blue A/B/C section signs, an island platform (Voie 2) with dark-red railings, and across the tracks the Shell
+   * fuel depot with white / pale-green storage tanks. u = metres along the building as seen from the track (right = +u); z = sx * u. */
+  const BT_RED = '#6e1b2a';
+  const BT_WALL = '#b8b9ba';
+  const BT_FL = 5.4; // building front (lat from the track centre)
+  const BT_BK = 13.0; // building rear
+  const BT_U0 = -6.2;
+  const BT_U1 = 6.2;
+  const BT_UT = 2.7; // end of the tall block (the low wing runs on to BT_U1)
+  const BT_WALLH = 6.1;
+  const BT_LOWH = 5.3;
+  const BT_PPM = 56;
+  const BT_S = 1024;
+  const BT_SH = 512;
+  const BT_REG = {
+    front: { x: 0, y: 0, w: 694, h: 342 },
+    annF: { x: 700, y: 0, w: 213, h: 168 },
+    annE: { x: 700, y: 172, w: 258, h: 168 },
+    endW: { x: 0, y: 350, w: 426, h: 342 },
+    rear: { x: 432, y: 350, w: 400, h: 342 },
+  };
+
+  // run draw(a) in metre coordinates inside a clipped atlas region (u from the left, v up from the region bottom)
+  function btRegion(c, R, xScale, draw) {
+    c.save();
+    c.translate(R.x, R.y);
+    c.beginPath();
+    c.rect(0, 0, R.w, R.h);
+    c.clip();
+    const vw = xScale ? R.w / xScale : R.w;
+    if (xScale) c.scale(xScale, 1);
+    const M = BT_PPM;
+    draw({ c, M, w: vw, h: R.h });
+    c.restore();
+  }
+  function btWindow(a, u0, v0, u1, v1, o) {
+    const { c, M, h: RH } = a;
+    const x = u0 * M;
+    const y = RH - v1 * M;
+    const w = (u1 - u0) * M;
+    const h = (v1 - v0) * M;
+    c.fillStyle = 'rgba(30,30,34,0.5)';
+    c.fillRect(x - 2, y - 2, w + 4, h + 4);
+    c.fillStyle = o.glass || '#3a424b';
+    c.fillRect(x, y, w, h);
+    const g = c.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, 'rgba(200,214,230,0.55)');
+    g.addColorStop(0.55, 'rgba(190,205,222,0.12)');
+    g.addColorStop(1, 'rgba(130,150,175,0.38)');
+    c.fillStyle = g;
+    c.fillRect(x, y, w, h);
+    if (o.inside) {
+      c.fillStyle = 'rgba(15,15,18,0.45)';
+      c.fillRect(x, y + h * 0.55, w, h * 0.45);
+    }
+    c.fillStyle = o.frame || BT_RED;
+    const fw = o.fw || 4;
+    c.fillRect(x, y, w, fw);
+    c.fillRect(x, y + h - fw, w, fw);
+    c.fillRect(x, y, fw, h);
+    c.fillRect(x + w - fw, y, fw, h);
+    for (let i = 1; i < (o.cols || 1); i++) c.fillRect(x + (w * i) / o.cols - fw / 2, y, fw, h);
+    (o.rows || []).forEach((r) => c.fillRect(x, y + h * r - fw / 2, w, fw));
+    if (o.bars) {
+      c.fillStyle = '#d6d2c6';
+      for (let i = 5; i < w - 3; i += 8) c.fillRect(x + i, y, 2, h);
+    }
+    if (o.sill !== false) {
+      c.fillStyle = '#ebe8df';
+      c.fillRect(x - 4, y + h, w + 8, 5);
+      c.fillStyle = 'rgba(0,0,0,0.28)';
+      c.fillRect(x - 3, y + h + 5, w + 6, 3);
+    }
+  }
+  function btShutter(a, u0, u1, v0, v1, color) {
+    const { c, M, h: RH } = a;
+    const x = u0 * M;
+    const y = RH - v1 * M;
+    const w = (u1 - u0) * M;
+    const h = (v1 - v0) * M;
+    c.fillStyle = color || '#ddd7c5';
+    c.fillRect(x, y, w, h);
+    c.fillStyle = 'rgba(120,112,92,0.38)';
+    for (let yy = y + 3; yy < y + h - 2; yy += 4) c.fillRect(x, yy, w, 1);
+    c.fillStyle = 'rgba(90,82,66,0.55)';
+    c.fillRect(x, y + h - 4, w, 4);
+    c.fillStyle = 'rgba(255,255,255,0.35)';
+    c.fillRect(x, y, w, 2);
+    c.fillStyle = 'rgba(60,56,48,0.35)';
+    c.fillRect(x, y, 2, h);
+    c.fillRect(x + w - 2, y, 2, h);
+  }
+  // recessed dark-red door (deep reveal shadowed on the left and top)
+  function btDoor(a, u0, u1, v1, o) {
+    const { c, M, h: RH } = a;
+    const x = u0 * M;
+    const y = RH - v1 * M;
+    const w = (u1 - u0) * M;
+    const h = v1 * M - 0.3 * M;
+    c.fillStyle = '#3a2d30';
+    c.fillRect(x - 3, y - 3, w + 6, h + 3);
+    c.fillStyle = 'rgba(0,0,0,0.5)';
+    c.fillRect(x, y, w * 0.28, h);
+    c.fillStyle = o && o.glassy ? '#5d1424' : '#6a1425';
+    c.fillRect(x + w * 0.28, y + 3, w * 0.72, h - 3);
+    if (o && o.glassy) {
+      c.fillStyle = '#2a323a';
+      c.fillRect(x + w * 0.4, y + 9, w * 0.5, h * 0.55);
+      c.fillStyle = 'rgba(190,205,222,0.3)';
+      c.fillRect(x + w * 0.4, y + 9, w * 0.5, h * 0.2);
+    } else {
+      c.fillStyle = '#4e0e1b';
+      c.fillRect(x + w * 0.4, y + 12, w * 0.5, h * 0.22);
+      c.fillRect(x + w * 0.4, y + h * 0.45, w * 0.5, h * 0.22);
+    }
+    c.fillStyle = '#c9c6bc';
+    c.fillRect(x + w * 0.86, y + h * 0.5, 2, 9);
+    c.fillStyle = 'rgba(0,0,0,0.3)';
+    c.fillRect(x - 3, y + h, w + 6, 3);
+  }
+  function btRough(c, w, h, rnd) {
+    c.fillStyle = BT_WALL;
+    c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 6500; i++) {
+      const v = rnd();
+      c.fillStyle = v > 0.5 ? 'rgba(255,255,250,' + (0.05 + rnd() * 0.1).toFixed(3) + ')' : 'rgba(80,80,86,' + (0.04 + rnd() * 0.08).toFixed(3) + ')';
+      const s = 1 + rnd() * 2.2;
+      c.fillRect(rnd() * w, rnd() * h, s, s);
+    }
+  }
+  function btFacadeAtlas(c, w, h) {
+    const rnd = seeded(2201);
+    btRough(c, w, h, rnd);
+    const dirt = (a, hm) => {
+      const g = a.c.createLinearGradient(0, a.h - hm * a.M, 0, a.h);
+      g.addColorStop(0, 'rgba(70,64,58,0)');
+      g.addColorStop(1, 'rgba(70,64,58,0.3)');
+      a.c.fillStyle = g;
+      a.c.fillRect(0, a.h - hm * a.M, a.w, hm * a.M);
+      a.c.fillStyle = '#8b8d90';
+      a.c.fillRect(0, a.h - 0.26 * a.M, a.w, 0.26 * a.M);
+    };
+    // --- front (track side), t = 0..12.4 m left to right, v up to 6.1
+    btRegion(c, BT_REG.front, 0, (a) => {
+      // soffit shadow under the slab
+      const g = a.c.createLinearGradient(0, 0, 0, 40);
+      g.addColorStop(0, 'rgba(30,30,34,0.35)');
+      g.addColorStop(1, 'rgba(30,30,34,0)');
+      a.c.fillStyle = g;
+      a.c.fillRect(0, 0, a.w, 40);
+      dirt(a, 0.9);
+      // upper floor: wide ribbon window with shutter box, second window with shutter box
+      btShutter(a, 2.78, 6.34, 5.15, 6.0, '#ddd7c5');
+      btWindow(a, 2.8, 4.05, 6.32, 5.15, { cols: 6, rows: [0.42], fw: 4, inside: true });
+      btShutter(a, 6.78, 8.12, 5.15, 6.0, '#e0dac8');
+      btWindow(a, 6.8, 4.05, 8.1, 5.15, { cols: 2, rows: [0.42], fw: 4, inside: true });
+      // row of small slit windows high up on the low wing
+      [9.3, 10.35, 11.4].forEach((t) => btWindow(a, t, 4.45, t + 0.55, 4.95, { cols: 2, fw: 3 }));
+      // ground floor: barred windows
+      btWindow(a, 1.5, 1.3, 2.05, 1.95, { bars: true, fw: 3, cols: 2 });
+      btWindow(a, 2.6, 0.95, 3.55, 2.15, { bars: true, fw: 4, cols: 2, rows: [0.35] });
+      btWindow(a, 4.0, 0.95, 5.55, 2.15, { bars: true, fw: 4, cols: 3, rows: [0.35] });
+      // doors: glazed entrance (recessed), then three plain doors
+      btDoor(a, 6.55, 7.55, 2.2, { glassy: true });
+      btDoor(a, 9.25, 10.0, 2.15);
+      btDoor(a, 10.4, 11.15, 2.15);
+      btDoor(a, 11.5, 12.25, 2.15);
+      // small fittings: vents, notices, meter box
+      a.c.fillStyle = '#56595d';
+      a.c.fillRect(5.85 * a.M, a.h - 1.55 * a.M, 9, 13);
+      a.c.fillRect(8.3 * a.M, a.h - 1.55 * a.M, 9, 13);
+      a.c.fillStyle = '#e8e6df';
+      a.c.fillRect(8.35 * a.M, a.h - 1.95 * a.M, 8, 11);
+      a.c.fillStyle = '#7e8184';
+      a.c.fillRect(0.5 * a.M, a.h - 1.7 * a.M, 15, 17);
+    });
+    // --- street end wall (depth 7.6 m, rear on the left, track side on the right)
+    btRegion(c, BT_REG.endW, 0, (a) => {
+      const g = a.c.createLinearGradient(0, 0, 0, 40);
+      g.addColorStop(0, 'rgba(30,30,34,0.3)');
+      g.addColorStop(1, 'rgba(30,30,34,0)');
+      a.c.fillStyle = g;
+      a.c.fillRect(0, 0, a.w, 40);
+      dirt(a, 0.9);
+      // vertical glass-block slit near the track corner
+      const gx = a.w - 0.95 * a.M;
+      const gy = a.h - 5.05 * a.M;
+      a.c.fillStyle = '#a9cbd0';
+      a.c.fillRect(gx, gy, 0.38 * a.M, 4.5 * a.M);
+      a.c.strokeStyle = 'rgba(70,95,100,0.7)';
+      a.c.lineWidth = 1;
+      for (let yy = gy; yy < gy + 4.5 * a.M; yy += 0.19 * a.M) {
+        a.c.beginPath();
+        a.c.moveTo(gx, yy);
+        a.c.lineTo(gx + 0.38 * a.M, yy);
+        a.c.stroke();
+      }
+      a.c.strokeStyle = '#d8d6cc';
+      a.c.lineWidth = 3;
+      a.c.strokeRect(gx - 1, gy - 1, 0.38 * a.M + 2, 4.5 * a.M + 2);
+      // row of small windows high up at the rear end
+      [0.6, 1.65, 2.7].forEach((d) => btWindow(a, d, 4.55, d + 0.6, 5.05, { cols: 2, fw: 3 }));
+      // two narrow doors and a barred window near the rear corner
+      btDoor(a, 0.9, 1.6, 2.15);
+      btDoor(a, 2.1, 2.8, 2.15);
+      btWindow(a, 3.6, 1.4, 4.2, 2.0, { bars: true, fw: 3, cols: 2 });
+      a.c.fillStyle = '#56595d';
+      a.c.fillRect(5.0 * a.M, a.h - 1.1 * a.M, 9, 13);
+    });
+    // --- rear wall (car-park side) drawn in front metres, squeezed into 400 px
+    btRegion(c, BT_REG.rear, BT_REG.rear.w / BT_REG.front.w, (a) => {
+      dirt(a, 0.9);
+      [1.2, 4.0, 7.2, 10.2].forEach((t) => btWindow(a, t, 4.1, t + 1.0, 5.15, { cols: 2, rows: [0.4], fw: 4, inside: true }));
+      [1.6, 4.6, 8.0].forEach((t) => btWindow(a, t, 1.1, t + 0.9, 2.1, { bars: true, fw: 4, cols: 2 }));
+      btDoor(a, 10.6, 11.4, 2.15);
+    });
+    // --- annex front (3.8 x 3.0) and annex end/rear (4.6 x 3.0)
+    btRegion(c, BT_REG.annF, 0, (a) => {
+      dirt(a, 0.7);
+      btWindow(a, 0.7, 1.1, 1.4, 2.0, { bars: true, fw: 3, cols: 2 });
+      btWindow(a, 2.3, 1.1, 3.0, 2.0, { bars: true, fw: 3, cols: 2 });
+    });
+    btRegion(c, BT_REG.annE, 0, (a) => {
+      dirt(a, 0.7);
+      btWindow(a, 0.5, 1.2, 1.1, 1.95, { bars: true, fw: 3, cols: 2 });
+      btDoor(a, 1.9, 2.7, 2.15);
+      btWindow(a, 3.4, 1.2, 4.0, 1.95, { bars: true, fw: 3, cols: 2 });
+    });
+  }
+
+  /* ---- sign atlas (1024 x 512, 128 px cells) */
+  const BT_CELL = { A: [0, 0, 1, 1], B: [1, 0, 1, 1], C: [2, 0, 1, 1], one: [3, 0, 1, 1], pr: [4, 0, 2, 1], no: [6, 0, 1, 1], arr: [0, 1, 2, 1], shell: [2, 1, 1, 1], depot: [3, 1, 2, 1] };
+  function btSignAtlas(c, w, h) {
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, w, h);
+    const BLUE = '#0f4c9a';
+    const cell = (key) => {
+      const [cx, cy, cw, ch] = BT_CELL[key];
+      return { x: cx * 128, y: cy * 128, w: cw * 128, h: ch * 128 };
+    };
+    const letter = (key, ch) => {
+      const r = cell(key);
+      c.fillStyle = BLUE;
+      c.fillRect(r.x, r.y, r.w, r.h);
+      c.strokeStyle = '#ffffff';
+      c.lineWidth = 5;
+      c.strokeRect(r.x + 8, r.y + 8, r.w - 16, r.h - 16);
+      c.fillStyle = '#ffffff';
+      c.font = '700 96px "Helvetica Neue", Arial, sans-serif';
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(ch, r.x + r.w / 2, r.y + r.h / 2 + 5);
+    };
+    letter('A', 'A');
+    letter('B', 'B');
+    letter('C', 'C');
+    // "1" (platform number, small CFL tab)
+    let r = cell('one');
+    c.fillStyle = BLUE;
+    c.fillRect(r.x, r.y, r.w, r.h);
+    c.fillStyle = '#ffffff';
+    c.font = '700 22px Arial, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('Voie', r.x + 64, r.y + 22);
+    c.font = '700 80px "Helvetica Neue", Arial, sans-serif';
+    c.fillText('1', r.x + 64, r.y + 72);
+    // "P+R ->"
+    r = cell('pr');
+    c.fillStyle = BLUE;
+    c.fillRect(r.x, r.y, r.w, r.h);
+    c.fillStyle = '#ffffff';
+    c.font = '700 64px "Helvetica Neue", Arial, sans-serif';
+    c.textAlign = 'left';
+    c.fillText('P+R', r.x + 16, r.y + 52);
+    c.beginPath();
+    c.moveTo(r.x + 150, r.y + 38);
+    c.lineTo(r.x + 188, r.y + 38);
+    c.lineTo(r.x + 188, r.y + 24);
+    c.lineTo(r.x + 226, r.y + 52);
+    c.lineTo(r.x + 188, r.y + 80);
+    c.lineTo(r.x + 188, r.y + 66);
+    c.lineTo(r.x + 150, r.y + 66);
+    c.fill();
+    c.font = '700 16px Arial, sans-serif';
+    c.textAlign = 'center';
+    c.fillText('Parking relais', r.x + 128, r.y + 108);
+    // prohibition board (white, red rings)
+    r = cell('no');
+    c.fillStyle = '#f4f4f0';
+    c.fillRect(r.x, r.y, r.w, r.h);
+    c.strokeStyle = '#c1121f';
+    c.lineWidth = 7;
+    [[34, 40], [92, 40]].forEach(([dx, dy]) => {
+      c.beginPath();
+      c.arc(r.x + dx, r.y + dy, 22, 0, Math.PI * 2);
+      c.moveTo(r.x + dx - 15, r.y + dy + 15);
+      c.lineTo(r.x + dx + 15, r.y + dy - 15);
+      c.stroke();
+    });
+    c.fillStyle = '#333333';
+    c.fillRect(r.x + 12, r.y + 82, 104, 4);
+    c.fillRect(r.x + 12, r.y + 94, 80, 4);
+    c.fillRect(r.x + 12, r.y + 106, 92, 4);
+    // blue direction tab "<- + accessible"
+    r = cell('arr');
+    c.fillStyle = BLUE;
+    c.fillRect(r.x, r.y, r.w, r.h);
+    c.fillStyle = '#ffffff';
+    c.fillRect(r.x + 128, r.y + 8, 3, 112);
+    c.beginPath();
+    c.moveTo(r.x + 22, r.y + 64);
+    c.lineTo(r.x + 62, r.y + 28);
+    c.lineTo(r.x + 62, r.y + 50);
+    c.lineTo(r.x + 108, r.y + 50);
+    c.lineTo(r.x + 108, r.y + 78);
+    c.lineTo(r.x + 62, r.y + 78);
+    c.lineTo(r.x + 62, r.y + 100);
+    c.fill();
+    c.beginPath();
+    c.arc(r.x + 176, r.y + 38, 11, 0, Math.PI * 2);
+    c.fill();
+    c.fillRect(r.x + 170, r.y + 52, 12, 34);
+    c.fillRect(r.x + 170, r.y + 80, 38, 10);
+    c.fillRect(r.x + 198, r.y + 88, 10, 26);
+    // Shell pecten (yellow shell, red outline)
+    const shellAt = (rx, ry, rw, rh) => {
+      c.fillStyle = '#ffffff';
+      c.fillRect(rx, ry, rw, rh);
+      const cx = rx + rw / 2;
+      const cy = ry + rh * 0.52;
+      const sc = Math.min(rw, rh) / 128;
+      c.save();
+      c.translate(cx, cy);
+      c.scale(sc, sc);
+      c.fillStyle = '#dd1d21';
+      c.beginPath();
+      c.moveTo(-44, 46);
+      c.quadraticCurveTo(-62, 30, -56, 6);
+      c.quadraticCurveTo(-60, -22, -40, -34);
+      c.quadraticCurveTo(-36, -52, -12, -50);
+      c.quadraticCurveTo(0, -58, 12, -50);
+      c.quadraticCurveTo(36, -52, 40, -34);
+      c.quadraticCurveTo(60, -22, 56, 6);
+      c.quadraticCurveTo(62, 30, 44, 46);
+      c.lineTo(22, 52);
+      c.lineTo(-22, 52);
+      c.closePath();
+      c.fill();
+      c.fillStyle = '#fbce07';
+      c.beginPath();
+      c.moveTo(-36, 40);
+      c.quadraticCurveTo(-50, 28, -46, 8);
+      c.quadraticCurveTo(-50, -16, -32, -26);
+      c.quadraticCurveTo(-30, -40, -10, -40);
+      c.quadraticCurveTo(0, -46, 10, -40);
+      c.quadraticCurveTo(30, -40, 32, -26);
+      c.quadraticCurveTo(50, -16, 46, 8);
+      c.quadraticCurveTo(50, 28, 36, 40);
+      c.lineTo(16, 44);
+      c.lineTo(-16, 44);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = '#dd1d21';
+      c.lineWidth = 5;
+      [-30, -15, 0, 15, 30].forEach((dx) => {
+        c.beginPath();
+        c.moveTo(dx * 0.3, 40);
+        c.lineTo(dx * 1.25, -30 + Math.abs(dx) * 0.4);
+        c.stroke();
+      });
+      c.restore();
+    };
+    r = cell('shell');
+    shellAt(r.x, r.y, r.w, r.h);
+    // pole sign of the depot: shell on white with a red band
+    r = cell('depot');
+    shellAt(r.x, r.y, r.w, r.h);
+    c.fillStyle = '#dd1d21';
+    c.fillRect(r.x, r.y + r.h - 14, r.w, 14);
+  }
+  function btUV(key) {
+    // whole cell of the sign atlas (BT_S wide, BT_SH tall), bottom-left first
+    const [cx, cy, cw, ch] = BT_CELL[key];
+    const u0 = (cx * 128 + 2) / BT_S;
+    const u1 = ((cx + cw) * 128 - 2) / BT_S;
+    const v0 = 1 - ((cy + ch) * 128 - 2) / BT_SH;
+    const v1 = 1 - (cy * 128 + 2) / BT_SH;
+    return [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+  }
+
+  /* ---- platform paving: grey-green pavers, cream kerb band, cream tactile strip with two grooves */
+  function btPaverTex(c, w, h) {
+    const rnd = seeded(1707);
+    c.fillStyle = '#6e726f';
+    c.fillRect(0, 0, w, h);
+    const bw = 13;
+    const bh = 13;
+    for (let y = 0; y < h; y += bh) {
+      for (let x = (y / bh) % 2 ? 0 : bw / 2; x < w; x += bw) {
+        const v = 108 + Math.floor(rnd() * 20);
+        c.fillStyle = 'rgb(' + v + ',' + (v + 3) + ',' + (v + 2) + ')';
+        c.fillRect(x + 1, y + 1, bw - 2, bh - 2);
+      }
+    }
+    const pm = 64; // px per metre across
+    // cream kerb band at the platform edge
+    c.fillStyle = '#cfc9b4';
+    c.fillRect(0, 0, 0.3 * pm, h);
+    c.fillStyle = '#b8b29c';
+    c.fillRect(0.3 * pm, 0, 0.03 * pm, h);
+    // tactile strip (cream, two grooves + studs)
+    c.fillStyle = '#cdc5a6';
+    c.fillRect(0.88 * pm, 0, 0.42 * pm, h);
+    c.fillStyle = 'rgba(120,108,70,0.7)';
+    c.fillRect(0.97 * pm, 0, 3, h);
+    c.fillRect(1.15 * pm, 0, 3, h);
+    c.fillStyle = 'rgba(255,255,245,0.45)';
+    for (let y = 4; y < h; y += 10) {
+      c.fillRect(0.91 * pm, y, 4, 4);
+      c.fillRect(1.22 * pm, y, 4, 4);
+    }
+    c.fillStyle = '#cfc9b4';
+    c.fillRect(0.84 * pm, 0, 0.04 * pm, h);
+    c.fillRect(1.3 * pm, 0, 0.04 * pm, h);
+    // darker wear lanes
+    c.fillStyle = 'rgba(40,44,42,0.1)';
+    c.fillRect(2.4 * pm, 0, 1.4 * pm, h);
+  }
+  const btPaveBatch = (k) => k.sets.get('luA:pave:bt', () => k.mat('luA:pave:bt', () => new k.T.MeshStandardMaterial({ map: k.canvasTex('luA:pave:bt', 512, 512, btPaverTex), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+
+  // the generic platform adds a grey back fence on our platform and a trackside fence across the far platform: remove both
+  // (triangles lying on those fence lines), the real station has dark-red railings / a green mesh fence instead
+  function btStripGenericFences(k) {
+    const b = k.vc;
+    const lines = [k.pf(k.edge + k.W + 0.45), -k.pf(7.4)];
+    const keep = [];
+    const near = (i) => lines.some((xf) => Math.abs(b.pos[i * 3] - xf) < 0.05);
+    for (let i = 0; i < b.idx.length; i += 3) {
+      if (near(b.idx[i]) && near(b.idx[i + 1]) && near(b.idx[i + 2])) continue;
+      keep.push(b.idx[i], b.idx[i + 1], b.idx[i + 2]);
+    }
+    b.idx = keep;
+  }
+
+  const btZ = (k, u) => k.sx * u;
+  // vertical wall quad in the atlas. fixed lat: u0 (left) -> u1 (right); fixed u: lat0 (left) -> lat1 (right)
+  function btWallLat(k, b, lat, u0, u1, y0, y1, nrm, uv) {
+    k.quadL(b, [lat, y0, btZ(k, u0)], [lat, y0, btZ(k, u1)], [lat, y1, btZ(k, u1)], [lat, y1, btZ(k, u0)], nrm, k.WHITE, uv);
+  }
+  function btWallU(k, b, u, lat0, lat1, y0, y1, nrm, uv) {
+    k.quadL(b, [lat0, y0, btZ(k, u)], [lat1, y0, btZ(k, u)], [lat1, y1, btZ(k, u)], [lat0, y1, btZ(k, u)], nrm, k.WHITE, uv);
+  }
+  const btRegUV = (R, f0, f1, g0, g1) => {
+    const u = (f) => (R.x + f * R.w) / BT_S;
+    const v = (g) => (BT_S - (R.y + R.h) + g * R.h) / BT_S;
+    return [[u(f0), v(g0)], [u(f1), v(g0)], [u(f1), v(g1)], [u(f0), v(g1)]];
+  };
+  // truncated hip roof (grey standing-seam zinc) between lat/u rectangles at heights y0 -> y1
+  function btHip(k, b, o) {
+    const c = k.col(o.color);
+    const a = [[o.l0, o.u0], [o.l1, o.u0], [o.l1, o.u1], [o.l0, o.u1]];
+    const t = [[o.l0 + o.ins, o.u0 + o.ins], [o.l1 - o.ins, o.u0 + o.ins], [o.l1 - o.ins, o.u1 - o.ins], [o.l0 + o.ins, o.u1 - o.ins]];
+    const P = (p, y) => [p[0], y, btZ(k, p[1])];
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) % 4;
+      const mx = (a[i][0] + a[j][0]) / 2 - (o.l0 + o.l1) / 2;
+      const mu = (a[i][1] + a[j][1]) / 2 - (o.u0 + o.u1) / 2;
+      const nl = Math.abs(mx) > Math.abs(mu) ? Math.sign(mx) : 0;
+      const nu = Math.abs(mx) > Math.abs(mu) ? 0 : Math.sign(mu);
+      b.quad(k.P(...P(a[i], o.y0)), k.P(...P(a[j], o.y0)), k.P(...P(t[j], o.y1)), k.P(...P(t[i], o.y1)), [nl * k.sx, 0.5, nu * k.sx], c);
+    }
+    b.quad(k.P(...P(t[0], o.y1)), k.P(...P(t[1], o.y1)), k.P(...P(t[2], o.y1)), k.P(...P(t[3], o.y1)), [0, 1, 0], c);
+  }
+
+  function btBuilding(k) {
+    const { H, vc, col } = k;
+    const fb = k.tex('btfac', BT_S, BT_S, btFacadeAtlas, { clampU: true, clampV: true });
+    const yT = H + BT_WALLH;
+    const yL = H + BT_LOWH;
+    const toTrack = -k.sx;
+    const away = k.sx;
+    const ft = BT_REG.front;
+    const fT = (BT_UT - BT_U0) / (BT_U1 - BT_U0);
+    const gL = BT_LOWH / BT_WALLH;
+    // front (track side)
+    btWallLat(k, fb, BT_FL, BT_U0, BT_UT, H, yT, [toTrack, 0, 0], btRegUV(ft, 0, fT, 0, 1));
+    btWallLat(k, fb, BT_FL, BT_UT, BT_U1, H, yL, [toTrack, 0, 0], btRegUV(ft, fT, 1, 0, gL));
+    // street end (u = U0) faces -u: left = rear, right = front corner
+    btWallU(k, fb, BT_U0, BT_BK, BT_FL, H, yT, [0, 0, -k.sx], btRegUV(BT_REG.endW, 0, 1, 0, 1));
+    // far end of the low wing faces +u: left = front corner, right = rear (mirrored end texture)
+    btWallU(k, fb, BT_U1, BT_FL, BT_BK, H, yL, [0, 0, k.sx], btRegUV(BT_REG.endW, 1, 0, 0, gL));
+    // step above the low wing (tall block side), plain
+    btWallU(k, fb, BT_UT, BT_FL, BT_BK, yL, yT, [0, 0, k.sx], btRegUV(BT_REG.endW, 0.25, 0.75, gL, 1));
+    // rear: low wing + tall block (rear region runs left = u 6.2 -> right = u -6.2)
+    const rr = BT_REG.rear;
+    const fr = (BT_U1 - BT_UT) / (BT_U1 - BT_U0);
+    btWallLat(k, fb, BT_BK, BT_U1, BT_U0, H, yL, [away, 0, 0], btRegUV(rr, 0, 1, 0, gL));
+    btWallLat(k, fb, BT_BK, BT_UT, BT_U0, yL, yT, [away, 0, 0], btRegUV(rr, fr, 1, gL, 1));
+
+    // roof slabs: thick white, very strong overhang at the front and the street corner; grey zinc hip behind the fascia
+    const white = col('#f1f1ec');
+    const under = col('#e4e4de');
+    const soffit = k.sets.get('luA:soffit', () => k.mat('luA:soffit', () => new k.T.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, emissive: new k.T.Color(0x3a3a3a) })));
+    const slab = (l0, l1, u0, u1, y, t) => {
+      k.box(vc, (l0 + l1) / 2, y + t / 2, btZ(k, (u0 + u1) / 2), l1 - l0, t, u1 - u0, white);
+      k.box(soffit, (l0 + l1) / 2, y - 0.015, btZ(k, (u0 + u1) / 2), l1 - l0 - 0.02, 0.03, u1 - u0 - 0.02, under);
+    };
+    slab(BT_FL - 1.5, BT_BK + 0.6, BT_U0 - 1.1, BT_UT + 0.5, yT, 0.55);
+    slab(BT_FL - 0.75, BT_BK + 0.3, BT_UT + 0.1, BT_U1 + 0.45, yL, 0.42);
+    btHip(k, vc, { l0: BT_FL - 1.1, l1: BT_BK + 0.2, u0: BT_U0 - 0.7, u1: BT_UT + 0.2, y0: yT + 0.55, y1: yT + 1.5, ins: 2.3, color: '#575d63' });
+    // thin entrance canopy over the recessed glazed door
+    k.box(vc, BT_FL - 0.55, H + 2.78, btZ(k, 0.95), 1.1, 0.1, 3.3, white);
+
+    // low annex with its own flat white slab, next to the stairs
+    const AL0 = 6.0;
+    const AL1 = 11.4;
+    const AU0 = BT_U1;
+    const AU1 = 10.2;
+    const yA = H + 3.0;
+    btWallLat(k, fb, AL0, AU0, AU1, H, yA, [toTrack, 0, 0], btRegUV(BT_REG.annF, 0, 1, 0, 1));
+    btWallU(k, fb, AU1, AL0, AL1, H, yA, [0, 0, k.sx], btRegUV(BT_REG.annE, 0, 1, 0, 1));
+    btWallLat(k, fb, AL1, AU1, AU0, H, yA, [away, 0, 0], btRegUV(BT_REG.annE, 0, 1, 0, 1));
+    slab(AL0 - 0.55, AL1 + 0.35, AU0 - 0.1, AU1 + 0.5, yA, 0.34);
+    // drainpipes, wall lamp
+    const grey = col('#7a7e82');
+    k.box(vc, BT_FL + 0.05, H + BT_WALLH / 2, btZ(k, BT_U0 + 0.08), 0.09, BT_WALLH, 0.09, grey);
+    k.box(vc, BT_BK - 0.05, H + BT_WALLH / 2, btZ(k, BT_U0 + 0.08), 0.09, BT_WALLH, 0.09, grey);
+    k.box(vc, BT_FL - 0.2, H + 5.0, btZ(k, 7.2 - 6.2 + 0.5), 0.4, 0.07, 0.07, col('#44484c'));
+    k.box(vc, BT_FL - 0.42, H + 4.98, btZ(k, 7.2 - 6.2 + 0.5), 0.22, 0.1, 0.2, col('#34383c'));
+    // roughcast plinth edge on the platform
+    k.box(vc, BT_FL - 0.02, H + 0.02, btZ(k, (BT_U0 + BT_U1) / 2), 0.05, 0.05, BT_U1 - BT_U0, col('#8b8d90'));
+  }
+
+  // raised paved forecourt behind/around the building (flush with the platform) so the building does not stand in a field
+  function btForecourt(k) {
+    const { H, FORM_Y, vc, col } = k;
+    const l0 = k.edge + k.W;
+    const l1 = BT_BK + 2.6;
+    const u0 = -13;
+    const u1 = 26;
+    const cz = btZ(k, (u0 + u1) / 2);
+    k.box(vc, (l0 + l1) / 2, (H + FORM_Y) / 2 - 0.01, cz, l1 - l0, H - FORM_Y - 0.02, u1 - u0, col('#9b9a93'));
+    k.quadL(vc, [l0, H + 0.006, btZ(k, u0)], [l1, H + 0.006, btZ(k, u0)], [l1, H + 0.006, btZ(k, u1)], [l0, H + 0.006, btZ(k, u1)], [0, 1, 0], col('#6c6e70'));
+    // a strip of cream/white car-park markings
+    for (let u = -10; u < 24; u += 3) k.box(vc, l1 - 0.9, H + 0.012, btZ(k, u), 0.1, 0.01, 1.6, col('#d9d8d0'));
+  }
+
+  // a few parked cars on the forecourt (body + cabin boxes, nose towards the track)
+  function btCars(k) {
+    const { vc, col, H, glass } = k;
+    const list = [[12.5, 9.0, '#2c4f86'], [15.1, 9.0, '#c9ccd0'], [17.7, 9.2, '#1f2326'], [20.3, 9.0, '#e4e5e6'], [23.0, 9.0, '#8d9196']];
+    list.forEach(([u, lat, hex]) => {
+      const z = btZ(k, u);
+      k.box(vc, lat, H + 0.62, z, 4.2, 0.62, 1.78, col(hex));
+      k.box(vc, lat + 0.2, H + 1.12, z, 2.2, 0.5, 1.6, col(hex));
+      k.box(glass, lat + 0.2, H + 1.12, z, 2.22, 0.34, 1.62, k.WHITE);
+      k.box(vc, lat, H + 0.22, z, 3.6, 0.3, 1.6, col('#1a1a1c'));
+    });
+  }
+
+  /* ---- little furniture */
+  function btBin(k, lat, z, dir) {
+    const { vc, col, H } = k;
+    const o = col('#f26a17');
+    k.box(vc, lat, H + 0.98, z, 0.4, 0.62, 0.42, o);
+    k.box(vc, lat + dir * 0.205, H + 1.12, z, 0.01, 0.2, 0.3, col('#2a1c12'));
+    k.box(vc, lat, H + 0.62, z, 0.05, 0.62, 0.05, col('#6a6e72'));
+    k.box(vc, lat, H + 0.3, z, 0.34, 0.04, 0.34, col('#6a6e72'));
+  }
+  function btValidator(k, lat, z) {
+    const { vc, col, H } = k;
+    k.box(vc, lat, H + 0.55, z, 0.12, 1.1, 0.12, col('#8c9094'));
+    k.box(vc, lat, H + 1.2, z, 0.16, 0.3, 0.12, col('#f08a1c'));
+    k.box(vc, lat, H + 1.2, z, 0.12, 0.2, 0.14, col('#2b2f33'));
+  }
+  // blue square platform section sign on a galvanised post (double faced, faces along the platform)
+  function btSectionSign(k, key, lat, z) {
+    const { vc, col, H, sets, M, canvasTex } = k;
+    const b = sets.get('luA:btsign', () => M.sign('luA:btsign', canvasTex('luA:btsign', BT_S, BT_SH, btSignAtlas, { clampU: true, clampV: true })));
+    vc.box(k.pf(lat), H + 1.55, z, 0.09, 3.1, 0.09, col('#9a9fa3'));
+    const hs = 0.95;
+    const cx = k.pf(lat);
+    const cy = H + 2.6;
+    const T = k.helpers.textQuad;
+    T(b, [cx, cy, z - 0.07], hs, hs, [0, 0, -1], [-1, 0, 0], [0, 1, 0], btUV(key));
+    T(b, [cx, cy, z + 0.07], hs, hs, [0, 0, 1], [1, 0, 0], [0, 1, 0], btUV(key));
+    vc.box(cx, cy, z, 0.04, hs, 0.1, col('#3d4a66'));
+  }
+  // small wide signs (1 / P+R, direction tabs) on a thin post, facing the track (read left to right = +u)
+  function btTabSign(k, key, lat, u, wide, high, y) {
+    const { vc, col, sets, M, canvasTex, sx } = k;
+    const b = sets.get('luA:btsign', () => M.sign('luA:btsign', canvasTex('luA:btsign', BT_S, BT_SH, btSignAtlas, { clampU: true, clampV: true })));
+    const z = btZ(k, u);
+    const cx = k.pf(lat);
+    k.helpers.textQuad(b, [cx - sx * 0.03, y, z], wide, high, [-sx, 0, 0], [0, 0, sx], [0, 1, 0], btUV(key));
+    vc.box(cx + sx * 0.02, y, z, 0.03, high, wide, col('#8a9096'));
+    vc.box(cx + sx * 0.06, y - high / 2 - 1.1, z, 0.06, 2.2 + 0.0, 0.06, col('#9a9fa3'));
+  }
+  function btPost(k, lat, z, h, hex) {
+    k.box(k.vc, lat, k.H + h / 2, z, 0.07, h, 0.07, k.col(hex || '#9a9fa3'));
+  }
+
+  // dark-red lamp post with the angled head; arm points towards the track (dir = -sign(lat))
+  function btLamp(k, lat, z) {
+    const { vc, col, H, glow } = k;
+    const dir = lat > 0 ? -1 : 1;
+    const red = col('#68172a');
+    k.box(vc, lat, H + 2.7, z, 0.12, 5.4, 0.12, red);
+    k.box(vc, lat, H + 0.35, z, 0.2, 0.7, 0.2, red);
+    k.between(vc, [lat, H + 5.3, z], [lat + dir * 0.55, H + 5.6, z], 0.09, red);
+    k.between(vc, [lat + dir * 0.4, H + 5.56, z], [lat + dir * 1.35, H + 5.72, z], 0.3, col('#5a1424'), 0.11);
+    k.between(glow, [lat + dir * 0.45, H + 5.5, z], [lat + dir * 1.3, H + 5.64, z], 0.22, col('#fff3d6'), 0.03);
+  }
+  function btRailing(k, lat, z0, z1, hex) {
+    const { vc, col, H } = k;
+    const c = col(hex || BT_RED);
+    const a = Math.min(z0, z1);
+    const b = Math.max(z0, z1);
+    for (let z = a; z <= b + 0.01; z += 2) k.box(vc, lat, H + 0.5, z, 0.06, 1.0, 0.06, c);
+    [0.98, 0.62, 0.28].forEach((y) => k.box(vc, lat, H + y, (a + b) / 2, 0.04, 0.04, b - a, c));
+    for (let z = a + 0.75; z < b; z += 1.5) k.box(vc, lat, H + 0.55, z, 0.02, 0.9, 0.02, c);
+  }
+  function btMeshFence(k, lat, z0, z1, h, hex) {
+    const { vc, col, H } = k;
+    const c = col(hex || '#2c4a3c');
+    const a = Math.min(z0, z1);
+    const b = Math.max(z0, z1);
+    const yb = k.sets ? 0 : 0;
+    void yb;
+    for (let z = a; z <= b + 0.01; z += 3) k.box(vc, lat, H + h / 2, z, 0.07, h, 0.07, c);
+    [h, h * 0.5, 0.08].forEach((y) => k.box(vc, lat, H + y, (a + b) / 2, 0.04, 0.04, b - a, c));
+    k.box(k.glass, lat, H + h / 2, (a + b) / 2, 0.02, h - 0.1, b - a, k.WHITE);
+  }
+
+  // open dark-red steel shelter with glass sides/back, thin glazed flat roof, red perforated seats on a low concrete plinth.
+  // lat = centre across, dir = +1 if the back is on the +lat side (our platform), -1 on the far platform
+  function btShelter(k, lat, z, len, dir) {
+    const { vc, col, H, glass } = k;
+    const red = col('#6e1b2a');
+    const dep = 2.2;
+    const fL = lat - dir * dep / 2;
+    const bL = lat + dir * dep / 2;
+    const hF = 2.75;
+    const hB = 2.5;
+    const n = Math.max(2, Math.round(len / 2.3));
+    const step = len / n;
+    for (let i = 0; i <= n; i++) {
+      const zz = z - len / 2 + i * step;
+      k.box(vc, fL, H + hF / 2, zz, 0.09, hF, 0.09, red);
+      k.box(vc, bL, H + hB / 2, zz, 0.09, hB, 0.09, red);
+      // roof rafter + knee brace at every bay line
+      k.between(vc, [fL - dir * 0.08, H + hF + 0.04, zz], [bL + dir * 0.1, H + hB + 0.04, zz], 0.07, red, 0.1);
+      k.between(vc, [fL, H + hF - 0.6, zz], [fL + dir * 0.55, H + hF + 0.02, zz], 0.06, red);
+    }
+    // front/back beams, mid rails
+    k.box(vc, fL, H + hF, z, 0.12, 0.14, len + 0.2, red);
+    k.box(vc, bL, H + hB, z, 0.12, 0.14, len + 0.2, red);
+    k.box(vc, bL, H + 1.45, z, 0.07, 0.08, len, red);
+    [-1, 1].forEach((d) => k.box(vc, lat, H + 1.45, z + d * len / 2, dep, 0.08, 0.07, red));
+    // glazed roof (sloped from front to back) + glass panes back and ends
+    const yf = H + hF + 0.1;
+    const yb = H + hB + 0.1;
+    k.quadL(glass, [fL - dir * 0.15, yf, z - len / 2 - 0.1], [fL - dir * 0.15, yf, z + len / 2 + 0.1], [bL + dir * 0.15, yb, z + len / 2 + 0.1], [bL + dir * 0.15, yb, z - len / 2 - 0.1], [0, 1, 0], k.WHITE);
+    k.box(glass, bL, H + 1.5, z, 0.03, 1.9, len - 0.1, k.WHITE);
+    [-1, 1].forEach((d) => k.box(glass, lat, H + 1.5, z + d * (len / 2 - 0.04), dep - 0.1, 1.9, 0.03, k.WHITE));
+    // concrete plinth (back and ends) + red brick floor inside
+    const conc = col('#a9a79e');
+    k.box(vc, bL - dir * 0.05, H + 0.28, z, 0.3, 0.56, len, conc);
+    [-1, 1].forEach((d) => k.box(vc, lat, H + 0.28, z + d * (len / 2 - 0.15), dep, 0.56, 0.3, conc));
+    k.quadL(vc, [fL, H + 0.012, z - len / 2], [bL, H + 0.012, z - len / 2], [bL, H + 0.012, z + len / 2], [fL, H + 0.012, z + len / 2], [0, 1, 0], col('#8c4a3e'));
+    // red perforated-steel seats along the back wall
+    const seat = col('#7d1f2e');
+    const sn = Math.max(3, Math.round(len / 1.7));
+    for (let i = 0; i < sn; i++) {
+      const zz = z - len / 2 + len * (i + 0.5) / sn;
+      k.box(vc, bL - dir * 0.62, H + 0.6, zz, 0.46, 0.045, 0.46, seat);
+      k.box(vc, bL - dir * 0.4, H + 0.9, zz, 0.045, 0.42, 0.46, seat, 0, 0, dir * k.sx * 0.12);
+      k.box(vc, bL - dir * 0.62, H + 0.42, zz, 0.05, 0.36, 0.1, col('#40444a'));
+    }
+  }
+
+  // far side: the other track, the island platform (Voie 2) with red railings behind, two shelters, yard tracks
+  function btFarSide(k) {
+    const { H, FORM_Y, vc, col } = k;
+    const tl = -4.5;
+    addTrack(k, tl, k.zB - 40, k.zA + 40);
+    const e0 = tl - 1.7;
+    const wid = 3.7;
+    const e1 = e0 - wid;
+    const z0 = k.zB;
+    const z1 = k.zA;
+    k.box(vc, (e0 + e1) / 2, (H + FORM_Y) / 2 - 0.005, (z0 + z1) / 2, wid, H - FORM_Y - 0.01, z1 - z0, col('#b4b1aa'));
+    k.box(vc, e0 - 0.06, H - 0.3, (z0 + z1) / 2, 0.12, 0.6, z1 - z0, col('#8f8c85'));
+    const pav = btPaveBatch(k);
+    const uM = wid / 8;
+    k.quadL(pav, [e0, H + 0.004, z0], [e1, H + 0.004, z0], [e1, H + 0.004, z1], [e0, H + 0.004, z1], [0, 1, 0], k.WHITE, [[0, z0 / 4], [uM, z0 / 4], [uM, z1 / 4], [0, z1 / 4]]);
+    btRailing(k, e1 + 0.15, z0 + 1, z1 - 1, BT_RED);
+    return { e0, e1 };
+  }
+
+  /* ---- fuel depot across the tracks */
+  function btTank(k, lat, z, r, h, hex, logo) {
+    const { vc, col, H, FORM_Y } = k;
+    const y0 = FORM_Y;
+    const body = col(hex);
+    k.frust(vc, lat, y0, z, r, r, h, body, 28);
+    k.frust(vc, lat, y0, z, r + 0.14, r + 0.14, 0.45, col('#8a8d8a'), 28);
+    k.frust(vc, lat, y0 + h - 0.35, z, r + 0.12, r + 0.12, 0.4, col('#cdd0cd'), 28);
+    k.frust(vc, lat, y0 + h, z, 0.5, r + 0.05, 0.9, col('#a9aeaa'), 28);
+    [0.34, 0.68].forEach((f) => k.frust(vc, lat, y0 + h * f, z, r + 0.05, r + 0.05, 0.14, shadeHex(hex, 0.88), 28));
+    // access stair running up the side (towards the tracks side stays plain for the logo)
+    k.between(vc, [lat - r * 0.7, y0, z + r * 0.7], [lat - r * 0.68, y0 + h, z + r * 0.68], 0.6, col('#6a6f6c'), 0.12);
+    void H;
+    if (logo) {
+      const b = k.sets.get('luA:btsign', () => k.M.sign('luA:btsign', k.canvasTex('luA:btsign', BT_S, BT_SH, btSignAtlas, { clampU: true, clampV: true })));
+      const side = lat < 0 ? 1 : -1; // towards the track centre
+      const cx = k.pf(lat + side * (r + 0.06));
+      k.helpers.textQuad(b, [cx, y0 + h * 0.58, z], r * 0.5, r * 0.5, [side * k.sx, 0, 0], [0, 0, -side * k.sx], [0, 1, 0], btUV('shell'));
+    }
+  }
+  const shadeHex = (hex, f) => {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.round(((n >> 16) & 255) * f);
+    const g = Math.round(((n >> 8) & 255) * f);
+    const b = Math.round((n & 255) * f);
+    return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+  };
+  function btDepot(k) {
+    const { vc, col, FORM_Y } = k;
+    const zu = (u) => btZ(k, u);
+    // second yard track, tarmac road + depot yard (all flat, cheap)
+    addTrack(k, -13.9, k.zB - 40, k.zA + 40);
+    addTrack(k, -18.4, k.zB - 40, k.zA + 40);
+    const ya = Math.min(zu(-230), zu(230));
+    const yb = Math.max(zu(-230), zu(230));
+    k.quadL(vc, [-21.5, FORM_Y + 0.05, ya], [-27, FORM_Y + 0.05, ya], [-27, FORM_Y + 0.05, yb], [-21.5, FORM_Y + 0.05, yb], [0, 1, 0], col('#55585b'));
+    k.quadL(vc, [-30.5, FORM_Y + 0.05, ya], [-84, FORM_Y + 0.05, ya], [-84, FORM_Y + 0.05, yb], [-30.5, FORM_Y + 0.05, yb], [0, 1, 0], col('#8f918b'));
+    // industrial fence: dark green posts, rails, translucent mesh
+    btFenceFlat(k, -30, ya, yb, 2.0);
+    // tanks: [lat, u, r, h, colour, logo]
+    const tanks = [
+      [-40, 78, 9.5, 10.5, '#f6f7f2', true],
+      [-42, 104, 7.4, 9.0, '#b9cbaa', false],
+      [-54, 64, 8.2, 9.4, '#f3f4ef', false],
+      [-36, 128, 5.2, 7.2, '#f1f2ed', false],
+      [-57, 96, 6.4, 8.4, '#b4c8a6', false],
+      [-39, -52, 8.6, 9.6, '#f3f4ef', true],
+      [-44, -78, 7.0, 8.8, '#b9cbaa', false],
+      [-37, -104, 5.4, 7.4, '#f6f7f2', false],
+      [-58, -92, 6.4, 8.4, '#b4c8a6', false],
+    ];
+    tanks.forEach(([lat, u, r, h, hex, logo]) => btTank(k, lat, zu(u), r, h, hex, logo));
+    // pipe racks, a low shed, a tall pole sign with the Shell pecten, flood lights
+    [[56, 140], [-130, -42]].forEach(([u0, u1]) => {
+      const len = u1 - u0;
+      k.box(vc, -32.6, FORM_Y + 1.2, zu((u0 + u1) / 2), 0.4, 0.4, len, col('#6f7570'));
+      k.box(vc, -32.9, FORM_Y + 1.7, zu((u0 + u1) / 2), 0.3, 0.3, len, col('#7a807b'));
+      for (let u = u0; u <= u1; u += 11) k.box(vc, -32.7, FORM_Y + 0.7, zu(u), 0.3, 1.4, 0.3, col('#5c615d'));
+    });
+    k.box(vc, -35, FORM_Y + 2.0, zu(40), 9, 4.0, 14, col('#d9dad4'));
+    k.box(vc, -35, FORM_Y + 4.1, zu(40), 9.4, 0.3, 14.4, col('#6a6f73'));
+    k.box(vc, -28.6, FORM_Y + 4.0, zu(44), 0.28, 8.2, 0.28, col('#8e9296'));
+    const b = k.sets.get('luA:btsign', () => k.M.sign('luA:btsign', k.canvasTex('luA:btsign', BT_S, BT_SH, btSignAtlas, { clampU: true, clampV: true })));
+    [1, -1].forEach((d) => k.helpers.textQuad(b, [k.pf(-28.6), FORM_Y + 7.4, zu(44) + d * 0.2], 2.6, 1.3, [0, 0, d], [d, 0, 0], [0, 1, 0], btUV('depot')));
+    k.box(vc, -28.6, FORM_Y + 7.4, zu(44), 0.1, 1.4, 2.7, col('#2e3338'));
+    [-70, 20, 60, 118].forEach((u) => {
+      k.box(vc, -31.2, FORM_Y + 6, zu(u), 0.18, 12, 0.18, col('#767b80'));
+      k.box(k.glow, -31.2, FORM_Y + 12.1, zu(u), 0.5, 0.15, 1.6, col('#fff6dc'));
+    });
+  }
+  function btFenceFlat(k, lat, z0, z1, h) {
+    const { vc, col, FORM_Y } = k;
+    const c = col('#2c4a3c');
+    for (let z = z0; z <= z1 + 0.01; z += 3) k.box(vc, lat, FORM_Y + h / 2, z, 0.08, h, 0.08, c);
+    [h, h * 0.55, 0.1].forEach((y) => k.box(vc, lat, FORM_Y + y, (z0 + z1) / 2, 0.04, 0.05, z1 - z0, c));
+    k.box(k.glass, lat, FORM_Y + h / 2, (z0 + z1) / 2, 0.02, h - 0.15, z1 - z0, k.WHITE);
+  }
+
   function buildBartreng(api) {
     const k = kit(api);
-    const BACK = k.edge + k.W;
-    platformSurface(k, 'brick');
-    const cfg = { wall: '#cfd0cf', trim: '#f4f4f0', frame: MAROON, glass: '#4f5c68', arch: false, ww: 0.5, wh: 0.46, frameOuter: true, seed: 91, plinth: '#c9c9c4' };
-    building(k, { lat0: BACK + 2.6, lat1: BACK + 9.6, z0: -8, z1: 7, floors: 2, floorH: 3.1, cfg, roof: { type: 'pent', h: 1.0, col: '#6b727a' } });
-    building(k, { lat0: BACK + 2.6, lat1: BACK + 7.4, z0: 7, z1: 16, floors: 1, floorH: 3.2, cfg, roof: { type: 'flat', col: '#80858a' } });
-    shelter(k, k.edge + 3.2, -24, 10, 2.4, MAROON, true);
-    shelter(k, k.edge + 3.2, 30, 8, 2.4, MAROON, true);
-    furnish(k, { totems: [-6], voie: [['Voie 1', -40], ['Voie 1', 50]], benches: [14], bins: [-14] });
-    otherPlatform(k, { width: 4.4, variant: 'brick', shelterAt: [-12], shelterCol: MAROON });
-    yardTracks(k, [-12.9], k.zB - 40, k.zA + 40);
-    overBridge(k, { z: -100, width: 13, latA: -11, latB: 13, yBot: 7.3, deck: '#9ca0a4', pier: '#a7abaf' });
+    const { H } = k;
+    btStripGenericFences(k);
+    // platform paving
+    const pav = btPaveBatch(k);
+    const uM = k.W / 8;
+    k.quadL(pav, [k.edge, H + 0.004, k.zA], [k.edge + k.W, H + 0.004, k.zA], [k.edge + k.W, H + 0.004, k.zB], [k.edge, H + 0.004, k.zB], [0, 1, 0], k.WHITE, [[0, k.zA / 4], [uM, k.zA / 4], [uM, k.zB / 4], [0, k.zB / 4]]);
+    btForecourt(k);
+    btCars(k);
+    btBuilding(k);
+    const z = (u) => btZ(k, u);
+    // platform side: lamps, section signs, direction signs, bins, validators, stairs to the underpass
+    const span = Math.max(Math.abs(k.zA), Math.abs(k.zB)) - 6;
+    const shelterU = [-62, 46];
+    for (let u = -Math.floor(span / 24) * 24; u <= span; u += 24) if (shelterU.every((su) => Math.abs(u + 9 - su) > 7)) btLamp(k, k.edge + 2.7, z(u + 9));
+    btSectionSign(k, 'A', 4.4, z(3.6));
+    btSectionSign(k, 'C', 4.9, z(-22));
+    btTabSign(k, 'one', 5.0, -10.5, 0.36, 0.36, k.H + 2.45);
+    btTabSign(k, 'pr', 5.0, -9.5, 0.84, 0.4, k.H + 2.45);
+    btTabSign(k, 'no', 4.6, -2.4, 0.42, 0.42, k.H + 2.35);
+    btTabSign(k, 'arr', 4.6, 1.4, 0.62, 0.3, k.H + 1.9);
+    btBin(k, 4.9, z(-1.3), 1);
+    btBin(k, 5.0, z(8.3), 1);
+    btValidator(k, 4.6, z(0.2));
+    btValidator(k, 4.6, z(5.6));
+    // underpass stairs behind the annex (dark void, white side walls, green railings)
+    stairCanopy(k, { lat: k.edge + 3.4, z: z(15.2), w: 2.4, len: 4.8, glazed: false });
+    [-1, 1].forEach((d) => btRailing(k, k.edge + 3.4 + d * 1.3, z(15.2) - 2.4, z(15.2) + 2.4, '#1f4a3a'));
+    // our platform: shelters + back fence (not in front of the building / stairs)
+    btShelter(k, k.edge + 3.4, z(-62), 9.2, 1);
+    btShelter(k, k.edge + 3.4, z(46), 7, 1);
+    const zl = Math.min(k.zA, k.zB) + 1;
+    const zh = Math.max(k.zA, k.zB) - 1;
+    [[zl, Math.min(z(-14), z(26))], [Math.max(z(-14), z(26)), zh]].forEach(([a, b]) => b > a + 3 && btMeshFence(k, k.edge + k.W + 0.4, a, b, 1.8));
+    // far side (island platform with Voie 2)
+    const far = btFarSide(k);
+    for (let u = -Math.floor(span / 24) * 24; u <= span; u += 24) btLamp(k, far.e1 + 0.7, z(u + 21));
+    btShelter(k, far.e0 - 1.6, z(-46), 9.2, -1);
+    btShelter(k, far.e0 - 1.6, z(34), 7, -1);
+    btSectionSign(k, 'B', far.e0 - 1.0, z(-62));
+    btBin(k, far.e0 - 2.2, z(3), -1);
+    btValidator(k, far.e0 - 1.0, z(-19));
+    voieBoard(k, 'Voie 1', k.edge + 1.6, z(-70), H + 2.7);
+    voieBoard(k, 'Voie 1', k.edge + 1.6, z(70), H + 2.7);
+    btDepot(k);
+    overBridge(k, { z: z(70), width: 13, latA: -29, latB: 13, yBot: 7.3, deck: '#9ca0a4', pier: '#a7abaf' });
   }
 
   // Mamer: grey-blue plaster two-storey building with white trim and dark-red window frames under a hipped slate roof, dark-red steel
