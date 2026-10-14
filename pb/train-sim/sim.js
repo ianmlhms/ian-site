@@ -276,7 +276,7 @@
               if (!reRate) vis.arrDelay = platformIdx === 0 ? 0 : Math.round(t - timetable.stops[platformIdx].arr);
               applyStopResult(platformIdx, vis, events);
             }
-            if (backedM > BACK_FREE_M) { totals.reverseFines++; cash -= REVERSE_FINE; events.push({ type: 'reverseFine', fine: REVERSE_FINE, metres: backedM }); }
+            if (backedM > BACK_FREE_M && !train.scout) { totals.reverseFines++; cash -= REVERSE_FINE; events.push({ type: 'reverseFine', fine: REVERSE_FINE, metres: backedM }); }
             backedM = 0;
             events.push({ type: 'doorsOpening', stationIndex: platformIdx, side: doorSide });
           }
@@ -313,7 +313,8 @@
       if (parking) brakeTarget = Math.max(brakeTarget, brakeMax);
       brakeDecel = approach(brakeDecel, brakeTarget, ebNow ? EB_UP : BRAKE_UP, BRAKE_DOWN, dt);
 
-      const topMs = dir < 0 ? REVERSE_MAX_MS : maxMs;
+      const revMaxMs = train.scout ? maxMs : REVERSE_MAX_MS;   // test mode: reverse at full speed
+      const topMs = dir < 0 ? revMaxMs : maxMs;
       const speedFade = clamp((topMs - v) / (topMs * (dir < 0 ? 0.25 : 0.06)), 0, 1);
       const tractionN = tractionFrac * Math.min(fMax, power / Math.max(v, 1)) * speedFade;
       const resist = mass * G * (ROLL_A + ROLL_B * v) + 0.5 * AIR_RHO * cdA * v * v;
@@ -328,7 +329,7 @@
       else if (v <= STANDSTILL && acc <= 0) { acc = 0; v = 0; }
       let vNew = Math.max(0, v + acc * dt);
       if (hardCapMs > 0 && vNew > hardCapMs) vNew = hardCapMs;
-      if (dir < 0 && vNew > REVERSE_MAX_MS) vNew = REVERSE_MAX_MS;   // reverse gear: 10 km/h   // Luxtram: never above its real top speed, not even downhill
+      if (dir < 0 && vNew > revMaxMs) vNew = revMaxMs;   // reverse gear: 10 km/h   // Luxtram: never above its real top speed, not even downhill
       if (vNew <= 0 && v <= STANDSTILL) { v = 0; a = 0; } else { a = (vNew - v) / Math.max(dt, 1e-6); v = vNew; }
       const ds = v * dt; s += ds * dir; distance += ds;
       if (dir < 0) {
@@ -377,7 +378,8 @@
         if (sg.hold && !sg.cleared && sg.revealedAt >= 0 && t - sg.revealedAt >= sg.clearAfter) sg.cleared = true;
         if (!sg.passed && s > sg.s) {
           sg.passed = true;
-          if (isRed(sg) && !spadActive) {
+          if (isRed(sg) && !spadActive && train.scout) events.push({ type: 'spadIgnored', signalIndex: sg.index });   // test mode: no SPAD
+          else if (isRed(sg) && !spadActive) {
             spadActive = true; spadStill = 0; spadSignal = sg.index; totals.spads++; cash -= SPAD_FINE;
             events.push({ type: 'spad', signalIndex: sg.index, fine: SPAD_FINE });
           }

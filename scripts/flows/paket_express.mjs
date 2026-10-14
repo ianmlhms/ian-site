@@ -156,7 +156,7 @@ export const flow = {
     await frame.evaluate(() => __pxTest.expireJob()); await h.pause(120);
     h.eq(await frame.evaluate(() => __pxTest.state().score), first.score, 'expired job earns zero and next pickup appears');
     h.eq(await frame.evaluate(() => __pxTest.state().step), -1, 'new pickup after expiry');
-    h.step('fragile pay, combo and actual radar pass');
+    h.step('fragile pay, combo, and no speed limits (fast driving is never fined)');
     await frame.evaluate(()=>__pxTest.forceJob('fragile'));
     const fragilePay=await frame.evaluate(()=>__pxTest.state().pay);
     await frame.evaluate(()=>__pxTest.crash());
@@ -166,9 +166,11 @@ export const flow = {
     const radarWallet=await frame.evaluate(()=>__pxTest.state().wallet);
     const radarTb=await frame.evaluate(()=>__pxTest.state().tb);
     await frame.evaluate(()=>__pxTest.radarPose());
-    await frame.waitForFunction(wallet=>__pxTest.state().wallet===wallet-35,radarWallet);
-    h.eq(await frame.evaluate(()=>PX.lux.fine({x:-115,z:3},50/3.6)),0,'no radar fine at the posted limit');
-    h.eq(await frame.evaluate(()=>__pxTest.state().tb),radarTb,'radar fine leaves lifetime tb unchanged');
+    await h.pause(1500);
+    h.eq(await frame.evaluate(()=>__pxTest.state().wallet),radarWallet,'driving fast past the old radar spot costs nothing');
+    h.eq(await frame.evaluate(()=>PX.lux.fine({x:-115,z:3},200/3.6)),0,'no speed fine even at 200 km/h');
+    h.eq(await frame.evaluate(()=>__pxTest.state().tb),radarTb,'lifetime tb unchanged');
+    h.expect(await frame.evaluate(()=>!document.getElementById('speedLimit')),'no speed-limit badge in the HUD');
     await frame.evaluate(()=>{__pxTest.resumeTraffic();__pxTest.pose(-25,3);});
     const finalShift=await frame.evaluate(()=>__pxTest.state().score);
     await frame.evaluate(() => __pxTest.end());
@@ -274,7 +276,7 @@ export const flow = {
     h.expect(await frame.evaluate(()=>__pxTest.state().elevation>1),'vehicle drives up the roof ramp');
     await frame.evaluate(()=>__pxTest.view([267,24,165,224,8,123]));await h.pause(250);await h.shot('roof-ramp-ipad');
     await frame.evaluate(()=>{__pxTest.pose(-278,204,Math.PI);__pxTest.view([-240,25,260,-278,2,214]);});await h.pause(250);await h.shot('river-shortcut-ipad');
-    await frame.evaluate(()=>{__pxTest.pose(-100,3);__pxTest.view([-123,8,17,-103,1,3]);});await h.pause(250);await h.shot('radar-ipad');
+    await frame.evaluate(()=>{__pxTest.pose(-100,3);__pxTest.view([-123,8,17,-103,1,3]);});await h.pause(250);await h.shot('old-radar-spot-ipad');
     await frame.evaluate(()=>__pxTest.end());await frame.locator('#toGarage').tap();
     await frame.evaluate(()=>__pxTest.merge({v:4,lifetime:61000,tb:61000,wallet:20000,owned:['auto'],vehicle:'auto',savedAt:Date.now()+1000}));
     await frame.locator('#startFree').tap();await frame.evaluate(()=>{__pxTest.pose(8,-84,-Math.PI/2);__pxTest.view([-28,6,-81,23,1.5,-84]);});await h.pause(250);await h.shot('roadworks-ipad');

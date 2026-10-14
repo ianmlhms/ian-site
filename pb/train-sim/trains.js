@@ -1495,6 +1495,7 @@
       pool.userData.disposeGeo = true; pool.userData.noRainOcc = true;
       built[0].group.add(pool);
     }
+    const ownGlow = new Set(built[0].glowHeads);   // the player's own nose glow sprites: hidden in the cab view (see applyLightFx)
     function applyLightFx() {
       if (pool) { const lv = BEAM_LEVELS[light.level]; pool.visible = light.level > 0 && light.dark > 0.05; pool.material.opacity = 0.5 * light.dark * (light.level === 2 ? 1 : 0.7); const len = light.level === 2 ? 70 : 38; pool.scale.set(light.level === 2 ? 7 : 11, len, 1); pool.position.z = lampF.z - len * 0.5 - 1.5; void lv; }
       const lv = BEAM_LEVELS[light.level], on = light.level > 0;
@@ -1511,7 +1512,7 @@
       if (tailBeams) { tailBeams.material.uniforms.uAmt.value = light.tail ? light.haze * 0.5 : 0; tailBeams.visible = light.tail && light.haze > 0.02; }
       const hv = on ? (0.3 + 0.7 * light.dark) * (light.level === 2 ? 1 : 0.65) : 0;
       mats.glowHead.opacity = hv * 0.8;
-      for (const sp of glowHeadAll) { sp.visible = on; sp.scale.setScalar(0.8 + 1.6 * light.dark * (light.level === 2 ? 1 : 0.6)); }
+      for (const sp of glowHeadAll) { sp.visible = on && !(cabViewOn && ownGlow.has(sp)); sp.scale.setScalar(0.8 + 1.6 * light.dark * (light.level === 2 ? 1 : 0.6)); }
       mats.glowTail.opacity = light.tail ? 0.35 + 0.35 * light.dark : 0;
       for (const sp of glowTailAll) { sp.visible = light.tail; sp.scale.setScalar(0.5 + 0.7 * light.dark); }
     }
@@ -1570,7 +1571,7 @@
         return { head: mk('lampfx-head', [headBeams, ...glowHeadAll]), tail: mk('lampfx-tail', [tailBeams, ...glowTailAll]) };
       },
       setCabView(on) { // cab camera: hide the outside skin of the front car's nose (keeps lining + shadows) so the track stays visible
-        cabViewOn = !!on; applyGlass();
+        cabViewOn = !!on; applyGlass(); applyLightFx();
         if (rainMesh) rainMesh.visible = cabViewOn && rainMesh.material.uniforms.uWet.value > 0.01;
         for (const m of built[0].paintMeshes) m.material = on ? mats.ghost : mats.paint;
         for (const m of built[0].fwdLinings) { if (Array.isArray(m.material)) m.material[0] = on ? mats.ghost : mats.insideFwd; else m.material = on ? mats.ghost : mats.insideFwd; }

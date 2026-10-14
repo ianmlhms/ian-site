@@ -1792,7 +1792,7 @@
 
     /* ---- traffic: moved to luxtram-traffic.js (TS.luxTraffic) */
     const traffic = (Q.cars && TS.luxTraffic)
-      ? TS.luxTraffic.create({ THREE: T, root, Q, roadsByChunk, gy, rawG, roadHeightAt, tileOf, nearest, frame, track, quality, night: () => nightK, hasOpp, oppLatAt, roadMarginExcept })
+      ? TS.luxTraffic.create({ THREE: T, root, Q, roadsByChunk, gy, rawG, roadHeightAt, tileOf, nearest, frame, track, quality, night: () => nightK, hasOpp, oppLatAt, roadMarginExcept, routeReverse: !!(options && options.reverse) })
       : null;
     const markTraffic = () => { if (traffic) traffic.markDirty(); };
     let tramS = -1e9;

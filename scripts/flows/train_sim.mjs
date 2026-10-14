@@ -213,8 +213,59 @@ async function luxtramNormalChecks(h, frame) {
   h.expect(rows.every((r) => r.door), 'the doors open on the stop\'s side at all 24 stops');
   h.expect(rows.every((r) => r.oppBuilt), 'the opposite track\'s own platform is built on its far side (none where the stop has an island platform)');
   h.eq(rows.filter((r) => r.side === 'left').map((r) => r.name), ['Findel-Aéroport', 'Rout Bréck', 'Stäreplaz'], 'the three island-platform stops (platform between the tracks) are the only left-hand ones');
+
+  /* The oncoming tram runs on the track the player is NOT on, chosen by the route (forward / ~r), never by the momentary direction: driving or backing (reverser R) must never put it on the player's own track. */
+  h.step('Luxtram: the oncoming tram always runs on the other track (forward, reverser, ~r), never overlapping the player\'s tram');
+  for (const route of ['luxtram', 'luxtram~r']) {
+    await frame.evaluate((r) => { __tsTest.setRoute(r); }, route);
+    await waitState(frame, (r) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === r, route, 90000);
+    for (const mode of ['forward', 'reverse']) {
+      const res = await frame.evaluate(async ([m, rt]) => {
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const tr = () => TS.luxTraffic.last, sign = m === 'forward' ? 1 : -1;
+        let s = m === 'forward' ? 2600 : 3400;
+        __tsTest.placeAt(s, 0); await sleep(1500);
+        const step = async (n, v) => { for (let i = 0; i < n; i++) { s += sign * v; __tsTest.placeAt(s, 0); await sleep(20); } };
+        await step(30, 0.3);
+        let ok = false;
+        for (let k = 0; k < 40 && !ok; k++) { ok = tr().spawnOncoming(120); if (!ok) await step(5, 0.3); }
+        let minLat = 1e9, n = 0, hidden = 0, routeReverse = null;
+        for (let i = 0; i < 900; i++) {
+          await step(1, 0.15);
+          const pr = tr().oncomingProbe(); if (!pr) break;
+          n++; minLat = Math.min(minLat, pr.minLat); routeReverse = pr.routeReverse; if (!pr.sepOk) hidden++;
+        }
+        return { ok, n, minLat, hidden, routeReverse, rt };
+      }, [mode, route]);
+      h.expect(res.ok && res.n > 400, route + ' ' + mode + ': an oncoming tram spawned and ran past (' + res.n + ' frames)');
+      h.expect(res.minLat >= 2.6 && res.hidden === 0, route + ' ' + mode + ': it stays >= 2.6 m (track centres) from the player\'s track the whole way (min ' + res.minLat.toFixed(2) + ' m, guard hid it ' + res.hidden + ' times)');
+      h.eq(res.routeReverse, route.endsWith('~r'), route + ' ' + mode + ': the oncoming track is chosen by the route identity');
+    }
+  }
   await frame.evaluate(() => __tsTest.toMenu());
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+}
+
+/* Rail tunnels: the ground over the double-track bore is never below its crown (6.7 m above the rails), at every metre of every tunnel, both directions. */
+async function railTunnelChecks(h, frame) {
+  h.step('rail tunnels: the ground height over every tunnel bore is above the crown (all rail routes, both directions)');
+  const res = await frame.evaluate(() => {
+    const out = [];
+    for (const base of ['east', 'north', 'trier', 'brussels', 'paris']) for (const id of [base, base + '~r']) {
+      const track = TS.track.build(TS.routes.get(id)), tb = track.base || track;
+      let worst = 99, samples = 0;
+      for (const tn of track.tunnels) for (let s = tn.s0 + 1; s <= tn.s1 - 1; s += 5) {   // the ground steps up exactly at the portals (the portal wall hides the step): sample from 1 m inside
+        const f = tb.frameAt(track.baseS ? track.baseS(s) : s);
+        for (let lat = -6.9; lat <= 6.9; lat += 1.15) {
+          const x = f.pos.x + f.right.x * lat, z = f.pos.z + f.right.z * lat;
+          worst = Math.min(worst, tb.terrainHeightAt(x, z) - f.pos.y); samples++;
+        }
+      }
+      out.push({ id, tunnels: track.tunnels.length, worst, samples });
+    }
+    return out;
+  });
+  for (const r of res) h.expect(r.tunnels > 0 && r.worst >= 6.8, r.id + ': ' + r.tunnels + ' tunnel(s), lowest ground above the bore ' + r.worst.toFixed(2) + ' m over the rails (crown 6.7 m, ' + r.samples + ' samples)');
 }
 
 /* Return direction, reverse gear, 2x fast-forward and real (natural) endless hand-over. TS_LUXTRAM_ONLY=1 runs these too. */
@@ -1037,6 +1088,7 @@ export const flow = {
 
     await luxtramNormalChecks(h, frame);
     await directionAndGearChecks(h, frame);
+    await railTunnelChecks(h, frame);
     frame = await weatherChecks(h, frame);
     frame = await backNavChecks(h, frame);
 

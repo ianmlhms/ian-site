@@ -538,6 +538,7 @@
       addCar, finish, uCars, uDoor,
       get done() { return done; },
       setVisible: (vis) => { for (let i = 0; i < meshes.length; i++) meshes[i].visible = vis; },
+      meshesVisible: () => meshes.length > 0 && meshes.some((m) => m.visible),
       drawCalls: () => meshes.length,
       /* copy the live light state of the source materials (setLights changes emissive / emissiveIntensity) onto the baked clones */
       syncLights: () => { for (let i = 0; i < mats.length; i++) { const s = srcOf[i]; if (s.emissive) mats[i].emissive.copy(s.emissive); if (s.emissiveIntensity !== undefined) mats[i].emissiveIntensity = s.emissiveIntensity; } },
@@ -549,6 +550,9 @@
   function create(ctx) {
     const { root, Q, roadsByChunk, gy, nearest, hasOpp, oppLatAt, roadMarginExcept, track } = ctx;
     const rawG = ctx.rawG || gy;
+    /* ROUTE identity (never the momentary driving direction): on the return routes (<id>~r) the player runs on the left-hand track (track.opposite) and the oncoming
+       trams on the forward track; on the forward routes the other way round.  The reverser (R) only flips player.dir, it must never move a tram onto the player's track. */
+    const routeReverse = !!ctx.routeReverse;
     const quality = ctx.quality || 'medium';
     const nightFn = ctx.night || (() => 0);
     const mats = [];
@@ -1018,8 +1022,11 @@
         return true;
       } catch (e) { console.warn(TAG + 'oncoming tram model failed', e); onc.model = null; return false; }
     }
-    /* frame source of the oncoming track: the opposite track when the player runs forward, the player's own track on the return direction */
-    const frameOn = (s, out) => (player.dir >= 0 ? track.opposite.frameAt(s, out) : track.frameAt(s, out));
+    /* frame sources: the oncoming tram's track is always the one the player is NOT on (by route identity); oncoming trams travel -s on the opposite track, +s on the forward track */
+    const ONC_DIR = routeReverse ? 1 : -1;
+    const frameOn = (s, out) => (routeReverse ? track.frameAt(s, out) : track.opposite.frameAt(s, out));
+    const framePlayer = (s, out) => (routeReverse ? track.opposite.frameAt(s, out) : track.frameAt(s, out));
+    const MIN_TRACK_SEP = 2.5;          // m: guard, an oncoming car closer than this to the player's track centre (at its own s) is hidden at once
     const fA = { pos: new T.Vector3(), tangent: new T.Vector3(), right: new T.Vector3(), up: new T.Vector3(0, 1, 0) };
     const fB = { pos: new T.Vector3(), tangent: new T.Vector3(), right: new T.Vector3(), up: new T.Vector3(0, 1, 0) };
     const bx = new T.Vector3(); const by = new T.Vector3(); const bz = new T.Vector3(); const bm = new T.Matrix4(); const bp = new T.Vector3();
@@ -1055,15 +1062,31 @@
         }
       }
       onc.x = bp.x; onc.z = bp.z; onc.y = bp.y;
+      onc.sepOk = true;
+    }
+    /* guard: lateral distance of the tram (nose, middle, tail) to the centre of the PLAYER's track at the same s; closer than MIN_TRACK_SEP = the models would overlap */
+    const fP = { pos: new T.Vector3(), tangent: new T.Vector3(), right: new T.Vector3(), up: new T.Vector3(0, 1, 0) };
+    function oncomingSeparated() {
+      for (let k = 0; k <= 2; k++) {
+        const s = onc.s - onc.dir * (onc.len * k * 0.5);
+        if (!track.opposite.has(s)) continue;
+        frameOn(s, fA); framePlayer(s, fP);
+        const dx = fA.pos.x - fP.pos.x, dz = fA.pos.z - fP.pos.z;
+        const lat = Math.abs(dx * fP.right.x + dz * fP.right.z);
+        if (lat < MIN_TRACK_SEP) return false;
+      }
+      return true;
     }
     function spawnOncoming(distOverride) {
       const rg = oppRange();
       if (!rg || onc.active || !track || !track.opposite || !hasOpp) { onc.why = 'no opposite track'; return false; }
       if (!ensureModel()) { onc.why = 'no model'; return false; }
-      const d = -player.dir;                      // travels against the player
-      // the world streams [s - behind, s + ahead] in base-track s, whichever way the player drives: the loaded range ahead of the player depends on the direction
-      const dist = distOverride || Math.min((player.dir > 0 ? (Q.ahead || 600) : (Q.behind || 200)) * 0.93, 780);
-      const sSpawn = player.s + player.dir * dist;
+      const d = ONC_DIR;                          // fixed by the route: the opposite track's direction of travel
+      // it must approach the player: start on the side it comes from (player.s - d * dist).  The world streams [s - behind, s + ahead] in base-track s,
+      // whichever way the player drives: the loaded range on that side depends on the player's current direction (the reverser flips it)
+      const sideSign = -d;
+      const dist = distOverride || Math.min((sideSign === player.dir ? (Q.ahead || 600) : (Q.behind || 200)) * 0.93, 780);
+      const sSpawn = player.s + sideSign * dist;
       const margin = onc.len + 5;
       if (sSpawn - margin * d < rg[0] + 5 || sSpawn - margin * d > rg[1] - 5 || sSpawn < rg[0] + 20 || sSpawn > rg[1] - 20) { onc.why = 'spawn outside the opposite track'; return false; }
       // the opposite track must also exist where the player is (so the tram can run past)
@@ -1116,8 +1139,9 @@
       const m = onc.model; const d = onc.dir;
       const rg = oppRange();
       // despawn: passed the player and out of the detailed world, or lost the opposite track
-      const behind = (player.s - onc.s) * player.dir;       // > 0 once it is behind the player (in the player's travelling direction)
-      const behindMax = (player.dir > 0 ? (Q.behind || 200) : (Q.ahead || 600)) * 0.85;
+      const rel = onc.s - player.s, passed = rel * d > 0;   // passed = it has gone by the player and runs away from it
+      const behind = passed ? Math.abs(rel) : 0;
+      const behindMax = (Math.sign(rel) === player.dir ? (Q.ahead || 600) : (Q.behind || 200)) * 0.85;
       if (!rg || behind > behindMax || (onc.s - rg[0] < 3 && d < 0) || (rg[1] - onc.s < 3 && d > 0)) {
         // at the end of the opposite track: only vanish while out of sight
         if (!rg || behind > behindMax || !inView(onc.x, onc.y, onc.z, 30)) { despawnOncoming(); return; }
@@ -1168,7 +1192,8 @@
       if (night !== onc.night) { onc.night = night; m.setLights({ head: !!night, tail: !!night, cabin: !!night }); if (onc.baked) onc.bake.syncLights(); }
       // hide while the ground below is not built (never float over a hole)
       const h = surfaceAt(onc.x, onc.z);
-      setTramVisible(h === h && (!onc.baked || inView(onc.x, onc.y + 2, onc.z, onc.len * 0.62)));
+      onc.sepOk = oncomingSeparated();
+      setTramVisible(onc.sepOk && h === h && (!onc.baked || inView(onc.x, onc.y + 2, onc.z, onc.len * 0.62)));
     }
 
     /* ================================================================ update */
@@ -1217,6 +1242,18 @@
       markDirty: () => { carDirty = true; },
       posts: () => crossPosts.slice(),
       spawnOncoming: (d) => spawnOncoming(d),
+      /* test hook: where the oncoming tram is, and how far its centre is (laterally, at the same s) from the player's track */
+      oncomingProbe: () => {
+        if (!onc.active || !track || !track.opposite) return null;
+        const out = { s: onc.s, dir: onc.dir, routeReverse, sepOk: onc.sepOk !== false, visible: onc.baked ? !!(onc.bake.meshesVisible && onc.bake.meshesVisible()) : !!(onc.model && onc.model.group.visible), minLat: 1e9 };
+        for (let k = 0; k <= 4; k++) {
+          const s = onc.s - onc.dir * (onc.len * k * 0.25);
+          if (!track.opposite.has(s)) continue;
+          frameOn(s, fA); framePlayer(s, fP);
+          out.minLat = Math.min(out.minLat, Math.abs((fA.pos.x - fP.pos.x) * fP.right.x + (fA.pos.z - fP.pos.z) * fP.right.z));
+        }
+        return out;
+      },
       prepareOncoming: () => ensureModel(),
       state: () => ({
         fails, guarded: guards, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),

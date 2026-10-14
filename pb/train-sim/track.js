@@ -649,7 +649,11 @@
       let w = 1 - smooth01((q.d - d0) / blend);
       w *= 1 - smooth01(cov / 5);
       w *= 1 - smooth01(dep / 1.5);
-      return h + (formY - h) * w;
+      const out = h + (formY - h) * w;
+      // inside a rail tunnel (exact s, no ramp at the portals): the ground is never lower than the crown of the double-track tube + cover, so no ground
+      // wedge can poke into the first metres of the bore (the portal wall hides the step at the mouth)
+      if (kind !== 'tram' && inTunnel(q.s)) return Math.max(out, formY + 8.2 * (1 - smooth01((q.d - 8) / 7)));
+      return out;
     }
 
     function water(s) {

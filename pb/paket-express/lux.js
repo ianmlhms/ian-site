@@ -5,7 +5,7 @@
   const RADARS=[{x:-115,z:3},{x:-168,z:-115},{x:110,z:87},{x:252,z:-110}];
   const STARS=[[-278,-230],[-278,-125],[-278,-20],[-278,80],[-278,180],[-278,260],[-205,-278],[-100,-278],[20,-278],[130,-278],[240,-278],[278,-220],[278,-110],[278,10],[278,130],[278,250],[-210,285],[-100,285],[10,285],[120,285],[240,285],[-125,174],[126,145],[244,164],[218,148,12]];
   function limit(point){return Math.max(Math.abs(point.x),Math.abs(point.z))>235?C.limits.outer:P.career.districtAt(point)==='Alstad'?C.limits.oldTown:C.limits.town;}
-  function fine(point,speed){return speed*3.6>limit(point)+C.radarGrace?C.radarFine:0;}
+  function fine(){return 0;}   // no radars any more
   function height(point){
     if(point.x>=231&&point.x<=244&&point.z>=85&&point.z<=145)return (point.z-85)/5;
     if(point.x>=204&&point.x<=244&&point.z>=141&&point.z<=154)return 12;
@@ -21,11 +21,7 @@
       ctx.fillStyle=bg;ctx.fillRect(0,0,512,160);ctx.fillStyle='#283930';ctx.font='bold 48px system-ui';ctx.textAlign='center';ctx.fillText(label,256,96);
       const material=new T.SpriteMaterial({map:new T.CanvasTexture(canvas)}),sprite=new T.Sprite(material);sprite.position.set(x,y,z);sprite.scale.set(w,w*160/512,1);scene.add(sprite);return sprite;
     }
-    RADARS.forEach(p=>{
-      box(geometry,'#62716e',p.x+7,2.5,p.z+7,.25,5,.25);box(geometry,'#abb4b2',p.x+7,4.6,p.z+7,1.1,1.4,1);box(geometry,'#263c40',p.x+7,4.8,p.z+6.45,.45,.4,.04);
-      sign('RADAR',p.x-12,2.8,p.z+8,'#ffe0a0',5);sign(String(limit(p)),p.x-20,2.8,p.z+8,'#ffffff',2.6);
-    });
-    for(const [x,z] of [[-252,-200],[-140,-84],[-84,35],[168,90],[252,210]])sign(String(limit({x,z})),x+8,2.8,z,'#ffffff',2.6);
+    // no speed limits, radars or limit signs: the goal is to deliver as fast as possible (Ian, 14 Oct 2026)
     const roadworks=(x,z,district,vertical)=>{
       const group=new T.Group(),parts=[];
       for(let i=-2;i<=2;i++){box(parts,'#ed9c35',vertical?x+i*3:x,1,vertical?z:z+i*3,vertical?2:.5,1.8,vertical?.5:2);}
@@ -58,9 +54,7 @@
       rain.visible=weather==='rain';rain.position.set(player.x,0,player.z);
       if(rain.visible){for(let i=1;i<rainPositions.length;i+=3){rainPositions[i]-=dt*20;if(rainPositions[i]<0)rainPositions[i]+=28;}rainGeometry.attributes.position.needsUpdate=true;}
     }
-    function cameraFine(player,now){
-      for(let i=0;i<RADARS.length;i++){const p=RADARS[i];if(Math.hypot(player.x-p.x,player.z-p.z)>9)continue;if(now-(lastPass.get(i)??-Infinity)<10)continue;const amount=fine(player,player.speed);if(amount){lastPass.set(i,now);return amount;}}return 0;
-    }
+    function cameraFine(){return 0;}
     function collect(player,save){return stars.find(s=>!save.stars.includes(s.id)&&Math.hypot(s.x-player.x,s.z-player.z)<3.5&&Math.abs(height(player)-s.y)<2);}
     return {refresh,update,cameraFine,collect,reset:()=>lastPass.clear(),stars,barriers};
   }

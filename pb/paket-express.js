@@ -366,7 +366,7 @@
 
   function updateHUD() {
     $('points').textContent = Math.floor(score*runMultiplier()).toLocaleString(lang); $('deliveries').textContent = deliveries; $('best').textContent = progress.best.toLocaleString(lang);
-    $('walletHud').textContent=progress.wallet.toLocaleString(lang)+' €';$('speedLimit').textContent=PX.lux.limit(player);
+    $('walletHud').textContent=progress.wallet.toLocaleString(lang)+' €';
     const comboLeft=Math.max(0,PX.config.comboSeconds-(elapsed-combo.last));$('combo').textContent='×'+(comboLeft>0?combo.multiplier:1);$('comboHud').classList.toggle('active',comboLeft>0&&combo.multiplier>1);$('comboBar').value=comboLeft;
     $('speed').textContent = Math.round(player.speed * 3.6); $('vehicleLabel').textContent = activeVehicle().name;
     $('shiftTimer').textContent = mode !== 'free' ? formatTime(SHIFT_SECONDS - elapsed) : '∞';

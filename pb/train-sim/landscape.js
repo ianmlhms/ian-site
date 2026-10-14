@@ -657,6 +657,7 @@ window.TS = window.TS || {};
     const chunks = new Map();
     let disposed = false, timeOfDay = 12, weatherName = 'clear', elapsed = 0, firstUpdate = true;
     const W = Q.strip, latHalf = LAT_OFFSETS.filter(v => v < W - 1); latHalf.push(W);
+    const PORTAL_HOLE = 9;   // m each side of the track: the hole in the ground's cliff face at a portal (the portal wall in infra.js is wide enough to hide it)
     const LAT = [...latHalf.slice(1).reverse().map(v => -v), ...latHalf];
 
     /* --- track helpers --- */
@@ -792,8 +793,18 @@ window.TS = window.TS || {};
 
     function terrainMesh(k, s0) {
       const step = Q.rowStep, nRow = Math.round(CHUNK / step), grid = [];
-      for (let j = -1; j <= nRow + 1; j++) {
-        const s = s0 + j * step, info = rowInfo(s), f = frame(s), row = [];
+      /* extra rows at every tunnel portal (the ground steps up to the tunnel cover exactly at s0 / s1): without them the triangles between two regular rows would
+         slope through the first metres of the bore */
+      const rowS = [];
+      for (let j = -1; j <= nRow + 1; j++) rowS.push(s0 + j * step);
+      if (track.kind !== 'tram') for (const tn of tunnels) for (const ps of [tn.s0, tn.s1]) {
+        if (ps >= s0 - 0.5 && ps <= s0 + CHUNK + 0.5) rowS.push(ps - 0.3, ps + 0.3);
+      }
+      rowS.sort((p, q) => p - q);
+      const portalPad = new Set();   // the pad rows of a portal pair: the quads between them (the ground's cliff face at the mouth) get a hole so the bore stays open
+      if (track.kind !== 'tram') for (const tn of tunnels) for (const ps of [tn.s0, tn.s1]) if (ps >= s0 - 0.5 && ps <= s0 + CHUNK + 0.5) for (let a = 0; a + 2 < rowS.length; a++) if (rowS[a + 1] >= ps - 0.3 - 1e-6 && rowS[a + 2] <= ps + 0.3 + 1e-6) portalPad.add(a);
+      for (let jj = 0; jj < rowS.length; jj++) {
+        const s = rowS[jj], info = rowInfo(s), f = frame(s), row = [];
         for (let i = 0; i < LAT.length; i++) {
           const lat = LAT[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat;
           row.push({ x, z, y: groundY(info, lat, x, z, s), lat, info });
@@ -813,6 +824,7 @@ window.TS = window.TS || {};
       }
       const nR = nA - 2;
       for (let a = 0; a < nR - 1; a++) for (let b = 0; b < nB - 1; b++) {
+        if (portalPad.has(a) && Math.abs(LAT[b]) <= PORTAL_HOLE && Math.abs(LAT[b + 1]) <= PORTAL_HOLE) continue;
         const i0 = base + a * nB + b, i1 = i0 + 1, i2 = i0 + nB, i3 = i2 + 1;
         mb.i.push(i0, i1, i2, i1, i3, i2);
       }
@@ -1205,11 +1217,23 @@ window.TS = window.TS || {};
     const FAR_TINT = { farmland: [1, 1, 1], suburb: [1, 1, 1], city: [0.92, 0.95, 0.9], tramcity: [0.92, 0.95, 0.9], forest: [0.86, 0.95, 0.86], ardennes: [0.8, 0.9, 0.82], industrial: [1.18, 0.86, 0.76], highspeed: [1.12, 1.04, 0.86], vineyard: [1.05, 1.02, 0.92], river: [0.96, 1, 0.96] };
     const farMeshes = [], farCache = new Map(), farTint = new T.Color(1, 1, 1), farTintTarget = new T.Color(1, 1, 1);
     let baseY = 0;
+    const FAR_TUNNEL_PAD = 160;
     function farHeight(x, z) {
       const key = (Math.round(x) + 524288) * 1048576 + Math.round(z) + 524288;
       let h = farCache.get(key); if (h !== undefined) return h;
       h = terrainH(x, z); const d = distToTrack(x, z);
-      if (d < W) h -= 22 * (1 - smooth(W - 40, W, d));
+      if (d < W) {
+        const f = 1 - smooth(W - 40, W, d);
+        let low = h - 22 * f;
+        /* tunnel corridor: the coarse far triangles (24 m / 96 m grid) must never cross the tube.  A vertex next to a tunnel (+/- FAR_TUNNEL_PAD m along it, which
+           also covers the portals seen from outside) goes far below the rails, deeper than the hill is high, so no triangle between it and the hillside can rise to
+           rail level (that was the flat field-coloured quad floating in the tunnel) */
+        if (tunnels.length && track.nearest) {
+          const q = track.nearest(x, z);
+          if (q && inTunnel(q.s, FAR_TUNNEL_PAD)) low = Math.min(low, lerp(h, q.y - 8 - Math.max(24, h - q.y), f));
+        }
+        h = low;
+      }
       if (farCache.size > 120000) farCache.clear();
       farCache.set(key, h); return h;
     }

@@ -250,7 +250,8 @@
     const liveries = base.liveries || [base.livery];
     // The Luxtram is capped at its real top speed (motor upgrade = acceleration only); arcade test mode lets it scout faster, fine-free.
     const isTram = base.kind === 'tram';
-    const scout = isTram && typeof window !== 'undefined' && window.__pbTestMode === true;
+    // arcade test mode (owner only, no scores): every vehicle may pass red signals and ignore limits, without fines or emergency brakes
+    const scout = typeof window !== 'undefined' && window.__pbTestMode === true;
     const capKmh = isTram ? (scout ? C.speedCaps.tramScoutKmh : C.speedCaps.tramKmh) : 0;
     return {
       ...base,

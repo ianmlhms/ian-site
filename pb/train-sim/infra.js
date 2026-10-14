@@ -850,7 +850,7 @@
   function railPortalGeometry(env) {
     if (env.railPortalGeo) return env.railPortalGeo;
     const depth = 2.2;
-    const hw = RT_R + 3.4;
+    const hw = RT_R + 6.9;   // wide enough to hide the hole in the ground's cliff face at the mouth (landscape.js PORTAL_HOLE = 9 m each side of the track, tunnel centre up to 2.25 m off it)
     const wall = new T.Shape();
     wall.moveTo(-hw, FORM_Y);
     wall.lineTo(hw, FORM_Y);
