@@ -71,6 +71,18 @@
 .ts-menu__envOpt:hover{background:var(--card2)}
 .ts-menu__envOpt[aria-checked="true"]{background:var(--gold);border-color:var(--gold);color:#2a2112}
 .ts-menu__env .ts-menu__small{margin-top:-2px}
+.ts-menu__resume{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 22px;align-items:center;border:2px solid var(--gold);border-radius:24px;padding:18px 22px;background:linear-gradient(135deg,rgba(255,188,66,.22),rgba(255,188,66,.06));box-shadow:0 14px 34px rgba(255,170,50,.18)}
+.ts-menu__resume h2{grid-column:1/-1;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:850}
+.ts-menu__resumeInfo{display:flex;flex-direction:column;gap:8px;min-width:0}
+.ts-menu__resumeInfo b{font-size:22px;font-weight:850;letter-spacing:-.01em;line-height:1.2}
+.ts-menu__resumeMeta{display:flex;flex-wrap:wrap;gap:6px 8px}
+.ts-menu__resumeMeta span{padding:4px 11px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink)}
+.ts-menu__resumeMeta span.eur{color:var(--gold2);font-variant-numeric:tabular-nums}
+.ts-menu__resumeBtns{display:flex;gap:10px;align-items:stretch}
+.ts-menu__resumeBtns button{min-height:52px;padding:0 22px;border-radius:14px;border:1px solid var(--line);background:var(--card2);font-weight:800;font-size:15px;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.ts-menu__resumeBtns button:hover{background:rgba(255,255,255,.18)}
+.ts-menu__resumeBtns .go{background:var(--gold);border-color:var(--gold2);color:#2a1a08;font-size:17px;font-weight:850;padding:0 28px}
+.ts-menu__resumeBtns .go:hover{background:var(--gold2)}
 .ts-menu__careers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ts-menu__career{display:flex;align-items:center;gap:14px;text-align:left;padding:14px 18px;border-radius:18px;border:2px solid var(--line);background:var(--card);min-height:76px;transition:transform .15s,background .15s,border-color .15s}
 .ts-menu__career .ico{font-size:34px;line-height:1}
@@ -152,6 +164,7 @@
   .ts-menu__heroTrain{width:min(54%,430px)}
 }
 @media (max-width:780px){
+  .ts-menu__resume{grid-template-columns:1fr}.ts-menu__resumeBtns{flex-direction:column}.ts-menu__resumeBtns button{width:100%}
   .ts-menu__up,.ts-menu__help,.ts-menu__modes{grid-template-columns:1fr}
   .ts-menu__career{padding:12px 14px;gap:10px}.ts-menu__career .ico{font-size:28px}.ts-menu__career .txt b{font-size:19px}
 }
@@ -521,6 +534,19 @@
     return h('div', { class: 'ts-menu__careers', role: 'tablist', 'aria-label': t('careerSwitch') }, C.careers.order.map(tab), h('p', { class: 'ts-menu__small ts-menu__careerNote', text: t('careerNote') }));
   }
 
+  /* "Weiderfueren": the host found a saved service (killed or reloaded page) and offers to carry on. opts.resume = { route, train, next, ago, cash, loop, focus, onResume(), onDiscard() } (texts are ready-made by the host). */
+  function resumeCard() {
+    const r = ctx.opts && ctx.opts.resume;
+    if (!r) return null;
+    const meta = [r.next ? h('span', { text: r.next }) : null, r.ago ? h('span', { text: r.ago }) : null, h('span', { class: 'eur', text: r.cash }), r.loop ? h('span', { text: r.loop }) : null];
+    return h('section', { class: 'ts-menu__resume', 'aria-labelledby': 'ts-menu-resume', 'data-test': 'resume-card' },
+      h('h2', { id: 'ts-menu-resume', text: t('resumeTitle') }),
+      h('div', { class: 'ts-menu__resumeInfo' }, h('b', { text: r.route }), h('div', { class: 'ts-menu__resumeMeta' }, meta), h('p', { class: 'ts-menu__small', text: r.train })),
+      h('div', { class: 'ts-menu__resumeBtns' },
+        h('button', { type: 'button', class: 'go', 'data-fid': 'resume-go', 'data-test': 'resume-go', on: { click: () => r.onResume && r.onResume() } }, t('resumeGo')),
+        h('button', { type: 'button', 'data-fid': 'resume-new', 'data-test': 'resume-new', on: { click: () => r.onDiscard && r.onDiscard() } }, t('resumeNew'))));
+  }
+
   function hero() {
     const s = cs();
     const info = K.rankInfo(s.lifetime, ctx.career);
@@ -690,6 +716,7 @@
     const root = h('div', { class: 'ts-menu', lang: TS.lang, role: 'main', 'aria-labelledby': 'ts-menu-title' });
     const inner = h('div', { class: 'ts-menu__inner' },
       h('div', { class: 'ts-menu__top' }, h('span', { class: 'ts-menu__stamp', text: C.careers[ctx.career].icon + (ctx.career === 'tram' ? ' LUXTRAM · SIM' : ' LUX RAIL · SIM') }), h('div', { class: 'ts-menu__topR' }, hintsToggle(), langBar())),
+      resumeCard(),
       careerSwitch(),
       hero(),
       modes(),
@@ -706,6 +733,8 @@
     ctx.container.replaceChildren(root);
     ctx.root = root;
     root.scrollTop = scroll;
+    const resume = ctx.opts && ctx.opts.resume;
+    if (resume && resume.focus && !fid) { const go = root.querySelector('[data-fid="resume-go"]'); if (go) go.focus({ preventScroll: true }); }
     if (fid) {
       const again = root.querySelector(`[data-fid="${fid}"]`);
       if (again && !again.disabled) again.focus({ preventScroll: true });
@@ -738,6 +767,7 @@
     const p = patch || {};
     if (p.lang) TS.setLang(p.lang);
     if (p.env) ctx.env = Object.assign({}, ctx.env, p.env);
+    if ('resume' in p) ctx.opts = { ...ctx.opts, resume: p.resume || null };
     if (p.save) {
       setSave(p.save);
       ctx.opts = { ...ctx.opts, save: ctx.save };

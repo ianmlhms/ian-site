@@ -144,10 +144,19 @@
     return Object.freeze({ pattern: pass.length ? 'RE' : 'RB', pass: Object.freeze(pass), tsr: Object.freeze(tsr), incidents: Object.freeze(incidents) });
   }
 
+  /* The timetable of a saved service (rows [arr, dep] per station), so a resumed run keeps exactly the times it had. */
+  function timetableFrom(track, clockStart, rows, total, passList) {
+    const stations = track.stations || [], pass = new Set(passList || []);
+    if (!Array.isArray(rows) || rows.length !== stations.length || !rows.every(r => Array.isArray(r) && Number.isFinite(r[0]) && Number.isFinite(r[1]))) return null;
+    const stops = stations.map((st, i) => Object.freeze({ name: st.name, s: st.s, arr: rows[i][0], dep: rows[i][1], pass: pass.has(i) && i > 0 && i < stations.length - 1 }));
+    return Object.freeze({ clockStart, stops: Object.freeze(stops), total: Number.isFinite(total) ? total : 0 });
+  }
+
   function create(config) {
     const { train, track } = config;
     const options = config.options || {};
-    const rng = options.rng || rngFrom(options.seed || Date.now());
+    const seed = options.seed || Date.now();
+    const rng = options.rng || rngFrom(seed);
     const stations = track.stations || [];
     const plan = options.plan || EMPTY_PLAN;
     const passSet = new Set((plan.pass || []).filter(i => i > 0 && i < stations.length - 1));
@@ -550,8 +559,63 @@
       for (const sg of signals) if (sg.s < s - 5) sg.passed = true;
     }
 
+    /* ---- resume support: a compact, JSON-safe copy of everything the rules need to carry on, and its inverse ----
+       restore() brings the train back standing still at the saved position: speed 0, lever 0, doors closed, parking brake on (auto: the first
+       power notch releases it). A red-signal stop is cleared. Nothing is ever credited again: cash, totals and every stop's record come back exactly. */
+    const r1 = (x) => Math.round(x * 10) / 10, r2 = (x) => Math.round(x * 100) / 100;
+    function snapshot() {
+      const holds = signals.filter(sg => sg.hold).map(sg => [sg.index, r1(sg.clearAfter), r1(sg.revealedAt), (sg.cleared || (spadActive && sg.index === spadSignal)) ? 1 : 0, sg.reason || '']);
+      return {
+        s: r2(s), t: r2(t), distance: Math.round(distance), dir, backedM: r1(backedM), cash: r2(cash), lastDelay, finished,
+        totals: { ...totals, overspeedSec: r2(totals.overspeedSec), overspeedFine: r2(totals.overspeedFine) },
+        visits: visits.map(x => [x.arrived ? 1 : 0, x.departed ? 1 : 0, x.skipped ? 1 : 0, x.opened ? 1 : 0, r1(x.arriveT), r2(x.errorM), x.rating, x.arrDelay, x.depDelay, x.boarded, x.alighted]),
+        passedN: signals.filter(sg => sg.passed).length, holds,
+        heldFired: [...heldFired], tsrWarned: [...tsrWarned], crowdWarned: [...crowdWarned],
+      };
+    }
+    const RATINGS = ['', 'perfect', 'ok', 'fair', 'overrun', 'short'];
+    const fin = (x) => typeof x === 'number' && Number.isFinite(x);
+    function restore(sn, bounds = {}) {
+      if (!sn || typeof sn !== 'object' || !fin(sn.s) || !fin(sn.t) || sn.s < 0 || sn.s > track.length + 1) return false;
+      if (!Array.isArray(sn.visits) || sn.visits.length !== stations.length) return false;
+      const maxCash = bounds.maxCash ?? (100 * stations.length + 200), minCash = bounds.minCash ?? -5000;
+      const num = (x, lo, hi, d = 0) => (fin(x) ? clamp(x, lo, hi) : d);
+      const int = (x, hi) => Math.round(num(x, 0, hi));
+      const rows = [];
+      for (const row of sn.visits) {
+        if (!Array.isArray(row) || row.length < 11 || !RATINGS.includes(row[6])) return false;
+        rows.push(row);
+      }
+      s = clamp(sn.s, 0, track.length); v = 0; a = 0; t = clamp(sn.t, 0, bounds.maxT ?? 4 * 3600); distance = num(sn.distance, 0, 1e7);
+      dir = sn.dir === -1 ? -1 : 1; backedM = num(sn.backedM, 0, 1e5);
+      cash = num(sn.cash, minCash, maxCash); lastDelay = num(sn.lastDelay, -7200, 7200);
+      const tt = sn.totals && typeof sn.totals === 'object' ? sn.totals : {};
+      Object.keys(totals).forEach((k) => { totals[k] = k === 'overspeedSec' || k === 'overspeedFine' ? num(tt[k], 0, 1e5) : int(tt[k], 1e4); });
+      rows.forEach((r, i) => {
+        const x = visits[i];
+        x.arrived = !!r[0]; x.departed = !!r[1]; x.skipped = !!r[2]; x.opened = !!r[3];
+        x.arriveT = num(r[4], 0, 1e5); x.errorM = num(r[5], -3000, 3000); x.rating = r[6];
+        x.arrDelay = Math.round(num(r[7], -7200, 7200)); x.depDelay = Math.round(num(r[8], -7200, 7200)); x.boarded = int(r[9], 1e4); x.alighted = int(r[10], 1e4);
+      });
+      signals.forEach((sg, i) => { sg.passed = i < (sn.passedN | 0); sg.hold = false; sg.cleared = false; sg.revealedAt = -1; sg.reason = undefined; });
+      (Array.isArray(sn.holds) ? sn.holds : []).forEach((h) => {
+        const sg = Array.isArray(h) && signals[h[0] | 0];
+        if (!sg) return;
+        sg.hold = true; sg.clearAfter = num(h[1], 0, 1e4, 20); sg.revealedAt = fin(h[2]) ? h[2] : -1; sg.cleared = !!h[3]; sg.reason = h[4] || undefined;
+      });
+      heldFired.clear(); (Array.isArray(sn.heldFired) ? sn.heldFired : []).forEach(x => fin(x) && heldFired.add(x));
+      tsrWarned.clear(); (Array.isArray(sn.tsrWarned) ? sn.tsrWarned : []).forEach(x => fin(x) && tsrWarned.add(x));
+      crowdWarned.clear(); (Array.isArray(sn.crowdWarned) ? sn.crowdWarned : []).forEach(x => fin(x) && crowdWarned.add(x));
+      finished = !!sn.finished;
+      // standing still, doors closed, parking brake on; no red-signal stop, no pending door hold
+      lever = 0; tractionFrac = 0; brakeDecel = 0; doorPhase = 'closed'; doorTimer = 0; doorsOpen01 = 0; doorsReleased = false; doorSide = null; doorStation = -1;
+      parking = true; parkingAuto = true; heldUntil = -1; parkHintAt = -99; spadActive = false; spadStill = 0; spadSignal = -1;
+      harshCooldown = 0; overspeedWasOn = false; ebWas = false; reverseBlockedNow = false;
+      return true;
+    }
+
     return Object.freeze({
-      step, summary, recordExchange, placeBeforeStation, setSpeed, setGradeOverride, place, forceRedAhead, timetable, stations, length: len, plan, isPass,
+      step, summary, recordExchange, snapshot, restore, seed, placeBeforeStation, setSpeed, setGradeOverride, place, forceRedAhead, timetable, stations, length: len, plan, isPass,
       signalAspects: () => signals.map(sg => ({ index: sg.srcIndex, s: sg.s, aspect: aspectOf(sg, s), hold: sg.hold })),
       get signals() { return signals.map(sg => ({ index: sg.index, s: sg.s, hold: sg.hold, cleared: sg.cleared, passed: sg.passed })); },
       get now() { return { s, v, t }; },
@@ -559,7 +623,7 @@
   }
 
   TS.sim = Object.freeze({
-    create, buildTimetable, planService, LEVER_MIN, LEVER_MAX, LEVER_EB,
+    create, buildTimetable, timetableFrom, planService, LEVER_MIN, LEVER_MAX, LEVER_EB,
     leverLabel(n) { return n === 0 ? '0' : n > 0 ? 'P' + n : n <= LEVER_EB ? 'EB' : 'B' + (-n); },
     constants: Object.freeze({ PERFECT_M, OK_M, OVERRUN_M, ON_TIME_S, OVERSPEED_TOL_KMH, DOOR_MAX_SPEED, SPAD_FINE }),
   });

@@ -589,6 +589,297 @@ async function luxtramScoutChecks(h, frame) {
   h.eq([scout.fine, scout.sec], [0, 0], 'test mode: no overspeed fines');
 }
 
+
+/* Resume: reload the arcade page (the game frame dies, like a killed Safari tab) and come back to the game's menu. */
+async function reloadToMenu(h) {
+  await h.page.reload();
+  const choice = h.page.locator('.pb-mode__box [data-mode="normal"]');
+  await choice.waitFor({ state: 'visible', timeout: 15000 }).then(() => choice.click()).catch(() => {});
+  return gameFrame(h);
+}
+/* One stop with the test hooks: place the train before it, stop at the marker, open the doors, let everybody board, close, pull away a few seconds. */
+async function serveStation(h, frame, index) {
+  await frame.evaluate((i) => { __tsTest.teleport(i); }, index);
+  await frame.evaluate(() => { __tsTest.stopAtMarker(-0.8); });
+  await waitState(frame, (i) => window.__tsTest.state().atStationIndex === i, index);
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorPhase === 'open');
+  await waitState(frame, () => { const e = window.__tsTest.state().exchange; return e && e.done; }, null, 60000);
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorPhase === 'closed', null, 20000);
+  await frame.evaluate(() => { __tsTest.forceSimStep(0.1, 0); __tsTest.forceSimStep(8, 3); });
+}
+/* Starts the west line with the seeded generator, serves stations 1 and 2, stands still and saves the snapshot now. Returns what must survive a reload. */
+async function driveTwoStops(h, frame, seed) {
+  await waitState(frame, () => window.__tsTest.state().demo === true, null, 60000);   // the menu backdrop is built (it draws random numbers too): a seeded run must start after it
+  await h.pause(300);
+  await frame.evaluate((sd) => { __tsTest.setSeed(sd); return __tsTest.startService('west', 'railcar', 'career'); }, seed);
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().simT > 0.3, null, 60000);   // (the first frames draw the start station's crowd: keep the random order the same every run)
+  await serveStation(h, frame, 1);
+  await serveStation(h, frame, 2);
+  return frame.evaluate(() => {
+    __tsTest.setSpeed(0); __tsTest.forceSimStep(0.5, -4);
+    const saved = __tsTest.saveSnapshot();
+    const s = __tsTest.state();
+    return { saved, routeId: s.routeId, trainId: s.trainId, mode: s.mode, s: s.s, visited: s.visited, cash: s.cash, liveCash: s.liveCash, next: s.nextStationIndex, hudNext: s.stations[s.headingIndex].name, onboard: s.onboard, delivered: s.delivered,
+      stopsRecord: s.stopsRecord, totals: s.totals, simT: s.simT, delay: s.delaySec, weather: s.weather, hour: s.hour, pattern: s.pattern, passIndices: s.passIndices,
+      wallet: s.wallet, tb: s.tb, services: s.services, lifetime: s.lifetime, text: __tsTest.peekSnapshot() };
+  });
+}
+/* From the last station to the summary, the same way every time. Returns the reward. */
+async function finishWest(h, frame, seed) {
+  await frame.evaluate((sd) => { __tsTest.setSeed(sd); __tsTest.finishRoute(); }, seed);
+  await waitState(frame, () => window.__tsTest.state().atStationIndex >= 0 && window.__tsTest.state().nextStationIndex === window.__tsTest.state().stations.length - 1);
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorPhase === 'open');
+  await waitState(frame, () => window.__tsTest.state().phase === 'summary', null, 90000);
+  if (process.env.TS_DEBUG) console.log('    summary: ' + (await frame.evaluate(() => document.getElementById('sumRows').innerText.replace(/\s+/g, ' '))));
+  const fin = await S(frame);
+  finishWest.last = fin.lastResult;
+  return fin.lastReward;
+}
+
+/* Resume (Weiderfueren): a killed or reloaded page offers to carry on where the service stood. */
+async function resumeChecks(h, frame) {
+  const snapKey = 'pb_resume_train-sim';
+  await frame.evaluate(() => { __tsTest.pokeSnapshot(null); __tsTest.toMenu(); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await frame.locator('[data-test="select-railcar"]').click().catch(() => {});
+
+  h.step('resume: control run (no reload) gives the reference reward; the snapshot is gone after the summary');
+  const ctrlBefore = await driveTwoStops(h, frame, 424242);
+  h.expect(ctrlBefore.saved && ctrlBefore.text && ctrlBefore.text.length < 20000, 'a snapshot was written, ' + (ctrlBefore.text || '').length + ' bytes (limit 20 KB)');
+  h.eq(ctrlBefore.visited.slice(0, 3), [0, 1, 2], 'control: stations 0..2 visited');
+  await h.pause(1500);
+  const ctrlReward = await finishWest(h, frame, 777);
+  const ctrlLast = finishWest.last;
+  h.expect(ctrlReward && ctrlReward.cash > 0, 'control reward: ' + JSON.stringify(ctrlReward));
+  h.eq(await frame.evaluate(() => __tsTest.peekSnapshot()), null, 'finishing the service cleared the snapshot');
+  await frame.locator('#sumMenu').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  h.expect(await frame.locator('[data-test="resume-card"]').count() === 0, 'no Weiderfueren card without a snapshot');
+
+  h.step('resume: reload after two stops, Weiderfueren card (Enter), same route / position / records / cash, standing with the parking brake on');
+  const before = await driveTwoStops(h, frame, 424242);
+  if (process.env.TS_DEBUG) console.log('    control before: ' + JSON.stringify({ ...ctrlBefore, text: undefined }) + '\n    resumed before: ' + JSON.stringify({ ...before, text: undefined }));
+  const snap = JSON.parse(before.text);
+  h.expect(snap.v === 1 && snap.route === 'west' && snap.train === 'railcar' && snap.mode === 'career' && Array.isArray(snap.tt) && snap.sim && snap.plan && snap.env && snap.w, 'snapshot has version, route, train, mode, timetable, sim, plan, environment and passengers');
+  await h.pause(1500);
+  frame = await reloadToMenu(h);
+  h.eq(await h.page.evaluate((k) => localStorage.getItem(k) !== null, snapKey), true, 'the snapshot survived the reload (normal mode key)');
+  h.expect(await frame.locator('[data-test="resume-card"]').isVisible(), 'the Weiderfueren card is on top of the menu');
+  const cardText = await frame.locator('[data-test="resume-card"]').innerText();
+  h.expect(/Weiderfueren/.test(cardText) && /Nei ufänken/.test(cardText), 'card text (lb): ' + cardText.replace(/\s+/g, ' ').slice(0, 160));
+  h.expect(cardText.includes(before.hudNext), 'card names the next stop: ' + before.hudNext);
+  h.expect(/viru \d+ Minutt|grad elo/.test(cardText) && cardText.includes('€'), 'card shows how long ago and the cash');
+  const tallest = await frame.evaluate(() => Math.min(...[...document.querySelectorAll('[data-test="resume-go"],[data-test="resume-new"]')].map((b) => b.getBoundingClientRect().height)));
+  h.expect(tallest >= 44, 'both buttons are at least 44 px high for the iPad (' + Math.round(tallest) + ' px)');
+  h.eq((await S(frame)).resumeFocus, 'resume-go', 'the primary button has the focus, so Enter carries on');
+  await h.shot('resume-card-ipad');
+  /* the age is computed from the stored time: pretend it is 12 minutes old */
+  await frame.evaluate(() => { const o = JSON.parse(__tsTest.peekSnapshot()); o.at -= 12 * 60000; __tsTest.pokeSnapshot(JSON.stringify(o)); __tsTest.toMenu(); });
+  await waitState(frame, () => !!document.querySelector('[data-test="resume-card"]'));
+  h.expect(/viru 12 Minutten/.test(await frame.locator('[data-test="resume-card"]').innerText()), 'a 12 minute old snapshot says "viru 12 Minutten"');
+  h.step('resume: Escape = not now (the snapshot stays), back in the menu it is offered again');
+  await key(h, 'Escape');
+  await h.pause(300);
+  h.expect(await frame.locator('[data-test="resume-card"]').count() === 0, 'Escape hides the card');
+  h.expect(await frame.evaluate(() => __tsTest.peekSnapshot() !== null), 'but keeps the snapshot');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => !!document.querySelector('[data-test="resume-card"]'));
+  await h.pause(5000);   // real time passes while the iPad was "off": it must not become delay
+  const msgsBefore = await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pb === 1).length);
+  await frame.locator('[data-test="resume-go"]').focus();
+  await key(h, 'Enter');
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 60000);
+  let after = await S(frame);
+  h.eq([after.routeId, after.trainId, after.mode], [before.routeId, before.trainId, before.mode], 'same route, train and mode');
+  h.expect(Math.abs(after.s - before.s) <= 5, 'same position (' + before.s.toFixed(1) + ' -> ' + after.s.toFixed(1) + ')');
+  h.eq(after.visited, before.visited, 'same visited stations');
+  h.eq(after.cash, before.cash, 'same cash (' + before.cash + ')');
+  h.eq([after.nextStationIndex, after.hudNext], [before.next, before.hudNext], 'same next station (' + before.hudNext + ')');
+  h.eq([after.onboard, after.delivered], [before.onboard, before.delivered], 'same passengers on board / delivered');
+  h.eq(after.stopsRecord, before.stopsRecord, 'same per-stop passenger records');
+  h.eq(after.totals, before.totals, 'same totals (stop ratings, fines)');
+  h.eq([after.pattern, after.passIndices, after.weather, after.hour], [before.pattern, before.passIndices, before.weather, before.hour], 'same service plan and weather / hour');
+  h.expect(after.v === 0 && after.kmh === 0, 'the train stands still');
+  h.expect(after.parkingBrake && after.parkLampVisible, 'parking brake on (lamp shown)');
+  h.eq([after.doorPhase, after.doorsOpen01, after.lever], ['closed', 0, 0], 'doors closed, lever 0');
+  h.expect(after.simT >= before.simT && after.simT - before.simT < 4, 'the service clock continues where it was: the 5+ s away (and any real time) did not count (' + (after.simT - before.simT).toFixed(2) + ' s)');
+  h.expect(after.delaySec - before.delay <= 4, 'no extra delay from the time the page was away (' + before.delay + ' -> ' + after.delaySec + ' s)');
+  h.expect(!after.events.includes('stopRated') && !after.events.includes('doorsOpened'), 'nothing was rated or opened again on resume');
+  h.expect(await frame.evaluate(() => /Weidergefuer bei/.test(document.getElementById('banner').textContent)), 'banner says "Weidergefuer bei ..."');
+  h.eq([after.wallet, after.tb, after.services, after.lifetime], [before.wallet, before.tb, before.services, before.lifetime], 'wallet, tb, services and lifetime untouched by the resume');
+  h.eq(await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pb === 1).length), msgsBefore, 'no score was posted on resume');
+  await h.shot('resume-banner');
+  /* the train must not move until the driver asks, and the first power notch lets go of the parking brake */
+  await h.pause(600);
+  h.expect(Math.abs((await S(frame)).s - after.s) < 0.01, 'still standing a moment later');
+  await key(h, 'w');
+  await waitState(frame, () => window.__tsTest.state().kmh > 1, null, 20000);
+  h.expect(!(await S(frame)).parkingBrake, 'W releases the parking brake and the train drives off');
+  await key(h, 'x');
+  await frame.evaluate(() => { __tsTest.setSpeed(0); __tsTest.forceSimStep(0.3, -4); });
+  h.expect((await frame.evaluate(() => JSON.parse(__tsTest.peekSnapshot()).at)) >= snap.at, 'the snapshot was refreshed on resume');
+  const resumedReward = await finishWest(h, frame, 777);
+  h.eq(resumedReward, ctrlReward, 'the resumed service pays exactly what the uninterrupted one paid (' + JSON.stringify(ctrlReward) + ')');
+  if (JSON.stringify(resumedReward) !== JSON.stringify(ctrlReward)) console.log('    DEBUG control ' + JSON.stringify(ctrlLast) + '\n    DEBUG resumed ' + JSON.stringify(finishWest.last) + '\n    DEBUG before ' + JSON.stringify({ ...ctrlBefore, text: undefined }) + '\n    DEBUG after  ' + JSON.stringify({ ...before, text: undefined }));
+  h.eq(await frame.evaluate(() => __tsTest.peekSnapshot()), null, 'finishing the resumed service cleared the snapshot');
+  h.eq(await h.page.evaluate((k) => localStorage.getItem(k), snapKey), null, 'and the stored key is gone');
+  const paid = await S(frame);
+  h.eq(paid.services, before.services + 1, 'exactly one service was paid after the resume (no double credit)');
+  await frame.locator('#sumMenu').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+
+  h.step('resume: a snapshot taken while the doors are open and people are boarding comes back with the doors closed, the stop record kept, nobody counted twice');
+  await frame.evaluate(() => { __tsTest.setSeed(31337); return __tsTest.startService('west', 'railcar', 'career'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 60000);
+  await frame.evaluate(() => { __tsTest.teleport(1); __tsTest.stopAtMarker(-0.8); });
+  await waitState(frame, () => window.__tsTest.state().atStationIndex === 1);
+  await key(h, 'd');
+  await waitState(frame, () => { const e = window.__tsTest.state().exchange; return window.__tsTest.state().doorPhase === 'open' && e && e.alightingTotal + e.boardingTotal > 0; });
+  const open = await frame.evaluate(() => { const ok = __tsTest.saveSnapshot(); const s = __tsTest.state(); return { ok, ex: s.exchange, onboard: s.onboard, delivered: s.delivered, cash: s.cash, doorPhase: s.doorPhase, perfect: s.totals.perfect }; });
+  h.expect(open.ok && open.doorPhase === 'open', 'snapshot written with the doors open (' + JSON.stringify(open.ex) + ')');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => !!document.querySelector('[data-test="resume-card"]'));
+  await frame.locator('[data-test="resume-go"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 60000);
+  let mid = await S(frame);
+  h.eq([mid.doorPhase, mid.doorsOpen01, mid.exchange, mid.parkingBrake, mid.v], ['closed', 0, null, true, 0], 'resumed at the stop with the doors closed, no exchange running, parking brake on, standing');
+  const wantOnboard = open.onboard + open.ex.alighted - open.ex.boarded - open.ex.alightingTotal + open.ex.boardingTotal;
+  h.eq(mid.stopsRecord[1], { alighted: open.ex.alightingTotal, boarded: open.ex.boardingTotal, alightingTotal: open.ex.alightingTotal, boardingTotal: open.ex.boardingTotal }, 'the stop is on record as complete: everybody who was to get off is off, everybody who was to board is on');
+  h.eq([mid.delivered, mid.onboard], [open.delivered + open.ex.alightingTotal, wantOnboard], 'delivered and on board match (' + mid.delivered + ' delivered, ' + mid.onboard + ' on board)');
+  h.eq(mid.cash, open.cash, 'cash unchanged (the stop bonus is not paid twice)');
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorPhase === 'open');
+  await h.pause(1200);
+  const reopened = await S(frame);
+  h.eq([reopened.totals.perfect, reopened.cash, reopened.onboard, reopened.delivered], [open.perfect, open.cash, wantOnboard, mid.delivered], 'reopening the doors changes nothing: no second stop rating, nobody gets off or on again');
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorPhase === 'closed', null, 20000);
+  const closedAgain = await S(frame);
+  h.eq([closedAgain.delivered, closedAgain.onboard], [mid.delivered, wantOnboard], 'and after closing again the same people are delivered / on board');
+  await frame.evaluate(() => { __tsTest.toMenu(); __tsTest.pokeSnapshot(null); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+
+  h.step('resume: Nei ufänken throws the snapshot away; a broken, old, foreign or tampered snapshot is ignored without noise');
+  await frame.evaluate(() => { __tsTest.setSeed(99); return __tsTest.startService('west', 'railcar', 'career'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 60000);
+  await serveStation(h, frame, 1);
+  await frame.evaluate(() => { __tsTest.setSpeed(0); __tsTest.forceSimStep(0.5, -4); __tsTest.saveSnapshot(); });
+  const good = await frame.evaluate(() => __tsTest.peekSnapshot());
+  h.expect(!!good, 'a snapshot exists after one more stop');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => !!document.querySelector('[data-test="resume-card"]'));
+  await frame.locator('[data-test="resume-new"]').click();
+  await h.pause(300);
+  h.expect(await frame.locator('[data-test="resume-card"]').count() === 0, 'Nei ufänken: the card is gone');
+  h.eq(await frame.evaluate(() => __tsTest.peekSnapshot()), null, 'and the snapshot is deleted');
+  const warnings = [];
+  const onConsole = (m) => { if (m.type() === 'warning') warnings.push(m.text()); };
+  h.page.on('console', onConsole);
+  const bad = (label, mutate) => ({ label, text: (() => { const o = JSON.parse(good); mutate(o); return JSON.stringify(o); })() });
+  const cases = [
+    bad('wrong version', (o) => { o.v = 2; }),
+    bad('25 hours old', (o) => { o.at -= 25 * 3600 * 1000; }),
+    bad('from the future', (o) => { o.at += 3600 * 1000; }),
+    bad('unknown route', (o) => { o.route = 'atlantis'; }),
+    bad('unknown train', (o) => { o.train = 'warp'; }),
+    bad('a Luxtram on a rail line (wrong career)', (o) => { o.train = 'tram'; }),
+    bad('a train that is not owned', (o) => { o.train = 'hst'; o.route = 'paris'; }),
+    bad('a later service was already paid (svc too low)', (o) => { o.svc = Math.max(0, o.svc - 1); }),
+    bad('plan with garbage', (o) => { o.plan = { p: 'XX' }; }),
+    { label: 'not json', text: '{"v":1,' },
+    { label: 'too big', text: JSON.stringify({ v: 1, junk: 'x'.repeat(25000) }) },
+  ];
+  for (const c of cases) {
+    await frame.evaluate((x) => { __tsTest.pokeSnapshot(x); __tsTest.toMenu(); }, c.text);
+    await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+    await h.pause(200);
+    const shown = await frame.locator('[data-test="resume-card"]').count();
+    const kept = await frame.evaluate(() => __tsTest.peekSnapshot() !== null);
+    h.expect(shown === 0, c.label + ': no card');
+    h.expect(!kept || c.label.startsWith('a train that is not owned'), c.label + ': the broken copy is deleted' + (kept ? ' (kept: it may become valid once the cloud save arrives)' : ''));
+  }
+  h.page.off('console', onConsole);
+  h.expect(warnings.some((w) => /saved service ignored/.test(w)), 'ignored snapshots only leave a console.warn');
+  /* a snapshot that looks fine but does not fit the track: found out while building, thrown away quietly, back in the menu */
+  for (const [label, edit] of [['s outside the track', (o) => { o.sim.s = 99999999; }], ['timetable of another line', (o) => { o.tt = o.tt.slice(0, 2); }], ['visits of another line', (o) => { o.sim.visits = o.sim.visits.slice(0, 2); }]]) {
+    await frame.evaluate(([g, code]) => { const o = JSON.parse(g); (new Function('o', code))(o); __tsTest.pokeSnapshot(JSON.stringify(o)); __tsTest.toMenu(); }, [good, '(' + edit.toString() + ')(o)']);
+    await waitState(frame, () => !!document.querySelector('[data-test="resume-card"]'));
+    await frame.locator('[data-test="resume-go"]').click();
+    await waitState(frame, () => window.__tsTest.state().phase === 'menu' && !document.querySelector('[data-test="resume-card"]'), null, 30000);
+    h.eq(await frame.evaluate(() => __tsTest.peekSnapshot()), null, label + ': discarded while building, no service started');
+  }
+  /* a cash/passenger claim beyond what a perfect run could earn is clamped, not trusted */
+  await frame.evaluate((g) => { const o = JSON.parse(g); o.sim.cash = 1e9; o.w.delivered = 9e9; o.w.boarded = 9e9; o.w.pkm = 9e9; o.w.onboard = 99999; __tsTest.pokeSnapshot(JSON.stringify(o)); __tsTest.toMenu(); }, good);
+  await waitState(frame, () => !!document.querySelector('[data-test="resume-card"]'));
+  await frame.locator('[data-test="resume-go"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 60000);
+  const clamped = await S(frame);
+  h.expect(clamped.cash <= 100 * clamped.stations.length + 200 && clamped.delivered <= 200 * clamped.stations.length && clamped.onboard <= 200, 'absurd cash / passenger numbers are clamped (cash ' + clamped.cash + ', delivered ' + clamped.delivered + ', onboard ' + clamped.onboard + ')');
+  await frame.evaluate(() => { __tsTest.press('p'); });
+  await frame.locator('#quit').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  h.eq(await frame.evaluate(() => __tsTest.peekSnapshot()), null, 'Zréck an de Menü (quit) deletes the snapshot');
+  await frame.locator('[data-test="select-emu"]').click({ timeout: 3000 }).catch(() => {});   // back to what the flow had selected before these checks
+  return frame;
+}
+
+/* Ends the endless route the real way (terminus exchange, everybody gets off, the fare is paid) and waits for the next route. */
+async function finishEndlessRoute(h, frame, nextIndex, loops) {
+  await frame.evaluate(() => { __tsTest.finishRoute(); });
+  await waitState(frame, () => window.__tsTest.state().atStationIndex >= 0 && window.__tsTest.state().nextStationIndex === window.__tsTest.state().stations.length - 1, null, 60000);
+  await key(h, 'd');
+  await waitState(frame, (a) => window.__tsTest.state().phase === 'running' && window.__tsTest.state().endless.index === a[0] && window.__tsTest.state().endless.loops === a[1] && window.__tsTest.state().doorPhase === 'closed', [nextIndex, loops], 150000);
+}
+
+/* Resume in the Luxtram endless run: the route, the endless index / loops / totals and the tram career come back; the run goes on to the next route. */
+async function resumeEndlessChecks(h, frame) {
+  h.step('resume: Luxtram endless, reload mid-route, the endless run continues at the same index');
+  await frame.locator('[data-test="career-tram"]').click();
+  await waitState(frame, () => window.__tsTest.state().career === 'tram');
+  await frame.locator('[data-test="mode-endless"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().mode === 'endless', null, 120000);
+  const first = await S(frame);
+  await frame.evaluate(() => { window.__freshSeen = null; clearInterval(window.__freshTimer); window.__freshTimer = setInterval(() => { try { const o = JSON.parse(__tsTest.peekSnapshot() || 'null'); if (o && o.fresh) window.__freshSeen = o; } catch (_) { /* ignore */ } }, 20); });
+  await finishEndlessRoute(h, frame, 1, 0);
+  const fresh = await frame.evaluate(() => { clearInterval(window.__freshTimer); return window.__freshSeen; });
+  h.expect(fresh && fresh.fresh === 1 && fresh.en.i === 1 && fresh.route === first.endless.order[1], 'a finished route moves the snapshot on to the next route (no deletion): index ' + (fresh && fresh.en && fresh.en.i));
+  const saved = await frame.evaluate(() => { const st = __tsTest.state(); __tsTest.placeAt(st.stations[0].s + 250, 0); return __tsTest.saveSnapshot(); });
+  const mid = await S(frame);
+  h.expect(saved === true && JSON.parse(await frame.evaluate(() => __tsTest.peekSnapshot())).fresh !== 1, 'a running Luxtram service writes a full snapshot (not just the route-start one)');
+  h.eq(mid.endless.index, 1, 'second route of the endless run');
+  const rec = { index: mid.endless.index, loops: mid.endless.loops, total: mid.endless.total, order: mid.endless.order, routeId: mid.routeId, wallet: mid.wallet, tb: mid.tb, services: mid.services, s: mid.s };
+  h.expect(rec.total.cash > 0, 'the first route earned ' + rec.total.cash + ' € (endless total)');
+  await h.pause(800);
+  frame = await reloadToMenu(h);
+  h.expect(await frame.locator('[data-test="resume-card"]').isVisible(), 'the Weiderfueren card shows after the reload');
+  const card = await frame.locator('[data-test="resume-card"]').innerText();
+  h.expect(/Linn 2\/2/.test(card), 'card names the endless route: ' + card.replace(/\s+/g, ' ').slice(0, 140));
+  await h.shot('resume-card-endless');
+  const railBefore = (await S(frame)).careers.rail;
+  await frame.locator('[data-test="career-rail"]').click();   // the menu shows the other career: the Luxtram service must still resume as a tram service
+  await waitState(frame, () => window.__tsTest.state().career === 'rail');
+  h.expect(await frame.locator('[data-test="resume-card"]').isVisible(), 'the card stays on top in the other career');
+  await frame.locator('[data-test="resume-go"]').click();
+  await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 120000);
+  const back = await S(frame);
+  h.eq([back.mode, back.routeId, back.career, back.trainId], ['endless', rec.routeId, 'tram', 'tram'], 'endless mode, same Luxtram route, tram career');
+  h.eq([back.endless.index, back.endless.loops, back.endless.total, back.endless.order, back.endless.active], [rec.index, rec.loops, rec.total, rec.order, true], 'endless index, loops, totals and order are kept');
+  h.expect(Math.abs(back.s - rec.s) <= 5 && back.v === 0 && back.parkingBrake, 'standing at the saved position with the parking brake on (s ' + rec.s + ' -> ' + back.s + ', v ' + back.v + ', parking ' + back.parkingBrake + ')');
+  h.eq([back.wallet, back.tb, back.services], [rec.wallet, rec.tb, rec.services], 'wallet, tb and services unchanged by the resume');
+  h.eq(back.careers.rail, railBefore, 'the rail career is untouched');
+  await finishEndlessRoute(h, frame, 0, 1);
+  const wrapped = await S(frame);
+  h.eq((await S(frame)).careers.rail, railBefore, 'the resumed Luxtram service paid the tram career only (rail career unchanged)');
+  h.expect(wrapped.endless.total.cash > rec.total.cash && wrapped.services === rec.services + 1, 'the resumed route paid once and the run wrapped around to loop 2 (' + rec.total.cash + ' -> ' + wrapped.endless.total.cash + ' €)');
+  await frame.evaluate(() => __tsTest.toMenu());
+  await waitState(frame, () => window.__tsTest.state().phase === 'menu');
+  await frame.evaluate(() => __tsTest.pokeSnapshot(null));
+  return frame;
+}
+
 export const flow = {
   name: 'train-sim', touch: true, fullChromium: true,
   backend: { tables: { game_saves: () => [], scores: () => [] } },
@@ -618,6 +909,13 @@ export const flow = {
     await gotoNormal(h, '/pixelbreak.html?g=train-sim&test=1');
     let frame = await gameFrame(h);
     if (process.env.TS_LUXTRAM_ONLY) { await luxtramNormalChecks(h, frame); await directionAndGearChecks(h, frame); return; }
+    if (process.env.TS_RESUME_ONLY) {   // just the resume checks (quick): a fresh save, rail first, then the Luxtram endless run
+      await frame.evaluate(() => __tsTest.grant(0));
+      frame = await resumeChecks(h, frame);
+      frame = await resumeEndlessChecks(h, frame);
+      h.expect(errors.length === 0, 'no console errors: ' + errors.slice(0, 3).join(' | '));
+      return;
+    }
 
     h.step('start screen: both modes, iPad keyboard notice');
     h.expect(await frame.locator('[data-test="mode-career"]').isVisible() && await frame.locator('[data-test="mode-endless"]').isVisible(), 'career and endless modes shown');
@@ -919,6 +1217,9 @@ export const flow = {
     h.eq([s.careers.tram.wallet, s.careers.tram.lifetime], [0, 0], 'the Zuch purchase did not touch the tram career');
     h.expect((await h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pbSave).length)) > savesBeforeMenu, 'purchase saves');
 
+    frame = await resumeChecks(h, frame);
+    if (process.env.TS_STOP_AFTER_RESUME) return;
+
     h.step('endless mode plays all compatible routes in order, then loops');
     await frame.locator('[data-test="select-railcar"]').click();
     await frame.locator('[data-test="mode-endless"]').click();
@@ -1043,6 +1344,7 @@ export const flow = {
     h.eq(allSaves[allSaves.length - 1].career, 'rail', 'the last chosen career is saved');
     h.expect(allSaves.every((d, i) => i === 0 || d.tb >= allSaves[i - 1].tb), 'tb never decreases across ALL saves (services, purchases, career switches): ' + allSaves.map((d) => d.tb).join(','));
     h.expect(allSaves.every((d) => d.v === 2 && d.tb === d.rail.lifetime + d.tram.lifetime), 'every posted save is v2 with tb = rail + tram lifetime');
+    frame = await resumeEndlessChecks(h, frame);
 
     h.step('phone viewport blocks, iPad does not');
     await h.page.setViewportSize({ width: 390, height: 844 });
@@ -1117,9 +1419,15 @@ export const flow = {
     await h.shot('menu-test-mode');
     await frame.locator('[data-test="mode-career"]').click();
     await waitState(frame, () => window.__tsTest.state().phase === 'running', null, 90000);
+    /* resume in test mode: the snapshot lives under the test-mode key (the real one is never touched) and does not leak into the normal-mode copy */
+    await frame.evaluate(() => { window.Arcade.testStorageShim('train-sim'); });   // (here the flag is simulated; the arcade proper also injects this storage redirect into the frame)
+    await frame.evaluate(() => { const st = __tsTest.state(); __tsTest.placeAt(st.stations[0].s + 300, 0); return __tsTest.saveSnapshot(); });
+    const keys = await h.page.evaluate(() => ({ real: localStorage.getItem('pb_resume_train-sim'), test: localStorage.getItem('pb_testls_train-sim_pb_resume_train-sim') }));
+    h.expect(keys.real === null && !!keys.test && JSON.parse(keys.test).v === 1, 'test mode keeps its snapshot under pb_testls_train-sim_pb_resume_train-sim and writes nothing to the real key');
     await frame.evaluate(() => { __tsTest.finishRoute(); });
     await frame.evaluate(() => { __tsTest.completeNow(); });
     await waitState(frame, () => window.__tsTest.state().phase === 'summary', null, 60000);
+    h.expect(await h.page.evaluate(() => localStorage.getItem('pb_testls_train-sim_pb_resume_train-sim') === null), 'finishing the service in test mode cleared the test-mode snapshot');
     await frame.locator('#sumMenu').click();
     await waitState(frame, () => window.__tsTest.state().phase === 'menu');
     await frame.locator('[data-test="career-rail"]').click();
@@ -1136,4 +1444,5 @@ export const flow = {
     h.expect((await S(frame)).errors === 0, 'no frame errors');
   },
 };
+export { driveTwoStops, finishWest, reloadToMenu, gameFrame, S, key, waitState };
 runIfMain(import.meta.url, flow);

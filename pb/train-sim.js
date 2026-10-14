@@ -38,6 +38,7 @@
   const has = (path) => path.split('.').reduce((o, k) => (o ? o[k] : undefined), TS) !== undefined;
   const readStore = (key) => safe('storage read ' + key, () => localStorage.getItem(key), null);
   const writeStore = (key, value) => safe('storage write ' + key, () => localStorage.setItem(key, value));
+  const removeStore = (key) => safe('storage remove ' + key, () => localStorage.removeItem(key));
   let randSource = Math.random;   // test hook only: __tsTest.setSeed swaps in a seeded generator
   const rand = () => randSource();
   const pick = (list) => list[Math.floor(rand() * list.length)];
@@ -227,6 +228,134 @@
     if (phase === 'menu') renderMenu();
   }
 
+  /* ------------------------------------------------------------ resume (a service saved while it runs)
+     While a service runs, a small snapshot goes to localStorage (every few seconds, at every stop event, and when the page is hidden, frozen or
+     closed). After a reload the menu offers "Weiderfueren": the same route, train, weather, plan, timetable, clock, passengers, records and
+     endless run come back, the train standing still at the saved position with doors closed and the parking brake on. The sim clock only
+     moves while the sim runs, so the time the page was away is never delay. Nothing is credited or posted on resume; the snapshot also
+     remembers how many services the career had finished, so a service that was paid after it was written can never be resumed (no double credit).
+     The storage key is not on the arcade test mode's pass-through list: test mode writes (and reads) its own copy, never the real one. */
+  const SNAPSHOT_INTERVAL_MS = 5000, SNAPSHOT_ARM_M = 30;
+  let resumeOffer = null, resumeDismissed = false, resumeFocusDone = false;
+  let snapshotArmed = false, snapshotDue = false, snapshotWrites = 0;
+  const resumeKey = () => (TS.resume ? TS.resume.KEY : '');
+
+  /* the stored snapshot if it is valid right now (version, age, route/train exist and are owned in that career, no later service paid, ...) */
+  function readSnapshot() {
+    if (!TS.resume) return null;
+    const raw = readStore(resumeKey());
+    if (!raw) return null;
+    const res = safe('resume check', () => TS.resume.check(raw, { now: Date.now(), save, testMode: ARCADE_TEST }), { reject: 'check failed' });
+    if (res.snap) return res.snap;
+    console.warn('[Lokféierer] saved service ignored: ' + res.reject);
+    if (!res.keep) removeStore(resumeKey());
+    return null;
+  }
+  function discardSnapshot() {
+    if (TS.resume) removeStore(resumeKey());
+    resumeOffer = null; snapshotDue = false;
+  }
+  function nearestStationName(sPos) {
+    const list = stationsOf();
+    let best = null;
+    for (const st of list) if (!best || Math.abs(st.s - sPos) < Math.abs(best.s - sPos)) best = st;
+    return best ? (typeof best.name === 'string' ? best.name : nameOf(best.name)) : '';
+  }
+
+  function snapshotReady() {
+    const w = world;
+    return !!(TS.resume && w && !w.demo && !w.finished && w.state && phase === 'running' && !rebuilding && snapshotArmed);
+  }
+  function buildSnapshot() {
+    const w = world;
+    if (!w || w.demo || !w.state || !TS.resume) return null;
+    const c = careerState(w.trainId), st = w.state, sim = w.sim.snapshot();
+    /* a door cycle that is still open is saved as if it had run to its end: everybody who was to get off is off and everybody who was to board is on
+       (the same people the driver would have waited for; the stop's totals were fixed when the doors opened). The train comes back with the doors closed. */
+    const ex = w.exch && !w.exch.finalized ? w.exch : null;
+    const fx = ex ? exchangeOutcome(w, ex, { alighted: ex.alighting, boarded: ex.boarding }) : null;
+    if (fx && sim.visits[ex.index]) { sim.visits[ex.index][9] = fx.rec.boarded; sim.visits[ex.index][10] = fx.rec.alighted; }
+    const pw = fx || w;
+    const stops = {}, plans = {};
+    Object.entries(pw.stops).forEach(([i, r]) => { stops[i] = [r.alighted, r.boarded, r.alightingTotal, r.boardingTotal]; });
+    Object.entries(w.plans).forEach(([i, p]) => { plans[i] = p.boarding; });
+    const heading = stationsOf()[st.headingIndex ?? st.nextStationIndex];
+    const plan = w.sim.plan || {};
+    const snap = {
+      v: TS.resume.VERSION, at: Date.now(), mode, route: w.routeId, train: w.trainId, svc: c.services || 0, life: c.lifetime || 0, cam: camMode, wxp: wxPref, todp: todPref,
+      env: { weather: w.env.weather, hour: w.env.hour }, shift: w.clockShift || 0, clock0: w.sim.timetable.clockStart,
+      ni: st.headingIndex ?? st.nextStationIndex, nn: heading ? (typeof heading.name === 'string' ? heading.name : nameOf(heading.name)) : '', live: Math.max(0, Math.round(w.liveCash || 0)),
+      plan: { p: plan.pattern || 'RB', pass: [...(plan.pass || [])], tsr: (plan.tsr || []).map((r) => ({ s0: r.s0, s1: r.s1, kmh: r.kmh })), inc: (plan.incidents || []).map((x) => ({ ...x })) },
+      tt: w.sim.timetable.stops.map((x) => [x.arr, x.dep]), ttt: w.sim.timetable.total,
+      sim,
+      w: { onboard: pw.onboard, delivered: pw.delivered, boarded: pw.boardedTotal, pkm: Math.round(pw.passengerKm * 1000) / 1000, riders: (pw.riders || []).map((r) => [r.n, Math.round(r.s * 100) / 100]), stops, log: pw.stopLog.map((l) => [l.index, l.boarded, l.alighted]), plans },
+    };
+    if (mode === 'endless') snap.en = { order: endless.order, i: endless.index, loops: endless.loops, cash: Math.round(endless.total.cash), pts: Math.round(endless.total.points) };
+    return snap;
+  }
+  function writeSnapshot() {
+    const snap = safe('resume snapshot', () => buildSnapshot(), null);
+    if (!snap) return false;
+    const out = JSON.stringify(snap);
+    if (out.length > TS.resume.MAX_BYTES) { warn('resume snapshot too big', out.length); return false; }
+    writeStore(resumeKey(), out);
+    snapshotWrites += 1;
+    return true;
+  }
+  /* endless: a finished route moves the saved run on to the next route (no sim state yet; the next route starts fresh) */
+  function writeFreshSnapshot(routeId, trainId) {
+    if (!TS.resume) return;
+    const c = careerState(trainId);
+    const snap = { v: TS.resume.VERSION, at: Date.now(), mode: 'endless', fresh: 1, route: routeId, train: trainId, svc: c.services || 0, life: c.lifetime || 0, cam: camMode, wxp: wxPref, todp: todPref, ni: 0, nn: '', live: 0,
+      en: { order: endless.order, i: endless.index, loops: endless.loops, cash: Math.round(endless.total.cash), pts: Math.round(endless.total.points) } };
+    writeStore(resumeKey(), JSON.stringify(snap));
+  }
+  /* the first seconds in the start station are not worth saving: armed once the train has moved or a stop is on record */
+  function armSnapshot(st) {
+    const w = world;
+    if (snapshotArmed || !w || !st) return;
+    const first = stationsOf()[0];
+    if (st.distance > SNAPSHOT_ARM_M || (first && Math.abs(st.s - first.s) > SNAPSHOT_ARM_M) || w.stopLog.length > 0) snapshotArmed = true;
+  }
+  const saveSnapshotNow = () => { if (world) armSnapshot(world.state); if (snapshotReady()) writeSnapshot(); };
+
+  /* the card at the top of the start menu */
+  function resumeCardData(snap) {
+    const def = routeDefOf(snap.route), train = trainDef(snap.train), a = TS.resume.ago(Date.now() - snap.at);
+    const focus = !resumeFocusDone;
+    resumeFocusDone = true;
+    const cash = (snap.en ? snap.en.total.cash : 0) + snap.live;
+    return {
+      route: def ? nameOf(def.name) : snap.route,
+      train: (train ? nameOf(train.name) : snap.train) + (snap.mode === 'endless' ? ' · ' + t('modeEndless') : ''),
+      next: snap.nextName ? t('resumeNext', { name: snap.nextName }) : '', ago: t(a.key, { n: a.n }), cash: '€ ' + fmtInt(cash),
+      loop: snap.en ? t('endlessLine', { n: snap.en.index + 1, total: snap.en.order.length }) + (snap.en.loops > 0 ? ' · ' + t('resumeLoop', { n: snap.en.loops + 1 }) : '') : '',
+      focus, onResume: resumeFromMenu, onDiscard: discardFromMenu,
+    };
+  }
+  function discardFromMenu() {
+    discardSnapshot();
+    if (phase === 'menu') renderMenu();
+  }
+  function dismissResume() {   // Escape: not now. The saved service stays until it is resumed, discarded or a day old.
+    resumeDismissed = true; resumeOffer = null;
+    if (phase === 'menu') renderMenu();
+  }
+  function resumeFromMenu() {
+    if (phase !== 'menu') return;
+    const snap = readSnapshot();   // checked again: the storage and the save may have changed since the card was drawn
+    if (!snap) { resumeOffer = null; renderMenu(); return; }
+    startResume(snap);
+  }
+  function startResume(snap) {
+    save = safe('setCareer', () => TS.career.setCareer(save, snap.career), null) || save;   // in memory only: the card belongs to that career's menu
+    if (snap.en) Object.assign(endless, { order: snap.en.order.slice(), index: snap.en.index, loops: snap.en.loops, total: { ...snap.en.total }, active: true });
+    if (WX_IDS.includes(snap.wxp)) { wxPref = snap.wxp; writeStore('ts_weather', wxPref); }
+    if (TOD_IDS.includes(snap.todp)) { todPref = snap.todp; writeStore('ts_tod', todPref); }
+    resumeOffer = null;
+    return startService(snap.route, snap.train, snap.mode, { resume: snap.fresh ? null : snap, camera: snap.cam, resumed: true });
+  }
+
   /* ------------------------------------------------------------ audio */
   function ensureAudio() {
     if (audio || audioFailed) return audio;
@@ -282,6 +411,9 @@
     if (!world) return;
     const w = world;
     world = null;
+    disposePieces(w);
+  }
+  function disposePieces(w) {
     safe('passengers dispose', () => w.passengers && w.passengers.dispose && w.passengers.dispose());
     safe('cab dispose', () => { if (w.cab) { if (w.cab.group && w.cab.group.parent) w.cab.group.parent.remove(w.cab.group); w.cab.dispose && w.cab.dispose(); } });
     safe('train dispose', () => { if (w.model) { scene.remove(w.model.group); w.model.dispose && w.model.dispose(); } });
@@ -290,11 +422,20 @@
     safe('renderer cleanup', () => renderer && renderer.renderLists && renderer.renderLists.dispose());
   }
 
-  async function buildWorld({ routeId, trainId, sim = null, env = null, demo = false, keepState = null }) {
+  const resumeInvalid = (why) => Object.assign(new Error('Saved service does not fit: ' + why), { resumeInvalid: true });
+  /* a saved service must fit the line it was saved on (station count, position on the track); anything else is thrown away silently */
+  function resumeFits(resume, track) {
+    const n = (track.stations || []).length;
+    if (n < 2 || n !== resume.tt.length) throw resumeInvalid('station count');
+    if (!(resume.sim.s >= 0 && resume.sim.s <= track.length + 1)) throw resumeInvalid('position');
+    if (resume.plan.pass.some((i) => i <= 0 || i >= n - 1) || resume.plan.incidents.some((x) => x.station !== undefined && x.station >= n)) throw resumeInvalid('plan');
+  }
+
+  async function buildWorld({ routeId, trainId, sim = null, env = null, demo = false, keepState = null, resume = null, abortIf = null }) {
     const routeDef = routeDefOf(routeId);
     if (!routeDef) throw new Error('Unknown route ' + routeId);
     const cfg = effectiveTrain(trainId);
-    const environment = env || pickEnvironment();
+    const environment = env || (resume ? { ...resume.env } : pickEnvironment());
     const isLux = /^luxtram/.test(routeId);
     const waitTiles = isLux && !demo && !keepState;   // the menu demo and quality rebuilds do not hold the screen for tiles
     // the menu backdrop (demo) loads silently: the loading banner is only for a real service
@@ -304,6 +445,17 @@
     loaderSet(isLux ? 0.16 : 0.15);
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
+    let resumeSim = null, resumeWorld = null;
+    if (resume) {   // a saved run: checked and rebuilt before anything heavy is built, so a bad snapshot costs nothing
+      resumeFits(resume, track);
+      const stationCount = track.stations.length;
+      const savedTimetable = TS.sim.timetableFrom(track, resume.clock0, resume.tt, resume.ttTotal, resume.plan.pass);
+      if (!savedTimetable) throw resumeInvalid('timetable');
+      resumeSim = TS.sim.create({ train: cfg, track, timetable: savedTimetable, options: { clockStart: resume.clock0, seed: Math.floor(rand() * 1e9), plan: resume.plan, holdChance: 0 } });
+      // every record of the sim comes back exactly; the passenger totals are re-checked against this vehicle and line
+      if (!resumeSim.restore(resume.sim, { maxCash: 100 * stationCount + 200, maxT: Math.max(4 * 3600, savedTimetable.total * 3) })) throw resumeInvalid('sim state');
+      resumeWorld = TS.resume.clampWorld(resume.world, cfg.capacity || 90, stationCount, track.length);
+    }
     loaderSet(isLux ? 0.22 : 0.3);
     const landscape = build('landscape', 'create', [scene, track.base || track, { quality, reverse: !!track.reverse, renderer }]);   // the return direction shares the forward track's scenery
     loaderSet(isLux ? 0.32 : 0.55);
@@ -324,16 +476,20 @@
     await frameDelay();
     safe('weather', () => landscape && landscape.setWeather && landscape.setWeather(environment.weather, true));
     safe('time of day', () => landscape && landscape.setTimeOfDay && landscape.setTimeOfDay(environment.hour));
-    const startS = keepState && keepState.warmS !== undefined ? keepState.warmS : (track.stations && track.stations[0] ? track.stations[0].s : 0);
+    const startS = keepState && keepState.warmS !== undefined ? keepState.warmS : resume ? resume.sim.s : (track.stations && track.stations[0] ? track.stations[0].s : 0);
     const warmS = track.baseS ? track.baseS(startS) : startS;
     safe('landscape warm', () => landscape && landscape.warm && landscape.warm(warmS));
     if (waitTiles) await waitForStartTiles(landscape, warmS, 0.52, 0.96);
-    const clockStart = Math.floor(environment.hour * 4) * 900;
-    const plan = sim ? sim.plan : demo ? null : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: careerState(trainId).services || 0, rng: rand, varied: !calmServices }), null));
+    const clockStart = resume ? resume.clock0 : Math.floor(environment.hour * 4) * 900;
+    const plan = sim ? sim.plan : demo ? null : resume ? resume.plan : (forcedPlan || safe('planService', () => TS.sim.planService(track, cfg, { services: careerState(trainId).services || 0, rng: rand, varied: !calmServices }), null));
     forcedPlan = null;
-    const simulation = sim || TS.sim.create({ train: cfg, track, options: { clockStart, seed: Math.floor(rand() * 1e9), plan: plan || undefined, ...(calmServices ? { holdChance: 0 } : {}) } });
+    const simulation = sim || resumeSim || TS.sim.create({ train: cfg, track, options: { clockStart, seed: Math.floor(rand() * 1e9), plan: plan || undefined, ...(calmServices ? { holdChance: 0 } : {}) } });
     safe('temp boards', () => { if (infra && infra.addTempBoard && simulation.plan) simulation.plan.tsr.forEach((r) => infra.addTempBoard(r.s0, r.kmh, r.s1)); });
     const nightish = environment.hour < 6.3 || environment.hour > 19.3;
+    if (abortIf && abortIf()) {   // the menu backdrop is no longer wanted (a service started meanwhile): drop it without touching the global world
+      disposePieces({ passengers, cab, model, infra, landscape });
+      return null;
+    }
     world = {
       routeId, trainId, routeDef, cfg, track, landscape, infra, obstacleRoots, model, cab, passengers, sim: simulation, env: environment,
       state: null, demo, exch: null, plans: {}, spawned: new Set(), onboard: 0, delivered: 0, boardedTotal: 0, passengerKm: 0,
@@ -342,6 +498,10 @@
       stopLog: [], stops: {}, carFrames: [], platformCam: null, tracksideCam: null, welcomed: false, liveCash: 0, lastTod: environment.hour, spawnedFor: -1,
     };
     if (keepState) Object.assign(world, keepState);
+    if (resumeWorld) {
+      Object.assign(world, { plans: resumeWorld.plans, onboard: resumeWorld.onboard, delivered: resumeWorld.delivered, boardedTotal: resumeWorld.boardedTotal, passengerKm: resumeWorld.passengerKm, riders: resumeWorld.riders, stopLog: resumeWorld.stopLog, stops: resumeWorld.stops, welcomed: true, clockShift: resume.shift || 0 });
+      safe('time of day (resume)', () => landscape && landscape.setTimeOfDay && landscape.setTimeOfDay(environment.hour + simulation.now.t / 3600));
+    }
     safe('lights', () => model && model.setLights && model.setLights({ head: world.lights ? 2 : 0, tail: true, cabin: true }));
     buildStrip();
     return world;
@@ -842,32 +1002,42 @@
     if (!c) return null;
     return { alighted: ex.base.alighted + c.alighted, boarded: ex.base.boarded + c.boarded, alightingTotal: ex.alightingTotal, boardingTotal: ex.boardingTotal, done: c.done };
   }
+  /* What closing the doors does to the passenger totals, as a pure result (the resume snapshot uses it too: it saves a door cycle that is still open as if it had just finished). */
+  function exchangeOutcome(w, ex, counts) {
+    const alightedFinal = Math.min(counts.alighted, w.onboard), boardedFinal = counts.boarded;
+    const sNow = w.sim.now.s;
+    let remaining = alightedFinal, passengerKm = w.passengerKm;
+    let riders = (w.riders || []).map((r) => ({ ...r }));
+    for (const r of riders) {
+      const take = Math.min(r.n, remaining);
+      passengerKm += (take * Math.max(0, sNow - r.s)) / 1000;
+      r.n -= take; remaining -= take;
+    }
+    riders = riders.filter((r) => r.n > 0);
+    if (boardedFinal > 0) riders.push({ n: boardedFinal, s: sNow });
+    const rec = { alighted: ex.base.alighted + alightedFinal, boarded: ex.base.boarded + boardedFinal, alightingTotal: ex.alightingTotal, boardingTotal: ex.boardingTotal };
+    const entry = { index: ex.index, boarded: rec.boarded, alighted: rec.alighted };
+    return {
+      alightedFinal, boardedFinal, riders, passengerKm, rec,
+      onboard: w.onboard - alightedFinal + boardedFinal, delivered: w.delivered + alightedFinal, boardedTotal: w.boardedTotal + boardedFinal,
+      stops: { ...w.stops, [ex.index]: rec },
+      stopLog: w.stopLog.some((l) => l.index === ex.index) ? w.stopLog.map((l) => (l.index === ex.index ? entry : l)) : [...w.stopLog, entry],
+    };
+  }
   function finalizeExchange() {
     const w = world, ex = w && w.exch;
     if (!ex || ex.finalized) return;
     const counts = phaseCounts();
     safe('stopExchange', () => w.passengers && w.passengers.stopExchange && w.passengers.stopExchange());
     ex.finalized = true;
-    ex.alightedFinal = Math.min(counts.alighted, w.onboard);
-    ex.boardedFinal = counts.boarded;
-    const sNow = w.sim.now.s;
-    let remaining = ex.alightedFinal;
-    w.riders = (w.riders || []).map((r) => ({ ...r }));
-    for (const r of w.riders) {
-      const take = Math.min(r.n, remaining);
-      w.passengerKm += (take * Math.max(0, sNow - r.s)) / 1000;
-      r.n -= take; remaining -= take;
-    }
-    w.riders = w.riders.filter((r) => r.n > 0);
-    if (ex.boardedFinal > 0) w.riders.push({ n: ex.boardedFinal, s: sNow });
-    w.onboard = w.onboard - ex.alightedFinal + ex.boardedFinal;
-    w.delivered += ex.alightedFinal;
-    w.boardedTotal += ex.boardedFinal;
-    const rec = { alighted: ex.base.alighted + ex.alightedFinal, boarded: ex.base.boarded + ex.boardedFinal, alightingTotal: ex.alightingTotal, boardingTotal: ex.boardingTotal };
-    w.stops = { ...w.stops, [ex.index]: rec };
-    w.sim.recordExchange(ex.index, rec.boarded, rec.alighted);
-    const entry = { index: ex.index, boarded: rec.boarded, alighted: rec.alighted };
-    w.stopLog = w.stopLog.some((l) => l.index === ex.index) ? w.stopLog.map((l) => (l.index === ex.index ? entry : l)) : [...w.stopLog, entry];
+    const o = exchangeOutcome(w, ex, counts);
+    ex.alightedFinal = o.alightedFinal;
+    ex.boardedFinal = o.boardedFinal;
+    w.riders = o.riders; w.passengerKm = o.passengerKm;
+    w.onboard = o.onboard; w.delivered = o.delivered; w.boardedTotal = o.boardedTotal;
+    w.stops = o.stops;
+    w.sim.recordExchange(ex.index, o.rec.boarded, o.rec.alighted);
+    w.stopLog = o.stopLog;
     refreshLiveCash();
   }
   function liveOnboard() {
@@ -892,11 +1062,13 @@
     w.liveCash = r ? r.cash : Math.max(0, Math.round(w.sim.now ? w.state && w.state.cash : 0));
   }
 
+  const SNAPSHOT_EVENTS = new Set(['arrived', 'departed', 'doorsOpened', 'doorsClosed', 'stopRated', 'missedStop']);
   const REASON_TEXT = { moving: 'evDoorInterlockMoving', noPlatform: 'evDoorNoPlatform', expressPass: 'evDoorExpress', held: 'evDoorsHeldWait' };
   function handleEvent(e) {
     const w = world;
     events.push(e.type);
     if (events.length > 80) events.shift();
+    if (SNAPSHOT_EVENTS.has(e.type)) snapshotDue = true;
     switch (e.type) {
       case 'doorsRefused': toast(t(REASON_TEXT[e.reason] || 'evDoorNoPlatform'), 'bad', 2200, 'doors'); break;
       case 'doorsOpening': sfx('doorOpen'); break;
@@ -1131,6 +1303,8 @@
     const st = w.state;
     if (!st) return;
     elapsedReal += dt;
+    armSnapshot(st);
+    if (snapshotDue) { snapshotDue = false; saveSnapshotNow(); }
     managePlatformPeople(st);
     if (w.endTimer >= 0 && !w.finished) {
       w.endTimer += dt;
@@ -1409,6 +1583,7 @@
       save = { ...next, tb: (next.rail.lifetime || 0) + (next.tram.lifetime || 0) };
     }
     persist();
+    if (mode !== 'endless') discardSnapshot();   // paid and done: the saved service must never come back (endless moves it on to the next route instead)
     w.lastReward = reward; w.lastResult = res;
     if (!ARCADE_TEST) safe('Arcade score', () => { window.Arcade.score(reward.points); window.Arcade.gameOver(reward.points); });
     scorePosted += 1;
@@ -1419,18 +1594,27 @@
   }
   async function startService(routeId, trainId, startMode, opts = {}) {
     if (!initRenderer()) return false;
+    demoToken += 1;   // a menu backdrop that is still being built must not replace this service's world
     const route = routeDefOf(routeId);
     if (!route) { toast(t('unknownRoute'), 'bad'); return false; }
     mode = startMode;
     phase = 'loading';
     paused = false;
+    snapshotArmed = false; snapshotDue = false;
+    if (!opts.resumed) resumeDismissed = false;
     $('menu').hidden = true; $('summary').hidden = true; $('pauseScreen').hidden = true; $('helpScreen').hidden = true;
     wakeAudio();
     closeWxPop();
     disposeWorld();
     try {
-      await buildWorld({ routeId, trainId });
+      await buildWorld({ routeId, trainId, resume: opts.resume || null });
     } catch (error) {
+      if (opts.resume && error && error.resumeInvalid) {   // a broken or tampered snapshot: gone, quietly
+        console.warn('[Lokféierer] saved service discarded: ' + error.message);
+        disposeWorld(); discardSnapshot(); hideLoading(); endless.active = false;
+        returnToMenu();
+        return false;
+      }
       warn('service build failed', error);
       hideLoading();
       if (opts.keepOnFail) return false;   // endless: the caller retries / skips to the next route instead of dropping to the menu
@@ -1440,7 +1624,7 @@
     }
     input.lever = 0; input.doorPress = false; input.parkingToggle = false; input.hornHeld = false; input.held.up = input.held.down = false; input.lights = null;
     accum = 0; elapsedReal = 0; todClock = 0; lastStripNext = -2;
-    world.state = world.sim.step(0, { lever: 0 });
+    world.state = world.sim.step(0, { lever: 0, passengers: world.onboard });
     placeTrain(world.state.s);
     safe('pantograph', () => world.model && world.model.setPantograph && world.model.setPantograph(world.cfg.sound === 'diesel' ? 0 : 1));
     safe('cab snap', () => { if (world.cab) { world.cab.update(cabInfo(world.state)); if (world.cab.snap) world.cab.snap(); } });
@@ -1453,6 +1637,12 @@
     serviceStartedAt = performance.now();
     phase = 'running';
     updateHud(true);
+    if (opts.resume) {
+      snapshotArmed = true;
+      writeSnapshot();   // the age on the card starts again from now
+      banner(t('resumeBanner', { name: nearestStationName(world.state.s) }), t('resumeBannerHint'), 4800);
+      return true;
+    }
     banner(nameOf(route.name), patternText() + ' · ' + (mode === 'endless' ? t('endlessLine', { n: endless.index + 1, total: endless.order.length }) : nameOf(world.cfg.name || trainId)), 3600);
     return true;
   }
@@ -1463,6 +1653,7 @@
     endless.index += 1;
     if (endless.index >= endless.order.length) { endless.index = 0; endless.loops += 1; }
     const nextId = endless.order[endless.index];
+    writeFreshSnapshot(nextId, w.trainId);
     const nextRoute = routeDefOf(nextId);
     banner(t('endlessNextLine', { name: nextRoute ? nameOf(nextRoute.name) : nextId }), '+' + fmtInt(reward.cash) + ' € · ' + fmtInt(reward.points) + ' ' + t('sumPoints'), 3200);
     $('fade').classList.add('on');
@@ -1487,6 +1678,7 @@
   }
   function returnToMenu() {
     closeWxPop();
+    resumeDismissed = false;   // "not now" (Escape) only lasts for one visit of the menu
     phase = 'menu';
     endless.active = false;
     paused = false;
@@ -1501,6 +1693,7 @@
     if (phase !== 'running') return;
     if (mode === 'endless' && endless.total.cash > 0) toast(t('endlessTotal') + ': ' + fmtInt(endless.total.cash) + ' €', 'good', 3600);
     persist();
+    discardSnapshot();   // leaving on purpose ends the saved service too
     returnToMenu();
   }
   let demoToken = 0;
@@ -1513,12 +1706,12 @@
       const current = save[save.career] || EMPTY_CAREER;
       const trainId = current.train, routeId = current.route || 'west';
       demoKey = demoKeyOf();
-      await buildWorld({ routeId, trainId, demo: true, env: demoEnvironment() });
-      if (token !== demoToken || phase !== 'menu') { disposeWorld(); return; }
+      const built = await buildWorld({ routeId, trainId, demo: true, env: demoEnvironment(), abortIf: () => token !== demoToken || phase !== 'menu' });
+      if (!built) return;
       world.state = world.sim.step(0, { lever: 0 });
       placeTrain(world.state.s);
       hideLoading();
-    } catch (error) { warn('demo world failed', error); hideLoading(); }
+    } catch (error) { warn('demo world failed', error); if (token === demoToken && phase === 'menu') hideLoading(); }
   }
   let demoDebounce = 0;
   // the menu backdrop only rebuilds when what it shows changes (career, vehicle, line): buying an upgrade or paying for something
@@ -1590,7 +1783,8 @@
   }
   function renderMenu() {
     const host = $('menuHost');
-    const opts = { save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onCareer: handleCareer, onLang: setLanguage, onHints: handleHints, onEnv: handleEnvChoice, env: { weather: wxPref, tod: todPref } };
+    resumeOffer = resumeDismissed ? null : readSnapshot();
+    const opts = { resume: resumeOffer ? resumeCardData(resumeOffer) : null, save, lang, onStart: startFromMenu, onBuy: handleBuy, onSelect: handleSelect, onCareer: handleCareer, onLang: setLanguage, onHints: handleHints, onEnv: handleEnvChoice, env: { weather: wxPref, tod: todPref } };
     try {
       if (!TS.menu || typeof TS.menu.render !== 'function') throw new Error('TS.menu missing');
       TS.menu.render(host, opts);
@@ -1819,6 +2013,10 @@
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     dismissNotice();
     wakeAudio();
+    if (phase === 'menu' && resumeOffer && !$('menu').hidden) {   // the Weiderfueren card: Enter carries on (unless a button has the focus and handles it), Escape = not now
+      if (e.key === 'Escape') { e.preventDefault(); dismissResume(); return; }
+      if (e.key === 'Enter' && !(e.target && e.target.closest && e.target.closest('button,a,input,select,textarea,[role="radio"]'))) { e.preventDefault(); resumeFromMenu(); return; }
+    }
     if (e.target && e.target.closest && e.target.closest('#wxPop,#btnWx')) {
       const r = wxPopKey(e);
       if (r === 'native') return;
@@ -1880,12 +2078,13 @@
           delivered: w ? w.delivered : 0, passengerKm: w ? w.passengerKm : 0,
           events: [...events], career: save.career, careers: JSON.parse(JSON.stringify({ rail: save.rail, tram: save.tram })), arcadeTest: ARCADE_TEST,
           wallet: careerState().wallet, tb: save.tb, lifetime: careerState().lifetime, owned: careerState().owned, routes: careerState().routes, saveTrain: careerState().train, services: careerState().services,
-          endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null,
+          endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null, lastResult: w && w.lastResult ? { delivered: w.lastResult.passengersDelivered, boarded: w.lastResult.passengersBoarded, pkm: w.lastResult.passengerKm, delays: w.lastResult.delaySecAtStations, errors: w.lastResult.stopErrors, over: w.lastResult.overspeedSeconds, harsh: w.lastResult.harshEvents, spads: w.lastResult.spads, breakdown: w.lastReward && w.lastReward.breakdown } : null,
           draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,
           hudSpeed: $('speedNum').textContent, hudSide: $('nextSide').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, kbNoticeVisible: !$('kbNotice').hidden, phoneBlocked: !$('phoneBlock').hidden,
           parkingBrake: !!(s && s.parkingBrake), guide: s ? s.guide : null, guideText: $('guide').hidden ? '' : $('guide').textContent, hintText: $('hint').textContent, parkLampVisible: !$('parkLamp').hidden,
           pattern: w && w.sim.plan ? w.sim.plan.pattern : '', passIndices: w && w.sim.plan ? [...w.sim.plan.pass] : [], tsr: w && w.sim.plan ? w.sim.plan.tsr.map((x) => ({ ...x })) : [], incidents: w && w.sim.plan ? w.sim.plan.incidents.map((x) => ({ ...x })) : [],
           spadHoldSec: s ? s.spadHoldSec : 0, hints: !!save.hints, svcLabel: $('svcLabel').textContent, cabHitTest: !!(w && w.cab && typeof w.cab.hitTest === 'function'), stopsRecord: w ? { ...w.stops } : {},
+          visited: w ? w.sim.summary().stops.filter((x) => x.visited).map((x) => x.index) : [], resumeOffer: !!resumeOffer, snapshotWrites, snapshotArmed, resumeFocus: document.activeElement ? document.activeElement.getAttribute('data-test') : null,
           signalsHeld: w ? w.sim.signals.filter((x) => x.hold).length : 0, timetable: w ? w.sim.timetable.stops.map((x) => ({ ...x })) : [],
         };
       },
@@ -1899,6 +2098,11 @@
         const w = world, s = w && w.state;
         return !!(w && s && phase === 'running' && !paused && camMode === 'cab' && $('loading').hidden && !s.spadActive && s.v < 0.01 && settle.stable >= minFrames);
       },
+      /* resume: saveSnapshot() writes now, peekSnapshot() the stored JSON text, tamperSnapshot(fn) rewrites it, resumeNow() = the card's primary button */
+      saveSnapshot() { if (world) armSnapshot(world.state); return snapshotReady() ? writeSnapshot() : false; },
+      peekSnapshot() { return readStore(resumeKey()); },
+      pokeSnapshot(textOut) { if (textOut === null) removeStore(resumeKey()); else writeStore(resumeKey(), textOut); return true; },
+      resumeNow() { resumeFromMenu(); return phase; },
       start: (m, routeId, trainId) => startFromMenu(m, routeId, trainId),
       startService: (routeId, trainId, m) => startService(routeId, trainId, m || 'career'),
       teleport(i) {
@@ -2008,9 +2212,11 @@
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', (e) => handleKeyUp(normKey(e)));
     window.addEventListener('blur', releaseAll);
-    window.addEventListener('pagehide', () => { if (phase !== 'boot') persist(); });
+    window.addEventListener('pagehide', () => { saveSnapshotNow(); if (phase !== 'boot') persist(); });
+    document.addEventListener('freeze', saveSnapshotNow);
+    setInterval(saveSnapshotNow, SNAPSHOT_INTERVAL_MS);
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) { releaseAll(); if (phase === 'running' && !paused) pauseGame(); safe('audio hide', () => audio && audio.setMuted(true)); persist(); }
+      if (document.hidden) { saveSnapshotNow(); releaseAll(); if (phase === 'running' && !paused) pauseGame(); safe('audio hide', () => audio && audio.setMuted(true)); persist(); }
       else { lastFrame = 0; safe('audio show', () => audio && audio.setMuted(muted)); }
     });
     window.addEventListener('message', (event) => {
@@ -2019,7 +2225,7 @@
       if (event.data && event.data.__pbSndMute !== undefined) applyMute(!!event.data.__pbSndMute);
     });
     window.addEventListener('resize', checkDevice);
-    window.addEventListener('beforeunload', () => { if (phase !== 'boot') persist(); });
+    window.addEventListener('beforeunload', () => { saveSnapshotNow(); if (phase !== 'boot') persist(); });
     $('kbClose').addEventListener('click', dismissNotice);
     if (parent !== window) safe('parent keydown', () => parent.addEventListener('keydown', dismissNotice, { capture: true }));   // keys typed while the arcade page still has focus
     // inside the arcade iframe some webviews report no touch points: a real touch on the page also raises the notice
