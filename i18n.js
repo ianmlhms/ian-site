@@ -32,7 +32,16 @@
   var STORE_KEY = "site_lang";
   var DICT = window.I18N_DICT || {};
 
+  // A page can pin one language with <html data-lang-lock="en"> (the pages a
+  // Garmin watch QR opens, which visitors from anywhere scan): no switcher, and
+  // the visitor's stored choice for the rest of the site is left untouched.
+  var LOCKED = (function () {
+    var l = document.documentElement.getAttribute("data-lang-lock");
+    return LANGS.indexOf(l) >= 0 ? l : null;
+  })();
+
   function read() {
+    if (LOCKED) return LOCKED;
     try {
       var v = localStorage.getItem(STORE_KEY);
       if (LANGS.indexOf(v) >= 0) return v;   // an explicit choice always wins
@@ -80,6 +89,7 @@
   }
 
   function set(next) {
+    if (LOCKED) return;
     if (LANGS.indexOf(next) < 0 || next === lang) {
       if (next === lang) return;
       return;
@@ -126,6 +136,7 @@
   }
 
   function mountSwitchers() {
+    if (LOCKED) return;
     document.querySelectorAll("#langSw, [data-langsw]").forEach(function (host) {
       if (!host.dataset.i18nMounted) {
         host.dataset.i18nMounted = "1";
