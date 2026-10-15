@@ -514,7 +514,9 @@
         const x = q[k * 2]; const z = q[k * 2 + 1];
         acc.vert(x, surfY(t, x, z) + lift, z, nn[0], nn[1], nn[2], mat, col[0] * s, col[1] * s, col[2] * s);
       }
-      acc.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      // winding so that the face looks up whichever way the corners were listed (a down-facing triangle of a DoubleSide Lambert material is lit as its flipped normal: the zebra stripes came out dark brown)
+      const P = acc.p; const e1x = P[(base + 2) * 3] - P[base * 3]; const e1z = P[(base + 2) * 3 + 2] - P[base * 3 + 2]; const e2x = P[(base + 1) * 3] - P[base * 3]; const e2z = P[(base + 1) * 3 + 2] - P[base * 3 + 2];
+      if (e2z * e1x - e2x * e1z >= 0) acc.i.push(base, base + 1, base + 2, base, base + 2, base + 3); else acc.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
     }
 
     const KERB_COL = [0.74, 0.73, 0.7];
@@ -537,7 +539,7 @@
       let iMark = S.i.length;
       const iA0 = S.i.length;
       const aCull = { n: 0 };
-      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: 5.0, cullSteep: true, steepK: 0.8, counter: aCull }));   // a carriageway never climbs a bank steeper than ~37 degrees: where its polygon runs over one the terrain stays
+      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: window.__lgAsphSeg || 5.0, cullSteep: true, steepK: 0.8, counter: aCull }));   // a carriageway never climbs a bank steeper than ~37 degrees: where its polygon runs over one the terrain stays
       const roadGrid = rasterRoad(t, S, iA0, S.i.length);
       iMark = mark('asph', iMark);
       const iS0 = S.i.length;
