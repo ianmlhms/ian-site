@@ -80,7 +80,7 @@ async function luxtramNormalChecks(h, frame) {
   h.expect(speed.limits.every((l) => l <= 70), 'no Luxtram limit board / curve / timetable speed above 70: ' + speed.limits.join(','));
   h.expect(speed.railMotor, 'rail trains keep their motor top-speed bonus');
 
-  h.step('Luxtram: calm limit profile (zones >= 150 m, >= 80 m in the centre, multiples of 10, no stop zones), Findel - Luxexpo is 70 except the motorway bridge');
+  h.step('Luxtram: calm limit profile (zones >= 300 m, multiples of 5, no stop zones), no 70 km/h between Findel and Héienhaff nor between the motorway bridge and Luxexpo');
   const lim = await frame.evaluate(() => {
     const out = {};
     for (const id of ['luxtram-kierchbierg', 'luxtram-stad', 'luxtram-sud', 'luxtram']) {
@@ -105,15 +105,8 @@ async function luxtramNormalChecks(h, frame) {
       const o = { zones: L.length, bad, shortest, values: [...values].sort((a, b) => a - b), dup, squeezed, stationLimitZones: 0 };
       if (id === 'luxtram-kierchbierg') {
         const mb = lt.motorwayBridge;
-        const seen = new Set();
-        let outsideBridge = 0;
-        for (let s = 0; s <= lt.fastEnd; s += 5) {
-          const k = limAt(s);
-          seen.add(k);
-          const inBridge = s >= mb[0] - 60 - 125 && s <= mb[1] + 71;
-          if (k !== 70 && !(inBridge && k === 50)) outsideBridge++;
-        }
-        o.fast = { values: [...seen], outsideBridge, bridgeMid: limAt((mb[0] + mb[1]) / 2), atLuxexpoPlatform: limAt(tr.stations[2].platformStart + 10), atPlatformEnd: limAt(tr.stations[2].platformEnd - 1), atHeienhaff: limAt(tr.stations[1].s) };
+        const maxIn = (a, b2) => { let m = 0; for (let s = a; s <= b2; s += 5) m = Math.max(m, limAt(s)); return m; };
+        o.fast = { findelHeienhaff: maxIn(0, tr.stations[1].platformEnd), bridgeLuxexpo: maxIn(mb[1], tr.stations[2].platformEnd), all: maxIn(0, tr.length), kierchberg: maxIn(tr.stations[2].platformEnd, tr.length) };
       }
       out[id] = o;
     }
@@ -124,8 +117,57 @@ async function luxtramNormalChecks(h, frame) {
     h.expect(o.values.every((v) => [25, 30, 40, 50, 60, 70].includes(v)) && o.dup === 0 && o.squeezed === 0, id + ': limits ' + o.values.join('/') + ' (multiples of 10, 25 only where needed), boards only where the value changes, nothing squeezed');
   }
   const fast = lim['luxtram-kierchbierg'].fast;
-  h.expect(fast.outsideBridge === 0 && fast.values.every((v) => v === 70 || v === 50), 'Findel - Héienhaff - Luxexpo: 70 km/h the whole way except the motorway bridge (values ' + fast.values.join('/') + ')');
-  h.eq([fast.bridgeMid, fast.atLuxexpoPlatform, fast.atPlatformEnd, fast.atHeienhaff], [50, 70, 70, 70], 'the bridge is 50; Héienhaff and the Luxexpo platform stay at 70');
+  h.expect(fast.findelHeienhaff <= 50, 'Findel - Héienhaff: no limit above 50 km/h (max ' + fast.findelHeienhaff + ')');
+  h.expect(fast.bridgeLuxexpo <= 60, 'motorway bridge - Luxexpo: no 70 km/h (max ' + fast.bridgeLuxexpo + ')');
+  h.expect(fast.kierchberg <= 60, 'Luxexpo - Kirchberg - Stad: no 70 km/h on the boulevard (max ' + fast.kierchberg + ')');
+
+  h.step('Luxtram: smooth vertical profile (no bumps), max grade 7 % (Findel - Héienhaff - Luxexpo and the whole line)');
+  const prof = await frame.evaluate(() => {
+    const out = {};
+    for (const id of ['luxtram', 'luxtram~r']) {
+      const tr = TS.track.build(TS.routes.get(id));
+      const ys = []; for (let s = 0; s <= tr.length; s += 2) ys.push(tr.frameAt(s).pos.y);
+      const reversals = (a, b) => { let last = 0, n = 0; for (let i = Math.floor(a / 2); i < Math.floor(b / 2); i++) { const g = (ys[i + 1] - ys[i]) / 2; if (Math.abs(g) < 0.003) continue; const sg = g > 0 ? 1 : -1; if (last && sg !== last) n++; last = sg; } return n / Math.max(0.001, (b - a) / 1000); };
+      let maxG = 0; for (let i = 0; i + 1 < ys.length; i++) maxG = Math.max(maxG, Math.abs((ys[i + 1] - ys[i]) / 2));
+      const fwdEnd = TS.track.build(TS.routes.get('luxtram')).stations[2].platformEnd;   // Luxexpo
+      const a = id === 'luxtram' ? [0, fwdEnd] : [tr.length - fwdEnd, tr.length];
+      out[id] = { maxG, perKm: reversals(a[0], a[1]), whole: reversals(0, tr.length) };
+    }
+    return out;
+  });
+  h.expect(prof.luxtram.maxG <= 0.0705 && prof['luxtram~r'].maxG <= 0.0705, 'max grade ' + (prof.luxtram.maxG * 100).toFixed(1) + ' % (limit 7 %)');
+  h.expect(prof.luxtram.perKm <= 4 && prof['luxtram~r'].perKm <= 4, 'Findel - Héienhaff - Luxexpo: ' + prof.luxtram.perKm.toFixed(1) + ' grade reversals per km (was 18)');
+  h.expect(prof.luxtram.whole <= 3 && prof['luxtram~r'].whole <= 3, 'whole line: ' + prof.luxtram.whole.toFixed(1) + ' grade reversals per km (was 7.4)');
+
+  h.step('limit changes apply at the tram\'s NOSE (decreases AND increases); no limit zone shorter than the minimum on any route (rail 400 m, TGV 800 m, tram 300 m)');
+  const nose = await frame.evaluate(() => {
+    const out = { cases: [], tailFirst: null };
+    const track = TS.track.build(TS.routes.get('luxtram-kierchbierg'));
+    const train = TS.config.trains.find((tr) => tr.id === 'tram');
+    const L = track.limits;
+    const mk = () => TS.sim.create({ train, track, options: { seed: 3 } });
+    for (let i = 1; i < L.length; i++) {
+      if (L[i].s < 120) continue;
+      const sim = mk(); const rise = L[i].kmh > L[i - 1].kmh;
+      sim.place(L[i].s - 1, 8); const before = sim.step(0.001, { lever: 0 });
+      sim.place(L[i].s + 0.5, 8); const after = sim.step(0.001, { lever: 0 });   // the nose is 0.5 m past the board, the tail still ~45 m before it
+      out.cases.push({ s: Math.round(L[i].s), rise, before: before.limitKmh, was: L[i - 1].kmh, after: after.limitKmh, now: L[i].kmh, next: before.nextLimit ? [before.nextLimit.kmh, Math.round(before.nextLimit.distance * 10) / 10] : null });
+    }
+    // the HUD's next limit / distance is measured from the nose too
+    const i1 = L.length > 2 ? 2 : 1; const sim = mk(); sim.place(L[i1].s - 37, 5); const st = sim.step(0.001, { lever: 0 }); out.tailFirst = { distance: st.nextLimit ? Math.round(st.nextLimit.distance) : null, expect: 37, kmh: st.nextLimit ? st.nextLimit.kmh : null };
+    // zones on every route (both directions)
+    const MIN = { rail: 400, hst: 800, tram: 300 }; const bad = []; let zones = 0, routes = 0;
+    for (const def of TS.routes.list) for (const id of [def.id, def.id + '~r']) {
+      const tr = TS.track.build(TS.routes.get(id)); const lim = tr.limits; const min = MIN[tr.kind] || 400; routes++;
+      for (let i = 0; i < lim.length; i++) { const len = (i + 1 < lim.length ? lim[i + 1].s : tr.length) - lim[i].s; zones++; if (len < min - 1) bad.push(id + '@' + Math.round(lim[i].s) + ':' + lim[i].kmh + ' ' + Math.round(len) + 'm'); }
+    }
+    out.zones = { routes, zones, bad };
+    return out;
+  });
+  h.expect(nose.cases.length >= 3 && nose.cases.every((c) => c.before === c.was && c.after === c.now), 'at every board of Findel - Kirchberg the limit changes exactly when the nose passes it: ' + nose.cases.map((c) => c.s + (c.rise ? '^' : 'v') + c.was + '>' + c.after).join(' '));
+  h.expect(nose.cases.some((c) => c.rise) && nose.cases.some((c) => !c.rise), 'both increases and decreases are covered');
+  h.expect(nose.tailFirst.distance === nose.tailFirst.expect, 'the HUD distance to the next limit is measured from the nose (' + nose.tailFirst.distance + ' m of ' + nose.tailFirst.expect + ')');
+  h.expect(nose.zones.bad.length === 0, nose.zones.zones + ' limit zones on ' + nose.zones.routes + ' routes (rail + tram, both directions): none shorter than the minimum' + (nose.zones.bad.length ? ': ' + nose.zones.bad.slice(0, 5).join(', ') : ''));
 
   h.step('Luxtram: the second (opposite) track exists along the whole line');
   const dbl = await frame.evaluate(() => {
@@ -425,13 +467,14 @@ async function directionAndGearChecks(h, frame) {
     const f = TS.track.build(TS.routes.get('luxtram-kierchbierg~r'));
     const L = f.limits; const limAt = (s) => { let k = L[0].kmh; for (const l of L) { if (l.s <= s) k = l.kmh; else break; } return k; };
     const fwd = TS.track.build(TS.routes.get('luxtram-kierchbierg'));
-    const seen = new Set();
-    for (let s = 0; s <= f.length; s += 5) { const abs = f.length - s; if (abs <= fwd.luxtram.fastEnd) seen.add(limAt(s)); }
-    out.fast = [...seen];
+    const lenF = f.length;
+    const maxIn = (a, b2) => { let m = 0; for (let s = a; s <= b2; s += 5) m = Math.max(m, limAt(s)); return m; };
+    // return direction: route coordinate s = length - forward s
+    out.fast = [maxIn(lenF - fwd.stations[1].platformEnd, lenF), maxIn(lenF - fwd.stations[2].platformEnd, lenF - fwd.luxtram.motorwayBridge[1])];
     return out;
   });
   for (const id of ['luxtram-kierchbierg~r', 'luxtram-stad~r', 'luxtram-sud~r', 'luxtram~r']) h.expect(revLimits[id].bad.length === 0, id + ': ' + revLimits[id].zones + ' limit zones, none below the minimum length' + (revLimits[id].bad.length ? ' ' + revLimits[id].bad.join(', ') : ''));
-  h.expect(revLimits.fast.every((v) => v === 70 || v === 50), 'Luxexpo - Héienhaff - Findel (return): 70 km/h except the motorway bridge (' + revLimits.fast.join('/') + ')');
+  h.expect(revLimits.fast[0] <= 50 && revLimits.fast[1] <= 60, 'Héienhaff - Findel and Luxexpo - motorway bridge (return): no 70 km/h (max ' + revLimits.fast.join(' / ') + ')');
 
   h.step('return direction in the cab: HUD side, door side and the stop marker at every stop of both directions (Luxtram full line + west)');
   for (const id of ['luxtram~r', 'west~r']) {

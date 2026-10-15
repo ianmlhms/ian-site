@@ -1120,7 +1120,7 @@
         const u = (tt - rd.cum[j - 1]) / (rd.cum[j] - rd.cum[j - 1] || 1);
         const x = lerp(a.x, b.x, u); const z = lerp(a.z, b.z, u);
         const q = nearest(x, z);
-        if (q.d < 14 && q.lat > corrLo(q.s) && q.lat < corrHi) {
+        if (q.d < 14 && q.lat > corrLo(q.s) && q.lat < corrHi && !track.bridgeAt(q.s) && !track.inTunnel(q.s)) {   // (a road under the tram's bridge / over its tunnel does not cross the rails)
           const fr = frame(q.s);
           const dx = b.x - a.x; const dz = b.z - a.z; const dl = Math.hypot(dx, dz) || 1;
           const along = Math.abs((dx * fr.tangent.x + dz * fr.tangent.z) / dl) > 0.8 ? 1 : 0;
@@ -1149,7 +1149,7 @@
           if (q0.d < 40 && q1.d < 40) { yA = q0.y - 0.5; yB = q1.y - 0.5; }
         }
         pts.forEach((p, i) => { p.y = bridge ? lerp(yA, yB, total ? cumLen[i] / total : 0) : 0; });
-        if (cls >= 1 && cls <= 4 && pts.length >= 2 && total > 30 && (!bridge || (TS.luxTraffic && TS.luxTraffic.CARS_ON_BRIDGES))) {
+        if (cls <= 4 && pts.length >= 2 && total > 30 && (!bridge || (TS.luxTraffic && TS.luxTraffic.CARS_ON_BRIDGES))) {
           const rdo = { pts, cum: cumLen, len: total, hw: width / 2, oneway: (flags & 4) !== 0, cls, cross: [], along: [], bridge };
           if (!bridge) findCrossings(rdo);      // a bridge over the tram is not a level crossing: no red lights on it
           roadsOut.push(rdo);
@@ -1790,6 +1790,16 @@
       return y === y ? y + ground.ROAD_LIFT : NaN;
     };
 
+    /* the painted carriageway under (x, z) for infra.js (masts / boards must not stand in a lane): 1 = drawn carriageway, 0 = none, -1 = the tile is not built / decorated yet */
+    const drawnRoad = (x, z) => {
+      const t = tileOf(x, z);
+      if (!t) return tileByKey.has(Math.floor((x + ox) / TS_) + '_' + Math.floor((z + oz) / TS_)) ? -1 : 0;
+      if (!t.built || !t.mesh || !t.decor) return -1;
+      const r = ground.roadSurface(t, x, z);
+      return r === r ? 1 : 0;
+    };
+    TS.luxDrawnRoad = drawnRoad;
+
     /* ---- traffic: moved to luxtram-traffic.js (TS.luxTraffic) */
     const traffic = (Q.cars && TS.luxTraffic)
       ? TS.luxTraffic.create({ THREE: T, root, Q, roadsByChunk, gy, rawG, roadHeightAt, tileOf, nearest, frame, track, quality, night: () => nightK, hasOpp, oppLatAt, roadMarginExcept, routeReverse: !!(options && options.reverse) })
@@ -2006,6 +2016,7 @@
       treeTpl.length = 0;
       activeOrigin = null;
       if (TS.luxRoadMargin === roadMargin) TS.luxRoadMargin = null;
+      if (TS.luxDrawnRoad === drawnRoad) TS.luxDrawnRoad = null;
     }
     ensureTiles(0, false);
     void lastS;

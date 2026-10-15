@@ -369,7 +369,10 @@
       }
 
       /* --- limits and overspeed --- */
-      const limitKmh = Math.min(effectiveLimit(limits, s - len, s, train.maxKmh || 100), train.maxKmh || 999);
+      // Rail: a limit change counts for the whole train (an increase applies once the rear has passed the board). Tram (Ian): at the NOSE for decreases AND increases:
+      // the limit is the one in force at the front of the tram, and the HUD's next limit / distance (below) is measured from the same point.
+      const noseRule = train.kind === 'tram' || track.kind === 'tram';
+      const limitKmh = Math.min(noseRule ? limitAt(limits, s, train.maxKmh || 100) : effectiveLimit(limits, s - len, s, train.maxKmh || 100), train.maxKmh || 999);
       const nextLimit = nextLimitAhead(limits, s, limitAt(limits, s, train.maxKmh || 100));
       const vKmh = v * KMH, over = vKmh - (limitKmh + OVERSPEED_TOL_KMH);
       if (over > 0 && !spadActive && !train.scout && dir > 0) {   // scout (arcade test mode, tram): no overspeed fines

@@ -167,7 +167,7 @@
   }
 
   // Post limit boards earlier ahead of reductions so the driver can brake in time.
-  function buildLimits(raw, kind) {
+  function buildLimits(raw, kind, length) {
     const [decel, cap] = BRAKE_LEAD[kind];
     const merged = raw.reduce((acc, e) => {
       const prev = acc[acc.length - 1];
@@ -184,17 +184,19 @@
     });
     const sorted = shifted.slice().sort((a, b) => a.s - b.s);
     sorted[0] = { s: 0, kmh: sorted[0].kmh };
-    return tidyLimits(sorted.filter((e, i) => i === 0 || (e.s - sorted[i - 1].s > 25 && e.kmh !== sorted[i - 1].kmh)), kind);
+    return tidyLimits(sorted.filter((e, i) => i === 0 || (e.s - sorted[i - 1].s > 25 && e.kmh !== sorted[i - 1].kmh)), kind, length);
   }
 
   /* Real lines: limits in steps of 10 km/h and no zone shorter than MIN_ZONE_M (Ian: boards close together, e.g. 110 for 30 m, then 80).
      A too-short zone is merged into the neighbour with the closer speed and takes the lower of the two (never faster than before).
-     The Luxtram keeps its own hand-tuned limits (luxtram.js). */
-  const MIN_ZONE_M = { rail: 400, hst: 800 };
-  function tidyLimits(limits, kind) {
+     The Luxtram builds its own limits (luxtram.js buildLimits, same minimum of 300 m) and passes through here again when its return direction is mirrored. */
+  const MIN_ZONE_M = { rail: 400, hst: 800, tram: 300 };
+  const ROUND_KMH = { rail: 10, hst: 10, tram: 5 };   // the Luxtram keeps its 25 km/h curves
+  function tidyLimits(limits, kind, length) {
     const minZone = MIN_ZONE_M[kind];
     if (!minZone || !limits.length) return limits;
-    let zones = limits.map((l) => ({ s: l.s, kmh: Math.max(10, Math.floor(l.kmh / 10) * 10) }));
+    const step = ROUND_KMH[kind] || 10;
+    let zones = limits.map((l) => ({ s: l.s, kmh: Math.max(step === 5 ? 15 : 10, Math.floor(l.kmh / step) * step) }));
     const dedupe = (list) => list.filter((z, i) => i === 0 || z.kmh !== list[i - 1].kmh);
     zones = dedupe(zones);
     for (let guard = 0; guard < 200 && zones.length > 1; guard++) {
@@ -218,6 +220,11 @@
         zones.splice(k, 1);
       }
       zones = dedupe(zones);
+    }
+    // the last zone runs to the end of the line: when that is shorter than the minimum it is dropped (the zone before it keeps the lower of the two speeds)
+    while (Number.isFinite(length) && zones.length > 1 && length - zones[zones.length - 1].s < minZone) {
+      const last = zones.pop();
+      zones[zones.length - 1].kmh = Math.min(zones[zones.length - 1].kmh, last.kmh);
     }
     zones[0] = { s: 0, kmh: zones[0].kmh };
     return zones;
@@ -425,7 +432,7 @@
 
     /* ---- stations / signals / limits */
     const stations = comp.stations;
-    const limits = buildLimits(comp.limitsRaw, kind);
+    const limits = buildLimits(comp.limitsRaw, kind, length);
     const signals = buildSignals(stations, comp.tunnels, comp.bridges, kind, length);
 
     const bridges = comp.bridges.map((b) => {
@@ -757,7 +764,7 @@
       }
       out.push({ s: i === 0 ? 0 : s, kmh: z.kmh });
     });
-    return tidyLimits(out.filter((e, i) => i === 0 || e.kmh !== out[i - 1].kmh), kind);
+    return tidyLimits(out.filter((e, i) => i === 0 || e.kmh !== out[i - 1].kmh), kind, L);
   }
 
   /* nearest point of a frame function sampled every STEP m (same contract as Track.nearest) */

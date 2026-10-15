@@ -657,7 +657,7 @@
       roadsByChunk.forEach((roads) => roads.forEach((rd) => {
         if (rd.bridge && !CARS_ON_BRIDGES) return;
         roadSet.add(rd); roadList.push(rd);
-        rd.w = rd.len * (rd.cls <= 2 ? 1.6 : rd.cls === 3 ? 1.2 : 1);
+        rd.w = rd.len * (rd.cls === 0 ? 0.8 : rd.cls <= 2 ? 1.6 : rd.cls === 3 ? 1.2 : 1);
         roadWeightTotal += rd.w;
         rd.pts.forEach((p, j) => {
           const key = Math.floor(p.x / CELL) + ',' + Math.floor(p.z / CELL);
@@ -721,12 +721,26 @@
     let tramX = 0; let tramZ = 0; let tramY = 0;
     const R_ACT = clamp(Q.ahead ? Q.ahead * 0.6 : 400, 240, 560);
     function newCar() {
-      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, chkRd: null, laneRd: null, laneK: 1, mat: new Float32Array(16) };
+      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, chkRd: null, laneRd: null, laneK: 1, laneF: undefined, mat: new Float32Array(16) };
     }
     function assignType(c, cls) {
       c.type = pickType(rng, cls); c.tid = TID[c.type]; c.spec = SPEC[c.type]; c.body = pick(rng, paintPool(c.type));
-      const isBus = c.type === 'avl' || c.type === 'rgtr';
-      c.vmax = isBus ? 7 + rng() * 3 : c.type === 'truck' ? 7 + rng() * 3 : 7.5 + rng() * 6 + (cls <= 2 ? 1.5 : 0);
+      assignSpeed(c, { cls, oneway: false, hw: 99 });
+    }
+    /* speed and lane of a car on road `rd`.  City streets: 27-49 km/h.  Motorway carriageways (class 0, one way): 2-3 lanes, right lane 76-90 km/h (lorries and buses
+       never faster than 78), middle ~94, left ~103 km/h; each car keeps its lane (laneF = lane centre as a fraction of the half width, + = right of the travel direction). */
+    function assignSpeed(c, rd) {
+      const cls = rd.cls;
+      const heavy = c.type === 'avl' || c.type === 'rgtr' || c.type === 'truck';
+      if (cls === 0 && rd.oneway) {
+        const lanes = rd.hw >= 4.8 ? 3 : 2;
+        const idx = heavy ? 0 : Math.floor(rng() * lanes);
+        c.laneF = lanes === 3 ? [0.62, 0, -0.62][idx] : [0.5, -0.5][idx];
+        c.vmax = heavy ? 20.5 + rng() * 1.2 : (lanes === 3 ? [23.5, 26.2, 28.8][idx] : [24.5, 28.5][idx]) * (0.97 + rng() * 0.06);
+        return;
+      }
+      c.laneF = undefined;
+      c.vmax = heavy && c.type !== 'truck' ? 7 + rng() * 3 : c.type === 'truck' ? 7 + rng() * 3 : 7.5 + rng() * 6 + (cls <= 2 ? 1.5 : 0);
     }
     function pickRoad() {
       if (!roadList.length) return null;
@@ -762,6 +776,8 @@
         if (clash) continue;
         c.rd = rd; c.t = t; c.dir = rd.oneway ? 1 : (rng() < 0.5 ? 1 : -1);
         assignType(c, rd.cls);
+        if (!rd.oneway && rd.hw < c.spec.W + 0.22) { c.type = 'hatch'; c.tid = TID.hatch; c.spec = SPEC.hatch; c.body = pick(rng, paintPool('hatch')); }   // a lorry / bus does not fit two lanes of a narrow street: no oncoming overlap
+        assignSpeed(c, rd);
         c.cur = c.vmax * 0.7; c.active = true; c.shown = false; c.since = 1e9; c.chkRd = null; c.x = sp.x; c.z = sp.z; c.y = NaN;
         return true;
       }
@@ -837,11 +853,20 @@
       }
     }
 
+    /* lateral offset of the lane centre from the road axis (right-hand traffic): a third of the half width, but never so little that two cars passing in opposite
+       directions overlap (centres >= body width + 0.28 m apart), and never so much that the body leaves the carriageway */
+    const laneOffset = (rd, spec, c) => {
+      const half = spec.W / 2;
+      const limit = Math.max(0.3, rd.hw - half - 0.08);
+      if (c && c.laneF !== undefined && rd.cls === 0 && rd.oneway) return clamp(c.laneF * rd.hw, -limit, limit);   // motorway: the car's own lane (signed)
+      const want = Math.max(rd.hw * LANE_K, half + 0.14);
+      return Math.min(want, limit);
+    };
     /* ground the car on its four wheel contact points; false = height unknown (hide) */
     function groundCar(c, dir, now) {
       const rd = c.rd; const sp0 = c.spec;
       if (c.laneRd !== rd) { c.laneRd = rd; c.laneK = 1; }       // lane factor: shrinks towards the road axis while a wheel stands on the kerb / pavement beside the asphalt
-      const lane = rd.hw * LANE_K * c.laneK * dir;
+      const lane = laneOffset(rd, sp0, c) * (c.laneF !== undefined && rd.cls === 0 && rd.oneway ? 1 : c.laneK) * dir;
       const tf = c.t + dir * sp0.wb / 2; const tr = c.t - dir * sp0.wb / 2;
       sample(rd, tf, spF); sample(rd, tr, spR);
       // front and rear axle centres on the lane (the lane offset follows each point's own tangent: smooth through bends)
@@ -923,9 +948,10 @@
           if (m2 === i) continue;
           const o = cars[m2];
           if (!o.active || o.rd !== rd || o.dir !== c.dir) continue;
+          if (c.laneF !== undefined && o.laneF !== undefined && Math.abs(o.laneF - c.laneF) > 0.3) continue;   // another motorway lane
           const gap = (o.t - c.t) * c.dir;
-          const need = c.spec.L / 2 + o.spec.L / 2 + 2.2;
-          if (gap > 0 && gap < need + 14) target = Math.min(target, Math.max(0, gap - need) * 0.9);
+          const need = c.spec.L / 2 + o.spec.L / 2 + 2.2 + (c.laneF !== undefined ? c.cur * 0.9 : 0);
+          if (gap > 0 && gap < need + 14 + (c.laneF !== undefined ? c.cur * 1.5 : 0)) target = Math.min(target, Math.max(0, gap - need) * 0.9);
         }
         // never come to rest on the rails
         const onRails = (rd.cross || []).some((q) => c.t > q.t0 && c.t < q.t1);
@@ -954,6 +980,7 @@
             if (blocked) { c.active = false; c.shown = false; continue; }
             c.wait = 0;
             c.rd = nx.rd; c.dir = nx.dir; c.t = clamp(nx.t + nx.dir * over, 0, nx.rd.len);
+            if (!(nx.rd.cls === 0 && nx.rd.oneway) !== (c.laneF === undefined)) assignSpeed(c, nx.rd);   // motorway <-> street: other speed / lane
           } else { c.active = false; c.shown = false; continue; }
         }
         // roads along the rails: jump over the stretch
@@ -1259,7 +1286,7 @@
         fails, guarded: guards, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
         oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
       }),
-      cars: () => cars.filter((c) => c.shown).map((c) => ({ type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur })),
+      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw })),   // (test hook)
       /* test hook: the 4 wheel contact points (world) of every shown car: the road surface must be at or just below each one */
       wheelPoints: () => {
         const out = []; const v = new T.Vector3(); const mm = new T.Matrix4();

@@ -32,15 +32,21 @@
   const APPROACH_AFTER = 45;
   const BRAKE_LEAD = [0.8, 120];
   /* Limit profile: calm and readable (Ian: "speed limits change weirdly often"). */
-  const MIN_ZONE = 150;              // m: shortest limit zone
-  const MIN_ZONE_CENTRE = 80;        // m: ... in the city centre (Theater .. Gare Centrale)
+  const MIN_ZONE = 300;              // m: shortest limit zone (Ian: no 70 km/h zone of a few dozen metres before a stop)
+  const MIN_ZONE_CENTRE = 300;       // m: ... also in the city centre (Theater .. Gare Centrale): the stops are 350-900 m apart
   const CENTRE_PAD = 150;
   const CURVE_R_25 = 45;             // m: curves tighter than this are limited to 25 km/h, tighter than CURVE_R_30 to 30 km/h
   const CURVE_R_30 = 70;
-  const FAST_END_STOP = 2;           // Findel -> Héienhaff -> Luxexpo (stop index 2): 70 km/h all the way, stops included ...
-  const BRIDGE_LIMIT = 50;           // ... except on the motorway bridge before Luxexpo
-  const BRIDGE_LIMIT_PAD = 60;       // m of the lower limit before / after the bridge deck
-  const GRADE_MAX = 0.08;
+  const DEFAULT_KMH = 50;            // limit where OSM has no maxspeed: the usual urban tram speed (70 only where OSM says so, never by surface)
+  const GRADE_MAX = 0.07;            // the steepest real stretches of the T1 (Pfaffenthal / Héienhaff ramps) stay under 7 %
+  /* Vertical profile smoothing (Ian: "the track goes up and down in many small bumps"): the LiDAR rail levels carry +-0.3 m of noise every few
+     metres, which reads as grades of +-5 % that change sign every 20-40 m. A penalised fit (Whittaker smoother = discrete cubic smoothing spline)
+     keeps the profile within PROFILE_DEV of the real levels but removes every wave shorter than ~PROFILE_WAVE_M. Bridge decks and tunnels
+     (real structure levels) and the platforms are pinned, the grade is capped afterwards. */
+  const PROFILE_WAVE_M = 260;         // m: waves shorter than this are removed (cutoff wavelength of the smoothing spline)
+  const PROFILE_DEV = 0.9;            // m: the smoothed rail level stays this close to the real level (the ground meets the track bed through the formation blend)
+  const PROFILE_PIN_W = 400;          // weight of structure samples (bridge decks, tunnels) in the fit
+  const PROFILE_PLATFORM_PAD = 12;    // m around a platform that is kept level
   const MAX_KMH = 70;                // the real Luxtram top speed: no limit board, curve or timetable ever shows more
   const OPP_DEFAULT_LAT = -3.45;     // spacing to the opposite track where OSM has no second way (the tracks are 3.0-4.5 m apart on the line)
   const OPP_LAT_MIN = -12;
@@ -190,6 +196,70 @@
     };
   }
 
+
+  /* Whittaker smoother: z minimises sum w (z - y)^2 + lambda * sum (second difference of z)^2 (banded Cholesky, bandwidth 2). */
+  function whittaker(y, w, lambda) {
+    const n = y.length;
+    const d0 = new Float64Array(n);   // diagonal
+    const d1 = new Float64Array(n);   // first off-diagonal (i, i+1)
+    const d2 = new Float64Array(n);   // second off-diagonal (i, i+2)
+    for (let i = 0; i < n; i++) d0[i] = w[i];
+    for (let i = 0; i + 2 < n; i++) {   // D^T D for the stencil (1, -2, 1) on rows i..i+2
+      d0[i] += lambda; d0[i + 1] += 4 * lambda; d0[i + 2] += lambda;
+      d1[i] += -2 * lambda; d1[i + 1] += -2 * lambda;
+      d2[i] += lambda;
+    }
+    // A = L D L^T (L unit lower triangular with two sub-diagonals L1, L2)
+    const L1 = new Float64Array(n);
+    const L2 = new Float64Array(n);
+    const D = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const l2 = i > 1 ? d2[i - 2] / D[i - 2] : 0;
+      const l1 = i > 0 ? ((d1[i - 1]) - (i > 1 ? l2 * L1[i - 1] * D[i - 2] : 0)) / D[i - 1] : 0;
+      D[i] = d0[i] - (i > 0 ? l1 * l1 * D[i - 1] : 0) - (i > 1 ? l2 * l2 * D[i - 2] : 0);
+      L1[i] = l1;
+      L2[i] = l2;
+    }
+    const b = new Float64Array(n);
+    for (let i = 0; i < n; i++) b[i] = w[i] * y[i];
+    const t = new Float64Array(n);
+    for (let i = 0; i < n; i++) t[i] = b[i] - (i > 0 ? L1[i] * t[i - 1] : 0) - (i > 1 ? L2[i] * t[i - 2] : 0);
+    for (let i = 0; i < n; i++) t[i] /= D[i];
+    const z = new Float64Array(n);
+    for (let i = n - 1; i >= 0; i--) z[i] = t[i] - (i + 1 < n ? L1[i + 1] * z[i + 1] : 0) - (i + 2 < n ? L2[i + 2] * z[i + 2] : 0);
+    return z;
+  }
+
+  /* Smooth rail profile within +-dev of the real levels. `pin[i]` > 0 marks samples that must keep their level (weights), `flat` = [i0, i1] index ranges
+     (platforms) that are laid out as one straight grade between their ends. */
+  function smoothProfile(raw, pin, flat, step) {
+    const n = raw.length;
+    const lambda = Math.pow(PROFILE_WAVE_M / step / (2 * Math.PI), 4);
+    const w = new Float64Array(n);
+    for (let i = 0; i < n; i++) w[i] = 1 + pin[i] * PROFILE_PIN_W;
+    let z = whittaker(raw, w, lambda);
+    for (let iter = 0; iter < 12; iter++) {   // pull the fit back where it strays further than allowed from the real level
+      let moved = 0;
+      for (let i = 0; i < n; i++) {
+        if (Math.abs(z[i] - raw[i]) > PROFILE_DEV && !pin[i]) { w[i] *= 3; moved++; }
+      }
+      if (!moved) break;
+      z = whittaker(raw, w, lambda);
+    }
+    // platforms: one straight grade across the platform (+ pad), blended back into the curve at both ends
+    flat.forEach(([a, b]) => {
+      const i0 = Math.max(0, a);
+      const i1 = Math.min(n - 1, b);
+      if (i1 - i0 < 4) return;
+      const y0 = z[i0];
+      const y1 = z[i1];
+      const out = Float64Array.from(z);
+      for (let i = i0; i <= i1; i++) out[i] = y0 + ((y1 - y0) * (i - i0)) / (i1 - i0);
+      z = out;
+    });
+    return z;
+  }
+
   function buildModel(data) {
     const raw = decodeFlat(data.path);
     const first = raw[0];
@@ -318,6 +388,15 @@
       Yground = new Float64Array(n);
       for (let i = 0; i < n; i++) Yground[i] = g(i * STEP);
       Yground = boxBlur(Yground, 2);
+      // smooth rail profile; the ground keeps its real height above / below the rails (cut / fill), smoothed the same way
+      const cutRaw = Float64Array.from(Yground, (v, i) => v - Yabs[i]);
+      const pin = new Uint8Array(n);
+      const pinRange = (a, b) => { for (let i = Math.max(0, Math.floor(a / STEP)); i <= Math.min(n - 1, Math.ceil(b / STEP)); i++) pin[i] = 1; };
+      bridges.forEach((b) => pinRange(b.s0 - 6, b.s1 + 6));
+      tunnels.forEach((tn) => pinRange(tn.s0 - 6, tn.s1 + 6));
+      const smoothed = smoothProfile(Yabs, pin, [], STEP);
+      Yabs = smoothed;
+      Yground = Float64Array.from(Yabs, (v, i) => v + cutRaw[i]);
       const mid = (a, b) => clamp(Math.round((a + b) / 2 / STEP), 0, n - 1);
       fixes = {
         adj: new Float64Array(n),
@@ -484,7 +563,7 @@
   /* limit zones from 10 m samples v[i] (km/h): zones shorter than the minimum are merged (a short zone higher than a neighbour takes the lower value,
      a short slow zone is widened to the minimum, so speed values only ever go down); the boards of drops are moved ahead by the braking lead
      without making the zone before them shorter than the minimum. */
-  function buildLimits(v, minLenAt, noShiftBefore, totalLen) {
+  function buildLimits(v, minLenAt, totalLen) {
     const n = v.length;
     const runs = () => {
       const out = [];
@@ -524,7 +603,7 @@
         const prevStart = out[out.length - 1].s;
         const room = z.s - prevStart - minLenAt(z.s);
         const lead = Math.max(0, Math.min(BRAKE_LEAD[1], (v1 * v1 - v2 * v2) / (2 * BRAKE_LEAD[0]), room));
-        s = Math.max(z.s - lead, noShiftBefore && z.s >= noShiftBefore ? noShiftBefore : 0);   // (no board ahead of the always-70 stretch's end)
+        s = z.s - lead;
       }
       out.push({ s: i === 0 ? 0 : s, kmh: z.kmh });
     });
@@ -604,28 +683,21 @@
 
     /* ---- limits (rounded to multiples of 10, 25 only where really needed; no artificial stop zones: braking for a stop is the driver's job) */
     const roundLimit = (kmh) => (kmh <= 27 ? 25 : Math.min(MAX_KMH, Math.max(30, Math.round((kmh - 0.1) / 10) * 10)));
-    const fastEndAbs = m.stops[FAST_END_STOP].sMid + MARKER_AHEAD + 4;   // end of the Luxexpo platform, absolute path coordinates
     const motorway = m.bridges.find((b) => !b.name && b.s0 < RISE_BRIDGE_MAX_S && b.s1 - b.s0 < 200) || null;
     const centre = [Math.max(0, m.stops[10].sMid - CENTRE_PAD - sStart), Math.max(0, m.stops[16].sMid + CENTRE_PAD - sStart)];
     const minLenAt = (s) => (s >= centre[0] && s <= centre[1] ? MIN_ZONE_CENTRE : MIN_ZONE);
     const samples = [];
     for (let s = 0; s <= length; s += 10) {
       const abs = s + sStart;
-      if (abs <= fastEndAbs) {   // the whole Findel - Luxexpo stretch is 70, only the motorway bridge is slower
-        const onBridge = motorway && abs >= motorway.s0 - BRIDGE_LIMIT_PAD && abs <= motorway.s1 + BRIDGE_LIMIT_PAD;
-        samples.push(onBridge ? BRIDGE_LIMIT : MAX_KMH);
-        continue;
-      }
       const q = segAt(abs);
-      let v = q.speed > 0 ? q.speed : 40;
-      if (q.surf === 0 && v === 50) v = MAX_KMH; // dedicated grass track: the full 70 km/h
+      let v = q.speed > 0 ? q.speed : DEFAULT_KMH;   // the real OSM maxspeed; 70 only on the dedicated Héienhaff - Luxexpo stretch the data marks as 70
       const ia = clamp(Math.round(s / STEP), 0, n - 1);
       let kmax = 0;   // tightest curve within +-10 m
       for (let d = -5; d <= 5; d++) kmax = Math.max(kmax, Math.abs(kappa[clamp(ia + d, 0, n - 1)]));
       if (kmax > 1 / CURVE_R_30) v = Math.min(v, kmax > 1 / CURVE_R_25 ? 25 : 30);
       samples.push(roundLimit(v));
     }
-    const limits = buildLimits(samples, minLenAt, fastEndAbs - sStart, length);
+    const limits = buildLimits(samples, minLenAt, length);
 
     /* ---- bridges / tunnels in route coordinates */
     // `rise` = deck height above the ground profile (the motorway bridge before Luxexpo), `depth` = rail level below the ground (Héienhaff tunnels);
@@ -836,7 +908,7 @@
       groundYAt, cutAt: (s) => groundYAt(s) - frameAt(s).pos.y,
       luxtram: {
         sStart, sEnd, origin: { x: ox, y: oy, z: oz }, segs, credit: CREDIT, centre, minZone: MIN_ZONE, minZoneCentre: MIN_ZONE_CENTRE,
-        fastEnd: fastEndAbs - sStart, motorwayBridge: motorway ? [motorway.s0 - sStart, motorway.s1 - sStart] : null,
+        motorwayBridge: motorway ? [motorway.s0 - sStart, motorway.s1 - sStart] : null,
         toRoute: (sAbs) => sAbs - sStart,
         absFromOrig: (sOrig) => m.toNew(sOrig),
         origFromAbs: (sAbs) => m.toOrig(sAbs),
@@ -883,7 +955,7 @@
     const lt = base.luxtram;
     rev.luxtram = Object.assign({}, lt, {
       reversed: true, centre, segs: lt.segs.map((q) => Object.assign({}, q, { s0: L - q.s1, s1: L - q.s0 })).sort((a, b) => a.s0 - b.s0),
-      toRoute: (sAbs) => L - (sAbs - lt.sStart), fastEnd: null, motorwayBridge: lt.motorwayBridge ? [L - lt.motorwayBridge[1], L - lt.motorwayBridge[0]] : null,
+      toRoute: (sAbs) => L - (sAbs - lt.sStart), motorwayBridge: lt.motorwayBridge ? [L - lt.motorwayBridge[1], L - lt.motorwayBridge[0]] : null,
     });
     rev.groundYAt = (s) => base.groundYAt(L - s);
     rev.cutAt = (s) => base.cutAt(L - s);

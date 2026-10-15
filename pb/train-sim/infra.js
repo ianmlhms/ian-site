@@ -595,6 +595,11 @@
   const tramGroove = () => mat('grooveTram', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }));
   const tramPaveMat = () => mat('paveTram', () => new T.MeshStandardMaterial({ map: tex.tramPave(), vertexColors: true, roughness: 0.9, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
   const lifted = (profile, dx) => profile.map((p) => [p[0] + dx, p[1] + RAIL_LIFT]);
+  /* Embedded tram rail: head + the top of the web only. The foot (0.075 m wide, 0.12-0.17 m below the head) lies buried in the formation; with the strong
+     negative polygon offset above it shows through the ground at a grazing angle as a thin dashed dark line 4 cm beside each rail, starting ~5 m ahead of the cab
+     (Ian: "a dark line running along the track a few metres in front of the tram"). */
+  const RAIL_PROFILE_EMBEDDED = RAIL_PROFILE.slice(0, 6).concat(RAIL_PROFILE.slice(10));
+  const RAIL_COLORS_EMBEDDED = RAIL_COLORS.slice(0, 6).concat(RAIL_COLORS.slice(10));
 
   /* Rails (and the street paving) of the player's track and of the opposite track. Both tracks sweep the chunk's own frames, so the
      rails and the wires of addTramOcs share their sample points. */
@@ -606,7 +611,7 @@
     const one = (frames) => {
       if (!frames || frames.length < 2) return;
       [-RAIL_X, RAIL_X].forEach((x) => {
-        sweep(steel, frames, lifted(RAIL_PROFILE, x), RAIL_COLORS, { closed: true });
+        sweep(steel, frames, lifted(RAIL_PROFILE_EMBEDDED, x), RAIL_COLORS_EMBEDDED, { closed: true });
         sweep(groove, frames, [[x - Math.sign(x) * 0.075, RAIL_LIFT - 0.012], [x - Math.sign(x) * 0.036, RAIL_LIFT - 0.012]].sort((a, b) => a[0] - b[0]), dark, { uvU: 1, uvV: 1 });
       });
     };
@@ -1012,16 +1017,38 @@
      luxtram-world.js publishes TS.luxRoadMargin(x, z) = metres to the nearest carriageway edge (negative = inside a lane).  Returns the lateral offset
      of the first spot outside every lane: first inwards (between track and lane, never closer than 2.3 m to the axis; not at stops, where the platform is),
      then outwards onto the pavement (at most `maxOut` m, default 10: a mast with its cantilever arm gets 6 so it never stands far out in a wide plaza).  `frameAt` = frame function of the track the offset refers to. */
-  function roadSafeLat(track, s, lat, frameAt, atStop, maxOut) {
+  /* The carriageway the player SEES is the painted ground of luxtram-ground.js (class map / vector layers), not the OSM centre line + nominal width that
+     TS.luxRoadMargin knows: where the world offers TS.luxDrawnRoad(x, z) (1 = drawn carriageway, 0 = none, -1 = the tile is not built yet) it decides; the OSM margin
+     is only the fallback while that tile is unknown.  A pole's footprint (centre + 4 corners, 0.35 m) must be clear.  When no spot beside the track is clear (the track runs
+     inside the street), `median` (the lateral offset halfway between the two tracks, the tram's own right-of-way) is used. */
+  const FOOT = [[0, 0], [0.35, 0.35], [-0.35, 0.35], [0.35, -0.35], [-0.35, -0.35]];
+  function laneBlocked(f, l, sd) {
+    const margin = window.TS.luxRoadMargin;
+    const drawn = window.TS.luxDrawnRoad;
+    const cx = f.pos.x + f.right.x * l * sd;
+    const cz = f.pos.z + f.right.z * l * sd;
+    let unknown = false;
+    if (typeof drawn === 'function') {
+      for (let k = 0; k < FOOT.length; k++) {
+        const v = drawn(cx + FOOT[k][0], cz + FOOT[k][1]);
+        if (v === 1) return true;
+        if (v < 0) unknown = true;
+      }
+      if (!unknown) return false;
+    }
+    return margin(cx, cz) <= 0.35;
+  }
+  function roadSafeLat(track, s, lat, frameAt, atStop, maxOut, median) {
     const margin = window.TS.luxRoadMargin;
     if (track.kind !== 'tram' || typeof margin !== 'function') return lat;
     const f = (frameAt || track.frameAt)(s);
     const sd = lat < 0 ? -1 : 1;
     const a = Math.abs(lat);
-    const ok = (l) => margin(f.pos.x + f.right.x * l * sd, f.pos.z + f.right.z * l * sd) > 0.35;
+    const ok = (l) => !laneBlocked(f, l, sd);
     if (ok(a)) return lat;
     if (!atStop) for (let l = a - 0.3; l >= 2.3; l -= 0.3) if (ok(l)) return sd * l;
     for (let l = a + 0.5; l <= a + (maxOut || 10); l += 0.5) if (ok(l)) return sd * l;
+    if (Number.isFinite(median) && !atStop) return median;
     return lat;
   }
   function inStation(track, s, pad) {
@@ -1091,12 +1118,17 @@
         }
       }
     };
-    wireRun(ctx.frames, 'player');
-    wireRun(ctx.frames2, 'opposite');
+    if (ctx.part !== 'furniture') {
+      wireRun(ctx.frames, 'player');
+      wireRun(ctx.frames2, 'opposite');
+    }
+    if (ctx.part === 'wires') return;   // the masts follow later (buildChunkContent part 'furniture'): they need the painted roads of the world
 
     const mast = (frameAt, s, side) => {
       const f = frameAt(s);
-      const lat = roadSafeLat(track, s, side * tramMastLat(track, s, side), frameAt, inStation(track, s, 8) >= 0, 6);
+      const oppLat = track.opposite && track.opposite.has(s) ? track.opposite.latAt(s) : NaN;
+      const median = Number.isFinite(oppLat) && oppLat < -2.6 ? (side === 1 ? oppLat / 2 : -oppLat / 2) : NaN;   // between the two tracks
+      const lat = roadSafeLat(track, s, side * tramMastLat(track, s, side), frameAt, inStation(track, s, 8) >= 0, 6, median);
       const theta = Math.atan2(f.tangent.x, -f.tangent.z);
       const P = (l, dy) => [f.pos.x + f.right.x * l, f.pos.y + dy, f.pos.z + f.right.z * l];
       const st = tramStagger(s);
@@ -2424,7 +2456,8 @@
     });
   }
 
-  function buildChunkContent(env, index) {
+  /* part: 'all' (default) | 'wires' (bed, rails, tunnels, bridges, contact wires) | 'furniture' (masts, limit boards, km posts: placed against the painted roads, see roadSafeLat) */
+  function buildChunkContent(env, index, part) {
     const { track, q } = env;
     const isRail = track.kind !== 'tram';
     const [rA, rB] = isRail ? railRange(track) : [0, track.length];   // rail: a terminus buffer stop ends the rails
@@ -2435,24 +2468,27 @@
     const sets = new BatchSet(origin);
     const group = new T.Group();
     const step = track.kind === 'tram' ? TRAM_SWEEP_STEP : q.sweepStep;
-    const ctx = { env, track, q, kind: track.kind, s0, s1: bedEnd, origin, sets, group, instanced: [], frames: makeFrames(track, s0, bedEnd, step), frames2: null, railRange: [rA, rB], pair: null };
+    const ctx = { env, track, q, kind: track.kind, s0, s1: bedEnd, origin, sets, group, instanced: [], frames: makeFrames(track, s0, bedEnd, step), frames2: null, railRange: [rA, rB], pair: null, part: part || 'all' };
     if (isRail) ctx.pair = makePair(ctx);
     if (track.kind === 'tram' && track.opposite) {   // the opposite (left-hand) track exists along the real line only
       const a2 = Math.max(s0, track.opposite.from);
       const b2 = Math.min(bedEnd, track.opposite.to);
       if (b2 - a2 >= 1) ctx.frames2 = makeFramesF(track.opposite.frameAt, a2, b2, step);
     }
-    addBed(ctx);
-    addSleepers(ctx);
+    const wiresPart = ctx.part !== 'furniture';
+    const furniturePart = ctx.part !== 'wires';
+    if (wiresPart) { addBed(ctx); addSleepers(ctx); }
     addCatenary(ctx);
-    addLimitBoards(ctx);
-    addDistantBoards(ctx);
-    addLineFence(ctx);
-    addKmPosts(ctx);
-    track.tunnels.forEach((tn) => addTunnel(ctx, tn));
-    track.bridges.forEach((br) => addBridge(ctx, br));
+    if (furniturePart) addLimitBoards(ctx);
+    if (wiresPart) { addDistantBoards(ctx); addLineFence(ctx); }
+    if (furniturePart) addKmPosts(ctx);
+    if (wiresPart) {
+      track.tunnels.forEach((tn) => addTunnel(ctx, tn));
+      track.bridges.forEach((br) => addBridge(ctx, br));
+    }
     sets.meshes(q.castAll).forEach((m) => group.add(m));
     const rec = { group, signals: [], crossings: [] };
+    if (!wiresPart) return rec;
     track.signals.forEach((sig, i) => {
       if (sig.s < s0 || sig.s >= bedEnd) return;
       const obj = buildSignal(env, track, sig, i, env.signalState[i]);
@@ -2540,21 +2576,64 @@
       obj.group.userData.built = false;
     }
 
+    /* LUXTRAM: masts, limit boards and km posts are placed against the painted roads (TS.luxDrawnRoad, see roadSafeLat), which exist only once the world has built
+       the ground tile: the chunk first gets bed, rails and wires, its furniture follows as soon as every spot it may use is known (or after FURNITURE_WAIT_MS) */
+    const isLux = !!track.luxtram;
+    const FURNITURE_WAIT_MS = 25000;
+    const furniturePending = new Map();     // chunk index -> { since }
+    function furnitureReady(index) {
+      const drawn = window.TS.luxDrawnRoad;
+      if (typeof drawn !== 'function' || typeof window.TS.luxRoadMargin !== 'function') return false;
+      const rec = chunks.get(index);
+      if (!rec) return true;
+      const sA = Math.max(0, index * CHUNK);
+      const sB = Math.min(track.length, index * CHUNK + CHUNK);
+      const f = { pos: new T.Vector3(), right: new T.Vector3(), tangent: new T.Vector3(), up: new T.Vector3() };
+      for (let sPos = sA; sPos <= sB + 0.01; sPos += 20) {
+        const frames = [track.frameAt(Math.min(sPos, track.length), f)];
+        for (const fr of frames) for (const l of [-11, -6, -3, 3, 6, 11]) if (drawn(fr.pos.x + fr.right.x * l, fr.pos.z + fr.right.z * l) < 0) return false;
+      }
+      return true;
+    }
+    function buildFurniture(index) {
+      furniturePending.delete(index);
+      const rec = chunks.get(index);
+      if (!rec) return;
+      try {
+        const fr = buildChunkContent(env, index, 'furniture');
+        if (fr) { rec.furn = fr.group; root.add(fr.group); }
+      } catch (err) {
+        console.warn('[Lokféierer] chunk furniture failed', index, err);
+      }
+    }
+    function pumpFurniture(pos) {
+      if (!furniturePending.size) return;
+      const now = performance.now();
+      const list = Array.from(furniturePending.entries()).sort((a, b) => Math.abs(a[0] * CHUNK + CHUNK / 2 - pos) - Math.abs(b[0] * CHUNK + CHUNK / 2 - pos));
+      let tested = 0;
+      for (const [index, info] of list) {
+        if (now - info.since > FURNITURE_WAIT_MS || furnitureReady(index)) { buildFurniture(index); break; }
+        if (++tested >= 3) break;
+      }
+    }
     function loadChunk(index) {
       if (chunks.has(index)) return;
       let rec = null;
       try {
-        rec = buildChunkContent(env, index);
+        rec = buildChunkContent(env, index, isLux ? 'wires' : 'all');
       } catch (err) {
         console.warn('[Lokféierer] chunk build failed', index, err);
       }
       chunks.set(index, rec);
       if (rec) root.add(rec.group);
+      if (rec && isLux) furniturePending.set(index, { since: performance.now() });
     }
     function unloadChunk(index) {
       const rec = chunks.get(index);
       chunks.delete(index);
+      furniturePending.delete(index);
       if (!rec) return;
+      if (rec.furn) { root.remove(rec.furn); disposeObject(rec.furn); }
       rec.signals.forEach((i) => { const o = env.signalObjs.get(i); if (o) o.dispose(); env.signalObjs.delete(i); });
       rec.crossings.forEach((i) => { const o = env.crossingObjs.get(i); if (o) o.dispose(); env.crossingObjs.delete(i); });
       root.remove(rec.group);
@@ -2580,6 +2659,7 @@
         built += 1;
         if (built >= 3) break;
       }
+      if (isLux) pumpFurniture(pos);
       track.stations.forEach((st, i) => {
         const near = st.platformEnd > pos - q.behind - 150 && st.platformStart < pos + q.ahead * 0.8;
         if (near) loadStation(i);
@@ -2696,7 +2776,7 @@
     return {
       update, dispose, setSignalAspect, setCrossing, addTempBoard, clearTempBoards, platformHeight, stationObjects, stationReport,
       quality: qualityName,
-      debug: { chunks, env },
+      debug: { chunks, env, furniturePending: () => furniturePending.size },
     };
   }
 
