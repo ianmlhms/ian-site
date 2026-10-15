@@ -1,25 +1,35 @@
-/* Control Room — health of the services on the server.
+/* Status — are brix and the Mac Mini alive?
  *
- * The page deliberately computes nothing: every verdict, reason and age string
- * arrives already resolved from the `ops` edge function, so there is one place
- * where "is this service healthy" is decided. See supabase/functions/ops/health.ts.
+ * Two tiles, nothing per-service: if a machine is up, what runs on it is up.
+ * The page deliberately computes nothing: every verdict arrives already
+ * resolved from the `ops` edge function (supabase/functions/ops/health.ts), so
+ * there is one place where "is this machine alive" is decided.
  *
- * English rather than Luxembourgish: every term here is technical (heartbeat,
- * daemon, launchd) and translating them would mean inventing vocabulary. The
- * two gate strings are the site's existing reviewed LB ones. */
+ * English rather than Luxembourgish: every term here is technical and
+ * translating them would mean inventing vocabulary. The two gate strings are
+ * the site's existing reviewed LB ones. */
 import * as auth from "./auth.js?v=32";
 
 const OWNER = "konto@ian.lu";
 const REFRESH_MS = 20_000;
-const COMMAND_POLL_MS = 1500;
-const COMMAND_TIMEOUT_MS = 90_000;
+const MINUTE = 60;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
-const HEALTH_LABEL = {
-  ok: "healthy", warn: "warning", missed: "missed a run",
-  down: "down", unknown: "no report",
+/* Never colour alone: each state has its own glyph and word. `unknown` is not
+ * a traffic-light colour — nothing has reported, which is neither good nor bad. */
+const STATE = {
+  ok: { mark: "●", word: "Up" },
+  warn: { mark: "▲", word: "Warning" },
+  down: { mark: "✕", word: "Down" },
+  unknown: { mark: "○", word: "No report" },
 };
-/* Not a traffic light: `unknown` must not read as either good or bad. */
-const HEALTH_MARK = { ok: "●", warn: "▲", missed: "▲", down: "✕", unknown: "○" };
+const SUMMARY = {
+  ok: "Both machines are up.",
+  warn: "A machine reports a warning.",
+  down: "A machine is down.",
+  unknown: "A machine has not reported yet.",
+};
 
 let refreshTimer = null;
 let inFlight = false;
@@ -37,8 +47,7 @@ function config() {
 
 async function callOps(body) {
   const cfg = config();
-  const session = auth.session();
-  const token = session?.access_token;
+  const token = auth.session()?.access_token;
   if (!token) throw new Error("Not signed in.");
   const response = await fetch(`${cfg.url.replace(/\/$/, "")}/functions/v1/ops`, {
     method: "POST",
@@ -65,105 +74,46 @@ function gate(title, message, canSignIn = false) {
   if (canSignIn) $("signIn").onclick = () => auth.openAuthModal();
 }
 
-function detailChips(detail) {
-  if (!detail || typeof detail !== "object" || Array.isArray(detail)) return "";
-  const chips = Object.entries(detail).slice(0, 6).map(([key, value]) =>
-    `<span class="chip"><b>${esc(key)}</b> ${esc(
-      typeof value === "object" ? JSON.stringify(value) : value,
-    )}</span>`);
-  return chips.length ? `<div class="chips">${chips.join("")}</div>` : "";
+/** "last seen 3 min ago", from the server's own age so a wrong phone clock can't skew it. */
+function lastSeen(seconds) {
+  if (seconds === null || seconds === undefined) return "never seen";
+  if (seconds < MINUTE) return "last seen just now";
+  if (seconds < HOUR) return `last seen ${Math.floor(seconds / MINUTE)} min ago`;
+  if (seconds < DAY) {
+    const hours = Math.floor(seconds / HOUR);
+    const minutes = Math.floor((seconds % HOUR) / MINUTE);
+    return `last seen ${hours} h${minutes ? ` ${minutes} min` : ""} ago`;
+  }
+  return `last seen ${Math.floor(seconds / DAY)} d ago`;
 }
 
-function serviceCard(service, anyReporting) {
-  /* With nothing listening the command is never claimed, so the button would
-   * spin for COMMAND_TIMEOUT_MS and then fail. Don't offer it. */
-  const canRestart = service.health !== "unknown" && anyReporting;
-  return `<article class="svc svc--${esc(service.health)}">
-    <header class="svc-head">
-      <span class="svc-mark" aria-hidden="true">${HEALTH_MARK[service.health] || "○"}</span>
-      <span class="svc-name">${esc(service.label)}</span>
-      <span class="svc-kind">${esc(service.kind)}</span>
-    </header>
-    <p class="svc-what">${esc(service.what)}</p>
-    <p class="svc-reason"><span class="sr-only">Status: </span>${
-      esc(HEALTH_LABEL[service.health] || service.health)} — ${esc(service.reason)}</p>
-    ${service.lastError && service.health !== "ok"
-      ? `<p class="svc-error">${esc(service.lastError)}</p>` : ""}
-    ${detailChips(service.detail)}
-    <div class="svc-actions">
-      ${canRestart
-        ? `<button class="svc-btn" type="button" data-restart="${esc(service.key)}"
-             data-label="${esc(service.label)}">Restart</button>`
-        : `<span class="svc-hint">${anyReporting
-            ? "nothing has reported yet" : "nothing is listening"}</span>`}
-      <span class="svc-msg" id="msg-${esc(service.key)}" role="status"></span>
-    </div>
+function tile(machine) {
+  const state = STATE[machine.health] || STATE.unknown;
+  const seen = machine.health === "unknown" ? "nothing has reported yet" : lastSeen(machine.ageSeconds);
+  return `<article class="tile tile--${esc(machine.health)}">
+    <div class="tile-mark" aria-hidden="true">${state.mark}</div>
+    <h2 class="tile-name">${esc(machine.label)}</h2>
+    <p class="tile-what">${esc(machine.what)}</p>
+    <p class="tile-state"><span class="sr-only">Status: </span>${esc(state.word)}</p>
+    <p class="tile-seen">${esc(seen)}</p>
+    ${machine.detailText ? `<p class="tile-detail">${esc(machine.detailText)}</p>` : ""}
+    ${machine.lastError && machine.health !== "ok"
+      ? `<p class="tile-detail tile-detail--error">${esc(machine.lastError)}</p>` : ""}
   </article>`;
 }
 
-function alertsList(alerts) {
-  if (!alerts.length) return "";
-  const rows = alerts.slice(0, 8).map((alert) => `<li>
-      <time datetime="${esc(alert.created_at)}">${
-        esc(new Date(alert.created_at).toLocaleString())}</time>
-      <span>${esc(alert.message)}</span>
-    </li>`).join("");
-  return `<section class="ops-alerts glass"><h2>Recent changes</h2><ul>${rows}</ul></section>`;
-}
-
 function render(state) {
-  /* The honesty rule: a verdict is only evidence if whatever produces it is
-   * still alive. If nothing has reported recently, a red cross is just the age
-   * of the last thing written — the same lie as a green tick.
-   *
-   * Deliberately asks "is anything reporting?" rather than naming a reporter.
-   * Two earlier versions were both too specific and both went stale:
-   *   - `every(health === "unknown")` was true only when rows are *absent*, so
-   *     rows left by a retired host slipped past it and the page called four
-   *     services down that were healthy on the new host (1 Sep 2026).
-   *   - Keying off OpsAgent's own health then broke the other way: OpsAgent is
-   *     retired, so under self-reporting services there is no such row at all
-   *     and the banner would latch on forever while everything ran fine.
-   * A live reporter of any shape — an external agent, or the services writing
-   * their own beats — satisfies this one, and so will the next shape. */
-  const anyReporting = state.services.some(
-    (service) => service.health === "ok" || service.health === "warn");
-  const neverReported = state.services.every((service) => service.health === "unknown");
-  const newestBeatMs = state.services.reduce((newest, service) => {
-    const beat = service.lastBeatISO ? Date.parse(service.lastBeatISO) : NaN;
-    return Number.isNaN(beat) ? newest : Math.max(newest, beat);
-  }, 0);
-
-  const banner = anyReporting ? "" : `<section class="ops-banner glass">
-         <h2>${neverReported ? "No reports yet" : "Nothing is reporting"}</h2>
-         <p>${neverReported
-           ? "Nothing has ever written a heartbeat."
-           : `Nothing has reported since <b>${
-               esc(new Date(newestBeatMs).toLocaleString())}</b>.`}
-            So the verdicts below are <b>frozen, not measured</b> — a service
-            shown as down may be running perfectly well. Restarting is disabled
-            until something is reporting again.</p>
-       </section>`;
-
-  const healthy = state.services.filter((service) => service.health === "ok").length;
   $("root").innerHTML = `
     <section class="ops-summary glass glass--thick ops-summary--${esc(state.overall)}">
       <div>
-        <h1>Server</h1>
-        <p>${anyReporting ? `${healthy} of ${state.services.length} healthy`
-          : "nothing reporting"}</p>
+        <h1>Status</h1>
+        <p>${esc(SUMMARY[state.overall] || "")}</p>
       </div>
-      <button class="ops-refresh" id="refresh" type="button" title="Refresh now">↻</button>
+      <button class="ops-refresh" id="refresh" type="button" title="Refresh now" aria-label="Refresh now">↻</button>
     </section>
-    ${banner}
-    <div class="ops-grid">${state.services.map((service) => serviceCard(service, anyReporting)).join("")}</div>
-    ${alertsList(state.alerts || [])}
+    <div class="tiles">${state.machines.map(tile).join("")}</div>
     <p class="ops-stamp">checked ${esc(new Date(state.checkedAt).toLocaleTimeString())}</p>`;
-
   $("refresh").onclick = () => refresh(true);
-  for (const button of document.querySelectorAll("[data-restart]")) {
-    button.onclick = () => restart(button.dataset.restart, button.dataset.label, button);
-  }
 }
 
 async function refresh(manual = false) {
@@ -172,7 +122,7 @@ async function refresh(manual = false) {
   try {
     render(await callOps({ action: "status" }));
   } catch (error) {
-    if (manual || !document.querySelector(".ops-grid")) {
+    if (manual || !document.querySelector(".tiles")) {
       $("root").innerHTML = `<section class="gate-panel glass glass--thick">
         <div class="gate-icon">⚠</div><h1>Could not read status</h1>
         <p>${esc(error.message)}</p></section>`;
@@ -180,43 +130,6 @@ async function refresh(manual = false) {
   } finally {
     inFlight = false;
   }
-}
-
-async function restart(key, label, button) {
-  if (!confirm(`Restart ${label} on the server?`)) return;
-  const message = $(`msg-${key}`);
-  button.disabled = true;
-  message.textContent = "queued…";
-  try {
-    const { command } = await callOps({ action: "command", service: key, verb: "restart" });
-    await followCommand(command.id, message);
-  } catch (error) {
-    message.textContent = error.message;
-  } finally {
-    button.disabled = false;
-    refresh();
-  }
-}
-
-/* The command sits in a table until OpsAgent claims it, so the only honest
- * thing the page can do is watch the row. If nothing claims it, say so —
- * "queued forever" is exactly the symptom of an agent that is not running. */
-async function followCommand(id, message) {
-  const deadline = Date.now() + COMMAND_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, COMMAND_POLL_MS));
-    const { command } = await callOps({ action: "commandStatus", id });
-    if (command.status === "done") {
-      message.textContent = command.result || "done";
-      return;
-    }
-    if (command.status === "error") {
-      message.textContent = command.error || "failed";
-      return;
-    }
-    message.textContent = command.status === "running" ? "running…" : "queued…";
-  }
-  message.textContent = "still queued — is OpsAgent running?";
 }
 
 function startAutoRefresh() {
@@ -241,17 +154,17 @@ async function boot() {
     auth.mountAccountButton($("acctHost"));
     const session = auth.session();
     if (!session?.user) {
-      gate("Server", "Mell dech un, fir de Kontrollraum opzemaachen.", true);
+      gate("Status", "Mell dech un, fir de Status ze gesinn.", true);
       return;
     }
     if ((session.user.email || "").toLowerCase() !== OWNER) {
-      gate("Dësen Outil ass privat", "De Kontrollraum ass nëmme fir de Besëtzer.");
+      gate("Dësen Outil ass privat", "De Status ass nëmme fir de Besëtzer.");
       return;
     }
     await refresh(true);
     startAutoRefresh();
   } catch (error) {
-    gate("Control room unavailable", error.message || "Could not start the connection.");
+    gate("Status unavailable", error.message || "Could not start the connection.");
   }
 }
 

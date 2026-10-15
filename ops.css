@@ -1,6 +1,6 @@
-/* Control Room — ops.html
+/* Status — ops.html
  *
- * A glance-from-the-phone page: the status of a service must be readable
+ * A glance-from-the-phone page: the status of a machine must be readable
  * before you have finished unlocking. Loaded after theme.js injects
  * site-glass.css, so the site tokens (--space-*, --hit-target, --glass-solid)
  * are available and these rules win on equal specificity. */
@@ -70,104 +70,40 @@ body {
 }
 .ops-refresh:hover { background: var(--card-hover); }
 
-.ops-banner {
-  padding: var(--space-4);
-  border-radius: var(--radius-pane);
-  margin-bottom: var(--space-3);
-  border-left: .3rem solid var(--border);
-}
-.ops-banner h2 { margin: 0 0 var(--space-1); font-size: 1.05rem; }
-.ops-banner p { margin: 0; color: var(--muted); line-height: 1.5; }
+/* ---- one tile per machine ---- */
+.tiles { display: grid; gap: var(--space-3); }
 
-/* ---- one card per service ---- */
-.ops-grid { display: grid; gap: var(--space-2); }
-
-.svc {
-  padding: var(--space-3);
+.tile {
+  padding: var(--space-5) var(--space-4);
   border: 1px solid var(--border);
-  border-left-width: .3rem;
-  border-radius: var(--radius-inner);
+  border-top-width: .35rem;
+  border-radius: var(--radius-pane);
   background: var(--glass-solid);
+  text-align: center;
 }
-.svc--ok { border-left-color: var(--ok, #3fb950); }
-.svc--warn,
-.svc--missed { border-left-color: #d29922; }
-.svc--down { border-left-color: #ff5a5a; }
-.svc--unknown { border-left-color: var(--border); }
+.tile--ok { border-top-color: var(--ok, #3fb950); }
+.tile--warn { border-top-color: #d29922; }
+.tile--down { border-top-color: #ff5a5a; }
+.tile--unknown { border-top-color: var(--border); }
 
-.svc-head { display: flex; align-items: center; gap: var(--space-2); }
-.svc-mark { font-size: 1.1rem; line-height: 1; }
-.svc--ok .svc-mark { color: var(--ok, #3fb950); }
-.svc--warn .svc-mark,
-.svc--missed .svc-mark { color: #d29922; }
-.svc--down .svc-mark { color: #ff5a5a; }
-.svc--unknown .svc-mark { color: var(--muted); }
-.svc-name { font-weight: 700; }
-.svc-kind {
-  margin-left: auto;
-  padding: .15rem .5rem;
-  border-radius: 999px;
-  background: var(--control-fill);
+.tile-mark { font-size: 3.5rem; line-height: 1; }
+.tile--ok .tile-mark { color: var(--ok, #3fb950); }
+.tile--warn .tile-mark { color: #d29922; }
+.tile--down .tile-mark { color: #ff5a5a; }
+.tile--unknown .tile-mark { color: var(--muted); }
+
+.tile-name { margin: var(--space-2) 0 0; font-size: 1.6rem; letter-spacing: -.02em; }
+.tile-what { margin: .15rem 0 0; color: var(--muted); font-size: .9rem; }
+.tile-state { margin: var(--space-3) 0 0; font-size: 1.25rem; font-weight: 700; }
+.tile-seen { margin: .25rem 0 0; color: var(--muted); }
+.tile-detail {
+  margin: var(--space-3) 0 0;
   color: var(--muted);
-  font-size: .75rem;
-}
-.svc-what { margin: var(--space-1) 0 0; color: var(--muted); font-size: .85rem; }
-.svc-reason { margin: var(--space-2) 0 0; font-size: .95rem; line-height: 1.4; }
-.svc-error {
-  margin: var(--space-2) 0 0;
-  padding: var(--space-2);
-  border-radius: var(--radius-inner);
-  background: color-mix(in srgb, #ff5a5a 12%, transparent);
-  color: color-mix(in srgb, #ff5a5a 55%, var(--text));
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: .8rem;
+  line-height: 1.4;
   overflow-wrap: anywhere;
 }
-
-.chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
-.chip {
-  padding: .2rem .5rem;
-  border-radius: 999px;
-  background: var(--control-fill);
-  color: var(--muted);
-  font-size: .75rem;
-}
-.chip b { color: var(--text); font-weight: 600; }
-
-.svc-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-.svc-btn {
-  min-height: var(--hit-target);
-  min-width: var(--hit-target);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-inner);
-  background: var(--control-fill);
-  color: var(--text);
-  cursor: pointer;
-  font: inherit;
-  font-size: .9rem;
-}
-.svc-btn:hover:not(:disabled) { background: var(--card-hover); }
-.svc-btn:disabled { opacity: .55; cursor: default; }
-.svc-hint,
-.svc-msg { color: var(--muted); font-size: .85rem; }
-
-/* ---- history ---- */
-.ops-alerts {
-  padding: var(--space-3);
-  border-radius: var(--radius-pane);
-  margin-top: var(--space-3);
-}
-.ops-alerts h2 { margin: 0 0 var(--space-2); font-size: 1rem; }
-.ops-alerts ul { display: grid; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
-.ops-alerts li { display: grid; gap: .15rem; font-size: .85rem; }
-.ops-alerts time { color: var(--muted); font-size: .75rem; }
+.tile-detail--error { color: color-mix(in srgb, #ff5a5a 55%, var(--text)); }
 
 .ops-stamp { margin-top: var(--space-3); color: var(--muted); font-size: .78rem; text-align: center; }
 
@@ -204,5 +140,5 @@ body {
 }
 
 @media (min-width: 40rem) {
-  .ops-grid { grid-template-columns: 1fr 1fr; }
+  .tiles { grid-template-columns: 1fr 1fr; }
 }

@@ -149,17 +149,19 @@ async function planFor(table: string, rec: any): Promise<Plan[]> {
     return plans;
   }
 
-  // Mini Control Room (ops.html): a service on the Mac mini changed state.
-  // Ian only — nobody else has a stake in his daemons. The `ops` function
+  // Status page (ops.html): brix or the Mac Mini changed state.
+  // Ian only — nobody else has a stake in his machines. The `ops` function
   // already filters to genuine transitions, so every row here is worth a push.
   if (table === "service_alerts") {
     if (!rec?.message || !rec?.service) return [];
     const { data: owner } = await admin.rpc("owner_user_id");
     if (!owner) return [];
     const recovered = rec.to_health === "ok";
+    // Alerts from before the two-machine catalog are keyed by old service names.
+    const machine = rec.service === "brix" ? "brix" : "Mac Mini";
     return [{
       recipients: [owner as string],
-      title: recovered ? "✅ Mac mini" : "⚠️ Mac mini",
+      title: `${recovered ? "✅" : "⚠️"} ${machine}`,
       body: String(rec.message).slice(0, 140),
       url: "ops.html",
       // One tag per service, so a flapping service replaces its own

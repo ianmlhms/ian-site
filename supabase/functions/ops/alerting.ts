@@ -1,16 +1,17 @@
 /* What is worth telling Ian about, kept apart from transport and from the
  * health arithmetic so each can be read on its own.
  *
- * Three rules live here, all learned from the 20 Aug 2026 outage, when the
- * mini rebooted, nobody logged in, and every service died at once:
+ * Two rules live here, both learned from the 20 Aug 2026 outage, when the
+ * mini rebooted, nobody logged in, and everything died at once:
  *
- *   1. A whole-machine outage is ONE event, not six. Six pushes that each name
- *      a different daemon bury the only sentence that matters ("log in").
- *   2. An unresolved alert must repeat. Alerting only on transitions means a
+ *   1. An unresolved alert must repeat. Alerting only on transitions means a
  *      single missed notification equals permanent silence — which is exactly
  *      what happened, and why the stack stayed dead for 41 hours.
- *   3. Recording and notifying are different things. Everything is logged;
+ *   2. Recording and notifying are different things. Everything is logged;
  *      only what a phone should buzz for is notified.
+ *
+ * (The old "whole box is down" collapsing rule is gone: a machine is now the
+ * unit being watched, so one dead machine is already one alert.)
  */
 import type { Health, ServiceHealth } from "./health.ts";
 
@@ -19,24 +20,12 @@ const HOUR_MS = 60 * MINUTE_MS;
 
 /** Health states worth waking a phone for. `unknown` means "never reported",
  * which is a deployment fact, not an incident. */
-export const ALERTABLE = new Set<Health>(["down", "missed", "warn"]);
+export const ALERTABLE = new Set<Health>(["down", "warn"]);
 
 /* An unresolved problem repeats: soon once, then slowly, so a missed
  * notification cannot turn into permanent silence without becoming a nag. */
 const FIRST_REPEAT_MS = 1 * HOUR_MS;
 const LATER_REPEAT_MS = 6 * HOUR_MS;
-
-/* The machine-level pseudo-service. Not in SERVICES: it is not something
- * OpsAgent reports on, it is the conclusion drawn when OpsAgent itself is
- * silent. `service_alerts.service` is free text and ops.js renders only the
- * message, so this key needs no schema change. */
-export const MACHINE_KEY = "mini";
-const MACHINE_LABEL = "Mac mini";
-
-/* OpsAgent is the watcher. If the watcher is silent AND most of what it
- * watches is silent too, the machine is down — not three daemons at once. */
-const MACHINE_WATCHER = "opsagent";
-const MACHINE_MIN_SILENT = 3;
 
 export type LastAlert = {
   health: string;
@@ -63,26 +52,6 @@ function repeatDueAfterMs(last: LastAlert): number {
   return wasRepeat(last) ? LATER_REPEAT_MS : FIRST_REPEAT_MS;
 }
 
-function isSilent(service: ServiceHealth): boolean {
-  return service.health === "down" || service.health === "missed";
-}
-
-/** The whole box is gone, rather than some of its services. */
-export function isMachineOutage(services: ServiceHealth[]): boolean {
-  const watcher = services.find((service) => service.key === MACHINE_WATCHER);
-  if (!watcher || watcher.health !== "down") return false;
-  return services.filter(isSilent).length >= MACHINE_MIN_SILENT;
-}
-
-function machineMessage(services: ServiceHealth[]): string {
-  const silent = services.filter(isSilent).length;
-  /* The actionable half. Every service on the mini is a LaunchAgent in
-   * gui/$UID, so a reboot nobody logs in after kills all of them while
-   * tailscaled — a system LaunchDaemon — keeps the mini looking "Online". */
-  return `${MACHINE_LABEL} is down — ${silent} services silent. ` +
-    "It most likely rebooted and nobody logged in: wake it and log in.";
-}
-
 /** Decide, for one key, whether its current state is worth a row right now. */
 function considerState(
   key: string,
@@ -92,6 +61,11 @@ function considerState(
   last: LastAlert | undefined,
   nowMs: number,
 ): PendingAlert | null {
+  /* "No report" is a deployment fact, never news in either direction — in
+   * particular it must not read as a recovery from whatever was logged before
+   * this machine had a heartbeat row. */
+  if (health === "unknown") return null;
+
   const alertable = ALERTABLE.has(health);
   const before = last?.health;
 
@@ -118,10 +92,6 @@ function considerState(
 
 /**
  * Pure: current health + what we last said → what to record and what to send.
- *
- * During a machine outage the per-service rows are still written (they are the
- * history the ops page shows) but they are not notified, so the phone gets the
- * one sentence that can be acted on.
  */
 export function planAlerts(
   services: ServiceHealth[],
@@ -129,25 +99,6 @@ export function planAlerts(
   nowMs: number,
 ): PendingAlert[] {
   const planned: PendingAlert[] = [];
-  const outage = isMachineOutage(services);
-  const lastMachine = lastAlerts.get(MACHINE_KEY);
-  const machineWasDown = lastMachine !== undefined &&
-    ALERTABLE.has(lastMachine.health as Health);
-
-  const machine = considerState(
-    MACHINE_KEY,
-    outage ? "down" : "ok",
-    machineMessage(services),
-    `${MACHINE_LABEL} is back — services are reporting again`,
-    lastMachine,
-    nowMs,
-  );
-  if (machine) planned.push(machine);
-
-  /* Silence the per-service chorus both while the box is down and on the tick
-   * it comes back, so one event never costs seven notifications. */
-  const notifyPerService = !outage && !machineWasDown;
-
   for (const service of services) {
     const item = considerState(
       service.key,
@@ -157,8 +108,7 @@ export function planAlerts(
       lastAlerts.get(service.key),
       nowMs,
     );
-    if (item) planned.push({ ...item, notify: item.notify && notifyPerService });
+    if (item) planned.push(item);
   }
-
   return planned;
 }
