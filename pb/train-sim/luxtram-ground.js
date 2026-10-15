@@ -322,6 +322,8 @@
     'vec3 groundAlbedo() {',
     '  vec4 a = texture2D(uCtrl0, vTerrUv); vec4 b = texture2D(uCtrl1, vTerrUv);',
     '  float tot = dot(a, vec4(1.0)) + dot(b, vec4(1.0)); a /= tot; b /= tot;',
+    /* near ground: sharpen the class mix (squared weights): the class map is 0.5 m per texel and softened, which smeared a ~1.5 m blurred band of grass into the asphalt along every verge and median */
+    '  if (uFar < 0.5) { a *= a; b *= b; float t2 = dot(a, vec4(1.0)) + dot(b, vec4(1.0)); a /= t2; b /= t2; }',
     '  vec2 wp = vWP.xz; vec2 dx = dFdx(wp); vec2 dy = dFdy(wp);',
     '  float m1 = lvn(wp * 0.035); float m2 = lvn(wp * 0.21); float m3 = lvn(wp * 1.3);',
     '  vec3 col = classMix(a, b, wp, dx, dy, m1, m2, m3);',
@@ -347,7 +349,7 @@
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + SPLAT_FRAG_COMMON)
         .replace('#include <map_fragment>', 'diffuseColor.rgb *= groundAlbedo();');
     };
-    mat.customProgramCacheKey = () => 'lt-splat-v3';
+    mat.customProgramCacheKey = () => 'lt-splat-v4';
     return mat;
   }
 
@@ -656,9 +658,13 @@
     /* The drawn carriageway rasterised into a 0.5 m height grid (cell centres), so roadHeightAt returns exactly the Y of the triangles that are on screen
        (the polygons are interpolated between their boundary vertices and differ from the terrain mesh by a few cm to dm). */
     const RG = 256; const RG_CELL = 128 / RG;
+    /* Two layers per cell: where carriageways of different height overlap (a ramp / overpass that is not an OSM bridge above a street) the cell keeps BOTH heights
+       (g = the lower, g2 = the upper, NaN when there is only one); roadSurface(t, x, z, refY) picks the one nearest to `refY` (the terrain height under a car),
+       so a car on the street below does not float on the ramp above it and a car on a ramp does not sink into the street below. */
     function rasterRoad(t, acc, i0, i1) {
       if (i1 <= i0) return null;
       const grid = new Float32Array(RG * RG).fill(NaN);
+      const grid2 = new Float32Array(RG * RG).fill(NaN);
       const P = acc.p; const I = acc.i;
       for (let k = i0; k + 2 < i1; k += 3) {
         const a = I[k] * 3; const b = I[k + 1] * 3; const c = I[k + 2] * 3;
@@ -676,27 +682,79 @@
             const l2 = ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / det;
             const l3 = 1 - l1 - l2;
             if (l1 < -0.02 || l2 < -0.02 || l3 < -0.02) continue;
-            grid[gz * RG + gx] = l1 * ya + l2 * yb + l3 * yc;
+            const y = l1 * ya + l2 * yb + l3 * yc;
+            const o = gz * RG + gx; const g1 = grid[o];
+            if (g1 !== g1) { grid[o] = y; continue; }
+            if (Math.abs(y - g1) <= 0.4) { grid[o] = y; continue; }               // the same surface (a later polygon on top of it)
+            const g2 = grid2[o];
+            if (g2 === g2 && Math.abs(y - g2) <= 0.4) { grid2[o] = y; continue; }
+            if (y < g1) { grid2[o] = g1; grid[o] = y; } else grid2[o] = y;         // another layer
           }
         }
       }
-      return grid;
+      return { g: grid, g2: grid2 };
     }
-    /* Y of the drawn carriageway at (x, z) (scene metres) in tile t, or NaN when the tile is not decorated / has no road there */
-    function roadSurface(t, x, z) {
-      const g = t && t.decor && t.decor.roadGrid;
-      if (!g) return NaN;
+    /* Y of the drawn carriageway at (x, z) (scene metres) in tile t, or NaN when the tile is not decorated / has no road there.  With several layers the one nearest to refY
+       wins (refY = the terrain height there); without refY the lower one. */
+    function roadSurface(t, x, z, refY) {
+      const rg = t && t.decor && t.decor.roadGrid;
+      if (!rg) return NaN;
+      const g = rg.g; const g2 = rg.g2;
       const u = (x - t.x0) / RG_CELL - 0.5; const v = (z - t.z0) / RG_CELL - 0.5;
       const iu = clamp(Math.floor(u), 0, RG - 2); const iv = clamp(Math.floor(v), 0, RG - 2);
       const fu = clamp(u - iu, 0, 1); const fv = clamp(v - iv, 0, 1);
+      const useRef = refY === refY && refY !== undefined;
       let sum = 0; let wsum = 0;
       for (let dz = 0; dz < 2; dz++) for (let dx = 0; dx < 2; dx++) {
-        const h = g[(iv + dz) * RG + iu + dx];
+        const o = (iv + dz) * RG + iu + dx;
+        let h = g[o];
         if (h !== h) continue;
+        const h2 = g2[o];
+        if (h2 === h2 && useRef && Math.abs(h2 - refY) < Math.abs(h - refY)) h = h2;
         const w = (dx ? fu : 1 - fu) * (dz ? fv : 1 - fv) + 1e-4;
         sum += h * w; wsum += w;
       }
       return wsum > 0 ? sum / wsum : NaN;
+    }
+
+    /* painted lines (lane dividers, edge lines, dashes; not parking bays) rasterised once per tile into a 0.25 m mask: paintAt(t, x, z) = 1 where a line is drawn */
+    const PM = 512; const PM_CELL = 128 / PM;
+    function paintMask(t) {
+      if (t.paintMask) return t.paintMask;
+      const vec = t.ground && t.ground.vec; const mask = new Uint8Array(PM * PM);
+      const line = (ax, az, bx, bz, w) => {
+        const dx = bx - ax; const dz = bz - az; const L = Math.hypot(dx, dz); const n = Math.max(1, Math.ceil(L / 10));
+        const r = Math.max(1, Math.round(w / 2 / (PM_CELL * 100)));
+        for (let i = 0; i <= n; i++) {
+          const px = Math.floor((ax + dx * i / n) / 100 / PM_CELL); const pz = Math.floor((az + dz * i / n) / 100 / PM_CELL);
+          for (let oz = -r + 1; oz <= r - 1; oz++) for (let ox = -r + 1; ox <= r - 1; ox++) { const x = px + ox; const z = pz + oz; if (x >= 0 && z >= 0 && x < PM && z < PM) mask[z * PM + x] = 1; }
+          if (r === 1 && px >= 0 && pz >= 0 && px < PM && pz < PM) mask[pz * PM + px] = 1;
+        }
+      };
+      if (vec) {
+        (vec.m || []).forEach((m) => { if (m[0] === 5) return; for (let i = 2; i + 3 < m.length; i += 2) line(m[i], m[i + 1], m[i + 2], m[i + 3], m[1]); });
+        (vec.d || []).forEach((d) => { for (let i = 2; i + 3 < d.length; i += 4) line(d[i], d[i + 1], d[i + 2], d[i + 3], d[1]); });
+      }
+      t.paintMask = mask;
+      return mask;
+    }
+    function paintAt(t, x, z) {
+      if (!t || !t.ground) return 0;
+      const m = paintMask(t); const px = Math.floor((x - t.x0) / PM_CELL); const pz = Math.floor((z - t.z0) / PM_CELL);
+      return px >= 0 && pz >= 0 && px < PM && pz < PM ? m[pz * PM + px] : 0;
+    }
+    /* test hook: distance (m) from (x, z) to the nearest painted road line (lane dividers, edge lines, dashes; not parking bays) of tile t, Infinity when none */
+    function paintDistance(t, x, z) {
+      const vec = t && t.ground && t.ground.vec; if (!vec) return Infinity;
+      const px = (x - t.x0) * 100; const pz = (z - t.z0) * 100; let best = Infinity;
+      const seg = (ax, az, bx, bz) => {
+        const dx = bx - ax; const dz = bz - az; const l2 = dx * dx + dz * dz || 1;
+        const u = clamp(((px - ax) * dx + (pz - az) * dz) / l2, 0, 1);
+        const d = Math.hypot(px - (ax + dx * u), pz - (az + dz * u)); if (d < best) best = d;
+      };
+      (vec.m || []).forEach((m) => { if (m[0] === 5) return; for (let i = 2; i + 3 < m.length; i += 2) seg(m[i], m[i + 1], m[i + 2], m[i + 3]); });
+      (vec.d || []).forEach((d) => { for (let i = 2; i + 3 < d.length; i += 4) seg(d[i], d[i + 1], d[i + 2], d[i + 3]); });
+      return best / 100;
     }
 
     function decorateWater(t, grp) {
@@ -841,7 +899,7 @@
     }
     return {
       fetchTile: (buf) => parseTile(buf), weightTextures: (cls, n, o) => weightTextures(T, cls, n, o), terrainMaterial, farMaterial, decorate, deckHeight, dropTile,
-      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, roadSurface, debugDecks: () => decks, Acc, MAT,
+      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, roadSurface, paintDistance, paintAt, debugDecks: () => decks, Acc, MAT,
     };
   }
 

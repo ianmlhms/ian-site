@@ -747,6 +747,19 @@
     const matTree = new T.MeshLambertMaterial({ vertexColors: true });
     mats.push(matTree);
     const tmpM = new T.Matrix4(); const tmpQ = new T.Quaternion(); const tmpP = new T.Vector3(); const tmpS = new T.Vector3(); const tmpC = new T.Color(); const yAxis = new T.Vector3(0, 1, 0);
+    /* painted class map: is (x, z) (scene metres) asphalt, or within `margin` m of asphalt?  (class 0 of the 0.5 m ground map; false when the map is not loaded) */
+    function onAsphalt(t, x, z, margin) {
+      const cls = t.ground && t.ground.cls; if (!cls) return false;
+      const N_ = ground.N; const cell = TS_ / N_; const r = Math.ceil(margin / cell);
+      const cx = Math.floor((x - t.x0) / cell); const cz = Math.floor((z - t.z0) / cell);
+      for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dz * dz > r * r + 1) continue;
+        const ix = cx + dx; const iz = cz + dz;
+        if (ix < 0 || iz < 0 || ix >= N_ || iz >= N_) continue;
+        if (cls[iz * N_ + ix] === 0) return true;
+      }
+      return false;
+    }
     function buildTileTrees(t) {
       if (!t.trees || t.trees.byteLength < 8) return null;
       const dv = new DataView(t.trees);
@@ -759,6 +772,7 @@
         const h = dv.getUint8(k * 8 + 4) / 4; const r = dv.getUint8(k * 8 + 5) / 20; const c565 = dv.getUint16(k * 8 + 6, true);
         const x = x0 + lx; const z = z0 + lz;
         if (nearest(x, z).d < 4.6) continue;
+        if (onAsphalt(t, x, z, 1.5)) continue;       // never on / within 1.5 m of a carriageway (a LiDAR canopy over a motorway / viaduct is not a tree)
         const cr = ((c565 >> 11) & 31) / 31; const cg = ((c565 >> 5) & 63) / 63; const cb = (c565 & 31) / 31;
         const lum = (cr + cg + cb) / 3;
         const con = lum < 0.26 && cg > cr * 1.05 && hash2(k, t.info.i * 5 + t.info.j) < 0.75;
@@ -1401,14 +1415,20 @@
       if (named && hasLandmarkFor(br.name)) return;
       const sA = br.s0 - 1; const sB = br.s1 + 1;
       const lL = (s) => slotLatL(s) - 0.9; const lR = SLOT_IN_R + 0.9;
-      const depth = named ? 2.4 : 1.5;
+      const depth = named ? 2.4 : 1.25;
       const deckCol = named ? C('#a9a69f') : CONC;
+      const SLAB = 0.45; const WEB_IN = 0.8;      // the top slab is 0.45 m thick and overhangs the box girder below by 0.8 m: a visible edge beam
       if (!named) {
         // the deck top across the whole slot (the OSM road decks of the ground module cover only the carriageways; without this the underside shows between them)
-        surfStrip(batch.surf, sA - 7, sB + 7, lL, () => lR, ground.MAT.PAVE, [0.86, 0.85, 0.82], -0.08, 3);   // 7 m run-on at both ends: the DEM under the abutments is a pit
-        wallStrip(batch.misc, sA, sB, lL, (f) => f.pos.y - depth, (f) => f.pos.y + 1.05, deckCol, 1);
-        wallStrip(batch.misc, sA, sB, () => lR, (f) => f.pos.y - depth, (f) => f.pos.y + 1.05, deckCol, -1);
-        flatStrip(batch.misc, sA, sB, lL, lR, (f) => f.pos.y - depth, CONC_D, false, { step: 3 });
+        surfStrip(batch.surf, sA - 2.5, sB + 2.5, lL, () => lR, ground.MAT.PAVE, [0.86, 0.85, 0.82], -0.08, 3);   // short run-on at both ends: no strip hanging over the embankment
+        // edge beams (outer faces of the slab, light concrete), then the girder webs set back under them
+        wallStrip(batch.misc, sA, sB, lL, (f) => f.pos.y - SLAB, (f) => f.pos.y + 1.05, CONC_L, 1);
+        wallStrip(batch.misc, sA, sB, () => lR, (f) => f.pos.y - SLAB, (f) => f.pos.y + 1.05, CONC_L, -1);
+        flatStrip(batch.misc, sA, sB, lL, (s) => lL(s) + WEB_IN, (f) => f.pos.y - SLAB, CONC_D, false, { step: 3 });      // soffit of the overhang
+        flatStrip(batch.misc, sA, sB, () => lR - WEB_IN, () => lR, (f) => f.pos.y - SLAB, CONC_D, false, { step: 3 });
+        wallStrip(batch.misc, sA, sB, (s) => lL(s) + WEB_IN, (f) => f.pos.y - depth, (f) => f.pos.y - SLAB, deckCol, 1);
+        wallStrip(batch.misc, sA, sB, () => lR - WEB_IN, (f) => f.pos.y - depth, (f) => f.pos.y - SLAB, deckCol, -1);
+        flatStrip(batch.misc, sA, sB, (s) => lL(s) + WEB_IN, () => lR - WEB_IN, (f) => f.pos.y - depth, CONC_D, false, { step: 3 });
         // end caps close the box girder at both ends (no void to see into at the abutments)
         [sA, sB].forEach((se, k) => {
           const f = frame(se); const l0 = lL(se); const sg = k === 0 ? -1 : 1;
@@ -1421,7 +1441,7 @@
         flatStrip(batch.misc, sA, sB, (s) => lL(s) - 0.25, (s) => lL(s), (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
         flatStrip(batch.misc, sA, sB, lR, lR + 0.25, (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
       }
-      // piers / abutments to the ground
+      // supports: a pair of columns with a cross-head under every pier line, columns that reach the ground; abutment walls at both ends
       const len = sB - sA;
       const np = Math.max(0, Math.floor(len / 30));
       const places = [];
@@ -1429,15 +1449,25 @@
       places.push(sA + 0.8); places.push(sB - 0.8);
       places.forEach((s, idx) => {
         const f = frame(s);
-        const lat = (slotLatL(s) + SLOT_IN_R) / 2;
-        const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat;
-        const g = rawG(x, z);
-        const hh = f.pos.y - depth - g;
-        if (hh < 1.2) return;
         const abut = idx >= places.length - 2;
-        const w = (lR - lL(s)) * (abut ? 1.02 : 0.7);
-        addBox(batch.misc, x, g + hh / 2 - 0.05, z, abut ? 1.4 : 2.0, hh + 0.1, w, Math.atan2(f.right.z, f.right.x) + Math.PI / 2, CONC);
-        if (!abut) addBox(batch.misc, x, f.pos.y - depth - 0.35, z, 2.6, 0.7, (lR - lL(s)) * 0.9, Math.atan2(f.right.z, f.right.x) + Math.PI / 2, CONC_D);
+        const rot = Math.atan2(f.right.z, f.right.x) + Math.PI / 2;
+        const l0 = lL(s) + WEB_IN; const l1 = lR - WEB_IN; const wid = l1 - l0;
+        if (abut) {
+          const lat = (l0 + l1) / 2; const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat;
+          const g = Math.min(rawG(f.pos.x + f.right.x * l0, f.pos.z + f.right.z * l0), rawG(x, z), rawG(f.pos.x + f.right.x * l1, f.pos.z + f.right.z * l1));
+          const hh = f.pos.y - depth - g + 0.4;
+          if (hh < 0.3) return;
+          addBox(batch.misc, x, g + hh / 2 - 0.4, z, 1.0, hh + 0.4, wid * 1.02, rot, CONC);     // the abutment wall stands 0.4 m into the embankment
+          return;
+        }
+        [l0 + 1.4, l1 - 1.4].forEach((lat) => {
+          const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat;
+          const g = rawG(x, z);
+          const hh = f.pos.y - depth - g;
+          if (hh < 0.6) return;
+          addBox(batch.misc, x, g + hh / 2 - 0.3, z, 1.3, hh + 0.6, 1.3, rot, CONC);              // column: 0.3 m into the ground, up to the girder
+        });
+        addBox(batch.misc, f.pos.x + f.right.x * (l0 + l1) / 2, f.pos.y - depth - 0.3, f.pos.z + f.right.z * (l0 + l1) / 2, 1.8, 0.6, wid * 0.94, rot, CONC_D);   // cross-head
       });
       if (!named) return;
       // Pont Rouge / Pont Adolphe without the landmark models: the old steel V legs / arch ribs
@@ -1783,7 +1813,7 @@
       if (onBridge) return ground.deckHeight(x, z);
       const t = tileOf(x, z);
       if (!t || !t.built || !t.mesh || !t.decor) return NaN;       // not built / not at its final LOD (decorated) yet
-      const r = ground.roadSurface(t, x, z);       // the drawn carriageway triangles
+      const r = ground.roadSurface(t, x, z, meshY(t, x, z));       // the drawn carriageway triangles (of overlapping layers: the one at the terrain, not a ramp above / street below)
       if (r === r) return r;
       if (roadOnly) return NaN;                    // roadOnly: no terrain fallback (the traffic then levels a wheel that is off the carriageway)
       const y = surfY(t, x, z);                    // no carriageway drawn here (kerb side, parking): the terrain + the road lift
@@ -1795,14 +1825,15 @@
       const t = tileOf(x, z);
       if (!t) return tileByKey.has(Math.floor((x + ox) / TS_) + '_' + Math.floor((z + oz) / TS_)) ? -1 : 0;
       if (!t.built || !t.mesh || !t.decor) return -1;
-      const r = ground.roadSurface(t, x, z);
+      const r = ground.roadSurface(t, x, z, meshY(t, x, z));
       return r === r ? 1 : 0;
     };
     TS.luxDrawnRoad = drawnRoad;
+    const paintAt = (x, z) => { const t = tileOf(x, z); return t ? ground.paintAt(t, x, z) : 0; };   // painted lane line under (x, z) (traffic: lane centres)
 
     /* ---- traffic: moved to luxtram-traffic.js (TS.luxTraffic) */
     const traffic = (Q.cars && TS.luxTraffic)
-      ? TS.luxTraffic.create({ THREE: T, root, Q, roadsByChunk, gy, rawG, roadHeightAt, tileOf, nearest, frame, track, quality, night: () => nightK, hasOpp, oppLatAt, roadMarginExcept, routeReverse: !!(options && options.reverse) })
+      ? TS.luxTraffic.create({ THREE: T, root, Q, roadsByChunk, gy, rawG, roadHeightAt, paintAt, tileOf, nearest, frame, track, quality, night: () => nightK, hasOpp, oppLatAt, roadMarginExcept, routeReverse: !!(options && options.reverse) })
       : null;
     const markTraffic = () => { if (traffic) traffic.markDirty(); };
     let tramS = -1e9;
@@ -2022,12 +2053,13 @@
     void lastS;
     /* test hook: the road carriageways (scene metres, half width) and road lamps of the loaded chunks, to check that no pole stands in a lane */
     const debugRoadFurniture = () => ({
-      roads: Array.from(roadsByChunk.values()).flat().map((r) => ({ cls: r.cls, hw: r.hw, pts: r.pts.map((p) => [p.x, p.z]) })),
+      roads: Array.from(roadsByChunk.values()).flat().map((r) => ({ cls: r.cls, hw: r.hw, bridge: r.bridge === true, oneway: r.oneway === true, pts: r.pts.map((p) => [p.x, p.z]) })),
       lamps: Array.from(lampsByChunk.values()).flat().map((l) => ({ x: l[0], z: l[1] })),
       posts: traffic ? traffic.posts() : [],
     });
     const debugSlot = (s) => { const sl = slotAt(s); if (!sl) return null; const f = frame(s); const L = slotLatL(s); return { kind: sl.kind, s0: sl.s0, s1: sl.s1, y: f.pos.y, HsL: slotShelf(sl, s, -1), HsR: slotShelf(sl, s, 1), L, R: SLOT_IN_R, left: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (L - d); const z = f.pos.z + f.right.z * (L - d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, -1, d, x, z).toFixed(1)]; }), right: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (SLOT_IN_R + d); const z = f.pos.z + f.right.z * (SLOT_IN_R + d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, 1, d, x, z).toFixed(1)]; }) }; };
-    return { debugSlot, debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
+    const paintDistance = (x, z) => { const t = tileOf(x, z); return t && t.ground ? ground.paintDistance(t, x, z) : NaN; };
+    return { paintDistance, debugSlot, debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
   }
 
   TS.luxtramWorld = { create, QUALITY, prefetchData };

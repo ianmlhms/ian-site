@@ -92,21 +92,24 @@ async function luxtramNormalChecks(h, frame) {
         const end = i + 1 < L.length ? L[i + 1].s : tr.length;
         const len = end - L[i].s;
         const mid = (L[i].s + end) / 2;
-        const min = mid >= lt.centre[0] && mid <= lt.centre[1] ? lt.minZoneCentre : lt.minZone;
-        if (len < min - 1) bad.push(Math.round(L[i].s) + ':' + L[i].kmh + ' ' + Math.round(len) + 'm<' + min);
+        const min = lt.minZone;
+        const kind = lt.zones && lt.zones[i] ? lt.zones[i].kind : 'base';   // curve zones (25 / 30 around a bend) and the gaps between two of them are short by design
+        if (kind === 'base' && len < min - 1) bad.push(Math.round(L[i].s) + ':' + L[i].kmh + ' ' + Math.round(len) + 'm<' + min);
         shortest = Math.min(shortest, len);
         values.add(L[i].kmh);
         if (i && L[i].kmh === L[i - 1].kmh) dup++;
       }
       // never a higher limit squeezed between two lower ones over a short distance
       let squeezed = 0;
-      for (let i = 1; i + 1 < L.length; i++) if (L[i].kmh > L[i - 1].kmh && L[i].kmh > L[i + 1].kmh && (L[i + 1].s - L[i].s) < 150) squeezed++;
+      for (let i = 1; i + 1 < L.length; i++) if (L[i].kmh > L[i - 1].kmh && L[i].kmh > L[i + 1].kmh && (L[i + 1].s - L[i].s) < 120) squeezed++;   // (a gap of 120 m or more between two bends keeps its own speed, one step above)
       const limAt = (s) => { let k = L[0].kmh; for (const l of L) { if (l.s <= s) k = l.kmh; else break; } return k; };
       const o = { zones: L.length, bad, shortest, values: [...values].sort((a, b) => a - b), dup, squeezed, stationLimitZones: 0 };
       if (id === 'luxtram-kierchbierg') {
         const mb = lt.motorwayBridge;
         const maxIn = (a, b2) => { let m = 0; for (let s = a; s <= b2; s += 5) m = Math.max(m, limAt(s)); return m; };
-        o.fast = { findelHeienhaff: maxIn(0, tr.stations[1].platformEnd), bridgeLuxexpo: maxIn(mb[1], tr.stations[2].platformEnd), all: maxIn(0, tr.length), kierchberg: maxIn(tr.stations[2].platformEnd, tr.length) };
+        const fw = lt.forestWindow;
+        let outside = 0, inside = 0; for (let s = 0; s <= tr.length; s += 5) { const k = limAt(s); if (fw && s >= fw[0] && s <= fw[1]) inside = Math.max(inside, k); else outside = Math.max(outside, k); }
+        o.fast = { findelHeienhaff: maxIn(0, tr.stations[1].platformEnd), bridgeLuxexpo: maxIn(mb[1], tr.stations[2].platformEnd), all: maxIn(0, tr.length), kierchberg: maxIn(tr.stations[2].platformEnd, tr.length), forest: inside, outside, fw };
       }
       out[id] = o;
     }
@@ -117,9 +120,10 @@ async function luxtramNormalChecks(h, frame) {
     h.expect(o.values.every((v) => [25, 30, 40, 50, 60, 70].includes(v)) && o.dup === 0 && o.squeezed === 0, id + ': limits ' + o.values.join('/') + ' (multiples of 10, 25 only where needed), boards only where the value changes, nothing squeezed');
   }
   const fast = lim['luxtram-kierchbierg'].fast;
-  h.expect(fast.findelHeienhaff <= 50, 'Findel - Héienhaff: no limit above 50 km/h (max ' + fast.findelHeienhaff + ')');
-  h.expect(fast.bridgeLuxexpo <= 60, 'motorway bridge - Luxexpo: no 70 km/h (max ' + fast.bridgeLuxexpo + ')');
-  h.expect(fast.kierchberg <= 60, 'Luxexpo - Kirchberg - Stad: no 70 km/h on the boulevard (max ' + fast.kierchberg + ')');
+  h.expect(fast.forest === 70 && fast.outside <= 50, '70 km/h only on the forest stretch Héienhaff - A1 bridge (' + fast.forest + ', window ' + Math.round(fast.fw[0]) + '..' + Math.round(fast.fw[1]) + '); everywhere else at most 50 (' + fast.outside + ')');
+  h.expect(fast.findelHeienhaff <= 50, 'Findel - Héienhaff (airport, cutting): no limit above 50 km/h (max ' + fast.findelHeienhaff + ')');
+  h.expect(fast.bridgeLuxexpo <= 50, 'A1 bridge - Luxexpo: no 70 km/h (max ' + fast.bridgeLuxexpo + ')');
+  h.expect(fast.kierchberg <= 50, 'Luxexpo - Kirchberg - Stad: no 70 km/h on the boulevard (max ' + fast.kierchberg + ')');
 
   h.step('Luxtram: smooth vertical profile (no bumps), max grade 7 % (Findel - Héienhaff - Luxexpo and the whole line)');
   const prof = await frame.evaluate(() => {
@@ -139,7 +143,45 @@ async function luxtramNormalChecks(h, frame) {
   h.expect(prof.luxtram.perKm <= 4 && prof['luxtram~r'].perKm <= 4, 'Findel - Héienhaff - Luxexpo: ' + prof.luxtram.perKm.toFixed(1) + ' grade reversals per km (was 18)');
   h.expect(prof.luxtram.whole <= 3 && prof['luxtram~r'].whole <= 3, 'whole line: ' + prof.luxtram.whole.toFixed(1) + ' grade reversals per km (was 7.4)');
 
-  h.step('limit changes apply at the tram\'s NOSE (decreases AND increases); no limit zone shorter than the minimum on any route (rail 400 m, TGV 800 m, tram 300 m)');
+  h.step('Luxtram limits: curve zones are local, and driving Stadion - Findel at the limits with 25 s dwell takes about the real 40 minutes');
+  const lim2 = await frame.evaluate(() => {
+    const out = { badCurve: [], runs: {} };
+    const fwd = TS.track.build(TS.routes.get('luxtram'));
+    const lt = fwd.luxtram; const cs = lt.curveSamples;
+    lt.zones.forEach((z) => {
+      if (z.kind !== 'curve') return;
+      let a = null, b = null;
+      for (let s = Math.max(0, z.s0 - 100); s <= z.s1 + 10; s += 10) { const i = Math.round(s / 10); if (Number.isFinite(cs[i]) && cs[i] <= z.kmh) { if (a === null) a = s; b = s; } }
+      const bend = a === null ? 0 : b - a + 10;
+      if (z.s1 - z.s0 > bend + 20 + 47 + 60 + 60) out.badCurve.push(Math.round(z.s0) + ':' + z.kmh + ' ' + Math.round(z.s1 - z.s0) + ' m for a ' + bend + ' m bend');
+    });
+    // time driven at the limits: acceleration 1.0 m/s2, braking 1.0 m/s2 for limit drops and stops, 25 s dwell at every intermediate stop
+    for (const id of ['luxtram~r', 'luxtram']) {
+      const tr = TS.track.build(TS.routes.get(id)); const L = tr.limits; const A = 1.0, B = 1.0, DT = 0.25;
+      const limAt = (s) => { let k = L[0].kmh; for (const l of L) { if (l.s <= s) k = l.kmh; else break; } return k / 3.6; };
+      const stops = tr.stations.map((st) => st.s);
+      let s = 0, v = 0, t = 0, si = 1, dwell = 0;
+      const maxV = (s0) => {
+        let m = limAt(s0);
+        for (const l of L) { if (l.s > s0 && l.s - s0 < 400) m = Math.min(m, Math.sqrt((l.kmh / 3.6) ** 2 + 2 * B * (l.s - s0))); }
+        if (si < stops.length) m = Math.min(m, Math.sqrt(2 * B * Math.max(0, stops[si] - s0)) + 0.3);
+        return m;
+      };
+      for (let guard = 0; guard < 400000 && s < tr.length - 3; guard++) {
+        if (dwell > 0) { dwell -= DT; t += DT; continue; }
+        const target = maxV(s);
+        v = v < target ? Math.min(target, v + A * DT) : Math.max(target, v - B * DT * 1.2);
+        s += v * DT; t += DT;
+        if (si < stops.length && stops[si] - s < 0.4 && v < 1.2) { s = stops[si]; v = 0; si++; if (si < stops.length) dwell = 25; else break; }
+      }
+      out.runs[id] = Math.round(t / 60);
+    }
+    return out;
+  });
+  h.expect(lim2.badCurve.length === 0, 'no 25 / 30 zone is more than bend + margins + 120 m long (' + lim2.badCurve.slice(0, 3).join('; ') + ')');
+  h.expect(lim2.runs['luxtram~r'] >= 30 && lim2.runs['luxtram~r'] <= 50 && lim2.runs.luxtram >= 30 && lim2.runs.luxtram <= 50, 'Stadion - Findel driven at the limits (25 s dwell, 1 m/s2): ' + lim2.runs['luxtram~r'] + ' min, Findel - Stadion ' + lim2.runs.luxtram + ' min (real timetable ~40 min)');
+
+  h.step('limit changes apply at the tram\'s NOSE (decreases AND increases); no limit zone shorter than the minimum on any route (rail 400 m, TGV 800 m, tram 300 m; a tram bend zone and the gap between two bends are local by design)');
   const nose = await frame.evaluate(() => {
     const out = { cases: [], tailFirst: null };
     const track = TS.track.build(TS.routes.get('luxtram-kierchbierg'));
@@ -159,7 +201,7 @@ async function luxtramNormalChecks(h, frame) {
     const MIN = { rail: 400, hst: 800, tram: 300 }; const bad = []; let zones = 0, routes = 0;
     for (const def of TS.routes.list) for (const id of [def.id, def.id + '~r']) {
       const tr = TS.track.build(TS.routes.get(id)); const lim = tr.limits; const min = MIN[tr.kind] || 400; routes++;
-      for (let i = 0; i < lim.length; i++) { const len = (i + 1 < lim.length ? lim[i + 1].s : tr.length) - lim[i].s; zones++; if (len < min - 1) bad.push(id + '@' + Math.round(lim[i].s) + ':' + lim[i].kmh + ' ' + Math.round(len) + 'm'); }
+      for (let i = 0; i < lim.length; i++) { const len = (i + 1 < lim.length ? lim[i + 1].s : tr.length) - lim[i].s; zones++; const kd = tr.luxtram && tr.luxtram.zones && tr.luxtram.zones[i] ? tr.luxtram.zones[i].kind : 'base'; if (kd === 'base' && len < min - 1) bad.push(id + '@' + Math.round(lim[i].s) + ':' + lim[i].kmh + ' ' + Math.round(len) + 'm'); }
     }
     out.zones = { routes, zones, bad };
     return out;
@@ -459,8 +501,8 @@ async function directionAndGearChecks(h, frame) {
       const bad = [];
       for (let i = 0; i < L.length; i++) {
         const end = i + 1 < L.length ? L[i + 1].s : tr.length, len = end - L[i].s, mid = (L[i].s + end) / 2;
-        const min = mid >= lt.centre[0] && mid <= lt.centre[1] ? lt.minZoneCentre : lt.minZone;
-        if (len < min - 1) bad.push(Math.round(L[i].s) + ':' + L[i].kmh + ' ' + Math.round(len) + 'm');
+        const kind = lt.zones && lt.zones[i] ? lt.zones[i].kind : 'base';
+        if (kind === 'base' && len < lt.minZone - 1) bad.push(Math.round(L[i].s) + ':' + L[i].kmh + ' ' + Math.round(len) + 'm');
       }
       out[id] = { zones: L.length, bad };
     }
@@ -474,7 +516,7 @@ async function directionAndGearChecks(h, frame) {
     return out;
   });
   for (const id of ['luxtram-kierchbierg~r', 'luxtram-stad~r', 'luxtram-sud~r', 'luxtram~r']) h.expect(revLimits[id].bad.length === 0, id + ': ' + revLimits[id].zones + ' limit zones, none below the minimum length' + (revLimits[id].bad.length ? ' ' + revLimits[id].bad.join(', ') : ''));
-  h.expect(revLimits.fast[0] <= 50 && revLimits.fast[1] <= 60, 'Héienhaff - Findel and Luxexpo - motorway bridge (return): no 70 km/h (max ' + revLimits.fast.join(' / ') + ')');
+  h.expect(revLimits.fast[0] <= 50 && revLimits.fast[1] <= 50, 'Héienhaff - Findel and Luxexpo - motorway bridge (return): no 70 km/h (max ' + revLimits.fast.join(' / ') + ')');
 
   h.step('return direction in the cab: HUD side, door side and the stop marker at every stop of both directions (Luxtram full line + west)');
   for (const id of ['luxtram~r', 'west~r']) {

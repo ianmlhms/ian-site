@@ -37,7 +37,22 @@
   const CENTRE_PAD = 150;
   const CURVE_R_25 = 45;             // m: curves tighter than this are limited to 25 km/h, tighter than CURVE_R_30 to 30 km/h
   const CURVE_R_30 = 70;
-  const DEFAULT_KMH = 50;            // limit where OSM has no maxspeed: the usual urban tram speed (70 only where OSM says so, never by surface)
+  const DEFAULT_KMH = 50;            // limit where OSM has no maxspeed: the usual urban tram speed
+  const MAX_NORMAL_KMH = 50;         // the line runs at 50 km/h at most (real T1: ~50 on its normal sections, commercial speed only 20-24 km/h); no 70 anywhere
+  /* The fast stretch: the ~2 km segregated track through the Gréngewald forest between Héienhaff and the A1 bridge before Luxexpo, where the real T1 runs up to 70 km/h
+     (Railway Gazette; press file of the Luxembourg government on the opening of the Findel extension, 2 March 2025; OSM maxspeed=70 there too).  Only OSM-60/70 track in this
+     window gets it; the A1 bridge itself and everything after it (towards / into Luxexpo), Findel - Héienhaff and the whole city keep the normal 50. */
+  const FOREST_STRETCH_KMH = 70;
+  const FOREST_BRIDGE_PAD = 60;       // the forest limit ends this far before the A1 bridge
+  /* Curve restrictions are local: from CURVE_BEFORE_M ahead of the bend to the bend's end + one tram length (the nose-based limit ends when the REAR has cleared it);
+     boards of drops move ahead by the braking distance (<= LEAD_MAX_M). A gap between two curve zones shorter than GAP_MERGE_M takes the lower limit, a longer one keeps its
+     own speed but at most one step above its higher neighbour (25 -> 40 -> 25, never 25 -> 70 -> 25). */
+  const CURVE_BEFORE_M = 20;
+  const CURVE_AFTER_M = TRAIN_LEN + 2;
+  const CURVE_JOIN_M = 30;
+  const GAP_MERGE_M = 120;
+  const LEAD_MAX_M = 60;
+  const LEAD_DECEL = 1.0;
   const GRADE_MAX = 0.07;            // the steepest real stretches of the T1 (Pfaffenthal / Héienhaff ramps) stay under 7 %
   /* Vertical profile smoothing (Ian: "the track goes up and down in many small bumps"): the LiDAR rail levels carry +-0.3 m of noise every few
      metres, which reads as grades of +-5 % that change sign every 20-40 m. A penalised fit (Whittaker smoother = discrete cubic smoothing spline)
@@ -560,54 +575,91 @@
   }
 
   /* ------------------------------------------------------------ Track for one route */
-  /* limit zones from 10 m samples v[i] (km/h): zones shorter than the minimum are merged (a short zone higher than a neighbour takes the lower value,
-     a short slow zone is widened to the minimum, so speed values only ever go down); the boards of drops are moved ahead by the braking lead
-     without making the zone before them shorter than the minimum. */
-  function buildLimits(v, minLenAt, totalLen) {
-    const n = v.length;
-    const runs = () => {
-      const out = [];
-      for (let i = 0; i < n; i++) { const r = out[out.length - 1]; if (r && r.v === v[i]) r.b = i + 1; else out.push({ a: i, b: i + 1, v: v[i] }); }
-      return out;
-    };
-    for (let guard = 0; guard < 4000; guard++) {
-      const rs = runs();
-      const lenOf = (r) => (r.b >= n ? totalLen - r.a * 10 : (r.b - r.a) * 10);
-      const k = rs.findIndex((r) => lenOf(r) < minLenAt(((r.a + r.b) / 2) * 10));
-      if (k < 0) break;
-      const r = rs[k];
-      const pv = k > 0 ? rs[k - 1].v : Infinity;
-      const nv = k + 1 < rs.length ? rs[k + 1].v : Infinity;
-      if (pv === Infinity && nv === Infinity) break;
-      if (r.v < pv && r.v < nv) {   // short slow zone between / at the end of faster ones: widen it to the minimum
-        const need = Math.ceil((minLenAt(((r.a + r.b) / 2) * 10) - lenOf(r)) / 10);
-        const before = pv === Infinity ? 0 : Math.ceil(need / 2);
-        const after = nv === Infinity ? 0 : need - before;
-        const lo = Math.max(0, r.a - (pv === Infinity ? 0 : before));
-        const hi = Math.min(n, r.b + (nv === Infinity ? need : after));
-        for (let i = lo; i < hi; i++) v[i] = Math.min(v[i], r.v);
-        if (lo === r.a && hi === r.b) break;
-      } else {
-        const to = Math.min(pv, nv);
-        for (let i = r.a; i < r.b; i++) v[i] = to;
-      }
+  /* Limit zones of one direction of travel from 10 m samples: baseV[i] = the line speed (OSM maxspeed, 50 default, capped), curveV[i] = 25 / 30 / Infinity from the bend.
+     Returns { limits: [{ s, kmh }] (boards), zones: [{ s0, s1, kmh, kind: 'base' | 'curve' | 'gap' | 'end' }] }.  Rules:
+       1. base zones (no curve) are at least minZone long (a shorter one takes the closer neighbour's speed);
+       2. every bend gets its own zone: CURVE_BEFORE_M before it .. its end + CURVE_AFTER_M (never longer);
+       3. a non-curve gap between two curve zones: < GAP_MERGE_M takes the lower limit, longer keeps its speed capped to one step above the higher neighbour. */
+  function buildTramLimits(baseV, curveV, totalLen, minZone) {
+    const n = baseV.length;
+    const v = Array.from(baseV);
+    const kind = new Array(n).fill(0);                 // 0 base, 1 curve, 2 gap
+    const lenOf = (r) => (r.b >= n ? totalLen - r.a * 10 : (r.b - r.a) * 10);
+    const runsOf = () => { const out = []; for (let i = 0; i < n; i++) { const r = out[out.length - 1]; if (r && r.v === v[i] && r.k === kind[i]) r.b = i + 1; else out.push({ a: i, b: i + 1, v: v[i], k: kind[i] }); } return out; };
+    // 1. base zones
+    for (let guard = 0; guard < 3000; guard++) {
+      const rs = runsOf();
+      let k = -1; let best = minZone;
+      rs.forEach((r, i) => { const l = lenOf(r); if (l < best) { best = l; k = i; } });
+      if (k < 0 || rs.length < 2) break;
+      const pv = k > 0 ? rs[k - 1].v : null; const nv = k + 1 < rs.length ? rs[k + 1].v : null;
+      let to;
+      if (pv === null) to = nv; else if (nv === null) to = pv; else { const dp = Math.abs(pv - rs[k].v); const dn = Math.abs(nv - rs[k].v); to = dp < dn ? pv : dn < dp ? nv : Math.min(pv, nv); }
+      for (let i = rs[k].a; i < rs[k].b; i++) v[i] = to;
     }
-    const zones = runs().map((r) => ({ s: r.a * 10, kmh: r.v }));
-    const out = [];
-    zones.forEach((z, i) => {
-      const prev = zones[i - 1];
-      let s = z.s;
-      if (prev && z.kmh < prev.kmh) {
-        const v1 = prev.kmh / 3.6;
-        const v2 = z.kmh / 3.6;
-        const prevStart = out[out.length - 1].s;
-        const room = z.s - prevStart - minLenAt(z.s);
-        const lead = Math.max(0, Math.min(BRAKE_LEAD[1], (v1 * v1 - v2 * v2) / (2 * BRAKE_LEAD[0]), room));
-        s = z.s - lead;
+    // 2. curve overlay: runs of equal curve limit (joined over short gaps), widened by the margins
+    const overlay = new Array(n).fill(Infinity);
+    const joinN = Math.round(CURVE_JOIN_M / 10);
+    const curveRuns = [];
+    for (let i = 0; i < n; i++) {
+      if (!Number.isFinite(curveV[i])) continue;
+      const last = curveRuns[curveRuns.length - 1];
+      if (last && last.val === curveV[i] && i - last.b <= joinN) last.b = i; else curveRuns.push({ a: i, b: i, val: curveV[i] });
+    }
+    const beforeN = Math.round(CURVE_BEFORE_M / 10); const afterN = Math.round(CURVE_AFTER_M / 10);
+    curveRuns.forEach((r) => { for (let i = Math.max(0, r.a - beforeN); i <= Math.min(n - 1, r.b + afterN); i++) overlay[i] = Math.min(overlay[i], r.val); });
+    for (let i = 0; i < n; i++) if (overlay[i] < v[i]) { v[i] = overlay[i]; kind[i] = 1; }
+    // 3. clean-up of the pieces the overlay left
+    for (let guard = 0; guard < 3000; guard++) {
+      const rs = runsOf();
+      let changed = false;
+      for (let k = 0; k < rs.length && !changed; k++) {
+        const r = rs[k]; if (r.k !== 0 || lenOf(r) >= minZone) continue;
+        const prev = rs[k - 1]; const next = rs[k + 1];
+        if (!prev && !next) continue;
+        const setTo = (to, kd) => { for (let i = r.a; i < r.b; i++) { v[i] = to; kind[i] = kd; } changed = true; };
+        if (prev && next && prev.k === 1 && next.k === 1) {
+          if (lenOf(r) < GAP_MERGE_M) setTo(Math.min(prev.v, next.v), 1);
+          else { const cap = Math.min(r.v, r.v > Math.max(prev.v, next.v) ? (Math.max(prev.v, next.v) <= 30 ? 40 : 50) : r.v); if (cap !== r.v || r.k !== 2) setTo(cap, 2); }
+        } else if (prev && next) {
+          const cand = [prev, next].filter((q) => q.k !== 1);
+          if (cand.length) { const q = cand.length === 1 ? cand[0] : (Math.abs(prev.v - r.v) <= Math.abs(next.v - r.v) ? prev : next); setTo(q.v, q.k); }
+        } else {
+          const q = prev || next;
+          if (q.k !== 1) setTo(q.v, q.k);              // a short piece at the end of the line next to a curve zone stays as it is
+        }
       }
-      out.push({ s: i === 0 ? 0 : s, kmh: z.kmh });
+      if (!changed) break;
+    }
+    // tiny curve pieces (the left-over of one bend's margin next to another zone) join the closer neighbour
+    for (let guard = 0; guard < 3000; guard++) {
+      const rs2 = runsOf(); let changed = false;
+      for (let k = 0; k < rs2.length && !changed; k++) {
+        const r = rs2[k]; if (r.k !== 1 || lenOf(r) >= 60) continue;
+        const nb = [rs2[k - 1], rs2[k + 1]].filter(Boolean); if (!nb.length) continue;
+        const q = nb.length === 1 ? nb[0] : (Math.abs(nb[0].v - r.v) <= Math.abs(nb[1].v - r.v) ? nb[0] : nb[1]);
+        for (let i = r.a; i < r.b; i++) { v[i] = q.v; kind[i] = q.k; }
+        changed = true;
+      }
+      if (!changed) break;
+    }
+    const rs = runsOf();
+    // 4. boards: drops move ahead by the braking distance, never into the minimum of the zone before them
+    const limits = []; const zones = [];
+    rs.forEach((r, i) => {
+      let s = r.a * 10; const prev = rs[i - 1];
+      if (prev && r.v < prev.v) {
+        const v1 = prev.v / 3.6; const v2 = r.v / 3.6;
+        let lead = Math.min(LEAD_MAX_M, Math.max(0, (v1 * v1 - v2 * v2) / (2 * LEAD_DECEL) - (r.k === 1 ? CURVE_BEFORE_M : 0)));
+        const prevStart = limits[limits.length - 1].s;
+        const room = prev.k === 0 ? (s - prevStart) - minZone : (s - prevStart) * 0.5;
+        lead = Math.max(0, Math.min(lead, room));
+        s -= lead;
+      }
+      limits.push({ s: i === 0 ? 0 : s, kmh: r.v });
+      zones.push({ s0: r.a * 10, s1: Math.min(totalLen, r.b * 10), kmh: r.v, kind: r.k === 1 ? 'curve' : r.k === 2 ? 'gap' : 'base' });
     });
-    return out;
+    return { limits, zones };
   }
 
   function buildForward(def) {
@@ -684,20 +736,30 @@
     /* ---- limits (rounded to multiples of 10, 25 only where really needed; no artificial stop zones: braking for a stop is the driver's job) */
     const roundLimit = (kmh) => (kmh <= 27 ? 25 : Math.min(MAX_KMH, Math.max(30, Math.round((kmh - 0.1) / 10) * 10)));
     const motorway = m.bridges.find((b) => !b.name && b.s0 < RISE_BRIDGE_MAX_S && b.s1 - b.s0 < 200) || null;
+    const forest = motorway ? [m.stops[1].sMid + MARKER_AHEAD + 4, motorway.s0 - FOREST_BRIDGE_PAD] : null;   // absolute path coordinates: Héienhaff platform end .. A1 bridge
     const centre = [Math.max(0, m.stops[10].sMid - CENTRE_PAD - sStart), Math.max(0, m.stops[16].sMid + CENTRE_PAD - sStart)];
-    const minLenAt = (s) => (s >= centre[0] && s <= centre[1] ? MIN_ZONE_CENTRE : MIN_ZONE);
-    const samples = [];
-    for (let s = 0; s <= length; s += 10) {
-      const abs = s + sStart;
-      const q = segAt(abs);
-      let v = q.speed > 0 ? q.speed : DEFAULT_KMH;   // the real OSM maxspeed; 70 only on the dedicated Héienhaff - Luxexpo stretch the data marks as 70
-      const ia = clamp(Math.round(s / STEP), 0, n - 1);
-      let kmax = 0;   // tightest curve within +-10 m
-      for (let d = -5; d <= 5; d++) kmax = Math.max(kmax, Math.abs(kappa[clamp(ia + d, 0, n - 1)]));
-      if (kmax > 1 / CURVE_R_30) v = Math.min(v, kmax > 1 / CURVE_R_25 ? 25 : 30);
-      samples.push(roundLimit(v));
-    }
-    const limits = buildLimits(samples, minLenAt, length);
+    /* per-direction samples every 10 m: the line speed and the bend limit (rev = measured in the direction of the return route) */
+    const limitSamples = (rev) => {
+      const baseV = []; const curveV = [];
+      for (let sp = 0; sp <= length; sp += 10) {
+        const s = rev ? Math.max(0, length - sp) : sp;
+        const abs = s + sStart;
+        const q = segAt(abs);
+        // the OSM maxspeed, never above the normal line speed; OSM's 15-25 km/h marks bends / station throats / crossings: the bends come from the geometry below, so the line speed is 30 at least
+        let v = Math.max(30, Math.min(MAX_NORMAL_KMH, q.speed > 0 ? q.speed : DEFAULT_KMH));
+        if (forest && q.speed >= 60 && abs >= forest[0] && abs <= forest[1]) v = FOREST_STRETCH_KMH;   // the segregated forest stretch (OSM 60 / 70 inside the window)
+        baseV.push(roundLimit(v));
+        const ia = clamp(Math.round(s / STEP), 0, n - 1);
+        let kmax = 0;   // tightest curve within +-10 m
+        for (let d = -5; d <= 5; d++) kmax = Math.max(kmax, Math.abs(kappa[clamp(ia + d, 0, n - 1)]));
+        curveV.push(kmax > 1 / CURVE_R_30 ? (kmax > 1 / CURVE_R_25 ? 25 : 30) : Infinity);
+      }
+      return { baseV, curveV };
+    };
+    const fwdS = limitSamples(false); const revS = limitSamples(true);
+    const fwdL = buildTramLimits(fwdS.baseV, fwdS.curveV, length, MIN_ZONE);
+    const revL = buildTramLimits(revS.baseV, revS.curveV, length, MIN_ZONE);
+    const limits = fwdL.limits;
 
     /* ---- bridges / tunnels in route coordinates */
     // `rise` = deck height above the ground profile (the motorway bridge before Luxexpo), `depth` = rail level below the ground (Héienhaff tunnels);
@@ -908,6 +970,7 @@
       groundYAt, cutAt: (s) => groundYAt(s) - frameAt(s).pos.y,
       luxtram: {
         sStart, sEnd, origin: { x: ox, y: oy, z: oz }, segs, credit: CREDIT, centre, minZone: MIN_ZONE, minZoneCentre: MIN_ZONE_CENTRE,
+        zones: fwdL.zones, limitsRev: revL.limits, zonesRev: revL.zones, curveSamples: fwdS.curveV, forestStretchKmh: FOREST_STRETCH_KMH, forestWindow: forest ? [forest[0] - sStart, forest[1] - sStart] : null,
         motorwayBridge: motorway ? [motorway.s0 - sStart, motorway.s1 - sStart] : null,
         toRoute: (sAbs) => sAbs - sStart,
         absFromOrig: (sOrig) => m.toNew(sOrig),
@@ -954,9 +1017,10 @@
     };
     const lt = base.luxtram;
     rev.luxtram = Object.assign({}, lt, {
-      reversed: true, centre, segs: lt.segs.map((q) => Object.assign({}, q, { s0: L - q.s1, s1: L - q.s0 })).sort((a, b) => a.s0 - b.s0),
+      reversed: true, centre, zones: lt.zonesRev, segs: lt.segs.map((q) => Object.assign({}, q, { s0: L - q.s1, s1: L - q.s0 })).sort((a, b) => a.s0 - b.s0),
       toRoute: (sAbs) => L - (sAbs - lt.sStart), motorwayBridge: lt.motorwayBridge ? [L - lt.motorwayBridge[1], L - lt.motorwayBridge[0]] : null,
     });
+    rev.limits = lt.limitsRev;   // built for the return direction itself (curve margins ahead of / behind the bend in the direction of travel), not mirrored
     rev.groundYAt = (s) => base.groundYAt(L - s);
     rev.cutAt = (s) => base.cutAt(L - s);
     return rev;

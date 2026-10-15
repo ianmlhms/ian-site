@@ -6,7 +6,18 @@
  *     terrain surface, bridge decks included), so it follows slopes and cambers, never sinks and never floats.  No height yet (tile not built) = hidden.
  *   - sometimes a Luxtram comes the other way on the opposite track, dwells at its stops and passes (visual only; spawns and despawns out of sight).
  * Created by luxtram-world.js:  const tr = TS.luxTraffic.create(ctx);  tr.markDirty() when roads change;  tr.update(dt, tramS, camera);  tr.dispose();
- * tr.posts() (test hook).  Debug / test handle: TS.luxTraffic.last = { spawnOncoming(), state(), cars() }. */
+ * tr.posts() (test hook).  Debug / test handle: TS.luxTraffic.last = { spawnOncoming(), state(), cars() }.
+ *
+ * Oncoming-tram dwell interface (optional, implemented by passengers.js; everything works without it):
+ *   TS.tramDwell.arrive(info)  called when an oncoming tram has stopped at a stop and opens its doors on the platform side.
+ *       info = { id, stopName, platformSide: 'left' | 'right' (relative to THAT tram's direction of travel),
+ *                doors: [{ x, y, z }] (world position of every door centre on the platform side, at floor level),
+ *                dwellMs (30000: the dwell in ms of sim time), getDoors: () => [{ x, y, z }] (the same list, recomputed) }
+ *       A returned number > dwellMs asks for a longer dwell; the dwell is extended to that value, at most 45 s.
+ *   TS.tramDwell.depart({ id })  called when the doors are closed again, right before the tram pulls away (also when the tram is
+ *       removed while it dwells).
+ * The oncoming tram dwells 30 s (or the extension), closes its doors during the last 3 s and then accelerates away; it never
+ * waits for the player's tram. */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
@@ -657,7 +668,7 @@
       roadsByChunk.forEach((roads) => roads.forEach((rd) => {
         if (rd.bridge && !CARS_ON_BRIDGES) return;
         roadSet.add(rd); roadList.push(rd);
-        rd.w = rd.len * (rd.cls === 0 ? 0.8 : rd.cls <= 2 ? 1.6 : rd.cls === 3 ? 1.2 : 1);
+        rd.w = rd.len * (rd.cls === 0 ? 0.5 : rd.cls <= 2 ? 1.6 : rd.cls === 3 ? 1.2 : 1);
         roadWeightTotal += rd.w;
         rd.pts.forEach((p, j) => {
           const key = Math.floor(p.x / CELL) + ',' + Math.floor(p.z / CELL);
@@ -721,25 +732,28 @@
     let tramX = 0; let tramZ = 0; let tramY = 0;
     const R_ACT = clamp(Q.ahead ? Q.ahead * 0.6 : 400, 240, 560);
     function newCar() {
-      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, chkRd: null, laneRd: null, laneK: 1, laneF: undefined, mat: new Float32Array(16) };
+      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, chkRd: null, laneRd: null, laneK: 1, mway: false, laneIdx: 0, latCur: NaN, mat: new Float32Array(16) };
     }
     function assignType(c, cls) {
       c.type = pickType(rng, cls); c.tid = TID[c.type]; c.spec = SPEC[c.type]; c.body = pick(rng, paintPool(c.type));
       assignSpeed(c, { cls, oneway: false, hw: 99 });
     }
-    /* speed and lane of a car on road `rd`.  City streets: 27-49 km/h.  Motorway carriageways (class 0, one way): 2-3 lanes, right lane 76-90 km/h (lorries and buses
-       never faster than 78), middle ~94, left ~103 km/h; each car keeps its lane (laneF = lane centre as a fraction of the half width, + = right of the travel direction). */
+    /* speed and lane rank of a car on road `rd`.  City streets: 27-49 km/h.  Motorway carriageways (class 0, one way): right lane 76-90 km/h (lorries and buses never
+       faster than 78), middle ~94, left ~103 km/h.  `laneIdx` (0 = the rightmost lane) picks the lane among however many lanes the DRAWN carriageway has at the car's
+       position (laneCentres): cars drive in the middle of a lane, never on a divider line. */
     function assignSpeed(c, rd) {
       const cls = rd.cls;
       const heavy = c.type === 'avl' || c.type === 'rgtr' || c.type === 'truck';
       if (cls === 0 && rd.oneway) {
         const lanes = rd.hw >= 4.8 ? 3 : 2;
         const idx = heavy ? 0 : Math.floor(rng() * lanes);
-        c.laneF = lanes === 3 ? [0.62, 0, -0.62][idx] : [0.5, -0.5][idx];
+        c.laneIdx = idx;
+        c.mway = true;
         c.vmax = heavy ? 20.5 + rng() * 1.2 : (lanes === 3 ? [23.5, 26.2, 28.8][idx] : [24.5, 28.5][idx]) * (0.97 + rng() * 0.06);
         return;
       }
-      c.laneF = undefined;
+      c.mway = false;
+      c.laneIdx = heavy || rng() < 0.7 ? 0 : 1;   // (counted from the rightmost lane; a one-lane street only has lane 0)
       c.vmax = heavy && c.type !== 'truck' ? 7 + rng() * 3 : c.type === 'truck' ? 7 + rng() * 3 : 7.5 + rng() * 6 + (cls <= 2 ? 1.5 : 0);
     }
     function pickRoad() {
@@ -763,6 +777,7 @@
       for (let attempt = 0; attempt < 10; attempt++) {
         const rd = pickRoad();
         if (!rd) return false;
+        if (rd.cls === 0) { let mw = 0; for (let k = 0; k < cars.length; k++) if (cars[k].active && cars[k].rd && cars[k].rd.cls === 0) mw++; if (mw >= Math.ceil(cars.length * 0.55)) { fails.mway = (fails.mway || 0) + 1; continue; } }   // the motorway never takes more than ~55 % of the cars: the streets stay busy
         const t = rng() * rd.len;
         if (onRailsAt(rd, t) || isBad(rd, t, now)) { fails.rails++; continue; }
         sample(rd, t, sp);
@@ -778,7 +793,7 @@
         assignType(c, rd.cls);
         if (!rd.oneway && rd.hw < c.spec.W + 0.22) { c.type = 'hatch'; c.tid = TID.hatch; c.spec = SPEC.hatch; c.body = pick(rng, paintPool('hatch')); }   // a lorry / bus does not fit two lanes of a narrow street: no oncoming overlap
         assignSpeed(c, rd);
-        c.cur = c.vmax * 0.7; c.active = true; c.shown = false; c.since = 1e9; c.chkRd = null; c.x = sp.x; c.z = sp.z; c.y = NaN;
+        c.latCur = NaN; c.cur = c.vmax * 0.7; c.active = true; c.shown = false; c.since = 1e9; c.chkRd = null; c.x = sp.x; c.z = sp.z; c.y = NaN;
         return true;
       }
       return false;
@@ -786,6 +801,7 @@
 
     function rebuild() {
       carDirty = false;
+      edgeCache.clear();
       rebuildGraph();
       // crossings + signal posts
       crossings.length = 0; lampList = []; crossPosts = [];
@@ -853,20 +869,83 @@
       }
     }
 
-    /* lateral offset of the lane centre from the road axis (right-hand traffic): a third of the half width, but never so little that two cars passing in opposite
-       directions overlap (centres >= body width + 0.28 m apart), and never so much that the body leaves the carriageway */
-    const laneOffset = (rd, spec, c) => {
+    /* ---- lanes from the DRAWN carriageway (the OSM width / lane count do not match what luxtram-ground paints): from the road axis the road-only height query is scanned
+       sideways until the asphalt ends; the width splits into lanes of ~3.4 m and a car drives on the centre line of its lane */
+    const edgeCache = new Map(); let rdUid = 0;
+    const paintAt = ctx.paintAt || null;
+    const LANE_MIN = 2.5;                // narrowest interval between two lines that is a lane
+    function edgesAt(rd, t) {
+      if (!roadAt) return null;
+      if (rd.uid === undefined) rd.uid = ++rdUid;
+      const bk = Math.floor(clamp(t, 0, rd.len) / 12);
+      const key = rd.uid * 8192 + bk;
+      const hit = edgeCache.get(key);
+      if (hit) return hit;
+      const tc = clamp(bk * 12 + 6, 0, rd.len);
+      sample(rd, tc, spE);
+      const nx = -spE.dz; const nz = spE.dx; const ox = spE.x; const oz = spE.z; const dx0 = spE.dx; const dz0 = spE.dz;
+      const h0 = roadAt(ox, oz);
+      if (h0 !== h0) return null;                       // tile not decorated / the axis is not on the drawn asphalt: use the nominal lanes (not cached)
+      const cap = Math.max(6, rd.hw * 1.5 + 2);
+      const scan = (sg) => { let last = 0; for (let d = 0.5; d <= cap; d += 0.5) { const h = roadAt(ox + nx * sg * d, oz + nz * sg * d); if (h !== h || Math.abs(h - h0) > 0.6) break; last = d; } return last + 0.25; };
+      const e = { er: scan(1), el: scan(-1), lines: [] };
+      if (paintAt) {
+        // painted lines across the road: sampled at 4 places along 10 m (dashed dividers have gaps), 0.2 m apart sideways
+        const hits = [];
+        for (let u = -e.el + 0.4; u <= e.er - 0.4; u += 0.2) {
+          let on = 0;
+          for (let k = -4; k <= 5; k += 3) { if (paintAt(ox + dx0 * k + nx * u, oz + dz0 * k + nz * u)) { on = 1; break; } }
+          if (on) hits.push(u);
+        }
+        let i = 0;
+        while (i < hits.length) { let j = i; while (j + 1 < hits.length && hits[j + 1] - hits[j] < 0.5) j++; e.lines.push((hits[i] + hits[j]) / 2); i = j + 1; }
+      }
+      edgeCache.set(key, e);
+      return e;
+    }
+    const spE = { x: 0, z: 0, dx: 0, dz: 0 };
+    /* lane centre lines as metres to the RIGHT of the travel direction, rightmost lane first; null = no drawn edges known.  Boundaries = the drawn asphalt edges + the painted lines
+       between them; an interval narrower than LANE_MIN is not a lane, one wider than 1.8 lanes is split evenly (no divider painted). */
+    function laneCentres(rd, t, dir) {
+      const e = edgesAt(rd, t);
+      if (!e) return null;
+      const b = [-e.el]; e.lines.forEach((u) => { if (u > -e.el + 0.8 && u < e.er - 0.8) b.push(u); }); b.push(e.er);   // (a line close to the edge is the edge line)
+      const lanes = [];                                  // lane centres as right-of-tangent coordinates, left to right
+      for (let i = 0; i + 1 < b.length; i++) {
+        const w = b[i + 1] - b[i];
+        if (w < LANE_MIN) continue;
+        const n = w > 5.9 ? Math.round(w / 3.4) : 1;
+        for (let k = 0; k < n; k++) lanes.push(b[i] + (k + 0.5) * w / n);
+      }
+      if (!lanes.length) return null;
+      if (rd.oneway) return lanes.slice().reverse();     // one way = along the tangent: right of travel = right of the tangent; rightmost first
+      if (dir > 0) { const r = lanes.filter((u) => u > 0.4).reverse(); return r.length ? r : null; }
+      const l = lanes.filter((u) => u < -0.4).map((u) => -u);   // against the tangent: right of travel = left of the tangent; rightmost (most negative u) first
+      return l.length ? l : null;
+    }
+    let curDt = 0.016;
+    /* nominal lane (no drawn edges yet): a third of the half width, wide enough that cars passing in opposite directions do not overlap, inside the carriageway */
+    const nominalOffset = (rd, spec, c) => {
       const half = spec.W / 2;
       const limit = Math.max(0.3, rd.hw - half - 0.08);
-      if (c && c.laneF !== undefined && rd.cls === 0 && rd.oneway) return clamp(c.laneF * rd.hw, -limit, limit);   // motorway: the car's own lane (signed)
+      if (c && c.mway && rd.cls === 0 && rd.oneway) { const lanes = rd.hw >= 4.8 ? 3 : 2; const idx = Math.min(lanes - 1, c.laneIdx); return clamp((lanes === 3 ? [0.62, 0, -0.62][idx] : [0.5, -0.5][idx]) * rd.hw, -limit, limit); }
       const want = Math.max(rd.hw * LANE_K, half + 0.14);
       return Math.min(want, limit);
     };
     /* ground the car on its four wheel contact points; false = height unknown (hide) */
     function groundCar(c, dir, now) {
       const rd = c.rd; const sp0 = c.spec;
-      if (c.laneRd !== rd) { c.laneRd = rd; c.laneK = 1; }       // lane factor: shrinks towards the road axis while a wheel stands on the kerb / pavement beside the asphalt
-      const lane = laneOffset(rd, sp0, c) * (c.laneF !== undefined && rd.cls === 0 && rd.oneway ? 1 : c.laneK) * dir;
+      if (c.laneRd !== rd) { c.laneRd = rd; c.laneK = 1; }       // lane factor (nominal lanes only): shrinks towards the road axis while a wheel stands on the kerb / pavement beside the asphalt
+      const lc = laneCentres(rd, c.t, dir);
+      let lane;
+      if (lc) {
+        const tgt = lc[Math.min(lc.length - 1, c.laneIdx)];
+        c.latCur = c.latCur === c.latCur ? c.latCur + clamp(tgt - c.latCur, -2.5 * curDt, 2.5 * curDt) : tgt;   // lane changes (a lane appears / ends) are eased
+        lane = c.latCur * dir;
+      } else {
+        c.latCur = nominalOffset(rd, sp0, c) * c.laneK;
+        lane = c.latCur * dir;
+      }
       const tf = c.t + dir * sp0.wb / 2; const tr = c.t - dir * sp0.wb / 2;
       sample(rd, tf, spF); sample(rd, tr, spR);
       // front and rear axle centres on the lane (the lane offset follows each point's own tangent: smooth through bends)
@@ -921,8 +1000,24 @@
       return true;
     }
 
+    let conflicts = 0;
+    const nq = { s: 0, d: 0, lat: 0, y: 0, i: 0 };
+    /* inside the plan footprint of a tram bridge (both tracks + 3.5 m each side) at about the deck's height, or on the player's / opposite track outside a crossing */
+    function structureConflict(c) {
+      if (!track || !track.bridgeAt || !nearest) return false;
+      const q = nearest(c.x, c.z, nq);
+      if (!q || q.d > 12) return false;
+      const dy = Math.abs(c.y - q.y);
+      if (track.bridgeAt(q.s)) {
+        const oppLat = hasOpp ? oppLatAt(q.s) : -3.5;
+        const lo = Math.min(0, oppLat) - 3.5; const hi = Math.max(0, oppLat) + 3.5;
+        if (q.lat > lo && q.lat < hi && dy < 3.4) return true;
+      }
+      return false;
+    }
     let writeN = 0; let guards = 0;
     function updateCars(dt, now) {
+      curDt = dt;
       for (let i = 0; i < cars.length; i++) cars[i].i = i;
       let spawned = 0;
       for (let i = 0; i < cars.length; i++) {
@@ -948,10 +1043,10 @@
           if (m2 === i) continue;
           const o = cars[m2];
           if (!o.active || o.rd !== rd || o.dir !== c.dir) continue;
-          if (c.laneF !== undefined && o.laneF !== undefined && Math.abs(o.laneF - c.laneF) > 0.3) continue;   // another motorway lane
+          if (o.latCur === o.latCur && c.latCur === c.latCur && Math.abs(o.latCur - c.latCur) > 1.8) continue;   // another lane
           const gap = (o.t - c.t) * c.dir;
-          const need = c.spec.L / 2 + o.spec.L / 2 + 2.2 + (c.laneF !== undefined ? c.cur * 0.9 : 0);
-          if (gap > 0 && gap < need + 14 + (c.laneF !== undefined ? c.cur * 1.5 : 0)) target = Math.min(target, Math.max(0, gap - need) * 0.9);
+          const need = c.spec.L / 2 + o.spec.L / 2 + 2.2 + (c.mway ? c.cur * 0.9 : 0);
+          if (gap > 0 && gap < need + 14 + (c.mway ? c.cur * 1.5 : 0)) target = Math.min(target, Math.max(0, gap - need) * 0.9);
         }
         // never come to rest on the rails
         const onRails = (rd.cross || []).some((q) => c.t > q.t0 && c.t < q.t1);
@@ -980,7 +1075,8 @@
             if (blocked) { c.active = false; c.shown = false; continue; }
             c.wait = 0;
             c.rd = nx.rd; c.dir = nx.dir; c.t = clamp(nx.t + nx.dir * over, 0, nx.rd.len);
-            if (!(nx.rd.cls === 0 && nx.rd.oneway) !== (c.laneF === undefined)) assignSpeed(c, nx.rd);   // motorway <-> street: other speed / lane
+            c.latCur = NaN;   // onto the lane of the new road at once (the junction already moves the car sideways)
+            if ((nx.rd.cls === 0 && nx.rd.oneway) !== c.mway) assignSpeed(c, nx.rd);   // motorway <-> street: other speed / lane
           } else { c.active = false; c.shown = false; continue; }
         }
         // roads along the rails: jump over the stretch
@@ -997,6 +1093,13 @@
         const c = cars[i];
         if (!c.active) continue;
         if (!groundCar(c, c.dir, now)) { c.shown = false; continue; }
+        // a road vehicle never stands inside the tram bridge (deck, parapets) or the track envelope: a road that is not a bridge itself but whose height query lands at the tram's deck level there is cut
+        if (!c.rd.bridge && structureConflict(c)) {
+          if (!c.rd.bad) c.rd.bad = [];
+          c.rd.bad.push([c.t - 25, c.t + 25, now + 600000]);
+          c.active = false; c.shown = false; conflicts++;
+          continue;
+        }
         // safety net: one cheap ray per frame at most, when a car has just spawned / entered another road / driven 40 m since its last check
         if (guardBudget > 0 && (c.rd !== c.chkRd || c.since > 40)) {
           guardBudget--; c.chkRd = c.rd; c.since = 0;
@@ -1076,6 +1179,7 @@
         bm.makeBasis(bx, by, bz);
         bm.setPosition(bp);
         if (onc.bake) bm.toArray(onc.bake.uCars.value, i * 16);
+        (onc.mats || (onc.mats = []))[i] = (onc.mats[i] || new Float32Array(16)); bm.toArray(onc.mats[i]);
         if (!onc.baked) {
           car.group.position.copy(bp);
           car.group.quaternion.setFromRotationMatrix(bm);
@@ -1138,10 +1242,46 @@
     }
     function setTramVisible(vis) { if (onc.baked) onc.bake.setVisible(vis); else onc.model.group.visible = vis; }
     function despawnOncoming() {
+      if (onc.phase === 'dwell') oncDepart();
       onc.active = false;
       if (onc.model) { setTramVisible(false); onc.model.setDoors(0); if (onc.bake) onc.bake.uDoor.value = 0; }
       if (onc.trig) onc.trig.active = false;
       moveSecs = 0; nextSpawnAt = 180 + rng() * 180;       // the next one in 3 to 6 minutes of driving
+    }
+    /* dwell interface (see the header): platform side of the tram's stop, door world positions, arrive / depart hooks */
+    const ONC_DWELL_MS = 30000; const ONC_DWELL_MAX_MS = 45000;
+    let oncSerial = 0;
+    function oncPlatformSide(k) {
+      // forward route: the oncoming tram runs on the left-hand track in the opposite direction: every platform (side platform or island) lies on its right.
+      // return route: it runs on the forward track in the forward direction: the platform is on the stop's own side (island stops: left)
+      if (!routeReverse || !track.base || !track.base.stations) return 'right';
+      const bs = track.base.stations[track.base.stations.length - 1 - k];
+      return bs && bs.side === 'left' ? 'left' : 'right';
+    }
+    function oncDoors() {
+      const out = []; const m = onc.model; if (!m || !onc.mats) return out;
+      const sgn = onc.platformSide === 'left' ? -1 : 1; const v = new T.Vector3(); const mm = new T.Matrix4();
+      m.cars.forEach((car, i) => {
+        if (!onc.mats[i]) return; mm.fromArray(onc.mats[i]);
+        (car.doors || []).forEach((dr) => { if ((dr.side || 'right') !== onc.platformSide) return; v.set(sgn * 1.2, 0.35, dr.zLocal).applyMatrix4(mm); out.push({ x: v.x, y: v.y, z: v.z }); });
+      });
+      return out;
+    }
+    function oncArrive(k) {
+      onc.platformSide = oncPlatformSide(k);
+      onc.dwellId = 'onc-' + (++oncSerial);
+      const hook = TS.tramDwell;
+      if (!hook || typeof hook.arrive !== 'function') return;
+      try {
+        const st = stations[k];
+        const ret = hook.arrive({ id: onc.dwellId, stopName: st ? nameOf(st.name) : '', platformSide: onc.platformSide, doors: oncDoors(), dwellMs: ONC_DWELL_MS, getDoors: oncDoors });
+        if (typeof ret === 'number' && ret > ONC_DWELL_MS) onc.dwell = Math.min(ONC_DWELL_MAX_MS, ret) / 1000;
+      } catch (e) { console.warn(TAG + 'tramDwell.arrive failed', e); }
+    }
+    function oncDepart() {
+      const id = onc.dwellId; onc.dwellId = null;
+      const hook = TS.tramDwell;
+      if (id && hook && typeof hook.depart === 'function') { try { hook.depart({ id }); } catch (e) { console.warn(TAG + 'tramDwell.depart failed', e); } }
     }
     function updateOncoming(dt) {
       // schedule
@@ -1199,7 +1339,8 @@
         if (onc.stop) {
           const rem = (onc.s - onc.stop.stopS) * -d;
           if (rem <= 0.35 && onc.v < 1.2) {
-            onc.s = onc.stop.stopS; onc.v = 0; onc.phase = 'dwell'; onc.dwell = 18 + rng() * 12; onc.visited.add(onc.stop.k); onc.stop = null;
+            onc.s = onc.stop.stopS; onc.v = 0; onc.phase = 'dwell'; onc.dwell = ONC_DWELL_MS / 1000; onc.visited.add(onc.stop.k);
+            oncArrive(onc.stop.k); onc.stop = null;
           } else if (rem < 0) { onc.s = onc.stop.stopS; onc.v = Math.min(onc.v, 0.5); }
         }
       } else {
@@ -1207,8 +1348,8 @@
         // doors: open after ~2 s standing, close 3 s before leaving
         const want = onc.dwell > 3.2 ? 1 : 0;
         onc.doors = clamp(onc.doors + (want ? dt / 1.6 : -dt / 1.6), 0, 1);
-        if (animDoors) { if (onc.baked) onc.bake.uDoor.value = onc.doors; else m.setDoors(onc.doors, 'right'); }
-        if (onc.dwell <= 0 && onc.doors <= 0) { onc.phase = 'run'; if (onc.baked) onc.bake.uDoor.value = 0; else m.setDoors(0); }
+        if (animDoors) { if (onc.baked) onc.bake.uDoor.value = onc.doors; else m.setDoors(onc.doors, onc.platformSide || 'right'); }
+        if (onc.dwell <= 0 && onc.doors <= 0) { onc.phase = 'run'; if (onc.baked) onc.bake.uDoor.value = 0; else m.setDoors(0); oncDepart(); }
       }
       // red-light trigger
       onc.trig.s = onc.s; onc.trig.dir = d; onc.trig.len = onc.len;
@@ -1283,10 +1424,10 @@
       },
       prepareOncoming: () => ensureModel(),
       state: () => ({
-        fails, guarded: guards, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
+        fails, guarded: guards, conflicts, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
         oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
       }),
-      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw })),   // (test hook)
+      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 1.5 && c.t < q.t1 + 1.5) })),   // (test hook)
       /* test hook: the 4 wheel contact points (world) of every shown car: the road surface must be at or just below each one */
       wheelPoints: () => {
         const out = []; const v = new T.Vector3(); const mm = new T.Matrix4();

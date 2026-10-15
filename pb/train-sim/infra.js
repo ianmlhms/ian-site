@@ -1011,7 +1011,7 @@
   /* test hook (scripts / pole sweep): window.__tsPoleLog = [] before the page loads collects every pole the infra builds ({ kind, s, x, z }) */
   function logPole(kind, s, p) {
     const log = typeof window !== 'undefined' ? window.__tsPoleLog : null;
-    if (log) log.push({ kind, s, x: p[0], z: p[2] });
+    if (log) log.push({ kind, s, x: p[0], z: p[2], drawn: typeof window.TS.luxDrawnRoad === 'function' ? window.TS.luxDrawnRoad(p[0], p[2]) : 'n/a', t: Math.round(performance.now()) });
   }
   /* LUXTRAM street running: a pole's default spot (mast 3.45 m, signal 3.9 m, limit board 4.7 m, km post 5.6 m beside the track) can be a traffic lane.
      luxtram-world.js publishes TS.luxRoadMargin(x, z) = metres to the nearest carriageway edge (negative = inside a lane).  Returns the lateral offset
@@ -1038,18 +1038,39 @@
     }
     return margin(cx, cz) <= 0.35;
   }
-  function roadSafeLat(track, s, lat, frameAt, atStop, maxOut, median) {
+  /* first clear lateral offset (inwards, then outwards) or the default offset flagged as not clear */
+  function safeSpot(track, s, lat, frameAt, atStop, maxOut) {
     const margin = window.TS.luxRoadMargin;
-    if (track.kind !== 'tram' || typeof margin !== 'function') return lat;
+    if (track.kind !== 'tram' || typeof margin !== 'function') return { lat, clear: true };
     const f = (frameAt || track.frameAt)(s);
     const sd = lat < 0 ? -1 : 1;
     const a = Math.abs(lat);
     const ok = (l) => !laneBlocked(f, l, sd);
-    if (ok(a)) return lat;
-    if (!atStop) for (let l = a - 0.3; l >= 2.3; l -= 0.3) if (ok(l)) return sd * l;
-    for (let l = a + 0.5; l <= a + (maxOut || 10); l += 0.5) if (ok(l)) return sd * l;
+    if (ok(a)) return { lat, clear: true };
+    for (let l = a - 0.25; l >= Math.max(2.3, atStop ? a - 0.3 : 0); l -= 0.25) if (ok(l)) return { lat: sd * l, clear: true };   // (at a stop the platform is there: at most 0.3 m inwards)
+    for (let l = a + 0.5; l <= a + (maxOut || 10); l += 0.5) if (ok(l)) return { lat: sd * l, clear: true };
+    return { lat, clear: false };
+  }
+  function roadSafeLat(track, s, lat, frameAt, atStop, maxOut, median) {
+    const r = safeSpot(track, s, lat, frameAt, atStop, maxOut);
+    if (r.clear) return r.lat;
     if (Number.isFinite(median) && !atStop) return median;
-    return lat;
+    return r.lat;
+  }
+  /* like roadSafeLat, but when no lateral offset is clear the spot is moved ALONG the track (+-3 .. 12 m, `shifts`) before the median / default is taken:
+     returns { s, lat } */
+  const SHIFTS = [3, -3, 6, -6, 9, -9, 12, -12];
+  function roadSafeSpot(track, s, lat, frameAt, atStop, maxOut, median, valid, shifts) {
+    const r = safeSpot(track, s, lat, frameAt, atStop, maxOut);
+    if (r.clear) return { s, lat: r.lat, clear: true };
+    for (const ds of shifts || SHIFTS) {
+      const sp = s + ds;
+      if (sp < 0 || sp > track.length || (valid && !valid(sp))) continue;
+      const q = safeSpot(track, sp, lat, frameAt, atStop, maxOut);
+      if (q.clear) return { s: sp, lat: q.lat, clear: true };
+    }
+    if (Number.isFinite(median) && !atStop) return { s, lat: median, clear: true };
+    return { s, lat: r.lat, clear: false };
   }
   function inStation(track, s, pad) {
     const idx = track.stations.findIndex((st) => s >= st.platformStart - pad && s <= st.platformEnd + pad);
@@ -1124,11 +1145,15 @@
     }
     if (ctx.part === 'wires') return;   // the masts follow later (buildChunkContent part 'furniture'): they need the painted roads of the world
 
-    const mast = (frameAt, s, side) => {
+    const mast = (frameAt, sNominal, side) => {
+      const oppLat0 = track.opposite && track.opposite.has(sNominal) ? track.opposite.latAt(sNominal) : NaN;
+      const median = Number.isFinite(oppLat0) && oppLat0 < -2.6 ? (side === 1 ? oppLat0 / 2 : -oppLat0 / 2) : NaN;   // between the two tracks
+      const valid = (sp) => !noOcs(sp) && !track.inTunnel(sp) && !(side === -1 && !(track.opposite && track.opposite.has(sp)));
+      const spot = roadSafeSpot(track, sNominal, side * tramMastLat(track, sNominal, side), frameAt, inStation(track, sNominal, 8) >= 0, 6, median, valid);
+      if (!spot.clear && inStation(track, sNominal, 8) >= 0) return;   // a stop whose platform side is hemmed in by lanes: no mast there rather than one in the road
+      const s = spot.s;
+      const lat = spot.lat;
       const f = frameAt(s);
-      const oppLat = track.opposite && track.opposite.has(s) ? track.opposite.latAt(s) : NaN;
-      const median = Number.isFinite(oppLat) && oppLat < -2.6 ? (side === 1 ? oppLat / 2 : -oppLat / 2) : NaN;   // between the two tracks
-      const lat = roadSafeLat(track, s, side * tramMastLat(track, s, side), frameAt, inStation(track, s, 8) >= 0, 6, median);
       const theta = Math.atan2(f.tangent.x, -f.tangent.z);
       const P = (l, dy) => [f.pos.x + f.right.x * l, f.pos.y + dy, f.pos.z + f.right.z * l];
       const st = tramStagger(s);
@@ -1176,13 +1201,16 @@
       const sd = 1;   // right of the track (tram: the left side is the opposite track; rail: the second main may be on the right, see railRightLat)
       let lat = sd * (ctx.kind === 'tram' ? 4.7 : railRightLat(track, lim.s, 2.95, 2.8));
       if (ctx.kind === 'tram') { const si = inStation(track, lim.s, 4); if (si >= 0 && track.stations[si].side === 'right' && track.stations[si].kind !== 'island') lat = track.stations[si].edge + track.stations[si].width + 0.45; }
-      lat = roadSafeLat(track, lim.s, lat, null, ctx.kind === 'tram' && inStation(track, lim.s, 4) >= 0);
-      const f = track.frameAt(lim.s);
+      const oppL = track.opposite && track.opposite.has(lim.s) ? track.opposite.latAt(lim.s) : NaN;
+      const spot = ctx.kind === 'tram' ? roadSafeSpot(track, lim.s, lat, null, inStation(track, lim.s, 4) >= 0, 10, Number.isFinite(oppL) && oppL < -2.6 ? oppL / 2 : NaN, (sp) => sp >= 0, [2, -2, 4, -4, 6, -6]) : { s: lim.s, lat };   // (a board may move a few metres along the track to clear a lane)
+      lat = spot.lat;
+      const bs = spot.s;
+      const f = track.frameAt(bs);
       const th = [f.tangent.x, 0, f.tangent.z];
       const tl = Math.hypot(th[0], th[2]) || 1;
       const nrm = [-th[0] / tl, 0, -th[2] / tl];
-      const base = posAt(track, lim.s, lat, ctx.kind === 'tram' ? 0.14 : -0.2);
-      logPole('limit', lim.s, base);
+      const base = posAt(track, bs, lat, ctx.kind === 'tram' ? 0.14 : -0.2);
+      logPole('limit', bs, base);
       post.box(base[0], base[1] + 1.2, base[2], 0.09, 2.5, 0.09, col('#6c7075'), -Math.atan2(f.tangent.x, -f.tangent.z));
       const batch = sets.get('limit:' + lim.kmh, () => M.tex('limit' + lim.kmh, limitTexture(lim.kmh), {}));
       const r = [f.right.x, 0, f.right.z];
@@ -1245,10 +1273,12 @@
       const sd = ctx.kind === 'tram' ? 1 : L2 > 3 ? -1 : 1;   // rail: on the free outer side (right, or left while the second main is on the right)
       const si = ctx.kind === 'tram' ? inStation(track, s, 4) : -1;
       const kmLat = sd * (ctx.kind === 'tram' ? (si >= 0 && track.stations[si].kind !== 'island' ? track.stations[si].edge + track.stations[si].width + 0.9 : 5.6) : L2 > 0 && L2 <= 3 ? L2 + 3.4 : 3.4);
-      const p = posAt(track, s, ctx.kind === 'tram' ? roadSafeLat(track, s, kmLat, null, si >= 0) : kmLat, ctx.kind === 'tram' ? 0.14 : -0.3);
-      const f = track.frameAt(s);
+      const spot = ctx.kind === 'tram' ? roadSafeSpot(track, s, kmLat, null, si >= 0, 10, NaN, (sp) => sp >= 0, [5, -5, 10, -10, 15, -15, 20, -20]) : { s, lat: kmLat };
+      if (ctx.kind === 'tram' && !spot.clear) continue;   // a km post in no free spot is left out rather than put into a lane
+      const p = posAt(track, spot.s, spot.lat, ctx.kind === 'tram' ? 0.14 : -0.3);
+      const f = track.frameAt(spot.s);
       const th = -Math.atan2(f.tangent.x, -f.tangent.z);
-      logPole('km', s, p);
+      logPole('km', spot.s, p);
       post.box(p[0], p[1] + 0.5, p[2], 0.14, 1.0, 0.1, col('#e8e6de'), th);
       post.box(p[0], p[1] + 0.92, p[2], 0.15, 0.2, 0.11, col('#1a1b1d'), th);
     }
@@ -2579,7 +2609,8 @@
     /* LUXTRAM: masts, limit boards and km posts are placed against the painted roads (TS.luxDrawnRoad, see roadSafeLat), which exist only once the world has built
        the ground tile: the chunk first gets bed, rails and wires, its furniture follows as soon as every spot it may use is known (or after FURNITURE_WAIT_MS) */
     const isLux = !!track.luxtram;
-    const FURNITURE_WAIT_MS = 25000;
+    const FURNITURE_WAIT_MS = 12000;          // counted from the moment the chunk is within FURNITURE_NEAR_M of the tram (the painted roads only exist near it)
+    const FURNITURE_NEAR_M = 200;           // (the world paints / decorates tiles within 260-420 m of the tram)
     const furniturePending = new Map();     // chunk index -> { since }
     function furnitureReady(index) {
       const drawn = window.TS.luxDrawnRoad;
@@ -2608,12 +2639,19 @@
     }
     function pumpFurniture(pos) {
       if (!furniturePending.size) return;
+      if (typeof window.TS.luxDrawnRoad !== 'function' || typeof window.TS.luxRoadMargin !== 'function') {   // no world (tests / a failed world): nothing to place against, build at once
+        Array.from(furniturePending.keys()).forEach(buildFurniture);
+        return;
+      }
       const now = performance.now();
       const list = Array.from(furniturePending.entries()).sort((a, b) => Math.abs(a[0] * CHUNK + CHUNK / 2 - pos) - Math.abs(b[0] * CHUNK + CHUNK / 2 - pos));
       let tested = 0;
       for (const [index, info] of list) {
-        if (now - info.since > FURNITURE_WAIT_MS || furnitureReady(index)) { buildFurniture(index); break; }
-        if (++tested >= 3) break;
+        if (Math.abs(index * CHUNK + CHUNK / 2 - pos) < FURNITURE_NEAR_M) {
+          if (!info.near) info.near = now;
+          if (now - info.near > FURNITURE_WAIT_MS || furnitureReady(index)) { buildFurniture(index); break; }
+        }
+        if (++tested >= 4) break;
       }
     }
     function loadChunk(index) {
@@ -2776,7 +2814,7 @@
     return {
       update, dispose, setSignalAspect, setCrossing, addTempBoard, clearTempBoards, platformHeight, stationObjects, stationReport,
       quality: qualityName,
-      debug: { chunks, env, furniturePending: () => furniturePending.size },
+      debug: { chunks, env, furniturePending: () => furniturePending.size, furniturePendingChunks: () => Array.from(furniturePending.keys()), CHUNK },
     };
   }
 
