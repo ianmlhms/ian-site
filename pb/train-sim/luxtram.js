@@ -626,7 +626,7 @@
           if (cand.length) { const q = cand.length === 1 ? cand[0] : (Math.abs(prev.v - r.v) <= Math.abs(next.v - r.v) ? prev : next); setTo(q.v, q.k); }
         } else {
           const q = prev || next;
-          if (q.k !== 1) setTo(q.v, q.k);              // a short piece at the end of the line next to a curve zone stays as it is
+          if (q.k !== 1) setTo(q.v, q.k); else setTo(r.v, 2);   // a short piece at the end of the line next to a curve zone keeps its speed (exempt from the minimum: 'gap')
         }
       }
       if (!changed) break;
