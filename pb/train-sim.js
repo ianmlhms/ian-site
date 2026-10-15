@@ -808,7 +808,7 @@
     const vp = w.cabin && w.cabin.viewpoint ? w.cabin.viewpoint(insidePos) : null;
     const car = vp ? cars[vp.car] : cars[[0, Math.floor(n / 2), n - 1][insidePos]], inf = car.interior;
     car.group.updateMatrixWorld(true); first.group.updateMatrixWorld(true); last.group.updateMatrixWorld(true);
-    const floorY = inf ? inf.floorY : 0.4, eyeY = floorY + 1.55;
+    const floorY = inf ? inf.floorY : 0.4, eyeY = floorY + 1.7;
     camTmp.eye.set(vp ? vp.x : 0.1, vp ? vp.y : eyeY, vp ? vp.z : 0); car.group.localToWorld(camTmp.eye);
     // aim down the length of the train: at the far end (front viewpoint) or at the front of the train (the others)
     const tgtCar = vp ? cars[vp.look.car] : (insidePos === 0 ? last : first);

@@ -853,28 +853,35 @@
         });
       }
       const count = () => activeCount((p) => p.cab);
-      /* the three viewpoints of the saloon camera: front end looking back down the whole tram, the front end of a middle car and the rear end, both looking forward.
-         Nobody sits or stands within VP_CLEAR metres of one (the camera would be inside a stranger's back). */
-      const VP_CLEAR = 2.2;
+      /* the three viewpoints of the saloon camera: front end looking back down the whole tram, a middle car looking forward (a metre behind its door, so people boarding walk in
+         ahead of you) and the rear end looking forward, all at a standing passenger's eye height.
+         Clearance: nothing (seat or standing spot) within VP_NEAR metres of a viewpoint or within VP_CONE metres in front of it (across the aisle and the seats beside it); a
+         STANDING spot also not within VP_CLEAR metres ahead (a standing body's head and shoulders would fill the lens). Seats in the zone stay empty. */
+      const VP_EYE = 1.7, VP_NEAR = 1.2, VP_CONE = 1.5, VP_CONE_HALF = 1.15, VP_CLEAR = 2.2;
       function viewpoint(pos) {
         const n = cab.cars.length;
         if (!n) return null;
         const k = [0, Math.floor(n / 2), n - 1][pos], c = cab.cars[k], inf = c.inf;
-        const z = pos === 2 ? inf.zB - 0.5 : pos === 1 ? (inf.doors.length ? inf.doors[0] : (inf.zA + inf.zB) / 2) + 0.2 : inf.zA + 0.4;
-        return { k, car: c.i, x: 0.1, y: inf.floorY + 1.55, z, look: pos === 0 ? { car: cab.cars[n - 1].i, z: cab.cars[n - 1].inf.zB } : { car: cab.cars[0].i, z: -cab.cars[0].car.length / 2 + 1 } };
+        const z = pos === 2 ? inf.zB - 0.5 : pos === 1 ? (inf.doors.length ? inf.doors[0] : (inf.zA + inf.zB) / 2) + 1.0 : inf.zA + 0.4;
+        return { k, car: c.i, x: 0.1, y: inf.floorY + VP_EYE, z, look: pos === 0 ? { car: cab.cars[n - 1].i, z: cab.cars[n - 1].inf.zB } : { car: cab.cars[0].i, z: -cab.cars[0].car.length / 2 + 1 } };
       }
-      // (seats are off to the side and below the eye: only people standing in or beside the aisle are kept away)
-      const vpBlocked = (k, z, reach) => [0, 1, 2].some((i) => { const v = viewpoint(i); if (!v || v.k !== k) return false; const ahead = (z - v.z) * (i === 0 ? 1 : -1); return ahead > -0.6 && ahead < (reach == null ? VP_CLEAR : reach); });   // nobody within 0.8 m behind or VP_CLEAR m in front of the camera
+      /* is the spot (x, z) of car k inside a viewpoint's clearance zone? `reach` = how far ahead of the camera the zone counts (VP_CLEAR for a standing spot, VP_CONE for a seat) */
+      const vpBlocked = (k, x, z, reach = VP_CLEAR) => [0, 1, 2].some((i) => {
+        const v = viewpoint(i); if (!v || v.k !== k) return false;
+        const ahead = (z - v.z) * (i === 0 ? 1 : -1);
+        return Math.hypot(x - v.x, z - v.z) < VP_NEAR || (ahead > 0 && ahead < reach && Math.abs(x - v.x) < VP_CONE_HALF);
+      });
+      const seatBlocked = (k, q) => vpBlocked(k, q.x, q.z, VP_CONE);
       const carEntry = (carIdx) => cab.cars.find((c) => c.i === carIdx) || cab.cars[0];
       function doorSide(door) { return door && door.side === 'left' ? -1 : 1; }
       function pickDestination(order) {
         const wantSit = chance(0.66);
-        const seatsOf = (k) => cab.cars[k].seats.filter((q) => !q.taken), holdsOf = (k) => cab.cars[k].holds.filter((q) => !q.taken && !vpBlocked(k, q.z, 1.9));
+        const seatsOf = (k) => cab.cars[k].seats.filter((q) => !q.taken && !seatBlocked(k, q)), holdsOf = (k) => cab.cars[k].holds.filter((q) => !q.taken && !vpBlocked(k, q.x, q.z));
         if (wantSit) for (const k of order) { const free = seatsOf(k); if (free.length) return { k, seat: pick(free) }; }
         for (const k of order) { const free = holdsOf(k); if (free.length) return { k, hold: pick(free) }; }
         for (const k of order) { const free = seatsOf(k); if (free.length) return { k, seat: pick(free) }; }
         const k = order[0], inf = cab.cars[k].inf;
-        for (let tries = 0; tries < 12; tries++) { const z = rnd(inf.zA + 0.3, inf.zB - 0.3); if (!vpBlocked(k, z, 2.0)) return { k, aisle: { x: rnd(-0.16, 0.16), z } }; }
+        for (let tries = 0; tries < 12; tries++) { const z = rnd(inf.zA + 0.3, inf.zB - 0.3); { const x = rnd(-0.16, 0.16); if (!vpBlocked(k, x, z)) return { k, aisle: { x, z } }; } }
         return { k, aisle: { x: 0.12, z: (inf.zA + inf.zB) / 2 } };
       }
       /* a new passenger: from `door` (walks in) or, without one, already at his place */

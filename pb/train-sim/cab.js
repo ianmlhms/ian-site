@@ -21,6 +21,8 @@
   const DESK_DROP = 0.08;               // desk surface falls this much over its depth (tilts toward the driver)
   const FONT = '"Helvetica Neue", Helvetica, Arial, sans-serif';
   const GLASS_OPACITY = 0.14;
+  const HOOD_X0 = -0.385;   // tram console fascia: left end (m from the centre line),
+  const HOOD_FACE_L = 0.36, HOOD_ALPHA = 55 * DEG;   // length of its face (m, along the slope) and slope
   const SIGN_FONT_SCALE = 0.62;
   const NIGHT_MATTE0 = new THREE.Color('#171a1f'), NIGHT_MATTE1 = new THREE.Color('#2b3544'), NIGHT_METAL0 = new THREE.Color('#0d0f12'), NIGHT_METAL1 = new THREE.Color('#1c2430');
   const NIGHT_MATTE_WARM = new THREE.Color('#2e2e30');   // tram cab at night: the white panelling takes the warm light of the cab lamp
@@ -63,8 +65,8 @@
     tram: {
       hw: 0.8, top: '#33373d', body: '#22252a', ramp: '#14171a', metal: '#aab1b8', trim: '#101215', accent: '#19a9c4',
       leverX: -0.52, joystick: true, seat: 'modern', low: true,
-      dials: [{ kind: 'speedo', x: -0.275, r: 0.058 }],
-      mfds: [{ x: -0.02, w: 0.3, h: 0.19, role: 'main' }, { x: 0.205, w: 0.15, h: 0.094, role: 'aux' }],
+      dials: [{ kind: 'speedo', x: -0.28, r: 0.064, v: 0.2 }],
+      mfds: [{ x: -0.065, w: 0.32, h: 0.2, v: 0.205, role: 'main' }, { x: 0.225, w: 0.2, h: 0.125, v: 0.215, role: 'aux' }],
       hood: true,
     },
     ic: {
@@ -525,9 +527,9 @@
     let tallest = 0.15;
     for (const d of dials) tallest = Math.max(tallest, d.r * 2 + 0.02);
     for (const m of mfds) tallest = Math.max(tallest, m.h + 0.03);
-    const rampLen = tallest;
-    let rampAlpha = 42 * DEG;
-    for (; rampAlpha > 14 * DEG; rampAlpha -= 1 * DEG) {
+    const rampLen = S.hood ? HOOD_FACE_L : tallest;
+    let rampAlpha = S.hood ? HOOD_ALPHA : 42 * DEG;
+    for (; !S.hood && rampAlpha > 14 * DEG; rampAlpha -= 1 * DEG) {
       const topU = rampBottomU - rampLen * Math.cos(rampAlpha);
       const topY = deskY(rampBottomU) + rampLen * Math.sin(rampAlpha);
       if (topY <= sightY(DESK_FRONT_U + topU) - 0.02) break;
@@ -545,7 +547,8 @@
     let rx0 = hw, rx1 = -hw;
     for (const d of dials) { rx0 = Math.min(rx0, d.x - d.r * 1.12); rx1 = Math.max(rx1, d.x + d.r * 1.12); }
     for (const m of mfds) { rx0 = Math.min(rx0, m.x - m.w / 2 - 0.02); rx1 = Math.max(rx1, m.x + m.w / 2 + 0.02); }
-    rx0 = Math.max(rx0 - (S.hood ? 0.07 : 0.015), -hw); rx1 = Math.min(rx1 + (S.hood ? 0.06 : 0.015), hw);
+    rx0 = Math.max(rx0 - 0.015, -hw); rx1 = Math.min(rx1 + 0.015, hw);
+    if (S.hood) { rx0 = HOOD_X0; rx1 = hw + 0.04; }
     const prismX = (profile, xa, xb, hex) => {
       const shape = new T.Shape();
       profile.forEach((p, i) => (i === 0 ? shape.moveTo(-p[0], p[1]) : shape.lineTo(-p[0], p[1])));
@@ -562,7 +565,45 @@
     const flatProfile = [
       [cowlZ, floor + 0.02], [cowlZ, cowlY - 0.004], [zF + DESK_FRONT_U, yFront - 0.004], [rearZ, deskY(DESK_DEPTH) - 0.004], [rearZ, floor + 0.02],
     ];
-    prismX(rampProfile, rx0, rx1, S.body);
+    /* tram console: a lofted fascia (smooth along x, crisp across): tall over the screens, sweeping down toward the right-hand end. Profile ring per x:
+       cowl foot, cowl top, top rim front, top rim rear, base of the face, desk rear, desk rear foot. */
+    const fasciaL = (x) => {
+      const sm = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+      if (x < HOOD_X0 + 0.11) return 0.1 + (HOOD_FACE_L - 0.1) * sm((x - HOOD_X0) / 0.11);
+      if (x < 0.2) return HOOD_FACE_L;
+      return HOOD_FACE_L - (HOOD_FACE_L - 0.07) * sm((x - 0.2) / (rx1 - 0.2));
+    };
+    const loftFascia = (hexTop, hexBot) => {
+      const N = 40, xs = [];
+      for (let i = 0; i <= N; i++) xs.push(rx0 + (rx1 - rx0) * i / N);
+      const zFb = zF + DESK_FRONT_U + rampBottomU, yFb = deskY(rampBottomU) - 0.004;
+      const ringOf = (x) => {
+        const L = fasciaL(x), zT = zFb - L * Math.cos(rampAlpha), yT = yFb + L * Math.sin(rampAlpha);
+        const zR = Math.max(capZ(yT) + 0.025, zT - 0.06);
+        return [[cowlZ, floor + 0.02], [cowlZ, cowlY], [zR, yT + 0.012], [zT, yT], [zFb, yFb], [rearZ, deskY(DESK_DEPTH) - 0.004], [rearZ, floor + 0.02]];
+      };
+      const rings = xs.map(ringOf), nv = rings[0].length, pos = [], idx = [];
+      for (let e = 0; e < nv; e++) {
+        const base = pos.length / 3;
+        for (let i = 0; i < xs.length; i++) { const a = rings[i][e], b = rings[i][(e + 1) % nv]; pos.push(xs[i], a[1], a[0], xs[i], b[1], b[0]); }
+        for (let i = 0; i < xs.length - 1; i++) { const a = base + i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      }
+      for (const end of [0, xs.length - 1]) {   // end caps
+        const base = pos.length / 3, ring = rings[end];
+        ring.forEach((q) => pos.push(xs[end], q[1], q[0]));
+        const tris = T.ShapeUtils.triangulateShape(ring.map((q) => new T.Vector2(q[0], q[1])), []);
+        for (const [a, b, c] of tris) {
+          const ay = ring[a][1], az = ring[a][0], nx = (ring[b][1] - ay) * (ring[c][0] - az) - (ring[b][0] - az) * (ring[c][1] - ay);   // x component of the triangle normal
+          if ((nx > 0) === (end === xs.length - 1)) idx.push(base + a, base + b, base + c); else idx.push(base + a, base + c, base + b);
+        }
+      }
+      const g = new T.BufferGeometry();
+      g.setAttribute('position', new T.BufferAttribute(new Float32Array(pos), 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      addTo('matte', g, new T.Matrix4(), hexTop, hexBot);
+    };
+    if (S.hood) loftFascia('#343941', '#0e1013'); else prismX(rampProfile, rx0, rx1, S.body);
     const wingXs = [[-hw - 0.04, rx0], [rx1, hw + 0.04]];
     for (const [xa, xb] of wingXs) {
       if (xb - xa < 0.01) continue;
@@ -574,8 +615,8 @@
     }
     // centre flat top and ramp plate
     deskBox('matte', rx1 - rx0, 0.008, DESK_DEPTH - rampBottomU + 0.02, (rx0 + rx1) / 2, (rampBottomU + DESK_DEPTH) / 2 - 0.01, S.top, -0.007);
-    addTo('matte', box(rx1 - rx0, rampLen, 0.008), panelM((rx0 + rx1) / 2, rampLen / 2, 0.0), S.ramp);
-    {
+    if (!S.hood) addTo('matte', box(rx1 - rx0, rampLen, 0.008), panelM((rx0 + rx1) / 2, rampLen / 2, 0.0), S.ramp);
+    if (!S.hood) {
       const z0 = cowlZ, y0 = cowlY, z1 = zF + DESK_FRONT_U + rampTopU, y1 = rampTopY;
       const len = Math.hypot(z1 - z0, y1 - y0), ang = Math.atan2(y1 - y0, z1 - z0);
       addTo('matte', box(rx1 - rx0, 0.012, len), compose((rx0 + rx1) / 2, (y0 + y1) / 2 + 0.004, (z0 + z1) / 2, -ang, 0, 0), '#14171a');
@@ -601,7 +642,7 @@
     const bezelHex = S.old ? '#b69a52' : '#20242a';
 
     for (const d of dials) {
-      const cy = rampLen / 2;
+      const cy = d.v != null ? d.v : rampLen / 2;
       const M = panelM(d.x, cy, 0.006);
       // bezel ring + back can
       const ringG = new T.TorusGeometry(d.r * 1.0, d.r * 0.075, 8, isLow ? 20 : 36);
@@ -655,12 +696,12 @@
       const canvas = makeCanvas(mfdW, Math.round(mfdW * 0.625));
       const texture = tex(canvasTexture(canvas, aniso));
       const material = mat(new T.MeshBasicMaterial({ map: texture, toneMapped: false }));
-      const M = panelM(m.x, rampLen / 2, 0.009);
+      const M = panelM(m.x, m.v != null ? m.v : rampLen / 2, 0.009);
       const screen = new T.Mesh(geo(new T.PlaneGeometry(m.w, m.h)), material);
       screen.applyMatrix4(M);
       mfdGroup.add(screen);
-      addTo('matte', box(m.w + 0.03, m.h + 0.03, 0.02), panelM(m.x, rampLen / 2, -0.004), '#0a0b0d');
-      addTo('metal', box(m.w + 0.034, 0.004, 0.008), panelM(m.x, rampLen / 2 + (m.h + 0.03) / 2, 0.008), S.metal);
+      addTo('matte', box(m.w + 0.03, m.h + 0.03, 0.02), panelM(m.x, m.v != null ? m.v : rampLen / 2, -0.004), '#0a0b0d');
+      addTo('metal', box(m.w + 0.034, 0.004, 0.008), panelM(m.x, (m.v != null ? m.v : rampLen / 2) + (m.h + 0.03) / 2, 0.008), S.metal);
       mfdList.push({ canvas, texture, role: m.role, sig: '' });
     }
     // Urbos console: framed screens + glass sheen + round backlit buttons along the lower edge of the panel + the radio / door-key block on the right
@@ -669,7 +710,7 @@
       { const c = sheenCanvas.getContext('2d'); const g = c.createLinearGradient(0, 0, 64, 64); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.35, 'rgba(255,255,255,0.0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.13)'); g.addColorStop(0.62, 'rgba(255,255,255,0.0)'); g.addColorStop(1, 'rgba(255,255,255,0.05)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); }
       const sheenMat = mat(new T.MeshBasicMaterial({ map: tex(canvasTexture(sheenCanvas, 1)), transparent: true, depthWrite: false, toneMapped: false }));
       for (const m of mfds) {
-        const fm = panelM(m.x, rampLen / 2, 0.0);
+        const fm = panelM(m.x, m.v != null ? m.v : rampLen / 2, 0.0);
         const bw = m.w + 0.03, bh = m.h + 0.03;
         // frame: four bars standing 6 mm proud of the panel, inner lip lighter
         for (const [w, hh, x, y] of [[bw + 0.016, 0.012, 0, bh / 2 + 0.002], [bw + 0.016, 0.012, 0, -bh / 2 - 0.002], [0.012, bh, -bw / 2 - 0.002, 0], [0.012, bh, bw / 2 + 0.002, 0]]) {
@@ -677,25 +718,23 @@
         }
         for (const [w, hh, x, y] of [[m.w + 0.004, 0.003, 0, m.h / 2 + 0.001], [m.w + 0.004, 0.003, 0, -m.h / 2 - 0.001]]) addTo('metal', box(w, hh, 0.004), fm.clone().multiply(compose(x, y, 0.0105)), '#3a4047');
         const sheen = new T.Mesh(geo(new T.PlaneGeometry(m.w, m.h)), sheenMat);
-        sheen.applyMatrix4(panelM(m.x, rampLen / 2, 0.0105));
+        sheen.applyMatrix4(panelM(m.x, m.v != null ? m.v : rampLen / 2, 0.0105));
         mfdGroup.add(sheen);
       }
       // dial: sheen + a black screw-down bezel ring
       for (const d of dials) {
         const sheen = new T.Mesh(geo(new T.CircleGeometry(d.r * 0.97, 28)), sheenMat);
-        sheen.applyMatrix4(panelM(d.x, rampLen / 2, 0.0105));
+        sheen.applyMatrix4(panelM(d.x, d.v != null ? d.v : rampLen / 2, 0.0105));
         dialGroup.add(sheen);
-        addTo('matte', new T.TorusGeometry(d.r * 1.12, d.r * 0.07, 6, 28), panelM(d.x, rampLen / 2, 0.003), '#16181c');
+        addTo('matte', new T.TorusGeometry(d.r * 1.12, d.r * 0.07, 6, 28), panelM(d.x, d.v != null ? d.v : rampLen / 2, 0.003), '#16181c');
       }
       // round backlit buttons: two short rows under the aux screen + a column at the far left of the panel
-      const rows = [
-        { x0: 0.165, y: rampLen * 0.12, n: 3, dx: 0.04, cols: ['#2c9a58', '#d23a2a', '#2f6fd0'] },
-        { x0: rx0 + 0.022, y: rampLen * 0.78, n: 1, dx: 0, cols: ['#e8b23a'] },
-        { x0: rx0 + 0.022, y: rampLen * 0.5, n: 1, dx: 0, cols: ['#d23a2a'] },
-        { x0: rx0 + 0.022, y: rampLen * 0.22, n: 1, dx: 0, cols: ['#2c9a58'] },
-        { x0: rx1 - 0.024, y: rampLen * 0.78, n: 1, dx: 0, cols: ['#2f6fd0'] },
-        { x0: rx1 - 0.024, y: rampLen * 0.5, n: 1, dx: 0, cols: ['#e8b23a'] },
-        { x0: rx1 - 0.024, y: rampLen * 0.22, n: 1, dx: 0, cols: ['#e8e6de'] },
+      const C = { w: '#e8e6de', g: '#2c9a58', a: '#e8b23a', r: '#d23a2a', b: '#2f6fd0' };
+      const rows = [   // x0, v (along the face from its foot), n, dx, colours: a long row under the main screen, a short one under the aux screen, two switch groups on the right wing
+        { x0: -0.345, y: 0.042, n: 8, dx: 0.046, cols: [C.w, C.g, C.a, C.r, C.g, C.b, C.a, C.w] },
+        { x0: 0.045, y: 0.042, n: 6, dx: 0.046, cols: [C.g, C.r, C.b, C.a, C.w, C.g] },
+        { x0: 0.36, y: 0.042, n: 7, dx: 0.062, cols: [C.a, C.w, C.b, C.r, C.g, C.a, C.w] },
+        { x0: 0.4, y: 0.09, n: 3, dx: 0.062, cols: [C.b, C.g, C.r] },
       ];
       for (const row of rows) for (let i = 0; i < row.n; i++) {
         const x = row.x0 + i * row.dx, col = row.cols[i];
@@ -883,7 +922,7 @@
         deskCyl('matte', 0.012, 0.014, 0.014, x, btnU - 0.075, i === 1 ? '#7a1a14' : '#262a30', 0, 12);
       }
       // ticket tray (right) and paper holder (left)
-      const trayX = Math.max(rx1 + 0.12, hw - 0.17);
+      const trayX = S.hood ? hw - 0.17 : Math.max(rx1 + 0.12, hw - 0.17);
       deskBox('matte', 0.2, 0.022, 0.1, trayX, 0.27, '#1a1c20', 0);
       deskBox('matte', 0.18, 0.004, 0.08, trayX, 0.27, '#0c0d0f', 0.022);
       addTo('matte', box(0.17, 0.01, 0.1), deskM(trayX, 0.1, 0.045, 0, 0.55), '#9ea4a8');
@@ -1018,16 +1057,17 @@
       const innerHW = fr.windHW, h = fr.windY1 - fr.windY0, ym = (fr.windY0 + fr.windY1) / 2, rk = rakeAng;
       const sideX = Math.min(fr.W / 2 * 0.92, fr.W / 2 - 0.12);
       for (const sx of [-1, 1]) {
-        // A-pillar: cream box with a darker return face and a black rubber lip along the glass
-        boxAt('matte', 0.12, h + 0.14, 0.17, sx * (innerHW + 0.035), ym, capZ(ym) + 0.1, cream, rk, 0, sx * 0.05, creamLo);
-        boxAt('matte', 0.05, h + 0.1, 0.07, sx * (innerHW - 0.025), ym, capZ(ym) + 0.05, shade, rk, 0, sx * 0.05, '#8d8b84');
-        boxAt('matte', 0.024, h + 0.02, 0.024, sx * (innerHW - 0.055), ym, capZ(ym) + 0.03, rubber, rk);
-        // side panel between pillar and cab door: cream above the sill, dark dado below
-        const zA = capZ(ym) + 0.2, zB = zF + 1.12;
-        if (zB > zA) {
-          boxAt('matte', 0.035, fr.windY1 - fr.windY0 + 0.25, zB - zA, sx * (sideX + 0.01), ym + 0.1, (zA + zB) / 2, '#d9d7cf', 0, 0, 0, creamLo);
-          boxAt('matte', 0.04, fr.windY0 - floor - 0.05, zB - zA, sx * (sideX + 0.01), (fr.windY0 + floor + 0.05) / 2 - 0.02, (zA + zB) / 2, dark, 0, 0, 0, '#1a1c20');
+        // A-pillar: a slim, slightly bowed white tube (painted steel) with a thin black rubber lip along the glass
+        {
+          const y0 = fr.windY0 - 0.08, y1 = fr.windY1 + 0.06, bow = 0.035;
+          const pts = [0, 0.25, 0.5, 0.75, 1].map((t) => { const y = y0 + (y1 - y0) * t; return new T.Vector3(sx * (innerHW + 0.03 + bow * Math.sin(Math.PI * t) - 0.03 * t), y, capZ(y) + 0.075); });
+          addTo('matte', new T.TubeGeometry(new T.CatmullRomCurve3(pts), 12, 0.027, 10, false), new T.Matrix4(), '#f1efe9', '#d3d1c9');
+          boxAt('matte', 0.022, h + 0.02, 0.022, sx * (innerHW - 0.04), ym, capZ(ym) + 0.035, rubber, rk);
         }
+        // side panel between pillar and cab door: a short cream return behind the pillar, dark dado below; the side window follows (below)
+        const zA = capZ(ym) + 0.12, zB = Math.min(zF + 1.12, zA + 0.1), zD = zF + 1.12;
+        if (zB > zA) boxAt('matte', 0.035, fr.windY1 - fr.windY0 + 0.25, zB - zA, sx * (sideX + 0.01), ym + 0.1, (zA + zB) / 2, '#e2e0d8', 0, 0, 0, creamLo);
+        if (zD > zA) boxAt('matte', 0.04, fr.windY0 - floor - 0.05, zD - zA, sx * (sideX + 0.01), (fr.windY0 + floor + 0.05) / 2 - 0.02, (zA + zD) / 2, dark, 0, 0, 0, '#1a1c20');
         // gasket round the lower and upper screen edge continues into the pillar
         boxAt('matte', 0.015, h, 0.012, sx * (innerHW - 0.07), ym, capZ(ym) + 0.012, '#050607', rk);
       }
@@ -1068,7 +1108,7 @@
         boxAt('matte', 0.012, 1.96, 0.016, x, floor + 1.03, z1, '#0d0e10');
         boxAt('metal', 0.03, 0.03, 0.14, x - sx * 0.01, floor + 1.05, z0 + 0.1, S.metal);
         // window frame + glass
-        const wy0 = floor + 0.85, wy1 = floor + 1.95, wz0 = z0 + 0.1, wz1 = z1 - 0.1;
+        const wy0 = floor + 0.85, wy1 = floor + 1.95, wz0 = fr.type === 'tram' ? capZ((fr.windY0 + fr.windY1) / 2) + 0.45 : z0 + 0.1, wz1 = z1 - 0.1;
         const fh = '#17191c';
         boxAt('matte', 0.03, 0.045, wz1 - wz0, x - sx * 0.01, wy0, (wz0 + wz1) / 2, fh);
         boxAt('matte', 0.03, 0.045, wz1 - wz0, x - sx * 0.01, wy1, (wz0 + wz1) / 2, fh);
