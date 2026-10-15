@@ -243,12 +243,12 @@
     /* Cloche d'Or: mall skin of diamond glazing, bright blue and black facets in a silver lattice (ref Commons "Cloche d'or Shopping Center (101)") */
     clglass(g, x, y, lit) {
       const dia = (fn) => { for (let r = -1; r < 5; r++) for (let c = -1; c < 3; c++) { const cx = x + c * 128 + 64 + (r & 1 ? 64 : 0); const cy = y + r * 64 + 64; const k = Math.floor(hash2((r + 5) * 7 + 3, (c + 4) * 5 + 11) * 8); fn(cx, cy, k); } };
-      if (lit) { g.fillStyle = 'rgba(170,215,255,0.38)'; dia((cx, cy, k) => { if (k < 6) { g.beginPath(); g.moveTo(cx, cy - 60); g.lineTo(cx + 60, cy); g.lineTo(cx, cy + 60); g.lineTo(cx - 60, cy); g.fill(); } }); return; }
+      if (lit) { g.fillStyle = 'rgba(170,215,255,0.38)'; dia((cx, cy, k) => { if (k < 7) { g.beginPath(); g.moveTo(cx, cy - 60); g.lineTo(cx + 60, cy); g.lineTo(cx, cy + 60); g.lineTo(cx - 60, cy); g.fill(); } }); return; }
       g.fillStyle = '#0f1b2e'; g.fillRect(x, y, CELL, CELL);
       dia((cx, cy, k) => {
         const grd = g.createLinearGradient(cx - 60, cy - 60, cx + 60, cy + 60);
         if (k === 7) { grd.addColorStop(0, '#0a1322'); grd.addColorStop(1, '#1a2b46'); }
-        else { grd.addColorStop(0, ['#9fd3f5', '#6db4e6', '#86c2ee', '#5aa3dc', '#7dbbe8', '#a9d9f7'][k]); grd.addColorStop(1, ['#3f88c6', '#2c6cae', '#3d7fbd', '#2a69ab', '#3478b6', '#4a92cc'][k]); }
+        else { grd.addColorStop(0, ['#9fd3f5', '#6db4e6', '#86c2ee', '#5aa3dc', '#7dbbe8', '#a9d9f7', '#79b9ea'][k]); grd.addColorStop(1, ['#3f88c6', '#2c6cae', '#3d7fbd', '#2a69ab', '#3478b6', '#4a92cc', '#3a7fbf'][k]); }
         g.fillStyle = grd; g.beginPath(); g.moveTo(cx, cy - 62); g.lineTo(cx + 62, cy); g.lineTo(cx, cy + 62); g.lineTo(cx - 62, cy); g.fill();
       });
       g.strokeStyle = 'rgba(210,218,226,0.9)'; g.lineWidth = 2.2;
@@ -1273,15 +1273,12 @@
     if (window.__tsLmDebug) console.info(TAG + 'wallSign', o.cell, best ? { len: Math.round(best.len), n: [best.nx.toFixed(2), best.nz.toFixed(2)], at: [Math.round(best.mx), Math.round(best.mz)], y: best.A[2] } : null, 'walls', b.walls.length);
     if (!best) return null;
     const tx = (best.B[0] - best.A[0]) / best.len; const tz = (best.B[1] - best.A[1]) / best.len;
-    const sgn = (tx * -best.nz + tz * best.nx) > 0 ? 1 : -1;   // keep the tangent so that (t, up, n) is right-handed seen from outside
     const y0 = (L.gy ? L.gy(best.mx, best.mz) : 0) + (o.up || 5); const off = 0.12;
     const px = best.mx + best.nx * off + (o.shift || 0) * tx; const pz = best.mz + best.nz * off + (o.shift || 0) * tz;
     const ww = Math.min(o.w, best.len * 0.92); const hh = ww / (o.aspect || 1); const hw = ww / 2;
-    const P = (u, v) => [px + tx * u * sgn * -1 * -1, y0 + v, pz + tz * u * sgn * -1 * -1];
     const a = [px - tx * hw, y0, pz - tz * hw]; const bb = [px + tx * hw, y0, pz + tz * hw]; const c = [px + tx * hw, y0 + hh, pz + tz * hw]; const d = [px - tx * hw, y0 + hh, pz - tz * hw];
     const nn = cross(sub(bb, a), sub(d, a));
     if (nn[0] * best.nx + nn[2] * best.nz < 0) quadP(g, bb, a, d, c, o.cell, o.color || WHITE); else quadP(g, a, bb, c, d, o.cell, o.color || WHITE);
-    void P;
     return { p: [px, y0, pz], n: [best.nx, best.nz], t: [tx, tz] };
   }
   /* flat-roof furniture on a LOD2 roof face: dark parapet rim, one louvred plant enclosure + a lift head (o.parapet = { h, color }, o.plant = { h, st }) */

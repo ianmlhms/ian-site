@@ -1190,6 +1190,29 @@
         }
       });
     }
+    const lampsPending = new Map();   // chunk -> { list, group, t0 } road lamps waiting for the decorated tiles (TS.luxDrawnRoad)
+    let lampClock = 0;
+    function pumpLamps(dt) {
+      if (!lampsPending.size) return;
+      lampClock += dt; if (lampClock < 0.25) return; lampClock = 0;
+      const now = performance.now();
+      lampsPending.forEach((e, ci) => {
+        const undecided = e.list.some((p) => drawnRoad(p[0], p[1]) === -1);
+        if (undecided && now - e.t0 < 30000) return;            // wait for the tiles around it (30 s at most: then the static margin has to do)
+        lampsPending.delete(ci);
+        if (!chunks.has(ci)) return;
+        const keep = e.list.filter((p) => {
+          if (undecided) return true;
+          for (let k = 0; k < 5; k++) { const a = k * Math.PI / 2.5; if (drawnRoad(p[0] + (k ? Math.cos(a) * 0.45 : 0), p[1] + (k ? Math.sin(a) * 0.45 : 0)) === 1) return false; }
+          return true;
+        });
+        const b2 = { misc: new Mesher(), glowLamp: new Mesher() };
+        keep.forEach((p) => addLamp(b2, p));
+        const m1 = b2.misc.mesh(matMisc, {}); if (m1) e.group.add(m1);
+        const m2 = b2.glowLamp.mesh(matLampGlow, { noReceive: true }); if (m2) e.group.add(m2);
+        lampsByChunk.set(ci, keep);
+      });
+    }
     function addLamp(batch, p) {
       const [x, z, ax, az] = p;
       const y = gy(x, z);
@@ -1749,8 +1772,7 @@
       const lampOut = { n: ci, list: [] };
       const roadsOut = [];
       buildRoads(ci, d, batch, lampOut, roadsOut);
-      lampOut.list.forEach((p) => addLamp(batch, p));
-      lampsByChunk.set(ci, lampOut.list);
+      lampsPending.set(ci, { list: lampOut.list, group, t0: performance.now() });   // the lamps are built once the painted roads there exist (pumpLamps): no lamp stands in a drawn lane
       buildTram(ci, sa, sb, batch);
       structuresInChunk(sa, sb, batch);
       buildTrees(ci, d, batch);
@@ -1904,7 +1926,7 @@
       chunks.delete(k);
       root.remove(c.group);
       c.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
-      roadsByChunk.delete(k); lampsByChunk.delete(k); markTraffic();
+      roadsByChunk.delete(k); lampsByChunk.delete(k); lampsPending.delete(k); markTraffic();
     }
 
     /* ---- landmark models (luxtram-landmarks.js) */
@@ -1985,6 +2007,7 @@
       ensureTiles(sc, false);
       ensureDecor(false, sc);
       ensureChunks(sc, false);
+      pumpLamps(Math.min(0.1, dt || 0.016));
       ensureFar(sc, camera, false);
       ground.update(Math.min(0.1, dt || 0.016));
       const sun = landscape && landscape.sun ? landscape.sun.intensity : 3;

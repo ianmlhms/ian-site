@@ -474,7 +474,7 @@
         if (o && o.cullSteep) {       // pavement / path polygons do not climb cuttings and banks (the earth of the splat shows there instead of paving streaked over a 60 degree slope)
           const e1y = P[b * 3 + 1] - P[a * 3 + 1]; const e2y = P[c * 3 + 1] - P[a * 3 + 1];
           const nx = e1y * e2z - e1z * e2y; const ny = e1z * e2x - e1x * e2z; const nz = e1x * e2y - e1y * e2x;
-          if (Math.abs(ny) < 0.85 * Math.hypot(nx, ny, nz)) continue;
+          if (Math.abs(ny) < ((o && o.steepK) || 0.85) * Math.hypot(nx, ny, nz)) { if (o.counter) o.counter.n++; continue; }
         }
         if (e1z * e2x - e1x * e2z >= 0) acc.i.push(a, b, c); else acc.i.push(a, c, b);
       }
@@ -536,7 +536,8 @@
       const dbg = {}; const mark = (k, a) => { dbg[k] = (S.i.length - a) / 3; return S.i.length; };
       let iMark = S.i.length;
       const iA0 = S.i.length;
-      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: 5.0 }));
+      const aCull = { n: 0 };
+      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: 5.0, cullSteep: true, steepK: 0.8, counter: aCull }));   // a carriageway never climbs a bank steeper than ~37 degrees: where its polygon runs over one the terrain stays
       const roadGrid = rasterRoad(t, S, iA0, S.i.length);
       iMark = mark('asph', iMark);
       const iS0 = S.i.length;
@@ -601,6 +602,7 @@
           S.i.push(a + 1, b + 1, b + 2, a + 1, b + 2, a + 2);   // top
         }
       });
+      grp.userData.asphCull = aCull.n;
       grp.userData.kerb = { cutM: Math.round(kerbCutM), keptM: Math.round(kerbKeptM) };      // (test / audit read-out)
       iMark = mark('kerb', iMark);
       // paint: dashes, solid lines, zebra, bays
@@ -910,7 +912,18 @@
           const f = fr[i]; const h = f.y - thick - f.g;
           if (h < 3.2) continue;
           [-1, 1].forEach((sd) => boxTo(S, f.x + f.nx * (hw * 0.55) * sd, f.g - 0.3, f.z + f.nz * (hw * 0.55) * sd, 1.3, h + 0.3, 1.3, Math.atan2(f.dz, f.dx), CONC));
+          // pier cap: a cross-head under the slab that ties the two columns together
+          boxTo(S, f.x, f.y - thick - 0.5, f.z, hw * 1.1 + 2.1, 1.0, 1.9, Math.atan2(f.dz, f.dx) + Math.PI / 2, CONC);
         }
+        // closed slab ends (a flat end face; the deck does not show its hollow inside where it runs into the embankment)
+        [[lo, -1], [hi, 1]].forEach(([k, sg]) => {
+          const f = fr[k]; const b0 = S.count; const y0 = f.y - thick; const y1 = f.y + top;
+          S.vert(f.x - f.nx * edge, y0, f.z - f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
+          S.vert(f.x + f.nx * edge, y0, f.z + f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
+          S.vert(f.x + f.nx * edge, y1, f.z + f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
+          S.vert(f.x - f.nx * edge, y1, f.z - f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
+          if (sg < 0) S.i.push(b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); else S.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+        });
       });
       if (reg.length) decks.set(t.key, reg); else decks.delete(t.key);
     }

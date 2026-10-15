@@ -640,6 +640,7 @@ async function directionAndGearChecks(h, frame) {
     await frame.waitForFunction(() => { const l = __tsTest.internals().world.landscape; return !l.pendingAhead || l.pendingAhead() === 0; }, null, { timeout: 30000 });
     await frame.evaluate(() => TS.luxTraffic.last.prepareOncoming());
     await frame.waitForFunction(() => { const st = TS.luxTraffic.last.state(); return st.baked && st.queue === 0; }, null, { timeout: 30000 });
+    h.expect(await frame.evaluate(() => !!(TS.luxLandmarks && TS.luxLandmarks.active && TS.luxLandmarks.active.state.length >= 50)), 'the hand-built landmarks (atlas + models, hedge maze, Lafayette, Cloche d\'Or) built without error');
     const onc = await frame.evaluate(() => {
       const lt = TS.luxTraffic.last; const { camera } = __tsTest.internals(); const ps = __tsTest.state().s;
       const spawned = lt.spawnOncoming(280);
