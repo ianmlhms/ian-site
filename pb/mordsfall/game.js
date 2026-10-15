@@ -2,12 +2,12 @@
  * Rules engine: solver.js · words: text.js · pictures: art.js · cases: cases.js (generated, see scripts/mordsfall_gen.mjs).
  * Input model on the board (with a person selected):
  *   tap = pencil letter (the person's initial) · swipe = letters on every cell passed · hold ~0.4 s or double-tap = place the person. */
-import cases from "./cases.js?v=3";
-import { SCENES } from "./scenes.js?v=3";
-import { FLOOR_OF } from "./rooms.js?v=3";
-import { buildModel, clueHolds, hint as solverHint, murdererOf } from "./solver.js?v=3";
-import { T, clueText, clueHTML, storyText, caseTitle, roomName, objName, OBJECTS, TIER_KEYS, LANGS, UI } from "./text.js?v=3";
-import { bust, bustBadge, portrait, lookOf, objectSVG, objectIcon, caseThumb, FLOOR_DEFS, ROOM_TINT, FLOOR_BASE } from "./art.js?v=3";
+import cases from "./cases.js?v=4";
+import { SCENES } from "./scenes.js?v=4";
+import { FLOOR_OF } from "./rooms.js?v=4";
+import { buildModel, clueHolds, hint as solverHint, murdererOf } from "./solver.js?v=4";
+import { T, clueText, clueHTML, storyText, caseTitle, roomName, objName, OBJECTS, TIER_KEYS, LANGS, UI } from "./text.js?v=4";
+import { bust, bustBadge, portrait, lookOf, objectSVG, objectIcon, caseThumb, FLOOR_DEFS, ROOM_TINT, FLOOR_BASE } from "./art.js?v=4";
 
 const TEST_MODE = window.__pbTestMode === true; // owner test mode: nothing is read from or written to storage, nothing reaches a leaderboard
 const SAVE_KEY = "pb_save_mordsfall";
