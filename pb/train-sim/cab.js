@@ -1104,8 +1104,6 @@
       }
       // grab handle on the left pillar and a coat hook
       boxAt('metal', 0.026, 0.4, 0.026, -(innerHW + 0.12), ym - 0.1, capZ(ym) + 0.22, '#c7ccd1', rk);
-      boxAt('metal', 0.026, 0.026, 0.1, -(innerHW + 0.12), ym - 0.3, capZ(ym) + 0.17, '#c7ccd1');
-      boxAt('metal', 0.026, 0.026, 0.1, -(innerHW + 0.12), ym + 0.1, capZ(ym) + 0.27, '#c7ccd1');
     }
 
     /* ---- side windows, cab doors, details ------------------------------------------------------ */
@@ -1122,16 +1120,16 @@
         boxAt('metal', 0.03, 0.03, 0.14, x - sx * 0.01, floor + 1.05, z0 + 0.1, S.metal);
         // window frame + glass
         const wy0 = floor + 0.85, wy1 = floor + 1.95, wz0 = fr.type === 'tram' ? capZ((fr.windY0 + fr.windY1) / 2) + 0.45 : z0 + 0.1, wz1 = z1 - 0.1;
-        const fh = '#17191c';
-        boxAt('matte', 0.03, 0.045, wz1 - wz0, x - sx * 0.01, wy0, (wz0 + wz1) / 2, fh);
-        boxAt('matte', 0.03, 0.045, wz1 - wz0, x - sx * 0.01, wy1, (wz0 + wz1) / 2, fh);
-        boxAt('matte', 0.03, wy1 - wy0, 0.045, x - sx * 0.01, (wy0 + wy1) / 2, wz0, fh);
-        boxAt('matte', 0.03, wy1 - wy0, 0.045, x - sx * 0.01, (wy0 + wy1) / 2, wz1, fh);
+        const fh = '#17191c', fw = fr.type === 'tram' ? 0.026 : 0.045;   // (the Urbos cab door window has a slim frame)
+        boxAt('matte', 0.03, fw, wz1 - wz0, x - sx * 0.01, wy0, (wz0 + wz1) / 2, fh);
+        boxAt('matte', 0.03, fw, wz1 - wz0, x - sx * 0.01, wy1, (wz0 + wz1) / 2, fh);
+        boxAt('matte', 0.03, wy1 - wy0, fw, x - sx * 0.01, (wy0 + wy1) / 2, wz0, fh);
+        boxAt('matte', 0.03, wy1 - wy0, fw, x - sx * 0.01, (wy0 + wy1) / 2, wz1, fh);
         boxAt('glass', 0.006, wy1 - wy0 - 0.04, wz1 - wz0 - 0.04, x - sx * 0.006, (wy0 + wy1) / 2, (wz0 + wz1) / 2, '#ffffff');
       }
       if (!isLow) {
         // handrail along the left wall, cable duct under the desk, key-box style plate
-        boxAt('metal', 0.035, 0.035, 0.9, -(xs - 0.07), floor + 1.15, zF + 0.7, S.metal);
+        if (fr.type !== 'tram') boxAt('metal', 0.035, 0.035, 0.9, -(xs - 0.07), floor + 1.15, zF + 0.7, S.metal);
         boxAt('matte', 0.04, 0.12, 0.55, hw + 0.02, floor + 0.2, zF + 0.9, '#2b2e33');
         // coiled cable from the desk to the floor
         const curve = new T.CatmullRomCurve3([
