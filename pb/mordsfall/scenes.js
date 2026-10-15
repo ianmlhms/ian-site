@@ -25,7 +25,7 @@ export const SCENES = [
     id: "office", name: r("Büro um Kirchbierg", "Büro auf dem Kirchberg", "Kirchberg office"), emoji: "🏢",
     rooms: [r("Empfang", "Empfang", "Reception", "reception"), r("Sëtzungssall", "Sitzungssaal", "Meeting room", "meeting"), r("Kaffiskichen", "Kaffeeküche", "Coffee kitchen", "kitchen"),
       r("Grousraumbüro", "Großraumbüro", "Open office", "openoffice"), r("Serverraum", "Serverraum", "Server room", "server", r("Server", "Server", "Server")), r("Dachterrass", "Dachterrasse", "Roof terrace", "terrace"),
-      r("Archiv", "Archiv", "Archive", "archive"), r("Chefbüro", "Chefbüro", "Boss's office", "boss"), r("Drockerraum", "Druckerraum", "Print room", "print")],
+      r("Archiv", "Archiv", "Archive", "archive"), r("Chefbüro", "Chefbüro", "Boss's office", "boss", r("Chef", "Chef", "Boss")), r("Drockerraum", "Druckerraum", "Print room", "print")],
     cases: [
       { title: r("Den Doud vum leschte Kaffi", "Der Tod des letzten Kaffees", "The Death of the Last Coffee"),
         story: r("{K} huet den Hunn vun der Kaffismaschinn zougedréint, wéi {v} just déi lescht Dass wollt. Ouni Kaffi ass e Büro séier ganz roueg ginn.",

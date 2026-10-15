@@ -247,6 +247,7 @@ export const UI = {
       "<b>Keyboard:</b> a person's letter writes a note on the cell under the mouse, 1–9 pick a person, Enter places, X = ✕, Backspace = erase, Ctrl+Z = undo, ? = hint."),
   ],
   erase: D("Gummi", "Radierer", "Eraser"),
+  howShort: D("Regelen", "Regeln", "Rules"),
   settings: D("Astellungen", "Einstellungen", "Settings"),
   cross: D("Kräiz", "Kreuz", "Cross"),
   checkLocked: D("Setz fir d'éischt jiddereen", "Erst alle platzieren", "Place everyone first"),

@@ -68,7 +68,7 @@ export const flow = {
     h.expect(await page.locator(".mf-cluebox b").count() >= 5, "the clues carry bold key words");
     h.expect(/victim|Affer|Opfer/i.test(await page.locator(".mf-card.victim .mf-cluebox").innerText()), "the victim card says «The victim …»");
     h.expect(await page.locator('[data-act="check"][aria-disabled="true"]').count() === 1, "Check is disabled until everybody is placed");
-    h.expect(/everyone first|jiddereen|alle/i.test(await page.locator('[data-act="check"]').innerText()), "the disabled Check button says to place everyone first");
+    h.expect(/everyone first|jiddereen|alle/i.test(await page.locator('[data-act="check"]').getAttribute("aria-label")), "the disabled Check button says to place everyone first (aria-label; the long text shows on wide screens)");
     // a blocked cell is refused
     const blocked = await page.evaluate(() => window.__mordsfall.blockedCell());
     await pick(page, 1);
@@ -85,6 +85,8 @@ export const flow = {
     await tap(page, cells[0]);
     h.eq(await marksOf(page, 2), [cells[0]], "tap writes the person's letter in the cell");
     h.expect(await page.locator(".mf-board .letter").count() === 1, "the letter is drawn on the board");
+    const lsz = await page.$$eval(".mf-board .letter", (els) => els.map((e) => Number(e.getAttribute("font-size"))));
+    h.expect(lsz.every((x) => x <= 28), `a single pencil letter stays small (font-size ${lsz})`);
     await page.waitForTimeout(450); // (two taps within ~0.3 s are a double-tap, which places the person)
     await tap(page, cells[0]);
     h.eq(await marksOf(page, 2), [], "tapping the same cell again removes the letter");
@@ -244,6 +246,22 @@ export const flow = {
     h.eq(await p3.locator(".mf-loupe").count(), 0, "a quick tap (pencil letter) shows no loupe");
     h.eq((await marksOf(p3, 3)).length, 1, "the quick tap wrote a pencil letter");
     await phone.close();
+
+    h.step("360px phone: all six tool buttons fit, nothing overflows horizontally");
+    const narrow = await page.context().browser().newContext({ viewport: { width: 360, height: 740 }, serviceWorkers: "block" });
+    await narrow.addInitScript(seen);
+    const p4 = await narrow.newPage();
+    p4.on("pageerror", (e) => h.failures.push("360px page error: " + e.message));
+    await p4.goto(h.origin + "/mordsfall.html?case=ex1", { waitUntil: "domcontentloaded" });
+    await p4.waitForSelector(".mf-tool");
+    const tools = await p4.$$eval(".mf-tool", (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), clipped: e.scrollWidth > e.clientWidth + 1, label: e.querySelector(".lb")?.scrollWidth > e.querySelector(".lb")?.clientWidth + 1 }; }));
+    h.eq(tools.length, 6, "six tool buttons");
+    h.expect(tools.every((x) => x.l >= 0 && x.r <= 360), `every tool button lies inside 360px (${tools.map((x) => x.l + "-" + x.r).join(" ")})`);
+    h.expect(tools.every((x) => !x.clipped && !x.label), "no tool button or label is clipped");
+    h.eq(await p4.evaluate(() => document.documentElement.scrollWidth <= 360), true, "no horizontal scroll at 360px");
+    const widths = tools.map((x) => x.r - x.l);
+    h.expect(Math.max(...widths) - Math.min(...widths) <= 1, `the six buttons have equal widths (${widths})`);
+    await narrow.close();
 
     h.step("owner test mode: nothing is read or written");
     const ctx2 = await page.context().browser().newContext({ viewport: { width: 820, height: 1180 }, serviceWorkers: "block" });

@@ -309,8 +309,8 @@ function toolsHTML() {
     </div>
     <div class="mf-tools-end">
       ${btn("hint", ICON.hint, t("hint"))}
-      <button type="button" class="mf-tool${all ? " go" : ""}" data-act="check" aria-disabled="${!all}"><span class="ic">${ICON.check}</span><span class="lb">${esc(all ? t("check") : t("checkLocked"))}</span></button>
-      ${btn("how", ICON.how, t("how"))}
+      <button type="button" class="mf-tool${all ? " go" : ""}" data-act="check" aria-disabled="${!all}" aria-label="${esc(all ? t("check") : t("checkLocked"))}"><span class="ic">${ICON.check}</span><span class="lb"><span class="wide">${esc(all ? t("check") : t("checkLocked"))}</span><span class="narrow">${esc(t("check"))}</span></span></button>
+      <button type="button" class="mf-tool" data-act="how" aria-label="${esc(t("how"))}"><span class="ic">${ICON.how}</span><span class="lb"><span class="wide">${esc(t("how"))}</span><span class="narrow">${esc(t("howShort"))}</span></span></button>
     </div>`;
 }
 
@@ -491,6 +491,7 @@ function buildStatic(scale) {
       r += len;
     }
   }
+  let L = ""; // room names are kept apart: they are drawn above the pencil marks
   const maxFs = Math.min(34, 15.5 / scale), minFs = Math.min(34, 9.4 / scale), hardMin = Math.min(34, 7.8 / scale);
   for (const [id, hrun] of best) {
     const vrun = tall.get(id), vertical = hrun.len === 1 && vrun.len >= 2;
@@ -498,7 +499,8 @@ function buildStatic(scale) {
     const avail = len * U - 24, full = roomName(cs, id, lang).toUpperCase(), short = cs.rooms[id].short?.[lang]?.toUpperCase();
     // candidates, best first: one line / two lines, full name then short name; a font size is accepted when it is not too small
     const variants = [];
-    for (const name of [full, short]) if (name && !variants.some((v) => v.join(" ") === name)) { variants.push([name]); const two = splitTwo(name); if (two) variants.push(two); }
+    const add = (lines) => { if (lines && !variants.some((v) => v.join("|") === lines.join("|"))) variants.push(lines); };
+    add([full]); if (short) add([short]); add(splitTwo(full)); if (short) add(splitTwo(short));
     const fitOf = (lines) => Math.min(maxFs, avail / Math.max(...lines.map((x) => textUnits(x))), lines.length > 1 ? 20 : 99);
     let pickV = null, fs = 0;
     for (const v of variants) { const f = fitOf(v); if (f >= minFs) { pickV = v; fs = f; break; } }
@@ -510,12 +512,13 @@ function buildStatic(scale) {
     }
     if (vertical) { // a one-cell-wide room (corridor): the name runs up along the column
       const x0 = c * U + 8 + fs * 0.86, ym = r * U + (len * U) / 2;
-      pickV.forEach((line, i) => { const x = x0 + i * fs * 1.02; s += `<text class="room-lbl" transform="rotate(-90 ${x.toFixed(1)} ${ym})" x="${x.toFixed(1)}" y="${ym}" font-size="${fs.toFixed(1)}" stroke-width="${(fs * 0.34).toFixed(1)}" text-anchor="middle">${esc(line)}</text>`; });
+      pickV.forEach((line, i) => { const x = x0 + i * fs * 1.02; L += `<text class="room-lbl" transform="rotate(-90 ${x.toFixed(1)} ${ym})" x="${x.toFixed(1)}" y="${ym}" font-size="${fs.toFixed(1)}" stroke-width="${(fs * 0.34).toFixed(1)}" text-anchor="middle">${esc(line)}</text>`; });
     } else {
       const x = c * U + (len * U) / 2, y0 = r * U + 8 + fs * 0.86;
-      pickV.forEach((line, i) => { s += `<text class="room-lbl" x="${x}" y="${(y0 + i * fs * 1.02).toFixed(1)}" font-size="${fs.toFixed(1)}" stroke-width="${(fs * 0.34).toFixed(1)}" text-anchor="middle">${esc(line)}</text>`; });
+      pickV.forEach((line, i) => { L += `<text class="room-lbl" x="${x}" y="${(y0 + i * fs * 1.02).toFixed(1)}" font-size="${fs.toFixed(1)}" stroke-width="${(fs * 0.34).toFixed(1)}" text-anchor="middle">${esc(line)}</text>`; });
     }
   }
+  G.labelSVG = L;
   // axis numbers
   for (let k = 0; k < n; k++) {
     s += `<text class="axis" x="${k * U + U / 2}" y="${-LM / 2 + 12}" font-size="34" text-anchor="middle">${k + 1}</text>`;
@@ -524,18 +527,13 @@ function buildStatic(scale) {
   return s;
 }
 
-const LETTER_SLOTS = {
-  1: [[50, 52]], 2: [[30, 52], [70, 52]], 3: [[28, 34], [72, 34], [50, 72]], 4: [[30, 36], [70, 36], [30, 76], [70, 76]],
-};
-const slots9 = [[20, 30], [50, 30], [80, 30], [20, 56], [50, 56], [80, 56], [20, 82], [50, 82], [80, 82]];
+/* Pencil letters are always small, like sudoku candidates: a fixed slot per person (3 x 3 grid by person index) in the lower part of the
+ * cell, so nothing jumps when somebody else writes a letter, and the top strip of the cell stays free for the room name. */
+const SLOT_X = [20, 50, 80], SLOT_Y = [47, 69, 91], LETTER_SIZE = 28;
 function lettersSVG(cell, x, y) {
-  const ps = marksOf(cell);
-  if (!ps.length) return "";
-  const k = ps.length, slots = k <= 4 ? LETTER_SLOTS[k] : slots9, size = k === 1 ? 62 : k <= 4 ? 44 : 32;
-  return ps.map((p, i) => {
-    const [sx, sy] = slots[i];
+  return marksOf(cell).map((p) => {
     const color = shade(personLook(p).color, 0.62);
-    return `<text class="letter${p === G.sel ? " selp" : ""}" x="${x + sx}" y="${y + sy + size * 0.36}" font-size="${size}" fill="${color}" text-anchor="middle" stroke-width="${(size * 0.16).toFixed(1)}">${esc(initialOf(G.cs.people[p]))}</text>`;
+    return `<text class="letter${p === G.sel ? " selp" : ""}" x="${x + SLOT_X[p % 3]}" y="${y + SLOT_Y[Math.floor(p / 3) % 3] + LETTER_SIZE * 0.36}" font-size="${LETTER_SIZE}" fill="${color}" text-anchor="middle" stroke-width="${(LETTER_SIZE * 0.24).toFixed(1)}">${esc(initialOf(G.cs.people[p]))}</text>`;
   }).join("");
 }
 
@@ -569,6 +567,7 @@ function buildDyn() {
       <circle cx="82" cy="82" r="15" fill="#fff" stroke="${INK}" stroke-width="4"/><text x="82" y="92" font-size="26" text-anchor="middle" font-weight="900" fill="${shade(look.color, 0.5)}">${esc(initialOf(cs.people[p]))}</text>
     </g>`;
   });
+  s += G.labelSVG || "";
   const showCursor = G.cursor >= 0 && (G.kbd || G.hover === G.cursor);
   if (G.hover >= 0 && G.hover !== G.cursor) { const [x, y] = xy(G.hover); s += `<rect x="${x + 3}" y="${y + 3}" width="${U - 6}" height="${U - 6}" fill="#fff" opacity=".18" stroke="#fff" stroke-width="4" pointer-events="none"/>`; }
   if (G.cursor >= 0) { const [x, y] = xy(G.cursor); s += `<rect x="${x + 5}" y="${y + 5}" width="${U - 10}" height="${U - 10}" rx="8" fill="none" stroke="#e08a00" stroke-width="${showCursor ? 7 : 5}" stroke-dasharray="16 9" pointer-events="none"/>`; }
