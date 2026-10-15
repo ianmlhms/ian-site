@@ -329,16 +329,25 @@
     /* walking people slide around the furniture instead of through it: push out of any footprint along the axis of least penetration */
     function avoidObstacles(p) {
       const ob = plat.obst;
-      for (let i = 0; i < ob.length; i++) {
-        const b = ob[i], hs = b.hs + 0.22, ho = b.ho + 0.22, dS = p.s - b.s, dO = p.o - b.o;
-        if (Math.abs(dS) >= hs || Math.abs(dO) >= ho) continue;
-        // a walker slides round the side that is across his heading (never head-on: he would stick); a standing person leaves along the shorter way
-        const alongO = p.mode === 'move' ? Math.abs(p.fs) >= Math.abs(p.fo) : hs - Math.abs(dS) >= ho - Math.abs(dO);
-        if (alongO) {
-          let up = dO >= 0;
-          if (plat.tram) { if (up && b.o + ho > plat.back - TRAM_LATERAL_MARGIN) up = false; else if (!up && b.o - ho < plat.edge + TRAM_LATERAL_MARGIN) up = true; }   // never round the side that is not walkable
-          p.o = b.o + (up ? ho : -ho);
-        } else p.s = b.s + (dS >= 0 ? hs : -hs);
+      if (!ob.length) return;
+      const oLo = plat.edge + TRAM_LATERAL_MARGIN, oHi = plat.back - TRAM_LATERAL_MARGIN;
+      const inside = (b, s, o, k) => Math.abs(s - b.s) < b.hs + 0.22 - k && Math.abs(o - b.o) < b.ho + 0.22 - k;
+      // (a few passes: where a wall meets another wall or an end panel, leaving one footprint must not land him in the next one)
+      for (let pass = 0; pass < 4; pass++) {
+        let moved = false;
+        for (let i = 0; i < ob.length; i++) {
+          const b = ob[i], hs = b.hs + 0.22, ho = b.ho + 0.22, dS = p.s - b.s, dO = p.o - b.o;
+          if (Math.abs(dS) >= hs || Math.abs(dO) >= ho) continue;
+          // a walker slides round the side that is across his heading (never head-on: he would stick); a standing person leaves along the shorter way.
+          // Candidates in that order; the first one that is on the walkway and clear of every other footprint wins
+          const alongO = p.mode === 'move' ? Math.abs(p.fs) >= Math.abs(p.fo) : hs - Math.abs(dS) >= ho - Math.abs(dO);
+          const oPair = dO >= 0 ? [[p.s, b.o + ho], [p.s, b.o - ho]] : [[p.s, b.o - ho], [p.s, b.o + ho]];
+          const sPair = dS >= 0 ? [[b.s + hs, p.o], [b.s - hs, p.o]] : [[b.s - hs, p.o], [b.s + hs, p.o]];
+          const cands = (alongO ? oPair.concat(sPair) : sPair.concat(oPair)).filter((c) => c[1] >= oLo && c[1] <= oHi);
+          const c = cands.find((q) => !ob.some((r) => r !== b && inside(r, q[0], q[1], 0.01))) || cands[0] || sPair[0];
+          p.s = c[0]; p.o = c[1]; moved = true;
+        }
+        if (!moved) break;
       }
     }
     function keepOnWalkway(p) {
@@ -448,8 +457,18 @@
     function queueSpot(d, k) {
       const row = Math.floor(k / QUEUE_LATERAL.length), lat = QUEUE_LATERAL[k % QUEUE_LATERAL.length] + rnd(-0.12, 0.12);
       const pt = doorPoint(d, 0.95 + row * 0.55 + rnd(0, 0.15), lat);
-      let oo = clamp(pt.o, plat.tram ? plat.edge + TRAM_LATERAL_MARGIN + 0.1 : -1e9, plat.back - 0.4);
-      for (let tries = 0; tries < 6 && plat.tram && blocked(pt.s, oo, 0.25); tries++) oo = Math.max(plat.edge + TRAM_LATERAL_MARGIN + 0.1, oo - 0.3);
+      const oLo = plat.tram ? plat.edge + TRAM_LATERAL_MARGIN + 0.1 : -1e9, oHi = plat.back - 0.4, oo = clamp(pt.o, oLo, oHi);
+      if (!plat.tram || !blocked(pt.s, oo, 0.3)) return { s: pt.s, o: oo };
+      // the door's own spot is inside a shelter wall, bench or sign: the nearest free spot (lateral steps first, then along the platform), never one inside a footprint
+      for (const dS of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 3, -3]) {
+        for (let k = 0; k <= 30; k++) {
+          for (const sg of k ? [-1, 1] : [1]) {
+            const o2 = oo + sg * k * 0.15;
+            if (o2 < oLo || o2 > oHi || blocked(pt.s + dS, o2, 0.3)) continue;
+            return { s: pt.s + dS, o: o2 };
+          }
+        }
+      }
       return { s: pt.s, o: oo };
     }
     // the walking lane along a Luxtram platform: just behind the tactile strip, in front of the shelters' glass ends and furniture
@@ -815,7 +834,7 @@
       for (let i = 0; i <= highSlot; i++) {
         const p = people[i];
         if (!p.active || p.wx === undefined) continue;
-        out.push({ slot: i, kind: p.kind, mode: p.mode, then: p.then, doorway: !!p.doorway, x: p.wx, y: p.wy, z: p.wz, s: p.s, o: p.o, rx: smpRX(p.s), rz: smpRZ(p.s) });
+        out.push({ slot: i, kind: p.kind, mode: p.mode, then: p.then, doorway: !!p.doorway, x: p.wx, y: p.wy, z: p.wz, s: p.s, o: p.o, pi: p.pi, w: p.path && p.path[p.pi] ? { s: p.path[p.pi].s, o: p.path[p.pi].o } : null, fs: p.fs, fo: p.fo, rx: smpRX(p.s), rz: smpRZ(p.s) });
       }
       return out;
     }
