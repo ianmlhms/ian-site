@@ -24,7 +24,7 @@ export const SCENES = [
   {
     id: "office", name: r("Büro um Kirchbierg", "Büro auf dem Kirchberg", "Kirchberg office"), emoji: "🏢",
     rooms: [r("Empfang", "Empfang", "Reception", "reception"), r("Sëtzungssall", "Sitzungssaal", "Meeting room", "meeting"), r("Kaffiskichen", "Kaffeeküche", "Coffee kitchen", "kitchen"),
-      r("Grousraumbüro", "Großraumbüro", "Open office", "openoffice"), r("Serverraum", "Serverraum", "Server room", "server"), r("Dachterrass", "Dachterrasse", "Roof terrace", "terrace"),
+      r("Grousraumbüro", "Großraumbüro", "Open office", "openoffice"), r("Serverraum", "Serverraum", "Server room", "server", r("Server", "Server", "Server")), r("Dachterrass", "Dachterrasse", "Roof terrace", "terrace"),
       r("Archiv", "Archiv", "Archive", "archive"), r("Chefbüro", "Chefbüro", "Boss's office", "boss"), r("Drockerraum", "Druckerraum", "Print room", "print")],
     cases: [
       { title: r("Den Doud vum leschte Kaffi", "Der Tod des letzten Kaffees", "The Death of the Last Coffee"),
@@ -55,7 +55,7 @@ export const SCENES = [
   },
   {
     id: "cellar", name: r("Mosel-Wäikeller", "Mosel-Weinkeller", "Moselle winery"), emoji: "🍇",
-    rooms: [r("Fassraum", "Fasskeller", "Barrel cellar", "barrelcellar"), r("Degustatiounsraum", "Verkostungsraum", "Tasting room", "tasting", r("Degustatioun", "Verkostung", "Tasting")), r("Flaschelager", "Flaschenlager", "Bottle store", "storeroom"),
+    rooms: [r("Fassraum", "Fasskeller", "Barrel cellar", "barrelcellar"), r("Degustatiounsraum", "Verkostungsraum", "Tasting room", "tasting", r("Degustatioun", "Verkostung", "Tasting")), r("Flaschelager", "Flaschenlager", "Bottle store", "storeroom", r("Flaschen", "Flaschen", "Bottles")),
       r("Pressraum", "Presshaus", "Press house", "presshouse"), r("Terrass", "Terrasse", "Terrace", "terrace"), r("Büro", "Büro", "Office", "smalloffice"),
       r("Rebbierg", "Weinberg", "Vineyard", "vineyard"), r("Kellerstuff", "Kellerstube", "Cellar parlour", "parlour", r("Keller", "Keller", "Cellar")), r("Verpackungshal", "Verpackungshalle", "Packing hall", "packing", r("Verpackung", "Packhalle", "Packing"))],
     cases: [
@@ -71,9 +71,9 @@ export const SCENES = [
   },
   {
     id: "station", name: r("Gare", "Bahnhof", "Train station"), emoji: "🚉",
-    rooms: [r("Schalterhal", "Schalterhalle", "Ticket hall", "tickethall"), r("Waardesall", "Wartesaal", "Waiting room", "waiting"), r("Gare-Bistro", "Bahnhofsbistro", "Station bistro", "cafe"),
+    rooms: [r("Schalterhal", "Schalterhalle", "Ticket hall", "tickethall", r("Schalter", "Schalter", "Tickets")), r("Waardesall", "Wartesaal", "Waiting room", "waiting"), r("Gare-Bistro", "Bahnhofsbistro", "Station bistro", "cafe"),
       r("Kiosk", "Kiosk", "Kiosk", "kiosk"), r("Quai 1", "Gleis 1", "Platform 1", "platform"), r("Gepäckdepot", "Gepäckaufbewahrung", "Left luggage", "storeroom", r("Depot", "Gepäck", "Luggage")),
-      r("Passerell", "Unterführung", "Underpass", "underpass"), r("Stationsbüro", "Stationsbüro", "Station office", "smalloffice"), r("Fahrradkeller", "Fahrradkeller", "Bike cellar", "storeroom")],
+      r("Passerell", "Unterführung", "Underpass", "underpass", r("Passerell", "Unterführ.", "Underpass")), r("Stationsbüro", "Stationsbüro", "Station office", "smalloffice"), r("Fahrradkeller", "Fahrradkeller", "Bike cellar", "storeroom", r("Fahrrad", "Fahrrad", "Bikes"))],
     cases: [
       { title: r("Den Zuch, dee keen huet kënne verpassen", "Der Zug, den keiner verpassen konnte", "The Train Nobody Could Miss"),
         story: r("{K} huet d'Auer an der Waardesall fënnef Minutte virgestallt, fir dass {v} den Zuch verpasst. {V} ass awer mam Taxi ukomm – an huet alles gesinn.",
@@ -137,7 +137,7 @@ export const SCENES = [
     id: "chalet", name: r("Ski-Chalet", "Ski-Chalet", "Ski chalet"), emoji: "🎿",
     rooms: [r("Stuff", "Stube", "Parlour", "lounge"), r("Kichen", "Küche", "Kitchen", "kitchen"), r("Bar", "Bar", "Bar", "bar"),
       r("Sauna", "Sauna", "Sauna", "sauna"), r("Terrass", "Terrasse", "Terrace", "terrace"), r("Skiraum", "Skiraum", "Ski room", "skiroom"),
-      r("Schlofzëmmer", "Schlafzimmer", "Bedroom", "bedroom"), r("Spillzëmmer", "Spielzimmer", "Games room", "games"), r("Entrée", "Eingangshalle", "Entrance hall", "entrance")],
+      r("Schlofzëmmer", "Schlafzimmer", "Bedroom", "bedroom", r("Schlof", "Schlaf", "Bedroom")), r("Spillzëmmer", "Spielzimmer", "Games room", "games"), r("Entrée", "Eingangshalle", "Entrance hall", "entrance")],
     cases: [
       { title: r("Schnéi, Fondue a Verdacht", "Schnee, Fondue und Verdacht", "Snow, Fondue and Suspicion"),
         story: r("{K} huet dat lescht Stéck Brout an de Fondue fale gelooss – genee dann, wéi {v} dat selwecht gemaach huet. Wien dat gewonnen huet, wësse mir elo.",
@@ -183,7 +183,7 @@ export const SCENES = [
   },
   {
     id: "castle", name: r("Schlass", "Burg", "Castle"), emoji: "🏰",
-    rooms: [r("Rittersall", "Rittersaal", "Great hall", "greathall"), r("Schlosskichen", "Schlossküche", "Castle kitchen", "castlekitchen"), r("Waffekummer", "Waffenkammer", "Armoury", "armoury"),
+    rooms: [r("Rittersall", "Rittersaal", "Great hall", "greathall"), r("Schlosskichen", "Schlossküche", "Castle kitchen", "castlekitchen", r("Kichen", "Küche", "Kitchen")), r("Waffekummer", "Waffenkammer", "Armoury", "armoury", r("Waffen", "Waffen", "Armoury")),
       r("Kapell", "Kapelle", "Chapel", "chapel"), r("Tuerm", "Turm", "Tower", "tower"), r("Schlassgaart", "Schlossgarten", "Castle garden", "garden"),
       r("Kierker", "Verlies", "Dungeon", "dungeon"), r("Bibliothéik", "Bibliothek", "Library", "library"), r("Haff", "Burghof", "Courtyard", "courtyard")],
     cases: [
@@ -199,7 +199,7 @@ export const SCENES = [
   },
   {
     id: "cinema", name: r("Kino", "Kino", "Cinema"), emoji: "🎬",
-    rooms: [r("Foyer", "Foyer", "Foyer", "foyer"), r("Kinosall", "Kinosaal", "Screening room", "screening"), r("Popcornbar", "Popcornbar", "Popcorn bar", "snackbar"),
+    rooms: [r("Foyer", "Foyer", "Foyer", "foyer"), r("Kinosall", "Kinosaal", "Screening room", "screening"), r("Popcornbar", "Popcornbar", "Popcorn bar", "snackbar", r("Popcorn", "Popcorn", "Popcorn")),
       r("Projektiounsraum", "Vorführraum", "Projection booth", "booth", r("Projektioun", "Vorführraum", "Projection")), r("Kees", "Kasse", "Box office", "boxoffice"), r("Lagerraum", "Lagerraum", "Storeroom", "storeroom"),
       r("Technikraum", "Technikraum", "Tech room", "techroom"), r("VIP-Loge", "VIP-Loge", "VIP lounge", "vip"), r("Spillautomaten", "Spielautomaten", "Arcade nook", "arcade", r("Automaten", "Automaten", "Arcade"))],
     cases: [

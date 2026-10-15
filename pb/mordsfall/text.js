@@ -50,6 +50,16 @@ export const OBJECTS = {
     on: { lb: "stoung op enger Turnmatt", de: "stand auf einer Turnmatte", en: "stood on a gym mat" } },
   sandbox:  { block: false, name: { lb: "Sandkaul", de: "Sandkasten", en: "Sandpit" }, a: { lb: "enger Sandkaul", de: "einem Sandkasten", en: "a sandpit" },
     on: { lb: "stoung an enger Sandkaul", de: "stand in einem Sandkasten", en: "stood in a sandpit" } },
+  sofa:     { block: false, name: { lb: "Sofa", de: "Sofa", en: "Sofa" }, a: { lb: "engem Sofa", de: "einem Sofa", en: "a sofa" },
+    on: { lb: "souz op engem Sofa", de: "saß auf einem Sofa", en: "sat on a sofa" } },
+  bumper:   { block: false, name: { lb: "Autoscooter", de: "Autoscooter", en: "Bumper car" }, a: { lb: "engem Autoscooter", de: "einem Autoscooter", en: "a bumper car" },
+    on: { lb: "souz an engem Autoscooter", de: "saß in einem Autoscooter", en: "sat in a bumper car" } },
+  stain:    { block: false, name: { lb: "Uelegfleck", de: "Ölfleck", en: "Oil stain" }, a: { lb: "engem Uelegfleck", de: "einem Ölfleck", en: "an oil stain" },
+    on: { lb: "stoung op engem Uelegfleck", de: "stand auf einem Ölfleck", en: "stood on an oil stain" } },
+  puddle:   { block: false, name: { lb: "Pëtz", de: "Pfütze", en: "Puddle" }, a: { lb: "enger Pëtz", de: "einer Pfütze", en: "a puddle" },
+    on: { lb: "stoung an enger Pëtz", de: "stand in einer Pfütze", en: "stood in a puddle" } },
+  blanket:  { block: false, name: { lb: "Picknickdeck", de: "Picknickdecke", en: "Picnic blanket" }, a: { lb: "enger Picknickdeck", de: "einer Picknickdecke", en: "a picnic blanket" },
+    on: { lb: "souz op enger Picknickdeck", de: "saß auf einer Picknickdecke", en: "sat on a picnic blanket" } },
 };
 
 export const objName = (type, lang) => OBJECTS[type].name[lang];
@@ -72,40 +82,52 @@ export function personRef(cs, p, lang, dative = false) {
   return lang === "lb" ? lbArticle(person, dative) : person.name;
 }
 
-/* The clue as a sentence fragment that goes under the person's name (no subject: "Was beside a table"). */
-export function clueText(cs, clue, lang) {
+/* The clue as a sentence fragment that goes under the person's name (no subject: "Was beside a table").
+ * clueRich marks the key words with \u0001 … \u0002; clueText strips the marks, clueHTML turns them into <b>. */
+const B = (x) => "\u0001" + x + "\u0002";
+const boldNoun = (phrase, noun) => { const i = phrase.toLowerCase().indexOf(noun.toLowerCase()); return i < 0 ? phrase : phrase.slice(0, i) + B(phrase.slice(i, i + noun.length)) + phrase.slice(i + noun.length); };
+const objA = (type, lang) => boldNoun(OBJECTS[type].a[lang], OBJECTS[type].name[lang]);
+export function clueRich(cs, clue, lang) {
   const ord = (k) => k + 1;
+  const R = (id) => B(roomName(cs, id, lang));
   switch (clue.t) {
-    case "victim": return { lb: "Wor eleng mam Mäerder", de: "War allein mit dem Mörder", en: "Was alone with the murderer" }[lang];
-    case "alone": return { lb: "Wor eleng am Beräich", de: "War allein im Bereich", en: "Was alone in their area" }[lang];
-    case "in": return { lb: `Wor am Beräich „${roomName(cs, clue.room, lang)}“`, de: `War im Bereich „${roomName(cs, clue.room, lang)}“`, en: `Was in the ${roomName(cs, clue.room, lang)}` }[lang];
-    case "notin": return { lb: `Wor net am Beräich „${roomName(cs, clue.room, lang)}“`, de: `War nicht im Bereich „${roomName(cs, clue.room, lang)}“`, en: `Was not in the ${roomName(cs, clue.room, lang)}` }[lang];
-    case "near": return { lb: `Wor nieft ${OBJECTS[clue.obj].a.lb}`, de: `Stand neben ${OBJECTS[clue.obj].a.de}`, en: `Was beside ${OBJECTS[clue.obj].a.en}` }[lang];
-    case "notnear": return { lb: `Wor net nieft ${OBJECTS[clue.obj].a.lb}`, de: `Stand nicht neben ${OBJECTS[clue.obj].a.de}`, en: `Was not beside ${OBJECTS[clue.obj].a.en}` }[lang];
-    case "on": return cap(OBJECTS[clue.obj].on[lang]);
+    case "victim": return { lb: `Wor ${B("eleng mam Mäerder")}`, de: `War ${B("allein mit dem Mörder")}`, en: `Was ${B("alone with the murderer")}` }[lang];
+    case "alone": return { lb: `Wor ${B("eleng")} am Beräich`, de: `War ${B("allein")} im Bereich`, en: `Was ${B("alone")} in their area` }[lang];
+    case "in": return { lb: `Wor am Beräich „${R(clue.room)}“`, de: `War im Bereich „${R(clue.room)}“`, en: `Was in the ${R(clue.room)}` }[lang];
+    case "notin": return { lb: `Wor ${B("net")} am Beräich „${R(clue.room)}“`, de: `War ${B("nicht")} im Bereich „${R(clue.room)}“`, en: `Was ${B("not")} in the ${R(clue.room)}` }[lang];
+    case "near": return { lb: `Wor nieft ${objA(clue.obj, "lb")}`, de: `Stand neben ${objA(clue.obj, "de")}`, en: `Was beside ${objA(clue.obj, "en")}` }[lang];
+    case "notnear": return { lb: `Wor ${B("net")} nieft ${objA(clue.obj, "lb")}`, de: `Stand ${B("nicht")} neben ${objA(clue.obj, "de")}`, en: `Was ${B("not")} beside ${objA(clue.obj, "en")}` }[lang];
+    case "on": { const ph = boldNoun(OBJECTS[clue.obj].on[lang], OBJECTS[clue.obj].name[lang]); return ph.charAt(0).toUpperCase() + ph.slice(1); }
     case "row":
-      if (clue.k === 0) return { lb: "Wor an der alleréischter Rei (uewen)", de: "War in der obersten Zeile", en: "Was in the top row" }[lang];
-      if (clue.k === cs.n - 1) return { lb: "Wor an der leschter Rei (ënnen)", de: "War in der untersten Zeile", en: "Was in the bottom row" }[lang];
-      return { lb: `Wor an der ${ord(clue.k)}. Rei`, de: `War in Zeile ${ord(clue.k)}`, en: `Was in row ${ord(clue.k)}` }[lang];
+      if (clue.k === 0) return { lb: `Wor an der ${B("alleréischter Rei")} (uewen)`, de: `War in der ${B("obersten Zeile")}`, en: `Was in the ${B("top row")}` }[lang];
+      if (clue.k === cs.n - 1) return { lb: `Wor an der ${B("leschter Rei")} (ënnen)`, de: `War in der ${B("untersten Zeile")}`, en: `Was in the ${B("bottom row")}` }[lang];
+      return { lb: `Wor an der ${B(ord(clue.k) + ". Rei")}`, de: `War in ${B("Zeile " + ord(clue.k))}`, en: `Was in ${B("row " + ord(clue.k))}` }[lang];
     case "col":
-      if (clue.k === 0) return { lb: "Wor an der alleréischter Kolonn (lénks)", de: "War in der linken Spalte", en: "Was in the left-most column" }[lang];
-      if (clue.k === cs.n - 1) return { lb: "Wor an der leschter Kolonn (riets)", de: "War in der rechten Spalte", en: "Was in the right-most column" }[lang];
-      return { lb: `Wor an der ${ord(clue.k)}. Kolonn`, de: `War in Spalte ${ord(clue.k)}`, en: `Was in column ${ord(clue.k)}` }[lang];
+      if (clue.k === 0) return { lb: `Wor an der ${B("alleréischter Kolonn")} (lénks)`, de: `War in der ${B("linken Spalte")}`, en: `Was in the ${B("left-most column")}` }[lang];
+      if (clue.k === cs.n - 1) return { lb: `Wor an der ${B("leschter Kolonn")} (riets)`, de: `War in der ${B("rechten Spalte")}`, en: `Was in the ${B("right-most column")}` }[lang];
+      return { lb: `Wor an der ${B(ord(clue.k) + ". Kolonn")}`, de: `War in ${B("Spalte " + ord(clue.k))}`, en: `Was in ${B("column " + ord(clue.k))}` }[lang];
     case "north": case "south": case "east": case "west": {
       const dir = {
         north: { lb: "nërdlech", de: "nördlich", en: "north" }, south: { lb: "südlech", de: "südlich", en: "south" },
         east: { lb: "ëstlech", de: "östlich", en: "east" }, west: { lb: "westlech", de: "westlich", en: "west" },
       }[clue.t][lang];
-      if (lang === "lb") return `Wor iergendwou ${dir} ${cs.people[clue.p].g === "f" ? "vun der" : "vum"} ${cs.people[clue.p].name}`;
-      if (lang === "de") return `War irgendwo ${dir} von ${cs.people[clue.p].name}`;
-      return `Was somewhere ${dir} of ${cs.people[clue.p].name}`;
+      const who = cs.people[clue.p];
+      if (lang === "lb") return `Wor iergendwou ${B(dir)} ${who.g === "f" ? "vun der" : "vum"} ${B(who.name)}`;
+      if (lang === "de") return `War irgendwo ${B(dir)} von ${B(who.name)}`;
+      return `Was somewhere ${B(dir)} of ${B(who.name)}`;
     }
-    case "same": return {
-      lb: `Wor am selwechte Beräich ewéi ${personRef(cs, clue.p, "lb")}`, de: `War im selben Bereich wie ${cs.people[clue.p].name}`, en: `Was in the same area as ${cs.people[clue.p].name}`,
-    }[lang];
+    case "same": {
+      const who = cs.people[clue.p];
+      return { lb: `Wor am ${B("selwechte Beräich")} ewéi ${personRef(cs, clue.p, "lb").replace(who.name, B(who.name))}`, de: `War im ${B("selben Bereich")} wie ${B(who.name)}`, en: `Was in the ${B("same area")} as ${B(who.name)}` }[lang];
+    }
   }
   return "";
 }
+const strip = (s) => s.replace(/[\u0001\u0002]/g, "");
+export const clueText = (cs, clue, lang) => strip(clueRich(cs, clue, lang));
+const escHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+/* "Was in a <b>car</b>." — key words bold, closing full stop */
+export const clueHTML = (cs, clue, lang) => escHtml(clueRich(cs, clue, lang)).replace(/\u0001/g, "<b>").replace(/\u0002/g, "</b>") + ".";
 
 /* Closing story with {K}/{k} murderer, {V}/{v} victim, {kd}/{vd} dative (Luxembourgish article form). */
 export function storyText(cs, lang, murdererIndex) {
@@ -205,25 +227,35 @@ export const UI = {
     D("<b>Ziel:</b> Eng Persoun ass de Mäerder. Setz alleguer Leit op d'Feld, esou datt all Hiweis stëmmt – dann weist sech, wien et war.",
       "<b>Ziel:</b> Eine der Personen ist der Mörder. Setze alle Leute so aufs Feld, dass jeder Hinweis stimmt – dann zeigt sich, wer es war.",
       "<b>Goal:</b> One of the people is the murderer. Place everybody on the grid so that every clue is true – then you will see who did it."),
-    D("<b>Eng pro Rei, eng pro Kolonn:</b> All Persoun kritt e Feld. An all Rei a all Kolonn steet genee eng Persoun (wéi bei Sudoku). D'Feld ass an Beräicher mat décke Grenzen opgedeelt.",
-      "<b>Eine pro Zeile, eine pro Spalte:</b> Jede Person bekommt ein Feld. In jeder Zeile und jeder Spalte steht genau eine Person (wie bei Sudoku). Das Spielfeld ist durch dicke Linien in benannte Bereiche geteilt.",
-      "<b>One per row, one per column:</b> Everybody gets one cell, and every row and every column holds exactly one person (like sudoku). Thick lines split the grid into named areas."),
-    D("<b>Objeten:</b> Op blockéierende Saachen (Dësch, Regal, Bam, Fiels, Auto, Brunnen, Fass, Planz, Këscht, Uewen) kann <b>keen</b> stoen. Op Stull, Teppech, Bank, Bett an Heeballen däerf een stoen.",
-      "<b>Objekte:</b> Auf blockierenden Dingen (Tisch, Regal, Baum, Felsbrocken, Auto, Brunnen, Fass, Pflanze, Kiste, Herd) kann <b>niemand</b> stehen. Auf Stuhl, Teppich, Bank, Bett und Heuballen darf man stehen.",
-      "<b>Objects:</b> <b>Nobody</b> can stand on blocking things (table, shelf, tree, boulder, car, fountain, barrel, plant, crate, stove). You may stand on chair, carpet, bench, bed and hay bale."),
-    D("<b>Niewendrun</b> heescht: ee vun den 8 Felder ronderëm, och diagonal. <b>Nord</b> ass uewen. „Nërdlech vum Pol“ heescht iergendwou méi wäit uewen, net just direkt driwwer.",
-      "<b>Daneben</b> heißt: eines der 8 umliegenden Felder, auch diagonal. <b>Norden</b> ist oben. „Nördlich von Pol“ heißt irgendwo weiter oben, nicht nur direkt darüber.",
-      "<b>Beside</b> means one of the 8 surrounding cells, diagonals included. <b>North</b> is up. “North of Pol” means anywhere further up, not only straight above."),
+    D("<b>Eng pro Rei, eng pro Kolonn:</b> All Persoun kritt e Feld. An all Rei a all Kolonn steet genee eng Persoun (wéi bei Sudoku). Déck Maueren deelen d'Feld a benannt Beräicher.",
+      "<b>Eine pro Zeile, eine pro Spalte:</b> Jede Person bekommt ein Feld. In jeder Zeile und jeder Spalte steht genau eine Person (wie bei Sudoku). Dicke Wände teilen das Spielfeld in benannte Bereiche.",
+      "<b>One per row, one per column:</b> Everybody gets one cell, and every row and every column holds exactly one person (like sudoku). Thick walls split the grid into named areas."),
+    D("<b>Objeten:</b> Op blockéierende Saachen (Dësch, Regal, Bam, Auto, Fass, Uewen …) kann <b>keen</b> stoen. Op Stull, Sofa, Bank, Bett, Teppech, Uelegfleck an Autoscooter däerf een stoen. Vill Saachen si méi Felder grouss (en Auto zwee, eng Theke dräi) – all Feld dovun zielt.",
+      "<b>Objekte:</b> Auf blockierenden Dingen (Tisch, Regal, Baum, Auto, Fass, Herd …) kann <b>niemand</b> stehen. Auf Stuhl, Sofa, Bank, Bett, Teppich, Ölfleck und Autoscooter darf man stehen. Viele Dinge sind mehrere Felder groß (ein Auto zwei, eine Theke drei) – jedes Feld davon zählt.",
+      "<b>Objects:</b> <b>Nobody</b> can stand on blocking things (table, shelf, tree, car, barrel, stove …). You may stand on a chair, sofa, bench, bed, carpet, oil stain or bumper car. Many things cover several cells (a car two, a counter three) – every one of those cells counts."),
+    D("<b>Niewendrun</b> heescht: ee vun den 8 Felder ronderëm, och diagonal (ouni dat Ding, op deem s du stees). <b>Nord</b> ass uewen. „Nërdlech vum Pol“ heescht iergendwou méi wäit uewen.",
+      "<b>Daneben</b> heißt: eines der 8 umliegenden Felder, auch diagonal (nicht das Ding, auf dem man selbst steht). <b>Norden</b> ist oben. „Nördlich von Pol“ heißt irgendwo weiter oben.",
+      "<b>Beside</b> means one of the 8 surrounding cells, diagonals included (not the thing you stand on yourself). <b>North</b> is up. “North of Pol” means anywhere further up."),
     D("<b>Dat Affer</b> seet ëmmer: „Wor eleng mam Mäerder.“ Am Beräich vum Affer stinn also genee zwou Persounen – déi aner ass de Mäerder.",
       "<b>Das Opfer</b> sagt immer: „War allein mit dem Mörder.“ Im Bereich des Opfers stehen also genau zwei Personen – die andere ist der Mörder.",
       "<b>The victim</b> always says: “Was alone with the murderer.” So exactly two people stand in the victim's area – the other one is the murderer."),
-    D("<b>Bedienung:</b> Tipp eng Persoun un, dann e Feld. Nach eng Kéier op d'Persoun tippen (oder se erausdroen) hëlt se erof. Mam Notiz-Modus setz s du Kräizer, wou eng Persoun net hi ka. Mat „Hiweis“ gëtt et Hëllef, awer et kascht Zäit.",
-      "<b>Bedienung:</b> Tippe eine Person an, dann ein Feld. Nochmal auf die Person tippen (oder sie hinausziehen) nimmt sie wieder weg. Im Notiz-Modus setzt du Kreuze, wo eine Person nicht sein kann. Der „Hinweis“ hilft, kostet aber Zeit.",
-      "<b>Controls:</b> Tap a person, then a cell. Tap the person again (or drag them out) to take them off. Notes mode lets you cross out cells where a person cannot be. The hint helps, but costs time."),
-    D("<b>Tastatur:</b> Pfeiltasten bewegen den Cursor, 1–9 wielt eng Persoun, Leertaste setzt, N = Notizen, U = Zréck, H = Hiweis.",
-      "<b>Tastatur:</b> Pfeiltasten bewegen den Cursor, 1–9 wählt eine Person, Leertaste setzt, N = Notizen, U = Zurück, H = Hinweis.",
-      "<b>Keyboard:</b> arrow keys move the cursor, 1–9 pick a person, space places, N = notes, U = undo, H = hint."),
+    D("<b>Bedienung:</b> Wiel eng Persoun. <b>Tippen</b> = kleng Buschtaf am Feld, <b>Wëschen</b> = Buschtawen op ville Felder, <b>laang drécken</b> (oder duebel tippen) = d'Persoun setzen. Mam ✕ markéiers du Felder, wou keen hi ka. De Gummi läscht d'Notize vum Feld (laang drécken = all Notizen).",
+      "<b>Bedienung:</b> Wähle eine Person. <b>Tippen</b> = kleiner Buchstabe im Feld, <b>Wischen</b> = Buchstaben auf vielen Feldern, <b>lange drücken</b> (oder Doppeltipp) = Person setzen. Mit ✕ markierst du Felder, auf denen niemand sein kann. Der Radierer löscht die Notizen des Feldes (lange drücken = alle Notizen).",
+      "<b>Controls:</b> Pick a person. <b>Tap</b> = a small letter in the cell, <b>swipe</b> = letters on many cells, <b>hold</b> (or double-tap) = place the person. ✕ marks cells where nobody can be. The eraser clears a cell's notes (hold = clear all notes)."),
+    D("<b>Tastatur:</b> D'Buschtaf vun enger Persoun schreift eng Notiz op dat Feld ënnert der Maus, 1–9 wielt eng Persoun, Enter setzt, X = ✕, Backspace = radéieren, Ctrl+Z = zréck, ? = Hiweis.",
+      "<b>Tastatur:</b> Der Buchstabe einer Person schreibt eine Notiz auf das Feld unter der Maus, 1–9 wählt eine Person, Enter setzt, X = ✕, Rücktaste = radieren, Strg+Z = zurück, ? = Hinweis.",
+      "<b>Keyboard:</b> a person's letter writes a note on the cell under the mouse, 1–9 pick a person, Enter places, X = ✕, Backspace = erase, Ctrl+Z = undo, ? = hint."),
   ],
+  erase: D("Gummi", "Radierer", "Eraser"),
+  settings: D("Astellungen", "Einstellungen", "Settings"),
+  cross: D("Kräiz", "Kreuz", "Cross"),
+  checkLocked: D("Setz fir d'éischt jiddereen", "Erst alle platzieren", "Place everyone first"),
+  clearOnPlace: D("Notize vun enger Persoun läschen, wann se gesat gëtt", "Notizen einer Person löschen, wenn sie gesetzt wird", "Clear a person's notes when they are placed"),
+  victimLead: D("D'Affer.", "Das Opfer.", "The victim."),
+  holdHint: D("Laang drécken fir ze setzen", "Lange drücken zum Setzen", "Hold to place"),
+  caseFile: D("Fall", "Fall", "Case"),
+  stamp: D("GELÉIST", "GELÖST", "SOLVED"),
+  who: D("Wien wor et?", "Wer war es?", "Who did it?"),
 };
 export const T = (key, lang, vars) => {
   const entry = UI[key];

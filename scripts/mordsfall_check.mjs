@@ -5,6 +5,7 @@
  *   - exactly ONE solution, found two ways: the propagation solver (pb/mordsfall/solver.js) and an independent
  *     plain backtracking counter written below (shares no code with the solver)
  *   - the stored solution equals that solution, and the victim's room holds exactly one other person (the murderer)
+ *   - multi-cell objects: all covered cells touch, lie in ONE room, match an allowed footprint of that type
  *   - realism: every object sits in a room whose kind allows it (pb/mordsfall/rooms.js), no room exceeds its per-object maximum,
  *     case-wide caps hold (one water tap …), rooms are compact (a 2x2 block, one tiny corridor at most), every person has a clue
  *   - the line-up is 6 cases per tier with sizes 5..9, and every clue renders in lb/de/en without gaps
@@ -14,8 +15,9 @@
 import cases from "../pb/mordsfall/cases.js";
 import { SCENES } from "../pb/mordsfall/scenes.js";
 import { buildModel, solve, validate, murdererOf, BLOCKING, STANDABLE } from "../pb/mordsfall/solver.js";
-import { KINDS, CASE_CAPS } from "../pb/mordsfall/rooms.js";
-import { clueText, storyText, caseTitle, roomName } from "../pb/mordsfall/text.js";
+import { KINDS, CASE_CAPS, FOOTPRINTS, SHAPES } from "../pb/mordsfall/rooms.js";
+import { clueText, storyText, caseTitle, roomName, OBJECTS } from "../pb/mordsfall/text.js";
+import { OBJECT_ART } from "../pb/mordsfall/art.js";
 
 const LANGS = ["lb", "de", "en"];
 const TIER_KEYS = ["ve", "ea", "me", "ha", "ex"];
@@ -27,11 +29,11 @@ const bad = (id, msg) => { problems++; console.log(`FAIL ${id}: ${msg}`); };
 function bruteCount(cs, limit = 2, nodeCap = 4e7) {
   const n = cs.n, P = cs.people.length;
   const roomAt = (r, c) => parseInt(cs.grid[r][c], 36);
-  const objAt = {}; for (const [r, c, t] of cs.objects) objAt[r + "," + c] = t;
+  const objAt = {}, objId = {}; cs.objects.forEach(([t, cells], id) => { for (const [r, c] of cells) { objAt[r + "," + c] = t; objId[r + "," + c] = id; } });
   const blockedTypes = new Set(["table", "shelf", "tree", "rock", "car", "fountain", "barrel", "plant", "crate", "stove", "heater", "bucket", "fridge",
     "counter", "parasol", "tent", "campfire", "tap", "desk", "copier", "board", "stall", "bin", "carousel", "press", "sink", "grill", "slide"]);
   const isBlockedCell = (r, c) => blockedTypes.has(objAt[r + "," + c]);
-  const nearHas = (r, c, t) => { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { if ((dr || dc) && objAt[(r + dr) + "," + (c + dc)] === t) return true; } return false; };
+  const nearHas = (r, c, t) => { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { const k = (r + dr) + "," + (c + dc); if ((dr || dc) && objAt[k] === t && objId[k] !== objId[r + "," + c]) return true; } return false; };
   const unary = (cl, r, c) => {
     switch (cl.t) {
       case "in": return roomAt(r, c) === cl.room;
@@ -105,6 +107,7 @@ const connected = (cells, n) => {
   return seen.size === set.size;
 };
 
+for (const t of OBJ_TYPES) { if (!OBJECT_ART[t]) bad("art", `no drawing for ${t}`); if (!OBJECTS[t]) bad("text", `no name for ${t}`); else if (OBJECTS[t].block !== BLOCKING.includes(t)) bad("text", `${t}: blocking flag differs from solver.js`); }
 const perTier = {};
 const ids = new Set();
 const started = Date.now();
@@ -131,13 +134,33 @@ for (const cs of cases) {
     if (!connected(cells, n)) bad(id, `room ${rid} is not connected`);
     for (const l of LANGS) if (!cs.rooms[rid]?.[l]) bad(id, `room ${rid} name.${l} missing`);
   });
-  // objects: each must belong in its room
+  // objects: each must belong in its room (and may span cells)
   {
     const scene = SCENES.find((x) => x.id === cs.scene);
     const roomKind = cs.rooms.map((rm) => scene.rooms.find((x) => x.lb === rm.lb)?.kind);
-    const perRoom = {}, perCase = {};
-    for (const [r, c, t] of cs.objects) {
-      const rid = parseInt(cs.grid[r][c], 36), kind = KINDS[roomKind[rid]];
+    const perRoom = {}, perCase = {}, seenCell = new Set();
+    const shapeOf = (cells) => { // "1" "2" "3" "L" "4" by cell count / geometry
+      const rs = cells.map((x) => x[0]), cs2 = cells.map((x) => x[1]), h = Math.max(...rs) - Math.min(...rs) + 1, w = Math.max(...cs2) - Math.min(...cs2) + 1;
+      if (cells.length === 1) return "1";
+      if (cells.length === 2 && h * w === 2) return "2";
+      if (cells.length === 3 && (h === 1 || w === 1)) return "3";
+      if (cells.length === 3 && h === 2 && w === 2) return "L";
+      if (cells.length === 4 && h === 2 && w === 2) return "4";
+      return null;
+    };
+    for (const [t, cells] of cs.objects) {
+      if (!OBJ_TYPES.has(t)) bad(id, `unknown object ${t}`);
+      const rooms = new Set();
+      for (const [r, c] of cells) {
+        if (r < 0 || c < 0 || r >= n || c >= n) { bad(id, "object outside the grid"); continue; }
+        if (seenCell.has(r + "," + c)) bad(id, "two objects in one cell"); seenCell.add(r + "," + c);
+        rooms.add(parseInt(cs.grid[r][c], 36));
+      }
+      if (rooms.size !== 1) { bad(id, `${t} spans several rooms`); continue; }
+      const key = shapeOf(cells);
+      if (!key || !((FOOTPRINTS[t] || { 1: 1 })[key])) bad(id, `${t} has a footprint it may not have (${key})`);
+      void SHAPES;
+      const rid = [...rooms][0], kind = KINDS[roomKind[rid]];
       if (!kind) { bad(id, `room ${rid} has no known kind`); continue; }
       const max = [...kind.block, ...kind.stand].find(([tt]) => tt === t)?.[1];
       if (max === undefined) bad(id, `${t} does not belong in «${cs.rooms[rid].lb}» (${roomKind[rid]})`);
@@ -154,12 +177,6 @@ for (const cs of cases) {
     const thin = roomIds.filter((rid) => !rooms2x2.includes(rid));
     if (thin.length > 1) bad(id, `${thin.length} thin rooms`);
     for (const rid of thin) if (cs.grid.join("").split("").filter((ch) => parseInt(ch, 36) === rid).length > 3) bad(id, `room ${rid} is a long thin strip`);
-  }
-  const seenObj = new Set();
-  for (const [r, c, t] of cs.objects) {
-    if (!OBJ_TYPES.has(t)) bad(id, `unknown object ${t}`);
-    if (r < 0 || c < 0 || r >= n || c >= n) bad(id, "object outside the grid");
-    if (seenObj.has(r + "," + c)) bad(id, "two objects in one cell"); seenObj.add(r + "," + c);
   }
   // people
   if (cs.people.length !== n) bad(id, `${cs.people.length} people for a ${n}x${n} grid`);

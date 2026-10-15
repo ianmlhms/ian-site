@@ -1,7 +1,7 @@
 /* Mordsfall — rules engine shared by the game, the generator and the check script.
  * Pure ES module, no DOM: Node can import it as well as the browser.
  *
- * A case is { n, grid:["0011",...], objects:[[r,c,type],...], people:[{name,clues:[...]}], victim, ... }.
+ * A case is { n, grid:["0011",...], objects:[[type,[[r,c],...]],...] (an object may cover several cells), people:[{name,clues:[...]}], victim, ... }.
  * Cells are numbered r*n+c. A placement is an array pos[person] = cell (or -1).
  *
  * Solver = propagation on candidate-cell domains (one Uint8Array(n*n) per person) + backtracking.
@@ -16,7 +16,7 @@
 export const BLOCKING = ["table", "shelf", "tree", "rock", "car", "fountain", "barrel", "plant", "crate", "stove",
   "heater", "bucket", "fridge", "counter", "parasol", "tent", "campfire", "tap", "desk", "copier", "board", "stall", "bin",
   "carousel", "press", "sink", "grill", "slide"];
-export const STANDABLE = ["chair", "carpet", "bench", "bed", "hay", "stool", "deckchair", "mat", "sandbox"];
+export const STANDABLE = ["chair", "carpet", "bench", "bed", "hay", "stool", "deckchair", "mat", "sandbox", "sofa", "bumper", "stain", "puddle", "blanket"];
 export const isBlocking = (type) => BLOCKING.includes(type);
 
 const UNARY = new Set(["in", "notin", "near", "notnear", "on", "row", "col"]);
@@ -25,25 +25,26 @@ export const isUnaryClue = (clue) => UNARY.has(clue.t);
 export function buildModel(cs) {
   const n = cs.n, N = n * n, P = cs.people.length;
   const row = new Int8Array(N), col = new Int8Array(N), room = new Int8Array(N);
-  const objAt = new Array(N).fill(null);
+  const objAt = new Array(N).fill(null), objId = new Int16Array(N).fill(-1);
   const blocked = new Uint8Array(N);
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
     row[r * n + c] = r; col[r * n + c] = c; room[r * n + c] = parseInt(cs.grid[r][c], 36);
   }
-  for (const [r, c, t] of cs.objects) { objAt[r * n + c] = t; if (isBlocking(t)) blocked[r * n + c] = 1; }
+  cs.objects.forEach(([t, cells], id) => { for (const [r, c] of cells) { objAt[r * n + c] = t; objId[r * n + c] = id; if (isBlocking(t)) blocked[r * n + c] = 1; } });
+  // "beside X": a neighbouring cell holds X — but never the very object you are standing on
   const near = {};
-  for (const t of new Set(cs.objects.map((o) => o[2]))) near[t] = new Uint8Array(N);
+  for (const [t] of cs.objects) if (!near[t]) near[t] = new Uint8Array(N);
   for (let i = 0; i < N; i++) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
     if (!dr && !dc) continue;
     const r = row[i] + dr, c = col[i] + dc;
     if (r < 0 || c < 0 || r >= n || c >= n) continue;
-    const t = objAt[r * n + c];
-    if (t) near[t][i] = 1;
+    const j = r * n + c;
+    if (objAt[j] && objId[j] !== objId[i]) near[objAt[j]][i] = 1;
   }
   const roomCount = Math.max(...room) + 1;
   const roomCells = Array.from({ length: roomCount }, () => []);
   for (let i = 0; i < N; i++) roomCells[room[i]].push(i);
-  const m = { n, N, P, row, col, room, objAt, blocked, near, roomCount, roomCells, cs, victim: cs.victim ?? 0 };
+  const m = { n, N, P, row, col, room, objAt, objId, blocked, near, roomCount, roomCells, cs, victim: cs.victim ?? 0 };
   m.allowed = cs.people.map((p) => {
     const a = new Uint8Array(N);
     for (let i = 0; i < N; i++) a[i] = blocked[i] ? 0 : 1;

@@ -6,6 +6,8 @@
  *   node scripts/mordsfall_gen.mjs --seed 7 --out /tmp/cases.js
  *   node scripts/mordsfall_gen.mjs --stats 5x5:200     # grade statistics for 200 random 5x5 cases (tuning aid)
  *
+ * Objects can cover several cells (cars 2, counters 2-3, L-shaped tables, 2x2 rugs …): footprints are in pb/mordsfall/rooms.js,
+ * big pieces are placed first, every covered cell counts as that object (blocking, "beside", "on").
  * Pipeline per case: BSP room layout -> objects -> random solution (victim shares a room with exactly one other
  * person) -> every true clue is a candidate -> add the most informative clues until the solver finds exactly one
  * solution -> try to drop each clue again (kept only if still unique) -> grade (see grade() in solver.js).
@@ -15,7 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModel, solve, grade, initialDomains, propagate, STANDABLE, BLOCKING, isBlocking } from "../pb/mordsfall/solver.js";
 import { SCENES, NAMES } from "../pb/mordsfall/scenes.js";
-import { KINDS, CASE_CAPS, PAIRS } from "../pb/mordsfall/rooms.js";
+import { KINDS, CASE_CAPS, PAIRS, SHAPES, footprintOf } from "../pb/mordsfall/rooms.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -93,53 +95,86 @@ function genGrid(n, k, rng) {
   return rows;
 }
 
-/* ---------- objects: each room draws only from its own kind's palette (pb/mordsfall/rooms.js) ---------- */
+/* ---------- objects: each room draws only from its own kind's palette (pb/mordsfall/rooms.js); big pieces first ---------- */
+/* all placements of a shape (every rotation / mirror) as lists of [dr, dc] offsets, anchored at the top-left of its bounding box */
+function orientations(shapeKey) {
+  const base = SHAPES[shapeKey], seen = new Set(), out = [];
+  let cur = base;
+  for (let mirror = 0; mirror < 2; mirror++) {
+    for (let rot = 0; rot < 4; rot++) {
+      const minR = Math.min(...cur.map((x) => x[0])), minC = Math.min(...cur.map((x) => x[1]));
+      const norm = cur.map(([r, c]) => [r - minR, c - minC]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const key = JSON.stringify(norm);
+      if (!seen.has(key)) { seen.add(key); out.push(norm); }
+      cur = cur.map(([r, c]) => [c, -r]);
+    }
+    cur = base.map(([r, c]) => [r, -c]);
+  }
+  return out;
+}
+const ORI = Object.fromEntries(Object.keys(SHAPES).map((k) => [k, orientations(k)]));
+
 function genObjects(n, grid, rooms, rng) {
-  const N = n * n, density = 0.24 + rng() * 0.1;
+  const N = n * n, density = 0.3 + rng() * 0.12;
   const roomCells = rooms.map(() => []);
   for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) roomCells[parseInt(grid[r][c], 36)].push([r, c]);
   const blockedRow = new Array(n).fill(0), blockedCol = new Array(n).fill(0);
   const taken = new Set(), objects = [], caseCount = {};
   const cap = (t) => CASE_CAPS[t] ?? 99;
+  const roomOf = (r, c) => parseInt(grid[r][c], 36);
   for (const id of shuffle(rng, rooms.map((_, i) => i))) {
     const kind = KINDS[rooms[id].kind];
     const cells = roomCells[id];
     const capacity = [...kind.block, ...kind.stand].reduce((a, [, m]) => a + m, 0);
-    let target = Math.round(cells.length * density + (rng() - 0.5) * 1.2);
-    target = Math.max(cells.length >= 4 ? 1 : 0, Math.min(target, capacity));
-    const nStand = kind.stand.length ? Math.round(target * (kind.block.length ? 0.4 : 1)) : 0;
-    const counts = {};
-    const here = []; // blocking objects placed in this room, for pairing
-    const free = () => cells.filter(([r, c]) => !taken.has(r * n + c));
-    const place = (type, r, c, isBlocking) => {
-      taken.add(r * n + c); objects.push([r, c, type]);
+    let budget = Math.round(cells.length * density + (rng() - 0.5) * 1.2);
+    budget = Math.max(cells.length >= 4 ? 1 : 0, Math.min(budget, cells.length - 1));
+    const standBudget = kind.stand.length ? Math.round(budget * (kind.block.length ? 0.4 : 1)) : 0;
+    let blockLeft = budget - standBudget, standLeft = standBudget;
+    const counts = {}, here = []; // objects placed in this room (for pairing)
+    const isFree = (r, c) => roomOf(r, c) === id && !taken.has(r * n + c);
+    // try to put `type` somewhere with a shape of at most `maxCells` cells; returns the number of cells used (0 = failed)
+    const put = (type, maxCells, blocking, pairWith) => {
+      const shapes = Object.entries(footprintOf(type)).filter(([k]) => SHAPES[k].length <= maxCells);
+      if (!shapes.length) return 0;
+      // every legal placement: shape x orientation x position, all cells free and in this room
+      const options = [];
+      for (const [key, w] of shapes) for (const ori of ORI[key]) for (const [ar, ac] of cells) {
+        const covered = ori.map(([dr, dc]) => [ar + dr, ac + dc]);
+        if (!covered.every(([r, c]) => r < n && c < n && isFree(r, c))) continue;
+        if (blocking && !covered.every(([r, c]) => blockedRow[r] < n - 2 && blockedCol[c] < n - 2)) continue;
+        options.push({ key, w, covered });
+      }
+      if (!options.length) return 0;
+      let pool = options;
+      if (pairWith) { // seats: beside a table / desk / counter of this room
+        const next = options.filter((o) => o.covered.some(([r, c]) => here.some(([ht, hc]) => pairWith.includes(ht) && hc.some(([hr, hcc]) => Math.abs(hr - r) + Math.abs(hcc - c) === 1))));
+        if (next.length && rng() < 0.92) pool = next;
+      }
+      const chosen = weighted(rng, pool, (o) => o.w);
+      for (const [r, c] of chosen.covered) { taken.add(r * n + c); if (blocking) { blockedRow[r]++; blockedCol[c]++; } }
+      objects.push([type, chosen.covered]);
+      here.push([type, chosen.covered]);
       counts[type] = (counts[type] || 0) + 1; caseCount[type] = (caseCount[type] || 0) + 1;
-      if (isBlocking) { blockedRow[r]++; blockedCol[c]++; here.push([r, c, type]); }
+      return chosen.covered.length;
     };
-    const okBlock = (r, c) => blockedRow[r] < n - 3 && blockedCol[c] < n - 3;
-    for (let k = 0; k < target - nStand; k++) {
-      const pool = kind.block.filter(([t, m]) => (counts[t] || 0) < m && (caseCount[t] || 0) < cap(t));
-      const spots = free().filter(([r, c]) => okBlock(r, c));
-      if (!pool.length || !spots.length) break;
-      const [type] = weighted(rng, pool, ([, m]) => m);
-      const [r, c] = pick(rng, spots);
-      place(type, r, c, true);
+    const avail = (list) => list.filter(([t, m]) => (counts[t] || 0) < m && (caseCount[t] || 0) < cap(t));
+    for (let guard = 0; guard < 30 && blockLeft > 0; guard++) {
+      const pool = avail(kind.block);
+      if (!pool.length) break;
+      const [type] = weighted(rng, pool, ([t, m]) => m * (1 + Object.keys(footprintOf(t)).length * 0.3));
+      blockLeft -= put(type, Math.max(1, blockLeft + 1), true, null) || 0;
     }
-    for (let k = 0; k < nStand; k++) {
-      const pool = kind.stand.filter(([t, m]) => (counts[t] || 0) < m && (caseCount[t] || 0) < cap(t));
-      const spots = free();
-      if (!pool.length || !spots.length) break;
+    for (let guard = 0; guard < 30 && standLeft > 0; guard++) {
+      const pool = avail(kind.stand);
+      if (!pool.length) break;
       const [type] = weighted(rng, pool, ([, m]) => m);
-      // seats like to stand beside a table / desk / counter of their own room
-      const likes = (PAIRS[type] || []);
-      const near = spots.filter(([r, c]) => here.some(([hr, hc, ht]) => likes.includes(ht) && Math.abs(hr - r) + Math.abs(hc - c) === 1));
-      const [r, c] = near.length && rng() < 0.9 ? pick(rng, near) : pick(rng, spots);
-      place(type, r, c, false);
+      standLeft -= put(type, Math.max(1, standLeft + 1), false, PAIRS[type] || null) || 0;
     }
   }
-  const stands = objects.filter((o) => !isBlocking(o[2])).length;
-  if (stands < 3 || objects.length < N * 0.15) return null;
-  objects.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const stands = objects.filter((o) => !isBlocking(o[0])).length;
+  const covered = objects.reduce((a, o) => a + o[1].length, 0);
+  if (stands < 3 || covered < N * 0.18) return null;
+  objects.sort((a, b) => a[1][0][0] - b[1][0][0] || a[1][0][1] - b[1][0][1]);
   return objects;
 }
 
@@ -168,7 +203,7 @@ function cluePool(cs, m, sol, p) {
   const rooms = m.roomCount;
   out.push({ t: "in", room: m.room[x] });
   for (let r = 0; r < rooms; r++) if (r !== m.room[x]) out.push({ t: "notin", room: r });
-  const types = new Set(cs.objects.map((o) => o[2]));
+  const types = new Set(cs.objects.map((o) => o[0]));
   for (const t of types) {
     if (m.near[t][x]) out.push({ t: "near", obj: t }); else out.push({ t: "notnear", obj: t });
   }
@@ -207,7 +242,7 @@ function makeCase(tier, scene, caseText, rng) {
   const roomPick = shuffle(rng, scene.rooms).slice(0, k);
   const objects = genObjects(n, grid, roomPick, rng);
   if (!objects) return fail('objects');
-  const blocked = new Set(objects.filter((o) => isBlocking(o[2])).map((o) => o[0] * n + o[1]));
+  const blocked = new Set(objects.filter((o) => isBlocking(o[0])).flatMap((o) => o[1].map(([r, c]) => r * n + c)));
   const sol = genSolution(n, grid, blocked, rng);
   if (!sol) return fail('solution');
   // people: victim first
