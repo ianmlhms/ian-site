@@ -1,10 +1,10 @@
 /* Mordsfall — the game screen: case list, board, suspects, hints, win.
  * Rules engine: solver.js · words: text.js · pictures: art.js · cases: cases.js (generated, see scripts/mordsfall_gen.mjs). */
-import cases from "./cases.js?v=1";
-import { SCENES } from "./scenes.js?v=1";
-import { buildModel, clueHolds, hint as solverHint, murdererOf } from "./solver.js?v=1";
-import { T, clueText, storyText, caseTitle, roomName, objName, OBJECTS, TIER_KEYS, LANGS, UI, personRef } from "./text.js?v=1";
-import { avatarBadge, avatar, lookOf, objectArt, objectIcon, caseThumb } from "./art.js?v=1";
+import cases from "./cases.js?v=2";
+import { SCENES } from "./scenes.js?v=2";
+import { buildModel, clueHolds, hint as solverHint, murdererOf } from "./solver.js?v=2";
+import { T, clueText, storyText, caseTitle, roomName, objName, OBJECTS, TIER_KEYS, LANGS, UI, personRef } from "./text.js?v=2";
+import { avatarBadge, avatar, lookOf, objectArt, objectIcon, caseThumb } from "./art.js?v=2";
 
 const TEST_MODE = window.__pbTestMode === true; // owner test mode: nothing is read from or written to storage, nothing reaches a leaderboard
 const SAVE_KEY = "pb_save_mordsfall";
@@ -459,19 +459,30 @@ function renderBoard() {
       <circle cx="50" cy="50" r="46" fill="none" stroke="${conflicts.has(p) ? "var(--mf-bad)" : look.shirt}" stroke-width="${conflicts.has(p) ? 9 : 7}" ${conflicts.has(p) ? 'stroke-dasharray="14 7"' : ""}/>
     </g>`;
   });
-  // room names (first cell of each room, spanning its first row)
-  const seen = new Set();
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-    const id = room(r, c);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    let span = 1;
-    while (c + span < n && room(r, c + span) === id) span++;
-    const fs = Math.min(30, 12 / scale);
-    const maxChars = Math.max(3, Math.floor((span * U - 10) / (fs * 0.6)));
-    let name = roomName(cs, id, lang);
-    if (name.length > maxChars) name = name.slice(0, Math.max(2, maxChars - 1)) + "…";
-    s += `<text class="room-lbl" x="${c * U + 7}" y="${r * U + fs + 3}" font-size="${fs.toFixed(1)}" stroke-width="${(fs * 0.3).toFixed(1)}">${esc(name)}</text>`;
+  // room names: written along the room's widest horizontal run of cells; shrink a little, then use the short name, before ever cutting
+  const best = new Map(); // room id -> {r, c, len}
+  for (let r = 0; r < n; r++) {
+    let c = 0;
+    while (c < n) {
+      const id = room(r, c);
+      let len = 1;
+      while (c + len < n && room(r, c + len) === id) len++;
+      const cur = best.get(id);
+      if (!cur || len > cur.len) best.set(id, { r, c, len });
+      c += len;
+    }
+  }
+  const maxFs = Math.min(30, 12.5 / scale), minFs = Math.min(30, 8.6 / scale), CHAR = 0.6;
+  for (const [id, { r, c, len }] of best) {
+    const avail = len * U - 12, full = roomName(cs, id, lang), short = cs.rooms[id].short?.[lang];
+    let text = full, fs = Math.min(maxFs, avail / (full.length * CHAR));
+    if (fs < minFs && short && short !== full) { text = short; fs = Math.min(maxFs, avail / (short.length * CHAR)); }
+    if (fs < minFs) {
+      fs = minFs;
+      const fit = Math.max(3, Math.floor(avail / (fs * CHAR)));
+      if (text.length > fit) text = text.slice(0, fit - 1) + "…";
+    }
+    s += `<text class="room-lbl" x="${c * U + 7}" y="${r * U + fs + 3}" font-size="${fs.toFixed(1)}" stroke-width="${(fs * 0.3).toFixed(1)}">${esc(text)}</text>`;
   }
   // keyboard cursor
   if (G.kbd) {
@@ -498,8 +509,31 @@ function cellFromPoint(clientX, clientY) {
   const c = Math.floor(x / CELL), r = Math.floor(y / CELL);
   return r >= 0 && c >= 0 && r < n && c < n ? r * n + c : -1;
 }
+/* Loupe for small cells (phones): while a finger rests on the grid, a magnified view of the cell under it floats above the finger. */
+let loupe = null, loupeTimer = 0;
+const smallCells = () => { const svg = $("#mfBoardWrap .mf-board"); return !!svg && !!G && svg.getBoundingClientRect().width / (G.cs.n * CELL + LABEL_MARGIN + 10) * CELL < 54; };
+function updateLoupe(x, y) {
+  const cell = cellFromPoint(x, y);
+  if (cell < 0) { hideLoupe(); return; }
+  const n = G.cs.n, r = Math.floor(cell / n), c = cell % n, span = CELL * 2.5;
+  if (!loupe) {
+    const src = $("#mfBoardWrap .mf-board");
+    loupe = document.createElement("div");
+    loupe.className = "mf-loupe";
+    loupe.innerHTML = `<svg viewBox="0 0 ${span} ${span}" width="150" height="150" aria-hidden="true">${src.innerHTML}<rect class="hi" fill="none" stroke="var(--accent)" stroke-width="7" rx="8"/></svg><div class="cap"></div>`;
+    document.body.appendChild(loupe);
+  }
+  const svg = loupe.querySelector("svg"), hi = loupe.querySelector(".hi");
+  svg.setAttribute("viewBox", `${c * CELL + CELL / 2 - span / 2} ${r * CELL + CELL / 2 - span / 2} ${span} ${span}`);
+  hi.setAttribute("x", c * CELL + 4); hi.setAttribute("y", r * CELL + 4); hi.setAttribute("width", CELL - 8); hi.setAttribute("height", CELL - 8);
+  loupe.querySelector(".cap").textContent = t("placedAt", { r: r + 1, c: c + 1 });
+  const left = Math.min(window.innerWidth - 158, Math.max(8, x - 79)), above = y - 200;
+  loupe.style.left = left + "px";
+  loupe.style.top = (above < 8 ? y + 70 : above) + "px";
+}
+function hideLoupe() { clearTimeout(loupeTimer); loupeTimer = 0; if (loupe) { loupe.remove(); loupe = null; } }
 let press = null, ghost = null;
-function endPress() { if (press) { clearTimeout(press.timer); press = null; } if (ghost) { ghost.remove(); ghost = null; } if (G) G.drag = null; }
+function endPress() { hideLoupe(); if (press) { clearTimeout(press.timer); press = null; } if (ghost) { ghost.remove(); ghost = null; } if (G) G.drag = null; }
 function startDrag() {
   if (!press || press.p < 0 || !G) return;
   press.drag = true;
@@ -539,25 +573,29 @@ function bindBoard() {
     const p = G.notes ? -1 : personAt(cell);
     press = { cell, p, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, drag: false, type: e.pointerType, timer: 0 };
     if (p >= 0 && e.pointerType !== "mouse") press.timer = setTimeout(startDrag, 260);
+    if (e.pointerType !== "mouse" && smallCells()) loupeTimer = setTimeout(() => { if (press && !press.moved) { press.hold = true; updateLoupe(press.lastX, press.lastY); } }, 180);
   });
   window.addEventListener("pointermove", (e) => {
     if (!press) return;
     press.lastX = e.clientX; press.lastY = e.clientY;
+    if (press.hold) updateLoupe(e.clientX, e.clientY);
     const dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
     if (!press.drag && press.p >= 0 && press.type === "mouse" && dist > 7) startDrag();
     if (press.drag) moveGhost(e.clientX, e.clientY);
-    else if (dist > 12) { clearTimeout(press.timer); press.moved = true; }
+    else if (dist > 12 && !press.hold) { clearTimeout(press.timer); clearTimeout(loupeTimer); press.moved = true; }
   });
   window.addEventListener("pointerup", (e) => {
     if (!press) return;
     if (press.drag) { finishDrag(e.clientX, e.clientY); return; }
     const was = press;
     endPress();
+    if (was.hold) { const c = cellFromPoint(e.clientX, e.clientY); if (c >= 0) tapCell(c); return; } // press-and-slide with the loupe: the cell under the finger on release
     if (!was.moved && Math.hypot(e.clientX - was.x, e.clientY - was.y) < 14) tapCell(was.cell);
   });
+  window.addEventListener("blur", hideLoupe);
   window.addEventListener("pointercancel", () => { if (press && press.drag) { endPress(); renderBoard(); } else endPress(); });
   // while a piece is being dragged the page must not scroll
-  window.addEventListener("touchmove", (e) => { if (press && press.drag) e.preventDefault(); }, { passive: false });
+  window.addEventListener("touchmove", (e) => { if (press && (press.drag || press.hold)) e.preventDefault(); }, { passive: false });
 }
 
 /* ---------------- click handlers (delegated) ---------------- */

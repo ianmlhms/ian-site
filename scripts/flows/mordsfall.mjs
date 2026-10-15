@@ -98,8 +98,45 @@ export const flow = {
     await h.shot("win");
     const stored = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || "{}"), SAVE_KEY);
     h.expect(stored.done && stored.done.ve1 && stored.done.ve1.t >= 1, "the solved case and its time are saved");
-    await page.locator('[data-win="list"]').click();
+    await page.locator('[data-win="next"]').click();
+    await page.waitForSelector(".mf-board");
+    h.eq((await state(page)).id, "ve2", "Next case opens the next unsolved case (same tier first)");
+    await page.locator('[data-act="cases"]').click();
     h.expect(await page.locator('[data-case="ve1"].solved').count() === 1, "the card shows the solved tick");
+
+    h.step("room names fit at phone width (no «…» in any case, any language) and the loupe helps on small cells");
+    const phone = await page.context().browser().newContext({ viewport: { width: 375, height: 800 }, serviceWorkers: "block" });
+    await phone.addInitScript(seen);
+    const p3 = await phone.newPage();
+    p3.on("pageerror", (e) => h.failures.push("phone page error: " + e.message));
+    await p3.goto(h.origin + "/mordsfall.html", { waitUntil: "domcontentloaded" });
+    await p3.waitForSelector(".mf-card");
+    const cut = [];
+    for (const lang of ["lb", "de", "en"]) {
+      await p3.locator(`[data-lang="${lang}"]`).click();
+      for (const id of await p3.evaluate(() => window.__mordsfall.cases.map((c) => c.id))) {
+        await p3.evaluate((i) => window.__mordsfall.openCase(i), id);
+        const texts = await p3.$$eval(".room-lbl", (els) => els.map((e) => e.textContent));
+        texts.filter((x) => x.endsWith("…")).forEach((x) => cut.push(`${lang} ${id} ${x}`));
+      }
+    }
+    h.eq(cut, [], "no truncated room name in 30 cases x 3 languages at 375px");
+    await p3.locator('[data-lang="lb"]').click().catch(() => {});
+    await p3.evaluate(() => window.__mordsfall.openCase("ex1"));
+    const s3 = await state(p3);
+    await p3.locator('.mf-pchip[data-p="2"]').click();
+    await p3.evaluate(() => document.querySelector(".mf-board").scrollIntoView({ block: "center" }));
+    const [tx, ty] = await cellXY(p3, s3.solution[2]);
+    await p3.evaluate(([x, y]) => document.querySelector(".mf-board").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: x, clientY: y, pointerType: "touch", pointerId: 7, isPrimary: true, button: 0 })), [tx, ty]);
+    await p3.waitForSelector(".mf-loupe", { timeout: 3000 });
+    const n9 = Math.sqrt(s3.solution.length ** 2);
+    const cap = await p3.locator(".mf-loupe .cap").innerText();
+    h.expect(cap.includes(String(Math.floor(s3.solution[2] / n9) + 1)) && cap.includes(String((s3.solution[2] % n9) + 1)), `the loupe names the row and column under the finger («${cap}»)`);
+    if (process.env.FLOW_SHOTS_DIR) await p3.screenshot({ path: process.env.FLOW_SHOTS_DIR + "/mordsfall.loupe-phone.png" });
+    await p3.evaluate(([x, y]) => window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: x, clientY: y, pointerType: "touch", pointerId: 7, isPrimary: true, button: 0 })), [tx, ty]);
+    h.eq(await p3.locator(".mf-loupe").count(), 0, "the loupe disappears when the finger lifts");
+    h.eq((await state(p3)).pos[2], s3.solution[2], "press, hold and release places the selected person on the cell under the finger");
+    await phone.close();
 
     h.step("owner test mode: unlocks nothing to write — storage stays untouched");
     const ctx2 = await page.context().browser().newContext({ viewport: { width: 820, height: 1180 }, serviceWorkers: "block" });

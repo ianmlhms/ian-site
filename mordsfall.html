@@ -88,6 +88,8 @@
   @media(min-width:980px){
     .mf-play{grid-template-columns:minmax(0,1fr) minmax(320px,400px);align-items:start;gap:22px}
     .mf-boardcol{width:min(100%,max(420px,calc(100svh - 270px)))}
+    .mf-boardwrap{width:100%}
+    .mf-selpanel{display:none}
     .mf-side{position:sticky;top:12px;max-height:calc(100svh - 24px);overflow:auto;padding-right:2px}
   }
   .mf-tray{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
@@ -97,7 +99,7 @@
   .mf-pchip.placed .mf-avatar{opacity:.55}
   .mf-pchip .ck{position:absolute;top:1px;right:3px;font-size:11px;color:var(--mf-ok);font-weight:900}
   .mf-pchip .vi{position:absolute;top:0;left:3px;font-size:12px}
-  .mf-selpanel{min-height:68px;margin-bottom:8px;padding:8px 10px;border:1px solid var(--border);border-radius:12px;background:var(--card,#161625);font-size:14px;line-height:1.4}
+  .mf-selpanel{min-height:152px;margin-bottom:8px;padding:8px 10px;border:1px solid var(--border);border-radius:12px;background:var(--card,#161625);font-size:14px;line-height:1.4}
   .mf-selpanel .empty{color:var(--muted)}
   .mf-selpanel .hd{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:2px}
   .mf-vtag{font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;background:#f5c542;color:#2a1d00}
@@ -109,13 +111,17 @@
   .mf-tk.on{background:var(--mf-ok);border-color:var(--mf-ok);color:#fff}
   .mf-noassist .mf-tk{display:none}
 
-  .mf-boardwrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--card,#161625);touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .mf-boardwrap{width:min(100%,max(340px,calc(100svh - 520px)));margin-inline:auto;position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--card,#161625);touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   .mf-board{display:block;width:100%;height:auto}
   .mf-board text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:800}
   .mf-board .lbl{fill:var(--muted)}
   .mf-board .room-lbl{fill:var(--mf-label);paint-order:stroke;stroke:var(--mf-label-halo);stroke-linejoin:round;pointer-events:none}
   .mf-board .pulse{animation:mfPulse 1.1s ease-in-out infinite}
   @keyframes mfPulse{50%{opacity:.35}}
+  .mf-loupe{position:fixed;z-index:3500;width:158px;padding:4px;border:3px solid var(--accent);border-radius:18px;background:var(--card-opaque,#161625);box-shadow:0 10px 28px rgba(0,0,0,.5);pointer-events:none;text-align:center}
+  .mf-loupe svg{display:block;border-radius:12px;width:150px;height:150px;overflow:hidden}
+  .mf-loupe .room-lbl{display:none}
+  .mf-loupe .cap{font-size:12.5px;font-weight:800;padding:4px 0 1px}
   .mf-ghost{position:fixed;z-index:3000;width:68px;height:68px;margin:-34px 0 0 -34px;pointer-events:none;filter:drop-shadow(0 6px 10px rgba(0,0,0,.4))}
   .mf-below{margin-top:10px;display:grid;gap:10px}
   .mf-legend,.mf-rooms{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--muted)}
@@ -168,6 +174,8 @@
   @media(prefers-reduced-motion:reduce){.mf-win .big,.mf-board .pulse{animation:none}.mf-card{transition:none}}
   @media(max-width:520px){
     .mf-tool{font-size:13px;gap:4px}
+    .mf-msg{min-height:44px}
+    .mf-boardwrap{width:100%}
     .mf-ttl{font-size:15px}
     .mf-pchip{width:calc((100% - 6px*4)/5);min-height:62px}
     .mf-card .mf-thumb{width:84px;height:84px}
@@ -196,6 +204,6 @@
 </main>
 <div id="modalHost"></div>
 <noscript><p style="padding:20px">Mordsfall needs JavaScript.</p></noscript>
-<script type="module" src="pb/mordsfall/game.js?v=1"></script>
+<script type="module" src="pb/mordsfall/game.js?v=2"></script>
 </body>
 </html>

@@ -5,6 +5,8 @@
  *   - exactly ONE solution, found two ways: the propagation solver (pb/mordsfall/solver.js) and an independent
  *     plain backtracking counter written below (shares no code with the solver)
  *   - the stored solution equals that solution, and the victim's room holds exactly one other person (the murderer)
+ *   - realism: every object sits in a room whose kind allows it (pb/mordsfall/rooms.js), no room exceeds its per-object maximum,
+ *     case-wide caps hold (one water tap …), rooms are compact (a 2x2 block, one tiny corridor at most), every person has a clue
  *   - the line-up is 6 cases per tier with sizes 5..9, and every clue renders in lb/de/en without gaps
  *
  *   node scripts/mordsfall_check.mjs
@@ -12,6 +14,7 @@
 import cases from "../pb/mordsfall/cases.js";
 import { SCENES } from "../pb/mordsfall/scenes.js";
 import { buildModel, solve, validate, murdererOf, BLOCKING, STANDABLE } from "../pb/mordsfall/solver.js";
+import { KINDS, CASE_CAPS } from "../pb/mordsfall/rooms.js";
 import { clueText, storyText, caseTitle, roomName } from "../pb/mordsfall/text.js";
 
 const LANGS = ["lb", "de", "en"];
@@ -25,7 +28,8 @@ function bruteCount(cs, limit = 2, nodeCap = 4e7) {
   const n = cs.n, P = cs.people.length;
   const roomAt = (r, c) => parseInt(cs.grid[r][c], 36);
   const objAt = {}; for (const [r, c, t] of cs.objects) objAt[r + "," + c] = t;
-  const blockedTypes = new Set(["table", "shelf", "tree", "rock", "car", "fountain", "barrel", "plant", "crate", "stove"]);
+  const blockedTypes = new Set(["table", "shelf", "tree", "rock", "car", "fountain", "barrel", "plant", "crate", "stove", "heater", "bucket", "fridge",
+    "counter", "parasol", "tent", "campfire", "tap", "desk", "copier", "board", "stall", "bin", "carousel", "press", "sink", "grill", "slide"]);
   const isBlockedCell = (r, c) => blockedTypes.has(objAt[r + "," + c]);
   const nearHas = (r, c, t) => { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { if ((dr || dc) && objAt[(r + dr) + "," + (c + dc)] === t) return true; } return false; };
   const unary = (cl, r, c) => {
@@ -127,7 +131,30 @@ for (const cs of cases) {
     if (!connected(cells, n)) bad(id, `room ${rid} is not connected`);
     for (const l of LANGS) if (!cs.rooms[rid]?.[l]) bad(id, `room ${rid} name.${l} missing`);
   });
-  // objects
+  // objects: each must belong in its room
+  {
+    const scene = SCENES.find((x) => x.id === cs.scene);
+    const roomKind = cs.rooms.map((rm) => scene.rooms.find((x) => x.lb === rm.lb)?.kind);
+    const perRoom = {}, perCase = {};
+    for (const [r, c, t] of cs.objects) {
+      const rid = parseInt(cs.grid[r][c], 36), kind = KINDS[roomKind[rid]];
+      if (!kind) { bad(id, `room ${rid} has no known kind`); continue; }
+      const max = [...kind.block, ...kind.stand].find(([tt]) => tt === t)?.[1];
+      if (max === undefined) bad(id, `${t} does not belong in «${cs.rooms[rid].lb}» (${roomKind[rid]})`);
+      perRoom[rid + t] = (perRoom[rid + t] || 0) + 1;
+      if (max !== undefined && perRoom[rid + t] > max) bad(id, `too many ${t} in «${cs.rooms[rid].lb}»`);
+      perCase[t] = (perCase[t] || 0) + 1;
+    }
+    for (const [t, cap] of Object.entries(CASE_CAPS)) if ((perCase[t] || 0) > cap) bad(id, `${perCase[t]} x ${t} (case cap ${cap})`);
+    const rooms2x2 = roomIds.filter((rid) => {
+      const has = (r, c) => r >= 0 && c >= 0 && r < n && c < n && parseInt(cs.grid[r][c], 36) === rid;
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (has(r, c) && has(r + 1, c) && has(r, c + 1) && has(r + 1, c + 1)) return true;
+      return false;
+    });
+    const thin = roomIds.filter((rid) => !rooms2x2.includes(rid));
+    if (thin.length > 1) bad(id, `${thin.length} thin rooms`);
+    for (const rid of thin) if (cs.grid.join("").split("").filter((ch) => parseInt(ch, 36) === rid).length > 3) bad(id, `room ${rid} is a long thin strip`);
+  }
   const seenObj = new Set();
   for (const [r, c, t] of cs.objects) {
     if (!OBJ_TYPES.has(t)) bad(id, `unknown object ${t}`);
@@ -141,6 +168,7 @@ for (const cs of cases) {
   if (initials.size !== cs.people.length) bad(id, "initials are not distinct");
   cs.people.forEach((p, i) => {
     if (p.clues.length > 3) bad(id, `${p.name} has more than 3 clues`);
+    if (p.clues.length < 1) bad(id, `${p.name} has no clue`);
     const hasVictim = p.clues.some((c) => c.t === "victim");
     if (hasVictim !== (i === cs.victim)) bad(id, `${p.name}: victim clue misplaced`);
     p.clues.forEach((cl) => {

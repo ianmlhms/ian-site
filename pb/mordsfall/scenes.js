@@ -2,14 +2,14 @@
  * Everything here is original. A scene gives the generator its room names and object palette and gives each
  * case its title and its closing story. Story tokens: {K}/{k} murderer, {V}/{v} victim (capital = sentence start;
  * Luxembourgish adds the article, e.g. "de Pol", "d'Lis"), {kd}/{vd} dative ("dem Pol", "der Lis"). */
-const r = (lb, de, en) => ({ lb, de, en });
+const r = (lb, de, en, kind, short) => (kind ? { lb, de, en, kind, ...(short ? { short } : {}) } : { lb, de, en });
 
 export const SCENES = [
   {
-    id: "fair", name: r("Schueberfouer", "Schueberfouer", "Schueberfouer fair"), emoji: "🎡", objects: ["table", "barrel", "crate", "car", "plant", "bench", "chair", "hay", "carpet"],
-    rooms: [r("Karussell", "Karussell", "Carousel"), r("Autoscooter", "Autoscooter", "Bumper cars"), r("Riseraad", "Riesenrad", "Ferris wheel"),
-      r("Fressbuden", "Imbissbuden", "Food stalls"), r("Schéisshal", "Schießbude", "Shooting gallery"), r("Bierzelt", "Bierzelt", "Beer tent"),
-      r("Geeschterbunn", "Geisterbahn", "Ghost train"), r("Zockerwatt", "Zuckerwatte", "Candy floss"), r("Haaptwee", "Hauptweg", "Main path")],
+    id: "fair", name: r("Schueberfouer", "Schueberfouer", "Schueberfouer fair"), emoji: "🎡",
+    rooms: [r("Karussell", "Karussell", "Carousel", "ride"), r("Autoscooter", "Autoscooter", "Bumper cars", "bumpers"), r("Riseraad", "Riesenrad", "Ferris wheel", "ride"),
+      r("Fressbuden", "Imbissbuden", "Food stalls", "foodstalls"), r("Schéisshal", "Schießbude", "Shooting gallery", "shooting", r("Schéisshal", "Schießbude", "Shooting")), r("Bierzelt", "Bierzelt", "Beer tent", "beertent"),
+      r("Geeschterbunn", "Geisterbahn", "Ghost train", "ride"), r("Zockerwatt", "Zuckerwatte", "Candy floss", "foodstalls"), r("Haaptwee", "Hauptweg", "Main path", "path")],
     cases: [
       { title: r("De Fall vum verschwonnene Plüschbier", "Der Fall des verschwundenen Plüschbären", "The Case of the Vanished Teddy Bear"),
         story: r("{K} war nidderdrächteg jalous: {v} hat dräi Joer hannereneen de grousse Plüschbier an der Schéisshal gewonnen. Dës Kéier ass et net beim Plüschbier bliwwen.",
@@ -22,10 +22,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "office", name: r("Büro um Kirchbierg", "Büro auf dem Kirchberg", "Kirchberg office"), emoji: "🏢", objects: ["table", "shelf", "plant", "crate", "chair", "carpet", "bench", "fountain"],
-    rooms: [r("Empfang", "Empfang", "Reception"), r("Sëtzungssall", "Sitzungssaal", "Meeting room"), r("Kaffiskichen", "Kaffeeküche", "Coffee kitchen"),
-      r("Grousraumbüro", "Großraumbüro", "Open office"), r("Serverraum", "Serverraum", "Server room"), r("Dachterrass", "Dachterrasse", "Roof terrace"),
-      r("Archiv", "Archiv", "Archive"), r("Chefbüro", "Chefbüro", "Boss's office"), r("Drockerraum", "Druckerraum", "Print room")],
+    id: "office", name: r("Büro um Kirchbierg", "Büro auf dem Kirchberg", "Kirchberg office"), emoji: "🏢",
+    rooms: [r("Empfang", "Empfang", "Reception", "reception"), r("Sëtzungssall", "Sitzungssaal", "Meeting room", "meeting"), r("Kaffiskichen", "Kaffeeküche", "Coffee kitchen", "kitchen"),
+      r("Grousraumbüro", "Großraumbüro", "Open office", "openoffice"), r("Serverraum", "Serverraum", "Server room", "server"), r("Dachterrass", "Dachterrasse", "Roof terrace", "terrace"),
+      r("Archiv", "Archiv", "Archive", "archive"), r("Chefbüro", "Chefbüro", "Boss's office", "boss"), r("Drockerraum", "Druckerraum", "Print room", "print")],
     cases: [
       { title: r("Den Doud vum leschte Kaffi", "Der Tod des letzten Kaffees", "The Death of the Last Coffee"),
         story: r("{K} huet den Hunn vun der Kaffismaschinn zougedréint, wéi {v} just déi lescht Dass wollt. Ouni Kaffi ass e Büro séier ganz roueg ginn.",
@@ -38,10 +38,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "woods", name: r("Mullerthal", "Mullerthal", "Mullerthal woods"), emoji: "🌲", objects: ["tree", "rock", "car", "plant", "barrel", "bench", "hay", "fountain"],
-    rooms: [r("Lichtung", "Lichtung", "Clearing"), r("Bach", "Bach", "Stream"), r("Fielsespalt", "Felsspalte", "Rock gorge"),
-      r("Wanderparking", "Wanderparkplatz", "Trailhead"), r("Grillplaz", "Grillplatz", "BBQ spot"), r("Aussiichtspunkt", "Aussichtspunkt", "Viewpoint"),
-      r("Mossewald", "Moswald", "Mossy wood"), r("Pilzewiss", "Pilzwiese", "Mushroom meadow"), r("Holzbréck", "Holzbrücke", "Wooden bridge")],
+    id: "woods", name: r("Mullerthal", "Mullerthal", "Mullerthal woods"), emoji: "🌲",
+    rooms: [r("Lichtung", "Lichtung", "Clearing", "clearing"), r("Bach", "Bach", "Stream", "stream"), r("Fielsespalt", "Felsspalte", "Rock gorge", "gorge"),
+      r("Wanderparking", "Wanderparkplatz", "Trailhead", "trailhead", r("Wanderparking", "Parkplatz", "Trailhead")), r("Grillplaz", "Grillplatz", "BBQ spot", "bbq"), r("Aussiichtspunkt", "Aussichtspunkt", "Viewpoint", "viewpoint", r("Aussiicht", "Aussicht", "Viewpoint")),
+      r("Mossewald", "Moswald", "Mossy wood", "mossy"), r("Pilzewiss", "Pilzwiese", "Mushroom meadow", "meadow", r("Pilzewiss", "Pilzwiese", "Mushrooms")), r("Holzbréck", "Holzbrücke", "Wooden bridge", "bridge")],
     cases: [
       { title: r("D'Geheimnis vun der Pilzewiss", "Das Geheimnis der Pilzwiese", "The Mystery of the Mushroom Meadow"),
         story: r("{K} hat sech de beschte Steepilz-Plaz gesicht, bis {v} dohi komm ass. Zanter deem ass d'Pilzewiss e ganz gefierlechen Eck.",
@@ -54,10 +54,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "cellar", name: r("Mosel-Wäikeller", "Mosel-Weinkeller", "Moselle winery"), emoji: "🍇", objects: ["barrel", "table", "shelf", "crate", "plant", "chair", "bench", "carpet"],
-    rooms: [r("Fassraum", "Fasskeller", "Barrel cellar"), r("Degustatiounsraum", "Verkostungsraum", "Tasting room"), r("Flaschelager", "Flaschenlager", "Bottle store"),
-      r("Pressraum", "Presshaus", "Press house"), r("Terrass", "Terrasse", "Terrace"), r("Büro", "Büro", "Office"),
-      r("Rebbierg", "Weinberg", "Vineyard"), r("Kellerstuff", "Kellerstube", "Cellar parlour"), r("Verpackungshal", "Verpackungshalle", "Packing hall")],
+    id: "cellar", name: r("Mosel-Wäikeller", "Mosel-Weinkeller", "Moselle winery"), emoji: "🍇",
+    rooms: [r("Fassraum", "Fasskeller", "Barrel cellar", "barrelcellar"), r("Degustatiounsraum", "Verkostungsraum", "Tasting room", "tasting", r("Degustatioun", "Verkostung", "Tasting")), r("Flaschelager", "Flaschenlager", "Bottle store", "storeroom"),
+      r("Pressraum", "Presshaus", "Press house", "presshouse"), r("Terrass", "Terrasse", "Terrace", "terrace"), r("Büro", "Büro", "Office", "smalloffice"),
+      r("Rebbierg", "Weinberg", "Vineyard", "vineyard"), r("Kellerstuff", "Kellerstube", "Cellar parlour", "parlour", r("Keller", "Keller", "Cellar")), r("Verpackungshal", "Verpackungshalle", "Packing hall", "packing", r("Verpackung", "Packhalle", "Packing"))],
     cases: [
       { title: r("De Wäin, dee verschwonn ass", "Der Wein, der verschwand", "The Wine That Went Missing"),
         story: r("{K} hat de beschte Crémant vum Joer zum eegene gemaach – bis {v} d'Fläschen gezielt huet. Zielen ass geféierlech.",
@@ -70,10 +70,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "station", name: r("Gare", "Bahnhof", "Train station"), emoji: "🚉", objects: ["bench", "table", "shelf", "crate", "plant", "chair", "carpet", "fountain"],
-    rooms: [r("Schalterhal", "Schalterhalle", "Ticket hall"), r("Waardesall", "Wartesaal", "Waiting room"), r("Gare-Bistro", "Bahnhofsbistro", "Station bistro"),
-      r("Kiosk", "Kiosk", "Kiosk"), r("Quai 1", "Gleis 1", "Platform 1"), r("Gepäckdepot", "Gepäckaufbewahrung", "Left luggage"),
-      r("Passerell", "Unterführung", "Underpass"), r("Stationsbüro", "Stationsbüro", "Station office"), r("Fahrradkeller", "Fahrradkeller", "Bike cellar")],
+    id: "station", name: r("Gare", "Bahnhof", "Train station"), emoji: "🚉",
+    rooms: [r("Schalterhal", "Schalterhalle", "Ticket hall", "tickethall"), r("Waardesall", "Wartesaal", "Waiting room", "waiting"), r("Gare-Bistro", "Bahnhofsbistro", "Station bistro", "cafe"),
+      r("Kiosk", "Kiosk", "Kiosk", "kiosk"), r("Quai 1", "Gleis 1", "Platform 1", "platform"), r("Gepäckdepot", "Gepäckaufbewahrung", "Left luggage", "storeroom", r("Depot", "Gepäck", "Luggage")),
+      r("Passerell", "Unterführung", "Underpass", "underpass"), r("Stationsbüro", "Stationsbüro", "Station office", "smalloffice"), r("Fahrradkeller", "Fahrradkeller", "Bike cellar", "storeroom")],
     cases: [
       { title: r("Den Zuch, dee keen huet kënne verpassen", "Der Zug, den keiner verpassen konnte", "The Train Nobody Could Miss"),
         story: r("{K} huet d'Auer an der Waardesall fënnef Minutte virgestallt, fir dass {v} den Zuch verpasst. {V} ass awer mam Taxi ukomm – an huet alles gesinn.",
@@ -86,10 +86,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "bistro", name: r("Bistro am Grund", "Bistro im Grund", "Bistro in the Grund"), emoji: "🥐", objects: ["table", "barrel", "shelf", "stove", "plant", "chair", "bench", "carpet", "crate"],
-    rooms: [r("Theke", "Theke", "Bar counter"), r("Gaart", "Biergarten", "Beer garden"), r("Kichen", "Küche", "Kitchen"),
-      r("Kellerstuff", "Kellerstube", "Cellar room"), r("Billardsstuff", "Billardzimmer", "Billiard room"), r("Stammdësch-Eck", "Stammtisch-Ecke", "Regulars' corner"),
-      r("Terrass", "Terrasse", "Terrace"), r("Spullkichen", "Spülküche", "Scullery"), r("Lager", "Lager", "Storeroom")],
+    id: "bistro", name: r("Bistro am Grund", "Bistro im Grund", "Bistro in the Grund"), emoji: "🥐",
+    rooms: [r("Theke", "Theke", "Bar counter", "bar"), r("Gaart", "Biergarten", "Beer garden", "beergarden"), r("Kichen", "Küche", "Kitchen", "kitchen"),
+      r("Kellerstuff", "Kellerstube", "Cellar room", "parlour", r("Keller", "Keller", "Cellar")), r("Billardsstuff", "Billardzimmer", "Billiard room", "games"), r("Stammdësch-Eck", "Stammtisch-Ecke", "Regulars' corner", "cafe", r("Stammdësch", "Stammtisch", "Regulars")),
+      r("Terrass", "Terrasse", "Terrace", "terrace"), r("Spullkichen", "Spülküche", "Scullery", "scullery"), r("Lager", "Lager", "Storeroom", "storeroom")],
     cases: [
       { title: r("D'Bouneschlupp vum Verdacht", "Die verdächtige Bouneschlupp", "The Suspicious Bean Soup"),
         story: r("{K} hat eng Prise Salz ze vill an d'Bouneschlupp gedoen, fir dass {v} d'Rezept net mat heem hëlt. De Plang ass ganz anescht opgaangen.",
@@ -102,10 +102,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "school", name: r("Lycée", "Schule", "School"), emoji: "🏫", objects: ["table", "shelf", "plant", "tree", "crate", "chair", "bench", "carpet", "fountain"],
-    rooms: [r("Klassesall", "Klassenzimmer", "Classroom"), r("Gank", "Flur", "Hallway"), r("Bibliothéik", "Bibliothek", "Library"),
-      r("Turnhal", "Turnhalle", "Gym"), r("Kantin", "Mensa", "Canteen"), r("Lehrerzëmmer", "Lehrerzimmer", "Staff room"),
-      r("Labo", "Labor", "Science lab"), r("Pausenhaff", "Pausenhof", "Schoolyard"), r("Informatiksall", "Computerraum", "Computer room")],
+    id: "school", name: r("Lycée", "Schule", "School"), emoji: "🏫",
+    rooms: [r("Klassesall", "Klassenzimmer", "Classroom", "classroom"), r("Gank", "Flur", "Hallway", "hallway"), r("Bibliothéik", "Bibliothek", "Library", "library"),
+      r("Turnhal", "Turnhalle", "Gym", "gym"), r("Kantin", "Mensa", "Canteen", "canteen"), r("Lehrerzëmmer", "Lehrerzimmer", "Staff room", "staffroom"),
+      r("Labo", "Labor", "Science lab", "lab"), r("Pausenhaff", "Pausenhof", "Schoolyard", "schoolyard"), r("Informatiksall", "Computerraum", "Computer room", "computerroom")],
     cases: [
       { title: r("D'Hausaufgab, déi verschwonn ass", "Die Hausaufgabe, die verschwand", "The Homework That Vanished"),
         story: r("{K} hat keng Hausaufgab gemaach an huet {vd} säi Heft ofgeschriwwen. {V} huet dat gemierkt, an doheem war et net méi lëschteg.",
@@ -118,10 +118,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "bakery", name: r("Bäckerei", "Bäckerei", "Bakery"), emoji: "🥖", objects: ["table", "shelf", "stove", "crate", "barrel", "plant", "chair", "bench", "carpet"],
-    rooms: [r("Verkafsraum", "Verkaufsraum", "Shop floor"), r("Bakstuff", "Backstube", "Bakehouse"), r("Mielelager", "Mehllager", "Flour store"),
-      r("Café-Eck", "Café-Ecke", "Café corner"), r("Büro", "Büro", "Office"), r("Hannerhaff", "Hinterhof", "Back yard"),
-      r("Kältraum", "Kühlraum", "Cold room"), r("Liwwerraum", "Lieferraum", "Delivery bay"), r("Tuertenatelier", "Tortenatelier", "Cake studio")],
+    id: "bakery", name: r("Bäckerei", "Bäckerei", "Bakery"), emoji: "🥖",
+    rooms: [r("Verkafsraum", "Verkaufsraum", "Shop floor", "shop", r("Verkaf", "Verkauf", "Shop floor")), r("Bakstuff", "Backstube", "Bakehouse", "bakehouse"), r("Mielelager", "Mehllager", "Flour store", "storeroom"),
+      r("Café-Eck", "Café-Ecke", "Café corner", "cafe"), r("Büro", "Büro", "Office", "smalloffice"), r("Hannerhaff", "Hinterhof", "Back yard", "backyard"),
+      r("Kältraum", "Kühlraum", "Cold room", "coldroom"), r("Liwwerraum", "Lieferraum", "Delivery bay", "delivery"), r("Tuertenatelier", "Tortenatelier", "Cake studio", "cakestudio")],
     cases: [
       { title: r("D'Verbriechen um Croissant", "Das Verbrechen am Croissant", "The Croissant Crime"),
         story: r("{K} wollt dat leschte Croissant vun der Moies fir sech – a {v} hat schonn eng Hand drop. Zënter deem gëtt an der Bakstuff net méi gedeelt.",
@@ -134,10 +134,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "chalet", name: r("Ski-Chalet", "Ski-Chalet", "Ski chalet"), emoji: "🎿", objects: ["table", "shelf", "stove", "tree", "rock", "barrel", "bed", "chair", "bench", "carpet", "plant"],
-    rooms: [r("Stuff", "Stube", "Parlour"), r("Kichen", "Küche", "Kitchen"), r("Bar", "Bar", "Bar"),
-      r("Sauna", "Sauna", "Sauna"), r("Terrass", "Terrasse", "Terrace"), r("Skiraum", "Skiraum", "Ski room"),
-      r("Schlofzëmmer", "Schlafzimmer", "Bedroom"), r("Spillzëmmer", "Spielzimmer", "Games room"), r("Entrée", "Eingangshalle", "Entrance hall")],
+    id: "chalet", name: r("Ski-Chalet", "Ski-Chalet", "Ski chalet"), emoji: "🎿",
+    rooms: [r("Stuff", "Stube", "Parlour", "lounge"), r("Kichen", "Küche", "Kitchen", "kitchen"), r("Bar", "Bar", "Bar", "bar"),
+      r("Sauna", "Sauna", "Sauna", "sauna"), r("Terrass", "Terrasse", "Terrace", "terrace"), r("Skiraum", "Skiraum", "Ski room", "skiroom"),
+      r("Schlofzëmmer", "Schlafzimmer", "Bedroom", "bedroom"), r("Spillzëmmer", "Spielzimmer", "Games room", "games"), r("Entrée", "Eingangshalle", "Entrance hall", "entrance")],
     cases: [
       { title: r("Schnéi, Fondue a Verdacht", "Schnee, Fondue und Verdacht", "Snow, Fondue and Suspicion"),
         story: r("{K} huet dat lescht Stéck Brout an de Fondue fale gelooss – genee dann, wéi {v} dat selwecht gemaach huet. Wien dat gewonnen huet, wësse mir elo.",
@@ -150,10 +150,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "xmas", name: r("Chrëschtmaart", "Weihnachtsmarkt", "Christmas market"), emoji: "🎄", objects: ["table", "barrel", "crate", "tree", "fountain", "chair", "bench", "hay", "carpet", "plant"],
-    rooms: [r("Glühwäinstand", "Glühweinstand", "Mulled-wine stand"), r("Krëppchen", "Krippe", "Nativity scene"), r("Eisbunn", "Eisbahn", "Ice rink"),
-      r("Bratwurschtbud", "Bratwurstbude", "Sausage stall"), r("Chrëschtbam-Plaz", "Weihnachtsbaum-Platz", "Christmas-tree square"), r("Kannerkarussell", "Kinderkarussell", "Merry-go-round"),
-      r("Marktstrooss", "Marktgasse", "Market lane"), r("Plätzchenstand", "Plätzchenstand", "Cookie stall"), r("Wärmeeck", "Wärmeecke", "Warm-up corner")],
+    id: "xmas", name: r("Chrëschtmaart", "Weihnachtsmarkt", "Christmas market"), emoji: "🎄",
+    rooms: [r("Glühwäinstand", "Glühweinstand", "Mulled-wine stand", "drinkstall", r("Glühwäin", "Glühwein", "Mulled wine")), r("Krëppchen", "Krippe", "Nativity scene", "nativity", r("Krëppchen", "Krippe", "Nativity")), r("Eisbunn", "Eisbahn", "Ice rink", "icerink"),
+      r("Bratwurschtbud", "Bratwurstbude", "Sausage stall", "foodstalls", r("Bratwurscht", "Bratwurst", "Sausages")), r("Chrëschtbam-Plaz", "Weihnachtsbaum-Platz", "Christmas-tree square", "square", r("Chrëschtbam", "Weihnachtsbaum", "Tree square")), r("Kannerkarussell", "Kinderkarussell", "Merry-go-round", "ride", r("Karussell", "Karussell", "Carousel")),
+      r("Marktstrooss", "Marktgasse", "Market lane", "market"), r("Plätzchenstand", "Plätzchenstand", "Cookie stall", "foodstalls", r("Plätzchen", "Plätzchen", "Cookies")), r("Wärmeeck", "Wärmeecke", "Warm-up corner", "warmcorner")],
     cases: [
       { title: r("Mord um Chrëschtmaart", "Mord auf dem Weihnachtsmarkt", "Murder at the Christmas Market"),
         story: r("{K} huet de leschte Becher Glühwäin ugefaang – an {v} huet gesot, dat wier säin. Beim Chrëschtmaart gëtt et Fridden, awer net beim Glühwäin.",
@@ -166,10 +166,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "park", name: r("Stadpark", "Stadtpark", "City park"), emoji: "🌳", objects: ["tree", "rock", "fountain", "plant", "bench", "table", "chair", "hay", "crate"],
-    rooms: [r("Rousegaart", "Rosengarten", "Rose garden"), r("Entetäich", "Entenweiher", "Duck pond"), r("Spillplaz", "Spielplatz", "Playground"),
-      r("Pavillon", "Pavillon", "Pavilion"), r("Kiosk", "Kiosk", "Kiosk"), r("Bänkeck", "Bankecke", "Bench corner"),
-      r("Ënner der Bréck", "Unter der Brücke", "Under the bridge"), r("Picknickwiss", "Picknickwiese", "Picnic meadow"), r("Boulesplaz", "Boulebahn", "Boules court")],
+    id: "park", name: r("Stadpark", "Stadtpark", "City park"), emoji: "🌳",
+    rooms: [r("Rousegaart", "Rosengarten", "Rose garden", "rosegarden"), r("Entetäich", "Entenweiher", "Duck pond", "pond"), r("Spillplaz", "Spielplatz", "Playground", "playground"),
+      r("Pavillon", "Pavillon", "Pavilion", "pavilion"), r("Kiosk", "Kiosk", "Kiosk", "kioskout"), r("Bänkeck", "Bankecke", "Bench corner", "benchcorner"),
+      r("Ënner der Bréck", "Unter der Brücke", "Under the bridge", "underbridge", r("Ënner Bréck", "Brücke", "Under bridge")), r("Picknickwiss", "Picknickwiese", "Picnic meadow", "picnic"), r("Boulesplaz", "Boulebahn", "Boules court", "boules")],
     cases: [
       { title: r("D'Entefudder-Déif", "Der Fall der Entenfutter-Diebe", "The Case of the Duck-Food Thieves"),
         story: r("{K} huet d'Entefudder verkaaft, dat {v} gesammelt hat. D'Enten hu sech net beschwéiert, {v} awer ëmsou méi.",
@@ -182,10 +182,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "castle", name: r("Schlass", "Burg", "Castle"), emoji: "🏰", objects: ["table", "shelf", "barrel", "stove", "fountain", "plant", "rock", "chair", "bench", "bed", "carpet", "crate"],
-    rooms: [r("Rittersall", "Rittersaal", "Great hall"), r("Schlosskichen", "Schlossküche", "Castle kitchen"), r("Waffekummer", "Waffenkammer", "Armoury"),
-      r("Kapell", "Kapelle", "Chapel"), r("Tuerm", "Turm", "Tower"), r("Schlassgaart", "Schlossgarten", "Castle garden"),
-      r("Kierker", "Verlies", "Dungeon"), r("Bibliothéik", "Bibliothek", "Library"), r("Haff", "Burghof", "Courtyard")],
+    id: "castle", name: r("Schlass", "Burg", "Castle"), emoji: "🏰",
+    rooms: [r("Rittersall", "Rittersaal", "Great hall", "greathall"), r("Schlosskichen", "Schlossküche", "Castle kitchen", "castlekitchen"), r("Waffekummer", "Waffenkammer", "Armoury", "armoury"),
+      r("Kapell", "Kapelle", "Chapel", "chapel"), r("Tuerm", "Turm", "Tower", "tower"), r("Schlassgaart", "Schlossgarten", "Castle garden", "garden"),
+      r("Kierker", "Verlies", "Dungeon", "dungeon"), r("Bibliothéik", "Bibliothek", "Library", "library"), r("Haff", "Burghof", "Courtyard", "courtyard")],
     cases: [
       { title: r("De Spuk um Rittersall", "Der Spuk im Rittersaal", "The Ghost in the Great Hall"),
         story: r("{K} huet sech als Schlassgeescht verkleed, fir dass {v} d'Schlass verléisst. Geschafft huet et – {v} war an enger Minutt dobaussen, mat engem Foto.",
@@ -198,10 +198,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "cinema", name: r("Kino", "Kino", "Cinema"), emoji: "🎬", objects: ["chair", "carpet", "table", "shelf", "plant", "crate", "bench", "barrel"],
-    rooms: [r("Foyer", "Foyer", "Foyer"), r("Kinosall", "Kinosaal", "Screening room"), r("Popcornbar", "Popcornbar", "Popcorn bar"),
-      r("Projektiounsraum", "Vorführraum", "Projection booth"), r("Kees", "Kasse", "Box office"), r("Lagerraum", "Lagerraum", "Storeroom"),
-      r("Technikraum", "Technikraum", "Tech room"), r("VIP-Loge", "VIP-Loge", "VIP lounge"), r("Spillautomaten", "Spielautomaten", "Arcade nook")],
+    id: "cinema", name: r("Kino", "Kino", "Cinema"), emoji: "🎬",
+    rooms: [r("Foyer", "Foyer", "Foyer", "foyer"), r("Kinosall", "Kinosaal", "Screening room", "screening"), r("Popcornbar", "Popcornbar", "Popcorn bar", "snackbar"),
+      r("Projektiounsraum", "Vorführraum", "Projection booth", "booth", r("Projektioun", "Vorführraum", "Projection")), r("Kees", "Kasse", "Box office", "boxoffice"), r("Lagerraum", "Lagerraum", "Storeroom", "storeroom"),
+      r("Technikraum", "Technikraum", "Tech room", "techroom"), r("VIP-Loge", "VIP-Loge", "VIP lounge", "vip"), r("Spillautomaten", "Spielautomaten", "Arcade nook", "arcade", r("Automaten", "Automaten", "Arcade"))],
     cases: [
       { title: r("De Film, dee keen ze gesi krut", "Der Film, den keiner sehen durfte", "The Film Nobody Was Allowed to See"),
         story: r("{K} huet den Enn vum Film verroden, laang virum Ofspillen. {V} huet dat ni vergiess a verstreet d'Popcorn.",
@@ -214,10 +214,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "camping", name: r("Camping", "Campingplatz", "Campsite"), emoji: "⛺", objects: ["tree", "car", "rock", "table", "bench", "chair", "hay", "barrel", "plant", "fountain"],
-    rooms: [r("Zelterwiss", "Zeltwiese", "Tent field"), r("Waschraum", "Waschhaus", "Wash house"), r("Rezeptioun", "Rezeption", "Reception"),
-      r("Grillplaz", "Grillplatz", "BBQ area"), r("Spillplaz", "Spielplatz", "Playground"), r("Séiplaz", "Seeufer", "Lakeshore"),
-      r("Camperrei", "Wohnwagenreihe", "Caravan row"), r("Gemeinschaftskichen", "Gemeinschaftsküche", "Camp kitchen"), r("Parkplaz", "Parkplatz", "Car park")],
+    id: "camping", name: r("Camping", "Campingplatz", "Campsite"), emoji: "⛺",
+    rooms: [r("Zelterwiss", "Zeltwiese", "Tent field", "tentfield"), r("Waschraum", "Waschhaus", "Wash house", "washhouse"), r("Rezeptioun", "Rezeption", "Reception", "reception"),
+      r("Grillplaz", "Grillplatz", "BBQ area", "bbq"), r("Spillplaz", "Spielplatz", "Playground", "playground"), r("Séiplaz", "Seeufer", "Lakeshore", "lakeshore"),
+      r("Camperrei", "Wohnwagenreihe", "Caravan row", "caravans", r("Camperrei", "Wohnwagen", "Caravans")), r("Gemeinschaftskichen", "Gemeinschaftsküche", "Camp kitchen", "kitchen", r("Campkichen", "Campküche", "Camp kitchen")), r("Parkplaz", "Parkplatz", "Car park", "carpark")],
     cases: [
       { title: r("D'Rätsel vum verschwonnene Zelt", "Das Rätsel des verschwundenen Zeltes", "The Riddle of the Vanished Tent"),
         story: r("{K} huet d'Seeler vum Zelt vun {vd} geléist, fir dass et beim nächste Wand fortfléit. De Wand huet matgespillt – méi wéi geplangt.",
@@ -230,10 +230,10 @@ export const SCENES = [
     ],
   },
   {
-    id: "museum", name: r("Konschtmusée", "Kunstmuseum", "Art museum"), emoji: "🖼️", objects: ["shelf", "table", "plant", "fountain", "rock", "crate", "bench", "chair", "carpet"],
-    rooms: [r("Galerie", "Galerie", "Gallery"), r("Skulpturesall", "Skulpturensaal", "Sculpture hall"), r("Café", "Café", "Café"),
-      r("Museumsshop", "Museumsshop", "Museum shop"), r("Depot", "Depot", "Storage vault"), r("Atelier", "Atelier", "Studio"),
-      r("Innenhaff", "Innenhof", "Inner courtyard"), r("Auditorium", "Auditorium", "Auditorium"), r("Restauratiounsraum", "Restaurierungswerkstatt", "Restoration lab")],
+    id: "museum", name: r("Konschtmusée", "Kunstmuseum", "Art museum"), emoji: "🖼️",
+    rooms: [r("Galerie", "Galerie", "Gallery", "gallery"), r("Skulpturesall", "Skulpturensaal", "Sculpture hall", "sculptures"), r("Café", "Café", "Café", "cafe"),
+      r("Museumsshop", "Museumsshop", "Museum shop", "mshop"), r("Depot", "Depot", "Storage vault", "storeroom"), r("Atelier", "Atelier", "Studio", "studio"),
+      r("Innenhaff", "Innenhof", "Inner courtyard", "innercourt", r("Innenhaff", "Innenhof", "Courtyard")), r("Auditorium", "Auditorium", "Auditorium", "auditorium"), r("Restauratiounsraum", "Restaurierungswerkstatt", "Restoration lab", "restoration", r("Restauratioun", "Restaurierung", "Restoration"))],
     cases: [
       { title: r("De Fall vum falsche Portrait", "Der Fall des falschen Porträts", "The Case of the Fake Portrait"),
         story: r("{K} huet dat berühmt Gemälde mat enger Kopie vun {vd} ausgetosch. D'Kopie war besser wéi d'Original – dat wollt kee gesinn.",

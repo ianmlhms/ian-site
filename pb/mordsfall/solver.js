@@ -13,8 +13,10 @@
  *   5  "what if" probing: try every cell of one person, drop the cells that lead to a contradiction at level 4
  *   6  needs deeper guessing (search)
  */
-export const BLOCKING = ["table", "shelf", "tree", "rock", "car", "fountain", "barrel", "plant", "crate", "stove"];
-export const STANDABLE = ["chair", "carpet", "bench", "bed", "hay"];
+export const BLOCKING = ["table", "shelf", "tree", "rock", "car", "fountain", "barrel", "plant", "crate", "stove",
+  "heater", "bucket", "fridge", "counter", "parasol", "tent", "campfire", "tap", "desk", "copier", "board", "stall", "bin",
+  "carousel", "press", "sink", "grill", "slide"];
+export const STANDABLE = ["chair", "carpet", "bench", "bed", "hay", "stool", "deckchair", "mat", "sandbox"];
 export const isBlocking = (type) => BLOCKING.includes(type);
 
 const UNARY = new Set(["in", "notin", "near", "notnear", "on", "row", "col"]);
@@ -208,10 +210,11 @@ export function propagate(m, dom, level = 5, trace = null) {
 }
 
 /* ---------- search ---------- */
-export function solve(m, { limit = 2, level = 5, givens = null } = {}) {
+export function solve(m, { limit = 2, level = 5, givens = null, maxNodes = Infinity } = {}) {
   const sols = [];
-  let nodes = 0, depthMax = 0;
+  let nodes = 0, depthMax = 0, aborted = false;
   const rec = (dom, depth) => {
+    if (aborted || nodes >= maxNodes) { aborted = true; return; }
     nodes++;
     if (depth > depthMax) depthMax = depth;
     if (!propagate(m, dom, level)) return;
@@ -230,7 +233,7 @@ export function solve(m, { limit = 2, level = 5, givens = null } = {}) {
     }
   };
   rec(initialDomains(m, givens), 0);
-  return { count: sols.length, solutions: sols, nodes, depth: depthMax };
+  return { count: aborted ? -1 : sols.length, solutions: sols, nodes, depth: depthMax, aborted };
 }
 
 /* "What if" step: a candidate cell that makes plain propagation (level 4) fail is wrong. Repeats until stable. */

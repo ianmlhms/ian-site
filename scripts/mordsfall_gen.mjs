@@ -15,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildModel, solve, grade, initialDomains, propagate, STANDABLE, BLOCKING, isBlocking } from "../pb/mordsfall/solver.js";
 import { SCENES, NAMES } from "../pb/mordsfall/scenes.js";
+import { KINDS, CASE_CAPS, PAIRS } from "../pb/mordsfall/rooms.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -50,17 +51,22 @@ function genGrid(n, k, rng) {
   let rects = [{ r0: 0, c0: 0, r1: n, c1: n }];
   const extra = k >= 6 ? 2 : 1;
   while (rects.length < k + extra) {
-    const splittable = rects.filter((q) => q.r1 - q.r0 >= 2 || q.c1 - q.c0 >= 2);
+    // prefer cuts that leave both parts at least 2 cells wide; thin rooms only when nothing else is left
+    const roomy = rects.filter((q) => q.r1 - q.r0 >= 4 || q.c1 - q.c0 >= 4);
+    const any = rects.filter((q) => q.r1 - q.r0 >= 2 || q.c1 - q.c0 >= 2);
+    const splittable = roomy.length ? roomy : any;
     if (!splittable.length) return null;
     const area = (q) => (q.r1 - q.r0) * (q.c1 - q.c0);
     const q = weighted(rng, splittable, (x) => area(x) ** 2);
     const h = q.r1 - q.r0, w = q.c1 - q.c0;
-    const horizontal = h > w ? rng() < 0.75 : h < w ? rng() < 0.25 : rng() < 0.5;
-    const axisOk = (horizontal ? h : w) >= 2;
-    const useH = axisOk ? horizontal : !horizontal;
-    const len = useH ? h : w, cut = 1 + Math.floor(rng() * (len - 1));
+    const canH = roomy.length ? h >= 4 : h >= 2, canW = roomy.length ? w >= 4 : w >= 2;
+    const horizontal = canH && canW ? (h > w ? rng() < 0.75 : h < w ? rng() < 0.25 : rng() < 0.5) : canH;
+    const len = horizontal ? h : w;
+    const lo = roomy.length ? 2 : 1, hi = roomy.length ? len - 2 : len - 1;
+    const cuts = []; for (let c = lo; c <= hi; c++) cuts.push(c);
+    const cut = weighted(rng, cuts, (c) => 1 + Math.min(c, len - c));
     rects = rects.filter((x) => x !== q);
-    if (useH) rects.push({ ...q, r1: q.r0 + cut }, { ...q, r0: q.r0 + cut });
+    if (horizontal) rects.push({ ...q, r1: q.r0 + cut }, { ...q, r0: q.r0 + cut });
     else rects.push({ ...q, c1: q.c0 + cut }, { ...q, c0: q.c0 + cut });
   }
   let regions = rects.map((q) => { const s = new Set(); for (let r = q.r0; r < q.r1; r++) for (let c = q.c0; c < q.c1; c++) s.add(r * n + c); return s; });
@@ -75,6 +81,10 @@ function genGrid(n, k, rng) {
   }
   const maxSize = Math.floor(n * n * 0.42) + 1;
   if (regions.some((s) => s.size < 3 || s.size > maxSize)) return null;
+  // compact rooms: every room holds a 2x2 block of cells, except at most one small corridor (3 cells or fewer)
+  const has2x2 = (set) => { for (const i of set) { if (i % n < n - 1 && set.has(i + 1) && set.has(i + n) && set.has(i + n + 1)) return true; } return false; };
+  const thin = regions.filter((set) => !has2x2(set));
+  if (thin.length > 1 || thin.some((set) => set.size > 3)) return null;
   regions.sort((x, y) => Math.min(...x) - Math.min(...y));
   const cell = new Array(n * n);
   regions.forEach((s, id) => { for (const i of s) cell[i] = id; });
@@ -83,30 +93,52 @@ function genGrid(n, k, rng) {
   return rows;
 }
 
-/* ---------- objects ---------- */
-function genObjects(n, scene, rng) {
-  const N = n * n;
-  const total = Math.round(N * (0.22 + rng() * 0.1));
-  const palette = shuffle(rng, scene.objects);
-  const blocking = palette.filter(isBlocking).slice(0, n >= 8 ? 4 : 3);
-  const standable = palette.filter((t) => !isBlocking(t)).slice(0, 3);
-  if (blocking.length < 2 || standable.length < 1) return null;
-  const kinds = [...blocking, ...standable];
+/* ---------- objects: each room draws only from its own kind's palette (pb/mordsfall/rooms.js) ---------- */
+function genObjects(n, grid, rooms, rng) {
+  const N = n * n, density = 0.24 + rng() * 0.1;
+  const roomCells = rooms.map(() => []);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) roomCells[parseInt(grid[r][c], 36)].push([r, c]);
   const blockedRow = new Array(n).fill(0), blockedCol = new Array(n).fill(0);
-  const used = new Set(), objects = [];
-  let guard = 0;
-  while (objects.length < total && guard++ < 400) {
-    const i = Math.floor(rng() * N), r = Math.floor(i / n), c = i % n;
-    if (used.has(i)) continue;
-    // the first objects cycle through the kinds so that every kind shows up
-    const type = objects.length < kinds.length ? kinds[objects.length] : weighted(rng, kinds, (t) => (isBlocking(t) ? 1.3 : 1));
-    if (isBlocking(type)) {
-      if (blockedRow[r] >= n - 3 || blockedCol[c] >= n - 3) continue;
-      blockedRow[r]++; blockedCol[c]++;
+  const taken = new Set(), objects = [], caseCount = {};
+  const cap = (t) => CASE_CAPS[t] ?? 99;
+  for (const id of shuffle(rng, rooms.map((_, i) => i))) {
+    const kind = KINDS[rooms[id].kind];
+    const cells = roomCells[id];
+    const capacity = [...kind.block, ...kind.stand].reduce((a, [, m]) => a + m, 0);
+    let target = Math.round(cells.length * density + (rng() - 0.5) * 1.2);
+    target = Math.max(cells.length >= 4 ? 1 : 0, Math.min(target, capacity));
+    const nStand = kind.stand.length ? Math.round(target * (kind.block.length ? 0.4 : 1)) : 0;
+    const counts = {};
+    const here = []; // blocking objects placed in this room, for pairing
+    const free = () => cells.filter(([r, c]) => !taken.has(r * n + c));
+    const place = (type, r, c, isBlocking) => {
+      taken.add(r * n + c); objects.push([r, c, type]);
+      counts[type] = (counts[type] || 0) + 1; caseCount[type] = (caseCount[type] || 0) + 1;
+      if (isBlocking) { blockedRow[r]++; blockedCol[c]++; here.push([r, c, type]); }
+    };
+    const okBlock = (r, c) => blockedRow[r] < n - 3 && blockedCol[c] < n - 3;
+    for (let k = 0; k < target - nStand; k++) {
+      const pool = kind.block.filter(([t, m]) => (counts[t] || 0) < m && (caseCount[t] || 0) < cap(t));
+      const spots = free().filter(([r, c]) => okBlock(r, c));
+      if (!pool.length || !spots.length) break;
+      const [type] = weighted(rng, pool, ([, m]) => m);
+      const [r, c] = pick(rng, spots);
+      place(type, r, c, true);
     }
-    used.add(i); objects.push([r, c, type]);
+    for (let k = 0; k < nStand; k++) {
+      const pool = kind.stand.filter(([t, m]) => (counts[t] || 0) < m && (caseCount[t] || 0) < cap(t));
+      const spots = free();
+      if (!pool.length || !spots.length) break;
+      const [type] = weighted(rng, pool, ([, m]) => m);
+      // seats like to stand beside a table / desk / counter of their own room
+      const likes = (PAIRS[type] || []);
+      const near = spots.filter(([r, c]) => here.some(([hr, hc, ht]) => likes.includes(ht) && Math.abs(hr - r) + Math.abs(hc - c) === 1));
+      const [r, c] = near.length && rng() < 0.9 ? pick(rng, near) : pick(rng, spots);
+      place(type, r, c, false);
+    }
   }
-  if (objects.length < total - 2) return null;
+  const stands = objects.filter((o) => !isBlocking(o[2])).length;
+  if (stands < 3 || objects.length < N * 0.15) return null;
   objects.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   return objects;
 }
@@ -162,6 +194,7 @@ function cluePool(cs, m, sol, p) {
 const clueKey = (c) => JSON.stringify(c);
 const clueCount = (cs) => cs.people.reduce((a, p) => a + p.clues.length, 0);
 
+const NODE_CAP = 6000; // a clue set that needs a bigger search than this is treated as 'not unique yet' (also keeps it playable)
 const SAMPLE = Number(argVal("--sample", 30));
 export const FAIL = {};
 const fail = (why) => { FAIL[why] = (FAIL[why] || 0) + 1; return null; };
@@ -171,7 +204,8 @@ function makeCase(tier, scene, caseText, rng) {
   const k = tier.rooms[0] + Math.floor(rng() * (tier.rooms[1] - tier.rooms[0] + 1));
   const grid = genGrid(n, k, rng);
   if (!grid) return fail('layout');
-  const objects = genObjects(n, scene, rng);
+  const roomPick = shuffle(rng, scene.rooms).slice(0, k);
+  const objects = genObjects(n, grid, roomPick, rng);
   if (!objects) return fail('objects');
   const blocked = new Set(objects.filter((o) => isBlocking(o[2])).map((o) => o[0] * n + o[1]));
   const sol = genSolution(n, grid, blocked, rng);
@@ -183,7 +217,7 @@ function makeCase(tier, scene, caseText, rng) {
   const order = shuffle(rng, sol.cells.map((_, i) => i));
   const vi = order.findIndex((ri) => sol.cells[ri][0] === sol.victimCell[0]);
   order.unshift(order.splice(vi, 1)[0]); // victim to index 0
-  const roomNames = shuffle(rng, scene.rooms).slice(0, k);
+  const roomNames = roomPick.map(({ kind, ...rest }) => rest);
   const cs = {
     id: "", scene: scene.id, diff: 0, n, title: caseText.title, story: caseText.story,
     rooms: roomNames, grid, objects, victim: 0,
@@ -200,7 +234,7 @@ function makeCase(tier, scene, caseText, rng) {
   const measure = () => { const dom = initialDomains(buildModel(cs)); if (!propagate(buildModel(cs), dom, 5)) return 1e9; return dom.reduce((a, d) => a + d.reduce((s, x) => s + x, 0), 0); };
   for (let guard = 0; guard < 60; guard++) {
     m = buildModel(cs);
-    const res = solve(m, { limit: 2 });
+    const res = solve(m, { limit: 2, maxNodes: NODE_CAP });
     if (res.count === 1) break;
     const open = cs.people.map((p, i) => i).filter((p) => cs.people[p].clues.length < 3);
     if (!open.length) return fail('too-many-clues');
@@ -218,7 +252,7 @@ function makeCase(tier, scene, caseText, rng) {
     if (!best) return fail('no-candidate');
     cs.people[best.p].clues.push(best.cand);
   }
-  if (solve(buildModel(cs), { limit: 2 }).count !== 1) return fail('not-unique');
+  if (solve(buildModel(cs), { limit: 2, maxNodes: NODE_CAP }).count !== 1) return fail('not-unique');
 
   // phase 2: drop redundant clues (some are kept on purpose on easy tiers)
   const all = [];
@@ -227,13 +261,16 @@ function makeCase(tier, scene, caseText, rng) {
     if (rng() < tier.keep) continue;
     const arr = cs.people[pi].clues, idx = arr.findIndex((c) => clueKey(c) === key);
     const removed = arr.splice(idx, 1)[0];
-    if (solve(buildModel(cs), { limit: 2 }).count !== 1) arr.splice(idx, 0, removed);
+    if (solve(buildModel(cs), { limit: 2, maxNodes: NODE_CAP }).count !== 1) arr.splice(idx, 0, removed);
   }
-  // easier tiers: top every person up to `fill` clues with extra true (hence harmless) clues
+  // everybody gets at least one clue (easier tiers: `fill`): extra true clues cannot break uniqueness.
+  // Somebody who would otherwise have none gets a flavourful one (a room, a seat, a neighbour) rather than a bare row number.
+  const FLAVOUR = { in: 5, on: 6, near: 4, notnear: 2, alone: 3, same: 2, north: 1, south: 1, east: 1, west: 1, notin: 1, row: 0.4, col: 0.4 };
   for (let p = 0; p < cs.people.length; p++) {
     let guard = 0;
-    while (cs.people[p].clues.length < Math.min(tier.fill, 3) && guard++ < 20) {
-      const cand = weighted(rng, pools[p].filter((c) => !have(p, c)), weight);
+    while (cs.people[p].clues.length < Math.max(1, Math.min(tier.fill, 3)) && guard++ < 20) {
+      const empty = cs.people[p].clues.length === 0;
+      const cand = weighted(rng, pools[p].filter((c) => !have(p, c)), empty ? (c) => FLAVOUR[c.t] ?? 1 : weight);
       if (cand) cs.people[p].clues.push(cand);
     }
   }
@@ -253,7 +290,9 @@ if (argVal("--stats", null)) {
   for (let i = 0; i < Number(countStr); i++) {
     const rng = mulberry32(mix(SEED, tier.n, i));
     const scene = SCENES[i % SCENES.length];
+    const t0 = Date.now();
     const out = makeCase(tier, scene, scene.cases[0], rng);
+    if (args.includes('--verbose')) console.log(i, scene.id, out ? 'ok' : 'fail', Date.now() - t0, 'ms');
     if (!out) continue;
     made++;
     const key = `L${out.g.level} nodes${out.g.nodes > 3 ? ">3" : out.g.nodes} clues${clueCount(out.cs)}`;
