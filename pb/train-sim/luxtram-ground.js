@@ -539,6 +539,7 @@
       (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: 5.0 }));
       const roadGrid = rasterRoad(t, S, iA0, S.i.length);
       iMark = mark('asph', iMark);
+      const iS0 = S.i.length;
       (vec.s || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_PAVE, [1, 1, 1], MAT.PAVE, { maxSeg: 3.5, cullSteep: true }));
       iMark = mark('side', iMark);
       (vec.p || []).forEach((poly) => {
@@ -548,16 +549,38 @@
         drapePoly(t, S, rings, PATH_LIFT + aT, col, mat, { maxSeg: 3.2, cullSteep: code !== 3 });
       });
       iMark = mark('paths', iMark);
-      // kerbs: a 3D stone edge between the carriageway and the sidewalk (the data lists them with the sidewalk on the left of the direction of travel)
+      /* kerbs: a 3D stone edge between the carriageway and the sidewalk (the data lists them with the sidewalk on the left of the direction of travel).
+         A kerb with bare asphalt (no drawn sidewalk on top) on BOTH sides (0.4 m either way) is not a kerb: the data also holds kerb lines of islands and junction
+         mouths that run on across the carriageway, which showed as thin brown / dark lines across the road. Such stretches are cut out (kerbs to grass stay). */
+      const sideCover = coverRaster(t, S, iS0, S.i.length);
+      const bare = (x, z) => roadAt(t, roadGrid, x, z) && !coverAt(t, sideCover, x, z);       // drawn carriageway with no sidewalk on top
+      const kerbOk = (x, z, nx, nz) => !(bare(x - nx * 0.4, z - nz * 0.4) && bare(x + nx * 0.4, z + nz * 0.4));   // not a kerb with bare asphalt on both sides
+      const kerbRuns = [];
+      let kerbCutM = 0; let kerbKeptM = 0;
       (vec.k || []).forEach((flat) => {
         const pts = []; for (let i = 0; i + 1 < flat.length; i += 2) pts.push([x0 + flat[i] / 100, z0 + flat[i + 1] / 100]);
-        const dens = [];
+        if (pts.length < 2) return;
+        // 1.5 m samples; a sample is good unless bare asphalt lies on both sides of it
+        const sm = [];
         for (let i = 0; i < pts.length - 1; i++) {
-          const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); const k = Math.max(1, Math.ceil(l / 3));
-          for (let s = 0; s < k; s++) dens.push([pts[i][0] + (pts[i + 1][0] - pts[i][0]) * s / k, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * s / k]);
+          const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); const k = Math.max(1, Math.ceil(l / 1.5));
+          const dx = (pts[i + 1][0] - pts[i][0]) / (l || 1); const dz = (pts[i + 1][1] - pts[i][1]) / (l || 1);
+          for (let s = 0; s < k; s++) { const x = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * s / k; const z = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * s / k; const ok = kerbOk(x, z, dz, -dx); if (ok) kerbKeptM += 1.5; else kerbCutM += 1.5; if (window.__lgKerbDebug) drapeQuad(t, S, [x - 0.3, z - 0.3, x + 0.3, z - 0.3, x + 0.3, z + 0.3, x - 0.3, z + 0.3], L_PAINT + 0.03, ok ? [0, 0.9, 0] : [1, 0, 0], MAT.FLAT); sm.push({ p: [x, z], ok }); }
         }
-        dens.push(pts[pts.length - 1]);
-        if (dens.length < 2) return;
+        const lst = pts[pts.length - 1]; const ld = sm.length ? sm[sm.length - 1] : null;
+        sm.push({ p: lst, ok: ld ? ld.ok : false });
+        // runs of good samples; a single bad sample (a driveway dip, a data wobble) is bridged, a longer gap cuts the kerb
+        let run = [];
+        for (let i = 0; i < sm.length; i++) {
+          if (sm[i].ok) { run.push(sm[i].p); continue; }
+          const next = sm[i + 1];
+          if (run.length && next && next.ok) { run.push(sm[i].p); continue; }
+          if (run.length >= 4) kerbRuns.push(run);
+          run = [];
+        }
+        if (run.length >= 4) kerbRuns.push(run);
+      });
+      kerbRuns.forEach((dens) => {
         const base = S.count;
         for (let i = 0; i < dens.length; i++) {
           const a = dens[Math.max(0, i - 1)]; const b = dens[Math.min(dens.length - 1, i + 1)];
@@ -578,6 +601,7 @@
           S.i.push(a + 1, b + 1, b + 2, a + 1, b + 2, a + 2);   // top
         }
       });
+      grp.userData.kerb = { cutM: Math.round(kerbCutM), keptM: Math.round(kerbKeptM) };      // (test / audit read-out)
       iMark = mark('kerb', iMark);
       // paint: dashes, solid lines, zebra, bays
       (vec.m || []).forEach((m) => {
@@ -715,6 +739,43 @@
         sum += h * w; wsum += w;
       }
       return wsum > 0 ? sum / wsum : NaN;
+    }
+
+    /* coverage of the sidewalk / path triangles (acc.i from i0 to i1) as a 0.5 m cell mask of the tile; coverAt / roadAt read a mask / the road height grid at scene metres */
+    function coverRaster(t, acc, i0, i1) {
+      const m = new Uint8Array(RG * RG);
+      const P = acc.p; const I = acc.i;
+      for (let k = i0; k + 2 < i1; k += 3) {
+        const a = I[k] * 3; const b = I[k + 1] * 3; const c = I[k + 2] * 3;
+        const ax = P[a] - t.x0; const az = P[a + 2] - t.z0; const bx = P[b] - t.x0; const bz = P[b + 2] - t.z0; const cx = P[c] - t.x0; const cz = P[c + 2] - t.z0;
+        const det = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+        if (Math.abs(det) < 1e-9) continue;
+        const gx0 = Math.max(0, Math.floor(Math.min(ax, bx, cx) / RG_CELL - 0.5)); const gx1 = Math.min(RG - 1, Math.ceil(Math.max(ax, bx, cx) / RG_CELL - 0.5));
+        const gz0 = Math.max(0, Math.floor(Math.min(az, bz, cz) / RG_CELL - 0.5)); const gz1 = Math.min(RG - 1, Math.ceil(Math.max(az, bz, cz) / RG_CELL - 0.5));
+        for (let gz = gz0; gz <= gz1; gz++) {
+          const pz = (gz + 0.5) * RG_CELL;
+          for (let gx = gx0; gx <= gx1; gx++) {
+            const px = (gx + 0.5) * RG_CELL;
+            const l1 = ((bz - cz) * (px - cx) + (cx - bx) * (pz - cz)) / det;
+            const l2 = ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / det;
+            if (l1 < -0.02 || l2 < -0.02 || 1 - l1 - l2 < -0.02) continue;
+            m[gz * RG + gx] = 1;
+          }
+        }
+      }
+      return m;
+    }
+    function coverAt(t, m, x, z) {
+      const gx = Math.floor((x - t.x0) / RG_CELL); const gz = Math.floor((z - t.z0) / RG_CELL);
+      if (gx < 0 || gz < 0 || gx >= RG || gz >= RG) return true;      // beyond the tile edge: not decidable, keep the kerb
+      return m[gz * RG + gx] === 1;
+    }
+    function roadAt(t, rg, x, z) {
+      if (!rg) return false;
+      const gx = Math.floor((x - t.x0) / RG_CELL); const gz = Math.floor((z - t.z0) / RG_CELL);
+      if (gx < 0 || gz < 0 || gx >= RG || gz >= RG) return true;      // beyond the tile edge: not decidable, keep the kerb
+      const h = rg.g[gz * RG + gx];
+      return h === h;
     }
 
     /* painted lines (lane dividers, edge lines, dashes; not parking bays) rasterised once per tile into a 0.25 m mask: paintAt(t, x, z) = 1 where a line is drawn */

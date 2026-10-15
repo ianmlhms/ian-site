@@ -631,6 +631,39 @@ async function directionAndGearChecks(h, frame) {
   await key(h, 'f');
   h.expect(await frame.evaluate(() => document.getElementById('helpBody').textContent.includes('R') && document.getElementById('helpBody').innerHTML.includes('<kbd>F</kbd>') && document.getElementById('helpBody').innerHTML.includes('<kbd>R</kbd>')), 'the controls help lists R and F');
 
+  h.step('oncoming Luxtram never stands still: it dwells at Alphonse Weicker at most 45 s, then leaves - also while the player stands there with open doors and the handbrake on (route Findel - Kirchberg, night)');
+  {
+    await frame.evaluate(() => { const w = __tsTest.internals().world; w.env.hour = 22.5; w.landscape.setTimeOfDay(22.5); __tsTest.teleport(3); __tsTest.stopAtMarker(-0.5); });
+    await h.pause(1500);
+    await key(h, 'd');
+    await key(h, 'b');
+    await frame.waitForFunction(() => { const l = __tsTest.internals().world.landscape; return !l.pendingAhead || l.pendingAhead() === 0; }, null, { timeout: 30000 });
+    await frame.evaluate(() => TS.luxTraffic.last.prepareOncoming());
+    await frame.waitForFunction(() => { const st = TS.luxTraffic.last.state(); return st.baked && st.queue === 0; }, null, { timeout: 30000 });
+    const onc = await frame.evaluate(() => {
+      const lt = TS.luxTraffic.last; const { camera } = __tsTest.internals(); const ps = __tsTest.state().s;
+      const spawned = lt.spawnOncoming(280);
+      const rec = { spawned, parked: __tsTest.state().parkingBrake, doorsOpen: __tsTest.state().doorPhase, dwells: [], maxStill: 0, forced: 0, minLeft: 1e9, steps: 0, ended: '' };
+      let cur = null, still = 0, atStop = null;
+      for (let i = 0; i < 3000; i++) {   // 300 s of traffic time at 0.1 s
+        lt.update(0.1, ps, camera); rec.steps++;
+        const o = lt.state().oncoming;
+        if (!o) { rec.ended = 'despawned after ' + (i / 10).toFixed(0) + ' s'; break; }
+        rec.forced = o.forced;
+        still = o.v < 0.05 ? still + 0.1 : 0; rec.maxStill = Math.max(rec.maxStill, still);
+        if (o.phase === 'dwell') { if (!cur) cur = { t: 0, s: o.s }; cur.t += 0.1; }
+        else if (cur) { cur.leftTo = o.s; rec.dwells.push(cur); cur = null; }
+      }
+      rec.dwells = rec.dwells.map((d) => ({ t: +d.t.toFixed(1), s: Math.round(d.s) }));
+      return rec;
+    });
+    h.expect(onc.spawned && onc.dwells.length >= 1, 'an oncoming tram spawned, reached a stop and dwelled (' + JSON.stringify(onc.dwells) + ')');
+    h.expect(onc.dwells.every((d) => d.t <= 46), 'no dwell longer than 45 s (' + onc.dwells.map((d) => d.t).join(', ') + ' s)');
+    h.expect(onc.maxStill <= 46, 'the oncoming tram never stands still longer than a dwell (longest standstill ' + onc.maxStill.toFixed(1) + ' s; ' + onc.ended + ')');
+    h.expect(onc.forced === 0, 'the standstill watchdog never had to release it (' + onc.forced + ' releases)');
+    await key(h, 'b');
+  }
+
   h.step('endless hands over seamlessly: a real service end (doors, terminus exchange) continues with the next route, tram career');
   await frame.evaluate(() => __tsTest.toMenu());
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');

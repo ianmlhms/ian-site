@@ -1124,7 +1124,7 @@
     }
 
     /* ================================================================ oncoming Luxtrams */
-    const onc = { model: null, active: false, s: 0, dir: -1, v: 0, phase: 'run', dwell: 0, doors: 0, visited: null, stop: null, len: TRAM_LEN_FALLBACK, cd: 0, clock: 0, spawnTick: 0, night: -1, destName: '', vmax: 13 };
+    const onc = { model: null, active: false, s: 0, dir: -1, v: 0, phase: 'run', dwell: 0, doors: 0, visited: null, stop: null, len: TRAM_LEN_FALLBACK, cd: 0, clock: 0, spawnTick: 0, night: -1, destName: '', vmax: 13, still: 0, age: 0, forced: 0 };
     const stations = (track && track.stations) || [];
     const oppRange = () => (track && track.opposite && track.opposite.from !== undefined ? [track.opposite.from, track.opposite.to] : null);
     onc.trig = { s: 0, dir: -1, len: TRAM_LEN_FALLBACK, active: false };
@@ -1226,7 +1226,7 @@
       frameOn(sSpawn, fA);
       const h = surfaceAt(fA.pos.x, fA.pos.z);
       if (h !== h) { onc.why = 'ground not built at the spawn point'; return false; }
-      onc.s = sSpawn; onc.dir = d; onc.v = 6 + rng() * 5; onc.phase = 'run'; onc.dwell = 0; onc.doors = 0; onc.stop = null;
+      onc.s = sSpawn; onc.dir = d; onc.v = 6 + rng() * 5; onc.phase = 'run'; onc.dwell = 0; onc.doors = 0; onc.stop = null; onc.still = 0; onc.age = 0;
       onc.vmax = 11.5 + rng() * 3;
       onc.visited = new Set();
       // stations behind the spawn point (in the travelling sense) are done
@@ -1305,6 +1305,15 @@
       }
       const m = onc.model; const d = onc.dir;
       const rg = oppRange();
+      /* watchdog: an oncoming tram never stays put for no reason.  Standing still longer than the longest dwell (+ margin) in a dwell, or 20 s in the 'run' phase, means something kept it
+         (a skipped stop, a stale phase after a long frame, a missing hook answer): it is released at once; one that has been around for 7 minutes is removed. */
+      onc.age += dt; onc.still = onc.v < 0.05 ? onc.still + dt : 0;
+      if (onc.still > (onc.phase === 'dwell' ? ONC_DWELL_MAX_MS / 1000 + 6 : 20)) {
+        onc.forced++; onc.still = 0;
+        if (onc.phase === 'dwell') { onc.dwell = 0; onc.doors = 0; onc.phase = 'run'; if (onc.baked) onc.bake.uDoor.value = 0; else m.setDoors(0); oncDepart(); }
+        else { if (onc.stop) { onc.visited.add(onc.stop.k); onc.stop = null; } onc.v = 2; }
+      }
+      if (onc.age > 420) { despawnOncoming(); return; }
       // despawn: passed the player and out of the detailed world, or lost the opposite track
       const rel = onc.s - player.s, passed = rel * d > 0;   // passed = it has gone by the player and runs away from it
       const behind = passed ? Math.abs(rel) : 0;
@@ -1425,7 +1434,7 @@
       prepareOncoming: () => ensureModel(),
       state: () => ({
         fails, guarded: guards, conflicts, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
-        oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
+        oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z, still: onc.still, age: onc.age, forced: onc.forced } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
       }),
       cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 1.5 && c.t < q.t1 + 1.5) })),   // (test hook)
       /* test hook: the 4 wheel contact points (world) of every shown car: the road surface must be at or just below each one */

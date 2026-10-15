@@ -764,6 +764,7 @@
       }
       return false;
     }
+    const lmNoTree = (x, z) => { const lm = TS.luxLandmarks; if (!lm || !lm.noTreeAt) return false; const ll = sceneToLonLat(x, z); return lm.noTreeAt(ll.lat, ll.lon); };
     function buildTileTrees(t) {
       if (!t.trees || t.trees.byteLength < 8) return null;
       const dv = new DataView(t.trees);
@@ -776,6 +777,7 @@
         const h = dv.getUint8(k * 8 + 4) / 4; const r = dv.getUint8(k * 8 + 5) / 20; const c565 = dv.getUint16(k * 8 + 6, true);
         const x = x0 + lx; const z = z0 + lz;
         if (nearest(x, z).d < 4.6) continue;
+        if (lmNoTree(x, z)) continue;                // never inside a hedge maze (the hedges are the landmark's own model)
         if (onAsphalt(t, x, z, 1.5)) continue;       // never on / within 1.5 m of a carriageway (a LiDAR canopy over a motorway / viaduct is not a tree)
         const cr = ((c565 >> 11) & 31) / 31; const cg = ((c565 >> 5) & 63) / 63; const cb = (c565 & 31) / 31;
         const lum = (cr + cg + cb) / 3;

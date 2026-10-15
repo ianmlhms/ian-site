@@ -46,12 +46,12 @@
    * 2048 x 1024, 8 x 4 cells of 256 px. Cell index -> uv rectangle; day atlas + a half-size emissive atlas (lit windows at night). */
   const CELL = 256;
   const COLS = 8;
-  const ROWS = 11;
+  const ROWS = 12;
   const CELL_NAMES = ['plain', 'curtain0', 'curtain1', 'curtain2', 'curtain3', 'punched0', 'punched1', 'punched2', 'punched3',
     'ribbon0', 'ribbon1', 'ribbon2', 'ribbon3', 'gold0', 'gold1', 'ashlar', 'slate', 'roofGrey', 'diamond', 'glassroof', 'columns',
     'corrug', 'pave', 'glow', 'greenroof', 'shell', 'clock', 'curtainLo', 'punchedLo', 'ribbonLo', 'goldLo', 'brick', 'plaza', 'panel', 'metal', 'flags', 'fins', 'blinds',
     'balust', 'hexfrieze', 'schist', 'lights', 'awning', 'sign',
-    'stonewin0', 'stonewin1', 'stonewin2', 'stonewin3', 'rust0', 'rust1', 'shop0', 'shop1', 'shop2', 'parkdeck', 'cladpanel0', 'cladpanel1', 'brickwin0', 'brickwin1', 'brickwin2', 'hotelbal0', 'hotelbal1', 'hotelbal2', 'louvre', 'concretebd', 'tiles', 'copper', 'terra0', 'terra1', 'bnlbase', 'txt0', 'txt1', 'txt2', 'txt3', 'txt4', 'txt5', 'txt6', 'txt7', 'timber', 'lace', 'hexwin', 'churchwin0', 'churchwin1', 'churchwin2', 'slatespire', 'corten', 'darkfin', 'goldblack', 'sandblock'];
+    'stonewin0', 'stonewin1', 'stonewin2', 'stonewin3', 'rust0', 'rust1', 'shop0', 'shop1', 'shop2', 'parkdeck', 'cladpanel0', 'cladpanel1', 'brickwin0', 'brickwin1', 'brickwin2', 'hotelbal0', 'hotelbal1', 'hotelbal2', 'louvre', 'concretebd', 'tiles', 'copper', 'terra0', 'terra1', 'bnlbase', 'txt0', 'txt1', 'txt2', 'txt3', 'txt4', 'txt5', 'txt6', 'txt7', 'timber', 'lace', 'hexwin', 'churchwin0', 'churchwin1', 'churchwin2', 'slatespire', 'corten', 'darkfin', 'goldblack', 'sandblock', 'lafacet', 'lafband', 'lafglass', 'lafsign', 'clglass', 'clsign', 'shopfront'];
   const CELL_INDEX = {};
   CELL_NAMES.forEach((n, i) => { CELL_INDEX[n] = i; });
   const UV_PAD = 3 / 2048; // keeps bilinear/mip sampling inside the cell
@@ -74,6 +74,18 @@
     for (let i = 0; i < n; i++) {
       g.fillStyle = r() > 0.5 ? 'rgba(255,255,255,' + a + ')' : 'rgba(0,0,0,' + a + ')';
       g.fillRect(x + r() * w, y + r() * h, size, size);
+    }
+  }
+  /* triangular tiling of one atlas cell: 2 rows of 2 up- and 2 down-triangles (128 px), odd row shifted by half; fn(r, c, up) -> fill colour string / 1 (use current fillStyle) / 0 (skip); fn === null strokes the edges */
+  function triGrid(g, x, y, fn) {
+    for (let r = 0; r < 2; r++) for (let c = -1; c < 3; c++) {
+      const ux = x + c * 128 + r * 64; const cy = y + r * 128;
+      [[true, [[ux, cy + 128], [ux + 64, cy], [ux + 128, cy + 128]]], [false, [[ux + 64, cy], [ux + 192, cy], [ux + 128, cy + 128]]]].forEach(([up, pts]) => {
+        let f = fn ? fn(r, ((c % 2) + 2) % 2, up) : 1;
+        if (!f) return;
+        g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[1][0], pts[1][1]); g.lineTo(pts[2][0], pts[2][1]); g.closePath();
+        if (fn) { if (typeof f === 'string') g.fillStyle = f; g.fill(); } else g.stroke();
+      });
     }
   }
   /* Each painter draws into the 256 x 256 box at (x, y); lit=true paints the emissive (night) version. */
@@ -195,6 +207,70 @@
       }
       g.strokeStyle = 'rgba(60,66,72,0.6)'; g.lineWidth = 3;
       for (let k = -4; k < 6; k++) { g.beginPath(); g.moveTo(x + k * 64, y); g.lineTo(x + k * 64 + 256, y + 256); g.stroke(); g.beginPath(); g.moveTo(x + k * 64 + 256, y); g.lineTo(x + k * 64, y + 256); g.stroke(); }
+    },
+    /* Royal-Hamilius / Galeries Lafayette (Foster + Partners, 2019): the skin is made of triangular facets (pearl-white, champagne-bronze, clear glass); refs Commons Royal-Hamilius 07-2019 (101), 11-2019 (101) */
+    lafacet(g, x, y, lit) {
+      if (lit) return;
+      g.fillStyle = '#d8dbdc'; g.fillRect(x, y, CELL, CELL);
+      const upC = ['#fcfcfb', '#f3f4f4', '#ebeeee', '#f7f4ee']; const dnC = ['#dadfe1', '#e6e8e6', '#d0d7db', '#ddd7c9'];
+      triGrid(g, x, y, (r, c, up) => (up ? upC : dnC)[(r * 5 + c * 3 + (up ? 0 : 1)) % 4]);
+      g.strokeStyle = 'rgba(80,86,92,0.5)'; g.lineWidth = 1.6; triGrid(g, x, y, null);
+      noise(g, x, y, CELL, CELL, 400, 0.03, 2, 301);
+    },
+    lafband(g, x, y, lit) { // champagne-bronze triangular panels of the upper floors
+      if (lit) return;
+      g.fillStyle = '#b09460'; g.fillRect(x, y, CELL, CELL);
+      const upC = ['#d1b678', '#c4a768', '#b79b5e']; const dnC = ['#9c8048', '#b4975a', '#a88a52'];
+      triGrid(g, x, y, (r, c, up) => (up ? upC : dnC)[(r * 3 + c + (up ? 0 : 1)) % 3]);
+      g.strokeStyle = 'rgba(60,48,28,0.55)'; g.lineWidth = 1.6; triGrid(g, x, y, null);
+    },
+    lafglass(g, x, y, lit) { // clear glazed storeys: dark reflective facets, warm lit interior at night
+      if (lit) { for (let c = 0; c < 4; c++) { g.fillStyle = ['rgba(255,214,150,0.62)', 'rgba(255,230,180,0.55)', 'rgba(255,205,140,0.6)', 'rgba(255,236,196,0.5)'][c]; g.fillRect(x + c * 64 + 5, y + 8, 54, CELL - 40); } return; }
+      const grd = g.createLinearGradient(x, y, x + CELL, y + CELL); grd.addColorStop(0, '#6f8794'); grd.addColorStop(0.5, '#2f4350'); grd.addColorStop(1, '#1c2a34');
+      g.fillStyle = grd; g.fillRect(x, y, CELL, CELL);
+      g.fillStyle = 'rgba(255,255,255,0.14)'; triGrid(g, x, y, (r, c, up) => (up && ((r + c) & 1) === 0 ? 1 : 0));
+      g.strokeStyle = 'rgba(190,198,204,0.7)'; g.lineWidth = 2.5; triGrid(g, x, y, null);
+      g.fillStyle = '#9aa3a8'; g.fillRect(x, y + CELL - 12, CELL, 12);
+    },
+    lafsign(g, x, y, lit) { // board "GALERIES LAFAYETTE" drawn 4x narrow (a 4:1 board shows it undistorted): plain capitals, no logo
+      g.save(); g.translate(x, y); g.scale(0.25, 1);
+      g.fillStyle = lit ? '#2a2113' : '#16181b'; g.fillRect(0, 0, 1024, 256);
+      g.fillStyle = lit ? '#ffe9b8' : '#eceae2'; g.font = '700 98px Helvetica, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (g.letterSpacing !== undefined) g.letterSpacing = '4px';
+      g.fillText('GALERIES LAFAYETTE', 512, 134);
+      g.restore();
+    },
+    /* Cloche d'Or: mall skin of diamond glazing, bright blue and black facets in a silver lattice (ref Commons "Cloche d'or Shopping Center (101)") */
+    clglass(g, x, y, lit) {
+      const dia = (fn) => { for (let r = -1; r < 5; r++) for (let c = -1; c < 3; c++) { const cx = x + c * 128 + 64 + (r & 1 ? 64 : 0); const cy = y + r * 64 + 64; const k = Math.floor(hash2((r + 5) * 7 + 3, (c + 4) * 5 + 11) * 8); fn(cx, cy, k); } };
+      if (lit) { g.fillStyle = 'rgba(170,215,255,0.38)'; dia((cx, cy, k) => { if (k < 6) { g.beginPath(); g.moveTo(cx, cy - 60); g.lineTo(cx + 60, cy); g.lineTo(cx, cy + 60); g.lineTo(cx - 60, cy); g.fill(); } }); return; }
+      g.fillStyle = '#0f1b2e'; g.fillRect(x, y, CELL, CELL);
+      dia((cx, cy, k) => {
+        const grd = g.createLinearGradient(cx - 60, cy - 60, cx + 60, cy + 60);
+        if (k === 7) { grd.addColorStop(0, '#0a1322'); grd.addColorStop(1, '#1a2b46'); }
+        else { grd.addColorStop(0, ['#9fd3f5', '#6db4e6', '#86c2ee', '#5aa3dc', '#7dbbe8', '#a9d9f7'][k]); grd.addColorStop(1, ['#3f88c6', '#2c6cae', '#3d7fbd', '#2a69ab', '#3478b6', '#4a92cc'][k]); }
+        g.fillStyle = grd; g.beginPath(); g.moveTo(cx, cy - 62); g.lineTo(cx + 62, cy); g.lineTo(cx, cy + 62); g.lineTo(cx - 62, cy); g.fill();
+      });
+      g.strokeStyle = 'rgba(210,218,226,0.9)'; g.lineWidth = 2.2;
+      for (let k = -6; k < 6; k++) { g.beginPath(); g.moveTo(x + k * 64, y); g.lineTo(x + k * 64 + 256, y + 256); g.stroke(); g.beginPath(); g.moveTo(x + k * 64 + 256, y); g.lineTo(x + k * 64, y + 256); g.stroke(); }
+    },
+    clsign(g, x, y, lit) { // the big white stacked name over the glass: CLO / CHE / D'OR (plain capitals)
+      PAINT.clglass(g, x, y, lit);
+      g.fillStyle = lit ? '#ffffff' : '#f4f6f8'; g.font = '700 74px Helvetica, Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (lit) { g.shadowColor = '#bfe2ff'; g.shadowBlur = 12; }
+      ['CLO', 'CHE', "D'OR"].forEach((t, i) => g.fillText(t, x + 128, y + 52 + i * 78));
+      g.shadowBlur = 0;
+    },
+    shopfront(g, x, y, lit) { // shop windows: dark mullions, big panes; at night warm white light with coloured displays
+      if (lit) {
+        for (let k = 0; k < 4; k++) { const gr = g.createLinearGradient(0, y + 26, 0, y + 176); gr.addColorStop(0, ['#ffeccb', '#fff6e0', '#ffe6b8', '#fff2d6'][k]); gr.addColorStop(1, ['#ffd48e', '#ffe2a8', '#ffcf86', '#ffdca0'][k]); g.fillStyle = gr; g.fillRect(x + k * 64 + 5, y + 26, 54, 150); }
+        g.globalAlpha = 0.55; const cols = ['#e5484d', '#3a7bd5', '#f2c230', '#46b37a', '#c45fb8']; for (let k = 0; k < 6; k++) { g.fillStyle = cols[k % 5]; g.fillRect(x + 14 + (k % 4) * 64 + (k & 1) * 12, y + 110 + ((k * 29) % 40), 14, 26); } g.globalAlpha = 1;
+        g.fillStyle = '#fff6d0'; g.fillRect(x + 4, y + 6, CELL - 8, 12); return;
+      }
+      g.fillStyle = '#2b2f33'; g.fillRect(x, y, CELL, CELL);
+      const grd = g.createLinearGradient(x, y, x + CELL, y + 190); grd.addColorStop(0, '#7e97a6'); grd.addColorStop(1, '#3d5160');
+      for (let k = 0; k < 4; k++) { g.fillStyle = grd; g.fillRect(x + k * 64 + 5, y + 26, 54, 150); g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.moveTo(x + k * 64 + 5, y + 120); g.lineTo(x + k * 64 + 40, y + 26); g.lineTo(x + k * 64 + 59, y + 26); g.lineTo(x + k * 64 + 5, y + 150); g.fill(); }
+      g.fillStyle = '#e6e3da'; g.fillRect(x, y + 4, CELL, 16); g.fillStyle = '#c4c1b8'; g.fillRect(x, y + 190, CELL, 66);
     },
     glassroof(g, x, y, lit) {
       if (lit) return;
@@ -1178,6 +1254,36 @@
       if (slope < 9 && hi && (o.parapet || o.plant) && ring.length >= 4) roofExtras(g, ring, o, dy);
     });
   }
+  /* A painted board on the best LOD2 street wall: among the vertical quads of the building b pick the one with the longest bottom edge whose outward normal points most towards `face` ([x, z], unit)
+     and which starts near the ground, then put a w x h quad of the atlas cell centred on it, `up` m above its foot and 0.12 m proud of the wall. Returns { p, n, t } (board centre, normal, tangent) or null. */
+  function wallSign(g, L, b, o) {
+    let cx = 0; let cz = 0; let cn = 0; b.roofs.forEach((r) => r.forEach((p) => { cx += p[0]; cz += p[1]; cn++; })); cx /= cn || 1; cz /= cn || 1;
+    let best = null;
+    b.walls.forEach((ring) => {
+      if (ring.length !== 4) return;
+      const nm = newell(ring); const l = Math.hypot(nm[0], nm[1], nm[2]) || 1; if (Math.abs(nm[1]) / l > 0.3) return;
+      const idx = [0, 1, 2, 3].sort((i, j) => ring[i][2] - ring[j][2]); const A = ring[idx[0]]; const B = ring[idx[1]];
+      const len = Math.hypot(B[0] - A[0], B[1] - A[1]); if (len < Math.min(o.w, 8) || A[2] > 2.5) return;
+      if (o.maxTop && Math.max(ring[0][2], ring[1][2], ring[2][2], ring[3][2]) > o.maxTop) return;
+      let nx = -(B[1] - A[1]) / len; let nz = (B[0] - A[0]) / len; const mx = (A[0] + B[0]) / 2; const mz = (A[1] + B[1]) / 2;
+      if (nx * (mx - cx) + nz * (mz - cz) < 0) { nx = -nx; nz = -nz; }
+      const sc = len * Math.max(0, nx * o.face[0] + nz * o.face[1]);
+      if (sc > 0 && (!best || sc > best.sc)) best = { sc, A, B, nx, nz, mx, mz, len };
+    });
+    if (window.__tsLmDebug) console.info(TAG + 'wallSign', o.cell, best ? { len: Math.round(best.len), n: [best.nx.toFixed(2), best.nz.toFixed(2)], at: [Math.round(best.mx), Math.round(best.mz)], y: best.A[2] } : null, 'walls', b.walls.length);
+    if (!best) return null;
+    const tx = (best.B[0] - best.A[0]) / best.len; const tz = (best.B[1] - best.A[1]) / best.len;
+    const sgn = (tx * -best.nz + tz * best.nx) > 0 ? 1 : -1;   // keep the tangent so that (t, up, n) is right-handed seen from outside
+    const y0 = (L.gy ? L.gy(best.mx, best.mz) : 0) + (o.up || 5); const off = 0.12;
+    const px = best.mx + best.nx * off + (o.shift || 0) * tx; const pz = best.mz + best.nz * off + (o.shift || 0) * tz;
+    const ww = Math.min(o.w, best.len * 0.92); const hh = ww / (o.aspect || 1); const hw = ww / 2;
+    const P = (u, v) => [px + tx * u * sgn * -1 * -1, y0 + v, pz + tz * u * sgn * -1 * -1];
+    const a = [px - tx * hw, y0, pz - tz * hw]; const bb = [px + tx * hw, y0, pz + tz * hw]; const c = [px + tx * hw, y0 + hh, pz + tz * hw]; const d = [px - tx * hw, y0 + hh, pz - tz * hw];
+    const nn = cross(sub(bb, a), sub(d, a));
+    if (nn[0] * best.nx + nn[2] * best.nz < 0) quadP(g, bb, a, d, c, o.cell, o.color || WHITE); else quadP(g, a, bb, c, d, o.cell, o.color || WHITE);
+    void P;
+    return { p: [px, y0, pz], n: [best.nx, best.nz], t: [tx, tz] };
+  }
   /* flat-roof furniture on a LOD2 roof face: dark parapet rim, one louvred plant enclosure + a lift head (o.parapet = { h, color }, o.plant = { h, st }) */
   function roofExtras(g, ring, o, dy) {
     const pts = ring.map((p) => [p[0], p[1]]);
@@ -1474,25 +1580,52 @@
   });
 
   /* ---- Cloche d'Or shopping centre */
+  const CL_FACE = [0.67, -0.74];   // direction the big white CLO / CHE / D'OR lettering faces (towards the tram stop side), tuned against the render
   def('cloche', "Cloche d'Or", { radius: 150, hiR: { high: 520, medium: 360 } }, (g, hi, L) => {
+    /* mall: skin of diamond glazing (bright blue / black facets in a silver lattice) over lit shop windows, white stacked name; the two Sky Cloche towers keep the champagne panels (refs Commons "Luxembourg, Cloche d'or Shopping Center (101)", "Ban de Gasperich - Cloche d'or 2019-08") */
     const BLK = { cell: 'plain', color: [0.1, 0.1, 0.12], bay: 12, floor: 12, jitter: 0 };
-    const mall = { cell: 'goldblack', color: WHITE, bay: 6, floor: 6, jitter: 0.05, baseBand: { h: 7, st: BLK } }; // champagne panels over black base storeys (ref Commons c_vauban 1 / 4 / 5)
+    const shops = { cell: 'shopfront', color: WHITE, bay: 4, floor: 4.5, jitter: 0.02 };
+    const skin = { cell: 'clglass', color: WHITE, bay: 6, floor: 6, jitter: 0.02, baseBand: { h: 5, st: shops } };
     const tower = { cell: 'goldblack', color: [1, 0.97, 0.9], bay: 6, floor: 6, jitter: 0.05, baseBand: { h: 7, st: BLK } }; // Sky Cloche
     lodOr(g, L, 'mall', hi, {
-      wall: mall, skirt: 8,
+      wall: skin, skirt: 8,
       wallFn: (ring3) => (ringTop(ring3) > 35 ? tower : null),
       roofFn: (ring, slope) => (slope > 6 && slope < 75 ? RF('#9bb8c9', 'glassroof') : (ringTop(ring) > 35 ? RF('#80848a') : RF('#9a8a5c', 'greenroof'))),
-    }, () => { const p = L.one('mall'); prism(g, p.r, null, -6, 20, mall, RF('#8b7a68', 'greenroof'), hi); });
+    }, () => { const p = L.one('mall'); prism(g, p.r, null, -6, 20, skin, RF('#8b7a68', 'greenroof'), hi); });
+    if (hi) L.lod('mall').forEach((b) => wallSign(g, L, b, { face: CL_FACE, cell: 'clsign', w: 14, aspect: 1, up: 3.4, maxTop: 30, color: WHITE }));
   });
 
   /* ---- Royal-Hamilius (Foster + Partners): faceted stone-and-glass Galeries Lafayette block with terraced green roofs */
+  const HAM_FACE = [-0.98, 0.19];   // direction the Galeries Lafayette board faces (towards the tram line; scene axes x east, z south), measured with the world's track
   def('hamilius', 'Royal-Hamilius', { radius: 80, hiR: { high: 480, medium: 340 } }, (g, hi, L) => {
-    const facet = { cell: 'diamond', color: [0.82, 0.9, 0.95], bay: 5, floor: 5, jitter: 0.05 };
-    ['lafayette', 'lafayette2', 'lafayette3'].forEach((role) => {
-      lodOr(g, L, role, hi, { wall: facet, roofFn: (ring, slope) => (slope > 12 ? RF('#a9bfcc', 'glassroof') : RF('#7e8c58', 'greenroof')), skirt: 8 }, () => {
-        const p = L.one(role); if (p) prism(g, p.r, null, -6, p.hm || 30, facet, RF('#7e8c58', 'greenroof'), hi);
-      });
+    /* Galeries Lafayette (Foster + Partners, 2019): a faceted skin of triangular pearl-white panels, a champagne-bronze band under the roof, clear glazed storeys (shops, entrance) at the foot
+       and a dark steel canopy over the roof terrace (refs Commons Royal-Hamilius 07-2019 (101), 11-2019 (101), 03-2019 Lafayette (101)). Board in plain capitals, no logo. */
+    const glass = { cell: 'lafglass', color: WHITE, bay: 6, floor: 5.5, jitter: 0.02 };
+    const shops = { cell: 'shopfront', color: WHITE, bay: 4, floor: 4.5, jitter: 0.02 };
+    const bronze = { cell: 'lafband', color: WHITE, bay: 6, floor: 6 };
+    const roofFn = (ring, slope) => (slope > 12 ? RF('#a9bfcc', 'glassroof') : RF('#6f7377', 'roofGrey'));
+    const facet = (base) => ({ cell: 'lafacet', color: WHITE, bay: 6, floor: 6, jitter: 0.03, baseBand: { h: 5.5, st: base }, topBand: { h: 8, st: bronze } });
+    const roles = [['lafayette', facet(glass)], ['lafayette2', facet(shops)], ['lafayette3', facet(shops)]];
+    roles.forEach(([role, wall]) => {
+      lodOr(g, L, role, hi, { wall, roofFn, skirt: 8 }, () => { const p = L.one(role); if (p) prism(g, p.r, null, -6, p.hm || 30, wall, RF('#6f7377', 'roofGrey'), hi); });
     });
+    if (hi) {
+      const sign = L.lod('lafayette').map((b) => wallSign(g, L, b, { face: HAM_FACE, cell: 'lafsign', w: 16, aspect: 4, up: 6.4, color: WHITE })).find((q) => q);
+      if (sign) { // entrance canopy under the board: a dark steel soffit with two lamps
+        const a = Math.atan2(sign.t[1], sign.t[0]);
+        box(g, sign.p[0] + sign.n[0] * 1.4, sign.p[1] - 1.0, sign.p[2] + sign.n[1] * 1.4, 9, 0.35, 3.2, a, { cell: 'plain', color: col('#2d3135'), bay: 12, floor: 12, jitter: 0 }, { cell: 'plain', color: col('#3a3f44') }, false);
+      }
+      // roof terrace canopy: faceted dark steel roof on posts over the south-east corner of the main block
+      L.lod('lafayette').forEach((b) => {
+        let top = -1e9; let tx = 0; let tz = 0; let tn = 0; b.roofs.forEach((r) => r.forEach((p) => { if (p[2] > top - 0.2) { top = Math.max(top, p[2]); } }));
+        b.roofs.forEach((r) => r.forEach((p) => { if (p[2] > top - 0.5) { tx += p[0]; tz += p[1]; tn++; } }));
+        if (!tn) return; tx /= tn; tz /= tn;
+        const y = top + L.dy; const steel = { cell: 'plain', color: col('#2b2f33'), bay: 12, floor: 12, jitter: 0 };
+        [[-7, -5], [7, -5], [7, 5], [-7, 5]].forEach(([dx, dz]) => box(g, tx + dx, y + 1.9, tz + dz, 0.25, 3.8, 0.25, 0, steel, false, false));
+        quadP(g, [tx - 8, y + 3.8, tz + 6], [tx + 8, y + 3.8, tz + 6], [tx + 6, y + 5.4, tz], [tx - 6, y + 5.4, tz], 'plain', col('#33373b'));
+        quadP(g, [tx - 6, y + 5.4, tz], [tx + 6, y + 5.4, tz], [tx + 8, y + 3.8, tz - 6], [tx - 8, y + 3.8, tz - 6], 'plain', col('#2b2f33'));
+      });
+    }
   });
 
   /* ---- Place de l'Étoile: the corner blocks around the junction (slate mansards, sandstone) */
@@ -2537,6 +2670,75 @@
     });
   });
 
+
+  /* ---- Labyrinthe Végétal (Parc Central, Kirchberg, next to d'Coque): a hedge maze laid out by the Fonds Kirchberg with the 5 m yellow steel stair sculpture "Dendrite" (Michel de Broin, 2016)
+     in its centre.  The hedge lines are the OSM ways barrier=hedge around the artwork node (49.6241088, 6.1565895; (c) OpenStreetMap contributors, ODbL), in dm from that node (x east, z south).
+     Checked against the descriptions of the Fonds Kirchberg / Paperjam / Luxembourg City Tourist Office (bright yellow, three staircases, 5 m, hedges around it): no photo could be fetched, so the
+     hedge height (1.9 m, a person is hidden) and the stair geometry are estimates.  Registered as footprint role 'maze' so that no LiDAR tree is planted inside it. */
+  const MAZE_HEDGES = [[-232,337,-231,223,-270,249,-267,161,-167,172,-165,80,-202,99,-204,134,-231,133,-229,-31],[386,-76,131,109],[-127,-47,-125,-133],[56,-121,71,-143,312,-117],[-157,319,-274,404,-271,285],[-198,-18,-196,-56,-262,-56,-267,132],[-164,-167,46,-145,-72,-53,-68,-102],[-231,223,-232,202,-116,209,51,87],[-230,-174,-276,-178,-280,-113,-216,-114],[-199,11,-201,65,-166,42,53,53,54,-34],[-16,-130,-95,-132,-97,-33,-165,16,-164,-134],[-242,-144,-207,-167,-191,-170,-195,-85,-261,-87],[35,-102,-124,13,18,25,22,-53,-35,-9],[147,-75,244,-68,291,-98,121,-108,108,64],[-282,-70,-319,478,96,176,128,153,477,-102,345,-114,279,-57,314,-55],[288,-36,143,-46,138,71,242,-3,175,-12,173,8],[51,133,-105,238,-208,237,-212,322,-142,272,-179,271],[55,-71,82,-93,79,114,106,94,104,129,-140,306],[-141,170,-140,80,8,85,-102,170,-102,113,-77,114]];
+  const mazeHull = (() => {
+    const pts = []; MAZE_HEDGES.forEach((f) => { for (let i = 0; i + 1 < f.length; i += 2) pts.push([f[i], f[i + 1]]); });
+    pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = []; pts.forEach((q) => { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); });
+    const up = []; for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    const h = lo.slice(0, -1).concat(up.slice(0, -1));
+    const c = h.reduce((m, q) => [m[0] + q[0] / h.length, m[1] + q[1] / h.length], [0, 0]);
+    const o = []; h.forEach((q) => { const dx = q[0] - c[0]; const dz = q[1] - c[1]; const l = Math.hypot(dx, dz) || 1; o.push(Math.round(q[0] + (dx / l) * 25), Math.round(q[1] + (dz / l) * 25)); });   // +2.5 m
+    return o;
+  })();
+  FP.labyrinth = { a: [49.6241088, 6.1565895], p: [{ id: -3, role: 'maze', r: mazeHull, h: 2, hm: 2 }] };
+  def('labyrinth', 'Labyrinthe Végétal + Dendrite', { radius: 70, hiR: { high: 420, medium: 300 }, showR: { high: 700, medium: 500, low: 350 } }, (g, hi, L) => {
+    const gy = L.gy || (() => 0);
+    const hedge = { cell: 'greenroof', color: [0.74, 0.98, 0.62], bay: 1.4, floor: 1.0, jitter: 0.12 };
+    const top = { cell: 'greenroof', color: [0.56, 0.78, 0.45] };
+    const HH = 1.9; const HW = 0.75;
+    MAZE_HEDGES.forEach((f) => {
+      for (let i = 0; i + 3 < f.length; i += 2) {
+        const ax = f[i] / 10; const az = f[i + 1] / 10; const bx = f[i + 2] / 10; const bz = f[i + 3] / 10;
+        const len = Math.hypot(bx - ax, bz - az); if (len < 0.2) continue;
+        const rot = Math.atan2(bz - az, bx - ax); const n = Math.max(1, Math.ceil(len / 4));
+        for (let k = 0; k < n; k++) {
+          const t0 = k / n; const t1 = (k + 1) / n; const cx = ax + (bx - ax) * (t0 + t1) / 2; const cz = az + (bz - az) * (t0 + t1) / 2;
+          const yb = gy(cx, cz);
+          box(g, cx, yb + (HH - 0.35) / 2, cz, len / n + (k < n - 1 ? 0.02 : HW * 0.8), HH + 0.35, HW, rot, hedge, top, hi);
+        }
+      }
+    });
+    // Dendrite: a yellow steel stair tree.  Three straight flights rise from the ground (about 8.5 m out) to a hexagonal landing at 5 m carried by a three-legged trunk; every flight has two sloped side
+    // stringers, open treads, handrails with posts and legs where it clears the ground.
+    const Y = col('#f3c300'); const YD = col('#d9a800');
+    const yel = { cell: 'plain', color: Y, bay: 12, floor: 12, jitter: 0 }; const yelD = { cell: 'plain', color: YD, bay: 12, floor: 12, jitter: 0 };
+    const y0 = gy(0, 0); const TOP = 5.0;
+    const STEPS = 26; const RUN = 0.3; const RISE = TOP / STEPS; const W = 1.4; const R0 = 2.0;
+    const flightLen = STEPS * RUN;
+    for (let b = 0; b < 3; b++) {
+      const ang = b * (Math.PI * 2 / 3) + 0.5; const dx = Math.cos(ang); const dz = Math.sin(ang);
+      const at = (r, w, y) => [dx * r - dz * w, y, dz * r + dx * w];
+      const yAt = (r) => y0 + TOP * (1 - (r - R0) / flightLen);      // surface height of the flight at radius r
+      for (let k = 0; k < STEPS; k++) {
+        const r = R0 + (k + 0.5) * RUN; const c = at(r, 0, yAt(r) - 0.04);
+        box(g, c[0], c[1], c[2], RUN * 0.92, 0.07, W, ang, yel, yel, false);
+      }
+      [-1, 1].forEach((sd) => {
+        const lat = sd * (W / 2 + 0.05);
+        beam(g, at(R0 - 0.1, lat, yAt(R0 - 0.1) - 0.2), at(R0 + flightLen, lat, yAt(R0 + flightLen) - 0.2), 0.08, 0.3, YD, 'plain');   // stringer
+        beam(g, at(R0 - 0.1, lat, yAt(R0 - 0.1) + 1.0), at(R0 + flightLen, lat, yAt(R0 + flightLen) + 1.0), 0.06, 0.06, Y, 'plain');   // handrail
+        const posts = hi ? 10 : 5;
+        for (let m = 0; m <= posts; m++) { const r = R0 + (flightLen * m) / posts; const a = at(r, lat, yAt(r) - 0.1); box(g, a[0], a[1] + 0.55, a[2], 0.05, 1.1, 0.05, ang, yel, false, false); }
+        for (let q = 1; q <= 3; q++) { // legs
+          const r = R0 + flightLen * (q / 4.2); const top = yAt(r) - 0.3; const hgt = top - y0; if (hgt > 0.5) { const a = at(r, lat, 0); box(g, a[0], y0 + hgt / 2, a[2], 0.14, hgt, 0.14, ang, yelD, false, false); }
+        }
+      });
+    }
+    // landing: a hexagon with a rail, carried by a three-legged trunk
+    const lr = [];
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; lr.push([Math.cos(a) * 2.4, Math.sin(a) * 2.4]); }
+    prism(g, lr, null, y0 + TOP - 0.3, y0 + TOP, yel, { cell: 'plain', color: Y }, false);
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const px = Math.cos(a) * 2.35; const pz = Math.sin(a) * 2.35; box(g, px, y0 + TOP + 0.55, pz, 0.05, 1.1, 0.05, 0, yel, false, false); }
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2 + 1.0; beam(g, [Math.cos(a) * 1.6, y0 + TOP - 0.3, Math.sin(a) * 1.6], [Math.cos(a) * 0.6, y0, Math.sin(a) * 0.6], 0.3, 0.3, YD, 'plain'); }
+  });
+
   /*PL-DEFS-END*/
 
   /* ================================================================== generic fallback for any landmark without its own model */
@@ -2791,8 +2993,16 @@
     return false;
   }
 
+  /* no LiDAR tree stands inside a hedge maze (the canopy model there is the hedge itself) */
+  const noTreeFp = footprints.filter((f) => f.role === 'maze').map((f) => { let a = 90; let b = 190; let c = -90; let d = -190; f.ring.forEach((q) => { a = Math.min(a, q[0]); c = Math.max(c, q[0]); b = Math.min(b, q[1]); d = Math.max(d, q[1]); }); return { ring: f.ring, box: [a, b, c, d] }; });
+  function noTreeAt(lat, lon) {
+    for (let i = 0; i < noTreeFp.length; i++) { const bx = noTreeFp[i].box; if (lat >= bx[0] && lat <= bx[2] && lon >= bx[1] && lon <= bx[3] && pointIn(noTreeFp[i].ring, lat, lon)) return true; }
+    return false;
+  }
+
   TS.luxLandmarks = {
     version: 1,
+    noTreeAt,
     overlaps,
     preload: (url) => loadLod(url),   // detail data, resolves when loaded (or failed): the loading bar waits for it
     build,
