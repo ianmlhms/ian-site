@@ -19,6 +19,12 @@
     --border:#2f4553; --text:#fff; --muted:#b1bad3;
     --green:#00e701; --green-d:#00c400; --red:#ed4163; --blue:#4ba7f5; --gold:#f7c948;
   }
+  /* The shared sign-in dialog (auth.css) is styled with site-glass tokens, which this
+     page doesn't load; without them it rendered unstyled and BEHIND the access gate. */
+  .auth-modal{--space-1:.25rem;--space-2:.5rem;--space-3:.75rem;--space-4:1rem;--space-5:1.5rem;
+    --radius-pane:1.5rem;--radius-inner:.75rem;--hit-target:2.75rem;--z-scrim:10000;
+    --control-fill:var(--panel2);--card-hover:var(--panel3);--glass-solid:var(--panel);
+    --accent:var(--green);--accent-foreground:#000;--accent-border:var(--text);--focus-ring:var(--text)}
   *{box-sizing:border-box}
   html,body{margin:0}
   body{min-height:100vh;background:var(--bg);color:var(--text);
@@ -1328,9 +1334,16 @@ boot();
   };
 
   async function check() {
+    // Start the auth client first: session() stays empty until client() has
+    // restored the stored login, so checking it straight away read as signed out.
+    let sb;
+    try { sb = await client(); }
+    catch (err) {
+      console.warn("[FakeStake] auth client failed", err);
+      return deny("Could not check your access. Reload once you are back online.", false);
+    }
     if (!session()) return deny("FakeStake is private. Please sign in.", true);
     try {
-      const sb = await client();
       const { data, error } = await sb
         .from("profiles").select("can_casino")
         .eq("id", session().user.id).maybeSingle();
