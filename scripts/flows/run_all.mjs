@@ -27,9 +27,10 @@ import { flow as busTycoon } from "./bus_tycoon.mjs";
 import { flow as paketExpress } from "./paket_express.mjs";
 
 import { flow as testMode } from "./test_mode.mjs";
+import { flow as mordsfall } from "./mordsfall.mjs";
 import { flow as trainSim } from "./train_sim.mjs";
 
-const ALL = [trainSim, paketExpress, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, testMode];
+const ALL = [trainSim, paketExpress, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, testMode, mordsfall];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }
