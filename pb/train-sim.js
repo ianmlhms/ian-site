@@ -1420,7 +1420,7 @@
     return {
       lever: state.lever, speedKmh: state.v * 3.6, limitKmh: state.limitKmh, targetKmh: state.nextLimit && state.nextLimit.distance < 400 ? Math.min(state.limitKmh, state.nextLimit.kmh) : state.limitKmh,
       signalAspect: state.signalAspect, doorsOpen01: state.doorsOpen01, doorsReleased: state.doorsReleased, doorSide: state.doorSide || (st && st.side) || 'right',
-      headlights: w.lightLevel, night: w.darkK, horn: input.hornHeld, parkingBrake: !!state.parkingBrake, nextStationName: st ? st.name : '', distanceToStopM: state.distanceToHeading ?? state.distanceToStop, delaySec: state.delaySec,
+      headlights: w.lightLevel, night: w.darkK, horn: input.hornHeld, parkingBrake: !!state.parkingBrake, nextStationName: st ? st.name : '', distanceToStopM: state.distanceToHeading ?? state.distanceToStop, delaySec: safe('cab delay', () => scheduleView(state, state.headingIndex ?? state.nextStationIndex).delay, state.delaySec),   // (the same delay as the HUD: in a stop it is measured against the departure)
       clock: shownClock(state.clockSec), powerKw: state.powerKw, brakePct: Math.round(state.brakePct * 100), wiper: w.env.weather === 'rain' || w.env.weather === 'snow',
     };
   }

@@ -473,7 +473,7 @@
     c.fillStyle = '#0d0f11';
     c.fillRect(0, 0, w, h);
     c.fillStyle = '#ffb02e';
-    c.font = '700 22px "Courier New", monospace';
+    c.font = '700 18px "Courier New", monospace';   // (20 characters across the 256 px board)
     c.textAlign = 'left';
     rows.slice(0, 3).forEach((r, i) => c.fillText(String(r), 12, 30 + 28 * i));
     c.strokeStyle = '#3c4146';
