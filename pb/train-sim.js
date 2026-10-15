@@ -9,7 +9,7 @@
   const HOST_ORIGIN = new URL(document.baseURI).origin;
   const SIM_STEP = 1 / 60, MAX_SIM_STEPS = 40, MAX_FRAME_S = 0.25;
   const LEVER_REPEAT_MS = 180, LEVER_MIN = -8, LEVER_MAX = 5, LEVER_EB = -8, LEVER_BRAKE_MAX = -7;
-  const CAMERAS = ['cab', 'chase', 'platform', 'orbit'];
+  const CAMERAS = ['cab', 'chase', 'platform', 'orbit', 'inside'];   // 'inside' (key 5): the passenger saloon, Luxtram only; pressing 5 again cycles front / middle / rear
   const QUALITIES = ['high', 'medium', 'low'];
   const MODULES = ['config', 'copy', 'track', 'routes', 'infra', 'landscape', 'trains', 'cab', 'passengers', 'audio', 'career', 'menu'];
   const PHONE_MIN_SIDE = 600, PHONE_MIN_VIEW = 560;
@@ -46,6 +46,8 @@
   const clockText = (sec) => { const s = ((Math.floor(sec) % 86400) + 86400) % 86400; return pad2(s / 3600) + ':' + pad2((s % 3600) / 60); };
   /* clock shown to the player: the timetable clock plus the shift from an in-game time-of-day change (the timetable itself is relative and stays untouched) */
   const shownClock = (sec) => clockText(sec + (world && world.clockShift ? world.clockShift : 0));
+  const clockSecText = (sec) => { const s = ((Math.floor(sec + (world && world.clockShift ? world.clockShift : 0)) % 86400) + 86400) % 86400; return pad2(s / 3600) + ':' + pad2((s % 3600) / 60) + ':' + pad2(s % 60); };
+  const minSec = (sec) => { const d = Math.max(0, Math.ceil(sec)); return Math.floor(d / 60) + ':' + pad2(d % 60); };
   const delayText = (sec) => { const d = Math.round(sec), a = Math.abs(d); return (d < 0 ? '−' : '+') + Math.floor(a / 60) + ':' + pad2(a % 60); };
   const fmtInt = (n) => Math.round(n).toLocaleString(lang === 'en' ? 'en' : lang === 'de' ? 'de' : 'fr-LU').replace(/ | /g, ' ');
 
@@ -64,7 +66,7 @@
     document.documentElement.lang = lang;
     translateStatic();
     if (phase === 'menu') renderMenu();
-    if (world) { buildStrip(); updateHud(true); }
+    if (world) { buildStrip(); updateHud(true); refreshCamLabel(); }
   }
   function translateStatic() {
     document.querySelectorAll('[data-t]').forEach((n) => { n.textContent = t(n.dataset.t); });
@@ -107,7 +109,13 @@
   let world = null;              // { track, routeDef, cfg, trainId, routeId, infra, landscape, model, cab, passengers, sim, ... }
   let audio = null, audioFailed = false;
   let camMode = 'cab', camSmooth = { pos: null, look: null };
+  let insidePos = 0;   // saloon camera: 0 front end looking back, 1 middle looking forward, 2 rear end looking forward
   const orbit = { yaw: 0.7, pitch: 0.28, dist: 30 }, look = { yaw: 0, pitch: 0 };
+  /* camera 3 (trackside / platform) is movable: drag = look round (yaw free, pitch -60..+30 deg), wheel / pinch = zoom (field of view), arrow keys / the pad = walk along the platform.
+     The view is kept while the player stays at the same stop (reset when the spot changes, or by pressing 3 again). */
+  const PLAT_PITCH_MIN = -1.05, PLAT_PITCH_MAX = 0.52, PLAT_FOV0 = 54, PLAT_FOV_MIN = 24, PLAT_FOV_MAX = 85, PLAT_EYE = 1.6, PLAT_WALK_MS = 3.2;
+  const platView = { yaw: 0, pitch: 0, fov: PLAT_FOV0, s: null, lat: null, vx: 0, vy: 0, keys: { left: false, right: false, in: false, out: false } };
+  function resetPlatView() { platView.yaw = 0; platView.pitch = 0; platView.fov = PLAT_FOV0; platView.s = null; platView.lat = null; platView.vx = platView.vy = 0; if (camera && camMode === 'platform') applyCabFov(); }
   let fastForward = false;       // 2x fast-forward (F): physics, timetable clock and passengers run twice as fast
   const input = { lever: 0, doorPress: false, parkingToggle: false, reverseToggle: false, hornHeld: false, lights: null, held: { up: false, down: false }, lastRepeat: 0 };
   const events = [];             // recent event log for tests
@@ -166,7 +174,7 @@
     if (camMode === 'cab') {
       const fit = (2 * Math.atan(Math.tan((CAB_FOV_FIT_HALF_DEG * Math.PI) / 180) / Math.max(0.3, camera.aspect)) * 180) / Math.PI;
       camera.fov = camera.aspect < 1.4 ? clamp(fit, CAB_FOV, CAB_FOV_PORTRAIT_MAX) : CAB_FOV;
-    } else camera.fov = camMode === 'chase' ? 58 : 54;
+    } else camera.fov = camMode === 'chase' ? 58 : camMode === 'inside' ? 70 : camMode === 'platform' ? platView.fov : 54;
     camera.updateProjectionMatrix();
   }
   function applyQuality() {
@@ -415,6 +423,8 @@
   }
   function disposePieces(w) {
     safe('passengers dispose', () => w.passengers && w.passengers.dispose && w.passengers.dispose());
+    safe('cabin dispose', () => w.cabin && w.cabin.dispose && w.cabin.dispose());
+    safe('tram dwell detach', () => TS.tramDwell && TS.tramDwell.detach && w.track && w.track.kind === 'tram' && TS.tramDwell.detach());
     safe('cab dispose', () => { if (w.cab) { if (w.cab.group && w.cab.group.parent) w.cab.group.parent.remove(w.cab.group); w.cab.dispose && w.cab.dispose(); } });
     safe('train dispose', () => { if (w.model) { scene.remove(w.model.group); w.model.dispose && w.model.dispose(); } });
     safe('infra dispose', () => w.infra && w.infra.dispose && w.infra.dispose());
@@ -472,6 +482,11 @@
     if (cab && model && model.cars[0]) model.cars[0].group.add(cab.group);
     const passengers = build('passengers', 'create', [scene, { quality }]);
     safe('passengers rain', () => passengers && passengers.setRain && passengers.setRain(environment.weather === 'rain'));
+    // the people inside the tram (saloon camera, key 5): only the records until that camera is active (nothing is drawn or animated before)
+    const cabin = !demo && track.kind === 'tram' && TS.passengers && TS.passengers.create ? safe('cabin passengers', () => TS.passengers.create(scene, { quality, cabin: true }), null) : null;
+    // oncoming (AI) trams that stand at a stop get people off and on while the player is near (luxtram-traffic.js calls TS.tramDwell.arrive / depart)
+    if (!demo && track.kind === 'tram' && TS.tramDwell) safe('tram dwell', () => TS.tramDwell.attach({ scene, track, quality, playerS: () => (world && world.state ? world.state.s : 0), platformHeight: (i) => platformHeight(i), obstaclesOf: (st, pi) => obstaclesOf(st, pi) }));
+    if (cabin && model) { cabin.setActive(false, model); safe('cabin hooks', () => passengers && passengers.setCabinHooks && passengers.setCabinHooks({ onBoard: (d) => cabin.onBoard(d, liveOnboard()), onAlight: (d) => cabin.onAlight(d, liveOnboard()) })); }
     loaderSet(isLux ? 0.5 : 0.88);
     await frameDelay();
     safe('weather', () => landscape && landscape.setWeather && landscape.setWeather(environment.weather, true));
@@ -487,11 +502,11 @@
     safe('temp boards', () => { if (infra && infra.addTempBoard && simulation.plan) simulation.plan.tsr.forEach((r) => infra.addTempBoard(r.s0, r.kmh, r.s1)); });
     const nightish = environment.hour < 6.3 || environment.hour > 19.3;
     if (abortIf && abortIf()) {   // the menu backdrop is no longer wanted (a service started meanwhile): drop it without touching the global world
-      disposePieces({ passengers, cab, model, infra, landscape });
+      disposePieces({ passengers, cabin, cab, model, infra, landscape });
       return null;
     }
     world = {
-      routeId, trainId, routeDef, cfg, track, landscape, infra, obstacleRoots, model, cab, passengers, sim: simulation, env: environment,
+      routeId, trainId, routeDef, cfg, track, landscape, infra, obstacleRoots, model, cab, passengers, cabin, sim: simulation, env: environment,
       state: null, demo, exch: null, plans: {}, spawned: new Set(), onboard: 0, delivered: 0, boardedTotal: 0, passengerKm: 0,
       aspects: new Map(), crossingClosed: new Map(), wheelAngle: 0, lights: nightish || environment.weather !== 'clear', 
       lightMode: null, lightLevel: 0, darkK: 0, tunnelK: 0, wipe: { cycles: 0, wet: 0 }, endTimer: -1, finished: false, departedAt: new Map(), announcedFor: -1, lastDoorSent: -1, lastDoorSide: '', lastBeacon: 0,
@@ -632,19 +647,51 @@
   let sideSpot = null, chaseSign = 1, chaseStationFor = -9;
   function setCamera(next) {
     if (!CAMERAS.includes(next)) return;
+    if (next === 'inside' && !isTramWorld()) { if (camMode !== 'inside') return; next = 'cab'; }
     camMode = next;
     document.body.dataset.cam = next;
     camSmooth = { pos: null, look: null };
     sideSpot = null;
     look.yaw = look.pitch = 0;
     setCabHover(null);
-    if (camera) { camera.near = next === 'cab' ? 0.06 : 0.25; applyCabFov(); }
+    if (camera) { camera.near = next === 'cab' ? 0.06 : next === 'inside' ? 0.08 : 0.25; applyCabFov(); }
     safe('cab visibility', () => { if (world && world.cab) world.cab.group.visible = true; });
     safe('interior view', () => world && world.model && world.model.setCabView && world.model.setCabView(next === 'cab'));
-    const names = { cab: 'cam1', chase: 'cam2', platform: 'cam3', orbit: 'cam4' };
-    $('camName').textContent = (CAMERAS.indexOf(next) + 1) + ' · ' + t(names[next]);
+    safe('saloon view', () => world && world.model && world.model.setInteriorView && world.model.setInteriorView(next === 'inside'));
+    safe('saloon light', () => setInteriorLight(next === 'inside'));
+    safe('cabin passengers', () => { if (world && world.cabin) { world.cabin.setActive(next === 'inside', world.model); if (next === 'inside') { world.cabin.reconcile(liveOnboard(), true); updatePaxDisplay(); } } });
+    refreshCamLabel();
   }
-  const cycleCamera = () => setCamera(CAMERAS[(CAMERAS.indexOf(camMode) + 1) % CAMERAS.length]);
+  function refreshCamLabel() {
+    const names = { cab: 'cam1', chase: 'cam2', platform: 'cam3', orbit: 'cam4', inside: 'cam5' };
+    $('camName').textContent = (CAMERAS.indexOf(camMode) + 1) + ' · ' + t(names[camMode]);
+    const ch = $('camHint');
+    if (ch) { ch.hidden = camMode !== 'platform'; ch.textContent = t('camHint3'); }
+    const wp = $('walkPad');
+    if (wp) wp.hidden = camMode !== 'platform';
+    const bi = $('btnInside');
+    if (bi) { bi.hidden = !isTramWorld(); bi.classList.toggle('on', camMode === 'inside'); bi.textContent = camMode === 'inside' ? '5 · ' + t(['camPosFront', 'camPosMid', 'camPosRear'][insidePos]) + ' ↻' : '5 · ' + t('cam5'); }
+  }
+  /* the saloon's own light: one point light at the ceiling above the camera (only while the saloon camera is on), so seats and people are not black in the car's shadow and the cab
+     lamps really light the inside at night */
+  let interiorLight = null;
+  function setInteriorLight(on) {
+    if (!camera) return;
+    if (on && !interiorLight) { interiorLight = new THREE.PointLight(0xfff1dc, 0, 11, 1.2); interiorLight.position.set(0, 0.55, -0.4); interiorLight.castShadow = false; camera.add(interiorLight); }
+    if (interiorLight) { interiorLight.visible = !!on; interiorLight.intensity = on ? interiorLightLevel() : 0; }
+  }
+  const interiorLightLevel = () => 2.4 + 2.6 * (world && Number.isFinite(world.darkK) ? clamp(world.darkK, 0, 1) : 0);
+  const isTramWorld = () => !!(world && world.track && world.track.kind === 'tram' && quality !== 'low');   // (low quality builds no saloon)
+  /* key 5 / the HUD button: into the saloon, and inside again = the next of the three viewpoints */
+  function pressInside() {
+    if (!isTramWorld()) return;
+    if (camMode === 'inside') { insidePos = (insidePos + 1) % 3; camSmooth.pos = null; refreshCamLabel(); } else setCamera('inside');
+  }
+  const cycleCamera = () => {
+    let i = CAMERAS.indexOf(camMode);
+    do { i = (i + 1) % CAMERAS.length; } while (CAMERAS[i] === 'inside' && !isTramWorld());
+    setCamera(CAMERAS[i]);
+  };
 
   function platformInfoOf(i) { return safe('platformInfo', () => (world && world.track.platformInfo ? world.track.platformInfo(i) : null), null); }
   function platformHeight(i) {
@@ -693,6 +740,7 @@
       camera.quaternion.copy(car0.group.quaternion).multiply(camTmp.q);
       return;
     }
+    if (camMode === 'inside') { updateInsideCamera(dt, state); return; }
     const f0 = w.carFrames[0];
     if (!f0 || !f0.pos) return;
     if (camMode === 'chase') {
@@ -710,15 +758,18 @@
       const st = state && state.nextStation;
       const nearStation = st && state.distanceToStop < 950 && state.distanceToStop > -(L + 60);
       if (nearStation) {
-        if (!sideSpot || !sideSpot.station || sideSpot.stationIndex !== state.nextStationIndex) { sideSpot = stationSpot(st, L); sideSpot.stationIndex = state.nextStationIndex; camSmooth.look = null; }
-      } else if (!sideSpot || sideSpot.station || frontS > sideSpot.s + 30) { sideSpot = tracksideSpot(frontS, L); camSmooth.look = null; }
+        if (!sideSpot || !sideSpot.station || sideSpot.stationIndex !== state.nextStationIndex) { sideSpot = stationSpot(st, L); sideSpot.stationIndex = state.nextStationIndex; camSmooth.look = null; resetPlatView(); }
+      } else if (!sideSpot || sideSpot.station || frontS > sideSpot.s + 30) { sideSpot = tracksideSpot(frontS, L); camSmooth.look = null; resetPlatView(); }
       camera.position.copy(sideSpot.pos);
+      platformWalk(dt, state);
       const rearS = frontS - L;
       const targetS = clamp(sideSpot.s, rearS + 3, frontS - 2);
       const lookFrame = frameSafe(w.track, sideSpot.station ? targetS + 4 : (frontS < sideSpot.s ? frontS : targetS));
       camTmp.look.copy(lookFrame.pos); camTmp.look.y += sideSpot.station ? platformHeight(state.nextStationIndex) + 0.9 : 1.6;
       if (!camSmooth.look) camSmooth.look = camTmp.look.clone(); else camSmooth.look.lerp(camTmp.look, 1 - Math.exp(-5 * dt));
       camera.lookAt(camSmooth.look);
+      if (platView.yaw || platView.pitch) { camTmp.e.set(platView.pitch, platView.yaw, 0, 'YXZ'); camTmp.q.setFromEuler(camTmp.e); camera.quaternion.multiply(camTmp.q); }
+      if (Math.abs(camera.fov - platView.fov) > 0.01) { camera.fov = platView.fov; camera.updateProjectionMatrix(); }
     } else {
       const mid = frameSafe(w.track, frontS - L / 2);
       camTmp.look.copy(mid.pos); camTmp.look.y += 1.8;
@@ -727,6 +778,53 @@
       camera.position.copy(camTmp.p);
       camera.lookAt(camTmp.look);
     }
+  }
+
+  /* walking on the platform (camera 3): arrow keys / the pad move the viewpoint along the stop, at eye height above the platform, clamped to the platform (never over the track, never beyond its ends) */
+  function platformWalk(dt, state) {
+    const w = world;
+    if (!sideSpot || !sideSpot.station || !w) return;
+    const k = platView.keys, ax = (k.right ? 1 : 0) - (k.left ? 1 : 0) + platView.vx, ay = (k.in ? 1 : 0) - (k.out ? 1 : 0) + platView.vy;
+    const idx = sideSpot.stationIndex, info = platformInfoOf(idx);
+    if (!info) return;
+    if (platView.s === null) {
+      if (!ax && !ay) return;
+      platView.s = sideSpot.s; platView.lat = info.edge + Math.max(2.4, info.width * 0.88);
+    }
+    const sMin = info.s0 + 0.6, sMax = info.s1 - 0.6, latMin = info.edge + 0.5, latMax = info.edge + info.width - 0.35;
+    // "right" walks towards the front of the train, "in" away from the track
+    platView.s = clamp(platView.s + clamp(ax, -1, 1) * PLAT_WALK_MS * dt, sMin, sMax);
+    platView.lat = clamp(platView.lat + clamp(ay, -1, 1) * PLAT_WALK_MS * dt, latMin, Math.max(latMin, latMax));
+    const f = frameSafe(w.track, platView.s), sign = lateralSign(w.track.stations[idx].side);
+    camera.position.copy(f.pos).addScaledVector(f.right, sign * platView.lat);
+    camera.position.y = f.pos.y + platformHeight(idx) + PLAT_EYE;
+  }
+
+  /* saloon camera: a standing passenger's eye height in the aisle, at the front end (looking back down the whole tram), the middle (looking forward) or the rear end (looking forward) */
+  function updateInsideCamera(dt, state) {
+    const w = world, cars = w.model && w.model.cars;
+    if (!cars || !cars.length) return;
+    const n = cars.length, last = cars[n - 1], first = cars[0];
+    const vp = w.cabin && w.cabin.viewpoint ? w.cabin.viewpoint(insidePos) : null;
+    const car = vp ? cars[vp.car] : cars[[0, Math.floor(n / 2), n - 1][insidePos]], inf = car.interior;
+    car.group.updateMatrixWorld(true); first.group.updateMatrixWorld(true); last.group.updateMatrixWorld(true);
+    const floorY = inf ? inf.floorY : 0.4, eyeY = floorY + 1.55;
+    camTmp.eye.set(vp ? vp.x : 0.1, vp ? vp.y : eyeY, vp ? vp.z : 0); car.group.localToWorld(camTmp.eye);
+    // aim down the length of the train: at the far end (front viewpoint) or at the front of the train (the others)
+    const tgtCar = vp ? cars[vp.look.car] : (insidePos === 0 ? last : first);
+    camTmp.t.set(0, (vp ? vp.y : eyeY) - 0.05, vp ? vp.look.z : 0);
+    tgtCar.group.updateMatrixWorld(true); tgtCar.group.localToWorld(camTmp.t);
+    if (interiorLight) interiorLight.intensity = interiorLightLevel();
+    const speed = state ? clamp(state.v / 28, 0, 1) : 0, tt = elapsedReal;
+    camTmp.eye.y += Math.sin(tt * 9.7) * 0.0025 * speed;
+    camera.position.copy(camTmp.eye);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(camTmp.t);
+    look.yaw *= dragging ? 1 : 1 - Math.min(1, dt * 1.2);
+    look.pitch *= dragging ? 1 : 1 - Math.min(1, dt * 1.2);
+    camTmp.e.set(look.pitch + Math.sin(tt * 0.5) * 0.002 * speed, look.yaw + Math.sin(tt * 0.33) * 0.004 * speed, 0, 'YXZ');
+    camTmp.q.setFromEuler(camTmp.e);
+    camera.quaternion.multiply(camTmp.q);
   }
 
   /* chase camera: candidates are tried in order and the first with a clear line of sight (no pole, canopy or portal in the way) wins */
@@ -806,6 +904,8 @@
 
   /* pointer: clickable cab controls (cab view), cab head look, free orbit drag + wheel */
   let dragging = false, dragX = 0, dragY = 0;
+  const pinch = new Map(); let pinchRef = 0;
+  const pinchDist = () => { const p = [...pinch.values()]; return p.length < 2 ? 0 : Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); };
   let cabPress = null, cabHover = null;           // { id, y0, n0 } while a control is held / the id under the cursor
   const cabRay = new THREE.Raycaster(), cabNdc = new THREE.Vector2();
   function cabHit(e) {
@@ -883,8 +983,22 @@
       const dx = e.clientX - dragX, dy = e.clientY - dragY; dragX = e.clientX; dragY = e.clientY;
       if (camMode === 'orbit') { orbit.yaw -= dx * 0.006; orbit.pitch = clamp(orbit.pitch + dy * 0.005, 0.03, 1.35); }
       else if (camMode === 'cab') { look.yaw = clamp(look.yaw - dx * 0.004, -1.2, 1.2); look.pitch = clamp(look.pitch - dy * 0.003, -0.6, 0.5); }
+      else if (camMode === 'inside') { look.yaw = clamp(look.yaw - dx * 0.004, -1.3, 1.3); look.pitch = clamp(look.pitch - dy * 0.003, -0.5, 0.45); }
+      else if (camMode === 'platform' && pinch.size < 2) { platView.yaw -= dx * 0.005 * (platView.fov / PLAT_FOV0); platView.pitch = clamp(platView.pitch - dy * 0.004 * (platView.fov / PLAT_FOV0), PLAT_PITCH_MIN, PLAT_PITCH_MAX); }
     });
-    el.addEventListener('wheel', (e) => { if (camMode === 'orbit') { e.preventDefault(); orbit.dist = clamp(orbit.dist * Math.exp(e.deltaY * 0.001), 8, 140); } }, { passive: false });
+    el.addEventListener('wheel', (e) => {
+      if (camMode === 'orbit') { e.preventDefault(); orbit.dist = clamp(orbit.dist * Math.exp(e.deltaY * 0.001), 8, 140); }
+      else if (camMode === 'platform') { e.preventDefault(); platView.fov = clamp(platView.fov * Math.exp(e.deltaY * 0.0012), PLAT_FOV_MIN, PLAT_FOV_MAX); }
+    }, { passive: false });
+    // two-finger pinch zooms camera 3
+    el.addEventListener('pointerdown', (e) => { pinch.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pinch.size === 2) pinchRef = pinchDist(); });
+    el.addEventListener('pointermove', (e) => {
+      if (!pinch.has(e.pointerId)) return;
+      pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch.size === 2 && camMode === 'platform' && pinchRef > 0) { const d = pinchDist(); platView.fov = clamp(platView.fov * (pinchRef / Math.max(10, d)), PLAT_FOV_MIN, PLAT_FOV_MAX); pinchRef = d; }
+    });
+    const pinchEnd = (e) => { pinch.delete(e.pointerId); pinchRef = 0; };
+    el.addEventListener('pointerup', pinchEnd); el.addEventListener('pointercancel', pinchEnd);
   }
 
   /* ------------------------------------------------------------ toasts */
@@ -928,8 +1042,13 @@
     const plan = planFor(i), last = i === stationsOf().length - 1;
     safe('passengers clear', () => w.passengers.clear && w.passengers.clear());
     const info = platformInfoOf(i);
-    safe('spawnPlatform', () => w.passengers.spawnPlatform && w.passengers.spawnPlatform(st, w.track, { count: plan.boarding + (last ? 6 : 3), side: st.side, platformHeight: platformHeight(i), edgeOffset: info ? info.edge : undefined, width: info ? info.width : undefined, trainLength: trainLength() }));
+    safe('spawnPlatform', () => w.passengers.spawnPlatform && w.passengers.spawnPlatform(st, w.track, { count: plan.boarding + (last ? 6 : 3), side: st.side, platformHeight: platformHeight(i), edgeOffset: info ? info.edge : undefined, width: info ? info.width : undefined, trainLength: trainLength(), tram: !!(w.track && w.track.kind === 'tram'), obstacles: obstaclesOf(st, info) }));
     w.spawnedFor = i;
+  }
+  /* footprints of the furniture on a Luxtram platform (stations-luxtram.js), so people never stand inside a bench or a ticket machine */
+  function obstaclesOf(st, info) {
+    if (!info || !world || !world.track || world.track.kind !== 'tram' || !TS.luxtramObstacles) return [];
+    return safe('platform obstacles', () => TS.luxtramObstacles(st.name, { edge: info.edge, width: info.width, island: info.kind === 'island', platformStart: st.platformStart, platformEnd: st.platformEnd }), []) || [];
   }
   function clearPlatform() {
     safe('passengers clear', () => world.passengers && world.passengers.clear && world.passengers.clear());
@@ -939,7 +1058,7 @@
     const w = world, out = [];
     if (!w.model) return out;
     const sign = side === 'left' ? -1 : 1, ph = platformHeight(world.exch ? world.exch.index : undefined);
-    for (const car of w.model.cars) {
+    w.model.cars.forEach((car, carIdx) => {
       car.group.updateMatrixWorld(true);
       const half = car.halfWidth || 1.45;
       for (const door of car.doors || []) {
@@ -947,9 +1066,9 @@
         const pos = car.group.localToWorld(new THREE.Vector3(sign * half, 0, door.zLocal));
         const dir = new THREE.Vector3(sign, 0, 0).applyQuaternion(car.group.quaternion).setY(0).normalize();
         pos.y = pos.y + ph;
-        out.push({ pos, side, dir });
+        out.push({ pos, side, dir, car: carIdx, zLocal: door.zLocal });
       }
-    }
+    });
     return out;
   }
   const exchangeStats = () => safe('passengers.stats', () => (world.passengers && world.passengers.stats ? world.passengers.stats() : null), null) || { waiting: 0, boarded: 0, alighted: 0, boardingTotal: 0, alightingTotal: 0, done: true };
@@ -980,7 +1099,7 @@
     if (!alighting && !boarding) w.exch.fixed = true;
     else if (w.passengers && w.passengers.startExchange) safe('startExchange', () => w.passengers.startExchange({ doorsWorld: doors, boarding, alighting }));
     else w.exch.simulated = { t: 0 };
-    if (e.terminus) { if (w.endTimer < 0) w.endTimer = 0; toast(t('evTerminus'), 'info', 3600); sfx('gong'); safe('announce', () => audio && audio.announce && audio.announce(t('annTerminus', { name: st.name }), lang)); }
+    if (e.terminus) { if (w.endTimer < 0) w.endTimer = 0; toast(t('evTerminus'), 'info', 3600); sfx('gong'); playAnnouncement('end', st, t('annTerminus', { name: st.name }), null); }
   }
   /* counts of the current door phase only */
   function phaseCounts() {
@@ -1109,7 +1228,32 @@
     else toast(t('evStopError', { n, dir: err > 0 ? t('evPast') : t('evShort') }), 'info', 2600);
   }
 
-  /* announcements */
+  /* announcements: on the Luxtram the pre-rendered voice clips (data/luxtram/voice, see scripts/gen_luxtram_voice.py) after the gong; every other case,
+     a missing clip or a clip that will not decode falls back to the browser's speech synthesis. The mute switch silences both. */
+  const VOICE_BASE = '/data/luxtram/voice/';
+  let voiceMap = null, voiceLoading = null;
+  function loadVoiceMap() {
+    if (!voiceLoading) {
+      voiceLoading = (typeof fetch === 'function' ? fetch(VOICE_BASE + 'index.json') : Promise.reject(new Error('no fetch')))
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { voiceMap = new Map(); if (j && j.clips) Object.keys(j.clips).forEach((id) => { const c = j.clips[id]; voiceMap.set(c.kind + '|' + (c.stop || '') + '|' + c.lang, id); }); return voiceMap; })
+        .catch(() => { voiceMap = new Map(); return voiceMap; });
+    }
+    return voiceLoading;
+  }
+  async function playAnnouncement(kind, st, text, side) {
+    if (!audio) return;
+    const onTram = !!(world && world.track && world.track.kind === 'tram');
+    let urls = null;
+    if (onTram && st && audio.announceClips) {
+      const map = await loadVoiceMap();
+      const ids = [map.get(kind + '|' + st.name + '|' + lang)];
+      if (side) ids.push(map.get('exit-' + side + '||' + lang));
+      if (ids[0]) urls = ids.filter(Boolean).map((id) => VOICE_BASE + id + '.mp3');
+    }
+    if (urls) { safe('announce clips', () => audio.announceClips(urls, text, lang, 1.2)); return; }
+    safe('announce', () => audio.announce && audio.announce(text, lang));
+  }
   function announceNext(auto) {
     const w = world;
     if (!w || !w.state) return;
@@ -1117,7 +1261,7 @@
     if (!st) return;
     const text = t('annNextStop', { name: st.name }) + '. ' + t(st.side === 'left' ? 'annExitLeft' : 'annExitRight');
     sfx('gong');
-    safe('announce', () => audio && audio.announce && audio.announce(text, lang));
+    playAnnouncement('next', st, text, st.side === 'left' ? 'left' : 'right');
     toast('🔔 ' + t('annNextStop', { name: st.name }), 'info', 3400);
     return auto;
   }
@@ -1243,9 +1387,33 @@
       updateSignals(state);
       updateCrossings(state);
       safe('passengers.update', () => w.passengers && w.passengers.update && w.passengers.update(dt, camera));
+      if (TS.tramDwell && w.track.kind === 'tram') safe('tram dwell update', () => TS.tramDwell.update(dt, camera));
+      if (w.cabin) {
+        const a = dt > 0 && w.lastV !== undefined ? (state.v - w.lastV) / dt : 0; w.lastV = state.v;
+        safe('cabin.update', () => w.cabin.update(dt, camera, { accel: clamp(a, -2.5, 2.5) }));
+        cabinTick(dt);
+      }
       safe('cab.update', () => w.cab && w.cab.update && w.cab.update(cabInfo(state)));
       updateAudio(state);
     }
+  }
+  /* the saloon people follow the real passenger count (whole seconds, no popping while the camera looks), the screens show the next stops */
+  let cabinClock = 0, paxClock = 0;
+  function cabinTick(dt) {
+    const w = world;
+    if (!w || !w.cabin) return;
+    cabinClock += dt; paxClock += dt;
+    if (cabinClock > 1.2 && !(w.exch && !w.exch.finalized)) { cabinClock = 0; safe('cabin reconcile', () => w.cabin.reconcile(liveOnboard(), false)); }
+    if (camMode === 'inside' && paxClock > 1) { paxClock = 0; safe('pax display', () => updatePaxDisplay()); }
+  }
+  function updatePaxDisplay() {
+    const w = world, st = w && w.state;
+    if (!w || !st || !w.model || !w.model.setPaxDisplay) return;
+    const stops = stationsOf(), tt = w.sim.timetable, h = st.headingIndex ?? st.nextStationIndex, here = st.platformIndex >= 0 && st.v < 0.3 && st.nextStationIndex === st.platformIndex;
+    const next = [];
+    for (let i = Math.max(0, h); i < stops.length && next.length < 4; i++) if (!tt.stops[i].pass) next.push({ name: stops[i].name, min: Math.max(0, Math.round((tt.stops[i].arr - st.t) / 60)) });
+    const last = stops[stops.length - 1];
+    w.model.setPaxDisplay({ dest: last ? last.name : '', clock: shownClock(st.clockSec), next, atStop: here ? t('hudHere') + ' · ' + stops[st.platformIndex].name : '' });
   }
   function cabInfo(state) {
     const w = world, st = state.headingStation || state.nextStation;
@@ -1339,6 +1507,7 @@
   function buildStrip() {
     const stations = stationsOf(), dots = $('stripDots');
     dots.replaceChildren();
+    lastStripNext = -2;
     if (!stations.length) return;
     const s0 = stations[0].s, span = Math.max(1, stations[stations.length - 1].s - s0);
     stations.forEach((st, i) => {
@@ -1382,6 +1551,12 @@
         const i = Number(dot.dataset.i);
         dot.className = (i < heading ? 'done' : i === heading ? 'next' : '') + (passIndices().includes(i) ? ' pass' : '');
       });
+      // the stop the box names gets its name under its dot (the ends already carry theirs)
+      let lbl = $('stripNextLbl');
+      if (!lbl) { lbl = document.createElement('span'); lbl.id = 'stripNextLbl'; $('stripDots').appendChild(lbl); }
+      const hs = stations[heading];
+      lbl.hidden = !hs || heading <= 0 || heading >= stations.length - 1;
+      if (hs) { lbl.textContent = hs.name; lbl.style.left = clamp(((hs.s - s0) / span) * 100, 12, 88) + '%'; }
     }
   }
   const fmtDist = (m) => (m >= 1000 ? t('distanceKm', { n: (m / 1000).toFixed(1) }) : t('distanceM', { n: Math.max(0, Math.round(m / 10) * 10) }));
@@ -1424,6 +1599,51 @@
     const head = g.state === 'brake' ? t('guideBrake') : g.state === 'late' ? t('guideLate') : t('guideOk');
     return { cls: g.state + (save.hints ? '' : ' subtle'), text: head + ' · ' + label + ' ' + fmtDist(g.distance) };
   }
+  /* ---- timetable rules shown on the HUD ----
+   *  1. every stop has a scheduled arrival (Ukunft) and departure (Ofaart); the departure is never before the arrival, the origin has only a departure and the terminus only an arrival;
+   *  2. both are clock times with seconds, the same clock as the one in the corner, so a countdown always ends exactly on the printed time;
+   *  3. between stops the delay is the position against the timetable (departure of the last stop -> arrival of the next one); standing in a stop it is measured against the DEPARTURE
+   *     only: arriving late is absorbed by the dwell (0:00 until the departure time has passed), after that it counts up;
+   *  4. delay colour: green when early or at most DELAY_LATE_S late, red when later; the word underneath says Fréi / Pünktlech / Verspéidung;
+   *  5. while standing in a stop (doors open, closed, boarding) a badge counts down to the departure time, turns green when the way is free and red when the departure time is long gone;
+   *  6. the box always lists the stop it names: while approaching, Ukunft is lit; standing in it, Ofaart is lit and Ukunft greyed. */
+  const DELAY_LATE_S = 30, DELAY_EARLY_S = 5, DEP_LATE_RED_S = 30;
+  function scheduleView(s, hIdx) {
+    const w = world, tt = w.sim.timetable, stops = tt.stops, last = stops.length - 1;
+    const stop = stops[hIdx], here = s.platformIndex >= 0 && s.v < 0.3 && s.nextStationIndex === s.platformIndex;
+    const cur = here ? stops[s.platformIndex] : null;
+    const out = { here: here && hIdx === s.platformIndex, hIdx, last: hIdx === last, first: hIdx === 0, pass: !!(stop && stop.pass), arr: stop ? tt.clockStart + stop.arr : 0, dep: stop ? tt.clockStart + stop.dep : 0, delay: s.delaySec, badge: null };
+    if (here && cur) {
+      const idx = s.platformIndex, depAt = cur.dep, late = s.t - depAt;
+      // rule 3: standing in a stop the delay is measured against the departure
+      out.delay = idx === last ? 0 : Math.max(0, Math.round(late));
+      if (idx !== last) {
+        const when = (stationsOf()[idx] ? stationsOf()[idx].name + ' · ' : '') + clockSecText(tt.clockStart + depAt);
+        if (late < 0) out.badge = { cls: '', left: t('hudDepIn', { t: minSec(-late) }), right: when };
+        else if (s.readyToDepart && s.doorPhase === 'closed') out.badge = { cls: 'go', left: t('hudDepGo'), right: when };
+        else out.badge = { cls: late > DEP_LATE_RED_S ? 'late' : '', left: t('hudDepLate', { t: '+' + minSec(late) }), right: when };
+      }
+    }
+    return out;
+  }
+  const clockPill = (sec) => { const t0 = clockSecText(sec); return t0.slice(0, 5) + '<i>' + t0.slice(5) + '</i>'; };
+  function renderSchedule(sv) {
+    const box = $('sched'), badge = $('depBadge');
+    box.hidden = false;
+    const arr = $('schedArr'), dep = $('schedDep');
+    $('schedArrLbl').textContent = sv.pass ? t('ttPass') : t('ttArrival');
+    $('schedDepLbl').textContent = t('ttDeparture');
+    $('schedArrT').innerHTML = clockPill(sv.arr);
+    $('schedDepT').innerHTML = sv.last || sv.pass ? '–' : clockPill(sv.dep);
+    arr.className = 'pill' + (sv.pass ? ' pass' : sv.here ? ' past' : ' now');
+    dep.className = 'pill' + (sv.last || sv.pass ? ' pass' : sv.here ? ' now' : '');
+    dep.hidden = sv.pass;
+    if (sv.first) { $('schedArrT').textContent = '–'; arr.className = 'pill pass'; }   // the origin has no arrival
+    if (sv.badge) {
+      badge.hidden = false; badge.className = 'depbadge ' + sv.badge.cls;
+      badge.replaceChildren(Object.assign(document.createElement('small'), { textContent: sv.badge.right }), Object.assign(document.createElement('b'), { textContent: sv.badge.left }));
+    } else badge.hidden = true;
+  }
   function updateHud(force) {
     const w = world;
     if (!w || !w.state || $('hud').hidden && !force) return;
@@ -1434,15 +1654,22 @@
     sign.classList.toggle('over', s.overspeed);
     const nl = s.nextLimit;
     $('nextLimit').textContent = nl && nl.distance < 3000 ? (nl.tsr ? '⚠ ' : '→ ') + Math.round(nl.kmh) + ' · ' + fmtDist(nl.distance) : '';
+    const sv = scheduleView(s, hIdx);
+    $('nextLbl').textContent = sv.here ? t('hudHere') : t('hudNextStop');
     $('nextName').textContent = st ? st.name : '–';
     $('nextDist').textContent = st ? fmtDist(Math.abs(s.distanceToHeading ?? s.distanceToStop)) : '–';
-    $('nextSide').textContent = st ? t('platformShort') + ' ' + t(st.side === 'left' ? 'sideLeft' : 'sideRight') : '';
-    $('nextWhen').textContent = st ? shownClock(w.sim.timetable.clockStart + w.sim.timetable.stops[hIdx][s.platformIndex === hIdx && s.v < 0.3 ? 'dep' : 'arr']) : '';
+    const sideEl = $('nextSide');
+    sideEl.textContent = st ? t('platformShort') + ' ' + t(st.side === 'left' ? 'sideLeft' : 'sideRight') : '';
+    sideEl.className = 'chip ' + (st ? (st.side === 'left' ? 'left' : 'right') : '');
+    renderSchedule(sv);
     $('clock').textContent = shownClock(s.clockSec);
     $('clockSec').textContent = ':' + pad2((((s.clockSec + (w.clockShift || 0)) % 60) + 60) % 60);
-    const d = $('delay');
-    d.textContent = delayText(s.delaySec);
-    d.className = 'delay' + (s.delaySec > 120 ? ' late' : s.delaySec > 30 ? ' warn' : '');
+    const d = $('delay'), dv = sv.delay, isLate = dv > DELAY_LATE_S;
+    d.textContent = delayText(dv);
+    d.className = 'delay' + (isLate ? ' late' : '');
+    const dw = $('delayWord');
+    dw.textContent = dv < -DELAY_EARLY_S ? t('hudEarly') : isLate ? t('hudDelay') : t('hudOnTime');
+    dw.className = 'delayword' + (isLate ? ' late' : '');
     $('onboard').textContent = String(liveOnboard());
     $('cashHud').textContent = fmtInt(w.liveCash || 0);
     $('svcLabel').textContent = (mode === 'endless' ? t('endlessLine', { n: endless.index + 1, total: endless.order.length }) : nameOf(w.routeDef.name)) + ' · ' + patternText();
@@ -1480,7 +1707,7 @@
   }
 
   /* ------------------------------------------------------------ overlays */
-  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['R', 'keyReverse'], ['F', 'keyFast'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['V', 'keyWeather'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–4', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
+  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['R', 'keyReverse'], ['F', 'keyFast'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['V', 'keyWeather'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–5', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
   function buildHelp() {
     const body = $('helpBody');
     body.replaceChildren();
@@ -1513,7 +1740,7 @@
       if (w.state && i === w.state.nextStationIndex) tr.className = 'cur';
       const rec = sum.stops[i];
       if (stop.pass) tr.className = 'pass';
-      const cells = stop.pass ? [stop.name, t('ttPass') + ' ' + shownClock(tt.clockStart + stop.arr), '–', '·'] : [stop.name, shownClock(tt.clockStart + stop.arr), i === tt.stops.length - 1 ? '–' : shownClock(tt.clockStart + stop.dep), rec && rec.visited ? delayText(rec.arrDelaySec) : '·'];
+      const cells = stop.pass ? [stop.name, t('ttPass') + ' ' + shownClock(tt.clockStart + stop.arr), '–', '·'] : [stop.name, shownClock(tt.clockStart + stop.arr), i === tt.stops.length - 1 ? '–' : shownClock(tt.clockStart + stop.dep), rec && rec.visited ? t('ttArrAbbr') + ' ' + delayText(rec.arrDelaySec) + (Number.isFinite(rec.depDelaySec) && i < tt.stops.length - 1 ? ' · ' + t('ttDepAbbr') + ' ' + delayText(rec.depDelaySec) : '') : '·'];
       for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
       table.appendChild(tr);
     });
@@ -1995,7 +2222,9 @@
       case 'v': if (!repeat) cycleWeather(); return true;
       case 'a': if (!repeat) announceNext(false); return true;
       case 'c': if (!repeat) cycleCamera(); return true;
-      case '1': case '2': case '3': case '4': setCamera(CAMERAS[Number(key) - 1]); return true;
+      case '3': if (camMode === 'platform') resetPlatView(); else setCamera('platform'); return true;
+      case '1': case '2': case '4': setCamera(CAMERAS[Number(key) - 1]); return true;
+      case '5': pressInside(); return true;
       case 't': if (!repeat) toggleTimetable(); return true;
       case 'm': if (!repeat) muteToggle(); return true;
       case 'q': if (!repeat) cycleQuality(); return true;
@@ -2023,9 +2252,18 @@
       if (r) { e.preventDefault(); return; }
     }
     if (phase === 'menu' && (e.key === 'Tab' || e.key === 'Enter' || e.key === ' ')) return;
+    if (phase === 'running' && camMode === 'platform' && platKey(e, true)) { e.preventDefault(); return; }
     if (handleKey(normKey(e), e.repeat)) e.preventDefault();
   }
-  function releaseAll() { input.held.up = input.held.down = false; cabPress = null; if (input.hornHeld) { input.hornHeld = false; sfx('horn', false); } }
+  /* camera 3: arrow left / right walk along the platform, Shift + arrow up / down towards / away from the track (plain up / down stay the lever) */
+  function platKey(e, down) {
+    const k = platView.keys;
+    if (e.key === 'ArrowLeft') { k.left = down; return true; }
+    if (e.key === 'ArrowRight') { k.right = down; return true; }
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (e.shiftKey || (!down && (k.in || k.out)))) { if (e.key === 'ArrowUp') k.out = down; else k.in = down; return true; }
+    return false;
+  }
+  function releaseAll() { input.held.up = input.held.down = false; platView.keys.left = platView.keys.right = platView.keys.in = platView.keys.out = false; cabPress = null; if (input.hornHeld) { input.hornHeld = false; sfx('horn', false); } }
 
   /* ------------------------------------------------------------ main loop */
   function frame(now) {
@@ -2079,7 +2317,7 @@
           events: [...events], career: save.career, careers: JSON.parse(JSON.stringify({ rail: save.rail, tram: save.tram })), arcadeTest: ARCADE_TEST,
           wallet: careerState().wallet, tb: save.tb, lifetime: careerState().lifetime, owned: careerState().owned, routes: careerState().routes, saveTrain: careerState().train, services: careerState().services,
           endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null, lastResult: w && w.lastResult ? { delivered: w.lastResult.passengersDelivered, boarded: w.lastResult.passengersBoarded, pkm: w.lastResult.passengerKm, delays: w.lastResult.delaySecAtStations, errors: w.lastResult.stopErrors, over: w.lastResult.overspeedSeconds, harsh: w.lastResult.harshEvents, spads: w.lastResult.spads, breakdown: w.lastReward && w.lastReward.breakdown } : null,
-          draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,
+          cabin: w && w.cabin ? w.cabin.stats() : null, insidePos, draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,
           hudSpeed: $('speedNum').textContent, hudSide: $('nextSide').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, kbNoticeVisible: !$('kbNotice').hidden, phoneBlocked: !$('phoneBlock').hidden,
           parkingBrake: !!(s && s.parkingBrake), guide: s ? s.guide : null, guideText: $('guide').hidden ? '' : $('guide').textContent, hintText: $('hint').textContent, parkLampVisible: !$('parkLamp').hidden,
           pattern: w && w.sim.plan ? w.sim.plan.pattern : '', passIndices: w && w.sim.plan ? [...w.sim.plan.pass] : [], tsr: w && w.sim.plan ? w.sim.plan.tsr.map((x) => ({ ...x })) : [], incidents: w && w.sim.plan ? w.sim.plan.incidents.map((x) => ({ ...x })) : [],
@@ -2210,7 +2448,7 @@
     try { mergeIncoming(window.__pbSave); } catch (error) { warn('restore injected save', error); }
     try { mergeIncoming(JSON.parse(readStore(SAVE_KEY) || 'null')); } catch (error) { warn('restore local save', error); }
     window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', (e) => handleKeyUp(normKey(e)));
+    window.addEventListener('keyup', (e) => { if (camMode === 'platform' && platKey(e, false)) return; handleKeyUp(normKey(e)); });
     window.addEventListener('blur', releaseAll);
     window.addEventListener('pagehide', () => { saveSnapshotNow(); if (phase !== 'boot') persist(); });
     document.addEventListener('freeze', saveSnapshotNow);
@@ -2243,6 +2481,13 @@
     $('pauseQuality').addEventListener('click', cycleQuality);
     $('camName').addEventListener('click', cycleCamera);
     $('camName').style.pointerEvents = 'auto';
+    { const pad = $('walkPad'), knob = $('walkKnob');   // touch walk pad (camera 3)
+      const move = (e) => { const r = pad.getBoundingClientRect(), R = r.width / 2; let dx = (e.clientX - r.left - R) / R, dy = (e.clientY - r.top - R) / R; const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; } platView.vx = Math.abs(dx) > 0.2 ? dx : 0; platView.vy = Math.abs(dy) > 0.2 ? dy : 0; knob.style.transform = 'translate(' + dx * R * 0.6 + 'px,' + dy * R * 0.6 + 'px)'; };
+      const stop = () => { platView.vx = platView.vy = 0; knob.style.transform = ''; };
+      pad.addEventListener('pointerdown', (e) => { try { pad.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } move(e); e.preventDefault(); e.stopPropagation(); });
+      pad.addEventListener('pointermove', (e) => { if (e.buttons || e.pressure) move(e); });
+      pad.addEventListener('pointerup', stop); pad.addEventListener('pointercancel', stop); pad.addEventListener('lostpointercapture', stop); }
+    $('btnInside').addEventListener('click', (e) => { pressInside(); if (e.detail !== 0) $('btnInside').blur(); });
     $('sumMenu').addEventListener('click', returnToMenu);
     $('sumAgain').addEventListener('click', () => { if (phase === 'summary' && world && !world.demo) startService(world.routeId, world.trainId, mode); });
     $('ttClose').addEventListener('click', () => { $('ttScreen').hidden = true; });

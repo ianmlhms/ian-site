@@ -1,5 +1,5 @@
 /* Lokféierer: procedural train audio (C). Create only after a user gesture.
- * TS.audio.create(opts?) -> { update, horn, doorChime, doorOpen, doorClose, gong, announce, brakeSqueal, signalBell, clack, setMuted, master, ctx, resume, dispose }
+ * TS.audio.create(opts?) -> { update, horn, doorChime, doorOpen, doorClose, gong, announce, announceClips, stopClips, brakeSqueal, signalBell, clack, setMuted, master, ctx, resume, dispose }
  * opts.context lets tests pass an OfflineAudioContext. Everything routes through one master gain. */
 (function () {
   'use strict';
@@ -394,6 +394,47 @@
       } catch (e) { console.warn('[Lokféierer] audio announce failed', e); }
     };
 
+    /* Pre-rendered announcements (data/luxtram/voice, made by scripts/gen_luxtram_voice.py): decoded once, played through the PA chain
+     * (band-limited like a tram loudspeaker) into the announcement bus, so the master gain / mute covers them like every other sound.
+     * announceClips(urls, fallbackText, lang, delayS): resolves true when the clips play; when one is missing or cannot be decoded it speaks the fallback text instead. */
+    const clipCache = new Map();
+    const paIn = gain(1), paHP = filt('highpass', 260, 0.7), paLP = filt('lowpass', 5200, 0.7);
+    paIn.connect(paHP); paHP.connect(paLP); paLP.connect(announceBus);
+    let clipSources = [], clipToken = 0;
+    function loadClip(url) {
+      if (clipCache.has(url)) return clipCache.get(url);
+      const p = (typeof fetch !== 'function' ? Promise.resolve(null) : fetch(url).then((r) => (r.ok ? r.arrayBuffer() : null)).then((ab) => {
+        if (!ab) return null;
+        return new Promise((resolve) => {
+          try { const r = ctx.decodeAudioData(ab, (b) => resolve(b), () => resolve(null)); if (r && r.then) r.then(resolve, () => resolve(null)); } catch (e) { resolve(null); }   // callback form for older Safari
+        });
+      })).catch(() => null);
+      clipCache.set(url, p);
+      return p;
+    }
+    function stopClips() {
+      clipToken++;
+      clipSources.forEach((n) => { try { n.stop(); n.disconnect(); } catch (e) { /* already ended */ } });
+      clipSources = [];
+    }
+    const announceClips = async function (urls, fallbackText, lang, delayS) {
+      try {
+        if (muted || !urls || !urls.length) return false;
+        stopClips();
+        const token = clipToken;
+        const bufs = await Promise.all(urls.map(loadClip));
+        if (token !== clipToken || muted) return false;
+        if (bufs.some((b) => !b)) { announce(fallbackText, lang); return false; }
+        let at = now() + Math.max(0.05, fin(delayS, 0));
+        bufs.forEach((b) => {
+          const src = ctx.createBufferSource(); src.buffer = b; src.connect(paIn);
+          src.onended = () => { clipSources = clipSources.filter((x) => x !== src); try { src.disconnect(); } catch (e) { /* gone */ } };
+          src.start(at); clipSources.push(src); at += b.duration + 0.22;
+        });
+        return true;
+      } catch (e) { console.warn('[Lokféierer] audio announce clips failed', e); return false; }
+    };
+
     const brakeSqueal = guard('brakeSqueal', function (level) {
       const l = clamp(fin(level, 0), 0, 1) * 0.5;
       manualSqueal = { level: l, until: now() + 0.4 };
@@ -405,7 +446,7 @@
       muted = !!m;
       master.gain.cancelScheduledValues(now());
       master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL, now(), 0.04);
-      if (muted) { try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* none */ } }
+      if (muted) { stopClips(); try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* none */ } }
     });
     const resume = () => {
       if (opts.context) return undefined;
@@ -419,11 +460,12 @@
       if (hornVoice) hornVoice.stop();
       clearInterval(crossTimer);
       sources.forEach((s) => { try { s.stop(); } catch (e) { /* not started */ } });
+      stopClips();
       try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* none */ }
       if (ctx.close && !opts.context) ctx.close();
     });
 
-    return { update, horn, doorChime, doorOpen, doorClose, gong, announce, brakeSqueal, signalBell, clack, setMuted, master, ctx, resume, dispose };
+    return { update, horn, doorChime, doorOpen, doorClose, gong, announce, announceClips, stopClips, brakeSqueal, signalBell, clack, setMuted, master, ctx, resume, dispose };
   }
 
   TS.audio = { create };

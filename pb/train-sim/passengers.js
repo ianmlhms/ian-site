@@ -6,10 +6,14 @@
   const TS = (window.TS = window.TS || {});
 
   const CAP = { high: 150, medium: 80, low: 40 };
+  const CABIN_CAP = { high: 60, medium: 48, low: 30 };   // people shown inside the tram (saloon camera), whatever the real passenger count
   const CROWD_SHARE = 0.65;
   const TAB_STEP = 2;
   const DEFAULT_EDGE = 1.75, DEFAULT_WIDTH = 4.5, DEFAULT_PLAT_H = 0.9;
   const SINK_DEPTH = 1.7;
+  /* Luxtram stops: the platform is a 0.3 m kerb with a short ramp at each end and level ground beyond (stations-luxtram / infra.js buildStation).
+   * In tram mode nobody uses the rail-style 'sink' exits: everybody leaves and arrives over the end ramps and their height follows walkY(). */
+  const TRAM_RAMP = 3.5, TRAM_WALK_OUT = 11, TRAM_LATERAL_MARGIN = 0.3, TRAM_FLOOR_H = 0.52, LANE_O = 0.76, TRAM_HALF_W = 1.5;   // floor height of the CAF Urbos above the rail (trains.js: floor 0.4 + slab), body half width
   const HIP_Y = 0.88, KNEE_DROP = 0.44, SHOULDER_Y = 1.36, SHOULDER_X = 0.255, NECK_Y = 1.4;
   const WALK_SPEED = [1.15, 1.55], RUN_SPEED = 4.6, RUNNER_CHANCE = 0.2;
   const ALIGHT_GAP = 0.8, BOARD_GAP = 1.2;
@@ -125,14 +129,15 @@
   function create(scene, opts) {
     const THREE = window.THREE;
     const quality = (opts && opts.quality) || 'medium';
-    const cap = CAP[quality] || CAP.medium;
+    const isCabin = !!(opts && opts.cabin);
+    const cap = opts && opts.cap ? opts.cap : isCabin ? (CABIN_CAP[quality] || CABIN_CAP.medium) : (CAP[quality] || CAP.medium);
     const crowdCap = Math.floor(cap * CROWD_SHARE);
     const castShadow = quality !== 'low';
     const geos = buildGeometries(THREE);
     const matLit = new THREE.MeshLambertMaterial({ vertexColors: true });
     const matUmb = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
     const group = new THREE.Group();
-    group.name = 'ts-passengers';
+    group.name = (opts && opts.name) || 'ts-passengers';
     scene.add(group);
 
     const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -164,6 +169,8 @@
     for (let i = 0; i < cap; i++) people.push({ slot: i, active: false });
     let highSlot = -1, colorsDirty = false, rainOn = false, clock = 0;
     let plat = null, ex = null;
+    let hooks = {};   // { onBoard(door), onAlight(door) }: the saloon (cabin) follows the people who really get on / off
+    const fire = (name, door) => { try { if (hooks[name]) hooks[name](door); } catch (e) { console.warn('[Lokféierer] passengers hook ' + name, e); } };
     const counters = { alighted: 0, boarded: 0, alightingTotal: 0, boardingTotal: 0 };
 
     function put(mesh2, idx, m) { m.toArray(mesh2.instanceMatrix.array, idx * 16); }
@@ -178,7 +185,8 @@
     // ------------------------------------------------------------ platform table
     function buildPlatform(station, track, o) {
       const ps = Math.min(station.platformStart, station.platformEnd), pe = Math.max(station.platformStart, station.platformEnd);
-      const s0 = ps - 12, s1 = pe + 12, n = Math.min(600, Math.ceil((s1 - s0) / TAB_STEP) + 1);
+      const tram = !!o.tram, ramp = tram ? (o.rampLen || TRAM_RAMP) : 0, margin = tram ? ramp + TRAM_WALK_OUT + 4 : 12;
+      const s0 = ps - margin, s1 = pe + margin, n = Math.min(600, Math.ceil((s1 - s0) / TAB_STEP) + 1);
       const side = o.side || station.side || 'right', sign = side === 'left' ? -1 : 1;
       const t = { px: new Float32Array(n), py: new Float32Array(n), pz: new Float32Array(n), tx: new Float32Array(n), tz: new Float32Array(n), rx: new Float32Array(n), rz: new Float32Array(n) };
       for (let i = 0; i < n; i++) {
@@ -191,15 +199,28 @@
       }
       const edge = o.edgeOffset == null ? DEFAULT_EDGE : o.edgeOffset, width = o.width == null ? DEFAULT_WIDTH : o.width;
       const mid = (ps + pe) / 2;
-      return {
-        station, side, sign, s0, s1, n, t, ps, pe, edge, width, back: edge + width, h: o.platformHeight == null ? DEFAULT_PLAT_H : o.platformHeight,
-        trainLength: o.trainLength || Math.min(pe - ps - 8, 110),
-        exits: [
+      const h = o.platformHeight == null ? DEFAULT_PLAT_H : o.platformHeight;
+      // Luxtram: the platform top is built from 3 m quads whose corners sit on the track profile (infra.js buildStation); the ramps are flat boxes centred on the profile
+      let segY = null, rampY = null;
+      if (tram) {
+        const nSeg = Math.max(1, Math.ceil((pe - ps) / 3));
+        segY = { n: nSeg, y: Array.from({ length: nSeg + 1 }, (_, k) => track.frameAt(ps + (k * (pe - ps)) / nSeg).pos.y), mid: Array.from({ length: nSeg }, (_, k) => track.frameAt(ps + ((k + 0.5) * (pe - ps)) / nSeg).pos.y) };   // quad corners; centres of the flat concrete boxes under them
+        // ramp top plane (infra.js): from 2 cm under the platform top at the platform end to the track's height at the far end
+        rampY = [{ a: track.frameAt(ps).pos.y + h - 0.02, b: track.frameAt(ps - ramp).pos.y }, { a: track.frameAt(pe).pos.y + h - 0.02, b: track.frameAt(pe + ramp).pos.y }];
+      }
+      const exits = tram
+        // Luxtram: people only come and go over the end ramps (bottom of the ramp = inn - ramp .. out), then walk on level ground
+        ? [{ kind: 'end', dir: -1, out: ps - ramp - TRAM_WALK_OUT, inn: ps + 1.5, ramp: ps - ramp }, { kind: 'end', dir: 1, out: pe + ramp + TRAM_WALK_OUT, inn: pe - 1.5, ramp: pe + ramp }]
+        : [
           { kind: 'end', dir: -1, out: ps - 5, inn: ps + 1.5 },
           { kind: 'end', dir: 1, out: pe + 5, inn: pe - 1.5 },
           { kind: 'mid', dir: 0, s: clamp(station.s - 14, ps + 6, pe - 6) || mid },
           { kind: 'mid', dir: 0, s: clamp(station.s - 52, ps + 6, pe - 6) || mid },
-        ],
+        ];
+      return {
+        station, side, sign, s0, s1, n, t, ps, pe, edge, width, back: edge + width, h, tram, ramp, segY, rampY, obst: Array.isArray(o.obstacles) ? o.obstacles : [], floorH: o.floorHeight == null ? TRAM_FLOOR_H : o.floorHeight,
+        trainLength: o.trainLength || Math.min(pe - ps - 8, 110),
+        exits,
       };
     }
     const smp = { x: 0, y: 0, z: 0, tx: 1, tz: 0, rx: 0, rz: 1 };
@@ -215,6 +236,118 @@
       for (let it = 0; it < 4; it++) { sample(s); s += (x - smp.x) * smp.tx + (z - smp.z) * smp.tz; }
       sample(s);
       return { s, o: (x - smp.x) * smp.rx + (z - smp.z) * smp.rz };
+    }
+    /* Ground beyond the ramps (Luxtram): probed with rays at spawn time, so people only walk where there really is ground and follow its height
+     * (some stops end in a cutting, a wall or a bridge: those ends are not used). Rays hit the world's ground / pavement meshes only. */
+    const rayProbe = new THREE.Raycaster();
+    function groundMeshes(cx, cz, radius) {
+      const out = [], box = new THREE.Box3();
+      scene.updateMatrixWorld();
+      scene.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || !o.visible || !o.geometry || o.material && o.material.transparent) return;
+        for (let a = o.parent; a; a = a.parent) if (a === group || (a.name && a.name.indexOf('train:') === 0)) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        box.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+        if (box.max.x < cx - radius || box.min.x > cx + radius || box.max.z < cz - radius || box.min.z > cz + radius) return;
+        out.push(o);
+      });
+      return out;
+    }
+    function probeExits() {
+      const mid = sample(plat.station.s), cx = mid.x, cz = mid.z, radius = (plat.pe - plat.ps) / 2 + plat.ramp + TRAM_WALK_OUT + 25;
+      const meshes = groundMeshes(cx, cz, radius), STEP = 0.75, oLane = plat.edge + LANE_O;
+      plat.exits.forEach((e) => {
+        const gs = [], gy = [], n = Math.ceil(TRAM_WALK_OUT / STEP);
+        let prev = 0, goodTo = 0;
+        for (let k = 0; k <= n; k++) {
+          const sS = e.dir < 0 ? e.ramp - k * STEP : e.ramp + k * STEP;
+          sample(sS);
+          let lo = 1e9, hi = -1e9, sum = 0, missing = false;
+          for (let li = 0; li < 3 && !missing; li++) {
+            const oo = oLane + (li - 1) * 0.3;
+            rayProbe.set(new THREE.Vector3(smp.x + smp.rx * oo, smp.y + 0.9, smp.z + smp.rz * oo), new THREE.Vector3(0, -1, 0)); rayProbe.far = 2.6;
+            const hit = rayProbe.intersectObjects(meshes, false).find((q) => !q.face || q.face.normal.y > 0.6);
+            if (!hit) { missing = true; break; }
+            const yy = hit.point.y - smp.y; lo = Math.min(lo, yy); hi = Math.max(hi, yy); if (li === 1) sum = yy;
+          }
+          if (missing || hi - lo > 0.06) break;   // uneven ground across the lane: nobody walks there
+          const y = sum;
+          if (Math.abs(y) > 0.45 || Math.abs(y - prev) > 0.07) break;
+          gs.push(sS); gy.push(y); prev = y; goodTo = k * STEP;
+        }
+        e.ground = { s: gs, y: gy };
+        e.reach = goodTo;                        // metres of usable ground beyond the ramp
+        e.usable = goodTo >= 3;
+        if (gs.length) e.out = gs[gs.length - 1];
+        else e.out = e.ramp;
+      });
+    }
+    function groundOff(s) {
+      const e = s < plat.station.s ? plat.exits[0] : plat.exits[1], g = e.ground;
+      if (!g || !g.s.length) return 0;
+      const a = g.s;
+      if (e.dir < 0) { if (s >= a[0]) return g.y[0]; if (s <= a[a.length - 1]) return g.y[a.length - 1]; for (let i = 0; i < a.length - 1; i++) if (s <= a[i] && s >= a[i + 1]) return g.y[i] + (g.y[i + 1] - g.y[i]) * (a[i] - s) / (a[i] - a[i + 1]); }
+      else { if (s <= a[0]) return g.y[0]; if (s >= a[a.length - 1]) return g.y[a.length - 1]; for (let i = 0; i < a.length - 1; i++) if (s >= a[i] && s <= a[i + 1]) return g.y[i] + (g.y[i + 1] - g.y[i]) * (s - a[i]) / (a[i + 1] - a[i]); }
+      return 0;
+    }
+    /* Height of the walkable surface above the track at platform coordinates (s, o):
+     * platform top (+ the tram floor beside it) over the platform, a linear ramp over the ramp length at each end, level ground beyond. */
+    function platformTop(s, ty) {
+      const L = plat.pe - plat.ps, n = plat.segY.n, segL = L / n, f = clamp((s - plat.ps) / L, 0, 1) * n, i = Math.min(n - 1, f | 0);
+      // the paving quad follows the profile; under each 3 m segment sits a FLAT concrete box (0.1 m longer than the segment), which on a steep stretch stands up to ~0.1 m proud of the quad
+      const segTop = (k) => Math.max(plat.segY.y[k] + (plat.segY.y[k + 1] - plat.segY.y[k]) * clamp((s - plat.ps) / segL - k, 0, 1) + plat.h, plat.segY.mid[k] + plat.h - 0.01);
+      let top = segTop(i);
+      // within a few cm of a joint the neighbour's box shows through on a curve (its end is not square to the track): take the middle of the two
+      const frac = f - i;
+      if (frac < 0.04 && i > 0) top = (top + segTop(i - 1)) / 2;
+      else if (frac > 0.96 && i < n - 1) top = (top + segTop(i + 1)) / 2;
+      return top - ty + 0.02;   // (+2 cm: the soles)
+    }
+    function walkY(s, o) {
+      if (!plat.tram) return plat.h;
+      const ty = sample(s).y;
+      if (s >= plat.ps - 0.05 && s <= plat.pe + 0.05) {
+        const top = platformTop(s, ty);
+        // between the tram body and the platform edge: the step from the tram floor to the platform top
+        if (o >= plat.edge || plat.edge <= TRAM_HALF_W + 0.05) return top;
+        const k = clamp((o - TRAM_HALF_W) / (plat.edge - TRAM_HALF_W), 0, 1);
+        return plat.floorH + (top - plat.floorH) * k;
+      }
+      const d = s < plat.ps ? plat.ps - s : s - plat.pe;
+      if (d >= plat.ramp) return groundOff(s);
+      const rr = plat.rampY[s < plat.ps ? 0 : 1], ramp = rr.a + (rr.b - rr.a) * (d / plat.ramp) - ty;
+      // on a curve the ramp box and the last platform box do not meet exactly: the first 0.7 m follow the platform end
+      if (d < 0.7) return Math.max(ramp, platformTop(s < plat.ps ? plat.ps : plat.pe, ty) - 0.08 - 0.12 * (d / 0.7));
+      return ramp;
+    }
+    /* keeps walkers off the track side of the platform edge (and off its back edge) while they are on / beside the platform or its ramps */
+    function blocked(s, o, pad) {
+      const ob = plat.obst;
+      for (let i = 0; i < ob.length; i++) { const b = ob[i]; if (Math.abs(s - b.s) < b.hs + pad && Math.abs(o - b.o) < b.ho + pad) return true; }
+      return false;
+    }
+    /* walking people slide around the furniture instead of through it: push out of any footprint along the axis of least penetration */
+    function avoidObstacles(p) {
+      const ob = plat.obst;
+      for (let i = 0; i < ob.length; i++) {
+        const b = ob[i], hs = b.hs + 0.22, ho = b.ho + 0.22, dS = p.s - b.s, dO = p.o - b.o;
+        if (Math.abs(dS) >= hs || Math.abs(dO) >= ho) continue;
+        // a walker slides round the side that is across his heading (never head-on: he would stick); a standing person leaves along the shorter way
+        const alongO = p.mode === 'move' ? Math.abs(p.fs) >= Math.abs(p.fo) : hs - Math.abs(dS) >= ho - Math.abs(dO);
+        if (alongO) {
+          let up = dO >= 0;
+          if (plat.tram) { if (up && b.o + ho > plat.back - TRAM_LATERAL_MARGIN) up = false; else if (!up && b.o - ho < plat.edge + TRAM_LATERAL_MARGIN) up = true; }   // never round the side that is not walkable
+          p.o = b.o + (up ? ho : -ho);
+        } else p.s = b.s + (dS >= 0 ? hs : -hs);
+      }
+    }
+    function keepOnWalkway(p) {
+      if (!plat.tram || p.doorway) return;
+      avoidObstacles(p);
+      if (p.s < plat.ps - plat.ramp - TRAM_WALK_OUT - 1 || p.s > plat.pe + plat.ramp + TRAM_WALK_OUT + 1) return;
+      p.o = clamp(p.o, plat.edge + TRAM_LATERAL_MARGIN, plat.back - TRAM_LATERAL_MARGIN);
+      avoidObstacles(p);   // (again: the clamp can push him back into a wall that stands on the walkway's back limit)
+      if (p.o < plat.edge + TRAM_LATERAL_MARGIN) p.o = plat.edge + TRAM_LATERAL_MARGIN;
     }
     function worldDir(s, a, b) { sample(s); return { x: smp.tx * a + smp.rx * b, z: smp.tz * a + smp.rz * b }; }
 
@@ -280,7 +413,7 @@
           let ok = false, s = 0, off = 0;
           for (let tr = 0; tr < 14 && !ok; tr++) {
             s = cs + rnd(-1.5, 1.5); off = clamp(co + rnd(-1.2, 1.2), plat.edge + 0.9, plat.back - 0.7);
-            ok = placed.every((q) => Math.hypot(q.s - s, q.o - off) > 0.62);
+            ok = placed.every((q) => Math.hypot(q.s - s, q.o - off) > 0.62) && !blocked(clamp(s, lo, hi), off, 0.3);
           }
           if (!ok) continue;
           const p = makePerson('crowd', clamp(s, lo, hi), off, k === 1 && chance(0.35) ? { kid: true } : null);
@@ -308,16 +441,28 @@
         let ds = (d.dir.x / n) * smp.tx + (d.dir.z / n) * smp.tz, dO = (d.dir.x / n) * smp.rx + (d.dir.z / n) * smp.rz;
         const l = Math.hypot(ds, dO) || 1; ds /= l; dO /= l;
         if (dO < 0.3) { ds = 0; dO = 1; }
-        return { s: w.s, o: w.o, ds, dO, queue: [], alightLeft: 0, virtualBoard: 0, tA: rnd(0, 0.6), tB: 0, intA: ALIGHT_GAP, intB: BOARD_GAP, pending: 0 };
+        return { car: d.car, zLocal: d.zLocal, side: d.side, s: w.s, o: w.o, ds, dO, queue: [], alightLeft: 0, virtualBoard: 0, tA: rnd(0, 0.6), tB: 0, intA: ALIGHT_GAP, intB: BOARD_GAP, pending: 0 };
       }).sort((a, b) => a.s - b.s);
     }
     function doorPoint(d, dist, lateral) { return { s: d.s + d.ds * dist - d.dO * lateral, o: d.o + d.dO * dist + d.ds * lateral }; }
     function queueSpot(d, k) {
       const row = Math.floor(k / QUEUE_LATERAL.length), lat = QUEUE_LATERAL[k % QUEUE_LATERAL.length] + rnd(-0.12, 0.12);
       const pt = doorPoint(d, 0.95 + row * 0.55 + rnd(0, 0.15), lat);
-      return { s: pt.s, o: Math.min(pt.o, plat.back - 0.4) };
+      let oo = clamp(pt.o, plat.tram ? plat.edge + TRAM_LATERAL_MARGIN + 0.1 : -1e9, plat.back - 0.4);
+      for (let tries = 0; tries < 6 && plat.tram && blocked(pt.s, oo, 0.25); tries++) oo = Math.max(plat.edge + TRAM_LATERAL_MARGIN + 0.1, oo - 0.3);
+      return { s: pt.s, o: oo };
     }
+    // the walking lane along a Luxtram platform: just behind the tactile strip, in front of the shelters' glass ends and furniture
+    function laneLat() { return clamp(plat.edge + LANE_O + rnd(-0.12, 0.12), plat.edge + 0.5, plat.back - 0.6); }
     function nearestExitPath(p, fromS, fromO) {
+      if (plat.tram) {
+        // Luxtram: along the platform lane to the nearer end, down the ramp, then a few metres on the level ground before they vanish
+        const laneO = laneLat();
+        let toLo = Math.abs(fromS - plat.ps) < Math.abs(fromS - plat.pe) ? chance(0.85) : chance(0.15);
+        if (plat.exits[toLo ? 0 : 1].usable === false && plat.exits[toLo ? 1 : 0].usable) toLo = !toLo;
+        const e = plat.exits[toLo ? 0 : 1];
+        return [{ s: e.inn, o: laneO }, { s: e.ramp, o: laneO }, { s: e.out, o: laneO }];
+      }
       const r = Math.random(), laneO = clamp(plat.edge + 1.8 + rnd(-0.1, 1.0), plat.edge + 1.7, plat.back - 0.8);
       const toLo = Math.abs(fromS - plat.ps) < Math.abs(fromS - plat.pe);
       const mids = plat.exits.slice(2).sort((a, b) => Math.abs(a.s - fromS) - Math.abs(b.s - fromS));
@@ -327,12 +472,21 @@
       if (ex2.kind === 'mid') { pts.push({ s: ex2.s, o: laneO }); pts.push({ s: ex2.s, o: plat.back + 2.6, sink: 1 }); } else { pts.push({ s: ex2.inn, o: laneO }); pts.push({ s: ex2.out, o: laneO, sink: 1 }); }
       return pts;
     }
-    function exitEntry(ex2) { return ex2.kind === 'mid' ? [{ s: ex2.s, o: plat.back + 2.6 }, { s: ex2.s, o: plat.back - 0.8, sink: -1 }] : [{ s: ex2.out, o: plat.edge + 2.2 }, { s: ex2.inn, o: plat.edge + 2.2, sink: -1 }]; }
+    // Luxtram: boarders come in over a random end ramp that has usable ground beyond it (both ends if both do)
+    function tramEntryExit() {
+      const ok = plat.exits.filter((e) => e.usable);
+      const list = ok.length ? ok : plat.exits;
+      return list[(Math.random() * list.length) | 0];
+    }
+    function exitEntry(ex2) {
+      if (plat.tram) { const laneO = laneLat(); return [{ s: ex2.out, o: laneO }, { s: ex2.ramp, o: laneO }, { s: ex2.inn, o: laneO }]; }
+      return ex2.kind === 'mid' ? [{ s: ex2.s, o: plat.back + 2.6 }, { s: ex2.s, o: plat.back - 0.8, sink: -1 }] : [{ s: ex2.out, o: plat.edge + 2.2 }, { s: ex2.inn, o: plat.edge + 2.2, sink: -1 }]; }
 
     function emitAlighter(d) {
       const inside = doorPoint(d, -1.0, rnd(-0.3, 0.3));
       const p = makePerson('alight', inside.s, inside.o);
       counters.alighted++;
+      fire('onAlight', d);
       if (!p) return;
       p.hasCase = p.hasCase && chance(0.8);
       const thr = doorPoint(d, 0.4, 0), out = doorPoint(d, 1.5, rnd(-0.4, 0.4));
@@ -344,6 +498,7 @@
 
     function startExchange(spec) {
       if (!plat) { console.warn('[Lokféierer] passengers: startExchange before spawnPlatform'); return; }
+      if (plat.tram) probeExits();   // now: the world's ground tiles around the stop are in their final detail
       const doors = buildDoors((spec && spec.doorsWorld) || []);
       if (!doors.length) { console.warn('[Lokféierer] passengers: no doors given'); return; }
       const alighting = Math.max(0, Math.round(spec.alighting || 0)), boarding = Math.max(0, Math.round(spec.boarding || 0));
@@ -388,7 +543,7 @@
       ex.inflowGap = clamp((BOARD_MAX_S * 0.7) / Math.max(1, ex.inflowLeft), 0.04, 0.45);
     }
     function spawnInflow() {
-      const e = plat.exits[Math.random() < 0.8 ? 2 + ((Math.random() * 2) | 0) : Math.random() < 0.5 ? 0 : 1];
+      const e = plat.tram ? tramEntryExit() : plat.exits[Math.random() < 0.8 ? 2 + ((Math.random() * 2) | 0) : Math.random() < 0.5 ? 0 : 1];
       const di = nearestDoorIdx(e.kind === 'mid' ? e.s : e.dir < 0 ? plat.ps : plat.pe, plat.edge + 2, 1.4);
       const entry = exitEntry(e);
       const p = makePerson('board', entry[0].s, entry[0].o);
@@ -402,14 +557,14 @@
     }
     function spawnRunner() {
       // from the platform access closest to a door, so the sprint takes seconds, not half a minute
-      const dist = (e2) => { const en = exitEntry(e2)[1]; return Math.min(...ex.doors.map((d) => Math.abs(d.s - en.s))); };
-      const e = plat.exits.slice().sort((a, b) => dist(a) - dist(b))[0];
+      const dist = (e2) => { const en = exitEntry(e2)[plat.tram ? 2 : 1]; return Math.min(...ex.doors.map((d) => Math.abs(d.s - en.s))); };
+      const usable = plat.tram ? plat.exits.filter((q) => q.usable) : [], e = (usable.length ? usable : plat.exits).slice().sort((a, b) => dist(a) - dist(b))[0];
       const entry = exitEntry(e);
       const p = makePerson('runner', entry[0].s, entry[0].o);
-      const di = nearestDoorIdx(entry[1].s, entry[1].o, 0.2);
+      const di = nearestDoorIdx(entry[plat.tram ? 2 : 1].s, entry[plat.tram ? 2 : 1].o, 0.2);
       const d = ex.doors[di];
       if (!p) { counters.boarded++; return; }
-      p.hasCase = false; p.hasUmb = p.hasUmb && chance(0.5); p.idleKind = 0; p.run = 1; p.speed = RUN_SPEED; p.door = d;
+      p.hasCase = false; p.hasUmb = p.hasUmb && chance(0.5); p.idleKind = 0; p.run = 1; p.speed = RUN_SPEED; p.door = d; p.entDoor = d;
       const front = doorPoint(d, 0.7, rnd(-0.3, 0.3)), thr = doorPoint(d, 0.25, 0), inside = doorPoint(d, -0.9, 0);
       setPath(p, entry.slice(1).concat([front, thr, inside]), 'enter', RUN_SPEED);
     }
@@ -418,12 +573,12 @@
       if (p && p.mode === 'queue') {
         d.queue.shift();
         const thr = doorPoint(d, 0.25, 0), inside = doorPoint(d, -0.9, 0);
-        p.speed = p.base; p.door = null;
+        p.speed = p.base; p.door = null; p.entDoor = d;
         setPath(p, [doorPoint(d, 0.9, 0), thr, inside], 'enter');
         d.queue.forEach((q, i) => { if (q.mode === 'queue' || q.mode === 'move') { q.spot = queueSpot(d, i); setPath(q, [q.spot], 'queue'); } });
         return true;
       }
-      if (!p && d.virtualBoard > 0) { d.virtualBoard--; counters.boarded++; return true; }
+      if (!p && d.virtualBoard > 0) { d.virtualBoard--; counters.boarded++; fire('onBoard', d); return true; }
       return false;
     }
 
@@ -485,7 +640,7 @@
     // ------------------------------------------------------------ simulation + animation
     function arrive(p) {
       if (p.then === 'despawn') { freePerson(p); return; }
-      if (p.then === 'enter') { counters.boarded++; freePerson(p); return; }
+      if (p.then === 'enter') { counters.boarded++; fire('onBoard', p.entDoor || p.door); freePerson(p); return; }
       if (p.then === 'queue') {
         p.mode = 'queue';
         if (p.door) { const dd = p.door; faceAtDoor(p, dd); }
@@ -496,18 +651,20 @@
     function faceAtDoor(p, d) { p.fs = -d.ds; p.fo = -d.dO; }
 
     function advance(p, dt) {
-      if (p.mode !== 'move') { p.moveT = 0; return; }
+      if (p.mode !== 'move') { p.moveT = 0; p.doorway = false; return; }
       p.moveT = (p.moveT || 0) + dt;
       if (p.moveT > 35 && p.path.length) { const lw = p.path[p.path.length - 1]; p.s = lw.s; p.o = lw.o; p.pi = p.path.length; p.moveT = 0; arrive(p); return; }
       const w = p.path[p.pi];
       const dS = w.s - p.s, dO = w.o - p.o, d = Math.hypot(dS, dO), step = p.speed * dt;
       if (d > 0.001) { p.fs += (dS / d - p.fs) * Math.min(1, 12 * dt); p.fo += (dO / d - p.fo) * Math.min(1, 12 * dt); }
-      if (w.sink) p.yOff = w.sink > 0 ? -SINK_DEPTH * (1 - d / p.segLen) : -SINK_DEPTH * (d / p.segLen);
+      p.doorway = (p.then === 'enter') || (p.kind === 'alight' && p.pi <= 1);
+      if (w.sink && !plat.tram) p.yOff = w.sink > 0 ? -SINK_DEPTH * (1 - d / p.segLen) : -SINK_DEPTH * (d / p.segLen);
       if (d <= step) {
         p.s = w.s; p.o = w.o; p.pi++;
         if (p.pi >= p.path.length) { arrive(p); return; }
         beginSeg(p);
       } else { p.s += (dS / d) * step; p.o += (dO / d) * step; }
+      keepOnWalkway(p);
       p.phase += step * (p.run ? 2.2 : 4.2) / p.sc;
     }
     function separate(p, dt) {
@@ -525,22 +682,29 @@
         const push = (SEPARATION - d) * k * (q.mode === 'move' ? 0.25 : 0.4);
         p.s += (dS / d) * push; p.o += (dO / d) * push;
       }
+      keepOnWalkway(p);
     }
 
     function writePerson(p, t) {
-      sample(p.s);
-      const wx = smp.x + smp.rx * p.o, wz = smp.z + smp.rz * p.o, wy = smp.y + plat.h + p.yOff;
-      // facing
-      const fx = smp.tx * p.fs + smp.rx * p.fo, fz = smp.tz * p.fs + smp.rz * p.fo;
-      const target = Math.atan2(fx, fz);
+      let wx, wy, wz, target;
+      if (p.cab) { wx = p.cab.wx; wy = p.cab.wy; wz = p.cab.wz; target = p.cab.yaw; }   // inside the tram: the pose comes from the saloon (world position + heading of the car)
+      else {
+        sample(p.s);
+        wx = smp.x + smp.rx * p.o; wz = smp.z + smp.rz * p.o; wy = smp.y + (plat.tram ? walkY(p.s, p.o) : plat.h) + p.yOff;
+        // facing
+        const fx = smp.tx * p.fs + smp.rx * p.fo, fz = smp.tz * p.fs + smp.rz * p.fo;
+        target = Math.atan2(fx, fz);
+      }
+      p.wx = wx; p.wy = wy; p.wz = wz;
       p.yaw += angleDiff(p.yaw, target) * Math.min(1, 0.22 + (p.mode === 'move' ? 0.15 : 0));
       const moving = p.mode === 'move';
       p.mv += ((moving ? 1 : 0) - p.mv) * 0.18;
       const mv = p.mv, idle = 1 - mv, ph = p.ph, run = p.run;
       const sw = Math.sin(p.phase), cw = Math.cos(p.phase);
       const legA = (0.46 + 0.5 * run) * mv, armA = (0.42 + 0.55 * run) * mv, kneeK = (0.85 + 0.65 * run) * mv;
-      const bob = 0.028 * Math.abs(sw) * mv * (1 + run) + 0.004 * Math.sin(t * 1.7 + ph) * idle;
-      const lean = (0.04 + 0.2 * run) * mv + 0.012 * Math.sin(t * 0.9 + ph) * idle;
+      const sitK = p.cab ? p.sit : 0, holdK = p.cab ? p.hold || 0 : 0;
+      const bob = (0.028 * Math.abs(sw) * mv * (1 + run) + 0.004 * Math.sin(t * 1.7 + ph) * idle) * (1 - sitK);
+      const lean = (0.04 + 0.2 * run) * mv + 0.012 * Math.sin(t * 0.9 + ph) * idle + (p.cab ? p.cab.lean : 0);
       const twist = 0.1 * sw * mv + 0.05 * Math.sin(t * 0.7 + ph) * idle;
       // idle behaviour
       const phoneUse = p.idleKind === 1 && !p.hasCase;
@@ -556,13 +720,18 @@
         if (talk) armL = armL * mv + idle * (-0.7 + 0.35 * Math.sin(t * 2.6 + ph * 3) * Math.max(0, Math.sin(t * 0.3 + ph)));
         if (phoneUse) { armR = armR * mv + idle * -1.05; rzR = 0.07 * mv + idle * -0.33; }
       }
+      if (sitK > 0.001) {   // seated: hands on the lap
+        armL = armL * (1 - sitK) + sitK * -0.8; rzL = rzL * (1 - sitK) + sitK * -0.1;
+        armR = phoneUse ? armR * (1 - sitK) + sitK * -1.15 : armR * (1 - sitK) + sitK * -0.8; rzR = rzR * (1 - sitK) + sitK * (phoneUse ? -0.25 : 0.1);
+      }
+      if (holdK > 0.001) { armR = armR * (1 - holdK) + holdK * -2.55; rzR = rzR * (1 - holdK) + holdK * -0.1; }   // standing: one hand up on the pole
       if (umbOn) { armR = -0.7; rzR = 0.04; }
       else if (p.hasCase) { armR = armR * 0.15 - 0.3; }
       if (umbOn && p.hasCase) armL = armL * 0.15 - 0.3;
       // base matrix
       eU.set(lean, p.yaw, 0, 'YXZ');
       qQ.setFromEuler(eU);
-      vP.set(wx, wy + bob, wz); vS.set(p.sc, p.sc, p.sc);
+      vP.set(wx, wy + bob - sitK * (HIP_Y - 0.5) * p.sc, wz); vS.set(p.sc, p.sc, p.sc);
       mB.compose(vP, qQ, vS);
       mU.copy(mB);
       if (Math.abs(twist) > 1e-4) { mT.makeRotationY(twist); mU.multiply(mT); }
@@ -593,11 +762,11 @@
       mL.copy(mB);
       for (let s2 = 0; s2 < 2; s2++) {
         const side = s2 === 0 ? -1 : 1;
-        mT.makeRotationX(s2 === 0 ? -legA * sw + legSway : legA * sw - legSway).setPosition(side * 0.095, HIP_Y, 0);
+        mT.makeRotationX((s2 === 0 ? -legA * sw + legSway : legA * sw - legSway) - sitK * 1.52).setPosition(side * 0.095, HIP_Y, 0);
         mA.multiplyMatrices(mL, mT);
         const k = i * 2 + s2;
         put(M.thigh, k, mA);
-        const kn = kneeK * Math.max(0, s2 === 0 ? cw : -cw);
+        const kn = kneeK * Math.max(0, s2 === 0 ? cw : -cw) + sitK * 1.52;
         mT.makeRotationX(kn).setPosition(0, -KNEE_DROP, 0);
         mO.multiplyMatrices(mA, mT);
         put(M.shin, k, mO);
@@ -640,10 +809,305 @@
       matLit.dispose(); matUmb.dispose();
     }
 
+    /* test hook: where every visible person's feet are (world space) and what they are doing */
+    function feet() {
+      const out = [];
+      for (let i = 0; i <= highSlot; i++) {
+        const p = people[i];
+        if (!p.active || p.wx === undefined) continue;
+        out.push({ slot: i, kind: p.kind, mode: p.mode, then: p.then, doorway: !!p.doorway, x: p.wx, y: p.wy, z: p.wz, s: p.s, o: p.o, rx: smpRX(p.s), rz: smpRZ(p.s) });
+      }
+      return out;
+    }
+    function smpRX(s) { return sample(s).rx; }
+    function smpRZ(s) { return sample(s).rz; }
+    function platformInfo() { return plat ? { ps: plat.ps, pe: plat.pe, edge: plat.edge, back: plat.back, h: plat.h, tram: plat.tram, ramp: plat.ramp, side: plat.side, obstacles: plat.obst, exits: plat.exits.map((e) => ({ dir: e.dir, ramp: e.ramp, out: e.out, reach: e.reach, usable: e.usable, ground: e.ground })) } : null; }
+
     function kinds() { const k = { crowd: 0, alight: 0, board: 0, runner: 0 }; for (let i = 0; i <= highSlot; i++) { const p = people[i]; if (p.active) k[p.kind]++; } return k; }
 
-    return { spawnPlatform, startExchange, stopExchange, update, stats, clear, dispose, setRain, kinds, get visible() { return activeCount(); }, get capacity() { return cap; } };
+
+    /* ------------------------------------------------------------ the people INSIDE the tram (saloon camera)
+     * A second, small instance of this module (opts.cabin) with its own instanced meshes. Positions live in the local frame of each car (x right, z toward the rear, y up from the rail),
+     * seats / poles / doors come from model.cars[i].interior (trains.js). Everything is logic only until the saloon camera is active: while it is not, the people are just records
+     * (nothing is drawn or animated); setActive(true) shows the group and update() animates the boarding, sitting, standing and leaving. */
+    function buildCabinApi() {
+      const cab = { model: null, cars: [], active: false, accelS: 0, clock: 0 };
+      const FLOOR_EXTRA = 0.035, WALK = 0.9;
+      const mWorld = new THREE.Matrix4();
+      group.visible = false;
+      function releaseSpots(p) {
+        const c = p.cab;
+        if (c.seatRef) c.seatRef.taken = false;
+        if (c.holdRef) c.holdRef.taken = false;
+        c.seatRef = c.holdRef = null;
+      }
+      function removePerson(p) { releaseSpots(p); freePerson(p); }
+      function clearAll() { for (let i = 0; i <= highSlot; i++) if (people[i].active) removePerson(people[i]); highSlot = -1; refreshCounts(); }
+      function setModel(model) {
+        clearAll();
+        cab.model = model || null; cab.cars = [];
+        ((model && model.cars) || []).forEach((car, i) => {
+          const inf = car.interior;
+          if (!inf) return;
+          cab.cars.push({ i, car, inf, seats: inf.seats.map((q) => ({ x: q.x, z: q.z, yaw: q.yaw, taken: false })), holds: inf.holds.map((h) => ({ x: h[0], z: h[1], px: h[2], pz: h[3], taken: false })) });
+        });
+      }
+      const count = () => activeCount((p) => p.cab);
+      /* the three viewpoints of the saloon camera: front end looking back down the whole tram, the front end of a middle car and the rear end, both looking forward.
+         Nobody sits or stands within VP_CLEAR metres of one (the camera would be inside a stranger's back). */
+      const VP_CLEAR = 2.2;
+      function viewpoint(pos) {
+        const n = cab.cars.length;
+        if (!n) return null;
+        const k = [0, Math.floor(n / 2), n - 1][pos], c = cab.cars[k], inf = c.inf;
+        const z = pos === 2 ? inf.zB - 0.5 : pos === 1 ? (inf.doors.length ? inf.doors[0] : (inf.zA + inf.zB) / 2) + 0.2 : inf.zA + 0.4;
+        return { k, car: c.i, x: 0.1, y: inf.floorY + 1.55, z, look: pos === 0 ? { car: cab.cars[n - 1].i, z: cab.cars[n - 1].inf.zB } : { car: cab.cars[0].i, z: -cab.cars[0].car.length / 2 + 1 } };
+      }
+      // (seats are off to the side and below the eye: only people standing in or beside the aisle are kept away)
+      const vpBlocked = (k, z, reach) => [0, 1, 2].some((i) => { const v = viewpoint(i); if (!v || v.k !== k) return false; const ahead = (z - v.z) * (i === 0 ? 1 : -1); return ahead > -0.6 && ahead < (reach == null ? VP_CLEAR : reach); });   // nobody within 0.8 m behind or VP_CLEAR m in front of the camera
+      const carEntry = (carIdx) => cab.cars.find((c) => c.i === carIdx) || cab.cars[0];
+      function doorSide(door) { return door && door.side === 'left' ? -1 : 1; }
+      function pickDestination(order) {
+        const wantSit = chance(0.66);
+        const seatsOf = (k) => cab.cars[k].seats.filter((q) => !q.taken), holdsOf = (k) => cab.cars[k].holds.filter((q) => !q.taken && !vpBlocked(k, q.z, 1.9));
+        if (wantSit) for (const k of order) { const free = seatsOf(k); if (free.length) return { k, seat: pick(free) }; }
+        for (const k of order) { const free = holdsOf(k); if (free.length) return { k, hold: pick(free) }; }
+        for (const k of order) { const free = seatsOf(k); if (free.length) return { k, seat: pick(free) }; }
+        const k = order[0], inf = cab.cars[k].inf;
+        for (let tries = 0; tries < 12; tries++) { const z = rnd(inf.zA + 0.3, inf.zB - 0.3); if (!vpBlocked(k, z, 2.0)) return { k, aisle: { x: rnd(-0.16, 0.16), z } }; }
+        return { k, aisle: { x: 0.12, z: (inf.zA + inf.zB) / 2 } };
+      }
+      /* a new passenger: from `door` (walks in) or, without one, already at his place */
+      function spawn(door, nearCar) {
+        if (!cab.cars.length) return null;
+        const startK = Math.max(0, cab.cars.findIndex((c) => c.i === (door ? door.car : nearCar)));
+        const order = cab.cars.map((_, k) => k).sort((a, b) => Math.abs(a - startK) - Math.abs(b - startK) + (Math.random() - 0.5) * (door ? 0 : 6));
+        const dest = pickDestination(order), car = cab.cars[dest.k], inf = car.inf;
+        const p = makePerson('cabin', 0, 0);
+        if (!p) return null;
+        const place = dest.seat ? { x: dest.seat.x, z: dest.seat.z } : dest.hold ? { x: dest.hold.x, z: dest.hold.z } : dest.aisle;
+        let yaw = 0;
+        if (dest.seat) { yaw = dest.seat.yaw + Math.PI; dest.seat.taken = true; p.hasCase = false; p.hasPack = chance(0.2); }
+        else if (dest.hold) { yaw = Math.atan2(dest.hold.px - dest.hold.x, dest.hold.pz - dest.hold.z); dest.hold.taken = true; }
+        else yaw = chance(0.5) ? 0 : Math.PI;
+        p.hasUmb = false; p.sit = 0; p.hold = 0;
+        p.cab = { k: dest.k, lx: place.x, lz: place.z, hd: yaw, yaw: 0, fresh: true, wx: 0, wy: 0, wz: 0, lean: 0, state: 'stand', path: [], pi: 0, seatRef: dest.seat || null, holdRef: dest.hold || null, dest: place, destYaw: yaw, doorZ: 0, doorX: 0 };
+        const c = p.cab;
+        if (door && dest.k === startK) {
+          const sd = doorSide(door), x0 = sd * (inf.hw + 0.2);
+          c.lx = x0; c.lz = door.zLocal; c.state = 'walk'; p.mode = 'move'; p.speed = p.base * WALK;
+          c.path = [{ x: sd * (inf.hw - 0.4), z: door.zLocal }, { x: 0, z: door.zLocal }];
+          if (Math.abs(place.z - door.zLocal) > 0.05) c.path.push({ x: 0, z: place.z });
+          c.path.push({ x: place.x, z: place.z });
+          c.hd = Math.atan2(-sd, 0);
+        } else if (dest.seat) { c.state = 'sit'; p.sit = 1; }
+        else if (dest.hold) { c.state = 'stand'; p.hold = 1; }
+        return p;
+      }
+      function startLeaving(p, door) {
+        const c = p.cab, car = cab.cars[c.k], inf = car.inf;
+        releaseSpots(p);
+        // the nearest door of his own car, on the side that is open
+        const sd = door ? doorSide(door) : (chance(0.5) ? 1 : -1);
+        let dz = inf.doors.length ? inf.doors[0] : 0;
+        inf.doors.forEach((z) => { if (Math.abs(z - c.lz) < Math.abs(dz - c.lz)) dz = z; });
+        c.path = [{ x: 0, z: c.lz }, { x: 0, z: dz }, { x: sd * (inf.hw - 0.4), z: dz }, { x: sd * (inf.hw + 0.25), z: dz }];
+        c.pi = 0; c.state = p.sit > 0.2 ? 'rise' : 'leave'; p.hold = 0; p.mode = c.state === 'leave' ? 'move' : 'idle'; p.speed = p.base * WALK * 1.1;
+      }
+      function nearestPerson(door, filter) {
+        let best = null, bd = 1e9;
+        for (let i = 0; i <= highSlot; i++) {
+          const p = people[i];
+          if (!p.active || !p.cab || p.cab.state === 'leave' || p.cab.state === 'rise' || (filter && !filter(p))) continue;
+          const sameCar = door && cab.cars[p.cab.k].i === door.car;
+          const d = (sameCar ? 0 : 50) + (door ? Math.abs(p.cab.lz - door.zLocal) : Math.random() * 5);
+          if (d < bd) { bd = d; best = p; }
+        }
+        return best;
+      }
+      function leaving() { return activeCount((p) => p.cab && (p.cab.state === 'leave' || p.cab.state === 'rise')); }
+      const target = (total) => clamp(Math.round(total), 0, cap);
+      function onBoard(door, total) {
+        if (!cab.cars.length || count() >= target(total)) return;
+        if (cab.active) spawn(door); else spawn(null, door ? door.car : 0);
+      }
+      function onAlight(door, total) {
+        if (count() - leaving() <= target(total)) return;
+        const p = nearestPerson(door);
+        if (!p) return;
+        if (cab.active) startLeaving(p, door); else removePerson(p);
+      }
+      /* bring the visible people to the real count (instant: nobody walks in or out) */
+      function reconcile(total, instant) {
+        if (!cab.cars.length) return;
+        const want = target(total);
+        let guard = 0;
+        while (count() - leaving() < want && guard++ < cap) { if (!spawn(null, Math.floor(Math.random() * 5))) break; }
+        while (count() - leaving() > want && guard++ < cap * 2) {
+          const p = nearestPerson(null);
+          if (!p) break;
+          if (instant || !cab.active) removePerson(p); else startLeaving(p, null);
+        }
+      }
+      function setActive(on, model) {
+        if (model && model !== cab.model) setModel(model);
+        cab.active = !!on; group.visible = !!on;
+      }
+      function advance(p, dt) {
+        const c = p.cab;
+        if (c.state === 'walk' || c.state === 'leave') {
+          const w = c.path[c.pi];
+          if (!w) { c.state = 'stand'; p.mode = 'idle'; return; }
+          const dx = w.x - c.lx, dz = w.z - c.lz, d = Math.hypot(dx, dz), step = p.speed * dt;
+          if (d > 0.001) c.hd += angleDiff(c.hd, Math.atan2(dx, dz)) * Math.min(1, 10 * dt);
+          if (d <= step) {
+            c.lx = w.x; c.lz = w.z; c.pi++;
+            if (c.pi >= c.path.length) {
+              if (c.state === 'leave') { removePerson(p); return; }
+              p.mode = 'idle';
+              if (c.seatRef) { c.state = 'sit'; } else { c.state = 'stand'; if (c.holdRef) p.hold = 0.01; }
+              c.hd = c.destYaw;
+            }
+          } else { c.lx += (dx / d) * step; c.lz += (dz / d) * step; }
+          p.phase += step * 4.2 / p.sc;
+        } else if (c.state === 'rise') {
+          p.sit = Math.max(0, p.sit - dt * 2.6);
+          if (p.sit <= 0) { c.state = 'leave'; p.mode = 'move'; }
+        } else if (c.state === 'sit') p.sit = Math.min(1, p.sit + dt * 2.6);
+        else if (c.state === 'stand') { if (c.holdRef) p.hold = Math.min(1, p.hold + dt * 3); }
+      }
+      function update(dt, camera, info) {
+        void camera;
+        if (!cab.active || !cab.model) return;
+        dt = Math.min(dt || 0, 0.1);
+        cab.clock += dt;
+        const a = info && Number.isFinite(info.accel) ? info.accel : 0;
+        cab.accelS += (a - cab.accelS) * Math.min(1, dt * 2.5);
+        cab.cars.forEach((c) => c.car.group.updateMatrixWorld(true));
+        for (let i = 0; i <= highSlot; i++) {
+          const p = people[i];
+          if (!p.active || !p.cab) continue;
+          advance(p, dt);
+          if (!p.active) continue;
+          const c = p.cab, car = cab.cars[c.k];
+          mWorld.copy(car.car.group.matrixWorld);
+          const m = mWorld.elements, ly = car.inf.floorY + FLOOR_EXTRA, lx = c.lx, lz = c.lz;
+          c.wx = m[0] * lx + m[4] * ly + m[8] * lz + m[12]; c.wy = m[1] * lx + m[5] * ly + m[9] * lz + m[13]; c.wz = m[2] * lx + m[6] * ly + m[10] * lz + m[14];
+          const carYaw = Math.atan2(m[8], m[10]);
+          if (c.state === 'sit' || c.state === 'rise') c.hd = c.destYaw;
+          c.yaw = carYaw + c.hd;
+          if (c.fresh) { p.yaw = c.yaw; c.fresh = false; }
+          c.lean = clamp(cab.accelS * 0.06 * Math.cos(c.hd), -0.14, 0.14) * (1 - 0.6 * p.sit);   // a braking tram throws standing people forward, an accelerating one backward
+          writePerson(p, cab.clock);
+        }
+        if (colorsDirty) { MESHES.forEach((mm) => { if (mm.instanceColor) mm.instanceColor.needsUpdate = true; }); colorsDirty = false; }
+        refreshCounts();
+        MESHES.forEach((mm) => { mm.instanceMatrix.needsUpdate = true; });
+      }
+      function cabStats() {
+        let sitting = 0, standing = 0, walking = 0;
+        for (let i = 0; i <= highSlot; i++) { const p = people[i]; if (!p.active || !p.cab) continue; if (p.cab.state === 'sit') sitting++; else if (p.cab.state === 'stand') standing++; else walking++; }
+        return { total: sitting + standing + walking, sitting, standing, walking, active: cab.active, cap, cars: cab.cars.length, seats: cab.cars.reduce((n, c) => n + c.seats.length, 0) };
+      }
+      function cabFeet() {
+        const out = [];
+        for (let i = 0; i <= highSlot; i++) { const p = people[i]; if (p.active && p.cab) out.push({ slot: i, k: p.cab.k, state: p.cab.state, lx: p.cab.lx, lz: p.cab.lz, sit: p.sit, x: p.cab.wx, y: p.cab.wy, z: p.cab.wz }); }
+        return out;
+      }
+      function dispose2() {
+        clearAll();
+        scene.remove(group);
+        MESHES.forEach((mm) => { mm.geometry.dispose(); mm.dispose(); });
+        matLit.dispose(); matUmb.dispose();
+      }
+      return { setActive, setModel, viewpoint, reconcile, onBoard, onAlight, update, stats: cabStats, feet: cabFeet, count, dispose: dispose2, get active() { return cab.active; }, get capacity() { return cap; } };
+    }
+    if (isCabin) return buildCabinApi();
+
+    return { spawnPlatform, startExchange, stopExchange, update, stats, clear, dispose, setRain, kinds, feet, platformInfo, setCabinHooks: (h) => { hooks = h || {}; }, get visible() { return activeCount(); }, get capacity() { return cap; } };
   }
 
   TS.passengers = { create };
+
+  /* ------------------------------------------------------------------ oncoming trams at their stops
+   * The AI trams on the other track (luxtram-traffic.js) call TS.tramDwell.arrive(info) when they stand at a stop and depart({ id }) when they leave. While the player is within
+   * NEAR_M of that stop, a small extra instance of this module plays the exchange on the OPPOSITE platform (the one of the opposite track; at an island stop the other side of the
+   * island): 4..15 people get off and walk away over the end ramps (same surface rules as the player's platform: no sinking, nobody on the track side), the people waiting there walk
+   * to the doors and board. Nothing here runs unless arrive() is called, so without the hook nothing changes.
+   *   arrive(info = { id, stopName, platformSide, doors: [{ x, y, z }], dwellMs, getDoors }) -> milliseconds this exchange needs when that is more than dwellMs, else undefined
+   *   depart({ id }) -> whoever is still on the way to the doors stays on the platform */
+  const NEAR_M = 250, MAX_SESSIONS = 2, DWELL_CAP_MS = 45000, TAIL_S = 25;
+  const dwell = { ctx: null, sessions: new Map(), free: [], made: 0 };
+  function dwellCap(q) { return q === 'low' ? 24 : q === 'medium' ? 32 : 40; }
+  function dwellInstance() {
+    if (dwell.free.length) return dwell.free.pop();
+    if (dwell.made >= MAX_SESSIONS || !dwell.ctx) return null;
+    dwell.made++;
+    return create(dwell.ctx.scene, { quality: dwell.ctx.quality, cap: dwellCap(dwell.ctx.quality), name: 'ts-passengers-oncoming' });
+  }
+  function dwellRelease(sess) {
+    try { sess.inst.clear(); } catch (e) { /* nothing */ }
+    dwell.free.push(sess.inst);
+  }
+  TS.tramDwell = {
+    /* ctx = { scene, track, quality, playerS(): number, platformHeight(i), obstaclesOf(station, platformInfo) } */
+    attach(ctx) { this.detach(); dwell.ctx = ctx; },
+    detach() {
+      dwell.sessions.forEach((x) => { try { x.inst.dispose(); } catch (e) { /* nothing */ } });
+      dwell.free.forEach((i) => { try { i.dispose(); } catch (e) { /* nothing */ } });
+      dwell.sessions.clear(); dwell.free.length = 0; dwell.made = 0; dwell.ctx = null;
+    },
+    arrive(info) {
+      const c = dwell.ctx;
+      if (!c || !info || dwell.sessions.has(info.id)) return undefined;
+      try {
+        const track = c.track, opp = track.opposite, stations = track.stations || [];
+        const idx = stations.findIndex((st) => st.name === info.stopName);
+        if (!opp || idx < 0 || !Array.isArray(info.doors) || !info.doors.length) return undefined;
+        const st = stations[idx];
+        if (Math.abs(st.s - c.playerS()) > NEAR_M) return undefined;   // only where the player can see it
+        const pinfo = track.platformInfo(idx), island = pinfo.kind === 'island';
+        // the real distance between the two track centres here (platformInfo.oppLat is what the platform was built for, and is not always what the opposite track does)
+        const f0 = track.frameAt(st.s), g0 = opp.frameAt(st.s), D = Math.abs((g0.pos.x - f0.pos.x) * f0.right.x + (g0.pos.z - f0.pos.z) * f0.right.z);
+        if (island && D - pinfo.edge - pinfo.width < 0.9) return undefined;   // no island between the tracks to walk on: leave this one standing as it is
+        const inst = dwellInstance();
+        if (!inst) return undefined;
+        const side = island ? 'right' : 'left';                      // seen from the opposite track: its platform is on the far left, the island on its right
+        const sign = side === 'left' ? -1 : 1;
+        const alighting = 4 + Math.floor(Math.random() * 12), boarding = 3 + Math.floor(Math.random() * 8);
+        const pseudo = { frameAt: opp.frameAt, kind: 'tram' };
+        const W = pinfo.width;
+        const edge = island ? D - pinfo.edge - W : pinfo.edge;   // island: the far edge of the island is the near edge seen from the other track
+        let obstacles = [];
+        try { obstacles = c.obstaclesOf ? c.obstaclesOf(st, pinfo) : []; } catch (e) { obstacles = []; }
+        if (island) { obstacles = obstacles.map((b) => ({ s: b.s, o: D - b.o, hs: b.hs, ho: b.ho })); }
+        inst.spawnPlatform(st, pseudo, { count: boarding, side, platformHeight: c.platformHeight(idx), edgeOffset: edge, width: W, trainLength: 45, tram: true, obstacles });
+        const doorsWorld = info.doors.map((d) => {
+          let best = 0, bd = 1e9;   // nearest sample of the opposite track: its right vector gives the way to the platform
+          for (let k = 0; k < 6; k++) { const sS = st.s + (k - 3) * 8, f = opp.frameAt(sS), dd = Math.hypot(f.pos.x - d.x, f.pos.z - d.z); if (dd < bd) { bd = dd; best = sS; } }
+          const f = opp.frameAt(best);
+          return { pos: { x: d.x, y: d.y, z: d.z }, dir: { x: f.right.x * sign, z: f.right.z * sign }, side };
+        });
+        inst.startExchange({ doorsWorld, alighting, boarding });
+        const needMs = Math.min(DWELL_CAP_MS, 9000 + alighting * 800 + boarding * 1100);
+        dwell.sessions.set(info.id, { id: info.id, inst, station: idx, departed: false, tail: 0, alighting, boarding, start: performance.now() });
+        return needMs > (info.dwellMs || 0) ? needMs : undefined;
+      } catch (e) { console.warn('[Lokféierer] tramDwell.arrive', e); return undefined; }
+    },
+    depart(info) {
+      const sess = info && dwell.sessions.get(info.id);
+      if (!sess || sess.departed) return;
+      sess.departed = true; sess.tail = TAIL_S;
+      try { sess.inst.stopExchange(); } catch (e) { /* nothing */ }
+    },
+    update(dt, camera) {
+      if (!dwell.sessions.size) return;
+      dwell.sessions.forEach((sess, id) => {
+        try { sess.inst.update(dt, camera); } catch (e) { console.warn('[Lokféierer] tramDwell.update', e); }
+        if (sess.departed) { sess.tail -= dt; if (sess.tail <= 0) { dwell.sessions.delete(id); dwellRelease(sess); } }
+        else if (dwell.ctx && Math.abs(dwell.ctx.track.stations[sess.station].s - dwell.ctx.playerS()) > NEAR_M * 1.6) { dwell.sessions.delete(id); dwellRelease(sess); }   // the player drove away
+      });
+    },
+    sessions() { return [...dwell.sessions.values()]; },   // test hook
+  };
 })();

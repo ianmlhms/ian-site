@@ -482,6 +482,38 @@
     return h;
   }
 
+  /* Footprints of everything standing on a platform, for the passengers (pb/train-sim/passengers.js): { s, o, hs, ho } = centre along the track,
+   * lateral distance from the track centre, half size along / across (people keep out of them). Mirrors the placement rules of buildStop. */
+  function obstacles(name, p) {
+    const cfg = LAYOUT[name];
+    if (!cfg || !p) return [];
+    const { edge, width: W, island } = p;
+    const sMid = (p.platformStart + p.platformEnd) / 2;
+    const out = [];
+    const add = (z, lat, hz, hl) => out.push({ s: sMid - z, o: lat, hs: hz, ho: hl });
+    const latBack = island ? edge + W / 2 : Math.min(edge + 2.95, edge + W - 0.12);
+    (cfg.shelters || []).forEach((sh) => {
+      const rB = island ? latBack + Math.min(1.5, (W - 0.9) / 2) : latBack + 0.22;
+      const bl = Math.min(sh.len * 0.62, 4.6);
+      add(sh.z, rB - 0.55, bl / 2 + 0.3, 0.4);                       // bench
+      add(sh.z, rB - 0.1, sh.len / 2 + 0.3, 0.1);                    // glass back wall
+      const rFr = island ? latBack - Math.min(1.5, (W - 0.9) / 2) : Math.max(edge + 0.85, 2.4);
+      [-1, 1].forEach((d) => add(sh.z + d * (sh.len / 2 - 0.15), (rFr + rB) / 2 - 0.05, 0.1, (rB - rFr - 0.5) / 2 + 0.1));   // glass end panels
+    });
+    if (cfg.ticket != null) add(cfg.ticket, island ? latBack - 0.4 : Math.min(edge + 2.35, edge + W - 0.5), 0.6, 0.5);
+    (cfg.ads || []).forEach((z) => add(z, island ? latBack : Math.min(latBack - 0.1, edge + W - 0.45), 0.85, 0.45));
+    if (cfg.led != null) add(cfg.led, island ? latBack + 0.6 : Math.min(edge + 1.5, edge + W - 0.7), 0.35, 0.35);
+    (cfg.bins || []).forEach((z) => add(z, island ? latBack + 1.1 : edge + W - 0.35, 0.4, 0.4));
+    (cfg.lamps || []).forEach((z) => add(z, island ? edge + W / 2 : edge + W - 0.3, 0.3, 0.3));
+    (cfg.extras || []).forEach((e) => {
+      if (e === 'veloh') add(cfg.island ? 20 - 4.5 : 19 - 4.5, island ? edge + W - 0.7 : edge + W - 0.5, 5.2, 0.7);
+      if (e === 'mbox') add((sMid - p.platformStart) - 4, edge + W - 1.1, 2.4, 1.2);
+    });
+    if (cfg.wing) [-14, -4.7, 4.7, 14].forEach((z) => add(z, edge + W - 0.85, 0.6, 0.6));
+    return out;
+  }
+  window.TS.luxtramObstacles = obstacles;
+
   const spec = { kind: 'tram', canopy: false, furniture: false, build: buildStop };
   Object.keys(LAYOUT).forEach((name) => RS.register(name, spec));
 })();

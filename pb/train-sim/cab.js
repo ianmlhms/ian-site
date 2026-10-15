@@ -23,6 +23,7 @@
   const GLASS_OPACITY = 0.14;
   const SIGN_FONT_SCALE = 0.62;
   const NIGHT_MATTE0 = new THREE.Color('#171a1f'), NIGHT_MATTE1 = new THREE.Color('#2b3544'), NIGHT_METAL0 = new THREE.Color('#0d0f12'), NIGHT_METAL1 = new THREE.Color('#1c2430');
+  const NIGHT_MATTE_WARM = new THREE.Color('#2e2e30');   // tram cab at night: the white panelling takes the warm light of the cab lamp
   const NIGHT_DIAL = new THREE.Color('#ffe7c2'), NIGHT_ONE = new THREE.Color(1, 1, 1);
   const HOVER_TINT = '#ffd27a';          // emissive tint of a hovered control
   const HOVER_EMISSIVE = 0.75;           // emissive floor of a hovered control
@@ -60,10 +61,11 @@
       mfds: [{ x: 0.1, w: 0.28, h: 0.18, role: 'main' }],
     },
     tram: {
-      hw: 0.8, top: '#5a6068', body: '#2c3036', ramp: '#1c1f24', metal: '#aab1b8', trim: '#14171a', accent: '#19a9c4',
+      hw: 0.8, top: '#33373d', body: '#22252a', ramp: '#14171a', metal: '#aab1b8', trim: '#101215', accent: '#19a9c4',
       leverX: -0.52, joystick: true, seat: 'modern', low: true,
-      dials: [{ kind: 'speedo', x: 0.27, r: 0.06 }],
-      mfds: [{ x: -0.04, w: 0.32, h: 0.2, role: 'main' }],
+      dials: [{ kind: 'speedo', x: -0.275, r: 0.058 }],
+      mfds: [{ x: -0.02, w: 0.3, h: 0.19, role: 'main' }, { x: 0.205, w: 0.15, h: 0.094, role: 'aux' }],
+      hood: true,
     },
     ic: {
       hw: 0.92, top: '#555b63', body: '#2c3036', ramp: '#1c1f24', metal: '#929ba5', trim: '#121417', accent: '#e9742c',
@@ -132,6 +134,20 @@
     const n = g.attributes.position.count;
     const a = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
+    g.setAttribute('color', new T.BufferAttribute(a, 3));
+    return g;
+  }
+
+  /* vertex colours from a top and a bottom colour by height (after the geometry sits in its final place): a cheap painted-plastic shading */
+  function colorizeV(g, topHex, botHex) {
+    g.computeBoundingBox();
+    const y0 = g.boundingBox.min.y, y1 = g.boundingBox.max.y, top = new T.Color(topHex), bot = new T.Color(botHex || topHex), c = new T.Color();
+    const pos = g.attributes.position, n = pos.count, a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const k = y1 - y0 > 1e-5 ? (pos.getY(i) - y0) / (y1 - y0) : 1;
+      c.copy(bot).lerp(top, k);
+      a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b;
+    }
     g.setAttribute('color', new T.BufferAttribute(a, 3));
     return g;
   }
@@ -449,6 +465,8 @@
     const matMatte = mat(new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.05, emissive: '#171a1f' }));
     const matMetal = mat(new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.34, metalness: 0.75, emissive: '#0d0f12' }));
     const matGlass = mat(new T.MeshStandardMaterial({ color: '#9fb8c4', roughness: 0.1, metalness: 0.1, transparent: true, opacity: GLASS_OPACITY, depthWrite: false }));
+    const matLed = mat(new T.MeshStandardMaterial({ vertexColors: true, color: '#ffffff', emissive: '#fff4dc', emissiveIntensity: 0.25, roughness: 0.5 }));   // cab ceiling LED strip + backlit parts (lit at night)
+    const matLens = mat(new T.MeshBasicMaterial({ vertexColors: true, color: '#ffffff', toneMapped: false }));   // coloured button lenses: unlit, brighter when it is dark
     const lampDefs = {
       green: { color: '#1d6a3a', emissive: '#4dff91' }, amber: { color: '#7a5a12', emissive: '#ffbf33' },
       red: { color: '#7a1a14', emissive: '#ff4636' }, blue: { color: '#1b4a8a', emissive: '#5aa8ff' },
@@ -464,17 +482,17 @@
     const metalOwn = (id, floor) => hoverMat(id, mat(new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.34, metalness: 0.75, emissive: HOVER_TINT, emissiveIntensity: 0 })), floor);
 
     /* ---- buckets of static geometry */
-    const buckets = { matte: [], metal: [], glass: [], sticker: [], lampStatic: [] };
-    const addTo = (bucket, g, matrix, hex) => {
+    const buckets = { matte: [], metal: [], glass: [], sticker: [], lampStatic: [], led: [], lens: [] };
+    const addTo = (bucket, g, matrix, hex, hexBottom) => {
       g.applyMatrix4(matrix);
-      colorize(g, hex || '#ffffff');
+      if (hexBottom) colorizeV(g, hex || '#ffffff', hexBottom); else colorize(g, hex || '#ffffff');
       buckets[bucket].push(g);
     };
     const box = (w, h, d) => new T.BoxGeometry(w, h, d);
     const cyl = (rt, rb, h, seg) => new T.CylinderGeometry(rt, rb, h, seg || 20);
     const compose = (px, py, pz, rx, ry, rz) => new T.Matrix4().compose(
       new T.Vector3(px, py, pz), new T.Quaternion().setFromEuler(new T.Euler(rx || 0, ry || 0, rz || 0, 'XYZ')), new T.Vector3(1, 1, 1));
-    const boxAt = (bucket, w, h, d, px, py, pz, hex, rx, ry, rz) => addTo(bucket, box(w, h, d), compose(px, py, pz, rx, ry, rz), hex);
+    const boxAt = (bucket, w, h, d, px, py, pz, hex, rx, ry, rz, hexBottom) => addTo(bucket, box(w, h, d), compose(px, py, pz, rx, ry, rz), hex, hexBottom);
 
     /* ---- desk frame: x right, y out of the desk surface, z toward the driver (u) */
     const deskTilt = Math.atan2(DESK_DROP, DESK_DEPTH);
@@ -527,7 +545,7 @@
     let rx0 = hw, rx1 = -hw;
     for (const d of dials) { rx0 = Math.min(rx0, d.x - d.r * 1.12); rx1 = Math.max(rx1, d.x + d.r * 1.12); }
     for (const m of mfds) { rx0 = Math.min(rx0, m.x - m.w / 2 - 0.02); rx1 = Math.max(rx1, m.x + m.w / 2 + 0.02); }
-    rx0 = Math.max(rx0 - 0.015, -hw); rx1 = Math.min(rx1 + 0.015, hw);
+    rx0 = Math.max(rx0 - (S.hood ? 0.07 : 0.015), -hw); rx1 = Math.min(rx1 + (S.hood ? 0.06 : 0.015), hw);
     const prismX = (profile, xa, xb, hex) => {
       const shape = new T.Shape();
       profile.forEach((p, i) => (i === 0 ? shape.moveTo(-p[0], p[1]) : shape.lineTo(-p[0], p[1])));
@@ -645,6 +663,46 @@
       addTo('metal', box(m.w + 0.034, 0.004, 0.008), panelM(m.x, rampLen / 2 + (m.h + 0.03) / 2, 0.008), S.metal);
       mfdList.push({ canvas, texture, role: m.role, sig: '' });
     }
+    // Urbos console: framed screens + glass sheen + round backlit buttons along the lower edge of the panel + the radio / door-key block on the right
+    if (S.hood) {
+      const sheenCanvas = makeCanvas(64, 64);
+      { const c = sheenCanvas.getContext('2d'); const g = c.createLinearGradient(0, 0, 64, 64); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.35, 'rgba(255,255,255,0.0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.13)'); g.addColorStop(0.62, 'rgba(255,255,255,0.0)'); g.addColorStop(1, 'rgba(255,255,255,0.05)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64); }
+      const sheenMat = mat(new T.MeshBasicMaterial({ map: tex(canvasTexture(sheenCanvas, 1)), transparent: true, depthWrite: false, toneMapped: false }));
+      for (const m of mfds) {
+        const fm = panelM(m.x, rampLen / 2, 0.0);
+        const bw = m.w + 0.03, bh = m.h + 0.03;
+        // frame: four bars standing 6 mm proud of the panel, inner lip lighter
+        for (const [w, hh, x, y] of [[bw + 0.016, 0.012, 0, bh / 2 + 0.002], [bw + 0.016, 0.012, 0, -bh / 2 - 0.002], [0.012, bh, -bw / 2 - 0.002, 0], [0.012, bh, bw / 2 + 0.002, 0]]) {
+          addTo('matte', box(w, hh, 0.014), fm.clone().multiply(compose(x, y, 0.006)), '#191c20', '#101215');
+        }
+        for (const [w, hh, x, y] of [[m.w + 0.004, 0.003, 0, m.h / 2 + 0.001], [m.w + 0.004, 0.003, 0, -m.h / 2 - 0.001]]) addTo('metal', box(w, hh, 0.004), fm.clone().multiply(compose(x, y, 0.0105)), '#3a4047');
+        const sheen = new T.Mesh(geo(new T.PlaneGeometry(m.w, m.h)), sheenMat);
+        sheen.applyMatrix4(panelM(m.x, rampLen / 2, 0.0105));
+        mfdGroup.add(sheen);
+      }
+      // dial: sheen + a black screw-down bezel ring
+      for (const d of dials) {
+        const sheen = new T.Mesh(geo(new T.CircleGeometry(d.r * 0.97, 28)), sheenMat);
+        sheen.applyMatrix4(panelM(d.x, rampLen / 2, 0.0105));
+        dialGroup.add(sheen);
+        addTo('matte', new T.TorusGeometry(d.r * 1.12, d.r * 0.07, 6, 28), panelM(d.x, rampLen / 2, 0.003), '#16181c');
+      }
+      // round backlit buttons: two short rows under the aux screen + a column at the far left of the panel
+      const rows = [
+        { x0: 0.165, y: rampLen * 0.12, n: 3, dx: 0.04, cols: ['#2c9a58', '#d23a2a', '#2f6fd0'] },
+        { x0: rx0 + 0.022, y: rampLen * 0.78, n: 1, dx: 0, cols: ['#e8b23a'] },
+        { x0: rx0 + 0.022, y: rampLen * 0.5, n: 1, dx: 0, cols: ['#d23a2a'] },
+        { x0: rx0 + 0.022, y: rampLen * 0.22, n: 1, dx: 0, cols: ['#2c9a58'] },
+        { x0: rx1 - 0.024, y: rampLen * 0.78, n: 1, dx: 0, cols: ['#2f6fd0'] },
+        { x0: rx1 - 0.024, y: rampLen * 0.5, n: 1, dx: 0, cols: ['#e8b23a'] },
+        { x0: rx1 - 0.024, y: rampLen * 0.22, n: 1, dx: 0, cols: ['#e8e6de'] },
+      ];
+      for (const row of rows) for (let i = 0; i < row.n; i++) {
+        const x = row.x0 + i * row.dx, col = row.cols[i];
+        addTo('matte', cyl(0.015, 0.016, 0.01, 16).rotateX(Math.PI / 2), panelM(x, row.y, 0.005), '#25282d');
+        addTo('lens', cyl(0.0105, 0.0105, 0.008, 16).rotateX(Math.PI / 2), panelM(x, row.y, 0.011), col);
+      }
+    }
 
     /* ---- sticker atlas material (key labels) ------------------------------------------------- */
     const cellPx = isLow ? 64 : STICKER_CELL;
@@ -713,9 +771,13 @@
       const parts = [];
       const L = lk.len;
       if (S.joystick) {
-        parts.push(colorize(cyl(0.012, 0.016, L - 0.05, 14).translate(0, (L - 0.05) / 2, 0), '#2a2d32'));
-        parts.push(colorize(new T.SphereGeometry(0.03, 18, 12).scale(1, 0.9, 1.1).translate(0, L - 0.015, 0), '#1c1f24'));
-        parts.push(colorize(cyl(0.021, 0.021, 0.012, 16).translate(0, L - 0.04, 0), S.accent));
+        // Urbos combined power / brake controller: satin shaft in a ribbed rubber boot, a palm grip with a finger rest, a chrome collar and a thumb pad in the accent colour
+        parts.push(colorize(cyl(0.011, 0.014, L - 0.06, 14).translate(0, (L - 0.06) / 2, 0), '#9aa3ad'));
+        for (let i = 0; i < 3; i++) parts.push(colorize(cyl(0.03 - i * 0.005, 0.034 - i * 0.005, 0.011, 18).translate(0, 0.008 + i * 0.011, 0), i % 2 ? '#25282c' : '#17191c'));
+        parts.push(colorize(cyl(0.02, 0.02, 0.008, 16).translate(0, L - 0.055, 0), '#c8ced4'));
+        parts.push(colorize(new T.SphereGeometry(0.032, 20, 14).scale(0.95, 0.8, 1.35).translate(0, L - 0.018, 0.006), '#1b1e23'));
+        parts.push(colorize(new T.SphereGeometry(0.014, 12, 8).scale(1, 0.55, 1.4).translate(0, L - 0.018, 0.045), '#2a2e34'));
+        parts.push(colorize(cyl(0.012, 0.012, 0.006, 14).translate(0, L + 0.004, -0.004), S.accent));
       } else if (S.old) {
         parts.push(colorize(cyl(0.008, 0.011, L - 0.03, 12).translate(0, (L - 0.03) / 2, 0), '#d6d2c4'));
         parts.push(colorize(new T.SphereGeometry(0.03, 18, 14).translate(0, L, 0), '#16130f'));
@@ -921,7 +983,8 @@
     };
 
     /* ---- pillars, seals, visor (all follow the raked cap plane) ---------------------------------- */
-    {
+    if (fr.type === 'tram') buildTramFrame();
+    else {
       const pillar = '#3b4047';
       const innerHW = fr.windHW;
       const h = fr.windY1 - fr.windY0;
@@ -945,6 +1008,51 @@
       const vw = Math.min(innerHW * 2 - 0.2, 1.05);
       boxAt('matte', vw, 0.014, 0.3, -vw * 0.05, fr.windY1 + 0.16, capZ(fr.windY1) + 0.25, '#4a5057', -0.5);
       boxAt('metal', vw, 0.02, 0.02, -vw * 0.05, fr.windY1 + 0.05, capZ(fr.windY1) + 0.12, S.metal);
+    }
+
+    /* The CAF Urbos cab frame (Luxtram): warm-white painted A-pillars and side panels, a black rubber gasket round the screen, the cream roller sun blind in its
+       header cassette, the interior mirror on the right pillar, a grab handle on the left one, and a white ceiling with its LED strip (lit when it is dark).
+       Proportions from the Wikimedia Commons photos of the Urbos 3 cab (Budapest, Kaohsiung) and the Luxtram saloon. */
+    function buildTramFrame() {
+      const cream = '#e6e4dc', creamLo = '#cbc9c0', shade = '#a9a79f', rubber = '#07080a', dark = '#2a2d32';
+      const innerHW = fr.windHW, h = fr.windY1 - fr.windY0, ym = (fr.windY0 + fr.windY1) / 2, rk = rakeAng;
+      const sideX = Math.min(fr.W / 2 * 0.92, fr.W / 2 - 0.12);
+      for (const sx of [-1, 1]) {
+        // A-pillar: cream box with a darker return face and a black rubber lip along the glass
+        boxAt('matte', 0.12, h + 0.14, 0.17, sx * (innerHW + 0.035), ym, capZ(ym) + 0.1, cream, rk, 0, sx * 0.05, creamLo);
+        boxAt('matte', 0.05, h + 0.1, 0.07, sx * (innerHW - 0.025), ym, capZ(ym) + 0.05, shade, rk, 0, sx * 0.05, '#8d8b84');
+        boxAt('matte', 0.024, h + 0.02, 0.024, sx * (innerHW - 0.055), ym, capZ(ym) + 0.03, rubber, rk);
+        // side panel between pillar and cab door: cream above the sill, dark dado below
+        const zA = capZ(ym) + 0.2, zB = zF + 1.12;
+        if (zB > zA) {
+          boxAt('matte', 0.035, fr.windY1 - fr.windY0 + 0.25, zB - zA, sx * (sideX + 0.01), ym + 0.1, (zA + zB) / 2, '#d9d7cf', 0, 0, 0, creamLo);
+          boxAt('matte', 0.04, fr.windY0 - floor - 0.05, zB - zA, sx * (sideX + 0.01), (fr.windY0 + floor + 0.05) / 2 - 0.02, (zA + zB) / 2, dark, 0, 0, 0, '#1a1c20');
+        }
+        // gasket round the lower and upper screen edge continues into the pillar
+        boxAt('matte', 0.015, h, 0.012, sx * (innerHW - 0.07), ym, capZ(ym) + 0.012, '#050607', rk);
+      }
+      // black rubber gasket along the bottom and top edge of the glass
+      boxAt('matte', innerHW * 2 + 0.08, 0.035, 0.03, 0, fr.windY0 + 0.012, capZ(fr.windY0) + 0.035, rubber);
+      boxAt('matte', innerHW * 2 + 0.08, 0.035, 0.03, 0, fr.windY1 - 0.045, capZ(fr.windY1) + 0.035, rubber);
+      // header: cream roof panel over the screen with the roller blind cassette (blind rolled up, bottom bar showing)
+      boxAt('matte', innerHW * 2 + 0.3, 0.11, 0.38, 0, fr.windY1 + 0.02, capZ(fr.windY1) + 0.2, cream, 0, 0, 0, creamLo);
+      addTo('matte', cyl(0.034, 0.034, innerHW * 2 + 0.08, 14).rotateZ(Math.PI / 2), compose(0, fr.windY1 - 0.085, capZ(fr.windY1) + 0.075), '#efe9d6', '#cfc8b2');
+      boxAt('matte', innerHW * 2 + 0.06, 0.02, 0.02, 0, fr.windY1 - 0.125, capZ(fr.windY1) + 0.07, '#b9b19b');
+      // ceiling above the driver, white, with a long LED strip
+      const zC0 = capZ(fr.windY1) + 0.1, zC1 = zF + 2.5, yC = fr.windY1 + 0.07;
+      boxAt('matte', fr.W - 0.3, 0.04, zC1 - zC0, 0, yC, (zC0 + zC1) / 2, '#ece9e2');
+      boxAt('led', 0.12, 0.014, zC1 - zC0 - 0.5, 0, yC - 0.03, (zC0 + zC1) / 2, '#ffffff');
+      // interior mirror on the right pillar: dark housing, mirror glass, swivel arm
+      {
+        const mx = innerHW + 0.18, my = fr.windY0 + h * 0.62, mz = capZ(my) + 0.34;
+        boxAt('matte', 0.05, 0.03, 0.05, innerHW + 0.07, my, capZ(my) + 0.16, '#1a1c20', rk);
+        boxAt('matte', 0.2, 0.2, 0.035, mx, my, mz, '#17191c', 0, -0.5);
+        boxAt('metal', 0.17, 0.17, 0.008, mx - 0.004, my, mz + 0.02, '#6f7c86', 0, -0.5);
+      }
+      // grab handle on the left pillar and a coat hook
+      boxAt('metal', 0.026, 0.4, 0.026, -(innerHW + 0.12), ym - 0.1, capZ(ym) + 0.22, '#c7ccd1', rk);
+      boxAt('metal', 0.026, 0.026, 0.1, -(innerHW + 0.12), ym - 0.3, capZ(ym) + 0.17, '#c7ccd1');
+      boxAt('metal', 0.026, 0.026, 0.1, -(innerHW + 0.12), ym + 0.1, capZ(ym) + 0.27, '#c7ccd1');
     }
 
     /* ---- side windows, cab doors, details ------------------------------------------------------ */
@@ -1013,6 +1121,8 @@
     addMerged('matte', matMatte);
     addMerged('metal', matMetal);
     addMerged('lampStatic', matMatte);
+    addMerged('led', matLed);
+    addMerged('lens', matLens);
     addMerged('sticker', matSticker);
     addMerged('glass', matGlass);
 
@@ -1120,8 +1230,9 @@
       const night = Math.round(clamp(num(s.night, 0), 0, 1) * 50) / 50;
       if (night !== rt.night) {   // instrument glow: the desk, labels and dial faces pick up a dim cool backlight when it is dark
         rt.night = night;
-        matMatte.emissive.copy(NIGHT_MATTE0).lerp(NIGHT_MATTE1, night); matMetal.emissive.copy(NIGHT_METAL0).lerp(NIGHT_METAL1, night);
+        matMatte.emissive.copy(NIGHT_MATTE0).lerp(S.hood ? NIGHT_MATTE_WARM : NIGHT_MATTE1, night); matMetal.emissive.copy(NIGHT_METAL0).lerp(NIGHT_METAL1, night);
         matSticker.emissiveIntensity = 0.38 + 0.7 * night; gateMat.emissiveIntensity = 0.4 + 0.6 * night;
+        matLed.emissiveIntensity = 0.25 + 1.5 * night; matLens.color.setScalar(0.62 + 0.38 * night);
         dialFaceMat.color.setScalar(1 - 0.22 * night).multiply(NIGHT_DIAL.clone().lerp(NIGHT_ONE, 1 - night));
       }
       setEmissive(dynLamps.eb, target <= NOTCH_EB ? 1.9 : 0.04);

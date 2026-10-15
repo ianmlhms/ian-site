@@ -1,0 +1,635 @@
+{
+ "voice": "synthetic (OpenAI gpt-4o-mini-tts, voice coral), not the real Luxtram announcer",
+ "clips": {
+  "next-findel-aeroport-lb": {
+   "text": "Nächsten Arrêt: Findel Aeroport.",
+   "stop": "Findel-Aéroport",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 13965
+  },
+  "next-heienhaff-lb": {
+   "text": "Nächsten Arrêt: Heienhaff.",
+   "stop": "Héienhaff",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 11085
+  },
+  "next-luxexpo-lb": {
+   "text": "Nächsten Arrêt: Luxexpo.",
+   "stop": "Luxexpo",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 10701
+  },
+  "next-alphonse-weicker-lb": {
+   "text": "Nächsten Arrêt: Alfons Weicker.",
+   "stop": "Alphonse Weicker",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 15213
+  },
+  "next-nationalbibliotheik-lb": {
+   "text": "Nächsten Arrêt: Nazionalbibliotheek.",
+   "stop": "Nationalbibliothéik",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 15981
+  },
+  "next-universiteit-lb": {
+   "text": "Nächsten Arrêt: Universitäit.",
+   "stop": "Universitéit",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 13101
+  },
+  "next-coque-lb": {
+   "text": "Nächsten Arrêt: Kock.",
+   "stop": "Coque",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 10125
+  },
+  "next-europaparlament-lb": {
+   "text": "Nächsten Arrêt: Europaparlament.",
+   "stop": "Europaparlament",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 13773
+  },
+  "next-philharmonie-lb": {
+   "text": "Nächsten Arrêt: Filharmonie.",
+   "stop": "Philharmonie",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 11565
+  },
+  "next-rout-breck-lb": {
+   "text": "Nächsten Arrêt: Rout Breck.",
+   "stop": "Rout Bréck",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 13005
+  },
+  "next-theater-lb": {
+   "text": "Nächsten Arrêt: Theater.",
+   "stop": "Theater",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 10221
+  },
+  "next-faiencerie-lb": {
+   "text": "Nächsten Arrêt: Fajansserie.",
+   "stop": "Faïencerie",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 12621
+  },
+  "next-stareplaz-lb": {
+   "text": "Nächsten Arrêt: Schtäreplaz.",
+   "stop": "Stäreplaz",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 12525
+  },
+  "next-hamilius-lb": {
+   "text": "Nächsten Arrêt: Hamilius.",
+   "stop": "Hamilius",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 11757
+  },
+  "next-place-de-metz-lb": {
+   "text": "Nächsten Arrêt: Plass de Mess.",
+   "stop": "Place de Metz",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 14829
+  },
+  "next-paraisser-plaz-lb": {
+   "text": "Nächsten Arrêt: Päräisser Plaz.",
+   "stop": "Paräisser Plaz",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 14637
+  },
+  "next-gare-centrale-lb": {
+   "text": "Nächsten Arrêt: Gar Santral.",
+   "stop": "Gare Centrale",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 12429
+  },
+  "next-leschte-steiwer-lb": {
+   "text": "Nächsten Arrêt: Leschte Schteiwer.",
+   "stop": "Leschte Steiwer",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 14253
+  },
+  "next-lycee-bouneweg-lb": {
+   "text": "Nächsten Arrêt: Lissee Bounewek.",
+   "stop": "Lycée Bouneweg",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 14733
+  },
+  "next-scillas-lb": {
+   "text": "Nächsten Arrêt: Scillas.",
+   "stop": "Scillas",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 12525
+  },
+  "next-gare-howald-lb": {
+   "text": "Nächsten Arrêt: Gar Howald.",
+   "stop": "Gare Howald",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 13869
+  },
+  "next-lycee-vauban-lb": {
+   "text": "Nächsten Arrêt: Lissee Vobang.",
+   "stop": "Lycée Vauban",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 15309
+  },
+  "next-waassertuerm-lb": {
+   "text": "Nächsten Arrêt: Waassertuerm.",
+   "stop": "Waassertuerm",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 11853
+  },
+  "next-stadion-lb": {
+   "text": "Nächsten Arrêt: Stadion.",
+   "stop": "Stadion",
+   "kind": "next",
+   "lang": "lb",
+   "bytes": 11469
+  },
+  "end-findel-aeroport-lb": {
+   "text": "Endstatioun Findel Aeroport. Mir bieden all Passagéier auszestigen.",
+   "stop": "Findel-Aéroport",
+   "kind": "end",
+   "lang": "lb",
+   "bytes": 25197
+  },
+  "end-stadion-lb": {
+   "text": "Endstatioun Stadion. Mir bieden all Passagéier auszestigen.",
+   "stop": "Stadion",
+   "kind": "end",
+   "lang": "lb",
+   "bytes": 25581
+  },
+  "end-rout-breck-lb": {
+   "text": "Endstatioun Rout Breck. Mir bieden all Passagéier auszestigen.",
+   "stop": "Rout Bréck",
+   "kind": "end",
+   "lang": "lb",
+   "bytes": 25293
+  },
+  "end-gare-centrale-lb": {
+   "text": "Endstatioun Gar Santral. Mir bieden all Passagéier auszestigen.",
+   "stop": "Gare Centrale",
+   "kind": "end",
+   "lang": "lb",
+   "bytes": 21357
+  },
+  "exit-left-lb": {
+   "text": "Ausstieg op der lénkser Säit.",
+   "stop": null,
+   "kind": "exit-left",
+   "lang": "lb",
+   "bytes": 11181
+  },
+  "exit-right-lb": {
+   "text": "Ausstieg op der rietser Säit.",
+   "stop": null,
+   "kind": "exit-right",
+   "lang": "lb",
+   "bytes": 12429
+  },
+  "next-findel-aeroport-de": {
+   "text": "Nächster Halt: Findel Aeroport.",
+   "stop": "Findel-Aéroport",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 14061
+  },
+  "next-heienhaff-de": {
+   "text": "Nächster Halt: Heienhaff.",
+   "stop": "Héienhaff",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 11277
+  },
+  "next-luxexpo-de": {
+   "text": "Nächster Halt: Luxexpo.",
+   "stop": "Luxexpo",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 10701
+  },
+  "next-alphonse-weicker-de": {
+   "text": "Nächster Halt: Alfons Weicker.",
+   "stop": "Alphonse Weicker",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 12237
+  },
+  "next-nationalbibliotheik-de": {
+   "text": "Nächster Halt: Nazionalbibliotheek.",
+   "stop": "Nationalbibliothéik",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 17421
+  },
+  "next-universiteit-de": {
+   "text": "Nächster Halt: Universitäit.",
+   "stop": "Universitéit",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 12333
+  },
+  "next-coque-de": {
+   "text": "Nächster Halt: Kock.",
+   "stop": "Coque",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 8301
+  },
+  "next-europaparlament-de": {
+   "text": "Nächster Halt: Europaparlament.",
+   "stop": "Europaparlament",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 12717
+  },
+  "next-philharmonie-de": {
+   "text": "Nächster Halt: Filharmonie.",
+   "stop": "Philharmonie",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 11181
+  },
+  "next-rout-breck-de": {
+   "text": "Nächster Halt: Rout Breck.",
+   "stop": "Rout Bréck",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 12045
+  },
+  "next-theater-de": {
+   "text": "Nächster Halt: Theater.",
+   "stop": "Theater",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 10221
+  },
+  "next-faiencerie-de": {
+   "text": "Nächster Halt: Fajansserie.",
+   "stop": "Faïencerie",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 11853
+  },
+  "next-stareplaz-de": {
+   "text": "Nächster Halt: Schtäreplaz.",
+   "stop": "Stäreplaz",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 13485
+  },
+  "next-hamilius-de": {
+   "text": "Nächster Halt: Hamilius.",
+   "stop": "Hamilius",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 10029
+  },
+  "next-place-de-metz-de": {
+   "text": "Nächster Halt: Plass de Mess.",
+   "stop": "Place de Metz",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 11181
+  },
+  "next-paraisser-plaz-de": {
+   "text": "Nächster Halt: Päräisser Plaz.",
+   "stop": "Paräisser Plaz",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 11949
+  },
+  "next-gare-centrale-de": {
+   "text": "Nächster Halt: Gar Santral.",
+   "stop": "Gare Centrale",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 13197
+  },
+  "next-leschte-steiwer-de": {
+   "text": "Nächster Halt: Leschte Schteiwer.",
+   "stop": "Leschte Steiwer",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 13869
+  },
+  "next-lycee-bouneweg-de": {
+   "text": "Nächster Halt: Lissee Bounewek.",
+   "stop": "Lycée Bouneweg",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 13677
+  },
+  "next-scillas-de": {
+   "text": "Nächster Halt: Scillas.",
+   "stop": "Scillas",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 10413
+  },
+  "next-gare-howald-de": {
+   "text": "Nächster Halt: Gar Howald.",
+   "stop": "Gare Howald",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 14253
+  },
+  "next-lycee-vauban-de": {
+   "text": "Nächster Halt: Lissee Vobang.",
+   "stop": "Lycée Vauban",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 12813
+  },
+  "next-waassertuerm-de": {
+   "text": "Nächster Halt: Waassertuerm.",
+   "stop": "Waassertuerm",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 12909
+  },
+  "next-stadion-de": {
+   "text": "Nächster Halt: Stadion.",
+   "stop": "Stadion",
+   "kind": "next",
+   "lang": "de",
+   "bytes": 10797
+  },
+  "end-findel-aeroport-de": {
+   "text": "Endstation Findel Aeroport. Wir bitten alle Fahrgäste auszusteigen.",
+   "stop": "Findel-Aéroport",
+   "kind": "end",
+   "lang": "de",
+   "bytes": 23853
+  },
+  "end-stadion-de": {
+   "text": "Endstation Stadion. Wir bitten alle Fahrgäste auszusteigen.",
+   "stop": "Stadion",
+   "kind": "end",
+   "lang": "de",
+   "bytes": 21741
+  },
+  "end-rout-breck-de": {
+   "text": "Endstation Rout Breck. Wir bitten alle Fahrgäste auszusteigen.",
+   "stop": "Rout Bréck",
+   "kind": "end",
+   "lang": "de",
+   "bytes": 22605
+  },
+  "end-gare-centrale-de": {
+   "text": "Endstation Gar Santral. Wir bitten alle Fahrgäste auszusteigen.",
+   "stop": "Gare Centrale",
+   "kind": "end",
+   "lang": "de",
+   "bytes": 22509
+  },
+  "exit-left-de": {
+   "text": "Ausstieg auf der linken Seite.",
+   "stop": null,
+   "kind": "exit-left",
+   "lang": "de",
+   "bytes": 11181
+  },
+  "exit-right-de": {
+   "text": "Ausstieg auf der rechten Seite.",
+   "stop": null,
+   "kind": "exit-right",
+   "lang": "de",
+   "bytes": 9645
+  },
+  "next-findel-aeroport-en": {
+   "text": "Next stop: Findel Aeroport.",
+   "stop": "Findel-Aéroport",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 12237
+  },
+  "next-heienhaff-en": {
+   "text": "Next stop: Heienhaff.",
+   "stop": "Héienhaff",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 8685
+  },
+  "next-luxexpo-en": {
+   "text": "Next stop: Luxexpo.",
+   "stop": "Luxexpo",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 11661
+  },
+  "next-alphonse-weicker-en": {
+   "text": "Next stop: Alfons Weicker.",
+   "stop": "Alphonse Weicker",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 10317
+  },
+  "next-nationalbibliotheik-en": {
+   "text": "Next stop: Nazionalbibliotheek.",
+   "stop": "Nationalbibliothéik",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 13197
+  },
+  "next-universiteit-en": {
+   "text": "Next stop: Universitäit.",
+   "stop": "Universitéit",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 9837
+  },
+  "next-coque-en": {
+   "text": "Next stop: Kock.",
+   "stop": "Coque",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 8109
+  },
+  "next-europaparlament-en": {
+   "text": "Next stop: Europaparlament.",
+   "stop": "Europaparlament",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 13485
+  },
+  "next-philharmonie-en": {
+   "text": "Next stop: Filharmonie.",
+   "stop": "Philharmonie",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 10125
+  },
+  "next-rout-breck-en": {
+   "text": "Next stop: Rout Breck.",
+   "stop": "Rout Bréck",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 8877
+  },
+  "next-theater-en": {
+   "text": "Next stop: Theater.",
+   "stop": "Theater",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 10221
+  },
+  "next-faiencerie-en": {
+   "text": "Next stop: Fajansserie.",
+   "stop": "Faïencerie",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 10221
+  },
+  "next-stareplaz-en": {
+   "text": "Next stop: Schtäreplaz.",
+   "stop": "Stäreplaz",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 11565
+  },
+  "next-hamilius-en": {
+   "text": "Next stop: Hamilius.",
+   "stop": "Hamilius",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 9645
+  },
+  "next-place-de-metz-en": {
+   "text": "Next stop: Plass de Mess.",
+   "stop": "Place de Metz",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 11277
+  },
+  "next-paraisser-plaz-en": {
+   "text": "Next stop: Päräisser Plaz.",
+   "stop": "Paräisser Plaz",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 11469
+  },
+  "next-gare-centrale-en": {
+   "text": "Next stop: Gar Santral.",
+   "stop": "Gare Centrale",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 11661
+  },
+  "next-leschte-steiwer-en": {
+   "text": "Next stop: Leschte Schteiwer.",
+   "stop": "Leschte Steiwer",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 10893
+  },
+  "next-lycee-bouneweg-en": {
+   "text": "Next stop: Lissee Bounewek.",
+   "stop": "Lycée Bouneweg",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 12909
+  },
+  "next-scillas-en": {
+   "text": "Next stop: Scillas.",
+   "stop": "Scillas",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 9261
+  },
+  "next-gare-howald-en": {
+   "text": "Next stop: Gar Howald.",
+   "stop": "Gare Howald",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 10509
+  },
+  "next-lycee-vauban-en": {
+   "text": "Next stop: Lissee Vobang.",
+   "stop": "Lycée Vauban",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 11853
+  },
+  "next-waassertuerm-en": {
+   "text": "Next stop: Waassertuerm.",
+   "stop": "Waassertuerm",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 9933
+  },
+  "next-stadion-en": {
+   "text": "Next stop: Stadion.",
+   "stop": "Stadion",
+   "kind": "next",
+   "lang": "en",
+   "bytes": 8973
+  },
+  "end-findel-aeroport-en": {
+   "text": "This is Findel Aeroport, the final stop. All passengers please alight.",
+   "stop": "Findel-Aéroport",
+   "kind": "end",
+   "lang": "en",
+   "bytes": 27213
+  },
+  "end-stadion-en": {
+   "text": "This is Stadion, the final stop. All passengers please alight.",
+   "stop": "Stadion",
+   "kind": "end",
+   "lang": "en",
+   "bytes": 23181
+  },
+  "end-rout-breck-en": {
+   "text": "This is Rout Breck, the final stop. All passengers please alight.",
+   "stop": "Rout Bréck",
+   "kind": "end",
+   "lang": "en",
+   "bytes": 22221
+  },
+  "end-gare-centrale-en": {
+   "text": "This is Gar Santral, the final stop. All passengers please alight.",
+   "stop": "Gare Centrale",
+   "kind": "end",
+   "lang": "en",
+   "bytes": 21933
+  },
+  "exit-left-en": {
+   "text": "Exit on the left-hand side.",
+   "stop": null,
+   "kind": "exit-left",
+   "lang": "en",
+   "bytes": 8589
+  },
+  "exit-right-en": {
+   "text": "Exit on the right-hand side.",
+   "stop": null,
+   "kind": "exit-right",
+   "lang": "en",
+   "bytes": 8781
+  }
+ }
+}
