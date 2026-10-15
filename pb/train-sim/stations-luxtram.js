@@ -167,19 +167,7 @@
       c.textAlign = 'center';
       c.fillText('TICKETS', w / 2, 20);
     }, { clampU: true, clampV: true });
-    const ledTex = () => canvasTex('luxtram:led', 256, 96, (c, w, h) => {
-      c.fillStyle = '#0d0f11';
-      c.fillRect(0, 0, w, h);
-      c.fillStyle = '#ffb02e';
-      c.font = '700 22px "Courier New", monospace';
-      c.textAlign = 'left';
-      c.fillText("T1  Stadion       2'", 12, 30);
-      c.fillText("T1  Findel        9'", 12, 58);
-      c.fillText('T1  Stadion    10:12', 12, 86);
-      c.strokeStyle = '#3c4146';
-      c.lineWidth = 4;
-      c.strokeRect(2, 2, w - 4, h - 4);
-    }, { clampU: true, clampV: true });
+    const ledTex = () => canvasTex('luxtram:led', 256, 96, (c, w, h) => drawLed(c, w, h, LED_DEFAULT), { clampU: true, clampV: true });
     const tactileTex = () => canvasTex('luxtram:tactile', 64, 128, (c, w, h) => {
       c.fillStyle = '#d9d4c7';
       c.fillRect(0, 0, w, h);
@@ -197,6 +185,7 @@
     const adB = sets.get('luxtram-ads', () => M.sign('luxtram-ads', adTex()));
     const ticketB = sets.get('luxtram-ticket', () => M.tex('luxtram-ticket', ticketTex()));
     const ledB = sets.get('luxtram-led', () => M.sign('luxtram-led', ledTex()));
+    ledTexRef = ledTex();   // (cached by name: the same texture the boards use)
     const tactB = sets.get('luxtram-tactile', () => M.tex('luxtram-tactile', tactileTex(), { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
     const signB = sets.get('sign:' + st.name, () => M.sign(st.name, helpers.signTexture(st.name, 'tram')));
 
@@ -475,6 +464,33 @@
       });
     }
   }
+
+  /* The departure boards (one texture shared by every stop): static text until the game calls TS.luxtramLed.show(rows), then live (train-sim.js: the next departures of the stop the
+   * player is in or approaching, from the game's timetable and clock). rows = up to 3 strings of 20 characters. */
+  const LED_DEFAULT = ["T1  Stadion       2'", "T1  Findel        9'", 'T1  Stadion    10:12'];
+  let ledTexRef = null, ledSig = '';
+  function drawLed(c, w, h, rows) {
+    c.fillStyle = '#0d0f11';
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffb02e';
+    c.font = '700 22px "Courier New", monospace';
+    c.textAlign = 'left';
+    rows.slice(0, 3).forEach((r, i) => c.fillText(String(r), 12, 30 + 28 * i));
+    c.strokeStyle = '#3c4146';
+    c.lineWidth = 4;
+    c.strokeRect(2, 2, w - 4, h - 4);
+  }
+  window.TS.luxtramLed = {
+    show(rows) {
+      const sig = rows.join('|');
+      if (!ledTexRef || sig === ledSig) return false;
+      ledSig = sig;
+      const cv = ledTexRef.image;
+      drawLed(cv.getContext('2d'), cv.width, cv.height, rows);
+      ledTexRef.needsUpdate = true;
+      return true;
+    },
+  };
 
   function hashName(s) {
     let h = 0;

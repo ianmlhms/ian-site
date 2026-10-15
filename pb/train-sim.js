@@ -1626,6 +1626,24 @@
     }
     return out;
   }
+  /* Luxtram departure boards (stations-luxtram.js, TS.luxtramLed): the next departures of the stop the player is in or heading for. Row 1 is the player's own tram (the timetable of
+     this service, minutes to its departure / arrival, "now" in the stop), row 2 the opposite direction and row 3 the tram after the player's one, both on the 5-minute T1 headway
+     keyed to the game clock. */
+  const LED_HEADWAY_MIN = 5, LED_NAME_LEN = 11;
+  function updateLedBoard(s, sv, hIdx) {
+    const led = window.TS && window.TS.luxtramLed, w = world;
+    if (!led || !isTramWorld() || !w || !sv) return;
+    const st = stationsOf();
+    if (!st.length || hIdx < 0 || hIdx >= st.length) return;
+    const short = (n) => String(n).replace(/[-–].*$/, '').slice(0, LED_NAME_LEN);
+    const row = (dest, tail) => ('T1  ' + short(dest).padEnd(LED_NAME_LEN) + String(tail).padStart(5)).slice(0, 20);
+    const toward = sv.last ? st[0].name : st[st.length - 1].name, away = sv.last ? st[st.length - 1].name : st[0].name;
+    const when = sv.here ? sv.dep : sv.arr, mins = Math.max(0, Math.ceil((when - s.clockSec) / 60));
+    const own = sv.here ? (mins <= 0 ? 'now' : mins + "'") : (mins <= 0 ? '<1' + "'" : mins + "'");
+    const clockMin = Math.floor(s.clockSec / 60), opp = LED_HEADWAY_MIN - ((clockMin + hIdx * 2) % LED_HEADWAY_MIN);
+    const afterText = clockSecText(when + LED_HEADWAY_MIN * 60).slice(0, 5);
+    led.show([sv.last ? row(away, 'now') : row(toward, own), row(away, opp + "'"), row(sv.last ? away : toward, afterText)]);
+  }
   const clockPill = (sec) => { const t0 = clockSecText(sec); return t0.slice(0, 5) + '<i>' + t0.slice(5) + '</i>'; };
   function renderSchedule(sv) {
     const box = $('sched'), badge = $('depBadge');
@@ -1662,6 +1680,7 @@
     sideEl.textContent = st ? t('platformShort') + ' ' + t(st.side === 'left' ? 'sideLeft' : 'sideRight') : '';
     sideEl.className = 'chip ' + (st ? (st.side === 'left' ? 'left' : 'right') : '');
     renderSchedule(sv);
+    safe('led board', () => updateLedBoard(s, sv, hIdx));
     $('clock').textContent = shownClock(s.clockSec);
     $('clockSec').textContent = ':' + pad2((((s.clockSec + (w.clockShift || 0)) % 60) + 60) % 60);
     const d = $('delay'), dv = sv.delay, isLate = dv > DELAY_LATE_S;
