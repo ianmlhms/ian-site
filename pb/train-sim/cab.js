@@ -603,7 +603,7 @@
       g.computeVertexNormals();
       addTo('matte', g, new T.Matrix4(), hexTop, hexBot);
     };
-    if (S.hood) loftFascia('#343941', '#0e1013'); else prismX(rampProfile, rx0, rx1, S.body);
+    if (S.hood) loftFascia('#363b43', '#191c21'); else prismX(rampProfile, rx0, rx1, S.body);
     const wingXs = [[-hw - 0.04, rx0], [rx1, hw + 0.04]];
     for (const [xa, xb] of wingXs) {
       if (xb - xa < 0.01) continue;
