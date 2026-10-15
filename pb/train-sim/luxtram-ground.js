@@ -323,7 +323,7 @@
     '  vec4 a = texture2D(uCtrl0, vTerrUv); vec4 b = texture2D(uCtrl1, vTerrUv);',
     '  float tot = dot(a, vec4(1.0)) + dot(b, vec4(1.0)); a /= tot; b /= tot;',
     /* near ground: sharpen the class mix (squared weights): the class map is 0.5 m per texel and softened, which smeared a ~1.5 m blurred band of grass into the asphalt along every verge and median */
-    '  if (uFar < 0.5) { a *= a; b *= b; float t2 = dot(a, vec4(1.0)) + dot(b, vec4(1.0)); a /= t2; b /= t2; }',
+    '  if (uFar < 0.5) { a *= a; b *= b; a *= a; b *= b; float t2 = dot(a, vec4(1.0)) + dot(b, vec4(1.0)); a /= t2; b /= t2; }',
     '  vec2 wp = vWP.xz; vec2 dx = dFdx(wp); vec2 dy = dFdy(wp);',
     '  float m1 = lvn(wp * 0.035); float m2 = lvn(wp * 0.21); float m3 = lvn(wp * 1.3);',
     '  vec3 col = classMix(a, b, wp, dx, dy, m1, m2, m3);',
@@ -349,7 +349,7 @@
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + SPLAT_FRAG_COMMON)
         .replace('#include <map_fragment>', 'diffuseColor.rgb *= groundAlbedo();');
     };
-    mat.customProgramCacheKey = () => 'lt-splat-v4';
+    mat.customProgramCacheKey = () => 'lt-splat-v5';
     return mat;
   }
 
@@ -539,7 +539,7 @@
       let iMark = S.i.length;
       const iA0 = S.i.length;
       const aCull = { n: 0 };
-      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: window.__lgAsphSeg || 5.0, cullSteep: true, steepK: 0.8, counter: aCull }));   // a carriageway never climbs a bank steeper than ~37 degrees: where its polygon runs over one the terrain stays
+      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: window.__lgAsphSeg || 5.0, cullSteep: true, steepK: 0.5, counter: aCull }));   // a carriageway triangle steeper than 60 degrees (a polygon edge that runs up a cliff / wall) is dropped; real cuttings and ramps up to ~45 degrees stay drawn (0.8 removed whole ramps)
       const roadGrid = rasterRoad(t, S, iA0, S.i.length);
       iMark = mark('asph', iMark);
       const iS0 = S.i.length;

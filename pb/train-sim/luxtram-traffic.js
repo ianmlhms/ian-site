@@ -1348,7 +1348,7 @@
         if (onc.stop) {
           const rem = (onc.s - onc.stop.stopS) * -d;
           if (rem <= 0.35 && onc.v < 1.2) {
-            onc.s = onc.stop.stopS; onc.v = 0; onc.phase = 'dwell'; onc.dwell = ONC_DWELL_MS / 1000; onc.visited.add(onc.stop.k);
+            onc.s = onc.stop.stopS; onc.v = 0; onc.phase = 'dwell'; onc.still = 0; onc.dwell = ONC_DWELL_MS / 1000; onc.visited.add(onc.stop.k);
             oncArrive(onc.stop.k); onc.stop = null;
           } else if (rem < 0) { onc.s = onc.stop.stopS; onc.v = Math.min(onc.v, 0.5); }
         }
@@ -1358,7 +1358,7 @@
         const want = onc.dwell > 3.2 ? 1 : 0;
         onc.doors = clamp(onc.doors + (want ? dt / 1.6 : -dt / 1.6), 0, 1);
         if (animDoors) { if (onc.baked) onc.bake.uDoor.value = onc.doors; else m.setDoors(onc.doors, onc.platformSide || 'right'); }
-        if (onc.dwell <= 0 && onc.doors <= 0) { onc.phase = 'run'; if (onc.baked) onc.bake.uDoor.value = 0; else m.setDoors(0); oncDepart(); }
+        if (onc.dwell <= 0 && onc.doors <= 0) { onc.phase = 'run'; onc.still = 0; if (onc.baked) onc.bake.uDoor.value = 0; else m.setDoors(0); oncDepart(); }
       }
       // red-light trigger
       onc.trig.s = onc.s; onc.trig.dir = d; onc.trig.len = onc.len;
