@@ -2750,8 +2750,50 @@
     return false;
   }
 
+  /* Does a generic building (ring of [lat, lon]) intersect any landmark footprint (OSM landmark outlines + the LOD2 ground outlines the models are made from)?  True when a vertex lies
+     inside / within bufferM of a footprint, a footprint vertex lies inside the ring, or two edges cross.  The world skips such buildings (no facade pokes through a landmark). */
+  const FP_BOX = [];   // lat/lon bounding boxes of footprints, same order as `footprints`
+  function fpBox(i) {
+    if (!FP_BOX[i]) { let a = 90; let b = 190; let c = -90; let d = -190; footprints[i].ring.forEach((q) => { a = Math.min(a, q[0]); c = Math.max(c, q[0]); b = Math.min(b, q[1]); d = Math.max(d, q[1]); }); FP_BOX[i] = [a, b, c, d]; }
+    return FP_BOX[i];
+  }
+  function pointIn(ring, lat, lon) {
+    let inside = false;
+    for (let k = 0, j = ring.length - 1; k < ring.length; j = k++) {
+      const yi = ring[k][0]; const xi = ring[k][1]; const yj = ring[j][0]; const xj = ring[j][1];
+      if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi + 1e-12) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  function segsCross(a, b, c, d) {
+    const o = (p, q, r) => (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1]);
+    const o1 = o(a, b, c); const o2 = o(a, b, d); const o3 = o(c, d, a); const o4 = o(c, d, b);
+    return o1 * o2 < 0 && o3 * o4 < 0;
+  }
+  function overlaps(ring, bufferM) {
+    if (!ring || ring.length < 3) return false;
+    const m = (bufferM === undefined ? 0.5 : bufferM);
+    let a = 90; let b = 190; let c = -90; let d = -190;
+    ring.forEach((q) => { a = Math.min(a, q[0]); c = Math.max(c, q[0]); b = Math.min(b, q[1]); d = Math.max(d, q[1]); });
+    const padLat = m / M_LAT; const padLon = m / M_LON;
+    for (let i = 0; i < footprints.length; i++) {
+      const bx = fpBox(i);
+      if (bx[2] < a - padLat || bx[0] > c + padLat || bx[3] < b - padLon || bx[1] > d + padLon) continue;
+      const fr = footprints[i].ring;
+      for (let k = 0; k < ring.length; k++) if (pointIn(fr, ring[k][0], ring[k][1])) return true;
+      for (let k = 0; k < fr.length; k++) if (pointIn(ring, fr[k][0], fr[k][1])) return true;
+      for (let k = 0; k < ring.length; k++) {
+        const p0 = ring[k]; const p1 = ring[(k + 1) % ring.length];
+        for (let j = 0; j < fr.length; j++) if (segsCross(p0, p1, fr[j], fr[(j + 1) % fr.length])) return true;
+      }
+      if (m > 0) for (let k = 0; k < ring.length; k++) if (covers(ring[k][0], ring[k][1], m)) return true;
+    }
+    return false;
+  }
+
   TS.luxLandmarks = {
     version: 1,
+    overlaps,
     preload: (url) => loadLod(url),   // detail data, resolves when loaded (or failed): the loading bar waits for it
     build,
     replaces,

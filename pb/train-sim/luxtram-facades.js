@@ -1222,6 +1222,14 @@
     }
 
     /* ------------------------------------------------ LOD2 buildings of one 128 m tile */
+    function convexHull(pts) {
+      const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      if (p.length < 3) return p;
+      const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      const lo = []; for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+      const up = []; for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+      lo.pop(); up.pop(); return lo.concat(up);
+    }
     function buildTile(t, tileBudget) {
       const list = t.bld;
       if (!list || !list.length) return null;
@@ -1237,7 +1245,11 @@
           cx += px[i]; cz += pz[i]; ymin = Math.min(ymin, py[i]); ymax = Math.max(ymax, py[i]);
         }
         cx /= nv; cz /= nv;
-        if (ctx.replacedBy(cx, cz, Array.from({ length: Math.min(nv, 6) }, (_, i) => [px[i], pz[i]]))) { stats.skipped++; return; }
+        // the ground outline of the building (convex hull of its bottom vertices) against the landmark footprints; the first six vertices decide the old centre / vertex test
+        const bottomIdx = Array.from(new Set(b.B));
+        const hull = convexHull(bottomIdx.map((i) => [px[i], pz[i]]));
+        if (ctx.replacedBy(cx, cz, hull.length >= 3 ? hull : Array.from({ length: Math.min(nv, 6) }, (_, i) => [px[i], pz[i]]))) { stats.skipped++; return; }
+        if (ctx.logBuilding && hull.length >= 3) ctx.logBuilding(hull, 'lod2');
         const H = ymax - ymin;
         if (H <= ctx.STOP_CLEAR_H && ctx.atStop(cx, cz)) { stats.skipped++; return; }
         const bottom = new Set(b.B);
@@ -1295,6 +1307,7 @@
       for (let i = 0; i < ring.length; i++) if (ctx.nearest(ring[i][0], ring[i][1]).d < 3.4) return false;
       const cc = ring.reduce((a, p) => [a[0] + p[0] / ring.length, a[1] + p[1] / ring.length], [0, 0]);
       if (ctx.replacedBy(cc[0], cc[1], ring)) return false;
+      if (ctx.logBuilding) ctx.logBuilding(ring, 'osm');
       if (H <= ctx.STOP_CLEAR_H && ctx.atStop(cc[0], cc[1])) return false;
       const rng = mulberry(hash2(ci * 977 + idx, 17) * 4294967296);
       let gMin = 1e9; let gSum = 0;

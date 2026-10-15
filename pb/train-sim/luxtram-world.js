@@ -396,7 +396,7 @@
     /* ---- buildings: facades + roofs live in luxtram-facades.js (TS.luxFacades): one material, merged per tile / chunk */
     const fx = TS.luxFacades.create({
       T, ox, oz, oy, quality, castShadow: Q.castShadow, get STOP_CLEAR_H() { return STOP_CLEAR_H; },
-      gy: (x, z) => gy(x, z), nearest: (x, z) => nearest(x, z), replacedBy: (x, z, pts) => replacedBy(x, z, pts), atStop: (x, z) => atStop(x, z),
+      gy: (x, z) => gy(x, z), nearest: (x, z) => nearest(x, z), replacedBy: (x, z, pts) => replacedBy(x, z, pts), logBuilding: (pts, kind) => logBuilding(pts, kind), atStop: (x, z) => atStop(x, z),
       sceneRing: (flat) => sceneRing(flat), localXZ: (x, z) => [x + ox, z + oz],
     });
     const matWall = fx.matWall;
@@ -732,15 +732,19 @@
     Object.keys(ROOF_PAL).forEach((k) => { roofC[k] = ROOF_PAL[k].map(C); });
     const palC = {};
     Object.keys(PAL).forEach((k) => { palC[k] = PAL[k].map(C); });
-    const replacedBy = (x, z, pts) => { // does a hand-built landmark replace this footprint? (TS.luxLandmarks.covers: lat/lon test)
+    const replacedBy = (x, z, pts) => { // does a hand-built landmark replace / overlap this footprint? (TS.luxLandmarks: polygon intersection + the old centre / vertex test)
       const lm = TS.luxLandmarks;
       if (!lm || !lm.covers) return false;
       let hit = 0; let tot = 0;
       const test = (px, pz) => { const ll = sceneToLonLat(px, pz); tot++; if (lm.covers(ll.lat, ll.lon, 1.0)) hit++; };
       test(x, z);
       for (let i = 0; i < pts.length && i < 6; i++) test(pts[i][0], pts[i][1]);
-      return hit * 2 >= tot;
+      if (hit * 2 >= tot) return true;
+      if (lm.overlaps && pts.length >= 3 && !(typeof window !== 'undefined' && window.__tsNoLmOverlap)) { const ring = pts.map((q) => { const ll = sceneToLonLat(q[0], q[1]); return [ll.lat, ll.lon]; }); if (lm.overlaps(ring, 0.5)) return true; }
+      return false;
     };
+    /* test hook: window.__tsBldLog = [] before the world is built records the ground ring (lat / lon) of every generic building that is drawn */
+    const logBuilding = (pts, kind) => { const log = typeof window !== 'undefined' ? window.__tsBldLog : null; if (log) log.push({ kind, ring: pts.map((q) => { const ll = sceneToLonLat(q[0], q[1]); return [ll.lat, ll.lon]; }) }); };
     function buildBuildings(t) { return fx.buildTile(t); }
 
     /* ---- canopy trees from the LiDAR (t/<i>_<j>.bin: u16 x, u16 z (0.1 m from the tile corner), u8 height (0.25 m), u8 crown radius (0.05 m), u16 rgb565) */
