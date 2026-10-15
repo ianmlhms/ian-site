@@ -1537,7 +1537,7 @@
     const mats = trainMats();
     const tramLook = model === 'tram'; // tram: darker windscreen tint and a dark cab lining (seen through the glass), like the real thing
     if (tramLook) { mats.glass.color.setHex(0x33434f); mats.glass.envMapIntensity = 0.2; mats.glass.metalness = 0.15; mats.glassD.envMapIntensity = 0.45; mats.inside.color.setHex(0x4a4f56); mats.insideFwd.color.setHex(0x4a4f56); }
-    const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x7a6d56 : INSIDE_EMIT_ON;   // tram cab lights: a warm lamp glow on the white lining
+    const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x6a6a68 : INSIDE_EMIT_ON;   // tram cab lights: a neutral lamp glow on the white lining (a warm one turned the cheeks pink at night)
     let cabViewOn = false, cabinOn = false, interiorViewOn = false;
     // tram windscreen: tinted and fairly opaque seen from outside, clear (like the other models) from the cab camera
     const applyGlass = () => { mats.glass.opacity = tramLook ? (interiorViewOn ? 0.18 : cabViewOn ? 0.2 : 0.58) : (cabinOn ? 0.26 : 0.34); };

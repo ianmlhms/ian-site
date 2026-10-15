@@ -736,6 +736,17 @@
         { x0: 0.36, y: 0.042, n: 7, dx: 0.062, cols: [C.a, C.w, C.b, C.r, C.g, C.a, C.w] },
         { x0: 0.4, y: 0.09, n: 3, dx: 0.062, cols: [C.b, C.g, C.r] },
       ];
+      {   // slim camera / side monitor standing on the right wing of the console, tilted back to the driver
+        const mx = 0.63, L = fasciaL(mx), zT = zF + DESK_FRONT_U + rampBottomU - L * Math.cos(rampAlpha), yT = deskY(rampBottomU) + L * Math.sin(rampAlpha), tilt = -0.42;
+        const my = yT + 0.1, mz = zT + 0.02;
+        boxAt('matte', 0.13, 0.215, 0.035, mx, my, mz, '#14161a', tilt);
+        boxAt('matte', 0.05, 0.03, 0.06, mx, yT + 0.01, mz - 0.01, '#14161a');
+        const face = compose(mx, my, mz, tilt).multiply(compose(0, 0.004, 0.0185));
+        addTo('lens', new T.PlaneGeometry(0.108, 0.17), face, '#1d4a66');
+        addTo('lens', new T.PlaneGeometry(0.1, 0.012), face.clone().multiply(compose(0, 0.07, 0.001)), '#8fd4ff');
+        addTo('lens', new T.PlaneGeometry(0.06, 0.012), face.clone().multiply(compose(-0.02, 0.045, 0.001)), '#5aa8d8');
+        addTo('lens', new T.PlaneGeometry(0.075, 0.07), face.clone().multiply(compose(0, -0.012, 0.001)), '#2b6f8f');
+      }
       for (const row of rows) for (let i = 0; i < row.n; i++) {
         const x = row.x0 + i * row.dx, col = row.cols[i];
         addTo('matte', cyl(0.015, 0.016, 0.01, 16).rotateX(Math.PI / 2), panelM(x, row.y, 0.005), '#25282d');
@@ -1077,7 +1088,9 @@
       // header: cream roof panel over the screen with the roller blind cassette (blind rolled up, bottom bar showing)
       boxAt('matte', innerHW * 2 + 0.3, 0.11, 0.38, 0, fr.windY1 + 0.02, capZ(fr.windY1) + 0.2, cream, 0, 0, 0, creamLo);
       addTo('matte', cyl(0.034, 0.034, innerHW * 2 + 0.08, 14).rotateZ(Math.PI / 2), compose(0, fr.windY1 - 0.085, capZ(fr.windY1) + 0.075), '#efe9d6', '#cfc8b2');
-      boxAt('matte', innerHW * 2 + 0.06, 0.02, 0.02, 0, fr.windY1 - 0.125, capZ(fr.windY1) + 0.07, '#b9b19b');
+      // the blind half rolled down: a cream sheet with a stiff bottom bar (the sun visor of the real cab)
+      boxAt('matte', innerHW * 2 + 0.05, 0.07, 0.006, 0, fr.windY1 - 0.155, capZ(fr.windY1) + 0.075, '#e8e2cf', rk, 0, 0, '#d4ccb4');
+      boxAt('matte', innerHW * 2 + 0.06, 0.024, 0.022, 0, fr.windY1 - 0.2, capZ(fr.windY1) + 0.07, '#b9b19b', rk);
       // ceiling above the driver, white, with a long LED strip
       const zC0 = capZ(fr.windY1) + 0.1, zC1 = zF + 2.5, yC = fr.windY1 + 0.07;
       boxAt('matte', fr.W - 0.3, 0.04, zC1 - zC0, 0, yC, (zC0 + zC1) / 2, '#ece9e2');
