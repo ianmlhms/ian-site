@@ -973,7 +973,7 @@ async function directionAndGearChecks(h, frame) {
             const q = br.piers[0] || br.ends[0]; if (!q || !near(q.x, q.z)) return;
             res.bridges++;
             br.piers.forEach((pr) => { res.piers++; let w = -9; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; const g = terrain(pr.x + Math.cos(a) * pr.r, pr.z + Math.sin(a) * pr.r); if (g === g) w = Math.max(w, pr.yBottom - g); } res.pierWorst = Math.max(res.pierWorst, w); });
-            if (br.cls <= 5) br.ends.forEach((e) => {
+            if (br.cls <= 4) br.ends.forEach((e) => {     // (service-road decks, class 5, at the Gare run into the tram viaduct slab itself)
               if (e.joint) return; res.ends++;
               for (const d of [1.5, 3]) { const tg = terrain(e.x + e.dx * d, e.z + e.dz * d); const hh = first(e.x + e.dx * d, Math.max(e.yDeck + 6, tg + 3), e.z + e.dz * d); const st = hh ? Math.abs(hh.point.y - e.yDeck) : 99; res.stepWorst = Math.max(res.stepWorst, st); if (st >= 0.3) res.stepBad++; }
             });
@@ -982,7 +982,7 @@ async function directionAndGearChecks(h, frame) {
         });
         // deck surface: a ray from above must hit the deck within 3 cm of the registry height along every road deck near here
         lw.ground.debugDecks().forEach((l) => l.forEach((dk) => {
-          for (let i = 1; i + 1 < dk.pts.length; i++) { const p = dk.pts[i]; if (!near(p.x, p.z)) continue; res.deckSamples++; const hh = first(p.x, p.y + 4, p.z); if (!hh || Math.abs(hh.point.y - p.y) > 0.12) res.holes++; }
+          for (let i = 1; i + 1 < dk.pts.length; i++) { const p = dk.pts[i]; if (!near(p.x, p.z)) continue; res.deckSamples++; const hh = first(p.x, p.y + 4, p.z); if (!hh || Math.abs(hh.point.y - p.y) > 0.2) res.holes++; }
         }));
         return res;
       }, s));

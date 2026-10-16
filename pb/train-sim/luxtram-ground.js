@@ -1039,7 +1039,6 @@
         if (x >= t.x0 && x < t.x0 + 128 && z >= t.z0 && z < t.z0 + 128) return surfY(t, x, z);
         return ctx.groundAt ? ctx.groundAt(x, z) : surfY(t, x, z);      // a neighbouring tile that is not built yet: the LiDAR ground (not the clamped edge of this tile)
       };
-      const jointEnds = new Set();
       /* the level (frame y) of another deck piece that passes within 2.5 m of (x, z) at about height y (<= 3 m apart), NaN when none: this tile's raw decks and the decks of the other tiles built so far */
       const otherDeckLevel = (self, x, z, y) => {
         let best = NaN; let bd = 2.5; let bestRaw = false; let raw = false;
@@ -1076,7 +1075,7 @@
           // the next OSM bridge way of the same viaduct starts here (two decks meet end to end): the end takes the level of the deck it meets (it is not an abutment)
           const other = otherDeckLevel(dk, p0.x + ox * 1.0, p0.z + oz * 1.0, p0.y);
           if (other) {
-            jointEnds.add(dk); p0.joint = true;
+            p0.joint = true;
             const delta = other.y - p0.y;
             let run = 0;
             for (let i = k; i >= 0 && i < n; i -= sg) {
@@ -1317,7 +1316,7 @@
           const dx = b.x - a.x; const dz = b.z - a.z; const l2 = dx * dx + dz * dz || 1;
           const uRaw = ((x - a.x) * dx + (z - a.z) * dz) / l2; const tt = clamp(uRaw, 0, 1);
           const over = Math.abs(uRaw - tt) * Math.sqrt(l2);       // metres past the end of this segment
-          if (over > ((i === 0 && uRaw < 0) || (i === pts.length - 2 && uRaw > 1) ? 0.4 : 1.0)) continue;       // past the end of the deck (or well outside this segment, a bend): no deck there
+          if (over > ((i === 0 && uRaw < 0) || (i === pts.length - 2 && uRaw > 1) ? 0.15 : 0.5)) continue;       // past the end of the deck (or well outside this segment, a bend): no deck there
           const d = Math.hypot(x - (a.x + dx * tt), z - (a.z + dz * tt));
           if (d > dk.hw) continue;
           const y = a.y + (b.y - a.y) * tt + (d > dk.hwRoad ? dk.kerb : 0);      // beside the carriageway: the sidewalk, one kerb up
