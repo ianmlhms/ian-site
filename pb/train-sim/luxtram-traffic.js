@@ -643,7 +643,7 @@
       rayO.set(x, y + 1.3, z); rc.set(rayO, rayDown); rc.near = 0; rc.far = 1.3 + SURF_TOL + 0.8;
       rayHits.length = 0;
       rc.intersectObjects(list, true, rayHits);
-      for (let i = 0; i < rayHits.length; i++) if (Math.abs(rayHits[i].point.y - y) <= SURF_TOL) return true;
+      for (let i = 0; i < rayHits.length; i++) if (Math.abs(rayHits[i].point.y - y) <= SURF_TOL && rayHits[i].object.visible) return true;      // (a hidden mesh is no surface)
       return false;
     }
     const inView = (x, y, z, r) => { if (!haveFrustum) return true; sph.center.set(x, y, z); sph.radius = r; return frustum.intersectsSphere(sph); };
@@ -974,6 +974,12 @@
         const hFL = surfaceAt(wxz[0], wxz[1], ob, refY); const hFR = surfaceAt(wxz[2], wxz[3], ob, refY);
         const hRL = surfaceAt(wxz[4], wxz[5], ob, refY); const hRR = surfaceAt(wxz[6], wxz[7], ob, refY);
         if (hFL !== hFL || hFR !== hFR || hRL !== hRL || hRR !== hRR) { if (pass === 0) return false; break; }
+        if (pass === 0 && Math.max(hFL, hFR, hRL, hRR) - Math.min(hFL, hFR, hRL, hRR) > 1.5) {
+          // the four wheels stand on ground that differs by more than 1.5 m (a cliff / a portal cutting the road crosses, no drivable surface): nobody drives here
+          if (!rd.bad) rd.bad = [];
+          rd.bad.push([c.t - 14, c.t + 14, now + 90000]); c.active = false; c.shown = false;
+          return false;
+        }
         if (pass === 0 && !ob && roadAt) {
           // a wheel off the asphalt (kerb, pavement, bank) although the road axis is asphalt: steer the lane towards the axis, 2 % of the half width per frame
           const off = roadAt(wxz[0], wxz[1]) !== roadAt(wxz[0], wxz[1]) || roadAt(wxz[2], wxz[3]) !== roadAt(wxz[2], wxz[3]) || roadAt(wxz[4], wxz[5]) !== roadAt(wxz[4], wxz[5]) || roadAt(wxz[6], wxz[7]) !== roadAt(wxz[6], wxz[7]);
