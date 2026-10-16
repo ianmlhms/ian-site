@@ -651,7 +651,7 @@
        Down-rays from just above every wheel against the infrastructure group; a hit from 0.8 m above to 0.5 m below the wheel is a conflict. */
     const infraRc = new T.Raycaster(); const infraHits = []; const wMat = new T.Matrix4(); const wV = new T.Vector3();
     const NO_MESHES = [];
-    const STRUCT_UP = 0.8; const STRUCT_DOWN = 0.5; const STRUCT_BURY = 0.25; const STRUCT_FLOAT = 0.4;
+    const STRUCT_UP = 0.8; const STRUCT_DOWN = 0.5; const STRUCT_BURY = 0.25;
     let infraList = []; let infraLook = -1e9;
     function infraRoot(now) {
       if (infraList.length && now - infraLook < 3000 && infraList.every((o) => o.parent)) return infraList;      // (tiles / chunks stream in and out: re-read every 3 s)
@@ -668,8 +668,8 @@
       const rd = c.rd; const m = c.spec.L / 2 + 3;
       if ((rd.cross || []).some((q) => c.t > q.t0 - m && c.t < q.t1 + m)) return true;     // (the rails of a level crossing are meant to be driven over)
       wMat.fromArray(c.mat); const sp0 = c.spec;
-      for (let k = 0; k < 9; k++) {       // 4 wheels, the middle, the 4 corners of the body (a platform pad under a bumper counts too)
-        if (k < 4) wV.set((k & 1 ? 1 : -1) * sp0.tw / 2, 0, (k & 2 ? 1 : -1) * sp0.wb / 2); else if (k === 4) wV.set(0, 0, 0); else wV.set((k & 1 ? 1 : -1) * sp0.W / 2, 0, (k & 2 ? 1 : -1) * sp0.L / 2);
+      for (let k = 0; k < 5; k++) {       // 4 wheels + the middle
+        if (k < 4) wV.set((k & 1 ? 1 : -1) * sp0.tw / 2, 0, (k & 2 ? 1 : -1) * sp0.wb / 2); else wV.set(0, 0, 0);
         wV.applyMatrix4(wMat);
         const wy = wV.y + (k < 4 && c.sus ? c.sus[k] : 0);
         rayO.set(wV.x, wy + STRUCT_UP, wV.z); infraRc.set(rayO, rayDown); infraRc.near = 0; infraRc.far = STRUCT_UP + STRUCT_DOWN;
@@ -682,16 +682,13 @@
         // ... and a wheel is never buried: the highest drawn ground surface (terrain, painted ground, deck, plug) within 0.8 m above it is not more than STRUCT_BURY above the contact point
         const tl = k < 4 ? surfaceMeshesAt(wV.x, wV.z) : NO_MESHES;
         if (tl.length) {
-          let ok = false;
           infraHits.length = 0; infraRc.intersectObjects(tl, true, infraHits);
           for (let i = 0; i < infraHits.length; i++) {
             const o = infraHits[i].object;
             if (!o.visible || o.isInstancedMesh || o.isSprite || o.isLine || o.isPoints || (o.material && o.material.transparent && o.material.opacity < 0.5)) continue;
-            if (infraHits[i].point.y > wy + STRUCT_BURY || infraHits[i].point.y < wy - STRUCT_FLOAT) return false;      // buried / hanging over a gap (a deck end that the mesh does not cover)
-            ok = true;
+            if (infraHits[i].point.y > wy + STRUCT_BURY) return false;
             break;
           }
-          if (!ok) return false;       // nothing drawn within STRUCT_DOWN below the wheel
         }
       }
       return true;
@@ -787,7 +784,7 @@
     let tramX = 0; let tramZ = 0; let tramY = 0;
     const R_ACT = clamp(Q.ahead ? Q.ahead * 0.6 : 400, 240, 560);
     function newCar() {
-      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, sinceS: 1e9, lastS: -1e9, chkRd: null, chkRdS: null, laneRd: null, laneK: 1, mway: false, laneIdx: 0, latCur: NaN, mat: new Float32Array(16) };
+      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, sinceS: 1e9, lastS: -1e9, nearT: false, chkRd: null, chkRdS: null, laneRd: null, laneK: 1, mway: false, laneIdx: 0, latCur: NaN, mat: new Float32Array(16) };
     }
     function assignType(c, cls) {
       c.type = pickType(rng, cls); c.tid = TID[c.type]; c.spec = SPEC[c.type]; c.body = pick(rng, paintPool(c.type));
@@ -1090,14 +1087,15 @@
     function envelopeConflict(c) {
       if (!track || !track.nearest) return false;
       const q0 = track.nearest(c.x, c.z, nq);
-      if (!q0 || q0.d > c.spec.L / 2 + 6) return false;
+      c.nearT = !!q0 && q0.d < c.spec.L / 2 + 30;      // (close to the tram line: the structure guard looks more often)
+      if (!q0 || q0.d > c.spec.L / 2 + 16) return false;
       const rd = c.rd; const m = c.spec.L / 2 + 3;
       if ((rd.cross || []).some((q) => c.t > q.t0 - m && c.t < q.t1 + m)) return false;
       const e = c.mat; const hx = -e[8]; const hz = -e[10]; const rx = e[0]; const rz = e[2]; const hl = c.spec.L / 2; const hw = c.spec.W / 2;
       for (let k = 0; k < 5; k++) {
         const a = k === 0 ? 0 : (k & 1 ? 1 : -1); const b = k === 0 ? 0 : (k & 2 ? 1 : -1);
         const x = c.x + hx * a * hl + rx * b * hw; const z = c.z + hz * a * hl + rz * b * hw;
-        const q = track.nearest(x, z, nq2); if (!q || q.d > 6 || q.d > Math.abs(q.lat) + 0.6) continue;     // (beyond the end of the track the lateral offset is no distance)
+        const q = track.nearest(x, z, nq2); if (!q || q.d > 16 || q.d > Math.abs(q.lat) + 0.6) continue;     // (beyond the end of the track the lateral offset is no distance)
         if (Math.abs(c.y - q.y) > 3) continue;
         const oppOk = hasOpp && track.opposite.has && track.opposite.has(q.s);
         if (Math.abs(q.lat) < ENV_HALF || (oppOk && Math.abs(q.lat - oppLatAt(q.s)) < ENV_HALF)) return true;
@@ -1176,7 +1174,7 @@
         c.since += c.cur * dt; c.sinceS += c.cur * dt;
       }
       // pass 2: ground every car, write instances
-      writeN = 0; guardBudget = 3; structBudget = 10;
+      writeN = 0; guardBudget = 3; structBudget = 3;
       for (let k = 0; k < veh.length; k++) veh[k].n = 0;
       for (let i = 0; i < cars.length; i++) {
         const c = cars[i];
@@ -1199,8 +1197,8 @@
             continue;
           }
         }
-        // structure guard: more often than the surface net (every 2 m driven or 0.7 s, 10 cars per frame at most): a platform pad is only a few metres long
-        if (structBudget > 0 && (c.rd !== c.chkRdS || c.sinceS > 2 || now - c.lastS > 700)) {
+        // structure guard (the raycasts against the tram infrastructure are expensive: 3 cars per frame at most; within 30 m of the tram line every 6 m driven or 1.5 s, else every 12 m / 4 s): a platform pad is only a few metres long
+        if (structBudget > 0 && (c.rd !== c.chkRdS || c.sinceS > (c.nearT ? 6 : 12) || now - c.lastS > (c.nearT ? 1500 : 4000))) {
           structBudget--; c.chkRdS = c.rd; c.sinceS = 0; c.lastS = now;
           if (!structureClear(c, now)) {
             if (!c.rd.bad) c.rd.bad = [];
