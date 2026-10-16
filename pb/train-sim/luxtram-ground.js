@@ -758,13 +758,13 @@
         const ya = P[a + 1]; const yb = P[b + 1]; const yc = P[c + 1];
         const e1x = bx - ax; const e1z = bz - az; const e1y = yb - ya; const e2x = cx - ax; const e2z = cz - az; const e2y = yc - ya;
         const gnx = e1y * e2z - e1z * e2y; const gny = e1z * e2x - e1x * e2z; const gnz = e1x * e2y - e1y * e2x;
-        const flat = Math.abs(gny) / (Math.hypot(gnx, gny, gnz) || 1);        // normal.y: a triangle on a steep bank (the drawn road climbing the slope beside it) is no carriageway for a car (steepOk only for heights)
+        const nyv = Math.abs(gny) / (Math.hypot(gnx, gny, gnz) || 1);        // normal.y: a triangle on a steep bank (the drawn road climbing the slope beside it) is no carriageway for a car (steepOk only for heights)
         // plane y = pA * x + pB * z + pC through the three corners
         const l1x = (bz - cz) / det; const l1z = (cx - bx) / det; const l1c = -(l1x * cx + l1z * cz);
         const l2x = (cz - az) / det; const l2z = (ax - cx) / det; const l2c = -(l2x * cx + l2z * cz);
         const pA = l1x * ya + l2x * yb + (-l1x - l2x) * yc; const pB = l1z * ya + l2z * yb + (-l1z - l2z) * yc;
         const pC = l1c * ya + l2c * yb + (1 - l1c - l2c) * yc;
-        tri.set([ax, az, bx, bz, cx, cz, pA, pB, pC, flat], m * 10);
+        tri.set([ax, az, bx, bz, cx, cz, pA, pB, pC, nyv], m * 10);
         const g0x = Math.max(0, Math.floor(Math.min(ax, bx, cx) / TG_CELL)); const g1x = Math.min(TG - 1, Math.floor(Math.max(ax, bx, cx) / TG_CELL));
         const g0z = Math.max(0, Math.floor(Math.min(az, bz, cz) / TG_CELL)); const g1z = Math.min(TG - 1, Math.floor(Math.max(az, bz, cz) / TG_CELL));
         keep.push(g0x, g1x, g0z, g1z);
