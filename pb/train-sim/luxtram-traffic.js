@@ -30,6 +30,7 @@
   const CARS_ON_BRIDGES = true;      // drive over the bridge decks (flag & 1 roads; needs the world to keep those roads in roadsByChunk with bridge: true)
   let LANE_K = 0.34;                 // lane centre = this * road half width
   const SUS_MAX = 0.4;               // largest wheel offset the body warp follows (m)
+  const WHEEL_SPREAD_MAX = 1.0;      // wheels on ground that differs by more than this: the body warp (3/4 of the spread at worst, SUS_MAX) cannot follow, no car there (m)
   const ROAD_LIFT = 0.015;           // wheels rest this far above the height query (it already is the drawn surface; the white lines are 3.5 cm above it)
   const TRAM_LEN_FALLBACK = 46;
   const RED_AHEAD = 90;              // a crossing turns red while a tram is this close before it
@@ -575,7 +576,7 @@
 
     /* height under a wheel: the ground's road-surface query when the world provides it, else the plain terrain height.  NaN = not known yet */
     const surfaceAt = ctx.roadHeightAt
-      ? (x, z, onBridge, refY) => ctx.roadHeightAt(x, z, !!onBridge, false, refY)
+      ? (x, z, onBridge, refY, hx, hz) => ctx.roadHeightAt(x, z, !!onBridge, false, refY, hx, hz)
       : (x, z) => gy(x, z);
     const roadAt = ctx.roadHeightAt ? (x, z) => ctx.roadHeightAt(x, z, false, true) : null;   // carriageway only (NaN beside it)
 
@@ -645,6 +646,40 @@
       rc.intersectObjects(list, true, rayHits);
       for (let i = 0; i < rayHits.length; i++) if (Math.abs(rayHits[i].point.y - y) <= SURF_TOL && rayHits[i].object.visible) return true;      // (a hidden mesh is no surface)
       return false;
+    }
+    /* ---- structure guard: a road vehicle never stands on / inside the tram infrastructure that is no road (platform pads, station furniture, tram bridge deck, rails outside a level crossing).
+       Down-rays from just above every wheel against the infrastructure group; a hit from 0.8 m above to 0.5 m below the wheel is a conflict. */
+    const infraRc = new T.Raycaster(); const infraHits = []; const wMat = new T.Matrix4(); const wV = new T.Vector3();
+    const STRUCT_UP = 0.8; const STRUCT_DOWN = 0.5;
+    let infraList = []; let infraLook = -1e9;
+    function infraRoot(now) {
+      if (infraList.length && now - infraLook < 3000 && infraList.every((o) => o.parent)) return infraList;      // (tiles / chunks stream in and out: re-read every 3 s)
+      if (now - infraLook < 1000) return infraList;
+      infraLook = now; infraList = []; let top = root; while (top.parent) top = top.parent;
+      top.children.forEach((o) => {
+        if (o.name === 'train-sim-infra') infraList.push(o);
+        else if (o.name === 'luxtram-world') o.children.forEach((q) => { if (/^lt-chunk/.test(q.name || '')) infraList.push(q); });      // (the world chunks: viaduct walls, track bed, parapets)
+      });
+      return infraList;
+    }
+    function structureClear(c, now) {
+      const gl = infraRoot(now); if (!gl.length) return true;
+      const rd = c.rd; const m = c.spec.L / 2 + 3;
+      if ((rd.cross || []).some((q) => c.t > q.t0 - m && c.t < q.t1 + m) || (rd.along || []).some((a) => c.t > a[0] - m && c.t < a[1] + m)) return true;     // (the rails of a level crossing are meant to be driven over)
+      wMat.fromArray(c.mat); const sp0 = c.spec;
+      for (let k = 0; k < 5; k++) {
+        if (k < 4) wV.set((k & 1 ? 1 : -1) * sp0.tw / 2, 0, (k & 2 ? 1 : -1) * sp0.wb / 2); else wV.set(0, 0, 0);
+        wV.applyMatrix4(wMat);
+        const wy = wV.y + (k < 4 && c.sus ? c.sus[k] : 0);
+        rayO.set(wV.x, wy + STRUCT_UP, wV.z); infraRc.set(rayO, rayDown); infraRc.near = 0; infraRc.far = STRUCT_UP + STRUCT_DOWN;
+        infraHits.length = 0; infraRc.intersectObjects(gl, true, infraHits);
+        for (let i = 0; i < infraHits.length; i++) {
+          const o = infraHits[i].object;
+          if (!o.visible || o.isInstancedMesh || o.isSprite || o.isLine || o.isPoints || (o.material && o.material.transparent && o.material.opacity < 0.5)) continue;
+          return false;
+        }
+      }
+      return true;
     }
     const inView = (x, y, z, r) => { if (!haveFrustum) return true; sph.center.set(x, y, z); sph.radius = r; return frustum.intersectsSphere(sph); };
 
@@ -788,7 +823,7 @@
         sample(rd, t, sp);
         const d = Math.hypot(sp.x - tramX, sp.z - tramZ);
         if (filling ? (d > R_ACT) : (d < R_ACT * 0.45 || d > R_ACT * 0.97)) { fails.dist++; continue; }
-        const gh = surfaceAt(sp.x, sp.z, rd.bridge);
+        const gh = surfaceAt(sp.x, sp.z, rd.bridge, undefined, sp.dx, sp.dz);
         if (gh !== gh) { fails.height++; continue; }
         if (!filling && d < R_ACT * 0.8 && inView(sp.x, gh + 1, sp.z, 9)) { fails.view++; continue; }   // far out (a few pixels) nobody sees a car appear
         let clash = false;
@@ -971,11 +1006,11 @@
       const hzW = wbL / 2;
       const su = c.sus || (c.sus = [0, 0, 0, 0]);
       for (let pass = 0; pass < 2; pass++) {
-        const hFL = surfaceAt(wxz[0], wxz[1], ob, refY); const hFR = surfaceAt(wxz[2], wxz[3], ob, refY);
-        const hRL = surfaceAt(wxz[4], wxz[5], ob, refY); const hRR = surfaceAt(wxz[6], wxz[7], ob, refY);
+        const hFL = surfaceAt(wxz[0], wxz[1], ob, refY, hx, hz); const hFR = surfaceAt(wxz[2], wxz[3], ob, refY, hx, hz);
+        const hRL = surfaceAt(wxz[4], wxz[5], ob, refY, hx, hz); const hRR = surfaceAt(wxz[6], wxz[7], ob, refY, hx, hz);
         if (hFL !== hFL || hFR !== hFR || hRL !== hRL || hRR !== hRR) { if (pass === 0) return false; break; }
-        if (pass === 0 && Math.max(hFL, hFR, hRL, hRR) - Math.min(hFL, hFR, hRL, hRR) > 1.5) {
-          // the four wheels stand on ground that differs by more than 1.5 m (a cliff / a portal cutting the road crosses, no drivable surface): nobody drives here
+        if (pass === 0 && Math.max(hFL, hFR, hRL, hRR) - Math.min(hFL, hFR, hRL, hRR) > WHEEL_SPREAD_MAX) {
+          // the four wheels stand on ground that differs by more than WHEEL_SPREAD_MAX (a cliff / a portal cutting the road crosses / a deck end with a step, no drivable surface): nobody drives here
           if (!rd.bad) rd.bad = [];
           rd.bad.push([c.t - 14, c.t + 14, now + 90000]); c.active = false; c.shown = false;
           return false;
@@ -1124,6 +1159,12 @@
             if (!c.rd.bad) c.rd.bad = [];
             c.rd.bad.push([c.t - 18, c.t + 18, now + 20000]);
             c.active = false; c.shown = false; guards++;
+            continue;
+          }
+          if (!structureClear(c, now)) {
+            if (!c.rd.bad) c.rd.bad = [];
+            c.rd.bad.push([c.t - 25, c.t + 25, now + 600000]);
+            c.active = false; c.shown = false; conflicts++;
             continue;
           }
         }
@@ -1455,7 +1496,7 @@
         fails, guarded: guards, conflicts, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
         oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z, still: onc.still, age: onc.age, forced: onc.forced } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
       }),
-      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, twist: c.twist, hdbg: c.hdbg, sus: c.sus, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 1.5 && c.t < q.t1 + 1.5) })),   // (test hook)
+      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, twist: c.twist, hdbg: c.hdbg, sus: c.sus, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 1.5 - c.spec.L / 2 && c.t < q.t1 + 1.5 + c.spec.L / 2) })),   // (test hook; onCross = some part of the body is on / at a level crossing)
       /* test hook: the 4 wheel contact points (world) of every shown car: the road surface must be at or just below each one */
       wheelPoints: () => {
         const out = []; const v = new T.Vector3(); const mm = new T.Matrix4();

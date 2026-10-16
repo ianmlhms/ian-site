@@ -1848,10 +1848,10 @@
 
     /* ---- height of the rendered ground (the painted-ground module drapes its geometry on it) and the shared road-height query (P-GROUND <-> P-TRAFFIC).
        meshY(t, x, z): the Y of the visible terrain mesh of tile t (same triangulation / LOD as buildTerrain: diagonal b -> c2), NaN when the tile has no mesh.
-       surfY(t, x, z): the same, falling back to the LiDAR height.  roadHeightAt(x, z, onBridge, roadOnly, refY): the surface actually rendered at (x, z):
+       surfY(t, x, z): the same, falling back to the LiDAR height.  roadHeightAt(x, z, onBridge, roadOnly, refY, hx, hz): the surface actually rendered at (x, z):
          onBridge = false: the carriageway drawn on the ground, looked up exactly in its own triangles (steep bank triangles and carriageway cells that have a sidewalk drawn on top are not carriageway; the approach
                            plugs of the bridges are); beside it (roadOnly = false) the drawn sidewalk / path, else the bare terrain; NaN while the tile is not built / not yet decorated at its final LOD
-         onBridge = true : the deck of the OSM bridge roads (flag&1), the one nearest to refY where decks are stacked (NaN when no deck there: the named bridges are drawn by their landmark).
+         onBridge = true : the deck of the OSM bridge roads (flag&1), the one nearest to refY (without refY: the one along the heading hx, hz) where decks are stacked (NaN when no deck there: the named bridges are drawn by their landmark).
        Roads under a bridge keep working: ask with onBridge = false. */
     function meshY(t, x, z) {
       if (!t || !t.mesh || !t.dem) return NaN;
@@ -1903,9 +1903,9 @@
       return q.lat < l0 ? l0 - q.lat : q.lat > l1 ? q.lat - l1 : -1;
     };
     const ground = TS.luxGround.create({ T, quality, Q, oy, surfY, normalAt, tileOf, slotClear, groundAt: gy });
-    const roadHeightAt = (x, z, onBridge, roadOnly, refY) => {
+    const roadHeightAt = (x, z, onBridge, roadOnly, refY, hx, hz) => {
       if (onBridge) {
-        const dh = ground.deckHeight(x, z, refY);      // NaN where no deck is registered (the named bridges are drawn by their landmark; a car there is not shown)
+        const dh = ground.deckHeight(x, z, refY, hx, hz);      // NaN where no deck is registered (the named bridges are drawn by their landmark; a car there is not shown)
         if (dh === dh || refY !== refY) return dh;
         // the OSM bridge way runs a few metres past the deck we could build (a bridge end): the drawn road / ground there, when it is at the car's own height
         const t0 = tileOf(x, z);

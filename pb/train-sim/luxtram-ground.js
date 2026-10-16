@@ -1305,9 +1305,10 @@
     }
 
     /* the deck surface Y under (x, z) (scene metres) or NaN: used by roadHeightAt */
-    function deckHeight(x, z, refY) {
-      // several decks can cover (x, z) (an interchange: stacked ramps): the one nearest to refY (a car's current height) wins, without a reference the one whose centre line is nearest
-      let best = NaN; let bestScore = Infinity;
+    function deckHeight(x, z, refY, hx, hz) {
+      // several decks can cover (x, z) (an interchange: stacked ramps): the one nearest to refY (a car's current height) wins; without a reference (a car that has just appeared) the one whose centre line is nearest,
+      // a deck that runs across the heading (hx, hz) of the car (another road crossing above / below) counting as far away, so a car never starts on the deck it merely crosses
+      let best = NaN; let bestScore = Infinity; const useDir = hx === hx && hx !== undefined && hz === hz && hz !== undefined;
       const useRef = refY === refY && refY !== undefined;
       decks.forEach((list) => list.forEach((dk) => {
         const pts = dk.pts;
@@ -1320,7 +1321,7 @@
           const d = Math.hypot(x - (a.x + dx * tt), z - (a.z + dz * tt));
           if (d > dk.hw) continue;
           const y = a.y + (b.y - a.y) * tt + (d > dk.hwRoad ? dk.kerb : 0);      // beside the carriageway: the sidewalk, one kerb up
-          const score = useRef ? Math.abs(y - refY) : d;
+          const score = useRef ? Math.abs(y - refY) : (useDir ? d + 8 * (1 - Math.abs(dx * hx + dz * hz) / Math.sqrt(l2)) : d);
           if (score < bestScore) { bestScore = score; best = y; }
         }
       }));

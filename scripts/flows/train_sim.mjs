@@ -954,6 +954,34 @@ async function directionAndGearChecks(h, frame) {
   {
     await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
     await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+    const carSum = { n: 0, bad: 0, severe: 0, floating: 0, envelope: 0, vehicles: 0, types: {} };
+    const carCheck = () => frame.evaluate(() => {
+      const lt = TS.luxTraffic.last; if (!lt) return { n: 0, bad: 0, severe: 0, floating: 0, envelope: 0, vehicles: 0, types: {}, bus: 0, truck: 0 };
+      const { scene, camera, THREE, world } = __tsTest.internals(); scene.updateMatrixWorld(true);
+      const rc = new THREE.Raycaster(); rc.camera = camera; const down = new THREE.Vector3(0, -1, 0); const tr = world.track; const nrm = new THREE.Vector3();
+      const okObj = (hh) => hh.object.visible && !hh.object.isInstancedMesh && !hh.object.isSprite && !hh.object.isPoints && !hh.object.isLine && !(hh.object.material && hh.object.material.transparent && hh.object.material.opacity < 0.5);
+      const isTrain = (o) => { for (let q = o; q; q = q.parent) if (world.model && q === world.model.group) return true; return false; };
+      const grp = (o) => { for (let q = o; q; q = q.parent) { const nm = q.name || ''; if (/^(lg-decor|lt-tile)/.test(nm) || nm === 'landscape') return true; } return false; };
+      const infra = (o) => { for (let q = o; q; q = q.parent) if ((q.name || '') === 'train-sim-infra') return true; return false; };
+      const cs = lt.cars(); const wps = lt.wheelPoints(); const types = {}; let n = 0; let bad = 0; let severe = 0; let floating = 0; let envelope = 0;
+      for (let i = 0; i < wps.length; i++) {
+        const c = cs[i]; const w = wps[i]; types[c.type] = (types[c.type] || 0) + 1;
+        for (const q of w.pts) { n++; rc.set(new THREE.Vector3(q[0], q[1] + 0.6, q[2]), down); rc.far = 5; const hs = rc.intersectObjects(scene.children, true).filter((hh) => okObj(hh) && !isTrain(hh.object)); const d = hs[0] ? q[1] - hs[0].point.y : 9; const far = hs[0] && (hs[0].object.name || (hs[0].object.parent && hs[0].object.parent.name)) === 'landscape' && Math.abs(hs[0].face.normal.y) < 0.5; if (Math.abs(d) > 0.06) bad++; if (Math.abs(d) > 0.4 && !far) severe++; }
+        const fx = (w.pts[0][0] + w.pts[1][0]) / 2 - (w.pts[2][0] + w.pts[3][0]) / 2; const fz = (w.pts[0][2] + w.pts[1][2]) / 2 - (w.pts[2][2] + w.pts[3][2]) / 2; const fl = Math.hypot(fx, fz) || 1; const hx = fx / fl; const hz = fz / fl; const rx = -hz; const rz = hx;
+        const mx = (w.pts[0][0] + w.pts[1][0] + w.pts[2][0] + w.pts[3][0]) / 4; const mz = (w.pts[0][2] + w.pts[1][2] + w.pts[2][2] + w.pts[3][2]) / 4; const base = (w.pts[0][1] + w.pts[1][1] + w.pts[2][1] + w.pts[3][1]) / 4;
+        const pts = [[mx, mz]]; for (const a of [-1, 1]) for (const b of [-1, 1]) pts.push([mx + hx * a * c.L / 2 + rx * b * c.w / 2, mz + hz * a * c.L / 2 + rz * b * c.w / 2]);
+        let maxY = -1e9;
+        for (const [x, z] of pts) { rc.set(new THREE.Vector3(x, base + 10, z), down); rc.far = 60; for (const hh of rc.intersectObjects(scene.children, true)) { if (!okObj(hh) || isTrain(hh.object) || hh.point.y > base + 0.3 || !grp(hh.object)) continue; nrm.copy(hh.face.normal).transformDirection(hh.object.matrixWorld); if (nrm.y < 0.7) continue; maxY = Math.max(maxY, hh.point.y); break; } }
+        if (!(base - maxY <= 0.5)) floating++;
+        if (!c.onCross) {
+          let hit = false;
+          for (const [x, z] of pts) { const q = tr.nearest(x, z); if (!q || q.d > 14) continue; const o = tr.opposite && tr.opposite.has && tr.opposite.has(q.s) ? tr.opposite.latAt(q.s) : null; if ((Math.abs(q.lat) < 1.4 || (o !== null && Math.abs(q.lat - o) < 1.4)) && base - q.y > -3.4 && base - q.y < 3) { hit = true; break; } }
+          if (!hit) for (const [x, z] of pts) { rc.set(new THREE.Vector3(x, base + 6, z), down); rc.far = 14; for (const hh of rc.intersectObjects(scene.children, true)) { if (!okObj(hh) || isTrain(hh.object) || hh.point.y > base + 6 - 0.01) continue; if (hh.point.y < base - 0.5) break; if (hh.point.y <= base + 0.5 && infra(hh.object)) hit = true; break; } if (hit) break; }
+          if (hit) envelope++;
+        }
+      }
+      return { n, bad, severe, floating, envelope, vehicles: wps.length, types };
+    });
     const out = [];
     for (const s of [15480, 11720, 3450]) {
       await frame.evaluate((s0) => { __tsTest.placeAt(s0, 0); }, s);
@@ -986,6 +1014,7 @@ async function directionAndGearChecks(h, frame) {
         }));
         return res;
       }, s));
+      { const cr = await carCheck(); carSum.n += cr.n; carSum.bad += cr.bad; carSum.severe += cr.severe; carSum.floating += cr.floating; carSum.envelope += cr.envelope; carSum.vehicles += cr.vehicles; Object.entries(cr.types).forEach(([k, v]) => { carSum.types[k] = (carSum.types[k] || 0) + v; }); }
     }
     const sum = (k) => out.reduce((a, r) => a + r[k], 0);
     h.expect(sum('bridges') >= 4 && sum('piers') >= 6, 'bridges with piers were found at the 3 spots (' + sum('bridges') + ' bridges, ' + sum('piers') + ' piers)');
@@ -993,15 +1022,12 @@ async function directionAndGearChecks(h, frame) {
     h.expect(sum('stepBad') <= 1 && Math.max(...out.map((r) => r.stepWorst)) < 0.6, 'road deck ends meet the road: ' + sum('ends') + ' ends, worst step ' + Math.max(...out.map((r) => r.stepWorst)).toFixed(2) + ' m, ' + sum('stepBad') + ' samples over 0.3 m');
     h.expect(sum('holes') === 0 && sum('deckSamples') > 20, 'no hole in the deck surfaces (' + sum('deckSamples') + ' samples, ' + sum('holes') + ' off the registered height)');
     h.expect(sum('plugs') >= 1, 'approach plugs are built where a deck ends above the ground (' + sum('plugs') + ')');
-    // cars: wheel contact points against the rendered surface along these stretches
-    const cars = await frame.evaluate(async () => {
-      const lt = TS.luxTraffic.last; if (!lt) return { n: 0, bad: 0, severe: 0 };
-      const { scene, camera, THREE, world } = __tsTest.internals(); scene.updateMatrixWorld(true);
-      const rc = new THREE.Raycaster(); rc.camera = camera; const down = new THREE.Vector3(0, -1, 0); let n = 0; let bad = 0; let severe = 0;
-      for (const c of lt.wheelPoints()) for (const q of c.pts) { n++; rc.set(new THREE.Vector3(q[0], q[1] + 0.6, q[2]), down); rc.far = 5; const hs = rc.intersectObjects(scene.children, true).filter((hh) => hh.object.visible && !hh.object.isInstancedMesh && !hh.object.isSprite && !hh.object.isPoints && !hh.object.isLine && !(hh.object.material && hh.object.material.transparent && hh.object.material.opacity < 0.5)); const d = hs[0] ? q[1] - hs[0].point.y : 9; if (Math.abs(d) > 0.06) bad++; if (Math.abs(d) > 0.4) severe++; }
-      return { n, bad, severe };
-    });
-    h.expect(cars.severe === 0, 'no car wheel is more than 0.4 m off the surface at the last spot (' + cars.n + ' wheels, ' + cars.bad + ' over 6 cm)');
+    // cars: every vehicle type (buses, lorries too): wheel contact points against the rendered surface, the body base against the highest DRIVABLE surface under its footprint
+    // (ground decor = asphalt / sidewalk / deck / plug tops, terrain), and the tram envelope (no vehicle within 1.4 m of a track axis or on the tram infrastructure, level crossings excepted)
+    h.expect(carSum.vehicles >= 20 && Object.keys(carSum.types).length >= 4, 'vehicles were checked at the 3 bridge spots: ' + carSum.vehicles + ' (' + JSON.stringify(carSum.types) + ')');
+    h.expect(carSum.severe === 0, 'no vehicle wheel (any type) is more than 0.4 m off the surface at the 3 spots (' + carSum.n + ' wheels, ' + carSum.bad + ' over 6 cm)');
+    h.expect(carSum.floating === 0, 'no vehicle floats more than 0.5 m above the highest drivable surface under its footprint (' + carSum.vehicles + ' vehicles)');
+    h.expect(carSum.envelope === 0, 'no road vehicle stands in the tram track envelope or on the tram infrastructure (' + carSum.envelope + ')');
   }
 
   h.step('endless hands over seamlessly: a real service end (doors, terminus exchange) continues with the next route, tram career');
