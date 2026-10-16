@@ -14,7 +14,10 @@
   /* Luxtram stops: the platform is a 0.3 m kerb with a short ramp at each end and level ground beyond (stations-luxtram / infra.js buildStation).
    * In tram mode nobody uses the rail-style 'sink' exits: everybody leaves and arrives over the end ramps and their height follows walkY(). */
   const TRAM_RAMP = 3.5, TRAM_WALK_OUT = 11, TRAM_LATERAL_MARGIN = 0.3, TRAM_FLOOR_H = 0.52, LANE_O = 0.76, TRAM_HALF_W = 1.5;   // floor height of the CAF Urbos above the rail (trains.js: floor 0.4 + slab), body half width
+  const HOLD_UPPER = -0.4, HOLD_BEND = -2.1;   // holding a pole: upper arm 0.4 rad forward, forearm 2.5 rad in all, so the hand sits at chest height about 0.28 m in front of the shoulder (the arm is two segments)
+  const ARM_UP = 0.25, ARM_LO = 0.25;
   const HIP_Y = 0.88, KNEE_DROP = 0.44, SHOULDER_Y = 1.36, SHOULDER_X = 0.255, NECK_Y = 1.4;
+  const HOLD_HAND_FWD = ARM_UP * Math.sin(-HOLD_UPPER) + (ARM_LO + 0.06) * Math.sin(-(HOLD_UPPER + HOLD_BEND)), HOLD_TURN = Math.atan2(SHOULDER_X, HOLD_HAND_FWD);   // turn of the body away from the pole direction
   const WALK_SPEED = [1.15, 1.55], RUN_SPEED = 4.6, RUNNER_CHANCE = 0.2;
   const ALIGHT_GAP = 0.8, BOARD_GAP = 1.2;
   const ALIGHT_MAX_S = 16, BOARD_MAX_S = 22;
@@ -98,8 +101,9 @@
       P(new THREE.BoxGeometry(0.1, 0.08, 0.25), 0x34302c, xf(THREE, 0, -0.4, 0.055)),
       P(new THREE.BoxGeometry(0.102, 0.022, 0.255), 0xe8e8e8, xf(THREE, 0, -0.436, 0.055)),
     ]);
-    g.arm = merge(THREE, [P(new THREE.CylinderGeometry(0.055, 0.045, 0.5, 6, 1), 0xffffff, xf(THREE, 0, -0.25, 0))]);
-    g.hand = merge(THREE, [P(new THREE.IcosahedronGeometry(0.05, 0), 0xffffff, xf(THREE, 0, -0.56, 0))]);
+    g.arm = merge(THREE, [P(new THREE.CylinderGeometry(0.055, 0.05, ARM_UP, 6, 1), 0xffffff, xf(THREE, 0, -ARM_UP / 2, 0))]);   // upper arm (shoulder -> elbow)
+    g.farm = merge(THREE, [P(new THREE.CylinderGeometry(0.05, 0.045, ARM_LO, 6, 1), 0xffffff, xf(THREE, 0, -ARM_LO / 2, 0))]);   // forearm (elbow -> wrist), bends at the elbow
+    g.hand = merge(THREE, [P(new THREE.IcosahedronGeometry(0.05, 0), 0xffffff, xf(THREE, 0, -(ARM_LO + 0.06), 0))]);              // hand: in the forearm's frame
     g.pack = merge(THREE, [
       P(new THREE.BoxGeometry(0.31, 0.42, 0.15), 0xffffff, xf(THREE, 0, 1.16, -0.185)),
       P(new THREE.BoxGeometry(0.22, 0.2, 0.05), 0xb8b8b8, xf(THREE, 0, 1.06, -0.285)),
@@ -158,11 +162,11 @@
     }
     const M = {
       torso: mesh(geos.torso, 1, null, true), head: mesh(geos.head, 1, null, true), hairShort: mesh(geos.hairShort, 1), hairLong: mesh(geos.hairLong, 1), hat: mesh(geos.hat, 1),
-      thigh: mesh(geos.thigh, 2, null, true), shin: mesh(geos.shin, 2, null, true), arm: mesh(geos.arm, 2, null, true), hand: mesh(geos.hand, 2),
+      thigh: mesh(geos.thigh, 2, null, true), shin: mesh(geos.shin, 2, null, true), arm: mesh(geos.arm, 2, null, true), farm: mesh(geos.farm, 2, null, true), hand: mesh(geos.hand, 2),
       pack: mesh(geos.pack, 1, null, true), case: mesh(geos.case, 1, null, true), umbrella: mesh(geos.umbrella, 1, matUmb, false), phone: mesh(geos.phone, 1),
     };
     const MESHES = Object.keys(M).map((k) => M[k]);
-    const PAIR = { thigh: 1, shin: 1, arm: 1, hand: 1 };
+    const PAIR = { thigh: 1, shin: 1, arm: 1, farm: 1, hand: 1 };
 
     // ------------------------------------------------------------ state
     const people = [];
@@ -177,7 +181,7 @@
     function setCol(mesh2, idx, hex) { cTmp.setHex(hex); mesh2.setColorAt(idx, cTmp); }
     function refreshCounts() {
       const n = highSlot + 1;
-      MESHES.forEach((m) => { const k = m.count; m.count = n * (m === M.thigh || m === M.shin || m === M.arm || m === M.hand ? 2 : 1); if (k !== m.count) m.instanceMatrix.needsUpdate = true; });
+      MESHES.forEach((m) => { const k = m.count; m.count = n * (m === M.thigh || m === M.shin || m === M.arm || m === M.farm || m === M.hand ? 2 : 1); if (k !== m.count) m.instanceMatrix.needsUpdate = true; });
     }
     function activeCount(fn) { let n = 0; for (let i = 0; i <= highSlot; i++) { const p = people[i]; if (p.active && (!fn || fn(p))) n++; } return n; }
     function freeSlots() { return cap - activeCount(); }
@@ -381,7 +385,7 @@
       highSlot = Math.max(highSlot, idx);
       setCol(M.torso, idx, p.shirt); setCol(M.head, idx, p.skin); setCol(M.hairShort, idx, p.hair); setCol(M.hairLong, idx, p.hair); setCol(M.hat, idx, p.hatCol);
       for (let k = 0; k < 2; k++) {
-        setCol(M.thigh, idx * 2 + k, p.trouser); setCol(M.shin, idx * 2 + k, p.shorts ? p.skin : p.trouser); setCol(M.arm, idx * 2 + k, p.shirt); setCol(M.hand, idx * 2 + k, p.skin);
+        setCol(M.thigh, idx * 2 + k, p.trouser); setCol(M.shin, idx * 2 + k, p.shorts ? p.skin : p.trouser); setCol(M.arm, idx * 2 + k, p.shirt); setCol(M.farm, idx * 2 + k, p.shirt); setCol(M.hand, idx * 2 + k, p.skin);
       }
       setCol(M.pack, idx, p.bag); setCol(M.case, idx, p.bag); setCol(M.umbrella, idx, p.umbCol); setCol(M.phone, idx, 0xffffff);
       colorsDirty = true;
@@ -732,20 +736,21 @@
       let headYaw = idle * (p.idleKind === 2 ? 0.7 * Math.sin(t * 0.5 + ph) : 0.12 * Math.sin(t * 0.4 + ph)) + mv * 0.12 * sw * 0.3;
       let headPitch = idle * (phoneUse ? 0.5 : 0.03 * Math.sin(t * 0.6 + ph)) + mv * 0.03;
       let armL = armA * sw, armR = -armA * sw, rzL = -0.07, rzR = 0.07;
+      let bendL = -0.1 - 0.35 * mv * (0.5 + 0.5 * run), bendR = bendL;   // elbow bend (negative = forearm swings forward / up)
       const legSway = 0.035 * Math.sin(t * 0.35 + ph) * idle;
       if (idle > 0.01) {
         armL += idle * (0.03 * Math.sin(t * 0.9 + ph));
         armR += idle * (0.03 * Math.sin(t * 0.8 + ph));
-        if (talk) armL = armL * mv + idle * (-0.7 + 0.35 * Math.sin(t * 2.6 + ph * 3) * Math.max(0, Math.sin(t * 0.3 + ph)));
-        if (phoneUse) { armR = armR * mv + idle * -1.05; rzR = 0.07 * mv + idle * -0.33; }
+        if (talk) { armL = armL * mv + idle * (-0.7 + 0.35 * Math.sin(t * 2.6 + ph * 3) * Math.max(0, Math.sin(t * 0.3 + ph))); bendL = bendL * mv + idle * -0.9; }
+        if (phoneUse) { armR = armR * mv + idle * -1.05; rzR = 0.07 * mv + idle * -0.33; bendR = bendR * mv + idle * -1.0; }
       }
       if (sitK > 0.001) {   // seated: hands on the lap
-        armL = armL * (1 - sitK) + sitK * -0.8; rzL = rzL * (1 - sitK) + sitK * -0.1;
-        armR = phoneUse ? armR * (1 - sitK) + sitK * -1.15 : armR * (1 - sitK) + sitK * -0.8; rzR = rzR * (1 - sitK) + sitK * (phoneUse ? -0.25 : 0.1);
+        armL = armL * (1 - sitK) + sitK * -0.55; rzL = rzL * (1 - sitK) + sitK * -0.1; bendL = bendL * (1 - sitK) + sitK * -0.95;
+        armR = phoneUse ? armR * (1 - sitK) + sitK * -0.9 : armR * (1 - sitK) + sitK * -0.55; rzR = rzR * (1 - sitK) + sitK * (phoneUse ? -0.25 : 0.1); bendR = bendR * (1 - sitK) + sitK * (phoneUse ? -1.15 : -0.95);
       }
-      if (holdK > 0.001) { armR = armR * (1 - holdK) + holdK * -2.55; rzR = rzR * (1 - holdK) + holdK * -0.1; }   // standing: one hand up on the pole
-      if (umbOn) { armR = -0.7; rzR = 0.04; }
-      else if (p.hasCase) { armR = armR * 0.15 - 0.3; }
+      if (holdK > 0.001) { armR = armR * (1 - holdK) + holdK * HOLD_UPPER; rzR = rzR * (1 - holdK) + holdK * -0.05; bendR = bendR * (1 - holdK) + holdK * HOLD_BEND; }   // standing: one hand round the pole at chest height, elbow bent
+      if (umbOn) { armR = -0.7; rzR = 0.04; bendR = 0; }
+      else if (p.hasCase) { armR = armR * 0.15 - 0.3; bendR = -0.1; }
       if (umbOn && p.hasCase) armL = armL * 0.15 - 0.3;
       // base matrix
       eU.set(lean, p.yaw, 0, 'YXZ');
@@ -766,14 +771,16 @@
       put(M.hairLong, i, p.long ? mO : ZERO); put(M.hat, i, p.hasHat ? mO : ZERO);
       // arms + hands (+ phone)
       [-1, 1].forEach((side) => {
-        const a = side < 0 ? armL : armR, rz = side < 0 ? rzL : rzR;
+        const a = side < 0 ? armL : armR, rz = side < 0 ? rzL : rzR, bend = side < 0 ? bendL : bendR;
         mT.makeRotationX(a); mR.makeRotationZ(rz); mT.multiply(mR); mT.setPosition(side * SHOULDER_X, SHOULDER_Y, 0);
         mA.multiplyMatrices(mU, mT);
         const k = i * 2 + (side < 0 ? 0 : 1);
-        put(M.arm, k, mA); put(M.hand, k, mA);
+        put(M.arm, k, mA);
+        mT.makeRotationX(bend).setPosition(0, -ARM_UP, 0); mR.multiplyMatrices(mA, mT);   // elbow
+        put(M.farm, k, mR); put(M.hand, k, mR);
         if (side > 0) {
           if (phoneUse && idle > 0.5) {
-            mT.makeRotationX(-0.25).setPosition(0, -0.58, 0.05); mO.multiplyMatrices(mA, mT); put(M.phone, i, mO);
+            mT.makeRotationX(-0.25).setPosition(0, -(ARM_LO + 0.08), 0.05); mO.multiplyMatrices(mR, mT); put(M.phone, i, mO);
           } else put(M.phone, i, ZERO);
         }
       });
@@ -914,7 +921,7 @@
         const place = dest.seat ? { x: dest.seat.x, z: dest.seat.z } : dest.hold ? { x: dest.hold.x, z: dest.hold.z } : dest.aisle;
         let yaw = 0;
         if (dest.seat) { yaw = dest.seat.yaw + Math.PI; dest.seat.taken = true; p.hasCase = false; p.hasPack = chance(0.2); }
-        else if (dest.hold) { yaw = Math.atan2(dest.hold.px - dest.hold.x, dest.hold.pz - dest.hold.z); dest.hold.taken = true; }
+        else if (dest.hold) { yaw = Math.atan2(dest.hold.px - dest.hold.x, dest.hold.pz - dest.hold.z) - HOLD_TURN; dest.hold.taken = true; }   // turned so that the right hand, not the nose, meets the pole
         else yaw = chance(0.5) ? 0 : Math.PI;
         p.hasUmb = false; p.sit = 0; p.hold = 0;
         p.cab = { k: dest.k, lx: place.x, lz: place.z, hd: yaw, yaw: 0, fresh: true, wx: 0, wy: 0, wz: 0, lean: 0, state: 'stand', path: [], pi: 0, seatRef: dest.seat || null, holdRef: dest.hold || null, dest: place, destYaw: yaw, doorZ: 0, doorX: 0 };

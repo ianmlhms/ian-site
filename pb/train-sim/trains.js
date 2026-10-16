@@ -20,7 +20,7 @@
   const lum = (c) => { TMP.set(c); return 0.2126 * TMP.r + 0.7152 * TMP.g + 0.0722 * TMP.b; };
 
   /* ------------------------------------------------------------------ specs */
-  const INSIDE_EMIT = 0x45443f, INSIDE_EMIT_ON = 0x80796a, SEAT_EMIT = 0x4a4a50, SEAT_EMIT_ON = 0x62626a;
+  const INSIDE_EMIT = 0x45443f, INSIDE_EMIT_ON = 0x80796a, SEAT_EMIT = 0x4a4a50, SEAT_EMIT_ON = 0x62626a, SHELL_EMIT = 0x44464a, SHELL_EMIT_ON = 0x5a5c60;
   const WIN_DARK = '#161d23';
   const GLASS_D_DAY = 0.9, GLASS_D_CAB = 0.84; // tram side glass opacity (day / cab lights on)
   const SEAT_COL = { railcar: '#8c3a30', emu: '#2d6aa6', tram: '#d4582f', kiss: '#2f8466', ic: '#a02b3b', hst: '#2b4e9a' };
@@ -109,6 +109,7 @@
     shared.inside = new T.MeshStandardMaterial({ color: 0xbcbab2, roughness: 0.95, metalness: 0, side: T.BackSide });
     shared.floor = new T.MeshStandardMaterial({ ...vc, roughness: 0.9, metalness: 0, side: T.DoubleSide });
     shared.lit = new T.MeshBasicMaterial({ ...vc, side: T.DoubleSide });
+    shared.litF = new T.MeshBasicMaterial({ ...vc });   // single-sided unlit colour (door film: only seen from outside)
     shared.lensOff = new T.MeshStandardMaterial({ ...vc, roughness: 0.2, metalness: 0.3 });
     shared.vest = new T.MeshBasicMaterial({ map: vestTexture() });
     shared.m = shared.metal; shared.r = shared.rubber;
@@ -331,12 +332,13 @@
     m.pax = new T.MeshBasicMaterial({ map: paxTexture(), toneMapped: false });
     m.inside = shared.inside.clone(); m.inside.userData.shared = false; m.inside.emissive = new T.Color(INSIDE_EMIT);
     m.seat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: new T.Color(SEAT_EMIT) });
+    m.sh = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, emissive: new T.Color(SHELL_EMIT) });   // the tram's saloon shell (passenger view)
     m.glowHead = new T.SpriteMaterial({ map: glowTexture('#fff2cf'), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     m.glowTail = new T.SpriteMaterial({ map: glowTexture('#ff3a24'), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
     m.insideFwd = m.inside.clone(); m.insideFwd.userData.shared = false;
     m.beamHead = makeBeamMaterial([0, -0.03, -1], 100, 0.1); m.beamTail = makeBeamMaterial([0, -0.05, 1], 16, 0.3);
     m.ghost = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false }); // invisible but still casts shadows
-    m.own = [m.pax, m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail, m.beamHead, m.beamTail];
+    m.own = [m.sh, m.pax, m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail, m.beamHead, m.beamTail];
     return m;
   }
 
@@ -542,18 +544,25 @@
       return mergeInto(b.raw);
     });
   }
-  /* Luxtram seat (photo: Wikimedia Commons, Luxembourg Luxtram CAF Urbos 3 interior): a teal moulded back with a perforated dark panel, a dark brown cushion on a grey bracket;
-     one unit 0.46 m wide, faces -Z. Instance colour stays white (the colours are in the vertices). */
+  /* Luxtram seat (photos: Wikimedia Commons, Luxembourg Luxtram CAF Urbos 3 interior + the Luxtram open-day set): a moulded shell, turquoise upper back over a dark brown lower back in
+     silver side frames, a perforated dark seat pan, all carried by a grey pedestal box fixed to the floor (the real ones sit on boxes along the wall / wheel arch, no legs).
+     One unit 0.46 m wide, faces -Z, y = 0 is the floor. Instance colour stays white (the colours are in the vertices). */
   function seatGeoTram() {
     return memo('seatTram', () => {
       const b = makeBuilder();
-      b.box('t', 0.4, 0.07, 0.34, 0, 0.17, -0.0, '#9aa1a7');          // bracket under the cushion
-      b.box('t', 0.43, 0.06, 0.4, 0, 0.44, -0.02, '#3b302c');         // cushion (dark brown)
-      b.box('t', 0.44, 0.5, 0.07, 0, 0.74, 0.2, '#22aebf');           // backrest: teal moulded shell
-      b.box('t', 0.34, 0.26, 0.012, 0, 0.7, 0.158, '#2c2f33');        // perforated panel on the seat face of the back
-      b.box('t', 0.44, 0.13, 0.075, 0, 1.04, 0.2, '#1f93a3');         // headrest band
-      b.box('t', 0.03, 0.34, 0.07, 0.225, 0.66, 0.15, '#9aa1a7');     // side frame
-      b.box('t', 0.03, 0.34, 0.07, -0.225, 0.66, 0.15, '#9aa1a7');
+      b.box('t', 0.40, 0.012, 0.30, 0, 0.006, 0.07, '#33373d');              // floor plate
+      b.box('t', 0.34, 0.36, 0.26, 0, 0.19, 0.08, '#7b838a');                // pedestal box (grey painted steel)
+      b.box('t', 0.36, 0.02, 0.28, 0, 0.375, 0.08, '#5c636a');               // pedestal cap
+      b.box('t', 0.44, 0.04, 0.42, 0, 0.415, -0.02, '#26292d');              // seat pan: dark perforated shell
+      b.box('t', 0.40, 0.006, 0.34, 0, 0.437, -0.02, '#3b3f45');             // pan inlay (perforation reads as a lighter pattern)
+      b.box('t', 0.44, 0.03, 0.03, 0, 0.405, -0.225, '#9aa2a8');             // front lip, silver
+      b.box('t', 0.44, 0.30, 0.07, 0, 0.62, 0.205, '#473830');               // lower back (dark brown)
+      b.box('t', 0.44, 0.36, 0.07, 0, 0.95, 0.205, '#2eb6c8');               // upper back (turquoise)
+      b.box('t', 0.34, 0.34, 0.012, 0, 0.83, 0.164, '#25282c');              // perforated panel on the sitting side of the back
+      for (const sx of [-1, 1]) {
+        b.box('t', 0.024, 0.74, 0.08, sx * 0.226, 0.77, 0.205, '#aeb5ba');   // silver side frames
+        b.box('t', 0.024, 0.05, 0.40, sx * 0.226, 0.45, 0.0, '#aeb5ba');     // frame arm under the pan
+      }
       return mergeInto(b.raw);
     });
   }
@@ -670,12 +679,22 @@
     if (noseR) for (let i = 0; i <= nose.N; i++) rearZs.push(zR - nose.len * (i / nose.N)); else rearZs.push(zR, zR - 0.6);
     const wzA = hasWin ? (noseF ? zF + nose.len + 0.7 : zF + 0.9) : 0;
     const wzB = hasWin ? (noseR ? zR - nose.len - 0.7 : zR - 0.9) : 0;
+    // door positions (car-local z): needed before the hull rows, the saloon lining is cut open exactly at the doorways
+    const carDoors = [];
+    const doorN = K.doors || 0;
+    if (doorN > 0) {
+      const za = (noseF ? zF + Math.max(nose.len, 2.7) + S.doorMargin * 0.55 : zF + S.doorMargin) + S.doorW / 2;
+      const zb = (noseR ? zR - Math.max(nose.len, 2.7) - S.doorMargin * 0.55 : zR - S.doorMargin) - S.doorW / 2;
+      for (let d = 0; d < doorN; d++) carDoors.push(doorN === 1 ? (za + zb) / 2 : za + (zb - za) * d / (doorN - 1));
+    }
+    const DOOR_EDGE = S.doorW / 2 + 0.01;
+    const inDoorZone = (m) => carDoors.some((dz) => Math.abs(m - dz) < DOOR_EDGE);
     const bogieCut = [-K.bogie, K.bogie].map((z) => [z - 1.75, z + 1.75]);
     const zs = new Set([...frontZs, ...rearZs, zF + (noseF ? nose.len : 0.6) + 0.0, zR - (noseR ? nose.len : 0.6)]);
     if (hasWin) { zs.add(wzA); zs.add(wzB); }
     const inNoseZone = (z) => (noseF && z < zF + nose.len + 1e-6) || (noseR && z > zR - nose.len - 1e-6);
     for (const [a, b] of bogieCut) { if (!inNoseZone(a)) zs.add(a); if (!inNoseZone(b)) zs.add(b); }
-    const zList = [...zs].filter((z) => z >= zF - 1e-6 && z <= zR + 1e-6).sort((a, b) => a - b).filter((z, i, arr) => i === 0 || z - arr[i - 1] > 0.01);
+    let zList = [...zs].filter((z) => z >= zF - 1e-6 && z <= zR + 1e-6).sort((a, b) => a - b).filter((z, i, arr) => i === 0 || z - arr[i - 1] > 0.01);
     const shapeAt = (z) => {
       if (noseF && z < zF + nose.len - 1e-6) return { ...noseShapeAt(nose, 1 - (z - zF) / nose.len), nz: true };
       if (noseR && z > zR - nose.len + 1e-6) { const s = { ...noseShapeAt(nose, 1 - (zR - z) / nose.len), nz: true }; s.rake = -s.rake; return s; }
@@ -686,13 +705,17 @@
     if (noseF) { const i = zList.findIndex((z) => Math.abs(z - (zF + nose.len)) < 0.011); if (i >= 0) zList.splice(i + 1, 0, zList[i] + JD); }
     if (noseR) { const i = zList.findIndex((z) => Math.abs(z - (zR - nose.len)) < 0.011); if (i >= 0) zList.splice(i, 0, zList[i] - JD); }
     const noseCArr = toRGB(C.nose);
-    const rowsR = [], rows = [];
-    zList.forEach((z) => {
-      const sh = shapeAt(z);
-      const nc = (noseF && z <= zF + nose.len + 1e-6) || (noseR && z >= zR - nose.len - 1e-6) ? noseCArr : null;
-      const Rr = ringFor(S, sh.nz && cabBands ? cabBands : bands, roofC, sh, nc);
-      rowsR.push(Rr); rows.push(fullRing(Rr, z, sh.rake, S.yb));
-    });
+    const buildRows = (zl) => {
+      const rR = [], rr = [];
+      zl.forEach((z) => {
+        const sh = shapeAt(z);
+        const nc = (noseF && z <= zF + nose.len + 1e-6) || (noseR && z >= zR - nose.len - 1e-6) ? noseCArr : null;
+        const Rr = ringFor(S, sh.nz && cabBands ? cabBands : bands, roofC, sh, nc);
+        rR.push(Rr); rr.push(fullRing(Rr, z, sh.rake, S.yb));
+      });
+      return { rR, rr };
+    };
+    let { rR: rowsR, rr: rows } = buildRows(zList);
     const strips = zList.length - 1;
     const stripMid = (k) => (zList[k] + zList[k + 1]) / 2;
     const inNose = (k, front) => front ? stripMid(k) < zF + nose.len : stripMid(k) > zR - nose.len;
@@ -730,13 +753,34 @@
     bodyMesh.castShadow = true; bodyMesh.receiveShadow = true;
     group.add(bodyMesh);
     const paintMeshes = [bodyMesh];
-    const innerMesh = new T.Mesh(bodyGeo, mats.inside); // interior lining (back faces)
+    // interior lining (back faces). Tram: the doorways are cut open in it (below the window band too), so with the doors open the platform shows through the opening only
+    let lineGeo = bodyGeo;
+    /* tram: the lining and the window glass get their own rows with a row at each door edge (the hull outside keeps exactly its old rows, and so its shading): the lining is cut open
+       at the doorways, the glass stops at them */
+    const onDoorRows = (fn) => {
+      if (!(S.tram && hasWin && carDoors.length)) return fn();
+      const z0 = zList, r0 = rowsR, rr0 = rows;
+      zList = [...z0, ...carDoors.flatMap((dz) => [+(dz - DOOR_EDGE).toFixed(4), +(dz + DOOR_EDGE).toFixed(4)])].sort((a, b) => a - b);
+      ({ rR: rowsR, rr: rows } = buildRows(zList));
+      try { return fn(); } finally { zList = z0; rowsR = r0; rows = rr0; }
+    };
+    if (S.tram && hasWin && carDoors.length) {
+      lineGeo = onDoorRows(() => loft(rows, (k, i) => {
+        if (segSkip(k, i)) return true;
+        if (!inDoorZone(stripMid(k)) || (noseF && inNose(k, true)) || (noseR && inNose(k, false))) return false;
+        const j = i < nR ? i : 2 * nR - i - 1;
+        return j >= 2 && j <= winSegR;
+      }));
+    }
+    if (lineGeo !== bodyGeo) lineGeo.userData.shared = false;
+    const innerMesh = new T.Mesh(lineGeo, mats.inside);
+    if (lineGeo !== bodyGeo) innerMesh.userData.disposeGeo = true;
     group.add(innerMesh);
     const fwdLinings = []; // lining ahead of the cab (hst): hidden in cab view so the track stays visible
     if (noseF && (S.cabFrame && S.cabFrame.dz)) {
-      const kcut = zList.findIndex((z) => z >= zF + S.cabFrame.dz - 1e-6), st = bodyGeo.userData.starts, total = bodyGeo.index.count;
+      const kcut = zList.findIndex((z) => z >= zF + S.cabFrame.dz - 1e-6), st = lineGeo.userData.starts, total = lineGeo.index.count;
       if (kcut > 0 && st) {
-        bodyGeo.clearGroups(); bodyGeo.addGroup(0, st[kcut], 0); bodyGeo.addGroup(st[kcut], total - st[kcut], 1);
+        lineGeo.clearGroups(); lineGeo.addGroup(0, st[kcut], 0); lineGeo.addGroup(st[kcut], total - st[kcut], 1);
         innerMesh.material = [mats.insideFwd, mats.inside]; fwdLinings.push(innerMesh);
       }
     }
@@ -766,12 +810,14 @@
     };
     const hollowSegs = [];
     for (let i = 0; i < 2 * nR; i++) hollowSegs.push(i);
+    onDoorRows(() => { const strips = zList.length - 1;
     for (let k = 0; k < strips; k++) {
       for (const i of hollowSegs) {
         if (!segSkip(k, i)) continue;
         const j = i < nR ? i : 2 * nR - i - 1;
         if (j === 1 || j === 2) continue; // bogie cut-out: no glass
         const isRoof = j >= 1 + 2 * bands.length;
+        if (S.tram && !isRoof && inDoorZone(stripMid(k))) continue;   // the doorway stays open when the leaves slide aside (the leaves carry their own glazing)
         if (isRoof) {
           addBandQuad(rows[k], rows[k + 1], i, 0, 1, 0, 'glass', null, glassB);
           continue;
@@ -780,15 +826,8 @@
         addBandQuad(rows[k], rows[k + 1], i, 0, 0.07, 0.006, 'trim', S.pillar, B);
         addBandQuad(rows[k], rows[k + 1], i, 0.93, 1, 0.006, 'trim', S.pillar, B);
       }
-    }
-    // pillars, door surrounds, doors
-    const carDoors = [];
-    const doorN = K.doors || 0;
-    if (doorN > 0) {
-      const za = (noseF ? zF + Math.max(nose.len, 2.7) + S.doorMargin * 0.55 : zF + S.doorMargin) + S.doorW / 2;
-      const zb = (noseR ? zR - Math.max(nose.len, 2.7) - S.doorMargin * 0.55 : zR - S.doorMargin) - S.doorW / 2;
-      for (let d = 0; d < doorN; d++) carDoors.push(doorN === 1 ? (za + zb) / 2 : za + (zb - za) * d / (doorN - 1));
-    }
+    } });
+    // pillars, door surrounds, doors (carDoors: see above, the hull rows need the door edges)
     if (hasWin) {
       const nb = Math.max(1, Math.round((wzB - wzA) / S.bay));
       for (let p = 0; p <= nb; p++) {
@@ -839,8 +878,13 @@
             for (const q of [-1, 1]) { pb.box('trim', 0.07, lh, 0.06, 0, 0, q * (leafW / 2 - 0.03), '#101418'); pb.box('trim', 0.07, 0.06, leafW, 0, q * (lh / 2 - 0.03), 0, '#101418'); }
             pb.box('trim', 0.07, 0.07, leafW, 0, -lh / 2 + split, 0, '#101418');
             const py0 = -lh / 2 + split + 0.09, py1 = lh / 2 - 0.08, lowY0 = -lh / 2 + 0.08, lowY1 = -lh / 2 + split - 0.07;
-            pb.box('lit', 0.012, py1 - py0, leafW - 0.1, 0.0, (py0 + py1) / 2, 0, dcol);
-            pb.box('lit', 0.012, lowY1 - lowY0, leafW - 0.1, 0.0, (lowY0 + lowY1) / 2, 0, dcol);
+            // the coloured film is a single-sided plane facing outwards (seen from the saloon the glass is clear, not a solid coloured slab); inside: clear glass, a light grey inner frame
+            const film = (y0, y1) => { const pg = new T.PlaneGeometry(leafW - 0.1, y1 - y0); pg.rotateY(Math.PI / 2); pg.translate(0.006, (y0 + y1) / 2, 0); pb.geo('litF', pg, dcol); };
+            film(py0, py1); film(lowY0, lowY1);
+            pb.box('glass', 0.008, py1 - py0, leafW - 0.1, -0.008, (py0 + py1) / 2, 0, '#8aa0ab');
+            pb.box('glass', 0.008, lowY1 - lowY0, leafW - 0.1, -0.008, (lowY0 + lowY1) / 2, 0, '#8aa0ab');
+            for (const q of [-1, 1]) { pb.box('trim', 0.012, lh - 0.02, 0.05, -0.041, 0, q * (leafW / 2 - 0.03), '#c4c8ca'); pb.box('trim', 0.012, 0.05, leafW - 0.02, -0.041, q * (lh / 2 - 0.03), 0, '#c4c8ca'); }
+            pb.box('trim', 0.012, 0.05, leafW - 0.02, -0.041, -lh / 2 + split, 0, '#c4c8ca');
             pb.box('trim', 0.006, py1 - py0 - 0.1, 0.02, 0.047, (py0 + py1) / 2 + 0.04, e * (leafW * 0.2), '#ffffff'); // glass glint
             pb.box('rubber', 0.05, lh, 0.025, 0.02, 0, -e * (leafW / 2) + e * 0.012, '#111');
             pb.box('rubber', 0.05, lh, 0.025, 0.02, 0, e * (leafW / 2) - e * 0.012, '#111');
@@ -1216,28 +1260,29 @@
         for (const sd of [-1, 1]) {
           B.cyl(S.tram ? 'steel' : 'metal', 0.022, 0.022, S.head - S.floor + 0.05, sd * 0.62, (S.floor + S.head) / 2, zz, '#dfe2e5', null, 8);
           glassB.box('glass', hw - 0.55, 1.75, 0.02, sd * ((hw - 0.05 + 0.6) / 2), S.floor + 1.0, zz + e * 0.1);
-          B.box('metal', hw - 0.55, 0.03, 0.03, sd * ((hw - 0.05 + 0.6) / 2), S.floor + 1.9, zz + e * 0.1, '#c8ccd0');
+          B.box(S.tram ? 'steel' : 'metal', hw - 0.55, 0.03, 0.03, sd * ((hw - 0.05 + 0.6) / 2), S.floor + 1.9, zz + e * 0.1, '#d9dee2');
         }
       }
       if (S.tram) {
         // stainless poles and rails (the photos of the Luxtram saloon show stainless steel, not painted ones), overhead rails with hanging grips, passenger info screens, the gangway arch
         const fl0 = S.floor, hd = S.head, steelC = '#d9dee2', ry = hd - 0.17, holds = [], screens = [];
-        for (const [px, pz] of tramPoles) B.cyl('steel', 0.017, 0.017, hd - fl0, px, (fl0 + hd) / 2, pz, steelC, null, 8);
+        const ceilY = hd + 0.05;   // the flat saloon ceiling of the passenger view
+        for (const [px, pz] of tramPoles) B.cyl('steel', 0.017, 0.017, ceilY - fl0, px, (fl0 + ceilY) / 2, pz, steelC, null, 8);
         for (const sd of [-1, 1]) {
           B.cyl('steel', 0.015, 0.015, zEnd - zStart, sd * 0.5, ry, (zStart + zEnd) / 2, steelC, 'z', 8);
           for (let z = zStart + 0.35; z < zEnd - 0.2; z += 0.95) {
-            if (nearDoor(z, 0.0)) continue;
+            if (nearDoor(z, 0.0) || Math.abs(z - (wzA + 0.4)) < 0.9 || Math.abs(z - (wzB - 0.5)) < 0.9 || carDoors.some((dz) => Math.abs(z - (dz + 1.0)) < 0.9)) continue;   // none right in front of the lens of a saloon camera viewpoint
             B.cyl('steel', 0.009, 0.009, 0.14, sd * 0.5, ry - 0.07, z, steelC, null, 6);
             B.cyl('steel', 0.011, 0.011, 0.15, sd * 0.5, ry - 0.145, z, steelC, 'z', 6);
           }
         }
         for (const dz of carDoors) for (const e of [-1, 1]) {
-          for (const sd of [-1, 1]) holds.push([sd * 0.42, dz + e * (S.doorW / 2 + 0.42), sd * 0.62, dz + e * (S.doorW / 2 + 0.18)]);
+          for (const sd of [-1, 1]) holds.push([sd * 0.40, dz + e * (S.doorW / 2 + 0.48), sd * 0.62, dz + e * (S.doorW / 2 + 0.18)]);   // the person stands 0.37 m from the pole: the bent right arm reaches it at chest height
         }
         for (const dz of carDoors) {
           const zc = dz + (dz < (wzA + wzB) / 2 ? 1 : -1) * (S.doorW / 2 + 0.95);
           B.box('trim', 0.52, 0.31, 0.07, 0, hd - 0.38, zc, '#d8dcdf');                       // ceiling screen housing
-          B.cyl('steel', 0.012, 0.012, 0.2, 0, hd - 0.18, zc, steelC, null, 6);
+          B.cyl('steel', 0.012, 0.012, ceilY - (hd - 0.225), 0, (ceilY + hd - 0.225) / 2, zc, steelC, null, 6);
           screens.push([zc, hd - 0.38]);
         }
         // the gangway arch (teal, like the articulation modules of the real tram) at every end that opens into another car
@@ -1253,10 +1298,104 @@
       }
     }
     // ceiling light strips (lit)
+    let lampMesh = null;   // tram: the strips under the window header, replaced by the ones of the flat ceiling in the passenger view
     if (hasWin && mid) {
       const ly = S.double ? S.head - 0.04 : S.head - 0.02, len = Math.max(1, wzB - wzA), zc = (wzA + wzB) / 2;
+      if (S.tram) {
+        const lampB = makeBuilder();
+        for (const x of [-0.75, 0.75]) lampB.box('lamp', 0.2, 0.03, len, x, ly, zc, '#ffffff');
+        lampMesh = lampB.bake(mats, { noShadow: true }); lampMesh.userData.disposeGeo = true; group.add(lampMesh);
+      } else
       for (const x of [-0.75, 0.75]) B.box('lamp', 0.2, 0.03, len, x, ly, zc, '#ffffff');
       if (S.double) for (const x of [-0.75, 0.75]) B.box('lamp', 0.2, 0.03, len, x, 3.72, zc, '#ffffff');
+    }
+
+    /* ----- Luxtram saloon shell (the passenger view, key 5): a complete lining for EVERY car section, end cars included. Walls with window sills, headers and cream mullions around the
+       tinted glass, a flat ceiling with light and vent strips, door jambs with the release buttons, teal gangway portals, the bulkhead of the cab, and the raised wheel-arch housings over the
+       bogies (the bogies themselves are hidden in this view). It sits inside the hull (|x| < hw) and is only shown from inside (setInteriorView), so the outside is exactly as before. */
+    let shellMesh = null;
+    if (S.tram && hasWin && mid) {
+      const SB = makeBuilder();
+      const fl0 = S.floor, ceil = S.head + 0.05, xin = hw - 0.012;
+      const za = noseF ? zF + 2.75 : zF + 0.02, zb = noseR ? zR - 2.75 : zR - 0.02, zc = (za + zb) / 2, len = zb - za;
+      const CREAM = '#e9e6dc', CREAM2 = '#dedbcf', GREY = '#4a5057', DGREY = '#3a3e45', TEAL = '#5db5ae', DW = S.doorW;
+      const sh = (w, h, d, x, y, z, col) => SB.box('sh', w, h, d, x, y, z, col);
+      const dk = (w, h, d, x, y, z, col) => SB.box('floor', w, h, d, x, y, z, col);   // dark parts: no glow, so they stay dark like the floor
+      // ceiling: flat panel, vent grilles at the sides, cyan edge lights, the two light strips
+      SB.box('lit', xin * 2, 0.02, len, 0, ceil + 0.01, zc, '#d2cfc4');   // unlit: the underside of the ceiling would stay dark in the sun
+      for (const sd of [-1, 1]) {
+        sh(0.26, 0.012, len, sd * 1.03, ceil - 0.004, zc, '#8f979d');
+        SB.box('lit', 0.014, 0.01, len, sd * 0.595, ceil - 0.003, zc, '#5fdcff');
+        SB.box('lamp', 0.2, 0.024, len, sd * 0.75, ceil - 0.011, zc, '#ffffff');
+      }
+      // floor: a dark rubber skin over the light slab (the outside view still sees the slab's edge), a lighter strip in the aisle
+      dk(hw * 2 - 0.1, 0.004, len, 0, fl0 + 0.0356, zc, '#3f444c'); dk(0.6, 0.002, len, 0, fl0 + 0.0376, zc, '#4a505a');
+      // window zone minus the doorways
+      const spans = []; let a0 = wzA;
+      for (const dz of [...carDoors].sort((p, q) => p - q)) { const e0 = dz - DW / 2 - 0.12; if (e0 > a0) spans.push([a0, e0]); a0 = dz + DW / 2 + 0.12; }
+      if (wzB > a0) spans.push([a0, wzB]);
+      for (const sd of [-1, 1]) {
+        dk(0.04, 0.12, len, sd * (xin - 0.02), fl0 + 0.09, zc, GREY);                                   // skirting
+        for (const [z0, z1] of spans) {
+          sh(0.09, 0.035, z1 - z0, sd * (xin - 0.045), S.sill - 0.0025, (z0 + z1) / 2, CREAM);          // window sill
+          sh(0.09, 0.06, z1 - z0, sd * (xin - 0.045), S.head - 0.03, (z0 + z1) / 2, CREAM);             // header
+        }
+      }
+      const nb = Math.max(1, Math.round((wzB - wzA) / S.bay));
+      for (let q = 0; q <= nb; q++) {   // mullions where the outside pillars are
+        const z = wzA + (wzB - wzA) * q / nb;
+        if (carDoors.some((dz) => Math.abs(z - dz) < DW / 2 + 0.2)) continue;
+        for (const sd of [-1, 1]) sh(0.06, S.head - S.sill, 0.09, sd * (xin - 0.04), (S.sill + S.head) / 2, z, CREAM);
+      }
+      // doorways: jambs, header cassette, release buttons, grab rails, the yellow threshold edge
+      for (const dz of carDoors) for (const sd of [-1, 1]) {
+        const xj = sd * (xin - 0.055);
+        sh(0.11, ceil - 2.28, DW + 0.3, xj, (2.28 + ceil) / 2, dz, CREAM2);                              // header cassette over the leaves
+        for (const e of [-1, 1]) {
+          const zj = dz + e * (DW / 2 + 0.075);
+          sh(0.11, ceil - fl0, 0.11, xj, (fl0 + ceil) / 2, zj, CREAM2);                                  // jamb column
+          sh(0.016, 0.2, 0.09, sd * (xin - 0.118), 1.3, zj, '#2b2f34');                                  // release panel
+          SB.cyl('lit', 0.022, 0.022, 0.012, sd * (xin - 0.128), 1.34, zj, '#47d36b', 'x', 12);
+          SB.cyl('lit', 0.012, 0.012, 0.012, sd * (xin - 0.128), 1.25, zj, '#ff8a2a', 'x', 8);
+          const zr = dz + e * (DW / 2 + 0.24);                                                              // stainless grab rail beside the jamb, held off it by two stubs
+          SB.cyl('steel', 0.016, 0.016, 1.0, sd * (xin - 0.08), 1.35, zr, '#d9dee2', null, 8);
+          for (const yy of [0.88, 1.82]) SB.cyl('steel', 0.011, 0.011, 0.11, sd * (xin - 0.08), yy, dz + e * (DW / 2 + 0.185), '#d9dee2', 'z', 6);
+        }
+        SB.box('lit', 0.05, 0.006, DW - 0.02, sd * (hw - 0.14), 0.458, dz, '#e8c52e');                  // yellow threshold edge
+      }
+      // wheel arches: low raised areas over the bogies (the real cars have them there, the transverse seats sit on them)
+      const arch = [];
+      for (const bz of [-K.bogie, K.bogie]) {
+        const z0 = Math.max(za, bz - (S.wb / 2 + 0.55)), z1 = Math.min(zb, bz + (S.wb / 2 + 0.55));
+        if (z1 - z0 < 0.2) continue;
+        arch.push([z0, z1]);
+        for (const sd of [-1, 1]) {
+          dk(xin - 0.5 - 0.02, 0.09, z1 - z0, sd * (0.5 + (xin - 0.5 - 0.02) / 2), fl0 + 0.03 + 0.045, (z0 + z1) / 2, DGREY);
+          SB.box('lit', 0.03, 0.006, z1 - z0, sd * 0.515, fl0 + 0.123, (z0 + z1) / 2, '#d9b92a');   // yellow nosing on the aisle edge
+        }
+      }
+      // gangway portals (teal) at the ends that open into the next car; bulkhead details at the cab ends
+      const portal = (zz) => {
+        for (const sd of [-1, 1]) sh(xin - 0.62, ceil - fl0, 0.1, sd * (0.62 + (xin - 0.62) / 2), (fl0 + ceil) / 2, zz, TEAL);
+        sh(1.24, ceil - 2.4, 0.1, 0, (2.4 + ceil) / 2, zz, TEAL);
+        for (const sd of [-1, 1]) SB.box('rubber', 0.05, 1.9, 0.12, sd * 0.605, fl0 + 0.95 + 0.03, zz, '#141517');   // black bellows edge
+      };
+      if (!noseF) portal(wzA - 0.1);
+      if (!noseR) portal(wzB + 0.1);
+      const bulk = (front) => {
+        const zw = front ? za : zb, sgn = front ? 1 : -1;
+        for (const sd of [-1, 1]) dk(0.07, ceil - fl0, 0.08, sd * (xin - 0.035), (fl0 + ceil) / 2, zw + sgn * 0.0, '#2b3138');
+        dk(xin * 2, cabFloorY + 0.04 - fl0, 0.06, 0, (fl0 + cabFloorY + 0.04) / 2, zw + sgn * 0.03, '#2b3138');   // closes the step up to the cab floor (the partition itself starts at the cab floor)
+        const zf = zw + sgn * 0.012;
+        sh(0.9, 0.03, 0.012, 0, fl0 + 0.03 + 1.0, zf, '#9aa0a6'); sh(0.9, 0.03, 0.012, 0, fl0 + 0.03 + 1.95, zf, '#9aa0a6');
+        for (const sd of [-1, 1]) sh(0.03, 0.95, 0.012, sd * 0.45, fl0 + 0.03 + 1.45 - 0.02, zf, '#9aa0a6');
+        sh(0.62, 0.55, 0.01, 0, fl0 + 1.6, zf, '#10161b');                                                  // dark glass of the cab door
+        SB.cyl('steel', 0.013, 0.013, 0.2, 0.32, fl0 + 1.15, zf + sgn * 0.02, '#d4d8db', 'y', 8);
+      };
+      if (noseF) bulk(true);
+      if (noseR) bulk(false);
+      shellMesh = SB.bake(mats, { noShadow: true });
+      if (shellMesh) { shellMesh.userData.disposeGeo = true; shellMesh.visible = false; shellMesh.name = 'saloon-shell'; group.add(shellMesh); }
     }
 
     // ----- roof equipment
@@ -1390,7 +1529,7 @@
     // ----- lights
     return {
       exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
-      interior: tramInterior, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
+      interior: tramInterior, shell: shellMesh, lampMesh, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
     };
   }
 
@@ -1643,9 +1782,10 @@
         const cab = !!l.cabin;
         mats.lamp.color.setHex(cab ? 0xffffff : 0xdad6c6);
         cabinOn = cab; applyGlass();
-        mats.glassD.opacity = interiorViewOn ? 0.2 : cab ? GLASS_D_CAB : GLASS_D_DAY;
+        mats.glassD.opacity = interiorViewOn ? 0.3 : cab ? GLASS_D_CAB : GLASS_D_DAY;
         mats.inside.emissive.setHex(cab ? emitOn : emitOff); mats.insideFwd.emissive.setHex(cab ? emitOn : emitOff);
-        mats.seat.emissive.setHex(cab ? SEAT_EMIT_ON : SEAT_EMIT);
+        mats.seat.emissive.setHex(tramLook ? (cab ? 0x3a3c40 : 0x2c2e32) : cab ? SEAT_EMIT_ON : SEAT_EMIT);   // tram: a gentler glow keeps the turquoise saturated
+        mats.sh.emissive.setHex(cab ? SHELL_EMIT_ON : SHELL_EMIT);
         applyLightFx();
       },
       /* dark 0..1 (how dark the surroundings are: night 1, dusk / dull weather in between, bright day 0, tunnel 1), haze 0..1 (how much the beams scatter: fog, rain, snow, night air) */
@@ -1684,9 +1824,14 @@
       setInteriorView(on) {
         interiorViewOn = !!on;
         if (!tramLook) return;
+        for (const b of built) {   // the saloon shell + its ceiling lights replace the outside view's; the bogies (and with them wheels, springs, frames) are not in the saloon
+          if (b.shell) b.shell.visible = interiorViewOn;
+          if (b.lampMesh) b.lampMesh.visible = !interiorViewOn;
+          for (const bg of b.bogies) bg.visible = !interiorViewOn;
+        }
         const c = interiorViewOn ? 0xe4e9e5 : cabViewOn ? 0xcfcdc5 : 0x4a4f56;
         mats.inside.color.setHex(c); mats.insideFwd.color.setHex(c);
-        mats.glassD.opacity = interiorViewOn ? 0.2 : (cabinOn ? GLASS_D_CAB : GLASS_D_DAY);
+        mats.glassD.opacity = interiorViewOn ? 0.3 : (cabinOn ? GLASS_D_CAB : GLASS_D_DAY);
         mats.glass.opacity = interiorViewOn ? 0.18 : tramLook ? (cabViewOn ? 0.2 : 0.58) : 0.34;
       },
       isInteriorView() { return interiorViewOn; },
