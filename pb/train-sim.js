@@ -1715,7 +1715,7 @@
     $('btnRev').classList.toggle('on', !!s.reverse);
     const pk = $('parkLamp');
     pk.hidden = !s.parkingBrake;
-    if (s.parkingBrake) pk.textContent = 'P · ' + t('hudParking');
+    if (s.parkingBrake) pk.textContent = 'B · ' + t('hudParking');
     const hintHtml = hintFor(s), gv = guideView(s), gEl = $('guide');
     $('hint').innerHTML = hintHtml;
     $('hint').classList.toggle('coach', !!save.hints && !!hintHtml);
@@ -1726,7 +1726,7 @@
   }
 
   /* ------------------------------------------------------------ overlays */
-  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['R', 'keyReverse'], ['F', 'keyFast'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['V', 'keyWeather'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–5', 'keyCamDirect'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
+  const HELP_ROWS = [['W / ↑', 'keyPower'], ['S / ↓', 'keyBrake'], ['X / ⌫', 'keyEB'], ['D', 'keyDoors'], ['B', 'keyParking'], ['R', 'keyReverse'], ['F', 'keyFast'], ['H / Space', 'keyHorn'], ['L', 'keyLights'], ['V', 'keyWeather'], ['A', 'keyAnnounce'], ['C', 'keyCamera'], ['1–5', 'keyCamDirect'], ['← →', 'keyWalk'], ['T', 'keyTimetable'], ['M', 'keyMute'], ['Q', 'keyQuality'], ['P / Esc', 'keyPause'], ['F1 / ?', 'keyHelp'], ['', 'keyOrbit'], ['', 'keyClick']];
   function buildHelp() {
     const body = $('helpBody');
     body.replaceChildren();

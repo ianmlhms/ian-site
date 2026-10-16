@@ -1478,6 +1478,7 @@
         flatStrip(batch.misc, sA, sB, lat - 0.1, lat + 0.1, (f) => yTop(f) + 1.0, rail, true, { step: 3 });
       });
     }
+    const bridgeAudit = new Map();       // tram bridges built so far (by s0): piers / abutments (test read-out, see scripts/flows)
     function buildBridge(br, batch) {
       const named = /Charlotte|Adolphe/.test(br.name || '');
       if (named && hasLandmarkFor(br.name)) return;
@@ -1485,13 +1486,13 @@
       const lL = (s) => slotLatL(s) - 0.9; const lR = SLOT_IN_R + 0.9;
       const depth = named ? 2.4 : 1.25;
       const deckCol = named ? C('#a9a69f') : CONC;
-      const SLAB = 0.45; const WEB_IN = 0.8;      // the top slab is 0.45 m thick and overhangs the box girder below by 0.8 m: a visible edge beam
+      const SLAB = 0.45; const WEB_IN = 0.8; const EDGE_UP = 0.42; const RAIL_STEEL = C('#4a5055');      // the top slab is 0.45 m thick and overhangs the box girder below by 0.8 m: a visible edge beam
       if (!named) {
         // the deck top across the whole slot (the OSM road decks of the ground module cover only the carriageways; without this the underside shows between them)
         surfStrip(batch.surf, sA - 2.5, sB + 2.5, lL, () => lR, ground.MAT.PAVE, [0.86, 0.85, 0.82], -0.08, 3);   // short run-on at both ends: no strip hanging over the embankment
         // edge beams (outer faces of the slab, light concrete), then the girder webs set back under them
-        wallStrip(batch.misc, sA, sB, lL, (f) => f.pos.y - SLAB, (f) => f.pos.y + 1.05, CONC_L, 1);
-        wallStrip(batch.misc, sA, sB, () => lR, (f) => f.pos.y - SLAB, (f) => f.pos.y + 1.05, CONC_L, -1);
+        wallStrip(batch.misc, sA, sB, lL, (f) => f.pos.y - SLAB, (f) => f.pos.y + EDGE_UP, CONC_L, 1);
+        wallStrip(batch.misc, sA, sB, () => lR, (f) => f.pos.y - SLAB, (f) => f.pos.y + EDGE_UP, CONC_L, -1);
         flatStrip(batch.misc, sA, sB, lL, (s) => lL(s) + WEB_IN, (f) => f.pos.y - SLAB, CONC_D, false, { step: 3 });      // soffit of the overhang
         flatStrip(batch.misc, sA, sB, () => lR - WEB_IN, () => lR, (f) => f.pos.y - SLAB, CONC_D, false, { step: 3 });
         wallStrip(batch.misc, sA, sB, (s) => lL(s) + WEB_IN, (f) => f.pos.y - depth, (f) => f.pos.y - SLAB, deckCol, 1);
@@ -1506,13 +1507,26 @@
           const d = batch.misc.vert(f.pos.x + f.right.x * l0, f.pos.y - 0.1, f.pos.z + f.right.z * l0, f.tangent.x * sg, 0, f.tangent.z * sg, 0, 0, CONC);
           batch.misc.quad(a, b, c, d);
         });
-        flatStrip(batch.misc, sA, sB, (s) => lL(s) - 0.25, (s) => lL(s), (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
-        flatStrip(batch.misc, sA, sB, lR, lR + 0.25, (f) => f.pos.y + 1.06, CONC_L, true, { step: 3 });
+        flatStrip(batch.misc, sA, sB, (s) => lL(s) - 0.25, (s) => lL(s), (f) => f.pos.y + EDGE_UP + 0.01, CONC_L, true, { step: 3 });
+        flatStrip(batch.misc, sA, sB, lR, lR + 0.25, (f) => f.pos.y + EDGE_UP + 0.01, CONC_L, true, { step: 3 });
+        // open steel railing on both edges (a low edge beam, not a solid parapet wall): posts every 2.5 m, a top rail and a mid rail
+        [[(s) => lL(s) - 0.12, -1], [() => lR + 0.12, 1]].forEach(([latFn]) => {
+          let prevTop = null; let prevMid = null;
+          for (let s = sA + 1; s <= sB - 1; s += 2.5) {
+            const f = frame(s); const lat = latFn(s); const x = f.pos.x + f.right.x * lat; const z = f.pos.z + f.right.z * lat;
+            addBox(batch.steel, x, f.pos.y + EDGE_UP + 0.55, z, 0.07, 1.1, 0.07, Math.atan2(f.right.z, f.right.x) + Math.PI / 2, RAIL_STEEL);
+            const top = [x, f.pos.y + EDGE_UP + 1.07, z]; const mid = [x, f.pos.y + EDGE_UP + 0.58, z];
+            if (prevTop) { addBeam(batch.steel, prevTop, top, 0.05, RAIL_STEEL); addBeam(batch.steel, prevMid, mid, 0.035, RAIL_STEEL); }
+            prevTop = top; prevMid = mid;
+          }
+        });
       }
       // supports: a pair of columns with a cross-head under every pier line, columns that reach the ground; abutment walls at both ends
       const len = sB - sA;
       const np = Math.max(0, Math.floor(len / 30));
       const places = [];
+      const rec = { kind: 'tram', name: br.name || '', s0: br.s0, s1: br.s1, piers: [], abuts: [] };
+      if (!named) bridgeAudit.set(br.s0, rec);
       for (let k = 1; k <= np; k++) places.push(sA + (len * k) / (np + 1));
       places.push(sA + 0.8); places.push(sB - 0.8);
       places.forEach((s, idx) => {
@@ -1526,6 +1540,7 @@
           const hh = f.pos.y - depth - g + 0.4;
           if (hh < 0.3) return;
           addBox(batch.misc, x, g + hh / 2 - 0.4, z, 1.0, hh + 0.4, wid * 1.02, rot, CONC);     // the abutment wall stands 0.4 m into the embankment
+          rec.abuts.push({ x, z, yBottom: g - 0.6, yDeck: f.pos.y, hw: wid / 2, dx: f.tangent.x * (idx === places.length - 2 ? -1 : 1), dz: f.tangent.z * (idx === places.length - 2 ? -1 : 1) });
           return;
         }
         [l0 + 1.4, l1 - 1.4].forEach((lat) => {
@@ -1534,6 +1549,7 @@
           const hh = f.pos.y - depth - g;
           if (hh < 0.6) return;
           addBox(batch.misc, x, g + hh / 2 - 0.3, z, 1.3, hh + 0.6, 1.3, rot, CONC);              // column: 0.3 m into the ground, up to the girder
+          rec.piers.push({ x, z, yBottom: g - 0.6, r: 0.65 });
         });
         addBox(batch.misc, f.pos.x + f.right.x * (l0 + l1) / 2, f.pos.y - depth - 0.3, f.pos.z + f.right.z * (l0 + l1) / 2, 1.8, 0.6, wid * 0.94, rot, CONC_D);   // cross-head
       });
@@ -1832,9 +1848,10 @@
 
     /* ---- height of the rendered ground (the painted-ground module drapes its geometry on it) and the shared road-height query (P-GROUND <-> P-TRAFFIC).
        meshY(t, x, z): the Y of the visible terrain mesh of tile t (same triangulation / LOD as buildTerrain: diagonal b -> c2), NaN when the tile has no mesh.
-       surfY(t, x, z): the same, falling back to the LiDAR height.  roadHeightAt(x, z, onBridge): the road surface actually rendered at (x, z):
-         onBridge = false: the carriageway drawn on the ground (rasterised from its own triangles; terrain mesh + ROAD_LIFT where none is drawn); NaN while the tile is not built / not yet decorated at its final LOD
-         onBridge = true : the bridge deck of the OSM bridge roads (flag&1), measured from the LiDAR surface model (NaN when no deck there).
+       surfY(t, x, z): the same, falling back to the LiDAR height.  roadHeightAt(x, z, onBridge, roadOnly, refY): the surface actually rendered at (x, z):
+         onBridge = false: the carriageway drawn on the ground, looked up exactly in its own triangles (steep bank triangles and carriageway cells that have a sidewalk drawn on top are not carriageway; the approach
+                           plugs of the bridges are); beside it (roadOnly = false) the drawn sidewalk / path, else the bare terrain; NaN while the tile is not built / not yet decorated at its final LOD
+         onBridge = true : the deck of the OSM bridge roads (flag&1), the one nearest to refY where decks are stacked (NaN when no deck there: the named bridges are drawn by their landmark).
        Roads under a bridge keep working: ask with onBridge = false. */
     function meshY(t, x, z) {
       if (!t || !t.mesh || !t.dem) return NaN;
@@ -1878,16 +1895,26 @@
       const N = t.mesh.geometry.attributes.normal.array;
       return [N[(r * m + c) * 3], N[(r * m + c) * 3 + 1], N[(r * m + c) * 3 + 2]];
     }
-    const ground = TS.luxGround.create({ T, quality, Q, oy, surfY, normalAt });
-    const roadHeightAt = (x, z, onBridge, roadOnly) => {
-      if (onBridge) return ground.deckHeight(x, z);
+    /* lateral distance (m) of (x, z) outside the tram slot (both tracks + clearance), negative inside it; Infinity far from the line (bridge piers must keep clear of the trams under a road bridge) */
+    const slotClear = (x, z) => {
+      const q = nearest(x, z);
+      if (!q || !(q.d < 40)) return Infinity;
+      const l0 = slotLatL(q.s); const l1 = SLOT_IN_R;
+      return q.lat < l0 ? l0 - q.lat : q.lat > l1 ? q.lat - l1 : -1;
+    };
+    const ground = TS.luxGround.create({ T, quality, Q, oy, surfY, normalAt, tileOf, slotClear });
+    const roadHeightAt = (x, z, onBridge, roadOnly, refY) => {
+      if (onBridge) return ground.deckHeight(x, z, refY);      // NaN where no deck is registered (the named bridges are drawn by their landmark; a car there is not shown)
       const t = tileOf(x, z);
       if (!t || !t.built || !t.mesh || !t.decor) return NaN;       // not built / not at its final LOD (decorated) yet
-      const r = ground.roadSurface(t, x, z, meshY(t, x, z));       // the drawn carriageway triangles (of overlapping layers: the one at the terrain, not a ramp above / street below)
+      const my = meshY(t, x, z);
+      const r = ground.roadSurface(t, x, z, my, !roadOnly);       // the drawn carriageway triangles (of overlapping layers: the one at the terrain, not a ramp above / street below)
       if (r === r) return r;
       if (roadOnly) return NaN;                    // roadOnly: no terrain fallback (the traffic then levels a wheel that is off the carriageway)
-      const y = surfY(t, x, z);                    // no carriageway drawn here (kerb side, parking): the terrain + the road lift
-      return y === y ? y + ground.ROAD_LIFT : NaN;
+      const sd = ground.sideSurface(t, x, z, my);  // a wheel beside the carriageway stands on the drawn sidewalk / path ...
+      if (sd === sd) return sd;
+      const y = surfY(t, x, z);                    // ... or on the bare terrain (no lift: nothing is drawn there)
+      return y === y ? y : NaN;
     };
 
     /* the painted carriageway under (x, z) for infra.js (masts / boards must not stand in a lane): 1 = drawn carriageway, 0 = none, -1 = the tile is not built / decorated yet */
@@ -2131,7 +2158,7 @@
     });
     const debugSlot = (s) => { const sl = slotAt(s); if (!sl) return null; const f = frame(s); const L = slotLatL(s); return { kind: sl.kind, s0: sl.s0, s1: sl.s1, y: f.pos.y, HsL: slotShelf(sl, s, -1), HsR: slotShelf(sl, s, 1), L, R: SLOT_IN_R, left: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (L - d); const z = f.pos.z + f.right.z * (L - d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, -1, d, x, z).toFixed(1)]; }), right: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (SLOT_IN_R + d); const z = f.pos.z + f.right.z * (SLOT_IN_R + d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, 1, d, x, z).toFixed(1)]; }) }; };
     const paintDistance = (x, z) => { const t = tileOf(x, z); return t && t.ground ? ground.paintDistance(t, x, z) : NaN; };
-    return { paintDistance, debugSlot, debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
+    return { bridgeAudit: () => [...bridgeAudit.values()], paintDistance, debugSlot, debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
   }
 
   TS.luxtramWorld = { create, QUALITY, prefetchData };

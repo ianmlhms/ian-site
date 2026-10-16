@@ -29,6 +29,7 @@
   /* ---- switches / constants */
   const CARS_ON_BRIDGES = true;      // drive over the bridge decks (flag & 1 roads; needs the world to keep those roads in roadsByChunk with bridge: true)
   let LANE_K = 0.34;                 // lane centre = this * road half width
+  const SUS_MAX = 0.4;               // largest wheel offset the body warp follows (m)
   const ROAD_LIFT = 0.015;           // wheels rest this far above the height query (it already is the drawn surface; the white lines are 3.5 cm above it)
   const TRAM_LEN_FALLBACK = 46;
   const RED_AHEAD = 90;              // a crossing turns red while a tram is this close before it
@@ -410,14 +411,16 @@
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uNight = nightU;
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute vec2 aMark;\nattribute vec3 iBody;\nvarying float vGlow;')
+        .replace('#include <common>', '#include <common>\nattribute vec2 aMark;\nattribute vec3 iBody;\nattribute vec4 iSus;\nattribute vec2 iDim;\nvarying float vGlow;')
         .replace('#include <color_vertex>', '#include <color_vertex>\nvColor.rgb = color.rgb * mix(vec3(1.0), iBody, aMark.x);\nvGlow = aMark.y;')
+        /* suspension: the body is warped by the vertical offsets of its four wheels (front left / right, rear left / right) so every wheel rests on the road even where the surface is not one plane (a rigid body cannot) */
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n{ float su = clamp(position.x / iDim.x * 0.5 + 0.5, 0.0, 1.0); float sv = clamp(position.z / iDim.y * 0.5 + 0.5, 0.0, 1.0); transformed.y += mix(mix(iSus.x, iSus.y, su), mix(iSus.z, iSus.w, su), sv); }')
         ;
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying float vGlow;\nuniform float uNight;')
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vColor.rgb * vGlow * uNight * 1.5;');
     };
-    mat.customProgramCacheKey = () => 'luxtraffic-v1';
+    mat.customProgramCacheKey = () => 'luxtraffic-v2';
     return mat;
   }
 
@@ -572,7 +575,7 @@
 
     /* height under a wheel: the ground's road-surface query when the world provides it, else the plain terrain height.  NaN = not known yet */
     const surfaceAt = ctx.roadHeightAt
-      ? (x, z, onBridge) => ctx.roadHeightAt(x, z, !!onBridge)
+      ? (x, z, onBridge, refY) => ctx.roadHeightAt(x, z, !!onBridge, false, refY)
       : (x, z) => gy(x, z);
     const roadAt = ctx.roadHeightAt ? (x, z) => ctx.roadHeightAt(x, z, false, true) : null;   // carriageway only (NaN beside it)
 
@@ -585,11 +588,13 @@
       const geo = buildVehicleGeometry(name);
       const body = new T.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
       body.setUsage(T.DynamicDrawUsage); geo.setAttribute('iBody', body);
+      const sus = new T.InstancedBufferAttribute(new Float32Array(cap * 4), 4); sus.setUsage(T.DynamicDrawUsage); geo.setAttribute('iSus', sus);
+      const dim = new T.InstancedBufferAttribute(new Float32Array(cap * 2), 2); dim.setUsage(T.DynamicDrawUsage); geo.setAttribute('iDim', dim);
       const mesh = new T.InstancedMesh(geo, matVeh, cap);
       mesh.frustumCulled = false; mesh.count = 0; mesh.castShadow = false; mesh.receiveShadow = false; mesh.visible = false;
       mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); mesh.name = 'luxtram-traffic-' + name;
       root.add(mesh);
-      return { name, geo, body, mesh, n: 0 };
+      return { name, geo, body, sus, dim, mesh, n: 0 };
     });
 
     /* ---- signal posts at the tram crossings */
@@ -875,7 +880,7 @@
     const paintAt = ctx.paintAt || null;
     const LANE_MIN = 2.5;                // narrowest interval between two lines that is a lane
     function edgesAt(rd, t) {
-      if (!roadAt) return null;
+      if (!roadAt || rd.bridge === true) return null;       // (a deck: the ground road query there would measure the street UNDER the bridge; decks use the nominal lanes, which match the lane markings drawn on them)
       if (rd.uid === undefined) rd.uid = ++rdUid;
       const bk = Math.floor(clamp(t, 0, rd.len) / 12);
       const key = rd.uid * 8192 + bk;
@@ -959,25 +964,16 @@
       const fCx = fX; const fCz = fZ; const bCx = rX; const bCz = rZ;
       const hwT = sp0.tw / 2;
       const ob = rd.bridge === true;
-      let hFL = surfaceAt(fCx - rx * hwT, fCz - rz * hwT, ob); let hFR = surfaceAt(fCx + rx * hwT, fCz + rz * hwT, ob);
-      let hRL = surfaceAt(bCx - rx * hwT, bCz - rz * hwT, ob); let hRR = surfaceAt(bCx + rx * hwT, bCz + rz * hwT, ob);
+      const refY = ob ? c.y - ROAD_LIFT : undefined;       // a bridge car stays on the deck nearest to its own height (stacked ramps of an interchange)
+      let hFL = surfaceAt(fCx - rx * hwT, fCz - rz * hwT, ob, refY); let hFR = surfaceAt(fCx + rx * hwT, fCz + rz * hwT, ob, refY);
+      let hRL = surfaceAt(bCx - rx * hwT, bCz - rz * hwT, ob, refY); let hRR = surfaceAt(bCx + rx * hwT, bCz + rz * hwT, ob, refY);
       if (hFL !== hFL || hFR !== hFR || hRL !== hRL || hRR !== hRR) return false;
       if (!ob && roadAt) {
         const rFL = roadAt(fCx - rx * hwT, fCz - rz * hwT); const rFR = roadAt(fCx + rx * hwT, fCz + rz * hwT);
         const rRL = roadAt(bCx - rx * hwT, bCz - rz * hwT); const rRR = roadAt(bCx + rx * hwT, bCz + rz * hwT);
         // a wheel off the asphalt (kerb, pavement, bank) although the road axis is asphalt: steer the lane towards the axis, 2 % of the half width per frame
         if ((rFL !== rFL || rFR !== rFR || rRL !== rRL || rRR !== rRR) && c.laneK > 0.3 && roadAt(spF.x, spF.z) === roadAt(spF.x, spF.z)) c.laneK = Math.max(0.3, c.laneK - 0.02);
-        if (Math.abs(hFL - hFR) > 0.18 || Math.abs(hRL - hRR) > 0.18) {
-        // a wheel stands on the bank beside the drawn carriageway (lane at the polygon edge): level the car on the wheels that are on the road
-        const pick = (a, b) => (a === a ? a : (b === b ? b : NaN));
-        const f1 = pick(rFL, rFR); const f2 = pick(rFR, rFL); const r1 = pick(rRL, rRR); const r2 = pick(rRR, rRL);
-        const fAny = f1 === f1; const rAny = r1 === r1;
-        if (fAny || rAny) {
-          const fl = fAny ? f1 : r1; const fr = fAny ? f2 : r2; const rl = rAny ? r1 : f1; const rr = rAny ? r2 : f2;
-          const near = (a, b) => (Math.abs(a - b) < 0.35 ? a : b);       // only trust a road-only height that is close to the terrain one (a ramp wall must not lift a wheel)
-          hFL = near(fl, hFL); hFR = near(fr, hFR); hRL = near(rl, hRL); hRR = near(rr, hRR);
-        }
-        }
+        // (every wheel stands on its own drawn surface - road, sidewalk, bare terrain: the suspension warp of the body takes the difference)
       }
       const yFL = hFL + ROAD_LIFT; const yFR = hFR + ROAD_LIFT; const yRL = hRL + ROAD_LIFT; const yRR = hRR + ROAD_LIFT;
       const wbL = Math.hypot(fCx - bCx, fCz - bCz) || sp0.wb;
@@ -990,8 +986,15 @@
       // lift: every wheel bottom (local y = 0) must be on or above its ground point
       const hzW = wbL / 2;
       const need = (hy, wx, wz) => hy - (cX.y * wx + cZ.y * wz);
-      let cy = need(yFL, -hwT, -hzW);
-      cy = Math.max(cy, need(yFR, hwT, -hzW), need(yRL, -hwT, hzW), need(yRR, hwT, hzW));
+      const n0 = need(yFL, -hwT, -hzW); const n1 = need(yFR, hwT, -hzW); const n2 = need(yRL, -hwT, hzW); const n3 = need(yRR, hwT, hzW);
+      const nMax = Math.max(n0, n1, n2, n3);
+      c.hdbg = [yFL, yFR, yRL, yRR];
+      c.twist = Math.abs(n0 - n1 - n2 + n3);                       // (test read-out) how far the four wheel points are from one plane
+      let cy = (n0 + n1 + n2 + n3) / 4 + Math.min(0.02, 0.1 * (nMax - (n0 + n1 + n2 + n3) / 4));      // a rigid body on a twisted surface rests on the mean of the four wheel heights: no wheel floats or sinks by more than a quarter of the twist
+      // residual of every wheel against the plane the body rests on (the suspension offsets, see makeMaterial)
+      const su = c.sus || (c.sus = [0, 0, 0, 0]);
+      su[0] = clamp(yFL - (cy + cX.y * -hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX); su[1] = clamp(yFR - (cy + cX.y * hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX);
+      su[2] = clamp(yRL - (cy + cX.y * -hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX); su[3] = clamp(yRR - (cy + cX.y * hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX);
       cq.setFromRotationMatrix(cm);
       tmpV.set((fCx + bCx) / 2, cy, (fCz + bCz) / 2);
       cm.compose(tmpV, cq, cs1);
@@ -1114,12 +1117,14 @@
         const vt = veh[c.tid];
         vt.mesh.setMatrixAt(vt.n, cm);
         const ba = vt.body.array; ba[vt.n * 3] = c.body[0]; ba[vt.n * 3 + 1] = c.body[1]; ba[vt.n * 3 + 2] = c.body[2];
+        const sa = vt.sus.array; const q4 = vt.n * 4; sa[q4] = c.sus[0]; sa[q4 + 1] = c.sus[1]; sa[q4 + 2] = c.sus[2]; sa[q4 + 3] = c.sus[3];
+        const da = vt.dim.array; da[vt.n * 2] = c.spec.tw / 2; da[vt.n * 2 + 1] = c.spec.wb / 2;
         vt.n++; writeN++;
       }
       for (let k = 0; k < veh.length; k++) {
         const vt = veh[k];
         vt.mesh.count = vt.n; vt.mesh.visible = vt.n > 0;
-        if (vt.n > 0) { vt.mesh.instanceMatrix.needsUpdate = true; vt.body.needsUpdate = true; }
+        if (vt.n > 0) { vt.mesh.instanceMatrix.needsUpdate = true; vt.body.needsUpdate = true; vt.sus.needsUpdate = true; vt.dim.needsUpdate = true; }
       }
     }
 
@@ -1436,14 +1441,14 @@
         fails, guarded: guards, conflicts, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
         oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z, still: onc.still, age: onc.age, forced: onc.forced } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
       }),
-      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 1.5 && c.t < q.t1 + 1.5) })),   // (test hook)
+      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, twist: c.twist, hdbg: c.hdbg, sus: c.sus, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 1.5 && c.t < q.t1 + 1.5) })),   // (test hook)
       /* test hook: the 4 wheel contact points (world) of every shown car: the road surface must be at or just below each one */
       wheelPoints: () => {
         const out = []; const v = new T.Vector3(); const mm = new T.Matrix4();
         cars.forEach((c) => {
           if (!c.shown) return;
           mm.fromArray(c.mat); const sp0 = c.spec; const pts = [];
-          [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach((q) => { v.set(q[0] * sp0.tw / 2, 0, q[1] * sp0.wb / 2).applyMatrix4(mm); pts.push([v.x, v.y, v.z]); });
+          [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach((q, k) => { v.set(q[0] * sp0.tw / 2, 0, q[1] * sp0.wb / 2).applyMatrix4(mm); pts.push([v.x, v.y + (c.sus ? c.sus[k] : 0), v.z]); });   // (the body warp lowers / lifts each wheel by its suspension offset)
           out.push({ type: c.type, bridge: c.rd.bridge === true, pts });
         });
         return out;

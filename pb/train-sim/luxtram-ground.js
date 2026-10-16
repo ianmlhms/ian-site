@@ -535,12 +535,13 @@
       const grp = new T.Group(); grp.name = 'lg-decor-' + t.key;
       const aT = t.coarse ? 0.07 : 0;            // 4 m terrain nodes: lift a little more
       const L_ASPH = ROAD_LIFT + aT; const L_PAINT = ROAD_LIFT + aT + 0.035; const L_PAVE = PAVE_LIFT + aT;
-      const dbg = {}; const mark = (k, a) => { dbg[k] = (S.i.length - a) / 3; return S.i.length; };
+      const dbg = {}; const ranges = []; const mark = (k, a) => { dbg[k] = (S.i.length - a) / 3; ranges.push([k, S.i.length / 3]); return S.i.length; };   // ranges: (test read-out) cumulative triangle count after each layer
       let iMark = S.i.length;
       const iA0 = S.i.length;
       const aCull = { n: 0 };
-      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: window.__lgAsphSeg || 5.0, cullSteep: true, steepK: 0.5, counter: aCull }));   // a carriageway triangle steeper than 60 degrees (a polygon edge that runs up a cliff / wall) is dropped; real cuttings and ramps up to ~45 degrees stay drawn (0.8 removed whole ramps)
-      const roadGrid = rasterRoad(t, S, iA0, S.i.length);
+      (vec.a || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_ASPH, [1, 1, 1], MAT.ASPH, { maxSeg: window.__lgAsphSeg || 2.5, cullSteep: true, steepK: 0.5, counter: aCull }));   // a carriageway triangle steeper than 60 degrees (a polygon edge that runs up a cliff / wall) is dropped; real cuttings and ramps up to ~45 degrees stay drawn (0.8 removed whole ramps)
+      const roadGrid = rasterRoad(t, S, iA0, S.i.length) || { g: new Float32Array(RG * RG).fill(NaN), g2: new Float32Array(RG * RG).fill(NaN) };
+      roadGrid.tri = triGrid(t, S, iA0, S.i.length);          // exact triangle lookup of the drawn carriageway (roadSurface)
       iMark = mark('asph', iMark);
       const iS0 = S.i.length;
       (vec.s || []).forEach((poly) => drapePoly(t, S, ringsToScene(poly, x0, z0), L_PAVE, [1, 1, 1], MAT.PAVE, { maxSeg: 3.5, cullSteep: true }));
@@ -552,6 +553,7 @@
         drapePoly(t, S, rings, PATH_LIFT + aT, col, mat, { maxSeg: 3.2, cullSteep: code !== 3 });
       });
       iMark = mark('paths', iMark);
+      roadGrid.sideTri = triGrid(t, S, iS0, S.i.length);      // sidewalks + paths: the surface a wheel that left the carriageway stands on (roadHeightAt)
       /* kerbs: a 3D stone edge between the carriageway and the sidewalk (the data lists them with the sidewalk on the left of the direction of travel).
          A kerb with bare asphalt (no drawn sidewalk on top) on BOTH sides (0.4 m either way) is not a kerb: the data also holds kerb lines of islands and junction
          mouths that run on across the carriageway, which showed as thin brown / dark lines across the road. Such stretches are cut out (kerbs to grass stay). */
@@ -649,7 +651,10 @@
         });
       });
       iMark = mark('rail', iMark);
-      decorateDecks(t, S);
+      grp.userData.ranges = ranges;
+      const bridgeAudit = decorateDecks(t, S, roadGrid, L_ASPH);
+      grp.userData.bridges = bridgeAudit;
+      roadGrid.plugTri = triGrid(t, S, bridgeAudit.plugRanges);      // approach plugs (see decorateDecks): the road height query follows them
       // parked cars on the painted stalls (vec.pk: x, z in cm from the tile corner, heading in degrees)
       const pk = vec.pk;
       if (pk && pk.length) {
@@ -713,9 +718,9 @@
             const y = l1 * ya + l2 * yb + l3 * yc;
             const o = gz * RG + gx; const g1 = grid[o];
             if (g1 !== g1) { grid[o] = y; continue; }
-            if (Math.abs(y - g1) <= 0.4) { grid[o] = y; continue; }               // the same surface (a later polygon on top of it)
+            if (Math.abs(y - g1) <= 0.4) { grid[o] = Math.max(g1, y); continue; }  // the same surface (overlapping polygons: the higher one is the one that shows)
             const g2 = grid2[o];
-            if (g2 === g2 && Math.abs(y - g2) <= 0.4) { grid2[o] = y; continue; }
+            if (g2 === g2 && Math.abs(y - g2) <= 0.4) { grid2[o] = Math.max(g2, y); continue; }
             if (y < g1) { grid2[o] = g1; grid[o] = y; } else grid2[o] = y;         // another layer
           }
         }
@@ -724,27 +729,89 @@
     }
     /* Y of the drawn carriageway at (x, z) (scene metres) in tile t, or NaN when the tile is not decorated / has no road there.  With several layers the one nearest to refY
        wins (refY = the terrain height there); without refY the lower one. */
-    function roadSurface(t, x, z, refY) {
+    function roadSurface(t, x, z, refY, steepOk) {
       const rg = t && t.decor && t.decor.roadGrid;
       if (!rg) return NaN;
-      const g = rg.g; const g2 = rg.g2;
-      const u = (x - t.x0) / RG_CELL - 0.5; const v = (z - t.z0) / RG_CELL - 0.5;
-      const iu = clamp(Math.floor(u), 0, RG - 2); const iv = clamp(Math.floor(v), 0, RG - 2);
-      const fu = clamp(u - iu, 0, 1); const fv = clamp(v - iv, 0, 1);
-      const useRef = refY === refY && refY !== undefined;
-      let sum = 0; let wsum = 0;
-      for (let dz = 0; dz < 2; dz++) for (let dx = 0; dx < 2; dx++) {
-        const o = (iv + dz) * RG + iu + dx;
-        let h = g[o];
-        if (h !== h) continue;
-        const h2 = g2[o];
-        if (h2 === h2 && useRef && Math.abs(h2 - refY) < Math.abs(h - refY)) h = h2;
-        const w = (dx ? fu : 1 - fu) * (dz ? fv : 1 - fv) + 1e-4;
-        sum += h * w; wsum += w;
-      }
-      return wsum > 0 ? sum / wsum : NaN;
+      if (rg.plugTri) { const pg = triQuery(t, rg.plugTri, x, z, undefined, true); if (pg === pg) return pg; }       // an approach plug of a bridge is the road there
+      if (!rg.tri) return NaN;
+      const r = triQuery(t, rg.tri, x, z, refY, steepOk);
+      if (r !== r) return NaN;
+      // a sidewalk / path drawn over the asphalt (every kerb polygon lies on carriageway asphalt) is the top surface there: not carriageway
+      if (rg.sideTri) { const sd = triQuery(t, rg.sideTri, x, z, r, true); if (sd === sd && sd - r > -0.05 && sd - r < 0.5) return NaN; }
+      return r;
     }
-
+    /* triangle lookup: the triangles of acc.i[i0..i1) with their plane (tile-local x / z), bucketed in 1 m cells; triQuery returns the Y of the drawn surface at (x, z) exactly like the rasteriser of the GPU
+       (overlapping triangles within 0.4 m of each other are one surface: the highest shows; separate layers: the one nearest to refY, else the lowest) */
+    const TG = 128; const TG_CELL = 128 / TG; const STEEP_NY = 0.9;
+    function triGrid(t, acc, i0, i1) {
+      const ranges = Array.isArray(i0) ? i0 : [[i0, i1]];
+      let n = 0; ranges.forEach((r) => { n += Math.floor((r[1] - r[0]) / 3); }); if (n <= 0) return null;
+      const P = acc.p; const I = acc.i;
+      const tri = new Float32Array(n * 10); const cnt = new Uint32Array(TG * TG + 1); let m = 0;
+      const keep = [];
+      const flat = []; ranges.forEach((r) => { for (let q = r[0]; q + 2 < r[1]; q += 3) flat.push(q); });
+      for (let k = 0; k < flat.length; k++) {
+        const a = I[flat[k]] * 3; const b = I[flat[k] + 1] * 3; const c = I[flat[k] + 2] * 3;
+        const ax = P[a] - t.x0; const az = P[a + 2] - t.z0; const bx = P[b] - t.x0; const bz = P[b + 2] - t.z0; const cx = P[c] - t.x0; const cz = P[c + 2] - t.z0;
+        const det = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+        if (Math.abs(det) < 1e-9) continue;
+        const ya = P[a + 1]; const yb = P[b + 1]; const yc = P[c + 1];
+        const e1x = bx - ax; const e1z = bz - az; const e1y = yb - ya; const e2x = cx - ax; const e2z = cz - az; const e2y = yc - ya;
+        const gnx = e1y * e2z - e1z * e2y; const gny = e1z * e2x - e1x * e2z; const gnz = e1x * e2y - e1y * e2x;
+        const flat = Math.abs(gny) / (Math.hypot(gnx, gny, gnz) || 1);        // normal.y: a triangle on a steep bank (the drawn road climbing the slope beside it) is no carriageway for a car (steepOk only for heights)
+        // plane y = pA * x + pB * z + pC through the three corners
+        const l1x = (bz - cz) / det; const l1z = (cx - bx) / det; const l1c = -(l1x * cx + l1z * cz);
+        const l2x = (cz - az) / det; const l2z = (ax - cx) / det; const l2c = -(l2x * cx + l2z * cz);
+        const pA = l1x * ya + l2x * yb + (-l1x - l2x) * yc; const pB = l1z * ya + l2z * yb + (-l1z - l2z) * yc;
+        const pC = l1c * ya + l2c * yb + (1 - l1c - l2c) * yc;
+        tri.set([ax, az, bx, bz, cx, cz, pA, pB, pC, flat], m * 10);
+        const g0x = Math.max(0, Math.floor(Math.min(ax, bx, cx) / TG_CELL)); const g1x = Math.min(TG - 1, Math.floor(Math.max(ax, bx, cx) / TG_CELL));
+        const g0z = Math.max(0, Math.floor(Math.min(az, bz, cz) / TG_CELL)); const g1z = Math.min(TG - 1, Math.floor(Math.max(az, bz, cz) / TG_CELL));
+        keep.push(g0x, g1x, g0z, g1z);
+        for (let gz = g0z; gz <= g1z; gz++) for (let gx = g0x; gx <= g1x; gx++) cnt[gz * TG + gx + 1]++;
+        m++;
+      }
+      for (let i = 0; i < TG * TG; i++) cnt[i + 1] += cnt[i];
+      const items = new Uint32Array(cnt[TG * TG]); const fill = cnt.slice(0, TG * TG);
+      for (let k = 0; k < m; k++) {
+        const g0x = keep[k * 4]; const g1x = keep[k * 4 + 1]; const g0z = keep[k * 4 + 2]; const g1z = keep[k * 4 + 3];
+        for (let gz = g0z; gz <= g1z; gz++) for (let gx = g0x; gx <= g1x; gx++) items[fill[gz * TG + gx]++] = k;
+      }
+      return { tri: tri.slice(0, m * 10), cnt, items };
+    }
+    const triYs = [];
+    function triQuery(t, tg, x, z, refY, steepOk) {
+      const lx = x - t.x0; const lz = z - t.z0;
+      const gx = clamp(Math.floor(lx / TG_CELL), 0, TG - 1); const gz = clamp(Math.floor(lz / TG_CELL), 0, TG - 1);
+      const T9 = tg.tri; triYs.length = 0;
+      for (let q = tg.cnt[gz * TG + gx]; q < tg.cnt[gz * TG + gx + 1]; q++) {
+        const o = tg.items[q] * 10;
+        if (!steepOk && T9[o + 9] < STEEP_NY) continue;
+        const ax = T9[o]; const az = T9[o + 1]; const bx = T9[o + 2]; const bz = T9[o + 3]; const cx = T9[o + 4]; const cz = T9[o + 5];
+        const det = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+        const l1 = ((bz - cz) * (lx - cx) + (cx - bx) * (lz - cz)) / det; const l2 = ((cz - az) * (lx - cx) + (ax - cx) * (lz - cz)) / det; const l3 = 1 - l1 - l2;
+        if (l1 < -0.001 || l2 < -0.001 || l3 < -0.001) continue;
+        triYs.push(T9[o + 6] * lx + T9[o + 7] * lz + T9[o + 8]);
+      }
+      if (!triYs.length) return NaN;
+      triYs.sort((p, q) => p - q);
+      // group into surfaces (gap > 0.4 = another layer)
+      const useRef = refY === refY && refY !== undefined;
+      let best = NaN; let bestScore = Infinity; let i = 0;
+      while (i < triYs.length) {
+        let j = i; while (j + 1 < triYs.length && triYs[j + 1] - triYs[j] <= 0.4) j++;
+        const top = triYs[j]; const score = useRef ? Math.min(Math.abs(top - refY), Math.abs(triYs[i] - refY)) : triYs[i];
+        if (score < bestScore) { bestScore = score; best = top; }
+        i = j + 1;
+      }
+      return best;
+    }
+    /* Y of the drawn sidewalk / path surface at (x, z) or NaN (same layer rule as roadSurface) */
+    function sideSurface(t, x, z, refY) {
+      const rg = t && t.decor && t.decor.roadGrid;
+      if (!rg || !rg.sideTri) return NaN;
+      return triQuery(t, rg.sideTri, x, z, refY, true);
+    }
     /* coverage of the sidewalk / path triangles (acc.i from i0 to i1) as a 0.5 m cell mask of the tile; coverAt / roadAt read a mask / the road height grid at scene metres */
     function coverRaster(t, acc, i0, i1) {
       const m = new Uint8Array(RG * RG);
@@ -847,111 +914,385 @@
       return mesh;
     }
 
-    /* ---- bridge decks: ribbon at the measured deck height, sidewalks, fascia, underside, parapets, piers; registered for the road height query */
+    /* ---- bridge decks: the OSM road / path bridges meshed at the measured deck height (data x of the tile), registered for the road height query.
+       A deck is a painted concrete box girder: a slab with an edge beam (kerb cap) that overhangs inclined webs, a wearing surface with the same lane markings as the roads
+       that run onto it (dashes, edge lines, double centre line), sidewalk or hard shoulder, a steel railing / W-beam crash barrier on the edge, hammerhead piers (round columns on a
+       footing + a cross-head) that reach the ground, and abutments (end wall to the ground) where the deck ends above the ground.
+       Everything is built from frames along the OSM centre line (3 m apart): a half section is a polyline in (lateral, height) that is swept along the frames. */
     const decks = new Map();       // tile key -> [{ pts: [{x, y, z}], hw }]
-    const CONC = [0.72, 0.71, 0.68]; const CONC_D = [0.5, 0.49, 0.47]; const CONC_L = [0.82, 0.81, 0.78];
-    function decorateDecks(t, S) {
+    const CONC = [0.76, 0.75, 0.72]; const CONC_D = [0.47, 0.46, 0.44]; const CONC_L = [0.86, 0.85, 0.82]; const CONC_M = [0.6, 0.59, 0.57];
+    const STEEL = [0.66, 0.69, 0.72]; const STEEL_D = [0.36, 0.39, 0.42];
+    const DECK_ASPH = [0.94, 0.94, 0.95];
+    const EDGE_FACE = 0.55;        // edge beam face below the carriageway top
+    const PIER_SPAN = 30;          // target span between pier lines
+    const PIER_EMBED = 0.45;       // columns / footings stand this far into the ground
+    const ABUT_EMBED = 0.5;
+    /* a quad whose winding follows the given outward normal (the surface material is double sided: a face that is wound against its normal is lit dark) */
+    function quadN(S, a, b, c, d, nx, ny, nz, mat, col) {
+      const i0 = S.vert(a[0], a[1], a[2], nx, ny, nz, mat, col[0], col[1], col[2]); const i1 = S.vert(b[0], b[1], b[2], nx, ny, nz, mat, col[0], col[1], col[2]);
+      const i2 = S.vert(c[0], c[1], c[2], nx, ny, nz, mat, col[0], col[1], col[2]); const i3 = S.vert(d[0], d[1], d[2], nx, ny, nz, mat, col[0], col[1], col[2]);
+      const ux = b[0] - a[0]; const uy = b[1] - a[1]; const uz = b[2] - a[2]; const vx = c[0] - a[0]; const vy = c[1] - a[1]; const vz = c[2] - a[2];
+      const gx = uy * vz - uz * vy; const gy = uz * vx - ux * vz; const gz = ux * vy - uy * vx;
+      if (gx * nx + gy * ny + gz * nz >= 0) S.i.push(i0, i1, i2, i0, i2, i3); else S.i.push(i0, i2, i1, i0, i3, i2);
+    }
+    /* box with a top cap (footings, posts, cross-heads); yaw turns it about its centre column */
+    function box3(S, cx, y0, cz, sx, sy, sz, yaw, col, o) {
+      const c = Math.cos(yaw); const s = Math.sin(yaw); const hx = sx / 2; const hz = sz / 2;
+      const P = (ix, iz, y) => [cx + ix * hx * c - iz * hz * s, y, cz + ix * hx * s + iz * hz * c];
+      const y1 = y0 + sy;
+      [[[-1, -1], [1, -1], [0, -1]], [[1, -1], [1, 1], [1, 0]], [[1, 1], [-1, 1], [0, 1]], [[-1, 1], [-1, -1], [-1, 0]]].forEach((f) => {
+        const nx = f[2][0] * c - f[2][1] * s; const nz = f[2][0] * s + f[2][1] * c;
+        const k = o && o.shade ? o.shade * (0.9 + 0.1 * Math.abs(nx)) : 1;
+        quadN(S, P(f[0][0], f[0][1], y0), P(f[1][0], f[1][1], y0), P(f[1][0], f[1][1], y1), P(f[0][0], f[0][1], y1), nx, 0, nz, MAT.FLAT, [col[0] * k, col[1] * k, col[2] * k]);
+      });
+      quadN(S, P(-1, -1, y1), P(1, -1, y1), P(1, 1, y1), P(-1, 1, y1), 0, 1, 0, MAT.FLAT, [col[0] * 1.04, col[1] * 1.04, col[2] * 1.04]);
+      if (o && o.bottom) quadN(S, P(-1, -1, y0), P(-1, 1, y0), P(1, 1, y0), P(1, -1, y0), 0, -1, 0, MAT.FLAT, [col[0] * 0.7, col[1] * 0.7, col[2] * 0.7]);
+    }
+    /* round column (n-sided prism), flat shaded per face */
+    function prism(S, cx, y0, cz, r, h, n, col) {
+      for (let k = 0; k < n; k++) {
+        const a0 = (k / n) * Math.PI * 2; const a1 = ((k + 1) / n) * Math.PI * 2; const am = (a0 + a1) / 2;
+        const shade = 0.88 + 0.12 * Math.cos(am - 0.6);
+        quadN(S, [cx + Math.cos(a0) * r, y0, cz + Math.sin(a0) * r], [cx + Math.cos(a1) * r, y0, cz + Math.sin(a1) * r], [cx + Math.cos(a1) * r, y0 + h, cz + Math.sin(a1) * r], [cx + Math.cos(a0) * r, y0 + h, cz + Math.sin(a0) * r],
+          Math.cos(am), 0, Math.sin(am), MAT.FLAT, [col[0] * shade, col[1] * shade, col[2] * shade]);
+      }
+    }
+    /* the half section (right side, lateral >= 0) of a deck as a polyline in (lateral, height rel. to the frame's y) that is walked clockwise (solid on its right):
+       [lat, y, mat, colour] with the material / colour of the segment that ENDS at that point.  The left half is the mirror image. */
+    function halfSection(L) {
+      const p = [];
+      const add = (lat, y, mat, col) => p.push([lat, y, mat, col]);
+      const tm = L.foot ? L.walkSurf : MAT.ASPH; const tc = L.foot ? [1, 1, 1] : DECK_ASPH;
+      add(0, 0.02, tm, tc);
+      add(L.hw, 0.02, tm, tc);                                                       // carriageway (a footbridge: the path)
+      let lat = L.hw;
+      if (L.shoulder > 0) { lat += L.shoulder; add(lat, 0.02, tm, tc); }  // hard shoulder (motorway)
+      if (L.walk > 0) {
+        add(lat, 0.02 + KERB_H, MAT.FLAT, CONC_L);                                   // kerb face
+        lat += L.walk; add(lat, 0.02 + KERB_H, MAT.PAVE, [0.95, 0.94, 0.9]);          // sidewalk
+      }
+      // the edge beam (kerb cap): a low upstand on the outermost 0.5 m
+      const capW = L.capW; const capH = L.capH;
+      add(lat, capH, MAT.FLAT, CONC_L);                                              // inner face of the cap (up)
+      lat += capW; add(lat, capH, MAT.FLAT, CONC_L);                                 // top of the cap
+      L.E = lat;                                                                     // outer edge of the deck
+      add(lat, -EDGE_FACE, MAT.FLAT, CONC);                                          // fascia (edge beam face)
+      const ov = Math.min(1.1, L.E * 0.28); const w2 = Math.min(2.4, L.E * 0.62);
+      add(lat - ov, -EDGE_FACE, MAT.FLAT, CONC_D);                                   // soffit of the overhang
+      add(lat - w2, -L.depth, MAT.FLAT, CONC_M);                                     // inclined web
+      add(0, -L.depth, MAT.FLAT, CONC_D);                                            // bottom slab
+      return p;
+    }
+    /* deck layout of one piece (data x entry) */
+    function deckLayout(dk) {
+      const hw = dk.h / 100; const cls = dk.c;
+      const foot = cls >= 6;
+      const mway = cls === 0 || (cls === 1 && dk.o === 1 && hw >= 3.0);
+      const L = { hw, foot, mway, shoulder: 0, walk: 0, capW: 0.45, capH: 0.3, depth: 1.3, rail: 'rail' };
+      if (foot) { L.capW = 0.18; L.capH = 0.08; L.depth = 0.5; L.rail = 'foot'; }
+      else if (mway) { L.shoulder = 0.9; L.capW = 0.6; L.capH = 0.22; L.depth = 1.4; L.rail = 'crash'; }
+      else { L.walk = cls <= 3 ? 1.7 : 1.3; L.depth = hw > 4 ? 1.3 : 1.05; L.capW = 0.4; L.rail = 'rail'; }
+      L.walkSurf = foot ? (dk.s === 2 ? MAT.SETT : dk.s === 1 ? MAT.GRAVEL : MAT.PAVE) : MAT.ASPH;
+      return L;
+    }
+    /* painted lines of the roads that run onto the deck: the same layout as scripts/build_luxtram_ground.py make_markings (kind 1 / 2 = dashes 2/4 m, 1.5/3.5 m, 3 = double centre line, 4 = edge lines) */
+    function deckMarkings(dk, hw) {
+      if (dk.c > 4 || hw * 2 < 4.3) return [];
+      const w = hw * 2; const specs = [];
+      if (dk.o === 1) {
+        const n = dk.n ? dk.n : Math.max(1, Math.round(w / 3.1));
+        for (let k = 1; k < n; k++) specs.push([2, -hw + (k * w) / n]);
+      } else {
+        let n = dk.n >= 2 ? dk.n : (w >= 5.0 ? 2 : 1);
+        if (w >= 11.0 && n < 4) n = 4;
+        if (n % 2) n += 1;
+        if (n >= 2) for (let k = 1; k < n; k++) { const off = -hw + (k * w) / n; specs.push([Math.abs(off) > 0.1 ? 1 : (n >= 4 ? 3 : 1), off]); }
+      }
+      if (dk.c <= 3 && w >= 6.0) { specs.push([4, hw - 0.28]); specs.push([4, -hw + 0.28]); }
+      return specs;
+    }
+
+    function decorateDecks(t, S, roadGrid, lAsph) {
       const list = (t.ground.vec.x || []);
-      if (!list.length) { decks.delete(t.key); return; }
+      const audit = [];
+      if (!list.length) { decks.delete(t.key); return audit; }
       const reg = [];
+      const surfAny = (x, z) => { const u = ctx.tileOf ? ctx.tileOf(x, z) : null; return surfY(u && u.mesh ? u : t, x, z); };
+      const jointEnds = new Set();
+      /* the level (frame y) of another deck piece that passes within 2.5 m of (x, z) at about height y (<= 3 m apart), NaN when none: this tile's raw decks and the decks of the other tiles built so far */
+      const otherDeckLevel = (self, x, z, y) => {
+        let best = NaN; let bd = 2.5; let bestRaw = false; let raw = false;
+        const probe = (ax, az, ay, bx, bz, by) => {
+          const dx = bx - ax; const dz = bz - az; const l2 = dx * dx + dz * dz || 1;
+          const u = clamp(((x - ax) * dx + (z - az) * dz) / l2, 0, 1); const d = Math.hypot(x - (ax + dx * u), z - (az + dz * u));
+          const yy = ay + (by - ay) * u;
+          if (d < bd && Math.abs(yy - y) < 3) { bd = d; best = yy; bestRaw = raw; }
+        };
+        raw = true;
+        list.forEach((o) => {
+          if (o === self) return;
+          const m = o.p.length / 2;
+          for (let i = 0; i + 1 < m; i++) probe(t.x0 + o.p[i * 2] / 100, t.z0 + o.p[i * 2 + 1] / 100, o.y[i] / 100 - ctx.oy, t.x0 + o.p[i * 2 + 2] / 100, t.z0 + o.p[i * 2 + 3] / 100, o.y[i + 1] / 100 - ctx.oy);
+        });
+        raw = false;
+        decks.forEach((l, key) => { if (key === t.key) return; l.forEach((o) => { for (let i = 0; i + 1 < o.pts.length; i++) probe(o.pts[i].x, o.pts[i].z, o.pts[i].y - 0.02, o.pts[i + 1].x, o.pts[i + 1].z, o.pts[i + 1].y - 0.02); }); });
+        return best === best ? { y: bestRaw ? (best + y) / 2 : best, raw: bestRaw } : null;      // a deck of this tile (not built yet) meets half way, one that is built already is met exactly
+      };
+      const plugRanges = [];          // [first, last) index of the plug top triangles in S.i (the road height query follows them)
       list.forEach((dk) => {
         const n = dk.p.length / 2;
-        const pts = []; for (let i = 0; i < n; i++) pts.push({ x: t.x0 + dk.p[i * 2] / 100, z: t.z0 + dk.p[i * 2 + 1] / 100, y: dk.y[i] / 100 - ctx.oy, g: dk.g[i] / 100 - ctx.oy });
         const lo = dk.pre; const hi = n - 1 - dk.post;
         if (hi <= lo) return;
-        const hw = dk.h / 100; const foot = dk.c >= 6;            // footways / cycle paths on a bridge
-        const walkW = foot ? 0 : (dk.c <= 3 ? 1.7 : 1.3);
-        const tot = hw + walkW;
-        const fr = pts.map((p, i) => {
-          const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(n - 1, i + 1)];
+        const pts = []; for (let i = 0; i < n; i++) pts.push({ x: t.x0 + dk.p[i * 2] / 100, z: t.z0 + dk.p[i * 2 + 1] / 100, y: dk.y[i] / 100 - ctx.oy, g: dk.g[i] / 100 - ctx.oy });
+        const L = deckLayout(dk);
+        /* a deck end that stands a little above / below the road that runs on from it (the LiDAR deck level vs the draped road): the last ~14 m of the deck are bent to meet the road exactly (no step at the joint) */
+        [[lo, -1, dk.pre === 0], [hi, 1, dk.post === 0]].forEach(([k, sg, real]) => {
+          if (!real) return;
+          const p0 = pts[k]; const q0 = pts[k - sg];
+          let ox = p0.x - q0.x; let oz = p0.z - q0.z; const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
+          // the next OSM bridge way of the same viaduct starts here (two decks meet end to end): the end takes the level of the deck it meets (it is not an abutment)
+          const other = otherDeckLevel(dk, p0.x + ox * 1.0, p0.z + oz * 1.0, p0.y);
+          if (other) {
+            jointEnds.add(dk); p0.joint = true;
+            const delta = other.y - p0.y;
+            let run = 0;
+            for (let i = k; i >= 0 && i < n; i -= sg) {
+              if (i !== k) run += Math.hypot(pts[i].x - pts[i + sg].x, pts[i].z - pts[i + sg].z);
+              const u = 1 - run / 14; if (u <= 0) break;
+              pts[i].y += delta * u * u * (3 - 2 * u);
+            }
+            return;
+          }
+          const gs = [1.5, 3, 4.5].map((d) => surfAny(p0.x + ox * d, p0.z + oz * d)); if (gs.some((v) => v !== v)) return;
+          const g = (gs[0] + gs[1] + gs[2]) / 3;           // the road level just beyond the end (a mean: the draped road is lumpy by a few dm)
+          const delta = (g + lAsph) - (p0.y + 0.02);
+          if (delta < -0.5 || delta > (L.foot ? 1.0 : 2.0)) return;                 // (a deck far above the ground beyond its end gets an approach plug instead)
+          let run = 0;
+          for (let i = k; i >= 0 && i < n; i -= sg) {
+            if (i !== k) run += Math.hypot(pts[i].x - pts[i + sg].x, pts[i].z - pts[i + sg].z);
+            const u = 1 - run / 14; if (u <= 0) break;
+            pts[i].y += delta * u * u * (3 - 2 * u);
+          }
+        });
+        const mkFrames = (arr) => arr.map((p, i) => {
+          const a = arr[Math.max(0, i - 1)]; const b = arr[Math.min(arr.length - 1, i + 1)];
           let dx = b.x - a.x; let dz = b.z - a.z; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
           return { x: p.x, z: p.z, y: p.y, g: p.g, nx: -dz, nz: dx, dx, dz };
         });
-        reg.push({ pts: fr.slice(lo, hi + 1).map((f) => ({ x: f.x, y: f.y + 0.02, z: f.z })), hw: tot });
-        const thick = foot ? 0.35 : 1.0;
-        const surfMat = foot ? (dk.s === 2 ? MAT.SETT : dk.s === 1 ? MAT.GRAVEL : MAT.PAVE) : MAT.ASPH;
-        const strip = (latA, latB, yOff, col, mat) => {
-          const b0 = S.count;
-          for (let i = lo; i <= hi; i++) {
-            const f = fr[i];
-            S.vert(f.x + f.nx * latA, f.y + yOff, f.z + f.nz * latA, 0, 1, 0, mat, col[0], col[1], col[2]);
-            S.vert(f.x + f.nx * latB, f.y + yOff, f.z + f.nz * latB, 0, 1, 0, mat, col[0], col[1], col[2]);
+        const mkSet = (frames, a, b) => { const cum = [0]; for (let i = 1; i < frames.length; i++) cum.push(cum[i - 1] + Math.hypot(frames[i].x - frames[i - 1].x, frames[i].z - frames[i - 1].z)); return { fr: frames, lo: a, hi: b, cum, total: cum[b] - cum[a] }; };
+        const F = mkSet(mkFrames(pts), lo, hi);
+        const fr = F.fr;
+        const prof = halfSection(L);
+        const E = L.E; const hw = L.hw;
+        reg.push({ pts: fr.slice(lo, hi + 1).map((f) => ({ x: f.x, y: f.y + 0.02, z: f.z })), hw: Math.min(E, hw + L.shoulder + L.walk) });
+        const at = (f, lat, y) => [f.x + f.nx * lat, f.y + y, f.z + f.nz * lat];
+        const yawOf = (f) => Math.atan2(f.dz, f.dx);
+        /* sweep a (lateral, height) polyline along the frames of a set; sd = +1 right half, -1 mirrored left half.  The profile is walked clockwise (solid on its right) for sd = +1. */
+        const sweep = (G, poly, sd) => {
+          for (let k = 0; k < poly.length - 1; k++) {
+            const a = poly[k]; const b = poly[k + 1];
+            const dl = b[0] - a[0]; const dy = b[1] - a[1]; const sl = Math.hypot(dl, dy); if (sl < 1e-4) continue;
+            const nl = (-dy / sl) * sd; const ny = dl / sl;                   // left perpendicular in (lateral, y): outward for a clockwise walk
+            for (let i = G.lo; i < G.hi; i++) {
+              const f0 = G.fr[i]; const f1 = G.fr[i + 1];
+              quadN(S, at(f0, a[0] * sd, a[1]), at(f1, a[0] * sd, a[1]), at(f1, b[0] * sd, b[1]), at(f0, b[0] * sd, b[1]), f0.nx * nl, ny, f0.nz * nl, b[2], b[3]);
+            }
           }
-          for (let i = 0; i < hi - lo; i++) { const a = b0 + i * 2; S.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
         };
-        const wall = (lat, y0, y1, col, nSign) => {
-          const b0 = S.count;
-          for (let i = lo; i <= hi; i++) {
-            const f = fr[i];
-            S.vert(f.x + f.nx * lat, f.y + y0, f.z + f.nz * lat, f.nx * nSign, 0, f.nz * nSign, MAT.FLAT, col[0], col[1], col[2]);
-            S.vert(f.x + f.nx * lat, f.y + y1, f.z + f.nz * lat, f.nx * nSign, 0, f.nz * nSign, MAT.FLAT, col[0], col[1], col[2]);
+        const posOn = (G, sArc) => {
+          const sa = G.cum[G.lo] + sArc; let i = G.lo; while (i < G.hi - 1 && G.cum[i + 1] < sa) i++;
+          const f0 = G.fr[i]; const f1 = G.fr[i + 1]; const u = clamp((sa - G.cum[i]) / ((G.cum[i + 1] - G.cum[i]) || 1), 0, 1);
+          return { x: lerp(f0.x, f1.x, u), z: lerp(f0.z, f1.z, u), y: lerp(f0.y, f1.y, u), nx: lerp(f0.nx, f1.nx, u), nz: lerp(f0.nz, f1.nz, u), dx: f0.dx, dz: f0.dz };
+        };
+        const WH = [0.95, 0.95, 0.92];
+        const ribbonAlong = (G, a0, a1, lat, hwid, col) => {      // a ribbon between arc lengths a0..a1 (relative to frame lo)
+          const len = a1 - a0; const nseg = Math.max(1, Math.ceil(len / 3));
+          let prev = null;
+          for (let q = 0; q <= nseg; q++) {
+            const p = posOn(G, a0 + (len * q) / nseg);
+            const l0 = [p.x + p.nx * (lat - hwid), p.y + 0.055, p.z + p.nz * (lat - hwid)]; const l1 = [p.x + p.nx * (lat + hwid), p.y + 0.055, p.z + p.nz * (lat + hwid)];
+            if (prev) quadN(S, prev[0], prev[1], l1, l0, 0, 1, 0, MAT.FLAT, col);
+            prev = [l0, l1];
           }
-          for (let i = 0; i < hi - lo; i++) { const a = b0 + i * 2; S.i.push(a, a + 2, a + 3, a, a + 3, a + 1); }
         };
-        strip(-hw, hw, 0.02, foot ? [1, 1, 1] : [1, 1, 1], surfMat);
-        if (walkW > 0) {
-          strip(hw, tot, 0.02 + KERB_H, [0.95, 0.94, 0.9], MAT.PAVE);
-          strip(-tot, -hw, 0.02 + KERB_H, [0.95, 0.94, 0.9], MAT.PAVE);
-          wall(hw, 0.02, 0.02 + KERB_H, CONC_L, -1);
-          wall(-hw, 0.02, 0.02 + KERB_H, CONC_L, 1);
-        }
-        const edge = tot + 0.12;
-        const top = 1.05 + (walkW > 0 ? KERB_H : 0);
-        wall(edge, -thick, top, CONC, 1);
-        wall(-edge, -thick, top, CONC, -1);
-        strip(edge - 0.18, edge + 0.12, top, CONC_L, MAT.FLAT);
-        strip(-edge - 0.12, -edge + 0.18, top, CONC_L, MAT.FLAT);
-        // underside (visible from below)
-        const bu = S.count;
-        for (let i = lo; i <= hi; i++) { const f = fr[i]; S.vert(f.x - f.nx * edge, f.y - thick, f.z - f.nz * edge, 0, -1, 0, MAT.FLAT, CONC_D[0], CONC_D[1], CONC_D[2]); S.vert(f.x + f.nx * edge, f.y - thick, f.z + f.nz * edge, 0, -1, 0, MAT.FLAT, CONC_D[0], CONC_D[1], CONC_D[2]); }
-        for (let i = 0; i < hi - lo; i++) { const a = bu + i * 2; S.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
-        // piers every ~22 m under high decks
-        let acc = 0;
-        for (let i = lo + 1; i < hi; i++) {
-          acc += Math.hypot(fr[i].x - fr[i - 1].x, fr[i].z - fr[i - 1].z);
-          if (acc < 22) continue;
-          acc = 0;
-          const f = fr[i]; const h = f.y - thick - f.g;
-          if (h < 3.2) continue;
-          [-1, 1].forEach((sd) => boxTo(S, f.x + f.nx * (hw * 0.55) * sd, f.g - 0.3, f.z + f.nz * (hw * 0.55) * sd, 1.3, h + 0.3, 1.3, Math.atan2(f.dz, f.dx), CONC));
-          // pier cap: a cross-head under the slab that ties the two columns together
-          boxTo(S, f.x, f.y - thick - 0.5, f.z, hw * 1.1 + 2.1, 1.0, 1.9, Math.atan2(f.dz, f.dx) + Math.PI / 2, CONC);
-        }
-        // closed slab ends (a flat end face; the deck does not show its hollow inside where it runs into the embankment)
+        const markSet = (G) => {
+          if (L.foot) return;
+          deckMarkings(dk, hw).forEach(([kind, off]) => {
+            if (kind === 3) { ribbonAlong(G, 0, G.total, off - 0.12, 0.06, WH); ribbonAlong(G, 0, G.total, off + 0.12, 0.06, WH); return; }
+            if (kind === 4) { ribbonAlong(G, 0, G.total, off, 0.075, WH); return; }
+            const on = kind === 1 ? 2.0 : 1.5; const offL = kind === 1 ? 4.0 : 3.5;
+            for (let s = 1.0; s < G.total; s += on + offL) { const e = Math.min(G.total, s + on); if (e - s > 0.3) ribbonAlong(G, s, e, off, 0.06, WH); }
+          });
+        };
+        const railSet = (G) => {
+          const railBar = (lat, y0, y1, thick, col) => { [1, -1].forEach((sd) => sweep(G, [[lat - thick / 2, y0, 0, 0], [lat - thick / 2, y1, MAT.FLAT, col], [lat + thick / 2, y1, MAT.FLAT, col], [lat + thick / 2, y0, MAT.FLAT, col], [lat - thick / 2, y0, MAT.FLAT, col]], sd)); };
+          const postsEvery = (gap, lat, y0, h, sz, col) => {
+            for (let s = gap * 0.5; s < G.total - 0.2; s += gap) {
+              const p = posOn(G, s); const yaw = Math.atan2(p.dz, p.dx);
+              [1, -1].forEach((sd) => box3(S, p.x + p.nx * lat * sd, p.y + y0, p.z + p.nz * lat * sd, sz, h, sz, yaw, col));
+            }
+          };
+          if (L.rail === 'crash') {
+            // concrete kerb cap + W-beam crash barrier (rail on posts) + a light handrail on the outer edge
+            const lc = E - 0.3;
+            railBar(lc, L.capH + 0.34, L.capH + 0.7, 0.05, STEEL);
+            postsEvery(2.0, lc, L.capH, 0.7, 0.1, STEEL_D);
+            railBar(E - 0.07, L.capH + 1.0, L.capH + 1.07, 0.06, STEEL_D);
+            postsEvery(3.0, E - 0.07, L.capH, 1.07, 0.07, STEEL_D);
+          } else if (L.rail === 'rail') {
+            const lc = E - 0.1;
+            railBar(lc, L.capH + 1.0, L.capH + 1.07, 0.06, STEEL_D);
+            railBar(lc, L.capH + 0.55, L.capH + 0.6, 0.04, STEEL_D);
+            postsEvery(2.5, lc, L.capH, 1.07, 0.07, STEEL_D);
+          } else {
+            const lc = E - 0.06;
+            railBar(lc, 0.08 + 1.0, 0.08 + 1.06, 0.05, STEEL_D);
+            railBar(lc, 0.08 + 0.5, 0.08 + 0.55, 0.035, STEEL_D);
+            postsEvery(2.0, lc, 0.08, 1.06, 0.05, STEEL_D);
+          }
+        };
+
+        /* ---- the girder */
+        [1, -1].forEach((sd) => sweep(F, prof, sd));
+        // deck ends: the cross section as a flat face (so the box girder shows no void where it runs into the embankment / the abutment)
+        const polyFull = []; prof.forEach((q) => polyFull.push([q[0], q[1]])); for (let k = prof.length - 2; k >= 1; k--) polyFull.push([-prof[k][0], prof[k][1]]);
+        let capTris = null;
+        try { capTris = T.ShapeUtils.triangulateShape(polyFull.map((q) => new V2(q[0], q[1])), []); } catch (e) { capTris = null; }
         [[lo, -1], [hi, 1]].forEach(([k, sg]) => {
-          const f = fr[k]; const b0 = S.count; const y0 = f.y - thick; const y1 = f.y + top;
-          S.vert(f.x - f.nx * edge, y0, f.z - f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
-          S.vert(f.x + f.nx * edge, y0, f.z + f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
-          S.vert(f.x + f.nx * edge, y1, f.z + f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
-          S.vert(f.x - f.nx * edge, y1, f.z - f.nz * edge, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC[0], CONC[1], CONC[2]);
-          if (sg < 0) S.i.push(b0, b0 + 2, b0 + 1, b0, b0 + 3, b0 + 2); else S.i.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3);
+          if (!capTris) return;
+          const f = fr[k];
+          capTris.forEach((tr) => {
+            const A = at(f, polyFull[tr[0]][0], polyFull[tr[0]][1]); const B = at(f, polyFull[tr[1]][0], polyFull[tr[1]][1]); const C = at(f, polyFull[tr[2]][0], polyFull[tr[2]][1]);
+            quadN(S, A, B, C, C, f.dx * sg, 0, f.dz * sg, MAT.FLAT, CONC);
+          });
         });
+        markSet(F);
+        railSet(F);
+
+        /* ---- piers: hammerhead piers on an even span, round columns on footings + a cross-head under the girder, only where the ground really is below (and not in a road / the tram corridor) */
+        const piers = []; const abuts = []; const ends = []; const plugs = [];
+        const total = F.total;
+        const nSpan = Math.max(1, Math.round(total / PIER_SPAN));
+        const wide = E > 3.0;
+        const colLats = wide ? [-E * 0.42, E * 0.42] : [0];
+        const colR = wide ? 0.55 : 0.34;
+        const colProbe = [[0, 0], [colR, 0], [-colR, 0], [0, colR], [0, -colR]];
+        for (let k = 1; k < nSpan; k++) {
+          let placed = null;
+          for (const sh of [0, 2, -2, 4, -4, 6, -6]) {
+            const f = posOn(F, clamp((total * k) / nSpan + sh, 1, total - 1));
+            let ok = true;
+            for (const lat of colLats) {
+              const cx = f.x + f.nx * lat; const cz = f.z + f.nz * lat;
+              for (const [ox, oz] of colProbe) { if (surfAny(cx + ox, cz + oz) !== surfAny(cx + ox, cz + oz)) { ok = false; break; } }
+              if (!ok) break;
+              if (roadAt(t, roadGrid, cx, cz) || (ctx.slotClear && ctx.slotClear(cx, cz) < 2.0)) { ok = false; break; }
+            }
+            if (ok) { placed = f; break; }
+          }
+          if (!placed) continue;
+          const f = placed;
+          const soffit = f.y - L.depth; const capH = 0.9; const colTop = soffit - capH + 0.02;
+          let built = false;
+          colLats.forEach((lat) => {
+            const cx = f.x + f.nx * lat; const cz = f.z + f.nz * lat;
+            const gHere = Math.min(...colProbe.map(([ox, oz]) => surfAny(cx + ox, cz + oz)));
+            const b = gHere - PIER_EMBED;
+            if (colTop - b < 0.6) return;
+            built = true;
+            prism(S, cx, b, cz, colR, colTop - b, 10, CONC);
+            box3(S, cx, b, cz, colR * 2 + 0.6, PIER_EMBED + 0.35, colR * 2 + 0.6, yawOf(f), CONC_M, { shade: 1 });          // footing
+            piers.push({ x: cx, z: cz, yBottom: b, yTop: colTop, r: colR });
+          });
+          if (!built) continue;
+          // cross-head under the girder (0.9 m deep)
+          box3(S, f.x, soffit - capH, f.z, 1.6, capH, wide ? E * 2 * 0.8 : 1.8, yawOf(f), CONC_M, { shade: 1, bottom: true });
+        }
+
+        /* ---- abutments and approach plugs: where the deck really ends (not at a tile border) the girder rests on an end wall that goes down into the ground; where the ground just beyond the end is lower than the
+           deck (the LiDAR ground under the structure is interpolated, the fill of the embankment is missing) a solid approach plug (asphalt on retaining walls) closes the gap down to the road */
+        [[lo, -1, dk.pre === 0], [hi, 1, dk.post === 0]].forEach(([k, sg, real]) => {
+          if (!real) return;
+          const f = fr[k];
+          if (pts[k].joint) { ends.push({ x: f.x, z: f.z, yDeck: f.y + 0.02, dx: f.dx * sg, dz: f.dz * sg, hw: E, joint: true }); return; }
+          const yEnd = f.y + 0.02;
+          ends.push({ x: f.x, z: f.z, yDeck: yEnd, dx: f.dx * sg, dz: f.dz * sg, hw: E });
+          const lats = [-E * 0.8, -E * 0.4, 0, E * 0.4, E * 0.8];
+          let gMin = Infinity;
+          lats.forEach((lat) => { for (const d of [0.4, 1.4]) { const g = surfAny(f.x + f.nx * lat - f.dx * sg * d, f.z + f.nz * lat - f.dz * sg * d); if (g === g) gMin = Math.min(gMin, g); } });
+          const soffit = f.y - L.depth;
+          if (gMin < soffit - 0.15) {                                    // the girder end is above the ground: end wall
+            const b = gMin - ABUT_EMBED; const h = (f.y - EDGE_FACE * 0.9) - b;
+            const wallW = Math.max(1.5, (E - 1.0) * 2);
+            box3(S, f.x - f.dx * sg * 0.55, b, f.z - f.dz * sg * 0.55, 1.1, h, wallW, yawOf(f), CONC_M, { shade: 1 });
+            abuts.push({ end: sg < 0 ? 'lo' : 'hi', x: f.x, z: f.z, yDeck: yEnd, yBottom: b, hw: E, dx: f.dx * sg, dz: f.dz * sg });
+          }
+          if (L.foot) return;
+          // approach plug
+          const ox = f.dx * sg; const oz = f.dz * sg;                   // outward direction
+          const STEP = 1.5; const LMAX = 21;
+          const sT = (d) => { const g = surfAny(f.x + ox * d, f.z + oz * d); return g === g ? g + lAsph : NaN; };
+          let need = 0; let Lp = 0;
+          for (let d = 0; d <= LMAX; d += STEP) { const g = sT(d); if (g !== g) { Lp = 0; need = 0; break; } const def = yEnd - g; if (def > need) need = def; }
+          if (need < 0.5) return;
+          // length: until the ground is back within 0.25 m of the road level for 6 m (or the maximum)
+          Lp = LMAX;
+          for (let d = STEP; d <= LMAX - 6; d += STEP) { let okAll = true; for (let e2 = d; e2 <= d + 6; e2 += STEP) if (yEnd - sT(e2) > 0.25 && !(sT(e2) > yEnd)) { okAll = false; break; } if (okAll) { Lp = d + 3; break; } }
+          Lp = Math.max(6, Math.min(LMAX, Lp));
+          const yT = sT(Lp); const yTarget = (yT === yT ? yT : yEnd) + 0.012;
+          const nP = Math.max(3, Math.ceil(Lp / STEP));
+          const pf = [];
+          for (let i = 0; i <= nP; i++) {
+            const d = (Lp * i) / nP; const u = d / Lp; const ease = u * u * (3 - 2 * u);
+            const x = f.x + ox * d; const z = f.z + oz * d;
+            pf.push({ x, z, y: lerp(f.y, yTarget - 0.02, ease), nx: f.nx, nz: f.nz, dx: ox, dz: oz });
+          }
+          const P = { fr: pf, lo: 0, hi: nP, cum: pf.map((_, i) => (Lp * i) / nP), total: Lp };
+          // the top: everything of the section up to the top of the kerb cap; the walls on both edges go down to the ground
+          let kTop = prof.length - 1; for (let q = 1; q < prof.length; q++) { if (prof[q][1] < 0 && prof[q][0] >= E - 1e-6) { kTop = q - 1; break; } }
+          const top = prof.slice(0, kTop + 1);
+          const iA = S.i.length;
+          [1, -1].forEach((sd) => sweep(P, top, sd));
+          plugRanges.push([iA, S.i.length]);
+          [1, -1].forEach((sd) => {
+            for (let i = 0; i < nP; i++) {
+              const f0 = pf[i]; const f1 = pf[i + 1];
+              const a = at(f0, E * sd, L.capH); const b = at(f1, E * sd, L.capH);
+              const bot0 = Math.min(surfAny(a[0], a[2]), a[1]) - 0.3; const bot1 = Math.min(surfAny(b[0], b[2]), b[1]) - 0.3;     // the wall stands 0.3 m in the ground
+              if (a[1] - bot0 < 0.02 && b[1] - bot1 < 0.02) continue;
+              quadN(S, [a[0], bot0, a[2]], [b[0], bot1, b[2]], b, a, f0.nx * sd, 0, f0.nz * sd, MAT.FLAT, CONC);
+            }
+          });
+          // end of the plug: a closing face where the plug still stands above the ground
+          { const fe = pf[nP]; const ya = fe.y + L.capH; const gb = Math.min(surfAny(fe.x + fe.nx * E, fe.z + fe.nz * E), surfAny(fe.x - fe.nx * E, fe.z - fe.nz * E)) - 0.3;
+            if (ya - gb > 0.05) quadN(S, at(fe, -E, gb - fe.y), at(fe, E, gb - fe.y), at(fe, E, L.capH), at(fe, -E, L.capH), ox, 0, oz, MAT.FLAT, CONC); }
+          markSet(P);
+          railSet(P);
+          plugs.push({ end: sg < 0 ? 'lo' : 'hi', x: f.x, z: f.z, len: Lp, need, yEnd, yTarget });
+        });
+        audit.push({ tile: t.key, cls: dk.c, hw: E, lo, hi, len: total, piers, abuts, ends, plugs, y0: fr[lo].y, yN: fr[hi].y, pre: dk.pre, post: dk.post });
       });
       if (reg.length) decks.set(t.key, reg); else decks.delete(t.key);
+      audit.plugRanges = plugRanges;
+      return audit;
     }
-    function boxTo(m, cx, cy, cz, sx, sy, sz, yaw, col) {
-      const c = Math.cos(yaw); const s = Math.sin(yaw);
-      const hx = sx / 2; const hz = sz / 2;
-      const corner = (ix, iz) => [cx + ix * hx * c - iz * hz * s, cz + ix * hx * s + iz * hz * c];
-      const faces = [[[-1, -1], [1, -1], [0, -1]], [[1, -1], [1, 1], [1, 0]], [[1, 1], [-1, 1], [0, 1]], [[-1, 1], [-1, -1], [-1, 0]]];
-      faces.forEach((f) => {
-        const a = corner(f[0][0], f[0][1]); const b = corner(f[1][0], f[1][1]);
-        const nx = f[2][0] * c - f[2][1] * s; const nz = f[2][0] * s + f[2][1] * c;
-        const i0 = m.vert(a[0], cy, a[1], nx, 0, nz, MAT.FLAT, col[0], col[1], col[2]); const i1 = m.vert(b[0], cy, b[1], nx, 0, nz, MAT.FLAT, col[0], col[1], col[2]);
-        const i2 = m.vert(b[0], cy + sy, b[1], nx, 0, nz, MAT.FLAT, col[0], col[1], col[2]); const i3 = m.vert(a[0], cy + sy, a[1], nx, 0, nz, MAT.FLAT, col[0], col[1], col[2]);
-        m.i.push(i0, i1, i2, i0, i2, i3);
-      });
-    }
+
     /* the deck surface Y under (x, z) (scene metres) or NaN: used by roadHeightAt */
-    function deckHeight(x, z) {
-      let best = NaN;
+    function deckHeight(x, z, refY) {
+      // several decks can cover (x, z) (an interchange: stacked ramps): the one nearest to refY (a car's current height) wins, without a reference the one whose centre line is nearest
+      let best = NaN; let bestScore = Infinity;
+      const useRef = refY === refY && refY !== undefined;
       decks.forEach((list) => list.forEach((dk) => {
         const pts = dk.pts;
         for (let i = 0; i + 1 < pts.length; i++) {
           const a = pts[i]; const b = pts[i + 1];
           const dx = b.x - a.x; const dz = b.z - a.z; const l2 = dx * dx + dz * dz || 1;
           const tt = clamp(((x - a.x) * dx + (z - a.z) * dz) / l2, 0, 1);
-          if (Math.hypot(x - (a.x + dx * tt), z - (a.z + dz * tt)) <= dk.hw) { const y = a.y + (b.y - a.y) * tt; if (best !== best || y > best) best = y; }
+          const d = Math.hypot(x - (a.x + dx * tt), z - (a.z + dz * tt));
+          if (d > dk.hw) continue;
+          const y = a.y + (b.y - a.y) * tt;
+          const score = useRef ? Math.abs(y - refY) : d;
+          if (score < bestScore) { bestScore = score; best = y; }
         }
       }));
       return best;
@@ -975,7 +1316,7 @@
     }
     return {
       fetchTile: (buf) => parseTile(buf), weightTextures: (cls, n, o) => weightTextures(T, cls, n, o), terrainMaterial, farMaterial, decorate, deckHeight, dropTile,
-      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, roadSurface, paintDistance, paintAt, debugDecks: () => decks, Acc, MAT,
+      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, roadSurface, sideSurface, paintDistance, paintAt, debugDecks: () => decks, Acc, MAT,
     };
   }
 

@@ -691,9 +691,9 @@
   }
 
   const KEYS = [
-    [['W', '↑'], 'keyPower'], [['S', '↓'], 'keyBrake'], [['X', '⌫'], 'keyEB'], [['D'], 'keyDoors'], [['B'], 'keyParking'],
-    [['H', 'Space'], 'keyHorn'], [['L'], 'keyLights'], [['V'], 'keyWeather'], [['A'], 'keyAnnounce'], [['C', '1–4'], 'keyCamera'],
-    [['T'], 'keyTimetable'], [['M'], 'keyMute'], [['P', 'Esc'], 'keyPause'], [['F1', '?'], 'keyHelp'],
+    [['W', '↑'], 'keyPower'], [['S', '↓'], 'keyBrake'], [['X', '⌫'], 'keyEB'], [['D'], 'keyDoors'], [['B'], 'keyParking'], [['R'], 'keyReverse'], [['F'], 'keyFast'],
+    [['H', 'Space'], 'keyHorn'], [['L'], 'keyLights'], [['V'], 'keyWeather'], [['A'], 'keyAnnounce'], [['C'], 'keyCamera'], [['1–5'], 'keyCamDirect'],
+    [['T'], 'keyTimetable'], [['M'], 'keyMute'], [['Q'], 'keyQuality'], [['P', 'Esc'], 'keyPause'], [['F1', '?'], 'keyHelp'],
   ];
   function helpPanel() {
     return h('section', { class: 'ts-menu__sec', 'aria-labelledby': 'ts-menu-help' },

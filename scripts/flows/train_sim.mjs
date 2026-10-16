@@ -887,6 +887,7 @@ async function directionAndGearChecks(h, frame) {
   h.expect((await S(frame)).fast, '2x stays as the player set it (also in the next service)');
   await key(h, 'f');
   h.expect(await frame.evaluate(() => document.getElementById('helpBody').textContent.includes('R') && document.getElementById('helpBody').innerHTML.includes('<kbd>F</kbd>') && document.getElementById('helpBody').innerHTML.includes('<kbd>R</kbd>')), 'the controls help lists R and F');
+  h.expect(await frame.evaluate(() => { const k = [...document.querySelectorAll('#helpBody kbd')].map((e) => e.textContent); return ['B', 'Q', 'P / Esc', '1–5'].every((x) => k.includes(x)); }), 'the controls help lists B (parking brake), Q (quality), P / Esc (pause) and 1–5 (cameras)');
 
   h.step('oncoming Luxtram never stands still: it dwells at Alphonse Weicker at most 45 s, then leaves - also while the player stands there with open doors and the handbrake on (route Findel - Kirchberg, night)');
   {
@@ -947,6 +948,60 @@ async function directionAndGearChecks(h, frame) {
     const bad = out.filter((r) => r.treesIn > 0 || r.lampsIn > 0);
     h.expect(bad.length === 0, 'trees ' + out.reduce((a, r) => a + r.trees, 0) + ', road lamps ' + out.reduce((a, r) => a + r.lamps, 0) + ' checked at 6 spots: none inside a drawn lane' + (bad.length ? ' (bad: ' + JSON.stringify(bad) + ')' : ''));
     h.expect(out.every((r) => r.kerbKept > 0) && out.reduce((a, r) => a + r.kerbCut, 0) < out.reduce((a, r) => a + r.kerbKept, 0), 'kerbs: kept ' + out.reduce((a, r) => a + r.kerbKept, 0) + ' m, cut across carriageways ' + out.reduce((a, r) => a + r.kerbCut, 0) + ' m (tile read-out)');
+  }
+
+  h.step('road bridges (Luxtram Stadion interchange, Gare, A1): every pier reaches the ground (gap < 0.2 m), no step > 0.3 m where a road deck meets the road, no hole in a deck, cars ride on the decks and the approach plugs');
+  {
+    await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
+    await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+    const out = [];
+    for (const s of [15480, 11720, 3450]) {
+      await frame.evaluate((s0) => { __tsTest.placeAt(s0, 0); }, s);
+      await frame.waitForFunction(() => { const l = __tsTest.internals().world.landscape; return !l.pendingAhead || l.pendingAhead() === 0; }, null, { timeout: 90000 });
+      await h.pause(3500);
+      out.push(await frame.evaluate((s0) => {
+        const { scene, world, THREE, camera } = __tsTest.internals(); const lw = world.landscape.luxtramWorld; scene.updateMatrixWorld(true);
+        const rc = new THREE.Raycaster(); rc.camera = camera; const down = new THREE.Vector3(0, -1, 0);
+        const isGround = (o) => { for (let q = o; q; q = q.parent) if (/^(lt-tile|lg-decor|train-sim-infra)/.test(q.name || '')) return true; return false; };
+        const first = (x, y, z) => { rc.set(new THREE.Vector3(x, y, z), down); rc.far = 200; const hs = rc.intersectObjects(scene.children, true).filter((hh) => hh.object.visible && !hh.object.isInstancedMesh && !hh.object.isSprite && isGround(hh.object)); return hs[0] || null; };
+        const terrain = (x, z) => { const u = lw.tileOf(x, z); if (!u || !u.mesh) return NaN; rc.set(new THREE.Vector3(x, 500, z), down); rc.far = 1000; const hh = rc.intersectObject(u.mesh, false)[0]; return hh ? hh.point.y : NaN; };
+        const f0 = world.track.frameAt(s0); const near = (x, z) => Math.hypot(x - f0.pos.x, z - f0.pos.z) < 160;
+        const res = { s: s0, bridges: 0, piers: 0, pierWorst: -9, ends: 0, stepWorst: 0, stepBad: 0, holes: 0, deckSamples: 0, plugs: 0, markedDecks: 0 };
+        lw.tiles.forEach((t) => {
+          const list = t.decor && t.decor.group.userData.bridges; if (!list) return;
+          list.forEach((br) => {
+            const q = br.piers[0] || br.ends[0]; if (!q || !near(q.x, q.z)) return;
+            res.bridges++;
+            br.piers.forEach((pr) => { res.piers++; let w = -9; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; const g = terrain(pr.x + Math.cos(a) * pr.r, pr.z + Math.sin(a) * pr.r); if (g === g) w = Math.max(w, pr.yBottom - g); } res.pierWorst = Math.max(res.pierWorst, w); });
+            if (br.cls <= 5) br.ends.forEach((e) => {
+              if (e.joint) return; res.ends++;
+              for (const d of [1.5, 3]) { const tg = terrain(e.x + e.dx * d, e.z + e.dz * d); const hh = first(e.x + e.dx * d, Math.max(e.yDeck + 6, tg + 3), e.z + e.dz * d); const st = hh ? Math.abs(hh.point.y - e.yDeck) : 99; res.stepWorst = Math.max(res.stepWorst, st); if (st >= 0.3) res.stepBad++; }
+            });
+            res.plugs += (br.plugs || []).length;
+          });
+        });
+        // deck surface: a ray from above must hit the deck within 3 cm of the registry height along every road deck near here
+        lw.ground.debugDecks().forEach((l) => l.forEach((dk) => {
+          for (let i = 1; i + 1 < dk.pts.length; i++) { const p = dk.pts[i]; if (!near(p.x, p.z)) continue; res.deckSamples++; const hh = first(p.x, p.y + 4, p.z); if (!hh || Math.abs(hh.point.y - p.y) > 0.12) res.holes++; }
+        }));
+        return res;
+      }, s));
+    }
+    const sum = (k) => out.reduce((a, r) => a + r[k], 0);
+    h.expect(sum('bridges') >= 4 && sum('piers') >= 6, 'bridges with piers were found at the 3 spots (' + sum('bridges') + ' bridges, ' + sum('piers') + ' piers)');
+    h.expect(Math.max(...out.map((r) => r.pierWorst)) < 0.2, 'every pier reaches the ground (worst gap ' + Math.max(...out.map((r) => r.pierWorst)).toFixed(2) + ' m)');
+    h.expect(sum('stepBad') <= 1 && Math.max(...out.map((r) => r.stepWorst)) < 0.6, 'road deck ends meet the road: ' + sum('ends') + ' ends, worst step ' + Math.max(...out.map((r) => r.stepWorst)).toFixed(2) + ' m, ' + sum('stepBad') + ' samples over 0.3 m');
+    h.expect(sum('holes') === 0 && sum('deckSamples') > 20, 'no hole in the deck surfaces (' + sum('deckSamples') + ' samples, ' + sum('holes') + ' off the registered height)');
+    h.expect(sum('plugs') >= 1, 'approach plugs are built where a deck ends above the ground (' + sum('plugs') + ')');
+    // cars: wheel contact points against the rendered surface along these stretches
+    const cars = await frame.evaluate(async () => {
+      const lt = TS.luxTraffic.last; if (!lt) return { n: 0, bad: 0, severe: 0 };
+      const { scene, camera, THREE, world } = __tsTest.internals(); scene.updateMatrixWorld(true);
+      const rc = new THREE.Raycaster(); rc.camera = camera; const down = new THREE.Vector3(0, -1, 0); let n = 0; let bad = 0; let severe = 0;
+      for (const c of lt.wheelPoints()) for (const q of c.pts) { n++; rc.set(new THREE.Vector3(q[0], q[1] + 0.6, q[2]), down); rc.far = 5; const hs = rc.intersectObjects(scene.children, true).filter((hh) => hh.object.visible && !hh.object.isInstancedMesh && !hh.object.isSprite && !hh.object.isPoints && !hh.object.isLine && !(hh.object.material && hh.object.material.transparent && hh.object.material.opacity < 0.5)); const d = hs[0] ? q[1] - hs[0].point.y : 9; if (Math.abs(d) > 0.06) bad++; if (Math.abs(d) > 0.4) severe++; }
+      return { n, bad, severe };
+    });
+    h.expect(cars.severe === 0, 'no car wheel is more than 0.4 m off the surface at the last spot (' + cars.n + ' wheels, ' + cars.bad + ' over 6 cm)');
   }
 
   h.step('endless hands over seamlessly: a real service end (doors, terminus exchange) continues with the next route, tram career');
@@ -1107,6 +1162,7 @@ async function resumeChecks(h, frame) {
   h.eq([after.pattern, after.passIndices, after.weather, after.hour], [before.pattern, before.passIndices, before.weather, before.hour], 'same service plan and weather / hour');
   h.expect(after.v === 0 && after.kmh === 0, 'the train stands still');
   h.expect(after.parkingBrake && after.parkLampVisible, 'parking brake on (lamp shown)');
+  h.expect(await frame.evaluate(() => /^B\b/.test(document.getElementById('parkLamp').textContent) && !/^P\b/.test(document.getElementById('parkLamp').textContent)), 'the parking-brake lamp names its key B (P is pause)');
   h.eq([after.doorPhase, after.doorsOpen01, after.lever], ['closed', 0, 0], 'doors closed, lever 0');
   h.expect(after.simT >= before.simT && after.simT - before.simT < 4, 'the service clock continues where it was: the 5+ s away (and any real time) did not count (' + (after.simT - before.simT).toFixed(2) + ' s)');
   h.expect(after.delaySec - before.delay <= 4, 'no extra delay from the time the page was away (' + before.delay + ' -> ' + after.delaySec + ' s)');
