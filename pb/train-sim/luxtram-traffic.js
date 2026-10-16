@@ -29,6 +29,7 @@
   /* ---- switches / constants */
   const CARS_ON_BRIDGES = true;      // drive over the bridge decks (flag & 1 roads; needs the world to keep those roads in roadsByChunk with bridge: true)
   let LANE_K = 0.34;                 // lane centre = this * road half width
+  const WHEEL_FIT_MAX = 0.3;         // a wheel that stands further than this from the plane of the body (the suspension warp reaches SUS_MAX): the vehicle is not drawn there (m)
   const SUS_MAX = 0.4;               // largest wheel offset the body warp follows (m)
   const WHEEL_SPREAD_MAX = 1.0;      // wheels on ground that differs by more than this: the body warp (3/4 of the spread at worst, SUS_MAX) cannot follow, no car there (m)
   const ROAD_LIFT = 0.015;           // wheels rest this far above the height query (it already is the drawn surface; the white lines are 3.5 cm above it)
@@ -1023,6 +1024,7 @@
       const wbL = Math.hypot(fCx - bCx, fCz - bCz) || sp0.wb;
       const hzW = wbL / 2;
       const su = c.sus || (c.sus = [0, 0, 0, 0]);
+      let resMax = 0;
       for (let pass = 0; pass < 2; pass++) {
         const hFL = surfaceAt(wxz[0], wxz[1], ob, refY, hx, hz); const hFR = surfaceAt(wxz[2], wxz[3], ob, refY, hx, hz);
         const hRL = surfaceAt(wxz[4], wxz[5], ob, refY, hx, hz); const hRR = surfaceAt(wxz[6], wxz[7], ob, refY, hx, hz);
@@ -1053,8 +1055,10 @@
         c.twist = Math.abs(n0 - n1 - n2 + n3);                       // (test read-out) how far the four wheel points are from one plane
         const cy = (n0 + n1 + n2 + n3) / 4 + Math.min(0.02, 0.1 * (nMax - (n0 + n1 + n2 + n3) / 4));      // a rigid body on a twisted surface rests on the mean of the four wheel heights: no wheel floats or sinks by more than a quarter of the twist
         // residual of every wheel against the plane the body rests on (the suspension offsets, see makeMaterial)
-        su[0] = clamp(yFL - (cy + cX.y * -hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX); su[1] = clamp(yFR - (cy + cX.y * hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX);
-        su[2] = clamp(yRL - (cy + cX.y * -hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX); su[3] = clamp(yRR - (cy + cX.y * hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX);
+        const r0 = yFL - (cy + cX.y * -hwT + cZ.y * -hzW); const r1 = yFR - (cy + cX.y * hwT + cZ.y * -hzW);
+        const r2 = yRL - (cy + cX.y * -hwT + cZ.y * hzW); const r3 = yRR - (cy + cX.y * hwT + cZ.y * hzW);
+        resMax = Math.max(Math.abs(r0), Math.abs(r1), Math.abs(r2), Math.abs(r3));
+        su[0] = clamp(r0, -SUS_MAX, SUS_MAX); su[1] = clamp(r1, -SUS_MAX, SUS_MAX); su[2] = clamp(r2, -SUS_MAX, SUS_MAX); su[3] = clamp(r3, -SUS_MAX, SUS_MAX);
         cq.setFromRotationMatrix(cm);
         const mx = (fCx + bCx) / 2; const mz = (fCz + bCz) / 2;
         tmpV.set(mx, cy, mz);
@@ -1066,7 +1070,12 @@
           for (let w = 0; w < 4; w++) { wxz[w * 2] = mx + cX.x * k[w][0] + cZ.x * k[w][1]; wxz[w * 2 + 1] = mz + cX.z * k[w][0] + cZ.z * k[w][1]; }
         } else break;
       }
-      void now;
+      if (resMax > WHEEL_FIT_MAX) {
+        // one wheel stands on ground that the body (rigid plane + suspension travel) cannot reach (a plug / deck edge, a kerb, a step beside the wheel base): no vehicle there
+        if (!rd.bad) rd.bad = [];
+        rd.bad.push([c.t - 14, c.t + 14, now + 90000]); c.active = false; c.shown = false;
+        return false;
+      }
       return true;
     }
 
