@@ -1902,16 +1902,24 @@
       const l0 = slotLatL(q.s); const l1 = SLOT_IN_R;
       return q.lat < l0 ? l0 - q.lat : q.lat > l1 ? q.lat - l1 : -1;
     };
-    const ground = TS.luxGround.create({ T, quality, Q, oy, surfY, normalAt, tileOf, slotClear });
+    const ground = TS.luxGround.create({ T, quality, Q, oy, surfY, normalAt, tileOf, slotClear, groundAt: gy });
     const roadHeightAt = (x, z, onBridge, roadOnly, refY) => {
-      if (onBridge) return ground.deckHeight(x, z, refY);      // NaN where no deck is registered (the named bridges are drawn by their landmark; a car there is not shown)
+      if (onBridge) {
+        const dh = ground.deckHeight(x, z, refY);      // NaN where no deck is registered (the named bridges are drawn by their landmark; a car there is not shown)
+        if (dh === dh || refY !== refY) return dh;
+        // the OSM bridge way runs a few metres past the deck we could build (a bridge end): the drawn road / ground there, when it is at the car's own height
+        const t0 = tileOf(x, z);
+        if (t0 && t0.built && t0.mesh && t0.decor) { const g0 = ground.roadSurface(t0, x, z, refY, true); const g1 = g0 === g0 ? g0 : surfY(t0, x, z); if (g1 === g1 && Math.abs(g1 - refY) < 1.2) return g1; }
+        return NaN;
+      }
       const t = tileOf(x, z);
       if (!t || !t.built || !t.mesh || !t.decor) return NaN;       // not built / not at its final LOD (decorated) yet
       const my = meshY(t, x, z);
-      const r = ground.roadSurface(t, x, z, my, !roadOnly);       // the drawn carriageway triangles (of overlapping layers: the one at the terrain, not a ramp above / street below)
+      const carY = refY === refY ? refY : undefined;       // a car's own height: it is only on the plug / layer that is at that height
+      const r = ground.roadSurface(t, x, z, carY !== undefined ? carY : my, !roadOnly, carY);       // the drawn carriageway triangles (of overlapping layers: the one at the terrain, not a ramp above / street below)
       if (r === r) return r;
       if (roadOnly) return NaN;                    // roadOnly: no terrain fallback (the traffic then levels a wheel that is off the carriageway)
-      const sd = ground.sideSurface(t, x, z, my);  // a wheel beside the carriageway stands on the drawn sidewalk / path ...
+      const sd = ground.sideSurface(t, x, z, carY !== undefined ? carY : my, carY);  // a wheel beside the carriageway stands on the drawn sidewalk / path ...
       if (sd === sd) return sd;
       const y = surfY(t, x, z);                    // ... or on the bare terrain (no lift: nothing is drawn there)
       return y === y ? y : NaN;

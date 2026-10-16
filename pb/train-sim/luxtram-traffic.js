@@ -964,7 +964,7 @@
       const fCx = fX; const fCz = fZ; const bCx = rX; const bCz = rZ;
       const hwT = sp0.tw / 2;
       const ob = rd.bridge === true;
-      const refY = ob ? c.y - ROAD_LIFT : undefined;       // a bridge car stays on the deck nearest to its own height (stacked ramps of an interchange)
+      const refY = c.y === c.y ? c.y - ROAD_LIFT : undefined;       // a car stays on the deck / ramp / plug nearest to its own height (stacked ramps of an interchange)
       // wheel contact positions (x, z): FL, FR, RL, RR; the second pass moves them to where the tilted body really puts its wheels (on a bank the wheels sit closer together than the lane sample points)
       const wxz = [fCx - rx * hwT, fCz - rz * hwT, fCx + rx * hwT, fCz + rz * hwT, bCx - rx * hwT, bCz - rz * hwT, bCx + rx * hwT, bCz + rz * hwT];
       const wbL = Math.hypot(fCx - bCx, fCz - bCz) || sp0.wb;
@@ -1098,7 +1098,7 @@
         c.since += c.cur * dt;
       }
       // pass 2: ground every car, write instances
-      writeN = 0; guardBudget = 1;
+      writeN = 0; guardBudget = 3;
       for (let k = 0; k < veh.length; k++) veh[k].n = 0;
       for (let i = 0; i < cars.length; i++) {
         const c = cars[i];
@@ -1111,8 +1111,8 @@
           c.active = false; c.shown = false; conflicts++;
           continue;
         }
-        // safety net: one cheap ray per frame at most, when a car has just spawned / entered another road / driven 40 m since its last check
-        if (guardBudget > 0 && (c.rd !== c.chkRd || c.since > 40)) {
+        // safety net: a few cheap rays per frame at most, when a car has just spawned / entered another road / driven 12 m since its last check
+        if (guardBudget > 0 && (c.rd !== c.chkRd || c.since > 12)) {
           guardBudget--; c.chkRd = c.rd; c.since = 0;
           if (surfaceCheck(c.x, c.y, c.z) === false) {
             if (!c.rd.bad) c.rd.bad = [];

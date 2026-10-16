@@ -654,7 +654,7 @@
       grp.userData.ranges = ranges;
       const bridgeAudit = decorateDecks(t, S, roadGrid, L_ASPH);
       grp.userData.bridges = bridgeAudit;
-      roadGrid.plugTri = triGrid(t, S, bridgeAudit.plugRanges); roadGrid.plugSideTri = triGrid(t, S, bridgeAudit.plugSideRanges);      // approach plugs (see decorateDecks): the road height query follows them
+      { const pr = triGrid(t, S, bridgeAudit.plugRanges); const ps = triGrid(t, S, bridgeAudit.plugSideRanges); if (pr || ps) plugTris.set(t.key, { x0: t.x0, z0: t.z0, t: { x0: t.x0, z0: t.z0 }, road: pr, side: ps }); else plugTris.delete(t.key); }      // approach plugs (see decorateDecks): the road height query follows them
       const dtg = triGrid(t, S, bridgeAudit.deckRanges);
       if (dtg) deckTris.set(t.key, { x0: t.x0, z0: t.z0, t: { x0: t.x0, z0: t.z0 }, grid: dtg }); else deckTris.delete(t.key);
       // parked cars on the painted stalls (vec.pk: x, z in cm from the tile corner, heading in degrees)
@@ -731,16 +731,26 @@
     }
     /* Y of the drawn carriageway at (x, z) (scene metres) in tile t, or NaN when the tile is not decorated / has no road there.  With several layers the one nearest to refY
        wins (refY = the terrain height there); without refY the lower one. */
-    function roadSurface(t, x, z, refY, steepOk) {
+    function roadSurface(t, x, z, refY, steepOk, carY) {
       const rg = t && t.decor && t.decor.roadGrid;
       if (!rg) return NaN;
-      if (rg.plugTri) { const pg = triQuery(t, rg.plugTri, x, z, undefined, true); if (pg === pg) return pg; }       // an approach plug of a bridge is the road there
+      { const pg = plugQuery(x, z, false, carY); if (pg === pg) return pg; }       // an approach plug of a bridge is the road there
       if (!rg.tri) return NaN;
       const r = triQuery(t, rg.tri, x, z, refY, steepOk);
       if (r !== r) return NaN;
       // a sidewalk / path drawn over the asphalt (every kerb polygon lies on carriageway asphalt) is the top surface there: not carriageway
       if (rg.sideTri) { const sd = triQuery(t, rg.sideTri, x, z, r, true); if (sd === sd && sd - r > -0.05 && sd - r < 0.5) return NaN; }
       return r;
+    }
+    function plugQuery(x, z, side, carY) {
+      let best = NaN;
+      plugTris.forEach((e) => {
+        if (x < e.x0 - 4 || x > e.x0 + 132 || z < e.z0 - 4 || z > e.z0 + 132) return;
+        const g = side ? e.side : e.road; if (!g) return;
+        const v = triQuery(e.t, g, x, z, undefined, true);
+        if (v === v && (carY !== carY || carY === undefined || Math.abs(v - carY) < 0.8) && (best !== best || v > best)) best = v;       // (a car at a known height is only on a plug that is at that height)
+      });
+      return best;
     }
     /* triangle lookup: the triangles of acc.i[i0..i1) with their plane (tile-local x / z), bucketed in 1 m cells; triQuery returns the Y of the drawn surface at (x, z) exactly like the rasteriser of the GPU
        (overlapping triangles within 0.4 m of each other are one surface: the highest shows; separate layers: the one nearest to refY, else the lowest) */
@@ -809,10 +819,10 @@
       return best;
     }
     /* Y of the drawn sidewalk / path surface at (x, z) or NaN (same layer rule as roadSurface) */
-    function sideSurface(t, x, z, refY) {
+    function sideSurface(t, x, z, refY, carY) {
       const rg = t && t.decor && t.decor.roadGrid;
       if (!rg) return NaN;
-      if (rg.plugSideTri) { const pg = triQuery(t, rg.plugSideTri, x, z, undefined, true); if (pg === pg) return pg; }
+      { const pg = plugQuery(x, z, true, carY); if (pg === pg) return pg; }
       if (!rg.sideTri) return NaN;
       return triQuery(t, rg.sideTri, x, z, refY, true);
     }
@@ -924,6 +934,7 @@
        footing + a cross-head) that reach the ground, and abutments (end wall to the ground) where the deck ends above the ground.
        Everything is built from frames along the OSM centre line (3 m apart): a half section is a polyline in (lateral, height) that is swept along the frames. */
     const decks = new Map();       // tile key -> [{ pts: [{x, y, z}], hw }]
+    const plugTris = new Map();    // tile key -> the exact triangles of the approach plugs (road part, sidewalk part): a plug crosses tile borders, so the query asks every tile
     const deckTris = new Map();    // tile key -> { x0, z0, t, grid }: the exact triangles of every deck top (deckHeight)
     const CONC = [0.76, 0.75, 0.72]; const CONC_D = [0.47, 0.46, 0.44]; const CONC_L = [0.86, 0.85, 0.82]; const CONC_M = [0.6, 0.59, 0.57];
     const STEEL = [0.66, 0.69, 0.72]; const STEEL_D = [0.36, 0.39, 0.42];
@@ -1022,7 +1033,12 @@
       const audit = [];
       if (!list.length) { decks.delete(t.key); return audit; }
       const reg = [];
-      const surfAny = (x, z) => { const u = ctx.tileOf ? ctx.tileOf(x, z) : null; return surfY(u && u.mesh ? u : t, x, z); };
+      const surfAny = (x, z) => {
+        const u = ctx.tileOf ? ctx.tileOf(x, z) : null;
+        if (u && u.mesh) return surfY(u, x, z);
+        if (x >= t.x0 && x < t.x0 + 128 && z >= t.z0 && z < t.z0 + 128) return surfY(t, x, z);
+        return ctx.groundAt ? ctx.groundAt(x, z) : surfY(t, x, z);      // a neighbouring tile that is not built yet: the LiDAR ground (not the clamped edge of this tile)
+      };
       const jointEnds = new Set();
       /* the level (frame y) of another deck piece that passes within 2.5 m of (x, z) at about height y (<= 3 m apart), NaN when none: this tile's raw decks and the decks of the other tiles built so far */
       const otherDeckLevel = (self, x, z, y) => {
@@ -1256,7 +1272,7 @@
           for (let i = 0; i <= nP; i++) {
             const d = (Lp * i) / nP; const u = d / Lp; const ease = u * u * (3 - 2 * u);
             const x = f.x + ox * d; const z = f.z + oz * d;
-            pf.push({ x, z, y: lerp(f.y, yTarget - 0.02, ease), nx: f.nx, nz: f.nz, dx: ox, dz: oz });
+            pf.push({ x, z, y: lerp(f.y, Math.min(yTarget - 0.02, f.y), ease), nx: f.nx, nz: f.nz, dx: ox, dz: oz });      // (a plug only ever steps down to the road: a rising ground is hidden by it anyway)
           }
           const P = { fr: pf, lo: 0, hi: nP, cum: pf.map((_, i) => (Lp * i) / nP), total: Lp };
           // the top: everything of the section up to the top of the kerb cap; the walls on both edges go down to the ground
@@ -1299,7 +1315,8 @@
         for (let i = 0; i + 1 < pts.length; i++) {
           const a = pts[i]; const b = pts[i + 1];
           const dx = b.x - a.x; const dz = b.z - a.z; const l2 = dx * dx + dz * dz || 1;
-          const tt = clamp(((x - a.x) * dx + (z - a.z) * dz) / l2, 0, 1);
+          const uRaw = ((x - a.x) * dx + (z - a.z) * dz) / l2; const tt = clamp(uRaw, 0, 1);
+          if ((i === 0 && uRaw < 0 || i === pts.length - 2 && uRaw > 1) && Math.abs(uRaw - tt) * Math.sqrt(l2) > 0.4) continue;       // past the end of the deck: no deck there
           const d = Math.hypot(x - (a.x + dx * tt), z - (a.z + dz * tt));
           if (d > dk.hw) continue;
           const y = a.y + (b.y - a.y) * tt + (d > dk.hwRoad ? dk.kerb : 0);      // beside the carriageway: the sidewalk, one kerb up
@@ -1328,15 +1345,15 @@
       waterT += dt;
       waterNormal.offset.set((waterT * 0.012) % 1, (waterT * 0.007) % 1);
     }
-    function dropTile(key) { decks.delete(key); deckTris.delete(key); }
+    function dropTile(key) { decks.delete(key); deckTris.delete(key); plugTris.delete(key); }
     function dispose() {
       disposables.forEach((o) => { try { o.dispose(); } catch (e) { /* ignore */ } });
       dummy1.dispose();
-      decks.clear(); deckTris.clear();
+      decks.clear(); deckTris.clear(); plugTris.clear();
     }
     return {
       fetchTile: (buf) => parseTile(buf), weightTextures: (cls, n, o) => weightTextures(T, cls, n, o), terrainMaterial, farMaterial, decorate, deckHeight, dropTile,
-      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, roadSurface, sideSurface, paintDistance, paintAt, debugDecks: () => decks, Acc, MAT,
+      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, roadSurface, sideSurface, plugQuery, paintDistance, paintAt, debugDecks: () => decks, Acc, MAT,
     };
   }
 
