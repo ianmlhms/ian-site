@@ -580,7 +580,7 @@
   const RAIL_PROFILE = [[-0.034, 0], [0.034, 0], [0.036, -0.012], [0.036, -0.032], [0.012, -0.046], [0.0095, -0.12], [0.075, -0.162], [0.075, -0.172], [-0.075, -0.172], [-0.075, -0.162], [-0.0095, -0.12], [-0.012, -0.046], [-0.036, -0.032], [-0.036, -0.012]];
   const RAIL_COLORS = [col('#e6e3dc'), col('#a8a298'), col('#a8a298'), col('#948e84'), col('#948e84'), col('#867f75'), col('#6f6a62'), col('#6f6a62'), col('#6f6a62'), col('#867f75'), col('#948e84'), col('#948e84'), col('#a8a298'), col('#a8a298')];
   const WHITE = [1, 1, 1];
-  const mark = () => mat('mark', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  const mark = () => mat('mark', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }));
 
   function shifted(profile, dx) {
     return profile.map((p) => [p[0] + dx, p[1]]);
@@ -591,9 +591,9 @@
      paving strip lies between the road surface and the rails. */
   const RAIL_LIFT = 0.05;
   const PAVE_LIFT = 0.035;
-  const tramSteel = () => mat('steelTram', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.72, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 }));
-  const tramGroove = () => mat('grooveTram', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }));
-  const tramPaveMat = () => mat('paveTram', () => new T.MeshStandardMaterial({ map: tex.tramPave(), vertexColors: true, roughness: 0.9, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+  const tramSteel = () => mat('steelTram', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.72, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -5 }));
+  const tramGroove = () => mat('grooveTram', () => new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -6 }));
+  const tramPaveMat = () => mat('paveTram', () => new T.MeshStandardMaterial({ map: tex.tramPave(), vertexColors: true, roughness: 0.9, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -3 }));
   const lifted = (profile, dx) => profile.map((p) => [p[0] + dx, p[1] + RAIL_LIFT]);
   /* Embedded tram rail: head + the top of the web only. The foot (0.075 m wide, 0.12-0.17 m below the head) lies buried in the formation; with the strong
      negative polygon offset above it shows through the ground at a grazing angle as a thin dashed dark line 4 cm beside each rail, starting ~5 m ahead of the cab
@@ -2082,7 +2082,7 @@
       c.fillRect(w * 0.2679, y + 23, w * 0.4643, 3);
     }
   });
-  const railBedMat = () => mat('railbed2', () => new T.MeshStandardMaterial({ map: railBedTex(), vertexColors: true, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  const railBedMat = () => mat('railbed2', () => new T.MeshStandardMaterial({ map: railBedTex(), vertexColors: true, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }));
   const leadLength = (gap) => clamp(gap * 9.5, 38, 90);
 
   function stationRailKit(api) {

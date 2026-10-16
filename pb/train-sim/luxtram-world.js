@@ -20,7 +20,7 @@
   const M_LAT = 111194.93;
   const M_LON = M_LAT * Math.cos((LAT0 * Math.PI) / 180);
   const H0 = 150;      // height tile encoding (build_luxtram_geo.py)
-  const HQ = 50;
+  const HQ = 200;     // 5 mm height steps (scripts/smooth_luxtram_roads.py writes the road ribbons into the tiles; the old 2 cm steps would terrace a smooth grade)
 
   const QUALITY = {
     high: { ahead: 900, behind: 260, castShadow: true, trees: 1, lamps: true, cars: 56 },
@@ -269,7 +269,7 @@
   let geoIndex = null;
   let structData = null;
   function loadStructures() { if (!structData) { try { structData = syncJson(GEO_BASE + 'structures.json?v=1'); } catch (e) { structData = { over: [] }; } } return structData; }
-  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=4'); return geoIndex; }
+  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=5'); return geoIndex; }
   /* Fetches the three data files the world needs at build time asynchronously (with a byte count) so that create() finds them in memory instead of
      blocking on synchronous requests. Resolves when all are in (or failed: create() then falls back to the blocking request). */
   function prefetchData() {
@@ -277,7 +277,7 @@
     const jobs = [];
     if (!worldData) jobs.push(getJson(WORLD_URL).then((d) => { if (!worldData) worldData = d; }));
     if (!structData) jobs.push(getJson(GEO_BASE + 'structures.json?v=1').then((d) => { if (!structData) structData = d; }).catch(() => { /* optional: loadStructures() falls back */ }));
-    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=4').then((d) => { if (!geoIndex) geoIndex = d; }));
+    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=5').then((d) => { if (!geoIndex) geoIndex = d; }));
     return Promise.all(jobs).then(() => true, (e) => { console.warn(TAG + 'data prefetch failed, loading synchronously', e); return false; });
   }
 
@@ -400,7 +400,7 @@
       sceneRing: (flat) => sceneRing(flat), localXZ: (x, z) => [x + ox, z + oz],
     });
     const matWall = fx.matWall;
-    const matBed = new T.MeshLambertMaterial({ side: T.DoubleSide, vertexColors: true, map: texBed(), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+    const matBed = new T.MeshLambertMaterial({ side: T.DoubleSide, vertexColors: true, map: texBed(), polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -4 });
     const matMisc = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
     const matSteel = new T.MeshStandardMaterial({ side: T.DoubleSide, vertexColors: true, roughness: 0.45, metalness: 0.7 });
     const matLeaf = new T.MeshLambertMaterial({ side: T.DoubleSide, vertexColors: true });
@@ -1753,7 +1753,7 @@
       g.computeVertexNormals();
       if (g.attributes.normal) for (let i = 0; i < g.attributes.normal.count; i++) if (g.attributes.normal.getY(i) < 0) g.attributes.normal.setXYZ(i, -g.attributes.normal.getX(i), -g.attributes.normal.getY(i), -g.attributes.normal.getZ(i));
       t.capMat = ground.terrainMaterial(t.x0, t.z0, TS_, t.ctrl, false);
-      t.capMat.polygonOffset = true; t.capMat.polygonOffsetFactor = -2; t.capMat.polygonOffsetUnits = -2;
+      t.capMat.polygonOffset = true; t.capMat.polygonOffsetFactor = 0; t.capMat.polygonOffsetUnits = -2;
       const mesh = new T.Mesh(g, t.capMat); mesh.renderOrder = 0;
       group.add(mesh);
     }

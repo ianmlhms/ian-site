@@ -192,7 +192,7 @@
     }
     /* platform surface re-paved: textured overlay over the platform slab (from lateral d0 to d1), z0..z1 */
     function paving(key, make, d0, d1, z0, z1, rep) {
-      const b = texB('pave-' + key, make, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }, false);
+      const b = texB('pave-' + key, make, { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }, false);
       const x0 = X(d0), x1 = X(d1), y = H + 0.006;
       b.quad([x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1], [0, 1, 0], WHITE, [[0, z0 / rep], [(d1 - d0) / rep, z0 / rep], [(d1 - d0) / rep, z1 / rep], [0, z1 / rep]]);
     }
@@ -202,7 +202,7 @@
         const r = rng(12); c.fillStyle = tone || '#9c9a96'; c.fillRect(0, 0, w, h);
         for (let y = 0; y < h; y += 16) for (let x = (y / 16) % 2 ? 0 : 16; x < w + 16; x += 32) { const v = Math.floor(r() * 20 - 10); c.fillStyle = 'rgb(' + (156 + v) + ',' + (152 + v) + ',' + (146 + v) + ')'; c.fillRect(x + 1, y + 1, 30, 14); }
       }), edge + 0.8, edge + W, z0, z1, 3);
-      const st = colB('db-strip', { roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }, false);
+      const st = colB('db-strip', { roughness: 0.8, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -4 }, false);
       const xa = X(edge + 1.1), xb = X(edge + 1.6), y = H + 0.012;
       st.quad([xa, y, z0], [xb, y, z0], [xb, y, z1], [xa, y, z1], [0, 1, 0], col('#e9e9e6'));
     }

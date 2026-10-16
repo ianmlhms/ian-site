@@ -621,7 +621,7 @@
     /* ---- scratch objects (no per-frame allocation) */
     const cm = new T.Matrix4(); const cq = new T.Quaternion(); const cX = new T.Vector3(); const cY = new T.Vector3(); const cZ = new T.Vector3();
     const tmpV = new T.Vector3(); const cs1 = new T.Vector3(1, 1, 1);
-    const sp = { x: 0, z: 0, dx: 0, dz: 0 }; const spF = { x: 0, z: 0, dx: 0, dz: 0 }; const spR = { x: 0, z: 0, dx: 0, dz: 0 };
+    const sp = { x: 0, z: 0, dx: 0, dz: 0 }; const spF = { x: 0, z: 0, dx: 0, dz: 0 }; const spR = { x: 0, z: 0, dx: 0, dz: 0 }; const spC = { x: 0, z: 0, dx: 0, dz: 0 };
     const frustum = new T.Frustum(); const pvm = new T.Matrix4(); const sph = new T.Sphere();
     const tmpFrame = { pos: new T.Vector3(), tangent: new T.Vector3(), right: new T.Vector3(), up: new T.Vector3(0, 1, 0), grade: 0, curvature: 0 };
     let haveFrustum = false;
@@ -1009,6 +1009,10 @@
       const hl = Math.hypot(hx, hz);
       if (hl < 0.05) { hx = spF.dx * dir; hz = spF.dz * dir; } else { hx /= hl; hz /= hl; }
       const rx = -hz; const rz = hx;                           // right of travel (scene coordinates, see the model frame)
+      // (test read-out) yaw of the body against the lane tangent at the car's centre, and how much the lane bends between the two axles
+      sample(rd, c.t, spC);
+      c.yawErr = Math.abs(Math.atan2(hx * spC.dz * dir - hz * spC.dx * dir, hx * spC.dx * dir + hz * spC.dz * dir)) * 57.2958;
+      c.bend = Math.abs(Math.atan2(spF.dx * spR.dz - spF.dz * spR.dx, spF.dx * spR.dx + spF.dz * spR.dz)) * 57.2958;
       const fCx = fX; const fCz = fZ; const bCx = rX; const bCz = rZ;
       const hwT = sp0.tw / 2;
       const ob = rd.bridge === true;
@@ -1531,11 +1535,13 @@
         return out;
       },
       prepareOncoming: () => ensureModel(),
+      /* test hook: the centre lines of the ground roads (scene metres): class, half width, bridge flag, points every <= step m */
+      roadLines: (step) => roadList.map((r, i) => { const pts = []; const st = step || 4; for (let t = 0; t <= r.len; t += st) { sample(r, t, sp); pts.push([+sp.x.toFixed(2), +sp.z.toFixed(2)]); } return { i, cls: r.cls, hw: r.hw, bridge: r.bridge === true, oneway: !!r.oneway, len: r.len, pts }; }),
       state: () => ({
         fails, guarded: guards, conflicts, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
         oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z, still: onc.still, age: onc.age, forced: onc.forced } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
       }),
-      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, twist: c.twist, hdbg: c.hdbg, sus: c.sus, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), cross: (c.rd.cross || []).map((q) => [q.t0, q.t1]), along: c.rd.along || [], rdLen: c.rd.len, onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 3 - c.spec.L / 2 && c.t < q.t1 + 3 + c.spec.L / 2) })),   // (test hook; onCross = the body is on / within 3 m of a level crossing: the same margin the structure / envelope guards leave free)
+      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, twist: c.twist, yawErr: c.yawErr, bend: c.bend, hdbg: c.hdbg, sus: c.sus, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), cross: (c.rd.cross || []).map((q) => [q.t0, q.t1]), along: c.rd.along || [], rdLen: c.rd.len, onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 3 - c.spec.L / 2 && c.t < q.t1 + 3 + c.spec.L / 2) })),   // (test hook; onCross = the body is on / within 3 m of a level crossing: the same margin the structure / envelope guards leave free)
       /* test hook: the 4 wheel contact points (world) of every shown car: the road surface must be at or just below each one */
       wheelPoints: () => {
         const out = []; const v = new T.Vector3(); const mm = new T.Matrix4();

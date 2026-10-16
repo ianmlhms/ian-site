@@ -186,7 +186,7 @@
     const ticketB = sets.get('luxtram-ticket', () => M.tex('luxtram-ticket', ticketTex()));
     const ledB = sets.get('luxtram-led', () => M.sign('luxtram-led', ledTex()));
     ledTexRef = ledTex();   // (cached by name: the same texture the boards use)
-    const tactB = sets.get('luxtram-tactile', () => M.tex('luxtram-tactile', tactileTex(), { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    const tactB = sets.get('luxtram-tactile', () => M.tex('luxtram-tactile', tactileTex(), { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -3 }));
     const signB = sets.get('sign:' + st.name, () => M.sign(st.name, helpers.signTexture(st.name, 'tram')));
 
     /* ---------- placement ---------- */
@@ -256,7 +256,7 @@
         c.fillStyle = '#4b4943';
         c.fillRect(0, 0, 4, h);
         c.fillRect(w - 4, 0, 4, h);
-      }, {}), { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      }, {}), { polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }));
       const n = Math.max(1, Math.ceil(L / 3));
       for (let k = 0; k < n; k++) {
         const sa = st.platformStart + (k * L) / n;

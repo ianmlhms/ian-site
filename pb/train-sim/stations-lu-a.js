@@ -323,7 +323,7 @@
     const cz = (zP + zN) / 2;
     const body = k.sets.get('luA:slab', () => k.M.vc(), true);
     k.box(body, mid, (k.H + k.FORM_Y) / 2 - 0.005, cz, Math.abs(latB - latA), k.H - k.FORM_Y - 0.01, len, k.col('#b4b1aa'));
-    const pav = k.sets.get('luA:pavers', () => k.mat('luA:pavers', () => new k.T.MeshStandardMaterial({ map: k.canvasTex('luA:pavers', 256, 256, paverTex), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+    const pav = k.sets.get('luA:pavers', () => k.mat('luA:pavers', () => new k.T.MeshStandardMaterial({ map: k.canvasTex('luA:pavers', 256, 256, paverTex), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 })));
     // texture u runs from the edge (u=0) across 8 m; the near edge is latA
     const dir = Math.sign(latB - latA);
     const w = Math.abs(latB - latA);
@@ -579,7 +579,7 @@
     helpers.textQuad(nameB, [pf(WALL) - sx * 0.1, 7.4, -22], 9, 1.4, [-sx, 0, 0], [0, 0, sx], [0, 1, 0]);
 
     // ---- platform paving (dark grey pavers + beige tactile band) over the generic slab
-    const pav = sets.get('luA:pavers', () => mat('luA:pavers', () => new T.MeshStandardMaterial({ map: k.canvasTex('luA:pavers', 256, 256, paverTex), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+    const pav = sets.get('luA:pavers', () => mat('luA:pavers', () => new T.MeshStandardMaterial({ map: k.canvasTex('luA:pavers', 256, 256, paverTex), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 })));
     const zA = api.zA;
     const zB = api.zB;
     const uM = api.W / 8;
@@ -892,7 +892,7 @@
   function platformSurface(k, variant, z0, z1) {
     const key = 'luA:pave:' + variant;
     const st = PAVE_STYLES[variant] || PAVE_STYLES.grey;
-    const pav = k.sets.get(key, () => k.mat(key, () => new k.T.MeshStandardMaterial({ map: k.canvasTex(key, 256, 256, (c, w, h) => paverTex2(c, w, h, st)), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+    const pav = k.sets.get(key, () => k.mat(key, () => new k.T.MeshStandardMaterial({ map: k.canvasTex(key, 256, 256, (c, w, h) => paverTex2(c, w, h, st)), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 })));
     const a = z0 === undefined ? k.zA : z0;
     const b = z1 === undefined ? k.zB : z1;
     const uM = k.W / 8;
@@ -909,7 +909,7 @@
     k.box(slab, (e0 + e1) / 2, (k.H + k.FORM_Y) / 2 - 0.005, (o.z0 + o.z1) / 2, o.width, k.H - k.FORM_Y - 0.01, o.z1 - o.z0, k.col('#b4b1aa'));
     const key = 'luA:pave:' + o.variant;
     const st = PAVE_STYLES[o.variant] || PAVE_STYLES.grey;
-    const pav = k.sets.get(key, () => k.mat(key, () => new k.T.MeshStandardMaterial({ map: k.canvasTex(key, 256, 256, (c, w, h) => paverTex2(c, w, h, st)), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+    const pav = k.sets.get(key, () => k.mat(key, () => new k.T.MeshStandardMaterial({ map: k.canvasTex(key, 256, 256, (c, w, h) => paverTex2(c, w, h, st)), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 })));
     const uM = o.width / 8;
     k.quadL(pav, [e0, k.H + 0.004, o.z0], [e1, k.H + 0.004, o.z0], [e1, k.H + 0.004, o.z1], [e0, k.H + 0.004, o.z1], [0, 1, 0], k.WHITE, [[0, o.z0 / 4], [uM, o.z0 / 4], [uM, o.z1 / 4], [0, o.z1 / 4]]);
     if (o.shelter) o.shelterAt.forEach((z) => shelter(k, e0 - 1.4, z, 9, 2.3, o.shelterCol, true));
@@ -1701,7 +1701,7 @@
     c.fillStyle = 'rgba(40,44,42,0.1)';
     c.fillRect(2.4 * pm, 0, 1.4 * pm, h);
   }
-  const btPaveBatch = (k) => k.sets.get('luA:pave:bt', () => k.mat('luA:pave:bt', () => new k.T.MeshStandardMaterial({ map: k.canvasTex('luA:pave:bt', 512, 512, btPaverTex), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+  const btPaveBatch = (k) => k.sets.get('luA:pave:bt', () => k.mat('luA:pave:bt', () => new k.T.MeshStandardMaterial({ map: k.canvasTex('luA:pave:bt', 512, 512, btPaverTex), vertexColors: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 })));
 
   // the generic platform adds a grey back fence on our platform and a trackside fence across the far platform: remove both
   // (triangles lying on those fence lines), the real station has dark-red railings / a green mesh fence instead

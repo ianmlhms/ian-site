@@ -35,7 +35,7 @@ import luxtram_geo as G  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pb", "train-sim", "data", "luxtram")
 H0 = 150.0         # height offset of the terrain encoding
-HQ = 50.0          # 1 / 0.02 m
+HQ = 200.0         # 1 / 0.005 m (was 50: scripts/smooth_luxtram_roads.py needs 5 mm; run it after this script)
 Q5 = 20.0          # building vertices: 5 cm
 WEBP_Q = int(os.environ.get("LUXTRAM_WEBP_Q", "70"))
 R_FULL = 170.0     # LOD2 buildings kept with all roof/wall polygons within this distance of the line

@@ -29,7 +29,7 @@
 
   /* ------------------------------------------------------------ painted textures (canvas, cached for the session) */
   const texCache = new Map();
-  const CELL = 128; const GUT = 8; const CP = CELL + 2 * GUT;       // 144 px per atlas cell: 128 content + 8 px wrapped gutter on every side
+  const CELL = 128; const GUT = 64; const CP = CELL + 2 * GUT;       // 256 px per atlas cell: 128 content + 64 px wrapped gutter on every side (a mip level up to 6 never reads a neighbouring cell: no darkening / colour bleed with distance)
   const ATLAS_W = CP * 4; const ATLAS_H = CP * 2;
   // metres per texture repeat of the 8 materials: asphalt, paving, lawn, meadow, forest, gravel, sett, water
   const PERIOD = [5.0, 2.4, 3.2, 4.0, 5.0, 2.6, 1.7, 8.0];
@@ -296,7 +296,9 @@
     '  vec2 org = vec2(float(ci - (ci / 4) * 4), float(ci / 4)) * ' + CP.toFixed(1) + ';',
     '  vec2 uv = (org + ' + GUT.toFixed(1) + ' + f * ' + CELL.toFixed(1) + ') / vec2(' + ATLAS_W.toFixed(1) + ', ' + ATLAS_H.toFixed(1) + ');',
     '  vec2 sc = vec2(' + (CELL / ATLAS_W).toFixed(6) + ', ' + (CELL / ATLAS_H).toFixed(6) + ') / per;',
-    '  return textureGrad(uAtlas, uv, dx * sc, dy * sc).rgb;',
+    /* the filter footprint is clamped to 64 atlas texels (mip level 6, the width of the gutter): beyond that distance the ground is the flat mean of its own cell, not the blend of the whole atlas */
+    '  vec2 gx = dx * sc; vec2 gy = dy * sc; float rho = max(length(gx * vec2(' + ATLAS_W.toFixed(1) + ', ' + ATLAS_H.toFixed(1) + ')), length(gy * vec2(' + ATLAS_W.toFixed(1) + ', ' + ATLAS_H.toFixed(1) + '))); float lk = min(1.0, 64.0 / max(rho, 1e-6));',
+    '  return textureGrad(uAtlas, uv, gx * lk, gy * lk).rgb;',
     '}',
   ].join('\n');
   const SPLAT_FRAG_COMMON = [
@@ -349,7 +351,7 @@
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + SPLAT_FRAG_COMMON)
         .replace('#include <map_fragment>', 'diffuseColor.rgb *= groundAlbedo();');
     };
-    mat.customProgramCacheKey = () => 'lt-splat-v5';
+    mat.customProgramCacheKey = () => 'lt-splat-v6';
     return mat;
   }
 
@@ -365,7 +367,7 @@
        asphalt, paving, kerbs, paint, gravel, setts, ballast, rails and bridge decks are merged per tile into one mesh; the material of a vertex is
        the attribute aMat (0..7 = atlas cell, 8 = flat vertex colour), painted procedurally like the terrain (no photographs). */
     const MAT = { ASPH: 0, PAVE: 1, LAWN: 2, MEADOW: 3, FOREST: 4, GRAVEL: 5, SETT: 6, FLAT: 8 };
-    const matSurface = own(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    const matSurface = own(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }));
     matSurface.onBeforeCompile = (sh) => {
       sh.uniforms.uAtlas = { value: atlas };
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aMat; varying float vMat; varying vec3 vWP; varying float vNy;')
@@ -373,7 +375,7 @@
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMat; varying vec3 vWP; varying float vNy; uniform sampler2D uAtlas;\n' + GLSL_CORE)
         .replace('#include <map_fragment>', 'vec2 swp = mix(vWP.xz, vec2(vWP.x + vWP.z, vWP.y * 1.25), smoothstep(0.78, 0.6, vNy)); vec2 sdx = dFdx(swp); vec2 sdy = dFdy(swp);   /* steep slope: side projection (no streaks)\n*/ if (vMat < 7.5) { diffuseColor.rgb *= gcell(int(vMat + 0.5), swp, sdx, sdy) * (0.94 + 0.12 * lvn(swp * 0.4)); }');
     };
-    matSurface.customProgramCacheKey = () => 'lt-surface-v2';
+    matSurface.customProgramCacheKey = () => 'lt-surface-v3';
     const waterNormal = tileTex(T, 'lg-water-n', 128, 128, (g, w, h) => {
       const hgt = new Float32Array(w * h); const r = mulberry(3);
       const waves = []; for (let k = 0; k < 9; k++) waves.push([Math.floor(r() * 4) + 1, Math.floor(r() * 4) + 1, r() * 6.28, 0.5 + r()]);
@@ -387,7 +389,7 @@
       g.putImageData(id, 0, 0);
     });
     waterNormal.colorSpace = T.NoColorSpace;
-    const matWater = own(new T.MeshPhongMaterial({ color: 0x2f5f70, specular: 0x9db7c4, shininess: 70, normalMap: waterNormal, normalScale: new T.Vector2(0.35, 0.35), transparent: true, opacity: 0.93, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
+    const matWater = own(new T.MeshPhongMaterial({ color: 0x2f5f70, specular: 0x9db7c4, shininess: 70, normalMap: waterNormal, normalScale: new T.Vector2(0.35, 0.35), transparent: true, opacity: 0.93, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -1 }));
 
     /* ---- terrain / far ground materials (one instance per tile, one shared program) */
     const dummy1 = (() => { const t = new T.DataTexture(new Uint8Array([255, 0, 0, 0]), 1, 1, T.RGBAFormat, T.UnsignedByteType); t.needsUpdate = true; return t; })();
@@ -674,10 +676,16 @@
           const cx = x0 + sx / 100 + (hash32(sx, sz, 47) - 0.5) * 0.22 - fz * 0.0; const cz = z0 + sz / 100 + (hash32(sx, sz, 53) - 0.5) * 0.22;
           const ty0 = CAR_TYPES[k];
           const hwb = ty0.L * 0.31;
-          const yF = surfY(t, cx + fx * hwb, cz + fz * hwb); const yR = surfY(t, cx - fx * hwb, cz - fz * hwb);
-          const yL = surfY(t, cx - fz * 0.8, cz + fx * 0.8); const yRt = surfY(t, cx + fz * 0.8, cz - fx * 0.8);
+          // the wheels stand on the DRAWN surface (the carriageway / sidewalk triangles, which lie ROAD_LIFT above the terrain mesh), not on the terrain under it: parked cars sank into the asphalt
+          const gyAt = (x, z) => {
+            let v = roadGrid.tri ? triQuery(t, roadGrid.tri, x, z, undefined, true) : NaN;
+            if (v !== v && roadGrid.sideTri) v = triQuery(t, roadGrid.sideTri, x, z, undefined, true);
+            return v === v ? v : surfY(t, x, z) + L_ASPH;
+          };
+          const yF = gyAt(cx + fx * hwb, cz + fz * hwb); const yR = gyAt(cx - fx * hwb, cz - fz * hwb);
+          const yL = gyAt(cx - fz * 0.8, cz + fx * 0.8); const yRt = gyAt(cx + fz * 0.8, cz - fx * 0.8);
           const sp = clamp((yF - yR) / (2 * hwb), -0.15, 0.15); const sr = clamp((yL - yRt) / 1.6, -0.15, 0.15);
-          const cy = (yF + yR + yL + yRt) / 4 + aT;
+          const cy = (yF + yR + yL + yRt) / 4 + 0.01;
           const ao = shadeAt(t, cx, cz);
           pushCar(S, ty0, cx, cy, cz, fx, fz, sp, sr, CAR_PAINT[q], ao);
         }
