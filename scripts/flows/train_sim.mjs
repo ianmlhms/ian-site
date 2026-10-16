@@ -950,7 +950,7 @@ async function directionAndGearChecks(h, frame) {
     h.expect(out.every((r) => r.kerbKept > 0) && out.reduce((a, r) => a + r.kerbCut, 0) < out.reduce((a, r) => a + r.kerbKept, 0), 'kerbs: kept ' + out.reduce((a, r) => a + r.kerbKept, 0) + ' m, cut across carriageways ' + out.reduce((a, r) => a + r.kerbCut, 0) + ' m (tile read-out)');
   }
 
-  h.step('road bridges (Luxtram Stadion interchange, Gare, A1): every pier reaches the ground (gap < 0.2 m), no step > 0.3 m where a road deck meets the road, no hole in a deck, cars ride on the decks and the approach plugs');
+  h.step('road bridges (Luxtram Stadion interchange, Gare, A1): every pier reaches the ground (gap < 0.2 m), no step > 0.3 m where a road deck meets the road, no hole in a deck, every vehicle type (buses, lorries too) rides on the decks and the approach plugs: wheels on the surface, body not above its road, never in the tram envelope');
   {
     await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
     await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);

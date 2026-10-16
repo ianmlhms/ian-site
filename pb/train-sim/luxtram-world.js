@@ -1905,6 +1905,7 @@
     const ground = TS.luxGround.create({ T, quality, Q, oy, surfY, normalAt, tileOf, slotClear, groundAt: gy });
     const roadHeightAt = (x, z, onBridge, roadOnly, refY, hx, hz) => {
       if (onBridge) {
+        { const tb = tileOf(x, z); if (!tb || !tb.built || !tb.mesh || !tb.decor) return NaN; }      // (a deck is drawn with the decor of its tile: no height before the tile is built)
         const dh = ground.deckHeight(x, z, refY, hx, hz);      // NaN where no deck is registered (the named bridges are drawn by their landmark; a car there is not shown)
         if (dh === dh || refY !== refY) return dh;
         // the OSM bridge way runs a few metres past the deck we could build (a bridge end): the drawn road / ground there, when it is at the car's own height
