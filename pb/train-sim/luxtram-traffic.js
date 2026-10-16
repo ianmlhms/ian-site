@@ -628,7 +628,7 @@
     /* ---- safety net: does a drawn surface really sit under the car?  (down-ray against the meshes of its tile: terrain, ground decor incl. bridge decks, caps) */
     const rc = new T.Raycaster(); const rayDown = new T.Vector3(0, -1, 0); const rayO = new T.Vector3(); const rayHits = []; const surfList = [];
     const SURF_TOL = 0.3;
-    let guardBudget = 0;
+    let guardBudget = 0; let structBudget = 0;
     function surfaceMeshesAt(x, z) {
       surfList.length = 0;
       const t = ctx.tileOf ? ctx.tileOf(x, z) : null;
@@ -650,6 +650,7 @@
     /* ---- structure guard: a road vehicle never stands on / inside the tram infrastructure that is no road (platform pads, station furniture, tram bridge deck, rails outside a level crossing).
        Down-rays from just above every wheel against the infrastructure group; a hit from 0.8 m above to 0.5 m below the wheel is a conflict. */
     const infraRc = new T.Raycaster(); const infraHits = []; const wMat = new T.Matrix4(); const wV = new T.Vector3();
+    const NO_MESHES = [];
     const STRUCT_UP = 0.8; const STRUCT_DOWN = 0.5; const STRUCT_BURY = 0.25;
     let infraList = []; let infraLook = -1e9;
     function infraRoot(now) {
@@ -667,8 +668,8 @@
       const rd = c.rd; const m = c.spec.L / 2 + 3;
       if ((rd.cross || []).some((q) => c.t > q.t0 - m && c.t < q.t1 + m)) return true;     // (the rails of a level crossing are meant to be driven over)
       wMat.fromArray(c.mat); const sp0 = c.spec;
-      for (let k = 0; k < 5; k++) {
-        if (k < 4) wV.set((k & 1 ? 1 : -1) * sp0.tw / 2, 0, (k & 2 ? 1 : -1) * sp0.wb / 2); else wV.set(0, 0, 0);
+      for (let k = 0; k < 9; k++) {       // 4 wheels, the middle, the 4 corners of the body (a platform pad under a bumper counts too)
+        if (k < 4) wV.set((k & 1 ? 1 : -1) * sp0.tw / 2, 0, (k & 2 ? 1 : -1) * sp0.wb / 2); else if (k === 4) wV.set(0, 0, 0); else wV.set((k & 1 ? 1 : -1) * sp0.W / 2, 0, (k & 2 ? 1 : -1) * sp0.L / 2);
         wV.applyMatrix4(wMat);
         const wy = wV.y + (k < 4 && c.sus ? c.sus[k] : 0);
         rayO.set(wV.x, wy + STRUCT_UP, wV.z); infraRc.set(rayO, rayDown); infraRc.near = 0; infraRc.far = STRUCT_UP + STRUCT_DOWN;
@@ -679,7 +680,7 @@
           return false;
         }
         // ... and a wheel is never buried: the highest drawn ground surface (terrain, painted ground, deck, plug) within 0.8 m above it is not more than STRUCT_BURY above the contact point
-        const tl = surfaceMeshesAt(wV.x, wV.z);
+        const tl = k < 4 ? surfaceMeshesAt(wV.x, wV.z) : NO_MESHES;
         if (tl.length) {
           infraHits.length = 0; infraRc.intersectObjects(tl, true, infraHits);
           for (let i = 0; i < infraHits.length; i++) {
@@ -783,7 +784,7 @@
     let tramX = 0; let tramZ = 0; let tramY = 0;
     const R_ACT = clamp(Q.ahead ? Q.ahead * 0.6 : 400, 240, 560);
     function newCar() {
-      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, chkRd: null, laneRd: null, laneK: 1, mway: false, laneIdx: 0, latCur: NaN, mat: new Float32Array(16) };
+      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, sinceS: 1e9, chkRd: null, chkRdS: null, laneRd: null, laneK: 1, mway: false, laneIdx: 0, latCur: NaN, mat: new Float32Array(16) };
     }
     function assignType(c, cls) {
       c.type = pickType(rng, cls); c.tid = TID[c.type]; c.spec = SPEC[c.type]; c.body = pick(rng, paintPool(c.type));
@@ -845,7 +846,7 @@
         assignType(c, rd.cls);
         if (!rd.oneway && rd.hw < c.spec.W + 0.22) { c.type = 'hatch'; c.tid = TID.hatch; c.spec = SPEC.hatch; c.body = pick(rng, paintPool('hatch')); }   // a lorry / bus does not fit two lanes of a narrow street: no oncoming overlap
         assignSpeed(c, rd);
-        c.latCur = NaN; c.cur = c.vmax * 0.7; c.active = true; c.shown = false; c.since = 1e9; c.chkRd = null; c.x = sp.x; c.z = sp.z; c.y = NaN;
+        c.latCur = NaN; c.cur = c.vmax * 0.7; c.active = true; c.shown = false; c.since = 1e9; c.sinceS = 1e9; c.chkRd = null; c.chkRdS = null; c.x = sp.x; c.z = sp.z; c.y = NaN;
         return true;
       }
       return false;
@@ -1093,7 +1094,7 @@
       for (let k = 0; k < 5; k++) {
         const a = k === 0 ? 0 : (k & 1 ? 1 : -1); const b = k === 0 ? 0 : (k & 2 ? 1 : -1);
         const x = c.x + hx * a * hl + rx * b * hw; const z = c.z + hz * a * hl + rz * b * hw;
-        const q = track.nearest(x, z, nq2); if (!q || q.d > 6) continue;
+        const q = track.nearest(x, z, nq2); if (!q || q.d > 6 || q.d > Math.abs(q.lat) + 0.6) continue;     // (beyond the end of the track the lateral offset is no distance)
         if (Math.abs(c.y - q.y) > 3) continue;
         const oppOk = hasOpp && track.opposite.has && track.opposite.has(q.s);
         if (Math.abs(q.lat) < ENV_HALF || (oppOk && Math.abs(q.lat - oppLatAt(q.s)) < ENV_HALF)) return true;
@@ -1169,10 +1170,10 @@
         if (al) c.t = c.dir > 0 ? al[1] + 0.5 + c.spec.L / 2 : al[0] - 0.5 - c.spec.L / 2;     // (the whole body clears the stretch: a bus is 12 m long)
         sample(c.rd, c.t, sp); c.x = sp.x; c.z = sp.z;
         if (isBad(c.rd, c.t, now)) { c.active = false; c.shown = false; continue; }
-        c.since += c.cur * dt;
+        c.since += c.cur * dt; c.sinceS += c.cur * dt;
       }
       // pass 2: ground every car, write instances
-      writeN = 0; guardBudget = 3;
+      writeN = 0; guardBudget = 3; structBudget = 10;
       for (let k = 0; k < veh.length; k++) veh[k].n = 0;
       for (let i = 0; i < cars.length; i++) {
         const c = cars[i];
@@ -1194,6 +1195,10 @@
             c.active = false; c.shown = false; guards++;
             continue;
           }
+        }
+        // structure guard: more often than the surface net (every 3 m driven, 10 cars per frame at most): a platform pad is only a few metres long
+        if (structBudget > 0 && (c.rd !== c.chkRdS || c.sinceS > 3)) {
+          structBudget--; c.chkRdS = c.rd; c.sinceS = 0;
           if (!structureClear(c, now)) {
             if (!c.rd.bad) c.rd.bad = [];
             c.rd.bad.push([c.t - 25, c.t + 25, now + 600000]);

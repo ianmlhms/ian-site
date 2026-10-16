@@ -975,7 +975,7 @@ async function directionAndGearChecks(h, frame) {
         if (!(base - maxY <= 0.5)) floating++;
         if (!c.onCross) {
           let hit = false;
-          for (const [x, z] of pts) { const q = tr.nearest(x, z); if (!q || q.d > 14) continue; const o = tr.opposite && tr.opposite.has && tr.opposite.has(q.s) ? tr.opposite.latAt(q.s) : null; if ((Math.abs(q.lat) < 1.4 || (o !== null && Math.abs(q.lat - o) < 1.4)) && base - q.y > -3.4 && base - q.y < 3) { hit = true; break; } }
+          for (const [x, z] of pts) { const q = tr.nearest(x, z); if (!q || q.d > 14 || q.d > Math.abs(q.lat) + 0.6) continue; const o = tr.opposite && tr.opposite.has && tr.opposite.has(q.s) ? tr.opposite.latAt(q.s) : null; if ((Math.abs(q.lat) < 1.4 || (o !== null && Math.abs(q.lat - o) < 1.4)) && base - q.y > -3.4 && base - q.y < 3) { hit = true; break; } }
           if (!hit) for (const [x, z] of pts) { rc.set(new THREE.Vector3(x, base + 6, z), down); rc.far = 14; for (const hh of rc.intersectObjects(scene.children, true)) { if (!okObj(hh) || isTrain(hh.object) || hh.point.y > base + 6 - 0.01) continue; if (hh.point.y < base - 0.5) break; if (hh.point.y <= base + 0.5 && infra(hh.object)) hit = true; break; } if (hit) break; }
           if (hit) envelope++;
         }
