@@ -665,6 +665,33 @@ async function directionAndGearChecks(h, frame) {
     await key(h, 'b');
   }
 
+  h.step('scatter: no tree and no road lamp stands inside a drawn carriageway lane (Luxtram Findel - Kirchberg, 6 spots); kerbs and zebra stripes are drawn');
+  {
+    const out = [];
+    for (const s of [4816, 5100, 5420, 6100, 6900, 7300]) {
+      await frame.evaluate((s0) => { __tsTest.placeAt(s0, 0); }, s);
+      await frame.waitForFunction(() => { const l = __tsTest.internals().world.landscape; return !l.pendingAhead || l.pendingAhead() === 0; }, null, { timeout: 60000 });
+      await h.pause(2500);
+      out.push(await frame.evaluate((s0) => {
+        const { scene, world, THREE } = __tsTest.internals(); const drawn = TS.luxDrawnRoad; const track = world.track; const f0 = track.frameAt(s0);
+        const near = (x, z) => Math.hypot(x - f0.pos.x, z - f0.pos.z) < 220;
+        const inLane = (x, z) => drawn(x, z) === 1;
+        const res = { s: s0, trees: 0, treesIn: 0, lamps: 0, lampsIn: 0, kerbCut: 0, kerbKept: 0, zebra: 0 };
+        const m = new THREE.Matrix4(); const v = new THREE.Vector3();
+        scene.traverse((o) => {
+          if (o.isInstancedMesh && o.visible && o.parent && o.parent.parent && /^lt-tile/.test(o.parent.parent.name || '')) for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); v.setFromMatrixPosition(m).applyMatrix4(o.matrixWorld); if (!near(v.x, v.z) || drawn(v.x, v.z) === -1) continue; res.trees++; if (inLane(v.x, v.z)) res.treesIn++; }
+          if (o.name && o.name.startsWith('lg-decor-') && o.userData.kerb) { res.kerbCut += o.userData.kerb.cutM; res.kerbKept += o.userData.kerb.keptM; }
+        });
+        const lw = world.landscape.luxtramWorld;
+        ((lw && lw.debugRoadFurniture && lw.debugRoadFurniture().lamps) || []).forEach((l) => { if (!near(l.x, l.z) || drawn(l.x, l.z) === -1) return; res.lamps++; if (inLane(l.x, l.z)) res.lampsIn++; });
+        return res;
+      }, s));
+    }
+    const bad = out.filter((r) => r.treesIn > 0 || r.lampsIn > 0);
+    h.expect(bad.length === 0, 'trees ' + out.reduce((a, r) => a + r.trees, 0) + ', road lamps ' + out.reduce((a, r) => a + r.lamps, 0) + ' checked at 6 spots: none inside a drawn lane' + (bad.length ? ' (bad: ' + JSON.stringify(bad) + ')' : ''));
+    h.expect(out.every((r) => r.kerbKept > 0) && out.reduce((a, r) => a + r.kerbCut, 0) < out.reduce((a, r) => a + r.kerbKept, 0), 'kerbs: kept ' + out.reduce((a, r) => a + r.kerbKept, 0) + ' m, cut across carriageways ' + out.reduce((a, r) => a + r.kerbCut, 0) + ' m (tile read-out)');
+  }
+
   h.step('endless hands over seamlessly: a real service end (doors, terminus exchange) continues with the next route, tram career');
   await frame.evaluate(() => __tsTest.toMenu());
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');

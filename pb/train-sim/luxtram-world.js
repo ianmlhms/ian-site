@@ -1234,23 +1234,62 @@
       for (let i = 0; i <= n; i++) { const f = getFrame(a + ((b - a) * i) / n); pts.push({ x: f.pos.x, y: f.pos.y + (grass ? -0.11 : -0.02), z: f.pos.z }); }
       if (grass) {
         /* the grass track is the SAME painted lawn as the terrain around it (ground surface material, same colours at every distance), lying 3 cm ABOVE
-           the terrain mesh: it can never z-fight with it, so there is no light/dark band that follows the camera */
-        const S = batch.surf; const base = S.count;
-        for (let i = 0; i < pts.length; i++) {
-          const q0 = pts[Math.max(0, i - 1)]; const q1 = pts[Math.min(pts.length - 1, i + 1)];
-          const dl = Math.hypot(q1.x - q0.x, q1.z - q0.z) || 1; const nx = -(q1.z - q0.z) / dl; const nz = (q1.x - q0.x) / dl;
-          const y = pts[i].y + 0.08;
-          S.vert(pts[i].x - nx * 1.75, y, pts[i].z - nz * 1.75, 0, 1, 0, ground.MAT.LAWN, 1, 1, 1);
-          S.vert(pts[i].x + nx * 1.75, y, pts[i].z + nz * 1.75, 0, 1, 0, ground.MAT.LAWN, 1, 1, 1);
-        }
-        for (let i = 0; i < pts.length - 1; i++) { const a = base + i * 2; S.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+           the terrain mesh: it can never z-fight with it, so there is no light/dark band that follows the camera.
+           It is built in a second pass (pumpGrass) once the painted roads there exist: where a drawn carriageway lies across the whole track (a level crossing,
+           a junction) the lawn is left out, the asphalt stays - a soft green tongue lay over the road there before. */
+        if (curGrassJobs) curGrassJobs.push(pts);
+        else buildGrassRun(batch.surf, batch.bed, pts, null);
       } else ribbon(batch.bed, pts, 1.65, col, { vScale: 3, u0: 0, u1: 1 });
-      if (grass) {
-        [-1, 1].forEach((sd) => {
-          const edge = pts.map((p, i) => { const q0 = pts[Math.max(0, i - 1)]; const q1 = pts[Math.min(pts.length - 1, i + 1)]; const dl = Math.hypot(q1.x - q0.x, q1.z - q0.z) || 1; return { x: p.x + (-(q1.z - q0.z) / dl) * 1.78 * sd, z: p.z + ((q1.x - q0.x) / dl) * 1.78 * sd, y: p.y - 0.06 + 0.11 }; });
-          ribbon(batch.bed, edge, 0.1, [0.7, 0.7, 0.68], { vScale: 3 });
-        });
+    }
+    /* lawn ribbon (3.5 m) + the two pale edge lines of a grass track along pts; keep[i] false = leave the i-th 3 m piece out */
+    function buildGrassRun(S, bed, pts, keep) {
+      const base = S.count;
+      const okI = (i) => !keep || keep[i];
+      for (let i = 0; i < pts.length; i++) {
+        const q0 = pts[Math.max(0, i - 1)]; const q1 = pts[Math.min(pts.length - 1, i + 1)];
+        const dl = Math.hypot(q1.x - q0.x, q1.z - q0.z) || 1; const nx = -(q1.z - q0.z) / dl; const nz = (q1.x - q0.x) / dl;
+        const y = pts[i].y + 0.08;
+        S.vert(pts[i].x - nx * 1.75, y, pts[i].z - nz * 1.75, 0, 1, 0, ground.MAT.LAWN, 1, 1, 1);
+        S.vert(pts[i].x + nx * 1.75, y, pts[i].z + nz * 1.75, 0, 1, 0, ground.MAT.LAWN, 1, 1, 1);
       }
+      for (let i = 0; i < pts.length - 1; i++) { if (!okI(i) || !okI(i + 1)) continue; const a = base + i * 2; S.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+      // edge lines in runs of kept samples
+      [-1, 1].forEach((sd) => {
+        let run = [];
+        const flush = () => { if (run.length >= 2) ribbon(bed, run, 0.1, [0.7, 0.7, 0.68], { vScale: 3 }); run = []; };
+        for (let i = 0; i < pts.length; i++) {
+          if (!okI(i)) { flush(); continue; }
+          const q0 = pts[Math.max(0, i - 1)]; const q1 = pts[Math.min(pts.length - 1, i + 1)]; const dl = Math.hypot(q1.x - q0.x, q1.z - q0.z) || 1;
+          run.push({ x: pts[i].x + (-(q1.z - q0.z) / dl) * 1.78 * sd, z: pts[i].z + ((q1.x - q0.x) / dl) * 1.78 * sd, y: pts[i].y });
+        }
+        flush();
+      });
+    }
+    let curGrassJobs = null;
+    const grassPending = new Map();   // chunk -> { jobs: [pts...], group, t0 }
+    let grassClock = 0;
+    function pumpGrass(dt) {
+      if (!grassPending.size) return;
+      grassClock += dt; if (grassClock < 0.3) return; grassClock = 0;
+      const now = performance.now();
+      grassPending.forEach((e, ci) => {
+        const undecided = e.jobs.some((pts) => pts.some((q) => drawnRoad(q.x, q.z) === -1));
+        if (undecided && now - e.t0 < 30000) return;
+        grassPending.delete(ci);
+        if (!chunks.has(ci)) return;
+        const S = new ground.Acc(); const bed = new Mesher();
+        e.jobs.forEach((pts) => {
+          const keep = pts.map((q, i) => {
+            if (undecided) return true;
+            const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)]; const dl = Math.hypot(b.x - a.x, b.z - a.z) || 1; const nx = -(b.z - a.z) / dl; const nz = (b.x - a.x) / dl;
+            // a road across the whole track: drawn at the centreline and 1.4 m to both sides (a road running along the rails does not cover both)
+            return !(drawnRoad(q.x, q.z) === 1 && drawnRoad(q.x + nx * 1.4, q.z + nz * 1.4) === 1 && drawnRoad(q.x - nx * 1.4, q.z - nz * 1.4) === 1);
+          });
+          buildGrassRun(S, bed, pts, keep);
+        });
+        const m1 = S.mesh(T, ground.matSurface, 0); if (m1) e.group.add(m1);
+        const m2 = bed.mesh(matBed, { order: 1 }); if (m2) e.group.add(m2);
+      });
     }
     function buildTram(ci, sa, sb, batch) {
       lt.segs.forEach((sg) => {
@@ -1773,7 +1812,10 @@
       const roadsOut = [];
       buildRoads(ci, d, batch, lampOut, roadsOut);
       lampsPending.set(ci, { list: lampOut.list, group, t0: performance.now() });   // the lamps are built once the painted roads there exist (pumpLamps): no lamp stands in a drawn lane
+      curGrassJobs = [];
       buildTram(ci, sa, sb, batch);
+      grassPending.set(ci, { jobs: curGrassJobs, group, t0: performance.now() });
+      curGrassJobs = null;
       structuresInChunk(sa, sb, batch);
       buildTrees(ci, d, batch);
       { const bm = fx.batchMesh(batch.bld); if (bm) group.add(bm); }
@@ -1926,7 +1968,7 @@
       chunks.delete(k);
       root.remove(c.group);
       c.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
-      roadsByChunk.delete(k); lampsByChunk.delete(k); lampsPending.delete(k); markTraffic();
+      roadsByChunk.delete(k); lampsByChunk.delete(k); lampsPending.delete(k); grassPending.delete(k); markTraffic();
     }
 
     /* ---- landmark models (luxtram-landmarks.js) */
@@ -2008,6 +2050,7 @@
       ensureDecor(false, sc);
       ensureChunks(sc, false);
       pumpLamps(Math.min(0.1, dt || 0.016));
+      pumpGrass(Math.min(0.1, dt || 0.016));
       ensureFar(sc, camera, false);
       ground.update(Math.min(0.1, dt || 0.016));
       const sun = landscape && landscape.sun ? landscape.sun.intensity : 3;
