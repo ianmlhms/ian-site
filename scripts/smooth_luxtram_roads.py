@@ -36,6 +36,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import luxtram_ground_model as M  # noqa: E402
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pb", "train-sim", "data", "luxtram")
+DATA_IN = os.environ.get("LUXTRAM_DATA_IN", DATA)         # read the tiles from here ...
+DATA_OUT = os.environ.get("LUXTRAM_DATA_OUT", DATA_IN)     # ... and write them here (default: in place)
 TILE = 128.0
 H0 = 150.0
 HQ_OLD = 50.0
@@ -52,6 +54,7 @@ BLEND_MIN, BLEND_MAX = 4.0, 14.0           # width of the blend into the LiDAR g
 DEV_FULL, DEV_ZERO = 0.35, 0.9             # ground that differs more than this from the road level is left alone (bank, cutting, wall): full effect below
                                            # DEV_FULL, none above DEV_ZERO
 JOIN_MAX_SPREAD = 1.0                      # roads at one node whose smoothed levels differ more than this are not at one level (m)
+CHAIN_COS = 0.6                            # two road ends are one street when the travel direction continues within ~53 degrees
 JOIN = 0.4                                 # points closer than this are one OSM node (m)
 CLASS_W = {0: 1000.0, 1: 300.0, 2: 100.0, 3: 30.0, 4: 10.0, 5: 3.0}       # who wins at a junction
 
@@ -243,11 +246,11 @@ def main():
     if "--report" in sys.argv:
         report = sys.argv[sys.argv.index("--report") + 1]
     t0 = time.time()
-    idx = json.load(open(os.path.join(DATA, "index.json")))
+    idx = json.load(open(os.path.join(DATA_IN, "index.json")))
     hq_in = HQ_OLD if idx.get("v", 1) < 5 else HQ_NEW
     tiles, steps = {}, {}
     for key, meta in idx["tiles"].items():
-        buf = open(os.path.join(DATA, "h", key + ".bin"), "rb").read()
+        buf = open(os.path.join(DATA_IN, "h", key + ".bin"), "rb").read()
         tiles[key] = decode_heights(buf, hq_in)
         steps[key] = float(meta["step"])
     print("tiles", len(tiles), "decoded in %.0fs (HQ %g)" % (time.time() - t0, hq_in))
@@ -318,41 +321,125 @@ def main():
     for d in R:
         d.vst = np.clip(np.round(d.arc / (d.L / (len(d.s) - 1))).astype(int), 0, len(d.s) - 1)
 
-    # ---- profiles with junction pins (3 rounds)
-    pins = [dict() for _ in R]
-    z = [None] * len(R)
+    # ---- chains: a street is cut into many OSM ways at every junction; the ways that simply continue into each other (two road ends at one node, same class,
+    # same direction) are smoothed as ONE profile, so the wavelength cutoff and the vertical curves hold across the junctions
+    ends = {}
+    for ni, nd in enumerate(nodes):
+        mem = nd["mem"]
+        if len(mem) != 2:
+            continue
+        (r0, v0, _), (r1, v1, _) = mem
+        if r0 == r1:
+            continue
+        d0, d1 = R[r0], R[r1]
+        if d0.cls != d1.cls:
+            continue
+        e0 = 0 if v0 == 0 else (1 if v0 == len(d0.r.pts) - 1 else None)
+        e1 = 0 if v1 == 0 else (1 if v1 == len(d1.r.pts) - 1 else None)
+        if e0 is None or e1 is None:
+            continue
+        p0 = np.array(d0.r.pts, dtype=float)
+        p1 = np.array(d1.r.pts, dtype=float)
+        tv0 = (p0[1] - p0[0]) if e0 == 0 else (p0[-1] - p0[-2])
+        tv1 = (p1[1] - p1[0]) if e1 == 0 else (p1[-1] - p1[-2])
+        tv0 = tv0 / (np.hypot(*tv0) + 1e-9)
+        tv1 = tv1 / (np.hypot(*tv1) + 1e-9)
+        # leaving road 0 through its end e0 and entering road 1 through e1: the travel direction must continue
+        out0 = tv0 if e0 == 1 else -tv0
+        in1 = tv1 if e1 == 0 else -tv1
+        if float(out0 @ in1) < CHAIN_COS:
+            continue
+        if (r0, e0) in ends or (r1, e1) in ends:
+            continue
+        ends[(r0, e0)] = (r1, e1)
+        ends[(r1, e1)] = (r0, e0)
+    used = set()
+    chains = []                                   # each chain: list of (road index, traversed reversed?)
+    for ri in range(len(R)):
+        if ri in used:
+            continue
+        start, entry = ri, 0                      # walk backwards to the first road of the street
+        seen = {ri}
+        while True:
+            nx = ends.get((start, entry))
+            if not nx or nx[0] in seen:
+                break
+            nr, ne = nx
+            start, entry = nr, 1 - ne             # the neighbour is traversed so that its end `ne` is the exit towards us
+            seen.add(nr)
+        chain = []
+        cur = start
+        seen2 = set()
+        while cur not in seen2:
+            seen2.add(cur)
+            chain.append((cur, entry == 1))       # entered through its end = traversed reversed
+            nx = ends.get((cur, 1 - entry))
+            if not nx or nx[0] in seen2:
+                break
+            cur, entry = nx[0], nx[1]
+        for c3, _ in chain:
+            used.add(c3)
+        chains.append(chain)
+    print("chains", len(chains), "for", len(R), "roads")
+    cmap = [None] * len(R)                         # road -> (chain index, station -> chain station index)
+    cy0, cw0, cls_of = [], [], []
+    for ci, chain in enumerate(chains):
+        ys, idxs = [], {}
+        for pos, (ri, rv) in enumerate(chain):
+            d = R[ri]
+            n = len(d.s)
+            order = list(range(n - 1, -1, -1)) if rv else list(range(n))
+            m = np.zeros(n, dtype=int)
+            for q, k in enumerate(order):
+                if pos > 0 and q == 0:
+                    m[k] = len(ys) - 1               # the shared node station
+                    continue
+                ys.append(d.y0[k])
+                m[k] = len(ys) - 1
+            cmap[ri] = (ci, m)
+        cy0.append(np.array(ys, dtype=float))
+        cls_of.append(R[chain[0][0]].cls)
+
+    # ---- profiles with junction pins (4 rounds)
+    pins = [dict() for _ in chains]
+    zc = [None] * len(chains)
     for rnd in range(4):
-        for ri, d in enumerate(R):
-            zz = smooth_profile(d.y0, np.ones(len(d.s)), d.cls, pins[ri])
-            z[ri] = zz if zz is not None else d.y0
-        newpins = [dict() for _ in R]
+        for ci in range(len(chains)):
+            zz = smooth_profile(cy0[ci], np.ones(len(cy0[ci])), cls_of[ci], pins[ci])
+            zc[ci] = zz if zz is not None else cy0[ci]
+        newpins = [dict() for _ in chains]
         for nd in nodes:
             mem = nd["mem"]
-            hs, ws = [], []
+            hs, ws, tg = [], [], []
             for ri, vi, _ in mem:
                 d = R[ri]
-                st = int(d.vst[vi])
-                if z[ri] is None or not np.isfinite(z[ri][st]):
+                ci, m = cmap[ri]
+                st = int(m[int(d.vst[vi])])
+                if zc[ci] is None or not np.isfinite(zc[ci][st]):
                     continue
-                hs.append(z[ri][st])
+                hs.append(zc[ci][st])
                 ws.append(CLASS_W[d.cls])
+                tg.append((ci, st))
             if not hs:
                 continue
             if max(hs) - min(hs) > JOIN_MAX_SPREAD:
                 continue                              # not one level (an overpass that shares a node in the data): no junction
             h = float(np.average(hs, weights=ws))
-            if nd["deck"] and len(set(m[0] for m in mem)) < 2:
+            if nd["deck"] and len(set(m_[0] for m_ in mem)) < 2:
                 continue                              # the end of a ground road at a bridge / tunnel: free (the deck bends to meet it)
-            for ri, vi, _ in mem:
-                d = R[ri]
-                st = int(d.vst[vi])
-                for k in (st,):
-                    newpins[ri][k] = (h, 400.0)
+            for ci, st in tg:
+                newpins[ci][st] = (h, 400.0)
         pins = newpins
+    z = [None] * len(R)
+    for ri, d in enumerate(R):
+        ci, m = cmap[ri]
+        zz = zc[ci][m]
+        z[ri] = zz
     for ri, d in enumerate(R):
         if z[ri] is None or not np.all(np.isfinite(z[ri])):
             z[ri] = np.where(np.isfinite(d.y0), d.y0, np.nanmean(d.y0) if np.isfinite(d.y0).any() else 0.0)
-        zr = whittaker(np.interp(np.arange(len(d.y0)), np.where(np.isfinite(d.y0))[0], d.y0[np.isfinite(d.y0)]) if np.isfinite(d.y0).any() else d.z0 if False else z[ri], np.ones(len(d.y0)), (25.0 / DS / (2 * math.pi)) ** 4) if np.isfinite(d.y0).any() else z[ri]
+        ok = np.isfinite(d.y0)
+        zr = whittaker(np.interp(np.arange(len(d.y0)), np.where(ok)[0], d.y0[ok]), np.ones(len(d.y0)), (25.0 / DS / (2 * math.pi)) ** 4) if ok.sum() >= 3 else z[ri]
         z[ri] = limit_shape(z[ri], d.cls, zr)
         d.z = z[ri]
     print("smoothed %.0fs" % (time.time() - t0))
@@ -375,6 +462,14 @@ def main():
         s["revBefore03"] += reversals(y0, DS, 0.003)
         s["revAfter03"] += reversals(d.z, DS, 0.003)
         s["maxDev"] = max(s["maxDev"], float(np.max(np.abs(d.z - y0))))
+        gz = np.abs(np.diff(d.z)) / DS
+        cz = np.abs(d.z[:-2] - 2 * d.z[1:-1] + d.z[2:]) / (DS * DS)
+        s["maxGradeAfter"] = max(s.get("maxGradeAfter", 0.0), float(gz.max()))
+        s["maxGradeBefore"] = max(s.get("maxGradeBefore", 0.0), float((np.abs(np.diff(y0)) / DS).max()))
+        s["minRadAfter"] = min(s.get("minRadAfter", 1e9), float(1.0 / max(cz.max(), 1e-9)) if len(cz) else 1e9)
+        s["p99GradeAfter"] = max(s.get("p99GradeAfter", 0.0), float(np.percentile(gz, 99)))
+        s.setdefault("_g", []).append(float(gz.max()))
+        s.setdefault("_r", []).append(float(1.0 / max(cz.max(), 1e-9)) if len(cz) else 1e9)
     worst = sorted(((float(np.max(np.abs(d.z - np.where(np.isfinite(d.y0), d.y0, d.z)))), d.cls, round(float(d.xy[len(d.xy) // 2][0])), round(float(d.xy[len(d.xy) // 2][1])), round(d.L)) for d in R), reverse=True)[:8]
     print("worst deviation (m, class, x, z, length):", worst)
     for k, s in stats["byClass"].items():
@@ -384,6 +479,16 @@ def main():
         s["perKmAfter03"] = round(s["revAfter03"] / s["km"], 1)
         s["km"] = round(s["km"], 1)
         s["maxDev"] = round(s["maxDev"], 2)
+        gs = np.array(s.pop("_g"))
+        rs = np.array(s.pop("_r"))
+        s["medianRoadMaxGradePct"] = round(float(np.median(gs)) * 100, 1)
+        s["roadsOver12pct"] = int((gs > 0.12).sum())
+        s["roads"] = len(gs)
+        s["medianRoadMinRadius"] = round(float(np.median(rs)))
+        s["maxGradeAfter"] = round(s["maxGradeAfter"] * 100, 1)
+        s["p99GradeAfter"] = round(s["p99GradeAfter"] * 100, 1)
+        s["maxGradeBefore"] = round(s["maxGradeBefore"] * 100, 1)
+        s["minRadAfter"] = round(s["minRadAfter"])
     print(json.dumps(stats))
     if report:
         json.dump(stats, open(report, "w"), indent=1)
@@ -485,9 +590,9 @@ def main():
     # ---- write
     for key, h in tiles.items():
         buf = encode_heights(h, HQ_NEW)
-        open(os.path.join(DATA, "h", key + ".bin"), "wb").write(buf)
+        open(os.path.join(DATA_OUT, "h", key + ".bin"), "wb").write(buf)
     idx["v"] = max(5, idx.get("v", 1) + 1) if hq_in == HQ_OLD else idx.get("v", 5)
-    json.dump(idx, open(os.path.join(DATA, "index.json"), "w"), separators=(",", ":"))
+    json.dump(idx, open(os.path.join(DATA_OUT, "index.json"), "w"), separators=(",", ":"))
     print("written %d tiles, index v %s, %.0fs" % (len(tiles), idx["v"], time.time() - t0))
 
 

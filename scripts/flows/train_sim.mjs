@@ -1030,6 +1030,34 @@ async function directionAndGearChecks(h, frame) {
     h.expect(carSum.envelope === 0, 'no road vehicle stands in the tram track envelope or on the tram infrastructure (' + carSum.envelope + ')');
   }
 
+  h.step('Luxtram roads: smooth carriageways (few grade reversals per km), vehicles point along their drawn lane, no slope-scaled polygon offset on the ground layers (it made a light / dark band that moves with the tram)');
+  {
+    const tot = { km: 0, rev: 0, runs: 0 }; const yaw = { n: 0, bad: 0, worst: 0 }; const pof = new Set();
+    for (const s of [4800, 10440, 14048]) {
+      await frame.evaluate((s0) => { __tsTest.placeAt(s0, 0); TS.luxTraffic.debugYaw = true; }, s);
+      await frame.waitForFunction(() => { const l = __tsTest.internals().world.landscape; return !l.pendingAhead || l.pendingAhead() === 0; }, null, { timeout: 90000 });
+      await h.pause(4500);
+      const r = await frame.evaluate(() => {
+        const { scene, world } = __tsTest.internals(); const lw = world.landscape.luxtramWorld; const lt = TS.luxTraffic.last; const tr = world.track;
+        const out = { km: 0, rev: 0, runs: 0, cars: 0, badYaw: 0, worst: 0, pof: [] };
+        for (const r of lt.roadLines(2)) {
+          if (r.bridge || r.cls > 3) continue; let ys = [];
+          const flush = () => { if (ys.length >= 50) { let last = 0, n = 0; for (let i = 1; i < ys.length; i++) { const g = (ys[i] - ys[i - 1]) / 2; if (Math.abs(g) <= 0.003) continue; const sg = g > 0 ? 1 : -1; if (last && sg !== last) n++; last = sg; } out.km += (ys.length - 1) * 0.002; out.rev += n; out.runs++; } ys = []; };
+          for (const [x, z] of r.pts) { const q = tr.nearest(x, z); const y = q.d < 150 ? lw.roadHeightAt(x, z, false, true) : NaN; if (y === y) ys.push(y); else flush(); }
+          flush();
+        }
+        lt.cars().forEach((c) => { if (c.bend < 2) { out.cars++; out.worst = Math.max(out.worst, c.yawErr || 0); if (c.yawErr > 5) out.badYaw++; } });
+        scene.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; if (!ms.some((m) => m.polygonOffset && m.polygonOffsetFactor < 0)) return; for (let q = o; q; q = q.parent) if (/^(lt-chunk|lg-decor|lt-tile|train-sim-infra)/.test(q.name || '')) { out.pof.push(q.name.replace(/[-_]?-?\d+_?-?\d*$/, '')); break; } });
+        return out;
+      });
+      tot.km += r.km; tot.rev += r.rev; tot.runs += r.runs; yaw.n += r.cars; yaw.bad += r.badYaw; yaw.worst = Math.max(yaw.worst, r.worst); r.pof.forEach((n) => pof.add(n));
+    }
+    h.expect(tot.runs >= 3 && tot.km >= 0.5, 'carriageway runs were measured (' + tot.runs + ' runs, ' + tot.km.toFixed(2) + ' km)');
+    h.expect(tot.rev / Math.max(0.1, tot.km) <= 14, 'drawn carriageways: ' + (tot.rev / Math.max(0.1, tot.km)).toFixed(1) + ' grade reversals per km (was 40-80 on the raw LiDAR ground)');
+    h.expect(yaw.n >= 10 && yaw.bad === 0, 'every vehicle on a straight lane stays within 5 degrees of its drawn lane (' + yaw.n + ' vehicles, worst ' + yaw.worst.toFixed(1) + ')');
+    h.expect(pof.size === 0, 'no ground layer uses a slope-scaled polygon offset (' + Array.from(pof).join(',') + ')');
+  }
+
   h.step('endless hands over seamlessly: a real service end (doors, terminus exchange) continues with the next route, tram career');
   await frame.evaluate(() => __tsTest.toMenu());
   await waitState(frame, () => window.__tsTest.state().phase === 'menu');
