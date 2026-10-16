@@ -1894,9 +1894,15 @@
     // ramps
     [[zA, 1], [zB, -1]].forEach(([z, dir]) => {
       const rampLen = isTram ? 3.5 : 14;
-      const ang = Math.atan2(H, rampLen);
-      const rp = spot(z + dir * rampLen / 2, edge + W / 2);
-      concrete.box(rp.x, rp.y + H / 2 - 0.3, rp.z, W, 0.25, Math.hypot(rampLen, H), col('#b2afa8'), rp.yaw, dir * -ang);
+      // the box reaches 0.35 m under the platform end (on a curved platform two boxes with different headings leave a thin wedge between them). Its top plane runs from just under the
+      // platform top at the platform end (yA) to the track's own height at the far end (yB), so it follows the profile on a gradient too (a flat box at the ramp's centre height stood 0.1 m proud on 7 %)
+      const ov = isTram ? 0.35 : 0;
+      const dropJ = ov ? 0.02 : 0;
+      const yA = spot(z, edge + W / 2).y + H - dropJ, yB = spot(z + dir * rampLen, edge + W / 2).y;
+      const ang = Math.atan2(yA - yB, rampLen);
+      const tc = (rampLen - ov) / 2;
+      const rp = spot(z + dir * tc, edge + W / 2);
+      concrete.box(rp.x, yA + (yB - yA) * (tc / rampLen) - 0.125, rp.z, W, 0.25, Math.hypot(rampLen, yA - yB) + ov, col('#b2afa8'), rp.yaw, dir * ang);
     });
     // stop marker
     const zm = zOf(st.s);

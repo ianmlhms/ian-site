@@ -298,6 +298,12 @@ async function luxtramNormalChecks(h, frame) {
   h.expect(rows.every((r) => r.oppBuilt), 'the opposite track\'s own platform is built on its far side (none where the stop has an island platform)');
   h.eq(rows.filter((r) => r.side === 'left').map((r) => r.name), ['Findel-Aéroport', 'Rout Bréck', 'Stäreplaz'], 'the three island-platform stops (platform between the tracks) are the only left-hand ones');
 
+  await luxtramPassengerChecks(h, frame);
+  await luxtramDwellChecks(h, frame);
+  await luxtramSaloonChecks(h, frame);
+  await luxtramTimetableChecks(h, frame);
+  await luxtramCam3Checks(h, frame);
+
   /* The oncoming tram runs on the track the player is NOT on, chosen by the route (forward / ~r), never by the momentary direction: driving or backing (reverser R) must never put it on the player's own track. */
   h.step('Luxtram: the oncoming tram always runs on the other track (forward, reverser, ~r), never overlapping the player\'s tram');
   for (const route of ['luxtram', 'luxtram~r']) {
@@ -350,6 +356,257 @@ async function railTunnelChecks(h, frame) {
     return out;
   });
   for (const r of res) h.expect(r.tunnels > 0 && r.worst >= 6.8, r.id + ': ' + r.tunnels + ' tunnel(s), lowest ground above the bore ' + r.worst.toFixed(2) + ' m over the rails (crown 6.7 m, ' + r.samples + ' samples)');
+}
+
+
+/* Luxtram people: at an island, a trench, a plain, a curved and a bridge-side stop, run a full exchange (everybody alights / boards) and sample every person's feet over time
+ * against a raycast of the surface under them. Platform top, end ramps and the ground beyond are the only places anybody may be; nobody on the track side of the platform edge. */
+async function luxtramPassengerChecks(h, frame) {
+  h.step('Luxtram passengers: boarding + alighting at 6 stops (island, trench, plain, curve ...), every person\'s feet are within 0.1 m of the surface under them, nobody beside the track under the edge');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+  const STOPS = [0, 1, 5, 11, 13, 20];
+  const rows = [];
+  for (const i of STOPS) {
+    await frame.evaluate((k) => { __tsTest.teleport(k); __tsTest.stopAtMarker(-0.5); }, i);
+    await waitState(frame, (k) => window.__tsTest.state().atStationIndex === k, i);
+    await h.pause(2500);   // the world around the stop finishes building
+    await key(h, 'd');
+    await waitState(frame, () => window.__tsTest.state().doorPhase === 'open');
+    const r = await frame.evaluate(async () => {
+      const { world, scene, camera, THREE } = __tsTest.internals(), P = world.passengers, pinfo = P.platformInfo();
+      const samples = []; let steps = 0;
+      while (steps < 1800) {
+        for (let k = 0; k < 5; k++) { P.update(0.1, camera); steps++; samples.push(P.feet().map((p) => [p.slot, p.kind, p.doorway ? 1 : 0, p.x, p.y, p.z, p.o, p.rx, p.rz])); }
+        await new Promise((res) => setTimeout(res, 0));
+        if (P.stats().done && steps > 20) break;
+      }
+      const tr = world.track, stn = tr.stations[__tsTest.state().atStationIndex], fc = tr.frameAt(stn.s);
+      const meshes = [], bb = new THREE.Box3(); scene.updateMatrixWorld(true);
+      scene.traverse((o) => {
+        if (!o.isMesh || !o.visible || o.isInstancedMesh || !o.geometry) return;
+        for (let a = o.parent; a; a = a.parent) if (a.name === 'ts-passengers') return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+        if (bb.max.x < fc.pos.x - 110 || bb.min.x > fc.pos.x + 110 || bb.max.z < fc.pos.z - 110 || bb.min.z > fc.pos.z + 110) return;
+        meshes.push(o);
+      });
+      const rc = new THREE.Raycaster(); rc.camera = camera; rc.far = 6;
+      const cache = new Map();
+      const rayAt = (x, y, z) => { rc.set(new THREE.Vector3(x, y + 1.1, z), new THREE.Vector3(0, -1, 0)); const hit = rc.intersectObjects(meshes, false).filter((q) => !q.face || q.face.normal.y > 0.5); return hit.length ? hit[0].point.y : null; };
+      // five rays 4 cm apart, the median wins
+      const surf = (x, y, z) => {
+        const key = Math.round(x * 6) + ',' + Math.round(z * 6) + ',' + Math.round(y * 6);
+        if (cache.has(key)) return cache.get(key);
+        const hits = [];
+        for (const [dx, dz] of [[0, 0], [0.04, 0], [-0.04, 0], [0, 0.04], [0, -0.04]]) { const v = rayAt(x + dx, y, z + dz); if (v != null) hits.push(v); }
+        hits.sort((a, b) => a - b);
+        const best = hits.length ? hits[hits.length >> 1] : null;   // median: one ray can slip through a shared triangle edge (low) or hit a sliver in the terrain mesh (high)
+        cache.set(key, best); return best;
+      };
+      let nS = 0, bad = 0, env = 0, none = 0, worst = 0; const ids = new Set();
+      samples.forEach((f) => f.forEach(([slot, kind, door, x, y, z, o, rx, rz]) => {
+        nS++; ids.add(slot + kind);
+        if (!door && o < pinfo.edge - 0.05) env++;
+        let sf = surf(x, y, z);
+        if (door) for (const dd of [-0.5, -0.25, 0.25, 0.5]) { const s2 = surf(x + rx * dd, y, z + rz * dd); if (s2 != null && (sf == null || s2 > sf)) sf = s2; }   // across the gap between tram and platform
+        if (sf == null) { none++; return; }
+        const d = y - sf; if (Math.abs(d) > Math.abs(worst)) worst = d;
+        if (Math.abs(d) > (door ? 0.4 : 0.1)) bad++;   // (the doorway: sill, step and gap, up to 0.4 m)
+      }));
+      return { name: stn.name, people: ids.size, samples: nS, bad, env, none, worst: +worst.toFixed(2), done: P.stats().done, boarded: P.stats().boarded, alighted: P.stats().alighted };
+    });
+    rows.push(r);
+    await key(h, 'd').catch(() => {});
+    await h.pause(300);
+  }
+  console.log('  passenger height check (stop | people samples | off-surface beyond 0.1 m | under the platform edge | no surface | worst diff m):\n' + rows.map((r) => '   ' + r.name.padEnd(18) + [r.people, r.samples, r.bad, r.env, r.none, r.worst].join('  ')).join('\n'));
+  h.expect(rows.every((r) => r.people > 20 && r.samples > 500), 'every stop had a real exchange to measure (people ' + rows.map((r) => r.people).join('/') + ')');
+  h.eq(rows.reduce((a, r) => a + r.bad, 0), 0, 'no person stands or walks more than 0.1 m off the surface under his feet (platform, ramp, ground) at 6 stops');
+  h.eq(rows.reduce((a, r) => a + r.env, 0), 0, 'nobody is on the track side of the platform edge outside the doorway');
+  h.eq(rows.reduce((a, r) => a + r.none, 0), 0, 'there is a surface under every person');
+}
+
+/* The saloon camera (key 5): three viewpoints, the interior drawn, people who board really appear inside and walk to a seat or a pole, the count follows the passenger count, alighting empties it. */
+async function luxtramSaloonChecks(h, frame) {
+  h.step('Luxtram saloon camera: key 5 and the HUD button, three viewpoints, seats + info screen + people inside, boarding fills the saloon, alighting at the terminus empties it');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+  await frame.evaluate(() => { __tsTest.setCamera('cab'); });
+  h.expect(await frame.evaluate(() => !document.getElementById('btnInside').hidden), 'the HUD has the saloon button on the Luxtram');
+  await key(h, '5');
+  let q = await S(frame);
+  h.eq([q.camMode, q.insidePos], ['inside', 0], 'key 5 switches to the saloon camera (front viewpoint first)');
+  await key(h, '5'); q = await S(frame); h.eq(q.insidePos, 1, 'key 5 again: middle viewpoint');
+  await key(h, '5'); q = await S(frame); h.eq(q.insidePos, 2, 'and again: rear viewpoint');
+  await key(h, '5'); q = await S(frame); h.eq([q.camMode, q.insidePos], ['inside', 0], 'a fourth press cycles back to the front viewpoint');
+  const geo = await frame.evaluate(() => { const { world } = __tsTest.internals(); return { cars: world.model.cars.length, interiors: world.model.cars.filter((c) => c.interior && c.interior.seats.length >= 4 && c.interior.screens.length >= 1).length, seatsMid: world.model.cars[2].interior.seats.length, transverse: world.model.cars[2].interior.seats.filter((x) => Math.abs(Math.sin(x.yaw)) < 0.1).length }; });
+  h.expect(geo.cars === 5 && geo.interiors === 5, 'all 5 cars have a saloon (seats, info screens)');
+  h.expect(geo.transverse >= geo.seatsMid * 0.8, 'mostly transverse (2+2) seats in the middle car (' + geo.transverse + ' of ' + geo.seatsMid + ')');
+  await frame.evaluate(() => { __tsTest.setCamera('cab'); __tsTest.teleport(0); __tsTest.stopAtMarker(-0.5); });
+  await waitState(frame, () => window.__tsTest.state().atStationIndex === 0 && window.__tsTest.state().kmh < 0.5);
+  await key(h, '5');
+  q = await S(frame);
+  const empty0 = q.cabin ? q.cabin.total : -1;
+  h.expect(q.cabin && q.cabin.active && q.cabin.cars === 5, 'the saloon people are active in the saloon camera (' + (q.cabin ? q.cabin.cars : 0) + ' cars)');
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorPhase === 'open');
+  let walkedIn = 0, maxTotal = 0, seatedAny = 0;
+  for (let i = 0; i < 90; i++) {
+    const c = (await S(frame)).cabin;
+    walkedIn = Math.max(walkedIn, c.walking); maxTotal = Math.max(maxTotal, c.total); seatedAny = Math.max(seatedAny, c.sitting);
+    if ((await S(frame)).exchange && (await S(frame)).exchange.done) break;
+    await h.pause(500);
+  }
+  await key(h, 'd');
+  await h.pause(1500);
+  q = await S(frame);
+  const want = Math.min(q.cabin.cap, q.onboard);
+  h.expect(maxTotal > empty0 + 15, 'people came aboard at Findel: ' + empty0 + ' -> ' + maxTotal + ' inside while boarding');
+  h.expect(walkedIn > 0, 'boarders walk in through the doors (up to ' + walkedIn + ' at once on the way to their place)');
+  h.expect(seatedAny > 0, 'boarders sit down (' + seatedAny + ' seated)');
+  await waitState(frame, (w) => window.__tsTest.state().cabin.total === w, want, 20000).catch(() => {});
+  q = await S(frame);
+  h.eq(q.cabin.total, Math.min(q.cabin.cap, q.onboard), 'the people inside match the passenger count (' + q.onboard + ' on board, at most ' + q.cabin.cap + ' drawn)');
+  h.expect(await frame.evaluate(() => { const { scene } = __tsTest.internals(); const g = scene.getObjectByName('ts-passengers'); return !!g; }), 'the passenger meshes exist in the scene');
+  const shown = await frame.evaluate(() => { const { scene } = __tsTest.internals(); let n = 0, vis = 0; scene.traverse((o) => { if (o.isInstancedMesh && o.parent && o.parent.name === 'ts-passengers') { n++; let v = true; for (let a = o; a; a = a.parent) if (!a.visible) v = false; if (v && o.count > 0) vis++; } }); return { n, vis }; });
+  h.expect(shown.vis >= 10, 'the people inside are drawn (' + shown.vis + ' of ' + shown.n + ' instanced part meshes visible with instances)');
+  await h.shot('luxtram-saloon');
+  await frame.evaluate(() => { __tsTest.finishRoute(); });
+  await waitState(frame, () => window.__tsTest.state().atStationIndex === window.__tsTest.state().stations.length - 1);
+  await h.pause(1500);
+  const before = (await S(frame)).cabin.total;
+  await key(h, 'd');
+  await waitState(frame, () => window.__tsTest.state().doorPhase === 'open');
+  await waitState(frame, () => { const e = window.__tsTest.state().exchange; return e && e.done; }, null, 90000);
+  await h.pause(2500);
+  q = await S(frame);
+  h.expect(before > 0 && q.cabin.total < before, 'alighting at the terminus empties the saloon (' + before + ' -> ' + q.cabin.total + ')');
+  await frame.evaluate(() => { __tsTest.setCamera('cab'); });
+  q = await S(frame);
+  h.eq(q.cabin.active, false, 'back in the cab the saloon people are inactive again (nothing drawn or animated)');
+}
+
+
+/* Timetable display rules (see scheduleView in train-sim.js): arrival <= departure, times rise along the route with a realistic dwell, both shown with seconds on the HUD,
+ * the delay in a stop is measured against the DEPARTURE only (early arrival and late arrival are absorbed by the dwell), green up to 0:30 late, red after, and a countdown to the departure. */
+async function luxtramTimetableChecks(h, frame) {
+  h.step('Luxtram timetable: arrival never after departure, times rise along the line, realistic dwell; the HUD shows arrival + departure, a countdown in the stop, delay green/red against the departure');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+  const tt = (await S(frame)).timetable;
+  h.eq(tt.length, 24, 'the timetable has all 24 stops');
+  const bad = [];
+  tt.forEach((x, i) => {
+    if (x.dep < x.arr) bad.push(x.name + ': departure before arrival');
+    if (i > 0 && !(x.arr > tt[i - 1].dep)) bad.push(x.name + ': arrival not after the previous departure');
+    if (i > 0 && i < tt.length - 1 && !x.pass && (x.dep - x.arr < 20 || x.dep - x.arr > 60)) bad.push(x.name + ': dwell ' + (x.dep - x.arr) + ' s');
+    if (!Number.isInteger(x.arr) || !Number.isInteger(x.dep)) bad.push(x.name + ': fractional seconds');
+  });
+  h.eq(bad, [], 'every stop: arrival <= departure, the next arrival after it, whole seconds, a 20..60 s dwell');
+  await frame.evaluate(() => { __tsTest.teleport(5); __tsTest.stopAtMarker(-0.5); });
+  await waitState(frame, () => window.__tsTest.state().atStationIndex === 5 && window.__tsTest.state().kmh < 0.5);
+  await h.pause(1200);   // the HUD catches up with the teleport
+  const pill = (id) => frame.evaluate((i) => document.getElementById(i).textContent, id);
+  const secs = (t) => { const m = /^(\d\d):(\d\d)(?::(\d\d))?$/.exec(String(t).trim()); return m ? +m[1] * 3600 + +m[2] * 60 + (+m[3] || 0) : NaN; };
+  const arr = secs(await pill('schedArrT')), dep = secs(await pill('schedDepT'));
+  h.expect(Number.isFinite(arr) && Number.isFinite(dep) && dep >= arr && dep - arr <= 60, 'the stop box shows arrival and departure with seconds, departure not before arrival (' + (await pill('schedArrT')) + ' / ' + (await pill('schedDepT')) + ')');
+  h.expect((await pill('nextLbl')).length > 0 && (await pill('depBadge')).includes(tt[5].name) && /\d:\d\d/.test(await pill('depBadge')), 'standing in the stop a badge names it and counts down to the departure: ' + (await pill('depBadge')));
+  let d = await frame.evaluate(() => ({ txt: document.getElementById('delay').textContent, cls: document.getElementById('delay').className, word: document.getElementById('delayWord').textContent }));
+  h.eq(d.txt, '+0:00', 'standing before the departure time the delay reads +0:00 (measured against the departure)');
+  h.expect(!/late/.test(d.cls), 'and it is green');
+  await frame.evaluate(() => { const s = __tsTest.state(); __tsTest.forceSimStep(Math.max(0, s.timetable[5].dep - s.simT) + 75, 0); });
+  await h.pause(500);
+  d = await frame.evaluate(() => ({ txt: document.getElementById('delay').textContent, cls: document.getElementById('delay').className, word: document.getElementById('delayWord').textContent, badge: document.getElementById('depBadge').className }));
+  h.expect(/^\+1:/.test(d.txt) && /late/.test(d.cls) && /late/.test(d.badge), 'a minute past the departure time the delay counts up (' + d.txt + '), red, and so does the badge');
+  const w = await frame.evaluate(() => document.getElementById('nextSide').textContent);
+  h.expect(/^Quai (riets|lénks)$/.test(w), 'the platform side stays readable: ' + w);
+}
+
+
+/* Camera 3 (platform view) is movable: drag = look round, wheel = zoom, arrow keys = walk along the platform (clamped to it, at eye height), 3 again resets. */
+async function luxtramCam3Checks(h, frame) {
+  h.step('Luxtram camera 3: drag to look, wheel to zoom, arrows to walk along the platform (clamped), key 3 resets');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+  await frame.evaluate(() => { __tsTest.setCamera('cab'); __tsTest.teleport(5); __tsTest.stopAtMarker(-0.5); });
+  await waitState(frame, () => window.__tsTest.state().atStationIndex === 5 && window.__tsTest.state().kmh < 0.5);
+  await key(h, '3'); await h.pause(1200);
+  const cam = () => frame.evaluate(() => { const { camera, world } = __tsTest.internals(), i = __tsTest.state().atStationIndex, st = world.track.stations[i], pi = world.track.platformInfo(i), f = world.track.frameAt(st.s), p = camera.position; return { pos: [p.x, p.y, p.z], q: [camera.quaternion.x, camera.quaternion.y, camera.quaternion.z, camera.quaternion.w], fov: camera.fov, lat: ((p.x - f.pos.x) * f.right.x + (p.z - f.pos.z) * f.right.z) * pi.sideSign, edge: pi.edge, back: pi.edge + pi.width, dy: p.y - f.pos.y, ph: pi.height, hint: !document.getElementById('camHint').hidden }; });
+  const c0 = await cam();
+  h.expect(c0.hint, 'camera 3 shows the hint (drag / arrows / wheel)');
+  const box = await (await frame.frameElement()).boundingBox(), cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  await h.page.mouse.move(cx, cy); await h.page.mouse.down(); await h.page.mouse.move(cx - 140, cy - 40, { steps: 8 }); await h.page.mouse.up();
+  await h.page.mouse.wheel(0, -400); await h.pause(500);
+  const c1 = await cam();
+  h.expect(c1.q.some((v, i) => Math.abs(v - c0.q[i]) > 0.02), 'a drag turns the view');
+  h.expect(c1.fov < c0.fov - 5, 'the wheel zooms (fov ' + c0.fov.toFixed(0) + ' -> ' + c1.fov.toFixed(0) + ')');
+  await h.page.keyboard.down('ArrowLeft'); await h.pause(1500); await h.page.keyboard.up('ArrowLeft');
+  await h.page.keyboard.down('Shift'); await h.page.keyboard.down('ArrowUp'); await h.pause(5000); await h.page.keyboard.up('ArrowUp'); await h.page.keyboard.up('Shift');
+  const c2 = await cam();
+  const moved = Math.hypot(c2.pos[0] - c1.pos[0], c2.pos[2] - c1.pos[2]);
+  h.expect(moved > 2, 'the arrow keys walk the viewpoint (' + moved.toFixed(1) + ' m)');
+  h.expect(c2.lat >= c2.edge + 0.3 && c2.lat <= c2.back, 'walking towards the track stops on the platform (lateral ' + c2.lat.toFixed(2) + ' m, edge ' + c2.edge.toFixed(2) + ', back ' + c2.back.toFixed(2) + ')');
+  h.expect(Math.abs(c2.dy - (c2.ph + 1.6)) < 0.8, 'at eye height over the platform (' + c2.dy.toFixed(2) + ' m above the rail)');
+  await h.page.keyboard.down('ArrowRight'); await h.pause(20000); await h.page.keyboard.up('ArrowRight');
+  const c3 = await cam();
+  h.expect(c3.lat >= c3.edge + 0.3 && c3.lat <= c3.back, 'and along it, never beyond the platform ends (lateral still ' + c3.lat.toFixed(2) + ' m)');
+  await h.shot('cam3-moved');
+  await key(h, '3'); await h.pause(500);
+  const c4 = await cam();
+  h.expect(Math.abs(c4.fov - c0.fov) < 0.5 && Math.hypot(c4.pos[0] - c0.pos[0], c4.pos[2] - c0.pos[2]) < 0.3, 'pressing 3 again resets the view');
+  await frame.evaluate(() => { __tsTest.setCamera('cab'); });
+}
+
+
+/* Oncoming (AI) trams that stand at a stop: TS.tramDwell.arrive() (the hook luxtram-traffic.js calls) lets 4..15 people off onto the OPPOSITE platform, where the waiting crowd boards.
+ * The door positions are taken from the opposite track here (no AI tram needed). Same surface rules as the player's platform. */
+async function luxtramDwellChecks(h, frame) {
+  h.step('Luxtram oncoming tram at a stop (TS.tramDwell): people alight onto the opposite platform and the crowd boards, nobody sinks or crosses the track');
+  await frame.evaluate(() => { __tsTest.setRoute('luxtram'); });
+  await waitState(frame, () => window.__tsTest.state().phase === 'running' && window.__tsTest.state().routeId === 'luxtram', null, 90000);
+  const rows = [];
+  for (const i of [0, 5, 13, 16]) {
+    await frame.evaluate((k) => { __tsTest.teleport(k); __tsTest.stopAtMarker(-0.5); }, i);
+    await waitState(frame, (k) => window.__tsTest.state().atStationIndex === k, i);
+    await h.pause(2500);
+    rows.push(await frame.evaluate(async () => {
+      const { world, scene, camera, THREE } = __tsTest.internals(), tr = world.track, k = __tsTest.state().atStationIndex, st = tr.stations[k], pi = tr.platformInfo(k), opp = tr.opposite;
+      const sign = pi.kind === 'island' ? 1 : -1, id = 'ai-' + k, doors = [];
+      for (let n = 0; n < 5; n++) { const f = opp.frameAt(st.s - 4 - n * 8); doors.push({ x: f.pos.x + f.right.x * sign * 1.45, y: f.pos.y + 0.5, z: f.pos.z + f.right.z * sign * 1.45 }); }
+      const hint = TS.tramDwell.arrive({ id, stopName: st.name, platformSide: 'left', doors, dwellMs: 20000 });
+      const sess = TS.tramDwell.sessions().find((x) => x.id === id);
+      if (!sess) return { name: st.name, err: true };
+      const P = sess.inst, info = P.platformInfo(), crowd0 = P.kinds().crowd, samples = []; let steps = 0, crowdMin = crowd0, alightMax = 0;
+      while (steps < 1500) {
+        for (let q = 0; q < 5; q++) { TS.tramDwell.update(0.1, camera); steps++; samples.push(P.feet().map((p) => [p.slot, p.kind, p.doorway ? 1 : 0, p.x, p.y, p.z, p.o, p.rx, p.rz])); const kk = P.kinds(); crowdMin = Math.min(crowdMin, kk.crowd); alightMax = Math.max(alightMax, kk.alight); }
+        await new Promise((r) => setTimeout(r, 0)); if (P.stats().done && steps > 20) break;
+      }
+      const stt = P.stats(); TS.tramDwell.depart({ id });
+      const fc = opp.frameAt(st.s), meshes = [], bb = new THREE.Box3(); scene.updateMatrixWorld(true);
+      scene.traverse((o) => { if (!o.isMesh || !o.visible || o.isInstancedMesh || !o.geometry) return; for (let a = o.parent; a; a = a.parent) if ((a.name || '').startsWith('ts-passengers') || (a.name || '').startsWith('train:')) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); if (bb.max.x < fc.pos.x - 110 || bb.min.x > fc.pos.x + 110 || bb.max.z < fc.pos.z - 110 || bb.min.z > fc.pos.z + 110) return; meshes.push(o); });
+      const rc = new THREE.Raycaster(); rc.camera = camera; rc.far = 6; const cache = new Map();
+      const rayAt = (x, y, z) => { rc.set(new THREE.Vector3(x, y + 1.1, z), new THREE.Vector3(0, -1, 0)); const hit = rc.intersectObjects(meshes, false).filter((q) => !q.face || q.face.normal.y > 0.5); return hit.length ? hit[0].point.y : null; };
+      const surf = (x, y, z) => { const key = Math.round(x * 6) + ',' + Math.round(z * 6) + ',' + Math.round(y * 6); if (cache.has(key)) return cache.get(key); const hs = []; for (const [dx, dz] of [[0, 0], [0.04, 0], [-0.04, 0], [0, 0.04], [0, -0.04]]) { const v = rayAt(x + dx, y, z + dz); if (v != null) hs.push(v); } hs.sort((a, b) => a - b); const v = hs.length ? hs[hs.length >> 1] : null; cache.set(key, v); return v; };
+      let bad = 0, env = 0, none = 0, nS = 0, onPlat = 0; const ids = new Set();
+      samples.forEach((f) => f.forEach(([slot, kind, door, x, y, z, o, rx, rz]) => {
+        nS++; ids.add(slot + kind);
+        if (kind === 'alight' && o > info.edge + 0.3) onPlat++;
+        if (!door && o < info.edge - 0.05) env++;
+        let sf = surf(x, y, z); if (door) for (const dd of [-0.5, -0.25, 0.25, 0.5]) { const s2 = surf(x + rx * dd, y, z + rz * dd); if (s2 != null && (sf == null || s2 > sf)) sf = s2; }
+        if (sf == null) { none++; return; }
+        if (Math.abs(y - sf) > (door ? 0.6 : 0.1)) bad++;   // (no AI tram body here: in the doorway the floor level hangs over the gap)
+      }));
+      return { name: st.name, hint, alighting: sess.alighting, boarding: sess.boarding, alighted: stt.alighted, boarded: stt.boarded, done: stt.done, crowd0, crowdMin, alightMax, onPlat, people: ids.size, samples: nS, bad, env, none };
+    }));
+    await frame.evaluate(() => { const cam = __tsTest.internals().camera; TS.tramDwell.sessions().forEach((x) => TS.tramDwell.depart({ id: x.id })); for (let q = 0; q < 300; q++) TS.tramDwell.update(0.1, cam); });   // (the departed session lingers 25 s, then its instance is free again)
+  }
+  console.log('  oncoming dwell (stop | alight/board | crowd before -> min | alighted on platform samples | off-surface | track side | no surface):\n' + rows.map((r) => '   ' + r.name.padEnd(16) + (r.err ? 'NO SESSION' : [r.alighting + '/' + r.boarding, r.crowd0 + '->' + r.crowdMin, r.onPlat, r.bad, r.env, r.none].join('  '))).join('\n'));
+  h.expect(rows.every((r) => !r.err && r.done && r.samples > 200), 'every oncoming exchange ran to its end (' + rows.map((r) => r.people).join('/') + ' people)');
+  h.expect(rows.every((r) => !r.err && r.alighted === r.alighting && r.alightMax > 0 && r.onPlat > 20), 'the alighting people (4..15) end up walking on the opposite platform');
+  h.expect(rows.every((r) => !r.err && r.crowdMin < r.crowd0), 'the waiting crowd shrinks while it boards');
+  h.eq(rows.reduce((a, r) => a + (r.err ? 99 : r.bad), 0), 0, 'nobody sinks or floats more than 0.1 m off the surface');
+  h.eq(rows.reduce((a, r) => a + (r.err ? 99 : r.env + r.none), 0), 0, 'nobody on the track side of the platform edge, a surface under everybody');
 }
 
 /* Return direction, reverse gear, 2x fast-forward and real (natural) endless hand-over. TS_LUXTRAM_ONLY=1 runs these too. */

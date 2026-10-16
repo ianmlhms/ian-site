@@ -12,13 +12,33 @@ button{font:inherit;color:inherit;cursor:pointer}
 #hud{position:absolute;inset:0;pointer-events:none;z-index:5;padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));display:flex;flex-direction:column;justify-content:space-between;font-variant-numeric:tabular-nums}
 .hud-top,.hud-bottom{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
 .hud-bottom{align-items:flex-end}
-.nextbox{padding:9px 14px;min-width:210px;max-width:290px}
+.nextbox{padding:9px 14px;min-width:236px;max-width:300px}
 .nextbox .lbl{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
 .nextbox b{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em;margin:1px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nextbox .row{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--soft)}
 .chip{font-size:11px;padding:1px 8px;border-radius:99px;background:rgba(255,194,74,.16);color:var(--amber);border:1px solid rgba(255,194,74,.35)}
 .chip:empty{display:none}
-.when{margin-left:auto;font-size:12px}
+/* timetable pills: scheduled arrival + departure of the stop in the box; the one that matters now is lit */
+.nextbox b{font-variant-numeric:tabular-nums}
+.sched{display:flex;gap:6px;margin-top:6px}
+.sched[hidden],.depbadge[hidden]{display:none}
+.pill{display:flex;flex-direction:column;align-items:flex-start;flex:1 1 0;min-width:0;padding:3px 9px 4px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid var(--line)}
+.pill b i{font-size:11px;font-weight:600;opacity:.8}
+.pill small{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+.nextbox .pill b{font-size:16px;margin:0;line-height:1.15;overflow:visible}
+.pill.now{background:rgba(255,194,74,.16);border-color:rgba(255,194,74,.55)}.pill.now b{color:var(--amber)}
+.pill.past b{color:var(--soft);font-weight:600}
+.pill.pass b{font-style:italic;color:var(--soft)}
+#nextSide{font-weight:700;font-size:12px;padding:2px 10px}
+#nextSide.left::before{content:"\25C0\00a0"}#nextSide.right::after{content:"\00a0\25B6"}
+.depbadge{margin-top:6px;padding:3px 10px 4px;border-radius:9px;background:rgba(255,194,74,.18);color:var(--amber);border:1px solid rgba(255,194,74,.5)}
+.depbadge small{display:block;font-size:10px;letter-spacing:.05em;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nextbox .depbadge b{font-size:16px;margin:0;line-height:1.2}
+.depbadge.go{background:rgba(61,220,132,.18);color:var(--green);border-color:rgba(61,220,132,.55)}
+.depbadge.late{background:rgba(255,90,77,.18);color:var(--red);border-color:rgba(255,90,77,.55)}
+.delayword{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-top:1px}
+.delayword.late{color:var(--red)}
+#stripNextLbl{position:absolute;top:30px;font-size:10px;font-weight:700;color:var(--amber);transform:translateX(-50%);white-space:nowrap;padding:0 5px;border-radius:5px;background:rgba(12,16,22,.72);z-index:2}
 .strip{flex:1;max-width:520px;height:46px;margin:0 6px;position:relative;align-self:flex-start;padding:0 18px}
 .strip .line{position:absolute;left:18px;right:18px;top:23px;height:2px;background:rgba(255,255,255,.28);border-radius:2px}
 #stripDots{position:absolute;left:18px;right:18px;top:0;bottom:0}
@@ -64,7 +84,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sig.r .r{background:var(--red);box-shadow:0 0 10px var(--red)}.sig.y .y{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}.sig.g .g{background:var(--green);box-shadow:0 0 10px var(--green)}
 .sigtext{font-size:12px;color:var(--soft);line-height:1.35}
 .sigtext b{display:block;color:var(--ink);font-size:15px}
-.hud-util{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 84px);display:flex;gap:6px;pointer-events:auto}
+.hud-util{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 112px);display:flex;gap:6px;pointer-events:auto}
 .chipbtn{padding:5px 11px;font-size:12px;border-radius:99px;color:var(--soft);min-height:30px;display:inline-flex;align-items:center}
 button.chipbtn:hover{color:var(--ink)}
 button.chipbtn.on{color:#ffd36a;background:rgba(255,196,58,.22);box-shadow:inset 0 0 0 1px rgba(255,196,58,.6)}
@@ -120,7 +140,7 @@ button.primary:hover{background:#ffd070}
 .loadbar i{display:block;height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--amber),#ffe3a0);box-shadow:0 0 12px rgba(255,194,74,.55);transition:width .12s linear;position:relative}
 .loadbar i::after{content:"";position:absolute;inset:0;border-radius:inherit;background:repeating-linear-gradient(115deg,rgba(255,255,255,.28) 0 7px,transparent 7px 14px);background-size:28px 100%;animation:loadstripe .8s linear infinite}
 .loadcard b{font-variant-numeric:tabular-nums}
-.aheadload{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 92px);padding:5px 12px;border-radius:99px;font-size:12px;font-weight:650;color:var(--soft);opacity:.88;pointer-events:none;z-index:5}
+.aheadload{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 148px);padding:5px 12px;border-radius:99px;font-size:12px;font-weight:650;color:var(--soft);opacity:.88;pointer-events:none;z-index:5}
 #loading{background:radial-gradient(circle at 50% 40%,rgba(30,50,70,.82),rgba(5,8,12,.94))}
 .spinner{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:var(--amber);animation:spin .9s linear infinite}
 #helpBody{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:12px 0;font-size:14px}
@@ -146,9 +166,9 @@ button.primary:hover{background:#ffd070}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes toast{from{transform:translateY(-8px);opacity:0}}
 @media(max-width:900px){
-  .strip{display:none}.nextbox{min-width:0;max-width:200px}.speed b{font-size:44px}.centerbox{max-width:none}.signalbox{min-width:0}
+  .strip{display:none}.nextbox{min-width:0;max-width:232px}.speed b{font-size:44px}.centerbox{max-width:none}.signalbox{min-width:0}
 }
-@media(max-height:560px){.speed b{font-size:38px}.hud-util{top:calc(max(10px,env(safe-area-inset-top)) + 70px)}}
+@media(max-height:560px){.speed b{font-size:38px}.hud-util{top:calc(max(10px,env(safe-area-inset-top)) + 96px)}}
 @media(prefers-reduced-motion:reduce){.loadbar i::after{animation:none}.loadbar i{transition:none}.spinner{animation-duration:2.4s}.toast{animation:none}#fade{transition-duration:.01s}}
 
 /* ---------- cab view: the desk already shows speed, limit and signal, so only a slim info strip stays ---------- */
@@ -160,7 +180,7 @@ body[data-cam="cab"] .xchg{margin-bottom:4px;padding-bottom:4px;font-size:15px}
 body[data-cam="cab"] .hint{margin-top:0;font-size:12px}
 body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 150px)}
 body[data-cam="cab"] #banner{top:34%}
-@media(max-width:900px){body[data-cam="cab"] .hud-util>:not(#btnWx):not(#wxPop){display:none}}
+@media(max-width:900px){body[data-cam="cab"] .hud-util>:not(#btnWx):not(#wxPop):not(#btnInside){display:none}}
 
 /* portrait (iPad): the slim cab info strip sits below the clock box so nothing overlaps */
 @media(max-aspect-ratio:5/4){body[data-cam="cab"] #hud .hud-bottom{top:calc(max(10px,env(safe-area-inset-top)) + 96px)}body[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 215px)}}
@@ -179,6 +199,13 @@ body.wx-open #hud{z-index:10}
 .wxopt:focus-visible,#btnWx:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 
 /* back to the menu while driving (top left, below the next-stop box) */
-#btnMenu{position:absolute;left:max(12px,env(safe-area-inset-left));top:calc(max(10px,env(safe-area-inset-top)) + 84px);pointer-events:auto;color:var(--ink);font-weight:650;font-size:13px;padding:5px 14px}
+#btnMenu{position:absolute;left:max(12px,env(safe-area-inset-left));top:calc(max(10px,env(safe-area-inset-top)) + 178px);pointer-events:auto;color:var(--ink);font-weight:650;font-size:13px;padding:5px 14px}
 @media(pointer:coarse){#btnMenu{min-height:44px;min-width:44px}}
-@media(max-height:560px){#btnMenu{top:calc(max(10px,env(safe-area-inset-top)) + 70px)}}
+@media(max-height:560px){#btnMenu{top:calc(max(10px,env(safe-area-inset-top)) + 160px)}}
+
+/* camera 3: hint + on-screen walk pad */
+.camhint{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 128px);transform:translateX(-50%);padding:5px 14px;font-size:12px;color:var(--soft);border-radius:99px;pointer-events:none;white-space:nowrap}
+.walkpad{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:150px;width:92px;height:92px;border-radius:50%;background:rgba(12,16,22,.42);border:1px solid var(--line);pointer-events:auto;touch-action:none;display:none}
+@media(pointer:coarse){.walkpad{display:block}}
+.walkpad[hidden]{display:none!important}
+.walkpad i{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:rgba(255,255,255,.28);border:1px solid var(--line)}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>Zuchsimulator Lëtzebuerg 🚆 – Arcade</title>
-<link rel="stylesheet" href="/pb/train-sim.css?v=5">
+<link rel="stylesheet" href="/pb/train-sim.css?v=6">
 <script src="/pb/arcade-kit.js?v=28" data-arcade-id="train-sim" data-arcade-title="Zuchsimulator Lëtzebuerg 🚆"></script>
 </head>
 <body>
@@ -16,11 +16,17 @@
       <div class="glass nextbox">
         <span class="lbl" id="nextLbl">Nächsten Arrêt</span>
         <b id="nextName">–</b>
-        <div class="row"><span id="nextDist">–</span><span id="nextSide" class="chip"></span><span id="nextWhen" class="when"></span></div>
+        <div class="row"><span id="nextDist">–</span><span id="nextSide" class="chip"></span></div>
+        <div class="sched" id="sched" hidden>
+          <span id="schedArr" class="pill"><small id="schedArrLbl">Ukunft</small><b id="schedArrT">--:--</b></span>
+          <span id="schedDep" class="pill"><small id="schedDepLbl">Ofaart</small><b id="schedDepT">--:--</b></span>
+        </div>
+        <div id="depBadge" class="depbadge" hidden></div>
       </div>
       <div class="glass strip" id="strip" aria-hidden="true"><div class="line"></div><div id="stripDots"></div><i id="stripTrain"></i></div>
       <div class="glass statsbox">
         <div class="clockrow"><b id="clock">08:00</b><small id="clockSec">:00</small><span id="delay" class="delay">+0:00</span></div>
+        <small id="delayWord" class="delayword"></small>
         <div class="statline"><span class="pax" title="Passagéier">&#128101; <b id="onboard">0</b></span><span class="eur">&euro; <b id="cashHud">0</b></span></div>
         <small id="svcLabel"></small>
       </div>
@@ -45,9 +51,12 @@
       </div>
     </div>
     <div id="aheadLoad" class="glass aheadload" role="status" hidden></div>
+    <div id="camHint" class="glass camhint" hidden></div>
+    <div id="walkPad" class="walkpad" hidden aria-hidden="true"><i id="walkKnob"></i></div>
     <button id="btnMenu" class="glass chipbtn" type="button" data-test="btn-menu"></button>
     <div class="hud-util">
       <span id="camName" class="glass chipbtn"></span>
+      <button id="btnInside" class="glass chipbtn" type="button" hidden data-test="btn-inside">5</button>
       <button id="btnQuality" class="glass chipbtn" type="button"></button>
       <button id="btnRev" class="glass chipbtn" type="button" aria-pressed="false">R</button>
       <button id="btnWx" class="glass chipbtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="wxPop" data-test="btn-wx">☀️</button>
@@ -74,7 +83,7 @@
 </main>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/pb/train-sim/config.js?v=5"></script>
-<script src="/pb/train-sim/copy.js?v=7"></script>
+<script src="/pb/train-sim/copy.js?v=8"></script>
 <script src="/pb/train-sim/track.js?v=6"></script>
 <script src="/pb/train-sim/routes.js?v=5"></script>
 <script src="/pb/train-sim/infra.js?v=11"></script>
@@ -82,7 +91,7 @@
 <script src="/pb/train-sim/stations-lu-a.js?v=4"></script>
 <script src="/pb/train-sim/stations-lu-b.js?v=2"></script>
 <script src="/pb/train-sim/stations-abroad.js?v=2"></script>
-<script src="/pb/train-sim/stations-luxtram.js?v=1"></script>
+<script src="/pb/train-sim/stations-luxtram.js?v=4"></script>
 <script src="/pb/train-sim/landscape.js?v=5"></script>
 <script src="/pb/train-sim/luxtram-landmarks.js?v=8"></script><!-- LUXTRAM: hand-built landmarks (photo-checked) -->
 <script src="/pb/train-sim/luxtram-traffic.js?v=10"></script><!-- LUXTRAM: road traffic + oncoming trams -->
@@ -90,15 +99,15 @@
 <script src="/pb/train-sim/luxtram-ground.js?v=10"></script><!-- LUXTRAM: painted ground (splat shader, roads, sidewalks, markings) -->
 <script src="/pb/train-sim/luxtram-world.js?v=16"></script><!-- LUXTRAM: real Luxtram T1 routes (new files, see luxtram.js) -->
 <script src="/pb/train-sim/luxtram.js?v=7"></script><!-- LUXTRAM -->
-<script src="/pb/train-sim/trains.js?v=5"></script>
-<script src="/pb/train-sim/cab.js?v=4"></script>
-<script src="/pb/train-sim/passengers.js?v=2"></script>
-<script src="/pb/train-sim/audio.js?v=1"></script>
+<script src="/pb/train-sim/trains.js?v=7"></script>
+<script src="/pb/train-sim/cab.js?v=8"></script>
+<script src="/pb/train-sim/passengers.js?v=4"></script>
+<script src="/pb/train-sim/audio.js?v=2"></script>
 <script src="/pb/train-sim/sim.js?v=8"></script>
 <script src="/pb/train-sim/career.js?v=7"></script>
 <script src="/pb/train-sim/resume.js?v=1"></script>
 <script src="/pb/train-sim/menu.js?v=7"></script>
 <script src="/pb/train-sim/fallback.js?v=2"></script>
-<script src="/pb/train-sim.js?v=11"></script>
+<script src="/pb/train-sim.js?v=14"></script>
 </body>
 </html>

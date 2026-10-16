@@ -103,7 +103,8 @@
     shared.paint = new T.MeshStandardMaterial({ ...vc, roughness: 0.36, metalness: 0.18 });
     shared.trim = new T.MeshStandardMaterial({ ...vc, roughness: 0.62, metalness: 0.15 });
     shared.metal = new T.MeshStandardMaterial({ ...vc, roughness: 0.42, metalness: 0.8, side: T.DoubleSide });
-    shared.rubber = new T.MeshStandardMaterial({ ...vc, roughness: 0.95, metalness: 0 });
+    shared.rubber = new T.MeshStandardMaterial({ ...vc, roughness: 0.95, metalness: 0, side: T.DoubleSide });   // double-sided: the gangway bellows are seen from inside the saloon
+    shared.steel = new T.MeshStandardMaterial({ ...vc, roughness: 0.34, metalness: 0.3 });   // stainless poles and rails (no env map: a low metalness keeps them light)
     shared.glass = new T.MeshStandardMaterial({ color: 0x4f6779, roughness: 0.05, metalness: 0.5, transparent: true, opacity: 0.34, depthWrite: false, envMapIntensity: 0.5 });
     shared.inside = new T.MeshStandardMaterial({ color: 0xbcbab2, roughness: 0.95, metalness: 0, side: T.BackSide });
     shared.floor = new T.MeshStandardMaterial({ ...vc, roughness: 0.9, metalness: 0, side: T.DoubleSide });
@@ -150,6 +151,33 @@
     const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
     const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
     drawDest(tex, text);
+    return tex;
+  }
+  /* Passenger information screens in the Luxtram saloon (ceiling, above the aisle): line badge, destination, the next stops with minutes. One canvas per train. */
+  function drawPax(tex, info) {
+    const cv = tex.image, x = cv.getContext('2d'), w = cv.width, h = cv.height;
+    info = info || {};
+    x.fillStyle = '#0a1226'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#16264a'; x.fillRect(0, 0, w, 64);
+    x.fillStyle = '#7b3f98'; x.beginPath(); if (x.roundRect) x.roundRect(14, 10, 70, 44, 9); else x.rect(14, 10, 70, 44); x.fill();
+    x.fillStyle = '#fff'; x.font = '800 36px Helvetica, Arial, sans-serif'; x.textBaseline = 'middle'; x.textAlign = 'center'; x.fillText('T1', 49, 34);
+    x.textAlign = 'left'; x.font = '700 34px Helvetica, Arial, sans-serif'; x.fillText((info.dest || '').slice(0, 20), 100, 34);
+    x.textAlign = 'right'; x.fillStyle = '#9fb3d9'; x.font = '600 30px Helvetica, Arial, sans-serif'; x.fillText(info.clock || '', w - 16, 34);
+    const rows = info.next || [];
+    rows.slice(0, 4).forEach((r, i) => {
+      const y = 98 + i * 52;
+      if (i === 0) { x.fillStyle = 'rgba(255,194,74,0.16)'; x.fillRect(8, y - 24, w - 16, 48); }
+      x.fillStyle = i === 0 ? '#ffd27a' : '#e8eefb'; x.textAlign = 'left'; x.font = (i === 0 ? '700 ' : '500 ') + '32px Helvetica, Arial, sans-serif';
+      x.fillText(String(r.name || '').slice(0, 22), 22, y);
+      x.textAlign = 'right'; x.fillStyle = i === 0 ? '#ffd27a' : '#9fb3d9'; x.fillText(r.min <= 0 ? 'now' : r.min + "'", w - 18, y);
+    });
+    if (info.atStop) { x.fillStyle = '#3ddc84'; x.textAlign = 'center'; x.font = '700 24px Helvetica, Arial, sans-serif'; x.fillText(info.atStop, w / 2, h - 16); }
+    tex.needsUpdate = true;
+  }
+  function paxTexture() {
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 288;
+    const tex = new T.CanvasTexture(cv); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 4;
+    drawPax(tex, { dest: 'Luxtram', next: [] });
     return tex;
   }
   const glowCache = new Map();
@@ -300,6 +328,7 @@
     m.glassD = shared.glass.clone(); // tinted side glazing (Luxtram: near-black, continuous band)
     m.glassD.userData.shared = false; m.glassD.color.set(0x0c1319); m.glassD.opacity = GLASS_D_DAY; m.glassD.roughness = 0.04; m.glassD.metalness = 0.65;
     m.dest = new T.MeshBasicMaterial({ map: destTexture('Luxexpo'), toneMapped: false });
+    m.pax = new T.MeshBasicMaterial({ map: paxTexture(), toneMapped: false });
     m.inside = shared.inside.clone(); m.inside.userData.shared = false; m.inside.emissive = new T.Color(INSIDE_EMIT);
     m.seat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: new T.Color(SEAT_EMIT) });
     m.glowHead = new T.SpriteMaterial({ map: glowTexture('#fff2cf'), blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 });
@@ -307,7 +336,7 @@
     m.insideFwd = m.inside.clone(); m.insideFwd.userData.shared = false;
     m.beamHead = makeBeamMaterial([0, -0.03, -1], 100, 0.1); m.beamTail = makeBeamMaterial([0, -0.05, 1], 16, 0.3);
     m.ghost = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false }); // invisible but still casts shadows
-    m.own = [m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail, m.beamHead, m.beamTail];
+    m.own = [m.pax, m.insideFwd, m.ghost, m.headF, m.tailR, m.lamp, m.glass, m.glassD, m.dest, m.inside, m.seat, m.glowHead, m.glowTail, m.beamHead, m.beamTail];
     return m;
   }
 
@@ -510,6 +539,21 @@
       b.box('t', 0.34, 0.2, 0.08, 0, 1.2, 0.2, '#ffffff');            // headrest
       b.box('t', 0.4, 0.5, 0.03, 0, 0.78, 0.26, '#41464c');           // plastic shell
       b.box('t', 0.04, 0.2, 0.34, 0.25, 0.58, 0.03, '#3a3e44');       // armrest
+      return mergeInto(b.raw);
+    });
+  }
+  /* Luxtram seat (photo: Wikimedia Commons, Luxembourg Luxtram CAF Urbos 3 interior): a teal moulded back with a perforated dark panel, a dark brown cushion on a grey bracket;
+     one unit 0.46 m wide, faces -Z. Instance colour stays white (the colours are in the vertices). */
+  function seatGeoTram() {
+    return memo('seatTram', () => {
+      const b = makeBuilder();
+      b.box('t', 0.4, 0.07, 0.34, 0, 0.17, -0.0, '#9aa1a7');          // bracket under the cushion
+      b.box('t', 0.43, 0.06, 0.4, 0, 0.44, -0.02, '#3b302c');         // cushion (dark brown)
+      b.box('t', 0.44, 0.5, 0.07, 0, 0.74, 0.2, '#22aebf');           // backrest: teal moulded shell
+      b.box('t', 0.34, 0.26, 0.012, 0, 0.7, 0.158, '#2c2f33');        // perforated panel on the seat face of the back
+      b.box('t', 0.44, 0.13, 0.075, 0, 1.04, 0.2, '#1f93a3');         // headrest band
+      b.box('t', 0.03, 0.34, 0.07, 0.225, 0.66, 0.15, '#9aa1a7');     // side frame
+      b.box('t', 0.03, 0.34, 0.07, -0.225, 0.66, 0.15, '#9aa1a7');
       return mergeInto(b.raw);
     });
   }
@@ -791,10 +835,12 @@
           const pb = makeBuilder();
           if (S.tram) { // glazed leaf: black frame, big coloured panes (the door colour of this car), silver grab handle
             const dcol = (C.doors || [upCol])[idx % (C.doors || [upCol]).length];
-            pb.push('trim', rbox(leafW, lh, 0.07, 0.02).rotateY(Math.PI / 2), '#101418');
+            // frame as four borders + the split bar (a solid slab would be a black wall seen from inside the saloon)
+            for (const q of [-1, 1]) { pb.box('trim', 0.07, lh, 0.06, 0, 0, q * (leafW / 2 - 0.03), '#101418'); pb.box('trim', 0.07, 0.06, leafW, 0, q * (lh / 2 - 0.03), 0, '#101418'); }
+            pb.box('trim', 0.07, 0.07, leafW, 0, -lh / 2 + split, 0, '#101418');
             const py0 = -lh / 2 + split + 0.09, py1 = lh / 2 - 0.08, lowY0 = -lh / 2 + 0.08, lowY1 = -lh / 2 + split - 0.07;
-            pb.box('lit', 0.012, py1 - py0, leafW - 0.1, 0.04, (py0 + py1) / 2, 0, dcol);
-            pb.box('lit', 0.012, lowY1 - lowY0, leafW - 0.1, 0.04, (lowY0 + lowY1) / 2, 0, dcol);
+            pb.box('lit', 0.012, py1 - py0, leafW - 0.1, 0.0, (py0 + py1) / 2, 0, dcol);
+            pb.box('lit', 0.012, lowY1 - lowY0, leafW - 0.1, 0.0, (lowY0 + lowY1) / 2, 0, dcol);
             pb.box('trim', 0.006, py1 - py0 - 0.1, 0.02, 0.047, (py0 + py1) / 2 + 0.04, e * (leafW * 0.2), '#ffffff'); // glass glint
             pb.box('rubber', 0.05, lh, 0.025, 0.02, 0, -e * (leafW / 2) + e * 0.012, '#111');
             pb.box('rubber', 0.05, lh, 0.025, 0.02, 0, e * (leafW / 2) - e * 0.012, '#111');
@@ -892,7 +938,8 @@
       for (let i = 0; i < cg.attributes.position.count; i++) { carr[i * 3] = nc[0]; carr[i * 3 + 1] = nc[1]; carr[i * 3 + 2] = nc[2]; }
       const capGeo = mergeInto([{ g: cg }]);
       const capMesh = new T.Mesh(capGeo, mats.paint); capMesh.castShadow = true;
-      group.add(capMesh); paintMeshes.push(capMesh);
+      // a tram's gangway ends stay open (the walk-through saloon seen from inside); the bellows close the joint from outside
+      if (!(S.tram && S.bellows && !isNose)) { group.add(capMesh); paintMeshes.push(capMesh); }
       if (isNose) { const ci = new T.Mesh(capGeo, front && nz ? mats.insideFwd : mats.inside); group.add(ci); if (front && nz) fwdLinings.push(ci); }
       if (!isNose) { // flat gangway end: darker door-ish frame
         return;
@@ -1026,11 +1073,15 @@
       const addWipers = (wg, hwW, H, inset, hwGlass) => {
         const Lw = clamp(H * 0.56, 0.45, 0.82), L = Math.min(Lw, hwW * 0.95);
         const xl = -hwW + L + 0.03, xr = Math.min(xl + hwW * 0.95, hwW - inset * 0.6 - 0.07);
-        const arm = memo('wiperArm2:' + L.toFixed(2), () => {
+        const arm = memo('wiperArm3:' + L.toFixed(2), () => {
+          // slim arm (silver-grey spring arm with a kink) carrying a long black blade with a rubber lip, on a round pivot cap with a spindle nut
           const b = makeBuilder();
-          b.box('m', L, 0.016, 0.01, -L / 2, 0, 0.012, '#1b1d1f');
-          b.box('m', L * 0.9, 0.022, 0.012, -(0.1 + L * 0.45), 0, 0.025, '#0f1011');
-          b.cyl('m', 0.02, 0.02, 0.03, 0, 0, 0.01, '#2a2d30', 'z', 10);
+          b.box('m', L * 0.97, 0.009, 0.008, -L * 0.485, 0, 0.014, '#5d646b');
+          b.box('m', L * 0.34, 0.012, 0.01, -L * 0.2, 0, 0.012, '#454b51');
+          b.box('m', L * 0.84, 0.02, 0.012, -(0.12 + L * 0.42), 0, 0.024, '#0d0e0f');
+          b.box('m', L * 0.84, 0.006, 0.008, -(0.12 + L * 0.42), -0.012, 0.028, '#050506');
+          b.cyl('m', 0.024, 0.024, 0.02, 0, 0, 0.01, '#2a2d30', 'z', 14);
+          b.cyl('m', 0.01, 0.01, 0.012, 0, 0, 0.022, '#9aa2aa', 'z', 8);
           return mergeInto(b.raw);
         });
         for (const x of [xl, xr]) {
@@ -1093,9 +1144,9 @@
       if (fb > fa) fl(S.double ? S.floor - 0.05 : S.floor, fa, fb, hw * 2 - 0.1, '#a2a7ad');
     }
     // ----- saloon interior (seats, tables, luggage racks, poles, glass screens, lit ceiling)
-    let seatInst = null;
+    let seatInst = null, tramInterior = null;
     if (hasWin && mid) {
-      const places = [], tables = [];
+      const places = [], tables = [], tramPoles = [];
       const zStart = wzA + 0.45, zEnd = wzB - 0.45;
       const decks = S.double ? [S.floor - 0.05, 2.45] : [S.floor];
       const nearDoor = (z, m) => carDoors.some((dz) => Math.abs(z - dz) < S.doorW / 2 + m);
@@ -1103,11 +1154,19 @@
       const bayLayout = !!(S.tables && hi);
       for (const fy of decks) {
         if (S.tram) {
-          for (let z = zStart; z < zEnd; z += 0.5) {
-            if (nearDoor(z, 0.45)) continue;
-            for (const sd of [-1, 1]) places.push([sd * (hw - 0.34), fy + 0.03, z, sd > 0 ? Math.PI / 2 : -Math.PI / 2]);
+          // Luxtram saloon: mostly 2+2 transverse seats (pairs back to back), a few longitudinal ones beside the cab bulkhead, wide standing areas at the doors
+          const xsT = [-0.93, -0.47, 0.47, 0.93], pitchT = 0.95;
+          const z0 = zStart + (noseF ? 1.0 : 0.3), z1 = zEnd - (noseR ? 1.0 : 0.3);
+          let bay = 0;
+          for (let z = z0; z < z1; z += pitchT) {
+            if (nearDoor(z, 0.52)) continue;
+            const yaw = bay % 2 === 0 ? 0 : Math.PI;
+            for (const x of xsT) places.push([x, fy + 0.03, z, yaw]);
+            if (bay % 2 === 0) tramPoles.push([0.27, z + pitchT / 2], [-0.27, z + pitchT / 2]);
+            bay++;
           }
-          if (hi) for (const z of [zStart + 0.2, zEnd - 0.2]) for (const sd of [-1, 1]) { if (!nearDoor(z, 0.6)) places.push([sd * 0.45, fy + 0.03, z, 0]); }
+          if (noseF) for (const sd of [-1, 1]) places.push([sd * (hw - 0.3), fy + 0.03, zStart + 0.3, sd > 0 ? Math.PI / 2 : -Math.PI / 2]);
+          if (noseR) for (const sd of [-1, 1]) places.push([sd * (hw - 0.3), fy + 0.03, zEnd - 0.3, sd > 0 ? Math.PI / 2 : -Math.PI / 2]);
         } else if (bayLayout) {
           for (let z = zStart; z < zEnd - 1.6; z += 2.5) {
             if (nearDoor(z, 0.5) || nearDoor(z + 1.5, 0.5)) continue;
@@ -1123,14 +1182,15 @@
         }
       }
       if (S.double) fl(2.47, wallA, wallB, hw * 2 - 0.12, '#a9aeb2');
-      seatInst = new T.InstancedMesh(seatGeo(), mats.seat, Math.max(1, places.length));
+      seatInst = new T.InstancedMesh(S.tram ? seatGeoTram() : seatGeo(), mats.seat, Math.max(1, places.length));
       const m4 = new T.Matrix4(), q = new T.Quaternion(), sc3 = new T.Vector3(1, 1, 1), colr = new T.Color(), up = new T.Vector3(0, 1, 0);
       const baseFab = (lum(livery.accent) < 0.6 && lum(livery.accent) > 0.04) ? livery.accent : SEAT_COL[model] || '#2d6aa6';
       const fabrics = [baseFab, new T.Color(baseFab).offsetHSL(0, -0.05, 0.08).getStyle(), new T.Color(baseFab).offsetHSL(0, 0, -0.07).getStyle()];
       places.forEach((p, i) => {
         q.setFromAxisAngle(up, p[3]);
         m4.compose(new T.Vector3(p[0], p[1], p[2]), q, sc3); seatInst.setMatrixAt(i, m4);
-        colr.set(fabrics[(i + idx) % 7 === 0 ? 2 : (i % 3 === 0 ? 1 : 0)]); seatInst.setColorAt(i, colr);
+        if (S.tram) colr.set('#ffffff'); else colr.set(fabrics[(i + idx) % 7 === 0 ? 2 : (i % 3 === 0 ? 1 : 0)]);
+        seatInst.setColorAt(i, colr);
       });
       seatInst.count = places.length; seatInst.castShadow = false; seatInst.frustumCulled = false;
       group.add(seatInst);
@@ -1138,7 +1198,7 @@
       // aisle runner + lighter floor
       for (const fy of decks) B.box('floor', 0.6, 0.062, Math.max(1, wzB - wzA), 0, fy + 0.002, (wzA + wzB) / 2, '#7d8da2');
       // luggage racks (single-level cars)
-      if (!S.double) {
+      if (!S.double && !S.tram) {
         const ry = S.floor + (S.tram ? 1.55 : 1.62), segs = [];
         let a0 = wzA + 0.1;
         for (const dz of [...carDoors].sort((p, q2) => p - q2)) { if (dz - S.doorW / 2 - 0.3 > a0) segs.push([a0, dz - S.doorW / 2 - 0.3]); a0 = dz + S.doorW / 2 + 0.3; }
@@ -1154,10 +1214,42 @@
       for (const dz of carDoors) for (const e of [-1, 1]) {
         const zz = dz + e * (S.doorW / 2 + 0.18);
         for (const sd of [-1, 1]) {
-          B.cyl('metal', 0.022, 0.022, S.head - S.floor + 0.05, sd * 0.62, (S.floor + S.head) / 2, zz, '#dfe2e5', null, 8);
+          B.cyl(S.tram ? 'steel' : 'metal', 0.022, 0.022, S.head - S.floor + 0.05, sd * 0.62, (S.floor + S.head) / 2, zz, '#dfe2e5', null, 8);
           glassB.box('glass', hw - 0.55, 1.75, 0.02, sd * ((hw - 0.05 + 0.6) / 2), S.floor + 1.0, zz + e * 0.1);
           B.box('metal', hw - 0.55, 0.03, 0.03, sd * ((hw - 0.05 + 0.6) / 2), S.floor + 1.9, zz + e * 0.1, '#c8ccd0');
         }
+      }
+      if (S.tram) {
+        // stainless poles and rails (the photos of the Luxtram saloon show stainless steel, not painted ones), overhead rails with hanging grips, passenger info screens, the gangway arch
+        const fl0 = S.floor, hd = S.head, steelC = '#d9dee2', ry = hd - 0.17, holds = [], screens = [];
+        for (const [px, pz] of tramPoles) B.cyl('steel', 0.017, 0.017, hd - fl0, px, (fl0 + hd) / 2, pz, steelC, null, 8);
+        for (const sd of [-1, 1]) {
+          B.cyl('steel', 0.015, 0.015, zEnd - zStart, sd * 0.5, ry, (zStart + zEnd) / 2, steelC, 'z', 8);
+          for (let z = zStart + 0.35; z < zEnd - 0.2; z += 0.95) {
+            if (nearDoor(z, 0.0)) continue;
+            B.cyl('steel', 0.009, 0.009, 0.14, sd * 0.5, ry - 0.07, z, steelC, null, 6);
+            B.cyl('steel', 0.011, 0.011, 0.15, sd * 0.5, ry - 0.145, z, steelC, 'z', 6);
+          }
+        }
+        for (const dz of carDoors) for (const e of [-1, 1]) {
+          for (const sd of [-1, 1]) holds.push([sd * 0.42, dz + e * (S.doorW / 2 + 0.42), sd * 0.62, dz + e * (S.doorW / 2 + 0.18)]);
+        }
+        for (const dz of carDoors) {
+          const zc = dz + (dz < (wzA + wzB) / 2 ? 1 : -1) * (S.doorW / 2 + 0.95);
+          B.box('trim', 0.52, 0.31, 0.07, 0, hd - 0.38, zc, '#d8dcdf');                       // ceiling screen housing
+          B.cyl('steel', 0.012, 0.012, 0.2, 0, hd - 0.18, zc, steelC, null, 6);
+          screens.push([zc, hd - 0.38]);
+        }
+        // the gangway arch (teal, like the articulation modules of the real tram) at every end that opens into another car
+        const arch = (zz, dirn) => {
+          if (Math.abs(zz) < 0.01) return;
+          for (const sd of [-1, 1]) B.box('trim', 0.12, hd - fl0, 0.1, sd * 0.66, (fl0 + hd) / 2, zz, '#3fb0b4');
+          B.box('trim', 1.44, 0.12, 0.1, 0, hd - 0.06, zz, '#3fb0b4');
+          B.cyl('floor', 0.66, 0.66, 0.012, 0, fl0 + 0.032, zz + dirn * 0.25, '#4a4d52', null, 28);   // the turntable plate over the articulation
+        };
+        if (!noseF) arch(wzA - 0.1, 1);
+        if (!noseR) arch(wzB + 0.1, -1);
+        tramInterior = { floorY: fl0, head: hd, hw, zA: wzA, zB: wzB, doors: carDoors.slice(), doorW: S.doorW, seats: places.map((q) => ({ x: q[0], z: q[2], yaw: q[3] })), holds, screens, length: L };
       }
     }
     // ceiling light strips (lit)
@@ -1256,6 +1348,7 @@
       if (dir < 0) { g.scale(1, 1, -1); const idx = g.index.array; for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; } g.computeVertexNormals(); }
       g.translate(0, 0, zend);
       B.geo('rubber', g, null);
+      if (S.tram) B.box('floor', S.W * 0.62, 0.06, len + 0.02, 0, S.floor, zend + dir * len / 2, '#33363a');   // walkway across the articulation
     };
     if (S.bellows) {
       if (!noseF && (idx > 0 || true)) bell(zF - 0.01, -1);
@@ -1297,7 +1390,7 @@
     // ----- lights
     return {
       exhaust, ownMats, paintMeshes, fwdLinings, group, length: L + S.gap, body: L, bogieOffset: K.bogie, doors: doorsOut, bogies: bogieGroups, doorAnim, wheelsets: wsList, pantos: panto, wipers: wiperPivots,
-      noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
+      interior: tramInterior, noseFront: noseF, noseRear: noseR, S, beamHead: beamHeadMesh, beamTail: beamTailMesh, glowHeads, glowTails, lampPos, rain: rainMesh,
     };
   }
 
@@ -1444,10 +1537,10 @@
     const mats = trainMats();
     const tramLook = model === 'tram'; // tram: darker windscreen tint and a dark cab lining (seen through the glass), like the real thing
     if (tramLook) { mats.glass.color.setHex(0x33434f); mats.glass.envMapIntensity = 0.2; mats.glass.metalness = 0.15; mats.glassD.envMapIntensity = 0.45; mats.inside.color.setHex(0x4a4f56); mats.insideFwd.color.setHex(0x4a4f56); }
-    const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x2c3035 : INSIDE_EMIT_ON;
-    let cabViewOn = false, cabinOn = false;
+    const emitOff = tramLook ? 0x1d2024 : INSIDE_EMIT, emitOn = tramLook ? 0x6a6a68 : INSIDE_EMIT_ON;   // tram cab lights: a neutral lamp glow on the white lining (a warm one turned the cheeks pink at night)
+    let cabViewOn = false, cabinOn = false, interiorViewOn = false;
     // tram windscreen: tinted and fairly opaque seen from outside, clear (like the other models) from the cab camera
-    const applyGlass = () => { mats.glass.opacity = tramLook ? (cabViewOn ? 0.2 : 0.58) : (cabinOn ? 0.26 : 0.34); };
+    const applyGlass = () => { mats.glass.opacity = tramLook ? (interiorViewOn ? 0.18 : cabViewOn ? 0.2 : 0.58) : (cabinOn ? 0.26 : 0.34); };
     const count = (cfg && cfg.cars) || { railcar: 1, emu: 2, tram: 5, kiss: 4, ic: 7, hst: 8 }[model];
     const comp = composition(model, count);
     const group = new T.Group(); group.name = 'train:' + model;
@@ -1456,8 +1549,17 @@
       const c = buildCar(model, S0, def, i, comp.length, livery, mats, quality, i === 0, i === comp.length - 1, numberFor(model, i));
       group.add(c.group);
       built.push(c);
-      cars.push({ group: c.group, length: c.length, bogieOffset: c.bogieOffset, doors: c.doors, bogies: c.bogies, nose: { front: c.noseFront, rear: c.noseRear } });
+      cars.push({ group: c.group, length: c.length, bogieOffset: c.bogieOffset, doors: c.doors, bogies: c.bogies, nose: { front: c.noseFront, rear: c.noseRear }, interior: c.interior });
     });
+    // passenger information screens (tram): two quads back to back at every screen housing
+    for (const c of cars) {
+      if (!c.interior) continue;
+      for (const [zz, yy] of c.interior.screens) for (const side of [1, -1]) {
+        const q = new T.Mesh(new T.PlaneGeometry(0.46, 0.259), mats.pax);
+        q.position.set(0, yy, zz + side * 0.037); if (side < 0) q.rotation.y = Math.PI;
+        q.userData.disposeGeo = true; q.castShadow = false; c.group.add(q);
+      }
+    }
     // lights: shared per-train materials
     const state = { open: { left: 0, right: 0 } };
     const pantoAll = built.flatMap((b) => b.pantos);
@@ -1541,7 +1643,7 @@
         const cab = !!l.cabin;
         mats.lamp.color.setHex(cab ? 0xffffff : 0xdad6c6);
         cabinOn = cab; applyGlass();
-        mats.glassD.opacity = cab ? GLASS_D_CAB : GLASS_D_DAY;
+        mats.glassD.opacity = interiorViewOn ? 0.2 : cab ? GLASS_D_CAB : GLASS_D_DAY;
         mats.inside.emissive.setHex(cab ? emitOn : emitOff); mats.insideFwd.emissive.setHex(cab ? emitOn : emitOff);
         mats.seat.emissive.setHex(cab ? SEAT_EMIT_ON : SEAT_EMIT);
         applyLightFx();
@@ -1572,10 +1674,23 @@
       },
       setCabView(on) { // cab camera: hide the outside skin of the front car's nose (keeps lining + shadows) so the track stays visible
         cabViewOn = !!on; applyGlass(); applyLightFx();
+        // tram: the cab lining is dark seen from outside (through the tinted screen) but warm-white painted from the driver's seat, like the real Urbos cab
+        if (tramLook && !interiorViewOn) { const c = on ? 0xcfcdc5 : 0x4a4f56; mats.inside.color.setHex(c); mats.insideFwd.color.setHex(c); }
         if (rainMesh) rainMesh.visible = cabViewOn && rainMesh.material.uniforms.uWet.value > 0.01;
         for (const m of built[0].paintMeshes) m.material = on ? mats.ghost : mats.paint;
         for (const m of built[0].fwdLinings) { if (Array.isArray(m.material)) m.material[0] = on ? mats.ghost : mats.insideFwd; else m.material = on ? mats.ghost : mats.insideFwd; }
       },
+      /* Passenger-saloon camera (trams): the lining becomes the light saloon wall, the side glazing clear enough to look out of, the screens are drawn by setPaxDisplay. */
+      setInteriorView(on) {
+        interiorViewOn = !!on;
+        if (!tramLook) return;
+        const c = interiorViewOn ? 0xe4e9e5 : cabViewOn ? 0xcfcdc5 : 0x4a4f56;
+        mats.inside.color.setHex(c); mats.insideFwd.color.setHex(c);
+        mats.glassD.opacity = interiorViewOn ? 0.2 : (cabinOn ? GLASS_D_CAB : GLASS_D_DAY);
+        mats.glass.opacity = interiorViewOn ? 0.18 : tramLook ? (cabViewOn ? 0.2 : 0.58) : 0.34;
+      },
+      isInteriorView() { return interiorViewOn; },
+      setPaxDisplay(info) { if (mats.pax && mats.pax.map) drawPax(mats.pax.map, info); },
       /* Destination text on the cab displays (trams only; no-op elsewhere). */
       setDestination(text) { if (mats.dest && mats.dest.map) drawDest(mats.dest.map, String(text || '')); },
       setPantograph(up01) { for (const p of pantoAll) p.set(up01); },

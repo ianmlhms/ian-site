@@ -167,19 +167,7 @@
       c.textAlign = 'center';
       c.fillText('TICKETS', w / 2, 20);
     }, { clampU: true, clampV: true });
-    const ledTex = () => canvasTex('luxtram:led', 256, 96, (c, w, h) => {
-      c.fillStyle = '#0d0f11';
-      c.fillRect(0, 0, w, h);
-      c.fillStyle = '#ffb02e';
-      c.font = '700 22px "Courier New", monospace';
-      c.textAlign = 'left';
-      c.fillText("T1  Stadion       2'", 12, 30);
-      c.fillText("T1  Findel        9'", 12, 58);
-      c.fillText('T1  Stadion    10:12', 12, 86);
-      c.strokeStyle = '#3c4146';
-      c.lineWidth = 4;
-      c.strokeRect(2, 2, w - 4, h - 4);
-    }, { clampU: true, clampV: true });
+    const ledTex = () => canvasTex('luxtram:led', 256, 96, (c, w, h) => drawLed(c, w, h, LED_DEFAULT), { clampU: true, clampV: true });
     const tactileTex = () => canvasTex('luxtram:tactile', 64, 128, (c, w, h) => {
       c.fillStyle = '#d9d4c7';
       c.fillRect(0, 0, w, h);
@@ -197,6 +185,7 @@
     const adB = sets.get('luxtram-ads', () => M.sign('luxtram-ads', adTex()));
     const ticketB = sets.get('luxtram-ticket', () => M.tex('luxtram-ticket', ticketTex()));
     const ledB = sets.get('luxtram-led', () => M.sign('luxtram-led', ledTex()));
+    ledTexRef = ledTex();   // (cached by name: the same texture the boards use)
     const tactB = sets.get('luxtram-tactile', () => M.tex('luxtram-tactile', tactileTex(), { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
     const signB = sets.get('sign:' + st.name, () => M.sign(st.name, helpers.signTexture(st.name, 'tram')));
 
@@ -476,11 +465,70 @@
     }
   }
 
+  /* The departure boards (one texture shared by every stop): static text until the game calls TS.luxtramLed.show(rows), then live (train-sim.js: the next departures of the stop the
+   * player is in or approaching, from the game's timetable and clock). rows = up to 3 strings of 20 characters. */
+  const LED_DEFAULT = ["T1  Stadion       2'", "T1  Findel        9'", 'T1  Stadion    10:12'];
+  let ledTexRef = null, ledSig = '';
+  function drawLed(c, w, h, rows) {
+    c.fillStyle = '#0d0f11';
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffb02e';
+    c.font = '700 18px "Courier New", monospace';   // (20 characters across the 256 px board)
+    c.textAlign = 'left';
+    rows.slice(0, 3).forEach((r, i) => c.fillText(String(r), 12, 30 + 28 * i));
+    c.strokeStyle = '#3c4146';
+    c.lineWidth = 4;
+    c.strokeRect(2, 2, w - 4, h - 4);
+  }
+  window.TS.luxtramLed = {
+    show(rows) {
+      const sig = rows.join('|');
+      if (!ledTexRef || sig === ledSig) return false;
+      ledSig = sig;
+      const cv = ledTexRef.image;
+      drawLed(cv.getContext('2d'), cv.width, cv.height, rows);
+      ledTexRef.needsUpdate = true;
+      return true;
+    },
+  };
+
   function hashName(s) {
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
     return h;
   }
+
+  /* Footprints of everything standing on a platform, for the passengers (pb/train-sim/passengers.js): { s, o, hs, ho } = centre along the track,
+   * lateral distance from the track centre, half size along / across (people keep out of them). Mirrors the placement rules of buildStop. */
+  function obstacles(name, p) {
+    const cfg = LAYOUT[name];
+    if (!cfg || !p) return [];
+    const { edge, width: W, island } = p;
+    const sMid = (p.platformStart + p.platformEnd) / 2;
+    const out = [];
+    const add = (z, lat, hz, hl) => out.push({ s: sMid - z, o: lat, hs: hz, ho: hl });
+    const latBack = island ? edge + W / 2 : Math.min(edge + 2.95, edge + W - 0.12);
+    (cfg.shelters || []).forEach((sh) => {
+      const rB = island ? latBack + Math.min(1.5, (W - 0.9) / 2) : latBack + 0.22;
+      const bl = Math.min(sh.len * 0.62, 4.6);
+      add(sh.z, rB - 0.55, bl / 2 + 0.3, 0.4);                       // bench
+      add(sh.z, rB - 0.1, sh.len / 2 + 0.3, 0.1);                    // glass back wall
+      const rFr = island ? latBack - Math.min(1.5, (W - 0.9) / 2) : Math.max(edge + 0.85, 2.4);
+      [-1, 1].forEach((d) => add(sh.z + d * (sh.len / 2 - 0.15), (rFr + rB) / 2 - 0.05, 0.1, (rB - rFr - 0.5) / 2 + 0.1));   // glass end panels
+    });
+    if (cfg.ticket != null) add(cfg.ticket, island ? latBack - 0.4 : Math.min(edge + 2.35, edge + W - 0.5), 0.6, 0.5);
+    (cfg.ads || []).forEach((z) => add(z, island ? latBack : Math.min(latBack - 0.1, edge + W - 0.45), 0.85, 0.45));
+    if (cfg.led != null) add(cfg.led, island ? latBack + 0.6 : Math.min(edge + 1.5, edge + W - 0.7), 0.35, 0.35);
+    (cfg.bins || []).forEach((z) => add(z, island ? latBack + 1.1 : edge + W - 0.35, 0.4, 0.4));
+    (cfg.lamps || []).forEach((z) => add(z, island ? edge + W / 2 : edge + W - 0.3, 0.3, 0.3));
+    (cfg.extras || []).forEach((e) => {
+      if (e === 'veloh') add(cfg.island ? 20 - 4.5 : 19 - 4.5, island ? edge + W - 0.7 : edge + W - 0.5, 5.2, 0.7);
+      if (e === 'mbox') add((sMid - p.platformStart) - 4, edge + W - 1.1, 2.4, 1.2);
+    });
+    if (cfg.wing) [-14, -4.7, 4.7, 14].forEach((z) => add(z, edge + W - 0.85, 0.6, 0.6));
+    return out;
+  }
+  window.TS.luxtramObstacles = obstacles;
 
   const spec = { kind: 'tram', canopy: false, furniture: false, build: buildStop };
   Object.keys(LAYOUT).forEach((name) => RS.register(name, spec));
