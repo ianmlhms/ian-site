@@ -55,6 +55,8 @@ CAP_W = 3.0                                # extra plateau beyond the carriagewa
 BLEND_MIN, BLEND_MAX = 4.0, 14.0           # width of the blend into the LiDAR ground (m)
 DEV_FULL, DEV_ZERO = 0.35, 0.9             # ground that differs more than this from the road level is left alone (bank, cutting, wall): full effect below
                                            # DEV_FULL, none above DEV_ZERO
+ROUGH_MAX = 0.45                            # a laid node may not be rougher than the LiDAR was by more than this (Laplacian, m)
+TARGET_SPREAD = 0.3                        # roads whose profile heights differ by more than this at one ground node do not move it (m)
 JOIN_MAX_SPREAD = 1.0                      # roads at one node whose smoothed levels differ more than this are not at one level (m)
 CHAIN_COS = 0.6                            # two road ends are one street when the travel direction continues within ~53 degrees
 JOIN = 0.4                                 # points closer than this are one OSM node (m)
@@ -498,6 +500,8 @@ def main():
     # ---- lay the road into the tiles
     wsum = {k: np.zeros_like(v) for k, v in tiles.items()}
     wtsum = {k: np.zeros_like(v) for k, v in tiles.items()}
+    tmin = {k: np.full_like(v, np.inf) for k, v in tiles.items()}      # lowest / highest target that a node was pulled to by a road with weight > 0.2:
+    tmax = {k: np.full_like(v, -np.inf) for k, v in tiles.items()}     # roads on top of each other (a ramp over a street) must not tear the ground between them
     side_w = M.SIDEWALK_W
     PIECE = 120                                   # stations per piece
     for ri, d in enumerate(R):
@@ -562,6 +566,7 @@ def main():
                     wl = 1.0 - smooth(0.0, 1.0, (best_d - plateau) / bw)
                     wl = np.where(best_d <= plateau, 1.0, wl)
                     wdev = 1.0 - smooth(DEV_FULL, DEV_ZERO, np.abs(dev))
+                    wdev = np.where(best_d <= d.hw, 1.0 - smooth(1.0, 1.6, np.abs(dev)), wdev)          # on the carriageway itself the profile is applied in full up to 1 m off (a tight gate would leave lumps of half-pulled nodes; a node 1.6 m off is a deck / wall, not road); beside it a bank / wall is protected tighter
                     w = wl * wdev * np.minimum(aok[k], 1.0)
                     # the same node can be reached from several pieces of the road: keep the strongest
                     rr_, cc_ = rr.ravel()[m], cc.ravel()[m]
@@ -570,6 +575,9 @@ def main():
                     # accumulate weight and weighted target; a node near two roads averages their targets
                     np.add.at(wsum[key], (rr_[upd], cc_[upd]), w[upd])
                     np.add.at(wtsum[key], (rr_[upd], cc_[upd]), (w * best_h)[upd])
+                    strong = w > 0.2
+                    np.minimum.at(tmin[key], (rr_[strong], cc_[strong]), best_h[strong])
+                    np.maximum.at(tmax[key], (rr_[strong], cc_[strong]), best_h[strong])
         if ri % 400 == 0:
             print("  road", ri, "/", len(R), "%.0fs" % (time.time() - t0))
     changed = 0
@@ -581,10 +589,30 @@ def main():
             continue
         tgt = np.where(m, wtsum[key] / np.where(m, ws, 1.0), tiles[key])
         wt = np.minimum(1.0, ws)
+        wt = np.where((tmax[key] - tmin[key]) > TARGET_SPREAD, 0.0, wt)          # two roads at different levels meet here: leave the ground alone
         new = tiles[key] + wt * (tgt - tiles[key])
         maxmove = max(maxmove, float(np.max(np.abs(new - tiles[key]))))
         changed += int(m.sum())
         tiles[key] = new
+    # safety net: a node that the road laying made much rougher than it was (the 4-neighbour Laplacian grew by more than ROUGH_MAX) goes back to the LiDAR level;
+    # where two road records disagree about the ground (rail yards, overpasses without a layer tag) the laying would otherwise leave single-node spikes
+    reverted = 0
+    for key in tiles:
+        for _ in range(3):
+            h = tiles[key]
+            o = orig[key]
+            def lap(a):
+                l = np.zeros_like(a)
+                l[1:-1, 1:-1] = a[:-2, 1:-1] + a[2:, 1:-1] + a[1:-1, :-2] + a[1:-1, 2:] - 4 * a[1:-1, 1:-1]
+                return l
+            bad = (np.abs(lap(h)) > np.abs(lap(o)) + ROUGH_MAX) & (np.abs(h - o) > 0.1)
+            if not bad.any():
+                break
+            grow = bad.copy()
+            grow[1:, :] |= bad[:-1, :]; grow[:-1, :] |= bad[1:, :]; grow[:, 1:] |= bad[:, :-1]; grow[:, :-1] |= bad[:, 1:]
+            reverted += int(grow.sum())
+            tiles[key] = np.where(grow, o, h)
+    print("nodes reverted by the roughness guard", reverted)
     print("nodes moved", changed, "max move %.2f m" % maxmove, "%.0fs" % (time.time() - t0))
     if dry:
         return
