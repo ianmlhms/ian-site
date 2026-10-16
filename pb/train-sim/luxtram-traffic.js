@@ -651,7 +651,7 @@
        Down-rays from just above every wheel against the infrastructure group; a hit from 0.8 m above to 0.5 m below the wheel is a conflict. */
     const infraRc = new T.Raycaster(); const infraHits = []; const wMat = new T.Matrix4(); const wV = new T.Vector3();
     const NO_MESHES = [];
-    const STRUCT_UP = 0.8; const STRUCT_DOWN = 0.5; const STRUCT_BURY = 0.25;
+    const STRUCT_UP = 0.8; const STRUCT_DOWN = 0.5; const STRUCT_BURY = 0.25; const STRUCT_FLOAT = 0.4;
     let infraList = []; let infraLook = -1e9;
     function infraRoot(now) {
       if (infraList.length && now - infraLook < 3000 && infraList.every((o) => o.parent)) return infraList;      // (tiles / chunks stream in and out: re-read every 3 s)
@@ -682,13 +682,16 @@
         // ... and a wheel is never buried: the highest drawn ground surface (terrain, painted ground, deck, plug) within 0.8 m above it is not more than STRUCT_BURY above the contact point
         const tl = k < 4 ? surfaceMeshesAt(wV.x, wV.z) : NO_MESHES;
         if (tl.length) {
+          let ok = false;
           infraHits.length = 0; infraRc.intersectObjects(tl, true, infraHits);
           for (let i = 0; i < infraHits.length; i++) {
             const o = infraHits[i].object;
             if (!o.visible || o.isInstancedMesh || o.isSprite || o.isLine || o.isPoints || (o.material && o.material.transparent && o.material.opacity < 0.5)) continue;
-            if (infraHits[i].point.y > wy + STRUCT_BURY) return false;
+            if (infraHits[i].point.y > wy + STRUCT_BURY || infraHits[i].point.y < wy - STRUCT_FLOAT) return false;      // buried / hanging over a gap (a deck end that the mesh does not cover)
+            ok = true;
             break;
           }
+          if (!ok) return false;       // nothing drawn within STRUCT_DOWN below the wheel
         }
       }
       return true;
@@ -784,7 +787,7 @@
     let tramX = 0; let tramZ = 0; let tramY = 0;
     const R_ACT = clamp(Q.ahead ? Q.ahead * 0.6 : 400, 240, 560);
     function newCar() {
-      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, sinceS: 1e9, chkRd: null, chkRdS: null, laneRd: null, laneK: 1, mway: false, laneIdx: 0, latCur: NaN, mat: new Float32Array(16) };
+      return { rd: null, t: 0, dir: 1, vmax: 10, cur: 0, type: 'hatch', tid: 0, body: [1, 1, 1], spec: SPEC.hatch, active: false, shown: false, x: 0, z: 0, i: 0, wait: 0, since: 1e9, sinceS: 1e9, lastS: -1e9, chkRd: null, chkRdS: null, laneRd: null, laneK: 1, mway: false, laneIdx: 0, latCur: NaN, mat: new Float32Array(16) };
     }
     function assignType(c, cls) {
       c.type = pickType(rng, cls); c.tid = TID[c.type]; c.spec = SPEC[c.type]; c.body = pick(rng, paintPool(c.type));
@@ -1196,9 +1199,9 @@
             continue;
           }
         }
-        // structure guard: more often than the surface net (every 3 m driven, 10 cars per frame at most): a platform pad is only a few metres long
-        if (structBudget > 0 && (c.rd !== c.chkRdS || c.sinceS > 3)) {
-          structBudget--; c.chkRdS = c.rd; c.sinceS = 0;
+        // structure guard: more often than the surface net (every 2 m driven or 0.7 s, 10 cars per frame at most): a platform pad is only a few metres long
+        if (structBudget > 0 && (c.rd !== c.chkRdS || c.sinceS > 2 || now - c.lastS > 700)) {
+          structBudget--; c.chkRdS = c.rd; c.sinceS = 0; c.lastS = now;
           if (!structureClear(c, now)) {
             if (!c.rd.bad) c.rd.bad = [];
             c.rd.bad.push([c.t - 25, c.t + 25, now + 600000]);
