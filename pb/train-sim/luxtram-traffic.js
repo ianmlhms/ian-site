@@ -965,40 +965,48 @@
       const hwT = sp0.tw / 2;
       const ob = rd.bridge === true;
       const refY = ob ? c.y - ROAD_LIFT : undefined;       // a bridge car stays on the deck nearest to its own height (stacked ramps of an interchange)
-      let hFL = surfaceAt(fCx - rx * hwT, fCz - rz * hwT, ob, refY); let hFR = surfaceAt(fCx + rx * hwT, fCz + rz * hwT, ob, refY);
-      let hRL = surfaceAt(bCx - rx * hwT, bCz - rz * hwT, ob, refY); let hRR = surfaceAt(bCx + rx * hwT, bCz + rz * hwT, ob, refY);
-      if (hFL !== hFL || hFR !== hFR || hRL !== hRL || hRR !== hRR) return false;
-      if (!ob && roadAt) {
-        const rFL = roadAt(fCx - rx * hwT, fCz - rz * hwT); const rFR = roadAt(fCx + rx * hwT, fCz + rz * hwT);
-        const rRL = roadAt(bCx - rx * hwT, bCz - rz * hwT); const rRR = roadAt(bCx + rx * hwT, bCz + rz * hwT);
-        // a wheel off the asphalt (kerb, pavement, bank) although the road axis is asphalt: steer the lane towards the axis, 2 % of the half width per frame
-        if ((rFL !== rFL || rFR !== rFR || rRL !== rRL || rRR !== rRR) && c.laneK > 0.3 && roadAt(spF.x, spF.z) === roadAt(spF.x, spF.z)) c.laneK = Math.max(0.3, c.laneK - 0.02);
-        // (every wheel stands on its own drawn surface - road, sidewalk, bare terrain: the suspension warp of the body takes the difference)
-      }
-      const yFL = hFL + ROAD_LIFT; const yFR = hFR + ROAD_LIFT; const yRL = hRL + ROAD_LIFT; const yRR = hRR + ROAD_LIFT;
+      // wheel contact positions (x, z): FL, FR, RL, RR; the second pass moves them to where the tilted body really puts its wheels (on a bank the wheels sit closer together than the lane sample points)
+      const wxz = [fCx - rx * hwT, fCz - rz * hwT, fCx + rx * hwT, fCz + rz * hwT, bCx - rx * hwT, bCz - rz * hwT, bCx + rx * hwT, bCz + rz * hwT];
       const wbL = Math.hypot(fCx - bCx, fCz - bCz) || sp0.wb;
-      // orientation: forward from the rear to the front axle, right from the lateral slope
-      cZ.set(-(fCx - bCx), -((yFL + yFR) / 2 - (yRL + yRR) / 2), -(fCz - bCz)).normalize();    // local +Z = backwards
-      tmpV.set(rx, ((yFR + yRR) / 2 - (yFL + yRL) / 2) / sp0.tw, rz).normalize();
-      cY.crossVectors(cZ, tmpV).normalize();
-      cX.crossVectors(cY, cZ);
-      cm.makeBasis(cX, cY, cZ);
-      // lift: every wheel bottom (local y = 0) must be on or above its ground point
       const hzW = wbL / 2;
-      const need = (hy, wx, wz) => hy - (cX.y * wx + cZ.y * wz);
-      const n0 = need(yFL, -hwT, -hzW); const n1 = need(yFR, hwT, -hzW); const n2 = need(yRL, -hwT, hzW); const n3 = need(yRR, hwT, hzW);
-      const nMax = Math.max(n0, n1, n2, n3);
-      c.hdbg = [yFL, yFR, yRL, yRR];
-      c.twist = Math.abs(n0 - n1 - n2 + n3);                       // (test read-out) how far the four wheel points are from one plane
-      let cy = (n0 + n1 + n2 + n3) / 4 + Math.min(0.02, 0.1 * (nMax - (n0 + n1 + n2 + n3) / 4));      // a rigid body on a twisted surface rests on the mean of the four wheel heights: no wheel floats or sinks by more than a quarter of the twist
-      // residual of every wheel against the plane the body rests on (the suspension offsets, see makeMaterial)
       const su = c.sus || (c.sus = [0, 0, 0, 0]);
-      su[0] = clamp(yFL - (cy + cX.y * -hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX); su[1] = clamp(yFR - (cy + cX.y * hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX);
-      su[2] = clamp(yRL - (cy + cX.y * -hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX); su[3] = clamp(yRR - (cy + cX.y * hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX);
-      cq.setFromRotationMatrix(cm);
-      tmpV.set((fCx + bCx) / 2, cy, (fCz + bCz) / 2);
-      cm.compose(tmpV, cq, cs1);
-      c.x = tmpV.x; c.z = tmpV.z; c.y = cy; c.mat.set(cm.elements);
+      for (let pass = 0; pass < 2; pass++) {
+        const hFL = surfaceAt(wxz[0], wxz[1], ob, refY); const hFR = surfaceAt(wxz[2], wxz[3], ob, refY);
+        const hRL = surfaceAt(wxz[4], wxz[5], ob, refY); const hRR = surfaceAt(wxz[6], wxz[7], ob, refY);
+        if (hFL !== hFL || hFR !== hFR || hRL !== hRL || hRR !== hRR) { if (pass === 0) return false; break; }
+        if (pass === 0 && !ob && roadAt) {
+          // a wheel off the asphalt (kerb, pavement, bank) although the road axis is asphalt: steer the lane towards the axis, 2 % of the half width per frame
+          const off = roadAt(wxz[0], wxz[1]) !== roadAt(wxz[0], wxz[1]) || roadAt(wxz[2], wxz[3]) !== roadAt(wxz[2], wxz[3]) || roadAt(wxz[4], wxz[5]) !== roadAt(wxz[4], wxz[5]) || roadAt(wxz[6], wxz[7]) !== roadAt(wxz[6], wxz[7]);
+          if (off && c.laneK > 0.3 && roadAt(spF.x, spF.z) === roadAt(spF.x, spF.z)) c.laneK = Math.max(0.3, c.laneK - 0.02);
+        }
+        // (every wheel stands on its own drawn surface - road, sidewalk, bare terrain: the suspension warp of the body takes the difference)
+        const yFL = hFL + ROAD_LIFT; const yFR = hFR + ROAD_LIFT; const yRL = hRL + ROAD_LIFT; const yRR = hRR + ROAD_LIFT;
+        // orientation: forward from the rear to the front axle, right from the lateral slope
+        cZ.set(-(fCx - bCx), -((yFL + yFR) / 2 - (yRL + yRR) / 2), -(fCz - bCz)).normalize();    // local +Z = backwards
+        tmpV.set(rx, ((yFR + yRR) / 2 - (yFL + yRL) / 2) / sp0.tw, rz).normalize();
+        cY.crossVectors(cZ, tmpV).normalize();
+        cX.crossVectors(cY, cZ);
+        cm.makeBasis(cX, cY, cZ);
+        const need = (hy, wx, wz) => hy - (cX.y * wx + cZ.y * wz);
+        const n0 = need(yFL, -hwT, -hzW); const n1 = need(yFR, hwT, -hzW); const n2 = need(yRL, -hwT, hzW); const n3 = need(yRR, hwT, hzW);
+        const nMax = Math.max(n0, n1, n2, n3);
+        c.hdbg = [yFL, yFR, yRL, yRR];
+        c.twist = Math.abs(n0 - n1 - n2 + n3);                       // (test read-out) how far the four wheel points are from one plane
+        const cy = (n0 + n1 + n2 + n3) / 4 + Math.min(0.02, 0.1 * (nMax - (n0 + n1 + n2 + n3) / 4));      // a rigid body on a twisted surface rests on the mean of the four wheel heights: no wheel floats or sinks by more than a quarter of the twist
+        // residual of every wheel against the plane the body rests on (the suspension offsets, see makeMaterial)
+        su[0] = clamp(yFL - (cy + cX.y * -hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX); su[1] = clamp(yFR - (cy + cX.y * hwT + cZ.y * -hzW), -SUS_MAX, SUS_MAX);
+        su[2] = clamp(yRL - (cy + cX.y * -hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX); su[3] = clamp(yRR - (cy + cX.y * hwT + cZ.y * hzW), -SUS_MAX, SUS_MAX);
+        cq.setFromRotationMatrix(cm);
+        const mx = (fCx + bCx) / 2; const mz = (fCz + bCz) / 2;
+        tmpV.set(mx, cy, mz);
+        cm.compose(tmpV, cq, cs1);
+        c.x = mx; c.z = mz; c.y = cy; c.mat.set(cm.elements);
+        if (pass === 0 && (Math.abs(cX.y) > 0.15 || Math.abs(cZ.y) > 0.15)) {
+          // steep: where the wheels really are, horizontally (the body is tilted: its wheel base / track project shorter)
+          const k = [[-hwT, -hzW], [hwT, -hzW], [-hwT, hzW], [hwT, hzW]];
+          for (let w = 0; w < 4; w++) { wxz[w * 2] = mx + cX.x * k[w][0] + cZ.x * k[w][1]; wxz[w * 2 + 1] = mz + cX.z * k[w][0] + cZ.z * k[w][1]; }
+        } else break;
+      }
       void now;
       return true;
     }

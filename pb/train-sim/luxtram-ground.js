@@ -654,7 +654,9 @@
       grp.userData.ranges = ranges;
       const bridgeAudit = decorateDecks(t, S, roadGrid, L_ASPH);
       grp.userData.bridges = bridgeAudit;
-      roadGrid.plugTri = triGrid(t, S, bridgeAudit.plugRanges);      // approach plugs (see decorateDecks): the road height query follows them
+      roadGrid.plugTri = triGrid(t, S, bridgeAudit.plugRanges); roadGrid.plugSideTri = triGrid(t, S, bridgeAudit.plugSideRanges);      // approach plugs (see decorateDecks): the road height query follows them
+      const dtg = triGrid(t, S, bridgeAudit.deckRanges);
+      if (dtg) deckTris.set(t.key, { x0: t.x0, z0: t.z0, t: { x0: t.x0, z0: t.z0 }, grid: dtg }); else deckTris.delete(t.key);
       // parked cars on the painted stalls (vec.pk: x, z in cm from the tile corner, heading in degrees)
       const pk = vec.pk;
       if (pk && pk.length) {
@@ -809,7 +811,9 @@
     /* Y of the drawn sidewalk / path surface at (x, z) or NaN (same layer rule as roadSurface) */
     function sideSurface(t, x, z, refY) {
       const rg = t && t.decor && t.decor.roadGrid;
-      if (!rg || !rg.sideTri) return NaN;
+      if (!rg) return NaN;
+      if (rg.plugSideTri) { const pg = triQuery(t, rg.plugSideTri, x, z, undefined, true); if (pg === pg) return pg; }
+      if (!rg.sideTri) return NaN;
       return triQuery(t, rg.sideTri, x, z, refY, true);
     }
     /* coverage of the sidewalk / path triangles (acc.i from i0 to i1) as a 0.5 m cell mask of the tile; coverAt / roadAt read a mask / the road height grid at scene metres */
@@ -920,6 +924,7 @@
        footing + a cross-head) that reach the ground, and abutments (end wall to the ground) where the deck ends above the ground.
        Everything is built from frames along the OSM centre line (3 m apart): a half section is a polyline in (lateral, height) that is swept along the frames. */
     const decks = new Map();       // tile key -> [{ pts: [{x, y, z}], hw }]
+    const deckTris = new Map();    // tile key -> { x0, z0, t, grid }: the exact triangles of every deck top (deckHeight)
     const CONC = [0.76, 0.75, 0.72]; const CONC_D = [0.47, 0.46, 0.44]; const CONC_L = [0.86, 0.85, 0.82]; const CONC_M = [0.6, 0.59, 0.57];
     const STEEL = [0.66, 0.69, 0.72]; const STEEL_D = [0.36, 0.39, 0.42];
     const DECK_ASPH = [0.94, 0.94, 0.95];
@@ -1038,6 +1043,8 @@
         decks.forEach((l, key) => { if (key === t.key) return; l.forEach((o) => { for (let i = 0; i + 1 < o.pts.length; i++) probe(o.pts[i].x, o.pts[i].z, o.pts[i].y - 0.02, o.pts[i + 1].x, o.pts[i + 1].z, o.pts[i + 1].y - 0.02); }); });
         return best === best ? { y: bestRaw ? (best + y) / 2 : best, raw: bestRaw } : null;      // a deck of this tile (not built yet) meets half way, one that is built already is met exactly
       };
+      const deckRanges = [];          // [first, last) index of every deck top surface (and plug top) in S.i: the exact deck height query
+      const plugSideRanges = [];      // the sidewalk / cap part of the plugs
       const plugRanges = [];          // [first, last) index of the plug top triangles in S.i (the road height query follows them)
       list.forEach((dk) => {
         const n = dk.p.length / 2;
@@ -1084,7 +1091,10 @@
         const fr = F.fr;
         const prof = halfSection(L);
         const E = L.E; const hw = L.hw;
-        reg.push({ pts: fr.slice(lo, hi + 1).map((f) => ({ x: f.x, y: f.y + 0.02, z: f.z })), hw: Math.min(E, hw + L.shoulder + L.walk) });
+        // the top surface of the section = every segment up to the top of the kerb cap; the rest is the girder below it
+        let kTop = prof.length - 1; for (let q = 1; q < prof.length; q++) { if (prof[q][1] < 0 && prof[q][0] >= E - 1e-6) { kTop = q - 1; break; } }
+        const topProf = prof.slice(0, kTop + 1); const underProf = prof.slice(kTop);
+        reg.push({ pts: fr.slice(lo, hi + 1).map((f) => ({ x: f.x, y: f.y + 0.02, z: f.z })), hw: Math.min(E, hw + L.shoulder + L.walk), hwRoad: hw + L.shoulder, kerb: L.walk > 0 ? KERB_H : 0 });
         const at = (f, lat, y) => [f.x + f.nx * lat, f.y + y, f.z + f.nz * lat];
         const yawOf = (f) => Math.atan2(f.dz, f.dx);
         /* sweep a (lateral, height) polyline along the frames of a set; sd = +1 right half, -1 mirrored left half.  The profile is walked clockwise (solid on its right) for sd = +1. */
@@ -1153,7 +1163,8 @@
         };
 
         /* ---- the girder */
-        [1, -1].forEach((sd) => sweep(F, prof, sd));
+        { const i0 = S.i.length; [1, -1].forEach((sd) => sweep(F, topProf, sd)); deckRanges.push([i0, S.i.length]); }
+        [1, -1].forEach((sd) => sweep(F, underProf, sd));
         // deck ends: the cross section as a flat face (so the box girder shows no void where it runs into the embankment / the abutment)
         const polyFull = []; prof.forEach((q) => polyFull.push([q[0], q[1]])); for (let k = prof.length - 2; k >= 1; k--) polyFull.push([-prof[k][0], prof[k][1]]);
         let capTris = null;
@@ -1249,11 +1260,12 @@
           }
           const P = { fr: pf, lo: 0, hi: nP, cum: pf.map((_, i) => (Lp * i) / nP), total: Lp };
           // the top: everything of the section up to the top of the kerb cap; the walls on both edges go down to the ground
-          let kTop = prof.length - 1; for (let q = 1; q < prof.length; q++) { if (prof[q][1] < 0 && prof[q][0] >= E - 1e-6) { kTop = q - 1; break; } }
-          const top = prof.slice(0, kTop + 1);
+          const nRoad = 2 + (L.shoulder > 0 ? 1 : 0);            // the carriageway (+ hard shoulder) part of the top: the road; sidewalk, kerb cap: beside it
           const iA = S.i.length;
-          [1, -1].forEach((sd) => sweep(P, top, sd));
-          plugRanges.push([iA, S.i.length]);
+          [1, -1].forEach((sd) => sweep(P, topProf.slice(0, nRoad), sd));
+          const iB = S.i.length;
+          [1, -1].forEach((sd) => sweep(P, topProf.slice(nRoad - 1), sd));
+          plugRanges.push([iA, iB]); plugSideRanges.push([iB, S.i.length]); deckRanges.push([iA, S.i.length]);
           [1, -1].forEach((sd) => {
             for (let i = 0; i < nP; i++) {
               const f0 = pf[i]; const f1 = pf[i + 1];
@@ -1273,7 +1285,7 @@
         audit.push({ tile: t.key, cls: dk.c, hw: E, lo, hi, len: total, piers, abuts, ends, plugs, y0: fr[lo].y, yN: fr[hi].y, pre: dk.pre, post: dk.post });
       });
       if (reg.length) decks.set(t.key, reg); else decks.delete(t.key);
-      audit.plugRanges = plugRanges;
+      audit.plugRanges = plugRanges; audit.plugSideRanges = plugSideRanges; audit.deckRanges = deckRanges;
       return audit;
     }
 
@@ -1290,12 +1302,20 @@
           const tt = clamp(((x - a.x) * dx + (z - a.z) * dz) / l2, 0, 1);
           const d = Math.hypot(x - (a.x + dx * tt), z - (a.z + dz * tt));
           if (d > dk.hw) continue;
-          const y = a.y + (b.y - a.y) * tt;
+          const y = a.y + (b.y - a.y) * tt + (d > dk.hwRoad ? dk.kerb : 0);      // beside the carriageway: the sidewalk, one kerb up
           const score = useRef ? Math.abs(y - refY) : d;
           if (score < bestScore) { bestScore = score; best = y; }
         }
       }));
-      return best;
+      if (best !== best) return NaN;
+      // exact: the drawn deck top triangles (every tile that has decks: a deck piece belongs to the tile of its centre, but overlaps its neighbours)
+      let exact = NaN; let bd = 0.6;
+      deckTris.forEach((e) => {
+        if (x < e.x0 - 4 || x > e.x0 + 132 || z < e.z0 - 4 || z > e.z0 + 132) return;
+        const v = triQuery(e.t, e.grid, x, z, best, false);
+        if (v === v && Math.abs(v - best) < bd) { bd = Math.abs(v - best); exact = v; }
+      });
+      return exact === exact ? exact : best;
     }
 
     /* ---- far ring */
@@ -1308,11 +1328,11 @@
       waterT += dt;
       waterNormal.offset.set((waterT * 0.012) % 1, (waterT * 0.007) % 1);
     }
-    function dropTile(key) { decks.delete(key); }
+    function dropTile(key) { decks.delete(key); deckTris.delete(key); }
     function dispose() {
       disposables.forEach((o) => { try { o.dispose(); } catch (e) { /* ignore */ } });
       dummy1.dispose();
-      decks.clear();
+      decks.clear(); deckTris.clear();
     }
     return {
       fetchTile: (buf) => parseTile(buf), weightTextures: (cls, n, o) => weightTextures(T, cls, n, o), terrainMaterial, farMaterial, decorate, deckHeight, dropTile,
