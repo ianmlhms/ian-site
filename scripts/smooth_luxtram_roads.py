@@ -10,7 +10,8 @@ kerbs, markings, cars, lamps, trees) sees the same smooth road, and the ground n
 
   1. every OSM carriageway (class 0-5, ground level: no bridge / tunnel / elevated layer) is resampled every 2 m; the LiDAR level is the median of five
      samples across the carriageway (gutters and kerbs do not bias it);
-  2. profile = weighted Whittaker smoother (second-difference penalty, wavelength cutoff WAVE_M[class]), pulled back where it strays more than MAX_DEV from the
+  2. ways that simply continue into each other at a junction (same class, same direction) are chained, so one street is ONE profile;
+     profile = weighted Whittaker smoother (second-difference penalty, wavelength cutoff WAVE_M[class]), pulled back where it strays more than MAX_DEV from the
      LiDAR level, then capped to MAX_GRADE and MIN_VRAD (vertical curve radius);
   3. junctions: roads that share a point (OSM nodes, 0.4 m) get ONE height there (the more important road wins); the end of a ground road that runs into a
      bridge / tunnel keeps the LiDAR level there (the deck end bends to meet it, see luxtram-ground.js decorateDecks);
@@ -18,7 +19,8 @@ kerbs, markings, cars, lamps, trees) sees the same smooth road, and the ground n
      (wider where the road differs more from the terrain); ground that is far above / below the road (cutting, bank, retaining wall) is not touched;
   5. the tiles are re-encoded with 5 mm resolution (HQ 200, was 50): the 2 cm steps of the old encoding would make a smooth 1 % grade look terraced.
 
-The script reads and writes the shipped tiles in place.  It is idempotent (smoothing a smooth road changes nothing).  Needs the venv (numpy scipy shapely pyproj).
+The script reads and writes the shipped tiles in place (LUXTRAM_DATA_IN / LUXTRAM_DATA_OUT = other folders with h/*.bin + index.json, e.g. the pristine
+tiles from git history).  It is idempotent (smoothing a smooth road changes nothing).  Needs the venv (numpy scipy shapely pyproj).
 After a run bump "v" in data/luxtram/index.json and HQ in luxtram-world.js decodeHeights (HQ = 200) if the encoding changed.
 """
 import json

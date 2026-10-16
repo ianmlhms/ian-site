@@ -121,6 +121,14 @@
       }
     }
     const t = new T.CanvasTexture(c);
+    // mean colour (linear) of every cell: the ground fades to it where one pixel covers more than ~24 texels (no atlas mip bleed, no speckle, no darkening with distance)
+    t.userData.cellMean = [];
+    for (let k = 0; k < CLS; k++) {
+      const ox = (k % 4) * CP + GUT; const oy = Math.floor(k / 4) * CP + GUT; const d = g.getImageData(ox, oy, CELL, CELL).data; let r = 0; let gg = 0; let bb = 0;
+      const lin = (v) => { const u = v / 255; return u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4); };
+      for (let i = 0; i < d.length; i += 4) { r += lin(d[i]); gg += lin(d[i + 1]); bb += lin(d[i + 2]); }
+      const n = d.length / 4; t.userData.cellMean.push([r / n, gg / n, bb / n]);
+    }
     t.flipY = false; t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.ClampToEdgeWrapping; t.anisotropy = 4; t.generateMipmaps = true;
     t.minFilter = T.LinearMipmapLinearFilter; t.needsUpdate = true;
     texCache.set(key, t);
@@ -298,12 +306,12 @@
     '  vec2 sc = vec2(' + (CELL / ATLAS_W).toFixed(6) + ', ' + (CELL / ATLAS_H).toFixed(6) + ') / per;',
     /* the filter footprint is clamped to 64 atlas texels (mip level 6, the width of the gutter): beyond that distance the ground is the flat mean of its own cell, not the blend of the whole atlas */
     '  vec2 gx = dx * sc; vec2 gy = dy * sc; float rho = max(length(gx * vec2(' + ATLAS_W.toFixed(1) + ', ' + ATLAS_H.toFixed(1) + ')), length(gy * vec2(' + ATLAS_W.toFixed(1) + ', ' + ATLAS_H.toFixed(1) + '))); float lk = min(1.0, 64.0 / max(rho, 1e-6));',
-    '  return textureGrad(uAtlas, uv, gx * lk, gy * lk).rgb;',
+    '  return mix(textureGrad(uAtlas, uv, gx * lk, gy * lk).rgb, uCellMean[ci], smoothstep(24.0, 64.0, rho));',
     '}',
   ].join('\n');
   const SPLAT_FRAG_COMMON = [
     'varying vec2 vTerrUv; varying vec3 vWP; varying float vSlopeY;',
-    'uniform sampler2D uCtrl0; uniform sampler2D uCtrl1; uniform sampler2D uAtlas; uniform float uFar;',
+    'uniform sampler2D uCtrl0; uniform sampler2D uCtrl1; uniform sampler2D uAtlas; uniform float uFar; uniform vec3 uCellMean[8];',
     GLSL_CORE,
     /* the class mix at a (projected) position: planar (x, z) on the flat ground, side projection on steep banks so the texture does not streak */
     'vec3 classMix(vec4 a, vec4 b, vec2 wp, vec2 dx, vec2 dy, float m1, float m2, float m3) {',
@@ -351,7 +359,7 @@
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + SPLAT_FRAG_COMMON)
         .replace('#include <map_fragment>', 'diffuseColor.rgb *= groundAlbedo();');
     };
-    mat.customProgramCacheKey = () => 'lt-splat-v6';
+    mat.customProgramCacheKey = () => 'lt-splat-v7';
     return mat;
   }
 
@@ -360,6 +368,7 @@
     const T = ctx.T;
     const quality = ctx.quality;
     const atlas = groundAtlas(T);
+    const cellMeanUniform = atlas.userData.cellMean.map((m) => new T.Vector3(m[0], m[1], m[2]));
     const disposables = [];
     const own = (o) => { disposables.push(o); return o; };
 
@@ -369,13 +378,13 @@
     const MAT = { ASPH: 0, PAVE: 1, LAWN: 2, MEADOW: 3, FOREST: 4, GRAVEL: 5, SETT: 6, FLAT: 8 };
     const matSurface = own(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }));
     matSurface.onBeforeCompile = (sh) => {
-      sh.uniforms.uAtlas = { value: atlas };
+      sh.uniforms.uAtlas = { value: atlas }; sh.uniforms.uCellMean = { value: cellMeanUniform };
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aMat; varying float vMat; varying vec3 vWP; varying float vNy;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = aMat; vWP = position; vNy = normal.y;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMat; varying vec3 vWP; varying float vNy; uniform sampler2D uAtlas;\n' + GLSL_CORE)
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMat; varying vec3 vWP; varying float vNy; uniform sampler2D uAtlas; uniform vec3 uCellMean[8];\n' + GLSL_CORE)
         .replace('#include <map_fragment>', 'vec2 swp = mix(vWP.xz, vec2(vWP.x + vWP.z, vWP.y * 1.25), smoothstep(0.78, 0.6, vNy)); vec2 sdx = dFdx(swp); vec2 sdy = dFdy(swp);   /* steep slope: side projection (no streaks)\n*/ if (vMat < 7.5) { diffuseColor.rgb *= gcell(int(vMat + 0.5), swp, sdx, sdy) * (0.94 + 0.12 * lvn(swp * 0.4)); }');
     };
-    matSurface.customProgramCacheKey = () => 'lt-surface-v3';
+    matSurface.customProgramCacheKey = () => 'lt-surface-v4';
     const waterNormal = tileTex(T, 'lg-water-n', 128, 128, (g, w, h) => {
       const hgt = new Float32Array(w * h); const r = mulberry(3);
       const waves = []; for (let k = 0; k < 9; k++) waves.push([Math.floor(r() * 4) + 1, Math.floor(r() * 4) + 1, r() * 6.28, 0.5 + r()]);
@@ -395,7 +404,7 @@
     const dummy1 = (() => { const t = new T.DataTexture(new Uint8Array([255, 0, 0, 0]), 1, 1, T.RGBAFormat, T.UnsignedByteType); t.needsUpdate = true; return t; })();
     function terrainMaterial(tileX, tileZ, size, ctrl, far) {
       const uniforms = {
-        uCtrl0: { value: ctrl ? ctrl[0] : dummy1 }, uCtrl1: { value: ctrl ? ctrl[1] : dummy1 }, uAtlas: { value: atlas },
+        uCtrl0: { value: ctrl ? ctrl[0] : dummy1 }, uCtrl1: { value: ctrl ? ctrl[1] : dummy1 }, uAtlas: { value: atlas }, uCellMean: { value: cellMeanUniform },
         uTile: { value: new T.Vector3(tileX, tileZ, size) }, uFar: { value: far ? 1 : 0 },
       };
       const m = new T.MeshLambertMaterial({ side: T.DoubleSide, color: 0xffffff });

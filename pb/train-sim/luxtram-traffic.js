@@ -976,43 +976,6 @@
       const l = lanes.filter((u) => u < -0.4).map((u) => -u);   // against the tangent: right of travel = left of the tangent; rightmost (most negative u) first
       return l.length ? l : null;
     }
-    /* The direction of the DRAWN carriageway.  The OSM line a car follows can be skewed against the drawn asphalt (junction mouths merge several ways into one polygon),
-       and a 12 m bus on a skewed line stands diagonal across the lanes.  The middle of the asphalt (distance to the right edge minus to the left edge, halved) is measured every
-       3 m along the line (cached per 3 m bucket, smoothed over 9 m); where the width is steady over the car's wheel base, each axle takes the lane at the position of its own wheels:
-       the body points along the drawn lane between its axles, up to 12 degrees against the road line. */
-    const midCache = new Map();
-    function midBucket(rd, k) {
-      if (rd.uid === undefined) rd.uid = ++rdUid;
-      const key = rd.uid * 65536 + (k + 8);
-      const hit = midCache.get(key);
-      if (hit) return hit;
-      const tc = clamp((k + 0.5) * 3, 0, rd.len);
-      sample(rd, tc, spE);
-      const nx = -spE.dz; const nz = spE.dx; const ox = spE.x; const oz = spE.z;
-      const h0 = roadAt(ox, oz);
-      let e = null;
-      if (h0 === h0) {
-        const cap = Math.max(6, rd.hw * 1.5 + 2);
-        const scan = (sg) => { let last = 0; for (let d = 0.25; d <= cap; d += 0.25) { const h = roadAt(ox + nx * sg * d, oz + nz * sg * d); if (h !== h || Math.abs(h - h0) > 0.6) break; last = d; } return last + 0.125; };
-        const er = scan(1); const el = scan(-1);
-        e = { mid: (er - el) / 2, w: er + el };
-      }
-      if (midCache.size > 40000) midCache.clear();
-      midCache.set(key, e || NOMID);
-      return e || NOMID;
-    }
-    const NOMID = { mid: NaN, w: NaN };
-    const midOut = { mid: 0, w: 0 };
-    function midAt(rd, t) {
-      if (!roadAt || rd.bridge === true) return null;
-      const u = t / 3 - 0.5; const k0 = Math.floor(u); const f = u - k0;
-      const b0 = midBucket(rd, k0 - 1); const b1 = midBucket(rd, k0); const b2 = midBucket(rd, k0 + 1); const b3 = midBucket(rd, k0 + 2);
-      if (b0.mid !== b0.mid || b1.mid !== b1.mid || b2.mid !== b2.mid || b3.mid !== b3.mid) return null;
-      const sm = (a, b, c) => 0.25 * a + 0.5 * b + 0.25 * c;
-      midOut.mid = lerp(sm(b0.mid, b1.mid, b2.mid), sm(b1.mid, b2.mid, b3.mid), f);
-      midOut.w = lerp(sm(b0.w, b1.w, b2.w), sm(b1.w, b2.w, b3.w), f);
-      return midOut;
-    }
     let curDt = 0.016;
     /* nominal lane (no drawn edges yet): a third of the half width, wide enough that cars passing in opposite directions do not overlap, inside the carriageway */
     const nominalOffset = (rd, spec, c) => {
@@ -1038,25 +1001,14 @@
       }
       const tf = c.t + dir * sp0.wb / 2; const tr = c.t - dir * sp0.wb / 2;
       sample(rd, tf, spF); sample(rd, tr, spR);
-      let laneF = lane; let laneR = lane;
-      if (rd.bridge !== true) {      // axles on the drawn lane at their own position (see midAt): the body points along the drawn lane, not along a skewed OSM line
-        const mc = midAt(rd, c.t); const mcm = mc ? mc.mid : NaN;
-        const mf = mc ? midAt(rd, tf) : null; const mfm = mf ? mf.mid : NaN; const mfw = mf ? mf.w : NaN;
-        const mr = mf ? midAt(rd, tr) : null; const mrm = mr ? mr.mid : NaN; const mrw = mr ? mr.w : NaN;   // (midAt returns one shared object: read right away)
-        if (mcm === mcm && mfm === mfm && mrm === mrm && Math.abs(mfw - mrw) < 0.6) {
-          const mx = 0.21 * sp0.wb;
-          laneF = lane + clamp(mfm - mcm, -mx, mx); laneR = lane + clamp(mrm - mcm, -mx, mx);
-        }
-      }
       // front and rear axle centres on the lane (the lane offset follows each point's own tangent: smooth through bends)
-      const fX = spF.x + -spF.dz * laneF; const fZ = spF.z + spF.dx * laneF;
-      const rX = spR.x + -spR.dz * laneR; const rZ = spR.z + spR.dx * laneR;
+      const fX = spF.x + -spF.dz * lane; const fZ = spF.z + spF.dx * lane;
+      const rX = spR.x + -spR.dz * lane; const rZ = spR.z + spR.dx * lane;
       // (spF / spR are already "front / rear" in the travelling sense: tf = t + dir * wb / 2)
       let hx = fX - rX; let hz = fZ - rZ;
       const hl = Math.hypot(hx, hz);
       if (hl < 0.05) { hx = spF.dx * dir; hz = spF.dz * dir; } else { hx /= hl; hz /= hl; }
       const rx = -hz; const rz = hx;                           // right of travel (scene coordinates, see the model frame)
-      // (test read-out) yaw of the body against the lane tangent at the car's centre, and how much the lane bends between the two axles
       if (TS.luxTraffic && TS.luxTraffic.debugYaw) {       // (test read-outs, set by the checks) body heading vs the lane tangent at the centre, and the bend of the lane between the two axles
         sample(rd, c.t, spC);
         c.yawErr = Math.abs(Math.atan2(hx * spC.dz * dir - hz * spC.dx * dir, hx * spC.dx * dir + hz * spC.dz * dir)) * 57.2958;

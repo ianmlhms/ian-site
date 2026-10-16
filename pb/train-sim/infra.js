@@ -612,7 +612,7 @@
       if (!frames || frames.length < 2) return;
       [-RAIL_X, RAIL_X].forEach((x) => {
         sweep(steel, frames, lifted(RAIL_PROFILE_EMBEDDED, x), RAIL_COLORS_EMBEDDED, { closed: true });
-        sweep(groove, frames, [[x - Math.sign(x) * 0.075, RAIL_LIFT - 0.012], [x - Math.sign(x) * 0.036, RAIL_LIFT - 0.012]].sort((a, b) => a[0] - b[0]), dark, { uvU: 1, uvV: 1 });
+        sweep(groove, frames, [[x - Math.sign(x) * 0.075, RAIL_LIFT - 0.003], [x - Math.sign(x) * 0.036, RAIL_LIFT - 0.003]].sort((a, b) => a[0] - b[0]), dark, { uvU: 1, uvV: 1 });
       });
     };
     one(ctx.frames);
