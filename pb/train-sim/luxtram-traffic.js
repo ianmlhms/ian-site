@@ -941,7 +941,7 @@
       const h0 = roadAt(ox, oz);
       if (h0 !== h0) return null;                       // tile not decorated / the axis is not on the drawn asphalt: use the nominal lanes (not cached)
       const cap = Math.max(6, rd.hw * 1.5 + 2);
-      const scan = (sg) => { let last = 0; for (let d = 0.5; d <= cap; d += 0.5) { const h = roadAt(ox + nx * sg * d, oz + nz * sg * d); if (h !== h || Math.abs(h - h0) > 0.6) break; last = d; } return last + 0.25; };
+      const scan = (sg) => { let last = 0; for (let d = 0.5; d <= cap; d += 0.5) { const h = roadAt(ox + nx * sg * d, oz + nz * sg * d); if (h !== h || Math.abs(h - h0) > 0.3) break; last = d; } return last + 0.25; };
       const e = { er: scan(1), el: scan(-1), lines: [] };
       if (paintAt) {
         // painted lines across the road: sampled at 4 places along 10 m (dashed dividers have gaps), 0.2 m apart sideways
