@@ -714,12 +714,18 @@
     for (let i = 1; i < n - 1; i++) kappa2[i] = (TH2[i + 1] - TH2[i - 1]) / (2 * STEP);
 
     /* ---- stations */
+    /* A street crosses the tracks at the very end of the platform of Place de Metz (its carriageway runs from 0.1 m to 4.1 m behind the stop marker, the platform used to end 4 m
+       behind the marker and its ramp 3.5 m further): cars of that street stood on the platform slab / ramp and in the stop post and marker strip.  The whole stop (marker, platform,
+       the train's stopping point) is 4.6 m earlier now and the platform ends 0.6 m behind the marker: platform + ramp end 0.5 m before the street, the train does not block it.
+       shift = how far the stop moves back, endAhead = where the platform ends relative to the marker (default 4). */
+    const STOP_FIX = { 'Place de Metz': { shift: 4.6, endAhead: 0.6 } };
     const stations = [];
     for (let k = spec.from; k <= spec.to; k++) {
       const st = m.stops[k];
-      const marker = st.sMid + MARKER_AHEAD - sStart;
+      const fix = STOP_FIX[st.name] || { shift: 0, endAhead: 4 };
+      const marker = st.sMid + MARKER_AHEAD - sStart - fix.shift;
       stations.push({
-        id: 'st' + stations.length, name: st.name, s: marker, platformStart: marker + 4 - PLATFORM_LEN, platformEnd: marker + 4,
+        id: 'st' + stations.length, name: st.name, s: marker, platformStart: marker + fix.endAhead - PLATFORM_LEN, platformEnd: marker + fix.endAhead,
         side: st.side, kind: st.kind, size: CROWD[st.name] || 1, terminus: k === spec.from || k === spec.to,
         edge: st.edge, width: st.width, oppLat: st.oppLat,
       });

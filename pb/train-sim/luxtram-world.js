@@ -268,16 +268,16 @@
   function loadWorld() { if (!worldData) worldData = syncJson(WORLD_URL); return worldData; }
   let geoIndex = null;
   let structData = null;
-  function loadStructures() { if (!structData) { try { structData = syncJson(GEO_BASE + 'structures.json?v=1'); } catch (e) { structData = { over: [] }; } } return structData; }
-  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=5'); return geoIndex; }
+  function loadStructures() { if (!structData) { try { structData = syncJson(GEO_BASE + 'structures.json?v=2'); } catch (e) { structData = { over: [] }; } } return structData; }
+  function loadGeoIndex() { if (!geoIndex) geoIndex = syncJson(GEO_BASE + 'index.json?v=6'); return geoIndex; }
   /* Fetches the three data files the world needs at build time asynchronously (with a byte count) so that create() finds them in memory instead of
      blocking on synchronous requests. Resolves when all are in (or failed: create() then falls back to the blocking request). */
   function prefetchData() {
     const getJson = (url) => fetch(url).then((r) => (r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))).then((txt) => { NET.bytes += txt.length; return JSON.parse(txt); });
     const jobs = [];
     if (!worldData) jobs.push(getJson(WORLD_URL).then((d) => { if (!worldData) worldData = d; }));
-    if (!structData) jobs.push(getJson(GEO_BASE + 'structures.json?v=1').then((d) => { if (!structData) structData = d; }).catch(() => { /* optional: loadStructures() falls back */ }));
-    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=5').then((d) => { if (!geoIndex) geoIndex = d; }));
+    if (!structData) jobs.push(getJson(GEO_BASE + 'structures.json?v=2').then((d) => { if (!structData) structData = d; }).catch(() => { /* optional: loadStructures() falls back */ }));
+    if (!geoIndex) jobs.push(getJson(GEO_BASE + 'index.json?v=6').then((d) => { if (!geoIndex) geoIndex = d; }));
     return Promise.all(jobs).then(() => true, (e) => { console.warn(TAG + 'data prefetch failed, loading synchronously', e); return false; });
   }
 
@@ -1169,10 +1169,13 @@
           if (q0.d < 40 && q1.d < 40) { yA = q0.y - 0.5; yB = q1.y - 0.5; }
         }
         pts.forEach((p, i) => { p.y = bridge ? lerp(yA, yB, total ? cumLen[i] / total : 0) : 0; });
-        if (cls <= 4 && pts.length >= 2 && total > 30 && (!bridge || (TS.luxTraffic && TS.luxTraffic.CARS_ON_BRIDGES))) {
+        if (pts.length >= 2 && total > 30 && (!bridge || (TS.luxTraffic && TS.luxTraffic.CARS_ON_BRIDGES))) {
           const rdo = { pts, cum: cumLen, len: total, hw: width / 2, oneway: (flags & 4) !== 0, cls, cross: [], along: [], bridge };
-          if (!bridge) findCrossings(rdo);      // a bridge over the tram is not a level crossing: no red lights on it
-          roadsOut.push(rdo);
+          // streets only (class <= 4) carry traffic, plus the ramp of a road pit (the exit of an underground car park: the cars climb out of the cutting)
+          if (cls <= 4 || (cls === 5 && !bridge && pits && pits.matchRoad(rdo))) {
+            if (!bridge) findCrossings(rdo);      // a bridge over the tram is not a level crossing: no red lights on it
+            roadsOut.push(rdo);
+          }
         }
         if (!bridge && Q.lamps && cls >= 1 && cls <= 3) {
           let acc = 14;
@@ -1903,7 +1906,13 @@
       return q.lat < l0 ? l0 - q.lat : q.lat > l1 ? q.lat - l1 : -1;
     };
     const ground = TS.luxGround.create({ T, quality, Q, oy, surfY, normalAt, tileOf, slotClear, groundAt: gy });
+    /* road pits (luxtram-pits.js): a ramp that sinks into a cutting.  The tiles are filled to the street level there; the ground shaders cut the footprint away and the pit is real geometry. */
+    const pitRows = (loadStructures().pits || []);
+    const pits = pitRows.length && TS.luxPits ? TS.luxPits.create({ T, root, ox, oz, oy, pits: pitRows, ground, matMisc, castShadow: Q.castShadow, roadLift: ground.ROAD_LIFT }) : null;
+    if (pits) ground.setPits(pits.rects);
+    const pitTileReady = () => { if (!pits) return; pits.pits.forEach((p) => { const t = tileOf(p.x0 + p.ux * 20, p.z0 + p.uz * 20); const on = !!(t && t.mesh); p.meshes.forEach((m) => { m.visible = on; }); }); };       // (the pit is drawn while the terrain mesh around it is)
     const roadHeightAt = (x, z, onBridge, roadOnly, refY, hx, hz) => {
+      if (pits && !onBridge) { const pf = pits.floorAt(x, z, roadOnly, refY); if (pf !== undefined) return pf; }       // inside a pit's footprint: the pit floor for a car on the ramp, no asphalt for a car in the street beside it
       if (onBridge) {
         { const tb = tileOf(x, z); if (!tb || !tb.built || !tb.mesh || !tb.decor) return NaN; }      // (a deck is drawn with the decor of its tile: no height before the tile is built)
         const dh = ground.deckHeight(x, z, refY, hx, hz);      // NaN where no deck is registered (the named bridges are drawn by their landmark; a car there is not shown)
@@ -1939,7 +1948,7 @@
 
     /* ---- traffic: moved to luxtram-traffic.js (TS.luxTraffic) */
     const traffic = (Q.cars && TS.luxTraffic)
-      ? TS.luxTraffic.create({ THREE: T, root, Q, roadsByChunk, gy, rawG, roadHeightAt, paintAt, tileOf, nearest, frame, track, quality, night: () => nightK, hasOpp, oppLatAt, roadMarginExcept, routeReverse: !!(options && options.reverse) })
+      ? TS.luxTraffic.create({ THREE: T, root, Q, roadsByChunk, gy, rawG, roadHeightAt, paintAt, tileOf, nearest, frame, track, quality, night: () => nightK, hasOpp, oppLatAt, roadMarginExcept, routeReverse: !!(options && options.reverse), pits })
       : null;
     const markTraffic = () => { if (traffic) traffic.markDirty(); };
     let tramS = -1e9;
@@ -2082,6 +2091,7 @@
       tramS = sc;
       trackDirection(sc);
       if (traffic) traffic.update(Math.min(0.1, dt || 0.016), sc, camera);
+      pitTileReady();
       ensureTiles(sc, false);
       ensureDecor(false, sc);
       ensureChunks(sc, false);
@@ -2150,6 +2160,7 @@
       scene.remove(root);
       mats.forEach((m) => m.dispose());
       if (traffic) traffic.dispose();
+      if (pits) pits.dispose();
       ground.dispose();
       treeTplDec.dispose(); treeTplCon.dispose(); treeTplBoth.dispose();
       treeTpl.length = 0;
@@ -2167,7 +2178,7 @@
     });
     const debugSlot = (s) => { const sl = slotAt(s); if (!sl) return null; const f = frame(s); const L = slotLatL(s); return { kind: sl.kind, s0: sl.s0, s1: sl.s1, y: f.pos.y, HsL: slotShelf(sl, s, -1), HsR: slotShelf(sl, s, 1), L, R: SLOT_IN_R, left: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (L - d); const z = f.pos.z + f.right.z * (L - d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, -1, d, x, z).toFixed(1)]; }), right: COLLAR_D.map((d) => { const x = f.pos.x + f.right.x * (SLOT_IN_R + d); const z = f.pos.z + f.right.z * (SLOT_IN_R + d); return [d, +rawG(x, z).toFixed(1), +collarY(sl, s, 1, d, x, z).toFixed(1)]; }) }; };
     const paintDistance = (x, z) => { const t = tileOf(x, z); return t && t.ground ? ground.paintDistance(t, x, z) : NaN; };
-    return { bridgeAudit: () => [...bridgeAudit.values()], paintDistance, debugSlot, debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
+    return { bridgeAudit: () => [...bridgeAudit.values()], pits, paintDistance, debugSlot, debugRoadFurniture, update, setTimeOfDay: noop, setWeather: noop, warm, stats, progress, pendingAhead, dispose, root, groundAt: gy, roadHeightAt, ground, meshY, tileOf, tiles, underpasses, far: farTiles, facades: fx };
   }
 
   TS.luxtramWorld = { create, QUALITY, prefetchData };

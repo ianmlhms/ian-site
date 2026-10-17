@@ -565,6 +565,7 @@
   /* ================================================================ module */
   function create(ctx) {
     const { root, Q, roadsByChunk, gy, nearest, hasOpp, oppLatAt, roadMarginExcept, track } = ctx;
+    const pits = ctx.pits || null;      // road pits (luxtram-pits.js): the ramp of an underground car park sinks into a cutting; its floor is the surface there
     const rawG = ctx.rawG || gy;
     /* ROUTE identity (never the momentary driving direction): on the return routes (<id>~r) the player runs on the left-hand track (track.opposite) and the oncoming
        trams on the forward track; on the forward routes the other way round.  The reverser (R) only flips player.dir, it must never move a tram onto the player's track. */
@@ -636,6 +637,7 @@
       if (!t || !t.group) return surfList;
       const ch = t.group.children;
       for (let i = 0; i < ch.length; i++) if (ch[i] !== t.bgroup && ch[i] !== t.tgroup) surfList.push(ch[i]);
+      if (pits) pits.surfaceMeshes(x, z, surfList);
       return surfList;
     }
     /* true = a surface within +-SURF_TOL of y, false = none (floating / buried), null = cannot tell (no tile data) */
@@ -720,8 +722,15 @@
       vertCells = new Map(); roadSet = new Set(); roadList = []; roadWeightTotal = 0;
       roadsByChunk.forEach((roads) => roads.forEach((rd) => {
         if (rd.bridge && !CARS_ON_BRIDGES) return;
+        if (pits && rd.pitChecked === undefined) {      // the ramp road of a pit: nothing is born in its covered part behind the portal (the cars come out of the dark and climb)
+          rd.pitChecked = true;
+          const pm = pits.matchRoad(rd);
+          if (pm && pm.tPortal > 0) { if (!rd.bad) rd.bad = []; rd.bad.push([-1, pm.tPortal, Infinity]); }
+          if (pm) rd.pit = pm.pit;
+        }
         roadSet.add(rd); roadList.push(rd);
         rd.w = rd.len * (rd.cls === 0 ? 0.5 : rd.cls <= 2 ? 1.6 : rd.cls === 3 ? 1.2 : 1);
+        if (rd.pit) rd.w *= 4;       // the exit of an underground car park is a busy ramp (the cars climb out of the cutting)
         roadWeightTotal += rd.w;
         rd.pts.forEach((p, j) => {
           const key = Math.floor(p.x / CELL) + ',' + Math.floor(p.z / CELL);
@@ -1545,13 +1554,34 @@
         return out;
       },
       prepareOncoming: () => ensureModel(),
+      /* test hook: put a free car of the given type (or any) on road roadList[i] at t, driving along it (dir +1 / -1); returns its index or -1 */
+      spawnAt: (i, t, dir, type) => {
+        const rd = roadList[i]; const c = cars.find((k) => !k.active) || cars.reduce((m, k) => (!m || Math.hypot(k.x - tramX, k.z - tramZ) > Math.hypot(m.x - tramX, m.z - tramZ) ? k : m), null);       // (a free car, else the one farthest from the tram)
+        if (!rd || !c) return -1;
+        c.rd = rd; c.t = Math.max(0, Math.min(rd.len, t)); c.dir = rd.oneway ? 1 : (dir || 1); assignType(c, rd.cls);
+        if (type && SPEC[type]) { c.type = type; c.tid = TID[type]; c.spec = SPEC[type]; c.body = pick(rng, paintPool(type)); }
+        assignSpeed(c, rd);
+        c.latCur = NaN; c.cur = c.vmax * 0.7; c.active = true; c.shown = false; c.since = 1e9; c.sinceS = 1e9; c.chkRd = null; c.chkRdS = null;
+        sample(rd, c.t, sp); c.x = sp.x; c.z = sp.z; c.y = NaN;
+        return c.i;
+      },
+      /* test hook: put a free car on the ramp road of a pit, tOff m above the portal guard, driving up (returns its index, -1 when there is no pit road / no free car) */
+      spawnOnPit: (tOff) => {
+        const rd = roadList.find((r) => r.pit); const c = cars.find((k) => !k.active) || cars.reduce((m, k) => (!m || Math.hypot(k.x - tramX, k.z - tramZ) > Math.hypot(m.x - tramX, m.z - tramZ) ? k : m), null);       // (a free car, else the one farthest from the tram)
+        if (!rd || !c) return -1;
+        const b = (rd.bad || []).reduce((m, x) => (x[2] === Infinity ? Math.max(m, x[1]) : m), 0);
+        c.rd = rd; c.t = b + (tOff || 0.5); c.dir = 1; assignType(c, rd.cls); assignSpeed(c, rd);
+        c.latCur = NaN; c.cur = c.vmax * 0.7; c.active = true; c.shown = false; c.since = 1e9; c.sinceS = 1e9; c.chkRd = null; c.chkRdS = null;
+        sample(rd, c.t, sp); c.x = sp.x; c.z = sp.z; c.y = NaN;
+        return c.i;
+      },
       /* test hook: the centre lines of the ground roads (scene metres): class, half width, bridge flag, points every <= step m */
       roadLines: (step) => roadList.map((r, i) => { const pts = []; const st = step || 4; for (let t = 0; t <= r.len; t += st) { sample(r, t, sp); pts.push([+sp.x.toFixed(2), +sp.z.toFixed(2)]); } return { i, cls: r.cls, hw: r.hw, bridge: r.bridge === true, oneway: !!r.oneway, len: r.len, pts }; }),
       state: () => ({
         fails, guarded: guards, conflicts, roads: roadList.length, total: cars.length, crossings: crossings.length, cars: cars.filter((c) => c.active).length, shown: writeN, types: cars.filter((c) => c.shown).reduce((o, c) => { o[c.type] = (o[c.type] || 0) + 1; return o; }, {}),
         oncoming: onc.active ? { s: onc.s, dir: onc.dir, v: onc.v, phase: onc.phase, doors: onc.doors, x: onc.x, y: onc.y, z: onc.z, still: onc.still, age: onc.age, forced: onc.forced } : null, moveSecs, nextSpawnAt, why: onc.why, baked: !!onc.baked, queue: onc.mergeQueue ? onc.mergeQueue.length : -1, tramDraws: onc.bake ? onc.bake.drawCalls() : 0, cd: onc.cd, playerDir: player.dir, rActive: R_ACT,
       }),
-      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, twist: c.twist, yawErr: c.yawErr, bend: c.bend, hdbg: c.hdbg, sus: c.sus, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), cross: (c.rd.cross || []).map((q) => [q.t0, q.t1]), along: c.rd.along || [], rdLen: c.rd.len, onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 3 - c.spec.L / 2 && c.t < q.t1 + 3 + c.spec.L / 2) })),   // (test hook; onCross = the body is on / within 3 m of a level crossing: the same margin the structure / envelope guards leave free)
+      cars: () => cars.filter((c) => c.shown).map((c) => ({ id: c.i, type: c.type, x: c.x, y: c.y, z: c.z, v: c.cur, dir: c.dir, t: c.t, rd: roadList.indexOf(c.rd), cls: c.rd.cls, oneway: !!c.rd.oneway, bridge: c.rd.bridge === true, twist: c.twist, laneK: c.laneK, yawErr: c.yawErr, bend: c.bend, hdbg: c.hdbg, sus: c.sus, hw: c.rd.hw, L: c.spec.L, w: c.spec.tw, lat: c.latCur, mway: c.mway, lanes: laneCentres(c.rd, c.t, c.dir), cross: (c.rd.cross || []).map((q) => [q.t0, q.t1]), along: c.rd.along || [], rdLen: c.rd.len, onCross: (c.rd.cross || []).some((q) => c.t > q.t0 - 3 - c.spec.L / 2 && c.t < q.t1 + 3 + c.spec.L / 2) })),   // (test hook; onCross = the body is on / within 3 m of a level crossing: the same margin the structure / envelope guards leave free)
       /* test hook: the 4 wheel contact points (world) of every shown car: the road surface must be at or just below each one */
       wheelPoints: () => {
         const out = []; const v = new T.Vector3(); const mm = new T.Matrix4();

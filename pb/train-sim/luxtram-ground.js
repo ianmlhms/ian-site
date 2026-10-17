@@ -309,8 +309,23 @@
     '  return mix(textureGrad(uAtlas, uv, gx * lk, gy * lk).rgb, uCellMean[ci], smoothstep(24.0, 64.0, rho));',
     '}',
   ].join('\n');
+  /* road pits (luxtram-pits.js): a ramp that sinks into a cutting.  The ground (terrain, asphalt, kerbs, paint, parked cars) is filled to the street level
+     around it and cut away inside the pit's footprint here, pixel exact; the pit itself (floor, walls, portal) is real geometry.  Up to 4 oriented
+     rectangles: uPitA = (centre x, centre z, axis x, axis z), uPitB = (half length, half width, 0, 0); half length 0 = unused. */
+  const PIT_GLSL = [
+    'uniform vec4 uPitA[4]; uniform vec4 uPitB[4];',
+    'bool inPit(vec2 p) {',
+    '  for (int i = 0; i < 4; i++) {',
+    '    if (uPitB[i].x <= 0.0) continue;',
+    '    vec2 d = p - uPitA[i].xy; float a = dot(d, uPitA[i].zw); float b = dot(d, vec2(-uPitA[i].w, uPitA[i].z));',
+    '    if (abs(a) < uPitB[i].x && abs(b) < uPitB[i].y) return true;',
+    '  }',
+    '  return false;',
+    '}',
+  ].join('\n');
   const SPLAT_FRAG_COMMON = [
     'varying vec2 vTerrUv; varying vec3 vWP; varying float vSlopeY;',
+    PIT_GLSL,
     'uniform sampler2D uCtrl0; uniform sampler2D uCtrl1; uniform sampler2D uAtlas; uniform float uFar; uniform vec3 uCellMean[8];',
     GLSL_CORE,
     /* the class mix at a (projected) position: planar (x, z) on the flat ground, side projection on steep banks so the texture does not streak */
@@ -357,9 +372,9 @@
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + SPLAT_CHUNK_VERT_COMMON)
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + SPLAT_CHUNK_VERT_BEGIN);
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + SPLAT_FRAG_COMMON)
-        .replace('#include <map_fragment>', 'diffuseColor.rgb *= groundAlbedo();');
+        .replace('#include <map_fragment>', 'if (inPit(vWP.xz)) discard;\ndiffuseColor.rgb *= groundAlbedo();');
     };
-    mat.customProgramCacheKey = () => 'lt-splat-v7';
+    mat.customProgramCacheKey = () => 'lt-splat-v8';
     return mat;
   }
 
@@ -376,15 +391,29 @@
        asphalt, paving, kerbs, paint, gravel, setts, ballast, rails and bridge decks are merged per tile into one mesh; the material of a vertex is
        the attribute aMat (0..7 = atlas cell, 8 = flat vertex colour), painted procedurally like the terrain (no photographs). */
     const MAT = { ASPH: 0, PAVE: 1, LAWN: 2, MEADOW: 3, FOREST: 4, GRAVEL: 5, SETT: 6, FLAT: 8 };
-    const matSurface = own(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }));
-    matSurface.onBeforeCompile = (sh) => {
-      sh.uniforms.uAtlas = { value: atlas }; sh.uniforms.uCellMean = { value: cellMeanUniform };
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aMat; varying float vMat; varying vec3 vWP; varying float vNy;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = aMat; vWP = position; vNy = normal.y;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMat; varying vec3 vWP; varying float vNy; uniform sampler2D uAtlas; uniform vec3 uCellMean[8];\n' + GLSL_CORE)
-        .replace('#include <map_fragment>', 'vec2 swp = mix(vWP.xz, vec2(vWP.x + vWP.z, vWP.y * 1.25), smoothstep(0.78, 0.6, vNy)); vec2 sdx = dFdx(swp); vec2 sdy = dFdy(swp);   /* steep slope: side projection (no streaks)\n*/ if (vMat < 7.5) { diffuseColor.rgb *= gcell(int(vMat + 0.5), swp, sdx, sdy) * (0.94 + 0.12 * lvn(swp * 0.4)); }');
-    };
-    matSurface.customProgramCacheKey = () => 'lt-surface-v4';
+    /* the pit rectangles (shared by every ground material, set by setPits) */
+    const pitU = { A: { value: [0, 1, 2, 3].map(() => new T.Vector4(0, 0, 1, 0)) }, B: { value: [0, 1, 2, 3].map(() => new T.Vector4(0, 0, 0, 0)) } };
+    function setPits(list) {
+      for (let i = 0; i < 4; i++) {
+        const p = list && list[i];
+        if (p) { pitU.A.value[i].set(p.cx, p.cz, p.ux, p.uz); pitU.B.value[i].set(p.hl, p.hw, 0, 0); } else { pitU.A.value[i].set(0, 0, 1, 0); pitU.B.value[i].set(0, 0, 0, 0); }
+      }
+    }
+    function surfaceMaterial(clip) {
+      const m = own(new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: 0, polygonOffsetUnits: -2 }));
+      m.onBeforeCompile = (sh) => {
+        sh.uniforms.uAtlas = { value: atlas }; sh.uniforms.uCellMean = { value: cellMeanUniform };
+        if (clip) { sh.uniforms.uPitA = pitU.A; sh.uniforms.uPitB = pitU.B; }
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aMat; varying float vMat; varying vec3 vWP; varying float vNy;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMat = aMat; vWP = position; vNy = normal.y;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vMat; varying vec3 vWP; varying float vNy; uniform sampler2D uAtlas; uniform vec3 uCellMean[8];\n' + (clip ? PIT_GLSL + '\n' : '') + GLSL_CORE)
+          .replace('#include <map_fragment>', (clip ? 'if (inPit(vWP.xz)) discard;\n' : '') + 'vec2 swp = mix(vWP.xz, vec2(vWP.x + vWP.z, vWP.y * 1.25), smoothstep(0.78, 0.6, vNy)); vec2 sdx = dFdx(swp); vec2 sdy = dFdy(swp);   /* steep slope: side projection (no streaks)\n*/ if (vMat < 7.5) { diffuseColor.rgb *= gcell(int(vMat + 0.5), swp, sdx, sdy) * (0.94 + 0.12 * lvn(swp * 0.4)); }');
+      };
+      m.customProgramCacheKey = () => (clip ? 'lt-surface-v5' : 'lt-surface-v5-noclip');
+      return m;
+    }
+    const matSurface = surfaceMaterial(true);
+    const matPitSurface = surfaceMaterial(false);      // the same asphalt / concrete look for the pit's own floor (inside the footprint: not cut away)
     const waterNormal = tileTex(T, 'lg-water-n', 128, 128, (g, w, h) => {
       const hgt = new Float32Array(w * h); const r = mulberry(3);
       const waves = []; for (let k = 0; k < 9; k++) waves.push([Math.floor(r() * 4) + 1, Math.floor(r() * 4) + 1, r() * 6.28, 0.5 + r()]);
@@ -405,7 +434,7 @@
     function terrainMaterial(tileX, tileZ, size, ctrl, far) {
       const uniforms = {
         uCtrl0: { value: ctrl ? ctrl[0] : dummy1 }, uCtrl1: { value: ctrl ? ctrl[1] : dummy1 }, uAtlas: { value: atlas }, uCellMean: { value: cellMeanUniform },
-        uTile: { value: new T.Vector3(tileX, tileZ, size) }, uFar: { value: far ? 1 : 0 },
+        uTile: { value: new T.Vector3(tileX, tileZ, size) }, uFar: { value: far ? 1 : 0 }, uPitA: pitU.A, uPitB: pitU.B,
       };
       const m = new T.MeshLambertMaterial({ side: T.DoubleSide, color: 0xffffff });
       if (far) { m.polygonOffset = true; m.polygonOffsetFactor = 3; m.polygonOffsetUnits = 3; }
@@ -1371,7 +1400,7 @@
     }
     return {
       fetchTile: (buf) => parseTile(buf), weightTextures: (cls, n, o) => weightTextures(T, cls, n, o), terrainMaterial, farMaterial, decorate, deckHeight, dropTile,
-      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, roadSurface, sideSurface, plugQuery, paintDistance, paintAt, debugDecks: () => decks, Acc, MAT,
+      fetchFarClass, update, dispose, ROAD_LIFT, atlas, N, shadeAt, matSurface, matPitSurface, setPits, roadSurface, sideSurface, plugQuery, paintDistance, paintAt, debugDecks: () => decks, Acc, MAT,
     };
   }
 
