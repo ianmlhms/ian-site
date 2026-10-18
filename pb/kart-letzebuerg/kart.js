@@ -131,6 +131,11 @@
       vx = (Math.cos(ang) * dx + Math.sin(ang) * nx) * mag;
       vz = (Math.cos(ang) * dz + Math.sin(ang) * nz) * mag;
     }
+    // total speed never exceeds the cap (drifting turns the heading away from the velocity, which let the forward-only cap leak)
+    if (k.grounded) {
+      const m2 = Math.hypot(vx, vz), over = m2 - vmax;
+      if (over > 0.3) { const k2 = (m2 - over * (1 - Math.exp(-5 * dt))) / m2; vx *= k2; vz *= k2; }
+    }
     k.vx = vx; k.vz = vz;
 
     // ---------- drift state machine ----------

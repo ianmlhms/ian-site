@@ -18,7 +18,7 @@
     id: 'geeschterschlass', hw: 9, r: 30, wl: 2.6, wr: 2.6,
     theme: {
       facade: 'old', ground: 'grass', verge: 'grass', buildings: false, lamps: false, groundY: 0, groundCell: 12, skyline: false, farColor: '#2b2f3a', farDrop: -40,
-      weathers: ['night', 'fog', 'sunset', 'rain'], startText: 'GEESCHTERSCHLASS', wallColor: '#6b6679', wallTop: '#8a8498', wallH: 1.5, vergeColor: '#6c7a60', roadColor: '#a6a0b4', groundColor: '#6b7a62', fogScale: 0.9,
+      weathers: ['night', 'fog', 'sunset', 'rain'], startText: 'GEESCHTERSCHLASS', wallColor: '#6b6679', wallTop: '#8a8498', wallH: 1.5, vergeColor: '#6c7a60', roadColor: '#d0cadc', groundColor: '#6b7a62', fogScale: 0.9,
       weatherTint: {
         night: { sky: ['#0a0720', '#3b2468'], fog: '#2a1b4a', hemi: ['#7a6ab8', '#2b2238', 0.62] },
         fog: { sky: ['#5d5775', '#8d82a6'], fog: '#7f7599', hemi: ['#d0c8e6', '#5a5070', 0.8] },
