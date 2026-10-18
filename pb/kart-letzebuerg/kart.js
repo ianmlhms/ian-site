@@ -249,7 +249,7 @@
 
   KL.hitKart = function hitKart(R, k, kind, source) {
     if (k.finished && false) return false;
-    if (k.invuln > 0 || k.frozenT > 0) return false;
+    if (k.invuln > 0 || k.frozenT > 0 || k.hitGuard > 0) return false;
     if (k.shieldT > 0) { k.shieldT = 0; k.invuln = 0.5; R.events.push({ t: 'shieldpop', id: k.id }); return false; }
     const spec = {
       oil: { spin: C.SPIN_TIME, keep: 0.55, vy: 0 },
@@ -258,7 +258,8 @@
       comet: { spin: C.SPIN_TIME * 1.6, keep: 0.1, vy: 13 },
       bump: { spin: 0, keep: 0.8, vy: 0 },
     }[kind] || { spin: C.SPIN_TIME, keep: 0.5, vy: 0 };
-    k.spinT = spec.spin; k.spinDir = Math.random() < 0.5 ? -1 : 1; k.vx *= spec.keep; k.vz *= spec.keep;
+    if (k.remote) k.hitGuard = 0.35;     // online: the owner's packets lag behind, do not hit the same kart twice
+    k.spinT = spec.spin; k.spinTot = spec.spin; k.spinDir = Math.random() < 0.5 ? -1 : 1; k.vx *= spec.keep; k.vz *= spec.keep;
     if (spec.vy) { k.vy = spec.vy; k.grounded = false; k.airT = 0; }
     k.drift.state = 0; k.drift.charge = 0; k.boostT = Math.min(k.boostT, 0.2);
     k.invuln = spec.spin + 0.9; k.hitT = 0.5; k.lastHitBy = source ? source.id : null;

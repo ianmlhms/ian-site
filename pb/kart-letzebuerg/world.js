@@ -302,11 +302,13 @@
       for (const k of R.karts) {
         const m = this.kartMeshes.get(k.id), root = m.root, u = root.userData;
         let x = k.x, y = k.y, z = k.z, yaw = k.yaw;
-        if (k.px != null && !k.teleported) { x = lerp(k.px, k.x, alpha); y = lerp(k.py, k.y, alpha); z = lerp(k.pz, k.z, alpha); let dy = k.yaw - k.pyaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); yaw = k.pyaw + dy * alpha; }
+        if (k.view) { x = k.view.x; y = k.view.y; z = k.view.z; yaw = k.view.yaw; }          // online: remote karts come from the snapshot interpolation
+        else if (k.px != null && !k.teleported) { x = lerp(k.px, k.x, alpha); y = lerp(k.py, k.y, alpha); z = lerp(k.pz, k.z, alpha); let dy = k.yaw - k.pyaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); yaw = k.pyaw + dy * alpha; }
         k.ix = x; k.iy = y; k.iz = z; k.iyaw = yaw;
         const hopy = k.hopY > 0 ? Math.sin(Math.min(1, k.hopY) * Math.PI) * 0.35 : 0;
         const air = k.grounded ? 0 : 0;
         root.position.set(x, y + hopy, z);
+        k.spinVis = k.spinT > 0 && k.spinTot ? k.spinDir * (1 - k.spinT / k.spinTot) * 4 * Math.PI : 0;
         root.rotation.y = yaw + k.spinVis;
         const flicker = k.invuln > 0 && k.spinT <= 0 && k.frozenT > 0 ? ((Math.floor(t * 18) % 2) ? 0.25 : 1) : 1;
         root.visible = flicker > 0.3;
@@ -466,9 +468,9 @@
       const R = this.raceRef; if (!R) return;
       const cam = this.camera, H = this._lblV || (this._lblV = new T.Vector3()), fovT = Math.tan((cam.fov * Math.PI) / 360), asp = cam.aspect || 1.5;
       cam.updateMatrixWorld();
-      const hu = R.karts.find((k) => k.human), hp = hu ? hu.place : 0, list = [];
+      const hu = (KL.G && KL.G.human) || R.karts.find((k) => k.human), hp = hu ? hu.place : 0, list = [];
       for (const k of R.karts) {
-        if (k.human) continue;
+        if (k === hu) continue;
         const m = this.kartMeshes.get(k.id); if (!m) continue;
         const u = m.root.userData, dd = Math.hypot(k.ix - cam.position.x, k.iz - cam.position.z);
         H.set(k.ix, k.iy + 3.4, k.iz).project(cam);

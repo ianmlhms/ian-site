@@ -89,6 +89,32 @@ h2{margin:0 0 8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;c
 .loadcard{display:flex;flex-direction:column;align-items:center;gap:14px;padding:30px 40px;border-radius:24px;background:var(--card);border:1px solid var(--line)}
 .spin{width:38px;height:38px;border-radius:50%;border:4px solid #fff3;border-top-color:var(--gold);animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 
+/* ---------- online ---------- */
+input[type=text]{font:inherit;color:var(--ink);background:#1a2545;border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 12px;min-width:0;-webkit-user-select:text;user-select:text}
+.card.olcard{width:min(460px,100%)}
+h2.mini{font-size:11px;margin-bottom:6px}
+.olbtns{display:grid;gap:8px}.olbtns button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 16px;min-height:60px;text-align:left}.olbtns button span{font-size:18px;font-weight:900}.olbtns button small{font-size:12px;color:#fffc;font-weight:500}
+button.big{font-weight:800;font-size:15px}
+.joinrow{display:flex;gap:8px}.joinrow input{flex:1;text-transform:uppercase;letter-spacing:.3em;font-weight:900;font-size:20px;text-align:center}
+.errmsg{margin:0;padding:8px 12px;border-radius:12px;background:rgba(237,41,57,.22);border:1px solid rgba(237,41,57,.6);font-size:14px;line-height:1.4}
+.card.lobbycard{width:min(820px,100%)}
+.lbhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}.lbhead h2{font-size:26px!important;letter-spacing:0!important;text-transform:none!important;color:var(--ink)!important;margin:0!important}
+.codebox{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.codebox small{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}.codebox b{font-size:30px;letter-spacing:.22em;font-weight:900;color:var(--gold);font-variant-numeric:tabular-nums;padding:0 6px;-webkit-user-select:text;user-select:text}.codebox button{padding:0 12px;font-size:13px;font-weight:700}
+.lbcols{display:grid;grid-template-columns:1.1fr 1fr;gap:18px}
+.plist{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.plist li{display:grid;grid-template-columns:22px 1fr auto auto;align-items:center;gap:8px;padding:7px 12px;border-radius:12px;background:rgba(255,255,255,.06);font-size:15px}
+.plist li.me{border:1px solid var(--gold);background:linear-gradient(90deg,rgba(255,210,63,.2),rgba(255,210,63,.05))}
+.plist li i{width:18px;height:18px;border-radius:50%;border:3px solid #fff8}.plist li b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.plist li small{color:var(--soft)}
+.plist .st{font-size:12px;font-weight:800;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.1)}.plist .st.ok{background:rgba(110,231,183,.25);color:#b9f5d8}.plist .st.host{background:rgba(255,210,63,.22);color:var(--gold)}.plist .st.wait{color:var(--soft)}
+.plist .slow{grid-column:2/-1;font-style:normal;font-size:12px;color:#ffcf7f}
+#lbSettings h2{margin-top:10px}#lbSettings h2:first-child{margin-top:0}
+.summary{margin:0 0 10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06);font-size:14px;line-height:1.5}
+.chk{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:14px;color:var(--soft);min-height:44px}.chk input{width:22px;height:22px}
+.modal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,20,.7);z-index:30;padding:14px}
+.frow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+#frList{max-height:46vh;overflow:auto}
+#netBadge{position:absolute;left:50%;top:max(60px,calc(env(safe-area-inset-top) + 56px));transform:translateX(-50%);padding:4px 12px;border-radius:99px;background:#7a4a00cc;font-size:12px;font-weight:800}
+@media (max-width:700px){.lbcols{grid-template-columns:1fr}.codebox b{font-size:24px}}
 @media (max-width:700px){.modes{grid-template-columns:repeat(2,1fr)}.row2{grid-template-columns:1fr}.card{padding:16px}}
 @media (orientation:portrait){#lapBox{left:auto;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 54px + clamp(110px,22vmin,170px) + 8px);transform:none;margin:0}
   #timeBox{left:50%;top:max(10px,env(safe-area-inset-top));margin-left:0;transform:translateX(-50%);align-items:center}#minimap{top:calc(max(10px,env(safe-area-inset-top)) + 54px)}}

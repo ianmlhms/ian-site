@@ -40,7 +40,7 @@
     const id = KL.rollItem(R, k);
     k.roll = { t: C.ROULETTE, id };
     k.boxes++;
-    R.events.push({ t: 'box', id: k.id, boxId: box.id });
+    R.events.push({ t: 'box', id: k.id, boxId: box.id, item: id });
     return true;
   };
 

@@ -29,6 +29,7 @@
     R.order = R.karts.slice();
     updateOrder(R);
     R.step = (dt) => step(R, dt);
+    R.updateOrder = () => updateOrder(R);
     R.rescue = (k) => KL.rescueKart(k, track);
     R.fastForward = (maxSec) => fastForward(R, maxSec);
     return R;
@@ -43,13 +44,24 @@
     R.order.forEach((k, i) => (k.place = i + 1));
   }
 
+  /* item roulette and the use-item button for one kart (the host also runs this for remote players' records) */
+  function itemLogic(R, k, dt) {
+    if (k.roll) { k.roll.t -= dt; if (k.roll.t <= 0) { k.item = { id: k.roll.id, count: (KL.ITEMS[k.roll.id].count || 1) }; k.roll = null; R.events.push({ t: 'itemget', id: k.id, item: k.item.id }); } }
+    if (k.wantItem) {
+      k.wantItem = false;
+      if (k.item && !k.roll) { if (R.net && R.net.role === 'client' && !k.remote) R.net.onUse(k); else KL.useItem(R, k); }
+    }
+  }
+
   function step(R, dt) {
-    const track = R.track;
+    if (R.hold) return;                                    // online: waiting for the host's "go"
+    const track = R.track, net = R.net, isClient = !!net && net.role === 'client';
     R.clock += dt;
     const racing = R.phase === 'race' || R.phase === 'finished';
     if (R.phase === 'countdown') {
       // track when the gas was first pressed (rocket start)
       for (const k of R.karts) {
+        if (k.remote) continue;                            // remote karts are simulated by their owner
         const g = k.input.gas > 0.5;
         if (g && k.gasSince === -1) k.gasSince = R.clock; else if (!g) k.gasSince = -1;
         if (k.isBot && !k.auto) KL.botThink(k, R, dt);
@@ -58,6 +70,7 @@
         R.phase = 'race';
         R.events.push({ t: 'go' });
         for (const k of R.karts) {
+          if (k.remote) continue;
           const early = k.gasSince !== -1 ? k.gasSince : null;
           let good = false, bad = false;
           if (k.isBot) { const r = R.rng(); good = r < 0.25 + 0.5 * R.diff.drift; bad = !good && r > 0.93; }
@@ -71,22 +84,22 @@
     if (R.humans.length && racing) {
       const hp = Math.max(...R.humans.map((h) => h.prog));
       for (const k of R.karts) {
-        if (!k.isBot || k.human) continue;
+        if (!k.isBot || k.human || k.remote) continue;
         const gap = hp - k.prog;            // positive: bot is behind the human
         k.rubber = 1 + clamp(gap / 300, -1, 1) * R.diff.rubber * (gap > 0 ? 1 : 1.2);
       }
     }
     for (const k of R.karts) {
+      if (k.remote) { if (net && net.role === 'host') itemLogic(R, k, dt); if (k.hitGuard > 0) k.hitGuard -= dt; continue; }
       if ((k.isBot || k.auto) && R.phase !== 'countdown') KL.botThink(k, R, dt);
       KL.stepKart(k, dt, R);
       k.input.itemBack = false;
-      // item usage / roulette
-      if (k.roll) { k.roll.t -= dt; if (k.roll.t <= 0) { k.item = { id: k.roll.id, count: (KL.ITEMS[k.roll.id].count || 1) }; k.roll = null; R.events.push({ t: 'itemget', id: k.id, item: k.item.id }); } }
-      if (k.wantItem) { k.wantItem = false; if (k.item && !k.roll) KL.useItem(R, k); }
+      itemLogic(R, k, dt);
     }
-    KL.updateItems(R, dt);
-    // item boxes
+    if (!isClient) KL.updateItems(R, dt);
+    // item boxes (online clients only mirror them)
     for (const b of R.boxes) {
+      if (isClient) { if (!b.active && b.respawn > 0) b.respawn -= dt; continue; }
       if (!b.active) { b.respawn -= dt; if (b.respawn <= 0) b.active = true; continue; }
       for (const k of R.karts) {
         if (Math.abs(k.y + 0.5 - b.y) > 2.5) continue;
@@ -97,6 +110,7 @@
     // boost pads
     for (const p of R.pads) {
       for (const k of R.karts) {
+        if (k.remote) continue;
         const dx = k.x - p.x, dz = k.z - p.z;
         const fx = Math.sin(p.h), fz = Math.cos(p.h);
         const along = dx * fx + dz * fz, side = dx * -fz + dz * fx;
@@ -106,27 +120,32 @@
         }
       }
     }
-    // kart-kart collisions
+    // kart-kart collisions: every simulator only moves the karts it owns (remote ones are seen at their displayed position)
     const rr = C.KART_RADIUS * 2;
     for (let i = 0; i < R.karts.length; i++) for (let j = i + 1; j < R.karts.length; j++) {
       const a = R.karts[i], b = R.karts[j];
+      if (a.remote && b.remote) continue;
       if (Math.abs(a.y - b.y) > 2) continue;
-      const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz;
+      const ax = a.view ? a.view.x : a.x, az = a.view ? a.view.z : a.z, bx = b.view ? b.view.x : b.x, bz = b.view ? b.view.z : b.z;
+      const dx = bx - ax, dz = bz - az, d2 = dx * dx + dz * dz;
       if (d2 >= rr * rr || d2 < 1e-6) continue;
       const d = Math.sqrt(d2), nx = dx / d, nz = dz / d, pen = rr - d;
       const ma = a.spinT > 0 ? 0.6 : 1, mb = b.spinT > 0 ? 0.6 : 1;
-      a.x -= nx * pen * 0.5; a.z -= nz * pen * 0.5; b.x += nx * pen * 0.5; b.z += nz * pen * 0.5;
+      if (!a.remote) { a.x -= nx * pen * 0.5; a.z -= nz * pen * 0.5; }
+      if (!b.remote) { b.x += nx * pen * 0.5; b.z += nz * pen * 0.5; }
       const rv = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
       if (rv < 0) {
         const j2 = -(1 + 0.5) * rv / (1 / ma + 1 / mb);
-        a.vx -= nx * j2 / ma; a.vz -= nz * j2 / ma; b.vx += nx * j2 / mb; b.vz += nz * j2 / mb;
-        if (-rv > 3 && a.bumpT <= 0 && b.bumpT <= 0) { a.bumpT = b.bumpT = 0.2; R.events.push({ t: 'bump', id: a.id, id2: b.id, power: -rv, x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, y: a.y }); }
-        // a boosting kart rams a slower one: spin it
-        if (-rv > 9) { const fast = a.boostT > 0 && a.speed > b.speed + 6 ? a : b.boostT > 0 && b.speed > a.speed + 6 ? b : null; if (fast) KL.hitKart(R, fast === a ? b : a, 'bump', fast); }
+        if (!a.remote) { a.vx -= nx * j2 / ma; a.vz -= nz * j2 / ma; }
+        if (!b.remote) { b.vx += nx * j2 / mb; b.vz += nz * j2 / mb; }
+        if (-rv > 3 && a.bumpT <= 0 && b.bumpT <= 0) { a.bumpT = b.bumpT = 0.2; R.events.push({ t: 'bump', id: a.id, id2: b.id, power: -rv, x: (ax + bx) / 2, z: (az + bz) / 2, y: a.y }); }
+        // a boosting kart rams a slower one: spin it (the victim's owner applies it)
+        if (-rv > 9) { const fast = a.boostT > 0 && a.speed > b.speed + 6 ? a : b.boostT > 0 && b.speed > a.speed + 6 ? b : null; if (fast) { const victim = fast === a ? b : a; if (!victim.remote) KL.hitKart(R, victim, 'bump', fast); } }
       }
     }
     // laps, finish, rescue
     for (const k of R.karts) {
+      if (isClient) { k.prevProg = k.prog; if (!k.remote && racing && !k.finished && (k.stuckT > 2.4 || k.airT > 5 || k.y < track.minY - 40)) { KL.rescueKart(k, track); R.events.push({ t: 'rescue', id: k.id }); if (net.onRescue) net.onRescue(k); } continue; }
       const idx = Math.floor(k.prog / track.length);
       if (idx > k.maxLap) {
         const prevProg = k.prog - k.vf * dt;
@@ -146,11 +165,12 @@
         }
       }
       k.prevProg = k.prog;
-      if (racing && !k.finished) {
+      if (racing && !k.finished && !k.remote) {
         if (k.stuckT > 2.4 || (k.airT > 5) || k.y < track.minY - 40) { KL.rescueKart(k, track); R.events.push({ t: 'rescue', id: k.id }); }
       }
     }
     updateOrder(R);
+    if (isClient) return;
     if (R.phase === 'race' && R.humans.length && R.humans.every((h) => h.finished)) { R.phase = 'finished'; R.finishClock = R.clock; }
     if (R.phase === 'race' && !R.humans.length && R.karts.every((k) => k.finished)) { R.phase = 'finished'; R.finishClock = R.clock; }
   }

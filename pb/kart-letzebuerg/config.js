@@ -28,6 +28,31 @@
     SPIN_TIME: 1.15,
   });
 
+  /* Online play (phase 2). Peer-to-peer WebRTC; Supabase Realtime only carries the lobby and the SDP hand-shake. */
+  KL.NET = Object.freeze({
+    ICE_SERVERS: [{ urls: 'stun:stun.l.google.com:19302' }],       // public STUN only, no TURN
+    CONNECT_TIMEOUT: 10000,       // ms a WebRTC link may take before it counts as failed
+    ICE_GATHER_MS: 2500,          // wait this long at most for ICE candidates (non-trickle hand-shake = 1 offer + 1 answer per pair)
+    SEND_HZ: 20,                  // kart states, both directions
+    INTERP_DELAY: 100,            // ms the remote karts are shown in the past (snapshot interpolation)
+    EXTRAP_MAX: 150,              // ms a remote kart is extrapolated when snapshots are late
+    PING_EVERY: 1000,
+    AWAY_SILENCE: 1500,           // ms without packets from a player: their kart is driven by a bot until they are back
+    HOST_SILENCE: 2500,           // ms without snapshots from the host: the deputy takes over
+    LEAVE_GRACE: 6000,            // ms a client waits for the deputy before ending the race
+    LOAD_TIMEOUT: 30000,          // ms the host waits for slow devices to load the track
+    FINISH_GRACE: 45,             // s after the first human finish until the race is closed for the rest
+    MAX_PLAYERS: 8,
+    CODE_ALPHABET: 'ABCDEFGHJKLMNPQRSTUVWXYZ',
+    CODE_LEN: 4,
+    /* Fallback for a peer that cannot connect through WebRTC: relay via the Supabase Realtime channel.
+     * One switch: set RELAY_FALLBACK to false and such a peer is simply refused with a message. */
+    RELAY_FALLBACK: true,
+    RELAY_HZ: 5,                  // kart states over the relay, at most
+    RELAY_MAX_MSGS: 900,          // hard cap of relayed messages per peer and race (~3 minutes at 5 Hz); after that the peer is dropped
+    DIR_CHANNEL: 'kl-dir',        // public lobbies for "Quick match"
+  });
+
   /* Items: generic designs, no Nintendo look-alikes. */
   KL.ITEMS = Object.freeze({
     oil:    { id: 'oil',    icon: '🛢️', color: '#2a2a3a' },

@@ -70,6 +70,51 @@
       place1: '1st', fin: 'Finished!', hintDrift: 'Hold drift and steer: long drifts give a boost.', changeWeather: 'Change weather',
     },
   };
+  const ON = {
+    lb: {
+      onlineDesc: 'Bis zu 8 Kärelen', olTitle: 'Online', olName: 'Däin Numm', olCreate: 'Lobby opmaachen', olCreateD: 'Du bass Host a wiels d\'Streck', olJoin: 'Matmaachen', olCode: 'Code vun de Frënn', olQuick: 'Schnellspill', olQuickD: 'Direkt an eng oppen Lobby',
+      olHint: 'Bots fëllen déi fräi Plazen. Zum Matspillen brauchs de keen Account.', olBack: 'Zréck',
+      lobby: 'Lobby', lbCode: 'Code', lbCopy: 'Link kopéieren', lbCopied: 'Link kopéiert!', lbInvite: 'Frënn invitéieren', lbPlayers: 'Spiller', lbPublic: 'Oppe fir Schnellspill',
+      lbReady: 'Prett!', lbNotReady: 'Net méi prett', lbStart: 'Rennen starten', lbLeave: 'Verloossen', lbWaitHost: 'Waart bis den Host d\'Rennen start…', lbWaitReady: 'Waart op déi aner Spiller…',
+      lbHost: 'Host', lbBots: 'Bots fëllen op bis 8', lbSolo: 'Nach keen do — d\'Bots fueren mat.',
+      pReady: 'prett', pWait: 'net prett', pConn: 'verbënnt…', pSlow: 'Lues Verbindung', pAway: 'ewech',
+      nvConnecting: 'Verbindung mam Server…', nvFindLobby: 'Sich eng Lobby…', nvCreating: 'Lobby gëtt opgemaach…', nvJoining: 'Trëtt der Lobby bäi…', nvLinking: 'Verbënnt d\'Spiller…', nvLoading: 'Streck lued… ({n}/{m})', nvStarting: 'Rennen fänkt un…',
+      eNoServer: 'Online-Modus ass grad net erreechbar.', eNoRtc: 'Dësen Browser ënnerstëtzt kee Live-Spill (WebRTC).', eNotFound: 'Dës Lobby gëtt et net — oder d\'Rennen huet schonn ugefaangen.', eFull: 'D\'Lobby ass voll.', eLocked: 'D\'Rennen huet schonn ugefaangen.',
+      eConn: 'Keng direkt Verbindung méiglech (Firewall oder Netz?).', eHostGone: 'Den Host huet d\'Lobby zougemaach.', eKicked: 'Du goufs aus der Lobby geholl.', eRelayOff: 'Keng direkt Verbindung — Relay ass ausgeschalt.',
+      rHostLeft: 'Den Host ass fort. {n} hëlt iwwer.', rEnded: 'De Host ass fort — d\'Rennen ass eriwwer.', rYouNewHost: 'Den Host ass fort. Du féiers d\'Rennen weider.', rLeft: '{n} huet d\'Rennen verlooss.', rLost: 'D\'Verbindung ass ofgebrach.', rAway: 'Du warst ewech — d\'Rennen ass weidergaangen.', rSlow: 'Lues Verbindung',
+      waitOthers: 'Waart op déi aner… ({n}/{m} am Zil)', backLobby: 'Zréck an d\'Lobby', friendsTitle: 'Frënn invitéieren', friendsNone: 'Nach keng Frënn. Deel de Link.', friendsSignIn: 'Mell dech op ian.lu un fir Frënn z\'invitéieren — oder deel de Link.', invited: 'Invitéiert', inviteBtn: 'Invitéieren', inviteFail: 'Invitatioun net méiglech — deel de Link.', close: 'Zoumaachen',
+      resultsOnline: 'Resultat', rank: 'Plaz',
+    },
+    de: {
+      onlineDesc: 'Bis zu 8 Fahrer', olTitle: 'Online', olName: 'Dein Name', olCreate: 'Lobby erstellen', olCreateD: 'Du bist Host und wählst die Strecke', olJoin: 'Beitreten', olCode: 'Code von Freunden', olQuick: 'Schnellspiel', olQuickD: 'Direkt in eine offene Lobby',
+      olHint: 'Bots füllen freie Plätze auf. Zum Mitspielen brauchst du keinen Account.', olBack: 'Zurück',
+      lobby: 'Lobby', lbCode: 'Code', lbCopy: 'Link kopieren', lbCopied: 'Link kopiert!', lbInvite: 'Freunde einladen', lbPlayers: 'Spieler', lbPublic: 'Offen für Schnellspiel',
+      lbReady: 'Bereit!', lbNotReady: 'Doch nicht bereit', lbStart: 'Rennen starten', lbLeave: 'Verlassen', lbWaitHost: 'Warte, bis der Host das Rennen startet…', lbWaitReady: 'Warte auf die anderen Spieler…',
+      lbHost: 'Host', lbBots: 'Bots füllen bis 8 auf', lbSolo: 'Noch niemand da — die Bots fahren mit.',
+      pReady: 'bereit', pWait: 'nicht bereit', pConn: 'verbindet…', pSlow: 'Langsame Verbindung', pAway: 'weg',
+      nvConnecting: 'Verbinde mit dem Server…', nvFindLobby: 'Suche eine Lobby…', nvCreating: 'Lobby wird erstellt…', nvJoining: 'Trete der Lobby bei…', nvLinking: 'Verbinde die Spieler…', nvLoading: 'Strecke lädt… ({n}/{m})', nvStarting: 'Rennen beginnt…',
+      eNoServer: 'Der Online-Modus ist gerade nicht erreichbar.', eNoRtc: 'Dieser Browser unterstützt kein Live-Spiel (WebRTC).', eNotFound: 'Diese Lobby gibt es nicht — oder das Rennen läuft schon.', eFull: 'Die Lobby ist voll.', eLocked: 'Das Rennen hat schon begonnen.',
+      eConn: 'Keine direkte Verbindung möglich (Firewall oder Netz?).', eHostGone: 'Der Host hat die Lobby geschlossen.', eKicked: 'Du wurdest aus der Lobby entfernt.', eRelayOff: 'Keine direkte Verbindung — der Relay ist ausgeschaltet.',
+      rHostLeft: 'Der Host ist weg. {n} übernimmt.', rEnded: 'Der Host ist weg — das Rennen ist vorbei.', rYouNewHost: 'Der Host ist weg. Du führst das Rennen weiter.', rLeft: '{n} hat das Rennen verlassen.', rLost: 'Die Verbindung ist abgebrochen.', rAway: 'Du warst weg — das Rennen ging weiter.', rSlow: 'Langsame Verbindung',
+      waitOthers: 'Warte auf die anderen… ({n}/{m} im Ziel)', backLobby: 'Zurück zur Lobby', friendsTitle: 'Freunde einladen', friendsNone: 'Noch keine Freunde. Teile den Link.', friendsSignIn: 'Melde dich auf ian.lu an, um Freunde einzuladen — oder teile den Link.', invited: 'Eingeladen', inviteBtn: 'Einladen', inviteFail: 'Einladung nicht möglich — teile den Link.', close: 'Schließen',
+      resultsOnline: 'Ergebnis', rank: 'Platz',
+    },
+    en: {
+      onlineDesc: 'Up to 8 racers', olTitle: 'Online', olName: 'Your name', olCreate: 'Create lobby', olCreateD: 'You host and pick the track', olJoin: 'Join', olCode: 'Code from a friend', olQuick: 'Quick match', olQuickD: 'Straight into an open lobby',
+      olHint: 'Bots fill the empty slots. No account needed to play.', olBack: 'Back',
+      lobby: 'Lobby', lbCode: 'Code', lbCopy: 'Copy link', lbCopied: 'Link copied!', lbInvite: 'Invite friends', lbPlayers: 'Players', lbPublic: 'Open for quick match',
+      lbReady: 'Ready!', lbNotReady: 'Not ready', lbStart: 'Start race', lbLeave: 'Leave', lbWaitHost: 'Waiting for the host to start the race…', lbWaitReady: 'Waiting for the other players…',
+      lbHost: 'Host', lbBots: 'Bots fill up to 8', lbSolo: 'Nobody here yet — the bots race along.',
+      pReady: 'ready', pWait: 'not ready', pConn: 'connecting…', pSlow: 'Slow connection', pAway: 'away',
+      nvConnecting: 'Connecting to the server…', nvFindLobby: 'Looking for a lobby…', nvCreating: 'Creating the lobby…', nvJoining: 'Joining the lobby…', nvLinking: 'Linking the players…', nvLoading: 'Loading the track… ({n}/{m})', nvStarting: 'Race is starting…',
+      eNoServer: 'Online mode is not reachable right now.', eNoRtc: 'This browser does not support live play (WebRTC).', eNotFound: 'That lobby does not exist, or the race has already started.', eFull: 'The lobby is full.', eLocked: 'The race has already started.',
+      eConn: 'No direct connection possible (firewall or network?).', eHostGone: 'The host closed the lobby.', eKicked: 'You were removed from the lobby.', eRelayOff: 'No direct connection, and the relay is switched off.',
+      rHostLeft: 'The host left. {n} takes over.', rEnded: 'The host left, so the race is over.', rYouNewHost: 'The host left. You are running the race now.', rLeft: '{n} left the race.', rLost: 'The connection dropped.', rAway: 'You were away, the race went on without you.', rSlow: 'Slow connection',
+      waitOthers: 'Waiting for the others… ({n}/{m} finished)', backLobby: 'Back to lobby', friendsTitle: 'Invite friends', friendsNone: 'No friends yet. Share the link.', friendsSignIn: 'Sign in on ian.lu to invite friends, or share the link.', invited: 'Invited', inviteBtn: 'Invite', inviteFail: 'Could not invite, share the link instead.', close: 'Close',
+      resultsOnline: 'Results', rank: 'Place',
+    },
+  };
+  for (const l in ON) Object.assign(TXT[l], ON[l]);
   TXT.de.tagline = 'Drifte durch die Stadt, schnapp dir die Boxen und gewinne das Rennen.';
   let lang = 'lb';
   KL.lang = () => lang;

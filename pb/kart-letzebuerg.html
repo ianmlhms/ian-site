@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <title>Kart Lëtzebuerg 🏎️ – Arcade</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/pb/kart-letzebuerg.css?v=1">
+<link rel="stylesheet" href="/pb/kart-letzebuerg.css?v=2">
 <script src="/pb/arcade-kit.js?v=28" data-arcade-id="kart-letzebuerg" data-arcade-title="Kart Lëtzebuerg 🏎️" data-arcade-no-score></script>
 </head>
 <body>
@@ -21,6 +21,7 @@
     <canvas id="minimap" width="240" height="240" aria-hidden="true"></canvas>
     <div id="speedBox" class="chip"><b id="hudSpeed">0</b><small data-t="speed">km/h</small></div>
     <div id="toast" role="status" aria-live="polite"></div>
+    <div id="netBadge" hidden>🐢</div>
     <div id="countdown" aria-live="assertive"></div>
     <div id="wrongWay" hidden data-t="wrong">Falsch Richtung!</div>
     <div id="cometWarn" hidden data-t="cometWarn">Komet kënnt!</div>
@@ -47,7 +48,7 @@
         <button id="modeRace" class="mode on"><b data-t="play">Rennen</b><small data-t="playDesc"></small></button>
         <button id="modeGp" class="mode" disabled><b data-t="gp">Grand Prix</b><small data-t="soon"></small></button>
         <button id="modeTt" class="mode" disabled><b data-t="tt">Zäitfueren</b><small data-t="soon"></small></button>
-        <button id="modeOnline" class="mode" disabled><b data-t="online">Online</b><small data-t="soon"></small></button>
+        <button id="modeOnline" class="mode"><b data-t="online">Online</b><small data-t="onlineDesc"></small></button>
       </div>
       <div class="row"><h2 data-t="track">Streck</h2><div id="trackCards" class="cards"></div></div>
       <div class="row2">
@@ -59,6 +60,49 @@
       <p class="hint" id="menuHint"></p>
     </section>
   </div>
+
+
+  <div id="onlineScreen" class="screen" hidden>
+    <section class="card small olcard" aria-labelledby="olTitle">
+      <h2 id="olTitle" data-t="olTitle">Online</h2>
+      <div class="setrow"><label for="olName" data-t="olName">Däin Numm</label><input id="olName" type="text" maxlength="14" autocomplete="nickname" spellcheck="false"></div>
+      <div><h2 class="mini" data-t="driver">Fuerer</h2><div id="olDrivers" class="drivers"></div></div>
+      <div class="olbtns">
+        <button id="olQuick" class="primary"><span data-t="olQuick">Schnellspill</span><small data-t="olQuickD"></small></button>
+        <button id="olCreate" class="big"><span data-t="olCreate">Lobby opmaachen</span><small data-t="olCreateD"></small></button>
+      </div>
+      <div class="joinrow"><input id="olCode" type="text" maxlength="10" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCD" aria-label="Code"><button id="olJoin" class="big" data-t="olJoin">Matmaachen</button></div>
+      <p id="olMsg" class="errmsg" role="alert" hidden></p>
+      <p class="hint" data-t="olHint"></p>
+      <button id="olBack" data-t="olBack">Zréck</button>
+    </section>
+  </div>
+
+  <div id="lobbyScreen" class="screen" hidden>
+    <section class="card lobbycard" aria-labelledby="lobbyTitle">
+      <header class="lbhead"><h2 id="lobbyTitle" data-t="lobby">Lobby</h2>
+        <div id="lbCodeRow" class="codebox"><small data-t="lbCode">Code</small><b id="lbCode"></b><button id="lbCopy" data-t="lbCopy">Link kopéieren</button><button id="lbInvite" data-t="lbInvite">Frënn invitéieren</button></div></header>
+      <div class="lbcols">
+        <div><h2 data-t="lbPlayers">Spiller</h2><ul id="lbList" class="plist"></ul><p id="lbBots" class="hint"></p></div>
+        <div>
+          <div id="lbSettings">
+            <h2 data-t="track">Streck</h2><div id="lbTrack" class="chips"></div>
+            <h2 data-t="weather">Wieder</h2><div id="lbWeather" class="chips"></div>
+            <h2 data-t="laps">Ronnen</h2><div id="lbLaps" class="chips"></div>
+            <h2 data-t="difficulty">Schwieregkeet</h2><div id="lbDiff" class="chips"></div>
+            <label id="lbPublicRow" class="chk"><input id="lbPublic" type="checkbox"> <span data-t="lbPublic">Oppe fir Schnellspill</span></label>
+          </div>
+          <p id="lbSummary" class="summary" hidden></p>
+          <h2 data-t="driver">Fuerer</h2><div id="lbDrivers" class="drivers"></div>
+        </div>
+      </div>
+      <p id="lbHint" class="hint"></p><p id="lbMsg" class="errmsg" role="status" hidden></p>
+      <div class="foot"><button id="lbLeave" data-t="lbLeave">Verloossen</button><button id="lbReady" class="primary"></button><button id="lbStart" class="primary" data-t="lbStart">Rennen starten</button></div>
+    </section>
+    <div id="frDlg" class="modal" hidden><section class="card small" role="dialog" aria-modal="true" aria-labelledby="frTitle"><h2 id="frTitle" data-t="friendsTitle">Frënn invitéieren</h2><div id="frList"></div><button id="frClose" data-t="close">Zoumaachen</button></section></div>
+  </div>
+
+  <div id="netBusy" class="screen" role="status" aria-live="polite" hidden><div class="loadcard"><span class="spin"></span><b id="netBusyText"></b></div></div>
 
   <div id="pauseScreen" class="screen" hidden>
     <section class="card small">
@@ -77,20 +121,20 @@
       <h2 id="endTitle" data-t="results">Resultat</h2>
       <p id="endSub"></p>
       <ol id="endList"></ol>
-      <div class="foot"><button id="eAgain" class="primary" data-t="again">Nach eng Kéier</button><button id="eMenu" data-t="menu">Menü</button></div>
+      <div class="foot"><button id="eAgain" class="primary" data-t="again">Nach eng Kéier</button><button id="eLobby" class="primary" data-t="backLobby" hidden>Zréck an d'Lobby</button><button id="eMenu" data-t="menu">Menü</button></div>
     </section>
   </div>
   <div id="fatal" class="screen" hidden><section class="card small"><p id="fatalText"></p></section></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/pb/kart-letzebuerg/util.js?v=1"></script>
-<script src="/pb/kart-letzebuerg/config.js?v=1"></script>
-<script src="/pb/kart-letzebuerg/copy.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/config.js?v=2"></script>
+<script src="/pb/kart-letzebuerg/copy.js?v=2"></script>
 <script src="/pb/kart-letzebuerg/track.js?v=1"></script>
-<script src="/pb/kart-letzebuerg/kart.js?v=1"></script>
-<script src="/pb/kart-letzebuerg/items.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/kart.js?v=2"></script>
+<script src="/pb/kart-letzebuerg/items.js?v=2"></script>
 <script src="/pb/kart-letzebuerg/bots.js?v=1"></script>
-<script src="/pb/kart-letzebuerg/race.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/race.js?v=2"></script>
 <script src="/pb/kart-letzebuerg/batch.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/textures.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/scenery.js?v=1"></script>
@@ -98,12 +142,15 @@
 <script src="/pb/kart-letzebuerg/city.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/kartmodel.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/fx.js?v=1"></script>
-<script src="/pb/kart-letzebuerg/world.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/world.js?v=2"></script>
 <script src="/pb/kart-letzebuerg/input.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/audio.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/net.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/lobby.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/mp.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/data-villehaute.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/tracks-villehaute.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/tracks-geeschterschlass.js?v=1"></script>
-<script src="/pb/kart-letzebuerg/game.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/game.js?v=2"></script>
 </body>
 </html>
