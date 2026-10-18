@@ -28,10 +28,10 @@
       const k = 'asphalt' + (opts.centre || 'dash') + (opts.edge === false ? 'n' : 'e');
       if (cacheT[k]) return cacheT[k];
       const W = 512, H = 256, [c, g] = mk(W, H), rnd = KL.rng(11);
-      g.fillStyle = '#b9bcc4'; g.fillRect(0, 0, W, H);
-      // painted patches
-      for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(${rnd() > 0.5 ? '255,255,255' : '0,0,0'},${0.03 + rnd() * 0.05})`; g.beginPath(); g.ellipse(rnd() * W, rnd() * H, 10 + rnd() * 60, 6 + rnd() * 26, rnd() * 3, 0, 7); g.fill(); }
-      noise(g, W, H, 0.22, rnd, 2);
+      g.fillStyle = '#767a84'; g.fillRect(0, 0, W, H);
+      // painted patches: small, low contrast (repairs and tyre wear), not big blotches
+      for (let i = 0; i < 46; i++) { g.fillStyle = `rgba(${rnd() > 0.5 ? '255,255,255' : '0,0,0'},${0.015 + rnd() * 0.025})`; g.beginPath(); g.ellipse(rnd() * W, rnd() * H, 4 + rnd() * 18, 3 + rnd() * 9, rnd() * 3, 0, 7); g.fill(); }
+      noise(g, W, H, 0.3, rnd, 1.5);
       if (opts.edge !== false) {
         g.fillStyle = '#f3f1e8';
         g.fillRect(W * 0.035, 0, 7, H); g.fillRect(W * 0.965 - 7, 0, 7, H);
@@ -211,7 +211,8 @@
       opts = opts || {};
       const [c, g] = mk(opts.w || 512, opts.h || 128);
       g.fillStyle = opts.bg || 'rgba(0,0,0,0)'; g.fillRect(0, 0, c.width, c.height);
-      g.fillStyle = opts.fg || '#fff'; g.font = '900 ' + (opts.size || 72) + 'px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = opts.fg || '#fff'; let fs = opts.size || 72; g.font = '900 ' + fs + 'px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      { const wmax = c.width * 0.92, wt = g.measureText(text).width; if (wt > wmax) { fs = Math.floor((fs * wmax) / wt); g.font = '900 ' + fs + 'px system-ui,sans-serif'; } }
       if (opts.stroke) { g.lineWidth = 10; g.strokeStyle = opts.stroke; g.strokeText(text, c.width / 2, c.height / 2 + 4); }
       g.fillText(text, c.width / 2, c.height / 2 + 4);
       return tex(c, { wrapS: T.ClampToEdgeWrapping, wrapT: T.ClampToEdgeWrapping });

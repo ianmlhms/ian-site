@@ -18,31 +18,48 @@
     if (dN <= 0 || dS <= 0) return 0;
     return -VALLEY * smooth(0, 22, dN) * smooth(0, 22, dS);
   }
-  function groundColor(x, z, h) {
-    const rock = col('#9b9486'), grass = col('#6aa149'), grass2 = col('#7fb256'), plaza = col('#e2ddd4');
-    if (h > -0.5) return [1, 1, 1];     // plateau: the painted street map (city.js) shows through
+  /* valley colours (sRGB 0-255), painted into the street map so the slopes blend smoothly and the river is a curve */
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const ROCK = hex('#a39c8c'), GRASS = hex('#6aa149'), GRASS2 = hex('#86b85c'), PAVE = hex('#b2aea6');
+  const riverZ = (x) => (interp(RIM_N, x) + interp(RIM_S, x)) / 2 + Math.sin(x * 0.03) * 12;
+  function valleyColor(x, z, h) {
     const depth = clamp(-h / VALLEY, 0, 1), n = Math.sin(x * 0.11) * Math.cos(z * 0.13) * 0.5 + 0.5;
-    const river = Math.abs(z - (interp(RIM_N, x) + interp(RIM_S, x)) / 2 - Math.sin(x * 0.03) * 12);
-    if (depth > 0.92 && river < 4.5) return col('#4f9ccf');
-    if (depth < 0.55) return KL.mix(plaza, rock, smooth(0, 0.25, depth));
-    return KL.mix(rock, KL.mix(grass, grass2, n), smooth(0.4, 0.75, depth));
+    if (depth < 0.55) return mixc(PAVE, ROCK, smooth(0, 0.25, depth));
+    return mixc(ROCK, mixc(GRASS, GRASS2, n), smooth(0.4, 0.75, depth));
   }
 
   /* the Pétrusse valley is coloured by vertex colours; keep the street map neutral (white) there */
-  function paintValley(g, X, Z) {
-    g.fillStyle = '#ffffff'; g.beginPath();
-    for (let x = -640; x <= 640; x += 20) { const zz = interp(RIM_N, x) - 3; if (x === -640) g.moveTo(X(x), Z(zz)); else g.lineTo(X(x), Z(zz)); }
-    for (let x = 640; x >= -640; x -= 20) g.lineTo(X(x), Z(interp(RIM_S, x) + 3));
-    g.closePath(); g.fill();
+  function paintValley(g, X, Z, sc) {
+    const x0 = -640, x1 = 640, z0 = 90, z1 = 500, cs = 4, cw = Math.round((x1 - x0) / cs), ch = Math.round((z1 - z0) / cs);
+    const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const cg = cv.getContext('2d'), im = cg.createImageData(cw, ch);
+    for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+      const x = x0 + (i + 0.5) * cs, z = z0 + (j + 0.5) * cs, h = terrain(x, z), a = clamp(-h / 5, 0, 1), c = valleyColor(x, z, h), o = (j * cw + i) * 4;
+      im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2]; im.data[o + 3] = a * 255;
+    }
+    cg.putImageData(im, 0, 0);
+    g.imageSmoothingEnabled = true; g.drawImage(cv, X(x0), Z(z0), (x1 - x0) * sc, (z1 - z0) * sc);
+    const rnd = KL.rng(77);                                   // leaf / grass blotches
+    for (let k = 0; k < 2600; k++) {
+      const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0), h = terrain(x, z); if (h > -6) continue;
+      g.fillStyle = rnd() > 0.5 ? 'rgba(40,100,40,.18)' : 'rgba(150,200,90,.16)'; g.beginPath(); g.ellipse(X(x), Z(z), (1 + rnd() * 5) * sc, (1 + rnd() * 3) * sc, rnd() * 3, 0, 7); g.fill();
+    }
+    // the Pétrusse
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const [w, c] of [[9, '#3d86b8'], [6, '#5aa9d6'], [2, 'rgba(210,235,250,.7)']]) {
+      g.beginPath(); let open = false;
+      for (let x = x0; x <= x1; x += 8) { const z = riverZ(x); if (terrain(x, z) > -33) { open = false; continue; } if (!open) { g.moveTo(X(x), Z(z)); open = true; } else g.lineTo(X(x), Z(z)); }
+      g.lineWidth = w * sc; g.strokeStyle = c; g.stroke();
+    }
   }
 
   KL.registerTrack({
     id: 'villehaute', hw: 9, r: 26, origin: [49.6105, 6.1295],
     theme: { facade: 'old', verge: 'slabs', ground: 'slabs', groundTint: '#ffffff', groundCell: 10, farColor: '#b9b4ab', farDrop: -41, weathers: ['day', 'sunset', 'night', 'rain'],
-      startText: 'UEWERSTAD', wallColor: '#d3c9b6', wallTop: '#e6dfcf', groundColorAt: groundColor, skyline: false, lampSpacing: 28,
-      osm: 'villehaute', cityRadius: 430,
-      groundMap: { x0: -640, z0: -480, size: 1280, paving: '#a8a49c', paint: paintValley },
-      treeKeepClear: (x, z) => terrain(x, z) < -8 && Math.random() < 0 },
+      startText: 'UEWERSTAD', wallColor: '#d3c9b6', wallTop: '#e6dfcf', vergeColor: '#c4bfb6', skyline: false, lampSpacing: 28,
+      osm: 'villehaute', cityRadius: 430, boulevardTrees: 15,
+      groundMap: { x0: -640, z0: -480, size: 1280, paving: '#8d8a84', paint: paintValley },
+    },
     terrain,
     pts: [
       [-232, 100, { r: 34, hw: 10 }], [-120, 104, { hw: 11 }], [-62, 106, { r: 16 }], [-37, 122, { r: 12 }], [-31, 148, { r: 16 }], [-10, 164, { r: 20 }], [14, 148, { r: 16 }], [18, 122, { r: 12 }], [40, 106, { r: 16 }], [61, 104, { r: 18 }],

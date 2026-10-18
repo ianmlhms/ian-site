@@ -66,7 +66,7 @@
           const w = (lim(i) - track.HW[i]) / 3;
           const I = [inner[0], inner[1], inner[2], 0], O = [outer[0], outer[1], outer[2], w];
           return side < 0 ? [O, I] : [I, O];
-        }, 3, null);
+        }, 3, () => vc);
         // kerb face (vertical step up from the road to the pavement)
         strip(kerb, track, 0, track.N, (i) => {
           const lo = edgePt(track, i, side * track.HW[i], 0), hi = edgePt(track, i, side * track.HW[i], KH);
@@ -181,6 +181,10 @@
     if (kind === 'pine') {
       B.cyl(0, 0, 0, 0.35, 0.28, 1.6, 5, KL.col('#5a3d27'));
       for (let i = 0; i < 4; i++) B.cyl(0, 1.2 + i * 1.5, 0, 2.5 - i * 0.55, 0.05, 2.6, 7, KL.mix(KL.col('#1f4d36'), KL.col('#2f7d52'), i / 4));
+    } else if (kind === 'boulevard') {       // tall plane tree: clear trunk, high round crown
+      B.cyl(0, 0, 0, 0.36, 0.24, 7.2, 6, KL.col('#7a6a58'));
+      const g1 = KL.col('#5f9e46'), g2 = KL.col('#7db856'), g3 = KL.col('#4d8a3e');
+      B.sphere(0, 9.6, 0, 3.7, 8, g1, { noise: 1, sy: 0.82 }); B.sphere(1.9, 8.6, 0.8, 2.7, 7, g2, { noise: 1 }); B.sphere(-1.8, 8.9, -0.9, 2.6, 7, g3, { noise: 1 }); B.sphere(0.3, 11.2, 0.5, 2.3, 6, g2, { noise: 1 });
     } else if (kind === 'dead') {
       B.cyl(0, 0, 0, 0.3, 0.12, 4.2, 5, KL.col('#3d3029'));
       for (let i = 0; i < 3; i++) { const a = i * 2.1 + rnd(); B.cyl(Math.cos(a) * 0.3, 2.2 + i * 0.6, Math.sin(a) * 0.3, 0.12, 0.04, 1.8, 4, KL.col('#3d3029')); }

@@ -206,6 +206,30 @@
     }
     return n;
   };
+  /* tree rows along the pavements where no building stands next to the street (boulevards, squares) */
+  KL.scenery.boulevardTrees = function (track, theme, data, city, rnd, terrain, quality) {
+    const idx = trackIndex(track), B = KL.scenery.tree('boulevard', rnd), spacing = theme.boulevardTrees || 15;
+    const fp = new Map(), key = (x, z) => Math.floor(x / 40) + ',' + Math.floor(z / 40);
+    for (const f of city.footprints) { const k = key(f.cx, f.cz); let a = fp.get(k); if (!a) fp.set(k, (a = [])); a.push(f); }
+    const near = (x, z, r) => { const gx = Math.floor(x / 40), gz = Math.floor(z / 40); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const l = fp.get((gx + a) + ',' + (gz + b)); if (!l) continue; for (const f of l) { if (Math.abs(f.cx - x) > 70 || Math.abs(f.cz - z) > 70) continue; if (inPoly(x, z, f.p)) return true; for (const q of f.p) if (Math.hypot(q[0] - x, q[1] - z) < r) return true; } } return false; };
+    const mapped = data.t.map((t) => [t[0] / 10, t[1] / 10]);
+    const noBuild = track.def.noBuild || [];
+    let n = 0;
+    for (const side of [-1, 1]) {
+      for (let s = 6 + (side > 0 ? spacing / 2 : 0); s < track.length; s += spacing + rnd() * 3) {
+        const i = Math.floor(s / track.step) % track.N, off = track.HW[i] + (side < 0 ? track.WL[i] : track.WR[i]) + 1.7;
+        const p = track.at(s, side * off), q = track.at(s, side * (off + 4));
+        if (terrain(p.x, p.z) < -1) continue;
+        if (near(p.x, p.z, 4.5) || near(q.x, q.z, 4)) continue;
+        if (noBuild.some((nb) => Math.hypot(p.x - nb[0], p.z - nb[1]) < nb[2] * 0.9)) continue;
+        if (mapped.some((m) => Math.abs(m[0] - p.x) < 7 && Math.abs(m[1] - p.z) < 7)) continue;
+        if (track.ZONE[i] >= 0 && track.zones[track.ZONE[i]].noTrees) continue;
+        const C = getChunkFor(city, p.x, p.z);
+        C.trees.addBatch(B, p.x, p.y - 0.1, p.z, rnd() * 6.28, 0.85 + rnd() * 0.3); n++;
+      }
+    }
+    return n;
+  };
   function getChunkFor(city, x, z) {
     const k = Math.floor(x / CHUNK) + ',' + Math.floor(z / CHUNK); let c = city.chunks.get(k);
     if (!c) { c = { walls: new KL.Batch(), roofs: new KL.Batch(), extra: new KL.Batch(), found: new KL.Batch(), trees: new KL.Batch(), x: Math.floor(x / CHUNK) * CHUNK, z: Math.floor(z / CHUNK) * CHUNK }; city.chunks.set(k, c); }

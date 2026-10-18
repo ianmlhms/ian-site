@@ -56,7 +56,7 @@
     const P = (u, v, y) => [a[0] + tx * u + nx * v, y, a[1] + tz * u + nz * v];
     const strip = (u0, u1, v0, v1, y0, y1, c) => { // box-ish prism between two (u,v) rects (axis-aligned in bridge frame)
       const cx = a[0] + tx * (u0 + u1) / 2 + nx * (v0 + v1) / 2, cz = a[1] + tz * (u0 + u1) / 2 + nz * (v0 + v1) / 2;
-      B.box(cx, y0, cz, v1 - v0, y1 - y0, u1 - u0, Math.atan2(nx, nz), c);
+      B.box(cx, y0, cz, Math.abs(v1 - v0), y1 - y0, Math.abs(u1 - u0), Math.atan2(tx, tz), c);   // local x across (n), local z along (t)
     };
     // deck slab + parapets
     strip(0, len, -W / 2, W / 2, deckY - 1.7, deckY, shade(stone, 0.95));

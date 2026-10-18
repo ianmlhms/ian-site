@@ -144,7 +144,9 @@
     buildCity(track, theme, data, rnd) {
       const terr = track.terrain || track.def.terrain || (() => 0), M = this.mats, add = this.add;
       const city = KL.scenery.osmCity(track, theme, data, rnd, terr, this.q);
+      this.city = city;
       KL.scenery.osmTrees(track, theme, data, city, rnd, terr, this.q, theme.treeKeepClear);
+      if (theme.boulevardTrees) KL.scenery.boulevardTrees(track, theme, data, city, rnd, terr, this.q);
       for (const c of city.chunks.values()) { add(c.walls, M.building); add(c.roofs, M.roof); add(c.extra, M.plain); add(c.found, M.wall); add(c.trees, M.plain); }
       this.cityCount = city.count;
     }
@@ -288,12 +290,12 @@
         head.rotation.x = -Math.PI / 2; head.position.set(0, 0.25, 7); head.renderOrder = 3; root.add(head); root.userData.head = head;
         this.scene.add(root);
         this.kartMeshes.set(k.id, { root, prev: null });
-        name.visible = !k.human;
+        name.visible = false; name.material.opacity = 0;
       }
     }
 
     syncRace(R, alpha, dt, focusId) {
-      this.ensureKarts(R);
+      this.ensureKarts(R); this.raceRef = R;
       const t = this.time;
       for (const k of R.karts) {
         const m = this.kartMeshes.get(k.id), root = m.root, u = root.userData;
@@ -317,7 +319,6 @@
         u.bubble.visible = k.shieldT > 0 && (k.shieldT > 2 || Math.floor(t * 8) % 2 === 0);
         if (u.bubble.visible) u.bubble.scale.setScalar(1 + Math.sin(t * 6) * 0.03);
         u.head.material.opacity = this.nightAmount > 0.25 ? 0.5 * this.nightAmount : 0;
-        { const dd = Math.hypot(x - this.cam.x, z - this.cam.z); u.name.visible = !k.human && dd < 75; const sc = clamp(dd * 0.05, 1.2, 3.4); u.name.scale.set(4.2 * sc * 0.5, 1.05 * sc * 0.5, 1); if (dd < 7) u.name.visible = false; }
         k.teleported = false;
         this.emitKartFx(k, m, dt, x, y, z, yaw);
       }
@@ -389,7 +390,7 @@
         const lv = k.drift.level, col = lv === 0 ? [1, 0.95, 0.7] : lv === 1 ? [0.3, 0.6, 1] : lv === 2 ? [1, 0.6, 0.15] : [1, 0.3, 0.95];
         for (const sd of [-1, 1]) {
           const px = x - fx * 1.2 + rx * sd * 0.95, pz = z - fz * 1.2 + rz * sd * 0.95;
-          this.fx.add.spawn(px, y + 0.2, pz, (Math.random() - 0.5) * 5 - fx * 2, 1.5 + Math.random() * 3, (Math.random() - 0.5) * 5 - fz * 2, 0.32, 0.45, 0.1, col[0], col[1], col[2], 0.9, 1.5, 9);
+          this.fx.add.spawn(px, y + 0.2, pz, (Math.random() - 0.5) * 5 - fx * 2, 1.5 + Math.random() * 3, (Math.random() - 0.5) * 5 - fz * 2, 0.3, 0.3, 0.05, col[0], col[1], col[2], 0.85, 1.5, 9);
         }
         if (Math.random() < 0.4) this.fx.norm.spawn(x - fx * 1.4, y + 0.3, z - fz * 1.4, (Math.random() - 0.5) * 2, 0.8, (Math.random() - 0.5) * 2, 0.7, 0.9, 2.0, 0.78, 0.78, 0.78, 0.25, 2, 0);
       }
@@ -397,7 +398,7 @@
       if (k.boostT > 0) {
         const kind = k.boostKind;
         const col = kind === 3 ? [1, 0.35, 0.95] : kind === 2 ? [1, 0.55, 0.15] : [0.35, 0.75, 1];
-        for (const sd of [-0.3, 0.3]) this.fx.add.spawn(x - fx * 1.7 + rx * sd, y + 0.6, z - fz * 1.7 + rz * sd, -fx * 7 + (Math.random() - 0.5), 0.2, -fz * 7 + (Math.random() - 0.5), 0.28, 0.7, 0.15, col[0], col[1], col[2], 0.7, 1, 0);
+        for (const sd of [-0.3, 0.3]) this.fx.add.spawn(x - fx * 1.7 + rx * sd, y + 0.6, z - fz * 1.7 + rz * sd, -fx * 7 + (Math.random() - 0.5), 0.2, -fz * 7 + (Math.random() - 0.5), 0.26, 0.36, 0.05, col[0] * 0.8, col[1] * 0.8, col[2] * 0.8, 0.5, 1, 0);
       }
       // dust / grass when off the road, rain spray
       if (k.surf === 1 && sp > 6 && k.grounded) this.fx.norm.spawn(x - fx * 1.3 + (Math.random() - 0.5) * 1.5, y + 0.2, z - fz * 1.3 + (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 3, 1.4, (Math.random() - 0.5) * 3, 0.6, 0.9, 2.2, 0.55, 0.5, 0.4, 0.35, 2, 0);
@@ -453,8 +454,36 @@
       c.px = this.camera.position.x; c.py = this.camera.position.y; c.pz = this.camera.position.z;
     }
 
+    /* name labels: only a few, never overlapping; the rivals right ahead/behind the player come first, then the nearest ones */
+    updateLabels(dt) {
+      const R = this.raceRef; if (!R) return;
+      const cam = this.camera, H = this._lblV || (this._lblV = new T.Vector3()), fovT = Math.tan((cam.fov * Math.PI) / 360), asp = cam.aspect || 1.5;
+      cam.updateMatrixWorld();
+      const hu = R.karts.find((k) => k.human), hp = hu ? hu.place : 0, list = [];
+      for (const k of R.karts) {
+        if (k.human) continue;
+        const m = this.kartMeshes.get(k.id); if (!m) continue;
+        const u = m.root.userData, dd = Math.hypot(k.ix - cam.position.x, k.iz - cam.position.z);
+        H.set(k.ix, k.iy + 3.4, k.iz).project(cam);
+        const sc = clamp(dd * 0.05, 1.2, 3.4), w = 4.2 * sc * 0.5, h = 1.05 * sc * 0.5, viewH = 2 * dd * fovT;
+        const ok = H.z < 1 && dd > 7 && dd < 85 && Math.abs(H.x) < 1.1 && Math.abs(H.y) < 1.1;
+        u.name.scale.set(w, h, 1);
+        list.push({ u, k, dd, ok, nx: H.x, ny: H.y, nw: (w / (viewH * asp)) * 2, nh: (h / viewH) * 2, pri: Math.abs(k.place - hp) === 1 ? dd - 60 : dd });
+      }
+      list.sort((a, b) => a.pri - b.pri);
+      const taken = []; let n = 0;
+      for (const c of list) {
+        let show = c.ok && n < 4;
+        if (show) for (const t of taken) if (Math.abs(c.nx - t.nx) < (c.nw + t.nw) * 0.55 && Math.abs(c.ny - t.ny) < (c.nh + t.nh) * 0.75) { show = false; break; }
+        if (show) { taken.push(c); n++; }
+        const target = show ? clamp((85 - c.dd) / 30, 0, 1) : 0, mat = c.u.name.material;
+        mat.opacity = lerp(mat.opacity, target, 1 - Math.exp(-10 * (dt || 0.016))); c.u.name.visible = mat.opacity > 0.03;
+      }
+    }
+
     render(dt) {
       this.time += dt;
+      this.updateLabels(dt);
       const sc = this.h * this.renderer.getPixelRatio() / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
       this.fx.add.update(dt, sc); this.fx.norm.update(dt, sc);
       const cp = this.camera.position;

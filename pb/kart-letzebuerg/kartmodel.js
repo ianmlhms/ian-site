@@ -64,9 +64,9 @@
 
   KL.makeBubble = function () { shared(); return new T.Mesh(bubbleGeo, bubbleMat); };
   KL.nameSprite = function (name) {
-    if (nameCache[name]) return nameCache[name].clone();
+    if (nameCache[name]) { const c = nameCache[name].clone(); c.material = nameCache[name].material.clone(); return c; }
     const tex = KL.tex.label(name, { w: 256, h: 64, size: 34, fg: '#fff', stroke: 'rgba(0,0,0,.75)' });
     const m = new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false });
-    const sp = new T.Sprite(m); sp.scale.set(4.2, 1.05, 1); sp.renderOrder = 10; nameCache[name] = sp; return sp.clone();
+    const sp = new T.Sprite(m); sp.scale.set(4.2, 1.05, 1); sp.renderOrder = 10; nameCache[name] = sp; const c = sp.clone(); c.material = m.clone(); return c;
   };
 })();

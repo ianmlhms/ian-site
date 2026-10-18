@@ -61,17 +61,17 @@
           L.box(B, f, mx, 0, mz, 3.2, 13, len, ang - Math.PI / 2 + Math.PI / 2 - ang + ang, stone);
           for (let k = -len / 2 + 2; k < len / 2; k += 4) { const px = mx + Math.sin(ang) * k, pz = mz + Math.cos(ang) * k; L.box(B, f, px, 13, pz, 1.6, 1.6, 1.6, ang, stoneL); }
         }
-        for (const [x, z] of ring) { L.cyl(B, f, x, 0, z, 6.2, 5.8, 20, 10, stone); L.cyl(B, f, x, 20, z, 6.8, 6.8, 1.4, 10, stoneD); L.cyl(B, f, x, 21.4, z, 7, 0.4, 9, 10, roof, { flat: true }); L.box(B, f, x + 4.0, 10, z, 0.5, 2.0, 1.1, 0, win); }
+        for (const [x, z] of ring) { L.cyl(B, f, x, 0, z, 6.2, 5.8, 20, 10, stone); L.cyl(B, f, x, 20, z, 6.8, 6.8, 1.4, 10, stoneD); L.cyl(B, f, x, 21.4, z, 7, 0.4, 9, 10, roof, { flat: true }); L.box(E, f, x + 4.0, 10, z, 0.5, 2.0, 1.1, 0, win); }
         // keep
         L.box(B, f, 0, 0, 0, 24, 40, 20, 0, stone);
         L.box(B, f, 0, 40, 0, 26, 2, 22, 0, stoneD);
         for (let k = -11; k <= 11; k += 3.2) for (const sz of [-10.5, 10.5]) L.box(B, f, k, 42, sz, 1.8, 1.8, 1.6, 0, stoneL);
         L.gable(B, f, 0, 42, 0, 22, 18, 12, roof, 1.2);
         L.cyl(B, f, 0, 0, -13, 5.5, 5.0, 46, 10, stone); L.cyl(B, f, 0, 46, -13, 6.2, 0.4, 14, 10, roof, { flat: true });
-        for (let fl = 0; fl < 4; fl++) for (const sx of [-7, -2, 3, 8]) { L.box(B, f, sx, 6 + fl * 8, -10.1, 1.5, 3, 0.3, 0, win); }
+        for (let fl = 0; fl < 4; fl++) for (const sx of [-7, -2, 3, 8]) { L.box(E, f, sx, 6 + fl * 8, -10.1, 1.5, 3, 0.3, 0, win); }
         L.cyl(B, f, 0, 52, -13, 0.12, 0.12, 6, 4, stoneD);
         E.sphere(...L.frame(f)(0, 59.2, -13), 0.9, 5, col('#ffb030'));
-        L.windowsSide(B, f, 12.1, -7, 7, 3, 8, 1.4, 3.6, win);
+        L.windowsSide(E, f, 12.1, -7, 7, 3, 8, 1.4, 3.6, win);
       };
       castle(-50, 152, 0.15);
 
@@ -82,7 +82,7 @@
         // local z = along the road. towers either side, bridge over the top
         for (const sd of [-1, 1]) {
           L.box(B, f, sd * 15.8, -2, 0, 7, 24, 9, 0, stone); L.cyl(B, f, sd * 15.8, 22, 0, 5.2, 5.2, 1.2, 8, stoneD); L.cyl(B, f, sd * 15.8, 23.2, 0, 5.6, 0.3, 9, 8, roof, { flat: true });
-          L.box(B, f, sd * 15.8, 8, -4.6, 1.2, 2.6, 0.3, 0, win); L.box(B, f, sd * 15.8, 14, -4.6, 1.2, 2.6, 0.3, 0, win);
+          L.box(E, f, sd * 15.8, 8, -4.6, 1.2, 2.6, 0.3, 0, win); L.box(E, f, sd * 15.8, 14, -4.6, 1.2, 2.6, 0.3, 0, win);
           // torches
           const tp = L.frame(f)(sd * 11.6, 3.4, -4.7); B.cyl(tp[0], tp[1], tp[2], 0.1, 0.1, 1.3, 4, wood); E.sphere(tp[0], tp[1] + 1.55, tp[2], 0.42, 5, col('#ff8a1f'));
         }
