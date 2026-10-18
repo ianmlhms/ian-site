@@ -122,7 +122,9 @@
       const dec = KL.scenery.decals(track, def.pads ? race.pads : []);
       add(dec.pads, M.pads); add(dec.checker, M.checker);
       this.buildGround(track, theme);
-      if (theme.buildings !== false) {
+      const cityData = theme.osm && KL.osm && KL.osm[theme.osm];
+      if (cityData) this.buildCity(track, theme, cityData, rnd);
+      else if (theme.buildings !== false) {
         const b = KL.scenery.buildings(track, theme, rnd, this.q);
         add(b.walls, M.building); add(b.roofs, M.roof); add(b.extra, M.plain);
       }
@@ -138,6 +140,15 @@
       this.setWeather(this.weatherName, true);
     }
 
+    /* real street fabric from baked OSM footprints (city.js) */
+    buildCity(track, theme, data, rnd) {
+      const terr = track.terrain || track.def.terrain || (() => 0), M = this.mats, add = this.add;
+      const city = KL.scenery.osmCity(track, theme, data, rnd, terr, this.q);
+      KL.scenery.osmTrees(track, theme, data, city, rnd, terr, this.q, theme.treeKeepClear);
+      for (const c of city.chunks.values()) { add(c.walls, M.building); add(c.roofs, M.roof); add(c.extra, M.plain); add(c.found, M.wall); add(c.trees, M.plain); }
+      this.cityCount = city.count;
+    }
+
     buildGround(track, theme) {
       const B = new KL.Batch(), terr = track.terrain || track.def.terrain || (() => 0);
       let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
@@ -147,9 +158,12 @@
       const base = KL.col(theme.groundTint || '#ffffff');
       const H = (x, z) => gy + terr(x, z);
       const col = (x, z) => (theme.groundColorAt ? theme.groundColorAt(x, z, terr(x, z)) : base);
+      const gm = theme.osm && KL.osm && KL.osm[theme.osm] && theme.groundMap;
+      if (gm) { const t = KL.tex.cityMap(KL.osm[theme.osm], { x0: gm.x0, z0: gm.z0, size: gm.size, px: this.q.mapPx || 2048, paving: gm.paving, paint: gm.paint }); this.mats.ground.map = t; this.mats.ground.needsUpdate = true; }
+      const uv = gm ? (x, z) => [(x - gm.x0) / gm.size, 1 - (z - gm.z0) / gm.size] : (x, z) => [x / 8, z / 8];
       const quad = (xa, za, xb, zb) => {
         const A = [xa, H(xa, za), za], Bq = [xb, H(xb, za), za], C = [xb, H(xb, zb), zb], D = [xa, H(xa, zb), zb];
-        B.quadUV(A, D, C, Bq, col((xa + xb) / 2, (za + zb) / 2), [xa / 8, za / 8], [xa / 8, zb / 8], [xb / 8, zb / 8], [xb / 8, za / 8]);
+        B.quadUV(A, D, C, Bq, col((xa + xb) / 2, (za + zb) / 2), uv(xa, za), uv(xa, zb), uv(xb, zb), uv(xb, za));
       };
       const ix0 = Math.floor((x0 - inner) / coarse) * coarse, iz0 = Math.floor((z0 - inner) / coarse) * coarse, ix1 = Math.ceil((x1 + inner) / coarse) * coarse, iz1 = Math.ceil((z1 + inner) / coarse) * coarse;
       for (let x = ix0; x < ix1; x += fine) for (let z = iz0; z < iz1; z += fine) quad(x, z, x + fine, z + fine);

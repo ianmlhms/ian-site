@@ -6,8 +6,8 @@
     LAPS: 3,
     MAX_KARTS: 8,
     STEP: 1 / 60,                 // fixed simulation step
-    MAX_SPEED: 31,                // m/s on tarmac (about 110 km/h)
-    BOOST_SPEED: 41,
+    MAX_SPEED: 29,                // m/s on tarmac (about 105 km/h)
+    BOOST_SPEED: 39,
     OFFROAD_SPEED: 13,
     SIDEWALK_SPEED: 21,
     ACCEL: 21,

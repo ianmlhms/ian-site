@@ -19,8 +19,8 @@
     return -VALLEY * smooth(0, 22, dN) * smooth(0, 22, dS);
   }
   function groundColor(x, z, h) {
-    const rock = col('#9b9486'), grass = col('#6aa149'), grass2 = col('#7fb256'), plaza = col('#d3cec6');
-    if (h > -0.5) return plaza;
+    const rock = col('#9b9486'), grass = col('#6aa149'), grass2 = col('#7fb256'), plaza = col('#e2ddd4');
+    if (h > -0.5) return [1, 1, 1];     // plateau: the painted street map (city.js) shows through
     const depth = clamp(-h / VALLEY, 0, 1), n = Math.sin(x * 0.11) * Math.cos(z * 0.13) * 0.5 + 0.5;
     const river = Math.abs(z - (interp(RIM_N, x) + interp(RIM_S, x)) / 2 - Math.sin(x * 0.03) * 12);
     if (depth > 0.92 && river < 4.5) return col('#4f9ccf');
@@ -28,17 +28,29 @@
     return KL.mix(rock, KL.mix(grass, grass2, n), smooth(0.4, 0.75, depth));
   }
 
+  /* the Pétrusse valley is coloured by vertex colours; keep the street map neutral (white) there */
+  function paintValley(g, X, Z) {
+    g.fillStyle = '#ffffff'; g.beginPath();
+    for (let x = -640; x <= 640; x += 20) { const zz = interp(RIM_N, x) - 3; if (x === -640) g.moveTo(X(x), Z(zz)); else g.lineTo(X(x), Z(zz)); }
+    for (let x = 640; x >= -640; x -= 20) g.lineTo(X(x), Z(interp(RIM_S, x) + 3));
+    g.closePath(); g.fill();
+  }
+
   KL.registerTrack({
     id: 'villehaute', hw: 9, r: 26, origin: [49.6105, 6.1295],
     theme: { facade: 'old', verge: 'slabs', ground: 'slabs', groundTint: '#ffffff', groundCell: 10, farColor: '#b9b4ab', farDrop: -41, weathers: ['day', 'sunset', 'night', 'rain'],
-      startText: 'UEWERSTAD', wallColor: '#d3c9b6', wallTop: '#e6dfcf', groundColorAt: groundColor, skylineR: 430, skylineColor: '#b3b9c8', skylineH: [18, 46], lampSpacing: 28 },
+      startText: 'UEWERSTAD', wallColor: '#d3c9b6', wallTop: '#e6dfcf', groundColorAt: groundColor, skyline: false, lampSpacing: 28,
+      osm: 'villehaute', cityRadius: 430,
+      groundMap: { x0: -640, z0: -480, size: 1280, paving: '#a8a49c', paint: paintValley },
+      treeKeepClear: (x, z) => terrain(x, z) < -8 && Math.random() < 0 },
     terrain,
     pts: [
       [-232, 100, { r: 34, hw: 10 }], [-120, 104, { hw: 11 }], [-62, 106, { r: 16 }], [-37, 122, { r: 12 }], [-31, 148, { r: 16 }], [-10, 164, { r: 20 }], [14, 148, { r: 16 }], [18, 122, { r: 12 }], [40, 106, { r: 16 }], [61, 104, { r: 18 }],
       [62, 56, { r: 20 }], [190, 45, { r: 34 }], [162, -24, { r: 46 }], [50, -24, { r: 30 }], [56, -78, { r: 24 }], [12, -66, { r: 30 }],
-      [-100, -50], [-180, -38, { hw: 10 }], [-232, -30, { r: 34 }], [-232, 50],
+      [-100, -52, { r: 16 }], [-101, -181, { r: 24 }], [-196, -191, { r: 24 }], [-187, -38, { r: 12 }], [-232, -30, { r: 30 }], [-232, 50],
     ],
-    front: {"L":"333333333333555330333000000000000000000000aa77a7660222aaaaaaaaaaaaaaa000000000000000000aaaaaaaaa35444443443666aaa444444a0000000666666888003","R":"8800000003333300000000000000000000000000000000aaaaa0000aa000aaaaa033aaaa000000000000000aaaaaa000000aa000000aa366600000000000000000000000000"},
+    // (front strings from the old procedural facades are no longer used: city.js builds from the real OSM footprints)
+    front0: {"L":"333333333333555330333000000000000000000000aa77a7660222aaaaaaaaaaaaaaa000000000000000000aaaaaaaaa35444443443666aaa444444a0000000666666888003","R":"8800000003333300000000000000000000000000000000aaaaa0000aa000aaaaa033aaaa000000000000000aaaaaa000000aa000000aa366600000000000000000000000000"},
     noBuild: [[71, 34, 30], [155, 98, 52], [-10, 137, 14]],
     pads: [[150, 0, 10], [470, 0, 10], [850, 0, 10]],
     decorate(S) {
@@ -129,9 +141,6 @@
       /* ---- trees: plane trees on the squares, forest in the valley ---- */
       const T = new KL.Batch(), q = S.quality.trees, planeA = KL.scenery.tree('plane', rnd), parkA = KL.scenery.tree('park', rnd);
       const place = (x, z, kind, sc) => { const y = terrain(x, z) - 0.15; T.addBatch(kind === 'plane' ? planeA : parkA, x, y, z, rnd() * 6.28, sc || (0.85 + rnd() * 0.5)); };
-      for (let i = 0; i < 12; i++) { place(-98 + i * 10.5, -93 + rnd() * 2, 'plane'); }
-      for (let i = 0; i < 8; i++) { place(-92 + i * 12, -70 + (i % 2) * 1.5, 'plane'); }
-      for (let i = 0; i < 6; i++) { place(60 + i * 18, -48 + rnd() * 2, 'plane'); }
       let tries = 0, planted = 0;
       while (planted < 130 * q && tries++ < 3000) {
         const x = -260 + rnd() * 560, z = 120 + rnd() * 260, h = terrain(x, z);
