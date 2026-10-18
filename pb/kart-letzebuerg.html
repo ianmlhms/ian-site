@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>Kart Lëtzebuerg 🏎️ – Arcade</title>
+<link rel="stylesheet" href="/pb/kart-letzebuerg.css?v=1">
+<script src="/pb/arcade-kit.js?v=28" data-arcade-id="kart-letzebuerg" data-arcade-title="Kart Lëtzebuerg 🏎️" data-arcade-no-score></script>
+</head>
+<body>
+<main id="game">
+  <canvas id="world" aria-label="3D"></canvas>
+
+  <div id="hud" hidden>
+    <div id="posBox" class="chip"><small data-t="place">Plaz</small><b id="hudPos">8</b><span id="hudPosOf">/8</span></div>
+    <div id="lapBox" class="chip"><small data-t="lap">Ronn</small><b id="hudLap">1/3</b></div>
+    <div id="timeBox" class="chip"><b id="hudTime">0:00.000</b><small><span data-t="best">Beschte</span> <span id="hudBest">--:--.---</span></small></div>
+    <div id="itemSlot" class="chip" aria-live="polite"><span id="itemIcon"></span><b id="itemCount"></b><small id="itemName"></small></div>
+    <canvas id="minimap" width="240" height="240" aria-hidden="true"></canvas>
+    <div id="speedBox" class="chip"><b id="hudSpeed">0</b><small data-t="speed">km/h</small></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <div id="countdown" aria-live="assertive"></div>
+    <div id="wrongWay" hidden data-t="wrong">Falsch Richtung!</div>
+    <div id="cometWarn" hidden data-t="cometWarn">Komet kënnt!</div>
+    <div id="utilities"><button id="btnPause" aria-label="Pause">Ⅱ</button><button id="btnWeather" aria-label="Wieder">☀️</button><button id="btnReset" aria-label="Reset">↺</button></div>
+    <p id="keyHint"></p>
+    <div id="touch" data-arcade-touch-controls>
+      <div id="steerPad" aria-label="Steieren"><div id="steerBase"><div id="steerKnob"></div></div><span id="padHint" data-t="touchHint"></span></div>
+      <div id="btns">
+        <button id="bItem" data-input="item" aria-label="Objet"><span data-t="btn_item">Objet</span></button>
+        <button id="bDrift" data-input="drift" aria-label="Drift"><span data-t="btn_drift">Drift</span></button>
+        <button id="bBrake" data-input="brake" aria-label="Brems"><span data-t="btn_brake">Brems</span></button>
+        <button id="bGas" data-input="gas" aria-label="Gas"><span data-t="btn_gas">Gas</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loading" class="screen" role="status" aria-live="polite"><div class="loadcard"><span class="spin"></span><b data-t="loading">D'Stad gëtt opgebaut…</b></div></div>
+
+  <div id="menu" class="screen" hidden>
+    <section class="card menu-card" aria-labelledby="menuTitle">
+      <header class="menu-head"><span class="flag" aria-hidden="true"><i></i><i></i><i></i></span><h1 id="menuTitle" data-t="title">Kart Lëtzebuerg</h1><div class="langs" role="group" aria-label="Language"><button data-lang="lb">LB</button><button data-lang="de">DE</button><button data-lang="en">EN</button></div></header>
+      <p class="tagline" data-t="tagline"></p>
+      <div class="modes">
+        <button id="modeRace" class="mode on"><b data-t="play">Rennen</b><small data-t="playDesc"></small></button>
+        <button id="modeGp" class="mode" disabled><b data-t="gp">Grand Prix</b><small data-t="soon"></small></button>
+        <button id="modeTt" class="mode" disabled><b data-t="tt">Zäitfueren</b><small data-t="soon"></small></button>
+        <button id="modeOnline" class="mode" disabled><b data-t="online">Online</b><small data-t="soon"></small></button>
+      </div>
+      <div class="row"><h2 data-t="track">Streck</h2><div id="trackCards" class="cards"></div></div>
+      <div class="row2">
+        <div><h2 data-t="weather">Wieder</h2><div id="weatherChips" class="chips"></div></div>
+        <div><h2 data-t="difficulty">Schwieregkeet</h2><div id="diffChips" class="chips"></div></div>
+      </div>
+      <div class="row"><h2 data-t="driver">Fuerer</h2><div id="driverChips" class="drivers"></div></div>
+      <div class="foot"><button id="btnStart" class="primary"><span data-t="start">Lass!</span></button></div>
+      <p class="hint" id="menuHint"></p>
+    </section>
+  </div>
+
+  <div id="pauseScreen" class="screen" hidden>
+    <section class="card small">
+      <h2 data-t="pause">Paus</h2>
+      <button id="pResume" class="primary" data-t="resume">Weiderfueren</button>
+      <button id="pRestart" data-t="restart">Nei starten</button>
+      <div class="setrow"><label for="pWeather" data-t="weather">Wieder</label><select id="pWeather"></select></div>
+      <div class="setrow"><label for="pQuality" data-t="quality">Qualitéit</label><select id="pQuality"></select></div>
+      <div class="setrow"><label for="pGas" data-t="btn_gas">Gas</label><select id="pGas"><option value="1">Auto</option><option value="0">Manuell</option></select></div>
+      <button id="pQuit" data-t="quit">Zréck an de Menü</button>
+    </section>
+  </div>
+
+  <div id="endScreen" class="screen" hidden>
+    <section class="card results">
+      <h2 id="endTitle" data-t="results">Resultat</h2>
+      <p id="endSub"></p>
+      <ol id="endList"></ol>
+      <div class="foot"><button id="eAgain" class="primary" data-t="again">Nach eng Kéier</button><button id="eMenu" data-t="menu">Menü</button></div>
+    </section>
+  </div>
+  <div id="fatal" class="screen" hidden><section class="card small"><p id="fatalText"></p></section></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="/pb/kart-letzebuerg/util.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/config.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/copy.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/track.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/kart.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/items.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/bots.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/race.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/batch.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/textures.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/scenery.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/kartmodel.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/fx.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/world.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/input.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/audio.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/tracks-villehaute.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/tracks-geeschterschlass.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/game.js?v=1"></script>
+</body>
+</html>

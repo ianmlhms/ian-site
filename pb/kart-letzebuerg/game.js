@@ -1,0 +1,434 @@
+/* Kart Lëtzebuerg — game controller: menu, race flow, fixed-step loop, HUD, results, settings, test hooks. */
+(function () {
+  'use strict';
+  const KL = window.KL, C = KL.CFG;
+  const { clamp, fmtTime } = KL;
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  let parentParams = null;
+  try { if (parent !== window) parentParams = new URL(parent.location.href).searchParams; } catch (e) { /* cross-origin parent */ }
+  const TEST = params.get('test') === '1' || (parentParams && parentParams.get('test') === '1');
+  const SETTINGS_KEY = 'kl_settings';
+
+  const G = {
+    state: 'boot', renderer: null, audio: new KL.Audio(), race: null, track: null, tracks: {}, human: null, rear: false,
+    settings: { track: 'villehaute', weather: 'random', diff: 'normal', driver: 'renert', quality: 'auto', autoGas: true },
+    acc: 0, last: 0, forced: null, paused: false, frame: 0, fpsAvg: 16, lowStreak: 0, raceCount: 0, resultsShown: false, finishAt: 0,
+    toastT: 0, lastCount: 99, hud: {}, ghost: null, steps: 0,
+  };
+  KL.G = G;
+  const warn = (m, e) => console.warn('[Kart] ' + m, e || '');
+
+  function loadSettings() {
+    try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); if (s && typeof s === 'object') Object.assign(G.settings, s); } catch (e) { warn('settings not readable', e); }
+    if (!KL.tracks[G.settings.track]) G.settings.track = 'villehaute';
+    if (!KL.DRIVERS.some((d) => d.id === G.settings.driver)) G.settings.driver = 'renert';
+    if (!KL.DIFFICULTY[G.settings.diff]) G.settings.diff = 'normal';
+  }
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) { warn('settings not saved', e); } }
+
+  /* ---------- i18n ---------- */
+  function translate() {
+    document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = KL.t(el.dataset.t); });
+    document.querySelectorAll('[data-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === KL.lang())));
+    buildMenuChips(); updateKeyHint();
+    $('btnPause').setAttribute('aria-label', KL.t('pause')); $('btnWeather').setAttribute('aria-label', KL.t('weather')); $('btnReset').setAttribute('aria-label', KL.t('reset'));
+    $('bItem').setAttribute('aria-label', KL.t('btn_item')); $('bDrift').setAttribute('aria-label', KL.t('btn_drift')); $('bBrake').setAttribute('aria-label', KL.t('btn_brake')); $('bGas').setAttribute('aria-label', KL.t('btn_gas'));
+    buildPauseSelects();
+  }
+  function updateKeyHint() { $('keyHint').textContent = KL.t('controls'); $('menuHint').textContent = KL.t('controls'); }
+
+  /* ---------- menu ---------- */
+  const WEATHER_ICON = { day: '☀️', sunset: '🌇', night: '🌙', rain: '🌧️', fog: '🌫️', random: '🎲' };
+  function weathersFor(trackId) { const d = KL.tracks[trackId]; return (d && d.theme && d.theme.weathers) || ['day', 'sunset', 'night', 'rain']; }
+  function chip(parent, label, on, fn, extra) { const b = document.createElement('button'); b.textContent = label; if (on) b.classList.add('on'); b.addEventListener('click', () => { fn(); KL.G.audio.sfx('click'); }); if (extra) extra(b); parent.appendChild(b); return b; }
+  function drawTrackPreview(canvas, track) {
+    const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+    g.clearRect(0, 0, W, H);
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let i = 0; i < track.N; i++) { x0 = Math.min(x0, track.X[i]); x1 = Math.max(x1, track.X[i]); z0 = Math.min(z0, track.Z[i]); z1 = Math.max(z1, track.Z[i]); }
+    const sc = Math.min((W - 12) / (x1 - x0), (H - 12) / (z1 - z0)), ox = (W - (x1 - x0) * sc) / 2 - x0 * sc, oz = (H - (z1 - z0) * sc) / 2 - z0 * sc;
+    g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = '#ffffffcc'; g.lineWidth = 3.2; g.beginPath();
+    for (let i = 0; i <= track.N; i++) { const j = i % track.N; const x = track.X[j] * sc + ox, z = track.Z[j] * sc + oz; if (i) g.lineTo(x, z); else g.moveTo(x, z); }
+    g.stroke();
+    g.fillStyle = '#ffd23f'; g.beginPath(); g.arc(track.X[0] * sc + ox, track.Z[0] * sc + oz, 3.6, 0, 7); g.fill();
+  }
+  function buildMenuChips() {
+    const S = G.settings;
+    const tc = $('trackCards'); tc.textContent = '';
+    for (const id of Object.keys(KL.tracks)) {
+      const def = KL.tracks[id];
+      const b = document.createElement('button'); b.className = 'tcard' + (S.track === id ? ' on' : '');
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108; b.appendChild(cv);
+      const d = document.createElement('div'); d.innerHTML = '<b></b><small></small>'; d.firstChild.textContent = KL.t('t_' + id); d.lastChild.textContent = KL.t('t_' + id + '_d'); b.appendChild(d);
+      b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); buildMenuChips(); G.audio.sfx('click'); });
+      tc.appendChild(b); drawTrackPreview(cv, getTrack(id));
+    }
+    const wc = $('weatherChips'); wc.textContent = '';
+    for (const w of ['random', ...weathersFor(S.track)]) chip(wc, WEATHER_ICON[w] + ' ' + KL.t('w_' + w), S.weather === w, () => { S.weather = w; saveSettings(); buildMenuChips(); });
+    const dc = $('diffChips'); dc.textContent = '';
+    for (const d of ['easy', 'normal', 'hard']) chip(dc, KL.t('d_' + d), S.diff === d, () => { S.diff = d; saveSettings(); buildMenuChips(); });
+    const vc = $('driverChips'); vc.textContent = '';
+    for (const d of KL.DRIVERS) { const b = chip(vc, d.name, S.driver === d.id, () => { S.driver = d.id; saveSettings(); buildMenuChips(); }); const i = document.createElement('i'); i.style.background = d.body; b.prepend(i); }
+  }
+  function buildPauseSelects() {
+    const pw = $('pWeather'); pw.textContent = '';
+    for (const w of weathersFor(G.settings.track)) { const o = document.createElement('option'); o.value = w; o.textContent = WEATHER_ICON[w] + ' ' + KL.t('w_' + w); pw.appendChild(o); }
+    pw.value = G.renderer ? G.renderer.weatherName : 'day';
+    const pq = $('pQuality'); pq.textContent = '';
+    for (const q of ['auto', 'low', 'medium', 'high']) { const o = document.createElement('option'); o.value = q; o.textContent = KL.t('q_' + q); pq.appendChild(o); }
+    pq.value = G.settings.quality; $('pGas').value = G.settings.autoGas ? '1' : '0';
+  }
+
+  /* ---------- tracks ---------- */
+  function getTrack(id) { return G.tracks[id] || (G.tracks[id] = KL.buildTrack(KL.tracks[id])); }
+
+  /* ---------- quality ---------- */
+  function detectQuality() {
+    const ua = navigator.userAgent || '', touchMac = /Mac/.test(ua) && navigator.maxTouchPoints > 1;
+    const mobile = /iPad|iPhone|Android/.test(ua) || touchMac;
+    const cores = navigator.hardwareConcurrency || 4;
+    if (mobile) return cores <= 4 ? 'low' : 'medium';
+    return 'high';
+  }
+  const effQuality = () => (G.settings.quality === 'auto' ? G.autoQ : G.settings.quality);
+
+  /* ---------- race flow ---------- */
+  function showOnly(name) {
+    for (const id of ['menu', 'pauseScreen', 'endScreen', 'loading', 'fatal']) $(id).hidden = id !== name;
+    $('hud').hidden = !(name === null);
+  }
+  function openMenu() {
+    G.state = 'menu'; G.paused = false; G.race = null; showOnly('menu'); G.audio.silence(); document.documentElement.classList.remove('kl-race');
+    if (G.renderer) { G.renderer.rain.visible = false; }
+    KL.input.setEnabled(false);
+    if (window.Arcade && Arcade.startRun) { /* a new run starts with each race */ }
+  }
+
+  function pickWeather(trackId, wanted) {
+    const list = weathersFor(trackId);
+    if (wanted && wanted !== 'random' && list.includes(wanted)) return wanted;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  function startRace(opts) {
+    opts = opts || {};
+    const S = G.settings, trackId = opts.track || S.track;
+    $('loading').hidden = false; $('menu').hidden = true;
+    setTimeout(() => {
+      try { beginRace(trackId, opts); } catch (e) { console.error(e); fatal(KL.t('engineError') + ' (' + (e && e.message) + ')'); }
+    }, 30);
+  }
+
+  function beginRace(trackId, opts) {
+    const S = G.settings, track = getTrack(trackId);
+    G.track = track;
+    const weather = pickWeather(trackId, opts.weather || S.weather);
+    const diffName = opts.diff || S.diff;
+    const me = KL.DRIVERS.find((d) => d.id === (opts.driver || S.driver)) || KL.DRIVERS[0];
+    const botDrivers = KL.DRIVERS.filter((d) => d.id !== me.id);
+    const seed = opts.seed || (Date.now() & 0xffffff);
+    const rnd = KL.rng(seed);
+    // grid order: bots shuffled; the player starts in the back half so there is something to overtake
+    const order = botDrivers.slice(); for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const nBots = opts.bots != null ? opts.bots : 7;
+    const defs = [];
+    const mySlot = opts.mySlot != null ? opts.mySlot : Math.min(5, nBots);
+    let bi = 0;
+    for (let slot = 0; slot < nBots + 1; slot++) {
+      if (slot === mySlot) defs.push({ id: 'me', name: opts.name || S.name || KL.t('you'), driver: me, human: true, gridSlot: slot });
+      else { const d = order[bi++ % order.length]; defs.push({ id: 'bot' + slot, name: d.name, driver: d, isBot: true, gridSlot: slot, botSkill: 0.97 + rnd() * 0.06, lanePref: (rnd() - 0.5) * 1.2 }); }
+    }
+    const R = KL.createRace({ track, karts: defs, laps: opts.laps || C.LAPS, difficulty: diffName, weather, seed, mode: opts.mode || 'race' });
+    G.race = R; G.human = R.byId.me; G.resultsShown = false; G.finishAt = 0; G.acc = 0; G.lastCount = 99; G.raceCount++;
+    G.autoWeather = weather;
+    if (!G.renderer) initRenderer();
+    G.renderer.weatherName = weather;
+    G.renderer.loadTrack(track, R);
+    G.renderer.setWeather(weather, true);
+    G.renderer.cam.snap = true; G.renderer.snapKarts();
+    // first frame placement of the camera
+    G.renderer.updateCamera(viewOf(G.human, 1), 0.016);
+    $('loading').hidden = true; showOnly(null);
+    G.state = 'race'; G.paused = false; KL.input.setEnabled(true);
+    $('hudBest').textContent = '--:--.---'; G.hud = {};
+    document.documentElement.classList.add('kl-race');
+    if (G.gesture) G.audio.start();
+    G.drawMini = makeMinimap(track);
+    buildPauseSelects();
+    $('btnWeather').textContent = WEATHER_ICON[weather];
+    G.last = performance.now();
+    if (window.Arcade && Arcade.startRun) Arcade.startRun();
+    showToast(KL.t('hintDrift'), 3200);
+  }
+
+  function viewOf(k, alpha) {
+    const v = G.view || (G.view = {});
+    v.x = k.ix != null ? k.ix : k.x; v.y = k.iy != null ? k.iy : k.y; v.z = k.iz != null ? k.iz : k.z; v.yaw = k.iyaw != null ? k.iyaw : k.yaw;
+    v.vx = k.vx; v.vz = k.vz; v.speed = k.speed; v.boostT = k.boostT; v.drift = k.drift; v.grounded = k.grounded;
+    return v;
+  }
+
+  function fatal(text) { $('fatalText').textContent = text; showOnly('fatal'); }
+
+  function initRenderer() {
+    G.autoQ = detectQuality();
+    G.renderer = new KL.Renderer($('world'), { quality: effQuality() });
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => setTimeout(onResize, 120));
+    if (window.ResizeObserver) new ResizeObserver(onResize).observe($('game'));
+  }
+  function onResize() {
+    layoutTouch();
+    if (G.renderer) G.renderer.resize();
+  }
+  function layoutTouch() {
+    const touch = document.documentElement.classList.contains('kl-touch');
+    const h = window.innerHeight, portrait = window.innerHeight > window.innerWidth;
+    $('hud').style.setProperty('--touch-h', touch ? clamp(Math.round(h * (portrait ? 0.3 : 0.42)), 150, 300) + 'px' : '0px');
+  }
+
+  /* ---------- toasts / countdown ---------- */
+  function showToast(text, ms) {
+    const t = $('toast'); t.textContent = text; t.classList.add('on'); G.toastT = performance.now() + (ms || 1600);
+  }
+  function popCountdown(text) {
+    const c = $('countdown'); c.textContent = text; c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
+  }
+
+  /* ---------- events ---------- */
+  function handleEvents(R) {
+    const me = G.human, rd = G.renderer, a = G.audio;
+    for (const e of R.events) {
+      const mine = e.id === 'me';
+      const camD = e.x != null ? Math.hypot(e.x - rd.cam.x, e.z - rd.cam.z) : 0;
+      switch (e.t) {
+        case 'go': a.sfx('go'); popCountdown(KL.t('go')); break;
+        case 'rocketstart': if (mine) { showToast(KL.t('rocketStart'), 1400); } a.sfx('rocketstart', { near: mine }); break;
+        case 'box': if (mine) a.sfx('box'); break;
+        case 'itemget': if (mine) a.sfx('itemget'); break;
+        case 'shoot': case 'drop': a.sfx(e.t, { near: mine }); break;
+        case 'boost': case 'pad': a.sfx(e.t, { near: mine }); break;
+        case 'miniturbo': if (mine) a.sfx('miniturbo', { level: e.level }); break;
+        case 'driftlevel': if (mine) a.sfx('driftlevel', { level: e.level }); break;
+        case 'shield': a.sfx('shield', { near: mine }); break;
+        case 'shieldpop': a.sfx('shieldpop', { near: mine }); break;
+        case 'hit': { a.sfx('hit', { near: mine }); if (mine) { rd.shake = Math.max(rd.shake, 0.5); } break; }
+        case 'boom': if (camD < 120) { rd.burst(e.x, e.y, e.z, e.kind); a.sfx('boom', { near: camD < 25 }); } break;
+        case 'splat': break;
+        case 'bump': if (camD < 40) a.sfx('bump', { near: e.id === 'me' || e.id2 === 'me' }); break;
+        case 'wall': if (mine) { a.sfx('wall'); rd.shake = Math.max(rd.shake, Math.min(0.35, e.power * 0.02)); } break;
+        case 'land': if (mine) a.sfx('land'); break;
+        case 'comet': a.sfx('comet', { near: true }); break;
+        case 'lap': if (mine) {
+          a.sfx('lap');
+          if (e.lap < R.laps) showToast((e.lap + 1 === R.laps ? KL.t('lastlap') : KL.t('lap') + ' ' + (e.lap + 1) + '/' + R.laps) + (e.best && e.lap > 1 ? ' · ' + KL.t('newbest') : ''), 1800);
+          $('hudBest').textContent = fmtTime(me.bestLap);
+        } break;
+        case 'finish': if (mine) { a.sfx('finish'); showToast(KL.t('fin') + ' ' + KL.t('place') + ' ' + e.place, 2400); rd.confetti(me.x, me.y, me.z); G.finishAt = performance.now(); } break;
+        case 'rescue': if (mine) { a.sfx('rescue'); rd.snapKarts(); rd.cam.snap = true; } break;
+      }
+    }
+    R.events.length = 0;
+  }
+
+  /* ---------- HUD ---------- */
+  const ITEM_ICONS = ['🛢️', '🔵', '🚀', '🛡️', '⚡', '☄️'];
+  function setText(id, v) { if (G.hud[id] !== v) { G.hud[id] = v; $(id).textContent = v; } }
+  function updateHud(R, now) {
+    const k = G.human; if (!k) return;
+    setText('hudPos', String(k.place)); setText('hudPosOf', '/' + R.karts.length);
+    const lapN = clamp(k.lapIdx + 1, 1, R.laps);
+    setText('hudLap', lapN + '/' + R.laps);
+    const t = R.clock < 0 ? 0 : (k.finished ? k.finishTime : R.clock - (k.lapIdx >= 0 ? 0 : 0));
+    setText('hudTime', fmtTime(Math.max(0, k.finished ? k.finishTime : R.clock)));
+    setText('hudSpeed', String(Math.round(k.speed * 3.6)));
+    const slot = $('itemSlot');
+    if (k.roll) { slot.classList.add('roll', 'has'); const ic = ITEM_ICONS[Math.floor(now / 90) % ITEM_ICONS.length]; setText('itemIcon', ic); setText('itemCount', ''); setText('itemName', ''); }
+    else if (k.item) { slot.classList.remove('roll'); slot.classList.add('has'); setText('itemIcon', KL.ITEMS[k.item.id].icon); setText('itemCount', k.item.count > 1 ? '×' + k.item.count : ''); setText('itemName', KL.t('item_' + k.item.id)); }
+    else { slot.classList.remove('roll', 'has'); setText('itemIcon', ''); setText('itemCount', ''); setText('itemName', ''); }
+    $('wrongWay').hidden = !(k.wrongT > 1.2 && !k.finished);
+    const comet = R.items.find((i) => i.type === 'comet' && i.target === k.id);
+    $('cometWarn').hidden = !comet;
+    if (G.toastT && now > G.toastT) { $('toast').classList.remove('on'); G.toastT = 0; }
+    // countdown digits
+    if (R.phase === 'countdown') {
+      const n = Math.ceil(-R.clock);
+      if (R.clock < -0.05 && n <= 3 && n !== G.lastCount) { G.lastCount = n; popCountdown(String(n)); G.audio.sfx('beep', { high: false }); }
+    }
+    if (G.drawMini) G.drawMini(R);
+  }
+
+  function makeMinimap(track) {
+    const cv = $('minimap'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+    const off = document.createElement('canvas'); off.width = W; off.height = H; const og = off.getContext('2d');
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    for (let i = 0; i < track.N; i++) { x0 = Math.min(x0, track.X[i]); x1 = Math.max(x1, track.X[i]); z0 = Math.min(z0, track.Z[i]); z1 = Math.max(z1, track.Z[i]); }
+    const pad = 18, sc = Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (z1 - z0));
+    const ox = (W - (x1 - x0) * sc) / 2 - x0 * sc, oz = (H - (z1 - z0) * sc) / 2 - z0 * sc;
+    og.lineJoin = 'round'; og.lineCap = 'round';
+    const path = () => { og.beginPath(); for (let i = 0; i <= track.N; i++) { const j = i % track.N; const x = track.X[j] * sc + ox, z = track.Z[j] * sc + oz; if (i) og.lineTo(x, z); else og.moveTo(x, z); } };
+    path(); og.strokeStyle = '#000a'; og.lineWidth = 13; og.stroke(); path(); og.strokeStyle = '#e9edf7'; og.lineWidth = 8; og.stroke();
+    const sx = track.X[0] * sc + ox, sz = track.Z[0] * sc + oz; og.fillStyle = '#ffd23f'; og.fillRect(sx - 6, sz - 3, 12, 6);
+    return (R) => {
+      g.clearRect(0, 0, W, H); g.drawImage(off, 0, 0);
+      for (const k of R.karts) { if (k.human) continue; g.fillStyle = k.driver.body; g.beginPath(); g.arc(k.x * sc + ox, k.z * sc + oz, 5, 0, 7); g.fill(); g.strokeStyle = '#000a'; g.lineWidth = 1.5; g.stroke(); }
+      const h = G.human; g.fillStyle = '#ffd23f'; g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(h.x * sc + ox, h.z * sc + oz, 8, 0, 7); g.fill(); g.stroke();
+      const a = h.yaw; g.beginPath(); g.moveTo(h.x * sc + ox + Math.sin(a) * 15, h.z * sc + oz + Math.cos(a) * 15); g.lineTo(h.x * sc + ox + Math.sin(a + 2.6) * 9, h.z * sc + oz + Math.cos(a + 2.6) * 9); g.lineTo(h.x * sc + ox + Math.sin(a - 2.6) * 9, h.z * sc + oz + Math.cos(a - 2.6) * 9); g.closePath(); g.fillStyle = '#fff'; g.fill();
+    };
+  }
+
+  /* ---------- results ---------- */
+  function showResults() {
+    const R = G.race; if (G.resultsShown) return; G.resultsShown = true;
+    $('endSub').textContent = KL.t('calc'); $('endList').textContent = ''; showOnlyOverlay('endScreen');
+    setTimeout(() => {
+      R.fastForward(150);
+      const rows = KL.standings(R);
+      const ol = $('endList'); ol.textContent = '';
+      rows.forEach((r) => {
+        const li = document.createElement('li'); if (r.human) li.className = 'me';
+        const a = document.createElement('b'); a.textContent = r.place + '.';
+        const n = document.createElement('span'); n.textContent = r.name + (r.human ? ' (' + KL.t('you') + ')' : '');
+        const t = document.createElement('span'); t.textContent = r.finished ? fmtTime(r.time) : KL.t('dnf');
+        const bl = document.createElement('small'); bl.textContent = r.bestLap ? '⏱ ' + fmtTime(r.bestLap) : '';
+        li.append(a, n, t, bl); ol.appendChild(li);
+      });
+      const me = rows.find((r) => r.human);
+      $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.bestLap) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
+      G.lastResult = { rows, me };
+      if (window.Arcade && TEST !== true) { /* leaderboards are submitted from phase 3 only, once per race */ }
+    }, 60);
+  }
+  function showOnlyOverlay(name) { for (const id of ['pauseScreen', 'endScreen']) $(id).hidden = id !== name; }
+
+  /* ---------- pause ---------- */
+  function setPaused(p) {
+    if (G.state !== 'race') return;
+    G.paused = p; $('pauseScreen').hidden = !p; G.audio.silence(); KL.input.setEnabled(!p);
+    if (p) buildPauseSelects();
+    G.last = performance.now();
+  }
+
+  /* ---------- weather cycle ---------- */
+  function cycleWeather() {
+    if (!G.renderer || !G.race) return;
+    const list = weathersFor(G.settings.track), cur = list.indexOf(G.renderer.weatherName);
+    setWeather(list[(cur + 1) % list.length]);
+  }
+  function setWeather(w) { G.renderer.setWeather(w); G.race.weather.name = w; G.race.weather.wet = KL.WEATHER[w].wet; $('btnWeather').textContent = WEATHER_ICON[w]; showToast(WEATHER_ICON[w] + ' ' + KL.t('w_' + w), 1100); }
+
+  /* ---------- main loop ---------- */
+  const inputScratch = {}; let itemLatch = false;
+  KL.input.on('itemkey', () => { itemLatch = true; });
+
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.1, Math.max(0.0001, (ts - (G.last || ts)) / 1000)); G.last = ts;
+    G.frame++;
+    if (!G.renderer || G.state !== 'race' || !G.race) return;
+    const R = G.race;
+    if (!G.paused) {
+      G.acc += dt;
+      let n = 0;
+      const k = G.human;
+      while (G.acc >= C.STEP && n < 6) {
+        applyPlayerInput(k);
+        R.step(C.STEP); G.acc -= C.STEP; n++; G.steps++;
+        itemLatch = false;
+      }
+      if (n === 6) G.acc = 0;
+      handleEvents(R);
+    }
+    const alpha = G.paused ? 1 : G.acc / C.STEP;
+    G.renderer.syncRace(R, alpha, G.paused ? 0 : dt);
+    G.renderer.updateCamera(viewOf(G.human, alpha), G.paused ? 0 : dt, { rear: G.rear });
+    updateHud(R, ts);
+    if (!G.paused) G.audio.update(G.human, { racing: R.phase !== 'countdown', rain: G.renderer.W && G.renderer.W.rain, paused: false });
+    if (R.karts.some((o) => o.roll && o.id === 'me') && G.audio.throttle('rollsfx', 90)) G.audio.sfx('roll');
+    G.renderer.render(G.paused ? 0 : dt);
+    adaptQuality(dt);
+    if (G.human.finished && !G.resultsShown && performance.now() - G.finishAt > 2600) showResults();
+  }
+
+  function applyPlayerInput(k) {
+    if (!k || k.auto) return;
+    const inp = KL.input.read(inputScratch);
+    const f = G.forced;
+    k.input.steer = f && f.steer != null ? f.steer : inp.steer; k.input.gas = f && f.gas != null ? f.gas : inp.gas; k.input.brake = f && f.brake != null ? f.brake : inp.brake;
+    k.input.drift = f && f.drift != null ? f.drift : inp.drift; k.input.item = (f && f.item != null ? f.item : inp.item) || itemLatch;
+    if (G.race.phase === 'countdown' && f && f.gas != null) k.input.gas = f.gas;
+  }
+
+  /* adaptive resolution (auto quality only) */
+  function adaptQuality(dt) {
+    if (G.settings.quality !== 'auto' || G.paused) return;
+    G.fpsAvg = G.fpsAvg * 0.95 + dt * 1000 * 0.05;
+    G.qT = (G.qT || 0) + dt;
+    if (G.qT < 2.5) return;
+    G.qT = 0;
+    const r = G.renderer;
+    if (G.fpsAvg > 21 && (r.dprScale || 1) > 0.6) { r.dprScale = Math.max(0.6, (r.dprScale || 1) - 0.15); r.resize(); }
+    else if (G.fpsAvg > 24 && G.autoQ !== 'low') { G.lowStreak++; if (G.lowStreak > 1) { G.autoQ = G.autoQ === 'high' ? 'medium' : 'low'; r.setQuality(G.autoQ); G.lowStreak = 0; } }
+    else if (G.fpsAvg < 12.5 && (r.dprScale || 1) < 1) { r.dprScale = Math.min(1, (r.dprScale || 1) + 0.1); r.resize(); }
+  }
+
+  /* ---------- boot ---------- */
+  function boot() {
+    loadSettings();
+    KL.setLang(KL.lang());
+    if (matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0) document.documentElement.classList.add('kl-touch');
+    window.addEventListener('pointerdown', (e) => { G.gesture = true; if (e.pointerType === 'touch' && !document.documentElement.classList.contains('kl-touch')) { document.documentElement.classList.add('kl-touch'); layoutTouch(); } G.audio.start(); }, { capture: true });
+    window.addEventListener('keydown', () => { G.gesture = true; G.audio.start(); }, { capture: true });
+    KL.input.bindTouch($('touch'));
+    layoutTouch();
+    G.autoQ = detectQuality();
+    document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { KL.setLang(b.dataset.lang); translate(); }));
+    translate();
+    $('btnStart').addEventListener('click', () => { G.audio.start(); startRace(); });
+    $('btnPause').addEventListener('click', () => setPaused(true));
+    $('btnWeather').addEventListener('click', cycleWeather);
+    $('btnReset').addEventListener('click', () => G.race && G.race.rescue(G.human));
+    $('pResume').addEventListener('click', () => setPaused(false));
+    $('pRestart').addEventListener('click', () => { $('pauseScreen').hidden = true; startRace({ seed: null }); });
+    $('pQuit').addEventListener('click', () => { $('pauseScreen').hidden = true; openMenu(); });
+    $('pWeather').addEventListener('change', (e) => setWeather(e.target.value));
+    $('pQuality').addEventListener('change', (e) => { G.settings.quality = e.target.value; saveSettings(); if (G.renderer) { G.renderer.dprScale = 1; G.renderer.setQuality(effQuality()); } });
+    $('pGas').addEventListener('change', (e) => { G.settings.autoGas = e.target.value === '1'; KL.input.setAutoGas(G.settings.autoGas); saveSettings(); });
+    $('eAgain').addEventListener('click', () => { $('endScreen').hidden = true; startRace({ seed: null }); });
+    $('eMenu').addEventListener('click', () => { $('endScreen').hidden = true; openMenu(); });
+    KL.input.setAutoGas(G.settings.autoGas);
+    KL.input.on('pause', () => { if (G.state === 'race') setPaused(!G.paused); });
+    KL.input.on('weather', cycleWeather);
+    KL.input.on('reset', () => G.race && !G.paused && G.race.phase !== 'countdown' && G.race.rescue(G.human));
+    KL.input.on('rear', (v) => { G.rear = !!v; });
+    KL.input.on('mute', () => { document.querySelector('.arcade-bar__button[aria-label*="ute" i], .arcade-bar__button')?.click?.(); });
+    if (window.Arcade && Arcade.onMute) Arcade.onMute((m) => G.audio.setMuted(m));
+    try { initRenderer(); } catch (e) { console.error(e); fatal(KL.t('engineError')); return; }
+    $('loading').hidden = true;
+    const auto = TEST && params.get('autostart') === '1';
+    if (auto) {
+      const o = { track: params.get('track') || undefined, weather: params.get('weather') || undefined, diff: params.get('diff') || undefined, laps: params.get('laps') ? +params.get('laps') : undefined, bots: params.get('bots') != null ? +params.get('bots') : undefined, seed: params.get('seed') ? +params.get('seed') : 7 };
+      startRace(o);
+    } else openMenu();
+    requestAnimationFrame(frame);
+    installTestHooks();
+  }
+
+  function installTestHooks() {
+    if (!TEST) return;
+    window.__klTest = {
+      G, KL,
+      state: () => { const R = G.race, k = G.human; return { state: G.state, paused: G.paused, phase: R && R.phase, clock: R && R.clock, steps: G.steps, kart: k && { x: k.x, y: k.y, z: k.z, yaw: k.yaw, speed: k.speed, place: k.place, lap: k.lapIdx + 1, prog: k.prog, s: k.s, d: k.d, finished: k.finished, finishTime: k.finishTime, bestLap: k.bestLap, lapTimes: k.lapTimes, item: k.item && k.item.id, roll: !!k.roll, drift: k.drift.state, driftLevel: k.drift.level, boostT: k.boostT, spinT: k.spinT, surf: k.surf, grounded: k.grounded, wrongT: k.wrongT, rescued: k.rescued || 0, shieldT: k.shieldT }, weather: G.renderer && G.renderer.weatherName, quality: G.settings.quality, calls: G.renderer && G.renderer.renderer.info.render.calls, tris: G.renderer && G.renderer.renderer.info.render.triangles, results: !!G.resultsShown }; },
+      start: (o) => startRace(o), force: (f) => { G.forced = f; }, forceItem: (id, count) => { if (G.human) { G.human.item = { id, count: count || (KL.ITEMS[id].count || 1) }; G.human.roll = null; } },
+      teleport: (s, d) => { const k = G.human; KL.placeKart(k, G.track, s, d || 0); k.prog = Math.floor(k.prog / G.track.length) * G.track.length + k.s; G.renderer.snapKarts(); G.renderer.cam.snap = true; },
+      /* run the simulation without rendering (autopilot = the player gets the bot driver) */
+      sim: (seconds, autopilot) => { const R = G.race; if (autopilot && G.human) G.human.auto = true; const n = Math.round(seconds / C.STEP); for (let i = 0; i < n; i++) { applyPlayerInput(G.human); R.step(C.STEP); G.steps++; } handleEvents(R); return true; },
+      standings: () => KL.standings(G.race), races: () => G.race, weather: (w) => setWeather(w),
+      menu: () => openMenu(), pause: (p) => setPaused(p), results: () => showResults(), autopilot: (v) => { if (G.human) G.human.auto = !!v; },
+    };
+  }
+
+  window.addEventListener('error', (e) => console.error('[Kart] uncaught', e.message));
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
