@@ -214,11 +214,12 @@
     // vertical motion: stick to the surface, take off over crests, land
     const gy = p.y;
     if (k.grounded) {
-      const dy = gy - k.y;
-      const climb = dy / dt;
-      if (climb < -9 && k.speed > 9 && !k.noAir) { k.grounded = false; k.vy = Math.max(-2, k.lastClimb || 0); k.airT = 0; }
+      const climb = (gy - k.y) / dt;
+      const vyG = k.lastClimb || 0;
+      // leave the ground when the surface falls away faster than a ballistic path (crests, ramps)
+      if (gy < k.y + vyG * dt - 0.5 * C.GRAVITY * dt * dt - 0.1 && k.speed > 6 && !k.noAir) { k.grounded = false; k.vy = vyG; k.airT = 0; }
       else { k.y = gy; k.vy = 0; }
-      k.lastClimb = lerp(k.lastClimb || 0, climb, 0.5);
+      k.lastClimb = lerp(vyG, clamp(climb, -30, 30), 0.35);
     }
     if (!k.grounded) {
       k.airT += dt;

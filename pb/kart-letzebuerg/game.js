@@ -342,7 +342,8 @@
     }
     const alpha = G.paused ? 1 : G.acc / C.STEP;
     G.renderer.syncRace(R, alpha, G.paused ? 0 : dt);
-    G.renderer.updateCamera(viewOf(G.human, alpha), G.paused ? 0 : dt, { rear: G.rear });
+    if (G.camOverride) { const o = G.camOverride, cm = G.renderer.camera; cm.position.set(o.x, o.y, o.z); cm.lookAt(o.lx, o.ly, o.lz); if (o.fov && cm.fov !== o.fov) { cm.fov = o.fov; cm.updateProjectionMatrix(); } G.renderer.cam.x = o.x; G.renderer.cam.z = o.z; G.renderer.cam.y = o.y; }
+    else G.renderer.updateCamera(viewOf(G.human, alpha), G.paused ? 0 : dt, { rear: G.rear });
     updateHud(R, ts);
     if (!G.paused) G.audio.update(G.human, { racing: R.phase !== 'countdown', rain: G.renderer.W && G.renderer.W.rain, paused: false });
     if (R.karts.some((o) => o.roll && o.id === 'me') && G.audio.throttle('rollsfx', 90)) G.audio.sfx('roll');
@@ -425,7 +426,7 @@
       /* run the simulation without rendering (autopilot = the player gets the bot driver) */
       sim: (seconds, autopilot) => { const R = G.race; if (autopilot && G.human) G.human.auto = true; const n = Math.round(seconds / C.STEP); for (let i = 0; i < n; i++) { applyPlayerInput(G.human); R.step(C.STEP); G.steps++; } handleEvents(R); return true; },
       standings: () => KL.standings(G.race), races: () => G.race, weather: (w) => setWeather(w),
-      menu: () => openMenu(), pause: (p) => setPaused(p), results: () => showResults(), autopilot: (v) => { if (G.human) G.human.auto = !!v; },
+      camera: (o) => { G.camOverride = o; }, menu: () => openMenu(), pause: (p) => setPaused(p), results: () => showResults(), autopilot: (v) => { if (G.human) G.human.auto = !!v; },
     };
   }
 

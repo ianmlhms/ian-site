@@ -13,7 +13,7 @@
       vec3 col=mix(uHor,uZen,t);
       float sd=max(dot(normalize(vDir),normalize(uSun)),0.0);
       col+=uSunCol*(pow(sd,48.0)*0.9+pow(sd,6.0)*0.25)*(1.0-uNight*0.6);
-      col=mix(col,uHor,smoothstep(0.0,-0.25,vDir.y)); gl_FragColor=vec4(col,1.0);
+      col=mix(col,uHor,smoothstep(0.0,-0.25,vDir.y)); gl_FragColor=vec4(pow(col,vec3(0.4545)),1.0);
     }`;
 
   KL.Renderer = class Renderer {
@@ -29,7 +29,7 @@
       this.hemi = new T.HemisphereLight(0xffffff, 0x888888, 1); this.scene.add(this.hemi);
       this.sun = new T.DirectionalLight(0xffffff, 1.4); this.sun.position.set(-40, 80, 30); this.scene.add(this.sun);
       this.group = new T.Group(); this.scene.add(this.group);       // track scenery
-      this.mats = {}; this.kartMeshes = new Map(); this.itemMeshes = new Map(); this.nightAmount = 0;
+      this.mats = {}; this.kartMeshes = new Map(); this.itemMeshes = new Map(); this.nightAmount = 0; this.animators = [];
       this.weatherName = 'day'; this.time = 0; this.shake = 0;
       this.cam = { x: 0, y: 5, z: 0, yaw: 0, lx: 0, ly: 0, lz: 0, fov: 62, snap: true };
       this.makeSky();
@@ -97,6 +97,7 @@
     }
 
     clearTrack() {
+      this.animators = []; this.lampHeads = null; this.lampPools = null; this.glowPoints = [];
       while (this.group.children.length) { const o = this.group.children.pop(); o.traverse((c) => { if (c.geometry) c.geometry.dispose(); }); }
       for (const [, m] of this.kartMeshes) this.scene.remove(m.root);
       this.kartMeshes.clear();
@@ -138,24 +139,26 @@
     }
 
     buildGround(track, theme) {
-      const B = new KL.Batch(), terr = track.def.terrain || (() => 0);
+      const B = new KL.Batch(), terr = track.terrain || track.def.terrain || (() => 0);
       let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
       for (let i = 0; i < track.N; i++) { x0 = Math.min(x0, track.X[i]); x1 = Math.max(x1, track.X[i]); z0 = Math.min(z0, track.Z[i]); z1 = Math.max(z1, track.Z[i]); }
-      const margin = 260, cell = theme.groundCell || 16;
-      x0 = Math.floor((x0 - margin) / cell) * cell; z0 = Math.floor((z0 - margin) / cell) * cell; x1 += margin; z1 += margin;
-      const base = KL.col(theme.groundTint || '#ffffff'), nx = Math.ceil((x1 - x0) / cell), nz = Math.ceil((z1 - z0) / cell);
+      const fine = theme.groundCell || 16, coarse = fine * 4, inner = 150, outer = 640;
       const gy = theme.groundY != null ? theme.groundY : -0.15;
+      const base = KL.col(theme.groundTint || '#ffffff');
       const H = (x, z) => gy + terr(x, z);
-      for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
-        const xa = x0 + i * cell, za = z0 + j * cell, xb = xa + cell, zb = za + cell;
-        const col = (x, z) => theme.groundColorAt ? theme.groundColorAt(x, z, terr(x, z)) : base;
+      const col = (x, z) => (theme.groundColorAt ? theme.groundColorAt(x, z, terr(x, z)) : base);
+      const quad = (xa, za, xb, zb) => {
         const A = [xa, H(xa, za), za], Bq = [xb, H(xb, za), za], C = [xb, H(xb, zb), zb], D = [xa, H(xa, zb), zb];
-        // winding: counter-clockwise from above is A, D, C, B in (x,z) with z increasing "down"
         B.quadUV(A, D, C, Bq, col((xa + xb) / 2, (za + zb) / 2), [xa / 8, za / 8], [xa / 8, zb / 8], [xb / 8, zb / 8], [xb / 8, za / 8]);
-      }
+      };
+      const ix0 = Math.floor((x0 - inner) / coarse) * coarse, iz0 = Math.floor((z0 - inner) / coarse) * coarse, ix1 = Math.ceil((x1 + inner) / coarse) * coarse, iz1 = Math.ceil((z1 + inner) / coarse) * coarse;
+      for (let x = ix0; x < ix1; x += fine) for (let z = iz0; z < iz1; z += fine) quad(x, z, x + fine, z + fine);
+      const ox0 = ix0 - outer, oz0 = iz0 - outer, ox1 = ix1 + outer, oz1 = iz1 + outer;
+      for (let x = ox0; x < ox1; x += coarse) for (let z = oz0; z < oz1; z += coarse) { if (x >= ix0 && x + coarse <= ix1 && z >= iz0 && z + coarse <= iz1) continue; quad(x, z, x + coarse, z + coarse); }
       const m = B.toMesh(this.mats.ground); m.matrixAutoUpdate = false; this.group.add(m);
-      // endless plane beyond the grid
-      const far = new T.Mesh(new T.PlaneGeometry(8000, 8000), new T.MeshBasicMaterial({ color: 0xffffff, vertexColors: false })); far.rotation.x = -Math.PI / 2; far.position.set((x0 + x1) / 2, gy - 0.3 + (theme.farDrop || 0), (z0 + z1) / 2);
+      // endless plane far beyond the grid (below the lowest terrain so valleys stay visible)
+      const lowest = theme.farDrop != null ? theme.farDrop : 0;
+      const far = new T.Mesh(new T.PlaneGeometry(9000, 9000), new T.MeshBasicMaterial({ color: 0xffffff })); far.rotation.x = -Math.PI / 2; far.position.set((x0 + x1) / 2, gy - 0.3 + lowest, (z0 + z1) / 2);
       this.farPlane = far; this.farPlane.material.color.set(theme.farColor || '#9a9690'); this.group.add(far);
     }
 
@@ -221,8 +224,9 @@
       const tint = th.weatherTint && th.weatherTint[name];
       _c.set(tint && tint.fog || W.fog); this.fog.color.copy(_c); this.renderer.setClearColor(_c);
       this.fog.near = W.fogNear * (th.fogScale || 1); this.fog.far = Math.min(W.fogFar, this.q.far) * (th.fogScale || 1);
-      this.hemi.color.set(W.hemi[0]); this.hemi.groundColor.set(W.hemi[1]); this.hemi.intensity = W.hemi[2] * 1.25;
-      this.sun.color.set(W.sun[0]); this.sun.intensity = W.sun[1] * 1.6; this.sunDir = new T.Vector3(...W.sun[2]).normalize();
+      const hm = tint && tint.hemi ? tint.hemi : W.hemi;
+      this.hemi.color.set(hm[0]); this.hemi.groundColor.set(hm[1]); this.hemi.intensity = hm[2] * 2.0 * (th.ambient || 1);
+      this.sun.color.set(W.sun[0]); this.sun.intensity = W.sun[1] * 1.7 * (th.sunBoost || 1); this.sunDir = new T.Vector3(...W.sun[2]).normalize();
       this.skyMat.uniforms.uZen.value.set(tint && tint.sky ? tint.sky[0] : W.sky[0]); this.skyMat.uniforms.uHor.value.set(tint && tint.sky ? tint.sky[1] : W.sky[1]);
       this.skyMat.uniforms.uSun.value.copy(this.sunDir); this.skyMat.uniforms.uSunCol.value.set(W.sun[0]); this.skyMat.uniforms.uNight.value = night;
       this.starMat.opacity = clamp((night - 0.5) * 2, 0, 1); this.moon.material.opacity = clamp((night - 0.6) * 2.2, 0, 0.9);
@@ -238,6 +242,7 @@
       }
       if (th.onWeather) th.onWeather(this, name, W);
       this.rain.visible = !!W.rain;
+      for (const g of this.glowPoints || []) g.material.opacity = clamp((night + (name === 'fog' ? 0.5 : 0)) * 0.9, 0.15, 1);
       this.rainMat.opacity = 0.35 + (name === 'night' ? 0.1 : 0);
       if (this.sunDir) this.sun.position.copy(this.sunDir).multiplyScalar(120);
       this.moon.position.set(-this.sunDir.x * 300 * 0 + 120, 240, -250);
@@ -440,7 +445,8 @@
       this.fx.add.update(dt, sc); this.fx.norm.update(dt, sc);
       const cp = this.camera.position;
       this.sky.position.copy(cp); this.stars.position.copy(cp); this.clouds.position.set(cp.x, 0, cp.z); this.moon.position.set(cp.x + 120, 240, cp.z - 250);
-      this.cam.x; this.updateRain(dt);
+      for (const a of this.animators) a(dt, this.time);
+      this.updateRain(dt);
       this.renderer.render(this.scene, this.camera);
     }
   };

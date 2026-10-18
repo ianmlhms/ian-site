@@ -251,7 +251,9 @@
       const p = track.at(s, side * hw * 0.38);
       return { x: p.x, y: p.y, z: p.z, yaw: p.h, s };
     };
+    track.sOf = (x, z) => track.project(x, z, -1, null, {}).s;
     analyze(track);
+    if (def.makeTerrain) track.terrain = def.makeTerrain(track);
     return track;
   };
 

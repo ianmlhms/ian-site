@@ -32,7 +32,7 @@
         const a = f(i), b = f(i2), v0 = (i * track.step) / 8, v1 = ((i + 1) * track.step) / 8;
         const hw0 = track.HW[i], hw1 = track.HW[i2];
         const uv = kind === 'cobble' ? [[-hw0 / 4, v0 * 2], [hw0 / 4, v0 * 2], [hw1 / 4, v1 * 2], [-hw1 / 4, v1 * 2]] : [[0, v0], [1, v0], [1, v1], [0, v1]];
-        const shade = kind === 'cobble' ? [1, 1, 1] : [1, 1, 1];
+        const shade = theme.roadColor ? KL.col(theme.roadColor) : [1, 1, 1];
         B.quadUV(a[0], a[1], b[1], b[0], shade, uv[0], uv[1], uv[2], uv[3]);
       }
       return { asphalt, cobble };
@@ -133,7 +133,7 @@
       let s = rnd() * 6;
       while (s < L) {
         const ci = Math.floor(s / track.step) % N;
-        const cell = frontStr ? frontStr[Math.floor(s / 8) % frontStr.length] : '1';
+        const cell = frontStr ? frontStr[Math.floor(s / 8) % frontStr.length] : 'a';
         const kAbs = Math.abs(track.K[ci]);
         const bays = Math.max(2, Math.round((kAbs > 0.03 ? 2.2 : 3.4) + rnd() * 2.2));
         const w = bays * BAY, depth = theme.depth ? theme.depth[0] + rnd() * (theme.depth[1] - theme.depth[0]) : 11 + rnd() * 7;
@@ -148,10 +148,12 @@
         for (let j = 0; j < N; j += 1) {
           const dx = sx[j] - cx, dz = sz[j] - cz, dd = dx * dx + dz * dz;
           const need = track.HW[j] + Math.max(track.WL[j], track.WR[j]) + Math.hypot(w, depth) / 2 - 0.5;
-          if (dd < need * need && Math.abs(((j - ci + N * 1.5) % N) - N / 2) < N / 2 - 12) { clash = true; break; }
+          if (dd < need * need) { const dj = Math.abs(j - ci), cd = Math.min(dj, N - dj); if (cd > 30) { clash = true; break; } }
         }
+        if (!clash && track.def.noBuild) for (const nb of track.def.noBuild) if (Math.hypot(cx - nb[0], cz - nb[1]) < nb[2] + Math.hypot(w, depth) / 2 * 0.8) { clash = true; break; }
         if (clash) { s += 6; continue; }
-        const floors = (theme.floors ? theme.floors[0] + Math.floor(rnd() * (theme.floors[1] - theme.floors[0] + 1)) : 3 + Math.floor(rnd() * 4));
+        let floors = (theme.floors ? theme.floors[0] + Math.floor(rnd() * (theme.floors[1] - theme.floors[0] + 1)) : 3 + Math.floor(rnd() * 4));
+        if (cell >= '1' && cell <= '9') floors = clamp(+cell + (rnd() < 0.3 ? 1 : 0), 2, 8);
         const hgt = floors * FLOOR;
         const base = pal[Math.floor(rnd() * pal.length)], tint = KL.shade(base, 0.92 + rnd() * 0.14);
         const yaw = Math.atan2(p.tx, p.tz) + 0;
