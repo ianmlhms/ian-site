@@ -102,7 +102,15 @@
         // wall from the base up to the slab, minus the opening
         let bot0 = yb0, bot1 = yb1;
         if (op) { const f0 = Math.max(yb0, floor), f1 = Math.max(yb1, floor); const t0 = topOf(op, Math.max(ua, op.ua)), t1 = topOf(op, Math.min(ub, op.ub)); if (floor > yb0 || floor > yb1) Q(P(ua, v, yb0), P(ub, v, yb1), P(ub, v, f1), P(ua, v, f0), wallC, h); bot0 = Math.max(t0, f0); bot1 = Math.max(t1, f1); }
-        if (slabY - bot0 > 0.05 || slabY - bot1 > 0.05) Q(P(ua, v, bot0), P(ub, v, bot1), P(ub, v, slabY), P(ua, v, slabY), wallC, h);
+        if (slabY - bot0 > 0.05 || slabY - bot1 > 0.05) {
+          if (Math.abs(bot0 - bot1) < 1e-6) {                       // flat bottom (abutments): dressed-stone courses, 2.4 m high, alternating tone
+            const k0 = Math.floor((bot0 - ground) / 2.4);
+            for (let y = ground + k0 * 2.4, kk = k0; y < slabY - 0.01; y += 2.4, kk++) {
+              const ya = Math.max(y, bot0), yb = Math.min(y + 2.4, slabY);
+              if (yb - ya > 0.01) Q(P(ua, v, ya), P(ub, v, ya), P(ub, v, yb), P(ua, v, yb), shade(wallC, kk % 2 ? 1.04 : 0.95), h);
+            }
+          } else Q(P(ua, v, bot0), P(ub, v, bot1), P(ub, v, slabY), P(ua, v, slabY), wallC, h);
+        }
       }
       // cornice (projecting band), balustrade, posts and lamps
       prism(0, len, sd > 0 ? W / 2 - 0.6 : -W / 2 - 0.5, sd > 0 ? W / 2 + 0.5 : -W / 2 + 0.6, slabY, deckY - 0.2, pale);

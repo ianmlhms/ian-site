@@ -114,6 +114,11 @@
       return true;
     }
     send(msg, reliable) {
+      if (reliable !== false && msg && msg.k === 'e' && Array.isArray(msg.e)) {          // event batches are coalesced too (<= RELAY_HZ per second)
+        this.evq = (this.evq || []).concat(msg.e);
+        if (!this.evTimer) this.evTimer = setTimeout(() => { this.evTimer = 0; const e = this.evq; this.evq = []; if (e.length) this._out({ k: 'e', e }); }, 1000 / N.RELAY_HZ);
+        return true;
+      }
       if (reliable !== false) return this._out(msg);
       const now = performance.now();
       if (now - this.lastState < 1000 / N.RELAY_HZ) { NetStats.relayDropped++; return false; }   // state packets are replaceable: drop, never queue

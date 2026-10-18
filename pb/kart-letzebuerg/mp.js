@@ -163,7 +163,7 @@
       case 'w': if (M.role === 'client' && from === M.hostId) onSnapshot(m, now); return;
       case 'e': if (M.role === 'client' && from === M.hostId && Array.isArray(m.e)) { M.lastHostMsg = now; for (const e of m.e.slice(0, 64)) applyEvent(e); M.stats.evIn += m.e.length; } return;
       case 'use': if (M.role === 'host') onUseMsg(from, m); return;
-      case 'away': if (M.role === 'host') { const k = M.R.byId[from]; if (k) setAway(k, true); } return;
+      case 'away': if (M.role === 'host') { const k = M.R.byId[from]; if (k && k.human) setAway(k, true, true); } return;
       case 'back': if (M.role === 'host') { const k = M.R.byId[from]; if (k && k.away) { M.lastRecv.set(from, now); setAway(k, false); } } return;
       case 'resume': if (M.role === 'client' && from === M.hostId) onResume(m); return;
       case 'results': if (from === M.hostId || from === M.migratedFrom) onResults(m); return;
@@ -195,7 +195,11 @@
     const k = R.karts[a[0] | 0];
     if (!k || k.id !== from || !k.human) return;                      // a peer may only speak for its own kart
     M.lastRecv.set(from, now);
-    if (k.away) { if (now - (k.awayAt || 0) > 300) setAway(k, false); return; }   // bot-driven until it is back (a state packet counts as "back")
+    if (k.away) {                                                    // bot-driven until it is back
+      if (!k.awayExplicit && now - (k.awayAt || 0) > 300) setAway(k, false);        // went silent: a state packet counts as "back"
+      else if (k.awayExplicit && now - (k.awayAt || 0) > 8000) setAway(k, false);    // said "away" but never "back" while still sending: believe the packets
+      return;
+    }
     if ((k.resumeUntil || 0) > now) return;                          // its state is being reset by our 'resume'
     const base = updateBase(from, now, num(m.ts, now));
     ingest(k, a, num(m.ts, now) + base, now);
@@ -312,10 +316,10 @@
     const R = M.R; const i = R.humans.indexOf(k); if (i >= 0) R.humans.splice(i, 1);
     k.input.gas = 0; k.input.steer = 0; k.input.drift = false; k.input.brake = 0;
   }
-  function setAway(k, on) {
+  function setAway(k, on, explicit) {
     const R = M.R;
     if (on === !!k.away) return;
-    k.away = on; k.awayAt = performance.now(); k.resumeUntil = on ? 0 : performance.now() + 500;
+    k.away = on; k.awayExplicit = !!explicit && on; k.awayAt = performance.now(); k.resumeUntil = on ? 0 : performance.now() + 500;
     if (on) {
       M.stats.away++;
       k.remote = false; k.isBot = true; k.hint = -1; k.ai = null; k.botSkill = 1; k.rubber = 1; k.view = null; k.buf.length = 0;

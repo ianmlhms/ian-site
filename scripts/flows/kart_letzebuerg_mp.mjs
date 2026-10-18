@@ -366,7 +366,7 @@ export const flow = {
         await waitFor(R2, () => document.querySelectorAll('#lbList li').length === 2 && document.querySelectorAll('#lbList li .slow').length === 1, null, 20000);
         await R2.page.click('#lbReady');
         await waitFor(R1, () => document.querySelectorAll('#lbList li .st.ok').length === 1, null, 15000);
-        await readyAndStart(R1, [R2].slice(0, 0), 1);
+        await setLaps(R1, 1); await R1.page.click('#lbStart');
         await waitRace([R1, R2]);
         const mr = await mp(R1), mr2 = await mp(R2);
         h.eq(mr.links.map((l) => l.kind), ['relay'], 'host talks to the blocked peer through the relay');
@@ -374,12 +374,13 @@ export const flow = {
         h.expect(mr.lobby.signalling && mr2.lobby.signalling, 'signalling channel stays open only because of the relay (justified)');
         h.expect(await R1.page.locator('#netBadge').isVisible() && await R2.page.locator('#netBadge').isVisible(), 'the "slow connection" badge is visible in the HUD');
         await kl(R1, () => __klTest.autopilot(true)); await kl(R2, () => __klTest.autopilot(true));
-        const f1 = hub.stats.framesIn + hub.stats.framesOut;
+        const f1 = hub.stats.framesIn + hub.stats.framesOut, e1 = JSON.stringify(hub.stats.perContext);
         await sleep(15000);
         const f2 = hub.stats.framesIn + hub.stats.framesOut;
         const rate = (f2 - f1) / 15;
+        console.log('    per context before/after: ' + e1 + ' -> ' + JSON.stringify(hub.stats.perContext));
         console.log('    relay traffic while racing: ' + (f2 - f1) + ' Realtime frames in 15 s (' + rate.toFixed(1) + '/s, both directions)');
-        h.expect(rate <= 26, 'relay stays at or below ~5 Hz per direction plus events (' + rate.toFixed(1) + ' Realtime frames/s = each message is one frame in and one out)');
+        h.expect(rate <= 26, 'relay stays around 5 Hz per direction state + batched events (' + rate.toFixed(1) + ' Realtime frames/s = each message is one frame in and one out)');
         const mrr = await mp(R1);
         h.expect(mrr.net.relayMsgs > 0 && mrr.net.relayMsgs < 900, 'relayed message counter is below the per-race cap (' + mrr.net.relayMsgs + ' < 900)');
         REPORT.relay = { framesPerSecond: rate, relayMsgsHostSide: mrr.net.relayMsgs };
@@ -390,7 +391,7 @@ export const flow = {
         const N2 = await newPlayer(h, hub, 'n2', { noRelay: true, init: () => { RTCPeerConnection.prototype.setRemoteDescription = () => new Promise(() => {}); } }); all.push(N2);
         await goOnline(N1, 'Direct'); await N1.page.click('#olCreate');
         await N1.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
-        await lobbyJoin(N1, N2, (await N1.page.textContent('#lbCode')).trim(), 'Blocked');
+        await goOnline(N2, 'Blocked'); await N2.page.fill('#olCode', (await N1.page.textContent('#lbCode')).trim()); await N2.page.click('#olJoin');
         await N2.page.waitForSelector('#onlineScreen:not([hidden]) #olMsg:not([hidden])', { timeout: 40000 });
         h.expect(/Verbindung|connection|Firewall|firewall/i.test(await N2.page.textContent('#olMsg')), 'blocked peer sees: ' + (await N2.page.textContent('#olMsg')));
         await waitFor(N1, () => document.querySelectorAll('#lbList li').length === 1, null, 10000);

@@ -69,7 +69,7 @@ export function createHub() {
           stats.joins++;
           const cfg = payload?.config || {};
           const mem = topics.get(topic) || new Map(); topics.set(topic, mem);
-          mem.set(conn, { joinRef, key: cfg.presence?.key || ('k' + (++refSeq)), meta: null, ref: 'r' + (++refSeq) });
+          mem.set(conn, { joinRef, key: cfg.presence?.key || ('k' + (++refSeq)), meta: null, ref: 'r' + (++refSeq), ack: !!cfg.broadcast?.ack });
           reply({ postgres_changes: [] });
           out(conn, joinRef, null, topic, 'presence_state', presenceOf(topic, conn));
         } else if (event === 'presence') {
@@ -90,7 +90,7 @@ export function createHub() {
             if (c === conn) continue;
             out(c, m.joinRef, null, topic, 'broadcast', { type: 'broadcast', event: text?.event, payload: text?.payload });
           }
-          reply();
+          if (members(topic).get(conn)?.ack) reply();        // like the real server: broadcasts are only acknowledged when asked for
         } else if (event === 'phx_leave') {
           leaveTopic(conn, topic); reply();
         } else reply();

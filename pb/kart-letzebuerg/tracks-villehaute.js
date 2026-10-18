@@ -124,7 +124,8 @@
         for (const sx of [-1, 1]) {
           L.box(B, f, sx * 11.5, 0, 0.5, 8.6, 33, 8.6, 0, wall);
           L.box(B, f, sx * 11.5, 33, 0.5, 9.2, 1, 9.2, 0, shade(wall, 0.9));
-          L.pyramid(B, f, sx * 11.5, 34, 0.5, 7.4, 34, col('#2d3039'));       // the twin west spires are dark slate, tall and slender
+          L.pyramid(B, f, sx * 11.5, 34, 0.5, 6.4, 41, col('#262931'));       // the twin west spires are dark slate/black, slim and sharp
+          L.pyramid(B, f, sx * 11.5, 74, 0.5, 1.2, 5, col('#1c1e24'));
           L.windows(B, f, sx * 11.5 - 1.4, sx * 11.5 + 1.4, -3.9, -1, 2, 24, 1.1, 5.5, win);
         }
         L.windows(B, f, -5, 5, -2.5, -1, 3, 8, 1.3, 6.5, win);

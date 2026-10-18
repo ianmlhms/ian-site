@@ -136,7 +136,8 @@
       floors = clamp(floors, 1, 9);
       const hgt = floors * FLOOR + (floors > 4 ? 0 : 0.4);
       let ymin = 0; for (const q of p) ymin = Math.min(ymin, terrain(q[0], q[1]));
-      const y0 = ymin - 0.3;
+      if (ymin < -9) { dropped++; continue; }            // a footprint that hangs over the Pétrusse rim would need a 40 m tall grey stilt: drop it
+      const y0 = Math.max(ymin - 0.3, -8);               // retaining wall of at most 8 m
       const C = getChunk(cx, cz);
       const base = pal[Math.floor(rnd() * pal.length)], tint = KL.shade(base, 0.93 + rnd() * 0.12);
       const uOff = Math.floor(rnd() * 4) / 4, rowSeed = Math.floor(rnd() * 7);
