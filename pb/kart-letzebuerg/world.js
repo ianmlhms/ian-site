@@ -398,7 +398,7 @@
       if (k.boostT > 0) {
         const kind = k.boostKind;
         const col = kind === 3 ? [1, 0.35, 0.95] : kind === 2 ? [1, 0.55, 0.15] : [0.35, 0.75, 1];
-        for (const sd of [-0.3, 0.3]) this.fx.add.spawn(x - fx * 1.7 + rx * sd, y + 0.6, z - fz * 1.7 + rz * sd, -fx * 7 + (Math.random() - 0.5), 0.2, -fz * 7 + (Math.random() - 0.5), 0.26, 0.36, 0.05, col[0] * 0.8, col[1] * 0.8, col[2] * 0.8, 0.5, 1, 0);
+        for (const sd of [-0.3, 0.3]) this.fx.add.spawn(x - fx * 1.7 + rx * sd, y + 0.6, z - fz * 1.7 + rz * sd, -fx * 7 + (Math.random() - 0.5), 0.2, -fz * 7 + (Math.random() - 0.5), 0.34, 0.6, 0.08, col[0] * 0.7, col[1] * 0.7, col[2] * 0.7, 0.6, 1, 0);
       }
       // dust / grass when off the road, rain spray
       if (k.surf === 1 && sp > 6 && k.grounded) this.fx.norm.spawn(x - fx * 1.3 + (Math.random() - 0.5) * 1.5, y + 0.2, z - fz * 1.3 + (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 3, 1.4, (Math.random() - 0.5) * 3, 0.6, 0.9, 2.2, 0.55, 0.5, 0.4, 0.35, 2, 0);
@@ -438,10 +438,15 @@
       const tx = k.x - Math.sin(c.yaw) * dist, tz = k.z - Math.cos(c.yaw) * dist, ty = k.y + hgt;
       const f = c.snap ? 1 : 1 - Math.exp(-14 * dt);
       c.x = lerp(c.x, tx, f); c.z = lerp(c.z, tz, f); c.y = lerp(c.y, ty, c.snap ? 1 : 1 - Math.exp(-9 * dt));
+      // keep the camera on the street side of the walls (no flying through the facade on tight corners)
+      if (this.track && this.theme.cameraClamp !== false) {
+        const p = this.track.project(c.x, c.z, k.hint, k.y, this._cp || (this._cp = {})), lim = p.hw + (p.d >= 0 ? p.wr : p.wl) - 0.3;
+        if (Math.abs(p.d) > lim) { const sg = Math.sign(p.d), over = Math.abs(p.d) - lim; c.x -= -p.tz * sg * over; c.z -= p.tx * sg * over; }
+      }
       const lookAhead = 5.5;
       const lx = k.x + Math.sin(c.yaw) * lookAhead, lz = k.z + Math.cos(c.yaw) * lookAhead, ly = k.y + 1.5;
       c.lx = lerp(c.lx, lx, f); c.ly = lerp(c.ly, ly, f); c.lz = lerp(c.lz, lz, f);
-      const fovT = 60 + clamp(sp / 41, 0, 1.2) * 14 + (k.boostT > 0 ? 9 : 0);
+      const asp = this.camera.aspect || 1.5, fovT = (60 + clamp(sp / 41, 0, 1.2) * 14 + (k.boostT > 0 ? 9 : 0)) * (1 + clamp(1.3 - asp, 0, 0.8) * 0.5);   // portrait screens get a wider lens
       c.fov = damp(c.fov, fovT, 4, dt);
       c.snap = false;
       this.shake = Math.max(0, this.shake - dt * 1.8);

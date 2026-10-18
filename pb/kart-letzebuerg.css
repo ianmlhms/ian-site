@@ -41,6 +41,8 @@ select{font:inherit;color:var(--ink);background:#1a2545;border:1px solid var(--l
 /* ---------- touch controls ---------- */
 #touch{position:absolute;left:0;right:0;bottom:0;height:var(--touch-h,0px);display:none}
 html.kl-touch #touch{display:block}
+html.kl-touch #keyHint{display:none}
+html.kl-touch #speedBox{bottom:auto;top:calc(max(10px,env(safe-area-inset-top)) + 62px)}
 html.arcade-hardware-keyboard #touch{display:none!important}
 #steerPad{position:absolute;left:0;top:0;bottom:0;width:52%;touch-action:none}
 #steerBase{position:absolute;width:150px;height:60px;margin:-30px 0 0 -75px;border-radius:30px;border:2px solid #fff6;background:#0a122b55;display:none}#steerBase.on{display:block}

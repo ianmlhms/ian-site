@@ -31,7 +31,7 @@
     if (pad) {
       pad.addEventListener('pointerdown', (e) => {
         if (padId !== null) return;
-        padId = e.pointerId; pad.setPointerCapture(e.pointerId); const r = pad.getBoundingClientRect(); ox = e.clientX; oy = e.clientY;
+        padId = e.pointerId; try { pad.setPointerCapture(e.pointerId); } catch (err) { /* synthetic or already-released pointer */ } const r = pad.getBoundingClientRect(); ox = e.clientX; oy = e.clientY;
         if (base) { base.style.left = ox - r.left + 'px'; base.style.top = oy - r.top + 'px'; base.classList.add('on'); }
         if (knob) { knob.style.transform = 'translate(0,0)'; }
         touch.steer = 0; e.preventDefault();
@@ -49,7 +49,7 @@
     root.querySelectorAll('[data-input]').forEach((b) => {
       const name = b.dataset.input; const ids = new Set();
       const set = (v) => { if (name === 'item') { if (v) emit('itemkey'); touch.item = v; } else touch[name] = v; b.classList.toggle('held', v); };
-      b.addEventListener('pointerdown', (e) => { ids.add(e.pointerId); b.setPointerCapture(e.pointerId); set(true); e.preventDefault(); });
+      b.addEventListener('pointerdown', (e) => { ids.add(e.pointerId); try { b.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } set(true); e.preventDefault(); });
       const up = (e) => { ids.delete(e.pointerId); if (!ids.size) set(false); };
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
     });
