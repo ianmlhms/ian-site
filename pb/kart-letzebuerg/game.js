@@ -430,6 +430,7 @@
     if (G.camOverride) { const o = G.camOverride, cm = G.renderer.camera; cm.position.set(o.x, o.y, o.z); cm.lookAt(o.lx, o.ly, o.lz); if (o.fov && cm.fov !== o.fov) { cm.fov = o.fov; cm.updateProjectionMatrix(); } G.renderer.cam.x = o.x; G.renderer.cam.z = o.z; G.renderer.cam.y = o.y; }
     else G.renderer.updateCamera(viewOf(G.human, alpha), G.paused ? 0 : dt, { rear: G.rear });
     updateHud(R, ts);
+    if (G.mp) { const slow = [...KL.Lobby.links.values()].some((l) => l.kind === 'relay'); if (G.hud.slow !== slow) { G.hud.slow = slow; $('netBadge').hidden = !slow; $('netBadge').textContent = '🐢 ' + KL.t('pSlow'); } }
     if (!G.paused) G.audio.update(G.human, { racing: R.phase !== 'countdown', rain: G.renderer.W && G.renderer.W.rain, paused: false });
     if (G.human.roll && G.audio.throttle('rollsfx', 90)) G.audio.sfx('roll');
     G.renderer.render(G.paused ? 0 : dt);

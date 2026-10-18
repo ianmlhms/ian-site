@@ -1,4 +1,4 @@
-/* Kart Lëtzebuerg (phase 1, solo): menu, language, both tracks, touch HUD, a full race with results, restart, test hook gating.
+/* Kart Lëtzebuerg (solo; online play has its own flow, kart_letzebuerg_mp.mjs): menu, language, both tracks, touch HUD, a full race with results, restart, test hook gating.
  * The game is not in the arcade yet (tile comes in phase 3), so the standalone page is loaded directly. No scores are written. */
 import { runIfMain } from './lib.mjs';
 
@@ -22,7 +22,12 @@ export const flow = {
     h.expect((await h.page.locator('#weatherChips > *').count()) >= 5, 'weather chips (random + presets)');
     h.eq(await h.page.locator('#diffChips > *').count(), 3, 'three difficulties');
     h.eq(await h.page.locator('#driverChips > *').count(), 8, 'eight drivers');
-    h.expect(await h.page.locator('#modeGp').isDisabled() && await h.page.locator('#modeOnline').isDisabled(), 'GP / online disabled until later phases');
+    h.expect(await h.page.locator('#modeGp').isDisabled() && !(await h.page.locator('#modeOnline').isDisabled()), 'GP stays disabled until phase 3, online is enabled');
+    await h.page.locator('#modeOnline').tap();
+    h.expect(await h.page.locator('#onlineScreen').isVisible() && await h.page.locator('#olCreate').isVisible() && await h.page.locator('#olQuick').isVisible() && await h.page.locator('#olJoin').isVisible(), 'online entry screen offers create / quick match / join by code');
+    await h.shot('online-entry');
+    await h.page.locator('#olBack').tap();
+    await h.page.waitForSelector('#menu:not([hidden])');
     await h.shot('menu');
 
     h.step('language switch lb -> de -> en');

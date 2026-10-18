@@ -49,46 +49,93 @@
     L.cyl(B, f, lx, 0.5 + h, lz, 0.6, 0.35, 1.7, 7, metal); L.sphere(B, f, lx, 0.5 + h + 2.05, lz, 0.36, 7, metal);
   };
 
-  /* arch bridge. axis from a=[x,z] to b=[x,z]; deck at y = deckY; main arch spans [uA,uB] and springs at springY. */
+  /* Stone arch bridge in the style of the Pont Adolphe: ONE huge elliptical main arch of dressed sandstone (voussoir bands), solid
+   * abutments, and above them a continuous arcade of small round arches under a cornice, balustrade and lamp posts.
+   * axis from a=[x,z] to b=[x,z]; deck top at deckY; main arch spans [archA, archB] (distance along the axis), springs at springY, rises `rise`. */
   L.archBridge = (B, a, b, o) => {
     const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz), tx = dx / len, tz = dz / len, nx = -tz, nz = tx;
-    const W = o.width || 18, deckY = o.deckY || 0, stone = col(o.color || '#d6c4a1'), dark = shade(stone, 0.78), light = shade(stone, 1.12);
+    const W = o.width || 18, deckY = o.deckY || 0, stone = col(o.color || '#cdb27c'), dark = shade(stone, 0.7), light = shade(stone, 1.1), pale = shade(stone, 1.18);
     const P = (u, v, y) => [a[0] + tx * u + nx * v, y, a[1] + tz * u + nz * v];
-    const strip = (u0, u1, v0, v1, y0, y1, c) => { // box-ish prism between two (u,v) rects (axis-aligned in bridge frame)
-      const cx = a[0] + tx * (u0 + u1) / 2 + nx * (v0 + v1) / 2, cz = a[1] + tz * (u0 + u1) / 2 + nz * (v0 + v1) / 2;
-      B.box(cx, y0, cz, Math.abs(v1 - v0), y1 - y0, Math.abs(u1 - u0), Math.atan2(tx, tz), c);   // local x across (n), local z along (t)
+    /* quad with a guaranteed outward orientation: `h` is a vector the front side must face */
+    const Q = (p0, p1, p2, p3, c, h) => {
+      const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2], vx = p3[0] - p0[0], vy = p3[1] - p0[1], vz = p3[2] - p0[2];
+      const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+      if (cx * h[0] + cy * h[1] + cz * h[2] >= 0) B.quad(p0, p1, p2, p3, c); else B.quad(p0, p3, p2, p1, c);
     };
-    // deck slab + parapets
-    strip(0, len, -W / 2, W / 2, deckY - 1.7, deckY, shade(stone, 0.95));
-    for (const sd of [-1, 1]) { strip(0, len, sd * (W / 2 - 0.5), sd * (W / 2 + 0.1), deckY, deckY + 1.1, light); for (let u = 0; u <= len; u += 6) strip(u - 0.3, u + 0.3, sd * (W / 2 - 0.6), sd * (W / 2 + 0.25), deckY, deckY + 1.5, light); }
-    // main arch (soffit ribbon) with open spandrels
-    const u0 = o.archA, u1 = o.archB, uc = (u0 + u1) / 2, half = (u1 - u0) / 2, spring = o.springY, rise = o.rise;
-    const Y = (u, t) => spring + rise * (1 - Math.pow((u - uc) / half, 2)) + t;        // t: thickness offset
-    const steps = 26;
-    for (const sd of [-1, 1]) {      // two ribs
-      const vA = sd * (W / 2 - 0.2), vB = sd * (W / 2 - 4.2);
-      for (let i = 0; i < steps; i++) {
-        const ua = u0 + (2 * half * i) / steps, ub = u0 + (2 * half * (i + 1)) / steps;
-        const lo0 = P(ua, vA, Y(ua, 0)), lo1 = P(ub, vA, Y(ub, 0)), hi0 = P(ua, vA, Y(ua, 3.4)), hi1 = P(ub, vA, Y(ub, 3.4));
-        const lo0b = P(ua, vB, Y(ua, 0)), lo1b = P(ub, vB, Y(ub, 0)), hi0b = P(ua, vB, Y(ua, 3.4)), hi1b = P(ub, vB, Y(ub, 3.4));
-        const sdc = sd > 0 ? 1 : -1;
-        if (sdc > 0) { B.quad(lo0, lo1, hi1, hi0, light); B.quad(hi0, hi1, hi1b, hi0b, stone); B.quad(lo0b, lo1b, lo1, lo0, dark); }
-        else { B.quad(lo1, lo0, hi0, hi1, light); B.quad(hi0b, hi1b, hi1, hi0, stone); B.quad(lo0, lo1, lo1b, lo0b, dark); }
+    const prism = (u0, u1, v0, v1, y0, y1, c) => {                       // axis-aligned box in the bridge frame
+      const cx = a[0] + tx * (u0 + u1) / 2 + nx * (v0 + v1) / 2, cz = a[1] + tz * (u0 + u1) / 2 + nz * (v0 + v1) / 2;
+      B.box(cx, y0, cz, Math.abs(v1 - v0), y1 - y0, Math.abs(u1 - u0), Math.atan2(tx, tz), c);
+    };
+    const u0 = o.archA, u1 = o.archB, uc = (u0 + u1) / 2, half = (u1 - u0) / 2, spring = o.springY, rise = o.rise, ground = o.groundY != null ? o.groundY : -45;
+    const slabY = deckY - 1.8;                                          // underside of the deck slab / cornice
+    const inArch = (u) => u > u0 && u < u1;
+    const tN = (u) => clamp2((u - uc) / half, -1, 1);
+    const yIn = (u) => spring + rise * Math.sqrt(Math.max(0, 1 - tN(u) * tN(u)));         // intrados (underside of the arch)
+    const yEx = (u) => yIn(u) + 2.4 + 2.2 * Math.pow(Math.abs(tN(u)), 3);                 // extrados: ring thickens towards the springs
+    function clamp2(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+    const yBot = (u) => (inArch(u) ? yEx(u) : ground);                  // what the spandrel wall stands on
+
+    // ---- the small arches of the arcade (period ~7.7 m, pier 2.3 m): floor, spring height and crown ----
+    const nOp = Math.max(6, Math.round(len / 7.7)), per = len / nOp, pier = 2.3, r = (per - pier) / 2, floor = deckY - 10.2, springOp = slabY - 0.9 - r, crown = springOp + r;
+    const ops = [];
+    for (let i = 0; i < nOp; i++) {
+      const ua = i * per + pier / 2, ub = (i + 1) * per - pier / 2;
+      // keep an opening only where it clears the main arch below it by at least 2.6 m
+      const lowA = Math.max(floor, yBot(ua)), lowB = Math.max(floor, yBot(ub)), low = Math.max(lowA, lowB, yBot((ua + ub) / 2));
+      if (crown - low >= 2.6) ops.push({ ua, ub, uc: (ua + ub) / 2, low, lowA, lowB });
+    }
+    const opAt = (u) => { for (const op of ops) if (u >= op.ua && u <= op.ub) return op; return null; };
+    const topOf = (op, u) => { const q = (u - op.uc) / r; return springOp + r * Math.sqrt(Math.max(0, 1 - q * q)); };
+
+    // ---- side faces (both sides): ring of the main arch + spandrel wall with the arcade openings, cut into 1-m slices ----
+    const step = 1.0, nS = Math.ceil(len / step);
+    for (const sd of [-1, 1]) {
+      const v = sd * W / 2, h = [nx * sd, 0, nz * sd];
+      for (let i = 0; i < nS; i++) {
+        const ua = i * len / nS, ub = (i + 1) * len / nS, um = (ua + ub) / 2;
+        const band = (i % 2 ? 1 : 0.94);
+        const ring = shade(stone, band * 1.04), wallC = shade(stone, band * 0.98 + 0.01 * ((i * 7) % 5));
+        const yb0 = yBot(ua), yb1 = yBot(ub);
+        const op = opAt(um);
+        // main-arch ring (voussoirs) between intrados and extrados
+        if (inArch(um)) Q(P(ua, v, yIn(ua)), P(ub, v, yIn(ub)), P(ub, v, yEx(ub)), P(ua, v, yEx(ua)), ring, h);
+        // wall from the base up to the slab, minus the opening
+        let bot0 = yb0, bot1 = yb1;
+        if (op) { const f0 = Math.max(yb0, floor), f1 = Math.max(yb1, floor); const t0 = topOf(op, Math.max(ua, op.ua)), t1 = topOf(op, Math.min(ub, op.ub)); if (floor > yb0 || floor > yb1) Q(P(ua, v, yb0), P(ub, v, yb1), P(ub, v, f1), P(ua, v, f0), wallC, h); bot0 = Math.max(t0, f0); bot1 = Math.max(t1, f1); }
+        if (slabY - bot0 > 0.05 || slabY - bot1 > 0.05) Q(P(ua, v, bot0), P(ub, v, bot1), P(ub, v, slabY), P(ua, v, slabY), wallC, h);
       }
-      // spandrel piers up to the deck
-      for (let u = u0 + 6; u < u1 - 3; u += 7.5) { const yb = Y(u, 3.0); strip(u - 1.0, u + 1.0, Math.min(vA, vB), Math.max(vA, vB), yb, deckY - 1.7, stone); }
+      // cornice (projecting band), balustrade, posts and lamps
+      prism(0, len, sd > 0 ? W / 2 - 0.6 : -W / 2 - 0.5, sd > 0 ? W / 2 + 0.5 : -W / 2 + 0.6, slabY, deckY - 0.2, pale);
+      prism(0, len, sd * (W / 2 - 0.35) - 0.2, sd * (W / 2 - 0.35) + 0.2, deckY, deckY + 0.28, light);
+      prism(0, len, sd * (W / 2 - 0.35) - 0.17, sd * (W / 2 - 0.35) + 0.17, deckY + 0.95, deckY + 1.18, light);
+      for (let u = 0.5; u < len; u += 2.4) prism(u - 0.14, u + 0.14, sd * (W / 2 - 0.35) - 0.14, sd * (W / 2 - 0.35) + 0.14, deckY + 0.28, deckY + 0.95, light);
+      for (let u = 5; u < len - 3; u += 14) { prism(u - 0.3, u + 0.3, sd * (W / 2 - 0.35) - 0.3, sd * (W / 2 - 0.35) + 0.3, deckY, deckY + 1.5, pale); const p = P(u, sd * (W / 2 - 0.35), deckY + 1.5); B.cyl(p[0], deckY + 1.5, p[2], 0.06, 0.06, 3.0, 5, col('#2c3038')); B.sphere(p[0], deckY + 4.7, p[2], 0.3, 6, col('#fff1c0')); }
     }
-    // soffit between the two ribs
-    for (let i = 0; i < steps; i++) {
-      const ua = u0 + (2 * half * i) / steps, ub = u0 + (2 * half * (i + 1)) / steps;
-      B.quad(P(ua, -W / 2 + 4.2, Y(ua, 0)), P(ua, W / 2 - 4.2, Y(ua, 0)), P(ub, W / 2 - 4.2, Y(ub, 0)), P(ub, -W / 2 + 4.2, Y(ub, 0)), dark);
+
+    // ---- soffit of the main arch (what you see from the valley) ----
+    const nA = 48;
+    for (let i = 0; i < nA; i++) {
+      const ua = u0 + (2 * half * i) / nA, ub = u0 + (2 * half * (i + 1)) / nA;
+      Q(P(ua, -W / 2, yIn(ua)), P(ub, -W / 2, yIn(ub)), P(ub, W / 2, yIn(ub)), P(ua, W / 2, yIn(ua)), shade(stone, 0.62 + 0.06 * (i % 2)), [0, -1, 0]);
     }
-    // approach arcades (solid piers with round-arch caps)
-    for (const [ua, ub, dir] of [[0, u0, 1], [u1, len, -1]]) {
-      const n = Math.max(2, Math.round((ub - ua) / 9));
-      for (let i = 0; i <= n; i++) { const u = ua + ((ub - ua) * i) / n; strip(u - 1.5, u + 1.5, -W / 2, W / 2, o.groundY || -45, deckY - 1.7, stone); }
-      strip(ua, ub, -W / 2, W / 2, deckY - 3.2, deckY - 1.7, shade(stone, 0.9));
+    // ---- arcade openings: floor, jambs, arched soffit (seen through the openings) ----
+    for (const op of ops) {
+      const lowFor = (u) => Math.max(floor, yBot(u));
+      const nF = 5;
+      for (let j = 0; j < nF; j++) { const ua = op.ua + ((op.ub - op.ua) * j) / nF, ub = op.ua + ((op.ub - op.ua) * (j + 1)) / nF; Q(P(ua, -W / 2, lowFor(ua)), P(ub, -W / 2, lowFor(ub)), P(ub, W / 2, lowFor(ub)), P(ua, W / 2, lowFor(ua)), shade(stone, 0.8), [0, 1, 0]); }
+      for (const [uJ, dirJ] of [[op.ua, 1], [op.ub, -1]]) Q(P(uJ, -W / 2, lowFor(uJ)), P(uJ, W / 2, lowFor(uJ)), P(uJ, W / 2, springOp), P(uJ, -W / 2, springOp), shade(stone, 0.72), [tx * dirJ, 0, tz * dirJ]);
+      const nC = 10;
+      for (let j = 0; j < nC; j++) {
+        const a0 = Math.PI * j / nC, a1 = Math.PI * (j + 1) / nC;
+        const ua = op.uc - Math.cos(a0) * r, ub = op.uc - Math.cos(a1) * r, ya = springOp + Math.sin(a0) * r, yb = springOp + Math.sin(a1) * r;
+        Q(P(ua, -W / 2, ya), P(ub, -W / 2, yb), P(ub, W / 2, yb), P(ua, W / 2, ya), shade(stone, 0.68), [0, -1, 0]);
+      }
     }
+    // ---- deck slab, abutment ends ----
+    prism(0, len, -W / 2, W / 2, slabY - 0.02, deckY, shade(stone, 0.92));
+    for (const [uE, dirE] of [[0, -1], [len, 1]]) Q(P(uE, -W / 2, ground), P(uE, W / 2, ground), P(uE, W / 2, slabY), P(uE, -W / 2, slabY), shade(stone, 0.85), [tx * dirE, 0, tz * dirE]);
+    // buttress piers where the arch springs: slightly proud of the faces, so the abutments read as massive
+    for (const uS of [u0, u1]) for (const sd of [-1, 1]) prism(uS - 3.2 * (uS === u0 ? 1 : 0) - 0.01, uS + 3.2 * (uS === u1 ? 1 : 0) + 0.01, sd * (W / 2 + 0.55) - 0.55, sd * (W / 2 + 0.55) + 0.55, spring - 2, slabY, shade(stone, 1.05));
   };
 
   /* simple pumpkin / lantern / gravestone helpers for the fantasy tracks */

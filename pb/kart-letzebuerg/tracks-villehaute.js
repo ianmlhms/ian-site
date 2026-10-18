@@ -151,10 +151,8 @@
       }
 
       /* ---- Pont Adolphe (1903): 84.6 m stone arch over the Pétrusse; the real double-decker is shown with the main arch and the approach arcades ---- */
-      KL.lm.archBridge(B, [-218, 168], [-146, 300], { width: 18, deckY: 0, archA: 34, archB: 119, springY: -37, rise: 30, groundY: -42, color: '#dcd3bf' });
+      KL.lm.archBridge(B, [-218, 168], [-146, 300], { width: 18, deckY: 0, archA: 34, archB: 119, springY: -37, rise: 30, groundY: -42, color: '#cdb27c' });
 
-      /* ---- BCEE tower and the far rim, as a recognisable skyline element ---- */
-      { const f = { x: -67, y: -2, z: 345, yaw: 0.2 }, L = KL.lm; L.box(B, f, 0, 0, 0, 14, 62, 14, 0, col('#9aa3b3')); L.box(B, f, 0, 62, 0, 10, 4, 10, 0, col('#d8dbe3')); L.pyramid(B, f, 0, 66, 0, 11, 8, col('#4f5a6a')); }
 
       add(B, M.plain);
 

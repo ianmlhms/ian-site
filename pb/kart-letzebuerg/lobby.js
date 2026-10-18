@@ -405,7 +405,7 @@
   function renderLobby() {
     if (!L.active || $('lobbyScreen').hidden) return;
     const isHost = L.role === 'host';
-    $('lbCode').textContent = L.code || ''; $('lbCodeRow').hidden = !L.signalling && !L.code;
+    $('lbCode').textContent = L.code || ''; $('lbCodeRow').hidden = !L.signalling;
     $('lbInvite').hidden = !(L.signalling && isHost); $('lbCopy').hidden = !(L.signalling && L.code);
     const ul = $('lbList'); ul.textContent = '';
     for (const p of L.roster) {
@@ -658,7 +658,7 @@
     $('lbReady').addEventListener('click', toggleReady);
     $('lbStart').addEventListener('click', hostStart);
     $('lbPublic').addEventListener('change', (e) => setCfg({ pub: !!e.target.checked }));
-    window.addEventListener('pagehide', () => { if (L.active) leave(false); });
+    window.addEventListener('pagehide', () => { if (L.active) { if (KL.MP && KL.MP.active) KL.MP.leave(); leave(false); } });
     // deep link from an invite / shared link:  ?room=CODE&role=guest|host
     const q = new URLSearchParams(location.search), room = cleanCode(q.get('room') || '');
     if (isCode(room) && !KL.TESTMODE_NOAUTOJOIN) {

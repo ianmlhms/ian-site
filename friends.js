@@ -52,6 +52,8 @@ const classTag = (name) => {
 
 const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe", checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel" };
 const GAME_PAGES = Object.freeze(Object.fromEntries(Object.keys(GAMES).map(id => [id, id + ".html"])));
+// Games that can only be reached through an invite that was sent from inside the game (not from the "invite to game" chooser).
+const INVITE_ONLY = Object.freeze({ "kart-letzebuerg": { name: "Kart Lëtzebuerg", page: "pb/kart-letzebuerg.html" } });
 const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe", "checkers", "maumau", "dice-duel"]);
 
 async function refresh() {
@@ -149,13 +151,14 @@ function renderInvites(list) {
   $("invitesWrap").style.display = list.length ? "" : "none";
   $("invites").innerHTML = list.map(i => `
     <div class="row">
-      <span class="name"><span aria-hidden="true">🎮</span> <b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(GAMES[i.game] || i.game)}</b></span>
-      <button type="button" class="mini go" data-join="${esc(i.game)}|${esc(i.room)}|${i.id}" aria-label="${esc(T("btn.join") + ": " + (GAMES[i.game] || i.game))}">${T("btn.join")}</button>
+      <span class="name"><span aria-hidden="true">🎮</span> <b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(GAMES[i.game] || INVITE_ONLY[i.game]?.name || i.game)}</b></span>
+      <button type="button" class="mini go" data-join="${esc(i.game)}|${esc(i.room)}|${i.id}" aria-label="${esc(T("btn.join") + ": " + (GAMES[i.game] || INVITE_ONLY[i.game]?.name || i.game))}">${T("btn.join")}</button>
     </div>`).join("");
   $("invites").querySelectorAll("[data-join]").forEach(b => b.onclick = async () => {
     const [game, room, id] = b.dataset.join.split("|");
-    if (!Object.hasOwn(GAME_PAGES, game)) return;
-    const page = GAME_PAGES[game];
+    const only = Object.hasOwn(INVITE_ONLY, game) ? INVITE_ONLY[game] : null;
+    if (!only && !Object.hasOwn(GAME_PAGES, game)) return;
+    const page = only ? only.page : GAME_PAGES[game];
     try { await sb.from("game_invites").update({ status: "accepted" }).eq("id", +id); } catch {}
     location.href = `${page}?room=${encodeURIComponent(room)}&role=guest`;
   });
