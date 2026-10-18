@@ -163,9 +163,11 @@
       const gm = theme.osm && KL.osm && KL.osm[theme.osm] && theme.groundMap;
       if (gm) { const t = KL.tex.cityMap(KL.osm[theme.osm], { x0: gm.x0, z0: gm.z0, size: gm.size, px: this.q.mapPx || 2048, paving: gm.paving, paint: gm.paint }); this.mats.ground.map = t; this.mats.ground.needsUpdate = true; }
       const uv = gm ? (x, z) => [(x - gm.x0) / gm.size, 1 - (z - gm.z0) / gm.size] : (x, z) => [x / 8, z / 8];
-      const quad = (xa, za, xb, zb) => {
-        const A = [xa, H(xa, za), za], Bq = [xb, H(xb, za), za], C = [xb, H(xb, zb), zb], D = [xa, H(xa, zb), zb];
-        B.quadUV(A, D, C, Bq, col((xa + xb) / 2, (za + zb) / 2), uv(xa, za), uv(xa, zb), uv(xb, zb), uv(xb, za));
+      const nrm = (x, z) => { const e = 3, hx = (H(x + e, z) - H(x - e, z)) / (2 * e), hz = (H(x, z + e) - H(x, z - e)) / (2 * e), l = Math.hypot(hx, 1, hz); return [-hx / l, 1 / l, -hz / l]; };
+      const quad = (xa, za, xb, zb) => {      // smooth-shaded: normals from the terrain gradient, so slopes do not show the quad diagonals
+        const c = col((xa + xb) / 2, (za + zb) / 2), P = [[xa, za], [xa, zb], [xb, zb], [xb, za]];
+        const ids = P.map(([x, z]) => { const n = nrm(x, z), u = uv(x, z); return B.vert(x, H(x, z), z, n[0], n[1], n[2], c, u[0], u[1]); });
+        B.i.push(ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]);
       };
       const ix0 = Math.floor((x0 - inner) / coarse) * coarse, iz0 = Math.floor((z0 - inner) / coarse) * coarse, ix1 = Math.ceil((x1 + inner) / coarse) * coarse, iz1 = Math.ceil((z1 + inner) / coarse) * coarse;
       for (let x = ix0; x < ix1; x += fine) for (let z = iz0; z < iz1; z += fine) quad(x, z, x + fine, z + fine);

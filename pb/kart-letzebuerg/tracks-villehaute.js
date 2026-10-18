@@ -31,6 +31,9 @@
 
   /* the Pétrusse valley is coloured by vertex colours; keep the street map neutral (white) there */
   function paintValley(g, X, Z, sc) {
+    // Place de la Constitution: lawn ring and a stone disc around the Gëlle Fra
+    g.fillStyle = '#76ab55'; g.beginPath(); g.arc(X(-10), Z(137), 19 * sc, 0, 7); g.fill();
+    g.fillStyle = '#b9b3a6'; g.beginPath(); g.arc(X(-10), Z(137), 9 * sc, 0, 7); g.fill();
     const x0 = -640, x1 = 640, z0 = 90, z1 = 500, cs = 4, cw = Math.round((x1 - x0) / cs), ch = Math.round((z1 - z0) / cs);
     const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const cg = cv.getContext('2d'), im = cg.createImageData(cw, ch);
     for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
@@ -58,7 +61,7 @@
     theme: { facade: 'old', verge: 'slabs', ground: 'slabs', groundTint: '#ffffff', groundCell: 10, farColor: '#b9b4ab', farDrop: -41, weathers: ['day', 'sunset', 'night', 'rain'],
       startText: 'UEWERSTAD', wallColor: '#d3c9b6', wallTop: '#e6dfcf', vergeColor: '#c4bfb6', skyline: false, lampSpacing: 28,
       osm: 'villehaute', cityRadius: 430, boulevardTrees: 15,
-      groundMap: { x0: -640, z0: -480, size: 1280, paving: '#8d8a84', paint: paintValley },
+      groundMap: { x0: -640, z0: -480, size: 1280, paving: '#85868a', paint: paintValley },
     },
     terrain,
     pts: [
@@ -68,7 +71,7 @@
     ],
     // (front strings from the old procedural facades are no longer used: city.js builds from the real OSM footprints)
     front0: {"L":"333333333333555330333000000000000000000000aa77a7660222aaaaaaaaaaaaaaa000000000000000000aaaaaaaaa35444443443666aaa444444a0000000666666888003","R":"8800000003333300000000000000000000000000000000aaaaa0000aa000aaaaa033aaaa000000000000000aaaaaa000000aa000000aa366600000000000000000000000000"},
-    noBuild: [[71, 34, 30], [155, 98, 52], [-10, 137, 14]],
+    noBuild: [[71, 34, 30], [155, 98, 52], [-10, 137, 14], [-28, -88, 9]],
     pads: [[150, 0, 10], [470, 0, 10], [850, 0, 10]],
     decorate(S) {
       const { add, mats, track, rnd } = S, M = mats;
@@ -121,7 +124,7 @@
         for (const sx of [-1, 1]) {
           L.box(B, f, sx * 11.5, 0, 0.5, 8.6, 33, 8.6, 0, wall);
           L.box(B, f, sx * 11.5, 33, 0.5, 9.2, 1, 9.2, 0, shade(wall, 0.9));
-          L.pyramid(B, f, sx * 11.5, 34, 0.5, 8.8, 17, copper);
+          L.pyramid(B, f, sx * 11.5, 34, 0.5, 7.4, 34, col('#2d3039'));       // the twin west spires are dark slate, tall and slender
           L.windows(B, f, sx * 11.5 - 1.4, sx * 11.5 + 1.4, -3.9, -1, 2, 24, 1.1, 5.5, win);
         }
         L.windows(B, f, -5, 5, -2.5, -1, 3, 8, 1.3, 6.5, win);
@@ -148,7 +151,7 @@
       }
 
       /* ---- Pont Adolphe (1903): 84.6 m stone arch over the Pétrusse; the real double-decker is shown with the main arch and the approach arcades ---- */
-      KL.lm.archBridge(B, [-218, 168], [-146, 300], { width: 18, deckY: 0, archA: 34, archB: 119, springY: -37, rise: 30, groundY: -42, color: '#d8c7a4' });
+      KL.lm.archBridge(B, [-218, 168], [-146, 300], { width: 18, deckY: 0, archA: 34, archB: 119, springY: -37, rise: 30, groundY: -42, color: '#dcd3bf' });
 
       /* ---- BCEE tower and the far rim, as a recognisable skyline element ---- */
       { const f = { x: -67, y: -2, z: 345, yaw: 0.2 }, L = KL.lm; L.box(B, f, 0, 0, 0, 14, 62, 14, 0, col('#9aa3b3')); L.box(B, f, 0, 62, 0, 10, 4, 10, 0, col('#d8dbe3')); L.pyramid(B, f, 0, 66, 0, 11, 8, col('#4f5a6a')); }

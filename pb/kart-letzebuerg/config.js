@@ -71,7 +71,7 @@
 
   /* Time of day / weather presets. sky: [zenith, horizon]; fog colour follows the horizon. */
   KL.WEATHER = {
-    day:    { sky: ['#4a9be8', '#cfe8f7'], fog: '#cfe8f7', fogNear: 120, fogFar: 520, hemi: ['#ffffff', '#b3a58f', 0.95], sun: ['#fff1d0', 1.35, [-0.45, 0.8, 0.35]], night: 0, wet: 0, rain: 0, exposure: 1 },
+    day:    { sky: ['#4a9be8', '#cfe8f7'], fog: '#cfe8f7', fogNear: 120, fogFar: 520, hemi: ['#ffffff', '#a9a9ad', 0.95], sun: ['#fff1d0', 1.35, [-0.45, 0.8, 0.35]], night: 0, wet: 0, rain: 0, exposure: 1 },
     sunset: { sky: ['#5b4a9a', '#ff9a5a'], fog: '#f2a275', fogNear: 90, fogFar: 460, hemi: ['#ffc9a0', '#6d4a58', 0.8], sun: ['#ff9248', 1.25, [0.8, 0.28, 0.5]], night: 0.25, wet: 0, rain: 0, exposure: 1 },
     night:  { sky: ['#050a22', '#1b2a5c'], fog: '#111a3a', fogNear: 60, fogFar: 330, hemi: ['#5a6fb4', '#1b1f2e', 0.55], sun: ['#7f9bff', 0.45, [-0.3, 0.9, -0.4]], night: 1, wet: 0, rain: 0, exposure: 1 },
     rain:   { sky: ['#6d7885', '#a7b1ba'], fog: '#99a3ad', fogNear: 50, fogFar: 300, hemi: ['#d0d8e0', '#6f7478', 0.85], sun: ['#dbe4ee', 0.5, [-0.3, 0.9, 0.2]], night: 0.15, wet: 1, rain: 1, exposure: 1 },
