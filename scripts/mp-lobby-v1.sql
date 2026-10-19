@@ -145,6 +145,9 @@ begin
   if me is null then
     raise exception ''not signed in'';
   end if;
+  if public.is_kart_only() then
+    raise exception ''not allowed'';            -- karting-only accounts stay out of the social features (kart_block policy)
+  end if;
   select * into g from public.mp_games where id = p_game and enabled;
   if g.id is null then
     raise exception ''unknown game'';
