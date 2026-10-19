@@ -21,6 +21,7 @@ import { flow as clientCommands } from "./client_commands.mjs";
 
 import { flow as arcadeWeeklyStreak } from "./arcade_weekly_streak.mjs";
 import { flow as idleRebirthHalloween } from "./idle_rebirth_halloween.mjs";
+import { flow as idleMoreContent } from "./idle_more_content.mjs";
 
 import { flow as busTycoon } from "./bus_tycoon.mjs";
 
@@ -33,7 +34,7 @@ import { flow as testMode } from "./test_mode.mjs";
 import { flow as mordsfall } from "./mordsfall.mjs";
 import { flow as trainSim } from "./train_sim.mjs";
 
-const ALL = [trainSim, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, testMode, mordsfall];
+const ALL = [trainSim, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, testMode, mordsfall];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

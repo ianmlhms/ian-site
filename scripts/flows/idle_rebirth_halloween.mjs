@@ -38,8 +38,8 @@ export const flow = {
     h.step("old 16-slot save and rebirth confirmation");
     await h.goto("/pixelbreak.html?g=cookie-clicker&halloween=1");
     let game = await frame(h);
-    h.eq(await game.evaluate(() => snapshot().u), Array.from({ length: 17 }, (_, i) => i === 11 ? 2 : 0), "old buildings preserved and new slot padded");
-    h.eq(await game.evaluate(() => snapshot().cu), [2, 0, 0, 0, 0, 0], "old click upgrades preserved");
+    h.eq(await game.evaluate(() => snapshot().u), Array.from({ length: 25 }, (_, i) => i === 11 ? 2 : 0), "old buildings preserved and new slots padded (Haunted Oven + 8 Beyond-the-God tiers)");
+    h.eq(await game.evaluate(() => snapshot().cu), [2, 0, 0, 0, 0, 0, 0, 0, 0], "old click upgrades preserved and the three new ones padded");
     await game.locator('.upgrade[data-type="cps"][data-i="16"]').click();
     await game.locator(".idle-rebirth").click();
     const before = await game.evaluate(() => ({ tb: totalBaked, buildings: snapshot().u }));
