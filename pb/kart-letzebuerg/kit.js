@@ -84,24 +84,20 @@
     }
   };
 
-  /* second routes (track.def.alts): a ribbon of road along each alt polyline, edged with kerb strips; `o.mat` = material (lit, vertex colours + map) */
+  /* second routes (track.def.alts): a ribbon of road along each alt polyline; `o.mat` = material (lit, vertex colours + map) */
   K.altRoads = (S, o) => {
-    const { track } = S, T = T3(), tmp = {}, road = new KL.Batch(), edge = new KL.Batch();
+    const { track } = S, tmp = {}, road = new KL.Batch();
     for (const a of track.alts) {
       const P = a.P, L = [], R = [];
       for (let i = 0; i < P.length; i++) {
         const q = P[Math.min(P.length - 1, i + 1)], r = P[Math.max(0, i - 1)]; let tx = q[0] - r[0], tz = q[1] - r[1]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
-        const pj = track.project(P[i][0], P[i][1], -1, null, tmp), y = pj.y + 0.04;
+        const pj = track.project(P[i][0], P[i][1], -1, null, tmp), y = pj.y + 0.17;
         L.push([P[i][0] + tz * a.hw, y, P[i][1] - tx * a.hw]); R.push([P[i][0] - tz * a.hw, y, P[i][1] + tx * a.hw]);
       }
       let v = 0;
       for (let i = 0; i + 1 < P.length; i++) {
         const dv = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]) / 8;
         road.quadUV(L[i], R[i], R[i + 1], L[i + 1], o.color || [1, 1, 1], [0, v], [1, v], [1, v + dv], [0, v + dv]);
-        for (const [A, B2, w] of [[L, L, 0], [R, R, 0]]) {      // low kerb stones on both edges
-          const sg = A === L ? 1 : -1, off = (p) => [p[0] + (A === L ? 1 : -1) * 0, p[1], p[2]];
-          edge.quadUV([A[i][0], A[i][1] + 0.16, A[i][2]], [A[i + 1][0], A[i + 1][1] + 0.16, A[i + 1][2]], [A[i + 1][0], A[i + 1][1], A[i + 1][2]], [A[i][0], A[i][1], A[i][2]], o.kerb || [1, 1, 1], [v, 0], [v + dv, 0], [v + dv, 1], [v, 1]);
-        }
         v += dv;
       }
     }

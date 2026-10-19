@@ -18,7 +18,7 @@
 
   KL.registerTrack({
     id: 'aisbierg',
-    speedMul: 1.05,
+    speedMul: 1.06,
     autoBank: { k: 3.0, max: 0.12 },
     /* ski jump over a crevasse on the start straight (bed = deep powder: slow if you fall in); snow-bank hops */
     ramps: [{ s: 105, k: [[0, 0], [10, 2.6], [11.5, -1.6], [13, -3.2], [28, -3.2], [38, 0]] }, { s: 255, k: [[0, 0], [8, 1.7], [9.5, 0]] }, { s: 1380, k: [[0, 0], [8, 1.7], [9.5, 0]] }],
