@@ -48,7 +48,9 @@
       if (!this.ctx || !k) return;
       const c = this.ctx, t = c.currentTime, e = this.eng, dr = k.drift || {};
       const paused = opts && opts.paused ? 0 : 1, rain = !!(opts && opts.rain);
-      const sp = clamp(fin(k.speed, 0), 0, 80), boost = fin(k.boostT, 0) > 0, charge = clamp(fin(dr.charge, 0), 0, 20), lvl = clamp(fin(dr.level, 0), 0, 5);
+      let nbad = 0; const fv = (v, d) => { if (typeof v === 'number' && isFinite(v)) return v; nbad++; return d; };     // (counted, so a test can see that bad input was caught)
+      const sp = clamp(fv(k.speed, 0), 0, 80), boost = fv(k.boostT, 0) > 0, charge = clamp(fv(dr.charge, 0), 0, 20), lvl = clamp(fv(dr.level, 0), 0, 5);
+      if (nbad) this.badValues = (this.badValues || 0) + nbad;
       const f = 48 + sp * 5.2 + (boost ? 22 : 0) + (k.grounded ? 0 : 14);
       this.ramp(e.o1.frequency, f, t, 0.05, 60); this.ramp(e.o2.frequency, f * 0.5, t, 0.05, 30);
       this.ramp(e.lp.frequency, 380 + sp * 38 + (boost ? 500 : 0), t, 0.08, 600);

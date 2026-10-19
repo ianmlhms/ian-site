@@ -322,6 +322,7 @@ export const flow = {
       await lobbyJoin(H, G2, hcode, 'Third');
       await readyAndStart(H, [G1, G2], 1);
       await waitRace([H, G1, G2]);
+      await waitFor(G2, () => __klTest.mp().links.length >= 2, null, 25000).catch(() => {});       // (the deputy links the other guest within a few seconds even on a slow machine; retried during the race)
       const m1 = await mp(G1), m2 = await mp(G2);
       h.expect(m1.deputy === (await kl(G1, () => __klTest.G.human.id)) && m1.links.length >= 2, 'the first guest is the deputy and has links to the host and to the other guest');
       h.expect(m2.links.length >= 2, 'the other guest also holds a link to the deputy (links: ' + m2.links.map((l) => l.kind).join(',') + ')');

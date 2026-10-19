@@ -24,8 +24,9 @@ export function createHub() {
   const conns = new Set();
 
   const bump = (name) => { stats.byEvent[name] = (stats.byEvent[name] || 0) + 1; };
-  function out(conn, joinRef, ref, topic, event, payload) {
+  function out(conn, joinRef, ref, topic, event, payload, heartbeat) {
     const text = JSON.stringify([joinRef, ref, topic, event, payload]);
+    if (heartbeat) { stats.heartbeatReplies = (stats.heartbeatReplies || 0) + 1; try { conn.ws.send(text); } catch { /* socket closed */ } return; }      // keep-alive replies are not messages (not billed, not counted)
     stats.framesOut++; stats.bytesOut += text.length; bump('out:' + event);
     const pc = (stats.perContext[conn.label] ||= { in: 0, out: 0, bytesIn: 0, bytesOut: 0 }); pc.out++; pc.bytesOut += text.length;
     try { conn.ws.send(text); } catch { /* socket closed */ }
@@ -62,7 +63,7 @@ export function createHub() {
         try { frame = typeof message === 'string' ? JSON.parse(message) : decodeBinaryPush(message); } catch { return; }
         if (!Array.isArray(frame)) return;
         const [joinRef, ref, topic, event, payload] = frame;
-        if (event === 'heartbeat') { stats.heartbeats++; ref && out(conn, joinRef, ref, topic, 'phx_reply', { status: 'ok', response: {} }); return; }
+        if (event === 'heartbeat') { stats.heartbeats++; ref && out(conn, joinRef, ref, topic, 'phx_reply', { status: 'ok', response: {} }, true); return; }
         stats.framesIn++; stats.bytesIn += size; pc.in++; pc.bytesIn += size; bump('in:' + event + (event === 'broadcast' ? ':' + (payload && payload.event) : ''));
         const reply = (response = {}) => ref && out(conn, joinRef, ref, topic, 'phx_reply', { status: 'ok', response });
         if (event === 'phx_join') {

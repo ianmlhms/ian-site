@@ -567,7 +567,13 @@
         }
         if (!L.active || L.role !== 'host') return;
         if (L.deputy && !L.peers.has(L.deputy)) { L.deputy = null; L.depOk = new Set(); L.depAgain = true; }       // it left while we waited
-        if (!L.depAgain) { announceDeputy(); break; }
+        if (!L.depAgain) {
+          announceDeputy();
+          // a lateral link that did not come up in time (slow device / network) is retried while the race runs, a few times
+          const missing = L.deputy ? depTargets(L.deputy).filter((id) => !L.depOk.has(id)) : [];
+          if (missing.length && (L.depRetry || 0) < 4) { L.depRetry = (L.depRetry || 0) + 1; setTimeout(() => { if (L.active && L.role === 'host') ensureDeputy('retry'); }, 4000); }
+          break;
+        }
       }
     } finally { L.depBusy = false; }
   }
@@ -578,7 +584,7 @@
     if ([...L.peers.values()].some((p) => !p.link || !p.link.open || !p.rdy)) return;
     L.phase = 'linking'; busyHost('nvLinking');
     await trackHost(); await dirUpdate();
-    await ensureDeputy('start');
+    L.depRetry = 0; await ensureDeputy('start');
     L.lateralOk = [...L.depOk];
     if (!L.active || L.phase !== 'linking') return;
     // build the grid: humans and bots on 8 shuffled slots
