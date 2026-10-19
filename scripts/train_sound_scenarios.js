@@ -20,7 +20,7 @@
   function run(trainId, camera, steps, opts) {
     opts = opts || {};
     const tr = TRAINS[trainId], boost = opts.accelBoost || 1;
-    let t = 0, v = 0, a = 0, doors = 0, doorsTarget = 0;
+    let t = 0, v = 0, a = 0, doors = 0, doorsTarget = 0, trac = 0;
     const frames = [], events = [];
     let parking = true;
     for (const st of steps) {
@@ -38,13 +38,15 @@
         if (lever > 0 && !parking && doors === 0) acc = tr.accel * boost * (lever / 5) * Math.max(0.12, 1 - Math.pow(v / vmax, 2.2) * 0.9);
         else if (lever < 0) acc = -tr.brake * Math.sqrt(boost) * Math.min(1, -lever / 7) * (lever <= -8 ? 1.5 : 1);
         else acc = -0.012 * (v > 0.1 ? 1 : 0) - 0.00008 * v * v;   // coasting drag
+        const tracTarget = lever > 0 && !parking && doors === 0 ? lever / 5 : 0;
+        trac += Math.max(-3 * DT, Math.min(0.9 * DT, tracTarget - trac));
         const nv = Math.max(0, v + acc * DT);
         a = (nv - v) / DT; v = nv;
         frames.push({
           t,
           p: {
             speedMs: v, lever, accelMs2: a, sound: tr.sound, train: tr.id, camera, curvature: typeof st.curv === 'function' ? st.curv(s) : st.curv || 0,
-            inTunnel: !!st.tunnel, onBridge: !!st.bridge, rain: st.rain || 0, doorsOpen01: doors, parkingBrake: parking && v < 0.05, brakePct: lever < 0 ? Math.min(1, -lever / 8) : 0,
+            inTunnel: !!st.tunnel, onBridge: !!st.bridge, rain: st.rain || 0, doorsOpen01: doors, parkingBrake: parking && v < 0.05, brakePct: lever < 0 ? Math.min(1, -lever / 8) : 0, traction: trac, weather: st.rain ? 'rain' : 'clear', timeScale: 1,
           },
         });
         t += DT;
