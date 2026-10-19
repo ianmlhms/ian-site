@@ -13,6 +13,8 @@
   const RIM_S = [[-400, 470], [-330, 430], [-230, 350], [-150, 306], [-60, 318], [40, 340], [130, 322], [220, 296], [400, 250]];
   const interp = (poly, x) => { if (x <= poly[0][0]) return poly[0][1]; for (let i = 1; i < poly.length; i++) if (x <= poly[i][0]) { const t = (x - poly[i - 1][0]) / (poly[i][0] - poly[i - 1][0]); return lerp(poly[i - 1][1], poly[i][1], t); } return poly[poly.length - 1][1]; };
   const VALLEY = 40;
+  /* Place de la Constitution layout in the monument's local frame (x, z, width, depth): lawn strips and the flower beds in the corners */
+  const LAWNS = [[-9.6, 0, 2.6, 13], [9.6, 0, 2.6, 13], [0, 9.6, 11, 2.2], [0, -9.8, 11, 2.2]], BEDS = [[-10.4, -10.8], [10.4, -10.8], [-10.4, 10.8], [10.4, 10.8]];
   function terrain(x, z) {
     const dN = z - interp(RIM_N, x), dS = interp(RIM_S, x) - z;
     if (dN <= 0 || dS <= 0) return 0;
@@ -31,9 +33,23 @@
 
   /* the Pétrusse valley is coloured by vertex colours; keep the street map neutral (white) there */
   function paintValley(g, X, Z, sc) {
-    // Place de la Constitution: lawn ring and a stone disc around the Gëlle Fra
-    g.fillStyle = '#76ab55'; g.beginPath(); g.arc(X(-10), Z(137), 19 * sc, 0, 7); g.fill();
-    g.fillStyle = '#b9b3a6'; g.beginPath(); g.arc(X(-10), Z(137), 9 * sc, 0, 7); g.fill();
+    // Place de la Constitution (like the real square, after Commons photos): a paved square around the stepped plinth, narrow lawn strips with low hedges,
+    // flower beds in the corners. Local frame = the monument's (x across, z towards the valley); it has to fit inside the road bowl (about 26 x 27 m free).
+    {
+      const MX = -10, MZ = 137, MY = 0.1, rr = KL.rng(41);
+      const loc = (fn) => { g.save(); g.translate(X(MX), Z(MZ)); g.rotate(MY); fn((lx, lz, w, h, fill) => { g.fillStyle = fill; g.fillRect((lx - w / 2) * sc, (lz - h / 2) * sc, w * sc, h * sc); }); g.restore(); };
+      loc((R) => {
+        R(0, 0, 27.4, 28.4, '#a8a398'); R(0, 0, 26.6, 27.6, '#cbc5b6');                           // stone paving with a darker kerb line
+        g.strokeStyle = 'rgba(120,114,100,.35)'; g.lineWidth = Math.max(1, 0.06 * sc);
+        for (let i = -13; i <= 13; i += 2.2) { g.beginPath(); g.moveTo(i * sc, -13.8 * sc); g.lineTo(i * sc, 13.8 * sc); g.stroke(); }
+        for (let j = -13.2; j <= 13.2; j += 2.2) { g.beginPath(); g.moveTo(-13.3 * sc, j * sc); g.lineTo(13.3 * sc, j * sc); g.stroke(); }
+        for (const [cx, cz, w, h] of LAWNS) { R(cx, cz, w + 1.2, h + 1.2, '#35703a'); R(cx, cz, w, h, '#78ad56'); }   // lawn strips inside hedges
+        for (const [cx, cz] of BEDS) {                                                           // flower beds
+          R(cx, cz, 2.6, 2.6, '#5b3f29');
+          for (let i = 0; i < 22; i++) { g.fillStyle = ['#d8343c', '#f2c230', '#ec7fb0', '#f6f2e8'][i % 4]; g.beginPath(); g.arc((cx + (rr() - 0.5) * 2.2) * sc, (cz + (rr() - 0.5) * 2.2) * sc, 0.18 * sc, 0, 7); g.fill(); }
+        }
+      });
+    }
     const x0 = -640, x1 = 640, z0 = 90, z1 = 500, cs = 4, cw = Math.round((x1 - x0) / cs), ch = Math.round((z1 - z0) / cs);
     const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const cg = cv.getContext('2d'), im = cg.createImageData(cw, ch);
     for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
@@ -59,7 +75,7 @@
   KL.registerTrack({
     id: 'villehaute', origin: [49.6105, 6.1295],
     theme: { facade: 'old', verge: 'slabs', ground: 'slabs', groundTint: '#ffffff', groundCell: 10, farColor: '#b9b4ab', farDrop: -41, weathers: ['day', 'sunset', 'night', 'rain'],
-      startText: 'UEWERSTAD', wallColor: '#d3c9b6', wallTop: '#e6dfcf', vergeColor: '#c4bfb6', skyline: false, lampSpacing: 28,
+      startText: 'UEWERSTAD', wallColor: '#d3c9b6', wallTop: '#e6dfcf', wallH: 0.5, vergeColor: '#c4bfb6', skyline: false, lampSpacing: 28,
       osm: 'villehaute', cityRadius: 430, boulevardTrees: 15,
       groundMap: { x0: -640, z0: -480, size: 1280, paving: '#85868a', paint: paintValley },
     },
@@ -87,6 +103,40 @@
         for (let i = 0; i < 9; i++) { const a = (i / 9) * 6.283; L.sphere(B, f, 0.55 + Math.cos(a) * 0.62, 25.3 + Math.sin(a) * 0.62, 0, 0.16, 4, gold); }   // wreath
         L.box(B, f, -0.9, 22.5, 0, 0.1, 1.8, 0.5, -0.35, gold); L.box(B, f, 0.0, 22.5, -0.45, 0.5, 1.6, 0.1, 0, gold);   // cloak
       }
+
+      /* ---- Place de la Constitution: hedges round the lawn strips, flag mast, and the stone balustrade along the Pétrusse valley with benches ---- */
+      {
+        const f = { x: -10, y: 0, z: 137, yaw: 0.1 }, L = KL.lm, hedge = col('#35703a'), hedgeT = col('#4f8e45');
+        for (const [cx, cz, w, h] of LAWNS) {
+          const o = 0.5;                                                                   // four hedge rails round each strip
+          L.box(B, f, cx, 0, cz - h / 2 - o / 2, w + 2 * o, 0.7, o, 0, hedge, { topCol: hedgeT }); L.box(B, f, cx, 0, cz + h / 2 + o / 2, w + 2 * o, 0.7, o, 0, hedge, { topCol: hedgeT });
+          L.box(B, f, cx - w / 2 - o / 2, 0, cz, o, 0.7, h, 0, hedge, { topCol: hedgeT }); L.box(B, f, cx + w / 2 + o / 2, 0, cz, o, 0.7, h, 0, hedge, { topCol: hedgeT });
+        }
+        for (const [cx, cz] of BEDS) { L.box(B, f, cx, 0, cz, 2.8, 0.25, 2.8, 0, stoneD); for (let i = 0; i < 4; i++) L.sphere(B, f, cx + ((i % 2) - 0.5) * 1.1, 0.5, cz + (Math.floor(i / 2) - 0.5) * 1.1, 0.42, 5, [col('#d8343c'), col('#f2c230'), col('#ec7fb0'), col('#f6f2e8')][i], { noise: 1, sy: 0.8 }); }
+        // flag mast with the Luxembourg tricolour (red, white, light blue)
+        L.cyl(B, f, 0, 0, -12.7, 0.09, 0.07, 15, 5, col('#c9ccd2'));
+        const fp = L.frame(f);
+        [['#e8334a', 0], ['#f4f4f4', 1], ['#4fb6e6', 2]].forEach(([c, k]) => { const y1 = 14.7 - k * 0.7, y0 = y1 - 0.7, a = fp(0.1, y0, -12.7), b = fp(3.3, y0, -12.7), cc = fp(3.3, y1, -12.7), d = fp(0.1, y1, -12.7); B.quad(a, b, cc, d, col(c)); B.quad(a, d, cc, b, col(c)); });
+        // balustrade: posts every ~2.4 m, top rail, openwork band and plinth along the valley rim
+        const rim = [[-64, 118], [-62, 124], [-46, 160], [-26, 186], [14, 186], [36, 154], [62, 132], [66, 126]], stoneL = col('#d8d0bf'), band = col('#8f897d');
+        let acc = 0, bench = 0;
+        for (let i = 0; i + 1 < rim.length; i++) {
+          const [x0, z0] = rim[i], [x1, z1] = rim[i + 1], dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz), ux = dx / len, uz = dz / len;
+          let nx = -uz, nz = ux; if (nz > 0) { nx = -nx; nz = -nz; }                      // normal pointing away from the valley (north)
+          const yaw = Math.atan2(dx, dz), n = Math.max(1, Math.round(len / 2.4)), off = 1.1;
+          for (let k = 0; k <= n; k++) {
+            const t = k / n, x = x0 + dx * t + nx * off, z = z0 + dz * t + nz * off;
+            B.box(x, 0, z, 0.36, 1.1, 0.36, yaw, stoneL);
+            if (k < n) {
+              const mx = x0 + dx * (t + 0.5 / n) + nx * off, mz = z0 + dz * (t + 0.5 / n) + nz * off, seg = len / n - 0.3;
+              B.box(mx, 1.0, mz, 0.3, 0.14, seg, yaw, stoneL); B.box(mx, 0.0, mz, 0.3, 0.26, seg, yaw, stoneL); B.box(mx, 0.26, mz, 0.12, 0.74, seg, yaw, band);
+            }
+          }
+          acc += len;
+          if (acc > 34 && i > 0 && i < rim.length - 2) { acc = 0; const mx = x0 + dx * 0.5 + nx * (off + 0.9), mz = z0 + dz * 0.5 + nz * (off + 0.9); KL.furniture.bench(B, { x: mx, y: 0, z: mz, yaw: Math.atan2(-nx, -nz) }); bench++; }
+        }
+      }
+      KL.furniture.street(S, { seed: 11, sFrom: 28, sTo: track.length - 24, skip: [[236, 292]], bench: 50, bin: 44, planter: 66, bikes: 150, busStops: [78, 438, 628, 838, 1135, 1290], signs: [44, 160, 400, 560, 790, 950, 1180, 1300] });
 
       /* ---- Hôtel de Ville (1838, neoclassical, bronze lions): faces north onto Place Guillaume II ---- */
       {
