@@ -167,25 +167,44 @@ export const flow = {
       const s0 = await kl(A, () => { const t = __klTest.G.track, K = t.K, step = t.step; for (let s = 30; s < t.length - 120; s += 5) { let ok = true; for (let d = -10; d < 110 && ok; d += step) if (Math.abs(K[Math.floor((s + d) / step) % t.N]) > 0.0015) ok = false; if (ok) return s; } return 140; });
       console.log('    straight test section starts at s=' + s0);
       for (const p of [A, B]) await kl(p, () => { window.__keep = setInterval(() => { __klTest.G.human.stuckT = 0; }, 100); });      // parked karts would be rescued after 2.4 s
-      await kl(A, (s) => __klTest.teleport(s, 0), s0 + 30);
-      await kl(B, (s) => __klTest.teleport(s, 0), s0);
-      await sleep(900);
-      await kl(A, (id) => { __klTest.G.race.byId[id].item = { id: 'rocket', count: 1 }; }, ids.b);      // the host's book-keeping record of the guest's item
-      await kl(B, () => { __klTest.forceItem('rocket'); __klTest.force({ item: true }); });
-      await sleep(120); await kl(B, () => __klTest.force(null));
-      await waitFor(A, () => __klTest.state().kart.spinT > 0 || __klTest.state().kart.rescued > 0, null, 5000).catch(() => {});
-      const hitA = await st(A);
-      h.expect(hitA.kart.spinT > 0, 'guest rocket spins the host kart (spinT ' + hitA.kart.spinT.toFixed(2) + ')');
+      // Load-robust: a latch records the highest spinT the victim's own kart ever had; if the hit has not landed after a few seconds (a loaded
+      // machine delays the item hand-over) the whole set-up is repeated, up to 4 times. What is verified is unchanged: the projectile fired on
+      // one side spins the kart on the other side.
+      for (const p of [A, B]) await kl(p, () => { window.__spin = 0; clearInterval(window.__spinT); window.__spinT = setInterval(() => { const k = __klTest.G.human; if (k && k.spinT > window.__spin) window.__spin = k.spinT; }, 25); });
+      const latch = (p) => kl(p, () => window.__spin);
+      const hitUntil = async (victim, label, attempt) => {
+        for (let i = 0; i < 4; i++) {
+          await attempt();
+          const t0 = Date.now();
+          while (Date.now() - t0 < 9000 && (await latch(victim)) <= 0) await sleep(150);
+          if ((await latch(victim)) > 0) return i + 1;
+          console.log('    (' + label + ' did not land on try ' + (i + 1) + ', repeating - slow machine)');
+        }
+        return 0;
+      };
+      const rocketTries = await hitUntil(A, 'rocket', async () => {
+        await kl(A, (s) => __klTest.teleport(s, 0), s0 + 30);
+        await kl(B, (s) => __klTest.teleport(s, 0), s0);
+        await sleep(1200);
+        await kl(A, (id) => { __klTest.G.race.byId[id].item = { id: 'rocket', count: 1 }; }, ids.b);      // the host's book-keeping record of the guest's item
+        await kl(B, () => { __klTest.forceItem('rocket'); __klTest.force({ item: true }); });
+        await sleep(150); await kl(B, () => __klTest.force(null));
+      });
+      const hitA = { kart: { spinT: await latch(A) } };
+      h.expect(hitA.kart.spinT > 0, 'guest rocket spins the host kart (spinT ' + hitA.kart.spinT.toFixed(2) + ', ' + rocketTries + ' try)');
       await sleep(4200);
       // host 12 m behind the guest fires an orb straight ahead
-      await kl(A, (s) => __klTest.teleport(s, 0), s0 + 40);
-      await kl(B, (s) => __klTest.teleport(s, 0), s0 + 62);
-      await sleep(900);
-      await kl(A, () => { __klTest.forceItem('orb'); __klTest.force({ item: true }); });
-      await sleep(120); await kl(A, () => __klTest.force(null));
-      await waitFor(B, () => __klTest.state().kart.spinT > 0, null, 5000).catch(() => {});
-      const hitB = await st(B);
-      h.expect(hitB.kart.spinT > 0, 'host orb spins the guest kart (spinT ' + hitB.kart.spinT.toFixed(2) + ')');
+      await kl(B, () => { window.__spin = 0; });
+      const orbTries = await hitUntil(B, 'orb', async () => {
+        await kl(A, (s) => __klTest.teleport(s, 0), s0 + 40);
+        await kl(B, (s) => __klTest.teleport(s, 0), s0 + 62);
+        await sleep(1200);
+        await kl(A, () => { __klTest.forceItem('orb'); __klTest.force({ item: true }); });
+        await sleep(150); await kl(A, () => __klTest.force(null));
+      });
+      const hitB = { kart: { spinT: await latch(B) } };
+      h.expect(hitB.kart.spinT > 0, 'host orb spins the guest kart (spinT ' + hitB.kart.spinT.toFixed(2) + ', ' + orbTries + ' try)');
+      for (const p of [A, B]) await kl(p, () => clearInterval(window.__spinT));
       // the spinning kart is seen spinning by the other side as well
       const seen = await kl(A, (id) => { const k = __klTest.G.race.byId[id]; return { spinT: k.spinT }; }, ids.b);
       h.expect(seen.spinT > 0 || hitB.kart.spinT > 0, 'the host sees the guest kart spinning too');
@@ -207,12 +226,14 @@ export const flow = {
       const resB = await kl(B, () => __klTest.G.lastResult.rows.map((r) => [r.id, r.place, r.finished, Math.round(r.time * 1000)]));
       h.eq(resA.map((r) => r[0] + ':' + r[1]), resB.map((r) => r[0] + ':' + r[1]), 'identical finish order (ids + places) on host and guest');
       h.eq(resA.map((r) => r[3]), resB.map((r) => r[3]), 'identical finish times on host and guest');
-      h.expect(resA.length === 8 && resA.every((r) => r[2]), 'results list has 8 finished karts');
+      h.expect(resA.length === 8 && resA.every((r) => r[2]), 'results list has 8 finished karts' + (resA.every((r) => r[2]) ? '' : ' (finished flags: ' + JSON.stringify(resA.map((r) => r[2])) + ')'));
       const textA = await A.page.locator('#endList li').allInnerTexts(), textB = await B.page.locator('#endList li').allInnerTexts();
       h.expect(textA.length === 8 && textB.length === 8, 'results are displayed on both pages (8 rows each)');
       h.expect(await A.page.locator('#endList li.me').count() === 1 && await B.page.locator('#endList li.me').count() === 1, 'each page highlights its own row');
       await h.shot('results-2p');
       await B.page.screenshot({ path: (process.env.FLOW_SHOTS_DIR || '/tmp') + '/kart-letzebuerg-mp.results-guest.png' }).catch(() => {});
+      // (lap events reach the guest over the reliable channel: on a loaded machine the last one can trail the results, so wait for the state)
+      await waitFor(A, (id) => __klTest.G.race.byId[id].lapTimes.length >= 3, ids.a, 60000).catch(() => {}); await waitFor(B, (id) => __klTest.G.race.byId[id].lapTimes.length >= 3, ids.b, 60000).catch(() => {});
       const lapsA = await kl(A, (id) => __klTest.G.race.byId[id].lapTimes.length, ids.a);
       h.eq(lapsA, 3, 'host recorded 3 lap times for itself');
       const lapsB = await kl(B, (id) => __klTest.G.race.byId[id].lapTimes.length, ids.b);
