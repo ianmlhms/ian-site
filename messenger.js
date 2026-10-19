@@ -1,7 +1,8 @@
 /* Messenger — group chat + DMs + media, on Supabase. Shared accounts with PixelBreak. */
 import * as auth from "./auth.js?v=32";
-import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=29";
+import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=30";
 import { searchPeople, highlightMatch, attachPeopleSearch } from "./people-search.js?v=1";
+import { openPeoplePicker } from "./people-picker.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -100,56 +101,17 @@ function promptModal(title, label, okText = "OK", { people = false } = {}) {
   });
 }
 
-/* One modal for "new group" (name + people) and "add people" (people only).
- * Type part of a name, tap a suggestion → it becomes a chip; resolves
- * { name, people: [{id, username}] } or null when cancelled. */
+/* "New group" (name + people) and "add people" (people only): the shared picker (people-picker.js, also used by the
+ * game lobby). Resolves { name, people: [{id, username}] } or null when cancelled. */
 function peoplePickerModal({ title, withName = false, okText, exclude = new Set() }) {
-  return new Promise((resolve) => {
-    const m = document.createElement("div");
-    m.className = "auth-modal open";
-    m.innerHTML = `<div class="auth-box pp-box" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-      <button class="auth-x" type="button" aria-label="${esc(TA("close"))}">&times;</button><h3>${esc(title)}</h3>
-      ${withName ? `<input id="ppName" name="group-name" aria-label="${esc(T("msg.newGroup.label"))}" placeholder="${esc(T("msg.newGroup.label"))}" maxlength="60" autocomplete="off" style="margin-top:12px">` : ""}
-      <label class="pp-label" for="ppSearch">${esc(TI("grp.who"))}</label>
-      <input id="ppSearch" name="people" type="search" placeholder="${esc(TI("inv.ph"))}" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <div class="pp-chips" id="ppChips"></div>
-      <button class="auth-go" id="ppGo"></button></div>`;
-    document.body.appendChild(m);
-    const me = auth.session()?.user?.id;
-    let picked = [];
-    const chips = m.querySelector("#ppChips");
-    const go = m.querySelector("#ppGo");
-    const nameInput = m.querySelector("#ppName");
-    const search = m.querySelector("#ppSearch");
-    const paint = () => {
-      chips.innerHTML = picked.length
-        ? picked.map((u) => `<span class="pp-chip">${esc(u.username)}<button type="button" data-uid="${esc(u.id)}" aria-label="${esc(TI("grp.remove") + ": " + u.username)}">&times;</button></span>`).join("")
-        : `<span class="pp-empty">${esc(TI("grp.none"))}</span>`;
-      chips.querySelectorAll("button[data-uid]").forEach((b) =>
-        (b.onclick = () => { picked = picked.filter((u) => u.id !== b.dataset.uid); paint(); }));
-      go.textContent = withName ? okText : (picked.length ? TI("grp.addN").replace("{n}", picked.length) : okText);
-      go.disabled = !withName && !picked.length;
-    };
-    const detach = attachPeopleSearch(search, {
-      sb, emptyText: TI("inv.none"),
-      exclude: () => new Set([...exclude, ...picked.map((u) => u.id), ...(me ? [me] : [])]),
-      allow: restricted ? (n) => allowName.has(n.toLowerCase()) : null,
-      onPick: (u) => { picked = [...picked, { id: u.id, username: u.username }]; search.value = ""; paint(); search.focus(); },
-    });
-    const close = (val) => { detach(); m.remove(); resolve(val); };
-    const submit = () => {
-      const name = nameInput ? nameInput.value.trim() : "";
-      if (withName && !name) { nameInput.focus(); return; }
-      if (!withName && !picked.length) { search.focus(); return; }
-      close({ name, people: picked });
-    };
-    m.querySelector(".auth-x").onclick = () => close(null);
-    m.addEventListener("click", (e) => { if (e.target === m) close(null); });
-    m.addEventListener("keydown", (e) => { if (e.key === "Escape") close(null); });
-    go.onclick = submit;
-    nameInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); search.focus(); } });
-    paint();
-    (nameInput || search).focus();
+  const me = auth.session()?.user?.id;
+  return openPeoplePicker({
+    sb, title, okText, withName, exclude: new Set([...exclude, ...(me ? [me] : [])]),
+    allow: restricted ? (n) => allowName.has(n.toLowerCase()) : null,
+    text: {
+      close: TA("close"), who: TI("grp.who"), placeholder: TI("inv.ph"), none: TI("grp.none"), noMatch: TI("inv.none"),
+      remove: TI("grp.remove"), addN: TI("grp.addN"), nameLabel: T("msg.newGroup.label"),
+    },
   });
 }
 // Add several people one after another; returns the names that failed.

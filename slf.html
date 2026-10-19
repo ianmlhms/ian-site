@@ -15,6 +15,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#0d0d1a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=2" data-game="slf"></script>
 <script src="theme.js?v=30"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
@@ -79,7 +80,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=29" data-arcade-id="o-slf" data-arcade-title="Stadt-Land-Fluss" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=29"></script>
+<script type="module" src="notify-ambient.js?v=30"></script>
 <script>
 /* 15 categories to choose from. `check` is the Wikidata WHERE-fragment used to
    verify an answer; null = no online check (that category always counts). */
@@ -104,6 +105,11 @@ const DEFAULT_CATS = [0,1,2,3,4,5];   // the classic six
 let selIdx = (()=>{ try{ const s=JSON.parse(localStorage.getItem("slfCats"));
   if(Array.isArray(s)&&s.length>=2&&s.every(n=>Number.isInteger(n)&&n>=0&&n<CATALOG.length)) return s;
 }catch{} return [...DEFAULT_CATS]; })();
+// Started from the shared lobby (lobby.html): the host's category choice comes with the context (mp-gate.js).
+if(window.MPGate&&MPGate.ctx&&Array.isArray(MPGate.ctx.cfg&&MPGate.ctx.cfg.cats)){
+  const fromLobby=[...new Set(MPGate.ctx.cfg.cats.filter(n=>Number.isInteger(n)&&n>=0&&n<CATALOG.length))].sort((a,b)=>a-b);
+  if(fromLobby.length>=2) selIdx=fromLobby;
+}
 let cats = DEFAULT_CATS.map(i=>CATALOG[i]);   // the categories in play this round
 const LETTERS = "ABDEFGHIKLMNOPRSTUVW";
 const params = new URLSearchParams(location.search);
@@ -233,6 +239,7 @@ function announce(text){
 }
 function render(){
   const ps = players();
+  if(window.MPGate) MPGate.setOver(phase==="lobby"||phase==="results");
   if (phase==="lobby"){
     announce(ps.length<2?"Lobby: waiting for players":"Lobby: ready");
     $("app").innerHTML = `
@@ -385,8 +392,25 @@ ch.on("broadcast",{event:"start"},onMessage("start",payload=>{ round=payload.rou
     const hh = role==="host" || Object.values(st).some(m=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
     const hostChanged = hh!==hostHere; hostHere=hh;
     if(phase==="lobby"||phase==="results"||hostChanged&&phase!=="play") render();
-  })
-  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
+    maybeAutoStart();
+  });
+// Started from the lobby: the host opens round 1 as soon as everybody from the line-up is in the room (or after a grace period).
+const AUTO_START_WAIT_MS=12000;
+let autoStartPending=!!(window.MPGate&&MPGate.ctx&&role==="host"), autoStartTimer=null;
+function maybeAutoStart(){
+  if(!autoStartPending||phase!=="lobby") return;
+  const need=MPGate.ctx.roster.length;
+  if(players().length>=need) fireAutoStart();
+}
+function fireAutoStart(){
+  if(!autoStartPending) return;
+  autoStartPending=false; clearTimeout(autoStartTimer);
+  if(phase==="lobby"&&players().length>=2&&selIdx.length>=2) startRound();
+}
+if(!(window.MPGate&&MPGate.redirecting)){
+  ch.subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render();
+    if(autoStartPending) autoStartTimer=setTimeout(fireAutoStart,AUTO_START_WAIT_MS); }});
+}
 </script>
   <script type="module" src="rtc-ring.js?v=29"></script>
   <script type="module" src="class-gate.js?v=30"></script>

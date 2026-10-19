@@ -646,8 +646,16 @@ om.classList.remove('open');
 if(_omOpener&&_omOpener.isConnected)_omOpener.focus();
 _omOpener=null;
 }
-function startOnline(href){location.href=href+'?room='+Math.random().toString(36).slice(2,8)+'&role=host'}
-function joinOnline(href){var c=(document.getElementById('omCode').value||'').trim().toLowerCase();if(c)location.href=href+'?room='+encodeURIComponent(c)+'&role=guest'}
+/* Games that have the shared lobby (lobby.html, see mp-games.js) open it instead of a bare room link.
+ * 4-letter codes belong to the lobby; older 6-character room codes still join the old way. */
+var MPG=null;
+import('./mp-games.js?v=1').then(function(m){MPG=m}).catch(function(){});
+function lobbyIdFor(href){if(!MPG)return null;var ids=Object.keys(MPG.MP_GAMES);for(var i=0;i<ids.length;i++){var g=MPG.MP_GAMES[ids[i]];if(g.lobby&&g.page===href)return g.id}return null}
+function startOnline(href){var lg=lobbyIdFor(href);if(lg){location.href=MPG.lobbyUrl(lg,'new');return}
+location.href=href+'?room='+Math.random().toString(36).slice(2,8)+'&role=host'}
+function joinOnline(href){var c=(document.getElementById('omCode').value||'').trim().toLowerCase();if(!c)return;
+var lg=lobbyIdFor(href);if(lg&&MPG.cleanCode(c).length===4){location.href=MPG.lobbyUrl(lg,c);return}
+location.href=href+'?room='+encodeURIComponent(c)+'&role=guest'}
 document.getElementById('om').addEventListener('click',function(e){if(e.target.id==='om')closeOnline()});
 
 // On-screen touch controls → synthetic key events into the open game (same-origin iframe).
