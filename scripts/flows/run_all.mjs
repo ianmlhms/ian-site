@@ -36,12 +36,13 @@ import { flow as mpLobbySlf } from "./mp_lobby_slf.mjs";
 import { flow as mpLobbyQuick } from "./mp_lobby_quick.mjs";
 import { flow as mpLobbyGames } from "./mp_lobby_games.mjs";
 import { flow as mpLobbyColor } from "./mp_lobby_color.mjs";
+import { flow as mpLobbyParty } from "./mp_lobby_party.mjs";
 
 import { flow as testMode } from "./test_mode.mjs";
 import { flow as mordsfall } from "./mordsfall.mjs";
 import { flow as trainSim } from "./train_sim.mjs";
 
-const ALL = [mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, trainSim, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, driveMadLevels, testMode, mordsfall];
+const ALL = [mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, trainSim, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, driveMadLevels, testMode, mordsfall];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

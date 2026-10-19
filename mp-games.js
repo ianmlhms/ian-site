@@ -18,6 +18,9 @@ export const LOBBY_PAGE = "lobby.html";
 // slf.html CATALOG order (index = value). A flow test compares this list with the page.
 const SLF_CATEGORIES = ["Stadt", "Land", "Fluss", "Name", "Tier", "Beruf", "Pflanze", "Farbe", "Sportart", "Essen", "Getränk", "Automarke", "Film", "Band", "Körperteil"];
 
+// intro-catalog.js order (index = value). A flow test compares this list with the page's catalogue.
+const INTRO_CATEGORIES = ["🔥 Charts", "📀 2000er", "💿 2010er", "🎤 Rap", "🎸 Rock", "🎬 Filmmusek", "🇩🇪 Deutschrap", "🎉 Party"];
+
 const G = (o) => Object.freeze({ lobby: false, ai: false, settings: Object.freeze([]), ...o });
 
 export const MP_GAMES = Object.freeze({
@@ -46,9 +49,16 @@ export const MP_GAMES = Object.freeze({
     ]),
   }),
   // ---- not migrated yet: the lobby is off, links stay  page?room=CODE&role=guest ----
-  draw: G({ id: "draw", name: "Draw & Guess", emoji: "✏️", page: "draw.html", min: 2, max: 8 }),
-  meme: G({ id: "meme", name: "Meme Caption Party", emoji: "😂", page: "meme.html", min: 2, max: 8 }),
-  intro: G({ id: "intro", name: "Guess the Song", emoji: "🎵", page: "intro.html", min: 2, max: 8 }),
+  draw: G({ id: "draw", name: "Draw & Guess", emoji: "✏️", page: "draw.html", min: 2, max: 8, lobby: true }),
+  meme: G({ id: "meme", name: "Meme Caption Party", emoji: "😂", page: "meme.html", min: 2, max: 8, lobby: true }),
+  intro: G({
+    id: "intro", name: "Guess the Song", emoji: "🎵", page: "intro.html", min: 2, max: 8, lobby: true,
+    settings: Object.freeze([
+      { key: "cat", type: "choice", def: 0, label: { lb: "Kategorie", de: "Kategorie", en: "Category" }, options: Object.freeze(INTRO_CATEGORIES.map((label, v) => Object.freeze({ v, label }))) },
+      { key: "count", type: "choice", def: 5, label: { lb: "Lidder", de: "Lieder", en: "Songs" }, options: Object.freeze([3, 5, 8, 10].map((v) => Object.freeze({ v, label: String(v) }))) },
+      { key: "mode", type: "choice", def: "speaker", label: { lb: "Lauschteren", de: "Zuhören", en: "Listening" }, options: Object.freeze([{ v: "speaker", label: "📢 Ee Lautsprecher" }, { v: "each", label: "🎧 All Handy" }]) },
+    ]),
+  }),
   "kart-letzebuerg": G({ id: "kart-letzebuerg", name: "Kart Lëtzebuerg", emoji: "🏎️", page: "pb/kart-letzebuerg.html", min: 2, max: 8 }),
 });
 
