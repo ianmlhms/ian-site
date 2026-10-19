@@ -10,7 +10,7 @@
    * thick rusty downcomers, a row of tall weathered hot-blast stoves, dust catcher. k = overall scale, f = frame, stoves behind (+z) */
   function furnace(B, E, f, opt) {
     const k = (opt && opt.k) || 1.5, L = KL.lm, F = L.frame(f), P = (x, y, z) => F(x * k, y * k, z * k);
-    const rust = col('#7a4a34'), rustD = col('#4a3028'), steel = col('#2b2f37'), steelL = col('#454b55'), stove = col('#8b8f87'), stoveD = col('#686c65'), conc = col('#7e7a74'), glow = col('#ff9a3c');
+    const rust = col('#7a4a34'), rustD = col('#4a3028'), steel = col('#2b2f37'), steelL = col('#454b55'), stove = col('#5d514b'), stoveD = col('#2f2824'), conc = col('#7e7a74'), glow = col('#ff9a3c');
     const box = (x, y, z, sx, sy, sz, c) => L.box(B, f, x * k, y * k, z * k, sx * k, sy * k, sz * k, 0, c);
     const cyl = (x, y, z, r0, r1, h, seg, c) => L.cyl(B, f, x * k, y * k, z * k, r0 * k, r1 * k, h * k, seg, c);
     const bar = (a, b, t, c) => L.bar(B, a, b, t * k, c);
@@ -49,6 +49,7 @@
       cyl(sx, 0, 22, 5.6, 5.6, 40, 14, stove); const d = P(sx, 40, 22); B.sphere(d[0], d[1], d[2], 5.6 * k, 10, stove, { sy: 0.5 });
       cyl(sx, 0, 22, 5.8, 5.8, 1.4, 14, rustD); cyl(sx, 20, 22, 5.75, 5.75, 0.8, 14, stoveD); cyl(sx, 33, 22, 5.75, 5.75, 0.8, 14, stoveD);
       bar(P(sx, 36, 18), P(sx * 0.15, 33, 6), 1.5, rust);
+      cyl(sx, 8, 22, 5.7, 5.7, 5, 14, col('#6a4636')); cyl(sx, 26, 22, 5.7, 5.7, 4, 14, col('#4d3a32'));
     }
     bar(P(-18, 41, 22), P(18, 41, 22), 1.2, rustD);
     for (const sx of [-18, -6, 6, 18]) bar(P(sx, 0, 16.6), P(sx, 30, 16.6), 0.35, steel);
@@ -101,6 +102,13 @@
         L.box(B, f, -38, 32, 0, 36, 0.8, 42, 0, col('#4c5058'));
         L.box(B, f, 12, 22, 4, 100, 0.8, 54, 0, col('#4c5058'));
         for (let i = -5; i <= 5; i++) L.cyl(B, f, 12 + i * 8, 0, -32, 0.5, 0.5, 8, 5, col('#3d4048'));
+        // raked roof over the hall, a dark ribbed facade, a canopy over the entrance and the tall fly tower behind
+        L.gableX(B, f, 12, 22.8, 4, 100, 54, 5.5, col('#5a5e66'), 0.6);
+        for (let i = 0; i < 24; i++) L.box(B, f, -35 + i * 4.3, 8.2, -22.35, 0.7, 13.6, 0.7, 0, col('#8f1a21'));
+        L.box(B, f, 12, 10.6, -28, 46, 0.7, 11, 0, col('#2e3138'), { topCol: col('#585d66') });
+        for (const cx of [-8, 12, 32]) L.cyl(B, f, cx, 0, -32.5, 0.35, 0.35, 10.6, 5, col('#2e3138'));
+        L.box(B, f, 38, 22, 20, 26, 20, 26, 0, col('#2f3238')); L.box(B, f, 38, 42, 20, 27, 0.8, 27, 0, col('#4c5058'));
+        L.box(E, f, 12, 17, -22.5, 40, 0.9, 0.2, 0, col('#ff3b3b'));                                     // red LED sign strip
       }
       // chimneys of the old works on the skyline (OSM man_made=chimney)
       for (const [x, z] of [[709, -33], [702, -13], [850, 29], [807, -58]]) { B.cyl(x, 0, z, 4.2, 2.6, 92, 12, col('#a05a46')); B.cyl(x, 78, z, 3.3, 3.3, 3, 12, col('#d9d2c0')); }

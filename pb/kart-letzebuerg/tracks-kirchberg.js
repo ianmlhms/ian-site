@@ -97,14 +97,27 @@
         for (let i = 0; i + 1 < tops.length; i++) for (const o of [-1, 1]) { const a = tops[i], b = tops[i + 1]; L.bar(B, [a[0] - (a[2] - b[2]) * 0 + 0, a[1] + 0.3, a[2]], [b[0], b[1] + 0.3, b[2]], 0.05, col('#2c2f35')); break; }
         add(R, M.plain);
         // trams: three-car sets that shuttle along the avenue
-        const car = new KL.Batch(), silver = col('#d8dce2'), band = col('#1c2a3a'), accent = col('#7b3fa0');
-        car.box(0, 0.7, 0, 2.6, 3.0, 8.4, 0, silver, { topCol: col('#f0f2f5') });
-        car.box(1.31, 1.6, 0, 0.1, 1.2, 8.0, 0, band); car.box(-1.31, 1.6, 0, 0.1, 1.2, 8.0, 0, band);
-        car.box(1.32, 0.9, 0, 0.1, 0.35, 8.2, 0, accent); car.box(-1.32, 0.9, 0, 0.1, 0.35, 8.2, 0, accent);
-        car.box(0, 3.7, 0, 1.6, 0.25, 1.6, 0, steel);
-        const geo = car.toGeometry(), trams = [];
+        /* CAF Urbos-style set: head car (rounded nose + raked windscreen), middle car, tail car (nose at the other end); a purple skirt, dark window band, pantograph on the middle car */
+        const silver = col('#d8dce2'), band = col('#1c2a3a'), accent = col('#7b3fa0');
+        const mk = (nose, pant) => {
+          const c = new KL.Batch(), L0 = nose ? 7.4 : 8.4, z0 = nose ? -0.5 * nose : 0, zn = nose ? 3.2 * nose : 0;
+          c.box(0, 0.7, z0, 2.6, 2.9, L0, 0, silver, { topCol: col('#f0f2f5') });
+          c.box(1.31, 1.6, z0, 0.1, 1.2, L0 - 0.4, 0, band); c.box(-1.31, 1.6, z0, 0.1, 1.2, L0 - 0.4, 0, band);
+          c.box(1.32, 0.9, z0, 0.1, 0.35, L0 - 0.2, 0, accent); c.box(-1.32, 0.9, z0, 0.1, 0.35, L0 - 0.2, 0, accent);
+          if (nose) {
+            c.cyl(0, 0.7, zn, 1.3, 1.3, 2.9, 12, silver, { capTop: true });                          // rounded plan-view nose
+            c.cyl(0, 0.9, zn, 1.33, 1.33, 0.35, 12, accent, { flat: true });
+            c.cyl(0, 1.45, zn, 1.31, 1.31, 1.3, 12, band, { flat: true });                           // dark windscreen band wrapping the nose
+            c.box(0, 3.4, z0, 2.5, 0.3, L0 - 0.2, 0, col('#e9ecf0'));
+            c.box(0, 1.0, zn + 1.28 * nose, 1.0, 0.22, 0.12, 0, col('#ffe9a0'));                      // headlight
+          }
+          if (pant) c.box(0, 3.6, 0, 1.6, 0.25, 1.6, 0, steel);
+          return c.toGeometry();
+        };
+        const geos = [mk(1, false), mk(0, true), mk(-1, false)];
+        const trams = [];
         for (let k = 0; k < 2; k++) {
-          const meshes = []; for (let c = 0; c < 3; c++) { const m = new T.Mesh(geo, M.plain); m.matrixAutoUpdate = true; group.add(m); meshes.push(m); }
+          const meshes = []; for (let c = 0; c < 3; c++) { const m = new T.Mesh(geos[c], M.plain); m.matrixAutoUpdate = true; group.add(m); meshes.push(m); }
           trams.push({ meshes, d: k ? 19.8 : 15.3, dir: k ? -1 : 1, s: sA + (k ? (sB - sA) * 0.7 : (sB - sA) * 0.2), v: 9 });
         }
         const o = {};
@@ -122,7 +135,9 @@
         L.cyl(B, f, 0, 0, 0, 29, 29, 1.2, 28, col('#d9d8d3'));                       // plinth
         L.cyl(B, f, 0, 1.2, 0, 24.5, 24.5, 15, 28, col('#8aa5bd'), { flat: true });             // glazed drum
         for (let i = 0; i < 64; i++) { const a = (i / 64) * Math.PI * 2; L.cyl(B, f, Math.cos(a) * 26.6, 1.2, Math.sin(a) * 26.6, 0.42, 0.38, 15.6, 5, white); }
-        L.cyl(B, f, 0, 16.4, 0, 29.2, 28.4, 0.9, 28, white);                           // roof slab
+        L.cyl(B, f, 0, 16.2, 0, 35, 33.6, 1.2, 36, white);                              // wide flat roof canopy overhanging the colonnade
+        L.cyl(B, f, 0, 15.9, 0, 33.4, 33.4, 0.35, 36, col('#c9c8c3'), { flat: true });  // shaded soffit edge
+        L.cyl(B, f, 0, 17.4, 0, 35.2, 35.2, 0.45, 36, white, { flat: true });            // crisp white rim
         L.cyl(B, f, 0, 17.3, 0, 22, 22, 3, 24, col('#e9e9e6'));                       // upper volume
         L.cyl(B, f, 0, 20.3, 0, 22.4, 22.4, 0.5, 24, white);
         L.box(E, f, 0, 3, 0, 1, 1, 1, 0, col('#000000'));
