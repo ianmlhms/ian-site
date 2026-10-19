@@ -24,6 +24,7 @@ body{display:flex;flex-direction:column}
 .join input:focus-visible{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(77,232,255,.25)}
 .status{min-height:22px;margin:12px 0 0!important;color:var(--cyan)!important;font-weight:650}
 </style>
+<script src="/mp-gate.js?v=6" data-game="fighters" data-menu data-adopt="#hudMenu,#menuBtn,!#mHost" data-over="#overOv"></script>
 <script src="/pb/arcade-kit.js?v=29" data-arcade-id="fighters" data-arcade-title="Platform Fighters"></script>
 </head>
 <body>
@@ -134,10 +135,10 @@ $('menuBtn').onclick=()=>backToMenu();
 $('hudMenu').onclick=()=>backToMenu();
 document.getElementById('mLocal').onclick=()=>{mode='local';begin()};
 document.getElementById('mAI').onclick=()=>{mode='ai';begin()};
-document.getElementById('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
+document.getElementById('mHost').onclick=()=>{if(window.MPGate){MPGate.openLobby('new');return}mode='host';const c=randCode();NET.open(c,'host');
   status('Room code: '+c.toUpperCase()+' — waiting for the other player…')};
 document.getElementById('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('mJoin').click()});
-document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();
+document.getElementById('mJoin').onclick=()=>{const c=(document.getElementById('mCode').value||'').trim().toLowerCase();if(window.MPGate&&/^[a-z]{4}$/.test(c)){MPGate.openLobby(c);return}
   if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
   mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'…')};
 NET.onPeers=(p)=>{
@@ -348,6 +349,8 @@ document.addEventListener('keydown',e=>{keys[e.key]=true;
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault()});
 document.addEventListener('keyup',e=>{keys[e.key]=false;if(mode==='guest')sendKeys()});
 requestAnimationFrame(loop);
+/* Started from the shared lobby (lobby.html): open the room with the lobby's code and role right away (as «Host online game» / «Join» would). */
+if(window.MPGate&&MPGate.ctx&&(MPGate.ctx.role==='host'||MPGate.ctx.role==='guest')){mode=MPGate.ctx.role;NET.open(MPGate.ctx.room,mode);status('Connecting to '+MPGate.ctx.room.toUpperCase()+'…')}
 </script>
 </body>
 </html>

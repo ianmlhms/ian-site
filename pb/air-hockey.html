@@ -14,7 +14,8 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 .arcade-hud b{text-transform:none}
 .arcade-panel p:empty{display:none}
 #panelExtra:not(:empty){margin:14px 0 2px}
-.arcade-hud{justify-content:center}
+.arcade-hud{justify-content:center;align-items:center}
+.hud-btn{pointer-events:auto;min-height:44px}   /* only shown for a lobby game: mp-gate.js turns it into «‹ Lobby» */
 .arcade-hud .arcade-pill{text-transform:none;letter-spacing:.01em}
 .menu-panel .arcade-actions{flex-direction:column;align-items:stretch;margin-top:16px}
 .menu-panel .arcade-btn{width:100%}
@@ -25,12 +26,13 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 .join .arcade-btn{width:auto}
 #mStatus{min-height:22px;margin:12px 0 0;color:var(--cyan);font-size:14px}
 </style>
+<script src="/mp-gate.js?v=6" data-game="air-hockey" data-menu data-adopt="#hudMenu,!#mHost"></script>
 <script src="/pb/arcade-kit.js?v=29" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">
   <canvas id="c" aria-label="Air Hockey arcade game"></canvas>
-  <div class="arcade-hud"><span class="arcade-pill" id="info"></span></div>
+  <div class="arcade-hud"><span class="arcade-pill" id="info"></span><button class="arcade-btn secondary hud-btn" id="hudMenu" type="button" hidden>Menu</button></div>
   <div class="arcade-overlay show" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
     <div class="arcade-panel menu-panel">
       <h2 id="menuTitle">Air Hockey</h2>
@@ -175,9 +177,9 @@ function backToMenu(msg){running=false;paused=false;matchShown=false;mode=null;p
 $('mCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('mJoin').click()});
 $('mLocal').onclick=()=>{mode='local';begin()};
 $('mAI').onclick=()=>{mode='ai';begin()};
-$('mHost').onclick=()=>{mode='host';const c=randCode();NET.open(c,'host');
+$('mHost').onclick=()=>{if(window.MPGate){MPGate.openLobby('new');return}mode='host';const c=randCode();NET.open(c,'host');
   status('Room code: '+c.toUpperCase()+' - waiting for the other iPad...')};
-$('mJoin').onclick=()=>{const c=($('mCode').value||'').trim().toLowerCase();
+$('mJoin').onclick=()=>{const c=($('mCode').value||'').trim().toLowerCase();if(window.MPGate&&/^[a-z]{4}$/.test(c)){MPGate.openLobby(c);return}
   if(!/^[a-z0-9]{4,6}$/.test(c)){status('Enter the 4-6 letter code from the host');return}
   mode='guest';NET.open(c,'guest');status('Joining '+c.toUpperCase()+'...')};
 NET.onPeers=(p)=>{
@@ -193,9 +195,10 @@ const meU=()=>keys['w']||keys['W']||keys['ArrowUp'],meD=()=>keys['s']||keys['S']
 function sendKeys(){NET.send({t:'k',k:{u:+!!meU(),d:+!!meD(),l:+!!meL(),r:+!!meR(),sp:+!!keys[' ']}})}
 
 /* ---------- match end + pause panels ---------- */
-function rematch(){hidePanel();p1.score=0;p2.score=0;matchShown=false;reset()}
+function rematch(){hidePanel();p1.score=0;p2.score=0;matchShown=false;if(window.MPGate)MPGate.setOver(false);reset()}
 function showMatchEnd(){
   matchShown=true;
+  if(window.MPGate)MPGate.setOver(true);   // lobby game: «‹ Lobby» is one tap now
   const p1w=p1.score>=WIN_SCORE;
   let name=p1w?'Red':'Blue';
   if(mode==='ai')name=p1w?'You':'Computer';
@@ -205,7 +208,7 @@ function showMatchEnd(){
   showPanel({title,big:p1.score+' : '+p2.score,
     bestLine:'Red : Blue',
     body:isGuest?'Waiting for the host to start a rematch.':'',
-    label:'Rematch',action:isGuest?null:rematch,label2:'Menu',action2:()=>backToMenu()});
+    label:'Rematch',action:isGuest?null:rematch,label2:window.MPGate&&MPGate.ctx?'‹ Lobby':'Menu',action2:()=>window.MPGate&&MPGate.ctx?MPGate.backToLobby():backToMenu()});
 }
 function pauseGame(){
   if(!running||paused||matchShown||(mode!=='local'&&mode!=='ai'))return;
@@ -328,6 +331,8 @@ document.addEventListener('keyup',e=>{keys[e.key]=false;if(mode==='guest')sendKe
 hidePanel();
 fitCanvas();
 requestAnimationFrame(loop);
+/* Started from the shared lobby (lobby.html): open the room with the lobby's code and role right away (as «Host online game» / «Join» would). */
+if(window.MPGate&&MPGate.ctx&&(MPGate.ctx.role==='host'||MPGate.ctx.role==='guest')){mode=MPGate.ctx.role;NET.open(MPGate.ctx.room,mode);status('Connecting to '+MPGate.ctx.room.toUpperCase()+'…')}
 </script>
 </body>
 </html>

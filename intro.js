@@ -40,6 +40,13 @@
   var name = 'Spiller';
   var phase = 'lobby';
   var catIdx = 0, songCount = 5, audioMode = 'speaker';
+  // Started from the shared lobby (lobby.html): the host's choices (category, number of songs, listening mode) come with the context (mp-gate.js).
+  if (window.MPGate && MPGate.ctx && MPGate.ctx.cfg) {
+    var lc = MPGate.ctx.cfg;
+    if (Number.isInteger(lc.cat) && lc.cat >= 0 && lc.cat < CATALOG.length) catIdx = lc.cat;
+    if ([3, 5, 8, 10].indexOf(lc.count) >= 0) songCount = lc.count;
+    if (lc.mode === 'speaker' || lc.mode === 'each') audioMode = lc.mode;
+  }
   var rounds = [];          // host only: [{id, url, art, choices:[ids]}]
   var roundIdx = 0, step = 0;
   var current = null;       // {ids:[4], url} as broadcast
@@ -176,6 +183,7 @@
   /* ---------- screens ---------- */
 
   function show(id) {
+    if (window.MPGate) MPGate.setOver(id === 's-lobby' || id === 's-final');   // «‹ Lobby» is one tap when no game is running
     ['s-lobby', 's-play', 's-reveal', 's-final'].forEach(function (s) {
       $(s).classList.toggle('on', s === id);
     });
@@ -456,13 +464,16 @@
       if (phase === 'lobby') renderLobby();
       else if (revealed) renderScores($('revScores'), scores, null);
       else renderScores($('playScores'), scores, null);
-    })
-    .subscribe(async function (s) {
+    });
+  // mp-gate.js sends a bare visit to the lobby (lobby.html): then this page must not open the "demo" room.
+  if (!(window.MPGate && window.MPGate.redirecting)) {
+    ch.subscribe(async function (s) {
       if (s !== 'SUBSCRIBED') return;
       name = await getName();
       await ch.track({ name: name, role: role });
       renderLobby();
     });
+  }
 
   async function getName() {
     var n = localStorage.getItem('playerName');

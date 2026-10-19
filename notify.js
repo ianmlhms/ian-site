@@ -9,7 +9,7 @@
  * Foreground notifications use the Notification API (no server). Closed-app push
  * is delivered by the Supabase Edge Function `notify` → the service worker. */
 import * as auth from "./auth.js?v=32";
-import { gameName, joinUrl } from "./mp-games.js?v=2";
+import { gameName, joinUrl } from "./mp-games.js?v=4";
 
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;

@@ -9,6 +9,7 @@
   <meta name="description" content="Draw &amp; Guess — a drawing party game on ian.lu. One player draws, everyone else guesses the word." />
   <link rel="canonical" href="https://ian.lu/draw.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=6" data-game="draw"></script>
 <script src="theme.js?v=30"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
@@ -76,7 +77,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=29" data-arcade-id="o-draw" data-arcade-title="Draw & Guess" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=31"></script>
+<script type="module" src="notify-ambient.js?v=33"></script>
 <script>
 const WORDS = ["HAUS","BAUM","AUTO","HUND","KATZE","SONNE","MOND","STERN","BLUME","FISCH","VOGEL","APFEL","BANANE","PIZZA","BURG","SCHIFF","ZUG","FLUGZEUG","RAKETE","ROBOTER","BRILLE","SCHUH","HUT","UHR","HERZ","SCHLANGE","ELEFANT","GIRAFFE","KROKODIL","PINGUIN","SCHMETTERLING","REGENBOGEN","WOLKE","BERG","BRÜCKE","GITARRE","FUSSBALL","KRONE","DRACHE","GESPENST","SCHNEEMANN","KAKTUS","LEUCHTTURM","AMPEL","FAHRRAD","EISBÄR","KERZE","TASSE","LÖFFEL","SCHLÜSSEL"];
 const LAPS = 2, TURN_SECS = 75, COLORS = ["#000000","#e53527","#1d72e8","#2ca02c","#ffcc00","#8b5a2b","#ff7ac0","#ffffff"];
@@ -136,6 +137,7 @@ async function getName(){ let n=localStorage.getItem("playerName"); if(!n){ try{
 /* ---------- render ---------- */
 function render(){
   const ps=players();
+  if(window.MPGate) MPGate.setOver(phase==="lobby"||phase==="final");   // «‹ Lobby» is one tap when no game is running
   let html = `<div class="scores">${ps.map(p=>`<span class="pchip ${p.cid===drawerCid?"draw":""} ${guessed.has(p.cid)?"got":""}">${p.cid===drawerCid?"✏️ ":""}${esc(p.name)} · ${scores[p.cid]||0}${guessed.has(p.cid)?" ✓":""}</span>`).join("")}</div>`;
   if(phase==="lobby"){
     html += `<p class="muted center">One player draws a secret word, everyone else races to guess it in the chat. Most points after ${LAPS} laps wins.</p>`;
@@ -287,8 +289,24 @@ ch.on("broadcast",{event:"turn"},onMessage("turn",payload=>applyTurn(payload)))
     if(hostHere&&!hh&&phase!=="lobby"&&phase!=="final") addLog({sys:true,t:"⚠️ The host left — the game can't continue until they rejoin."});
     hostHere=hh;
     if(phase==="lobby"||phase==="final") render();
-  })
-  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
+    maybeAutoStart();
+  });
+// Started from the lobby (lobby.html): the host starts the game as soon as everybody from the line-up is in the room (or after a grace period).
+const AUTO_START_WAIT_MS=12000;
+let autoStartPending=!!(window.MPGate&&MPGate.ctx&&role==="host"), autoStartTimer=null;
+function maybeAutoStart(){
+  if(!autoStartPending||phase!=="lobby") return;
+  if(players().length>=MPGate.ctx.roster.length) fireAutoStart();
+}
+function fireAutoStart(){
+  if(!autoStartPending) return;
+  autoStartPending=false; clearTimeout(autoStartTimer);
+  if(phase==="lobby"&&players().length>=2) start();
+}
+if(!(window.MPGate&&window.MPGate.redirecting)){   // mp-gate.js sends a bare visit to the lobby (lobby.html)
+  ch.subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render();
+    if(autoStartPending) autoStartTimer=setTimeout(fireAutoStart,AUTO_START_WAIT_MS); }});
+}
 function isDrawerHost(){ return true; } // host validates picks regardless
 </script>
   <script type="module" src="rtc-ring.js?v=29"></script>

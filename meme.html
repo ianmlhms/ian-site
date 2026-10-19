@@ -10,6 +10,7 @@
   <link rel="canonical" href="https://ian.lu/meme.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <meta name="theme-color" content="#0d0d1a">
+<script src="mp-gate.js?v=6" data-game="meme"></script>
 <script src="theme.js?v=30"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#6ea8fe;--accent2:#4de8ff;--good:#3fb950}
@@ -179,6 +180,7 @@ function topbar(){ const s=Math.max(0,Math.ceil((roundEnd-Date.now())/1000));
 /* ---------- render ---------- */
 function render(){
   announcePhase();
+  if(window.MPGate) MPGate.setOver(phase==="lobby"||phase==="final");   // «‹ Lobby» is one tap when no game is running
   if(phase==="lobby"){
     let html = `<p class="muted center">Everyone gets a meme — keep it or <b>change it up to ${MAX_REROLLS}×</b> — caption it, then vote for the funniest. Most votes over ${ROUNDS} rounds wins. 3+ players is best!</p>`;
     html += scoreChips();
@@ -339,8 +341,24 @@ ch.on("broadcast",{event:"round"},onMessage("round",payload=>applyRound(payload)
     const st=ch.presenceState();
     hostHere = role==="host" || Object.values(st).some(m=>Array.isArray(m)&&isObject(m[0])&&m[0].role==="host");
     if(phase==="lobby"||phase==="final") render();
-  })
-  .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
+    maybeAutoStart();
+  });
+// Started from the lobby (lobby.html): the host starts the game as soon as everybody from the line-up is in the room (or after a grace period).
+const AUTO_START_WAIT_MS=12000;
+let autoStartPending=!!(window.MPGate&&MPGate.ctx&&role==="host"), autoStartTimer=null;
+function maybeAutoStart(){
+  if(!autoStartPending||phase!=="lobby") return;
+  if(players().length>=MPGate.ctx.roster.length) fireAutoStart();
+}
+function fireAutoStart(){
+  if(!autoStartPending) return;
+  autoStartPending=false; clearTimeout(autoStartTimer);
+  if(phase==="lobby"&&players().length>=2) start();
+}
+if(!(window.MPGate&&window.MPGate.redirecting)){   // mp-gate.js sends a bare visit to the lobby (lobby.html)
+  ch.subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render();
+    if(autoStartPending) autoStartTimer=setTimeout(fireAutoStart,AUTO_START_WAIT_MS); }});
+}
 </script>
   <script type="module" src="rtc-ring.js?v=29"></script>
   <script type="module" src="class-gate.js?v=30"></script>

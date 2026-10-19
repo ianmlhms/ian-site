@@ -1,5 +1,5 @@
 /* mp-gate.js — the small in-game half of the shared lobby. Classic script, first <script> in the game page:
- *   <script src="mp-gate.js?v=4" data-game="connect4"></script>
+ *   <script src="mp-gate.js?v=6" data-game="connect4"></script>
  *
  * 1. Gate: a visit with neither ?room= nor ?ai=1 (arcade card, old bookmark, ?lobby=CODE) is sent to lobby.html. The old
  *    links page?room=CODE&role=host|guest and page?ai=1 keep working untouched — they never see the lobby.
@@ -9,6 +9,10 @@
  *      MPGate.ctx = { game, code, room, role, cfg, roster:[{id,name,uid,avatar,role}] }   (null for old links)
  * 3. Back to lobby: a floating button (rematch / change settings / add people). setOver(true) tells it the match is
  *    finished (one tap, highlighted); mid-match it asks for a second tap so nobody leaves by accident.
+ * 4. Arcade games (pong, tank-wars, fighters, air-hockey) run in the arcade's sandboxed frame: there the context comes from the shell's URL
+ *    (pixelbreak.html?g=pong&room=..&role=..&lb=..), a lobby jump is a postMessage to the shell ({__pbLobby:{url}}, handled by pixelbreak.html),
+ *    data-menu keeps the bare visit on the game's own menu (its «Host online game» button calls MPGate.openLobby instead), and
+ *    data-adopt="#hudMenu,#menuBtn" turns the game's own Menu buttons into the «‹ Lobby» button instead of floating a second one over the canvas.
  *    Games without their own setOver() calls can add  data-over="#rematch"  to the script tag: "over" then simply follows
  *    whether that element (the game's own rematch / new-game button) is shown.
  */
@@ -16,22 +20,33 @@
   "use strict";
   var script = document.currentScript;
   var game = (script && script.getAttribute("data-game")) || "";
-  var params = new URLSearchParams(location.search);
+  var inFrame = false;
+  try { inFrame = window.parent !== window; } catch (e) { /* cross-origin parent: not ours */ }
+  var search = location.search;
+  if (inFrame) { try { search = window.parent.location.search; } catch (e) { search = ""; } }
+  var params = new URLSearchParams(search);
+  var menuEntry = !!(script && script.hasAttribute("data-menu"));
   var LOBBY = "lobby.html";
   var CTX_KEY = "mpl.ctx";
   var MAX_AGE_MS = 6 * 3600 * 1000;
-  var gate = (window.MPGate = { redirecting: false, game: game, code: "", ctx: null, over: false, setOver: function () {}, backToLobby: function () {}, lobbyUrl: lobbyUrl });
+  var gate = (window.MPGate = { redirecting: false, game: game, code: "", ctx: null, over: false, setOver: function () {}, backToLobby: function () {}, lobbyUrl: lobbyUrl, inFrame: inFrame, openLobby: function (code) { jump(lobbyUrl(code)); } });
 
   function cleanCode(s) { return String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10); }
   function lobbyUrl(code, back) {
     var q = new URLSearchParams({ g: game });
-    if (code) q.set("c", cleanCode(code));
+    if (code) q.set("c", code === "new" ? "new" : cleanCode(code));
     if (back) { q.set("back", "1"); if (params.get("role") === "host") q.set("host", "1"); }
     return LOBBY + "?" + q.toString();
   }
 
+  /* leave for the lobby: a normal page navigates, a sandboxed arcade frame asks the shell to (it may not touch the top window itself) */
+  function jump(url) {
+    if (inFrame) { try { window.parent.postMessage({ __pbLobby: { url: url } }, "*"); } catch (e) { /* no shell */ } }
+    else location.href = url;
+  }
+
   var hasRoom = params.has("room"), isAi = params.get("ai") === "1";
-  if (!hasRoom && !isAi) {
+  if (!hasRoom && !isAi && !menuEntry) {
     gate.redirecting = true;
     location.replace(lobbyUrl(params.get("lobby") || ""));
     return;
@@ -45,7 +60,7 @@
   function readCtx() {
     if (!lbCode) return null;
     try {
-      var c = JSON.parse(sessionStorage.getItem(CTX_KEY) || "null");
+      var c = JSON.parse(window.sessionStorage.getItem(CTX_KEY) || "null");
       if (!c || c.v !== 1 || c.game !== game || c.code !== lbCode || !Array.isArray(c.roster) || Date.now() - Number(c.at) > MAX_AGE_MS) return null;
       return Object.freeze({
         game: c.game, code: c.code, room: String(c.room || ""), role: c.role === "host" ? "host" : "guest",
@@ -58,9 +73,9 @@
   function onReady(fn) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn); else fn(); }
 
   var TEXT = {
-    lb: { lobby: "‹ Lobby", back: "↩ Zréck an d'Lobby", sure: "Sécher? Nach eng Kéier tippen", aria: "Zréck an d'Lobby" },
-    de: { lobby: "‹ Lobby", back: "↩ Zurück zur Lobby", sure: "Sicher? Nochmal tippen", aria: "Zurück zur Lobby" },
-    en: { lobby: "‹ Lobby", back: "↩ Back to lobby", sure: "Sure? Tap again", aria: "Back to the lobby" },
+    lb: { lobby: "‹ Lobby", back: "↩ Zréck an d'Lobby", sure: "Sécher? Nach eng Kéier tippen", sureShort: "Sécher?", aria: "Zréck an d'Lobby" },
+    de: { lobby: "‹ Lobby", back: "↩ Zurück zur Lobby", sure: "Sicher? Nochmal tippen", sureShort: "Sicher?", aria: "Zurück zur Lobby" },
+    en: { lobby: "‹ Lobby", back: "↩ Back to lobby", sure: "Sure? Tap again", sureShort: "Sure?", aria: "Back to the lobby" },
   };
   function lang() { try { var l = localStorage.getItem("site_lang"); return TEXT[l] ? l : "lb"; } catch (e) { return "lb"; } }
 
@@ -87,21 +102,32 @@
       ".mpg-chip:hover{border-color:var(--accent,#6ea8fe)}.mpg-chip[data-over='1']{background:var(--accent,#6ea8fe);border-color:var(--accent,#6ea8fe);color:var(--accent-foreground,#000)}" +
       ".mpg-chip:focus-visible{outline:3px solid var(--focus-ring,var(--accent2,#4de8ff));outline-offset:2px}@media print{.mpg-chip{display:none}}";
     document.head.appendChild(style);
-    var btn = document.createElement("button");
-    btn.type = "button"; btn.className = "mpg-chip"; btn.id = "mpgBack";
-    btn.setAttribute("aria-label", tx.aria);
-    var armed = 0, timer = 0;
-    function paint() { btn.textContent = armed ? tx.sure : (gate.over ? tx.back : tx.lobby); btn.dataset.over = gate.over ? "1" : "0"; }
-    function go() { location.href = lobbyUrl(lbCode, true); }
-    btn.addEventListener("click", function () {
-      if (gate.over || armed) { go(); return; }
+    /* data-adopt: the game's own buttons that become «‹ Lobby». A leading "!" = one tap always (e.g. the start menu the game falls back to
+     * when the opponent has left: there is no match to lose any more). */
+    var specs = ((script && script.getAttribute("data-adopt")) || "").split(",").map(function (q) { return q.trim(); }).filter(Boolean);
+    var adopt = specs.map(function (q) { var el = document.querySelector(q.replace(/^!/, "")); return el ? { el: el, instant: q.charAt(0) === "!" } : null; }).filter(Boolean);
+    var btns = adopt.length ? adopt.map(function (a) { return a.el; }) : [document.createElement("button")];
+    var armed = 0, timer = 0, compact = adopt.length > 0;
+    function paint() {
+      var label = armed ? (compact ? tx.sureShort : tx.sure) : (gate.over ? (compact ? tx.lobby : tx.back) : tx.lobby);
+      btns.forEach(function (b) { b.textContent = b.dataset.mpgInstant ? tx.lobby : label; b.dataset.over = gate.over ? "1" : "0"; });
+    }
+    function go() { jump(lobbyUrl(lbCode, true)); }
+    function onClick(e) {
+      if (gate.over || armed || (e && e.currentTarget.dataset.mpgInstant)) { go(); return; }
       armed = 1; paint(); clearTimeout(timer);
       timer = setTimeout(function () { armed = 0; paint(); }, 3000);
+    }
+    btns.forEach(function (b, i) {
+      b.setAttribute("aria-label", tx.aria);
+      b.onclick = onClick;
+      if (!adopt.length) { b.type = "button"; b.className = "mpg-chip"; b.id = "mpgBack"; }
+      else { b.dataset.mpg = "1"; b.hidden = false; if (adopt[i].instant) b.dataset.mpgInstant = "1"; }
     });
     gate.setOver = function (over) { gate.over = !!over; armed = 0; paint(); };
     gate.backToLobby = go;
     paint();
-    document.body.appendChild(btn);
+    if (!adopt.length) document.body.appendChild(btns[0]);
     watchOver();
   }
 })();
