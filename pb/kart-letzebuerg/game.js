@@ -48,13 +48,13 @@
   const WEATHER_ICON = { day: '☀️', sunset: '🌇', night: '🌙', rain: '🌧️', fog: '🌫️', random: '🎲' };
   function weathersFor(trackId) { const d = KL.tracks[trackId]; return (d && d.theme && d.theme.weathers) || ['day', 'sunset', 'night', 'rain']; }
   function chip(parent, label, on, fn, extra) { const b = document.createElement('button'); b.textContent = label; if (on) b.classList.add('on'); b.addEventListener('click', () => { fn(); KL.G.audio.sfx('click'); }); if (extra) extra(b); parent.appendChild(b); return b; }
-  function drawTrackPreview(canvas, track) {
+  function drawTrackPreview(canvas, track, overlay) {
     const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
     g.clearRect(0, 0, W, H);
     let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
     for (let i = 0; i < track.N; i++) { x0 = Math.min(x0, track.X[i]); x1 = Math.max(x1, track.X[i]); z0 = Math.min(z0, track.Z[i]); z1 = Math.max(z1, track.Z[i]); }
     const sc = Math.min((W - 12) / (x1 - x0), (H - 12) / (z1 - z0)), ox = (W - (x1 - x0) * sc) / 2 - x0 * sc, oz = (H - (z1 - z0) * sc) / 2 - z0 * sc;
-    g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = '#ffffffcc'; g.lineWidth = 3.2; g.beginPath();
+    g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = '#ffffffcc'; g.lineWidth = 3.2; if (overlay) { g.shadowColor = '#000c'; g.shadowBlur = 5; g.strokeStyle = '#fffffff0'; } g.beginPath();
     for (let i = 0; i <= track.N; i++) { const j = i % track.N; const x = track.X[j] * sc + ox, z = track.Z[j] * sc + oz; if (i) g.lineTo(x, z); else g.moveTo(x, z); }
     g.stroke();
     g.fillStyle = '#ffd23f'; g.beginPath(); g.arc(track.X[0] * sc + ox, track.Z[0] * sc + oz, 3.6, 0, 7); g.fill();
@@ -94,10 +94,11 @@
       for (const id of Object.keys(KL.tracks)) {
         const def = KL.tracks[id];
         const b = document.createElement('button'); b.className = 'tcard' + (S.track === id ? ' on' : '');
-        const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108; b.appendChild(cv);
+        const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108;
+        const pv = document.createElement('span'); pv.className = 'tpv'; const im = new Image(); im.alt = ''; im.decoding = 'async'; im.draggable = false; im.src = '/pb/kart-letzebuerg/thumbs/' + id + '.webp?v=1'; im.addEventListener('error', () => im.remove()); pv.appendChild(im); pv.appendChild(cv); b.appendChild(pv);
         const d = document.createElement('div'); d.innerHTML = '<b></b><small></small><small class="rec"></small>'; d.firstChild.textContent = trackName(id); d.children[1].textContent = KL.t('t_' + id + '_d'); d.lastChild.textContent = recLine(id); b.appendChild(d);
         b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); KL.Boards.select('lap', id); buildMenuChips(); G.audio.sfx('click'); });
-        tc.appendChild(b); drawTrackPreview(cv, previewTrack(id));
+        tc.appendChild(b); drawTrackPreview(cv, previewTrack(id), true);
       }
     }
     const wc = $('weatherChips'); wc.textContent = '';
