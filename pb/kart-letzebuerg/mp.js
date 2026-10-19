@@ -8,7 +8,7 @@
  *    other clients (made during the lobby hand-shake), so if the host disappears it simply promotes itself: the bots, items and
  *    remote records it already holds become the new simulation, the other clients switch their uplink to it.
  *  - A player that goes away (tab hidden / silent) is driven by a bot until he is back; a player that leaves becomes a bot.
- * No Supabase traffic happens in here. */
+ * Supabase is touched in exactly one place: the host logs the finished race with ONE record_kart_race call (see "race log"). */
 (function () {
   'use strict';
   const KL = window.KL, N = KL.NET, C = KL.CFG;
@@ -50,6 +50,7 @@
   M.attach = function (R, start, L) {
     Object.assign(M, { active: true, R, L, role: L.role, myId: L.myId, hostId: start.hostId, deputy: start.deputy || null, epoch: start.epoch || 0, lateralOk: new Set(start.ok || []), resultsDone: false, goAt: 0, lastSend: 0, evIdx: 0, out: [], itemMap: new Map(), base: new Map(), lastRecv: new Map(), lastHostMsg: 0, firstFinish: null, hostAway: false, ended: false, seq: 0, migratedFrom: null });
     M.self = R.byId[L.myId];
+    M.info = raceInfo(start, L); M.recorded = false;
     R.nid = 0;
     R.net = { role: M.role, onUse: (k) => M.onUse(k), onRescue: (k) => { k.tpc = (k.tpc | 0) + 1; } };
     R.hold = true;
@@ -432,13 +433,65 @@
     const msg = { k: 'results', rows };
     sendAllClients(msg, true);
     KL.G.mpShowResults(rows);
+    M.record(rows);
   };
   function onResults(m) {
     if (M.resultsDone || !Array.isArray(m.rows)) return;
     M.resultsDone = true;
     const rows = m.rows.slice(0, 8).map((r) => ({ id: String(r.id), name: String(r.name || '').slice(0, 14), drv: r.drv, human: !!r.human, finished: !!r.finished, time: r.finished ? num(r.time, 0) : null, best: r.best == null ? null : num(r.best, 0), place: r.place | 0 }));
     KL.G.mpShowResults(rows);
+    if (M.role === 'host') M.record(rows);       // promoted to host after the old host had already sent the results: dedup (race_key) makes a double call harmless
   }
+  /* ---------- race log (the only Supabase call of an online race) ----------
+   * At the end of every ONLINE race with >= 2 humans, the CURRENT host (after a migration: the new host) logs it once through the
+   * record_kart_race RPC (scripts/kart-letzebuerg-races-v1.sql). race_key = the start seed (+ Grand Prix round), which every client
+   * already holds, so a second call from a migrated host is a no-op on the server. One attempt plus at most one retry; no loops, no polling. */
+  const REC_RETRY_MS = 4000;
+  function raceInfo(start, L) {
+    const uids = new Map();
+    for (const g of start.grid || []) if (g && g.human && typeof g.uid === 'string' && KL.UUID_RE && KL.UUID_RE.test(g.uid)) uids.set(String(g.id).slice(0, 12), g.uid.toLowerCase());
+    const gp = start.gp && typeof start.gp.idx === 'number' ? { cup: String(start.gp.cup || ''), round: (start.gp.idx | 0) + 1 } : null;
+    return { room: String(L.code || ''), key: 's' + ((start.seed >>> 0).toString(36)) + (gp ? '-' + gp.round : ''), track: start.track, weather: start.weather, laps: start.laps | 0, gp, uids };
+  }
+  function buildRecord(rows) {
+    const I = M.info; if (!I || !Array.isArray(rows)) return null;
+    const players = rows.slice(0, 8).map((r) => {
+      const bot = !r.human, uid = bot ? '' : I.uids.get(String(r.id)) || '';
+      return {
+        name: String(r.name || '?').slice(0, 24) || '?', user_id: uid || null, guest: !bot && !uid, bot, place: r.place | 0,
+        time_ms: r.finished && isFinite(r.time) && r.time != null ? Math.round(r.time * 1000) : null,
+        best_lap_ms: r.best != null && isFinite(r.best) ? Math.round(r.best * 1000) : null,
+        driver: String(r.drv || '').slice(0, 24),
+      };
+    });
+    const humans = players.filter((p) => !p.bot).length;
+    if (humans < 2 || !I.room) return null;                          // solo / one human + bots: never logged
+    return { room: I.room, race_key: I.key, track: I.track, mode: I.gp ? 'gp' : 'race', cup: I.gp ? I.gp.cup : null, gp_round: I.gp ? I.gp.round : null, laps: I.laps, weather: I.weather, human_count: humans, players };
+  }
+  async function postRecord(body) {
+    const a = KL.authObj && KL.authObj();
+    if (a && a.session && a.sb && typeof a.sb.rpc === 'function') {      // signed in: the verified auth.uid() becomes "reporter"
+      const { error } = await a.sb.rpc('record_kart_race', { p: body });
+      if (error) throw new Error(error.message || 'rpc error');
+      return;
+    }
+    const cfg = window.PB_CONFIG; if (!cfg) throw new Error('no config');   // guest host: plain anon REST call, no library needed
+    const res = await fetch(cfg.url.replace(/\/$/, '') + '/rest/v1/rpc/record_kart_race', { method: 'POST', headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + cfg.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p: body }) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  }
+  M.record = function (rows) {
+    if (M.recorded || M.role !== 'host' || !M.info) return;
+    let body = null;
+    try { body = buildRecord(rows); } catch (e) { console.warn('[kart-mp] race log skipped', e); }
+    if (!body) return;
+    M.recorded = true;
+    (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try { await postRecord(body); log('race logged', body.race_key); return; }
+        catch (e) { console.warn('[kart-mp] race not logged' + (attempt ? '' : ', retrying once'), e && e.message); if (!attempt) await new Promise((r) => setTimeout(r, REC_RETRY_MS)); }
+      }
+    })();
+  };
   M.endRace = function (key, vars) {
     if (M.ended) return;
     M.ended = true;

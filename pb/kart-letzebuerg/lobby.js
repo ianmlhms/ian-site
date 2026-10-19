@@ -26,6 +26,10 @@
 
   /* ---------- identity / auth ---------- */
   function authObj() { try { return window.__pbAuth || (parent !== window && parent.__pbAuth) || null; } catch (e) { return null; } }
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  /* the signed-in user's id (shared with the host so the finished online race can be logged with it); '' for a guest */
+  function myUid() { const a = authObj(); const u = a && a.session && a.session.user; return u && typeof u.id === 'string' && UUID_RE.test(u.id) ? u.id.toLowerCase() : ''; }
+  KL.authObj = authObj; KL.myUid = myUid; KL.UUID_RE = UUID_RE;
   function signedInName() { const a = authObj(); const u = a && a.session && a.session.user; return u ? cleanName((u.user_metadata && u.user_metadata.username) || (u.email || '').split('@')[0]) : ''; }
   function savedName() { try { return cleanName(localStorage.getItem(NAME_KEY) || ''); } catch (e) { return ''; } }
   function defaultName() { return savedName() || signedInName() || ('Gast' + (100 + Math.floor(Math.random() * 900))); }
@@ -277,7 +281,7 @@
     if (L.role === 'host' && L.peers.has(peerId)) {
       const p = L.peers.get(peerId); p.state = 'open'; broadcastRoster();
     } else if (L.role === 'client' && peerId === L.hostId) {
-      link.send({ k: 'hi', name: L.name, drv: L.drv, v: 1 }, true);
+      link.send({ k: 'hi', name: L.name, drv: L.drv, uid: myUid(), v: 1 }, true);
       startPing(link);
     }
     if (KL.MP && KL.MP.active) KL.MP.onLinkOpen(peerId, link);
@@ -327,7 +331,7 @@
       if (L.links.has(L.hostId) && L.links.get(L.hostId).open) return;
       const old = L.links.get(L.hostId); if (old) { old.onclose = null; old.close('relay'); }
       const link = makeRelay(L.hostId); L.links.set(L.hostId, link); L.relayInUse = true;
-      link.send({ k: 'hi', name: L.name, drv: L.drv, v: 1 }, true);
+      link.send({ k: 'hi', name: L.name, drv: L.drv, uid: myUid(), v: 1 }, true);
     }
   }
 
@@ -351,7 +355,7 @@
       // ---- host side ----
       case 'hi': if (L.role === 'host') {
         const p = L.peers.get(from); if (!p) return;
-        p.name = cleanName(m.name) || p.name; if (driverOk(m.drv)) p.drv = freeDriver(m.drv, p.id); broadcastRoster();
+        p.name = cleanName(m.name) || p.name; p.uid = typeof m.uid === 'string' && UUID_RE.test(m.uid) ? m.uid.toLowerCase() : ''; if (driverOk(m.drv)) p.drv = freeDriver(m.drv, p.id); broadcastRoster();
       } return;
       case 'ready': if (L.role === 'host' && L.phase === 'lobby') { const p = L.peers.get(from); if (p) { p.rdy = !!m.v; broadcastRoster(); } } return;
       case 'pick': if (L.role === 'host' && L.phase === 'lobby') { const p = L.peers.get(from); if (p && driverOk(m.drv)) { p.drv = freeDriver(m.drv, p.id); broadcastRoster(); } } return;
@@ -521,7 +525,7 @@
     if (!L.active || L.phase !== 'linking') return;
     // build the grid: humans and bots on 8 shuffled slots
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffff)) >>> 0, rnd = KL.rng(seed);
-    const humans = rosterNow().map((p) => ({ id: p.id, name: p.name, drv: p.drv, human: true }));
+    const humans = rosterNow().map((p) => { const uid = p.id === L.myId ? myUid() : ((L.peers.get(p.id) || {}).uid || ''); return { id: p.id, name: p.name, drv: p.drv, human: true, ...(uid ? { uid } : {}) }; });
     const usedDrv = new Set(humans.map((h) => h.drv));
     const botDrv = KL.DRIVERS.filter((d) => !usedDrv.has(d.id));
     const total = N.MAX_PLAYERS;

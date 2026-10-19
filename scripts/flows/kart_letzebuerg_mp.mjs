@@ -2,7 +2,7 @@
  * Lobby + SDP hand-shake run through an in-process Realtime hub (kart_mp_hub.mjs), nothing reaches the live Supabase project.
  * Covers: lobby by room code, ready/start, WebRTC link, both players driving (autopilot), position sync (measured), items hitting
  * across peers, identical finish order + results on both, the Supabase request/message budget of one full 3-lap race, quick match,
- * and the host leaving mid-race (host migration to the deputy). Set KL_MP_REPORT=/path.json to dump the measured numbers. */
+ * the host leaving mid-race (host migration to the deputy), and the race log (record_kart_race: exactly one call per online race, none for solo). Set KL_MP_REPORT=/path.json to dump the measured numbers. */
 import fs from 'node:fs';
 import { runIfMain } from './lib.mjs';
 import { createHub } from './kart_mp_hub.mjs';
@@ -11,11 +11,26 @@ const URL_BASE = '/pb/kart-letzebuerg.html?test=1';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isSupabase = (u) => /supabase\.co/.test(u);
 const REPORT = {};
+/* ---------- race log capture: every record_kart_race call (REST route or the signed-in sb.rpc stub) ---------- */
+const RECORDS = [];                                  // { by, via, status, p }
+const FAIL = { n: 0 };                               // the next n REST calls answer HTTP 500
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+const UID = { guest: '5b1d6c0e-2f4a-4c1b-9a77-0a1b2c3d4e51', dep: '7c2e8d1f-3a5b-4d2c-8b88-1b2c3d4e5f62', third: '9d3f9e20-4b6c-4e3d-9c99-2c3d4e5f6073' };
+const recCount = () => RECORDS.length;
+async function pageCalls(players) {                  // calls made through a stubbed signed-in client (window.__rpcCalls)
+  const out = [];
+  for (const p of players) { try { const c = (await p.page.evaluate(() => window.__rpcCalls || [])).filter((x) => x.name === 'record_kart_race'); for (const x of c) out.push({ by: p.label, via: 'rpc', p: x.p, name: x.name }); } catch { /* gone */ } }
+  return out;
+}
+async function settle(fn, n, ms = 15000) {          // wait until fn() >= n, then 3.5 s more so a stray second call would show up
+  const t0 = Date.now(); while (Date.now() - t0 < ms && fn() < n) await sleep(200);
+  await sleep(3500);
+}
 const ONLY = (process.env.KL_MP_ONLY || 'all').split(',');
 const want = (n) => ONLY.includes('all') || ONLY.includes(n);
 
 /* ---------- helpers ---------- */
-async function newPlayer(h, hub, label, { first = false, viewport = { width: 640, height: 400 }, init = null, noRelay = false } = {}) {
+async function newPlayer(h, hub, label, { first = false, viewport = { width: 640, height: 400 }, init = null, noRelay = false, auth = null } = {}) {
   let context = h.context, page = h.page;
   if (!first) {
     context = await h.context.browser().newContext({ viewport, serviceWorkers: 'block' });
@@ -23,12 +38,26 @@ async function newPlayer(h, hub, label, { first = false, viewport = { width: 640
   }
   await hub.attach(context, label);
   if (init) await context.addInitScript(init);
+  if (auth) await context.addInitScript((a) => {              // a signed-in user (id only, or with a stubbed sb.rpc that records record_kart_race)
+    window.__rpcCalls = [];
+    window.__pbAuth = { session: { user: { id: a.id, user_metadata: { username: a.name } } } };
+    if (a.withRpc) window.__pbAuth.sb = { rpc: async (name, args) => { window.__rpcCalls.push({ name, p: args && args.p }); return { data: 1, error: null }; } };
+  }, auth);
   if (noRelay) await context.route(/kart-letzebuerg\/config\.js/, async (route) => { const r = await route.fetch(); route.fulfill({ response: r, body: (await r.text()).replace('RELAY_FALLBACK: true', 'RELAY_FALLBACK: false') }); });
   const p = { label, context, page, http: [], errors: [], first };
-  page.on('request', (r) => { if (isSupabase(r.url()) && r.resourceType() !== 'websocket') p.http.push(r.method() + ' ' + new URL(r.url()).pathname); });
+  page.on('request', (r) => { if (isSupabase(r.url()) && r.resourceType() !== 'websocket' && r.method() !== 'OPTIONS') p.http.push(r.method() + ' ' + new URL(r.url()).pathname); });
   page.on('console', (m) => { if (m.type() === 'error') p.errors.push(m.text()); });
+  page.on('console', (m) => { if (/\[kart-mp\] race/.test(m.text())) console.log('    [' + label + '] ' + m.text()); });
   page.on('pageerror', (e) => p.errors.push('pageerror: ' + e.message));
   if (!first) await context.route(/supabase\.co\/(rest|auth|functions|storage)\//, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  await context.route(/\/rest\/v1\/rpc\/record_kart_race/, async (route) => {
+    const rq = route.request();
+    if (rq.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+    let body = null; try { body = JSON.parse(rq.postData() || 'null'); } catch { /* bad json */ }
+    const bad = FAIL.n > 0; if (bad) FAIL.n--;
+    RECORDS.push({ by: label, via: 'fetch', status: bad ? 500 : 200, p: body && body.p, hdr: rq.headers() });
+    return route.fulfill({ status: bad ? 500 : 200, headers: CORS, contentType: 'application/json', body: bad ? '{"message":"boom"}' : '1' });
+  });
   await page.goto(h.origin + URL_BASE, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#menu:not([hidden])', { timeout: 30000 });
   // debug aid: remember the first non-finite kart state the engine sound sees
@@ -97,7 +126,8 @@ export const flow = {
       if (want('race')) {
       h.step('2 players: create lobby, join by room code, ready, start (3 laps)');
       const A = await newPlayer(h, hub, 'host', { first: true }); all.push(A);
-      const B = await newPlayer(h, hub, 'guest'); all.push(B);
+      const B = await newPlayer(h, hub, 'guest', { auth: { id: UID.guest, name: 'Guesty' } }); all.push(B);
+      const rec0 = recCount();
       const f0 = { ...hub.stats }; hub.reset();
       await goOnline(A, 'Hosty');
       await A.page.click('#olCreate');
@@ -186,6 +216,23 @@ export const flow = {
       const lapsB = await kl(B, (id) => __klTest.G.race.byId[id].lapTimes.length, ids.b);
       h.eq(lapsB, 3, 'guest recorded 3 lap times for itself (lap events from the host)');
 
+      // ---- race log: the host logs the finished race exactly once, the guest never
+      h.step('race log: exactly ONE record_kart_race call (from the host) with the right players, places and track');
+      await settle(() => recCount() - rec0, 1);
+      const calls = RECORDS.slice(rec0);
+      h.eq(calls.map((c) => c.by), ['host'], 'one call for the whole 2-player race, made by the host (guest made none)');
+      const body = calls[0] && calls[0].p || {};
+      const shown = await kl(A, () => __klTest.G.lastResult.rows.map((r) => [r.name, r.place, r.finished ? Math.round(r.time * 1000) : null, r.best == null ? null : Math.round(r.best * 1000), !!r.human]));
+      const trackA = await kl(A, () => __klTest.G.track.id);
+      h.eq([body.room, body.track, body.mode, body.cup, body.gp_round, body.laps, body.human_count, (body.players || []).length], [code, trackA, 'race', null, null, 3, 2, 8], 'room, track, mode, laps and counts are right');
+      h.expect(/^s[0-9a-z]+$/.test(body.race_key || ''), 'race_key comes from the shared start seed (' + body.race_key + ')');
+      h.eq((body.players || []).map((p) => [p.name, p.place, p.time_ms, p.best_lap_ms]).sort(), shown.map((r) => [r[0], r[1], r[2], r[3]]).sort(), 'players, places and times equal the results both players saw');
+      h.eq((body.players || []).map((p) => p.place).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8], 'places are 1..8');
+      const bodyHum = (body.players || []).filter((p) => !p.bot), bodyBots = (body.players || []).filter((p) => p.bot);
+      h.eq([bodyHum.length, bodyBots.length, bodyBots.every((p) => p.user_id === null && p.guest === false)], [2, 6, true], '2 humans + 6 bots (bots without user_id)');
+      h.eq(bodyHum.map((p) => [p.name, p.user_id, p.guest]).sort(), [['Guesty', UID.guest, false], ['Hosty', null, true]], 'the signed-in guest player carries his user id, the guest host is a guest');
+      h.expect(!!(calls[0] && calls[0].hdr && calls[0].hdr.apikey), 'a guest host logs through a plain anon REST call (apikey header)');
+
       // ---- sync numbers
       const recA = await kl(A, () => __klTest.mpRecord(false)), recB = await kl(B, () => __klTest.mpRecord(false));
       const cutA = recA.filter((s) => s.t), cutB = recB.filter((s) => s.t);
@@ -207,7 +254,7 @@ export const flow = {
       console.log('    Realtime frames: ' + frames + ' total (' + s.framesIn + ' to server, ' + s.framesOut + ' to clients), ' + (s.bytesIn + s.bytesOut) + ' bytes, heartbeats ' + s.heartbeats + '; after the race went live: ' + duringRace);
       console.log('    HTTP requests to supabase.co: ' + http.length + (http.length ? ' ' + JSON.stringify(http) : ''));
       console.log('    by event: ' + JSON.stringify(s.byEvent));
-      h.eq(http.length, 0, 'no Supabase HTTP (REST/auth/functions) requests in the whole lobby -> race -> results cycle');
+      h.eq(http, ['POST /rest/v1/rpc/record_kart_race'], 'the only Supabase HTTP request of the whole lobby -> race -> results cycle is the one race log call');
       h.expect(duringRace === 0, 'no Realtime traffic at all while racing (' + duringRace + ' frames after "go")');
       h.expect(frames <= 70, 'whole 2-player race stays within the Realtime frame budget (<= 70 frames, measured ' + frames + ')');
       h.expect(s.bytesIn + s.bytesOut <= 40000, 'and within 40 kB (measured ' + (s.bytesIn + s.bytesOut) + ' bytes)');
@@ -240,6 +287,22 @@ export const flow = {
       await readyAndStart(Q1, [Q2], 1);
       await waitRace([Q1, Q2]);
       h.expect(true, 'quick-match race starts on both sides');
+
+      h.step('race log failure: one attempt plus at most ONE retry, never a loop (the server answers 500 every time)');
+      FAIL.n = 99; const q0 = recCount();
+      await kl(Q1, () => __klTest.autopilot(true)); await kl(Q2, () => __klTest.autopilot(true));
+      await Promise.all([Q1, Q2].map((p) => p.page.waitForSelector('#endScreen:not([hidden]) #endList li', { timeout: 300000 })));
+      await settle(() => recCount() - q0, 2, 20000);
+      let qc = RECORDS.slice(q0);
+      h.eq(qc.map((c) => [c.by, c.status]), [['q1', 500], ['q1', 500]], 'failed call is retried exactly once (2 POSTs in total, then nothing more after ' + '7 s)');
+      h.eq(qc[0].p.race_key, qc[1].p.race_key, 'the retry carries the same race_key');
+      h.step('race log: first attempt fails, the retry succeeds');
+      FAIL.n = 1; const q1 = recCount();
+      await Q1.page.evaluate(() => { const M = KL.MP; M.recorded = false; M.record(__klTest.G.lastResult.rows); });
+      await settle(() => recCount() - q1, 2, 20000);
+      qc = RECORDS.slice(q1);
+      h.eq(qc.map((c) => c.status), [500, 200], 'a failed first attempt is followed by one successful retry');
+      FAIL.n = 0;
       await closeAll(all); all.length = 0;
 
       }
@@ -247,8 +310,9 @@ export const flow = {
       if (want('migration')) {
       h.step('host leaves mid-race: the deputy takes over, the others finish');
       const H = await newPlayer(h, hub, 'h'); all.push(H);
-      const G1 = await newPlayer(h, hub, 'g1'); all.push(G1);
-      const G2 = await newPlayer(h, hub, 'g2'); all.push(G2);
+      const G1 = await newPlayer(h, hub, 'g1', { auth: { id: UID.dep, name: 'Deputy', withRpc: true } }); all.push(G1);       // signed in: logs through sb.rpc (reporter = auth.uid())
+      const G2 = await newPlayer(h, hub, 'g2', { auth: { id: UID.third, name: 'Third' } }); all.push(G2);
+      const mig0 = recCount();
       await goOnline(H, 'HostLeaver'); await H.page.click('#olCreate');
       await H.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
       const hcode = (await H.page.textContent('#lbCode')).trim();
@@ -276,7 +340,16 @@ export const flow = {
       h.expect(r1.length === 8, 'results include all 8 karts');
       const bad = [await kl(G1, () => window.__bad || null), await kl(G2, () => window.__bad || null)];
       h.expect(G1.errors.filter((e) => !/three/.test(e)).length + G2.errors.filter((e) => !/three/.test(e)).length === 0, 'no console errors during migration: ' + JSON.stringify([...G1.errors, ...G2.errors, bad]));
-      REPORT.migration = { epoch: after1.epoch, resultRows: r1.length };
+      h.step('race log after the host migration: exactly one call, from the new host');
+      for (let t0 = Date.now(); Date.now() - t0 < 15000 && (recCount() - mig0) + (await pageCalls([G1, G2])).length < 1;) await sleep(250);
+      await sleep(3500);
+      const migCalls = [...RECORDS.slice(mig0), ...(await pageCalls([G1, G2]))];
+      h.eq(migCalls.map((c) => [c.by, c.via]), [['g1', 'rpc']], 'one call in total: the new host (signed in, via sb.rpc); the dead host and the third player made none');
+      const mb = migCalls[0] && migCalls[0].p || {};
+      h.eq([mb.human_count, (mb.players || []).length, mb.laps, mb.mode], [3, 8, 1, 'race'], '3 humans (the old host counts as a player) among 8 karts');
+      h.eq((mb.players || []).filter((p) => !p.bot).map((p) => [p.name, p.user_id, p.guest]).sort(), [['Deputy', UID.dep, false], ['HostLeaver', null, true], ['Third', UID.third, false]], 'user ids of the signed-in players are in the log, the dead guest host is a guest');
+      h.eq((mb.players || []).map((p) => p.place).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8], 'places are 1..8');
+      REPORT.migration = { epoch: after1.epoch, resultRows: r1.length, raceLogCalls: migCalls.length };
       }
 
       /* ================= 4. invite link, friends dialog (signed in) ================= */
@@ -365,6 +438,7 @@ export const flow = {
       /* ================= 5b. online Grand Prix ================= */
       if (want('gp')) {
         h.step('online Grand Prix: the whole Fantasy cup (4 races, 4 lazily loaded tracks: candy, ice, volcano, ghost castle), the same points table on both sides, the host moves on, final standings');
+        const gp0 = recCount();
         const P = await newPlayer(h, hub, 'gp-host'); all.push(P);
         const Q = await newPlayer(h, hub, 'gp-guest'); all.push(Q);
         await goOnline(P, 'GPHost'); await P.page.click('#olCreate');
@@ -395,11 +469,39 @@ export const flow = {
             await waitRace([P, Q]);
           }
         }
-        h.eq(P.http.length + Q.http.length, 0, 'the online Grand Prix makes no Supabase REST request (signed out)');
+        await settle(() => recCount() - gp0, 4);
+        const gc = RECORDS.slice(gp0);
+        h.eq(gc.map((c) => [c.by, c.p.mode, c.p.cup, c.p.gp_round, c.p.track, c.p.human_count]), CUP.map((t, i) => ['gp-host', 'gp', 'fantasy', i + 1, t, 2]), 'a Grand Prix of 4 rounds = exactly 4 race log calls (rounds 1-4, right tracks, 2 humans), all from the host');
+        h.eq(new Set(gc.map((c) => c.p.race_key)).size, 4, 'every round has its own race_key');
+        h.eq([P.http.length, Q.http.length, P.http.every((x) => x === 'POST /rest/v1/rpc/record_kart_race')], [4, 0, true], 'that is the whole Supabase REST traffic of the online Grand Prix (4 requests: host only)');
         const pts = await kl(P, () => Object.values(__klTest.session().table).reduce((a, b) => a + b.pts, 0));
         h.eq(pts, 4 * 39, '4 races x 39 points in the table');
         h.expect(await P.page.locator('#eLobby').isVisible() && await P.page.locator('#eNext').isHidden(), 'after the last race the host can go back to the lobby');
         await h.shot('gp-online-final');
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 5c. solo races are never logged ================= */
+      if (want('solo')) {
+        h.step('race log: a solo race and an online lobby with only one human are NOT logged');
+        const S = await newPlayer(h, hub, 'solo'); all.push(S);
+        const so0 = recCount();
+        await S.page.evaluate(() => window.__klTest.start({ track: 'villehaute', laps: 1 }));
+        await waitFor(S, () => window.__klTest.state().phase === 'race', null, 30000);
+        await S.page.evaluate(() => window.__klTest.sim(200, true));
+        await S.page.waitForSelector('#endScreen:not([hidden]) #endList li', { timeout: 30000 });
+        await sleep(3500);
+        h.eq([recCount() - so0, S.http.filter((x) => /record_kart_race/.test(x)).length], [0, 0], 'solo race (menu): no race log call');
+        await S.page.evaluate(() => window.__klTest.menu());
+        await goOnline(S, 'Solo'); await S.page.click('#olCreate');
+        await S.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        await setLaps(S, 1); await S.page.click('#lbStart');
+        await waitRace([S]);
+        h.eq(await kl(S, () => __klTest.G.race.karts.filter((k) => k.human).length), 1, 'online lobby with one human: 1 human + 7 bots');
+        await kl(S, () => __klTest.autopilot(true));
+        await S.page.waitForSelector('#endScreen:not([hidden]) #endList li', { timeout: 300000 });
+        await sleep(3500);
+        h.eq([recCount() - so0, S.http.filter((x) => /record_kart_race/.test(x)).length], [0, 0], 'online race with a single human: no race log call');
         await closeAll(all); all.length = 0;
       }
 
