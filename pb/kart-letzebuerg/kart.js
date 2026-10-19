@@ -66,10 +66,11 @@
     k.steer += (steerIn - k.steer) * Math.min(1, dt * (Math.abs(steerIn) < 0.05 ? 13 : 9));
 
     // ---------- limits ----------
-    let vmax = C.MAX_SPEED * (k.rubber || 1);
+    const spdMul = def.speedMul || 1;                  // per-track pace (long tracks run a little faster)
+    let vmax = C.MAX_SPEED * spdMul * (k.rubber || 1);
     const offroadCap = def.offroadSpeed || (def.offroad === 'grass' ? C.OFFROAD_SPEED : C.SIDEWALK_SPEED);
     if (k.surf === 1 && k.boostT <= 0) vmax = Math.min(vmax, offroadCap);
-    if (k.boostT > 0) vmax = Math.max(vmax, C.BOOST_SPEED * (k.boostKind === 2 ? 1.04 : 1));
+    if (k.boostT > 0) vmax = Math.max(vmax, C.BOOST_SPEED * spdMul * (k.boostKind === 2 ? 1.04 : 1));
     if (R.weather && R.weather.wet) vmax *= 1 - 0.02 * R.weather.wet;
 
     const fx = Math.sin(k.yaw), fz = Math.cos(k.yaw);

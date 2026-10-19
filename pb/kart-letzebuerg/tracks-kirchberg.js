@@ -31,9 +31,9 @@
         paint: KL.kit.valleyPaint(terrain, 'kirchberg', { box: [-900, -320, 220, 470], depth: 62, rock: '#a69f90', grass: '#69a24c', grass2: '#86b95e', edge: '#b9b8b2', lawns: [PARK, ROUND] }) },
       weathers: ['day', 'sunset', 'night', 'rain'],
     },
-    terrain,
+    terrain, speedMul: 1.09,
     noBuild: [[-119, 113, 52], [-205, 252, 38], [-262, 262, 14], [150, -40, 60], [260, -70, 60]],
-    pads: [[60, 0, 10], [200, 0, 10], [392, 13, 9], [438, 14, 9], [700, 0, 10], [980, 0, 10], [1150, 13, 9], [1198, 14, 9], [1245, 13, 9], [1500, 0, 10]],
+    pads: [[60, 0, 10], [130, 0, 10], [200, 0, 10], [260, 0, 10], [392, 13, 9], [438, 14, 9], [600, 0, 10], [700, 0, 10], [770, 0, 10], [840, 0, 10], [915, 0, 10], [980, 0, 10], [1060, 0, 10], [1150, 13, 9], [1198, 14, 9], [1245, 13, 9], [1380, 0, 10], [1440, 0, 10], [1500, 0, 10]],
     extraBoxes: [[415, 14], [1198, 15]],
     decorate(S) {
       const { add, mats, track, rnd, renderer, group } = S, M = mats, N = track.N, st = track.stations;
@@ -120,7 +120,7 @@
       {
         const f = { x: -119, y: 0, z: 113, yaw: 0.35 };
         L.cyl(B, f, 0, 0, 0, 29, 29, 1.2, 28, col('#d9d8d3'));                       // plinth
-        L.cyl(B, f, 0, 1.2, 0, 24.5, 24.5, 15, 28, glass, { flat: true });             // glazed drum
+        L.cyl(B, f, 0, 1.2, 0, 24.5, 24.5, 15, 28, col('#8aa5bd'), { flat: true });             // glazed drum
         for (let i = 0; i < 64; i++) { const a = (i / 64) * Math.PI * 2; L.cyl(B, f, Math.cos(a) * 26.6, 1.2, Math.sin(a) * 26.6, 0.42, 0.38, 15.6, 5, white); }
         L.cyl(B, f, 0, 16.4, 0, 29.2, 28.4, 0.9, 28, white);                           // roof slab
         L.cyl(B, f, 0, 17.3, 0, 22, 22, 3, 24, col('#e9e9e6'));                       // upper volume
@@ -136,11 +136,11 @@
         const f = { x: -205, y: 0, z: 254, yaw: 0.5 };
         L.box(B, f, 0, 0, 0, 36, 9, 20, 0, stone); L.box(B, f, 14, 0, -16, 16, 7, 16, 0, col('#f0ece4'));
         L.gable(B, f, -6, 9, 0, 22, 20, 7, col('#f3f0e8'), 0.2); L.gableX(B, f, 14, 7, -16, 16, 16, 5.5, col('#f8f5ee'), 0.2);
-        L.box(B, f, -8, 0, 0, 14, 17, 14, 0, glass); L.pyramid(B, f, -8, 17, 0, 15, 10, col('#76b0c2'));
+        L.box(B, f, -8, 0, 0, 14, 17, 14, 0, glass); L.pyramid(B, f, -8, 17, 0, 17, 13, col('#8fc9dc'));
         L.box(E, f, -8, 3, 7.1, 11, 8, 0.3, 0, col('#ffe3a5'));
         const g = { x: -262, y: 0, z: 262, yaw: 0 };
-        L.cyl(B, g, 0, 0, 0, 10, 8.6, 16, 14, col('#b9ae98')); L.cyl(B, g, 0, 16, 0, 10.8, 10.8, 1.4, 14, col('#a99d86'));
-        for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; L.box(B, g, Math.cos(a) * 10.3, 17.4, Math.sin(a) * 10.3, 2.2, 1.6, 2.2, a, col('#b9ae98')); }
+        L.cyl(B, g, 0, 0, 0, 10, 8.6, 16, 14, col('#cfc4ab')); L.cyl(B, g, 0, 12.5, 0, 9.6, 9.6, 0.9, 14, col('#a89c84')); L.cyl(B, g, 0, 16, 0, 10.8, 10.8, 1.4, 14, col('#a99d86'));
+        for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; L.box(B, g, Math.cos(a) * 10.3, 17.4, Math.sin(a) * 10.3, 3.6, 1.8, 1.4, -a - 1.5708, col('#b9ae98')); }
         for (let i = 0; i < 6; i++) { const a = i * 1.05; L.box(B, g, Math.cos(a) * 8.9, 9, Math.sin(a) * 8.9, 0.6, 1.4, 0.6, 0, col('#2f3640')); }
         const wallB = [[-262, 262], [-232, 262]]; void wallB;
       }
