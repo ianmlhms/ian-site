@@ -88,6 +88,12 @@
     { id: 'fraenz',   name: 'Fränz',     body: '#b84dff', trim: '#ffe9ff', head: 'fox' },
   ];
 
+  /* Cups (Grand Prix): four races each. A cup plays the tracks of its list that exist in this build. */
+  KL.CUPS = [
+    { id: 'letzebuerg', name: 'cup_letzebuerg', tracks: ['villehaute', 'kirchberg', 'grund', 'belval'] },
+    { id: 'fantasy', name: 'cup_fantasy', tracks: ['geeschterschlass'] },
+  ];
+
   KL.DIFFICULTY = {
     easy:   { speed: 0.90, mistakes: 0.9, drift: 0.2, items: 0.4, rubber: 0.05 },
     normal: { speed: 0.96, mistakes: 0.5, drift: 0.65, items: 0.75, rubber: 0.05 },

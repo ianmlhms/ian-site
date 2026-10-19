@@ -12,9 +12,9 @@
 
   const G = {
     state: 'boot', renderer: null, audio: new KL.Audio(), race: null, track: null, tracks: {}, human: null, rear: false,
-    settings: { track: 'villehaute', weather: 'random', diff: 'normal', driver: 'renert', quality: 'auto', autoGas: true },
+    settings: { track: 'villehaute', weather: 'random', diff: 'normal', driver: 'renert', quality: 'auto', autoGas: true, mode: 'race', cup: 'letzebuerg' },
     acc: 0, last: 0, forced: null, paused: false, frame: 0, fpsAvg: 16, lowStreak: 0, raceCount: 0, resultsShown: false, finishAt: 0,
-    toastT: 0, lastCount: 99, hud: {}, ghost: null, steps: 0,
+    toastT: 0, lastCount: 99, hud: {}, ghost: null, ghostPose: null, rec: null, session: null, steps: 0,
   };
   KL.G = G;
   const warn = (m, e) => console.warn('[Kart] ' + m, e || '');
@@ -25,6 +25,8 @@
     if (!KL.tracks[G.settings.track]) G.settings.track = 'villehaute';
     if (!KL.DRIVERS.some((d) => d.id === G.settings.driver)) G.settings.driver = 'renert';
     if (!KL.DIFFICULTY[G.settings.diff]) G.settings.diff = 'normal';
+    if (!['race', 'gp', 'tt'].includes(G.settings.mode)) G.settings.mode = 'race';
+    if (!KL.CUPS.some((c) => c.id === G.settings.cup)) G.settings.cup = KL.CUPS[0].id;
   }
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) { warn('settings not saved', e); } }
 
@@ -54,24 +56,67 @@
     g.stroke();
     g.fillStyle = '#ffd23f'; g.beginPath(); g.arc(track.X[0] * sc + ox, track.Z[0] * sc + oz, 3.6, 0, 7); g.fill();
   }
+  function cupWeathers(cupId) {
+    const cup = KL.CUPS.find((c) => c.id === cupId) || KL.CUPS[0], set = new Set();
+    for (const r of KL.gpRaces(cup, KL.tracks)) for (const w of weathersFor(r.track)) set.add(w);
+    return ['day', 'sunset', 'night', 'rain', 'fog'].filter((w) => set.has(w));
+  }
+  function menuWeathers() { return G.settings.mode === 'gp' ? cupWeathers(G.settings.cup) : weathersFor(G.settings.track); }
+  function recLine(trackId) {
+    const lap = KL.Save.best(trackId, 'lap'), race = KL.Save.best(trackId, 'race'), out = [];
+    if (lap) out.push(KL.t('bestLapShort') + ' ' + fmtTime(lap / 1000));
+    if (race) out.push(KL.t('bestRaceShort') + ' ' + fmtTime(race / 1000));
+    return out.join(' · ');
+  }
   function buildMenuChips() {
     const S = G.settings;
+    for (const [m, id] of [['race', 'modeRace'], ['gp', 'modeGp'], ['tt', 'modeTt']]) { $(id).classList.toggle('on', S.mode === m); $(id).setAttribute('aria-pressed', String(S.mode === m)); }
+    $('trackHead').textContent = KL.t(S.mode === 'gp' ? 'cup' : 'track');
+    $('diffBox').hidden = S.mode === 'tt';
     const tc = $('trackCards'); tc.textContent = '';
-    for (const id of Object.keys(KL.tracks)) {
-      const def = KL.tracks[id];
-      const b = document.createElement('button'); b.className = 'tcard' + (S.track === id ? ' on' : '');
-      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108; b.appendChild(cv);
-      const d = document.createElement('div'); d.innerHTML = '<b></b><small></small>'; d.firstChild.textContent = KL.t('t_' + id); d.lastChild.textContent = KL.t('t_' + id + '_d'); b.appendChild(d);
-      b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); buildMenuChips(); G.audio.sfx('click'); });
-      tc.appendChild(b); drawTrackPreview(cv, getTrack(id));
+    if (S.mode === 'gp') {
+      for (const cup of KL.CUPS) {
+        const races = KL.gpRaces(cup, KL.tracks); if (!races.length) continue;
+        const ids = [...new Set(races.map((r) => r.track))];
+        const b = document.createElement('button'); b.className = 'tcard cup' + (S.cup === cup.id ? ' on' : '');
+        const prev = document.createElement('span'); prev.className = 'cprev';
+        for (const id of ids) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 54; prev.appendChild(cv); drawTrackPreview(cv, getTrack(id)); }
+        b.appendChild(prev);
+        const d = document.createElement('div'); d.innerHTML = '<b></b><small></small>'; d.firstChild.textContent = KL.t(cup.name); d.lastChild.textContent = ids.map((id) => KL.t('t_' + id)).join(' · ') + ' · ' + KL.t('cupDesc', { n: races.length });
+        b.appendChild(d);
+        b.addEventListener('click', () => { S.cup = cup.id; if (S.weather !== 'random' && !cupWeathers(cup.id).includes(S.weather)) S.weather = 'random'; saveSettings(); buildMenuChips(); G.audio.sfx('click'); });
+        tc.appendChild(b);
+      }
+    } else {
+      for (const id of Object.keys(KL.tracks)) {
+        const def = KL.tracks[id];
+        const b = document.createElement('button'); b.className = 'tcard' + (S.track === id ? ' on' : '');
+        const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108; b.appendChild(cv);
+        const d = document.createElement('div'); d.innerHTML = '<b></b><small></small><small class="rec"></small>'; d.firstChild.textContent = KL.t('t_' + id); d.children[1].textContent = KL.t('t_' + id + '_d'); d.lastChild.textContent = recLine(id); b.appendChild(d);
+        b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); KL.Boards.select('lap', id); buildMenuChips(); G.audio.sfx('click'); });
+        tc.appendChild(b); drawTrackPreview(cv, getTrack(id));
+      }
     }
     const wc = $('weatherChips'); wc.textContent = '';
-    for (const w of ['random', ...weathersFor(S.track)]) chip(wc, WEATHER_ICON[w] + ' ' + KL.t('w_' + w), S.weather === w, () => { S.weather = w; saveSettings(); buildMenuChips(); });
+    for (const w of ['random', ...menuWeathers()]) chip(wc, WEATHER_ICON[w] + ' ' + KL.t('w_' + w), S.weather === w, () => { S.weather = w; saveSettings(); buildMenuChips(); });
     const dc = $('diffChips'); dc.textContent = '';
     for (const d of ['easy', 'normal', 'hard']) chip(dc, KL.t('d_' + d), S.diff === d, () => { S.diff = d; saveSettings(); buildMenuChips(); });
     const vc = $('driverChips'); vc.textContent = '';
     for (const d of KL.DRIVERS) { const b = chip(vc, d.name, S.driver === d.id, () => { S.driver = d.id; saveSettings(); buildMenuChips(); }); const i = document.createElement('i'); i.style.background = d.body; b.prepend(i); }
   }
+  G.refreshMenu = () => buildMenuChips();
+
+  /* leaderboards dialog: the arcade shows one board at a time, this picks which one */
+  const BD = { kind: 'lap', track: null };
+  function buildBoardsDlg() {
+    BD.track = BD.track && KL.tracks[BD.track] ? BD.track : G.settings.track;
+    const k = $('bdKinds'); k.textContent = '';
+    for (const kind of KL.Boards.kinds) chip(k, KL.t('bd_' + kind), BD.kind === kind, () => { BD.kind = kind; buildBoardsDlg(); });
+    const t = $('bdTracks'); t.textContent = ''; t.hidden = BD.kind === 'gp';
+    for (const id of Object.keys(KL.tracks)) chip(t, KL.t('t_' + id), BD.track === id, () => { BD.track = id; buildBoardsDlg(); });
+  }
+  function openBoardsDlg() { buildBoardsDlg(); $('bdScreen').hidden = false; }
+
   function buildPauseSelects() {
     const pw = $('pWeather'); pw.textContent = '';
     for (const w of weathersFor(G.settings.track)) { const o = document.createElement('option'); o.value = w; o.textContent = WEATHER_ICON[w] + ' ' + KL.t('w_' + w); pw.appendChild(o); }
@@ -96,16 +141,15 @@
 
   /* ---------- race flow ---------- */
   function showOnly(name) {
-    for (const id of ['menu', 'onlineScreen', 'lobbyScreen', 'netBusy', 'pauseScreen', 'endScreen', 'loading', 'fatal']) $(id).hidden = id !== name;
+    for (const id of ['menu', 'onlineScreen', 'lobbyScreen', 'netBusy', 'pauseScreen', 'endScreen', 'loading', 'fatal', 'bdScreen']) $(id).hidden = id !== name;
     $('hud').hidden = !(name === null);
   }
   function openMenu() {
     if (KL.Lobby && KL.Lobby.active) KL.leaveOnline(false);
     G.mp = false;
-    G.state = 'menu'; G.paused = false; G.race = null; showOnly('menu'); G.audio.silence(); document.documentElement.classList.remove('kl-race');
+    G.state = 'menu'; G.paused = false; G.race = null; G.session = null; showOnly('menu'); KL.Boards.select('lap', G.settings.track); G.audio.silence(); document.documentElement.classList.remove('kl-race');
     if (G.renderer) { G.renderer.rain.visible = false; }
     KL.input.setEnabled(false);
-    if (window.Arcade && Arcade.startRun) { /* a new run starts with each race */ }
   }
 
   function pickWeather(trackId, wanted) {
@@ -114,8 +158,28 @@
     return list[Math.floor(Math.random() * list.length)];
   }
 
+  /* ---------- sessions: single race, Grand Prix (4 races, points) and time trial (ghost) ---------- */
+  function newGp(cupId) {
+    const cup = KL.CUPS.find((c) => c.id === cupId) || KL.CUPS[0], races = KL.gpRaces(cup, KL.tracks), S = G.settings;
+    const off = Math.floor(Math.random() * 4);
+    races.forEach((r, i) => { const list = weathersFor(r.track); r.weather = S.weather !== 'random' && list.includes(S.weather) ? S.weather : list[(off + i) % list.length]; });
+    return { kind: 'gp', cup: cup.id, races, idx: 0, table: {}, names: {}, done: false };
+  }
+  /* what the running session adds to a race's options */
+  function sessionOpts() {
+    const ss = G.session, S = G.settings;
+    if (ss && ss.kind === 'gp') { const r = ss.races[ss.idx]; return { track: r.track, weather: r.weather, bots: 7 }; }
+    if (ss && ss.kind === 'tt') return { track: S.track, bots: 0, mode: 'tt' };
+    return {};
+  }
+  function startSelected() {
+    const S = G.settings;
+    G.session = S.mode === 'gp' ? newGp(S.cup) : { kind: S.mode === 'tt' ? 'tt' : 'race' };
+    startRace();
+  }
+
   function startRace(opts) {
-    opts = opts || {};
+    opts = Object.assign({}, sessionOpts(), opts || {});
     const S = G.settings, trackId = opts.track || S.track;
     $('loading').hidden = false; $('menu').hidden = true;
     setTimeout(() => {
@@ -143,16 +207,52 @@
       else { const d = order[bi++ % order.length]; defs.push({ id: 'bot' + slot, name: d.name, driver: d, isBot: true, gridSlot: slot, botSkill: 0.97 + rnd() * 0.06, lanePref: (rnd() - 0.5) * 1.2 }); }
     }
     const R = KL.createRace({ track, karts: defs, laps: opts.laps || C.LAPS, difficulty: diffName, weather, seed, mode: opts.mode || 'race' });
+    if (R.mode === 'tt') for (const b of R.boxes) { b.active = false; b.respawn = 1e9; }          // time trial: no item boxes
     setupScene(R, track, weather, 'me', false);
+    setupGhost(R, track, me);
     $('loading').hidden = true; showOnly(null);
     G.state = 'race'; G.paused = false; KL.input.setEnabled(true);
     revealHud(weather);
-    if (window.Arcade && Arcade.startRun) Arcade.startRun();
-    showToast(KL.t('hintDrift'), 3200);
+    const ss = G.session;
+    if (ss && ss.kind === 'gp') showToast(KL.t('gpRace', { n: ss.idx + 1, m: ss.races.length }) + ' · ' + KL.t('t_' + trackId), 3000);
+    else if (R.mode === 'tt') showToast(G.ghost ? '👻 ' + fmtTime(G.ghost.sec) : KL.t('ttNoGhost'), 3200);
+    else showToast(KL.t('hintDrift'), 3200);
+  }
+
+  /* time-trial ghost: your best lap so far on this track, replayed from every line crossing */
+  function setupGhost(R, track, driver) {
+    G.ghost = null; G.ghostPose = null; G.rec = null; G.ttDelta = null;
+    G.renderer.setGhost(null);
+    if (R.mode !== 'tt') return;
+    G.rec = KL.Ghost.recorder();
+    const sv = KL.Save.ghostOf(track.id), samples = sv && KL.Ghost.decode(sv.g);
+    if (samples) {
+      const drv = KL.DRIVERS.find((d) => d.id === sv.drv) || driver;
+      G.ghost = { samples, sec: sv.ms / 1000, drv }; G.renderer.setGhost(drv);
+    }
+  }
+  /* after every simulation step (solo): ghost recording */
+  function afterStep(R) {
+    const k = G.human;
+    if (!G.rec || !k) return;
+    const done = G.rec.tick(k, R);
+    if (!done) return;
+    G.ttDelta = G.ghost ? done.sec - G.ghost.sec : null;
+    if (KL.Save.ghost(G.track.id, done.sec, done.samples, k.driver.id)) {
+      G.ghost = { samples: done.samples, sec: done.sec, drv: k.driver }; G.renderer.setGhost(k.driver);
+    }
+  }
+  function updateGhostPose(R, alpha) {
+    const k = G.human;
+    if (!G.ghost || !G.renderer.ghost || !k) return;
+    if (k.finished) { G.renderer.updateGhost(null); return; }
+    const t = k.lapIdx < 0 ? 0 : R.clock - (1 - alpha) * C.STEP - k.lapStart;
+    G.renderer.updateGhost(KL.Ghost.poseAt(G.ghost.samples, Math.max(0, t), G.ghostPose || (G.ghostPose = {})));
   }
 
   /* shared by solo and online races: renderer, camera, minimap */
   function setupScene(R, track, weather, humanId, mp) {
+    G.ghost = null; G.ghostPose = null; G.rec = null; G.ttDelta = null;
     G.race = R; G.human = R.byId[humanId]; G.mp = !!mp; G.resultsShown = false; G.waitingShown = false; G.finishAt = 0; G.acc = 0; G.lastCount = 99; G.raceCount++;
     G.autoWeather = weather;
     if (!G.renderer) initRenderer();
@@ -213,7 +313,7 @@
     });
   }
   function mpButtons(final) {
-    $('eAgain').hidden = true;
+    $('eAgain').hidden = true; $('eNext').hidden = true; $('eMenu').textContent = KL.t('menu'); $('endNote').textContent = '';
     $('eLobby').hidden = !(final && KL.Lobby.role === 'host' && KL.Lobby.originalHost && KL.Lobby.links.size > 0);
   }
   function showMpWaiting(R) {
@@ -236,6 +336,7 @@
     fillResultList(rows);
     const me = rows.find((r) => G.human && r.id === G.human.id) || rows[0];
     $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.best) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
+    $('endNote').textContent = G.human && G.human.finished ? recordRace() : '';
     G.lastResult = { rows, me };
   }
   KL.G.mpBegin = mpBegin; KL.G.mpReveal = mpReveal; KL.G.mpClosed = mpClosed; KL.G.mpShowResults = mpShowResults; KL.G.mpEnded = (key, vars) => KL.lobbyFail(key, vars);
@@ -302,7 +403,7 @@
         case 'comet': a.sfx('comet', { near: true }); break;
         case 'lap': if (mine) {
           a.sfx('lap');
-          if (e.lap < R.laps) showToast((e.lap + 1 === R.laps ? KL.t('lastlap') : KL.t('lap') + ' ' + (e.lap + 1) + '/' + R.laps) + (e.best && e.lap > 1 ? ' · ' + KL.t('newbest') : ''), 1800);
+          if (e.lap < R.laps) showToast((e.lap + 1 === R.laps ? KL.t('lastlap') : KL.t('lap') + ' ' + (e.lap + 1) + '/' + R.laps) + (e.best && e.lap > 1 ? ' · ' + KL.t('newbest') : '') + (G.ttDelta != null ? ' · ' + (G.ttDelta <= 0 ? '−' : '+') + Math.abs(G.ttDelta).toFixed(2) + ' s ' + KL.t(G.ttDelta <= 0 ? 'ttAhead' : 'ttBehind') : ''), 2200);
           $('hudBest').textContent = fmtTime(me.bestLap);
         } break;
         case 'finish': if (mine) { a.sfx('finish'); showToast(KL.t('fin') + ' ' + KL.t('place') + ' ' + e.place, 2400); rd.confetti(me.x, me.y, me.z); G.finishAt = performance.now(); } break;
@@ -359,25 +460,63 @@
   }
 
   /* ---------- results ---------- */
+  function resultLi(rank, name, mid, small, mine) {
+    const li = document.createElement('li'); if (mine) li.className = 'me';
+    const a = document.createElement('b'); a.textContent = rank;
+    const n = document.createElement('span'); n.textContent = name;
+    const t = document.createElement('span'); t.textContent = mid;
+    const bl = document.createElement('small'); bl.textContent = small || '';
+    li.append(a, n, t, bl); return li;
+  }
+  /* personal records + leaderboards for the human's finished race (solo and online): returns the note shown under the result */
+  function recordRace() {
+    const R = G.race, k = G.human; if (!R || !k) return '';
+    const res = KL.Progress.onRaceDone({ track: G.track.id, laps: R.laps, lapTimes: k.lapTimes.filter(isFinite), finished: k.finished, time: k.finishTime });
+    return [res.lap ? '⏱ ' + KL.t('newBestLap') : '', res.race ? '🏁 ' + KL.t('newBestRace') : ''].filter(Boolean).join('  ');
+  }
+  function endButtons(o) {
+    $('eAgain').hidden = !!o.noAgain; $('eLobby').hidden = true;
+    $('eNext').hidden = !o.next; if (o.next) $('eNext').textContent = o.next;
+    $('eMenu').textContent = KL.t(o.menuKey || 'menu');
+  }
   function showResults() {
     const R = G.race; if (G.resultsShown) return; G.resultsShown = true;
-    $('endSub').textContent = KL.t('calc'); $('endList').textContent = ''; showOnlyOverlay('endScreen'); $('eAgain').hidden = false; $('eLobby').hidden = true; $('endTitle').textContent = KL.t('results');
+    const ss = G.session || { kind: 'race' };
+    $('endSub').textContent = KL.t('calc'); $('endNote').textContent = ''; $('endList').textContent = ''; showOnlyOverlay('endScreen');
+    endButtons({}); $('endTitle').textContent = KL.t('results');
     setTimeout(() => {
       R.fastForward(150);
-      const rows = KL.standings(R);
-      const ol = $('endList'); ol.textContent = '';
-      rows.forEach((r) => {
-        const li = document.createElement('li'); if (r.human) li.className = 'me';
-        const a = document.createElement('b'); a.textContent = r.place + '.';
-        const n = document.createElement('span'); n.textContent = r.name + (r.human ? ' (' + KL.t('you') + ')' : '');
-        const t = document.createElement('span'); t.textContent = r.finished ? fmtTime(r.time) : KL.t('dnf');
-        const bl = document.createElement('small'); bl.textContent = r.bestLap ? '⏱ ' + fmtTime(r.bestLap) : '';
-        li.append(a, n, t, bl); ol.appendChild(li);
-      });
-      const me = rows.find((r) => r.human);
-      $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.bestLap) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
+      const rows = KL.standings(R), me = rows.find((r) => r.human), ol = $('endList'); ol.textContent = '';
+      const note = recordRace();
+      if (ss.kind === 'tt') {
+        const best = Math.min(...G.human.lapTimes);
+        G.human.lapTimes.forEach((t, i) => ol.appendChild(resultLi(i + 1 + '.', KL.t('lap') + ' ' + (i + 1), fmtTime(t), t === best ? '⭐' : '', t === best)));
+        $('endTitle').textContent = KL.t('tt');
+        $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.bestLap) + (G.ghost ? ' · 👻 ' + fmtTime(G.ghost.sec) : '');
+      } else if (ss.kind === 'gp') {
+        ss.table = KL.gpAward(ss.table, rows.map((r) => ({ driver: r.driver.id, place: r.place })));
+        rows.forEach((r) => { ss.names[r.driver.id] = r.human ? r.name + ' (' + KL.t('you') + ')' : r.name; });
+        const last = ss.idx === ss.races.length - 1, rank = KL.gpRanking(ss.table), myDrv = G.human.driver.id;
+        rank.forEach((r) => ol.appendChild(resultLi(r.rank + '.', ss.names[r.driver] || r.driver, r.pts + ' ' + KL.t('gpPts'), r.driver === myDrv ? '+' + (KL.GP_POINTS[me.place - 1] || 0) : '', r.driver === myDrv)));
+        $('endTitle').textContent = last ? KL.t('gpFinal') : KL.t('gpTable') + ' · ' + KL.t('gpRace', { n: ss.idx + 1, m: ss.races.length });
+        $('endSub').textContent = KL.t('gpPlace', { n: me.place, p: KL.GP_POINTS[me.place - 1] || 0 }) + ' · ' + KL.t('raceTime') + ' ' + fmtTime(me.time);
+        if (last) {
+          ss.done = true;
+          const won = rank[0].driver === myDrv;
+          const gpNote = won ? KL.t('gpWon') + ' ' + KL.t('gpWins', { n: KL.Progress.onGpWon() }) : KL.t('gpRank', { n: rank.findIndex((r) => r.driver === myDrv) + 1 + '.' });
+          KL.Boards.select('lap', G.track.id);
+          $('endNote').textContent = [gpNote, note].filter(Boolean).join('  ');
+          endButtons({ menuKey: 'menu' });
+          G.lastResult = { rows, me, gp: rank };
+          return;
+        }
+        endButtons({ noAgain: true, next: KL.t('gpNext'), menuKey: 'gpLeave' });
+      } else {
+        rows.forEach((r) => ol.appendChild(resultLi(r.place + '.', r.name + (r.human ? ' (' + KL.t('you') + ')' : ''), r.finished ? fmtTime(r.time) : KL.t('dnf'), r.bestLap ? '⏱ ' + fmtTime(r.bestLap) : '', r.human)));
+        $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.bestLap) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
+      }
+      $('endNote').textContent = note;
       G.lastResult = { rows, me };
-      if (window.Arcade && TEST !== true) { /* leaderboards are submitted from phase 3 only, once per race */ }
     }, 60);
   }
   function showOnlyOverlay(name) { for (const id of ['pauseScreen', 'endScreen']) $(id).hidden = id !== name; }
@@ -418,7 +557,7 @@
       while (G.acc >= C.STEP && n < 6) {
         applyPlayerInput(k);
         R.step(C.STEP); G.acc -= C.STEP; n++; G.steps++;
-        if (mp) KL.MP.afterStep(R);
+        if (mp) KL.MP.afterStep(R); else afterStep(R);
         itemLatch = false;
       }
       if (n === 6) G.acc = 0;
@@ -427,6 +566,7 @@
     }
     const alpha = G.paused ? 1 : G.acc / C.STEP;
     G.renderer.syncRace(R, alpha, G.paused ? 0 : dt);
+    if (G.ghost) updateGhostPose(R, alpha);
     if (G.camOverride) { const o = G.camOverride, cm = G.renderer.camera; cm.position.set(o.x, o.y, o.z); cm.lookAt(o.lx, o.ly, o.lz); if (o.fov && cm.fov !== o.fov) { cm.fov = o.fov; cm.updateProjectionMatrix(); } G.renderer.cam.x = o.x; G.renderer.cam.z = o.z; G.renderer.cam.y = o.y; }
     else G.renderer.updateCamera(viewOf(G.human, alpha), G.paused ? 0 : dt, { rear: G.rear });
     updateHud(R, ts);
@@ -464,6 +604,8 @@
   /* ---------- boot ---------- */
   function boot() {
     loadSettings();
+    KL.Save.load();
+    try { if (window.parent !== window) window.parent.postMessage({ __pbWantSave: 1 }, '*'); } catch (e) { /* standalone */ }
     KL.setLang(KL.lang());
     if (matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0) document.documentElement.classList.add('kl-touch');
     window.addEventListener('pointerdown', (e) => { G.gesture = true; if (e.pointerType === 'touch' && !document.documentElement.classList.contains('kl-touch')) { document.documentElement.classList.add('kl-touch'); layoutTouch(); } G.audio.start(); }, { capture: true });
@@ -473,7 +615,11 @@
     G.autoQ = detectQuality();
     document.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => { KL.setLang(b.dataset.lang); translate(); }));
     translate();
-    $('btnStart').addEventListener('click', () => { G.audio.start(); startRace(); });
+    $('btnStart').addEventListener('click', () => { G.audio.start(); startSelected(); });
+    for (const [m, id] of [['race', 'modeRace'], ['gp', 'modeGp'], ['tt', 'modeTt']]) $(id).addEventListener('click', () => { G.settings.mode = m; saveSettings(); buildMenuChips(); G.audio.sfx('click'); });
+    $('btnBoards').addEventListener('click', openBoardsDlg);
+    $('bdClose').addEventListener('click', () => { $('bdScreen').hidden = true; });
+    $('bdShow').addEventListener('click', () => KL.Boards.open(BD.kind, BD.track));
     $('btnPause').addEventListener('click', () => setPaused(true));
     $('btnWeather').addEventListener('click', cycleWeather);
     $('btnReset').addEventListener('click', doRescue);
@@ -483,7 +629,12 @@
     $('pWeather').addEventListener('change', (e) => setWeather(e.target.value));
     $('pQuality').addEventListener('change', (e) => { G.settings.quality = e.target.value; saveSettings(); if (G.renderer) { G.renderer.dprScale = 1; G.renderer.setQuality(effQuality()); } });
     $('pGas').addEventListener('change', (e) => { G.settings.autoGas = e.target.value === '1'; KL.input.setAutoGas(G.settings.autoGas); saveSettings(); });
-    $('eAgain').addEventListener('click', () => { $('endScreen').hidden = true; startRace({ seed: null }); });
+    $('eAgain').addEventListener('click', () => {
+      $('endScreen').hidden = true;
+      if (G.session && G.session.kind === 'gp') G.session = newGp(G.settings.cup);       // a finished Grand Prix: play the cup again
+      startRace({ seed: null });
+    });
+    $('eNext').addEventListener('click', () => { $('endScreen').hidden = true; if (G.session && G.session.kind === 'gp') G.session.idx++; startRace({ seed: null }); });
     $('eMenu').addEventListener('click', () => { $('endScreen').hidden = true; if (G.mp) KL.MP.leave(); openMenu(); });
     $('eLobby').addEventListener('click', () => { $('endScreen').hidden = true; if (KL.backToLobby) KL.backToLobby(); });
     $('modeOnline').addEventListener('click', () => KL.openOnline());
@@ -500,6 +651,8 @@
     const auto = TEST && params.get('autostart') === '1';
     if (auto) {
       const o = { track: params.get('track') || undefined, weather: params.get('weather') || undefined, diff: params.get('diff') || undefined, laps: params.get('laps') ? +params.get('laps') : undefined, bots: params.get('bots') != null ? +params.get('bots') : undefined, seed: params.get('seed') ? +params.get('seed') : 7 };
+      const m = params.get('mode');
+      if (m === 'tt') G.session = { kind: 'tt' }; else if (m === 'gp') { G.settings.cup = params.get('cup') || G.settings.cup; G.session = newGp(G.settings.cup); }
       startRace(o);
     } else openMenu();
     requestAnimationFrame(frame);
@@ -512,10 +665,11 @@
     window.__klTest = {
       G, KL,
       state: () => { const R = G.race, k = G.human; return { state: G.state, paused: G.paused, phase: R && R.phase, clock: R && R.clock, steps: G.steps, kart: k && { x: k.x, y: k.y, z: k.z, yaw: k.yaw, speed: k.speed, place: k.place, lap: k.lapIdx + 1, prog: k.prog, s: k.s, d: k.d, finished: k.finished, finishTime: k.finishTime, bestLap: k.bestLap, lapTimes: k.lapTimes, item: k.item && k.item.id, roll: !!k.roll, drift: k.drift.state, driftLevel: k.drift.level, boostT: k.boostT, spinT: k.spinT, surf: k.surf, grounded: k.grounded, wrongT: k.wrongT, rescued: k.rescued || 0, shieldT: k.shieldT }, weather: G.renderer && G.renderer.weatherName, quality: G.settings.quality, calls: G.renderer && G.renderer.renderer.info.render.calls, tris: G.renderer && G.renderer.renderer.info.render.triangles, results: !!G.resultsShown }; },
-      start: (o) => startRace(o), force: (f) => { G.forced = f; }, forceItem: (id, count) => { if (G.human) { G.human.item = { id, count: count || (KL.ITEMS[id].count || 1) }; G.human.roll = null; } },
+      start: (o) => { o = o || {}; G.session = o.kind === 'gp' ? newGp(o.cup || G.settings.cup) : { kind: o.kind || 'race' }; startRace(o); },
+      save: () => KL.Save.data, session: () => G.session, boards: () => KL.Boards.sent.slice(), nextRace: () => $('eNext').click(), force: (f) => { G.forced = f; }, forceItem: (id, count) => { if (G.human) { G.human.item = { id, count: count || (KL.ITEMS[id].count || 1) }; G.human.roll = null; } },
       teleport: (s, d) => { const k = G.human; k.tpc = (k.tpc | 0) + 1; KL.placeKart(k, G.track, s, d || 0); k.prog = Math.floor(k.prog / G.track.length) * G.track.length + k.s; G.renderer.snapKarts(); G.renderer.cam.snap = true; },
       /* run the simulation without rendering (autopilot = the player gets the bot driver) */
-      sim: (seconds, autopilot) => { const R = G.race; if (autopilot && G.human) G.human.auto = true; const n = Math.round(seconds / C.STEP); for (let i = 0; i < n; i++) { applyPlayerInput(G.human); R.step(C.STEP); G.steps++; } handleEvents(R); return true; },
+      sim: (seconds, autopilot) => { const R = G.race; if (autopilot && G.human) G.human.auto = true; const n = Math.round(seconds / C.STEP); for (let i = 0; i < n; i++) { applyPlayerInput(G.human); R.step(C.STEP); G.steps++; afterStep(R); } handleEvents(R); return true; },
       mp: () => { const M = KL.MP; return { active: M.active, role: M.role, hostId: M.hostId, deputy: M.deputy, epoch: M.epoch, stats: M.stats, ended: M.ended, results: !!M.resultsDone, net: KL.netStats, rtt: M.rtt, links: [...KL.Lobby.links].map(([id, l]) => ({ id, kind: l.kind, open: l.open, rtt: l.rtt })), lobby: { phase: KL.Lobby.phase, role: KL.Lobby.role, code: KL.Lobby.code, signalling: KL.Lobby.signalling }, karts: G.race ? G.race.karts.map((k) => ({ id: k.id, name: k.name, human: k.human, bot: k.isBot, remote: k.remote, away: !!k.away, place: k.place, prog: k.prog, finished: k.finished, finishOrder: k.finishOrder, finishTime: k.finishTime, spinT: k.spinT })) : [] }; },
       /* sample own truth and the displayed remote karts every 20 ms (wall clock), for the sync-error analysis */
       mpRecord: (on) => { if (!on) { clearInterval(G._rec); const out = G._recOut || []; G._recOut = null; return out; } G._recOut = []; clearInterval(G._rec); G._rec = setInterval(() => { const R = G.race; if (!R) return; const me = G.human, t = performance.timeOrigin + performance.now(), views = {}; for (const k of R.karts) if (k !== me) { const v = k.view || k; views[k.id] = [v.x, v.z, k.x, k.z]; } G._recOut.push({ t, own: [me.x, me.z, me.speed], views }); }, 20); return true; },

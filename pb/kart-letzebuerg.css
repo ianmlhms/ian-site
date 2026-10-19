@@ -119,3 +119,8 @@ button.big{font-weight:800;font-size:15px}
 @media (orientation:portrait){#lapBox{left:auto;right:max(12px,env(safe-area-inset-right));top:calc(max(10px,env(safe-area-inset-top)) + 54px + clamp(110px,22vmin,170px) + 8px);transform:none;margin:0}
   #timeBox{left:50%;top:max(10px,env(safe-area-inset-top));margin-left:0;transform:translateX(-50%);align-items:center}#minimap{top:calc(max(10px,env(safe-area-inset-top)) + 54px)}}
 @media (prefers-reduced-motion:reduce){#countdown.pop{animation:none;opacity:1}.spin{animation-duration:2s}}
+/* phase 3: cups, records, leaderboards dialog */
+.tcard.cup{align-items:center}.cprev{display:grid;grid-template-columns:repeat(2,32px);gap:2px;flex:none}.cprev canvas{width:32px;height:27px;border-radius:6px}.cprev canvas:only-child{grid-column:1/3;width:64px;height:54px;border-radius:10px}
+.tcard small.rec{color:var(--gold);font-weight:700}
+#endNote{margin:0 0 10px;min-height:0;color:var(--gold);font-size:14px;font-weight:700}#endNote:empty{display:none}
+#bdScreen{z-index:40;background:rgba(5,8,20,.7)}#bdKinds,#bdTracks{margin:6px 0 12px}

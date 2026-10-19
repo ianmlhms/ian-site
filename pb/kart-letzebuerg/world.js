@@ -101,6 +101,7 @@
       while (this.group.children.length) { const o = this.group.children.pop(); o.traverse((c) => { if (c.geometry) c.geometry.dispose(); }); }
       for (const [, m] of this.kartMeshes) this.scene.remove(m.root);
       this.kartMeshes.clear();
+      this.setGhost(null);
       for (const [, m] of this.itemMeshes) this.scene.remove(m);
       this.itemMeshes.clear();
       if (this.boxMesh) { this.scene.remove(this.boxMesh); this.boxMesh = null; }
@@ -423,6 +424,25 @@
     confetti(x, y, z) {
       for (let i = 0; i < 46; i++) { const c = [[1, 0.3, 0.4], [0.3, 0.8, 1], [1, 0.85, 0.2], [0.5, 1, 0.5], [0.9, 0.5, 1]][i % 5]; this.fx.norm.spawn(x + (Math.random() - 0.5) * 6, y + 5 + Math.random() * 3, z + (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 8, 4 + Math.random() * 5, (Math.random() - 0.5) * 8, 2.4, 0.4, 0.3, c[0], c[1], c[2], 1, 0.6, 10); }
     }
+    /* ----- time-trial ghost: a see-through copy of the kart that drives the stored best lap ----- */
+    setGhost(driver) {
+      if (this.ghost) { this.scene.remove(this.ghost); this.ghost.traverse((o) => { if (o.isMesh && o.userData.ghostOwn) o.material.dispose(); }); this.ghost = null; }
+      if (!driver) return;
+      const root = KL.buildKartMesh(driver);
+      root.traverse((o) => {
+        if (!o.isMesh || o === root.userData.shadow) return;
+        o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.42; o.material.depthWrite = false; o.userData.ghostOwn = true;
+      });
+      const name = KL.nameSprite('👻 ' + KL.t('ttGhost')); name.position.set(0, 3.2, 0); root.add(name);
+      root.visible = false; this.scene.add(root); this.ghost = root;
+    }
+    updateGhost(p) {
+      const g = this.ghost; if (!g) return;
+      if (!p) { g.visible = false; return; }
+      g.visible = true; g.position.set(p.x, p.y, p.z); g.rotation.y = p.yaw;
+      const sp = this.raceRef && this.raceRef.clock * 9; for (const w of g.userData.wheels) w.spin.rotation.x = sp || 0;
+    }
+
     snapKarts() { for (const [, m] of this.kartMeshes) m.snap = true; }
 
     /* ----- chase camera ------------------------------------------------------------------------------------------------------------ */

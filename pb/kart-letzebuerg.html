@@ -6,8 +6,8 @@
 <meta name="color-scheme" content="dark">
 <title>Kart Lëtzebuerg 🏎️ – Arcade</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/pb/kart-letzebuerg.css?v=2">
-<script src="/pb/arcade-kit.js?v=28" data-arcade-id="kart-letzebuerg" data-arcade-title="Kart Lëtzebuerg 🏎️" data-arcade-no-score></script>
+<link rel="stylesheet" href="/pb/kart-letzebuerg.css?v=3">
+<script src="/pb/arcade-kit.js?v=29" data-arcade-id="kart-letzebuerg" data-arcade-title="Kart Lëtzebuerg 🏎️"></script>
 </head>
 <body>
 <main id="game">
@@ -46,17 +46,17 @@
       <p class="tagline" data-t="tagline"></p>
       <div class="modes">
         <button id="modeRace" class="mode on"><b data-t="play">Rennen</b><small data-t="playDesc"></small></button>
-        <button id="modeGp" class="mode" disabled><b data-t="gp">Grand Prix</b><small data-t="soon"></small></button>
-        <button id="modeTt" class="mode" disabled><b data-t="tt">Zäitfueren</b><small data-t="soon"></small></button>
+        <button id="modeGp" class="mode"><b data-t="gp">Grand Prix</b><small data-t="gpDesc"></small></button>
+        <button id="modeTt" class="mode"><b data-t="tt">Zäitfueren</b><small data-t="ttDesc"></small></button>
         <button id="modeOnline" class="mode"><b data-t="online">Online</b><small data-t="onlineDesc"></small></button>
       </div>
-      <div class="row"><h2 data-t="track">Streck</h2><div id="trackCards" class="cards"></div></div>
+      <div class="row"><h2 id="trackHead">Streck</h2><div id="trackCards" class="cards"></div></div>
       <div class="row2">
         <div><h2 data-t="weather">Wieder</h2><div id="weatherChips" class="chips"></div></div>
-        <div><h2 data-t="difficulty">Schwieregkeet</h2><div id="diffChips" class="chips"></div></div>
+        <div id="diffBox"><h2 data-t="difficulty">Schwieregkeet</h2><div id="diffChips" class="chips"></div></div>
       </div>
       <div class="row"><h2 data-t="driver">Fuerer</h2><div id="driverChips" class="drivers"></div></div>
-      <div class="foot"><button id="btnStart" class="primary"><span data-t="start">Lass!</span></button></div>
+      <div class="foot"><button id="btnBoards" data-t="boards">Ranglëschten</button><button id="btnStart" class="primary"><span data-t="start">Lass!</span></button></div>
       <p class="hint" id="menuHint"></p>
     </section>
   </div>
@@ -102,6 +102,15 @@
     <div id="frDlg" class="modal" hidden><section class="card small" role="dialog" aria-modal="true" aria-labelledby="frTitle"><h2 id="frTitle" data-t="friendsTitle">Frënn invitéieren</h2><div id="frList"></div><button id="frClose" data-t="close">Zoumaachen</button></section></div>
   </div>
 
+  <div id="bdScreen" class="screen" hidden>
+    <section class="card small" role="dialog" aria-modal="true" aria-labelledby="bdTitle">
+      <h2 id="bdTitle" data-t="boards">Ranglëschten</h2>
+      <div id="bdKinds" class="chips"></div>
+      <div id="bdTracks" class="chips"></div>
+      <div class="foot"><button id="bdClose" data-t="bdClose">Zoumaachen</button><button id="bdShow" class="primary" data-t="bdOpen">Ranglëscht weisen</button></div>
+    </section>
+  </div>
+
   <div id="netBusy" class="screen" role="status" aria-live="polite" hidden><div class="loadcard"><span class="spin"></span><b id="netBusyText"></b></div></div>
 
   <div id="pauseScreen" class="screen" hidden>
@@ -119,9 +128,9 @@
   <div id="endScreen" class="screen" hidden>
     <section class="card results">
       <h2 id="endTitle" data-t="results">Resultat</h2>
-      <p id="endSub"></p>
+      <p id="endSub"></p><p id="endNote"></p>
       <ol id="endList"></ol>
-      <div class="foot"><button id="eAgain" class="primary" data-t="again">Nach eng Kéier</button><button id="eLobby" class="primary" data-t="backLobby" hidden>Zréck an d'Lobby</button><button id="eMenu" data-t="menu">Menü</button></div>
+      <div class="foot"><button id="eNext" class="primary" hidden></button><button id="eAgain" class="primary" data-t="again">Nach eng Kéier</button><button id="eLobby" class="primary" data-t="backLobby" hidden>Zréck an d'Lobby</button><button id="eMenu" data-t="menu">Menü</button></div>
     </section>
   </div>
   <div id="fatal" class="screen" hidden><section class="card small"><p id="fatalText"></p></section></div>
@@ -145,6 +154,7 @@
 <script src="/pb/kart-letzebuerg/world.js?v=2"></script>
 <script src="/pb/kart-letzebuerg/input.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/audio.js?v=1"></script>
+<script src="/pb/kart-letzebuerg/progress.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/net.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/lobby.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/mp.js?v=1"></script>

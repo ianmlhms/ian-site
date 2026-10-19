@@ -114,6 +114,34 @@
       resultsOnline: 'Results', rank: 'Place',
     },
   };
+  /* Grand Prix, time trial, records and leaderboards (phase 3) */
+  const GP = {
+    lb: {
+      cup: 'Cup', cupDesc: '{n} Rennen', gpRace: 'Rennen {n}/{m}', gpTable: 'Grand Prix Stand', gpFinal: 'Grand Prix Resultat', gpNext: 'Nächst Rennen', gpWon: 'Grand Prix gewonnen! 🏆', gpRank: 'Du bass {n}. am Grand Prix', gpPts: 'Pkt', gpTotal: 'Total',
+      gpPlace: '{n}. Plaz: +{p} Punkten', gpLeave: 'Grand Prix verloossen', gpWins: '{n} GP-Siger',
+      ttGhost: 'Däi Geescht', ttNoGhost: 'Nach kee Geescht: fuer eng séier Ronn!', ttAhead: 'virun dem Geescht', ttBehind: 'hannert dem Geescht', ttLaps: 'Rondenzäiten', ttBest: 'Bestzäit',
+      newBestLap: 'Nei perséinlech Bestzäit (Ronn)!', newBestRace: 'Nei perséinlech Bestzäit (Rennen)!', yourBest: 'Däi Rekord', bestLapShort: 'Ronn', bestRaceShort: 'Rennen',
+      boards: 'Ranglëschten', bdOpen: 'Ranglëscht weisen', bd_lap: 'Beschte Ronn', bd_race: 'Beschte Rennzäit', bd_gp: 'GP-Siger', bdClose: 'Zoumaachen',
+      lbMode: 'Modus', lbModeRace: 'Rennen', lbModeGp: 'Grand Prix', lbCup: 'Cup',
+    },
+    de: {
+      cup: 'Cup', cupDesc: '{n} Rennen', gpRace: 'Rennen {n}/{m}', gpTable: 'Grand-Prix-Stand', gpFinal: 'Grand-Prix-Ergebnis', gpNext: 'Nächstes Rennen', gpWon: 'Grand Prix gewonnen! 🏆', gpRank: 'Du bist {n}. im Grand Prix', gpPts: 'Pkt', gpTotal: 'Gesamt',
+      gpPlace: '{n}. Platz: +{p} Punkte', gpLeave: 'Grand Prix verlassen', gpWins: '{n} GP-Siege',
+      ttGhost: 'Dein Geist', ttNoGhost: 'Noch kein Geist: fahr eine schnelle Runde!', ttAhead: 'vor dem Geist', ttBehind: 'hinter dem Geist', ttLaps: 'Rundenzeiten', ttBest: 'Bestzeit',
+      newBestLap: 'Neue persönliche Bestzeit (Runde)!', newBestRace: 'Neue persönliche Bestzeit (Rennen)!', yourBest: 'Däi Rekord', bestLapShort: 'Runde', bestRaceShort: 'Rennen',
+      boards: 'Bestenlisten', bdOpen: 'Bestenliste zeigen', bd_lap: 'Beste Runde', bd_race: 'Beste Rennzeit', bd_gp: 'GP-Siege', bdClose: 'Schließen',
+      lbMode: 'Modus', lbModeRace: 'Rennen', lbModeGp: 'Grand Prix', lbCup: 'Cup',
+    },
+    en: {
+      cup: 'Cup', cupDesc: '{n} races', gpRace: 'Race {n}/{m}', gpTable: 'Grand Prix standings', gpFinal: 'Grand Prix result', gpNext: 'Next race', gpWon: 'Grand Prix won! 🏆', gpRank: 'You are {n} in the Grand Prix', gpPts: 'pts', gpTotal: 'Total',
+      gpPlace: 'Place {n}: +{p} points', gpLeave: 'Leave Grand Prix', gpWins: '{n} GP wins',
+      ttGhost: 'Your ghost', ttNoGhost: 'No ghost yet: drive a fast lap!', ttAhead: 'ahead of the ghost', ttBehind: 'behind the ghost', ttLaps: 'Lap times', ttBest: 'Best',
+      newBestLap: 'New personal best (lap)!', newBestRace: 'New personal best (race)!', yourBest: 'Your record', bestLapShort: 'Lap', bestRaceShort: 'Race',
+      boards: 'Leaderboards', bdOpen: 'Show leaderboard', bd_lap: 'Best lap', bd_race: 'Best race time', bd_gp: 'GP wins', bdClose: 'Close',
+      lbMode: 'Mode', lbModeRace: 'Race', lbModeGp: 'Grand Prix', lbCup: 'Cup',
+    },
+  };
+  for (const l in GP) Object.assign(TXT[l], GP[l]);
   for (const l in ON) Object.assign(TXT[l], ON[l]);
   TXT.de.tagline = 'Drifte durch die Stadt, schnapp dir die Boxen und gewinne das Rennen.';
   let lang = 'lb';

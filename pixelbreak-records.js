@@ -103,6 +103,14 @@ function setActiveBoard(board) {
 
 /* Scores that need more than a bare number: the game names a format, we know how to print it. */
 const SCORE_FORMATS = {
+  // Kart Lëtzebuerg: times are stored as KART_TIME_BASE - milliseconds, so a faster time is a HIGHER score (the leaderboard
+  // table and its keep-best trigger only know "higher is better"). Shown as m:ss.mmm.
+  kt(score) {
+    const ms = 1_000_000 - score;
+    if (!Number.isFinite(ms) || ms < 0) return String(score);
+    const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), t = ms % 1000;
+    return m + ":" + String(s).padStart(2, "0") + "." + String(t).padStart(3, "0");
+  },
   // Geometry Dash: below 1000 a plain best %, from 1000 up a finished run (1000 + 999 - attempts).
   gd(score) {
     if (score < 1000) return score + " %";
@@ -173,8 +181,8 @@ const SOUND = `<script>(function(){
 const isMuted = () => localStorage.getItem("pb_muted") === "1";
 
 PB.instrument = (html) => {
-  // Paket Express reports only completed shifts; DOM polling would submit free-drive points.
-  const automaticFeedback = PB.current?.id === "paket-express" ? "" : REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
+  // Paket Express and Kart Lëtzebuerg report only finished shifts/races themselves; DOM polling would submit free-drive points or half-race clocks.
+  const automaticFeedback = ["paket-express", "kart-letzebuerg"].includes(PB.current?.id) ? "" : REPORTER + SOUND.replace("__PB_MUTED__", isMuted() ? "true" : "false");
   // Test mode: the flag and the storage redirect come first, ahead of every other script of the game.
   let inject = testMode ? testModeInject(PB.current) : "";
   inject += `<script>window.addEventListener('message',function(event){
