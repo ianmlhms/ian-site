@@ -155,11 +155,12 @@
   };
 
   /* a river / stream: ribbon along a world polyline [[x, z], ...] with half width w at height y */
-  K.river = (S, pts, w, y, mat, vscale) => {
-    const B = new KL.Batch(); let v = 0;
+  K.river = (S, pts0, w, y, mat, vscale) => {
+    const B = new KL.Batch(), yf = typeof y === 'function' ? y : () => y; let pts = pts0, v = 0;
+    if (typeof y === 'function') { pts = []; for (let i = 0; i + 1 < pts0.length; i++) { const a = pts0[i], b = pts0[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 9)); for (let k = 0; k < n; k++) pts.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]); } pts.push(pts0[pts0.length - 1]); }
     for (let i = 0; i + 1 < pts.length; i++) {
-      const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = dz / l * w, nz = -dx / l * w, dv = l / (vscale || 10);
-      B.quadUV([a[0] + nx, y, a[1] + nz], [a[0] - nx, y, a[1] - nz], [b[0] - nx, y, b[1] - nz], [b[0] + nx, y, b[1] + nz], [1, 1, 1], [0, v], [1, v], [1, v + dv], [0, v + dv]);
+      const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = dz / l * w, nz = -dx / l * w, dv = l / (vscale || 10), ya = yf(a[0], a[1]), yb = yf(b[0], b[1]);
+      B.quadUV([a[0] + nx, ya, a[1] + nz], [a[0] - nx, ya, a[1] - nz], [b[0] - nx, yb, b[1] - nz], [b[0] + nx, yb, b[1] + nz], [1, 1, 1], [0, v], [1, v], [1, v + dv], [0, v + dv]);
       v += dv;
     }
     return S.add(B, mat);
