@@ -151,7 +151,12 @@ begin
     if jsonb_typeof(v_pl) <> ''object'' then
       raise exception ''bad player'';
     end if;
-    v_name := public.kart_races_txt(v_pl -> ''name'', c_name);
+    -- names are cleaned, not rejected (one odd guest name must not lose the whole race)
+    v_name := null;
+    if jsonb_typeof(v_pl -> ''name'') = ''string'' then
+      v_name := left(btrim(regexp_replace(v_pl ->> ''name'', ''[[:cntrl:]<>&"`]'', '''', ''g'')), 24);
+      if v_name !~ c_name then v_name := null; end if;
+    end if;
     v_driver := public.kart_races_txt(v_pl -> ''driver'', ''^[a-z0-9_-]{1,24}$'');
     v_place := public.kart_races_int(v_pl -> ''place'', 1, v_n);
     if v_name is null or btrim(v_name) = '''' or v_driver is null or v_place is null then
