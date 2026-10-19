@@ -126,19 +126,18 @@
         for (const sd of [-1, 1]) { L.cyl(B, f, sd * 6.4, 0, 0, 1.5, 1.2, 8, 6, basalt[0]); E.sphere(P0[0] + nx * sd * 6.4, y + 8.5, P0[1] + nz * sd * 6.4, 0.9, 5, col('#ff7a1a')); }
         L.box(B, f, 0, 7.6, 0, 14.6, 1.2, 1.8, 0, basalt[2]); L.box(E, f, 0, 7.5, 0, 14.6, 0.15, 1.9, 0, col('#ff6a14'));
       }
-      /* ---- lava glow: warm pools of light on the tarmac around both fords and beside the road, braziers with embers along the whole lap ---- */
+      /* ---- lava glow: warm pools of light on the tarmac beside the road (flat quads: kept away from the kicker ramps at the fords), braziers with embers along the whole lap ---- */
       {
         const P = new KL.Batch(), tint = [1, 0.5, 0.16];
         const pool = (x, z, y, r, k) => P.quadUV([x - r, y, z - r], [x - r, y, z + r], [x + r, y, z + r], [x + r, y, z - r], [tint[0] * k, tint[1] * k, tint[2] * k], [0, 0], [0, 1], [1, 1], [1, 0]);
-        for (const sF of FORDS) for (const ds of [-30, -16, 16, 30]) { const a = track.at(sF + ds, 0); pool(a.x, a.z, a.y + 0.08, 22, 1); }
         let side = 1;
         for (let s = 24; s < track.length; s += 46) {
           const i = Math.floor(s / track.step) % track.N, hwi = track.HW[i], lim = hwi + (side < 0 ? track.WL[i] : track.WR[i]);
-          if (lim < hwi + 1.5 || Math.abs(s - FORDS[0]) < 40 || Math.abs(s - FORDS[1]) < 40) { side = -side; continue; }
+          if (lim < hwi + 1.5 || Math.abs(s - FORDS[0]) < 70 || Math.abs(s - FORDS[1]) < 70) { side = -side; continue; }
           const p = track.at(s, side * (hwi + 1.4)), y = p.y;
           B.cyl(p.x, y, p.z, 0.75, 0.55, 1.1, 6, basalt[2]); B.cyl(p.x, y + 1.1, p.z, 0.9, 0.9, 0.18, 6, basalt[3]);
           E.cyl(p.x, y + 1.25, p.z, 0.55, 0.15, 0.9, 6, col('#ff7a1a')); E.sphere(p.x, y + 2.0, p.z, 0.32, 5, col('#ffd27a'));
-          pool(p.x, p.z, y + 0.08, 15, 1); side = -side;
+          pool(p.x, p.z, y + 0.08, 13, 1); side = -side;
         }
         const gm = new T.MeshBasicMaterial({ map: KL.tex.glow(), vertexColors: true, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
         const pm = add(P, gm), prev = S.theme.onWeather;
