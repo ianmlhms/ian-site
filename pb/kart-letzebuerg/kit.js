@@ -213,13 +213,18 @@
   /* a tunnel / cave over a stretch of road or along any polyline. o.pts = [[x, y, z, hw], ...] (centre line, <= 6 m apart); o.H inner height, o.thick shell thickness;
    * colours: o.inner (walls), o.outer (shell), o.top (cap, snow), o.crystal (emissive spikes), o.drip (stalactites). Returns nothing; adds meshes to S. */
   K.tunnel = (S, o) => {
-    const P = o.pts, n = P.length, B = new KL.Batch(), E = new KL.Batch(), rnd = KL.rng(o.seed || 5), M = 11, H = o.H || 11, th = o.thick || 6;
+    const P = o.pts, n = P.length, B = new KL.Batch(), E = new KL.Batch(), rnd = KL.rng(o.seed || 5), M = 14, H = o.H || 11, th = o.thick || 6;
     const ci = KL.col(o.inner || '#9ccbea'), co = KL.col(o.outer || '#d6e6f4'), ct = KL.col(o.top || '#ffffff'), cc = KL.col(o.crystal || '#7fe0ff'), cd = KL.col(o.drip || '#cfeaff');
     const fr = P.map((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)]; let tx = b[2] - a[2] === 0 && b[0] - a[0] === 0 ? 1 : b[0] - a[0], tz = b[2] - a[2]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l; return { tx, tz, rx: -tz, rz: tx }; });
     const jit = (i, k) => 1 + (Math.sin(i * 1.7 + k * 2.3) * 0.5 + Math.sin(i * 0.43 + k * 5.1) * 0.5) * 0.09 * (o.rough || 1);
     const prof = (i, k, out) => {          // inner profile point k of ring i -> [u, v]
       const a = Math.PI - (Math.PI * k) / M, W = P[i][3] + (o.margin || 5), j = jit(i, k);
       return [Math.cos(a) * W * j, Math.pow(Math.sin(a), 0.75) * H * j];
+    };
+    const outer = (i, k) => {              // outer shell point of ring i -> [u, v]
+      const a = Math.PI - (Math.PI * k) / M, e = Math.min(i, n - 1 - i), tp = 0.38 + 0.62 * KL.smooth(0, 4, e), W = P[i][3] + (o.margin || 5), sn = Math.sin(a);
+      const lump = 1 + 0.1 * Math.sin(i * 0.37 + k * 0.7) + 0.07 * Math.sin(i * 0.91 + k * 1.9 + 1) + 0.05 * Math.sin(i * 0.19 - k * 0.5);
+      return [Math.cos(a) * (W + th * 1.1 * tp * lump), -2 + (H + 2 + th * 1.15 * tp * lump) * Math.pow(Math.max(0, sn), 0.7)];
     };
     const pt = (i, u, v) => [P[i][0] + fr[i].rx * u, P[i][1] + v, P[i][2] + fr[i].rz * u];
     const Qf = (p0, p1, p2, p3, c, hx, hy, hz) => {        // quad facing the hint direction (hx,hy,hz)
@@ -232,18 +237,19 @@
       const q = [pt(i, ...a0), pt(i + 1, ...b0), pt(i + 1, ...b1), pt(i, ...a1)], cx = (a0[0] + a1[0]) / 2, cy = (a0[1] + a1[1]) / 2;
       const sh = 0.8 + 0.28 * Math.min(1, cy / H) + 0.1 * ((i * 7 + k * 3) % 5) / 4;
       Qf(q[0], q[1], q[2], q[3], KL.shade(ci, sh), -fr[i].rx * cx, H * 0.45 - cy, -fr[i].rz * cx);          // faces inward (towards the axis)
-      // shell: offset outward
-      const sc = (u, v, ii) => { const dx = u, dy = v - H * 0.3, l = Math.hypot(dx, dy) || 1, t = th * (0.8 + 0.5 * Math.sin(ii * 0.9 + k)); return [u + dx / l * t, Math.max(-3, v + dy / l * t * 0.9)]; };
-      const o0 = sc(...a0, i), o1 = sc(...a1, i), p0 = sc(...b0, i + 1), p1 = sc(...b1, i + 1);
-      const oq = [pt(i, ...o0), pt(i + 1, ...p0), pt(i + 1, ...p1), pt(i, ...o1)], high = (o0[1] + o1[1]) / 2 > H * 0.9;
-      Qf(oq[0], oq[1], oq[2], oq[3], high ? KL.shade(ct, 0.92 + 0.08 * ((i + k) % 3)) : KL.shade(co, 0.78 + 0.18 * ((i * 5 + k) % 4) / 3), cx * fr[i].rx, cy + 6, cx * fr[i].rz);       // faces outward
+      // shell: a rounded, lumpy dome (superellipse) that is thinner at the portals and carries a snow cap
+      const o0 = outer(i, k), o1 = outer(i, k + 1), p0 = outer(i + 1, k), p1 = outer(i + 1, k + 1);
+      const oq = [pt(i, ...o0), pt(i + 1, ...p0), pt(i + 1, ...p1), pt(i, ...o1)], hi = (o0[1] + o1[1] + p0[1] + p1[1]) / 4 / (H + th);
+      const mixK = KL.smooth(0.3 + 0.04 * Math.sin(i * 1.3 + k * 2.1), 0.62, hi);
+      Qf(oq[0], oq[1], oq[2], oq[3], KL.shade(KL.mix(co, ct, mixK), 0.86 + 0.14 * ((i * 5 + k * 3) % 4) / 3), cx * fr[i].rx, cy + 6, cx * fr[i].rz);       // faces outward
     }
     // portals: close the shell between inner and outer ring at both ends
     for (const [i, dir] of [[0, -1], [n - 1, 1]]) for (let k = 0; k < M; k++) {
-      const a0 = prof(i, k), a1 = prof(i, k + 1), sc = (u, v) => { const dx = u, dy = v - H * 0.3, l = Math.hypot(dx, dy) || 1; return [u + dx / l * th, Math.max(-3, v + dy / l * th * 0.9)]; };
-      const o0 = sc(...a0), o1 = sc(...a1);
+      const a0 = prof(i, k), a1 = prof(i, k + 1), o0 = outer(i, k), o1 = outer(i, k + 1);
       Qf(pt(i, ...a0), pt(i, ...a1), pt(i, ...o1), pt(i, ...o0), KL.shade(co, 0.95), fr[i].tx * dir, 0, fr[i].tz * dir);
     }
+    // snow drifts piled on the dome
+    for (let i = 3; i + 3 < n; i += 2) if (rnd() < 0.7) { const u = (rnd() - 0.5) * (P[i][3] + (o.margin || 5)) * 0.6, e = outer(i, M / 2), q = pt(i, u, e[1] * 0.97); B.sphere(q[0], q[1] - 0.6, q[2], 2.2 + rnd() * 2.4, 6, KL.shade(ct, 0.93 + rnd() * 0.07), { sy: 0.5, noise: 1 }); }
     // stalactites and crystals
     for (let i = 1; i + 1 < n; i++) {
       if (rnd() < 0.55) { const k = 3 + Math.floor(rnd() * 5), a = prof(i, k), u = a[0] * 0.92 + (rnd() - 0.5) * 2, p = pt(i, u, a[1] - 0.4), len = 1.6 + rnd() * 3.2; B.cyl(p[0], p[1] - len, p[2], 0.05, 0.4 + rnd() * 0.5, len, 5, cd, { flat: true }); }

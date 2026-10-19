@@ -81,7 +81,7 @@
         K.river(S, pts, 13, y, new T.MeshLambertMaterial({ map: K.canvasTex(c), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 20);
       }
       /* ---- the ice cave ---- */
-      K.tunnel(S, { pts: K.roadPts(track, CAVE[0] - 6, CAVE[1] + 6, 5), H: 12, thick: 7, margin: 5, inner: '#8fc8ee', outer: '#9db9d6', top: '#ffffff', crystal: '#6fe3ff', drip: '#d8f1ff', seed: 3 });
+      K.tunnel(S, { pts: K.roadPts(track, CAVE[0] - 6, CAVE[1] + 6, 5), H: 12, thick: 7, margin: 5, inner: '#8fc8ee', outer: '#a8cdee', top: '#ffffff', crystal: '#6fe3ff', drip: '#d8f1ff', seed: 3 });
       /* ---- trees: snowy pines ---- */
       const pine = (x, y, z, k) => { B.cyl(x, y, z, 0.35 * k, 0.3 * k, 1.8 * k, 5, woodD); for (let i = 0; i < 4; i++) { const r = (2.7 - i * 0.55) * k, y0 = y + (1.2 + i * 1.5) * k; B.cyl(x, y0, z, r, 0.05, 2.7 * k, 7, KL.mix(col('#1d4a3a'), col('#2f7a56'), i / 4)); B.cyl(x, y0 + 1.15 * k, z, r * 0.72, 0.05, 1.55 * k, 7, snowW, { flat: true }); } };
       K.scatter(S, rnd, Math.round(190 * q.trees), [-430, -430, 430, 200], 6, (x, y, z, i) => { if (massif(x, z) > 38) return false; pine(x, y, z, 0.9 + rnd() * 1.1); });
