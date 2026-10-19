@@ -44,7 +44,8 @@ async function newPlayer(h, hub, label, { first = false, viewport = { width: 640
     if (a.withRpc) window.__pbAuth.sb = { rpc: async (name, args) => { window.__rpcCalls.push({ name, p: args && args.p }); return { data: 1, error: null }; } };
   }, auth);
   if (noRelay) await context.route(/kart-letzebuerg\/config\.js/, async (route) => { const r = await route.fetch(); route.fulfill({ response: r, body: (await r.text()).replace('RELAY_FALLBACK: true', 'RELAY_FALLBACK: false') }); });
-  const p = { label, context, page, http: [], errors: [], first };
+  const p = { label, context, page, http: [], errors: [], notFound: [], first };
+  page.on('response', (r) => { if (r.status() === 404) p.notFound.push(r.url()); });
   page.on('request', (r) => { if (isSupabase(r.url()) && r.resourceType() !== 'websocket' && r.method() !== 'OPTIONS') p.http.push(r.method() + ' ' + new URL(r.url()).pathname); });
   page.on('console', (m) => { if (m.type() === 'error') p.errors.push(m.text()); });
   page.on('console', (m) => { if (/\[kart-mp\] race/.test(m.text())) console.log('    [' + label + '] ' + m.text()); });
@@ -514,11 +515,14 @@ export const flow = {
         await S.page.click('#lbReady');
         await waitFor(B, () => document.querySelectorAll('#lbList li .st.ok').length === 1, null, 20000);
         await B.page.locator('#lbLaps button', { hasText: /^1$/ }).click();
+        const rc0 = await Promise.all([B, S].map((p) => kl(p, () => __klTest.G.raceCount)));
         await B.page.click('#lbStart');
-        await waitRace([B, S]);
+        await Promise.all([B, S].map((p, i) => waitFor(p, (n) => window.__klTest.G.raceCount > n && window.__klTest.state().phase === 'race' && window.__klTest.state().clock > 0.3, rc0[i], 60000).catch(async (e) => { throw new Error('race 2 did not start on ' + p.label + ': ' + JSON.stringify(await kl(p, () => ({ lobby: KL.Lobby.phase, state: __klTest.G.state, spec: KL.MP.spec, msg: document.getElementById('olMsg').textContent })).catch(() => '?')) + ' ' + JSON.stringify(p.errors) + ' ' + JSON.stringify(p.notFound)); })));
         h.eq(await Promise.all([B, S].map((p) => kl(p, () => __klTest.G.race.karts.filter((k) => k.human).length))), [2, 2], 'next race: the former spectator drives as a full player');
         h.eq(await mp(S).then((m) => [m.spec, m.role]), [false, 'client'], 'and is a normal client now');
-        h.expect([A, B, S].every((p) => p.errors.filter((e) => !/three/.test(e)).length === 0), 'no console errors: ' + JSON.stringify([A, B, S].flatMap((p) => p.errors)));
+        // (known, not ours: the shared auth.js injects "auth.css" with a relative path, a 404 on every /pb/ page opened with ?room=; ignored here)
+        const realErrors = (p) => p.errors.filter((e) => !/three/.test(e) && !(/404/.test(e) && p.notFound.length && p.notFound.every((u) => /auth\.css/.test(u))));
+        h.expect([A, B, S].every((p) => realErrors(p).length === 0), 'no console errors: ' + JSON.stringify([A, B, S].flatMap((p) => realErrors(p).concat(p.notFound))));
         await closeAll(all); all.length = 0;
       }
 

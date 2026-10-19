@@ -35,13 +35,15 @@
   const FINITE_KEYS = ['x', 'y', 'z', 'yaw', 'vx', 'vy', 'vz', 'speed', 'vf', 'steer', 'boostT', 'spinT', 'prog', 's', 'd', 'hopY'];
   KL.kartFinite = function kartFinite(k) {
     for (let i = 0; i < FINITE_KEYS.length; i++) if (!isFinite(k[FINITE_KEYS[i]])) return false;
-    return isFinite(k.drift.charge) && isFinite(k.drift.level) && (k.drift.dir === 1 || k.drift.dir === -1 || k.drift.dir === 0);
+    const i = k.input;
+    return isFinite(k.drift.charge) && isFinite(k.drift.level) && (k.drift.dir === 1 || k.drift.dir === -1 || k.drift.dir === 0) && (!i || (isFinite(i.steer) && isFinite(i.gas) && isFinite(i.brake)));
   };
   /* repair a kart whose state went non-finite: scrub the numbers, then respawn it on the tarmac (counted in k.healed for the tests) */
   KL.healKart = function healKart(k, track) {
     const dr = k.drift;
     for (const key of FINITE_KEYS) if (!isFinite(k[key])) k[key] = key === 'prog' || key === 's' ? (isFinite(k.safeS) ? k.safeS : 0) : 0;
     if (!isFinite(dr.charge)) dr.charge = 0; if (!isFinite(dr.level)) dr.level = 0; if (dr.dir !== 1 && dr.dir !== -1) dr.dir = 1;
+    if (k.input) for (const key of ['steer', 'gas', 'brake']) if (!isFinite(k.input[key])) k.input[key] = 0;
     if (!isFinite(k.safeS)) k.safeS = k.s;
     if (!isFinite(k.hint)) k.hint = -1;
     KL.rescueKart(k, track);

@@ -87,6 +87,43 @@ export const flow = {
       h.expect(res.length === 8 && res.every((r) => r.f), track + ': all 8 karts finish the lap');
     }
 
+    h.step('regression "setTargetAtTime non-finite": the engine sound and the kart state survive NaN / Infinity');
+    await h.goto(`${URL_BASE}?test=1&autostart=1&track=villehaute&laps=1&bots=7&seed=3`);
+    await waitState(h, () => window.__klTest && window.__klTest.state().phase === 'race', null, 25000);
+    const nf = await h.page.evaluate(() => {
+      const G = __klTest.G, KL = __klTest.KL, a = G.audio, out = { ctx: false, threw: [], calls: 0, bad: 0, healed: 0, finite: false, afterThrew: null };
+      a.start(); out.ctx = !!a.ctx;
+      if (!a.ctx) return out;
+      const evil = [NaN, Infinity, -Infinity, undefined, null];
+      const base = G.human;
+      for (const v of evil) for (const key of ['speed', 'boostT', 'surf']) {
+        const fake = Object.assign({}, base, { drift: Object.assign({}, base.drift) }); fake[key] = v; out.calls++;
+        try { a.update(fake, { racing: true }); } catch (e) { out.threw.push(key + '=' + v + ': ' + e.message); }
+      }
+      for (const v of evil) for (const key of ['charge', 'level', 'state', 'dir']) {
+        const fake = Object.assign({}, base, { drift: Object.assign({}, base.drift, { state: 2 }) }); fake.grounded = true; fake.drift[key] = v; out.calls++;
+        try { a.update(fake, { racing: true, rain: true, paused: v }); } catch (e) { out.threw.push('drift.' + key + '=' + v + ': ' + e.message); }
+      }
+      try { a.update(Object.assign({}, base, { drift: null }), {}); } catch (e) { out.threw.push('drift=null: ' + e.message); }
+      for (const v of evil) {
+        try { a.sfx('miniturbo', { level: v }); a.sfx('driftlevel', { level: v }); a.tone(v, v, 'square', v, v, v); a.noise(v, v, v, v, 'lowpass', v); } catch (e) { out.threw.push('one-shot ' + v + ': ' + e.message); }
+      }
+      out.bad = a.badValues || 0;
+      // the kart itself: a poisoned state is repaired on the next simulation step instead of spreading
+      const R = G.race, k = G.human; k.auto = true;
+      k.vx = NaN; k.drift.charge = Infinity; k.steer = NaN;
+      try { R.step(KL.CFG.STEP); } catch (e) { out.threw.push('step: ' + e.message); }
+      out.healed = k.healed || 0; out.finite = KL.kartFinite(k);
+      try { a.update(k, { racing: true }); out.afterThrew = false; } catch (e) { out.afterThrew = e.message; }
+      return out;
+    });
+    h.expect(nf.ctx, 'AudioContext available in the test browser');
+    h.eq(nf.threw, [], 'no AudioParam call throws for NaN / Infinity / undefined / null inputs (' + nf.calls + ' engine updates + one-shots)');
+    h.expect(nf.bad > 0, 'the bad values were caught and replaced at the source (' + nf.bad + ' substitutions)');
+    h.expect(nf.healed >= 1 && nf.finite, 'a NaN / Infinity kart state is repaired by the simulation (healed ' + nf.healed + 'x, finite again: ' + nf.finite + ')');
+    h.eq(nf.afterThrew, false, 'engine sound keeps working on the repaired kart');
+    await h.page.evaluate(() => window.__klTest.menu());
+
     h.step('test hook is absent in normal play; no network beyond the CDN; no off-site requests');
     await h.goto(URL_BASE);
     await h.page.waitForSelector('#menu:not([hidden])', { timeout: 20000 });
