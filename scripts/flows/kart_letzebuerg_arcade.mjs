@@ -138,6 +138,34 @@ export const flow = {
     await sleep(6000);
     h.eq(h.backend.calls.length - idleFrom, 0, 'no Supabase traffic while the menu/result screen idles (6 s)');
     h.expect(h.backend.calls.slice(callsAtOpen).length <= 30, 'whole session (time trial + Grand Prix) stays within 30 requests (' + h.backend.calls.slice(callsAtOpen).length + ')');
+    /* ---------------- stage 2a: the three real tracks ---------------- */
+    h.step('Kirchberg, Grund, Belval: menu cards with thumbnails, per-track boards (lap + race) and the boards dialog, Lëtzebuerg cup order');
+    await F.evaluate(() => __klTest.menu());
+    await F.locator('#modeRace').click();
+    const ids = await F.evaluate(() => Object.keys(__klTest.KL.tracks));
+    h.eq(ids, ['villehaute', 'kirchberg', 'grund', 'belval', 'geeschterschlass'], 'five tracks in menu order');
+    h.eq(await F.locator('#trackCards > *').count(), 5, 'five track cards');
+    await F.waitForFunction(() => [...document.querySelectorAll('#trackCards .tpv img')].length === 5 && [...document.querySelectorAll('#trackCards .tpv img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 15000 });
+    h.expect(true, 'every card shows its thumbnail');
+    h.eq(await F.evaluate(() => __klTest.KL.gpRaces(__klTest.KL.CUPS[0], __klTest.KL.tracks).map((r) => r.track)), ['villehaute', 'kirchberg', 'grund', 'belval'], 'Lëtzebuerg cup = Uewerstad, Kirchberg, Grund, Belval');
+    const sentFrom = h.backend.calls.length;
+    for (const [i, id] of ['kirchberg', 'grund', 'belval'].entries()) {
+      const r = await F.evaluate((id, i) => __klTest.KL.Progress.onRaceDone({ track: id, laps: 3, lapTimes: [52 + i, 51 + i, 50 + i], finished: true, time: 160 + i }), id, i);
+      h.eq([r.lap, r.race], [true, true], id + ': first run sets both personal records');
+    }
+    await sleep(2500);
+    const np = posts(sentFrom).map((c) => c.body.game_id).sort();
+    h.eq(np, ['kart-letzebuerg-lap-belval', 'kart-letzebuerg-lap-grund', 'kart-letzebuerg-lap-kirchberg', 'kart-letzebuerg-race-belval', 'kart-letzebuerg-race-grund', 'kart-letzebuerg-race-kirchberg'], 'each new track writes its own lap and race board');
+    h.expect(posts(sentFrom).every((c) => c.body.score > 0 && c.body.score < SCORE_BASE), 'scores are 1000000 - milliseconds');
+    await F.evaluate(() => document.getElementById('btnBoards') && document.getElementById('btnBoards').click());
+    await F.waitForSelector('#bdScreen:not([hidden]) #bdTracks button', { timeout: 8000 });
+    h.eq(await F.locator('#bdTracks button').count(), 5, 'the boards dialog lists all five tracks');
+    await F.locator('#bdTracks button', { hasText: /Kierchbierg|Kirchberg/ }).first().click();
+    await F.evaluate(() => __klTest.KL.Boards.open('lap', 'kirchberg'));
+    await h.page.waitForSelector('.pb-modal.open .pb-row', { timeout: 8000 });
+    h.expect(/Kart Lëtzebuerg · Kierchbierg · Beschte Ronn/.test(await h.page.locator('.pb-modal.open').innerText()), 'the arcade board for Kirchberg is titled with game, track and kind');
+    await h.page.locator('.pb-modal.open .pb-x').click();
+    await h.shot('new-tracks-menu');
     h.expect(errors.filter((e) => !/three\.js|three\.min\.js/.test(e)).length === 0, 'no console errors: ' + errors.join('; '));
   },
 };

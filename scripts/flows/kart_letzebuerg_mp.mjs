@@ -364,39 +364,40 @@ export const flow = {
 
       /* ================= 5b. online Grand Prix ================= */
       if (want('gp')) {
-        h.step('online Grand Prix: 2 races of the Fantasy cup, the same points table on both sides, the host moves on, final standings');
+        h.step('online Grand Prix: the whole Lëtzebuerg cup (4 races, 4 lazily loaded tracks), the same points table on both sides, the host moves on, final standings');
         const P = await newPlayer(h, hub, 'gp-host'); all.push(P);
         const Q = await newPlayer(h, hub, 'gp-guest'); all.push(Q);
         await goOnline(P, 'GPHost'); await P.page.click('#olCreate');
         await P.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
         await lobbyJoin(P, Q, (await P.page.textContent('#lbCode')).trim(), 'GPGuest');
-        await kl(P, () => { __klTest.KL.GP_RACES = 2; });           // two races keep the test short
         await setLaps(P, 1);
         await P.page.locator('#lbModeChips button', { hasText: /Grand Prix/ }).click();
         h.expect(await P.page.locator('#lbCupBox').isVisible() && await P.page.locator('#lbTrackBox').isHidden(), 'Grand Prix mode shows the cup picker instead of the track picker');
-        await P.page.locator('#lbCup button', { hasText: /Fantasy/ }).click();
+        await P.page.locator('#lbCup button', { hasText: /L[eë]tzebuerg/ }).click();
         await waitFor(Q, () => /Grand Prix/.test(document.getElementById('lbSummary').textContent), null, 10000);
         h.expect(true, 'the guest sees the Grand Prix in the lobby summary');
         await readyAndStart(P, [Q], null);
         await waitRace([P, Q]);
-        h.eq(await kl(P, () => [__klTest.session().kind, __klTest.session().idx, __klTest.session().n, __klTest.G.track.id]), ['gp', 0, 2, 'geeschterschlass'], 'race 1 of 2 on the cup track');
-        await kl(P, () => __klTest.autopilot(true)); await kl(Q, () => __klTest.autopilot(true));
-        for (const p of [P, Q]) await waitFor(p, () => /1\/2/.test(document.getElementById('endTitle').textContent) && !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 240000);
+        const CUP = ['villehaute', 'kirchberg', 'grund', 'belval'];
         const same = (t) => t.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');   // each side marks its own row
-        const t1 = await Promise.all([P, Q].map((p) => p.page.locator('#endList').innerText()));
-        h.eq(same(t1[0]), same(t1[1]), 'both sides show the same Grand Prix table after race 1');
-        h.expect(await P.page.locator('#eNext').isVisible() && await Q.page.locator('#eNext').isHidden(), 'only the host can start the next race');
-        h.expect(/\+\d+/.test(t1[0]), 'the table shows the points of this race: ' + t1[0].replace(/\s+/g, ' ').slice(0, 80));
-        await P.page.locator('#eNext').click();
-        await waitRace([P, Q]);
-        h.eq(await kl(Q, () => [__klTest.session().idx, __klTest.session().online]), [1, true], 'the guest is in race 2 without pressing ready again');
-        await kl(P, () => __klTest.autopilot(true)); await kl(Q, () => __klTest.autopilot(true));
-        for (const p of [P, Q]) await waitFor(p, () => /Resultat|result|Ergebnis/i.test(document.getElementById('endTitle').textContent) && !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 240000);
-        const t2 = await Promise.all([P, Q].map((p) => p.page.locator('#endList').innerText()));
-        h.eq(same(t2[0]), same(t2[1]), 'both sides show the same final table');
+        for (let r = 0; r < CUP.length; r++) {
+          h.eq(await kl(P, () => [__klTest.session().kind, __klTest.session().idx, __klTest.session().n, __klTest.G.track.id]), ['gp', r, 4, CUP[r]], 'race ' + (r + 1) + ' of 4 on ' + CUP[r]);
+          h.eq(await kl(Q, () => [__klTest.session().idx, __klTest.G.track.id]), [r, CUP[r]], 'the guest loaded the same track (' + CUP[r] + ') without pressing ready again');
+          await kl(P, () => __klTest.autopilot(true)); await kl(Q, () => __klTest.autopilot(true));
+          const last = r === CUP.length - 1;
+          for (const p of [P, Q]) await waitFor(p, (l) => (l ? /Resultat|result|Ergebnis/i : /\d\/4/).test(document.getElementById('endTitle').textContent) && !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, last, 300000);
+          const t = await Promise.all([P, Q].map((p) => p.page.locator('#endList').innerText()));
+          h.eq(same(t[0]), same(t[1]), 'both sides show the same ' + (last ? 'final table' : 'Grand Prix table after race ' + (r + 1)));
+          if (!last) {
+            h.expect(await P.page.locator('#eNext').isVisible() && await Q.page.locator('#eNext').isHidden(), 'only the host can start the next race');
+            h.expect(/\+\d+/.test(t[0]), 'the table shows the points of this race: ' + t[0].replace(/\s+/g, ' ').slice(0, 80));
+            await P.page.locator('#eNext').click();
+            await waitRace([P, Q]);
+          }
+        }
         h.eq(P.http.length + Q.http.length, 0, 'the online Grand Prix makes no Supabase REST request (signed out)');
         const pts = await kl(P, () => Object.values(__klTest.session().table).reduce((a, b) => a + b.pts, 0));
-        h.eq(pts, 2 * 39, '2 races x 39 points in the table');
+        h.eq(pts, 4 * 39, '4 races x 39 points in the table');
         h.expect(await P.page.locator('#eLobby').isVisible() && await P.page.locator('#eNext').isHidden(), 'after the last race the host can go back to the lobby');
         await h.shot('gp-online-final');
         await closeAll(all); all.length = 0;
