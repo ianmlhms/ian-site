@@ -146,6 +146,23 @@
     for (const uS of [u0, u1]) for (const sd of [-1, 1]) prism(uS - 3.2 * (uS === u0 ? 1 : 0) - 0.01, uS + 3.2 * (uS === u1 ? 1 : 0) + 0.01, sd * (W / 2 + 0.55) - 0.55, sd * (W / 2 + 0.55) + 0.55, spring - 2, slabY, shade(stone, 1.05));
   };
 
+  /* square bar between two world points a, b (steel beams, pipes, ropes), t = thickness; 4 outward-facing sides + end caps */
+  L.bar = (B, a, b, t, color) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], len = Math.hypot(dx, dy, dz); if (len < 1e-4) return;
+    const u = [dx / len, dy / len, dz / len], ref = Math.abs(u[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+    const cr = (p, q) => [p[1] * q[2] - p[2] * q[1], p[2] * q[0] - p[0] * q[2], p[0] * q[1] - p[1] * q[0]], nz = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const n1 = nz(cr(u, ref)), n2 = nz(cr(u, n1)), h = t / 2;
+    const C = (p, s1, s2) => [p[0] + n1[0] * h * s1 + n2[0] * h * s2, p[1] + n1[1] * h * s1 + n2[1] * h * s2, p[2] + n1[2] * h * s1 + n2[2] * h * s2];
+    const sg = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    for (let i = 0; i < 4; i++) {
+      const [s1, s2] = sg[i], [t1, t2] = sg[(i + 1) % 4];
+      const q = [C(a, s1, s2), C(b, s1, s2), C(b, t1, t2), C(a, t1, t2)];
+      const mid = [(s1 + t1) / 2, (s2 + t2) / 2], out = [n1[0] * mid[0] + n2[0] * mid[1], n1[1] * mid[0] + n2[1] * mid[1], n1[2] * mid[0] + n2[2] * mid[1]];
+      const e1 = [q[1][0] - q[0][0], q[1][1] - q[0][1], q[1][2] - q[0][2]], e2 = [q[3][0] - q[0][0], q[3][1] - q[0][1], q[3][2] - q[0][2]], nn = cr(e1, e2);
+      const sh = shade(color, 0.82 + 0.1 * i);
+      if (nn[0] * out[0] + nn[1] * out[1] + nn[2] * out[2] >= 0) B.quad(q[0], q[1], q[2], q[3], sh); else B.quad(q[0], q[3], q[2], q[1], sh);
+    }
+  };
   /* simple pumpkin / lantern / gravestone helpers for the fantasy tracks */
   L.gravestone = (B, x, y, z, yaw, c) => { B.box(x, y, z, 0.9, 1.4, 0.28, yaw, c || col('#8a8f99')); B.cyl(x, y + 1.4, z, 0.45, 0.45, 0.28, 8, c || col('#8a8f99')); };
 })();

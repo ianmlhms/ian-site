@@ -13,8 +13,6 @@
   const GRID = 16;          // spatial hash cell size
   const SEARCH = 26;        // samples searched around the hint (+-52 m)
 
-  KL.tracks = KL.tracks || {};
-  KL.registerTrack = (def) => { KL.tracks[def.id] = def; };
 
   /* ---------- path construction ---------- */
   function filletPath(wps, closed, defaultR) {

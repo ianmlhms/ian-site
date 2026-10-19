@@ -83,11 +83,12 @@
     const idx = trackIndex(track), noBuild = track.def.noBuild || [];
     const chunks = new Map(), footprints = [];
     const pal = (theme.palette || ['#f0e5cd', '#e8d6b4', '#dcc7a2', '#efe2c8', '#cdbb9c', '#e9cdbd', '#d9d3c3', '#c9ced2', '#f2dfb0', '#e4c9b0']).map(KL.col);
+    const palM = (theme.paletteM || []).map(KL.col), palI = (theme.paletteI || []).map(KL.col);
     const roofPal = (theme.roofs || ['#4a505c', '#434955', '#58606b', '#3c424d', '#4d5562', '#5b4a48', '#7d4a3b']).map(KL.col);
     const stone = KL.col('#bdb29c');
     const getChunk = (x, z) => {
       const k = Math.floor(x / CHUNK) + ',' + Math.floor(z / CHUNK); let c = chunks.get(k);
-      if (!c) { c = { walls: new KL.Batch(), roofs: new KL.Batch(), extra: new KL.Batch(), found: new KL.Batch(), trees: new KL.Batch(), x: Math.floor(x / CHUNK) * CHUNK, z: Math.floor(z / CHUNK) * CHUNK }; chunks.set(k, c); }
+      if (!c) { c = { walls: new KL.Batch(), wallsM: new KL.Batch(), roofs: new KL.Batch(), extra: new KL.Batch(), found: new KL.Batch(), trees: new KL.Batch(), x: Math.floor(x / CHUNK) * CHUNK, z: Math.floor(z / CHUNK) * CHUNK }; chunks.set(k, c); }
       return c;
     };
     const maxDist = theme.cityRadius || 420;        // drop buildings far from the track (fog hides them anyway)
@@ -132,14 +133,30 @@
 
       const area = Math.abs(signedArea(p));
       let floors = lv;
-      if (!floors) floors = kind === 2 ? 1 : kind === 3 ? 3 : kind === 1 ? 5 : (area > 500 ? 5 : 4) + (rnd() < 0.35 ? 1 : 0);
-      floors = clamp(floors, 1, 9);
-      const hgt = floors * FLOOR + (floors > 4 ? 0 : 0.4);
-      let ymin = 0; for (const q of p) ymin = Math.min(ymin, terrain(q[0], q[1]));
-      if (ymin < -9) { dropped++; continue; }            // a footprint that hangs over the Pétrusse rim would need a 40 m tall grey stilt: drop it
-      const y0 = Math.max(ymin - 0.3, -8);               // retaining wall of at most 8 m
+      if (!floors) {
+        if (kind === 2) floors = 1; else if (kind === 3) floors = 3; else if (kind === 1) floors = 5; else if (kind === 5) floors = 3 + Math.floor(rnd() * 3);
+        else if (theme.cityFloors) floors = Math.round(lerp(theme.cityFloors[0], theme.cityFloors[1], clamp(area / 2500, 0, 1) * 0.6 + rnd() * 0.4));
+        else floors = (area > 500 ? 5 : 4) + (rnd() < 0.35 ? 1 : 0);
+      }
+      floors = clamp(floors, 1, theme.maxFloors || 9);
+      let hgt = floors * FLOOR + (floors > 4 ? 0 : 0.4);
+      let ymin = 0, yBase = 0, y0;
+      if (theme.cityFollow) {                            // hilly tracks: the building stands on the lowest ground under its footprint (uphill side is buried)
+        ymin = 1e9; let ymax = -1e9;
+        for (const q of p) { const h = terrain(q[0], q[1]); ymin = Math.min(ymin, h); ymax = Math.max(ymax, h); }
+        const hc = terrain(cx, cz); ymin = Math.min(ymin, hc); ymax = Math.max(ymax, hc);
+        if (ymax - ymin > (theme.cityMaxSlope || 9)) { dropped++; continue; }
+        yBase = ymin - 0.25; y0 = 0; hgt += yBase;       // hgt is the absolute roof line from here on
+      } else {
+        for (const q of p) ymin = Math.min(ymin, terrain(q[0], q[1]));
+        if (ymin < -9) { dropped++; continue; }          // a footprint that hangs over the Pétrusse rim would need a 40 m tall grey stilt: drop it
+        y0 = Math.max(ymin - 0.3, -8);                   // retaining wall of at most 8 m
+      }
       const C = getChunk(cx, cz);
-      const base = pal[Math.floor(rnd() * pal.length)], tint = KL.shade(base, 0.93 + rnd() * 0.12);
+      const modern = theme.modernKinds && kind === 4;
+      const palK = modern && palM.length ? palM : kind === 5 && palI.length ? palI : pal;
+      const base = palK[Math.floor(rnd() * palK.length)], tint = KL.shade(base, 0.93 + rnd() * 0.12);
+      const WB = modern ? C.wallsM : C.walls;
       const uOff = Math.floor(rnd() * 4) / 4, rowSeed = Math.floor(rnd() * 7);
       // walls: ring is counter-clockwise in (x, z) (positive shoelace), outward normal = (dz, -dx)
       for (let i = 0; i < p.length; i++) {
@@ -148,25 +165,26 @@
         const dxn = (b[0] - a[0]) / len, dzn = (b[1] - a[1]) / len, sideShade = 0.9 + 0.12 * (dzn * 0.6 - dxn * 0.4);
         const col = KL.shade(tint, sideShade);
         for (let f = 0; f < floors; f++) {
-          const yb = f * FLOOR, yt = yb + FLOOR + (f === floors - 1 ? 0.4 : 0);
+          const yb = yBase + f * FLOOR, yt = yb + FLOOR + (f === floors - 1 ? 0.4 : 0);
           const row = f === 0 ? 0 : 1 + ((f * 7 + rowSeed + i) % 3), v0 = row / 4 + 0.004, v1 = (row + 1) / 4 - 0.004;
-          C.walls.quadUV([a[0], yb, a[1]], [a[0], yt, a[1]], [b[0], yt, b[1]], [b[0], yb, b[1]], col, [u0, v0], [u0, v1], [u1, v1], [u1, v0]);
+          WB.quadUV([a[0], yb, a[1]], [a[0], yt, a[1]], [b[0], yt, b[1]], [b[0], yb, b[1]], col, [u0, v0], [u0, v1], [u1, v1], [u1, v0]);
         }
         if (y0 < -0.05) C.found.quad([b[0], y0, b[1]], [a[0], y0, a[1]], [a[0], 0.02, a[1]], [b[0], 0.02, b[1]], KL.shade(stone, 0.8));
       }
       // roof
       const rc = roofPal[Math.floor(rnd() * roofPal.length)];
       const O = obb(p), rectness = O ? area / O.area : 0, smallSide = O ? Math.min(O.w, O.d) : 0;
-      if (O && rectness > 0.8 && area < 1300 && kind !== 2 && smallSide > 5) {
+      const flatRoof = theme.flatRoofs || kind === 2;
+      if (!flatRoof && O && rectness > 0.8 && area < 1300 && smallSide > 5) {
         const h = clamp(smallSide * 0.4, 1.8, 5.6);
         gableRoof(C.roofs, O, hgt - 0.05, h, rc, kind === 3 || rnd() < 0.3);
         if (rnd() < 0.6) { const ox = (rnd() - 0.5) * Math.max(O.w, O.d) * 0.5, ax = O.w >= O.d ? [O.ux, O.uz] : [-O.uz, O.ux]; C.extra.box(O.cx + ax[0] * ox, hgt + h * 0.55, O.cz + ax[1] * ox, 0.9, h * 0.7 + 1.4, 0.9, 0, KL.shade(KL.col('#9c8b7b'), 0.95 + rnd() * 0.1)); }
       } else {
         // mansard-like truncated roof (or a flat slab for sheds)
         let rad = 0; for (const q of p) rad += Math.hypot(q[0] - cx, q[1] - cz); rad /= p.length;
-        const k = kind === 2 ? 1 : clamp(1 - 4.5 / Math.max(rad, 1), 0.35, 0.92), rise = kind === 2 ? 0.3 : 2.6;
+        const k = flatRoof ? 1 : clamp(1 - 4.5 / Math.max(rad, 1), 0.35, 0.92), rise = flatRoof ? 0.35 : 2.6;
         const inner = p.map((q) => [cx + (q[0] - cx) * k, cz + (q[1] - cz) * k]);
-        if (kind !== 2) for (let i = 0; i < p.length; i++) {
+        if (!flatRoof) for (let i = 0; i < p.length; i++) {
           const a = p[i], b = p[(i + 1) % p.length], a2 = inner[i], b2 = inner[(i + 1) % p.length];
           C.roofs.quad([b[0], hgt, b[1]], [a[0], hgt, a[1]], [a2[0], hgt + rise, a2[1]], [b2[0], hgt + rise, b2[1]], KL.shade(rc, 0.8 + 0.25 * (((i * 5) % 4) / 4)));
         }
@@ -233,7 +251,7 @@
   };
   function getChunkFor(city, x, z) {
     const k = Math.floor(x / CHUNK) + ',' + Math.floor(z / CHUNK); let c = city.chunks.get(k);
-    if (!c) { c = { walls: new KL.Batch(), roofs: new KL.Batch(), extra: new KL.Batch(), found: new KL.Batch(), trees: new KL.Batch(), x: Math.floor(x / CHUNK) * CHUNK, z: Math.floor(z / CHUNK) * CHUNK }; city.chunks.set(k, c); }
+    if (!c) { c = { walls: new KL.Batch(), wallsM: new KL.Batch(), roofs: new KL.Batch(), extra: new KL.Batch(), found: new KL.Batch(), trees: new KL.Batch(), x: Math.floor(x / CHUNK) * CHUNK, z: Math.floor(z / CHUNK) * CHUNK }; city.chunks.set(k, c); }
     return c;
   }
 
@@ -245,7 +263,24 @@
     // paving texture: mottled slabs
     for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(${rnd() > 0.5 ? '255,255,255' : '0,0,0'},${0.02 + rnd() * 0.035})`; const w = 2 + rnd() * 5; g.fillRect(rnd() * S, rnd() * S, w, w * (0.6 + rnd() * 0.8)); }
     const path = (arr, close) => { g.beginPath(); for (let i = 0; i + 1 < arr.length; i += 2) { const x = X(arr[i] / 10), y = Z(arr[i + 1] / 10); if (i === 0) g.moveTo(x, y); else g.lineTo(x, y); } if (close) g.closePath(); };
-    for (const [kind, pts] of data.g) { path(pts, true); g.fillStyle = kind === 1 ? '#5f9a52' : '#86b866'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = 'rgba(40,80,40,.35)'; g.stroke(); }
+    for (const [kind, pts] of data.g) {
+      path(pts, true);
+      if (kind === 3) { g.fillStyle = o.industrial || '#9b9084'; g.fill(); continue; }
+      g.fillStyle = kind === 1 ? '#5f9a52' : '#86b866'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = 'rgba(40,80,40,.35)'; g.stroke();
+    }
+    for (const [kind, pts] of data.w || []) {            // water: polygons (ponds, basins) and river / canal / stream lines
+      if (kind === 2) { path(pts, true); g.fillStyle = o.water || '#4f9fd0'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = 'rgba(210,235,250,.6)'; g.stroke(); }
+    }
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const [kind, pts] of data.w || []) {
+      if (kind === 2) continue;
+      const w = [11, 8, 0, 3][kind] * sc;
+      for (const [k, c] of [[1.0, o.water || '#3f86b8'], [0.62, '#5aa9d6'], [0.2, 'rgba(210,235,250,.7)']]) { path(pts, false); g.lineWidth = Math.max(1, w * k); g.strokeStyle = c; g.stroke(); }
+    }
+    for (const [kind, pts] of data.rl || []) {           // tram and railway beds
+      path(pts, false); g.lineWidth = Math.max(1, (kind === 0 ? 4.4 : 6) * sc); g.strokeStyle = kind === 0 ? (o.tramBed || '#a9aba4') : '#7b746b'; g.stroke();
+      g.lineWidth = Math.max(0.8, 0.28 * sc); g.strokeStyle = 'rgba(60,62,66,.9)'; path(pts, false); g.setLineDash([]); g.stroke();
+    }
     const rw = data.roadW || [11, 7, 4, 6, 1.6], col = ['#686a73', '#72747c', '#7b7d85', '#bfb8aa', '#c9c3b5'];
     g.lineCap = 'round'; g.lineJoin = 'round';
     for (const cls of [3, 1, 0, 2, 4]) {

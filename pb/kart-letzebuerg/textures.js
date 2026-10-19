@@ -104,7 +104,7 @@
       const k = 'facade' + style;
       if (cacheT[k]) return cacheT[k];
       const S = 512, cell = S / 4;
-      const [c, g] = mk(S, S), [ce, ge] = mk(S, S), rnd = KL.rng(style === 'modern' ? 77 : 41);
+      const [c, g] = mk(S, S), [ce, ge] = mk(S, S), rnd = KL.rng(style === 'modern' ? 77 : style === 'brick' ? 53 : style === 'glass' ? 91 : style === 'lattice' ? 63 : 41);
       g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
       ge.fillStyle = '#000'; ge.fillRect(0, 0, S, S);
       for (let row = 0; row < 4; row++) for (let col = 0; col < 4; col++) {
@@ -112,6 +112,43 @@
         // wall plaster speckle
         for (let i = 0; i < 30; i++) { g.fillStyle = `rgba(0,0,0,${rnd() * 0.04})`; g.fillRect(x + rnd() * cell, y + rnd() * cell, 3 + rnd() * 9, 3 + rnd() * 6); }
         const lit = rnd() < 0.55;
+        if (style === 'brick') {                                    // industrial brick (Belval): courses, tall steel-framed windows, loading doors below
+          for (let r = 0; r < cell; r += 8) { g.fillStyle = 'rgba(40,18,10,.16)'; g.fillRect(x, y + r, cell, 1.5); for (let c2 = (r / 8) % 2 ? 0 : 8; c2 < cell; c2 += 16) g.fillRect(x + c2, y + r, 1.5, 8); }
+          for (let i = 0; i < 26; i++) { g.fillStyle = `rgba(${rnd() > 0.5 ? '90,40,20' : '255,235,210'},${0.05 + rnd() * 0.06})`; g.fillRect(x + rnd() * cell, y + rnd() * cell, 4 + rnd() * 12, 3 + rnd() * 5); }
+          if (row === 0) {
+            if ((col + (rnd() > 0.6 ? 1 : 0)) % 2 === 0) { g.fillStyle = '#2d3138'; g.fillRect(x + 22, y + 46, cell - 44, cell - 46); g.fillStyle = '#4a515c'; for (let q = 0; q < 5; q++) g.fillRect(x + 22, y + 52 + q * 14, cell - 44, 3); }
+            else { g.fillStyle = '#242c36'; g.fillRect(x + 20, y + 34, cell - 40, cell - 44); g.fillStyle = '#9aa4ae'; g.fillRect(x + cell / 2 - 1.5, y + 34, 3, cell - 44); g.fillStyle = 'rgba(160,200,235,.25)'; g.fillRect(x + 20, y + 34, 26, cell - 44); if (lit) { ge.fillStyle = '#ffd27a'; ge.fillRect(x + 22, y + 36, cell - 44, cell - 48); } }
+            continue;
+          }
+          const wx = x + 16, wy = y + 14, ww = cell - 32, wh = cell - 30;
+          g.fillStyle = '#6d4a3c'; g.fillRect(wx - 4, wy - 4, ww + 8, wh + 8);                    // stone lintel / frame
+          g.fillStyle = '#26323f'; g.fillRect(wx, wy, ww, wh);
+          const gl = g.createLinearGradient(wx, wy, wx + ww, wy + wh); gl.addColorStop(0, 'rgba(160,205,240,.5)'); gl.addColorStop(0.6, 'rgba(20,40,60,0)'); g.fillStyle = gl; g.fillRect(wx, wy, ww, wh);
+          g.fillStyle = '#16191f'; for (let q = 1; q < 4; q++) g.fillRect(wx + (ww * q) / 4 - 1, wy, 2.5, wh); for (let q = 1; q < 3; q++) g.fillRect(wx, wy + (wh * q) / 3 - 1, ww, 2.5);
+          if (lit) { ge.fillStyle = rnd() > 0.5 ? '#ffc766' : '#ffe0a0'; for (let q = 0; q < 4; q++) if (rnd() < 0.7) ge.fillRect(wx + (ww * q) / 4 + 2, wy + 2, ww / 4 - 4, wh - 4); }
+          continue;
+        }
+        if (style === 'lattice') {                                   // white perforated concrete grid (Maison du Savoir): square deep-set windows
+          const n = 4, w = cell / n;
+          g.fillStyle = 'rgba(0,0,0,.05)'; g.fillRect(x, y, cell, cell);
+          for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+            const wx = x + i * w + 4, wy = y + j * w + 4, ww = w - 8;
+            g.fillStyle = '#3d4a58'; g.fillRect(wx, wy, ww, ww); g.fillStyle = 'rgba(170,210,240,.45)'; g.fillRect(wx, wy, ww * 0.55, ww * 0.55);
+            g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(wx, wy, ww, 3); g.fillRect(wx, wy, 3, ww);
+            if (lit && rnd() < 0.75) { ge.fillStyle = rnd() > 0.5 ? '#ffe2a0' : '#cfe6ff'; ge.fillRect(wx + 2, wy + 3, ww - 4, ww - 5); }
+          }
+          continue;
+        }
+        if (style === 'glass') {                                    // office glass (Kirchberg): continuous window ribbons with fine mullions and pale spandrels
+          g.fillStyle = 'rgba(30,50,70,.10)'; g.fillRect(x, y, cell, cell);
+          if (row === 0) { g.fillStyle = '#1f3447'; g.fillRect(x + 3, y + 18, cell - 6, cell - 18); g.fillStyle = 'rgba(190,225,255,.35)'; g.fillRect(x + 3, y + 18, 30, cell - 18); g.fillStyle = '#c9d3dc'; for (let q = 0; q < 4; q++) g.fillRect(x + 3 + q * ((cell - 6) / 4), y + 18, 2.5, cell - 18); if (lit) { ge.fillStyle = '#ffe3a8'; ge.fillRect(x + 6, y + 22, cell - 12, cell - 26); } continue; }
+          g.fillStyle = '#1c3045'; g.fillRect(x, y + 14, cell, cell - 30);
+          const g2 = g.createLinearGradient(x, y + 14, x + cell, y + cell - 16); g2.addColorStop(0, 'rgba(170,215,250,.6)'); g2.addColorStop(0.55, 'rgba(60,110,150,.2)'); g2.addColorStop(1, 'rgba(10,20,35,0)'); g.fillStyle = g2; g.fillRect(x, y + 14, cell, cell - 30);
+          g.fillStyle = '#d4dae1'; for (let q = 0; q < 8; q++) g.fillRect(x + q * (cell / 8), y + 14, 2, cell - 30);
+          g.fillStyle = '#e8ecef'; g.fillRect(x, y + cell - 16, cell, 16); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(x, y + cell - 4, cell, 4);
+          if (lit) { ge.fillStyle = rnd() > 0.4 ? '#cfe6ff' : '#ffe9b8'; for (let q = 0; q < 8; q++) if (rnd() < 0.8) ge.fillRect(x + q * (cell / 8) + 3, y + 17, cell / 8 - 5, cell - 36); }
+          continue;
+        }
         if (style === 'modern') {
           if (row === 0) { g.fillStyle = '#3c4d5e'; g.fillRect(x + 4, y + 22, cell - 8, cell - 22); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + 4, y + 22, 18, cell - 22); if (lit) { ge.fillStyle = '#ffcf7a'; ge.fillRect(x + 4, y + 22, cell - 8, cell - 22); } continue; }
           g.fillStyle = '#26394d'; g.fillRect(x + 3, y + 10, cell - 6, cell - 20);

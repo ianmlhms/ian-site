@@ -85,6 +85,7 @@
       M.wall = new T.MeshLambertMaterial({ vertexColors: true, map: KL.tex.stone() });
       const fa = KL.tex.facade(theme.facade || 'old');
       M.building = new T.MeshLambertMaterial({ vertexColors: true, map: fa.map, emissive: new T.Color(0xffd48a), emissiveMap: fa.emissive, emissiveIntensity: 0 });
+      if (theme.modernKinds) { const fm = KL.tex.facade(theme.modernFacade || 'modern'); M.buildingM = new T.MeshLambertMaterial({ vertexColors: true, map: fm.map, emissive: new T.Color(0xcfe0ff), emissiveMap: fm.emissive, emissiveIntensity: 0 }); }
       M.roof = new T.MeshLambertMaterial({ vertexColors: true });
       M.plain = new T.MeshLambertMaterial({ vertexColors: true });
       M.plainEmissive = new T.MeshBasicMaterial({ vertexColors: true });
@@ -148,7 +149,7 @@
       this.city = city;
       KL.scenery.osmTrees(track, theme, data, city, rnd, terr, this.q, theme.treeKeepClear);
       if (theme.boulevardTrees) KL.scenery.boulevardTrees(track, theme, data, city, rnd, terr, this.q);
-      for (const c of city.chunks.values()) { add(c.walls, M.building); add(c.roofs, M.roof); add(c.extra, M.plain); add(c.found, M.wall); add(c.trees, M.plain); }
+      for (const c of city.chunks.values()) { add(c.walls, M.building); add(c.wallsM, M.buildingM); add(c.roofs, M.roof); add(c.extra, M.plain); add(c.found, M.wall); add(c.trees, M.plain); }
       this.cityCount = city.count;
     }
 
@@ -162,7 +163,7 @@
       const H = (x, z) => gy + terr(x, z);
       const col = (x, z) => (theme.groundColorAt ? theme.groundColorAt(x, z, terr(x, z)) : base);
       const gm = theme.osm && KL.osm && KL.osm[theme.osm] && theme.groundMap;
-      if (gm) { const t = KL.tex.cityMap(KL.osm[theme.osm], { x0: gm.x0, z0: gm.z0, size: gm.size, px: this.q.mapPx || 2048, paving: gm.paving, paint: gm.paint }); this.mats.ground.map = t; this.mats.ground.needsUpdate = true; }
+      if (gm) { const t = KL.tex.cityMap(KL.osm[theme.osm], Object.assign({}, gm, { px: this.q.mapPx || 2048 })); this.mats.ground.map = t; this.mats.ground.needsUpdate = true; }
       const uv = gm ? (x, z) => [(x - gm.x0) / gm.size, 1 - (z - gm.z0) / gm.size] : (x, z) => [x / 8, z / 8];
       const nrm = (x, z) => { const e = 3, hx = (H(x + e, z) - H(x - e, z)) / (2 * e), hz = (H(x, z + e) - H(x, z - e)) / (2 * e), l = Math.hypot(hx, 1, hz); return [-hx / l, 1 / l, -hz / l]; };
       const quad = (xa, za, xb, zb) => {      // smooth-shaded: normals from the terrain gradient, so slopes do not show the quad diagonals
@@ -255,6 +256,7 @@
       if (M.asphalt) {
         for (const m of [M.asphalt, M.cobble, M.verge]) { m.shininess = 10 + wet * 70; m.specular.setScalar(0.07 + wet * 0.5); m.color.setScalar(1 - wet * 0.32); }
         M.building.emissiveIntensity = clamp((night - 0.2) * 1.3, 0, 1.1);
+        if (M.buildingM) M.buildingM.emissiveIntensity = clamp((night - 0.2) * 1.3, 0, 1.1);
         if (this.lampHeads) this.lampHeads.material.color.set(night > 0.45 ? 0xffefb0 : 0x9a9588);
         if (this.lampPools) this.lampPools.material.opacity = clamp((night - 0.3) * 1.2, 0, 0.55);
         M.ground.color.setScalar(1 - wet * 0.15);

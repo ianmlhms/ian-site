@@ -17,6 +17,7 @@
         boxes.push({ x: p.x, y: p.y + 1.1, z: p.z, s, d, active: true, respawn: 0, id: boxes.length });
       }
     }
+    for (const [s, d] of def.extraBoxes || []) { const p = track.at(s, d); boxes.push({ x: p.x, y: p.y + 1.1, z: p.z, s, d, active: true, respawn: 0, id: boxes.length }); }   // item boxes off the racing line (shortcuts)
     return boxes;
   };
 

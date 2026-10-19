@@ -14,7 +14,7 @@
   const trackName = (id) => KL.t('t_' + id) + (halloween() && id === 'geeschterschlass' ? ' 🎃' : '');
 
   const G = {
-    state: 'boot', renderer: null, audio: new KL.Audio(), race: null, track: null, tracks: {}, human: null, rear: false,
+    state: 'boot', renderer: null, audio: new KL.Audio(), race: null, track: null, tracks: {}, previews: {}, human: null, rear: false,
     settings: { track: 'villehaute', weather: 'random', diff: 'normal', driver: 'renert', quality: 'auto', autoGas: true, mode: 'race', cup: 'letzebuerg' },
     acc: 0, last: 0, forced: null, paused: false, frame: 0, fpsAvg: 16, lowStreak: 0, raceCount: 0, resultsShown: false, finishAt: 0,
     toastT: 0, lastCount: 99, hud: {}, ghost: null, ghostPose: null, rec: null, session: null, steps: 0,
@@ -83,7 +83,7 @@
         const ids = [...new Set(races.map((r) => r.track))];
         const b = document.createElement('button'); b.className = 'tcard cup' + (S.cup === cup.id ? ' on' : '');
         const prev = document.createElement('span'); prev.className = 'cprev';
-        for (const id of ids) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 54; prev.appendChild(cv); drawTrackPreview(cv, getTrack(id)); }
+        for (const id of ids) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 54; prev.appendChild(cv); drawTrackPreview(cv, previewTrack(id)); }
         b.appendChild(prev);
         const d = document.createElement('div'); d.innerHTML = '<b></b><small></small>'; d.firstChild.textContent = KL.t(cup.name); d.lastChild.textContent = ids.map(trackName).join(' · ') + ' · ' + KL.t('cupDesc', { n: races.length });
         b.appendChild(d);
@@ -97,7 +97,7 @@
         const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108; b.appendChild(cv);
         const d = document.createElement('div'); d.innerHTML = '<b></b><small></small><small class="rec"></small>'; d.firstChild.textContent = trackName(id); d.children[1].textContent = KL.t('t_' + id + '_d'); d.lastChild.textContent = recLine(id); b.appendChild(d);
         b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); KL.Boards.select('lap', id); buildMenuChips(); G.audio.sfx('click'); });
-        tc.appendChild(b); drawTrackPreview(cv, getTrack(id));
+        tc.appendChild(b); drawTrackPreview(cv, previewTrack(id));
       }
     }
     const wc = $('weatherChips'); wc.textContent = '';
@@ -130,7 +130,9 @@
   }
 
   /* ---------- tracks ---------- */
-  function getTrack(id) { return G.tracks[id] || (G.tracks[id] = KL.buildTrack(KL.tracks[id])); }
+  /* the menu only has the waypoints of every track (tracks-index.js); the full definition is loaded when a race starts (KL.ensureTrack) */
+  function getTrack(id) { const d = KL.tracks[id]; if (!d || !d.loaded) throw new Error('track not loaded: ' + id); return G.tracks[id] || (G.tracks[id] = KL.buildTrack(d)); }
+  function previewTrack(id) { return KL.tracks[id].loaded ? getTrack(id) : (G.previews[id] || (G.previews[id] = KL.buildTrack(KL.tracks[id]))); }
 
   /* ---------- quality ---------- */
   function detectQuality() {
@@ -185,9 +187,8 @@
     opts = Object.assign({}, sessionOpts(), opts || {});
     const S = G.settings, trackId = opts.track || S.track;
     $('loading').hidden = false; $('menu').hidden = true;
-    setTimeout(() => {
-      try { beginRace(trackId, opts); } catch (e) { console.error(e); fatal(KL.t('engineError') + ' (' + (e && e.message) + ')'); }
-    }, 30);
+    KL.ensureTrack(trackId).then(() => new Promise((r) => setTimeout(r, 30))).then(() => beginRace(trackId, opts))
+      .catch((e) => { console.error(e); fatal(KL.t('engineError') + ' (' + (e && e.message) + ')'); });
   }
 
   function beginRace(trackId, opts) {
@@ -280,7 +281,7 @@
   /* ---------- online races (phase 2): the lobby hand-shake calls these ---------- */
   function mpBegin(start, L) {
     return new Promise((resolve, reject) => {
-      setTimeout(() => { try { beginMpRace(start, L); resolve(); } catch (e) { console.error(e); reject(e); } }, 30);
+      KL.ensureTrack(start.track).then(() => new Promise((r) => setTimeout(r, 30))).then(() => { beginMpRace(start, L); resolve(); }).catch((e) => { console.error(e); reject(e); });
     });
   }
   function beginMpRace(start, L) {

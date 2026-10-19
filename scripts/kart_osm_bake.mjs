@@ -40,7 +40,7 @@ function simplifyLine(p, tol) {
 const flat = (pts) => pts.flatMap((q) => [dm(q[0]), dm(q[1])]);
 
 const A = JSON.parse(fs.readFileSync(fileA)), B = JSON.parse(fs.readFileSync(fileB));
-const buildings = [], roads = [], greens = [], trees = [];
+const buildings = [], roads = [], greens = [], trees = [], water = [], rails = [];
 const roadClass = { motorway: 0, trunk: 0, primary: 0, secondary: 0, tertiary: 0, residential: 1, unclassified: 1, living_street: 1, service: 2, pedestrian: 3, footway: 4, path: 4, cycleway: 4, steps: 4, track: 4 };
 const roadWidth = [11, 7, 4, 6, 1.6];
 for (const e of A.elements) {
@@ -56,7 +56,8 @@ for (const e of A.elements) {
     const a = area(ring); if (Math.abs(a) < 14) continue;
     if (a < 0) ring.reverse();                              // normalise: positive signed area in (x, z)
     const kindTag = t.building;
-    const kind = /^(church|chapel|cathedral)$/.test(kindTag) ? 1 : /^(garage|garages|roof|shed|kiosk|carport|service|hut)$/.test(kindTag) ? 2 : kindTag === 'house' ? 3 : 0;
+    const kind = /^(church|chapel|cathedral)$/.test(kindTag) ? 1 : /^(garage|garages|roof|shed|kiosk|carport|service|hut)$/.test(kindTag) ? 2 : kindTag === 'house' ? 3
+      : /^(university|college|office|commercial|retail|public|civic|government|hospital|hotel|kindergarten|school|train_station|transportation)$/.test(kindTag) ? 4 : /^(industrial|warehouse|factory|manufacture|storage_tank|silo)$/.test(kindTag) ? 5 : 0;
     const lv = Math.max(0, Math.min(14, parseInt(t['building:levels']) || (t.height ? Math.round(parseFloat(t.height) / 3.2) : 0)));
     buildings.push([lv, kind, flat(ring)]);
   } else if (t.highway && roadClass[t.highway] != null) {
@@ -65,6 +66,11 @@ for (const e of A.elements) {
     roads.push([roadClass[t.highway], flat(simplifyLine(pts, 0.4))]);
   } else if (t.leisure === 'park' || t.leisure === 'garden') {
     greens.push([0, flat(simplifyLine(pts, 0.6))]);
+  } else if (t.waterway && /^(river|stream|canal|ditch|drain)$/.test(t.waterway)) {
+    if (t.tunnel && t.tunnel !== 'no') continue;
+    if (pts.some((q) => inBox(q[0], q[1]))) water.push([t.waterway === 'river' ? 0 : t.waterway === 'canal' ? 1 : 3, flat(simplifyLine(pts, 0.5))]);
+  } else if (t.natural === 'water') {
+    if (pts.some((q) => inBox(q[0], q[1]))) water.push([2, flat(simplifyLine(pts, 0.6))]);
   }
 }
 for (const e of B.elements) {
@@ -77,6 +83,11 @@ for (const e of B.elements) {
       const a = pts[i], b = pts[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(L / 7));
       for (let k = 0; k < n; k++) { const x = a[0] + ((b[0] - a[0]) * k) / n, z = a[1] + ((b[1] - a[1]) * k) / n; if (inBox(x, z)) trees.push([dm(x), dm(z)]); }
     }
+  } else if (t.railway && /^(tram|light_rail|rail)$/.test(t.railway)) {
+    if (t.tunnel && t.tunnel !== 'no') continue;
+    if (pts.some((q) => inBox(q[0], q[1]))) rails.push([t.railway === 'tram' ? 0 : 1, flat(simplifyLine(pts, 0.5))]);
+  } else if (t.landuse === 'industrial' || t.landuse === 'railway' || t.natural === 'bare_rock') {
+    if (pts.some((q) => inBox(q[0], q[1]))) greens.push([3, flat(simplifyLine(pts, 1.0))]);
   } else if (t.landuse || t.natural) {
     const forest = t.natural === 'wood' || t.landuse === 'forest' || t.natural === 'scrub';
     if (pts.some((q) => inBox(q[0], q[1]))) greens.push([forest ? 1 : 0, flat(simplifyLine(pts, 0.8))]);
@@ -90,7 +101,9 @@ roadW: ${json(roadWidth)},
 b: ${json(buildings)},
 r: ${json(roads)},
 g: ${json(greens)},
-t: ${json(trees)} }; })();
+t: ${json(trees)},
+w: ${json(water)},
+rl: ${json(rails)} }; })();
 `;
 fs.writeFileSync(out, src);
-console.error(`buildings ${buildings.length}, roads ${roads.length}, greens ${greens.length}, trees ${trees.length}, ${(src.length / 1024).toFixed(0)} KB`);
+console.error(`buildings ${buildings.length}, roads ${roads.length}, greens ${greens.length}, trees ${trees.length}, water ${water.length}, rails ${rails.length}, ${(src.length / 1024).toFixed(0)} KB`);

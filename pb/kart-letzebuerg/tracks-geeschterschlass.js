@@ -15,7 +15,7 @@
   }
 
   KL.registerTrack({
-    id: 'geeschterschlass', hw: 9, r: 30, wl: 2.6, wr: 2.6,
+    id: 'geeschterschlass',
     theme: {
       facade: 'old', ground: 'grass', verge: 'grass', buildings: false, lamps: false, groundY: 0, groundCell: 12, skyline: false, farColor: '#2b2f3a', farDrop: -40,
       weathers: ['night', 'fog', 'sunset', 'rain'], startText: 'GEESCHTERSCHLASS', wallColor: '#6b6679', wallTop: '#8a8498', wallH: 1.5, vergeColor: '#6c7a60', roadColor: '#d0cadc', groundColor: '#6b7a62', fogScale: 0.9,
@@ -41,7 +41,6 @@
         return lerp(p.cy - 0.4, baseHeight(x, z), t);
       };
     },
-    pts: [[-30, 0, { y: 0, hw: 11, r: 30 }], [160, -6, { y: 0, r: 40 }], [270, 50, { y: 1, r: 60 }], [285, 150, { y: 2, r: 30 }], [222, 186, { y: 3, r: 14 }], [276, 238, { y: 3.5, r: 14 }], [270, 330, { y: 4, r: 40 }], [180, 362, { y: 5, r: 22 }], [60, 346, { y: 7, r: 30 }], [40, 262, { y: 9, r: 16 }], [-60, 232, { y: 11, r: 16 }], [-130, 170, { y: 11, r: 30 }], [-120, 90, { y: 9, r: 30 }], [-70, 30, { y: 5, r: 30 }]],
     zones: [{ a: 9, b: 11, road: 'cobble', name: 'gate' }],
     pads: [[160, 0, 10], [860, 0, 10]],
     decorate(S) {
