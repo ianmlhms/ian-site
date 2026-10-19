@@ -39,10 +39,10 @@
   },
   "pb/cookie-clicker.html": {
     "light": {
-      "collision": 22
+      "collision": 34
     },
     "dark": {
-      "collision": 22
+      "collision": 34
     }
   },
   "pb/memory.html": {

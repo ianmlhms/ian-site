@@ -9,18 +9,19 @@
  * Foreground notifications use the Notification API (no server). Closed-app push
  * is delivered by the Supabase Edge Function `notify` → the service worker. */
 import * as auth from "./auth.js?v=32";
+import { gameName, joinUrl } from "./mp-games.js?v=1";
 
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;
 
-// Pretty game names — keep in sync with friends.js GAMES.
-const GAME_NAMES = {
-  connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship",
-  color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi",
-  dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
-  checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel",
-  "kart-letzebuerg": "Kart Lëtzebuerg",
+// Game names + where an invite leads come from the shared registry (mp-games.js), the same list the lobby and friends.html use.
+const INVITE_TOAST_MS = 15000;   // an invite is worth more than the 6 s of a chat message: the lobby code stays valid for hours
+const INVITE_TEXT = {
+  lb: { title: "🎮 Spillinvitatioun", body: "{name} huet dech op {game} invitéiert — tippen fir bäizetrieden" },
+  de: { title: "🎮 Spieleeinladung", body: "{name} hat dich zu {game} eingeladen — tippen zum Beitreten" },
+  en: { title: "🎮 Game invite", body: "{name} invited you to {game} — tap to join" },
 };
+const inviteText = () => { let l = "lb"; try { const v = localStorage.getItem("site_lang"); if (INVITE_TEXT[v]) l = v; } catch {} return INVITE_TEXT[l]; };
 
 /* ---------- service worker ---------- */
 let _swReg = null;
@@ -88,24 +89,30 @@ function injectCss() {
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.4);cursor:pointer;animation:ntfIn .18s ease-out}
   .ntf .ntf-t{font-weight:800;font-size:13px;margin-bottom:2px;color:#4de8ff}
   .ntf .ntf-b{font-size:13px;color:#e8e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ntf-long .ntf-b{white-space:normal;line-height:1.35}
   @keyframes ntfIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`;
   document.head.appendChild(s);
 }
 function wrapEl() {
   let w = document.getElementById("ntf-wrap");
-  if (!w) { injectCss(); w = document.createElement("div"); w.id = "ntf-wrap"; w.className = "ntf-wrap"; document.body.appendChild(w); }
+  if (!w) { injectCss(); w = document.createElement("div"); w.id = "ntf-wrap"; w.className = "ntf-wrap"; w.setAttribute("aria-live", "polite"); document.body.appendChild(w); }
   return w;
 }
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-export function showToast(title, body, onClick) {
+export function showToast(title, body, onClick, opts = {}) {
+  const { ms = 6000, wrap = false } = typeof opts === "number" ? { ms: opts } : opts;
   const w = wrapEl();
   const el = document.createElement("div");
-  el.className = "ntf";
+  el.className = wrap ? "ntf ntf-long" : "ntf";
   el.innerHTML = `<div class="ntf-t">${esc(title)}</div><div class="ntf-b">${esc(body)}</div>`;
   el.onclick = () => { el.remove(); onClick && onClick(); };
+  if (onClick) {   // reachable without a pointer too
+    el.setAttribute("role", "button"); el.tabIndex = 0;
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); el.click(); } });
+  }
   w.appendChild(el);
-  setTimeout(() => el.remove(), 6000);
+  setTimeout(() => el.remove(), ms);
 }
 
 function systemNotify(title, body, url) {
@@ -166,9 +173,12 @@ function startAmbient(sb) {
     })
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "game_invites", filter: "to_user=eq." + me }, ({ new: gi }) => {
       if (!gi || (gi.status && gi.status !== "pending")) return;
-      const body = (gi.from_name || "Someone") + " invited you to " + (GAME_NAMES[gi.game] || gi.game);
-      showToast("🎮 Game invite", body, social);
-      systemNotify("🎮 Game invite", body, "friends.html");
+      // straight into the lobby (or the old room link) for a known game; the friends page for anything else
+      const url = joinUrl(gi.game, gi.room) || "friends.html";
+      const tx = inviteText();
+      const body = tx.body.replace("{name}", gi.from_name || "?").replace("{game}", gameName(gi.game));
+      showToast(tx.title, body, () => (location.href = url), { ms: INVITE_TOAST_MS, wrap: true });
+      systemNotify(tx.title, body, url);
     })
     .subscribe();
 }

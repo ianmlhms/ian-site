@@ -193,7 +193,7 @@ const bestTime=(level)=>+(storageGet('pb_dm_bt_'+level)||0);
 window.score=doneLvls();window.Arcade?.score(window.score);
 
 /* cloud sync: preserve the established PixelBreak save round-trip */
-function dmSnapshot(){const bt={};for(let i=0;i<16;i++){const t=bestTime(i);if(t)bt[i]=t}return{v:1,done:doneLvls(),bt}}
+function dmSnapshot(){const bt={};for(let i=0;i<C.LEVELS.length;i++){const t=bestTime(i);if(t)bt[i]=t}return{v:1,done:doneLvls(),bt}}
 function dmApply(sv){if(!sv||sv.v!==1)return;
   if((sv.done||0)>doneLvls())storageSet('pb_dm_done',sv.done);
   for(const k in (sv.bt||{})){const t=+sv.bt[k],cur=bestTime(+k);if(t&&(!cur||t<cur))storageSet('pb_dm_bt_'+k,t)}
@@ -216,7 +216,7 @@ function refreshLevels(){
   C.LEVELS.forEach((level,index)=>{const button=document.createElement('button');button.type='button';button.textContent=String(index+1);button.setAttribute('aria-label','Stage '+(index+1)+(index>reach?' locked':''));button.disabled=index>reach;if(index<done)button.classList.add('done');button.title=level.name;button.addEventListener('click',()=>startLevel(index));levelsBox.appendChild(button);});
 }
 function showMenu(){
-  state='menu';setPlayUI(false);overlay.classList.remove('hidden');message.textContent='Balance the throttle, work the suspension, and survive sixteen short obstacle courses.\nWASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.';playButton.textContent='DRIVE';refreshLevels();
+  state='menu';setPlayUI(false);overlay.classList.remove('hidden');message.textContent='Balance the throttle, work the suspension, and survive twenty-four short obstacle courses.\nWASD / arrows to drive and tilt. Touch pedals work anywhere on iPad.';playButton.textContent='DRIVE';refreshLevels();
 }
 function startLevel(index){
   levelIndex=C.clamp(index,0,C.LEVELS.length-1);terrain=C.buildLevel(C.LEVELS[levelIndex]);car=C.newCar(C.CAR_START_X,C.groundY(terrain,C.CAR_START_X)-43);ticks=0;accumulator=0;crashClock=0;winDelay=0;state='play';
@@ -274,5 +274,12 @@ window.addEventListener('resize',resize,{passive:true});
 makeScenery();terrain=C.buildLevel(C.LEVELS[0]);car=C.newCar(C.CAR_START_X,C.groundY(terrain,C.CAR_START_X)-43);buildWorld();syncProps();syncCar();refreshLevels();showMenu();
 document.documentElement.dataset.threeReady='1';
 if(new URLSearchParams(location.search).has('probe'))document.title='ROAD_RAGE_BOOT_OK_THREE';
+/* Debug handle for headless verification only (open the page with ?dmTest=1). Exposed during normal play it
+ * would be a ready-made cheat handle for the shared leaderboard. */
+if(new URLSearchParams(location.search).get('dmTest')==='1')window.__driveMad=Object.freeze({
+  startLevel,levels:()=>C.LEVELS.length,getState:()=>({state,ticks,levelIndex}),
+  botInput:()=>C.botInput(terrain,car,levelIndex),setKeys:(input)=>Object.assign(keys,input),
+  snapshot:dmSnapshot,unlock:(done)=>{storageSet('pb_dm_done',done);refreshLevels();}
+});
 requestAnimationFrame(animate);
 })();

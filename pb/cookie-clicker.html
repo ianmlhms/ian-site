@@ -66,11 +66,12 @@ const $=id=>document.getElementById(id);
 const ROOT_STYLE=getComputedStyle(document.documentElement);
 const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
 const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const MAX_SAFE_SCORE=Number.MAX_SAFE_INTEGER;
 const COOKIE_SIZE=250,COOKIE_R=95,MAX_DPR=3,FLOAT_MS=1000,TICK_MS=100,SAVE_EVERY_MS=5000,COST_GROWTH=1.15,SWAY=0.05;
 const REBIRTH_THRESHOLD=1e12;
 /* Arcade test mode: everything affordable, rebirth always ready. Saves go to the isolated test store (platform). */
 const TEST_MODE=window.__pbTestMode===true;
-const TEST_COOKIES=1e21;
+const TEST_COOKIES=1e30;
 let cookies=0,cps=0,clickPower=1,totalClicks=0,totalBaked=0,roundBaked=0,stars=0,rebirthCount=0,giftDay='',loaded=false;
 let rewards=null;
 const upgrades=[
@@ -91,6 +92,17 @@ const upgrades=[
   {name:'Cookie Singularity',desc:'Infinite cookie density',baseCost:20000000000000,cps:1000000000,count:0,icon:'🕳️'},
   {name:'Cookie God',desc:'The cookie is all',baseCost:500000000000000,cps:10000000000,count:0,icon:'👑'},
   {name:'Haunted Oven',desc:'🎃 Halloween only',baseCost:300e9,cps:40e6,count:0,icon:'👻',halloween:true},
+  /* "Beyond the God" (19 Oct 2026). Saves store counts by position, so these sit after the Haunted Oven
+   * (slot 16) and are only shown before it. Cost x22 and output x10 per step: the first unit of each
+   * tier pays itself back in 2.2x the time of the one before (Cookie God: 14 h, Cookie Infinity: ~7 years). */
+  {name:'Big Bang Bakery',desc:'Restarts the universe, with extra chips',baseCost:11e15,cps:100e9,count:0,icon:'💥'},
+  {name:'Dark Matter Dough',desc:'Most of the universe is cookie dough',baseCost:240e15,cps:1e12,count:0,icon:'🌑'},
+  {name:'Parallel Bakery',desc:'Your reflection bakes too',baseCost:5.3e18,cps:10e12,count:0,icon:'🪞'},
+  {name:'Entropy Engine',desc:'Turns the heat death into warm cookies',baseCost:120e18,cps:100e12,count:0,icon:'🌡️'},
+  {name:'Cookie Architect',desc:'Designs brand-new universes',baseCost:2.6e21,cps:1e15,count:0,icon:'📐'},
+  {name:'Dream Oven',desc:'Bakes the cookies you dream of',baseCost:57e21,cps:10e15,count:0,icon:'💭'},
+  {name:'Omni-Oven',desc:'Bakes in every moment at once',baseCost:1.3e24,cps:100e15,count:0,icon:'🌈'},
+  {name:'Cookie Infinity',desc:'The last cookie. Or the first.',baseCost:28e24,cps:1e18,count:0,icon:'♾️'},
 ];
 
 const clickUpgrades=[
@@ -100,11 +112,18 @@ const clickUpgrades=[
   {name:'Cookie Storm',desc:'+100 click power',baseCost:50000,power:100,count:0,icon:'⚡'},
   {name:'Cookie Quake',desc:'+1K click power',baseCost:1000000,power:1000,count:0,icon:'🌋'},
   {name:'Cosmic Finger',desc:'+20K click power',baseCost:50000000,power:20000,count:0,icon:'🌠'},
+  {name:'Meteor Fist',desc:'+500K click power',baseCost:2.5e9,power:500000,count:0,icon:'☄️'},
+  {name:'Supernova Touch',desc:'+25M click power',baseCost:2e11,power:25000000,count:0,icon:'💫'},
+  {name:'Big Bang Click',desc:'+500M click power',baseCost:2e13,power:500000000,count:0,icon:'🎇'},
 ];
 
 function getCost(u){return Math.floor(u.baseCost*Math.pow(COST_GROWTH,u.count))}
 
 function format(n){
+  if(n>=1e33)return(n/1e33).toFixed(1)+'Dc';
+  if(n>=1e30)return(n/1e30).toFixed(1)+'No';
+  if(n>=1e27)return(n/1e27).toFixed(1)+'Oc';
+  if(n>=1e24)return(n/1e24).toFixed(1)+'Sp';
   if(n>=1e21)return(n/1e21).toFixed(1)+'Sx';
   if(n>=1e18)return(n/1e18).toFixed(1)+'Qi';
   if(n>=1e15)return(n/1e15).toFixed(1)+'Qa';
@@ -115,9 +134,11 @@ function format(n){
   return Math.floor(n);
 }
 
+/* The arcade ignores scores above Number.MAX_SAFE_INTEGER; clamp so the board entry stays at the cap instead of freezing. */
+function reportScore(){window.score=Math.min(Math.floor(totalBaked),MAX_SAFE_SCORE);Arcade.score(window.score)}
 function clickCookie(e){
   earnCookies(clickPower);totalClicks++;
-  window.score=Math.floor(totalBaked);Arcade.score(window.score);
+  reportScore();
   // a keyboard "click" has no pointer position: float from the cookie's centre instead
   const r=$('cookie').getBoundingClientRect();
   const x=e.detail===0?r.left+r.width/2:e.clientX,y=e.detail===0?r.top+r.height/2:e.clientY;
@@ -150,7 +171,11 @@ function buildUpgrades(){
       <span class="cost"></span><span class="name"></span><span class="desc">${u.desc}</span></button>`;
   });
   h+='<p class="group-title">Production</p>';
-  upgrades.forEach((u,i)=>{
+  /* Saves are positional, so the shop order is separate: an event building (Haunted Oven) leads the list
+   * while its event runs and is parked at the end of the list otherwise. */
+  const eventRank=u=>u.halloween?(IdleExtras.halloween()?-1:1):0;
+  const shopOrder=upgrades.map((u,i)=>i).sort((a,b)=>eventRank(upgrades[a])-eventRank(upgrades[b])||a-b);
+  shopOrder.forEach(i=>{
     h+=`<button type="button" class="upgrade" data-type="cps" data-i="${i}">
       <span class="cost"></span><span class="name"></span><span class="desc"></span></button>`;
   });
@@ -240,7 +265,7 @@ function applySave(sv){
   if(!sv||sv.v!==1||!Number.isFinite(sv.tb)||sv.tb<0)return;
   const incomingRebirth=Math.floor(safeNumber(sv.rbc));
   if(incomingRebirth<rebirthCount){
-    if(sv.tb>totalBaked){totalBaked=sv.tb;window.score=Math.floor(totalBaked);Arcade.score(window.score);pushSave()}
+    if(sv.tb>totalBaked){totalBaked=sv.tb;reportScore();pushSave()}
     return;
   }
   if(incomingRebirth===rebirthCount&&(sv.tb<totalBaked||(loaded&&sv.tb===totalBaked)))return;
@@ -253,7 +278,7 @@ function applySave(sv){
   recalculate();
   const result=IdleExtras.offline(stars,sv.savedAt,cps);
   earnCookies(result.credited);rewards?.notice(result);
-  window.score=Math.floor(totalBaked);Arcade.score(window.score);
+  reportScore();
   updateUI();
   pushSave();
 }
@@ -261,7 +286,7 @@ function pushSave(){try{parent.postMessage({__pbSave:1,data:snapshot()},'*')}cat
 window.addEventListener('message',(e)=>{const d=e.data;if(e.source===parent&&d&&d.__pbLoadSave===1)applySave(d.data)});
 
 // Game loop
-setInterval(()=>{earnCookies(cps/10*IdleExtras.activityRate(stars));testRefill();window.score=Math.floor(totalBaked);Arcade.score(window.score);updateUI()},TICK_MS);
+setInterval(()=>{earnCookies(cps/10*IdleExtras.activityRate(stars));testRefill();reportScore();updateUI()},TICK_MS);
 buildUpgrades();testRefill();
 rewards=IdleExtras.mount({host:$('shop'),threshold:REBIRTH_THRESHOLD,read:()=>({rb:roundBaked,st:stars,gd:giftDay}),format,
   resets:'cookies, all buildings (including gifted Time Machines) except Haunted Ovens, click upgrades and round clicks.',

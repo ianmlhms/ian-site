@@ -29,6 +29,7 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
 .details{display:flex;justify-content:space-between;gap:8px;margin-bottom:9px;color:var(--muted);font-size:11px}.details strong{color:var(--ink)}
 .actions{display:grid;grid-template-columns:.8fr 1.2fr;gap:8px}.run{background:var(--green)}.buy{background:var(--gold)}
 .manager{width:100%;margin-top:8px;padding:6px 10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:12px}.manager.hired{border-color:color-mix(in srgb,var(--good) 45%,transparent);background:color-mix(in srgb,var(--good) 14%,var(--bg));color:var(--good)}
+.era{margin:18px 2px 10px;color:var(--cyan);font:800 13px/1 var(--font);letter-spacing:.08em;text-transform:uppercase}
 .milestone{margin:8px 1px 0;color:var(--muted);font-size:10px;text-align:center}
 .notice{display:none;margin:10px 10px 0;padding:11px 42px 11px 12px;position:relative;border:1px solid color-mix(in srgb,var(--good) 45%,transparent);border-radius:var(--radius);background:color-mix(in srgb,var(--good) 12%,var(--bg));color:var(--text);font-size:12px}.notice.show{display:block}.notice strong{display:block;margin-bottom:2px;color:var(--green);font-size:14px}.notice button{position:absolute;top:4px;right:5px;min-width:36px;padding:0;background:transparent;color:var(--ink);font-size:18px}
 .modal{display:none;position:fixed;inset:0;z-index:20;align-items:center;justify-content:center;padding:18px;background:rgba(8,8,18,.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}.modal.show{display:flex}.modal-card{width:min(430px,100%);padding:20px;border:1px solid rgba(77,232,255,.42);border-radius:var(--radius-l);background:rgba(22,22,37,.94);box-shadow:var(--glow)}.modal-card h2{margin:0 0 8px;color:var(--text);font:750 26px/1.1 var(--font-display);letter-spacing:-.02em}.modal-card p{margin:7px 0;color:var(--muted);font-size:14px;line-height:1.45}.preview{margin:14px 0;padding:12px;border-radius:12px;background:var(--bg);color:var(--ink)}.warning{color:var(--danger)!important}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.cancel{background:var(--panel2);border:1px solid var(--line);color:var(--ink)}.confirm{background:var(--violet)}
@@ -92,6 +93,11 @@ const MAX_SUFFIX_GROUP=102;
 const MILLISECONDS_PER_SECOND=1000;
 const DIGITS_PER_SUFFIX=3;
 const MILESTONES=Object.freeze([25,50,100,200]);
+/* Beyond 200 owned a milestone doubles profit only: cycles stay as short as at 200 owned.
+ * The extra levels give every business a next goal at any wealth, because the cost of
+ * the next unit grows exponentially while each level only doubles profit. */
+const PROFIT_MILESTONES=Object.freeze([300,400,500,600,750,900,1000,1250,1500,2000,2500,3000,4000,5000]);
+const MAX_SAFE_SCORE=Number.MAX_SAFE_INTEGER;
 /* Arcade test mode: everything affordable, both prestige systems ready. Saves go to the isolated test store (platform). */
 const TEST_MODE=window.__pbTestMode===true;
 const TEST_CASH=1e60;
@@ -106,7 +112,17 @@ const BUSINESSES=Object.freeze([
   {id:"hockey",name:"Hockey Team",icon:"🏒",baseCost:14.9e6,costGrowth:1.12,cycleSeconds:120,payout:2.8e6,managerCost:200e6,manager:"Coach Slapshot"},
   {id:"studio",name:"Movie Studio",icon:"🎬",baseCost:179e6,costGrowth:1.125,cycleSeconds:300,payout:50e6,managerCost:3e9,manager:"Mona Montage"},
   {id:"bank",name:"Bank",icon:"🏦",baseCost:2.15e9,costGrowth:1.13,cycleSeconds:600,payout:900e6,managerCost:50e9,manager:"Buck Ledger"},
-  {id:"oil",name:"Oil Company",icon:"🛢️",baseCost:25.8e9,costGrowth:1.135,cycleSeconds:1200,payout:18e9,managerCost:1e12,manager:"Ollie Derrick"}
+  {id:"oil",name:"Oil Company",icon:"🛢️",baseCost:25.8e9,costGrowth:1.135,cycleSeconds:1200,payout:18e9,managerCost:1e12,manager:"Ollie Derrick"},
+  /* "Beyond Oil" (19 Oct 2026). Base cost x60 per step, first-unit payback x5 per step
+   * (2.4 h for Airline, ~7.7 days for Dyson Sphere at a x1 multiplier). */
+  {id:"airline",name:"Airline",icon:"✈️",baseCost:1.5e12,costGrowth:1.14,cycleSeconds:1500,payout:260e9,managerCost:60e12,manager:"Jet-Stream Jenny",beyond:true},
+  {id:"port",name:"Container Port",icon:"🚢",baseCost:93e12,costGrowth:1.145,cycleSeconds:1800,payout:3.9e12,managerCost:3.7e15,manager:"Crane Carl",beyond:true},
+  {id:"tech",name:"Tech Giant",icon:"💻",baseCost:5.6e15,costGrowth:1.15,cycleSeconds:2100,payout:55e12,managerCost:220e15,manager:"Byte Bernard",beyond:true},
+  {id:"space",name:"Space Agency",icon:"🚀",baseCost:330e15,costGrowth:1.155,cycleSeconds:2400,payout:740e12,managerCost:13e18,manager:"Commander Comet",beyond:true},
+  {id:"moon",name:"Moon Colony",icon:"🌙",baseCost:20e18,costGrowth:1.16,cycleSeconds:2700,payout:10e15,managerCost:800e18,manager:"Major Moonbeam",beyond:true},
+  {id:"asteroid",name:"Asteroid Mining",icon:"☄️",baseCost:1.2e21,costGrowth:1.165,cycleSeconds:3000,payout:130e15,managerCost:48e21,manager:"Rocky Rubble",beyond:true},
+  {id:"dyson",name:"Dyson Sphere",icon:"☀️",baseCost:72e21,costGrowth:1.17,cycleSeconds:3300,payout:1.8e18,managerCost:2.9e24,manager:"Sol Sparks",beyond:true},
+  {id:"galaxy",name:"Galactic Exchange",icon:"🌌",baseCost:4.3e24,costGrowth:1.175,cycleSeconds:3600,payout:23e18,managerCost:170e24,manager:"Nova Nickel",beyond:true}
 ]);
 
 const emptyOwned=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,0]));
@@ -181,7 +197,11 @@ function letterSuffix(index){
 
 function getBusiness(id){return BUSINESSES.find((business)=>business.id===id)}
 function getMilestoneCount(owned){return MILESTONES.filter((target)=>owned>=target).length}
+function getProfitMilestoneCount(owned){return PROFIT_MILESTONES.filter((target)=>owned>=target).length}
+/* Speed multiplier: only the original milestones (25 to 200 owned) shorten the cycle. */
 function getMilestoneMultiplier(owned){return Math.pow(MILESTONE_FACTOR,getMilestoneCount(owned))}
+/* Profit multiplier: the speed milestones plus the profit-only ones beyond 200 owned. */
+function getProfitMultiplier(owned){return Math.pow(MILESTONE_FACTOR,getMilestoneCount(owned)+getProfitMilestoneCount(owned))}
 function getInvestorMultiplier(investors=state.investors){return 1+investors*INVESTOR_BONUS}
 
 function getCost(business,owned=state.owned[business.id]){
@@ -196,7 +216,7 @@ function getCycleDurationMs(business,owned=state.owned[business.id]){
 function getCyclePayout(business,sourceState=state){
   const owned=sourceState.owned[business.id]||0;
   const base=safeMultiply(business.payout,owned);
-  const milestoneProfit=safeMultiply(base,getMilestoneMultiplier(owned));
+  const milestoneProfit=safeMultiply(base,getProfitMultiplier(owned));
   return safeMultiply(safeMultiply(milestoneProfit,getInvestorMultiplier(sourceState.investors)),IdleExtras.multiplier(sourceState.st));
 }
 
@@ -218,7 +238,12 @@ function createElement(tag,className,text){
 /* Cards are created once. Timed refreshes only update their existing fields. */
 function buildBusinessCards(){
   const list=document.getElementById("business-list");
-  BUSINESSES.forEach((business)=>{
+  BUSINESSES.forEach((business,index)=>{
+    if(business.beyond&&!BUSINESSES[index-1].beyond){
+      const era=createElement("h3","era","🚀 Beyond Oil");
+      era.id="era-beyond";
+      list.append(era);
+    }
     const card=createElement("article","business");
     card.dataset.id=business.id;
     const head=createElement("div","business-head");
@@ -360,12 +385,11 @@ function refreshBusiness(business,now){
 }
 
 function getMilestoneCopy(owned){
-  const next=MILESTONES.find((target)=>target>owned);
-  if(!next){
-    const multiplier=getMilestoneMultiplier(owned);
-    return `All milestones · ${format(multiplier)}× profit and speed`;
-  }
-  return `Next milestone: ${next} owned · ${next-owned} to go · doubles profit and speed`;
+  const speedNext=MILESTONES.find((target)=>target>owned);
+  if(speedNext)return `Next milestone: ${speedNext} owned · ${speedNext-owned} to go · doubles profit and speed`;
+  const profitNext=PROFIT_MILESTONES.find((target)=>target>owned);
+  if(profitNext)return `Next milestone: ${profitNext} owned · ${profitNext-owned} to go · doubles profit · now ${format(getProfitMultiplier(owned))}× profit, ${format(getMilestoneMultiplier(owned))}× speed`;
+  return `All milestones · ${format(getProfitMultiplier(owned))}× profit, ${format(getMilestoneMultiplier(owned))}× speed`;
 }
 
 function getClaimableInvestors(sourceState=state){
@@ -487,7 +511,8 @@ function requestCloudSave(){
   catch(error){reportError("Could not request cloud progress",error)}
 }
 
-function updateScore(){window.score=Math.floor(state.lifetime);Arcade.score(window.score)}
+/* The arcade ignores scores above Number.MAX_SAFE_INTEGER; clamp so the board entry stays at the cap instead of freezing. */
+function updateScore(){window.score=Math.min(Math.floor(state.lifetime),MAX_SAFE_SCORE);Arcade.score(window.score)}
 
 function boot(){
   buildBusinessCards();
@@ -535,6 +560,10 @@ if(testMode)window.__idleEmpire=Object.freeze({
   snapshot,
   getState:()=>({...state,owned:{...state.owned},managers:{...state.managers}}),
   getOfflineResult:()=>({...lastOfflineResult}),
+  businessIds:()=>BUSINESSES.map((business)=>business.id),
+  milestoneCopy:getMilestoneCopy,
+  profitMultiplier:getProfitMultiplier,
+  speedMultiplier:getMilestoneMultiplier,
   getMetrics:(id)=>{
     const business=getBusiness(id);
     if(!business)return null;

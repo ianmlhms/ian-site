@@ -9,6 +9,7 @@
   <meta name="description" content="Connect 4 on ian.lu — drop discs and connect four, online on two devices or against three AI difficulty levels." />
   <link rel="canonical" href="https://ian.lu/connect4.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=2" data-game="connect4"></script>
 <script src="theme.js?v=30"></script>
 <link rel="stylesheet" href="game-common.css?v=5">
 <style>
@@ -56,7 +57,7 @@
 <script src="pb/arcade-kit.js?v=29" data-arcade-id="o-connect4" data-arcade-title="Connect 4" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="game-common.js?v=4"></script>
-<script type="module" src="notify-ambient.js?v=29"></script>
+<script type="module" src="notify-ambient.js?v=30"></script>
 <script>
 const COLS = 7, ROWS = 6;
 const GC = window.GameCommon;
@@ -129,6 +130,7 @@ function play(col, player, local) {
   else turn = player === 1 ? 2 : 1;
   render();
   if (over) $("rematch").style.display = "";
+  if (window.MPGate) MPGate.setOver(!!over);
   if (over && !AI && !recorded) { recorded = true; recordResult("connect4", over === "draw" ? "draw" : over === me ? "win" : "loss"); }
   if (local && !AI) ch.send({ type: "broadcast", event: "move", payload: { col, player } });
   if (AI && !over && turn === opp) setTimeout(aiMove, 350);   // computer replies
@@ -148,21 +150,21 @@ if (AI) {
   document.querySelector(".bar h1").textContent = "🔴 Connect 4 — vs Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
-} else {
+} else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
   ch = GC.createChannel("c4");
   ch.on("broadcast", { event: "move" }, ({ payload }) => play(payload.col, payload.player, false))
-    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; render(); });
+    .on("broadcast", { event: "reset" }, () => { fresh(); $("rematch").style.display = "none"; if (window.MPGate) MPGate.setOver(false); render(); });
   fresh(); render();
   GC.joinRoom(ch, {
     getState: () => ({ board, turn, over }),
-    setState: (p) => { board = p.board; turn = p.turn; over = p.over; render(); if (over) $("rematch").style.display = ""; },
+    setState: (p) => { board = p.board; turn = p.turn; over = p.over; render(); if (over) { $("rematch").style.display = ""; if (window.MPGate) MPGate.setOver(true); } },
     isStarted: () => over !== false || board.some((row) => row.some((v) => v)),
     onPeers: (here) => { oppHere = here; render(); },
     onSeatTaken: () => { over = true; render(); setStatus("Seat already taken", `This room already has a ${role} — join with the other role or start a new room.`); },
   });
 }
 
-$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
+$("rematch").onclick = () => { fresh(); $("rematch").style.display = "none"; if (window.MPGate) MPGate.setOver(false); render(); if (!AI) ch.send({ type: "broadcast", event: "reset" }); };
 
 /* ---------- AI (minimax + alpha-beta), computer plays `opp` (=2) ---------- */
 function aiMove() {

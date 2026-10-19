@@ -1,6 +1,7 @@
 /* Friends: add by username, list, message (DM) or invite to a game. */
 import * as auth from "./auth.js?v=32";
 import { attachPeopleSearch } from "./people-search.js?v=1";
+import { MP_GAMES, gameInfo, gameName, isLobbyGame, joinUrl, lobbyUrl } from "./mp-games.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -50,11 +51,10 @@ const classTag = (name) => {
   return c ? ` <span class="class-tag">${esc(c)}</span>` : "";
 };
 
-const GAMES = { connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship", color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi", dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe", checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel" };
-const GAME_PAGES = Object.freeze(Object.fromEntries(Object.keys(GAMES).map(id => [id, id + ".html"])));
-// Games that can only be reached through an invite that was sent from inside the game (not from the "invite to game" chooser).
-const INVITE_ONLY = Object.freeze({ "kart-letzebuerg": { name: "Kart Lëtzebuerg", page: "pb/kart-letzebuerg.html" } });
-const READY = new Set(["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe", "checkers", "maumau", "dice-duel"]);
+// The "invite to game" chooser: the games the old per-game invite (invite_game) knows, plus every game that has the shared lobby.
+// Names, pages and join links come from the registry (mp-games.js) — adding a game there is all it takes.
+const LEGACY_INVITE_IDS = ["connect4", "slf", "battleship", "color", "draw", "reversi", "dots", "tictactoe", "checkers", "maumau", "dice-duel"];
+const GAMES = Object.freeze(Object.fromEntries(Object.values(MP_GAMES).filter((g) => g.lobby || LEGACY_INVITE_IDS.includes(g.id)).map((g) => [g.id, g.name])));
 
 async function refresh() {
   const [{ data: fr }, { data: rq }, { data: gi }, { data: sent }, { data: act }] = await Promise.all([
@@ -151,16 +151,15 @@ function renderInvites(list) {
   $("invitesWrap").style.display = list.length ? "" : "none";
   $("invites").innerHTML = list.map(i => `
     <div class="row">
-      <span class="name"><span aria-hidden="true">🎮</span> <b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(GAMES[i.game] || INVITE_ONLY[i.game]?.name || i.game)}</b></span>
-      <button type="button" class="mini go" data-join="${esc(i.game)}|${esc(i.room)}|${i.id}" aria-label="${esc(T("btn.join") + ": " + (GAMES[i.game] || INVITE_ONLY[i.game]?.name || i.game))}">${T("btn.join")}</button>
+      <span class="name"><span aria-hidden="true">🎮</span> <b>${esc(i.from_name)}</b>${classTag(i.from_name)} ${T("friends.invitedYou")} <b>${esc(gameName(i.game))}</b></span>
+      <button type="button" class="mini go" data-join="${esc(i.game)}|${esc(i.room)}|${i.id}" aria-label="${esc(T("btn.join") + ": " + gameName(i.game))}">${T("btn.join")}</button>
     </div>`).join("");
   $("invites").querySelectorAll("[data-join]").forEach(b => b.onclick = async () => {
     const [game, room, id] = b.dataset.join.split("|");
-    const only = Object.hasOwn(INVITE_ONLY, game) ? INVITE_ONLY[game] : null;
-    if (!only && !Object.hasOwn(GAME_PAGES, game)) return;
-    const page = only ? only.page : GAME_PAGES[game];
+    const url = joinUrl(game, room);   // lobby games → lobby.html?g=…&c=CODE, the rest → page?room=…&role=guest
+    if (!url) return;
     try { await sb.from("game_invites").update({ status: "accepted" }).eq("id", +id); } catch {}
-    location.href = `${page}?room=${encodeURIComponent(room)}&role=guest`;
+    location.href = url;
   });
 }
 
@@ -178,13 +177,15 @@ function chooseGame(uid, name) {
   m.addEventListener("click", e => { if (e.target === m) dismiss(); });
   m.addEventListener("keydown", e => { if (e.key === "Escape") dismiss(); });
   m.querySelector("[data-x]").onclick = dismiss;
-  m.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { m.remove(); invite(uid, b.dataset.g); });
+  m.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { m.remove(); invite(uid, b.dataset.g, name); });
   m.querySelector("[data-g]")?.focus();
 }
 
-async function invite(uid, game) {
-  if (!Object.hasOwn(GAME_PAGES, game)) return;
-  const page = GAME_PAGES[game];
+async function invite(uid, game, name) {
+  if (!Object.hasOwn(GAMES, game)) return;
+  // Lobby games: open a lobby and invite this friend into it (lobby.html sends the invite once the lobby is up)
+  if (isLobbyGame(game)) { location.href = lobbyUrl(game, "new", { invite: [{ id: uid, name }] }); return; }
+  const page = gameInfo(game).page;
   const { data, error } = await sb.rpc("invite_game", { p_to: uid, p_game: game });
   if (error) return alert(error.message);
   location.href = `${page}?room=${encodeURIComponent(data.room)}&role=host`;
