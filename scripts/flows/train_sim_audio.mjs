@@ -51,7 +51,11 @@ export const flow = {
   name: 'train-sim-audio', fullChromium: true,
   async run(h) {
     const consoleErrors = [];
-    h.page.on('console', (m) => { if ((m.type() === 'error' || m.type() === 'warning') && !/favicon/.test(m.location().url || '') && !/Failed to load resource|three\.js|three\.min\.js/.test(m.text())) consoleErrors.push(m.type() + ': ' + m.text().slice(0, 160)); });
+    h.page.on('console', (m) => {   // every console error, plus every warning that comes from Web Audio / our audio code (the game's own WebGL / canvas warnings are not ours)
+      const text = m.text();
+      if (/favicon/.test(m.location().url || '') || /Failed to load resource/.test(text)) return;
+      if (m.type() === 'error' || (m.type() === 'warning' && /Lokféierer|audio|Oscillator|Biquad|AudioParam|AudioNode|AudioBuffer|Convolver|PeriodicWave/i.test(text))) consoleErrors.push(m.type() + ': ' + text.slice(0, 160));
+    });
     await h.context.addInitScript(() => { window.__pbTestMode = true; });
     await h.goto('/pb/train-sim.html?test=1');
     await h.page.waitForFunction(() => window.__tsTest && window.__tsTest.state().phase === 'menu' && !document.getElementById('bootStatus').textContent, null, { timeout: 90000 });

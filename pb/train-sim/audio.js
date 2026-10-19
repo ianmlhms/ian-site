@@ -624,7 +624,7 @@
       const brakePitch = 1900 + 1500 * clamp(v / 2.6, 0, 1), flangePitch = (kindKey === 'tram' ? 2900 : 2400) + 500 * clamp(Math.abs(fin(p.curvature, 0)) * prof.rcrit, 0, 2);
       const sqF = brakeSq >= flangeSq ? brakePitch : flangePitch;
       squealG.level(sqLevel, t);
-      if (squealG.active()) { set(squeal.o1.frequency, sqF, 0.08); set(squeal.o2.frequency, sqF * 2.01, 0.08); set(squeal.o3.frequency, sqF * 3.02, 0.08); set(squeal.nz.frequency, sqF * 1.2, 0.08); set(squeal.gOut.gain, sqLevel * 0.2, 0.07); set(squeal.lp.frequency, kindKey === 'tram' ? 8200 : 6200, 0.2); }
+      if (squealG.active()) { set(squeal.o1.frequency, Math.min(sqF, NYQ), 0.08); set(squeal.o2.frequency, Math.min(sqF * 2.01, NYQ), 0.08); set(squeal.o3.frequency, Math.min(sqF * 3.02, NYQ), 0.08); set(squeal.nz.frequency, Math.min(sqF * 1.2, NYQ), 0.08); set(squeal.gOut.gain, sqLevel * 0.2, 0.07); set(squeal.lp.frequency, kindKey === 'tram' ? 8200 : 6200, 0.2); }
       // pad rub (low speed, braking)
       // (modelled inside the squeal bus' noise; plain hiss events above carry the pneumatics)
 
