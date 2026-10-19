@@ -83,6 +83,9 @@ const DRIVERS = {
   },
 };
 
+/* meme.html asks two public template APIs; answer them empty (the page falls back to its built-in list) so the flow never leaves the machine */
+const offline = async (p) => { await p.context.route(/api\.(memegen\.link|imgflip\.com)/, (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: "[]" })); return p; };
+
 async function oneGame(h, id, index, players) {
   const g = MP_GAMES[id], d = DRIVERS[id];
   const hub = createHub();
@@ -91,9 +94,9 @@ async function oneGame(h, id, index, players) {
   const mine = [];
   const out = { game: id };
   try {
-    const host = await newPlayer(h, world, { label: "host", user: USERS.ian, first: index === 0 }); mine.push(host); players.push(host);
-    const emma = await newPlayer(h, world, { label: "emma", user: USERS.emma }); mine.push(emma); players.push(emma);
-    const guest = await newPlayer(h, world, { label: "guest" }); mine.push(guest); players.push(guest);
+    const host = await offline(await newPlayer(h, world, { label: "host", user: USERS.ian, first: index === 0 })); mine.push(host); players.push(host);
+    const emma = await offline(await newPlayer(h, world, { label: "emma", user: USERS.emma })); mine.push(emma); players.push(emma);
+    const guest = await offline(await newPlayer(h, world, { label: "guest" })); mine.push(guest); players.push(guest);
     const all = [host, emma, guest];
     await emma.page.goto(h.origin + "/connect4.html?ai=1", { waitUntil: "domcontentloaded" });
     await emma.page.waitForSelector("#board .cell");
@@ -153,7 +156,7 @@ async function oneGame(h, id, index, players) {
     h.expect(true, "the rematch starts a clean game");
 
     h.step(`${id}: old links still work (?room=…&role=host)`);
-    const legacy = await newPlayer(h, world, { label: "legacy", user: USERS.max }); mine.push(legacy); players.push(legacy);
+    const legacy = await offline(await newPlayer(h, world, { label: "legacy", user: USERS.max })); mine.push(legacy); players.push(legacy);
     await legacy.page.goto(h.origin + `/${g.page}?room=abc123&role=host`, { waitUntil: "domcontentloaded" });
     await legacy.page.waitForFunction(() => document.querySelector("#app, #s-lobby")?.textContent.trim().length > 0);
     h.expect(legacy.page.url().includes("room=abc123") && !legacy.page.url().includes("lobby.html") && await legacy.page.$("#mpgBack") === null, "opens the game directly, no lobby, no lobby button");
