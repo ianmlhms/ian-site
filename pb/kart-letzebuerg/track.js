@@ -176,6 +176,8 @@
     }
     for (let i = 0; i < N; i++) K[i] = wrapAngle(H[idx(i + 1)] - H[idx(i - 1)]) / (2 * step);
     const Ks = movingAverage(K, 2, closed);
+    // banked corners (fantasy tracks): bank follows the curvature, raising the outside edge (K > 0 = left turn = outside is right = positive bank)
+    if (def.autoBank) for (let i = 0; i < N; i++) BANK[i] += clamp(Ks[i] * def.autoBank.k, -def.autoBank.max, def.autoBank.max);
     // zones (named ranges between waypoint indices)
     const zones = (def.zones || []).map((z) => ({ ...z, s0: stations[z.a], s1: stations[z.b] }));
     const ZONE = new Int16Array(N).fill(-1);

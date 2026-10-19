@@ -68,4 +68,192 @@
       g.beginPath(); l.forEach((q, i) => { if (i) g.lineTo(X(q[0]), Z(q[1])); else g.moveTo(X(q[0]), Z(q[1])); }); g.lineWidth = w * sc; g.strokeStyle = c; g.stroke();
     }
   };
+  /* ================= fantasy-track helpers (stage 2b) ================= */
+  const T3 = () => window.THREE;
+  const gv = (hexv, k) => { const c = KL.col(hexv); return [c[0] * k, c[1] * k, c[2] * k]; };
+  K.cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+  K.canvasTex = (c, o) => { o = o || {}; const T = T3(), t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.wrapS = o.wrapS || T.RepeatWrapping; t.wrapT = o.wrapT || T.RepeatWrapping; t.anisotropy = KL.maxAniso || 4; return t; };
+
+  /* a quad strip along the main road: s0..s1, lateral d0..d1 (d > 0 right), yo above the surface; u = across 0..1 (x uvx), v = metres / vscale */
+  K.strip = (B, track, s0, s1, d0, d1, yo, color, vscale, uvx) => {
+    const n = Math.max(1, Math.ceil(Math.abs(s1 - s0) / 2)), a = [], b = [];
+    for (let i = 0; i <= n; i++) { const s = s0 + ((s1 - s0) * i) / n; a.push(track.at(s, d0)); b.push(track.at(s, d1)); }
+    for (let i = 0; i < n; i++) {
+      const v0 = (i * Math.abs(s1 - s0)) / n / (vscale || 6), v1 = ((i + 1) * Math.abs(s1 - s0)) / n / (vscale || 6), ux = uvx || 1;
+      B.quadUV([a[i].x, a[i].y + yo, a[i].z], [b[i].x, b[i].y + yo, b[i].z], [b[i + 1].x, b[i + 1].y + yo, b[i + 1].z], [a[i + 1].x, a[i + 1].y + yo, a[i + 1].z], color || [1, 1, 1], [0, v0], [ux, v0], [ux, v1], [0, v1]);
+    }
+  };
+
+  /* second routes (track.def.alts): a ribbon of road along each alt polyline, edged with kerb strips; `o.mat` = material (lit, vertex colours + map) */
+  K.altRoads = (S, o) => {
+    const { track } = S, T = T3(), tmp = {}, road = new KL.Batch(), edge = new KL.Batch();
+    for (const a of track.alts) {
+      const P = a.P, L = [], R = [];
+      for (let i = 0; i < P.length; i++) {
+        const q = P[Math.min(P.length - 1, i + 1)], r = P[Math.max(0, i - 1)]; let tx = q[0] - r[0], tz = q[1] - r[1]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+        const pj = track.project(P[i][0], P[i][1], -1, null, tmp), y = pj.y + 0.04;
+        L.push([P[i][0] + tz * a.hw, y, P[i][1] - tx * a.hw]); R.push([P[i][0] - tz * a.hw, y, P[i][1] + tx * a.hw]);
+      }
+      let v = 0;
+      for (let i = 0; i + 1 < P.length; i++) {
+        const dv = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]) / 8;
+        road.quadUV(L[i], R[i], R[i + 1], L[i + 1], o.color || [1, 1, 1], [0, v], [1, v], [1, v + dv], [0, v + dv]);
+        for (const [A, B2, w] of [[L, L, 0], [R, R, 0]]) {      // low kerb stones on both edges
+          const sg = A === L ? 1 : -1, off = (p) => [p[0] + (A === L ? 1 : -1) * 0, p[1], p[2]];
+          edge.quadUV([A[i][0], A[i][1] + 0.16, A[i][2]], [A[i + 1][0], A[i + 1][1] + 0.16, A[i + 1][2]], [A[i + 1][0], A[i + 1][1], A[i + 1][2]], [A[i][0], A[i][1], A[i][2]], o.kerb || [1, 1, 1], [v, 0], [v + dv, 0], [v + dv, 1], [v, 1]);
+        }
+        v += dv;
+      }
+    }
+    if (road.count) S.add(road, o.mat);
+    return road;
+  };
+
+  /* surface patches (track.def.patches): decals on the road. styles: { goo: { a: '#hex', b: '#hex', emissive: bool, flow: speed }, ice: {...}, lava: {...} } */
+  K.patchDecals = (S, styles) => {
+    const { track, renderer } = S, T = T3(), made = {};
+    for (const q of track.patches) {
+      const st = styles[q.kind]; if (!st) continue;
+      let m = made[q.kind];
+      if (!m) {
+        const [c, g] = K.cv(128, 128), rnd = KL.rng(KL.hashStr(q.kind));
+        g.fillStyle = st.a; g.fillRect(0, 0, 128, 128);
+        for (let i = 0; i < 40; i++) { g.fillStyle = st.b; g.globalAlpha = 0.25 + rnd() * 0.5; g.beginPath(); g.ellipse(rnd() * 128, rnd() * 128, 4 + rnd() * 16, 3 + rnd() * 9, rnd() * 3, 0, 7); g.fill(); }
+        g.globalAlpha = 1;
+        if (st.glints) for (let i = 0; i < 22; i++) { g.fillStyle = st.glints; g.globalAlpha = 0.35 + rnd() * 0.5; g.beginPath(); g.arc(rnd() * 128, rnd() * 128, 1 + rnd() * 3, 0, 7); g.fill(); } g.globalAlpha = 1;
+        const tex = K.canvasTex(c);
+        const mat = st.emissive ? new T.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }) : new T.MeshLambertMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, transparent: st.opacity != null, opacity: st.opacity != null ? st.opacity : 1 });
+        m = made[q.kind] = { B: new KL.Batch(), mat, tex, st };
+      }
+      const s1 = q.s1 < q.s0 ? q.s1 + track.length : q.s1;
+      K.strip(m.B, track, q.s0, s1, q.d0, q.d1, 0.05, [1, 1, 1], 8, Math.max(1, (q.d1 - q.d0) / 8));
+    }
+    for (const k in made) {
+      const m = made[k], mesh = S.add(m.B, m.mat);
+      if (m.st.flow && renderer) renderer.animators.push((dt) => { m.tex.offset.y -= dt * m.st.flow; });
+    }
+  };
+
+  /* wedge supports under ramps that rise above the base height: side walls from the wall line down below the terrain */
+  K.skirts = (S, color) => {
+    const { track } = S, B = new KL.Batch(), c = color || KL.col('#8a8f99');
+    for (const rp of track.def.ramps || []) {
+      const k = rp.k, i0 = Math.floor((((rp.s + k[0][0]) % track.length) + track.length) % track.length / track.step), n = Math.ceil((k[k.length - 1][0] - k[0][0]) / track.step) + 1;
+      for (let m = 0; m < n; m++) {
+        const i = (i0 + m) % track.N, j = (i + 1) % track.N;
+        if (track.Y[i] - track.YB[i] < 0.25 && track.Y[j] - track.YB[j] < 0.25) continue;
+        for (const sd of [-1, 1]) {
+          const lim = (q) => track.HW[q] + (sd < 0 ? track.WL[q] : track.WR[q]) + 0.55;
+          const a = KL.edgePt(track, i, sd * lim(i), 0), b = KL.edgePt(track, j, sd * lim(j), 0);
+          const aLow = track.YB[i] - 2.5, bLow = track.YB[j] - 2.5;
+          const P0 = [a[0], aLow, a[2]], P1 = [b[0], bLow, b[2]], P2 = [b[0], b[1], b[2]], P3 = [a[0], a[1], a[2]];
+          if (sd > 0) B.quad(P0, P1, P2, P3, c); else B.quad(P1, P0, P3, P2, c);
+        }
+      }
+    }
+    if (B.count) S.add(B, S.mats.plain);
+  };
+
+  /* a river / stream: ribbon along a world polyline [[x, z], ...] with half width w at height y */
+  K.river = (S, pts, w, y, mat, vscale) => {
+    const B = new KL.Batch(); let v = 0;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = dz / l * w, nz = -dx / l * w, dv = l / (vscale || 10);
+      B.quadUV([a[0] + nx, y, a[1] + nz], [a[0] - nx, y, a[1] - nz], [b[0] - nx, y, b[1] - nz], [b[0] + nx, y, b[1] + nz], [1, 1, 1], [0, v], [1, v], [1, v + dv], [0, v + dv]);
+      v += dv;
+    }
+    return S.add(B, mat);
+  };
+
+  /* random placement away from the road: fn(x, y, z, i) for up to n points inside box [x0, z0, x1, z1] whose distance to the road is >= clear (and fn not skipped) */
+  K.scatter = (S, rnd, n, box, clear, fn, maxTry) => {
+    const { track } = S, tmp = {}, terr = track.terrain || (() => 0); let placed = 0, tries = 0;
+    while (placed < n && tries++ < (maxTry || n * 30)) {
+      const x = box[0] + rnd() * (box[2] - box[0]), z = box[1] + rnd() * (box[3] - box[1]), p = track.project(x, z, -1, null, tmp), dist = Math.hypot(x - p.cx, z - p.cz);
+      if (dist < p.hw + Math.max(p.wl, p.wr) + clear) continue;
+      if (track.onAlt(x, z) || (track.alts.length && track.alts.some((a) => { for (let i = 0; i < a.P.length; i += 2) if (Math.hypot(a.P[i][0] - x, a.P[i][1] - z) < a.hw + clear) return true; return false; }))) continue;
+      if (fn(x, terr(x, z), z, placed) === false) continue;
+      placed++;
+    }
+    return placed;
+  };
+
+  /* glowing points (always on or with the night amount): positions flat [x,y,z,...] */
+  K.glow = (S, pos, o) => {
+    const T = T3(), g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+    const p = new T.Points(g, new T.PointsMaterial({ map: KL.tex.glow(), color: o.color || 0xffe08a, size: o.size || 5, sizeAttenuation: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: o.opacity != null ? o.opacity : 0.9, fog: false }));
+    p.frustumCulled = false; S.group.add(p); if (o.night !== false) S.renderer.glowPoints.push(p); return p;
+  };
+
+  /* timed fire geysers (track.def.hazards): a pulsing warning ring on the ground, then a column of flame while the sim burns karts there */
+  K.geysers = (S, o) => {
+    const T = T3(), R = S.race, hz = R && R.hazards || [], items = [];
+    if (!hz.length) return;
+    const ringMat = new T.MeshBasicMaterial({ map: KL.tex.glow(), color: o.ring || 0xff6a1a, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    const colMat = new T.MeshBasicMaterial({ color: o.flame || 0xffa030, transparent: true, opacity: 0.85, blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide });
+    const coreMat = new T.MeshBasicMaterial({ color: o.core || 0xfff1b0, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide });
+    const colGeo = new T.CylinderGeometry(0.55, 1, 1, 10, 1, true), vent = new KL.Batch();
+    for (const h of hz) {
+      const ring = new T.Mesh(new T.PlaneGeometry(h.r * 2.6, h.r * 2.6), ringMat.clone()); ring.rotation.x = -Math.PI / 2; ring.position.set(h.x, h.y + 0.12, h.z); S.group.add(ring);
+      const col = new T.Mesh(colGeo, colMat.clone()), core = new T.Mesh(colGeo, coreMat.clone()); col.scale.set(h.r * 0.85, 0.01, h.r * 0.85); core.scale.set(h.r * 0.4, 0.01, h.r * 0.4);
+      col.position.set(h.x, h.y, h.z); core.position.set(h.x, h.y, h.z); col.visible = core.visible = false; S.group.add(col, core);
+      vent.cyl(h.x, h.y, h.z, h.r * 0.75, h.r * 0.95, 0.5, 10, KL.col(o.vent || '#2b2220'), { capTop: true });
+      items.push({ h, ring, col, core });
+    }
+    S.add(vent, S.mats.plain);
+    const H = o.height || 11;
+    S.renderer.animators.push((dt, t) => {
+      for (const it of items) {
+        const st = R.hazardState(it.h), on = st === 2, warn = st > 0 && !on;
+        it.ring.material.opacity = on ? 0.9 : warn ? 0.25 + 0.55 * st * (0.6 + 0.4 * Math.sin(t * 22)) : 0;
+        it.ring.scale.setScalar(on ? 1.25 : 0.7 + 0.5 * st);
+        it.col.visible = it.core.visible = on;
+        if (on) { const f = 1 + 0.12 * Math.sin(t * 40 + it.h.id); it.col.scale.y = H * f; it.core.scale.y = H * 0.82 * f; it.col.position.y = it.h.y + H * f / 2; it.core.position.y = it.h.y + H * 0.82 * f / 2; }
+      }
+    });
+  };
+  /* a tunnel / cave over a stretch of road or along any polyline. o.pts = [[x, y, z, hw], ...] (centre line, <= 6 m apart); o.H inner height, o.thick shell thickness;
+   * colours: o.inner (walls), o.outer (shell), o.top (cap, snow), o.crystal (emissive spikes), o.drip (stalactites). Returns nothing; adds meshes to S. */
+  K.tunnel = (S, o) => {
+    const P = o.pts, n = P.length, B = new KL.Batch(), E = new KL.Batch(), rnd = KL.rng(o.seed || 5), M = 11, H = o.H || 11, th = o.thick || 6;
+    const ci = KL.col(o.inner || '#9ccbea'), co = KL.col(o.outer || '#d6e6f4'), ct = KL.col(o.top || '#ffffff'), cc = KL.col(o.crystal || '#7fe0ff'), cd = KL.col(o.drip || '#cfeaff');
+    const fr = P.map((p, i) => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)]; let tx = b[2] - a[2] === 0 && b[0] - a[0] === 0 ? 1 : b[0] - a[0], tz = b[2] - a[2]; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l; return { tx, tz, rx: -tz, rz: tx }; });
+    const jit = (i, k) => 1 + (Math.sin(i * 1.7 + k * 2.3) * 0.5 + Math.sin(i * 0.43 + k * 5.1) * 0.5) * 0.09 * (o.rough || 1);
+    const prof = (i, k, out) => {          // inner profile point k of ring i -> [u, v]
+      const a = Math.PI - (Math.PI * k) / M, W = P[i][3] + (o.margin || 5), j = jit(i, k);
+      return [Math.cos(a) * W * j, Math.pow(Math.sin(a), 0.75) * H * j];
+    };
+    const pt = (i, u, v) => [P[i][0] + fr[i].rx * u, P[i][1] + v, P[i][2] + fr[i].rz * u];
+    const Qf = (p0, p1, p2, p3, c, hx, hy, hz) => {        // quad facing the hint direction (hx,hy,hz)
+      const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2], vx = p3[0] - p0[0], vy = p3[1] - p0[1], vz = p3[2] - p0[2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      if (nx * hx + ny * hy + nz * hz >= 0) B.quad(p0, p1, p2, p3, c); else B.quad(p0, p3, p2, p1, c);
+    };
+    for (let i = 0; i + 1 < n; i++) for (let k = 0; k < M; k++) {
+      const a0 = prof(i, k), a1 = prof(i, k + 1), b0 = prof(i + 1, k), b1 = prof(i + 1, k + 1);
+      const q = [pt(i, ...a0), pt(i + 1, ...b0), pt(i + 1, ...b1), pt(i, ...a1)], cx = (a0[0] + a1[0]) / 2, cy = (a0[1] + a1[1]) / 2;
+      const sh = 0.8 + 0.28 * Math.min(1, cy / H) + 0.1 * ((i * 7 + k * 3) % 5) / 4;
+      Qf(q[0], q[1], q[2], q[3], KL.shade(ci, sh), -fr[i].rx * cx, H * 0.45 - cy, -fr[i].rz * cx);          // faces inward (towards the axis)
+      // shell: offset outward
+      const sc = (u, v, ii) => { const dx = u, dy = v - H * 0.3, l = Math.hypot(dx, dy) || 1, t = th * (0.8 + 0.5 * Math.sin(ii * 0.9 + k)); return [u + dx / l * t, Math.max(-3, v + dy / l * t * 0.9)]; };
+      const o0 = sc(...a0, i), o1 = sc(...a1, i), p0 = sc(...b0, i + 1), p1 = sc(...b1, i + 1);
+      const oq = [pt(i, ...o0), pt(i + 1, ...p0), pt(i + 1, ...p1), pt(i, ...o1)], high = (o0[1] + o1[1]) / 2 > H * 0.9;
+      Qf(oq[0], oq[1], oq[2], oq[3], high ? KL.shade(ct, 0.92 + 0.08 * ((i + k) % 3)) : KL.shade(co, 0.78 + 0.18 * ((i * 5 + k) % 4) / 3), cx * fr[i].rx, cy + 6, cx * fr[i].rz);       // faces outward
+    }
+    // portals: close the shell between inner and outer ring at both ends
+    for (const [i, dir] of [[0, -1], [n - 1, 1]]) for (let k = 0; k < M; k++) {
+      const a0 = prof(i, k), a1 = prof(i, k + 1), sc = (u, v) => { const dx = u, dy = v - H * 0.3, l = Math.hypot(dx, dy) || 1; return [u + dx / l * th, Math.max(-3, v + dy / l * th * 0.9)]; };
+      const o0 = sc(...a0), o1 = sc(...a1);
+      Qf(pt(i, ...a0), pt(i, ...a1), pt(i, ...o1), pt(i, ...o0), KL.shade(co, 0.95), fr[i].tx * dir, 0, fr[i].tz * dir);
+    }
+    // stalactites and crystals
+    for (let i = 1; i + 1 < n; i++) {
+      if (rnd() < 0.55) { const k = 3 + Math.floor(rnd() * 5), a = prof(i, k), u = a[0] * 0.92 + (rnd() - 0.5) * 2, p = pt(i, u, a[1] - 0.4), len = 1.6 + rnd() * 3.2; B.cyl(p[0], p[1] - len, p[2], 0.05, 0.4 + rnd() * 0.5, len, 5, cd, { flat: true }); }
+      if (rnd() < 0.4) { const sd = rnd() < 0.5 ? -1 : 1, a = prof(i, sd < 0 ? 0 : M), p = pt(i, a[0] * 0.96, 0.2), h = 1.4 + rnd() * 2.6; E.cyl(p[0], p[1], p[2], 0.5, 0.05, h, 5, KL.shade(cc, 0.8 + rnd() * 0.4), { flat: true }); }
+    }
+    S.add(B, S.mats.plain); S.add(E, S.mats.plainEmissive);
+  };
+
+  /* samples of the main road for K.tunnel: s0..s1 every `step` metres -> [[x, y, z, hw], ...] */
+  K.roadPts = (track, s0, s1, step) => { const o = []; for (let s = s0; s <= s1 + 1e-6; s += step || 5) { const p = track.at(s, 0); o.push([p.x, p.y, p.z, p.hw]); } return o; };
 })();
