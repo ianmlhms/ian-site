@@ -649,8 +649,13 @@ _omOpener=null;
 /* Games that have the shared lobby (lobby.html, see mp-games.js) open it instead of a bare room link.
  * 4-letter codes belong to the lobby; older 6-character room codes still join the old way. */
 var MPG=null;
-import('./mp-games.js?v=3').then(function(m){MPG=m}).catch(function(){});
+import('./mp-games.js?v=4').then(function(m){MPG=m}).catch(function(){});
 function lobbyIdFor(href){if(!MPG)return null;var ids=Object.keys(MPG.MP_GAMES);for(var i=0;i<ids.length;i++){var g=MPG.MP_GAMES[ids[i]];if(g.lobby&&g.page===href)return g.id}return null}
+/* A lobby game (pong, tank-wars, fighters, air-hockey) runs in the sandboxed frame and may not navigate this page itself: it asks, and only the
+ * game frame's own request for a lobby.html link is honoured. */
+window.addEventListener('message',function(e){var f=document.getElementById('gf'),d=e.data;
+if(!f||e.source!==f.contentWindow||!d||!d.__pbLobby||typeof d.__pbLobby.url!=='string')return;
+if(/^lobby\.html\?g=[a-z0-9-]{2,24}(&[a-z]{1,8}=[A-Za-z0-9~,._-]{0,200}){0,4}$/.test(d.__pbLobby.url))location.href=d.__pbLobby.url});
 function startOnline(href){var lg=lobbyIdFor(href);if(lg){location.href=MPG.lobbyUrl(lg,'new');return}
 location.href=href+'?room='+Math.random().toString(36).slice(2,8)+'&role=host'}
 function joinOnline(href){var c=(document.getElementById('omCode').value||'').trim().toLowerCase();if(!c)return;

@@ -1,7 +1,7 @@
 /* Friends: add by username, list, message (DM) or invite to a game. */
 import * as auth from "./auth.js?v=32";
 import { attachPeopleSearch } from "./people-search.js?v=1";
-import { MP_GAMES, gameInfo, gameName, isLobbyGame, joinUrl, lobbyUrl } from "./mp-games.js?v=3";
+import { MP_GAMES, gameInfo, gameName, isLobbyGame, joinUrl, lobbyUrl } from "./mp-games.js?v=4";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (""+(s??"")).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

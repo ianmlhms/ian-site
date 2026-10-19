@@ -16,8 +16,8 @@
  *
  * Everything that arrives over Realtime is untrusted: names, avatars, settings are sanitised before they are rendered. */
 import {
-  gameInfo, CODE_ALPHABET, CODE_LEN, cleanCode, isCode, lobbyUrl, gameUrl, sanitizeCfg, defaultCfg,
-} from "./mp-games.js?v=3";
+  gameInfo, CODE_ALPHABET, CODE_LEN, cleanCode, isCode, lobbyUrl, gameUrl, offlineUrl, sanitizeCfg, defaultCfg,
+} from "./mp-games.js?v=4";
 
 /* ------------------------------------------------------------------ constants */
 const CTX_KEY = "mpl.ctx";               // handed to mp-gate.js in the game page
@@ -644,7 +644,7 @@ export async function mountLobby(root, options = {}) {
         h("div", { class: "mpl-joinrow" }, codeInput, h("button", { class: "mpl-btn", id: "mplJoin", type: "button", onclick: joinNow }, t("join")))),
       h("div", { class: "mpl-more" },
         h("button", { class: "mpl-link", id: "mplOpenList", type: "button", "aria-expanded": "false", onclick: (e) => toggleDirectory(e.currentTarget, dirBox) }, t("openLobbies")),
-        game.ai ? h("a", { class: "mpl-link", href: `${game.page}?ai=1` }, "🤖 " + t("vsAi")) : null,
+        game.ai ? h("a", { class: "mpl-link", href: offlineUrl(game.id) }, "🤖 " + t("vsAi")) : null,
         h("a", { class: "mpl-link", href: "pixelbreak.html" }, "‹ Arcade")),
       dirBox,
     );

@@ -3,6 +3,7 @@
  * the server only accepts invites for ids that exist there; this file decides how each id looks and how it is joined.
  *
  *   id        the page slug used by game_invites.game (NOT the arcade id "o-connect4")
+ *   arcade    (iframe games only) the arcade id: the game runs inside pixelbreak.html?g=<arcade>, so that is the page a lobby start opens
  *   lobby     true  = starts through lobby.html (code, add people, ready, settings)
  *             false = still the old  page?room=CODE&role=host|guest  link (migrate later by flipping this + the SQL row)
  *   min/max   players the game supports; the lobby enforces both
@@ -21,7 +22,7 @@ const SLF_CATEGORIES = ["Stadt", "Land", "Fluss", "Name", "Tier", "Beruf", "Pfla
 // intro-catalog.js order (index = value). A flow test compares this list with the page's catalogue.
 const INTRO_CATEGORIES = ["🔥 Charts", "📀 2000er", "💿 2010er", "🎤 Rap", "🎸 Rock", "🎬 Filmmusek", "🇩🇪 Deutschrap", "🎉 Party"];
 
-const G = (o) => Object.freeze({ lobby: false, ai: false, settings: Object.freeze([]), ...o });
+const G = (o) => Object.freeze({ lobby: false, arcade: "", ai: false, settings: Object.freeze([]), ...o });
 
 export const MP_GAMES = Object.freeze({
   connect4: G({ id: "connect4", name: "Connect 4", emoji: "🔴", page: "connect4.html", min: 2, max: 2, lobby: true, ai: true }),
@@ -48,7 +49,12 @@ export const MP_GAMES = Object.freeze({
       { key: "mode", type: "choice", def: "visible", label: { lb: "Modus", de: "Modus", en: "Mode" }, options: Object.freeze([{ v: "visible", label: "👁 Stays visible" }, { v: "flash", label: "⚡ Flash (memory)" }]) },
     ]),
   }),
-  // ---- not migrated yet: the lobby is off, links stay  page?room=CODE&role=guest ----
+  // ---- arcade games (they run inside the arcade shell; their relay code = the lobby code) ----
+  pong: G({ id: "pong", name: "Pong", emoji: "🏓", page: "pb/pong.html", arcade: "pong", min: 2, max: 2, lobby: true, ai: true }),
+  "tank-wars": G({ id: "tank-wars", name: "Tank Battles", emoji: "💥", page: "pb/tank-wars.html", arcade: "tank-wars", min: 2, max: 2, lobby: true, ai: true }),
+  fighters: G({ id: "fighters", name: "Platform Fighters", emoji: "🥊", page: "pb/fighters.html", arcade: "fighters", min: 2, max: 2, lobby: true, ai: true }),
+  "air-hockey": G({ id: "air-hockey", name: "Air Hockey", emoji: "🥅", page: "pb/air-hockey.html", arcade: "air-hockey", min: 2, max: 2, lobby: true, ai: true }),
+  // ---- not migrated: the lobby is off, links stay  page?room=CODE&role=guest ----
   draw: G({ id: "draw", name: "Draw & Guess", emoji: "✏️", page: "draw.html", min: 2, max: 8, lobby: true }),
   meme: G({ id: "meme", name: "Meme Caption Party", emoji: "😂", page: "meme.html", min: 2, max: 8, lobby: true }),
   intro: G({
@@ -85,14 +91,19 @@ export function joinUrl(id, room) {
   if (!g) return null;
   return g.lobby ? lobbyUrl(id, room) : `${g.page}?room=${encodeURIComponent(room)}&role=guest`;
 }
-/** the page a lobby hands the players to when the game starts: the same link the game always understood */
+/** the page a lobby hands the players to when the game starts: the same link the game always understood
+ *  (arcade games: the arcade shell, which opens the game inside its frame) */
 export function gameUrl(id, room, role, code) {
   const g = gameInfo(id);
   if (!g) return null;
-  const q = new URLSearchParams({ room: String(room).toLowerCase(), role: role === "host" ? "host" : "guest" });
+  const q = new URLSearchParams(g.arcade ? { g: g.arcade } : {});
+  q.set("room", String(room).toLowerCase());
+  q.set("role", role === "host" ? "host" : "guest");
   if (code) q.set("lb", cleanCode(code));
-  return `${g.page}?${q}`;
+  return `${g.arcade ? "pixelbreak.html" : g.page}?${q}`;
 }
+/** where "play against the computer" leads (the lobby's entry link) */
+export const offlineUrl = (id) => { const g = gameInfo(id); return !g ? "pixelbreak.html" : g.arcade ? `pixelbreak.html?g=${g.arcade}` : `${g.page}?ai=1`; };
 
 /** Validate a host-chosen config (it travels through Realtime presence, so peers treat it as untrusted). */
 export function sanitizeCfg(id, raw) {
