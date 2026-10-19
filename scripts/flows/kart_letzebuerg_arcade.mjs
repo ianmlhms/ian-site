@@ -134,9 +134,10 @@ export const flow = {
     h.expect(gpCalls.length <= 16, 'Grand Prix: Supabase requests stay low (' + gpCalls.length + ': ' + desc(gpCalls) + ')');
     h.expect(await F.locator('#eAgain').isVisible(), 'a finished Grand Prix offers another round');
     // no polling: nothing else happens on the wire while the result screen idles
+    await sleep(4000);                                   // the arcade's 3 s debounced cloud save of the finished Grand Prix lands first (not polling)
     const idleFrom = h.backend.calls.length;
     await sleep(6000);
-    h.eq(h.backend.calls.length - idleFrom, 0, 'no Supabase traffic while the menu/result screen idles (6 s)');
+    h.eq(h.backend.calls.slice(idleFrom).map((c) => c.method + ' ' + c.name), [], 'no Supabase traffic while the menu/result screen idles (6 s)');
     h.expect(h.backend.calls.slice(callsAtOpen).length <= 30, 'whole session (time trial + Grand Prix) stays within 30 requests (' + h.backend.calls.slice(callsAtOpen).length + ')');
     /* ---------------- stage 2a: the three real tracks ---------------- */
     h.step('Kirchberg, Grund, Belval: menu cards with thumbnails, per-track boards (lap + race) and the boards dialog, Lëtzebuerg cup order');
@@ -150,7 +151,7 @@ export const flow = {
     h.eq(await F.evaluate(() => __klTest.KL.gpRaces(__klTest.KL.CUPS[0], __klTest.KL.tracks).map((r) => r.track)), ['villehaute', 'kirchberg', 'grund', 'belval'], 'Lëtzebuerg cup = Uewerstad, Kirchberg, Grund, Belval');
     const sentFrom = h.backend.calls.length;
     for (const [i, id] of ['kirchberg', 'grund', 'belval'].entries()) {
-      const r = await F.evaluate((id, i) => __klTest.KL.Progress.onRaceDone({ track: id, laps: 3, lapTimes: [52 + i, 51 + i, 50 + i], finished: true, time: 160 + i }), id, i);
+      const r = await F.evaluate(([id, i]) => __klTest.KL.Progress.onRaceDone({ track: id, laps: 3, lapTimes: [52 + i, 51 + i, 50 + i], finished: true, time: 160 + i }), [id, i]);
       h.eq([r.lap, r.race], [true, true], id + ': first run sets both personal records');
     }
     await sleep(2500);

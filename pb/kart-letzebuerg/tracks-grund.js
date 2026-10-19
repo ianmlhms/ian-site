@@ -8,6 +8,7 @@
   const BOX = [-330, -300, 330, 330];
   const valley = KL.kit.valleyTerrain('grund', { box: BOX, depth: 40, a: 20, b: 84, cell: 4 });
   let TERR = (x, z) => valley(x, z);
+  const ABBEY = { x: 120, z: -86, yaw: -0.5, y: -38.2, hx: 41, hz: 44, cz: -6 };
 
   KL.registerTrack({
     id: 'grund', origin: [49.61, 6.137],
@@ -28,7 +29,11 @@
         const base = valley(x, z), p = track.project(x, z, -1, null, sc);
         const dist = Math.hypot(x - p.cx, z - p.cz), flat = p.hw + Math.max(p.wl, p.wr) + 0.9;
         const corniche = (p.s > L0 - 80 || p.s < 175) && p.d < 0;                // balcony: the valley side drops like a cliff
-        return lerp(p.cy - 0.4, base, smooth(flat, flat + (corniche ? 5 : 26), dist));
+        const h = lerp(p.cy - 0.4, base, smooth(flat, flat + (corniche ? 5 : 26), dist));
+        // the Abbey stands on a flat pad cut into the hillside (like the real Grund plain)
+        const ca = Math.cos(ABBEY.yaw), sa = Math.sin(ABBEY.yaw), ax = x - ABBEY.x, az = z - ABBEY.z, lx = ax * ca - az * sa, lz = ax * sa + az * ca;
+        const ex = Math.max(0, Math.abs(lx) - ABBEY.hx), ez = Math.max(0, Math.abs(lz - ABBEY.cz) - ABBEY.hz), pd = Math.hypot(ex, ez);
+        return h > ABBEY.y ? lerp(ABBEY.y, h, smooth(4, 30, pd)) : h;
       };
       return TERR;
     },
@@ -64,12 +69,13 @@
 
       /* ---- Abbaye de Neumünster: ochre wings with slate mansards around a courtyard, slender church spire ---- */
       {
-        const y0 = T(120, -86) + 0.2, f = { x: 120, y: y0, z: -86, yaw: -0.5 };
+        const y0 = ABBEY.y + 0.2, f = { x: 120, y: y0, z: -86, yaw: -0.5 };
         L.box(B, f, 0, 0, 0, 74, 15, 15, 0, ochre); L.gable(B, f, 0, 15, 0, 74, 15, 7, slate, 0.5);
         L.box(B, f, -30, 0, 22, 14, 15, 30, 0, ochre); L.gableX(B, f, -30, 15, 22, 14, 30, 6, slate, 0.5);
         L.box(B, f, 30, 0, 22, 14, 15, 30, 0, ochre); L.gableX(B, f, 30, 15, 22, 14, 30, 6, slate, 0.5);
         for (let i = 0; i < 11; i++) for (const lz of [-7.6, 7.6]) for (const fl of [0, 1, 2]) L.box(B, f, -32 + i * 6.4, 1.6 + fl * 4.4, lz, 1.7, 2.6, 0.3, 0, dark);
-        for (let i = 0; i < 4; i++) for (const sx of [-1, 1]) for (const fl of [0, 1, 2]) L.box(B, f, -30 + (sx > 0 ? 60 : 0), 1.6 + fl * 4.4, 10 + i * 7, 0.3, 2.6, 1.7, 0, dark);
+        for (let i = 0; i < 4; i++) for (const lx of [-37.1, -22.9, 22.9, 37.1]) for (const fl of [0, 1, 2]) L.box(B, f, lx, 1.6 + fl * 4.4, 10.5 + i * 7, 0.3, 2.6, 1.7, 0, dark);
+        for (let i = 0; i < 4; i++) for (const sx of [-8.1, 8.1]) L.box(B, f, sx, 3.5, -38 + i * 7.2, 0.3, 8.5, 1.8, 0, dark);
         const c = { x: 120, y: y0, z: -86, yaw: -0.5 };                                // church: nave + square tower + needle
         L.box(B, c, 0, 0, -26, 16, 17, 30, 0, shade(ochre, 0.95)); L.gable(B, c, 0, 17, -26, 16, 30, 9, slate, 0.5);
         L.box(B, c, 0, 0, -44, 9, 36, 9, 0, shade(ochre, 0.92)); L.pyramid(B, c, 0, 36, -44, 10, 26, col('#2f3541'));
