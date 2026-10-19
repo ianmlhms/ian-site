@@ -8,6 +8,25 @@ const SCORE_BASE = 1000000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const BOARD_ROWS = [{ user_id: 'u-1', username: 'Anna', score: 953000 }, { user_id: 'u-2', username: 'Ben', score: 940000 }];
 
+/* The hub re-renders its tiles while the cloud data arrives, so a locator can lose its element between "found" and "scrolled".
+ * Wait until the tile is attached and its position has been identical for 3 samples, then scroll it with a plain DOM call
+ * (no actionability wait that can race the re-render) and re-check; never touch a stale handle. */
+async function settledCard(h, text) {
+  const pos = () => h.page.evaluate((t) => { const c = [...document.querySelectorAll('.game-card')].find((x) => x.textContent.includes(t)); if (!c) return null; const r = c.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y + window.scrollY), Math.round(r.width), Math.round(r.height), document.querySelectorAll('.game-card').length].join(','); }, text);
+  let last = null, same = 0;
+  for (let i = 0; i < 80 && same < 3; i++) {
+    const p = await pos();
+    if (p && p === last) same++; else { same = 0; last = p; }
+    await sleep(150);
+  }
+  for (let i = 0; i < 5; i++) {
+    const ok = await h.page.evaluate((t) => { const c = [...document.querySelectorAll('.game-card')].find((x) => x.textContent.includes(t)); if (!c) return false; c.scrollIntoView({ block: 'center' }); return true; }, text);
+    if (ok) break;
+    await sleep(300);
+  }
+  return h.page.locator('.game-card', { hasText: text }).first();
+}
+
 async function gameFrame(h) {
   await h.page.waitForFunction(() => document.getElementById('gf')?.contentWindow?.__klTest);
   const frame = h.page.frames().find((f) => f.parentFrame());
@@ -35,10 +54,9 @@ export const flow = {
     /* ---------------- the tile ---------------- */
     h.step('arcade tile: Kart Lëtzebuerg is listed with thumbnail, description and multiplayer tag; 🎃 hint only in the Halloween window');
     await h.goto('/pixelbreak.html');
-    const card = h.page.locator('.game-card', { hasText: 'Kart Lëtzebuerg' }).first();
-    await card.waitFor({ timeout: 20000 });
+    await h.page.locator('.game-card', { hasText: 'Kart Lëtzebuerg' }).first().waitFor({ timeout: 20000 });
+    const card = await settledCard(h, 'Kart Lëtzebuerg');
     h.expect(await card.isVisible(), 'the tile is visible');
-    await card.scrollIntoViewIfNeeded();
     h.expect(await card.locator('.game-desc').innerText().then((t) => /kart|Kart/.test(t) && t.length > 40), 'the big tile carries a description');
     h.expect(/Multiplayer/i.test(await card.locator('.game-tags').innerText()), 'tile has the multiplayer tag');
     h.eq(await card.locator('.tag', { hasText: '🎃' }).count(), 0, 'no 🎃 outside the event window');

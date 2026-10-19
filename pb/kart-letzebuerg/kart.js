@@ -31,6 +31,24 @@
     Object.assign(k, extra || {});
   };
 
+  /* every numeric field the physics, the camera and the engine sound read must be a finite number */
+  const FINITE_KEYS = ['x', 'y', 'z', 'yaw', 'vx', 'vy', 'vz', 'speed', 'vf', 'steer', 'boostT', 'spinT', 'prog', 's', 'd', 'hopY'];
+  KL.kartFinite = function kartFinite(k) {
+    for (let i = 0; i < FINITE_KEYS.length; i++) if (!isFinite(k[FINITE_KEYS[i]])) return false;
+    return isFinite(k.drift.charge) && isFinite(k.drift.level) && (k.drift.dir === 1 || k.drift.dir === -1 || k.drift.dir === 0);
+  };
+  /* repair a kart whose state went non-finite: scrub the numbers, then respawn it on the tarmac (counted in k.healed for the tests) */
+  KL.healKart = function healKart(k, track) {
+    const dr = k.drift;
+    for (const key of FINITE_KEYS) if (!isFinite(k[key])) k[key] = key === 'prog' || key === 's' ? (isFinite(k.safeS) ? k.safeS : 0) : 0;
+    if (!isFinite(dr.charge)) dr.charge = 0; if (!isFinite(dr.level)) dr.level = 0; if (dr.dir !== 1 && dr.dir !== -1) dr.dir = 1;
+    if (!isFinite(k.safeS)) k.safeS = k.s;
+    if (!isFinite(k.hint)) k.hint = -1;
+    KL.rescueKart(k, track);
+    k.healed = (k.healed || 0) + 1;
+    if (!KL.healWarned) { KL.healWarned = true; console.warn('[Kart] a kart state was not finite and has been repaired (' + k.id + ')'); }
+  };
+
   /* respawn on the tarmac a little behind the current position */
   KL.rescueKart = function rescueKart(k, track) {
     const sBack = (k.safeS != null ? k.safeS : k.s) - 5;
@@ -49,6 +67,7 @@
 
   KL.stepKart = function stepKart(k, dt, R) {
     const track = R.track, def = track.def;
+    if (!KL.kartFinite(k)) KL.healKart(k, track);          // a NaN/Infinity in the state would poison everything downstream (physics, camera, sound)
     k.t += dt;
     k.px = k.x; k.py = k.y; k.pz = k.z; k.pyaw = k.yaw;
     // timers

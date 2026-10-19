@@ -14,10 +14,11 @@
   function onKey(e, down) {
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     const a = MAP[e.key];
+    if (a && down && !e.repeat && (a === 'left' || a === 'right')) emit('nav', a === 'left' ? -1 : 1);       // (a spectator steps through the karts with these)
     if (a) { if (down) keys.add(a); else keys.delete(a); if (enabled) e.preventDefault(); if (down && !e.repeat && a === 'item') emit('itemkey'); return; }
     if (!down || e.repeat) return;
     const k = e.key.toLowerCase();
-    if (k === 'r') emit('reset'); else if (k === 'p' || e.key === 'Escape') emit('pause'); else if (k === 'c') emit('weather'); else if (k === 'm') emit('mute'); else if (k === 'b' || k === 'v') emit('rear', true);
+    if (k === 'r') emit('reset'); else if (k === 'p' || e.key === 'Escape') emit('pause'); else if (k === 'c') emit('weather'); else if (k === 'm') emit('mute'); else if (k === 'l') emit('leader'); else if (k === 'b' || k === 'v') emit('rear', true);
   }
   window.addEventListener('keydown', (e) => onKey(e, true));
   window.addEventListener('keyup', (e) => { onKey(e, false); if (e.key.toLowerCase() === 'b' || e.key.toLowerCase() === 'v') emit('rear', false); });

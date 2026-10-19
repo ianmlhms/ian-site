@@ -112,7 +112,7 @@
 
   /* ---------- entry points ---------- */
   function reset() {
-    Object.assign(L, { active: true, role: null, code: '', phase: 'idle', rdy: false, peers: new Map(), roster: [], links: new Map(), hostId: null, deputy: null, epoch: 0, originalHost: false, relayInUse: false, joined: false });
+    Object.assign(L, { active: true, role: null, code: '', phase: 'idle', rdy: false, peers: new Map(), roster: [], links: new Map(), hostId: null, deputy: null, epoch: 0, originalHost: false, relayInUse: false, joined: false, depOk: new Set(), depBusy: false, depAgain: false, handoff: null, linkWait: null });
     L.myId = rid(); L.cfg = { track: KL.G.settings.track, weather: KL.G.settings.weather === 'random' ? 'random' : KL.G.settings.weather, laps: 3, diff: KL.G.settings.diff, pub: false, mode: KL.G.settings.mode === 'gp' ? 'gp' : 'race', cup: KL.G.settings.cup }; L.gp = null;
   }
   function genCode() { let s = ''; for (let i = 0; i < N.CODE_LEN; i++) s += N.CODE_ALPHABET[Math.floor(Math.random() * N.CODE_ALPHABET.length)]; return s; }
@@ -160,7 +160,7 @@
       let host = null; const t0 = performance.now();
       while (!host && performance.now() - t0 < 3500) { host = metasOf(ch).find((m) => m && m.host && m.id !== L.myId); if (!host) await sleep(150); }
       if (!host) return fail('eNotFound');
-      if (host.open === false) return fail('eLocked');
+      if (host.open === false && !host.spec) return fail('eLocked');
       if ((host.n || 1) >= N.MAX_PLAYERS) return fail('eFull');
       L.hostId = host.id;
       L.joinTimer = setTimeout(() => { if (L.active && L.role === 'client' && !L.links.has(L.hostId) && !L.joined) fail('eConn'); }, N.CONNECT_TIMEOUT + 4000);
@@ -196,10 +196,20 @@
       .on('presence', { event: 'sync' }, () => onPresence());
   }
   const sendCh = (event, payload) => { if (L.ch) try { L.ch.send({ type: 'broadcast', event, payload }); } catch (e) { /* closing */ } };
-  const sendSig = (to, t, d) => sendCh('sig', { to, from: L.myId, t, d });
+  /* hand-shake messages: through the room channel while it is the only path (host <-> newcomer); between two clients (deputy <-> client)
+   * through the host's own data channel, which also works after the room channel was closed */
+  function sendSig(to, t, d) {
+    if (L.role === 'client' && to !== L.hostId) {
+      const hl = L.links.get(L.hostId);
+      if (hl && hl.open) { hl.send({ k: 'sig', to, t, d }, true); return; }
+    }
+    sendCh('sig', { to, from: L.myId, t, d });
+  }
   async function trackHost() {
     if (!L.ch || L.role !== 'host') return;
-    try { await L.ch.track({ id: L.myId, name: L.name, drv: L.drv, host: true, open: L.phase === 'lobby', n: L.peers.size + 1, v: 1 }); } catch (e) { log('track failed', e); }
+    // open = takes players into the lobby; spec = a race is running and a newcomer may watch it (and is on the roster for the next one)
+    const spec = L.phase === 'race' && !!(KL.MP && KL.MP.active && !KL.MP.ended && !KL.MP.resultsDone);
+    try { await L.ch.track({ id: L.myId, name: L.name, drv: L.drv, host: true, open: L.phase === 'lobby', spec, n: L.peers.size + 1, v: 1 }); } catch (e) { log('track failed', e); }
   }
   async function dirUpdate() {
     // the public-lobby directory is only joined while a public lobby is open
@@ -228,9 +238,10 @@
   }
 
   function addPeer(m) {
-    if (L.phase !== 'lobby') { sendSys(m.id, 'locked'); return; }
+    const watching = L.phase === 'race' && !!(KL.MP && KL.MP.canSpectate && KL.MP.canSpectate());     // a newcomer during a running race watches it
+    if (L.phase !== 'lobby' && !watching) { sendSys(m.id, 'locked'); return; }
     if (L.peers.size + 1 >= N.MAX_PLAYERS) { sendSys(m.id, 'full'); return; }
-    const p = { id: String(m.id).slice(0, 12), name: cleanName(m.name) || 'Gast', drv: driverOk(m.drv) ? m.drv : 'renert', rdy: false, via: 'rtc', link: null, t: performance.now(), state: 'connecting' };
+    const p = { id: String(m.id).slice(0, 12), name: cleanName(m.name) || 'Gast', drv: driverOk(m.drv) ? m.drv : 'renert', rdy: false, via: 'rtc', link: null, t: performance.now(), state: 'connecting', spec: watching };
     p.drv = freeDriver(p.drv, p.id);
     L.peers.set(p.id, p);
     p.link = makeLink(p.id, true);
@@ -238,11 +249,13 @@
     broadcastRoster(); dirUpdate(); trackHost();
   }
   function removePeer(id, why) {
-    const p = L.peers.get(id); if (!p) return;
-    L.peers.delete(id); L.links.delete(id);
+    const p = L.peers.get(id);
+    if (!p) { if (L.role === 'host' && KL.MP && KL.MP.active) KL.MP.onPeerGone(id, why); return; }
+    L.peers.delete(id); L.links.delete(id); L.depOk.delete(id);
     if (p.link && !p.link.closed) { p.link.onclose = null; p.link.close(why); }
     if (L.phase === 'lobby') { broadcastRoster(); dirUpdate(); trackHost(); }
     else if (KL.MP && KL.MP.active) KL.MP.onPeerGone(id, why);
+    if (id === L.deputy) { L.deputy = null; if (KL.MP && KL.MP.active) ensureDeputy('gone'); }      // the deputy left: elect and link the next one at once
   }
   function freeDriver(want, selfId) {
     const taken = new Set([...L.peers.values()].filter((p) => p.id !== selfId).map((p) => p.drv)); taken.add(L.drv);
@@ -267,9 +280,13 @@
     if (!p || p.to !== L.myId || typeof p.from !== 'string' || !L.active) return;
     const from = p.from.slice(0, 12);
     if (p.t === 'offer') {
-      const fromHost = from === L.hostId, fromDeputy = from === L.deputy;
-      if (L.role === 'client' && !fromHost && !fromDeputy && L.phase === 'lobby' && (p.retry || 0) < 6) { setTimeout(() => onSig(Object.assign({}, p, { retry: (p.retry || 0) + 1 })), 350); return; }
-      if (!(L.role === 'client' && (fromHost || fromDeputy))) return;        // clients only talk to the host and to the deputy
+      const viaHost = !!p.viaHost;                                           // forwarded by the host (it vouches for `from`)
+      let fromHost = from === L.hostId;
+      const fromDeputy = from === L.deputy;
+      // an offer from the player who is next in line while we still think the old host is there: the host is gone, this is the new one
+      if (L.role === 'client' && !viaHost && !fromHost && L.phase === 'lobby' && L.joined && !L.handoff && successorId() === from) { startHandoff('offer'); fromHost = from === L.hostId; }
+      if (L.role === 'client' && !viaHost && !fromHost && !fromDeputy && L.phase === 'lobby' && (p.retry || 0) < 6) { setTimeout(() => onSig(Object.assign({}, p, { retry: (p.retry || 0) + 1 })), 350); return; }
+      if (!(L.role === 'client' && (viaHost || fromHost || fromDeputy))) return;        // clients only talk to the host, the deputy and (through the host) the players it links
       const old = L.links.get(from); if (old) { old.onclose = null; old.close('replaced'); }
       const link = makeLink(from, false);
       link.acceptOffer(String(p.d));
@@ -280,6 +297,7 @@
   function onLinkOpen(peerId, link) {
     if (L.role === 'host' && L.peers.has(peerId)) {
       const p = L.peers.get(peerId); p.state = 'open'; broadcastRoster();
+      if (p.spec && KL.MP) KL.MP.sendSpecInit(peerId);
     } else if (L.role === 'client' && peerId === L.hostId) {
       link.send({ k: 'hi', name: L.name, drv: L.drv, uid: myUid(), v: 1 }, true);
       startPing(link);
@@ -295,11 +313,14 @@
       if (!wasOpen && L.phase === 'lobby' && N.RELAY_FALLBACK && L.signalling && (reason === 'timeout' || reason === 'failed')) { switchToRelay(p); return; }
       if (!wasOpen && L.phase === 'lobby') { sendSys(peerId, 'conn'); }
       removePeer(peerId, reason);
+    } else if (L.role === 'host' && !L.peers.has(peerId)) {
+      // (a host that took over mid-race tracks its players as peers too, see adoptAsHost; anything else is a stray link)
     } else if (L.role === 'client') {
       if (peerId === L.hostId) {
         if (L.phase === 'lobby' && !L.joined) { if (N.RELAY_FALLBACK && !wasOpen && L.signalling && (reason === 'timeout' || reason === 'failed')) return; /* the host decides about the relay */ fail(wasOpen ? 'eHostGone' : 'eConn'); }
-        else if (L.phase === 'lobby') { fail('eHostGone'); }
+        else if (L.phase === 'lobby') { if (!(L.handoff && L.handoff.old === peerId)) hostLostInLobby('link'); }
         else if (KL.MP && KL.MP.active) KL.MP.onHostLinkClosed(reason);
+        else fail('eHostGone');                                                // lost while the race was being prepared
       } else if (KL.MP && KL.MP.active) KL.MP.onLateralClosed(peerId);
     }
   }
@@ -309,6 +330,7 @@
     console.warn('[kart-lobby] no WebRTC path to', p.id, '- using the capped Realtime relay');
     sendSys(p.id, 'relay');
     p.link = makeRelay(p.id); p.via = 'relay'; p.state = 'open'; L.links.set(p.id, p.link); L.relayInUse = true;
+    setTimeout(() => { if (L.peers.get(p.id) === p && !p.hi && L.phase === 'lobby') removePeer(p.id, 'no answer'); }, 12000);     // a stale presence entry (a player who is already gone) never says hello: drop it
     broadcastRoster();
   }
   function makeRelay(peerId) {
@@ -355,12 +377,17 @@
       // ---- host side ----
       case 'hi': if (L.role === 'host') {
         const p = L.peers.get(from); if (!p) return;
-        p.name = cleanName(m.name) || p.name; p.uid = typeof m.uid === 'string' && UUID_RE.test(m.uid) ? m.uid.toLowerCase() : ''; if (driverOk(m.drv)) p.drv = freeDriver(m.drv, p.id); broadcastRoster();
+        p.hi = true; p.name = cleanName(m.name) || p.name; p.uid = typeof m.uid === 'string' && UUID_RE.test(m.uid) ? m.uid.toLowerCase() : ''; if (driverOk(m.drv)) p.drv = freeDriver(m.drv, p.id); broadcastRoster();
       } return;
       case 'ready': if (L.role === 'host' && L.phase === 'lobby') { const p = L.peers.get(from); if (p) { p.rdy = !!m.v; broadcastRoster(); } } return;
       case 'pick': if (L.role === 'host' && L.phase === 'lobby') { const p = L.peers.get(from); if (p && driverOk(m.drv)) { p.drv = freeDriver(m.drv, p.id); broadcastRoster(); } } return;
       case 'leave': if (L.role === 'host') removePeer(from, 'left'); return;
+      case 'sig':
+        if (L.role === 'host') { const t = L.peers.get(String(m.to || '').slice(0, 12)); if (t && t.link && t.link.open && typeof m.t === 'string') t.link.send({ k: 'sig', from, t: m.t, d: m.d }, true); }
+        else if (from === L.hostId) onSig({ to: L.myId, from: m.from, t: m.t, d: m.d, viaHost: true });
+        return;
       case 'linked': if (L.role === 'host') onLinked(from, m); return;
+      case 'specready': if (L.role === 'host' && KL.MP) KL.MP.addSpectator(from); return;
       case 'loaded': if (L.role === 'host') onLoaded(from); return;
       // ---- client side ----
       case 'roster': if (L.role === 'client' && from === L.hostId) onRoster(m); return;
@@ -368,7 +395,9 @@
       case 'start': if (L.role === 'client' && from === L.hostId) onStart(m); return;
       case 'go': if (L.role === 'client' && from === L.hostId) onGo(m); return;
       case 'lobby': if (L.role === 'client' && from === L.hostId) backToLobby(m); return;
-      case 'closed': if (L.role === 'client' && from === L.hostId && L.phase === 'lobby') fail('eHostGone'); return;
+      case 'spec': if (L.role === 'client' && from === L.hostId) onSpec(m); return;
+      case 'dep': if (L.role === 'client' && from === L.hostId) { L.deputy = m.id ? String(m.id).slice(0, 12) : null; if (KL.MP && KL.MP.active) KL.MP.deputy = L.deputy; } return;
+      case 'closed': if (L.role === 'client' && from === L.hostId && L.phase === 'lobby') hostLostInLobby('closed'); return;
       default: if (KL.MP) KL.MP.onMsg(from, m, reliable, link);
     }
   }
@@ -383,7 +412,7 @@
     if (L.role !== 'host') return;
     L.roster = rosterNow();
     const msg = { k: 'roster', host: L.myId, deputy: L.deputy, epoch: L.epoch, cfg: L.cfg, players: L.roster };
-    for (const p of L.peers.values()) if (p.link && p.link.open) p.link.send(msg, true);
+    for (const p of L.peers.values()) if (p.link && p.link.open && !p.spec) p.link.send(msg, true);      // (a spectator gets the roster when the race is over)
     renderLobby();
   }
   function onRoster(m) {
@@ -392,6 +421,7 @@
     const c = m.cfg || {};
     L.cfg = { track: KL.tracks[c.track] ? c.track : L.cfg.track, weather: String(c.weather || 'random'), laps: Math.max(1, Math.min(10, +c.laps || 3)), diff: KL.DIFFICULTY[c.diff] ? c.diff : 'normal', pub: !!c.pub, mode: c.mode === 'gp' ? 'gp' : 'race', cup: KL.CUPS.some((x) => x.id === c.cup) ? c.cup : KL.CUPS[0].id };
     L.deputy = m.deputy || null;
+    if (L.handoff) { clearTimeout(L.handoff.timer); L.handoff = null; }          // the new host has taken the lobby over
     const me = L.roster.find((p) => p.id === L.myId);
     if (me) { L.drv = me.drv; L.rdy = me.rdy; }
     if (!L.joined) { L.joined = true; clearTimeout(L.joinTimer); L.phase = 'lobby'; enterLobby(); } else renderLobby();
@@ -499,29 +529,57 @@
   KL.leaveOnline = leave;
 
   /* ---------- start hand-shake: prep (deputy links) -> start -> loaded -> go ---------- */
-  function deputyCandidate() {
-    for (const p of [...L.peers.values()].sort((a, b) => a.t - b.t)) if (p.link && p.link.kind === 'rtc' && p.link.open) return p.id;
-    return null;
+  /* ---------- the deputy: always one human client that is linked to every other client and takes over if the host disappears ---------- */
+  const depEligible = (p) => !!(p.link && p.link.kind === 'rtc' && p.link.open && !p.spec && !(KL.MP && KL.MP.active && KL.MP.isAway(p.id)));
+  const depTargets = (dep) => [...L.peers.values()].filter((p) => p.id !== dep && p.link && p.link.kind === 'rtc' && p.link.open).map((p) => p.id);
+  /* ask the deputy to link to `ids` (the offers/answers travel through the host's own data channels); resolves with the ids that opened */
+  async function requestLinks(dep, ids) {
+    const p = L.peers.get(dep); if (!p || !p.link || !p.link.open) return [];
+    const w = (L.linkWait = { done: false, ok: [], dep });
+    p.link.send({ k: 'prep', deputy: dep, ids }, true);
+    const t0 = performance.now();
+    while (!w.done && performance.now() - t0 < LINK_WAIT + 2500 && L.active && L.peers.has(dep)) await sleep(100);
+    L.linkWait = null;
+    return w.ok.filter((id) => ids.includes(id));
   }
+  function announceDeputy() {
+    const key = (L.deputy || '-') + '|' + [...L.depOk].sort().join(',');
+    if (L.depSent === key) return; L.depSent = key;
+    if (KL.MP && KL.MP.active) KL.MP.deputy = L.deputy;
+    const msg = { k: 'dep', id: L.deputy, ok: [...L.depOk] };
+    for (const p of L.peers.values()) if (p.link && p.link.open && p.link.kind === 'rtc') p.link.send(msg, true);
+    log('deputy', L.deputy, [...L.depOk]);
+  }
+  /* host: (re-)elect the deputy if needed and link it to every client that it is not linked to yet; announce it when it is ready */
+  async function ensureDeputy(why) {
+    if (L.role !== 'host') return;
+    if (L.depBusy) { L.depAgain = true; return; }
+    L.depBusy = true;
+    try {
+      for (let round = 0; round < 6; round++) {
+        L.depAgain = false;
+        const cands = [...L.peers.values()].filter(depEligible).sort((a, b) => a.t - b.t);
+        const dep = L.deputy && cands.some((p) => p.id === L.deputy) ? L.deputy : (cands[0] ? cands[0].id : null);
+        if (dep !== L.deputy) { L.deputy = dep; L.depOk = new Set(); L.depSent = null; }
+        if (dep) {
+          const need = depTargets(dep).filter((id) => !L.depOk.has(id));
+          if (need.length) for (const id of await requestLinks(dep, need)) L.depOk.add(id);
+        }
+        if (!L.active || L.role !== 'host') return;
+        if (L.deputy && !L.peers.has(L.deputy)) { L.deputy = null; L.depOk = new Set(); L.depAgain = true; }       // it left while we waited
+        if (!L.depAgain) { announceDeputy(); break; }
+      }
+    } finally { L.depBusy = false; }
+  }
+  KL.Lobby.ensureDeputy = ensureDeputy;
+
   async function hostStart() {
     if (L.role !== 'host' || L.phase !== 'lobby') return;
     if ([...L.peers.values()].some((p) => !p.link || !p.link.open || !p.rdy)) return;
     L.phase = 'linking'; busyHost('nvLinking');
     await trackHost(); await dirUpdate();
-    const clients = [...L.peers.values()];
-    L.deputy = deputyCandidate();
-    L.lateralOk = [];
-    if (L.deputy && clients.length > 1 && !L.lateralReady) {
-      const others = clients.filter((p) => p.id !== L.deputy && p.link.kind === 'rtc').map((p) => p.id);
-      broadcastRoster();
-      L.linkWait = { done: false };
-      const dl = L.peers.get(L.deputy).link;
-      dl.send({ k: 'prep', deputy: L.deputy, ids: others }, true);
-      const t0 = performance.now();
-      while (!L.linkWait.done && performance.now() - t0 < LINK_WAIT + 2500) await sleep(100);
-      L.lateralOk = L.linkWait.ok || [];
-    } else if (L.deputy && clients.length > 1) L.lateralOk = clients.filter((p) => p.id !== L.deputy && p.link.kind === 'rtc').map((p) => p.id);
-    if (L.deputy) L.lateralReady = true;
+    await ensureDeputy('start');
+    L.lateralOk = [...L.depOk];
     if (!L.active || L.phase !== 'linking') return;
     // build the grid: humans and bots on 8 shuffled slots
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xffffff)) >>> 0, rnd = KL.rng(seed);
@@ -555,7 +613,7 @@
     return list[Math.floor(Math.random() * list.length)];
   }
   function busyHost(key, vars) { showScreen('netBusy'); $('netBusyText').textContent = T(key, vars); }
-  function onLinked(from, m) { if (L.linkWait && from === L.deputy) { L.linkWait.ok = Array.isArray(m.ok) ? m.ok.map((x) => String(x).slice(0, 12)) : []; L.linkWait.done = true; } }
+  function onLinked(from, m) { if (L.linkWait && from === L.linkWait.dep) { L.linkWait.ok = Array.isArray(m.ok) ? m.ok.map((x) => String(x).slice(0, 12)) : []; L.linkWait.done = true; } }
   function onLoaded(from) { if (L.phase !== 'loading') return; L.loaded.add(from); loadedProgress(); }
   function loadedProgress() {
     if (L.phase !== 'loading') return;
@@ -572,17 +630,18 @@
   }
   /* client side of the hand-shake */
   function onPrep(m) {
-    // I am the deputy: link to every other client now (the signalling channel is still open)
+    // I am the deputy: link to the clients named by the host now (offers and answers travel through the host's data channel)
     L.deputy = L.myId;
-    const ids = (Array.isArray(m.ids) ? m.ids : []).map((x) => String(x).slice(0, 12)).filter((x) => x !== L.myId);
+    const ids = (Array.isArray(m.ids) ? m.ids : []).map((x) => String(x).slice(0, 12)).filter((x) => x !== L.myId && x !== L.hostId);
     const hostLink = L.links.get(L.hostId);
-    if (!ids.length) { hostLink && hostLink.send({ k: 'linked', ok: [] }, true); return; }
-    const results = new Set();
+    const results = new Set(), pending = [];
+    for (const id of ids) { const ex = L.links.get(id); if (ex && ex.open && ex.kind === 'rtc') results.add(id); else pending.push(id); }
     let sent = false;
     const finish = () => { if (sent) return; sent = true; hostLink && hostLink.send({ k: 'linked', ok: [...results] }, true); };
-    for (const id of ids) {
+    if (!pending.length) { finish(); return; }
+    for (const id of pending) {
+      const old = L.links.get(id); if (old) { old.onclose = null; old.close('replaced'); }
       const link = makeLink(id, true);
-      const prevOpen = link.onopen;
       link.onopen = () => { results.add(id); if (results.size === ids.length) finish(); };
       link.makeOffer();
     }
@@ -606,6 +665,9 @@
   function releaseSignalling() {
     const needRelay = [...L.links.values()].some((l) => l.kind === 'relay');
     if (needRelay) { log('signalling stays open for the relay fallback'); return; }
+    if (L.role === 'host' && L.ch) {            // the host stays on its (idle) room channel: somebody who opens the code during the race can find it and watch
+      dirUpdate(); trackHost(); log('host keeps the idle room channel for spectators'); return;
+    }
     if (L.ch) { try { L.ch.untrack(); } catch (e) { /* closing */ } }
     closeSignalling();
   }
@@ -618,10 +680,10 @@
   function hostBackToLobby(gpNext) {
     if (L.role !== 'host') return;
     if (KL.MP) KL.MP.stop();
-    for (const p of L.peers.values()) { p.rdy = !!gpNext; if (p.link && p.link.open) p.link.send({ k: 'lobby', ...(gpNext ? { gp: true } : {}) }, true); }
+    for (const p of L.peers.values()) { p.rdy = !!gpNext; p.spec = false; if (p.link && p.link.open) p.link.send({ k: 'lobby', ...(gpNext ? { gp: true } : {}) }, true); }   // watchers are on the roster now
     L.phase = 'lobby';
     if (!gpNext) { L.gp = null; showScreen('lobbyScreen'); }
-    broadcastRoster();
+    broadcastRoster(); trackHost(); dirUpdate();
   }
   KL.backToLobby = () => (L.role === 'host' ? hostBackToLobby() : null);
   /* Grand Prix: the host moves on to the next race (nobody has to press ready again) */
@@ -630,6 +692,80 @@
     L.gp.idx++; busyHost('nvStarting'); hostBackToLobby(true); hostStart();
   };
   KL.gpActive = () => !!(L.gp && L.role === 'host' && L.originalHost);
+
+  /* ---------- the host leaves the LOBBY: the next player takes it over (same code, same settings) ----------
+   * Everybody holds the last roster, so everybody computes the same successor (first connected player after the host). The successor
+   * re-opens the room channel as host (kept for the whole lobby session by the host, so a client re-joins it only now), the others join the
+   * channel too and take the successor's offer; a successor that does not show up within HANDOFF_WAIT is skipped. */
+  const HANDOFF_WAIT = 9000;
+  const successorList = (old) => L.roster.filter((p) => p.id !== old && !p.host && p.via === 'rtc' && (p.st === 'open' || p.id === L.myId)).map((p) => p.id);
+  const successorId = () => successorList(L.hostId)[0] || null;
+  function ensureChannel() {
+    if (L.ch && L.signalling) return Promise.resolve();
+    if (L.chPromise) return L.chPromise;
+    L.chPromise = (async () => {
+      const sb = await getSb();
+      const ch = sb.channel('kl:' + L.code, { config: { broadcast: { self: false }, presence: { key: L.myId } } });
+      wireRoomChannel(ch); await subscribe(ch);
+      L.ch = ch; L.signalling = true;
+      if (L.role === 'client') await ch.track({ id: L.myId, name: L.name, drv: L.drv, v: 1 });
+    })().finally(() => { L.chPromise = null; });
+    return L.chPromise;
+  }
+  function hostLostInLobby(why) {
+    if (!L.active || L.role !== 'client' || L.phase !== 'lobby' || !L.joined || L.handoff) return;
+    startHandoff(why);
+  }
+  function startHandoff(why) {
+    const old = L.hostId;
+    L.handoff = { old, cands: successorList(old), i: 0, timer: 0 };
+    log('lobby host gone (' + why + '), next in line:', L.handoff.cands);
+    const gone = L.links.get(old); if (gone) { gone.onclose = null; gone.close('host gone'); L.links.delete(old); }
+    handoffStep();
+  }
+  function handoffStep() {
+    const h = L.handoff; if (!h || !L.active) return;
+    const next = h.cands[h.i];
+    if (!next) { L.handoff = null; fail('eHostGone'); return; }
+    L.hostId = next; L.deputy = null;
+    clearTimeout(h.timer);
+    if (next === L.myId) { becomeLobbyHost(h); return; }
+    ensureChannel().catch((e) => { console.warn('[kart-lobby] hand-over: room channel failed', e); if (L.handoff === h) { L.handoff = null; fail('eHostGone'); } });
+    h.timer = setTimeout(() => { const l = L.links.get(next); if (L.handoff === h && !(l && l.open)) { h.i++; handoffStep(); } }, HANDOFF_WAIT);
+  }
+  async function becomeLobbyHost(h) {
+    clearTimeout(h.timer); L.handoff = null;
+    for (const [id, l] of [...L.links]) { l.onclose = null; try { l.close('hand-over'); } catch (e) { /* closing */ } L.links.delete(id); }
+    Object.assign(L, { role: 'host', originalHost: true, hostId: L.myId, deputy: null, rdy: false, peers: new Map(), depOk: new Set(), depSent: null, gp: null, joined: true, phase: 'lobby' });
+    try { await ensureChannel(); await trackHost(); await dirUpdate(); } catch (e) { console.warn('[kart-lobby] hand-over failed', e); fail('eNoServer'); return; }
+    L.roster = rosterNow(); enterLobby(); lbMsg(T('lbYouHost')); setTimeout(() => lbMsg(''), 4000);
+    onPresence();
+  }
+
+  /* ---------- watching a race that is already running ---------- */
+  function onSpec(m) {
+    if (!m || !m.start || !Array.isArray(m.start.grid) || m.start.grid.length > N.MAX_PLAYERS) return;
+    clearTimeout(L.joinTimer);
+    L.joined = true; L.phase = 'loading'; L.deputy = m.start.deputy || null; L.start = m.start; L.rdy = false;
+    busy('nvLoading', { n: 0, m: m.start.grid.filter((g) => g.human).length });
+    KL.G.mpBegin(m.start, L, { spec: true, clock: m.c, phase: m.ph })
+      .then(() => { const hl = L.links.get(L.hostId); if (hl) hl.send({ k: 'specready' }, true); })
+      .catch((e) => { console.error(e); fail('eNoServer'); });
+  }
+  /* a client that has just become the host in a running race: track the remaining humans and watchers as peers, so leave detection, the
+   * deputy election and the way back to the lobby work like for a host that created the lobby */
+  function adoptAsHost() {
+    L.peers = new Map(); L.depOk = new Set(); L.deputy = null; L.depSent = null; L.handoff = null;
+    let t = 0;
+    for (const [id, link] of L.links) {
+      if (id === L.myId || !link || link.closed) continue;
+      const k = KL.MP.R.byId[id];
+      L.peers.set(id, { id, name: k ? k.name : 'Gast', drv: k ? k.driver.id : 'renert', rdy: false, via: link.kind === 'relay' ? 'relay' : 'rtc', link, t: ++t, state: 'open', spec: !k });
+    }
+    L.roster = rosterNow();
+    ensureDeputy('promoted');
+  }
+  KL.Lobby.adoptAsHost = adoptAsHost;
 
   /* ---------- friends: invite from the ian.lu friends list ---------- */
   async function openFriends() {

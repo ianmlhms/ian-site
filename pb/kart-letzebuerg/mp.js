@@ -40,6 +40,7 @@
     k.prog = num(a[16], k.prog, 1e6); k.d = num(a[17], 0, 200); k.tpc = a[18] | 0;
     k.speed = Math.hypot(k.vx, k.vz); k.vf = k.vx * Math.sin(k.yaw) + k.vz * Math.cos(k.yaw);
     const L = M.R.track.length; k.s = ((k.prog % L) + L) % L;
+    if (M.spec) { k.finished = !!(f & 512); k.lapIdx = k.maxLap = Math.max(0, Math.min(M.R.laps - 1, Math.floor(k.prog / L))); }       // a watcher missed the lap events
     if (k.spinT > 0 && !k.spinTot) k.spinTot = Math.max(k.spinT, 0.5); else if (k.spinT <= 0) k.spinTot = 0;
   }
   function packItem(it) {
@@ -47,9 +48,9 @@
   }
 
   /* ---------- session ---------- */
-  M.attach = function (R, start, L) {
-    Object.assign(M, { active: true, R, L, role: L.role, myId: L.myId, hostId: start.hostId, deputy: start.deputy || null, epoch: start.epoch || 0, lateralOk: new Set(start.ok || []), resultsDone: false, goAt: 0, lastSend: 0, evIdx: 0, out: [], itemMap: new Map(), base: new Map(), lastRecv: new Map(), lastHostMsg: 0, firstFinish: null, hostAway: false, ended: false, seq: 0, migratedFrom: null });
-    M.self = R.byId[L.myId];
+  M.attach = function (R, start, L, spec) {
+    Object.assign(M, { spec: !!spec, specs: new Set(), specLive: false, specRevealAt: 0, active: true, R, L, role: L.role, myId: L.myId, hostId: start.hostId, deputy: start.deputy || null, epoch: start.epoch || 0, lateralOk: new Set(start.ok || []), resultsDone: false, goAt: 0, lastSend: 0, evIdx: 0, out: [], itemMap: new Map(), base: new Map(), lastRecv: new Map(), lastHostMsg: 0, firstFinish: null, hostAway: false, ended: false, seq: 0, migratedFrom: null });
+    M.self = R.byId[L.myId];                        // undefined for a spectator (it has no kart)
     M.info = raceInfo(start, L); M.recorded = false;
     R.nid = 0;
     R.net = { role: M.role, onUse: (k) => M.onUse(k), onRescue: (k) => { k.tpc = (k.tpc | 0) + 1; } };
@@ -73,13 +74,34 @@
     M.evIdx = R.events.length;
     KL.G.mpReveal();
   };
+  /* a spectator (joined while the race was running): start the clock where the host is and show the race once the first snapshots are in */
+  M.specGo = function (rtt, clock, phase) {
+    const R = M.R; R.hold = false;
+    R.phase = phase === 'finished' || phase === 'countdown' ? phase : 'race'; R.clock = (isFinite(+clock) ? +clock : 0) + (rtt || 0) / 2000;
+    const now = performance.now(); M.goAt = now; M.lastHostMsg = now;
+    M.evIdx = R.events.length;
+  };
+  M.canSpectate = function () {
+    return M.active && M.role === 'host' && !M.ended && !M.resultsDone && !!M.R && !M.R.hold && M.R.phase !== 'finished';
+  };
+  M.isAway = (id) => { const k = M.R && M.R.byId[id]; return !!(k && k.away); };
+  M.sendSpecInit = function (id) {
+    if (!M.canSpectate() || !KL.Lobby.start) return;
+    const st = Object.assign({}, KL.Lobby.start, { hostId: M.hostId, deputy: M.deputy, ok: [], epoch: M.epoch });
+    sendTo(id, { k: 'spec', start: st, c: r3(M.R.clock), ph: M.R.phase }, true);
+  };
+  M.addSpectator = function (id) {
+    if (!M.canSpectate()) return;
+    M.specs.add(id); M.stats.spectators = (M.stats.spectators || 0) + 1;
+    KL.Lobby.ensureDeputy('spectator');
+  };
   M.dropBeforeStart = function (id) { const k = M.R && M.R.byId[id]; if (k) convertToBot(k); };
 
   /* ---------- links ---------- */
   const linkOf = (id) => M.L.links.get(id);
   function sendTo(id, msg, reliable) { const l = linkOf(id); return !!l && l.open && l.send(msg, reliable); }
   function sendAllClients(msg, reliable, except) {
-    for (const [id, l] of M.L.links) { if (id === except || !l.open) continue; if (M.role === 'host' && !M.R.byId[id]) continue; l.send(msg, reliable); }
+    for (const [id, l] of M.L.links) { if (id === except || !l.open) continue; if (M.role === 'host' && !M.R.byId[id] && !M.specs.has(id)) continue; l.send(msg, reliable); }
   }
   M.onLinkOpen = function () {};
   M.onRtt = function (from, rtt) { M.rtt = rtt; };
@@ -153,6 +175,10 @@
       const msg = { k: 'w', q: ++M.seq, ts: now, c: r3(R.clock), ks: entries.filter((e) => e[0] !== rec.slot), it: items, bx, ph: R.phase };
       if (l.send(msg, false)) M.stats.snapOut++;
     }
+    if (M.specs.size) {                                      // watchers get every kart
+      const all = { k: 'w', q: ++M.seq, ts: now, c: r3(R.clock), ks: entries, it: items, bx, ph: R.phase };
+      for (const id of M.specs) { const l = linkOf(id); if (l && l.open && l.send(all, false)) M.stats.snapOut++; }
+    }
   }
 
   /* ---------- receiving ---------- */
@@ -209,6 +235,10 @@
   function onSnapshot(m, now) {
     const R = M.R;
     M.lastHostMsg = now; M.stats.snapIn++;
+    if (M.spec && !M.specLive) {                           // first snapshot of a watcher: let a few more fill the interpolation buffers, then show the race
+      M.specLive = true;
+      setTimeout(() => { if (M.active && M.spec) { M.L.phase = 'race'; KL.G.mpReveal(); } }, 400);
+    }
     const ts = num(m.ts, now), base = updateBase('host', now, ts), te = ts + base;
     for (const a of m.ks || []) {
       if (!Array.isArray(a)) continue;
@@ -325,6 +355,7 @@
       M.stats.away++;
       k.remote = false; k.isBot = true; k.hint = -1; k.ai = null; k.botSkill = 1; k.rubber = 1; k.view = null; k.buf.length = 0;
       log('away', k.id);
+      if (M.role === 'host' && k.id === KL.Lobby.deputy) KL.Lobby.ensureDeputy('away');        // a silent deputy is replaced (ensureDeputy skips away players)
     } else {
       k.remote = true; k.isBot = false; k.input.gas = 0; k.input.steer = 0; k.input.drift = false; k.input.brake = 0;
       sendTo(k.id, { k: 'resume', st: packKart(k.slot, k), lap: k.lapIdx, lt: k.lapTimes, bl: isFinite(k.bestLap) ? k.bestLap : null, fin: k.finished, ft: k.finishTime, fo: k.finishOrder, item: k.item ? k.item.id : null, cnt: k.item ? k.item.count : 0, c: r3(R.clock) }, true);
@@ -354,6 +385,7 @@
   };
   M.onPeerGone = function (id, why) {
     if (!M.active || M.role !== 'host') return;
+    M.specs.delete(id);
     const k = M.R.byId[id]; if (!k || !k.human) return;
     convertToBot(k);
     k.name = k.name;
@@ -395,10 +427,12 @@
     R.rng = KL.rng(((Date.now() ^ 0x9e3779b9) >>> 0));
     const now = performance.now();
     for (const k of R.karts) M.lastRecv.set(k.id, now);
-    for (const id of [...L.links.keys()]) if (!R.byId[id] || !R.byId[id].human) L.links.delete(id);
+    for (const id of [...L.links.keys()]) if (R.byId[id] && !R.byId[id].human) L.links.delete(id);      // (a link to somebody without a kart is a watcher: kept)
+    for (const id of L.links.keys()) if (!R.byId[id]) M.specs.add(id);
     for (const k of R.karts) if (k.human && k !== M.self && !L.links.has(k.id)) { /* no link to this player: it cannot follow, its kart turns into a bot */ convertToBot(k); }
     sendAllClients({ k: 'hostchange', epoch: M.epoch, host: M.myId, from: M.migratedFrom, gone: oldHost ? oldHost.id : null }, true);
     KL.G.toast && KL.G.toast(KL.t('rYouNewHost'), 3200);
+    M.deputy = null; if (KL.Lobby.adoptAsHost) KL.Lobby.adoptAsHost();          // lobby side: peers, then elect + link the next deputy
     M.out = []; M.evIdx = R.events.length;
     M.promoting = false; M.lastSend = 0;
     console.info('[kart-mp] promoted to host (' + why + '), epoch ' + M.epoch);

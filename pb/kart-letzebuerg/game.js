@@ -152,7 +152,7 @@
   }
   function openMenu() {
     if (KL.Lobby && KL.Lobby.active) KL.leaveOnline(false);
-    G.mp = false;
+    G.mp = false; G.spec = false; document.documentElement.classList.remove('kl-spec');
     G.state = 'menu'; G.paused = false; G.race = null; G.session = null; showOnly('menu'); KL.Boards.select('lap', G.settings.track); G.audio.silence(); document.documentElement.classList.remove('kl-race');
     if (G.renderer) { G.renderer.rain.visible = false; G.renderer.snow.visible = false; }
     KL.input.setEnabled(false);
@@ -280,27 +280,31 @@
   }
 
   /* ---------- online races (phase 2): the lobby hand-shake calls these ---------- */
-  function mpBegin(start, L) {
+  function mpBegin(start, L, o) {
     return new Promise((resolve, reject) => {
-      KL.ensureTrack(start.track).then(() => new Promise((r) => setTimeout(r, 30))).then(() => { beginMpRace(start, L); resolve(); }).catch((e) => { console.error(e); reject(e); });
+      KL.ensureTrack(start.track).then(() => new Promise((r) => setTimeout(r, 30))).then(() => { beginMpRace(start, L, o); resolve(); }).catch((e) => { console.error(e); reject(e); });
     });
   }
-  function beginMpRace(start, L) {
+  function beginMpRace(start, L, o) {
+    const spec = !!(o && o.spec);           // somebody who opened the code while the race was running: watches it (no kart of his own)
+    G.spec = spec; G.specMode = 'leader'; G.specId = null; G.specAt = 0;
     const track = getTrack(start.track); G.track = track;
     const grid = start.grid.slice().sort((a, b) => a.slot - b.slot);
     const defs = grid.map((g, i) => {
       const drv = KL.DRIVERS.find((d) => d.id === g.drv) || KL.DRIVERS[0];
       const base = { id: String(g.id).slice(0, 12), name: String(g.name).slice(0, 14), driver: drv, gridSlot: i };
-      if (g.human) return { ...base, human: true, remote: g.id !== L.myId };
+      if (g.human) return { ...base, human: true, remote: spec || g.id !== L.myId };
       return { ...base, isBot: true, remote: L.role !== 'host', botSkill: +g.skill || 1, lanePref: +g.lane || 0 };
     });
-    if (start.gp && KL.CUPS.some((c) => c.id === start.gp.cup)) {      // online Grand Prix: every client keeps the same table (from the shared results)
+    if (!spec && start.gp && KL.CUPS.some((c) => c.id === start.gp.cup)) {      // online Grand Prix: every client keeps the same table (from the shared results)
       const prev = G.session && G.session.kind === 'gp' && G.session.online && start.gp.idx > 0 ? G.session : null;
       G.session = { kind: 'gp', online: true, cup: start.gp.cup, idx: Math.max(0, start.gp.idx | 0), n: Math.max(1, Math.min(8, start.gp.n | 0)), table: prev ? prev.table : {}, names: prev ? prev.names : {}, done: false };
     } else G.session = { kind: 'race' };
     const R = KL.createRace({ track, karts: defs, laps: start.laps, difficulty: start.diff, weather: start.weather, seed: start.seed, mode: 'online' });
-    setupScene(R, track, start.weather, L.myId, true);
-    KL.MP.attach(R, start, L);
+    setupScene(R, track, start.weather, spec ? defs[0].id : L.myId, true);
+    document.documentElement.classList.toggle('kl-spec', spec);
+    KL.MP.attach(R, start, L, spec);
+    if (spec) KL.MP.specGo((L.links.get(L.hostId) || {}).rtt, o.clock, o.phase);
     G.state = 'mpload';
   }
   function mpReveal() {
@@ -309,11 +313,11 @@
     revealHud();
     showToast(KL.t('hintDrift'), 3000);
   }
-  function mpClosed() { G.mp = false; G.state = 'lobby'; G.waitingShown = false; KL.input.setEnabled(false); G.audio.silence(); document.documentElement.classList.remove('kl-race'); }
+  function mpClosed() { G.spec = false; document.documentElement.classList.remove('kl-spec'); G.mp = false; G.state = 'lobby'; G.waitingShown = false; KL.input.setEnabled(false); G.audio.silence(); document.documentElement.classList.remove('kl-race'); }
   function fillResultList(rows) {
     const ol = $('endList'); ol.textContent = '';
     rows.forEach((r) => {
-      const li = document.createElement('li'); const mine = G.human && r.id === G.human.id; if (mine) li.className = 'me';
+      const li = document.createElement('li'); const mine = !G.spec && G.human && r.id === G.human.id; if (mine) li.className = 'me';
       const a = document.createElement('b'); a.textContent = r.place + '.';
       const n = document.createElement('span'); n.textContent = dispName(r.name, mine);
       const t = document.createElement('span'); t.textContent = r.finished ? fmtTime(r.time) : KL.t('dnf');
@@ -323,7 +327,7 @@
   }
   function mpButtons(final) {
     $('eAgain').hidden = true; $('eNext').hidden = true; $('eMenu').textContent = KL.t('menu'); $('endNote').textContent = '';
-    $('eLobby').hidden = !(final && KL.Lobby.role === 'host' && KL.Lobby.originalHost && KL.Lobby.links.size > 0);
+    $('eLobby').hidden = !(final && KL.Lobby.role === 'host' && KL.Lobby.links.size > 0);          // (also for a host that took over mid-race)
   }
   /* online Grand Prix: points from the shared results, table, next race (host) or the final standings */
   function mpGpResults(rows, me, note) {
@@ -364,16 +368,16 @@
     showOnlyOverlay('endScreen'); mpButtons(true);
     $('endTitle').textContent = KL.t('resultsOnline');
     fillResultList(rows);
-    const me = rows.find((r) => G.human && r.id === G.human.id) || rows[0];
-    $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.best) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
-    const note = G.human && G.human.finished ? recordRace() : '';
+    const me = G.spec ? rows[0] : (rows.find((r) => G.human && r.id === G.human.id) || rows[0]);
+    $('endSub').textContent = G.spec ? KL.t('specNext') : KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.best) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
+    const note = !G.spec && G.human && G.human.finished ? recordRace() : '';
     $('endNote').textContent = note;
-    if (G.session && G.session.kind === 'gp' && G.session.online && G.human) { const last = mpGpResults(rows, me, note); if (!last) $('eLobby').hidden = true; }
+    if (!G.spec && G.session && G.session.kind === 'gp' && G.session.online && G.human) { const last = mpGpResults(rows, me, note); if (!last) $('eLobby').hidden = true; }
     G.lastResult = { rows, me };
   }
   KL.G.mpBegin = mpBegin; KL.G.mpReveal = mpReveal; KL.G.mpClosed = mpClosed; KL.G.mpShowResults = mpShowResults; KL.G.mpEnded = (key, vars) => KL.lobbyFail(key, vars);
   KL.G.toast = showToast; KL.G.openMenu = () => openMenu();
-  function doRescue() { if (!G.race || !G.human) return; G.race.rescue(G.human); G.human.tpc = (G.human.tpc | 0) + 1; }
+  function doRescue() { if (!G.race || !G.human || G.spec) return; G.race.rescue(G.human); G.human.tpc = (G.human.tpc | 0) + 1; }
 
   function viewOf(k, alpha) {
     const v = G.view || (G.view = {});
@@ -572,6 +576,28 @@
   function setWeather(w) { G.renderer.setWeather(w); G.race.weather.name = w; G.race.weather.wet = KL.WEATHER[w].wet; $('btnWeather').textContent = WEATHER_ICON[w]; showToast(WEATHER_ICON[w] + ' ' + KL.t('w_' + w), 1100); }
 
   /* ---------- main loop ---------- */
+  /* ---------- spectator: camera follows the leader (re-checked every 1.5 s so it does not flip on every overtake) or a kart picked with ◀ ▶ ---------- */
+  function specKarts(R) { return R.order.slice(); }
+  function specSet(k) {
+    if (!k || k === G.human) return;
+    G.human = k; G.renderer.cam.snap = true; G.hud = {};
+    $('specName').textContent = k.name;
+  }
+  function updateSpectator(R, ts) {
+    if (G.specMode === 'leader' && ts - G.specAt > 1500) {
+      G.specAt = ts;
+      const lead = R.order[0], cur = G.human;
+      if (lead && lead !== cur && (!cur || cur.finished !== lead.finished || lead.prog - cur.prog > 12 || lead.finished)) specSet(lead);
+    }
+    if ($('specName').textContent !== G.human.name) $('specName').textContent = G.human.name;
+    $('specLeader').classList.toggle('on', G.specMode === 'leader');
+  }
+  function specStep(dir) {
+    if (!G.spec || !G.race) return;
+    const list = specKarts(G.race), i = list.indexOf(G.human);
+    G.specMode = 'follow';
+    specSet(list[(i + dir + list.length) % list.length]);
+  }
   const inputScratch = {}; let itemLatch = false;
   KL.input.on('itemkey', () => { itemLatch = true; });
 
@@ -608,12 +634,13 @@
     if (G.human.roll && G.audio.throttle('rollsfx', 90)) G.audio.sfx('roll');
     G.renderer.render(G.paused ? 0 : dt);
     adaptQuality(dt);
-    if (G.human.finished && !G.resultsShown && performance.now() - G.finishAt > 2600) { if (G.mp) showMpWaiting(R); else showResults(); }
+    if (G.spec) updateSpectator(R, ts);
+    if (G.human.finished && !G.spec && !G.resultsShown && performance.now() - G.finishAt > 2600) { if (G.mp) showMpWaiting(R); else showResults(); }
     if (G.mp && G.waitingShown && ts - (G.waitT || 0) > 500) { G.waitT = ts; updateMpWaiting(R); }
   }
 
   function applyPlayerInput(k) {
-    if (!k || k.auto) return;
+    if (!k || k.auto || G.spec) return;
     const inp = KL.input.read(inputScratch);
     const f = G.forced;
     k.input.steer = f && f.steer != null ? f.steer : inp.steer; k.input.gas = f && f.gas != null ? f.gas : inp.gas; k.input.brake = f && f.brake != null ? f.brake : inp.brake;
@@ -654,6 +681,9 @@
     $('bdClose').addEventListener('click', () => { $('bdScreen').hidden = true; });
     $('bdShow').addEventListener('click', () => KL.Boards.open(BD.kind, BD.track));
     $('btnPause').addEventListener('click', () => setPaused(true));
+    $('specPrev').addEventListener('click', () => specStep(-1)); $('specNext').addEventListener('click', () => specStep(1));
+    $('specLeader').addEventListener('click', () => { if (G.spec) { G.specMode = 'leader'; G.specAt = 0; } });
+    KL.input.on('nav', (d) => specStep(d)); KL.input.on('leader', () => { if (G.spec) { G.specMode = 'leader'; G.specAt = 0; } });
     $('btnWeather').addEventListener('click', cycleWeather);
     $('btnReset').addEventListener('click', doRescue);
     $('pResume').addEventListener('click', () => setPaused(false));
@@ -708,7 +738,7 @@
       teleport: (s, d) => { const k = G.human; k.tpc = (k.tpc | 0) + 1; KL.placeKart(k, G.track, s, d || 0); k.prog = Math.floor(k.prog / G.track.length) * G.track.length + k.s; G.renderer.snapKarts(); G.renderer.cam.snap = true; },
       /* run the simulation without rendering (autopilot = the player gets the bot driver) */
       sim: (seconds, autopilot) => { const R = G.race; if (autopilot && G.human) G.human.auto = true; const n = Math.round(seconds / C.STEP); for (let i = 0; i < n; i++) { applyPlayerInput(G.human); R.step(C.STEP); G.steps++; afterStep(R); } handleEvents(R); return true; },
-      mp: () => { const M = KL.MP; return { active: M.active, role: M.role, hostId: M.hostId, deputy: M.deputy, epoch: M.epoch, stats: M.stats, ended: M.ended, results: !!M.resultsDone, net: KL.netStats, rtt: M.rtt, links: [...KL.Lobby.links].map(([id, l]) => ({ id, kind: l.kind, open: l.open, rtt: l.rtt })), lobby: { phase: KL.Lobby.phase, role: KL.Lobby.role, code: KL.Lobby.code, signalling: KL.Lobby.signalling }, karts: G.race ? G.race.karts.map((k) => ({ id: k.id, name: k.name, human: k.human, bot: k.isBot, remote: k.remote, away: !!k.away, place: k.place, prog: k.prog, finished: k.finished, finishOrder: k.finishOrder, finishTime: k.finishTime, spinT: k.spinT })) : [] }; },
+      mp: () => { const M = KL.MP; return { active: M.active, role: M.role, hostId: M.hostId, deputy: M.deputy, epoch: M.epoch, stats: M.stats, ended: M.ended, results: !!M.resultsDone, net: KL.netStats, rtt: M.rtt, spec: !!M.spec, specLive: !!M.specLive, specs: M.specs ? [...M.specs] : [], watching: G.spec ? G.human && G.human.id : null, specMode: G.specMode, links: [...KL.Lobby.links].map(([id, l]) => ({ id, kind: l.kind, open: l.open, rtt: l.rtt })), lobby: { phase: KL.Lobby.phase, role: KL.Lobby.role, code: KL.Lobby.code, signalling: KL.Lobby.signalling, hostId: KL.Lobby.hostId, deputy: KL.Lobby.deputy, myId: KL.Lobby.myId, peers: KL.Lobby.peers ? [...KL.Lobby.peers.keys()] : [], handoff: !!KL.Lobby.handoff }, karts: G.race ? G.race.karts.map((k) => ({ id: k.id, name: k.name, human: k.human, bot: k.isBot, remote: k.remote, away: !!k.away, place: k.place, prog: k.prog, finished: k.finished, finishOrder: k.finishOrder, finishTime: k.finishTime, spinT: k.spinT })) : [] }; },
       /* sample own truth and the displayed remote karts every 20 ms (wall clock), for the sync-error analysis */
       mpRecord: (on) => { if (!on) { clearInterval(G._rec); const out = G._recOut || []; G._recOut = null; return out; } G._recOut = []; clearInterval(G._rec); G._rec = setInterval(() => { const R = G.race; if (!R) return; const me = G.human, t = performance.timeOrigin + performance.now(), views = {}; for (const k of R.karts) if (k !== me) { const v = k.view || k; views[k.id] = [v.x, v.z, k.x, k.z]; } G._recOut.push({ t, own: [me.x, me.z, me.speed], views }); }, 20); return true; },
       standings: () => KL.standings(G.race), races: () => G.race, weather: (w) => setWeather(w),

@@ -125,3 +125,13 @@ button.big{font-weight:800;font-size:15px}
 .tcard small.rec{color:var(--gold);font-weight:700}
 #endNote{margin:0 0 10px;min-height:0;color:var(--gold);font-size:14px;font-weight:700}#endNote:empty{display:none}
 #bdScreen{z-index:40;background:rgba(5,8,20,.7)}#bdKinds,#bdTracks{margin:6px 0 12px}
+
+/* ---------- spectator (joined while a race was running) ---------- */
+#specBar{display:none;position:absolute;left:50%;bottom:max(14px,env(safe-area-inset-bottom));transform:translateX(-50%);align-items:center;gap:8px;padding:6px 10px;border-radius:99px;background:#0a1020d0;box-shadow:0 2px 14px #0008;white-space:nowrap;pointer-events:auto;z-index:6}
+html.kl-spec #specBar{display:flex}
+#specBar .eye{font-size:12px;font-weight:800;opacity:.75;text-transform:uppercase;letter-spacing:.06em}
+#specBar .eye::before{content:"👁 "}
+#specBar b{min-width:84px;text-align:center;font-size:16px}
+#specBar button{pointer-events:auto;min-width:44px;min-height:44px;border-radius:99px;border:0;background:#ffffff1f;color:#fff;font-weight:800;font-size:15px;padding:0 12px}
+#specBar button.on{background:#ffd23f;color:#111}
+html.kl-spec #itemSlot,html.kl-spec #touch,html.kl-spec #btnReset,html.kl-spec #btnWeather,html.kl-spec #keyHint,html.kl-spec #wrongWay,html.kl-spec #cometWarn,html.kl-spec #speedBox{display:none!important}

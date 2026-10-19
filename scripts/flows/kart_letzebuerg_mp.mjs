@@ -72,7 +72,8 @@ async function waitFor(p, fn, arg, timeout = 30000) { await p.page.waitForFuncti
 async function lobbyJoin(host, guest, code, name) {
   await goOnline(guest, name);
   await guest.page.fill('#olCode', code); await guest.page.click('#olJoin');
-  await guest.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+  try { await guest.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 }); }
+  catch (e) { const msg = await guest.page.textContent('#olMsg').catch(() => '?'); throw new Error('join failed for ' + guest.label + ' (code ' + code + '): "' + msg + '" ' + JSON.stringify(guest.errors)); }
 }
 async function setLaps(host, n) { await host.page.locator('#lbLaps button', { hasText: new RegExp('^' + n + '$') }).click(); }
 async function readyAndStart(host, guests, laps) {
@@ -153,7 +154,7 @@ export const flow = {
       h.expect(mB.links.some((l) => l.kind === 'rtc' && l.open), 'guest side link is WebRTC too');
       h.eq(await kl(A, () => __klTest.G.race.karts.length), 8, '8 karts (2 humans + 6 bots)');
       h.eq([await kl(A, () => __klTest.G.race.karts.filter((k) => k.human).length), await kl(B, () => __klTest.G.race.karts.filter((k) => k.human).length)], [2, 2], '2 humans on both sides');
-      h.expect(!mA.lobby.signalling && !mB.lobby.signalling, 'Realtime signalling is closed once the race is live (both sides)');
+      h.expect(!mB.lobby.signalling && mA.lobby.signalling, 'Realtime is closed on the guest once the race is live; the host keeps ONE idle room presence (no traffic) so a latecomer can find the race and watch it');
       const afterGo = { frames: hub.stats.framesIn + hub.stats.framesOut, bytes: hub.stats.bytesIn + hub.stats.bytesOut };
       await h.shot('race-2p');
       await A.page.screenshot({ path: (process.env.FLOW_SHOTS_DIR || '/tmp') + '/kart-letzebuerg-mp.race-host.png' }).catch(() => {});
@@ -350,6 +351,175 @@ export const flow = {
       h.eq((mb.players || []).filter((p) => !p.bot).map((p) => [p.name, p.user_id, p.guest]).sort(), [['Deputy', UID.dep, false], ['HostLeaver', null, true], ['Third', UID.third, false]], 'user ids of the signed-in players are in the log, the dead guest host is a guest');
       h.eq((mb.players || []).map((p) => p.place).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8], 'places are 1..8');
       REPORT.migration = { epoch: after1.epoch, resultRows: r1.length, raceLogCalls: migCalls.length };
+      }
+
+      /* ================= 3b. the deputy leaves first, then the host: a new deputy is elected + linked ================= */
+      if (want('deputy')) {
+        h.step('4 players: the deputy leaves first, then the host: the next deputy is elected and pre-linked, the race goes on for the remaining two with identical results');
+        const vp = { width: 480, height: 300 };
+        const A = await newPlayer(h, hub, 'd-host', { viewport: vp }); all.push(A);
+        const B = await newPlayer(h, hub, 'd-b', { viewport: vp }); all.push(B);
+        const C = await newPlayer(h, hub, 'd-c', { viewport: vp }); all.push(C);
+        const D = await newPlayer(h, hub, 'd-d', { viewport: vp }); all.push(D);
+        await goOnline(A, 'Alpha'); await A.page.click('#olCreate');
+        await A.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        const dcode = (await A.page.textContent('#lbCode')).trim();
+        await lobbyJoin(A, B, dcode, 'Bravo');
+        await waitFor(A, () => document.querySelectorAll('#lbList li').length === 2);
+        await lobbyJoin(A, C, dcode, 'Charlie');
+        await waitFor(A, () => document.querySelectorAll('#lbList li').length === 3);
+        await lobbyJoin(A, D, dcode, 'Delta');
+        await waitFor(A, () => document.querySelectorAll('#lbList li').length === 4);
+        await readyAndStart(A, [B, C, D], 2);
+        await waitRace([A, B, C, D]);
+        const id = {}; for (const [k, p] of Object.entries({ a: A, b: B, c: C, d: D })) id[k] = await kl(p, () => __klTest.G.human.id);
+        const depOf = async (p) => (await mp(p)).deputy;
+        h.eq([(await mp(A)).lobby.deputy, await depOf(B), await depOf(C), await depOf(D)], [id.b, id.b, id.b, id.b], 'first deputy = the first guest, known to everybody');
+        for (const p of [A, B, C, D]) await kl(p, () => __klTest.autopilot(true));
+        await sleep(4000);
+        // the deputy leaves through the pause menu
+        await B.page.evaluate(() => __klTest.pause(true)); await B.page.click('#pQuit');
+        await waitFor(A, (c) => __klTest.mp().lobby.deputy === c, id.c, 30000);
+        await waitFor(C, (c) => __klTest.mp().deputy === c, id.c, 30000);
+        await waitFor(D, (c) => __klTest.mp().deputy === c, id.c, 30000);
+        h.expect(true, 'the deputy left: the host elected the next client (Charlie) and everybody knows it');
+        await waitFor(D, (c) => __klTest.mp().links.some((l) => l.id === c && l.open && l.kind === 'rtc'), id.c, 20000);
+        await waitFor(C, (d) => __klTest.mp().links.some((l) => l.id === d && l.open && l.kind === 'rtc'), id.d, 20000);
+        h.expect(true, 'the new deputy was pre-linked to the other client (direct WebRTC link Charlie <-> Delta, made through the host, no Realtime)');
+        const bK = (await mp(A)).karts.find((k) => k.id === id.b);
+        h.expect(bK && bK.bot && !bK.human, 'the deputy that left is a bot now');
+        await sleep(2500);
+        // then the host disappears
+        await A.page.close();
+        await waitFor(C, () => __klTest.mp().role === 'host', null, 30000);
+        await waitFor(D, (c) => __klTest.mp().hostId === c, id.c, 30000);
+        const mC = await mp(C), mD = await mp(D);
+        h.eq([mC.role, mC.epoch, mD.role, mD.hostId], ['host', 1, 'client', id.c], 'host gone: the pre-linked deputy took over (epoch 1), the last client follows it');
+        await waitFor(C, (d) => __klTest.mp().deputy === d, id.d, 20000);
+        h.expect(true, 'and the new host immediately elected Delta as its own deputy');
+        await Promise.all([C, D].map((p) => p.page.waitForSelector('#endScreen:not([hidden]) #endList li', { timeout: 300000 })));
+        await Promise.all([C, D].map((p) => waitFor(p, () => window.__klTest.G.lastResult && document.querySelector('#endSub').textContent.includes('/8'), null, 120000)));
+        const rC = await kl(C, () => __klTest.G.lastResult.rows.map((r) => r.id + ':' + r.place + ':' + Math.round(r.time * 1000))), rD = await kl(D, () => __klTest.G.lastResult.rows.map((r) => r.id + ':' + r.place + ':' + Math.round(r.time * 1000)));
+        h.eq(rC, rD, 'the remaining two get identical results (ids, places, times)');
+        h.eq(rC.length, 8, 'results include all 8 karts');
+        const hum = await kl(C, () => __klTest.G.lastResult.rows.filter((r) => r.human).length);
+        h.eq(hum, 4, 'the four players are all counted as humans in the results');
+        const errs = [C, D].flatMap((p) => p.errors.filter((e) => !/three/.test(e)));
+        h.expect(errs.length === 0, 'no console errors on the survivors: ' + JSON.stringify(errs));
+        REPORT.deputyChain = { epoch: mC.epoch, finalDeputy: id.d === (await mp(C)).deputy };
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 3c. the host leaves the LOBBY: the next player takes it over ================= */
+      if (want('lobbyhost')) {
+        h.step('the host leaves the lobby before the race: the next player becomes host (same code, same settings), newcomers still join, and the race starts');
+        const vp = { width: 480, height: 300 };
+        const H = await newPlayer(h, hub, 'l-host', { viewport: vp }); all.push(H);
+        const G1 = await newPlayer(h, hub, 'l-one', { viewport: vp }); all.push(G1);
+        const G2 = await newPlayer(h, hub, 'l-two', { viewport: vp }); all.push(G2);
+        const NW = await newPlayer(h, hub, 'l-new', { viewport: vp }); all.push(NW);
+        await goOnline(H, 'Leaver'); await H.page.click('#olCreate');
+        await H.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        const lcode = (await H.page.textContent('#lbCode')).trim();
+        await lobbyJoin(H, G1, lcode, 'Nextup');
+        await waitFor(H, () => document.querySelectorAll('#lbList li').length === 2);
+        await lobbyJoin(H, G2, lcode, 'Second');
+        await waitFor(H, () => document.querySelectorAll('#lbList li').length === 3);
+        await setLaps(H, 2); await H.page.locator('#lbDiff button').nth(2).click();
+        await waitFor(G2, () => KL.Lobby.cfg.laps === 2 && KL.Lobby.cfg.diff === 'hard', null, 10000);
+        await G2.page.click('#lbReady');
+        await H.page.click('#lbLeave');
+        await G1.page.waitForFunction(() => KL.Lobby.role === 'host' && document.querySelectorAll('#lbList li').length === 2 && !document.getElementById('lbStart').hidden, null, { timeout: 40000 });
+        await waitFor(G2, () => document.querySelectorAll('#lbList li').length === 2 && /👑/.test(document.querySelector('#lbList li .st.host') ? document.querySelector('#lbList li .st.host').textContent : ''), null, 40000);
+        const c1 = (await G1.page.textContent('#lbCode')).trim();
+        h.eq(c1, lcode, 'the lobby kept its code after the host left');
+        h.eq(await kl(G1, () => [KL.Lobby.cfg.laps, KL.Lobby.cfg.diff]), [2, 'hard'], 'settings (2 laps, hard) survived the hand-over');
+        h.eq(await kl(G2, () => [KL.Lobby.cfg.laps, KL.Lobby.cfg.diff, KL.Lobby.role]), [2, 'hard', 'client'], 'the other player follows (settings visible, still a client)');
+        h.expect(await G1.page.locator('#lbSettings').isVisible() && await G2.page.locator('#lbSettings').isHidden(), 'the new host edits the settings, the other player only sees the summary');
+        // a newcomer uses the same code: the new host takes him in
+        await lobbyJoin(G1, NW, lcode, 'Latecomer');
+        await waitFor(G1, () => document.querySelectorAll('#lbList li').length === 3, null, 30000);
+        h.expect(true, 'the new host took a newcomer in with the old code (3 players)');
+        await G2.page.evaluate(() => { const b = document.getElementById('lbReady'); if (!/✓|bereit|ready/i.test(document.querySelector('#lbList li.me .st').textContent)) b.click(); });
+        await NW.page.click('#lbReady');
+        await waitFor(G1, () => document.querySelectorAll('#lbList li .st.ok').length === 2, null, 20000);
+        await G1.page.click('#lbStart');
+        await waitRace([G1, G2, NW]);
+        h.eq(await Promise.all([G1, G2, NW].map((p) => kl(p, () => __klTest.G.race.karts.filter((k) => k.human).length))), [3, 3, 3], 'the race starts with the three remaining players');
+        const ml = await mp(G1), ml2 = await mp(G2);
+        h.eq([ml.role, ml2.role, ml.deputy === ml2.deputy && !!ml.deputy], ['host', 'client', true], 'new host + deputy as usual');
+        h.expect(G1.errors.concat(G2.errors, NW.errors).filter((e) => !/three/.test(e)).length === 0, 'no console errors');
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 3d. opening the code while a race runs: spectator, roster for the next race ================= */
+      if (want('spectate')) {
+        h.step('latecomer opens the invite link during a race: he watches it (camera on the leader, can switch), then he is on the roster for the next race');
+        const A = await newPlayer(h, hub, 's-host'); all.push(A);
+        const B = await newPlayer(h, hub, 's-guest'); all.push(B);
+        const S = await newPlayer(h, hub, 's-watch'); all.push(S);
+        await goOnline(A, 'Racer'); await A.page.click('#olCreate');
+        await A.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        const scode = (await A.page.textContent('#lbCode')).trim();
+        await lobbyJoin(A, B, scode, 'Guesty');
+        await readyAndStart(A, [B], 1);
+        await waitRace([A, B]);
+        for (const p of [A, B]) await kl(p, () => __klTest.autopilot(true));
+        await sleep(6000);
+        const frames0 = hub.stats.framesIn + hub.stats.framesOut, http0 = S.http.length;
+        await S.page.goto(h.origin + URL_BASE + '&room=' + scode.toLowerCase() + '&role=guest');
+        await waitFor(S, () => { const m = __klTest.mp(); return m.spec && m.specLive && !document.getElementById('hud').hidden; }, null, 45000);
+        await sleep(1500);
+        const joinFrames = hub.stats.framesIn + hub.stats.framesOut - frames0;
+        const sm = await mp(S), am = await mp(A);
+        h.expect(sm.spec && sm.links.some((l) => l.kind === 'rtc' && l.open), 'the latecomer is a spectator, linked to the host by WebRTC');
+        h.eq(am.specs.length, 1, 'the host serves one spectator');
+        h.expect(await S.page.locator('#specBar').isVisible() && await S.page.locator('#itemSlot').isHidden(), 'spectator bar is shown, driving controls are hidden');
+        h.eq(await kl(S, () => __klTest.G.race.karts.length), 8, 'the spectator sees all 8 karts');
+        const look = () => kl(S, () => { const G = __klTest.G, k = G.human, c = G.renderer.cam; return { id: k.id, d: Math.hypot(c.x - k.ix, c.z - k.iz), lead: G.race.order[0].id, speed: k.speed, mode: G.specMode }; });
+        let l0 = await look();
+        h.expect(l0.mode === 'leader' && l0.d < 40 && l0.speed > 5, 'camera follows the leader and the leader is driving (cam ' + l0.d.toFixed(1) + ' m away, ' + l0.speed.toFixed(1) + ' m/s)');
+        const own = await kl(S, () => __klTest.G.race.karts.filter((k) => !k.remote).length);
+        h.eq(own, 0, 'no kart of the spectator is simulated locally');
+        await S.page.click('#specNext'); await sleep(2000);
+        let l1 = await look();
+        h.expect(l1.id !== l0.id && l1.mode === 'follow' && l1.d < 40, 'switching the target works (now ' + l1.id + ', camera ' + l1.d.toFixed(1) + ' m away)');
+        await S.page.click('#specLeader'); await sleep(2000);
+        const l2 = await look();
+        h.expect(l2.mode === 'leader', 'the leader button returns to the leader');
+        const prog = await Promise.all([kl(A, (id) => __klTest.G.race.byId[id].prog, am.hostId), kl(S, (id) => __klTest.G.race.byId[id].prog, am.hostId)]);
+        h.expect(Math.abs(prog[0] - prog[1]) < 60, 'the spectator\'s picture of the host kart agrees with the host (progress ' + Math.round(prog[0]) + ' vs ' + Math.round(prog[1]) + ' m)');
+        console.log('    spectator join: ' + joinFrames + ' Realtime frames, ' + (S.http.length - http0) + ' REST requests');
+        h.expect(joinFrames <= 40, 'joining as spectator costs few Realtime frames (' + joinFrames + ')');
+        h.eq(S.http.length - http0, 0, 'and no REST request');
+        await S.page.screenshot({ path: (process.env.FLOW_SHOTS_DIR || '/tmp') + '/kart-letzebuerg-mp.spectator.png' }).catch(() => {});
+        // results: the same list as the players get
+        await Promise.all([A, B, S].map((p) => p.page.waitForSelector('#endScreen:not([hidden]) #endList li', { timeout: 300000 })));
+        await Promise.all([A, B, S].map((p) => waitFor(p, () => window.__klTest.G.lastResult && document.querySelectorAll('#endList li').length === 8, null, 120000)));
+        const rows = await Promise.all([A, B, S].map((p) => p.page.locator('#endList li').allInnerTexts().then((t) => t.map((x) => x.replace(/\s+/g, ' ').replace(/ \((Du|You)\)/, '')))));
+        h.eq(rows[2], rows[0], 'the spectator sees the same result list as the host');
+        h.expect(await S.page.locator('#endList li.me').count() === 0 && /Du kucks zou|watching|schaust zu/i.test(await S.page.textContent('#endSub')), 'no row is "his own" and he is told he races next round');
+        h.eq(await kl(S, () => __klTest.boards().length), 0, 'watching a race writes no personal record / board entry');
+        // rematch: the watcher is on the roster
+        await A.page.click('#eLobby');
+        await Promise.all([B, S].map((p) => p.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 15000 })));
+        await waitFor(A, () => document.querySelectorAll('#lbList li').length === 3, null, 15000);
+        h.eq(await S.page.locator('#lbList li').count(), 3, 'rematch lobby: the spectator is on the roster (3 players) without doing anything');
+        h.expect(await A.page.locator('#lbCodeRow').isVisible(), 'the host still has the room code in the rematch lobby');
+        // the host leaves the rematch lobby (nobody has Realtime open any more): B takes over, S follows
+        await A.page.click('#lbLeave');
+        await B.page.waitForFunction(() => KL.Lobby.role === 'host' && document.querySelectorAll('#lbList li').length === 2 && !document.getElementById('lbStart').hidden, null, { timeout: 40000 });
+        await waitFor(S, () => KL.Lobby.role === 'client' && document.querySelectorAll('#lbList li').length === 2, null, 40000);
+        h.expect(true, 'rematch lobby, host left: the guest took the lobby over although the Realtime channels had been closed (re-opened on demand)');
+        await S.page.click('#lbReady');
+        await waitFor(B, () => document.querySelectorAll('#lbList li .st.ok').length === 1, null, 20000);
+        await B.page.locator('#lbLaps button', { hasText: /^1$/ }).click();
+        await B.page.click('#lbStart');
+        await waitRace([B, S]);
+        h.eq(await Promise.all([B, S].map((p) => kl(p, () => __klTest.G.race.karts.filter((k) => k.human).length))), [2, 2], 'next race: the former spectator drives as a full player');
+        h.eq(await mp(S).then((m) => [m.spec, m.role]), [false, 'client'], 'and is a normal client now');
+        h.expect([A, B, S].every((p) => p.errors.filter((e) => !/three/.test(e)).length === 0), 'no console errors: ' + JSON.stringify([A, B, S].flatMap((p) => p.errors)));
+        await closeAll(all); all.length = 0;
       }
 
       /* ================= 4. invite link, friends dialog (signed in) ================= */

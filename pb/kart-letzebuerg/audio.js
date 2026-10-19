@@ -3,6 +3,10 @@
   'use strict';
   const KL = window.KL;
   const { clamp } = KL;
+  /* every AudioParam value goes through here: a NaN / Infinity from any kart state (migration, teleport, spectating a remote kart ...)
+   * must never reach setTargetAtTime & co (they throw "non-finite") — it is replaced by a safe fallback instead */
+  const fin = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
+  KL.audioFinite = fin;
 
   KL.Audio = class GameAudio {
     constructor() { this.ctx = null; this.muted = false; this.master = null; this.eng = null; this.last = {}; }
@@ -31,25 +35,35 @@
       const n2 = c.createBufferSource(); n2.buffer = buf; n2.loop = true; const lp2 = c.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 900;
       const wg = c.createGain(); wg.gain.value = 0; n2.connect(lp2); lp2.connect(wg); wg.connect(this.master); n2.start(); this.wind = { wg, lp2 };
     }
+    /* the one place that sets an AudioParam smoothly; returns false (and counts it) if the value had to be replaced */
+    ramp(param, v, t, tc, fallback) {
+      const ok = typeof v === 'number' && isFinite(v);
+      if (!ok) this.badValues = (this.badValues || 0) + 1;
+      param.setTargetAtTime(ok ? v : fallback, isFinite(t) ? t : 0, tc);
+      return ok;
+    }
     setMuted(m) { this.muted = !!m; if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.55, this.ctx.currentTime, 0.02); }
     /* continuous sounds, called every frame */
     update(k, opts) {
       if (!this.ctx || !k) return;
-      const c = this.ctx, t = c.currentTime;
-      const sp = k.speed, f = 48 + sp * 5.2 + (k.boostT > 0 ? 22 : 0) + (k.grounded ? 0 : 14);
-      this.eng.o1.frequency.setTargetAtTime(f, t, 0.05); this.eng.o2.frequency.setTargetAtTime(f * 0.5, t, 0.05);
-      this.eng.lp.frequency.setTargetAtTime(380 + sp * 38 + (k.boostT > 0 ? 500 : 0), t, 0.08);
+      const c = this.ctx, t = c.currentTime, e = this.eng, dr = k.drift || {};
+      const paused = opts && opts.paused ? 0 : 1, rain = !!(opts && opts.rain);
+      const sp = clamp(fin(k.speed, 0), 0, 80), boost = fin(k.boostT, 0) > 0, charge = clamp(fin(dr.charge, 0), 0, 20), lvl = clamp(fin(dr.level, 0), 0, 5);
+      const f = 48 + sp * 5.2 + (boost ? 22 : 0) + (k.grounded ? 0 : 14);
+      this.ramp(e.o1.frequency, f, t, 0.05, 60); this.ramp(e.o2.frequency, f * 0.5, t, 0.05, 30);
+      this.ramp(e.lp.frequency, 380 + sp * 38 + (boost ? 500 : 0), t, 0.08, 600);
       const run = opts && opts.racing ? 1 : 0.6;
-      this.eng.eg.gain.setTargetAtTime((0.05 + clamp(sp / 31, 0, 1) * 0.1) * run * (opts && opts.paused ? 0 : 1), t, 0.06);
-      const drifting = k.drift.state === 2 && k.grounded;
-      this.screech.sg.gain.setTargetAtTime((drifting ? 0.07 + k.drift.level * 0.015 : (k.surf === 1 && sp > 8 && k.grounded ? 0.03 : 0)) * (opts && opts.paused ? 0 : 1), t, 0.05);
-      this.screech.bp.frequency.setTargetAtTime(drifting ? 1500 + k.drift.charge * 220 : 700, t, 0.1);
-      const w = opts && opts.rain ? 0.05 : clamp(sp / 41, 0, 1) * 0.025;
-      this.wind.wg.gain.setTargetAtTime(w * (opts && opts.paused ? 0 : 1), t, 0.2); this.wind.lp2.frequency.setTargetAtTime(opts && opts.rain ? 3500 : 500 + sp * 20, t, 0.2);
+      this.ramp(e.eg.gain, (0.05 + clamp(sp / 31, 0, 1) * 0.1) * run * paused, t, 0.06, 0);
+      const drifting = dr.state === 2 && k.grounded;
+      this.ramp(this.screech.sg.gain, (drifting ? 0.07 + lvl * 0.015 : (k.surf === 1 && sp > 8 && k.grounded ? 0.03 : 0)) * paused, t, 0.05, 0);
+      this.ramp(this.screech.bp.frequency, drifting ? 1500 + charge * 220 : 700, t, 0.1, 700);
+      const w = rain ? 0.05 : clamp(sp / 41, 0, 1) * 0.025;
+      this.ramp(this.wind.wg.gain, w * paused, t, 0.2, 0); this.ramp(this.wind.lp2.frequency, rain ? 3500 : 500 + sp * 20, t, 0.2, 500);
     }
     silence() { if (!this.ctx) return; const t = this.ctx.currentTime; this.eng.eg.gain.setTargetAtTime(0, t, 0.05); this.screech.sg.gain.setTargetAtTime(0, t, 0.05); this.wind.wg.gain.setTargetAtTime(0, t, 0.05); }
     tone(freq, dur, type, vol, slide, delay) {
       if (!this.ctx || this.muted) return;
+      freq = fin(freq, 440); dur = Math.max(0.02, fin(dur, 0.1)); vol = fin(vol, 0.15); slide = fin(slide, 0); delay = fin(delay, 0);
       const c = this.ctx, t = c.currentTime + (delay || 0), o = c.createOscillator(), g = c.createGain();
       o.type = type || 'triangle'; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * slide), t + dur);
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -57,6 +71,7 @@
     }
     noise(dur, f0, f1, vol, type, delay) {
       if (!this.ctx || this.muted) return;
+      f0 = fin(f0, 800); f1 = fin(f1, 200); dur = Math.max(0.02, fin(dur, 0.2)); vol = fin(vol, 0.2); delay = fin(delay, 0);
       const c = this.ctx, t = c.currentTime + (delay || 0), s = c.createBufferSource(); s.buffer = this.noiseBuf;
       const f = c.createBiquadFilter(); f.type = type || 'lowpass'; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
       const g = c.createGain(); g.gain.setValueAtTime(vol || 0.2, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -75,8 +90,8 @@
         case 'shoot': this.noise(0.28, 2800, 300, 0.2 * v, 'bandpass'); this.tone(300, 0.2, 'sawtooth', 0.07 * v, 0.4); break;
         case 'drop': this.tone(180, 0.18, 'sine', 0.2 * v, 0.5); this.noise(0.12, 900, 300, 0.1 * v); break;
         case 'boost': case 'pad': this.noise(0.7, 400, 3500, 0.22 * v, 'bandpass'); this.tone(220, 0.5, 'sawtooth', 0.09 * v, 3); break;
-        case 'miniturbo': this.noise(0.55, 600, 4000, 0.2 * v, 'bandpass'); this.tone(330 * (1 + 0.25 * (p.level || 1)), 0.3, 'square', 0.07 * v, 1.8); break;
-        case 'driftlevel': this.tone(700 + 250 * (p.level || 1), 0.09, 'square', 0.08); break;
+        case 'miniturbo': this.noise(0.55, 600, 4000, 0.2 * v, 'bandpass'); this.tone(330 * (1 + 0.25 * fin(p && p.level, 1)), 0.3, 'square', 0.07 * v, 1.8); break;
+        case 'driftlevel': this.tone(700 + 250 * fin(p && p.level, 1), 0.09, 'square', 0.08); break;
         case 'hit': this.noise(0.4, 1600, 120, 0.35 * v); this.tone(380, 0.5, 'sawtooth', 0.14 * v, 0.2); break;
         case 'boom': this.noise(0.8, 2500, 80, 0.5 * v); this.tone(110, 0.6, 'sine', 0.3 * v, 0.3); break;
         case 'bump': if (this.throttle('bump', 120)) { this.noise(0.12, 900, 200, 0.2 * v); this.tone(150, 0.1, 'square', 0.08 * v, 0.5); } break;
