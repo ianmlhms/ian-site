@@ -533,7 +533,7 @@
     let track = cfg.track, laps = cfg.laps, gp = null;
     if (cfg.mode === 'gp') {                  // Grand Prix: the cup's tracks one after the other, same roster and drivers
       if (!L.gp || L.gp.cup !== cfg.cup) L.gp = { cup: cfg.cup, idx: 0, races: KL.gpRaces(KL.CUPS.find((c) => c.id === cfg.cup) || KL.CUPS[0], KL.tracks).map((r) => r.track) };
-      track = L.gp.races[L.gp.idx]; laps = KL.G.test && cfg.laps ? cfg.laps : KL.CFG.LAPS;   // (the lap override is for the test flows only) gp = { cup: L.gp.cup, idx: L.gp.idx, n: L.gp.races.length };
+      track = L.gp.races[L.gp.idx]; laps = KL.G.test && cfg.laps ? cfg.laps : KL.CFG.LAPS; gp = { cup: L.gp.cup, idx: L.gp.idx, n: L.gp.races.length };   // (the lap override is for the test flows only)
     } else L.gp = null;
     const weather = pickWeather(track, cfg.weather);
     const start = { k: 'start', seed, track, weather, laps, diff: cfg.diff, grid: entries, hostId: L.myId, deputy: L.deputy, ok: L.lateralOk, epoch: 0, ...(gp ? { gp } : {}) };

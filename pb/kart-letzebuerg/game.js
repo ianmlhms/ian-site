@@ -9,6 +9,9 @@
   try { if (parent !== window) parentParams = new URL(parent.location.href).searchParams; } catch (e) { /* cross-origin parent */ }
   const TEST = params.get('test') === '1' || (parentParams && parentParams.get('test') === '1');
   const SETTINGS_KEY = 'kl_settings';
+  /* the arcade tells its games when the Halloween event is on (window.__pbHalloween); ?halloween=1 previews it */
+  const halloween = () => window.__pbHalloween === true || params.get('halloween') === '1';
+  const trackName = (id) => KL.t('t_' + id) + (halloween() && id === 'geeschterschlass' ? ' 🎃' : '');
 
   const G = {
     state: 'boot', renderer: null, audio: new KL.Audio(), race: null, track: null, tracks: {}, human: null, rear: false,
@@ -82,7 +85,7 @@
         const prev = document.createElement('span'); prev.className = 'cprev';
         for (const id of ids) { const cv = document.createElement('canvas'); cv.width = 64; cv.height = 54; prev.appendChild(cv); drawTrackPreview(cv, getTrack(id)); }
         b.appendChild(prev);
-        const d = document.createElement('div'); d.innerHTML = '<b></b><small></small>'; d.firstChild.textContent = KL.t(cup.name); d.lastChild.textContent = ids.map((id) => KL.t('t_' + id)).join(' · ') + ' · ' + KL.t('cupDesc', { n: races.length });
+        const d = document.createElement('div'); d.innerHTML = '<b></b><small></small>'; d.firstChild.textContent = KL.t(cup.name); d.lastChild.textContent = ids.map(trackName).join(' · ') + ' · ' + KL.t('cupDesc', { n: races.length });
         b.appendChild(d);
         b.addEventListener('click', () => { S.cup = cup.id; if (S.weather !== 'random' && !cupWeathers(cup.id).includes(S.weather)) S.weather = 'random'; saveSettings(); buildMenuChips(); G.audio.sfx('click'); });
         tc.appendChild(b);
@@ -92,7 +95,7 @@
         const def = KL.tracks[id];
         const b = document.createElement('button'); b.className = 'tcard' + (S.track === id ? ' on' : '');
         const cv = document.createElement('canvas'); cv.width = 128; cv.height = 108; b.appendChild(cv);
-        const d = document.createElement('div'); d.innerHTML = '<b></b><small></small><small class="rec"></small>'; d.firstChild.textContent = KL.t('t_' + id); d.children[1].textContent = KL.t('t_' + id + '_d'); d.lastChild.textContent = recLine(id); b.appendChild(d);
+        const d = document.createElement('div'); d.innerHTML = '<b></b><small></small><small class="rec"></small>'; d.firstChild.textContent = trackName(id); d.children[1].textContent = KL.t('t_' + id + '_d'); d.lastChild.textContent = recLine(id); b.appendChild(d);
         b.addEventListener('click', () => { S.track = id; if (S.weather !== 'random' && !weathersFor(id).includes(S.weather)) S.weather = 'random'; saveSettings(); KL.Boards.select('lap', id); buildMenuChips(); G.audio.sfx('click'); });
         tc.appendChild(b); drawTrackPreview(cv, getTrack(id));
       }
