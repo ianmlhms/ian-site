@@ -48,6 +48,18 @@
     }
     off += clamp(avoid, -1, 1) * 2.8;
     const hwT = track.HW[iT];
+    if (R.hazards && R.hazards.length) {      // fire geysers: if one will be erupting when we get there, take the other side of the road
+      for (const h of R.hazards) {
+        let ahead = h.s - k.s; if (ahead < -track.length / 2) ahead += track.length; else if (ahead > track.length / 2) ahead -= track.length;
+        if (ahead < 1 || ahead > 62 || Math.abs(off - h.d) > h.r + 3.2) continue;
+        const eta = ahead / Math.max(sp, 9);
+        if (R.hazardState(h, R.clock + eta) !== 2 && R.hazardState(h, R.clock + eta + 0.5) !== 2 && R.hazardState(h, R.clock + eta - 0.4) !== 2) continue;
+        off = h.d - (h.d >= 0 ? 1 : -1) * (h.r + 2.6);
+      }
+    }
+    if (track.patches.length) {            // steer round syrup patches
+      for (const sx of [sT, k.s + ld * 0.55]) if (track.patchAt(sx, off) === 'goo') { for (const dd of [3.2, -3.2, 6.4, -6.4, 9.6, -9.6]) if (Math.abs(off + dd) < hwT - 2 && !track.patchAt(sx, off + dd)) { off += dd; break; } }
+    }
     off = clamp(off, -hwT + 2.2, hwT - 2.2);
     track.at(sT, off, tgt);
     let err = wrapAngle(Math.atan2(tgt.x - k.x, tgt.z - k.z) - k.yaw) + ai.mistake * (ai.mistakeT > 0 ? 1 : 0);
@@ -62,6 +74,7 @@
     const vFar = track.vsafe[(i0 + Math.round(clamp(sp * 1.1, 12, 60) / step)) % N] * 1.12;
     vt = Math.min(vt, Math.max(vFar, 8));
     if (k.surf === 1 && k.boostT <= 0) vt = Math.min(vt, 22);
+    if (k.patch === 'ice') vt *= 0.8;
     let gas = sp < vt ? 1 : 0, brake = 0;
     if (sp > vt * 1.1) brake = clamp((sp - vt * 1.1) / 7, 0, 1);
     if (R.phase === 'countdown') { gas = 0; brake = 0; }

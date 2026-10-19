@@ -70,6 +70,7 @@
     let vmax = C.MAX_SPEED * spdMul * (k.rubber || 1);
     const offroadCap = def.offroadSpeed || (def.offroad === 'grass' ? C.OFFROAD_SPEED : C.SIDEWALK_SPEED);
     if (k.surf === 1 && k.boostT <= 0) vmax = Math.min(vmax, offroadCap);
+    if (k.patch === 'goo' && k.boostT <= 0) vmax = Math.min(vmax, vmax * 0.55);              // syrup / mud
     if (k.boostT > 0) vmax = Math.max(vmax, C.BOOST_SPEED * spdMul * (k.boostKind === 2 ? 1.04 : 1));
     if (R.weather && R.weather.wet) vmax *= 1 - 0.02 * R.weather.wet;
 
@@ -84,7 +85,7 @@
         const a = boosting ? 58 : C.ACCEL * (1 - clamp(vf / vmax, 0, 1) * 0.72) * gas;
         vf = Math.min(vmax, vf + a * dt);
       } else if (vf > vmax) {
-        vf = Math.max(vmax, vf - (k.surf === 1 ? 30 : 12) * dt);
+        vf = Math.max(vmax, vf - (k.surf === 1 || k.patch === 'goo' ? 30 : 12) * dt);
       } else if (gas <= 0 && brake <= 0) {
         vf -= Math.sign(vf) * Math.min(Math.abs(vf), C.DRAG * dt);
       }
@@ -123,6 +124,7 @@
       const along = vx * dx + vz * dz, side = vx * nx + vz * nz;
       let grip = dr.state === 2 ? C.DRIFT_GRIP : C.GRIP;
       if (k.surf === 1) grip *= 0.6;
+      if (k.patch === 'ice') grip *= 0.2;                                                  // slippery: the heading changes, the velocity hardly follows
       if (R.weather && R.weather.wet) grip *= 1 - 0.28 * R.weather.wet;
       if (k.slipT > 0) grip *= 0.5;
       if (spinning) grip = 1.2;
@@ -178,7 +180,7 @@
     const lim = p.hw + (side > 0 ? p.wr : p.wl);
     const nxR = -p.tz, nzR = p.tx;                       // right normal
     let surf = 0;
-    if (ad > p.hw) surf = 1;
+    if (ad > p.hw) surf = track.alts.length && track.onAlt(k.x, k.z) ? 0 : 1;      // a second route counts as tarmac
     if (ad > lim) {
       // wall: push back, bounce, scrape
       const over = ad - lim;
@@ -201,6 +203,8 @@
       k.wallT = 0.2;
     }
     k.surf = surf; k.d = p.d;
+    k.patch = track.patches.length ? track.patchAt(p.s, p.d) : '';
+    if (k.patch === 'lava' && k.grounded && k.invuln <= 0 && k.spinT <= 0 && racing) KL.hitKart(R, k, 'burn', null);      // the bed of a lava ford
     // static obstacles (fountains, statues, planters)
     if (def.obstacles) for (const ob of def.obstacles) {
       const dx = k.x - ob[0], dz = k.z - ob[1], rr = ob[2] + C.KART_RADIUS * 0.8, d2 = dx * dx + dz * dz;
@@ -258,6 +262,7 @@
       rocket: { spin: C.SPIN_TIME * 1.25, keep: 0.2, vy: 6 },
       comet: { spin: C.SPIN_TIME * 1.6, keep: 0.1, vy: 13 },
       bump: { spin: 0, keep: 0.8, vy: 0 },
+      burn: { spin: C.SPIN_TIME * 0.9, keep: 0.5, vy: 7 },
     }[kind] || { spin: C.SPIN_TIME, keep: 0.5, vy: 0 };
     if (k.remote) k.hitGuard = 0.35;     // online: the owner's packets lag behind, do not hit the same kart twice
     k.spinT = spec.spin; k.spinTot = spec.spin; k.spinDir = Math.random() < 0.5 ? -1 : 1; k.vx *= spec.keep; k.vz *= spec.keep;

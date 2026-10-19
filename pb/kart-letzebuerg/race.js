@@ -13,7 +13,10 @@
       rng: KL.rng((o.seed || 1) >>> 0), mode: o.mode || 'race', humans: [], finishClock: null, ghostBest: o.ghostBest || null,
     };
     R.boxes = KL.makeBoxes(track);
-    R.pads = (track.def.pads || []).map(([s, d, len], i) => { const p = track.at(s, d || 0); return { x: p.x, z: p.z, y: p.y, s, d: d || 0, h: p.h, len: len || 8, w: 4.2, id: i }; });
+    R.pads = (track.def.pads || []).map(([s, d, len, dyaw], i) => { const p = track.at(s, d || 0); return { x: p.x, z: p.z, y: p.y, s, d: d || 0, h: p.h + (dyaw || 0), len: len || 8, w: 4.2, id: i }; });   // optional 4th: heading offset (pads on second routes)
+    /* timed hazards (fire geysers): erupt for `on` seconds at the end of every `period`; hazardState() is 0 idle / (0,1) warning ramp / 2 erupting */
+    R.hazards = (track.def.hazards || []).map((h, i) => { const p = track.at(h.s, h.d || 0); return { x: p.x, y: p.y, z: p.z, s: h.s, d: h.d || 0, r: h.r || 3, period: h.period || 6, on: h.on || 1, warn: h.warn || 1.1, phase: h.phase || 0, id: i }; });
+    R.hazardState = (h, at) => { const ph = ((((at != null ? at : R.clock) + h.phase) % h.period) + h.period) % h.period, t0 = h.period - h.on; return ph >= t0 ? 2 : ph >= t0 - h.warn ? (ph - (t0 - h.warn)) / h.warn : 0; };
     const defs = o.karts;
     defs.forEach((d, i) => {
       const k = KL.createKart({ ...d, slot: i });
@@ -118,6 +121,15 @@
           if (k.boostT < 0.35) { k.boostT = 0.9; k.boostKind = 1; R.events.push({ t: 'pad', id: k.id }); }
           else k.boostT = Math.max(k.boostT, 0.6);
         }
+      }
+    }
+    // hazards: each simulator burns the karts it owns (the telegraph is on screen well before)
+    if (racing) for (const h of R.hazards) {
+      if (R.hazardState(h) !== 2) continue;
+      for (const k of R.karts) {
+        if (k.remote || k.finished || k.invuln > 0 || Math.abs(k.y - h.y) > 2.6) continue;
+        const dx = k.x - h.x, dz = k.z - h.z;
+        if (dx * dx + dz * dz < (h.r + 0.6) * (h.r + 0.6)) KL.hitKart(R, k, 'burn', null);
       }
     }
     // kart-kart collisions: every simulator only moves the karts it owns (remote ones are seen at their displayed position)

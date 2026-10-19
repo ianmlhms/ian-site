@@ -153,6 +153,19 @@
     }
     Y = movingAverage(Y, 2, closed); HW = movingAverage(HW, 4, closed); WL = movingAverage(WL, 4, closed); WR = movingAverage(WR, 4, closed);
     BANK = movingAverage(BANK, 3, closed);
+    // jumps: height profiles added on top of the smoothed centre-line height. ramps: [{ s, k: [[ds, dy], ...] }] (linear between the knots,
+    // so a rise followed by an abrupt drop is a take-off lip; a dip is a ford / chasm bed). YB keeps the height without them (terrain, skirts).
+    const YB = Float32Array.from(Y);
+    for (const rp of def.ramps || []) {
+      const k = rp.k, ds0 = k[0][0], ds1 = k[k.length - 1][0];
+      for (let i = 0; i < N; i++) {
+        let u = i * step - rp.s; if (closed) { if (u < -total / 2) u += total; else if (u > total / 2) u -= total; }
+        if (u < ds0 || u > ds1) continue;
+        let j = 0; while (j < k.length - 2 && u > k[j + 1][0]) j++;
+        const t = k[j + 1][0] > k[j][0] ? (u - k[j][0]) / (k[j + 1][0] - k[j][0]) : 1;
+        Y[i] += k[j][1] + (k[j + 1][1] - k[j][1]) * clamp(t, 0, 1);
+      }
+    }
     // tangents / normals / heading / curvature
     const TX = new Float32Array(N), TZ = new Float32Array(N), H = new Float32Array(N), K = new Float32Array(N), S = new Float32Array(N);
     const idx = (i) => (closed ? ((i % N) + N) % N : clamp(i, 0, N - 1));
@@ -175,8 +188,42 @@
     });
     let minY = 1e9; for (let i = 0; i < N; i++) if (Y[i] < minY) minY = Y[i];
     const track = {
-      minY, id: def.id, def, closed, N, step, length: total, X, Y, Z, TX, TZ, H, K: Ks, S, HW, WL, WR, BANK, ZONE, zones, stations,
+      minY, id: def.id, def, closed, N, step, length: total, X, Y, YB, Z, TX, TZ, H, K: Ks, S, HW, WL, WR, BANK, ZONE, zones, stations,
       idx, wps,
+    };
+    /* second routes: [{ hw, pts: [[x, z], ...] }] — a drivable ribbon (Catmull-Rom through the points, in world metres) beside the main road,
+     * lying in its wide wall margin WL/WR. It counts as tarmac for the kart (no off-road slowdown) and is drawn by the track scenery (kit.altRoads). */
+    track.alts = (def.alts || []).map((a) => {
+      const q = a.pts, P = [];
+      for (let i = 0; i + 1 < q.length; i++) {
+        const p0 = q[Math.max(0, i - 1)], p1 = q[i], p2 = q[i + 1], p3 = q[Math.min(q.length - 1, i + 2)], n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 2));
+        for (let k = 0; k < n; k++) { const t = k / n; P.push([catmull(p0[0], p1[0], p2[0], p3[0], t), catmull(p0[1], p1[1], p2[1], p3[1], t)]); }
+      }
+      P.push([q[q.length - 1][0], q[q.length - 1][1]]);
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const p of P) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }
+      const hw = a.hw || 4.5;
+      return { ...a, hw, P, box: [x0 - hw - 1, z0 - hw - 1, x1 + hw + 1, z1 + hw + 1] };
+    });
+    track.onAlt = (x, z) => {
+      for (const a of track.alts) {
+        if (x < a.box[0] || x > a.box[2] || z < a.box[1] || z > a.box[3]) continue;
+        const P = a.P, lim = (a.hw + 0.3) * (a.hw + 0.3);
+        for (let i = 0; i + 1 < P.length; i++) {
+          const ax = P[i][0], az = P[i][1], dx = P[i + 1][0] - ax, dz = P[i + 1][1] - az, l2 = dx * dx + dz * dz || 1, t = clamp(((x - ax) * dx + (z - az) * dz) / l2, 0, 1), ex = x - ax - dx * t, ez = z - az - dz * t;
+          if (ex * ex + ez * ez <= lim) return true;
+        }
+      }
+      return false;
+    };
+    const spanTo = (s, s0) => { let u = s - s0; if (closed) { if (u < -total / 2) u += total; else if (u > total / 2) u -= total; } return u; };
+    /* surface patches: [{ s0, s1, d0, d1, kind: 'ice' | 'goo' }] (s0 > s1 wraps over the start line); returns the kind or ''. */
+    track.patches = def.patches || [];
+    track.patchAt = (s, d) => {
+      for (const q of track.patches) {
+        const u = spanTo(s, q.s0), len = spanTo(q.s1, q.s0);
+        if (u >= 0 && u <= (len < 0 ? len + total : len) && d >= q.d0 && d <= q.d1) return q.kind;
+      }
+      return '';
     };
     // spatial hash for global searches
     const grid = new Map();
@@ -224,8 +271,8 @@
       let tx = lerp(TX[i], TX[i2], t), tz = lerp(TZ[i], TZ[i2], t); const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl;
       const d = (x - cx) * -tz + (z - cz) * tx;            // signed lateral offset, right positive
       const hw = lerp(HW[i], HW[i2], t), wl = lerp(WL[i], WL[i2], t), wr = lerp(WR[i], WR[i2], t);
-      const cy = lerp(Y[i], Y[i2], t), bank = lerp(BANK[i], BANK[i2], t);
-      out.i = i; out.cx = cx; out.cz = cz; out.cy = cy; out.tx = tx; out.tz = tz; out.d = d; out.hw = hw; out.wl = wl; out.wr = wr;
+      const cy = lerp(Y[i], Y[i2], t), by = lerp(YB[i], YB[i2], t), bank = lerp(BANK[i], BANK[i2], t);
+      out.i = i; out.cx = cx; out.cz = cz; out.cy = cy; out.by = by; out.tx = tx; out.tz = tz; out.d = d; out.hw = hw; out.wl = wl; out.wr = wr;
       out.y = cy + Math.tan(bank) * clamp(d, -hw, hw);      // surface height (banking only on the tarmac)
       out.s = lerp(S[i], S[i] + step, t); out.bank = bank; out.zone = ZONE[i];
       return out;
