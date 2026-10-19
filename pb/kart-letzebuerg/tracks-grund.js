@@ -8,6 +8,7 @@
   const BOX = [-330, -300, 330, 330];
   const valley = KL.kit.valleyTerrain('grund', { box: BOX, depth: 40, a: 20, b: 84, cell: 4 });
   let TERR = (x, z) => valley(x, z);
+  const valleyPaint = KL.kit.valleyPaint((x, z) => TERR(x, z), 'grund', { box: BOX, depth: 40, rock: '#8f9470', grass: '#5f9a44', grass2: '#86b85c', edge: '#b1a894', floor: '#8fa56d', blotches: 1800 });
   const ABBEY = { x: 120, z: -86, yaw: -0.5, y: -38.2, hx: 41, hz: 44, cz: -6 };
 
   KL.registerTrack({
@@ -19,7 +20,24 @@
       palette: ['#ecd9a8', '#e6c98b', '#e3b88a', '#efe0c0', '#d9a97a', '#e8c6a8', '#cdb48a', '#f0e3c8'],
       roofs: ['#4a505c', '#434955', '#58606b', '#3c424d', '#5d5560'],
       groundMap: { x0: -540, z0: -520, size: 1050, paving: '#a89f8c', water: '#4f90b8',
-        paint: KL.kit.valleyPaint((x, z) => TERR(x, z), 'grund', { box: BOX, depth: 40, rock: '#8f9470', grass: '#5f9a44', grass2: '#86b85c', edge: '#b1a894', floor: '#8fa56d', blotches: 1800 }) },
+        paint(g, X, Z, sc, data) {
+          valleyPaint(g, X, Z, sc, data);
+          /* the upper hillsides (above the green slope) are layered sandstone with gardens and scrub, like the real Grund / Corniche cliffs, instead of bare tan */
+          const [x0, z0, x1, z1] = BOX, cs = 3, cw = Math.round((x1 - x0) / cs), ch = Math.round((z1 - z0) / cs), cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+          const cg = cv.getContext('2d'), im = cg.createImageData(cw, ch), hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+          const BAND = ['#cdb98f', '#b39d72', '#d8c79f', '#a68f66', '#c4af84'].map(hex), GARD = ['#6f9f4a', '#7fae52', '#5a8c3f'].map(hex), SCRUB = hex('#55803c');
+          for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+            const x = x0 + (i + 0.5) * cs, z = z0 + (j + 0.5) * cs, h = TERR(x, z), o = (j * cw + i) * 4;
+            if (h > -0.6 || h < -27) continue;
+            const slope = Math.hypot(TERR(x + 3, z) - TERR(x - 3, z), TERR(x, z + 3) - TERR(x, z - 3)) / 6, n = Math.sin(x * 0.21 + z * 0.17) * Math.cos(x * 0.09 - z * 0.23) * 0.5 + 0.5, n2 = Math.sin(x * 0.7) * Math.sin(z * 0.63) * 0.5 + 0.5;
+            let c;
+            if (slope > 0.42) { const b = Math.floor(-h * 0.62 + n * 1.3 + 40); c = BAND[b % 5]; if (n2 > 0.8) c = SCRUB; else if (n2 < 0.12) c = [c[0] * 0.78, c[1] * 0.78, c[2] * 0.74]; }     // steep: horizontal rock layers, dark crevices
+            else c = n > 0.52 ? GARD[Math.floor(n2 * 3) % 3] : BAND[(Math.floor(n * 9) + 1) % 5];                                                              // gentle: gardens between sandy terraces
+            const a = Math.min(1, (-h - 0.6) / 3) * (h > -17 ? 1 : Math.max(0, (-h - 27) / -10));
+            im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2]; im.data[o + 3] = a * 255;
+          }
+          cg.putImageData(im, 0, 0); g.imageSmoothingEnabled = true; g.drawImage(cv, X(x0), Z(z0), (x1 - x0) * sc, (z1 - z0) * sc);
+        } },
       weathers: ['day', 'sunset', 'night', 'rain'],
     },
     zones: [{ a: 9, b: 17, road: 'cobble', name: 'grund' }],
@@ -143,6 +161,27 @@
           B.cyl(p.x, y + 5.2, p.z, 5.0, 0.3, 6, 10, col('#3d4350'));
           B.box(p.x + 3.6, y + 1, p.z, 0.7, 2.0, 0.9, 0, dark);
         }
+      }
+      /* ---- the hillsides above the green slope: pines and bushes on the slopes, villas with slate roofs standing on the terraces ---- */
+      {
+        const pine = KL.scenery.tree('pine', rnd), bush = new KL.Batch(), tb = new KL.Batch(), q = S.quality || {};
+        bush.sphere(0, 0.6, 0, 1.5, 5, col('#5b8a42'), { noise: 1, sy: 0.7 }); bush.sphere(1.0, 0.5, 0.4, 1.0, 5, col('#6f9a4c'), { noise: 1 });
+        const nTree = Math.round(70 * (q.trees != null ? q.trees : 1)), nBush = Math.round(80 * (q.trees != null ? q.trees : 1));
+        KL.kit.scatter(S, rnd, nTree, BOX, 7, (x, y, z) => { if (y > -1.5 || y < -26) return false; tb.addBatch(pine, x, y, z, rnd() * 6.28, 0.9 + rnd() * 0.9); });
+        KL.kit.scatter(S, rnd, nBush, BOX, 5, (x, y, z) => { if (y > -1 || y < -30) return false; tb.addBatch(bush, x, y, z, rnd() * 6.28, 0.8 + rnd() * 0.9); });
+        add(tb, M.plain);
+        const wall = [col('#ecd9a8'), col('#e3b88a'), col('#efe0c0'), col('#d9a97a')], roofC = [col('#4a505c'), col('#58606b'), col('#3c424d')];
+        const villa = new KL.Batch(), vf = { x: 0, y: 0, z: 0, yaw: 0 };
+        L.box(villa, vf, 0, 0, 0, 9, 6.5, 7, 0, wall[0]); L.gable(villa, vf, 0, 6.5, 0, 9, 7, 3.4, roofC[0], 0.5);
+        for (let i = 0; i < 3; i++) L.box(villa, vf, -3 + i * 3, 1.6, -3.55, 1.3, 1.9, 0.2, 0, dark); for (let i = 0; i < 3; i++) L.box(villa, vf, -3 + i * 3, 4.2, -3.55, 1.3, 1.9, 0.2, 0, dark);
+        let nv = 0; const vBox = new KL.Batch();
+        KL.kit.scatter(S, rnd, Math.round(18 * (q.trees != null ? Math.min(1, q.trees + 0.3) : 1)), BOX, 16, (x, y, z) => {
+          if (y > -2.5 || y < -13) return false;
+          const e = 4, gx = (T(x + e, z) - T(x - e, z)) / (2 * e), gz = (T(x, z + e) - T(x, z - e)) / (2 * e); if (Math.hypot(gx, gz) > 0.5) return false;            // only on gentle terraces
+          const yaw = Math.atan2(-gx, -gz) + (rnd() - 0.5) * 0.3, sx = 0.9 + rnd() * 0.5;
+          vBox.addBatch(villa, x, y - 0.3, z, yaw, sx); L.box(vBox, { x, y: y - 3, z, yaw }, 0, 0, 0, 10 * sx, 3, 8 * sx, 0, shade(sand, 0.9)); nv++;           // plinth wall down the slope
+        });
+        add(vBox, M.plain);
       }
       add(B, M.plain); KL.kit.nightOnly(S, E, 0.35);
     },
