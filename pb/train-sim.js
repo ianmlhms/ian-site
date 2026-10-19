@@ -1430,7 +1430,11 @@
     const front = state.s;
     const inTunnel = (w.track.tunnels || []).some((tn) => front > tn.s0 && front < tn.s1);
     const onBridge = (w.track.bridges || []).some((b) => front > b.s0 && front < b.s1);
-    safe('audio.update', () => audio.update({ curvature: Math.abs(safe('curvature', () => w.track.frameAt(clamp(state.s, 0, w.track.length)).curvature, 0) || 0), speedMs: state.v, lever: state.lever, accelMs2: state.a, sound: w.cfg.sound || 'electric', inTunnel, onBridge, rain: w.env.weather === 'rain', camera: camMode === 'cab' ? 'cab' : 'outside' }));
+    safe('audio.update', () => audio.update({
+      curvature: Math.abs(safe('curvature', () => w.track.frameAt(clamp(state.s, 0, w.track.length)).curvature, 0) || 0), speedMs: state.v, lever: state.lever, accelMs2: state.a,
+      sound: w.cfg.sound || 'electric', train: w.cfg.id || w.trainId, cars: w.cfg.cars, carLength: w.cfg.carLength, inTunnel, onBridge, rain: w.env.weather === 'rain', weather: w.env.weather,
+      camera: camMode === 'cab' ? 'cab' : camMode === 'inside' ? 'inside' : 'outside', doorsOpen01: state.doorsOpen01, parkingBrake: !!state.parkingBrake, traction: state.tractionFrac, brakePct: state.brakePct, timeScale: fastForward ? 2 : 1,
+    }));
   }
   function updateSignals(state) {
     const w = world;
@@ -2437,6 +2441,27 @@
       toMenu: () => returnToMenu(),
       setCamera, setQuality(q) { if (QUALITIES.includes(q) && q !== quality) { quality = q; applyQuality(); rebuildWorld(); } },
       forceSimStep: (seconds, lever) => { const w = world; if (!w) return null; if (lever !== undefined) input.lever = lever; for (let i = 0; i < Math.ceil(seconds * 60); i++) { const st = w.sim.step(SIM_STEP, { lever: input.lever, doorPress: i === 0 && input.doorPress, parkingToggle: i === 0 && input.parkingToggle, passengers: w.onboard }); input.doorPress = false; input.parkingToggle = false; w.state = st; for (const e of st.events) handleEvent(e); } return w.state.s; },
+      /* audio checks: wakeAudio() creates the audio graph (needs the context to be allowed), audioStats() = node / one-shot counts, audioCall runs one of the audio object's one-shots */
+      wakeAudio() { wakeAudio(); return !!audio; },
+      audioStats() { return audio && audio.stats ? audio.stats() : null; },
+      /* Chromium only: audio-thread load (0..1) of the real context over `ms` milliseconds, and the cost of 400 update() calls */
+      audioLoad(ms = 4000) {
+        const ctx = audio && audio.ctx;
+        if (!ctx || !ctx.renderCapacity) return Promise.resolve(null);
+        return new Promise((resolve) => {
+          const rc = ctx.renderCapacity; let last = null;
+          rc.onupdate = (e) => { last = { avg: e.averageLoad, peak: e.peakLoad, under: e.underrunRatio }; };
+          rc.start({ updateInterval: 1 });
+          setTimeout(() => { rc.stop(); resolve(last); }, ms);
+        });
+      },
+      audioUpdateCost(n = 400) {
+        if (!audio) return null;
+        const t0 = performance.now();
+        for (let i = 0; i < n; i++) audio.update({ speedMs: 10 + (i % 40) * 0.5, lever: 3, accelMs2: 0.5, sound: 'tram', train: 'tram', camera: 'cab', traction: 0.6, curvature: 0.001 });
+        return (performance.now() - t0) / n;
+      },
+      audioCall(name, ...args) { return audio && typeof audio[name] === 'function' ? audio[name](...args) : null; },
       career: () => TS.career, buy: (kind, id, extra) => handleBuy(kind, id, extra),
     });
   }
