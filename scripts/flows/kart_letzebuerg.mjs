@@ -1,5 +1,6 @@
 /* Kart Lëtzebuerg (solo; online play has its own flow, kart_letzebuerg_mp.mjs): menu, language, both tracks, touch HUD, a full race with results, restart, test hook gating.
- * The game is not in the arcade yet (tile comes in phase 3), so the standalone page is loaded directly. No scores are written. */
+ * Phase 3 (Grand Prix, time trial, boards, request budget, arcade tile) lives in kart_letzebuerg_arcade.mjs.
+ * The standalone page is loaded directly. */
 import { runIfMain } from './lib.mjs';
 
 const URL_BASE = '/pb/kart-letzebuerg.html';
@@ -18,11 +19,11 @@ export const flow = {
     h.step('menu: tracks, weather, difficulty, drivers, modes');
     await h.goto(URL_BASE + '?test=1');
     await h.page.waitForSelector('#menu:not([hidden])', { timeout: 20000 });
-    h.eq(await h.page.locator('#trackCards > *').count(), 2, 'two tracks in phase 1');
+    h.expect((await h.page.locator('#trackCards > *').count()) >= 2, 'track cards in race mode');
     h.expect((await h.page.locator('#weatherChips > *').count()) >= 5, 'weather chips (random + presets)');
     h.eq(await h.page.locator('#diffChips > *').count(), 3, 'three difficulties');
     h.eq(await h.page.locator('#driverChips > *').count(), 8, 'eight drivers');
-    h.expect(await h.page.locator('#modeGp').isDisabled() && !(await h.page.locator('#modeOnline').isDisabled()), 'GP stays disabled until phase 3, online is enabled');
+    h.expect(!(await h.page.locator('#modeGp').isDisabled()) && !(await h.page.locator('#modeTt').isDisabled()) && !(await h.page.locator('#modeOnline').isDisabled()), 'race, Grand Prix, time trial and online are all enabled');
     await h.page.locator('#modeOnline').tap();
     h.expect(await h.page.locator('#onlineScreen').isVisible() && await h.page.locator('#olCreate').isVisible() && await h.page.locator('#olQuick').isVisible() && await h.page.locator('#olJoin').isVisible(), 'online entry screen offers create / quick match / join by code');
     await h.shot('online-entry');
@@ -86,12 +87,11 @@ export const flow = {
       h.expect(res.length === 8 && res.every((r) => r.f), track + ': all 8 karts finish the lap');
     }
 
-    h.step('test hook is absent in normal play; no network beyond the CDN; no score writes');
+    h.step('test hook is absent in normal play; no network beyond the CDN; no off-site requests');
     await h.goto(URL_BASE);
     await h.page.waitForSelector('#menu:not([hidden])', { timeout: 20000 });
     h.expect(await h.page.evaluate(() => typeof window.__klTest === 'undefined'), 'no __klTest without ?test=1');
     h.eq([...new Set(foreign)], [], 'no off-site requests except cdn.jsdelivr.net');
-    h.eq(h.backend.callsTo('scores').filter((c) => c.method === 'POST').length, 0, 'no score writes in phase 1');
     h.expect(errors.filter((e) => !/three\.js|three\.min\.js/.test(e)).length === 0, 'no console errors: ' + errors.join('; '));
   },
 };

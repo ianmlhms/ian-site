@@ -16,7 +16,7 @@
     acc: 0, last: 0, forced: null, paused: false, frame: 0, fpsAvg: 16, lowStreak: 0, raceCount: 0, resultsShown: false, finishAt: 0,
     toastT: 0, lastCount: 99, hud: {}, ghost: null, ghostPose: null, rec: null, session: null, steps: 0,
   };
-  KL.G = G;
+  KL.G = G; G.test = TEST;
   const warn = (m, e) => console.warn('[Kart] ' + m, e || '');
 
   function loadSettings() {
@@ -289,6 +289,10 @@
       if (g.human) return { ...base, human: true, remote: g.id !== L.myId };
       return { ...base, isBot: true, remote: L.role !== 'host', botSkill: +g.skill || 1, lanePref: +g.lane || 0 };
     });
+    if (start.gp && KL.CUPS.some((c) => c.id === start.gp.cup)) {      // online Grand Prix: every client keeps the same table (from the shared results)
+      const prev = G.session && G.session.kind === 'gp' && G.session.online && start.gp.idx > 0 ? G.session : null;
+      G.session = { kind: 'gp', online: true, cup: start.gp.cup, idx: Math.max(0, start.gp.idx | 0), n: Math.max(1, Math.min(8, start.gp.n | 0)), table: prev ? prev.table : {}, names: prev ? prev.names : {}, done: false };
+    } else G.session = { kind: 'race' };
     const R = KL.createRace({ track, karts: defs, laps: start.laps, difficulty: start.diff, weather: start.weather, seed: start.seed, mode: 'online' });
     setupScene(R, track, start.weather, L.myId, true);
     KL.MP.attach(R, start, L);
@@ -306,7 +310,7 @@
     rows.forEach((r) => {
       const li = document.createElement('li'); const mine = G.human && r.id === G.human.id; if (mine) li.className = 'me';
       const a = document.createElement('b'); a.textContent = r.place + '.';
-      const n = document.createElement('span'); n.textContent = r.name + (mine ? ' (' + KL.t('you') + ')' : '');
+      const n = document.createElement('span'); n.textContent = dispName(r.name, mine);
       const t = document.createElement('span'); t.textContent = r.finished ? fmtTime(r.time) : KL.t('dnf');
       const bl = document.createElement('small'); bl.textContent = r.best ? '⏱ ' + fmtTime(r.best) : '';
       li.append(a, n, t, bl); ol.appendChild(li);
@@ -315,6 +319,27 @@
   function mpButtons(final) {
     $('eAgain').hidden = true; $('eNext').hidden = true; $('eMenu').textContent = KL.t('menu'); $('endNote').textContent = '';
     $('eLobby').hidden = !(final && KL.Lobby.role === 'host' && KL.Lobby.originalHost && KL.Lobby.links.size > 0);
+  }
+  /* online Grand Prix: points from the shared results, table, next race (host) or the final standings */
+  function mpGpResults(rows, me, note) {
+    const ss = G.session, ol = $('endList'); ol.textContent = '';
+    ss.table = KL.gpAward(ss.table, rows.map((r) => ({ driver: r.drv, place: r.place })));
+    rows.forEach((r) => { ss.names[r.drv] = r.name; });
+    const last = ss.idx >= ss.n - 1, rank = KL.gpRanking(ss.table), myDrv = G.human.driver.id;
+    const host = KL.Lobby.role === 'host' && KL.Lobby.originalHost && KL.Lobby.links.size > 0;
+    rank.forEach((r) => ol.appendChild(resultLi(r.rank + '.', dispName(ss.names[r.driver] || r.driver, r.driver === myDrv), r.pts + ' ' + KL.t('gpPts'), r.driver === myDrv ? '+' + (KL.GP_POINTS[me.place - 1] || 0) : '', r.driver === myDrv)));
+    $('endTitle').textContent = last ? KL.t('gpFinal') : KL.t('gpTable') + ' · ' + KL.t('gpRace', { n: ss.idx + 1, m: ss.n });
+    $('endSub').textContent = KL.t('gpPlace', { n: me.place, p: KL.GP_POINTS[me.place - 1] || 0 }) + ' · ' + KL.t('raceTime') + ' ' + fmtTime(me.time);
+    let extra = '';
+    if (last) {
+      ss.done = true;
+      const won = rank[0].driver === myDrv;
+      extra = won ? KL.t('gpWon') + ' ' + KL.t('gpWins', { n: KL.Progress.onGpWon() }) : KL.t('gpRank', { n: rank.findIndex((r) => r.driver === myDrv) + 1 });
+      KL.Boards.select('lap', G.track.id);
+    } else if (host) { $('eNext').hidden = false; $('eNext').textContent = KL.t('gpNext'); }
+    else extra = KL.t('lbWaitHost');
+    $('endNote').textContent = [extra, note].filter(Boolean).join('  ');
+    return last;
   }
   function showMpWaiting(R) {
     if (G.resultsShown || G.waitingShown) return;
@@ -336,7 +361,9 @@
     fillResultList(rows);
     const me = rows.find((r) => G.human && r.id === G.human.id) || rows[0];
     $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.best) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
-    $('endNote').textContent = G.human && G.human.finished ? recordRace() : '';
+    const note = G.human && G.human.finished ? recordRace() : '';
+    $('endNote').textContent = note;
+    if (G.session && G.session.kind === 'gp' && G.session.online && G.human) { const last = mpGpResults(rows, me, note); if (!last) $('eLobby').hidden = true; }
     G.lastResult = { rows, me };
   }
   KL.G.mpBegin = mpBegin; KL.G.mpReveal = mpReveal; KL.G.mpClosed = mpClosed; KL.G.mpShowResults = mpShowResults; KL.G.mpEnded = (key, vars) => KL.lobbyFail(key, vars);
@@ -460,6 +487,7 @@
   }
 
   /* ---------- results ---------- */
+  const dispName = (name, mine) => (mine && name !== KL.t('you') ? name + ' (' + KL.t('you') + ')' : name);
   function resultLi(rank, name, mid, small, mine) {
     const li = document.createElement('li'); if (mine) li.className = 'me';
     const a = document.createElement('b'); a.textContent = rank;
@@ -495,7 +523,7 @@
         $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.bestLap) + (G.ghost ? ' · 👻 ' + fmtTime(G.ghost.sec) : '');
       } else if (ss.kind === 'gp') {
         ss.table = KL.gpAward(ss.table, rows.map((r) => ({ driver: r.driver.id, place: r.place })));
-        rows.forEach((r) => { ss.names[r.driver.id] = r.human ? r.name + ' (' + KL.t('you') + ')' : r.name; });
+        rows.forEach((r) => { ss.names[r.driver.id] = dispName(r.name, r.human); });
         const last = ss.idx === ss.races.length - 1, rank = KL.gpRanking(ss.table), myDrv = G.human.driver.id;
         rank.forEach((r) => ol.appendChild(resultLi(r.rank + '.', ss.names[r.driver] || r.driver, r.pts + ' ' + KL.t('gpPts'), r.driver === myDrv ? '+' + (KL.GP_POINTS[me.place - 1] || 0) : '', r.driver === myDrv)));
         $('endTitle').textContent = last ? KL.t('gpFinal') : KL.t('gpTable') + ' · ' + KL.t('gpRace', { n: ss.idx + 1, m: ss.races.length });
@@ -503,7 +531,7 @@
         if (last) {
           ss.done = true;
           const won = rank[0].driver === myDrv;
-          const gpNote = won ? KL.t('gpWon') + ' ' + KL.t('gpWins', { n: KL.Progress.onGpWon() }) : KL.t('gpRank', { n: rank.findIndex((r) => r.driver === myDrv) + 1 + '.' });
+          const gpNote = won ? KL.t('gpWon') + ' ' + KL.t('gpWins', { n: KL.Progress.onGpWon() }) : KL.t('gpRank', { n: rank.findIndex((r) => r.driver === myDrv) + 1 });
           KL.Boards.select('lap', G.track.id);
           $('endNote').textContent = [gpNote, note].filter(Boolean).join('  ');
           endButtons({ menuKey: 'menu' });
@@ -512,7 +540,7 @@
         }
         endButtons({ noAgain: true, next: KL.t('gpNext'), menuKey: 'gpLeave' });
       } else {
-        rows.forEach((r) => ol.appendChild(resultLi(r.place + '.', r.name + (r.human ? ' (' + KL.t('you') + ')' : ''), r.finished ? fmtTime(r.time) : KL.t('dnf'), r.bestLap ? '⏱ ' + fmtTime(r.bestLap) : '', r.human)));
+        rows.forEach((r) => ol.appendChild(resultLi(r.place + '.', dispName(r.name, r.human), r.finished ? fmtTime(r.time) : KL.t('dnf'), r.bestLap ? '⏱ ' + fmtTime(r.bestLap) : '', r.human)));
         $('endSub').textContent = KL.t('raceTime') + ' ' + fmtTime(me.time) + ' · ' + KL.t('bestLap') + ' ' + fmtTime(me.bestLap) + ' · ' + KL.t('place') + ' ' + me.place + '/' + rows.length;
       }
       $('endNote').textContent = note;
@@ -634,7 +662,12 @@
       if (G.session && G.session.kind === 'gp') G.session = newGp(G.settings.cup);       // a finished Grand Prix: play the cup again
       startRace({ seed: null });
     });
-    $('eNext').addEventListener('click', () => { $('endScreen').hidden = true; if (G.session && G.session.kind === 'gp') G.session.idx++; startRace({ seed: null }); });
+    $('eNext').addEventListener('click', () => {
+      $('endScreen').hidden = true;
+      if (G.session && G.session.online) { KL.gpNext(); return; }
+      if (G.session && G.session.kind === 'gp') G.session.idx++;
+      startRace({ seed: null });
+    });
     $('eMenu').addEventListener('click', () => { $('endScreen').hidden = true; if (G.mp) KL.MP.leave(); openMenu(); });
     $('eLobby').addEventListener('click', () => { $('endScreen').hidden = true; if (KL.backToLobby) KL.backToLobby(); });
     $('modeOnline').addEventListener('click', () => KL.openOnline());

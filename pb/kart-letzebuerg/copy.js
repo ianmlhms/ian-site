@@ -133,7 +133,7 @@
       lbMode: 'Modus', lbModeRace: 'Rennen', lbModeGp: 'Grand Prix', lbCup: 'Cup',
     },
     en: {
-      cup: 'Cup', cupDesc: '{n} races', gpRace: 'Race {n}/{m}', gpTable: 'Grand Prix standings', gpFinal: 'Grand Prix result', gpNext: 'Next race', gpWon: 'Grand Prix won! 🏆', gpRank: 'You are {n} in the Grand Prix', gpPts: 'pts', gpTotal: 'Total',
+      cup: 'Cup', cupDesc: '{n} races', gpRace: 'Race {n}/{m}', gpTable: 'Grand Prix standings', gpFinal: 'Grand Prix result', gpNext: 'Next race', gpWon: 'Grand Prix won! 🏆', gpRank: 'You finished the Grand Prix in place {n}', gpPts: 'pts', gpTotal: 'Total',
       gpPlace: 'Place {n}: +{p} points', gpLeave: 'Leave Grand Prix', gpWins: '{n} GP wins',
       ttGhost: 'Your ghost', ttNoGhost: 'No ghost yet: drive a fast lap!', ttAhead: 'ahead of the ghost', ttBehind: 'behind the ghost', ttLaps: 'Lap times', ttBest: 'Best',
       newBestLap: 'New personal best (lap)!', newBestRace: 'New personal best (race)!', yourBest: 'Your record', bestLapShort: 'Lap', bestRaceShort: 'Race',

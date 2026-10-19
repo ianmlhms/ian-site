@@ -18,7 +18,7 @@
 
   const L = (KL.Lobby = {
     active: false, role: null, code: '', myId: '', name: '', drv: 'renert', phase: 'idle', busy: false,
-    cfg: { track: 'villehaute', weather: 'random', laps: 3, diff: 'normal', pub: false },
+    cfg: { track: 'villehaute', weather: 'random', laps: 3, diff: 'normal', pub: false, mode: 'race', cup: 'letzebuerg' },
     peers: new Map(),          // host only: id -> { id, name, drv, rdy, via, link, t }
     roster: [], links: new Map(), hostId: null, deputy: null, epoch: 0, sb: null, ch: null, dirCh: null,
     originalHost: false, relayInUse: false, signalling: false,
@@ -109,7 +109,7 @@
   /* ---------- entry points ---------- */
   function reset() {
     Object.assign(L, { active: true, role: null, code: '', phase: 'idle', rdy: false, peers: new Map(), roster: [], links: new Map(), hostId: null, deputy: null, epoch: 0, originalHost: false, relayInUse: false, joined: false });
-    L.myId = rid(); L.cfg = { track: KL.G.settings.track, weather: KL.G.settings.weather === 'random' ? 'random' : KL.G.settings.weather, laps: 3, diff: KL.G.settings.diff, pub: false };
+    L.myId = rid(); L.cfg = { track: KL.G.settings.track, weather: KL.G.settings.weather === 'random' ? 'random' : KL.G.settings.weather, laps: 3, diff: KL.G.settings.diff, pub: false, mode: KL.G.settings.mode === 'gp' ? 'gp' : 'race', cup: KL.G.settings.cup }; L.gp = null;
   }
   function genCode() { let s = ''; for (let i = 0; i < N.CODE_LEN; i++) s += N.CODE_ALPHABET[Math.floor(Math.random() * N.CODE_ALPHABET.length)]; return s; }
 
@@ -386,7 +386,7 @@
     if (!Array.isArray(m.players)) return;
     L.roster = m.players.slice(0, N.MAX_PLAYERS).map((p) => ({ id: String(p.id).slice(0, 12), name: cleanName(p.name), drv: driverOk(p.drv) ? p.drv : 'renert', rdy: !!p.rdy, via: p.via === 'relay' ? 'relay' : 'rtc', host: !!p.host, st: p.st === 'open' ? 'open' : 'connecting' }));
     const c = m.cfg || {};
-    L.cfg = { track: KL.tracks[c.track] ? c.track : L.cfg.track, weather: String(c.weather || 'random'), laps: Math.max(1, Math.min(10, +c.laps || 3)), diff: KL.DIFFICULTY[c.diff] ? c.diff : 'normal', pub: !!c.pub };
+    L.cfg = { track: KL.tracks[c.track] ? c.track : L.cfg.track, weather: String(c.weather || 'random'), laps: Math.max(1, Math.min(10, +c.laps || 3)), diff: KL.DIFFICULTY[c.diff] ? c.diff : 'normal', pub: !!c.pub, mode: c.mode === 'gp' ? 'gp' : 'race', cup: KL.CUPS.some((x) => x.id === c.cup) ? c.cup : KL.CUPS[0].id };
     L.deputy = m.deputy || null;
     const me = L.roster.find((p) => p.id === L.myId);
     if (me) { L.drv = me.drv; L.rdy = me.rdy; }
@@ -427,8 +427,14 @@
     const sets = $('lbSettings'), sum = $('lbSummary');
     sets.hidden = !isHost; sum.hidden = isHost;
     const trName = T('t_' + L.cfg.track), wName = WEATHER_ICON[L.cfg.weather] + ' ' + T('w_' + L.cfg.weather);
-    if (!isHost) sum.textContent = trName + ' · ' + wName + ' · ' + L.cfg.laps + ' ' + T('laps') + ' · ' + T('d_' + L.cfg.diff);
+    const gpMode = L.cfg.mode === 'gp';
+    if (!isHost) sum.textContent = (gpMode ? T('gp') + ': ' + T((KL.CUPS.find((c) => c.id === L.cfg.cup) || KL.CUPS[0]).name) : trName + ' · ' + L.cfg.laps + ' ' + T('laps')) + ' · ' + wName + ' · ' + T('d_' + L.cfg.diff);
     if (isHost) {
+      const md = $('lbModeChips'); md.textContent = '';
+      for (const m of ['race', 'gp']) btn(md, T(m === 'gp' ? 'lbModeGp' : 'lbModeRace'), L.cfg.mode === m, () => setCfg({ mode: m }));
+      $('lbTrackBox').hidden = gpMode; $('lbLapsBox').hidden = gpMode; $('lbCupBox').hidden = !gpMode;
+      const cp = $('lbCup'); cp.textContent = '';
+      for (const cup of KL.CUPS) if (KL.gpRaces(cup, KL.tracks).length) btn(cp, T(cup.name), L.cfg.cup === cup.id, () => setCfg({ cup: cup.id }));
       const tr = $('lbTrack'); tr.textContent = '';
       for (const id of Object.keys(KL.tracks)) btn(tr, T('t_' + id), L.cfg.track === id, () => setCfg({ track: id, weather: (L.cfg.weather !== 'random' && !weathersFor(id).includes(L.cfg.weather)) ? 'random' : L.cfg.weather }));
       const w = $('lbWeather'); w.textContent = '';
@@ -524,8 +530,13 @@
     for (let i = entries.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [entries[i], entries[j]] = [entries[j], entries[i]]; }
     entries.forEach((e, i) => (e.slot = i));
     const cfg = L.cfg;
-    const weather = pickWeather(cfg.track, cfg.weather);
-    const start = { k: 'start', seed, track: cfg.track, weather, laps: cfg.laps, diff: cfg.diff, grid: entries, hostId: L.myId, deputy: L.deputy, ok: L.lateralOk, epoch: 0 };
+    let track = cfg.track, laps = cfg.laps, gp = null;
+    if (cfg.mode === 'gp') {                  // Grand Prix: the cup's tracks one after the other, same roster and drivers
+      if (!L.gp || L.gp.cup !== cfg.cup) L.gp = { cup: cfg.cup, idx: 0, races: KL.gpRaces(KL.CUPS.find((c) => c.id === cfg.cup) || KL.CUPS[0], KL.tracks).map((r) => r.track) };
+      track = L.gp.races[L.gp.idx]; laps = KL.G.test && cfg.laps ? cfg.laps : KL.CFG.LAPS;   // (the lap override is for the test flows only) gp = { cup: L.gp.cup, idx: L.gp.idx, n: L.gp.races.length };
+    } else L.gp = null;
+    const weather = pickWeather(track, cfg.weather);
+    const start = { k: 'start', seed, track, weather, laps, diff: cfg.diff, grid: entries, hostId: L.myId, deputy: L.deputy, ok: L.lateralOk, epoch: 0, ...(gp ? { gp } : {}) };
     L.start = start; L.loaded = new Set(); L.phase = 'loading';
     for (const p of L.peers.values()) p.link.send(start, true);
     busyHost('nvLoading', { n: 0, m: L.peers.size + 1 });
@@ -595,17 +606,26 @@
     closeSignalling();
   }
   function backToLobby(m) {
-    // host asks everybody to return to the lobby after a race (the links are still open)
+    // host asks everybody to return to the lobby after a race (the links are still open); m.gp = the next Grand Prix race starts right away
     if (KL.MP) KL.MP.stop();
-    L.phase = 'lobby'; L.rdy = false; L.joined = true; showScreen('lobbyScreen'); renderLobby();
+    L.phase = 'lobby'; L.rdy = false; L.joined = true;
+    if (m && m.gp) busy('nvStarting'); else { showScreen('lobbyScreen'); renderLobby(); }
   }
-  function hostBackToLobby() {
+  function hostBackToLobby(gpNext) {
     if (L.role !== 'host') return;
     if (KL.MP) KL.MP.stop();
-    for (const p of L.peers.values()) { p.rdy = false; if (p.link && p.link.open) p.link.send({ k: 'lobby' }, true); }
-    L.phase = 'lobby'; showScreen('lobbyScreen'); broadcastRoster();
+    for (const p of L.peers.values()) { p.rdy = !!gpNext; if (p.link && p.link.open) p.link.send({ k: 'lobby', ...(gpNext ? { gp: true } : {}) }, true); }
+    L.phase = 'lobby';
+    if (!gpNext) { L.gp = null; showScreen('lobbyScreen'); }
+    broadcastRoster();
   }
   KL.backToLobby = () => (L.role === 'host' ? hostBackToLobby() : null);
+  /* Grand Prix: the host moves on to the next race (nobody has to press ready again) */
+  KL.gpNext = () => {
+    if (L.role !== 'host' || !L.gp || L.gp.idx + 1 >= L.gp.races.length) return;
+    L.gp.idx++; busyHost('nvStarting'); hostBackToLobby(true); hostStart();
+  };
+  KL.gpActive = () => !!(L.gp && L.role === 'host' && L.originalHost);
 
   /* ---------- friends: invite from the ian.lu friends list ---------- */
   async function openFriends() {
@@ -635,7 +655,10 @@
       }
     } catch (e) { console.warn('[kart-lobby] friends failed', e); list.textContent = ''; msg.textContent = T('inviteFail'); list.appendChild(msg); }
   }
-  function inviteUrl() { return location.origin + '/pb/kart-letzebuerg.html?room=' + encodeURIComponent(L.code.toLowerCase()) + '&role=guest'; }
+  /* inside the arcade frame (srcdoc) location.origin is the string "null": window.origin is the site's */
+  function siteOrigin() { const o = window.origin; return o && o !== 'null' ? o : 'https://ian.lu'; }
+  function inviteUrl() { return siteOrigin() + '/pb/kart-letzebuerg.html?room=' + encodeURIComponent(L.code.toLowerCase()) + '&role=guest'; }
+  KL.inviteUrl = inviteUrl;
   async function copyLink() {
     const url = inviteUrl();
     try { await navigator.clipboard.writeText(url); lbMsg(T('lbCopied')); }
