@@ -395,7 +395,7 @@
 
   /* ---------- lobby screen ---------- */
   function weathersFor(trackId) { const d = KL.tracks[trackId]; return (d && d.theme && d.theme.weathers) || ['day', 'sunset', 'night', 'rain']; }
-  const WEATHER_ICON = { day: '☀️', sunset: '🌇', night: '🌙', rain: '🌧️', fog: '🌫️', random: '🎲' };
+  const WEATHER_ICON = { day: '☀️', sunset: '🌇', night: '🌙', rain: '🌧️', fog: '🌫️', snow: '❄️', random: '🎲' };
   function enterLobby() {
     L.busy = false; showScreen('lobbyScreen'); lbMsg('');
     if (L.role === 'host') { L.roster = rosterNow(); }

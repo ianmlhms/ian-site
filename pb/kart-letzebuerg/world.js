@@ -35,7 +35,7 @@
       this.makeSky();
       this.fx = { add: new KL.Particles(420, true), norm: new KL.Particles(420, false) };
       this.scene.add(this.fx.add.points, this.fx.norm.points);
-      this.makeRain();
+      this.makeRain(); this.makeSnow();
       this.resize();
       this.emitAcc = {};
     }
@@ -63,6 +63,22 @@
       this.rainMat = new T.LineBasicMaterial({ color: 0xcfe0f0, transparent: true, opacity: 0.45, depthWrite: false, fog: false });
       this.rain = new T.LineSegments(g, this.rainMat); this.rain.frustumCulled = false; this.rain.visible = false; this.scene.add(this.rain);
     }
+    makeSnow() {            // snowfall: soft flakes in a box that follows the camera (only on weather presets with snow: 1)
+      const n = 640, rnd = KL.rng(31); this.snowSeed = [];
+      for (let i = 0; i < n; i++) this.snowSeed.push([rnd() * 64, rnd() * 34, rnd() * 64, 0.7 + rnd() * 0.8, rnd() * 6.28]);
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(n * 3), 3));
+      this.snow = new T.Points(g, new T.PointsMaterial({ map: KL.tex.spark(), color: 0xffffff, size: 0.55, sizeAttenuation: true, transparent: true, opacity: 0.95, depthWrite: false, fog: false }));
+      this.snow.frustumCulled = false; this.snow.visible = false; this.scene.add(this.snow);
+    }
+    updateSnow(dt) {
+      if (!this.snow.visible) return;
+      const pos = this.snow.geometry.attributes.position.array, cx = this.cam.x, cy = this.cam.y, cz = this.cam.z, t = this.time;
+      for (let i = 0; i < this.snowSeed.length; i++) {
+        const s = this.snowSeed[i]; s[1] -= dt * 4.2 * s[3]; if (s[1] < 0) s[1] += 34;
+        pos[i * 3] = cx + ((((s[0] + Math.sin(t * 0.7 + s[4]) * 1.6 + 32) % 64) + 64) % 64) - 32; pos[i * 3 + 1] = cy - 10 + s[1]; pos[i * 3 + 2] = cz + ((((s[2] + Math.cos(t * 0.6 + s[4]) * 1.6 + 32) % 64) + 64) % 64) - 32;
+      }
+      this.snow.geometry.attributes.position.needsUpdate = true;
+    }
     updateRain(dt) {
       if (!this.rain.visible) return;
       const pos = this.rain.geometry.attributes.position.array, cx = this.cam.x, cy = this.cam.y, cz = this.cam.z;
@@ -78,18 +94,18 @@
     makeMaterials(theme) {
       const M = this.mats = {};
       const phong = (map, spec) => new T.MeshPhongMaterial({ map, vertexColors: true, specular: new T.Color(spec || 0x111111), shininess: 10 });
-      M.asphalt = phong(KL.tex.asphalt({ centre: theme.centre || 'dash' }), 0x222222);
+      M.asphalt = phong(KL.tex.asphalt({ centre: theme.centre || 'dash', style: theme.roadStyle }), 0x222222);
       M.cobble = phong(KL.tex.cobble(), 0x1a1a1a);
-      M.verge = phong(theme.verge === 'grass' ? KL.tex.grass('#6fae4a', '#4d8f3a', '#8ccf5c') : KL.tex.slabs(), 0x151515);
-      M.kerb = new T.MeshLambertMaterial({ vertexColors: true, map: KL.tex.kerb() });
-      M.wall = new T.MeshLambertMaterial({ vertexColors: true, map: KL.tex.stone() });
+      M.verge = phong(theme.vergeTex ? KL.tex.grass(theme.vergeTex[0], theme.vergeTex[1], theme.vergeTex[2], 7, theme.vergeTex[3]) : theme.verge === 'grass' ? KL.tex.grass('#6fae4a', '#4d8f3a', '#8ccf5c') : KL.tex.slabs(), 0x151515);
+      M.kerb = new T.MeshLambertMaterial({ vertexColors: true, map: KL.tex.kerb(...(theme.kerbColors || [])) });
+      M.wall = new T.MeshLambertMaterial({ vertexColors: true, map: KL.tex.stone(theme.wallStyle) });
       const fa = KL.tex.facade(theme.facade || 'old');
       M.building = new T.MeshLambertMaterial({ vertexColors: true, map: fa.map, emissive: new T.Color(0xffd48a), emissiveMap: fa.emissive, emissiveIntensity: 0 });
       if (theme.modernKinds) { const fm = KL.tex.facade(theme.modernFacade || 'modern'); M.buildingM = new T.MeshLambertMaterial({ vertexColors: true, map: fm.map, emissive: new T.Color(0xcfe0ff), emissiveMap: fm.emissive, emissiveIntensity: 0 }); }
       M.roof = new T.MeshLambertMaterial({ vertexColors: true });
       M.plain = new T.MeshLambertMaterial({ vertexColors: true });
       M.plainEmissive = new T.MeshBasicMaterial({ vertexColors: true });
-      M.ground = new T.MeshLambertMaterial({ map: theme.ground === 'grass' ? KL.tex.grass(theme.groundColor || '#5e8f3f', '#487432', '#78a851') : KL.tex.slabs(), vertexColors: true });
+      M.ground = new T.MeshLambertMaterial({ map: theme.groundTex ? KL.tex.grass(theme.groundTex[0], theme.groundTex[1], theme.groundTex[2], 9, theme.groundTex[3]) : theme.ground === 'grass' ? KL.tex.grass(theme.groundColor || '#5e8f3f', '#487432', '#78a851') : KL.tex.slabs(), vertexColors: true });
       M.lampHead = new T.MeshBasicMaterial({ color: 0xfff2b0 });
       M.checker = new T.MeshBasicMaterial({ map: KL.tex.checker(), vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
       M.pads = new T.MeshBasicMaterial({ map: KL.tex.chevrons(), vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
@@ -262,7 +278,7 @@
         M.ground.color.setScalar(1 - wet * 0.15);
       }
       if (th.onWeather) th.onWeather(this, name, W);
-      this.rain.visible = !!W.rain;
+      this.rain.visible = !!W.rain; this.snow.visible = !!W.snow;
       for (const g of this.glowPoints || []) g.material.opacity = clamp((night + (name === 'fog' ? 0.5 : 0)) * 0.9, 0.15, 1);
       this.rainMat.opacity = 0.35 + (name === 'night' ? 0.1 : 0);
       if (this.sunDir) this.sun.position.copy(this.sunDir).multiplyScalar(120);
@@ -520,7 +536,7 @@
       const cp = this.camera.position;
       this.sky.position.copy(cp); this.stars.position.copy(cp); this.clouds.position.set(cp.x, 0, cp.z); this.moon.position.set(cp.x + 120, 240, cp.z - 250);
       for (const a of this.animators) a(dt, this.time);
-      this.updateRain(dt);
+      this.updateRain(dt); this.updateSnow(dt);
       this.renderer.render(this.scene, this.camera);
     }
   };

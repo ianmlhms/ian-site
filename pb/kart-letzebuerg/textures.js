@@ -20,24 +20,46 @@
     }
   }
 
+
+  /* fantasy road surfaces: base colour, edge line, centre dash, optional painter */
+  const ROAD = {
+    asphalt: { base: '#767a84', edge: '#f3f1e8', dash: '#f6efd2' },
+    candy: { base: '#f4a8c6', edge: '#ffffff', dash: '#fff6a8', extra(g, W, H, rnd) {          // icing road: soft swirls + sprinkles
+      for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(255,255,255,${0.12 + rnd() * 0.16})`; g.lineWidth = 3 + rnd() * 4; g.beginPath(); const x = rnd() * W, y = rnd() * H; g.moveTo(x, y); g.bezierCurveTo(x + 20, y - 18, x + 46, y + 18, x + 70, y - 4); g.stroke(); }
+      const cols = ['#ffffff', '#7fd8ff', '#ffe066', '#9be37a', '#b78cff'];
+      for (let i = 0; i < 150; i++) { g.fillStyle = cols[i % cols.length]; g.save(); g.translate(rnd() * W, rnd() * H); g.rotate(rnd() * 3); g.fillRect(-4, -1.5, 8, 3); g.restore(); }
+    } },
+    ice: { base: '#b9dcef', edge: '#ffffff', dash: '#e8f6ff', extra(g, W, H, rnd) {                // blue ice: long white scratches and cracks
+      for (let i = 0; i < 34; i++) { g.strokeStyle = `rgba(255,255,255,${0.18 + rnd() * 0.3})`; g.lineWidth = 1 + rnd() * 2; g.beginPath(); let x = rnd() * W, y = rnd() * H; g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (rnd() - 0.3) * 44; y += (rnd() - 0.5) * 30; g.lineTo(x, y); } g.stroke(); }
+      for (let i = 0; i < 12; i++) { const x = rnd() * W, y = rnd() * H, gr = g.createRadialGradient(x, y, 0, x, y, 26 + rnd() * 30); gr.addColorStop(0, 'rgba(110,170,225,.28)'); gr.addColorStop(1, 'rgba(110,170,225,0)'); g.fillStyle = gr; g.fillRect(x - 60, y - 60, 120, 120); }
+    } },
+    basalt: { base: '#3b3735', edge: '#ffb347', dash: '#ff8a2a', extra(g, W, H, rnd) {             // cooled lava: dark crust with glowing hairline cracks
+      for (let i = 0; i < 24; i++) { g.strokeStyle = `rgba(255,${110 + Math.floor(rnd() * 70)},30,${0.25 + rnd() * 0.4})`; g.lineWidth = 1 + rnd() * 1.6; g.beginPath(); let x = rnd() * W, y = rnd() * H; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - 0.5) * 50; y += (rnd() - 0.5) * 36; g.lineTo(x, y); } g.stroke(); }
+    } },
+  };
+
   const cacheT = {};
   KL.tex = {
     /* asphalt road seen across its full width (u) and 8 m along (v); markings optional */
+    /* road seen across its full width (u) and 8 m along (v); markings optional. opts.style: asphalt | candy | ice | basalt (fantasy tracks) */
     asphalt(opts) {
       opts = opts || {};
-      const k = 'asphalt' + (opts.centre || 'dash') + (opts.edge === false ? 'n' : 'e');
+      const st = opts.style || 'asphalt';
+      const k = 'asphalt' + st + (opts.centre || 'dash') + (opts.edge === false ? 'n' : 'e');
       if (cacheT[k]) return cacheT[k];
       const W = 512, H = 256, [c, g] = mk(W, H), rnd = KL.rng(11);
-      g.fillStyle = '#767a84'; g.fillRect(0, 0, W, H);
+      const P = ROAD[st] || ROAD.asphalt;
+      g.fillStyle = P.base; g.fillRect(0, 0, W, H);
       // painted patches: small, low contrast (repairs and tyre wear), not big blotches
       for (let i = 0; i < 46; i++) { g.fillStyle = `rgba(${rnd() > 0.5 ? '255,255,255' : '0,0,0'},${0.015 + rnd() * 0.025})`; g.beginPath(); g.ellipse(rnd() * W, rnd() * H, 4 + rnd() * 18, 3 + rnd() * 9, rnd() * 3, 0, 7); g.fill(); }
       noise(g, W, H, 0.3, rnd, 1.5);
+      if (P.extra) P.extra(g, W, H, rnd);
       if (opts.edge !== false) {
-        g.fillStyle = '#f3f1e8';
+        g.fillStyle = P.edge;
         g.fillRect(W * 0.035, 0, 7, H); g.fillRect(W * 0.965 - 7, 0, 7, H);
       }
       if (opts.centre !== 'none') {
-        g.fillStyle = '#f6efd2';
+        g.fillStyle = P.dash;
         if (opts.centre === 'solid') { g.fillRect(W / 2 - 3, 0, 6, H); }
         else { g.fillRect(W / 2 - 3, 20, 6, 100); g.fillRect(W / 2 - 3, 148, 6, 100); }
       }
@@ -70,28 +92,47 @@
       noise(g, S, S, 0.16, rnd, 2);
       return (cacheT.slabs = tex(c));
     },
-    grass(base, dark, light, seed) {
-      const k = 'grass' + base + dark;
+    /* painted ground: base colour + dark/light blotches. extra: { dots: [colours] confetti, cracks: colour glowing cracks, flakes: colour sparkle } */
+    grass(base, dark, light, seed, extra) {
+      extra = extra || {};
+      const k = 'grass' + base + dark + (extra.dots ? extra.dots.join('') : '') + (extra.cracks || '') + (extra.flakes || '');
       if (cacheT[k]) return cacheT[k];
       const S = 256, [c, g] = mk(S, S), rnd = KL.rng(seed || 5);
       g.fillStyle = base; g.fillRect(0, 0, S, S);
       for (let i = 0; i < 260; i++) { g.fillStyle = rnd() > 0.5 ? dark : light; g.globalAlpha = 0.18 + rnd() * 0.25; g.beginPath(); g.ellipse(rnd() * S, rnd() * S, 3 + rnd() * 14, 2 + rnd() * 8, rnd() * 3, 0, 7); g.fill(); }
       g.globalAlpha = 1;
+      if (extra.dots) for (let i = 0; i < 70; i++) { g.fillStyle = extra.dots[i % extra.dots.length]; g.beginPath(); g.arc(rnd() * S, rnd() * S, 1.6 + rnd() * 2.2, 0, 7); g.fill(); }
+      if (extra.flakes) for (let i = 0; i < 90; i++) { g.fillStyle = extra.flakes; g.globalAlpha = 0.5 + rnd() * 0.5; g.fillRect(rnd() * S, rnd() * S, 1.5 + rnd() * 1.5, 1.5 + rnd() * 1.5); } g.globalAlpha = 1;
+      if (extra.cracks) { g.lineCap = 'round'; for (let i = 0; i < 9; i++) { let x = rnd() * S, y = rnd() * S; g.strokeStyle = extra.cracks; g.globalAlpha = 0.5 + rnd() * 0.4; g.lineWidth = 1.2 + rnd() * 1.6; g.beginPath(); g.moveTo(x, y); for (let q = 0; q < 5; q++) { x += (rnd() - 0.5) * 70; y += (rnd() - 0.5) * 70; g.lineTo(x, y); } g.stroke(); } g.globalAlpha = 1; }
       return (cacheT[k] = tex(c));
     },
-    kerb() {
-      if (cacheT.kerb) return cacheT.kerb;
+    kerb(a, b) {
+      const k = 'kerb' + (a || '') + (b || '');
+      if (cacheT[k]) return cacheT[k];
       const [c, g] = mk(64, 64);
-      g.fillStyle = '#e8e3da'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#d6303a'; g.fillRect(0, 0, 32, 64);
-      return (cacheT.kerb = tex(c));
+      g.fillStyle = b || '#e8e3da'; g.fillRect(0, 0, 64, 64); g.fillStyle = a || '#d6303a'; g.fillRect(0, 0, 32, 64);
+      return (cacheT[k] = tex(c));
     },
-    stone() {
-      if (cacheT.stone) return cacheT.stone;
+    /* wall faces: stone (default) | icing (pastel scallops) | snow (drift bank) | rock (dark basalt blocks) — drawn white-ish, tinted by vertex colours */
+    stone(style) {
+      const k = 'stone' + (style || '');
+      if (cacheT[k]) return cacheT[k];
       const S = 256, [c, g] = mk(S, S), rnd = KL.rng(21);
       g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
-      for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(80,70,60,.18)'; g.fillRect(0, j * 32, S, 2); for (let i = 0; i < 4; i++) { g.fillRect(((i * 64 + (j % 2) * 32) % S), j * 32, 2, 32); } }
-      noise(g, S, S, 0.25, rnd, 3);
-      return (cacheT.stone = tex(c));
+      if (style === 'icing') {
+        for (let i = 0; i < 4; i++) { const x = i * 64 + 32; g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(x, 40, 30, 0, Math.PI); g.fill(); g.fillStyle = 'rgba(210,90,150,.12)'; g.beginPath(); g.arc(x, 128, 30, 0, 7); g.fill(); }
+        for (let i = 0; i < 60; i++) { g.fillStyle = ['#ff5fa2', '#7fd8ff', '#ffe066', '#9be37a'][i % 4]; g.globalAlpha = 0.55; g.fillRect(rnd() * S, 60 + rnd() * 190, 6, 2.5); } g.globalAlpha = 1;
+      } else if (style === 'snow') {
+        for (let i = 0; i < 50; i++) { g.fillStyle = `rgba(150,190,235,${0.06 + rnd() * 0.1})`; g.beginPath(); g.ellipse(rnd() * S, rnd() * S, 12 + rnd() * 30, 5 + rnd() * 10, 0, 0, 7); g.fill(); }
+        for (let i = 0; i < 60; i++) { g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(rnd() * S, rnd() * S, 2, 2); }
+      } else if (style === 'rock') {
+        for (let j = 0; j < 6; j++) { let x = -rnd() * 30; while (x < S) { const w = 30 + rnd() * 40, sh = 0.72 + rnd() * 0.28; g.fillStyle = `rgba(0,0,0,${1 - sh})`; g.fillRect(x + 2, j * 43 + 2, w - 4, 39); x += w; } }
+        for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(255,${110 + Math.floor(rnd() * 70)},30,.7)`; g.lineWidth = 1.2; g.beginPath(); const x = rnd() * S, y = rnd() * S; g.moveTo(x, y); g.lineTo(x + (rnd() - 0.5) * 40, y + (rnd() - 0.5) * 28); g.stroke(); }
+      } else {
+        for (let j = 0; j < 8; j++) { g.fillStyle = 'rgba(80,70,60,.18)'; g.fillRect(0, j * 32, S, 2); for (let i = 0; i < 4; i++) { g.fillRect(((i * 64 + (j % 2) * 32) % S), j * 32, 2, 32); } }
+        noise(g, S, S, 0.25, rnd, 3);
+      }
+      return (cacheT[k] = tex(c));
     },
     checker() {
       if (cacheT.checker) return cacheT.checker;

@@ -91,7 +91,7 @@
   /* Cups (Grand Prix): four races each. A cup plays the tracks of its list that exist in this build. */
   KL.CUPS = [
     { id: 'letzebuerg', name: 'cup_letzebuerg', tracks: ['villehaute', 'kirchberg', 'grund', 'belval'] },
-    { id: 'fantasy', name: 'cup_fantasy', tracks: ['geeschterschlass'] },
+    { id: 'fantasy', name: 'cup_fantasy', tracks: ['zockerland', 'aisbierg', 'vulkan', 'geeschterschlass'] },
   ];
 
   KL.DIFFICULTY = {
@@ -106,6 +106,7 @@
     sunset: { sky: ['#5b4a9a', '#ff9a5a'], fog: '#f2a275', fogNear: 90, fogFar: 460, hemi: ['#ffc9a0', '#6d4a58', 0.8], sun: ['#ff9248', 1.25, [0.8, 0.28, 0.5]], night: 0.25, wet: 0, rain: 0, exposure: 1 },
     night:  { sky: ['#050a22', '#1b2a5c'], fog: '#111a3a', fogNear: 60, fogFar: 330, hemi: ['#5a6fb4', '#1b1f2e', 0.55], sun: ['#7f9bff', 0.45, [-0.3, 0.9, -0.4]], night: 1, wet: 0, rain: 0, exposure: 1 },
     rain:   { sky: ['#6d7885', '#a7b1ba'], fog: '#99a3ad', fogNear: 50, fogFar: 300, hemi: ['#d0d8e0', '#6f7478', 0.85], sun: ['#dbe4ee', 0.5, [-0.3, 0.9, 0.2]], night: 0.15, wet: 1, rain: 1, exposure: 1 },
+    snow:   { sky: ['#8fa9cc', '#dce8f5'], fog: '#d6e3f2', fogNear: 45, fogFar: 270, hemi: ['#e8f0fb', '#8f9bb3', 0.92], sun: ['#eef3ff', 0.55, [-0.3, 0.9, 0.2]], night: 0.1, wet: 0.15, rain: 0, snow: 1, exposure: 1 },
     fog:    { sky: ['#8d8fa6', '#b9b4c9'], fog: '#b3adc2', fogNear: 25, fogFar: 200, hemi: ['#d6d0e6', '#5c5668', 0.8], sun: ['#e6dff5', 0.5, [-0.3, 0.9, 0.2]], night: 0.1, wet: 0.3, rain: 0, exposure: 1 },
   };
 

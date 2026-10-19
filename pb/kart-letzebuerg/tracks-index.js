@@ -34,9 +34,6 @@
     [446, -150, { r: 40 }], [300, -197, { hw: 11 }], [200, -230, { hw: 10, wl: 20 }], [118, -250, { r: 34, hw: 10, wl: 20 }], [110, -215, { hw: 10, wl: 20 }], [90, -150, { hw: 11 }], [20, 96, { r: 28 }],
   ] }, ['day', 'sunset', 'night', 'rain'], [['data-belval.js', 1], ['tracks-belval.js', 1]]);
 
-  T('geeschterschlass', { hw: 9, r: 30, wl: 2.6, wr: 2.6, pts: [[-30, 0, { y: 0, hw: 11, r: 30 }], [160, -6, { y: 0, r: 40 }], [270, 50, { y: 1, r: 60 }], [285, 150, { y: 2, r: 30 }], [222, 186, { y: 3, r: 14 }], [276, 238, { y: 3.5, r: 14 }], [270, 330, { y: 4, r: 40 }], [180, 362, { y: 5, r: 22 }], [60, 346, { y: 7, r: 30 }], [40, 262, { y: 9, r: 16 }], [-60, 232, { y: 11, r: 16 }], [-130, 170, { y: 11, r: 30 }], [-120, 90, { y: 9, r: 30 }], [-70, 30, { y: 5, r: 30 }]],
-  }, ['night', 'fog', 'sunset', 'rain'], [['tracks-geeschterschlass.js', 2]]);
-
 
   /* ---- Fantasy Cup (stage 2b): Zockerland (candy), Äisbierg (ice mountain), Vulkanbierg (volcano) ---- */
   T('zockerland', { hw: 10, r: 30, wl: 2.6, wr: 2.6, pts: [
@@ -67,6 +64,9 @@
     [123, -123, { y: 11, r: 27 }],
     [189, -82, { y: 5, r: 32 }],
   ] }, ['day', 'sunset', 'night', 'fog'], [['tracks-vulkan.js', 1]]);
+
+  T('geeschterschlass', { hw: 9, r: 30, wl: 2.6, wr: 2.6, pts: [[-30, 0, { y: 0, hw: 11, r: 30 }], [160, -6, { y: 0, r: 40 }], [270, 50, { y: 1, r: 60 }], [285, 150, { y: 2, r: 30 }], [222, 186, { y: 3, r: 14 }], [276, 238, { y: 3.5, r: 14 }], [270, 330, { y: 4, r: 40 }], [180, 362, { y: 5, r: 22 }], [60, 346, { y: 7, r: 30 }], [40, 262, { y: 9, r: 16 }], [-60, 232, { y: 11, r: 16 }], [-130, 170, { y: 11, r: 30 }], [-120, 90, { y: 9, r: 30 }], [-70, 30, { y: 5, r: 30 }]],
+  }, ['night', 'fog', 'sunset', 'rain'], [['tracks-geeschterschlass.js', 2]]);
 
   /* registers the full definition (called by tracks-<id>.js): merged into the index entry, theme merged key by key */
   KL.registerTrack = (def) => {

@@ -45,7 +45,7 @@
   function updateKeyHint() { $('keyHint').textContent = KL.t('controls'); $('menuHint').textContent = KL.t('controls'); }
 
   /* ---------- menu ---------- */
-  const WEATHER_ICON = { day: '☀️', sunset: '🌇', night: '🌙', rain: '🌧️', fog: '🌫️', random: '🎲' };
+  const WEATHER_ICON = { day: '☀️', sunset: '🌇', night: '🌙', rain: '🌧️', fog: '🌫️', snow: '❄️', random: '🎲' };
   function weathersFor(trackId) { const d = KL.tracks[trackId]; return (d && d.theme && d.theme.weathers) || ['day', 'sunset', 'night', 'rain']; }
   function chip(parent, label, on, fn, extra) { const b = document.createElement('button'); b.textContent = label; if (on) b.classList.add('on'); b.addEventListener('click', () => { fn(); KL.G.audio.sfx('click'); }); if (extra) extra(b); parent.appendChild(b); return b; }
   function drawTrackPreview(canvas, track, overlay) {
@@ -62,7 +62,7 @@
   function cupWeathers(cupId) {
     const cup = KL.CUPS.find((c) => c.id === cupId) || KL.CUPS[0], set = new Set();
     for (const r of KL.gpRaces(cup, KL.tracks)) for (const w of weathersFor(r.track)) set.add(w);
-    return ['day', 'sunset', 'night', 'rain', 'fog'].filter((w) => set.has(w));
+    return ['day', 'sunset', 'night', 'rain', 'snow', 'fog'].filter((w) => set.has(w));
   }
   function menuWeathers() { return G.settings.mode === 'gp' ? cupWeathers(G.settings.cup) : weathersFor(G.settings.track); }
   function recLine(trackId) {
@@ -154,7 +154,7 @@
     if (KL.Lobby && KL.Lobby.active) KL.leaveOnline(false);
     G.mp = false;
     G.state = 'menu'; G.paused = false; G.race = null; G.session = null; showOnly('menu'); KL.Boards.select('lap', G.settings.track); G.audio.silence(); document.documentElement.classList.remove('kl-race');
-    if (G.renderer) { G.renderer.rain.visible = false; }
+    if (G.renderer) { G.renderer.rain.visible = false; G.renderer.snow.visible = false; }
     KL.input.setEnabled(false);
   }
 
