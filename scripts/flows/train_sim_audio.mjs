@@ -96,6 +96,15 @@ export const flow = {
         h.expect(ok === true && a.clips > 0 && a.duck < 0.9, `luxtram: announcement clip decodes + plays and the vehicle sound is ducked (clips ${a.clips}, duck ${a.duck})`);
         await h.page.evaluate(() => __tsTest.audioCall('stopClips'));
       }
+      if (route === 'luxtram') {   // 2x fast-forward (F) and pause (P): no errors, the pause silences the master bus and the resume restores it
+        await h.page.keyboard.press('f'); await h.page.waitForTimeout(1500);
+        await h.page.keyboard.press('p'); await h.page.waitForTimeout(500);
+        const p1 = await h.page.evaluate(() => ({ paused: __tsTest.state().paused, a: __tsTest.audioStats() }));
+        await h.page.keyboard.press('p'); await h.page.waitForTimeout(700);
+        const p2 = await h.page.evaluate(() => ({ paused: __tsTest.state().paused, fast: __tsTest.state().fast, a: __tsTest.audioStats() }));
+        h.expect(p1.paused === true && p1.a.master < 0.02 && p2.paused === false && p2.fast === true && p2.a.master > 0.5, `luxtram: pause mutes the audio bus (${p1.a.master}), resume + 2x fast-forward bring it back (${p2.a.master})`);
+        await h.page.keyboard.press('f');
+      }
       await h.page.evaluate(() => __tsTest.audioCall('setMuted', true));
       await h.page.waitForTimeout(500);
       const m1 = await h.page.evaluate(() => __tsTest.audioStats());
