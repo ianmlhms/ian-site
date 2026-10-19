@@ -396,6 +396,7 @@
       case 'go': if (L.role === 'client' && from === L.hostId) onGo(m); return;
       case 'lobby': if (L.role === 'client' && from === L.hostId) backToLobby(m); return;
       case 'spec': if (L.role === 'client' && from === L.hostId) onSpec(m); return;
+      case 'specno': if (L.role === 'client' && from === L.hostId && !L.joined) fail('eLocked'); return;
       case 'dep': if (L.role === 'client' && from === L.hostId) { L.deputy = m.id ? String(m.id).slice(0, 12) : null; if (KL.MP && KL.MP.active) KL.MP.deputy = L.deputy; } return;
       case 'closed': if (L.role === 'client' && from === L.hostId && L.phase === 'lobby') hostLostInLobby('closed'); return;
       default: if (KL.MP) KL.MP.onMsg(from, m, reliable, link);
@@ -578,6 +579,7 @@
     } finally { L.depBusy = false; }
   }
   KL.Lobby.ensureDeputy = ensureDeputy;
+  KL.Lobby.dropPeer = (id, why) => { if (L.role === 'host' && L.peers.has(id)) removePeer(id, why); };
 
   async function hostStart() {
     if (L.role !== 'host' || L.phase !== 'lobby') return;

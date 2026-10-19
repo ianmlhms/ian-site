@@ -86,7 +86,7 @@
   };
   M.isAway = (id) => { const k = M.R && M.R.byId[id]; return !!(k && k.away); };
   M.sendSpecInit = function (id) {
-    if (!M.canSpectate() || !KL.Lobby.start) return;
+    if (!M.canSpectate() || !KL.Lobby.start) { sendTo(id, { k: 'specno' }, true); setTimeout(() => KL.Lobby.dropPeer(id, 'too late'), 400); return; }     // the race ended meanwhile: tell the latecomer
     const st = Object.assign({}, KL.Lobby.start, { hostId: M.hostId, deputy: M.deputy, ok: [], epoch: M.epoch });
     sendTo(id, { k: 'spec', start: st, c: r3(M.R.clock), ph: M.R.phase }, true);
   };
