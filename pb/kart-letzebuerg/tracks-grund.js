@@ -19,7 +19,7 @@
       palette: ['#ecd9a8', '#e6c98b', '#e3b88a', '#efe0c0', '#d9a97a', '#e8c6a8', '#cdb48a', '#f0e3c8'],
       roofs: ['#4a505c', '#434955', '#58606b', '#3c424d', '#5d5560'],
       groundMap: { x0: -540, z0: -520, size: 1050, paving: '#a89f8c', water: '#4f90b8',
-        paint: KL.kit.valleyPaint((x, z) => TERR(x, z), 'grund', { box: BOX, depth: 40, rock: '#a79f8d', grass: '#6aa149', grass2: '#86b85c', edge: '#b1a894', floor: '#8fa56d', blotches: 1800 }) },
+        paint: KL.kit.valleyPaint((x, z) => TERR(x, z), 'grund', { box: BOX, depth: 40, rock: '#8f9470', grass: '#5f9a44', grass2: '#86b85c', edge: '#b1a894', floor: '#8fa56d', blotches: 1800 }) },
       weathers: ['day', 'sunset', 'night', 'rain'],
     },
     zones: [{ a: 9, b: 17, road: 'cobble', name: 'grund' }],
