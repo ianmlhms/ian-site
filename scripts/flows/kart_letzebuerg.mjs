@@ -74,8 +74,8 @@ export const flow = {
     await h.page.waitForSelector('#menu:not([hidden])');
     h.expect(true, 'menu reachable again');
 
-    h.step('both tracks: one-lap races finish, every weather preset applies');
-    for (const track of ['villehaute', 'geeschterschlass']) {
+    h.step('every track: one-lap races finish, every weather preset applies');
+    for (const track of ['villehaute', 'kirchberg', 'grund', 'belval', 'geeschterschlass']) {
       await h.goto(`${URL_BASE}?test=1&autostart=1&track=${track}&laps=1&bots=7&seed=3`);
       await waitState(h, () => window.__klTest && window.__klTest.state().phase === 'race', null, 25000);
       const info = await h.page.evaluate(() => ({ calls: __klTest.state().calls, tris: __klTest.state().tris }));
