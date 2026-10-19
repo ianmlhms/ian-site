@@ -41,7 +41,8 @@
       weatherTint: {
         day: { sky: ['#d2603a', '#ffd0a0'], fog: '#eeaa7c', hemi: ['#fff0d8', '#b07a64', 1.65] },
         sunset: { sky: ['#4a1d4a', '#ff7a3a'], fog: '#d0643c', hemi: ['#ffbc94', '#8e5044', 1.4] },
-        night: { sky: ['#07030a', '#3a1210'], fog: '#241010', hemi: ['#ff9a6a', '#33181a', 0.8] },
+        // night: still moody, but the road reads: a warm lava key light from the crater side, a cool violet sky fill (rim light on the karts) and an ember-lit haze
+        night: { sky: ['#0a0414', '#5a2216'], fog: '#4a2018', hemi: ['#8e7cd0', '#7a3422', 1.55], sun: ['#ff8a46', 1.05, [-0.55, 0.42, -0.4]] },
         fog: { sky: ['#5a4a46', '#8a7870'], fog: '#80706a', hemi: ['#d0bcb0', '#4a3a36', 0.82] },
       },
       groundColorAt(x, z, h) {
@@ -124,6 +125,24 @@
         const dx = P1[0] - P0[0], dz = P1[1] - P0[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l, y = track.project(P0[0], P0[1], -1, null, {}).y, yaw = Math.atan2(dx, dz), f = { x: P0[0], y, z: P0[1], yaw };
         for (const sd of [-1, 1]) { L.cyl(B, f, sd * 6.4, 0, 0, 1.5, 1.2, 8, 6, basalt[0]); E.sphere(P0[0] + nx * sd * 6.4, y + 8.5, P0[1] + nz * sd * 6.4, 0.9, 5, col('#ff7a1a')); }
         L.box(B, f, 0, 7.6, 0, 14.6, 1.2, 1.8, 0, basalt[2]); L.box(E, f, 0, 7.5, 0, 14.6, 0.15, 1.9, 0, col('#ff6a14'));
+      }
+      /* ---- lava glow: warm pools of light on the tarmac around both fords and beside the road, braziers with embers along the whole lap ---- */
+      {
+        const P = new KL.Batch(), tint = [1, 0.5, 0.16];
+        const pool = (x, z, y, r, k) => P.quadUV([x - r, y, z - r], [x - r, y, z + r], [x + r, y, z + r], [x + r, y, z - r], [tint[0] * k, tint[1] * k, tint[2] * k], [0, 0], [0, 1], [1, 1], [1, 0]);
+        for (const sF of FORDS) for (const ds of [-30, -16, 16, 30]) { const a = track.at(sF + ds, 0); pool(a.x, a.z, a.y + 0.08, 22, 1); }
+        let side = 1;
+        for (let s = 24; s < track.length; s += 46) {
+          const i = Math.floor(s / track.step) % track.N, hwi = track.HW[i], lim = hwi + (side < 0 ? track.WL[i] : track.WR[i]);
+          if (lim < hwi + 1.5 || Math.abs(s - FORDS[0]) < 40 || Math.abs(s - FORDS[1]) < 40) { side = -side; continue; }
+          const p = track.at(s, side * (hwi + 1.4)), y = p.y;
+          B.cyl(p.x, y, p.z, 0.75, 0.55, 1.1, 6, basalt[2]); B.cyl(p.x, y + 1.1, p.z, 0.9, 0.9, 0.18, 6, basalt[3]);
+          E.cyl(p.x, y + 1.25, p.z, 0.55, 0.15, 0.9, 6, col('#ff7a1a')); E.sphere(p.x, y + 2.0, p.z, 0.32, 5, col('#ffd27a'));
+          pool(p.x, p.z, y + 0.08, 15, 1); side = -side;
+        }
+        const gm = new T.MeshBasicMaterial({ map: KL.tex.glow(), vertexColors: true, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+        const pm = add(P, gm), prev = S.theme.onWeather;
+        S.theme.onWeather = (r, name, Wx) => { if (prev) prev(r, name, Wx); gm.opacity = clamp(Wx.night * 0.95 + (name === 'fog' ? 0.3 : 0), 0, 0.95); if (pm) pm.visible = gm.opacity > 0.02; };
       }
       /* start gantry lava drips: a lava glow strip along the start line */
       add(B, M.plain); add(E, M.plainEmissive);

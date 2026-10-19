@@ -262,9 +262,10 @@
       this.fog.near = W.fogNear * (th.fogScale || 1); this.fog.far = Math.min(W.fogFar, this.q.far) * (th.fogScale || 1);
       const hm = tint && tint.hemi ? tint.hemi : W.hemi;
       this.hemi.color.set(hm[0]); this.hemi.groundColor.set(hm[1]); this.hemi.intensity = hm[2] * 2.0 * (th.ambient || 1);
-      this.sun.color.set(W.sun[0]); this.sun.intensity = W.sun[1] * 1.7 * (th.sunBoost || 1); this.sunDir = new T.Vector3(...W.sun[2]).normalize();
+      const sn = tint && tint.sun ? tint.sun : W.sun;            // a track may tint the sun too (e.g. the volcano's warm night light)
+      this.sun.color.set(sn[0]); this.sun.intensity = sn[1] * 1.7 * (th.sunBoost || 1); this.sunDir = new T.Vector3(...sn[2]).normalize();
       this.skyMat.uniforms.uZen.value.set(tint && tint.sky ? tint.sky[0] : W.sky[0]); this.skyMat.uniforms.uHor.value.set(tint && tint.sky ? tint.sky[1] : W.sky[1]);
-      this.skyMat.uniforms.uSun.value.copy(this.sunDir); this.skyMat.uniforms.uSunCol.value.set(W.sun[0]); this.skyMat.uniforms.uNight.value = night;
+      this.skyMat.uniforms.uSun.value.copy(this.sunDir); this.skyMat.uniforms.uSunCol.value.set(sn[0]); this.skyMat.uniforms.uNight.value = night;
       this.starMat.opacity = clamp((night - 0.5) * 2, 0, 1); this.moon.material.opacity = clamp((night - 0.6) * 2.2, 0, 0.9);
       this.cloudMat.opacity = night > 0.5 ? 0.12 : 0.88; this.cloudMat.color.set(name === 'rain' || name === 'fog' ? '#b5bcc4' : name === 'sunset' ? '#ffc9a8' : '#ffffff');
       this.nightAmount = night;
