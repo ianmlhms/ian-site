@@ -66,7 +66,7 @@
       K.skirts(S, col('#bcd4ee'));
       K.patchDecals(S, { goo: { a: '#e8f0fb', b: '#b9cde8', glints: '#ffffff', opacity: 0.97 } });
       /* ice patches: a glossy shine over the road */
-      K.patchDecals(S, { ice: { a: '#9fd4f5', b: '#e8f8ff', glints: '#ffffff', opacity: 0.55 } });
+      K.patchDecals(S, { ice: { a: '#5fb8f0', b: '#c8ecff', glints: '#ffffff', opacity: 0.82 } });
       { /* summit shortcut: a packed-snow track */
         const [c, g] = K.cv(128, 128), r = KL.rng(6); g.fillStyle = '#dfe9f6'; g.fillRect(0, 0, 128, 128);
         for (let i = 0; i < 30; i++) { g.fillStyle = r() > 0.5 ? '#c3d4ea' : '#ffffff'; g.globalAlpha = 0.5; g.beginPath(); g.ellipse(r() * 128, r() * 128, 3 + r() * 8, 2 + r() * 4, r() * 3, 0, 7); g.fill(); }

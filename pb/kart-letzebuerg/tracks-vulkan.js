@@ -35,12 +35,12 @@
     alts: [{ hw: 4.6, pts: [[-190.8, 41.6], [-72.3, -93.3]] }],
     theme: {
       weathers: ['day', 'sunset', 'night', 'fog'], startText: 'FEIERBIERG', facade: 'old', buildings: false, lamps: false, skyline: false,
-      roadStyle: 'basalt', vergeTex: ['#2e2826', '#1c1614', '#4a3b34', { cracks: '#ff6a14' }], kerbColors: ['#ff6a14', '#2a2220'],
-      ground: 'grass', groundTex: ['#2b2523', '#171110', '#4f3e36', { cracks: '#ff6a14' }], groundY: 0, groundCell: 12, groundColor: '#2b2523',
+      roadStyle: 'basalt', vergeTex: ['#3a312d', '#201a18', '#574940', { cracks: '#ff6a14' }], kerbColors: ['#ff6a14', '#2a2220'],
+      ground: 'grass', groundTex: ['#3b312e', '#201817', '#5f4a40', { cracks: '#ff6a14' }], groundY: 0, groundCell: 8, groundColor: '#3a302d',
       wallStyle: 'rock', wallColor: '#6a5a52', wallTop: '#8a7468', wallH: 1.4, vergeColor: '#ffffff', fogScale: 1.0, farColor: '#3a2a26', farDrop: -50,
       weatherTint: {
-        day: { sky: ['#c25a3a', '#ffc690'], fog: '#e6a070', hemi: ['#ffdcb4', '#7a4a3c', 1.0] },
-        sunset: { sky: ['#4a1d4a', '#ff7a3a'], fog: '#c55a38', hemi: ['#ffa070', '#5a2a2a', 0.9] },
+        day: { sky: ['#c25a3a', '#ffc690'], fog: '#e6a070', hemi: ['#ffe4c4', '#9a6a58', 1.2] },
+        sunset: { sky: ['#4a1d4a', '#ff7a3a'], fog: '#c55a38', hemi: ['#ffb088', '#7a4038', 1.05] },
         night: { sky: ['#07030a', '#3a1210'], fog: '#1e0c0b', hemi: ['#ff8a5a', '#2a1210', 0.62] },
         fog: { sky: ['#5a4a46', '#8a7870'], fog: '#80706a', hemi: ['#d0bcb0', '#4a3a36', 0.82] },
       },
@@ -79,7 +79,7 @@
       /* ---- lava: rivers (animated), crater lake, pond ---- */
       const lavaTex = (() => { const [c, g] = K.cv(128, 256), r = KL.rng(12); g.fillStyle = '#e8420c'; g.fillRect(0, 0, 128, 256); for (let i = 0; i < 70; i++) { g.fillStyle = r() > 0.5 ? '#ffb21e' : '#b32a08'; g.globalAlpha = 0.55; g.beginPath(); g.ellipse(r() * 128, r() * 256, 5 + r() * 16, 3 + r() * 10, r() * 3, 0, 7); g.fill(); } g.globalAlpha = 1; for (let i = 0; i < 24; i++) { g.fillStyle = '#fff2a0'; g.globalAlpha = 0.6; g.beginPath(); g.ellipse(r() * 128, r() * 256, 2 + r() * 4, 1 + r() * 2, 0, 0, 7); g.fill(); } return K.canvasTex(c); })();
       const lavaMat = new T.MeshBasicMaterial({ map: lavaTex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-      for (const s of FORDS) K.river(S, riverPts(track, s), 13, (x, z) => terr(x, z) + 0.6, lavaMat, 18);
+      for (const s of FORDS) K.river(S, riverPts(track, s), 13, (x, z) => terr(x, z) + 0.9, lavaMat, 18);
       renderer.animators.push((dt) => { lavaTex.offset.y -= dt * 0.04; });
       const craterY = PEAK - 36 + 4;
       { const m = new T.Mesh(new T.CircleGeometry(24, 28), lavaMat); m.rotation.x = -Math.PI / 2; m.position.set(VC[0], craterY, VC[1]); S.group.add(m); }
@@ -89,8 +89,10 @@
       {
         const f = { x: pond.x, y: pondY, z: pond.z, yaw: 0 };
         L.cyl(B, f, 0, -1, 0, 5.2, 3.4, 15, 8, basalt[1]); L.cyl(B, f, 0, 14, 0, 3.6, 3.6, 0.8, 8, basalt[2]);
-        const gold = col('#ffd23f'); L.box(E, f, 0, 14.8, 0, 1.6, 1.0, 1.6, 0, col('#e0a82a')); L.cyl(E, f, 0, 15.8, 0, 0.75, 0.45, 3.6, 7, gold); L.sphere(E, f, 0, 19.8, 0, 0.55, 6, gold);
-        L.bar(E, [pond.x, pondY + 17.4, pond.z], [pond.x + 1.4, pondY + 21.6, pond.z], 0.18, gold); E.sphere(pond.x + 1.45, pondY + 22.0, pond.z, 0.4, 5, gold);       // raised arm with the wreath
+        const gold = col('#ffd23f'), gd = col('#e0a82a');
+        L.box(E, f, 0, 14.8, 0, 2.6, 1.2, 2.6, 0, gd); L.cyl(E, f, 0, 16, 0, 1.9, 0.8, 5.2, 10, gold); L.cyl(E, f, 0, 21.2, 0, 0.85, 0.65, 2.4, 8, gold); L.sphere(E, f, 0, 24.0, 0, 0.7, 6, gold);
+        const ap = L.frame(f); L.bar(E, ap(0.5, 22.4, 0), ap(1.8, 26.2, 0), 0.28, gold);
+        for (let i = 0; i < 12; i++) { const a = (i / 12) * 6.283; L.sphere(E, f, 1.8 + Math.cos(a) * 1.25, 27.2 + Math.sin(a) * 1.25, 0, 0.32, 4, gold); }
       }
       /* ---- the volcano: smoke, embers, bombs ---- */
       {

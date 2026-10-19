@@ -364,7 +364,7 @@ export const flow = {
 
       /* ================= 5b. online Grand Prix ================= */
       if (want('gp')) {
-        h.step('online Grand Prix: the whole Lëtzebuerg cup (4 races, 4 lazily loaded tracks), the same points table on both sides, the host moves on, final standings');
+        h.step('online Grand Prix: the whole Fantasy cup (4 races, 4 lazily loaded tracks: candy, ice, volcano, ghost castle), the same points table on both sides, the host moves on, final standings');
         const P = await newPlayer(h, hub, 'gp-host'); all.push(P);
         const Q = await newPlayer(h, hub, 'gp-guest'); all.push(Q);
         await goOnline(P, 'GPHost'); await P.page.click('#olCreate');
@@ -373,12 +373,12 @@ export const flow = {
         await setLaps(P, 1);
         await P.page.locator('#lbModeChips button', { hasText: /Grand Prix/ }).click();
         h.expect(await P.page.locator('#lbCupBox').isVisible() && await P.page.locator('#lbTrackBox').isHidden(), 'Grand Prix mode shows the cup picker instead of the track picker');
-        await P.page.locator('#lbCup button', { hasText: /L[eë]tzebuerg/ }).click();
+        await P.page.locator('#lbCup button', { hasText: /Fantasy/ }).click();
         await waitFor(Q, () => /Grand Prix/.test(document.getElementById('lbSummary').textContent), null, 10000);
         h.expect(true, 'the guest sees the Grand Prix in the lobby summary');
         await readyAndStart(P, [Q], null);
         await waitRace([P, Q]);
-        const CUP = ['villehaute', 'kirchberg', 'grund', 'belval'];
+        const CUP = ['zockerland', 'aisbierg', 'vulkan', 'geeschterschlass'];
         const same = (t) => t.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');   // each side marks its own row
         for (let r = 0; r < CUP.length; r++) {
           h.eq(await kl(P, () => [__klTest.session().kind, __klTest.session().idx, __klTest.session().n, __klTest.G.track.id]), ['gp', r, 4, CUP[r]], 'race ' + (r + 1) + ' of 4 on ' + CUP[r]);

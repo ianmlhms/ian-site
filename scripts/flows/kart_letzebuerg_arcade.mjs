@@ -129,7 +129,7 @@ export const flow = {
     await h.shot('gp-final');
     await sleep(1500);
     const gp = posts(gpFrom).map((c) => c.body.game_id);
-    h.expect(gp.length <= 5 && gp.every((id) => /^kart-letzebuerg-(lap|race)-geeschterschlass$|^kart-letzebuerg-gp$/.test(id)), 'Grand Prix writes only improved boards (' + gp.join(', ') + ')');
+    h.expect(gp.length <= 9 && gp.every((id) => /^kart-letzebuerg-(lap|race)-(zockerland|aisbierg|vulkan|geeschterschlass)$|^kart-letzebuerg-gp$/.test(id)), 'Grand Prix writes only improved boards (' + gp.join(', ') + ')');
     const gpCalls = supa(gpFrom);
     h.expect(gpCalls.length <= 16, 'Grand Prix: Supabase requests stay low (' + gpCalls.length + ': ' + desc(gpCalls) + ')');
     h.expect(await F.locator('#eAgain').isVisible(), 'a finished Grand Prix offers another round');
@@ -144,24 +144,25 @@ export const flow = {
     await F.evaluate(() => __klTest.menu());
     await F.locator('#modeRace').click();
     const ids = await F.evaluate(() => Object.keys(__klTest.KL.tracks));
-    h.eq(ids, ['villehaute', 'kirchberg', 'grund', 'belval', 'geeschterschlass'], 'five tracks in menu order');
-    h.eq(await F.locator('#trackCards > *').count(), 5, 'five track cards');
-    await F.waitForFunction(() => [...document.querySelectorAll('#trackCards .tpv img')].length === 5 && [...document.querySelectorAll('#trackCards .tpv img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 15000 });
+    h.eq(ids, ['villehaute', 'kirchberg', 'grund', 'belval', 'zockerland', 'aisbierg', 'vulkan', 'geeschterschlass'], 'eight tracks in menu order');
+    h.eq(await F.locator('#trackCards > *').count(), 8, 'eight track cards');
+    await F.waitForFunction(() => [...document.querySelectorAll('#trackCards .tpv img')].length === 8 && [...document.querySelectorAll('#trackCards .tpv img')].every((i) => i.complete && i.naturalWidth > 0), null, { timeout: 15000 });
     h.expect(true, 'every card shows its thumbnail');
     h.eq(await F.evaluate(() => __klTest.KL.gpRaces(__klTest.KL.CUPS[0], __klTest.KL.tracks).map((r) => r.track)), ['villehaute', 'kirchberg', 'grund', 'belval'], 'Lëtzebuerg cup = Uewerstad, Kirchberg, Grund, Belval');
+    h.eq(await F.evaluate(() => __klTest.KL.gpRaces(__klTest.KL.CUPS[1], __klTest.KL.tracks).map((r) => r.track)), ['zockerland', 'aisbierg', 'vulkan', 'geeschterschlass'], 'Fantasy cup = Zockerland, Äisbierg, Feierbierg, Geeschterschlass');
     const sentFrom = h.backend.calls.length;
-    for (const [i, id] of ['kirchberg', 'grund', 'belval'].entries()) {
+    for (const [i, id] of ['kirchberg', 'grund', 'belval', 'zockerland', 'aisbierg', 'vulkan'].entries()) {
       const r = await F.evaluate(([id, i]) => __klTest.KL.Progress.onRaceDone({ track: id, laps: 3, lapTimes: [52 + i, 51 + i, 50 + i], finished: true, time: 160 + i }), [id, i]);
       h.eq([r.lap, r.race], [true, true], id + ': first run sets both personal records');
     }
     await sleep(2500);
-    const newPosts = posts(sentFrom).filter((c) => /kirchberg|grund|belval/.test(c.body.game_id));
+    const newPosts = posts(sentFrom).filter((c) => /kirchberg|grund|belval|zockerland|aisbierg|vulkan/.test(c.body.game_id));
     const np = newPosts.map((c) => c.body.game_id).sort();
-    h.eq(np, ['kart-letzebuerg-lap-belval', 'kart-letzebuerg-lap-grund', 'kart-letzebuerg-lap-kirchberg', 'kart-letzebuerg-race-belval', 'kart-letzebuerg-race-grund', 'kart-letzebuerg-race-kirchberg'], 'each new track writes its own lap and race board');
+    h.eq(np, ['aisbierg', 'belval', 'grund', 'kirchberg', 'vulkan', 'zockerland'].flatMap((t) => ['lap', 'race'].map((k) => 'kart-letzebuerg-' + k + '-' + t)).sort(), 'each new track writes its own lap and race board');
     h.expect(newPosts.every((c) => c.body.score > 0 && c.body.score < SCORE_BASE), 'scores are 1000000 - milliseconds');
     await F.evaluate(() => document.getElementById('btnBoards') && document.getElementById('btnBoards').click());
     await F.waitForSelector('#bdScreen:not([hidden]) #bdTracks button', { timeout: 8000 });
-    h.eq(await F.locator('#bdTracks button').count(), 5, 'the boards dialog lists all five tracks');
+    h.eq(await F.locator('#bdTracks button').count(), 8, 'the boards dialog lists all eight tracks');
     await F.locator('#bdTracks button', { hasText: /Kierchbierg|Kirchberg/ }).first().click();
     await F.evaluate(() => __klTest.KL.Boards.open('lap', 'kirchberg'));
     await h.page.waitForSelector('.pb-modal.open .pb-row', { timeout: 8000 });

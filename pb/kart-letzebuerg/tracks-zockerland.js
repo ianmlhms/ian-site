@@ -5,6 +5,7 @@
   const KL = window.KL, T = window.THREE, { clamp, lerp, smooth } = KL;
   const col = KL.col, shade = KL.shade, K = KL.kit, L = KL.lm;
   const CAKE = [70, 118], FORD = 1407;
+  let FIELD = null;
 
   const PAL = ['#ff7eb6', '#7fd8ff', '#ffe066', '#9be37a', '#b78cff', '#ff9a5c', '#ffffff', '#ff5f7e'];
 
@@ -40,18 +41,20 @@
       groundColorAt(x, z, h) {
         const n = Math.sin(x * 0.045) * Math.cos(z * 0.04) * 0.5 + 0.5, m = Math.sin(x * 0.013 + 2) * Math.sin(z * 0.017) * 0.5 + 0.5;
         const mint = [1, 1, 1], pink = [1.0, 0.82, 0.9], lilac = [0.92, 0.86, 1.0];
-        return KL.mix(KL.mix(mint, pink, smooth(0.35, 0.65, n)), lilac, smooth(0.55, 0.8, m) * 0.7);
+        let c = KL.mix(KL.mix(mint, pink, smooth(0.35, 0.65, n)), lilac, smooth(0.55, 0.8, m) * 0.7);
+        if (FIELD) { const d = FIELD(x, z); if (d < 22) c = KL.mix([0.55, 0.36, 0.26], c, smooth(10, 22, d)); }
+        return c;
       },
     },
     makeTerrain(track) {
       const sc = {};
       let field = null;
-      const river = () => field || (field = K.distField([riverPts(track)], -700, -500, 700, 700, 6));
+      const river = () => field || (field = FIELD = K.distField([riverPts(track)], -700, -500, 700, 700, 6));
       const base = (x, z, dR) => {
         const r = Math.hypot(x - CAKE[0], z - CAKE[1]), calm = smooth(8, 46, dR);
         const n = (3.4 * Math.sin(x * 0.021 + 1) * Math.cos(z * 0.017) + 2 * Math.sin(x * 0.052 + z * 0.041) + 0.9 * Math.sin(x * 0.12) * Math.cos(z * 0.1)) * calm;
         const far = 30 * smooth(300, 560, Math.hypot(x - 20, z - 120));
-        return n + far + 6.5 * (1 - smooth(52, 92, r)) - 3.7 * (1 - smooth(7, 24, dR));
+        return n + far + 6.5 * (1 - smooth(52, 92, r)) - 3.7 * (1 - smooth(7, 15, dR));
       };
       return (x, z) => {
         const p = track.project(x, z, -1, null, sc), dist = Math.hypot(x - p.cx, z - p.cz), flat = p.hw + (p.d >= 0 ? p.wr : p.wl) + 0.8;
@@ -150,7 +153,7 @@
         else { const R2 = 2.7 * k; for (let a = 0; a < 14; a++) { const an = a / 14 * 6.283; B.sphere(x + Math.cos(an) * R2, y + 1.1 * k, z + Math.sin(an) * R2, 1.15 * k, 6, col('#e59a52'), { sy: 0.85, noise: 1 }); B.sphere(x + Math.cos(an) * R2, y + 1.75 * k, z + Math.sin(an) * R2, 0.95 * k, 5, col(c1), { sy: 0.55 }); } }
       });
       /* ---- distant candy mountains ---- */
-      for (let i = 0; i < 26; i++) { const a = (i / 26) * 6.283 + rnd() * 0.2, r = 360 + rnd() * 90, x = 20 + Math.cos(a) * r, z = 120 + Math.sin(a) * r * 0.85, h = 55 + rnd() * 60, w = 40 + rnd() * 30, c = PAL[Math.floor(rnd() * 5)], y = terr(x, z) - 4; B.cyl(x, y, z, w, w * 0.12, h, 9, col(c), { noise: 1 }); B.cyl(x, y + h * 0.78, z, w * 0.32, 0.01, h * 0.22, 9, col('#ffffff'), { flat: true }); }
+      for (let i = 0; i < 26; i++) { const a = (i / 26) * 6.283 + rnd() * 0.2, r = 430 + rnd() * 90, x = 20 + Math.cos(a) * r, z = 120 + Math.sin(a) * r * 0.85, h = 50 + rnd() * 45, w = 22 + rnd() * 14, c = PAL[Math.floor(rnd() * 5)], y = terr(x, z) - 4; B.cyl(x, y, z, w, w * 0.12, h, 9, col(c), { noise: 1 }); B.cyl(x, y + h * 0.78, z, w * 0.32, 0.01, h * 0.22, 9, col('#ffffff'), { flat: true }); }
       add(B, M.plain); const em = K.nightOnly(S, E);
       K.glow(S, (() => { const o = []; for (let s = 20; s < track.length; s += 48) for (const sd of [-1, 1]) { const ci = Math.floor(s / track.step) % track.N, lim = track.HW[ci] + (sd < 0 ? track.WL[ci] : track.WR[ci]) + 0.9; if (lim > 20) continue; const p = track.at(s + (sd > 0 ? 24 : 0), sd * lim); o.push(p.x, p.y + 3.4, p.z); } return o; })(), { color: 0xff7eb6, size: 6 });
     },

@@ -27,9 +27,9 @@
     candy: { base: '#f4a8c6', edge: '#ffffff', dash: '#fff6a8', extra(g, W, H, rnd) {          // icing road: soft swirls + sprinkles
       for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(255,255,255,${0.12 + rnd() * 0.16})`; g.lineWidth = 3 + rnd() * 4; g.beginPath(); const x = rnd() * W, y = rnd() * H; g.moveTo(x, y); g.bezierCurveTo(x + 20, y - 18, x + 46, y + 18, x + 70, y - 4); g.stroke(); }
       const cols = ['#ffffff', '#7fd8ff', '#ffe066', '#9be37a', '#b78cff'];
-      for (let i = 0; i < 150; i++) { g.fillStyle = cols[i % cols.length]; g.save(); g.translate(rnd() * W, rnd() * H); g.rotate(rnd() * 3); g.fillRect(-4, -1.5, 8, 3); g.restore(); }
+      for (let i = 0; i < 70; i++) { g.fillStyle = cols[i % cols.length]; g.save(); g.translate(rnd() * W, rnd() * H); g.rotate(rnd() * 3); g.fillRect(-4, -1.5, 8, 3); g.restore(); }
     } },
-    ice: { base: '#b9dcef', edge: '#ffffff', dash: '#e8f6ff', extra(g, W, H, rnd) {                // blue ice: long white scratches and cracks
+    ice: { base: '#cfdbe8', edge: '#ffffff', dash: '#9fb8d6', extra(g, W, H, rnd) {                // blue ice: long white scratches and cracks
       for (let i = 0; i < 34; i++) { g.strokeStyle = `rgba(255,255,255,${0.18 + rnd() * 0.3})`; g.lineWidth = 1 + rnd() * 2; g.beginPath(); let x = rnd() * W, y = rnd() * H; g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (rnd() - 0.3) * 44; y += (rnd() - 0.5) * 30; g.lineTo(x, y); } g.stroke(); }
       for (let i = 0; i < 12; i++) { const x = rnd() * W, y = rnd() * H, gr = g.createRadialGradient(x, y, 0, x, y, 26 + rnd() * 30); gr.addColorStop(0, 'rgba(110,170,225,.28)'); gr.addColorStop(1, 'rgba(110,170,225,0)'); g.fillStyle = gr; g.fillRect(x - 60, y - 60, 120, 120); }
     } },

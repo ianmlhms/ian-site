@@ -75,12 +75,12 @@ export const flow = {
     h.expect(true, 'menu reachable again');
 
     h.step('every track: one-lap races finish, every weather preset applies');
-    for (const track of ['villehaute', 'kirchberg', 'grund', 'belval', 'geeschterschlass']) {
+    for (const track of ['villehaute', 'kirchberg', 'grund', 'belval', 'zockerland', 'aisbierg', 'vulkan', 'geeschterschlass']) {
       await h.goto(`${URL_BASE}?test=1&autostart=1&track=${track}&laps=1&bots=7&seed=3`);
       await waitState(h, () => window.__klTest && window.__klTest.state().phase === 'race', null, 25000);
       const info = await h.page.evaluate(() => ({ calls: __klTest.state().calls, tris: __klTest.state().tris }));
       h.expect(info.calls < 400, track + ': draw calls under 400 (' + info.calls + ')');
-      for (const w of ['day', 'sunset', 'night', 'rain', 'fog']) { await h.page.evaluate((w) => window.__klTest.weather(w), w); }
+      for (const w of ['day', 'sunset', 'night', 'rain', 'fog', 'snow']) { await h.page.evaluate((w) => window.__klTest.weather(w), w); }
       await h.page.evaluate(() => { __klTest.weather('night'); __klTest.sim(90, true); });
       await h.page.waitForSelector('#endScreen:not([hidden]) #endList li', { timeout: 20000 });
       const res = await h.page.evaluate(() => __klTest.G.lastResult.rows.map((r) => ({ f: r.finished, p: r.place })));
