@@ -11,6 +11,7 @@ import { pathToFileURL } from "node:url";
 import { runFlow, startServer } from "./lib.mjs";
 import { flow as idleRebirthHalloween } from "./idle_rebirth_halloween.mjs";
 import { flow as idleMoreContent } from "./idle_more_content.mjs";
+import { flow as driveMadLevels } from "./drive_mad_levels.mjs";
 import { flow as ccSigninHint } from "./cc_signin_hint.mjs";
 
 const GLOBAL_PLAYWRIGHT = "/opt/homebrew/lib/node_modules/@playwright/cli/node_modules/playwright";
@@ -25,7 +26,7 @@ async function importPlaywright() {
   throw new Error("Playwright not found: set PLAYWRIGHT_DIR to a playwright package folder.");
 }
 
-const ALL = [ccSigninHint, idleRebirthHalloween, idleMoreContent];
+const ALL = [ccSigninHint, idleRebirthHalloween, idleMoreContent, driveMadLevels];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 const { webkit } = await importPlaywright();

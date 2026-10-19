@@ -41,5 +41,5 @@ const results=core.LEVELS.map((level,index)=>({level:index+1,name:level.name,...
 console.log('| Level | Name | Completable | Time |');
 console.log('|---:|---|:---:|---:|');
 for(const result of results)console.log(`| ${result.level} | ${result.name} | ${result.passed?'yes':'NO'} | ${result.passed?(result.steps/60).toFixed(2)+'s':'—'} |`);
-assert.equal(core.LEVELS.length,16,'expected exactly 16 levels');
+assert.equal(core.LEVELS.length,24,'expected exactly 24 levels');
 assert.ok(results.every(result=>result.passed),'every level must be completable without throwing or getting stuck');
