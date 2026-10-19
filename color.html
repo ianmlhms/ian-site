@@ -9,6 +9,7 @@
   <meta name="description" content="Colour Guess — guess the colour together with a friend, or against an AI that reasons about hue." />
   <link rel="canonical" href="https://ian.lu/color.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=4" data-game="color"></script>
 <script src="theme.js?v=30"></script>
 <style>
   :root{--bg:#0d0d1a;--card:#161625;--card2:#1e1e35;--border:#2a2a4a;--text:#e8e8f0;--muted:#8888aa;--accent:#ff6b9d;--accent2:#4de8ff;--good:#3fb950}
@@ -78,7 +79,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="pb/arcade-kit.js?v=29" data-arcade-id="o-color" data-arcade-title="Colour Guess" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=30"></script>
+<script type="module" src="notify-ambient.js?v=31"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const AI = params.get("ai")==="1";              // single-player vs computer bots
@@ -150,6 +151,12 @@ function isMessage(event,p){
 }
 
 let name="Player", phase="lobby", rounds=5, round=0, target=null, mode="visible";
+// Started from the shared lobby (lobby.html): the host's choices (rounds, colour mode) come with the context (mp-gate.js).
+if(window.MPGate&&MPGate.ctx&&MPGate.ctx.cfg){
+  const c=MPGate.ctx.cfg;
+  if(Number.isInteger(c.rounds)&&c.rounds>=1&&c.rounds<=15) rounds=c.rounds;
+  if(c.mode==="visible"||c.mode==="flash") mode=c.mode;
+}
 let guess={r:128,g:128,b:128}, locked=false, guesses={}, results=null, winner=null, isFinal=false;
 let wins={}, distTot={}, peeking=false, peekTimer=null, recorded=false, hostHere=true;
 // Colour Dial does not load game-common.js (only its stylesheet), so this stays
@@ -185,6 +192,7 @@ const lockedCount=(ps)=>ps.filter(p=>guesses[p.cid]).length;
 
 function render(){
   const ps=players();
+  if(window.MPGate) MPGate.setOver(phase==="lobby"||(phase==="results"&&isFinal));   // «‹ Lobby» is one tap when no match is running
   drawApp(ps);
   if(!AI && role!=="host" && !hostHere)
     $("app").insertAdjacentHTML("afterbegin",
@@ -335,8 +343,24 @@ if(AI){
       const hostChanged = hh!==hostHere; hostHere=hh;
       if(role==="host") sendCfg();
       if(phase==="lobby"||phase==="results"||hostChanged) render();
-    })
-    .subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render(); }});
+      maybeAutoStart();
+    });
+  // Started from the lobby: the host opens round 1 as soon as everybody from the line-up is in the room (or after a grace period).
+  const AUTO_START_WAIT_MS=12000;
+  var autoStartPending=!!(window.MPGate&&MPGate.ctx&&role==="host"), autoStartTimer=null;
+  function maybeAutoStart(){
+    if(!autoStartPending||phase!=="lobby") return;
+    if(players().length>=MPGate.ctx.roster.length) fireAutoStart();
+  }
+  function fireAutoStart(){
+    if(!autoStartPending) return;
+    autoStartPending=false; clearTimeout(autoStartTimer);
+    if(phase==="lobby"&&players().length>=2) startRound();
+  }
+  if(!(window.MPGate&&window.MPGate.redirecting)){   // mp-gate.js sends a bare visit to the lobby (lobby.html)
+    ch.subscribe(async (s)=>{ if(s==="SUBSCRIBED"){ name=await getName(); await ch.track({name,role}); render();
+      if(autoStartPending) autoStartTimer=setTimeout(fireAutoStart,AUTO_START_WAIT_MS); }});
+  }
 }
 </script>
   <script type="module" src="rtc-ring.js?v=29"></script>
