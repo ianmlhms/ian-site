@@ -7,7 +7,8 @@ import fs from 'node:fs';
 const [, , fileA, fileB, lat0s, lon0s, id, out, ...box] = process.argv;
 const lat0 = +lat0s, lon0 = +lon0s, M_LAT = 111194.93, M_LON = M_LAT * Math.cos((lat0 * Math.PI) / 180);
 const [X0, X1, Z0, Z1] = box.length === 4 ? box.map(Number) : [-620, 560, -460, 560];
-const proj = (p) => [(p.lon - lon0) * M_LON, -(p.lat - lat0) * M_LAT];
+const SCALE = +(process.env.KL_SCALE || 1);          // miniature tracks (e.g. Kirchberg 0.65): every coordinate is scaled about the origin
+const proj = (p) => [(p.lon - lon0) * M_LON * SCALE, -(p.lat - lat0) * M_LAT * SCALE];
 const inBox = (x, z) => x >= X0 && x <= X1 && z >= Z0 && z <= Z1;
 const dm = (v) => Math.round(v * 10);
 
@@ -62,6 +63,7 @@ for (const e of A.elements) {
     buildings.push([lv, kind, flat(ring)]);
   } else if (t.highway && roadClass[t.highway] != null) {
     if (t.tunnel && t.tunnel !== 'no' && t.tunnel !== 'building_passage') continue;
+    if (process.env.KL_NOBRIDGE && t.bridge && t.bridge !== 'no') continue;     // the track builds its own deck
     if (!pts.some((q) => inBox(q[0], q[1]))) continue;
     roads.push([roadClass[t.highway], flat(simplifyLine(pts, 0.4))]);
   } else if (t.leisure === 'park' || t.leisure === 'garden') {

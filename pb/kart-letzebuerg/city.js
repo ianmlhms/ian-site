@@ -132,9 +132,12 @@
       if (!theme.cityKeepFar && !nearT) { const n2 = trackFarDist(track, cx, cz); if (n2 > maxDist) continue; }
 
       const area = Math.abs(signedArea(p));
+      const mb = theme.modernBox, hc0 = theme.cityFollow ? terrain(cx, cz) : 0;
+      const modern = !!theme.modernKinds && (kind === 4 || (!!mb && kind === 0 && cx >= mb[0] && cx <= mb[1] && cz >= mb[2] && cz <= mb[3] && hc0 > -4));
       let floors = lv;
       if (!floors) {
         if (kind === 2) floors = 1; else if (kind === 3) floors = 3; else if (kind === 1) floors = 5; else if (kind === 5) floors = 3 + Math.floor(rnd() * 3);
+        else if (theme.cityFloorsOld && !modern) floors = theme.cityFloorsOld[0] + Math.floor(rnd() * (theme.cityFloorsOld[1] - theme.cityFloorsOld[0] + 1));
         else if (theme.cityFloors) floors = Math.round(lerp(theme.cityFloors[0], theme.cityFloors[1], clamp(area / 2500, 0, 1) * 0.6 + rnd() * 0.4));
         else floors = (area > 500 ? 5 : 4) + (rnd() < 0.35 ? 1 : 0);
       }
@@ -153,7 +156,6 @@
         y0 = Math.max(ymin - 0.3, -8);                   // retaining wall of at most 8 m
       }
       const C = getChunk(cx, cz);
-      const modern = theme.modernKinds && kind === 4;
       const palK = modern && palM.length ? palM : kind === 5 && palI.length ? palI : pal;
       const base = palK[Math.floor(rnd() * palK.length)], tint = KL.shade(base, 0.93 + rnd() * 0.12);
       const WB = modern ? C.wallsM : C.walls;
@@ -174,7 +176,7 @@
       // roof
       const rc = roofPal[Math.floor(rnd() * roofPal.length)];
       const O = obb(p), rectness = O ? area / O.area : 0, smallSide = O ? Math.min(O.w, O.d) : 0;
-      const flatRoof = theme.flatRoofs || kind === 2;
+      const flatRoof = (theme.flatRoofs && (modern || !theme.modernKinds)) || kind === 2;
       if (!flatRoof && O && rectness > 0.8 && area < 1300 && smallSide > 5) {
         const h = clamp(smallSide * 0.4, 1.8, 5.6);
         gableRoof(C.roofs, O, hgt - 0.05, h, rc, kind === 3 || rnd() < 0.3);
@@ -290,7 +292,7 @@
     g.setLineDash([6, 8]); g.lineWidth = 1; g.strokeStyle = 'rgba(245,240,210,.55)';
     for (const [k, pts] of data.r) if (k === 0) { path(pts, false); g.stroke(); }
     g.setLineDash([]);
-    if (o.paint) o.paint(g, X, Z, sc);
+    if (o.paint) o.paint(g, X, Z, sc, data);
     const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.ClampToEdgeWrapping; t.anisotropy = KL.maxAniso || 4; t.generateMipmaps = true; t.minFilter = T.LinearMipmapLinearFilter;
     return t;
   };
