@@ -22,6 +22,14 @@ export const flow = {
       /* ---- static checks ---- */
       const sql = fs.readFileSync(new URL("../mp-lobby-v1.sql", import.meta.url), "utf8");
       const seed = [...sql.matchAll(/\('([a-z0-9-]+)',\s*'[^']*',\s*'([^']+)',\s*(\d+),\s*(\d+),\s*(true|false)\)/g)].map((m) => ({ id: m[1], page: m[2], min: +m[3], max: +m[4], lobby: m[5] === "true" }));
+      /* the enable files flip the lobby flag afterwards (v2: batch 2, later files: further batches) */
+      for (const f of fs.readdirSync(new URL("../", import.meta.url)).filter((n) => /^mp-lobby-v\d+-enable\.sql$/.test(n)).sort()) {
+        const upd = fs.readFileSync(new URL("../" + f, import.meta.url), "utf8").replace(/--[^\n]*/g, "");
+        for (const m of upd.matchAll(/update public\.mp_games set lobby = true\s+where id in \(([^)]*)\)/g)) {
+          const ids = new Set([...m[1].matchAll(/'([a-z0-9-]+)'/g)].map((x) => x[1]));
+          for (const row of seed) if (ids.has(row.id)) row.lobby = true;
+        }
+      }
       const reg = Object.values(MP_GAMES).map((g) => ({ id: g.id, page: g.page, min: g.min, max: g.max, lobby: g.lobby }));
       h.eq(seed.sort((a, b) => a.id.localeCompare(b.id)), reg.sort((a, b) => a.id.localeCompare(b.id)), "mp_games seed in the SQL = the JS registry (ids, pages, min/max, lobby flag)");
       for (const f of ["mp-lobby.js", "mp-gate.js", "people-picker.js", "mp-games.js"]) {
@@ -107,10 +115,10 @@ export const flow = {
       h.expect(true, "a 6-character code → the old room link (no lobby)");
       await c.page.goto(h.origin + "/pixelbreak.html", { waitUntil: "domcontentloaded" });
       await c.page.waitForFunction(() => window.MPG);
-      await c.page.evaluate(() => openOnline(GAMES.findIndex((g) => g.id === "o-tictactoe")));
+      await c.page.evaluate(() => openOnline(GAMES.findIndex((g) => g.id === "o-meme")));
       await c.page.click("#om .go >> nth=0");
-      await c.page.waitForURL(/tictactoe\.html\?room=[a-z0-9]{6}&role=host/);
-      h.expect(true, "a game without the lobby (Tic-Tac-Toe) still starts the old way");
+      await c.page.waitForURL(/meme\.html\?room=[a-z0-9]{6}&role=host/);
+      h.expect(true, "a game without the lobby (Meme Caption Party) still starts the old way");
 
       h.step("friends page: «Play» → Connect 4 opens a lobby and invites that friend; a pending invite's Join goes to the lobby");
       const fr = await newPlayer(h, world, { label: "friends-page", user: USERS.ian }); players.push(fr);

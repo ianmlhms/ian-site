@@ -9,6 +9,7 @@
   <meta name="description" content="Kniffel (Yahtzee) on ian.lu — roll, hold and score against a friend or the computer." />
   <link rel="canonical" href="https://ian.lu/dice-duel.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=4" data-game="dice-duel" data-over="#rematch"></script>
 <script src="theme.js?v=30"></script>
 <link rel="stylesheet" href="game-common.css?v=5">
 <style>
@@ -62,7 +63,7 @@
 <script src="pb/arcade-kit.js?v=29" data-arcade-id="o-dice-duel" data-arcade-title="Kniffel" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="game-common.js?v=4"></script>
-<script type="module" src="notify-ambient.js?v=30"></script>
+<script type="module" src="notify-ambient.js?v=31"></script>
 <script>
 /* Yahtzee-style dice duel: 3 rolls per turn, hold dice between rolls, score one
  * of 14 categories per turn. Upper section pays a 35 bonus at 63+. Only dice
@@ -216,7 +217,7 @@ if (AI) {
   document.querySelector(".bar h1").textContent = "🎲 Kniffel — vs Computer";
   GC.mountDifficulty(() => difficulty, (d) => { difficulty = d; });
   oppHere = true; fresh(); render();
-} else {
+} else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
   ch = GC.createChannel("dd");
   ch.on("broadcast", { event: "roll" }, ({ payload }) => { if (turn === opp) applyRoll(payload.d, payload.r); })
     .on("broadcast", { event: "hold" }, ({ payload }) => { if (turn === opp) applyHold(payload.h); })

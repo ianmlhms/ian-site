@@ -9,6 +9,7 @@
   <meta name="description" content="Battleship on ian.lu — place your fleet and play against a friend on two devices, or against the computer." />
   <link rel="canonical" href="https://ian.lu/battleship.html" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="mp-gate.js?v=4" data-game="battleship" data-over="#rematch"></script>
 <script src="theme.js?v=30"></script>
 <link rel="stylesheet" href="game-common.css?v=5">
 <style>
@@ -85,7 +86,7 @@
 <script src="pb/arcade-kit.js?v=29" data-arcade-id="o-battleship" data-arcade-title="Battleship" data-arcade-no-score data-arcade-replace=".bar"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="game-common.js?v=4"></script>
-<script type="module" src="notify-ambient.js?v=30"></script>
+<script type="module" src="notify-ambient.js?v=31"></script>
 <script>
 const N=8, SHIPS=[4,3,3,2];
 const GC=window.GameCommon;
@@ -267,12 +268,14 @@ if(AI){
   document.querySelector(".bar h1").textContent="🚢 Battleship — vs Computer";
   GC.mountDifficulty(()=>difficulty,(d)=>{difficulty=d;});
   clearAll(); phase="setup"; oppHere=true; renderSetup();
-} else {
+} else if (!(window.MPGate && window.MPGate.redirecting)) {   // mp-gate.js sends a bare visit to the lobby (lobby.html)
   ch=GC.createChannel("bs");
   ch.on("broadcast",{event:"ready"},()=>{ oppReady=true; bothReady(); if(phase==="setup")renderSetup(); })
     .on("broadcast",{event:"fire"},({payload})=>{ if(phase==="play") onFire(payload.r,payload.c); })
     .on("broadcast",{event:"result"},({payload})=>onResult(payload.r,payload.c,payload.hit,payload.lost))
     .on("broadcast",{event:"reset"},()=>resetGame(false));
+  // A lobby start / rematch re-uses the same room code: only a reload may restore the previous fleet, a fresh visit begins clean.
+  try{ if(window.MPGate&&MPGate.ctx&&performance.getEntriesByType("navigation")[0].type!=="reload") clearLocal(); }catch{}
   if(!restoreLocal()){ phase="setup"; }        // refresh mid-game restores our fleet
   if(phase==="play"||over) renderPlay(); else renderSetup();
   GC.joinRoom(ch,{

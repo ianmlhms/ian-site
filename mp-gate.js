@@ -1,5 +1,5 @@
 /* mp-gate.js — the small in-game half of the shared lobby. Classic script, first <script> in the game page:
- *   <script src="mp-gate.js?v=1" data-game="connect4"></script>
+ *   <script src="mp-gate.js?v=4" data-game="connect4"></script>
  *
  * 1. Gate: a visit with neither ?room= nor ?ai=1 (arcade card, old bookmark, ?lobby=CODE) is sent to lobby.html. The old
  *    links page?room=CODE&role=host|guest and page?ai=1 keep working untouched — they never see the lobby.
@@ -9,6 +9,8 @@
  *      MPGate.ctx = { game, code, room, role, cfg, roster:[{id,name,uid,avatar,role}] }   (null for old links)
  * 3. Back to lobby: a floating button (rematch / change settings / add people). setOver(true) tells it the match is
  *    finished (one tap, highlighted); mid-match it asks for a second tap so nobody leaves by accident.
+ *    Games without their own setOver() calls can add  data-over="#rematch"  to the script tag: "over" then simply follows
+ *    whether that element (the game's own rematch / new-game button) is shown.
  */
 (function () {
   "use strict";
@@ -62,6 +64,20 @@
   };
   function lang() { try { var l = localStorage.getItem("site_lang"); return TEXT[l] ? l : "lb"; } catch (e) { return "lb"; } }
 
+  /* data-over="#sel": over = the element is displayed (the game shows its rematch button exactly when the match is finished) */
+  function watchOver() {
+    var sel = script && script.getAttribute("data-over");
+    var el = sel ? document.querySelector(sel) : null;
+    if (!el || typeof MutationObserver === "undefined") return;
+    var last = null;
+    function sync() {
+      var shown = getComputedStyle(el).display !== "none";
+      if (shown !== last) { last = shown; gate.setOver(shown); }
+    }
+    new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ["style", "hidden", "class"] });
+    sync();
+  }
+
   function mountChip() {
     var tx = TEXT[lang()];
     var style = document.createElement("style");
@@ -86,5 +102,6 @@
     gate.backToLobby = go;
     paint();
     document.body.appendChild(btn);
+    watchOver();
   }
 })();
