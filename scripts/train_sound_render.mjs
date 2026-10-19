@@ -37,7 +37,8 @@ function wav16(l, r, rate) {
 
 const { chromium } = await importPlaywright();
 let browser;
-for (const opts of [{ channel: "chrome" }, {}]) { try { browser = await chromium.launch({ ...opts, args: ["--mute-audio", "--autoplay-policy=no-user-gesture-required"] }); break; } catch { /* try next */ } }
+if (args.browser === "webkit") { const { webkit } = await importPlaywright(); browser = await webkit.launch(); }
+else for (const opts of [{ channel: "chrome" }, {}]) { try { browser = await chromium.launch({ ...opts, args: ["--mute-audio", "--autoplay-policy=no-user-gesture-required"] }); break; } catch { /* try next */ } }
 if (!browser) throw new Error("no chromium");
 const page = await browser.newPage();
 const errors = [];

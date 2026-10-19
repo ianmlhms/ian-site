@@ -332,7 +332,7 @@
       if (vo && !vo.attached) { vo.out.connect(G.tract); vo.outMech.connect(G.mech); vo.attached = true; }
     }
     function detachAllIgbt() { attachIgbt(null, null); }
-    function igbtUpdate(vo, v, pow, regen) {
+    function igbtUpdate(vo, v, pow, powTone, regen) {
       const prof = vo.prof, fm = prof.k * v, tc = 0.03;
       // pick the PWM mode with hysteresis
       let m = vo.state.mode;
@@ -342,7 +342,7 @@
       if (m === -2) m = want(fm);
       else { const up = want(fm * (1 - hys)), dn = want(fm * (1 + hys)); if (up > m) m = up; else if (dn < m) m = dn; }
       vo.state.mode = m;
-      const lvl = 0.11 * prof.tone * pow * smooth(v / 0.7);
+      const lvl = 0.11 * prof.tone * powTone * smooth(v / 0.7);
       vo.modes.forEach((md, i) => { set(md.a.frequency, Math.max(fm, 0.5), tc); set(md.b.frequency, Math.max(fm * 1.0035, 0.5), tc); set(md.g.gain, i === m ? lvl : 0, 0.012, 0.01); });
       const asy = m === -1 ? lvl * 1.15 : 0;
       set(vo.gAsync.gain, asy, 0.012, 0.01);
@@ -468,7 +468,7 @@
 
     // ---------------------------------------------------------- state
     let kindKey = 'emu', hornVoice = null, bellHeld = false, bellNext = 0, bellVariant = 0, crossUntil = 0, crossLevel = 1, crossNext = 0, crossFlip = 0, disposed = false;
-    let lastUpdate = 0, lastLever = 0, lastSpeed = 0, lastTrac = 0, lastPark = null, lastTunnel = false, tunnelStamp = 0, joint = { acc: 0, next: 0, nextPoints: 800, pending: [] };
+    let contactorAt = -9, lastUpdate = 0, lastLever = 0, lastSpeed = 0, lastTrac = 0, lastPark = null, lastTunnel = false, tunnelStamp = 0, joint = { acc: 0, next: 0, nextPoints: 800, pending: [] };
     let curP = { lever: 0, speed: 0 }, perspNow = 'outside', persp = Object.assign({}, PERSP.outside), brakeHissAt = 0, parkAt = 0, lastBrakePct = 0, stopAt = 0, wasBraking = false;
 
     // ---------------------------------------------------------- hits on the track (joints, points, bridges)
@@ -575,7 +575,7 @@
       const powTraction = tracFrac > 0.02 ? 0.4 + 0.6 * tracFrac : 0;
       const regenFade = lever < 0 ? smooth((v - (kindKey === 'tram' ? 1.2 : 2.2)) / (kindKey === 'tram' ? 2.0 : 3.5)) : 0;
       const regen = lever < 0 ? Math.min(1, -lever / 3) * (lever <= -8 ? 0.35 : 1) * regenFade : 0;
-      const pow = Math.max(powTraction, regen * 0.85, 0.03 * smooth(v / 2));
+      const powTone = Math.max(powTraction, regen * 0.85), pow = Math.max(powTone, 0.03 * smooth(v / 2));   // coasting: inverters off, only hum / fans / gears remain
       const eTraction = prof.fam === 'igbt';
       const flangeRaw = clamp((prof.rcrit * Math.abs(fin(p.curvature, 0)) - 0.6) / 1.6, 0, 1);
       const flange = flangeRaw * clamp(v / 4, 0, 1) * (v > 22 ? 0.6 : 1);
@@ -588,7 +588,7 @@
       if (eTraction) {
         const vo = igbtVoices[kindKey] || (igbtVoices[kindKey] = buildIgbt(kindKey, prof));
         attachIgbt(kindKey, vo);
-        igbtUpdate(vo, v, pow, regen);
+        igbtUpdate(vo, v, pow, powTone, regen);
         if (diesel && diesel.out) diesel.gate.force(false);
       }
       if (!eTraction) {
@@ -597,7 +597,7 @@
         dieselUpdate(diesel, v, tracFrac > 0.02 ? 0.35 + 0.65 * tracFrac : 0, dt, t);
       }
       // contactor thunk when power comes on from standstill (electric)
-      if (eTraction && tracFrac > 0.06 && lastTrac <= 0.06 && v < 0.6) { play(HITS.contactor, { t, vol: 0.3, dest: G.tract }); }
+      if (eTraction && tracFrac > 0.06 && lastTrac <= 0.06 && v < 0.6 && t - contactorAt > 3) { contactorAt = t; play(HITS.contactor, { t, vol: 0.3, dest: G.tract }); }
       lastTrac = tracFrac;
 
       // ----- brake system
@@ -834,7 +834,7 @@
     };
     resume();
 
-    const stats = () => ({ created: count.created, live: count.live, livePeak: count.livePeak, shots: count.shots, dropped: count.dropped, pending: joint.pending.length, sources: sources.length, state: ctx.state, vehicle: kindKey, perspective: perspNow });
+    const stats = () => ({ created: count.created, live: count.live, livePeak: count.livePeak, shots: count.shots, dropped: count.dropped, pending: joint.pending.length, sources: sources.length, state: ctx.state, time: +ctx.currentTime.toFixed(2), vehicle: kindKey, perspective: perspNow });
     const dispose = guard('dispose', function () {
       disposed = true;
       if (hornVoice) hornVoice.stop();

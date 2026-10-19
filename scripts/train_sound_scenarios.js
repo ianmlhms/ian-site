@@ -40,7 +40,7 @@
         else acc = -0.012 * (v > 0.1 ? 1 : 0) - 0.00008 * v * v;   // coasting drag
         const tracTarget = lever > 0 && !parking && doors === 0 ? lever / 5 : 0;
         trac += Math.max(-3 * DT, Math.min(0.9 * DT, tracTarget - trac));
-        const nv = Math.max(0, v + acc * DT);
+        const nv = st.holdV != null ? st.holdV : Math.max(0, v + acc * DT);
         a = (nv - v) / DT; v = nv;
         frames.push({
           t,
@@ -112,7 +112,27 @@
     ], { tail: 1.5 });
   }
 
+  /* Every one-shot of every vehicle, one after the other (horn / bell, door chime, door open + close, announcement gong, crossing bell, emergency brake). */
+  function oneshots(camera) {
+    const all = [];
+    const seg = (id, speed, ev, len) => { const frames = run(id, camera, [{ for: len, lever: 0, holdV: speed, doors: 0, park: false, events: ev }], { tail: 0 }); all.push({ id, frames }); };
+    ['tram', 'railcar', 'emu', 'kiss', 'ic', 'hst'].forEach((id) => {
+      const fast = id === 'tram' ? 14 : 0;   // the tram uses the bell below 30 km/h and the horn above
+      seg(id, id === 'tram' ? 3 : 0, [[0.4, 'horn', true], [2.2, 'horn', false], [2.8, 'doorChime'], [5.6, 'doorOpen'], [8.4, 'doorClose'], [11.0, id === 'tram' ? 'gong' : 'signalBell', 3, 1]], 13.5);
+      if (id === 'tram') seg(id, fast, [[0.4, 'horn', true], [1.6, 'horn', false]], 2.6);
+    });
+    // stitch: shift times, concatenate frames/events
+    const frames = [], events = []; let off = 0, tNow = 0;
+    all.forEach(({ id, frames: f }) => {
+      f.frames.forEach((fr) => frames.push({ t: fr.t + off, p: fr.p }));
+      f.events.forEach((e) => events.push({ ...e, t: e.t + off }));
+      off += f.dur; tNow = off;
+    });
+    return { dur: tNow + 1, frames, events };
+  }
+
   const NAMES = {
+    oneshots: (c) => oneshots(c),
     tram_city: (c) => tramCity(c),
     railcar: (c) => railRun('railcar', 80, c, { accelBoost: 1.25 }),
     emu: (c) => railRun('emu', 120, c, { accelBoost: 2.2 }),
