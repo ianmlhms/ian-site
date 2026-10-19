@@ -20,7 +20,7 @@
     [-540, 158, { hw: 8, wl: 2.2, wr: 2.2 }], [-640, 181, { hw: 8, wl: 2.2, wr: 2.2 }], [-731, 202, { hw: 8, wl: 2.2, wr: 2.2 }],
     [-775, 212, { hw: 9, wl: 4, wr: 4 }], [-795, 217, { r: 34, hw: 10, wl: 5, wr: 15 }], [-822, 188, { r: 34, hw: 10, wl: 5, wr: 15 }], [-810, 150, { r: 34, hw: 10, wl: 5, wr: 15 }], [-770, 152, { hw: 9, wl: 4, wr: 4 }], [-733, 160, { hw: 8, wl: 2.2, wr: 2.2 }],
     [-640, 142, { hw: 8, wl: 2.2, wr: 2.2 }], [-511, 117, { hw: 8, wl: 2.2, wr: 2.2 }],
-  ] }, ['day', 'sunset', 'night', 'rain'], [['data-kirchberg.js', 1], ['tracks-kirchberg.js', 1]]);
+  ] }, ['day', 'sunset', 'night', 'rain'], [['data-kirchberg.js', 1], ['tracks-kirchberg.js', 2]]);
 
   T('grund', { hw: 7, r: 22, wl: 2.6, wr: 2.6, pts: [
     [-218, -30, { y: 0 }], [-224, 70, { y: 0 }], [-221, 118, { y: 0, r: 20 }],
@@ -32,7 +32,7 @@
   T('belval', { hw: 11, r: 30, pts: [
     [150, 119, { hw: 12 }], [262, 164, { hw: 13 }], [301, 180, { hw: 13, wl: 24 }], [352, 200, { r: 34, hw: 13, wl: 24 }], [368, 142, { hw: 13, wl: 24 }], [392, 70, { hw: 12 }],
     [446, -150, { r: 40 }], [300, -197, { hw: 11 }], [200, -230, { hw: 10, wl: 20 }], [118, -250, { r: 34, hw: 10, wl: 20 }], [110, -215, { hw: 10, wl: 20 }], [90, -150, { hw: 11 }], [20, 96, { r: 28 }],
-  ] }, ['day', 'sunset', 'night', 'rain'], [['data-belval.js', 1], ['tracks-belval.js', 1]]);
+  ] }, ['day', 'sunset', 'night', 'rain'], [['data-belval.js', 1], ['tracks-belval.js', 2]]);
 
 
   /* ---- Fantasy Cup (stage 2b): Zockerland (candy), Äisbierg (ice mountain), Vulkanbierg (volcano) ---- */
