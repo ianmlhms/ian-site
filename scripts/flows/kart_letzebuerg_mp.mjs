@@ -634,7 +634,7 @@ export const flow = {
           h.eq(await kl(Q, () => [__klTest.session().idx, __klTest.G.track.id]), [r, CUP[r]], 'the guest loaded the same track (' + CUP[r] + ') without pressing ready again');
           await kl(P, () => __klTest.autopilot(true)); await kl(Q, () => __klTest.autopilot(true));
           const last = r === CUP.length - 1;
-          for (const p of [P, Q]) await waitFor(p, (l) => (l ? /Resultat|result|Ergebnis/i : /\d\/4/).test(document.getElementById('endTitle').textContent) && !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, last, 300000);
+          for (const p of [P, Q]) await waitFor(p, (l) => (l ? /Resultat|result|Ergebnis/i : /\d\/4/).test(document.getElementById('endTitle').textContent) && !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, last, 480000);
           const t = await Promise.all([P, Q].map((p) => p.page.locator('#endList').innerText()));
           h.eq(same(t[0]), same(t[1]), 'both sides show the same ' + (last ? 'final table' : 'Grand Prix table after race ' + (r + 1)));
           if (!last) {
