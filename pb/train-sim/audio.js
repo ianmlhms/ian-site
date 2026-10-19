@@ -20,7 +20,7 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
 
-  const MASTER_LEVEL = 0.63;
+  const MASTER_LEVEL = 0.8;
   const SPEECH_LANG = { lb: ['lb-LU', 'lb', 'de-LU', 'de-DE', 'de'], de: ['de-DE', 'de'], fr: ['fr-FR', 'fr'], en: ['en-GB', 'en-US', 'en'] };
   const MAX_TRANSIENT = 90;       // hard cap on simultaneously alive one-shot nodes groups (hits, hisses): protects slow devices
   const DT_MIN = 0.02;            // update throttle (s)
@@ -43,9 +43,9 @@
   };
   /* camera perspectives: per-group level + low-pass of the whole scene */
   const PERSP = {
-    outside: { lp: 16000, tract: 0.9, mech: 0.8, roll: 1.0, aero: 1.0, aux: 0.2, eng: 1.0, brk: 1.0, doors: 0.6, announce: 0.5, rain: 1.0 },
-    cab: { lp: 4200, tract: 0.55, mech: 0.7, roll: 0.6, aero: 0.45, aux: 0.7, eng: 0.8, brk: 0.7, doors: 0.45, announce: 0.4, rain: 0.9 },
-    saloon: { lp: 3300, tract: 0.4, mech: 0.45, roll: 0.7, aero: 0.3, aux: 1.0, eng: 0.55, brk: 0.55, doors: 0.7, announce: 1.0, rain: 0.85 },
+    outside: { gain: 1.0, lp: 16000, tract: 0.9, mech: 0.8, roll: 1.0, aero: 1.0, aux: 0.2, eng: 1.0, brk: 1.0, doors: 0.6, announce: 0.5, rain: 1.0 },
+    cab: { gain: 1.2, lp: 4200, tract: 0.55, mech: 0.7, roll: 0.6, aero: 0.45, aux: 0.7, eng: 0.62, brk: 0.7, doors: 0.45, announce: 0.4, rain: 0.9 },
+    saloon: { gain: 1.1, lp: 3300, tract: 0.4, mech: 0.45, roll: 0.7, aero: 0.3, aux: 1.0, eng: 0.55, brk: 0.55, doors: 0.7, announce: 1.0, rain: 0.85 },
   };
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -79,7 +79,8 @@
 
     // ---------------------------------------------------------- node helpers
     const gain = (v) => { const g = ctx.createGain(); g.gain.value = v == null ? 0 : v; count.created++; return g; };
-    const filt = (type, f, q) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; if (q != null) n.Q.value = q; count.created++; return n; };
+    const NYQ = sr * 0.45;
+    const filt = (type, f, q) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = Math.min(f, NYQ); if (q != null) n.Q.value = q; count.created++; return n; };
     const osc = (type, f) => { const o = ctx.createOscillator(); if (type) o.type = type; o.frequency.value = f; count.created++; return o; };
     const lastSet = new WeakMap();
     function set(param, v, tc, rel) {
@@ -515,7 +516,6 @@
       if (compState.next < 0) compState.next = t + rnd(5, 14);
       if (!compState.on && t >= compState.next) {
         compState.on = true; compState.started = t; compState.until = t + rnd(11, 24);
-        if (!comp || comp.style !== prof.aux) { if (comp) { try { comp.out.disconnect(); } catch (e) { /* none */ } } comp = buildComp(prof.aux); }
         comp.out.connect(G.aux); comp.out.gain.cancelScheduledValues(t); comp.out.gain.setValueAtTime(0, t); comp.out.gain.linearRampToValueAtTime(prof.aux === 'piston' ? 0.13 : 0.1, t + 1.1);
         if (comp.pls) { comp.pls.frequency.setValueAtTime(2.2, t); comp.pls.frequency.linearRampToValueAtTime(6.5, t + 1.2); }
         if (comp.s1 && comp.style === 'screw') { comp.s1.frequency.setValueAtTime(60, t); comp.s1.frequency.exponentialRampToValueAtTime(160, t + 1.2); }
@@ -549,6 +549,7 @@
       const v = Math.max(0, fin(p.speedMs, 0)), lever = fin(p.lever, 0), ts = clamp(fin(p.timeScale, 1), 1, 2.5);
       kindKey = resolveVehicle(p, kindKey);
       const prof = VEH[kindKey], vEff = v * ts;
+      if (!comp || comp.style !== prof.aux) { if (comp) { try { comp.out.disconnect(); } catch (e) { /* none */ } compState.on = false; } comp = buildComp(prof.aux); }
       const camera = p.camera === 'cab' ? 'cab' : p.camera === 'inside' ? 'saloon' : 'outside'; perspNow = camera;
       const tunnel = !!p.inTunnel, bridge = !!p.onBridge, doors = clamp(fin(p.doorsOpen01, 0), 0, 1);
       const weather = p.weather || (p.rain ? 'rain' : 'clear');
@@ -560,14 +561,14 @@
       const pr = (k) => lerp(persp[k], PERSP.outside[k], leak * 0.6);
       const snow = weather === 'snow', fog = weather === 'fog';
       const wxMuff = snow ? 0.6 : fog ? 0.8 : 1;
-      set(camLP.frequency, Math.min(persp.lp * (leak > 0 ? 1 + leak * 1.2 : 1), 16000) * wxMuff, 0.15, 0.01);
+      set(camLP.frequency, Math.min(persp.lp * (leak > 0 ? 1 + leak * 1.2 : 1), 16000, NYQ) * wxMuff, 0.15, 0.01);
       set(camBody.gain, camera === 'outside' ? 0 : 2.5, 0.2);
       set(tunnelGain.gain, tunnel ? 1.3 : 1, 0.35); set(tunnelSend.gain, tunnel ? 0.42 : 0, 0.4);
-      set(vehTrim.gain, prof.level, 0.3);
+      set(vehTrim.gain, prof.level * persp.gain, 0.3);
       const gv = { tract: pr('tract'), mech: pr('mech'), roll: pr('roll') * (snow ? 0.75 : 1), aero: pr('aero'), aux: pr('aux'), eng: pr('eng'), brk: pr('brk'), amb: 1 };
       Object.keys(gv).forEach((k) => set(G[k].gain, dbg.mute.has(k) ? 0 : gv[k], 0.1));
       set(doorBus.gain, dbg.mute.has('doors') ? 0 : persp.doors, 0.1); set(shotBus.gain, dbg.mute.has('shots') ? 0 : 1, 0.1);
-      set(announceBus.gain, 0.9 * persp.announce, 0.15); set(announceLP.frequency, camera === 'outside' ? 5200 : camera === 'cab' ? 3600 : 12000, 0.2);
+      set(announceBus.gain, 0.9 * persp.announce, 0.15); set(announceLP.frequency, Math.min(NYQ, camera === 'outside' ? 5200 : camera === 'cab' ? 3600 : 12000), 0.2);
 
       // ----- demands
       const tracFrac = p.traction != null ? clamp(fin(p.traction, 0), 0, 1) : (lever > 0 ? clamp(lever / 5, 0, 1) : 0);
@@ -657,7 +658,7 @@
       const wxLevel = Math.max(rainK, 0);
       wxG.level(wxLevel + snowK, t);
       set(wxBus.gain, (wxLevel * (camera === 'outside' ? 0.12 : camera === 'cab' ? 0.2 : 0.17) + snowK * 0.05) * persp.rain, 0.4);
-      set(wxFilter.frequency, camera === 'outside' ? 9000 : 3200, 0.3);
+      set(wxFilter.frequency, Math.min(NYQ, camera === 'outside' ? 9000 : 3200), 0.3);
       set(wx.bp.frequency, camera === 'outside' ? 4200 : 1700, 0.3); set(wx.gH.gain, camera === 'outside' ? 0.65 : 0.3, 0.3); set(wx.gD.gain, camera === 'outside' ? 0.7 : 1.1, 0.3); set(wx.gR.gain, camera === 'outside' ? 0.15 : 0.9, 0.3);
       const wipers = camera === 'cab' && !tunnel && (weather === 'rain' || weather === 'snow' || rainK > 0.3);
       // ambience: street / countryside + station murmur with open doors

@@ -141,5 +141,10 @@
     hst: (c) => railRun('hst', 220, c, { accelBoost: 4, curveR: 2500 }),
     tunnel_rain: (c) => tunnelRain(c),
   };
-  window.TS_SCEN = { names: Object.keys(NAMES), trains: TRAINS, build: (name, camera) => NAMES[name](camera || 'cab') };
+  window.TS_SCEN = { names: Object.keys(NAMES), trains: TRAINS, build: (name, camera, maxDur) => {
+      const sc = NAMES[name](camera || 'cab');
+      if (!(maxDur > 0) || sc.dur <= maxDur) return sc;
+      return { dur: maxDur, frames: sc.frames.filter((f) => f.t < maxDur), events: sc.events.filter((e) => e.t < maxDur) };
+    },
+  };
 })();
