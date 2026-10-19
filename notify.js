@@ -19,6 +19,7 @@ const GAME_NAMES = {
   color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi",
   dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
   checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel",
+  "kart-letzebuerg": "Kart Lëtzebuerg",
 };
 
 /* ---------- service worker ---------- */

@@ -10,7 +10,7 @@
     const N = track.N, step = track.step;
     const i0 = k.hint >= 0 ? k.hint : 0;
     const sp = Math.max(k.speed, 0);
-    k.ai = k.ai || { t: Math.random() * 3, mistake: 0, mistakeT: 0, driftHold: 0, itemT: 1 + Math.random() * 2, laneJit: 0, laneT: 0, wobble: Math.random() * 6 };
+    k.ai = k.ai || { t: Math.random() * 3, mistake: 0, mistakeT: 0, driftHold: 0, itemT: 1 + Math.random() * 2, laneJit: 0, laneT: 0, wobble: Math.random() * 6, driftDir: k.drift.dir < 0 ? -1 : 1 };   // a human kart handed to the AI mid-drift (away / left the room) has no drift side yet
     const ai = k.ai;
     ai.t += dt;
     // occasional lane change and small mistakes (more on easy)
@@ -89,6 +89,7 @@
         if (k.drift.state === 1) steer = ai.driftDir * 0.8;
       }
     }
+    if (!isFinite(steer)) steer = 0;     // never let a NaN reach the kart state (it would poison the position and progress)
     // starting boost for the bots
     inp.steer = steer; inp.gas = gas; inp.brake = brake; inp.drift = wantDrift; inp.item = false;
 

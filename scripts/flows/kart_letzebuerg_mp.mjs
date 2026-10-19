@@ -327,6 +327,17 @@ export const flow = {
         await sleep(3000);
         const yid = await kl(Y, () => __klTest.G.human.id);
         const hide = (p, hidden) => p.page.evaluate((hd) => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => hd }); document.dispatchEvent(new Event('visibilitychange')); }, hidden);
+        // regression (flaky before): a kart that was mid-drift when its human went away/left had no drift side in its fresh AI state -> NaN steer -> NaN position/progress for good
+        const aiSteer = await kl(X, (id) => {
+          const R = __klTest.G.race, base = R.byId[id], out = [];
+          for (const [state, dir] of [[1, -1], [1, 1], [2, -1], [2, 1], [0, 1]]) {
+            const k = Object.assign({}, base, { drift: { state, dir, charge: 0, level: 1, hopT: 0 }, input: { steer: 0, gas: 0, brake: 0, drift: false, item: false, itemBack: false }, ai: null, hint: -1, item: null, isBot: true });
+            for (let i = 0; i < 3; i++) KL.botThink(k, R, 1 / 60);
+            out.push(k.input.steer);
+          }
+          return out;
+        }, yid);
+        h.expect(aiSteer.every((v) => Number.isFinite(v)), 'a bot taking over a drifting kart steers with finite input (' + aiSteer.map((v) => Math.round(v * 100) / 100).join(', ') + ')');
         const prog0 = await kl(X, (id) => __klTest.G.race.byId[id].prog, yid);
         await hide(Y, true);
         await sleep(1200);
@@ -334,7 +345,7 @@ export const flow = {
         h.expect(awayK && awayK.away && awayK.bot, 'host: the hidden player\'s kart is bot-driven (away)');
         await sleep(3500);
         const prog1 = await kl(X, (id) => __klTest.G.race.byId[id].prog, yid);
-        h.expect(prog1 - prog0 > 60, 'the bot keeps the kart racing while the tab is hidden (+' + Math.round(prog1 - prog0) + ' m)');
+        h.expect(Number.isFinite(prog1) && prog1 - prog0 > 60, 'the bot keeps the kart racing while the tab is hidden (+' + Math.round(prog1 - prog0) + ' m)');
         await hide(Y, false);
         await sleep(1500);
         mx = await mp(X); const backK = mx.karts.find((k) => k.id === yid);
