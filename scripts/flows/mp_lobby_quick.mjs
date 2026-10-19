@@ -107,10 +107,10 @@ export const flow = {
       h.expect(true, "a 6-character code → the old room link (no lobby)");
       await c.page.goto(h.origin + "/pixelbreak.html", { waitUntil: "domcontentloaded" });
       await c.page.waitForFunction(() => window.MPG);
-      await c.page.evaluate(() => openOnline(GAMES.findIndex((g) => g.id === "o-tictactoe")));
+      await c.page.evaluate(() => openOnline(GAMES.findIndex((g) => g.id === "o-meme")));
       await c.page.click("#om .go >> nth=0");
-      await c.page.waitForURL(/tictactoe\.html\?room=[a-z0-9]{6}&role=host/);
-      h.expect(true, "a game without the lobby (Tic-Tac-Toe) still starts the old way");
+      await c.page.waitForURL(/meme\.html\?room=[a-z0-9]{6}&role=host/);
+      h.expect(true, "a game without the lobby (Meme Caption Party) still starts the old way");
 
       h.step("friends page: «Play» → Connect 4 opens a lobby and invites that friend; a pending invite's Join goes to the lobby");
       const fr = await newPlayer(h, world, { label: "friends-page", user: USERS.ian }); players.push(fr);

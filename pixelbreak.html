@@ -649,7 +649,7 @@ _omOpener=null;
 /* Games that have the shared lobby (lobby.html, see mp-games.js) open it instead of a bare room link.
  * 4-letter codes belong to the lobby; older 6-character room codes still join the old way. */
 var MPG=null;
-import('./mp-games.js?v=1').then(function(m){MPG=m}).catch(function(){});
+import('./mp-games.js?v=2').then(function(m){MPG=m}).catch(function(){});
 function lobbyIdFor(href){if(!MPG)return null;var ids=Object.keys(MPG.MP_GAMES);for(var i=0;i<ids.length;i++){var g=MPG.MP_GAMES[ids[i]];if(g.lobby&&g.page===href)return g.id}return null}
 function startOnline(href){var lg=lobbyIdFor(href);if(lg){location.href=MPG.lobbyUrl(lg,'new');return}
 location.href=href+'?room='+Math.random().toString(36).slice(2,8)+'&role=host'}
