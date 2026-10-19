@@ -1,5 +1,5 @@
 /* Kart Lëtzebuerg — fantasy track 2: Zockerland (candy land). Original design: icing road, a layer-cake mountain with a chocolate river
- * that the last straight crosses on a kicker (ford), a pretzel arch (Bretzelsonndeg wink), honey puddles, a gumdrop shortcut, banked sweepers. */
+ * that the last straight crosses on a kicker (ford), a rainbow sugar arch, honey puddles, a gumdrop shortcut, banked sweepers. */
 (function () {
   'use strict';
   const KL = window.KL, T = window.THREE, { clamp, lerp, smooth } = KL;
@@ -133,16 +133,20 @@
         const mkc = (r1, r2, h, y) => { const m = new T.Mesh(new T.CylinderGeometry(r1, r2, h, 14, 1, true), cm); m.position.set(fx, fy + y, fz); S.group.add(m); return m; };
         mkc(6.2, 9.4, 6, 14.6 + 0.0); mkc(9.0, 14.2, 7.2, 7.1); renderer.animators.push((dt) => { cm.map.offset.y -= dt * 0.5; });
       }
-      /* ---- pretzel arch over the first straight ---- */
+      /* ---- rainbow sugar arch over the first straight (four pastel bands, gumdrop feet, sprinkles on top) ---- */
       {
-        const s = 108, p = track.at(s, 0), rx = -p.tz, rz = p.tx, hw = p.hw + 2.6 + 2.4, base = p.y;
-        for (const sd of [-1, 1]) { L.box(B, { x: p.x + rx * sd * (hw + 1.5), y: base, z: p.z + rz * sd * (hw + 1.5), yaw: Math.atan2(p.tx, p.tz) }, 0, 0, 0, 3.6, 17, 3.6, 0, col('#d9a35c')); for (let k = 0; k < 4; k++) L.box(B, { x: p.x + rx * sd * (hw + 1.5), y: base, z: p.z + rz * sd * (hw + 1.5), yaw: Math.atan2(p.tx, p.tz) }, 0, 3 + k * 4, 0, 3.9, 0.7, 3.9, 0, col('#ffffff')); }
-        L.box(B, { x: p.x, y: base, z: p.z, yaw: Math.atan2(p.tx, p.tz) }, 0, 17, 0, (hw + 3.3) * 2, 2.2, 3.6, 0, col('#ff7eb6'), { topCol: col('#ffffff') });
-        const P = (u, v, d) => [p.x + rx * u - p.tx * (d || 0), base + 19.2 + v, p.z + rz * u - p.tz * (d || 0)];
-        const brown = col('#b86b2e'), pts = [];
-        const ell = (cu, cv, ru, rv, a0, a1, n) => { const o = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push([cu + Math.cos(a) * ru, cv + Math.sin(a) * rv]); } return o; };
-        const strands = [ell(-5.4, 4.3, 5.8, 4.6, 0.6, 6.28 + 0.6 + 2.4, 28), ell(5.4, 4.3, 5.8, 4.6, 2.55, 6.28 + 2.55 + 2.4, 28), ell(0, 9.2, 7.6, 7.4, 0.15, 3.0, 22)];
-        for (const st of strands) { for (let i = 0; i + 1 < st.length; i++) L.bar(B, P(st[i][0] * 1.3, st[i][1] * 1.05), P(st[i + 1][0] * 1.3, st[i + 1][1] * 1.05), 1.35, brown); for (let i = 0; i < st.length; i += 2) { const a = P(st[i][0] * 1.3, st[i][1] * 1.05, 0.9); B.sphere(a[0], a[1], a[2], 0.28, 4, col('#fffaf0')); } }
+        const s = 108, p = track.at(s, 0), rx = -p.tz, rz = p.tx, base = p.y;
+        const R = p.hw + 2.6 + 4.2, T0 = 1.5, bands = ['#ff5f9a', '#ffd23f', '#7be08a', '#59b8ff'];
+        const P = (u, v, d) => [p.x + rx * u - p.tx * (d || 0), base + v, p.z + rz * u - p.tz * (d || 0)];
+        bands.forEach((c, bi) => {
+          const r = R - bi * T0, n = 30, cc = col(c), pts = [];
+          for (let i = 0; i <= n; i++) { const a = Math.PI * i / n; pts.push(P(Math.cos(a) * r, 1 + Math.sin(a) * r * 1.05)); }
+          for (let i = 0; i < n; i++) L.bar(B, pts[i], pts[i + 1], T0 * 1.02, cc);
+        });
+        // gumdrop feet on both sides, sprinkles and a cherry on the crown
+        for (const sd of [-1, 1]) { const q = P(sd * (R - 2.25), 0.2); B.sphere(q[0], q[1], q[2], 4.4, 9, col('#ffffff'), { sy: 0.55 }); const q2 = P(sd * (R - 2.25), 1.8); B.sphere(q2[0], q2[1], q2[2], 3.0, 8, col(sd < 0 ? '#ff7eb6' : '#b78cff'), { sy: 0.8 }); }
+        for (let i = 1; i < 17; i++) { const a = Math.PI * i / 17, q = P(Math.cos(a) * (R + 0.9), 1 + Math.sin(a) * (R + 0.9) * 1.05, 0); B.sphere(q[0], q[1], q[2], 0.7, 5, col(PAL[i % 7])); }
+        const top = P(0, 1 + R * 1.05 + 1.8); B.sphere(top[0], top[1], top[2], 1.8, 7, col('#e3173f'), { noise: 1 }); B.cyl(top[0], top[1] + 1.6, top[2], 0.2, 0.15, 1.6, 5, col('#3b7a2a'));
       }
       /* ---- cupcakes, ice-cream towers, donuts around the field ---- */
       K.scatter(S, rnd, Math.round(16 * q.trees), [-380, -240, 420, 420], 14, (x, y, z, i) => {
