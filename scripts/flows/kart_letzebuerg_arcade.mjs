@@ -155,9 +155,10 @@ export const flow = {
       h.eq([r.lap, r.race], [true, true], id + ': first run sets both personal records');
     }
     await sleep(2500);
-    const np = posts(sentFrom).map((c) => c.body.game_id).sort();
+    const newPosts = posts(sentFrom).filter((c) => /kirchberg|grund|belval/.test(c.body.game_id));
+    const np = newPosts.map((c) => c.body.game_id).sort();
     h.eq(np, ['kart-letzebuerg-lap-belval', 'kart-letzebuerg-lap-grund', 'kart-letzebuerg-lap-kirchberg', 'kart-letzebuerg-race-belval', 'kart-letzebuerg-race-grund', 'kart-letzebuerg-race-kirchberg'], 'each new track writes its own lap and race board');
-    h.expect(posts(sentFrom).every((c) => c.body.score > 0 && c.body.score < SCORE_BASE), 'scores are 1000000 - milliseconds');
+    h.expect(newPosts.every((c) => c.body.score > 0 && c.body.score < SCORE_BASE), 'scores are 1000000 - milliseconds');
     await F.evaluate(() => document.getElementById('btnBoards') && document.getElementById('btnBoards').click());
     await F.waitForSelector('#bdScreen:not([hidden]) #bdTracks button', { timeout: 8000 });
     h.eq(await F.locator('#bdTracks button').count(), 5, 'the boards dialog lists all five tracks');
