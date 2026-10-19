@@ -33,7 +33,7 @@
       for (let i = 0; i < 34; i++) { g.strokeStyle = `rgba(255,255,255,${0.18 + rnd() * 0.3})`; g.lineWidth = 1 + rnd() * 2; g.beginPath(); let x = rnd() * W, y = rnd() * H; g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (rnd() - 0.3) * 44; y += (rnd() - 0.5) * 30; g.lineTo(x, y); } g.stroke(); }
       for (let i = 0; i < 12; i++) { const x = rnd() * W, y = rnd() * H, gr = g.createRadialGradient(x, y, 0, x, y, 26 + rnd() * 30); gr.addColorStop(0, 'rgba(110,170,225,.28)'); gr.addColorStop(1, 'rgba(110,170,225,0)'); g.fillStyle = gr; g.fillRect(x - 60, y - 60, 120, 120); }
     } },
-    basalt: { base: '#3b3735', edge: '#ffb347', dash: '#ff8a2a', extra(g, W, H, rnd) {             // cooled lava: dark crust with glowing hairline cracks
+    basalt: { base: '#5b524d', edge: '#ffb347', dash: '#ff8a2a', extra(g, W, H, rnd) {             // cooled lava: dark crust with glowing hairline cracks
       for (let i = 0; i < 24; i++) { g.strokeStyle = `rgba(255,${110 + Math.floor(rnd() * 70)},30,${0.25 + rnd() * 0.4})`; g.lineWidth = 1 + rnd() * 1.6; g.beginPath(); let x = rnd() * W, y = rnd() * H; g.moveTo(x, y); for (let k = 0; k < 5; k++) { x += (rnd() - 0.5) * 50; y += (rnd() - 0.5) * 36; g.lineTo(x, y); } g.stroke(); }
     } },
   };

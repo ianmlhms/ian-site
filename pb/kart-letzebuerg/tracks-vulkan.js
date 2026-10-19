@@ -35,13 +35,13 @@
     alts: [{ hw: 4.6, pts: [[-190.8, 41.6], [-72.3, -93.3]] }],
     theme: {
       weathers: ['day', 'sunset', 'night', 'fog'], startText: 'FEIERBIERG', facade: 'old', buildings: false, lamps: false, skyline: false,
-      roadStyle: 'basalt', vergeTex: ['#3a312d', '#201a18', '#574940', { cracks: '#ff6a14' }], kerbColors: ['#ff6a14', '#2a2220'],
-      ground: 'grass', groundTex: ['#3b312e', '#201817', '#5f4a40', { cracks: '#ff6a14' }], groundY: 0, groundCell: 8, groundColor: '#3a302d',
-      wallStyle: 'rock', wallColor: '#6a5a52', wallTop: '#8a7468', wallH: 1.4, vergeColor: '#ffffff', fogScale: 1.0, farColor: '#3a2a26', farDrop: -50,
+      roadStyle: 'basalt', vergeTex: ['#5a4a42', '#33292a', '#7a6458', { cracks: '#ff6a14' }], kerbColors: ['#ff6a14', '#2a2220'],
+      ground: 'grass', groundTex: ['#5c4a42', '#352a28', '#80675a', { cracks: '#ff6a14' }], groundY: 0, groundCell: 8, groundColor: '#5c4a42',
+      wallStyle: 'rock', wallColor: '#8a766b', wallTop: '#a88e80', wallH: 1.4, vergeColor: '#ffffff', fogScale: 1.0, farColor: '#3a2a26', farDrop: -50,
       weatherTint: {
-        day: { sky: ['#c25a3a', '#ffc690'], fog: '#e6a070', hemi: ['#ffe4c4', '#9a6a58', 1.2] },
-        sunset: { sky: ['#4a1d4a', '#ff7a3a'], fog: '#c55a38', hemi: ['#ffb088', '#7a4038', 1.05] },
-        night: { sky: ['#07030a', '#3a1210'], fog: '#1e0c0b', hemi: ['#ff8a5a', '#2a1210', 0.62] },
+        day: { sky: ['#d2603a', '#ffd0a0'], fog: '#eeaa7c', hemi: ['#fff0d8', '#b07a64', 1.65] },
+        sunset: { sky: ['#4a1d4a', '#ff7a3a'], fog: '#d0643c', hemi: ['#ffbc94', '#8e5044', 1.4] },
+        night: { sky: ['#07030a', '#3a1210'], fog: '#241010', hemi: ['#ff9a6a', '#33181a', 0.8] },
         fog: { sky: ['#5a4a46', '#8a7870'], fog: '#80706a', hemi: ['#d0bcb0', '#4a3a36', 0.82] },
       },
       groundColorAt(x, z, h) {
