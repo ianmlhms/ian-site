@@ -28,11 +28,11 @@
   /* Vehicle table. igbt: k = motor electrical Hz per m/s, fc = asynchronous carrier, fHigh = highest synchronous tone, Ps = pulse counts (descending). */
   const VEH = {
     tram: { fam: 'igbt', k: 5.8, fc: 1700, fHigh: 2300, Ps: [63, 45, 33, 27, 21], tone: 0.55, hum: 0.8, gearK: 44, gear: 0.55, trafo: 0, fan: 0.55, aux: 'screw', rollK: 1.3, hiss: 0.0, grit: 1.0, joint: 0, wind: 0.5, rcrit: 80, cars: 5, carLen: 9, level: 0.61, beep: 'tram', horn: 'tram', amb: 'city', bogieSpacing: 2.2 },
-    emu: { fam: 'igbt', k: 4.6, fc: 1050, fHigh: 1450, Ps: [27, 21, 15, 11, 9, 7], tone: 0.55, hum: 0.8, gearK: 40, gear: 0.5, trafo: 0.9, fan: 0.75, aux: 'piston', rollK: 1.0, hiss: 0.8, grit: 0.4, joint: 0.28, wind: 0.8, rcrit: 330, cars: 2, carLen: 26, level: 0.6, beep: 'pip', horn: 'emu', amb: 'country', bogieSpacing: 2.5 },
-    kiss: { fam: 'igbt', k: 4.2, fc: 900, fHigh: 1250, Ps: [21, 15, 11, 9, 7, 5], tone: 0.6, hum: 1.0, gearK: 36, gear: 0.5, trafo: 1.0, fan: 0.85, aux: 'piston', rollK: 1.05, hiss: 0.8, grit: 0.4, joint: 0.22, wind: 0.9, rcrit: 380, cars: 4, carLen: 26, level: 0.5, beep: 'pip', horn: 'kiss', amb: 'country', bogieSpacing: 2.5 },
-    ic: { fam: 'igbt', k: 3.3, fc: 750, fHigh: 1050, Ps: [15, 11, 9, 7, 5], tone: 0.62, hum: 1.25, gearK: 30, gear: 0.7, trafo: 1.5, fan: 1.3, aux: 'piston', rollK: 1.15, hiss: 0.9, grit: 0.4, joint: 0.2, wind: 1.0, rcrit: 450, cars: 7, carLen: 25, level: 0.41, beep: 'beep', horn: 'ic', amb: 'country', bogieSpacing: 2.6 },
-    hst: { fam: 'igbt', k: 2.5, fc: 820, fHigh: 1100, Ps: [21, 15, 11, 9, 7, 5], tone: 0.42, hum: 0.9, gearK: 26, gear: 0.4, trafo: 1.1, fan: 1.0, aux: 'screw', rollK: 1.1, hiss: 1.2, grit: 0.3, joint: 0.06, wind: 1.7, rcrit: 1500, cars: 8, carLen: 21.5, level: 0.36, beep: 'bing', horn: 'hst', amb: 'country', bogieSpacing: 3.0 },
-    railcar: { fam: 'diesel', rollK: 1.0, hiss: 0.6, grit: 0.55, joint: 0.5, wind: 0.6, rcrit: 280, cars: 1, carLen: 22, level: 0.62, aux: 'piston', beep: 'buzz', horn: 'diesel', amb: 'country', bogieSpacing: 2.6 },
+    emu: { fam: 'igbt', k: 4.6, fc: 1050, fHigh: 1450, Ps: [27, 21, 15, 11, 9, 7], tone: 0.9, hum: 0.8, gearK: 40, gear: 0.5, trafo: 0.9, fan: 0.75, aux: 'piston', rollK: 0.75, hiss: 0.8, grit: 0.4, joint: 0.28, wind: 0.8, rcrit: 330, cars: 2, carLen: 26, level: 0.6, beep: 'pip', horn: 'emu', amb: 'country', bogieSpacing: 2.5 },
+    kiss: { fam: 'igbt', k: 4.2, fc: 900, fHigh: 1250, Ps: [21, 15, 11, 9, 7, 5], tone: 0.95, hum: 1.0, gearK: 36, gear: 0.5, trafo: 1.0, fan: 0.85, aux: 'piston', rollK: 0.8, hiss: 0.8, grit: 0.4, joint: 0.22, wind: 0.9, rcrit: 380, cars: 4, carLen: 26, level: 0.5, beep: 'pip', horn: 'kiss', amb: 'country', bogieSpacing: 2.5 },
+    ic: { fam: 'igbt', k: 3.3, fc: 750, fHigh: 1050, Ps: [15, 11, 9, 7, 5], tone: 1.0, hum: 1.25, gearK: 30, gear: 0.7, trafo: 1.5, fan: 1.3, aux: 'piston', rollK: 0.85, hiss: 0.9, grit: 0.4, joint: 0.2, wind: 1.0, rcrit: 450, cars: 7, carLen: 25, level: 0.41, beep: 'beep', horn: 'ic', amb: 'country', bogieSpacing: 2.6 },
+    hst: { fam: 'igbt', k: 2.5, fc: 820, fHigh: 1100, Ps: [21, 15, 11, 9, 7, 5], tone: 0.65, hum: 0.9, gearK: 26, gear: 0.4, trafo: 1.1, fan: 1.0, aux: 'screw', rollK: 0.8, hiss: 1.2, grit: 0.3, joint: 0.06, wind: 1.7, rcrit: 1500, cars: 8, carLen: 21.5, level: 0.4, beep: 'bing', horn: 'hst', amb: 'country', bogieSpacing: 3.0 },
+    railcar: { fam: 'diesel', rollK: 0.8, hiss: 0.6, grit: 0.55, joint: 0.5, wind: 0.6, rcrit: 280, cars: 1, carLen: 22, level: 0.62, aux: 'piston', beep: 'buzz', horn: 'diesel', amb: 'country', bogieSpacing: 2.6 },
   };
   const HORNS = {
     diesel: { f: [311, 392], bright: 0.8, level: 1.0 },
@@ -835,7 +835,7 @@
     };
     resume();
 
-    const stats = () => ({ created: count.created, live: count.live, livePeak: count.livePeak, shots: count.shots, dropped: count.dropped, pending: joint.pending.length, sources: sources.length, state: ctx.state, time: +ctx.currentTime.toFixed(2), vehicle: kindKey, perspective: perspNow });
+    const stats = () => ({ created: count.created, live: count.live, livePeak: count.livePeak, shots: count.shots, dropped: count.dropped, pending: joint.pending.length, sources: sources.length, muted, clips: clipSources.length, duck: +duck.gain.value.toFixed(2), master: +master.gain.value.toFixed(3), state: ctx.state, time: +ctx.currentTime.toFixed(2), vehicle: kindKey, perspective: perspNow });
     const dispose = guard('dispose', function () {
       disposed = true;
       if (hornVoice) hornVoice.stop();

@@ -85,6 +85,20 @@ export const flow = {
       h.expect(samples.every((s) => s && s.state === 'running' && s.livePeak <= MAX_LIVE && s.dropped === 0), `${route}: running context, one-shots bounded (live peak ${Math.max(...samples.map((s) => s.livePeak))}), none dropped`);
       h.expect(samples.slice(1).every((s) => s.sources === samples[1].sources), `${route}: the number of looping sources stays constant while driving (${samples.map((s) => s.sources).join(',')})`);
       h.expect(last.live <= 30, `${route}: finished one-shots are released (${last.live} alive after the last burst)`);
+      if (route === 'luxtram') {
+        const ok = await h.page.evaluate(() => __tsTest.audioCall('announceClips', ['/data/luxtram/voice/exit-left-en.mp3'], 'x', 'en', 0));
+        await h.page.waitForTimeout(900);
+        const a = await h.page.evaluate(() => __tsTest.audioStats());
+        h.expect(ok === true && a.clips > 0 && a.duck < 0.9, `luxtram: announcement clip decodes + plays and the vehicle sound is ducked (clips ${a.clips}, duck ${a.duck})`);
+        await h.page.evaluate(() => __tsTest.audioCall('stopClips'));
+      }
+      await h.page.evaluate(() => __tsTest.audioCall('setMuted', true));
+      await h.page.waitForTimeout(500);
+      const m1 = await h.page.evaluate(() => __tsTest.audioStats());
+      await h.page.evaluate(() => __tsTest.audioCall('setMuted', false));
+      await h.page.waitForTimeout(500);
+      const m2 = await h.page.evaluate(() => __tsTest.audioStats());
+      h.expect(m1.muted === true && m1.master < 0.02 && m2.muted === false && m2.master > 0.5, `${route}: mute silences the master bus and unmute restores it (${m1.master} -> ${m2.master})`);
       await h.page.evaluate(() => __tsTest.toMenu());
       await h.page.waitForFunction(() => __tsTest.state().phase === 'menu', null, { timeout: 30000 });
     }
