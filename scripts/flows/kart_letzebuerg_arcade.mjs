@@ -151,14 +151,17 @@ export const flow = {
     h.eq(await F.evaluate(() => __klTest.KL.gpRaces(__klTest.KL.CUPS[0], __klTest.KL.tracks).map((r) => r.track)), ['villehaute', 'kirchberg', 'grund', 'belval'], 'Lëtzebuerg cup = Uewerstad, Kirchberg, Grund, Belval');
     h.eq(await F.evaluate(() => __klTest.KL.gpRaces(__klTest.KL.CUPS[1], __klTest.KL.tracks).map((r) => r.track)), ['zockerland', 'aisbierg', 'vulkan', 'geeschterschlass'], 'Fantasy cup = Zockerland, Äisbierg, Feierbierg, Geeschterschlass');
     const sentFrom = h.backend.calls.length;
-    for (const [i, id] of ['kirchberg', 'grund', 'belval', 'zockerland', 'aisbierg', 'vulkan'].entries()) {
+    for (const [i, id] of ['kirchberg', 'grund', 'belval'].entries()) {
       const r = await F.evaluate(([id, i]) => __klTest.KL.Progress.onRaceDone({ track: id, laps: 3, lapTimes: [52 + i, 51 + i, 50 + i], finished: true, time: 160 + i }), [id, i]);
       h.eq([r.lap, r.race], [true, true], id + ': first run sets both personal records');
     }
+    /* the Fantasy cup tracks got their records (and boards) from the Grand Prix above, so they are not part of the first-run record loop above */
+    const bests = await F.evaluate(() => __klTest.save().bests);
+    h.expect(['zockerland', 'aisbierg', 'vulkan'].every((t) => bests[t] && bests[t].lap > 0 && bests[t].race > 0), 'the Grand Prix stored lap and race records for the three Fantasy tracks');
     await sleep(2500);
-    const newPosts = posts(sentFrom).filter((c) => /kirchberg|grund|belval|zockerland|aisbierg|vulkan/.test(c.body.game_id));
+    const newPosts = posts(sentFrom).filter((c) => /kirchberg|grund|belval/.test(c.body.game_id));
     const np = newPosts.map((c) => c.body.game_id).sort();
-    h.eq(np, ['aisbierg', 'belval', 'grund', 'kirchberg', 'vulkan', 'zockerland'].flatMap((t) => ['lap', 'race'].map((k) => 'kart-letzebuerg-' + k + '-' + t)).sort(), 'each new track writes its own lap and race board');
+    h.eq(np, ['belval', 'grund', 'kirchberg'].flatMap((t) => ['lap', 'race'].map((k) => 'kart-letzebuerg-' + k + '-' + t)).sort(), 'each new track writes its own lap and race board');
     h.expect(newPosts.every((c) => c.body.score > 0 && c.body.score < SCORE_BASE), 'scores are 1000000 - milliseconds');
     await F.evaluate(() => document.getElementById('btnBoards') && document.getElementById('btnBoards').click());
     await F.waitForSelector('#bdScreen:not([hidden]) #bdTracks button', { timeout: 8000 });
