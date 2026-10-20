@@ -1,4 +1,6 @@
-/* Shared idle-game rewards. All calendar decisions use Luxembourg time. */
+/* Shared idle-game rewards. All calendar decisions use Luxembourg time.
+ * mount() options a game may add: starsText(save) and rebirthPreview(earnedStars) replace the default star bonus
+ * texts (Business Empire soft-caps its prestige bonus, so +N% would be wrong there). */
 (function(){
   const HOUR=3600,STAR_BONUS=0.1,ACTIVE_MS=15*60*1000,AWAY_BASE_RATE=0.25,AWAY_STAR_RATE=0.0375,MIN_SPAWN_MS=45000,SPAWN_RANGE_MS=45000,PUMPKIN_MS=8000;
   // Arcade test mode: everything unlocked, nothing counts (the games refill their own balances).
@@ -52,7 +54,7 @@
       const sleep=find('.idle-sleep'),rate=activityRate(save.st);
       sleep.hidden=rate===1;
       if(rate<1)sleep.textContent=rate===0?'💤 Inactive too long · production paused · tap to play':`💤 Inactive · ${Math.round(rate*100)}% production · tap to play`;
-      find('.idle-stars').textContent=`⭐ ${options.format(save.st)} · +${options.format(save.st*10)}%`;
+      find('.idle-stars').textContent=options.starsText?options.starsText(save):`⭐ ${options.format(save.st)} · +${options.format(save.st*10)}%`;
       find('.idle-rebirth').disabled=earned<1;
       find('.idle-progress').textContent=earned<1?`${options.format(save.rb)} / ${options.format(options.threshold)} this round`:`+${options.format(earned)} stars ready`;
       const gift=find('.idle-gift'),known=TEST_MODE||(Number.isFinite(streak?.streak)&&streak.streak>=1);
@@ -65,7 +67,7 @@
       if(earned<1)return;
       dialog.querySelector('.idle-reset').textContent='Resets: '+options.resets;
       dialog.querySelector('.idle-keep').textContent='Keeps: stars, lifetime total (leaderboard score), rebirth count, daily gift day'+(options.keeps?', '+options.keeps:'.');
-      dialog.querySelector('.idle-preview').textContent=`You get ${options.format(earned)} stars (+${options.format(earned*10)}% production).`;
+      dialog.querySelector('.idle-preview').textContent=options.rebirthPreview?options.rebirthPreview(earned):`You get ${options.format(earned)} stars (+${options.format(earned*10)}% production).`;
       dialog.showModal();
     });
     dialog.querySelector('.idle-cancel').addEventListener('click',()=>dialog.close());
@@ -113,5 +115,5 @@
     if(halloween())schedulePumpkin();
     refresh();return Object.freeze({refresh,notice});
   }
-  window.IdleExtras=Object.freeze({day,halloween,multiplier,offline,awayRate,activityRate,isActive,mount});
+  window.IdleExtras=Object.freeze({day,halloween,multiplier,starBonus:STAR_BONUS,offline,awayRate,activityRate,isActive,mount});
 })();
