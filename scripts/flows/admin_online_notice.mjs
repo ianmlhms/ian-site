@@ -11,7 +11,8 @@ const NOTICE = {
   url: "/pixelbreak.html?g=cookie-clicker",
 };
 const minsAgo = (m) => new Date(Date.now() - m * 60_000).toISOString();
-const ONLINE = [
+// built per call: «online for 12 min» must be 12 min when the page asks, not when this module loaded (the flows run one after the other in one process)
+const online = () => [
   { user_id: "o1", username: "Ian", class: "4C6", avatar: "😎", account_kind: "full", page: "/pixelbreak.html?g=cookie-clicker", last_seen: minsAgo(0), started_at: minsAgo(12), online: true },
   { user_id: "p1", username: "Emma", class: "4C6", avatar: "🙂", account_kind: "full", page: "/messenger.html", last_seen: minsAgo(1), started_at: minsAgo(3), online: true },
   { user_id: "k1", username: "Racer", class: null, avatar: null, account_kind: "kart", page: "/kart-account.html", last_seen: minsAgo(6), started_at: minsAgo(9), online: false },
@@ -30,7 +31,7 @@ export const flow = {
       dismiss_notice: () => { noticeSeen = true; return null; },
       touch_presence: () => null,
       is_admin: () => true,
-      admin_online: () => ONLINE,
+      admin_online: online,
       admin_groups: () => [],
       leaderboard_tags: () => [{ user_id: "o1", username: "Ian", class: "4C6", is_admin: true, is_owner: true }],
       admin_user_ids: () => [{ user_id: "o1" }],

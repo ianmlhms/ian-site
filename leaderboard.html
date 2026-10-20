@@ -143,9 +143,9 @@
 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script type="module" src="notify-ambient.js?v=33"></script>
+<script type="module" src="notify-ambient.js?v=34"></script>
 <script type="module">
-import * as auth from "./auth.js?v=32";
+import * as auth from "./auth.js?v=33";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
 import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=9";
 import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=9";
@@ -262,7 +262,7 @@ auth.onAuth(()=>{ tagData=null; draw(); });
 applyStatic();
 (async()=>{ if(auth.authConfigured){ auth.mountAccountButton($("acctHost")); sb=await auth.client(); } draw(); })();
 </script>
-  <script type="module" src="rtc-ring.js?v=29"></script>
-  <script type="module" src="class-gate.js?v=30"></script>
+  <script type="module" src="rtc-ring.js?v=30"></script>
+  <script type="module" src="class-gate.js?v=31"></script>
 </body>
 </html>
