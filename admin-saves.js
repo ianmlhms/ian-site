@@ -230,7 +230,7 @@ export function mountSaves(host, { getClient, pageLabel }) {
         <label class="wide-field"><span>${esc(at("saves.giftAmount", { what }))}</span><input id="svGiftAmount" value="${esc(state.giftText)}" inputmode="decimal" autocomplete="off" spellcheck="false"></label>
         <button type="submit" class="wide-btn">${esc(at("saves.giftBtn"))}</button>
       </form>
-      <div class="hint">${esc(at("saves.giftAmountHint"))}</div>
+      <div class="sv-hint">${esc(at("saves.giftAmountHint"))}</div>
       <div class="sv-gift-err" id="svGiftErr" role="alert"></div></div>`;
   }
 
