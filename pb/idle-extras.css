@@ -11,3 +11,14 @@
 @media(prefers-reduced-motion:reduce){.idle-pumpkin,.idle-float{animation:none}}
 
 .idle-sleep{flex-basis:100%;margin:2px 0 0;padding:6px 10px;border-radius:10px;background:color-mix(in srgb,var(--amber,#f4bc52) 16%,transparent);color:inherit;font-size:13px;font-weight:650}
+
+/* Reset safety: hold-to-confirm, advice list, undo toast (20 Oct 2026) */
+button.idle-guard{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button.idle-hold{position:relative;overflow:hidden;--hold:0;background:linear-gradient(90deg,var(--danger,#ff5d6c) calc(var(--hold)*1%),var(--card2,#2a2a40) calc(var(--hold)*1%));color:var(--text,#fff);border:1px solid var(--danger,#ff5d6c)}
+button.idle-guard:disabled{opacity:.45;cursor:not-allowed}
+.idle-advice{margin:10px 0;padding:10px 12px 10px 28px;border-radius:12px;background:color-mix(in srgb,var(--text,#fff) 7%,transparent);font-size:13px;line-height:1.45}
+.idle-advice.idle-low{background:color-mix(in srgb,var(--amber,#f4bc52) 18%,transparent)}
+.idle-advice.idle-bad{background:color-mix(in srgb,var(--danger,#ff5d6c) 20%,transparent);font-weight:650}
+.idle-undo{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:8px 8px 8px 14px;transform:translateX(-50%);border:1px solid var(--border,#444);border-radius:16px;background:var(--card,#1b1b2b);color:var(--text,#fff);box-shadow:0 8px 28px #0008;font:650 14px/1.3 var(--font,system-ui)}
+.idle-undo button{min-height:44px;padding:8px 14px;border:0;border-radius:12px;background:var(--amber,#f4bc52);color:#14100a;font:800 14px/1.2 var(--font,system-ui);cursor:pointer;touch-action:manipulation}
+.idle-undo button.idle-undo-x{min-width:44px;padding:0;background:transparent;color:inherit;font-size:20px}

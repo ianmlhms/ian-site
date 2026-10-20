@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Cookie Clicker - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
-<link rel="stylesheet" href="/pb/idle-extras.css?v=3">
-<script src="/pb/idle-extras.js?v=5"></script>
+<link rel="stylesheet" href="/pb/idle-extras.css?v=4">
+<script src="/pb/idle-extras.js?v=6"></script>
 <style>
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
@@ -73,6 +73,7 @@ const REBIRTH_THRESHOLD=1e12;
 const TEST_MODE=window.__pbTestMode===true;
 const TEST_COOKIES=1e30;
 let cookies=0,cps=0,clickPower=1,totalClicks=0,totalBaked=0,roundBaked=0,stars=0,rebirthCount=0,giftDay='',loaded=false;
+let roundStart=Date.now(),undoStamp=0;   // roundStart: when this round began (0 = unknown, legacy save); undoStamp: set by an Undo, tells the server guard
 let rewards=null;
 const upgrades=[
   {name:'Auto Clicker',desc:'Clicks once per second',baseCost:15,cps:0.1,count:0,icon:'👆'},
@@ -236,8 +237,8 @@ drawCookie();
  * via postMessage; whichever has more total cookies baked wins ---------- */
 function snapshot(){
   return {v:1,c:Math.floor(cookies),tb:Math.floor(totalBaked),tc:totalClicks,
-    rb:roundBaked,st:stars,rbc:rebirthCount,gd:giftDay,savedAt:Date.now(),
-    u:upgrades.map(u=>u.count),cu:clickUpgrades.map(u=>u.count)};
+    rb:roundBaked,st:stars,rbc:rebirthCount,gd:giftDay,rs:roundStart,savedAt:Date.now(),
+    u:upgrades.map(u=>u.count),cu:clickUpgrades.map(u=>u.count),...(undoStamp?{ud:undoStamp}:{})};
 }
 function safeNumber(value,fallback=0){return typeof value==='number'&&Number.isFinite(value)&&value>=0?value:fallback}
 function testUnlockAll(save){
@@ -256,10 +257,20 @@ function earnCookies(amount){cookies+=amount;totalBaked+=amount;roundBaked+=amou
 function rebirth(){
   const earned=Math.floor(Math.sqrt(roundBaked/REBIRTH_THRESHOLD));
   if(earned<1)return;
-  cookies=0;roundBaked=0;totalClicks=0;stars+=earned;rebirthCount++;
+  cookies=0;roundBaked=0;totalClicks=0;stars+=earned;rebirthCount++;roundStart=Date.now();
   upgrades.forEach(u=>{if(!u.halloween)u.count=0});
   clickUpgrades.forEach(u=>{u.count=0});
   recalculate();updateUI();
+}
+/* Exact pre-reset state for the 30 s Undo (lifetime and the daily gift never go backwards; ud tells the server guard it is an Undo). */
+function undoSnapshot(){
+  return{cookies,totalClicks,totalBaked,roundBaked,stars,rebirthCount,giftDay,roundStart,u:upgrades.map(u=>u.count),cu:clickUpgrades.map(u=>u.count)};
+}
+function undoRestore(snap){
+  cookies=snap.cookies;totalClicks=snap.totalClicks;roundBaked=snap.roundBaked;stars=snap.stars;rebirthCount=snap.rebirthCount;roundStart=snap.roundStart;
+  totalBaked=Math.max(totalBaked,snap.totalBaked);if(snap.giftDay>giftDay)giftDay=snap.giftDay;
+  upgrades.forEach((u,i)=>{u.count=Math.floor(safeNumber(snap.u?.[i]))});clickUpgrades.forEach((u,i)=>{u.count=Math.floor(safeNumber(snap.cu?.[i]))});
+  undoStamp=Date.now();recalculate();reportScore();updateUI();
 }
 function applySave(sv){
   if(!sv||sv.v!==1||!Number.isFinite(sv.tb)||sv.tb<0)return;
@@ -271,7 +282,7 @@ function applySave(sv){
   if(incomingRebirth===rebirthCount&&(sv.tb<totalBaked||(loaded&&sv.tb===totalBaked)))return;
   loaded=true;
   cookies=safeNumber(sv.c);totalBaked=Math.max(totalBaked,sv.tb);totalClicks=safeNumber(sv.tc);
-  roundBaked=safeNumber(sv.rb,sv.tb);stars=Math.max(stars,Math.floor(safeNumber(sv.st)));rebirthCount=incomingRebirth;
+  roundBaked=safeNumber(sv.rb,sv.tb);stars=Math.max(stars,Math.floor(safeNumber(sv.st)));rebirthCount=incomingRebirth;roundStart=safeNumber(sv.rs,0);
   if(typeof sv.gd==='string'&&sv.gd>giftDay)giftDay=sv.gd;
   upgrades.forEach((u,i)=>{u.count=Math.floor(safeNumber(sv.u?.[i]))});
   clickUpgrades.forEach((u,i)=>{u.count=Math.floor(safeNumber(sv.cu?.[i]))});
@@ -291,6 +302,7 @@ buildUpgrades();testRefill();
 rewards=IdleExtras.mount({host:$('shop'),threshold:REBIRTH_THRESHOLD,read:()=>({rb:roundBaked,st:stars,gd:giftDay}),format,
   resets:'cookies, all buildings (including gifted Time Machines) except Haunted Ovens, click upgrades and round clicks.',
   keeps:'Haunted Ovens if owned.',production:()=>cps,currency:'🍪',rebirth,save:pushSave,earn:earnCookies,
+  undoKey:'cookie-clicker',snapshot:undoSnapshot,restore:undoRestore,roundStart:()=>roundStart,
   gift:(day,amount)=>{giftDay=day;earnCookies(amount);updateUI()}});
 applySave(window.__pbSave);                       // local save (injected before load)
 try{parent.postMessage({__pbWantSave:1},'*')}catch(e){}  // ask for the cloud save

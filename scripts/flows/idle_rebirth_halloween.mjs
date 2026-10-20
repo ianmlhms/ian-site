@@ -1,5 +1,6 @@
 /* Real iframe interactions with local saves and mocked event RPCs. */
 import { runIfMain, ME, ME_NAME } from "./lib.mjs";
+import { holdConfirm } from "./reset_guard.mjs";
 
 const EVENT = "halloween-2026";
 const status = (count) => ({ event: EVENT, starts_at: "2026-10-24T00:00:00+02:00", ends_at: "2026-11-03T00:00:00+01:00", active: true, goal: 50, count, badge: count >= 50 });
@@ -49,12 +50,11 @@ export const flow = {
     h.expect((await game.locator(".idle-reset").innerText()).includes("Time Machines"), "dialog explains gifted building reset");
     h.expect((await game.locator(".idle-keep").innerText()).includes("leaderboard"), "dialog explains lifetime preservation");
     // Confirm with no production tick between the captured lifetime and the action.
-    const reset = await game.evaluate(() => {
-      const before = totalBaked;
-      document.querySelector(".idle-confirm").click();
-      return { before, after: totalBaked, save: snapshot() };
-    });
-    h.eq(reset.after, reset.before, "rebirth keeps exact lifetime tb");
+    const bakedBefore = await game.evaluate(() => totalBaked);
+    await holdConfirm(h, game, ".idle-confirm");
+    const reset = await game.evaluate(() => ({ after: totalBaked, save: snapshot() }));
+    reset.before = bakedBefore;
+    h.expect(reset.after >= reset.before && reset.after - reset.before <= 1e-3 * reset.before, "rebirth keeps the lifetime tb (only the seconds of the hold are added)");
     h.eq(reset.save.st, 2, "4T round adds two stars");
     h.eq(reset.save.rbc, 1, "rebirth count saved");
     h.expect(reset.save.u.slice(0, 16).every((n) => n === 0) && reset.save.cu.every((n) => n === 0), "ordinary and gifted buildings and click upgrades reset");
@@ -117,11 +117,11 @@ export const flow = {
     await game.locator(".idle-gift").click();
     h.expect(!(await game.locator(".idle-gift").isVisible()), "Empire daily gift claimed once");
     await game.locator(".idle-rebirth").click();
-    const empire = await game.evaluate(() => {
-      const before = state.lifetime; document.querySelector(".idle-confirm").click();
-      return { before, after: state.lifetime, save: snapshot() };
-    });
-    h.eq(empire.after, empire.before, "Empire rebirth preserves lifetime");
+    const lifetimeBefore = await game.evaluate(() => state.lifetime);
+    await holdConfirm(h, game, ".idle-confirm");
+    const empire = await game.evaluate(() => ({ after: state.lifetime, save: snapshot() }));
+    empire.before = lifetimeBefore;
+    h.expect(empire.after >= empire.before && empire.after - empire.before <= 1e-3 * empire.before, "Empire rebirth preserves lifetime");
     h.eq(empire.save.st, 1, "$100B round earns one star");
     h.eq(empire.save.investors, 2, "existing investors stay");
     h.expect(Object.values(empire.save.owned).every((n) => n === 0), "Empire businesses reset");

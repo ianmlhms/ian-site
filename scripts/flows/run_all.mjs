@@ -23,6 +23,7 @@ import { flow as arcadeWeeklyStreak } from "./arcade_weekly_streak.mjs";
 import { flow as idleRebirthHalloween } from "./idle_rebirth_halloween.mjs";
 import { flow as idleMoreContent } from "./idle_more_content.mjs";
 import { flow as idleSoftcap } from "./idle_softcap.mjs";
+import { flow as idleResetSafety } from "./idle_reset_safety.mjs";
 import { flow as leaderboardBigScores } from "./leaderboard_big_scores.mjs";
 import { flow as driveMadLevels } from "./drive_mad_levels.mjs";
 
@@ -46,7 +47,7 @@ import { flow as mordsfall } from "./mordsfall.mjs";
 import { flow as trainSim } from "./train_sim.mjs";
 import { flow as trainSimAudio } from "./train_sim_audio.mjs";
 
-const ALL = [mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
+const ALL = [mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, busTycoon, newGroup, addMember, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

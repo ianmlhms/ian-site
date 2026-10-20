@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Business Empire - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
-<link rel="stylesheet" href="/pb/idle-extras.css?v=3">
-<script src="/pb/idle-extras.js?v=5"></script>
+<link rel="stylesheet" href="/pb/idle-extras.css?v=4">
+<script src="/pb/idle-extras.js?v=6"></script>
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
@@ -68,10 +68,12 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
     <h2 id="prestige-title">Bring in investors?</h2>
     <p>Investors permanently increase every business payout by 10% each.</p>
     <div id="prestige-preview" class="preview"></div>
-    <p class="warning">This resets cash, businesses, managers, and active cycles. Lifetime earnings stay on your leaderboard.</p>
+    <ul id="prestige-advice" class="idle-advice"></ul>
+    <p class="warning">⚠ This resets ALL businesses, managers and your cash (back to $10) and stops every running cycle.</p>
+    <p>You keep: investors, stars, lifetime earnings (leaderboard score) and the daily gift.</p>
     <div class="modal-actions">
-      <button id="prestige-cancel" class="cancel" type="button">Not yet</button>
-      <button id="prestige-confirm" class="confirm" type="button">Confirm reset</button>
+      <button id="prestige-cancel" class="cancel" type="button">Keep playing</button>
+      <button id="prestige-confirm" class="confirm" type="button" disabled>Confirm reset</button>
     </div>
   </div>
 </section>
@@ -136,7 +138,7 @@ const BUSINESSES=Object.freeze([
 const emptyOwned=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,0]));
 const emptyManagers=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,false]));
 const emptyRuntime=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,{startedAt:0,endsAt:0}]));
-const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',sc:0,owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now(),savedAt:Date.now()});
+const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',sc:0,rs:Date.now(),owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now(),savedAt:Date.now()});
 
 /** Test mode only: a copy of the state with huge cash, one of every business and both resets ready. */
 function testUnlockAll(save){
@@ -439,11 +441,22 @@ function openPrestige(){
     ?`Claim ${format(claimable)} investor${claimable===1?"":"s"}. Global profit: ${format(currentMultiplier)}× → ${format(nextMultiplier)}×.${capNote}`
     :`No investors are ready. Earn $${format(nextInvestorTarget())} lifetime for the next one.`;
   const confirm=document.getElementById("prestige-confirm");
-  confirm.disabled=claimable===0;
-  confirm.textContent=claimable>0?`Reset for ${format(claimable)}`:"Nothing to claim";
+  const list=document.getElementById("prestige-advice");
+  list.replaceChildren();
+  if(claimable>0){
+    const advice=IdleExtras.advise({before:currentMultiplier,after:nextMultiplier,roundMs:state.rs>0?Date.now()-state.rs:0,
+      small:claimable<IdleExtras.smallShare*(state.investors+1),format});
+    list.className="idle-advice idle-"+advice.level;
+    advice.lines.forEach((line)=>{const item=document.createElement("li");item.textContent=line;list.append(item)});
+    prestigeGuard.arm({needsHold:advice.needsHold,plainLabel:`Reset for ${format(claimable)}`,holdLabel:`Hold to reset for ${format(claimable)}`,onConfirm:confirmPrestige});
+  }else{
+    prestigeGuard.disarm();
+    list.className="idle-advice";
+    confirm.textContent="Nothing to claim";
+  }
   prestigeOpener=document.activeElement;
   document.getElementById("prestige-modal").classList.add("show");
-  document.getElementById(claimable>0?"prestige-confirm":"prestige-cancel").focus();
+  document.getElementById("prestige-cancel").focus();   // never the destructive button: Enter / Space / a stray tap must not reset
 }
 
 function nextInvestorTarget(){
@@ -452,7 +465,9 @@ function nextInvestorTarget(){
 }
 
 let prestigeOpener=null;
+let prestigeGuard=null;
 function closePrestige(){
+  prestigeGuard.disarm();
   document.getElementById("prestige-modal").classList.remove("show");
   if(prestigeOpener&&prestigeOpener.focus)prestigeOpener.focus();
   prestigeOpener=null;
@@ -461,12 +476,27 @@ document.addEventListener("keydown",(event)=>{
   if(event.key==="Escape"&&document.getElementById("prestige-modal").classList.contains("show"))closePrestige();
 });
 
+/* Exact copy of the game state for the 30 s Undo that follows every reset. */
+function cloneState(){return JSON.parse(JSON.stringify(state))}
+/* Undo: the pre-reset state again. Lifetime never goes down (it is the leaderboard score and the cloud guard's progress marker);
+ * ud tells the server guard that the lower rebirth count is an Undo (game-saves-history guard), kept for the session. */
+function restoreState(snap){
+  const now=Date.now();
+  state={...snap,owned:{...snap.owned},managers:{...snap.managers},lifetime:Math.max(snap.lifetime,state.lifetime),gd:snap.gd>state.gd?snap.gd:state.gd,sc:Math.max(snap.sc||0,state.sc||0),ts:now,savedAt:now,ud:now};
+  runtime=emptyRuntime();
+  startManagedCycles(now);
+  updateScore();refreshAll(now);
+}
+
 function confirmPrestige(){
   const claimable=getClaimableInvestors();
   if(claimable<=0)return;
-  state={...state,cash:STARTING_CASH,owned:emptyOwned(),managers:emptyManagers(),investors:state.investors+claimable,ts:Date.now(),savedAt:Date.now()};
+  const before=cloneState();
+  const now=Date.now();
+  state={...state,cash:STARTING_CASH,owned:emptyOwned(),managers:emptyManagers(),investors:state.investors+claimable,rs:now,ts:now,savedAt:now};
   runtime=emptyRuntime();
   closePrestige();refreshAll();pushSave();
+  rewards?.offerUndo(`Claimed ${format(claimable)} investor${claimable===1?"":"s"}.`,before);
 }
 
 function normalizeSave(raw){
@@ -482,7 +512,7 @@ function normalizeSave(raw){
   }));
   const managers=Object.fromEntries(BUSINESSES.map((business)=>[business.id,raw.managers[business.id]===true]));
   return{v:SAVE_VERSION,cash,lifetime,owned,managers,investors,ts,savedAt,
-    rb:safeNumber(raw.rb,lifetime),st:Math.floor(safeNumber(raw.st)),rbc:Math.floor(safeNumber(raw.rbc)),gd:typeof raw.gd==='string'?raw.gd:'',sc:raw.sc===1?1:0};
+    rb:safeNumber(raw.rb,lifetime),rs:safeNumber(raw.rs,0),st:Math.floor(safeNumber(raw.st)),rbc:Math.floor(safeNumber(raw.rbc)),gd:typeof raw.gd==='string'?raw.gd:'',sc:raw.sc===1?1:0};
 }
 
 function calculateOffline(save,now){
@@ -530,7 +560,7 @@ function snapshot(){
 function rebirth(){
   const earned=Math.floor(Math.sqrt(state.rb/REBIRTH_THRESHOLD));
   if(earned<1)return;
-  state={...state,cash:STARTING_CASH,rb:0,st:state.st+earned,rbc:state.rbc+1,owned:emptyOwned(),managers:emptyManagers(),ts:Date.now(),savedAt:Date.now()};
+  state={...state,cash:STARTING_CASH,rb:0,rs:Date.now(),st:state.st+earned,rbc:state.rbc+1,owned:emptyOwned(),managers:emptyManagers(),ts:Date.now(),savedAt:Date.now()};
   runtime=emptyRuntime();refreshAll();updateScore();
 }
 
@@ -553,6 +583,7 @@ function boot(){
     starsText:(save)=>`⭐ ${format(save.st)} · +${format(save.st*10)}%${isSoftCapped(save.investors,save.st)?` · soft cap ×${format(PRESTIGE_SOFT_CAP)}`:""}`,
     rebirthPreview:(earned)=>`You get ${format(earned)} stars. Total investor and star bonus: ×${format(prestigeMultiplier())} → ×${format(prestigeMultiplier(state.investors,state.st+earned))}${isSoftCapped(state.investors,state.st+earned)?` (diminishing returns above ×${format(PRESTIGE_SOFT_CAP)})`:""}.`,
     resets:'cash (back to $10), businesses including gifted ones, managers and running cycles. This game has no click upgrades.',
+    undoKey:'idle-empire',snapshot:cloneState,restore:restoreState,roundStart:()=>state.rs,bonus:(stars)=>prestigeMultiplier(state.investors,stars),
     keeps:'existing investors.',production:()=>getAutomaticIncome(),currency:'💵',rebirth,save:pushSave,earn:applyEarnings,
     gift:(day,amount)=>{state={...state,gd:day};applyEarnings(amount);refreshAll()}});
   applySave(window.__pbSave);
@@ -578,7 +609,7 @@ window.addEventListener("pagehide",pushSave);
 document.addEventListener("DOMContentLoaded",boot,{once:true});
 document.getElementById("prestige-button").addEventListener("click",openPrestige);
 document.getElementById("prestige-cancel").addEventListener("click",closePrestige);
-document.getElementById("prestige-confirm").addEventListener("click",confirmPrestige);
+prestigeGuard=IdleExtras.makeGuard(document.getElementById("prestige-confirm"));
 document.getElementById("offline-close").addEventListener("click",()=>document.getElementById("offline-notice").classList.remove("show"));
 document.getElementById("softcap-close").addEventListener("click",()=>document.getElementById("softcap-notice").classList.remove("show"));
 document.getElementById("prestige-modal").addEventListener("click",(event)=>{if(event.target.id==="prestige-modal")closePrestige()});
