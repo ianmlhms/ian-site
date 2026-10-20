@@ -3,16 +3,31 @@
   'use strict';
   const KL = window.KL, C = KL.CFG;
   const { clamp, wrapAngle } = KL;
-  const tgt = {};
+  const tgt = {}, guideP = {};
 
   KL.botThink = function botThink(k, R, dt) {
-    const track = R.track, inp = k.input, diff = R.diff;
-    const N = track.N, step = track.step;
-    const i0 = k.hint >= 0 ? k.hint : 0;
+    const main = R.track, inp = k.input, diff = R.diff;
     const sp = Math.max(k.speed, 0);
+    // the road the kart is steered along: the one it is on (main road or a branch), or, on the way to a cut it has chosen, that cut's centre line
+    let track = k.br ? k.br.T : main, sk = k.br ? k.ss : k.s, i0 = k.hint >= 0 ? k.hint : 0;
+    let guide = null;
     k.ai = k.ai || { t: Math.random() * 3, mistake: 0, mistakeT: 0, driftHold: 0, itemT: 1 + Math.random() * 2, laneJit: 0, laneT: 0, wobble: Math.random() * 6, driftDir: k.drift.dir < 0 ? -1 : 1 };   // a human kart handed to the AI mid-drift (away / left the room) has no drift side yet
     const ai = k.ai;
     ai.t += dt;
+    if (!k.br && main.branches.length && R.phase === 'race') {          // shortcuts: decide once per lap and cut whether to take it; then follow its centre line from afar
+      for (const b of main.branches) {
+        let ahead = b.sA - k.s; if (ahead < -main.length / 2) ahead += main.length;
+        if (ahead < -4 || ahead > 150) continue;
+        const key = b.id + ':' + Math.floor(k.prog / main.length);
+        if (ai.cutKey !== key) { ai.cutKey = key; ai.cut = Math.random() < (diff.cut || 0) * (b.def.botLike != null ? b.def.botLike : 1); }
+        if (!ai.cut) continue;
+        const q = b.T.project(k.x, k.z, -1, null, guideP);
+        if (q.u < 0 && q.i === 0) { track = b.T; sk = 0; i0 = 0; guide = b; }
+        else if (q.s < b.g0 + 20) { track = b.T; sk = q.s; i0 = q.i; guide = b; }
+        break;
+      }
+    }
+    const N = track.N, step = track.step;
     // occasional lane change and small mistakes (more on easy)
     ai.laneT -= dt;
     if (ai.laneT <= 0) { ai.laneT = 2 + Math.random() * 4; ai.laneJit = (Math.random() - 0.5) * 2 * Math.max(1, track.HW[i0] - 4) * 0.6; }
@@ -21,8 +36,8 @@
 
     // look-ahead target on the racing line
     const ld = clamp(7 + sp * 0.42, 9, 24);
-    const sT = k.s + ld;
-    const iT = Math.floor(sT / step) % N;
+    const sT = sk + ld;
+    const iT = track.idx(Math.floor(sT / step));
     let off = track.line[iT] * 0.85 + ai.laneJit * 0.35 + k.lanePref * (track.HW[iT] - 3.4) * 0.5;
     // keep away from traps, projectiles and other karts straight ahead
     let avoid = 0;
@@ -58,20 +73,21 @@
       }
     }
     if (track.patches.length) {            // steer round syrup patches
-      for (const sx of [sT, k.s + ld * 0.55]) if (track.patchAt(sx, off) === 'goo') { for (const dd of [3.2, -3.2, 6.4, -6.4, 9.6, -9.6]) if (Math.abs(off + dd) < hwT - 2 && !track.patchAt(sx, off + dd)) { off += dd; break; } }
+      for (const sx of [sT, sk + ld * 0.55]) if (track.patchAt(sx, off) === 'goo') { for (const dd of [3.2, -3.2, 6.4, -6.4, 9.6, -9.6]) if (Math.abs(off + dd) < hwT - 2 && !track.patchAt(sx, off + dd)) { off += dd; break; } }
     }
     off = clamp(off, -hwT + 2.2, hwT - 2.2);
-    track.at(sT, off, tgt);
+    if (track !== main && !guide && sT > track.length) { const e = k.br; main.at(e.sB + (sT - track.length), clamp(e.endD, -hwT + 2.2, hwT - 2.2), tgt); }   // looking past the end of a cut: onto the main road
+    else track.at(sT, off, tgt);
     let err = wrapAngle(Math.atan2(tgt.x - k.x, tgt.z - k.z) - k.yaw) + ai.mistake * (ai.mistakeT > 0 ? 1 : 0);
     // steer right when the target is on the right (err negative)
     let steer = clamp(-err * 2.1, -1, 1);
 
     // speed plan
-    const aheadIdx = (i0 + Math.round(clamp(sp * 0.42, 4, 30) / step)) % N;
+    const aheadIdx = track.idx(i0 + Math.round(clamp(sp * 0.42, 4, 30) / step));
     let vt = track.vsafe[aheadIdx] * diff.speed * k.botSkill * (R.phase === 'race' || R.phase === 'finished' ? 1 : 0);
     if (k.finished) vt = Math.min(vt, 13);
     // look further for tight corners so we lift early
-    const vFar = track.vsafe[(i0 + Math.round(clamp(sp * 1.1, 12, 60) / step)) % N] * 1.12;
+    const vFar = track.vsafe[track.idx(i0 + Math.round(clamp(sp * 1.1, 12, 60) / step))] * 1.12;
     vt = Math.min(vt, Math.max(vFar, 8));
     if (k.surf === 1 && k.boostT <= 0) vt = Math.min(vt, 22);
     if (k.patch === 'ice') vt *= 0.8;
@@ -82,7 +98,7 @@
 
     // drifting through longer corners
     let wantDrift = false;
-    const kk = (off2) => track.K[(i0 + Math.round(off2 / step)) % N];
+    const kk = (off2) => track.K[track.idx(i0 + Math.round(off2 / step))];
     const curveNear = (kk(8) + kk(18) + kk(30)) / 3;
     if (diff.drift > 0 && sp > 15 && R.phase === 'race') {
       const ak = Math.abs(curveNear);

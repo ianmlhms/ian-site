@@ -24,6 +24,7 @@
   /* fantasy road surfaces: base colour, edge line, centre dash, optional painter */
   const ROAD = {
     asphalt: { base: '#767a84', edge: '#f3f1e8', dash: '#f6efd2' },
+    bike: { base: '#b5594c', edge: '#f4ece2', dash: '#f4ece2' },                                   // red cycle-path tarmac: the look of a shortcut
     candy: { base: '#f4a8c6', edge: '#ffffff', dash: '#fff6a8', extra(g, W, H, rnd) {          // icing road: soft swirls + sprinkles
       for (let i = 0; i < 26; i++) { g.strokeStyle = `rgba(255,255,255,${0.12 + rnd() * 0.16})`; g.lineWidth = 3 + rnd() * 4; g.beginPath(); const x = rnd() * W, y = rnd() * H; g.moveTo(x, y); g.bezierCurveTo(x + 20, y - 18, x + 46, y + 18, x + 70, y - 4); g.stroke(); }
       const cols = ['#ffffff', '#7fd8ff', '#ffe066', '#9be37a', '#b78cff'];

@@ -249,11 +249,11 @@
         const i2 = idx(i + 1);
         const ax = X[i], az = Z[i], bx = X[i2], bz = Z[i2];
         const abx = bx - ax, abz = bz - az, l2 = abx * abx + abz * abz || 1;
-        const t = clamp(((x - ax) * abx + (z - az) * abz) / l2, 0, 1);
+        const tu = ((x - ax) * abx + (z - az) * abz) / l2, t = clamp(tu, 0, 1);
         const cx = ax + abx * t, cz = az + abz * t, dd = (x - cx) * (x - cx) + (z - cz) * (z - cz);
         let cost = dd;
         if (py != null) { const cy = lerp(Y[i], Y[i2], t); const dy = Math.abs(py - cy); if (dy > 3) cost += (dy - 3) * (dy - 3) * 12; }
-        if (cost < bestCost) { bestCost = cost; best = i; out.f = t; }
+        if (cost < bestCost) { bestCost = cost; best = i; out.f = t; out.u = tu; }
       };
       let usedHint = false;
       if (hint != null && hint >= 0) {
@@ -301,8 +301,91 @@
     track.sOf = (x, z) => track.project(x, z, -1, null, {}).s;
     analyze(track);
     if (def.makeTerrain) track.terrain = def.makeTerrain(track);
+    track.branches = (def.branches || []).map((bd) => buildBranch(track, bd));
+    track.loc = makeLoc(track);
+    track.inMouth = makeInMouth(track);
     return track;
   };
+
+  /* ---------- branches: drivable routes that leave the main road and rejoin it further on (a real shortcut) ----------
+   * A branch is an open track of its own (own samples, width, walls, ramps, patches). Its first `g0` metres and its last `g1` metres are the
+   * "mouths", which overlap the main road: a kart that leaves the main road surface inside a mouth ribbon is on the branch, a kart that
+   * drives onto the main road surface from a mouth is on the main road again. Between the mouths the branch is a world of its own.
+   * Race progress along a branch is the main-road distance (map): linear between the mouths' own main-road distances, so the progress of a
+   * kart on the cut runs from where the cut leaves the road to where it comes back (position / lap logic stay monotone). */
+  function buildBranch(main, bd) {
+    const T = KL.buildTrack({ id: main.id + ':' + bd.id, closed: false, mode: bd.mode, r: bd.r || 24, hw: bd.hw || 4.5, wl: bd.wl != null ? bd.wl : 1.5, wr: bd.wr != null ? bd.wr : 1.5, pts: bd.pts, ramps: bd.ramps, patches: bd.patches, zones: bd.zones });
+    const L = T.length, g0 = bd.g0 || 24, g1 = bd.g1 || 24, tmp = {};
+    const stn = [0, g0, L - g1, L].map((q) => { const p = T.at(q, 0), m = main.project(p.x, p.z, -1, null, tmp); return { q, s: m.s, i: m.i, d: m.d }; });
+    for (let i = 1; i < 4; i++) if (stn[i].s < stn[i - 1].s - 1e-6) stn[i].s += main.length;        // wrapped over the start line (unsupported by progress mapping: keeps it monotone)
+    const map = (q) => {
+      q = clamp(q, 0, L);
+      const k = q < g0 ? 0 : q < L - g1 ? 1 : 2, a = stn[k], b = stn[k + 1];
+      return lerp(a.s, b.s, b.q > a.q ? (q - a.q) / (b.q - a.q) : 0);
+    };
+    const boxOf = (q0, q1, pad) => {
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+      for (let i = Math.max(0, Math.floor(q0 / T.step)); i <= Math.min(T.N - 1, Math.ceil(q1 / T.step)); i++) { x0 = Math.min(x0, T.X[i]); x1 = Math.max(x1, T.X[i]); z0 = Math.min(z0, T.Z[i]); z1 = Math.max(z1, T.Z[i]); }
+      return [x0 - pad, z0 - pad, x1 + pad, z1 + pad];
+    };
+    const pad = (bd.hw || 4.5) + (bd.wl != null ? bd.wl : 1.5) + 4;
+    return { id: bd.id, def: bd, T, L, g0, g1, stn, map, sA: stn[0].s, sB: stn[3].s, hA: stn[0].i, hE: stn[3].i, endD: stn[3].d, startD: stn[0].d,
+      boxA: boxOf(0, g0 + 2, pad), boxE: boxOf(L - g1 - 2, L, pad), box: boxOf(0, L, pad) };
+  }
+
+  /* where is this kart / item? ent = { br, hint } (the branch it is on, or null for the main road, and the sample hint in that road).
+   * Fills `out` like track.project plus: T (the road it is on), br, ss (distance along that road); s is always the main-road progress. */
+  function makeLoc(track) {
+    const bt = {}, mt = {};
+    const copy = (a, b) => { for (const k in b) a[k] = b[k]; return a; };
+    const toMain = (ent, out, m) => { ent.br = null; ent.hint = m.i; copy(out, m); out.T = track; out.br = null; out.ss = out.s; return out; };
+    return function loc(ent, x, z, py, out) {
+      out = out || {};
+      const brs = track.branches;
+      if (!brs.length) { track.project(x, z, ent.hint, py, out); out.T = track; out.br = null; out.ss = out.s; ent.br = null; return out; }
+      const br = ent.br;
+      if (br) {
+        const ss0 = br.T.project(x, z, ent.hint, py, out).s;
+        if (ss0 <= br.g0 + 2 || ss0 >= br.L - br.g1 - 2) {                      // inside a mouth: back on the main road surface?
+          const m = track.project(x, z, ss0 <= br.g0 + 2 ? br.hA : br.hE, py, mt);
+          if (Math.abs(m.d) < m.hw - 1.0) return toMain(ent, out, m);
+        }
+        out.T = br.T; out.br = br; out.ss = out.s; out.s = br.map(out.s);
+        return out;
+      }
+      const p = track.project(x, z, ent.hint, py, out);
+      const lost = !(ent.hint >= 0) || Math.abs(p.d) > p.hw + Math.max(p.wl, p.wr) + 1.5;      // teleported / respawned somewhere off the main road
+      for (let bi = 0; bi < brs.length; bi++) {
+        const b = brs[bi];
+        const inA = x > b.boxA[0] && x < b.boxA[2] && z > b.boxA[1] && z < b.boxA[3], inE = x > b.boxE[0] && x < b.boxE[2] && z > b.boxE[1] && z < b.boxE[3];
+        if (!inA && !inE && !(lost && x > b.box[0] && x < b.box[2] && z > b.box[1] && z < b.box[3])) continue;
+        const q = b.T.project(x, z, -1, py, bt);
+        if (Math.abs(q.d) > q.hw + 0.3 || (q.i === 0 && q.u < 0) || (q.i === b.T.N - 2 && q.u > 1)) continue;
+        const mouth = q.s <= b.g0 || q.s >= b.L - b.g1;
+        if (mouth ? Math.abs(p.d) < p.hw - 0.5 : !lost) continue;               // on the main road surface: stays on the main road
+        ent.br = b; ent.hint = q.i; copy(out, bt);
+        out.T = b.T; out.br = b; out.ss = out.s; out.s = b.map(out.s);
+        return out;
+      }
+      out.T = track; out.br = null; out.ss = out.s;
+      return out;
+    };
+  }
+
+  /* is (x, z) inside a mouth ribbon (+pad)? the scenery leaves the main road's wall open there */
+  function makeInMouth(track) {
+    const tmp = {};
+    return function inMouth(x, z, pad) {
+      for (const b of track.branches) {
+        const inA = x > b.boxA[0] && x < b.boxA[2] && z > b.boxA[1] && z < b.boxA[3], inE = x > b.boxE[0] && x < b.boxE[2] && z > b.boxE[1] && z < b.boxE[3];
+        if (!inA && !inE) continue;
+        const q = b.T.project(x, z, -1, null, tmp);
+        if (Math.abs(q.d) > q.hw + pad || (q.i === 0 && q.u < 0) || (q.i === b.T.N - 2 && q.u > 1)) continue;
+        if (q.s <= b.g0 + pad || q.s >= b.L - b.g1 - pad) return true;
+      }
+      return false;
+    };
+  }
 
   /* racing line (lateral offset per sample) and a safe speed profile for the bots */
   function analyze(track) {

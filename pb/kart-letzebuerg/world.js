@@ -135,10 +135,12 @@
       this.add = add;
       const road = KL.scenery.road(track, theme);
       add(road.asphalt, M.asphalt); add(road.cobble, M.cobble);
-      const sides = KL.scenery.sides(track, theme);
+      const wallPt = (i, side) => { const lim = track.HW[i] + (side < 0 ? track.WL[i] : track.WR[i]); return [track.X[i] - track.TZ[i] * side * lim, track.Z[i] + track.TX[i] * side * lim]; };
+      const sides = KL.scenery.sides(track, theme, track.branches.length ? { skip: (i, side) => { const q = wallPt(i, side); return track.inMouth(q[0], q[1], 1.2); } } : null);      // walls stay open where a shortcut leaves / joins
       add(sides.verge, M.verge); add(sides.kerb, M.kerb); add(sides.wall, M.wall);
       const dec = KL.scenery.decals(track, def.pads ? race.pads : []);
       add(dec.pads, M.pads); add(dec.checker, M.checker);
+      this.buildBranches(track, theme);
       this.buildGround(track, theme);
       const cityData = theme.osm && KL.osm && KL.osm[theme.osm];
       if (cityData) this.buildCity(track, theme, cityData, rnd);
@@ -156,6 +158,27 @@
       this.boxMesh = new T.InstancedMesh(boxGeo, new T.MeshBasicMaterial({ map: KL.tex.itemBox(), transparent: true, opacity: 0.92 }), Math.max(1, race.boxes.length));
       this.boxMesh.frustumCulled = false; this.scene.add(this.boxMesh);
       this.setWeather(this.weatherName, true);
+    }
+
+    /* shortcuts (track.branches): own ribbon (red cycle-path tarmac), kerbs and walls; nothing is drawn where it lies on the main road */
+    buildBranches(track, theme) {
+      if (!track.branches.length) return;
+      const M = this.mats, add = this.add, tmp = {};
+      const mat = M.asphalt.clone(); mat.map = KL.tex.asphalt({ style: 'bike', centre: 'none' }); mat.polygonOffset = true; mat.polygonOffsetFactor = -1.5; mat.polygonOffsetUnits = -1.5; M.cutRoad = mat;
+      for (const b of track.branches) {
+        const T = b.T, L = b.L;
+        const onMain = (x, z, pad) => { const m = track.project(x, z, -1, null, tmp); return Math.abs(m.d) < m.hw + pad; };
+        const inside = (j) => { for (const sg of [-1, 1]) { const p = KL.edgePt(T, j, sg * T.HW[j], 0); if (!onMain(p[0], p[2], -0.2)) return false; } return true; };
+        const road = KL.scenery.road(T, theme, { lift: 0.03, skip: (i, i2) => inside(i) && inside(i2), tint: b.def.tint ? KL.col(b.def.tint) : null });
+        add(road.asphalt, mat);
+        const wallSkip = (i, side) => {
+          const q = i * T.step; if (q < 6 || q > L - 6) return true;
+          const p = KL.edgePt(T, i, side * (T.HW[i] + (side < 0 ? T.WL[i] : T.WR[i])), 0);
+          const m = track.project(p[0], p[2], -1, null, tmp); return Math.abs(m.d) < m.hw + Math.max(m.wl, m.wr) + 1.5;
+        };
+        const sides = KL.scenery.sides(T, theme, { skip: wallSkip });
+        add(sides.verge, M.verge); add(sides.kerb, M.kerb); add(sides.wall, M.wall);
+      }
     }
 
     /* real street fabric from baked OSM footprints (city.js) */
@@ -483,8 +506,10 @@
       c.x = lerp(c.x, tx, f); c.z = lerp(c.z, tz, f); c.y = lerp(c.y, ty, c.snap ? 1 : 1 - Math.exp(-9 * dt));
       // keep the camera on the street side of the walls (no flying through the facade on tight corners)
       if (this.track && this.theme.cameraClamp !== false) {
-        const p = this.track.project(c.x, c.z, k.hint, k.y, this._cp || (this._cp = {})), lim = p.hw + (p.d >= 0 ? p.wr : p.wl) - 0.3;
-        if (Math.abs(p.d) > lim) { const sg = Math.sign(p.d), over = Math.abs(p.d) - lim; c.x -= -p.tz * sg * over; c.z -= p.tx * sg * over; }
+        const ce = this._ce || (this._ce = {}); ce.br = k.br || null; ce.hint = k.hint;
+        const p = this.track.loc(ce, c.x, c.z, k.y, this._cp || (this._cp = {})), lim = p.hw + (p.d >= 0 ? p.wr : p.wl) - 0.3;
+        const inMouthZone = p.br && (p.ss < p.br.g0 || p.ss > p.br.L - p.br.g1);        // where a shortcut leaves / joins the road its walls are open
+        if (Math.abs(p.d) > lim && !inMouthZone) { const sg = Math.sign(p.d), over = Math.abs(p.d) - lim; c.x -= -p.tz * sg * over; c.z -= p.tx * sg * over; }
       }
       const lookAhead = 5.5;
       const lx = k.x + Math.sin(c.yaw) * lookAhead, lz = k.z + Math.cos(c.yaw) * lookAhead, ly = k.y + 1.5;

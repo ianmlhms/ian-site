@@ -8,9 +8,11 @@
 
   /* --- strips along the track ---------------------------------------------------------------------------------------- */
   /* ptsFn(i) -> [A, B, uA, uB] where A and B are [x,y,z]; builds quads i..i+1 (counter-clockwise from above when A is left of B). */
-  function strip(B, track, i0, i1, fn, vScale, colFn) {
+  function strip(B, track, i0, i1, fn, vScale, colFn, skip) {
     const N = track.N, step = track.step;
+    if (!track.closed) i1 = Math.min(i1, N - 1);            // an open road (a branch) does not join its end to its start
     for (let i = i0; i < i1; i++) {
+      if (skip && (skip(i) || skip((i + 1) % N))) continue;
       const a = fn(i % N), b = fn((i + 1) % N);
       const v0 = (i * step) / vScale, v1 = ((i + 1) * step) / vScale;
       const col = colFn ? colFn(i) : [1, 1, 1];
@@ -22,17 +24,20 @@
 
   KL.scenery = {
     /* the tarmac (or plaza / bridge deck) between the road edges, split in runs by zone kind */
-    road(track, theme) {
+    road(track, theme, o) {
+      o = o || {};
       const asphalt = new KL.Batch(), cobble = new KL.Batch();
       const kindAt = (i) => { const z = track.ZONE[i]; return z >= 0 && track.zones[z].road ? track.zones[z].road : (theme.road || 'asphalt'); };
-      for (let i = 0; i < track.N; i++) {
+      const NQ = track.closed ? track.N : track.N - 1;
+      for (let i = 0; i < NQ; i++) {
         const i2 = (i + 1) % track.N, kind = kindAt(i);
         const B = kind === 'cobble' ? cobble : asphalt;
-        const f = (j) => [edgePt(track, j, -track.HW[j], 0.0), edgePt(track, j, track.HW[j], 0.0)];
+        const f = (j) => [edgePt(track, j, -track.HW[j], o.lift || 0.0), edgePt(track, j, track.HW[j], o.lift || 0.0)];
+        if (o.skip && o.skip(i, i2)) continue;
         const a = f(i), b = f(i2), v0 = (i * track.step) / 8, v1 = ((i + 1) * track.step) / 8;
         const hw0 = track.HW[i], hw1 = track.HW[i2];
         const uv = kind === 'cobble' ? [[-hw0 / 4, v0 * 2], [hw0 / 4, v0 * 2], [hw1 / 4, v1 * 2], [-hw1 / 4, v1 * 2]] : [[0, v0], [1, v0], [1, v1], [0, v1]];
-        const shade = theme.roadColor ? KL.col(theme.roadColor) : [1, 1, 1];
+        const shade = o.tint || (theme.roadColor ? KL.col(theme.roadColor) : [1, 1, 1]);
         B.quadUV(a[0], a[1], b[1], b[0], shade, uv[0], uv[1], uv[2], uv[3]);
       }
       return { asphalt, cobble };
@@ -54,7 +59,8 @@
       return { pads: B, checker: C };
     },
     /* raised pavement/verge strip between the road edge and the wall + a kerb stone + the wall itself */
-    sides(track, theme) {
+    sides(track, theme, o) {
+      o = o || {};
       const verge = new KL.Batch(), kerb = new KL.Batch(), wall = new KL.Batch();
       const H = theme.wallH != null ? theme.wallH : 1.15, KH = theme.kerbH != null ? theme.kerbH : 0.14;
       const vc = KL.col(theme.vergeColor || '#ffffff'), wc = KL.col(theme.wallColor || '#cfc6b4'), wt = KL.col(theme.wallTop || '#e3dccb');
@@ -66,21 +72,21 @@
           const w = (lim(i) - track.HW[i]) / 3;
           const I = [inner[0], inner[1], inner[2], 0], O = [outer[0], outer[1], outer[2], w];
           return side < 0 ? [O, I] : [I, O];
-        }, 3, () => vc);
+        }, 3, () => vc, (i) => o.skip && o.skip(i, side));
         // kerb face (vertical step up from the road to the pavement)
         strip(kerb, track, 0, track.N, (i) => {
           const lo = edgePt(track, i, side * track.HW[i], 0), hi = edgePt(track, i, side * track.HW[i], KH);
           return side < 0 ? [[hi[0], hi[1], hi[2], 0], [lo[0], lo[1], lo[2], 1]] : [[lo[0], lo[1], lo[2], 0], [hi[0], hi[1], hi[2], 1]];
-        }, 2, null);
+        }, 2, null, (i) => o.skip && o.skip(i, side));
         // wall: inner face + cap
         strip(wall, track, 0, track.N, (i) => {
           const lo = edgePt(track, i, side * lim(i), KH), hi = edgePt(track, i, side * lim(i), KH + H);
           return side < 0 ? [[hi[0], hi[1], hi[2], 0], [lo[0], lo[1], lo[2], 1]] : [[lo[0], lo[1], lo[2], 0], [hi[0], hi[1], hi[2], 1]];
-        }, 2, (i) => wc);
+        }, 2, (i) => wc, (i) => o.skip && o.skip(i, side));
         strip(wall, track, 0, track.N, (i) => {
           const a = edgePt(track, i, side * lim(i), KH + H), b = edgePt(track, i, side * (lim(i) + 0.55), KH + H);
           return side < 0 ? [[b[0], b[1], b[2], 0], [a[0], a[1], a[2], 1]] : [[a[0], a[1], a[2], 0], [b[0], b[1], b[2], 1]];
-        }, 2, (i) => wt);
+        }, 2, (i) => wt, (i) => o.skip && o.skip(i, side));
       }
       return { verge, kerb, wall };
     },
