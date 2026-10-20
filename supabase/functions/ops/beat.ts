@@ -5,14 +5,17 @@
  * Contract:  POST /functions/v1/ops
  *   headers  apikey: <anon key>, content-type: application/json,
  *            x-beat-secret: <OPS_BEAT_SECRET>
- *   body     {"action":"beat","service":"brix"|"mini","detail":"<optional, ≤200 chars>"}
+ *   body     {"action":"beat","service":"brix"|"mini"|"supabase","detail":"<optional, ≤200 chars>",
+ *             "status":"ok"|"warn"|"error" (optional, default ok),
+ *             "message":"<optional, ≤200 chars: why, shown when status is not ok>"}
  *   reply    {"ok":true}                                                        */
 import { SERVICES } from "./health.ts";
 
 export const MAX_DETAIL = 200;
-export const BEAT_EXPECT_SECONDS = 300;
 
 const BEAT_KEYS = new Set(SERVICES.map((service) => service.key));
+const EXPECT_SECONDS = new Map(SERVICES.map((service) => [service.key, service.expectSeconds]));
+const STATUSES = new Set(["ok", "warn", "error"]);
 const encoder = new TextEncoder();
 
 /** Constant-time string equality. Both sides are hashed first so the loop
@@ -28,7 +31,19 @@ export async function secretsMatch(expected: string, given: string | null): Prom
   return diff === 0;
 }
 
-export type Beat = { service: string; detail: string | null };
+export type Beat = {
+  service: string;
+  detail: string | null;
+  status: "ok" | "warn" | "error";
+  message: string | null;
+};
+
+/** One line, no control characters, clipped. Non-strings become "". */
+function oneLine(value: unknown): string {
+  const raw = typeof value === "string" ? value : "";
+  // deno-lint-ignore no-control-regex
+  return raw.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, MAX_DETAIL);
+}
 
 /** Returns the validated beat, or an error message for a 400. */
 export function parseBeat(payload: unknown): Beat | { error: string } {
@@ -37,15 +52,18 @@ export function parseBeat(payload: unknown): Beat | { error: string } {
   if (!BEAT_KEYS.has(service)) return { error: "Unknown service." };
   /* Control characters (incl. newlines) stripped: this text is shown on a page
    * and must stay one line. Non-strings are ignored rather than rejected so a
-   * sender bug never costs a heartbeat. */
-  const raw = typeof body.detail === "string" ? body.detail : "";
-  // deno-lint-ignore no-control-regex
-  const detail = raw.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, MAX_DETAIL);
-  return { service, detail: detail || null };
+   * sender bug never costs a heartbeat. An unknown status is ignored too (ok). */
+  const detail = oneLine(body.detail);
+  const message = oneLine(body.message);
+  const status = typeof body.status === "string" && STATUSES.has(body.status)
+    ? body.status as Beat["status"]
+    : "ok";
+  return { service, detail: detail || null, status, message: message || null };
 }
 
 /** The `service_heartbeats` row for a beat. A beat IS the proof of life, so
- * last_ok_at moves with it and any earlier error is cleared. */
+ * last_ok_at moves with it. The sender's own verdict (status/message) is
+ * stored as given; an ok beat clears any earlier error. */
 export function beatRow(beat: Beat, nowISO: string) {
   return {
     service: beat.service,
@@ -53,10 +71,10 @@ export function beatRow(beat: Beat, nowISO: string) {
     beat_at: nowISO,
     last_ok_at: nowISO,
     updated_at: nowISO,
-    status: "ok",
+    status: beat.status,
     detail: beat.detail ? { text: beat.detail } : null,
-    last_error: null,
-    last_error_at: null,
-    expected_every_seconds: BEAT_EXPECT_SECONDS,
+    last_error: beat.status === "ok" ? null : beat.message,
+    last_error_at: beat.status === "ok" ? null : nowISO,
+    expected_every_seconds: EXPECT_SECONDS.get(beat.service) ?? null,
   };
 }

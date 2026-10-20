@@ -1,6 +1,8 @@
-/* Status — are brix and the Mac Mini alive?
+/* Status — are brix and the Mac Mini alive, and is Supabase inside its free quota?
  *
- * Two tiles, nothing per-service: if a machine is up, what runs on it is up.
+ * Three tiles, nothing per-service: if a machine is up, what runs on it is up.
+ * The third tile (Supabase) is the free-plan usage watch: egress this billing
+ * cycle against 5 GB, with the projection and the last 24 h on its detail line.
  * The page deliberately computes nothing: every verdict arrives already
  * resolved from the `ops` edge function (supabase/functions/ops/health.ts), so
  * there is one place where "is this machine alive" is decided.
@@ -24,11 +26,20 @@ const STATE = {
   down: { mark: "✕", word: "Down" },
   unknown: { mark: "○", word: "No report" },
 };
+/* The Supabase tile reports usage, not liveness, so its words differ: warn =
+ * heading for the limit, over = a free-plan limit is already crossed. */
+const USAGE_STATE = {
+  ok: { mark: "●", word: "OK" },
+  warn: { mark: "▲", word: "Warn" },
+  down: { mark: "✕", word: "Over" },
+  unknown: STATE.unknown,
+};
+const STALE_STATE = { mark: "✕", word: "No data" };
 const SUMMARY = {
-  ok: "Both machines are up.",
-  warn: "A machine reports a warning.",
-  down: "A machine is down.",
-  unknown: "A machine has not reported yet.",
+  ok: "Everything is up.",
+  warn: "Something reports a warning.",
+  down: "Something is down.",
+  unknown: "Something has not reported yet.",
 };
 
 let refreshTimer = null;
@@ -88,7 +99,9 @@ function lastSeen(seconds) {
 }
 
 function tile(machine) {
-  const state = STATE[machine.health] || STATE.unknown;
+  const states = machine.key === "supabase" ? USAGE_STATE : STATE;
+  const state = machine.stale && machine.key === "supabase"
+    ? STALE_STATE : (states[machine.health] || STATE.unknown);
   const seen = machine.health === "unknown" ? "nothing has reported yet" : lastSeen(machine.ageSeconds);
   return `<article class="tile tile--${esc(machine.health)}">
     <div class="tile-mark" aria-hidden="true">${state.mark}</div>

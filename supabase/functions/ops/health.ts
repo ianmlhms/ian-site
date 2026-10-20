@@ -1,4 +1,4 @@
-/* The two machines and the health rules, kept apart from transport so the
+/* The two machines (plus the Supabase usage tile) and the health rules, kept apart from transport so the
  * arithmetic can be read (and reasoned about) on its own.
  *
  * The catalog lives here rather than in a database table on purpose: a seeded
@@ -17,6 +17,10 @@ export type ServiceSpec = {
   what: string;
   /** Expected heartbeat period. */
   expectSeconds: number;
+  /** The sender raises its own alerts (Slack). Its reported warn/error status is
+   * shown on the tile but not pushed again from here; only silence (a stale
+   * beat) still alerts, because then the sender itself is gone. */
+  quiet?: boolean;
 };
 
 /* Health, worst last. `unknown` is deliberately NOT an error: nothing has
@@ -34,6 +38,9 @@ const BEAT_EVERY_SECONDS = 5 * MINUTE;
 export const SERVICES: readonly ServiceSpec[] = Object.freeze([
   { key: "brix", label: "brix", what: "Home server", expectSeconds: BEAT_EVERY_SECONDS },
   { key: "mini", label: "Mac Mini", what: "Always-on Mac", expectSeconds: BEAT_EVERY_SECONDS },
+  /* Not a machine: the free-plan quota watch (scripts/ops/supabase_usage_watch.py,
+   * run hourly on the Mini). Its status is its own verdict on usage, not liveness. */
+  { key: "supabase", label: "Supabase", what: "Free-plan usage", expectSeconds: HOUR, quiet: true },
 ]);
 
 export type HeartbeatRow = {
@@ -52,6 +59,10 @@ export type ServiceHealth = {
   label: string;
   what: string;
   health: Health;
+  /** True when the sender has gone silent (missed beats), as opposed to reporting a problem. */
+  stale: boolean;
+  /** Mirrors ServiceSpec.quiet. */
+  quiet: boolean;
   /** Human-readable reason, already resolved server-side. */
   reason: string;
   ageSeconds: number | null;
@@ -94,7 +105,10 @@ export function evaluate(
   spec: ServiceSpec, row: HeartbeatRow | undefined, nowMs: number,
 ): ServiceHealth {
   const beatAge = ageSeconds(row?.beat_at, nowMs);
+  const stale = beatAge !== null && beatAge > spec.expectSeconds * MISS_FACTOR;
   const base = {
+    stale,
+    quiet: spec.quiet === true,
     key: spec.key,
     label: spec.label,
     what: spec.what,
@@ -108,7 +122,7 @@ export function evaluate(
     return { ...base, health: "unknown", reason: "no report yet" };
   }
 
-  if (beatAge > spec.expectSeconds * MISS_FACTOR) {
+  if (stale) {
     return { ...base, health: "down", reason: `no heartbeat for ${describeAge(beatAge)}` };
   }
 

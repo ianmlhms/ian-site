@@ -10,8 +10,10 @@ import type { Health, ServiceHealth } from "./health.ts";
 const NOW = Date.parse("2026-08-22T12:00:00Z");
 const HOUR = 60 * 60 * 1000;
 
-function svc(key: string, health: Health): ServiceHealth {
+function svc(key: string, health: Health, extra: Partial<ServiceHealth> = {}): ServiceHealth {
   return {
+    stale: false,
+    quiet: false,
     key,
     label: key,
     what: "",
@@ -21,6 +23,7 @@ function svc(key: string, health: Health): ServiceHealth {
     lastBeatISO: null,
     detailText: null,
     lastError: null,
+    ...extra,
   };
 }
 
@@ -111,4 +114,15 @@ Deno.test("'no report' is never news, even after an old alert under the same key
     NOW,
   );
   assertEquals(planned.length, 0);
+});
+
+Deno.test("a quiet service's own warn/error is not re-pushed, but its silence is", () => {
+  const reported = svc("supabase", "down", { quiet: true, stale: false });
+  assertEquals(planAlerts([reported], new Map(), NOW).length, 0);
+  const warned = svc("supabase", "warn", { quiet: true, stale: false });
+  assertEquals(planAlerts([warned], new Map(), NOW).length, 0);
+  const silent = svc("supabase", "down", { quiet: true, stale: true });
+  const planned = planAlerts([silent], new Map(), NOW);
+  assertEquals(planned.length, 1);
+  assertEquals(planned[0].service, "supabase");
 });

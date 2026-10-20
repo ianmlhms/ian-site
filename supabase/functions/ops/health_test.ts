@@ -5,9 +5,21 @@ const NOW = Date.parse("2026-10-15T12:00:00Z");
 const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
 const [brix] = SERVICES;
 
-Deno.test("catalog is exactly brix and mini, 5-minute daemons", () => {
-  assertEquals(SERVICES.map((s) => s.key), ["brix", "mini"]);
-  assertEquals(SERVICES.map((s) => s.expectSeconds), [300, 300]);
+Deno.test("catalog is brix, mini (5-minute daemons) and the hourly supabase usage watch", () => {
+  assertEquals(SERVICES.map((s) => s.key), ["brix", "mini", "supabase"]);
+  assertEquals(SERVICES.map((s) => s.expectSeconds), [300, 300, 3600]);
+});
+
+Deno.test("supabase reports its own verdict; silence for three hours is stale", () => {
+  const supabase = SERVICES[2];
+  const row = (age: number, status: string, last_error?: string) =>
+    ({ service: "supabase", beat_at: ago(age), status, last_error });
+  assertEquals(evaluate(supabase, row(600, "ok"), NOW).health, "ok");
+  const warn = evaluate(supabase, row(600, "warn", "egress on track for 4 GB"), NOW);
+  assertEquals([warn.health, warn.stale, warn.reason], ["warn", false, "egress on track for 4 GB"]);
+  assertEquals(evaluate(supabase, row(600, "error", "egress over the free limit"), NOW).health, "down");
+  const stale = evaluate(supabase, row(3 * 3600 + 1, "ok"), NOW);
+  assertEquals([stale.health, stale.stale], ["down", true]);
 });
 
 Deno.test("no row is 'unknown', never 'down'", () => {
@@ -37,7 +49,7 @@ Deno.test("evaluateAll ignores rows of retired services", () => {
     [{ service: "opsagent", beat_at: ago(5) }, { service: "mini", beat_at: ago(5) }],
     NOW,
   );
-  assertEquals(all.map((s) => s.health), ["unknown", "ok"]);
+  assertEquals(all.map((s) => s.health), ["unknown", "ok", "unknown"]);
   assertEquals(overallHealth(all), "unknown");
 });
 
