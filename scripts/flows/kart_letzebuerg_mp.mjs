@@ -842,6 +842,7 @@ export const flow = {
 
       /* ================= 5e. network stalls: a lagging player keeps his kart, a lagging host keeps his race ================= */
       if (want('stalls')) {
+        const stRec0 = recCount();
         h.step('stalls (WebRTC): a client lags 2.5 s (nothing happens) and 6 s (a gentle bot for a moment, kart back without a reset); the host lags 3 s and 9 s (indicator, no second host)');
         const H = await newPlayer(h, hub, 'st-host', { cfg: NO_STALL_FORGIVENESS }); all.push(H);
         const G1 = await newPlayer(h, hub, 'st-g1', { cfg: NO_STALL_FORGIVENESS }); all.push(G1);
@@ -898,6 +899,11 @@ export const flow = {
         for (const n of ['Lagger', 'Deputy', 'Victim']) h.expect(tb[0].includes(n), n + ' finished and is in the table');
         const mH = await mp(H);
         h.eq(mH.karts.filter((k) => k.human).length, 3, 'all three are still human at the end (nobody was dropped for good)');
+        await settle(() => recCount() - stRec0, 1, 20000);
+        const stp = (RECORDS[stRec0] || { p: { players: [] } }).p.players.filter((p) => !p.bot);
+        const vic = stp.find((p) => p.name === 'Victim'), hos = stp.find((p) => p.name === 'Lagger');
+        h.expect(vic && vic.link === 'p2p' && vic.dropped_at_s === null && vic.away_s > 2 && vic.away_s < 30, 'race log diagnostics: the stalled player is link p2p, never dropped, away_s ' + (vic && vic.away_s) + ' (about the 6 s stall)');
+        h.expect(hos && hos.link === 'p2p' && hos.dropped_at_s === null, 'and the host entry is p2p / never dropped');
         await closeAll(all); all.length = 0;
       }
 
@@ -986,7 +992,7 @@ export const flow = {
         await lobbyJoin(L0, L1, lcode, 'Nora'); await lobbyJoin(L0, L2, lcode, 'Fernando');
         await waitFor(L0, () => document.querySelectorAll('#lbList li').length === 3 && document.querySelectorAll('#lbList li .slow').length === 2, null, 40000);
         FAIL.bad = 1;                                                  // the server refuses the first (new-shape) race log call as "bad player"
-        await readyAndStart(L0, [L1, L2], 1);
+        await readyAndStart(L0, [L1, L2], 3);
         await waitRace([L0, L1, L2]);
         for (const p of [L0, L1, L2]) await kl(p, () => __klTest.autopilot(true));
         await sleep(8000);
@@ -995,7 +1001,8 @@ export const flow = {
         const f0 = hub.stats.framesIn + hub.stats.framesOut;
         const tEmma = Date.now();
         await E.page.goto(h.origin + URL_BASE + '&room=' + lcode.toLowerCase() + '&role=guest');
-        await waitFor(E, () => { const m = __klTest.mp(); return m.spec && m.specLive && !document.getElementById('hud').hidden; }, null, 90000);
+        try { await waitFor(E, () => { const m = __klTest.mp(); return m.spec && m.specLive && !document.getElementById('hud').hidden; }, null, 90000); }
+        catch (e) { console.log('    DEBUG emma: ' + JSON.stringify(await E.page.evaluate(() => ({ mp: (() => { const m = __klTest.mp(); return { spec: m.spec, live: m.specLive, active: m.active, links: m.links, lobby: m.lobby }; })(), screens: [...document.querySelectorAll('#menu,#onlineScreen,#lobbyScreen,#netBusy,#loading,#endScreen')].filter((x) => !x.hidden).map((x) => x.id), olMsg: document.getElementById('olMsg').textContent, busy: document.getElementById('netBusyText').textContent })).catch((x) => String(x))) + ' errors ' + JSON.stringify(E.errors)); console.log('    DEBUG host: ' + JSON.stringify(await mp(L0).then((m) => ({ specs: m.specs, links: m.links, phase: m.lobby.phase, peers: m.lobby.peers, results: m.results })))); throw e; }
         const joinSecs = (Date.now() - tEmma) / 1000;
         const em = await mp(E), hm = await mp(L0);
         h.expect(em.spec && em.links.length === 1 && em.links[0].kind === 'relay', 'Emma watches the race through the relay (join took ' + joinSecs.toFixed(1) + ' s)');

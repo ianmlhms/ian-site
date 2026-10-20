@@ -298,7 +298,7 @@
     p.drv = freeDriver(p.drv, p.id);
     L.peers.set(p.id, p);
     // a watcher while everybody else is already on the relay (school network) goes straight to the relay: no 10 s WebRTC attempt first
-    if (watching && N.RELAY_FALLBACK && L.relayInUse && L.signalling && ![...L.peers.values()].some((q) => q !== p && q.link && q.link.kind === 'rtc' && q.link.open)) { switchToRelay(p); trackHost(); return; }
+    if ((watching || waiting) && N.RELAY_FALLBACK && L.relayInUse && L.signalling && ![...L.peers.values()].some((q) => q !== p && q.link && q.link.kind === 'rtc' && q.link.open)) { switchToRelay(p); trackHost(); return; }
     p.link = makeLink(p.id, true);
     p.link.makeOffer();
     broadcastRoster(); dirUpdate(); trackHost();
@@ -365,8 +365,8 @@
     if (L.role === 'host' && L.peers.has(peerId)) {
       const p = L.peers.get(peerId);
       if (p.link !== link) return;
-      if (!wasOpen && (L.phase === 'lobby' || p.spec) && N.RELAY_FALLBACK && L.signalling && (reason === 'timeout' || reason === 'failed')) { switchToRelay(p); return; }
-      if (!wasOpen && (L.phase === 'lobby' || p.spec)) { sendSys(peerId, 'conn'); }
+      if (!wasOpen && (L.phase === 'lobby' || p.spec || raceOver()) && N.RELAY_FALLBACK && L.signalling && (reason === 'timeout' || reason === 'failed')) { switchToRelay(p); return; }
+      if (!wasOpen && (L.phase === 'lobby' || p.spec || raceOver())) { sendSys(peerId, 'conn'); }
       removePeer(peerId, reason);
     } else if (L.role === 'host' && !L.peers.has(peerId)) {
       // (a host that took over mid-race tracks its players as peers too, see adoptAsHost; anything else is a stray link)
@@ -751,7 +751,7 @@
   /* drop the Realtime channel once nobody needs it any more (only a relayed peer keeps it) */
   function releaseSignalling() {
     const needRelay = [...L.links.values()].some((l) => l.kind === 'relay');
-    if (needRelay) { log('signalling stays open for the relay fallback'); return; }
+    if (needRelay) { log('signalling stays open for the relay fallback'); if (L.role === 'host' && L.ch) { dirUpdate(); trackHost(); } return; }     // (the presence says "a race is running, watch it" now)
     if (L.role === 'host' && L.ch) {            // the host stays on its (idle) room channel: somebody who opens the code during the race can find it and watch
       dirUpdate(); trackHost(); log('host keeps the idle room channel for spectators'); return;
     }
