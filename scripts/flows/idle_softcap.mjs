@@ -72,15 +72,15 @@ export const flow = {
     const curve = await game.evaluate(() => {
       const points = []; const stars = 7;
       for (let e = 3; e <= 150; e += 0.25) points.push(prestigeMultiplier(Math.pow(10, e), stars));
-      const edge = [prestigeMultiplier(1e9 - 1, 0), prestigeMultiplier(1e9, 0), prestigeMultiplier(1e9 + 1, 0), prestigeMultiplier(1e9 + 1e4, 0)];
+      const edge = [prestigeMultiplier(9e8, 0), prestigeMultiplier(1e9 - 20, 0), prestigeMultiplier(1e9, 0), prestigeMultiplier(1e9 + 20, 0)];
       const raw = (i, s) => rawPrestigeMultiplier(i, s);
-      return { increasing: points.every((v, i) => i === 0 || v > points[i - 1]), finite: points.every(Number.isFinite), edge, rawEdge: [raw(1e9 - 1, 0), raw(1e9, 0)],
+      return { increasing: points.every((v, i) => i === 0 || v > points[i - 1]), finite: points.every(Number.isFinite), edge, rawEdge: [raw(9e8, 0), raw(1e9 - 20, 0)],
         last: points.at(-1), huge: prestigeMultiplier(1e200, 1e200), inf: prestigeMultiplier(1e300, 1e300), zero: prestigeMultiplier(0, 0) };
     });
     h.expect(curve.increasing && curve.finite, "strictly increasing and finite for 1e3 .. 1e150 investors");
     h.eq(curve.zero, 1, "no investors, no stars: x1");
     h.expect(curve.edge[0] === curve.rawEdge[0] && curve.edge[1] === curve.rawEdge[1], "exactly linear up to the cap");
-    h.expect(curve.edge[2] - curve.edge[1] > 0 && curve.edge[2] - curve.edge[1] < 1 + 1e-6 * CAP, "continuous across the cap (no jump)");
+    h.expect(curve.edge[1] < curve.edge[2] && curve.edge[2] < curve.edge[3] && relClose(curve.edge[1], curve.edge[3], 1e-6), "continuous across the cap (no jump, still increasing)");
     h.expect(relClose(curve.last, expectedBonus(Math.pow(10, 150), 7)) && relClose(curve.huge, expectedBonus(1e200, 1e200)), "matches C x (1 + ln(raw / C)) far above the cap");
     h.expect(Number.isFinite(curve.inf), `no overflow with absurd counts (${curve.inf.toExponential(2)})`);
 
@@ -141,9 +141,16 @@ export const flow = {
     h.expect(late.shown && /Nothing is removed/.test(late.copy), "notice shown on crossing");
     h.eq(crossed.save.investors, 4e8, "investors survive the rebirth");
 
-    h.step("daily gift and Halloween production still follow the capped income");
-    const gift = await game.evaluate(() => ({ income: getAutomaticIncome(), snapshotIncome: IdleExtras.offline(snapshot().st, Date.now() - 3600 * 1000, getAutomaticIncome()).credited }));
-    h.expect(Number.isFinite(gift.income) && gift.snapshotIncome > 0, "automatic income and the offline helper work with the capped bonus");
+    h.step("production, offline earnings and the daily gift follow the capped income");
+    const income = await game.evaluate(() => {
+      const probe = { ...state, owned: { ...state.owned, lemonade: 30 }, managers: { ...state.managers, lemonade: true } };
+      const lemonade = getBusiness("lemonade");
+      const perSecond = getCyclePayout(lemonade, probe) / (getCycleDurationMs(lemonade, 30) / 1000);
+      return { automatic: getAutomaticIncome(probe), perSecond, bonus: prestigeMultiplier(probe.investors, probe.st),
+        offline: IdleExtras.offline(probe.st, Date.now() - 3600 * 1000, getAutomaticIncome(probe)).credited };
+    });
+    h.expect(Number.isFinite(income.automatic) && income.automatic > 0 && relClose(income.automatic, income.perSecond), `automatic income = lemonade payout per second (${income.automatic.toExponential(3)})`);
+    h.expect(income.offline > 0 && Number.isFinite(income.offline) && income.offline <= income.automatic * 3600 * (1 + 1e-9), "one hour away credits at most an hour of the capped income");
 
     h.eq(consoleProblems, [], "no console errors or ignored-score warnings");
   },
