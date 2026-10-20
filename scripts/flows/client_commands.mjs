@@ -31,7 +31,8 @@ export const flow = {
       window.__presenceTicks = [];
       const interval = window.setInterval.bind(window);
       window.setInterval = (callback, delay, ...args) => {
-        if (delay === 60_000) window.__presenceTicks.push(() => callback(...args));
+        // only the presence ping: other 60 s timers exist (the arcade's weekly-countdown refresh), and their callbacks answer no RPC
+        if (delay === 60_000 && /\bping\(/.test(String(callback))) window.__presenceTicks.push(() => callback(...args));
         return interval(callback, delay, ...args);
       };
     });
@@ -153,6 +154,43 @@ export const flow = {
     await page.click("#reloadAll");
     await page.waitForFunction(() => /konnt net/.test(document.getElementById("commandStatus").textContent));
     h.expect(await page.isEnabled("#reloadAll"), "RPC failure shows friendly error and releases buttons");
+
+    h.step("end to end: the admin tab's own buttons reach a second open tab (close game, reload, reload all) through one shared queue");
+    const queue = createClientCommandsMock();
+    backend.rpc.client_commands_since = queue.rpc.client_commands_since;
+    backend.rpc.issue_client_command = queue.rpc.issue_client_command;
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await h.goto("/pixelbreak.html?g=snake");
+    await ready(h);
+    await page.waitForFunction(() => window.PB?.current?.id === "snake" && document.getElementById("gf")?.contentDocument?.body?.children.length);
+    const admin = await context.newPage();
+    admin.on("dialog", (dialog) => dialog.accept());
+    await admin.goto(h.origin + "/admin.html");
+    await admin.click("#tabOnline");
+    await admin.waitForSelector(".online-row");
+    const send = async (selector) => {
+      const before = backend.callsTo("issue_client_command").length;
+      await admin.click(selector);
+      await admin.waitForFunction(() => document.getElementById("commandStatus").textContent && !document.getElementById("reloadAll").disabled);
+      h.eq(backend.callsTo("issue_client_command").length, before + 1, `admin click ${selector} issued one command`);
+    };
+    await send(`[data-user="${ME}"][data-client-command="close_game"]`);
+    await tick(h);
+    await page.waitForFunction(() => window.PB.current === null && !document.body.classList.contains("game-open"));
+    h.eq(await page.getAttribute("#gf", "srcdoc"), "", "admin «Spill zou» closed the game in the other tab");
+    await page.evaluate(() => {
+      window.__reloadCount = 0;
+      window.__ianCommands.reload = () => { window.__reloadCount++; return true; };
+    });
+    await send(`[data-user="${ME}"][data-client-command="reload"]`);
+    await tick(h);
+    h.eq(await page.evaluate(() => window.__reloadCount), 1, "admin «Reload» reaches the other tab");
+    await send("#reloadAll");
+    await tick(h);
+    h.eq(await page.evaluate(() => window.__reloadCount), 2, "admin «Alles nei lueden» reaches the other tab");
+    await tick(h);
+    h.eq(await page.evaluate(() => window.__reloadCount), 2, "each command runs once");
+    await admin.close();
   },
 };
 

@@ -1,5 +1,5 @@
 /* Friends: add by username, list, message (DM) or invite to a game. */
-import * as auth from "./auth.js?v=32";
+import * as auth from "./auth.js?v=33";
 import { attachPeopleSearch } from "./people-search.js?v=1";
 import { MP_GAMES, gameInfo, gameName, isLobbyGame, joinUrl, lobbyUrl } from "./mp-games.js?v=4";
 

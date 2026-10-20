@@ -9,12 +9,13 @@
 body{display:flex;flex-direction:column}
 [hidden]{display:none!important}
 /* top padding keeps the board clear of the HUD pills */
-.arcade-stage{padding:52px 10px 12px}
+/* top padding = HUD row (12px inset + 44px «‹ Lobby» button) + 8px air, so the board's frame never touches the button; side/bottom padding respect the notch / home bar */
+.arcade-stage{padding:64px max(10px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
 canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48px rgba(0,0,0,.35)}
 .arcade-hud b{text-transform:none}
 .arcade-panel p:empty{display:none}
 #panelExtra:not(:empty){margin:14px 0 2px}
-.arcade-hud{justify-content:center;align-items:center}
+.arcade-hud{justify-content:center;align-items:center;left:max(14px,env(safe-area-inset-left));right:max(14px,env(safe-area-inset-right))}
 .hud-btn{pointer-events:auto;min-height:44px}   /* only shown for a lobby game: mp-gate.js turns it into «‹ Lobby» */
 .arcade-hud .arcade-pill{text-transform:none;letter-spacing:.01em}
 .menu-panel .arcade-actions{flex-direction:column;align-items:stretch;margin-top:16px}
@@ -27,7 +28,7 @@ canvas{border-radius:var(--radius);box-shadow:0 0 0 1px var(--border),0 18px 48p
 #mStatus{min-height:22px;margin:12px 0 0;color:var(--cyan);font-size:14px}
 </style>
 <script src="/mp-gate.js?v=6" data-game="air-hockey" data-menu data-adopt="#hudMenu,!#mHost"></script>
-<script src="/pb/arcade-kit.js?v=29" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
+<script src="/pb/arcade-kit.js?v=30" data-arcade-id="air-hockey" data-arcade-title="Air Hockey"></script>
 </head>
 <body>
 <main class="arcade-stage" id="stage">

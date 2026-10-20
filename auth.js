@@ -131,7 +131,7 @@ function startPresencePing() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=9");
+    _g.accountCheckModule = import("./account-check.js?v=10");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))
@@ -537,7 +537,8 @@ function injectCss() {
   const link = document.createElement("link");
   link.id = "auth-css";
   link.rel = "stylesheet";
-  link.href = "auth.css?v=2";
+  // resolved against this module, not the page: a relative "auth.css" 404s on /pb/… (and any other sub-path) pages
+  link.href = new URL("auth.css?v=3", import.meta.url).href;
   document.head.appendChild(link);
 }
 
