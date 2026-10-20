@@ -304,6 +304,16 @@
     track.branches = (def.branches || []).map((bd) => buildBranch(track, bd));
     track.loc = makeLoc(track);
     track.inMouth = makeInMouth(track);
+    /* is (x, z) within pad metres of the body of a shortcut (scenery keeps trees and lamps off it) */
+    track.nearBranch = (x, z, pad) => {
+      const tmp = {};
+      for (const b of track.branches) {
+        if (x < b.box[0] - pad || x > b.box[2] + pad || z < b.box[1] - pad || z > b.box[3] + pad) continue;
+        const q = b.T.project(x, z, -1, null, tmp);
+        if (Math.abs(q.d) < q.hw + Math.max(q.wl, q.wr) + pad) return true;
+      }
+      return false;
+    };
     return track;
   };
 

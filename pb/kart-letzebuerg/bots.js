@@ -17,7 +17,7 @@
     if (!k.br && main.branches.length && R.phase === 'race') {          // shortcuts: decide once per lap and cut whether to take it; then follow its centre line from afar
       for (const b of main.branches) {
         let ahead = b.sA - k.s; if (ahead < -main.length / 2) ahead += main.length;
-        if (ahead < -4 || ahead > 150) continue;
+        if (ahead < -(b.g0 + 24) || ahead > 150) continue;
         const key = b.id + ':' + Math.floor(k.prog / main.length);
         if (ai.cutKey !== key) { ai.cutKey = key; ai.cut = Math.random() < (diff.cut || 0) * (b.def.botLike != null ? b.def.botLike : 1); }
         if (!ai.cut) continue;

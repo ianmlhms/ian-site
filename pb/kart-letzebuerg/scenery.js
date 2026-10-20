@@ -30,7 +30,7 @@
       const kindAt = (i) => { const z = track.ZONE[i]; return z >= 0 && track.zones[z].road ? track.zones[z].road : (theme.road || 'asphalt'); };
       const NQ = track.closed ? track.N : track.N - 1;
       for (let i = 0; i < NQ; i++) {
-        const i2 = (i + 1) % track.N, kind = kindAt(i);
+        const i2 = (i + 1) % track.N, kind = o.kind || kindAt(i);
         const B = kind === 'cobble' ? cobble : asphalt;
         const f = (j) => [edgePt(track, j, -track.HW[j], o.lift || 0.0), edgePt(track, j, track.HW[j], o.lift || 0.0)];
         if (o.skip && o.skip(i, i2)) continue;
@@ -41,6 +41,26 @@
         B.quadUV(a[0], a[1], b[1], b[0], shade, uv[0], uv[1], uv[2], uv[3]);
       }
       return { asphalt, cobble };
+    },
+    /* the ribbon of a shortcut, trimmed where it lies on the main road (so no brick carpet on the avenue); returns a Batch */
+    cutRoad(T, main, o) {
+      o = o || {};
+      const B = new KL.Batch(), tmp = {}, shade = o.tint || [1, 1, 1], f = (p) => { const m = main.project(p[0], p[2], -1, null, tmp); return Math.abs(m.d) - m.hw; };    // < 0: on the main road surface
+      const sec = [];
+      for (let j = 0; j < T.N; j++) {
+        const hw = T.HW[j], L = edgePt(T, j, -hw, o.lift || 0), R = edgePt(T, j, hw, o.lift || 0), fl = f(L), fr = f(R);
+        let t0 = 0, t1 = 1;                                                // visible part of the section, 0 = left edge, 1 = right edge
+        const cross = (inside, outside) => { let a = 0, b = 1; for (let k = 0; k < 7; k++) { const m = (a + b) / 2, p = [lerp(inside[0], outside[0], m), 0, lerp(inside[2], outside[2], m)]; if (f(p) < -0.4) a = m; else b = m; } return b; };
+        if (fl < -0.4 && fr < -0.4) { sec.push(null); continue; }
+        if (fl < -0.4) t0 = cross(L, R); else if (fr < -0.4) t1 = 1 - cross(R, L);
+        const P = (t) => [lerp(L[0], R[0], t), lerp(L[1], R[1], t), lerp(L[2], R[2], t)];
+        sec.push({ a: P(t0), b: P(t1), ua: (t0 * 2 - 1) * hw / 4, ub: (t1 * 2 - 1) * hw / 4, v: (j * T.step) / 4 });
+      }
+      for (let j = 0; j + 1 < sec.length; j++) {
+        const s0 = sec[j], s1 = sec[j + 1]; if (!s0 || !s1) continue;
+        B.quadUV(s0.a, s0.b, s1.b, s1.a, shade, [s0.ua, s0.v], [s0.ub, s0.v], [s1.ub, s1.v], [s1.ua, s1.v]);
+      }
+      return B;
     },
     /* start/finish line + pads + checker */
     decals(track, pads) {

@@ -382,7 +382,7 @@
   function viewOf(k, alpha) {
     const v = G.view || (G.view = {});
     v.x = k.ix != null ? k.ix : k.x; v.y = k.iy != null ? k.iy : k.y; v.z = k.iz != null ? k.iz : k.z; v.yaw = k.iyaw != null ? k.iyaw : k.yaw;
-    v.vx = k.vx; v.vz = k.vz; v.speed = k.speed; v.boostT = k.boostT; v.drift = k.drift; v.grounded = k.grounded;
+    v.vx = k.vx; v.vz = k.vz; v.speed = k.speed; v.boostT = k.boostT; v.drift = k.drift; v.grounded = k.grounded; v.br = k.br || null;
     return v;
   }
 
@@ -436,6 +436,7 @@
         case 'bump': if (camD < 40) a.sfx('bump', { near: e.id === me.id || e.id2 === me.id }); break;
         case 'wall': if (mine) { a.sfx('wall'); rd.shake = Math.max(rd.shake, Math.min(0.35, e.power * 0.02)); } break;
         case 'land': if (mine) a.sfx('land'); break;
+        case 'cut': if (mine) showToast('✂ ' + KL.t('cut') + '!', 1100); break;
         case 'comet': a.sfx('comet', { near: true }); break;
         case 'lap': if (mine) {
           a.sfx('lap');

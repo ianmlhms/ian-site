@@ -94,7 +94,7 @@
 
     // ---------- limits ----------
     const spdMul = def.speedMul || 1;                  // per-track pace (long tracks run a little faster)
-    let vmax = C.MAX_SPEED * spdMul * (k.rubber || 1);
+    let vmax = C.MAX_SPEED * spdMul * (k.br && k.br.def.speedMul || 1) * (k.rubber || 1);      // a shortcut can have a slower surface (cobbles)
     const offroadCap = def.offroadSpeed || (def.offroad === 'grass' ? C.OFFROAD_SPEED : C.SIDEWALK_SPEED);
     if (k.surf === 1 && k.boostT <= 0) vmax = Math.min(vmax, offroadCap);
     if (k.patch === 'goo' && k.boostT <= 0) vmax = Math.min(vmax, vmax * 0.55);              // syrup / mud
@@ -202,6 +202,7 @@
 
     // ---------- track, walls, ground ----------
     const p = track.loc(k, k.x, k.z, k.y, proj);          // main road or a branch (k.br)
+    if (p.br && p.br !== k.br && k.human) R.events.push({ t: 'cut', id: k.id });          // the human has just left the road for a shortcut
     k.hint = p.i; k.br = p.br; k.ss = p.ss;
     const side = p.d >= 0 ? 1 : -1, ad = Math.abs(p.d);
     const lim = p.hw + (side > 0 ? p.wr : p.wl);
