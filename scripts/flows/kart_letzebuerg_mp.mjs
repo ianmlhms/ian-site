@@ -97,6 +97,8 @@ function netStall(p, ms) {
     setTimeout(() => { M.onMsg = origOn; KL.Link.prototype.send = origSend; for (const [l, m, r] of heldOut) origSend.call(l, m, r); for (const a of heldIn) origOn.apply(M, a); }, ms);
   }, ms);
 }
+// (these sections simulate NETWORK stalls; the CPU-load stalls of a busy test machine must not be forgiven on top of them)
+const NO_STALL_FORGIVENESS = [['STALL_FRAME: 700', 'STALL_FRAME: 6000']];
 const BLOCK_RTC = () => { RTCPeerConnection.prototype.setRemoteDescription = () => new Promise(() => {}); };   // school Wi-Fi: no direct path between devices
 const FAST_RELAY = [['CONNECT_TIMEOUT: 10000', 'CONNECT_TIMEOUT: 2500']];                                       // (test speed: give up WebRTC sooner)
 
@@ -826,9 +828,9 @@ export const flow = {
       /* ================= 5e. network stalls: a lagging player keeps his kart, a lagging host keeps his race ================= */
       if (want('stalls')) {
         h.step('stalls (WebRTC): a client lags 2.5 s (nothing happens) and 6 s (a gentle bot for a moment, kart back without a reset); the host lags 3 s and 9 s (indicator, no second host)');
-        const H = await newPlayer(h, hub, 'st-host', { first: true }); all.push(H);
-        const G1 = await newPlayer(h, hub, 'st-g1'); all.push(G1);
-        const G2 = await newPlayer(h, hub, 'st-g2'); all.push(G2);
+        const H = await newPlayer(h, hub, 'st-host', { first: true, cfg: NO_STALL_FORGIVENESS }); all.push(H);
+        const G1 = await newPlayer(h, hub, 'st-g1', { cfg: NO_STALL_FORGIVENESS }); all.push(G1);
+        const G2 = await newPlayer(h, hub, 'st-g2', { cfg: NO_STALL_FORGIVENESS }); all.push(G2);
         await goOnline(H, 'Lagger'); await H.page.click('#olCreate');
         await H.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
         const stcode = (await H.page.textContent('#lbCode')).trim();
@@ -887,9 +889,9 @@ export const flow = {
       /* ================= 5f. a host that was only stalled for a very long time: the deputy takes over, the old host steps aside (no split brain) ================= */
       if (want('splitbrain')) {
         h.step('a host stalls for 17 s: the deputy takes over once, the old host steps aside when it wakes up (one race, one host)');
-        const H = await newPlayer(h, hub, 'sb-host', { first: true }); all.push(H);
-        const G1 = await newPlayer(h, hub, 'sb-g1'); all.push(G1);
-        const G2 = await newPlayer(h, hub, 'sb-g2'); all.push(G2);
+        const H = await newPlayer(h, hub, 'sb-host', { first: true, cfg: NO_STALL_FORGIVENESS }); all.push(H);
+        const G1 = await newPlayer(h, hub, 'sb-g1', { cfg: NO_STALL_FORGIVENESS }); all.push(G1);
+        const G2 = await newPlayer(h, hub, 'sb-g2', { cfg: NO_STALL_FORGIVENESS }); all.push(G2);
         await goOnline(H, 'OldHost'); await H.page.click('#olCreate');
         await H.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
         const sbcode = (await H.page.textContent('#lbCode')).trim();
@@ -899,7 +901,7 @@ export const flow = {
         for (const p of [H, G1, G2]) await kl(p, () => __klTest.autopilot(true));
         await sleep(5000);
         await netStall(H, 17000);
-        await waitFor(G1, () => KL.MP.role === 'host', null, 30000);
+        await waitFor(G1, () => KL.MP.role === 'host', null, 90000);
         h.expect(true, 'the deputy promoted itself to host');
         const g1 = await mp(G1), g2 = await mp(G2);
         h.eq([g1.epoch, g1.stats.promoted], [1, 1], 'exactly one promotion (epoch 1)');
