@@ -12,9 +12,11 @@ import { runFlow, startServer } from "./lib.mjs";
 import { flow as idleRebirthHalloween } from "./idle_rebirth_halloween.mjs";
 import { flow as idleMoreContent } from "./idle_more_content.mjs";
 import { flow as idleSoftcap } from "./idle_softcap.mjs";
+import { flow as idleResetSafety } from "./idle_reset_safety.mjs";
 import { flow as leaderboardBigScores } from "./leaderboard_big_scores.mjs";
 import { flow as driveMadLevels } from "./drive_mad_levels.mjs";
 import { flow as ccSigninHint } from "./cc_signin_hint.mjs";
+import { flow as invitesLight } from "./invite_pop_light.mjs";
 
 const GLOBAL_PLAYWRIGHT = "/opt/homebrew/lib/node_modules/@playwright/cli/node_modules/playwright";
 async function importPlaywright() {
@@ -28,7 +30,7 @@ async function importPlaywright() {
   throw new Error("Playwright not found: set PLAYWRIGHT_DIR to a playwright package folder.");
 }
 
-const ALL = [ccSigninHint, idleRebirthHalloween, idleMoreContent, idleSoftcap, leaderboardBigScores, driveMadLevels];
+const ALL = [invitesLight, ccSigninHint, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleResetSafety, leaderboardBigScores, driveMadLevels];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 const { webkit } = await importPlaywright();

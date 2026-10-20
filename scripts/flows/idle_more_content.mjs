@@ -4,6 +4,7 @@
  * unchanged, the new top tiers must be buyable, rebirth must reset them, and big
  * numbers must format and report their score (no 2^53 clamp, only the 1e300 limit) without console noise. */
 import { runIfMain } from "./lib.mjs";
+import { holdConfirm } from "./reset_guard.mjs";
 
 const SCORE_LIMIT = 1e300;   // the leaderboard limit (arcade-kit.js); the old 2^53 clamp is gone
 const OLD_BUSINESSES = ["lemonade", "newspaper", "carwash", "pizzeria", "donut", "shrimp", "hockey", "studio", "bank", "oil"];
@@ -97,7 +98,7 @@ export const flow = {
     const roundTrip = await game.evaluate(() => { const saved = snapshot(); const ok = applySave(saved); return { ok, same: JSON.stringify(snapshot().owned) === JSON.stringify(saved.owned) }; });
     h.expect(roundTrip.same, "snapshot -> applySave keeps owned counts");
     await tap(game, ".idle-rebirth");
-    await tap(game, ".idle-confirm");
+    await holdConfirm(h, game, ".idle-confirm");
     const afterRebirth = await game.evaluate(() => snapshot());
     h.expect(Object.values(afterRebirth.owned).every((count) => count === 0) && Object.values(afterRebirth.managers).every((m) => m === false), "rebirth resets all 18 businesses and managers");
     h.expect(afterRebirth.st > 3 && afterRebirth.rbc === 3, `rebirth adds stars (${afterRebirth.st}) and counts (${afterRebirth.rbc})`);
@@ -143,7 +144,8 @@ export const flow = {
 
     h.step("Cookie Clicker: rebirth resets the new tiers, keeps Haunted Oven; score clamps");
     await tap(game, ".idle-rebirth");
-    const rebirth = await game.evaluate(() => { document.querySelector(".idle-confirm").click(); return snapshot(); });
+    await holdConfirm(h, game, ".idle-confirm");
+    const rebirth = await game.evaluate(() => snapshot());
     h.expect(rebirth.u.slice(0, 16).every((count) => count === 0) && rebirth.u.slice(17).every((count) => count === 0), "ordinary and new tiers reset");
     h.eq(rebirth.u[16], 1, "Haunted Oven survives");
     h.expect(rebirth.cu.every((count) => count === 0), "click upgrades reset (including the new three)");

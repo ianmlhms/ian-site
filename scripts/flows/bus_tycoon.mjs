@@ -1,5 +1,6 @@
 /* Real touch interactions, parent save messages and mocked cloud / event RPCs. */
 import { runIfMain } from './lib.mjs';
+import { holdConfirm } from "./reset_guard.mjs";
 
 const EVENT = 'halloween-2026';
 let cloudSave = null, pumpkins = 0;
@@ -75,7 +76,7 @@ export const flow = {
     h.expect(!(await game.locator('.idle-dialog').isVisible()), 'rebirth can be cancelled');
     await game.locator('.idle-rebirth').tap({ force: true });
     const lifetime = (await saved(h)).tb;
-    await game.locator('.idle-confirm').tap(); await h.pause(100);
+    await holdConfirm(h, game, '.idle-confirm'); await h.pause(100);
     const reborn = await saved(h);
     h.expect(reborn.tb >= lifetime, 'rebirth preserves lifetime');
     h.eq(reborn.st, 1, 'one trillion round earns one star');

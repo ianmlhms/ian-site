@@ -7,6 +7,7 @@
  * Also: continuity/monotonicity of the bonus function, offline earnings, the leaderboard score (lifetime, no 2^53
  * clamp), investor claims and the rebirth preview texts. */
 import { runIfMain } from "./lib.mjs";
+import { holdConfirm } from "./reset_guard.mjs";
 
 const CAP = 1e8;
 const expectedBonus = (investors, stars) => {
@@ -132,7 +133,7 @@ export const flow = {
     const before = await game.evaluate(() => ({ bonus: prestigeMultiplier(), raw: rawPrestigeMultiplier(state.investors, state.st), capped: isSoftCapped() }));
     h.expect(!before.capped && before.bonus === before.raw && relClose(before.bonus, 4e7 + 1, 1e-6), `bonus x${before.bonus.toExponential(2)}, linear`);
     await tap(game, ".idle-rebirth");
-    await tap(game, ".idle-confirm");
+    await holdConfirm(h, game, ".idle-confirm");
     await h.pause(300);
     const crossed = await game.evaluate(() => ({ save: snapshot(), bonus: prestigeMultiplier(), raw: rawPrestigeMultiplier(state.investors, state.st), capped: isSoftCapped() }));
     h.expect(crossed.save.st >= 20 && crossed.capped, `rebirth gave ${crossed.save.st} stars and crossed the cap (raw x${crossed.raw.toExponential(3)} -> x${crossed.bonus.toExponential(3)})`);

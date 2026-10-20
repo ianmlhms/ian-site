@@ -21,6 +21,9 @@
   };
   KL.G = G; G.test = TEST;
   const warn = (m, e) => console.warn('[Kart] ' + m, e || '');
+  /* live-game signal for invite-pop.js: a race (countdown, driving, results) is a slim invite banner, the menus get the popup */
+  const syncLive = () => { const on = document.documentElement.classList.contains('kl-race'); try { if (parent !== window) parent.postMessage({ __ianLive: on }, '*'); else document.documentElement.dataset.liveGame = on ? '1' : '0'; } catch (e) { /* no shell */ } };
+  new MutationObserver(syncLive).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); syncLive();
 
   function loadSettings() {
     G.saveSettings = saveSettings;

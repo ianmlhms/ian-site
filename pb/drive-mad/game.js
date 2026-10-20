@@ -220,7 +220,7 @@ function showMenu(){
 }
 function startLevel(index){
   levelIndex=C.clamp(index,0,C.LEVELS.length-1);terrain=C.buildLevel(C.LEVELS[levelIndex]);car=C.newCar(C.CAR_START_X,C.groundY(terrain,C.CAR_START_X)-43);ticks=0;accumulator=0;crashClock=0;winDelay=0;state='play';
-  keys.up=keys.down=keys.left=keys.right=false;$('gas').classList.remove('on');$('brake').classList.remove('on');camera.userData.ready=false;buildWorld();syncProps();syncCar();overlay.classList.add('hidden');setPlayUI(true);
+  keys.up=keys.down=keys.left=keys.right=false;$('gas').classList.remove('on');$('brake').classList.remove('on');$('tiltL').classList.remove('on');$('tiltR').classList.remove('on');camera.userData.ready=false;buildWorld();syncProps();syncCar();overlay.classList.add('hidden');setPlayUI(true);
   $('levelText').textContent=`${levelIndex+1} / ${C.LEVELS.length}`;$('timeText').textContent='0.0s';const best=bestTime(levelIndex);$('bestText').textContent=best?(best/60).toFixed(1)+'s':'—';$('hint').textContent=terrain.hint;startAudio();
 }
 function crash(){if(state!=='play')return;state='dead';crashClock=0;$('hint').textContent='CRASHED — press gas, Space, or ↻ to retry';}
@@ -242,12 +242,12 @@ window.addEventListener('keydown',event=>{
 });
 window.addEventListener('keyup',event=>{const mapped=keyMap[event.key];if(mapped){keys[mapped]=false;event.preventDefault();}});
 window.addEventListener('blur',()=>{keys.up=keys.down=keys.left=keys.right=false;});
-function bindPedal(id,key){
+function bindPedal(id,key,restarts=true){
   const element=$(id),release=event=>{keys[key]=false;element.classList.remove('on');if(element.hasPointerCapture&&element.hasPointerCapture(event.pointerId))element.releasePointerCapture(event.pointerId);};
-  element.addEventListener('pointerdown',event=>{event.preventDefault();if(state==='dead')startLevel(levelIndex);element.setPointerCapture(event.pointerId);keys[key]=true;element.classList.add('on');startAudio();});
+  element.addEventListener('pointerdown',event=>{event.preventDefault();if(restarts&&state==='dead')startLevel(levelIndex);element.setPointerCapture(event.pointerId);keys[key]=true;element.classList.add('on');startAudio();});
   element.addEventListener('pointerup',release);element.addEventListener('pointercancel',release);element.addEventListener('lostpointercapture',()=>{keys[key]=false;element.classList.remove('on');});
 }
-bindPedal('gas','up');bindPedal('brake','down');
+bindPedal('gas','up');bindPedal('brake','down');bindPedal('tiltL','left',false);bindPedal('tiltR','right',false);   // tilt without driving (the old arcade D-pad left / right)
 
 function simulate(){
   if(state!=='play')return;

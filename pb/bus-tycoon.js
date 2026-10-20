@@ -31,7 +31,7 @@
   const format = value => formatter.format(value);
   const $ = id => document.getElementById(id);
   const zeroOwned = () => Object.fromEntries(LINES.map(line => [line.id, 0]));
-  const initial = () => ({ v: SAVE_VERSION, p: 0, tb: 0, rb: 0, st: 0, rbc: 0, gd: '',
+  const initial = () => ({ v: SAVE_VERSION, p: 0, tb: 0, rb: 0, st: 0, rbc: 0, gd: '', rs: Date.now(),
     savedAt: Date.now(), owned: zeroOwned(), upgrades: [], drivers: 0 });
   /** Test mode only: a copy of the state with huge funds, rebirth ready and one of every line (drivers/upgrades stay buyable). */
   function testUnlockAll(save) {
@@ -92,7 +92,7 @@
     if (!raw || raw.v !== SAVE_VERSION || !raw.owned || typeof raw.owned !== 'object' || Array.isArray(raw.owned)) return null;
     if (typeof raw.tb !== 'number' || !Number.isFinite(raw.tb) || raw.tb < 0) return null;
     return { v: SAVE_VERSION, p: number(raw.p), tb: number(raw.tb), rb: Math.min(number(raw.rb, raw.tb), number(raw.tb)),
-      st: Math.floor(number(raw.st)), rbc: Math.floor(number(raw.rbc)),
+      st: Math.floor(number(raw.st)), rbc: Math.floor(number(raw.rbc)), rs: number(raw.rs, 0),
       gd: typeof raw.gd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.gd) ? raw.gd : '',
       savedAt: number(raw.savedAt, Date.now()), drivers: Math.min(DRIVER_LIMIT, Math.floor(number(raw.drivers))),
       owned: Object.fromEntries(LINES.map(line => [line.id, Math.min(MAX_OWNED, Math.floor(number(raw.owned[line.id])))])),
@@ -141,6 +141,15 @@
     if (stars < 1) return;
     state = { ...initial(), tb: state.tb, st: state.st + stars, rbc: state.rbc + 1, gd: state.gd };
     lastTick = Date.now(); score(); refresh();
+  }
+  /* Exact pre-reset state for the 30 s Undo. Lifetime and the daily gift never go backwards; ud tells the server guard the
+   * lower rebirth count is an Undo (it stays in the state for the session so the debounced cloud save still carries it). */
+  function undoSnapshot() { settle(); return JSON.parse(JSON.stringify(state)); }
+  function undoRestore(snap) {
+    const now = Date.now();
+    state = { ...snap, owned: { ...snap.owned }, upgrades: [...snap.upgrades], tb: Math.max(snap.tb, state.tb),
+      gd: snap.gd > state.gd ? snap.gd : state.gd, savedAt: now, ud: now };
+    lastTick = now; score(); refresh();
   }
   function buildShop() {
     for (const line of LINES) {
@@ -193,6 +202,7 @@
   window.addEventListener('storage', theme);
   rewards = IdleExtras.mount({ host: $('rewards-host'), threshold: REBIRTH_THRESHOLD, read: () => state, format,
     resets: 'passengers to invest, all lines (including gifted lines), drivers and network upgrades.',
+    undoKey: 'bus-tycoon', snapshot: undoSnapshot, restore: undoRestore, roundStart: () => state.rs,
     production, currency: '🧍', rebirth, save: pushSave, earn: amount => { earn(amount); refresh(); },
     gift: (day, amount) => { state = { ...state, gd: day }; earn(amount); refresh(); } });
   let local = window.__pbSave;

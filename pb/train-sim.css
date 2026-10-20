@@ -156,8 +156,6 @@ button.primary:hover{background:#ffd070}
 .grade small{font-size:14px;color:var(--soft);margin-left:8px;font-weight:500}
 .sumtotal{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;font-size:20px;font-weight:700}
 .sumtotal b{font-size:30px;color:var(--amber)}
-#kbNotice{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:30;background:var(--glass-strong);border:1px solid rgba(255,194,74,.5);color:var(--ink);padding:9px 10px 9px 16px;border-radius:99px;display:flex;gap:12px;align-items:center;font-size:14px;font-weight:600;max-width:94vw}
-#kbNotice button{padding:6px 14px;border-radius:99px;border:0;background:var(--amber);color:#1a1405;font-weight:700}
 #phoneBlock{z-index:60;background:#0b0f14;text-align:center}
 #phoneBlock .card{background:transparent;border:0;box-shadow:none}
 #errorScreen{z-index:70;background:#0b0f14}
@@ -209,3 +207,32 @@ body.wx-open #hud{z-index:10}
 @media(pointer:coarse){.walkpad{display:block}}
 .walkpad[hidden]{display:none!important}
 .walkpad i{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:rgba(255,255,255,.28);border:1px solid var(--line)}
+
+/* ---------- touch controls (iPad without a keyboard): lever on the left, buttons on the right, thumb-sized, below the route strip and clear of the speed / clock boxes ---------- */
+.tpad{display:none;position:absolute;pointer-events:auto;z-index:4;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+body.touch .tpad{display:flex}
+.tlever{left:max(12px,env(safe-area-inset-left));bottom:calc(max(10px,env(safe-area-inset-bottom)) + 104px);width:84px;flex-direction:column;gap:8px}
+.tbtns{right:max(12px,env(safe-area-inset-right));bottom:calc(max(10px,env(safe-area-inset-bottom)) + 104px);display:none;grid-template-columns:repeat(2,84px);gap:8px}
+body.touch .tbtns{display:grid}
+body[data-cam="cab"] .tlever,body[data-cam="cab"] .tbtns{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 6px)}
+.tl-rail{position:relative;height:clamp(170px,34vh,330px);border-radius:20px;touch-action:none;cursor:ns-resize}
+.tl-ticks{position:absolute;inset:8px 0;display:flex;flex-direction:column;gap:3px;align-items:center;pointer-events:none}
+.tl-ticks i{flex:1;width:26px;border-radius:4px;background:rgba(255,255,255,.14)}
+.tl-ticks i.p{background:rgba(79,209,197,.38)}.tl-ticks i.b{background:rgba(255,138,101,.38)}.tl-ticks i.zero{background:rgba(255,255,255,.55)}
+.tl-thumb{position:absolute;left:50%;width:66px;height:42px;margin:-21px 0 0 -33px;border-radius:14px;background:rgba(255,194,74,.94);border:2px solid rgba(255,255,255,.5);box-shadow:0 4px 14px rgba(0,0,0,.45);display:grid;place-items:center;pointer-events:none;transition:top .08s linear}
+.tl-thumb b{font-size:19px;font-weight:800;color:#1a1405;font-style:normal}
+.tl-thumb.brake{background:#ff8a65}.tl-thumb.neutral{background:#dfe5ea}.tl-thumb.eb{background:var(--red)}.tl-thumb.eb b{color:#fff}
+.tbtn{min-height:64px;padding:6px 4px;border-radius:16px;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:700;touch-action:none;-webkit-tap-highlight-color:transparent}
+.tbtn .ic{font-size:22px;line-height:1;font-weight:800}
+.tbtn .lb{font-size:11px;line-height:1.1;font-weight:650;color:var(--soft);text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbtn.tb-main{min-height:72px}
+.tbtn.tb-eb{min-height:56px;border-color:rgba(255,90,77,.65);background:rgba(255,90,77,.22)}
+.tbtn.tb-eb .ic{font-size:18px;color:#ffb3ab}
+.tbtn.on{background:rgba(255,196,58,.26);box-shadow:inset 0 0 0 2px rgba(255,196,58,.7)}
+.tbtn.tb-eb.on{background:var(--red)}
+.tbtn.down{background:rgba(255,255,255,.28);transform:scale(.97)}
+body.touch .walkpad{left:calc(max(12px,env(safe-area-inset-left)) + 100px)}
+/* the cab info strip in portrait hides most HUD buttons: with a finger the camera / reverse / pause / help buttons stay (only the quality switch hides) */
+body.touch[data-cam="cab"] .hud-util>:not(#btnQuality):not(#wxPop):not([hidden]){display:inline-flex!important}
+/* portrait + touch: the cab info strip sits below the (now visible) button row */
+@media(max-aspect-ratio:5/4){body.touch[data-cam="cab"] #hud .hud-bottom{top:calc(max(10px,env(safe-area-inset-top)) + 162px)}body.touch[data-cam="cab"] #toasts{top:calc(max(10px,env(safe-area-inset-top)) + 226px)}}

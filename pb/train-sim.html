@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>Zuchsimulator Lëtzebuerg 🚆 – Arcade</title>
-<link rel="stylesheet" href="/pb/train-sim.css?v=6">
-<script src="/pb/arcade-kit.js?v=31" data-arcade-id="train-sim" data-arcade-title="Zuchsimulator Lëtzebuerg 🚆"></script>
+<link rel="stylesheet" href="/pb/train-sim.css?v=7">
+<script src="/pb/arcade-kit.js?v=32" data-arcade-id="train-sim" data-arcade-title="Zuchsimulator Lëtzebuerg 🚆"></script>
 </head>
 <body>
 <main id="game">
@@ -54,6 +54,19 @@
     <div id="camHint" class="glass camhint" hidden></div>
     <div id="walkPad" class="walkpad" hidden aria-hidden="true"><i id="walkKnob"></i></div>
     <button id="btnMenu" class="glass chipbtn" type="button" data-test="btn-menu"></button>
+    <div id="touchLever" class="tpad tlever" role="group" aria-labelledby="tlTitle">
+      <span id="tlTitle" hidden data-t="touchLever"></span>
+      <div id="tlRail" class="glass tl-rail" role="slider" aria-orientation="vertical" aria-labelledby="tlTitle" aria-valuemin="-7" aria-valuemax="5" aria-valuenow="0" data-test="touch-lever"><div id="tlTicks" class="tl-ticks"></div><i id="tlThumb" class="tl-thumb neutral"><b id="tlLabel">0</b></i></div>
+      <button id="tbEb" class="glass tbtn tb-eb" type="button" tabindex="-1" data-test="touch-eb"><span class="ic">EB</span><span class="lb" data-t="touchEb"></span></button>
+    </div>
+    <div id="touchBtns" class="tpad tbtns">
+      <button id="tbDoors" class="glass tbtn tb-main" type="button" tabindex="-1" data-test="touch-doors"><span class="ic" aria-hidden="true">&#128682;</span><span class="lb" data-t="touchDoors"></span></button>
+      <button id="tbHorn" class="glass tbtn tb-main" type="button" tabindex="-1" data-test="touch-horn"><span class="ic" aria-hidden="true">&#128239;</span><span class="lb" data-t="touchHorn"></span></button>
+      <button id="tbLights" class="glass tbtn" type="button" tabindex="-1" data-test="touch-lights"><span class="ic" aria-hidden="true">&#128161;</span><span class="lb" data-t="touchLights"></span></button>
+      <button id="tbPark" class="glass tbtn" type="button" tabindex="-1" data-test="touch-park"><span class="ic" aria-hidden="true">P</span><span class="lb" data-t="touchPark"></span></button>
+      <button id="tbTimetable" class="glass tbtn" type="button" tabindex="-1" data-test="touch-timetable"><span class="ic" aria-hidden="true">&#128339;</span><span class="lb" data-t="touchTimetable"></span></button>
+      <button id="tbAnnounce" class="glass tbtn" type="button" tabindex="-1" data-test="touch-announce"><span class="ic" aria-hidden="true">&#128276;</span><span class="lb" data-t="touchAnnounce"></span></button>
+    </div>
     <div class="hud-util">
       <span id="camName" class="glass chipbtn"></span>
       <button id="btnInside" class="glass chipbtn" type="button" hidden data-test="btn-inside">5</button>
@@ -77,13 +90,12 @@
   <div id="helpScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="helpTitle">Steierung</h2><div id="helpBody"></div><p class="muted" data-t="helpHint"></p><button id="helpClose" class="primary" data-t="backBtn"></button></section></div>
   <div id="ttScreen" class="overlay center" hidden><section class="card wide"><h2 data-t="timetable">Fuerplang</h2><div id="ttBody"></div><p class="muted">T</p><button id="ttClose" class="primary" data-t="backBtn"></button></section></div>
   <div id="summary" class="overlay center" hidden><section class="card wide"><span class="stamp">&#128646; ZUCHSIMULATOR L&Euml;TZEBUERG</span><h2 id="sumTitle"></h2><p id="sumRoute" class="muted"></p><div id="sumGrade" class="grade"></div><table id="sumRows"></table><div class="sumtotal"><span id="sumCash"></span><b id="sumPoints"></b></div><p id="sumNote" class="muted"></p><div class="btns"><button id="sumAgain" class="primary"></button><button id="sumMenu"></button></div></section></div>
-  <div id="kbNotice" hidden><span id="kbText"></span><button id="kbClose" type="button"></button></div>
   <div id="phoneBlock" class="overlay center" hidden><section class="card"><div class="bigemoji">&#128646;</div><h2 id="phoneTitle"></h2><p id="phoneText"></p><p id="phoneHint" class="muted"></p></section></div>
   <div id="errorScreen" class="overlay center" hidden><section class="card"><h2>&#9888;</h2><p id="errorText"></p></section></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/pb/train-sim/config.js?v=5"></script>
-<script src="/pb/train-sim/copy.js?v=9"></script>
+<script src="/pb/train-sim/copy.js?v=10"></script>
 <script src="/pb/train-sim/track.js?v=6"></script>
 <script src="/pb/train-sim/routes.js?v=5"></script>
 <script src="/pb/train-sim/infra.js?v=12"></script>
@@ -109,6 +121,6 @@
 <script src="/pb/train-sim/resume.js?v=1"></script>
 <script src="/pb/train-sim/menu.js?v=8"></script>
 <script src="/pb/train-sim/fallback.js?v=2"></script>
-<script src="/pb/train-sim.js?v=16"></script>
+<script src="/pb/train-sim.js?v=17"></script>
 </body>
 </html>
