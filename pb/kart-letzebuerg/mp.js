@@ -478,7 +478,8 @@
   function onHostChange(from, m) {
     if (!M.active || M.ended) return;
     if (M.role === 'host') {                               // a stalled host that has been replaced: step aside instead of running a second race
-      if (from === M.deputy && (m.epoch | 0) > M.epoch) { console.info('[kart-mp] replaced by ' + from + ' (epoch ' + m.epoch + ')'); M.stepAside(); }
+      const sender = M.R.byId[from];
+      if (sender && sender.wasHuman && (m.epoch | 0) > M.epoch) { console.info('[kart-mp] replaced by ' + from + ' (epoch ' + m.epoch + ')'); M.stepAside(); }
       return;
     }
     if (M.role !== 'client' || from !== M.deputy) return;

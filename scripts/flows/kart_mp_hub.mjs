@@ -26,6 +26,7 @@ export function createHub() {
   const bump = (name) => { stats.byEvent[name] = (stats.byEvent[name] || 0) + 1; };
   function out(conn, joinRef, ref, topic, event, payload, heartbeat) {
     const text = JSON.stringify([joinRef, ref, topic, event, payload]);
+    if (conn.holdOut && !heartbeat) { conn.heldOut.push({ text, event, size: text.length }); return; }      // a stalled link: everything arrives late, in one burst
     if (heartbeat) { stats.heartbeatReplies = (stats.heartbeatReplies || 0) + 1; try { conn.ws.send(text); } catch { /* socket closed */ } return; }      // keep-alive replies are not messages (not billed, not counted)
     stats.framesOut++; stats.bytesOut += text.length; bump('out:' + event);
     const pc = (stats.perContext[conn.label] ||= { in: 0, out: 0, bytesIn: 0, bytesOut: 0 }); pc.out++; pc.bytesOut += text.length;
@@ -57,7 +58,12 @@ export function createHub() {
       conns.add(conn);
       const pc = (stats.perContext[label] ||= { in: 0, out: 0, bytesIn: 0, bytesOut: 0 });
       ws.onClose(() => { conns.delete(conn); for (const t of [...topics.keys()]) leaveTopic(conn, t); });
+      conn.heldIn = []; conn.heldOut = [];
       ws.onMessage((message) => {
+        if (conn.holdIn) { conn.heldIn.push(message); return; }
+        handle(message);
+      });
+      const handle = (message) => {
         let frame;
         const size = typeof message === 'string' ? message.length : message.length;
         try { frame = typeof message === 'string' ? JSON.parse(message) : decodeBinaryPush(message); } catch { return; }
@@ -95,8 +101,24 @@ export function createHub() {
         } else if (event === 'phx_leave') {
           leaveTopic(conn, topic); reply();
         } else reply();
-      });
+      };
+      conn.handleHeld = handle;
     });
   }
-  return { attach, stats, topics, reset() { for (const k of Object.keys(stats)) delete stats[k]; Object.assign(stats, { framesIn: 0, framesOut: 0, bytesIn: 0, bytesOut: 0, heartbeats: 0, byEvent: {}, perContext: {}, joins: 0, tracks: 0, broadcasts: 0, log: [] }); } };
+  /* Simulate a network stall of one context (matched by label): its uplink and/or downlink are held back for `ms` and then delivered in one burst. */
+  function stall(label, ms, dir = 'both') {
+    const hit = [...conns].filter((c) => c.label === label);
+    for (const c of hit) {
+      if (dir !== 'down') c.holdIn = true;
+      if (dir !== 'up') c.holdOut = true;
+      setTimeout(() => {
+        c.holdIn = false; c.holdOut = false;
+        const inn = c.heldIn.splice(0), outt = c.heldOut.splice(0);
+        for (const m of outt) { stats.framesOut++; stats.bytesOut += m.size; try { c.ws.send(m.text); } catch { /* closed */ } }
+        for (const m of inn) c.handleHeld && c.handleHeld(m);
+      }, ms);
+    }
+    return hit.length;
+  }
+  return { attach, stall, stats, topics, reset() { for (const k of Object.keys(stats)) delete stats[k]; Object.assign(stats, { framesIn: 0, framesOut: 0, bytesIn: 0, bytesOut: 0, heartbeats: 0, byEvent: {}, perContext: {}, joins: 0, tracks: 0, broadcasts: 0, log: [] }); } };
 }

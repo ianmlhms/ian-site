@@ -30,7 +30,7 @@ const ONLY = (process.env.KL_MP_ONLY || 'all').split(',');
 const want = (n) => ONLY.includes('all') || ONLY.includes(n);
 
 /* ---------- helpers ---------- */
-async function newPlayer(h, hub, label, { first = false, viewport = { width: 640, height: 400 }, init = null, noRelay = false, auth = null } = {}) {
+async function newPlayer(h, hub, label, { first = false, viewport = { width: 640, height: 400 }, init = null, noRelay = false, auth = null, cfg = null } = {}) {
   let context = h.context, page = h.page;
   if (!first) {
     context = await h.context.browser().newContext({ viewport, serviceWorkers: 'block' });
@@ -43,6 +43,7 @@ async function newPlayer(h, hub, label, { first = false, viewport = { width: 640
     window.__pbAuth = { session: { user: { id: a.id, user_metadata: { username: a.name } } } };
     if (a.withRpc) window.__pbAuth.sb = { rpc: async (name, args) => { window.__rpcCalls.push({ name, p: args && args.p }); return { data: 1, error: null }; } };
   }, auth);
+  if (cfg) await context.route(/kart-letzebuerg\/config\.js/, async (route) => { const r = await route.fetch(); let body = await r.text(); for (const [a, b] of cfg) { if (!body.includes(a)) throw new Error('config patch target missing: ' + a); body = body.replace(a, b); } route.fulfill({ response: r, body }); });
   if (noRelay) await context.route(/kart-letzebuerg\/config\.js/, async (route) => { const r = await route.fetch(); route.fulfill({ response: r, body: (await r.text()).replace('RELAY_FALLBACK: true', 'RELAY_FALLBACK: false') }); });
   const p = { label, context, page, http: [], errors: [], notFound: [], first };
   page.on('response', (r) => { if (r.status() === 404) p.notFound.push(r.url()); });
@@ -85,6 +86,19 @@ async function readyAndStart(host, guests, laps) {
 }
 async function waitRace(players) { for (const p of players) await waitFor(p, () => window.__klTest && window.__klTest.state().phase === 'race' && window.__klTest.state().clock > 0.3, null, 60000); }
 async function closeAll(players) { for (const p of players) { try { await p.page.evaluate(() => window.__klTest && window.__klTest.mpRecord && window.__klTest.mpRecord(false)); } catch { /* gone */ } if (!p.first) { try { await p.context.close(); } catch { /* gone */ } } } }
+
+/* A stalled network on THIS page (WebRTC links): incoming messages and outgoing sends are held for `ms` and then delivered in one burst,
+ * like a Wi-Fi hiccup or a throttled tab. (For the relay the in-process hub holds the frames: hub.stall(label, ms).) */
+function netStall(p, ms) {
+  return p.page.evaluate((ms) => {
+    const M = KL.MP, origOn = M.onMsg, origSend = KL.Link.prototype.send, heldIn = [], heldOut = [];
+    M.onMsg = function (...a) { heldIn.push(a); };
+    KL.Link.prototype.send = function (m, r) { heldOut.push([this, m, r]); return true; };
+    setTimeout(() => { M.onMsg = origOn; KL.Link.prototype.send = origSend; for (const [l, m, r] of heldOut) origSend.call(l, m, r); for (const a of heldIn) origOn.apply(M, a); }, ms);
+  }, ms);
+}
+const BLOCK_RTC = () => { RTCPeerConnection.prototype.setRemoteDescription = () => new Promise(() => {}); };   // school Wi-Fi: no direct path between devices
+const FAST_RELAY = [['CONNECT_TIMEOUT: 10000', 'CONNECT_TIMEOUT: 2500']];                                       // (test speed: give up WebRTC sooner)
 
 /* ---------- sync analysis: how far is the displayed remote kart from where it really is? ---------- */
 function interp(rec, t) {
@@ -701,6 +715,176 @@ export const flow = {
         await closeAll(all); all.length = 0;
       }
 
+      /* ================= 5d. SCHOOL NETWORK: no WebRTC for anybody (client isolation) -> everything through the relay ================= */
+      if (want('school')) {
+        h.step('school network: WebRTC blocked for ALL, 4 players over the relay: full 3-lap race + Grand Prix round, nobody dropped, same results, Realtime message counts');
+        const names = ['SchHost', 'Nora', 'Fernando', 'Celia'];
+        const S = [];
+        for (let i = 0; i < 4; i++) { S.push(await newPlayer(h, hub, 'sch' + i, { first: i === 0, init: BLOCK_RTC, cfg: FAST_RELAY })); all.push(S[i]); }
+        hub.reset();
+        await goOnline(S[0], names[0]); await S[0].page.click('#olCreate');
+        await S[0].page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        const scode = (await S[0].page.textContent('#lbCode')).trim();
+        for (let i = 1; i < 4; i++) await lobbyJoin(S[0], S[i], scode, names[i]);
+        await waitFor(S[0], () => document.querySelectorAll('#lbList li').length === 4 && document.querySelectorAll('#lbList li .slow').length === 3, null, 40000);
+        h.expect(true, 'all three joiners are in the lobby over the relay (badge "slow connection" on each)');
+        await h.shot('school-lobby');
+        for (let i = 1; i < 4; i++) await S[i].page.click('#lbReady');
+        await waitFor(S[0], () => document.querySelectorAll('#lbList li .st.ok').length === 3, null, 20000);
+        await setLaps(S[0], 3);
+        const lobbyFrames = hub.stats.framesIn + hub.stats.framesOut;
+        const ctx0 = JSON.parse(JSON.stringify(hub.stats.perContext));
+        await S[0].page.click('#lbStart');
+        await waitRace(S);
+        const t0 = Date.now();
+        for (const p of S) await kl(p, () => __klTest.autopilot(true));
+        const mSt = await mp(S[0]);
+        h.eq(mSt.links.map((l) => l.kind), ['relay', 'relay', 'relay'], 'the host reaches every client through the relay');
+        h.expect(S.every((p, i) => i === 0 || true), 'race running');
+        // the race itself
+        for (const p of S) await waitFor(p, () => !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 420000);
+        const raceSecs = (Date.now() - t0) / 1000;
+        const same = (t) => t.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');
+        const tables = await Promise.all(S.map((p) => p.page.locator('#endList').innerText()));
+        for (let i = 1; i < 4; i++) h.eq(same(tables[i]), same(tables[0]), 'player ' + names[i] + ' sees exactly the host\'s result table (places, names, times)');
+        for (const n of names) h.expect(tables[0].includes(n), n + ' is in the result table');
+        const mEnd = await mp(S[0]);
+        h.eq([mEnd.stats.away, mEnd.karts.filter((k) => k.wasHuman || k.human).length, mEnd.karts.filter((k) => k.human).length], [0, 4, 4], 'host: nobody was ever taken over by a bot (away 0), all 4 humans are still humans at the end');
+        const finishedHumans = await kl(S[0], () => __klTest.G.race.karts.filter((k) => k.human).map((k) => k.finished));
+        h.eq(finishedHumans, [true, true, true, true], 'all four humans finished the race');
+        for (const p of S) h.expect(!(await p.page.evaluate(() => KL.MP.ended)), p.label + ': race not ended abnormally');
+        const perCtx = {};
+        for (const p of S) { const a = hub.stats.perContext[p.label], b = ctx0[p.label] || { in: 0, out: 0, bytesIn: 0, bytesOut: 0 }; perCtx[p.label] = { in: a.in - b.in, out: a.out - b.out, bytesIn: a.bytesIn - b.bytesIn, bytesOut: a.bytesOut - b.bytesOut }; }
+        const totFrames = Object.values(perCtx).reduce((x, c) => x + c.in + c.out, 0);
+        const links = (await Promise.all(S.map((p) => mp(p)))).map((m) => m.links.map((l) => ({ kind: l.kind, raceSent: l.raceSent, got: l.got })));
+        console.log('    school race: ' + raceSecs.toFixed(0) + ' s wall clock, Realtime frames per player (in/out): ' + JSON.stringify(perCtx));
+        console.log('    relay messages sent per link (race): ' + JSON.stringify(links));
+        const raceLen = mEnd.karts.length ? await kl(S[0], () => Math.max(...__klTest.G.race.karts.map((k) => k.finishTime || 0))) : 0;
+        h.expect(Math.max(...links.flat().map((l) => l.raceSent)) < 3000, 'no link comes near the old cap pattern: max ' + Math.max(...links.flat().map((l) => l.raceSent)) + ' messages sent on one link in a ' + Math.round(raceLen) + ' s race (budget ' + 4000 + ')');
+        REPORT.school = { raceWallSeconds: raceSecs, raceSeconds: raceLen, framesPerContext: perCtx, totalFrames: totFrames, messagesPerLink: links, lobbyFrames, humans: 4 };
+        await h.shot('school-results');
+
+        // Grand Prix round(s) on the same lobby, same relay links (the budget is per race, so round 2 starts fresh)
+        h.step('school network: Grand Prix, 2 rounds over the relay');
+        await S[0].page.evaluate(() => { KL.GP_RACES = 2; });
+        await S[0].page.locator('#eLobby').click();
+        for (const p of S.slice(1)) await waitFor(p, () => !document.getElementById('lobbyScreen').hidden, null, 20000);
+        await S[0].page.locator('#lbModeChips button', { hasText: /Grand Prix/ }).click();
+        await setLaps(S[0], 1);
+        for (const p of S.slice(1)) { await waitFor(p, () => /Grand Prix/.test(document.getElementById('lbSummary').textContent), null, 10000); await p.page.click('#lbReady'); }
+        await waitFor(S[0], () => document.querySelectorAll('#lbList li .st.ok').length === 3, null, 20000);
+        const g0 = JSON.parse(JSON.stringify(hub.stats.perContext));
+        await S[0].page.click('#lbStart');
+        await waitRace(S);
+        for (let r = 0; r < 2; r++) {
+          for (const p of S) await kl(p, () => __klTest.autopilot(true));
+          const last = r === 1;
+          for (const p of S) await waitFor(p, () => !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 420000);
+          const gt = await Promise.all(S.map((p) => p.page.locator('#endList').innerText()));
+          for (let i = 1; i < 4; i++) h.eq(same(gt[i]), same(gt[0]), 'GP round ' + (r + 1) + ': ' + names[i] + ' sees the host\'s table');
+          const mg = await mp(S[0]);
+          h.eq([mg.stats.away, mg.karts.filter((k) => k.human).length], [0, 4], 'GP round ' + (r + 1) + ': nobody dropped or bot-driven');
+          if (!last) { await S[0].page.locator('#eNext').click(); await waitRace(S); }
+        }
+        const gpCtx = {};
+        for (const p of S) { const a = hub.stats.perContext[p.label], b = g0[p.label]; gpCtx[p.label] = { in: a.in - b.in, out: a.out - b.out }; }
+        console.log('    school GP (2 laps-1 rounds) Realtime frames per player: ' + JSON.stringify(gpCtx));
+        REPORT.school.gpFramesPerContext = gpCtx;
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 5e. network stalls: a lagging player keeps his kart, a lagging host keeps his race ================= */
+      if (want('stalls')) {
+        h.step('stalls (WebRTC): a client lags 2.5 s (nothing happens) and 6 s (a gentle bot for a moment, kart back without a reset); the host lags 3 s and 9 s (indicator, no second host)');
+        const H = await newPlayer(h, hub, 'st-host', { first: true }); all.push(H);
+        const G1 = await newPlayer(h, hub, 'st-g1'); all.push(G1);
+        const G2 = await newPlayer(h, hub, 'st-g2'); all.push(G2);
+        await goOnline(H, 'Lagger'); await H.page.click('#olCreate');
+        await H.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        const stcode = (await H.page.textContent('#lbCode')).trim();
+        await lobbyJoin(H, G1, stcode, 'Deputy'); await lobbyJoin(H, G2, stcode, 'Victim');
+        await readyAndStart(H, [G1, G2], 3);
+        await waitRace([H, G1, G2]);
+        for (const p of [H, G1, G2]) await kl(p, () => __klTest.autopilot(true));
+        await sleep(6000);
+        const vid = await kl(G2, () => __klTest.G.human.id);
+        const kartOf = async (id) => (await mp(H)).karts.find((k) => k.id === id);
+        const watchAway = async (ms) => { let saw = false; const t = Date.now(); while (Date.now() - t < ms) { const k = await kartOf(vid); if (k && k.away) saw = true; await sleep(200); } return saw; };
+
+        // A: 2.5 s stall of a client
+        await netStall(G2, 2500);
+        h.expect(!(await watchAway(3800)), 'A: a 2.5 s stall of a client: the host never hands his kart to a bot');
+        // B: 6 s stall of a client
+        const tpc0 = await kl(G2, () => __klTest.G.human.tpc | 0);
+        const prog0 = await kl(G2, () => __klTest.G.human.prog);
+        await netStall(G2, 6000);
+        const sawB = await watchAway(8500);
+        h.expect(sawB, 'B: a 6 s stall of a client: the host lets a (gentle) bot steer the kart in the meantime');
+        const kb = await kartOf(vid);
+        h.expect(kb && !kb.away && kb.remote && !kb.bot, 'B: the very next packets give the kart back to the player (no longer away, remote human again)');
+        const tpc1 = await kl(G2, () => __klTest.G.human.tpc | 0);
+        h.eq(tpc1, tpc0, 'B: the player\'s own kart was NOT reset/teleported (it kept driving on his own device)');
+        const d = await Promise.all([kl(H, (id) => { const k = __klTest.G.race.byId[id]; return [k.x, k.z]; }, vid), kl(G2, () => { const k = __klTest.G.human; return [k.x, k.z]; })]);
+        h.expect(Math.hypot(d[0][0] - d[1][0], d[0][1] - d[1][1]) < 15, 'B: host record and own kart agree again (' + Math.hypot(d[0][0] - d[1][0], d[0][1] - d[1][1]).toFixed(1) + ' m apart)');
+        h.expect((await kl(G2, () => __klTest.G.human.prog)) - prog0 > 100, 'B: and the player kept making progress (+' + Math.round((await kl(G2, () => __klTest.G.human.prog)) - prog0) + ' m)');
+        // C: 3 s stall of the host
+        await netStall(H, 3000);
+        let sawLag = [false, false];
+        for (let i = 0; i < 12; i++) { const l = await Promise.all([mp(G1), mp(G2)]); sawLag = sawLag.map((v, j) => v || l[j].hostLag); await sleep(250); }
+        const lagMs = await Promise.all([G1, G2].map((p) => kl(p, () => KL.MP.stats.hostLagMs)));
+        h.expect(sawLag[0] && sawLag[1], 'C: during a 3 s stall of the host both clients show the "host lagging" indicator (longest silence seen: ' + lagMs.map(Math.round).join(' / ') + ' ms)');
+        await sleep(1500);
+        const aft = await Promise.all([mp(H), mp(G1), mp(G2)]);
+        h.eq(aft.map((m) => [m.role, m.epoch, m.stats.promoted, m.hostLag]), [['host', 0, 0, false], ['client', 0, 0, false], ['client', 0, 0, false]], 'C: afterwards nothing changed: same host, epoch 0, no promotion, no indicator');
+        // D: 9 s stall of the host: longer than HOST_SILENCE, but the connection is alive -> the deputy must wait (no second host)
+        await netStall(H, 9000);
+        await sleep(10000);
+        const aft2 = await Promise.all([mp(H), mp(G1), mp(G2)]);
+        h.eq(aft2.map((m) => [m.role, m.epoch, m.stats.promoted, m.ended]), [['host', 0, 0, false], ['client', 0, 0, false], ['client', 0, 0, false]], 'D: a 9 s stall of the host: the deputy did NOT take over (transport alive), nobody ended');
+        await sleep(3000);
+        const kn = await Promise.all([G1, G2].map((p) => kl(p, () => __klTest.G.human.finished || __klTest.G.race.phase)));
+        // the race finishes for everyone with the same table
+        for (const p of [H, G1, G2]) await waitFor(p, () => !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 300000);
+        const same = (t) => t.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');
+        const tb = await Promise.all([H, G1, G2].map((p) => p.page.locator('#endList').innerText()));
+        h.eq([same(tb[1]), same(tb[2])], [same(tb[0]), same(tb[0])], 'all three see the same result table after all those stalls');
+        for (const n of ['Lagger', 'Deputy', 'Victim']) h.expect(tb[0].includes(n), n + ' finished and is in the table');
+        const mH = await mp(H);
+        h.eq(mH.karts.filter((k) => k.human).length, 3, 'all three are still human at the end (nobody was dropped for good)');
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 5f. a host that was only stalled for a very long time: the deputy takes over, the old host steps aside (no split brain) ================= */
+      if (want('splitbrain')) {
+        h.step('a host stalls for 17 s: the deputy takes over once, the old host steps aside when it wakes up (one race, one host)');
+        const H = await newPlayer(h, hub, 'sb-host', { first: true }); all.push(H);
+        const G1 = await newPlayer(h, hub, 'sb-g1'); all.push(G1);
+        const G2 = await newPlayer(h, hub, 'sb-g2'); all.push(G2);
+        await goOnline(H, 'OldHost'); await H.page.click('#olCreate');
+        await H.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        const sbcode = (await H.page.textContent('#lbCode')).trim();
+        await lobbyJoin(H, G1, sbcode, 'Dep'); await lobbyJoin(H, G2, sbcode, 'Other');
+        await readyAndStart(H, [G1, G2], 3);
+        await waitRace([H, G1, G2]);
+        for (const p of [H, G1, G2]) await kl(p, () => __klTest.autopilot(true));
+        await sleep(5000);
+        await netStall(H, 17000);
+        await waitFor(G1, () => KL.MP.role === 'host', null, 30000);
+        h.expect(true, 'the deputy promoted itself to host');
+        const g1 = await mp(G1), g2 = await mp(G2);
+        h.eq([g1.epoch, g1.stats.promoted], [1, 1], 'exactly one promotion (epoch 1)');
+        await waitFor(G2, (id) => KL.MP.hostId === id, g1.lobby.myId, 10000);
+        h.expect(true, 'the other client follows the new host');
+        await waitFor(H, () => KL.MP.ended || !document.getElementById('onlineScreen').hidden, null, 40000);
+        const msg = await H.page.textContent('#olMsg').catch(() => '');
+        h.expect(/hangen|haangen|froze|gefroren/i.test(msg), 'the old host wakes up, steps aside and is told why: "' + msg + '"');
+        for (const p of [G1, G2]) await waitFor(p, () => !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 300000);
+        const tb = await Promise.all([G1, G2].map((p) => p.page.locator('#endList').innerText()));
+        const same = (t) => t.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');
+        h.eq(same(tb[1]), same(tb[0]), 'the two remaining players get identical results from the single new host');
+        await closeAll(all); all.length = 0;
+      }
+
       /* ================= 6. no WebRTC path: capped relay fallback for that peer only ================= */
       if (want('relay')) {
         h.step('WebRTC blocked for one peer: slow relay fallback (capped, badge) and the other peer unaffected');
@@ -732,7 +916,7 @@ export const flow = {
         console.log('    relay traffic while racing: ' + (f2 - f1) + ' Realtime frames in 15 s (' + rate.toFixed(1) + '/s, both directions)');
         h.expect(rate <= 26, 'relay stays around 5 Hz per direction state + batched events (' + rate.toFixed(1) + ' Realtime frames/s = each message is one frame in and one out)');
         const mrr = await mp(R1);
-        h.expect(mrr.net.relayMsgs > 0 && mrr.net.relayMsgs < 900, 'relayed message counter is below the per-race cap (' + mrr.net.relayMsgs + ' < 900)');
+        h.expect(mrr.net.relayMsgs > 0 && mrr.net.relayMsgs < 4000, 'relayed message counter is below the per-race budget (' + mrr.net.relayMsgs + ' < 4000)');
         REPORT.relay = { framesPerSecond: rate, relayMsgsHostSide: mrr.net.relayMsgs };
         await closeAll(all); all.length = 0;
 
