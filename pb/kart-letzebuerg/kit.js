@@ -108,7 +108,8 @@
   /* surface patches (track.def.patches): decals on the road. styles: { goo: { a: '#hex', b: '#hex', emissive: bool, flow: speed }, ice: {...}, lava: {...} } */
   K.patchDecals = (S, styles) => {
     const { track, renderer } = S, T = T3(), made = {};
-    for (const q of track.patches) {
+    const roads = [track].concat((track.branches || []).map((b) => b.T));          // the main road and its shortcuts
+    for (const road of roads) for (const q of road.patches) {
       const st = styles[q.kind]; if (!st) continue;
       let m = made[q.kind];
       if (!m) {
@@ -121,8 +122,8 @@
         const mat = st.emissive ? new T.MeshBasicMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }) : new T.MeshLambertMaterial({ map: tex, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, transparent: st.opacity != null, opacity: st.opacity != null ? st.opacity : 1 });
         m = made[q.kind] = { B: new KL.Batch(), mat, tex, st };
       }
-      const s1 = q.s1 < q.s0 ? q.s1 + track.length : q.s1;
-      K.strip(m.B, track, q.s0, s1, q.d0, q.d1, 0.05, [1, 1, 1], 8, Math.max(1, (q.d1 - q.d0) / 8));
+      const s1 = q.s1 < q.s0 ? q.s1 + road.length : q.s1;
+      K.strip(m.B, road, q.s0, s1, q.d0, q.d1, 0.05, [1, 1, 1], 8, Math.max(1, (q.d1 - q.d0) / 8));
     }
     for (const k in made) {
       const m = made[k], mesh = S.add(m.B, m.mat);
@@ -132,8 +133,9 @@
 
   /* wedge supports under ramps that rise above the base height: side walls from the wall line down below the terrain */
   K.skirts = (S, color) => {
-    const { track } = S, B = new KL.Batch(), c = color || KL.col('#8a8f99');
-    for (const rp of track.def.ramps || []) {
+    const { track: main } = S, B = new KL.Batch(), c = color || KL.col('#8a8f99');
+    const roads = [main].concat((main.branches || []).map((b) => b.T));
+    for (const track of roads) for (const rp of track.def.ramps || []) {
       const k = rp.k, i0 = Math.floor((((rp.s + k[0][0]) % track.length) + track.length) % track.length / track.step), n = Math.ceil((k[k.length - 1][0] - k[0][0]) / track.step) + 1;
       for (let m = 0; m < n; m++) {
         const i = (i0 + m) % track.N, j = (i + 1) % track.N;

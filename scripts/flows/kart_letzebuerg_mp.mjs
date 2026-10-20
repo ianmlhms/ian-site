@@ -556,8 +556,7 @@ export const flow = {
         await Promise.all([B, S].map((p, i) => waitFor(p, (n) => window.__klTest.G.raceCount > n && window.__klTest.state().phase === 'race' && window.__klTest.state().clock > 0.3, rc0[i], 60000).catch(async (e) => { throw new Error('race 2 did not start on ' + p.label + ': ' + JSON.stringify(await kl(p, () => ({ lobby: KL.Lobby.phase, state: __klTest.G.state, spec: KL.MP.spec, msg: document.getElementById('olMsg').textContent })).catch(() => '?')) + ' ' + JSON.stringify(p.errors) + ' ' + JSON.stringify(p.notFound)); })));
         h.eq(await Promise.all([B, S].map((p) => kl(p, () => __klTest.G.race.karts.filter((k) => k.human).length))), [2, 2], 'next race: the former spectator drives as a full player');
         h.eq(await mp(S).then((m) => [m.spec, m.role]), [false, 'client'], 'and is a normal client now');
-        // (known, not ours: the shared auth.js injects "auth.css" with a relative path, a 404 on every /pb/ page opened with ?room=; ignored here)
-        const realErrors = (p) => p.errors.filter((e) => !/three/.test(e) && !(/404/.test(e) && p.notFound.length && p.notFound.every((u) => /auth\.css/.test(u))));
+        const realErrors = (p) => p.errors.filter((e) => !/three/.test(e));
         h.expect([A, B, S].every((p) => realErrors(p).length === 0), 'no console errors: ' + JSON.stringify([A, B, S].flatMap((p) => realErrors(p).concat(p.notFound))));
         await closeAll(all); all.length = 0;
       }
@@ -688,6 +687,37 @@ export const flow = {
         h.eq(pts, 4 * 39, '4 races x 39 points in the table');
         h.expect(await P.page.locator('#eLobby').isVisible() && await P.page.locator('#eNext').isHidden(), 'after the last race the host can go back to the lobby');
         await h.shot('gp-online-final');
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 5b2. the Kirchberg shortcut online: positions / progress stay right for karts on the cut ================= */
+      if (want('cut')) {
+        h.step('online on Kirchberg: both humans take the shortcut (own kart simulated on the cut), the host sees steady progress and the same final order');
+        const P = await newPlayer(h, hub, 'cut-host'); all.push(P);
+        const Q = await newPlayer(h, hub, 'cut-guest'); all.push(Q);
+        await goOnline(P, 'CutHost'); await P.page.click('#olCreate');
+        await P.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        await lobbyJoin(P, Q, (await P.page.textContent('#lbCode')).trim(), 'CutGuest');
+        await P.page.locator('#lbTrack button', { hasText: /Kierchbierg/ }).click();
+        await waitFor(Q, () => /Kierchbierg/.test(document.getElementById('lbSummary').textContent), null, 10000);
+        await readyAndStart(P, [Q], 1);
+        await waitRace([P, Q]);
+        h.eq(await kl(P, () => __klTest.G.track.id), 'kirchberg', 'the race is on Kirchberg');
+        h.expect(await kl(P, () => __klTest.G.track.branches.length) === 1 && await kl(Q, () => __klTest.G.track.branches.length) === 1, 'both sides built the shortcut');
+        for (const p of [P, Q]) await kl(p, () => { const R = __klTest.G.race; R.diff = Object.assign({}, R.diff, { cut: 1 }); __klTest.autopilot(true); });
+        const gid = await kl(Q, () => __klTest.G.human.id);
+        await kl(P, (id) => { window.__cutLog = { prev: null, back: 0, maxBack: 0, steps: 0, hostCuts: 0 }; window.__cutIv = setInterval(() => { const k = __klTest.G.race.byId[id], L = window.__cutLog; if (!k) return; if (L.prev != null) { const d = k.prog - L.prev; if (d < 0) { L.back++; L.maxBack = Math.min(L.maxBack, d); } } L.prev = k.prog; L.steps++; }, 50); }, gid);
+        await kl(Q, () => { window.__cutQ = { cuts: 0, was: false }; window.__cutQi = setInterval(() => { const k = __klTest.G.human, c = window.__cutQ; if (k.br && !c.was) c.cuts++; c.was = !!k.br; }, 30); });
+        await kl(P, () => { window.__cutP = { cuts: 0, was: false }; window.__cutPi = setInterval(() => { const k = __klTest.G.human, c = window.__cutP; if (k.br && !c.was) c.cuts++; c.was = !!k.br; }, 30); });
+        for (const p of [P, Q]) await waitFor(p, () => !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 240000);
+        const cutsP = await kl(P, () => window.__cutP.cuts), cutsQ = await kl(Q, () => window.__cutQ.cuts), lg = await kl(P, () => window.__cutLog);
+        h.expect(cutsP >= 1 && cutsQ >= 1, 'both humans drove the shortcut (host ' + cutsP + 'x, guest ' + cutsQ + 'x)');
+        h.expect(lg.steps > 200 && lg.maxBack > -3, 'the host saw the guest\'s progress run steadily (' + lg.steps + ' samples, ' + lg.back + ' small backward steps, worst ' + lg.maxBack.toFixed(2) + ' m)');
+        const t = await Promise.all([P, Q].map((p) => p.page.locator('#endList').innerText()));
+        const same = (x) => x.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');
+        h.eq(same(t[0]), same(t[1]), 'identical final order on both sides');
+        h.expect(await kl(P, () => __klTest.G.race.karts.every((k) => !k.rescued)) && await kl(Q, () => __klTest.G.race.karts.every((k) => !k.rescued)), 'no rescues on either side');
+        await h.shot('cut-online-final');
         await closeAll(all); all.length = 0;
       }
 
