@@ -53,8 +53,9 @@
 
   /* ------------------------------------------------------------ i18n */
   let lang = (['lb', 'de', 'en'].includes(readStore('site_lang')) ? readStore('site_lang') : 'lb');
+  /* on a touch screen a hint that names a key (W, D, ...) has a 'T' twin in the copy that names the on-screen control instead */
   function t(key, vars) {
-    return safe('TS.t', () => (TS.t ? TS.t(key, vars) : key), key);
+    return safe('TS.t', () => (TS.t ? TS.t(touchUi && TS.copy && TS.copy.lb && TS.copy.lb[key + 'T'] !== undefined ? key + 'T' : key, vars) : key), key);
   }
   const nameOf = (obj) => (obj && typeof obj === 'object' ? obj[lang] || obj.lb || obj.en || '' : String(obj || ''));
   function setLanguage(next) {
@@ -74,8 +75,6 @@
     $('sumMenu').textContent = t('backToMenu');
     $('sumAgain').textContent = t('sumAgain');
     $('btnMenu').textContent = t('menuBtn'); $('btnMenu').title = t('menuBtnTitle');
-    $('kbText').textContent = t('deviceKeyboardOnly');
-    $('kbClose').textContent = t('deviceDismiss');
     $('phoneTitle').textContent = t('devicePhoneTitle');
     $('phoneText').textContent = t('devicePhoneBlock');
     $('phoneHint').textContent = t('devicePhoneHint');
@@ -90,6 +89,9 @@
 
   /* ------------------------------------------------------------ state */
   const isTouch = (navigator.maxTouchPoints || 0) > 0 || matchMedia('(pointer:coarse)').matches;
+  /* touch controls (lever + buttons) and the touch wording of the hints: on while the main pointer is a finger (iPad), or after the first real touch */
+  let touchUi = matchMedia('(pointer:coarse)').matches;
+  let touchHintShown = false;
   let quality = readStore('ts_quality');
   if (!QUALITIES.includes(quality)) quality = isTouch ? 'medium' : 'high';
   let phase = 'boot';            // boot | menu | loading | running | paused | summary | transition
@@ -136,11 +138,8 @@
     $('phoneBlock').hidden = !phone;
     if (phone && phase === 'running') pauseGame(true);
     if (phone) return;
-    if (isTouch && !noticeDismissed) $('kbNotice').hidden = false;
     if (phase === 'boot') boot();
   }
-  let noticeDismissed = false;
-  function dismissNotice() { noticeDismissed = true; $('kbNotice').hidden = true; }
 
   /* ------------------------------------------------------------ renderer */
   function initRenderer() {
@@ -1001,6 +1000,88 @@
     el.addEventListener('pointerup', pinchEnd); el.addEventListener('pointercancel', pinchEnd);
   }
 
+  /* ------------------------------------------------------------ touch controls */
+  /* The lever (left) and the buttons (right) of the on-screen cab for a touch screen; they call the same functions as the keys. */
+  const LEVER_SLOTS = LEVER_MAX - LEVER_BRAKE_MAX + 1;   // P5 .. B7 (EB is its own button)
+  function setTouchUi(on) {
+    if (touchUi === on) return;
+    touchUi = on;
+    document.body.classList.toggle('touch', on);
+    translateStatic();
+    if (world && world.state) updateHud(true);
+  }
+  function buildTouchLever() {
+    const ticks = $('tlTicks');
+    ticks.replaceChildren();
+    for (let n = LEVER_MAX; n >= LEVER_BRAKE_MAX; n--) {
+      const i = document.createElement('i');
+      i.className = n === 0 ? 'zero' : n > 0 ? 'p' : 'b';
+      ticks.appendChild(i);
+    }
+  }
+  function syncTouchPad(s) {
+    if (!touchUi) return;
+    const st = s || (world && world.state);
+    if (!st) return;
+    const n = input.lever, eb = n <= LEVER_EB;
+    const slot = LEVER_MAX - clamp(n, LEVER_BRAKE_MAX, LEVER_MAX);
+    const label = TS.sim && TS.sim.leverLabel ? TS.sim.leverLabel(n) : String(n);
+    const thumb = $('tlThumb');
+    thumb.style.top = ((slot + 0.5) / LEVER_SLOTS * 100) + '%';
+    thumb.className = 'tl-thumb' + (eb ? ' eb' : n === 0 ? ' neutral' : n < 0 ? ' brake' : '');
+    $('tlLabel').textContent = label;
+    const rail = $('tlRail');
+    rail.setAttribute('aria-valuenow', String(n)); rail.setAttribute('aria-valuetext', label);
+    $('tbEb').classList.toggle('on', eb);
+    $('tbDoors').classList.toggle('on', st.doorsOpen01 > 0.02 || !!st.doorsReleased);
+    $('tbPark').classList.toggle('on', !!st.parkingBrake);
+    $('tbLights').classList.toggle('on', !!(world && world.lightLevel > 0));
+  }
+  function bindTouchControls() {
+    buildTouchLever();
+    const live = () => phase === 'running' && !paused && !!world && !world.demo;
+    const rail = $('tlRail');
+    const notchAt = (e) => {
+      const r = rail.getBoundingClientRect();
+      const k = clamp((e.clientY - r.top) / Math.max(1, r.height), 0, 0.9999);
+      return LEVER_MAX - Math.floor(k * LEVER_SLOTS);
+    };
+    rail.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!live()) return;
+      wakeAudio();
+      try { rail.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      setLeverNotch(notchAt(e)); syncTouchPad();
+    });
+    rail.addEventListener('pointermove', (e) => { if (live() && rail.hasPointerCapture && rail.hasPointerCapture(e.pointerId)) { setLeverNotch(notchAt(e)); syncTouchPad(); } });
+    // tap = act at once (no 300 ms click delay); the buttons never keep the focus (Space is the horn)
+    const press = (id, action) => {
+      const b = $(id);
+      b.addEventListener('pointerdown', (e) => { e.preventDefault(); if (!live()) return; wakeAudio(); action(e); syncTouchPad(); b.classList.add('down'); });
+      const up = () => b.classList.remove('down');
+      b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
+    };
+    press('tbEb', () => { input.lever = LEVER_EB; });
+    press('tbDoors', () => { input.doorPress = true; });
+    press('tbPark', () => { input.parkingToggle = true; });
+    press('tbLights', () => toggleLights());
+    press('tbAnnounce', () => announceNext(false));
+    $('tbTimetable').addEventListener('pointerdown', (e) => { e.preventDefault(); if (phase === 'running') toggleTimetable(); });
+    // horn: sounds while the finger is down
+    const horn = $('tbHorn');
+    const hornOff = (e) => { if (input.hornHeld) { input.hornHeld = false; sfx('horn', false); } horn.classList.remove('down'); if (e && e.pointerId !== undefined) { try { horn.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ } } };
+    horn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!live()) return;
+      wakeAudio();
+      try { horn.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      if (!input.hornHeld) { input.hornHeld = true; sfx('horn', true); }
+      horn.classList.add('down');
+    });
+    horn.addEventListener('pointerup', hornOff); horn.addEventListener('pointercancel', hornOff); horn.addEventListener('lostpointercapture', hornOff);
+    document.body.classList.toggle('touch', touchUi);
+  }
+
   /* ------------------------------------------------------------ toasts */
   /* At most TOAST_MAX at once; a new toast replaces an older one of the same group (or with the same text). */
   function toast(text, kind = 'info', ms = 3000, group = '') {
@@ -1564,7 +1645,7 @@
     }
   }
   const fmtDist = (m) => (m >= 1000 ? t('distanceKm', { n: (m / 1000).toFixed(1) }) : t('distanceM', { n: Math.max(0, Math.round(m / 10) * 10) }));
-  function kbd(key) { return '<kbd>' + key + '</kbd>'; }
+  function kbd(key) { return touchUi ? '' : '<kbd>' + key + '</kbd>'; }
   /* short contextual coach (save.hints): the same steps as the plain hints, but with the why */
   function hintFor(state) {
     const w = world, st = state.nextStation, coach = !!save.hints;
@@ -1720,8 +1801,9 @@
     const pk = $('parkLamp');
     pk.hidden = !s.parkingBrake;
     if (s.parkingBrake) pk.textContent = 'B · ' + t('hudParking');
-    const hintHtml = hintFor(s), gv = guideView(s), gEl = $('guide');
+    const hintHtml = String(hintFor(s) || '').trim(), gv = guideView(s), gEl = $('guide');
     $('hint').innerHTML = hintHtml;
+    syncTouchPad(s);
     $('hint').classList.toggle('coach', !!save.hints && !!hintHtml);
     gEl.hidden = !gv;
     if (gv) { gEl.className = 'guide ' + gv.cls; gEl.textContent = gv.text; }
@@ -1734,7 +1816,7 @@
   function buildHelp() {
     const body = $('helpBody');
     body.replaceChildren();
-    for (const [keys, label] of HELP_ROWS) {
+    for (const [keys, label] of (touchUi ? [['', 'keyTouch'], ...HELP_ROWS] : HELP_ROWS)) {
       const k = document.createElement(keys ? 'kbd' : 'span');
       k.textContent = keys;
       const d = document.createElement('span');
@@ -1893,6 +1975,7 @@
       banner(t('resumeBanner', { name: nearestStationName(world.state.s) }), t('resumeBannerHint'), 4800);
       return true;
     }
+    if (touchUi && !touchHintShown) { touchHintShown = true; setTimeout(() => { if (phase === 'running' && world && !world.demo) toast(t('touchHint'), 'info', 6000, 'touch'); }, 4200); }
     banner(nameOf(route.name), patternText() + ' · ' + (mode === 'endless' ? t('endlessLine', { n: endless.index + 1, total: endless.order.length }) : nameOf(world.cfg.name || trainId)), 3600);
     return true;
   }
@@ -2263,7 +2346,6 @@
   function onKeyDown(e) {
     if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    dismissNotice();
     wakeAudio();
     if (phase === 'menu' && resumeOffer && !$('menu').hidden) {   // the Weiderfueren card: Enter carries on (unless a button has the focus and handles it), Escape = not now
       if (e.key === 'Escape') { e.preventDefault(); dismissResume(); return; }
@@ -2341,7 +2423,7 @@
           wallet: careerState().wallet, tb: save.tb, lifetime: careerState().lifetime, owned: careerState().owned, routes: careerState().routes, saveTrain: careerState().train, services: careerState().services,
           endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null, lastResult: w && w.lastResult ? { delivered: w.lastResult.passengersDelivered, boarded: w.lastResult.passengersBoarded, pkm: w.lastResult.passengerKm, delays: w.lastResult.delaySecAtStations, errors: w.lastResult.stopErrors, over: w.lastResult.overspeedSeconds, harsh: w.lastResult.harshEvents, spads: w.lastResult.spads, breakdown: w.lastReward && w.lastReward.breakdown } : null,
           cabin: w && w.cabin ? w.cabin.stats() : null, insidePos, draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,
-          hudSpeed: $('speedNum').textContent, hudSide: $('nextSide').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, kbNoticeVisible: !$('kbNotice').hidden, phoneBlocked: !$('phoneBlock').hidden,
+          hudSpeed: $('speedNum').textContent, hudSide: $('nextSide').textContent, hudNext: $('nextName').textContent, hudXchg: $('xchg').hidden ? '' : $('xchg').textContent, touchUi, phoneBlocked: !$('phoneBlock').hidden,
           parkingBrake: !!(s && s.parkingBrake), guide: s ? s.guide : null, guideText: $('guide').hidden ? '' : $('guide').textContent, hintText: $('hint').textContent, parkLampVisible: !$('parkLamp').hidden,
           pattern: w && w.sim.plan ? w.sim.plan.pattern : '', passIndices: w && w.sim.plan ? [...w.sim.plan.pass] : [], tsr: w && w.sim.plan ? w.sim.plan.tsr.map((x) => ({ ...x })) : [], incidents: w && w.sim.plan ? w.sim.plan.incidents.map((x) => ({ ...x })) : [],
           spadHoldSec: s ? s.spadHoldSec : 0, hints: !!save.hints, svcLabel: $('svcLabel').textContent, cabHitTest: !!(w && w.cab && typeof w.cab.hitTest === 'function'), stopsRecord: w ? { ...w.stops } : {},
@@ -2416,6 +2498,7 @@
         return fallback;
       },
       pointerAction(kind, x, y) { const hit = cabHit({ clientX: x, clientY: y }); return hit ? { ...hit } : null; },
+      setTouchUi(on) { setTouchUi(!!on); return touchUi; },
       press(key) { return handleKey(key.length === 1 ? key.toLowerCase() : key, false); },
       release(key) { handleKeyUp(key.length === 1 ? key.toLowerCase() : key); },
       finishRoute() {
@@ -2508,10 +2591,9 @@
     });
     window.addEventListener('resize', checkDevice);
     window.addEventListener('beforeunload', () => { saveSnapshotNow(); if (phase !== 'boot') persist(); });
-    $('kbClose').addEventListener('click', dismissNotice);
-    if (parent !== window) safe('parent keydown', () => parent.addEventListener('keydown', dismissNotice, { capture: true }));   // keys typed while the arcade page still has focus
-    // inside the arcade iframe some webviews report no touch points: a real touch on the page also raises the notice
-    window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' && !noticeDismissed && !isPhone()) $('kbNotice').hidden = false; }, { capture: true });
+    // inside the arcade iframe some webviews report no coarse pointer: a real touch on the page also switches the touch controls on
+    window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch' && !isPhone()) setTouchUi(true); }, { capture: true });
+    bindTouchControls();
     $('resume').addEventListener('click', resumeGame);
     $('quit').addEventListener('click', quitService);
     $('btnPause').addEventListener('click', () => (paused ? resumeGame() : pauseGame()));
