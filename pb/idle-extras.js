@@ -74,7 +74,7 @@
   /** Confirm button guard: locked for OPEN_LOCK_MS after arm(), then either a plain click or (needsHold) a press-and-hold of
    * HOLD_MS (pointer or Enter/Space held down; a bare click, a double tap or a key tap does nothing). */
   function makeGuard(button){
-    let cfg=null,unlockTimer=0,holdTimer=0,raf=0,heldSince=0,holding=false;
+    let cfg=null,unlockTimer=0,holdTimer=0,raf=0,heldSince=0,holding=false,heldBy='';
     const progress=fraction=>button.style.setProperty('--hold',String(Math.round(fraction*100)));
     function stopHold(){
       if(!holding)return;
@@ -93,9 +93,9 @@
       holding=false;cancelAnimationFrame(raf);button.classList.remove('idle-holding');progress(0);
       const done=cfg;disarm();if(done)done.onConfirm();
     }
-    function startHold(){
+    function startHold(source){
       if(holding||!cfg||!cfg.needsHold||button.disabled)return;
-      holding=true;heldSince=performance.now();
+      holding=true;heldBy=source;heldSince=performance.now();
       button.classList.add('idle-holding');button.textContent=cfg.holdingLabel;
       raf=requestAnimationFrame(step);holdTimer=setTimeout(complete,HOLD_MS);
     }
@@ -103,12 +103,14 @@
       clearTimeout(unlockTimer);stopHold();cfg=null;button.disabled=true;
     }
     button.classList.add('idle-guard');
-    button.addEventListener('pointerdown',event=>{if(event.button===0||event.pointerType==='touch')startHold()});
-    ['pointerup','pointercancel','pointerleave','blur'].forEach(type=>button.addEventListener(type,stopHold));
+    button.addEventListener('pointerdown',event=>{if(event.button===0||event.pointerType==='touch')startHold('pointer')});
+    ['pointerup','pointercancel','pointerleave'].forEach(type=>button.addEventListener(type,stopHold));
+    // Safari moves the focus off a button when it is pressed with the mouse: only a key hold ends on blur.
+    button.addEventListener('blur',()=>{if(heldBy==='key')stopHold()});
     button.addEventListener('contextmenu',event=>event.preventDefault());
     button.addEventListener('keydown',event=>{
       if(event.key!=='Enter'&&event.key!==' ')return;
-      event.preventDefault();if(!event.repeat)startHold();
+      event.preventDefault();if(!event.repeat)startHold('key');
     });
     button.addEventListener('keyup',event=>{if(event.key==='Enter'||event.key===' ')stopHold()});
     button.addEventListener('click',event=>{
