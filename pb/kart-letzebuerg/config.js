@@ -37,9 +37,19 @@
     INTERP_DELAY: 100,            // ms the remote karts are shown in the past (snapshot interpolation)
     EXTRAP_MAX: 150,              // ms a remote kart is extrapolated when snapshots are late
     PING_EVERY: 1000,
-    AWAY_SILENCE: 1500,           // ms without packets from a player: their kart is driven by a bot until they are back
-    HOST_SILENCE: 2500,           // ms without snapshots from the host: the deputy takes over
-    LEAVE_GRACE: 6000,            // ms a client waits for the deputy before ending the race
+    LINK_GRACE: 10000,            // ms a WebRTC link may stay in the (often self-healing) 'disconnected' state before it counts as lost
+    /* Silence thresholds are tolerant on purpose: school Wi-Fi, iPads and Safari throttling stall a player for 1-3 s now and then, and a stall must
+     * never cost a player his kart. AWAY: the host lets a bot steer gently (no items, no drifting) until the packets are back; the player gets
+     * his kart back the moment a state packet arrives. HOST_LAG only shows an indicator; the deputy takes over after HOST_SILENCE and only when
+     * the transport itself says the host is gone, otherwise after HOST_SILENCE_HARD (so a merely stalled host never gets a second host). */
+    AWAY_SILENCE: 4000,           // ms without packets from a player (WebRTC): a gentle bot steers his kart until he is back
+    AWAY_SILENCE_RELAY: 5500,     // the same for a relayed player (batches arrive only a few times per second)
+    HOST_LAG: 2000,               // ms without snapshots from the host: "host lagging" indicator
+    HOST_SILENCE: 6000,           // ms without snapshots from the host: the deputy checks whether the host is really gone
+    HOST_SILENCE_HARD: 14000,     // ms: the deputy takes over even if the connection still looks alive
+    HOSTAWAY_GRACE: 4000,         // ms the deputy waits after "host tab hidden" for the host to come back before taking over
+    STALL_FRAME: 700,             // ms between two frames of THIS device that count as a local stall (all silence timers restart then)
+    LEAVE_GRACE: 14000,           // ms a client without deputy waits (after HOST_SILENCE) for the host before ending the race
     LOAD_TIMEOUT: 30000,          // ms the host waits for slow devices to load the track
     FINISH_GRACE: 45,             // s after the first human finish until the race is closed for the rest
     MAX_PLAYERS: 8,
@@ -48,8 +58,19 @@
     /* Fallback for a peer that cannot connect through WebRTC: relay via the Supabase Realtime channel.
      * One switch: set RELAY_FALLBACK to false and such a peer is simply refused with a message. */
     RELAY_FALLBACK: true,
-    RELAY_HZ: 5,                  // kart states over the relay, at most
-    RELAY_MAX_MSGS: 900,          // hard cap of relayed messages per peer and race (~3 minutes at 5 Hz); after that the peer is dropped
+    /* The relay costs Supabase Realtime messages (a sent message is one message, each delivery another one) and egress, so it is lean:
+     * every relayed peer has its OWN two-member channel (nobody else gets the traffic), kart states go out RELAY_HZ times per second with
+     * RELAY_BATCH states in each message, and events/uses ride along with the next state message. */
+    RELAY_HZ: 5,                  // messages per second and direction (budget permitting)
+    RELAY_BATCH: 2,               // kart states per message (10 states/s at RELAY_HZ 5)
+    RELAY_INTERP_DELAY: 300,      // ms remote karts are shown in the past when their data comes through the relay
+    RELAY_EXTRAP_MAX: 450,
+    /* Budget per relayed peer and race. Normal use is ~5.3 messages/s per direction (~900 in a 3 minute race); the budget is generous (several
+     * races' worth), and when it runs low the rate drops step by step (RELAY_SLOW: [budget fraction, messages/s]). Only if it is used up
+     * completely the relay of THAT peer ends with a clear message (never silently, never before the end of a normal race). */
+    RELAY_RACE_MSGS: 4000,
+    RELAY_LOBBY_MSGS: 1500,       // runaway protection for the lobby phase (rosters, hand-shake)
+    RELAY_SLOW: [[0.6, 3.5], [0.85, 2.5]],
     DIR_CHANNEL: 'kl-dir',        // public lobbies for "Quick match"
   });
 

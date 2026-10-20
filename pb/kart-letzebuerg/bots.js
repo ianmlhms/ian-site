@@ -73,6 +73,7 @@
     // look further for tight corners so we lift early
     const vFar = track.vsafe[(i0 + Math.round(clamp(sp * 1.1, 12, 60) / step)) % N] * 1.12;
     vt = Math.min(vt, Math.max(vFar, 8));
+    if (k.gentle) vt *= 0.88;                                  // a human's kart held by the AI for a moment (lost connection): calm, no risks
     if (k.surf === 1 && k.boostT <= 0) vt = Math.min(vt, 22);
     if (k.patch === 'ice') vt *= 0.8;
     let gas = sp < vt ? 1 : 0, brake = 0;
@@ -102,12 +103,13 @@
         if (k.drift.state === 1) steer = ai.driftDir * 0.8;
       }
     }
+    if (k.gentle) { wantDrift = false; ai.mistake = 0; ai.mistakeT = 0; if (k.drift.state > 0) steer = clamp(-err * 2.1, -1, 1); }
     if (!isFinite(steer)) steer = 0;     // never let a NaN reach the kart state (it would poison the position and progress)
     // starting boost for the bots
     inp.steer = steer; inp.gas = gas; inp.brake = brake; inp.drift = wantDrift; inp.item = false;
 
     // items
-    if (k.item && k.itemCool <= 0 && R.phase === 'race') {
+    if (k.item && k.itemCool <= 0 && R.phase === 'race' && !k.gentle) {      // (a gentle bot keeps the player's item for him)
       ai.itemT -= dt;
       if (ai.itemT <= 0) {
         const id = k.item.id;

@@ -20,7 +20,7 @@
 
   const M = (KL.MP = {
     active: false, role: null, R: null, L: null, self: null, myId: '', hostId: '', deputy: null, epoch: 0,
-    stats: { snapOut: 0, snapIn: 0, stateOut: 0, stateIn: 0, evOut: 0, evIn: 0, promoted: 0, away: 0 },
+    stats: { snapOut: 0, snapIn: 0, stateOut: 0, stateIn: 0, evOut: 0, evIn: 0, promoted: 0, away: 0, stalls: 0, hostLagMs: 0 },
     probe: null,
   });
 
@@ -49,7 +49,7 @@
 
   /* ---------- session ---------- */
   M.attach = function (R, start, L, spec) {
-    Object.assign(M, { spec: !!spec, specs: new Set(), specLive: false, specRevealAt: 0, active: true, R, L, role: L.role, myId: L.myId, hostId: start.hostId, deputy: start.deputy || null, epoch: start.epoch || 0, lateralOk: new Set(start.ok || []), resultsDone: false, goAt: 0, lastSend: 0, evIdx: 0, out: [], itemMap: new Map(), base: new Map(), lastRecv: new Map(), lastHostMsg: 0, firstFinish: null, hostAway: false, ended: false, seq: 0, migratedFrom: null });
+    Object.assign(M, { spec: !!spec, specs: new Set(), specLive: false, specRevealAt: 0, active: true, R, L, role: L.role, myId: L.myId, hostId: start.hostId, deputy: start.deputy || null, epoch: start.epoch || 0, lateralOk: new Set(start.ok || []), resultsDone: false, goAt: 0, lastSend: 0, evIdx: 0, out: [], itemMap: new Map(), base: new Map(), lastRecv: new Map(), lastHostMsg: 0, firstFinish: null, hostAway: false, ended: false, seq: 0, migratedFrom: null, lastTick: 0, hostLag: false, hostAwaySince: 0, silentSince: 0, startedAt: performance.now() });
     M.self = R.byId[L.myId];                        // undefined for a spectator (it has no kart)
     M.info = raceInfo(start, L); M.recorded = false;
     R.nid = 0;
@@ -103,13 +103,32 @@
   function sendAllClients(msg, reliable, except) {
     for (const [id, l] of M.L.links) { if (id === except || !l.open) continue; if (M.role === 'host' && !M.R.byId[id] && !M.specs.has(id)) continue; l.send(msg, reliable); }
   }
+  /* the data of this kart (host) / of everybody (client) comes through the relay: shown further in the past, extrapolated longer */
+  function viaRelay(k) { const l = M.role === 'host' ? linkOf(k.id) : linkOf(M.hostId); return !!l && l.kind === 'relay'; }
+  /* is the connection to the host still alive as far as the transport can tell? (a stalled page keeps its WebRTC link, a vanished one loses it) */
+  function hostTransportAlive() {
+    const l = linkOf(M.hostId);
+    if (!l || l.closed || !l.open) return false;
+    if (l.kind === 'rtc') return !!l.pc && l.pc.connectionState === 'connected' && !!l.ev && l.ev.readyState === 'open';
+    return true;
+  }
   M.onLinkOpen = function () {};
   M.onRtt = function (from, rtt) { M.rtt = rtt; };
 
   /* ---------- per-frame ---------- */
+  /* this device itself stalled (garbage collection, a throttled tab, a slow frame): messages that arrive late are nobody's fault, so every
+   * silence timer starts again from now */
+  function restartSilence(now, gap) {
+    M.stats.stalls++;
+    for (const id of M.lastRecv.keys()) M.lastRecv.set(id, now);
+    M.lastHostMsg = now; M.silentSince = 0; M.hostAwaySince = M.hostAwaySince ? now : 0;
+    log('local stall', Math.round(gap), 'ms');
+  }
   M.tick = function (now) {
     if (!M.active || M.ended) return;
     const R = M.R;
+    if (M.lastTick && now - M.lastTick > N.STALL_FRAME) restartSilence(now, now - M.lastTick);
+    M.lastTick = now;
     updateViews(now);
     if (R.hold) return;
     if (now - M.lastSend >= 1000 / N.SEND_HZ) {
@@ -121,19 +140,27 @@
       for (const k of R.karts) {
         if (!k.remote || !k.human) continue;
         const last = M.lastRecv.get(k.id) || M.goAt;
-        if (now - last > N.AWAY_SILENCE && !k.away) setAway(k, true);
+        if (now - last > (viaRelay(k) ? N.AWAY_SILENCE_RELAY : N.AWAY_SILENCE) && !k.away) setAway(k, true);
       }
       if (M.resumeCheck && now > M.resumeCheck) {
         M.resumeCheck = 0;
         const alive = [...M.L.links.values()].some((l) => l.open && now - l.lastRecv < 2000);
         if (M.hostAway && !alive) M.endRace('rAway');
+        M.hostAway = false;
       }
       checkResults(now);
     } else {
       const silent = now - M.lastHostMsg;
+      if (silent > N.HOST_LAG) M.stats.hostLagMs = Math.max(M.stats.hostLagMs, silent);
+      M.hostLag = silent > N.HOST_LAG;
+      if (M.hostAwaySince && M.lastHostMsg > M.hostAwaySince + 250) M.hostAwaySince = 0;       // it is back
+      if (M.deputy === M.myId && !M.promoting) {
+        // take over only if the host is really gone: its transport says so, it told us it left, or it has been silent for a long time
+        if (M.hostAwaySince && now - M.hostAwaySince > N.HOSTAWAY_GRACE) M.promote('away');
+        else if (silent > N.HOST_SILENCE && (silent > N.HOST_SILENCE_HARD || !hostTransportAlive())) M.promote('silence');
+      }
       if (silent > N.HOST_SILENCE) {
-        if (M.deputy === M.myId && !M.promoting) M.promote('silence');
-        else if (!M.silentSince) M.silentSince = now;
+        if (!M.silentSince) M.silentSince = now;
         else if (now - M.silentSince > N.LEAVE_GRACE && !M.resultsDone) M.endRace('rEnded');
       } else M.silentSince = 0;
     }
@@ -196,8 +223,9 @@
       case 'results': if (from === M.hostId || from === M.migratedFrom) onResults(m); return;
       case 'left': if (M.role === 'client' && (from === M.hostId) && typeof m.id === 'string') onLeft(m.id); return;
       case 'hostchange': onHostChange(from, m); return;
-      case 'hostleave': if (from === M.hostId) { if (M.deputy === M.myId) M.promote('left'); else M.silentSince = M.silentSince || now; } return;
-      case 'hostaway': if (from === M.hostId) { if (M.deputy === M.myId) M.promote('away'); } return;
+      case 'hostleave': if (from === M.hostId) { if (M.deputy === M.myId) M.promote('left'); else M.silentSince = M.silentSince || (now - N.HOST_SILENCE); } return;
+      case 'hostaway': if (from === M.hostId && M.deputy === M.myId && !M.hostAwaySince) M.hostAwaySince = now; return;       // the deputy waits a little: the host may be back in a moment
+      case 'hostback': if (from === M.hostId) { M.hostAwaySince = 0; M.lastHostMsg = now; } return;
       default: return;
     }
   };
@@ -223,9 +251,9 @@
     if (!k || k.id !== from || !k.human) return;                      // a peer may only speak for its own kart
     M.lastRecv.set(from, now);
     if (k.away) {                                                    // bot-driven until it is back
-      if (!k.awayExplicit && now - (k.awayAt || 0) > 300) setAway(k, false);        // went silent: a state packet counts as "back"
-      else if (k.awayExplicit && now - (k.awayAt || 0) > 8000) setAway(k, false);    // said "away" but never "back" while still sending: believe the packets
-      return;
+      if (!k.awayExplicit) setAway(k, false);                       // went silent: the very first state packet gives the kart back (the player kept driving all along, so no reset)
+      else if (now - (k.awayAt || 0) > 8000) setAway(k, false);      // said "away" but never "back" while still sending: believe the packets
+      else return;
     }
     if ((k.resumeUntil || 0) > now) return;                          // its state is being reset by our 'resume'
     const base = updateBase(from, now, num(m.ts, now));
@@ -273,15 +301,16 @@
 
   /* ---------- remote karts: interpolated view ---------- */
   function updateViews(now) {
-    const R = M.R, rt = now - N.INTERP_DELAY, dtF = M.lastView ? Math.min(0.1, (now - M.lastView) / 1000) : 0.016;
+    const R = M.R, dtF = M.lastView ? Math.min(0.1, (now - M.lastView) / 1000) : 0.016;
     M.lastView = now;
     for (const k of R.karts) {
       if (!k.remote) continue;
       const buf = k.buf; if (!buf || !buf.length) continue;
+      const relay = viaRelay(k), rt = now - (relay ? N.RELAY_INTERP_DELAY : N.INTERP_DELAY), xMax = relay ? N.RELAY_EXTRAP_MAX : N.EXTRAP_MAX;
       const v = k.view || (k.view = { x: k.x, y: k.y, z: k.z, yaw: k.yaw });
       const first = buf[0], last = buf[buf.length - 1];
       if (rt >= last.t) {
-        const dt = Math.min(rt - last.t, N.EXTRAP_MAX) / 1000;
+        const dt = Math.min(rt - last.t, xMax) / 1000;
         v.x = last.x + last.vx * dt; v.z = last.z + last.vz * dt; v.y = last.y; v.yaw = last.yaw;
       } else if (rt <= first.t) { v.x = first.x; v.y = first.y; v.z = first.z; v.yaw = first.yaw; }
       else {
@@ -347,18 +376,24 @@
     const R = M.R; const i = R.humans.indexOf(k); if (i >= 0) R.humans.splice(i, 1);
     k.input.gas = 0; k.input.steer = 0; k.input.drift = false; k.input.brake = 0;
   }
+  /* A player whose packets stop (or who hides the tab) is steered by a gentle bot (no items, no drifting) until he is back.
+   * Silent players kept driving on their own device, so when their packets resume they simply continue from their own state (no reset);
+   * only a player who said "away" (tab hidden: his game was paused) is put back where the bot has taken his kart ('resume'). */
   function setAway(k, on, explicit) {
-    const R = M.R;
+    const R = M.R, now = performance.now();
     if (on === !!k.away) return;
-    k.away = on; k.awayExplicit = !!explicit && on; k.awayAt = performance.now(); k.resumeUntil = on ? 0 : performance.now() + 500;
+    const wasExplicit = !!k.awayExplicit;
+    k.away = on; k.awayExplicit = !!explicit && on; k.awayAt = now;
     if (on) {
-      M.stats.away++;
+      M.stats.away++; k.awaySince = now; k.gentle = true;
       k.remote = false; k.isBot = true; k.hint = -1; k.ai = null; k.botSkill = 1; k.rubber = 1; k.view = null; k.buf.length = 0;
-      log('away', k.id);
+      log('away', k.id, explicit ? '(hidden)' : '(silent)');
       if (M.role === 'host' && k.id === KL.Lobby.deputy) KL.Lobby.ensureDeputy('away');        // a silent deputy is replaced (ensureDeputy skips away players)
     } else {
-      k.remote = true; k.isBot = false; k.input.gas = 0; k.input.steer = 0; k.input.drift = false; k.input.brake = 0;
-      sendTo(k.id, { k: 'resume', st: packKart(k.slot, k), lap: k.lapIdx, lt: k.lapTimes, bl: isFinite(k.bestLap) ? k.bestLap : null, fin: k.finished, ft: k.finishTime, fo: k.finishOrder, item: k.item ? k.item.id : null, cnt: k.item ? k.item.count : 0, c: r3(R.clock) }, true);
+      k.gentle = false; k.awayTotal = (k.awayTotal || 0) + (now - (k.awaySince || now)) / 1000;
+      k.remote = true; k.isBot = false; k.input.gas = 0; k.input.steer = 0; k.input.drift = false; k.input.brake = 0; k.view = null; k.buf.length = 0;
+      k.resumeUntil = wasExplicit ? now + 500 : 0;
+      if (wasExplicit) sendTo(k.id, { k: 'resume', st: packKart(k.slot, k), lap: k.lapIdx, lt: k.lapTimes, bl: isFinite(k.bestLap) ? k.bestLap : null, fin: k.finished, ft: k.finishTime, fo: k.finishOrder, item: k.item ? k.item.id : null, cnt: k.item ? k.item.count : 0, c: r3(R.clock) }, true);
       log('back', k.id);
     }
   }
@@ -380,7 +415,7 @@
   };
   M.back = function () {
     if (!M.active || M.ended || M.R.hold) return;
-    if (M.role === 'host') { if (M.hostAway) M.resumeCheck = performance.now() + 1800; }
+    if (M.role === 'host') { if (M.hostAway) { M.resumeCheck = performance.now() + 1800; for (const l of M.L.links.values()) if (l.open) l.send({ k: 'hostback' }, true); } }
     else { sendTo(M.hostId, { k: 'back' }, true); M.lastHostMsg = performance.now(); }
   };
   M.onPeerGone = function (id, why) {
@@ -418,6 +453,9 @@
     M.promoting = true; M.stats.promoted++;
     const oldHost = R.byId[M.hostId];
     M.migratedFrom = M.hostId; M.epoch++; M.role = 'host'; L.role = 'host'; L.hostId = M.myId; M.hostId = M.myId; R.net.role = 'host';
+    // tell the old host too: if it was only stalled (not gone) it must not keep a second, parallel race alive
+    const oldLink = L.links.get(M.migratedFrom);
+    if (oldLink && oldLink.open) { oldLink.send({ k: 'hostchange', epoch: M.epoch, host: M.myId, from: M.migratedFrom, gone: M.migratedFrom }, true); setTimeout(() => { oldLink.onclose = null; oldLink.close('migrated'); }, 1500); }
     L.links.delete(M.migratedFrom);
     // the old host's kart is a bot now; every bot (until now a mirror) is simulated here
     if (oldHost) { convertToBot(oldHost); oldHost.name = oldHost.name; }
@@ -438,7 +476,12 @@
     console.info('[kart-mp] promoted to host (' + why + '), epoch ' + M.epoch);
   };
   function onHostChange(from, m) {
-    if (M.role !== 'client' || from !== M.deputy || !M.active) return;
+    if (!M.active || M.ended) return;
+    if (M.role === 'host') {                               // a stalled host that has been replaced: step aside instead of running a second race
+      if (from === M.deputy && (m.epoch | 0) > M.epoch) { console.info('[kart-mp] replaced by ' + from + ' (epoch ' + m.epoch + ')'); M.stepAside(); }
+      return;
+    }
+    if (M.role !== 'client' || from !== M.deputy) return;
     if ((m.epoch | 0) <= M.epoch) return;
     const old = M.hostId, oldL = linkOf(old);
     M.epoch = m.epoch | 0; M.hostId = from; M.L.hostId = from; M.deputy = null; M.silentSince = 0; M.lastHostMsg = performance.now(); M.migratedFrom = old;
@@ -525,6 +568,11 @@
         catch (e) { console.warn('[kart-mp] race not logged' + (attempt ? '' : ', retrying once'), e && e.message); if (!attempt) await new Promise((r) => setTimeout(r, REC_RETRY_MS)); }
       }
     })();
+  };
+  M.stepAside = function () {
+    M.stats.replaced = (M.stats.replaced || 0) + 1;
+    for (const l of M.L.links.values()) { l.onclose = null; }
+    M.endRace('rReplaced');
   };
   M.endRace = function (key, vars) {
     if (M.ended) return;

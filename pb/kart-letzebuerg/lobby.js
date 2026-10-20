@@ -191,7 +191,6 @@
   /* ---------- room channel ---------- */
   function wireRoomChannel(ch) {
     ch.on('broadcast', { event: 'sig' }, ({ payload }) => onSig(payload))
-      .on('broadcast', { event: 'rl' }, ({ payload }) => onRelayIn(payload))
       .on('broadcast', { event: 'sys' }, ({ payload }) => onSys(payload))
       .on('presence', { event: 'sync' }, () => onPresence());
   }
@@ -324,22 +323,41 @@
       } else if (KL.MP && KL.MP.active) KL.MP.onLateralClosed(peerId);
     }
   }
-  /* relay fallback for ONE peer (never for the others) */
-  function switchToRelay(p) {
+  /* relay fallback for ONE peer (never for the others): the host and that peer meet on a channel of their own (kl:CODE:r:PEERID), so
+   * the relayed traffic is delivered to exactly one receiver and costs no other player anything */
+  async function openPair(clientId) {
+    const sb = await getSb();
+    const ch = sb.channel('kl:' + L.code + ':r:' + clientId, { config: { broadcast: { self: false } } });
+    const pair = { ch, link: null, send: (payload) => { if (ch.state === 'joined') { try { ch.send({ type: 'broadcast', event: 'rl', payload }); } catch (e) { /* closing */ } } }, close: () => { try { sb.removeChannel(ch); } catch (e) { /* closing */ } } };
+    ch.on('broadcast', { event: 'rl' }, ({ payload }) => { if (pair.link) pair.link.receive(payload); });
+    try { await subscribe(ch); } catch (e) { pair.close(); throw e; }
+    return pair;
+  }
+  async function switchToRelay(p) {
     if (!N.RELAY_FALLBACK) return;
-    console.warn('[kart-lobby] no WebRTC path to', p.id, '- using the capped Realtime relay');
+    console.warn('[kart-lobby] no WebRTC path to', p.id, '- using the Realtime relay');
+    p.via = 'relay'; p.state = 'connecting'; broadcastRoster();
+    let pair;
+    try { pair = await openPair(p.id); }
+    catch (e) { console.warn('[kart-lobby] relay channel failed', e); if (L.peers.get(p.id) === p) { sendSys(p.id, 'conn'); removePeer(p.id, 'relay'); } return; }
+    if (!L.active || L.peers.get(p.id) !== p) { pair.close(); return; }
+    p.link = makeRelay(p.id, pair, false); L.links.set(p.id, p.link); L.relayInUse = true;
     sendSys(p.id, 'relay');
-    p.link = makeRelay(p.id); p.via = 'relay'; p.state = 'open'; L.links.set(p.id, p.link); L.relayInUse = true;
     setTimeout(() => { if (L.peers.get(p.id) === p && !p.hi && L.phase === 'lobby') removePeer(p.id, 'no answer'); }, 12000);     // a stale presence entry (a player who is already gone) never says hello: drop it
-    broadcastRoster();
   }
-  function makeRelay(peerId) {
-    return new KL.RelayLink({ peerId, myId: L.myId, broadcast: (payload) => sendCh('rl', payload), onmessage: (m, r) => onMsg(peerId, m, r), onclose: (why) => { if (L.role === 'host') removePeer(peerId, why); else if (peerId === L.hostId) fail('eConn'); } });
-  }
-  function onRelayIn(p) {
-    if (!p || p.to !== L.myId || !L.active) return;
-    const link = L.links.get(String(p.from).slice(0, 12));
-    if (link && link.kind === 'relay') link.receive(p.m);
+  function makeRelay(peerId, pair, open) {
+    const link = new KL.RelayLink({
+      peerId, myId: L.myId, open, send: pair.send, dispose: pair.close,
+      onmessage: (m, r) => onMsg(peerId, m, r),
+      onopen: () => onLinkOpen(peerId, link),
+      onclose: (why) => {
+        if (L.links.get(peerId) === link) L.links.delete(peerId);
+        if (L.role === 'host') removePeer(peerId, why);
+        else if (peerId === L.hostId) { if (/budget/.test(why)) fail('eRelayCap'); else if (KL.MP && KL.MP.active) KL.MP.onHostLinkClosed(why); else fail('eConn'); }
+      },
+    });
+    pair.link = link;
+    return link;
   }
   function sendSys(to, what, extra) { sendCh('sys', Object.assign({ to, from: L.myId, w: what }, extra || {})); }
   function onSys(p) {
@@ -351,9 +369,13 @@
     else if (p.w === 'kick') fail('eKicked');
     else if (p.w === 'relay') {
       if (L.links.has(L.hostId) && L.links.get(L.hostId).open) return;
-      const old = L.links.get(L.hostId); if (old) { old.onclose = null; old.close('relay'); }
-      const link = makeRelay(L.hostId); L.links.set(L.hostId, link); L.relayInUse = true;
-      link.send({ k: 'hi', name: L.name, drv: L.drv, uid: myUid(), v: 1 }, true);
+      const hostId = L.hostId;
+      openPair(L.myId).then((pair) => {
+        if (!L.active || L.hostId !== hostId) { pair.close(); return; }
+        const old = L.links.get(hostId); if (old) { old.onclose = null; old.close('relay'); }
+        const link = makeRelay(hostId, pair, true); L.links.set(hostId, link); L.relayInUse = true;
+        link.send({ k: 'hi', name: L.name, drv: L.drv, uid: myUid(), v: 1 }, true);
+      }).catch((e) => { console.warn('[kart-lobby] relay channel failed', e); if (L.active) fail('eConn'); });
     }
   }
 
