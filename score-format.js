@@ -2,7 +2,9 @@
 import "./i18n-dict.js?v=50";
 
 const COMPACT_MIN = 10_000;
-const SUFFIXES = Object.freeze(["", "K", "M", "B", "T", "Qa", "Qi", "Sx"]);
+/* K..Dc (1e3..1e33) match the idle games' own number format. Above that the score is shown in scientific
+ * notation (1.23e45): the arcade accepts any finite score up to 1e300. */
+const SUFFIXES = Object.freeze(["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"]);
 export const escapeHtml = (value) => String(value ?? "").replace(/[&<>"]/g,
   (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char]);
 
@@ -17,6 +19,11 @@ export function arcadeText(key, values = {}) {
   return copy.replace(/\{(\w+)\}/g, (match, name) => String(values[name] ?? match));
 }
 
+/** 1.2345e+45 -> "1.23e45" (three significant digits, no plus sign). */
+function scientific(number, digits = 3) {
+  return number.toExponential(digits - 1).replace(/\.?0+e/, "e").replace("e+", "e");
+}
+
 export function compactScore(value) {
   const number = Number(value);
   if (!Number.isFinite(number)) return String(value ?? "—");
@@ -24,19 +31,26 @@ export function compactScore(value) {
     const [integer, fraction] = String(value).split(".");
     return integer.replace(/\B(?=(\d{3})+(?!\d))/g, "\u2009") + (fraction ? "." + fraction : "");
   }
-  let unit = Math.min(SUFFIXES.length - 1, Math.floor(Math.log10(Math.abs(number)) / 3));
+  const lastUnit = SUFFIXES.length - 1;
+  let unit = Math.floor(Math.log10(Math.abs(number)) / 3);
+  if (unit > lastUnit) return scientific(number);
   let scaled = Number((number / 1000 ** unit).toPrecision(3));
-  if (Math.abs(scaled) >= 1000 && unit < SUFFIXES.length - 1) {
+  if (Math.abs(scaled) >= 1000) {   // 999.6K -> 1M
+    if (unit === lastUnit) return scientific(number);
     unit += 1;
     scaled = Number((number / 1000 ** unit).toPrecision(3));
   }
   return scaled + SUFFIXES[unit];
 }
 
-/** "185468747281" → "185 468 747 281" (thin spaces), for the expanded/full view. */
+/** "185468747281" -> "185 468 747 281" (thin spaces), for the expanded/full view. From 1e21 on JavaScript prints
+ * exponent form, which is shown as 1.5e45 instead of a digit string no double can honour anyway. */
 function groupDigits(value) {
-  const [integer, fraction] = String(value ?? "").split(".");
-  if (!/^-?\d+$/.test(integer)) return String(value ?? "");
+  let text = String(value ?? "");
+  if (/e/i.test(text) && Math.abs(Number(text)) < 1e21) text = String(Number(text));   // "8.7e+15" -> "8700000000000000"
+  const [integer, fraction] = text.split(".");
+  if (/^-?\d+(\.\d+)?e[+-]?\d+$/i.test(text)) return scientific(Number(text), 6);
+  if (!/^-?\d+$/.test(integer)) return text;
   return integer.replace(/\B(?=(\d{3})+(?!\d))/g, "\u2009") + (fraction ? "." + fraction : "");
 }
 

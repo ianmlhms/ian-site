@@ -149,7 +149,9 @@ export const flow = {
     const gp = posts(gpFrom).map((c) => c.body.game_id);
     h.expect(gp.length <= 9 && gp.every((id) => /^kart-letzebuerg-(lap|race)-(zockerland|aisbierg|vulkan|geeschterschlass)$|^kart-letzebuerg-gp$/.test(id)), 'Grand Prix writes only improved boards (' + gp.join(', ') + ')');
     const gpCalls = supa(gpFrom);
-    h.expect(gpCalls.length <= 16, 'Grand Prix: Supabase requests stay low (' + gpCalls.length + ': ' + desc(gpCalls) + ')');
+    // 4 races x 2 boards x (read + write) = 16; winning the Grand Prix (bots are random) also writes the gp board: +1 read +1 write
+    const gpBudget = 16 + (gp.includes('kart-letzebuerg-gp') ? 2 : 0);
+    h.expect(gpCalls.length <= gpBudget, 'Grand Prix: Supabase requests stay low (' + gpCalls.length + ': ' + desc(gpCalls) + ')');
     h.expect(await F.locator('#eAgain').isVisible(), 'a finished Grand Prix offers another round');
     // no polling: nothing else happens on the wire while the result screen idles
     await sleep(4000);                                   // the arcade's 3 s debounced cloud save of the finished Grand Prix lands first (not polling)

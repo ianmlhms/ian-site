@@ -1,7 +1,7 @@
 /* Admin panel — moderate groups/messages AND manage registered users.
  * All privileged actions are guarded server-side by is_admin(). */
 import * as auth from "./auth.js?v=33";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=10";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
