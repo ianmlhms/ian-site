@@ -769,8 +769,8 @@ export const flow = {
         await S[0].page.evaluate(() => { KL.GP_RACES = 2; });
         await S[0].page.locator('#eLobby').click();
         for (const p of S.slice(1)) await waitFor(p, () => !document.getElementById('lobbyScreen').hidden, null, 20000);
-        await S[0].page.locator('#lbModeChips button', { hasText: /Grand Prix/ }).click();
         await setLaps(S[0], 1);
+        await S[0].page.locator('#lbModeChips button', { hasText: /Grand Prix/ }).click();
         for (const p of S.slice(1)) { await waitFor(p, () => /Grand Prix/.test(document.getElementById('lbSummary').textContent), null, 10000); await p.page.click('#lbReady'); }
         await waitFor(S[0], () => document.querySelectorAll('#lbList li .st.ok').length === 3, null, 20000);
         const g0 = JSON.parse(JSON.stringify(hub.stats.perContext));
