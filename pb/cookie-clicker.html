@@ -66,7 +66,7 @@ const $=id=>document.getElementById(id);
 const ROOT_STYLE=getComputedStyle(document.documentElement);
 const cssVar=(name,fallback)=>ROOT_STYLE.getPropertyValue(name).trim()||fallback;
 const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const MAX_SAFE_SCORE=Number.MAX_SAFE_INTEGER;
+const SCORE_LIMIT=1e300; // the leaderboard accepts any finite score up to 1e300
 const COOKIE_SIZE=250,COOKIE_R=95,MAX_DPR=3,FLOAT_MS=1000,TICK_MS=100,SAVE_EVERY_MS=5000,COST_GROWTH=1.15,SWAY=0.05;
 const REBIRTH_THRESHOLD=1e12;
 /* Arcade test mode: everything affordable, rebirth always ready. Saves go to the isolated test store (platform). */
@@ -120,6 +120,7 @@ const clickUpgrades=[
 function getCost(u){return Math.floor(u.baseCost*Math.pow(COST_GROWTH,u.count))}
 
 function format(n){
+  if(n>=1e36)return n.toExponential(2).replace('e+','e'); // beyond Dc: 1.23e45
   if(n>=1e33)return(n/1e33).toFixed(1)+'Dc';
   if(n>=1e30)return(n/1e30).toFixed(1)+'No';
   if(n>=1e27)return(n/1e27).toFixed(1)+'Oc';
@@ -134,8 +135,7 @@ function format(n){
   return Math.floor(n);
 }
 
-/* The arcade ignores scores above Number.MAX_SAFE_INTEGER; clamp so the board entry stays at the cap instead of freezing. */
-function reportScore(){window.score=Math.min(Math.floor(totalBaked),MAX_SAFE_SCORE);Arcade.score(window.score)}
+function reportScore(){window.score=Math.min(Math.floor(totalBaked),SCORE_LIMIT);Arcade.score(window.score)}
 function clickCookie(e){
   earnCookies(clickPower);totalClicks++;
   reportScore();

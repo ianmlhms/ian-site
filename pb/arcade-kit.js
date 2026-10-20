@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const SCORE_LIMIT = Number.MAX_SAFE_INTEGER;
+  /* Any finite score up to 1e300 (the idle games reach 1e25 and far beyond); the database columns are double
+   * precision with the same range check, and pixelbreak-records.js uses the same limit. */
+  const SCORE_LIMIT = 1e300;
   const KEYBOARD_IDLE_MS = 10_000;
   const KEYBOARD_SESSION_KEY = "pb_hardware_keyboard_at";
   const CONTROL_KEYS = new Set([

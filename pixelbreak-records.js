@@ -247,7 +247,8 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 const SAVE_PREFIX = "pb_save_";
 let saveTimer = null, pendingSave = null, cloudSave;   // undefined = fetching, null = none
 
-const MAX_MESSAGE_SIZE = 256 * 1024, MAX_SAVE_DEPTH = 32, MAX_SCORE = Number.MAX_SAFE_INTEGER;
+const MAX_MESSAGE_SIZE = 256 * 1024, MAX_SAVE_DEPTH = 32;
+const MAX_SCORE = 1e300;   // any finite score up to 1e300 (scores.score is double precision); same limit in arcade-kit.js
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 function isGameMessage(e) {
   const frame = document.getElementById("gf");
@@ -598,7 +599,7 @@ let homeWeekly = null;
 const fullAccount = () => !!session && session.user.user_metadata?.account_kind !== "kart";
 
 async function submitWeeklyRun(game, detail) {
-  if (testMode || !sb || !fullAccount() || !Number.isSafeInteger(detail.score) || detail.score < 0) return;
+  if (testMode || !sb || !fullAccount() || !Number.isFinite(detail.score) || detail.score < 0 || detail.score > MAX_SCORE) return;
   // Arcade supplies a run token. Retain the fallback for older cached game reporters.
   const key = `${session.user.id}:${game.id}:${detail.run ?? "legacy-" + detail.score}`;
   if (weeklyFinals.has(key)) return;
