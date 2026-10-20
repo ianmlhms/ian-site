@@ -1,16 +1,6 @@
 import { client, session, onAuth } from './auth.js';
 import { mountAccountButton, openAuthModal } from "./auth.js";
-import {
-  createMediaUrl,
-  fetchAccounts,
-  fetchChats,
-  fetchMessages,
-  queueMediaRequest,
-  queueOutbox,
-  searchMessages,
-  subscribeToBridge,
-  uploadOutboxFile,
-} from "./inbox-data.js?v=3";
+import { loadBackend } from "./inbox-backend.js?v=1";
 import {
   highlightMessage,
   renderAccounts,
@@ -21,30 +11,47 @@ import {
   renderMessagesLoading,
   renderSearchResults,
   showNotice,
-} from "./inbox-render.js?v=5";
+} from "./inbox-render.js?v=6";
 import { isAttachmentSizeAllowed } from "./inbox-attach.js?v=1";
-import {
-  createMailBodyUrl,
-  fetchMailAccounts,
-  fetchMailAttachments,
-  fetchMailMessages,
-  fetchMailThread,
-  queueMailReply,
-  searchMail,
-  subscribeToMail,
-} from "./inbox-mail-data.js?v=1";
 import {
   renderMailAccounts,
   renderMailBody,
   renderMailHeader,
   renderMailList,
   renderMailLoading,
-} from "./inbox-mail-render.js?v=3";
+} from "./inbox-mail-render.js?v=4";
+
+const {
+  createMailBodyUrl,
+  createMediaUrl,
+  fetchAccounts,
+  fetchChats,
+  fetchMailAccounts,
+  fetchMailAttachments,
+  fetchMailMessages,
+  fetchMailThread,
+  fetchMessages,
+  fetchOlderMessages,
+  hasLivePresence,
+  hasOlderMessages,
+  markChatRead,
+  queueMailReply,
+  queueMediaRequest,
+  queueOutbox,
+  removeOutboxFile,
+  searchMail,
+  searchMessages,
+  subscribeToBridge,
+  subscribeToMail,
+  unsubscribe,
+  uploadOutboxFile,
+} = await loadBackend();
 
 const MODE_CHATS = "chats";
 const MODE_MAIL = "mail";
 
 const SEARCH_DELAY_MS = 300;
+// Re-draws relative times ("virun 5 Min.") and stale marks; makes no request.
 const ACCOUNT_REFRESH_MS = 30 * 1000;
 const PENDING_MATCH_WINDOW_MS = 2 * 60 * 1000;
 const REALTIME_NOTICE_MS = 2500;
@@ -202,6 +209,10 @@ function filteredMail() {
   return source;
 }
 
+function drawAccounts() {
+  renderAccounts(state.accounts, Date.now(), { ignoreStale: hasLivePresence });
+}
+
 function renderSidebar() {
   if (state.mode === MODE_MAIL) {
     renderMailList(filteredMail(), state.selectedMailId, selectMail, mailAccountsById());
@@ -233,7 +244,7 @@ function renderMailConversation() {
   });
 }
 
-function renderConversation() {
+function renderConversation(options = {}) {
   if (state.mode === MODE_MAIL) {
     renderMailConversation();
     return;
@@ -241,7 +252,9 @@ function renderConversation() {
   renderChatHeader(currentChat(), closeMobileChat);
   renderMessages(state.messages, pendingForCurrentChat(), {
     createMediaUrl: (path) => createMediaUrl(supabase, path),
+    keepScroll: Boolean(options.keepScroll),
     onError: showError,
+    onLoadOlder: hasOlderMessages(state.selectedChatId) ? loadOlderMessages : null,
     onMediaRequest: requestMedia,
     onRetry: retryPending,
   });
@@ -295,6 +308,14 @@ function closeMobileChat() {
   document.getElementById("app").classList.remove("chat-open");
 }
 
+async function loadMailDetail(mail) {
+  const [mailThread, mailAttachments] = await Promise.all([
+    fetchMailThread(supabase, mail.thread_key, mail.id),
+    mail.has_attachments ? fetchMailAttachments(supabase, mail.id) : Promise.resolve([]),
+  ]);
+  return { mailAttachments, mailThread };
+}
+
 async function selectMail(mailId) {
   const mail = state.mailMessages.find((entry) => entry.id === mailId)
     || state.mailSearchResults.find((entry) => entry.id === mailId);
@@ -310,12 +331,9 @@ async function selectMail(mailId) {
   document.getElementById("app").classList.add("chat-open");
   document.getElementById("composer").hidden = false;
   try {
-    const [mailThread, mailAttachments] = await Promise.all([
-      fetchMailThread(supabase, mail.thread_key),
-      mail.has_attachments ? fetchMailAttachments(supabase, mailId) : Promise.resolve([]),
-    ]);
+    const detail = await loadMailDetail(mail);
     if (state.selectedMailId !== mailId) return;
-    setState({ mailAttachments, mailThread });
+    setState(detail);
     renderMailConversation();
   } catch (error) {
     if (state.selectedMailId !== mailId) return;
@@ -355,10 +373,32 @@ async function selectChat(chatId, remoteId = null) {
     setState({ messages });
     renderConversation();
     highlightMessage(remoteId);
+    if (chat.unread) void markOpenedChatRead(chat);
   } catch (error) {
     if (state.selectedChatId !== chatId) return;
     setState({ messages: [] });
     renderConversation();
+    showError(error);
+  }
+}
+
+async function markOpenedChatRead(chat) {
+  try {
+    const updated = await markChatRead(supabase, chat);
+    if (updated) onChatUpdate(updated);
+  } catch (error) {
+    console.warn("Chat could not be marked as read:", error);
+  }
+}
+
+async function loadOlderMessages() {
+  const chatId = state.selectedChatId;
+  try {
+    const older = await fetchOlderMessages(supabase, chatId);
+    if (state.selectedChatId !== chatId) return;
+    setState({ messages: sortedMessages(older.reduce(upsertById, state.messages)) });
+    renderConversation({ keepScroll: true });
+  } catch (error) {
     showError(error);
   }
 }
@@ -408,15 +448,6 @@ function removePending(localId) {
   renderConversation();
 }
 
-async function removeUploadedFile(path) {
-  try {
-    const { error } = await supabase.storage.from("bridge-media").remove([path]);
-    if (error) console.warn("Uploaded outbox file could not be removed:", error.message);
-  } catch (error) {
-    console.warn("Uploaded outbox file could not be removed:", error);
-  }
-}
-
 async function sendAttachment(chat, body, attachment) {
   if (chat.service !== "whatsapp") return;
   if (!isAttachmentSizeAllowed(attachment.file.size)) {
@@ -438,7 +469,7 @@ async function sendAttachment(chat, body, attachment) {
       outbox = await queueOutbox(supabase, chat, pending.body, mediaPath);
     } catch (error) {
       removePending(pending.localId);
-      await removeUploadedFile(mediaPath);
+      await removeOutboxFile(supabase, mediaPath);
       showError(error);
       return;
     }
@@ -598,7 +629,7 @@ function onOutboxUpdate(outbox) {
 
 function onAccountUpdate(account) {
   setState({ accounts: upsertById(state.accounts, account) });
-  renderAccounts(state.accounts);
+  drawAccounts();
 }
 
 function onMailInsert(mail) {
@@ -683,9 +714,9 @@ function onSearchInput(event) {
 }
 
 function stopAuthenticatedApp() {
-  if (bridgeChannel) void supabase.removeChannel(bridgeChannel);
+  if (bridgeChannel) void unsubscribe(supabase, bridgeChannel);
   bridgeChannel = null;
-  if (mailChannel) void supabase.removeChannel(mailChannel);
+  if (mailChannel) void unsubscribe(supabase, mailChannel);
   mailChannel = null;
   window.clearInterval(accountTimer);
   accountTimer = null;
@@ -716,6 +747,63 @@ function stopAuthenticatedApp() {
   renderGate(true, openAuthModal);
 }
 
+async function loadLists() {
+  const [chats, accounts, mailAccounts, mailMessages] = await Promise.all([
+    fetchChats(supabase),
+    fetchAccounts(supabase),
+    fetchMailAccounts(supabase).catch(() => []),
+    fetchMailMessages(supabase).catch(() => []),
+  ]);
+  setState({
+    accounts,
+    chats: sortedChats(chats),
+    mailAccounts,
+    mailMessages: sortedMail(mailMessages),
+  });
+  drawAccounts();
+  renderMailAccounts(state.mailAccounts);
+  renderSidebar();
+}
+
+async function refreshOpenChat() {
+  const chatId = state.selectedChatId;
+  if (!chatId) return;
+  const messages = await fetchMessages(supabase, chatId);
+  if (state.selectedChatId !== chatId) return;
+  // A reply the live connection missed would otherwise show twice.
+  const pending = state.pending.filter((item) => !messages.some(
+    (message) => message.is_from_me && matchesPending(message, item),
+  ));
+  setState({ messages, pending });
+}
+
+async function refreshOpenMail() {
+  const mail = currentMail();
+  if (!mail) return;
+  const detail = await loadMailDetail(mail);
+  if (state.selectedMailId === mail.id) setState(detail);
+}
+
+// Live events are not replayed after a gap (reconnect, resync): reload what is on screen.
+async function reloadAfterGap() {
+  try {
+    await loadLists();
+    await (state.mode === MODE_MAIL ? refreshOpenMail() : refreshOpenChat());
+    renderConversation();
+  } catch (error) {
+    showError(error);
+  }
+}
+
+async function refreshAccounts() {
+  try {
+    setState({ accounts: await fetchAccounts(supabase) });
+    drawAccounts();
+  } catch (error) {
+    console.warn("Accounts could not be refreshed:", error);
+  }
+}
+
 async function startAuthenticatedApp() {
   const activeSession = session();
   if (!activeSession) {
@@ -725,26 +813,12 @@ async function startAuthenticatedApp() {
   renderGate(false, openAuthModal);
   if (!accountTimer) {
     accountTimer = window.setInterval(() => {
-      renderAccounts(state.accounts);
+      drawAccounts();
       renderSidebar();
     }, ACCOUNT_REFRESH_MS);
   }
   try {
-    const [chats, accounts, mailAccounts, mailMessages] = await Promise.all([
-      fetchChats(supabase),
-      fetchAccounts(supabase),
-      fetchMailAccounts(supabase).catch(() => []),
-      fetchMailMessages(supabase).catch(() => []),
-    ]);
-    setState({
-      accounts,
-      chats: sortedChats(chats),
-      mailAccounts,
-      mailMessages: sortedMail(mailMessages),
-    });
-    renderAccounts(state.accounts);
-    renderMailAccounts(state.mailAccounts);
-    renderSidebar();
+    await loadLists();
     renderChatHeader(null, closeMobileChat);
     subscribe(activeSession.user.id);
     openChatFromUrl();
@@ -754,16 +828,19 @@ async function startAuthenticatedApp() {
 }
 
 function subscribe(userId) {
-  if (bridgeChannel) void supabase.removeChannel(bridgeChannel);
+  if (bridgeChannel) void unsubscribe(supabase, bridgeChannel);
   bridgeChannel = subscribeToBridge(supabase, userId, {
     onAccountUpdate,
     onChatUpdate,
     onMessageInsert,
     onMessageUpdate,
     onOutboxUpdate,
+    onPresence: refreshAccounts,
+    onReconnect: reloadAfterGap,
+    onResync: reloadAfterGap,
     onStatus: onRealtimeStatus,
   });
-  if (mailChannel) void supabase.removeChannel(mailChannel);
+  if (mailChannel) void unsubscribe(supabase, mailChannel);
   mailChannel = subscribeToMail(supabase, userId, {
     onMailAccountUpdate,
     onMailInsert,

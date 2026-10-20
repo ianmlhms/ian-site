@@ -2,6 +2,8 @@
 // Fan-out Web Push for new activity. Invoked by Database Webhooks on INSERT into:
 //   - public.messages       → "new message"      (notify other group members)
 //   - public.bridge_messages → "bridge message"  (notify the bridge owner)
+//   - inbox_message         → posted by the Cloudflare inbox Worker (no DB
+//                             webhook) with a ready-made {title, body, url, tag}
 //   - public.friendships    → "friend request"   (notify the addressee)
 //   - public.game_invites   → "game invite"      (notify the invitee)
 // so notifications arrive on the iPad even when the site is fully closed.
@@ -27,6 +29,10 @@ const PUSH_PREVIEW_LENGTH = 140;
 // after downtime), not a new message: pushing it would buzz the phone once per
 // old message.
 const STALE_BRIDGE_MESSAGE_MS = 10 * 60 * 1000;
+// The Cloudflare inbox Worker has no Supabase user of its own; its pushes go
+// to the one person whose inbox it is.
+const INBOX_OWNER_ID = "a40ba59a-3460-4ef2-a8e8-3db0c91eac66";
+const PUSH_TITLE_LENGTH = 100;
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -98,6 +104,20 @@ async function planFor(table: string, rec: any): Promise<Plan[]> {
       body,
       url: `inbox.html?chat=${encodeURIComponent(String(rec.chat_id))}`,
       tag: `bridge-${rec.service || "message"}-${rec.chat_id}`,
+    }];
+  }
+
+  // Posted by the Cloudflare inbox Worker, which already decided that this
+  // message deserves a push (fresh, inbound, unmuted) and wrote the text.
+  if (table === "inbox_message") {
+    const { title, body, url, tag } = rec ?? {};
+    if (![title, body, url, tag].every((value) => typeof value === "string" && value)) return [];
+    return [{
+      recipients: [INBOX_OWNER_ID],
+      title: title.slice(0, PUSH_TITLE_LENGTH),
+      body: body.slice(0, PUSH_PREVIEW_LENGTH),
+      url,
+      tag,
     }];
   }
 

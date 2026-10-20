@@ -1,4 +1,4 @@
-import { relativeTime } from "./inbox-render.js?v=5";
+import { relativeTime } from "./inbox-render.js?v=6";
 
 const PROVIDER_ICONS = Object.freeze({
   m365: "🏢",

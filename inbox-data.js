@@ -89,6 +89,15 @@ export async function uploadOutboxFile(supabase, file) {
   return path;
 }
 
+export async function removeOutboxFile(supabase, path) {
+  try {
+    const { error } = await supabase.storage.from("bridge-media").remove([path]);
+    if (error) console.warn("Uploaded outbox file could not be removed:", error.message);
+  } catch (error) {
+    console.warn("Uploaded outbox file could not be removed:", error);
+  }
+}
+
 export async function queueMediaRequest(supabase, messageId) {
   const { data, error } = await supabase
     .from("bridge_media_requests")

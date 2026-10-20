@@ -171,20 +171,22 @@ export function renderSearchResults(results, chatsById, onSelect) {
   });
 }
 
-function accountState(account, now) {
+function accountState(account, now, ignoreStale) {
   if (!account) return Object.freeze({ className: "missing", label: "net ageriicht" });
   const lastSeen = new Date(account.last_seen_at).getTime();
-  const isStale = !Number.isFinite(lastSeen) || now - lastSeen > ACCOUNT_STALE_MS;
+  const isStale = !ignoreStale && (!Number.isFinite(lastSeen) || now - lastSeen > ACCOUNT_STALE_MS);
   const status = STATUS_LABELS[account.status] || account.status || "onbekannt";
   if (isStale) return Object.freeze({ className: "stale", label: `${status} · al` });
   return Object.freeze({ className: "fresh", label: status });
 }
 
-export function renderAccounts(accounts, now = Date.now()) {
+// ignoreStale: the backend reports presence itself, so an old last_seen_at
+// does not mean the bridge is stuck.
+export function renderAccounts(accounts, now = Date.now(), { ignoreStale = false } = {}) {
   const strip = emptyNode(element("connectionStrip"));
   ["whatsapp", "imessage"].forEach((service) => {
     const account = accounts.find((entry) => entry.service === service);
-    strip.append(accountItem(service, account, accountState(account, now)));
+    strip.append(accountItem(service, account, accountState(account, now, ignoreStale)));
   });
 }
 
@@ -383,15 +385,33 @@ function pendingNode(pending, onRetry) {
   return row;
 }
 
+function loadOlderButton(onLoadOlder) {
+  const button = textNode("button", "media-chip load-older", "Eeler Noriichte lueden");
+  button.type = "button";
+  button.onclick = () => {
+    button.disabled = true;
+    button.textContent = "Gëtt gelueden…";
+    Promise.resolve(onLoadOlder()).finally(() => {
+      button.disabled = false;
+      button.textContent = "Eeler Noriichte lueden";
+    });
+  };
+  return button;
+}
+
+// options.keepScroll keeps the reader at the same message (after "load older").
 export function renderMessages(messages, pending, options) {
-  const host = emptyNode(element("messages"));
+  const host = element("messages");
+  const distanceFromBottom = host.scrollHeight - host.scrollTop;
+  emptyNode(host);
   const rows = [
     ...messages.map((message) => messageNode(message, options)),
     ...pending.map((item) => pendingNode(item, options.onRetry)),
   ];
   if (!rows.length) host.append(textNode("p", "empty", "Nach keng Noriichten an dësem Chat."));
   else host.append(...rows);
-  host.scrollTop = host.scrollHeight;
+  if (options.onLoadOlder) host.prepend(loadOlderButton(options.onLoadOlder));
+  host.scrollTop = options.keepScroll ? host.scrollHeight - distanceFromBottom : host.scrollHeight;
 }
 
 export function renderMessagesLoading() {

@@ -1,3 +1,5 @@
+import { buildMailReply } from "./inbox-mail-reply.js?v=1";
+
 const MAIL_LIST_LIMIT = 300;
 const THREAD_LIMIT = 50;
 const SEARCH_LIMIT = 100;
@@ -70,25 +72,8 @@ export async function searchMail(supabase, term) {
   return data || [];
 }
 
-function replySubject(subject) {
-  const clean = (subject || "").trim();
-  if (!clean) return "Re:";
-  return /^re\s*:/i.test(clean) ? clean : `Re: ${clean}`;
-}
-
 export async function queueMailReply(supabase, message, body) {
-  const recipient = message.is_from_me
-    ? (message.to_addrs || [])[0]
-    : message.from_addr;
-  if (!recipient) throw new Error("Keng Adress fir ze äntweren.");
-  const row = Object.freeze({
-    account_id: message.account_id,
-    to_addrs: [recipient],
-    subject: replySubject(message.subject),
-    body,
-    in_reply_to: message.rfc_message_id || null,
-    reply_refs: message.rfc_message_id ? [message.rfc_message_id] : [],
-  });
+  const row = buildMailReply(message, body);
   const { data, error } = await supabase
     .from("bridge_mail_outbox")
     .insert(row)

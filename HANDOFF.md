@@ -356,6 +356,18 @@ site side must know:
 Files: `inbox.js` (entry, mode state), `inbox-data.js` + `inbox-render.js`
 (chats), `inbox-mail-data.js` + `inbox-mail-render.js` (mail).
 
+**Backend switch (20 Oct 2026):** the data now lives in a Cloudflare Worker
+(`ianlu-inbox.ianlu.workers.dev`, repo `MessengerCloud`), Supabase only does
+login. `inbox-backend.js` picks the data layer at startup: `cloud`
+(`inbox-cloud-data.js` + `-http` + `-socket`, default) or `supabase`
+(`inbox-data.js` + `inbox-mail-data.js`, the old tables). Rollback: set
+`DEFAULT_BACKEND` in `inbox-backend.js` to `BACKEND_SUPABASE`, or open
+`inbox.html?backend=supabase` (remembered per browser; `?backend=cloud` undoes).
+`?cloud=http://127.0.0.1:PORT` points a test run at a mock (loopback only).
+Tests: `node scripts/test-inbox-cloud.mjs`, flow `inbox-cloud`
+(`scripts/flows/inbox_cloud.mjs` + `inbox_cloud_mock.mjs`). Web Push for cloud
+messages arrives as `table: "inbox_message"` in `supabase/functions/notify`.
+
 ### Mail schema
 `scripts/bridge-mail-v1.sql` — `bridge_mail_accounts`, `bridge_mail_messages`,
 `bridge_mail_attachments`, `bridge_mail_outbox`. Same RLS shape as the chat
