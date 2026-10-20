@@ -60,7 +60,8 @@
   function advise({before,after,roundMs=0,small=false,format=String}){
     const ratio=before>0&&Number.isFinite(after/before)?after/before:1;
     const level=ratio<WEAK_GAIN?'bad':ratio<WORTH_GAIN||small?'low':'ok';
-    const lines=[`Profit bonus ×${format(before)} → ×${format(after)} (${ratio>=10?'×'+format(ratio):'+'+Math.round((ratio-1)*100)+'%'}).`];
+    const times=value=>value<1000?String(Math.round(value*100)/100):format(value);   // the games' own formats drop the decimals of small numbers
+    const lines=[`Profit bonus ×${times(before)} → ×${times(after)} (${ratio>=10?'×'+times(ratio):'+'+Math.round((ratio-1)*100)+'%'}).`];
     if(roundMs>=60000){
       lines.push(ratio>1.0001
         ?`This round took about ${duration(roundMs)}. Starting over pays for itself after about ${duration(roundMs/(ratio-1))} of play.`

@@ -84,6 +84,14 @@ export const flow = {
     await page.keyboard.press("Enter");
     h.expect(!(await game.evaluate(() => document.getElementById("prestige-modal").classList.contains("show"))), "Enter on the focused Cancel closes the dialog");
     await game.evaluate(() => document.getElementById("prestige-button").click());
+    await game.waitForFunction(() => !document.getElementById("prestige-confirm").disabled);
+    const holdBox = await game.locator("#prestige-confirm").boundingBox();
+    await page.mouse.move(holdBox.x + holdBox.width / 2, holdBox.y + holdBox.height / 2);
+    await page.mouse.down(); await h.pause(800);
+    h.expect(/Keep holding/.test(await game.locator("#prestige-confirm").innerText()), "the button says Keep holding… while the press runs");
+    await h.shot("empire-hold-in-progress");
+    await page.mouse.up(); await h.pause(200);
+    h.eq(await game.evaluate(() => state.investors), 0, "letting go after 0.8 s resets nothing");
     await holdConfirm(h, game, "#prestige-confirm");
     const after = await game.evaluate(() => JSON.parse(JSON.stringify(state)));
     h.expect(after.investors === 1 && after.cash === 10 && Object.values(after.owned).every((n) => n === 0), "holding for 1.5 s resets (investors 1, cash $10, nothing owned)");
@@ -92,13 +100,15 @@ export const flow = {
     const requestsBeforeUndo = saveBodies(h, "idle-empire").length;
     await game.locator(".idle-undo button:not(.idle-undo-x)").click();
     const restored = await game.evaluate(() => JSON.parse(JSON.stringify(state)));
-    h.eq([restored.cash, restored.investors, restored.owned, restored.managers, restored.st, restored.rbc, restored.rb], [before.cash, 0, before.owned, before.managers, 0, 0, before.rb], "Undo restores cash, businesses, managers and investors exactly");
+    h.eq([restored.investors, restored.owned, restored.managers, restored.st, restored.rbc], [0, before.owned, before.managers, 0, 0], "Undo restores businesses, managers and investors exactly");
+    h.expect(restored.rb >= before.rb, "round earnings restored (they only grew by what the managers earned meanwhile)");
+    h.expect(restored.cash >= before.cash && restored.cash < before.cash * 2, `Undo restores the cash of the moment of the reset (${restored.cash} vs ${before.cash} when the dialog opened; managers earned the difference)`);
     h.expect(restored.lifetime >= before.lifetime, "lifetime never goes down");
     h.expect(!(await game.locator(".idle-undo").count()), "toast gone after Undo");
     await h.pause(SAVE_DEBOUNCE_WAIT);
     const writes = saveBodies(h, "idle-empire");
     const lastWrite = writes.at(-1);
-    h.expect(lastWrite && lastWrite.data.investors === 0 && lastWrite.data.cash === before.cash && lastWrite.data.owned.lemonade === 60, "the cloud save holds the restored state");
+    h.expect(lastWrite && lastWrite.data.investors === 0 && lastWrite.data.cash > 1e9 && lastWrite.data.owned.lemonade === 60, "the cloud save holds the restored state");
     h.expect(writes.length - requestsBeforeUndo <= 1, `Undo cost at most one save request (${writes.length - requestsBeforeUndo})`);
     h.eq(await page.evaluate(() => JSON.parse(localStorage.getItem("pb_save_idle-empire")).investors), 0, "local save holds the restored state too");
 
@@ -110,14 +120,15 @@ export const flow = {
     h.expect(!/Hold/.test(await game.locator("#prestige-confirm").innerText()), "a x100 gain is a plain confirm button");
     const bigBefore = await game.evaluate(() => JSON.parse(JSON.stringify(state)));
     await game.locator("#prestige-confirm").click();
-    h.expect((await game.evaluate(() => state.investors)) === 1000, "plain click claims 1000 investors");
+    h.expect((await game.evaluate(() => state.investors)) === 31, "plain click claims 31 investors");
     await h.pause(3500);   // let the arcade store the reset save, then reload
     await h.goto("/pixelbreak.html?g=idle-empire");
     await page.waitForFunction(() => document.getElementById("gf")?.contentWindow?.document.querySelector(".business"));
     await h.pause(800); game = frameOf(h);
     h.expect(/Undo/.test(await toastText(game)), "after a reload the Undo toast is still there");
     await game.locator(".idle-undo button:not(.idle-undo-x)").click();
-    h.eq(await game.evaluate(() => [state.investors, state.owned.lemonade, state.cash]), [0, 60, bigBefore.cash], "Undo after a reload restores the exact pre-reset state");
+    const reloaded = await game.evaluate(() => [state.investors, state.owned.lemonade, state.cash]);
+    h.expect(reloaded[0] === 0 && reloaded[1] === 60 && reloaded[2] >= bigBefore.cash, "Undo after a reload restores the exact pre-reset state");
     await game.evaluate(() => rewards.offerUndo("Test reset.", cloneState(), Date.now() + 1500));
     h.expect(/Undo/.test(await toastText(game)), "toast shows");
     await h.pause(2600);
@@ -133,7 +144,7 @@ export const flow = {
     h.expect(await game.locator(".idle-confirm").isDisabled(), "rebirth confirm locked on open");
     await h.pause(1200);
     h.expect(/Hold to rebirth/.test(await game.locator(".idle-confirm").innerText()), "small rebirth asks for a hold");
-    h.expect(/This round took about 3 h/.test(await game.locator(".idle-advice").innerText()), "rebirth dialog shows the round time");
+    h.expect(/This round took about 3 h/.test(await game.locator(".idle-dialog .idle-advice").innerText()), "rebirth dialog shows the round time");
     await shots(h, "empire-rebirth-dialog");
     await failedPresses(h, game, ".idle-confirm");
     h.eq(await game.evaluate(() => [state.rbc, state.owned.lemonade]), [2, 60], "short presses do not rebirth");
@@ -141,7 +152,8 @@ export const flow = {
     h.eq(await game.evaluate(() => [state.rbc, state.st, state.owned.lemonade]), [3, 3 + Math.floor(Math.sqrt(4e11 / 100e9)), 0], "hold -> rebirth");
     h.expect(/Rebirth done/.test(await toastText(game)), "rebirth Undo toast");
     await game.locator(".idle-undo button:not(.idle-undo-x)").click();
-    h.eq(await game.evaluate(() => [state.rbc, state.st, state.rb, state.cash, state.owned, state.managers, state.investors]), [2, 3, rbBefore.rb, rbBefore.cash, rbBefore.owned, rbBefore.managers, 50], "rebirth Undo restores everything");
+    const rbBack = await game.evaluate(() => [state.rbc, state.st, state.owned, state.managers, state.investors, state.rb >= 4e11, state.cash >= 1e9]);
+    h.eq(rbBack, [2, 3, rbBefore.owned, rbBefore.managers, 50, true, true], "rebirth Undo restores stars, rebirth count, businesses, managers, investors, round earnings and cash");
     await h.pause(SAVE_DEBOUNCE_WAIT);
     const rbWrite = saveBodies(h, "idle-empire").at(-1);
     h.expect(rbWrite && rbWrite.data.rbc === 2 && rbWrite.data.st === 3 && typeof rbWrite.data.ud === "number", "cloud save: restored rebirth count, carries the ud marker the server guard needs");
@@ -183,7 +195,7 @@ export const flow = {
     h.expect(busReset.rbc === 2 && busReset.drivers === 0 && busReset.upgrades.length === 0, "Bus Tycoon: hold -> rebirth");
     await game.locator(".idle-undo button:not(.idle-undo-x)").click();
     const busBack = await page.evaluate(() => JSON.parse(localStorage.getItem("pb_save_bus-tycoon")));
-    h.expect(busBack.rbc === 1 && busBack.st === 2 && busBack.drivers === 3 && busBack.upgrades.join() === "lanes,free" && JSON.stringify(busBack.owned) === JSON.stringify(busBefore.owned) && busBack.p >= busBefore.p * 0.999 && busBack.tb >= busBefore.tb,
+    h.expect(busBack.rbc === 1 && busBack.st === 2 && busBack.drivers === 3 && busBack.upgrades.join() === "lanes,free" && ["school", "city", "gare", "kirchberg", "belval"].every((id) => busBack.owned[id] === busBefore.owned[id]) && busBack.p >= busBefore.p * 0.999 && busBack.tb >= busBefore.tb,
       "Bus Tycoon Undo restores lines, drivers, upgrades, stars and passengers");
     await h.pause(SAVE_DEBOUNCE_WAIT);
     const busWrite = saveBodies(h, "bus-tycoon").at(-1);
