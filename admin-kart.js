@@ -1,6 +1,6 @@
 /* Admin tab "Kart": the latest online races of Kart Lëtzebuerg (RPC admin_kart_races, admin only).
  * Loads when the tab is opened and on the Refresh button, never on a timer. Paging = a bigger p_limit. */
-import { at, esc, label, fmtDateTime, fmtDay, fmtTime, fmtRaceTime, localDayKey } from "./admin-texts.js?v=1";
+import { at, esc, label, fmtDay, fmtTime, fmtRaceTime, localDayKey } from "./admin-texts.js?v=1";
 
 const PAGE_SIZE = 25;
 const MAX_LIMIT = 500;
@@ -95,7 +95,7 @@ export function mountKart(host, { getClient, openSaves }) {
     const open = state.open.has(id);
     const nameFilter = state.name.trim().toLowerCase();
     const issues = hasIssues(race);
-    const head = `<button type="button" class="kt-head" data-race-toggle="${esc(id)}" aria-expanded="${open}" aria-controls="kart-race-${esc(id)}" aria-label="${esc(at("kart.expand"))}: ${esc(fmtDateTime(race.created_at))} ${esc(label("t", race.track))}">
+    const head = `<button type="button" class="kt-head" data-race-toggle="${esc(id)}" aria-expanded="${open}" aria-controls="kart-race-${esc(id)}">
       <span class="kt-time"><b>${esc(fmtTime(race.created_at))}</b><span class="muted"> ${esc(fmtDay(race.created_at))}</span></span>
       <span class="kt-room">${esc(at("kart.room", { code: race.room }))}</span>
       <span class="kt-track">${esc(label("t", race.track))}</span>

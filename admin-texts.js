@@ -14,7 +14,7 @@ export const lang = () => {
 /* key: [lb, de, en]. {name} placeholders are filled by at(key, { name }). */
 const TEXTS = {
   "tab.kart": ["🏎️ Kart", "🏎️ Kart", "🏎️ Kart"],
-  "tab.saves": ["💾 Späicherstänn", "💾 Spielstände", "💾 Saves"],
+  "tab.saves": ["💾 Saves", "💾 Saves", "💾 Saves"],
   "common.refresh": ["🔄 Aktualiséieren", "🔄 Aktualisieren", "🔄 Refresh"],
   "common.loading": ["Gëtt gelueden…", "Wird geladen…", "Loading…"],
   "common.cancel": ["Ofbriechen", "Abbrechen", "Cancel"],
@@ -124,9 +124,9 @@ const TEXTS = {
   "saves.giftBtn": ["🎁 Schenken", "🎁 Schenken", "🎁 Gift"],
   "saves.giftBad": ["Ongültege Betrag (méi wéi 0 a héchstens 1e30).", "Ungültiger Betrag (größer als 0 und höchstens 1e30).", "Invalid amount (more than 0 and at most 1e30)."],
   "saves.giftTitle": ["Kaddo schécken?", "Geschenk senden?", "Send this gift?"],
-  "saves.giftBody": ["{user} kritt {amount} {what} am Spill {game}. De Spillstand gëtt bei {lifetime} ëm ca. {bump} erhéicht, soudass d'Cloud-Kopie gewënnt. Dat zielt och fir de Leaderboard. De Stand vu virdrun kënnt als «virum Kaddo» an de Verlaf.",
-    "{user} bekommt {amount} {what} im Spiel {game}. Der Gesamtwert ({lifetime}) steigt um ca. {bump}, damit die Cloud-Kopie gewinnt. Das zählt auch fürs Leaderboard. Der bisherige Stand kommt als „vor Geschenk“ in den Verlauf.",
-    "{user} gets {amount} {what} in {game}. The lifetime value ({lifetime}) rises by about {bump} so the cloud copy wins. That also counts for the leaderboard. The previous state goes to the history as “before gift”."],
+  "saves.giftBody": ["{user} kritt {amount} {what} am Spill {game}. D'Gesamtzuel ({lifetime}) klëmmt ëm ca. {bump}, esou datt d'Cloud-Kopie gewënnt. Dat zielt och fir de Leaderboard. De Stand vu virdrun kënnt als «virum Kaddo» an de Verlaf.",
+    "{user} bekommt {amount} {what} im Spiel {game}. Die Gesamtzahl ({lifetime}) steigt um ca. {bump}, damit die Cloud-Kopie gewinnt. Das zählt auch fürs Leaderboard. Der bisherige Stand kommt als „vor Geschenk“ in den Verlauf.",
+    "{user} gets {amount} {what} in {game}. The lifetime total ({lifetime}) rises by about {bump} so the cloud copy wins. That also counts for the leaderboard. The previous state goes to the history as “before gift”."],
   "saves.giftCaveat": ["Gëlt nëmmen, wann de Spiller säi Spill zou ass (≥ 90 s roueg). De Server kontrolléiert dat och. De Spiller soll d'Spill bannent ca. 10 Minutten nees opmaachen.", "Gilt nur, wenn das Spiel des Spielers zu ist (≥ 90 s ruhig). Der Server prüft das auch. Der Spieler soll das Spiel innerhalb von ca. 10 Minuten wieder öffnen.", "Only works while the player’s game is closed (idle for 90 s). The server checks that too. The player should reopen the game within about 10 minutes."],
   "saves.gifted": ["Kaddo geschéckt ✓: {what} {before} → {after}. De Spiller soll d'Spill nei opmaachen.", "Geschenk gesendet ✓: {what} {before} → {after}. Der Spieler soll das Spiel neu öffnen.", "Gift sent ✓: {what} {before} → {after}. The player should reopen the game."],
   "saves.giftFail": ["Kaddo ass feelgeschloen: {err}", "Geschenk fehlgeschlagen: {err}", "Gift failed: {err}"],

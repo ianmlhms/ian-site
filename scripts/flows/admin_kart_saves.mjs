@@ -142,7 +142,7 @@ export const flow = {
     await h.goto("/admin.html?pollms=150&waitms=4000");
     await page.waitForSelector("#tabKart", { state: "visible", timeout: 10000 });
     h.eq(await text(page, "#tabKart"), "🏎️ Kart", "Kart tab label");
-    h.eq(await text(page, "#tabSaves"), "💾 Späicherstänn", "Saves tab label (lb default)");
+    h.eq(await text(page, "#tabSaves"), "💾 Saves", "Saves tab label");
     h.eq(backend.callsTo("admin_kart_races").length + backend.callsTo("admin_find_users").length + backend.callsTo("admin_user_saves").length, 0, "no request for the new tabs before they are opened");
 
     h.step("Kart tab: latest races, newest first");
@@ -436,16 +436,24 @@ export const flow = {
     await setTheme(h, "light");
     await h.goto("/admin.html#kart");
     await page.waitForSelector(".kt-race");
-    h.eq(await text(page, "#tabSaves"), "💾 Saves", "English tab label");
+    h.eq(await text(page, "#tabKart"), "🏎️ Kart", "English tab label");
     h.expect(/Upper Town/.test(await text(page, ".kt-race")) && /3 humans/.test(await text(page, ".kt-race")), "English race row");
     await h.shot("kart-light-ipad");
     await page.evaluate(() => localStorage.setItem("site_lang", "de"));
     await h.goto("/admin.html?de=1#saves");
     await page.waitForSelector("#svSearch");
-    h.eq(await text(page, "#tabSaves"), "💾 Spielstände", "German tab label");
+    h.expect(/Spielstände eines Benutzers/.test(await text(page, ".wide-bar h2")), "German texts");
     await h.shot("saves-search-de-light-ipad");
     await setTheme(h, "dark");
     await page.evaluate(() => localStorage.setItem("site_lang", "lb"));
+
+    h.step("the old Groups layout still fits the six tabs");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await h.goto("/admin.html?groups=1");
+    await page.waitForSelector("#tabSaves", { state: "visible" });
+    await noOverflow(h, "Groups: no horizontal scroll with six tabs");
+    h.eq(await page.locator(".tabs .tab").count(), 6, "six tabs");
+    await h.shot("groups-desktop");
 
     h.eq(consoleErrors, [], "0 console errors");
   },
