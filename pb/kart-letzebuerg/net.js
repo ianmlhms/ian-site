@@ -5,6 +5,8 @@
   'use strict';
   const KL = window.KL, N = KL.NET;
   const NetStats = (KL.netStats = { relayMsgs: 0, relayIn: 0, relayDropped: 0, rtcSent: 0, rtcRecv: 0, rtcBytesSent: 0, rtcBytesRecv: 0, links: 0 });
+  /* the ICE servers every new link uses: Google STUN until KL.loadIce (lobby.js) has fetched the TURN servers from the `turn` edge function */
+  KL.ice = { servers: N.ICE_SERVERS, source: 'stun' };
   const log = (...a) => { if (KL.NET_DEBUG) console.info('[kart-net]', ...a); };
 
   class Link {
@@ -13,7 +15,7 @@
       Object.assign(this, { id: o.peerId, kind: 'rtc', open: false, closed: false, initiator: !!o.initiator, signal: o.signal, onmessage: o.onmessage, onopen: o.onopen, onclose: o.onclose });
       this.ev = null; this.st = null; this.rtt = null; this.lastRecv = performance.now(); this.born = performance.now();
       NetStats.links++;
-      const pc = (this.pc = new RTCPeerConnection({ iceServers: N.ICE_SERVERS }));
+      const pc = (this.pc = new RTCPeerConnection({ iceServers: KL.ice.servers }));
       pc.onconnectionstatechange = () => {
         log(this.id, 'connection', pc.connectionState);
         if (pc.connectionState === 'failed') this.close('failed');

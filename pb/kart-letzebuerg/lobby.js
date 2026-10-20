@@ -53,6 +53,54 @@
     L.sb = window.supabase.createClient(cfg.url.replace(/\/$/, ''), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     return L.sb;
   }
+  /* ---------- ICE servers: STUN always, TURN from the `turn` edge function (Cloudflare) when it answers ---------- */
+  const ICE_KEY = 'kl_ice_v1', ICE_EARLY = 600000, ICE_RETRY = 60000, ICE_URL = /^(stun|turn|turns):[^\s]{3,200}$/;
+  let icePending = null, iceFailedAt = 0;
+  function cleanIce(list) {
+    const out = [];
+    if (!Array.isArray(list)) return out;
+    for (const s of list.slice(0, 8)) {
+      if (!s || typeof s !== 'object') continue;
+      const urls = (Array.isArray(s.urls) ? s.urls : [s.urls]).filter((u) => typeof u === 'string' && ICE_URL.test(u)).slice(0, 8);
+      if (!urls.length) continue;
+      const e = { urls };
+      if (typeof s.username === 'string' && typeof s.credential === 'string' && s.username.length < 400 && s.credential.length < 400) { e.username = s.username; e.credential = s.credential; }
+      else if (urls.some((u) => /^turns?:/.test(u))) continue;                       // a TURN entry without credentials is useless
+      out.push(e);
+    }
+    return out;
+  }
+  const withBaseline = (extra) => [...N.ICE_SERVERS, ...extra.filter((e) => !e.urls.every((u) => N.ICE_SERVERS.some((b) => b.urls === u)))];
+  function loadIce() {
+    if (icePending) return icePending;
+    const now = Date.now();
+    try {
+      const c = JSON.parse(sessionStorage.getItem(ICE_KEY) || 'null');
+      if (c && typeof c.exp === 'number' && c.exp - ICE_EARLY > now) { const l = cleanIce(c.servers); if (l.length) { KL.ice = { servers: withBaseline(l), source: 'cache' }; return Promise.resolve(KL.ice); } }
+    } catch (e) { /* storage may be blocked */ }
+    if (now - iceFailedAt < ICE_RETRY) return Promise.resolve(KL.ice);
+    icePending = (async () => {
+      try {
+        if (!window.PB_CONFIG) await loadScript('/pixelbreak-config.js');
+        const cfg = window.PB_CONFIG, a = authObj(), token = (a && a.session && a.session.access_token) || cfg.anonKey;
+        const ctl = typeof AbortController === 'function' ? new AbortController() : null, to = ctl && setTimeout(() => ctl.abort(), 5000);
+        const res = await fetch(cfg.url.replace(/\/$/, '') + '/functions/v1/turn?for=kart', { headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token }, signal: ctl ? ctl.signal : undefined });
+        clearTimeout(to);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json(), list = cleanIce(d && d.iceServers);
+        if (!list.length) throw new Error('no ice servers');
+        const hasTurn = list.some((e) => e.urls.some((u) => /^turns?:/.test(u))), ttl = Math.max(0, Math.min(14400, +d.ttl || 0));
+        KL.ice = { servers: withBaseline(list), source: hasTurn ? 'turn' : 'stun+' };
+        try { sessionStorage.setItem(ICE_KEY, JSON.stringify({ exp: now + (hasTurn && ttl ? ttl * 1000 : 1200000), servers: list })); } catch (e) { /* storage may be blocked */ }
+      } catch (e) { iceFailedAt = Date.now(); console.warn('[kart-lobby] no TURN servers (' + (e && e.message) + ') - STUN and the relay only'); }
+      finally { icePending = null; }
+      return KL.ice;
+    })();
+    return icePending;
+  }
+  KL.loadIce = loadIce;
+  const iceReady = () => Promise.race([loadIce(), sleep(3500)]);
+
   function closeSignalling() {
     L.signalling = false;
     const sb = L.sb; L.sb = null; L.ch = null; L.dirCh = null;
@@ -102,6 +150,7 @@
   function openOnline() {
     if (!window.RTCPeerConnection) { showScreen('menu'); alert(T('eNoRtc')); return; }
     L.drv = KL.G.settings.driver; showScreen('onlineScreen'); renderOnline(); olMsg('');
+    loadIce();                                              // warm up while the player types a name / code
   }
   KL.openOnline = openOnline;
   function takeName() {
@@ -122,6 +171,7 @@
     takeName(); reset(); L.role = 'host'; L.originalHost = true; L.hostId = L.myId; L.cfg.pub = !!opts.pub;
     busy('nvCreating');
     try {
+      await iceReady();
       const sb = await getSb();
       let code = opts.code ? cleanCode(opts.code) : '';
       for (let tries = 0; tries < 6; tries++) {
@@ -150,6 +200,7 @@
     if (!(o && o.fromCreate)) { takeName(); reset(); } else { L.role = null; }
     L.role = 'client'; L.originalHost = false; L.code = code; busy('nvJoining');
     try {
+      await iceReady();
       const sb = await getSb();
       const ch = sb.channel('kl:' + code, { config: { broadcast: { self: false }, presence: { key: L.myId } } });
       wireRoomChannel(ch);
@@ -163,7 +214,7 @@
       if (host.open === false && !host.spec) return fail('eLocked');
       if ((host.n || 1) >= N.MAX_PLAYERS) return fail('eFull');
       L.hostId = host.id;
-      L.joinTimer = setTimeout(() => { if (L.active && L.role === 'client' && !L.links.has(L.hostId) && !L.joined) fail('eConn'); }, N.CONNECT_TIMEOUT + 4000);
+      L.joinTimer = setTimeout(() => { if (L.active && L.role === 'client' && !L.links.has(L.hostId) && !L.joined) fail('eConn'); }, N.CONNECT_TIMEOUT + (N.RELAY_FALLBACK ? 14000 : 4000));       // (WebRTC gets its chance first, then the relay hand-shake)
     } catch (e) { console.warn('[kart-lobby] join failed', e); fail('eNoServer'); }
   }
 
@@ -204,11 +255,13 @@
     }
     sendCh('sig', { to, from: L.myId, t, d });
   }
+  /* the race on this host is over (results are showing): a newcomer is welcome in the lobby and races in the next one */
+  const raceOver = () => !!(KL.MP && KL.MP.active && (KL.MP.resultsDone || KL.MP.ended));
   async function trackHost() {
     if (!L.ch || L.role !== 'host') return;
     // open = takes players into the lobby; spec = a race is running and a newcomer may watch it (and is on the roster for the next one)
     const spec = L.phase === 'race' && !!(KL.MP && KL.MP.active && !KL.MP.ended && !KL.MP.resultsDone);
-    try { await L.ch.track({ id: L.myId, name: L.name, drv: L.drv, host: true, open: L.phase === 'lobby', spec, n: L.peers.size + 1, v: 1 }); } catch (e) { log('track failed', e); }
+    try { await L.ch.track({ id: L.myId, name: L.name, drv: L.drv, host: true, open: L.phase === 'lobby' || (L.phase === 'race' && raceOver()), spec, n: L.peers.size + 1, v: 1 }); } catch (e) { log('track failed', e); }
   }
   async function dirUpdate() {
     // the public-lobby directory is only joined while a public lobby is open
@@ -238,11 +291,14 @@
 
   function addPeer(m) {
     const watching = L.phase === 'race' && !!(KL.MP && KL.MP.canSpectate && KL.MP.canSpectate());     // a newcomer during a running race watches it
-    if (L.phase !== 'lobby' && !watching) { sendSys(m.id, 'locked'); return; }
+    const waiting = L.phase === 'race' && raceOver();                                                      // ... after it: he waits in the lobby for the next one
+    if (L.phase !== 'lobby' && !watching && !waiting) { sendSys(m.id, 'locked'); return; }
     if (L.peers.size + 1 >= N.MAX_PLAYERS) { sendSys(m.id, 'full'); return; }
     const p = { id: String(m.id).slice(0, 12), name: cleanName(m.name) || 'Gast', drv: driverOk(m.drv) ? m.drv : 'renert', rdy: false, via: 'rtc', link: null, t: performance.now(), state: 'connecting', spec: watching };
     p.drv = freeDriver(p.drv, p.id);
     L.peers.set(p.id, p);
+    // a watcher while everybody else is already on the relay (school network) goes straight to the relay: no 10 s WebRTC attempt first
+    if (watching && N.RELAY_FALLBACK && L.relayInUse && L.signalling && ![...L.peers.values()].some((q) => q !== p && q.link && q.link.kind === 'rtc' && q.link.open)) { switchToRelay(p); trackHost(); return; }
     p.link = makeLink(p.id, true);
     p.link.makeOffer();
     broadcastRoster(); dirUpdate(); trackHost();
@@ -309,8 +365,8 @@
     if (L.role === 'host' && L.peers.has(peerId)) {
       const p = L.peers.get(peerId);
       if (p.link !== link) return;
-      if (!wasOpen && L.phase === 'lobby' && N.RELAY_FALLBACK && L.signalling && (reason === 'timeout' || reason === 'failed')) { switchToRelay(p); return; }
-      if (!wasOpen && L.phase === 'lobby') { sendSys(peerId, 'conn'); }
+      if (!wasOpen && (L.phase === 'lobby' || p.spec) && N.RELAY_FALLBACK && L.signalling && (reason === 'timeout' || reason === 'failed')) { switchToRelay(p); return; }
+      if (!wasOpen && (L.phase === 'lobby' || p.spec)) { sendSys(peerId, 'conn'); }
       removePeer(peerId, reason);
     } else if (L.role === 'host' && !L.peers.has(peerId)) {
       // (a host that took over mid-race tracks its players as peers too, see adoptAsHost; anything else is a stray link)
@@ -434,7 +490,7 @@
   function broadcastRoster() {
     if (L.role !== 'host') return;
     L.roster = rosterNow();
-    const msg = { k: 'roster', host: L.myId, deputy: L.deputy, epoch: L.epoch, cfg: L.cfg, players: L.roster };
+    const msg = { k: 'roster', host: L.myId, deputy: L.deputy, epoch: L.epoch, cfg: L.cfg, players: L.roster, ...(L.phase !== 'lobby' ? { wait: 1 } : {}) };
     for (const p of L.peers.values()) if (p.link && p.link.open && !p.spec) p.link.send(msg, true);      // (a spectator gets the roster when the race is over)
     renderLobby();
   }
@@ -447,7 +503,7 @@
     if (L.handoff) { clearTimeout(L.handoff.timer); L.handoff = null; }          // the new host has taken the lobby over
     const me = L.roster.find((p) => p.id === L.myId);
     if (me) { L.drv = me.drv; L.rdy = me.rdy; }
-    if (!L.joined) { L.joined = true; clearTimeout(L.joinTimer); L.phase = 'lobby'; enterLobby(); } else renderLobby();
+    if (!L.joined) { L.joined = true; clearTimeout(L.joinTimer); L.phase = 'lobby'; enterLobby(); if (m.wait) { lbMsg(T('lbLate')); } } else renderLobby();
   }
 
   /* ---------- lobby screen ---------- */
@@ -601,6 +657,7 @@
     } finally { L.depBusy = false; }
   }
   KL.Lobby.ensureDeputy = ensureDeputy;
+  KL.Lobby.refreshPresence = () => { if (L.role === 'host') { trackHost(); dirUpdate(); } };
   KL.Lobby.dropPeer = (id, why) => { if (L.role === 'host' && L.peers.has(id)) removePeer(id, why); };
 
   async function hostStart() {

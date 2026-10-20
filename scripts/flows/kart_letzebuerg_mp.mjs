@@ -12,8 +12,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const isSupabase = (u) => /supabase\.co/.test(u);
 const REPORT = {};
 /* ---------- race log capture: every record_kart_race call (REST route or the signed-in sb.rpc stub) ---------- */
+const TURN_CALLS = [], TURN = { mode: 'ok' };           // calls to the mocked `turn` function
 const RECORDS = [];                                  // { by, via, status, p }
-const FAIL = { n: 0 };                               // the next n REST calls answer HTTP 500
+const FAIL = { n: 0, bad: 0 };                               // the next n REST calls answer HTTP 500
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
 const UID = { guest: '5b1d6c0e-2f4a-4c1b-9a77-0a1b2c3d4e51', dep: '7c2e8d1f-3a5b-4d2c-8b88-1b2c3d4e5f62', third: '9d3f9e20-4b6c-4e3d-9c99-2c3d4e5f6073' };
 const recCount = () => RECORDS.length;
@@ -52,10 +53,23 @@ async function newPlayer(h, hub, label, { first = false, viewport = { width: 640
   page.on('console', (m) => { if (/\[kart-mp\] race/.test(m.text())) console.log('    [' + label + '] ' + m.text()); });
   page.on('pageerror', (e) => p.errors.push('pageerror: ' + e.message));
   if (!first) await context.route(/supabase\.co\/(rest|auth|functions|storage)\//, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+  // the `turn` edge function (TURN credentials) is mocked: no flow ever talks to Cloudflare
+  await context.addInitScript(() => { const O = window.RTCPeerConnection; if (!O) return; window.__ice = []; window.RTCPeerConnection = class extends O { constructor(c, ...r) { super(c, ...r); window.__ice.push(c); } }; });
+  await context.route(/\/functions\/v1\/turn/, async (route) => {
+    const rq = route.request();
+    if (rq.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...CORS, 'access-control-allow-methods': 'GET, OPTIONS' } });
+    TURN_CALLS.push({ by: label, url: rq.url(), auth: rq.headers().authorization || '' });
+    if (TURN.mode === 'fail') return route.fulfill({ status: 500, headers: CORS, contentType: 'application/json', body: '{"error":"boom"}' });
+    return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ iceServers: [{ urls: ['stun:stun.cloudflare.com:3478'] }, { urls: ['turn:127.0.0.1:3478?transport=udp', 'turn:127.0.0.1:3478?transport=tcp'], username: 'mock-user', credential: 'mock-pass' }], turn: true, provider: 'mock', ttl: 7200 }) });
+  });
   await context.route(/\/rest\/v1\/rpc\/record_kart_race/, async (route) => {
     const rq = route.request();
     if (rq.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
     let body = null; try { body = JSON.parse(rq.postData() || 'null'); } catch { /* bad json */ }
+    if (FAIL.bad > 0) {                                     // the server (v1 validation) refuses the new payload shape as invalid
+      FAIL.bad--; RECORDS.push({ by: label, via: 'fetch', status: 400, p: body && body.p, hdr: rq.headers() });
+      return route.fulfill({ status: 400, headers: CORS, contentType: 'application/json', body: '{"message":"bad player"}' });
+    }
     const bad = FAIL.n > 0; if (bad) FAIL.n--;
     RECORDS.push({ by: label, via: 'fetch', status: bad ? 500 : 200, p: body && body.p, hdr: rq.headers() });
     return route.fulfill({ status: bad ? 500 : 200, headers: CORS, contentType: 'application/json', body: bad ? '{"message":"boom"}' : '1' });
@@ -915,6 +929,117 @@ export const flow = {
         const tb = await Promise.all([G1, G2].map((p) => p.page.locator('#endList').innerText()));
         const same = (t) => t.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');
         h.eq(same(tb[1]), same(tb[0]), 'the two remaining players get identical results from the single new host');
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 5g. TURN servers from the `turn` function (mocked): fetched once, cached, STUN-only fallback ================= */
+      if (want('turn')) {
+        h.step('TURN: the ICE servers come from the (mocked) turn function once per session, are cached in sessionStorage, and a failing function leaves STUN + relay');
+        TURN.mode = 'ok'; TURN_CALLS.length = 0;
+        const T1 = await newPlayer(h, hub, 'turn-host'); all.push(T1);
+        const T2 = await newPlayer(h, hub, 'turn-guest'); all.push(T2);
+        await goOnline(T1, 'TurnHost'); await T1.page.click('#olCreate');
+        await T1.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        await lobbyJoin(T1, T2, (await T1.page.textContent('#lbCode')).trim(), 'TurnGuest');
+        await waitFor(T1, () => KL.Lobby.links.size === 1 && [...KL.Lobby.links.values()].every((l) => l.open), null, 30000);
+        h.eq(TURN_CALLS.map((c) => c.by).sort(), ['turn-guest', 'turn-host'], 'one call to the turn function per player (not per link, not per screen)');
+        h.expect(TURN_CALLS.every((c) => /\/functions\/v1\/turn\?for=kart$/.test(c.url) && /^Bearer /.test(c.auth)), 'the call is /functions/v1/turn?for=kart with a bearer token (the anon key for guests)');
+        const cfg1 = await T1.page.evaluate(() => window.__ice.map((c) => c.iceServers));
+        const flat = (l) => l.flatMap((e) => [].concat(e.urls));
+        h.expect(cfg1.length >= 1 && flat(cfg1[0])[0] === 'stun:stun.l.google.com:19302' && flat(cfg1[0]).some((u) => /^turn:127\.0\.0\.1/.test(u)) && cfg1[0].some((e) => e.credential === 'mock-pass'), 'every peer connection gets Google STUN first, then the TURN entries with their credentials: ' + JSON.stringify(flat(cfg1[0])));
+        h.expect(await T1.page.evaluate(() => !!sessionStorage.getItem('kl_ice_v1')), 'the answer is cached in sessionStorage');
+        h.expect(await T1.page.locator('#lbList li .slow').count() === 0, 'the link is direct WebRTC (the relay was not needed)');
+        // a second lobby in the same session: no new call
+        const n0 = TURN_CALLS.length;
+        await T1.page.click('#lbLeave'); await T2.page.click('#lbLeave').catch(() => {});
+        await T1.page.evaluate(() => __klTest.menu());
+        await goOnline(T1, 'TurnHost'); await T1.page.click('#olCreate');
+        await T1.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        h.eq(TURN_CALLS.length, n0, 'a second lobby in the same session reuses the cache (no new call)');
+        await closeAll(all); all.length = 0;
+
+        TURN.mode = 'fail'; TURN_CALLS.length = 0;
+        const F1 = await newPlayer(h, hub, 'turnf-host'); all.push(F1);
+        const F2 = await newPlayer(h, hub, 'turnf-guest'); all.push(F2);
+        await goOnline(F1, 'FHost'); await F1.page.click('#olCreate');
+        await F1.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        await lobbyJoin(F1, F2, (await F1.page.textContent('#lbCode')).trim(), 'FGuest');
+        await waitFor(F1, () => KL.Lobby.links.size === 1 && [...KL.Lobby.links.values()].every((l) => l.open), null, 30000);
+        const cfg2 = await F1.page.evaluate(() => window.__ice.map((c) => c.iceServers));
+        h.eq(cfg2[0].flatMap((e) => [].concat(e.urls)), ['stun:stun.l.google.com:19302'], 'the turn function fails (HTTP 500): STUN only, the lobby and the link still work');
+        h.expect(TURN_CALLS.length <= 2, 'and nobody hammers it (' + TURN_CALLS.length + ' calls in total)');
+        TURN.mode = 'ok';
+        await closeAll(all); all.length = 0;
+      }
+
+      /* ================= 5h. latecomers on a school network: watch over the relay, wait in the lobby, race next round; race log diagnostics ================= */
+      if (want('latecomer')) {
+        h.step('school network: a latecomer joins a running race (spectator over the relay), another joins while the results show (waits in the lobby), both race the next round');
+        TURN.mode = 'ok';
+        const rec0 = recCount();
+        const mk = (label, first = false) => newPlayer(h, hub, label, { first, init: BLOCK_RTC, cfg: FAST_RELAY });
+        const L0 = await mk('lc-host'), L1 = await mk('lc-1'), L2 = await mk('lc-2'); all.push(L0, L1, L2);
+        hub.reset();
+        await goOnline(L0, 'Ian'); await L0.page.click('#olCreate');
+        await L0.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        const lcode = (await L0.page.textContent('#lbCode')).trim();
+        await lobbyJoin(L0, L1, lcode, 'Nora'); await lobbyJoin(L0, L2, lcode, 'Fernando');
+        await waitFor(L0, () => document.querySelectorAll('#lbList li').length === 3 && document.querySelectorAll('#lbList li .slow').length === 2, null, 40000);
+        FAIL.bad = 1;                                                  // the server refuses the first (new-shape) race log call as "bad player"
+        await readyAndStart(L0, [L1, L2], 1);
+        await waitRace([L0, L1, L2]);
+        for (const p of [L0, L1, L2]) await kl(p, () => __klTest.autopilot(true));
+        await sleep(8000);
+        // Emma opens the invite link while the race runs: no WebRTC possible -> relay spectator
+        const E = await mk('lc-emma'); all.push(E);
+        const f0 = hub.stats.framesIn + hub.stats.framesOut;
+        const tEmma = Date.now();
+        await E.page.goto(h.origin + URL_BASE + '&room=' + lcode.toLowerCase() + '&role=guest');
+        await waitFor(E, () => { const m = __klTest.mp(); return m.spec && m.specLive && !document.getElementById('hud').hidden; }, null, 90000);
+        const joinSecs = (Date.now() - tEmma) / 1000;
+        const em = await mp(E), hm = await mp(L0);
+        h.expect(em.spec && em.links.length === 1 && em.links[0].kind === 'relay', 'Emma watches the race through the relay (join took ' + joinSecs.toFixed(1) + ' s)');
+        h.eq(hm.specs.length, 1, 'the host serves one spectator');
+        h.eq(await kl(E, () => __klTest.G.race.karts.length), 8, 'she sees all 8 karts');
+        await sleep(2500);
+        const lp = await kl(E, () => ({ speed: __klTest.G.human.speed, lead: __klTest.G.race.order[0].prog }));
+        h.expect(lp.lead > 100, 'the picture moves (leader at ' + Math.round(lp.lead) + ' m)');
+        h.expect(await E.page.locator('#specBar').isVisible(), 'spectator bar is visible');
+        // results on everybody
+        for (const p of [L0, L1, L2, E]) await p.page.waitForSelector('#endScreen:not([hidden]) #endList li', { timeout: 300000 });
+        await settle(() => recCount() - rec0, 2, 20000);
+        const lrec = RECORDS.slice(rec0);
+        h.eq(lrec.map((c) => c.status), [400, 200], 'race log: the first call was refused as invalid (400), the client retried at once with the plain v1 shape (200)');
+        h.expect(lrec[0].p.players.some((p) => p.link) && !lrec[1].p.players.some((p) => 'link' in p || 'away_s' in p || 'dropped_at_s' in p), 'the first payload carries link/dropped_at_s/away_s, the retry does not');
+        const hum = lrec[0].p.players.filter((p) => !p.bot);
+        h.eq(hum.map((p) => [p.link, p.dropped_at_s]), [['relay', null], ['relay', null], ['relay', null]], 'diagnostics: all 3 humans were on the relay and nobody was dropped');
+        h.expect(hum.every((p) => typeof p.away_s === 'number' && p.away_s >= 0), 'away_s is a number for every human: ' + JSON.stringify(hum.map((p) => p.away_s)));
+        // Max arrives while the results are showing
+        const Mx = await mk('lc-max'); all.push(Mx);
+        await goOnline(Mx, 'Max'); await Mx.page.fill('#olCode', lcode); await Mx.page.click('#olJoin');
+        await Mx.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 90000 });
+        h.expect(true, 'Max joins while the results are showing and lands in the lobby (no "locked")');
+        h.expect(/\S/.test(await Mx.page.textContent('#lbMsg')) && await Mx.page.locator('#lbMsg').isVisible(), 'and is told he is in the next race: "' + (await Mx.page.textContent('#lbMsg')) + '"');
+        // back to the lobby, everybody ready, next race with 5 humans
+        await L0.page.click('#eLobby');
+        await Promise.all([L1, L2, E, Mx].map((p) => p.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 })));
+        await waitFor(L0, () => document.querySelectorAll('#lbList li').length === 5, null, 30000);
+        h.expect(true, 'the lobby has 5 players: both latecomers are on the roster');
+        const rc0 = await Promise.all([L0, L1, L2, E, Mx].map((p) => kl(p, () => __klTest.G.raceCount)));
+        for (const p of [L1, L2, E, Mx]) await p.page.click('#lbReady');
+        await waitFor(L0, () => document.querySelectorAll('#lbList li .st.ok').length === 4, null, 40000);
+        await L0.page.click('#lbStart');
+        await Promise.all([L0, L1, L2, E, Mx].map((p, i) => waitFor(p, (n) => window.__klTest.G.raceCount > n && window.__klTest.state().phase === 'race' && window.__klTest.state().clock > 0.3, rc0[i], 120000)));
+        h.eq(await Promise.all([L0, L1, L2, E, Mx].map((p) => kl(p, () => __klTest.G.race.karts.filter((k) => k.human).length))), [5, 5, 5, 5, 5], 'next race: 5 humans on every screen (Emma and Max drive)');
+        for (const p of [L0, L1, L2, E, Mx]) await kl(p, () => __klTest.autopilot(true));
+        for (const p of [L0, L1, L2, E, Mx]) await waitFor(p, () => !document.getElementById('endScreen').hidden && document.querySelectorAll('#endList li').length === 8, null, 420000);
+        const same2 = (t) => t.replace(/ \((Du|You)\)/g, '').replace(/\n\+\d+/g, '');
+        const tb = await Promise.all([L0, L1, L2, E, Mx].map((p) => p.page.locator('#endList').innerText()));
+        for (let i = 1; i < 5; i++) h.eq(same2(tb[i]), same2(tb[0]), 'screen ' + i + ' shows the host\'s table');
+        for (const n of ['Ian', 'Nora', 'Fernando', 'Emma', 'Max']) { if (n === 'Emma') continue; h.expect(tb[0].includes(n), n + ' is in the table'); }
+        const mh = await mp(L0);
+        h.eq([mh.stats.away, mh.karts.filter((k) => k.human).length], [0, 5], 'nobody dropped or bot-driven in the second race');
+        console.log('    latecomer join over the relay: ' + (hub.stats.framesIn + hub.stats.framesOut - f0) + ' Realtime frames until the end of the first race (incl. 4 players\' race traffic)');
         await closeAll(all); all.length = 0;
       }
 

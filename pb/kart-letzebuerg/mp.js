@@ -127,6 +127,15 @@
     if (M.silentSince) M.silentSince = fwd(M.silentSince);
     log('local stall', Math.round(gap), 'ms');
   }
+  /* diagnostics: which kinds of link did each player have during the race (host only) */
+  function noteLinks(now) {
+    M.linkNoteAt = now;
+    for (const [id, l] of M.L.links) {
+      const k = M.R.byId[id]; if (!k || !k.wasHuman || !l.open) continue;
+      (k.linkSeen || (k.linkSeen = new Set())).add(l.kind === 'relay' ? 'relay' : 'p2p');
+    }
+  }
+  const linkWord = (set) => (!set || !set.size ? null : set.size > 1 ? 'mixed' : set.has('relay') ? 'relay' : 'p2p');
   M.tick = function (now) {
     if (!M.active || M.ended) return;
     const R = M.R;
@@ -151,6 +160,7 @@
         if (M.hostAway && !alive) M.endRace('rAway');
         M.hostAway = false;
       }
+      if (now - (M.linkNoteAt || 0) > 2000) noteLinks(now);
       checkResults(now);
     } else {
       const silent = now - M.lastHostMsg;
@@ -375,6 +385,7 @@
 
   /* ---------- away / leave / conversion ---------- */
   function convertToBot(k) {
+    if (k.wasHuman && k.droppedAt == null && M.R) k.droppedAt = Math.max(0, M.R.clock);            // (diagnostics: when this player was lost for good)
     k.remote = false; k.isBot = true; k.human = false; k.auto = false; k.away = false; k.view = null; k.hint = -1; k.br = null; k.safeBr = null; k.ai = null; k.botSkill = k.botSkill || 1; k.rubber = 1;
     const R = M.R; const i = R.humans.indexOf(k); if (i >= 0) R.humans.splice(i, 1);
     k.input.gas = 0; k.input.steer = 0; k.input.drift = false; k.input.brake = 0;
@@ -515,6 +526,7 @@
     sendAllClients(msg, true);
     KL.G.mpShowResults(rows);
     M.record(rows);
+    if (KL.Lobby.refreshPresence) KL.Lobby.refreshPresence();        // latecomers may now come into the lobby for the next race
   };
   function onResults(m) {
     if (M.resultsDone || !Array.isArray(m.rows)) return;
@@ -536,18 +548,33 @@
   }
   function buildRecord(rows) {
     const I = M.info; if (!I || !Array.isArray(rows)) return null;
+    const R = M.R, now = performance.now(), all = new Set();
+    for (const k of R.karts) if (k.wasHuman && k !== M.self && k.linkSeen) for (const x of k.linkSeen) all.add(x);
     const players = rows.slice(0, 8).map((r) => {
       const bot = !r.human, uid = bot ? '' : I.uids.get(String(r.id)) || '';
-      return {
+      const o = {
         name: String(r.name || '?').slice(0, 24) || '?', user_id: uid || null, guest: !bot && !uid, bot, place: r.place | 0,
         time_ms: r.finished && isFinite(r.time) && r.time != null ? Math.round(r.time * 1000) : null,
         best_lap_ms: r.best != null && isFinite(r.best) ? Math.round(r.best * 1000) : null,
         driver: String(r.drv || '').slice(0, 24),
       };
+      const k = R.byId[r.id];
+      if (!bot && k) {                                          // connection diagnostics (kart-letzebuerg-races-v2.sql): human entries only
+        const link = k === M.self ? linkWord(all) : linkWord(k.linkSeen);
+        if (link) {
+          const away = (k.awayTotal || 0) + (k.away ? (now - (k.awaySince || now)) / 1000 : 0);
+          o.link = link; o.dropped_at_s = k.droppedAt != null ? Math.round(Math.min(7200, k.droppedAt) * 10) / 10 : null; o.away_s = Math.round(Math.min(7200, away) * 10) / 10;
+        }
+      }
+      return o;
     });
     const humans = players.filter((p) => !p.bot).length;
     if (humans < 2 || !I.room) return null;                          // solo / one human + bots: never logged
     return { room: I.room, race_key: I.key, track: I.track, mode: I.gp ? 'gp' : 'race', cup: I.gp ? I.gp.cup : null, gp_round: I.gp ? I.gp.round : null, laps: I.laps, weather: I.weather, human_count: humans, players };
+  }
+  /* the shape the first server version knows (no diagnostics): used if the server rejects the new one */
+  function v1Shape(body) {
+    return Object.assign({}, body, { players: body.players.map((p) => { const q = Object.assign({}, p); delete q.link; delete q.dropped_at_s; delete q.away_s; return q; }) });
   }
   async function postRecord(body) {
     const a = KL.authObj && KL.authObj();
@@ -558,7 +585,7 @@
     }
     const cfg = window.PB_CONFIG; if (!cfg) throw new Error('no config');   // guest host: plain anon REST call, no library needed
     const res = await fetch(cfg.url.replace(/\/$/, '') + '/rest/v1/rpc/record_kart_race', { method: 'POST', headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + cfg.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p: body }) });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) { let t = ''; try { t = (await res.text()).slice(0, 160); } catch (e) { /* no body */ } throw new Error('HTTP ' + res.status + ' ' + t); }
   }
   M.record = function (rows) {
     if (M.recorded || M.role !== 'host' || !M.info) return;
@@ -567,9 +594,16 @@
     if (!body) return;
     M.recorded = true;
     (async () => {
+      let shape = body;                                            // the new shape first; a server that rejects it as invalid gets the old one at once
       for (let attempt = 0; attempt < 2; attempt++) {
-        try { await postRecord(body); log('race logged', body.race_key); return; }
-        catch (e) { console.warn('[kart-mp] race not logged' + (attempt ? '' : ', retrying once'), e && e.message); if (!attempt) await new Promise((r) => setTimeout(r, REC_RETRY_MS)); }
+        try { await postRecord(shape); log('race logged', body.race_key); return; }
+        catch (e) {
+          const msg = e && e.message || '';
+          console.warn('[kart-mp] race not logged' + (attempt ? '' : ', retrying once'), msg);
+          if (attempt) return;
+          if (shape === body && /bad (player|race|payload)|too large/i.test(msg)) shape = v1Shape(body);
+          else await new Promise((r) => setTimeout(r, REC_RETRY_MS));
+        }
       }
     })();
   };
