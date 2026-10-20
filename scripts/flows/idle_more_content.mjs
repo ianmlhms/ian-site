@@ -2,10 +2,10 @@
  * Cookie Clicker "Beyond the God" (8 new production tiers, 3 click upgrades).
  * Old-shaped saves (built from the previous schema, not real player data) must load
  * unchanged, the new top tiers must be buyable, rebirth must reset them, and big
- * numbers must format and clamp to the leaderboard cap without console noise. */
+ * numbers must format and report their score (no 2^53 clamp, only the 1e300 limit) without console noise. */
 import { runIfMain } from "./lib.mjs";
 
-const MAX_SAFE = Number.MAX_SAFE_INTEGER;
+const SCORE_LIMIT = 1e300;   // the leaderboard limit (arcade-kit.js); the old 2^53 clamp is gone
 const OLD_BUSINESSES = ["lemonade", "newspaper", "carwash", "pizzeria", "donut", "shrimp", "hockey", "studio", "bank", "oil"];
 const NEW_BUSINESSES = ["airline", "port", "tech", "space", "moon", "asteroid", "dyson", "galaxy"];
 const relClose = (a, b, tolerance = 1e-9) => Math.abs(a - b) <= tolerance * Math.max(Math.abs(a), Math.abs(b), 1);
@@ -88,9 +88,9 @@ export const flow = {
     const formatted = await game.evaluate(() => [format(4.3e24), format(170e24), format(9e307), format(Number.MAX_VALUE)]);
     h.expect(formatted.every((text) => /^\d/.test(text) && !/NaN|undefined|∞/.test(text)), `big numbers format (${formatted.join(", ")})`);
 
-    h.step("Business Empire: score clamps to the leaderboard cap");
-    const clamped = await game.evaluate(() => { state = { ...state, lifetime: 1e30 }; updateScore(); return window.score; });
-    h.eq(clamped, MAX_SAFE, "score reported at Number.MAX_SAFE_INTEGER, not dropped");
+    h.step("Business Empire: scores above 2^53 are reported as they are (limit 1e300)");
+    const reported = await game.evaluate(() => { const out = []; for (const lifetime of [1e30, 3e20, 1.5e45, 1e305, Number.MAX_VALUE]) { state = { ...state, lifetime }; updateScore(); out.push(window.score); } return out; });
+    h.eq(reported, [1e30, 3e20, 1.5e45, SCORE_LIMIT, SCORE_LIMIT], "score = lifetime above the old cap, clamped only at 1e300");
     await game.evaluate(() => { state = { ...state, lifetime: 4.2e17 }; updateScore(); });
 
     h.step("Business Empire: round trip and rebirth reset the new businesses");
@@ -147,8 +147,9 @@ export const flow = {
     h.expect(rebirth.u.slice(0, 16).every((count) => count === 0) && rebirth.u.slice(17).every((count) => count === 0), "ordinary and new tiers reset");
     h.eq(rebirth.u[16], 1, "Haunted Oven survives");
     h.expect(rebirth.cu.every((count) => count === 0), "click upgrades reset (including the new three)");
-    const ccScore = await game.evaluate(() => { totalBaked = 1e30; reportScore(); return window.score; });
-    h.eq(ccScore, MAX_SAFE, "Cookie Clicker score clamps at the cap");
+    const ccScore = await game.evaluate(() => { const out = []; for (const baked of [1e30, 3e20, 1.5e45, 1e305]) { totalBaked = baked; reportScore(); out.push(window.score); } return out; });
+    h.eq(ccScore, [1e30, 3e20, 1.5e45, SCORE_LIMIT], "Cookie Clicker score = total baked above the old cap, clamped only at 1e300");
+    h.eq(await game.evaluate(() => [format(1.5e45), format(2.5e36), format(9.9e35)]), ["1.50e45", "2.50e36", "990.0Dc"], "Cookie Clicker number format: Dc, then scientific");
     await page.setViewportSize({ width: 390, height: 844 });
     h.expect(await game.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Cookie Clicker fits 390 px");
     await h.shot("cookie-beyond");

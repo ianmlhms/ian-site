@@ -6,7 +6,7 @@
 <title>Business Empire - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
 <link rel="stylesheet" href="/pb/idle-extras.css?v=3">
-<script src="/pb/idle-extras.js?v=4"></script>
+<script src="/pb/idle-extras.js?v=5"></script>
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
@@ -37,7 +37,7 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
 @media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
 @media (prefers-reduced-motion:reduce){button{transition:none}button:active:not(:disabled){transform:none}.progress-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=30" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
+<script src="/pb/arcade-kit.js?v=31" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
 </head>
 <body>
 <main id="game">
@@ -50,12 +50,16 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
       <div class="stat"><span>Cash</span><strong id="cash">$10</strong></div>
       <div class="stat"><span>Lifetime</span><strong id="lifetime">$0</strong></div>
       <div class="stat"><span>Auto / sec</span><strong id="income">$0</strong></div>
-      <div class="stat"><span>Investors</span><strong id="investors">0 · 1×</strong></div>
+      <div class="stat" title="Investors and stars together: total profit bonus"><span>Investors</span><strong id="investors">0 · 1×</strong></div>
     </div>
   </header>
   <section id="offline-notice" class="notice" aria-live="polite">
     <strong>While you were away</strong><span id="offline-copy"></span>
     <button id="offline-close" type="button" aria-label="Dismiss">×</button>
+  </section>
+  <section id="softcap-notice" class="notice" aria-live="polite">
+    <strong>Prestige bonus soft cap</strong><span id="softcap-copy"></span>
+    <button id="softcap-close" type="button" aria-label="Dismiss">×</button>
   </section>
   <section id="business-list" aria-label="Businesses"></section>
 </main>
@@ -83,6 +87,10 @@ const REBIRTH_THRESHOLD=100e9;
 const OFFLINE_NOTICE_MIN_SECONDS=5;
 const PRESTIGE_EARNINGS_UNIT=1e9;
 const INVESTOR_BONUS=0.1;
+/* Prestige soft cap (20 Oct 2026): investors and stars multiply each other and both grew with the square root of
+ * the earnings, so the combined bonus ran away (x1e141 exists). Up to PRESTIGE_SOFT_CAP the total bonus is exactly
+ * what it always was; above it, it grows with the natural logarithm. Counts are never touched. */
+const PRESTIGE_SOFT_CAP=1e8;
 const MILESTONE_FACTOR=2;
 const COST_LIMIT=Number.MAX_VALUE;
 const MAX_OWNED=1000000;
@@ -97,7 +105,7 @@ const MILESTONES=Object.freeze([25,50,100,200]);
  * The extra levels give every business a next goal at any wealth, because the cost of
  * the next unit grows exponentially while each level only doubles profit. */
 const PROFIT_MILESTONES=Object.freeze([300,400,500,600,750,900,1000,1250,1500,2000,2500,3000,4000,5000]);
-const MAX_SAFE_SCORE=Number.MAX_SAFE_INTEGER;
+const SCORE_LIMIT=1e300; // the leaderboard accepts any finite score up to 1e300
 /* Arcade test mode: everything affordable, both prestige systems ready. Saves go to the isolated test store (platform). */
 const TEST_MODE=window.__pbTestMode===true;
 const TEST_CASH=1e60;
@@ -128,7 +136,7 @@ const BUSINESSES=Object.freeze([
 const emptyOwned=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,0]));
 const emptyManagers=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,false]));
 const emptyRuntime=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,{startedAt:0,endsAt:0}]));
-const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now(),savedAt:Date.now()});
+const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',sc:0,owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now(),savedAt:Date.now()});
 
 /** Test mode only: a copy of the state with huge cash, one of every business and both resets ready. */
 function testUnlockAll(save){
@@ -203,6 +211,18 @@ function getMilestoneMultiplier(owned){return Math.pow(MILESTONE_FACTOR,getMiles
 /* Profit multiplier: the speed milestones plus the profit-only ones beyond 200 owned. */
 function getProfitMultiplier(owned){return Math.pow(MILESTONE_FACTOR,getMilestoneCount(owned)+getProfitMilestoneCount(owned))}
 function getInvestorMultiplier(investors=state.investors){return 1+investors*INVESTOR_BONUS}
+/* PRESTIGE-SOFTCAP-START (scripts/be-prestige-sim.mjs evaluates this block, keep it self-contained) */
+function rawPrestigeMultiplier(investors,stars){return(1+investors*INVESTOR_BONUS)*(1+stars*IdleExtras.starBonus)}
+/* Total payout bonus of investors and stars: linear to PRESTIGE_SOFT_CAP, then C * (1 + ln(raw / C)). Continuous and
+ * increasing; the logarithms are added instead of multiplying first so it cannot overflow. */
+function prestigeMultiplier(investors=state.investors,stars=state.st){
+  const raw=rawPrestigeMultiplier(investors,stars);
+  if(Number.isFinite(raw)&&raw<=PRESTIGE_SOFT_CAP)return raw;
+  const logRaw=Math.log1p(investors*INVESTOR_BONUS)+Math.log1p(stars*IdleExtras.starBonus);
+  return PRESTIGE_SOFT_CAP*(1+logRaw-Math.log(PRESTIGE_SOFT_CAP));
+}
+/* PRESTIGE-SOFTCAP-END */
+function isSoftCapped(investors=state.investors,stars=state.st){return!(rawPrestigeMultiplier(investors,stars)<=PRESTIGE_SOFT_CAP)}
 
 function getCost(business,owned=state.owned[business.id]){
   const cost=business.baseCost*Math.pow(business.costGrowth,owned);
@@ -217,7 +237,7 @@ function getCyclePayout(business,sourceState=state){
   const owned=sourceState.owned[business.id]||0;
   const base=safeMultiply(business.payout,owned);
   const milestoneProfit=safeMultiply(base,getProfitMultiplier(owned));
-  return safeMultiply(safeMultiply(milestoneProfit,getInvestorMultiplier(sourceState.investors)),IdleExtras.multiplier(sourceState.st));
+  return safeMultiply(milestoneProfit,prestigeMultiplier(sourceState.investors,sourceState.st));
 }
 
 function getAutomaticIncome(sourceState=state){
@@ -347,13 +367,25 @@ function gameTick(){
   if(TEST_MODE&&state.cash<TEST_CASH/2)state=testUnlockAll(state);
   settleProduction(now);
   refreshAll(now);
+  checkSoftcapNotice();
+}
+
+/* One-time explanation the first time the combined prestige bonus is above the soft cap (an old save that already was
+ * far above it, or a player who just crossed it). `sc` in the save remembers that it was shown; nothing else changes. */
+function checkSoftcapNotice(){
+  if(state.sc===1||!isSoftCapped())return;
+  state={...state,sc:1};
+  const raw=rawPrestigeMultiplier(state.investors,state.st);
+  document.getElementById("softcap-copy").textContent=`Your investors and stars are worth ×${format(raw)} in total. Above ×${format(PRESTIGE_SOFT_CAP)} that bonus now grows with the logarithm instead of linearly, so it counts as ×${format(prestigeMultiplier())}. Nothing is removed: investors, stars and lifetime earnings stay exactly as they are.`;
+  document.getElementById("softcap-notice").classList.add("show");
+  pushSave();
 }
 
 function refreshAll(now=Date.now()){
   document.getElementById("cash").textContent="$"+format(state.cash);
   document.getElementById("lifetime").textContent="$"+format(state.lifetime);
   document.getElementById("income").textContent="$"+format(getAutomaticIncome());
-  document.getElementById("investors").textContent=`${format(state.investors)} · ${format(getInvestorMultiplier())}×`;
+  document.getElementById("investors").textContent=`${format(state.investors)} · ${format(prestigeMultiplier())}×`;
   BUSINESSES.forEach((business)=>refreshBusiness(business,now));
   rewards?.refresh();
 }
@@ -399,11 +431,12 @@ function getClaimableInvestors(sourceState=state){
 
 function openPrestige(){
   const claimable=getClaimableInvestors();
-  const currentMultiplier=getInvestorMultiplier();
-  const nextMultiplier=getInvestorMultiplier(state.investors+claimable);
+  const currentMultiplier=prestigeMultiplier();
+  const nextMultiplier=prestigeMultiplier(state.investors+claimable,state.st);
+  const capNote=isSoftCapped(state.investors+claimable,state.st)?` Above ×${format(PRESTIGE_SOFT_CAP)} the bonus has diminishing returns.`:"";
   const preview=document.getElementById("prestige-preview");
   preview.textContent=claimable>0
-    ?`Claim ${format(claimable)} investor${claimable===1?"":"s"}. Global profit: ${format(currentMultiplier)}× → ${format(nextMultiplier)}×.`
+    ?`Claim ${format(claimable)} investor${claimable===1?"":"s"}. Global profit: ${format(currentMultiplier)}× → ${format(nextMultiplier)}×.${capNote}`
     :`No investors are ready. Earn $${format(nextInvestorTarget())} lifetime for the next one.`;
   const confirm=document.getElementById("prestige-confirm");
   confirm.disabled=claimable===0;
@@ -449,7 +482,7 @@ function normalizeSave(raw){
   }));
   const managers=Object.fromEntries(BUSINESSES.map((business)=>[business.id,raw.managers[business.id]===true]));
   return{v:SAVE_VERSION,cash,lifetime,owned,managers,investors,ts,savedAt,
-    rb:safeNumber(raw.rb,lifetime),st:Math.floor(safeNumber(raw.st)),rbc:Math.floor(safeNumber(raw.rbc)),gd:typeof raw.gd==='string'?raw.gd:''};
+    rb:safeNumber(raw.rb,lifetime),st:Math.floor(safeNumber(raw.st)),rbc:Math.floor(safeNumber(raw.rbc)),gd:typeof raw.gd==='string'?raw.gd:'',sc:raw.sc===1?1:0};
 }
 
 function calculateOffline(save,now){
@@ -468,7 +501,7 @@ function applySave(raw){
   loaded=true;
   const now=Date.now();
   lastOfflineResult=calculateOffline(save,now);
-  state={...save,st:Math.max(state.st,save.st),gd:save.gd>state.gd?save.gd:state.gd,
+  state={...save,st:Math.max(state.st,save.st),sc:Math.max(state.sc||0,save.sc),gd:save.gd>state.gd?save.gd:state.gd,
     cash:safeAdd(save.cash,lastOfflineResult.credited),lifetime:safeAdd(Math.max(state.lifetime,save.lifetime),lastOfflineResult.credited),rb:safeAdd(save.rb,lastOfflineResult.credited),ts:now,savedAt:now};
   runtime=emptyRuntime();
   startManagedCycles(now);
@@ -511,13 +544,14 @@ function requestCloudSave(){
   catch(error){reportError("Could not request cloud progress",error)}
 }
 
-/* The arcade ignores scores above Number.MAX_SAFE_INTEGER; clamp so the board entry stays at the cap instead of freezing. */
-function updateScore(){window.score=Math.min(Math.floor(state.lifetime),MAX_SAFE_SCORE);Arcade.score(window.score)}
+function updateScore(){window.score=Math.min(Math.floor(state.lifetime),SCORE_LIMIT);Arcade.score(window.score)}
 
 function boot(){
   buildBusinessCards();
   isBooted=true;
   rewards=IdleExtras.mount({host:document.querySelector('header'),threshold:REBIRTH_THRESHOLD,read:()=>state,format,
+    starsText:(save)=>`⭐ ${format(save.st)} · +${format(save.st*10)}%${isSoftCapped(save.investors,save.st)?` · soft cap ×${format(PRESTIGE_SOFT_CAP)}`:""}`,
+    rebirthPreview:(earned)=>`You get ${format(earned)} stars. Total investor and star bonus: ×${format(prestigeMultiplier())} → ×${format(prestigeMultiplier(state.investors,state.st+earned))}${isSoftCapped(state.investors,state.st+earned)?` (diminishing returns above ×${format(PRESTIGE_SOFT_CAP)})`:""}.`,
     resets:'cash (back to $10), businesses including gifted ones, managers and running cycles. This game has no click upgrades.',
     keeps:'existing investors.',production:()=>getAutomaticIncome(),currency:'💵',rebirth,save:pushSave,earn:applyEarnings,
     gift:(day,amount)=>{state={...state,gd:day};applyEarnings(amount);refreshAll()}});
@@ -546,6 +580,7 @@ document.getElementById("prestige-button").addEventListener("click",openPrestige
 document.getElementById("prestige-cancel").addEventListener("click",closePrestige);
 document.getElementById("prestige-confirm").addEventListener("click",confirmPrestige);
 document.getElementById("offline-close").addEventListener("click",()=>document.getElementById("offline-notice").classList.remove("show"));
+document.getElementById("softcap-close").addEventListener("click",()=>document.getElementById("softcap-notice").classList.remove("show"));
 document.getElementById("prestige-modal").addEventListener("click",(event)=>{if(event.target.id==="prestige-modal")closePrestige()});
 
 /* Debug handle for headless verification only. Exposed during normal play it
@@ -563,6 +598,10 @@ if(testMode)window.__idleEmpire=Object.freeze({
   businessIds:()=>BUSINESSES.map((business)=>business.id),
   milestoneCopy:getMilestoneCopy,
   profitMultiplier:getProfitMultiplier,
+  prestigeMultiplier,
+  rawPrestigeMultiplier,
+  isSoftCapped,
+  softCap:PRESTIGE_SOFT_CAP,
   speedMultiplier:getMilestoneMultiplier,
   getMetrics:(id)=>{
     const business=getBusiness(id);
