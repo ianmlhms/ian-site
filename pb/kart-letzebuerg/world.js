@@ -135,10 +135,12 @@
       this.add = add;
       const road = KL.scenery.road(track, theme);
       add(road.asphalt, M.asphalt); add(road.cobble, M.cobble);
-      const sides = KL.scenery.sides(track, theme);
+      const wallPt = (i, side) => { const lim = track.HW[i] + (side < 0 ? track.WL[i] : track.WR[i]); return [track.X[i] - track.TZ[i] * side * lim, track.Z[i] + track.TX[i] * side * lim]; };
+      const sides = KL.scenery.sides(track, theme, track.branches.length ? { skip: (i, side) => { const q = wallPt(i, side); return track.inMouth(q[0], q[1], 1.2); } } : null);      // walls stay open where a shortcut leaves / joins
       add(sides.verge, M.verge); add(sides.kerb, M.kerb); add(sides.wall, M.wall);
       const dec = KL.scenery.decals(track, def.pads ? race.pads : []);
       add(dec.pads, M.pads); add(dec.checker, M.checker);
+      this.buildBranches(track, theme);
       this.buildGround(track, theme);
       const cityData = theme.osm && KL.osm && KL.osm[theme.osm];
       if (cityData) this.buildCity(track, theme, cityData, rnd);
@@ -158,12 +160,31 @@
       this.setWeather(this.weatherName, true);
     }
 
+    /* shortcuts (track.branches): own ribbon (red cycle-path tarmac), kerbs and walls; nothing is drawn where it lies on the main road */
+    buildBranches(track, theme) {
+      if (!track.branches.length) return;
+      const M = this.mats, add = this.add, tmp = {};
+      const mat = M.cobble.clone(); mat.polygonOffset = true; mat.polygonOffsetFactor = -1.5; mat.polygonOffsetUnits = -1.5; M.cutRoad = mat;      // brick paving: slower than the avenue, and it reads as another road
+      for (const b of track.branches) {
+        const T = b.T, L = b.L;
+        const onMain = (x, z, pad) => { const m = track.project(x, z, -1, null, tmp); return Math.abs(m.d) < m.hw + pad; };
+        add(KL.scenery.cutRoad(T, track, { lift: 0.03, tint: KL.col(b.def.tint || '#ee9c84') }), mat);
+        const wallSkip = (i, side) => {
+          const q = i * T.step; if (q < 6 || q > L - 6) return true;
+          const p = KL.edgePt(T, i, side * (T.HW[i] + (side < 0 ? T.WL[i] : T.WR[i])), 0);
+          const m = track.project(p[0], p[2], -1, null, tmp); return Math.abs(m.d) < m.hw + Math.max(m.wl, m.wr) + 1.5;
+        };
+        const sides = KL.scenery.sides(T, theme, { skip: wallSkip });
+        add(sides.verge, M.verge); add(sides.kerb, M.kerb); add(sides.wall, M.wall);
+      }
+    }
+
     /* real street fabric from baked OSM footprints (city.js) */
     buildCity(track, theme, data, rnd) {
       const terr = track.terrain || track.def.terrain || (() => 0), M = this.mats, add = this.add;
       const city = KL.scenery.osmCity(track, theme, data, rnd, terr, this.q);
       this.city = city;
-      KL.scenery.osmTrees(track, theme, data, city, rnd, terr, this.q, theme.treeKeepClear);
+      KL.scenery.osmTrees(track, theme, data, city, rnd, terr, this.q, track.branches.length ? (x, z) => track.nearBranch(x, z, 5) || (theme.treeKeepClear && theme.treeKeepClear(x, z)) : theme.treeKeepClear);
       if (theme.boulevardTrees) KL.scenery.boulevardTrees(track, theme, data, city, rnd, terr, this.q);
       for (const c of city.chunks.values()) { add(c.walls, M.building); add(c.wallsM, M.buildingM); add(c.roofs, M.roof); add(c.extra, M.plain); add(c.found, M.wall); add(c.trees, M.plain); }
       this.cityCount = city.count;
@@ -211,6 +232,7 @@
         for (const sdx of sides) {
           const lim = track.HW[ci] + (sdx < 0 ? track.WL[ci] : track.WR[ci]) - 0.4;
           const p = track.at(s, sdx * lim);
+          if (track.branches.length && (track.inMouth(p.x, p.z, 3) || track.nearBranch(p.x, p.z, 3))) continue;
           // local +x of the lamp model must point to the road: world direction = (-right * sdx) = (tz*sdx, ... ) ; yaw such that (cos yaw, -sin yaw) = dir
           const dx = p.tz * sdx, dz = -p.tx * sdx;       // -right*sdx where right = (-tz, tx)
           const yaw = Math.atan2(-dz, dx);
@@ -482,9 +504,9 @@
       const f = c.snap ? 1 : 1 - Math.exp(-14 * dt);
       c.x = lerp(c.x, tx, f); c.z = lerp(c.z, tz, f); c.y = lerp(c.y, ty, c.snap ? 1 : 1 - Math.exp(-9 * dt));
       // keep the camera on the street side of the walls (no flying through the facade on tight corners)
-      if (this.track && this.theme.cameraClamp !== false) {
+      if (this.track && this.theme.cameraClamp !== false && !k.br) {          // (on a shortcut the walls are low and nothing stands beside it)
         const p = this.track.project(c.x, c.z, k.hint, k.y, this._cp || (this._cp = {})), lim = p.hw + (p.d >= 0 ? p.wr : p.wl) - 0.3;
-        if (Math.abs(p.d) > lim) { const sg = Math.sign(p.d), over = Math.abs(p.d) - lim; c.x -= -p.tz * sg * over; c.z -= p.tx * sg * over; }
+        if (Math.abs(p.d) > lim && !(this.track.branches.length && this.track.inMouth(c.x, c.z, 1))) { const sg = Math.sign(p.d), over = Math.abs(p.d) - lim; c.x -= -p.tz * sg * over; c.z -= p.tx * sg * over; }
       }
       const lookAhead = 5.5;
       const lx = k.x + Math.sin(c.yaw) * lookAhead, lz = k.z + Math.cos(c.yaw) * lookAhead, ly = k.y + 1.5;

@@ -241,6 +241,7 @@
         const i = Math.floor(s / track.step) % track.N, off = track.HW[i] + (side < 0 ? track.WL[i] : track.WR[i]) + 1.7;
         const p = track.at(s, side * off), q = track.at(s, side * (off + 4));
         if (terrain(p.x, p.z) < -1) continue;
+        if (track.branches.length && (track.inMouth(p.x, p.z, 4) || track.nearBranch(p.x, p.z, 4))) continue;
         if (near(p.x, p.z, 4.5) || near(q.x, q.z, 4)) continue;
         if (noBuild.some((nb) => Math.hypot(p.x - nb[0], p.z - nb[1]) < nb[2] * 0.9)) continue;
         if (mapped.some((m) => Math.abs(m[0] - p.x) < 7 && Math.abs(m[1] - p.z) < 7)) continue;

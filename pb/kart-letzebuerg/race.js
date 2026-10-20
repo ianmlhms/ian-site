@@ -14,6 +14,7 @@
     };
     R.boxes = KL.makeBoxes(track);
     R.pads = (track.def.pads || []).map(([s, d, len, dyaw], i) => { const p = track.at(s, d || 0); return { x: p.x, z: p.z, y: p.y, s, d: d || 0, h: p.h + (dyaw || 0), len: len || 8, w: 4.2, id: i }; });   // optional 4th: heading offset (pads on second routes)
+    for (const b of track.branches || []) for (const [qs, d, len, dyaw] of b.def.pads || []) { const p = b.T.at(qs, d || 0); R.pads.push({ x: p.x, z: p.z, y: p.y, s: b.map(qs), d: d || 0, h: p.h + (dyaw || 0), len: len || 8, w: 4.2, id: R.pads.length }); }    // boost pads on a shortcut
     /* timed hazards (fire geysers): erupt for `on` seconds at the end of every `period`; hazardState() is 0 idle / (0,1) warning ramp / 2 erupting */
     R.hazards = (track.def.hazards || []).map((h, i) => { const p = track.at(h.s, h.d || 0); return { x: p.x, y: p.y, z: p.z, s: h.s, d: h.d || 0, r: h.r || 3, period: h.period || 6, on: h.on || 1, warn: h.warn || 1.1, phase: h.phase || 0, id: i }; });
     R.hazardState = (h, at) => { const ph = ((((at != null ? at : R.clock) + h.phase) % h.period) + h.period) % h.period, t0 = h.period - h.on; return ph >= t0 ? 2 : ph >= t0 - h.warn ? (ph - (t0 - h.warn)) / h.warn : 0; };

@@ -18,6 +18,10 @@
       }
     }
     for (const [s, d] of def.extraBoxes || []) { const p = track.at(s, d); boxes.push({ x: p.x, y: p.y + 1.1, z: p.z, s, d, active: true, respawn: 0, id: boxes.length }); }   // item boxes off the racing line (shortcuts)
+    for (const b of track.branches || []) for (const [qs, count] of b.def.boxes || []) {      // item boxes on a shortcut (qs: metres along the cut)
+      const span = Math.min(b.T.HW[0] * 1.5, (count - 1) * 3.2);
+      for (let k = 0; k < count; k++) { const d = count === 1 ? 0 : -span / 2 + (span * k) / (count - 1), p = b.T.at(qs, d); boxes.push({ x: p.x, y: p.y + 1.1, z: p.z, s: b.map(qs), d, active: true, respawn: 0, id: boxes.length }); }
+    }
     return boxes;
   };
 
@@ -120,7 +124,7 @@
         }
       } else if (it.type === 'orb') {
         it.x += it.vx * dt; it.z += it.vz * dt;
-        const p = track.project(it.x, it.z, it.hint != null ? it.hint : -1, it.y - 0.7, tmp);
+        const p = track.loc(it, it.x, it.z, it.y - 0.7, tmp);
         it.hint = p.i;
         const lim = p.hw + (p.d >= 0 ? p.wr : p.wl) - 0.8;
         if (Math.abs(p.d) > lim) {
@@ -137,13 +141,13 @@
       } else if (it.type === 'rocket') {
         const tgt = it.target != null ? R.byId[it.target] : null;
         let tx, tz;
-        const p = track.project(it.x, it.z, it.hint != null ? it.hint : -1, it.y - 0.9, tmp);
+        const p = track.loc(it, it.x, it.z, it.y - 0.9, tmp);
         it.hint = p.i;
         if (tgt && !tgt.finished) {
           const dist = Math.hypot(tgt.x - it.x, tgt.z - it.z);
           if (dist < 40) { tx = tgt.x; tz = tgt.z; }
-          else { const q = track.at(p.s + 16, clamp(tgt.d, -p.hw * 0.7, p.hw * 0.7)); tx = q.x; tz = q.z; }
-        } else { const q = track.at(p.s + 16, clamp(p.d, -p.hw * 0.6, p.hw * 0.6)); tx = q.x; tz = q.z; }
+          else { const q = p.T.at(p.ss + 16, clamp(tgt.d, -p.hw * 0.7, p.hw * 0.7)); tx = q.x; tz = q.z; }
+        } else { const q = p.T.at(p.ss + 16, clamp(p.d, -p.hw * 0.6, p.hw * 0.6)); tx = q.x; tz = q.z; }
         const want = Math.atan2(tx - it.x, tz - it.z), err = wrapAngle(want - it.yaw);
         it.yaw += clamp(err, -4.2 * dt, 4.2 * dt);
         it.x += Math.sin(it.yaw) * it.speed * dt; it.z += Math.cos(it.yaw) * it.speed * dt;

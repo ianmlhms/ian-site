@@ -78,6 +78,10 @@ h2{margin:0 0 8px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;c
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chips button{padding:0 12px;font-size:13px;font-weight:700;border-radius:999px}.chips button.on{background:var(--ink);color:#0b1226;border-color:var(--ink)}
 .drivers{display:flex;flex-wrap:wrap;gap:6px}.drivers button{padding:0 10px 0 6px;display:flex;align-items:center;gap:7px;border-radius:999px;font-size:13px;font-weight:700}.drivers i{width:22px;height:22px;border-radius:50%;border:3px solid #fff;display:inline-block}.drivers button.on{border-color:var(--gold);background:rgba(255,210,63,.16)}
 .foot{display:flex;gap:10px;margin-top:6px}
+/* the start button stays on screen however short the viewport (iPad landscape, phones): the menu card scrolls, the footer sticks to its bottom edge */
+.menu-card .foot{position:sticky;bottom:-22px;z-index:3;margin:6px -24px 0;padding:12px 24px 22px;background:linear-gradient(to top,#0e162c 72%,rgba(14,22,44,0));border-radius:0 0 26px 26px}
+.menu-card .hint{margin-top:0}
+@media (max-width:700px){.menu-card .foot{bottom:-16px;margin:6px -16px 0;padding:10px 16px 16px}}
 .primary{flex:1;min-height:54px;border-radius:18px;font-size:20px;font-weight:900;font-style:italic;background:linear-gradient(135deg,#ed2939,#ff7a3c);border-color:#fff6;box-shadow:0 6px 24px #ed293966}
 .hint{margin:10px 0 0;font-size:12px;color:var(--soft);text-align:center}
 .small h2{font-size:22px;letter-spacing:0;text-transform:none;color:var(--ink);margin:0}
