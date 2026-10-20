@@ -98,7 +98,7 @@ function netStall(p, ms) {
   }, ms);
 }
 // (these sections simulate NETWORK stalls; the CPU-load stalls of a busy test machine must not be forgiven on top of them)
-const NO_STALL_FORGIVENESS = [['STALL_FRAME: 700', 'STALL_FRAME: 6000']];
+const NO_STALL_FORGIVENESS = [['STALL_FRAME: 700', 'STALL_FRAME: 6000'], ['CONNECT_TIMEOUT: 10000', 'CONNECT_TIMEOUT: 45000']];   // (+ a loaded machine must not push WebRTC onto the relay)
 const BLOCK_RTC = () => { RTCPeerConnection.prototype.setRemoteDescription = () => new Promise(() => {}); };   // school Wi-Fi: no direct path between devices
 const FAST_RELAY = [['CONNECT_TIMEOUT: 10000', 'CONNECT_TIMEOUT: 2500']];                                       // (test speed: give up WebRTC sooner)
 
