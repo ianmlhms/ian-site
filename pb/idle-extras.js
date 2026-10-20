@@ -74,27 +74,30 @@
   /** Confirm button guard: locked for OPEN_LOCK_MS after arm(), then either a plain click or (needsHold) a press-and-hold of
    * HOLD_MS (pointer or Enter/Space held down; a bare click, a double tap or a key tap does nothing). */
   function makeGuard(button){
-    let cfg=null,unlockTimer=0,raf=0,heldSince=0,holding=false;
+    let cfg=null,unlockTimer=0,holdTimer=0,raf=0,heldSince=0,holding=false;
     const progress=fraction=>button.style.setProperty('--hold',String(Math.round(fraction*100)));
     function stopHold(){
       if(!holding)return;
-      holding=false;cancelAnimationFrame(raf);progress(0);
+      holding=false;cancelAnimationFrame(raf);clearTimeout(holdTimer);progress(0);
       button.classList.remove('idle-holding');
       if(cfg)button.textContent=cfg.holdLabel;
     }
+    // The timer decides, the animation frame only draws the fill (a busy or slow device must not stretch the hold).
     function step(){
       if(!holding)return;
-      const fraction=Math.min(1,(performance.now()-heldSince)/HOLD_MS);
-      progress(fraction);
-      if(fraction<1){raf=requestAnimationFrame(step);return}
-      holding=false;button.classList.remove('idle-holding');progress(0);
+      progress(Math.min(1,(performance.now()-heldSince)/HOLD_MS));
+      raf=requestAnimationFrame(step);
+    }
+    function complete(){
+      if(!holding)return;
+      holding=false;cancelAnimationFrame(raf);button.classList.remove('idle-holding');progress(0);
       const done=cfg;disarm();if(done)done.onConfirm();
     }
     function startHold(){
       if(holding||!cfg||!cfg.needsHold||button.disabled)return;
       holding=true;heldSince=performance.now();
       button.classList.add('idle-holding');button.textContent=cfg.holdingLabel;
-      raf=requestAnimationFrame(step);
+      raf=requestAnimationFrame(step);holdTimer=setTimeout(complete,HOLD_MS);
     }
     function disarm(){
       clearTimeout(unlockTimer);stopHold();cfg=null;button.disabled=true;
