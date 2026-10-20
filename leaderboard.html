@@ -146,9 +146,9 @@
 <script type="module" src="notify-ambient.js?v=33"></script>
 <script type="module">
 import * as auth from "./auth.js?v=32";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=10";
-import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=8";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=8";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
+import { scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=9";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=9";
 installWeeklyUi();
 const $ = (id)=>document.getElementById(id);
 const esc=(s)=>(""+(s??"")).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
