@@ -74,7 +74,7 @@ export const flow = {
       h.step("Emma gets the invite popup while she plays, taps it, lands in the lobby");
       await emma.page.waitForSelector(".ip-card");
       const toast = await text(emma.page, ".ip-title");
-      h.expect(/tester/.test(popup) && /Connect 4/.test(popup), `popup names the host and the game (${toast})`);
+      h.expect(/tester/.test(toast) && /Connect 4/.test(toast), `popup names the host and the game (${toast})`);
       await shot(emma, "invite-toast");
       await emma.page.click(".ip-card .ip-primary");
       await emma.page.waitForSelector("#mplRoster");
@@ -160,7 +160,7 @@ export const flow = {
       REPORT.openToReady = { framesIn: budgetOpen.frames.framesIn, framesOut: budgetOpen.frames.framesOut, bytes: budgetOpen.frames.bytesIn + budgetOpen.frames.bytesOut };
       h.expect(sum(host.http, /rpc\/mp_invite/) === 1 && countHttp(host, /rpc\/my_friends/) === 1, "host: exactly 1 mp_invite + 1 my_friends");
       h.expect(countHttp(host, /^[A-Z]+ game_invites/) === 0, "host: never reads or writes the game_invites table (no polling)");
-      h.expect(countHttp(host, /rpc\/my_game_invites/) <= 2, "host: my_game_invites only when an entry screen opened (2x)");
+      h.expect(countHttp(host, /rpc\/my_game_invites/) <= 3, "host: my_game_invites only when an entry screen opened (2x) + the one site-wide catch-up of the first page load (invite-pop.js)");
       console.log("    requests host:", JSON.stringify(host.http));
       console.log("    requests emma:", JSON.stringify(emma.http));
       console.log("    realtime:", JSON.stringify(REPORT.realtime), "· open→ready:", JSON.stringify(REPORT.openToReady));
