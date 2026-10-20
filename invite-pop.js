@@ -8,7 +8,7 @@
  *     never takes focus, hides itself after ~8 s and opens a compact Join / Later sheet when tapped. Everywhere else a
  *     centred popup (Join / Decline / Later; Esc or the backdrop = Later). A banner nobody answered is offered once as a
  *     popup when the game ends (or on the next page that is not a live game).
- *   - Several tabs: the first visible tab to claim an invite shows it (localStorage claim), the result is shared through
+ *   - Several tabs: the first visible tab to claim an invite (a Web Lock per invite) shows it, the result is shared through
  *     localStorage so the others drop it. Expired (> 12 h) and non-pending invites are ignored; who may invite whom is
  *     decided by the server (mp_invite / visible_user_ids), nothing is added here.
  *
@@ -30,6 +30,7 @@ const STATE_KEY = "invitepop:state";
 const ALIVE_KEY = "invitepop:alive";
 const CLAIM_KEY = "invitepop:claim:";
 const LOCK_NAME = "invitepop-live";
+const CLAIM_LOCK = "invitepop-claim-";
 const ROOM_RE = /^[A-Za-z0-9]{4,10}$/;
 const LIVE_BY_DEFAULT = /(?:^|\/)(?:pb\/[A-Za-z0-9_-]+|geometrydash|mordsfall)\.html$/;
 
@@ -133,14 +134,33 @@ async function setStatus(inv, status) {
   } catch (error) { console.warn("[invites] status not saved", error); }
 }
 
-/* ---------- who shows it: a claim in localStorage, settled after a short jittered wait ---------- */
+/* ---------- who shows it ----------
+ * A Web Lock per invite, taken with ifAvailable and held for the life of the page: exactly one tab gets it, atomically
+ * (localStorage is only eventually consistent between processes, so it cannot arbitrate a race). Without Web Locks a claim
+ * in localStorage, settled after a short jittered wait, is the best effort. */
+const claimed = new Set();
+function takeLock(id) {
+  return new Promise((resolve) => {
+    navigator.locks.request(CLAIM_LOCK + id, { ifAvailable: true }, (lock) => {
+      resolve(Boolean(lock));
+      return lock ? new Promise(() => {}) : undefined;
+    }).catch(() => resolve(false));
+  });
+}
 async function claim(id) {
-  const key = CLAIM_KEY + id;
-  const held = readJson(key, null);
-  if (held && held.tok !== TOKEN && Date.now() - held.t < CLAIM_MS) return false;
-  writeJson(key, { tok: TOKEN, t: Date.now() });
-  await sleep(CLAIM_SETTLE_MS + Math.random() * 60);
-  return readJson(key, null)?.tok === TOKEN;
+  if (claimed.has(id)) return true;
+  let won;
+  if (navigator.locks?.request) won = await takeLock(id);
+  else {
+    const key = CLAIM_KEY + id;
+    const held = readJson(key, null);
+    if (held && held.tok !== TOKEN && Date.now() - held.t < CLAIM_MS) return false;
+    writeJson(key, { tok: TOKEN, t: Date.now() });
+    await sleep(CLAIM_SETTLE_MS + Math.random() * 60);
+    won = readJson(key, null)?.tok === TOKEN;
+  }
+  if (won) claimed.add(id);
+  return won;
 }
 
 /* ---------- queue → screen ---------- */
@@ -256,7 +276,7 @@ function showBanner(inv, previous, done) {
   let timer = 0, root = null, sheetOpen = false;
   const stop = () => { clearTimeout(timer); timer = 0; };
   const arm = () => { stop(); if (!sheetOpen) timer = setTimeout(expire, BANNER_MS); };
-  const close = () => { stop(); document.removeEventListener("keydown", onKey, true); root?.remove(); root = null; done(); };
+  const close = () => { stop(); document.removeEventListener("keydown", onKey, true); document.removeEventListener("pointerdown", onOutside, true); root?.remove(); root = null; done(); };
   function expire() { queue = [{ ...inv, bannered: true }, ...queue.filter((q) => q.id !== inv.id)]; close(); }   // unanswered: offered again once the game is over
   const later = () => answer(inv, "later", previous, close);
   function onKey(e) { if (sheetOpen && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); later(); } }
@@ -267,9 +287,13 @@ function showBanner(inv, previous, done) {
     root.addEventListener(on, stop);
     root.addEventListener(off, arm);
   }
+  const SHEET_MS = 20_000;                                   // a forgotten sheet must not sit on the game for ever
+  const onOutside = (e) => { if (root && !root.contains(e.target)) later(); };   // a tap on the game itself = Later
   function openSheet() {
     if (sheetOpen) return;
     sheetOpen = true; stop();
+    timer = setTimeout(expire, SHEET_MS);
+    document.addEventListener("pointerdown", onOutside, true);
     const joinBtn = h("button", { type: "button", class: "ip-btn ip-primary", onclick: () => answer(inv, "join", previous, close) }, t.join);
     const laterBtn = h("button", { type: "button", class: "ip-btn ip-quiet", onclick: later }, t.later);
     const sheet = h("div", { class: "ip-sheet", role: "dialog", "aria-label": t.sheet },

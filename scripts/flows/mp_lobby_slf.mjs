@@ -1,6 +1,6 @@
 /* Shared multiplayer lobby — pilot 2: Stadt-Land-Fluss (3+ players, host settings, host hand-over).
  *   tester (host, signed in) · Emma (friend, invited by toast) · Gast (signed out, joins by link) — one browser, one Realtime hub.
- * Covers: the game's declared settings (categories: host edits, the others see them read-only), invite toast → join, a guest joining
+ * Covers: the game's declared settings (categories: host edits, the others see them read-only), invite popup → join, a guest joining
  * by link, host removes a player (who lands back on the entry screen), ready/start with three players, the game receiving roster +
  * settings (round 1 opens by itself with the chosen categories), back to lobby, the host leaving in the lobby → Emma takes over
  * with the settings carried over, and the budget of the whole session. */
@@ -52,13 +52,13 @@ export const flow = {
       for (const c of ["Land", "Fluss", "Name", "Beruf"]) await host.page.click(`#mplSettings .mpl-chip:text-is("${c}")`);
       h.eq(await pressed(host.page), ["Stadt", "Land", "Fluss", "Name", "Beruf", "Farbe"], "…and six are back");
 
-      h.step("invite Emma through the picker → toast → she joins");
+      h.step("invite Emma through the picker → popup → she joins");
       await host.page.click("#mplAdd");
       await host.page.click('.ppk-row[data-name="Emma"]');
       await host.page.click("#ppGo");
-      await emma.page.waitForSelector(".ntf");
-      h.expect(/Stadt-Land-Fluss/.test(await text(emma.page, ".ntf")), `toast names the game (${await text(emma.page, ".ntf")})`);
-      await emma.page.click(".ntf");
+      await emma.page.waitForSelector(".ip-card");
+      h.expect(/Stadt-Land-Fluss/.test(await text(emma.page, ".ip-title")), `popup names the game (${await text(emma.page, ".ip-title")})`);
+      await emma.page.click(".ip-card .ip-primary");
       await emma.page.waitForSelector("#mplRoster");
       h.eq(await pressed(emma.page), ["Stadt", "Land", "Fluss", "Name", "Beruf", "Farbe"], "Emma sees the host's categories");
       h.expect(await emma.page.$$eval("#mplSettings .mpl-chip", (els) => els.every((e) => e.disabled)), "…read-only for her");

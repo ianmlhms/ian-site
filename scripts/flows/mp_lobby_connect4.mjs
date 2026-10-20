@@ -1,7 +1,7 @@
 /* Shared multiplayer lobby — pilot 1: Connect 4 (2 players, turn based).
  * Three browser contexts, one in-process Realtime hub, nothing reaches the live project:
  *   tester (host, signed in)  ·  Emma (friend, signed in, busy in a Connect 4 vs-computer game)  ·  Gast (signed out)
- * Covers: bare game URL → lobby, create (4-letter code), add people via the shared picker, the invite toast on Emma's page, join
+ * Covers: bare game URL → lobby, create (4-letter code), add people via the shared picker, the invite popup on Emma's page, join
  * from the toast, ready/start, the game itself (a move crosses over), back to the lobby for a rematch, a full lobby, a guest joining
  * by link, old ?room= links, and the request / realtime-frame budget of the whole session (printed + MP_LOBBY_REPORT=/path.json). */
 import fs from "node:fs";
@@ -71,12 +71,12 @@ export const flow = {
       h.eq(world.mpInviteCalls.map((c) => [c.p_game, c.p_room, c.p_to]), [["connect4", code.toLowerCase(), [USERS.emma.id]]], "ONE mp_invite request: game, lowercase code, Emma");
       h.expect(/invitéiert/.test(await text(host.page, ".mpl-row.mpl-invited")), "roster shows «Emma — invitéiert…»");
 
-      h.step("Emma gets the invite toast while she plays, taps it, lands in the lobby");
-      await emma.page.waitForSelector(".ntf");
-      const toast = await text(emma.page, ".ntf");
-      h.expect(/tester/.test(toast) && /Connect 4/.test(toast), `toast names the host and the game (${toast})`);
+      h.step("Emma gets the invite popup while she plays, taps it, lands in the lobby");
+      await emma.page.waitForSelector(".ip-card");
+      const toast = await text(emma.page, ".ip-title");
+      h.expect(/tester/.test(popup) && /Connect 4/.test(popup), `popup names the host and the game (${toast})`);
       await shot(emma, "invite-toast");
-      await emma.page.click(".ntf");
+      await emma.page.click(".ip-card .ip-primary");
       await emma.page.waitForSelector("#mplRoster");
       h.expect(emma.page.url().includes("c=" + code), "Emma joined the lobby with the code from the invite");
       await host.page.waitForFunction(() => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length === 2);

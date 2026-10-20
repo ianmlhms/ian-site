@@ -118,13 +118,13 @@ async function oneGame(h, id, index, players) {
       h.eq(await pressed(host.page), d.expectPressed, "host's settings chosen");
     } else h.expect(await host.page.isHidden("#mplSettings"), "no settings panel for this game");
 
-    h.step(`${id}: invite Emma (toast) + guest by link`);
+    h.step(`${id}: invite Emma (popup) + guest by link`);
     await host.page.click("#mplAdd");
     await host.page.click('.ppk-row[data-name="Emma"]');
     await host.page.click("#ppGo");
-    await emma.page.waitForSelector(".ntf");
-    h.expect((await text(emma.page, ".ntf")).includes(g.name), "toast names the game");
-    await emma.page.click(".ntf");
+    await emma.page.waitForSelector(".ip-card");
+    h.expect((await text(emma.page, ".ip-title")).includes(g.name), "popup names the game");
+    await emma.page.click(".ip-card .ip-primary");
     await emma.page.waitForSelector("#mplRoster");
     await guest.page.goto(h.origin + `/lobby.html?g=${id}&c=${code}`, { waitUntil: "domcontentloaded" });
     await guest.page.waitForSelector("#mplRoster");

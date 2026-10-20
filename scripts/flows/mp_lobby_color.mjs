@@ -1,6 +1,6 @@
 /* Shared multiplayer lobby — Colour Guess (2–8 players, host settings: rounds + colour mode). FOUR players in one browser, one Realtime hub:
  *   tester (host) · Emma + Max (friends, invited together in ONE mp_invite, both busy in another game) · Gast (signed out, joins by link).
- * Covers: bare color.html → lobby, the game's declared settings (rounds, flash mode), invite toasts → join, ready/start, the game
+ * Covers: bare color.html → lobby, the game's declared settings (rounds, flash mode), invite popups → join, ready/start, the game
  * opens round 1 by itself with the host's rounds + mode on every device, a full round (everybody locks a colour in → results on all four),
  * the «‹ Lobby» button (two taps mid-round, one after the final round), settings kept after the rematch, ?ai=1 and the old ?room= link,
  * and the request/frame budget of a 4-player session. */
@@ -56,9 +56,9 @@ export const flow = {
       await host.page.waitForSelector(".mpl-row.mpl-invited");
       h.eq(world.mpInviteCalls.map((c) => [c.p_game, c.p_to.length]), [["color", 2]], "ONE mp_invite with two people");
       for (const p of [emma, max]) {
-        await p.page.waitForSelector(".ntf");
-        h.expect(/Colour Guess/.test(await text(p.page, ".ntf")), `${p.label}: toast names the game`);
-        await p.page.click(".ntf");
+        await p.page.waitForSelector(".ip-card");
+        h.expect(/Colour Guess/.test(await text(p.page, ".ip-title")), `${p.label}: popup names the game`);
+        await p.page.click(".ip-card .ip-primary");
         await p.page.waitForSelector("#mplRoster");
       }
       await guest.page.goto(h.origin + `/lobby.html?g=color&c=${code}`, { waitUntil: "domcontentloaded" });
