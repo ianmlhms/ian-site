@@ -285,7 +285,7 @@ export function mountSaves(host, { getClient, pageLabel }) {
     host.innerHTML = `<section class="wide-section" aria-label="${esc(at("saves.title"))}">
       <div class="wide-bar"><h2>${esc(at("saves.title"))}</h2></div>
       <form class="wide-filters" id="svSearchForm" role="search">
-        <label class="wide-field grow"><span class="sr-only">${esc(at("saves.search"))}</span><input id="svSearch" type="search" value="${esc(state.query)}" placeholder="${esc(at("saves.search"))}" aria-label="${esc(at("saves.search"))}" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+        <label class="wide-field stretch"><span class="sr-only">${esc(at("saves.search"))}</span><input id="svSearch" type="search" value="${esc(state.query)}" placeholder="${esc(at("saves.search"))}" aria-label="${esc(at("saves.search"))}" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
         <button type="submit" class="wide-btn" id="svSearchBtn">${esc(at("saves.searchBtn"))}</button>
       </form>
       <div id="svResults">${resultsHtml()}</div>
