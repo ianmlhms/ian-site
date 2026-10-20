@@ -1,6 +1,7 @@
 // Supabase Edge Function: ops
-// Status of Ian's two machines (brix, Mac Mini): their heartbeats, the owner-only
-// status read for ops.html, and the cron check that pushes when one changes state.
+// Status of Ian's two machines (brix, Mac Mini) and the Supabase usage watch: their
+// heartbeats, the owner-only status read for ops.html, and the cron check that
+// pushes when one changes state.
 //
 // Deployed with --no-verify-jwt because two paths authenticate with shared
 // secrets (cron: x-cron-secret, machines: x-beat-secret); every other action is

@@ -52,6 +52,13 @@ function repeatDueAfterMs(last: LastAlert): number {
   return wasRepeat(last) ? LATER_REPEAT_MS : FIRST_REPEAT_MS;
 }
 
+/** The health that alerting judges. A `quiet` service (it alerts for itself)
+ * only counts as unhealthy when it has gone silent, not when it reports a
+ * problem of its own. */
+function alertHealth(service: ServiceHealth): Health {
+  return service.quiet && !service.stale ? "ok" : service.health;
+}
+
 /** Decide, for one key, whether its current state is worth a row right now. */
 function considerState(
   key: string,
@@ -102,7 +109,7 @@ export function planAlerts(
   for (const service of services) {
     const item = considerState(
       service.key,
-      service.health,
+      alertHealth(service),
       `${service.label}: ${service.reason}`,
       `${service.label} is back — ${service.reason}`,
       lastAlerts.get(service.key),
