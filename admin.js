@@ -2,6 +2,9 @@
  * All privileged actions are guarded server-side by is_admin(). */
 import * as auth from "./auth.js?v=34";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
+import { at } from "./admin-texts.js?v=1";
+import { mountKart } from "./admin-kart.js?v=1";
+import { mountSaves } from "./admin-saves.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -60,6 +63,9 @@ $("glist").addEventListener("click", (event) => {
 });
 document.addEventListener("i18n:change", () => {
   if (mode === "online" && onlineLoaded) renderOnline(filteredOnlineRows());
+  setTabLabels();
+  if (mode === "kart") kartView?.relabel();
+  if (mode === "saves") savesView?.relabel();
 });
 
 $("glist").addEventListener("keydown", (e) => {
@@ -91,6 +97,8 @@ function appendMedia(container, m) {
 let sb = null, mode = "groups", groups = [], users = [], current = null;
 let onlineRows = [], onlineTags = null, onlineLoaded = false;
 let onlineRefreshTimer = null, onlineGeneration = 0;
+let kartView = null, savesView = null;
+const WIDE_MODES = new Set(["kart", "saves"]);
 
 async function signedUrl(path) {
   try { const { data, error } = await sb.storage.from("chat-media").createSignedUrl(path, 3600); return error ? null : data.signedUrl; }
@@ -426,11 +434,24 @@ document.addEventListener("visibilitychange", () => {
 });
 
 /* ============================ SHARED ============================ */
+/* The Kart and Saves tabs (admin-kart.js / admin-saves.js) use the whole width and bring their own texts. */
+function setTabLabels() {
+  $("tabKart").textContent = at("tab.kart");
+  $("tabSaves").textContent = at("tab.saves");
+}
+
 function setMode(m) {
   stopOnlineRefresh();
   mode = m; current = null;
   $("panel").classList.toggle("detail-open", m === "feedback");
   $("panel").classList.toggle("online-mode", m === "online");
+  $("panel").classList.toggle("wide-mode", WIDE_MODES.has(m));
+  $("wideKart").hidden = m !== "kart";
+  $("wideSaves").hidden = m !== "saves";
+  $("tabKart").classList.toggle("active", m === "kart");
+  $("tabSaves").classList.toggle("active", m === "saves");
+  if (m !== "kart") kartView?.hide();
+  if (m !== "saves") savesView?.hide();
   $("tabGroups").classList.toggle("active", m === "groups");
   $("tabUsers").classList.toggle("active", m === "users");
   $("tabFeedback").classList.toggle("active", m === "feedback");
@@ -443,6 +464,8 @@ function setMode(m) {
   if (m === "groups") loadGroups();
   else if (m === "users") loadUsers();
   else if (m === "feedback") loadFeedback();
+  else if (m === "kart") kartView?.show();
+  else if (m === "saves") savesView?.show();
   else {
     if (onlineLoaded) renderOnline(filteredOnlineRows());
     startOnlineRefresh();
@@ -470,6 +493,15 @@ async function gate() {
   $("tabUsers").onclick = () => setMode("users");
   $("tabFeedback").onclick = () => setMode("feedback");
   $("tabOnline").onclick = () => setMode("online");
+  $("tabKart").onclick = () => setMode("kart");
+  $("tabSaves").onclick = () => setMode("saves");
+  setTabLabels();
+  const getClient = async () => sb;
+  kartView = kartView || mountKart($("wideKart"), {
+    getClient,
+    openSaves: (userId, name) => { setMode("saves"); savesView.openUser(userId, name); },
+  });
+  savesView = savesView || mountSaves($("wideSaves"), { getClient, pageLabel });
   $("search").oninput = (e) => {
     const q = e.target.value.toLowerCase();
     if (mode === "groups") renderGroupList(groups.filter((g) => (g.name + " " + g.invite_code).toLowerCase().includes(q)));
@@ -477,7 +509,8 @@ async function gate() {
     else if (mode === "feedback") renderFeedback(feedback.filter((f) => ((f.message || "") + " " + (f.username || "") + " " + (f.page || "")).toLowerCase().includes(q)));
     else renderOnline(filteredOnlineRows());
   };
-  setMode("groups");
+  const fromHash = location.hash.slice(1);
+  setMode(WIDE_MODES.has(fromHash) ? fromHash : "groups");
 }
 
 async function boot() {
