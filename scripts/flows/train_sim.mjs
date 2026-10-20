@@ -1,5 +1,5 @@
 /* Lokféierer (train-sim): real arcade iframe, keyboard driving, doors/interlock, SPAD, passenger exchange,
- * service end -> score + monotonic save, endless order, purchase, phone block and iPad keyboard notice.
+ * service end -> score + monotonic save, endless order, purchase, phone block and touch controls.
  * Two separate careers (Zuch + Tram, the Luxtram only): wallets, purchases, tb monotonic, endless per career,
  * old-format save migration, merge, and the arcade-wide test mode (everything unlocked, nothing saved or scored).
  * Supabase is mocked; no real account. */
@@ -1439,19 +1439,17 @@ export const flow = {
       return;
     }
 
-    h.step('start screen: both modes, iPad keyboard notice');
+    h.step('start screen: both modes, no keyboard-only notice on the iPad (touch drives the train)');
     h.expect(await frame.locator('[data-test="mode-career"]').isVisible() && await frame.locator('[data-test="mode-endless"]').isVisible(), 'career and endless modes shown');
-    h.expect((await S(frame)).kbNoticeVisible, 'iPad shows the keyboard-only notice');
-    h.expect((await frame.locator('#kbText').innerText()).includes('Tastatur'), 'notice text is the Luxembourgish keyboard message');
+    h.eq(await frame.locator('#kbNotice').count(), 0, 'the keyboard-only notice is gone');
+    h.expect((await S(frame)).touchUi, 'the iPad runs with the touch controls on');
     await h.shot('start-ipad');
     await h.page.setViewportSize({ width: 1180, height: 820 });
     await h.pause(400);
-    h.expect((await S(frame)).kbNoticeVisible && await frame.locator('#kbNotice').isVisible(), 'keyboard notice also visible in the arcade iframe on iPad landscape');
+    h.expect(await frame.locator('.ts-menu').isVisible() && (await frame.locator('body').innerText()).indexOf('Tastatur') < 0, 'iPad landscape: the menu shows no keyboard message');
     await h.shot('start-ipad-landscape');
     await h.page.setViewportSize({ width: 820, height: 1180 });
     await h.pause(300);
-    await key(h, 'Shift');
-    h.expect(!(await S(frame)).kbNoticeVisible, 'notice auto-hides on the first key press');
     h.expect(await frame.evaluate(() => !!document.querySelector('.ts-menu')), 'D2 menu rendered');
 
     h.step('fresh save: two careers, the tram is playable immediately');
