@@ -191,9 +191,11 @@ export const flow = {
     h.expect(/Hold to rebirth/.test(await game.locator(".idle-confirm").innerText()), "Bus Tycoon rebirth needs the hold");
     await shots(h, "bus-rebirth-dialog");
     await holdConfirm(h, game, ".idle-confirm");
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem("pb_save_bus-tycoon") || "{}").rbc === 2);   // the game posts its save to the arcade, which stores it
     const busReset = await page.evaluate(() => JSON.parse(localStorage.getItem("pb_save_bus-tycoon")));
     h.expect(busReset.rbc === 2 && busReset.drivers === 0 && busReset.upgrades.length === 0, "Bus Tycoon: hold -> rebirth");
     await game.locator(".idle-undo button:not(.idle-undo-x)").click();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem("pb_save_bus-tycoon") || "{}").rbc === 1);
     const busBack = await page.evaluate(() => JSON.parse(localStorage.getItem("pb_save_bus-tycoon")));
     h.expect(busBack.rbc === 1 && busBack.st === 2 && busBack.drivers === 3 && busBack.upgrades.join() === "lanes,free" && ["school", "city", "gare", "kirchberg", "belval"].every((id) => busBack.owned[id] === busBefore.owned[id]) && busBack.p >= busBefore.p * 0.999 && busBack.tb >= busBefore.tb,
       "Bus Tycoon Undo restores lines, drivers, upgrades, stars and passengers");
