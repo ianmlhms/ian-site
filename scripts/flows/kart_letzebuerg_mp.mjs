@@ -48,7 +48,7 @@ async function newPlayer(h, hub, label, { first = false, viewport = { width: 640
   if (noRelay) await context.route(/kart-letzebuerg\/config\.js/, async (route) => { const r = await route.fetch(); route.fulfill({ response: r, body: (await r.text()).replace('RELAY_FALLBACK: true', 'RELAY_FALLBACK: false') }); });
   const p = { label, context, page, http: [], errors: [], notFound: [], first };
   page.on('response', (r) => { if (r.status() === 404) p.notFound.push(r.url()); });
-  page.on('request', (r) => { if (isSupabase(r.url()) && r.resourceType() !== 'websocket' && r.method() !== 'OPTIONS') p.http.push(r.method() + ' ' + new URL(r.url()).pathname); });
+  page.on('request', (r) => { if (isSupabase(r.url()) && r.resourceType() !== 'websocket' && r.method() !== 'OPTIONS' && !/\/functions\/v1\/turn/.test(r.url())) p.http.push(r.method() + ' ' + new URL(r.url()).pathname); });
   page.on('console', (m) => { if (m.type() === 'error') p.errors.push(m.text()); });
   page.on('console', (m) => { if (/\[kart-mp\] race/.test(m.text())) console.log('    [' + label + '] ' + m.text()); });
   page.on('pageerror', (e) => p.errors.push('pageerror: ' + e.message));
@@ -58,7 +58,7 @@ async function newPlayer(h, hub, label, { first = false, viewport = { width: 640
   await context.route(/\/functions\/v1\/turn/, async (route) => {
     const rq = route.request();
     if (rq.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { ...CORS, 'access-control-allow-methods': 'GET, OPTIONS' } });
-    TURN_CALLS.push({ by: label, url: rq.url(), auth: rq.headers().authorization || '' });
+    TURN_CALLS.push({ by: label, t: Date.now(), url: rq.url(), auth: rq.headers().authorization || '' });
     if (TURN.mode === 'fail') return route.fulfill({ status: 500, headers: CORS, contentType: 'application/json', body: '{"error":"boom"}' });
     return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify({ iceServers: [{ urls: ['stun:stun.cloudflare.com:3478'] }, { urls: ['turn:127.0.0.1:3478?transport=udp', 'turn:127.0.0.1:3478?transport=tcp'], username: 'mock-user', credential: 'mock-pass' }], turn: true, provider: 'mock', ttl: 7200 }) });
   });
@@ -159,7 +159,7 @@ export const flow = {
       h.step('2 players: create lobby, join by room code, ready, start (3 laps)');
       const A = await newPlayer(h, hub, 'host', { first: true }); all.push(A);
       const B = await newPlayer(h, hub, 'guest', { auth: { id: UID.guest, name: 'Guesty' } }); all.push(B);
-      const rec0 = recCount();
+      const rec0 = recCount(), turnT0 = Date.now();
       const f0 = { ...hub.stats }; hub.reset();
       await goOnline(A, 'Hosty');
       await A.page.click('#olCreate');
@@ -308,8 +308,8 @@ export const flow = {
       console.log('    Realtime frames: ' + frames + ' total (' + s.framesIn + ' to server, ' + s.framesOut + ' to clients), ' + (s.bytesIn + s.bytesOut) + ' bytes, heartbeats ' + s.heartbeats + '; after the race went live: ' + duringRace);
       console.log('    HTTP requests to supabase.co: ' + http.length + (http.length ? ' ' + JSON.stringify(http) : ''));
       console.log('    by event: ' + JSON.stringify(s.byEvent));
-      h.eq(http.filter((x) => !/functions\/v1\/turn/.test(x)), ['POST /rest/v1/rpc/record_kart_race'], 'the only Supabase HTTP request of the whole lobby -> race -> results cycle is the one race log call (besides the ICE-server lookup below)');
-      h.eq(http.filter((x) => /functions\/v1\/turn/.test(x)).length, 2, 'plus exactly one ICE-server lookup (turn function) per player when going online');
+      h.eq(http, ['POST /rest/v1/rpc/record_kart_race'], 'the only Supabase HTTP request of the whole lobby -> race -> results cycle is the one race log call (the ICE-server lookup is counted separately)');
+      h.eq(TURN_CALLS.filter((c) => c.t > turnT0).length, 2, 'plus exactly one ICE-server lookup (turn function) per player when going online');
       h.expect(duringRace <= 3, 'no Realtime traffic while racing, only ONE presence update when the results show so latecomers may come in (' + duringRace + ' frames after "go")');
       h.expect(frames <= 70, 'whole 2-player race stays within the Realtime frame budget (<= 70 frames, measured ' + frames + ')');
       h.expect(s.bytesIn + s.bytesOut <= 40000, 'and within 40 kB (measured ' + (s.bytesIn + s.bytesOut) + ' bytes)');
