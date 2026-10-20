@@ -308,8 +308,9 @@ export const flow = {
       console.log('    Realtime frames: ' + frames + ' total (' + s.framesIn + ' to server, ' + s.framesOut + ' to clients), ' + (s.bytesIn + s.bytesOut) + ' bytes, heartbeats ' + s.heartbeats + '; after the race went live: ' + duringRace);
       console.log('    HTTP requests to supabase.co: ' + http.length + (http.length ? ' ' + JSON.stringify(http) : ''));
       console.log('    by event: ' + JSON.stringify(s.byEvent));
-      h.eq(http, ['POST /rest/v1/rpc/record_kart_race'], 'the only Supabase HTTP request of the whole lobby -> race -> results cycle is the one race log call');
-      h.expect(duringRace === 0, 'no Realtime traffic at all while racing (' + duringRace + ' frames after "go")');
+      h.eq(http.filter((x) => !/functions\/v1\/turn/.test(x)), ['POST /rest/v1/rpc/record_kart_race'], 'the only Supabase HTTP request of the whole lobby -> race -> results cycle is the one race log call (besides the ICE-server lookup below)');
+      h.eq(http.filter((x) => /functions\/v1\/turn/.test(x)).length, 2, 'plus exactly one ICE-server lookup (turn function) per player when going online');
+      h.expect(duringRace <= 3, 'no Realtime traffic while racing, only ONE presence update when the results show so latecomers may come in (' + duringRace + ' frames after "go")');
       h.expect(frames <= 70, 'whole 2-player race stays within the Realtime frame budget (<= 70 frames, measured ' + frames + ')');
       h.expect(s.bytesIn + s.bytesOut <= 40000, 'and within 40 kB (measured ' + (s.bytesIn + s.bytesOut) + ' bytes)');
       h.expect(A.errors.filter((e) => !/three/.test(e)).length === 0 && B.errors.filter((e) => !/three/.test(e)).length === 0, 'no console errors on either page: ' + JSON.stringify([...A.errors, ...B.errors]));

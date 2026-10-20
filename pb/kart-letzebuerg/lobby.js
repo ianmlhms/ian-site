@@ -150,7 +150,6 @@
   function openOnline() {
     if (!window.RTCPeerConnection) { showScreen('menu'); alert(T('eNoRtc')); return; }
     L.drv = KL.G.settings.driver; showScreen('onlineScreen'); renderOnline(); olMsg('');
-    loadIce();                                              // warm up while the player types a name / code
   }
   KL.openOnline = openOnline;
   function takeName() {
