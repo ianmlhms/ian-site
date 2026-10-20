@@ -116,12 +116,15 @@
   M.onRtt = function (from, rtt) { M.rtt = rtt; };
 
   /* ---------- per-frame ---------- */
-  /* this device itself stalled (garbage collection, a throttled tab, a slow frame): messages that arrive late are nobody's fault, so every
-   * silence timer starts again from now */
+  /* this device itself stalled (garbage collection, a throttled tab, a slow frame): messages that arrive late are nobody's fault, so the
+   * stalled time is not counted as silence (the timers are moved forward by exactly the stall, never reset: a device that stalls all the
+   * time still notices a host that is really gone) */
   function restartSilence(now, gap) {
     M.stats.stalls++;
-    for (const id of M.lastRecv.keys()) M.lastRecv.set(id, now);
-    M.lastHostMsg = now; M.silentSince = 0; M.hostAwaySince = M.hostAwaySince ? now : 0;
+    const fwd = (t) => Math.min(now, (t || now) + gap);
+    for (const [id, t] of M.lastRecv) M.lastRecv.set(id, fwd(t));
+    M.lastHostMsg = fwd(M.lastHostMsg); M.hostAwaySince = M.hostAwaySince ? fwd(M.hostAwaySince) : 0;
+    if (M.silentSince) M.silentSince = fwd(M.silentSince);
     log('local stall', Math.round(gap), 'ms');
   }
   M.tick = function (now) {
