@@ -109,7 +109,8 @@ export const flow = {
     const writes = saveBodies(h, "idle-empire");
     const lastWrite = writes.at(-1);
     h.expect(lastWrite && lastWrite.data.investors === 0 && lastWrite.data.cash > 1e9 && lastWrite.data.owned.lemonade === 60, "the cloud save holds the restored state");
-    h.expect(writes.length - requestsBeforeUndo <= 1, `Undo cost at most one save request (${writes.length - requestsBeforeUndo})`);
+    const afterUndo = writes.slice(requestsBeforeUndo);   // Undo only schedules the normal debounced save: no request of its own, none carries the reset state
+    h.expect(afterUndo.length >= 1 && afterUndo.every((row) => row.data.investors === 0), `every save request after the Undo carries the restored state (${afterUndo.length} request(s) in 4.5 s, the game's own 5 s autosave included)`);
     h.eq(await page.evaluate(() => JSON.parse(localStorage.getItem("pb_save_idle-empire")).investors), 0, "local save holds the restored state too");
 
     h.step("Business Empire: a big gain needs no hold; Undo survives a reload; the toast expires");
