@@ -128,7 +128,7 @@ body.ui .pb-x{min-width:44px;min-height:44px;margin:-8px -8px 0 0}
 
 /* ---- game overlay (the games bring their own top bar) ---- */
 #overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:1000;display:none;flex-direction:column}
-#overlay.open{display:flex}
+#overlay.open{display:flex;padding-bottom:var(--pb-hint-space,0px)}   /* room for the sign-in / save hint (fixed at the bottom by pixelbreak-records.js): it must not sit on the game */
 #gh{width:100%;flex:none}
 #gf{flex:1;width:100%;border:none;border-radius:0;background:#000;min-height:0}
 /* on-screen touch controls (touch devices only) — float over the game, drive it via synthetic key events */
@@ -311,7 +311,7 @@ artwork and the level design are my own, and none of it is copied from another g
 const GAMES=[
 {id:"park",name:"Theme Park Tycoon",emoji:"🎢",thumb:"pb/thumbs/park.webp",featured:true,desc:"Build rides, paths and stalls — grow a park and visit other players'",cats:["sim","creative"],tags:[],src:"pb/park.html"},
 {id:"geometrydash",name:"Geometry Dash",emoji:"🟧",thumb:"pb/thumbs/geometrydash.webp",featured:true,desc:"Rhythm auto-runner with 15 levels — jump spikes, gaps and orbs, flip gravity, fly a ship, all to the beat",cats:["action"],tags:[],go:"geometrydash.html"},
-{id:"drive-mad",pad:true,name:"Stunt Driver",emoji:"🚗",thumb:"pb/thumbs/drive-mad.webp",featured:true,desc:"3D stunt driving — 24 levels of see-saws, hammers and crushers",cats:["action","driving"],tags:[],src:"pb/drive-mad.html"},
+{id:"drive-mad",name:"Stunt Driver",emoji:"🚗",thumb:"pb/thumbs/drive-mad.webp",featured:true,desc:"3D stunt driving — 24 levels of see-saws, hammers and crushers",cats:["action","driving"],tags:[],src:"pb/drive-mad.html"},
 {id:"paket-express",name:"Paket Express",emoji:"📦",thumb:"pb/thumbs/paket-express.webp",featured:true,desc:"Deliver parcels through a Luxembourg town — timed shifts, free driving and three unlockable vehicles",cats:["sim"],tags:[],src:"pb/paket-express.html"},
 {id:"kart-letzebuerg",name:"Kart Lëtzebuerg",emoji:"🏎️",thumb:"pb/thumbs/kart-letzebuerg.webp",featured:true,desc:"Kart racing through Luxembourg City, Kirchberg, Grund and Belval plus a fantasy cup of candy land, ice mountain, volcano and haunted castle — jumps, shortcuts, items, Grand Prix cups, time trial against your ghost, and online races for up to 8",cats:["driving","action"],tags:["mp"],src:"pb/kart-letzebuerg.html"},
 {id:"train-sim",name:"Zuchsimulator Lëtzebuerg",emoji:"🚆",thumb:"pb/thumbs/train-sim.webp",featured:true,desc:"Drive Luxembourg's trains and the real Luxtram from the cab: stop at the platform, obey signals and speed limits, earn € and buy new trains",cats:["sim"],tags:[],src:"pb/train-sim.html"},
@@ -771,6 +771,31 @@ loadPlayCounts();
     document.body.appendChild(tip);
     setTimeout(function(){tip.remove();},5000);
   };
+})();
+</script>
+<script>
+/* ---------- room for the sign-in hint ----------
+ * pixelbreak-records.js shows #pbSaveHint fixed at the bottom of the screen, over the open game (on an iPad it covered the last row of Cookie Clicker's upgrades).
+ * While it is there the game overlay keeps that much space free at the bottom (--pb-hint-space), so the game ends above the hint. */
+(function(){
+  var root=document.documentElement,ro=null,watched=null;
+  function measure(){
+    var hint=document.getElementById('pbSaveHint');
+    if(!hint){root.style.removeProperty('--pb-hint-space');return;}
+    var top=hint.getBoundingClientRect().top;
+    root.style.setProperty('--pb-hint-space',Math.max(0,Math.ceil(innerHeight-top+6))+'px');
+  }
+  function sync(){
+    var hint=document.getElementById('pbSaveHint');
+    if(hint===watched)return;
+    if(ro){ro.disconnect();ro=null;}
+    watched=hint;
+    if(hint&&window.ResizeObserver){ro=new ResizeObserver(measure);ro.observe(hint);}
+    measure();
+  }
+  new MutationObserver(sync).observe(document.body,{childList:true});
+  addEventListener('resize',measure);
+  sync();
 })();
 </script>
   <script type="module" src="rtc-ring.js?v=30"></script>
