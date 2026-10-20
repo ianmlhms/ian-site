@@ -95,9 +95,9 @@
   ];
 
   KL.DIFFICULTY = {
-    easy:   { speed: 0.90, mistakes: 0.9, drift: 0.2, items: 0.4, rubber: 0.05, cut: 0.1 },
-    normal: { speed: 0.96, mistakes: 0.5, drift: 0.65, items: 0.75, rubber: 0.05, cut: 0.35 },
-    hard:   { speed: 1.01, mistakes: 0.2, drift: 1.0, items: 1.0, rubber: 0.04, cut: 0.7 },
+    easy:   { speed: 0.90, mistakes: 0.9, drift: 0.2, items: 0.4, rubber: 0.05, cut: 0.08 },
+    normal: { speed: 0.96, mistakes: 0.5, drift: 0.65, items: 0.75, rubber: 0.05, cut: 0.3 },
+    hard:   { speed: 1.01, mistakes: 0.2, drift: 1.0, items: 1.0, rubber: 0.04, cut: 0.6 },
   };
 
   /* Time of day / weather presets. sky: [zenith, horizon]; fog colour follows the horizon. */

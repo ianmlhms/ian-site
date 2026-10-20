@@ -326,11 +326,15 @@
   function buildBranch(main, bd) {
     const T = KL.buildTrack({ id: main.id + ':' + bd.id, closed: false, mode: bd.mode, r: bd.r || 24, hw: bd.hw || 4.5, wl: bd.wl != null ? bd.wl : 1.5, wr: bd.wr != null ? bd.wr : 1.5, pts: bd.pts, ramps: bd.ramps, patches: bd.patches, zones: bd.zones });
     const L = T.length, g0 = bd.g0 || 24, g1 = bd.g1 || 24, tmp = {};
-    const stn = [0, g0, L - g1, L].map((q) => { const p = T.at(q, 0), m = main.project(p.x, p.z, -1, null, tmp); return { q, s: m.s, i: m.i, d: m.d }; });
-    for (let i = 1; i < 4; i++) if (stn[i].s < stn[i - 1].s - 1e-6) stn[i].s += main.length;        // wrapped over the start line (unsupported by progress mapping: keeps it monotone)
+    // progress stations: along the mouths the main-road distance of the point itself (every 6 m, so a kart that changes road keeps its progress), between the mouths a straight line
+    const qs = []; for (let q = 0; q < g0; q += 6) qs.push(q); qs.push(g0, L - g1); for (let q = Math.ceil((L - g1 + 1) / 6) * 6; q < L; q += 6) if (q > L - g1 + 1) qs.push(q); qs.push(L);
+    const stn = qs.map((q) => { const p = T.at(q, 0), m = main.project(p.x, p.z, -1, null, tmp); return { q, s: m.s, i: m.i, d: m.d }; });
+    for (let i = 1; i < stn.length; i++) while (stn[i].s < stn[i - 1].s - 1e-6) stn[i].s += main.length;        // keep it monotone (a cut over the start line is not supported)
+    const last = stn.length - 1;
     const map = (q) => {
       q = clamp(q, 0, L);
-      const k = q < g0 ? 0 : q < L - g1 ? 1 : 2, a = stn[k], b = stn[k + 1];
+      let lo = 0, hi = last; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (stn[mid].q <= q) lo = mid; else hi = mid; }
+      const a = stn[lo], b = stn[hi];
       return lerp(a.s, b.s, b.q > a.q ? (q - a.q) / (b.q - a.q) : 0);
     };
     const boxOf = (q0, q1, pad) => {
@@ -339,7 +343,7 @@
       return [x0 - pad, z0 - pad, x1 + pad, z1 + pad];
     };
     const pad = (bd.hw || 4.5) + (bd.wl != null ? bd.wl : 1.5) + 4;
-    return { id: bd.id, def: bd, T, L, g0, g1, stn, map, sA: stn[0].s, sB: stn[3].s, hA: stn[0].i, hE: stn[3].i, endD: stn[3].d, startD: stn[0].d,
+    return { id: bd.id, def: bd, T, L, g0, g1, stn, map, sA: stn[0].s, sB: stn[last].s, hA: stn[0].i, hE: stn[last].i, endD: stn[last].d, startD: stn[0].d,
       boxA: boxOf(0, g0 + 2, pad), boxE: boxOf(L - g1 - 2, L, pad), box: boxOf(0, L, pad) };
   }
 

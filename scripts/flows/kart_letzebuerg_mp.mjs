@@ -542,8 +542,7 @@ export const flow = {
         await Promise.all([B, S].map((p, i) => waitFor(p, (n) => window.__klTest.G.raceCount > n && window.__klTest.state().phase === 'race' && window.__klTest.state().clock > 0.3, rc0[i], 60000).catch(async (e) => { throw new Error('race 2 did not start on ' + p.label + ': ' + JSON.stringify(await kl(p, () => ({ lobby: KL.Lobby.phase, state: __klTest.G.state, spec: KL.MP.spec, msg: document.getElementById('olMsg').textContent })).catch(() => '?')) + ' ' + JSON.stringify(p.errors) + ' ' + JSON.stringify(p.notFound)); })));
         h.eq(await Promise.all([B, S].map((p) => kl(p, () => __klTest.G.race.karts.filter((k) => k.human).length))), [2, 2], 'next race: the former spectator drives as a full player');
         h.eq(await mp(S).then((m) => [m.spec, m.role]), [false, 'client'], 'and is a normal client now');
-        // (known, not ours: the shared auth.js injects "auth.css" with a relative path, a 404 on every /pb/ page opened with ?room=; ignored here)
-        const realErrors = (p) => p.errors.filter((e) => !/three/.test(e) && !(/404/.test(e) && p.notFound.length && p.notFound.every((u) => /auth\.css/.test(u))));
+        const realErrors = (p) => p.errors.filter((e) => !/three/.test(e));
         h.expect([A, B, S].every((p) => realErrors(p).length === 0), 'no console errors: ' + JSON.stringify([A, B, S].flatMap((p) => realErrors(p).concat(p.notFound))));
         await closeAll(all); all.length = 0;
       }
