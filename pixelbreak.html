@@ -543,6 +543,7 @@ var frame=document.getElementById('gf');
 frame.onload=function(){try{frame.contentWindow.focus();}catch(e){}};
 document.getElementById('overlay').classList.add('open');
 document.body.classList.add('game-open');
+document.documentElement.dataset.liveGame='1';   // invite-pop.js: an invite is a slim banner while a game is open
 // Arrows only for games steered with keys; tap/drag games (Solitaire, Minesweeper…) don't need them.
 document.body.classList.toggle('game-no-pad',!g.pad);
 document.body.style.overflow='hidden';
@@ -580,6 +581,7 @@ function closeGame(fromHistory){
 openSeq++;
 document.getElementById('overlay').classList.remove('open');
 document.body.classList.remove('game-open');
+delete document.documentElement.dataset.liveGame;
 document.body.classList.remove('game-no-pad');
 document.getElementById('gf').srcdoc='';
 document.body.style.overflow='';
@@ -653,6 +655,9 @@ import('./mp-games.js?v=4').then(function(m){MPG=m}).catch(function(){});
 function lobbyIdFor(href){if(!MPG)return null;var ids=Object.keys(MPG.MP_GAMES);for(var i=0;i<ids.length;i++){var g=MPG.MP_GAMES[ids[i]];if(g.lobby&&g.page===href)return g.id}return null}
 /* A lobby game (pong, tank-wars, fighters, air-hockey) runs in the sandboxed frame and may not navigate this page itself: it asks, and only the
  * game frame's own request for a lobby.html link is honoured. */
+/* A game frame can say its match is over / running ({__ianLive:bool}, sent by mp-gate.js): a finished match gets the invite popup again. */
+window.addEventListener('message',function(e){var f=document.getElementById('gf'),d=e.data;
+if(f&&e.source===f.contentWindow&&d&&typeof d.__ianLive==='boolean'&&document.body.classList.contains('game-open'))document.documentElement.dataset.liveGame=d.__ianLive?'1':'0'});
 window.addEventListener('message',function(e){var f=document.getElementById('gf'),d=e.data;
 if(!f||e.source!==f.contentWindow||!d||!d.__pbLobby||typeof d.__pbLobby.url!=='string')return;
 if(/^lobby\.html\?g=[a-z0-9-]{2,24}(&[a-z]{1,8}=[A-Za-z0-9~,._-]{0,200}){0,4}$/.test(d.__pbLobby.url))location.href=d.__pbLobby.url});
@@ -746,8 +751,8 @@ loadPlayCounts();
 </script>
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
-<script src="pb/arcade-kit.js?v=31"></script>
-<script type="module" src="pixelbreak-records.js?v=49"></script>
+<script src="pb/arcade-kit.js?v=32"></script>
+<script type="module" src="pixelbreak-records.js?v=50"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){
@@ -798,7 +803,7 @@ loadPlayCounts();
   sync();
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=30"></script>
-  <script type="module" src="class-gate.js?v=31"></script>
+  <script type="module" src="rtc-ring.js?v=31"></script>
+  <script type="module" src="class-gate.js?v=32"></script>
 </body>
 </html>

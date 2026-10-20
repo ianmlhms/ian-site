@@ -1,7 +1,7 @@
 /* Shared multiplayer lobby — pilot 1: Connect 4 (2 players, turn based).
  * Three browser contexts, one in-process Realtime hub, nothing reaches the live project:
  *   tester (host, signed in)  ·  Emma (friend, signed in, busy in a Connect 4 vs-computer game)  ·  Gast (signed out)
- * Covers: bare game URL → lobby, create (4-letter code), add people via the shared picker, the invite toast on Emma's page, join
+ * Covers: bare game URL → lobby, create (4-letter code), add people via the shared picker, the invite popup on Emma's page, join
  * from the toast, ready/start, the game itself (a move crosses over), back to the lobby for a rematch, a full lobby, a guest joining
  * by link, old ?room= links, and the request / realtime-frame budget of the whole session (printed + MP_LOBBY_REPORT=/path.json). */
 import fs from "node:fs";
@@ -71,12 +71,12 @@ export const flow = {
       h.eq(world.mpInviteCalls.map((c) => [c.p_game, c.p_room, c.p_to]), [["connect4", code.toLowerCase(), [USERS.emma.id]]], "ONE mp_invite request: game, lowercase code, Emma");
       h.expect(/invitéiert/.test(await text(host.page, ".mpl-row.mpl-invited")), "roster shows «Emma — invitéiert…»");
 
-      h.step("Emma gets the invite toast while she plays, taps it, lands in the lobby");
-      await emma.page.waitForSelector(".ntf");
-      const toast = await text(emma.page, ".ntf");
-      h.expect(/tester/.test(toast) && /Connect 4/.test(toast), `toast names the host and the game (${toast})`);
+      h.step("Emma gets the invite popup while she plays, taps it, lands in the lobby");
+      await emma.page.waitForSelector(".ip-card");
+      const toast = await text(emma.page, ".ip-title");
+      h.expect(/tester/.test(toast) && /Connect 4/.test(toast), `popup names the host and the game (${toast})`);
       await shot(emma, "invite-toast");
-      await emma.page.click(".ntf");
+      await emma.page.click(".ip-card .ip-primary");
       await emma.page.waitForSelector("#mplRoster");
       h.expect(emma.page.url().includes("c=" + code), "Emma joined the lobby with the code from the invite");
       await host.page.waitForFunction(() => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length === 2);
@@ -160,7 +160,7 @@ export const flow = {
       REPORT.openToReady = { framesIn: budgetOpen.frames.framesIn, framesOut: budgetOpen.frames.framesOut, bytes: budgetOpen.frames.bytesIn + budgetOpen.frames.bytesOut };
       h.expect(sum(host.http, /rpc\/mp_invite/) === 1 && countHttp(host, /rpc\/my_friends/) === 1, "host: exactly 1 mp_invite + 1 my_friends");
       h.expect(countHttp(host, /^[A-Z]+ game_invites/) === 0, "host: never reads or writes the game_invites table (no polling)");
-      h.expect(countHttp(host, /rpc\/my_game_invites/) <= 2, "host: my_game_invites only when an entry screen opened (2x)");
+      h.expect(countHttp(host, /rpc\/my_game_invites/) <= 3, "host: my_game_invites only when an entry screen opened (2x) + the one site-wide catch-up of the first page load (invite-pop.js)");
       console.log("    requests host:", JSON.stringify(host.http));
       console.log("    requests emma:", JSON.stringify(emma.http));
       console.log("    realtime:", JSON.stringify(REPORT.realtime), "· open→ready:", JSON.stringify(REPORT.openToReady));

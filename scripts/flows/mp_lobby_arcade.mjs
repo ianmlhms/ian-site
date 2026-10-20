@@ -49,14 +49,14 @@ async function oneGame(h, id, index, players) {
     h.expect(/^[A-HJ-NP-Z]{4}$/.test(code), `lobby code ${code}`);
     h.expect(/1\/2/.test(await text(host.page, ".mpl-count")), "1/2 players");
 
-    h.step(`${id}: invite Emma (picker) → toast → she joins → ready → start`);
+    h.step(`${id}: invite Emma (picker) → popup → she joins → ready → start`);
     await host.page.click("#mplAdd");
     await host.page.click('.ppk-row[data-name="Emma"]');
     await host.page.click("#ppGo");
     h.eq(world.mpInviteCalls.map((c) => [c.p_game, c.p_room]), [[id, code.toLowerCase()]], "mp_invite carries the arcade game id and the lobby code");
-    await emma.page.waitForSelector(".ntf");
-    h.expect((await text(emma.page, ".ntf")).includes(g.name), `toast names the game (${await text(emma.page, ".ntf")})`);
-    await emma.page.click(".ntf");
+    await emma.page.waitForSelector(".ip-card");
+    h.expect((await text(emma.page, ".ip-title")).includes(g.name), `popup names the game (${await text(emma.page, ".ip-title")})`);
+    await emma.page.click(".ip-card .ip-primary");
     await emma.page.waitForSelector("#mplRoster");
     await host.page.waitForFunction(() => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length === 2);
     await emma.page.click("#mplReady");

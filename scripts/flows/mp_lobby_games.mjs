@@ -144,15 +144,15 @@ async function oneGame(h, id, index, players) {
     h.expect(await host.page.isDisabled("#mplStart"), "Start is disabled with one player");
     h.expect(new RegExp(`1/${g.max}`).test(await text(host.page, ".mpl-count")), `1/${g.max} players`);
 
-    h.step(`${id}: invite Emma via the picker → toast → she joins from it`);
+    h.step(`${id}: invite Emma via the picker → popup → she joins from it`);
     await host.page.click("#mplAdd");
     await host.page.click('.ppk-row[data-name="Emma"]');
     await host.page.click("#ppGo");
     await host.page.waitForSelector(".mpl-row.mpl-invited");
     h.eq(world.mpInviteCalls.map((c) => [c.p_game, c.p_room, c.p_to]), [[id, code.toLowerCase(), [USERS.emma.id]]], "ONE mp_invite: game id, lowercase code, Emma");
-    await emma.page.waitForSelector(".ntf");
-    h.expect((await text(emma.page, ".ntf")).includes(g.name), `toast names the game (${await text(emma.page, ".ntf")})`);
-    await emma.page.click(".ntf");
+    await emma.page.waitForSelector(".ip-card");
+    h.expect((await text(emma.page, ".ip-title")).includes(g.name), `popup names the game (${await text(emma.page, ".ip-title")})`);
+    await emma.page.click(".ip-card .ip-primary");
     await emma.page.waitForSelector("#mplRoster");
     await host.page.waitForFunction(() => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length === 2);
     h.eq(await rosterNames(host.page), ["tester (du) 👑 Host", "Emma"], "host sees both players");
