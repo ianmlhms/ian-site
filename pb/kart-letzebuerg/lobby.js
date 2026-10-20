@@ -1,4 +1,4 @@
-/* Kart Lëtzebuerg — online lobby: room codes, quick match, roster, ready/settings, friends invites and the start hand-shake.
+/* Kart Lëtzebuerg — online lobby: room codes, quick match, roster, ready/settings, invites (shared people picker) and the start hand-shake.
  * Supabase Realtime is used ONLY here (lobby presence + SDP hand-shake) and is closed again when the race goes live
  * (kept open only for a peer that needs the relay fallback). No REST calls, no polling. Race traffic: see mp.js. */
 (function () {
@@ -160,7 +160,8 @@
 
   /* ---------- entry points ---------- */
   function reset() {
-    Object.assign(L, { active: true, role: null, code: '', phase: 'idle', rdy: false, peers: new Map(), roster: [], links: new Map(), hostId: null, deputy: null, epoch: 0, originalHost: false, relayInUse: false, joined: false, depOk: new Set(), depBusy: false, depAgain: false, handoff: null, linkWait: null });
+    Object.assign(L, { active: true, role: null, code: '', phase: 'idle', rdy: false, peers: new Map(), roster: [], links: new Map(), hostId: null, deputy: null, epoch: 0, originalHost: false, relayInUse: false, joined: false, depOk: new Set(), depBusy: false, depAgain: false, handoff: null, linkWait: null, invited: new Map() });
+    if ($('lbInv')) { $('lbInv').textContent = ''; $('lbInv').hidden = true; }
     L.myId = rid(); L.cfg = { track: KL.G.settings.track, weather: KL.G.settings.weather === 'random' ? 'random' : KL.G.settings.weather, laps: 3, diff: KL.G.settings.diff, pub: false, mode: KL.G.settings.mode === 'gp' ? 'gp' : 'race', cup: KL.G.settings.cup }; L.gp = null;
   }
   function genCode() { let s = ''; for (let i = 0; i < N.CODE_LEN; i++) s += N.CODE_ALPHABET[Math.floor(Math.random() * N.CODE_ALPHABET.length)]; return s; }
@@ -853,33 +854,104 @@
   }
   KL.Lobby.adoptAsHost = adoptAsHost;
 
-  /* ---------- friends: invite from the ian.lu friends list ---------- */
-  async function openFriends() {
-    const dlg = $('frDlg'), list = $('frList'); dlg.hidden = false; list.textContent = '';
-    const a = authObj();
-    const msg = document.createElement('p'); msg.className = 'hint';
-    if (!(a && a.session && a.sb)) { msg.textContent = T('friendsSignIn'); list.appendChild(msg); return; }
-    msg.textContent = '…'; list.appendChild(msg);
+  /* ---------- invites: the site-wide "add people" picker (people-picker.js) + ONE mp_invite call for everybody picked ----------
+   * Same dialog as lobby.html and the messenger; the invitees get the usual popup / live-game banner (invite-pop.js) with a Join link to
+   * pb/kart-letzebuerg.html?room=CODE&role=guest. The lobby code goes out lowercase (mp_invite checks ^[a-z0-9]{4,10}$). */
+  const INVITE_BATCH = 8, RECENT_KEY = 'mpl.recent', MAX_RECENT = 12;
+  const PICKER_MODULE = '/people-picker.js?v=1', AUTH_MODULE = '/auth.js?v=34';           // same URLs as mp-lobby.js, so the browser cache is shared
+  const INVITE_STATUS_KEY = { already_invited: 'invAlready', not_allowed: 'invNotAllowed', unknown_user: 'invUnknown', rate_limited: 'invRate', self: 'invUnknown' };
+  const siteImport = (path) => import(siteOrigin() + path);
+  const hasSession = (a) => !!(a && a.session && a.sb);
+
+  /* the invite results live under the player list: one line per person (or one line for a problem with the whole request) */
+  function showInviteLines(lines) {
+    const box = $('lbInv'); box.textContent = '';
+    for (const ln of lines) {
+      const li = document.createElement('li'); li.className = ln.ok ? 'ok' : 'bad';
+      const ic = document.createElement('span'); ic.className = 'ic'; ic.setAttribute('aria-hidden', 'true'); ic.textContent = ln.ok ? '✓' : '!'; li.appendChild(ic);
+      const tx = document.createElement('span'); tx.className = 'tx'; tx.textContent = ln.text; li.appendChild(tx);
+      if (ln.action) { const b = document.createElement('button'); b.type = 'button'; b.textContent = ln.action.label; b.addEventListener('click', ln.action.run); li.appendChild(b); }
+      box.appendChild(li);
+    }
+    box.hidden = !lines.length;
+  }
+  const loadRecent = () => {
     try {
-      const { data, error } = await a.sb.rpc('my_friends');             // one on-demand call, only when the dialog is opened
+      const list = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+      return (Array.isArray(list) ? list : []).filter((p) => p && typeof p.id === 'string' && typeof p.username === 'string').slice(0, MAX_RECENT)
+        .map((p) => ({ id: p.id.toLowerCase(), username: cleanName(p.username), avatar: typeof p.avatar === 'string' ? p.avatar : '' }));
+    } catch (e) { return []; }
+  };
+  /* people met in a lobby go to the same "played with recently" list the other games use (this device only) */
+  function rememberRecent() {
+    const me = myUid();
+    const fresh = [...L.peers.values()].filter((p) => p.uid && p.uid !== me && !p.spec).map((p) => ({ id: p.uid, username: cleanName(p.name), avatar: '' }));
+    if (!fresh.length) return;
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify([...fresh, ...loadRecent().filter((p) => !fresh.some((f) => f.id === p.id))].slice(0, MAX_RECENT))); } catch (e) { /* private mode: only the recent list is lost */ }
+  }
+  /* a signed-out host: standalone page -> open the site's own sign-in dialog (auth.js, loaded on demand; it also picks up a stored session);
+   * inside the arcade the page above owns the session -> its account button */
+  async function authForInvite() {
+    let a = authObj();
+    if (hasSession(a)) return { a };
+    if (window.parent !== window) return { a: null, signIn: arcadeSignIn() };
+    let auth;
+    try {
+      auth = await siteImport(AUTH_MODULE);
+      if (auth.authConfigured && auth.hasStoredSession()) await auth.client();
+    } catch (e) { console.warn('[kart-lobby] sign-in module failed', e); return { a: null, failed: true }; }
+    a = authObj();
+    return hasSession(a) ? { a } : { a: null, signIn: () => { try { auth.openAuthModal(); } catch (e) { console.warn('[kart-lobby] sign-in dialog failed', e); } } };
+  }
+  function arcadeSignIn() {
+    try { const b = parent.document.getElementById('pbAcct'); if (b) return () => b.click(); } catch (e) { /* cross-origin parent: text only */ }
+    return null;
+  }
+  async function openInvites() {
+    if (!L.signalling || !L.code) return;
+    const { a, signIn, failed } = await authForInvite();
+    if (!a) {
+      if (failed) { showInviteLines([{ ok: false, text: T('inviteFail') }]); return; }
+      showInviteLines([{ ok: false, text: T(signIn ? 'signInInvite' : 'signInFrame'), action: signIn ? { label: T('signInBtn'), run: signIn } : null }]);
+      if (signIn && window.parent === window) signIn();
+      return;
+    }
+    let picker, restriction;
+    try {
+      picker = await siteImport(PICKER_MODULE);
+      restriction = await picker.loadViewerRestriction(a.sb);                  // one call, only when the picker is about to open
+    } catch (e) { console.warn('[kart-lobby] picker failed to load', e); showInviteLines([{ ok: false, text: T('inviteFail') }]); return; }
+    let friends = [];
+    try {
+      const { data } = await a.sb.rpc('my_friends');                           // one on-demand call, only when the picker opens
+      friends = (data || []).map((f) => ({ id: String(f.user_id).toLowerCase(), username: f.username }));
+    } catch (e) { console.warn('[kart-lobby] friends unavailable', e); }
+    rememberRecent();
+    const taken = new Set([myUid(), ...[...L.peers.values()].map((p) => p.uid).filter(Boolean), ...L.invited.keys()]);
+    const res = await picker.openPeoplePicker({
+      sb: a.sb, title: T('pickTitle'), okText: T('pickOk'), exclude: taken, allow: restriction.allow, friends, recent: loadRecent(), maxPick: INVITE_BATCH,
+      text: { close: T('close'), who: T('pickWho'), placeholder: T('pickPh'), none: T('pickNone'), noMatch: T('pickNoMatch'), remove: T('pickRemove'), addN: T('pickN'), friends: T('pickFriends'), recent: T('pickRecent') },
+    });
+    if (res && res.people.length && L.active && L.code) await sendInvites(a, res.people);
+  }
+  async function sendInvites(a, people) {
+    const batch = people.slice(0, INVITE_BATCH), names = new Map(batch.map((p) => [p.id, p.username]));
+    try {
+      const { data, error } = await a.sb.rpc('mp_invite', { p_game: 'kart-letzebuerg', p_room: L.code.toLowerCase(), p_to: batch.map((p) => p.id) });
       if (error) throw error;
-      list.textContent = '';
-      if (!data || !data.length) { msg.textContent = T('friendsNone'); list.appendChild(msg); return; }
-      for (const f of data) {
-        const row = document.createElement('div'); row.className = 'frow';
-        const n = document.createElement('b'); n.textContent = String(f.username || '?').slice(0, 24); row.appendChild(n);
-        const b = document.createElement('button'); b.textContent = T('inviteBtn');
-        b.addEventListener('click', async () => {
-          b.disabled = true;
-          try {
-            const r = await a.sb.rpc('invite_game_room', { p_to: f.user_id, p_game: 'kart-letzebuerg', p_room: L.code.toLowerCase() });
-            if (r.error) throw r.error;
-            b.textContent = '✓ ' + T('invited');
-          } catch (e) { console.warn('[kart-lobby] invite failed', e); b.disabled = false; b.textContent = T('inviteBtn'); lbMsg(T('inviteFail')); }
-        });
-        row.appendChild(b); list.appendChild(row);
+      const lines = [];
+      for (const r of data || []) {
+        const name = names.get(r.user_id) || '…';
+        if (r.status === 'sent' || r.status === 'already_invited') L.invited.set(r.user_id, name);
+        if (r.status === 'sent') lines.push({ ok: true, text: name + ' — ' + T('invTag') });
+        else lines.push({ ok: false, text: T(INVITE_STATUS_KEY[r.status] || 'inviteFail', { name }) });
       }
-    } catch (e) { console.warn('[kart-lobby] friends failed', e); list.textContent = ''; msg.textContent = T('inviteFail'); list.appendChild(msg); }
+      showInviteLines(lines.length ? lines : [{ ok: false, text: T('inviteFail') }]);
+    } catch (e) {
+      console.warn('[kart-lobby] invite failed', e);
+      const missing = e && (e.code === 'PGRST202' || /could not find the function|does not exist/i.test(String(e.message)));
+      showInviteLines([{ ok: false, text: T(missing ? 'invUnavailable' : 'inviteFail') }]);
+    }
   }
   /* inside the arcade frame (srcdoc) location.origin is the string "null": window.origin is the site's */
   function siteOrigin() { const o = window.origin; return o && o !== 'null' ? o : 'https://ian.lu'; }
@@ -901,8 +973,7 @@
     $('olCode').addEventListener('input', (e) => { e.target.value = cleanCode(e.target.value); });
     $('olCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinLobby($('olCode').value); });
     $('lbCopy').addEventListener('click', copyLink);
-    $('lbInvite').addEventListener('click', openFriends);
-    $('frClose').addEventListener('click', () => { $('frDlg').hidden = true; });
+    $('lbInvite').addEventListener('click', openInvites);
     $('lbLeave').addEventListener('click', () => leave(true));
     $('lbReady').addEventListener('click', toggleReady);
     $('lbStart').addEventListener('click', hostStart);
