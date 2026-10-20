@@ -33,7 +33,8 @@ export const flow = {
   async run(h) {
     const hub = createHub();
     const world = createWorld({ hub });
-    const shot = shotter(NAME);
+    const rawShot = shotter(NAME);
+    const shot = async (player, label) => { await sleep(450); await rawShot(player, label); };   // let the fade-in finish
     const players = [];
     const errorsOf = [];
     try {
