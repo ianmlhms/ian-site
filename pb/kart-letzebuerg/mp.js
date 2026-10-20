@@ -343,7 +343,7 @@
 
   /* ---------- away / leave / conversion ---------- */
   function convertToBot(k) {
-    k.remote = false; k.isBot = true; k.human = false; k.auto = false; k.away = false; k.view = null; k.hint = -1; k.ai = null; k.botSkill = k.botSkill || 1; k.rubber = 1;
+    k.remote = false; k.isBot = true; k.human = false; k.auto = false; k.away = false; k.view = null; k.hint = -1; k.br = null; k.safeBr = null; k.ai = null; k.botSkill = k.botSkill || 1; k.rubber = 1;
     const R = M.R; const i = R.humans.indexOf(k); if (i >= 0) R.humans.splice(i, 1);
     k.input.gas = 0; k.input.steer = 0; k.input.drift = false; k.input.brake = 0;
   }
@@ -353,7 +353,7 @@
     k.away = on; k.awayExplicit = !!explicit && on; k.awayAt = performance.now(); k.resumeUntil = on ? 0 : performance.now() + 500;
     if (on) {
       M.stats.away++;
-      k.remote = false; k.isBot = true; k.hint = -1; k.ai = null; k.botSkill = 1; k.rubber = 1; k.view = null; k.buf.length = 0;
+      k.remote = false; k.isBot = true; k.hint = -1; k.br = null; k.safeBr = null; k.ai = null; k.botSkill = 1; k.rubber = 1; k.view = null; k.buf.length = 0;
       log('away', k.id);
       if (M.role === 'host' && k.id === KL.Lobby.deputy) KL.Lobby.ensureDeputy('away');        // a silent deputy is replaced (ensureDeputy skips away players)
     } else {
@@ -364,7 +364,7 @@
   }
   function onResume(m) {
     const k = M.self, R = M.R; if (!k || !Array.isArray(m.st)) return;
-    applyState(k, m.st); k.px = k.x; k.py = k.y; k.pz = k.z; k.pyaw = k.yaw; k.teleported = true; k.tpc = (k.tpc | 0) + 1; k.hint = -1; k.safeS = k.s; k.stuckT = 0; k.wrongT = 0;
+    applyState(k, m.st); k.px = k.x; k.py = k.y; k.pz = k.z; k.pyaw = k.yaw; k.teleported = true; k.tpc = (k.tpc | 0) + 1; k.hint = -1; k.br = null; k.safeBr = null; k.safeS = k.s; k.stuckT = 0; k.wrongT = 0;
     k.lapIdx = m.lap | 0; k.maxLap = k.lapIdx; k.lapTimes = Array.isArray(m.lt) ? m.lt.map((x) => num(x, 0)) : k.lapTimes; if (m.bl != null) k.bestLap = num(m.bl, Infinity);
     k.finished = !!m.fin; k.finishTime = num(m.ft, 0); k.finishOrder = m.fo | 0; if (k.finished) k.auto = true;
     k.item = m.item && KL.ITEMS[m.item] ? { id: m.item, count: Math.max(1, m.cnt | 0) } : null; k.roll = null;
@@ -421,8 +421,8 @@
     L.links.delete(M.migratedFrom);
     // the old host's kart is a bot now; every bot (until now a mirror) is simulated here
     if (oldHost) { convertToBot(oldHost); oldHost.name = oldHost.name; }
-    for (const k of R.karts) if (k.isBot) { k.remote = false; k.hint = -1; k.ai = null; k.rubber = 1; }
-    let maxNid = 0; for (const it of R.items) { it.hint = null; maxNid = Math.max(maxNid, it.nid || 0); } R.nid = maxNid;
+    for (const k of R.karts) if (k.isBot) { k.remote = false; k.hint = -1; k.br = null; k.safeBr = null; k.ai = null; k.rubber = 1; }
+    let maxNid = 0; for (const it of R.items) { it.hint = null; it.br = null; maxNid = Math.max(maxNid, it.nid || 0); } R.nid = maxNid;
     M.itemMap.clear();
     R.rng = KL.rng(((Date.now() ^ 0x9e3779b9) >>> 0));
     const now = performance.now();

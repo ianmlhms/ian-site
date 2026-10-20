@@ -3,7 +3,7 @@
  * Layout loosely after OpenStreetMap (contributors, ODbL), scaled by 0.65 about 49.62 N / 6.145 E (x east, z south). */
 (function () {
   'use strict';
-  const KL = window.KL, T = window.THREE, { clamp, lerp, smooth } = KL;
+  const KL = window.KL, T = window.THREE, T3 = T, { clamp, lerp, smooth } = KL;
   const col = KL.col, shade = KL.shade, L = KL.lm;
   const BOX = [-900, -320, 220, 470];
   const terrain = KL.kit.valleyTerrain('kirchberg', { box: BOX, depth: 62, a: 22, b: 100, cell: 5 });
@@ -32,7 +32,7 @@
       weathers: ['day', 'sunset', 'night', 'rain'],
     },
     terrain, speedMul: 1.09,
-    noBuild: [[-119, 113, 52], [-205, 252, 38], [-262, 262, 14], [150, -40, 60], [260, -70, 60]],
+    noBuild: [[-119, 113, 52], [-205, 252, 38], [-262, 262, 14], [150, -40, 60], [260, -70, 60], [-204, 79, 17], [-185, 79, 17], [-176, 92, 17], [-180, 111, 17], [-177, 129, 17], [-177, 148, 17], [-182, 166, 17], [-194, 180, 17], [-212, 186, 17]],
     pads: [[60, 0, 10], [130, 0, 10], [200, 0, 10], [260, 0, 10], [392, 13, 9], [438, 14, 9], [600, 0, 10], [700, 0, 10], [770, 0, 10], [840, 0, 10], [915, 0, 10], [980, 0, 10], [1060, 0, 10], [1150, 13, 9], [1198, 14, 9], [1245, 13, 9], [1380, 0, 10], [1440, 0, 10], [1500, 0, 10]],
     extraBoxes: [[415, 14], [1198, 15]],
     decorate(S) {
@@ -80,7 +80,7 @@
 
       /* ---- tram line along the avenue (south of the north carriageway): bed, rails, catenary, two trams ---- */
       {
-        const R = new KL.Batch(), sA = st[21], sB = track.length + st[3] - 20, step = 3;
+        const R = new KL.Batch(), sA = st[21], sB = track.length + 182, step = 3;        // the line ends at x = -250, west of the shortcut
         const tp = (s, d, out) => track.at(((s % track.length) + track.length) % track.length, d, out);
         const bed = col('#b6b0a3'), rail = col('#4c5058');
         for (const d0 of [15.3, 19.8]) {
@@ -142,7 +142,6 @@
         L.cyl(B, f, 0, 20.3, 0, 22.4, 22.4, 0.5, 24, white);
         L.box(E, f, 0, 3, 0, 1, 1, 1, 0, col('#000000'));
         for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2 + 0.05; L.box(E, f, Math.cos(a) * 24.8, 3.4, Math.sin(a) * 24.8, 2.6, 9, 2.6, a, col('#ffd98a')); }  // warm light behind the glass (night)
-        L.box(B, f, -40, 0, 8, 22, 6, 16, 0, col('#eeeeea')); L.box(B, f, -40, 6, 8, 23, 0.7, 17, 0, white);
         L.box(B, f, 36, 0, -10, 14, 5, 12, 0, col('#eeeeea')); L.box(B, f, 36, 5, -10, 15, 0.6, 13, 0, white);
       }
 
@@ -184,6 +183,44 @@
           Tb.addBatch(rnd() < 0.5 ? park : plane, x, terrain(x, z) - 0.1, z, rnd() * 6.28, 0.9 + rnd() * 0.7); n++;
         }
         add(Tb, M.plain);
+      }
+      /* ---- shortcut "Place de l'Europe": red cycle-path tarmac through the plaza, a gantry over its mouth, bollards at the gaps in the wall, a pond ---- */
+      if (track.branches.length) {
+        const K = KL.kit, br = track.branches[0], T = br.T, redP = col('#d9323c'), cream = col('#f4f0e6'), dark = col('#2c2f35');
+        K.skirts(S, col('#a9a49a'));
+        K.patchDecals(S, { goo: { a: '#2f79b0', b: '#68b4e0', glints: '#e4f5ff', flow: 0.05 } });
+        // gantry over the mouth: two posts, a beam, and the sign facing the oncoming traffic of the avenue
+        {
+          const q = 24, p = T.at(q, 0), hw = T.HW[Math.floor(q / T.step)] + 0.9, yaw = Math.atan2(p.tx, p.tz), rx = -p.tz, rz = p.tx;
+          for (const sd of [-1, 1]) B.box(p.x + rx * sd * hw, p.y, p.z + rz * sd * hw, 0.6, 6.3, 0.6, yaw, redP);
+          B.box(p.x, p.y + 5.7, p.z, hw * 2 + 0.8, 1.5, 0.7, yaw, redP, { topCol: col('#ff5a5f') });
+          const label = KL.t('cut').toUpperCase(), tex = KL.tex.label(label, { w: 1024, h: 256, size: 130, fg: '#fff', bg: '#d9323c' });
+          for (const sd of [-1, 1]) {
+            const m = new T3.Mesh(new T3.PlaneGeometry(hw * 2 + 0.4, 1.25), new T3.MeshBasicMaterial({ map: tex }));
+            m.position.set(p.x + p.tx * 0.38 * sd, p.y + 5.7, p.z + p.tz * 0.38 * sd); m.rotation.y = sd > 0 ? yaw : yaw + Math.PI; group.add(m);
+          }
+        }
+        // striped bollards where the avenue's wall ends beside each mouth
+        {
+          const wp = (i, sd) => { const lim = track.HW[i] + (sd < 0 ? track.WL[i] : track.WR[i]) + 0.25; return [track.X[i] - track.TZ[i] * sd * lim, track.Z[i] + track.TX[i] * sd * lim, Math.atan2(track.TX[i], track.TZ[i]), track.Y[i]]; };
+          for (const sd of [-1, 1]) {
+            let run = null;
+            for (let i = 0; i <= N; i++) {
+              const j = i % N, q = i < N ? wp(j, sd) : null, inside = q ? track.inMouth(q[0], q[1], 1.2) : false;
+              if (inside && !run) run = [j, j]; else if (inside) run[1] = j;
+              if ((!inside || i === N) && run) {
+                for (const k of [Math.max(0, run[0] - 1), Math.min(N - 1, run[1] + 1)]) { const w = wp(k, sd); B.box(w[0], w[3], w[1], 0.9, 1.9, 0.9, w[2], redP, { topCol: cream }); B.box(w[0], w[3] + 1.9, w[1], 0.95, 0.25, 0.95, w[2], cream); E.box(w[0], w[3] + 2.15, w[1], 0.5, 0.2, 0.5, w[2], col('#ffb347')); }
+                run = null;
+              }
+            }
+          }
+        }
+        // low lights along the cut (lit at night)
+        for (let q = 30; q < br.L - 30; q += 11) for (const sd of [-1, 1]) {
+          const hw = T.HW[Math.floor(q / T.step)] + 1.05, p = T.at(q, sd * hw);
+          if (T.Y[Math.floor(q / T.step)] - T.YB[Math.floor(q / T.step)] > 0.2) continue;
+          B.box(p.x, p.y, p.z, 0.3, 0.55, 0.3, 0, dark); E.box(p.x, p.y + 0.55, p.z, 0.36, 0.14, 0.36, 0, col('#ffb347'));
+        }
       }
       add(B, M.plain); KL.kit.nightOnly(S, E); add(W, M.buildingM || M.building);
     },

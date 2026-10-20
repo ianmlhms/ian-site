@@ -15,7 +15,7 @@
       prevDrift: false, prevItem: false,
       drift: { state: 0, dir: 0, charge: 0, level: 0, hopT: 0 },
       boostT: 0, boostKind: 0, spinT: 0, spinDir: 1, spinVis: 0, invuln: 0, frozenT: 0, shieldT: 0, slipT: 0, hitT: 0,
-      surf: 0, hint: -1, s: 0, d: 0, prog: 0, lap: 0, lapStart: 0, lapTimes: [], bestLap: Infinity, finished: false, finishTime: 0, finishOrder: 0,
+      surf: 0, hint: -1, br: null, ss: 0, safeBr: null, safeSS: 0, s: 0, d: 0, prog: 0, lap: 0, lapStart: 0, lapTimes: [], bestLap: Infinity, finished: false, finishTime: 0, finishOrder: 0,
       place: o.slot + 1, item: null, roll: null, itemCool: 0, auto: false,
       wrongT: 0, stuckT: 0, airT: 0, rocketStart: 0, gasSince: -1, stallT: 0, safeS: 0, speed: 0, vf: 0, hopY: 0, wheelSpin: 0, bumpT: 0,
       scrapeT: 0, landT: 0, lastHitBy: null, boxes: 0, rubber: 1, t: 0, steerVis: 0, roll3: 0,
@@ -25,7 +25,7 @@
   KL.placeKart = function placeKart(k, track, s, d, extra) {
     const p = track.at(s, d);
     k.x = p.x; k.z = p.z; k.y = p.y; k.yaw = p.h; k.vx = 0; k.vz = 0; k.vy = 0; k.grounded = true;
-    k.hint = p.i; k.s = ((s % track.length) + track.length) % track.length; k.d = d || 0;
+    k.hint = p.i; k.br = null; k.safeBr = null; k.s = ((s % track.length) + track.length) % track.length; k.ss = k.s; k.d = d || 0;
     k.px = k.x; k.py = k.y; k.pz = k.z; k.pyaw = k.yaw;
     k.drift.state = 0; k.drift.charge = 0; k.boostT = 0; k.spinT = 0; k.spinVis = 0; k.steer = 0;
     Object.assign(k, extra || {});
@@ -51,14 +51,20 @@
     if (!KL.healWarned) { KL.healWarned = true; console.warn('[Kart] a kart state was not finite and has been repaired (' + k.id + ')'); }
   };
 
-  /* respawn on the tarmac a little behind the current position */
+  /* respawn on the tarmac a little behind the current position (on the branch the kart was last on tarmac, if it was on one) */
   KL.rescueKart = function rescueKart(k, track) {
-    const sBack = (k.safeS != null ? k.safeS : k.s) - 5;
-    const p = track.at(sBack, 0);
+    const br = k.safeBr || null, L = track.length;
+    let p, sNew;
+    if (br) {
+      const ssBack = Math.max(1, (k.safeSS != null ? k.safeSS : 1) - 5);
+      p = br.T.at(ssBack, 0); sNew = br.map(ssBack); k.br = br; k.ss = ssBack;
+    } else {
+      const sBack = (k.safeS != null ? k.safeS : k.s) - 5;
+      p = track.at(sBack, 0); sNew = ((sBack % L) + L) % L; k.br = null; k.ss = sNew;
+    }
     k.x = p.x; k.z = p.z; k.y = p.y + 1.5; k.yaw = p.h; k.vx = Math.sin(p.h) * 6; k.vz = Math.cos(p.h) * 6; k.vy = 0; k.grounded = false;
-    k.hint = p.i; k.s = ((sBack % track.length) + track.length) % track.length; k.d = 0;
+    k.hint = p.i; k.s = sNew; k.d = 0;
     k.px = k.x; k.py = k.y; k.pz = k.z; k.pyaw = k.yaw; k.teleported = true;
-    const L = track.length;
     // keep progress consistent: put prog at the rescue point
     const turns = Math.round((k.prog - k.s) / L);
     k.prog = k.s + turns * L;
@@ -88,7 +94,7 @@
 
     // ---------- limits ----------
     const spdMul = def.speedMul || 1;                  // per-track pace (long tracks run a little faster)
-    let vmax = C.MAX_SPEED * spdMul * (k.rubber || 1);
+    let vmax = C.MAX_SPEED * spdMul * (k.br && k.br.def.speedMul || 1) * (k.rubber || 1);      // a shortcut can have a slower surface (cobbles)
     const offroadCap = def.offroadSpeed || (def.offroad === 'grass' ? C.OFFROAD_SPEED : C.SIDEWALK_SPEED);
     if (k.surf === 1 && k.boostT <= 0) vmax = Math.min(vmax, offroadCap);
     if (k.patch === 'goo' && k.boostT <= 0) vmax = Math.min(vmax, vmax * 0.55);              // syrup / mud
@@ -195,13 +201,14 @@
     k.vf = vf; k.speed = Math.hypot(k.vx, k.vz);
 
     // ---------- track, walls, ground ----------
-    const p = track.project(k.x, k.z, k.hint, k.y, proj);
-    k.hint = p.i;
+    const p = track.loc(k, k.x, k.z, k.y, proj);          // main road or a branch (k.br)
+    if (p.br && p.br !== k.br && k.human) R.events.push({ t: 'cut', id: k.id });          // the human has just left the road for a shortcut
+    k.hint = p.i; k.br = p.br; k.ss = p.ss;
     const side = p.d >= 0 ? 1 : -1, ad = Math.abs(p.d);
     const lim = p.hw + (side > 0 ? p.wr : p.wl);
     const nxR = -p.tz, nzR = p.tx;                       // right normal
     let surf = 0;
-    if (ad > p.hw) surf = track.alts.length && track.onAlt(k.x, k.z) ? 0 : 1;      // a second route counts as tarmac
+    if (ad > p.hw) surf = !p.br && track.alts.length && track.onAlt(k.x, k.z) ? 0 : 1;      // a second route counts as tarmac
     if (ad > lim) {
       // wall: push back, bounce, scrape
       const over = ad - lim;
@@ -224,7 +231,7 @@
       k.wallT = 0.2;
     }
     k.surf = surf; k.d = p.d;
-    k.patch = track.patches.length ? track.patchAt(p.s, p.d) : '';
+    k.patch = p.T.patches.length ? p.T.patchAt(p.ss, p.d) : '';
     if (k.patch === 'lava' && k.grounded && k.invuln <= 0 && k.spinT <= 0 && racing) KL.hitKart(R, k, 'burn', null);      // the bed of a lava ford
     // static obstacles (fountains, statues, planters)
     if (def.obstacles) for (const ob of def.obstacles) {
@@ -240,7 +247,7 @@
     let ds = p.s - k.s;
     if (track.closed) { if (ds > track.length / 2) ds -= track.length; else if (ds < -track.length / 2) ds += track.length; }
     k.prog += ds; k.s = p.s;
-    if (surf === 0 && k.grounded) k.safeS = p.s;
+    if (surf === 0 && k.grounded) { k.safeS = p.s; k.safeBr = p.br; k.safeSS = p.ss; }
 
     // vertical motion: stick to the surface, take off over crests, land
     const gy = p.y;

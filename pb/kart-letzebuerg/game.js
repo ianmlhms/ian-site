@@ -385,7 +385,7 @@
   function viewOf(k, alpha) {
     const v = G.view || (G.view = {});
     v.x = k.ix != null ? k.ix : k.x; v.y = k.iy != null ? k.iy : k.y; v.z = k.iz != null ? k.iz : k.z; v.yaw = k.iyaw != null ? k.iyaw : k.yaw;
-    v.vx = k.vx; v.vz = k.vz; v.speed = k.speed; v.boostT = k.boostT; v.drift = k.drift; v.grounded = k.grounded;
+    v.vx = k.vx; v.vz = k.vz; v.speed = k.speed; v.boostT = k.boostT; v.drift = k.drift; v.grounded = k.grounded; v.br = k.br || null;
     return v;
   }
 
@@ -439,6 +439,7 @@
         case 'bump': if (camD < 40) a.sfx('bump', { near: e.id === me.id || e.id2 === me.id }); break;
         case 'wall': if (mine) { a.sfx('wall'); rd.shake = Math.max(rd.shake, Math.min(0.35, e.power * 0.02)); } break;
         case 'land': if (mine) a.sfx('land'); break;
+        case 'cut': if (mine) showToast('✂ ' + KL.t('cut') + '!', 1100); break;
         case 'comet': a.sfx('comet', { near: true }); break;
         case 'lap': if (mine) {
           a.sfx('lap');
@@ -489,6 +490,10 @@
     og.lineJoin = 'round'; og.lineCap = 'round';
     const path = () => { og.beginPath(); for (let i = 0; i <= track.N; i++) { const j = i % track.N; const x = track.X[j] * sc + ox, z = track.Z[j] * sc + oz; if (i) og.lineTo(x, z); else og.moveTo(x, z); } };
     path(); og.strokeStyle = '#000a'; og.lineWidth = 13; og.stroke(); path(); og.strokeStyle = '#e9edf7'; og.lineWidth = 8; og.stroke();
+    for (const b of track.branches) {       // shortcuts: a slimmer salmon-coloured line
+      const T = b.T, bp = () => { og.beginPath(); for (let i = 0; i < T.N; i++) { const x = T.X[i] * sc + ox, z = T.Z[i] * sc + oz; if (i) og.lineTo(x, z); else og.moveTo(x, z); } };
+      bp(); og.strokeStyle = '#000a'; og.lineWidth = 9; og.stroke(); bp(); og.strokeStyle = '#ff9b83'; og.lineWidth = 5; og.stroke();
+    }
     const sx = track.X[0] * sc + ox, sz = track.Z[0] * sc + oz; og.fillStyle = '#ffd23f'; og.fillRect(sx - 6, sz - 3, 12, 6);
     return (R) => {
       g.clearRect(0, 0, W, H); g.drawImage(off, 0, 0);
@@ -735,10 +740,12 @@
     if (!TEST) return;
     window.__klTest = {
       G, KL,
-      state: () => { const R = G.race, k = G.human; return { state: G.state, paused: G.paused, phase: R && R.phase, clock: R && R.clock, steps: G.steps, kart: k && { x: k.x, y: k.y, z: k.z, yaw: k.yaw, speed: k.speed, place: k.place, lap: k.lapIdx + 1, prog: k.prog, s: k.s, d: k.d, finished: k.finished, finishTime: k.finishTime, bestLap: k.bestLap, lapTimes: k.lapTimes, item: k.item && k.item.id, roll: !!k.roll, drift: k.drift.state, driftLevel: k.drift.level, boostT: k.boostT, spinT: k.spinT, surf: k.surf, grounded: k.grounded, wrongT: k.wrongT, rescued: k.rescued || 0, shieldT: k.shieldT }, weather: G.renderer && G.renderer.weatherName, quality: G.settings.quality, calls: G.renderer && G.renderer.renderer.info.render.calls, tris: G.renderer && G.renderer.renderer.info.render.triangles, results: !!G.resultsShown }; },
+      state: () => { const R = G.race, k = G.human; return { state: G.state, paused: G.paused, phase: R && R.phase, clock: R && R.clock, steps: G.steps, kart: k && { x: k.x, y: k.y, z: k.z, yaw: k.yaw, speed: k.speed, place: k.place, lap: k.lapIdx + 1, prog: k.prog, s: k.s, d: k.d, finished: k.finished, finishTime: k.finishTime, bestLap: k.bestLap, lapTimes: k.lapTimes, item: k.item && k.item.id, roll: !!k.roll, drift: k.drift.state, driftLevel: k.drift.level, boostT: k.boostT, spinT: k.spinT, surf: k.surf, grounded: k.grounded, wrongT: k.wrongT, rescued: k.rescued || 0, shieldT: k.shieldT, br: k.br ? k.br.id : null, ss: k.ss }, weather: G.renderer && G.renderer.weatherName, quality: G.settings.quality, calls: G.renderer && G.renderer.renderer.info.render.calls, tris: G.renderer && G.renderer.renderer.info.render.triangles, results: !!G.resultsShown }; },
       start: (o) => { o = o || {}; G.session = o.kind === 'gp' ? newGp(o.cup || G.settings.cup) : { kind: o.kind || 'race' }; startRace(o); },
       save: () => KL.Save.data, session: () => G.session, boards: () => KL.Boards.sent.slice(), nextRace: () => $('eNext').click(), force: (f) => { G.forced = f; }, forceItem: (id, count) => { if (G.human) { G.human.item = { id, count: count || (KL.ITEMS[id].count || 1) }; G.human.roll = null; } },
       teleport: (s, d) => { const k = G.human; k.tpc = (k.tpc | 0) + 1; KL.placeKart(k, G.track, s, d || 0); k.prog = Math.floor(k.prog / G.track.length) * G.track.length + k.s; G.renderer.snapKarts(); G.renderer.cam.snap = true; },
+      /* put the human at distance qs along a shortcut (branch id), lateral d, heading along the cut */
+      teleportBranch: (id, qs, d) => { const k = G.human, b = G.track.branches.find((x) => x.id === id); if (!b) return false; k.tpc = (k.tpc | 0) + 1; const p = b.T.at(qs, d || 0); KL.placeKart(k, G.track, 0, 0); k.x = p.x; k.z = p.z; k.y = p.y; k.yaw = p.h; k.br = b; k.hint = p.i; k.ss = qs; k.s = b.map(qs); k.px = k.x; k.py = k.y; k.pz = k.z; k.pyaw = k.yaw; k.safeBr = b; k.safeSS = qs; k.safeS = k.s; k.prog = Math.floor(k.prog / G.track.length) * G.track.length + k.s; G.renderer.snapKarts(); G.renderer.cam.snap = true; return true; },
       /* run the simulation without rendering (autopilot = the player gets the bot driver) */
       sim: (seconds, autopilot) => { const R = G.race; if (autopilot && G.human) G.human.auto = true; const n = Math.round(seconds / C.STEP); for (let i = 0; i < n; i++) { applyPlayerInput(G.human); R.step(C.STEP); G.steps++; afterStep(R); } handleEvents(R); return true; },
       mp: () => { const M = KL.MP; return { active: M.active, role: M.role, hostId: M.hostId, deputy: M.deputy, epoch: M.epoch, stats: M.stats, ended: M.ended, results: !!M.resultsDone, net: KL.netStats, rtt: M.rtt, spec: !!M.spec, specLive: !!M.specLive, specs: M.specs ? [...M.specs] : [], watching: G.spec ? G.human && G.human.id : null, specMode: G.specMode, links: [...KL.Lobby.links].map(([id, l]) => ({ id, kind: l.kind, open: l.open, rtt: l.rtt })), lobby: { phase: KL.Lobby.phase, role: KL.Lobby.role, code: KL.Lobby.code, signalling: KL.Lobby.signalling, hostId: KL.Lobby.hostId, deputy: KL.Lobby.deputy, myId: KL.Lobby.myId, peers: KL.Lobby.peers ? [...KL.Lobby.peers.keys()] : [], handoff: !!KL.Lobby.handoff }, karts: G.race ? G.race.karts.map((k) => ({ id: k.id, name: k.name, human: k.human, bot: k.isBot, remote: k.remote, away: !!k.away, place: k.place, prog: k.prog, finished: k.finished, finishOrder: k.finishOrder, finishTime: k.finishTime, spinT: k.spinT })) : [] }; },

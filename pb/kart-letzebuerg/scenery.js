@@ -8,9 +8,11 @@
 
   /* --- strips along the track ---------------------------------------------------------------------------------------- */
   /* ptsFn(i) -> [A, B, uA, uB] where A and B are [x,y,z]; builds quads i..i+1 (counter-clockwise from above when A is left of B). */
-  function strip(B, track, i0, i1, fn, vScale, colFn) {
+  function strip(B, track, i0, i1, fn, vScale, colFn, skip) {
     const N = track.N, step = track.step;
+    if (!track.closed) i1 = Math.min(i1, N - 1);            // an open road (a branch) does not join its end to its start
     for (let i = i0; i < i1; i++) {
+      if (skip && (skip(i) || skip((i + 1) % N))) continue;
       const a = fn(i % N), b = fn((i + 1) % N);
       const v0 = (i * step) / vScale, v1 = ((i + 1) * step) / vScale;
       const col = colFn ? colFn(i) : [1, 1, 1];
@@ -22,20 +24,43 @@
 
   KL.scenery = {
     /* the tarmac (or plaza / bridge deck) between the road edges, split in runs by zone kind */
-    road(track, theme) {
+    road(track, theme, o) {
+      o = o || {};
       const asphalt = new KL.Batch(), cobble = new KL.Batch();
       const kindAt = (i) => { const z = track.ZONE[i]; return z >= 0 && track.zones[z].road ? track.zones[z].road : (theme.road || 'asphalt'); };
-      for (let i = 0; i < track.N; i++) {
-        const i2 = (i + 1) % track.N, kind = kindAt(i);
+      const NQ = track.closed ? track.N : track.N - 1;
+      for (let i = 0; i < NQ; i++) {
+        const i2 = (i + 1) % track.N, kind = o.kind || kindAt(i);
         const B = kind === 'cobble' ? cobble : asphalt;
-        const f = (j) => [edgePt(track, j, -track.HW[j], 0.0), edgePt(track, j, track.HW[j], 0.0)];
+        const f = (j) => [edgePt(track, j, -track.HW[j], o.lift || 0.0), edgePt(track, j, track.HW[j], o.lift || 0.0)];
+        if (o.skip && o.skip(i, i2)) continue;
         const a = f(i), b = f(i2), v0 = (i * track.step) / 8, v1 = ((i + 1) * track.step) / 8;
         const hw0 = track.HW[i], hw1 = track.HW[i2];
         const uv = kind === 'cobble' ? [[-hw0 / 4, v0 * 2], [hw0 / 4, v0 * 2], [hw1 / 4, v1 * 2], [-hw1 / 4, v1 * 2]] : [[0, v0], [1, v0], [1, v1], [0, v1]];
-        const shade = theme.roadColor ? KL.col(theme.roadColor) : [1, 1, 1];
+        const shade = o.tint || (theme.roadColor ? KL.col(theme.roadColor) : [1, 1, 1]);
         B.quadUV(a[0], a[1], b[1], b[0], shade, uv[0], uv[1], uv[2], uv[3]);
       }
       return { asphalt, cobble };
+    },
+    /* the ribbon of a shortcut, trimmed where it lies on the main road (so no brick carpet on the avenue); returns a Batch */
+    cutRoad(T, main, o) {
+      o = o || {};
+      const B = new KL.Batch(), tmp = {}, shade = o.tint || [1, 1, 1], f = (p) => { const m = main.project(p[0], p[2], -1, null, tmp); return Math.abs(m.d) - m.hw; };    // < 0: on the main road surface
+      const sec = [];
+      for (let j = 0; j < T.N; j++) {
+        const hw = T.HW[j], L = edgePt(T, j, -hw, o.lift || 0), R = edgePt(T, j, hw, o.lift || 0), fl = f(L), fr = f(R);
+        let t0 = 0, t1 = 1;                                                // visible part of the section, 0 = left edge, 1 = right edge
+        const cross = (inside, outside) => { let a = 0, b = 1; for (let k = 0; k < 7; k++) { const m = (a + b) / 2, p = [lerp(inside[0], outside[0], m), 0, lerp(inside[2], outside[2], m)]; if (f(p) < -0.4) a = m; else b = m; } return b; };
+        if (fl < -0.4 && fr < -0.4) { sec.push(null); continue; }
+        if (fl < -0.4) t0 = cross(L, R); else if (fr < -0.4) t1 = 1 - cross(R, L);
+        const P = (t) => [lerp(L[0], R[0], t), lerp(L[1], R[1], t), lerp(L[2], R[2], t)];
+        sec.push({ a: P(t0), b: P(t1), ua: (t0 * 2 - 1) * hw / 4, ub: (t1 * 2 - 1) * hw / 4, v: (j * T.step) / 4 });
+      }
+      for (let j = 0; j + 1 < sec.length; j++) {
+        const s0 = sec[j], s1 = sec[j + 1]; if (!s0 || !s1) continue;
+        B.quadUV(s0.a, s0.b, s1.b, s1.a, shade, [s0.ua, s0.v], [s0.ub, s0.v], [s1.ub, s1.v], [s1.ua, s1.v]);
+      }
+      return B;
     },
     /* start/finish line + pads + checker */
     decals(track, pads) {
@@ -54,7 +79,8 @@
       return { pads: B, checker: C };
     },
     /* raised pavement/verge strip between the road edge and the wall + a kerb stone + the wall itself */
-    sides(track, theme) {
+    sides(track, theme, o) {
+      o = o || {};
       const verge = new KL.Batch(), kerb = new KL.Batch(), wall = new KL.Batch();
       const H = theme.wallH != null ? theme.wallH : 1.15, KH = theme.kerbH != null ? theme.kerbH : 0.14;
       const vc = KL.col(theme.vergeColor || '#ffffff'), wc = KL.col(theme.wallColor || '#cfc6b4'), wt = KL.col(theme.wallTop || '#e3dccb');
@@ -66,21 +92,21 @@
           const w = (lim(i) - track.HW[i]) / 3;
           const I = [inner[0], inner[1], inner[2], 0], O = [outer[0], outer[1], outer[2], w];
           return side < 0 ? [O, I] : [I, O];
-        }, 3, () => vc);
+        }, 3, () => vc, (i) => o.skip && o.skip(i, side));
         // kerb face (vertical step up from the road to the pavement)
         strip(kerb, track, 0, track.N, (i) => {
           const lo = edgePt(track, i, side * track.HW[i], 0), hi = edgePt(track, i, side * track.HW[i], KH);
           return side < 0 ? [[hi[0], hi[1], hi[2], 0], [lo[0], lo[1], lo[2], 1]] : [[lo[0], lo[1], lo[2], 0], [hi[0], hi[1], hi[2], 1]];
-        }, 2, null);
+        }, 2, null, (i) => o.skip && o.skip(i, side));
         // wall: inner face + cap
         strip(wall, track, 0, track.N, (i) => {
           const lo = edgePt(track, i, side * lim(i), KH), hi = edgePt(track, i, side * lim(i), KH + H);
           return side < 0 ? [[hi[0], hi[1], hi[2], 0], [lo[0], lo[1], lo[2], 1]] : [[lo[0], lo[1], lo[2], 0], [hi[0], hi[1], hi[2], 1]];
-        }, 2, (i) => wc);
+        }, 2, (i) => wc, (i) => o.skip && o.skip(i, side));
         strip(wall, track, 0, track.N, (i) => {
           const a = edgePt(track, i, side * lim(i), KH + H), b = edgePt(track, i, side * (lim(i) + 0.55), KH + H);
           return side < 0 ? [[b[0], b[1], b[2], 0], [a[0], a[1], a[2], 1]] : [[a[0], a[1], a[2], 0], [b[0], b[1], b[2], 1]];
-        }, 2, (i) => wt);
+        }, 2, (i) => wt, (i) => o.skip && o.skip(i, side));
       }
       return { verge, kerb, wall };
     },
