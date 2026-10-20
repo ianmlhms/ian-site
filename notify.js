@@ -3,25 +3,16 @@
  *  - enablePush():  asks permission, subscribes this device, stores it server-side.
  *  - disablePush(): unsubscribes + forgets this device.
  *  - pushState():   "unsupported" | "default" | "granted" | "denied" | "subscribed".
- *  - initAmbient(): live in-app toast + system notification for new messages on
- *                   any page (e.g. while you're playing a game). Used by
- *                   notify-ambient.js on non-messenger pages.
+ *  - initAmbient(): live in-app toast + system notification for new messages and
+ *                   friend requests on a few pages. Game invites are NOT handled
+ *                   here any more: invite-pop.js (loaded by auth.js) shows them on
+ *                   every page.
  * Foreground notifications use the Notification API (no server). Closed-app push
  * is delivered by the Supabase Edge Function `notify` → the service worker. */
-import * as auth from "./auth.js?v=33";
-import { gameName, joinUrl } from "./mp-games.js?v=4";
+import * as auth from "./auth.js?v=34";
 
 const cfg = window.PB_CONFIG || {};
 const swSupported = "serviceWorker" in navigator && "PushManager" in window;
-
-// Game names + where an invite leads come from the shared registry (mp-games.js), the same list the lobby and friends.html use.
-const INVITE_TOAST_MS = 15000;   // an invite is worth more than the 6 s of a chat message: the lobby code stays valid for hours
-const INVITE_TEXT = {
-  lb: { title: "🎮 Spillinvitatioun", body: "{name} huet dech op {game} invitéiert — tippen fir bäizetrieden" },
-  de: { title: "🎮 Spieleeinladung", body: "{name} hat dich zu {game} eingeladen — tippen zum Beitreten" },
-  en: { title: "🎮 Game invite", body: "{name} invited you to {game} — tap to join" },
-};
-const inviteText = () => { let l = "lb"; try { const v = localStorage.getItem("site_lang"); if (INVITE_TEXT[v]) l = v; } catch {} return INVITE_TEXT[l]; };
 
 /* ---------- service worker ---------- */
 let _swReg = null;
@@ -159,9 +150,9 @@ function startAmbient(sb) {
     })
     .subscribe();
 
-  // Friend requests + game invites aimed at me (so I'm notified while I'm
-  // elsewhere on the site, e.g. mid-game). Closed-app delivery is handled by
-  // the `notify` Edge Function; this is the foreground complement.
+  // Friend requests aimed at me (so I'm notified while I'm elsewhere on the site).
+  // Game invites are handled site-wide by invite-pop.js. Closed-app delivery is
+  // handled by the `notify` Edge Function; this is the foreground complement.
   const social = () => (location.href = "friends.html");
   sb.channel("ambient-social-" + me)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "friendships", filter: "addressee=eq." + me }, async ({ new: f }) => {
@@ -170,15 +161,6 @@ function startAmbient(sb) {
       const body = (p?.username || "Someone") + " wants to be friends";
       showToast("👋 Friend request", body, social);
       systemNotify("👋 Friend request", body, "friends.html");
-    })
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "game_invites", filter: "to_user=eq." + me }, ({ new: gi }) => {
-      if (!gi || (gi.status && gi.status !== "pending")) return;
-      // straight into the lobby (or the old room link) for a known game; the friends page for anything else
-      const url = joinUrl(gi.game, gi.room) || "friends.html";
-      const tx = inviteText();
-      const body = tx.body.replace("{name}", gi.from_name || "?").replace("{game}", gameName(gi.game));
-      showToast(tx.title, body, () => (location.href = url), { ms: INVITE_TOAST_MS, wrap: true });
-      systemNotify(tx.title, body, url);
     })
     .subscribe();
 }

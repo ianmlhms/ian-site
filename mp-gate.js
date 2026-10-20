@@ -1,5 +1,5 @@
 /* mp-gate.js — the small in-game half of the shared lobby. Classic script, first <script> in the game page:
- *   <script src="mp-gate.js?v=6" data-game="connect4"></script>
+ *   <script src="mp-gate.js?v=7" data-game="connect4"></script>
  *
  * 1. Gate: a visit with neither ?room= nor ?ai=1 (arcade card, old bookmark, ?lobby=CODE) is sent to lobby.html. The old
  *    links page?room=CODE&role=host|guest and page?ai=1 keep working untouched — they never see the lobby.
@@ -51,6 +51,14 @@
     location.replace(lobbyUrl(params.get("lobby") || ""));
     return;
   }
+
+  /* An online match is "live": invite-pop.js then shows a new game invite as a slim banner instead of a popup.
+   * A page sets the flag itself; a game inside the arcade frame tells the shell (pixelbreak.html copies it). */
+  function live(on) {
+    if (inFrame) { try { window.parent.postMessage({ __ianLive: !!on }, "*"); } catch (e) { /* no shell */ } }
+    else document.documentElement.dataset.liveGame = on ? "1" : "0";
+  }
+  if (hasRoom) live(true);
 
   var lbCode = cleanCode(params.get("lb"));
   gate.code = lbCode;
@@ -124,7 +132,7 @@
       if (!adopt.length) { b.type = "button"; b.className = "mpg-chip"; b.id = "mpgBack"; }
       else { b.dataset.mpg = "1"; b.hidden = false; if (adopt[i].instant) b.dataset.mpgInstant = "1"; }
     });
-    gate.setOver = function (over) { gate.over = !!over; armed = 0; paint(); };
+    gate.setOver = function (over) { gate.over = !!over; armed = 0; paint(); live(!over); };
     gate.backToLobby = go;
     paint();
     if (!adopt.length) document.body.appendChild(btns[0]);

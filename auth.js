@@ -124,6 +124,28 @@ function startPresencePing() {
     .then(({ showNotices }) => showNotices(_g.sb, () => _g.session))
     .catch((error) => console.warn("[notice] module failed to load", error));
   startAccountCheck();
+  startInvitePop();
+}
+
+/* Game invites reach you on every page (popup, or a slim banner during a live
+ * game): see invite-pop.js. Top-level pages only, never kart-only accounts, and
+ * the module is fetched once the page is idle so it never competes with load. */
+function startInvitePop() {
+  if (window.top !== window || isKartAccount() || !_g.sb || !_g.session?.user?.id) return;
+  if (_g.inviteModule) {
+    void _g.inviteModule
+      .then(({ startInvitePop: start }) => start(_g.sb, () => _g.session))
+      .catch((error) => console.warn("[invites] module failed to load", error));
+    return;
+  }
+  if (_g.inviteScheduled) return;
+  _g.inviteScheduled = true;
+  const load = () => {
+    _g.inviteModule = import("./invite-pop.js?v=1");
+    startInvitePop();
+  };
+  if ("requestIdleCallback" in window) window.requestIdleCallback(load, { timeout: 3000 });
+  else setTimeout(load, 1500);
 }
 
 /* One-time "is your username and class still right?" popup. Top-level pages
@@ -131,7 +153,7 @@ function startPresencePing() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=10");
+    _g.accountCheckModule = import("./account-check.js?v=11");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))
