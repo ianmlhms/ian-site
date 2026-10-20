@@ -231,7 +231,8 @@ export const flow = {
       await kl(A, () => { __klTest.autopilot(true); return __klTest.mpRecord(true); });
       await kl(B, () => { __klTest.autopilot(true); return __klTest.mpRecord(true); });
       await sleep(8000);
-      const speedA = (await st(A)).kart.speed, speedB = (await st(B)).kart.speed;
+      let speedA = 0, speedB = 0;                                  // (best of a few samples: a kart may be mid-spin or in a tight corner at one instant)
+      for (let i = 0; i < 6; i++) { speedA = Math.max(speedA, (await st(A)).kart.speed); speedB = Math.max(speedB, (await st(B)).kart.speed); await sleep(400); }
       h.expect(speedA > 8 && speedB > 8, 'both karts are moving (' + speedA.toFixed(1) + ' / ' + speedB.toFixed(1) + ' m/s)');
       const rttB = (await mp(B)).rtt;
 
@@ -828,7 +829,7 @@ export const flow = {
       /* ================= 5e. network stalls: a lagging player keeps his kart, a lagging host keeps his race ================= */
       if (want('stalls')) {
         h.step('stalls (WebRTC): a client lags 2.5 s (nothing happens) and 6 s (a gentle bot for a moment, kart back without a reset); the host lags 3 s and 9 s (indicator, no second host)');
-        const H = await newPlayer(h, hub, 'st-host', { first: true, cfg: NO_STALL_FORGIVENESS }); all.push(H);
+        const H = await newPlayer(h, hub, 'st-host', { cfg: NO_STALL_FORGIVENESS }); all.push(H);
         const G1 = await newPlayer(h, hub, 'st-g1', { cfg: NO_STALL_FORGIVENESS }); all.push(G1);
         const G2 = await newPlayer(h, hub, 'st-g2', { cfg: NO_STALL_FORGIVENESS }); all.push(G2);
         await goOnline(H, 'Lagger'); await H.page.click('#olCreate');
@@ -889,7 +890,7 @@ export const flow = {
       /* ================= 5f. a host that was only stalled for a very long time: the deputy takes over, the old host steps aside (no split brain) ================= */
       if (want('splitbrain')) {
         h.step('a host stalls for 17 s: the deputy takes over once, the old host steps aside when it wakes up (one race, one host)');
-        const H = await newPlayer(h, hub, 'sb-host', { first: true, cfg: NO_STALL_FORGIVENESS }); all.push(H);
+        const H = await newPlayer(h, hub, 'sb-host', { cfg: NO_STALL_FORGIVENESS }); all.push(H);
         const G1 = await newPlayer(h, hub, 'sb-g1', { cfg: NO_STALL_FORGIVENESS }); all.push(G1);
         const G2 = await newPlayer(h, hub, 'sb-g2', { cfg: NO_STALL_FORGIVENESS }); all.push(G2);
         await goOnline(H, 'OldHost'); await H.page.click('#olCreate');
