@@ -3,6 +3,7 @@ import * as auth from "./auth.js?v=34";
 import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=35";
 import { searchPeople, highlightMatch, attachPeopleSearch } from "./people-search.js?v=1";
 import { openPeoplePicker } from "./people-picker.js?v=1";
+import { createMediaUrls, UPLOAD_CACHE_SECONDS } from "./chat-media.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -14,6 +15,8 @@ const MAX_MEDIA = 50 * 1024 * 1024; // 50 MB
 const SNIPPET = 80; // chars kept of a quoted reply
 
 let sb = null;
+// one signed URL per file (cached + batched) and media loaded only near the viewport — see chat-media.js
+const media = createMediaUrls(() => sb, () => auth.session()?.user?.id);
 let current = null;          // {id, display, is_dm, invite_code, ...}
 let channel = null;          // current chat's realtime channel
 let allChannel = null;       // all-my-messages channel (drives unread badges)
@@ -540,7 +543,7 @@ async function sendVoice(blob) {
   if (!current || !blob.size) return;
   const ext = blob.type.includes("mp4") ? "mp4" : "webm";
   const path = `${current.id}/${crypto.randomUUID()}.${ext}`;
-  const { error: upErr } = await sb.storage.from("chat-media").upload(path, blob, { contentType: blob.type });
+  const { error: upErr } = await sb.storage.from("chat-media").upload(path, blob, { contentType: blob.type, cacheControl: UPLOAD_CACHE_SECONDS });
   if (upErr) return alert(T("msg.uploadFail") + ": " + upErr.message);
   const u = auth.session().user;
   const { data, error } = await sb.from("messages")
@@ -673,23 +676,25 @@ function appendMessage(m) {
   };
   if (m.media_url) {
     if (m.media_type === "audio") {
-      const au = document.createElement("audio"); au.className = "voice"; au.controls = true;
+      const au = document.createElement("audio"); au.className = "voice"; au.controls = true; au.preload = "none";
       bubble.insertBefore(au, el.querySelector(".time"));
-      signedUrl(m.media_url).then((u) => { if (u) au.src = u; });
+      media.loadInto(au, m.media_url);
     } else if (m.media_type === "file") {
       const a = document.createElement("a");
       a.className = "filechip"; a.target = "_blank"; a.rel = "noopener";
       a.download = m.content || "file";
       a.innerHTML = `<span class="fc-ico">${fileIcon(m.content)}</span><span class="fc-name">${esc(m.content || "File")}</span><span class="fc-dl">⬇</span>`;
       bubble.insertBefore(a, el.querySelector(".time"));
-      signedUrl(m.media_url).then((u) => { if (u) a.href = u; });
+      media.loadInto(a, m.media_url, { attr: "href" });
     } else {
       const wrap = document.createElement(m.media_type === "video" ? "video" : "img");
-      wrap.className = "media";
-      if (m.media_type === "video") wrap.controls = true;
-      else wrap.onclick = () => { if (Date.now() < suppressClickUntil) return; if (wrap.src) openLightbox(wrap.src); };   // tap photo → fullscreen
+      wrap.className = "media pending";
+      const settle = () => wrap.classList.remove("pending");
+      if (m.media_type === "video") { wrap.controls = true; wrap.preload = "none"; wrap.setAttribute("playsinline", ""); wrap.addEventListener("loadedmetadata", settle); }
+      else { wrap.loading = "lazy"; wrap.decoding = "async"; wrap.alt = ""; wrap.addEventListener("load", settle); wrap.onclick = () => { if (Date.now() < suppressClickUntil) return; if (wrap.src) openLightbox(wrap.src); }; }   // tap photo → fullscreen
+      wrap.addEventListener("error", settle);
       bubble.insertBefore(wrap, el.querySelector(".time"));
-      signedUrl(m.media_url).then((u) => { if (u) wrap.src = u; });
+      media.loadInto(wrap, m.media_url);
     }
   }
   // desktop hover reply button
@@ -740,12 +745,6 @@ async function deleteOwnMessage(id) {
   removeMessage(id); // realtime DELETE removes it for everyone else
 }
 
-async function signedUrl(path) {
-  try {
-    const { data, error } = await sb.storage.from("chat-media").createSignedUrl(path, 3600);
-    return error ? null : data.signedUrl;
-  } catch { return null; }
-}
 
 function subscribe(gid) {
   if (channel) { sb.removeChannel(channel); channel = null; }
@@ -816,7 +815,7 @@ async function uploadAndSend(file) {
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
   const path = `${current.id}/${crypto.randomUUID()}.${ext}`;
   const att = $("attachBtn"); att.disabled = true; att.textContent = "⏳";
-  const { error: upErr } = await sb.storage.from("chat-media").upload(path, file, { contentType: file.type || "application/octet-stream" });
+  const { error: upErr } = await sb.storage.from("chat-media").upload(path, file, { contentType: file.type || "application/octet-stream", cacheControl: UPLOAD_CACHE_SECONDS });
   att.disabled = false; att.textContent = "📎";
   if (upErr) return alert(T("msg.uploadFail") + ": " + upErr.message);
   const u = auth.session().user;

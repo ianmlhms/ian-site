@@ -134,7 +134,7 @@ export function ilikeRegExp(filter) {
  *   functions: { name: (body) => data },
  *   calls: [] // filled in: { kind: "rpc"|"table"|"function", name, method, body }
  * } */
-export function createBackend({ rpc = {}, tables = {}, functions = {} } = {}) {
+export function createBackend({ rpc = {}, tables = {}, functions = {}, storage = null } = {}) {
   const dailyScores = new Map();
   const luxDay = () => new Intl.DateTimeFormat('sv-SE', { timeZone:'Europe/Luxembourg', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
   const dailyRpc = {
@@ -153,7 +153,7 @@ export function createBackend({ rpc = {}, tables = {}, functions = {} } = {}) {
       return [{day,game_id:p_game,ends_at,rank:score === undefined ? null : 1,user_id:score === undefined ? null : ME,username:ME_NAME,score:score ?? null,is_self:score !== undefined}];
     },
   };
-  return { rpc: {...dailyRpc,...rpc}, tables, functions, calls: [], callsTo(name) { return this.calls.filter((c) => c.name === name); } };
+  return { rpc: {...dailyRpc,...rpc}, tables, functions, storage, calls: [], callsTo(name) { return this.calls.filter((c) => c.name === name); } };
 }
 
 /* Stateful command endpoint; repeat=true deliberately redelivers IDs to test
@@ -225,7 +225,17 @@ export async function mockSupabase(context, backend) {
       return json(method === "GET" || out ? out : []);
     }
 
-    if (p.startsWith("/storage/v1/")) return json({});
+    if (p.startsWith("/storage/v1/")) {
+      // optional handler: ({ url, method, body, raw }) => data | { raw: <route.fulfill options> }
+      const method = request.method();
+      backend.calls.push({ kind: "storage", name: p, method, body: body && typeof body === "object" ? body : null });
+      if (backend.storage) {
+        const out = await backend.storage({ url, method, body, raw: request.postDataBuffer() });
+        if (out && out.raw) return route.fulfill({ headers: CORS, ...out.raw });
+        if (out !== undefined) return json(out);
+      }
+      return json({});
+    }
     return json({});
   });
 }
@@ -328,6 +338,7 @@ export async function runFlow(flow, { browser, origin, shotsDir = process.env.FL
     },
     tables: { profiles: profilesTable, ...base.tables },
     functions: { "auth-pin": () => ({ hasPin: true, isLegacy: false }), ...base.functions },
+    storage: base.storage || null,
   });
   // Optional offline run: serve the pinned UMD from a local, SRI-checked cache
   // and refuse every other off-site request. Supabase routes below stay mocked.

@@ -5,6 +5,7 @@ import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
 import { at } from "./admin-texts.js?v=1";
 import { mountKart } from "./admin-kart.js?v=1";
 import { mountSaves } from "./admin-saves.js?v=1";
+import { createMediaUrls } from "./chat-media.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -81,17 +82,17 @@ $("detailBack").onclick = showList;
 function appendMedia(container, m) {
   let tag;
   if (m.media_type === "audio") {
-    tag = document.createElement("audio"); tag.controls = true; tag.className = "media";
+    tag = document.createElement("audio"); tag.controls = true; tag.preload = "none"; tag.className = "media";
   } else if (m.media_type === "video") {
-    tag = document.createElement("video"); tag.controls = true; tag.className = "media";
+    tag = document.createElement("video"); tag.controls = true; tag.preload = "none"; tag.className = "media";
   } else if (m.media_type === "file") {
     tag = document.createElement("a"); tag.className = "filechip"; tag.target = "_blank"; tag.rel = "noopener";
     tag.innerHTML = `<span>${fileIcon(m.content)}</span><span>${esc(m.content || "File")}</span><span>⬇</span>`;
   } else {
-    tag = document.createElement("img"); tag.className = "media";   // image (default)
+    tag = document.createElement("img"); tag.className = "media"; tag.loading = "lazy"; tag.decoding = "async";   // image (default)
   }
   container.appendChild(tag);
-  signedUrl(m.media_url).then((u) => { if (u) { if (tag.tagName === "A") tag.href = u; else tag.src = u; } });
+  media.loadInto(tag, m.media_url, { attr: tag.tagName === "A" ? "href" : "src" });
 }
 
 let sb = null, mode = "groups", groups = [], users = [], current = null;
@@ -100,10 +101,8 @@ let onlineRefreshTimer = null, onlineGeneration = 0;
 let kartView = null, savesView = null;
 const WIDE_MODES = new Set(["kart", "saves"]);
 
-async function signedUrl(path) {
-  try { const { data, error } = await sb.storage.from("chat-media").createSignedUrl(path, 3600); return error ? null : data.signedUrl; }
-  catch { return null; }
-}
+// one signed URL per file (cached + batched), loaded lazily — see chat-media.js
+const media = createMediaUrls(() => sb, () => auth.session()?.user?.id);
 
 /* ============================ GROUPS ============================ */
 async function loadGroups() {
