@@ -5,7 +5,7 @@ import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
 import { at } from "./admin-texts.js?v=1";
 import { mountKart } from "./admin-kart.js?v=1";
 import { mountSaves } from "./admin-saves.js?v=1";
-import { createMediaUrls } from "./chat-media.js?v=1";
+import { createMediaUrls, thumbPathFor } from "./chat-media.js?v=2";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -85,6 +85,7 @@ function appendMedia(container, m) {
     tag = document.createElement("audio"); tag.controls = true; tag.preload = "none"; tag.className = "media";
   } else if (m.media_type === "video") {
     tag = document.createElement("video"); tag.controls = true; tag.preload = "none"; tag.className = "media";
+    const vp = thumbPathFor(m.media_url); if (vp) media.loadInto(tag, vp, { attr: "poster" });
   } else if (m.media_type === "file") {
     tag = document.createElement("a"); tag.className = "filechip"; tag.target = "_blank"; tag.rel = "noopener";
     tag.innerHTML = `<span>${fileIcon(m.content)}</span><span>${esc(m.content || "File")}</span><span>⬇</span>`;
@@ -92,7 +93,9 @@ function appendMedia(container, m) {
     tag = document.createElement("img"); tag.className = "media"; tag.loading = "lazy"; tag.decoding = "async";   // image (default)
   }
   container.appendChild(tag);
-  media.loadInto(tag, m.media_url, { attr: tag.tagName === "A" ? "href" : "src" });
+  const tp = tag.tagName === "IMG" ? thumbPathFor(m.media_url) : null;   // photos: show the thumbnail, open the full picture on click
+  if (tp) { tag.style.cursor = "zoom-in"; tag.onclick = () => media.signedUrl(m.media_url).then((u) => { if (u) window.open(u, "_blank", "noopener"); }); }
+  media.loadInto(tag, tp || m.media_url, { attr: tag.tagName === "A" ? "href" : "src" });
 }
 
 let sb = null, mode = "groups", groups = [], users = [], current = null;

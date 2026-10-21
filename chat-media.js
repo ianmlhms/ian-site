@@ -19,6 +19,12 @@ const REFRESH_MARGIN_MS = 5 * 60 * 1000;           // re-sign when < 5 min left
 const BATCH_DELAY_MS = 40;                          // coalesce sign requests of one render pass
 const STORE_KEY = "cm_urls_v1";
 const STORE_MAX = 600;                              // entries kept in localStorage
+/* Paths made by the compressing uploader: "<gid>/i_<uuid>.<ext>" (photo) or "<gid>/v_<uuid>.<ext>" (video)
+ * sit next to a thumbnail "<gid>/t_<uuid>.jpg". Older files have neither prefix and no thumbnail. */
+const THUMBED = /^(\d+)\/[iv]_([0-9a-f-]{36})\.[a-z0-9]+$/;
+export const thumbPathFor = (path) => { const m = THUMBED.exec(path || ""); return m ? `${m[1]}/t_${m[2]}.jpg` : null; };
+export const newMediaPaths = (gid, uuid, ext, kind, withThumb) =>
+  withThumb ? { full: `${gid}/${kind === "video" ? "v" : "i"}_${uuid}.${ext}`, thumb: `${gid}/t_${uuid}.jpg` } : { full: `${gid}/${uuid}.${ext}`, thumb: null };
 const NEAR_VIEWPORT = "400px 0px";                  // start loading this far before a bubble is visible
 
 export function createMediaUrls(getClient, getScope = () => "", { now = () => Date.now() } = {}) {
@@ -134,9 +140,9 @@ export function createMediaUrls(getClient, getScope = () => "", { now = () => Da
       for (const en of entries) {
         if (!en.isIntersecting) continue;
         io.unobserve(en.target);
-        const job = jobs.get(en.target);
+        const list = jobs.get(en.target) || [];
         jobs.delete(en.target);
-        if (job && en.target.isConnected) job();
+        if (en.target.isConnected) for (const job of list) job();
       }
     }, { rootMargin: NEAR_VIEWPORT });
     return io;
@@ -145,18 +151,20 @@ export function createMediaUrls(getClient, getScope = () => "", { now = () => Da
   function whenVisible(el, job) {
     const o = observer();
     if (!o) { job(); return; }
-    jobs.set(el, job);
+    const list = jobs.get(el);
+    if (list) { list.push(job); return; }       // several loads on one element (video: poster + file)
+    jobs.set(el, [job]);
     o.observe(el);
   }
 
   /* Sign `path` when `el` is near the viewport, then put the URL into el[attr]. A failed load
    * (expired / evicted URL) is retried once with a freshly signed URL. */
   function loadInto(el, path, { attr = "src", lazy = true, onUrl } = {}) {
-    const apply = (url) => { if (attr === "href") el.href = url; else el.src = url; if (onUrl) onUrl(url); };
+    const apply = (url) => { if (attr === "href") el.href = url; else if (attr === "poster") el.poster = url; else el.src = url; if (onUrl) onUrl(url); };
     const run = () => {
       signedUrl(path).then((url) => {
         if (!url) return;
-        if (attr !== "href") {
+        if (attr === "src") {
           let retried = false;
           el.addEventListener("error", () => {
             if (retried) return; retried = true;

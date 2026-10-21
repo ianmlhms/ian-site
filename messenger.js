@@ -3,7 +3,8 @@ import * as auth from "./auth.js?v=34";
 import { registerSW, enablePush, disablePush, pushState } from "./notify.js?v=35";
 import { searchPeople, highlightMatch, attachPeopleSearch } from "./people-search.js?v=1";
 import { openPeoplePicker } from "./people-picker.js?v=1";
-import { createMediaUrls, UPLOAD_CACHE_SECONDS } from "./chat-media.js?v=1";
+import { createMediaUrls, UPLOAD_CACHE_SECONDS, thumbPathFor, newMediaPaths } from "./chat-media.js?v=2";
+import { prepareImage, videoPoster, extOf } from "./chat-media-prep.js?v=1";
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -599,16 +600,25 @@ function cancelReply() { replyTo = null; const b = $("replyBar"); if (b) b.class
 
 /* ---------- image lightbox ---------- */
 let lightboxReturnFocus = null;
-function openLightbox(src) {
+let lightboxToken = 0;
+/* `src` shows at once (the thumbnail); `fullPath`, if given, is signed and swapped in when it has loaded. */
+function openLightbox(src, fullPath) {
   const lb = $("lightbox");
   lightboxReturnFocus = document.activeElement;
+  const token = ++lightboxToken;
   $("lbImg").src = src;
+  if (fullPath) media.signedUrl(fullPath).then((u) => {
+    if (!u || token !== lightboxToken) return;
+    const pre = new Image();
+    pre.onload = () => { if (token === lightboxToken) $("lbImg").src = u; };
+    pre.src = u;
+  });
   $("lbImg").alt = TA("photo");
   lb.classList.add("open");
   $("lbX").focus();
 }
 function closeLightbox() {
-  const lb = $("lightbox"); lb.classList.remove("open"); $("lbImg").src = ""; $("lbImg").alt = "";
+  const lb = $("lightbox"); lightboxToken++; lb.classList.remove("open"); $("lbImg").src = ""; $("lbImg").alt = "";
   if (lightboxReturnFocus && lightboxReturnFocus.isConnected) lightboxReturnFocus.focus();
   lightboxReturnFocus = null;
 }
@@ -688,13 +698,20 @@ function appendMessage(m) {
       media.loadInto(a, m.media_url, { attr: "href" });
     } else {
       const wrap = document.createElement(m.media_type === "video" ? "video" : "img");
-      wrap.className = "media pending";
+      const thumbPath = thumbPathFor(m.media_url);   // null for files uploaded before thumbnails existed
+      wrap.className = "media" + (m.media_type === "video" ? "" : " pending");
       const settle = () => wrap.classList.remove("pending");
-      if (m.media_type === "video") { wrap.controls = true; wrap.preload = "none"; wrap.setAttribute("playsinline", ""); wrap.addEventListener("loadedmetadata", settle); }
-      else { wrap.loading = "lazy"; wrap.decoding = "async"; wrap.alt = ""; wrap.addEventListener("load", settle); wrap.onclick = () => { if (Date.now() < suppressClickUntil) return; if (wrap.src) openLightbox(wrap.src); }; }   // tap photo → fullscreen
-      wrap.addEventListener("error", settle);
+      if (m.media_type === "video") {
+        wrap.controls = true; wrap.preload = "none"; wrap.setAttribute("playsinline", "");   // the file is only fetched when played
+        if (thumbPath) media.loadInto(wrap, thumbPath, { attr: "poster" });
+        media.loadInto(wrap, m.media_url);
+      } else {
+        wrap.loading = "lazy"; wrap.decoding = "async"; wrap.alt = ""; wrap.addEventListener("load", settle); wrap.addEventListener("error", settle);
+        // tap photo → fullscreen: the thumbnail opens at once, the full picture is fetched only now
+        wrap.onclick = () => { if (Date.now() < suppressClickUntil) return; if (wrap.src) openLightbox(wrap.src, thumbPath ? m.media_url : null); };
+        media.loadInto(wrap, thumbPath || m.media_url);
+      }
       bubble.insertBefore(wrap, el.querySelector(".time"));
-      media.loadInto(wrap, m.media_url);
     }
   }
   // desktop hover reply button
@@ -812,12 +829,28 @@ async function uploadAndSend(file) {
   if (!file || !current) return;
   const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : "file";
   if (file.size > MAX_MEDIA) return alert(T("msg.tooLarge"));
-  const ext = (file.name.split(".").pop() || "bin").toLowerCase();
-  const path = `${current.id}/${crypto.randomUUID()}.${ext}`;
   const att = $("attachBtn"); att.disabled = true; att.textContent = "⏳";
-  const { error: upErr } = await sb.storage.from("chat-media").upload(path, file, { contentType: file.type || "application/octet-stream", cacheControl: UPLOAD_CACHE_SECONDS });
-  att.disabled = false; att.textContent = "📎";
+  const done = () => { att.disabled = false; att.textContent = "📎"; };
+  // photos: shrink to <= 1600 px + a 480 px thumbnail; videos: a poster frame. Any failure falls back to the plain upload.
+  let body = file, ext = extOf(file), thumb = null;
+  if (type === "image") {
+    const prep = await prepareImage(file);
+    if (prep && prep.tooLarge) { done(); return alert(T("msg.tooLarge")); }
+    if (prep) { body = prep.full; ext = prep.ext; thumb = prep.thumb; }
+  } else if (type === "video") thumb = await videoPoster(file);
+  const gid = current.id, id = crypto.randomUUID();
+  let paths = newMediaPaths(gid, id, ext, type, !!thumb);
+  const put = (p, blob, contentType) => sb.storage.from("chat-media").upload(p, blob, { contentType, cacheControl: UPLOAD_CACHE_SECONDS });
+  if (thumb) {                                           // thumbnail first, so a message never points at a missing thumbnail
+    const { error: thErr } = await put(paths.thumb, thumb, "image/jpeg");
+    if (thErr) { thumb = null; paths = newMediaPaths(gid, id, ext, type, false); }
+  }
+  const path = paths.full;
+  const { error: upErr } = await put(path, body, body.type || file.type || "application/octet-stream");
+  done();
   if (upErr) return alert(T("msg.uploadFail") + ": " + upErr.message);
+  if (thumb) media.seed(paths.thumb, URL.createObjectURL(thumb));              // the sender never downloads their own upload again
+  if (type === "image") media.seed(path, URL.createObjectURL(body));
   const u = auth.session().user;
   // for generic files we keep the original filename in `content` (no text body for files)
   const row = { group_id: current.id, user_id: u.id, username: auth.username(), content: type === "file" ? (file.name || "file").slice(0, 120) : "", media_url: path, media_type: type };
