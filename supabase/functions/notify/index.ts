@@ -24,6 +24,7 @@ const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:konto@ian.lu";
 const NOTIFY_SECRET = Deno.env.get("NOTIFY_SECRET") ?? "";
+const INBOX_PUSH_SECRET = Deno.env.get("INBOX_PUSH_SECRET") ?? "";
 const PUSH_PREVIEW_LENGTH = 140;
 // A bridge row older than this is history (a backfill or a daemon catching up
 // after downtime), not a new message: pushing it would buzz the phone once per
@@ -318,7 +319,12 @@ Deno.serve(async (req) => {
 
   // Webhook path — shared-secret guard (deployed with --no-verify-jwt).
   // Fails closed: with NOTIFY_SECRET unset, nobody can invoke this path.
-  if (!NOTIFY_SECRET || req.headers.get("x-notify-secret") !== NOTIFY_SECRET) {
+  // The Cloudflare inbox Worker has its own secret (INBOX_PUSH_SECRET) and may
+  // only use the inbox_message branch; DB webhooks keep NOTIFY_SECRET.
+  const given = req.headers.get("x-notify-secret") ?? "";
+  const isWebhook = !!NOTIFY_SECRET && given === NOTIFY_SECRET;
+  const isInbox = !!INBOX_PUSH_SECRET && given === INBOX_PUSH_SECRET && payload?.table === "inbox_message";
+  if (!isWebhook && !isInbox) {
     return json({ error: "unauthorized" }, 401);
   }
 
