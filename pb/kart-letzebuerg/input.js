@@ -13,6 +13,7 @@
     ' ': 'drift', Shift: 'drift', e: 'item', E: 'item', Enter: 'item', Control: 'item', x: 'item', X: 'item' };
   function onKey(e, down) {
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (e.target && e.target.closest && e.target.closest('.ppk-modal')) return;                    // the invite picker (people-picker.js) keeps its own keys: Enter / Space / Esc
     const a = MAP[e.key];
     if (a && down && !e.repeat && (a === 'left' || a === 'right')) emit('nav', a === 'left' ? -1 : 1);       // (a spectator steps through the karts with these)
     if (a) { if (down) keys.add(a); else keys.delete(a); if (enabled) e.preventDefault(); if (down && !e.repeat && a === 'item') emit('itemkey'); return; }

@@ -579,16 +579,24 @@ export const flow = {
         await closeAll(all); all.length = 0;
       }
 
-      /* ================= 4. invite link, friends dialog (signed in) ================= */
+      /* ================= 4. invite link + the shared people picker (signed in) + one mp_invite ================= */
       if (want('link')) {
-        h.step('invite link opens the lobby; the signed-in host can invite friends from the lobby');
+        h.step('invite link opens the lobby; the signed-in host adds people with the shared picker (one mp_invite call), a guest host is sent to sign in');
         const F1 = await newPlayer(h, hub, 'f1', { init: () => {
-          window.__invites = [];
-          window.__pbAuth = { session: { user: { id: 'u-host', user_metadata: { username: 'Anna' } } }, sb: { rpc: async (name, args) => {
-            if (name === 'my_friends') return { data: [{ user_id: 'u-1', username: 'Ben' }, { user_id: 'u-2', username: 'Cleo' }], error: null };
-            if (name === 'invite_game_room') { window.__invites.push([name, args]); return { data: { room: args.p_room }, error: null }; }
-            return { data: null, error: { message: 'unexpected ' + name } };
-          } } };
+          window.__calls = [];
+          const PEOPLE = [{ id: 'u-3', username: 'Dora' }, { id: 'u-4', username: 'Emil' }, { id: 'u-5', username: 'Finn' }];
+          const STATUS = { 'u-1': 'sent', 'u-2': 'already_invited', 'u-3': 'not_allowed', 'u-4': 'rate_limited', 'u-5': 'sent' };
+          const search = (pat) => { const re = new RegExp('^' + String(pat).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*') + '$', 'i'); return PEOPLE.filter((p) => re.test(p.username)); };
+          window.__pbAuth = { session: { user: { id: 'u-host', user_metadata: { username: 'Anna' } } }, sb: {
+            rpc: async (name, args) => {
+              window.__calls.push([name, args]);
+              if (name === 'my_friends') return { data: [{ user_id: 'u-1', username: 'Ben' }, { user_id: 'u-2', username: 'Cleo' }], error: null };
+              if (name === 'is_view_restricted') return { data: false, error: null };
+              if (name === 'mp_invite') return { data: args.p_to.map((id) => ({ user_id: id, status: STATUS[id] || 'unknown_user' })), error: null };
+              return { data: null, error: { message: 'unexpected ' + name } };
+            },
+            from: (table) => { window.__calls.push(['from', table]); const q = { select: () => q, ilike: (c, pat) => { q.pat = pat; return q; }, order: () => q, limit: () => q, then: (res, rej) => Promise.resolve({ data: search(q.pat), error: null }).then(res, rej) }; return q; },
+          } };
         } }); all.push(F1);
         const F2 = await newPlayer(h, hub, 'f2'); all.push(F2);
         await F1.page.click('#modeOnline');
@@ -596,13 +604,51 @@ export const flow = {
         await F1.page.click('#olCreate');
         await F1.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
         const fcode = (await F1.page.textContent('#lbCode')).trim();
+        h.eq((await F1.page.textContent('#lbInvite')).trim(), '＋ Leit derbäisetzen', 'the invite button is the shared "add people" entry');
+        const calls = () => kl(F1, () => window.__calls);
+        const shotDir = process.env.KART_PICKER_SHOTS;
+        const shot = async (name) => { if (shotDir) { fs.mkdirSync(shotDir, { recursive: true }); await F1.page.screenshot({ path: shotDir + '/' + name + '.png' }); } };
         await F1.page.click('#lbInvite');
-        await F1.page.waitForSelector('#frList .frow', { timeout: 5000 });
-        h.eq(await F1.page.locator('#frList .frow b').allInnerTexts(), ['Ben', 'Cleo'], 'friends list is loaded on demand (one my_friends call)');
-        await F1.page.locator('#frList .frow button').first().click();
-        const inv = await kl(F1, () => window.__invites);
-        h.eq(inv.map((i) => [i[0], i[1].p_to, i[1].p_game, i[1].p_room]), [['invite_game_room', 'u-1', 'kart-letzebuerg', fcode.toLowerCase()]], 'inviting a friend sends the lobby code to the invite function');
-        await F1.page.click('#frClose');
+        await F1.page.waitForSelector('.ppk-box #ppSearch', { timeout: 5000 });
+        h.eq(await F1.page.$$eval('.ppk-row', (els) => els.map((e) => e.dataset.name)), ['Ben', 'Cleo'], 'the picker lists the friends (one my_friends call, loaded when it opens)');
+        await F1.page.click('.ppk-row[data-name="Ben"]'); await F1.page.click('.ppk-row[data-name="Cleo"]');
+        for (const nm of ['Dora', 'Emil', 'Finn']) {                                  // people who are not friends: found through the name search
+          await F1.page.fill('#ppSearch', nm.toLowerCase().slice(0, 3));
+          await F1.page.waitForSelector('.ps-drop.open .ps-item', { timeout: 5000 });
+          await F1.page.dispatchEvent('.ps-drop.open .ps-item', 'mousedown');
+        }
+        h.eq(await F1.page.$$eval('.pp-chip', (els) => els.map((e) => e.firstChild.textContent)), ['Ben', 'Cleo', 'Dora', 'Emil', 'Finn'], 'friends and searched names end up as chips');
+        h.eq(await F1.page.textContent('#ppGo'), '5 invitéieren', 'the confirm button counts the people');
+        await shot('picker-5');
+        await F1.page.click('#ppGo');
+        await F1.page.waitForSelector('.ppk-box', { state: 'detached' });
+        await F1.page.waitForSelector('#lbInv li', { timeout: 5000 });
+        const c1 = await calls();
+        const inv = c1.filter((c) => c[0] === 'mp_invite');
+        h.eq(inv.map((c) => [c[1].p_game, c[1].p_room, c[1].p_to]), [['kart-letzebuerg', fcode.toLowerCase(), ['u-1', 'u-2', 'u-3', 'u-4', 'u-5']]], 'ONE mp_invite call: game, lowercase code, everybody picked');
+        h.eq(c1.filter((c) => c[0] === 'invite_game_room').length, 0, 'the old per-friend invite_game_room is not called any more');
+        h.eq(c1.filter((c) => c[0] === 'my_friends' || c[0] === 'is_view_restricted').map((c) => c[0]), ['is_view_restricted', 'my_friends'], 'one restriction check + one friends read for the whole picker session');
+        h.eq(await F1.page.$$eval('#lbInv li', (els) => els.map((e) => [e.className, e.querySelector('.tx').textContent])), [
+          ['ok', 'Ben — invitéiert'], ['bad', 'Cleo ass scho invitéiert.'], ['bad', 'Dora ass net verfügbar.'], ['bad', 'Zevill Invitatiounen — probéier et gläich nach eng Kéier.'], ['ok', 'Finn — invitéiert'],
+        ], 'every person gets a result line (sent / already invited / not allowed / rate limited)');
+        await shot('picker-results');
+        // the people who got an invite (sent or already invited) are not offered again; the others still are
+        await F1.page.click('#lbInvite');
+        await F1.page.waitForSelector('.ppk-box #ppSearch', { timeout: 5000 });
+        h.eq(await F1.page.$$eval('.ppk-row', (els) => els.length), 0, 'a second time the invited friends are not listed again');
+        await F1.page.keyboard.press('Escape');
+        await F1.page.waitForSelector('.ppk-box', { state: 'detached' });
+        h.eq((await calls()).filter((c) => c[0] === 'mp_invite').length, 1, 'closing the picker sends nothing');
+        // a guest as host: no session -> a "sign in" line and the site's own sign-in dialog
+        const G = await newPlayer(h, hub, 'g1'); all.push(G);
+        await G.page.click('#modeOnline'); await G.page.click('#olCreate');
+        await G.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
+        await G.page.click('#lbInvite');
+        await G.page.waitForSelector('#lbInv li.bad', { timeout: 15000 });
+        h.eq(await G.page.textContent('#lbInv .tx'), 'Mell dech un, fir Leit anzelueden.', 'a signed-out host is asked to sign in');
+        await G.page.waitForSelector('.auth-modal', { timeout: 15000 });
+        h.expect(true, 'and the site sign-in dialog opens');
+        h.eq(G.http.filter((x) => /rpc\//.test(x)), [], 'no invite request for a guest');
         // a friend (or anybody) who opens the shared link lands in the same lobby
         await F2.page.goto(h.origin + URL_BASE + '&room=' + fcode.toLowerCase() + '&role=guest');
         await F2.page.waitForSelector('#lobbyScreen:not([hidden])', { timeout: 30000 });
@@ -610,6 +656,8 @@ export const flow = {
         await waitFor(F1, () => document.querySelectorAll('#lbList li').length === 2, null, 20000);
         h.expect(true, 'the host sees the new player in the roster');
         h.expect(await F2.page.locator('#lbInvite').isHidden(), 'guests do not get the invite button');
+        const real = (p) => p.errors.filter((e) => !/three/.test(e));
+        h.expect([F1, F2, G].every((p) => real(p).length === 0), 'no console errors: ' + JSON.stringify([F1, F2, G].flatMap((p) => real(p))));
         await closeAll(all); all.length = 0;
       }
 

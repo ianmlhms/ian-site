@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <title>Kart Lëtzebuerg 🏎️ – Arcade</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/pb/kart-letzebuerg.css?v=6">
+<link rel="stylesheet" href="/pb/kart-letzebuerg.css?v=7">
 <script src="/pb/arcade-kit.js?v=32" data-arcade-id="kart-letzebuerg" data-arcade-title="Kart Lëtzebuerg 🏎️"></script>
 </head>
 <body>
@@ -82,9 +82,9 @@
   <div id="lobbyScreen" class="screen" hidden>
     <section class="card lobbycard" aria-labelledby="lobbyTitle">
       <header class="lbhead"><h2 id="lobbyTitle" data-t="lobby">Lobby</h2>
-        <div id="lbCodeRow" class="codebox"><small data-t="lbCode">Code</small><b id="lbCode"></b><button id="lbCopy" data-t="lbCopy">Link kopéieren</button><button id="lbInvite" data-t="lbInvite">Frënn invitéieren</button></div></header>
+        <div id="lbCodeRow" class="codebox"><small data-t="lbCode">Code</small><b id="lbCode"></b><button id="lbCopy" data-t="lbCopy">Link kopéieren</button><button id="lbInvite" data-t="lbInvite">＋ Leit derbäisetzen</button></div></header>
       <div class="lbcols">
-        <div><h2 data-t="lbPlayers">Spiller</h2><ul id="lbList" class="plist"></ul><p id="lbBots" class="hint"></p></div>
+        <div><h2 data-t="lbPlayers">Spiller</h2><ul id="lbList" class="plist"></ul><p id="lbBots" class="hint"></p><ul id="lbInv" class="invres" role="status" aria-live="polite" hidden></ul></div>
         <div>
           <div id="lbSettings">
             <h2 data-t="lbMode">Modus</h2><div id="lbModeChips" class="chips"></div>
@@ -103,7 +103,6 @@
       <p class="hint" data-t="lbPrivacy">Online-Rennen ginn mat de Spillernimm gespäichert.</p>
       <div class="foot"><button id="lbLeave" data-t="lbLeave">Verloossen</button><button id="lbReady" class="primary"></button><button id="lbStart" class="primary" data-t="lbStart">Rennen starten</button></div>
     </section>
-    <div id="frDlg" class="modal" hidden><section class="card small" role="dialog" aria-modal="true" aria-labelledby="frTitle"><h2 id="frTitle" data-t="friendsTitle">Frënn invitéieren</h2><div id="frList"></div><button id="frClose" data-t="close">Zoumaachen</button></section></div>
   </div>
 
   <div id="bdScreen" class="screen" hidden>
@@ -142,7 +141,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/pb/kart-letzebuerg/util.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/config.js?v=6"></script>
-<script src="/pb/kart-letzebuerg/copy.js?v=10"></script>
+<script src="/pb/kart-letzebuerg/copy.js?v=11"></script>
 <script src="/pb/kart-letzebuerg/track.js?v=4"></script>
 <script src="/pb/kart-letzebuerg/kart.js?v=6"></script>
 <script src="/pb/kart-letzebuerg/items.js?v=4"></script>
@@ -157,11 +156,11 @@
 <script src="/pb/kart-letzebuerg/kartmodel.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/fx.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/world.js?v=7"></script>
-<script src="/pb/kart-letzebuerg/input.js?v=2"></script>
+<script src="/pb/kart-letzebuerg/input.js?v=3"></script>
 <script src="/pb/kart-letzebuerg/audio.js?v=2"></script>
 <script src="/pb/kart-letzebuerg/progress.js?v=1"></script>
 <script src="/pb/kart-letzebuerg/net.js?v=3"></script>
-<script src="/pb/kart-letzebuerg/lobby.js?v=8"></script>
+<script src="/pb/kart-letzebuerg/lobby.js?v=9"></script>
 <script src="/pb/kart-letzebuerg/mp.js?v=7"></script>
 <script src="/pb/kart-letzebuerg/tracks-index.js?v=5"></script>
 <script src="/pb/kart-letzebuerg/game.js?v=9"></script>
