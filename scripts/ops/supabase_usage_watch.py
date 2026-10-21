@@ -157,7 +157,7 @@ HOURLY_SQL = (
 ).format(svc=SERVICE_SQL, cl=CL, st=STATUS, m=METHOD, cache=CACHE, p=PATH)
 TOP_PATHS_SQL = (
     "select {m} as m, {p} as p, count() as n, sum(toUInt64OrZero({cl})) as bytes "
-    "from logs where {p}!='' group by m, p order by n desc limit 40"
+    "from logs where {p}!='' group by m, p order by bytes + n * 1500 desc limit 60"
 ).format(m=METHOD, p=PATH, cl=CL)
 DB_SQL = (
     "select pg_database_size(current_database()) as db_bytes, "
@@ -625,12 +625,18 @@ def top_paths(start: datetime, end: datetime, simulated: bool = False) -> str:
         rows = query_logs(TOP_PATHS_SQL, start, end)
     except WatchError as error:
         return "(top paths unavailable: {})".format(error)
-    merged: Dict[str, int] = {}
+    # Rank by estimated egress (body bytes + per-request overhead), not by count:
+    # a few big downloads (e.g. chat photos) matter more than many tiny calls.
+    merged: Dict[str, List[int]] = {}
     for row in rows:
         label = normalise_path(str(row.get("m", "")), str(row.get("p", "")))
-        merged[label] = merged.get(label, 0) + int(row.get("n") or 0)
-    ranked = sorted(merged.items(), key=lambda pair: -pair[1])[:3]
-    return "; ".join("{} x{}".format(label, fmt_count(count)) for label, count in ranked) or "(none)"
+        count = int(row.get("n") or 0)
+        egress = int(row.get("bytes") or 0) + count * 1500
+        slot = merged.setdefault(label, [0, 0])
+        slot[0] += count
+        slot[1] += egress
+    ranked = sorted(merged.items(), key=lambda pair: -pair[1][1])[:3]
+    return "; ".join("{} x{} ({:.0f} MB)".format(label, fmt_count(c), b / 1e6) for label, (c, b) in ranked) or "(none)"
 
 
 def biggest_service(report: Dict[str, Any]) -> str:
