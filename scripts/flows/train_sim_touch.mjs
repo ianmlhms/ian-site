@@ -6,13 +6,14 @@
  * inside the screen and never cover the route strip, the clocks, the speed box or the other HUD buttons (portrait and landscape).
  * Supabase is mocked; no real account. */
 import { runIfMain } from './lib.mjs';
-import { gameFrame, S, waitState } from './train_sim.mjs';
+import { gameFrame, openBothCareers, S, waitState } from './train_sim.mjs';
 
 const LEVER_MAX = 5, SLOTS = 13;
 
 /* Owner-only page gate + normal (not test) mode, like the keyboard flow. */
 async function openArcade(h) {
   await h.signIn();
+  await openBothCareers(h);
   await h.context.addInitScript(() => {
     try {
       const k = Object.keys(localStorage).find((x) => /^sb-.*-auth-token$/.test(x));

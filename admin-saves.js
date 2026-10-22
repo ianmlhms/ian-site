@@ -17,7 +17,7 @@ const PAGE_GRACE_S = 180;     // presence on the game page counts for this long 
 const COMMAND_MINUTES = 15;   // how long the close_game command stays valid
 const MAX_AMOUNT = 1e30;
 const GIFT_GAMES = new Set(["idle-empire", "cookie-clicker", "bus-tycoon"]);
-const GAME_NAMES = { "idle-empire": "Business Empire", "cookie-clicker": "Cookie Clicker", "bus-tycoon": "Bus Tycoon", "train-sim": "Train Sim", "paket-express": "Paket Express", "drive-mad": "Drive Mad", "kart-letzebuerg": "Kart Lëtzebuerg", "chill-drive": "Chill Drive", "crossy-road": "Crossy Road", towerdefense: "Tower Defense", burger: "Burger" };
+const GAME_NAMES = { "idle-empire": "Business Empire", "cookie-clicker": "Cookie Clicker", "bus-tycoon": "Bus Tycoon", "train-sim": "Zuch & Tram Sim", "paket-express": "Paket Express", "drive-mad": "Drive Mad", "kart-letzebuerg": "Kart Lëtzebuerg", "chill-drive": "Chill Drive", "crossy-road": "Crossy Road", towerdefense: "Tower Defense", burger: "Burger" };
 const NOISE_KEYS = new Set(["v", "savedAt", "ts", "rs", "ud", "gd", "sc"]);
 const params = new URLSearchParams(location.search);
 // test hooks (the flows speed the waiting up); normal use keeps the defaults

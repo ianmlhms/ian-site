@@ -498,7 +498,7 @@ export const flow = {
 
     h.step("generic summary for other games; no gift card");
     await page.click('.sv-game[data-game="train-sim"]');
-    await page.waitForFunction(() => /Train Sim/.test(document.querySelector(".sv-card")?.innerText || ""));
+    await page.waitForFunction(() => /Zuch & Tram Sim/.test(document.querySelector(".sv-card")?.innerText || ""));
     const generic = await text(page, ".sv-card");
     h.expect(/tb 15/.test(generic) && /rail 3/.test(generic), `generic fallback: top-level numbers and sizes (${generic})`);
     h.eq(await page.locator("#svGiftForm").count(), 0, "no gift card for a game that is not an idle game");

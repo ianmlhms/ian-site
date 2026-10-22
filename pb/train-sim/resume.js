@@ -1,13 +1,17 @@
 /* Lokféierer: resume support (pure). A running service is written to localStorage as a small JSON snapshot, so a killed or reloaded page can
    offer "Weiderfueren". This module only validates and normalizes a stored snapshot (nothing is trusted: a broken or tampered one is
    rejected) and says how long ago it was. Reading/writing the storage and rebuilding the world stay in the shell (train-sim.js).
-   TS.resume.check(rawText, { now, save, testMode }) -> { snap } | { reject: 'reason', keep: boolean }
+   TS.resume.check(rawText, { now, save, testMode, lock }) -> { snap } | { reject: 'reason', keep: boolean }
+     lock = the career the page is locked to (TS.careerLock) or null: a service of the other career is rejected with keep = true.
      keep = true: it may become valid once the (cloud) save has arrived, so the stored copy is left alone; otherwise the shell deletes it. */
 (function () {
   'use strict';
   const TS = (window.TS = window.TS || {});
   const VERSION = 1;
   const KEY = 'pb_resume_train-sim';
+  const OTHER_CAREER = 'other career';   // reject reason of a service that belongs to the career the page is not locked to
+  /* one slot per arcade tile (career lock), so a Zuch service and a Tram service wait side by side; without a lock the original key */
+  const keyFor = (lock) => (lock === 'rail' || lock === 'tram' ? KEY + '_' + lock : KEY);
   const MAX_AGE_MS = 24 * 3600 * 1000, FUTURE_SKEW_MS = 5 * 60 * 1000, MAX_BYTES = 20000;
   const CAMERAS = ['cab', 'chase', 'platform', 'orbit'];
   const WEATHER = ['clear', 'rain', 'fog', 'snow'];
@@ -87,6 +91,7 @@
     const K = TS.career;
     const career = K.careerOfTrain(train);
     if (!career || K.careerOfRoute(route) !== career) return reject('route and train are from different careers');
+    if (ctx.lock && career !== ctx.lock) return reject(OTHER_CAREER, true);   // the other arcade tile owns this service: leave it stored for that tile
     const save = K.normalize(ctx.save);
     const cs = save[career];
     if (!cs.owned.includes(train)) return reject('train not owned', true);
@@ -148,5 +153,5 @@
     return h === 1 ? { key: 'resumeAgoHour1', n: 1 } : { key: 'resumeAgoHourN', n: h };
   }
 
-  TS.resume = Object.freeze({ VERSION, KEY, MAX_AGE_MS, MAX_BYTES, check, clampWorld, ago });
+  TS.resume = Object.freeze({ VERSION, KEY, OTHER_CAREER, keyFor, MAX_AGE_MS, MAX_BYTES, check, clampWorld, ago });
 })();

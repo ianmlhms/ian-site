@@ -4,10 +4,16 @@
   'use strict';
   const TS = (window.TS = window.TS || {});
   const LANGS = ['lb', 'de', 'en'];
+  /* The arcade opens this page as two games (TS.careerLock, see lock.js): the title and the camera line follow the career that is locked. */
+  const TITLE = TS.careerLock === 'tram' ? 'Tramsimulator Lëtzebuerg' : 'Zuchsimulator Lëtzebuerg';
+  const CAM_DIRECT_RAIL = ['Kamera direkt: 1 Féierstand, 2 Verfolger, 3 Quai, 4 fräi', 'Kamera direkt: 1 Führerstand, 2 Verfolger, 3 Bahnsteig, 4 frei', 'Camera direct: 1 cab, 2 chase, 3 trackside, 4 free'];
+  const CAM_DIRECT_TRAM = ['Kamera direkt: 1 Féierstand, 2 Verfolger, 3 Quai, 4 fräi, 5 Passagéierraum', 'Kamera direkt: 1 Führerstand, 2 Verfolger, 3 Bahnsteig, 4 frei, 5 Fahrgastraum', 'Camera direct: 1 cab, 2 chase, 3 trackside, 4 free, 5 passenger saloon'];
+  const CAM_DIRECT_BOTH = ['Kamera direkt: 1 Féierstand, 2 Verfolger, 3 Quai, 4 fräi, 5 Passagéierraum (nëmmen Luxtram)', 'Kamera direkt: 1 Führerstand, 2 Verfolger, 3 Bahnsteig, 4 frei, 5 Fahrgastraum (nur Luxtram)', 'Camera direct: 1 cab, 2 chase, 3 trackside, 4 free, 5 passenger saloon (Luxtram only)'];
+  const CAM_DIRECT = TS.careerLock === 'rail' ? CAM_DIRECT_RAIL : TS.careerLock === 'tram' ? CAM_DIRECT_TRAM : CAM_DIRECT_BOTH;
 
   const ROWS = [
     // ---- general / menu
-    ['title', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg'],   // the game's name, the same in every language
+    ['title', TITLE, TITLE, TITLE],   // the game's name, the same in every language
         ['tagline', 'Vu Lëtzebuerg bis op Paräis.', 'Von Luxemburg bis nach Paris.', 'From Luxembourg all the way to Paris.'],
     ['language', 'Sprooch', 'Sprache', 'Language'],
     ['taglineTram', 'Mat der Luxtram vum Findel bis an de Stadion.', 'Mit der Luxtram vom Findel bis zum Stadion.', 'By Luxtram from Findel to the Stadium.'],
@@ -104,6 +110,7 @@
     ['up_capacity_info', 'Méi Sëtz- a Stehplazen', 'Mehr Sitz- und Stehplätze', 'More seats and standing room'],
     ['up_capacity_info_car', 'Méi Plazen, um Maximum +1 Waggon', 'Mehr Plätze, auf Maximum +1 Wagen', 'More room, +1 car at max level'],
     ['up_paint_info', 'Nei Faarwen fir däin Zuch', 'Neue Farben für deinen Zug', 'New colours for your train'],
+    ['up_paint_info_tram', 'Nei Faarwen fir deng Tram', 'Neue Farben für deine Tram', 'New colours for your tram'],
     // ---- ranks
     ['rank_praktikant', 'Praktikant', 'Praktikant', 'Trainee'],
     ['rank_lokfeierer', 'Lokféierer', 'Lokführer', 'Train driver'],
@@ -186,7 +193,7 @@
     ['keyLights', 'Frontluuchten', 'Frontlicht', 'Headlights'],
     ['keyAnnounce', 'Duerchsoe (Gong + nächsten Arrêt)', 'Durchsage (Gong + nächster Halt)', 'Announcement (gong + next stop)'],
     ['keyCamera', 'Kamera wiesselen', 'Kamera wechseln', 'Cycle camera'],
-    ['keyCamDirect', 'Kamera direkt: 1 Féierstand, 2 Verfolger, 3 Quai, 4 fräi, 5 Passagéierraum (nëmmen Luxtram)', 'Kamera direkt: 1 Führerstand, 2 Verfolger, 3 Bahnsteig, 4 frei, 5 Fahrgastraum (nur Luxtram)', 'Camera direct: 1 cab, 2 chase, 3 trackside, 4 free, 5 passenger saloon (Luxtram only)'],
+    ['keyCamDirect', ...CAM_DIRECT],
     ['keyTimetable', 'Fuerplang', 'Fahrplan', 'Timetable'],
     ['keyMute', 'Toun un / aus', 'Ton an / aus', 'Sound on / off'],
     ['keyPause', 'Paus', 'Pause', 'Pause'],
@@ -222,7 +229,7 @@
     ['hintReverseT', 'Iwwerfuer? Tipp op R an fuer lues zréck bis op de Stopp-Schëld.', 'Übers Ziel hinaus? Tippe auf R und fahre langsam zurück zur Haltetafel.', 'Overshot? Tap R and back up slowly to the stop board.'],
     ['welcomeHintT', 'Hiewel = fueren · Dieren-Knapp · ? = Hëllef', 'Hebel = fahren · Türen-Taste · ? = Hilfe', 'Lever = drive · Doors button · ? = help'],
     ['resumeBannerHintT', 'Parkbrems ass un. Tipp op „Handbrems“, dann den Hiewel erop.', 'Feststellbremse ist an. Tippe auf „Feststellbr.“, dann den Hebel hoch.', 'Parking brake is on. Tap “Park brake”, then lever up.'],
-    ['devicePhoneTitle', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg', 'Zuchsimulator Lëtzebuerg'],
+    ['devicePhoneTitle', TITLE, TITLE, TITLE],
     ['devicePhoneBlock', 'Dëst Spill gëtt et nëmmen op iPad a Laptop.', 'Dieses Spiel gibt es nur auf iPad und Laptop.', 'This game is only available on iPad and laptop.'],
     ['devicePhoneHint', 'Maach et op engem gréissere Bildschierm op.', 'Öffne es auf einem größeren Bildschirm.', 'Open it on a larger screen.'],
     ['deviceRotate', 'Dréi däin iPad op d’Säit (Querformat) fir de beschten Androck.', 'Drehe dein iPad ins Querformat für das beste Erlebnis.', 'Rotate your iPad to landscape for the best view.'],
@@ -312,6 +319,7 @@
     ['endlessTotal', 'Insgesamt dës Sessioun', 'Insgesamt diese Sitzung', 'Session total'],
     ['endlessStop', 'Endlos stoppen', 'Endlos beenden', 'Stop endless'],
     ['endlessRoutes', 'Dës Linnen fiert dësen Zuch:', 'Diese Strecken fährt dieser Zug:', 'This train runs these routes:'],
+    ['endlessRoutesTram', 'Dës Linnen fiert d’Tram:', 'Diese Strecken fährt die Tram:', 'The tram runs these routes:'],
     // ---- resume (a killed or reloaded page offers to carry on)
     ['resumeTitle', 'Weiderfueren', 'Weiterfahren', 'Resume'],
     ['resumeGo', '▶ Weiderfueren', '▶ Weiterfahren', '▶ Resume'],

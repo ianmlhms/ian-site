@@ -72,6 +72,7 @@
   function translateStatic() {
     document.querySelectorAll('[data-t]').forEach((n) => { n.textContent = t(n.dataset.t); });
     $('nextLbl').textContent = t('hudNextStop');
+    $('sumStamp').textContent = (TS.careerLock === 'tram' ? '\u{1F68A} ' : '\u{1F686} ') + t('title').toUpperCase();
     $('sumMenu').textContent = t('backToMenu');
     $('sumAgain').textContent = t('sumAgain');
     $('btnMenu').textContent = t('menuBtn'); $('btnMenu').title = t('menuBtnTitle');
@@ -98,6 +99,7 @@
   let mode = 'career';           // career | endless
   const EMPTY_CAREER = { lifetime: 0, wallet: 0, owned: [], routes: [], train: '', route: '', upgrades: {}, best: {}, services: 0, endlessBest: 0 };
   let save = safe('career defaults', () => (ARCADE_TEST ? TS.career.unlockedAll() : TS.career.defaults()), { hints: true, tb: 0, career: 'rail', rail: { ...EMPTY_CAREER, owned: ['railcar'], routes: ['west'], train: 'railcar', route: 'west' }, tram: { ...EMPTY_CAREER, owned: ['tram'], routes: ['luxtram-stad'], train: 'tram', route: 'luxtram-stad' } });
+  save = safe('career lock', () => TS.career.applyLock(save), save);   // an arcade tile opens one career only (TS.careerLock)
   let muted = readStore('pb_muted') === '1';
   /* weather + time-of-day choice (menu and in-game popover), remembered per player in localStorage; 'random' = pick per service */
   const WX_IDS = TS.envChoices ? TS.envChoices.weather.map((o) => o.id) : ['random', 'clear', 'rain', 'fog', 'snow'];
@@ -231,7 +233,7 @@
     if (!data || typeof data !== 'object' || Array.isArray(data)) return;
     const merged = safe('career merge', () => TS.career.merge(save, data), null);
     if (!merged) return;
-    save = merged;
+    save = safe('career lock', () => TS.career.applyLock(merged), merged);   // a cloud save may have been left on the other career
     if (phase === 'menu') renderMenu();
   }
 
@@ -245,16 +247,16 @@
   const SNAPSHOT_INTERVAL_MS = 5000, SNAPSHOT_ARM_M = 30;
   let resumeOffer = null, resumeDismissed = false, resumeFocusDone = false;
   let snapshotArmed = false, snapshotDue = false, snapshotWrites = 0;
-  const resumeKey = () => (TS.resume ? TS.resume.KEY : '');
+  const resumeKey = () => (TS.resume ? TS.resume.keyFor(TS.careerLock) : '');   // one slot per arcade tile (career lock)
 
   /* the stored snapshot if it is valid right now (version, age, route/train exist and are owned in that career, no later service paid, ...) */
   function readSnapshot() {
     if (!TS.resume) return null;
     const raw = readStore(resumeKey());
     if (!raw) return null;
-    const res = safe('resume check', () => TS.resume.check(raw, { now: Date.now(), save, testMode: ARCADE_TEST }), { reject: 'check failed' });
+    const res = safe('resume check', () => TS.resume.check(raw, { now: Date.now(), save, testMode: ARCADE_TEST, lock: TS.careerLock }), { reject: 'check failed' });
     if (res.snap) return res.snap;
-    console.warn('[Lokféierer] saved service ignored: ' + res.reject);
+    if (res.reject !== TS.resume.OTHER_CAREER) console.warn('[Lokféierer] saved service ignored: ' + res.reject);
     if (!res.keep) removeStore(resumeKey());
     return null;
   }
@@ -2100,6 +2102,7 @@
   }
   /* Career switch in the menu (Zuch | Tram): remembered in the save. */
   function handleCareer(cid) {
+    if (TS.careerLock && cid !== TS.careerLock) return undefined;   // the arcade tile fixes the career
     const next = safe('setCareer', () => TS.career.setCareer(save, cid), null);
     if (!next) return undefined;
     save = next;
@@ -2419,7 +2422,7 @@
           clock: s ? clockText(s.clockSec) : '', simT: s ? s.t : 0, onboard: w ? liveOnboard() : 0, exchange: ex, exchStation: w && w.exch ? w.exch.index : -1,
           cash: s ? s.cash : 0, liveCash: w ? w.liveCash : 0, totals: s ? s.totals : null, spadActive: s ? s.spadActive : false, finished: w ? w.finished : false, endTimer: w ? w.endTimer : -1,
           delivered: w ? w.delivered : 0, passengerKm: w ? w.passengerKm : 0,
-          events: [...events], career: save.career, careers: JSON.parse(JSON.stringify({ rail: save.rail, tram: save.tram })), arcadeTest: ARCADE_TEST,
+          events: [...events], career: save.career, careerLock: TS.careerLock, careers: JSON.parse(JSON.stringify({ rail: save.rail, tram: save.tram })), arcadeTest: ARCADE_TEST,
           wallet: careerState().wallet, tb: save.tb, lifetime: careerState().lifetime, owned: careerState().owned, routes: careerState().routes, saveTrain: careerState().train, services: careerState().services,
           endless: { ...endless, total: { ...endless.total } }, scorePosted, lastReward: w && w.lastReward ? { cash: w.lastReward.cash, points: w.lastReward.points } : null, lastResult: w && w.lastResult ? { delivered: w.lastResult.passengersDelivered, boarded: w.lastResult.passengersBoarded, pkm: w.lastResult.passengerKm, delays: w.lastResult.delaySecAtStations, errors: w.lastResult.stopErrors, over: w.lastResult.overspeedSeconds, harsh: w.lastResult.harshEvents, spads: w.lastResult.spads, breakdown: w.lastReward && w.lastReward.breakdown } : null,
           cabin: w && w.cabin ? w.cabin.stats() : null, insidePos, draws: renderer ? renderer.info.render.calls : 0, triangles: renderer ? renderer.info.render.triangles : 0, errors: errorsSeen, audio: !!audio,

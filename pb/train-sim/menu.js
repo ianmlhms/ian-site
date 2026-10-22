@@ -522,6 +522,7 @@
   }
 
   function careerSwitch() {
+    if (TS.careerLock) return null;   // the arcade tile fixed the career: no tabs, no wallet note about the other one
     const tab = (cid) => {
       const c = ctx.save[cid];
       const info = K.rankInfo(c.lifetime, cid);
@@ -581,6 +582,7 @@
     const endlessList = K.endlessOrder(ctx.trainId);
     const route = routeInfo(routeKey(ctx.routeId));
     const train = trainById(ctx.trainId);
+    const endlessRoutesKey = ctx.career === 'tram' ? 'endlessRoutesTram' : 'endlessRoutes';
     const careerSub = avail.ok ? `${route.name} · ${pick(train.name)}` : t(avail.reason === 'needsRoute' ? 'needsRoute' : avail.reason);
     return [
       h('div', { class: 'ts-menu__modes' },
@@ -588,7 +590,7 @@
           h('span', { class: 'go', 'aria-hidden': 'true', text: '▶' }), h('b', { text: t('modeCareer') }), h('small', { text: t(ctx.career === 'tram' ? 'modeCareerDescTram' : 'modeCareerDesc') }), h('span', { class: 'sub', text: careerSub })),
         h('button', { type: 'button', class: 'ts-menu__mode ts-menu__mode--endless', disabled: !endlessList.length, 'data-fid': 'mode-endless', 'data-test': 'mode-endless', on: { click: () => doStart('endless') } },
           h('span', { class: 'go', 'aria-hidden': 'true', text: '∞' }), h('b', { text: t('modeEndless') }), h('small', { text: t(ctx.career === 'tram' ? 'modeEndlessDescTram' : 'modeEndlessDesc') }), h('span', { class: 'sub', text: pick(train.name) + ' · ×' + C.economy.endlessMultiplier }))),
-      h('div', { class: 'ts-menu__order', 'aria-label': t('endlessRoutes') }, h('span', { text: t('endlessRoutes') }),
+      h('div', { class: 'ts-menu__order', 'aria-label': t(endlessRoutesKey) }, h('span', { text: t(endlessRoutesKey) }),
         endlessList.map((id, i) => h('span', { class: 'chip' }, (i ? '→ ' : '') + chipLabel(id)))),
     ];
   }
@@ -675,7 +677,7 @@
       const price = K.upgradePrice(ctx.save, train.id, kind);
       const check = K.canBuy(ctx.save, 'upgrade', kind, train.id);
       const isMax = price === undefined;
-      const infoKey = kind === 'capacity' && C.extraCarTrains.includes(train.id) ? 'up_capacity_info_car' : kind === 'motor' && train.kind === 'tram' ? 'up_motor_info_tram' : 'up_' + kind + '_info';
+      const infoKey = kind === 'capacity' && C.extraCarTrains.includes(train.id) ? 'up_capacity_info_car' : kind === 'motor' && train.kind === 'tram' ? 'up_motor_info_tram' : kind === 'paint' && train.kind === 'tram' ? 'up_paint_info_tram' : 'up_' + kind + '_info';
       const liveries = train.liveries || [train.livery];
       return h('div', { class: 'ts-menu__upRow', 'data-upgrade': kind },
         h('h3', { text: t('up_' + kind) + '  ' }, h('span', { class: 'ts-menu__small', text: t('level', { n: lv, max }) })),
@@ -727,7 +729,7 @@
         h('div', { class: 'ts-menu__grid ts-menu__grid--trains' }, careerTrains().map(trainCard))),
       upgradesPanel(),
       helpPanel(),
-      h('p', { class: 'ts-menu__footer', text: 'ian.lu · Zuchsimulator Lëtzebuerg' }),
+      h('p', { class: 'ts-menu__footer', text: 'ian.lu · ' + t('title') }),
       ctx.toast ? h('div', { class: 'ts-menu__toast' + (ctx.toast.bad ? ' ts-menu__toast--bad' : ''), role: 'status', text: ctx.toast.text }) : null);
     root.append(inner);
     ctx.container.replaceChildren(root);
@@ -752,7 +754,7 @@
     ctx.opts = { ...(opts || {}) };
     if (ctx.opts.lang) TS.setLang(ctx.opts.lang);
     setSave(ctx.opts.save);
-    ctx.career = ctx.save.career;
+    ctx.career = TS.careerLock || ctx.save.career;
     ctx.routeId = cs().route;
     ctx.trainId = cs().train;
     ctx.env = Object.assign({ weather: 'random', tod: 'random' }, ctx.opts.env || {});
@@ -771,7 +773,7 @@
     if (p.save) {
       setSave(p.save);
       ctx.opts = { ...ctx.opts, save: ctx.save };
-      ctx.career = ctx.save.career;
+      ctx.career = TS.careerLock || ctx.save.career;
       ctx.trainId = cs().train;
       if (cs().routes.includes(cs().route)) ctx.routeId = cs().route;
     }

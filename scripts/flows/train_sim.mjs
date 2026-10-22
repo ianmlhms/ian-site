@@ -38,6 +38,17 @@ const savePosts = (h) => h.page.evaluate(() => window.__tsMessages.filter((m) =>
 const scoreMessages = (h) => h.page.evaluate(() => window.__tsMessages.filter((m) => m.__pb === 1).length);
 const gameSaveWrites = (h) => h.backend.callsTo('game_saves').filter((c) => c.method !== 'GET').length;
 
+/* The arcade opens train-sim locked to the Zuch career (the Luxtram has its own tile, tram-sim). These flows drive BOTH careers in one session
+ * (tabs, merges, endless per career), so they take the lock off the tile before the game opens: the page then behaves as it does without a lock.
+ * The locked tiles are covered by train_sim_career_lock.mjs. */
+export async function openBothCareers(h) {
+  await h.context.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {   // registered before the arcade's own deep-link handler, so it runs first
+      try { const tile = GAMES.find((g) => g.id === 'train-sim'); if (tile) tile.careerLock = null; } catch (_) { /* a game frame has no GAMES */ }
+    });
+  });
+}
+
 /* The owner (konto@ian.lu) is asked Normal / Test on every open: this flow plays Normal. */
 async function gotoNormal(h, url) {
   await h.goto(url);
@@ -1410,6 +1421,7 @@ export const flow = {
     let sA = 0;
     h.page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text() + ' @ ' + (m.location().url || '').slice(-60)); });
     await h.signIn();
+    await openBothCareers(h);
     // Lokféierer is owner-only for now (catalog entry + page gate): sign in as the owner account.
     await h.context.addInitScript(() => {
       try {

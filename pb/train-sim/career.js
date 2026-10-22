@@ -114,6 +114,14 @@
   const setHints = (save, on) => withTop(normalize(save), { hints: !!on, hintsSet: true });
   const setCareer = (save, cid) => (CAREERS.includes(cid) ? withTop(normalize(save), { career: cid }) : null);
 
+  /* The arcade can open the game locked to one career (TS.careerLock, see lock.js). Applied to every save the shell holds (start, merges of
+     local/cloud saves): the lock decides which career is shown, so only `career` changes and both wallets stay untouched. */
+  const applyLock = (save) => {
+    const s = normalize(save);
+    const lock = TS.careerLock;
+    return CAREERS.includes(lock) && s.career !== lock ? withTop(s, { career: lock }) : s;
+  };
+
   /* Everything unlocked, lots of EUR, in both careers. Only for the arcade test mode: never persist the result. */
   function unlockedAll() {
     const everything = (cid) => ({
@@ -440,7 +448,7 @@
   }
 
   TS.career = {
-    defaults, normalize, merge, of, setCareer, setHints, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
+    defaults, normalize, merge, of, setCareer, applyLock, setHints, buyTrain, buyUpgrade, buyRoute, select, selectRoute, canBuy, upgradePrice,
     applyUpgrades, routeAvailable, endlessOrder, routeClass, trainCompatible, trainsForRoute, requiredTrain,
     baseRouteId: baseOf, careerOfTrain, careerOfRoute, trainIdsOf, routeIdsOf, unlockedAll, CAREERS,
     rank, rankInfo, reward, completeService, punctualityScore, accuracyScore, MAX_LEVELS,
