@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f2430">
+<title>Schueberfouer Tycoon · big rides preview</title>
+<link rel="icon" href="data:,">
+<!-- W4a standalone preview: the W2 Glacis world with the Riserad and the four towers standing on their pitches (pb/fouer/models/wheel.js, towers.js).
+     ?look=0|1|2  ?level=1..4  ?q=low|medium|high (model quality)  ?time=noon|evening|night|<hour>  ?lod=auto|near|far  ?only=wheel,jules  ?bare=1 (flat ground, no world)
+     ?speed=<wheel speed x>  ?fouerQ=low|medium|high (renderer quality)  window.__big is the test / screenshot API (always on here). -->
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0f2430; }
+body { display: flex; flex-direction: column; font-family: ui-rounded, "Avenir Next", "Segoe UI", sans-serif; color: #fff7e0; }
+#shell { position: relative; flex: 1 1 auto; min-height: 0; }
+#fouerCanvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+#hud { position: absolute; left: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 20px); }
+#hud button, #hud span { font: inherit; font-size: 12px; font-weight: 700; padding: 6px 9px; min-height: 32px; border-radius: 10px; border: 1px solid #ffffff30; background: #0f2430dd; color: inherit; cursor: pointer; }
+#hud button[aria-pressed="true"] { background: #ffcf5c; color: #2a2208; border-color: #ffcf5c; }
+#hud span { cursor: default; opacity: .8; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: #0b1a24; z-index: 5; }
+#loading.done { display: none; }
+[hidden] { display: none !important; }
+body.nohud #hud { display: none; }
+#envBtn, #frameBtn, #menuBtn, #envPop, #menu { display: none; }
+</style>
+</head>
+<body>
+<main id="shell">
+  <canvas id="fouerCanvas" tabindex="0" role="img" aria-label="Preview of the Schueberfouer big rides: the Riserad (big wheel), tower swing, drop tower, booster arm and pendulum arm on the Glacis."></canvas>
+  <div id="hud"></div>
+  <button id="envBtn" type="button" hidden></button><button id="frameBtn" type="button" hidden></button><button id="menuBtn" type="button" hidden></button>
+  <div id="envPop" hidden></div><div id="menu" hidden></div>
+  <div id="loading" role="status"><div><b>Big rides</b> <small id="loadMsg">…</small><div id="bar"><i></i></div></div></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.addEventListener("error", function (event) { document.documentElement.dataset.bootError = event.message || "script-error"; });
+if (!window.THREE) { document.documentElement.dataset.bootError = "three-missing"; throw new Error("three.js r160 failed to load"); }
+</script>
+<script src="/pb/train-sim/luxtram-facades.js?v=3"></script>
+<script src="/pb/train-sim/luxtram-ground.js?v=14"></script>
+<script type="module">
+import { createRenderer } from '/pb/fouer/renderer.js';
+import { createWorld } from '/pb/fouer/world/index.js';
+import { createEnv } from '/pb/fouer/world/sky.js';
+import { createPitches } from '/pb/fouer/world/pitches.js';
+import { updateLODs } from '/pb/fouer/models/big-kit.js';
+
+const T = window.THREE;
+const qs = new URLSearchParams(location.search);
+const bare = qs.get('bare') === '1';
+const LOOK = Number(qs.get('look') || 0); const LEVEL = Number(qs.get('level') || 4); const MQ = qs.get('q') || 'medium';
+const only = qs.get('only') ? qs.get('only').split(',') : null;
+if (qs.get('hud') === '0') document.body.classList.add('nohud');
+
+/* which pitch each big ride stands on in this preview, and which way it faces (pitches.json `face`) */
+const SPOTS = { wheel: 'P24', jules: 'P08', booster: 'P09', hangover: 'P16', infinity: 'P25' };
+const ROT = { '+w': 0, '-w': Math.PI, '+u': Math.PI / 2, '-u': -Math.PI / 2 };
+/** the rule W5 reuses: origin on the pitch centre, local +z toward the pitch's face */
+function placeOnPitch(group, rect, face, y) { group.position.set(rect.u, y, rect.w); group.rotation.y = ROT[face] || 0; group.updateMatrixWorld(true); }
+
+async function loadModels() {
+  const mods = {};
+  const files = ['wheel', 'towers'];
+  for (const f of files) {
+    try { const m = await import('/pb/fouer/models/' + f + '.js'); Object.assign(mods, m.MODELS); } catch (e) { console.error('[big] ' + f + '.js failed', e); document.documentElement.dataset.bootError = 'models'; }
+  }
+  return mods;
+}
+
+async function boot() {
+  const canvas = document.getElementById('fouerCanvas');
+  const r = createRenderer({ THREE: T, canvas });
+  const setLoad = (p, msg) => { document.querySelector('#bar i') && (document.getElementById('loadMsg').textContent = msg || ''); };
+  let world; let pitches;
+  if (bare) {
+    // a flat stub world: enough for createEnv (sky, light, night) and for the model builds
+    const root = new T.Group(); r.scene.add(root);
+    const ground = new T.Mesh(new T.PlaneGeometry(1200, 1200).rotateX(-Math.PI / 2), new T.MeshLambertMaterial({ color: 0x6f7468 })); ground.position.set(150, -0.02, 62); r.scene.add(ground);
+    world = { glacis: { chunks: [], ground: { matSurface: ground.material }, root }, parts: {}, groundY: () => 0, setNight() {}, nightK: 0 };
+    r.state.groundY = () => 0;
+    const list = await (await fetch('/pb/fouer/pitches.json')).json();
+    const rects = new Map(list.map((it) => { const S = { S: [8, 8], M: [16, 16], L: [30, 18], XL: [56, 30], W: [40, 24] }[it.size]; return [it.id, { id: it.id, u: it.u, w: it.w, du: S[0], dw: S[1], size: it.size, y: 0 }]; }));
+    pitches = { rect: (id) => rects.get(id), items: list, setMode() {}, setState() {} };
+  } else {
+    world = await createWorld({ T, TS: window.TS, r, quality: r.state.quality, onProgress: setLoad,
+      parts: { pitches: async (w) => { const p = await createPitches({ T, world: w }); r.gameRoot.add(p.group); p.setMode('off'); return p; } } });
+    pitches = world.parts.pitches;
+  }
+  const env = createEnv({ T, scene: r.scene, renderer: r.renderer, world, quality: r.state.quality });
+  world.env = env;
+  const T0 = qs.get('time') || 'evening';
+  if (/^[\d.]+$/.test(T0)) env.setHour(Number(T0)); else env.setTime(T0, false);
+  env.setWeatherNow(qs.get('weather') || 'clear');
+
+  const MODELS = await loadModels();
+  const groups = {}; const faces = Object.fromEntries(pitches.items.map((p) => [p.id, p.face]));
+  const state = { look: LOOK, level: LEVEL, quality: MQ, lodMode: qs.get('lod') || 'auto', t: 0, speed: Number(qs.get('speed') || 1), nearN: Number(qs.get('nearN') || 3), animate: qs.get('anim') !== '0' };
+
+  function buildAll() {
+    for (const id of Object.keys(groups)) { r.gameRoot.remove(groups[id]); groups[id].userData.dispose && groups[id].userData.dispose(); delete groups[id]; }
+    for (const [id, spot] of Object.entries(SPOTS)) {
+      if (!MODELS[id] || (only && !only.includes(id))) continue;
+      const g = MODELS[id].build({ look: state.look, level: state.level, quality: state.quality, seed: 7 });
+      const rect = pitches.rect(spot);
+      placeOnPitch(g, rect, faces[spot], world.groundY(rect.u, rect.w));
+      g.userData.spot = spot; g.userData.rect = rect;
+      r.gameRoot.add(g); groups[id] = g;
+    }
+    applyLod();
+  }
+  function applyLod() {
+    const list = Object.values(groups);
+    if (state.lodMode === 'near') list.forEach((g) => { g.userData.setLOD(1); g.userData.setAnimated(true); });
+    else if (state.lodMode === 'far') list.forEach((g) => { g.userData.setLOD(0); g.userData.setAnimated(true); });
+    else updateLODs(list, r.camera.position, { nearN: state.nearN, distance: 80 });
+  }
+  buildAll();
+
+  r.on('frame', (dt) => {
+    env.update(dt, r.camera);
+    if (state.lodMode === 'auto') applyLod();
+    const k = env.getState().night;
+    state.t += dt;
+    if (state.animate) for (const g of Object.values(groups)) { if (g.userData.ride) g.userData.ride.speed = state.speed; g.userData.animate(state.t, dt, k); }
+  });
+  r.poses.overview = Object.assign({}, r.framePose());
+  r.flyIn(0.01);
+  r.start();
+
+  /* ---------- shots: eye / look in model-local metres, turned into game-frame metres by the model's placement */
+  const SHOTS = {
+    wheel: { front: { eye: [0, 12, 125], look: [0, 25, 0], fov: 34 }, three: { eye: [66, 16, 84], look: [0, 23, 0], fov: 34 }, night: { eye: [0, 12, 125], look: [0, 25, 0], fov: 34 }, legs: { eye: [-16, 3, 26], look: [0, 14, 0], fov: 46 }, hub: { eye: [0, 12, 52], look: [0, 26, 0], fov: 34 },
+      station: { eye: [-8, 3.2, 27], look: [0, 3.4, 8], fov: 52 }, gondola: { eye: [5.5, 3.4, 12.5], look: [0, 3.0, 0], fov: 42 }, fp: { eye: [1.6, 2.4, 6.4], look: [-0.4, 4.2, -1], fov: 66 }, side: { eye: [120, 20, 4], look: [0, 24, 0], fov: 34 } },
+    jules: { front: { eye: [0, 34, 118], look: [0, 40, 0], fov: 36 }, three: { eye: [78, 26, 84], look: [0, 38, 0], fov: 36 }, night: { eye: [0, 34, 118], look: [0, 40, 0], fov: 36 }, crown: { eye: [30, 52, 45], look: [0, 60, 0], fov: 40 }, base: { eye: [18, 5, 26], look: [0, 6, 0], fov: 55 } },
+    hangover: { front: { eye: [0, 40, 125], look: [0, 44, 0], fov: 38 }, three: { eye: [80, 30, 90], look: [0, 42, 0], fov: 38 }, night: { eye: [0, 40, 125], look: [0, 44, 0], fov: 38 }, base: { eye: [18, 5, 24], look: [0, 6, 0], fov: 55 } },
+    booster: { front: { eye: [0, 26, 105], look: [0, 29, 0], fov: 38 }, three: { eye: [70, 22, 72], look: [0, 27, 0], fov: 38 }, night: { eye: [0, 26, 105], look: [0, 29, 0], fov: 38 }, base: { eye: [18, 5, 30], look: [0, 6, 0], fov: 55 } },
+    infinity: { front: { eye: [0, 13, 56], look: [0, 14, 0], fov: 38 }, three: { eye: [-40, 16, 50], look: [0, 14, 0], fov: 38 }, night: { eye: [0, 13, 56], look: [0, 14, 0], fov: 38 }, base: { eye: [10, 3, 22], look: [0, 4, 0], fov: 55 } },
+  };
+  const toWorld = (g, p) => { g.updateMatrixWorld(true); const v = new T.Vector3(p[0], p[1], p[2]).applyMatrix4(g.matrixWorld); return [v.x, v.y, v.z]; };
+  function shot(id, name) {
+    const g = groups[id]; const s = SHOTS[id][name]; if (!s) throw new Error('no shot ' + id + '/' + name);
+    r.setFreeCamera({ eye: toWorld(g, s.eye), look: toWorld(g, s.look), fov: s.fov }); applyLod(); return s;
+  }
+  window.__big = {
+    r, world, env, THREE: T, groups, state, SPOTS, SHOTS, pitches, MODELS,
+    rebuild(o = {}) { Object.assign(state, o); buildAll(); },
+    shot, applyLod,
+    /** show only one ride (clean comparison shots), or all again with solo(null) */
+    solo(id) { for (const [k, g] of Object.entries(groups)) g.visible = !id || k === id; },
+    setTime(h) { if (typeof h === 'string') env.setTime(h, false); else env.setHour(h); env.update(0.01, r.camera); },
+    setWeather(w) { env.setWeatherNow(w); },
+    freeCam(eye, look, fov = 32) { r.setFreeCamera({ eye, look, fov }); applyLod(); },
+    /** animate by hand (headless tests): advance the models by dt, render once */
+    advance(dt, steps = 1) { const k = env.getState().night; for (let i = 0; i < steps; i++) { state.t += dt; for (const g of Object.values(groups)) g.userData.animate(state.t, dt, k); } },
+    render() { r.renderOnce(); },
+    snapshot() { return r.performanceSnapshot(); },
+    pause() { r.stop(); }, resume() { r.start(); },
+  };
+  // small HUD
+  const hud = document.getElementById('hud');
+  const mk = (label, group, value, on) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.dataset.group = group; b.dataset.value = String(value); b.addEventListener('click', () => { on(); refresh(); }); hud.appendChild(b); return b; };
+  const btns = [];
+  for (let i = 0; i < 3; i++) btns.push(['look', i, mk('look ' + i, 'look', i, () => window.__big.rebuild({ look: i }))]);
+  for (let i = 1; i <= 4; i++) btns.push(['level', i, mk('L' + i, 'level', i, () => window.__big.rebuild({ level: i }))]);
+  for (const q of ['low', 'medium', 'high']) btns.push(['quality', q, mk(q, 'quality', q, () => window.__big.rebuild({ quality: q }))]);
+  for (const tm of ['noon', 'evening', 'night']) btns.push(['time', tm, mk(tm, 'time', tm, () => window.__big.setTime(tm))]);
+  for (const m of ['auto', 'near', 'far']) btns.push(['lodMode', m, mk('lod ' + m, 'lodMode', m, () => { state.lodMode = m; applyLod(); })]);
+  function refresh() { btns.forEach(([g, v, el]) => el.setAttribute('aria-pressed', String(g === 'time' ? env.getState().timeMode === v : String(state[g]) === String(v)))); }
+  refresh();
+  document.getElementById('loading').classList.add('done');
+  document.documentElement.dataset.fouerReady = '1';
+}
+boot().catch((e) => { console.error('[big] boot failed', e); document.documentElement.dataset.bootError = 'boot'; });
+</script>
+</body>
+</html>
