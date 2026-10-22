@@ -9,7 +9,7 @@
  * The page calls: PB.chooseMode(game) (owner prompt: true = test, false = normal, null = cancelled),
  * PB.onOpenGame(game, {testMode}), PB.instrument(html), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=34";
+import * as auth from "./auth.js?v=35";
 import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
 
 import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=9";
@@ -215,12 +215,12 @@ PB.onOpenGame = (g, options = {}) => {
   flushScores();                          // the previous game's scores go out before the mode flips
   dismissModeDialog(null);
   setTestMode(options.testMode === true);
-  PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); loadCloudSave(g); loadEventStatus();
+  PB.current = g; weeklyFinals = new Set(); touchStreak(); sessionBests = new Map(); activeBoard = null; renderGameBar(); resetGifts(); loadCloudSave(g); loadEventStatus();
 };
 PB.onCloseGame = () => {
   dismissModeDialog(null);
   flushScores(); flushSave(); flushEvent(); netClose();
-  PB.current = null; activeBoard = null; setTestMode(false); updateSaveHint();
+  PB.current = null; activeBoard = null; resetGifts(); setTestMode(false); updateSaveHint();
 };
 PB.registerStandalone = (g) => {
   setTestMode(window.__pbTestMode === true);   // set by arcade-kit.js from the arcade's choice
@@ -297,6 +297,12 @@ window.addEventListener("message", (e) => {
     if (sb && session && !saveTimer) saveTimer = setTimeout(flushSave, 3000);
   }
   if (d && d.__pbWantSave === 1 && !testMode && cloudSave !== undefined) sendCloudSave();
+  if (d.__pbGiftReady === 1 && !testMode) {   // the idle game loaded its local save and asked for the cloud save (always in that order)
+    giftFrameReady = true;
+    postGifts();
+    void deliverGifts();
+  }
+  if (d.__pbGiftApplied === 1 && !testMode && Number.isSafeInteger(d.id) && d.id > 0) void ackGift(d.id);
   if (d.__pbEvent && !testMode && eventGame(g) && halloweenVisible() && fullAccount()) {
     const event = d.__pbEvent;
     if (event.event === HALLOWEEN_EVENT && Number.isSafeInteger(event.count) && event.count > 0 && event.count <= 5) {
@@ -450,18 +456,113 @@ window.__pbFlushSave = async () => {
 };
 
 async function loadCloudSave(g) {
+  const seq = ++cloudLoadSeq;
   cloudSave = undefined;
+  giftCloudSettled = false;
   if (testMode || !sb || !session) { cloudSave = null; return; }
   try {
-    const { data } = await sb.from("game_saves")
+    const { data, error } = await sb.from("game_saves")
       .select("data").eq("user_id", session.user.id).eq("game_id", g.id).maybeSingle();
+    if (error) throw error;
     // A slow response for a game the player has already left must not land in
     // cloudSave: the next game's {__pbWantSave} would be answered with it and
     // could adopt another game's progress as its own.
-    if (PB.current !== g) return;
+    if (PB.current !== g || seq !== cloudLoadSeq) return;
     cloudSave = (data && data.data) || null;
-  } catch { if (PB.current === g) cloudSave = null; return; }
+  } catch (error) {
+    // Not "settled": without knowing the cloud save, no gift may be applied (see deliverGifts).
+    console.warn("[PB] cloud save load failed", { game: g.id, error });
+    if (PB.current === g && seq === cloudLoadSeq) cloudSave = null;
+    return;
+  }
   sendCloudSave();
+  giftCloudSettled = true;   // the cloud save is now posted to the frame (or the account has none): gifts may follow
+  void deliverGifts();
+}
+
+/* ---------------- live gifts (admin -> the idle game that is open right now) ----------------
+ * The admin queues a gift (game_gifts) and a `gift` client command; the command (client-commands.js) or the game's own
+ * {__pbGiftReady} calls deliverGifts(): claim_game_gifts hands this game's pending gifts over exactly once, each one is
+ * posted to the frame as {__pbGift,id,amount}, the game adds it, saves and answers {__pbGiftApplied,id}, which we
+ * acknowledge (ack_game_gift). A gift the game confirmed twice is harmless (the game remembers the ids in its save).
+ * ORDERING: gifts are claimed only when BOTH the game announced itself (its local save is loaded, the cloud save was
+ * requested) AND this game's cloud save was loaded and posted to the frame (or the account has none). postMessage keeps
+ * the order, so the game has run its applySave(cloud) before it sees a gift and nothing can wipe the gift afterwards. */
+const GIFT_GAMES = new Set(["idle-empire", "cookie-clicker", "bus-tycoon"]);
+const GIFT_RESEND_MS = 10_000, GIFT_RESEND_MAX = 3;
+let cloudLoadSeq = 0;
+let giftFrameReady = false, giftCloudSettled = false, giftBusy = false, giftAgain = false;
+const giftInflight = new Map();   // id -> { amount, tries }: posted to the frame, not yet confirmed
+let giftTimer = null;
+
+function resetGifts() {
+  giftFrameReady = false; giftCloudSettled = false; giftAgain = false;
+  giftInflight.clear();
+  if (giftTimer) { clearTimeout(giftTimer); giftTimer = null; }
+}
+
+function postGifts() {
+  const frame = document.getElementById("gf");
+  if (!giftInflight.size || !frame?.contentWindow || !PB.current) return;
+  for (const [id, gift] of giftInflight) {
+    try { frame.contentWindow.postMessage({ __pbGift: 1, id, amount: gift.amount }, location.origin); }
+    catch (error) { console.warn("[PB] gift post failed", { id, error }); }
+  }
+  scheduleGiftResend();
+}
+
+// A confirmation that never comes (frame reloading, message lost) is asked for again a few times; the game ignores repeats.
+function scheduleGiftResend() {
+  if (giftTimer || !giftInflight.size) return;
+  giftTimer = setTimeout(() => {
+    giftTimer = null;
+    for (const [id, gift] of giftInflight) {
+      if (gift.tries >= GIFT_RESEND_MAX) giftInflight.delete(id);   // stays "claimed": back to pending after 2 min, delivered next time
+      else giftInflight.set(id, { ...gift, tries: gift.tries + 1 });
+    }
+    postGifts();
+  }, GIFT_RESEND_MS);
+}
+
+async function deliverGifts() {
+  const g = PB.current;
+  if (!g || testMode || !GIFT_GAMES.has(g.id) || !sb || !session || !giftFrameReady || !giftCloudSettled) return;
+  if (giftBusy) { giftAgain = true; return; }
+  giftBusy = true;
+  const userId = session.user.id;
+  try {
+    const { data, error } = await sb.rpc("claim_game_gifts", { p_game: g.id });
+    if (error) throw error;
+    // Left the game, signed out or reloaded the game meanwhile: the claimed gifts return to pending after 2 minutes.
+    if (PB.current !== g || session?.user?.id !== userId || testMode || !giftFrameReady || !giftCloudSettled) return;
+    for (const row of Array.isArray(data) ? data : []) {
+      const id = Number(row?.id), amount = Number(row?.amount);
+      if (!Number.isSafeInteger(id) || id < 1 || !Number.isFinite(amount) || amount <= 0) {
+        console.warn("[PB] ignored a malformed gift", row);
+        continue;
+      }
+      giftInflight.set(id, { amount, tries: 0 });
+    }
+    postGifts();
+  } catch (error) {
+    console.warn("[PB] claiming gifts failed", { game: g.id, error });
+  } finally {
+    giftBusy = false;
+    if (giftAgain) { giftAgain = false; void deliverGifts(); }
+  }
+}
+window.__pbDeliverGifts = deliverGifts;
+
+async function ackGift(id) {
+  giftInflight.delete(id);
+  if (!sb || !session || testMode) return;
+  try {
+    const { error } = await sb.rpc("ack_game_gift", { p_id: id });
+    if (error) throw error;
+  } catch (error) {
+    // The gift stays "claimed", returns to pending after 2 minutes and the game just confirms it again next time.
+    console.warn("[PB] gift acknowledgement failed", { id, error });
+  }
 }
 
 /* ---------------- receive scores from iframe or standalone games ---------------- */

@@ -109,7 +109,7 @@ function parentHandlesPresence() {
 function startPresencePing() {
   if (!_g.sb || parentHandlesPresence()) return;
   if (!_g.presenceModule) {
-    _g.presenceModule = import("./presence-ping.js?v=5");
+    _g.presenceModule = import("./presence-ping.js?v=6");
   }
   void _g.presenceModule
     .then(({ startPresence }) => startPresence(_g.sb, () => _g.session))
@@ -153,7 +153,7 @@ function startInvitePop() {
 function startAccountCheck() {
   if (window.top !== window || isKartAccount()) return;
   if (!_g.accountCheckModule) {
-    _g.accountCheckModule = import("./account-check.js?v=11");
+    _g.accountCheckModule = import("./account-check.js?v=12");
   }
   void _g.accountCheckModule
     .then(({ startAccountCheck: start }) => start(_g.sb, () => _g.session))

@@ -6,9 +6,11 @@
  *   admin_user_saves(p_user, p_game)     games + presence (+ the live save of p_game)
  *   admin_game_save_history(p_user, p_game)
  *   admin_restore_game_save(p_id) / admin_gift_idle(p_user, p_game, p_amount)
- * The only repeated calls are the ones of the "close their game first" helper while it waits for the
- * player to leave the game (small admin_user_saves answers, every few seconds, at most 10 minutes). */
-import { at, esc, label, ago, fmtDateTime, fmtNum, parseAmount } from "./admin-texts.js?v=1";
+ * and, for live gifts (scripts/game-gifts-v1.sql), admin_gift_live / admin_game_gifts / admin_cancel_gift.
+ * The only repeated calls are made while a dialog is open and waiting: the "close their game first" helper
+ * (small admin_user_saves answers every few seconds, at most 10 minutes) and a live gift waiting to be picked up
+ * (small admin_game_gifts answers every 5 s, at most 3 minutes). Closing the dialog stops both. */
+import { at, esc, label, ago, fmtDateTime, fmtNum, parseAmount } from "./admin-texts.js?v=2";
 
 const NEED_IDLE_S = 90;       // the cloud save must not have changed for this long
 const PAGE_GRACE_S = 180;     // presence on the game page counts for this long after the last ping
@@ -21,6 +23,9 @@ const params = new URLSearchParams(location.search);
 // test hooks (the flows speed the waiting up); normal use keeps the defaults
 const POLL_MS = Number(params.get("pollms")) || 5000;
 const WAIT_TIMEOUT_MS = Number(params.get("waitms")) || 10 * 60_000;
+const LIVE_POLL_MS = Number(params.get("livepollms")) || 5000;
+const LIVE_TIMEOUT_MS = Number(params.get("livems")) || 3 * 60_000;
+const GIFT_END_STATES = new Set(["applied", "cancelled", "expired"]);
 
 export const gameName = (id) => GAME_NAMES[id] || String(id).replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
 
@@ -105,6 +110,7 @@ export function mountSaves(host, { getClient, pageLabel }) {
     query: "", results: null, searching: false, searchFailed: false,
     user: null, games: null, game: null, live: null, presence: null, serverNow: null, history: [],
     loading: false, failed: false, notice: null, generation: 0, giftText: "",
+    gifts: [], giftsFailed: false,
   };
   const dialog = document.createElement("dialog");
   dialog.className = "sv-dialog";
@@ -132,17 +138,32 @@ export function mountSaves(host, { getClient, pageLabel }) {
     }
   }
 
+  /* The gift list is a side dish: if it fails (e.g. the SQL isn't applied yet) the rest of the tab still works. */
+  async function fetchGifts(sb, userId) {
+    try {
+      const { data, error } = await sb.rpc("admin_game_gifts", { p_user: userId });
+      if (error) throw error;
+      return { list: Array.isArray(data?.gifts) ? data.gifts : [], failed: false, now: data?.now || null };
+    } catch (error) {
+      console.warn("[admin] gift list failed to load", error);
+      return { list: [], failed: true, now: null };
+    }
+  }
+
   async function loadUser(id, name, keepGame = null) {
     const generation = ++state.generation;
     state.user = { id, username: name || "" };
     state.games = null; state.game = null; state.live = null; state.presence = null; state.history = [];
+    state.gifts = []; state.giftsFailed = false;
     state.failed = false; state.loading = true; state.notice = null;
     render();
     try {
       const sb = await getClient();
-      const { data, error } = await sb.rpc("admin_user_saves", { p_user: id });
+      const [saves, gifts] = await Promise.all([sb.rpc("admin_user_saves", { p_user: id }), fetchGifts(sb, id)]);
+      const { data, error } = saves;
       if (error) throw error;
       if (generation !== state.generation) return;
+      state.gifts = gifts.list; state.giftsFailed = gifts.failed;
       state.user = data?.user ? { ...data.user } : { id, username: name || "" };
       state.games = Array.isArray(data?.games) ? data.games : [];
       state.presence = data?.presence || null;
@@ -234,6 +255,22 @@ export function mountSaves(host, { getClient, pageLabel }) {
       <div class="sv-gift-err" id="svGiftErr" role="alert"></div></div>`;
   }
 
+  function giftRowHtml(gift) {
+    const nowMs = Date.parse(state.serverNow) || Date.now();
+    const when = gift.applied_at && gift.status === "applied" ? gift.applied_at : gift.created_at;
+    return `<li class="sv-gift-row" data-gift="${esc(gift.id)}">
+      <span class="sv-reason r-g-${esc(gift.status)}">${esc(label("saves.gstatus", gift.status))}</span>
+      <b>${esc(fmtNum(Number(gift.amount)))}</b> ${esc(GIFT_GAMES.has(gift.game_id) ? at(`what.${gift.game_id}`) : "")}
+      <span class="muted">${esc(gameName(gift.game_id))} · ${esc(fmtDateTime(when))} (${esc(ago(when, nowMs))})</span>
+      ${gift.status === "pending" ? `<button type="button" class="wide-btn" data-cancel-gift="${esc(gift.id)}">${esc(at("saves.gifts.cancel"))}</button>` : ""}</li>`;
+  }
+
+  function giftsListHtml() {
+    if (state.giftsFailed) return `<div class="sv-card"><h3>${esc(at("saves.gifts"))}</h3><div class="muted">${esc(at("saves.gifts.unavailable"))}</div></div>`;
+    if (!state.gifts.length) return "";
+    return `<div class="sv-card"><h3>${esc(at("saves.gifts"))}</h3><ul class="sv-gifts">${state.gifts.map(giftRowHtml).join("")}</ul></div>`;
+  }
+
   function gameDetailHtml() {
     const liveSummary = state.live ? summarize(state.game, state.live.data) : [];
     return `<div class="sv-card"><h3>${esc(at("saves.live"))} · ${esc(gameName(state.game))}</h3>
@@ -260,7 +297,8 @@ export function mountSaves(host, { getClient, pageLabel }) {
       ${games && games.length ? `<div class="sv-games" role="group" aria-label="${esc(at("saves.pickGame"))}">${games.map((game) => `<button type="button" class="sv-game${game.game_id === state.game ? " active" : ""}" data-game="${esc(game.game_id)}" aria-pressed="${game.game_id === state.game}">${esc(gameName(game.game_id))}<span class="muted"> · ${esc(game.history_count)}</span></button>`).join("")}</div>` : ""}
       ${state.notice ? `<div class="wide-note ${state.notice.kind}" role="status">${esc(state.notice.text)}</div>` : ""}
       ${state.game && !state.failed && (state.live || state.history.length || !state.loading) ? gameDetailHtml() : ""}
-      ${state.loading && state.game ? `<div class="wide-note" role="status">${esc(at("common.loading"))}</div>` : ""}</div>`;
+      ${state.loading && state.game ? `<div class="wide-note" role="status">${esc(at("common.loading"))}</div>` : ""}
+      ${games ? giftsListHtml() : ""}</div>`;
   }
 
   function resultsHtml() {
@@ -293,7 +331,9 @@ export function mountSaves(host, { getClient, pageLabel }) {
   }
 
   /* ---------------- dialog + helper ---------------- */
-  function openDialog({ title, bodyText, caveat, nowLabel, perform, successText }) {
+  /* live (optional): { run(signal, setProgress) -> { kind, text } } adds the primary "send now (live)" button; the
+   * close-first / write-now buttons then become the secondary way for a closed game. */
+  function openDialog({ title, bodyText, caveat, nowLabel, perform, successText, live = null }) {
     let abort = null;
     let running = false;
     dialog.innerHTML = `<form method="dialog" class="sv-dialog-body">
@@ -302,14 +342,15 @@ export function mountSaves(host, { getClient, pageLabel }) {
       <p class="sv-caveat">${esc(caveat)}</p>
       <div class="sv-progress" id="svProgress" role="status" aria-live="polite"></div>
       <div class="sv-dialog-a">
-        <button type="button" class="wide-btn primary" id="svCloseFirst">${esc(at("saves.closeFirst"))}</button>
+        ${live ? `<button type="button" class="wide-btn primary" id="svLive">${esc(live.label)}</button>` : ""}
+        <button type="button" class="wide-btn${live ? "" : " primary"}" id="svCloseFirst">${esc(at("saves.closeFirst"))}</button>
         <button type="button" class="wide-btn" id="svNow">${esc(nowLabel)}</button>
         <button type="button" class="wide-btn ghost" id="svCancel">${esc(at("common.cancel"))}</button>
       </div></form>`;
     const $ = (id) => dialog.querySelector(id);
     const progress = $("#svProgress");
     const setProgress = (html, kind = "") => { progress.className = `sv-progress ${kind}`; progress.innerHTML = html; };
-    const setBusy = (busy) => { $("#svCloseFirst").disabled = busy; $("#svNow").disabled = busy; };
+    const setBusy = (busy) => { $("#svCloseFirst").disabled = busy; $("#svNow").disabled = busy; if (live) $("#svLive").disabled = busy; };
     const finish = (kind, text) => {
       setProgress(`<span>${esc(text)}</span>`, kind);
       const actions = $(".sv-dialog-a");
@@ -340,6 +381,28 @@ export function mountSaves(host, { getClient, pageLabel }) {
         finish("bad", `${errorText(error)}`);
       }
     };
+    const runLive = async () => {
+      if (running) return;
+      running = true;
+      abort = new AbortController();
+      setBusy(true);
+      $("#svCancel").textContent = at("saves.stopWaiting");
+      let outcome;
+      try {
+        outcome = await live.run(abort.signal, setProgress);
+      } catch (error) {
+        console.error("[admin] live gift failed", error);
+        running = false;
+        finish("bad", errorText(error));
+        return;
+      }
+      running = false;
+      finish(outcome.kind, outcome.text);
+      await reload();
+      state.notice = { kind: outcome.kind, text: outcome.text };
+      render();
+    };
+    if (live) $("#svLive").addEventListener("click", () => void runLive());
     $("#svCloseFirst").addEventListener("click", () => void run(true));
     $("#svNow").addEventListener("click", () => void run(false));
     $("#svCancel").addEventListener("click", () => {
@@ -348,7 +411,7 @@ export function mountSaves(host, { getClient, pageLabel }) {
     dialog.onclose = () => abort?.abort();
     dialog.oncancel = (event) => { if (running) { event.preventDefault(); abort?.abort(); } };
     dialog.showModal();
-    $("#svCloseFirst").focus();
+    $(live ? "#svLive" : "#svCloseFirst").focus();
   }
 
   /* close_game command, then wait until the cloud save is idle and the player is off the game page */
@@ -381,6 +444,48 @@ export function mountSaves(host, { getClient, pageLabel }) {
     return "cancelled";
   }
 
+  /* queue the gift, then wait (every LIVE_POLL_MS, at most LIVE_TIMEOUT_MS) until the player's open game applied it */
+  async function sendLiveGift({ userId, game, amount, what }, signal, setProgress) {
+    const sb = await getClient();
+    const { data: sent, error } = await sb.rpc("admin_gift_live", { p_user: userId, p_game: game, p_amount: amount });
+    if (error) throw error;
+    const giftId = sent?.id;
+    const show = (key) => setProgress(`<span>${esc(at(key))}</span>`);
+    show("saves.live.waiting");
+    const deadline = Date.now() + LIVE_TIMEOUT_MS;
+    while (!signal.aborted) {
+      await sleep(LIVE_POLL_MS, signal);
+      if (signal.aborted) break;
+      let row = null;
+      try {
+        const { data, error: pollError } = await sb.rpc("admin_game_gifts", { p_user: userId });
+        if (pollError) throw pollError;
+        row = (Array.isArray(data?.gifts) ? data.gifts : []).find((gift) => String(gift.id) === String(giftId)) || null;
+      } catch (pollError) {
+        console.warn("[admin] gift status poll failed", pollError);   // a hiccup: try again until the deadline
+      }
+      if (row?.status === "applied") return { kind: "good", text: at("saves.live.done", { amount: fmtNum(amount), what }) };
+      if (row?.status === "cancelled" || row?.status === "expired") return { kind: "bad", text: at(`saves.live.${row.status}`) };
+      show(row?.status === "claimed" ? "saves.live.claimed" : "saves.live.waiting");
+      if (Date.now() > deadline) return { kind: "", text: at("saves.live.timeout") };
+    }
+    return { kind: "", text: at("saves.live.stopped") };
+  }
+
+  async function cancelGift(giftId) {
+    try {
+      const sb = await getClient();
+      const { error } = await sb.rpc("admin_cancel_gift", { p_id: giftId });
+      if (error) throw error;
+      await reload();
+      state.notice = { kind: "good", text: at("saves.live.cancelled") };
+    } catch (error) {
+      console.error("[admin] gift cancel failed", error);
+      state.notice = { kind: "bad", text: at("saves.gifts.cancelFail", { err: String(error?.message || error) }) };
+    }
+    render();
+  }
+
   function startRestore(historyId) {
     const row = state.history.find((item) => String(item.id) === String(historyId));
     if (!row) return;
@@ -405,11 +510,13 @@ export function mountSaves(host, { getClient, pageLabel }) {
     const bump = Math.max(1e4, base * 0.001);
     const user = state.user.username;
     const game = state.game;
+    const userId = state.user.id;
     openDialog({
       title: at("saves.giftTitle"),
-      bodyText: at("saves.giftBody", { user, amount: fmtNum(amount), what, game: gameName(game), lifetime: fmtNum(base), bump: fmtNum(bump) }),
-      caveat: at("saves.giftCaveat"),
+      bodyText: at("saves.giftLiveBody", { user, amount: fmtNum(amount), what, game: gameName(game) }),
+      caveat: at("saves.giftAlt") + at("saves.giftBody", { user, amount: fmtNum(amount), what, game: gameName(game), lifetime: fmtNum(base), bump: fmtNum(bump) }) + " " + at("saves.giftCaveat"),
       nowLabel: at("saves.giftNow"),
+      live: { label: at("saves.giftLive"), run: (signal, setProgress) => sendLiveGift({ userId, game, amount, what }, signal, setProgress) },
       perform: async () => {
         const sb = await getClient();
         const { data: result, error } = await sb.rpc("admin_gift_idle", { p_user: state.user.id, p_game: game, p_amount: amount });
@@ -444,6 +551,8 @@ export function mountSaves(host, { getClient, pageLabel }) {
     if (result) { void loadUser(result.dataset.user, result.dataset.name); return; }
     const game = event.target.closest?.("[data-game]");
     if (game) { void loadGame(game.dataset.game); return; }
+    const cancel = event.target.closest?.("[data-cancel-gift]");
+    if (cancel) { void cancelGift(Number(cancel.dataset.cancelGift)); return; }
     const restore = event.target.closest?.("[data-restore]");
     if (restore) { startRestore(restore.dataset.restore); return; }
     if (event.target.closest?.("[data-saves-refresh]")) void reload();

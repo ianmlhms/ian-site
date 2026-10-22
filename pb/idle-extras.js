@@ -163,6 +163,67 @@
     dismiss.addEventListener('click',()=>finish(onGone));
     return Object.freeze({close:()=>finish(()=>{})});
   }
+  /* Live admin gifts (22 Oct 2026). The arcade page (pixelbreak-records.js) claims a player's pending gifts from the server and
+   * posts {__pbGift:1,id,amount} into the game frame; the game adds the amount to its main balance (never to lifetime / stars /
+   * rebirth progress), remembers the id in its save (giftIds, last GIFT_IDS_KEPT) and answers {__pbGiftApplied:1,id}.
+   * A gift id already in giftIds is only acknowledged again, so a redelivery after a lost answer never pays twice.
+   * Ordering: the game announces {__pbGiftReady:1} only after its local save is loaded and the cloud save was requested; the
+   * page then delivers gifts only after the cloud save reached (or was found missing for) this game, so applySave can never wipe one.
+   * options: game (id), read() -> current giftIds, apply(amount, giftIds) (updates the game state), save(), refresh(), format(n). */
+  const GIFT_IDS_KEPT=50;
+  const GIFT_TOAST_MS=5000;
+  const GIFT_TEXTS=Object.freeze({
+    lb:'🎁 Kaddo: +{amount} {what}',de:'🎁 Geschenk: +{amount} {what}',en:'🎁 Gift: +{amount} {what}',fr:'🎁 Cadeau : +{amount} {what}'});
+  const GIFT_WHAT=Object.freeze({
+    'idle-empire':{lb:'Cash',de:'Cash',en:'cash',fr:'cash'},
+    'cookie-clicker':{lb:'Cookien',de:'Cookies',en:'cookies',fr:'cookies'},
+    'bus-tycoon':{lb:'Passagéier',de:'Passagiere',en:'passengers',fr:'passagers'}});
+  function giftLang(){
+    try{const stored=localStorage.getItem('site_lang');return GIFT_TEXTS[stored]?stored:'lb'}
+    catch(error){console.warn('[Idle gifts] Could not read the language',error);return'lb'}
+  }
+  /** Last GIFT_IDS_KEPT ids of a save field; anything that is not a positive integer is dropped. */
+  function cleanGiftIds(raw){
+    return Array.isArray(raw)?raw.filter(id=>Number.isSafeInteger(id)&&id>0).slice(-GIFT_IDS_KEPT):[];
+  }
+  function giftToast(game,amount,format){
+    const lang=giftLang();
+    let stack=document.querySelector('.idle-gift-stack');
+    if(!stack){stack=document.createElement('div');stack.className='idle-gift-stack';document.body.append(stack)}
+    const toast=document.createElement('div');toast.className='idle-gift-toast';toast.setAttribute('role','status');
+    toast.textContent=GIFT_TEXTS[lang].replace('{amount}',format(amount)).replace('{what}',(GIFT_WHAT[game]||GIFT_WHAT['idle-empire'])[lang]);
+    stack.append(toast);
+    setTimeout(()=>{toast.remove();if(!stack.childElementCount)stack.remove()},GIFT_TOAST_MS);
+  }
+  function liveGifts(options){
+    // Standalone play and arcade test mode have no server gifts (the page refuses them in test mode too).
+    const enabled=!TEST_MODE&&parent!==window;
+    function post(message){
+      try{parent.postMessage(message,'*')}
+      catch(error){console.warn('[Idle gifts] Could not message the arcade page',error)}
+    }
+    function receive(id,amount){
+      if(!Number.isSafeInteger(id)||id<1||typeof amount!=='number'||!Number.isFinite(amount)||amount<=0)return;
+      const ids=cleanGiftIds(options.read());
+      if(!ids.includes(id)){
+        options.apply(amount,[...ids,id].slice(-GIFT_IDS_KEPT));
+        options.save();
+        if(options.refresh)options.refresh();
+        giftToast(options.game,amount,options.format);
+      }
+      post({__pbGiftApplied:1,id});
+    }
+    if(enabled)window.addEventListener('message',event=>{
+      const data=event.data;
+      if(event.source!==parent||!data||data.__pbGift!==1)return;
+      try{receive(data.id,data.amount)}
+      catch(error){console.warn('[Idle gifts] Could not apply a gift',error)}
+    });
+    return Object.freeze({
+      /** Call once, after the local save is loaded and the cloud save requested. */
+      ready(){if(enabled)post({__pbGiftReady:1})}
+    });
+  }
   function mount(options){
     const box=document.createElement('div');box.className='idle-rewards';
     box.innerHTML=(TEST_MODE?'<span class="idle-test" style="font-weight:800;font-size:12px">🧪 TEST</span>':'')+'<span class="idle-stars"></span><button type="button" class="idle-rebirth">⭐ Rebirth</button><span class="idle-progress"></span><button type="button" class="idle-gift" hidden></button><p class="idle-away" role="status" hidden></p><p class="idle-sleep" role="status" hidden></p>';
@@ -266,5 +327,5 @@
     if(pending)offerUndo(pending.label,pending.snap,pending.until);
     refresh();return Object.freeze({refresh,notice,offerUndo});
   }
-  window.IdleExtras=Object.freeze({day,halloween,multiplier,starBonus:STAR_BONUS,offline,awayRate,activityRate,isActive,mount,makeGuard,advise,duration,undoToast,undoRead,undoWrite,holdMs:HOLD_MS,lockMs:OPEN_LOCK_MS,undoMs:UNDO_MS,worthGain:WORTH_GAIN,smallShare:SMALL_SHARE});
+  window.IdleExtras=Object.freeze({liveGifts,cleanGiftIds,day,halloween,multiplier,starBonus:STAR_BONUS,offline,awayRate,activityRate,isActive,mount,makeGuard,advise,duration,undoToast,undoRead,undoWrite,holdMs:HOLD_MS,lockMs:OPEN_LOCK_MS,undoMs:UNDO_MS,worthGain:WORTH_GAIN,smallShare:SMALL_SHARE});
 })();

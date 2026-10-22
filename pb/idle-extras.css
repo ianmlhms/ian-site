@@ -22,3 +22,7 @@ button.idle-guard:disabled{opacity:.45;cursor:not-allowed}
 .idle-undo{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));z-index:40;display:flex;align-items:center;gap:10px;max-width:calc(100% - 32px);padding:8px 8px 8px 14px;transform:translateX(-50%);border:1px solid var(--border,#444);border-radius:16px;background:var(--card,#1b1b2b);color:var(--text,#fff);box-shadow:0 8px 28px #0008;font:650 14px/1.3 var(--font,system-ui)}
 .idle-undo button{min-height:44px;padding:8px 14px;border:0;border-radius:12px;background:var(--amber,#f4bc52);color:#14100a;font:800 14px/1.2 var(--font,system-ui);cursor:pointer;touch-action:manipulation}
 .idle-undo button.idle-undo-x{min-width:44px;padding:0;background:transparent;color:inherit;font-size:20px}
+.idle-gift-stack{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;z-index:41;display:flex;flex-direction:column;align-items:center;gap:8px;max-width:calc(100% - 32px);transform:translateX(-50%);pointer-events:none}
+.idle-gift-toast{padding:10px 16px;border:1px solid var(--amber,#f4bc52);border-radius:16px;background:var(--card,#1b1b2b);color:var(--text,#fff);box-shadow:0 8px 28px #0008;font:800 15px/1.3 var(--font,system-ui);text-align:center;animation:idleGiftIn .25s ease-out}
+@keyframes idleGiftIn{from{opacity:0;transform:translateY(-12px)}}
+@media(prefers-reduced-motion:reduce){.idle-gift-toast{animation:none}}

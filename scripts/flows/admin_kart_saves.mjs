@@ -4,7 +4,8 @@
  *   filter by player and by day, "load older races" (bigger p_limit), empty and error state, name → Saves tab.
  * Saves: search a user, pick a game, live summary + presence, history with a diff against live, Restore with the
  *   confirmation dialog and the "close their game first" helper (close_game command, waits for an idle save and a
- *   player who left the game, then restores), restore now, stop waiting, Gift (amount parsing, safe recipe).
+ *   player who left the game, then restores), restore now, stop waiting, Gift (amount parsing, safe recipe), live gift
+ *   (admin_gift_live, polling until the open game applied it, timeout, the gift list with Cancel; no polling once the dialog is closed).
  * Nothing is fetched until a tab is opened (no polling). Supabase is entirely mocked; all names are made up. */
 import { runIfMain } from "./lib.mjs";
 
@@ -61,6 +62,7 @@ export function makeWorld() {
     // afterwards every poll moves one step on
     idleS: 4, page: "/pixelbreak.html?g=idle-empire", seenS: 20,
     script: null, commands: [], restored: [], gifts: [], saveReads: 0,
+    liveGifts: [], giftRows: [], giftSteps: null, giftReads: 0, cancelled: [],
   };
 }
 
@@ -101,6 +103,29 @@ export function backendFor(world) {
         world.live[row.game_id] = row.data;
         return null;
       },
+      admin_gift_live: (body) => {
+        if (world.failLive) return { error: { message: world.failLive } };
+        world.liveGifts.push(body);
+        const row = { id: 500 + world.liveGifts.length, user_id: body.p_user, game_id: body.p_game, amount: body.p_amount, created_by: "admin", created_at: new Date().toISOString(),
+          status: "pending", claimed_at: null, applied_at: null, expires_at: iso(-7 * 24 * 60 * MIN) };
+        world.giftRows = [row, ...world.giftRows];
+        return { id: row.id, game: body.p_game, amount: body.p_amount };
+      },
+      admin_game_gifts: () => {
+        world.giftReads += 1;
+        if (world.giftSteps && world.giftRows.length) {
+          const status = world.giftSteps.length > 1 ? world.giftSteps.shift() : world.giftSteps[0];
+          world.giftRows = world.giftRows.map((row, index) => (index === 0 ? { ...row, status, applied_at: status === "applied" ? new Date().toISOString() : null } : row));
+        }
+        return { now: new Date().toISOString(), gifts: world.giftRows };
+      },
+      admin_cancel_gift: ({ p_id }) => {
+        const row = world.giftRows.find((item) => item.id === p_id);
+        if (!row || row.status !== "pending") return { error: { message: "gift not pending" } };
+        world.cancelled.push(p_id);
+        world.giftRows = world.giftRows.map((item) => (item.id === p_id ? { ...item, status: "cancelled" } : item));
+        return { id: p_id, status: "cancelled" };
+      },
       admin_gift_idle: (body) => {
         world.gifts.push(body);
         if (world.failGift) return { error: { message: world.failGift } };
@@ -139,7 +164,7 @@ export const flow = {
     await page.setViewportSize({ width: 820, height: 1180 });
 
     h.step("opening the admin page loads nothing from the new tabs");
-    await h.goto("/admin.html?pollms=150&waitms=4000");
+    await h.goto("/admin.html?pollms=150&waitms=4000&livepollms=150&livems=1500");
     await page.waitForSelector("#tabKart", { state: "visible", timeout: 10000 });
     h.eq(await text(page, "#tabKart"), "🏎️ Kart", "Kart tab label");
     h.eq(await text(page, "#tabSaves"), "💾 Saves", "Saves tab label");
@@ -405,6 +430,71 @@ export const flow = {
     await page.click("#svDone");
     world.failGift = null;
     consoleErrors.length = errorsBeforeGift;   // the logged failure is intended
+
+    h.step("live gift: dialog offers «Direkt schécken (live)», the game picks it up, delivered");
+    await page.fill("#svGiftAmount", "1,5M");
+    await page.click("#svGiftForm button[type=submit]");
+    await page.waitForSelector("dialog[open]");
+    const liveDialog = await text(page, "dialog[open]");
+    h.expect(/während d'Spill oppen ass/.test(liveDialog) && /1,5 M/.test(liveDialog) && /Oder bei zouenem Spill/.test(liveDialog), `live dialog explains both ways (${liveDialog.slice(0, 120)})`);
+    h.expect(await page.locator("#svLive.primary").count() === 1 && await page.locator("#svCloseFirst.primary").count() === 0, "«live» is the primary button");
+    h.expect(await page.isVisible("#svCloseFirst") && await page.isVisible("#svNow"), "the closed-game ways stay available");
+    await h.shot("saves-live-gift-dialog");
+    world.giftSteps = ["pending", "pending", "claimed", "applied"];
+    const readsBeforeLive = world.giftReads;
+    const idleGiftsBefore = world.gifts.length;
+    await page.click("#svLive");
+    await page.waitForFunction(() => /Waart, bis d'Spill/.test(document.querySelector("#svProgress")?.innerText || ""));
+    h.eq(world.liveGifts, [{ p_user: "u-emma", p_game: "idle-empire", p_amount: 1500000 }], "admin_gift_live got the parsed amount");
+    h.eq(world.gifts.length, idleGiftsBefore, "the old write-into-the-save RPC was not used");
+    await page.waitForFunction(() => /Geliwwert ✓/.test(document.querySelector("#svProgress")?.innerText || ""), null, { timeout: 8000 });
+    h.expect(/1,5 M/.test(await text(page, "#svProgress")), "delivery message names the amount");
+    h.expect(world.giftReads - readsBeforeLive >= 3, "polled until the status turned applied");
+    await page.click("#svDone");
+    await page.waitForSelector("dialog[open]", { state: "detached" });
+    h.expect(/geliwwert/.test(await text(page, ".sv-gifts")) && /1,5 M/.test(await text(page, ".sv-gifts")), `gift list shows the delivered gift (${await text(page, ".sv-gifts")})`);
+    const readsDone = world.giftReads;
+    await h.pause(700);
+    h.eq(world.giftReads, readsDone, "no polling once the dialog is closed");
+
+    h.step("live gift: nobody picks it up -> stays pending, can be cancelled from the list");
+    world.giftSteps = ["pending"];
+    await page.fill("#svGiftAmount", "300");
+    await page.click("#svGiftForm button[type=submit]");
+    await page.click("#svLive");
+    await page.waitForFunction(() => /Nach net ofgeholl/.test(document.querySelector("#svProgress")?.innerText || ""), null, { timeout: 8000 });
+    h.expect(/d'nächst Kéier/.test(await text(page, "#svProgress")), "timeout text promises delivery on the next open");
+    await page.click("#svDone");
+    await page.waitForSelector("dialog[open]", { state: "detached" });
+    h.eq(await page.locator("[data-cancel-gift]").count(), 1, "only the pending gift has a Cancel button");
+    h.expect(/ausstoend/.test(await text(page, ".sv-gift-row")), `pending gift is first in the list (${await text(page, ".sv-gift-row")})`);
+    world.giftSteps = null;   // from here the mocked server keeps what it has
+    await page.click("[data-cancel-gift]");
+    await page.waitForFunction(() => document.querySelectorAll("[data-cancel-gift]").length === 0);
+    h.eq(world.cancelled, [502], "admin_cancel_gift for the pending gift");
+    h.expect(/ofgebrach/.test(await text(page, ".sv-gifts")), "list shows it cancelled");
+
+    h.step("live gift: stop waiting keeps the gift pending; server refusal is shown");
+    world.giftSteps = ["pending"];
+    await page.fill("#svGiftAmount", "10");
+    await page.click("#svGiftForm button[type=submit]");
+    await page.click("#svLive");
+    await page.waitForFunction(() => /Waart, bis d'Spill/.test(document.querySelector("#svProgress")?.innerText || ""));
+    await page.click("#svCancel");
+    await page.waitForFunction(() => /Mam Waarden opgehalen/.test(document.querySelector("#svProgress")?.innerText || ""));
+    await page.click("#svDone");
+    await page.waitForSelector("dialog[open]", { state: "detached" });
+    h.eq(world.giftRows[0].status, "pending", "stopping the wait does not cancel the gift");
+    world.failLive = "game not allowed";
+    const errorsBeforeLive = consoleErrors.length;
+    await page.fill("#svGiftAmount", "10");
+    await page.click("#svGiftForm button[type=submit]");
+    await page.click("#svLive");
+    await page.waitForSelector("#svDone");
+    h.expect(/game not allowed/.test(await text(page, "#svProgress")), "server error shown");
+    await page.click("#svDone");
+    world.failLive = null;
+    consoleErrors.length = errorsBeforeLive;   // the logged failure is intended
 
     h.step("generic summary for other games; no gift card");
     await page.click('.sv-game[data-game="train-sim"]');

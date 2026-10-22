@@ -31,7 +31,7 @@
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script type="module">
-import { mountLobby } from "./mp-lobby.js?v=6";
+import { mountLobby } from "./mp-lobby.js?v=7";
 import { gameInfo } from "./mp-games.js?v=4";
 const g = gameInfo(new URLSearchParams(location.search).get("g") || "");
 if (g) document.getElementById("lobbyH1").textContent = g.emoji + " " + g.name;
@@ -40,8 +40,8 @@ mountLobby(document.getElementById("mpl")).catch((error) => {
   document.getElementById("mpl").textContent = "Lobby konnt net starten. / Lobby could not start.";
 });
 </script>
-<script type="module" src="notify-ambient.js?v=35"></script>
-<script type="module" src="rtc-ring.js?v=31"></script>
-<script type="module" src="class-gate.js?v=32"></script>
+<script type="module" src="notify-ambient.js?v=36"></script>
+<script type="module" src="rtc-ring.js?v=32"></script>
+<script type="module" src="class-gate.js?v=33"></script>
 </body>
 </html>

@@ -32,7 +32,7 @@
   const $ = id => document.getElementById(id);
   const zeroOwned = () => Object.fromEntries(LINES.map(line => [line.id, 0]));
   const initial = () => ({ v: SAVE_VERSION, p: 0, tb: 0, rb: 0, st: 0, rbc: 0, gd: '', rs: Date.now(),
-    savedAt: Date.now(), owned: zeroOwned(), upgrades: [], drivers: 0 });
+    savedAt: Date.now(), owned: zeroOwned(), upgrades: [], drivers: 0, giftIds: [] });
   /** Test mode only: a copy of the state with huge funds, rebirth ready and one of every line (drivers/upgrades stay buyable). */
   function testUnlockAll(save) {
     if (!TEST_MODE) return save;
@@ -72,7 +72,7 @@
     lastTick = Math.max(now, lastTick);
   }
   function snapshot() {
-    return { ...state, owned: { ...state.owned }, upgrades: [...state.upgrades], savedAt: Date.now() };
+    return { ...state, owned: { ...state.owned }, upgrades: [...state.upgrades], giftIds: [...state.giftIds], savedAt: Date.now() };
   }
   function post(message) {
     try { parent.postMessage(message, '*'); }
@@ -96,7 +96,8 @@
       gd: typeof raw.gd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.gd) ? raw.gd : '',
       savedAt: number(raw.savedAt, Date.now()), drivers: Math.min(DRIVER_LIMIT, Math.floor(number(raw.drivers))),
       owned: Object.fromEntries(LINES.map(line => [line.id, Math.min(MAX_OWNED, Math.floor(number(raw.owned[line.id])))])),
-      upgrades: UPGRADES.filter(up => Array.isArray(raw.upgrades) && raw.upgrades.includes(up.id)).map(up => up.id) };
+      upgrades: UPGRADES.filter(up => Array.isArray(raw.upgrades) && raw.upgrades.includes(up.id)).map(up => up.id),
+      giftIds: IdleExtras.cleanGiftIds(raw.giftIds) };
   }
   function applySave(raw) {
     const save = normalize(raw);
@@ -139,7 +140,7 @@
     settle();
     const stars = Math.floor(Math.sqrt(state.rb / REBIRTH_THRESHOLD));
     if (stars < 1) return;
-    state = { ...initial(), tb: state.tb, st: state.st + stars, rbc: state.rbc + 1, gd: state.gd };
+    state = { ...initial(), tb: state.tb, st: state.st + stars, rbc: state.rbc + 1, gd: state.gd, giftIds: state.giftIds };
     lastTick = Date.now(); score(); refresh();
   }
   /* Exact pre-reset state for the 30 s Undo. Lifetime and the daily gift never go backwards; ud tells the server guard the
@@ -148,7 +149,7 @@
   function undoRestore(snap) {
     const now = Date.now();
     state = { ...snap, owned: { ...snap.owned }, upgrades: [...snap.upgrades], tb: Math.max(snap.tb, state.tb),
-      gd: snap.gd > state.gd ? snap.gd : state.gd, savedAt: now, ud: now };
+      gd: snap.gd > state.gd ? snap.gd : state.gd, giftIds: state.giftIds, savedAt: now, ud: now };
     lastTick = now; score(); refresh();
   }
   function buildShop() {
@@ -210,7 +211,11 @@
     try { local = JSON.parse(localStorage.getItem('pb_save_bus-tycoon') || 'null'); }
     catch (error) { warn('Could not restore progress', error); }
   }
-  applySave(local); refresh(); score(); post({ __pbWantSave: 1 });
+  applySave(local); refresh(); score();
+  // Live admin gifts add passengers only (not lifetime / round / stars). Announced after the cloud save was requested.
+  const liveGifts = IdleExtras.liveGifts({ game: 'bus-tycoon', format, read: () => state.giftIds, save: pushSave, refresh,
+    apply: (amount, giftIds) => { state = { ...state, p: bounded(state.p + amount), giftIds }; } });
+  post({ __pbWantSave: 1 }); liveGifts.ready();
   $('wave').addEventListener('click', () => { settle(); earn(tapPower()); refresh(); pushSave(); });
   window.addEventListener('message', event => {
     if (event.source === parent && event.data?.__pbLoadSave === 1) applySave(event.data.data);

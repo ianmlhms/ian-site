@@ -26,6 +26,7 @@ import { flow as arcadeWeeklyStreak } from "./arcade_weekly_streak.mjs";
 import { flow as idleRebirthHalloween } from "./idle_rebirth_halloween.mjs";
 import { flow as idleMoreContent } from "./idle_more_content.mjs";
 import { flow as idleSoftcap } from "./idle_softcap.mjs";
+import { flow as idleLiveGift } from "./idle_live_gift.mjs";
 import { flow as idleResetSafety } from "./idle_reset_safety.mjs";
 import { flow as leaderboardBigScores } from "./leaderboard_big_scores.mjs";
 import { flow as driveMadLevels } from "./drive_mad_levels.mjs";
@@ -53,7 +54,7 @@ import { flow as trainSim } from "./train_sim.mjs";
 import { flow as trainSimAudio } from "./train_sim_audio.mjs";
 import { flow as trainSimTouch } from "./train_sim_touch.mjs";
 
-const ALL = [invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, trainSimTouch, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
+const ALL = [invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, trainSimTouch, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

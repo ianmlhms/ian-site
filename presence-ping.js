@@ -1,10 +1,12 @@
 /* Site-wide authenticated presence ping. Loaded lazily by auth.js. */
-import { commandsSafe } from "./client-commands.js?v=5";
+import { commandsSafe } from "./client-commands.js?v=6";
 
 const PING_INTERVAL_MS = 60_000;
 const MAX_PAGE_LENGTH = 120;
 const COMMAND_WAIT_MS = 10 * 60_000;
-const COMMAND_HANDLERS = Object.freeze({ reload: "reload", close_game: "closeGame" });
+const COMMAND_HANDLERS = Object.freeze({ reload: "reload", close_game: "closeGame", gift: "gift" });
+// Actions that cannot interrupt what the person is doing (no reload, no closed game): they skip the commandsSafe() wait.
+const UNINTERRUPTIVE_ACTIONS = new Set(["gift"]);
 const handledCommands = new Set();
 const pendingCommands = new Map();
 
@@ -91,7 +93,7 @@ async function pollCommands(userId) {
         finishCommand(id, cmd);
         continue;
       }
-      if (!commandsSafe()) continue;
+      if (!UNINTERRUPTIVE_ACTIONS.has(cmd.action) && !commandsSafe()) continue;
       const handler = window.__ianCommands?.[COMMAND_HANDLERS[cmd.action]];
       if (typeof handler !== "function") {
         console.warn("[commands] unsupported action", cmd.action);

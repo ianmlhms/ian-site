@@ -177,7 +177,7 @@ function avatarEl(name, avatar) {
 async function loadIdentity() {
   const id = { sb: null, uid: "", username: "", signedIn: false, avatar: "", auth: null };
   try {
-    const auth = await import("./auth.js?v=34");
+    const auth = await import("./auth.js?v=35");
     id.auth = auth;
     if (auth.authConfigured) {
       id.sb = await auth.client();

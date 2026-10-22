@@ -90,4 +90,15 @@ async function closeGame(cmd, eligible = () => true) {
   return true;
 }
 
-window.__ianCommands = { reload, closeGame, ...window.__ianCommands };
+/* A live gift never disturbs typing, so presence-ping runs it without waiting for commandsSafe(). Only the open game of that
+ * name is told to claim; for any other page the gift simply stays pending and arrives when the player opens the game. */
+async function gift(cmd, eligible = () => true) {
+  if (!eligible()) return false;
+  const game = window.PB?.current;
+  if (!game || cmd.game_id !== game.id) return true;
+  if (typeof window.__pbDeliverGifts !== "function") throw new Error("arcade gift hook unavailable");
+  await window.__pbDeliverGifts();
+  return true;
+}
+
+window.__ianCommands = { reload, closeGame, gift, ...window.__ianCommands };

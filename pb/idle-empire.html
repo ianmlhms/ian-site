@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Business Empire - Arcade</title>
 <link rel="stylesheet" href="/pb/arcade-ui.css?v=1">
-<link rel="stylesheet" href="/pb/idle-extras.css?v=4">
-<script src="/pb/idle-extras.js?v=6"></script>
+<link rel="stylesheet" href="/pb/idle-extras.css?v=5">
+<script src="/pb/idle-extras.js?v=7"></script>
 <style>
 :root{--ink:var(--text);--panel:var(--card);--panel2:var(--card2);--line:var(--border);--gold:var(--amber);--green:var(--good);--blue:var(--cyan)}
 *{box-sizing:border-box}
@@ -37,7 +37,7 @@ header{flex:0 0 auto;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;bor
 @media (max-height:600px){header{padding-top:8px}.brand p{display:none}.stats{margin-top:7px}.stat{padding:6px 8px}}
 @media (prefers-reduced-motion:reduce){button{transition:none}button:active:not(:disabled){transform:none}.progress-fill{transition:none}}
 </style>
-<script src="/pb/arcade-kit.js?v=32" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
+<script src="/pb/arcade-kit.js?v=33" data-arcade-id="idle-empire" data-arcade-title="Business Empire"></script>
 </head>
 <body>
 <main id="game">
@@ -138,7 +138,7 @@ const BUSINESSES=Object.freeze([
 const emptyOwned=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,0]));
 const emptyManagers=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,false]));
 const emptyRuntime=()=>Object.fromEntries(BUSINESSES.map((business)=>[business.id,{startedAt:0,endsAt:0}]));
-const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',sc:0,rs:Date.now(),owned:emptyOwned(),managers:emptyManagers(),investors:0,ts:Date.now(),savedAt:Date.now()});
+const initialState=()=>({v:SAVE_VERSION,cash:STARTING_CASH,lifetime:0,rb:0,st:0,rbc:0,gd:'',sc:0,rs:Date.now(),owned:emptyOwned(),managers:emptyManagers(),investors:0,giftIds:[],ts:Date.now(),savedAt:Date.now()});
 
 /** Test mode only: a copy of the state with huge cash, one of every business and both resets ready. */
 function testUnlockAll(save){
@@ -155,7 +155,7 @@ let isBooted=false;
 let pendingIncomingSave=null;
 let lastOfflineResult={elapsedSeconds:0,credited:0,wasCapped:false,clockWentBackwards:false};
 let cardRefs={};
-let rewards=null,loaded=false;
+let rewards=null,loaded=false,liveGifts=null;
 
 function reportError(context,error){
   const detail=error instanceof Error?error.message:String(error);
@@ -482,7 +482,7 @@ function cloneState(){return JSON.parse(JSON.stringify(state))}
  * ud tells the server guard that the lower rebirth count is an Undo (game-saves-history guard), kept for the session. */
 function restoreState(snap){
   const now=Date.now();
-  state={...snap,owned:{...snap.owned},managers:{...snap.managers},lifetime:Math.max(snap.lifetime,state.lifetime),gd:snap.gd>state.gd?snap.gd:state.gd,sc:Math.max(snap.sc||0,state.sc||0),ts:now,savedAt:now,ud:now};
+  state={...snap,owned:{...snap.owned},managers:{...snap.managers},lifetime:Math.max(snap.lifetime,state.lifetime),gd:snap.gd>state.gd?snap.gd:state.gd,sc:Math.max(snap.sc||0,state.sc||0),giftIds:state.giftIds,ts:now,savedAt:now,ud:now};
   runtime=emptyRuntime();
   startManagedCycles(now);
   updateScore();refreshAll(now);
@@ -512,7 +512,7 @@ function normalizeSave(raw){
   }));
   const managers=Object.fromEntries(BUSINESSES.map((business)=>[business.id,raw.managers[business.id]===true]));
   return{v:SAVE_VERSION,cash,lifetime,owned,managers,investors,ts,savedAt,
-    rb:safeNumber(raw.rb,lifetime),rs:safeNumber(raw.rs,0),st:Math.floor(safeNumber(raw.st)),rbc:Math.floor(safeNumber(raw.rbc)),gd:typeof raw.gd==='string'?raw.gd:'',sc:raw.sc===1?1:0};
+    rb:safeNumber(raw.rb,lifetime),rs:safeNumber(raw.rs,0),st:Math.floor(safeNumber(raw.st)),rbc:Math.floor(safeNumber(raw.rbc)),gd:typeof raw.gd==='string'?raw.gd:'',sc:raw.sc===1?1:0,giftIds:IdleExtras.cleanGiftIds(raw.giftIds)};
 }
 
 function calculateOffline(save,now){
@@ -590,7 +590,11 @@ function boot(){
   if(pendingIncomingSave)applySave(pendingIncomingSave);
   pendingIncomingSave=null;
   state=testUnlockAll(state);
+  // Live admin gifts: cash only (lifetime and prestige counters stay untouched). Announced after the cloud save was requested.
+  liveGifts=IdleExtras.liveGifts({game:"idle-empire",format,read:()=>state.giftIds,save:pushSave,refresh:refreshAll,
+    apply:(amount,giftIds)=>{state={...state,cash:safeAdd(state.cash,amount),giftIds}}});
   updateScore();refreshAll();requestCloudSave();
+  liveGifts.ready();
   setInterval(gameTick,GAME_TICK_MS);
   setInterval(pushSave,SAVE_INTERVAL_MS);
 }
