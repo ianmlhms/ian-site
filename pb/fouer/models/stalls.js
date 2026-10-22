@@ -261,26 +261,29 @@ MODELS.zocker = { build(opts) {
 MODELS.lukas = { build(opts) {
   const { b, ctx } = begin('lukas', opts); const P = ctx.pal;
   deck(b, ctx, 0, 0, 7.4, 7.0, ctx.look === 1 ? 0x1a1430 : 0x6a5a4c);
-  // cut-out knight (flat painted plates) behind the tower
-  const metal = 0xc9ced4; const plume = 0xc8283a; const zk = -2.6;
-  b.box(0, 0.14, zk, 2.2, 3.4, 0.22, ctx.look === 1 ? 0x41e8ff : 0x2d6fd0);                       // tabard / body
-  b.box(0, 3.5, zk, 1.5, 0.9, 0.22, metal);                                                    // shoulders / gorget
-  b.sphere(0, 4.6, zk + 0.06, 0.62, 0xf0c4a0, { seg: 7 });                                     // face
-  b.cyl(0, 4.95, zk, 0.72, 0.62, 0.7, 8, metal, { cap: true });                                // helmet
-  b.box(0, 5.6, zk, 0.14, 0.9, 0.14, metal); [-0.3, 0, 0.3].forEach((x, i) => b.blob(x, 6.3 - Math.abs(x) * 0.5, zk, 0.28, 0.5, 0.18, plume));
-  b.box(0, 4.4, zk + 0.16, 1.0, 0.16, 0.1, 0xffffff); b.blob(-0.5, 4.34, zk + 0.2, 0.34, 0.1, 0.06, 0xffffff); b.blob(0.5, 4.34, zk + 0.2, 0.34, 0.1, 0.06, 0xffffff);   // moustache
-  b.sphere(-0.2, 4.7, zk + 0.5, 0.07, 0x222222, { seg: 4 }); b.sphere(0.2, 4.7, zk + 0.5, 0.07, 0x222222, { seg: 4 });
-  b.box(-1.5, 1.5, zk + 0.02, 0.8, 1.6, 0.16, metal); b.box(1.5, 1.5, zk + 0.02, 0.8, 1.6, 0.16, 0xf4c430);       // shield + arm plates
+  // the tall cut-out knight (flat painted plates, ~11 m with the plume) behind the tower: a long tabard with gold bands, shoulders, face with moustache, helmet + plume
+  const metal = 0xc9ced4; const plume = 0xc8283a; const zk = -2.6; const tab = ctx.look === 1 ? 0x41e8ff : 0x2d6fd0;
+  b.box(0, 0.14, zk, 2.2, 6.0, 0.22, tab);                                                      // tabard
+  [1.4, 3.6, 5.6].forEach((y) => b.box(0, y, zk + 0.02, 2.24, 0.26, 0.24, GOLD));                // gold bands
+  b.box(0, 2.2, zk + 0.13, 0.3, 3.4, 0.05, 0xf2e8d0); b.box(0, 3.0, zk + 0.13, 1.4, 0.26, 0.05, 0xf2e8d0);   // a painted cross on the tabard
+  b.box(0, 6.1, zk, 1.9, 1.0, 0.24, metal); b.box(-1.15, 5.9, zk, 0.7, 0.7, 0.24, metal); b.box(1.15, 5.9, zk, 0.7, 0.7, 0.24, metal);   // gorget + pauldrons
+  b.sphere(0, 7.55, zk + 0.06, 0.78, 0xf0c4a0, { seg: 7 });                                     // face
+  b.cyl(0, 7.95, zk, 0.9, 0.78, 0.95, 8, metal, { cap: true });                                 // helmet
+  b.box(0, 8.9, zk, 0.16, 1.1, 0.16, metal); [-0.4, 0, 0.4].forEach((x) => b.blob(x, 10.2 - Math.abs(x) * 0.6, zk, 0.34, 0.65, 0.2, plume));
+  b.box(0, 7.25, zk + 0.2, 1.2, 0.2, 0.1, 0xffffff); b.blob(-0.62, 7.15, zk + 0.24, 0.4, 0.12, 0.08, 0xffffff); b.blob(0.62, 7.15, zk + 0.24, 0.4, 0.12, 0.08, 0xffffff);   // moustache
+  b.sphere(-0.26, 7.72, zk + 0.62, 0.09, 0x222222, { seg: 4 }); b.sphere(0.26, 7.72, zk + 0.62, 0.09, 0x222222, { seg: 4 });
+  b.box(-1.55, 2.2, zk + 0.02, 0.9, 2.2, 0.16, metal); b.box(1.55, 2.2, zk + 0.02, 0.9, 2.2, 0.16, 0xf4c430);       // shield + banner plates
+  b.bulbRow([-1.1, 0.4, zk + 0.16], [-1.1, 6.0, zk + 0.16], 0.45, ctx.bulb, 0.13); b.bulbRow([1.1, 0.4, zk + 0.16], [1.1, 6.0, zk + 0.16], 0.45, ctx.bulb, 0.13);
   // the tower: ladder track with rank plates, bell and puck
-  const tx = 1.6; const tz = -0.9;
+  const tx = 1.6; const tz = -0.9; const TOP = 9.2;
   b.box(tx, 0.14, tz, 1.5, 0.5, 1.3, P.dark); b.box(tx, 0.64, tz, 1.1, 0.16, 0.9, 0x884433);
-  b.box(tx, 0.8, tz - 0.4, 0.5, 5.6, 0.22, ctx.look === 1 ? 0x22103f : 0xf2e8d0);
+  b.box(tx, 0.8, tz - 0.4, 0.5, TOP - 0.7, 0.22, ctx.look === 1 ? 0x22103f : 0xf2e8d0);
   const ranks = [0xc8283a, 0xf08a2a, 0xf4c430, 0x7ad06a, 0x41c4d8, 0x8a5bc8];
-  ranks.forEach((c, i) => { b.box(tx, 1.5 + i * 0.82, tz - 0.28, 0.9, 0.34, 0.1, c); });
-  b.box(tx - 0.3, 0.9, tz - 0.3, 0.05, 5.3, 0.1, 0x333333); b.box(tx + 0.3, 0.9, tz - 0.3, 0.05, 5.3, 0.1, 0x333333);
-  b.sphere(tx, 6.5, tz - 0.3, 0.42, ctx.L4 ? GOLD : 0xe6b13a, { seg: 6 }); b.cyl(tx, 6.2, tz - 0.3, 0.12, 0.12, 0.3, 5, 0x333333);
+  const nr = b.far ? 7 : 11; for (let i = 0; i < nr; i++) { b.box(tx, 1.4 + i * 0.74, tz - 0.28, 0.9, 0.34, 0.1, ranks[i % ranks.length]); if (!b.far) b.box(tx + 0.62, 1.44 + i * 0.74, tz - 0.28, 0.34, 0.26, 0.08, 0xffffff); }   // plates + small white rank cards
+  b.box(tx - 0.3, 0.9, tz - 0.3, 0.05, TOP - 1.0, 0.1, 0x333333); b.box(tx + 0.3, 0.9, tz - 0.3, 0.05, TOP - 1.0, 0.1, 0x333333);
+  b.sphere(tx, TOP + 0.5, tz - 0.3, 0.46, ctx.L4 ? GOLD : 0xe6b13a, { seg: 6 }); b.cyl(tx, TOP + 0.2, tz - 0.3, 0.12, 0.12, 0.3, 5, 0x333333);
   b.sphere(tx, 3.2, tz - 0.3, 0.16, 0xc8283a, { seg: 5 });
-  b.bulbRow([tx - 0.5, 1.2, tz - 0.2], [tx - 0.5, 6.3, tz - 0.2], 0.4, ctx.bulb, 0.13); b.bulbRow([tx + 0.5, 1.2, tz - 0.2], [tx + 0.5, 6.3, tz - 0.2], 0.4, ctx.bulb, 0.13);
+  b.bulbRow([tx - 0.5, 1.2, tz - 0.2], [tx - 0.5, TOP, tz - 0.2], 0.4, ctx.bulb, 0.13); b.bulbRow([tx + 0.5, 1.2, tz - 0.2], [tx + 0.5, TOP, tz - 0.2], 0.4, ctx.bulb, 0.13);
   // mallet and plush stall to the left
   b.box(tx - 0.2, 0.9, tz + 0.55, 0.5, 0.1, 0.9, 0x6a4a30); b.cyl(tx - 0.9, 0.9, tz + 0.9, 0.09, 0.09, 1.3, 5, C.wood, { }); b.cyl(tx - 0.9, 2.1, tz + 0.9, 0.18, 0.18, 0.45, 6, 0x884433);
   b.box(-1.9, 0.14, -0.4, 2.8, 1.0, 1.1, P.main); b.box(-1.9, 1.14, -0.4, 3.0, 0.07, 1.2, ctx.metal);
@@ -293,9 +296,9 @@ MODELS.lukas = { build(opts) {
   staff(b, ctx, [-2.3], -0.4, { vest: P.main });
   dressEdge(b, ctx, -3.3, -0.5, 2.5, 0.45, { step: 0.34, noFlags: false });
   if (ctx.L2) { forecourtStrings(b, ctx, -3.6, 3.6, 3.2); }
-  if (ctx.L3) { dressForecourt(b, ctx, -3.5, 3.5, 3.7); b.figure(1.0, 1.8, Math.PI); b.figure(2.0, 2.0, Math.PI); b.figure(0.2, 2.6, Math.PI); b.ledRect(tx - 0.62, 1.3, tx + 0.62, 6.2, tz - 0.34, 0.07, ctx.led); }
-  if (ctx.L4) { b.sphere(0, 6.55, zk, 0.2, GOLD, { seg: 6 }); b.box(tx, 0.64, tz + 0.46, 1.2, 0.08, 0.1, GOLD); }
-  return end(b, ctx, [8, 8], 7.0);
+  if (ctx.L3) { dressForecourt(b, ctx, -3.5, 3.5, 3.7); b.figure(1.0, 1.8, Math.PI); b.figure(2.0, 2.0, Math.PI); b.figure(0.2, 2.6, Math.PI); b.ledRect(tx - 0.62, 1.3, tx + 0.62, TOP - 0.1, tz - 0.34, 0.07, ctx.led); }
+  if (ctx.L4) { b.sphere(0, 10.9, zk, 0.2, GOLD, { seg: 6 }); b.box(tx, 0.64, tz + 0.46, 1.2, 0.08, 0.1, GOLD); }
+  return end(b, ctx, [8, 8], 11.2);
 } };
 
 /* ------------------------------------------------------------------ mandel: roasted almonds + Magenbrot (S) */

@@ -14,11 +14,12 @@ const IDS = ["wheel", "jules", "hangover", "booster", "infinity"];
 const IDS_B = ["maus", "looping", "alpina", "splash", "geister", "scooter", "tent"];
 const ALL_IDS = [...IDS, ...IDS_B];
 const PITCH_B = { maus: { x: 15, zMin: -9, zMax: 9 }, geister: { x: 15, zMin: -9, zMax: 9 }, splash: { x: 15, zMin: -9, zMax: 9 }, scooter: { x: 15, zMin: -9, zMax: 9 }, tent: { x: 15, zMin: -9, zMax: 9 }, alpina: { x: 28, zMin: -15, zMax: 15 }, looping: { x: 28, zMin: -15, zMax: 15 } };
-const BUDGET_B = { allDraws: 20, allTris: 35000, nearDraws: 6, nearTris: 12000, animateMs: 1.5 };
+const BUDGET_B = { allDraws: 32,           // polish wave: +1 bloom Points per emissive mesh (models/halos.js), 20 -> 32
+   allTris: 35000, nearDraws: 6, nearTris: 12000, animateMs: 1.5 };
 const FILES_B = ["pb/fouer/models/coasters.js", "pb/fouer/models/coaster-kit.js", "pb/fouer/models/coaster-props.js", "pb/fouer/models/coaster-maus.js", "pb/fouer/models/coaster-looping.js", "pb/fouer/models/coaster-alpina.js", "pb/fouer/models/coaster-splash.js",
   "pb/fouer/models/halls.js", "pb/fouer/models/hall-scooter.js", "pb/fouer/models/hall-geister.js", "pb/fouer/models/hall-tent.js"];
 const FORBIDDEN_B = /olympia|big ?splash|thriller|bellevue|booster ?maxx|jules verne|oscar ?bruch|schneider|alpina[ -]?bahn|burg des grauens|l[aä]mmy|bayern ?kurve/i;
-const BUDGET = { allDraws: 20, allTris: 35000, wheelDraws: 8, wheelTris: 15000 };
+const BUDGET = { allDraws: 32, allTris: 35000, wheelDraws: 8, wheelTris: 16500 };   // polish wave: bloom Points draws (20 -> 32) and the dense rim bulbs of the Riserad (15000 -> 16500 tris)
 const FILES = ["pb/fouer/models/wheel.js", "pb/fouer/models/towers.js", "pb/fouer/models/big-kit.js", "pb/fouer/preview-big.html"];
 const FORBIDDEN = /bellevue|jules verne|booster ?maxx|power ?tower|schneider|infinity ?tower|hangover ?the|alpina[ -]?bahn|olympia|l[aä]mmy/i;
 

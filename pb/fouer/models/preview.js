@@ -8,6 +8,7 @@ import { createRenderer } from '/pb/fouer/renderer.js';
 import { createEnv } from '/pb/fouer/world/sky.js';
 import { buildModel, modelIds, loadBigModels, REGISTRY } from '/pb/fouer/models/index.js';
 import { getMaterials } from '/pb/fouer/models/materials.js';
+import { createGlow } from '/pb/fouer/world/glow.js';
 import { ITEM_BY_ID } from '/pb/fouer/data.js';
 
 const T = window.THREE;
@@ -33,8 +34,9 @@ async function boot() {
   const gridGroup = new T.Group(); gridGroup.name = 'fouer-model-grid';
   const stubWorld = { glacis: { chunks: [], ground: { matSurface: { color: new T.Color(0x444444) } }, root: { getObjectByName: () => null } }, setNight: (k) => onNight(k), nightK: 0 };
 
+  let pGlow = null;
   function onNight(k) {
-    M.setNight(k);
+    M.setNight(k); if (pGlow) pGlow.setNight(k);
     models.forEach((m) => m.group.userData.setNight && m.group.userData.setNight(k));
     if (fairLayer) fairLayer.setNight(k);
     state.nightK = k;
@@ -64,12 +66,13 @@ async function boot() {
     fairMod.fillShowcase(fairLayer, { level: state.level || 4, look: qs.get('look') === null ? 'mixed' : state.look, seed: state.seed });
   } else {
     r.scene.add(gridGroup);
+    pGlow = createGlow({ T, root: gridGroup, groundY: () => 0, fieldPoly: view === 'single' ? [[128, 38], [172, 38], [172, 82], [128, 82]] : [[60, -10], [240, -10], [240, 130], [240, 280], [60, 280]], quality: r.state.quality });
     const ground = new T.Mesh(new T.PlaneGeometry(900, 900), new T.MeshLambertMaterial({ color: 0x45484e }));
     ground.rotation.x = -Math.PI / 2; ground.position.set(150, -0.02, 60); gridGroup.add(ground);
     r.gameRoot.add(new T.Group());
     env = createEnv({ T, scene: r.scene, renderer: r.renderer, world: stubWorld, quality: r.state.quality });
     r.on('frame', (dt) => {
-      simT += dt; env.update(dt, r.camera); M.tick(simT);
+      simT += dt; env.update(dt, r.camera); M.tick(simT); if (pGlow) pGlow.update(dt);
       models.forEach((m, i) => { if (state.spin && view === 'grid') m.group.rotation.y = simT * 0.35 + i; const a = m.group.userData.animate; if (a) a(simT, dt, state.nightK); });
     });
   }
@@ -101,6 +104,7 @@ async function boot() {
       models.push({ id, group: g, foot, label, ms, x, z });
       g.userData.setNight(state.nightK || 0);
     });
+    if (pGlow) pGlow.setLightsFrom(gridGroup, true);
     if (view === 'single') r.setPose({ tu: 150, tw: 60, yaw: 0.5, dist: 40, tilt: 0 }, true);
     else { const rows = Math.ceil(ids.length / cols); r.setPose({ tu: 150, tw: 60 + (rows - 1) * gap / 2, yaw: 0, dist: 190, tilt: 0 }, true); }
   }
@@ -142,7 +146,7 @@ async function boot() {
   }, 500);
 
   window.__fouerModels = {
-    r, T, env, M, state, models, view, world, fair: fairLayer, buildModel, modelIds, REGISTRY,
+    r, T, env, M, state, models, view, world, fair: fairLayer, glow: () => (fairLayer ? fairLayer.glow : pGlow), buildModel, modelIds, REGISTRY,
     rebuild, setTime, setLook: (v) => { state.look = v; rebuild(); syncUi(); }, setLevel: (v) => { state.level = v; rebuild(); syncUi(); }, setFar: (v) => { state.far = !!v; rebuild(); },
     setItem: (id) => { state.item = id; rebuild(); }, setSpin: (v) => { state.spin = !!v; },
     performanceSnapshot: () => r.performanceSnapshot(), atlas: () => M.atlasStats(),

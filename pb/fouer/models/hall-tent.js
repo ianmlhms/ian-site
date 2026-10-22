@@ -30,6 +30,8 @@ function chandelier(b, near, pal) {
 function puff(b) { b.P.sphere([0, 0, 0], 0.5, 0xeceae4, 6, 4); }
 
 /* ------------------------------------------------------------------------------------------------------------------ static tent */
+/** HDR canvas white (albedo > 1): by day the brightest thing on the field; the roof also glows warm from inside at night (G bucket) */
+const hdr = (hex, k) => { const c = new globalThis.THREE.Color(hex); return [c.r * k, c.g * k, c.b * k]; };
 function buildStatic(b, cfg, near, name) {
   const { pal, level, gold } = cfg; const P = b.P; const L = b.L; const handles = { lamps: [], led: pal.led };
   const G = b.G(pal.glow); const trim = gold ? GOLD : pal.trim;
@@ -71,23 +73,25 @@ function buildStatic(b, cfg, near, name) {
   const dy = 0.14;
   slope(-X_NAVE, Y_EAVE_N - dy, 0, Y_RIDGE - dy); slope(X_NAVE, Y_EAVE_N - dy, 0, Y_RIDGE - dy); slope(-X_AISLE, Y_EAVE_A - dy, -X_NAVE, Y_EAVE_N - dy); slope(X_AISLE, Y_EAVE_A - dy, X_NAVE, Y_EAVE_N - dy);
   if (near) for (const sg of [-1, 1]) for (let q = 1; q < 6; q++) { const z = lerp(Z0, Z1, q / 6); P.tube([sg * X_NAVE, Y_EAVE_N + 0.03, z], [0, Y_RIDGE + 0.03, z], 0.04, 0xc8ccd0, { sides: 3, flat: true }); P.tube([sg * X_AISLE, Y_EAVE_A + 0.03, z], [sg * X_NAVE, Y_EAVE_N + 0.03, z], 0.04, 0xc8ccd0, { sides: 3, flat: true }); }
+  const RG = b.G([0.7, 0.4, 0.16]); const ROOF = hdr(pal.roof, 1.75); const ROOFB = hdr(pal.roofB, 1.5);
   for (const sg of [-1, 1]) {
-    P.quad([sg * X_NAVE, Y_EAVE_N, Z0], [0, Y_RIDGE, Z0], [0, Y_RIDGE, Z1], [sg * X_NAVE, Y_EAVE_N, Z1], sg < 0 ? pal.roof : pal.roofB);
-    P.quad([sg * X_AISLE, Y_EAVE_A, Z0], [sg * X_NAVE, Y_EAVE_N, Z0], [sg * X_NAVE, Y_EAVE_N, Z1], [sg * X_AISLE, Y_EAVE_A, Z1], sg < 0 ? pal.roof : pal.roofB);
+    RG.quad([sg * X_NAVE, Y_EAVE_N, Z0], [0, Y_RIDGE, Z0], [0, Y_RIDGE, Z1], [sg * X_NAVE, Y_EAVE_N, Z1], sg < 0 ? ROOF : ROOFB);
+    RG.quad([sg * X_AISLE, Y_EAVE_A, Z0], [sg * X_NAVE, Y_EAVE_N, Z0], [sg * X_NAVE, Y_EAVE_N, Z1], [sg * X_AISLE, Y_EAVE_A, Z1], sg < 0 ? ROOF : ROOFB);
     // scalloped valance along the outer eave, coloured fabric flaps
     const nv = near ? 18 : 8; for (let i = 0; i < nv; i++) { const za = lerp(Z0, Z1, i / nv); const zb = lerp(Z0, Z1, (i + 1) / nv); const zm = (za + zb) / 2; const c = i % 2 ? pal.valA : pal.valB; P.tri([sg * X_AISLE, Y_EAVE_A, za], [sg * X_AISLE, Y_EAVE_A, zb], [sg * X_AISLE, Y_EAVE_A - 0.7, zm], c); }
     const nv2 = near ? 18 : 8; for (let i = 0; i < nv2; i++) { const za = lerp(Z0, Z1, i / nv2); const zb = lerp(Z0, Z1, (i + 1) / nv2); const zm = (za + zb) / 2; const c = i % 2 ? pal.valB : pal.valA; P.tri([sg * X_NAVE, Y_EAVE_N, za], [sg * X_NAVE, Y_EAVE_N, zb], [sg * X_NAVE, Y_EAVE_N - 0.55, zm], c); }
   }
   // front and back walls: nave gable + aisle ends, in white; door, lettering
+  const WALL = hdr(pal.wall, 1.4);
   const wall = (z, front) => {
-    P.tri([-X_NAVE, Y_EAVE_N, z], [X_NAVE, Y_EAVE_N, z], [0, Y_RIDGE, z], pal.wall);
-    P.quad([-X_NAVE, 0.3, z], [X_NAVE, 0.3, z], [X_NAVE, Y_EAVE_N, z], [-X_NAVE, Y_EAVE_N, z], pal.wall);
-    for (const sg of [-1, 1]) P.quad([sg * X_NAVE, 0.3, z], [sg * X_AISLE, 0.3, z], [sg * X_AISLE, Y_EAVE_A, z], [sg * X_NAVE, Y_EAVE_N, z], pal.wall);
+    P.tri([-X_NAVE, Y_EAVE_N, z], [X_NAVE, Y_EAVE_N, z], [0, Y_RIDGE, z], WALL);
+    P.quad([-X_NAVE, 0.3, z], [X_NAVE, 0.3, z], [X_NAVE, Y_EAVE_N, z], [-X_NAVE, Y_EAVE_N, z], WALL);
+    for (const sg of [-1, 1]) P.quad([sg * X_NAVE, 0.3, z], [sg * X_AISLE, 0.3, z], [sg * X_AISLE, Y_EAVE_A, z], [sg * X_NAVE, Y_EAVE_N, z], WALL);
   };
   wall(Z1, true);
   // back wall: kept simple, behind the stage
-  P.quad([-X_NAVE, 0.3, Z0 + 0.02], [X_NAVE, 0.3, Z0 + 0.02], [X_NAVE, Y_EAVE_N, Z0 + 0.02], [-X_NAVE, Y_EAVE_N, Z0 + 0.02], pal.wall); P.tri([-X_NAVE, Y_EAVE_N, Z0 + 0.02], [X_NAVE, Y_EAVE_N, Z0 + 0.02], [0, Y_RIDGE, Z0 + 0.02], pal.wall);
-  for (const sg of [-1, 1]) P.quad([sg * X_NAVE, 0.3, Z0 + 0.02], [sg * X_AISLE, 0.3, Z0 + 0.02], [sg * X_AISLE, Y_EAVE_A, Z0 + 0.02], [sg * X_NAVE, Y_EAVE_N, Z0 + 0.02], pal.wall);
+  P.quad([-X_NAVE, 0.3, Z0 + 0.02], [X_NAVE, 0.3, Z0 + 0.02], [X_NAVE, Y_EAVE_N, Z0 + 0.02], [-X_NAVE, Y_EAVE_N, Z0 + 0.02], WALL); P.tri([-X_NAVE, Y_EAVE_N, Z0 + 0.02], [X_NAVE, Y_EAVE_N, Z0 + 0.02], [0, Y_RIDGE, Z0 + 0.02], WALL);
+  for (const sg of [-1, 1]) P.quad([sg * X_NAVE, 0.3, Z0 + 0.02], [sg * X_AISLE, 0.3, Z0 + 0.02], [sg * X_AISLE, Y_EAVE_A, Z0 + 0.02], [sg * X_NAVE, Y_EAVE_N, Z0 + 0.02], WALL);
   // entrance: arched door with a curtain, frame, steps
   const zf = Z1 + 0.04;
   P.quad([-2.7, 0.3, zf], [2.7, 0.3, zf], [2.7, 3.4, zf], [-2.7, 3.4, zf], pal.door); P.fan([0, 3.4, zf], [2.7, 0, 0], [0, 0.9, 0], pal.door, 14);

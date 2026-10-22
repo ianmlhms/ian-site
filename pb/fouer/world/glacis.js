@@ -8,6 +8,8 @@
  *   - the far ring (640 m tiles) is ONE terrain mesh (40 m nodes, one class mosaic) + ONE mesh of extruded far buildings.
  * Everything here is in Luxtram local metres (x east, z south) with y = LiDAR height - oy; frame.js rotates the root into the game frame. */
 import { decodeHeights } from './dem.js';
+import { getMaterials } from '../models/materials.js';
+import { makePlaneTreeGeometries, createTreeLod } from './trees.js';
 
 const TILE = 128;
 const CHUNK = 2;                    // tiles per chunk edge
@@ -260,48 +262,11 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
     return g;
   }
 
-  /* ---- trees: LiDAR canopy, one unit tree template, one InstancedMesh per chunk */
-  const treeTpl = (() => {
-    const P = []; const Nn = []; const Cc = []; const I = [];
-    const add = (p, n, c) => { P.push(...p); Nn.push(...n); Cc.push(...c); return P.length / 3 - 1; };
-    const trunk = [0.36, 0.28, 0.21];
-    const seg = 5;
-    for (let k = 0; k < seg; k++) {
-      const a0 = (k / seg) * Math.PI * 2; const a1 = ((k + 1) / seg) * Math.PI * 2; const am = (a0 + a1) / 2;
-      const nx = Math.cos(am); const nz = Math.sin(am); const rr = 0.045;
-      const i0 = add([Math.cos(a0) * rr, 0, Math.sin(a0) * rr], [nx, 0, nz], trunk); const i1 = add([Math.cos(a1) * rr, 0, Math.sin(a1) * rr], [nx, 0, nz], trunk);
-      const i2 = add([Math.cos(a1) * rr * 0.7, 0.55, Math.sin(a1) * rr * 0.7], [nx, 0, nz], trunk); const i3 = add([Math.cos(a0) * rr * 0.7, 0.55, Math.sin(a0) * rr * 0.7], [nx, 0, nz], trunk);
-      I.push(i0, i1, i2, i0, i2, i3);
-    }
-    const ico = new T.IcosahedronGeometry(1, 1);
-    const blob = (cx, cy, cz, rx, ry, rz, lo, hi, geo) => {
-      const pos = geo.attributes.position; const nor = geo.attributes.normal; const b0 = P.length / 3;
-      for (let q = 0; q < pos.count; q++) {
-        const x = pos.getX(q); const y = pos.getY(q); const z = pos.getZ(q);
-        const j = 0.94 + 0.12 * hash2(Math.round(x * 40) + Math.round(z * 31), Math.round(y * 37));
-        const t = clamp(y * 0.5 + 0.5, 0, 1) * 0.75 + (nor.getY(q) * 0.5 + 0.5) * 0.25;
-        const nl = Math.hypot(x / rx, y / ry, z / rz) || 1;
-        add([cx + x * rx * j, cy + y * ry * j, cz + z * rz * j], [x / rx / nl, y / ry / nl, z / rz / nl], [lo[0] + (hi[0] - lo[0]) * t, lo[1] + (hi[1] - lo[1]) * t, lo[2] + (hi[2] - lo[2]) * t]);
-      }
-      for (let q = 0; q < pos.count; q += 3) I.push(b0 + q, b0 + q + 1, b0 + q + 2);
-    };
-    // unit height, unit crown radius; high: 80 + 20 triangles (smooth crown + a lobe), medium 20 + 20, low 20 (+ the 10 of the trunk)
-    const ico0 = new T.IcosahedronGeometry(1, 0);
-    blob(0, 0.6, 0, 1, 0.42, 1, [0.5, 0.62, 0.46], [1.15, 1.2, 0.9], quality === 'high' ? ico : ico0);
-    if (quality === 'high') {
-      const pos = ico0.attributes.position; const nor = ico0.attributes.normal; const b0 = P.length / 3;
-      for (let q = 0; q < pos.count; q++) add([0.45 + pos.getX(q) * 0.6, 0.78 + pos.getY(q) * 0.24, 0.2 + pos.getZ(q) * 0.55], [nor.getX(q), nor.getY(q), nor.getZ(q)], [0.9, 1.0, 0.75]);
-      for (let q = 0; q < pos.count; q += 3) I.push(b0 + q, b0 + q + 1, b0 + q + 2);
-    }
-    ico.dispose(); ico0.dispose();
-    const g = new T.BufferGeometry();
-    g.setAttribute('position', new T.Float32BufferAttribute(P, 3));
-    g.setAttribute('normal', new T.Float32BufferAttribute(Nn, 3));
-    g.setAttribute('color', new T.Float32BufferAttribute(Cc, 3));
-    g.setIndex(new T.Uint16BufferAttribute(I, 1));
-    return g;
-  })();
+  /* ---- trees: LiDAR canopy + OSM avenue trees = painted plane trees (world/trees.js): a near and a far template, two InstancedMesh per chunk */
+  const treeGeos = makePlaneTreeGeometries(T, quality);
   const matTree = new T.MeshLambertMaterial({ vertexColors: true });
+  getMaterials().patchLit(matTree, 'tree');          // polish wave: the fair's night light map reaches the avenue trees; a little more saturated by day
+  const treeLod = createTreeLod({ T, root, near: treeGeos.near, far: treeGeos.far, material: matTree, quality });
   const tmpM = new T.Matrix4(); const tmpQ = new T.Quaternion(); const tmpP = new T.Vector3(); const tmpS = new T.Vector3(); const tmpC = new T.Color(); const yAxis = new T.Vector3(0, 1, 0);
   const noTreeRings = [];        // no tree on the tram lane (both tracks + 2.5 m)
   { const pts = H.tram.pts; const L = []; const R = [];
@@ -317,7 +282,7 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
       (t.osmTrees || []).forEach(([x, z], q) => {          // avenue trees (plane trees) the LiDAR canopy missed: 14 m, crown radius 3.9 m
         if (noTreeRings.some((nq) => x > nq.box[0] && x < nq.box[2] && z > nq.box[1] && z < nq.box[3] && pointInRing(nq.ring, x, z))) return;
         const j = hash2(Math.round(x * 10), Math.round(z * 10));
-        items.push([x, z, 9.5 + 2.5 * j, 2.9 + 0.7 * hash2(q, 77), 0.3 + 0.05 * j, 0.42 + 0.05 * j, 0.2, 1000 + q]);
+        items.push([x, z, 14 + 5 * j, 5 + 2.3 * hash2(q, 77), 0.3 + 0.05 * j, 0.42 + 0.05 * j, 0.2, 1000 + q]);
       });
       if (!t.trees || t.trees.byteLength < 8) return;
       const dv = new DataView(t.trees); const n = Math.floor(t.trees.byteLength / 8);
@@ -339,27 +304,32 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
       }
     });
     if (!items.length) return null;
-    const im = new T.InstancedMesh(treeTpl, matTree, items.length);
-    im.userData.sharedGeo = true;
-    items.forEach((it, q) => {
-      const y = gy(it[0], it[1]) - 0.15;
-      const lum = (it[4] + it[5] + it[6]) / 3;
-      const con = lum < 0.26 && it[5] > it[4] * 1.05 && hash2(it[7], ch.ci * 5 + ch.cj) < 0.75;
-      tmpQ.setFromAxisAngle(yAxis, hash2(q * 3, 11) * 6.283);
-      tmpP.set(it[0], y, it[1]);
-      const rad = Math.max(1.2, it[3]) * (0.9 + 0.2 * hash2(q, 5));
-      if (con) tmpS.set(rad * 0.62, it[2] * 1.02, rad * 0.62); else tmpS.set(rad, it[2], rad);
-      tmpM.compose(tmpP, tmpQ, tmpS);
-      im.setMatrixAt(q, tmpM);
-      const boost = clamp(0.34 / (lum + 0.02), 0.9, 2.1);
-      if (con) tmpC.setRGB(0.16, 0.34, 0.2); else tmpC.setRGB(clamp(it[4] * boost * 0.85, 0.05, 0.75), clamp(it[5] * boost * 1.08, 0.08, 0.85), clamp(it[6] * boost * 0.7, 0.03, 0.6));
-      im.setColorAt(q, tmpC);
+    const group = treeLod.add(ch.key, items, null, {
+      compose(m, it, q) {
+        const y = gy(it[0], it[1]) - 0.15;
+        const lum = (it[4] + it[5] + it[6]) / 3;
+        const con = lum < 0.26 && it[5] > it[4] * 1.05 && hash2(it[7], ch.ci * 5 + ch.cj) < 0.75;
+        tmpQ.setFromAxisAngle(yAxis, hash2(q * 3, 11) * 6.283);
+        tmpP.set(it[0], y, it[1]);
+        const rad = Math.max(1.2, it[3]) * (0.9 + 0.2 * hash2(q, 5));
+        const sq = 0.9 + 0.2 * hash2(q, 9);                        // crowns are not round: a little x / z stretch
+        if (con) tmpS.set(rad * 0.62, it[2] * 1.02, rad * 0.62); else tmpS.set(rad * sq, it[2], rad / sq);
+        m.compose(tmpP, tmpQ, tmpS);
+      },
+      colorOf(c, it, q) {
+        // tint around white: the LiDAR / orthophoto colour only nudges it, so the painted vertex colours carry the look
+        const lum = (it[4] + it[5] + it[6]) / 3;
+        const con = lum < 0.26 && it[5] > it[4] * 1.05 && hash2(it[7], ch.ci * 5 + ch.cj) < 0.75;
+        if (con) { c.setRGB(0.55, 0.8, 0.68); return; }
+        const l = lum + 0.02; const v = 0.86 + 0.28 * hash2(q, 21);
+        const nr = clamp(it[4] / l, 0.6, 1.5); const ng = clamp(it[5] / l, 0.7, 1.4); const nb = clamp(it[6] / l, 0.5, 1.4);
+        const k = 0.4; const warm = hash2(q, 33) < 0.18 ? 1.18 : 1;     // some trees a bit yellower
+        c.setRGB((1 + (nr - 1) * k) * v * warm, (1 + (ng - 1) * k) * v, (1 + (nb - 1) * k) * v * (warm > 1 ? 0.75 : 1));
+      },
     });
-    im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-    im.computeBoundingSphere();
-    im.name = 'fouer-trees-' + ch.key;
-    stats.tris += items.length * (treeTpl.index.count / 3);
-    return im;
+    group.name = 'fouer-trees-group-' + ch.key;
+    stats.tris += items.length * (treeGeos.tris.far);
+    return group;
   }
 
   /** the painted bay lines inside the fair field stay (the 2008 photo shows them between the rides) but fainter: vertex colour x 0.55 */
@@ -568,10 +538,11 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
     root, ground, fx, tiles, chunks, stats, oy, quality,
     gy, meshY: (x, z) => { const t = tiles.get(Math.floor(x / TILE) + '_' + Math.floor(z / TILE)); const y = t ? meshY(t, x, z) : NaN; return y === y ? y : gy(x, z); },
     setNight(k) { fx.setNight(k); },
-    update(dt) { ground.update(Math.min(0.1, dt || 0.016)); },
+    update(dt) { ground.update(Math.min(0.1, dt || 0.016)); treeLod.update(); },
+    treeLod, treeGeos,
     /** every mesh of the near + far world (sky/weather module tints materials through this) */
     materials() { const s = new Set(); root.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => s.add(m)); }); return [...s]; },
-    dispose() { root.traverse((o) => { if (o.isInstancedMesh) o.dispose(); else if (o.geometry && !o.userData.sharedGeo) o.geometry.dispose(); }); fx.dispose && fx.dispose(); ground.dispose(); matTree.dispose(); treeTpl.dispose(); },
+    dispose() { root.traverse((o) => { if (o.isInstancedMesh) o.dispose(); else if (o.geometry && !o.userData.sharedGeo) o.geometry.dispose(); }); fx.dispose && fx.dispose(); ground.dispose(); matTree.dispose(); treeGeos.near.dispose(); treeGeos.far.dispose(); },
   };
   void nightRef; void mulberry;
   return api;

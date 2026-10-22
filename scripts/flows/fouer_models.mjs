@@ -2,12 +2,12 @@
  * - the turntable grid boots with zero console errors and shows every model;
  * - every W3 model builds at every look x level (x quality, x far LOD) and its footprint fits the pitch size of data.js, including all animation poses;
  * - the night toggle drives the shared lamp / lit-sign materials;
- * - the full fair (all 34 pitches at max level + NPC background fair + props on the real Glacis) stays inside the W3 budget (<= 35 draw calls, <= 60k triangles
+ * - the full fair (all 34 pitches at max level + NPC background fair + props on the real Glacis) stays inside the W3 budget (<= 35 draw calls, <= 90k triangles
  *   at the "frame the field" preset), the live-ride LOD works, and a pitch can be swapped between NPC stall / empty / player model at runtime. */
 import { runIfMain } from "./lib.mjs";
 
 const MAX_DRAWS = 35;
-const MAX_TRIS = 60000;
+const MAX_TRIS = 90000;               // polish wave (glow + density): 60k -> 90k for the W3 share (clutter, 24 NPC skins, murals); the whole scene stays <= 140 draws / 300k below
 const MAX_MODEL_TRIS = 6500;            // one S / M model at level 4 near LOD
 const MAX_FAR_TRIS = 3200;              // far LOD
 const NO_404 = (text) => /wheel\.js|towers\.js|Failed to load resource.*404/i.test(text);

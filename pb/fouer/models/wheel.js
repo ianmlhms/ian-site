@@ -163,6 +163,8 @@ function buildRotor(b, cfg, near, K) {
       h.rimLed.push({ s: n0, n: b.count - n0, j });
     }
   }
+  // dense warm rim bulbs (the real Riserad's rim is a chain of yellow bulbs): one row on each outer edge, they get their own bloom points
+  if (near) { const nb = cfg.high ? 168 : 132; for (const s of [1, -1]) for (let j = 0; j < nb; j++) { const a = ang(j, nb); bulb(b, [Math.sin(a) * (S.rimR + 0.34), Math.cos(a) * (S.rimR + 0.34) - 0.08, s * (S.faceZ + half + 0.1)], 0.16, pal.bulb); } }
   // gondola axles between the two rims
   if (near) {
     for (let i = 0; i < S.gondolas; i++) { const a = ang(i, S.gondolas); const x = Math.sin(a) * S.gondolaR; const y = Math.cos(a) * S.gondolaR; P.beam([x, y, -S.faceZ], [x, y, S.faceZ], 0.16, STEEL); }

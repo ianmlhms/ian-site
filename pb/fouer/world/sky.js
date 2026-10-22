@@ -5,6 +5,7 @@
  *   env.update(dt, camera);  env.getState() -> { weatherMode, timeMode, weather, hour, sunElevation, night }
  * Both choices are player-chosen (a menu and the in-game button, stage.js) and remembered per device in localStorage (pb_fouer_weather / pb_fouer_time),
  * Random is the default: a random start, then a slow day drift (12 real minutes = 24 h) and a weather change every 4-8 minutes.  They are visual only.
+ * env.start({ weather, hour, thenRandom }): explicit start state, see the method (e.g. start({ weather: 'clear', hour: 19.25, thenRandom: true })).
  * Draw calls: the sky dome (gradient + sun / moon / stars / procedural clouds in one fragment shader) and one fullscreen rain overlay.
  * Lights: one hemisphere + one directional (sun by day, a blue moon by night), exponential fog tinted to the horizon, no real-time shadows. */
 import { COS, SIN } from './frame.js';
@@ -24,11 +25,11 @@ const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t
 const KF = [
   [-20, '#050a1a', '#0e1830', '#4466aa', 0.0, '#26396a', '#161c26', 0.95, '#101a2e', 1.25],
   [-9, '#0a1634', '#2a315a', '#7a7fbb', 0.0, '#34477a', '#1c222c', 0.85, '#2a3152', 1.15],
-  [-3, '#1c3260', '#d9806f', '#ff8a5a', 0.6, '#52628f', '#2b2a2c', 0.62, '#c98a86', 1.05],
-  [2, '#365f9c', '#ffb680', '#ffa760', 1.7, '#7390b8', '#4a4036', 0.85, '#f1b896', 1.0],
+  [-3, '#1a2c64', '#c9706c', '#ff8a5a', 0.6, '#52628f', '#2b2a2c', 0.62, '#c98a86', 1.05],
+  [2, '#2c4f96', '#ff9a58', '#ffa760', 1.7, '#7390b8', '#4a4036', 0.85, '#f1b896', 1.0],
   [9, '#4a82c4', '#e8d3bd', '#ffd3a0', 2.5, '#97b8de', '#6c6a54', 1.0, '#dcd2c6', 0.98],
-  [24, '#3a78c4', '#bfd7ec', '#fff0dc', 3.0, '#a9c6e8', '#77775f', 1.1, '#cadae6', 0.95],
-  [55, '#2d6fc2', '#b4d3ee', '#fff7ea', 3.2, '#b0cdea', '#7d7d63', 1.15, '#c3d7ea', 0.93],
+  [24, '#2a68bd', '#bcd6ee', '#fff0dc', 3.0, '#a9c6e8', '#77775f', 1.1, '#cadae6', 0.95],
+  [55, '#1f5fb8', '#b2d2ee', '#fff7ea', 3.2, '#b0cdea', '#7d7d63', 1.15, '#c3d7ea', 0.93],
 ];
 const KFC = KF.map((k) => ({ e: k[0], zenith: new Float32Array(3), horizon: new Float32Array(3), sun: new Float32Array(3), sunI: k[4], hemiSky: new Float32Array(3), hemiGround: new Float32Array(3), hemiI: k[7], fog: new Float32Array(3), exposure: k[9], hex: k }));
 
@@ -51,46 +52,106 @@ float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 float hash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
 float vnoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
-float fbm(vec2 p) { float a = 0.5; float s = 0.0; for (int i = 0; i < 5; i++) { s += a * vnoise(p); p = p * 2.03 + vec2(17.1, 9.2); a *= 0.5; } return s; }
+float fbmC(vec2 p) { float a = 0.5; float s = 0.0; for (int i = 0; i < 5; i++) { s += a * vnoise(p); p = p * 2.13 + vec2(17.1, 9.2); a *= 0.56; } return s * 0.8; }   // 5 octaves, slow falloff: crisp cauliflower edges
+float fbm3(vec2 p) { float a = 0.5; float s = 0.0; for (int i = 0; i < 3; i++) { s += a * vnoise(p); p = p * 2.07 + vec2(17.1, 9.2); a *= 0.5; } return s * 1.143; }
 void main() {
   vec3 d = normalize(vDir);
   float h = d.y;
+  vec2 az = normalize(d.xz + vec2(1e-5));                       // azimuth in the game frame (x = u = toward Kirchberg)
+  vec2 saz = normalize(uSun.xz + vec2(1e-5));
+  float sd = max(dot(d, uSun), 0.0);
+  float sunSide = max(dot(az, saz), 0.0);
+  // twilight factor: 1 while the sun is within about -9 .. +9 degrees, 0 by day and in the deep night
+  float tw = smoothstep(-0.17, -0.02, uSun.y) * (1.0 - smoothstep(0.04, 0.26, uSun.y));
+  tw *= (1.0 - uDark * 0.6);
+  float kirch = pow(max(dot(az, normalize(vec2(1.0, 0.12))), 0.0), 2.0);     // toward Kirchberg (+u)
+
+  // ---- gradient: deep blue above, paler toward the horizon, merged into the fog colour right at the edge
   float t = pow(clamp(h, 0.0, 1.0), 0.45);
   vec3 col = mix(uHorizon, uZenith, t);
-  col = mix(col, uFog, uHaze * (1.0 - smoothstep(0.0, 0.55, h)));
-  float sd = max(dot(d, uSun), 0.0);
-  float glow = pow(sd, 5.0) * 0.22 + pow(sd, 60.0) * 0.55;
+  // dusk / dawn: warm orange band low on the sun side, pink above it, a violet belt opposite
+  float sw = pow(sunSide, 1.6);
+  vec3 orange = vec3(1.0, 0.17, 0.012); vec3 pink = vec3(0.8, 0.085, 0.2); vec3 violet = vec3(0.1, 0.06, 0.3);       // linear values
+  col = mix(col, orange, clamp(tw * sw * exp(-h * 5.5) * 1.25, 0.0, 0.95));
+  col = mix(col, pink, tw * (0.3 + 0.7 * sw) * exp(-pow((h - 0.17) * 4.5, 2.0)) * 0.7);
+  col = mix(col, violet, tw * (0.3 + 0.7 * sw) * exp(-pow((h - 0.42) * 2.8, 2.0)) * 0.4);
+  col = mix(col, vec3(0.5, 0.2, 0.33), tw * (1.0 - sw) * exp(-h * 9.0) * 0.35);
+  // haze: weather haze, a little more toward Kirchberg and more at dawn / dusk, so the far skyline melts into the sky
+  float hz = clamp(uHaze + (0.1 + 0.16 * tw) * kirch * (1.0 - uNight), 0.0, 1.0);
+  col = mix(col, uFog, hz * (1.0 - smoothstep(0.0, 0.55, h)));
+  col = mix(col, uFog, (1.0 - uNight * 0.5) * (0.5 - 0.3 * tw) * exp(-max(h, 0.0) * 22.0));
+
+  // ---- sun
+  float glow = pow(sd, 7.0) * 0.16 + pow(sd, 60.0) * 0.55 + pow(sd, 3.0) * 0.16 * tw;
   col += uSunCol * glow * uSunVis * (1.0 - uHaze * 0.7);
   float disc = smoothstep(0.99935, 0.99965, dot(d, uSun)) * uSunVis;
-  // stars
-  float stars = 0.0;
-  if (uNight > 0.01 && h > 0.0) {
-    vec3 sp = d * 120.0; vec3 cell = floor(sp); float r = hash3(cell);
-    if (r > 0.9965) { vec3 f = fract(sp) - 0.5; float dd = length(f); stars = smoothstep(0.35, 0.0, dd) * (0.5 + 0.5 * hash3(cell + 3.1)) * (0.75 + 0.25 * sin(uTime * 2.0 + r * 80.0)); }
-    stars *= uNight * smoothstep(0.0, 0.12, h);
+
+  // ---- night: stars (two sizes), faint city glow along the horizon, moon
+  float glowK = exp(-max(h, 0.0) * 9.0) * 0.85 + exp(-max(h, 0.0) * 3.0) * 0.07;       // vertical falloff of the city glow
+  float glowAz = 0.45 + 0.55 * kirch;                                                  // strongest toward the field / Kirchberg
+  float cityGlow = uNight * glowK * glowAz;
+  if (uNight > 0.01) {
+    float stars = 0.0;
+    if (h > 0.0) {
+      vec3 sp = d * 230.0; vec3 cell = floor(sp); float r = hash3(cell);
+      if (r > 0.985) { vec3 f = fract(sp) - 0.5; stars += smoothstep(0.36, 0.0, length(f)) * (0.3 + 0.7 * hash3(cell + 3.1)) * (0.75 + 0.25 * sin(uTime * 2.0 + r * 80.0)) * 0.7; }
+      vec3 sp2 = d * 110.0; vec3 cell2 = floor(sp2); float r2 = hash3(cell2 + 7.7);
+      if (r2 > 0.9965) { vec3 f2 = fract(sp2) - 0.5; vec3 sc = mix(vec3(0.8, 0.88, 1.0), vec3(1.0, 0.86, 0.7), hash3(cell2 + 1.3)); stars += smoothstep(0.3, 0.0, length(f2)) * (0.8 + 0.2 * sin(uTime * 1.3 + r2 * 60.0)) * 1.6; col += sc * 0.0; }
+      stars *= uNight * smoothstep(0.0, 0.16, h) * (1.0 - smoothstep(0.0, 0.8, cityGlow * 2.2)) * (1.0 - uDark);
+    }
+    col += vec3(stars);
+    col += vec3(1.0, 0.24, 0.04) * cityGlow * 0.3 * (1.0 - uDark * 0.4);
   }
-  col += vec3(stars);
-  // moon
   float md = dot(d, uMoon);
   col += vec3(0.82, 0.88, 1.0) * (smoothstep(0.99955, 0.99975, md) * 1.4 + pow(max(md, 0.0), 50.0) * 0.12) * uNight;
-  // clouds on a plane above the player
+
+  // ---- clouds: a cumulus layer on a plane above the player (perspective: bigger overhead, small and dense at the horizon) + one thin high veil
   float cl = 0.0; vec3 clCol = vec3(1.0);
+  float cv = smoothstep(0.1, 1.0, uCover);
+  float over = smoothstep(0.35, 1.0, uCover);
   if (h > 0.0) {
-    vec2 p = d.xz / (h + 0.16) * 1.15 + vec2(uTime * 0.012, uTime * 0.005);
-    float n = fbm(p * 1.1);
-    float lo = 0.84 - uCover * 0.62; float hi = lo + 0.2;
-    cl = smoothstep(lo, hi, n);
-    float n2 = fbm(p * 1.1 + uSun.xz * 0.09);
-    float lit = clamp(0.62 + (n - n2) * 3.2, 0.0, 1.0);
-    vec3 litC = mix(vec3(0.97, 0.96, 0.95), uSunCol, 0.35 * smoothstep(0.0, 0.6, uSunI / 3.0));
-    litC = mix(litC, uFog * 1.1, clamp(1.0 - uSunI / 2.0, 0.0, 0.8));
-    vec3 shadeC = mix(vec3(0.5, 0.56, 0.68), uHorizon * 0.7, 0.3) * (1.0 - uDark * 0.55);
-    clCol = mix(shadeC, litC, lit) * mix(1.0, 0.42, uDark);
-    clCol *= mix(1.0, 0.14, uNight);
-    clCol += uSunCol * 0.12 * pow(sd, 8.0) * uSunVis;
-    cl *= smoothstep(0.0, 0.09, h);
+    vec2 p = d.xz / (h + 0.13) * 0.95 + vec2(uTime * 0.0075, uTime * 0.0032);
+    // cumulus = warped 5-octave noise, thresholded; overcast weather lowers the threshold and softens the edge
+    vec2 q = p + 0.55 * (vec2(vnoise(p * 1.1 + 3.1), vnoise(p * 1.1 + 8.7)) - 0.5);            // domain warp: billows, not a smooth blob
+    float n = fbmC(q * 1.15);
+    float thr = mix(0.5, 0.06, smoothstep(0.2, 0.92, uCover));
+    float soft = mix(0.055, 0.42, over);
+    cl = smoothstep(thr, thr + soft, n);
+    float core = clamp((n - thr) / 0.25, 0.0, 1.0);                                                // how deep inside a cloud
+    vec2 toSun = saz * 0.12;
+    float nS = fbm3((q + toSun) * 1.15) * 0.9 + 0.05;
+    float nD = fbm3((q + az * 0.12) * 1.15) * 0.9 + 0.05;                                           // a step toward the horizon (down on screen)
+    float bl = n;
+    vec2 bestRel = vec2(0.0);
+    float dirK = 1.0 - over * 0.7;
+    float sunUp = clamp(uSun.y + 0.3, 0.0, 1.0);
+    float lit = clamp(0.5 + (n - nS) * 6.5 * sunUp * dirK + (nD - n) * 5.0 * dirK + (n - thr) * 0.6, 0.0, 1.0);
+    float under = core * smoothstep(0.1, 0.85, h) * 0.55 + clamp((n - nD) * 6.0, 0.0, 1.0) * 0.55 * dirK;   // flat blue-grey bases
+    vec3 white = mix(vec3(1.32, 1.3, 1.26), uSunCol * 1.3, 0.2 * smoothstep(0.0, 1.0, uSunI / 3.0)) * mix(0.72, 1.0, smoothstep(0.0, 2.0, uSunI));
+    white = mix(white, uFog * 1.15, clamp(1.0 - uSunI / 2.2, 0.0, 0.8));
+    vec3 grey = mix(vec3(0.30, 0.39, 0.58), uHorizon * 0.45, 0.2) * (1.0 - uDark * 0.5);
+    float br = clamp(-0.05 + 1.0 * lit - 0.6 * clamp(under, 0.0, 1.0) + 0.2 * (1.0 - core), 0.0, 1.0);
+    clCol = mix(grey, white, br) * mix(1.0, 0.45, uDark);
+    clCol += uSunCol * 0.4 * pow(sd, 6.0) * (1.0 - core) * uSunVis;                                // silver lining
+    // dusk: undersides catch the low sun, orange toward it, pink away
+    float twc = tw * (0.4 + 0.6 * sw) * (0.55 + 0.45 * (1.0 - smoothstep(0.0, 0.9, h)));
+    vec3 warm = mix(vec3(1.0, 0.13, 0.22), vec3(1.0, 0.24, 0.035), sw);
+    clCol = mix(clCol, warm * (0.3 + 0.8 * mix(lit, 1.0, 0.35) * (1.0 - 0.5 * clamp(under, 0.0, 1.0))), clamp(twc * 1.5, 0.0, 0.97));
+    // night: dark, with the city glow warming the cloud bellies near the horizon
+    clCol *= mix(1.0, 0.1, uNight);
+    clCol += vec3(0.5, 0.1, 0.02) * cityGlow * 0.9 * (0.4 + 0.6 * core) * uNight;
+    // far clouds melt into the haze
+    clCol = mix(clCol, uFog, (1.0 - smoothstep(0.02, 0.32, h)) * 0.55);
+    cl *= smoothstep(0.0, 0.07, h);
   }
-  col = mix(col, clCol, cl * 0.96);
+  col = mix(col, clCol, cl * 0.97);
+  // thin high veil (cirrus), mostly visible on clear days and at dusk
+  if (h > 0.02) {
+    vec2 pc = d.xz / (h + 0.35) * vec2(0.45, 1.5) + vec2(uTime * 0.004, 0.0) + vec2(5.0, 2.0);
+    float vl = smoothstep(0.55, 0.9, fbm3(pc * 1.2)) * 0.2 * (1.0 - cv) * (1.0 - uNight * 0.9) * smoothstep(0.02, 0.2, h);
+    vec3 vc = mix(vec3(1.0), mix(vec3(1.0, 0.3, 0.14), vec3(0.8, 0.2, 0.3), 1.0 - sw), tw);
+    col = mix(col, vc, vl * (1.0 - cl));
+  }
   col += uSunCol * disc * 4.0 * (1.0 - cl);
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
@@ -257,6 +318,15 @@ export function createEnv({ T, scene, renderer, world, quality = 'medium', initi
       const was = S.timeMode; S.timeMode = mode;
       if (mode === 'random') { if (was !== 'random') S.hour = S.hour; } else if (mode === 'live') S.hour = luxHour(); else S.hour = TIMES[mode];
       if (persist) { try { localStorage.setItem(KEYS.time, mode); } catch (e) { /* storage blocked */ } }
+      apply();
+    },
+    /** explicit start state (not persisted, beats the random / stored initial state, snaps without a cross-fade):
+     *  start({ weather: 'clear', hour: 19.25, thenRandom: true }) -> begin clear at golden hour, then the modes are 'random' (weather rotates after the usual 240-480 s, the day keeps drifting from that hour)
+     *  start({ weather, hour })                                  -> frozen: weather mode = weather, time mode = 'fixed' (no drift); either key may be omitted to keep the current value */
+    start({ weather, hour, thenRandom = false } = {}) {
+      const w = WX[weather] ? weather : S.weather; const hr = Number.isFinite(Number(hour)) && hour !== null && hour !== undefined ? ((Number(hour) % 24) + 24) % 24 : S.hour;
+      S.weather = w; S.cur = Object.assign({}, WX[w]); S.hour = hr;
+      if (thenRandom) { S.weatherMode = 'random'; S.timeMode = 'random'; S.nextWeatherIn = 240 + S.rng() * 240; } else { S.weatherMode = w; S.timeMode = 'fixed'; }
       apply();
     },
     /** debug: jump to an hour (the mode becomes a frozen custom time, not persisted) */

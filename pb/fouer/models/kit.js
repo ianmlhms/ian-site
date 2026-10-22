@@ -61,7 +61,7 @@ export class Builder {
     this.M = getMaterials();
     this.far = !!opts.far;
     this.rnd = opts.rnd || mulberry(opts.seed || 1);
-    this.ch = { solid: new Acc(), lamp: new Acc(true), sign: new Acc(), signLit: new Acc(), swing: new Acc(false, true) };
+    this.ch = { solid: new Acc(), fabric: new Acc(), lamp: new Acc(true), sign: new Acc(), signLit: new Acc(), swing: new Acc(false, true) };
     this.swingTop = 0;
     this.bulbs = [];            // x,y,z, r,g,b, size, phase
     this.fxp = [];              // x,y,z, r,g,b, size, phase, kind
@@ -100,7 +100,7 @@ export class Builder {
     }
     const pts = [a, b, c];
     const multi = Array.isArray(color[0]);
-    const jit = ch === 'solid' ? 1 + (this.rnd() - 0.5) * this.jit : 1;
+    const jit = ch === 'solid' || ch === 'fabric' ? 1 + (this.rnd() - 0.5) * this.jit : 1;
     for (let i = 0; i < 3; i++) {
       const P = pts[i]; A.p.push(P[0], P[1], P[2]); A.n.push(n[i][0], n[i][1], n[i][2]);
       const k = multi ? color[i] : color;
@@ -380,10 +380,10 @@ export class Builder {
     const r = this.M.atlas.slot(key, wpx, hpx, o.style ? (o.style.bg || bgc) : bgc, o.painter || (o.style ? stylePainter(text, o.style) : signPainter(look, text, kind, o)));
     return this.panel(r, x, y, z, w, h, o);
   }
-  /** a mural panel */
+  /** a mural panel: kind 0 alpine, 1 space, 2 circus, 3 sea, 4 comic, 5 jungle, 6 print, 7 rosette (airbrush painters in atlas.js; seed picks one of 4 variants) */
   mural(kind, seed, x, y, z, w, h, o = {}) {
-    const wpx = Math.round(clamp(w / h * 26, 96, 192)); const hpx = Math.max(24, Math.round(wpx * h / w));
-    const r = this.M.atlas.slot(`mural|${kind}|${seed}|${o.look || 0}|${wpx}x${hpx}`, wpx, hpx, '#888', muralPainter(kind, seed, o.look || 0));
+    const wpx = clamp(Math.round(w * 30 / 64) * 64, 128, 256); const hpx = Math.max(32, Math.round(wpx * h / w / 16) * 16);          // quantised: few atlas slots for many panels
+    const r = this.M.atlas.slot(`mural|${kind}|${seed % 2}|${o.look || 0}|${wpx}x${hpx}`, wpx, hpx, '#888', muralPainter(kind, seed % 2, o.look || 0));
     return this.panel(r, x, y, z, w, h, o);
   }
   /** the padlock plate of a locked pitch ("ab * N") */
@@ -469,13 +469,13 @@ export class Builder {
       geo.computeBoundingSphere(); geo.computeBoundingBox();
       const mesh = new T.Mesh(geo, mat); mesh.name = nm; g.add(mesh);
     };
-    mk('solid', this.ch.solid, this.M.solid); mk('lamp', this.ch.lamp, this.M.lamp); mk('sign', this.ch.sign, this.M.sign); mk('signLit', this.ch.signLit, this.M.signLit); mk('swing', this.ch.swing, this.M.swing);
+    mk('solid', this.ch.solid, this.M.solid); mk('fabric', this.ch.fabric, this.M.fabric); mk('lamp', this.ch.lamp, this.M.lamp); mk('sign', this.ch.sign, this.M.sign); mk('signLit', this.ch.signLit, this.M.signLit); mk('swing', this.ch.swing, this.M.swing);
     const pts = (name, arr, stride, mat, attrs) => {
       if (!arr.length) return;
       const n = arr.length / stride; const pos = new Float32Array(n * 3); const cc = new Float32Array(n * 3); const sz = new Float32Array(n); const ph = new Float32Array(n); const kd = new Float32Array(n);
       for (let i = 0; i < n; i++) { const o = i * stride; pos[i * 3] = arr[o] - this.pivot[0]; pos[i * 3 + 1] = arr[o + 1] - this.pivot[1]; pos[i * 3 + 2] = arr[o + 2] - this.pivot[2]; cc.set([arr[o + 3], arr[o + 4], arr[o + 5]], i * 3); sz[i] = arr[o + 6]; ph[i] = arr[o + 7]; if (stride > 8) kd[i] = arr[o + 8]; }
       const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('aCol', new T.BufferAttribute(cc, 3));
-      geo.setAttribute('aSize', new T.BufferAttribute(sz, 1)); geo.setAttribute('aPh', new T.BufferAttribute(ph, 1)); if (attrs) geo.setAttribute('aKind', new T.BufferAttribute(kd, 1));
+      geo.setAttribute('aSize', new T.BufferAttribute(sz, 1)); geo.setAttribute('aPh', new T.BufferAttribute(ph, 1)); if (attrs) geo.setAttribute('aKind', new T.BufferAttribute(kd, 1)); else geo.setAttribute('aGain', new T.BufferAttribute(haloGain(pos, sz), 1));
       geo.computeBoundingSphere(); geo.computeBoundingBox();
       const pm = new T.Points(geo, mat); pm.name = name; pm.frustumCulled = true;
       const M = this.M; pm.onBeforeRender = (renderer, scene, camera) => M.feed(renderer, scene, camera);
@@ -501,6 +501,18 @@ export class Builder {
     if (anim) anim(0, 0, g.userData.parts, 0);          // rest pose (the frozen far LOD is merged from here)
     return g;
   }
+}
+/** per-bulb halo gain: overlapping blooms add up, so a dense bulb row gets a weaker halo per bulb (the sum stays about constant; a lone bulb keeps its full bloom) */
+export function haloGain(pos, sz) {
+  const n = sz.length; const out = new Float32Array(n).fill(1); if (n < 2) return out;
+  const cell = 1.0; const map = new Map(); const key = (x, y, z) => ((Math.floor(x / cell) + 4096) * 8192 + (Math.floor(z / cell) + 4096)) * 1024 + Math.floor(y / cell) + 256;
+  for (let i = 0; i < n; i++) { const k = key(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]); const a = map.get(k); if (a) a.push(i); else map.set(k, [i]); }
+  for (let i = 0; i < n; i++) {
+    const x = pos[i * 3]; const y = pos[i * 3 + 1]; const z = pos[i * 3 + 2]; let m = 0; const R = 0.9;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) { const a = map.get(key(x + dx * cell, y + dy * cell, z + dz * cell)); if (!a) continue; for (const j of a) { if (j === i) continue; const d = Math.hypot(pos[j * 3] - x, pos[j * 3 + 1] - y, pos[j * 3 + 2] - z); if (d < R) m += 1 - d / R; } }
+    out[i] = Math.max(0.28, Math.min(1, 1 / (1 + m * 0.55)));
+  }
+  return out;
 }
 function countBulbs(g) { let n = 0; g.traverse((o) => { if (o.isPoints && o.name === 'bulbs') n += o.geometry.attributes.position.count; }); return n; }
 

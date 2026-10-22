@@ -15,6 +15,8 @@ import { getMaterials } from './materials.js';
 import { buildModel, hasModel } from './index.js';
 import { ITEM_BY_ID } from '../data.js';
 import { buildPitchNpc } from './npc.js';
+import { createGlow } from '../world/glow.js';
+import { dressPitch } from './clutter.js';
 
 const QUALITY = {
   low: { farDist: 55, live: 6, hyst: 1.15 },
@@ -89,7 +91,7 @@ export function sampleLane(world, step = 5) {
   return out;
 }
 
-export async function createFairLayer({ T, root, pitches, groundY, quality = 'medium', fieldPoly, buildBase = true, seed = 1, renderer = null, world = null, lane = null }) {
+export async function createFairLayer({ T, root, pitches, groundY, quality = 'medium', fieldPoly, buildBase = true, seed = 1, renderer = null, world = null, lane = null, glow: glowOpt = true }) {
   const M = getMaterials();
   const group = new T.Group(); group.name = 'fouer-fair'; root.add(group);
   const baseBatch = new Batch(T, M, 'base'); const pitchBatch = new Batch(T, M, 'pitches'); const frozenBatch = new Batch(T, M, 'frozen');
@@ -102,6 +104,8 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
     pits.set(p.id, { rect, holder, spec: { state: 'open' }, near: null, farG: null, cur: null, far: false, live: false, opaque: false });
   });
   const dirty = { pitch: true, frozen: true };
+  /* the night light of the fair (world/glow.js): halos of the big rides, a baked light map for the painted surfaces and the asphalt */
+  const glow = glowOpt === false ? null : createGlow({ T, root, groundY, fieldPoly, quality });
   let night = 0; let time = 0; let accLod = 9; let lastLiveKey = '';
   const opaque = new Set();
 
@@ -113,9 +117,12 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
     const laneSamples = lane || sampleLane(world);
     baseInfo.npc = npcMod.buildNpcFair({ T, pitches: [...pits.values()].map((q) => q.rect), fieldPoly, groundY, seed, quality, lane: laneSamples });
     baseInfo.props = propMod.buildProps({ T, pitches: [...pits.values()].map((q) => q.rect), fieldPoly, groundY, seed, quality });
-    [baseInfo.npc.group, baseInfo.props.group].forEach((g) => holders.push(g));
+    const clutterMod = await import('./clutter.js');
+    baseInfo.clutter = clutterMod.buildClutter({ T, fieldPoly, groundY, seed, quality, grid: baseInfo.npc.grid, gridDims: baseInfo.npc.gridDims });
+    [baseInfo.npc.group, baseInfo.props.group, baseInfo.clutter.group].forEach((g) => holders.push(g));
     const tmp = new T.Group(); holders.forEach((g) => tmp.add(g));
     baseBatch.build(collect(M, tmp)); tmp.clear();
+    if (glow) glow.setLightsFrom(group, true);
   }
 
   /* ---- content of one pitch: pit.near (full detail) / pit.farG (simplified static LOD, built lazily) / pit.cur = the one in pit.holder now */
@@ -128,6 +135,8 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
       if (hasModel(spec.item)) g = buildModel(spec.item, { look: spec.look | 0, level: spec.level | 0 || 1, quality, seed: sd, far });
       else g = buildPitchNpc({ T, rect: pit.rect, seed: sd, far, bigFor: item ? item.size : pit.rect.size, noLock: true });
     }
+    if (g && glow && g.userData.kit !== 'w3') glow.attachHalos(g);          // W4a / W4b rides: bloom points from their lamp vertices
+    if (g && g.userData.kit === 'w3' && !far && pit.rect.size !== 'XL') { const d = dressPitch({ T, size: pit.rect.size, g, seed: sd }); if (d) d.children.slice().forEach((c) => g.add(c)); }   // crates / tables / bins in the slack of the slot
     return g;
   }
   const disposeGroup = (g) => { if (!g) return; if (g.userData.dispose) g.userData.dispose(); else g.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); };
@@ -156,7 +165,7 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
       const g = pit.cur; pit.holder.updateMatrixWorld(true);
       collect(M, pit.holder, (o) => !isPartObj(o, g)).forEach((o) => objs.push(o));
     });
-    pitchBatch.build(objs); dirty.pitch = false;
+    pitchBatch.build(objs); dirty.pitch = false; if (glow) glow.setLightsFrom(group);
   }
   function rebuildFrozen() {
     const objs = [];
@@ -166,7 +175,7 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
       if (g.userData.animate) g.userData.animate(0, 0, night);
       collect(M, pit.holder, (o) => isPartObj(o, g)).forEach((o) => objs.push(o));
     });
-    frozenBatch.build(objs); dirty.frozen = false;
+    frozenBatch.build(objs); dirty.frozen = false; if (glow) glow.setLightsFrom(group);
   }
 
   /* ---- LOD: far models, live rides */
@@ -202,7 +211,7 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
 
   /* ---- public api */
   const api = {
-    group, pits, baseInfo, batches: { base: baseBatch, pitches: pitchBatch, frozen: frozenBatch }, quality: () => quality,
+    group, pits, baseInfo, glow, batches: { base: baseBatch, pitches: pitchBatch, frozen: frozenBatch }, quality: () => quality,
     pitchIds: () => [...pits.keys()],
     getPitch: (id) => (pits.get(id) ? Object.assign({}, pits.get(id).spec) : null),
     setPitch(id, spec) {
@@ -215,10 +224,10 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
     /** swap one pitch between NPC background and player content (locked pitches show an NPC stall + padlock) */
     toNpc(id) { const p = pits.get(id); api.setPitch(id, { state: 'locked' }); return p ? p.rect.star : 0; },
     flush(camera) { if (camera) lodUpdate(camera); if (dirty.pitch) rebuildPitchBatch(); if (dirty.frozen) rebuildFrozen(); },
-    setNight(k) { night = k; M.setNight(k); opaque.forEach((pit) => pit.near.userData.setNight && pit.near.userData.setNight(k)); },
-    setQuality(q) { if (QUALITY[q]) { Q = QUALITY[q]; quality = q; lastLiveKey = ''; accLod = 9; } },
+    setNight(k) { night = k; M.setNight(k); if (glow) glow.setNight(k); opaque.forEach((pit) => pit.near.userData.setNight && pit.near.userData.setNight(k)); },
+    setQuality(q) { if (QUALITY[q]) { Q = QUALITY[q]; quality = q; lastLiveKey = ''; accLod = 9; if (glow) glow.setQuality(q); } },
     update(dt, camera) {
-      time += dt; M.tick(time); accLod += dt;
+      time += dt; M.tick(time); accLod += dt; if (glow) glow.update(dt);
       if (camera && accLod > 0.3) { accLod = 0; lodUpdate(camera); }
       if (dirty.pitch) rebuildPitchBatch();
       if (dirty.frozen) rebuildFrozen();
@@ -238,7 +247,7 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
         atlas: M.atlasStats(),
       };
     },
-    dispose() { pits.forEach(clearPit); [baseBatch, pitchBatch, frozenBatch].forEach((b) => b.clear()); root.remove(group); },
+    dispose() { pits.forEach(clearPit); [baseBatch, pitchBatch, frozenBatch].forEach((b) => b.clear()); if (glow) glow.dispose(); root.remove(group); },
   };
   return api;
 }

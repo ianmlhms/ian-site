@@ -19,14 +19,17 @@ const GOODS = [0xee6fa8, 0xf4c430, 0x41c4d8, 0x8a5bc8, 0xf08a2a, 0x7ad06a, 0xd84
 
 const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
 const warm = 0xffd890;
+const GLASS = 0xffb458;          // lit shop window (lamp channel: dim amber by day, glowing by night)
 
 /* ------------------------------------------------------------------ skins: draw at the origin, front = +z, within w x d (centred) */
-function sign(b, text, x, y, z, w, h, look, kind = 'plate') { b.sign(text, x, y, z, w, h, { look, kind, frameW: 0.05, frame: 0x3a2a20 }); }
+function sign(b, text, x, y, z, w, h, look, kind = 'plate') { b.sign(text, x, y, z, w, h, { look, kind, frameW: 0.05, frame: 0x3a2a20, lit: true }); }
 
+/** canvas whites are HDR (> 1): a real hall tent is the brightest thing on the field by day, and glows from inside by night (the `fabric` channel) */
+const CANVAS = { roof: [1.75, 1.74, 1.68], wall: [1.45, 1.45, 1.4], end: [1.55, 1.55, 1.5], back: [1.3, 1.3, 1.27] };
 function hallTent(b, r, w, d, o = {}) {
-  const body = o.body || pick(r, [0xf3f1ea, 0xf8f8f2, 0xeeeee6]); const band = pick(r, AWN)[0]; const H = 2.5; const rise = Math.min(2.8, w * 0.28);
-  b.box(0, 0, 0, w, H, d, body, { cols: { front: 0xf7f5ee } });
-  b.gable(0, H, 0, w, d, rise, 0xf1efe8, { ridge: 'z', over: 0.15, ends: 0xf8f6ef, back: 0xe6e4dc });
+  const band = pick(r, AWN)[0]; const H = 2.5; const rise = Math.min(2.8, w * 0.28);
+  b.box(0, 0, 0, w, H, d, CANVAS.wall, { ch: 'fabric', cols: { front: CANVAS.end } });
+  b.gable(0, H, 0, w, d, rise, CANVAS.roof, { ridge: 'z', over: 0.15, ends: CANVAS.end, back: CANVAS.back, ch: 'fabric' });
   b.box(0, H - 0.05, d / 2 + 0.02, w + 0.2, 0.3, 0.06, band);                                    // coloured eave band on the gable end
   b.box(0, H, 0, w + 0.3, 0.12, d + 0.3, band, { noTop: false });
   b.box(0, 0, 0, w + 0.06, 0.55, d + 0.06, band, { cols: { top: band } });
@@ -42,7 +45,7 @@ function hallTent(b, r, w, d, o = {}) {
 }
 function chalet(b, r, w, d) {
   const wood = pick(r, WOODS); const H = 2.3;
-  b.box(0, 0, 0, w, H, d, wood, { cols: { front: shade(wood, 1.15) } }); b.box(0, 0.8, d / 2 + 0.02, w * 0.7, 1.0, 0.05, 0x1f2c36); b.box(0, 0.75, d / 2 + 0.25, w * 0.78, 0.07, 0.5, C.steel);
+  b.box(0, 0, 0, w, H, d, wood, { cols: { front: shade(wood, 1.15) } }); b.box(0, 0.8, d / 2 + 0.02, w * 0.7, 1.0, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.75, d / 2 + 0.25, w * 0.78, 0.07, 0.5, C.steel);
   b.gable(0, H, 0, w + 0.4, d + 0.5, 1.4, pick(r, [0x4a3228, 0x6b3a2a, 0x3a4048]), { over: 0.2, ridge: 'x' }); b.tri([-w / 2 - 0.1, H, d / 2 + 0.25], [w / 2 + 0.1, H, d / 2 + 0.25], [0, H + 1.4, d / 2 + 0.25], shade(wood, 1.1));
   sign(b, pick(r, WORDS), 0, H + 0.45, d / 2 + 0.3, Math.min(w * 0.8, 3.0), 0.55, r() < 0.4 ? 2 : 0);
   b.bulbRow([-w / 2 - 0.1, H + 0.1, d / 2 + 0.3], [w / 2 + 0.1, H + 0.1, d / 2 + 0.3], 0.5, warm, 0.13);
@@ -50,7 +53,7 @@ function chalet(b, r, w, d) {
 }
 function kiosk(b, r, w, d) {
   const wall = pick(r, BODY); const H = 2.3; const aw = pick(r, AWN);
-  b.box(0, 0, 0, w, H, d, wall); b.box(0, 0.9, d / 2 + 0.02, w * 0.7, 0.95, 0.05, 0x1f2c36); b.box(0, 0.85, d / 2 + 0.2, w * 0.8, 0.07, 0.42, C.steel);
+  b.box(0, 0, 0, w, H, d, wall); b.box(0, 0.9, d / 2 + 0.02, w * 0.7, 0.95, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.85, d / 2 + 0.2, w * 0.8, 0.07, 0.42, C.steel);
   b.hip(0, H, 0, w, d, 1.1, aw[0], { over: 0.3, alt: aw });
   sign(b, pick(r, WORDS), 0, H + 0.55, d / 2 + 0.34, Math.min(w * 0.85, 3.0), 0.55, r() < 0.4 ? 2 : 0);
   b.bulbRow([-w / 2, H + 0.1, d / 2 + 0.34], [w / 2, H + 0.1, d / 2 + 0.34], 0.5, warm, 0.13);
@@ -77,18 +80,23 @@ function camelot(b, r, w, d, o = {}) {
 const TARP = [0xc8283a, 0xf4f0e6, 0x8a9096, 0x2f7a52, 0xe8e2d0, 0xc8283a, 0x2d5fa8, 0xf2d070];
 /** a camelot stall of the Allée Scheffer lane: canvas-draped booth, pitched white roof, red / white / grey tarp front (photo food-camelots-allee-scheffer-2018-120) */
 function camelotTarp(b, r, w, d) {
-  const tarp = pick(r, TARP); const H = 2.3; const side = pick(r, [0xf4f0e6, 0xe8e2d0, 0x8a9096]);
+  const tarp = pick(r, TARP); const H = 2.3; const side = pick(r, [0xf4f0e6, 0xe8e2d0, 0x8a9096]); const kind = r();
   b.box(0, 0, 0, w, H, d, side, { cols: { front: shade(side, 0.95) } });
-  b.quad([-w / 2 - 0.02, 0.0, d / 2 + 0.03], [w / 2 + 0.02, 0.0, d / 2 + 0.03], [w / 2 + 0.02, H - 0.1, d / 2 + 0.03], [-w / 2 - 0.02, H - 0.1, d / 2 + 0.03], tarp);
-  if (!b.far) b.quad([-w * 0.08, 0.0, d / 2 + 0.04], [w * 0.08, 0.0, d / 2 + 0.04], [w * 0.08, H - 0.1, d / 2 + 0.04], [-w * 0.08, H - 0.1, d / 2 + 0.04], shade(tarp, 0.8));
-  b.gable(0, H, 0, w + 0.2, d + 0.3, 0.55, 0xf2efe6, { over: 0.1, ridge: 'x', back: 0xe0ddd2 });
-  if (r() < 0.5) b.valance([-w / 2, H, d / 2 + 0.2], [w / 2, H, d / 2 + 0.2], 0.22, Math.round(w * 2), tarp, 0xf4f0e6);
-  b.bulb(-w / 2 + 0.2, H - 0.05, d / 2 + 0.15, warm, 0.13); b.bulb(w / 2 - 0.2, H - 0.05, d / 2 + 0.15, warm, 0.13);
+  const zf = d / 2 + 0.03; const n = Math.max(3, Math.round(w * 1.8)); const alt = kind < 0.4 ? shade(tarp, 1.28) : kind < 0.7 ? 0xf4f0e6 : shade(tarp, 0.82);   // striped / printed canvas
+  for (let i = 0; i < n; i++) { const x0 = -w / 2 - 0.02 + (w + 0.04) * i / n; const x1 = -w / 2 - 0.02 + (w + 0.04) * (i + 1) / n; const sag = (i & 1) ? 0.12 : 0; b.quad([x0, 0.0, zf], [x1, 0.0, zf], [x1, H - 0.1 - sag, zf], [x0, H - 0.1 - sag, zf], i & 1 ? alt : tarp); }
+  if (!b.far) {
+    b.quad([-w * 0.08, 0.0, zf + 0.01], [w * 0.08, 0.0, zf + 0.01], [w * 0.08, H - 0.1, zf + 0.01], [-w * 0.08, H - 0.1, zf + 0.01], shade(tarp, 0.7));                // the roll-up opening
+    if (kind > 0.45) b.mural([6, 2, 4, 5, 0, 1][Math.floor(r() * 6)], Math.floor(r() * 4), 0, H * 0.62, zf + 0.02, Math.min(w * 0.8, 2.6), 0.62, { frame: false, back: false, lit: true });   // the printed banner
+    for (let i = 0; i < 3; i++) b.quad([-w / 2 + (i + 0.5) * w / 3, H - 0.12, zf + 0.012], [-w / 2 + (i + 0.5) * w / 3 + 0.05, H - 0.12, zf + 0.012], [-w / 2 + (i + 0.5) * w / 3 + 0.02, 0.3, zf + 0.012], [-w / 2 + (i + 0.5) * w / 3 - 0.03, 0.3, zf + 0.012], shade(tarp, 0.6));   // folds
+  }
+  b.gable(0, H, 0, w + 0.2, d + 0.3, 0.55, [1.6, 1.6, 1.55], { over: 0.1, ridge: 'x', back: [1.3, 1.3, 1.27], ch: 'fabric' });
+  if (r() < 0.55) b.valance([-w / 2, H, d / 2 + 0.2], [w / 2, H, d / 2 + 0.2], 0.22, Math.round(w * 2), tarp, 0xf4f0e6);
+  b.bulb(-w / 2 + 0.2, H - 0.05, d / 2 + 0.15, warm, 0.13); b.bulb(w / 2 - 0.2, H - 0.05, d / 2 + 0.15, warm, 0.13); b.bulb(0, H - 0.05, d / 2 + 0.2, warm, 0.13);
   if (!b.far && r() < 0.4) sign(b, pick(r, ['NOUGAT', 'MANDELEN', 'KÄSE', 'SOUVENIRS', 'BONBONS', 'WÄRSCHT']), 0, H + 0.5, d / 2 + 0.1, Math.min(w * 0.85, 2.2), 0.42, 0);
 }
 function temple(b, r, w, d) {
   const H = 2.6; const wall = pick(r, [0xf3efe2, 0xe8e0c8]);
-  b.box(0, 0, -0.3, w, H, d - 0.6, wall); b.box(0, 0.85, d / 2 - 0.6, w * 0.8, 1.0, 0.05, 0x1f2c36);
+  b.box(0, 0, -0.3, w, H, d - 0.6, wall); b.box(0, 0.85, d / 2 - 0.6, w * 0.8, 1.0, 0.05, GLASS, { ch: 'lamp' });
   [-1, -0.33, 0.33, 1].forEach((k) => b.cyl(k * (w / 2 - 0.4), 0, d / 2 - 0.2, 0.16, 0.14, H + 0.1, 6, 0xf8f6ee));
   b.box(0, H + 0.1, d / 2 - 0.2, w + 0.3, 0.3, 0.9, 0xf0eadb); b.tri([-w / 2 - 0.1, H + 0.4, d / 2 + 0.2], [w / 2 + 0.1, H + 0.4, d / 2 + 0.2], [0, H + 1.5, d / 2 + 0.2], 0xe6dfcb);
   b.box(0, 0, -0.3, w, 0.0, d - 0.6, wall); b.gable(0, H + 0.4, -0.3, w + 0.2, d - 0.4, 1.1, 0xb8b0a0, { ridge: 'x', over: 0.1 });
@@ -97,7 +105,7 @@ function temple(b, r, w, d) {
 function fisherHut(b, r, w, d) {
   const H = 2.4; const wood = 0x6a4a30;
   b.box(0, 0, 0, w, H, d, wood, { cols: { front: 0x7a5a3a } }); b.gable(0, H, 0, w + 0.5, d + 0.5, 1.5, 0x3a5a6a, { over: 0.25, ridge: 'x', back: 0x30485a });
-  b.box(0, 0.9, d / 2 + 0.02, w * 0.6, 0.9, 0.05, 0x1f2c36); b.box(0, 0.85, d / 2 + 0.25, w * 0.7, 0.07, 0.45, 0xb9672f);
+  b.box(0, 0.9, d / 2 + 0.02, w * 0.6, 0.9, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.85, d / 2 + 0.25, w * 0.7, 0.07, 0.45, 0xb9672f);
   if (!b.far) { for (let k = 0; k < 3; k++) { const x = -w / 2 + 0.6 + k * (w - 1.2) / 2; b.tri([x - 0.5, H, d / 2 + 0.06], [x + 0.5, H, d / 2 + 0.06], [x, H - 1.2, d / 2 + 0.06], 0x8aa0a8, { dbl: true }); }
     [-1, 1].forEach((s) => { b.push().translate(s * (w / 2 - 0.5), 1.0, d / 2 + 0.1).rotX(Math.PI / 2); b.disc(0, 0, 0, 0.45, 0.32, 8, 0x8a5a34); b.pop(); }); }
   sign(b, 'FËSCH', 0, H + 0.5, d / 2 + 0.3, 2.0, 0.5, 0); b.bulbRow([-w / 2, H + 0.12, d / 2 + 0.3], [w / 2, H + 0.12, d / 2 + 0.3], 0.5, warm, 0.13);
@@ -158,11 +166,109 @@ function bigTentRow(b, r, w, d) {
   for (let k = 0; k < rows; k++) for (let i = 0; i < n; i++) { b.push().translate(-w / 2 + (i + 0.5) * w / n, 0, -d / 2 + (k + 0.5) * d / rows); hallTent(b, r, tw, td); b.pop(); }
 }
 
+
+/* ------------------------------------------------------------------ polish wave: nine more skins (24 in total) with airbrush murals, lit signs, glowing windows */
+const NEON = 0xfff2d0;
+function postSign(b, text, x, y, z, w, h, look, kind = 'main') {
+  [-1, 1].forEach((k) => b.cyl(x + k * (w / 2 - 0.15), y - 0.2, z - 0.05, 0.04, 0.04, 1.4, 4, 0x333333));
+  b.sign(text, x, y + 0.7, z, w, h, { look, kind, lit: true, frameW: 0.06, frame: 0x3a2a20 });
+}
+function pizzaTrailer(b, r, w, d) {
+  const H = 2.3; const body = pick(r, [0xf4e8d0, 0xf0d8b0, 0xe8f0e0]);
+  b.box(0, -0.2, 0, w + 0.3, 0.9, d + 0.2, 0x2f2f35, { cols: { top: C.plate } });
+  b.box(0, 0.7, -0.2, w, H, d - 0.4, body); b.box(0, 0.7, d / 2 - 0.35, w, 1.0, 0.45, pick(r, WOODS)); b.box(0, 1.7, d / 2 - 0.35, w + 0.1, 0.06, 0.6, C.steel);
+  b.box(0, 1.85, d / 2 - 0.12, w * 0.76, 0.95, 0.05, GLASS, { ch: 'lamp' });
+  if (!b.far) b.valance([-w / 2 - 0.1, 0.7 + H + 0.05, d / 2 + 0.05], [w / 2 + 0.1, 0.7 + H + 0.05, d / 2 + 0.05], 0.34, Math.round(w * 2.4), 0xd8283a, 0xf6ead0);
+  b.sphere(-w * 0.26, 0.7 + H + 0.35, -0.3, 0.85, 0xb04a2a, { seg: 7, sy: 0.75 }); b.cyl(-w * 0.26, 0.7 + H + 0.8, -0.3, 0.16, 0.12, 1.1, 5, 0x555a60);
+  if (!b.far) { b.fx(-w * 0.26, 0.7 + H + 1.9, -0.3, 2, 0); b.mural(2, Math.floor(r() * 4), w * 0.15, 0.7 + H * 0.5, -d / 2 + 0.02, w * 0.42, 1.2, { frame: false, back: false, lit: true }); }
+  postSign(b, 'PIZZA', 0, 0.7 + H + 0.9, d / 2 - 0.1, Math.min(w * 0.7, 3.4), 0.7, r() < 0.3 ? 2 : 0);
+  b.bulbRow([-w / 2, 0.7 + H - 0.1, d / 2 + 0.1], [w / 2, 0.7 + H - 0.1, d / 2 + 0.1], 0.4, warm, 0.14);
+}
+function popcornCart(b, r, w, d) {
+  const x0 = 0; b.cyl(-w * 0.3, 0, d * 0.2, 0.28, 0.28, 0.1, 6, 0x222222); b.cyl(w * 0.3, 0, d * 0.2, 0.28, 0.28, 0.1, 6, 0x222222);
+  b.box(0, 0.25, 0, w * 0.8, 0.85, d * 0.6, 0xd8283a, { cols: { top: 0xf6ead0 } });
+  b.box(0, 1.1, 0, w * 0.7, 1.0, d * 0.5, NEON, { ch: 'lamp' });
+  const n = b.far ? 4 : 10; for (let i = 0; i < n; i++) b.blob(-w * 0.28 + (i % 5) * w * 0.14, 1.2 + Math.floor(i / 5) * 0.28, (r() - 0.5) * 0.3, 0.14, 0.12, 0.14, 0xfff0c0);
+  b.cone(0, 2.0, 0, Math.max(w, d) * 0.55, 0.8, 8, 0xd8283a, { alt: [0xd8283a, 0xf6ead0], smooth: false }); b.sphere(0, 2.85, 0, 0.12, GOLD, { seg: 5 });
+  [-1, 1].forEach((k) => b.cyl(k * w * 0.36, 1.0, d * 0.22, 0.03, 0.03, 1.0, 4, 0x777777));
+  b.cyl(w * 0.5, 0, -d * 0.1, 0.4, 0.55, 1.2, 8, 0xd8283a, { alt: [0xd8283a, 0xffffff], smooth: false }); for (let i = 0; i < 6; i++) b.blob(w * 0.5 + (r() - 0.5) * 0.3, 1.3 + r() * 0.15, -d * 0.1 + (r() - 0.5) * 0.3, 0.18, 0.14, 0.18, 0xfff0c0);
+  b.bulbRing(0, 2.0, 0, Math.max(w, d) * 0.55, 10, warm, 0.12);
+}
+function iceCreamVan(b, r, w, d) {
+  const body = pick(r, [0xf6b8d0, 0xa8e8d0, 0xf6e8a0, 0xa8d0f6]); const H = 2.1;
+  b.box(0, 0.3, 0, w, H, d, body, { cols: { front: shade(body, 1.05) } }); b.box(0, 0.3, d / 2 + 0.0, w, 0.2, 0.05, 0xffffff);
+  b.box(w * 0.2, 1.1, d / 2 + 0.02, w * 0.5, 0.9, 0.05, GLASS, { ch: 'lamp' }); b.box(w * 0.2, 1.05, d / 2 + 0.18, w * 0.56, 0.06, 0.4, C.steel);
+  b.box(-w * 0.36, 0.3, 0, w * 0.28, 1.2, d * 0.98, shade(body, 0.92)); b.box(-w * 0.4, 1.0, d / 2 + 0.01, w * 0.2, 0.5, 0.04, 0x39465a);
+  [-w * 0.32, w * 0.3].forEach((wx) => [-1, 1].forEach((s) => b.cyl(wx, 0, s * (d / 2 - 0.1), 0.38, 0.38, 0.25, 8, 0x1d1b1a)));
+  if (!b.far) b.valance([w * -0.05, 2.35, d / 2 + 0.05], [w * 0.45, 2.35, d / 2 + 0.05], 0.3, 6, 0xd8283a, 0xf6ead0);
+  b.cyl(w * 0.1, 2.4, 0, 0.01, 0.5, 1.2, 8, 0xe0a860, { cap: true, capColor: 0xe0a860 }); b.sphere(w * 0.1, 3.65, 0, 0.5, 0xf6a0c8, { seg: 6 }); b.sphere(w * 0.1, 4.25, 0, 0.42, 0xfff0d0, { seg: 6 }); b.sphere(w * 0.1, 4.7, 0, 0.12, 0xd8283a, { seg: 5 });
+  b.bulbRing(w * 0.1, 3.0, 0, 0.5, 8, 0xffe9b0, 0.12);
+  sign(b, 'GLACE', 0, 3.0, d / 2 - 0.1, Math.min(w * 0.5, 2.0), 0.5, 0, 'banner');
+}
+function balloonDarts(b, r, w, d) {
+  const H = 2.6; b.box(0, 0, -d / 2 + 0.15, w, H, 0.2, pick(r, [0xf6ead0, 0xffe27a, 0xcfe8ff])); [-1, 1].forEach((s) => b.box(s * (w / 2 - 0.08), 0, 0, 0.16, H, d - 0.2, pick(r, BODY)));
+  b.box(0, 0, d / 2 - 0.35, w, 1.0, 0.5, pick(r, WOODS)); b.box(0, 1.0, d / 2 - 0.35, w + 0.1, 0.06, 0.7, C.steel);
+  b.gable(0, H, 0, w + 0.3, d + 0.3, 0.55, pick(r, AWN)[0], { over: 0.1, ridge: 'x' });
+  const cols = [0xd8283a, 0xf4c430, 0x2d79c8, 0x2fc35a, 0xee6fa8, 0xf08a2a]; const cn = Math.max(5, Math.round(w * 1.5)); const rows = b.far ? 2 : 4;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cn; i++) b.sphere(-w / 2 + 0.45 + i * ((w - 0.9) / (cn - 1)) + (j & 1 ? 0.2 : 0), 1.35 + j * 0.28, -d / 2 + 0.36, 0.2, cols[(i + j * 2) % cols.length], { seg: 5, sy: 1.15 });
+  b.bulbRow([-w / 2, H + 0.1, d / 2 + 0.1], [w / 2, H + 0.1, d / 2 + 0.1], 0.4, warm, 0.14);
+  postSign(b, 'BALLONGEN', 0, H + 0.7, d / 2 - 0.2, Math.min(w * 0.8, 3.6), 0.7, 0);
+}
+function tikiBar(b, r, w, d) {
+  const roof = [0xc9a25a, 0xb8903f];
+  b.box(0, 0, d * 0.1, w * 0.8, 1.0, d * 0.4, pick(r, WOODS), { cols: { top: 0x9a6a3c } });
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => b.cyl(sx * (w / 2 - 0.2), 0, sz * (d / 2 - 0.25), 0.1, 0.1, 2.5, 5, 0x6a4a30));
+  b.cone(0, 2.4, 0, Math.max(w, d) * 0.62, 1.5, 10, roof[0], { alt: roof, smooth: false }); b.sphere(0, 3.95, 0, 0.14, 0x6a4a30, { seg: 5 });
+  b.bulbRing(0, 2.45, 0, Math.max(w, d) * 0.6, 14, warm, 0.14);
+  if (!b.far) { for (let i = 0; i < 4; i++) { const x = -w * 0.3 + i * w * 0.2; b.cyl(x, 0, d * 0.42, 0.12, 0.12, 0.65, 5, pick(r, CRATE_COLS)); b.cyl(x, 0.65, d * 0.42, 0.2, 0.2, 0.06, 6, 0x333333, { cap: true }); }
+    b.cyl(w * 0.55, 0, d * 0.4, 0.04, 0.04, 1.8, 4, 0x4a3020); b.blob(w * 0.55, 1.95, d * 0.4, 0.1, 0.17, 0.1, 0xff9a2a, { ch: 'lamp' }); b.bulb(w * 0.55, 1.95, d * 0.4, 0xffa040, 0.45); }
+  b.mural(5, Math.floor(r() * 4), 0, 0.5, d * 0.1 + d * 0.2 + 0.02, w * 0.78, 0.9, { frame: false, back: false, lit: true });
+  sign(b, 'TIKI BAR', 0, 2.1, d / 2 + 0.0, Math.min(w * 0.6, 2.6), 0.46, 0, 'banner');
+}
+const CRATE_COLS = [0xd8433a, 0x2d6fd0, 0xf4c430, 0x2f9a58];
+function clawMachine(b, r, w, d) {
+  const body = pick(r, [0x2d3a8a, 0x7a2a8a, 0x1f6a8a, 0xb0284a]); const H = 2.8;
+  b.box(0, 0, 0, w, H, d, body, { cols: { front: shade(body, 1.1) } }); b.box(0, 0.8, d / 2 + 0.02, w * 0.84, 1.6, 0.05, pick(r, [0xff9ad8, 0x9af0ff, 0xffe27a]), { ch: 'lamp' });
+  const n = b.far ? 6 : 16; for (let i = 0; i < n; i++) b.blob(-w * 0.36 + (i % 8) * w * 0.1, 0.95 + Math.floor(i / 8) * 0.3, d / 2 + 0.2 + (r() - 0.5) * 0.1, 0.16, 0.16, 0.12, pick(r, GOODS));
+  b.box(0, H, 0, w + 0.2, 0.2, d + 0.2, shade(body, 0.8)); if (!b.far) { b.ledRect(-w / 2 + 0.1, 0.2, w / 2 - 0.1, H - 0.1, d / 2 + 0.06, 0.07, [0xff9ad8, 0x9af0ff, 0xffe27a], { seg: 1.2 }); }
+  b.bulbRow([-w / 2, H + 0.15, d / 2 + 0.1], [w / 2, H + 0.15, d / 2 + 0.1], 0.35, 0xbfefff, 0.14);
+  postSign(b, 'GREIFER', 0, H + 0.2, d / 2 - 0.1, Math.min(w * 0.8, 3.0), 0.62, 1);
+}
+function bouncyCastle(b, r, w, d) {
+  const c1 = pick(r, [0xd8283a, 0xf08a2a, 0xee6fa8]); const c2 = pick(r, [0x2d79c8, 0x2fc35a, 0x8a5bc8]); const c3 = pick(r, [0xf4c430, 0x41c4d8, 0xffffff]);
+  b.box(0, 0.0, 0, w, 1.1, d, c2, { cols: { top: c3 } });
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz], i) => { const x = sx * (w / 2 - 0.9); const z = sz * (d / 2 - 0.9); b.cyl(x, 0, z, 0.95, 0.9, 3.2 + (i & 1) * 0.4, 7, i & 1 ? c1 : c3, { smooth: true }); b.cone(x, 3.2 + (i & 1) * 0.4, z, 1.05, 1.0, 7, i & 1 ? c3 : c1, { smooth: true }); b.sphere(x, 4.35 + (i & 1) * 0.4, z, 0.18, 0xffffff, { seg: 5 }); });
+  b.box(0, 0.8, d / 2 - 0.9, w - 2.4, 1.6, 0.9, c1, { cols: { top: c3 } });
+  if (!b.far) b.mural(4, Math.floor(r() * 4), 0, 1.2, d / 2 - 0.44, w - 3.0, 0.9, { frame: false, back: false, lit: true });
+  if (!b.far) for (let i = 0; i < 3; i++) b.figure(-w * 0.2 + i * w * 0.2, -d * 0.1, r() * 6, { y: 1.1, scale: 0.8 });
+  b.bulbRow([-w / 2, 1.15, d / 2 + 0.05], [w / 2, 1.15, d / 2 + 0.05], 0.5, 0xfff4d0, 0.14);
+}
+function funHouse(b, r, w, d) {
+  const kind = [1, 5, 4, 2][Math.floor(r() * 4)]; const body = pick(r, [0x241048, 0x10304a, 0x4a1030, 0x1a2a5a]); const H = 6.6;
+  b.box(0, 0, -d / 2 + 0.5, w, H, 1.0, body); b.box(0, 0, -d * 0.1, w * 0.84, 3.0, d * 0.5, shade(body, 0.8));
+  b.mural(kind, Math.floor(r() * 4), 0, 2.2 + 1.6, -d / 2 + 1.03, w - 2.8, 3.6, { frame: 0xe6b13a, frameW: 0.14, back: false, lit: true });
+  [-1, 1].forEach((s, i) => { const x = s * (w / 2 - 0.6); b.cyl(x, 0, -d / 2 + 0.7, 0.9, 0.8, H, 8, i ? 0x3a2a6a : 0x2a3a7a, { smooth: true }); b.cone(x, H, -d / 2 + 0.7, 1.15, 1.6, 8, i ? 0xff3fc8 : 0x41e8ff, { smooth: true }); b.bulbRing(x, H - 0.3, -d / 2 + 0.7, 0.95, 10, i ? 0xff9ae0 : 0x9af0ff, 0.16); });
+  b.box(0, 0, -d / 2 + 1.0, w * 0.3, 2.2, 0.1, 0x000000, { noBack: true }); b.box(0, 0.05, -d / 2 + 1.06, w * 0.28, 2.0, 0.05, GLASS, { ch: 'lamp' });
+  if (!b.far) b.ledRect(-w / 2 + 1.6, 1.6, w / 2 - 1.6, 6.4, -d / 2 + 1.07, 0.09, [0xff3fc8, 0x41e8ff, 0xffd23c, 0x8a5bff], { seg: 1.3 });
+  b.bulbRow([-w / 2 + 1.6, 6.5, -d / 2 + 1.1], [w / 2 - 1.6, 6.5, -d / 2 + 1.1], 0.45, warm, 0.16);
+  postSign(b, 'SPUKHAUS', 0, H + 0.1, -d / 2 + 1.0, Math.min(w * 0.6, 5.0), 0.95, 1);
+  b.box(0, 0, d / 2 - 0.7, w * 0.4, 0.5, 1.4, 0x555a60); b.box(0, 0.5, d / 2 - 0.7, w * 0.4, 0.08, 1.4, 0xf4c430);
+}
+function souvenirContainer(b, r, w, d) {
+  const c = pick(r, [0x2d6fd0, 0xd8433a, 0x2f9a58, 0xf08a2a, 0x7a47c8]); const H = 2.5;
+  b.box(0, 0, 0, w, H, d, c, { cols: { front: shade(c, 1.05) } }); b.box(0, 0.9, d / 2 + 0.02, w * 0.8, 1.2, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.85, d / 2 + 0.25, w * 0.86, 0.07, 0.5, C.steel);
+  if (!b.far) { b.valance([-w / 2, H - 0.1, d / 2 + 0.05], [w / 2, H - 0.1, d / 2 + 0.05], 0.3, Math.round(w * 2), 0xf6ead0, c); for (let i = 0; i < Math.round(w * 2); i++) b.blob(-w / 2 + 0.4 + i * 0.5, 1.9, d / 2 + 0.2, 0.12, 0.18, 0.1, pick(r, GOODS)); }
+  b.mural([0, 3, 5, 1][Math.floor(r() * 4)], Math.floor(r() * 4), 0, H + 0.6, d / 2 - 0.05, w * 0.92, 0.9, { frame: false, back: false, lit: true });
+  b.bulbRow([-w / 2, H + 1.1, d / 2], [w / 2, H + 1.1, d / 2], 0.4, warm, 0.14);
+}
+
 export const SKINS = {
   hall: { w: [8, 14], d: [10, 18], fn: hallTent }, hallWide: { w: [14, 24], d: [10, 16], fn: hallTent }, hallL: { w: [28, 29], d: [16, 17], fn: hallTent }, hallSmall: { w: [6, 9], d: [8, 12], fn: hallTent },
   chalet: { w: [4, 6], d: [3.5, 5], fn: chalet }, kiosk: { w: [3.5, 5], d: [3, 4], fn: kiosk }, trailer: { w: [5, 8], d: [2.6, 3.2], fn: trailer },
   camelot: { w: [2.4, 3.6], d: [2, 2.6], fn: (b, r, w, d) => camelot(b, r, w, d, { umbrella: r() < 0.4 }) }, temple: { w: [5, 6.5], d: [4, 5], fn: temple }, fisher: { w: [5, 6.5], d: [3.5, 4.5], fn: fisherHut },
   arch: { w: [4.5, 6], d: [3.2, 4], fn: archStall }, game: { w: [5, 8], d: [2.8, 3.4], fn: gameStall }, sweets: { w: [4, 6], d: [3, 3.8], fn: sweets }, kids: { w: [6, 7.6], d: [6, 7.6], fn: kidsRide }, chair: { w: [11, 14], d: [11, 14], fn: chairRide },
+  pizza: { w: [4.5, 6], d: [2.8, 3.4], fn: pizzaTrailer }, popcorn: { w: [2.4, 3.2], d: [2.2, 2.8], fn: popcornCart }, icecream: { w: [4.5, 5.6], d: [2.2, 2.6], fn: iceCreamVan }, balloon: { w: [4.5, 6.5], d: [2.8, 3.4], fn: balloonDarts },
+  tiki: { w: [4, 5.2], d: [3.4, 4.4], fn: tikiBar }, claw: { w: [3, 4.2], d: [2.2, 2.8], fn: clawMachine }, bouncy: { w: [6.5, 8], d: [6, 7.5], fn: bouncyCastle }, funhouse: { w: [9, 11], d: [4.5, 5.5], fn: funHouse }, souvenir: { w: [3.4, 5], d: [2.4, 3], fn: souvenirContainer },
   worksite: { w: [38, 38], d: [22, 22], fn: worksite }, bigTent: { w: [52, 55], d: [27, 29], fn: bigTentRow },
 };
 const rangeVal = (r, [a, b]) => a + (b - a) * r();
@@ -178,7 +284,7 @@ export function buildPitchNpc({ T, rect, seed = 1, far = false, bigFor, noLock =
   const size = bigFor || rect.size; const dims = SIZE[size] || SIZE.S; const r = mulberry(seed * 1013 + 7);
   const b = new Builder({ seed, rnd: r, far }); b.jit = 0.06;
   const [pw, pd] = dims.map((v) => v - 0.8);
-  const choices = { S: ['kiosk', 'chalet', 'trailer', 'arch', 'sweets', 'game', 'temple', 'fisher'], M: ['hall', 'hallSmall', 'kids', 'chair'], L: ['hallL'], XL: ['bigTent'], W: ['worksite'] }[size] || ['kiosk'];
+  const choices = { S: ['kiosk', 'chalet', 'trailer', 'arch', 'sweets', 'game', 'temple', 'fisher', 'pizza', 'popcorn', 'icecream', 'balloon', 'tiki', 'claw', 'souvenir'], M: ['hall', 'hallSmall', 'kids', 'chair', 'bouncy', 'funhouse', 'hallSmall'], L: ['hallL'], XL: ['bigTent'], W: ['worksite'] }[size] || ['kiosk'];
   const name = choices[Math.floor(r() * choices.length)];
   const used = drawSkin(b, name, r, pw, pd);
   // everything is drawn around the centre of its footprint: shift the skin so it sits in the pitch (the front stays towards the alley)
@@ -201,10 +307,10 @@ export const CORRIDORS = [
   { name: 'gate-sw', u: [8, 32], w: [38, 72] }, { name: 'gate-ne', u: [262, 296], w: [44, 70] },
 ];
 const ROWS = [
-  { name: 'N', front: 22.5, face: '+w', depth: 17, skins: { hallWide: 5, hall: 7, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 3, arch: 2, game: 2, sweets: 2, temple: 1, fisher: 1 } },
-  { name: 'M1', front: 49, face: '+w', depth: 17, skins: { hallWide: 4, hall: 6, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 4, arch: 2, game: 3, sweets: 3, temple: 1, fisher: 1, kids: 1 } },
-  { name: 'M2', front: 64, face: '-w', depth: 20, skins: { hallWide: 5, hall: 6, trailer: 3, kiosk: 2, game: 2, chalet: 2, kids: 1, chair: 1, sweets: 1 } },
-  { name: 'S', front: 95, face: '-w', depth: 17, skins: { hallWide: 3, hall: 4, hallSmall: 3, kiosk: 3, trailer: 3, chalet: 2, sweets: 2, game: 2, arch: 1 } },
+  { name: 'N', front: 22.5, face: '+w', depth: 17, skins: { hallWide: 5, hall: 7, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 3, arch: 2, game: 2, sweets: 2, temple: 1, fisher: 1, pizza: 2, popcorn: 2, icecream: 1, balloon: 2, tiki: 1, claw: 1, funhouse: 1, souvenir: 2, bouncy: 1 } },
+  { name: 'M1', front: 49, face: '+w', depth: 17, skins: { hallWide: 4, hall: 6, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 4, arch: 2, game: 3, sweets: 3, temple: 1, fisher: 1, kids: 1, pizza: 2, popcorn: 2, icecream: 2, balloon: 2, tiki: 1, claw: 2, funhouse: 1, souvenir: 2, bouncy: 1 } },
+  { name: 'M2', front: 64, face: '-w', depth: 20, skins: { hallWide: 5, hall: 6, trailer: 3, kiosk: 2, game: 2, chalet: 2, kids: 1, chair: 1, sweets: 1, pizza: 1, balloon: 1, claw: 1, funhouse: 1, bouncy: 1, souvenir: 1 } },
+  { name: 'S', front: 95, face: '-w', depth: 17, skins: { hallWide: 3, hall: 4, hallSmall: 3, kiosk: 3, trailer: 3, chalet: 2, sweets: 2, game: 2, arch: 1, pizza: 2, popcorn: 2, icecream: 2, tiki: 1, claw: 1, souvenir: 2, balloon: 1 } },
 ];
 
 export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality = 'medium', lane }) {
@@ -253,12 +359,13 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   const alleyW = [27.7, 56]; const nearestFace = (u, w, d) => { const c = w + d / 2; const t = alleyW.reduce((a, v) => (Math.abs(v - c) < Math.abs(a - c) ? v : a), alleyW[0]); return c < t ? '+w' : '-w'; };
   const cells = []; for (let w = 4; w < 126; w += 2) for (let u = 14; u < 292; u += 2) cells.push([u, w]);
   for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(rp() * (i + 1)); [cells[i], cells[j]] = [cells[j], cells[i]]; }
-  [['hall', 0.85], ['hallSmall', 0.85], ['trailer', 0.7], ['chalet', 0.7], ['kiosk', 0.7], ['sweets', 0.6], ['game', 0.6], ['arch', 0.5], ['camelot', 0.9]].forEach(([skin, prob]) => {
-    const s = SKINS[skin];
+  [['hall', 0.85], ['hallSmall', 0.85], ['funhouse', 0.3, 5], ['bouncy', 0.3, 3], ['trailer', 0.7], ['pizza', 0.5, 12], ['icecream', 0.5, 8], ['chalet', 0.7], ['kiosk', 0.7], ['balloon', 0.5, 8], ['tiki', 0.4, 4], ['sweets', 0.6], ['game', 0.6], ['claw', 0.5, 8], ['souvenir', 0.6, 10], ['arch', 0.5], ['popcorn', 0.8, 12], ['camelot', 0.9], ['popcorn', 0.6, 4], ['camelot', 0.9]].forEach(([skin, prob, cap]) => {
+    const s = SKINS[skin]; let placed = 0;
     for (const [u, w] of cells) {
+      if (cap && placed >= cap) break;
       if (rp() > prob) continue;
       const sw = rangeVal(rp, s.w); const sd = rangeVal(rp, s.d); const face = nearestFace(u, w, sd);
-      if (fits(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3)) { place(skin, u + sw / 2, w + sd / 2, face, rp, sw, sd); grid.mark(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3); }
+      if (fits(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3)) { placed++; place(skin, u + sw / 2, w + sd / 2, face, rp, sw, sd); grid.mark(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3); }
     }
   });
   // camelots standing right beside the tram rails on both sides, shoulder to shoulder (free lane ~6 m); lane = [{u, w, tu, tw}] centre line samples in the game frame
@@ -280,5 +387,5 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   }
   const g = b.finish({ id: 'npc-fair', look: 0, level: 1, size: [300, 150], height: 8, kind: 'npc-fair' });
   g.name = 'fouer-npc-fair';
-  return { group: g, count, camelots, byKind, tris: g.userData.tris, bulbs: g.userData.bulbs };
+  return { group: g, count, camelots, byKind, tris: g.userData.tris, bulbs: g.userData.bulbs, grid: grid.g, gridDims: [NU, NW, CELL, U0, W0] };
 }

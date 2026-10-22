@@ -13,6 +13,9 @@
  * Night convention (W2): setNight(k) sets the lamp scalar 0.45 + 0.55 k (always-on bulbs), a night-only window glow k, and a soft self-lit
  * paint k (the whole fair is lit by its own bulbs). */
 
+import { getMaterials } from './materials.js';
+import { makeHalos } from './halos.js';
+
 const kits = new WeakMap();
 const LAMP_DIFFUSE = 0.3;     // a bulb is mostly emissive: its lit-paint part stays small so the colour stays saturated
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -47,13 +50,14 @@ function createKit(T) {
     shader.vertexShader = 'attribute vec4 aEm; varying vec4 vEm;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vEm = aEm;');
     shader.fragmentShader = 'uniform float uLamp; uniform float uNight; uniform float uGlow; varying vec4 vEm;\n' + shader.fragmentShader.replace(
       '#include <emissivemap_fragment>',
-      '#include <emissivemap_fragment>\n totalEmissiveRadiance += vEm.rgb * mix(uNight, uLamp, vEm.a) + diffuseColor.rgb * uGlow * vec3(1.0, 0.94, 0.84);');
+      '#include <emissivemap_fragment>\n totalEmissiveRadiance += vEm.rgb * mix(uNight, uLamp, vEm.a) * (1.0 + 0.4 * uNight * vEm.a) + diffuseColor.rgb * uGlow * vec3(1.0, 0.94, 0.84);');
   };
   material.customProgramCacheKey = () => 'fouer-big-lit-v1';
+  getMaterials().patchLit(material, 'big');        // polish wave: day saturation + the night light map (see world/glow.js)
   const lineMaterial = new T.LineBasicMaterial({ vertexColors: true });
   lineMaterial.name = 'fouer-big-lines';
   const setNight = (k) => {
-    uniforms.uNight.value = k; uniforms.uLamp.value = 0.45 + 0.55 * k; uniforms.uGlow.value = 0.1 + 0.18 * k;
+    uniforms.uNight.value = k; uniforms.uLamp.value = 0.45 + 0.55 * k; uniforms.uGlow.value = 0.1 + 0.34 * k;
     lineMaterial.color.setScalar(0.55 + 0.3 * k);
   };
 
@@ -254,6 +258,7 @@ function createKit(T) {
       const mesh = new T.Mesh(this.geometry(), material);
       mesh.name = name || 'fouer-big'; mesh.matrixAutoUpdate = true;
       mesh.userData.tris = this.count / 3;
+      makeHalos(T, mesh);                         // bloom points from the lamp vertices (children of the mesh)
       return mesh;
     }
     lines(name) {
@@ -271,6 +276,7 @@ function createKit(T) {
   function dynamic(geometry, ranges, extraBoundsRadius, boundsCenter) {
     const pos = geometry.attributes.position; const nrm = geometry.attributes.normal;
     pos.setUsage(T.DynamicDrawUsage); nrm.setUsage(T.DynamicDrawUsage);
+    const hp = geometry.userData && geometry.userData.haloPoints; if (hp && hp.parent) { hp.parent.remove(hp); hp.geometry.dispose(); geometry.userData.haloPoints = null; }      // skinned vertices move one by one: no static halos
     const bp = pos.array.slice(); const bn = nrm.array.slice();
     const nm = new T.Matrix3();
     if (extraBoundsRadius) { geometry.boundingSphere = new T.Sphere(boundsCenter ? new T.Vector3(boundsCenter[0], boundsCenter[1], boundsCenter[2]) : geometry.boundingSphere.center.clone(), extraBoundsRadius); }
