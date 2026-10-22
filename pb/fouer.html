@@ -69,6 +69,10 @@ if(!window.THREE){
 <!-- the Luxtram ground and facade renderers are reused as they are (same URLs as pb/train-sim.html: one browser cache entry) -->
 <script src="/pb/train-sim/luxtram-facades.js?v=3"></script>
 <script src="/pb/train-sim/luxtram-ground.js?v=14"></script>
-<script type="module" src="/pb/fouer/world/stage.js?v=1"></script>
+<script type="module">
+  // ?models=1 -> the W3 model preview (turntable grid / single model / full fair); otherwise the standalone Glacis stage
+  const preview = new URLSearchParams(location.search).get("models") === "1";
+  import(preview ? "/pb/fouer/models/preview.js?v=1" : "/pb/fouer/world/stage.js?v=1");
+</script>
 </body>
 </html>
