@@ -4,7 +4,7 @@
  * the render loop pauses when the page is hidden and survives a WebGL context loss. */
 import { runIfMain } from "./lib.mjs";
 
-const URL = "/pb/fouer.html?fouerDebug=1&fouerNoFly=1&fouerQ=medium&fouerTimeMode=noon";
+const URL = "/pb/fouer.html?stage=1&fouerDebug=1&fouerNoFly=1&fouerQ=medium&fouerTimeMode=noon";   // stage=1: W2's empty Glacis (the default page is the game since W5)
 const MAX_DRAWS = 60;
 const MAX_TRIS = 165000;
 const BUNDLE_MAX = 700 * 1024;
@@ -47,7 +47,7 @@ export const flow = {
 
     h.step("weather + time: the in-game button popover changes the scene and persists");
     await page.evaluate(() => { localStorage.removeItem("pb_fouer_weather"); localStorage.removeItem("pb_fouer_time"); });
-    await boot(h, "/pb/fouer.html?fouerDebug=1&fouerNoFly=1&fouerQ=medium");
+    await boot(h, "/pb/fouer.html?stage=1&fouerDebug=1&fouerNoFly=1&fouerQ=medium");
     const st0 = await page.evaluate(() => window.__fouer.env.getState());
     h.eq([st0.weatherMode, st0.timeMode], ["random", "random"], "Random is the default for weather and time");
     await page.click("#envBtn");
@@ -62,7 +62,7 @@ export const flow = {
     h.expect(after.fog > before.fog && after.rainVisible && after.s.rain > 0.9, "rain: denser fog + rain overlay on");
     h.eq(await page.evaluate(() => [localStorage.getItem("pb_fouer_weather"), localStorage.getItem("pb_fouer_time")]), ["rain", "night"], "choices stored in localStorage");
     await h.shot("rain-night");
-    await boot(h, "/pb/fouer.html?fouerDebug=1&fouerNoFly=1&fouerQ=medium");
+    await boot(h, "/pb/fouer.html?stage=1&fouerDebug=1&fouerNoFly=1&fouerQ=medium");
     const st1 = await page.evaluate(() => window.__fouer.env.getState());
     h.eq([st1.weatherMode, st1.timeMode, st1.weather], ["rain", "night", "rain"], "choices persist across a reload");
     h.expect(st1.night > 0.9, "reloaded scene is at night");
