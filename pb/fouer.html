@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f2430">
+<title>Schueberfouer Tycoon · Arcade</title>
+<link rel="icon" href="data:,">
+<style>
+:root { color-scheme: dark; --ink: #fff7e0; --muted: #a9b9bd; --panel: #0f2430e8; --line: #ffffff26; --gold: #ffcf5c; --green: #2f8f6b; }
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0f2430; }
+body { display: flex; flex-direction: column; font-family: ui-rounded, "Avenir Next", "Segoe UI", sans-serif; color: var(--ink); -webkit-user-select: none; user-select: none; }
+button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+#shell { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; isolation: isolate; }
+#fouerCanvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+.fab { position: absolute; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); font-size: 22px; line-height: 1;
+  display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.fab:hover { background: #1c3a49f2; }
+.fab:focus-visible, .chip:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+#envBtn { top: max(12px, env(safe-area-inset-top)); right: 12px; }
+#frameBtn { top: calc(max(12px, env(safe-area-inset-top)) + 58px); right: 12px; }
+#menuBtn { top: calc(max(12px, env(safe-area-inset-top)) + 116px); right: 12px; }
+#title { position: absolute; top: max(14px, env(safe-area-inset-top)); left: 14px; pointer-events: none; text-shadow: 0 1px 6px #0009; }
+#title b { display: block; font-size: clamp(17px, 3vw, 24px); letter-spacing: -.5px; }
+#title span { font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; color: #ffe9b0; }
+.popover { position: absolute; right: 70px; top: max(12px, env(safe-area-inset-top)); width: min(330px, calc(100% - 90px)); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 12px 14px 14px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 12px 40px #0008; }
+.popover h3 { margin: 4px 0 8px; font-size: 12px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); font-weight: 800; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip { min-height: 44px; min-width: 44px; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: #ffffff0f; cursor: pointer; font-weight: 700; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--gold); color: #2a2208; border-color: var(--gold); }
+.chip small { display: block; font-size: 10px; font-weight: 600; opacity: .75; }
+#menu { top: calc(max(12px, env(safe-area-inset-top)) + 116px); }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #1c4254, #0b1a24); z-index: 5; transition: opacity .6s; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading .box { text-align: center; width: min(340px, 80%); }
+#loading .sheep { font-size: 52px; margin-bottom: 6px; }
+#loading b { font-size: 24px; letter-spacing: -.5px; }
+#bar { height: 6px; border-radius: 3px; background: #ffffff22; margin-top: 18px; overflow: hidden; }
+#bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .25s; }
+#loading small { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; }
+#toast { position: absolute; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: #0f2430ee; border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; font-size: 13px; pointer-events: none; }
+@media (max-width: 520px) { .popover { right: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 180px); width: calc(100% - 24px); } #menu { top: calc(max(12px, env(safe-area-inset-top)) + 180px); } }
+</style>
+<script src="/pb/arcade-kit.js?v=33" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
+</head>
+<body>
+<main id="shell">
+  <canvas id="fouerCanvas" tabindex="0" role="img" aria-label="The Schueberfouer ground on the Glacis in Luxembourg. Drag to pan, pinch or scroll to zoom, two fingers to rotate."></canvas>
+  <div id="title"><span>Glacis · Lëtzebuerg</span><b>Schueberfouer Tycoon</b></div>
+  <button class="fab" id="envBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Weather and time of day">☀️</button>
+  <button class="fab" id="frameBtn" type="button" aria-label="Frame the whole fair ground">⤢</button>
+  <button class="fab" id="menuBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Menu">☰</button>
+  <div class="popover" id="envPop" role="dialog" aria-label="Weather and time" hidden></div>
+  <div class="popover" id="menu" role="dialog" aria-label="Menu" hidden></div>
+  <div id="loading" role="status"><div class="box"><div class="sheep">🐑</div><b>Schueberfouer</b><div id="bar"><i></i></div><small id="loadMsg">…</small></div></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
+if(!window.THREE){
+  document.documentElement.dataset.bootError="three-missing";
+  document.getElementById("loadMsg").textContent="three.js r160 failed to load";
+  throw new Error("three.js r160 failed to load");
+}
+</script>
+<!-- the Luxtram ground and facade renderers are reused as they are (same URLs as pb/train-sim.html: one browser cache entry) -->
+<script src="/pb/train-sim/luxtram-facades.js?v=3"></script>
+<script src="/pb/train-sim/luxtram-ground.js?v=14"></script>
+<script type="module" src="/pb/fouer/world/stage.js?v=1"></script>
+</body>
+</html>
