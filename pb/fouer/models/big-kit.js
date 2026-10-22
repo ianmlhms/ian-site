@@ -411,3 +411,70 @@ export function latticeMast(b, o) {
   }
   return b;
 }
+
+
+/* ------------------------------------------------------------------------------------------------------------------ W4b additions (coasters + halls)
+ * Additive only: everything above keeps its API.  pixelText = a 5 x 7 dot-matrix font so signs carry real (generic) lettering without textures. */
+const GLYPHS = {
+  A: '01110 10001 10001 11111 10001 10001 10001', B: '11110 10001 10001 11110 10001 10001 11110', C: '01110 10001 10000 10000 10000 10001 01110',
+  D: '11110 10001 10001 10001 10001 10001 11110', E: '11111 10000 10000 11110 10000 10000 11111', F: '11111 10000 10000 11110 10000 10000 10000',
+  G: '01110 10001 10000 10111 10001 10001 01111', H: '10001 10001 10001 11111 10001 10001 10001', I: '01110 00100 00100 00100 00100 00100 01110',
+  J: '00111 00010 00010 00010 00010 10010 01100', K: '10001 10010 10100 11000 10100 10010 10001', L: '10000 10000 10000 10000 10000 10000 11111',
+  M: '10001 11011 10101 10101 10001 10001 10001', N: '10001 11001 10101 10011 10001 10001 10001', O: '01110 10001 10001 10001 10001 10001 01110',
+  P: '11110 10001 10001 11110 10000 10000 10000', Q: '01110 10001 10001 10001 10101 10010 01101', R: '11110 10001 10001 11110 10100 10010 10001',
+  S: '01111 10000 10000 01110 00001 00001 11110', T: '11111 00100 00100 00100 00100 00100 00100', U: '10001 10001 10001 10001 10001 10001 01110',
+  V: '10001 10001 10001 10001 10001 01010 00100', W: '10001 10001 10001 10101 10101 11011 10001', X: '10001 10001 01010 00100 01010 10001 10001',
+  Y: '10001 10001 01010 00100 00100 00100 00100', Z: '11111 00001 00010 00100 01000 10000 11111', '-': '00000 00000 00000 11111 00000 00000 00000',
+  ' ': '00000 00000 00000 00000 00000 00000 00000', '!': '00100 00100 00100 00100 00100 00000 00100', '1': '00100 01100 00100 00100 00100 00100 01110',
+};
+GLYPHS['Ë'] = GLYPHS.E;
+/** width of a pixelText string in metres (dot = pitch of one dot) */
+export function pixelTextWidth(text, dot) { return Math.max(0, text.length * 6 - 1) * dot; }
+/** dot-matrix lettering in the plane z = const facing +z (use b.place() to turn it).  bucket = b.P (paint) or b.L / b.LC(hex) (bulbs).
+ *  cx = centre x, y0 = bottom of the letters, dot = dot pitch (letter height 7 dots).  o: merge (join horizontal runs, default for paint), fill (0..1 dot fill), skew */
+export function pixelText(b, bucket, text, cx, y0, z, dot, col, o = {}) {
+  const t = String(text).toUpperCase(); const fill = o.fill === undefined ? 0.84 : o.fill; const merge = o.merge === undefined ? bucket === b.P : o.merge;
+  let x = cx - pixelTextWidth(t, dot) / 2; const d = dot * fill; const off = (dot - d) / 2;
+  for (const ch of t) {
+    const g = GLYPHS[ch] || GLYPHS[' ']; const rows = g.split(' ');
+    for (let r = 0; r < 7; r++) {
+      const yy = y0 + (6 - r) * dot + off; let c = 0;
+      while (c < 5) {
+        if (rows[r][c] !== '1') { c++; continue; }
+        let e = c; if (merge) while (e + 1 < 5 && rows[r][e + 1] === '1') e++;
+        const x0 = x + c * dot + off; const x1 = x + e * dot + off + d;
+        bucket.quad([x0, yy, z], [x1, yy, z], [x1, yy + d, z], [x0, yy + d, z], col);
+        c = e + 1;
+      }
+    }
+    if (ch === 'Ë') { for (const cc of [1, 3]) bucket.quad([x + cc * dot + off, y0 + 7.4 * dot, z], [x + cc * dot + off + d, y0 + 7.4 * dot, z], [x + cc * dot + off + d, y0 + 7.4 * dot + d, z], [x + cc * dot + off, y0 + 7.4 * dot + d, z], col); }
+    x += 6 * dot;
+  }
+}
+/** the 1.1 m thick pad slab every big model stands on (reaches 0.8 m below the ground) + a paving glow for night; cx / cz = centre */
+export function padSlab(b, w, d, cx = 0, cz = 0, col = 0x9b958a) {
+  b.P.box(cx, -0.25, cz, w, 1.1, d, col, 32);
+  const g = b.G([0.5, 0.4, 0.24]); const y = 0.292; const x0 = cx - (w - 1) / 2; const x1 = cx + (w - 1) / 2; const z0 = cz - (d - 1) / 2; const z1 = cz + (d - 1) / 2;
+  g.quad([x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1], 0xaaa496);
+}
+/** a bulb festoon between two points that sags by `drop` metres */
+export function festoon(b, p, q, n, drop, col, size = 0.17) { for (let i = 1; i < n; i++) { const f = i / n; bulb(b, [lerp(p[0], q[0], f), lerp(p[1], q[1], f) - Math.sin(f * Math.PI) * drop, lerp(p[2], q[2], f)], size, col); } }
+/** a tubular safety railing along a polyline of [x, z] points at height y */
+export function railing(b, pts, y, color, o = {}) {
+  const P = b.P; const h = o.h || 1.05; const step = o.step || 1.8; const close = o.close; const n = pts.length; const last = close ? n : n - 1;
+  for (let i = 0; i < last; i++) {
+    const p = pts[i]; const q = pts[(i + 1) % n];
+    P.tube([p[0], y + h, p[1]], [q[0], y + h, q[1]], 0.04, color, { sides: 4, flat: true });
+    if (o.mid !== false) P.tube([p[0], y + h * 0.5, p[1]], [q[0], y + h * 0.5, q[1]], 0.03, color, { sides: 3, flat: true });
+    const m = Math.max(1, Math.round(Math.hypot(q[0] - p[0], q[1] - p[1]) / step));
+    for (let k = 0; k < m + (i === last - 1 && !close ? 1 : 0); k++) { const f = k / m; const x = lerp(p[0], q[0], f); const z = lerp(p[1], q[1], f); P.tube([x, y, z], [x, y + h, z], 0.03, color, { sides: 3, flat: true }); }
+  }
+}
+/** a pennant on a thin pole: base at (x, y, z), pole height h, streaming along +x (dir = 1) or -x (dir = -1) */
+export function pennant(b, x, y, z, h, col, dir = 1, len = 1.3) {
+  const P = b.P;
+  P.tube([x, y, z], [x, y + h, z], 0.05, 0xcfd3d6, { sides: 3, flat: true });
+  P.tri([x, y + h, z], [x + dir * len, y + h - 0.16, z + 0.1], [x, y + h - 0.5, z], col);
+}
+/** pure-function helpers for animated parts */
+export const wrap = (t, p) => ((t % p) + p) % p;

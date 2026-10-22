@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0f2430">
 <title>Schueberfouer Tycoon · big rides preview</title>
 <link rel="icon" href="data:,">
-<!-- W4a standalone preview: the W2 Glacis world with the Riserad and the four towers standing on their pitches (pb/fouer/models/wheel.js, towers.js).
+<!-- W4a + W4b standalone preview: the W2 Glacis world with the Riserad, the four towers (wheel.js, towers.js), the four coaster / water rides (coasters.js: maus, looping, alpina, splash) and the three halls (halls.js: geister, scooter, tent) on their pitches.
      ?look=0|1|2  ?level=1..4  ?q=low|medium|high (model quality)  ?time=noon|evening|night|<hour>  ?lod=auto|near|far  ?only=wheel,jules  ?bare=1 (flat ground, no world)
      ?speed=<wheel speed x>  ?fouerQ=low|medium|high (renderer quality)  window.__big is the test / screenshot API (always on here). -->
 <style>
@@ -57,16 +57,18 @@ const only = qs.get('only') ? qs.get('only').split(',') : null;
 if (qs.get('hud') === '0') document.body.classList.add('nohud');
 
 /* which pitch each big ride stands on in this preview, and which way it faces (pitches.json `face`) */
-const SPOTS = { wheel: 'P24', jules: 'P08', booster: 'P09', hangover: 'P16', infinity: 'P25' };
+const SPOTS = { wheel: 'P24', jules: 'P08', booster: 'P09', hangover: 'P16', infinity: 'P25',
+  /* W4b: coasters + halls (L pitches; alpina / looping on the XL pitches) */
+  tent: 'P04', maus: 'P11', geister: 'P21', scooter: 'P13', splash: 'P22', alpina: 'P28', looping: 'P33' };
 const ROT = { '+w': 0, '-w': Math.PI, '+u': Math.PI / 2, '-u': -Math.PI / 2 };
 /** the rule W5 reuses: origin on the pitch centre, local +z toward the pitch's face */
 function placeOnPitch(group, rect, face, y) { group.position.set(rect.u, y, rect.w); group.rotation.y = ROT[face] || 0; group.updateMatrixWorld(true); }
 
 async function loadModels() {
   const mods = {};
-  const files = ['wheel', 'towers'];
+  const files = ['wheel', 'towers', 'coasters', 'halls'];
   for (const f of files) {
-    try { const m = await import('/pb/fouer/models/' + f + '.js'); Object.assign(mods, m.MODELS); } catch (e) { console.error('[big] ' + f + '.js failed', e); document.documentElement.dataset.bootError = 'models'; }
+    try { const m = await import('/pb/fouer/models/' + f + '.js'); Object.assign(mods, m.MODELS); } catch (e) { if (/404|Failed to fetch dynamically|error loading dynamically/i.test(String(e && e.message))) { console.warn('[big] ' + f + '.js not there yet'); continue; } console.error('[big] ' + f + '.js failed', e); document.documentElement.dataset.bootError = 'models'; }
   }
   return mods;
 }
@@ -113,7 +115,7 @@ async function boot() {
     applyLod();
   }
   function applyLod() {
-    const list = Object.values(groups);
+    const list = Object.values(groups).filter((g) => g.visible);
     if (state.lodMode === 'near') list.forEach((g) => { g.userData.setLOD(1); g.userData.setAnimated(true); });
     else if (state.lodMode === 'far') list.forEach((g) => { g.userData.setLOD(0); g.userData.setAnimated(true); });
     else updateLODs(list, r.camera.position, { nearN: state.nearN, distance: 80 });
@@ -139,6 +141,14 @@ async function boot() {
     hangover: { front: { eye: [0, 40, 125], look: [0, 44, 0], fov: 38 }, three: { eye: [80, 30, 90], look: [0, 42, 0], fov: 38 }, night: { eye: [0, 40, 125], look: [0, 44, 0], fov: 38 }, base: { eye: [18, 5, 24], look: [0, 6, 0], fov: 55 } },
     booster: { front: { eye: [0, 26, 105], look: [0, 29, 0], fov: 38 }, three: { eye: [70, 22, 72], look: [0, 27, 0], fov: 38 }, night: { eye: [0, 26, 105], look: [0, 29, 0], fov: 38 }, base: { eye: [18, 5, 30], look: [0, 6, 0], fov: 55 } },
     infinity: { front: { eye: [0, 13, 56], look: [0, 14, 0], fov: 38 }, three: { eye: [-40, 16, 50], look: [0, 14, 0], fov: 38 }, night: { eye: [0, 13, 56], look: [0, 14, 0], fov: 38 }, base: { eye: [10, 3, 22], look: [0, 4, 0], fov: 55 } },
+    /* W4b: eye / look in model-local metres (+z = front) */
+    maus: { front: { eye: [0, 11, 56], look: [0, 10, 0], fov: 40 }, three: { eye: [34, 13, 40], look: [0, 9, 0], fov: 40 }, night: { eye: [0, 11, 56], look: [0, 10, 0], fov: 40 }, top: { eye: [0, 70, 26], look: [0, 6, 0], fov: 40 }, hairpin: { eye: [26, 12, 14], look: [8, 11, 0], fov: 46 }, base: { eye: [8, 3, 22], look: [-2, 3, 5], fov: 60 }, side: { eye: [60, 12, 4], look: [0, 9, 0], fov: 38 } },
+    looping: { front: { eye: [0, 20, 92], look: [0, 14, -4], fov: 42 }, three: { eye: [62, 22, 66], look: [0, 12, -2], fov: 42 }, night: { eye: [0, 20, 92], look: [0, 14, -4], fov: 42 }, top: { eye: [0, 100, 44], look: [0, 6, 0], fov: 42 }, loops: { eye: [14, 8, 46], look: [10, 6, -9], fov: 44 }, base: { eye: [-6, 3.5, 30], look: [-14, 3, 11], fov: 60 }, side: { eye: [92, 16, 0], look: [0, 14, -2], fov: 40 } },
+    alpina: { front: { eye: [0, 12, 66], look: [0, 9, -4], fov: 42 }, three: { eye: [58, 16, 54], look: [0, 8, -2], fov: 42 }, night: { eye: [0, 12, 66], look: [0, 9, -4], fov: 42 }, top: { eye: [0, 90, 40], look: [0, 6, 0], fov: 42 }, chalet: { eye: [-14, 4.5, 30], look: [-4, 4.5, 10], fov: 46 }, side: { eye: [86, 14, 0], look: [0, 10, -2], fov: 40 }, base: { eye: [10, 3.5, 22], look: [2, 3, 4], fov: 60 } },
+    splash: { front: { eye: [0, 11, 56], look: [0, 6, 0], fov: 40 }, three: { eye: [36, 13, 40], look: [0, 5, 0], fov: 40 }, night: { eye: [0, 11, 56], look: [0, 6, 0], fov: 40 }, top: { eye: [0, 64, 24], look: [0, 3, 0], fov: 40 }, chute: { eye: [24, 6, 20], look: [5, 5, -2], fov: 46 }, side: { eye: [58, 9, 2], look: [0, 6, 0], fov: 38 } },
+    geister: { front: { eye: [0, 7, 50], look: [0, 6, 0], fov: 42 }, three: { eye: [32, 9, 36], look: [0, 6, 0], fov: 42 }, night: { eye: [0, 7, 50], look: [0, 6, 0], fov: 42 }, door: { eye: [6, 2.6, 17], look: [0, 4, 6], fov: 56 }, hand: { eye: [10, 13, 18], look: [8, 12.5, 1.5], fov: 50 }, top: { eye: [0, 52, 28], look: [0, 3, 0], fov: 40 } },
+    scooter: { front: { eye: [0, 6, 46], look: [0, 3, 0], fov: 42 }, three: { eye: [30, 9, 32], look: [0, 2.5, 0], fov: 42 }, night: { eye: [0, 6, 46], look: [0, 3, 0], fov: 42 }, floor: { eye: [-6, 16, 26], look: [0, 0.5, -2], fov: 46 }, inner: { eye: [-9, 3.2, 2.4], look: [4, 1.6, -3], fov: 62 }, side: { eye: [44, 4, 2], look: [0, 3, 0], fov: 40 }, car: { eye: [4, 2.2, 8], look: [0, 0.7, 0], fov: 50 } },
+    tent: { front: { eye: [0, 8, 52], look: [0, 4.5, 0], fov: 42 }, three: { eye: [34, 10, 38], look: [0, 4, 0], fov: 42 }, night: { eye: [0, 8, 52], look: [0, 4.5, 0], fov: 42 }, side: { eye: [48, 3.2, 3], look: [0, 3.5, 0], fov: 42 }, top: { eye: [0, 50, 26], look: [0, 3, 0], fov: 40 }, inside: { eye: [13.4, 2.1, 6.4], look: [0, 5.2, -3], fov: 72 }, outside: { eye: [24, 2.4, 6], look: [0, 3.2, -2], fov: 62 } },
   };
   const toWorld = (g, p) => { g.updateMatrixWorld(true); const v = new T.Vector3(p[0], p[1], p[2]).applyMatrix4(g.matrixWorld); return [v.x, v.y, v.z]; };
   function shot(id, name) {

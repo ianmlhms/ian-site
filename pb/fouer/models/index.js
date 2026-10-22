@@ -17,7 +17,7 @@ import { MODELS as RIDES } from './rides-small.js';
 
 export const MY_MODELS = Object.assign({}, STALLS, RIDES);      // W3's own models (the tests import these directly; W4a may override ids in REGISTRY)
 export const REGISTRY = Object.assign({}, MY_MODELS);
-export const BIG_FILES = ['./wheel.js', './towers.js'];
+export const BIG_FILES = ['./wheel.js', './towers.js', './coasters.js', './halls.js'];
 let bigLoaded = null;
 
 export const hasModel = (id) => !!REGISTRY[id];
