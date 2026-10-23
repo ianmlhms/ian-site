@@ -38,10 +38,11 @@ export function createGlow({ T, root, groundY, fieldPoly, quality = 'medium' }) 
   const baseY = groundY(cu, cw);
   let nx = 0; let ny = 0; let acc = null; let data = null; let tex = null; let kernels = null;
   let lights = new Float32Array(0); const extra = []; let pending = null; let dirtyT = 0; let night = 0; let baked = 0; let lastMs = 0; let lightCount = 0;
+  let groundOn = quality !== 'low';             // polish 2: the additive ground overlay is skipped on low (the light map still lights the painted surfaces)
 
   /* ---- ground overlay */
   const group = new T.Group(); group.name = 'fouer-glow'; root.add(group);
-  const CELL = 4;
+  const CELL = 6;                      // polish 2: 6 m (was 4): the overlay reads the light map per fragment, the grid only says where light exists (-3k triangles at night)
   const gx = Math.ceil((u1 - u0) / CELL); const gz = Math.ceil((w1 - w0) / CELL);
   const gpos = new Float32Array((gx + 1) * (gz + 1) * 3);
   for (let j = 0; j <= gz; j++) for (let i = 0; i <= gx; i++) { const u = u0 + i * CELL; const w = w0 + j * CELL; const o = (j * (gx + 1) + i) * 3; gpos[o] = u; gpos[o + 1] = groundY(u, w) + 0.1; gpos[o + 2] = w; }
@@ -153,11 +154,11 @@ export function createGlow({ T, root, groundY, fieldPoly, quality = 'medium' }) 
     attachHalos,
     /** screenshot-session tuning: glow.tune({ amp, ground, wall, haloK, haloI, lampGain, fabric }) */
     tune(o) { ['amp', 'ground'].forEach((k) => { if (o[k] !== undefined) CFG[k] = o[k]; }); ['wall', 'haloK', 'haloI', 'lampGain', 'fabric'].forEach((k) => { if (o[k] !== undefined) M.cfg[k] = o[k]; }); M.setNight(M.night.k); api.setNight(night); if (o.amp !== undefined && lights.length) bake(); return Object.assign({}, CFG, M.cfg); },
-    setNight(k) { night = k; gmat.uniforms.uK.value = k * CFG.ground; gmesh.visible = k > 0.01 && ggeo.drawRange.count > 0; },
+    setNight(k) { night = k; gmat.uniforms.uK.value = k * CFG.ground; gmesh.visible = groundOn && k > 0.01 && ggeo.drawRange.count > 0; },
     update(dt) {
-      if (pending) { dirtyT += dt; if (dirtyT > 0.35) { const out = []; collect(pending, out); extra.forEach((e) => out.push(e)); pending = null; lights = Float32Array.from(out); bake(); gmesh.visible = night > 0.01 && ggeo.drawRange.count > 0; } }
+      if (pending) { dirtyT += dt; if (dirtyT > 0.35) { const out = []; collect(pending, out); extra.forEach((e) => out.push(e)); pending = null; lights = Float32Array.from(out); bake(); gmesh.visible = groundOn && night > 0.01 && ggeo.drawRange.count > 0; } }
     },
-    setQuality(q) { const r = RES[q] || RES.medium; if (r !== res) { res = r; alloc(); if (lights.length) bake(); } },
+    setQuality(q) { groundOn = q !== 'low'; gmesh.visible = groundOn && night > 0.01 && ggeo.drawRange.count > 0; const r = RES[q] || RES.medium; if (r !== res) { res = r; alloc(); if (lights.length) bake(); } },
     stats: () => ({ lights: lightCount, bakes: baked, lastBakeMs: +lastMs.toFixed(1), texture: `${nx}x${ny}`, groundTris: Math.round(ggeo.drawRange.count / 3), res }),
     dispose() { root.remove(group); ggeo.dispose(); gmat.dispose(); if (tex) tex.dispose(); tex = null; U.uLM.value = M.lmDefault; U.uLMP.value.x = 0; },
   };

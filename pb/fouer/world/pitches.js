@@ -41,7 +41,7 @@ export async function createPitches({ T, world, list }) {
   const rects = new Map();
   const P = []; const ST = []; const KD = []; const PH = []; const I = [];
   const ranges = new Map();           // id -> [first vertex, vertex count] (state is rewritten in place)
-  const LIFT = 0.16; const EDGE = 0.34; const STEP = 3;
+  const LIFT = 0.26; const EDGE = 0.34; const STEP = 3;      // polish 2: 0.16 -> 0.26 (free plots / plates lie 0.2 m above the terrain)
   items.forEach((it, n) => {
     const [du, dw] = PITCH_SIZE[it.size] || PITCH_SIZE.S;
     const r = { id: it.id, u: it.u, w: it.w, du, dw, size: it.size, star: it.star, zone: it.zone, y: world.groundY(it.u, it.w) };

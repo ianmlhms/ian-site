@@ -128,19 +128,19 @@ function gateFrame(b, x, y, z, yaw, idx) {
 
 export function buildProps({ T, pitches, fieldPoly, groundY, seed = 1, quality = 'medium' }) {
   const M = getMaterials(); const r = mulberry(seed * 23 + 1);
-  const b = new Builder({ seed, rnd: r, far: false }); let count = 0;
+  const b = new Builder({ seed, rnd: r, far: false }); let count = 0; const solids = []; const boxes = [];
   // alley lamps + bulb strings + bins + benches
   ALLEYS.forEach((al, ai) => {
     const poles = [];
-    for (let u = al.u[0]; u <= al.u[1]; u += al.step) { al.w.forEach((w, k) => { const y = groundY(u, w); lampPost(b, u, w, y, k ? -1 : 1); poles.push([u, w, y, k]); count++; }); }
+    for (let u = al.u[0]; u <= al.u[1]; u += al.step) { al.w.forEach((w, k) => { const y = groundY(u, w); lampPost(b, u, w, y, k ? -1 : 1); poles.push([u, w, y, k]); solids.push({ u, w, r: 0.24 }); count++; }); }
     if (al.strings) {
       const byU = new Map(); poles.forEach((p) => { if (!byU.has(p[0])) byU.set(p[0], []); byU.get(p[0]).push(p); });
       const us = [...byU.keys()].sort((a, c) => a - c);
       us.forEach((u, i) => { const [p0, p1] = byU.get(u).sort((a, c) => a[3] - c[3]); stringLights(b, [u, p0[2] + 5.0, p0[1]], [u, p1[2] + 5.0, p1[1]], 0.8, 14, i & 1 ? MULTI : [WARM, 0xfff4d0]); if (i > 0) { const q = byU.get(us[i - 1]).sort((a, c) => a[3] - c[3]); [[q[0], p0], [q[1], p1]].forEach(([qa, pa]) => stringLights(b, [qa[0], qa[2] + 5.1, qa[1]], [pa[0], pa[2] + 5.1, pa[1]], 0.55, 14, [WARM, 0xfff4d0, WARM, 0xffc870])); } });
       us.forEach((u, i) => { if (i % 2) { const [p0, p1] = byU.get(u).sort((a, c) => a[3] - c[3]); b.pennants([u + 1.2, p0[2] + 4.5, p0[1]], [u + 1.2, p1[2] + 4.5, p1[1]], 16, MULTI, 0.45, { sag: 0.6 }); } });
     }
-    for (let u = al.u[0] + 9; u <= al.u[1]; u += 31) { const w = al.w[ai & 1 ? 0 : 1] + (ai ? 0.6 : (r() < 0.5 ? 0.6 : -0.6)); bin(b, u, groundY(u, w), w, 0); count++; }
-    for (let u = al.u[0] + 22; u <= al.u[1]; u += 58) { const w = al.w[0] - 0.4; bench(b, u, groundY(u, w), w, Math.PI); count++; }
+    for (let u = al.u[0] + 9; u <= al.u[1]; u += 31) { const w = al.w[ai & 1 ? 0 : 1] + (ai ? 0.6 : (r() < 0.5 ? 0.6 : -0.6)); bin(b, u, groundY(u, w), w, 0); solids.push({ u, w, r: 0.34 }); count++; }
+    for (let u = al.u[0] + 22; u <= al.u[1]; u += 58) { const w = al.w[0] - 0.4; bench(b, u, groundY(u, w), w, Math.PI); boxes.push({ u0: u - 0.9, u1: u + 0.9, w0: w - 0.3, w1: w + 0.3 }); count++; }
   });
   // crowd barriers along the SE rim (the long edge from (240,138) to (26,104)); gaps at the entrance gates
   const rim = []; for (let t = 0; t <= 1.0001; t += 1 / 36) rim.push([lerp(30, 236, t), lerp(105.5, 136.5, t)]);
@@ -155,5 +155,5 @@ export function buildProps({ T, pitches, fieldPoly, groundY, seed = 1, quality =
     count++;
   });
   const g = b.finish({ id: 'props', look: 0, level: 1, size: [300, 150], height: 10, kind: 'props' }); g.name = 'fouer-props';
-  return { group: g, count, tris: g.userData.tris, bulbs: g.userData.bulbs };
+  return { group: g, count, tris: g.userData.tris, bulbs: g.userData.bulbs, solids, boxes };
 }

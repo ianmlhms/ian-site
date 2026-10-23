@@ -10,6 +10,7 @@
 import { decodeHeights } from './dem.js';
 import { getMaterials } from '../models/materials.js';
 import { makePlaneTreeGeometries, createTreeLod } from './trees.js';
+import { COS as FRAME_COS, SIN as FRAME_SIN } from './frame.js';
 
 const TILE = 128;
 const CHUNK = 2;                    // tiles per chunk edge
@@ -39,6 +40,30 @@ function pointInRing(ring, x, z) {
     if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi + 1e-12) + xi) ins = !ins;
   }
   return ins;
+}
+
+/** cut an indexed mesh into n x n tiles by triangle centroid (shared vertex buffers, own index arrays and bounding spheres); the group is added next to the source mesh */
+function tileMesh(T, mesh, n) {
+  const g = mesh.geometry; const idx = g.index.array; const pos = g.attributes.position.array;
+  g.computeBoundingBox(); const bb = g.boundingBox; const dx = (bb.max.x - bb.min.x) / n || 1; const dz = (bb.max.z - bb.min.z) / n || 1;
+  const lists = Array.from({ length: n * n }, () => []);
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t]; const b = idx[t + 1]; const c = idx[t + 2];
+    const x = (pos[a * 3] + pos[b * 3] + pos[c * 3]) / 3; const z = (pos[a * 3 + 2] + pos[b * 3 + 2] + pos[c * 3 + 2]) / 3;
+    const i = Math.min(n - 1, Math.max(0, Math.floor((x - bb.min.x) / dx))); const j = Math.min(n - 1, Math.max(0, Math.floor((z - bb.min.z) / dz)));
+    lists[j * n + i].push(a, b, c);
+  }
+  const grp = new T.Group(); grp.name = mesh.name + '-tiles';
+  lists.forEach((list, k) => {
+    if (!list.length) return;
+    const sg = new T.BufferGeometry(); for (const name of Object.keys(g.attributes)) sg.setAttribute(name, g.attributes[name]);
+    const ind = list.length / 3 > 21000 || pos.length / 3 > 65535 ? new Uint32Array(list) : new Uint16Array(list); sg.setIndex(new T.BufferAttribute(ind, 1));
+    const box = new T.Box3(); for (let q = 0; q < list.length; q++) box.expandByPoint(new T.Vector3(pos[list[q] * 3], pos[list[q] * 3 + 1], pos[list[q] * 3 + 2]));
+    sg.boundingBox = box; sg.boundingSphere = box.getBoundingSphere(new T.Sphere());
+    const tm = new T.Mesh(sg, mesh.material); tm.name = mesh.name + '-t' + k; tm.renderOrder = mesh.renderOrder; tm.userData.sharedGeo = true; grp.add(tm);
+  });
+  grp.visible = false; mesh.parent.add(grp);
+  return grp;
 }
 
 /** concatenates same-schema BufferGeometries (indexed or not) into one */
@@ -94,6 +119,59 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
     groundAt: (x, z) => gy(x, z),
     slotClear: null,
   });
+
+
+  /* ---------------------------------------------------------------- polish 2: a worn field (no extra draw call: a few lines in the two ground shaders)
+   * The asphalt was one flat grey.  Inside the field box the fragment shader now adds: big soft patches (age, repairs), oil stains, long dark tyre streaks along the alleys,
+   * lighter and smoother alleys (the real ones are swept and walked flat), worn parking-bay paint, and when it rains a darker, bluer surface with sky-coloured puddles.
+   * Everything is computed from the world position (game-frame u, w from the local x, z with a uniform affine) and gated on asphalt-like albedo, so lawn, paving and roads
+   * keep their look.  uWear scales it (low quality keeps the patches only). */
+  const WEAR = {
+    uGF: { value: new T.Vector4(FRAME_COS, FRAME_SIN, frame.rootPos[0], frame.rootPos[1]) },
+    uWet: { value: 0 }, uWear: { value: quality === 'low' ? 0.5 : 1 },
+    uAl: { value: [0, 1, 2, 3, 4, 5, 6, 7].map(() => new T.Vector4(0, 0, 0, 0)) },
+  };
+  const WEAR_FRAG = `
+uniform vec4 uGF; uniform float uWet; uniform float uWear; uniform vec4 uAl[8];
+float wearAlley(vec2 g) { float m = 0.0; for (int k = 0; k < 8; k++) { vec4 a = uAl[k]; vec2 d = max(vec2(a.x - g.x, a.z - g.y), vec2(g.x - a.y, g.y - a.w)); m = max(m, 1.0 - smoothstep(0.0, 1.6, max(d.x, d.y))); } return m; }
+vec3 wearGround(vec3 rgb, vec3 wp) {
+  vec2 g = vec2(uGF.z + uGF.x * wp.x - uGF.y * wp.z, uGF.w + uGF.y * wp.x + uGF.x * wp.z);
+  float box = smoothstep(9.0, 13.0, g.x) * (1.0 - smoothstep(293.0, 298.0, g.x)) * smoothstep(3.0, 6.0, g.y) * (1.0 - smoothstep(134.0, 139.0, g.y));
+  if (box <= 0.001) return rgb;
+  float lum = dot(rgb, vec3(0.299, 0.587, 0.114)); float mx = max(rgb.r, max(rgb.g, rgb.b)); float mn = min(rgb.r, min(rgb.g, rgb.b));
+  float asph = (1.0 - smoothstep(0.10, 0.2, (mx - mn) / max(mx, 0.05))) * (1.0 - smoothstep(0.38, 0.5, lum));     // grey, dark: asphalt
+  float paint = smoothstep(0.52, 0.7, lum) * (1.0 - smoothstep(0.1, 0.2, (mx - mn) / max(mx, 0.05)));           // white bay lines
+  float al = wearAlley(g);
+  float n1 = lvn(g * 0.085 + 11.0); float n2 = lvn(g * 0.42 + 3.7); float n3 = lvn(g * 2.1);
+  vec3 o = rgb;
+  float k = 1.0 + 0.34 * (n1 - 0.5) + 0.2 * (n2 - 0.5) + 0.1 * (n3 - 0.5);
+  o = rgb * k * vec3(1.0 + 0.07 * (n1 - 0.5), 1.0, 1.0 - 0.07 * (n1 - 0.5));
+  float oil = smoothstep(0.74, 0.88, lvn(g * 0.31 + 41.0));
+  o *= 1.0 - 0.2 * oil;
+  float streak = smoothstep(0.7, 0.92, lvn(vec2(g.x * 0.022, g.y * 0.6) + 5.0)) * smoothstep(0.35, 0.8, lvn(g * vec2(0.07, 0.3) + 17.0)) * al;
+  o *= 1.0 - 0.17 * streak * uWear;
+  o = mix(o, o * 1.11 + 0.016, al * 0.8);                                                                          // swept alleys: lighter
+  float wet = uWet; float pud = smoothstep(0.56, 0.62, n1 * 0.55 + lvn(g * 0.19 + 9.0) * 0.45) * wet;
+  o *= 1.0 - 0.2 * wet;
+  o = mix(o, vec3(0.34, 0.38, 0.46) * (0.75 + 0.5 * n3), pud * 0.62);                                              // puddles: sky-coloured sheen
+  vec3 res = mix(rgb, o, asph * box * mix(0.6, 1.0, uWear));
+  // worn paint: bay lines fade in patches, more in the alleys
+  float pw = 0.58 + 0.42 * smoothstep(0.15, 0.75, lvn(g * 0.55 + 23.0)) - 0.22 * al;
+  res = mix(res, res * clamp(pw, 0.3, 1.0), paint * box * uWear);
+  return res;
+}`;
+  function patchWear(mat) {
+    const prev = mat.onBeforeCompile; const key = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
+    mat.onBeforeCompile = (sh, rr) => {
+      if (prev) prev(sh, rr);
+      sh.uniforms.uGF = WEAR.uGF; sh.uniforms.uWet = WEAR.uWet; sh.uniforms.uWear = WEAR.uWear; sh.uniforms.uAl = WEAR.uAl;
+      sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = wearGround(diffuseColor.rgb, vWP);')
+        .replace('void main()', WEAR_FRAG + '\nvoid main()');
+    };
+    mat.customProgramCacheKey = () => key + '|wear2';
+    return mat;
+  }
+  patchWear(ground.matSurface);
 
   function strideOf(t) {
     const dem = t.dem.n;
@@ -353,7 +431,7 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
     // terrain
     const ctrl = chunkCtrl(ch);
     const mat = ground.terrainMaterial(ch.x0, ch.z0, CHUNK * TILE, ctrl, false);
-    mat.vertexColors = true;
+    mat.vertexColors = true; patchWear(mat);
     ch.ctrl = ctrl; ch.mat = mat;
     const geo = terrainGeometry(ch);
     const mesh = new T.Mesh(geo, mat);
@@ -367,7 +445,7 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
   onProgress(0.3, 'terrain');
   // ground decor (draped on the final mesh), merged per chunk and material.  Tiles on the field get everything; the ring around it gets
   // carriageways / sidewalks / kerbs / paint only; beyond that the painted class map is enough (the Luxtram DECOR_R idea).
-  const TIERS = quality === 'low' ? [[50, null, 4.5], [95, ['a', 's', 'k', 'm'], 6], [135, ['a'], 8]] : [[48, null, 7], [95, ['a', 'k'], 8], [150, ['a'], 10]];
+  const TIERS = quality === 'low' ? [[44, null, 9], [80, ['a', 'k'], 10], [120, ['a'], 12]] : [[48, null, 7], [95, ['a', 'k'], 8], [150, ['a'], 10]];     // polish 2: low was FINER (4.5 m) than medium (7 m): coarser and shorter-ranged now
   for (const ch of chunks.values()) {
     decorBuckets.clear();
     for (const t of ch.tiles) {
@@ -505,6 +583,7 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
         const pal = farPal[kind] || farPal[0]; const wcol = pal[(bi * 7) % pal.length]; const rp0 = farRoof[kind] || farRoof[1]; const rcol = rp0[(bi * 5 + 3) % rp0.length];
         let ar = 0; for (let a = 0; a < ring.length; a++) { const pa = ring[a]; const pb = ring[(a + 1) % ring.length]; ar += pa[0] * pb[1] - pb[0] * pa[1]; }
         const sg = ar < 0 ? -1 : 1;
+        if (quality !== 'high' && Math.abs(ar) < 90) continue;                 // polish 2: sheds and garages of the far ring are invisible from the fair (< 45 m2)
         for (let a = 0; a < ring.length; a++) {
           const p0 = ring[a]; const p1 = ring[(a + 1) % ring.length];
           const dx = p1[0] - p0[0]; const dz = p1[1] - p0[1]; const l = Math.hypot(dx, dz) || 1;
@@ -517,7 +596,7 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
         } catch (e2) { /* skip the roof */ }
       }
     });
-    if (wp.length) {
+    if (wp.length && quality !== 'low') {                  // polish 2: the far ring of extruded footprints (11k triangles) is skipped on low (renderer.js QUALITY.low.farBuildings was never honoured)
       const g2 = new T.BufferGeometry();
       g2.setAttribute('position', new T.Float32BufferAttribute(wp.concat(rp), 3));
       g2.setAttribute('normal', new T.Float32BufferAttribute(wn.concat(rn), 3));
@@ -538,6 +617,43 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
     root, ground, fx, tiles, chunks, stats, oy, quality,
     gy, meshY: (x, z) => { const t = tiles.get(Math.floor(x / TILE) + '_' + Math.floor(z / TILE)); const y = t ? meshY(t, x, z) : NaN; return y === y ? y : gy(x, z); },
     setNight(k) { fx.setNight(k); },
+    /** polish 2: drop the faded parking-bay paint inside the field polygon wherever `keep(u, w)` is false (under the stalls, pitches and plots: it is never seen there). Returns the removed triangles. */
+    cullFieldBays(keep) {
+      let removed = 0; const poly = H.polysGame.glacis; const surf = ground.matSurface;
+      const toU = (x, z) => FRAME_COS * x - FRAME_SIN * z + frame.rootPos[0]; const toW = (x, z) => FRAME_SIN * x + FRAME_COS * z + frame.rootPos[1];
+      chunks.forEach((ch) => ch.group.children.forEach((m) => {
+        if (!m.isMesh || m.material !== surf || !m.geometry.index) return;
+        const g = m.geometry; const idx = g.index.array; const pos = g.attributes.position.array; const col = g.attributes.color && g.attributes.color.array; const aM = g.attributes.aMat && g.attributes.aMat.array; if (!col || !aM) return;
+        const out = new idx.constructor(idx.length); let n = 0;
+        for (let t = 0; t < idx.length; t += 3) {
+          const a = idx[t]; const b = idx[t + 1]; const c = idx[t + 2];
+          let drop = false;
+          if (aM[a] > 7.5 && col[a * 3] > 0.46 && col[a * 3] < 0.51 && col[a * 3 + 2] < 0.49) {          // BAY (0.88, 0.88, 0.85) x BAY_K
+            const x = (pos[a * 3] + pos[b * 3] + pos[c * 3]) / 3; const z = (pos[a * 3 + 2] + pos[b * 3 + 2] + pos[c * 3 + 2]) / 3; const u = toU(x, z); const w = toW(x, z);
+            if (pointInRing(poly, u, w) && !keep(u, w)) drop = true;
+          }
+          if (drop) removed++; else { out[n++] = a; out[n++] = b; out[n++] = c; }
+        }
+        if (n < idx.length) { g.setIndex(new T.BufferAttribute(out.slice(0, n), 1)); }
+      }));
+      stats.tris -= removed; return removed;
+    },
+    /** polish 2: the walk asks for the big indexed ground meshes (terrain + decor of every chunk) cut into 2 x 2 (3 x 3 for the biggest) tiles with their own bounding spheres (the builder view keeps the single meshes).
+     * Tiles share the vertex buffers of the source mesh (only index arrays are new). */
+    setTiled(on) {
+      chunks.forEach((ch) => {
+        const metas = ch.group.children.filter((c) => c.isMesh && c.geometry.index && c.geometry.index.count > 18000 && (c.name.startsWith('fouer-ground') || c.name.startsWith('fouer-terrain')));      // only the big ones (> 6k triangles)
+        metas.forEach((m) => {
+          if (on && !m.userData.tiles) m.userData.tiles = tileMesh(T, m, m.geometry.index.count > 45000 ? 3 : 2);
+          m.visible = !on; if (m.userData.tiles) m.userData.tiles.visible = on;
+        });
+      });
+    },
+    /** wet ground 0..1 (sky.js, rain): darker asphalt with puddles */
+    setWet(k) { WEAR.uWet.value = k; },
+    /** the alley rectangles that get the swept / tyre-marked look: [{ u: [u0, u1], w: [w0, w1] }] (models/fair.js passes CORRIDORS) */
+    setWearAlleys(list) { WEAR.uAl.value.forEach((v, i) => { const c = list && list[i]; if (c) v.set(c.u[0], c.u[1], c.w[0], c.w[1]); else v.set(0, 0, 0, 0); }); },
+    setWear(k) { WEAR.uWear.value = k; },
     update(dt) { ground.update(Math.min(0.1, dt || 0.016)); treeLod.update(); },
     treeLod, treeGeos,
     /** every mesh of the near + far world (sky/weather module tints materials through this) */

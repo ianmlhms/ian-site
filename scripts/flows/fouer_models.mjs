@@ -7,7 +7,7 @@
 import { runIfMain } from "./lib.mjs";
 
 const MAX_DRAWS = 35;
-const MAX_TRIS = 90000;               // polish wave (glow + density): 60k -> 90k for the W3 share (clutter, 24 NPC skins, murals); the whole scene stays <= 140 draws / 300k below
+const MAX_TRIS = 110000;              // polish wave (glow + density): 60k -> 90k for the W3 share (clutter, 24 NPC skins, murals); polish 2: 90k -> 110k (packed NPC fair, locked-pitch clusters, free plots, slot floors); the whole scene stays <= 140 draws / 300k below
 const MAX_MODEL_TRIS = 6500;            // one S / M model at level 4 near LOD
 const MAX_FAR_TRIS = 3200;              // far LOD
 const NO_404 = (text) => /wheel\.js|towers\.js|Failed to load resource.*404/i.test(text);
@@ -99,13 +99,13 @@ export const flow = {
       const F = window.__fouerModels; const L = F.fair; const out = {};
       L.setPitch("P01", { state: "locked" }); L.flush(); out.locked = { tris: L.stats().pitches.tris, spec: L.getPitch("P01"), skin: L.pits.get("P01").near.userData.skin, lock: L.pits.get("P01").near.userData.locked };
       L.setPitch("P01", { state: "built", item: "kachel", look: 1, level: 2 }); L.flush(); out.built = { tris: L.stats().pitches.tris, spec: L.getPitch("P01"), name: L.pits.get("P01").near.name };
-      L.setPitch("P01", { state: "open" }); L.flush(); out.open = { tris: L.stats().pitches.tris, spec: L.getPitch("P01") };
+      L.setPitch("P01", { state: "open" }); L.flush(); out.open = { tris: L.stats().pitches.tris, spec: L.getPitch("P01"), plot: !!(L.pits.get("P01").near && L.pits.get("P01").near.userData.plot), name: L.pits.get("P01").near && L.pits.get("P01").near.name };
       L.toNpc("P01"); L.flush(); out.back = { spec: L.getPitch("P01") };
       return out;
     });
     h.expect(swap.locked.lock === true && swap.locked.spec.state === "locked", `locked pitch shows an NPC stall (${swap.locked.skin}) with a padlock plate`);
     h.eq([swap.built.spec.item, swap.built.name], ["kachel", "kachel"], "built: the player model replaces the NPC stall");
-    h.expect(swap.open.tris < swap.built.tris, "open pitch is empty (the W2 marker glows there)");
+    h.expect(swap.open.plot === true && swap.open.tris < swap.built.tris, `open pitch is a free plot (gravel, barrier, \"FRÄI PLAZ\" sign, parked trailer: ${swap.open.name}; fewer triangles than a built stall; W2's marker still glows on it)`);
     h.eq(swap.back.spec.state, "locked", "toNpc() swaps back to the NPC stall");
 
     h.eq(errors, [], "zero console errors in the full fair");

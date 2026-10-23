@@ -52,6 +52,9 @@ export const flow = {
     h.eq([st0.weatherMode, st0.timeMode], ["random", "random"], "Random is the default for weather and time");
     await page.click("#envBtn");
     h.expect(await page.isVisible("#envPop"), "the sun button opens the popover");
+    // the random start weather may already be rain / fog: measure the "before" from a clear sky (polish 2: this check was flaky when the random start was rain)
+    await page.click('#envPop [data-group="weather"][data-value="clear"]');
+    await page.evaluate(() => { for (let i = 0; i < 200; i++) window.__fouer.env.update(0.1, window.__fouer.r.camera); });
     const before = await page.evaluate(() => { const E = window.__fouer.env; return { fog: E.fog.density, sun: E.sunLight.intensity, rain: E.getState().rain }; });
     await page.click('#envPop [data-group="weather"][data-value="rain"]');
     await page.click('#envPop [data-group="time"][data-value="night"]');

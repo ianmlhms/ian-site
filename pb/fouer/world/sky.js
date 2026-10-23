@@ -296,6 +296,7 @@ export function createEnv({ T, scene, renderer, world, quality = 'medium', initi
     renderer.toneMappingExposure = k.exposure * lerp(1, 1.08, wx.cover);
     scene.background = null;
     // wet ground: darker, a little cooler
+    if (world.glacis.setWet) world.glacis.setWet(wx.wet);
     wetMats.forEach((m) => { const b = wetBase.get(m); const f = 1 - 0.3 * wx.wet; m.color.setRGB(b.r * f, b.g * f * 1.01, b.b * f * 1.03); });
     rainMat.uniforms.uRain.value = wx.rain; rainMesh.visible = wx.rain > 0.02; rainMat.uniforms.uNight.value = night;
     world.setNight(night);

@@ -168,6 +168,7 @@ export async function createTram({ T, world, bundle }) {
     mesh.quad(ia, ib, ic, id);
   }
   const platformTop = 0.3; const PLAT_LEN = 46;
+  const HEDGE_STEP = world.quality === 'high' ? 1.1 : 1.6; const PICKET = world.quality === 'high' ? 0.4 : 0.7;      // polish 2: fewer hedge boxes / railing pickets on medium and low (the two stops were 8.5k triangles)
   function platform(st, sd, tone) {
     const S = SIDES[sd]; const sEnd = st.sPos; const sBeg = sEnd - PLAT_LEN; const e = st.edge; const w = st.width;
     const n = Math.ceil(PLAT_LEN / 1.5);
@@ -232,11 +233,11 @@ export async function createTram({ T, world, bundle }) {
   function backing(st, P, kind) {
     const e = st.edge; const w = st.width; const sc = P.sc; const top = platformTop;
     if (kind === 'hedge') {
-      for (let a = -23; a < 23; a += 1.1) { const hh = 2.05 + 0.12 * Math.sin(a * 2.3) + 0.08 * Math.sin(a * 5.1); boxAt(sc, a + 0.55, P.L(e + w + 0.55), top - 0.1, 1.12, hh, 0.85 + 0.1 * Math.sin(a * 3.7), C.hedge[(Math.floor((a + 23) / 1.1) * 7) % 4]); boxAt(sc, a + 0.55, P.L(e + w + 0.55), top - 0.1 + hh - 0.05, 0.9, 0.22, 0.65, C.hedge[(Math.floor((a + 23) / 1.1) * 3 + 1) % 4]); }
+      for (let a = -23; a < 23; a += HEDGE_STEP) { const hh = 2.05 + 0.12 * Math.sin(a * 2.3) + 0.08 * Math.sin(a * 5.1); boxAt(sc, a + 0.55, P.L(e + w + 0.55), top - 0.1, 1.12, hh, 0.85 + 0.1 * Math.sin(a * 3.7), C.hedge[(Math.floor((a + 23) / 1.1) * 7) % 4]); boxAt(sc, a + 0.55, P.L(e + w + 0.55), top - 0.1 + hh - 0.05, 0.9, 0.22, 0.65, C.hedge[(Math.floor((a + 23) / 1.1) * 3 + 1) % 4]); }
     } else if (kind === 'fence') {
       // low sandstone plinth + black iron railing with finials (the Notre-Dame cemetery wall, Allee Scheffer side)
       boxAt(sc, 0, P.L(e + w + 0.45), top - 0.1, PLAT_LEN, 0.75, 0.5, C.plinth);
-      for (let a = -23; a <= 23; a += 0.4) boxAt(sc, a, P.L(e + w + 0.45), top + 0.62, 0.04, 1.15, 0.04, C.iron);
+      for (let a = -23; a <= 23; a += PICKET) boxAt(sc, a, P.L(e + w + 0.45), top + 0.62, 0.04, 1.15, 0.04, C.iron);
       boxAt(sc, 0, P.L(e + w + 0.45), top + 1.7, PLAT_LEN, 0.04, 0.04, C.iron); boxAt(sc, 0, P.L(e + w + 0.45), top + 0.7, PLAT_LEN, 0.04, 0.04, C.iron);
       for (let a = -23; a <= 23; a += 4.4) boxAt(sc, a, P.L(e + w + 0.45), top + 0.4, 0.16, 1.45, 0.16, C.plinth);
     } else if (kind === 'bars') {

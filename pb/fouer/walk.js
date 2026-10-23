@@ -87,7 +87,7 @@ export function frontSpot(rect, face, out = 2.5, shift = 0) {
 
 /** the pitch footprint the NPC filler reserved around a pitch (same margins as models/npc.js buildNpcFair) */
 function npcReserve(rect, face) {
-  let u0 = rect.u - rect.du / 2 - 0.7, u1 = rect.u + rect.du / 2 + 0.7, w0 = rect.w - rect.dw / 2 - 0.7, w1 = rect.w + rect.dw / 2 + 0.7;
+  let u0 = rect.u - rect.du / 2 - 0.7, u1 = rect.u + rect.du / 2 + 0.7, w0 = rect.w - rect.dw / 2 - 0.7, w1 = rect.w + rect.dw / 2 + 0.7;       // fallback only (the exact stall footprints replace the grid): keep the generous reserve
   if (face === "+w") w1 += 0.8; else if (face === "-w") w0 -= 0.8; else if (face === "+u") u1 += 4; else u0 -= 4;
   return { u0, u1, w0, w1 };
 }
@@ -95,8 +95,9 @@ function npcReserve(rect, face) {
 /** Where can feet go. Static layer: NPC stalls (merged runs of the filler's occupancy grid), camelots beside the tram rails. Pitch layer: rebuilt
  * whenever a pitch changes (built and locked pitches are solid, open ones are walkable, the Riserad keeps a boarding corridor). Dynamic layer: the tram.
  * Region: the Glacis polygon + the open gates + the Allée Scheffer lane (reached through the NE portal). */
-export function createMask({ fieldPoly, corridors = [], grid = null, rects = [], faces = [], entrances = [], lane = [], radius = WALK.radius } = {}) {
-  const npc = [];            // boxes from the filler grid
+export function createMask({ fieldPoly, corridors = [], grid = null, rects = [], faces = [], entrances = [], lane = [], radius = WALK.radius, stalls = null, solids = null, boxes = null } = {}) {
+  const npc = [];            // boxes of the NPC stalls: the exact footprints when the filler gives them, else runs of its occupancy grid
+  const posts = [];          // small round solids { u, w, r }: lamp posts, bins, standing tables, masts
   const obbs = [];           // camelot strips
   let pitchBoxes = [];
   let dynamic = [];          // oriented boxes
@@ -104,9 +105,17 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
   const ribbon = [];         // lane segments { u, w, ax, az, hl, hw }
   const LANE_HALF = 5.4, CAMELOT_IN = 3.45, CAMELOT_OUT = 6.1, GATE_OUT = 18;
 
-  // ---- NPC stalls from the occupancy grid of models/npc.js buildNpcFair. The filler marks the pitches and the alley corridors first (cells are rounded
+  // ---- polish 2: the filler hands over its exact footprints (`stalls`), the small solids (`solids`: circles, `boxes`: benches / caravans). They ride on the grid array
+  // (grid.g.stalls ...) so main.js needs no change; explicit options win.
+  const exactStalls = stalls || (grid && grid.g && grid.g.stalls) || null;
+  const smallSolids = solids || (grid && grid.g && grid.g.solids) || null;
+  const smallBoxes = boxes || (grid && grid.g && grid.g.boxes) || null;
+  if (smallSolids) smallSolids.forEach(p => posts.push({ u: p.u, w: p.w, r: p.r }));
+  if (smallBoxes) smallBoxes.forEach(b => npc.push({ u0: b.u0, u1: b.u1, w0: b.w0, w1: b.w1 }));
+  if (exactStalls) exactStalls.forEach(s => npc.push({ u0: s.u0, u1: s.u1, w0: s.w0, w1: s.w1 }));
+  // ---- NPC stalls from the occupancy grid of models/npc.js buildNpcFair (fallback when no exact footprints exist). The filler marks the pitches and the alley corridors first (cells are rounded
   // OUT to whole cells) and only then places stalls on cells that are still free, so "marked and not reserved by a pitch / corridor" is exactly a stall.
-  if (grid && grid.g) {
+  if (!exactStalls && grid && grid.g) {
     const { g, nu, nw, cell, u0, w0 } = grid;
     const reserved = new Uint8Array(nu * nw);
     const markReserved = (a0, a1, b0, b1) => {
@@ -137,14 +146,16 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
     }
   }
 
-  // ---- the lane: free ribbon plus the camelot stalls on both sides
+  // ---- the lane: free ribbon plus the camelot stalls on both sides (a gap in front of each NW gate: same half length as models/npc.js GATE_GAP)
+  const NW_GATE_GAP = 6.5;
+  const nwGateGap = u => entrances.some(e => e.kind === "gate" && e.face === "-w" && Math.abs(u - e.u) < NW_GATE_GAP);
   for (let i = 0; i + 1 < lane.length; i++) {
     const a = lane[i], b = lane[i + 1];
     const dx = b.u - a.u, dz = b.w - a.w, len = Math.hypot(dx, dz) || 1;
     const ax = dx / len, az = dz / len;
     const mid = { u: (a.u + b.u) / 2, w: (a.w + b.w) / 2 };
     ribbon.push({ ...mid, ax, az, hl: len / 2 + 0.05, hw: LANE_HALF });
-    if (a.u >= 22 && a.u <= 272) {
+    if (a.u >= 22 && a.u <= 272 && !nwGateGap(mid.u)) {
       for (const side of [-1, 1]) {
         const lat = side * (CAMELOT_IN + CAMELOT_OUT) / 2;
         obbs.push({ u: mid.u - az * lat, w: mid.w + ax * lat, ax, az, hl: len / 2 + 0.05, hw: (CAMELOT_OUT - CAMELOT_IN) / 2 });
@@ -188,6 +199,7 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
       let moved = false;
       const apply = h => { if (h) { px += h.nx * (h.depth + 1e-4); pz += h.nz * (h.depth + 1e-4); moved = hit = true; } };
       for (const b of npc) { if (px + r < b.u0 || px - r > b.u1 || pz + r < b.w0 || pz - r > b.w1) continue; apply(circleVsBox(px, pz, r, b)); }
+      for (const p of posts) { const dx = px - p.u, dz = pz - p.w, rr = r + p.r; if (dx * dx + dz * dz >= rr * rr) continue; const d = Math.sqrt(dx * dx + dz * dz) || 1e-6; const k = (rr - d + 1e-4) / d; px += dx * k; pz += dz * k; moved = hit = true; }
       for (const b of pitchBoxes) { if (px + r < b.u0 || px - r > b.u1 || pz + r < b.w0 || pz - r > b.w1) continue; apply(circleVsBox(px, pz, r, b)); }
       for (const b of obbs) { if (Math.abs(px - b.u) > b.hl + b.hw + r || Math.abs(pz - b.w) > b.hl + b.hw + r) continue; apply(circleVsObb(px, pz, r, b)); }
       for (const b of dynamic) { if (Math.abs(px - b.u) > b.hl + b.hw + r || Math.abs(pz - b.w) > b.hl + b.hw + r) continue; apply(circleVsObb(px, pz, r, b)); }
@@ -201,7 +213,7 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
   }
 
   const api = {
-    npc, obbs, ribbon,
+    npc, obbs, ribbon, posts,
     get pitchBoxes() { return pitchBoxes; },
     setGates,
     /** boxes of the pitch layer: built or locked pitches are solid, `carve` = [{ index, hole }] removes a rectangle from one pitch */
@@ -214,12 +226,14 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
       let nx = x + dx, nz = z + dz;
       const out = pushOut(nx, nz, r);
       nx = out.x; nz = out.z;
+      let edge = false;                       // the walker presses against the border of the walkable region (not against a stall)
       if (!regionOk(nx, nz, r)) {
+        edge = true;
         if (regionOk(x + dx, z, r) && !overlaps(x + dx, z, r)) { nx = x + dx; nz = z; }
         else if (regionOk(x, z + dz, r) && !overlaps(x, z + dz, r)) { nx = x; nz = z + dz; }
         else { nx = x; nz = z; }
       }
-      return { x: nx, z: nz, blocked: Math.hypot(nx - (x + dx), nz - (z + dz)) > 1e-3 };
+      return { x: nx, z: nz, blocked: Math.hypot(nx - (x + dx), nz - (z + dz)) > 1e-3, edge };
     },
     /** nearest point where a walker of radius r fits (spiral search), or null */
     nearestFree(x, z, maxR = 30, step = 0.5, r = radius) {
@@ -240,16 +254,32 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
       while (d + 0.5 <= max && api.allowed(x + nx * (d + 0.5), z + nz * (d + 0.5), r)) d += 0.5;
       return d;
     },
-    stats: () => ({ npc: npc.length, obbs: obbs.length, pitch: pitchBoxes.length, ribbon: ribbon.length, gates: gateRects.length }),
+    stats: () => ({ npc: npc.length, posts: posts.length, obbs: obbs.length, pitch: pitchBoxes.length, ribbon: ribbon.length, gates: gateRects.length }),
   };
   return api;
 }
 
-/** Solid boxes of the pitch layer from the game state: built / locked / growing pitches block, open ones do not. `holes[index]` carves a corridor. */
-export function pitchSolids(rects, solidAt, holes = {}) {
+/** the low red-white barrier round a free plot (models/plots.js: three sides + the front with a gate opening in the middle): thin boxes in world metres */
+export function plotFence(rect, face) {
+  if (rect.size === "W") return [];
+  const hx = rect.du / 2 - 0.35, hz = rect.dw / 2 - 0.35, t = 0.2, gate = Math.min(4.2, rect.du * 0.4);
+  const s = face === "-w" ? -1 : 1;
+  const wb = rect.w - s * hz, wf = rect.w + s * hz, wlo = Math.min(wb, wf), whi = Math.max(wb, wf);
+  return [
+    { u0: rect.u - hx, u1: rect.u + hx, w0: wb - t, w1: wb + t },
+    { u0: rect.u - hx - t, u1: rect.u - hx + t, w0: wlo, w1: whi },
+    { u0: rect.u + hx - t, u1: rect.u + hx + t, w0: wlo, w1: whi },
+    { u0: rect.u - hx, u1: rect.u - gate / 2, w0: wf - t, w1: wf + t },
+    { u0: rect.u + gate / 2, u1: rect.u + hx, w0: wf - t, w1: wf + t },
+  ];
+}
+
+/** Solid boxes of the pitch layer from the game state: built / locked / growing pitches block, open ones do not (but their plot barrier does, `fenceAt` + `faces`).
+ * `holes[index]` carves a corridor. */
+export function pitchSolids(rects, solidAt, holes = {}, { fenceAt = null, faces = [] } = {}) {
   const out = [];
   rects.forEach((rect, i) => {
-    if (!solidAt(i)) return;
+    if (!solidAt(i)) { if (fenceAt && fenceAt(i)) out.push(...plotFence(rect, faces[i] ?? "+w")); return; }
     let boxes = [{ u0: rect.u - rect.du / 2 - 0.2, u1: rect.u + rect.du / 2 + 0.2, w0: rect.w - rect.dw / 2 - 0.2, w1: rect.w + rect.dw / 2 + 0.2 }];
     if (holes[i]) boxes = boxes.flatMap(b => subtractBox(b, holes[i]));
     out.push(...boxes);
@@ -267,6 +297,7 @@ const COASTERS = new Set(["maus", "looping", "alpina", "splash", "geister"]);
 export const isFood = id => FOOD.has(id);
 const FOOD_ICON = { kachel: "🥔", fritten: "🍟", wurscht: "🌭", zocker: "🍭", mandel: "🌰", waffel: "🧇", fesch: "🐟", crepes: "🥞", tent: "🍺" };
 const EAT_SECONDS = 2.0;
+const NE_EDGE_U = 288, NE_BACK_U = 262;        // walking beyond the NE portal: where the soft border starts, where the nudge points to (a point inside the fair)
 
 export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, crowd, ride, mask, env, hooks, rects, items, tram = null, translate }) {
   const camera = r.camera;
@@ -275,7 +306,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   const view = { x: 0, z: 0, y: 0, yaw: 0, pitch: 0 };
   const motion = { vx: 0, vz: 0, bob: 0, speed: 0 };
   const input = { keys: new Set(), stick: { x: 0, y: 0, id: null }, look: null, locked: false, touchSeen: false };
-  const state = { active: false, saved: null, targets: [], target: null, eating: 0, eatItem: null, clock: 0, scan: 0, lastBuilt: -1, flash: 0, hintShown: false, photoBusy: false };
+  const state = { edgeT: 0, active: false, saved: null, targets: [], target: null, eating: 0, eatItem: null, clock: 0, scan: 0, lastBuilt: -1, flash: 0, hintShown: false, photoBusy: false };
   const T_ = (key, params) => translate(ui.lang, key, params);
   const tmpF = new T.Vector3();
 
@@ -288,7 +319,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     const holes = {};
     const wheel = state.wheelIndex();
     if (wheel >= 0) { const hole = ride.boardingHole(wheel); if (hole) holes[wheel] = hole; }
-    mask.setPitches(pitchSolids(rects, i => Boolean(game.state.pitches[i]) || game.pitchStatus(i) === "locked", holes));
+    mask.setPitches(pitchSolids(rects, i => Boolean(game.state.pitches[i]) || game.pitchStatus(i) === "locked", holes, { fenceAt: () => true, faces: items.faceOf ? rects.map((_, i) => items.faceOf(i)) : [] }));
     mask.setGates(game.stars());
   }
   state.wheelIndex = () => game.state.pitches.findIndex(entry => entry && entry.k === "wheel");
@@ -483,6 +514,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     state.hintShown = false;
     rebuildMask();
     crowd.setMode("walk"); audio.setMode("walk");
+    if (fair.setTiled) fair.setTiled(true);                  // polish 2: spatial tiles of the base + pitch batches (frustum culling at eye level)
     hooks.walking = true;
     hooks.onWalkChange(true);
     document.body.classList.add("wk-on");
@@ -507,6 +539,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     hud.hidden = true;
     document.body.classList.remove("wk-on");
     crowd.setMode("builder"); audio.setMode("builder");
+    if (fair.setTiled) fair.setTiled(false);
     hooks.walking = false;
     hooks.onWalkChange(false);
   }
@@ -685,6 +718,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     if (input.keys.has("tl")) view.yaw -= WALK.turnKeys * dt;
     if (input.keys.has("tr")) view.yaw += WALK.turnKeys * dt;
     const rideOn = ride.active;
+    if (fair.setTiled) fair.setTiled(!rideOn);                // the ride shows the whole field: merged meshes there
     if (!rideOn) {
       const mv = moveVector();
       const locked = state.eating > 0;
@@ -699,6 +733,9 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
       const res = mask.move(view.x, view.z, motion.vx * dt, motion.vz * dt);
       view.x = res.x; view.z = res.z;
       if (res.blocked) { motion.vx *= 0.6; motion.vz *= 0.6; }
+      // beyond the NE portal the world ends at the road: a gentle nudge turns a walker who keeps pushing against that border back towards the fair
+      if (res.edge && view.x > NE_EDGE_U && Math.hypot(tx, tz) > 0.3) { state.edgeT += dt; if (state.edgeT > 0.3) view.yaw += angleDelta(view.yaw, Math.atan2(56 - view.z, NE_BACK_U - view.x)) * Math.min(1, dt * 1.8); }
+      else state.edgeT = Math.max(0, state.edgeT - dt * 2);
       motion.speed = Math.hypot(motion.vx, motion.vz);
       motion.bob += motion.speed * dt * 4.2;
       const gy = world.groundY(view.x, view.z) + WALK.eye;

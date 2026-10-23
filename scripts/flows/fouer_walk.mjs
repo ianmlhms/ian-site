@@ -161,7 +161,9 @@ export const flow = {
     /* ------------------------------------------------------------ 3. collision */
     h.step("collision: walking at a built stall, at an NPC stall, through the open NE portal");
     const rect0 = await evalG(page, g => g.scene.rects[0]);       // P01, face +w: front edge at w 45
-    await place(62, 53, -Math.PI / 2);
+    // polish 2: the alley edge now carries small solids (tables, crates, bins): walk down a lane in front of the stall that is clear of them
+    const lane = await evalG(page, g => { for (let u = 58.8; u <= 65.2; u += 0.4) { let ok = true; for (let w = 53; w >= 45.6; w -= 0.4) if (!g.mask.allowed(u, w)) { ok = false; break; } if (ok) return u; } return 62; });
+    await place(lane, 53, -Math.PI / 2);
     await page.keyboard.down("KeyW"); await sleep(5200); await page.keyboard.up("KeyW");
     const stall = (await walkState()).view;
     h.expect(stall.z > rect0.w + rect0.dw / 2 + 0.2 && stall.z < 50, `a built stall blocks the walker (stopped at w ${stall.z.toFixed(2)}, front edge ${rect0.w + rect0.dw / 2})`);

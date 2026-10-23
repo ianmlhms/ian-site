@@ -563,3 +563,15 @@ export function apron(b, ctx, w, d, o = {}) {
 
 /** palette helper for the second sign panel of a Look */
 export function bannerFor(look) { return look === 1 ? 'banner' : 'banner'; }
+
+/** a draped surface: a grid of `cell` m quads over [-hx, hx] x [-hz, hz] following the terrain (ly(x, z) = local terrain height), colour from colorFn(i, j, x, z) */
+export function drape(b, hx, hz, ly, colorFn, cell = 3, lift = 0.07) {
+  if (globalThis.__fouerNoFloors) return;                      // debug switch of the coverage measurement (flat plates / gravel off)
+  const nx = Math.max(1, Math.round((2 * hx) / cell)); const nz = Math.max(1, Math.round((2 * hz) / cell)); const ao = b.ao; b.ao = false;
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const x0 = -hx + (2 * hx) * i / nx; const x1 = -hx + (2 * hx) * (i + 1) / nx; const z0 = -hz + (2 * hz) * j / nz; const z1 = -hz + (2 * hz) * (j + 1) / nz;
+    b.quad([x0, ly(x0, z1) + lift, z1], [x1, ly(x1, z1) + lift, z1], [x1, ly(x1, z0) + lift, z0], [x0, ly(x0, z0) + lift, z0], colorFn(i, j, (x0 + x1) / 2, (z0 + z1) / 2));
+  }
+  b.ao = ao;
+}
+

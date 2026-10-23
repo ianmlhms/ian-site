@@ -36,16 +36,19 @@ const BULB_BODY = `
   float tw = 1.0;
   if (aPh > 0.0) tw = 0.3 + 0.7 * step(0.0, sin(uT * 5.0 - aPh * 30.0));
   float core = aSize * uScale / dist;                        // px diameter of the physical bulb
-  float spr = core * (1.0 + uHaloK * uNight);               // sprite = bulb + bloom, in world metres, so it shrinks with distance like a real glow
+  // polish 2: the bloom shrinks from far above (builder / wheel view: strings of bulbs were big white blobs) and big lamps (flood masts, pylons) bloom relatively less
+  float farK = smoothstep(14.0, 100.0, dist);
+  float kEff = uHaloK * mix(1.0, 0.3, farK) * clamp(0.16 / max(aSize, 0.01), 0.35, 1.0);
+  float spr = core * (1.0 + kEff * uNight);                  // sprite = bulb + bloom, in world metres, so it shrinks with distance like a real glow
   float hOnly = step(aPh, -0.5);                             // aPh = -1: a harvested halo point (big rides): bloom only, invisible by day
   core *= mix(1.0, 0.3, hOnly);
   float fogH = exp(-uFogD * uFogD * dist * dist * 0.35);     // lights shine through the haze
-  float px = clamp(spr, 2.6 + 3.4 * uNight, 58.0);
+  float px = clamp(spr, 2.6 + 3.4 * uNight, mix(58.0, 24.0, farK));
   vCore = clamp(core / px, 0.06, 1.0);
   vCol = aCol * tw * (0.8 + 1.2 * uNight) * mix(fog, fogH, uNight) * mix(1.0, uNight, hOnly);
   vA = clamp(core / 2.6, 0.6, 1.0);
   // a far bulb squeezed into the minimum sprite must not outshine a near one: energy follows the covered area
-  vHalo = aGain * (0.4 + 0.6 * smoothstep(3.0, 22.0, dist)) * mix(1.0, 0.5, hOnly) * uNight * uHaloI * fogH * tw * clamp(spr / px, 0.0, 1.0) * (0.55 + 0.45 * smoothstep(2.0, 14.0, px));
+  vHalo = aGain * (0.4 + 0.6 * smoothstep(3.0, 22.0, dist)) * mix(1.0, 0.6, farK) * mix(1.0, 0.5, hOnly) * uNight * uHaloI * fogH * tw * clamp(spr / px, 0.0, 1.0) * (0.55 + 0.45 * smoothstep(2.0, 14.0, px));
   gl_PointSize = px;`;
 const BULB_FRAG = `
 varying vec3 vCol; varying float vA; varying float vHalo; varying float vCore;

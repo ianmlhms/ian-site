@@ -147,7 +147,7 @@ export function createTreeLod({ T, root, near, far, material, quality = 'medium'
   const chunks = [];                          // { key, n, pos, mats, cols, state, near, far, group }
   const camLocal = new T.Vector3(); const camWorld = new T.Vector3(); let haveCam = false; let lastX = 1e9; let lastY = 1e9; let lastZ = 1e9;
   const grab = (r, s, cam) => { camWorld.setFromMatrixPosition(cam.matrixWorld); haveCam = true; };
-  const maxNear = quality === 'low' ? Math.round(MAX_NEAR * 0.6) : MAX_NEAR;
+  const maxNear = quality === 'low' ? Math.round(MAX_NEAR * 0.5) : quality === 'medium' ? Math.round(MAX_NEAR * 0.8) : MAX_NEAR;      // polish 2: medium 40 -> 32 near trees (416 triangles each)
 
   function add(key, items, groundYOf, { yawOf, compose, colorOf }) {
     const n = items.length;
