@@ -50,6 +50,7 @@ function bannerPole(b, r, x, z, yaw, text, look) {
   b.push().translate(x, 0, z).rotY(yaw);
   b.cyl(0, 0, 0, 0.07, 0.05, 6.4, 5, 0xdadada); b.beam([0, 6.3, 0], [0.75, 6.3, 0], 0.05, 0xdadada);
   b.sign(text, 0.4, 4.4, 0.02, 0.78, 3.3, { look, kind: 'banner', frame: 0x3a2a20, frameW: 0.03, lit: true, key: 'bp|' + look + '|' + text });
+  b.push().translate(0.4, 0, -0.1).rotY(Math.PI); b.sign(text, 0, 4.4, 0.0, 0.78, 3.3, { look, kind: 'banner', frame: false, back: false, lit: true, key: 'bp|' + look + '|' + text }); b.pop();      // the back of the banner is a lit sign too
   b.pop();
 }
 function floodMast(b, r, x, z) {

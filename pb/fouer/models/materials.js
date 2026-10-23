@@ -117,6 +117,20 @@ export function getMaterials() {
   const solid = new T.MeshLambertMaterial({ vertexColors: true, name: 'fouer-solid' });
   solid.emissive = new T.Color(0x000000);
   patchLit(solid, 'solid');
+  // looks wave: gravel / dirt ground of the free plots and the building sites: vertex colours + fine procedural grit by world position (no texture), lit by the night light map like the rest
+  const ground = new T.MeshLambertMaterial({ vertexColors: true, name: 'fouer-ground' });
+  ground.emissive = new T.Color(0x000000);
+  ground.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+{
+  vec2 q = vWP.xz;
+  vec2 i1 = floor(q * 11.0), i2 = floor(q * 3.3 + 13.0), i3 = floor(q * 0.55 + 5.0);
+  float g1 = fract(sin(dot(i1, vec2(127.1, 311.7))) * 43758.5453), g2 = fract(sin(dot(i2, vec2(269.5, 183.3))) * 43758.5453), g3 = fract(sin(dot(i3, vec2(419.2, 371.9))) * 43758.5453);
+  float grit = (g1 - 0.5) * 0.34 + (g2 - 0.5) * 0.2 + (g3 - 0.5) * 0.16 + step(0.94, g1) * 0.2 - step(g1, 0.05) * 0.18;
+  diffuseColor.rgb *= 1.0 + grit;
+}`);
+  };
+  patchLit(ground, 'ground');
   // tent canvas: HDR white albedo by day, translucent warm glow from inside by night
   const fabric = new T.MeshLambertMaterial({ vertexColors: true, name: 'fouer-fabric', side: T.DoubleSide });
   fabric.emissive = new T.Color(0x000000);
@@ -132,13 +146,13 @@ export function getMaterials() {
   };
   lamp.customProgramCacheKey = () => 'fouer-lamp-chase';
 
-  // chair-swing chains + seats: every vertex carries its depth below the attachment point (aDepth); the vertex shader swings it outward by U.uSwing (radians)
+  // chair-swing chains + seats: every vertex carries its depth below the attachment point (aDepth); the vertex shader swings it outward by U.uSwing (radians): out AND UP (a pendulum on a chain of length D rises by D (1 - cos))
   const swing = new T.MeshLambertMaterial({ vertexColors: true, name: 'fouer-swing' });
   swing.emissive = new T.Color(0x000000);
   swing.onBeforeCompile = (sh) => {
     sh.uniforms.uSwing = U.uSwing;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aDepth; uniform float uSwing;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvec2 rd = normalize(transformed.xz + vec2(1e-4, 0.0)); transformed.xz += rd * aDepth * sin(uSwing); transformed.y += aDepth * (cos(uSwing) - 1.0);');
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvec2 rd = normalize(transformed.xz + vec2(1e-4, 0.0)); transformed.xz += rd * aDepth * sin(uSwing); transformed.y += aDepth * (1.0 - cos(uSwing));');
   };
   swing.customProgramCacheKey = () => 'fouer-swing';
   patchLit(swing, 'swing');
@@ -156,7 +170,7 @@ export function getMaterials() {
 
   const night = { k: 0 };
   const SET_ = {
-    T, atlas, U, cfg: CFG, lmDefault, solid, fabric, lamp, sign, signLit, swing, bulbs, fx, night, patchLit,
+    T, atlas, U, cfg: CFG, lmDefault, solid, ground, fabric, lamp, sign, signLit, swing, bulbs, fx, night, patchLit,
     setNight(k) {
       k = Math.max(0, Math.min(1, k)); night.k = k; U.uNight.value = k;
       lamp.color.setScalar(0.45 + 0.55 * k);                  // contract of W2: 0.45 + 0.55 k (the HDR gain below makes the lit LEDs blaze on top)
@@ -165,7 +179,7 @@ export function getMaterials() {
       signLit.emissiveIntensity = 0.2 + 1.2 * k;
       fabric.color.setRGB(1 - 0.12 * k, 1 - 0.38 * k, 1 - 0.68 * k);                    // canvas lit from inside: the cold moon light on it turns warm
       fabric.emissive.setRGB(CFG.fabric * k + 0.03 * (1 - k), CFG.fabric * 0.58 * k + 0.03 * (1 - k), CFG.fabric * 0.26 * k + 0.028 * (1 - k));
-      const day = 0.05 * (1 - k); solid.emissive.setRGB(0.055 * k + day, 0.034 * k + day, 0.016 * k + day * 0.9); swing.emissive.copy(solid.emissive);   // a little fill by day (the real fair is high key), the fair's own warm light by night       // the fair's own light washes the painted bodies a little
+      const day = 0.05 * (1 - k); solid.emissive.setRGB(0.055 * k + day, 0.034 * k + day, 0.016 * k + day * 0.9); swing.emissive.copy(solid.emissive); ground.emissive.copy(solid.emissive);   // a little fill by day (the real fair is high key), the fair's own warm light by night       // the fair's own light washes the painted bodies a little
     },
     tick(t) { U.uT.value = t; },
     /** called by every Points mesh before it is drawn: pixel scale and fog density follow the view */
@@ -175,7 +189,7 @@ export function getMaterials() {
       U.uFogD.value = scene && scene.fog && scene.fog.density !== undefined ? scene.fog.density : 0.0004;
     },
     atlasStats: () => atlas.stats(),
-    all: () => [solid, fabric, lamp, sign, signLit, swing, bulbs, fx],
+    all: () => [solid, ground, fabric, lamp, sign, signLit, swing, bulbs, fx],
   };
   SET = SET_;
   return SET;

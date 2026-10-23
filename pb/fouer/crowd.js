@@ -14,7 +14,8 @@ export const CROWD_CAP = Object.freeze({ low: 70, medium: 150, high: 320 });
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
-const NEAR_WALK = 40, NEAR_RIDE = 110, NEAR_BUILDER = 175, NEAR_HI = 15;       // NEAR_HI: the detailed figure (142 triangles) within this distance
+const NEAR_WALK = 40, NEAR_RIDE = 110, NEAR_BUILDER = 175, NEAR_HI = 12;       // NEAR_HI: the detailed figure (142 triangles) within this distance
+const NEAR_PROP = 24;                       // carried things (candy floss, balloons, pushchairs) are drawn within this distance
 const BUILDER_SHARE = 0.6;                  // the builder view shows a thinner crowd
 const QUEUE_SHARE = 0.3;                    // queue rows may use at most this share of the guests
 const LANE_BASE = { haaptallee: 2.1, fressgaass: 1.0 };
@@ -130,23 +131,41 @@ export function queueSlot(rect, face, k, side = 1) {
 }
 
 /* ------------------------------------------------------------------------------------------------ looks */
-const SHIRTS = [0xd8283a, 0x2d6fd0, 0xf2c230, 0xf4f4ef, 0x2f9a58, 0xe8702a, 0x7a47c8, 0x1c8fa0, 0xe86aa6, 0x35405c, 0x9aa0a6, 0xc84a2a, 0x8bc34a, 0xb8284a];
-const PANTS = [0x2f4a7a, 0x3a4660, 0x2a2a30, 0x6a5a45, 0x4a4f5a, 0x7a6a50, 0x1f3550, 0x5a3a2a];
-const HAIR = [0x1c1612, 0x3a2616, 0x6a4423, 0xc9a45c, 0xe6d9b0, 0x8a8a8a, 0xa8421c, 0x111111];
+const SHIRTS = [0xd8283a, 0x2d6fd0, 0xf2c230, 0xf4f4ef, 0x2f9a58, 0xe8702a, 0x7a47c8, 0x1c8fa0, 0xe86aa6, 0x35405c, 0x9aa0a6, 0xc84a2a, 0x8bc34a, 0xb8284a, 0x1f2430, 0x6a8a3a, 0xf08a8a, 0x4a6fa5];
+const PANTS = [0x2f4a7a, 0x3a4660, 0x2a2a30, 0x6a5a45, 0x4a4f5a, 0x7a6a50, 0x1f3550, 0x5a3a2a, 0x8a96b0, 0x3d5a40];
+const HAIR = [0x1c1612, 0x3a2616, 0x6a4423, 0xc9a45c, 0xe6d9b0, 0x8a8a8a, 0xa8421c, 0x111111, 0x2a1a10, 0x4a3020];
+const HAIR_ELDER = [0xe8e8e4, 0xb8b8b8, 0x8a8a8a, 0xd8d0c0];
 const SKIN = [0xf2c9a4, 0xe8b48a, 0xd39c6c, 0xa86f46, 0x7a4a2c, 0xf6d6bd];
-const FOOD_COLORS = { kachel: 0xe0a24a, fritten: 0xf2d04a, wurscht: 0xc86a3a, zocker: 0xff8ac8, mandel: 0xa8703a, waffel: 0xf0d8a0, fesch: 0xd8d8c8, crepes: 0xe8c07a, tent: 0xe8c040 };
+const FOOD_COLORS = { kachel: 0xe0a24a, fritten: 0xf2d04a, wurscht: 0xc86a3a, zocker: 0xff8ac8, mandel: 0xa8703a, waffel: 0xf0d8a0, fesch: 0xd8d8c8, crepes: 0xe8c07a, tent: 0xe8a820 };
+/** what a guest carries away from a food pitch: 1 a tray of food, 2 candy floss, 5 a beer */
+const FOOD_KIND = { zocker: 2, tent: 5 };
+const BALLOON_COLORS = [0xe8403a, 0x3a8ee8, 0xf2c230, 0x4ac070, 0xe870b0];
+const PRAM_COLORS = [0x2d6fd0, 0xd8283a, 0x2f9a58, 0x35405c, 0xe8702a];
+const FLOSS_COLORS = [0xff8ac8, 0x8ad0ff, 0xffb0e0];
 
 export function makeLook(rnd, kind) {
   const pick = list => list[Math.floor(rnd() * list.length)];
-  const adult = kind === "adult", teen = kind === "teen";
+  const adult = kind === "adult" || kind === "elder", teen = kind === "teen";
   const look = { kind, shirt: pick(SHIRTS), pants: pick(PANTS), hair: pick(HAIR), skin: pick(SKIN),
     scale: kind === "kid" ? 0.5 + rnd() * 0.16 : teen ? 0.86 + rnd() * 0.1 : adult ? 0.92 + rnd() * 0.13 : 1,
-    skirt: kind !== "kid" && rnd() < 0.3 ? 1 : 0, speed: lerp(SPEED_RANGE[0], SPEED_RANGE[1], rnd()) * (kind === "kid" ? 0.9 : 1) };
-  // polish 2: variants drawn by the figure shader (no extra triangles per guest): hair (0 short, 1 long, 2 bald), hat (0 none, 1 cap, 2 sun hat), build
+    skirt: kind !== "kid" && rnd() < 0.3 ? 1 : 0, speed: lerp(SPEED_RANGE[0], SPEED_RANGE[1], rnd()) * (kind === "kid" ? 0.9 : kind === "elder" ? 0.66 : 1) };
+  // polish 2: variants drawn by the figure shader (no extra triangles per guest): hair (0 short, 1 long, 2 bald, 3 ponytail, 4 puffy), hat (0 none, 1 cap, 2 sun hat), build
   const h = rnd(), t = rnd();
-  look.hairStyle = kind === "kid" ? (h < 0.4 ? 1 : 0) : look.skirt ? (h < 0.7 ? 1 : 0) : h < 0.12 ? 1 : h < 0.2 ? 2 : 0;
+  look.hairStyle = kind === "kid" ? (h < 0.4 ? 1 : h < 0.55 ? 3 : 0) : look.skirt ? (h < 0.55 ? 1 : h < 0.8 ? 3 : 0) : h < 0.12 ? 1 : h < 0.2 ? 2 : h < 0.3 ? 3 : h < 0.38 ? 4 : 0;
   look.hat = t < 0.14 ? 1 : t < 0.2 ? 2 : 0;
   look.build = kind === "kid" ? 1 : 0.92 + rnd() * 0.2;
+  // looks wave: clothing (sleeves, shoes, jacket / hoodie, dress), elderly stoop and grey hair, what a guest carries
+  const c = rnd(), sl = rnd(), sh = rnd(), cr = rnd();
+  look.sleeves = sl < 0.4 ? 1 : 0;
+  look.shoe = sh < 0.6 ? 0 : sh < 0.85 ? 1 : 2;
+  look.cloth = c < 0.62 ? 0 : c < 0.82 ? 1 : 2;                 // tee, jacket (the pelvis takes the shirt colour), hoodie (hood at the neck)
+  if (look.cloth > 0) look.sleeves = 1;
+  if (look.skirt && rnd() < 0.5) look.skirt = 2;               // a dress takes the shirt colour
+  look.stoop = 0; look.carry = 0;
+  if (kind === "elder") { look.hair = pick(HAIR_ELDER); look.stoop = 0.1 + rnd() * 0.1; look.hat = rnd() < 0.35 ? (rnd() < 0.5 ? 1 : 2) : 0; look.hairStyle = look.skirt ? (rnd() < 0.5 ? 1 : 0) : rnd() < 0.3 ? 2 : 0; look.sleeves = 1; }
+  else if (cr < 0.07) { look.carry = 2; look.carryColor = pick(FLOSS_COLORS); }
+  else if (cr < 0.12) { look.carry = 3; look.carryColor = pick(BALLOON_COLORS); }
+  else if (cr < 0.17 && kind !== "kid") { look.carry = 5; look.carryColor = 0xe8a820; }
   return look;
 }
 
@@ -158,7 +177,11 @@ const GROUPS = [
   { w: 10, members: [["adult", 0.8, 0], ["kid", -0.65, 0.25]] },
   { w: 8, members: [["teen", 0.8, 0.1], ["teen", -0.8, 0.2]] },
   { w: 6, members: [["kid", 0.6, 0.1], ["kid", -0.6, 0.3]] },
+  { w: 5, members: [], leader: "elder" },
+  { w: 4, members: [["elder", 0.75, 0.05]], leader: "elder" },
+  { w: 5, members: [["kid", 0.75, 0.0]], pram: true },                    // a parent with a pushchair (and a toddler walking next to it)
 ];
+const pick = (rnd, list) => list[Math.floor(rnd() * list.length)];
 function pickGroup(rnd) {
   const total = GROUPS.reduce((s, g) => s + g.w, 0);
   let t = rnd() * total;
@@ -167,57 +190,124 @@ function pickGroup(rnd) {
 }
 
 /* ------------------------------------------------------------------------------------------------ the THREE part */
+/* ---- looks 2 ("Looks" wave): the figure shader.  Parts (aInfo.x): 0 skin 1 shirt 2 pelvis (pants, or the shirt for a jacket) 3 hair 4 prop colour 5 hat 6 shoe 7 legs (pants, skin under a skirt)
+ * 8 hair that only long / puffy styles have at the back 9 forearm (shirt for long sleeves, else skin) 10 eyes 11 skirt (pants, or the shirt for a dress).
+ * Groups (aInfo.y): 0 torso 1/2 thigh L/R 3/4 upper arm L/R 9 head 10/11 shin L/R 12/13 forearm + hand L/R.  Tags (aInfo.z): parts that exist only for some variants
+ * (1 long hair, 2 skirt, 3 hat crown, 4 hat brim, 5 ponytail, 6 hood).  Walk cycle: swing at the hip and shoulder, the knee bends while the leg swings through, the elbow follows. */
+const FIGURE_COMMON = `
+const float HIP = 0.92, KNEE = 0.49, SHOULDER = 1.385, ELBOW = 1.09, LEANY = 0.94;
+void rotX(inout vec3 p, inout vec3 n, float py, float a) {
+  float c = cos(a), s = sin(a); float dy = p.y - py;
+  p = vec3(p.x, py + dy * c + p.z * s, p.z * c - dy * s);
+  n = vec3(n.x, n.y * c + n.z * s, n.z * c - n.y * s);
+}`;
 const FIGURE_VERT = `
-attribute vec2 aInfo;            // x: part (0 skin 1 shirt 2 pants 3 hair 4 item 5 hat 6 shoe 7 lower leg), y: group (0 torso 1 legL 2 legR 3 armL 4 armR 5 item 6 long hair 7 skirt 8 hat brim 9 head)
+attribute vec3 aInfo;
 attribute vec4 iPos;             // x, y, z, heading
-attribute vec4 iParam;           // phase, walk amount, scale, item (0 none, 1 snack, 2 big)
-attribute vec4 iVar;             // hair style (0 short 1 long 2 bald), hat (0 none 1 cap 2 sun hat), build, skirt
-attribute vec3 iShirt; attribute vec3 iPants; attribute vec3 iHair; attribute vec3 iSkin; attribute vec3 iItem;
+attribute vec4 iParam;           // phase, walk amount, scale, item kind (0 none 1 food 2 candy floss 3 balloons 4 pushchair 5 mug)
+attribute vec4 iVar;             // hair style (0 short 1 long 2 bald 3 ponytail 4 puffy), hat (0 none 1 cap 2 sun hat), build, skirt (0 trousers 1 skirt 2 dress)
+attribute vec4 iVar2;            // sleeves (0 short 1 long), shoes (0 dark 1 white 2 brown), stoop (elderly lean), cloth (0 tee 1 jacket 2 hoodie)
+attribute vec3 iShirt; attribute vec3 iPants; attribute vec3 iHair; attribute vec3 iSkin;
 uniform vec3 uAmb; uniform vec3 uSunCol; uniform vec3 uSunDir; uniform float uNight; uniform float uTime;
-varying vec3 vColor; varying float vFog;
+varying vec3 vColor;
 #include <fog_pars_vertex>
+${FIGURE_COMMON}
 void main() {
   vec3 p = position; vec3 n = normal;
-  float part = aInfo.x; float grp = aInfo.y;
-  float amt = iParam.y; float swing = sin(iParam.x) * 0.62 * amt;
-  float pivotY = grp > 2.5 && grp < 4.5 ? 1.43 : 0.88;
-  float ang = 0.0;
-  if (grp > 0.5 && grp < 1.5) ang = swing; else if (grp > 1.5 && grp < 2.5) ang = -swing;
-  else if (grp > 2.5 && grp < 3.5) ang = -swing * 0.9; else if (grp > 3.5 && grp < 4.5) ang = swing * 0.9;
-  else if (grp > 4.5 && grp < 5.5) ang = swing * 0.9 - 0.25;
-  float c = cos(ang), s = sin(ang);
-  float dy = p.y - pivotY;
-  if (grp > 0.5 && grp < 5.5) { float z2 = p.z * c - dy * s; float y2 = pivotY + dy * c + p.z * s; p.z = z2; p.y = y2; float nz = n.z * c - n.y * s; float ny = n.y * c + n.z * s; n.z = nz; n.y = ny; }
-  // body build (torso and arms), the item (collapsed when the guest holds nothing), the variants (collapsed when not worn)
-  if (grp < 0.5 || (grp > 2.5 && grp < 4.5)) p.x *= iVar.z;
-  p.y += abs(sin(iParam.x)) * 0.03 * amt;
-  if (grp > 4.5 && grp < 5.5) { if (iParam.w < 0.5) p = vec3(0.0); else if (iParam.w > 1.5) { p.z += 0.28; p.y -= 0.34; p *= 1.9; } }
-  if (grp > 5.5 && grp < 6.5 && (iVar.x < 0.5 || iVar.x > 1.5)) p = vec3(0.0);
-  if (grp > 6.5 && grp < 7.5 && iVar.w < 0.5) p = vec3(0.0);
-  if (grp > 7.5 && grp < 8.5) { if (iVar.y < 0.5) p = vec3(0.0); else p.xz *= iVar.y > 1.5 ? 1.65 : 0.7; }
-  bool hatOn = iVar.y > 0.5;
-  if (grp > 8.5 && hatOn && p.y > 1.606) { p.xz *= 1.07; p.y += 0.02; }
-  // children have bigger heads
-  if ((grp > 5.5 && grp < 6.5) || grp > 7.5) { if (iParam.z < 0.8) { vec3 hc = vec3(0.0, 1.5, 0.0); p = hc + (p - hc) * 1.28; } }
+  float part = aInfo.x; float grp = aInfo.y; float tag = aInfo.z;
+  float ph = iParam.x; float amt = iParam.y; float kind = iParam.w;
+  // variants that exist only for some guests collapse to a point
+  if (tag > 0.5) {
+    bool show = true;
+    if (tag < 1.5) show = iVar.x > 0.5 && iVar.x < 1.5;
+    else if (tag < 2.5) show = iVar.w > 0.5;
+    else if (tag < 4.5) show = iVar.y > 0.5;
+    else if (tag < 5.5) show = iVar.x > 2.5 && iVar.x < 3.5;
+    else show = iVar2.w > 1.5;
+    if (!show) p = vec3(0.0);
+  }
+  bool hat = iVar.y > 0.5;
+  // hat brim: a small visor for the cap, a wide brim for the sun hat; puffy hair is bigger
+  if (tag > 3.5 && tag < 4.5) { if (iVar.y > 1.5) p.xz *= 1.7; else { p.xz *= 0.78; p.z += 0.075; } }
+  if (grp > 8.5 && grp < 9.5 && part > 2.5 && part < 3.5 && !(iVar.x > 1.5 && iVar.x < 2.5)) {          // hair has volume; the puffy style a lot
+    if (iVar.x > 3.5 && !hat) { p.xz *= 1.3; p.y += (p.y - 1.63) * 0.12; } else { p.xz *= 1.06; p.y += (p.y - 1.63) * 0.04; }
+  }
+  // walk cycle
+  float s0 = sin(ph);
+  float legL = s0 * 0.47 * amt, legR = -legL;
+  float kneeL = amt * (0.1 + 0.95 * max(0.0, cos(ph))), kneeR = amt * (0.1 + 0.95 * max(0.0, -cos(ph)));
+  float armL = -s0 * 0.42 * amt, armR = s0 * 0.42 * amt;
+  float elbL = 0.2 + amt * 0.55 * max(0.0, -s0), elbR = 0.2 + amt * 0.55 * max(0.0, s0);
+  // holding something: the right arm is bent up in front of the chest, a pushchair is held with both hands
+  if (kind > 0.5) { armR = 0.5 + s0 * 0.03 * amt; elbR = 1.25; }
+  if (kind > 3.5 && kind < 4.5) { armR = 0.55; elbR = 0.4; armL = 0.55; elbL = 0.4; }
+  if (grp > 0.5 && grp < 1.5) rotX(p, n, HIP, legL);
+  else if (grp > 1.5 && grp < 2.5) rotX(p, n, HIP, legR);
+  else if (grp > 9.5 && grp < 10.5) { rotX(p, n, KNEE, -kneeL); rotX(p, n, HIP, legL); }
+  else if (grp > 10.5 && grp < 11.5) { rotX(p, n, KNEE, -kneeR); rotX(p, n, HIP, legR); }
+  else if (grp > 2.5 && grp < 3.5) rotX(p, n, SHOULDER, armL);
+  else if (grp > 3.5 && grp < 4.5) rotX(p, n, SHOULDER, armR);
+  else if (grp > 11.5 && grp < 12.5) { rotX(p, n, ELBOW, elbL); rotX(p, n, SHOULDER, armL); }
+  else if (grp > 12.5 && grp < 13.5) { rotX(p, n, ELBOW, elbR); rotX(p, n, SHOULDER, armR); }
+  // the elderly stoop: everything above the hips leans forward
+  bool upper = (grp < 0.5 && p.y > LEANY) || (grp > 2.5 && grp < 4.5) || (grp > 8.5 && grp < 9.5) || grp > 11.5;
+  if (upper && iVar2.z > 0.0) rotX(p, n, LEANY, -iVar2.z);
+  // body build (torso and arms)
+  if (grp < 0.5 || (grp > 2.5 && grp < 4.5) || grp > 11.5) p.x *= iVar.z;
+  // a slightly big head (friendly proportions), bigger still on children
+  if (grp > 8.5 && grp < 9.5) { vec3 hc = vec3(0.0, 1.62, 0.0); p = hc + (p - hc) * (iParam.z < 0.8 ? 1.42 : 1.16); }
+  p.y += abs(s0) * 0.03 * amt;
   p *= iParam.z;
   float ch = cos(iPos.w), sh = sin(iPos.w);
-  vec3 world = vec3(iPos.x + ch * p.z - sh * p.x, iPos.y + p.y, iPos.z + sh * p.z + ch * p.x);
-  vec3 wn = vec3(ch * n.z - sh * n.x, n.y, sh * n.z + ch * n.x);
+  vec3 world = vec3(iPos.x + ch * p.z + sh * p.x, iPos.y + p.y, iPos.z + sh * p.z - ch * p.x);
+  vec3 wn = vec3(ch * n.z + sh * n.x, n.y, sh * n.z - ch * n.x);
   vec3 hatCol = iShirt.zxy * 0.85 + 0.06;
+  vec3 shoe = iVar2.y < 0.5 ? vec3(0.12, 0.11, 0.11) : iVar2.y < 1.5 ? vec3(0.9, 0.9, 0.88) : vec3(0.32, 0.2, 0.12);
+  bool longHair = iVar.x > 0.5 && iVar.x < 1.5 || iVar.x > 3.5;
   vec3 base;
   if (part < 0.5) base = iSkin;
   else if (part < 1.5) base = iShirt;
-  else if (part < 2.5) base = iPants;
-  else if (part < 3.5) base = iVar.x > 1.5 ? iSkin : (hatOn && grp > 8.5 ? hatCol : iHair);
-  else if (part < 4.5) base = iItem;
+  else if (part < 2.5) base = iVar2.w > 0.5 ? iShirt * 0.92 : iPants;
+  else if (part < 3.5) base = iVar.x > 1.5 && iVar.x < 2.5 ? iSkin : iHair;
+  else if (part < 4.5) base = iShirt;
   else if (part < 5.5) base = hatCol;
-  else if (part < 6.5) base = vec3(0.13, 0.12, 0.12);
-  else base = iVar.w > 0.5 ? iSkin * 0.92 : iPants;
+  else if (part < 6.5) base = shoe;
+  else if (part < 7.5) base = iVar.w > 0.5 ? iSkin * 0.94 : iPants;
+  else if (part < 8.5) base = longHair ? iHair : iSkin;
+  else if (part < 9.5) base = iVar2.x > 0.5 ? iShirt : iSkin;
+  else if (part < 10.5) base = vec3(0.1, 0.08, 0.08);
+  else base = iVar.w > 1.5 ? iShirt * 0.95 : iPants;
   float dir = clamp(dot(wn, uSunDir), 0.0, 1.0);
   vec3 light = (uAmb * (0.62 + 0.38 * wn.y) + uSunCol * dir) * 0.38;
   light = mix(light, max(light, vec3(0.42, 0.36, 0.3)), uNight * 0.85);
   float ground = mix(0.55, 1.0, smoothstep(0.0, 0.16, p.y / max(iParam.z, 0.1)));
   vColor = base * light * ground;
+  vec4 mvPosition = viewMatrix * vec4(world, 1.0);
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+/** carried things (own instanced mesh: only the guests that hold something): same transform as the figure, hand fixed in the "holding" pose */
+const PROP_VERT = `
+attribute vec3 aInfo;            // x part (0 main colour, 1 second, 2 third, 3 paper / dark, 4 white, 5 metal, 6 wheel), y unused, z kind
+attribute vec4 iPos; attribute vec4 iParam; attribute vec3 iItem;
+uniform vec3 uAmb; uniform vec3 uSunCol; uniform vec3 uSunDir; uniform float uNight;
+varying vec3 vColor;
+#include <fog_pars_vertex>
+void main() {
+  vec3 p = position; vec3 n = normal;
+  if (abs(aInfo.z - iParam.w) > 0.5) p = vec3(0.0);
+  p.y += abs(sin(iParam.x)) * 0.03 * iParam.y;
+  p *= iParam.z;
+  float ch = cos(iPos.w), sh = sin(iPos.w);
+  vec3 world = vec3(iPos.x + ch * p.z + sh * p.x, iPos.y + p.y, iPos.z + sh * p.z - ch * p.x);
+  vec3 wn = vec3(ch * n.z + sh * n.x, n.y, sh * n.z - ch * n.x);
+  float pt = aInfo.x; vec3 base;
+  if (pt < 0.5) base = iItem; else if (pt < 1.5) base = iItem.gbr; else if (pt < 2.5) base = iItem.brg;
+  else if (pt < 3.5) base = vec3(0.92, 0.86, 0.72); else if (pt < 4.5) base = vec3(0.96, 0.95, 0.92); else if (pt < 5.5) base = vec3(0.5, 0.52, 0.55); else base = vec3(0.09, 0.09, 0.1);
+  float dir = clamp(dot(wn, uSunDir), 0.0, 1.0);
+  vec3 light = (uAmb * (0.62 + 0.38 * wn.y) + uSunCol * dir) * 0.38;
+  light = mix(light, max(light, vec3(0.42, 0.36, 0.3)), uNight * 0.85);
+  vColor = base * light;
   vec4 mvPosition = viewMatrix * vec4(world, 1.0);
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
@@ -231,6 +321,8 @@ void main() {
   #include <colorspace_fragment>
   #include <fog_fragment>
 }`;
+/** the figure shaders, exported for the figure preview (tests / montages) */
+export const FIGURE_SHADERS = () => ({ FIGURE_VERT, FIGURE_FRAG, PROP_VERT });
 const DOT_VERT = `
 attribute vec3 iColor; uniform float uScale; uniform float uSize; uniform vec3 uAmb; uniform float uNight;
 varying vec3 vColor;
@@ -254,82 +346,149 @@ void main() {
   #include <fog_fragment>
 }`;
 
-/** figure geometry as plain arrays: [x, y, z] positions, smooth normals, per vertex part + group (see FIGURE_VERT).
- * level 'hi' (LOD0, within ~14 m): 142 triangles, rounded torso (6 sided, 3 rings + neck), tapered legs with shoes, tapered arms, icosphere head, a skirt, long hair, a hat brim.
- * level 'base' (default, LOD1, further out): 94 triangles, the same pieces without shoes, skirt, brim and neck. */
-export function figureArrays(level = "base") {
-  const hi = level === "hi";
+/** Figure geometry as plain arrays: positions, smooth normals, per vertex [part, group, tag] (see FIGURE_VERT).  Stylised low-poly human, 1.76 m: head with a flat face (nose, eyes),
+ * hair painted by face + panels, neck, tapered torso with shoulders, pelvis, thigh + shin with a knee, shoes, upper arm + forearm + hand, skirt, hat, hood, ponytail.
+ * level 'hi' (LOD0, within ~15 m): ~300 triangles; level 'base' (LOD1, beyond): ~120, legs and arms in one piece (no knee / elbow).  `propArrays()`: the carried things. */
+function geoBuilder() {
   const pos = [], nor = [], info = [];
   const norm = v => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
-  const tri = (a, b, c, na, nb, nc, pa, pb, pc, grp) => {
-    const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const g = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+  const area2 = (a, b, c) => { const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]; return [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; };
+  const tri = (a, b, c, na, nb, nc, part, grp, tag) => {
+    const g = area2(a, b, c);
+    if (Math.hypot(g[0], g[1], g[2]) < 1e-9) return;                       // degenerate (the pole of a lathe)
     const flip = g[0] * (na[0] + nb[0] + nc[0]) + g[1] * (na[1] + nb[1] + nc[1]) + g[2] * (na[2] + nb[2] + nc[2]) < 0;     // winding follows the intended outward normal
-    const vs = flip ? [[a, na, pa], [c, nc, pc], [b, nb, pb]] : [[a, na, pa], [b, nb, pb], [c, nc, pc]];
-    for (const [p, n, pt] of vs) { pos.push(p[0], p[1], p[2]); nor.push(n[0], n[1], n[2]); info.push(pt, grp); }
+    const vs = flip ? [[a, na], [c, nc], [b, nb]] : [[a, na], [b, nb], [c, nc]];
+    for (const [p, n] of vs) { pos.push(p[0], p[1], p[2]); nor.push(n[0], n[1], n[2]); info.push(part, grp, tag); }
   };
-  const flat = (a, b, c, pa, pb, pc, grp, hint) => {
-    const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    let n = norm([e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]);
+  const flat = (a, b, c, part, grp, tag, hint) => {
+    let n = norm(area2(a, b, c));
     if (hint && n[0] * hint[0] + n[1] * hint[1] + n[2] * hint[2] < 0) n = [-n[0], -n[1], -n[2]];
-    tri(a, b, c, n, n, n, pa, pb, pc, grp);
+    tri(a, b, c, n, n, n, part, grp, tag);
   };
-  // a lathe (tapered prism / rounded body): rings bottom to top, each { y, rx, rz, x, z, part }; smooth normals around the ring
-  const lathe = (rings, sides, grp, phase = 0) => {
+  const quad = (a, b, c, d, part, grp, tag, hint) => { flat(a, b, c, part, grp, tag, hint); flat(a, c, d, part, grp, tag, hint); };
+  /** a surface of revolution: rings bottom to top { y, rx, rz, x, z }; `part` is a number or (segment, side) => number; the last ring may be a pole (rx = 0) */
+  const lathe = (rings, sides, grp, { part = 0, tag = 0, phase = 0 } = {}) => {
     const sq = sides === 4 ? Math.SQRT2 : 1;
+    const slope = (i, key) => {
+      const sl = j => (rings[j + 1][key] - rings[j][key]) / (rings[j + 1].y - rings[j].y || 1e-6);
+      if (i === 0) return sl(0); if (i === rings.length - 1) return sl(i - 1); return (sl(i - 1) + sl(i)) / 2;
+    };
     const pt = (r, k) => { const th = (k + phase) / sides * TAU; return [(r.x || 0) + Math.cos(th) * r.rx * sq, r.y, (r.z || 0) + Math.sin(th) * r.rz * sq]; };
-    const nm = (r, k, ny) => { const th = (k + phase) / sides * TAU; return norm([Math.cos(th) / r.rx, ny, Math.sin(th) / r.rz]); };
+    const nm = (i, k) => {
+      const r = rings[i]; const top = i === rings.length - 1;
+      if (r.rx < 0.004) return [0, top ? 1 : -1, 0];
+      const th = (k + phase) / sides * TAU; const cx = Math.cos(th), sz = Math.sin(th);
+      const dRx = slope(i, "rx"), dRz = slope(i, "rz");
+      return norm([cx / r.rx, -(cx * cx * dRx / r.rx + sz * sz * dRz / r.rz), sz / r.rz]);
+    };
     for (let i = 0; i + 1 < rings.length; i++) {
-      const a = rings[i], b = rings[i + 1]; const ny = (a.rx - b.rx) / (Math.abs(b.y - a.y) + 1e-6) * 0.45 * Math.max(a.rx, 0.05);
       for (let k = 0; k < sides; k++) {
-        const a0 = pt(a, k), a1 = pt(a, k + 1), b0 = pt(b, k), b1 = pt(b, k + 1);
-        const na0 = nm(a, k, ny), na1 = nm(a, k + 1, ny), nb0 = nm(b, k, ny), nb1 = nm(b, k + 1, ny);
-        tri(a0, a1, b1, na0, na1, nb1, a.part, a.part, b.part, grp);
-        tri(a0, b1, b0, na0, nb1, nb0, a.part, b.part, b.part, grp);
+        const a0 = pt(rings[i], k), a1 = pt(rings[i], k + 1), b0 = pt(rings[i + 1], k), b1 = pt(rings[i + 1], k + 1);
+        const na0 = nm(i, k), na1 = nm(i, k + 1), nb0 = nm(i + 1, k), nb1 = nm(i + 1, k + 1);
+        const pf = typeof part === "function" ? part(i, k) : part;
+        tri(a0, a1, b1, na0, na1, nb1, pf, grp, tag);
+        tri(a0, b1, b0, na0, nb1, nb0, pf, grp, tag);
       }
     }
   };
-  const legSides = hi ? 5 : 4;
-  for (const [sx, grp] of [[1, 1], [-1, 2]]) {
-    const x = sx * 0.105;
-    lathe([{ y: hi ? 0.09 : 0.0, rx: hi ? 0.056 : 0.06, rz: hi ? 0.054 : 0.058, x, z: 0, part: hi ? 7 : 6 }, { y: 0.9, rx: 0.082, rz: 0.076, x, z: 0, part: 2 }], legSides, grp);
-    if (hi) lathe([{ y: 0.0, rx: 0.066, rz: 0.128, x, z: 0.05, part: 6 }, { y: 0.09, rx: 0.06, rz: 0.058, x, z: 0.0, part: 6 }], 4, grp, 0.5);
-  }
-  lathe([{ y: 0.84, rx: 0.165, rz: 0.095, part: 1 }, { y: 1.32, rx: 0.19, rz: 0.1, part: 1 }, { y: 1.46, rx: 0.195, rz: 0.088, part: 1 }], 6, 0);
-  if (hi) { const apex = [0, 1.54, 0]; const R = 0.07; for (let k = 0; k < 6; k++) { const t0 = k / 6 * TAU, t1 = (k + 1) / 6 * TAU; const a0 = [Math.cos(t0) * 0.195, 1.46, Math.sin(t0) * 0.088], a1 = [Math.cos(t1) * 0.195, 1.46, Math.sin(t1) * 0.088]; flat(a0, a1, [Math.cos((t0 + t1) / 2) * R * 0.6, 1.53, Math.sin((t0 + t1) / 2) * R * 0.5], 1, 1, 0, 0, [0, 1, 0]); } void apex; }
-  for (const [sx, grp] of [[1, 3], [-1, 4]]) lathe([{ y: 0.84, rx: 0.04, rz: 0.04, x: sx * 0.255, part: 0 }, { y: 1.43, rx: 0.05, rz: 0.05, x: sx * 0.245, part: 1 }], hi ? 5 : 4, grp);
-  // head: a low icosphere, the faces above the middle carry the hair (whole faces: the part id must not interpolate across 0..3)
-  const t = (1 + Math.sqrt(5)) / 2;
-  const raw = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]];
-  const faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
-  const R = 0.122 / Math.hypot(1, t);
-  const hv = raw.map(v => [v[0] * R * 0.92, 1.62 + v[1] * R * 1.08, v[2] * R]);
-  for (const f of faces) {
-    const a = hv[f[0]], b = hv[f[1]], c = hv[f[2]];
-    const hair = (a[1] + b[1] + c[1]) / 3 > 1.632 ? 3 : 0;
-    const nn = v => norm([(v[0]) / 0.92, (v[1] - 1.62) / 1.08, v[2]]);
-    tri(a, b, c, nn(a), nn(b), nn(c), hair, hair, hair, 9);
-  }
-  // long hair: a back panel and two side flaps (collapsed unless the guest has long hair)
-  const q = (a, b, c, d, hint) => { flat(a, b, c, 3, 3, 3, 6, hint); flat(a, c, d, 3, 3, 3, 6, hint); };
-  q([-0.125, 1.66, -0.085], [0.125, 1.66, -0.085], [0.15, 1.3, -0.12], [-0.15, 1.3, -0.12], [0, 0, -1]);
-  q([0.128, 1.66, 0.04], [0.128, 1.66, -0.085], [0.152, 1.3, -0.12], [0.152, 1.3, 0.0], [1, 0, 0]);
-  q([-0.128, 1.66, -0.085], [-0.128, 1.66, 0.04], [-0.152, 1.3, 0.0], [-0.152, 1.3, -0.12], [-1, 0, 0]);
+  return { pos, nor, info, tri, flat, quad, lathe, done: () => ({ position: new Float32Array(pos), normal: new Float32Array(nor), info: new Float32Array(info), triangles: pos.length / 9 }) };
+}
+
+export function figureArrays(level = "base") {
+  const hi = level === "hi";
+  const G = geoBuilder(); const { lathe, quad, flat } = G;
+  const R = (y, rx, rz, x = 0, z = 0) => ({ y, rx, rz, x, z });
+  const S = hi ? 7 : 6;
+  // torso (shirt) + pelvis (trousers / jacket) + neck
+  lathe(hi ? [R(0.94, 0.15, 0.095), R(1.2, 0.178, 0.108), R(1.395, 0.198, 0.098), R(1.465, 0.0, 0.0)] : [R(0.94, 0.15, 0.095), R(1.395, 0.198, 0.098), R(1.465, 0.0, 0.0)], S, 0, { part: 1 });
+  lathe([R(0.78, 0.155, 0.1), R(0.945, 0.15, 0.095)], S, 0, { part: 2 });
+  if (hi) lathe([R(1.41, 0.052, 0.052, 0, 0.005), R(1.53, 0.046, 0.05, 0, 0.012)], 5, 0, { part: 0 });
+  // skirt (collapsed unless worn)
+  lathe([R(0.96, 0.157, 0.1), R(0.56, 0.265, 0.2)], hi ? 6 : 5, 0, { part: 11, tag: 2 });
+  // head: faces choose their part (hair above the hairline at the back and the sides, skin on the face), a nose, eyes
+  const hairOf = hi
+    ? (i, k) => (i === 0 ? 0 : i === 1 ? (k >= 3 ? 8 : 0) : i === 2 ? (k !== 1 ? 3 : 0) : 3)
+    : (i, k) => (i === 0 ? 0 : i === 1 ? (k >= 2 ? 3 : 0) : 3);
+  lathe(hi ? [R(1.51, 0.04, 0.05, 0, 0.01), R(1.565, 0.088, 0.09), R(1.635, 0.115, 0.122), R(1.705, 0.108, 0.115), R(1.768, 0.0, 0.0)] : [R(1.545, 0.06, 0.06), R(1.65, 0.118, 0.122), R(1.735, 0.06, 0.06), R(1.77, 0.0, 0.0)], hi ? 8 : 5, 9, { part: hairOf, phase: 0.5 });
   if (hi) {
-    // hat brim: a flat hexagon above the forehead (scaled small for a cap, wide for a sun hat in the shader)
-    for (let k = 0; k < 6; k++) { const t0 = k / 6 * TAU, t1 = (k + 1) / 6 * TAU; flat([0, 1.655, 0], [Math.cos(t0) * 0.14, 1.652, Math.sin(t0) * 0.14], [Math.cos(t1) * 0.14, 1.652, Math.sin(t1) * 0.14], 5, 5, 5, 8, [0, 1, 0]); }
-    // skirt: a flared band over the legs (collapsed unless worn)
-    lathe([{ y: 0.52, rx: 0.27, rz: 0.19, part: 2 }, { y: 0.98, rx: 0.17, rz: 0.1, part: 2 }], 6, 7);
+    const nz = 0.115; flat([-0.02, 1.6, nz], [0.02, 1.6, nz], [0, 1.625, nz + 0.034], 0, 9, 0, [0, 0, 1]); flat([0.02, 1.6, nz], [0.0, 1.648, nz], [0, 1.625, nz + 0.034], 0, 9, 0, [0.5, 0, 1]);
+    flat([0.0, 1.648, nz], [-0.02, 1.6, nz], [0, 1.625, nz + 0.034], 0, 9, 0, [-0.5, 0, 1]);
+    for (const sx of [-1, 1]) { const x = sx * 0.045; quad([x - 0.016, 1.648, nz + 0.004], [x + 0.016, 1.648, nz + 0.004], [x + 0.016, 1.67, nz + 0.004], [x - 0.016, 1.67, nz + 0.004], 10, 9, 0, [0, 0, 1]); }
   }
-  // held item: a small box at the right hand (collapsed in the shader when the guest holds nothing)
-  const boxF = (x0, y0, z0, x1, y1, z1) => {
-    const f = (a, b, c, d, n) => { flat(a, b, c, 4, 4, 4, 5, n); flat(a, c, d, 4, 4, 4, 5, n); };
+  // long hair (three panels), ponytail, hood
+  if (hi) {
+    quad([-0.125, 1.66, 0.03], [-0.128, 1.66, -0.09], [-0.15, 1.33, -0.12], [-0.15, 1.34, 0.01], 3, 9, 1, [-1, 0, 0]);
+    quad([0.128, 1.66, -0.09], [0.125, 1.66, 0.03], [0.15, 1.34, 0.01], [0.15, 1.33, -0.12], 3, 9, 1, [1, 0, 0]);
+    lathe([R(1.5, 0.014, 0.014, 0, -0.185), R(1.72, 0.036, 0.036, 0, -0.115)], 3, 9, { part: 3, tag: 5 });
+  }
+  quad([-0.125, 1.66, -0.1], [0.125, 1.66, -0.1], [0.15, 1.33, -0.13], [-0.15, 1.33, -0.13], 3, 9, 1, [0, 0, -1]);
+  if (hi) {
+    quad([-0.13, 1.5, 0.0], [-0.115, 1.5, -0.12], [-0.155, 1.38, -0.15], [-0.18, 1.38, 0.0], 1, 0, 6, [-1, 0, -0.3]);
+    quad([-0.115, 1.5, -0.12], [0.115, 1.5, -0.12], [0.155, 1.38, -0.15], [-0.155, 1.38, -0.15], 1, 0, 6, [0, 0, -1]);
+    quad([0.115, 1.5, -0.12], [0.13, 1.5, 0.0], [0.18, 1.38, 0.0], [0.155, 1.38, -0.15], 1, 0, 6, [1, 0, -0.3]);
+  }
+  // hat: crown + brim (a visor for the cap and a wide brim for the sun hat are made from it in the shader)
+  lathe([R(1.662, 0.128, 0.134), R(1.775, 0.118, 0.124), R(1.795, 0.0, 0.0)], hi ? 6 : 5, 9, { part: 5, tag: 3 });
+  {
+    const n = hi ? 6 : 5; const br = (k, y) => [Math.cos(k / n * TAU) * 0.16, y, Math.sin(k / n * TAU) * 0.17];
+    for (let k = 0; k < n; k++) { flat([0, 1.668, 0], br(k + 1, 1.668), br(k, 1.668), 5, 9, 4, [0, 1, 0]); if (hi) flat([0, 1.666, 0], br(k, 1.666), br(k + 1, 1.666), 5, 9, 4, [0, -1, 0]); }
+  }
+  // legs
+  for (const [sx, gT, gS] of [[1, 1, 10], [-1, 2, 11]]) {
+    const x = sx * 0.088;
+    if (hi) {
+      lathe([R(0.49, 0.062, 0.062, x), R(0.925, 0.083, 0.08, x)], 5, gT, { part: 7 });
+      lathe([R(0.085, 0.045, 0.045, x), R(0.495, 0.062, 0.062, x)], 5, gS, { part: 7 });
+      lathe([R(0.0, 0.05, 0.116, x, 0.036), R(0.088, 0.046, 0.058, x, 0.0)], 4, gS, { part: 6, phase: 0.5 });
+    } else lathe([R(0.04, 0.045, 0.045, x), R(0.925, 0.082, 0.08, x)], 4, gT, { part: 7 });
+  }
+  // arms
+  for (const [sx, gU, gF] of [[1, 3, 12], [-1, 4, 13]]) {
+    if (hi) {
+      lathe([R(1.09, 0.04, 0.04, sx * 0.247), R(1.39, 0.05, 0.05, sx * 0.222)], 5, gU, { part: 1 });
+      lathe([R(0.83, 0.034, 0.034, sx * 0.262), R(1.095, 0.04, 0.04, sx * 0.247)], 5, gF, { part: 9 });
+      lathe([R(0.73, 0.026, 0.026, sx * 0.266), R(0.835, 0.035, 0.035, sx * 0.262)], 4, gF, { part: 0 });
+    } else lathe([R(0.76, 0.03, 0.03, sx * 0.265), R(1.39, 0.05, 0.05, sx * 0.222)], 4, sx > 0 ? 3 : 4, { part: 9 });
+  }
+  return G.done();
+}
+
+/** carried things, all kinds in one mesh (aInfo.z = kind, see PROP_VERT); positions in the guest's frame: the right hand holds at about (-0.25, 1.2, 0.47) */
+export function propArrays() {
+  const G = geoBuilder(); const { lathe, quad, flat } = G;
+  const R = (y, rx, rz, x = 0, z = 0) => ({ y, rx, rz, x, z });
+  const box = (x0, y0, z0, x1, y1, z1, part, kind) => {
+    const f = (a, b, c, d, n) => quad(a, b, c, d, part, 0, kind, n);
     f([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1]); f([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1]);
     f([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0]); f([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0]);
-    f([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0]); f([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0]);
+    f([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0]);
   };
-  boxF(0.2, 1.0, 0.1, 0.32, 1.12, 0.22);
-  return { position: new Float32Array(pos), normal: new Float32Array(nor), info: new Float32Array(info), triangles: pos.length / 9 };
+  const hx = -0.25, hy = 1.2, hz = 0.47;
+  // 1 food: a paper tray with the food heaped on it
+  box(hx - 0.1, hy - 0.05, hz - 0.08, hx + 0.1, hy - 0.01, hz + 0.08, 3, 1);
+  lathe([R(hy - 0.01, 0.075, 0.06, hx, hz), R(hy + 0.06, 0.05, 0.04, hx, hz), R(hy + 0.075, 0.0, 0.0, hx, hz)], 5, 0, { part: 0, tag: 1 });
+  // 2 candy floss: a stick and a cloud
+  lathe([R(hy - 0.12, 0.012, 0.012, hx, hz), R(hy + 0.28, 0.012, 0.012, hx, hz)], 4, 0, { part: 3, tag: 2 });
+  lathe([R(hy + 0.2, 0.04, 0.04, hx, hz), R(hy + 0.3, 0.115, 0.115, hx, hz), R(hy + 0.41, 0.14, 0.14, hx, hz), R(hy + 0.51, 0.09, 0.09, hx, hz), R(hy + 0.56, 0.0, 0.0, hx, hz)], 8, 0, { part: 0, tag: 2 });
+  // 3 balloons: three small octahedra on strings
+  [[-0.3, 2.28, 0.5, 0], [-0.1, 2.42, 0.58, 1], [-0.45, 2.2, 0.6, 2]].forEach(([x, y, z, c]) => {
+    lathe([R(y - 0.15, 0.0, 0.0, x, z), R(y, 0.1, 0.1, x, z), R(y + 0.12, 0.0, 0.0, x, z)], 4, 0, { part: c, tag: 3 });
+    flat([hx, hy + 0.05, hz], [x - 0.004, y - 0.15, z], [x + 0.004, y - 0.15, z], 3, 0, 3, [0, 0, 1]);
+  });
+  // 4 pushchair: handle, frame, bed, hood, wheels
+  box(-0.28, 0.93, 0.38, 0.28, 0.97, 0.43, 5, 4);
+  box(-0.24, 0.5, 0.58, 0.24, 0.68, 1.18, 0, 4);
+  lathe([R(0.68, 0.24, 0.3, 0, 1.0), R(0.92, 0.2, 0.24, 0, 1.06), R(1.0, 0.0, 0.0, 0, 1.08)], 6, 0, { part: 1, tag: 4 });
+  box(-0.02, 0.22, 0.6, 0.02, 0.94, 0.64, 5, 4); box(-0.02, 0.22, 1.1, 0.02, 0.5, 1.14, 5, 4);
+  for (const x of [-0.27, 0.27]) for (const z of [0.66, 1.1]) box(x - 0.025, 0.02, z - 0.1, x + 0.025, 0.22, z + 0.1, 6, 4);
+  // 5 mug: a glass of beer with foam
+  lathe([R(hy - 0.07, 0.04, 0.04, hx, hz), R(hy + 0.05, 0.046, 0.046, hx, hz)], 6, 0, { part: 0, tag: 5 });
+  lathe([R(hy + 0.05, 0.048, 0.048, hx, hz), R(hy + 0.085, 0.048, 0.048, hx, hz), R(hy + 0.095, 0.0, 0.0, hx, hz)], 6, 0, { part: 4, tag: 5 });
+  const out = G.done();
+  const info = new Float32Array(out.info.length / 3 * 3); // (part, 0, kind): the builder wrote (part, grp, tag)
+  for (let i = 0; i < info.length; i += 3) { info[i] = out.info[i]; info[i + 1] = 0; info[i + 2] = out.info[i + 2]; }
+  out.info = info;
+  return out;
 }
 
 export function createCrowd({ T, r, world, game, mask, corridors, polylines = [], rects, faces, quality = "medium", env, seed = 11, getFocus, onBleat = () => {} }) {
@@ -346,23 +505,24 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
   const maxCap = CROWD_CAP.high;
   const uniforms = T.UniformsUtils.merge([T.UniformsLib.fog, { uAmb: { value: new T.Vector3(1, 1, 1) }, uSunCol: { value: new T.Vector3(1, 1, 1) }, uSunDir: { value: new T.Vector3(0, 1, 0) }, uNight: { value: 0 }, uTime: { value: 0 } }]);
   const figMat = new T.ShaderMaterial({ vertexShader: FIGURE_VERT, fragmentShader: FIGURE_FRAG, uniforms, fog: true });
-  const makeSet = (level, name) => {
-    const fig = figureArrays(level);
+  const FIELDS = { pos: ["iPos", 4], param: ["iParam", 4], vars: ["iVar", 4], vars2: ["iVar2", 4], shirt: ["iShirt", 3], pants: ["iPants", 3], hair: ["iHair", 3], skin: ["iSkin", 3], item: ["iItem", 3] };
+  const makeSet = (fig, material, keys, name) => {
     const geo = new T.InstancedBufferGeometry();
     geo.setAttribute("position", new T.BufferAttribute(fig.position, 3));
     geo.setAttribute("normal", new T.BufferAttribute(fig.normal, 3));
-    geo.setAttribute("aInfo", new T.BufferAttribute(fig.info, 2));
-    const arr = { pos: new Float32Array(maxCap * 4), param: new Float32Array(maxCap * 4), vars: new Float32Array(maxCap * 4), shirt: new Float32Array(maxCap * 3), pants: new Float32Array(maxCap * 3), hair: new Float32Array(maxCap * 3), skin: new Float32Array(maxCap * 3), item: new Float32Array(maxCap * 3) };
-    const names = { pos: ["iPos", 4], param: ["iParam", 4], vars: ["iVar", 4], shirt: ["iShirt", 3], pants: ["iPants", 3], hair: ["iHair", 3], skin: ["iSkin", 3], item: ["iItem", 3] };
-    const attrs = {};
-    for (const k of Object.keys(arr)) { const at = new T.InstancedBufferAttribute(arr[k], names[k][1]); at.setUsage(T.DynamicDrawUsage); geo.setAttribute(names[k][0], at); attrs[k] = at; }
+    geo.setAttribute("aInfo", new T.BufferAttribute(fig.info, 3));
+    const arr = {}, attrs = {};
+    for (const k of keys) { arr[k] = new Float32Array(maxCap * FIELDS[k][1]); const at = new T.InstancedBufferAttribute(arr[k], FIELDS[k][1]); at.setUsage(T.DynamicDrawUsage); geo.setAttribute(FIELDS[k][0], at); attrs[k] = at; }
     geo.instanceCount = 0;
-    const mesh = new T.Mesh(geo, figMat); mesh.frustumCulled = false; mesh.name = name; mesh.renderOrder = 2;
+    const mesh = new T.Mesh(geo, material); mesh.frustumCulled = false; mesh.name = name; mesh.renderOrder = 2;
     return { geo, arr, attrs, mesh, n: 0, tris: fig.triangles };
   };
-  const hiSet = makeSet("hi", "fouer-crowd"), loSet = makeSet("base", "fouer-crowd-lod1");
+  const FIG_KEYS = ["pos", "param", "vars", "vars2", "shirt", "pants", "hair", "skin"];
+  const hiSet = makeSet(figureArrays("hi"), figMat, FIG_KEYS, "fouer-crowd"), loSet = makeSet(figureArrays("base"), figMat, FIG_KEYS, "fouer-crowd-lod1");
+  const propMat = new T.ShaderMaterial({ vertexShader: PROP_VERT, fragmentShader: FIGURE_FRAG, uniforms, fog: true });
+  const propSet = makeSet(propArrays(), propMat, ["pos", "param", "item"], "fouer-crowd-props");
   // per-agent source data (by id): colours and variants, copied into the sets of the guests that are drawn as figures
-  const A = { shirt: new Float32Array(maxCap * 3), pants: new Float32Array(maxCap * 3), hair: new Float32Array(maxCap * 3), skin: new Float32Array(maxCap * 3), item: new Float32Array(maxCap * 3), vars: new Float32Array(maxCap * 4) };
+  const A = { shirt: new Float32Array(maxCap * 3), pants: new Float32Array(maxCap * 3), hair: new Float32Array(maxCap * 3), skin: new Float32Array(maxCap * 3), item: new Float32Array(maxCap * 3), vars: new Float32Array(maxCap * 4), vars2: new Float32Array(maxCap * 4) };
   const dotGeo = new T.BufferGeometry();
   const dotPos = new Float32Array(maxCap * 3), dotCol = new Float32Array(maxCap * 3);
   const dotPosAttr = new T.BufferAttribute(dotPos, 3); dotPosAttr.setUsage(T.DynamicDrawUsage);
@@ -371,21 +531,22 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
   const dotMat = new T.ShaderMaterial({ vertexShader: DOT_VERT, fragmentShader: DOT_FRAG, uniforms: T.UniformsUtils.merge([T.UniformsLib.fog, { uScale: { value: 500 }, uSize: { value: 0.8 }, uAmb: uniforms.uAmb, uNight: uniforms.uNight }]), fog: true });
   const dots = new T.Points(dotGeo, dotMat); dots.frustumCulled = false; dots.name = "fouer-crowd-dots"; dots.renderOrder = 2;
 
-  const group = new T.Group(); group.name = "fouer-crowd-group"; group.add(hiSet.mesh, loSet.mesh, dots);
+  const group = new T.Group(); group.name = "fouer-crowd-group"; group.add(hiSet.mesh, loSet.mesh, propSet.mesh, dots);
   r.gameRoot.add(group);
 
   /* ---- Hämmi: white fluffy sheep with a red-white-light-blue ribbon, one merged vertex-coloured mesh */
   const sheep = (() => {
     const parts = [];
-    const add = (geometry, color, matrix) => { const g = geometry.index ? geometry.toNonIndexed() : geometry.clone(); g.applyMatrix4(matrix); const c = new T.Color(color); const n = g.attributes.position.count; const arr = new Float32Array(n * 3); for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; } g.setAttribute("color", new T.BufferAttribute(arr, 3)); g.deleteAttribute("uv"); parts.push(g); };
+    const add = (geometry, color, matrix, smooth = false) => { const g = geometry.index ? geometry.toNonIndexed() : geometry.clone(); if (smooth) { const pa = g.attributes.position, na = g.attributes.normal; for (let i = 0; i < pa.count; i++) { const l = Math.hypot(pa.getX(i), pa.getY(i), pa.getZ(i)) || 1; na.setXYZ(i, pa.getX(i) / l, pa.getY(i) / l, pa.getZ(i) / l); } } g.applyMatrix4(matrix); const c = new T.Color(color); const n = g.attributes.position.count; const arr = new Float32Array(n * 3); for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; } g.setAttribute("color", new T.BufferAttribute(arr, 3)); g.deleteAttribute("uv"); parts.push(g); };
     const M = (x, y, z, sx = 1, sy = 1, sz = 1) => new T.Matrix4().compose(new T.Vector3(x, y, z), new T.Quaternion(), new T.Vector3(sx, sy, sz));
-    add(new T.IcosahedronGeometry(0.5, 1), 0xf6f3ea, M(0, 0.68, 0, 0.9, 0.78, 1.25));
-    add(new T.IcosahedronGeometry(0.3, 0), 0xfaf8f0, M(0, 0.95, -0.28, 1, 0.8, 1));
-    // wool tufts: a fluffy outline instead of a smooth egg
-    for (const [x, y, z, k] of [[-0.34, 0.8, 0.3, 0.2], [0.34, 0.8, 0.3, 0.2], [-0.36, 0.78, -0.25, 0.22], [0.36, 0.78, -0.25, 0.22], [0, 1.08, 0.2, 0.22], [0, 1.02, -0.52, 0.2]]) add(new T.IcosahedronGeometry(k, 0), 0xfbf9f2, M(x, y, z));
+    add(new T.IcosahedronGeometry(0.5, 2), 0xf6f3ea, M(0, 0.68, 0, 0.9, 0.78, 1.25), true);
+    add(new T.IcosahedronGeometry(0.3, 1), 0xfaf8f0, M(0, 0.95, -0.28, 1, 0.8, 1), true);
+    // looks wave: curly wool, a ring of tufts round the body and a crown of them on the back (cream and white alternating), each smooth shaded
+    const tufts = [[-0.34, 0.8, 0.3, 0.2], [0.34, 0.8, 0.3, 0.2], [-0.36, 0.78, -0.25, 0.22], [0.36, 0.78, -0.25, 0.22], [0, 1.08, 0.2, 0.22], [0, 1.02, -0.52, 0.2], [-0.3, 1.0, -0.05, 0.2], [0.3, 1.0, -0.05, 0.2], [-0.38, 0.6, 0.05, 0.19], [0.38, 0.6, 0.05, 0.19], [-0.2, 1.12, -0.3, 0.17], [0.2, 1.12, -0.3, 0.17], [0, 0.58, -0.56, 0.17], [-0.3, 0.6, -0.4, 0.17], [0.3, 0.6, -0.4, 0.17], [0, 0.96, 0.42, 0.17]];
+    tufts.forEach(([x, y, z, k], i) => add(new T.IcosahedronGeometry(k, 1), i & 1 ? 0xfbf9f2 : 0xf3efe4, M(x, y, z), true));
     // the head: a warm cream face with a woolly fringe, dark eyes and nose, pink ears
-    add(new T.IcosahedronGeometry(0.2, 1), 0xf0dcc8, M(0, 0.9, 0.66, 0.9, 1, 1.05));
-    add(new T.IcosahedronGeometry(0.15, 0), 0xfbf9f2, M(0, 1.07, 0.6));
+    add(new T.IcosahedronGeometry(0.2, 2), 0xf0dcc8, M(0, 0.9, 0.66, 0.9, 1, 1.05), true);
+    add(new T.IcosahedronGeometry(0.15, 1), 0xfbf9f2, M(0, 1.07, 0.6), true);
     add(new T.BoxGeometry(0.05, 0.06, 0.04), 0x2a2228, M(-0.085, 0.95, 0.82)); add(new T.BoxGeometry(0.05, 0.06, 0.04), 0x2a2228, M(0.085, 0.95, 0.82));
     add(new T.BoxGeometry(0.08, 0.05, 0.05), 0x4a3238, M(0, 0.86, 0.86));
     add(new T.BoxGeometry(0.14, 0.04, 0.09), 0xe9a9a4, new T.Matrix4().compose(new T.Vector3(-0.22, 0.97, 0.62), new T.Quaternion().setFromEuler(new T.Euler(0, 0, 0.5)), new T.Vector3(1, 1, 1)));
@@ -480,10 +641,11 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
   function dress(a, kind, leader = null) {
     a.look = makeLook(rnd, kind);
     a.speed = leader ? leader.speed : a.look.speed;
-    a.item = 0; a.itemUntil = 0; a.state = "walk"; a.dest = null; a.slot = null; a.queuePitch = -1; a.timer = 0; a.cooldown = 4 + rnd() * 10; a.walk = 0;
+    a.item = a.look.carry; a.itemColor = a.look.carryColor || 0xff8ac8; a.itemUntil = a.item ? 1e9 : 0; a.state = "walk"; a.dest = null; a.slot = null; a.queuePitch = -1; a.timer = 0; a.cooldown = 4 + rnd() * 10; a.walk = 0;
     const i = a.id;
     col(a.look.shirt, A.shirt, i * 3); col(a.look.pants, A.pants, i * 3); col(a.look.hair, A.hair, i * 3); col(a.look.skin, A.skin, i * 3);
     A.vars[i * 4] = a.look.hairStyle; A.vars[i * 4 + 1] = a.look.hat; A.vars[i * 4 + 2] = a.look.build; A.vars[i * 4 + 3] = a.look.skirt;
+    A.vars2[i * 4] = a.look.sleeves; A.vars2[i * 4 + 1] = a.look.shoe; A.vars2[i * 4 + 2] = a.look.stoop; A.vars2[i * 4 + 3] = a.look.cloth;
   }
 
   function spawnGroup(f, room = 4) {
@@ -497,7 +659,8 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
     if (free.length < size) return false;
     const leader = free[0];
     if (!place(leader, f)) return false;
-    dress(leader, rnd() < 0.12 ? "teen" : "adult");
+    dress(leader, recipe.leader || (rnd() < 0.12 ? "teen" : "adult"));
+    if (recipe.pram) { leader.item = 4; leader.itemUntil = 1e9; leader.itemColor = pick(rnd, PRAM_COLORS); leader.look.skirt = 0; A.vars[leader.id * 4 + 3] = 0; }
     leader.active = true; leader.leader = null; leader.members = [];
     active++;
     recipe.members.forEach(([kind, ox, oz], k) => {
@@ -611,7 +774,7 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
       case "wait": {
         a.timer -= dt; tx = a.ix; tz = a.iz; face = { spot: { x: rects[a.dest.i].u, z: rects[a.dest.i].w } };
         if (a.timer <= 0) {
-          if (a.dest.kind === "food") { a.item = 1; a.itemColor = FOOD_COLORS[a.dest.item] ?? 0xe0a24a; a.itemUntil = 18 + rnd() * 20; }
+          if (a.dest.kind === "food" && a.item !== 4) { a.item = FOOD_KIND[a.dest.item] ?? 1; a.itemColor = a.item === 2 ? pick(rnd, FLOSS_COLORS) : FOOD_COLORS[a.dest.item] ?? 0xe0a24a; a.itemUntil = 18 + rnd() * 20; }
           a.state = "return";
         }
         break;
@@ -733,7 +896,7 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
       }
     }
     // step everybody, write the instance data (indexed by agent id: far guests get scale 0 here and a dot below)
-    let near = 0, nDots = 0; hiSet.n = 0; loSet.n = 0;
+    let near = 0, nDots = 0; hiSet.n = 0; loSet.n = 0; propSet.n = 0;
     const nearR = mode === "walk" ? NEAR_WALK : mode === "ride" ? NEAR_RIDE : NEAR_BUILDER;
     const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z;
     for (const a of agents) {
@@ -764,10 +927,16 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
         const S = a.dist <= NEAR_HI ? hiSet : loSet; const i = S.n++; const o = i * 4, o3 = i * 3, s3 = a.id * 3;
         const P = S.arr;
         P.pos[o] = a.x; P.pos[o + 1] = y; P.pos[o + 2] = a.z; P.pos[o + 3] = a.yaw;
-        P.param[o] = a.phase; P.param[o + 1] = a.walk; P.param[o + 2] = a.look.scale; P.param[o + 3] = a.item ? 1 : 0;
+        P.param[o] = a.phase; P.param[o + 1] = a.walk; P.param[o + 2] = a.look.scale; P.param[o + 3] = a.item;
         const v4 = a.id * 4; P.vars[o] = A.vars[v4]; P.vars[o + 1] = A.vars[v4 + 1]; P.vars[o + 2] = A.vars[v4 + 2]; P.vars[o + 3] = A.vars[v4 + 3];
+        P.vars2[o] = A.vars2[v4]; P.vars2[o + 1] = A.vars2[v4 + 1]; P.vars2[o + 2] = A.vars2[v4 + 2]; P.vars2[o + 3] = A.vars2[v4 + 3];
         for (let c = 0; c < 3; c++) { P.shirt[o3 + c] = A.shirt[s3 + c]; P.pants[o3 + c] = A.pants[s3 + c]; P.hair[o3 + c] = A.hair[s3 + c]; P.skin[o3 + c] = A.skin[s3 + c]; }
-        if (a.item) col(a.itemColor, P.item, o3);
+        if (a.item && a.dist <= NEAR_PROP) {                    // carried things (only within 24 m: they are small): own instanced mesh, the same transform
+          const Q = propSet.arr, j = propSet.n++, j4 = j * 4;
+          Q.pos[j4] = a.x; Q.pos[j4 + 1] = y; Q.pos[j4 + 2] = a.z; Q.pos[j4 + 3] = a.yaw;
+          Q.param[j4] = a.phase; Q.param[j4 + 1] = a.walk; Q.param[j4 + 2] = a.look.scale; Q.param[j4 + 3] = a.item;
+          col(a.itemColor, Q.item, j * 3);
+        }
         near++;
       } else {
         const d3 = nDots * 3;
@@ -776,7 +945,7 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
         nDots++;
       }
     }
-    for (const S of [hiSet, loSet]) { S.geo.instanceCount = S.n; for (const k of Object.keys(S.attrs)) S.attrs[k].needsUpdate = S.n > 0; }
+    for (const S of [hiSet, loSet, propSet]) { S.geo.instanceCount = S.n; for (const k of Object.keys(S.attrs)) S.attrs[k].needsUpdate = S.n > 0; }
     dotGeo.setDrawRange(0, nDots); dotPosAttr.needsUpdate = true; dotColAttr.needsUpdate = true;
     stats.near = near; stats.hi = hiSet.n; stats.far = nDots; stats.active = active; stats.queued = queued;
     updateSheep(dt);
@@ -815,7 +984,7 @@ export function createCrowd({ T, r, world, game, mask, corridors, polylines = []
     refresh() { recount = 0; queueClock = 0; },
     /** spread the free guests around the focus again (after a teleport, a mode change) */
     repopulate() { repop = true; },
-    dispose() { r.gameRoot.remove(group, sheep); hiSet.geo.dispose(); loSet.geo.dispose(); dotGeo.dispose(); figMat.dispose(); dotMat.dispose(); sheep.geometry.dispose(); sheep.material.dispose(); },
+    dispose() { r.gameRoot.remove(group, sheep); hiSet.geo.dispose(); loSet.geo.dispose(); propSet.geo.dispose(); dotGeo.dispose(); figMat.dispose(); propMat.dispose(); dotMat.dispose(); sheep.geometry.dispose(); sheep.material.dispose(); },
   };
   game.on("change", () => { recount = 0; });
   return api;

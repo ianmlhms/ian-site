@@ -10,6 +10,8 @@
  * (cos yaw, sin yaw); the RIGHT hand is (-sin yaw, cos yaw). So D / joystick-right is +right and A / joystick-left is -right: the v1 walk mode
  * had these swapped (vault notes), flows/fouer_walk.mjs checks it by projecting the real movement on the camera's right vector. */
 
+import { isRideable, RIDE_DEFS } from "./rides/catalog.js";
+
 export const WALK = Object.freeze({
   eye: 1.65, fov: 70, near: 0.2, radius: 0.34, speed: 2.0, run: 4.0, accel: 9, pitchLimit: 75 * Math.PI / 180,
   turnKeys: 1.9, lookTouch: 0.0042, lookMouse: 0.0034, bob: 0.028, stickRadius: 56, interactRange: 3.4, sheepRange: 3.6,
@@ -293,7 +295,6 @@ export const angleDelta = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d 
 /* ------------------------------------------------------------------------------------------------ the controller */
 const FOOD = new Set(["kachel", "fritten", "wurscht", "zocker", "mandel", "waffel", "fesch", "crepes", "tent"]);
 const GAMES = new Set(["lous", "lukas", "schiess"]);
-const COASTERS = new Set(["maus", "looping", "alpina", "splash", "geister"]);
 export const isFood = id => FOOD.has(id);
 const FOOD_ICON = { kachel: "🥔", fritten: "🍟", wurscht: "🌭", zocker: "🍭", mandel: "🌰", waffel: "🧇", fesch: "🐟", crepes: "🥞", tent: "🍺" };
 const EAT_SECONDS = 2.0;
@@ -582,7 +583,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
       else if (entry.k === "wheel") {
         const b = ride.boardInfo(i);
         if (b) { const bd = Math.hypot(px - b.u, pz - b.w); if (bd <= b.radius) list.push({ kind: "wheel", i, d: bd * 0.6, icon: "🎡", label: "act.ride" }); }
-      } else if (COASTERS.has(entry.k)) { if (d <= WALK.interactRange + 0.8 && frontOk(i, px, pz) && ride.canCoaster(i)) list.push({ kind: "coaster", i, item: entry.k, d, icon: entry.k === "splash" ? "🌊" : entry.k === "geister" ? "👻" : "🎢", label: "act.ride" }); }
+      } else if (isRideable(entry.k)) { if (d <= WALK.interactRange + 0.8 && frontOk(i, px, pz) && ride.canRide(i)) list.push({ kind: "ride", i, item: entry.k, d, icon: RIDE_DEFS[entry.k].icon, label: "act.ride" }); }
       else if (GAMES.has(entry.k)) { if (d <= WALK.interactRange && frontOk(i, px, pz)) list.push({ kind: "play", i, item: entry.k, d, icon: entry.k === "lukas" ? "🔨" : entry.k === "schiess" ? "🎯" : "🎟️", label: "act.play" }); }
     });
     const probe = ride.probeSpot();
@@ -614,7 +615,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
       case "eat": eat(target.i, target.item); break;
       case "wheel": ride.boardWheel(target.i); break;
       case "probe": ride.probe(); break;
-      case "coaster": ride.boardCoaster(target.i); break;
+      case "ride": ride.board(target.i); break;
       case "play": playGame(target); break;
       case "pet": petSheep(); break;
       default: break;
@@ -646,8 +647,11 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   }
   function refreshFoodie() {
     const f = game.foodie();
-    foodieEl.hidden = f.stacks === 0;
-    if (f.stacks) foodieEl.innerHTML = `<b>🍴 ${esc(T_("foodie.title"))} ×${foodieText(f.mult)}</b><small>${esc(formatSeconds(f.left))}</small>`;
+    foodieEl.hidden = f.stacks === 0 && !f.fun;
+    const parts = [];
+    if (f.stacks) parts.push(`<b>🍴 ${esc(T_("foodie.title"))} ×${foodieText(f.mult)}</b><small>${esc(formatSeconds(f.left))}</small>`);
+    if (f.fun) parts.push(`<b>🎠 ${esc(T_("fun.title"))} +3%</b><small>${esc(formatSeconds(f.funLeft))}</small>`);
+    if (parts.length) foodieEl.innerHTML = parts.join("");
   }
   const esc = text => String(text).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const formatSeconds = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -715,10 +719,12 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   function update(dt) {
     if (!state.active) return;
     state.clock += dt;
-    if (input.keys.has("tl")) view.yaw -= WALK.turnKeys * dt;
-    if (input.keys.has("tr")) view.yaw += WALK.turnKeys * dt;
+    if (!ride.steering) {
+      if (input.keys.has("tl")) view.yaw -= WALK.turnKeys * dt;
+      if (input.keys.has("tr")) view.yaw += WALK.turnKeys * dt;
+    }
     const rideOn = ride.active;
-    if (fair.setTiled) fair.setTiled(!rideOn);                // the ride shows the whole field: merged meshes there
+    if (fair.setTiled) fair.setTiled(!(rideOn && ride.untiled));      // the wheel shows the whole field: merged meshes there; the other rides keep the tiles (frustum culling)
     if (!rideOn) {
       const mv = moveVector();
       const locked = state.eating > 0;
@@ -744,7 +750,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     state.scan -= dt;
     if (state.scan <= 0) { state.scan = 0.15; tramObstacle(); scanTargets(); refreshButton(); cashEl.textContent = ui.money(game.state.c); refreshFoodie(); }
     if (state.eating > 0) { state.eating -= dt; if (state.eating <= 0) { eatEl.hidden = true; eatEl.classList.remove("go"); } }
-    stickEl.hidden = !(input.touchSeen || matchMedia("(pointer: coarse)").matches);
+    stickEl.hidden = !(input.touchSeen || matchMedia("(pointer: coarse)").matches) || (ride.active && !ride.steering);      // a passive ride has nothing to steer: only the bumper cars keep the stick
     keysEl.hidden = !stickEl.hidden || ride.active;
     applyCamera(dt);
   }
@@ -773,6 +779,12 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     addLook: look, hud, labels,
     refreshLabels() { labels(); },
     inputState: () => ({ keys: [...input.keys], stick: { ...input.stick } }),
+    /** the bumper-car controls: throttle (W / stick up = +1) and steer (D / arrow right / stick right = +1, a right turn) */
+    driveControls() {
+      const mv = moveVector();
+      const turn = (input.keys.has("tr") ? 1 : 0) - (input.keys.has("tl") ? 1 : 0);
+      return { throttle: clamp(mv.f, -1, 1), steer: clamp(mv.s + turn, -1, 1) };
+    },
     setInputKeys(keys) { input.keys = new Set(keys); },
     setStick(x, y) { input.stick.id = x === 0 && y === 0 ? null : -1; input.stick.x = x; input.stick.y = y; },
     movementProbe() { return { vx: motion.vx, vz: motion.vz }; },

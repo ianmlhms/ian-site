@@ -275,13 +275,13 @@ export const flow = {
       const spot = await frontOf(maus.i, 2.4);
       await place(spot.x, spot.z, spot.yaw); await sleep(1200);
       const cAct = await evalG(page, g => g.walk.targets.map(t => t.kind));
-      if (h.expect(cAct.includes("coaster"), `the coaster ride button shows at the front (${cAct.join()})`)) {
+      if (h.expect(cAct.includes("ride"), `the coaster ride button shows at the front (${cAct.join()})`)) {
         await evalG(page, g => g.walk.interact());
         await sleep(9000);                       // the train may still stand in the station for a few seconds
         const p1 = await evalG(page, g => { const c = g.r.camera.position; return { x: c.x, y: c.y, z: c.z, info: g.ride.info() }; });
         await sleep(5000);
         const p2 = await evalG(page, g => { const c = g.r.camera.position; return { x: c.x, y: c.y, z: c.z, info: g.ride.info() }; });
-        h.expect(p1.info.kind === "coaster" && p1.info.active, "the coaster ride is running");
+        h.expect(p1.info.kind === "track" && p1.info.id === "maus" && p1.info.active, "the coaster ride is running");
         h.expect(Math.hypot(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z) > 8, `the camera moves along the track (${Math.hypot(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z).toFixed(1)} m in 5 s)`);
         await h.shot("05-coaster");
         await page.keyboard.press("Escape");

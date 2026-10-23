@@ -7,6 +7,7 @@ import { stampRewards, stampCount } from "./sim.js";
 import { mountEnvUi } from "./world/envmenu.js";
 import { parseSnapshot, loadKernel, readV1, deflateLayout } from "./legacy.js";
 import { createGallery } from "./social.js";
+import { readReduceMotion, writeReduceMotion } from "./rides/settings.js";
 
 export const ICON = { kachel: "🥔", fritten: "🍟", lous: "🎟️", kanner: "🎠", wurscht: "🌭", zocker: "🍭", lukas: "🔨", mandel: "🌰", waffel: "🧇", fesch: "🐟",
   kette: "🎪", scooter: "🚗", crepes: "🥞", schiess: "🎯", bayern: "🚙", happy: "⛵", break: "🌀", musik: "🎵", takeoff: "🛩️", tent: "🍺", wheel: "🎡", maus: "🐭",
@@ -745,6 +746,15 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
       soundRow.append(chip);
     }
     head.append(soundRow);
+    head.insertAdjacentHTML("beforeend", `<h3>${esc(T("set.motion"))}</h3>`);
+    const motionRow = el("div", "row");
+    for (const on of [true, false]) {
+      const chip = el("button", "chip", esc(T(on ? "set.on" : "set.off"))); chip.type = "button"; chip.dataset.motion = on ? "1" : "0";
+      chip.setAttribute("aria-pressed", String(readReduceMotion() === on));
+      chip.addEventListener("click", () => { writeReduceMotion(on); motionRow.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String((c.dataset.motion === "1") === on))); sfx.click(); });
+      motionRow.append(chip);
+    }
+    head.append(motionRow);
     menu.prepend(...head.childNodes);
     const tail = el("div", "");
     const days = game.nextFouerDays();

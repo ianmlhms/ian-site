@@ -20,6 +20,7 @@ import { createState as v1Create, tick as v1Tick } from "../park/sim.js";
 import { canPlace as v1CanPlace, place as v1Place, placePath as v1PlacePath, KINDS as V1_KINDS } from "../park/build.js";
 import { serializeSave as v1Serialize } from "../park/save.js";
 import { verifyLaunch } from "./harness-w7.js";
+import { verifyRides } from "./harness-rides.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const DAY_MS = 86400000;
@@ -1370,9 +1371,11 @@ async function verifyWalk() {
   const slot0 = queueSlot(rect, "+w", 0), slot5 = queueSlot(rect, "+w", 5);
   check(slot0.z >= 41 + 4 + 3 - 1e-9 && Math.abs(slot5.x - slot0.x) > 4 && Math.abs(slot5.z - slot0.z) < 1e-9, "queue slots form a row 3 m in front of the pitch");
   const fig = figureArrays();
-  check(fig.triangles >= 60 && fig.triangles <= 100, `crowd figure has ${fig.triangles} triangles (about 90)`);
+  const figHi = figureArrays("hi");
+  check(fig.triangles >= 90 && fig.triangles <= 120, `crowd figure LOD1 has ${fig.triangles} triangles (looks wave: <= 120)`);
+  check(figHi.triangles >= 200 && figHi.triangles <= 300, `crowd figure LOD0 has ${figHi.triangles} triangles (looks wave: <= 300)`);
   check(Array.from(fig.position).every(Number.isFinite) && Array.from(fig.normal).every(v => Math.abs(v) <= 1.0001), "figure geometry is finite with unit normals");
-  equal(fig.info.length / 2, fig.position.length / 3, "every vertex has a part id and an animation group");
+  equal(fig.info.length / 3, fig.position.length / 3, "every vertex has a part id, an animation group and a variant tag");
   const look1 = makeLook(mulberry(5), "adult"), look2 = makeLook(mulberry(5), "adult");
   equal(look1, look2, "looks are deterministic per seed");
   check(makeLook(mulberry(5), "kid").scale < 0.75 && look1.scale > 0.88, "kids are smaller than adults");
@@ -1460,6 +1463,7 @@ async function run() {
   verifyPersistence();
   await verifyMigration();
   verifyI18n();
+  await verifyRides({ check, equal, near });
   await verifyWalk();
   await verifyLaunch({ check, equal, near, lux, deepFreeze });
   if (process.argv.includes("--table")) printTable();

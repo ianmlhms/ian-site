@@ -128,7 +128,7 @@ async function boot() {
     fieldPoly: world.fieldPoly, corridors: CORRIDORS, rects, faces, entrances: ENTRANCES, lane: streetSamples,
     grid: npcInfo && npcInfo.grid ? { g: npcInfo.grid, nu: npcInfo.gridDims[0], nw: npcInfo.gridDims[1], cell: npcInfo.gridDims[2], u0: npcInfo.gridDims[3], w0: npcInfo.gridDims[4] } : null,
   });
-  const getFocus = () => (walk && walk.active && !ride.active ? { x: walk.view.x, z: walk.view.z, yaw: walk.view.yaw, walk: true } : { x: r.rig.cu, z: r.rig.cw, yaw: r.rig.cyaw, walk: false });
+  const getFocus = () => (walk && walk.active && !(ride.active && ride.high) ? { x: walk.view.x, z: walk.view.z, yaw: walk.view.yaw, walk: true } : { x: r.rig.cu, z: r.rig.cw, yaw: r.rig.cyaw, walk: false });
   const laneLine = streetSamples.map(q => ({ x: q.u, z: q.w }));
   crowd = createCrowd({ T, r, world, game, mask, corridors: CORRIDORS, polylines: laneLine.length > 5 ? [{ name: 'allee', pts: laneLine, lane: 2.3, chunk: 4 }] : [], rects, faces, quality: r.state.quality, env, getFocus, onBleat: () => ui.sheepTapped() });
   const items = { faceOf: i => faces[i], cycleOf: i => { const pit = fair.pits.get(PITCHES[i].id); return pit && pit.near && pit.near.userData.cycle ? pit.near.userData.cycle : 45; } };

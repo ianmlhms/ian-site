@@ -27,6 +27,11 @@ export function fascia(b, ctx, text, x, y, z, w, h, o = {}) {
 export function deck(b, ctx, x, z, w, d, top, o = {}) {
   b.box(x, -0.5, z, w, 0.64, d, o.skirt || 0x2f2f35, { cols: { top } });
   if (o.plate !== false) b.box(x, 0.14, z, w - 0.1, 0.03, d - 0.1, o.plateColor || C.plate, { noFront: true, noBack: true });
+  // looks wave: a trailer is a trailer: wheels under the front edge, jack legs at the corners (all inside the footprint)
+  if (!b.far && w >= 4 && o.wheels !== false) {
+    for (const sx of [-1, 1]) { b.push().translate(x + sx * w * 0.3, 0.05, z + d / 2 - 0.12).rotX(Math.PI / 2); b.cyl(0, -0.09, 0, 0.36, 0.36, 0.18, 6, 0x1d1b1a, { cap: true, capColor: 0xb9c0c6 }); b.pop(); }
+    b.box(x + w / 2 - 0.2, -0.5, z + d / 2 - 0.2, 0.1, 0.5, 0.1, 0x555a60); b.box(x - w / 2 + 0.2, -0.5, z + d / 2 - 0.2, 0.1, 0.5, 0.1, 0x555a60);
+  }
 }
 /** counter: body, metal top, X-braced trestle front */
 export function counter(b, ctx, x, z, w, d, h, body, top, o = {}) {

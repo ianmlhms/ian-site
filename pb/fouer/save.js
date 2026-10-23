@@ -124,7 +124,7 @@ export function decodeSave(raw) {
     mg: integer(data.mg, 0, 0, MAX_PIONEER_P), vo: decodeVouchers(data.vo),
     lg: typeof data.lg === "string" && data.lg.length <= LG_LIMIT && /^L1\|[0-9a-z|]*$/.test(data.lg) ? data.lg : "",
     st, gi: cleanGiftIds(data.gi), n: cleanName(data.n), tu: integer(data.tu, 0, 0, RULES.tutorialDone),
-    ea: typeof data.ea === "string" && /^[a-z0-9]{0,8}$/.test(data.ea) ? data.ea : "",
+    ea: typeof data.ea === "string" && /^[a-z0-9]{0,32}$/.test(data.ea) ? data.ea : "",
     fw: Number.isInteger(data.fw) && data.fw >= MIN_YEAR && data.fw <= MAX_YEAR ? data.fw : 0,
     hd: integer(data.hd, 0, 0, MAX_DAY_NUMBER) };
 }

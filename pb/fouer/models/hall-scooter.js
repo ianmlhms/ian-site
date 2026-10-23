@@ -146,16 +146,17 @@ function build(opts = {}) {
   const n = [8, 9, 10, 12][level - 1];
   const pose = makePaths(n, opts.seed || 1);
   const name = nameOf('scooter', opts.lang);
+  let holder = null;                      // rides wave: while somebody drives, ud.drive(j, matrix) writes the pose of car j (rides/bumper.js), otherwise the Lissajous paths
   const g = buildTrackRide({
     id: 'scooter', T, K, quality, look, level, cycle: PERIOD, footprint: { x: 14.4, zMin: -8.4, zMax: 8.4 }, height: 9.2, carRadius: 24, lodDistance: 70,
-    trains: [{ cars: n, spacing: 0, shift: 0, custom: (j, t, m) => { const p = pose(j, t); m.makeRotationY(p.yaw); m.setPosition(p.x, FLOOR_Y, p.z); return true; } }],
+    trains: [{ cars: n, spacing: 0, shift: 0, custom: (j, t, m) => { const d = holder && holder.userData.drive; if (d) return d(j, m); const p = pose(j, t); m.makeRotationY(p.yaw); m.setPosition(p.x, FLOOR_Y, p.z); return true; } }],
     buildStatic: (b, near) => buildStatic(b, cfg, near, name),
     buildCar: (b, near, ti, j) => carBody(b, near, pal.carCols[j % pal.carCols.length], pal.carAcc[j % pal.carAcc.length], pal),
     chase,
     extra: { carCount: n },
   });
   g.userData.phaseAt = (t) => ({ t: ((t % PERIOD) + PERIOD) % PERIOD, cars: Array.from({ length: n }, (_, i) => pose(i, t)) });
-  g.userData.floor = FL;
+  g.userData.carColors = { body: pal.carCols[0], acc: pal.carAcc[0], pole: pal.pole, bulbs: pal.bulbs, uv: pal.uv, wall: pal.wall }; g.userData.floor = FL; g.userData.floorY = FLOOR_Y; g.userData.ceilY = CEIL; g.userData.drive = null; holder = g;
   return g;
 }
 

@@ -9,6 +9,8 @@
 import { Builder, mulberry, col, shade, C, PAL, GOLD, lerp, TAU, drape } from './kit.js';
 import { ENTRANCES } from './props.js';
 import { backLot } from './clutter.js';
+import { hallTent } from './tents.js';
+import { buildStall, awning } from './stallkit.js';
 
 /** half-length (m, along the rails) of the gap the camelots leave in front of a NW gate */
 export const GATE_GAP = 6.5;
@@ -31,47 +33,6 @@ function sign(b, text, x, y, z, w, h, look, kind = 'plate') { b.sign(text, x, y,
 
 /** canvas whites are HDR (> 1): a real hall tent is the brightest thing on the field by day, and glows from inside by night (the `fabric` channel) */
 const CANVAS = { roof: [1.75, 1.74, 1.68], wall: [1.45, 1.45, 1.4], end: [1.55, 1.55, 1.5], back: [1.3, 1.3, 1.27] };
-function hallTent(b, r, w, d, o = {}) {
-  const band = pick(r, AWN)[0]; const H = 2.5; const rise = Math.min(2.8, w * 0.28);
-  b.box(0, 0, 0, w, H, d, CANVAS.wall, { ch: 'fabric', cols: { front: CANVAS.end } });
-  b.gable(0, H, 0, w, d, rise, CANVAS.roof, { ridge: 'z', over: 0.15, ends: CANVAS.end, back: CANVAS.back, ch: 'fabric' });
-  b.box(0, H - 0.05, d / 2 + 0.02, w + 0.2, 0.3, 0.06, band);                                    // coloured eave band on the gable end
-  b.box(0, H, 0, w + 0.3, 0.12, d + 0.3, band, { noTop: false });
-  b.box(0, 0, 0, w + 0.06, 0.55, d + 0.06, band, { cols: { top: band } });
-  b.box(0, H + rise - 0.05, 0, 0.16, 0.14, d + 0.2, band);
-  // large lettered end wall + dark entrance + bulbs on the eave and gable edge
-  const look = r() < 0.3 ? 2 : 0; sign(b, pick(r, HALL_WORDS), 0, H + rise * 0.42, d / 2 + 0.06, Math.min(w * 0.7, 6.5), Math.min(1.3, rise * 0.6), look, 'main');
-  b.box(0, 0.05, d / 2 + 0.03, Math.min(3.2, w * 0.4), 2.1, 0.04, 0x3a2f2a);
-  b.bulbRow([-w / 2, H + 0.1, d / 2 + 0.22], [w / 2, H + 0.1, d / 2 + 0.22], 0.7, warm, 0.14);
-  b.bulbRow([-w / 2, H + 0.1, d / 2 + 0.2], [0, H + rise, d / 2 + 0.2], 0.7, warm, 0.14); b.bulbRow([w / 2, H + 0.1, d / 2 + 0.2], [0, H + rise, d / 2 + 0.2], 0.7, warm, 0.14);
-  // side windows (dark glass strips) + a row of flags along the eave
-  if (!b.far) { for (let k = 0; k < 2; k++) { const z = -d / 2 + (k + 0.5) * d / 2; b.quad([w / 2 + 0.02, 0.5, z + 1.0], [w / 2 + 0.02, 0.5, z - 1.0], [w / 2 + 0.02, 1.7, z - 1.0], [w / 2 + 0.02, 1.7, z + 1.0], 0x39465a); b.quad([-w / 2 - 0.02, 0.5, z - 1.0], [-w / 2 - 0.02, 0.5, z + 1.0], [-w / 2 - 0.02, 1.7, z + 1.0], [-w / 2 - 0.02, 1.7, z - 1.0], 0x39465a); } }
-  if (o.flags !== false && !b.far) { b.pennants([-w / 2, H + 0.5, d / 2 + 0.3], [w / 2, H + 0.5, d / 2 + 0.3], Math.max(5, Math.round(w)), pick(r, AWN), 0.3, { noWire: true }); }
-}
-function chalet(b, r, w, d) {
-  const wood = pick(r, WOODS); const H = 2.3;
-  b.box(0, 0, 0, w, H, d, wood, { cols: { front: shade(wood, 1.15) } }); b.box(0, 0.8, d / 2 + 0.02, w * 0.7, 1.0, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.75, d / 2 + 0.25, w * 0.78, 0.07, 0.5, C.steel);
-  b.gable(0, H, 0, w + 0.4, d + 0.5, 1.4, pick(r, [0x4a3228, 0x6b3a2a, 0x3a4048]), { over: 0.2, ridge: 'x' }); b.tri([-w / 2 - 0.1, H, d / 2 + 0.25], [w / 2 + 0.1, H, d / 2 + 0.25], [0, H + 1.4, d / 2 + 0.25], shade(wood, 1.1));
-  sign(b, pick(r, WORDS), 0, H + 0.45, d / 2 + 0.3, Math.min(w * 0.8, 3.0), 0.55, r() < 0.4 ? 2 : 0);
-  b.bulbRow([-w / 2 - 0.1, H + 0.1, d / 2 + 0.3], [w / 2 + 0.1, H + 0.1, d / 2 + 0.3], 0.5, warm, 0.13);
-  if (!b.far) { const aw = pick(r, AWN); b.valance([-w / 2, H - 0.1, d / 2 + 0.28], [w / 2, H - 0.1, d / 2 + 0.28], 0.3, Math.round(w * 2), aw[0], aw[1]); }
-}
-function kiosk(b, r, w, d) {
-  const wall = pick(r, BODY); const H = 2.3; const aw = pick(r, AWN);
-  b.box(0, 0, 0, w, H, d, wall); b.box(0, 0.9, d / 2 + 0.02, w * 0.7, 0.95, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.85, d / 2 + 0.2, w * 0.8, 0.07, 0.42, C.steel);
-  b.hip(0, H, 0, w, d, 1.1, aw[0], { over: 0.3, alt: aw });
-  sign(b, pick(r, WORDS), 0, H + 0.55, d / 2 + 0.34, Math.min(w * 0.85, 3.0), 0.55, r() < 0.4 ? 2 : 0);
-  b.bulbRow([-w / 2, H + 0.1, d / 2 + 0.34], [w / 2, H + 0.1, d / 2 + 0.34], 0.5, warm, 0.13);
-  if (!b.far) b.valance([-w / 2 - 0.2, H + 0.05, d / 2 + 0.32], [w / 2 + 0.2, H + 0.05, d / 2 + 0.32], 0.26, Math.round(w * 2), aw[0], aw[1]);
-}
-function trailer(b, r, w, d) {
-  const body = pick(r, BODY); const aw = pick(r, AWN); const H = 2.5;
-  b.box(0, -0.2, 0, w + 0.3, 0.9, d + 0.2, 0x2f2f35, { cols: { top: C.plate } });
-  b.box(0, 0.7, -0.2, w, H, d - 0.4, body); b.box(0, 0.7, d / 2 - 0.35, w, 1.0, 0.4, pick(r, WOODS)); b.box(0, 1.7, d / 2 - 0.35, w + 0.1, 0.06, 0.5, C.steel);
-  b.box(0, 0.7 + H - 0.2, d / 2 - 0.1, w + 0.1, 0.55, 0.2, aw[0]); b.bulbRow([-w / 2, 0.7 + H + 0.1, d / 2 + 0.05], [w / 2, 0.7 + H + 0.1, d / 2 + 0.05], 0.45, warm, 0.13);
-  sign(b, pick(r, WORDS), 0, 0.7 + H + 0.65, d / 2 - 0.1, Math.min(w * 0.7, 3.6), 0.62, r() < 0.4 ? 2 : 0, 'main');
-  if (!b.far) for (let i = 0; i < 6; i++) b.blob(-w * 0.35 + i * w * 0.14, 2.0, d / 2 - 0.6, 0.18, 0.2, 0.15, pick(r, GOODS));
-}
 function camelot(b, r, w, d, o = {}) {
   const aw = pick(r, AWN); const H = 2.2;
   b.box(0, 0, 0.1, w, 0.85, d * 0.5, pick(r, WOODS)); b.box(0, 0.85, 0.1, w + 0.1, 0.05, d * 0.5 + 0.1, 0xf4f0e2);
@@ -100,20 +61,16 @@ function camelotTarp(b, r, w, d) {
   if (!b.far && r() < 0.4) sign(b, pick(r, ['NOUGAT', 'MANDELEN', 'KÄSE', 'SOUVENIRS', 'BONBONS', 'WÄRSCHT']), 0, H + 0.5, d / 2 + 0.1, Math.min(w * 0.85, 2.2), 0.42, 0);
 }
 function temple(b, r, w, d) {
-  const H = 2.6; const wall = pick(r, [0xf3efe2, 0xe8e0c8]);
-  b.box(0, 0, -0.3, w, H, d - 0.6, wall); b.box(0, 0.85, d / 2 - 0.6, w * 0.8, 1.0, 0.05, GLASS, { ch: 'lamp' });
-  [-1, -0.33, 0.33, 1].forEach((k) => b.cyl(k * (w / 2 - 0.4), 0, d / 2 - 0.2, 0.16, 0.14, H + 0.1, 6, 0xf8f6ee));
-  b.box(0, H + 0.1, d / 2 - 0.2, w + 0.3, 0.3, 0.9, 0xf0eadb); b.tri([-w / 2 - 0.1, H + 0.4, d / 2 + 0.2], [w / 2 + 0.1, H + 0.4, d / 2 + 0.2], [0, H + 1.5, d / 2 + 0.2], 0xe6dfcb);
-  b.box(0, 0, -0.3, w, 0.0, d - 0.6, wall); b.gable(0, H + 0.4, -0.3, w + 0.2, d - 0.4, 1.1, 0xb8b0a0, { ridge: 'x', over: 0.1 });
-  sign(b, 'DÖNER', 0, H + 0.45, d / 2 + 0.28, 2.4, 0.5, 0); b.bulbRow([-w / 2, H + 0.12, d / 2 + 0.3], [w / 2, H + 0.12, d / 2 + 0.3], 0.5, warm, 0.13);
+  buildStall(b, r, w, d, { body: pick(r, [0xf3efe2, 0xe8e0c8]), accent: [0x2d6fd0, 0xf6ead0], counter: 0xd8d2c0, word: 'DÖNER', roof: 'flat', roofCol: [0xe6dfcb], goods: [0x8a4a2a, 0xd8433a, 0xf2e4b0], mural: null, pylon: false });
+  const H = 2.4 + 0.06;
+  [-1, 1].forEach((s) => b.cyl(s * (w / 2 - 0.12), 0.06, d / 2 + 1.0, 0.13, 0.12, H, 7, 0xf8f6ee));
+  b.box(0, H + 0.1, d / 2 + 0.9, w + 0.3, 0.22, 0.5, 0xf0eadb); b.tri([-w / 2 - 0.1, H + 0.32, d / 2 + 1.1], [w / 2 + 0.1, H + 0.32, d / 2 + 1.1], [0, H + 1.2, d / 2 + 1.1], 0xe6dfcb);
 }
 function fisherHut(b, r, w, d) {
-  const H = 2.4; const wood = 0x6a4a30;
-  b.box(0, 0, 0, w, H, d, wood, { cols: { front: 0x7a5a3a } }); b.gable(0, H, 0, w + 0.5, d + 0.5, 1.5, 0x3a5a6a, { over: 0.25, ridge: 'x', back: 0x30485a });
-  b.box(0, 0.9, d / 2 + 0.02, w * 0.6, 0.9, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.85, d / 2 + 0.25, w * 0.7, 0.07, 0.45, 0xb9672f);
-  if (!b.far) { for (let k = 0; k < 3; k++) { const x = -w / 2 + 0.6 + k * (w - 1.2) / 2; b.tri([x - 0.5, H, d / 2 + 0.06], [x + 0.5, H, d / 2 + 0.06], [x, H - 1.2, d / 2 + 0.06], 0x8aa0a8, { dbl: true }); }
-    [-1, 1].forEach((s) => { b.push().translate(s * (w / 2 - 0.5), 1.0, d / 2 + 0.1).rotX(Math.PI / 2); b.disc(0, 0, 0, 0.45, 0.32, 8, 0x8a5a34); b.pop(); }); }
-  sign(b, 'FËSCH', 0, H + 0.5, d / 2 + 0.3, 2.0, 0.5, 0); b.bulbRow([-w / 2, H + 0.12, d / 2 + 0.3], [w / 2, H + 0.12, d / 2 + 0.3], 0.5, warm, 0.13);
+  const wood = 0x6a4a30; const H = 2.4;
+  buildStall(b, r, w, d, { body: wood, side: wood, roof: 'gable', roofCol: [0x3a5a6a, 0x30485a], accent: [0xb9672f, 0xf6ead0], counter: 0x7a5a3a, word: 'FËSCH', goods: [0x8aa0a8, 0xd8d8c8], mural: null, pylon: false });
+  if (!b.far) { for (let k = 0; k < 3; k++) { const x = -w / 2 + 0.6 + k * (w - 1.2) / 2; b.tri([x - 0.5, H + 0.06, -d / 2 + 0.2], [x + 0.5, H + 0.06, -d / 2 + 0.2], [x, H - 1.1, -d / 2 + 0.2], 0x8aa0a8, { dbl: true }); }
+    [-1, 1].forEach((s) => { b.push().translate(s * (w / 2 - 0.4), 1.25, d / 2 + 0.02).rotX(Math.PI / 2); b.disc(0, 0, 0, 0.42, 0.3, 8, 0x8a5a34); b.pop(); }); }
 }
 function archStall(b, r, w, d) {
   const green = pick(r, [0x1f5e46, 0x22103f, 0x1f5fb8, 0x7a1a3a]); const H = 2.2;
@@ -124,21 +81,6 @@ function archStall(b, r, w, d) {
   b.bulbRow([-w / 2, H - 0.2, d / 2 + 0.58], [w / 2, H - 0.2, d / 2 + 0.58], 0.4, warm, 0.14); b.bulbRow([-w / 2, H + 0.45, d / 2 + 0.2], [w / 2, H + 0.45, d / 2 + 0.2], 0.4, warm, 0.13);
   sign(b, pick(r, WORDS), 0, H + 0.45, d / 2 + 0.05, Math.min(w * 0.8, 3.4), 0.5, 0, 'banner');
   if (!b.far) for (let i = 0; i < 5; i++) b.blob(-w * 0.35 + i * w * 0.17, 1.15, d / 2 - 0.4, 0.1, 0.08, 0.1, pick(r, [0x5a3a26, 0xc89a5a, 0xf2e4b0]));
-}
-function gameStall(b, r, w, d) {
-  const H = 2.5; const aw = pick(r, AWN);
-  b.box(0, -0.2, 0, w + 0.3, 0.9, d + 0.2, 0x2f2f35, { cols: { top: C.plate } }); b.box(0, 0.7, -d / 2 + 0.2, w, H, 0.2, pick(r, BODY)); [-1, 1].forEach((s) => b.box(s * (w / 2 - 0.07), 0.7, 0, 0.14, H, d - 0.3, pick(r, BODY)));
-  b.box(0, 0.7, d / 2 - 0.3, w + 0.1, 1.0, 0.5, aw[0]); b.box(0, 1.7, d / 2 - 0.3, w + 0.2, 0.06, 0.7, C.steel);
-  if (!b.far) for (let k = 0; k < 2; k++) for (let i = 0; i < Math.round(w * 1.4); i++) b.blob(-w / 2 + 0.5 + i * 0.5, 2.2 + k * 0.4, -d / 2 + 0.4, 0.17, 0.18, 0.14, pick(r, GOODS));
-  b.box(0, 0.7 + H - 0.1, d / 2 - 0.1, w + 0.3, 0.6, 0.3, aw[0]); b.bulbRow([-w / 2, 0.7 + H + 0.25, d / 2 + 0.08], [w / 2, 0.7 + H + 0.25, d / 2 + 0.08], 0.4, warm, 0.14); b.bulbRow([-w / 2, 0.7 + H - 0.1, d / 2 + 0.08], [w / 2, 0.7 + H - 0.1, d / 2 + 0.08], 0.4, warm, 0.14);
-  sign(b, pick(r, ['SCHÉISSBUD', 'WÄRFELBUD', 'DOSEWUERF', 'LOS', 'DART']), 0, 0.7 + H + 0.95, d / 2 - 0.05, Math.min(w * 0.6, 3.4), 0.7, r() < 0.4 ? 2 : 0, 'main');
-}
-function sweets(b, r, w, d) {
-  const aw = pick(r, AWN); const H = 2.4; const colr = pick(r, [0xf08aa8, 0xf4a03a, 0xf4c430, 0x7fd0f0]);
-  b.box(0, 0, -d / 2 + 0.12, w, H, 0.16, colr); b.box(0, 0, d / 2 - 0.4, w, 1.0, 0.7, pick(r, WOODS)); b.box(0, 1.0, d / 2 - 0.4, w + 0.1, 0.06, 0.85, C.steel);
-  b.gable(0, H, 0, w + 0.4, d + 0.4, 0.5, aw[0], { over: 0.1, ridge: 'x' }); if (!b.far) b.valance([-w / 2 - 0.2, H, d / 2 + 0.22], [w / 2 + 0.2, H, d / 2 + 0.22], 0.3, Math.round(w * 2), aw[0], aw[1]);
-  if (!b.far) for (let i = 0; i < Math.round(w * 2); i++) b.blob(-w / 2 + 0.3 + i * 0.5, 1.25, d / 2 - 0.4, 0.14, 0.16, 0.12, pick(r, GOODS));
-  b.bulbRow([-w / 2, H + 0.05, d / 2 + 0.24], [w / 2, H + 0.05, d / 2 + 0.24], 0.4, warm, 0.14); sign(b, pick(r, WORDS), 0, H + 0.62, d / 2 + 0.1, Math.min(w * 0.8, 3.2), 0.55, 0);
 }
 function kidsRide(b, r, w, d) {
   const R = Math.min(w, d) / 2 - 0.3; const aw = pick(r, AWN);
@@ -178,37 +120,9 @@ function postSign(b, text, x, y, z, w, h, look, kind = 'main') {
   [-1, 1].forEach((k) => b.cyl(x + k * (w / 2 - 0.15), y - 0.2, z - 0.05, 0.04, 0.04, 1.4, 4, 0x333333));
   b.sign(text, x, y + 0.7, z, w, h, { look, kind, lit: true, frameW: 0.06, frame: 0x3a2a20 });
 }
-function pizzaTrailer(b, r, w, d) {
-  const H = 2.3; const body = pick(r, [0xf4e8d0, 0xf0d8b0, 0xe8f0e0]);
-  b.box(0, -0.2, 0, w + 0.3, 0.9, d + 0.2, 0x2f2f35, { cols: { top: C.plate } });
-  b.box(0, 0.7, -0.2, w, H, d - 0.4, body); b.box(0, 0.7, d / 2 - 0.35, w, 1.0, 0.45, pick(r, WOODS)); b.box(0, 1.7, d / 2 - 0.35, w + 0.1, 0.06, 0.6, C.steel);
-  b.box(0, 1.85, d / 2 - 0.12, w * 0.76, 0.95, 0.05, GLASS, { ch: 'lamp' });
-  if (!b.far) b.valance([-w / 2 - 0.1, 0.7 + H + 0.05, d / 2 + 0.05], [w / 2 + 0.1, 0.7 + H + 0.05, d / 2 + 0.05], 0.34, Math.round(w * 2.4), 0xd8283a, 0xf6ead0);
-  b.sphere(-w * 0.26, 0.7 + H + 0.35, -0.3, 0.85, 0xb04a2a, { seg: 7, sy: 0.75 }); b.cyl(-w * 0.26, 0.7 + H + 0.8, -0.3, 0.16, 0.12, 1.1, 5, 0x555a60);
-  if (!b.far) { b.fx(-w * 0.26, 0.7 + H + 1.9, -0.3, 2, 0); b.mural(2, Math.floor(r() * 4), w * 0.15, 0.7 + H * 0.5, -d / 2 + 0.02, w * 0.42, 1.2, { frame: false, back: false, lit: true }); }
-  postSign(b, 'PIZZA', 0, 0.7 + H + 0.9, d / 2 - 0.1, Math.min(w * 0.7, 3.4), 0.7, r() < 0.3 ? 2 : 0);
-  b.bulbRow([-w / 2, 0.7 + H - 0.1, d / 2 + 0.1], [w / 2, 0.7 + H - 0.1, d / 2 + 0.1], 0.4, warm, 0.14);
-}
 function popcornCart(b, r, w, d) {
-  const x0 = 0; b.cyl(-w * 0.3, 0, d * 0.2, 0.28, 0.28, 0.1, 6, 0x222222); b.cyl(w * 0.3, 0, d * 0.2, 0.28, 0.28, 0.1, 6, 0x222222);
-  b.box(0, 0.25, 0, w * 0.8, 0.85, d * 0.6, 0xd8283a, { cols: { top: 0xf6ead0 } });
-  b.box(0, 1.1, 0, w * 0.7, 1.0, d * 0.5, NEON, { ch: 'lamp' });
-  const n = b.far ? 4 : 10; for (let i = 0; i < n; i++) b.blob(-w * 0.28 + (i % 5) * w * 0.14, 1.2 + Math.floor(i / 5) * 0.28, (r() - 0.5) * 0.3, 0.14, 0.12, 0.14, 0xfff0c0);
-  b.cone(0, 2.0, 0, Math.max(w, d) * 0.55, 0.8, 8, 0xd8283a, { alt: [0xd8283a, 0xf6ead0], smooth: false }); b.sphere(0, 2.85, 0, 0.12, GOLD, { seg: 5 });
-  [-1, 1].forEach((k) => b.cyl(k * w * 0.36, 1.0, d * 0.22, 0.03, 0.03, 1.0, 4, 0x777777));
-  b.cyl(w * 0.5, 0, -d * 0.1, 0.4, 0.55, 1.2, 8, 0xd8283a, { alt: [0xd8283a, 0xffffff], smooth: false }); for (let i = 0; i < 6; i++) b.blob(w * 0.5 + (r() - 0.5) * 0.3, 1.3 + r() * 0.15, -d * 0.1 + (r() - 0.5) * 0.3, 0.18, 0.14, 0.18, 0xfff0c0);
-  b.bulbRing(0, 2.0, 0, Math.max(w, d) * 0.55, 10, warm, 0.12);
-}
-function iceCreamVan(b, r, w, d) {
-  const body = pick(r, [0xf6b8d0, 0xa8e8d0, 0xf6e8a0, 0xa8d0f6]); const H = 2.1;
-  b.box(0, 0.3, 0, w, H, d, body, { cols: { front: shade(body, 1.05) } }); b.box(0, 0.3, d / 2 + 0.0, w, 0.2, 0.05, 0xffffff);
-  b.box(w * 0.2, 1.1, d / 2 + 0.02, w * 0.5, 0.9, 0.05, GLASS, { ch: 'lamp' }); b.box(w * 0.2, 1.05, d / 2 + 0.18, w * 0.56, 0.06, 0.4, C.steel);
-  b.box(-w * 0.36, 0.3, 0, w * 0.28, 1.2, d * 0.98, shade(body, 0.92)); b.box(-w * 0.4, 1.0, d / 2 + 0.01, w * 0.2, 0.5, 0.04, 0x39465a);
-  [-w * 0.32, w * 0.3].forEach((wx) => [-1, 1].forEach((s) => b.cyl(wx, 0, s * (d / 2 - 0.1), 0.38, 0.38, 0.25, 8, 0x1d1b1a)));
-  if (!b.far) b.valance([w * -0.05, 2.35, d / 2 + 0.05], [w * 0.45, 2.35, d / 2 + 0.05], 0.3, 6, 0xd8283a, 0xf6ead0);
-  b.cyl(w * 0.1, 2.4, 0, 0.01, 0.5, 1.2, 8, 0xe0a860, { cap: true, capColor: 0xe0a860 }); b.sphere(w * 0.1, 3.65, 0, 0.5, 0xf6a0c8, { seg: 6 }); b.sphere(w * 0.1, 4.25, 0, 0.42, 0xfff0d0, { seg: 6 }); b.sphere(w * 0.1, 4.7, 0, 0.12, 0xd8283a, { seg: 5 });
-  b.bulbRing(w * 0.1, 3.0, 0, 0.5, 8, 0xffe9b0, 0.12);
-  sign(b, 'GLACE', 0, 3.0, d / 2 - 0.1, Math.min(w * 0.5, 2.0), 0.5, 0, 'banner');
+  buildStall(b, r, w, d, { trailer: true, body: 0xd8283a, side: 0xd8283a, accent: [0xd8283a, 0xf6ead0], counter: 0xf6ead0, word: 'POPCORN', roof: 'barrel', roofCol: [0xd8283a, 0xf6ead0], goods: [0xfff0c0], goodsKind: 'blob', mural: null, pylon: false, menu: null, display: false, H: 2.2 });
+  if (!b.far) { b.box(w * 0.28, 0.72 + 1.12, d / 2 - 0.3, w * 0.34, 0.9, 0.46, NEON, { ch: 'lamp' }); for (let i = 0; i < 4; i++) b.blob(w * 0.2 + (i % 2) * w * 0.12, 0.72 + 1.3 + Math.floor(i / 2) * 0.22, d / 2 - 0.3, 0.1, 0.1, 0.1, 0xfff0c0); }
 }
 function balloonDarts(b, r, w, d) {
   const H = 2.6; b.box(0, 0, -d / 2 + 0.15, w, H, 0.2, pick(r, [0xf6ead0, 0xffe27a, 0xcfe8ff])); [-1, 1].forEach((s) => b.box(s * (w / 2 - 0.08), 0, 0, 0.16, H, d - 0.2, pick(r, BODY)));
@@ -232,12 +146,9 @@ function tikiBar(b, r, w, d) {
 }
 const CRATE_COLS = [0xd8433a, 0x2d6fd0, 0xf4c430, 0x2f9a58];
 function clawMachine(b, r, w, d) {
-  const body = pick(r, [0x2d3a8a, 0x7a2a8a, 0x1f6a8a, 0xb0284a]); const H = 2.8;
-  b.box(0, 0, 0, w, H, d, body, { cols: { front: shade(body, 1.1) } }); b.box(0, 0.8, d / 2 + 0.02, w * 0.84, 1.6, 0.05, pick(r, [0xff9ad8, 0x9af0ff, 0xffe27a]), { ch: 'lamp' });
-  const n = b.far ? 6 : 16; for (let i = 0; i < n; i++) b.blob(-w * 0.36 + (i % 8) * w * 0.1, 0.95 + Math.floor(i / 8) * 0.3, d / 2 + 0.2 + (r() - 0.5) * 0.1, 0.16, 0.16, 0.12, pick(r, GOODS));
-  b.box(0, H, 0, w + 0.2, 0.2, d + 0.2, shade(body, 0.8)); if (!b.far) { b.ledRect(-w / 2 + 0.1, 0.2, w / 2 - 0.1, H - 0.1, d / 2 + 0.06, 0.07, [0xff9ad8, 0x9af0ff, 0xffe27a], { seg: 1.2 }); }
-  b.bulbRow([-w / 2, H + 0.15, d / 2 + 0.1], [w / 2, H + 0.15, d / 2 + 0.1], 0.35, 0xbfefff, 0.14);
-  postSign(b, 'GREIFER', 0, H + 0.2, d / 2 - 0.1, Math.min(w * 0.8, 3.0), 0.62, 1);
+  const body = pick(r, [0x2d3a8a, 0x7a2a8a, 0x1f6a8a, 0xb0284a]); const neon = pick(r, [[0xff9ad8, 0x9af0ff], [0x9af0ff, 0xffe27a], [0xffe27a, 0xff9ad8]]);
+  buildStall(b, r, w, d, { body, side: body, accent: neon, counter: shade(body, 0.7), word: 'GREIFER', signLook: 1, roof: 'flat', roofCol: [shade(body, 0.8)], goods: [0xff9ad8, 0x9af0ff, 0xffe27a, 0xf08a2a], mural: null, pylon: true, pylonWord: 'GREIFER', menu: null });
+  if (!b.far) for (let k = 0; k < 2; k++) { const x = -w * 0.22 + k * w * 0.44; b.box(x, 1.12, d / 2 - 0.28, w * 0.34, 0.9, 0.42, pick(r, [0xff9ad8, 0x9af0ff, 0xffe27a]), { ch: 'lamp' }); for (let i = 0; i < 3; i++) b.blob(x - w * 0.09 + i * w * 0.09, 1.2, d / 2 - 0.1, 0.1, 0.1, 0.08, pick(r, GOODS)); }
 }
 function bouncyCastle(b, r, w, d) {
   const c1 = pick(r, [0xd8283a, 0xf08a2a, 0xee6fa8]); const c2 = pick(r, [0x2d79c8, 0x2fc35a, 0x8a5bc8]); const c3 = pick(r, [0xf4c430, 0x41c4d8, 0xffffff]);
@@ -247,6 +158,7 @@ function bouncyCastle(b, r, w, d) {
   if (!b.far) b.mural(4, Math.floor(r() * 4), 0, 1.2, d / 2 - 0.44, w - 3.0, 0.9, { frame: false, back: false, lit: true });
   if (!b.far) for (let i = 0; i < 3; i++) b.figure(-w * 0.2 + i * w * 0.2, -d * 0.1, r() * 6, { y: 1.1, scale: 0.8 });
   b.bulbRow([-w / 2, 1.15, d / 2 + 0.05], [w / 2, 1.15, d / 2 + 0.05], 0.5, 0xfff4d0, 0.14);
+  b.push().translate(-w / 2 + 1.5, 0, d / 2 - 0.8); buildStall(b, r, 2.4, 1.6, { trailer: false, body: c2, accent: [c1, 0xf6ead0], counter: c1, word: 'KASSE', roof: 'flat', roofCol: [c1], mural: null, pylon: false, menu: null, goods: [c3, c1] }); b.pop();
 }
 function funHouse(b, r, w, d) {
   const kind = [1, 5, 4, 2][Math.floor(r() * 4)]; const body = pick(r, [0x241048, 0x10304a, 0x4a1030, 0x1a2a5a]); const H = 6.6;
@@ -257,14 +169,39 @@ function funHouse(b, r, w, d) {
   if (!b.far) b.ledRect(-w / 2 + 1.6, 1.6, w / 2 - 1.6, 6.4, -d / 2 + 1.07, 0.09, [0xff3fc8, 0x41e8ff, 0xffd23c, 0x8a5bff], { seg: 1.3 });
   b.bulbRow([-w / 2 + 1.6, 6.5, -d / 2 + 1.1], [w / 2 - 1.6, 6.5, -d / 2 + 1.1], 0.45, warm, 0.16);
   postSign(b, 'SPUKHAUS', 0, H + 0.1, -d / 2 + 1.0, Math.min(w * 0.6, 5.0), 0.95, 1);
-  b.box(0, 0, d / 2 - 0.7, w * 0.4, 0.5, 1.4, 0x555a60); b.box(0, 0.5, d / 2 - 0.7, w * 0.4, 0.08, 1.4, 0xf4c430);
+  b.push().translate(0, 0, d / 2 - 1.9); buildStall(b, r, 3.0, 1.9, { trailer: false, body: 0x2a2a46, accent: [0xff3fc8, 0x41e8ff], counter: 0x2a2a46, word: 'KASSE', signLook: 1, roof: 'flat', roofCol: [0x2a2a46], mural: null, pylon: false, menu: null, goods: [0x41e8ff, 0xff3fc8] }); b.pop();
+}
+
+/* ------------------------------------------------------------------ looks wave: the stall skins built with the shared composer (models/stallkit.js) */
+const COUNTERS = [0x6a4a30, 0x8a5a34, 0x3f4a58, 0x5a3a28, 0x7a2a2a, 0x2f5a46];
+const spec = (r, extra) => Object.assign({ body: pick(r, BODY), accent: pick(r, AWN), counter: pick(r, COUNTERS), word: pick(r, WORDS), signLook: r() < 0.35 ? 2 : 0, goods: [pick(r, GOODS), pick(r, GOODS), pick(r, GOODS), pick(r, GOODS)], pylon: r() < 0.3, mural: r() < 0.4 ? [[0, 3, 5, 1, 4, 2][Math.floor(r() * 6)], Math.floor(r() * 4)] : null }, extra);
+function trailer(b, r, w, d) { buildStall(b, r, w, d, spec(r, { trailer: true, roof: r() < 0.5 ? 'barrel' : 'gable', roofWhite: true, goodsKind: pick(r, ['blob', 'bag', 'cone']) })); }
+function kiosk(b, r, w, d) { buildStall(b, r, w, d, spec(r, { roof: 'hip', pylon: false, goodsKind: 'blob', mural: null })); }
+function chalet(b, r, w, d) {
+  const wood = pick(r, WOODS); const acc = pick(r, AWN);
+  buildStall(b, r, w, d, spec(r, { body: wood, side: wood, roof: 'gable', roofCol: [pick(r, [0x4a3228, 0x6b3a2a, 0x3a4048]), 0x3a2a20], accent: [acc[0], 0xf6ead0], counter: shade(wood, 0.8), mural: null, pylon: false }));
+  if (!b.far) for (const s of [-1, 1]) { b.box(s * (w / 2 - 0.55), 1.2, d / 2 + 0.3, 0.9, 0.2, 0.22, 0x5a3a28); for (let i = 0; i < 4; i++) b.blob(s * (w / 2 - 0.55) - 0.3 + i * 0.2, 1.46, d / 2 + 0.3, 0.1, 0.1, 0.1, [0xe3242b, 0xf2c80c, 0xe86aa8, 0x7ad06a][i]); }
+}
+function sweets(b, r, w, d) { buildStall(b, r, w, d, spec(r, { accent: pick(r, [[0xee6fa8, 0xf6ead0], [0xf08a2a, 0xf6ead0], [0x41c4d8, 0xf6ead0], [0xf4c430, 0xf6ead0]]), roof: 'barrel', goodsKind: pick(r, ['bag', 'cone']), body: pick(r, [0xf08aa8, 0xf4a03a, 0xf4c430, 0x7fd0f0]), counter: 0xf6ead0 })); }
+function gameStall(b, r, w, d) {
+  buildStall(b, r, w, d, spec(r, { trailer: true, roof: 'flat', accent: pick(r, [[0xc8283a, 0xf6ead0], [0x2d6fd0, 0xf4c430], [0x7a47c8, 0xf4c430]]), word: pick(r, ['SCHÉISSBUD', 'WÄRFELBUD', 'DOSEWUERF', 'LOS', 'DART']), signLook: 2, goods: [0xee6fa8, 0xf4c430, 0x41c4d8, 0x8a5bc8] }));
+  if (!b.far) for (let k = 0; k < 2; k++) for (let i = 0; i < Math.round(w * 1.4); i++) b.blob(-w / 2 + 0.5 + i * 0.5, 0.72 + 1.55 + k * 0.4, -d / 2 + 0.3, 0.17, 0.18, 0.14, pick(r, GOODS));
+}
+function pizzaTrailer(b, r, w, d) {
+  buildStall(b, r, w, d, spec(r, { trailer: true, roof: 'flat', word: 'PIZZA', accent: [0xd8283a, 0xf6ead0], body: pick(r, [0xf4e8d0, 0xf0d8b0, 0xe8f0e0]), pylon: true, pylonWord: 'PIZZA', goods: [0xf2d070, 0xd8433a] }));
+  b.sphere(-w * 0.26, 0.72 + 2.4 + 0.3, -d * 0.2, 0.85, 0xb04a2a, { seg: 7, sy: 0.75 }); b.cyl(-w * 0.26, 0.72 + 2.4 + 0.75, -d * 0.2, 0.16, 0.12, 1.1, 5, 0x555a60);
+  if (!b.far) b.fx(-w * 0.26, 0.72 + 2.4 + 1.9, -d * 0.2, 2, 0);
+}
+function iceCreamVan(b, r, w, d) {
+  const body = pick(r, [0xf6b8d0, 0xa8e8d0, 0xf6e8a0, 0xa8d0f6]);
+  buildStall(b, r, w, d, spec(r, { trailer: true, roof: 'flat', word: 'GLACE', body, accent: [0xd8283a, 0xf6ead0], goodsKind: 'cone', pylon: false, mural: null }));
+  b.cyl(w * 0.1, 0.72 + 2.4 + 0.1, 0, 0.01, 0.5, 1.2, 8, 0xe0a860, { cap: true, capColor: 0xe0a860 }); b.sphere(w * 0.1, 0.72 + 2.4 + 1.35, 0, 0.5, 0xf6a0c8, { seg: 6 }); b.sphere(w * 0.1, 0.72 + 2.4 + 1.95, 0, 0.42, 0xfff0d0, { seg: 6 }); b.sphere(w * 0.1, 0.72 + 2.4 + 2.4, 0, 0.12, 0xd8283a, { seg: 5 });
+  b.bulbRing(w * 0.1, 0.72 + 2.4 + 0.7, 0, 0.5, 8, 0xffe9b0, 0.12);
 }
 function souvenirContainer(b, r, w, d) {
-  const c = pick(r, [0x2d6fd0, 0xd8433a, 0x2f9a58, 0xf08a2a, 0x7a47c8]); const H = 2.5;
-  b.box(0, 0, 0, w, H, d, c, { cols: { front: shade(c, 1.05) } }); b.box(0, 0.9, d / 2 + 0.02, w * 0.8, 1.2, 0.05, GLASS, { ch: 'lamp' }); b.box(0, 0.85, d / 2 + 0.25, w * 0.86, 0.07, 0.5, C.steel);
-  if (!b.far) { b.valance([-w / 2, H - 0.1, d / 2 + 0.05], [w / 2, H - 0.1, d / 2 + 0.05], 0.3, Math.round(w * 2), 0xf6ead0, c); for (let i = 0; i < Math.round(w * 2); i++) b.blob(-w / 2 + 0.4 + i * 0.5, 1.9, d / 2 + 0.2, 0.12, 0.18, 0.1, pick(r, GOODS)); }
-  b.mural([0, 3, 5, 1][Math.floor(r() * 4)], Math.floor(r() * 4), 0, H + 0.6, d / 2 - 0.05, w * 0.92, 0.9, { frame: false, back: false, lit: true });
-  b.bulbRow([-w / 2, H + 1.1, d / 2], [w / 2, H + 1.1, d / 2], 0.4, warm, 0.14);
+  const c = pick(r, [0x2d6fd0, 0xd8433a, 0x2f9a58, 0xf08a2a, 0x7a47c8]);
+  buildStall(b, r, w, d, spec(r, { body: c, side: c, roof: 'flat', accent: [0xf6ead0, c], word: 'SOUVENIRS', counter: shade(c, 0.8), pylon: false, mural: null }));
+  b.mural([0, 3, 5, 1][Math.floor(r() * 4)], Math.floor(r() * 4), 0, 2.46 + 1.1, d / 2 - 0.05, w * 0.92, 0.9, { frame: false, back: false, lit: true });
 }
 
 export const SKINS = {
@@ -281,6 +218,7 @@ const rangeVal = (r, [a, b]) => a + (b - a) * r();
 
 /** the cheap form of a stall (about 20 triangles): a box with a canvas gable (a hall tent when it is big) - what every skin becomes in the `far` form (stalls away from the alleys, the
  * iPad-low fair, the far LOD of a locked pitch): from above they are roofs, nobody sees their detail */
+const ALWAYS_NEAR = new Set(['hall', 'hallWide', 'hallL', 'hallSmall', 'tentS', 'bigTent', 'worksite', 'kids', 'chair', 'bouncy', 'funhouse']);
 const SIMPLE_NOT = new Set(['hall', 'hallWide', 'hallL', 'hallSmall', 'tentS', 'bigTent', 'worksite', 'kids', 'chair', 'bouncy', 'funhouse']);
 function simpleStall(b, r, w, d) {
   if (w >= 5.5 && d >= 6.5) {
@@ -288,6 +226,11 @@ function simpleStall(b, r, w, d) {
     b.box(0, 0, 0, w, H, d, CANVAS.wall, { ch: 'fabric', noBottom: true, noTop: true }); b.gable(0, H, 0, w + 0.1, d + 0.1, rise, CANVAS.roof, { ridge: 'z', over: 0.05, ends: CANVAS.end, back: CANVAS.back, ch: 'fabric' });
   } else {
     const aw = pick(r, AWN); b.box(0, 0, 0, w, 2.3, d, pick(r, BODY));
+    // the front, even in the cheap form: a lit window, a counter ledge, a striped awning with a bulb edge (a wall of lit fronts at night)
+    b.quad([-w * 0.38, 0.95, d / 2 + 0.02], [w * 0.38, 0.95, d / 2 + 0.02], [w * 0.38, 1.95, d / 2 + 0.02], [-w * 0.38, 1.95, d / 2 + 0.02], 0xd89a48, { ch: 'lamp' });
+    if (w >= 3.2) { b.quad([-w / 2, 2.3, d / 2 + 0.02], [w / 2, 2.3, d / 2 + 0.02], [w / 2, 2.85, d / 2 + 0.02], [-w / 2, 2.85, d / 2 + 0.02], aw[0]); b.sign(pick(r, WORDS), 0, 2.58, d / 2 + 0.03, Math.min(w * 0.82, 3.2), 0.4, { look: r() < 0.35 ? 2 : 0, kind: 'main', lit: true, frame: false, back: false }); b.bulbRow([-w / 2, 2.88, d / 2 + 0.06], [w / 2, 2.88, d / 2 + 0.06], 0.7, warm, 0.12); }
+    b.box(0, 0.9, d / 2 + 0.12, w * 0.84, 0.06, 0.3, C.steel);
+    awning(b, w, d / 2 + 0.02, 2.25, d / 2 + 0.95, 1.85, [aw[0], aw[1]], Math.max(3, Math.round(w / 1.3)), false);
     if (r() < 0.65) b.gable(0, 2.3, 0, w + 0.2, d + 0.2, 0.6, CANVAS.roof, { ridge: 'x', over: 0.08, back: CANVAS.back, ch: 'fabric' }); else b.gable(0, 2.3, 0, w + 0.2, d + 0.2, 0.6, aw[0], { ridge: 'x', over: 0.08 });      // most roofs are white canvas, like the photos
   }
 }
@@ -360,6 +303,7 @@ export const CORRIDORS = [
 ];
 const ROWS = [
   { name: 'N', front: 22.5, face: '+w', depth: 17, skins: { hallWide: 5, hall: 7, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 3, arch: 2, game: 2, sweets: 2, temple: 1, fisher: 1, pizza: 2, popcorn: 2, icecream: 1, balloon: 2, tiki: 1, claw: 1, funhouse: 1, souvenir: 2, bouncy: 1 } },
+  { name: 'F', front: 32.3, face: '-w', depth: 8, skins: { chalet: 3, kiosk: 3, trailer: 4, game: 3, sweets: 3, pizza: 2, popcorn: 2, icecream: 2, arch: 2, claw: 2, balloon: 1, tiki: 1, temple: 1, fisher: 1, souvenir: 2 } },
   { name: 'M1', front: 49, face: '+w', depth: 17, skins: { hallWide: 4, hall: 6, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 4, arch: 2, game: 3, sweets: 3, temple: 1, fisher: 1, kids: 1, pizza: 2, popcorn: 2, icecream: 2, balloon: 2, tiki: 1, claw: 2, funhouse: 1, souvenir: 2, bouncy: 1 } },
   { name: 'M2', front: 64, face: '-w', depth: 20, skins: { hallWide: 5, hall: 6, trailer: 3, kiosk: 2, game: 2, chalet: 2, kids: 1, chair: 1, sweets: 1, pizza: 1, balloon: 1, claw: 1, funhouse: 1, bouncy: 1, souvenir: 1 } },
   { name: 'S', front: 95, face: '-w', depth: 17, skins: { hallWide: 3, hall: 4, hallSmall: 3, kiosk: 3, trailer: 3, chalet: 2, sweets: 2, game: 2, arch: 1, pizza: 2, popcorn: 2, icecream: 2, tiki: 1, claw: 1, souvenir: 2, balloon: 1 } },
@@ -443,7 +387,7 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   for (let j = 0; j < FNW; j++) for (let i = 0; i < FNU; i++) if (!inPoly(fieldPoly, U0 + (i + 0.5) * FINE, W0 + (j + 0.5) * FINE)) fine[j * FNU + i] = 2;     // outside the field: never free
   const markAll = (u0, u1, w0, w1) => { grid.mark(u0, u1, w0, w1); fineMark(u0, u1, w0, w1); };
   const stalls = [];                                    // exact footprints { u0, u1, w0, w1 } (walk collision, coverage)
-  const addStall = (cu, cw, w, d, over = 0.15) => { stalls.push({ u0: +(cu - w / 2 - over).toFixed(2), u1: +(cu + w / 2 + over).toFixed(2), w0: +(cw - d / 2 - over).toFixed(2), w1: +(cw + d / 2 + over).toFixed(2) }); };
+  const addStall = (cu, cw, w, d, over = 0.15, k = '', f = '') => { stalls.push({ k, f, u0: +(cu - w / 2 - over).toFixed(2), u1: +(cu + w / 2 + over).toFixed(2), w0: +(cw - d / 2 - over).toFixed(2), w1: +(cw + d / 2 + over).toFixed(2) }); };
   pitches.forEach((p) => {
     const [du, dw] = SIZE[p.size] || SIZE.S; const f = p.face || '+w';
     let u0 = p.u - du / 2 - PIT_M; let u1 = p.u + du / 2 + PIT_M; let w0 = p.w - dw / 2 - PIT_M; let w1 = p.w + dw / 2 + PIT_M;
@@ -456,11 +400,11 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   const trisNow = () => { let t = 0; for (const k of Object.keys(b.ch)) t += b.ch[k].tris; return t; };
   const place = (skin, u, w, face, rr, maxW, maxD) => {
     const y = groundY(u, w);
-    b.push().translate(u, y, w).rotY(YAW[face]); b.aoY = y; b.far = LOW;
-    const t0 = trisNow(); const used = drawSkin(b, skin, rr, maxW, maxD); triKind[skin] = (triKind[skin] || 0) + trisNow() - t0;
+    b.push().translate(u, y, w).rotY(YAW[face]); b.aoY = y; b.far = LOW || (!ALWAYS_NEAR.has(skin) && corridorDist(u, w) > 7);        // stalls deep in the field are roofs from above: cheap form
+    const t0 = trisNow(); const used = drawSkin(b, skin, rr, maxW, maxD); b.far = LOW; triKind[skin] = (triKind[skin] || 0) + trisNow() - t0;
     b.pop(); b.aoY = 0; count++;
     b.push().translate(u, y, w); groundPad(b, groundY, u, w, y, used.w + 0.35, used.d + 0.35, rr); b.pop(); byKind[skin] = (byKind[skin] || 0) + 1;
-    addStall(u, w, used.w, used.d); fineMark(u - used.w / 2 - 0.2, u + used.w / 2 + 0.2, w - used.d / 2 - 0.2, w + used.d / 2 + 0.2);
+    addStall(u, w, used.w, used.d, 0.15, skin, face); fineMark(u - used.w / 2 - 0.2, u + used.w / 2 + 0.2, w - used.d / 2 - 0.2, w + used.d / 2 + 0.2);
     return used;
   };
   const wsum = (m) => Object.values(m).reduce((a, v) => a + v, 0);
@@ -520,7 +464,7 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
       byKind[kk] = (byKind[kk] || 0) + 1; triKind[kk] = (triKind[kk] || 0) + trisNow() - t0;
       b.pop(); b.aoY = 0; b.far = LOW; count++;
       b.push().translate(cu, y, cw); groundPad(b, groundY, cu, cw, y, sw + gap - 0.05, sd + gap - 0.05, rf); b.pop();
-      addStall(cu, cw, sw, sd); markAll(u - 0.05, u + sw + gap + 0.05, w - 0.05, w + sd + gap + 0.05);
+      addStall(cu, cw, sw, sd, 0.15, skin || 'lot', skin ? nearestFace(cu, cw, 0) : '?'); markAll(u - 0.05, u + sw + gap + 0.05, w - 0.05, w + sd + gap + 0.05);
       return true;
     },
   });

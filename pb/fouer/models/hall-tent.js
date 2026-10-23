@@ -75,16 +75,36 @@ function buildStatic(b, cfg, near, name) {
   if (near) for (const sg of [-1, 1]) for (let q = 1; q < 6; q++) { const z = lerp(Z0, Z1, q / 6); P.tube([sg * X_NAVE, Y_EAVE_N + 0.03, z], [0, Y_RIDGE + 0.03, z], 0.04, 0xc8ccd0, { sides: 3, flat: true }); P.tube([sg * X_AISLE, Y_EAVE_A + 0.03, z], [sg * X_NAVE, Y_EAVE_N + 0.03, z], 0.04, 0xc8ccd0, { sides: 3, flat: true }); }
   const RG = b.G([0.7, 0.4, 0.16]); const ROOF = hdr(pal.roof, 1.75); const ROOFB = hdr(pal.roofB, 1.5);
   for (const sg of [-1, 1]) {
-    RG.quad([sg * X_NAVE, Y_EAVE_N, Z0], [0, Y_RIDGE, Z0], [0, Y_RIDGE, Z1], [sg * X_NAVE, Y_EAVE_N, Z1], sg < 0 ? ROOF : ROOFB);
-    RG.quad([sg * X_AISLE, Y_EAVE_A, Z0], [sg * X_NAVE, Y_EAVE_N, Z0], [sg * X_NAVE, Y_EAVE_N, Z1], [sg * X_AISLE, Y_EAVE_A, Z1], sg < 0 ? ROOF : ROOFB);
+    // looks wave: PVC panels sewn along the frames, sagging a little between them (4 triangles round a lowered centre), a ridge cap, gutters, the seams over the frames
+    const sagPanel = (x0, y0, x1, y1, za, zb, c) => {
+      const E0 = [x0, y0, za], E1 = [x0, y0, zb], R0 = [x1, y1, za], R1 = [x1, y1, zb]; const M = [(x0 + x1) / 2, (y0 + y1) / 2 - 0.14, (za + zb) / 2];
+      for (const [a, bb, cc] of [[E0, E1, M], [E1, R1, M], [R1, R0, M], [R0, E0, M]]) {
+        const u = [bb[0] - a[0], bb[1] - a[1], bb[2] - a[2]], v = [cc[0] - a[0], cc[1] - a[1], cc[2] - a[2]];
+        const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+        if (n[1] >= 0) RG.tri(a, bb, cc, c); else RG.tri(a, cc, bb, c);          // the roof faces up
+      }
+    };
+    for (let i = 0; i < nb; i++) {
+      const za = lerp(Z0, Z1, i / nb), zb = lerp(Z0, Z1, (i + 1) / nb); const cN = (i & 1) ? ROOFB : (sg < 0 ? ROOF : ROOFB); const cA = (i & 1) ? ROOFB : ROOF;
+      sagPanel(sg * X_NAVE, Y_EAVE_N, 0, Y_RIDGE, za, zb, cN); sagPanel(sg * X_AISLE, Y_EAVE_A, sg * X_NAVE, Y_EAVE_N, za, zb, cA);
+    }
+    for (let i = 0; i <= nb; i++) { const z = lerp(Z0, Z1, i / nb); const zz = Math.max(Z0 + 0.1, Math.min(Z1 - 0.1, z));
+      P.quad(...(sg > 0 ? [[X_NAVE, Y_EAVE_N + 0.05, zz + 0.09], [X_NAVE, Y_EAVE_N + 0.05, zz - 0.09], [0, Y_RIDGE + 0.05, zz - 0.09], [0, Y_RIDGE + 0.05, zz + 0.09]] : [[-X_NAVE, Y_EAVE_N + 0.05, zz - 0.09], [-X_NAVE, Y_EAVE_N + 0.05, zz + 0.09], [0, Y_RIDGE + 0.05, zz + 0.09], [0, Y_RIDGE + 0.05, zz - 0.09]]), 0xdfe3e6);
+      P.quad(...(sg > 0 ? [[X_AISLE, Y_EAVE_A + 0.05, zz + 0.09], [X_AISLE, Y_EAVE_A + 0.05, zz - 0.09], [X_NAVE, Y_EAVE_N + 0.05, zz - 0.09], [X_NAVE, Y_EAVE_N + 0.05, zz + 0.09]] : [[-X_AISLE, Y_EAVE_A + 0.05, zz - 0.09], [-X_AISLE, Y_EAVE_A + 0.05, zz + 0.09], [-X_NAVE, Y_EAVE_N + 0.05, zz + 0.09], [-X_NAVE, Y_EAVE_N + 0.05, zz - 0.09]]), 0xdfe3e6);
+    }
+    P.box(sg * X_AISLE, Y_EAVE_A - 0.12, (Z0 + Z1) / 2, 0.16, 0.14, Z1 - Z0 + 0.2, pal.post, 32); P.box(sg * X_NAVE, Y_EAVE_N - 0.12, (Z0 + Z1) / 2, 0.16, 0.14, Z1 - Z0 + 0.2, pal.post, 32);
     // scalloped valance along the outer eave, coloured fabric flaps
     const nv = near ? 18 : 8; for (let i = 0; i < nv; i++) { const za = lerp(Z0, Z1, i / nv); const zb = lerp(Z0, Z1, (i + 1) / nv); const zm = (za + zb) / 2; const c = i % 2 ? pal.valA : pal.valB; P.tri([sg * X_AISLE, Y_EAVE_A, za], [sg * X_AISLE, Y_EAVE_A, zb], [sg * X_AISLE, Y_EAVE_A - 0.7, zm], c); }
     const nv2 = near ? 18 : 8; for (let i = 0; i < nv2; i++) { const za = lerp(Z0, Z1, i / nv2); const zb = lerp(Z0, Z1, (i + 1) / nv2); const zm = (za + zb) / 2; const c = i % 2 ? pal.valB : pal.valA; P.tri([sg * X_NAVE, Y_EAVE_N, za], [sg * X_NAVE, Y_EAVE_N, zb], [sg * X_NAVE, Y_EAVE_N - 0.55, zm], c); }
   }
+  P.box(0, Y_RIDGE - 0.08, (Z0 + Z1) / 2, 0.36, 0.17, Z1 - Z0 + 0.3, pal.post, 32);
   // front and back walls: nave gable + aisle ends, in white; door, lettering
   const WALL = hdr(pal.wall, 1.4);
   const wall = (z, front) => {
-    P.tri([-X_NAVE, Y_EAVE_N, z], [X_NAVE, Y_EAVE_N, z], [0, Y_RIDGE, z], WALL);
+    if (front) {      // looks wave: the upper gable shows the striped fabric ceiling (as in the photos) instead of a flat white panel, behind the aluminium truss
+      const ns = 10; const gy = (x) => Y_EAVE_N + (1 - Math.abs(x) / X_NAVE) * (Y_RIDGE - Y_EAVE_N);
+      for (let i = 0; i < ns; i++) { const x0 = -X_NAVE + 2 * X_NAVE * i / ns; const x1 = -X_NAVE + 2 * X_NAVE * (i + 1) / ns; const c = i & 1 ? pal.stripeA : pal.stripeB; P.quad([x0, Y_EAVE_N, z], [x1, Y_EAVE_N, z], [x1, gy(x1), z], [x0, gy(x0), z], c); }
+    } else P.tri([-X_NAVE, Y_EAVE_N, z], [X_NAVE, Y_EAVE_N, z], [0, Y_RIDGE, z], WALL);
     P.quad([-X_NAVE, 0.3, z], [X_NAVE, 0.3, z], [X_NAVE, Y_EAVE_N, z], [-X_NAVE, Y_EAVE_N, z], WALL);
     for (const sg of [-1, 1]) P.quad([sg * X_NAVE, 0.3, z], [sg * X_AISLE, 0.3, z], [sg * X_AISLE, Y_EAVE_A, z], [sg * X_NAVE, Y_EAVE_N, z], WALL);
   };
@@ -107,6 +127,10 @@ function buildStatic(b, cfg, near, name) {
   // gable trim along the nave front
   for (const sg of [-1, 1]) P.tube([sg * X_NAVE, Y_EAVE_N, zf + 0.05], [0, Y_RIDGE, zf + 0.05], 0.09, trim, { sides: 4, flat: true });
   pennant(b, 0, Y_RIDGE, zf + 0.05, 2.4, pal.flags[0], 1, 1.6);
+  // looks wave: the aluminium truss of the gable end (tie beam, king post, struts) and battens over the white panels
+  P.tube([-X_NAVE, Y_EAVE_N, zf + 0.07], [X_NAVE, Y_EAVE_N, zf + 0.07], 0.16, 0xaab1b8, { sides: 4, flat: true }); P.tube([0, Y_EAVE_N, zf + 0.07], [0, Y_RIDGE, zf + 0.07], 0.14, 0xaab1b8, { sides: 4, flat: true });
+  for (const sg of [-1, 1]) P.tube([sg * X_NAVE * 0.5, Y_EAVE_N, zf + 0.05], [0, Y_RIDGE * 0.78 + Y_EAVE_N * 0.22, zf + 0.05], 0.12, 0xaab1b8, { sides: 4, flat: true });
+  for (let k = -5; k <= 5; k++) { const x = k * 1.3; if (Math.abs(x) < 3.2 || Math.abs(x) > X_NAVE - 0.3) continue; P.box(x, 0.35, zf + 0.012, 0.1, Y_EAVE_N - 0.4, 0.02, 0xdfe3e6, 32); }
   // terrace in front: deck, steps, rail, barrels, tubs
   P.box(0, 0.55, 8.1, 19.0, 0.32, 1.7, pal.deck, 32); P.box(0, 0.74, 8.1, 18.8, 0.06, 1.6, pal.wood, 0);
   P.box(0, 0.42, 8.95, 5.6, 0.2, 0.3, pal.woodB, 0);

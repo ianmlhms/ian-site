@@ -5,6 +5,7 @@
 import { makeCtx, C, GOLD, dressEdge, dressForecourt, lerp, TAU, shade, col } from './kit.js';
 import { begin, end, fascia, booth, forecourtStrings, posts, bin, hammi } from './stalls.js';
 import { getMaterials } from './materials.js';
+import { attachSeats, tangentYaw, onCircle } from '../rides/anchors.js';
 
 export const MODELS = {};
 const FLAGS = [[0xc8283a, 0xffffff, 0x7fc4ec], [0x1d1b1a, 0xc8283a, 0xf4c430], [0x2d6fd0, 0xffffff, 0xc8283a], [0x2f9a58, 0xffffff, 0xc8283a], [0xf08a2a, 0xffffff, 0x2f9a58], [0x1d1b1a, 0xf4c430, 0xc8283a]];
@@ -107,9 +108,14 @@ function carousel(opts, id, R, nAnimals, gold) {
   if (ctx.L2) { booth(b, ctx, gold ? 6.6 : 3.1, gold ? R + 0.7 : zg - 0.4, { body: ctx.pal.dark, roof: second }); forecourtStrings(b, ctx, -R, R, gold ? R + 1.8 : 3.75, 3.0); }
   const fp = R * 0.78; flagPoles(b, ctx, [[-fp, -fp], [fp, -fp], [-fp, fp], [fp, fp]], 5.4 * k);
   if (ctx.L3) { b.railing([-R * 0.9, 0, R + 0.45], [-1.6, 0, R + 0.45], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.6, 0, R + 0.45], [R * 0.9, 0, R + 0.45], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, R + 0.7, 3); b.fx(0, 0.4, 0, 4, 0, { spread: R * 1.2, size: 0.5, color: ctx.look === 1 ? 0xb9a0ff : 0xf2f2f2 }); }
-  return end(b, ctx, gold ? [16, 16] : [8, 8], apex + 1.6, {
-    animate: (t, dt, parts) => { parts.rotor.rotation.y = t * 0.9; parts.bobA.position.y = Math.sin(t * 2.0) * 0.14; parts.bobB.position.y = Math.sin(t * 2.0 + Math.PI) * 0.14; },
+  const g = end(b, ctx, gold ? [16, 16] : [8, 8], apex + 1.6, {
+    animate: (t, dt, parts) => { parts.rotor.rotation.y = t * 0.9; parts.bobA.position.y = Math.sin(t * 2.0) * 0.2; parts.bobB.position.y = Math.sin(t * 2.0 + Math.PI) * 0.2; },
   });
+  // ride seats (rides wave): the odd animals (no L3 rider figure) in the bobbing group B; the rider sits behind the saddle, looking along the horse (the direction of travel)
+  const sc = k * 0.9; const eyeY = 0.37 + 0.5 + 1.0 * sc + (gold ? 0.85 : 0.42); const back = gold ? 0.32 : 0.12; const odd = [];       // eye above the horse's head: you look over its neck
+  for (let i = 1; i < nn; i += 2) { const a = TAU * i / nn; const [px, pz] = onCircle(a, rp); const lat = gold ? 0.16 : 0.1; odd.push({ p: [px - Math.cos(a) * back + Math.sin(a) * lat, eyeY, pz + Math.sin(a) * back + Math.cos(a) * lat], yaw: tangentYaw(a) }); }   // a little to the side of the pole (the rider leans), so the pole is not in the middle of the view
+  attachSeats(g, 'bobB', odd, 0);
+  return g;
 }
 MODELS.kanner = { build: (opts) => carousel(opts, 'kanner', 3.0, 8, false) };
 MODELS.gold = { build: (opts) => carousel(opts, 'gold', 5.6, 14, true) };
@@ -138,19 +144,40 @@ MODELS.kette = { build(opts) {
   rot.bulbRing(0, rimY - 0.98, 0, R + 0.12, 40, ctx.bulb, 0.15); rot.bulbRing(0, rimY + 0.02, 0, R + 0.1, 40, ctx.bulb, 0.15);
   if (ctx.L2) rot.radial(12, () => rot.bulbRow([0, rimY + 0.1, R - 0.1], [0, apexY - 0.1, 0.4], 0.55, ctx.bulb, 0.13));
   if (ctx.L3) { ledRing(rot, rimY + 0.06, R + 0.1, 36, 0.08, ctx.led); ledRing(rot, rimY - 0.82, R + 0.1, 36, 0.07, ctx.led.slice().reverse()); }
+  // rides wave: the chairs hang 0.8 m higher (pan at SEAT_Y) so that the swing shader (which lowers a seat by depth * (1 - cos)) keeps them above the deck when they fly out
+  const SEAT_Y = 1.42;
   rot.swingTop = swingTop; const nSeat = ctx.L3 ? 28 : 24; const sw = { ch: 'swing' };
   rot.radial(nSeat, (i) => {
     const c = ctx.look === 1 ? [0x41e8ff, 0xff3fc8, 0x8a5bff][i % 3] : ctx.look === 2 ? [0x1f5fb8, 0xfdfdf6][i & 1] : [0xc8283a, 0xf4c430, 0x2f9a58, 0x2d6fd0][i % 4];
-    rot.wire([0, swingTop, R - 0.25], [0, 0.95, R - 0.25], 0.04, 0x333333, sw); rot.wire([0, swingTop, R + 0.15], [0, 0.95, R + 0.15], 0.04, 0x333333, sw);
-    rot.box(0, 0.62, R - 0.05, 0.46, 0.08, 0.5, c, sw); rot.box(-0.2, 0.7, R - 0.05, 0.06, 0.5, 0.5, c, sw); rot.box(0.15, 0.82, R - 0.05, 0.05, 0.04, 0.52, 0x333333, sw);
+    rot.wire([0, swingTop, R - 0.25], [0, SEAT_Y + 0.33, R - 0.25], 0.04, 0x333333, sw); rot.wire([0, swingTop, R + 0.15], [0, SEAT_Y + 0.33, R + 0.15], 0.04, 0x333333, sw);
+    rot.box(0, SEAT_Y, R - 0.05, 0.46, 0.08, 0.5, c, sw); rot.box(-0.2, SEAT_Y + 0.08, R - 0.05, 0.06, 0.5, 0.5, c, sw); rot.box(0.15, SEAT_Y + 0.2, R - 0.05, 0.05, 0.04, 0.52, 0x333333, sw);
   });
   gate(b, ctx, ctx.name, 6.4, 3.2, { h: 3.0 }); for (let i = 0; i < 3; i++) b.box(0, i * 0.1, 6.0 + i * 0.12, 2.0, 0.1, 0.4, C.plate);
   if (ctx.L2) { booth(b, ctx, 5.3, 6.4, { body: P.dark, roof: P.second }); forecourtStrings(b, ctx, -5, 5, 7.3, 3.0); }
   flagPoles(b, ctx, [[-6.8, 5.8], [-6.8, -6], [6.2, -6], [6.2, 2]], 5.0);
   if (ctx.L3) { b.railing([-6.6, 0, 7.2], [-1.8, 0, 7.2], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.2], [6.6, 0, 7.2], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.45, 4); b.fx(0, 0.4, 0, 5, 0, { spread: 9, size: 0.6, color: 0xdfe8ff }); }
-  return end(b, ctx, [16, 16], apexY + 2.4, {
-    animate: (t, dt, parts) => { const ramp = Math.min(1, 0.25 + t * 0.4); parts.rotor.rotation.y = t * 1.0; U.uSwing.value = 0.2 + 0.34 * ramp + 0.03 * Math.sin(t * 0.6); },
+  // the ride overrides `KS.swing` / `KS.tilt` (flying chairs and a leaning canopy as the rotor speeds up); idle: the old look
+  const KS = { swing: null, tilt: 0.03 };
+  const g = end(b, ctx, [16, 16], apexY + 2.4, {
+    animate: (t, dt, parts) => {
+      const ramp = Math.min(1, 0.25 + t * 0.4); parts.rotor.rotation.y = t * 1.0; parts.rotor.rotation.x = KS.tilt;
+      U.uSwing.value = KS.swing !== null ? KS.swing : 0.2 + 0.34 * ramp + 0.03 * Math.sin(t * 0.6);
+    },
   });
+  g.userData.kette = KS;
+  const YAW_OUT = 0.5, COS_OUT = Math.cos(YAW_OUT), SIN_OUT = Math.sin(YAW_OUT);       // the view is turned 30 degrees outwards: over the fair, not at the central column
+  const seats = []; for (let i = 0; i < nSeat; i++) { const a = TAU * i / nSeat; const [px, pz] = onCircle(a, R - 0.05); seats.push({ p: [px + Math.cos(a) * 0.32, SEAT_Y + 0.9, pz - Math.sin(a) * 0.32], yaw: tangentYaw(a) - YAW_OUT }); }   // 0.3 m ahead of the seat: the chains are behind the camera
+  const rs = attachSeats(g, 'rotor', seats, 0); const baseFrame = rs.frame; const depth = swingTop - SEAT_Y; const tmp = { x: 0, y: 0, z: 0 };
+  // the chair flies out: shift along the radial direction and up by depth * (1 - cos)
+  rs.frame = (i, out) => {
+    baseFrame(i, out); const sa = U.uSwing.value; const f = out.forward; const u = out.up;
+    tmp.x = u.y * f.z - u.z * f.y; tmp.y = u.z * f.x - u.x * f.z; tmp.z = u.x * f.y - u.y * f.x;       // the anchor's +x = up x forward; the radial (outward) direction = -x cos(turn) + forward sin(turn)
+    const rx = -tmp.x * COS_OUT + f.x * SIN_OUT, ry = -tmp.y * COS_OUT + f.y * SIN_OUT, rz = -tmp.z * COS_OUT + f.z * SIN_OUT;
+    const o = depth * Math.sin(sa), d = depth * (1 - Math.cos(sa));      // the camera RISES with the swing (a real chair does; the model's shader lowers the seat meshes, which are not in view)
+    out.position.x += rx * o + u.x * d; out.position.y += ry * o + u.y * d; out.position.z += rz * o + u.z * d;
+    return out;
+  };
+  return g;
 } };
 
 /* ------------------------------------------------------------------ bayern: the Bayern curve (M) */
@@ -184,7 +211,11 @@ MODELS.bayern = { build(opts) {
   if (ctx.L2) { booth(b, ctx, 5.2, 6.5, { body: blue, roof: white }); forecourtStrings(b, ctx, -5, 5, 7.4, 3.0); }
   flagPoles(b, ctx, [[-6.8, 6.0], [-6.8, -6.2], [6.2, -6.2], [6.2, 2.0]], 5.5);
   if (ctx.L3) { b.railing([-6.8, 0, 7.25], [-1.8, 0, 7.25], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.25], [6.8, 0, 7.25], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.4, 4); }
-  return end(b, ctx, [16, 16], 8.3, { animate: (t, dt, parts) => { parts.ring.rotation.y = -t * 1.25; } });
+  const g = end(b, ctx, [16, 16], 8.3, { animate: (t, dt, parts) => { parts.ring.rotation.y = -t * 1.25; } });
+  // ride seats: the cars face +x of their radial frame (tangent, increasing angle); no L3 figure on cars 1, 2, 4, 5 ...
+  const seats = []; for (let i = 0; i < nCars; i++) { const a = TAU * i / nCars; const [px, pz] = onCircle(a, 5.25); seats.push({ p: [px - Math.cos(a) * 0.1, 1.6, pz + Math.sin(a) * 0.1], yaw: tangentYaw(a) }); }
+  attachSeats(g, 'ring', seats, 1);
+  return g;
 } };
 
 /* ------------------------------------------------------------------ happy: boat carousel (M) */
@@ -225,7 +256,11 @@ MODELS.happy = { build(opts) {
   if (ctx.L2) { booth(b, ctx, 5.5, 6.6, { body: P.main, roof: foam }); forecourtStrings(b, ctx, -5, 5, 7.4, 3.0); }
   flagPoles(b, ctx, [[-7.0, 6.5], [-7.0, -6.5], [6.4, -6.5], [6.4, 2.0]], 5.5);
   if (ctx.L3) { b.railing([-7.0, 0, 7.3], [-1.8, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.3], [7.0, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.45, 4); b.fx(0, 0.5, 0, 5, 0, { spread: 10, size: 0.6, color: 0xdff4ff }); }
-  return end(b, ctx, [16, 16], 10.6, { animate: (t, dt, parts) => { parts.rotor.rotation.y = t * 0.55; parts.boatsA.position.y = Math.sin(t * 1.7) * 0.16; parts.boatsB.position.y = Math.sin(t * 1.7 + Math.PI) * 0.16; } });
+  const g = end(b, ctx, [16, 16], 10.6, { animate: (t, dt, parts) => { parts.rotor.rotation.y = t * 0.55; parts.boatsA.position.y = Math.sin(t * 1.7) * 0.16; parts.boatsB.position.y = Math.sin(t * 1.7 + Math.PI) * 0.16; } });
+  // ride seats: the odd boats (no L3 figure) are in group B; the rider sits on the thwart looking along the bow (the direction of travel)
+  const seats = []; for (let i = 1; i < nb; i += 2) { const a = TAU * i / nb; const [px, pz] = onCircle(a, 3.4); seats.push({ p: [px - Math.cos(a) * 0.2, 0.55 + 0.5 + 0.8, pz + Math.sin(a) * 0.2], yaw: tangentYaw(a) }); }
+  attachSeats(g, 'boatsB', seats, 0);
+  return g;
 } };
 
 /* ------------------------------------------------------------------ break: Break Dance (M) */
@@ -259,7 +294,14 @@ MODELS.break = { build(opts) {
   if (ctx.L2) { booth(b, ctx, 5.4, 6.6, { body: P.main, roof: P.second }); forecourtStrings(b, ctx, -5, 5, 7.4, 3.0); }
   flagPoles(b, ctx, [[-6.9, 6.0], [6.2, 6.0], [-6.9, -2], [6.2, -2]], 5.5);
   if (ctx.L3) { b.railing([-7.0, 0, 7.3], [-1.8, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.3], [7.0, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.45, 4); b.fx(0, 0.5, 0, 5, 1, { spread: 8, size: 0.14 }); }
-  return end(b, ctx, [16, 16], 8.4, { animate: (t, dt, parts) => { parts.rotor.rotation.y = t * 0.95; parts.rotor.rotation.x = Math.sin(t * 1.9) * 0.06; parts.rotor.rotation.z = Math.cos(t * 1.9) * 0.05; } });
+  const g = end(b, ctx, [16, 16], 8.4, { animate: (t, dt, parts) => { parts.rotor.rotation.y = t * 0.95; parts.rotor.rotation.x = Math.sin(t * 1.9) * 0.06; parts.rotor.rotation.z = Math.cos(t * 1.9) * 0.05; } });
+  // ride seats: arm i carries a platform at radius 4.5, its five seats sit on a ring of 0.95 m facing the platform centre; seat y = hubY - 0.9, eye 0.85 above
+  const seats = []; for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+    const a = TAU * i / 5; const c = a + TAU * j / 5; const [ax, az] = onCircle(a, 4.5); const [sx, sz] = onCircle(c, 0.82);
+    seats.push({ p: [ax + sx, hubY - 0.9 + 0.88, az + sz], yaw: c + Math.PI });
+  }
+  attachSeats(g, 'rotor', seats, 0);
+  return g;
 } };
 
 /* ------------------------------------------------------------------ musik: Music Express (M) */
@@ -295,7 +337,11 @@ MODELS.musik = { build(opts) {
   if (ctx.L2) { booth(b, ctx, 5.5, 6.6, { body: P.main, roof: P.second }); forecourtStrings(b, ctx, -5, 5, 7.4, 3.0); }
   flagPoles(b, ctx, [[-7.0, 6.2], [-7.0, -6.5], [6.3, -6.5], [6.3, 2.0]], 5.5);
   if (ctx.L3) { b.railing([-7.0, 0, 7.3], [-1.8, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.3], [7.0, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.45, 3); }
-  return end(b, ctx, [16, 16], 8.0, { animate: (t, dt, parts) => { parts.ringA.rotation.y = -t * 1.1; parts.ringB.rotation.y = -t * 1.1; parts.ringA.position.y = Math.sin(t * 3.0) * 0.18; parts.ringB.position.y = Math.sin(t * 3.0 + Math.PI) * 0.18; } });
+  const g = end(b, ctx, [16, 16], 8.0, { animate: (t, dt, parts) => { parts.ringA.rotation.y = -t * 1.1; parts.ringB.rotation.y = -t * 1.1; parts.ringA.position.y = Math.sin(t * 3.0) * 0.18; parts.ringB.position.y = Math.sin(t * 3.0 + Math.PI) * 0.18; } });
+  // ride seats: the odd cars (ring B, no L3 figure) face +x of their radial frame; the ring turns the other way: you ride backwards, like the real Music Express
+  const seats = []; for (let i = 1; i < nCars; i += 2) { const a = TAU * i / nCars; const [px, pz] = onCircle(a, 5.1); seats.push({ p: [px - Math.cos(a) * 0.12, 0.55 + 0.42 + 1.05, pz + Math.sin(a) * 0.12], yaw: tangentYaw(a) }); }
+  attachSeats(g, 'ringB', seats, 0);
+  return g;
 } };
 
 /* ------------------------------------------------------------------ takeoff: tilt ride (M) */
@@ -330,7 +376,11 @@ MODELS.takeoff = { build(opts) {
   gate(b, ctx, ctx.name, 6.9, 3.2, { h: 3.0 }); if (ctx.L2) booth(b, ctx, 5.8, 6.5, { body: P.main, roof: P.second }); if (ctx.L2) forecourtStrings(b, ctx, -5, 5, 7.4, 3.0);
   flagPoles(b, ctx, [[-7.0, 7.0], [6.2, 7.0], [-7.0, -4], [6.2, -4]], 6.0);
   if (ctx.L3) { b.railing([-7.0, 0, 7.3], [-1.8, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.3], [7.0, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.45, 3); b.fx(-4, 1.4, 3, 3, 0, { spread: 3, size: 0.4 }); }
-  return end(b, ctx, [16, 16], 9.6, { animate: (t, dt, parts) => { parts.tilt.rotation.x = 0.34; parts.spin.rotation.y = t * 1.3; } });
+  const g = end(b, ctx, [16, 16], 9.6, { animate: (t, dt, parts) => { parts.tilt.rotation.x = 0.34; parts.spin.rotation.y = t * 1.3; } });
+  // ride seats: outer row of the +x end, the seat without a figure (r + q odd); the rider faces outward along the arm, hanging under it
+  const seats = [{ p: [2.4 + 4 * 0.72 - 0.05, 5.02 + 0.2 + 0.72, 0.55], yaw: Math.PI / 2 }, { p: [-(2.4 + 4 * 0.72 - 0.05), 5.02 + 0.2 + 0.72, 0.55], yaw: -Math.PI / 2 }];
+  attachSeats(g, 'spin', seats, 0);
+  return g;
 } };
 
 /* ------------------------------------------------------------------ infinity: pendulum arm (M) */

@@ -61,7 +61,7 @@ export class Builder {
     this.M = getMaterials();
     this.far = !!opts.far;
     this.rnd = opts.rnd || mulberry(opts.seed || 1);
-    this.ch = { solid: new Acc(), fabric: new Acc(), lamp: new Acc(true), sign: new Acc(), signLit: new Acc(), swing: new Acc(false, true) };
+    this.ch = { solid: new Acc(), ground: new Acc(), fabric: new Acc(), lamp: new Acc(true), sign: new Acc(), signLit: new Acc(), swing: new Acc(false, true) };
     this.swingTop = 0;
     this.bulbs = [];            // x,y,z, r,g,b, size, phase
     this.fxp = [];              // x,y,z, r,g,b, size, phase, kind
@@ -100,7 +100,7 @@ export class Builder {
     }
     const pts = [a, b, c];
     const multi = Array.isArray(color[0]);
-    const jit = ch === 'solid' || ch === 'fabric' ? 1 + (this.rnd() - 0.5) * this.jit : 1;
+    const jit = ch === 'solid' || ch === 'fabric' || ch === 'ground' ? 1 + (this.rnd() - 0.5) * this.jit : 1;
     for (let i = 0; i < 3; i++) {
       const P = pts[i]; A.p.push(P[0], P[1], P[2]); A.n.push(n[i][0], n[i][1], n[i][2]);
       const k = multi ? color[i] : color;
@@ -469,7 +469,7 @@ export class Builder {
       geo.computeBoundingSphere(); geo.computeBoundingBox();
       const mesh = new T.Mesh(geo, mat); mesh.name = nm; g.add(mesh);
     };
-    mk('solid', this.ch.solid, this.M.solid); mk('fabric', this.ch.fabric, this.M.fabric); mk('lamp', this.ch.lamp, this.M.lamp); mk('sign', this.ch.sign, this.M.sign); mk('signLit', this.ch.signLit, this.M.signLit); mk('swing', this.ch.swing, this.M.swing);
+    mk('solid', this.ch.solid, this.M.solid); mk('ground', this.ch.ground, this.M.ground); mk('fabric', this.ch.fabric, this.M.fabric); mk('lamp', this.ch.lamp, this.M.lamp); mk('sign', this.ch.sign, this.M.sign); mk('signLit', this.ch.signLit, this.M.signLit); mk('swing', this.ch.swing, this.M.swing);
     const pts = (name, arr, stride, mat, attrs) => {
       if (!arr.length) return;
       const n = arr.length / stride; const pos = new Float32Array(n * 3); const cc = new Float32Array(n * 3); const sz = new Float32Array(n); const ph = new Float32Array(n); const kd = new Float32Array(n);

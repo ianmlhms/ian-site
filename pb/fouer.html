@@ -28,7 +28,7 @@ button { font: inherit; color: inherit; }
 @keyframes bob { 50% { transform: translateY(-6px); } }
 </style>
 <link rel="stylesheet" href="/pb/idle-extras.css?v=5">
-<link rel="stylesheet" href="/pb/fouer/ui.css?v=3">
+<link rel="stylesheet" href="/pb/fouer/ui.css?v=4">
 <script src="/pb/idle-extras.js?v=8"></script>
 <script src="/pb/arcade-kit.js?v=34" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
 </head>
@@ -63,7 +63,7 @@ if(!window.THREE){
   // ?models=1 -> the W3 model preview (turntable grid / single model / full fair); ?stage=1 -> W2's empty Glacis stage; otherwise the game.
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe.
   const q = new URLSearchParams(location.search);
-  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=3";
+  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=4";
   import(entry);
 </script>
 </body>

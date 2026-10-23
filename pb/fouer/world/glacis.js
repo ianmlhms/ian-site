@@ -97,7 +97,7 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
   const oy = H.oy;
   const Q = {
     high: { stride: 2, farStride: 2, trees: 1, shadows: false },
-    medium: { stride: 2, farStride: 2, trees: 0.6, shadows: false },
+    medium: { stride: 2, farStride: 3, trees: 0.6, shadows: false },
     low: { stride: 4, farStride: 4, trees: 0.45, shadows: false },
   }[quality] || { stride: 2, farStride: 2, trees: 0.8 };
   const root = new T.Group();
@@ -445,7 +445,7 @@ vec3 wearGround(vec3 rgb, vec3 wp) {
   onProgress(0.3, 'terrain');
   // ground decor (draped on the final mesh), merged per chunk and material.  Tiles on the field get everything; the ring around it gets
   // carriageways / sidewalks / kerbs / paint only; beyond that the painted class map is enough (the Luxtram DECOR_R idea).
-  const TIERS = quality === 'low' ? [[44, null, 9], [80, ['a', 'k'], 10], [120, ['a'], 12]] : [[48, null, 7], [95, ['a', 'k'], 8], [150, ['a'], 10]];     // polish 2: low was FINER (4.5 m) than medium (7 m): coarser and shorter-ranged now
+  const TIERS = quality === 'low' ? [[44, null, 9], [80, ['a', 'k'], 10], [120, ['a'], 12]] : [[48, null, 14], [95, ['a', 'k'], 14], [150, ['a'], 16]];     // polish 2: low was FINER (4.5 m) than medium (7 m): coarser and shorter-ranged now
   for (const ch of chunks.values()) {
     decorBuckets.clear();
     for (const t of ch.tiles) {
@@ -583,7 +583,7 @@ vec3 wearGround(vec3 rgb, vec3 wp) {
         const pal = farPal[kind] || farPal[0]; const wcol = pal[(bi * 7) % pal.length]; const rp0 = farRoof[kind] || farRoof[1]; const rcol = rp0[(bi * 5 + 3) % rp0.length];
         let ar = 0; for (let a = 0; a < ring.length; a++) { const pa = ring[a]; const pb = ring[(a + 1) % ring.length]; ar += pa[0] * pb[1] - pb[0] * pa[1]; }
         const sg = ar < 0 ? -1 : 1;
-        if (quality !== 'high' && Math.abs(ar) < 90) continue;                 // polish 2: sheds and garages of the far ring are invisible from the fair (< 45 m2)
+        if (quality !== 'high' && Math.abs(ar) < 360) continue;                 // polish 2: sheds and garages of the far ring are invisible from the fair (< 45 m2)
         for (let a = 0; a < ring.length; a++) {
           const p0 = ring[a]; const p1 = ring[(a + 1) % ring.length];
           const dx = p1[0] - p0[0]; const dz = p1[1] - p0[1]; const l = Math.hypot(dx, dz) || 1;

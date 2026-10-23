@@ -170,59 +170,74 @@ export function marchNotes(fromBeat, toBeat) {
 export const midiHz = midi => 440 * 2 ** ((midi - 69) / 12);
 
 /* ================================================================================================ the THREE part */
-const HUMAN_BOXES = 7, HUMAN_BALLS = 1, HUMAN_CYLS = 2, SHEEP_BOXES = 9, SHEEP_BALLS = 6;
 const HAT_STRAW = 0xd9b66a, SMOCK_BLUE = 0x2c52a8, NECK_RED = 0xd4202c, BAND_BLUE = 0x1c2a5a, BRASS = 0xe6b832, WOOL = 0xf6f3ea, FACE = 0xf0dcc8;
 const RIBBON_COLORS = [0xd8283a, 0xfaf8f0, 0x8fd0f0];
 const SKINS = [0xf2c9a4, 0xe8b48a, 0xd39c6c, 0xa86f46, 0xf6d6bd], HAIRS = [0x1c1612, 0x3a2616, 0x6a4423, 0xc9a45c, 0x8a8a8a];
 const CLOTHES = [0xd8283a, 0x2d6fd0, 0xf2c230, 0xf4f4ef, 0x2f9a58, 0xe8702a, 0x7a47c8, 0x1c8fa0, 0xe86aa6, 0x35405c];
 
-/** instanced humans and sheep: 3 draw calls (boxes, balls, cylinders), per-instance colour, lit by the scene's lights */
+/** Looks wave: instanced humans and sheep in rigid parts (tapered torso, hips, thigh + shin with a knee, upper arm + forearm + hand, neck, head with nose and eyes, hair, hats, shoes, instruments),
+ * 6 draw calls (boxes, low balls, head balls, cylinders, tapered limbs, flares), per-instance colour, lit by the scene's lights.  ~600 triangles per human, ~900 per sheep. */
+const CAST_CAP = { human: { box: 12, ball: 2, ball0: 8, cyl: 8, tap: 10, flare: 2 }, sheep: { box: 5, ball: 13, ball0: 8, cyl: 0, tap: 4, flare: 0 }, prop: { box: 1 } };
 function createCast(T, parent, { humans, sheep, props }) {
-  const boxGeo = new T.BoxGeometry(1, 1, 1), ballGeo = new T.IcosahedronGeometry(1, 1), cylGeo = new T.CylinderGeometry(1, 1, 1, 10);
-  const material = new T.MeshLambertMaterial({ color: 0xffffff });
-  const make = (geo, n, name) => {
-    const mesh = new T.InstancedMesh(geo, material, Math.max(1, n)); mesh.name = name; mesh.frustumCulled = false; mesh.renderOrder = 3;
-    mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); mesh.count = 0; parent.add(mesh); return mesh;
+  const geos = {
+    box: new T.BoxGeometry(1, 1, 1), ball: new T.IcosahedronGeometry(1, 1), ball0: new T.IcosahedronGeometry(1, 0), cyl: new T.CylinderGeometry(1, 1, 1, 7),
+    tap: new T.CylinderGeometry(1, 0.74, 1, 7), flare: new T.CylinderGeometry(0.72, 1, 1, 8),
   };
-  const boxes = make(boxGeo, humans * HUMAN_BOXES + sheep * SHEEP_BOXES + props, "fouer-cast-boxes");
-  const balls = make(ballGeo, humans * HUMAN_BALLS + sheep * SHEEP_BALLS, "fouer-cast-balls");
-  const cyls = make(cylGeo, humans * HUMAN_CYLS, "fouer-cast-cyls");
-  const counts = { box: 0, ball: 0, cyl: 0 };
-  const meshes = { box: boxes, ball: balls, cyl: cyls };
+  const material = new T.MeshLambertMaterial({ color: 0xffffff });
+  const cap = k => Math.max(1, humans * (CAST_CAP.human[k] || 0) + sheep * (CAST_CAP.sheep[k] || 0) + (k === "box" ? props : 0));
+  const meshes = {};
+  for (const k of Object.keys(geos)) {
+    const mesh = new T.InstancedMesh(geos[k], material, cap(k)); mesh.name = "fouer-cast-" + k; mesh.frustumCulled = false; mesh.renderOrder = 3;
+    mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); mesh.count = 0; parent.add(mesh); meshes[k] = mesh;
+  }
+  const counts = {}; for (const k of Object.keys(geos)) counts[k] = 0;
   const color = new T.Color();
   const slot = (kind, hex) => { const i = counts[kind]++; meshes[kind].setColorAt(i, color.setHex(hex)); meshes[kind].count = counts[kind]; return i; };
   const F = new T.Matrix4(), L = new T.Matrix4(), W = new T.Matrix4(), q = new T.Quaternion(), qy = new T.Quaternion(), p = new T.Vector3(), s = new T.Vector3(), fp = new T.Vector3(), fs = new T.Vector3();
-  const AX = new T.Vector3(1, 0, 0), AY = new T.Vector3(0, 1, 0), AZ = new T.Vector3(0, 0, 1);
+  const AX = new T.Vector3(1, 0, 0), AY = new T.Vector3(0, 1, 0), AZ = new T.Vector3(0, 0, 1), UP = new T.Vector3(0, 1, 0), dir = new T.Vector3();
   const put = (kind, i, px, py, pz, rx, sx, sy, sz, rz = 0) => {
     q.setFromAxisAngle(AX, rx); if (rz) { qy.setFromAxisAngle(AZ, rz); q.multiply(qy); }
     p.set(px, py, pz); s.set(sx, sy, sz); L.compose(p, q, s); W.multiplyMatrices(F, L); meshes[kind].setMatrixAt(i, W);
   };
-  /** a limb of length `len` hanging from pivot (px,py,pz), swung forward by `ang` radians */
-  const limb = (kind, i, px, py, pz, ang, len, sx, sz) => put(kind, i, px, py - (len / 2) * Math.cos(ang), pz + (len / 2) * Math.sin(ang), -ang, sx, len, sz);
+  /** a tapered / plain / flared part from a to b (local points): the geometry's +y axis points to a, so the wide end of a limb is at its joint */
+  const seg = (kind, i, a, b, rx, rz = rx) => {
+    dir.set(a[0] - b[0], a[1] - b[1], a[2] - b[2]); const len = dir.length() || 1e-4; dir.divideScalar(len);
+    q.setFromUnitVectors(UP, dir); p.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); s.set(rx, len, rz); L.compose(p, q, s); W.multiplyMatrices(F, L); meshes[kind].setMatrixAt(i, W);
+  };
+  const ball = (kind, i, c, rx, ry = rx, rz = rx) => put(kind, i, c[0], c[1], c[2], 0, rx, ry, rz);
   const hide = (kind, i) => { W.makeScale(0, 0, 0); meshes[kind].setMatrixAt(i, W); };
   const entries = [];
+  const SKIN_DARK = 0x1c1816;
 
   function addHuman(spec) {
     const rnd = spec.rnd ?? Math.random;
     const entry = { type: "human", spec, visible: true, pose: { x: 0, z: 0, y: 0, yaw: 0, walk: 0, phase: rnd() * TAU, arms: "swing", scale: 1, hop: 0, lift: 0, fade: 1 }, slots: {} };
-    const body = spec.body ?? CLOTHES[Math.floor(rnd() * CLOTHES.length)];
+    const body = spec.body ?? CLOTHES[Math.floor(rnd() * CLOTHES.length)]; const skin = spec.skin ?? SKINS[Math.floor(rnd() * SKINS.length)];
+    const sleeves = spec.sleeves ?? body; const long = spec.sleeves !== undefined || spec.smock;
     entry.color = { body, legs: spec.legs ?? 0x2f3a58 };
-    const S = entry.slots;
-    S.legL = slot("box", entry.color.legs); S.legR = slot("box", entry.color.legs); S.body = slot("box", body);
-    S.armL = slot("box", spec.sleeves ?? body); S.armR = slot("box", spec.sleeves ?? body);
-    S.scarf = slot("box", spec.scarf ?? body); S.item = slot("box", spec.itemColor ?? BRASS);
-    S.head = slot("ball", spec.skin ?? SKINS[Math.floor(rnd() * SKINS.length)]);
-    S.crown = slot("cyl", spec.hat ?? HAIRS[Math.floor(rnd() * HAIRS.length)]); S.brim = slot("cyl", spec.hat ?? HAT_STRAW);
+    const hair = spec.hair ?? HAIRS[Math.floor(rnd() * HAIRS.length)]; const S = entry.slots;
+    S.torso = slot("tap", body); S.hips = slot("tap", spec.smock ? body : entry.color.legs);
+    S.thighL = slot("tap", entry.color.legs); S.thighR = slot("tap", entry.color.legs); S.shinL = slot("tap", entry.color.legs); S.shinR = slot("tap", entry.color.legs);
+    S.upL = slot("tap", sleeves); S.upR = slot("tap", sleeves); S.foreL = slot("tap", long ? sleeves : skin); S.foreR = slot("tap", long ? sleeves : skin);
+    S.smock = slot("flare", body); S.bell = slot("flare", BRASS);
+    S.shoeL = slot("box", 0x1c1816); S.shoeR = slot("box", 0x1c1816); S.scarf = slot("box", spec.scarf ?? body); S.tie = slot("box", spec.scarf ?? body);
+    S.item = slot("box", spec.itemColor ?? BRASS); S.item2 = slot("box", spec.itemColor ?? BRASS); S.visor = slot("box", spec.hat ?? 0x20306a); S.epL = slot("box", 0xe6b832); S.epR = slot("box", 0xe6b832);
+    S.handL = slot("ball0", skin); S.handR = slot("ball0", skin); S.eyeL = slot("ball0", SKIN_DARK); S.eyeR = slot("ball0", SKIN_DARK); S.nose = slot("ball0", skin); S.hairBack = slot("ball0", hair);
+    S.itemBall = slot("ball0", spec.itemColor ?? BRASS); S.itemBall2 = slot("ball0", 0xf4f4ef);
+    S.head = slot("ball", skin); S.hair = slot("ball", hair);
+    S.neck = slot("cyl", skin); S.crown = slot("cyl", spec.hat ?? hair); S.brim = slot("cyl", spec.hat ?? HAT_STRAW); S.band = slot("cyl", 0xc8283a);
+    S.tube = slot("cyl", spec.itemColor ?? BRASS); S.stick = slot("cyl", 0x7a5530); S.drum = slot("cyl", 0xf4f4ef); S.rim = slot("cyl", 0x2c52a8);
     entries.push(entry); return entry;
   }
   function addSheep(spec) {
     const rnd = spec.rnd ?? Math.random;
-    const entry = { type: "sheep", spec, visible: true, pose: { x: 0, z: 0, y: 0, yaw: 0, walk: 0, phase: rnd() * TAU, scale: spec.scale ?? 1, hop: 0, fade: 1 }, slots: {} };
+    const entry = { type: "sheep", spec, visible: true, pose: { x: 0, z: 0, y: 0, yaw: 0, walk: 0, phase: rnd() * TAU, scale: spec.scale ?? 1, hop: 0, fade: 1 }, slots: {}, tufts: [] };
     const S = entry.slots;
-    S.fl = slot("box", 0x4a3a34); S.fr = slot("box", 0x4a3a34); S.bl = slot("box", 0x4a3a34); S.br = slot("box", 0x4a3a34);
-    S.ribA = slot("box", RIBBON_COLORS[0]); S.ribB = slot("box", RIBBON_COLORS[1]); S.ribC = slot("box", RIBBON_COLORS[2]);
-    S.earL = slot("box", 0xe9a8a0); S.earR = slot("box", 0xe9a8a0);
-    S.body = slot("ball", WOOL); S.head = slot("ball", FACE); S.t1 = slot("ball", 0xfbf9f2); S.t2 = slot("ball", 0xfbf9f2); S.t3 = slot("ball", 0xfbf9f2); S.tail = slot("ball", WOOL);
+    S.fl = slot("tap", 0x4a3a34); S.fr = slot("tap", 0x4a3a34); S.bl = slot("tap", 0x4a3a34); S.br = slot("tap", 0x4a3a34);
+    S.ribA = slot("box", RIBBON_COLORS[0]); S.ribB = slot("box", RIBBON_COLORS[1]); S.ribC = slot("box", RIBBON_COLORS[2]); S.earL = slot("box", 0xe9a8a0); S.earR = slot("box", 0xe9a8a0);
+    S.body = slot("ball", WOOL); S.rump = slot("ball", 0xfbf9f2); S.shoulder = slot("ball", 0xfbf9f2); S.head = slot("ball", FACE);
+    for (let k = 0; k < 9; k++) entry.tufts.push(slot("ball", k & 1 ? 0xfbf9f2 : WOOL));
+    S.tail = slot("ball0", WOOL); S.fringe = slot("ball0", 0xfbf9f2); S.eyeL = slot("ball0", 0x2a2228); S.eyeR = slot("ball0", 0x2a2228); S.nose = slot("ball0", 0x4a3238); S.poll = slot("ball0", 0xfbf9f2);
     entries.push(entry); return entry;
   }
   /** a static or scripted box (posts, ribbon halves, the scissors, the collection box) */
@@ -231,59 +246,91 @@ function createCast(T, parent, { humans, sheep, props }) {
     entries.push(entry); return entry;
   }
 
+  const HUMAN_SLOTS = { tap: ["torso", "hips", "thighL", "thighR", "shinL", "shinR", "upL", "upR", "foreL", "foreR"], flare: ["smock", "bell"], box: ["shoeL", "shoeR", "scarf", "tie", "item", "item2", "visor", "epL", "epR"],
+    ball0: ["handL", "handR", "eyeL", "eyeR", "nose", "hairBack", "itemBall", "itemBall2"], ball: ["head", "hair"], cyl: ["neck", "crown", "brim", "band", "tube", "stick", "drum", "rim"] };
+  const SHEEP_SLOTS = { tap: ["fl", "fr", "bl", "br"], box: ["ribA", "ribB", "ribC", "earL", "earR"], ball: ["body", "rump", "shoulder", "head"], ball0: ["tail", "fringe", "eyeL", "eyeR", "nose", "poll"] };
+  const hideSlots = (table, S) => { for (const [kind, names] of Object.entries(table)) for (const n of names) hide(kind, S[n]); };
+  /** arm angles for a pose: [shoulder (forward +), elbow bend, spread outward] */
+  function armAngles(arms, side, t, swing) {
+    const R = side < 0;                                           // the right hand (x < 0) carries the items
+    switch (arms) {
+      case "up": return [2.7 + Math.sin(t * 2) * 0.35 * (R ? -1 : 1), 0.25, 0.18];
+      case "clap": return [1.15 + Math.sin(t * 3) * 0.12 * (R ? -1 : 1), 1.0, -0.22];
+      case "play": return [R ? 1.2 + Math.sin(t) * 0.05 : 1.05, 1.0, -0.15];
+      case "hold": return [0.95, 0.75, -0.1];
+      case "wave": return R ? [2.8 + Math.sin(t * 3) * 0.4, 0.2, 0.2] : [0.05, 0.2, 0.08];
+      case "speak": return R ? [1.9 + Math.sin(t * 1.5) * 0.35, 0.5, 0.1] : [0.4, 0.5, 0.08];
+      case "crook": return R ? [0.6 + swing * 0.2, 0.7, 0.08] : [-swing * 0.9, 0.3, 0.08];
+      case "scissors": return R ? [1.35, 0.5, 0.0] : [0.9, 0.6, -0.05];
+      default: return [R ? swing * 0.9 : -swing * 0.9, 0.25 + Math.abs(swing) * 0.4, 0.07];
+    }
+  }
+  const vA = [0, 0, 0], vB = [0, 0, 0], vC = [0, 0, 0], vD = [0, 0, 0];
   function writeHuman(e) {
     const { pose: o, spec, slots: S } = e;
     const sc = o.scale * (spec.size ?? 1) * o.fade;
-    if (sc < 0.02) { for (const k of ["legL", "legR", "body", "armL", "armR", "scarf", "item"]) hide("box", S[k]); hide("ball", S.head); hide("cyl", S.crown); hide("cyl", S.brim); return; }
+    if (sc < 0.02) { hideSlots(HUMAN_SLOTS, S); return; }
     fp.set(o.x, o.y + Math.abs(Math.sin(o.phase)) * 0.03 * o.walk + o.hop, o.z); qy.setFromAxisAngle(AY, o.yaw); fs.set(sc, sc, sc); F.compose(fp, qy, fs);
-    const swing = Math.sin(o.phase) * 0.62 * o.walk;
-    limb("box", S.legL, 0.1, 0.86, 0, swing, 0.86, 0.15, 0.17); limb("box", S.legR, -0.1, 0.86, 0, -swing, 0.86, 0.15, 0.17);
-    const long = spec.smock;
-    if (long) put("box", S.body, 0, 1.0, 0, 0, 0.46, 0.98, 0.28); else put("box", S.body, 0, 1.17, 0, 0, 0.42, 0.62, 0.25);
-    let aL = -swing * 0.9, aR = swing * 0.9;
-    const t = o.phase;
-    switch (o.arms) {
-      case "up": aL = 2.7 + Math.sin(t * 2) * 0.35; aR = 2.7 - Math.sin(t * 2) * 0.35; break;
-      case "clap": aL = 1.25 + Math.sin(t * 3) * 0.12; aR = 1.25 - Math.sin(t * 3) * 0.12; break;
-      case "play": aL = 1.05; aR = 1.2 + Math.sin(t) * 0.05; break;
-      case "hold": aL = 0.95; aR = 0.95; break;
-      case "wave": aR = 2.8 + Math.sin(t * 3) * 0.4; aL = 0.05; break;
-      case "speak": aR = 1.9 + Math.sin(t * 1.5) * 0.35; aL = 0.4; break;
-      case "crook": aR = 0.6 + swing * 0.2; aL = swing * 0.9; break;
-      case "scissors": aR = 1.35; aL = 0.9; break;
+    const swing = Math.sin(o.phase) * 0.62 * o.walk; const t = o.phase; const smock = !!spec.smock;
+    const legs = spec.legs ?? 0x2f3a58;
+    // legs: hip swing, the knee bends while the leg swings through
+    for (const [sx, tN, sN, shN, sw, bend] of [[0.09, "thighL", "shinL", "shoeL", swing * 0.9, o.walk * (0.12 + 0.9 * Math.max(0, Math.cos(t)))], [-0.09, "thighR", "shinR", "shoeR", -swing * 0.9, o.walk * (0.12 + 0.9 * Math.max(0, -Math.cos(t)))]]) {
+      const hip = [sx, 0.9, 0]; const knee = [sx, hip[1] - 0.43 * Math.cos(sw), hip[2] + 0.43 * Math.sin(sw)]; const a2 = sw - bend; const ank = [sx, knee[1] - 0.42 * Math.cos(a2), knee[2] + 0.42 * Math.sin(a2)];
+      seg("tap", S[tN], hip, knee, 0.082, 0.082); seg("tap", S[sN], knee, ank, 0.062, 0.062);
+      put("box", S[shN], sx, ank[1] - 0.02, ank[2] + 0.05, -a2 * 0.5, 0.105, 0.075, 0.24);
+    }
+    // torso, hips, smock, neck, head
+    if (smock) { seg("flare", S.smock, [0, 1.4, 0], [0, 0.6, 0], 0.31, 0.2); put("tap", S.torso, 0, 1.26, 0, 0, 0.22, 0.28, 0.13); put("tap", S.hips, 0, 0.8, 0, 0, 0.0, 0.0, 0.0); }
+    else { hide("flare", S.smock); put("tap", S.torso, 0, 1.18, 0, 0, 0.215, 0.3, 0.125); put("tap", S.hips, 0, 0.88, 0, 0, 0.185, 0.17, 0.115); }
+    put("cyl", S.neck, 0, 1.5, 0.005, 0, 0.05, 0.08, 0.05);
+    if (spec.scarf !== undefined) { put("box", S.scarf, 0, 1.46, 0.0, 0, 0.27, 0.07, 0.2); put("box", S.tie, 0, 1.36, 0.115, 0, 0.055, 0.17, 0.025); } else { hide("box", S.scarf); hide("box", S.tie); }
+    ball("ball", S.head, [0, 1.64, 0.01], 0.118, 0.135, 0.122);
+    ball("ball0", S.eyeL, [0.045, 1.655, 0.118], 0.014); ball("ball0", S.eyeR, [-0.045, 1.655, 0.118], 0.014); ball("ball0", S.nose, [0, 1.625, 0.134], 0.026, 0.03, 0.03);
+    const hat = spec.hatKind;
+    if (hat) { hide("ball", S.hair); ball("ball0", S.hairBack, [0, 1.64, -0.09], 0.1, 0.09, 0.07); } else { ball("ball", S.hair, [0, 1.675, -0.018], 0.128, 0.115, 0.13); hide("ball0", S.hairBack); }
+    hide("cyl", S.crown); hide("cyl", S.brim); hide("cyl", S.band); hide("box", S.visor);
+    if (hat === "straw") { put("cyl", S.crown, 0, 1.795, 0, 0, 0.115, 0.1, 0.115); put("cyl", S.brim, 0, 1.725, 0, 0, 0.31, 0.02, 0.31); put("cyl", S.band, 0, 1.74, 0, 0, 0.122, 0.035, 0.122); }
+    else if (hat === "cap") { put("cyl", S.crown, 0, 1.78, 0, 0, 0.14, 0.1, 0.14); put("cyl", S.band, 0, 1.725, 0, 0, 0.145, 0.03, 0.145); put("box", S.visor, 0, 1.715, 0.15, 0.25, 0.17, 0.014, 0.12); }
+    else if (hat === "tall") { put("cyl", S.crown, 0, 1.9, 0, 0, 0.12, 0.3, 0.12); put("cyl", S.brim, 0, 1.74, 0, 0, 0.15, 0.02, 0.15); put("cyl", S.band, 0, 1.76, 0, 0, 0.125, 0.04, 0.125); }
+    if (spec.epaulettes) { put("box", S.epL, 0.2, 1.43, 0, 0, 0.09, 0.025, 0.12); put("box", S.epR, -0.2, 1.43, 0, 0, 0.09, 0.025, 0.12); } else { hide("box", S.epL); hide("box", S.epR); }
+    // arms: shoulder, elbow, wrist, hand
+    const wrist = {};
+    for (const [sx, uN, fN, hN, key] of [[0.225, "upL", "foreL", "handL", "L"], [-0.225, "upR", "foreR", "handR", "R"]]) {
+      const [a1, bend, spread] = armAngles(o.arms, sx, t, swing); const out = sx > 0 ? 1 : -1;
+      const sh = [sx, 1.37, 0]; const el = [sh[0] + out * Math.sin(spread) * 0.29, sh[1] - 0.29 * Math.cos(a1) * Math.cos(spread), sh[2] + 0.29 * Math.sin(a1)];
+      const a2 = a1 + bend; const wr = [el[0] + out * Math.sin(spread) * 0.12, el[1] - 0.26 * Math.cos(a2), el[2] + 0.26 * Math.sin(a2)];
+      seg("tap", S[uN], sh, el, 0.052, 0.052); seg("tap", S[fN], el, wr, 0.043, 0.043); ball("ball0", S[hN], [wr[0], wr[1] - 0.03 * Math.cos(a2), wr[2] + 0.03 * Math.sin(a2)], 0.04, 0.045, 0.04);
+      wrist[key] = wr;
+    }
+    // what they carry
+    hide("cyl", S.tube); hide("cyl", S.stick); hide("cyl", S.drum); hide("cyl", S.rim); hide("flare", S.bell); hide("box", S.item); hide("box", S.item2); hide("ball0", S.itemBall); hide("ball0", S.itemBall2);
+    const wR = wrist.R, wL = wrist.L;
+    switch (spec.item) {
+      case "brass": { const m = [0, 1.56, 0.12]; const e2 = [0, 1.5, 0.62]; seg("cyl", S.tube, m, e2, 0.022, 0.022); seg("flare", S.bell, [0, 1.5, 0.6], [0, 1.4, 0.86], 0.11, 0.11); ball("ball0", S.itemBall, [0, 1.565, 0.12], 0.035); break; }
+      case "drum": { seg("cyl", S.drum, [-0.2, 1.0, 0.3], [0.2, 1.0, 0.3], 0.21, 0.21); seg("cyl", S.rim, [-0.205, 1.0, 0.3], [0.205, 1.0, 0.3], 0.19, 0.19); const bob = Math.sin(o.phase * 2) * 0.05; seg("cyl", S.stick, [wR[0], wR[1] + 0.2 + bob, wR[2]], [wR[0], wR[1] - 0.02, wR[2]], 0.012, 0.012); break; }
+      case "box": put("box", S.item, 0, wR[1] + 0.0, 0.32, 0, 0.3, 0.26, 0.3); put("box", S.item2, 0, wR[1] + 0.14, 0.32, 0, 0.32, 0.03, 0.32); break;
+      case "crook": { seg("cyl", S.stick, [wR[0], 1.95, wR[2]], [wR[0], 0.0, wR[2]], 0.022, 0.022); ball("ball0", S.itemBall, [wR[0], 1.96, wR[2] + 0.03], 0.05, 0.05, 0.05); put("box", S.item, wR[0], 1.93, wR[2] + 0.08, 0, 0.03, 0.05, 0.16); break; }
+      case "baton": seg("cyl", S.stick, [wR[0], wR[1] + 0.55, wR[2]], [wR[0], wR[1] - 0.05, wR[2]], 0.02, 0.02); ball("ball0", S.itemBall, [wR[0], wR[1] + 0.58, wR[2]], 0.05); break;
+      case "scissors": { const open = spec.scissorsOpen ?? 0; put("box", S.item, wR[0], wR[1], wR[2] + 0.12, open > 0.4 ? 0.3 : 0, 0.018, 0.02, 0.3); put("box", S.item2, wR[0], wR[1], wR[2] + 0.12, open > 0.4 ? -0.3 : 0, 0.018, 0.02, 0.3); break; }
       default: break;
     }
-    limb("box", S.armL, 0.28, 1.45, 0, aL, 0.6, 0.11, 0.13); limb("box", S.armR, -0.28, 1.45, 0, aR, 0.6, 0.11, 0.13);
-    if (spec.scarf !== undefined) put("box", S.scarf, 0, 1.52, 0.02, 0, 0.27, 0.09, 0.2); else hide("box", S.scarf);
-    put("ball", S.head, 0, 1.63, 0.01, 0, 0.125, 0.14, 0.125);
-    if (spec.hatKind === "straw") { put("cyl", S.crown, 0, 1.79, 0, 0, 0.12, 0.13, 0.12); put("cyl", S.brim, 0, 1.73, 0, 0, 0.3, 0.025, 0.3); }
-    else if (spec.hatKind === "cap") { put("cyl", S.crown, 0, 1.78, 0, 0, 0.135, 0.12, 0.135); put("cyl", S.brim, 0, 1.73, 0.05, 0, 0.14, 0.02, 0.17); }
-    else if (spec.hatKind === "tall") { put("cyl", S.crown, 0, 1.86, 0, 0, 0.12, 0.3, 0.12); put("cyl", S.brim, 0, 1.73, 0, 0, 0.15, 0.025, 0.15); }
-    else { put("cyl", S.crown, 0, 1.72, -0.005, 0, 0.12, 0.07, 0.12); hide("cyl", S.brim); }
-    switch (spec.item) {
-      case "brass": put("box", S.item, 0, 1.2, 0.3, 0.1, 0.12, 0.12, 0.5); break;
-      case "drum": put("box", S.item, 0, 1.0, 0.26, 0, 0.42, 0.3, 0.3); break;
-      case "box": put("box", S.item, 0, 1.12, 0.3, 0, 0.3, 0.26, 0.3); break;
-      case "crook": put("box", S.item, -0.3, 1.0, 0.18, 0, 0.04, 2.0, 0.04); break;
-      case "baton": put("box", S.item, -0.3, 2.0, 0.16, 0, 0.05, 0.5, 0.05); break;
-      case "scissors": { const open = spec.scissorsOpen ?? 0; put("box", S.item, -0.22, 1.3, 0.55, open > 0.4 ? 0 : 0, open > 0.4 ? 0.04 : 0.025, 0.06, 0.36); break; }
-      default: hide("box", S.item);
-    }
+    void wL; void legs; void vA; void vB; void vC; void vD;
   }
   function writeSheep(e) {
-    const { pose: o, slots: S } = e;
+    const { pose: o, slots: S, tufts } = e;
     const sc = o.scale * o.fade;
-    if (sc < 0.02) { for (const k of ["fl", "fr", "bl", "br", "ribA", "ribB", "ribC", "earL", "earR"]) hide("box", S[k]); for (const k of ["body", "head", "t1", "t2", "t3", "tail"]) hide("ball", S[k]); return; }
+    if (sc < 0.02) { hideSlots(SHEEP_SLOTS, S); tufts.forEach(i => hide("ball", i)); return; }
     fp.set(o.x, o.y + o.hop + Math.abs(Math.sin(o.phase)) * 0.04 * o.walk, o.z); qy.setFromAxisAngle(AY, o.yaw); fs.set(sc, sc, sc); F.compose(fp, qy, fs);
     const sw = Math.sin(o.phase) * 0.7 * o.walk;
-    limb("box", S.fl, 0.16, 0.42, 0.34, sw, 0.42, 0.09, 0.09); limb("box", S.fr, -0.16, 0.42, 0.34, -sw, 0.42, 0.09, 0.09);
-    limb("box", S.bl, 0.16, 0.42, -0.34, -sw, 0.42, 0.09, 0.09); limb("box", S.br, -0.16, 0.42, -0.34, sw, 0.42, 0.09, 0.09);
-    put("ball", S.body, 0, 0.66, 0, 0, 0.4, 0.34, 0.62);
-    put("ball", S.t1, 0.24, 0.8, 0.2, 0, 0.2, 0.2, 0.2); put("ball", S.t2, -0.24, 0.8, -0.2, 0, 0.22, 0.2, 0.22); put("ball", S.t3, 0, 0.98, 0, 0, 0.22, 0.16, 0.26);
-    put("ball", S.tail, 0, 0.7, -0.62, 0, 0.12, 0.12, 0.12);
-    put("ball", S.head, 0, 0.86, 0.66, 0, 0.16, 0.19, 0.21);
-    put("box", S.earL, 0.19, 0.96, 0.62, 0.0, 0.1, 0.05, 0.12, 0.5); put("box", S.earR, -0.19, 0.96, 0.62, 0.0, 0.1, 0.05, 0.12, -0.5);
-    put("box", S.ribA, 0.12, 0.72, 0.5, 0, 0.12, 0.1, 0.08); put("box", S.ribB, 0, 0.72, 0.5, 0, 0.12, 0.1, 0.08); put("box", S.ribC, -0.12, 0.72, 0.5, 0, 0.12, 0.1, 0.08);
+    for (const [x, z, n, a] of [[0.16, 0.36, "fl", sw], [-0.16, 0.36, "fr", -sw], [0.16, -0.36, "bl", -sw], [-0.16, -0.36, "br", sw]]) seg("tap", S[n], [x, 0.5, z], [x, 0.5 - 0.46 * Math.cos(a), z + 0.46 * Math.sin(a)], 0.05, 0.05);
+    ball("ball", S.body, [0, 0.7, 0.02], 0.36, 0.3, 0.56); ball("ball", S.rump, [0, 0.72, -0.34], 0.34, 0.29, 0.3); ball("ball", S.shoulder, [0, 0.74, 0.32], 0.33, 0.29, 0.3);
+    const T0 = [[0.28, 0.82, 0.12, 0.17], [-0.28, 0.82, -0.12, 0.18], [0.0, 0.98, 0.1, 0.2], [0.24, 0.78, -0.4, 0.17], [-0.25, 0.78, 0.38, 0.16], [0.0, 0.94, -0.4, 0.17], [0.3, 0.62, 0.3, 0.14], [-0.3, 0.62, -0.28, 0.15], [0, 0.6, -0.1, 0.16]];
+    tufts.forEach((i, k) => { const [x, y, z, r] = T0[k]; ball("ball", i, [x, y, z], r, r * 0.9, r); });
+    ball("ball0", S.tail, [0, 0.76, -0.64], 0.11); ball("ball", S.head, [0, 0.86, 0.68], 0.15, 0.18, 0.21);
+    ball("ball0", S.fringe, [0, 1.04, 0.62], 0.16, 0.12, 0.16); ball("ball0", S.poll, [0, 1.0, 0.5], 0.14, 0.1, 0.16);
+    ball("ball0", S.eyeL, [0.085, 0.93, 0.84], 0.026); ball("ball0", S.eyeR, [-0.085, 0.93, 0.84], 0.026); ball("ball0", S.nose, [0, 0.83, 0.89], 0.04);
+    put("box", S.earL, 0.2, 0.96, 0.62, 0.0, 0.1, 0.05, 0.12, 0.5); put("box", S.earR, -0.2, 0.96, 0.62, 0.0, 0.1, 0.05, 0.12, -0.5);
+    put("box", S.ribA, 0.12, 0.72, 0.52, 0, 0.12, 0.1, 0.08); put("box", S.ribB, 0, 0.72, 0.52, 0, 0.12, 0.1, 0.08); put("box", S.ribC, -0.12, 0.72, 0.52, 0, 0.12, 0.1, 0.08);
   }
   function writeProp(e) {
     const { pose: o, slots: S } = e;
@@ -297,7 +344,7 @@ function createCast(T, parent, { humans, sheep, props }) {
   }
   return { addHuman, addSheep, addProp, flush, entries, material, meshes,
     setNight(k) { material.emissive.setRGB(0.2 * k, 0.17 * k, 0.12 * k); },
-    dispose() { for (const m of Object.values(meshes)) parent.remove(m); boxGeo.dispose(); ballGeo.dispose(); cylGeo.dispose(); material.dispose(); entries.length = 0; } };
+    dispose() { for (const m of Object.values(meshes)) parent.remove(m); for (const g of Object.values(geos)) g.dispose(); material.dispose(); entries.length = 0; } };
 }
 
 /** a small pool of glowing / flying specks: fireworks (additive) and confetti (normal blending) */
@@ -535,7 +582,7 @@ export function createEvents({ T, r, world, game, env, audio, ui, translate }) {
     const hammi = cast.addSheep({ rnd, scale: 1.25 });
     const band = []; const specBand = [[-3.3, 0, "brass"], [-2.2, 0, "brass"], [-1.1, 0, "brass"], [0, 0, "brass"], [-2.8, 1.5, "brass"], [-1.7, 1.5, "drum"], [-0.6, 1.5, "drum"], [0.5, 1.5, "brass"]];
     for (const [dw, du, item] of specBand) {
-      const e = cast.addHuman({ rnd, body: BAND_BLUE, legs: 0x151d3e, sleeves: BAND_BLUE, hatKind: "cap", hat: 0x20306a, item, itemColor: item === "drum" ? 0xf4f4ef : BRASS, skin: SKINS[Math.floor(rnd() * SKINS.length)] });
+      const e = cast.addHuman({ rnd, body: BAND_BLUE, legs: 0x151d3e, sleeves: BAND_BLUE, hatKind: "cap", hat: 0x20306a, epaulettes: true, item, itemColor: item === "drum" ? 0xf4f4ef : BRASS, skin: SKINS[Math.floor(rnd() * SKINS.length)] });
       e.base = { u: C.mayorU + 5 + du, w: ALLEY.w0 + 2.4 + (dw + 3.3) * 0.95 };
       band.push(e);
     }
@@ -597,7 +644,7 @@ export function createEvents({ T, r, world, game, env, audio, ui, translate }) {
       if (slotSpec.role === "sheep") entry = cast.addSheep({ rnd, scale: 1 });
       else if (slotSpec.role === "shepherd") entry = cast.addHuman({ rnd, body: SMOCK_BLUE, legs: 0x2f3a58, smock: true, scarf: NECK_RED, hatKind: "straw", hat: HAT_STRAW, item: slotSpec.box ? "box" : "crook", itemColor: slotSpec.box ? 0xd8283a : 0x7a5530, skin: SKINS[index % SKINS.length] });
       else if (slotSpec.role === "major") entry = cast.addHuman({ rnd, body: BAND_BLUE, legs: 0x151d3e, hatKind: "tall", hat: 0xf4f4ef, item: "baton", itemColor: BRASS, size: 1.04 });
-      else entry = cast.addHuman({ rnd, body: BAND_BLUE, legs: 0x151d3e, hatKind: "cap", hat: 0x20306a, item: slotSpec.item, itemColor: slotSpec.item === "drum" ? 0xf4f4ef : BRASS, skin: SKINS[index % SKINS.length] });
+      else entry = cast.addHuman({ rnd, body: BAND_BLUE, legs: 0x151d3e, hatKind: "cap", hat: 0x20306a, epaulettes: true, item: slotSpec.item, itemColor: slotSpec.item === "drum" ? 0xf4f4ef : BRASS, skin: SKINS[index % SKINS.length] });
       entry.slotSpec = slotSpec; entry.offset = rnd() * TAU; entry.wob = rnd();
       return entry;
     });

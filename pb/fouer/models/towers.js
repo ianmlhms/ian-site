@@ -45,6 +45,15 @@ const PAL = {
 
 /* ------------------------------------------------------------------------------------------------ shared station pieces */
 const ang = (i, n) => (i / n) * TAU;
+/** ride seats (rides wave): fills out.{position, forward, up} (world) from a model-space matrix `m` (relative to the group) and an eye offset / heading in that frame */
+function seatOut(T, group, m, eye, fwd, out) {
+  group.updateWorldMatrix(true, false);
+  const w = seatOut.w || (seatOut.w = new T.Matrix4()); w.multiplyMatrices(group.matrixWorld, m);
+  out.position.set(eye[0], eye[1], eye[2]).applyMatrix4(w);
+  out.forward.set(fwd[0], fwd[1], fwd[2]).transformDirection(w);
+  out.up.set(0, 1, 0).transformDirection(w);
+  return out;
+}
 
 function setup(opts, id) {
   const T = window.THREE; const K = makeKit(T);
@@ -294,6 +303,15 @@ function buildJules(opts = {}) {
   const animNear = (t, dt) => { advance(t, dt); seatPose(parts.near, t); };
   const animFar = (t, dt) => { advance(t, dt); seatPose(parts.far, t); };
   const group = finishModel(T, K, { id: 'jules', near: nearGroup, far: farGroup, footprint: { x: 8, zMin: -8, zMax: 8 }, height: 85, lodDistance: 90, animateNear: animNear, animateFar: animFar });
+  // ride seats: the paired swings hang 9.2 m below the arm tips; seat 2k = side -z, 2k + 1 = side +z; the camera looks along -x of the seat frame (inwards)
+  { const mm = new T.Matrix4(); const qq = new T.Quaternion(); const qA = new T.Quaternion(); const qB = new T.Quaternion(); const p3 = new T.Vector3(); const one = new T.Vector3(1, 1, 1);
+    const yAxis = new T.Vector3(0, 1, 0); const zAxis = new T.Vector3(0, 0, 1);
+    group.userData.rideSeat = { count: JU.arms * 2, preferred: 1, frame(i, out) {
+      const k = i >> 1; const side = i & 1 ? 1 : -1; const th = st.theta + ang(k, JU.arms); const beta = st.w * st.w * 0.78 + st.w * 0.05 * Math.sin(Math.max(0, st.last) * 1.3 + k * 1.7);
+      qA.setFromAxisAngle(yAxis, th); qB.setFromAxisAngle(zAxis, beta); qq.copy(qA).multiply(qB);
+      p3.set(Math.cos(th) * JU.armR, st.y + JU.armY, -Math.sin(th) * JU.armR); mm.compose(p3, qq, one);
+      return seatOut(T, group, mm, [0.12, -JU.wire + 0.86, side * 0.52], [-1, 0, 0], out);      // the camera looks towards the tower: the lattice, the other swings flying out and the fair below (outwards the seat's own backrest fills the view)
+    } }; }
   group.userData.cycle = CYCLES.jules; group.userData.phaseAt = julesPhase; group.userData.rig = st; group.userData.parts = parts; group.userData.tier = { look: cfg.look, level: cfg.level, quality: cfg.quality };
   return group;
 }
@@ -393,6 +411,13 @@ function buildHangover(opts = {}) {
   const adv = (t) => { if (t === st.last) return; st.last = t; const ph = hangoverPhase(t); st.y = ph.y; st.mode = ph.mode; st.v = ph.v; };
   const anim = (which) => (t) => { adv(t); const p = parts[which]; p.ring.position.y = st.y + (st.mode === 'hold' ? 0.04 * Math.sin(t * 40) : 0); if (!p.ledT || t - p.ledT > 0.06) { p.ledT = t; chase(p, t); } };
   const group = finishModel(T, K, { id: 'hangover', near: nearGroup, far: farGroup, footprint: { x: 8, zMin: -7.6, zMax: 8 }, height: 90, lodDistance: 90, animateNear: anim('near'), animateFar: anim('far') });
+  // ride seats: the saucer ring (12 seats near / 8 far) rises and drops with st.y; the rider looks outward; preferred seat looks at the alley (+z)
+  { const nSeat = nearGroup ? 12 : 8; const mm = new T.Matrix4();
+    group.userData.rideSeat = { count: nSeat, preferred: Math.round(nSeat * 0.75), frame(i, out) {
+      const a = ang(i % nSeat, nSeat); const y = st.y + (st.mode === 'hold' ? 0.04 * Math.sin(Math.max(0, st.last) * 40) : 0);
+      mm.makeTranslation(0, y, 0);
+      return seatOut(T, group, mm, [Math.cos(a) * 3.0, 1.5, -Math.sin(a) * 3.0], [Math.cos(a), 0, -Math.sin(a)], out);
+    } }; }
   group.userData.cycle = CYCLES.hangover; group.userData.phaseAt = hangoverPhase; group.userData.rig = st; group.userData.parts = parts; group.userData.tier = { look: cfg.look, level: cfg.level, quality: cfg.quality };
   return group;
 }
@@ -504,6 +529,14 @@ function buildBooster(opts = {}) {
     if (!p.ledT || t - p.ledT > 0.06) { p.ledT = t; chase(p, t); }
   };
   const group = finishModel(T, K, { id: 'booster', near: nearGroup, far: farGroup, footprint: { x: 15, zMin: -9, zMax: 9 }, height: 60, lodDistance: 90, animateNear: anim('near'), animateFar: anim('far') });
+  // ride seats: the pod at the end of the 25 m arm has four seats on each long side (i 0..3: +x side, 4..7: -x side), riders face outward; the arm sweeps full circles
+  { const mm = new T.Matrix4(); const m2 = new T.Matrix4();
+    group.userData.rideSeat = { count: 8, preferred: 1, frame(i, out) {
+      const sx = i < 4 ? 1 : -1; const z = -1.7 + (i % 4) * 1.15;
+      mm.makeTranslation(0, BO.axleY, BO.axleZ); m2.makeRotationZ(st.a); mm.multiply(m2); m2.makeTranslation(0, -BO.armLong - 0.5, 0); mm.multiply(m2);
+      m2.makeRotationY(nearGroup ? st.pod : 0); mm.multiply(m2);
+      return seatOut(T, group, mm, [sx * 1.15, 1.32, z], [sx, 0, 0], out);
+    } }; }
   group.userData.cycle = CYCLES.booster; group.userData.phaseAt = boosterPhase; group.userData.rig = st; group.userData.parts = parts; group.userData.tier = { look: cfg.look, level: cfg.level, quality: cfg.quality };
   return group;
 }
@@ -602,6 +635,14 @@ function buildInfinity(opts = {}) {
     if (!p.ledT || t - p.ledT > 0.06) { p.ledT = t; chase(p, t); }
   };
   const group = finishModel(T, K, { id: 'infinity', near: nearGroup, far: farGroup, footprint: { x: 8, zMin: -7.6, zMax: 8 }, height: 30, lodDistance: 80, animateNear: anim('near'), animateFar: anim('far') });
+  // ride seats: 16 (near) / 10 (far) seats on the ring at the end of the 21 m arm; the ring spins about the arm axis, the rider looks outward
+  { const nSeat = nearGroup ? 16 : 10; const mm = new T.Matrix4(); const m2 = new T.Matrix4();
+    group.userData.rideSeat = { count: nSeat, preferred: 0, frame(i, out) {
+      const a = ang(i % nSeat, nSeat);
+      mm.makeTranslation(0, IN.pivotY, 0); m2.makeRotationX(st.a); mm.multiply(m2); m2.makeTranslation(0, -IN.armLen - 0.25, 0); mm.multiply(m2);
+      m2.makeRotationY((nearGroup ? st.spin : 0) + a); mm.multiply(m2);
+      return seatOut(T, group, mm, [3.95, 1.25, 0], [0.97, 0.25, 0], out);      // the eye sits just outside the ring's rim and looks 14 degrees up out of the ring plane: the ring's plates and seat backs stay below the view at every swing angle
+    } }; }
   group.userData.cycle = CYCLES.infinity; group.userData.phaseAt = infinityPhase; group.userData.rig = st; group.userData.parts = parts; group.userData.tier = { look: cfg.look, level: cfg.level, quality: cfg.quality };
   return group;
 }

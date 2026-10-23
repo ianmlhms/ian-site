@@ -23,6 +23,10 @@ const FIRST_COIN_SECONDS = 3.2;                  // the "guests pay" bubble stay
 export const FOODIE = Object.freeze({ perFood: 1.05, seconds: 180, maxStacks: 3 });
 export const foodieMultiplier = stacks => FOODIE.perFood ** Math.max(0, Math.min(FOODIE.maxStacks, Math.floor(stacks)));
 const withBonus = (base, mult) => mult === 1 ? base : { ...base, bonus: base.bonus * mult };
+/** "Spaass" (Rides wave): a ride in the walk gives a tiny x1.03 income for 2 minutes (one buff at a time, riding again only refreshes it). Same `bonus` mechanism as Foodie. */
+export const FUN = Object.freeze({ perRide: 1.03, seconds: 120 });
+/** the save flags in `ea`: single [a-z0-9] letters, one per achievement / trial (g starter gift, r Riserad, p Probefahrt, one per ride since the Rides wave) */
+export const FLAGS_MAX = 32;
 
 export const TUTORIAL = Object.freeze({
   firstBuild: 1,        // steps 1 + 2 of DESIGN 1: tap the glowing pitch, tap "Build"
@@ -75,6 +79,8 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
   let baseCtx = economyContext(events);
   let ctx = baseCtx;
   let foodieEntries = [];         // [{ item, until }] (wall clock ms): the active Foodie stacks
+  let funUntil = 0;               // wall clock ms: the Spaass buff of the last ride
+  const bonusMult = (at = now()) => foodieMultiplier(foodieEntries.length) * (funUntil > at ? FUN.perRide : 1);
   const eatenThisSession = new Set();
   let persistence = null;
   let ready = false;
@@ -371,14 +377,22 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
 
   // ---- Foodie (eating in the walk) and small flags ----
   function applyFoodie() {
-    ctx = withBonus(baseCtx, foodieMultiplier(foodieEntries.length));
+    ctx = withBonus(baseCtx, bonusMult());
     infoCache = null;
     emit("foodie", foodie());
   }
   function foodie(at = now()) {
     const live = foodieEntries.filter(entry => entry.until > at);
     const left = live.length ? Math.max(0, Math.min(...live.map(entry => entry.until)) - at) / 1000 : 0;
-    return { stacks: live.length, mult: foodieMultiplier(live.length), left, items: live.map(entry => entry.item) };
+    return { stacks: live.length, mult: foodieMultiplier(live.length), left, items: live.map(entry => entry.item), fun: funUntil > at, funLeft: funUntil > at ? (funUntil - at) / 1000 : 0 };
+  }
+  /** The player finished a ride (walk). A small income buff for 2 minutes; a repeat while it runs only refreshes it. */
+  function fun(rideId) {
+    const at = now();
+    const was = funUntil > at;
+    funUntil = at + FUN.seconds * 1000;
+    if (!was) applyFoodie();
+    return { ok: true, ride: rideId, granted: !was, percent: Math.round((FUN.perRide - 1) * 100) };
   }
   function expireFoodie(at) {
     if (!foodieEntries.length) return;
@@ -399,9 +413,9 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     return { ...base, granted: true, ...foodie(at) };
   }
   const hasFlag = flag => state.ea.includes(flag);
-  /** one-letter achievement / trial flags in the save (`ea`: "g" starter gift, "r" Op der Spëtzt, "p" Probefahrt used) */
+  /** one-letter achievement / trial flags in the save (`ea`: "g" starter gift, "r" Op der Spëtzt, "p" Probefahrt used, one letter per ride: rides/catalog.js RIDE_FLAGS) */
   function setFlag(flag) {
-    if (!/^[a-z0-9]$/.test(flag) || hasFlag(flag) || state.ea.length >= 8) return false;
+    if (!/^[a-z0-9]$/.test(flag) || hasFlag(flag) || state.ea.length >= FLAGS_MAX) return false;
     setState({ ...state, ea: state.ea + flag }, "flag", { flag });
     return true;
   }
@@ -414,7 +428,7 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     const dayChanged = next.today !== events.today;
     events = next;
     const nextCtx = economyContext(next);
-    if (JSON.stringify(nextCtx) !== JSON.stringify(baseCtx)) { baseCtx = nextCtx; ctx = withBonus(baseCtx, foodieMultiplier(foodieEntries.length)); infoCache = null; }
+    if (JSON.stringify(nextCtx) !== JSON.stringify(baseCtx)) { baseCtx = nextCtx; ctx = withBonus(baseCtx, bonusMult(at)); infoCache = null; }
     const stamped = sim.stampToday(state, next);
     if (stamped !== state) {
       state = stamped;
@@ -447,6 +461,7 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     wall = at;
     if (!ready) return;
     if (foodieEntries.length) expireFoodie(at);
+    if (funUntil && funUntil <= at) { funUntil = 0; applyFoodie(); }
     if (elapsed < 0) { state = sim.touch(state, at); return; }       // the clock went backwards: just resync
     if (elapsed > AWAY_GAP_SECONDS) {
       refreshEvents(at);
@@ -586,7 +601,7 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     get testMode() { return testMode; }, get persistence() { return persistence; }, get startup() { return flags.startup; },
     get pendingOffline() { return pendingOffline; }, get pendingLetter() { return pendingLetter; },
     info, stars, banners: () => bannersAt(events), refreshEvents, entries, builtCount,
-    eat, foodie, hasFlag, setFlag,
+    eat, foodie, fun, hasFlag, setFlag,
     pitchStatus, pitchUsable, voucherFits, buildOptions, manageInfo, glowPitches, goal: () => sim.nextGoal(state, ctx),
     tutorial: tutorialInfo, acknowledgeTutorial, skipTutorial,
     build, upgrade, setLook, replace, claimFireworks, claimHaemmi, applyGift,

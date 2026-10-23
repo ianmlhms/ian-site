@@ -21,7 +21,7 @@ import { buildPlot, buildFloor } from './plots.js';
 
 const QUALITY = {
   low: { farDist: 45, live: 6, hyst: 1.15, tiles: [4, 2] },
-  medium: { farDist: 65, live: 10, hyst: 1.15, tiles: [4, 2] },
+  medium: { farDist: 65, live: 10, hyst: 1.15, tiles: [6, 2] },
   high: { farDist: 140, live: 40, hyst: 1.15, tiles: [6, 3] },
 };
 const TILE_BOX = { u0: 0, u1: 300, w0: -20, w1: 140 };      // the area the spatial tiles of the walk cover (game metres); everything outside falls into the edge tiles
@@ -204,6 +204,7 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
   }
   function applySpec(pit) {
     clearPit(pit); dirty.pitch = dirty.frozen = true; pit.applied = specKey(pit.spec);
+    lastLiveKey = '';          // a rebuilt pit on an unchanged live set must be re-evaluated (it stayed frozen until the set changed)
     pit.near = makeModel(pit, false); if (!pit.near) return;
     pit.opaque = pit.near.userData.kit !== 'w3';
     showCur(pit);
