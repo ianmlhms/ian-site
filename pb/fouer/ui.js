@@ -5,7 +5,8 @@ import { t, formatMoney, formatDuration, formatDate, LANGS } from "./i18n.js";
 import { ITEM_BY_ID, LOOKS, LEVELS, PITCHES, STAR_POINTS, RULES } from "./data.js";
 import { stampRewards, stampCount } from "./sim.js";
 import { mountEnvUi } from "./world/envmenu.js";
-import { parseSnapshot, loadKernel } from "./legacy.js";
+import { parseSnapshot, loadKernel, readV1, deflateLayout } from "./legacy.js";
+import { createGallery } from "./social.js";
 
 export const ICON = { kachel: "🥔", fritten: "🍟", lous: "🎟️", kanner: "🎠", wurscht: "🌭", zocker: "🍭", lukas: "🔨", mandel: "🌰", waffel: "🧇", fesch: "🐟",
   kette: "🎪", scooter: "🚗", crepes: "🥞", schiess: "🎯", bayern: "🚙", happy: "⛵", break: "🌀", musik: "🎵", takeoff: "🛩️", tent: "🍺", wheel: "🎡", maus: "🐭",
@@ -43,6 +44,8 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   let lastStars = 0;
   let goalCollapsed = false;
   let walking = false;
+  let visiting = false;
+  let replayChipEl = null;
   let welcomeOver = false;
   const popClock = new Map();
   const popAcc = new Map();
@@ -100,11 +103,29 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     $("rate").textContent = per > 0 ? `+${money(per)}/min` : "";
   }
 
+  const WATCHABLE = new Set(["opening", "haemmelsmarsch", "fireworks"]);
+  let bannerKey = "";
   function refreshBanners() {
-    banners.innerHTML = "";
-    for (const id of game.banners().slice(0, 2)) banners.append(el("div", "pill", esc(T(`event.${id}`))));
     const foodie = game.foodie();
+    const ids = game.banners().filter((id, i, all) => id !== "fouer" || all.length === 1).slice(0, 2);     // "D'Fouer leeft!" only when nothing more specific is on
+    const gift = !game.tutorial().active && !visiting && game.haemmiReady();
+    const key = `${lang}|${ids.join(",")}|${foodie.stacks}|${foodie.mult}|${gift}|${walking}`;
+    if (key === bannerKey) return;
+    bannerKey = key;
+    banners.innerHTML = "";
+    for (const id of ids) {
+      if (WATCHABLE.has(id) && hooks.events) {
+        const pill = el("button", "pill watch", `${esc(T(`event.${id}`))} · ${esc(T("ev.watch"))}`); pill.type = "button"; pill.dataset.event = id;
+        pill.addEventListener("click", () => { sfx.click(); hooks.events.watch(id); });
+        banners.append(pill);
+      } else banners.append(el("div", "pill", esc(T(`event.${id}`))));
+    }
     if (foodie.stacks) banners.append(el("div", "pill foodie", `🍴 ${esc(T("foodie.title"))} ×${(Math.round(foodie.mult * 100) / 100).toFixed(2).replace(/0$/, "")}`));
+    if (gift) {
+      const pill = el("button", "pill gift", `🎁 ${esc(T("hammi.ready"))}`); pill.type = "button"; pill.dataset.hammi = "gift";
+      pill.addEventListener("click", () => { sfx.click(); if (hooks.findSheep) hooks.findSheep(); });
+      banners.append(pill);
+    }
   }
 
   function applyChrome() {
@@ -112,7 +133,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     const minimal = tut.active && tut.mode === "fresh" && (tut.step <= 3 || tut.step === 4);
     document.body.classList.toggle("tut-minimal", minimal);
     const showWalk = !tut.active || (tut.mode === "fresh" ? tut.step >= 7 : tut.step >= 3);
-    walkBtn.hidden = !showWalk || walking;
+    walkBtn.hidden = !showWalk || walking || visiting;
     walkBtn.classList.toggle("tut-glow", tut.active && tut.stage === "walk");
     walkBtn.setAttribute("aria-label", T("hud.walk"));
     document.body.classList.toggle("has-sheet", Boolean(sheetEl));
@@ -185,6 +206,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   }
 
   function openPitch(index, { replace = false } = {}) {
+    if (visiting) return;                                       // a visited fair is look-only
     const tut = game.tutorial();
     if (tut.active) {
       const ok = (tut.stage === "pitch" || tut.stage === "upgrade") && index === tut.pitchTarget;
@@ -391,6 +413,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   // ---------------------------------------------------------------- tapping the world
   function onTap(event) {
     if (walking) return;                                        // the walk handles its own taps
+    if (visiting || (hooks.events && hooks.events.cinema)) { sfx.unlock(); return; }
     sfx.unlock();
     if (hooks.tapSheep && hooks.tapSheep(event.clientX, event.clientY)) return;     // Hämmi bleats (W6)
     const index = scene.pick(event.clientX, event.clientY, event.ground);
@@ -552,7 +575,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     ctx.fillStyle = "#ffcf5c"; ctx.beginPath(); ctx.arc(20 * S + S / 2, S, S * 1.4, 0, Math.PI * 2); ctx.fill();   // the golden gate
   }
 
-  function showLetter(letter, { museum = false } = {}) {
+  function showLetter(letter, { museum = false, subtitle = "" } = {}) {
     const { report, lg } = letter;
     return showModal((overlay, close) => {
       const paper = el("div", "paper");
@@ -562,6 +585,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
       const intro = museum ? "" : kind === "corrupt" ? T("letter.corrupt") : kind === "stub" ? T("letter.stub") : kind === "topup" ? T("letter.topup") : T("letter.body");
       const showNums = !museum;
       paper.innerHTML = `<div class="seal" aria-hidden="true">🐑</div><h1>${esc(museum ? T("letter.museumTitle") : T("letter.title"))}</h1>
+        ${subtitle ? `<p class="museum-by">${esc(subtitle)}</p>` : ""}
         ${intro ? `<p>${esc(intro)}</p>` : ""}
         ${lg ? `<div class="map"><canvas width="160" height="160" aria-label="${esc(T("museum.title"))}"></canvas></div>` : museum ? `<p>${esc(T("museum.empty"))}</p>` : ""}
         ${showNums ? `<ul>
@@ -643,6 +667,61 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     showStamps({ year: ev.fair.year, day: ev.stamp.today });
   }
 
+  // ---------------------------------------------------------------- gallery (W7): publish / browse / visit / museum
+  const ownName = () => { try { return localStorage.getItem("playerName") || ""; } catch (error) { return ""; } };
+  const DATE_LOCALE = { lb: "de-LU", de: "de-DE", en: "en-GB" };
+  const formatStamp = text => { const ms = Date.parse(text); return Number.isFinite(ms) ? new Date(ms).toLocaleDateString(DATE_LOCALE[lang] ?? "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "?"; };
+  const visitBar = el("div", "visitbar"); visitBar.hidden = true;
+  visitBar.innerHTML = `<span class="vlabel"></span><button class="btn" type="button" data-gal="back"></button>`;
+  root.append(visitBar);
+  let visitRow = null;
+  function paintVisitBar() {
+    if (!visitRow) return;
+    visitBar.querySelector(".vlabel").textContent = T("gal.visitBar", { name: visitRow.name, user: visitRow.username });
+    visitBar.querySelector("button").textContent = T("gal.back");
+  }
+  visitBar.querySelector("button").addEventListener("click", () => { sfx.click(); exitVisit(); });
+  function enterVisit(layout, row) {
+    if (walking) hooks.endWalk();
+    closeSheet();
+    visiting = true; visitRow = row;
+    document.body.classList.add("visiting");
+    scene.showVisit(layout);
+    if (hooks.setCrowdVisible) hooks.setCrowdVisible(false);
+    paintVisitBar(); visitBar.hidden = false;
+    const built = layout.pitches.map((e, i) => e && PITCHES[i]).filter(Boolean);
+    if (built.length) r.flyTo({ tu: built.reduce((sum, p) => sum + p.u, 0) / built.length, tw: built.reduce((sum, p) => sum + p.w, 0) / built.length, yaw: 0, dist: built.length > 6 ? 190 : 130, tilt: 0 }, 1.2);
+    else r.frameField(true);
+    bannerKey = ""; applyChrome();
+  }
+  function exitVisit() {
+    if (!visiting) return;
+    visiting = false; visitRow = null;
+    document.body.classList.remove("visiting");
+    scene.endVisit();
+    if (hooks.setCrowdVisible) hooks.setCrowdVisible(true);
+    visitBar.hidden = true;
+    bannerKey = ""; applyChrome();
+  }
+  async function openMuseum(layoutText, row) {
+    let lg = "";
+    try { const reading = await readV1(layoutText); if (reading.ok) lg = deflateLayout(reading); }
+    catch (error) { console.warn("[fouer] museum card needs the v1 kernel", error); }
+    return showLetter({ report: { kind: "museum", vouchers: [], gold: false }, lg }, { museum: true, subtitle: `${row.name} · ${T("gal.by", { name: row.username })}` });
+  }
+  const gallery = createGallery({ game, showModal, T: (key, params) => T(key, params), money, formatDate: formatStamp, ownName, sfx,
+    onVisit: enterVisit, onMuseum: openMuseum });
+  function openGallery() { sfx.unlock(); document.getElementById("menu").hidden = true; document.getElementById("menuBtn").setAttribute("aria-expanded", "false"); return gallery.open(); }
+
+  // ---------------------------------------------------------------- Hämmi's daily present (builder tap, walk pet button and the pill)
+  function sheepTapped() {
+    if (game.tutorial().active) { toast(T("sheep.say"), 1800); return { ok: false, reason: "tutorial" }; }     // the present comes after the onboarding
+    const result = game.claimHaemmi();
+    if (result.ok) { sfx.coin(); sfx.star(); toast(T("hammi.gift", { amount: money(result.amount) }), 3600); coinRain(); }
+    else toast(T("hammi.wait"), 2600);
+    return result;
+  }
+
   // ---------------------------------------------------------------- settings (weather / time come from W2's env menu)
   function mountSettings() {
     for (const id of ["envBtn", "menuBtn", "frameBtn"]) { const node = document.getElementById(id); node.replaceWith(node.cloneNode(true)); }   // drop old listeners (language switch)
@@ -670,6 +749,19 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     const tail = el("div", "");
     const days = game.nextFouerDays();
     const next = game.events.next;
+    const social = el("div", "");
+    const socialRow = el("div", "row");
+    const galleryChip = el("button", "chip wide", `🖼️ ${esc(T("gal.open"))}`); galleryChip.type = "button"; galleryChip.dataset.gal = "open";
+    galleryChip.addEventListener("click", () => openGallery());
+    socialRow.append(galleryChip);
+    replayChipEl = null;
+    if (hooks.events) {
+      const replayChip = el("button", "chip wide", `🎬 ${esc(T("ev.replay"))}`); replayChip.type = "button"; replayChip.dataset.event = "replay"; replayChip.hidden = !game.events.ceremony.replay;
+      replayChipEl = replayChip;
+      replayChip.addEventListener("click", () => { document.getElementById("menu").hidden = true; document.getElementById("menuBtn").setAttribute("aria-expanded", "false"); sfx.click(); hooks.events.replay(); });
+      socialRow.append(replayChip);
+    }
+    social.append(socialRow);
     tail.innerHTML = `<h3>${esc(T("set.nextFouer"))}</h3><p class="note">${esc(days <= 0 ? T("event.nextFouerToday") : T("event.nextFouer", { date: formatDate(lang, next.open), days }))}</p>`;
     if (game.state.pi === 1 || game.state.lg) {
       const row = el("div", "row"); const old = el("button", "chip wide", `🏛️ ${esc(T("set.oldPark"))}`); old.type = "button";
@@ -677,7 +769,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
       row.append(old); tail.append(row);
     }
     tail.insertAdjacentHTML("beforeend", `<p class="note">${esc(T("set.about"))}</p>`);
-    menu.append(...tail.childNodes);
+    menu.append(...social.childNodes, ...tail.childNodes);
     document.getElementById("menuBtn").setAttribute("aria-label", T("hud.menu"));
     document.getElementById("envBtn").setAttribute("aria-label", T("hud.env"));
     document.getElementById("frameBtn").setAttribute("aria-label", T("hud.frame"));
@@ -685,7 +777,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     document.getElementById("menuBtn").addEventListener("click", () => { sfx.unlock(); renderSettingsDynamic(); });
     return mounted;
   }
-  function renderSettingsDynamic() { /* the next-Fouer line is static per session */ }
+  function renderSettingsDynamic() { if (replayChipEl) replayChipEl.hidden = !game.events.ceremony.replay; }       // the replay offer appears once the opening ceremony is over
 
   function changeLang(code) {
     lang = code;
@@ -703,6 +795,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     const tut = game.tutorial();
     if (tut.active && tut.stage === "walk") game.acknowledgeTutorial();
     closeSheet();
+    if (hooks.events) hooks.events.leaveCinema();                // the free show camera gives the view back before the walk takes it
     hooks.startWalk();
   });
   hooks.onWalkChange = on => {
@@ -749,7 +842,8 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
 
   let sheetClock = 0;
   return {
-    toast, openPitch, closeSheet, showLetter, showOffline, showStamps, refreshAll, changeLang, money,
+    toast, openPitch, closeSheet, showLetter, showOffline, showStamps, refreshAll, changeLang, money, showModal, sheepTapped, openGallery, enterVisit, exitVisit, openMuseum,
+    get visiting() { return visiting; }, get walking() { return walking; },
     get lang() { return lang; }, get selected() { return selected; }, get sheetMode() { return sheetMode; }, get modalOpen() { return modalOpen; },
     update(dt) {
       // the cash counter rolls towards the real value

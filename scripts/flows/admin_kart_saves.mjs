@@ -56,6 +56,8 @@ export function makeWorld() {
       "idle-empire": idleSave(15000, 2.1e6),
       "cookie-clicker": { v: 1, c: 1200, tb: 56000, tc: 900, st: 1, rbc: 0, savedAt: 1, u: [4, 2, 1], cu: [1] },
       "train-sim": { v: 1, tb: 15, career: "c1", hints: true, savedAt: 1, rail: { a: 1, b: 2, c: 3 }, tram: {} },
+      // Schueberfouer Tycoon (v2 save: tb = lifetime value, c = cash, p = 34 pitches x 3 base36 chars, "000" = empty)
+      park: { v: 2, tb: 34472, c: 5530, t: 1790000000, p: "1a02b03c0" + "000".repeat(31), pu: "0", rb: 68, pi: 1, mg: 4059, vo: "", lg: "", st: "", gi: [12, 13], n: "Emma", tu: 8, ea: "g", fw: 0, hd: 0 },
     },
     history: HISTORY,
     // what the mocked player is doing: before the close_game command he is in the game with a fresh save,
@@ -273,7 +275,7 @@ export const flow = {
     await page.waitForSelector(".sv-game");
     h.eq(backend.callsTo("admin_user_saves").at(-1).body, { p_user: "u-emma" }, "saves of Emma requested");
     h.eq(await page.locator("#tabSaves").evaluate((el) => el.classList.contains("active")), true, "Saves tab active");
-    h.eq(await page.locator(".sv-game").count(), 3, "games with saves listed");
+    h.eq(await page.locator(".sv-game").count(), 4, "games with saves listed (idle-empire, cookie-clicker, park, train-sim)");
 
     h.step("Saves tab: search");
     await page.click("#tabKart");
@@ -507,6 +509,14 @@ export const flow = {
     const cookie = await text(page, ".sv-card");
     h.expect(/Gebak \(insgesamt\) 56 K/.test(cookie) && /Cookien 1,2 K/.test(cookie) && /Gebaier \(Total\) 7/.test(cookie), `Cookie Clicker summary (${cookie})`);
     h.expect(/Gläich wéi de live|live méi/.test(await text(page, ".sv-row")), "diff line on the cookie history row");
+
+    h.step("park (Schueberfouer Tycoon): named, lifetime / cash / attractions, a gift card in Suen");
+    await page.click('.sv-game[data-game="park"]');
+    await page.waitForFunction(() => /Schueberfouer Tycoon/.test(document.querySelector(".sv-card")?.innerText || ""));
+    const park = await text(page, ".sv-card");
+    h.expect(/Insgesamt 34,47 K/.test(park) && /Cash 5,53 K/.test(park) && /Attraktiounen 3/.test(park) && /Pionéier-Bonus 68/.test(park) && /Kaddoen ugewannt 2/.test(park), `park summary (${park})`);
+    h.eq(await page.locator("#svGiftForm").count(), 1, "the park gets the live gift card");
+    h.expect(/Suen/.test(await text(page, "#svGiftForm")), "...asking for an amount in Suen");
 
     h.step("desktop and mobile layouts, de/en texts, light theme");
     await page.setViewportSize({ width: 1440, height: 900 });

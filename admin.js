@@ -1,10 +1,10 @@
 /* Admin panel — moderate groups/messages AND manage registered users.
  * All privileged actions are guarded server-side by is_admin(). */
-import * as auth from "./auth.js?v=35";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
-import { at } from "./admin-texts.js?v=2";
-import { mountKart } from "./admin-kart.js?v=2";
-import { mountSaves } from "./admin-saves.js?v=3";
+import * as auth from "./auth.js?v=36";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=12";
+import { at } from "./admin-texts.js?v=3";
+import { mountKart } from "./admin-kart.js?v=3";
+import { mountSaves } from "./admin-saves.js?v=4";
 import { createMediaUrls, thumbPathFor } from "./chat-media.js?v=2";
 
 const $ = (id) => document.getElementById(id);

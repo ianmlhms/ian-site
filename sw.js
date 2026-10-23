@@ -4,7 +4,10 @@
  *    Safe with the site's ?v= versioning: bumped asset URLs are cache misses and
  *    fetch fresh; navigations are network-first so pages are never stale online. */
 
-const CACHE = "ianlu-v10";
+/* v11 (Schueberfouer Tycoon launch): drops every cache entry a player's browser kept of the old Theme Park Tycoon page and arcade.
+ * pb/fouer.html, its modules and pb/fouer/data/glacis-world.bin (about 600 KB) are NOT precached on purpose: all /pb/ requests go to
+ * the network first (see below) and the browser's own HTTP cache keeps the bundle, a second copy here would only cost storage. */
+const CACHE = "ianlu-v11";
 const CORE = [
   "index.html", "favicon.svg", "apple-touch-icon.png", "site.webmanifest",
   "skylens.html", "skylens.css?v=5", "skylens.js?v=7", "skylens.webmanifest",

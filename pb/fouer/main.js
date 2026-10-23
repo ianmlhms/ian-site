@@ -18,6 +18,7 @@ import { createAudio } from '/pb/fouer/audio.js';
 import { createMask, createWalk } from '/pb/fouer/walk.js';
 import { createCrowd } from '/pb/fouer/crowd.js';
 import { createRide } from '/pb/fouer/ride.js';
+import { createEvents } from '/pb/fouer/events.js';
 import { CORRIDORS } from '/pb/fouer/models/npc.js';
 import { ENTRANCES } from '/pb/fouer/models/props.js';
 import { LANGS, t as translate, formatMoney } from '/pb/fouer/i18n.js';
@@ -89,8 +90,8 @@ async function boot() {
   const markers = world.parts.pitches;
   markers.setMode('outline');
   const fair = await createFairLayer({ T, root: r.gameRoot, pitches: markers.items, groundY: (u, w) => world.groundY(u, w), quality: r.state.quality, fieldPoly: world.fieldPoly, renderer: r, world });
-  let scene = null; let crowd = null;
-  world.parts.fair = { setNight: k => { fair.setNight(k); if (scene) scene.setNight(k); if (crowd) crowd.setNight(k); }, dispose: () => fair.dispose() };
+  let scene = null; let crowd = null; let events = null;
+  world.parts.fair = { setNight: k => { fair.setNight(k); if (scene) scene.setNight(k); if (crowd) crowd.setNight(k); if (events) events.setNight(k); }, dispose: () => fair.dispose() };
   r.on('quality', q => { fair.setQuality(q); if (crowd) crowd.setQuality(q); });
   setLoad(0.9, translate(lang, 'load.start'));
 
@@ -129,7 +130,7 @@ async function boot() {
   });
   const getFocus = () => (walk && walk.active && !ride.active ? { x: walk.view.x, z: walk.view.z, yaw: walk.view.yaw, walk: true } : { x: r.rig.cu, z: r.rig.cw, yaw: r.rig.cyaw, walk: false });
   const laneLine = streetSamples.map(q => ({ x: q.u, z: q.w }));
-  crowd = createCrowd({ T, r, world, game, mask, corridors: CORRIDORS, polylines: laneLine.length > 5 ? [{ name: 'allee', pts: laneLine, lane: 2.3, chunk: 4 }] : [], rects, faces, quality: r.state.quality, env, getFocus, onBleat: () => ui.toast(translate(ui.lang, 'sheep.say'), 1800) });
+  crowd = createCrowd({ T, r, world, game, mask, corridors: CORRIDORS, polylines: laneLine.length > 5 ? [{ name: 'allee', pts: laneLine, lane: 2.3, chunk: 4 }] : [], rects, faces, quality: r.state.quality, env, getFocus, onBleat: () => ui.sheepTapped() });
   const items = { faceOf: i => faces[i], cycleOf: i => { const pit = fair.pits.get(PITCHES[i].id); return pit && pit.near && pit.near.userData.cycle ? pit.near.userData.cycle : 45; } };
   const getListener = () => {
     if (walk && walk.active) { const d = r.camera.getWorldDirection(new T.Vector3()); return { x: r.camera.position.x, y: r.camera.position.y, z: r.camera.position.z, fx: d.x, fy: d.y, fz: d.z, dist: 0 }; }
@@ -144,15 +145,23 @@ async function boot() {
     endWalk() { if (walk) walk.end(); },
     /** a tap on Hämmi (builder view and walk): bleat */
     tapSheep(x, y) { if (!crowd.tapSheep(x, y)) return false; crowd.bleat(); audio.unlock(); audio.bleat(); return true; },
+    /** W7: the pill "Hämmi has a present" flies the builder camera to the sheep */
+    findSheep() { const p = crowd.sheepPosition(); if (!p || (walk && walk.active)) return false; r.flyTo({ tu: p.x, tw: p.z, yaw: r.rig.yaw, dist: 70, tilt: 0 }, 1.1); return true; },
+    /** W7: a visited fair (gallery) hides the guests and Hämmi: they belong to the player's own fair */
+    setCrowdVisible(on) { crowd.group.visible = on; crowd.sheep.visible = on; },
+    /** W7: the event controller, reachable before it exists (the UI is built first) */
+    events: { watch: id => (events ? events.watch(id) : false), replay: () => { if (events) events.replay(); }, leaveCinema: () => { if (events) events.leaveCinema(); }, get cinema() { return events ? events.cinema : false; } },
   };
   window.__fouerHooks = hooks;
   ui = createUi({
     root: $('ui'), game, scene, r, env, hooks, sfx, lang, debug,
-    setLang: code => { try { localStorage.setItem(LANG_KEY, code); } catch (error) { /* storage blocked */ } if (walk) walk.refreshLabels(); },
+    setLang: code => { try { localStorage.setItem(LANG_KEY, code); } catch (error) { /* storage blocked */ } if (walk) walk.refreshLabels(); if (events) events.setLang(code); },
   });
   let fairTime = 0;       // the fair layer's own clock (fair.update(dt) adds dt every frame): the coaster ride needs the model time
   ride = createRide({ T, r, world, fair, game, scene, ui, audio, crowd, rects, faces, getWalk: () => walk, getFairTime: () => fairTime, translate });
   walk = createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, crowd, ride, mask, env, hooks, rects, items, tram: world.parts.tram, translate });
+  events = createEvents({ T, r, world, game, env, audio, ui, translate });
+  events.setNight(world.nightK || 0);
   scene.sync();
   fair.flush(r.camera);
 
@@ -167,6 +176,7 @@ async function boot() {
     walk.update(dt);
     crowd.update(dt);
     audio.update(dt);
+    events.update(dt);
     ui.update(dt);
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) game.flushSave(); });
@@ -216,7 +226,7 @@ async function boot() {
       setFreeCamera: o => r.setFreeCamera(o),
     };
     window.__fouerGame = {
-      game, ui, scene, fair, sfx, hooks, r, world, env, markers, walk, crowd, audio, ride, mask,
+      game, ui, scene, fair, sfx, hooks, r, world, env, markers, walk, crowd, audio, ride, mask, events,
       advance: (sec) => game.advance(sec),
       setClockOffset: ms => { clockOffset = ms; },
       snapshot() {

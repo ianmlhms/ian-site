@@ -39,6 +39,7 @@ const dialogVisible = (h) => h.page.locator(".pb-mode__box").isVisible();
 
 export const flow = {
   name: "test-mode",
+  fullChromium: true,          // the Schueberfouer step needs WebGL
   backend: {
     rpc: { weekly_game: () => GAME },
     tables: {
@@ -264,6 +265,36 @@ export const flow = {
     await page.evaluate(() => window.openOnline(GAMES.findIndex((game) => game.id === "o-connect4")));
     h.expect(!(await dialogVisible(h)), "online game opens its room dialog without the mode prompt");
     await page.evaluate(() => window.closeOnline());
+
+    h.step("Schueberfouer Tycoon in test mode: everything unlocked, nothing written, no gallery writes, no gifts; ?fouerDate= works only here");
+    {
+      const savesBefore = saveWrites(h), scoresBefore = scoreWrites(h), claimsBefore = calls(h, "claim_game_gifts"), publishBefore = calls(h, "publish_park"), likeBefore = calls(h, "like_park");
+      await h.goto("/pixelbreak.html?g=park&fouerDebug=1&fouerDate=2027-08-20T17%3A00%3A30%2B02%3A00");
+      await page.waitForSelector(".pb-mode__box");
+      await page.keyboard.press("t");
+      await page.waitForFunction(() => document.getElementById("gf")?.contentWindow?.document?.documentElement?.dataset.fouerReady === "1", null, { timeout: 120000 });
+      await h.pause(1500);
+      const fouer = await frameOf(h).evaluate(() => { const G = window.__fouerGame; const s = G.game.state; return { test: window.__pbTestMode, c: s.c, tu: s.tu, pi: s.pi, ev: G.events.state().kind, year: G.game.events.fair.year, title: (window.parent.document.querySelector(".arcade-bar__title") || document.querySelector(".arcade-bar__title"))?.textContent.trim() }; });
+      h.eq([fouer.test, fouer.tu, fouer.pi, fouer.title], [true, 8, 1, "Schueberfouer Tycoon"], "test mode: flag set, tutorial done, pioneer items unlocked");
+      h.expect(fouer.c >= 5e7, `test cash (${fouer.c})`);
+      h.eq([fouer.year, fouer.ev], [2027, "opening"], "?fouerDate= moves the calendar in test mode: the opening ceremony runs");
+      await frameOf(h).evaluate(() => { const G = window.__fouerGame; G.game.build(0, "kachel"); G.game.advance(20); G.game.flushSave(); });
+      await h.pause(3800);
+      await page.evaluate(() => window.__pbFlushSave());
+      h.eq(saveWrites(h), savesBefore, "no game_saves write from the Schueberfouer in test mode");
+      h.eq(scoreWrites(h), scoresBefore, "no score write");
+      h.eq(calls(h, "claim_game_gifts"), claimsBefore, "no live gifts are claimed in test mode");
+      for (let i = 0; i < 4 && (await frameOf(h).locator(".modal button").count()); i++) { await frameOf(h).locator(".modal button").first().click(); await h.pause(300); }   // the stamp card of a fair day
+      await frameOf(h).locator("#menuBtn").click();
+      await frameOf(h).locator('[data-gal="open"]').click();
+      await frameOf(h).locator(".dialog.gallery").waitFor({ timeout: 8000 });
+      h.eq(await frameOf(h).locator('[data-gal="publish"]').count(), 0, "the gallery offers no 'publish' in test mode");
+      await h.pause(1200);
+      h.eq(await frameOf(h).locator(".like").count(), 0, "...and no like buttons");
+      h.eq([calls(h, "publish_park"), calls(h, "like_park")], [publishBefore, likeBefore], "no gallery write reached the backend");
+      await h.shot("park-test-mode");
+      await closeGame(h);
+    }
 
     h.step("Geometry Dash (own page): test choice is handed over");
     await page.evaluate(() => window.openGo(GAMES.findIndex((game) => game.id === "geometrydash")));

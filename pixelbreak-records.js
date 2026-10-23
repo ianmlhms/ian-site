@@ -9,11 +9,11 @@
  * The page calls: PB.chooseMode(game) (owner prompt: true = test, false = normal, null = cancelled),
  * PB.onOpenGame(game, {testMode}), PB.instrument(html), PB.onCloseGame().
  */
-import * as auth from "./auth.js?v=35";
-import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=11";
+import * as auth from "./auth.js?v=36";
+import { loadTags, tagsHtml } from "./leaderboard-tags.js?v=12";
 
-import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=9";
-import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=9";
+import { compactScore, scoreHtml, scoreKeyHtml, arcadeText } from "./score-format.js?v=10";
+import { loadWeekly, installWeeklyUi, weeklyHeadingHtml, weeklyRowsHtml } from "./arcade-weekly.js?v=10";
 
 const cfg = window.PB_CONFIG || {};
 const cloudEnabled = /^https:\/\/.+\.supabase\.co\/?$/.test((cfg.url || "").trim()) &&
@@ -488,7 +488,7 @@ async function loadCloudSave(g) {
  * ORDERING: gifts are claimed only when BOTH the game announced itself (its local save is loaded, the cloud save was
  * requested) AND this game's cloud save was loaded and posted to the frame (or the account has none). postMessage keeps
  * the order, so the game has run its applySave(cloud) before it sees a gift and nothing can wipe the gift afterwards. */
-const GIFT_GAMES = new Set(["idle-empire", "cookie-clicker", "bus-tycoon"]);
+const GIFT_GAMES = new Set(["idle-empire", "cookie-clicker", "bus-tycoon", "park"]);   // park = Schueberfouer Tycoon (cash, 22 Oct 2026 + W7)
 const GIFT_RESEND_MS = 10_000, GIFT_RESEND_MAX = 3;
 let cloudLoadSeq = 0;
 let giftFrameReady = false, giftCloudSettled = false, giftBusy = false, giftAgain = false;

@@ -19,6 +19,7 @@ import { RIDES, STALLS } from "../park/data.js";
 import { createState as v1Create, tick as v1Tick } from "../park/sim.js";
 import { canPlace as v1CanPlace, place as v1Place, placePath as v1PlacePath, KINDS as V1_KINDS } from "../park/build.js";
 import { serializeSave as v1Serialize } from "../park/save.js";
+import { verifyLaunch } from "./harness-w7.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const DAY_MS = 86400000;
@@ -472,6 +473,27 @@ function verifyGiftsStampsEvents() {
   check(claim.state.c === earning.c + claim.amount && claim.state.fw === 2027 && claim.state.tb === earning.tb, "gift is cash only and remembered");
   equal(sim.claimFireworks(claim.state, after).reason, "already-claimed", "once per edition");
   check(sim.claimFireworks(earning, eventsAt(lux(2027, 9, 12))).ok, "claimable on the days after closing");
+  // Hämmi's daily present (W7): once per Luxembourg calendar day, cash only, scaled to income.
+  const monday = eventsAt(lux(2027, 7, 5, 10)), mondayLate = eventsAt(lux(2027, 7, 5, 23, 50)), tuesday = eventsAt(lux(2027, 7, 6, 0, 5));
+  check(sim.haemmiGiftReady(earning, monday), "a fresh player has Hämmi's present waiting");
+  const gift1 = sim.claimHaemmiGift(earning, monday);
+  const perMin = sim.economy(earning).incomePerMin;
+  check(gift1.ok && gift1.amount === Math.max(25, Math.round(perMin * 3 / 5) * 5), "present = 3 minutes of income in steps of 5, at least 25");
+  check(gift1.state.c === earning.c + gift1.amount && gift1.state.tb === earning.tb && gift1.state.gi === earning.gi && sim.stars(gift1.state) === sim.stars(earning), "cash only: tb, stars and gift ids untouched");
+  equal(gift1.state.hd, monday.now.dayNumber, "the Lux day is remembered");
+  equal(sim.claimHaemmiGift(gift1.state, mondayLate).reason, "already-today", "a second present on the same day is refused (even at 23:50)");
+  check(sim.claimHaemmiGift(gift1.state, tuesday).ok, "...but 10 minutes after Lux midnight there is a new one");
+  equal(sim.claimHaemmiGift(sim.claimHaemmiGift(gift1.state, tuesday).state, tuesday).reason, "already-today", "once on Tuesday too");
+  const poor = sim.haemmiGiftAmount(sim.createState({ now: 0 }));
+  equal(poor, 25, "an empty fair still gets the 25 euro minimum");
+  const rich2 = sim.haemmiGiftAmount({ ...earning, pitches: earning.pitches.map((e, i) => (i < 6 ? sim.makeEntry(["kachel", "fritten", "kanner", "wurscht", "zocker", "crepes"][i], 3, 0, 0) : null)), rb: 80 });
+  check(rich2 > poor * 4, `a richer fair gets a bigger present (${rich2})`);
+  check(sim.claimHaemmiGift({ ...earning, c: CASH_CAP }, monday).state.c === CASH_CAP, "the cash cap holds");
+  check(!sim.haemmiGiftReady({ ...earning, hd: monday.now.dayNumber + 1 }, monday) && sim.haemmiGiftReady({ ...earning, hd: monday.now.dayNumber - 1 }, monday), "ready only when the stored day is older");
+  const saved = save.decodeSave(JSON.stringify(save.encodeSave(gift1.state)));
+  equal(saved.hd, gift1.state.hd, "the present day survives the save codec");
+  equal(save.decodeSave({ ...save.encodeSave(earning), hd: -4 }).hd, 0, "a forged day is clamped");
+  equal(save.decodeSave({ ...save.encodeSave(earning), hd: "x" }).hd, 0, "a non-number day becomes 0");
 }
 
 function verifyEconomyModel() {
@@ -781,7 +803,7 @@ function fakeEnv({ testMode = false } = {}) {
 function verifySave() {
   const sample = deepFreeze({ ...ok(sim.build(sim.createState({ name: "Ian", now: 1.7e12 }), idx("P01"), "kachel")), tb: 1234.9, c: 99.6, vo: ["wheel"], gi: [3, 4] });
   const record = save.encodeSave(sample);
-  equal(Object.keys(record), ["v", "tb", "c", "t", "p", "pu", "rb", "pi", "mg", "vo", "lg", "st", "gi", "n", "tu", "ea", "fw"], "record fields (8.3)");
+  equal(Object.keys(record), ["v", "tb", "c", "t", "p", "pu", "rb", "pi", "mg", "vo", "lg", "st", "gi", "n", "tu", "ea", "fw", "hd"], "record fields (8.3)");
   equal(record.p.length, 102, "34 pitches x 3 characters");
   check(Object.entries(record).every(([key, value]) => key === "gi" ? Array.isArray(value) : typeof value === "string" || Number.isInteger(value)), "strings and integers only; gi is the only array");
   const decoded = save.decodeSave(JSON.stringify(record));
@@ -1439,6 +1461,7 @@ async function run() {
   await verifyMigration();
   verifyI18n();
   await verifyWalk();
+  await verifyLaunch({ check, equal, near, lux, deepFreeze });
   if (process.argv.includes("--table")) printTable();
   const p = section.pacing;
   console.log(`PASS: ${checks} checks; stars at ${p.starMinutes[2]}/${p.starMinutes[3]}/${p.starMinutes[4]}/${p.starMinutes[5]} min; save ${section.saveSizes.json} B JSON, ${section.saveSizes.jsonb} B jsonb.`);

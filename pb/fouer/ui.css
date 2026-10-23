@@ -281,3 +281,39 @@ body.walking .bubble, body.walking .anchors, body.walking #finger, body.walking 
 body.wk-on #title { display: none; }
 .pill.foodie { background: linear-gradient(180deg, #ffd978, #ffab3c); color: #3a2208; }
 @media (prefers-reduced-motion: reduce) { .wk-act { animation: none; } .wk-eat.go .steam i { animation-duration: 2.4s; } }
+
+/* ---------- W7: gallery, visit bar, event captions, clickable banner pills */
+.banners .pill.watch, .banners .pill.gift { pointer-events: auto; cursor: pointer; font-family: var(--font); min-height: 36px; }
+.banners .pill.watch { background: linear-gradient(90deg, #1d4f8f, #3c8bd9); animation: wkpulse 1.8s ease-in-out infinite; }
+.banners .pill.gift { background: linear-gradient(90deg, #d49420, #ffcf5c); color: #3a2a08; border-color: #fff0b8; }
+#ui > .visitbar, #ui > .evcap { pointer-events: auto; }
+.visitbar { position: absolute; left: 50%; bottom: calc(14px + var(--safe-bottom)); transform: translateX(-50%); z-index: 12; width: min(620px, calc(100% - 24px)); display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 18px;
+  border-radius: 22px; background: var(--panel); border: 1px solid var(--gold); box-shadow: 0 8px 24px #0008; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.visitbar[hidden] { display: none; }
+.visitbar .vlabel { flex: 1; min-width: 0; font-weight: 800; font-size: 14px; line-height: 1.3; }
+.visitbar .btn { width: auto; flex: none; min-height: 48px; font-size: 15px; }
+body.visiting .hud, body.visiting #goal, body.visiting #goalChip, body.visiting .anchors, body.visiting .bubble, body.visiting #walkBtn, body.visiting .finger { display: none !important; }
+.evcap { position: absolute; left: 50%; bottom: calc(18px + var(--safe-bottom)); transform: translateX(-50%); z-index: 11; width: min(640px, calc(100% - 24px)); display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 18px;
+  border-radius: 22px; background: linear-gradient(180deg, #14324a, #0e2230); border: 1px solid #ffffff30; box-shadow: 0 8px 24px #0008; animation: bubblein .35s ease-out; }
+.evcap[hidden] { display: none; }
+.evcap .evtext { flex: 1; min-width: 0; font-weight: 800; font-size: 15px; line-height: 1.3; }
+.evcap .evskip { flex: none; min-height: 46px; padding: 0 18px; border-radius: 16px; border: 1px solid var(--line); background: #ffffff14; color: var(--ink); font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; }
+body.has-sheet .evcap { bottom: auto; top: calc(max(12px, var(--safe-top)) + 70px); }
+body.walking .evcap { bottom: auto; top: calc(max(12px, var(--safe-top)) + 70px); }
+.dialog.gallery { width: min(620px, 100%); max-height: 100%; overflow: auto; text-align: left; }
+.dialog.gallery h2 { text-align: center; }
+.dialog.gallery .note, .dialog.gallery .gstatus { margin: 4px 0 8px; font-size: 13px; color: var(--muted); font-weight: 700; min-height: 18px; }
+.gallery .glist { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 12px; }
+.gcard { padding: 12px 14px; border-radius: 16px; background: #ffffff0e; border: 1px solid var(--line); }
+.gcard.museum { background: linear-gradient(180deg, #5a4a2a55, #3a2f1c44); border-color: #d9b46a66; }
+.gcard h3 { margin: 0 0 2px; font-size: 17px; overflow-wrap: anywhere; }
+.gcard .gbadge { display: inline-block; margin-right: 8px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 900; background: #d9b46a; color: #3a2a08; vertical-align: 2px; }
+.gcard .gbadge.mine { background: var(--gold); }
+.gcard .gby, .gcard .gstats { margin: 2px 0; font-size: 14px; font-weight: 700; color: #cfe3e6; overflow-wrap: anywhere; }
+.gcard .gdate { color: var(--muted); font-size: 12px; font-weight: 700; }
+.gallery .gactions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+.gallery .gactions .btn { width: auto; min-height: 46px; font-size: 15px; }
+.gallery .gform label { display: block; margin: 8px 0; font-weight: 800; font-size: 14px; }
+.gallery .gform input { display: block; width: 100%; margin-top: 6px; min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); background: #0b1a24; color: var(--ink); font: inherit; font-size: 16px; }
+.paper .museum-by { font-size: 15px; color: #7a6244; margin: 0 0 6px; }
+body.cinema .anchors, body.cinema #goal, body.cinema #goalChip, body.cinema .bubble, body.cinema .finger { display: none !important; }

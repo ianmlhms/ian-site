@@ -175,6 +175,11 @@ const TEXTS = {
   "what.idle-empire": ["Cash", "Cash", "cash"],
   "what.cookie-clicker": ["Cookien", "Cookies", "cookies"],
   "what.bus-tycoon": ["Passagéier", "Passagiere", "passengers"],
+  "what.park": ["Suen", "Geld", "cash"],
+  "m.built": ["Attraktiounen", "Attraktionen", "Attractions"],
+  "m.ratingBonus": ["Pionéier-Bonus", "Pionier-Bonus", "Pioneer bonus"],
+  "m.oldPark": ["Wäert vum ale Park", "Wert des alten Parks", "Old park value"],
+  "m.giftsApplied": ["Kaddoen ugewannt", "Geschenke angewendet", "Gifts applied"],
 
   /* tracks, cups, weather */
   "t.villehaute": ["Uewerstad", "Oberstadt", "Upper Town"],

@@ -6,6 +6,7 @@
 import { PITCHES, PITCH_COUNT, ITEM_BY_ID } from "./data.js";
 import { buildModel, hasModel } from "./models/index.js";
 import { ENTRANCES } from "./models/props.js";
+import { visitSpec } from "./social.js";
 
 const GROW_SECONDS = 1.15;
 const RING_SECONDS = 1.0;
@@ -33,6 +34,7 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
   let selectT = 0;
   let gateMesh = null;
   let gateStars = 0;
+  let visit = null;                     // W7: a published fair shown read-only instead of the player's own (social.js layout)
   const rects = PITCHES.map((pitch, index) => ({ index, ...(markers.rect(pitch.id) ?? { u: pitch.u, w: pitch.w, du: 8, dw: 8, y: world.groundY(pitch.u, pitch.w), size: pitch.size }) }));
 
   // ---- shared sparkle texture ----
@@ -55,6 +57,7 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
   const keyOf = spec => spec.state === "built" ? `b|${spec.item}|${spec.look}|${spec.level}` : spec.state;
 
   function applyPitch(index) {
+    if (visit) return;
     const spec = specFor(index);
     const key = keyOf(spec);
     if (applied.get(index) === key) return;
@@ -63,6 +66,7 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
   }
 
   function syncMarkers() {
+    if (visit) { for (const pitch of PITCHES) markers.setState(pitch.id, "built"); return; }
     const glow = new Set(game.glowPitches());
     for (let i = 0; i < PITCH_COUNT; i++) {
       const status = game.pitchStatus(i);
@@ -74,9 +78,24 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
 
   /** Brings the drawn fair in line with the state. Pitches that are mid-animation are applied when it ends. */
   function sync() {
+    if (visit) return;
     for (let i = 0; i < PITCH_COUNT; i++) if (!growing.has(i)) applyPitch(i);
     syncMarkers();
     syncGates();
+  }
+
+  /** Visit another player's fair: the fair layer shows their pitches until endVisit() (the economy and the save are not touched). */
+  function showVisit(layout) {
+    visit = layout;
+    select(-1);
+    PITCHES.forEach((pitch, i) => { const spec = visitSpec(layout, i); applied.set(i, `v|${keyOf(spec)}`); fair.setPitch(pitch.id, spec); });
+    syncMarkers();
+  }
+  function endVisit() {
+    if (!visit) return;
+    visit = null;
+    applied.clear();
+    sync();
   }
 
   // ---- build / upgrade effects ----
@@ -318,8 +337,8 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
   game.on("looked", ({ index }) => { addSparkles(index, 2); });
 
   return {
-    sync, update, select, anchor, pick, focus, heightOf, rects, effects,
-    get selected() { return selected; }, get growing() { return growing.size; },
+    sync, update, select, anchor, pick, focus, heightOf, rects, effects, showVisit, endVisit,
+    get visiting() { return visit !== null; }, get selected() { return selected; }, get growing() { return growing.size; },
     setNight(k) { night = k; },
     addRing, addSparkles,
     dispose() { effects.splice(0).forEach(fx => fx.dispose()); select(-1); if (gateMesh) { root.remove(gateMesh); gateMesh.geometry.dispose(); gateMesh.material.dispose(); } },

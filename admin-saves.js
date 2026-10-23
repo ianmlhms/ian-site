@@ -10,14 +10,14 @@
  * The only repeated calls are made while a dialog is open and waiting: the "close their game first" helper
  * (small admin_user_saves answers every few seconds, at most 10 minutes) and a live gift waiting to be picked up
  * (small admin_game_gifts answers every 5 s, at most 3 minutes). Closing the dialog stops both. */
-import { at, esc, label, ago, fmtDateTime, fmtNum, parseAmount } from "./admin-texts.js?v=2";
+import { at, esc, label, ago, fmtDateTime, fmtNum, parseAmount } from "./admin-texts.js?v=3";
 
 const NEED_IDLE_S = 90;       // the cloud save must not have changed for this long
 const PAGE_GRACE_S = 180;     // presence on the game page counts for this long after the last ping
 const COMMAND_MINUTES = 15;   // how long the close_game command stays valid
 const MAX_AMOUNT = 1e30;
-const GIFT_GAMES = new Set(["idle-empire", "cookie-clicker", "bus-tycoon"]);
-const GAME_NAMES = { "idle-empire": "Business Empire", "cookie-clicker": "Cookie Clicker", "bus-tycoon": "Bus Tycoon", "train-sim": "Zuch & Tram Sim", "paket-express": "Paket Express", "drive-mad": "Drive Mad", "kart-letzebuerg": "Kart Lëtzebuerg", "chill-drive": "Chill Drive", "crossy-road": "Crossy Road", towerdefense: "Tower Defense", burger: "Burger" };
+const GIFT_GAMES = new Set(["idle-empire", "cookie-clicker", "bus-tycoon", "park"]);
+const GAME_NAMES = { "idle-empire": "Business Empire", "cookie-clicker": "Cookie Clicker", "bus-tycoon": "Bus Tycoon", park: "Schueberfouer Tycoon", "train-sim": "Zuch & Tram Sim", "paket-express": "Paket Express", "drive-mad": "Drive Mad", "kart-letzebuerg": "Kart Lëtzebuerg", "chill-drive": "Chill Drive", "crossy-road": "Crossy Road", towerdefense: "Tower Defense", burger: "Burger" };
 const NOISE_KEYS = new Set(["v", "savedAt", "ts", "rs", "ud", "gd", "sc"]);
 const params = new URLSearchParams(location.search);
 // test hooks (the flows speed the waiting up); normal use keeps the defaults
@@ -50,6 +50,12 @@ export function summarize(gameId, data) {
   } else if (gameId === "bus-tycoon") {
     list = [metric("p", "m.passengers", num(data.p)), metric("tb", "m.lifetime", num(data.tb)), metric("st", "m.stars", num(data.st)), metric("rbc", "m.rebirths", num(data.rbc)),
       metric("drivers", "m.drivers", num(data.drivers)), metric("owned", "m.owned", sumValues(data.owned)), metric("upgrades", "m.upgrades", countItems(data.upgrades))];
+  } else if (gameId === "park") {
+    // Schueberfouer Tycoon v2 save: tb = lifetime Fouer-Waert (the score), c = cash, p = 34 pitches x 3 base36 chars ("000" = empty).
+    // A pioneer stub ({v:2, stub:1, pv}) has none of them: it shows the old park value only.
+    const built = typeof data.p === "string" ? (data.p.match(/.{3}/g) || []).filter((chunk) => chunk !== "000").length : null;
+    list = [metric("tb", "m.lifetime", num(data.tb)), metric("c", "m.cash", num(data.c)), metric("built", "m.built", built), metric("rb", "m.ratingBonus", num(data.rb)),
+      metric("pv", "m.oldPark", data.stub === 1 ? num(data.pv) : null), metric("gi", "m.giftsApplied", Array.isArray(data.gi) ? data.gi.length : null)];
   } else {
     const numbers = Object.entries(data).filter(([key, value]) => !NOISE_KEYS.has(key) && num(value) !== null).slice(0, 8)
       .map(([key, value]) => ({ id: key, label: key, value }));

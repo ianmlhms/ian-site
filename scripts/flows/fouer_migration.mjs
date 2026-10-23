@@ -1,5 +1,5 @@
 /* Flow: Schueberfouer Tycoon W5, the migration of Theme Park Tycoon (v1) players (DESIGN 7), inside the real arcade
- * (pixelbreak.html with the park tile pointed at pb/fouer.html, srcdoc frame, Supabase mocked).
+ * (pixelbreak.html, the park tile opens pb/fouer.html in the srcdoc frame, Supabase mocked).
  * The v1 blobs are built in Node with the frozen v1 kernel (the same recipe as the W1 harness golden blobs).
  *   1. median park via __pbSave (localStorage pb_save_park): the letter "Bréif vum Hämmi" shows the exact numbers of the report, the old park
  *      as a 2D map, the vouchers and the golden carousel; "Op d'Fouer!" starts the 3-step pioneer tutorial (place a voucher, see the crowd, upgrade);
@@ -100,10 +100,6 @@ export const flow = {
     const errors = consoleCollector(page);
     await h.signIn();
     await context.addInitScript(() => { localStorage.setItem("pb_fouer_time", "evening"); localStorage.setItem("pb_fouer_weather", "clear"); localStorage.setItem("site_lang", "lb"); localStorage.setItem("playerName", "Ian"); });
-    await page.route("**/pixelbreak.html*", async (route) => {
-      const response = await route.fetch();
-      await route.fulfill({ response, body: (await response.text()).replace('src:"pb/park.html"', 'src:"pb/fouer.html"') });
-    });
 
     /* what W1 says the numbers must be (the letter has to show exactly these) */
     const plan = await legacy.migrate(MEDIAN, null, { now: Date.now(), name: "Ian" });

@@ -11,6 +11,7 @@ export const LG_LIMIT = 900;
 const SAVE_DELAY_MS = 1200, MAX_SAVE_WAIT_MS = 5000, BACKUP_INTERVAL_MS = 60000;
 const MAX_STAMP_YEARS = 12, STAMP_DAYS = 20, MIN_YEAR = 2000, MAX_YEAR = 2200;
 const MAX_PIONEER_P = 20000, MAX_RB = 75, MAX_TIME = 4102444800, PITCH_MASK_LIMIT = 2 ** PITCH_COUNT - 1;
+const MAX_DAY_NUMBER = 200000;   // Lux day number (days since 1970): Hämmi's daily present
 const PITCH_CHARS = 3, VOUCHER_CHARS = RULES.voucherSlots, FLAG_MAX = 7;
 const isRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const BASE36 = /^[0-9a-z]*$/;
@@ -88,7 +89,7 @@ export function encodeSave(state) {
   return { v: SAVE_VERSION, tb: Math.floor(state.tb), c: Math.floor(state.c), t: state.t,
     p: encodePitches(state.pitches), pu: state.pu.toString(36), rb: state.rb, pi: state.pi, mg: state.mg,
     vo: state.vo.map(id => ITEM_BY_ID[id].idx.toString(36)).join(""), lg: state.lg, st: encodeStamps(state.st),
-    gi: [...state.gi], n: state.n, tu: state.tu, ea: state.ea, fw: state.fw };
+    gi: [...state.gi], n: state.n, tu: state.tu, ea: state.ea, fw: state.fw, hd: state.hd };
 }
 
 export function parseRaw(raw) {
@@ -124,7 +125,8 @@ export function decodeSave(raw) {
     lg: typeof data.lg === "string" && data.lg.length <= LG_LIMIT && /^L1\|[0-9a-z|]*$/.test(data.lg) ? data.lg : "",
     st, gi: cleanGiftIds(data.gi), n: cleanName(data.n), tu: integer(data.tu, 0, 0, RULES.tutorialDone),
     ea: typeof data.ea === "string" && /^[a-z0-9]{0,8}$/.test(data.ea) ? data.ea : "",
-    fw: Number.isInteger(data.fw) && data.fw >= MIN_YEAR && data.fw <= MAX_YEAR ? data.fw : 0 };
+    fw: Number.isInteger(data.fw) && data.fw >= MIN_YEAR && data.fw <= MAX_YEAR ? data.fw : 0,
+    hd: integer(data.hd, 0, 0, MAX_DAY_NUMBER) };
 }
 
 // ---- size guard ----

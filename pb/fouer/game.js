@@ -352,6 +352,15 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     return result;
   }
 
+  /** Hämmi's daily present (tap the sheep): once per Luxembourg day, cash only. Refreshes the events first so the day is the current one. */
+  function claimHaemmi() {
+    refreshEvents();
+    const result = sim.claimHaemmiGift(state, events);
+    if (!result.ok) return result;
+    setState(result.state, "haemmi", { amount: result.amount });
+    return result;
+  }
+
   /** The arcade delivers an admin gift; `ids` already has the new id last. Idempotent. */
   function applyGift(amount, ids) {
     const id = ids[ids.length - 1];
@@ -543,7 +552,7 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
   /** A newer save arrived from the cloud: take it, credit the time since it was saved, redraw everything. */
   function adopt(incoming) {
     const at = now();
-    state = unlockedState(incoming);
+    state = unlockedState({ ...incoming, hd: Math.max(incoming.hd, state.hd) });   // a cloud save never gives Hämmi's present of today back
     const report = offlineNow(at, { silent: false });
     lastStars = stars();
     emit("adopted", { report });
@@ -580,7 +589,10 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     eat, foodie, hasFlag, setFlag,
     pitchStatus, pitchUsable, voucherFits, buildOptions, manageInfo, glowPitches, goal: () => sim.nextGoal(state, ctx),
     tutorial: tutorialInfo, acknowledgeTutorial, skipTutorial,
-    build, upgrade, setLook, replace, claimFireworks, applyGift,
+    build, upgrade, setLook, replace, claimFireworks, claimHaemmi, applyGift,
+    haemmiReady: () => sim.haemmiGiftReady(state, events),
+    /** the (test-overridable) wall clock in ms */
+    clock: () => now(),
     dismissOffline() { const card = pendingOffline; pendingOffline = null; return card; },
     dismissLetter() { const letter = pendingLetter; pendingLetter = null; return letter; },
     setTutorialStep: setTutorial,

@@ -1,6 +1,6 @@
 /* Admin tab "Kart": the latest online races of Kart Lëtzebuerg (RPC admin_kart_races, admin only).
  * Loads when the tab is opened and on the Refresh button, never on a timer. Paging = a bigger p_limit. */
-import { at, esc, label, fmtDay, fmtTime, fmtRaceTime, localDayKey } from "./admin-texts.js?v=2";
+import { at, esc, label, fmtDay, fmtTime, fmtRaceTime, localDayKey } from "./admin-texts.js?v=3";
 
 const PAGE_SIZE = 25;
 const MAX_LIMIT = 500;

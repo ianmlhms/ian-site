@@ -11,6 +11,8 @@ const HOUR = 3600;
 const AWAY_BASE_RATE = 0.25, AWAY_STAR_RATE = 0.0375, ACTIVE_MS = 15 * 60 * 1000;
 const BASE_CAP_HOURS = 8, CAP_HOURS_PER_STAR = 0.25, MAX_CAP_HOURS = 12;
 const FIREWORKS_GIFT_SECONDS = 900;       // 6: one-time gift of 15 minutes of current income
+/** Hämmi's daily present (W7): tap the sheep once per Luxembourg calendar day; 3 minutes of current income, never less than 25, in steps of 5. */
+export const HAEMMI_GIFT = Object.freeze({ minutes: 3, min: 25, step: 5 });
 const STARTER_FLAG = "g";
 const FREE = 1, HALF = 2, DOUBLE = 4;     // pitch flags: how the attraction was paid
 const QUEUE_FIGURES_MIN = 5, QUEUE_FIGURES_MAX = 15, QUEUE_PROBLEM_SHARE = 0.15;
@@ -29,7 +31,7 @@ export function cleanName(text) {
 export function createState({ name = "", now = 0 } = {}) {
   return { v: SAVE_VERSION, tb: 0, c: RULES.startCash, t: Math.max(0, Math.floor(now / 1000)),
     pitches: Array(PITCH_COUNT).fill(null), pu: 0, rb: 0, pi: 0, mg: 0, vo: [], lg: "",
-    st: {}, gi: [], n: cleanName(name), tu: 0, ea: "", fw: 0 };
+    st: {}, gi: [], n: cleanName(name), tu: 0, ea: "", fw: 0, hd: 0 };
 }
 
 export const makeEntry = (k, lv = 0, look = 0, fl = 0) => ({ k, lv, look, fl });
@@ -284,6 +286,22 @@ export function claimFireworks(state, events) {
   if (state.fw === year) return refuse("already-claimed");
   const amount = Math.floor(economy(state).incomePerSec * FIREWORKS_GIFT_SECONDS);
   return { ok: true, amount, state: { ...state, c: clampMoney(state.c + amount), fw: year } };
+}
+
+/** Is Hämmi's present waiting today? `events.now.dayNumber` is the Luxembourg calendar day; `hd` the day of the last present (0 = never). */
+export const haemmiGiftReady = (state, events) => state.hd < events.now.dayNumber;
+
+/** The present's size: HAEMMI_GIFT.minutes of the current income (neutral event context, like the closing-night gift), at least HAEMMI_GIFT.min. */
+export function haemmiGiftAmount(state) {
+  const raw = economy(state).incomePerMin * HAEMMI_GIFT.minutes;
+  return Math.max(HAEMMI_GIFT.min, Math.round(raw / HAEMMI_GIFT.step) * HAEMMI_GIFT.step);
+}
+
+/** Once per Luxembourg day: cash only (tb, stars and rating are untouched). Returns { ok, amount, state } or { ok: false, reason: "already-today" }. */
+export function claimHaemmiGift(state, events) {
+  if (!haemmiGiftReady(state, events)) return refuse("already-today");
+  const amount = haemmiGiftAmount(state);
+  return { ok: true, amount, state: { ...state, c: clampMoney(state.c + amount), hd: events.now.dayNumber } };
 }
 
 // ---- actions, tips and the goal card ----

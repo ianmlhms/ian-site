@@ -6,7 +6,7 @@
  *     the goal card updates; weather / time work and never change the income; language switch; reload restores the state;
  *     the offline return (+6 h and +20 h by a mocked clock) shows the card with the right (capped) amount; test mode unlocks everything and writes nothing;
  *     zero console errors.
- * Part B, inside the real arcade (pixelbreak.html with the park tile pointed at pb/fouer.html, srcdoc iframe):
+ * Part B, inside the real arcade (pixelbreak.html, the park tile opens pb/fouer.html in a srcdoc iframe, no route rewrite):
  *   boots, saves through __pbSave (localStorage + game_saves), reports window.score, merges a richer cloud save (higher tb wins),
  *   live gifts through a mocked __pbGift message: cash +once, toast, __pbGiftApplied, redelivery pays once.
  * Screenshots (set FLOW_SHOTS_DIR): first seconds, every onboarding step, mid-game day and night, offline card. */
@@ -361,7 +361,7 @@ export const flow = {
     await page.goto(h.origin + "/pb/fouer.html?fouerDebug=1&fouerNoFly=1&fouerQ=medium&__test=1&fouerDate=2027-08-25T14:00:00%2B02:00", { waitUntil: "domcontentloaded" });
     await bootGame(h, null, page);
     const ev = await page.evaluate(() => ({ banners: [...document.querySelectorAll(".banners .pill")].map((p) => p.textContent), fair: window.__fouerGame.game.events.fair.active, day: window.__fouerGame.game.events.stamp.today, stampCard: !!document.querySelector(".stampgrid") }));
-    h.expect(ev.fair && ev.banners.includes("D'Fouer leeft!") && ev.banners.includes("Familljendag"), `banners on a Fouer Wednesday: ${ev.banners.join(" | ")}`);
+    h.expect(ev.fair && ev.banners.includes("Familljendag") && !ev.banners.includes("D'Fouer leeft!"), `banners on a Fouer Wednesday (the generic "D'Fouer leeft!" gives way to the specific one, W7): ${ev.banners.join(" | ")}`);
     h.expect(ev.stampCard, "the daily stamp card opens");
     await h.shot("19-stamp-card");
     await tapLocator(h, page.locator(".dialog button"));
@@ -407,12 +407,6 @@ async function arcadePart(h) {
     Object.assign(arcadeWorld, { cloud: null, upserts: [], acks: [] });
     await h.signIn();
     await context.addInitScript(() => { localStorage.setItem("pb_fouer_time", "evening"); localStorage.setItem("pb_fouer_weather", "clear"); localStorage.setItem("site_lang", "de"); });
-    // the arcade's park tile points at the new page (the real change is W7's; this is the same rewrite)
-    await page.route("**/pixelbreak.html*", async (route) => {
-      const response = await route.fetch();
-      const body = (await response.text()).replace('src:"pb/park.html"', 'src:"pb/fouer.html"');
-      await route.fulfill({ response, body });
-    });
     await page.addInitScript(() => {
       window.__fromGame = [];
       window.addEventListener("message", (e) => { const d = e.data; if (d && (d.__pbWantSave || d.__pbSave || d.__pbGiftReady || d.__pbGiftApplied || d.__pb)) window.__fromGame.push(d.__pbSave ? { save: true, v: d.data.v, tb: d.data.tb } : d); });

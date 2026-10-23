@@ -1,4 +1,5 @@
-/* Live admin gifts for the idle games (game_gifts, scripts/game-gifts-v1.sql) — Business Empire, Cookie Clicker, Bus Tycoon.
+/* Live admin gifts for the idle games (game_gifts, scripts/game-gifts-v1.sql) — Business Empire, Cookie Clicker, Bus Tycoon, and (W7) Schueberfouer Tycoon
+ * (id park; its save keeps the ids in `gi`, cash in `c`, lifetime in `tb`, and its toast formats the amount as euros).
  * The arcade page claims the gifts of the OPEN game and posts them into the frame; the game adds them to its main balance only
  * (never lifetime), remembers the id in its save (giftIds), saves, toasts and answers; the page acknowledges.
  *
@@ -12,6 +13,8 @@
  *   - the next save carries the gift to the cloud (game_saves upsert)
  * Supabase is entirely mocked; all saves are invented. */
 import { createClientCommandsMock, runIfMain, sleep } from "./lib.mjs";
+import { encodeSave } from "../../pb/fouer/save.js";
+import * as fouerSim from "../../pb/fouer/sim.js";
 
 const CLOUD_DELAY_MS = 2500;
 const GIFT_AMOUNT = 2500;
@@ -29,6 +32,9 @@ const GAMES = [
     cloud: () => ({ v: 1, c: 1000, tb: 5000, tc: 0, rb: 5000, st: 0, rbc: 0, gd: "", rs: 1, savedAt: stamp(), u: [], cu: [] }) },
   { id: "bus-tycoon", lang: "en", toast: /^🎁 Gift: \+2\.5K passengers$/, main: "p", life: "tb", cloudMain: 1000, cloudLife: 5000, wait: "#wave",
     cloud: () => ({ v: 1, p: 1000, tb: 5000, rb: 5000, st: 0, rbc: 0, rs: 1, gd: "", savedAt: stamp(), drivers: 0, owned: {}, upgrades: [] }) },
+  // an empty fair earns nothing, so the balance is exactly cloud + gift; the game boots slowly (WebGL), so the "nothing claimed yet" check is skipped
+  { id: "park", lang: "de", toast: /^🎁 Geschenk: \+€2,500 Geld$/, main: "c", life: "tb", ids: "gi", cloudMain: 1000, cloudLife: 5000, wait: ".cashcard", slowBoot: true, fullChromium: true,
+    cloud: () => encodeSave({ ...fouerSim.createState({ now: Date.now() }), c: 1000, tb: 5000, tu: 8 }) },
 ];
 
 const world = {};
@@ -43,12 +49,12 @@ async function frameOf(h, selector) {
   return h.page.frames().find((candidate) => candidate.parentFrame());
 }
 const localSave = (h, id) => h.page.evaluate((key) => JSON.parse(localStorage.getItem(key) || "null"), `pb_save_${id}`);
-async function saveWhere(h, id, test, message) {
-  await h.page.waitForFunction(([key, source]) => {
-    try { return new Function("save", `return (${source})(save)`)(JSON.parse(localStorage.getItem(key) || "null")); } catch { return false; }
-  }, [`pb_save_${id}`, test.toString()], { timeout: 10000 }).catch(() => {});
+async function saveWhere(h, id, test, message, arg = null) {
+  await h.page.waitForFunction(([key, source, extra]) => {
+    try { return new Function("save", "extra", `return (${source})(save, extra)`)(JSON.parse(localStorage.getItem(key) || "null"), extra); } catch { return false; }
+  }, [`pb_save_${id}`, test.toString(), arg], { timeout: 10000 }).catch(() => {});
   const save = await localSave(h, id);
-  h.expect(!!save && test(save), message);
+  h.expect(!!save && test(save, arg), message);
   return save;
 }
 async function tick(h) {
@@ -60,6 +66,7 @@ async function tick(h) {
 
 export const flow = {
   name: "idle-live-gift",
+  fullChromium: true,          // the park needs WebGL
   backend: {
     tables: {
       game_saves: async ({ method, body }) => {
@@ -107,21 +114,21 @@ export const flow = {
       world.pending.push({ id: 7, game: game.id, amount: GIFT_AMOUNT });
       await h.goto(`/pixelbreak.html?g=${game.id}`);
       const frame = await frameOf(h, game.wait);
-      h.eq(world.log, [], "nothing claimed while the cloud save is still loading");
+      if (!game.slowBoot) h.eq(world.log, [], "nothing claimed while the cloud save is still loading");
       await waitReady();
       await page.waitForFunction(() => document.querySelector("#gf")?.contentWindow?.document.querySelector(".idle-gift-toast"), null, { timeout: 15000 });
       h.eq(world.log, ["cloud-save-sent", "claim"], "the claim came after the cloud save was sent");
-      const first = await saveWhere(h, game.id, (save) => Array.isArray(save.giftIds) && save.giftIds.includes(7), "gift id 7 is in the save");
+      const first = await saveWhere(h, game.id, (save, key) => Array.isArray(save[key]) && save[key].includes(7), "gift id 7 is in the save", game.ids ?? "giftIds");
       h.eq(first?.[game.main], game.cloudMain + GIFT_AMOUNT, "balance = cloud save + gift (the cloud save did not wipe it)");
       h.eq(first?.[game.life], game.cloudLife, "lifetime total untouched");
-      h.eq(first?.giftIds, [7], "giftIds holds the id");
+      h.eq(first?.[game.ids ?? "giftIds"], [7], "the gift ids hold the id");
       h.expect(game.toast.test(await frame.locator(".idle-gift-toast").first().innerText()), `toast in ${game.lang}: ${await frame.locator(".idle-gift-toast").first().innerText()}`);
       h.eq(world.acks, [7], "the page acknowledged the gift");
 
       h.step(`${game.id}: the next save reaches the cloud with the gift`);
       const deadline = Date.now() + 8000;
-      while (Date.now() < deadline && !world.upserts.some((row) => row.data?.giftIds?.includes(7))) await h.pause(250);
-      const upsert = world.upserts.find((row) => row.data?.giftIds?.includes(7));
+      while (Date.now() < deadline && !world.upserts.some((row) => row.data?.[game.ids ?? "giftIds"]?.includes(7))) await h.pause(250);
+      const upsert = world.upserts.find((row) => row.data?.[game.ids ?? "giftIds"]?.includes(7));
       h.expect(!!upsert, "game_saves upsert carries giftIds");
       h.eq(upsert?.data?.[game.main], game.cloudMain + GIFT_AMOUNT, "cloud copy has the gifted balance");
 
@@ -136,10 +143,10 @@ export const flow = {
       world.pending.push({ id: 8, game: game.id, amount: SECOND_AMOUNT });
       commands.add("gift", game.id);
       await tick(h);
-      const second = await saveWhere(h, game.id, (save) => save.giftIds?.includes(8), "gift id 8 landed");
+      const second = await saveWhere(h, game.id, (save, key) => save[key]?.includes(8), "gift id 8 landed", game.ids ?? "giftIds");
       h.eq(second?.[game.main], game.cloudMain + GIFT_AMOUNT + SECOND_AMOUNT, "balance went up by the second gift");
       h.eq(second?.[game.life], game.cloudLife, "lifetime still untouched");
-      h.eq(second?.giftIds, [7, 8], "both ids kept");
+      h.eq(second?.[game.ids ?? "giftIds"], [7, 8], "both ids kept");
       h.eq(world.acks, [7, 8], "second gift acknowledged");
 
       h.step(`${game.id}: a command for another game claims nothing`);
@@ -159,7 +166,7 @@ export const flow = {
       h.eq(world.acks, [7, 8, 8], "acknowledged again");
       const third = await localSave(h, game.id);
       h.eq(third?.[game.main], game.cloudMain + GIFT_AMOUNT + SECOND_AMOUNT, "balance unchanged by the repeat");
-      h.eq(third?.giftIds, [7, 8], "ids unchanged by the repeat");
+      h.eq(third?.[game.ids ?? "giftIds"], [7, 8], "ids unchanged by the repeat");
 
       h.step(`${game.id}: closing and reopening keeps the ids (a lost-ack redelivery after a reload is still ignored)`);
       world.cloud = third;

@@ -858,7 +858,7 @@
    * Same dialog as lobby.html and the messenger; the invitees get the usual popup / live-game banner (invite-pop.js) with a Join link to
    * pb/kart-letzebuerg.html?room=CODE&role=guest. The lobby code goes out lowercase (mp_invite checks ^[a-z0-9]{4,10}$). */
   const INVITE_BATCH = 8, RECENT_KEY = 'mpl.recent', MAX_RECENT = 12;
-  const PICKER_MODULE = '/people-picker.js?v=1', AUTH_MODULE = '/auth.js?v=35';           // same URLs as mp-lobby.js, so the browser cache is shared
+  const PICKER_MODULE = '/people-picker.js?v=1', AUTH_MODULE = '/auth.js?v=36';           // same URLs as mp-lobby.js, so the browser cache is shared
   const INVITE_STATUS_KEY = { already_invited: 'invAlready', not_allowed: 'invNotAllowed', unknown_user: 'invUnknown', rate_limited: 'invRate', self: 'invUnknown' };
   const siteImport = (path) => import(siteOrigin() + path);
   const hasSession = (a) => !!(a && a.session && a.sb);

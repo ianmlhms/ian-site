@@ -177,7 +177,8 @@
   const GIFT_WHAT=Object.freeze({
     'idle-empire':{lb:'Cash',de:'Cash',en:'cash',fr:'cash'},
     'cookie-clicker':{lb:'Cookien',de:'Cookies',en:'cookies',fr:'cookies'},
-    'bus-tycoon':{lb:'Passagéier',de:'Passagiere',en:'passengers',fr:'passagers'}});
+    'bus-tycoon':{lb:'Passagéier',de:'Passagiere',en:'passengers',fr:'passagers'},
+    'park':{lb:'Suen',de:'Geld',en:'cash',fr:'argent'}});
   function giftLang(){
     try{const stored=localStorage.getItem('site_lang');return GIFT_TEXTS[stored]?stored:'lb'}
     catch(error){console.warn('[Idle gifts] Could not read the language',error);return'lb'}
