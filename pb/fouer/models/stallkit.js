@@ -106,7 +106,8 @@ export function buildStall(b, r, w, d, spec = {}) {
   b.bulbRow([-w / 2, roofY - 0.1, zf - 0.02], [w / 2, roofY - 0.1, zf - 0.02], 0.42, WARM, 0.14);
   for (const sx of [-1, 1]) b.bulbRow([sx * w / 2, roofY - 0.1, zf - 0.02], [sx * w / 2, roofY + 0.62, zf - 0.02], 0.38, WARM, 0.13);
   if (o.pylon && !far) {
-    for (const s of [-1, 1]) b.cyl(s * (w * 0.34), roofY, zf - 0.5, 0.04, 0.04, 1.0, 4, 0x333333);
+    const pw = Math.min(w * 0.75, 3.4);          // the posts stand under the ends of the sign (they used to stand at 0.34 w: outside a narrow sign, which then hung in the air)
+    for (const s of [-1, 1]) b.cyl(s * (pw / 2 - 0.15), roofY, zf - 0.5, 0.04, 0.04, 1.05, 4, 0x333333);
     b.sign(o.pylonWord || o.word || 'KAFFI', 0, roofY + 1.35, zf - 0.5, Math.min(w * 0.75, 3.4), 0.7, { look: (o.signLook || 0) === 2 ? 0 : 2, kind: 'main', lit: true, frameW: 0.06, frame: 0x3a2a20 });
   }
 

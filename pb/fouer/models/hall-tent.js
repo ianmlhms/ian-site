@@ -24,6 +24,7 @@ function chandelier(b, near, pal) {
   for (let i = 0; i < N; i++) { const a0 = (i / N) * Math.PI * 2; const a1 = ((i + 1) / N) * Math.PI * 2; P.tube([Math.cos(a0) * R, 0, Math.sin(a0) * R], [Math.cos(a1) * R, 0, Math.sin(a1) * R], 0.1, i % 2 ? 0x1f3a2a : 0x23262a, { sides: 4, flat: true }); }
   for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2; if (near) bulb(b, [Math.cos(a) * R, 0.12, Math.sin(a) * R], 0.2, pal.bulb); else L.quad([Math.cos(a) * R - 0.1, 0.12, Math.sin(a) * R], [Math.cos(a) * R + 0.1, 0.12, Math.sin(a) * R], [Math.cos(a) * R + 0.1, 0.32, Math.sin(a) * R], [Math.cos(a) * R - 0.1, 0.32, Math.sin(a) * R], pal.bulb); }
   for (const k of [0, 1, 2, 3]) { const a = (k / 4) * Math.PI * 2; P.tube([Math.cos(a) * R, 0, Math.sin(a) * R], [0, 2.6, 0], 0.025, 0x23262a, { sides: 3, flat: true }); }
+  P.tube([0, 2.6, 0], [0, -0.1, 0], 0.03, 0x23262a, { sides: 3, flat: true });         // the rod the centre globe hangs from (the globe used to float inside the ring)
   P.sphere([0, -0.5, 0], 0.45, 0xf8f6ee, near ? 8 : 6, near ? 6 : 4); L.sphere([0, -0.5, 0], 0.38, [1, 0.9, 0.6], 6, 4);
   if (near) for (const k of [0, 1, 2]) { const a = (k / 3) * Math.PI * 2 + 0.5; P.tube([Math.cos(a) * R * 0.9, 0, Math.sin(a) * R * 0.9], [Math.cos(a) * R * 0.9, -0.8, Math.sin(a) * R * 0.9], 0.02, 0x23262a, { sides: 3, flat: true }); P.sphere([Math.cos(a) * R * 0.9, -0.95, Math.sin(a) * R * 0.9], 0.22, 0xf8f6ee, 6, 4); }
 }

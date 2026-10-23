@@ -1,6 +1,7 @@
 // Access wave, Node side: build the REAL NPC fair, props and clutter (models/npc.js, props.js, clutter.js) with a tiny stand-in for THREE (the builders only need
 // matrices and vectors to place stalls; the geometry they emit is thrown away) and run the layout validator on the footprints they produce.  Test-only: nothing here ships.
 import * as layout from "./layout.js";
+import { auditFloating, sourcesFromBuilders } from "./float-audit.js";
 
 const proxyHandler = {
   get(t, k) { if (k === Symbol.toPrimitive) return () => 0; if (k === "then") return undefined; return t[k] ?? (t[k] = stub()); },
@@ -17,6 +18,7 @@ class Matrix4 {
   makeRotationY(a) { const c = Math.cos(a), s = Math.sin(a); this.elements = [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]; return this; }
   makeRotationZ(a) { const c = Math.cos(a), s = Math.sin(a); this.elements = [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; return this; }
   makeScale(x, y, z) { this.elements = [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]; return this; }
+  makeBasis(x, y, z) { this.elements = [x.x, x.y, x.z, 0, y.x, y.y, y.z, 0, z.x, z.y, z.z, 0, 0, 0, 0, 1]; return this; }
   clone() { const m = new Matrix4(); m.elements = [...this.elements]; return m; }
   copy(m) { this.elements = [...m.elements]; return this; }
 }
@@ -65,11 +67,28 @@ async function childRun() {
   const out = { errors: {}, runs: [], reach: null };
   let last = null;
   await withStandInThree(async T => {
+    const AUDIT = new Set(["1 medium", "2 medium", "3 low"]);          // the floating audit takes a second per fair: three of the ten builds
+    out.floating = {};
     for (const [seed, quality] of [[1, "medium"], [2, "medium"], [3, "medium"], [4, "medium"], [5, "medium"], [6, "medium"], [7, "medium"], [8, "medium"], [3, "low"], [5, "low"]]) {
+      const audit = AUDIT.has(`${seed} ${quality}`); globalThis.__fouerRawSink = audit ? [] : null;
       const built = await buildFairFootprints({ T, pitches, seed, quality });
-      out.errors[`seed ${seed} ${quality}`] = [...layout.validateFootprints({ pitches, stalls: built.stalls, solids: built.solids, boxes: built.boxes }), ...layout.validateStallFaces({ stalls: built.stalls })];
-      out.runs.push({ seed, quality, stalls: built.stalls.length, solids: built.solids.length, boxes: built.boxes.length });
+      if (audit) { const r = auditFloating(sourcesFromBuilders(globalThis.__fouerRawSink), { groundY: () => 0 }); out.floating[`seed ${seed} ${quality}`] = [...r.floating.map(f => `${f.id}: ${f.why}`), ...r.bulbs.slice(0, 5).map(f => `${f.id}: ${f.why}`)]; globalThis.__fouerRawSink = null; }
+      out.errors[`seed ${seed} ${quality}`] = [...layout.validateFootprints({ pitches, stalls: built.stalls, solids: built.solids, boxes: built.boxes }), ...layout.validateStallFaces({ stalls: built.stalls }), ...layout.validateStallFronts({ pitches, stalls: built.stalls })];
+      out.runs.push({ seed, quality, stalls: built.stalls.length, solids: built.solids.length, boxes: built.boxes.length, lots: built.stalls.filter(x => x.k === "lot").length, shops: built.stalls.filter(x => x.k !== "lot").length });
       last = built;
+    }
+    // the player models built with the Builder kit (food / game stalls, the small rides): every level and look; nothing floats
+    {
+      const idx = await import("./models/index.js");
+      for (const id of Object.keys(idx.MY_MODELS)) {
+        const problems = [];
+        for (const level of [1, 2, 3, 4]) for (const look of [0, 1, 2]) {
+          globalThis.__fouerRawSink = []; idx.buildModel(id, { look, level, quality: "medium", seed: 7, far: false });
+          const r = auditFloating(sourcesFromBuilders(globalThis.__fouerRawSink), { groundY: () => 0 }); globalThis.__fouerRawSink = null;
+          for (const f of [...r.floating.map(x => x.why), ...r.bulbs.slice(0, 3).map(x => x.why)]) if (!problems.includes(`L${level} look ${look}: ${f}`)) problems.push(`L${level} look ${look}: ${f}`);
+        }
+        out.floating[`model ${id}`] = problems.slice(0, 6);
+      }
     }
   });
   const bfs = layout.validateLayout({ pitches, stalls: last.stalls, solids: last.solids, boxes: last.boxes, createMask: walk.createMask, pitchSolids: walk.pitchSolids, stars: [1, 3, 5] });

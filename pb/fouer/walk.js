@@ -11,10 +11,14 @@
  * had these swapped (vault notes), flows/fouer_walk.mjs checks it by projecting the real movement on the camera's right vector. */
 
 import { isRideable, RIDE_DEFS } from "./rides/catalog.js";
+import { PITCHES } from "./data.js";
+import { derivePitchBoxes } from "./solids.js";
 
 export const WALK = Object.freeze({
-  eye: 1.65, fov: 70, near: 0.2, radius: 0.34, speed: 2.0, run: 4.0, accel: 9, pitchLimit: 75 * Math.PI / 180,
-  turnKeys: 1.9, lookTouch: 0.0042, lookMouse: 0.0034, bob: 0.028, stickRadius: 56, interactRange: 3.4, sheepRange: 3.6,
+  // feedback A: "sprinting in walk mode, otherwise it's really slow": 2.6 m/s walking (was 2.0), 6.5 m/s sprinting (was 4.0); the speed eases in / out (`accel` is the
+  // rate of the exponential approach, so ~95 % of a change after 3 / accel seconds); the stick sprints from `stickRun` of its travel.
+  eye: 1.65, fov: 70, near: 0.2, radius: 0.3, speed: 2.6, run: 6.5, accel: 8, brake: 12, pitchLimit: 75 * Math.PI / 180, sprintFov: 5,
+  turnKeys: 1.9, lookTouch: 0.0042, lookMouse: 0.0034, bob: 0.028, stickRadius: 56, stickRun: 0.82, interactRange: 3.4, sheepRange: 3.6,
 });
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -75,10 +79,13 @@ export function distToRect(rect, x, z) {
 }
 /** half the depth of the pitch along its facing direction */
 export const halfDepth = (rect, face) => (face === "+u" || face === "-u" ? rect.du : rect.dw) / 2;
-/** is the point on the front half of the pitch (the side the attraction faces)? */
+/** is the point on the front side of the pitch (the side the attraction faces)?  In front of its front edge, or (feedback A: the pitch is no longer a wall, a walker stands in the
+ * seating area or right at a counter) inside the pitch rectangle in its front 70 % */
 export function onFrontSide(rect, face, x, z) {
   const [fu, fw] = faceVec(face);
-  return (x - rect.u) * fu + (z - rect.w) * fw >= halfDepth(rect, face) - 0.6;
+  const dot = (x - rect.u) * fu + (z - rect.w) * fw, h = halfDepth(rect, face);
+  if (dot >= h - 0.6) return true;
+  return dot >= -0.4 * h && Math.abs((x - rect.u) * fw) + Math.abs((z - rect.w) * fu) <= (face === "+u" || face === "-u" ? rect.dw : rect.du) / 2 + 0.3;
 }
 /** where a guest or the player stands to use a pitch: `out` metres in front of the middle of its front edge, `shift` along the front */
 export function frontSpot(rect, face, out = 2.5, shift = 0) {
@@ -94,14 +101,38 @@ function npcReserve(rect, face) {
   return { u0, u1, w0, w1 };
 }
 
+/** a bucket grid over axis-aligned boxes: `each(x0, x1, z0, z1, fn)` calls fn for every box whose bucket is touched (each box once per query).  The derived solids are thousands of
+ * small boxes, a linear scan per frame step would be too slow on an iPad. */
+export function makeBoxIndex(boxes, bucket = 4) {
+  const cells = new Map();
+  const key = (i, j) => i * 100003 + j;
+  boxes.forEach((b, n) => {
+    for (let i = Math.floor(b.u0 / bucket); i <= Math.floor(b.u1 / bucket); i++) for (let j = Math.floor(b.w0 / bucket); j <= Math.floor(b.w1 / bucket); j++) {
+      const k = key(i, j); const list = cells.get(k); if (list) list.push(n); else cells.set(k, [n]);
+    }
+  });
+  const stamp = new Int32Array(boxes.length); let pass = 0;
+  return {
+    size: boxes.length,
+    each(x0, x1, z0, z1, fn) {
+      pass++;
+      for (let i = Math.floor(x0 / bucket); i <= Math.floor(x1 / bucket); i++) for (let j = Math.floor(z0 / bucket); j <= Math.floor(z1 / bucket); j++) {
+        const list = cells.get(key(i, j)); if (!list) continue;
+        for (let k = 0; k < list.length; k++) { const n = list[k]; if (stamp[n] === pass) continue; stamp[n] = pass; fn(boxes[n]); }
+      }
+    },
+  };
+}
+
 /** Where can feet go. Static layer: NPC stalls (merged runs of the filler's occupancy grid), camelots beside the tram rails. Pitch layer: rebuilt
  * whenever a pitch changes (built and locked pitches are solid, open ones are walkable, the Riserad keeps a boarding corridor). Dynamic layer: the tram.
  * Region: the Glacis polygon + the open gates + the Allée Scheffer lane (reached through the NE portal). */
-export function createMask({ fieldPoly, corridors = [], grid = null, rects = [], faces = [], entrances = [], lane = [], radius = WALK.radius, stalls = null, solids = null, boxes = null } = {}) {
+export function createMask({ fieldPoly, corridors = [], grid = null, rects = [], faces = [], entrances = [], lane = [], radius = WALK.radius, stalls = null, solids = null, boxes = null, baseBoxes = null } = {}) {
   const npc = [];            // boxes of the NPC stalls: the exact footprints when the filler gives them, else runs of its occupancy grid
   const posts = [];          // small round solids { u, w, r }: lamp posts, bins, standing tables, masts
   const obbs = [];           // camelot strips
   let pitchBoxes = [];
+  let pitchIndex = makeBoxIndex(pitchBoxes);
   let dynamic = [];          // oriented boxes
   let gateRects = [];
   const ribbon = [];         // lane segments { u, w, ax, az, hl, hw }
@@ -112,12 +143,14 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
   const exactStalls = stalls || (grid && grid.g && grid.g.stalls) || null;
   const smallSolids = solids || (grid && grid.g && grid.g.solids) || null;
   const smallBoxes = boxes || (grid && grid.g && grid.g.boxes) || null;
-  if (smallSolids) smallSolids.forEach(p => posts.push({ u: p.u, w: p.w, r: p.r }));
-  if (smallBoxes) smallBoxes.forEach(b => npc.push({ u0: b.u0, u1: b.u1, w0: b.w0, w1: b.w1 }));
-  if (exactStalls) exactStalls.forEach(s => npc.push({ u0: s.u0, u1: s.u1, w0: s.w0, w1: s.w1 }));
+  // feedback A: `baseBoxes` = the solids read from the drawn base layer (solids.js deriveLayerBoxes: NPC stalls, props, clutter as they look); they replace the footprint lists
+  if (baseBoxes) baseBoxes.forEach(b => npc.push({ u0: b.u0, u1: b.u1, w0: b.w0, w1: b.w1 }));
+  if (!baseBoxes && smallSolids) smallSolids.forEach(p => posts.push({ u: p.u, w: p.w, r: p.r }));
+  if (!baseBoxes && smallBoxes) smallBoxes.forEach(b => npc.push({ u0: b.u0, u1: b.u1, w0: b.w0, w1: b.w1 }));
+  if (!baseBoxes && exactStalls) exactStalls.forEach(s => npc.push({ u0: s.u0, u1: s.u1, w0: s.w0, w1: s.w1 }));
   // ---- NPC stalls from the occupancy grid of models/npc.js buildNpcFair (fallback when no exact footprints exist). The filler marks the pitches and the alley corridors first (cells are rounded
   // OUT to whole cells) and only then places stalls on cells that are still free, so "marked and not reserved by a pitch / corridor" is exactly a stall.
-  if (!exactStalls && grid && grid.g) {
+  if (!baseBoxes && !exactStalls && grid && grid.g) {
     const { g, nu, nw, cell, u0, w0 } = grid;
     const reserved = new Uint8Array(nu * nw);
     const markReserved = (a0, a1, b0, b1) => {
@@ -195,14 +228,16 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
     for (const [dx, dz] of RING) if (!inRegion(x + dx * r, z + dz * r)) return false;
     return true;
   }
+  let npcIndex = null;
+  const npcIdx = () => npcIndex ?? (npcIndex = makeBoxIndex(npc));
   function pushOut(x, z, r) {
     let px = x, pz = z, hit = false;
     for (let pass = 0; pass < 3; pass++) {
       let moved = false;
       const apply = h => { if (h) { px += h.nx * (h.depth + 1e-4); pz += h.nz * (h.depth + 1e-4); moved = hit = true; } };
-      for (const b of npc) { if (px + r < b.u0 || px - r > b.u1 || pz + r < b.w0 || pz - r > b.w1) continue; apply(circleVsBox(px, pz, r, b)); }
+      npcIdx().each(px - r, px + r, pz - r, pz + r, b => { if (px + r < b.u0 || px - r > b.u1 || pz + r < b.w0 || pz - r > b.w1) return; apply(circleVsBox(px, pz, r, b)); });
       for (const p of posts) { const dx = px - p.u, dz = pz - p.w, rr = r + p.r; if (dx * dx + dz * dz >= rr * rr) continue; const d = Math.sqrt(dx * dx + dz * dz) || 1e-6; const k = (rr - d + 1e-4) / d; px += dx * k; pz += dz * k; moved = hit = true; }
-      for (const b of pitchBoxes) { if (px + r < b.u0 || px - r > b.u1 || pz + r < b.w0 || pz - r > b.w1) continue; apply(circleVsBox(px, pz, r, b)); }
+      pitchIndex.each(px - r, px + r, pz - r, pz + r, b => { if (px + r < b.u0 || px - r > b.u1 || pz + r < b.w0 || pz - r > b.w1) return; apply(circleVsBox(px, pz, r, b)); });
       for (const b of obbs) { if (Math.abs(px - b.u) > b.hl + b.hw + r || Math.abs(pz - b.w) > b.hl + b.hw + r) continue; apply(circleVsObb(px, pz, r, b)); }
       for (const b of dynamic) { if (Math.abs(px - b.u) > b.hl + b.hw + r || Math.abs(pz - b.w) > b.hl + b.hw + r) continue; apply(circleVsObb(px, pz, r, b)); }
       if (!moved) break;
@@ -214,40 +249,78 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
     return q.hit;
   }
 
+  const MAX_STEP = 0.12;
+  function moveOnce(x, z, dx, dz, r) {
+    let nx = x + dx, nz = z + dz;
+    const out = pushOut(nx, nz, r);
+    nx = out.x; nz = out.z;
+    let edge = false;                       // the walker presses against the border of the walkable region (not against a stall)
+    if (!regionOk(nx, nz, r)) {
+      edge = true;
+      if (regionOk(x + dx, z, r) && !overlaps(x + dx, z, r)) { nx = x + dx; nz = z; }
+      else if (regionOk(x, z + dz, r) && !overlaps(x, z + dz, r)) { nx = x; nz = z + dz; }
+      else { nx = x; nz = z; }
+    }
+    return { x: nx, z: nz, edge };
+  }
+
   const api = {
     npc, obbs, ribbon, posts,
     get pitchBoxes() { return pitchBoxes; },
     setGates,
     /** boxes of the pitch layer: built or locked pitches are solid, `carve` = [{ index, hole }] removes a rectangle from one pitch */
-    setPitches(list) { pitchBoxes = list; },
+    setPitches(list) { pitchBoxes = list; pitchIndex = makeBoxIndex(list); },
     setDynamic(list) { dynamic = list; },
     inRegion,
     allowed(x, z, r = radius) { return regionOk(x, z, r) && !overlaps(x, z, r); },
-    /** move a walker: push out of solids (so it slides along walls of any angle), never leave the region */
-    move(x, z, dx, dz, r = radius) {
-      let nx = x + dx, nz = z + dz;
-      const out = pushOut(nx, nz, r);
-      nx = out.x; nz = out.z;
-      let edge = false;                       // the walker presses against the border of the walkable region (not against a stall)
-      if (!regionOk(nx, nz, r)) {
-        edge = true;
-        if (regionOk(x + dx, z, r) && !overlaps(x + dx, z, r)) { nx = x + dx; nz = z; }
-        else if (regionOk(x, z + dz, r) && !overlaps(x, z + dz, r)) { nx = x; nz = z + dz; }
-        else { nx = x; nz = z; }
-      }
-      return { x: nx, z: nz, blocked: Math.hypot(nx - (x + dx), nz - (z + dz)) > 1e-3, edge };
+    /** is the point (a disc of radius r, default a pin prick) inside a solid of the fair layer (base boxes, posts, pitches)?  Ignores the region border, the camelot strips and the tram (solids.js maskVsVisible) */
+    solidAt(x, z, r = 0.04) {
+      let hit = false;
+      npcIdx().each(x - r, x + r, z - r, z + r, b => { if (!hit && circleVsBox(x, z, r, b)) hit = true; });
+      if (!hit) for (const p of posts) { if (Math.hypot(x - p.u, z - p.w) < r + p.r) { hit = true; break; } }
+      if (!hit) pitchIndex.each(x - r, x + r, z - r, z + r, b => { if (!hit && circleVsBox(x, z, r, b)) hit = true; });
+      return hit;
     },
-    /** nearest point where a walker of radius r fits (spiral search), or null */
-    nearestFree(x, z, maxR = 30, step = 0.5, r = radius) {
-      if (api.allowed(x, z, r)) return { x, z };
+    /** move a walker: push out of solids (so it slides along walls of any angle), never leave the region.  Long steps (a sprint on a slow frame) are cut into pieces of at most
+     * MAX_STEP metres, so a thin derived wall can never be skipped. */
+    move(x, z, dx, dz, r = radius) {
+      const len = Math.hypot(dx, dz), n = Math.max(1, Math.ceil(len / MAX_STEP));
+      let cx = x, cz = z, edge = false;
+      for (let k = 0; k < n; k++) { const q = moveOnce(cx, cz, dx / n, dz / n, r); cx = q.x; cz = q.z; if (q.edge) edge = true; }
+      return { x: cx, z: cz, blocked: Math.hypot(cx - (x + dx), cz - (z + dz)) > 1e-3, edge };
+    },
+    /** nearest point where a walker of radius r fits (spiral search), or null; `accept(x, z)` can refuse spots (the pin refuses sealed pockets) */
+    nearestFree(x, z, maxR = 30, step = 0.5, r = radius, accept = null) {
+      const ok = (px, pz) => api.allowed(px, pz, r) && (!accept || accept(px, pz));
+      if (ok(x, z)) return { x, z };
       for (let ring = step; ring <= maxR; ring += step) {
         const n = Math.max(8, Math.round(TAU * ring / step));
         for (let k = 0; k < n; k++) {
           const a = k / n * TAU, px = x + Math.cos(a) * ring, pz = z + Math.sin(a) * ring;
-          if (api.allowed(px, pz, r)) return { x: px, z: pz };
+          if (ok(px, pz)) return { x: px, z: pz };
         }
       }
       return null;
+    },
+    /** how much walkable ground is connected to (x, z)?  A flood fill on a 0.5 m grid that stops at `limit` cells (limit * 0.25 m^2): a small number means a sealed pocket (the inside
+     * of a closed hut, a fenced yard without a gate) that nobody can walk out of */
+    openArea(x, z, limit = 3000, cache = null) {
+      const step = 0.5, key = (i, j) => i * 100003 + j;
+      const i0 = Math.round(x / step), j0 = Math.round(z / step);
+      if (cache && cache.has(key(i0, j0))) return cache.get(key(i0, j0)) ? limit : 0;
+      if (!api.allowed(i0 * step, j0 * step) && !api.allowed(x, z)) return 0;
+      const seen = new Set([key(i0, j0)]), stack = [[i0, j0]];
+      let count = 0;
+      while (stack.length && count < limit) {
+        const [i, j] = stack.pop(); count++;
+        for (const [di, dj] of RING) {
+          const ni = i + di, nj = j + dj, k = key(ni, nj);
+          if (seen.has(k)) continue; seen.add(k);
+          if (api.allowed(ni * step, nj * step)) stack.push([ni, nj]);
+        }
+      }
+      if (cache) for (const k of seen) cache.set(k, count >= limit);        // every cell of the flood has the same answer
+      return count;
     },
     /** free width to the left (-1) / right (+1) of a heading at a point, up to `max` metres, in 0.5 m steps (the crowd lanes use it) */
     freeSide(x, z, hx, hz, side, max = 6, r = 0.3) {
@@ -256,6 +329,8 @@ export function createMask({ fieldPoly, corridors = [], grid = null, rects = [],
       while (d + 0.5 <= max && api.allowed(x + nx * (d + 0.5), z + nz * (d + 0.5), r)) d += 0.5;
       return d;
     },
+    /** like `allowed` but only the fair layer counts (no camelot strips, no tram): what solids.js blockedOpenGaps compares with the drawn fair */
+    freeAt(x, z, r = radius) { return regionOk(x, z, r) && !api.solidAt(x, z, r); },
     stats: () => ({ npc: npc.length, posts: posts.length, obbs: obbs.length, pitch: pitchBoxes.length, ribbon: ribbon.length, gates: gateRects.length }),
   };
   return api;
@@ -276,17 +351,42 @@ export function plotFence(rect, face) {
   ];
 }
 
-/** Solid boxes of the pitch layer from the game state: built / locked / growing pitches block, open ones do not (but their plot barrier does, `fenceAt` + `faces`).
- * `holes[index]` carves a corridor. */
-export function pitchSolids(rects, solidAt, holes = {}, { fenceAt = null, faces = [] } = {}) {
+/** Solid boxes of the pitch layer from the game state: built / locked / growing pitches block (`derived(i)` = the boxes of what is drawn there), open ones do not (but their plot barrier does,
+ * `fenceAt` + `faces`).  `holes[index]` carves a corridor. */
+export function pitchSolids(rects, solidAt, holes = {}, { fenceAt = null, faces = [], derived = null } = {}) {
   const out = [];
   rects.forEach((rect, i) => {
-    if (!solidAt(i)) { if (fenceAt && fenceAt(i)) out.push(...plotFence(rect, faces[i] ?? "+w")); return; }
-    let boxes = [{ u0: rect.u - rect.du / 2 - 0.2, u1: rect.u + rect.du / 2 + 0.2, w0: rect.w - rect.dw / 2 - 0.2, w1: rect.w + rect.dw / 2 + 0.2 }];
+    // an open plot: its drawn barrier + dressing (crates, a portaloo ...) when the model is there, else the analytic barrier
+    if (!solidAt(i)) { if (fenceAt && fenceAt(i)) out.push(...((derived && derived(i)) || plotFence(rect, faces[i] ?? "+w"))); return; }
+    // feedback A: the boxes read from the drawn model (solids.js derivePitchBoxes); only without a model (tests, a pit that has none) the whole slot is solid
+    let boxes = (derived && derived(i)) || [{ u0: rect.u - rect.du / 2 - 0.2, u1: rect.u + rect.du / 2 + 0.2, w0: rect.w - rect.dw / 2 - 0.2, w1: rect.w + rect.dw / 2 + 0.2 }];
     if (holes[i]) boxes = boxes.flatMap(b => subtractBox(b, holes[i]));
     out.push(...boxes);
   });
   return out;
+}
+
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+/** the joystick: direction magnitude `m` (0.35 .. 1: a light push still walks) and the sprint share `run` (0 .. 1: the last 18 % of the travel blend into a sprint) for a stick length 0 .. 1 */
+export function stickPace(len) {
+  if (len <= 0.12) return { m: 0, run: 0 };
+  const k = Math.min(1, (len - 0.12) / 0.8);
+  return { m: 0.35 + 0.65 * k, run: smoothstep(WALK.stickRun, WALK.stickRun + 0.15, len) };
+}
+/** walking pace for a sprint share 0 .. 1 */
+export const paceFor = run => WALK.speed + (WALK.run - WALK.speed) * clamp(run, 0, 1);
+/** one step of the velocity ease: exponential approach to `target` (m/s), faster when slowing down than when speeding up (no jerk, no skating) */
+export function easeSpeed(current, target, dt) {
+  return current + (target - current) * (1 - Math.exp(-(target >= current - 0.05 ? WALK.accel : WALK.brake) * dt));
+}
+/** the pin (pegman): where a drop on game point (u, w) lands: the point itself when a walker fits there, else the nearest walkable one within `snap` metres; `valid` false when there is none */
+export function pinLanding(mask, u, w, facing = () => 0, snap = 10, pocketCells = 3000) {
+  const cache = new Map();
+  const open = mask.openArea ? (x, z) => mask.openArea(x, z, pocketCells, cache) >= pocketCells : () => true;      // not a sealed pocket (inside a closed hut, a fenced yard)
+  const rawOk = mask.allowed(u, w) && open(u, w);
+  const spot = rawOk ? { x: u, z: w } : mask.nearestFree(u, w, snap, 0.5, undefined, open);
+  if (!spot) return { valid: false, rawOk: false, snapped: false, raw: { x: u, z: w }, x: u, z: w, yaw: 0 };
+  return { valid: true, rawOk, snapped: !rawOk, raw: { x: u, z: w }, x: spot.x, z: spot.z, yaw: facing(spot.x, spot.z) };
 }
 
 /** step an angle towards a target the short way */
@@ -305,9 +405,9 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   const canvas = r.renderer.domElement;
   const root = document.getElementById("ui");
   const view = { x: 0, z: 0, y: 0, yaw: 0, pitch: 0 };
-  const motion = { vx: 0, vz: 0, bob: 0, speed: 0 };
-  const input = { keys: new Set(), stick: { x: 0, y: 0, id: null }, look: null, locked: false, touchSeen: false };
-  const state = { edgeT: 0, active: false, saved: null, targets: [], target: null, eating: 0, eatItem: null, clock: 0, scan: 0, lastBuilt: -1, flash: 0, hintShown: false, photoBusy: false };
+  const motion = { vx: 0, vz: 0, bob: 0, speed: 0, sprintK: 0 };
+  const input = { shift: false, keys: new Set(), stick: { x: 0, y: 0, id: null }, look: null, locked: false, touchSeen: false };
+  const state = { maskDirty: false, sprint: false, fromBuilder: false, busy: false, edgeT: 0, active: false, saved: null, targets: [], target: null, eating: 0, eatItem: null, clock: 0, scan: 0, lastBuilt: -1, flash: 0, hintShown: false, photoBusy: false };
   const T_ = (key, params) => translate(ui.lang, key, params);
   const tmpF = new T.Vector3();
 
@@ -316,15 +416,27 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   game.on("upgraded", ({ index }) => { state.lastBuilt = index; });
 
   /* ---------------------------------------------------------------- pitch layer of the mask */
+  // feedback A: a built / locked pitch is solid where its drawn model is (solids.js), cached per model object (a rebuilt pit has a new one)
+  const derivedCache = new WeakMap();
+  function derivedBoxes(i) {
+    const pit = fair.pits && fair.pits.get(PITCHES[i].id);
+    if (!pit || !pit.near) return null;
+    let boxes = derivedCache.get(pit.near);
+    if (!boxes) { boxes = derivePitchBoxes(pit.near, rects[i], items.faceOf(i)); derivedCache.set(pit.near, boxes); }
+    return boxes;
+  }
   function rebuildMask() {
+    state.maskDirty = false;
     const holes = {};
     const wheel = state.wheelIndex();
     if (wheel >= 0) { const hole = ride.boardingHole(wheel); if (hole) holes[wheel] = hole; }
-    mask.setPitches(pitchSolids(rects, i => Boolean(game.state.pitches[i]) || game.pitchStatus(i) === "locked", holes, { fenceAt: () => true, faces: items.faceOf ? rects.map((_, i) => items.faceOf(i)) : [] }));
+    mask.setPitches(pitchSolids(rects, i => Boolean(game.state.pitches[i]) || game.pitchStatus(i) === "locked", holes,
+      { fenceAt: () => true, faces: items.faceOf ? rects.map((_, i) => items.faceOf(i)) : [], derived: derivedBoxes }));
     mask.setGates(game.stars());
   }
   state.wheelIndex = () => game.state.pitches.findIndex(entry => entry && entry.k === "wheel");
   game.on("change", rebuildMask);
+  if (scene.onApplied) scene.onApplied(() => { state.maskDirty = true; });      // a model was (re)built: its solids change with it
   rebuildMask();
 
   /* ---------------------------------------------------------------- DOM (walk HUD) */
@@ -335,6 +447,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     <div class="wk-cash"><i>€</i><b></b></div>
     <div class="wk-foodie" hidden></div>
     <button class="wk-photo" type="button">📷</button>
+    <button class="wk-sprint" type="button" aria-pressed="false">🏃</button>
     <div class="wk-dot"></div>
     <div class="wk-stick" hidden><i></i></div>
     <button class="wk-act" type="button" hidden><span class="ic"></span><small></small></button>
@@ -346,6 +459,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     <div class="wk-flash"></div>`;
   root.append(hud);
   const q = sel => hud.querySelector(sel);
+  const sprintBtn = q(".wk-sprint");
   const exitBtn = q(".wk-exit"), cashEl = q(".wk-cash b"), foodieEl = q(".wk-foodie"), photoBtn = q(".wk-photo"), stickEl = q(".wk-stick"), knob = q(".wk-stick i"),
     stampEl = q(".wk-stamp"), actBtn = q(".wk-act"), keysEl = q(".wk-keys"), eatEl = q(".wk-eat"), thinkEl = q(".wk-think"), fadeEl = q(".wk-fade"), flashEl = q(".wk-flash");
 
@@ -353,22 +467,29 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     exitBtn.querySelector("b").textContent = T_("walk.exit");
     exitBtn.setAttribute("aria-label", T_("walk.exit"));
     photoBtn.setAttribute("aria-label", T_("walk.photo"));
+    sprintBtn.setAttribute("aria-label", T_("walk.sprint")); sprintBtn.title = T_("walk.sprint");
     keysEl.textContent = T_("walk.keys");
   }
 
   /* ---------------------------------------------------------------- input */
+  // Shift: `e.shiftKey` is the truth on every key / pointer event (Safari reports Shift through `key` and the modifier flag; a missed keyup after Cmd-Tab or a context menu would
+  // otherwise leave the walker running for ever), `code` / `key` still set it as soon as the key goes down.
+  const isShiftKey = e => e.key === "Shift" || e.code === "ShiftLeft" || e.code === "ShiftRight";
+  function syncShift(e) { if (typeof e.shiftKey === "boolean") input.shift = e.shiftKey; }
   function onKeyDown(e) {
     if (!state.active) return;
     if (e.target && /^(input|textarea|select)$/i.test(e.target.tagName)) return;
     const code = e.code;
     let handled = true;
+    syncShift(e);
+    if (isShiftKey(e)) input.shift = true;
     if (code === "Escape") { if (ride.active) ride.abort(); else end(); }
     else if (code === "KeyE" || code === "Enter" || code === "Space") { if (!e.repeat) interact(); }
     else if (code === "KeyP") photo();
     else if (code === "KeyL") togglePointerLock();
     else if (code === "ArrowLeft") input.keys.add("tl");
     else if (code === "ArrowRight") input.keys.add("tr");
-    else if (code === "ShiftLeft" || code === "ShiftRight") input.keys.add("run");
+    else if (isShiftKey(e)) { /* input.shift is set above */ }
     else if (code === "KeyW" || code === "ArrowUp") input.keys.add("f");
     else if (code === "KeyS" || code === "ArrowDown") input.keys.add("b");
     else if (code === "KeyA") input.keys.add("l");
@@ -379,15 +500,17 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   }
   function onKeyUp(e) {
     const code = e.code;
+    syncShift(e);
+    if (isShiftKey(e)) input.shift = false;
     if (code === "ArrowLeft") input.keys.delete("tl"); else if (code === "ArrowRight") input.keys.delete("tr");
-    else if (code === "ShiftLeft" || code === "ShiftRight") input.keys.delete("run");
     else if (code === "KeyW" || code === "ArrowUp") input.keys.delete("f");
     else if (code === "KeyS" || code === "ArrowDown") input.keys.delete("b");
     else if (code === "KeyA") input.keys.delete("l");
     else if (code === "KeyD") input.keys.delete("r");
     if (state.active) e.stopImmediatePropagation();
   }
-  function onBlur() { input.keys.clear(); }
+  function onBlur() { input.keys.clear(); input.shift = false; }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) onBlur(); });
 
   /** look: yaw / pitch from a drag; the ride keeps its own base orientation and only adds this */
   function look(dx, dy, scale) {
@@ -458,6 +581,8 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   actBtn.addEventListener("click", () => { audio.unlock(); sfx.unlock(); interact(); });
   exitBtn.addEventListener("click", () => { sfx.click(); if (ride.active) ride.abort(); else end(); });
   photoBtn.addEventListener("click", () => { audio.unlock(); photo(); });
+  function setSprint(on) { state.sprint = on; sprintBtn.setAttribute("aria-pressed", String(on)); sprintBtn.classList.toggle("on", on); }
+  sprintBtn.addEventListener("click", () => { audio.unlock(); sfx.click(); setSprint(!state.sprint); });
   // the walk owns the keyboard and the canvas while it runs: the builder's handlers (registered earlier, bubbling) never see these events
   window.addEventListener("keydown", onKeyDown, true);
   window.addEventListener("keyup", onKeyUp, true);
@@ -468,23 +593,25 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   window.addEventListener("pointercancel", onPointerUp, true);
   window.addEventListener("wheel", e => { if (state.active && e.target === canvas) { e.stopImmediatePropagation(); e.preventDefault(); } }, { capture: true, passive: false });
 
+  /** the wish of the player: forward / side (-1 .. 1), `run` 0 .. 1 (0 = walking pace, 1 = sprint).  Shift or the 🏃 toggle sprint; a stick pushed to the last 18 % of its travel
+   * sprints too (the pace blends in over 82 .. 97 %, so there is no jump), a light push still walks slowly. */
   function moveVector() {
     let f = 0, s = 0;
     if (input.keys.has("f")) f += 1; if (input.keys.has("b")) f -= 1;
     if (input.keys.has("r")) s += 1; if (input.keys.has("l")) s -= 1;
     const keysUsed = f !== 0 || s !== 0;
-    let analog = false;
+    let run = input.shift || state.sprint || input.keys.has("run") ? 1 : 0;
     if (input.stick.id !== null && !keysUsed) {
       const sx = input.stick.x, sy = input.stick.y, len = Math.hypot(sx, sy);
       if (len > 0.12) {
         // direction from the thumb, magnitude 0.35 .. 1 from how far it is pushed (a light push still walks)
-        const k = Math.min(1, (len - 0.12) / 0.8), m = 0.35 + 0.65 * k;
-        f = -sy / len * m; s = sx / len * m; analog = true;
+        const pace = stickPace(len);
+        f = -sy / len * pace.m; s = sx / len * pace.m;
+        run = Math.max(run, pace.run);
       }
     }
     const l = Math.hypot(f, s);
     if (l > 1) { f /= l; s /= l; }
-    const run = input.keys.has("run") || (analog && Math.hypot(input.stick.x, input.stick.y) > 0.93);
     return { f, s, run };
   }
 
@@ -498,7 +625,18 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     return { x: free.x, z: free.z, yaw: Math.atan2(rect.w - free.z, rect.u - free.x) };
   }
 
-  function start(spot = null) {
+  /* ---------------------------------------------------------------- the pin (pegman): where a drop on the map lands */
+  const PIN_SNAP = 10;                              // metres: a drop farther than this from any walkable point is "invalid" (red)
+  /** yaw that looks at the nearest built attraction within 60 m (else along the Haaptallee, towards +u) */
+  function facingFrom(x, z) {
+    let best = null, bestD = 60;
+    game.state.pitches.forEach((entry, i) => { if (!entry) return; const d = Math.hypot(rects[i].u - x, rects[i].w - z); if (d < bestD) { bestD = d; best = i; } });
+    return best === null ? 0 : Math.atan2(rects[best].w - z, rects[best].u - x);
+  }
+  /** the preview of a drop on game point (u, w): `valid` (a walkable point within 10 m), the snapped spot, the yaw it would face, whether the raw point itself was walkable */
+  function pinSpot(u, w) { return pinLanding(mask, u, w, facingFrom, PIN_SNAP); }
+
+  function start(spot = null, opts = {}) {
     if (state.active) return;
     const rig = r.rig;
     state.saved = { rig: { ...rig }, fov: camera.fov, near: camera.near, pos: camera.position.clone(), quat: camera.quaternion.clone(), free: r.state.free };
@@ -508,7 +646,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     const s = spot ?? startSpot();
     view.x = s.x; view.z = s.z; view.yaw = s.yaw ?? 0; view.pitch = -0.02;
     view.y = world.groundY(view.x, view.z) + WALK.eye;
-    motion.vx = motion.vz = 0;
+    motion.vx = motion.vz = 0; motion.sprintK = 0; motion.speed = 0;
     camera.fov = WALK.fov; camera.near = WALK.near; camera.updateProjectionMatrix();
     hud.hidden = false;
     labels();
@@ -519,14 +657,49 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     hooks.walking = true;
     hooks.onWalkChange(true);
     document.body.classList.add("wk-on");
-    fadeEl.classList.remove("on"); fadeEl.style.transition = "none"; fadeEl.style.opacity = "1"; void fadeEl.offsetWidth; fadeEl.style.transition = ""; fadeEl.style.opacity = "0";
+    fadeEl.classList.remove("on"); fadeEl.style.transition = "none"; fadeEl.style.opacity = "1"; void fadeEl.offsetWidth; fadeEl.style.transition = "";
+    if (!opts.keepBlack) fadeEl.style.opacity = "0";           // a ride from the builder keeps the screen black until the ride has set itself up
     applyCamera(0.016);
-    ui.toast(T_(input.touchSeen || matchMedia("(pointer: coarse)").matches ? "walk.hintTouch" : "walk.hintKeys"), 4200);
+    if (!opts.quiet) ui.toast(T_(input.touchSeen || matchMedia("(pointer: coarse)").matches ? "walk.hintTouch" : "walk.hintKeys"), 4200);
     return s;
+  }
+
+  /* ---------------------------------------------------------------- feedback A: ride an attraction straight from the builder view */
+  const bfade = el("div", "wk-bfade"); root.append(bfade);           // a veil above everything (the walk HUD is hidden in the builder view, so its own fade cannot be used there)
+  const veil = (to, ms) => new Promise(resolve => {
+    bfade.style.transition = ms ? `opacity ${ms}ms` : "none"; bfade.style.opacity = String(to);
+    if (!ms) void bfade.offsetWidth;
+    setTimeout(resolve, ms);
+  });
+  /** fade out of the builder, stand in front of the attraction, board it; the ride gives the camera back (`leaveToBuilder`) when it ends or is aborted */
+  async function rideFrom(index) {
+    if (state.active || state.busy || !ride.canRide(index)) return false;
+    state.busy = true;
+    try {
+      await veil(1, 300);
+      const rect = rects[index], face = items.faceOf(index);
+      const board = rect.size === "W" ? ride.boardInfo(index) : null;
+      const spot = board ? { x: board.u, z: board.w } : frontSpot(rect, face, 2.4);
+      const free = mask.nearestFree(spot.x, spot.z, 12) ?? spot;
+      start({ x: free.x, z: free.z, yaw: Math.atan2(rect.w - free.z, rect.u - free.x) }, { keepBlack: true, quiet: true });
+      state.fromBuilder = true;
+      await veil(0, 0);                                                  // the walk HUD's own fade holds the black from here
+      const ok = await ride.board(index);
+      if (!ok) { await leaveToBuilder(); return false; }
+      return true;
+    } finally { state.busy = false; }
+  }
+  /** end of a ride that began in the builder view: black, the exact builder camera back, fade in */
+  async function leaveToBuilder() {
+    state.fromBuilder = false;
+    await veil(1, 0);
+    end();
+    await veil(0, 450);
   }
 
   function end() {
     if (!state.active) return;
+    state.fromBuilder = false; input.shift = false; setSprint(false);
     if (ride.active) ride.abort(true);
     state.active = false;
     state.eating = 0; eatEl.hidden = true; thinkEl.hidden = true;
@@ -534,6 +707,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     input.keys.clear(); input.stick = { x: 0, y: 0, id: null }; input.look = null; knob.style.transform = "";
     const saved = state.saved; state.saved = null;
     Object.assign(r.rig, saved.rig); r.rig.flight = null;
+    const rg = r.rig; rg.tu = rg.cu; rg.tw = rg.cw; rg.ty = rg.cy; rg.yaw = rg.cyaw; rg.tilt = rg.ctilt; rg.dist = rg.cdist;       // exactly the view that was left (a flight still easing at that moment is not resumed)
     r.state.free = saved.free ?? null;
     camera.fov = saved.fov; camera.near = saved.near; camera.updateProjectionMatrix();
     r.setPose({}, true);
@@ -717,6 +891,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
 
   /* ---------------------------------------------------------------- frame update */
   function update(dt) {
+    if (state.maskDirty) rebuildMask();
     if (!state.active) return;
     state.clock += dt;
     if (!ride.steering) {
@@ -729,11 +904,12 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
       const mv = moveVector();
       const locked = state.eating > 0;
       // keys: full speed at once; the joystick scales the speed by how far the thumb is pushed (the last 7 % of the stick is "run")
-      const top = mv.run ? WALK.run : WALK.speed;
+      const top = paceFor(mv.run);
       const fx = Math.cos(view.yaw), fz = Math.sin(view.yaw), rx = -Math.sin(view.yaw), rz = Math.cos(view.yaw);
       let tx = (fx * mv.f + rx * mv.s) * top, tz = (fz * mv.f + rz * mv.s) * top;
       if (locked) { tx = 0; tz = 0; }
-      const a = 1 - Math.exp(-WALK.accel * dt);
+      // a short smooth ease: speeding up takes ~0.35 s, stopping ~0.25 s (no jerk, no skating)
+      const a = 1 - Math.exp(-(Math.hypot(tx, tz) >= motion.speed - 0.05 ? WALK.accel : WALK.brake) * dt);       // = easeSpeed on the vector
       motion.vx += (tx - motion.vx) * a; motion.vz += (tz - motion.vz) * a;
       // also when standing still: the tram (a moving obstacle) or a new stall can push the walker out of its way
       const res = mask.move(view.x, view.z, motion.vx * dt, motion.vz * dt);
@@ -744,6 +920,9 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
       else state.edgeT = Math.max(0, state.edgeT - dt * 2);
       motion.speed = Math.hypot(motion.vx, motion.vz);
       motion.bob += motion.speed * dt * 4.2;
+      motion.sprintK += ((motion.speed > WALK.speed * 1.25 ? 1 : 0) - motion.sprintK) * Math.min(1, dt * 4);
+      const fov = WALK.fov + WALK.sprintFov * motion.sprintK;
+      if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
       const gy = world.groundY(view.x, view.z) + WALK.eye;
       view.y += (gy - view.y) * (1 - Math.exp(-dt * 14));
     } else motion.speed = 0;
@@ -752,6 +931,7 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     if (state.eating > 0) { state.eating -= dt; if (state.eating <= 0) { eatEl.hidden = true; eatEl.classList.remove("go"); } }
     stickEl.hidden = !(input.touchSeen || matchMedia("(pointer: coarse)").matches) || (ride.active && !ride.steering);      // a passive ride has nothing to steer: only the bumper cars keep the stick
     keysEl.hidden = !stickEl.hidden || ride.active;
+    sprintBtn.hidden = ride.active; sprintBtn.classList.toggle("live", !rideOn && motion.sprintK > 0.5);
     applyCamera(dt);
   }
 
@@ -765,7 +945,9 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
   }
 
   const api = {
-    start, end, update, interact, photo, eat, fade, say, showStamp, rebuildMask, scanTargets,
+    start, end, update, interact, photo, eat, fade, say, showStamp, rebuildMask, scanTargets, rideFrom, leaveToBuilder, pinSpot, facingFrom, setSprint,
+    get fromBuilder() { return state.fromBuilder; },
+    get sprint() { return state.sprint; },
     get active() { return state.active; },
     get view() { return view; },
     get targets() { return state.targets; },

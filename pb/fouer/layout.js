@@ -339,12 +339,68 @@ export function validateStallFaces({ stalls = [], alleys = ALLEYS } = {}) {
   return errors;
 }
 
+/* ------------------------------------------------------------------------------------------------ stall fronts (feedback B) */
+/** a stall front must reach a walkway (alley, lane, service lane, forecourt, queue strip) within this many metres, straight out over ground that is free of stalls and pitches */
+export const FRONT_REACH = 3.4;
+/** skins that are back-of-house or have no shop front: never checked */
+const NO_FRONT = /^(lot|worksite|backLot)$/;
+/** skins that look the same every time (fixed murals / shapes): never two of them side by side.  Tents and the generic booths vary by name / colour and may stand in a row. */
+export const DUP_SKINS = Object.freeze(["funhouse", "bouncy", "kids", "chair", "tiki", "temple", "fisher", "arch", "claw", "popcorn", "icecream", "pizza", "balloon", "souvenir", "sweets", "game", "kiosk", "chalet", "trailer", "camelot"]);
+/** the big themed attractions (Spukhaus, bouncy castle, kids' ride, chair swing): at most one per block, i.e. no two within BIG_SPACING metres of each other (centre to centre) */
+export const BIG_SKINS = Object.freeze(["funhouse", "bouncy", "kids", "chair"]);
+export const BIG_SPACING = 40;
+/** two stalls of the same fixed skin closer than this (gap between the footprints) are "adjacent" */
+export const DUP_GAP = 2.5;
+
+/** the front of a stall at (u, w) straight out: where does it end up?  { ok, reason?, dist?, zone? } (probes the middle of the front over the middle half of its width) */
+export function frontProbe(s, face, { pitches = [], stalls = [], self = -1, res = null, fieldPoly = FIELD_POLY, reach = FRONT_REACH, step = 0.25, shrink = 0.05 } = {}) {
+  const f = FACE_VEC[face]; if (!f) return { ok: true };
+  const R = res ?? createReservations(pitches);
+  const cu = (s.u0 + s.u1) / 2, cw = (s.w0 + s.w1) / 2; const half = Math.max(0.5, (f[0] ? s.w1 - s.w0 : s.u1 - s.u0) / 4);
+  const edge = f[0] > 0 ? s.u1 : f[0] < 0 ? s.u0 : f[1] > 0 ? s.w1 : s.w0;
+  const prects = pitches.map(rectOfPitch);
+  for (let t = step; t <= reach + 1e-9; t += step) {
+    for (const k of [0, -half, half]) {
+      const u = f[0] ? edge + f[0] * t : cu + k, w = f[1] ? edge + f[1] * t : cw + k;
+      if (k === 0) { const z = R.inZone(u, w); if (z) return { ok: true, dist: t, zone: z.id }; }
+      if (!pointInPoly(fieldPoly, u, w)) return { ok: false, reason: `looks at the edge of the field after ${fmt(t)} m` };
+      const pi = prects.findIndex(r => u > r.u0 && u < r.u1 && w > r.w0 && w < r.w1); if (pi >= 0) return { ok: false, reason: `looks at the plot ${pitches[pi].id} after ${fmt(t)} m` };
+      for (let j = 0; j < stalls.length; j++) {
+        if (j === self) continue; const o = stalls[j];
+        if (u > o.u0 + shrink && u < o.u1 - shrink && w > o.w0 + shrink && w < o.w1 - shrink) {
+          const back = o.f && FACE_VEC[o.f] && FACE_VEC[o.f][0] === -f[0] && FACE_VEC[o.f][1] === -f[1] ? "front" : o.f === face ? "back" : "side";
+          return { ok: false, reason: `looks at the ${back} of stall #${j} (${o.k ?? "?"}) after ${fmt(t)} m` };
+        }
+      }
+    }
+  }
+  return { ok: false, reason: `reaches no walkway within ${fmt(reach)} m` };
+}
+
+/** feedback B: (1) every stall front opens straight onto a walkway (no stall faces the back or side of another stall, a plot, the field edge), (2) no two stalls of the same fixed skin
+ * side by side, (3) the big themed skins (Spukhaus ...) keep BIG_SPACING metres apart.  stalls = footprints { k, f, u0, u1, w0, w1 } of the NPC fair */
+export function validateStallFronts({ pitches = [], stalls = [], alleys = ALLEYS, fieldPoly = FIELD_POLY } = {}) {
+  const errors = []; const res = createReservations(pitches, { alleys });
+  stalls.forEach((s, i) => {
+    if (!s.f || s.f === "?" || NO_FRONT.test(s.k ?? "")) return;
+    const r = frontProbe(s, s.f, { pitches, stalls, self: i, res, fieldPoly });
+    if (!r.ok) errors.push(`stall #${i} (${s.k}) ${rectText(s)} faces ${s.f}: its front ${r.reason}`);
+  });
+  const gap = (a, b) => Math.hypot(Math.max(a.u0 - b.u1, 0, b.u0 - a.u1), Math.max(a.w0 - b.w1, 0, b.w0 - a.w1));
+  for (let i = 0; i < stalls.length; i++) for (let j = i + 1; j < stalls.length; j++) {
+    const a = stalls[i], b = stalls[j]; if (!a.k || a.k !== b.k) continue;
+    if (DUP_SKINS.includes(a.k) && gap(a, b) < DUP_GAP) errors.push(`stalls #${i} and #${j} are both "${a.k}" side by side (${fmt(gap(a, b))} m apart)`);
+    if (BIG_SKINS.includes(a.k) && Math.hypot((a.u0 + a.u1 - b.u0 - b.u1) / 2, (a.w0 + a.w1 - b.w0 - b.w1) / 2) < BIG_SPACING) errors.push(`stalls #${i} and #${j} are both the big "${a.k}" less than ${BIG_SPACING} m apart`);
+  }
+  return errors;
+}
+
 /** The whole check.  `createMask` / `pitchSolids` come from walk.js (passed in: this module stays import-free of the walker).  Options:
  *  stalls, solids, boxes (real footprints when the filler ran, else empty), stars (levels to test), step (BFS cell in metres).  Returns { ok, errors, stats }. */
 export function validateLayout({ pitches, stalls = [], solids = [], boxes = [], createMask = null, pitchSolids = null, stars = [1, 3, 5], step = 0.5, entrances = ENTRANCES, alleys = ALLEYS, fieldPoly = FIELD_POLY, checkFaces = true } = {}) {
   const st = validateStatic({ pitches, alleys, fieldPoly, entrances });
   const errors = [...st.errors, ...validateFootprints({ pitches, stalls, solids, boxes, alleys })];
-  if (checkFaces) errors.push(...validateStallFaces({ stalls, alleys }));
+  if (checkFaces) errors.push(...validateStallFaces({ stalls, alleys }), ...validateStallFronts({ pitches, stalls, alleys, fieldPoly }));
   const stats = { ...st.stats, stalls: stalls.length, solids: solids.length, reach: {} };
   if (createMask && pitchSolids) {
     const rects = pitches.map(p => { const s = SIZES[p.size] ?? SIZES.S; return { id: p.id, u: p.u, w: p.w, du: s.u, dw: s.w, size: p.size }; });

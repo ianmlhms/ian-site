@@ -77,6 +77,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   const starsEl = $("stars");
   for (let i = 0; i < 5; i++) starsEl.append(el("span", "star", "⭐"));
   const walkBtn = document.getElementById("walkBtn");
+  const pinBtn = document.getElementById("pinBtn");
 
   // ---------------------------------------------------------------- toasts
   function toast(text, ms = TOAST_MS) {
@@ -135,6 +136,8 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     document.body.classList.toggle("tut-minimal", minimal);
     const showWalk = !tut.active || (tut.mode === "fresh" ? tut.step >= 7 : tut.step >= 3);
     walkBtn.hidden = !showWalk || walking || visiting;
+    pinBtn.hidden = walkBtn.hidden || !hooks.pinPreview;
+    pinBtn.setAttribute("aria-label", T("pin.label")); pinBtn.title = T("pin.label");
     walkBtn.classList.toggle("tut-glow", tut.active && tut.stage === "walk");
     walkBtn.setAttribute("aria-label", T("hud.walk"));
     document.body.classList.toggle("has-sheet", Boolean(sheetEl));
@@ -303,6 +306,12 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
     const up = el("button", "btn"); up.type = "button"; up.dataset.tut = "upgrade";
     up.addEventListener("click", () => doUpgrade());
     sheet.append(up);
+    // feedback A: every rideable attraction can be ridden straight from the builder view; the ride gives the builder camera back
+    if (!tut.active && !visiting && hooks.canRideFromBuilder && hooks.canRideFromBuilder(selected)) {
+      const go = el("button", "btn ghost ridego", `🎢 ${esc(T("act.ride"))}`); go.type = "button"; go.dataset.ride = "go";
+      go.addEventListener("click", () => { sfx.unlock(); sfx.click(); const index = selected; closeSheet(); hooks.rideFromBuilder(index); });
+      sheet.append(go);
+    }
     if (!(tut.active)) {
       const looks = el("div", "looks"); looks.append(el("span", "", esc(T("manage.look"))));
       LOOKS.forEach((lookName, look) => {
@@ -800,14 +809,61 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   }
 
   // ---------------------------------------------------------------- walk (W6 replaces hooks.startWalk)
-  walkBtn.addEventListener("click", () => {
-    sfx.unlock(); sfx.click();
+  function beginWalk(spot = null) {
     const tut = game.tutorial();
     if (tut.active && tut.stage === "walk") game.acknowledgeTutorial();
     closeSheet();
     if (hooks.events) hooks.events.leaveCinema();                // the free show camera gives the view back before the walk takes it
-    hooks.startWalk();
+    hooks.startWalk(spot);
+  }
+  walkBtn.addEventListener("click", () => { sfx.unlock(); sfx.click(); beginWalk(); });
+
+  // ---------------------------------------------------------------- feedback A: the pin (pegman). Drag the 🧍 onto the map like the Google Maps pegman: the ground marker follows the
+  // pin's tip (snapped to the nearest walkable point, red where nothing can be walked), letting go starts the walk there, facing the nearest attraction.  A plain tap explains it.
+  const PIN_LIFT = 58;                      // px: with a finger the pin hangs this far above it, so the thumb never hides the drop point (a mouse points with the tip itself)
+  const PIN_CANCEL = 34;                    // px: letting go on the button again cancels
+  let pinDrag = null;
+  const tipOf = e => ({ x: e.clientX, y: e.clientY - (e.pointerType === "mouse" ? 0 : PIN_LIFT) });
+  function pinUpdate(e) {
+    const tip = tipOf(e);
+    pinDrag.ghost.style.left = `${tip.x}px`; pinDrag.ghost.style.top = `${tip.y}px`;
+    if (Math.hypot(e.clientX - pinDrag.sx, e.clientY - pinDrag.sy) > 10) pinDrag.moved = true;
+    if (!pinDrag.moved) return;
+    const box = pinBtn.getBoundingClientRect();
+    pinDrag.cancel = Math.hypot(e.clientX - (box.left + box.width / 2), e.clientY - (box.top + box.height / 2)) < PIN_CANCEL;
+    const ground = pinDrag.cancel ? null : r.screenToGround(tip.x, tip.y);
+    pinDrag.spot = ground ? hooks.pinPreview(ground.u, ground.w) : null;
+    hooks.setPin(pinDrag.spot);
+    pinDrag.ghost.classList.toggle("bad", !pinDrag.cancel && !(pinDrag.spot && pinDrag.spot.valid));
+    pinDrag.ghost.classList.toggle("cancel", pinDrag.cancel);
+  }
+  function pinEnd(e, drop) {
+    if (!pinDrag || (e && e.pointerId !== pinDrag.id)) return;
+    const drag = pinDrag; pinDrag = null;
+    drag.ghost.remove(); pinBtn.classList.remove("drag"); document.body.classList.remove("pin-drag");
+    try { pinBtn.releasePointerCapture(drag.id); } catch (error) { /* already released */ }
+    hooks.setPin(null);
+    if (!drop) return;
+    if (!drag.moved) { toast(T("pin.label")); sfx.click(); return; }
+    if (drag.cancel) return;
+    if (drag.spot && drag.spot.valid) { sfx.click(); beginWalk({ x: drag.spot.x, z: drag.spot.z, yaw: drag.spot.yaw }); }
+    else { sfx.error(); toast(T("pin.invalid")); }
+  }
+  pinBtn.addEventListener("pointerdown", e => {
+    if (pinDrag || !hooks.pinPreview || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault(); sfx.unlock();
+    closeSheet();
+    const ghost = el("div", "pin-ghost", "🧍"); ghost.setAttribute("aria-hidden", "true"); document.body.append(ghost);
+    pinDrag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, cancel: false, spot: null, ghost };
+    pinBtn.classList.add("drag"); document.body.classList.add("pin-drag");
+    try { pinBtn.setPointerCapture(e.pointerId); } catch (error) { /* synthetic pointers */ }
+    pinUpdate(e);
   });
+  pinBtn.addEventListener("pointermove", e => { if (pinDrag && e.pointerId === pinDrag.id) { e.preventDefault(); pinUpdate(e); } });
+  pinBtn.addEventListener("pointerup", e => { if (pinDrag && e.pointerId === pinDrag.id) { pinUpdate(e); pinEnd(e, true); } });
+  pinBtn.addEventListener("pointercancel", e => pinEnd(e, false));
+  pinBtn.addEventListener("lostpointercapture", e => { if (pinDrag && e.pointerId === pinDrag.id && !pinDrag.ending) pinEnd(e, false); });
+  pinBtn.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toast(T("pin.label")); } });
   hooks.onWalkChange = on => {
     walking = on;
     document.body.classList.toggle("walking", on);

@@ -31,7 +31,8 @@ function standTable(b, r, x, z, cloth, h = 1.08) {
   b.cyl(x, 0, z, 0.05, 0.05, h, 3, C.darkSteel); b.cyl(x, h, z, 0.46, 0.46, 0.05, 6, 0xf2ece0, { cap: true });
   b.cyl(x, h - 0.62, z, 0.56, 0.4, 0.62, 6, cloth, { smooth: false });
 }
-function parasol(b, r, x, z, h = 2.4, rad = 1.5) { const p = pick(r, PARASOL); b.cyl(x, 0, z, 0.035, 0.035, h, 3, C.darkSteel); b.cone(x, h - 0.1, z, rad, 0.5, 6, p[0], { alt: p, smooth: false }); }
+/** (the pole runs up to the apex of the canopy: feedback B, parasols used to float on a pole that stopped short) */
+function parasol(b, r, x, z, h = 2.4, rad = 1.5) { const p = pick(r, PARASOL); b.cyl(x, 0, z, 0.035, 0.035, h + 0.4, 3, C.darkSteel); b.cone(x, h - 0.1, z, rad, 0.5, 6, p[0], { alt: p, smooth: false }); }
 function tableGroup(b, r, x, z, yaw = 0, withParasol = true) {
   b.push().translate(x, 0, z).rotY(yaw);
   const cl = pick(r, CLOTH); const n = 2 + Math.floor(r() * 3);
@@ -140,6 +141,9 @@ export function buildClutter({ T, fieldPoly, groundY, seed = 1, quality = 'mediu
     for (let w = ca.w[0] + 4; w < ca.w[1]; w += 11 + rr() * 3) {
       if (inLong(w)) continue;                                                // the long alleys have their own strings
       const ya = groundY(ca.u[0] - 0.3, w); const yb = groundY(ca.u[1] + 0.3, w);
+      // a flag line hangs from two poles on the kerb (feedback B: it used to span the alley with nothing at either end); no room for a pole = no line
+      if (!free(ca.u[0] - 0.3, w, 0.1) || !free(ca.u[1] + 0.3, w, 0.1)) continue;
+      for (const uu of [ca.u[0] - 0.3, ca.u[1] + 0.3]) at(uu, w, 0, () => { b.cyl(0, 0, 0, 0.09, 0.06, 5.0, 5, 0x6a6e74); b.sphere(0, 5.0, 0, 0.09, 0xdadada, { seg: 4 }); }, 0.1);
       b.pennants([ca.u[0] - 0.3, ya + 4.8, w], [ca.u[1] + 0.3, yb + 4.8, w], 12, [0xd8283a, 0xf4c430, 0x2d6fd0, 0xf6ead0, 0x2f9a58], 0.42, { sag: 0.4 }); count++;
       if (rr() < 0.55) { const n = 8; for (let k = 0; k <= n; k++) { const t = k / n; b.bulb(lerp(ca.u[0] - 0.3, ca.u[1] + 0.3, t), lerp(ya, yb, t) + 4.6 - Math.sin(Math.PI * t) * 0.45, w, rr() < 0.5 ? WARM : 0xfff4d0, 0.2); } }
     }

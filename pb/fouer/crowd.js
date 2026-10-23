@@ -57,14 +57,19 @@ export function buildGraph(mask, corridors, { minPiece = 8, margin = 0.5, polyli
   segs.forEach(sg => { sg.len = Math.hypot(sg.x1 - sg.x0, sg.z1 - sg.z0); sg.dx = (sg.x1 - sg.x0) / sg.len; sg.dz = (sg.z1 - sg.z0) / sg.len; });
   // free pieces of every segment (sampled every metre)
   const pieces = [];
+  const BRIDGE = 8.5;       // feedback A: a drawn barrier / boom across half an alley (solid since the collision follows the geometry) must not cut the lane: runs closer than this are one piece
   for (const sg of segs) {
+    const runs = [];
     let run = null;
     const ts = []; for (let t = 0; t < sg.len; t += 1) ts.push(t); ts.push(sg.len);
     ts.forEach((tt, k) => {
       const free = mask.allowed(sg.x0 + sg.dx * tt, sg.z0 + sg.dz * tt, margin);
       if (free) { if (!run) run = { t0: tt, t1: tt }; run.t1 = tt; }
-      if ((!free || k === ts.length - 1) && run) { if (run.t1 - run.t0 >= minPiece || (sg.len < minPiece * 1.5 && run.t1 - run.t0 >= sg.len - 1.5)) pieces.push({ ...sg, t0: run.t0, t1: run.t1 }); run = null; }
+      if ((!free || k === ts.length - 1) && run) { runs.push(run); run = null; }
     });
+    const merged = [];
+    for (const r of runs) { const last = merged[merged.length - 1]; if (last && r.t0 - last.t1 <= BRIDGE) last.t1 = r.t1; else merged.push({ ...r }); }
+    for (const r of merged) if (r.t1 - r.t0 >= minPiece || (sg.len < minPiece * 1.5 && r.t1 - r.t0 >= sg.len - 1.5)) pieces.push({ ...sg, t0: r.t0, t1: r.t1 });
   }
   const cross = (p, q) => {          // distance along p where it crosses q (interior of both), or null
     const d = p.dx * q.dz - p.dz * q.dx;

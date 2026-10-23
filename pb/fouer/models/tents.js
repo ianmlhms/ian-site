@@ -101,6 +101,10 @@ export function hallTent(b, r, w, d, o = {}) {
 
   // ---- gable end (front, +z): white wall, door with a glimpse of the lit inside, truss, raised lettered panel, string lights
   const dw = Math.min(3.6, w * 0.42); const dh = 2.4;
+  if (o.closed) {          // back-of-house tent (storage, kitchen, staff): a blank end wall, no door, no lettered panel, nothing that reads as a shop front
+    quadF(b, [-hw, 0.1, zf], [hw, 0.1, zf], [hw, H, zf], [-hw, H, zf], CANVAS.end, [0, 0, 1]);
+    if (!far) { b.beam([-hw, H, zf + 0.06], [0, H + rise, zf + 0.06], 0.15, ALU); b.beam([hw, H, zf + 0.06], [0, H + rise, zf + 0.06], 0.15, ALU); b.beam([-hw, H - 0.02, zf + 0.06], [hw, H - 0.02, zf + 0.06], 0.15, ALU); }
+  } else {
   quadF(b, [-hw, 0.1, zf], [-dw / 2, 0.1, zf], [-dw / 2, H, zf], [-hw, H, zf], CANVAS.end, [0, 0, 1]);
   quadF(b, [dw / 2, 0.1, zf], [hw, 0.1, zf], [hw, H, zf], [dw / 2, H, zf], CANVAS.end, [0, 0, 1]);
   quadF(b, [-dw / 2, dh, zf], [dw / 2, dh, zf], [dw / 2, H, zf], [-dw / 2, H, zf], CANVAS.end, [0, 0, 1]);
@@ -140,7 +144,7 @@ export function hallTent(b, r, w, d, o = {}) {
       const pw = dw + 2.4; const pd = 1.9;
       for (const s of [-1, 1]) b.box(s * pw / 2, 0, zf + pd, 0.14, 2.6, 0.14, ALU, { noTop: true, noBottom: true });
       quadF(b, [-pw / 2 - 0.2, 2.9, zf + pd + 0.2], [pw / 2 + 0.2, 2.9, zf + pd + 0.2], [pw / 2 + 0.2, 3.3, zf], [-pw / 2 - 0.2, 3.3, zf], CANVAS.roof, [0, 1, 0.4]);
-      fringe(b, 0, 2.9, -pw / 2 - 0.2, pw / 2 + 0.2, Math.max(4, Math.round(pw / 0.7)), 0.4, accent, 0xf4f1e8, 0);
+      b.valance([-pw / 2 - 0.2, 2.9, zf + pd + 0.2], [pw / 2 + 0.2, 2.9, zf + pd + 0.2], 0.4, Math.max(4, Math.round(pw / 0.7)), accent, 0xf4f1e8);          // the porch's scalloped edge (it used to be drawn along the tent's middle line, in mid-air)
       b.bulbRow([-pw / 2, 2.55, zf + pd], [pw / 2, 2.55, zf + pd], 0.5, WARM, 0.12);
     }
     // a pennant string along the front eave
@@ -155,6 +159,7 @@ export function hallTent(b, r, w, d, o = {}) {
     const nb = Math.max(0, Math.floor((hw - dw / 2) / 1.6));
     for (let k = 1; k <= nb; k++) for (const sgn of [-1, 1]) { const x = sgn * (dw / 2 + k * (hw - dw / 2) / (nb + 1)); b.quad([x - 0.05, 0.55, zf + 0.014], [x + 0.05, 0.55, zf + 0.014], [x + 0.05, H - 0.05, zf + 0.014], [x - 0.05, H - 0.05, zf + 0.014], 0xdfe3e6); }
   }
+  }          // (not closed)
   // back wall
   quadF(b, [hw, 0.1, -hd], [-hw, 0.1, -hd], [-hw, H, -hd], [hw, H, -hd], CANVAS.back, [0, 0, -1]);
 }

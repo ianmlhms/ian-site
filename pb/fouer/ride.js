@@ -151,7 +151,8 @@ export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = 
     st.completed = completed;
     st.active = false; st.phase = "idle"; st.frame = null; st.ud = null; st.rig = null;
     if (st.look) walk.setLook(st.look.yaw, st.look.pitch);
-    if (!instant) await walk.fade(0, FADE_MS);
+    if (walk.fromBuilder) { if (!instant) await walk.leaveToBuilder(); }           // feedback A: a ride that began in the builder view returns to the builder camera
+    else if (!instant) await walk.fade(0, FADE_MS);
     if (completed) firstRide(wasId, wasKind, st.probe);
     st.probe = null;
   }

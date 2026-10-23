@@ -14,10 +14,13 @@
  *     and the builder view shows a thinner crowd; Hämmi bleats when tapped (builder and walk);
  *   - audio: the graph builds after a tap without errors (ambient layers, at most 6 attraction voices), the arcade mute silences it;
  *   - the photo button saves a PNG; performance on the iPad-medium profile stays inside DESIGN 5 (walk <= 220 draws / 300k triangles) at six positions;
- *   - zero console errors.
- * Screenshots (set FLOW_SHOTS_DIR): the walk at the start, in the alley, eating, in a queue, the ride, the Allée Scheffer. */
+ *   - zero console errors;
+ *   - feedback A (fouer_walk_a.mjs): sprint (Shift, the 🏃 toggle, a full stick push: 2.6 / 6.5 m/s, eased), the 🧍 pin dragged onto the map (marker, snapping, red, cancel, touch),
+ *     collision == visible geometry (no invisible wall, no blocked open gap, the Fouerfësch seating area, a stall counter, the walk-in Bierzelt), "Fueren" from the builder view.
+ * Screenshots (set FLOW_SHOTS_DIR): the walk at the start, in the alley, eating, in a queue, the ride, the Allée Scheffer, the pin drag, the seating area, the Bierzelt. */
 import { runIfMain } from "./lib.mjs";
 import { bootGame, tapAt, consoleCollector } from "./fouer_game.mjs";
+import { sprintChecks, pinChecks, solidsChecks, builderRideChecks } from "./fouer_walk_a.mjs";
 
 const URL_BASE = "/pb/fouer.html?fouerDebug=1&fouerNoFly=1&fouerTimeMode=evening&fouerWeather=clear&fouerQ=";
 const WALK_DRAWS = 220, WALK_TRIS = 300000, BUILDER_DRAWS = 140, BUILDER_TRIS = 300000;
@@ -166,7 +169,8 @@ export const flow = {
     await place(lane, 53, -Math.PI / 2);
     await page.keyboard.down("KeyW"); await sleep(5200); await page.keyboard.up("KeyW");
     const stall = (await walkState()).view;
-    h.expect(stall.z > rect0.w + rect0.dw / 2 + 0.2 && stall.z < 50, `a built stall blocks the walker (stopped at w ${stall.z.toFixed(2)}, front edge ${rect0.w + rect0.dw / 2})`);
+    // feedback A: the stall is solid where it is drawn (its forecourt rail / counter), no longer the whole pitch rectangle: the walker stops at the visible rail, in front of the pitch's centre
+    h.expect(stall.z > rect0.w + 2.5 && stall.z < 50, `a built stall blocks the walker (stopped at w ${stall.z.toFixed(2)}, pitch centre ${rect0.w}, front edge ${rect0.w + rect0.dw / 2})`);
     // access wave: the stalls keep 1.2 m back from the alley (layout.js FRONTAGE), so the north-side stall edge is at about w 48.5 and the stalls are mostly small
     const npcBox = await evalG(page, g => { const b = g.mask.npc.filter(q => q.w1 > 44 && q.w1 <= 50.01 && q.u1 - q.u0 >= 3.5 && q.u0 > 100 && q.u1 < 250).sort((a, c) => a.u0 - c.u0)[0] ?? null; return b ? { ...b } : null; });
     if (h.expect(npcBox !== null, "an NPC stall on the north side of the main alley exists in the mask")) {
@@ -428,6 +432,15 @@ export const flow = {
     }
     h.expect(counts.low.active < 80 && counts.high.active > 200 && counts.low.active < counts.high.active, `the crowd follows the quality (low ${counts.low.active}, high ${counts.high.active})`);
     h.expect(results.low.draws <= 150, `low quality walk: ${results.low.draws} draw calls (DESIGN 5 low walk limit 150), ${(results.low.tris / 1000).toFixed(0)}k triangles (limit 150k, informative)`);
+
+    /* ------------------------------------------------------------ feedback A (fouer_walk_a.mjs): sprint, pin, collision == visible geometry, rides from the builder */
+    await evalG(page, g => { if (g.walk.active) g.walk.end(); g.fillFair(3, 5); });
+    await sleep(2800);
+    await sprintChecks(h);
+    await evalG(page, g => g.walk.end()); await sleep(900);
+    await pinChecks(h);
+    await solidsChecks(h);
+    await builderRideChecks(h);
 
     h.step("no console errors");
     h.expect(errors.length === 0, `no console errors${errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""}`);

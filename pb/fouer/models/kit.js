@@ -313,7 +313,10 @@ export class Builder {
       this.tri([x - dx, y, z - dz], [x + dx, y, z + dz], [x, y - size, z], colors[i % colors.length], { dbl: true });
       if (prev === null) prev = [x, y, z];
     }
-    if (!o.noWire) this.wire(a, b, 0.025, 0x222222, { ch: 'solid' });
+    if (!o.noWire) {          // the line the flags hang from follows the same sag (it used to run straight from a to b, high above the flags)
+      const nseg = Math.max(2, Math.min(16, Math.round(nn / 2) * 2)); let q0 = a;
+      for (let i = 1; i <= nseg; i++) { const t = i / nseg; const q1 = [lerp(a[0], b[0], t), lerp(a[1], b[1], t) - Math.sin(Math.PI * t) * sag, lerp(a[2], b[2], t)]; this.wire(q0, q1, 0.025, 0x222222, { ch: 'solid' }); q0 = q1; }
+    }
     return this;
   }
 
@@ -423,7 +426,7 @@ export class Builder {
   /** a round table with a cloth, optionally a parasol */
   table(x, z, r, cloth, o = {}) {
     this.cyl(x, 0, z, 0.06, 0.06, 0.95, 5, C.darkSteel); this.cyl(x, 0.95, z, r, r, 0.05, 9, cloth, { cap: true });
-    if (o.parasol) { this.cyl(x, 0, z, 0.03, 0.03, 2.3, 4, C.darkSteel); this.cone(x, 2.0, z, r * 2.2, 0.55, 8, o.parasol, { alt: o.parasolAlt || [o.parasol, 0xffffff], smooth: false }); }
+    if (o.parasol) { this.cyl(x, 0, z, 0.03, 0.03, 2.55, 4, C.darkSteel); this.cone(x, 2.0, z, r * 2.2, 0.55, 8, o.parasol, { alt: o.parasolAlt || [o.parasol, 0xffffff], smooth: false }); }
     return this;
   }
   /** a railing run (queue barrier): posts + two rails, from a to b at ground y 0 */
@@ -490,6 +493,7 @@ export class Builder {
 
   /** the finished model group (contract in index.js); `meta` = { id, look, level, size: [w, d] } */
   finish(meta = {}) {
+    if (globalThis.__fouerRawSink) globalThis.__fouerRawSink.push({ id: meta.id || 'model', builder: this });      // test hook (float-audit.js): the raw triangles / bulbs of every model that gets built
     const g = this._make([0, 0, 0]); g.name = meta.id || 'model';
     const M = this.M;
     let tris = 0; g.traverse((o) => { if (o.isMesh) tris += o.geometry.attributes.position.count / 3; });
@@ -532,7 +536,10 @@ export function dressEdge(b, ctx, x0, x1, y, z, o = {}) {
   if (o.second) b.bulbRow([x0, y + 0.2, z - 0.1], [x1, y + 0.2, z - 0.1], step, ctx.bulb, bsz);
   if (ctx.L2) {
     const colors = ctx.look === 1 ? [0x41e8ff, 0xff3fc8, 0x8a5bff] : ctx.look === 2 ? [0x1f5fb8, 0xffffff, 0x1f5fb8] : [0xc8283a, 0xf6ead0, 0x2f6a4c, 0xf4c430];
-    if (!o.noFlags) b.pennants([x0, y + 0.6, z + 0.3], [x1, y + 0.6, z + 0.3], Math.max(4, Math.round(Math.abs(x1 - x0) * 1.6)), colors, 0.34);
+    if (!o.noFlags) {          // the flag line is strung between two little masts that stand on the canopy edge (it used to float 0.6 m above it, fastened to nothing)
+      for (const px of [x0, x1]) b.cyl(px, y - 0.05, z, 0.025, 0.025, 0.72, 4, 0x333333);
+      b.pennants([x0, y + 0.62, z], [x1, y + 0.62, z], Math.max(4, Math.round(Math.abs(x1 - x0) * 1.6)), colors, 0.34);
+    }
   }
   if (ctx.L3) {
     b.led([x0, y - 0.18, z + 0.04], [x1, y - 0.18, z + 0.04], 0.06, ctx.led[0], { chase: 0.3 });
@@ -545,11 +552,16 @@ export function dressEdge(b, ctx, x0, x1, y, z, o = {}) {
   }
 }
 
+const FORECOURT_GATE = 1.6;   // m, opening in the L3+ crowd barrier in front of a stall counter
+
 /** crowd barrier / forecourt dressing for L3+ : railings along the front of a w x d forecourt strip at z, plus two planters, and queue figures */
 export function dressForecourt(b, ctx, x0, x1, zFront, o = {}) {
   if (ctx.L3) {
-    b.railing([x0, 0, zFront], [x1, 0, zFront], 0.95, ctx.L4 ? GOLD : C.steel);
     const mid = (x0 + x1) / 2;
+    const railColor = ctx.L4 ? GOLD : C.steel;
+    // a gate in the middle so the counter stays reachable on foot (walk collision follows the drawn railing)
+    b.railing([x0, 0, zFront], [mid - FORECOURT_GATE / 2, 0, zFront], 0.95, railColor);
+    b.railing([mid + FORECOURT_GATE / 2, 0, zFront], [x1, 0, zFront], 0.95, railColor);
     if (o.planters !== false) { [x0 + 0.3, x1 - 0.3].forEach((px) => { b.cyl(px, 0, zFront - 0.3, 0.28, 0.22, 0.4, 6, 0x8a5a34); b.sphere(px, 0.62, zFront - 0.3, 0.3, 0x3b9a4c, { seg: 5 }); }); }
     if (o.figures !== false) { b.figure(mid - 0.6, zFront - 0.7, Math.PI); b.figure(mid + 0.5, zFront - 1.0, Math.PI); }
   }

@@ -386,7 +386,8 @@ MODELS.fesch = { build(opts) {
   awning(b, ctx, -W / 2 - 0.3, W / 2 + 0.3, H + 0.1, H - 0.7, zc + D / 2 + 0.05, zc + D / 2 + 1.3, 0x2d6fd0, 0xffffff, { stripe: 0.5 });
   fascia(b, ctx, ctx.name, 0, H + 1.3, zc + D / 2 + 0.38, 4.6, 1.0);
   // fish sign on a post: three blobs + tail + eye
-  b.cyl(-W / 2 + 0.2, 0.14, zc + D / 2 + 1.1, 0.06, 0.06, 4.0, 5, C.darkWood);
+  // (a pale post that runs on above the fish: the old dark 0.12 m post vanished against the night sky and the lit fish seemed to float in the air)
+  b.cyl(-W / 2 + 0.2, 0.14, zc + D / 2 + 1.1, 0.1, 0.07, 4.95, 6, 0xe6dcc4); b.sphere(-W / 2 + 0.2, 5.15, zc + D / 2 + 1.1, 0.15, ctx.L4 ? GOLD : 0xf6ead0, { seg: 5 });
   b.push().translate(-W / 2 + 0.2, 4.2, zc + D / 2 + 1.1); b.blob(0, 0, 0, 0.8, 0.38, 0.1, 0xf0c04a); b.tri([0.7, 0, 0], [1.2, 0.4, 0], [1.2, -0.4, 0], 0xe6a02a, { dbl: true }); b.sphere(-0.5, 0.08, 0.1, 0.07, 0x111111, { seg: 4 }); b.pop();
   b.box(2.9, 1.4, zc + D / 2 + 0.07, 1.4, 1.1, 0.06, 0x234535); b.sign('Fouerfësch + Béier', 2.9, 1.45, zc + D / 2 + 0.12, 1.3, 0.55, { look: ctx.look, kind: 'plate', frameW: 0.04, frame: C.darkWood });
   b.bulbRow([-W / 2 - 0.3, H - 0.7, zc + D / 2 + 1.34], [W / 2 + 0.3, H - 0.7, zc + D / 2 + 1.34], 0.34, ctx.bulb, 0.16);
@@ -404,7 +405,7 @@ MODELS.fesch = { build(opts) {
   b.box(0, 0.0, 6.7, 13.5, 0.04, 0.1, 0x777777);
   if (ctx.L2) { forecourtStrings(b, ctx, -6.6, 6.6, 6.0, 3.0); forecourtStrings(b, ctx, -6.6, 6.6, 3.2, 3.0); booth(b, ctx, 6.6, -3.4, { body: timber }); }
   if (ctx.L3) { dressForecourt(b, ctx, -6.5, 6.5, 7.3); b.ledRect(-W / 2 - 0.2, H + 0.3, W / 2 + 0.2, H + 1.9, zc + D / 2 + 0.44, 0.07, ctx.led); }
-  if (ctx.L4) { b.sphere(-W / 2 + 0.2, 6.35, zc + D / 2 + 1.1, 0.25, GOLD, { seg: 6 }); }
+  if (ctx.L4) { b.sphere(-W / 2 + 0.2, 5.35, zc + D / 2 + 1.1, 0.25, GOLD, { seg: 6 }); }
   return end(b, ctx, [16, 16], 6.4);
 } };
 
@@ -448,7 +449,7 @@ MODELS.schiess = { build(opts) {
   // plush wall (rows), tin-can pyramids, targets
   for (let r = 0; r < 4; r++) for (let i = 0; i < 13; i++) plush(b, -3.1 + i * 0.52 + (r & 1) * 0.26, y0 + 1.45 + r * 0.34, zc - D / 2 + 0.55, PLUSH[(i * 3 + r * 2) % 8], 0.19);
   for (let p = 0; p < 2; p++) { const x0 = p ? 1.9 : -2.2; for (let r = 0; r < 3; r++) for (let k = 0; k <= 2 - r; k++) b.cyl(x0 + (k - (2 - r) / 2) * 0.26, y0 + 1.1 + r * 0.2, zc + 0.2, 0.1, 0.1, 0.2, 6, [0xc8283a, 0x2d6fd0, 0xf4c430][(r + k) % 3]); }
-  [-0.4, 0.5].forEach((x, i) => { b.cyl(x, y0 + 1.6, zc + 0.35, 0.3, 0.3, 0.05, 10, i ? 0xc8283a : 0xf4c430); b.cyl(x, y0 + 1.6, zc + 0.37, 0.15, 0.15, 0.05, 10, 0xffffff); });
+  [-0.4, 0.5].forEach((x, i) => { b.cyl(x, y0, zc + 0.33, 0.03, 0.03, 1.62, 4, 0x333333); b.cyl(x, y0 + 1.6, zc + 0.35, 0.3, 0.3, 0.05, 10, i ? 0xc8283a : 0xf4c430); b.cyl(x, y0 + 1.6, zc + 0.37, 0.15, 0.15, 0.05, 10, 0xffffff); });
   [-2.8, -1.0, 1.0, 2.8].forEach((x) => { b.beam([x, y0 + 1.1, zc + D / 2 - 0.2], [x + 0.12, y0 + 1.5, zc + D / 2 - 0.6], 0.04, 0x222222); b.box(x + 0.12, y0 + 1.1, zc + D / 2 - 0.6, 0.06, 0.06, 0.5, 0x333333); });
   // red chase fascia with double bulb header
   b.box(0, y0 + H - 0.1, zc + D / 2 - 0.1, W + 0.3, 0.7, 0.3, ctx.look === 1 ? 0x22103f : 0xc8283a);

@@ -16,6 +16,7 @@ import { createUi } from '/pb/fouer/ui.js';
 import { createSfx } from '/pb/fouer/sfx.js';
 import { createAudio } from '/pb/fouer/audio.js';
 import { createMask, createWalk } from '/pb/fouer/walk.js';
+import { deriveLayerBoxes } from '/pb/fouer/solids.js';
 import { createCrowd } from '/pb/fouer/crowd.js';
 import { createRide } from '/pb/fouer/ride.js';
 import { createEvents } from '/pb/fouer/events.js';
@@ -52,8 +53,11 @@ async function boot() {
   const canvas = $('fouerCanvas');
   const lang = pickLang();
   document.documentElement.lang = lang;
-  const setLoad = (p, msg) => { $('bar').firstElementChild.style.width = Math.round(p * 100) + '%'; if (msg) $('loadMsg').textContent = msg; };
-  setLoad(0.02, translate(lang, 'load.start'));
+  // the loading screen (inline in pb/fouer.html): real steps call set(p, label, ceiling), the bar creeps on between them (feedback A)
+  const loader = window.__fouerLoad || { set() {}, touch() {}, done() {}, fail() {}, take() {} };
+  loader.take();
+  const setLoad = (p, key, ceiling, ms) => loader.set(p, key ? translate(lang, key) : '', ceiling, ms);
+  setLoad(0.12, 'load.glacis', 0.6, 14000);
   const testMode = window.__pbTestMode === true;
   const debug = param('fouerDebug') === '1';
   let clockOffset = 0;
@@ -72,7 +76,7 @@ async function boot() {
   let world;
   try {
     world = await createWorld({
-      T, TS: window.TS, r, quality: r.state.quality, onProgress: (p, msg) => setLoad(0.05 + p * 0.7, msg),
+      T, TS: window.TS, r, quality: r.state.quality, onProgress: (p, msg) => setLoad(0.12 + p * 0.5, msg === 'bundle' ? 'load.code' : 'load.glacis', 0.63, 12000),
       parts: {
         tram: w => createTram({ T, world: w, bundle: w.bundle }),
         pitches: async w => { const p = await createPitches({ T, world: w }); r.gameRoot.add(p.group); return p; },
@@ -80,20 +84,21 @@ async function boot() {
     });
   } catch (error) {
     console.error('[fouer] world failed', error);
-    $('loadMsg').textContent = translate(lang, 'load.fail');
+    loader.fail(translate(lang, 'load.fail'));
     document.documentElement.dataset.bootError = 'world';
     throw error;
   }
   if (world.parts.tram) world.root.add(world.parts.tram.group);
-  setLoad(0.8, translate(lang, 'load.start'));
+  setLoad(0.64, 'load.rides', 0.69, 3000);
   await modelsReady;
+  setLoad(0.7, 'load.stalls', 0.89, 16000);
   const markers = world.parts.pitches;
   markers.setMode('outline');
   const fair = await createFairLayer({ T, root: r.gameRoot, pitches: markers.items, groundY: (u, w) => world.groundY(u, w), quality: r.state.quality, fieldPoly: world.fieldPoly, renderer: r, world });
   let scene = null; let crowd = null; let events = null;
   world.parts.fair = { setNight: k => { fair.setNight(k); if (scene) scene.setNight(k); if (crowd) crowd.setNight(k); if (events) events.setNight(k); }, dispose: () => fair.dispose() };
   r.on('quality', q => { fair.setQuality(q); if (crowd) crowd.setQuality(q); });
-  setLoad(0.9, translate(lang, 'load.start'));
+  setLoad(0.9, 'load.light', 0.925, 2500);
 
   // a first-time player starts at golden hour with clear weather (still "Random": the day drifts on from there)
   const env = createEnv({ T, scene: r.scene, renderer: r.renderer, world, quality: r.state.quality });
@@ -107,6 +112,7 @@ async function boot() {
   }
   r.poses.overview = Object.assign({}, r.framePose());
 
+  setLoad(0.93, 'load.people', 0.975, 6000);
   await started;
   let sfx = null; let ui = null; let walk = null; let ride = null;
   scene = createSceneBridge({ T, r, world, fair, markers, game, quality: r.state.quality, onGates: () => { ui.toast(translate(ui.lang, 'toast.entrance')); sfx.star(); } });
@@ -124,8 +130,12 @@ async function boot() {
     return out;
   })();
   const npcInfo = fair.baseInfo && fair.baseInfo.npc;
+  // feedback A: the collision of the NPC stalls, props and clutter is read from the drawn base layer (solids.js), the footprint lists of the filler are only the fallback
+  let baseBoxes = null;
+  try { baseBoxes = deriveLayerBoxes(fair.batches.base.merged, { u0: -12, u1: 322, w0: -24, w1: 164 }); }
+  catch (error) { console.warn('[fouer] solids of the base layer failed, using the filler footprints', error); }
   const mask = createMask({
-    fieldPoly: world.fieldPoly, corridors: CORRIDORS, rects, faces, entrances: ENTRANCES, lane: streetSamples,
+    fieldPoly: world.fieldPoly, corridors: CORRIDORS, rects, faces, entrances: ENTRANCES, lane: streetSamples, baseBoxes,
     grid: npcInfo && npcInfo.grid ? { g: npcInfo.grid, nu: npcInfo.gridDims[0], nw: npcInfo.gridDims[1], cell: npcInfo.gridDims[2], u0: npcInfo.gridDims[3], w0: npcInfo.gridDims[4] } : null,
   });
   const getFocus = () => (walk && walk.active && !(ride.active && ride.high) ? { x: walk.view.x, z: walk.view.z, yaw: walk.view.yaw, walk: true } : { x: r.rig.cu, z: r.rig.cw, yaw: r.rig.cyaw, walk: false });
@@ -141,7 +151,12 @@ async function boot() {
   const hooks = {
     walking: false,
     onWalkChange() {},
-    startWalk() { if (walk) walk.start(); },
+    startWalk(spot) { if (walk) walk.start(spot ?? null); },
+    /** feedback A: the pin (pegman) drag in the builder view: where a drop on game point (u, w) would land, its marker, and the ride-from-the-builder button */
+    pinPreview: (u, w) => (walk ? walk.pinSpot(u, w) : null),
+    setPin: spot => { if (scene) scene.setPin(spot); },
+    canRideFromBuilder: i => Boolean(ride && walk && !walk.active && ride.canRide(i)),
+    rideFromBuilder: i => (walk ? walk.rideFrom(i) : false),
     endWalk() { if (walk) walk.end(); },
     /** a tap on Hämmi (builder view and walk): bleat */
     tapSheep(x, y) { if (!crowd.tapSheep(x, y)) return false; crowd.bleat(); audio.unlock(); audio.bleat(); return true; },
@@ -162,6 +177,9 @@ async function boot() {
   walk = createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, crowd, ride, mask, env, hooks, rects, items, tram: world.parts.tram, translate });
   events = createEvents({ T, r, world, game, env, audio, ui, translate });
   events.setNight(world.nightK || 0);
+  // the pitch models are built here (one tick of the loading bar per pitch)
+  let modelsDone = 0;
+  scene.onApplied(() => { modelsDone++; setLoad(0.95 + 0.04 * Math.min(1, modelsDone / 34), 'load.rides', 0.995, 5000); });
   scene.sync();
   fair.flush(r.camera);
 
@@ -205,7 +223,7 @@ async function boot() {
     setTimeout(() => document.body.classList.remove('intro'), 3200);
   }
   r.start();
-  setLoad(1, '');
+  loader.done();
   $('loading').classList.add('done');
   document.documentElement.dataset.fouerReady = '1';
   document.documentElement.dataset.fouerGame = '1';
@@ -225,13 +243,26 @@ async function boot() {
       showPitches: m => markers.setMode(m === true ? 'glow' : m === false ? 'off' : m),
       setFreeCamera: o => r.setFreeCamera(o),
     };
-    let accessOverlay = null;
+    let accessOverlay = null; let solidsMesh = null;
     window.__fouerGame = {
       game, ui, scene, fair, sfx, hooks, r, world, env, markers, walk, crowd, audio, ride, mask, events,
       /** access wave: the walkway network painted on the ground (alleys blue, lanes red, service lane orange, forecourts green, entrance points white) */
       async accessOverlay(on = true) {
         if (!accessOverlay) { const m = await import('/pb/fouer/models/access-debug.js'); accessOverlay = m.createAccessOverlay({ T, root: r.gameRoot, groundY: (u, w) => world.groundY(u, w), pitches: PITCHES }); }
         accessOverlay.show(on); return on;
+      },
+      /** feedback A: the collision boxes painted on the ground (magenta = base layer, cyan = pitches), for the screenshots and the flows */
+      solidsOverlay(on = true) {
+        if (solidsMesh) { r.gameRoot.remove(solidsMesh); solidsMesh.geometry.dispose(); solidsMesh.material.dispose(); solidsMesh = null; }
+        if (!on) return false;
+        const pos = [], col = [];
+        const add = (b, c) => { const y = world.groundY((b.u0 + b.u1) / 2, (b.w0 + b.w1) / 2) + 2.2; for (const [x, z] of [[b.u0, b.w0], [b.u1, b.w0], [b.u1, b.w1], [b.u0, b.w0], [b.u1, b.w1], [b.u0, b.w1]]) { pos.push(x, y, z); col.push(...c); } };
+        mask.npc.forEach(b => add(b, [1, 0.05, 0.75])); mask.pitchBoxes.forEach(b => add(b, [0.05, 0.9, 1]));
+        const geometry = new T.BufferGeometry();
+        geometry.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geometry.setAttribute('color', new T.Float32BufferAttribute(col, 3));
+        solidsMesh = new T.Mesh(geometry, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.8, depthTest: false, side: T.DoubleSide, fog: false }));
+        solidsMesh.frustumCulled = false; solidsMesh.renderOrder = 20; r.gameRoot.add(solidsMesh);
+        return true;
       },
       advance: (sec) => game.advance(sec),
       setClockOffset: ms => { clockOffset = ms; },
@@ -262,4 +293,5 @@ boot().catch(error => {
   console.error('[fouer] boot failed', error);
   document.documentElement.dataset.bootError = document.documentElement.dataset.bootError || 'boot';
   const msg = $('loadMsg'); if (msg) msg.textContent = (msg.textContent || '') + ' ' + error.message;
+  if (window.__fouerLoad) window.__fouerLoad.fail();
 });

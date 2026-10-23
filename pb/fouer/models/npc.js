@@ -7,7 +7,7 @@
  * 15 skins (hall tent x3, chalet, kiosk, trailer, camelot x2, temple gable, fisher hut, arch stall, game stall, sweets booth, kids ride, chair-ride canopy, worksite).
  * Fully procedural, no real names: the lettering is generic (Fritten, Bratwurst, Crêpes, Bar, Café ...). */
 import { Builder, mulberry, col, shade, C, PAL, GOLD, lerp, TAU, drape } from './kit.js';
-import { ENTRANCES, ALLEYS, SERVICE, FRONTAGE, corridors as layoutCorridors, createReservations, rasterZones, pointInPoly as layoutInPoly } from '../layout.js';
+import { ENTRANCES, ALLEYS, SERVICE, FRONTAGE, FACE_VEC, FRONT_REACH, DUP_SKINS, BIG_SKINS, BIG_SPACING, DUP_GAP, corridors as layoutCorridors, createReservations, rasterZones, pointInPoly as layoutInPoly } from '../layout.js';
 import { backLot } from './clutter.js';
 import { hallTent } from './tents.js';
 import { buildStall, awning } from './stallkit.js';
@@ -37,11 +37,15 @@ function camelot(b, r, w, d, o = {}) {
   const aw = pick(r, AWN); const H = 2.2;
   b.box(0, 0, 0.1, w, 0.85, d * 0.5, pick(r, WOODS)); b.box(0, 0.85, 0.1, w + 0.1, 0.05, d * 0.5 + 0.1, 0xf4f0e2);
   [-1, 1].forEach((s) => b.cyl(s * (w / 2 - 0.05), 0, -d * 0.2, 0.04, 0.04, H, 4, 0x333333));
-  if (o.umbrella) { b.cyl(0, 0, -d * 0.1, 0.04, 0.04, 2.6, 4, 0x333333); b.cone(0, 2.2, -d * 0.1, Math.max(w, d) * 0.62, 0.7, 8, aw[0], { alt: aw, smooth: false }); }
+  if (o.umbrella) { b.cyl(0, 0, -d * 0.1, 0.04, 0.04, 2.9, 4, 0x333333); b.cone(0, 2.2, -d * 0.1, Math.max(w, d) * 0.62, 0.7, 8, aw[0], { alt: aw, smooth: false }); }
   else { b.gable(0, H, -d * 0.15, w + 0.3, d * 0.9, 0.5, aw[0], { over: 0.1, ridge: 'x' }); }
   if (!b.far) for (let i = 0; i < 6; i++) b.blob(-w * 0.35 + i * w * 0.14, 1.05, 0.15, 0.1, 0.12, 0.1, pick(r, GOODS));
   b.bulb(-w / 2 + 0.2, H - 0.1, d * 0.3, warm, 0.13); b.bulb(w / 2 - 0.2, H - 0.1, d * 0.3, warm, 0.13);
-  if (!b.far && r() < 0.5) sign(b, pick(r, ['NOUGAT', 'SOUVENIRS', 'BONBONS', 'MANDELEN', 'LUFTBALLONGEN']), 0, 1.45, d * 0.38, Math.min(w * 0.85, 2.2), 0.4, 0);
+  if (!b.far && r() < 0.5) {         // a little board standing on the counter's front edge on two posts (it used to hang in the air in front of the counter)
+    const sw = Math.min(w * 0.85, 2.2); const sz = 0.1 + d * 0.25 - 0.08;
+    [-1, 1].forEach((s) => b.cyl(s * (sw / 2 - 0.1), 0.88, sz, 0.02, 0.02, 0.5, 4, 0x333333));
+    sign(b, pick(r, ['NOUGAT', 'SOUVENIRS', 'BONBONS', 'MANDELEN', 'LUFTBALLONGEN']), 0, 1.58, sz, sw, 0.4, 0);
+  }
 }
 const TARP = [0xc8283a, 0xf4f0e6, 0x8a9096, 0x2f7a52, 0xe8e2d0, 0xc8283a, 0x2d5fa8, 0xf2d070];
 /** a camelot stall of the Allée Scheffer lane: canvas-draped booth, pitched white roof, red / white / grey tarp front (photo food-camelots-allee-scheffer-2018-120) */
@@ -85,13 +89,13 @@ function archStall(b, r, w, d) {
 function kidsRide(b, r, w, d) {
   const R = Math.min(w, d) / 2 - 0.3; const aw = pick(r, AWN);
   b.cyl(0, -0.2, 0, R + 0.2, R + 0.2, 0.5, 14, 0x3a3a40, { cap: true, capColor: 0x6a5648 }); b.cyl(0, 0.3, 0, 0.35, 0.35, 2.4, 8, aw[0]);
-  b.cyl(0, 2.7, 0, R, R, 0.6, 14, aw[1]); b.cyl(0, 3.3, 0, R + 0.2, 0.15, 1.7, 14, aw[0], { alt: aw, smooth: false }); b.sphere(0, 5.15, 0, 0.14, GOLD, { seg: 5 });
+  b.cyl(0, 2.7, 0, R, R, 0.6, 14, aw[1], { bottom: true }); b.cyl(0, 3.3, 0, R + 0.2, 0.15, 1.7, 14, aw[0], { alt: aw, smooth: false }); b.sphere(0, 5.15, 0, 0.14, GOLD, { seg: 5 });
   b.bulbRing(0, 2.7, 0, R + 0.05, Math.round(R * 6), warm, 0.14); if (!b.far) for (let i = 0; i < 6; i++) { const a = TAU * i / 6; b.blob(Math.sin(a) * R * 0.62, 0.9, Math.cos(a) * R * 0.62, 0.3, 0.35, 0.2, pick(r, [0xf6ead0, 0xe0a860, 0xd8433a])); }
 }
 function chairRide(b, r, w, d) {
   const R = Math.min(w, d) / 2 - 0.6; const aw = pick(r, AWN);
   b.cyl(0, -0.2, 0, R + 0.3, R + 0.3, 0.45, 14, 0x3a3a40, { cap: true, capColor: 0x6a6256 }); b.cyl(0, 0.2, 0, 0.9, 0.7, 3.4, 8, aw[0]);
-  b.cyl(0, 3.6, 0, R, 0.3, 2.0, 18, aw[0], { alt: aw, smooth: false }); b.cyl(0, 3.0, 0, R + 0.02, R + 0.02, 0.6, 18, aw[1]);
+  b.cyl(0, 3.6, 0, R, 0.3, 2.0, 18, aw[0], { alt: aw, smooth: false }); b.cyl(0, 3.0, 0, R + 0.02, R + 0.02, 0.6, 18, aw[1], { bottom: true });
   b.bulbRing(0, 3.0, 0, R + 0.1, Math.round(R * 5), warm, 0.14); b.sphere(0, 5.9, 0, 0.25, GOLD, { seg: 5 });
   const n = b.far ? 8 : 16; for (let i = 0; i < n; i++) { const a = TAU * i / n; const x = Math.sin(a) * (R + 0.5); const z = Math.cos(a) * (R + 0.5); b.wire([Math.sin(a) * R, 3.0, Math.cos(a) * R], [x, 0.8, z], 0.04, 0x333333); b.box(x, 0.6, z, 0.45, 0.1, 0.45, pick(r, GOODS)); }
 }
@@ -113,6 +117,9 @@ function bigTentRow(b, r, w, d) {
   for (let k = 0; k < rows; k++) for (let i = 0; i < n; i++) { b.push().translate(-w / 2 + (i + 0.5) * w / n, 0, -d / 2 + (k + 0.5) * d / rows); hallTent(b, r, tw, td); b.pop(); }
 }
 
+
+/** a closed storage / staff tent (back-of-house): white canvas, no door, no lettered panel, no shop front.  Stands where no stall front can open onto a walkway. */
+function storeTent(b, r, w, d) { hallTent(b, r, Math.min(w - 0.4, 14), Math.min(d - 0.4, 18), { closed: true, open: [false, false], porch: false, stripes: false }); }
 
 /* ------------------------------------------------------------------ polish wave: nine more skins (24 in total) with airbrush murals, lit signs, glowing windows */
 const NEON = 0xfff2d0;
@@ -142,7 +149,8 @@ function tikiBar(b, r, w, d) {
   if (!b.far) { for (let i = 0; i < 4; i++) { const x = -w * 0.3 + i * w * 0.2; b.cyl(x, 0, d * 0.42, 0.12, 0.12, 0.65, 5, pick(r, CRATE_COLS)); b.cyl(x, 0.65, d * 0.42, 0.2, 0.2, 0.06, 6, 0x333333, { cap: true }); }
     b.cyl(w * 0.55, 0, d * 0.4, 0.04, 0.04, 1.8, 4, 0x4a3020); b.blob(w * 0.55, 1.95, d * 0.4, 0.1, 0.17, 0.1, 0xff9a2a, { ch: 'lamp' }); b.bulb(w * 0.55, 1.95, d * 0.4, 0xffa040, 0.45); }
   b.mural(5, Math.floor(r() * 4), 0, 0.5, d * 0.1 + d * 0.2 + 0.02, w * 0.78, 0.9, { frame: false, back: false, lit: true });
-  sign(b, 'TIKI BAR', 0, 2.1, d / 2 + 0.0, Math.min(w * 0.6, 2.6), 0.46, 0, 'banner');
+  b.beam([-w / 2 + 0.2, 2.3, d / 2 - 0.25], [w / 2 - 0.2, 2.3, d / 2 - 0.25], 0.1, 0x6a4a30);                  // the lintel between the front posts the board hangs from
+  sign(b, 'TIKI BAR', 0, 2.08, d / 2 - 0.17, Math.min(w * 0.6, 2.6), 0.46, 0, 'banner');
 }
 const CRATE_COLS = [0xd8433a, 0x2d6fd0, 0xf4c430, 0x2f9a58];
 function clawMachine(b, r, w, d) {
@@ -253,14 +261,26 @@ function pitchCluster({ rect, seed, far, groundY }) {
   // the slot floor: steel plates draped on the terrain (the stalls stand on them)
   if (groundY) { const yw = (YAW[rect.face] || 0); const cs = Math.cos(yw); const sn = Math.sin(yw); const ly = (x, z) => groundY(rect.u + x * cs + z * sn, rect.w - x * sn + z * cs) - rect.y; drape(b, dims[0] / 2 - 0.4, dims[1] / 2 - 0.4, ly, (i, j) => shade(PAD[(i * 3 + j * 5 + (rect.u | 0)) % 3], 0.92 + 0.16 * r()), 4, 0.18); }
   let n = 0; let first = null;
+  // feedback B: the cluster is packed from the FRONT edge of the slot backwards (rows j = 0 at the front).  A stall may only stand where the strip between its front and the slot's front edge is
+  // free (that strip is reserved: it is the way out onto the forecourt); everything behind the front row is back-of-house (caravans, crates, a closed tent).  Never two identical skins side by side.
+  const zFront = nw * CL / 2; const placed = [];
   packFree({
     nu, nw, free, rf: r, margin: GAP, cell: CL, weights: () => (size === 'S' ? FILL_PITCH_S : FILL_PITCH_M), maxRun: nu * CL, maxDepth: nw * CL,
-    put: (i, j, sw, sd, skin) => {
-      const cu = x0 + i * CL + (sw + GAP) / 2; const cw = z0 + j * CL + (sd + GAP) / 2;
+    put: (i, j, sw, sd, skin, rot = false) => {
+      if (rot) return false;
+      const cu = x0 + i * CL + (sw + GAP) / 2; const cw = zFront - j * CL - (sd + GAP) / 2;
+      const ni = Math.ceil((sw + GAP) / CL - 1e-6); const nj = Math.ceil((sd + GAP) / CL - 1e-6);
+      if (skin) {
+        for (let jj = 0; jj < j; jj++) for (let ii = i; ii < Math.min(nu, i + ni); ii++) if (used[jj * nu + ii]) return false;          // something stands in front of it
+        const fp = { u0: cu - sw / 2, u1: cu + sw / 2, w0: cw - sd / 2, w1: cw + sd / 2 };
+        if (DUP_SKINS.includes(skin) && placed.some((o) => o.k === skin && Math.hypot(Math.max(fp.u0 - o.u1, 0, o.u0 - fp.u1), Math.max(fp.w0 - o.w1, 0, o.w0 - fp.w1)) < DUP_GAP + 0.1)) return false;
+        for (let jj = 0; jj < j; jj++) for (let ii = i; ii < Math.min(nu, i + ni); ii++) used[jj * nu + ii] = 1;                          // reserve the way out
+        placed.push({ k: skin, ...fp });
+      }
       b.push().translate(cu, 0, cw);
-      if (!skin) backLot(b, r, sw, sd); else runSkin(b, skin, r, sw, sd);
+      if (!skin) { if (sw >= 6.5 && sd >= 8 && r() < 0.5) storeTent(b, r, sw, sd); else backLot(b, r, sw, sd); } else runSkin(b, skin, r, sw, sd);
       b.pop();
-      for (let jj = j; jj < Math.min(nw, j + Math.ceil((sd + GAP) / CL - 1e-6)); jj++) for (let ii = i; ii < Math.min(nu, i + Math.ceil((sw + GAP) / CL - 1e-6)); ii++) used[jj * nu + ii] = 1;
+      for (let jj = j; jj < Math.min(nw, j + nj); jj++) for (let ii = i; ii < Math.min(nu, i + ni); ii++) used[jj * nu + ii] = 1;
       n++; if (!first && skin) first = skin; return true;
     },
   });
@@ -365,22 +385,34 @@ export function packFree({ nu, nw, free, weights, rf, put, margin = 0.3, maxRun 
     const depthFor = (sw) => { let m = 1e9; const kk = Math.min(run, Math.ceil((sw + margin) / cell - 1e-6)); for (let k = 0; k < kk; k++) m = Math.min(m, col[k]); return m * cell; };
     const runM = run * cell;
     if (depthFor(2.2) < 1.8) continue;
-    const wt = weights(i, j); let best = null; let bestScore = 0;
+    const wt = weights(i, j); const cands = [];
     for (const name of Object.keys(wt)) {
       const sk = SKINS[name]; if (!sk) continue;
-      const ww = rangeVal(rf, sk.w) * (1 + 0.2 * rf()); const dd = rangeVal(rf, sk.d) * (1 + 0.15 * rf());
-      if (ww + margin > runM) continue; const dav = depthFor(ww); if (dd + margin > dav) continue;
-      const score = wt[name] * Math.sqrt(ww * dd) * (0.4 + rf());
-      if (score > bestScore) { bestScore = score; best = { name, sw: ww, sd: dd, dav }; }
+      // a skin may stand either way round: along u as drawn (front +w / -w), or turned (its depth along u, front +u / -u)
+      for (const rot of [false, true]) {
+        if (rot && (name === 'kids' || name === 'chair' || name === 'bouncy')) continue;       // round / square skins have no "turned" form
+        const ww0 = rangeVal(rf, rot ? sk.d : sk.w) * (1 + 0.2 * rf()); const dd0 = rangeVal(rf, rot ? sk.w : sk.d) * (1 + 0.15 * rf());
+        if (ww0 + margin > runM) continue; const dav = depthFor(ww0); if (dd0 + margin > dav) continue;
+        cands.push({ name, rot, sw: ww0, sd: dd0, dav, score: wt[name] * Math.sqrt(ww0 * dd0) * (0.4 + rf()) * (rot ? 0.6 : 1) });
+      }
     }
-    if (best) {
-      let { sw, sd } = best; const sk = SKINS[best.name];
-      if (runM - (sw + margin) < 2.6 && runM - margin <= sk.w[1] * 1.5) sw = runM - margin;
-      const dav2 = depthFor(sw); if (dav2 - (sd + margin) < 2.6 && dav2 - margin <= sk.d[1] * 1.5) sd = dav2 - margin; if (sd + margin > dav2) sd = dav2 - margin;
-      if (put(i, j, sw, sd, best.name)) n++;
-    } else {
-      const swS = Math.min(runM - margin, 8); const dav = depthFor(swS);        // the depth over the WHOLE width of the strip (a free column that is shorter must shorten it: it used to poke into a neighbouring zone)
-      if (dav >= 1.8 && runM >= 2.4 && put(i, j, swS, Math.min(dav - margin, 3.2), null)) n++;
+    cands.sort((x, y) => y.score - x.score);
+    let done = false;
+    for (let ci = 0; ci < Math.min(cands.length, 8) && !done; ci++) {
+      const c = cands[ci]; let { sw, sd } = c; const sk = SKINS[c.name];
+      const wMax = c.rot ? sk.d[1] : sk.w[1]; const dMax = c.rot ? sk.w[1] : sk.d[1];
+      if (runM - (sw + margin) < 2.6 && runM - margin <= wMax * 1.5) sw = runM - margin;
+      const dav2 = depthFor(sw); if (dav2 - (sd + margin) < 2.6 && dav2 - margin <= dMax * 1.5) sd = dav2 - margin; if (sd + margin > dav2) sd = dav2 - margin;
+      if (put(i, j, sw, sd, c.name, c.rot)) { n++; done = true; }
+    }
+    if (!done) {
+      // no skin can open its front onto a walkway here (or none fits): back-of-house.  The biggest candidate's size when there is one (a caravan yard / closed tent), else a thin strip.
+      const big = cands[0];
+      if (big && put(i, j, Math.min(big.sw, runM - margin), Math.min(big.sd, depthFor(Math.min(big.sw, runM - margin)) - margin), null)) n++;
+      else {
+        const swS = Math.min(runM - margin, 8); const dav = depthFor(swS);        // the depth over the WHOLE width of the strip (a free column that is shorter must shorten it: it used to poke into a neighbouring zone)
+        if (dav >= 1.8 && runM >= 2.4 && put(i, j, swS, Math.min(dav - margin, 3.2), null)) n++;
+      }
     }
   }
   return n;
@@ -430,40 +462,117 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   };
   let count = 0; const byKind = {}; const triKind = {};      // triKind: triangles per skin (diagnostics for the budget)
   const trisNow = () => { let t = 0; for (const k of Object.keys(b.ch)) t += b.ch[k].tris; return t; };
-  const place = (skin, u, w, face, rr, maxW, maxD) => {
-    const y = groundY(u, w);
+  // ---- feedback B: every stall front opens straight onto a walkway; no stall stands in front of / behind another; no identical skin side by side
+  // `occ` = footprints of stalls and plots (0.5 m cells, +0.2 m margin) and the outside of the field; the zone raster `zf` says where the walkways are.  The probe walks straight out
+  // of the front (centre line, and the two quarter lines) and succeeds when the centre line reaches a walkway cell before anything else is in the way (layout.js frontProbe does the exact
+  // version for the validator; the grid is a little stricter: the reach is shorter, the margins wider).
+  const occ = new Uint8Array(FNU * FNW);
+  for (let k = 0; k < occ.length; k++) if (fine[k] === 2) occ[k] = 2;
+  const occMark = (u0, u1, w0, w1) => {
+    const i0 = Math.max(0, Math.floor((u0 - U0) / FINE)); const i1 = Math.min(FNU - 1, Math.ceil((u1 - U0) / FINE) - 1); const j0 = Math.max(0, Math.floor((w0 - W0) / FINE)); const j1 = Math.min(FNW - 1, Math.ceil((w1 - W0) / FINE) - 1);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) occ[j * FNU + i] |= 1;
+  };
+  pitchRects.forEach((q) => occMark(q.u0, q.u1, q.w0, q.w1));
+  const GRID_REACH = FRONT_REACH - 0.6;
+  /** straight out of the `face` of the footprint `fp`: the distance (m) at which a walkway starts, or null (something is in the way / no walkway within reach) */
+  const probeFront = (fp, face) => {
+    const f = FACE_VEC[face]; if (!f) return null;
+    const cu = (fp.u0 + fp.u1) / 2; const cw = (fp.w0 + fp.w1) / 2; const half = Math.max(0.5, (f[0] ? fp.w1 - fp.w0 : fp.u1 - fp.u0) / 4);
+    const edge = f[0] > 0 ? fp.u1 : f[0] < 0 ? fp.u0 : f[1] > 0 ? fp.w1 : fp.w0;
+    for (let t = 0.25; t <= GRID_REACH + 1e-9; t += 0.25) {
+      for (const k of [0, -half, half]) {
+        const u = f[0] ? edge + f[0] * t : cu + k; const w = f[1] ? edge + f[1] * t : cw + k;
+        const i = Math.floor((u - U0) / FINE); const j = Math.floor((w - W0) / FINE); if (i < 0 || j < 0 || i >= FNU || j >= FNW) return null;
+        const c = j * FNU + i;
+        if (k === 0 && zf.data[c] && res.inZone(u, w)) return t;          // the raster says "maybe" (cells overlapping a zone), the zone list decides
+        if (occ[c]) return null;
+      }
+    }
+    return null;
+  };
+  /** keep the strip in front of a stall clear for good: nothing else may be packed into it */
+  const reserveFront = (fp, face, t) => {
+    const f = FACE_VEC[face]; const e = t + 0.3;
+    const strip = f[0] > 0 ? { u0: fp.u1, u1: fp.u1 + e, w0: fp.w0, w1: fp.w1 } : f[0] < 0 ? { u0: fp.u0 - e, u1: fp.u0, w0: fp.w0, w1: fp.w1 } : f[1] > 0 ? { u0: fp.u0, u1: fp.u1, w0: fp.w1, w1: fp.w1 + e } : { u0: fp.u0, u1: fp.u1, w0: fp.w0 - e, w1: fp.w0 };
+    fineMark(strip.u0, strip.u1, strip.w0, strip.w1); grid.mark(strip.u0, strip.u1, strip.w0, strip.w1);
+  };
+  const gapOf = (a, c) => Math.hypot(Math.max(a.u0 - c.u1, 0, c.u0 - a.u1), Math.max(a.w0 - c.w1, 0, c.w0 - a.w1));
+  /** may a stall of this skin stand at this footprint?  Not beside the same fixed skin; the big themed skins (Spukhaus ...) keep BIG_SPACING apart */
+  const skinOk = (skin, fp) => {
+    const dup = DUP_SKINS.includes(skin); const big = BIG_SKINS.includes(skin); if (!dup && !big) return true;
+    for (const o of stalls) {
+      if (o.k !== skin) continue;
+      if (dup && gapOf(fp, o) < DUP_GAP + 0.1) return false;
+      if (big && Math.hypot((fp.u0 + fp.u1 - o.u0 - o.u1) / 2, (fp.w0 + fp.w1 - o.w0 - o.w1) / 2) < BIG_SPACING + 1) return false;
+    }
+    return true;
+  };
+  const worldDims = (face, lw, ld) => (face === '+u' || face === '-u') ? [ld, lw] : [lw, ld];      // [extent along u, extent along w] of a stall drawn lw wide, ld deep
+  const footprintAt = (cu, cw, face, lw, ld, over = 0.15) => { const [eu, ew] = worldDims(face, lw, ld); return { u0: cu - eu / 2 - over, u1: cu + eu / 2 + over, w0: cw - ew / 2 - over, w1: cw + ew / 2 + over }; };
+  /** the first of `faces` whose front opens onto a walkway for a stall drawn lw x ld at (cu, cw): { face, t, fp } or null */
+  const openFace = (cu, cw, lw, ld, faces) => {
+    for (const face of faces) {
+      const fp = footprintAt(cu, cw, face, lw, ld); if (touchesAlleyAway(fp, face)) continue;
+      const t = probeFront(fp, face); if (t !== null) return { face, t, fp };
+    }
+    return null;
+  };
+  /** a stall standing right at an alley (within the frontage strip + 0.6 m) must face it, never turn its back or side to it (same rule as layout.js validateStallFaces) */
+  const touchesAlleyAway = (fp, face) => {
+    let touching = 0; let ok = false;
+    for (const a of ALLEYS) {
+      const near = (FRONTAGE[a.kind] ?? 0.8) + 0.6; const ov = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0);
+      if (a.axis === 'u' && ov(fp.u0, fp.u1, a.u[0], a.u[1]) > 2) {
+        if (fp.w1 <= a.w[0] + 1e-6 && a.w[0] - fp.w1 < near) { touching++; if (face === '+w') ok = true; }
+        if (fp.w0 >= a.w[1] - 1e-6 && fp.w0 - a.w[1] < near) { touching++; if (face === '-w') ok = true; }
+      } else if (a.axis === 'w' && ov(fp.w0, fp.w1, a.w[0], a.w[1]) > 2) {
+        if (fp.u1 <= a.u[0] + 1e-6 && a.u[0] - fp.u1 < near) { touching++; if (face === '+u') ok = true; }
+        if (fp.u0 >= a.u[1] - 1e-6 && fp.u0 - a.u[1] < near) { touching++; if (face === '-u') ok = true; }
+      }
+    }
+    return touching > 0 && !ok;
+  };
+  const AXIS_FACES = { w: ['+w', '-w'], u: ['+u', '-u'] };
+  const facesFor = (pref, axis) => { const list = AXIS_FACES[axis]; return list.includes(pref) ? [pref, list.find((f) => f !== pref)] : list; };
+  const place = (skin, u, w, face, rr, lw, ld) => {
+    const y = groundY(u, w); const [eu, ew] = worldDims(face, lw, ld);
     b.push().translate(u, y, w).rotY(YAW[face]); b.aoY = y; b.far = LOW || (!ALWAYS_NEAR.has(skin) && corridorDist(u, w) > 7);        // stalls deep in the field are roofs from above: cheap form
-    const t0 = trisNow(); const used = drawSkin(b, skin, rr, maxW, maxD); b.far = LOW; triKind[skin] = (triKind[skin] || 0) + trisNow() - t0;
+    const t0 = trisNow(); runSkin(b, skin, rr, lw, ld); b.far = LOW; triKind[skin] = (triKind[skin] || 0) + trisNow() - t0;
     b.pop(); b.aoY = 0; count++;
-    b.push().translate(u, y, w); groundPad(b, groundY, u, w, y, used.w + 0.35, used.d + 0.35, rr); b.pop(); byKind[skin] = (byKind[skin] || 0) + 1;
-    addStall(u, w, used.w, used.d, 0.15, skin, face); fineMark(u - used.w / 2 - 0.2, u + used.w / 2 + 0.2, w - used.d / 2 - 0.2, w + used.d / 2 + 0.2);
-    return used;
+    b.push().translate(u, y, w); groundPad(b, groundY, u, w, y, eu + 0.35, ew + 0.35, rr); b.pop(); byKind[skin] = (byKind[skin] || 0) + 1;
+    addStall(u, w, eu, ew, 0.15, skin, face); fineMark(u - eu / 2 - 0.2, u + eu / 2 + 0.2, w - ew / 2 - 0.2, w + ew / 2 + 0.2); occMark(u - eu / 2 - 0.2, u + eu / 2 + 0.2, w - ew / 2 - 0.2, w + ew / 2 + 0.2);
   };
   const wsum = (m) => Object.values(m).reduce((a, v) => a + v, 0);
   const pickSkin = (m, rr) => { let t = rr() * wsum(m); for (const [k, v] of Object.entries(m)) { t -= v; if (t <= 0) return k; } return Object.keys(m)[0]; };
   const fits = (u0, u1, w0, w1) => grid.free(u0, u1, w0, w1) && rectOk({ u0, u1, w0, w1 }) && [[u0, w0], [u1, w0], [u0, w1], [u1, w1], [(u0 + u1) / 2, (w0 + w1) / 2]].every(([u, w]) => inPoly(fieldPoly, u, w));
-  // rows of stalls along the alleys
+  // rows of stalls along the alleys: the stall is drawn at exactly the size that was fitted (it used to be re-rolled smaller, which left gaps between its front and the alley)
   ROWS.forEach((row, ri) => {
     const rr = mulberry(seed * 31 + ri * 977); let u = row.u ? row.u[0] : 14; const uEnd = row.u ? row.u[1] : 292;
     while (u < uEnd) {
-      const skin = pickSkin(row.skins, rr); const s = SKINS[skin];
-      let w = rangeVal(rr, s.w); let d = Math.min(rangeVal(rr, s.d), row.depth);
-      // try the chosen skin, then shrink to the smallest ones when the gap is tight
-      let ok = false; let tries = 0;
-      while (!ok && tries < 5) {
-        const front = row.front; const wA = row.face === '+w' ? front - d : front; const wB = row.face === '+w' ? front : front + d;
-        if (fits(u - 0.2, u + w + 0.2, wA - 0.2, wB + 0.2)) { ok = true; break; }
-        w *= 0.82; d *= 0.88; tries++;
-        if (w < 3 || d < 2.6) break;
+      let done = false; let blocked = false;
+      for (let attempt = 0; attempt < 5 && !done && !blocked; attempt++) {
+        const skin = pickSkin(row.skins, rr); const s = SKINS[skin];
+        let w = rangeVal(rr, s.w); let d = Math.min(rangeVal(rr, s.d), row.depth);
+        // try the chosen skin, then shrink to the smallest ones when the gap is tight
+        let ok = false; let tries = 0; const front = row.front; let wA = 0; let wB = 0;
+        while (!ok && tries < 5) {
+          wA = row.face === '+w' ? front - d : front; wB = row.face === '+w' ? front : front + d;
+          if (fits(u - 0.2, u + w + 0.2, wA - 0.2, wB + 0.2)) { ok = true; break; }
+          w *= 0.82; d *= 0.88; tries++;
+          if (w < 3 || d < 2.6) break;
+        }
+        if (!ok) { blocked = true; break; }
+        const cu = u + w / 2; const cw = (wA + wB) / 2; const fp = footprintAt(cu, cw, row.face, w, d);
+        const t = touchesAlleyAway(fp, row.face) ? null : probeFront(fp, row.face);
+        if (t === null) { blocked = true; break; }                     // the alley is not in front of this part of the row (the row skips it)
+        if (!skinOk(skin, fp)) continue;                               // the same skin stands right beside it: draw another one
+        reserveFront(fp, row.face, t); place(skin, cu, cw, row.face, rr, w, d); grid.mark(u - 0.2, u + w + 0.2, wA - 0.2, wB + 0.2);
+        u += w + 0.35 + rr() * 0.5; done = true;
       }
-      if (!ok) { u += 1.5; continue; }
-      const front = row.front; const wA = row.face === '+w' ? front - d : front; const wB = row.face === '+w' ? front : front + d;
-      const cu = u + w / 2; const cw = row.face === '+w' ? front - d / 2 : front + d / 2;
-      place(skin, cu, cw, row.face, rr, w, d); grid.mark(u - 0.2, u + w + 0.2, wA - 0.2, wB + 0.2);
-      u += w + 0.35 + rr() * 0.5;
+      if (!done) u += 1.5;
     }
   });
-  // gap filling: several greedy passes (big to small) over the whole field in a shuffled scan order; the front looks at the nearest alley
+  // gap filling: several greedy passes (big to small) over the whole field in a shuffled scan order; the front looks at the nearest walkway it can open onto (nothing in front, no plot, no back of another stall)
   const rp = mulberry(seed * 53 + 5);
   const nearestFace = (u, w, d) => faceToward(u, w + d / 2);
   const cells = []; for (let w = 4; w < 126; w += 2) for (let u = 14; u < 292; u += 2) cells.push([u, w]);
@@ -473,30 +582,46 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
     for (const [u, w] of cells) {
       if (cap && placed >= cap) break;
       if (rp() > prob) continue;
-      const sw = rangeVal(rp, s.w); const sd = rangeVal(rp, s.d); const face = faceToward(u + sw / 2, w + sd / 2);
-      if (fits(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3)) { placed++; place(skin, u + sw / 2, w + sd / 2, face, rp, sw, sd); grid.mark(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3); }
+      const lw = rangeVal(rp, s.w); const ld = rangeVal(rp, s.d); const pref = faceToward(u + lw / 2, w + ld / 2);
+      const axis = pref === '+u' || pref === '-u' ? 'u' : 'w'; const [eu, ew] = worldDims(pref, lw, ld);
+      if (!fits(u - 0.3, u + eu + 0.3, w - 0.3, w + ew + 0.3)) continue;
+      const cu = u + eu / 2; const cw = w + ew / 2;
+      const open = openFace(cu, cw, lw, ld, facesFor(pref, axis)); if (!open || !skinOk(skin, open.fp)) continue;
+      placed++; reserveFront(open.fp, open.face, open.t); place(skin, cu, cw, open.face, rp, lw, ld); grid.mark(u - 0.3, u + eu + 0.3, w - 0.3, w + ew + 0.3);
     }
   });
-  // polish 2: pack every free rectangle that is left (1 m grid, packFree).  Halls dominate the NW section, the SE rim becomes a service lot, stalls away from the alleys are
-  // built in the cheap `far` form (nobody sees their detail from the alley, they are roofs from above).
+  // polish 2: pack every free rectangle that is left (0.5 m grid, packFree).  Halls dominate the NW section, the SE rim becomes a service lot, stalls away from the alleys are
+  // built in the cheap `far` form (nobody sees their detail from the alley, they are roofs from above).  Feedback B: a stall whose front cannot open onto a walkway is never built;
+  // the space becomes back-of-house (caravans, crates, generators, fenced storage, a closed storage tent) instead.
   const rf = mulberry(seed * 977 + 41); let packed = 0;
   const cellFree = (i, j) => i >= 0 && j >= 0 && i < FNU && j < FNW && !fine[j * FNU + i];
   packed = packFree({
     nu: FNU, nw: FNW, free: cellFree, rf, cell: FINE,
     weights: (i, j) => { const w = W0 + j * FINE; return w > 100 ? FILL_SMALL : w < 26 ? FILL_NW : FILL_MID; },
-    put: (i, j, sw, sd, skin) => {
+    put: (i, j, sw, sd, skin, rot = false) => {
       const u = U0 + i * FINE; const w = W0 + j * FINE; const gap = 0.3;
       const cu = u + (sw + gap) / 2; const cw = w + (sd + gap) / 2;
       if (![[u, w], [u + sw + gap, w], [u, w + sd + gap], [u + sw + gap, w + sd + gap]].every(([x, z]) => inPoly(fieldPoly, x, z))) { fineMark(u, u + 1, w, w + 1); return false; }
       const interior = corridorDist(cu, cw) > 2.5 && w > 4; const y = groundY(cu, cw);
-      b.push().translate(cu, y, cw); b.aoY = y; b.far = interior || LOW;
-      const t0 = trisNow(); let kk;
-      if (!skin || (w > 100 && skin !== 'camelot' && sw >= 5 && sd >= 3 && rf() < 0.5)) { b.rotY(rf() < 0.5 ? 0 : Math.PI); backLot(b, rf, sw, sd); kk = 'backLot'; }
-      else { b.rotY(YAW[nearestFace(cu, cw, 0)]); runSkin(b, skin, rf, sw, sd); kk = skin; }
-      byKind[kk] = (byKind[kk] || 0) + 1; triKind[kk] = (triKind[kk] || 0) + trisNow() - t0;
+      const lot = !skin || (w > 100 && skin !== 'camelot' && sw >= 5 && sd >= 3 && rf() < 0.5);
+      let face = '?';
+      if (!lot) {
+        // a rotated candidate (world u extent = the skin's depth) faces +u / -u, an ordinary one +w / -w; the nearest alley decides between the two
+        const pref = nearestFace(cu, cw, 0); const lw = rot ? sd : sw; const ld = rot ? sw : sd;
+        const open = openFace(cu, cw, lw, ld, facesFor(pref, rot ? 'u' : 'w'));
+        if (!open || !skinOk(skin, footprintAt(cu, cw, open.face, lw, ld))) return false;
+        face = open.face; reserveFront(open.fp, face, open.t);
+        b.push().translate(cu, y, cw); b.aoY = y; b.far = interior || LOW; b.rotY(YAW[face]);
+        const t0 = trisNow(); runSkin(b, skin, rf, lw, ld); byKind[skin] = (byKind[skin] || 0) + 1; triKind[skin] = (triKind[skin] || 0) + trisNow() - t0;
+      } else {
+        b.push().translate(cu, y, cw); b.aoY = y; b.far = interior || LOW; b.rotY(rf() < 0.5 ? 0 : Math.PI);
+        const t0 = trisNow();
+        if (sw >= 6.5 && sd >= 8 && rf() < 0.55) storeTent(b, rf, sw, sd); else backLot(b, rf, sw, sd);
+        byKind.backLot = (byKind.backLot || 0) + 1; triKind.backLot = (triKind.backLot || 0) + trisNow() - t0;
+      }
       b.pop(); b.aoY = 0; b.far = LOW; count++;
       b.push().translate(cu, y, cw); groundPad(b, groundY, cu, cw, y, sw + gap - 0.05, sd + gap - 0.05, rf); b.pop();
-      addStall(cu, cw, sw, sd, 0.15, skin || 'lot', skin ? nearestFace(cu, cw, 0) : '?'); markAll(u - 0.05, u + sw + gap + 0.05, w - 0.05, w + sd + gap + 0.05);
+      addStall(cu, cw, sw, sd, 0.15, lot ? 'lot' : skin, lot ? '?' : face); markAll(u - 0.05, u + sw + gap + 0.05, w - 0.05, w + sd + gap + 0.05); occMark(u - 0.05, u + sw + gap + 0.05, w - 0.05, w + sd + gap + 0.05);
       return true;
     },
   });

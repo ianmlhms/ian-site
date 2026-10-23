@@ -6,7 +6,10 @@ import { createSmoother } from "./rigs.js";
 import { makeBuilder, makeTexBuilder, glowTexture, steelFloorTexture, airbrushTexture } from "./mesh.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const EYE_UP = 1.25, EYE_BACK = 0.15, PITCH = -0.03;   // metres above the floor / behind the car centre: the driver's eye, just behind the steering wheel of the cockpit drawn by this rig
+/** the driver's eye in the car's frame (metres): 1.5 above the floor, 0.42 behind the car centre (over the seat), looking a little down.  The wheel (CENTER, R 0.115) is 0.72 m ahead and 0.38 m
+ * below the eye, so it fills about 18 % of the screen height at the bottom (the old 0.21 m wheel 0.67 m in front of a 1.25 m eye took half the screen); the bonnet is a slim band behind it. */
+const EYE_UP = 1.5, EYE_BACK = 0.42, PITCH = -0.05;
+export const WHEEL = { center: [0, 1.1, 0.32], r: 0.09, ax: [1, 0, 0], ay: [0, 0.87, 0.5], maxTurn: 0.95 };
 
 export function createDriveRig(env) {
   const { T, ud, def, id, fx, snd, audio, calm, walk, group } = env;
@@ -19,7 +22,7 @@ export function createDriveRig(env) {
   let sparks = null, sparkPos = null, sparkLife = null;
   const extras = [];                                  // everything this rig adds to the model group (removed in stop())
   const mats = [];
-  let cockpit = null, bulbs = null;
+  let cockpit = null, bulbs = null, wheelG = null, wheelAxis = null, wheelAngle = 0;
   const carc = ud.carColors ?? { body: 0x9fb4c8, acc: 0xf08a22, pole: [0xb8212e, 0xefe3c2], uv: [0.55, 0.25, 1] };
   const basic = o => { const m = new T.MeshBasicMaterial({ fog: false, ...o }); mats.push(m); return m; };
   const add = o => { group.add(o); extras.push(o); return o; };
@@ -40,7 +43,7 @@ export function createDriveRig(env) {
     const pos = [], col = [], c = new T.Color(); const palette = [0xfff0c0, 0xff6ad0, 0x6ae8ff, 0xffd060];
     const push = (x, y, z, k) => { pos.push(x, y, z); c.set(palette[k % palette.length]); col.push(c.r, c.g, c.b); };
     let n = 0;
-    for (const z of [-5.6, -2.0, 1.6]) for (const dz of [-0.55, 0.55]) for (let x = fl.x0 + 0.4; x <= fl.x1 - 0.4; x += 0.55) push(x, ceilY - 0.12, z + dz, n++);
+    for (const k of [0.125, 0.375, 0.625, 0.875]) for (const dz of [-0.55, 0.55]) for (let x = fl.x0 + 0.4; x <= fl.x1 - 0.4; x += 0.55) push(x, ceilY - 0.12, fl.z0 + k * (fl.z1 - fl.z0) + dz, n++);       // under the four UV bars of the hall model
     for (let x = fl.x0; x <= fl.x1; x += 0.5) { push(x, floorY + 1.32, fl.z0 - 0.05, n++); if (Math.abs(x) > 2) push(x, floorY + 1.32, fl.z1 + 0.05, n++); }
     for (let z = fl.z0; z <= fl.z1; z += 0.5) { push(fl.x0 - 0.05, floorY + 1.32, z, n++); push(fl.x1 + 0.05, floorY + 1.32, z, n++); }
     const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(new Float32Array(pos), 3)); g.setAttribute("color", new T.BufferAttribute(new Float32Array(col), 3));
@@ -49,15 +52,17 @@ export function createDriveRig(env) {
     bulbs.frustumCulled = false; bulbs.name = "ride-bulbs"; bulbs.renderOrder = 4; add(bulbs);
   }
 
-  /** your own car in first person (car 0 of the model is hidden): sloping bonnet with a stripe, the rubber bumper ring, the dashboard, a thin steering wheel with a hub, your hands and sleeves, the pole behind */
+  /** your own car in first person (car 0 of the model is hidden): a slim sloping bonnet with a stripe, the dashboard, the rubber bumper ring, a small steering wheel (it turns with the stick),
+   * your two hands in orange sleeves on the rim, the pole behind.  Everything below the horizon line of the screen's bottom fifth. */
   function buildCockpit() {
     const b = makeBuilder(T), body = carc.body, acc = carc.acc;
-    b.quad([-0.5, 0.88, 0.5], [0.5, 0.88, 0.5], [0.62, 0.58, 1.3], [-0.62, 0.58, 1.3], body);
-    b.quad([-0.1, 0.885, 0.5], [0.1, 0.885, 0.5], [0.14, 0.585, 1.3], [-0.14, 0.585, 1.3], acc);
-    for (const sx of [-1, 1]) { b.quad([sx * 0.5, 0.88, 0.5], [sx * 0.62, 0.58, 1.3], [sx * 0.62, 0.3, 1.3], [sx * 0.5, 0.3, 0.5], 0x7d8da0); }
-    b.quad([-0.62, 0.58, 1.3], [0.62, 0.58, 1.3], [0.62, 0.3, 1.3], [-0.62, 0.3, 1.3], 0x8898ac);
-    b.box(0, 0.93, 0.4, 1.3, 0.1, 0.3, body); b.box(0, 0.99, 0.5, 1.2, 0.03, 0.1, 0x3a3f46);
-    for (const x of [-0.45, 0.45]) b.box(x, 0.99, 0.43, 0.14, 0.015, 0.14, 0xffb030);                        // dash lamps
+    // the bonnet: from just behind the wheel down to the nose, kept slim (the wheel stands in front of its rear half)
+    b.quad([-0.5, 0.98, 0.34], [0.5, 0.98, 0.34], [0.62, 0.6, 1.3], [-0.62, 0.6, 1.3], body);
+    b.quad([-0.05, 0.985, 0.34], [0.05, 0.985, 0.34], [0.07, 0.605, 1.3], [-0.07, 0.605, 1.3], acc);
+    for (const sx of [-1, 1]) { b.quad([sx * 0.5, 0.98, 0.34], [sx * 0.62, 0.6, 1.3], [sx * 0.62, 0.3, 1.3], [sx * 0.5, 0.3, 0.34], 0x7d8da0); }
+    b.quad([-0.62, 0.6, 1.3], [0.62, 0.6, 1.3], [0.62, 0.3, 1.3], [-0.62, 0.3, 1.3], 0x8898ac);
+    b.box(0, 1.0, 0.22, 1.24, 0.1, 0.34, 0x2a2e36); b.box(0, 1.055, 0.3, 1.0, 0.02, 0.1, 0x3a3f46);          // the dashboard under the wheel
+    for (const x of [-0.42, 0.42]) b.box(x, 1.057, 0.3, 0.06, 0.012, 0.05, 0xffb030);                           // dash lamps
     // the rubber ring (a rounded rectangle) around the car
     const N = 24, ring = [];
     for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2, cs = Math.cos(a), sn = Math.sin(a); ring.push([0.85 * Math.sign(cs) * Math.abs(cs) ** 0.7, 1.3 * Math.sign(sn) * Math.abs(sn) ** 0.7]); }
@@ -69,20 +74,25 @@ export function createDriveRig(env) {
       b.quad(at(p, r, 0.36), at(q, r, 0.36), at(q, r, 0.1), at(p, r, 0.1), 0x2a2d34);
       b.quad(at(p, -r * 0.2, 0.37), at(q, -r * 0.2, 0.37), at(q, r * 0.2, 0.37), at(p, r * 0.2, 0.37), 0xc4cad4);
     }
-    // the steering wheel: a thin tilted rim, a gold hub, three spokes and the column; the hands
-    const C = [0, 1.02, 0.52], ax = [1, 0, 0], ay = [0, 0.87, 0.5];
-    b.ring(C, ax, ay, 0.21, 16, 0.035, 0.045, 0x15161a); b.ball(C[0], C[1], C[2], 0.06, 0xd8a830, 6);
-    for (const a of [Math.PI / 2, Math.PI * 0.5 + 2.1, Math.PI * 0.5 - 2.1]) b.beam(C, [C[0] + (ax[0] * Math.cos(a) + ay[0] * Math.sin(a)) * 0.21, C[1] + (ax[1] * Math.cos(a) + ay[1] * Math.sin(a)) * 0.21, C[2] + (ax[2] * Math.cos(a) + ay[2] * Math.sin(a)) * 0.21], 0.03, 0.03, 0x15161a);
-    b.beam([0, 0.93, 0.4], C, 0.07, 0.07, 0x23262a);
+    // the column and your hands: on the rim at 3 and 9 o'clock, sleeves back to the shoulders
+    const C = WHEEL.center, ax = WHEEL.ax, ay = WHEEL.ay, R = WHEEL.r;
+    b.beam([0, 1.0, 0.22], [C[0], C[1] - 0.02, C[2] - 0.02], 0.05, 0.05, 0x23262a);
     for (const sx of [-1, 1]) {
-      const a = sx > 0 ? 0.55 : Math.PI - 0.55, hand = [C[0] + (ax[0] * Math.cos(a) + ay[0] * Math.sin(a)) * 0.21, C[1] + (ax[1] * Math.cos(a) + ay[1] * Math.sin(a)) * 0.21, C[2] + (ax[2] * Math.cos(a) + ay[2] * Math.sin(a)) * 0.21];
-      b.ball(hand[0], hand[1], hand[2], 0.055, 0xf0c4a0, 6);                                                  // the hand
-      b.beam([hand[0], hand[1] - 0.02, hand[2] - 0.05], [sx * 0.4, 0.78, -0.35], 0.055, 0.05, 0xf06a1e);        // sleeve
-      b.beam([hand[0], hand[1], hand[2] - 0.04], [hand[0] + sx * 0.02, hand[1] - 0.03, hand[2] - 0.1], 0.07, 0.06, 0xf0c4a0);
+      const a = sx > 0 ? 0.25 : Math.PI - 0.25, hand = [C[0] + (ax[0] * Math.cos(a) + ay[0] * Math.sin(a)) * R, C[1] + (ax[1] * Math.cos(a) + ay[1] * Math.sin(a)) * R, C[2] + (ax[2] * Math.cos(a) + ay[2] * Math.sin(a)) * R];
+      b.ball(hand[0], hand[1], hand[2], 0.04, 0xf0c4a0, 6);                                                  // the hand
+      b.beam([hand[0], hand[1] - 0.01, hand[2] - 0.03], [sx * 0.3, 0.98, -0.26], 0.038, 0.034, 0xe0601c);       // sleeve
+      b.beam([hand[0], hand[1], hand[2] - 0.02], [hand[0] + sx * 0.015, hand[1] - 0.02, hand[2] - 0.06], 0.055, 0.045, 0xf0c4a0);
     }
     // the pole behind the seat with its flag
     b.beam([0, 0.9, -0.8], [0, ceilY - floorY - 0.05, -0.8], 0.06, 0.06, carc.pole[0]);
     cockpit = new T.Group(); cockpit.name = "ride-cockpit"; cockpit.add(b.mesh(basic({ vertexColors: true, side: T.DoubleSide }))); add(cockpit);
+    // the wheel: a thin rim, a gold hub, three spokes, in its own group at the hub so that it can turn about the column
+    const w = makeBuilder(T), o = [0, 0, 0];
+    w.ring(o, ax, ay, R, 18, 0.026, 0.034, 0x15161a); w.ball(0, 0, 0, 0.035, 0xd8a830, 6);
+    for (const a of [Math.PI / 2, Math.PI * 0.5 + 2.1, Math.PI * 0.5 - 2.1]) w.beam(o, [(ax[0] * Math.cos(a) + ay[0] * Math.sin(a)) * R, (ax[1] * Math.cos(a) + ay[1] * Math.sin(a)) * R, (ax[2] * Math.cos(a) + ay[2] * Math.sin(a)) * R], 0.022, 0.022, 0x15161a);
+    wheelG = new T.Group(); wheelG.name = "ride-wheel"; wheelG.position.set(C[0], C[1], C[2]); wheelG.add(w.mesh(basic({ vertexColors: true, side: T.DoubleSide })));
+    wheelAxis = new T.Vector3(ax[1] * ay[2] - ax[2] * ay[1], ax[2] * ay[0] - ax[0] * ay[2], ax[0] * ay[1] - ax[1] * ay[0]).normalize();
+    cockpit.add(wheelG);
   }
 
 
@@ -154,6 +164,7 @@ export function createDriveRig(env) {
       updateSparks(dt);
       frameOf(dt);
       cockpit.position.set(p.x, floorY, p.z); cockpit.rotation.y = p.yaw;
+      wheelAngle += (st.input.steer * WHEEL.maxTurn - wheelAngle) * clamp(dt * 9, 0, 1); if (wheelG) wheelG.quaternion.setFromAxisAngle(wheelAxis, wheelAngle);       // the wheel follows the stick
       snd.tickMusic();
       if (st.rt >= def.dur) { st.over = true; return true; }
       return false;

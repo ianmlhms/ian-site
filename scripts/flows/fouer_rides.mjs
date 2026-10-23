@@ -19,15 +19,15 @@ const SPEEDUP = 6;
 
 /** per ride: horizontal reach of the camera from the pitch centre (m), minimum path length (m), min up.y of the camera, where to take the screenshots (progress), min height gain */
 const RIDES = {
-  kanner: { reach: 8, path: 8, upY: 0.5, shots: [0.4] },
-  gold: { reach: 12, path: 14, upY: 0.5, shots: [0.4] },
-  kette: { reach: 14, path: 14, upY: 0.5, shots: [0.45] },
-  bayern: { reach: 12, path: 14, upY: 0.5, shots: [0.45] },
-  happy: { reach: 12, path: 12, upY: 0.5, shots: [0.45] },
-  break: { reach: 12, path: 12, upY: 0.5, shots: [0.5] },
-  musik: { reach: 12, path: 14, upY: 0.5, shots: [0.5] },
+  kanner: { reach: 8, path: 8, upY: 0.5, shots: [0.4], look: "travel" },
+  gold: { reach: 12, path: 14, upY: 0.5, shots: [0.4], look: "travel" },
+  kette: { reach: 14, path: 14, upY: 0.5, shots: [0.45], look: "travel" },
+  bayern: { reach: 12, path: 14, upY: 0.5, shots: [0.45], look: "travel" },
+  happy: { reach: 12, path: 12, upY: 0.5, shots: [0.45], look: "travel" },
+  break: { reach: 12, path: 12, upY: 0.5, shots: [0.5], look: "centre" },
+  musik: { reach: 12, path: 14, upY: 0.5, shots: [0.5], look: "travel" },
   takeoff: { reach: 14, path: 12, upY: 0.5, shots: [0.5] },
-  jules: { reach: 20, path: 120, upY: 0.35, rise: 45, shots: [0.5] },
+  jules: { reach: 20, path: 120, upY: 0.35, rise: 45, shots: [0.5], look: "centre" },
   hangover: { reach: 8, path: 120, upY: 0.5, rise: 70, shots: [0.35, 0.83] },
   booster: { reach: 32, path: 120, upY: -1, rise: 25, shots: [0.45] },
   infinity: { reach: 30, path: 60, upY: -1, rise: 10, shots: [0.34, 0.6] },
@@ -171,6 +171,17 @@ export const flow = {
       h.expect(maxY - gy <= 100, `${id}: the camera stays below 100 m (${(maxY - gy).toFixed(0)} m)`);
       h.expect(badFrame === 0, `${id}: every frame is finite, unit length and orthogonal (${badFrame} bad of ${cams.length})`);
       h.expect(minUp >= R.upY, `${id}: the camera's up vector stays sane (lowest up.y ${minUp.toFixed(2)}, limit ${R.upY})`);
+      if (R.look) {              // feedback B: the ride starts looking the way it travels (or at the ride's centre where that is the natural view), never backwards
+        let n = 0, sum = 0, sumC = 0;
+        for (let i = 1; i < cams.length && n < 60; i++) {
+          const a = cams[i - 1], c = cams[i]; const dx = c[0] - a[0], dz = c[2] - a[2], sp = Math.hypot(dx, dz); if (sp < 0.004) continue;
+          const fh = Math.hypot(c[6], c[8]) || 1; sum += (c[6] * dx + c[8] * dz) / (fh * sp);
+          const tx = spot.cx - c[0], tz = spot.cz - c[2], tl = Math.hypot(tx, tz) || 1; sumC += (c[6] * tx + c[8] * tz) / (fh * tl); n++;
+        }
+        const along = n ? sum / n : 0, toCentre = n ? sumC / n : 0;
+        if (R.look === "travel") h.expect(n > 5 && along > 0.75, `${id}: the first seconds look along the direction of travel (forward . velocity = ${along.toFixed(2)}, ${n} samples)`);
+        else h.expect(n > 5 && toCentre > 0.75, `${id}: the first seconds look at the ride's centre (forward . to centre = ${toCentre.toFixed(2)}, ${n} samples)`);
+      }
       h.expect(log.max.draws <= WALK_DRAWS && log.max.tris <= WALK_TRIS, `${id}: perf ${log.max.draws} draws / ${Math.round(log.max.tris / 1000)}k triangles (budget ${WALK_DRAWS} / ${WALK_TRIS / 1000}k)`);
       const after = await evalG(page, g => ({ ea: g.game.state.ea, view: { ...g.walk.view }, active: g.ride.active, interior: Boolean(document.querySelector("canvas") && g.fair.pits && [...g.fair.pits.values()].some(p => p.near && p.near.getObjectByName && p.near.getObjectByName("ghost-interior"))), fade: document.querySelector(".wk-fade").style.opacity }));
       const flagCount = await evalG(page, (g, a) => (g.game.state.ea.match(new RegExp(a.f, "g")) || []).length, { f: await flagOf(page, evalG, id) });
@@ -195,6 +206,13 @@ export const flow = {
         h.expect(Math.max(...rigs.flatMap(r => r.doorsOpen ?? [0])) > 1.2, "geister: the doors banged open");
         h.expect(log.strobe > 0.5, `geister: the strobe flashed (${log.strobe.toFixed(2)})`);
         void last;
+      }
+      if (id === "bayern") {         // feedback B: the track goes up and down and is banked, the car follows both (height and roll of the camera)
+        const ys = cams.map(c => c[1]), rolls = cams.map(c => Math.acos(Math.max(-1, Math.min(1, c[4]))) * 180 / Math.PI);
+        h.expect(Math.max(...ys) - Math.min(...ys) >= 0.6, `bayern: the camera rises and falls with the hills (${(Math.max(...ys) - Math.min(...ys)).toFixed(2)} m)`);
+        h.expect(Math.max(...rolls) >= 10 && Math.max(...rolls) <= 32, `bayern: the camera leans into the banking, comfortably (up to ${Math.max(...rolls).toFixed(0)} degrees)`);
+        const trk = await evalG(page, g => { const ud = [...g.fair.pits.values()].find(p => p.near && p.near.userData.bayern); return ud ? { cars: ud.near.userData.bayern.cars, hills: (() => { const f = ud.near.userData.bayern.at; let lo = 9, hi = -9, b0 = 9, b1 = -9; for (let a = 0; a < 6.283; a += 0.02) { const k = f(a); lo = Math.min(lo, k.c[1]); hi = Math.max(hi, k.c[1]); b0 = Math.min(b0, k.bank); b1 = Math.max(b1, k.bank); } return [hi - lo, b0, b1]; })() } : null; });
+        h.expect(trk && trk.hills[0] >= 1.0 && trk.hills[1] > 0.2 && trk.hills[2] < 0.7, `bayern: the model track has hills (${trk ? trk.hills[0].toFixed(2) : "?"} m) and banking (${trk ? trk.hills[1].toFixed(2) : "?"} - ${trk ? trk.hills[2].toFixed(2) : "?"} rad)`);
       }
       if (id === "kette") h.expect(Math.max(...rigs.map(r => r.swing ?? 0)) > 0.5, `kette: the chairs fly out (swing ${Math.max(...rigs.map(r => r.swing ?? 0)).toFixed(2)} rad)`);
       await evalG(page, g => g.ride.setTestSpeedup(1));
@@ -291,6 +309,21 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   while (Date.now() - t0 < 12000 && !(rr.bumps > 0)) { await sleep(300); rr = await rig(); }
   h.expect(rr.bumps > 0, `scooter: driving into the barrier / the other cars gives bumps (${rr.bumps}; barrier ${rr.wallBumps}, cars ${rr.carBumps})`);
   await h.shot("scooter-bump");
+  const hall = await evalG(page, g => { const p = [...g.fair.pits.values()].find(q => q.near && q.near.userData.floor); const ud = p.near.userData; return { cars: ud.carCount, riders: ud.riders, area: (ud.floor.x1 - ud.floor.x0) * (ud.floor.z1 - ud.floor.z0), depth: ud.floor.z1 - ud.floor.z0 }; });
+  h.expect(hall.area >= 340 && hall.depth >= 13, `scooter: the driving floor fills the L pitch (${hall.area.toFixed(0)} m2, ${hall.depth.toFixed(1)} m deep; it was 299 / 11.5)`);
+  h.expect(hall.cars >= 10 && hall.riders === hall.cars, `scooter: ${hall.cars} cars, every one with a seated rider (${hall.riders})`);
+  // the rim of the wheel projected to the screen (the real rim, not a bounding box): its share of the viewport height, and where its lower edge is
+  const wheelShare = () => evalG(page, async g => { const T = window.__fouer.THREE; const { WHEEL } = await import("/pb/fouer/rides/drive.js"); const R = WHEEL.r; const p = [...g.fair.pits.values()].find(q => q.near && q.near.getObjectByName("ride-wheel")); const w = p.near.getObjectByName("ride-wheel"); w.updateWorldMatrix(true, true); const cam = g.r.camera; cam.updateMatrixWorld(true);
+    let y0 = 9, y1 = -9, x0 = 9, x1 = -9; for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; const v = w.localToWorld(new T.Vector3(Math.cos(a) * R, Math.sin(a) * R * 0.87, Math.sin(a) * R * 0.5)).project(cam); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); }
+    return { h: (y1 - y0) / 2, w: (x1 - x0) / 2, bottom: (y0 + 1) / 2 }; });
+  const wPortrait = await wheelShare();
+  await page.setViewportSize({ width: 1600, height: 900 }); await sleep(600);
+  const wLand = await wheelShare();
+  await h.shot("scooter-landscape");
+  await page.setViewportSize({ width: 820, height: 1180 }); await sleep(600);
+  h.expect(wPortrait.h >= 0.08 && wPortrait.h <= 0.21 && wPortrait.bottom < 0.4, `scooter: the steering wheel is ${(wPortrait.h * 100).toFixed(0)} % of the screen height in portrait, at the bottom (limit 8 - 21 %; was about 50 %)`);
+  h.expect(wLand.h >= 0.08 && wLand.h <= 0.21 && wLand.bottom < 0.4, `scooter: ... and ${(wLand.h * 100).toFixed(0)} % in landscape`);
+
   await sleep(2500);
   rr = await rig();
   const inside = rr.x >= rr.arena.x0 && rr.x <= rr.arena.x1 && rr.z >= rr.arena.z0 && rr.z <= rr.arena.z1 && rr.others.every(([x, z]) => x >= rr.arena.x0 - 0.01 && x <= rr.arena.x1 + 0.01 && z >= rr.arena.z0 - 0.01 && z <= rr.arena.z1 + 0.01);

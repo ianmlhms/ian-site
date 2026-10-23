@@ -245,6 +245,12 @@ body.walking .bubble, body.walking .anchors, body.walking #finger, body.walking 
 .wk-stick i { width: 58px; height: 58px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffffffcc, #ffffff66); border: 1px solid #fff9; box-shadow: 0 4px 12px #0005; pointer-events: none; }
 .wk-act { position: absolute; right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(40px + var(--safe-bottom)); width: 96px; height: 96px; border-radius: 50%; border: 3px solid #fff0b8; background: linear-gradient(180deg, #ffd978, #ffab3c); color: #3a2208; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0; cursor: pointer; box-shadow: 0 10px 26px #0008, inset 0 2px 0 #fff8; animation: wkpulse 1.6s ease-in-out infinite; }
 .wk-act[hidden] { display: none; }
+/* feedback A: the sprint toggle (touch and mouse); Shift does the same on a keyboard */
+.wk-sprint { position: absolute; right: calc(34px + env(safe-area-inset-right, 0px)); bottom: calc(150px + var(--safe-bottom)); width: 62px; height: 62px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel); font-size: 28px; line-height: 1; padding: 0; display: grid; place-items: center; cursor: pointer; box-shadow: 0 6px 16px #0006; transition: background .15s, transform .12s; }
+.wk-sprint:active { transform: scale(.92); }
+.wk-sprint.on { background: linear-gradient(180deg, #ffd978, #ffab3c); border-color: #fff0b8; box-shadow: 0 6px 18px #0007, 0 0 0 4px #ffcf5c55; }
+.wk-sprint.live:not(.on) { border-color: #ffcf5c; box-shadow: 0 6px 16px #0006, 0 0 0 3px #ffcf5c44; }
+.wk-sprint[hidden] { display: none; }
 .wk-act .ic { font-size: 38px; line-height: 1; } .wk-act small { font-size: 11px; font-weight: 900; letter-spacing: .3px; max-width: 86px; text-align: center; line-height: 1.05; }
 .wk-act[data-kind="leave"] { background: linear-gradient(180deg, #ff8f86, #e5483c); border-color: #ffd0cb; color: #fff; animation: none; }
 @keyframes wkpulse { 50% { transform: scale(1.06); box-shadow: 0 10px 30px #0008, 0 0 0 8px #ffd97844, inset 0 2px 0 #fff8; } }
@@ -338,3 +344,17 @@ body.walking .evcap { bottom: auto; top: calc(max(12px, var(--safe-top)) + 70px)
 .gallery .gform input { display: block; width: 100%; margin-top: 6px; min-height: 46px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line); background: #0b1a24; color: var(--ink); font: inherit; font-size: 16px; }
 .paper .museum-by { font-size: 15px; color: #7a6244; margin: 0 0 6px; }
 body.cinema .anchors, body.cinema #goal, body.cinema #goalChip, body.cinema .bubble, body.cinema .finger { display: none !important; }
+
+/* feedback A: the veil for a ride from the builder view */
+.wk-bfade { position: fixed; inset: 0; background: #05080c; opacity: 0; pointer-events: none; z-index: 70; }
+
+/* feedback A: the pin (pegman) button + the ghost that follows the finger */
+#pinBtn { touch-action: none; cursor: grab; -webkit-touch-callout: none; }
+#pinBtn.drag { opacity: .45; cursor: grabbing; }
+.pin-ghost { position: fixed; z-index: 80; transform: translate(-50%, -100%); font-size: 54px; line-height: 1; pointer-events: none; filter: drop-shadow(0 6px 6px #0008); transition: filter .12s; }
+.pin-ghost::after { content: ""; position: absolute; left: 50%; bottom: -3px; width: 12px; height: 5px; margin-left: -6px; border-radius: 50%; background: #0007; }
+.pin-ghost.bad { filter: grayscale(1) sepia(1) hue-rotate(-40deg) saturate(5) drop-shadow(0 6px 6px #0008); }
+.pin-ghost.cancel { opacity: .35; }
+body.pin-drag { cursor: grabbing; }
+body.pin-drag .sheet, body.pin-drag .popover { opacity: .25; pointer-events: none; }
+.btn.ridego { display: flex; align-items: center; justify-content: center; gap: 8px; }

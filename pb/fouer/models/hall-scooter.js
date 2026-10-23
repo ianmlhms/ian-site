@@ -15,20 +15,54 @@ const PAL = [
     booth: 0xf2f0e6, boothRoof: 0x2f64b8, beam: 0x8d9296, carCols: [0xb8c8d8, 0xc8d8b8, 0xd8b8b8, 0xc0b8d8, 0xd8d0a0], carAcc: [0x2f64b8, 0xe3242b, 0xf2c80c, 0x2fa84f], pole: [0x2f64b8, 0xf4f4f0], flag: 0x2f64b8, led: [[1, 0.85, 0.5], [0.75, 0.88, 1]] },
 ];
 
-const FL = { x0: -13.0, x1: 13.0, z0: -7.6, z1: 3.9 };          // the floor
-const HALL = { x: 14.2, zBack: -8.3, zFront: 8.3 };
+/** the driving floor (feedback B: it used to be 26 x 11.5 m, a third of the pitch was porch; now 27 x 13.7 m = 370 m2 of the L pitch's 30 x 18, the porch is only 2.4 m deep) */
+const FL = { x0: -13.5, x1: 13.5, z0: -8.1, z1: 5.6 };
+const HALL = { x: 14.2, zBack: -8.8, zFront: 8.3 };
+const PORCH_Z0 = 5.9;                   // the roofed porch with the cash booths starts here (it was 4.4)
 const CEIL = 3.9; const FLOOR_Y = 0.45;
 const PERIOD = 48;
+const UV_Z = [0.125, 0.375, 0.625, 0.875].map((k) => FL.z0 + k * (FL.z1 - FL.z0));       // the four UV light bars over the floor (rides/drive.js lays its bulb rows under the same ones)
+
+
+/* ------------------------------------------------------------------------------------------------------------------ the riders */
+const SKIN = [0xf1c8a8, 0xe3b08a, 0xc98e64, 0x9a6440, 0x6a4430];
+const HAIR = [0x2a1c14, 0x4a2e1c, 0x8a5a2c, 0xc89a4a, 0xa83a22, 0x1a1a1e, 0xd8d2c6, 0x6a6a72];
+const SHIRT = [0xd8433a, 0x2d79c8, 0x3aa05a, 0xf0b52f, 0x8a5bc8, 0xee7a9a, 0xf4f0e6, 0xe06a2a, 0x3ab5b0, 0x2f2f3a, 0xa02a3a, 0x1f5fb8];
+const TROU = [0x2a3350, 0x3a3a3a, 0x4a5a78, 0x6a5a44, 0x2a2a30, 0x5a3a2a];
+/** a seated rider (crowd style: box body, ball head, hair or a cap, jacket / shirt colours that vary from car to car) in REAL metres in the car's frame (call it after the car's 1.28 scale is popped), hands on the wheel; `seed` + car index pick the look */
+const dim = (c) => ((((c >> 16) & 255) * 0.82) << 16) | ((((c >> 8) & 255) * 0.82) << 8) | ((c & 255) * 0.82);
+function rider(b, near, j, seed) {
+  const P = b.P; const r = rng(seed * 977 + j * 131 + 5); const pick = (a) => a[Math.floor(r() * a.length) % a.length];
+  const skin = pick(SKIN), hair = pick(HAIR), shirt = pick(SHIRT), trou = pick(TROU), kind = Math.floor(r() * 5); const s = 0.8 + r() * 0.16;     // 0.8 teenager .. 0.96 adult
+  const sh2 = (r() < 0.35) ? pick(SHIRT) : shirt;                    // a different sleeve colour now and then (jacket over a shirt)
+  const seatY = 0.95, z0 = -0.38; const ty = seatY + 0.28 * s, hy = seatY + 0.56 * s + 0.12 * s;
+  if (!near) { P.box(0, ty, z0 - 0.08, 0.4 * s, 0.56 * s, 0.24, shirt, 0); P.sphere([0, hy, z0 - 0.06], 0.12 * s, skin, 5, 3); return; }
+  for (const sx of [-1, 1]) {
+    P.box(sx * 0.1, seatY + 0.04, z0 + 0.22, 0.16 * s, 0.14 * s, 0.56 * s, trou, 0);                                                       // thigh
+    P.tube([sx * 0.1, seatY + 0.02, z0 + 0.5], [sx * 0.1, seatY - 0.36, z0 + 0.62], 0.06 * s, trou, { sides: 4, flat: true });          // shin
+    P.box(sx * 0.1, seatY - 0.4, z0 + 0.72, 0.13, 0.08, 0.28, 0x23262a, 0);                                                            // shoe
+  }
+  P.box(0, ty, z0 - 0.08, 0.4 * s, 0.56 * s, 0.24, shirt, 0);                                                                        // torso
+  P.box(0, ty - 0.2 * s, z0 - 0.07, 0.42 * s, 0.1 * s, 0.26, dim(shirt), 0);                                                   // hem / belt line
+  for (const sx of [-1, 1]) P.tube([sx * 0.24 * s, seatY + 0.5 * s, z0 - 0.08], [sx * 0.13, seatY + 0.12, z0 + 0.5], 0.05 * s, sh2, { sides: 4, flat: true });   // arm to the wheel
+  for (const sx of [-1, 1]) P.sphere([sx * 0.13, seatY + 0.12, z0 + 0.52], 0.04, skin, 4, 3);                                          // hands
+  P.sphere([0, hy, z0 - 0.06], 0.12 * s, skin, 7, 5);                                                                                // head
+  if (kind === 0) P.sphere([0, hy + 0.025, z0 - 0.09], 0.13 * s, hair, 7, 4);                                                         // short hair
+  else if (kind === 1) { P.sphere([0, hy + 0.02, z0 - 0.1], 0.135 * s, hair, 7, 4); P.box(0, hy - 0.1 * s, z0 - 0.17, 0.22 * s, 0.26 * s, 0.07, hair, 0); }   // long hair
+  else if (kind === 2) { P.tube([0, hy + 0.09 * s, z0 - 0.06], [0, hy + 0.14 * s, z0 - 0.06], 0.125 * s, pick(SHIRT), { sides: 6 }); P.box(0, hy + 0.1 * s, z0 + 0.05, 0.18 * s, 0.025, 0.1, pick(SHIRT), 0); }   // cap with a peak
+  else if (kind === 3) { P.sphere([0, hy + 0.03, z0 - 0.08], 0.14 * s, shirt, 6, 4); }                                                   // hood
+  else P.sphere([0, hy + 0.04, z0 - 0.09], 0.115 * s, hair, 5, 3);                                                                      // a bun / tuft on top
+}
 
 /* ------------------------------------------------------------------------------------------------------------------ the cars */
-function carBody(b, near, col, acc, pal, withPole = true) {
+function carBody(b, near, col, acc, pal, withPole = true, riderSeed = 0) {
   const P = b.P; const L = b.L;
   b.place([0, 0, 0], 0, 0, 0, 1.28);
   // bumper ring (a flattened rubber tyre): a rounded rectangle of short tubes
   const N = near ? 16 : 8; const pts = [];
   for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2; const c = Math.cos(a); const s = Math.sin(a); pts.push([0.62 * Math.sign(c) * Math.pow(Math.abs(c), 0.7), 0.17, 1.0 * Math.sign(s) * Math.pow(Math.abs(s), 0.7)]); }
   for (let i = 0; i < N; i++) { const p = pts[i]; const q = pts[(i + 1) % N]; P.tube(p, q, 0.15, 0x1d1f22, { sides: near ? 5 : 4, flat: true }); }
-  if (!near) { P.box(0, 0.5, 0, 1.0, 0.45, 1.5, col, 32); P.box(0, 0.86, -0.4, 0.7, 0.4, 0.3, 0x23262a, 0); b.pop(); if (withPole) P.tube([0, 0.9, -0.8], [0, CEIL - FLOOR_Y - 0.1, -0.8], 0.06, pal.pole[0], { sides: 3, flat: true }); return; }
+  if (!near) { P.box(0, 0.5, 0, 1.0, 0.45, 1.5, col, 32); P.box(0, 0.86, -0.4, 0.7, 0.4, 0.3, 0x23262a, 0); b.pop(); if (riderSeed) rider(b, false, riderSeed, 1); if (withPole) P.tube([0, 0.9, -0.8], [0, CEIL - FLOOR_Y - 0.1, -0.8], 0.06, pal.pole[0], { sides: 3, flat: true }); return; }
   P.box(0, 0.42, 0, 1.0, 0.3, 1.5, col, 32);
   P.quad([-0.5, 0.57, 0.35], [0.5, 0.57, 0.35], [0.42, 0.4, 0.92], [-0.42, 0.4, 0.92], col);                     // sloping bonnet
   P.quad([-0.5, 0.57, -0.4], [0.5, 0.57, -0.4], [0.48, 0.74, -0.72], [-0.48, 0.74, -0.72], col);                // tail deck
@@ -37,6 +71,7 @@ function carBody(b, near, col, acc, pal, withPole = true) {
   P.box(0, 0.62, -0.28, 0.66, 0.2, 0.46, 0x23262a, 0); P.box(0, 0.9, -0.52, 0.66, 0.5, 0.1, 0x23262a, 0);
   P.tube([0, 0.62, 0.32], [0, 0.82, 0.12], 0.025, 0x23262a, { sides: 3 }); P.disc([0, 0.84, 0.1], [0, 0.5, -0.86], 0.2, 0x23262a, 8);
   b.pop();
+  if (riderSeed) rider(b, true, riderSeed, 1);
   if (withPole) {
     P.tube([0, 0.9, -0.8], [0, CEIL - FLOOR_Y - 0.1, -0.8], 0.055, pal.pole[0], { sides: 4, flat: true });
     for (let k = 0; k < 6; k++) { const y0 = 1.1 + k * 0.5; P.tube([0, y0, -0.8], [0, y0 + 0.25, -0.8], 0.062, pal.pole[1], { sides: 4, flat: true }); }
@@ -52,14 +87,14 @@ function carBody(b, near, col, acc, pal, withPole = true) {
 function makePaths(n, seed) {
   const R = rng(seed * 13 + 5); const out = [];
   const NX = [1, 2, 3, 2, 4, 3, 1, 4, 2, 3, 5, 1]; const NZ = [2, 3, 1, 5, 3, 4, 3, 2, 5, 1, 2, 4];
-  for (let i = 0; i < n; i++) out.push({ nx: NX[i % 12], nz: NZ[i % 12], px: R() * Math.PI * 2, pz: R() * Math.PI * 2, ax: 8.6 + R() * 2.4, az: 3.4 + R() * 0.7 });
+  for (let i = 0; i < n; i++) out.push({ nx: NX[i % 12], nz: NZ[i % 12], px: R() * Math.PI * 2, pz: R() * Math.PI * 2, ax: 9.4 + R() * 2.4, az: 4.4 + R() * 1.0 });
   const base = (c, t) => { const w = (Math.PI * 2) / PERIOD; return [Math.sin(c.nx * w * t + c.px) * c.ax, Math.sin(c.nz * w * t + c.pz) * c.az]; };
-  const cx = (FL.x0 + FL.x1) / 2; const cz = (FL.z0 + FL.z1) / 2 - 0.2;
+  const cx = (FL.x0 + FL.x1) / 2; const cz = (FL.z0 + FL.z1) / 2;
   const pose = (i, t) => {
     const p = base(out[i], t); let x = p[0]; let z = p[1];
     for (let j = 0; j < n; j++) { if (j === i) continue; const q = base(out[j], t); const dx = x - q[0]; const dz = z - q[1]; const d = Math.hypot(dx, dz); if (d < 2.5 && d > 1e-3) { const push = (2.5 - d) * 0.5; x += (dx / d) * push; z += (dz / d) * push; } }
     const p2 = base(out[i], t + 0.08); const yaw = Math.atan2(p2[0] - p[0], p2[1] - p[1]) + 0.1 * Math.sin(t * 2.7 + i * 1.3);
-    return { x: cx + clamp(x, -11.9, 11.9), z: cz + clamp(z, -4.6, 4.2), yaw };
+    return { x: cx + clamp(x, FL.x0 + 1.4 - cx, FL.x1 - 1.4 - cx), z: cz + clamp(z, FL.z0 + 1.4 - cz, FL.z1 - 1.4 - cz), yaw };
   };
   return pose;
 }
@@ -67,7 +102,7 @@ function makePaths(n, seed) {
 /* ------------------------------------------------------------------------------------------------------------------ static hall */
 function buildStatic(b, cfg, near, name) {
   const { pal, level, gold } = cfg; const P = b.P; const L = b.L; const handles = { lamps: [], led: pal.led };
-  padSlab(b, 29.0, 17.4, 0, 0);
+  padSlab(b, 29.6, 17.9, 0, 0);
   const UV = b.G([pal.uv[0] * 1.3, pal.uv[1] * 1.3, pal.uv[2] * 1.2]); const WG = [b.G(pal.wall[0]), b.G(pal.wall[1]), b.G(pal.wall[2])];
   // steel floor with night reflections of the lights
   P.box(0, 0.38, (FL.z0 + FL.z1) / 2, FL.x1 - FL.x0 + 0.6, 0.14, FL.z1 - FL.z0 + 0.6, pal.floor, 32);
@@ -85,7 +120,7 @@ function buildStatic(b, cfg, near, name) {
   for (const x of [bx0 - 0.2, bx1 + 0.2]) P.box(x, gy, (bz0 + bz1) / 2, 0.3, 0.3, bz1 - bz0 + 0.4, pal.beam, 0);
   for (const x of near ? [-9.5, -4.8, 0, 4.8, 9.5] : [-6, 6]) P.box(x, gy, (bz0 + bz1) / 2, 0.14, 0.22, bz1 - bz0, pal.beam, 0);
   const nx = near ? 11 : 4; for (let q = 0; q < nx; q++) { const x = lerp(bx0 + 1.2, bx1 - 1.2, q / (nx - 1)); P.box(x, gy - 0.05, (bz0 + bz1) / 2, 0.08, 0.1, bz1 - bz0, 0x8a929a, 0); }
-  for (const z of [-5.6, -2.0, 1.6]) { UV.quad([bx0 + 1, gy - 0.18, z - 0.3], [bx1 - 1, gy - 0.18, z - 0.3], [bx1 - 1, gy - 0.18, z + 0.3], [bx0 + 1, gy - 0.18, z + 0.3], 0xd8d0ff); P.box(0, gy - 0.1, z, 26, 0.12, 0.34, 0x30343a, 0); }
+  for (const z of UV_Z) { UV.quad([bx0 + 1, gy - 0.18, z - 0.3], [bx1 - 1, gy - 0.18, z - 0.3], [bx1 - 1, gy - 0.18, z + 0.3], [bx0 + 1, gy - 0.18, z + 0.3], 0xd8d0ff); P.box(0, gy - 0.1, z, 26, 0.12, 0.34, 0x30343a, 0); }
   for (const [x, z] of [[bx0 - 0.2, bz0 - 0.2], [bx1 + 0.2, bz0 - 0.2], [bx0 - 0.2, bz1 + 0.2], [bx1 + 0.2, bz1 + 0.2], [0, bz0 - 0.2], [-6.6, bz1 + 0.2], [6.6, bz1 + 0.2]]) P.tube([x, FLOOR_Y, z], [x, gy, z], 0.17, pal.beam, { sides: 6, flat: true });
   // back wall with the mirrored airbrush mural
   const wz = HALL.zBack; P.box(0, 2.35, wz - 0.1, 28.4, 4.2, 0.3, 0x30343a, 0);
@@ -99,7 +134,7 @@ function buildStatic(b, cfg, near, name) {
     if (near) { for (let k = 0; k < 4; k++) P.quad([x0 + 0.3, 0.9 + k * 0.85, wz + 0.1], [x1 - 0.3, 0.9 + k * 0.85, wz + 0.1], [x1 - 0.3, 0.96 + k * 0.85, wz + 0.1], [x0 + 0.3, 0.96 + k * 0.85, wz + 0.1], 0xcfe8f4); }
   }
   // roofed porch + the bright front
-  const pz0 = 4.4; const pz1 = HALL.zFront;
+  const pz0 = PORCH_Z0; const pz1 = HALL.zFront;
   P.box(0, gy + 0.12, (pz0 + pz1) / 2, 28.8, 0.24, pz1 - pz0, pal.fasciaB, 0);
   for (const x of [-13.9, -6.9, 0, 6.9, 13.9]) P.tube([x, 0.3, pz1 - 0.3], [x, gy, pz1 - 0.3], 0.14, pal.beam, { sides: 4, flat: true });
   P.box(0, 6.1, pz1 - 0.1, 28.8, 2.4, 0.4, pal.fascia, 32 | 16);
@@ -118,13 +153,12 @@ function buildStatic(b, cfg, near, name) {
   else { P.box(0, 6.1, pz1 + 0.2, 8.5, 1.4, 0.15, pal.board, 0); L.quad([-3.6, 5.6, pz1 + 0.3], [3.6, 5.6, pz1 + 0.3], [3.6, 6.6, pz1 + 0.3], [-3.6, 6.6, pz1 + 0.3], pal.sign); }
   for (const sx of [-1, 1]) { P.box(sx * 11.2, 6.1, pz1 + 0.18, 4.6, 1.8, 0.14, pal.board, 0); if (level >= 2) { for (let q = 0; q < 3; q++) L.quad([sx * 11.2 - 1.95 + q * 1.35, 5.45, pz1 + 0.27], [sx * 11.2 - 0.75 + q * 1.35, 5.45, pz1 + 0.27], [sx * 11.2 - 0.75 + q * 1.35, 6.75, pz1 + 0.27], [sx * 11.2 - 1.95 + q * 1.35, 6.75, pz1 + 0.27], pal.bulbs[q % 2]); } }
   // porch: booth(s) and the entrance arch
-  ticketBooth(b, -9.5, 6.2, 0, pal, level, near, level >= 2);
-  if (level >= 2) ticketBooth(b, 9.5, 6.2, 0, pal, level, near, false);
-  for (const x of [-2.1, 2.1]) P.box(x, 1.2, 4.3, 0.22, 1.8, 0.22, gold ? GOLD : pal.trim, 0);
-  P.box(0, 2.2, 4.3, 4.4, 0.2, 0.26, gold ? GOLD : pal.trim, 0);
-  if (near) { railing(b, [[-12.6, 4.4], [-2.4, 4.4]], 0.3, pal.rail, { h: 0.9, step: 1.8, mid: false }); railing(b, [[2.4, 4.4], [12.6, 4.4]], 0.3, pal.rail, { h: 0.9, step: 1.8, mid: false }); }
+  ticketBooth(b, -9.5, 6.95, 0, pal, level, near, level >= 2);
+  if (level >= 2) ticketBooth(b, 9.5, 6.95, 0, pal, level, near, false);
+  for (const x of [-2.1, 2.1]) P.box(x, 1.2, PORCH_Z0 - 0.1, 0.22, 1.8, 0.22, gold ? GOLD : pal.trim, 0);
+  P.box(0, 2.2, PORCH_Z0 - 0.1, 4.4, 0.2, 0.26, gold ? GOLD : pal.trim, 0);
   // L2: pennants along the roofline; L3: LED outlines of the fascia, the barrier, Hämmi in a giant car; L4: gold caps
-  if (level >= 2) { for (let q = 0; q < (near ? 10 : 5); q++) pennant(b, -13.2 + q * (26.4 / (near ? 9 : 4)), 7.4, pz1 - 0.1, 2.0, pal.flag, q % 2 ? 1 : -1); if (near) { festoon(b, [-14, 4.1, pz1 + 0.3], [-14.1, 4.0, 4.4], 6, 0.4, pal.bulbs[0]); } }
+  if (level >= 2) { for (let q = 0; q < (near ? 10 : 5); q++) pennant(b, -13.2 + q * (26.4 / (near ? 9 : 4)), 7.4, pz1 - 0.1, 2.0, pal.flag, q % 2 ? 1 : -1); if (near) { festoon(b, [-14, 4.1, pz1 + 0.3], [-14.1, 4.0, PORCH_Z0], 6, 0.4, pal.bulbs[0]); } }
   if (level >= 3) {
     const lw = (x0, y0, x1, y1, k) => { const n0 = b.count; L.quad([x0, y0, pz1 + 0.3], [x1, y0, pz1 + 0.3], [x1, y1, pz1 + 0.3], [x0, y1, pz1 + 0.3], pal.led[k % 2]); handles.lamps.push({ s: n0, n: b.count - n0, k, kind: 'fascia' }); };
     const NS = near ? 14 : 7; for (let q = 0; q < NS; q++) { const x = -14.4 + q * (28.8 / NS); lw(x, 7.34, x + 28.8 / NS - 0.1, 7.5, q); lw(x, 4.0, x + 28.8 / NS - 0.1, 4.14, q + 1); }
@@ -143,20 +177,20 @@ function build(opts = {}) {
   const T = window.THREE; const K = makeKit(T);
   const look = clamp(opts.look | 0, 0, 2); const level = clamp(opts.level | 0 || 1, 1, 4); const quality = opts.quality || 'medium';
   const pal = PAL[look]; const cfg = { pal, level, gold: level >= 4, look, quality };
-  const n = [8, 9, 10, 12][level - 1];
+  const n = [10, 11, 12, 12][level - 1];                // 9 - 11 other cars on the bigger floor (it was 7 - 11 on 26 x 11.5 m)
   const pose = makePaths(n, opts.seed || 1);
   const name = nameOf('scooter', opts.lang);
   let holder = null;                      // rides wave: while somebody drives, ud.drive(j, matrix) writes the pose of car j (rides/bumper.js), otherwise the Lissajous paths
   const g = buildTrackRide({
-    id: 'scooter', T, K, quality, look, level, cycle: PERIOD, footprint: { x: 14.4, zMin: -8.4, zMax: 8.4 }, height: 9.2, carRadius: 24, lodDistance: 70,
+    id: 'scooter', T, K, quality, look, level, cycle: PERIOD, footprint: { x: 14.4, zMin: -8.9, zMax: 8.4 }, height: 9.2, carRadius: 24, lodDistance: 70,
     trains: [{ cars: n, spacing: 0, shift: 0, custom: (j, t, m) => { const d = holder && holder.userData.drive; if (d) return d(j, m); const p = pose(j, t); m.makeRotationY(p.yaw); m.setPosition(p.x, FLOOR_Y, p.z); return true; } }],
     buildStatic: (b, near) => buildStatic(b, cfg, near, name),
-    buildCar: (b, near, ti, j) => carBody(b, near, pal.carCols[j % pal.carCols.length], pal.carAcc[j % pal.carAcc.length], pal),
+    buildCar: (b, near, ti, j) => carBody(b, near, pal.carCols[j % pal.carCols.length], pal.carAcc[j % pal.carAcc.length], pal, true, j + 1),
     chase,
     extra: { carCount: n },
   });
   g.userData.phaseAt = (t) => ({ t: ((t % PERIOD) + PERIOD) % PERIOD, cars: Array.from({ length: n }, (_, i) => pose(i, t)) });
-  g.userData.carColors = { body: pal.carCols[0], acc: pal.carAcc[0], pole: pal.pole, bulbs: pal.bulbs, uv: pal.uv, wall: pal.wall }; g.userData.floor = FL; g.userData.floorY = FLOOR_Y; g.userData.ceilY = CEIL; g.userData.drive = null; holder = g;
+  g.userData.riders = n; g.userData.carColors = { body: pal.carCols[0], acc: pal.carAcc[0], pole: pal.pole, bulbs: pal.bulbs, uv: pal.uv, wall: pal.wall }; g.userData.floor = FL; g.userData.floorY = FLOOR_Y; g.userData.ceilY = CEIL; g.userData.drive = null; holder = g;
   return g;
 }
 

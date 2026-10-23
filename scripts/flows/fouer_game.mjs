@@ -84,10 +84,57 @@ export const flow = {
     /* ------------------------------------------------------------ A1: fresh player, first seconds */
     h.step("fresh player: the first seconds (fly-in), loading bar, cash and stars, no menu wall");
     const t0 = Date.now();
+    // feedback A, the loading screen: a sampler logs the bar (value + label) every 60 ms from the first script on; the Glacis bake is held back for 2.2 s so that a stretch of
+    // the boot has nothing real to report: the bar must still creep (never static for 1 s), never go backwards, and the labels must name the steps
+    await page.route(/glacis-world\.bin/, async route => { await new Promise(r => setTimeout(r, 2200)); route.continue().catch(() => {}); });
+    await page.addInitScript(() => {
+      if (window.top !== window || !location.pathname.endsWith("/pb/fouer.html")) return;
+      window.__loadLog = []; const t0 = performance.now();
+      const tick = () => { const L = window.__fouerLoad, m = document.getElementById("loadMsg"); if (L) window.__loadLog.push([Math.round(performance.now() - t0), +L.value().toFixed(5), m ? m.textContent : "", L.stalled() ? 1 : 0]); };
+      setInterval(tick, 60);
+    });
     await h.goto("/pb/fouer.html?fouerDebug=1&fouerQ=medium&fouerTimeMode=evening&fouerWeather=clear");
     await page.waitForFunction(() => document.querySelector("#loading") && !document.querySelector("#loading").classList.contains("done") || document.documentElement.dataset.fouerReady, null, { timeout: 30000 });
+    await page.waitForFunction(() => window.__fouerLoad && window.__fouerLoad.value() > 0.3 && window.__fouerLoad.value() < 0.97, null, { timeout: 20000 }).catch(() => {});
     await h.shot("00-loading");
     await bootGame(h, null, page);
+    await page.unroute(/glacis-world\.bin/);
+    const loadLog = await page.evaluate(() => window.__loadLog);
+    {
+      // a sample every 60 ms while the main thread is free; a long task (the fair layer is built in one go) delays the next sample, and the bar keeps moving through it (a transform
+      // animation runs on the compositor), so only stretches of responsive samples count: static = consecutive samples <= 250 ms apart whose value did not grow
+      let backwards = 0, worstStatic = 0, run = 0, stalledSeen = 0, longTasks = 0;
+      for (let i = 1; i < loadLog.length; i++) {
+        const [t, v, , stalled] = loadLog[i], [pt, pv] = loadLog[i - 1];
+        if (v < pv - 1e-6) backwards++;
+        if (stalled) stalledSeen++;
+        if (t - pt > 250) { longTasks++; run = 0; continue; }
+        if (v > pv + 0.0002 || v >= 0.999) run = 0; else run += t - pt;
+        worstStatic = Math.max(worstStatic, run);
+      }
+      const labels = [...new Set(loadLog.map(e => e[2]).filter(Boolean))];
+      h.expect(loadLog.length > 25, `the loading bar was sampled ${loadLog.length} times`);
+      h.eq(backwards, 0, "the loading bar never goes backwards");
+      h.expect(worstStatic <= 1000, `the loading bar was never static for more than 1 s while booting (longest static stretch ${worstStatic} ms of responsive samples, ${longTasks} long tasks skipped, the Glacis bake held back 2.2 s)`);
+      h.expect(labels.some(t => /Glacis/.test(t)) && labels.some(t => /Stänn/.test(t)), `the step labels name what is built: ${labels.join(" | ")}`);
+      h.eq(stalledSeen, 0, "a normal (slow) boot never shows the 'taking longer' hint");
+      h.expect(loadLog.at(-1)[1] >= 0.999, `the bar ends full (${loadLog.at(-1)[1]})`);
+    }
+    // a load that is really stuck (three.js never answers): after 12 s a calm hint with a retry button, not before
+    {
+      const stuck = await context.newPage();
+      await stuck.route("**/three.min.js", () => {});
+      await stuck.goto(h.origin + "/pb/fouer.html?fouerDebug=1&fouerQ=medium", { waitUntil: "commit" });
+      await stuck.waitForSelector("#loadMsg", { state: "attached", timeout: 8000 });
+      await h.pause(9000);
+      const early = await stuck.evaluate(() => ({ hint: !document.getElementById("loadSlow").hidden, v: window.__fouerLoad.value() }));
+      await h.pause(5000);
+      const late = await stuck.evaluate(() => ({ hint: !document.getElementById("loadSlow").hidden, text: document.getElementById("loadSlowText").textContent, retry: document.getElementById("loadRetry").textContent, v: window.__fouerLoad.value() }));
+      h.expect(!early.hint && early.v > 0.03, `a stuck load: no hint after 9 s, the bar still creeps (${early.v.toFixed(3)})`);
+      h.expect(late.hint && /laang/.test(late.text) && late.retry.length > 3 && late.v >= early.v, `after 14 s the calm hint "${late.text}" and the retry button "${late.retry}" appear`);
+      await stuck.screenshot({ path: process.env.FLOW_SHOTS_DIR ? `${process.env.FLOW_SHOTS_DIR}/fouer-game.00-loading-stuck.png` : "/dev/null" }).catch(() => {});
+      await stuck.close();
+    }
     await h.shot("01-flyin-start");
     await h.pause(1800);
     await h.shot("02-flyin-mid");

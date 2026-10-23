@@ -15,6 +15,7 @@ import * as crowdMod from "./crowd.js";
 import * as audioMod from "./audio.js";
 import * as rideMod from "./ride.js";
 import * as layout from "./layout.js";
+import { auditFloating } from "./float-audit.js";
 import { FOODIE, foodieMultiplier, createGame } from "./game.js";
 import { RIDES, STALLS } from "../park/data.js";
 import { createState as v1Create, tick as v1Tick } from "../park/sim.js";
@@ -22,6 +23,7 @@ import { canPlace as v1CanPlace, place as v1Place, placePath as v1PlacePath, KIN
 import { serializeSave as v1Serialize } from "../park/save.js";
 import { verifyLaunch } from "./harness-w7.js";
 import { verifyRides } from "./harness-rides.js";
+import { verifySolids } from "./harness-solids.js";
 import { execFileSync } from "node:child_process";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
@@ -1285,6 +1287,36 @@ function verifyAccess() {
   equal(layout.validateFootprints({ pitches, solids: [{ u: 120, w: 49.73, r: 0.24 }, { u: 120, w: 62.27, r: 0.24 }] }), [], "lamp posts on the kerb line (0.27 m outside the alley edge) are allowed");
   check(layout.validateFootprints({ pitches, solids: [{ u: 120, w: 62.6, r: 0.5 }] }).length > 0, "a fat solid on the kerb line is not kerb furniture");
   check(layout.validateStallFaces({ stalls: [{ k: "trailer", f: "-w", u0: 20, u1: 25, w0: 46, w1: 48.8 }] }).length === 1, "a stall at the Haaptallee that turns its back to it is reported");
+  // feedback B: stall fronts open onto walkways, no front looks at a back / a plot, no identical skin side by side
+  const okStall = { k: "trailer", f: "+w", u0: 20, u1: 26, w0: 44.2, w1: 47.2 };           // a trailer 1.2 m back from the Haaptallee, front towards it
+  equal(layout.validateStallFronts({ pitches, stalls: [okStall] }), [], "a stall whose front opens onto the Haaptallee passes");
+  const behind = layout.validateStallFronts({ pitches, stalls: [okStall, { k: "kiosk", f: "+w", u0: 20, u1: 25, w0: 38, w1: 42 }] });
+  check(behind.length === 1 && /back of stall #0/.test(behind[0]), "a stall that faces the back of another stall is reported: " + behind.join(" | "));
+  const side = layout.validateStallFronts({ pitches, stalls: [{ k: "chalet", f: "+u", u0: 20, u1: 25, w0: 40, w1: 44 }, { k: "kiosk", f: "+u", u0: 26, u1: 30, w0: 40, w1: 44 }] });
+  check(side.some(e => /stall #0/.test(e) && /faces \+u/.test(e)), "a front that looks at the side of the next stall is reported: " + side.join(" | "));
+  const plot = pitches.find(p => p.id === "P13"), pr = layout.rectOfPitch(plot);       // an NPC attraction behind the Autoscooter pitch, looking at its back
+  const atPlot = layout.validateStallFronts({ pitches, stalls: [{ k: "funhouse", f: "-w", u0: plot.u - 5, u1: plot.u + 5, w0: pr.w1 + 1.2, w1: pr.w1 + 6 }] });
+  check(atPlot.length === 1 && /plot P13/.test(atPlot[0]), "an NPC attraction that looks at the back of a player plot is reported: " + atPlot.join(" | "));
+  const twins = layout.validateStallFronts({ pitches, stalls: [{ k: "popcorn", f: "+w", u0: 20, u1: 23, w0: 45, w1: 47.6 }, { k: "popcorn", f: "+w", u0: 24, u1: 27, w0: 45, w1: 47.6 }] });
+  check(twins.length === 1 && /side by side/.test(twins[0]), "two identical fixed skins side by side are reported: " + twins.join(" | "));
+  equal(layout.validateStallFronts({ pitches, stalls: [{ k: "hall", f: "+w", u0: 20, u1: 30, w0: 36, w1: 47 }, { k: "hall", f: "+w", u0: 30.5, u1: 40, w0: 36, w1: 47 }] }), [], "tents may stand in a row");
+  const bigTwins = layout.validateStallFronts({ pitches, stalls: [{ k: "funhouse", f: "+w", u0: 20, u1: 30, w0: 40, w1: 47.6 }, { k: "funhouse", f: "+w", u0: 60, u1: 70, w0: 40, w1: 47.6 }] });
+  check(bigTwins.length === 0, "two Spukhaeuser 40 m apart are fine");
+  const bigNear = layout.validateStallFronts({ pitches, stalls: [{ k: "funhouse", f: "+w", u0: 20, u1: 30, w0: 40, w1: 47.6 }, { k: "funhouse", f: "+w", u0: 40, u1: 50, w0: 40, w1: 47.6 }] });
+  check(bigNear.some(e => /big "funhouse"/.test(e)), "two Spukhaeuser in one block are reported: " + bigNear.join(" | "));
+  // feedback B: the floating audit (voxel connectivity): a flag string with a pole at each end is fine, the same string between two empty points hangs in the air, a bulb needs a fixture
+  {
+    const wallTris = (x0, x1, y0, y1, z) => [x0, y0, z, x1, y0, z, x1, y1, z, x0, y0, z, x1, y1, z, x0, y1, z];       // a vertical rectangle
+    const pole = (x, h) => wallTris(x - 0.05, x + 0.05, 0, h, 0);
+    const wire = (x0, x1, y) => wallTris(x0, x1, y - 0.01, y + 0.01, 0);
+    const withPoles = { id: "ok", tris: [...pole(0, 5), ...pole(10, 5), ...wire(0, 10, 5)], bulbs: [5, 5, 0] };
+    const noPoles = { id: "bunting", tris: [...wire(0, 10, 5)], bulbs: [] };
+    const halo = { id: "halo", tris: [...pole(0, 5)], bulbs: [0, 5.2, 0, 3, 8, 0] };
+    const sky = auditFloating([withPoles]); equal([sky.floating.length, sky.bulbs.length], [0, 0], "a flag line between two poles that reach it, with a bulb on it, is not floating");
+    const floaty = auditFloating([noPoles]); check(floaty.floating.length === 1 && /string \/ line/.test(floaty.floating[0].kind) && /bunting/.test(floaty.floating[0].id), "a line between two poles that are not there is reported as floating: " + floaty.floating.map(f => f.why).join(" | "));
+    const glow = auditFloating([halo]); check(glow.floating.length === 0 && glow.bulbs.length === 1, "a bulb 3 m from anything standing on the ground is a floating halo: " + glow.bulbs.map(f => f.why).join(" | "));
+    const high = auditFloating([{ id: "hover", tris: [...pole(0, 5).map((v, i) => (i % 3 === 1 ? v + 2 : v))], bulbs: [] }]); check(high.floating.length === 1, "a post that hovers 2 m above the ground is reported");
+  }
   // 4. a layout that breaks the rules is rejected, naming the culprit
   const wrongFace = layout.validateStatic({ pitches: pitches.map(p => (p.id === "P13" ? { ...p, face: "+w" } : p)) });
   check(wrongFace.errors.some(e => /P13/.test(e)), "a pitch that faces away from its alley is named: " + wrongFace.errors.join(" | "));
@@ -1318,6 +1350,8 @@ function verifyAccessBuilt() {
   check(Boolean(line), "harness-access.js reports");
   const out = JSON.parse(line.slice("ACCESS-JSON ".length));
   for (const [name, errors] of Object.entries(out.errors)) equal(errors.slice(0, 8), [], `${name}: no NPC stall, prop or clutter footprint on an alley, forecourt or entrance lane; stalls at an alley face it; every pitch reachable (${errors.length} offenders)`);
+  for (const [name, list] of Object.entries(out.floating ?? {})) equal(list.slice(0, 5), [], `${name}: nothing floats (every piece of every prop, stall, tent, flag line and bulb is on the ground or fastened to something that is: ${list.length} offenders)`);
+  check(Object.keys(out.floating ?? {}).length >= 25, "the floating audit ran over the fairs and every Builder-kit model");
   for (const run of out.runs) check(run.stalls > 150, `seed ${run.seed} ${run.quality}: the fair is still dense (${run.stalls} stalls, ${run.solids} solids)`);
   section.accessBuilt = { runs: out.runs, reach: out.reach };
 }
@@ -1539,6 +1573,7 @@ async function run() {
   verifyI18n();
   await verifyRides({ check, equal, near });
   await verifyWalk();
+  verifySolids({ check, equal, near });
   await verifyLaunch({ check, equal, near, lux, deepFreeze });
   verifyAccessBuilt();
   if (process.argv.includes("--table")) printTable();

@@ -108,6 +108,36 @@ export const flow = {
     h.expect(swap.open.plot === true && swap.open.tris < swap.built.tris, `open pitch is a free plot (gravel, barrier, \"FRÄI PLAZ\" sign, parked trailer: ${swap.open.name}; fewer triangles than a built stall; W2's marker still glows on it)`);
     h.eq(swap.back.spec.state, "locked", "toNpc() swaps back to the NPC stall");
 
+    /* ------------------------------------------------------------ feedback B: nothing floats in the air, the NPC stall fronts open onto walkways (real THREE, real geometry) */
+    h.step("nothing floats: every Builder-kit model (all looks x levels), the NPC fair, props and clutter; every NPC stall front opens onto a walkway");
+    const air = await page.evaluate(async (ids) => {
+      const M = await import("/pb/fouer/models/index.js"); const A = await import("/pb/fouer/float-audit.js"); const L = await import("/pb/fouer/layout.js"); const D = await import("/pb/fouer/data.js");
+      const T = window.THREE; const out = { models: {}, fairs: {}, fronts: {}, n: 0 };
+      for (const id of ids) for (const level of [1, 2, 3, 4]) for (const look of [0, 1, 2]) {
+        const g = M.buildModel(id, { look, level, quality: "medium", seed: 7, far: false }); g.updateMatrixWorld(true); out.n++;
+        const r = A.auditFloating([A.sourcesFromGroup(g, id)], { groundY: () => 0 });
+        for (const f of [...r.floating.map(x => x.why), ...r.bulbs.slice(0, 2).map(x => x.why)]) (out.models[id] = out.models[id] || []).push(`L${level} look ${look}: ${f}`);
+        g.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+      }
+      const pitches = D.PITCHES.map(p => ({ id: p.id, u: p.u, w: p.w, size: p.size, face: p.face, star: p.star }));
+      const npc = await import("/pb/fouer/models/npc.js"), props = await import("/pb/fouer/models/props.js"), clutter = await import("/pb/fouer/models/clutter.js");
+      for (const seed of [1, 4]) {
+        const common = { T, fieldPoly: [...L.FIELD_POLY], groundY: () => 0, seed, quality: "medium" };
+        const fair = npc.buildNpcFair({ ...common, pitches, lane: [] }); const pr = props.buildProps({ ...common, pitches }); const cl = clutter.buildClutter({ ...common, grid: fair.grid, gridDims: fair.gridDims, pitches, stalls: fair.stalls });
+        const srcs = [fair.group, pr.group, cl.group].map((g, i) => { g.updateMatrixWorld(true); return A.sourcesFromGroup(g, ["npc", "props", "clutter"][i]); });
+        const r = A.auditFloating(srcs, { groundY: () => 0 });
+        out.fairs[`seed ${seed}`] = [...r.floating.map(x => `${x.id}: ${x.why}`), ...r.bulbs.slice(0, 3).map(x => x.why)];
+        out.fronts[`seed ${seed}`] = L.validateStallFronts({ pitches: D.PITCHES.map(p => ({ ...p })), stalls: fair.stalls }).slice(0, 5);
+        out.fronts[`seed ${seed} lots`] = [fair.stalls.filter(x => x.k === "lot").length, fair.stalls.filter(x => x.k !== "lot").length];
+      }
+      return out;
+    }, MINE);
+    for (const [id, list] of Object.entries(air.models)) h.eq(list.slice(0, 3), [], `${id}: nothing floats (${list.length} offenders)`);
+    h.eq(Object.keys(air.models).length, 0, `all ${air.n} model builds (${MINE.length} items x 4 levels x 3 looks) are free of floating pieces`);
+    for (const [k, list] of Object.entries(air.fairs)) h.eq(list.slice(0, 3), [], `NPC fair + props + clutter (${k}): nothing floats (${list.length} offenders)`);
+    for (const k of ["seed 1", "seed 4"]) h.eq(air.fronts[k], [], `NPC fair (${k}): every stall front opens onto a walkway, none looks at the back of another stall or a plot, no identical skins side by side`);
+    h.expect(air.fronts["seed 1 lots"][1] >= 60, `the fair is still dense: ${air.fronts["seed 1 lots"][1]} shop fronts and ${air.fronts["seed 1 lots"][0]} back-of-house lots / tents`);
+
     h.eq(errors, [], "zero console errors in the full fair");
   },
 };

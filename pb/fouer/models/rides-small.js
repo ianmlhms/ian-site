@@ -5,7 +5,7 @@
 import { makeCtx, C, GOLD, dressEdge, dressForecourt, lerp, TAU, shade, col } from './kit.js';
 import { begin, end, fascia, booth, forecourtStrings, posts, bin, hammi } from './stalls.js';
 import { getMaterials } from './materials.js';
-import { attachSeats, tangentYaw, onCircle } from '../rides/anchors.js';
+import { attachSeats, tangentYaw, onCircle, frameOfObject } from '../rides/anchors.js';
 
 export const MODELS = {};
 const FLAGS = [[0xc8283a, 0xffffff, 0x7fc4ec], [0x1d1b1a, 0xc8283a, 0xf4c430], [0x2d6fd0, 0xffffff, 0xc8283a], [0x2f9a58, 0xffffff, 0xc8283a], [0xf08a2a, 0xffffff, 0x2f9a58], [0x1d1b1a, 0xf4c430, 0xc8283a]];
@@ -180,6 +180,29 @@ MODELS.kette = { build(opts) {
   return g;
 } };
 
+/** the Bayern curve's track as functions of the angle a (0 = +z, increasing towards +x, the direction the cars travel): centre line c, forward f (follows the slope), up u (leans into the
+ * curve by the bank angle), radial n, bank (rad).  R = 5.35 m, three hills of 0.55 m, the bank swings between 0.27 and 0.63 rad. */
+export const BAYERN = { R: 5.35, halfWidth: 0.68, y0: 1.3, hill: 0.55, hills: 3, bank0: 0.45, bank1: 0.18, cars: 8, omega: 1.25, seatCar: 1, eye: [0, 1.4, 0.45] };
+export function bayernAt(a) {
+  const B = BAYERN, s = Math.sin(a), c = Math.cos(a), hh = Math.sin(B.hills * a), dh = B.hills * Math.cos(B.hills * a) * B.hill;
+  const cc = [B.R * s, B.y0 + B.hill * hh, B.R * c];
+  const bank = B.bank0 + B.bank1 * Math.sin(B.hills * a + 1.2);
+  const n = [s, 0, c]; const d = [B.R * c, dh, -B.R * s]; const dl = Math.hypot(d[0], d[1], d[2]); const f = [d[0] / dl, d[1] / dl, d[2] / dl];
+  let u = [-Math.sin(bank) * n[0], Math.cos(bank), -Math.sin(bank) * n[2]]; const k = u[0] * f[0] + u[1] * f[1] + u[2] * f[2];
+  u = [u[0] - k * f[0], u[1] - k * f[1], u[2] - k * f[2]]; const ul = Math.hypot(u[0], u[1], u[2]); u = [u[0] / ul, u[1] / ul, u[2] / ul];
+  const r = [u[1] * f[2] - u[2] * f[1], u[2] * f[0] - u[0] * f[2], u[0] * f[1] - u[1] * f[0]];       // right = up x forward
+  return { c: cc, f, u, r, n, bank };
+}
+/** put car i of nCars at clock time t on the track (parts = the model's animated parts) */
+function bayernPlace(ps, nCars, t) {
+  const T = globalThis.THREE; if (!T) return; const m = bayernPlace.m || (bayernPlace.m = new T.Matrix4());
+  for (let i = 0; i < nCars; i++) {
+    const part = ps['car' + i]; if (!part) continue; const k = bayernAt(TAU * i / nCars + BAYERN.omega * t);
+    part.position.set(k.c[0], k.c[1], k.c[2]);
+    m.makeBasis(new T.Vector3(...k.r), new T.Vector3(...k.u), new T.Vector3(...k.f)); part.quaternion.setFromRotationMatrix(m);
+  }
+}
+
 /* ------------------------------------------------------------------ bayern: the Bayern curve (M) */
 MODELS.bayern = { build(opts) {
   const { b, ctx } = begin('bayern', opts); const P = ctx.pal; const trim = ctx.L4 ? GOLD : P.trim;
@@ -197,24 +220,50 @@ MODELS.bayern = { build(opts) {
   if (ctx.L2) b.radial(16, () => b.bulbRow([0, 4.1, 3.55], [0, 5.9, 0.3], 0.5, ctx.bulb, 0.13));
   b.cyl(0, 5.9, 0, 0.12, 0.05, 1.1, 5, trim); b.sphere(0, 7.1, 0, 0.2, trim, { seg: 6 });
   if (ctx.L3) ledRing(b, 3.95, 3.74, 32, 0.09, ctx.led);
-  // rotating ring of 12 cars with flag-coloured shells
-  const ring = b.part('ring', [0, 0, 0]); const nCars = 12;
-  ring.radial(nCars, (i) => {
-    const f = FLAGS[i % FLAGS.length]; const rr = 5.25;
-    for (let k = 0; k < 3; k++) ring.box(-0.52 + k * 0.52, 0.34, rr, 0.52, 0.42, 0.98, f[k], { cols: { top: f[k] } });
-    ring.box(0.0, 0.34, rr + 0.5, 1.6, 0.14, 0.04, 0xc9ced4); ring.box(0.0, 0.34, rr - 0.5, 1.6, 0.14, 0.04, 0xc9ced4);
-    ring.box(-0.7, 0.76, rr, 0.12, 0.4, 0.8, 0x333a44);
-    ring.beam([-0.6, 0.76, rr - 0.38], [0.15, 1.12, rr - 0.38], 0.05, 0xdfe5ea); ring.beam([-0.6, 0.76, rr + 0.38], [0.15, 1.12, rr + 0.38], 0.05, 0xdfe5ea); ring.beam([0.15, 1.12, rr - 0.38], [0.15, 1.12, rr + 0.38], 0.05, 0xdfe5ea);
-    if (ctx.L3 && i % 3 === 0) ring.figure(-0.25, rr, Math.PI / 2, { y: 0.55, scale: 0.7, body: SEAT[i % 8] });
-  });
+  // the track (feedback B): a closed circular track that rolls over three hills and leans into the curve (banked towards the pavilion, 20 - 37 degrees), on steel legs;
+  // the cars ride it forward (in the direction their noses point) and follow its height, slope and bank.  Pure functions of the angle: model, rig camera and tests share them.
+  const nCars = BAYERN.cars; const N = b.far ? 30 : 72; const hw = BAYERN.halfWidth;
+  const steel = ctx.look === 1 ? 0x3a2f5a : 0x6a7690; const steel2 = ctx.look === 1 ? 0x41e8ff : 0x9aa6bc; const under = 0x2a2e38;
+  const edge = (th, side) => { const k = bayernAt(th); return [k.c[0] + (k.n[0] * Math.cos(k.bank) * hw + 0) * side, k.c[1] + Math.sin(k.bank) * hw * side, k.c[2] + k.n[2] * Math.cos(k.bank) * hw * side]; };
+  for (let k = 0; k < N; k++) {
+    const t0 = TAU * k / N, t1 = TAU * (k + 1) / N; const I0 = edge(t0, -1), O0 = edge(t0, 1), I1 = edge(t1, -1), O1 = edge(t1, 1);
+    const dn = (q, d = 0.2) => [q[0], q[1] - d, q[2]];
+    b.quad(I0, O0, O1, I1, k % 6 < 3 ? steel : steel2, { dbl: true });
+    b.quad(O0, dn(O0), dn(O1), O1, steel, { dbl: true }); b.quad(I0, dn(I0), dn(I1), I1, steel, { dbl: true });
+    b.quad(dn(I0), dn(O0), dn(O1), dn(I1), under, { dbl: true });
+  }
+  for (let k = 0; k < (b.far ? 12 : 24); k++) {            // legs under the track, on the base plate
+    const th = TAU * (k + 0.5) / (b.far ? 12 : 24); const q = bayernAt(th); const hLeg = q.c[1] - 0.3 - 0.2;
+    b.box(q.c[0], 0.3, q.c[2], 0.2, hLeg, 0.2, 0x2a2e36);
+    if (!b.far) b.box(q.c[0], 0.3, q.c[2], 0.5, 0.1, 0.5, 0x2a2e36);
+  }
+  if (!b.far) for (let k = 0; k < 36; k++) { const q = edge(TAU * k / 36, 1); b.bulb(q[0], q[1] + 0.05, q[2], k % 2 ? 0xffe9b0 : ctx.bulb, 0.13); }
+  // the cars: bobsleigh style, two rows of seats with high backs, a flag-coloured shell; one animated part each (positions come from the track, see `animate`)
+  const parts = [];
+  for (let i = 0; i < nCars; i++) {
+    const f = FLAGS[i % FLAGS.length]; const car = b.part('car' + i, [0, 0, 0]); car.localFrame = true; parts.push(car);          // drawn in the car's own frame at the origin; the animate puts it on the track
+    car.box(0, 0.12, -0.05, 0.96, 0.3, 1.66, f[0], { cols: { top: f[0] } }); car.box(0, 0.16, 0.95, 0.66, 0.22, 0.4, f[0]); car.box(0, 0.19, 1.2, 0.34, 0.17, 0.2, f[1]);
+    car.box(0, 0.42, 0.0, 0.26, 0.02, 1.7, f[1]); car.box(0, 0.1, -0.98, 0.7, 0.26, 0.12, 0x23262e);
+    for (const z of [0.42, -0.4]) {
+      car.box(0, 0.42, z, 0.72, 0.1, 0.5, 0x7a1c26); car.box(0, 0.42, z - 0.28, 0.76, 0.74, 0.12, i % 3 === 0 ? 0xc8283a : f[2]);
+      if (!b.far) { car.beam([-0.5, 0.78, z - 0.2], [-0.5, 0.78, z + 0.3], 0.05, 0xdfe5ea); car.beam([0.5, 0.78, z - 0.2], [0.5, 0.78, z + 0.3], 0.05, 0xdfe5ea); car.beam([-0.5, 0.78, z + 0.3], [0.5, 0.78, z + 0.3], 0.05, 0xdfe5ea); }
+    }
+    if (!b.far) { for (const sx of [-1, 1]) { car.bulb(sx * 0.3, 0.34, 1.34, 0xfff4d0, 0.2); car.bulb(sx * 0.3, 0.3, -1.06, 0xff3a2a, 0.15); } car.sphere(0, 0.5, 1.18, 0.07, ctx.L4 ? GOLD : trim, { seg: 4 }); }
+    if (ctx.L3) {                                             // riders: both rows, but not the front seat of the car the camera sits in (the eye)
+      if (i !== BAYERN.seatCar) car.figure(0, 0.42, 0, { y: 0.45, scale: 0.62, body: SEAT[i % 8] });
+      car.figure(0, -0.4, 0, { y: 0.45, scale: 0.62, body: SEAT[(i + 3) % 8] });
+    }
+  }
   gate(b, ctx, ctx.name, 6.8, 3.2, { h: 3.0 }); for (let i = 0; i < 3; i++) b.box(0, i * 0.1, 6.35 + i * 0.12, 2.0, 0.1, 0.4, C.plate);
   if (ctx.L2) { booth(b, ctx, 5.2, 6.5, { body: blue, roof: white }); forecourtStrings(b, ctx, -5, 5, 7.4, 3.0); }
   flagPoles(b, ctx, [[-6.8, 6.0], [-6.8, -6.2], [6.2, -6.2], [6.2, 2.0]], 5.5);
   if (ctx.L3) { b.railing([-6.8, 0, 7.25], [-1.8, 0, 7.25], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.25], [6.8, 0, 7.25], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.4, 4); }
-  const g = end(b, ctx, [16, 16], 8.3, { animate: (t, dt, parts) => { parts.ring.rotation.y = -t * 1.25; } });
-  // ride seats: the cars face +x of their radial frame (tangent, increasing angle); no L3 figure on cars 1, 2, 4, 5 ...
-  const seats = []; for (let i = 0; i < nCars; i++) { const a = TAU * i / nCars; const [px, pz] = onCircle(a, 5.25); seats.push({ p: [px - Math.cos(a) * 0.1, 1.6, pz + Math.sin(a) * 0.1], yaw: tangentYaw(a) }); }
-  attachSeats(g, 'ring', seats, 1);
+  const g = end(b, ctx, [16, 16], 8.3, { animate: (t, dt, ps) => { bayernPlace(ps, nCars, t); } });
+  // ride seats: the front seat of every car, in the car's frame (+z = the direction of travel, +y = the car's up: it banks and pitches with the track)
+  const T = globalThis.THREE; const anchors = [];
+  for (let i = 0; i < nCars; i++) { const o = new T.Object3D(); o.name = 'seat'; o.position.set(0, BAYERN.eye[1], BAYERN.eye[2]); g.userData.parts['car' + i].add(o); anchors.push(o); }
+  g.userData.rideSeat = { count: nCars, preferred: BAYERN.seatCar, anchors, frame: (i, out) => frameOfObject(anchors[i % nCars], out) };
+  g.userData.bayern = { at: bayernAt, omega: BAYERN.omega, cars: nCars };
   return g;
 } };
 
@@ -327,7 +376,7 @@ MODELS.musik = { build(opts) {
   b.cyl(0, 0.3, 0, 2.4, 2.4, 2.4, 12, P.main, { alt: [P.main, shade(P.main, 0.85)] });
   b.band(0, 2.7, 0, 2.55, 1.7, 12, P.second, { alt: [P.second, shade(P.second, 0.9)] }); b.band(0, 2.62, 0, 2.6, 0.12, 12, trim); b.band(0, 4.3, 0, 2.6, 0.12, 12, trim);
   b.radial(12, (i) => b.mural([4, 0, 4, 5][i % 4], i + 21, 0, 3.5, 2.56, 1.5, 1.2, { look: ctx.look, frame: trim, frameW: 0.06, back: false, frameZ: -0.03 }), Math.PI / 12);
-  b.cyl(0, 4.4, 0, 3.7, 0.3, 2.3, 12, P.awn[0], { alt: ctx.look === 1 ? [0x22103f, 0x5a2ad0] : P.awn, smooth: false });
+  b.cyl(0, 4.4, 0, 3.7, 0.3, 2.3, 12, P.awn[0], { alt: ctx.look === 1 ? [0x22103f, 0x5a2ad0] : P.awn, smooth: false, bottom: true });
   b.scallopRing(0, 4.4, 0, 3.72, 0.4, 12, P.awn[0], P.awn[1], { flare: 0.08 });
   b.bulbRing(0, 4.3, 0, 3.78, 36, ctx.bulb, 0.15); b.bulbRing(0, 2.64, 0, 2.66, 24, ctx.bulb, 0.14); b.bulbRing(0, 4.28, 0, 2.66, 24, ctx.bulb, 0.14); b.bulbRing(0, 3.45, 0, 2.66, 24, ctx.bulb, 0.1);
   b.radial(12, () => b.bulbRow([0, 4.6, 3.5], [0, 6.6, 0.3], 0.45, ctx.bulb, 0.13));
@@ -337,8 +386,8 @@ MODELS.musik = { build(opts) {
   if (ctx.L2) { booth(b, ctx, 5.5, 6.6, { body: P.main, roof: P.second }); forecourtStrings(b, ctx, -5, 5, 7.4, 3.0); }
   flagPoles(b, ctx, [[-7.0, 6.2], [-7.0, -6.5], [6.3, -6.5], [6.3, 2.0]], 5.5);
   if (ctx.L3) { b.railing([-7.0, 0, 7.3], [-1.8, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); b.railing([1.8, 0, 7.3], [7.0, 0, 7.3], 0.95, ctx.L4 ? GOLD : C.steel); queue(b, ctx, 7.45, 3); }
-  const g = end(b, ctx, [16, 16], 8.0, { animate: (t, dt, parts) => { parts.ringA.rotation.y = -t * 1.1; parts.ringB.rotation.y = -t * 1.1; parts.ringA.position.y = Math.sin(t * 3.0) * 0.18; parts.ringB.position.y = Math.sin(t * 3.0 + Math.PI) * 0.18; } });
-  // ride seats: the odd cars (ring B, no L3 figure) face +x of their radial frame; the ring turns the other way: you ride backwards, like the real Music Express
+  const g = end(b, ctx, [16, 16], 8.0, { animate: (t, dt, parts) => { parts.ringA.rotation.y = t * 1.1; parts.ringB.rotation.y = t * 1.1; parts.ringA.position.y = Math.sin(t * 3.0) * 0.18; parts.ringB.position.y = Math.sin(t * 3.0 + Math.PI) * 0.18; } });
+  // ride seats: the odd cars (ring B, no L3 figure) face +x of their radial frame, the direction the ring turns: you ride forward (feedback B: it used to turn the other way, so the camera started looking backwards)
   const seats = []; for (let i = 1; i < nCars; i += 2) { const a = TAU * i / nCars; const [px, pz] = onCircle(a, 5.1); seats.push({ p: [px - Math.cos(a) * 0.12, 0.55 + 0.42 + 1.05, pz + Math.sin(a) * 0.12], yaw: tangentYaw(a) }); }
   attachSeats(g, 'ringB', seats, 0);
   return g;
@@ -355,8 +404,14 @@ MODELS.takeoff = { build(opts) {
   b.box(0, 1.36, -5.4, 13.6, 6.4, 0.4, P.dark); b.mural(1, 9, 0, 4.6, -5.18, 13.0, 4.6, { look: ctx.look, frame: trim, frameW: 0.1, back: false, frameZ: -0.1 });
   b.bulbRow([-6.6, 7.6, -5.0], [6.6, 7.6, -5.0], 0.4, ctx.bulb, 0.15);
   fascia(b, ctx, ctx.name, 0, 8.5, -5.2, 5.4, 1.1);
-  [-1, 1].forEach((sx) => { b.cyl(sx * 5.4, 1.4, -3.2, 0.06, 0.06, 5.2, 4, 0xdddddd); b.bulbRing(sx * 5.4, 6.9, -3.2, 1.5, 24, ctx.look === 1 ? 0xff3fc8 : 0x9be040, 0.17, { vertical: true }); b.bulbRing(sx * 5.4, 6.9, -3.2, 0.9, 14, 0xffe27a, 0.15, { vertical: true }); });
+  [-1, 1].forEach((sx) => {
+    b.cyl(sx * 5.4, 1.4, -3.2, 0.06, 0.06, 5.5, 4, 0xdddddd);
+    for (const rr of [1.5, 0.9]) for (let k = 0; k < 16; k++) { const a0 = TAU * k / 16, a1 = TAU * (k + 1) / 16; b.beam([sx * 5.4 + Math.sin(a0) * rr, 6.9 + Math.cos(a0) * rr, -3.2], [sx * 5.4 + Math.sin(a1) * rr, 6.9 + Math.cos(a1) * rr, -3.2], 0.05, 0xdddddd); }          // the wheel the bulbs sit on (the bulbs used to hang in the air round the post)
+    for (let k = 0; k < 4; k++) { const a = TAU * k / 4 + 0.4; b.beam([sx * 5.4, 6.9, -3.2], [sx * 5.4 + Math.sin(a) * 1.5, 6.9 + Math.cos(a) * 1.5, -3.2], 0.04, 0xdddddd); }
+    b.bulbRing(sx * 5.4, 6.9, -3.2, 1.5, 24, ctx.look === 1 ? 0xff3fc8 : 0x9be040, 0.17, { vertical: true }); b.bulbRing(sx * 5.4, 6.9, -3.2, 0.9, 14, 0xffe27a, 0.15, { vertical: true }); });
   // gold bulb ellipse
+  { const pts = []; for (let i = 0; i < 28; i++) { const a = TAU * i / 28; pts.push([Math.cos(a) * 3.75, 8.5 + Math.sin(a) * 1.12, -5.26]); } b.poly(pts, P.dark);        // the board the bulb ellipse is mounted on, standing on two posts on the wall top
+    [-1, 1].forEach((sx) => b.box(sx * 2.4, 7.7, -5.3, 0.22, 1.0, 0.2, P.dark)); }
   for (let i = 0; i < 40; i++) { const a = TAU * i / 40; b.bulb(Math.cos(a) * 3.6, 8.5 + Math.sin(a) * 1.0, -5.0, ctx.look === 1 ? 0x41e8ff : 0xffcf5a, 0.14); }
   // static mast, tilted hub, spinning arm with two rows of seats at each end
   b.cyl(0, 1.38, 0, 0.9, 0.6, 4.6, 9, P.main, { alt: [P.main, shade(P.main, 0.85)] }); b.band(0, 2.1, 0, 0.92, 0.14, 9, trim);

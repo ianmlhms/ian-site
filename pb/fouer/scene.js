@@ -34,6 +34,7 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
   let selectT = 0;
   let gateMesh = null;
   let gateStars = 0;
+  const appliedListeners = [];          // feedback A: told when a pitch model was (re)built (the walk's solids follow the drawn model)
   let visit = null;                     // W7: a published fair shown read-only instead of the player's own (social.js layout)
   const rects = PITCHES.map((pitch, index) => ({ index, ...(markers.rect(pitch.id) ?? { u: pitch.u, w: pitch.w, du: 8, dw: 8, y: world.groundY(pitch.u, pitch.w), size: pitch.size }) }));
 
@@ -63,6 +64,7 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
     if (applied.get(index) === key) return;
     applied.set(index, key);
     fair.setPitch(PITCHES[index].id, spec);
+    appliedListeners.forEach(fn => fn(index));
   }
 
   function syncMarkers() {
@@ -89,6 +91,7 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
     visit = layout;
     select(-1);
     PITCHES.forEach((pitch, i) => { const spec = visitSpec(layout, i); applied.set(i, `v|${keyOf(spec)}`); fair.setPitch(pitch.id, spec); });
+    appliedListeners.forEach(fn => fn(-1));
     syncMarkers();
   }
   function endVisit() {
@@ -155,7 +158,7 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
     const rect = rects[index];
     const finish = () => { growing.delete(index); applyPitch(index); syncMarkers(); };
     if (!hasModel(spec.item)) { addRing(index); addSparkles(index); return; }
-    applied.set(index, "open"); fair.setPitch(PITCHES[index].id, { state: "open" });   // the old attraction (replace) or bare pitch stays out until the new one has grown
+    applied.set(index, "open"); fair.setPitch(PITCHES[index].id, { state: "open" }); appliedListeners.forEach(fn => fn(index));   // the old attraction (replace) or bare pitch stays out until the new one has grown
     let model = null;
     try { model = buildModel(spec.item, { look: spec.look, level: spec.level, quality, seed: (hashStr(PITCHES[index].id) % 997) + 1, far: false }); }
     catch (error) { console.warn("[fouer] grow-in model failed", error); return; }
@@ -318,7 +321,51 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
     r.flyTo({ tu: rect.u - Math.cos(yaw) * k, tw: rect.w - Math.sin(yaw) * k, yaw, dist: d, tilt: r.rig.tilt }, seconds);
   }
 
+  // ---- feedback A: the landing marker of the pin (pegman) drag: a ring + beam at the snapped spot (green = valid, red = nowhere to walk), an arrow for the facing, and an amber
+  // ring + line at the raw drop point when the spot was snapped to the nearest walkable one.  The marker grows with the camera distance (a 1 m ring would vanish in the overview).
+  let pin = null, pinT = 0, pinSpot = null;
+  function makePin() {
+    const group = new T.Group(); group.name = "fouer-pin"; group.renderOrder = 9;
+    const mat = (color, opacity) => new T.MeshBasicMaterial({ color, transparent: true, opacity, depthTest: false, depthWrite: false, fog: false, side: T.DoubleSide });
+    const ringGeo = new T.RingGeometry(0.78, 1, 40); ringGeo.rotateX(-Math.PI / 2);
+    const ring = new T.Mesh(ringGeo, mat(0x59e08a, 0.95));
+    const disc = new T.Mesh(new T.CircleGeometry(0.78, 32).rotateX(-Math.PI / 2), mat(0x59e08a, 0.28));
+    const beam = new T.Mesh(new T.CylinderGeometry(0.1, 0.1, 6, 8, 1, true).translate(0, 3, 0), mat(0x59e08a, 0.55));
+    const head = new T.Mesh(new T.SphereGeometry(0.42, 12, 8).translate(0, 6.2, 0), mat(0x59e08a, 0.95));
+    const arrowGeo = new T.BufferGeometry(); arrowGeo.setAttribute("position", new T.Float32BufferAttribute([1.3, 0, 0, 0.65, 0, 0.5, 0.65, 0, -0.5], 3));
+    const arrow = new T.Mesh(arrowGeo, mat(0xffffff, 0.9));
+    const rawRing = new T.Mesh(ringGeo.clone(), mat(0xffb347, 0.9)); rawRing.scale.set(0.55, 1, 0.55); rawRing.visible = false;
+    const line = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3()]), new T.LineBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.85, depthTest: false, fog: false })); line.visible = false;
+    [ring, disc, beam, head, arrow, rawRing, line].forEach(m => { m.renderOrder = 9; m.frustumCulled = false; group.add(m); });
+    return { group, ring, disc, beam, head, arrow, rawRing, line };
+  }
+  const pinScale = () => clamp(r.rig.cdist / 45, 1, 6);
+  function layoutPin() {
+    if (!pin || !pinSpot) return;
+    const k = pinScale(), y = world.groundY(pinSpot.x, pinSpot.z) + 0.5;
+    pin.group.position.set(pinSpot.x, y, pinSpot.z); pin.group.scale.set(k, k, k);
+    pin.arrow.rotation.y = -pinSpot.yaw;
+    if (pinSpot.snapped && pinSpot.raw) {
+      const dx = (pinSpot.raw.x - pinSpot.x) / k, dz = (pinSpot.raw.z - pinSpot.z) / k, dy = (world.groundY(pinSpot.raw.x, pinSpot.raw.z) - world.groundY(pinSpot.x, pinSpot.z)) / k;
+      pin.rawRing.position.set(dx, dy, dz);
+      const a = pin.line.geometry.attributes.position; a.setXYZ(0, 0, 0, 0); a.setXYZ(1, dx, dy, dz); a.needsUpdate = true;
+    }
+  }
+  /** show / move / hide the pin marker; `spot` = { x, z, yaw, valid, snapped, raw } (walk.pinSpot) or null */
+  function setPin(spot) {
+    pinSpot = spot ? { x: spot.x, z: spot.z, valid: Boolean(spot.valid), snapped: Boolean(spot.snapped), yaw: spot.yaw ?? 0, raw: spot.raw ?? null } : null;
+    if (!spot) { if (pin) { root.remove(pin.group); pin.group.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); pin = null; } return; }
+    if (!pin) { pin = makePin(); root.add(pin.group); }
+    const color = spot.valid ? 0x59e08a : 0xff5a4a;
+    for (const key of ["ring", "disc", "beam", "head"]) pin[key].material.color.setHex(color);
+    pin.arrow.visible = Boolean(spot.valid);
+    const showRaw = Boolean(spot.snapped && spot.raw);
+    pin.rawRing.visible = showRaw; pin.line.visible = showRaw;
+    layoutPin();
+  }
+
   function update(dt) {
+    if (pin) { pinT += dt; const k = 1 + 0.08 * Math.sin(pinT * 7); pin.ring.scale.set(k, 1, k); layoutPin(); }
     for (let i = effects.length - 1; i >= 0; i--) {
       const fx = effects[i];
       fx.t += dt;
@@ -338,6 +385,8 @@ export function createSceneBridge({ T, r, world, fair, markers, game, quality = 
 
   return {
     sync, update, select, anchor, pick, focus, heightOf, rects, effects, showVisit, endVisit,
+    onApplied(fn) { appliedListeners.push(fn); },
+    setPin, get pinShown() { return pin !== null && pin.group.parent !== null; }, get pinState() { return pinSpot ? { x: pinSpot.x, z: pinSpot.z, valid: pinSpot.valid, snapped: pinSpot.snapped, yaw: pinSpot.yaw } : null; },
     get visiting() { return visit !== null; }, get selected() { return selected; }, get growing() { return growing.size; },
     setNight(k) { night = k; },
     addRing, addSparkles,

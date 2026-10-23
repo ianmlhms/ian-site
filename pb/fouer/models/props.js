@@ -140,7 +140,8 @@ export function buildProps({ T, pitches, fieldPoly, groundY, seed = 1, quality =
       const byU = new Map(); poles.forEach((p) => { if (!byU.has(p[0])) byU.set(p[0], []); byU.get(p[0]).push(p); });
       const us = [...byU.keys()].sort((a, c) => a - c);
       us.forEach((u, i) => { const [p0, p1] = byU.get(u).sort((a, c) => a[3] - c[3]); stringLights(b, [u, p0[2] + 5.0, p0[1]], [u, p1[2] + 5.0, p1[1]], 0.8, 14, i & 1 ? MULTI : [WARM, 0xfff4d0]); if (i > 0) { const q = byU.get(us[i - 1]).sort((a, c) => a[3] - c[3]); [[q[0], p0], [q[1], p1]].forEach(([qa, pa]) => stringLights(b, [qa[0], qa[2] + 5.1, qa[1]], [pa[0], pa[2] + 5.1, pa[1]], 0.55, 14, [WARM, 0xfff4d0, WARM, 0xffc870])); } });
-      us.forEach((u, i) => { if (i % 2) { const [p0, p1] = byU.get(u).sort((a, c) => a[3] - c[3]); b.pennants([u + 1.2, p0[2] + 4.5, p0[1]], [u + 1.2, p1[2] + 4.5, p1[1]], 16, MULTI, 0.45, { sag: 0.6 }); } });
+      // the flag strings hang from the two lamp posts of the crossing (they used to start 1.2 m beside them, in mid-air)
+      us.forEach((u, i) => { if (i % 2) { const [p0, p1] = byU.get(u).sort((a, c) => a[3] - c[3]); b.pennants([u, p0[2] + 4.5, p0[1]], [u, p1[2] + 4.5, p1[1]], 16, MULTI, 0.45, { sag: 0.6 }); } });
     }
     for (let u0 = al.u[0] + 9; u0 <= al.u[1]; u0 += 31) {
       const w = ai & 1 ? al.w[0] : (r() < 0.5 ? al.w[0] : al.w[1]);

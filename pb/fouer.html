@@ -22,13 +22,18 @@ button { font: inherit; color: inherit; }
 #loading .box { text-align: center; width: min(340px, 80%); }
 #loading .sheep { font-size: 56px; margin-bottom: 6px; animation: bob 1.4s ease-in-out infinite; }
 #loading b { font-size: 26px; letter-spacing: -.5px; }
-#bar { height: 7px; border-radius: 4px; background: #ffffff22; margin-top: 18px; overflow: hidden; }
-#bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffcf5c, #ff9d3c); transition: width .25s; }
-#loading small { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; }
+#bar { position: relative; height: 8px; border-radius: 4px; background: #ffffff22; margin-top: 18px; overflow: hidden; }
+#bar i { position: absolute; inset: 0; display: block; border-radius: 4px; background: linear-gradient(90deg, #ffcf5c, #ff9d3c); transform-origin: 0 50%; transform: scaleX(0); will-change: transform; overflow: hidden; }
+#bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 0, #ffffff80 50%, transparent 100%); transform: translateX(-100%); animation: shine 1.15s linear infinite; }
+#loading small { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; min-height: 15px; }
+#loading .slow { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+#loading .slow button { margin-top: 10px; padding: 9px 18px; border-radius: 18px; border: 1px solid #ffffff44; background: #ffffff18; font-weight: 700; cursor: pointer; }
+@keyframes shine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { #bar i::after, #loading .sheep { animation: none; } }
 @keyframes bob { 50% { transform: translateY(-6px); } }
 </style>
 <link rel="stylesheet" href="/pb/idle-extras.css?v=5">
-<link rel="stylesheet" href="/pb/fouer/ui.css?v=4">
+<link rel="stylesheet" href="/pb/fouer/ui.css?v=5">
 <script src="/pb/idle-extras.js?v=8"></script>
 <script src="/pb/arcade-kit.js?v=34" data-arcade-id="park" data-arcade-title="Schueberfouer Tycoon"></script>
 </head>
@@ -38,6 +43,7 @@ button { font: inherit; color: inherit; }
   <div id="title"><span>Glacis · Lëtzebuerg</span><b>Schueberfouer Tycoon</b></div>
   <div class="fabs" id="fabs">
     <button class="fab" id="walkBtn" type="button" data-tut="walk" hidden>👣</button>
+    <button class="fab" id="pinBtn" type="button" aria-label="Drag onto the fair to walk from there" hidden>🧍</button>
     <button class="fab" id="envBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Weather and time of day">☀️</button>
     <button class="fab" id="frameBtn" type="button" aria-label="Frame the whole fair ground">⤢</button>
     <button class="fab" id="menuBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Menu">☰</button>
@@ -45,14 +51,83 @@ button { font: inherit; color: inherit; }
   <div class="popover" id="envPop" role="dialog" aria-label="Weather and time" hidden></div>
   <div class="popover" id="menu" role="dialog" aria-label="Menu" hidden></div>
   <div id="ui" aria-live="polite"></div>
-  <div id="loading" role="status"><div class="box"><div class="sheep">🐑</div><b>Schueberfouer</b><div id="bar"><i></i></div><small id="loadMsg">…</small></div></div>
+  <div id="loading" role="status"><div class="box"><div class="sheep">🐑</div><b>Schueberfouer</b><div id="bar"><i></i></div><small id="loadMsg">…</small><div class="slow" id="loadSlow" hidden><span id="loadSlowText"></span><br><button type="button" id="loadRetry"></button></div></div></div>
 </main>
+<script>
+/* The loading screen (feedback A): the bar must feel alive and still be honest.
+ *  - REAL progress arrives as set(p, label, ceiling): the 59 modules (Resource Timing, counted below until main.js takes over), the world build, the models, the fair layer, the
+ *    scene (main.js calls it between its steps and once per pitch model);
+ *  - between two real steps the bar creeps on towards the next step's ceiling with a Web Animation (a transform: it runs on the compositor, so it keeps moving while the main thread
+ *    is busy building models), it never goes backwards and it never reaches the ceiling by itself;
+ *  - if nothing real has happened for 12 s the screen says so calmly and offers a retry (a stuck load is the only case that shows the hint). */
+(function () {
+  var bar = document.querySelector("#bar i"), msg = document.getElementById("loadMsg"), slow = document.getElementById("loadSlow"), slowText = document.getElementById("loadSlowText"), retry = document.getElementById("loadRetry");
+  var STR = {
+    lb: { code: "Code gëtt gelueden …", slow: "Dauert méi laang wéi gewinnt …", retry: "Nei probéieren" },
+    de: { code: "Code wird geladen …", slow: "Dauert länger als sonst …", retry: "Nochmal versuchen" },
+    en: { code: "Loading the code …", slow: "Taking longer than usual …", retry: "Try again" }
+  };
+  var lang = "lb";
+  try { var own = localStorage.getItem("pb_fouer_lang"), site = localStorage.getItem("site_lang"); lang = STR[own] ? own : STR[site] ? site : site === "fr" ? "en" : "lb"; } catch (e) { /* storage blocked */ }
+  var T = STR[lang], STALL_MS = 12000, EXPECT_MODULES = 60, QUICK_MS = 380;
+  var state = { value: 0, ceiling: 0.1, last: Date.now(), anim: null, done: false, taken: false, log: [], seen: 0 };
+  function now() { return Date.now(); }
+  function shown() {                                   // the value the bar shows right now (computed transform, so it includes the running animation)
+    try { var t = getComputedStyle(bar).transform; if (t && t !== "none") { var m = t.match(/matrix\(([^,]+)/); if (m) return Math.max(0, Math.min(1, parseFloat(m[1]))); } } catch (e) { /* fall through */ }
+    return state.value;
+  }
+  function paint(from, to, ceil, ms) {
+    if (state.anim) { try { state.anim.cancel(); } catch (e) { /* ignore */ } state.anim = null; }
+    bar.style.transform = "scaleX(" + from + ")";
+    if (!bar.animate || to >= 1) { bar.style.transition = "transform .35s ease-out"; bar.style.transform = "scaleX(" + (to >= 1 ? 1 : ceil) + ")"; return; }
+    var q = Math.min(0.2, QUICK_MS / ms);
+    state.anim = bar.animate([
+      { transform: "scaleX(" + from + ")", easing: "cubic-bezier(.2,.7,.3,1)" },
+      { transform: "scaleX(" + to + ")", offset: q, easing: "cubic-bezier(.25,.55,.4,1)" },
+      { transform: "scaleX(" + ceil + ")" }
+    ], { duration: ms, fill: "forwards" });
+  }
+  var api = window.__fouerLoad = {
+    /** real progress: p in 0..1 (never goes back), an optional label, the ceiling the bar may creep to before the next real step and how long that creep takes (ms, a slow device's estimate) */
+    set: function (p, label, ceiling, ms) {
+      if (state.done) return;
+      var cur = shown(), to = Math.max(p, cur, state.value);
+      var ceil = Math.min(0.995, Math.max(ceiling == null ? to + 0.04 : ceiling, to + 0.01));
+      state.value = to; state.ceiling = ceil; api.touch();
+      if (label) msg.textContent = label;
+      paint(cur, to, ceil, Math.max(STALL_MS + 2000, ms || 0));       // a creep always outlasts the stall timer: the bar never sits still before the hint
+    },
+    /** something real happened without a number (a model was built): resets the stall clock only */
+    touch: function () { state.last = now(); if (!slow.hidden) slow.hidden = true; },
+    done: function () {
+      if (state.done) return; state.done = true; state.value = 1; paint(shown(), 1, 1, 400); msg.textContent = ""; slow.hidden = true; clearInterval(timer);
+    },
+    fail: function (text) { state.done = true; clearInterval(timer); if (text) msg.textContent = text; showSlow(true); },
+    value: function () { return state.done ? 1 : shown(); },
+    take: function () { state.taken = true; },          // main.js is running: module counting stops
+    stalled: function () { return !slow.hidden; },
+    str: STR, lang: lang
+  };
+  function showSlow(failed) { slowText.textContent = T.slow; retry.textContent = T.retry; slow.hidden = false; void failed; }
+  retry.addEventListener("click", function () { location.reload(); });
+  var timer = setInterval(function () { if (!state.done && now() - state.last > STALL_MS) showSlow(false); }, 1000);
+  msg.textContent = T.code;
+  api.set(0.02, T.code, 0.1, 4000);
+  try {      // the modules and three.js: one tick per finished request
+    new PerformanceObserver(function (list) {
+      list.getEntries().forEach(function (e) { if (/\/pb\/(fouer\/|idle-extras|arcade-kit)|three(\.min)?\.js/.test(e.name)) state.seen++; });
+      if (!state.taken && !state.done) api.set(0.02 + 0.09 * Math.min(1, state.seen / EXPECT_MODULES), T.code, 0.115, 4000);
+    }).observe({ type: "resource", buffered: true });
+  } catch (e) { /* Resource Timing missing: the creep alone carries this phase */ }
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
 if(!window.THREE){
   document.documentElement.dataset.bootError="three-missing";
   document.getElementById("loadMsg").textContent="three.js r160 failed to load";
+  if(window.__fouerLoad)window.__fouerLoad.fail("three.js r160 failed to load");
   throw new Error("three.js r160 failed to load");
 }
 </script>
@@ -63,7 +138,8 @@ if(!window.THREE){
   // ?models=1 -> the W3 model preview (turntable grid / single model / full fair); ?stage=1 -> W2's empty Glacis stage; otherwise the game.
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe.
   const q = new URLSearchParams(location.search);
-  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=6";
+  const entry = q.get("models") === "1" ? "/pb/fouer/models/preview.js?v=1" : q.get("stage") === "1" ? "/pb/fouer/world/stage.js?v=1" : "/pb/fouer/main.js?v=7";
+  if (entry.indexOf("main.js") < 0 && window.__fouerLoad) window.__fouerLoad.done();         // the preview pages run their own screens
   import(entry);
 </script>
 </body>

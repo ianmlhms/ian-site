@@ -124,6 +124,10 @@ export const flow = {
       const gridEdges = g.crowd.graph ? g.crowd.graph.edges.length : -1;
       return { polyDiff, errors: res.errors.slice(0, 30), nErr: res.errors.length, stats: res.stats, ms: Math.round(performance.now() - t0), entrancesSame: JSON.stringify(P.ENTRANCES) === JSON.stringify(L.ENTRANCES), corridors: N.CORRIDORS.length, gridEdges, stalls: g.fair.baseInfo.npc.stalls.length, solids: g.fair.baseInfo.solids.length };
     });
+    // feedback B: every NPC stall front opens onto a walkway (no stall looks at the back of another stall, a plot or the field edge), no identical skins side by side
+    const fronts = await evalG(page, async g => { const L = await import("/pb/fouer/layout.js"), D = await import("/pb/fouer/data.js"); const stalls = g.fair.baseInfo.npc.stalls;
+      return { errors: L.validateStallFronts({ pitches: D.PITCHES.map(p => ({ ...p })), stalls }).slice(0, 10), shops: stalls.filter(s => s.k !== "lot").length, lots: stalls.filter(s => s.k === "lot").length, funhouses: stalls.filter(s => s.k === "funhouse").length }; });
+    h.eq(fronts.errors, [], `every NPC stall front opens onto a walkway on the real fair (${fronts.shops} shop fronts, ${fronts.lots} back-of-house lots / tents, ${fronts.funhouses} Spukhaeuser)`);
     h.expect(lay.polyDiff < 0.01, `the Glacis outline of layout.js is the baked one (max difference ${lay.polyDiff} m)`);
     h.expect(lay.entrancesSame, "props.js re-exports the entrances of layout.js");
     h.eq(lay.errors, [], `validateLayout on the real fair: 0 problems (${lay.stalls} stalls, ${lay.solids} solids, ${lay.ms} ms; ${lay.nErr} offenders)`);

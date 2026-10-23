@@ -37,7 +37,7 @@ export const RIDE_DEFS = Object.freeze({
   kanner:   { kind: "seat", clock: "speed", dur: 46, hi: 1.25, lo: 0.1, icon: "🎠", sound: "carousel", up: 0.14, down: 0.82, high: false },
   gold:     { kind: "seat", clock: "speed", dur: 46, hi: 1.2, lo: 0.1, icon: "🎠", sound: "carousel", up: 0.14, down: 0.82, high: false },
   kette:    { kind: "seat", clock: "speed", dur: 54, hi: 1.55, lo: 0.12, icon: "🎪", sound: "swing", up: 0.22, down: 0.8, high: false, assist: { pitch: 0.3, roll: 0.3 } },
-  bayern:   { kind: "seat", clock: "speed", dur: 50, hi: 1.7, lo: 0.12, icon: "🏎️", sound: "curve", up: 0.2, down: 0.82, high: false },
+  bayern:   { kind: "seat", clock: "speed", dur: 50, hi: 1.7, lo: 0.12, icon: "🏎️", sound: "curve", up: 0.2, down: 0.82, high: false, assist: { pitch: 0.3, roll: 0.45 } },
   happy:    { kind: "seat", clock: "speed", dur: 50, hi: 1.5, lo: 0.1, icon: "⛵", sound: "boats", up: 0.16, down: 0.82, high: false },
   break:    { kind: "seat", clock: "speed", dur: 56, hi: 2.3, lo: 0.12, icon: "💫", sound: "dance", up: 0.22, down: 0.8, high: false },
   musik:    { kind: "seat", clock: "speed", dur: 54, hi: 1.9, lo: 0.12, icon: "🎶", sound: "dance", up: 0.2, down: 0.82, high: false },

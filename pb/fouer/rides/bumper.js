@@ -41,13 +41,13 @@ export function createBumper({ floor, count = 8, seed = 1, cfg = BUMPER, playerS
   const arena = arenaOf(floor);
   const rnd = makeRandom(seed * 7919 + 13);
   const cars = [];
-  const cols = 4, spanX = (arena.x1 - arena.x0 - 4), spanZ = (arena.z1 - arena.z0 - 3);
+  const cols = 4, spanX = (arena.x1 - arena.x0 - 4), spanZ = (arena.z1 - arena.z0 - 3) - 3.4;          // the strip at the front (where the player starts) stays free of cars
   for (let i = 0; i < count; i++) {
     const c = i % cols, r = Math.floor(i / cols);
     const x = arena.x0 + 2 + spanX * (c + 0.5 + (r % 2) * 0.25) / cols * (1 / 1) + (rnd() - 0.5) * 1.2;
     const z = arena.z0 + 1.5 + spanZ * (r + 0.5) / Math.ceil(count / cols) + (rnd() - 0.5) * 0.8;
     cars.push({ x: clamp(x, arena.x0 + cfg.radius, arena.x1 - cfg.radius), z: clamp(z, arena.z0 + cfg.radius, arena.z1 - cfg.radius), yaw: rnd() * Math.PI * 2 - Math.PI, vx: 0, vz: 0, speed: 0, slip: 0,
-      ai: { until: 0, steer: 0, target: 2.6 + rnd() * 2, bias: 0, hunt: rnd() < 0.55 } });
+      ai: { until: 0, steer: 0, target: 2.6 + rnd() * 2, bias: 0, hunt: rnd() < 0.4, wx: 0, wz: 0 } });
   }
   const start = playerStart ?? { x: (arena.x0 + arena.x1) / 2, z: arena.z1 - cfg.radius - 0.3, yaw: Math.PI };
   Object.assign(cars[0], { x: start.x, z: start.z, yaw: start.yaw, vx: 0, vz: 0 });
@@ -62,8 +62,16 @@ export function createBumper({ floor, count = 8, seed = 1, cfg = BUMPER, playerS
     if (now < ai.until) return;
     ai.until = now + 0.8 + rnd() * 2.2;
     ai.target = cfg.aiSpeed[0] + rnd() * (cfg.aiSpeed[1] - cfg.aiSpeed[0]);
-    let steer = (rnd() - 0.5) * 1.2;
-    if (ai.hunt && rnd() < 0.6) {                    // go for the nearest other car (mostly the player)
+    // spread out: head for the emptiest of three random spots on the floor (a bigger floor with 9 - 11 cars should not turn into one pile)
+    let bestSpot = null, bestGap = -1;
+    for (let k = 0; k < 3; k++) {
+      const wx = arena.x0 + 1.5 + rnd() * (arena.x1 - arena.x0 - 3), wz = arena.z0 + 1.5 + rnd() * (arena.z1 - arena.z0 - 3);
+      let gap = 1e9; for (let j = 0; j < cars.length; j++) if (j !== i) gap = Math.min(gap, Math.hypot(cars[j].x - wx, cars[j].z - wz));
+      if (gap > bestGap) { bestGap = gap; bestSpot = [wx, wz]; }
+    }
+    ai.wx = bestSpot[0]; ai.wz = bestSpot[1];
+    let steer = clamp(-wrapAngle(Math.atan2(ai.wx - car.x, ai.wz - car.z) - car.yaw) * 1.3, -1, 1) + (rnd() - 0.5) * 0.4;
+    if (ai.hunt && now > 5 && rnd() < 0.5) {                      // nobody hunts the player in the first seconds: he gets to roll off the start                    // go for the nearest other car (mostly the player)
       let best = null, bd = 1e9;
       for (let j = 0; j < cars.length; j++) { if (j === i) continue; const d = Math.hypot(cars[j].x - car.x, cars[j].z - car.z) - (j === 0 ? 3 : 0); if (d < bd) { bd = d; best = cars[j]; } }
       if (best) { const want = Math.atan2(best.x - car.x, best.z - car.z); steer = clamp(-wrapAngle(want - car.yaw) * 1.5, -1, 1); }
