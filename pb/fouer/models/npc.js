@@ -379,8 +379,8 @@ export function packFree({ nu, nw, free, weights, rf, put, margin = 0.3, maxRun 
       const dav2 = depthFor(sw); if (dav2 - (sd + margin) < 2.6 && dav2 - margin <= sk.d[1] * 1.5) sd = dav2 - margin; if (sd + margin > dav2) sd = dav2 - margin;
       if (put(i, j, sw, sd, best.name)) n++;
     } else {
-      const dav = depthFor(3);
-      if (dav >= 1.8 && runM >= 2.4 && put(i, j, Math.min(runM - margin, 8), Math.min(dav - margin, 3.2), null)) n++;
+      const swS = Math.min(runM - margin, 8); const dav = depthFor(swS);        // the depth over the WHOLE width of the strip (a free column that is shorter must shorten it: it used to poke into a neighbouring zone)
+      if (dav >= 1.8 && runM >= 2.4 && put(i, j, swS, Math.min(dav - margin, 3.2), null)) n++;
     }
   }
   return n;

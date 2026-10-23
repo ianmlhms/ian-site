@@ -17,7 +17,7 @@ export function createAccessOverlay({ T, root, groundY, pitches }) {
     }
   };
   for (const z of zones(pitches)) {
-    if (z.kind === 'forecourt') quadGrid(buckets.forecourt, z.rect);
+    if (z.kind === 'forecourt' || z.kind === 'queue') quadGrid(buckets.forecourt, z.rect);
     else if (z.kind === 'service') {
       const [p0, p1, p2, p3] = z.poly; const n = 12;
       for (let k = 0; k < n; k++) {

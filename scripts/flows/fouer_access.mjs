@@ -156,7 +156,7 @@ export const flow = {
           best[side] = { free, inCourt };
         }
         const b = [best[1], best[-1]].sort((x, y) => y.free - x.free)[0];          // the crowd flips to the other side when a slot is blocked
-        if (b.free < 4) bad.push(`${p.id}: only ${b.free} of 15 queue slots are free on the better side (need 4; the crowd stops the row at the first blocked slot)`);
+        if (b.free < L.QUEUE_RESERVED) bad.push(`${p.id}: only ${b.free} of 15 queue slots are free on the better side (layout.js reserves ${L.QUEUE_RESERVED})`);
         if (p.size !== "S" && b.inCourt < 4) bad.push(`${p.id}: only ${b.inCourt} queue slots lie in its forecourt`);
       });
       return bad;

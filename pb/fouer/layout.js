@@ -81,6 +81,10 @@ export const APRON_MAX = 6.5;
 export const FACE_TOLERANCE = 1.5;
 /** kerb furniture: radius <= KERB_R, centre at most KERB_OUT metres outside an alley edge */
 export const KERB_R = 0.26, KERB_OUT = 0.6;
+/** queue rows (crowd.js queueSlot): slot k stands QUEUE_OUT m in front of the front edge, QUEUE_START + k * QUEUE_STEP m along it, on either side of the middle.  The first
+ * QUEUE_RESERVED slots of both sides are reserved like the forecourt (zone `queue-<id>`: nothing of the NPC fair, props or clutter may stand there), so a queue row always fits. */
+export const QUEUE_OUT = 3.0, QUEUE_START = 0.6, QUEUE_STEP = 0.85, QUEUE_RESERVED = 8, QUEUE_DEPTH = 3.6;
+const QUEUE_HALF = QUEUE_START + QUEUE_STEP * (QUEUE_RESERVED - 1) + 0.4;
 /** how far NPC stalls keep back from the long alleys (1.2 m + the 0.25 m row margin: their 0.95 m awnings stay clear of the walkway); the dressing (tables, crates, A-frames, bins) fills the gaps between them */
 export const FRONTAGE = Object.freeze({ main: 1.2, cross: 0.8, lane: 0.8, service: 0.8 });
 
@@ -120,11 +124,34 @@ export function forecourtOf(p, alleys = ALLEYS) {
   return { ...out, depth, gap, alley: hit ? hit.alley.id : null, face, id: p.id };
 }
 
-/** every zone that must stay free: alleys, service lane, forecourts.  { id, kind, rect?, poly?, pitch? } (rect = { u0, u1, w0, w1 }) */
+/** the reserved queue strip of a pitch: QUEUE_HALF either side of the middle, QUEUE_DEPTH deep, trimmed where another pitch stands in the way */
+export function queueRectOf(p, pitches = [], alleys = ALLEYS) {
+  void alleys;
+  const face = p.face ?? "+w"; const r = rectOfPitch(p); const [fu, fw] = FACE_VEC[face] ?? FACE_VEC["+w"];
+  let q = fu ? { u0: fu > 0 ? r.u1 : r.u0 - QUEUE_DEPTH, u1: fu > 0 ? r.u1 + QUEUE_DEPTH : r.u0, w0: p.w - QUEUE_HALF, w1: p.w + QUEUE_HALF }
+    : { u0: p.u - QUEUE_HALF, u1: p.u + QUEUE_HALF, w0: fw > 0 ? r.w1 : r.w0 - QUEUE_DEPTH, w1: fw > 0 ? r.w1 + QUEUE_DEPTH : r.w0 };
+  for (const o of pitches) {
+    if (o.id === p.id) continue; const b = rectOfPitch(o);
+    if (!rectsOverlap(q, b, 0.3)) continue;
+    if (fu) { if (b.w0 + b.w1 > 2 * p.w) q = { ...q, w1: Math.min(q.w1, b.w0 - 0.3) }; else q = { ...q, w0: Math.max(q.w0, b.w1 + 0.3) }; }
+    else if (b.u0 + b.u1 > 2 * p.u) q = { ...q, u1: Math.min(q.u1, b.u0 - 0.3) }; else q = { ...q, u0: Math.max(q.u0, b.u1 + 0.3) };
+  }
+  return q;
+}
+/** queue slot k of a pitch on one side (+1 / -1): the same formula as crowd.js queueSlot (frontSpot with out QUEUE_OUT and shift side * (QUEUE_START + QUEUE_STEP * k)) */
+export function queueSlotOf(p, k, side = 1) {
+  const r = rectOfPitch(p); const [fu, fw] = FACE_VEC[p.face ?? "+w"]; const shift = side * (QUEUE_START + QUEUE_STEP * k); const hd = fu ? (r.u1 - r.u0) / 2 : (r.w1 - r.w0) / 2;
+  return { x: p.u + fu * (hd + QUEUE_OUT) - fw * shift, z: p.w + fw * (hd + QUEUE_OUT) + fu * shift };
+}
+
+/** every zone that must stay free: alleys, service lane, forecourts, queue strips.  { id, kind, rect?, poly?, pitch? } (rect = { u0, u1, w0, w1 }) */
 export function zones(pitches = [], alleys = ALLEYS) {
   const out = alleys.map(a => ({ id: a.id, kind: a.kind, rect: rectOf(a), alley: true }));
   out.push({ id: SERVICE.id, kind: "service", poly: SERVICE.pts, alley: true });
-  for (const p of pitches) { const f = forecourtOf(p, alleys); out.push({ id: "forecourt-" + p.id, kind: "forecourt", rect: { u0: f.u0, u1: f.u1, w0: f.w0, w1: f.w1 }, pitch: p.id, alley: false }); }
+  for (const p of pitches) {
+    const f = forecourtOf(p, alleys); out.push({ id: "forecourt-" + p.id, kind: "forecourt", rect: { u0: f.u0, u1: f.u1, w0: f.w0, w1: f.w1 }, pitch: p.id, alley: false });
+    out.push({ id: "queue-" + p.id, kind: "queue", rect: queueRectOf(p, pitches, alleys), pitch: p.id, alley: false });
+  }
   return out;
 }
 
@@ -215,7 +242,7 @@ export function createReservations(pitches = [], { alleys = ALLEYS } = {}) {
 export function rasterZones(pitches = [], { cell = 0.5, u0 = -20, w0 = -24, nu = 640, nw = 360, alleys = ALLEYS } = {}) {
   const data = new Uint8Array(nu * nw); const res = createReservations(pitches, { alleys });
   for (const z of res.list) {
-    const flag = z.kind === "forecourt" ? 2 : z.kind === "service" ? 4 : 1;
+    const flag = z.kind === "forecourt" || z.kind === "queue" ? 2 : z.kind === "service" ? 4 : 1;
     const bb = z.rect ?? { u0: Math.min(...z.poly.map(p => p[0])), u1: Math.max(...z.poly.map(p => p[0])), w0: Math.min(...z.poly.map(p => p[1])), w1: Math.max(...z.poly.map(p => p[1])) };
     const i0 = Math.max(0, Math.floor((bb.u0 - u0) / cell)), i1 = Math.min(nu - 1, Math.floor((bb.u1 - u0) / cell - 1e-9));
     const j0 = Math.max(0, Math.floor((bb.w0 - w0) / cell)), j1 = Math.min(nw - 1, Math.floor((bb.w1 - w0) / cell - 1e-9));
@@ -261,6 +288,10 @@ export function validateStatic({ pitches, alleys = ALLEYS, fieldPoly = FIELD_POL
     const fr = { u0: f.u0, u1: f.u1, w0: f.w0, w1: f.w1 };
     for (const other of rects) if (other.p.id !== p.id && rectsOverlap(fr, other.r)) errors.push(`forecourt of ${p.id} ${rectText(fr)} is blocked by pitch ${other.p.id}`);
     if (!pointInPoly(fieldPoly, (fr.u0 + fr.u1) / 2, (fr.w0 + fr.w1) / 2)) errors.push(`forecourt of ${p.id} lies outside the field`);
+    // room for a queue row: the first QUEUE_RESERVED slots of one side lie inside the field and clear of every other pitch (the crowd flips to the other side at the first blocked slot)
+    const run = side => { let k = 0; for (; k < QUEUE_RESERVED; k++) { const sl = queueSlotOf(p, k, side); if (!pointInPoly(fieldPoly, sl.x, sl.z) || rects.some(o => o.p.id !== p.id && sl.x > o.r.u0 - 0.5 && sl.x < o.r.u1 + 0.5 && sl.z > o.r.w0 - 0.5 && sl.z < o.r.w1 + 0.5)) break; } return k; };
+    const best = Math.max(run(1), run(-1));
+    if (best < QUEUE_RESERVED) errors.push(`pitch ${p.id}: only ${best} of ${QUEUE_RESERVED} queue slots fit in front of it (field edge or a neighbouring pitch)`);
   }
   for (const e of entrances) if (!alleys.some(a => a.id === e.lane)) errors.push(`entrance ${e.id} names the unknown lane ${e.lane}`);
   return { errors, stats };

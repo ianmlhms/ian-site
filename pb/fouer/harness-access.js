@@ -65,7 +65,7 @@ async function childRun() {
   const out = { errors: {}, runs: [], reach: null };
   let last = null;
   await withStandInThree(async T => {
-    for (const [seed, quality] of [[1, "medium"], [7, "medium"], [3, "low"]]) {
+    for (const [seed, quality] of [[1, "medium"], [2, "medium"], [3, "medium"], [4, "medium"], [5, "medium"], [6, "medium"], [7, "medium"], [8, "medium"], [3, "low"], [5, "low"]]) {
       const built = await buildFairFootprints({ T, pitches, seed, quality });
       out.errors[`seed ${seed} ${quality}`] = [...layout.validateFootprints({ pitches, stalls: built.stalls, solids: built.solids, boxes: built.boxes }), ...layout.validateStallFaces({ stalls: built.stalls })];
       out.runs.push({ seed, quality, stalls: built.stalls.length, solids: built.solids.length, boxes: built.boxes.length });

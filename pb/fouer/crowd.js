@@ -8,6 +8,7 @@
  * the economy's demand), stand there for a few seconds and carry a snack afterwards; overloaded attractions get a real row of queueing guests.
  * Guests are smoothed followers of an "ideal" point that runs along the lane, so a turn or a lane change never teleports them. */
 import { frontSpot } from "./walk.js";
+import { QUEUE_OUT, QUEUE_START, QUEUE_STEP } from "./layout.js";
 import { ITEM_BY_ID } from "./data.js";
 
 export const CROWD_CAP = Object.freeze({ low: 70, medium: 150, high: 320 });
@@ -128,7 +129,7 @@ export function edgePoint(edge, dir, s, lat) {
 
 /** queue slot k of a pitch: a row along the front of the pitch, 3 m out, 0.85 m apart; `side` = +1 / -1 picks the direction along the front */
 export function queueSlot(rect, face, k, side = 1) {
-  return frontSpot(rect, face, 3.0, side * (0.6 + 0.85 * k));
+  return frontSpot(rect, face, QUEUE_OUT, side * (QUEUE_START + QUEUE_STEP * k));      // layout.js reserves the first 8 slots of both sides (zone queue-<id>)
 }
 
 /* ------------------------------------------------------------------------------------------------ looks */

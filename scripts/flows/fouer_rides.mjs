@@ -299,10 +299,9 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   // keep driving with the stick-free keys, the other cars bump us; then the timer: fast-forward
   await evalG(page, g => g.ride.setTestSpeedup(6));
   await evalG(page, g => g.walk.setInputKeys(["f", "r"]));
-  const gone = await waitIdle(16000);
-  // access wave: the keys (forward + right) stay held while the test waits for the stamp card; measure the walker the moment the ride is over, then release them (kerb lamp posts no longer sit in the lane to stop the strafe)
-  const landed = await evalG(page, g => ({ ...g.walk.view }));
-  await evalG(page, g => g.walk.setInputKeys([]));
+  // the keys (forward + right) stay held to the very end of the ride: read the walker on the first frame after the ride is over and release the keys in the same tick (a poll every 250 ms let the walker stroll away)
+  const landed = await evalG(page, g => new Promise(resolve => { const t0 = performance.now(); const tick = () => { if (!g.ride.active) { const v = { ...g.walk.view }; g.walk.setInputKeys([]); resolve({ ...v, ended: true }); } else if (performance.now() - t0 > 16000) resolve({ ended: false }); else requestAnimationFrame(tick); }; tick(); }));
+  const gone = landed.ended;
   await sleep(1100);
   const log = await stopLog();
   h.expect(gone, "scooter: the timer ends the ride (about 60 s)");
