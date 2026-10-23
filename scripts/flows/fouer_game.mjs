@@ -179,8 +179,8 @@ export const flow = {
     await h.shot("11-step7-walk");
     await tapLocator(h, page.locator("#walkBtn"));
     await page.waitForFunction(() => window.__fouerGame.game.state.tu === 8);
-    h.expect(await page.isVisible(".walkbar"), "the walk hook ran (placeholder bar with an exit button)");
-    await tapLocator(h, page.locator(".walkbar .btn"));
+    h.expect(await page.isVisible(".wk .wk-exit"), "the first-person walk started (W6: HUD with the exit button)");
+    await tapLocator(h, page.locator(".wk .wk-exit"));
     await h.pause(1300);
     h.eq((await state(page)).tu, 8, "the tutorial is finished (tu = 8)");
     h.eq(await page.locator(".finger").count(), 0, "no more hints");

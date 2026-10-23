@@ -10,6 +10,11 @@ import * as sim from "./sim.js";
 import * as save from "./save.js";
 import * as legacy from "./legacy.js";
 import * as i18n from "./i18n.js";
+import * as walkMod from "./walk.js";
+import * as crowdMod from "./crowd.js";
+import * as audioMod from "./audio.js";
+import * as rideMod from "./ride.js";
+import { FOODIE, foodieMultiplier, createGame } from "./game.js";
 import { RIDES, STALLS } from "../park/data.js";
 import { createState as v1Create, tick as v1Tick } from "../park/sim.js";
 import { canPlace as v1CanPlace, place as v1Place, placePath as v1PlacePath, KINDS as V1_KINDS } from "../park/build.js";
@@ -17,6 +22,7 @@ import { serializeSave as v1Serialize } from "../park/save.js";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const DAY_MS = 86400000;
+const TAU_ = Math.PI * 2;
 let checks = 0;
 const section = {};   // numbers printed at the end of the run
 
@@ -1250,6 +1256,170 @@ function printTable() {
   console.log(`min gap between pitches ${section.minPitchGap} m; ${m.generated} generated v1 parks, ${m.below} with PV < 6800 (formula can be below the old score there)`);
 }
 
+// ---------------------------------------------------------------- W6: walk, crowd, audio, ride, Foodie
+
+async function verifyWalk() {
+  const { circleVsBox, circleVsObb, subtractBox, createMask, pitchSolids, frontSpot, distToRect, onFrontSide, halfDepth, pointInPoly, angleDelta, WALK } = walkMod;
+  // collision primitives
+  const box = { u0: 0, u1: 10, w0: 0, w1: 4 };
+  equal(circleVsBox(-1, 2, 0.3, box), null, "circle left of a box does not touch");
+  const hit = circleVsBox(-0.1, 2, 0.34, box);
+  check(hit && hit.nx < -0.99 && Math.abs(hit.depth - 0.24) < 1e-9, "circle touching the left face is pushed left by the overlap");
+  const inside = circleVsBox(5, 3.9, 0.3, box);
+  check(inside && inside.nz > 0.99 && inside.depth > 0.3, "a centre inside the box leaves through the nearest face");
+  const obb = { u: 0, w: 0, ax: Math.SQRT1_2, az: Math.SQRT1_2, hl: 5, hw: 1 };
+  check(circleVsObb(0, 0.5, 0.2, obb) !== null && circleVsObb(0, 5, 0.2, obb) === null, "oriented box: inside hits, far misses");
+  const o2 = circleVsObb(-0.6, 0.6, 0.3, obb);
+  check(o2 && Math.abs(Math.hypot(o2.nx, o2.nz) - 1) < 1e-9, "oriented box normals are unit length");
+  check(pointInPoly([[0, 0], [10, 0], [10, 10], [0, 10]], 5, 5) && !pointInPoly([[0, 0], [10, 0], [10, 10], [0, 10]], 11, 5), "point in polygon");
+  const holeParts = subtractBox({ u0: 0, u1: 10, w0: 0, w1: 10 }, { u0: 3, u1: 5, w0: -1, w1: 4 });
+  const area = list => list.reduce((sum, b) => sum + (b.u1 - b.u0) * (b.w1 - b.w0), 0);
+  near(area(holeParts), 100 - 2 * 4, 1e-9, "a carved corridor removes exactly its area");
+  equal(subtractBox({ u0: 0, u1: 1, w0: 0, w1: 1 }, { u0: 5, u1: 6, w0: 5, w1: 6 }).length, 1, "a hole that misses leaves the box alone");
+  near(angleDelta(0.1, TAU_ - 0.1), -0.2, 1e-9, "angle delta takes the short way");
+
+  // the mask: a 100 x 100 field with one solid pitch, one open gate
+  const rects = [{ u: 50, w: 50, du: 8, dw: 8 }];
+  const mask = createMask({ fieldPoly: [[0, 0], [100, 0], [100, 100], [0, 100]], rects, faces: ["+w"], entrances: [{ id: "E", kind: "gate", u: 100, w: 20, face: "+u", star: 2 }] });
+  mask.setPitches(pitchSolids(rects, () => true));
+  check(!mask.allowed(50, 50), "inside a solid pitch is blocked");
+  check(mask.allowed(40, 40), "free ground is walkable");
+  let pos = { x: 40, z: 50 };
+  for (let i = 0; i < 120; i++) pos = mask.move(pos.x, pos.z, 0.05, 0);                 // walk straight at the pitch (6 m)
+  check(pos.x < 50 - 4 && pos.x > 50 - 4 - WALK.radius - 0.6, `walking into a solid pitch stops at its face (x ${pos.x.toFixed(2)})`);
+  let slide = { x: 45.3, z: 47 };
+  for (let i = 0; i < 60; i++) slide = mask.move(slide.x, slide.z, 0.04, 0.04);      // diagonal into the left wall: slides along it
+  check(slide.z > 49 && slide.x < 45.6, `a diagonal push into a wall slides along it (${slide.x.toFixed(2)}, ${slide.z.toFixed(2)})`);
+  mask.setPitches(pitchSolids(rects, () => false));
+  check(mask.allowed(50, 50), "an open (empty) pitch is walkable");
+  mask.setPitches(pitchSolids(rects, () => true, { 0: { u0: 49, u1: 51, w0: 53, w1: 56 } }));
+  check(mask.pitchBoxes.length === 3 && mask.allowed(50, 55) && !mask.allowed(47, 52), "a carved pitch becomes several boxes");
+  mask.setGates(1);
+  check(!mask.allowed(103, 20), "a gate that needs more stars is closed (nothing outside the field)");
+  mask.setGates(2);
+  check(mask.allowed(103, 20) && !mask.allowed(103, 40), "an open gate lets the walker outside, only through the gate");
+  check(!mask.allowed(-3, 50), "outside the field is blocked");
+  const out = mask.move(0.4, 50, -3, 0);
+  check(out.x >= 0.3, "the walker cannot leave the field");
+  const free = mask.nearestFree(50, 50, 10);
+  check(free !== null && mask.allowed(free.x, free.z), "nearestFree finds a standable point");
+  mask.setPitches(pitchSolids(rects, () => true));
+  const nf = mask.nearestFree(50, 50, 10);
+  check(nf && Math.hypot(nf.x - 50, nf.z - 50) > 4, "nearestFree leaves a solid pitch");
+  // tram as a moving obstacle
+  mask.setDynamic([{ u: 20, w: 20, ax: 1, az: 0, hl: 20, hw: 1.5 }]);
+  const pushed = mask.move(20, 20, 0, 0);
+  check(Math.abs(pushed.z - 20) > 1.5, "the walker is pushed out of the tram");
+  // pitch helpers
+  const rect = { u: 62, w: 41, du: 8, dw: 8 };
+  const spot = frontSpot(rect, "+w", 2.5);
+  near(spot.z, 41 + 4 + 2.5, 1e-9, "front spot is 2.5 m in front of the front edge");
+  near(frontSpot(rect, "-u", 3).x, 62 - 4 - 3, 1e-9, "front spot follows the face");
+  near(distToRect(rect, 62, 50), 5, 1e-9, "distance to a pitch rectangle");
+  check(onFrontSide(rect, "+w", 62, 47) && !onFrontSide(rect, "+w", 62, 35), "front side test");
+  equal(halfDepth({ du: 40, dw: 24 }, "+u"), 20, "half depth follows the face axis");
+  check(WALK.eye === 1.65 && WALK.fov === 70, "eye 1.65 m, FOV 70 (DESIGN 5)");
+  // the right-hand rule the A/D fix depends on: heading (cos, sin), right (-sin, cos) -> looking along +u the right hand is +w
+  const yaw = 0.7;
+  const fwd = [Math.cos(yaw), Math.sin(yaw)], rgt = [-Math.sin(yaw), Math.cos(yaw)];
+  near(fwd[0] * rgt[0] + fwd[1] * rgt[1], 0, 1e-12, "right is perpendicular to forward");
+  check(Math.abs(-Math.sin(0)) < 1e-12 && Math.cos(0) === 1, "looking along +u the right hand is +w (as in the builder rig)");
+
+  // ---- crowd
+  const { crowdTarget, CROWD_CAP, buildGraph, edgePoint, queueSlot, figureArrays, makeLook, mulberry } = crowdMod;
+  equal(CROWD_CAP, { low: 70, medium: 150, high: 320 }, "crowd caps 70 / 150 / 320 (DESIGN 5)");
+  for (const q of ["low", "medium", "high"]) {
+    const lo = crowdTarget(q, 0, "walk"), hi = crowdTarget(q, 1e6, "walk");
+    check(lo > 0 && lo <= hi && hi === CROWD_CAP[q], `${q}: crowd between ${lo} and the cap ${hi}`);
+    check(crowdTarget(q, 50, "builder") < crowdTarget(q, 50, "walk"), `${q}: the builder view shows a thinner crowd`);
+  }
+  check(crowdTarget("medium", 10) < crowdTarget("medium", 60) && crowdTarget("medium", 60) < crowdTarget("medium", 140), "more guests per minute -> a bigger crowd");
+  const open = { allowed: (x, z) => x > 0 && x < 200 && z > 0 && z < 100, freeSide: (x, z, hx, hz, side) => Math.min(6, side > 0 ? 6 : 6) };
+  const graph = buildGraph(open, [{ name: "a", u: [0, 200], w: [48, 52] }, { name: "b", u: [98, 102], w: [0, 100] }, { name: "gate-x", u: [0, 4], w: [0, 4] }], { minPiece: 8 });
+  equal(graph.edges.length, 4, "two alleys crossing: four edges");
+  equal(graph.nodes.length, 5, "...and five nodes");
+  check(graph.nodes.some(n => n.edges.length === 4), "the crossing node has four edges");
+  check(graph.edges.every(e => Math.abs(Math.hypot(e.dx, e.dz) - 1) < 1e-9 && e.fl.length === Math.floor(e.len) + 1), "edges have unit directions and free-width samples");
+  const e0 = graph.edges[0];
+  const p1 = edgePoint(e0, 1, 5, 2), p2 = edgePoint(e0, -1, 5, 2);
+  check(Math.hypot(p1.x - p2.x, p1.z - p2.z) > 3.9, "right-hand traffic: opposite directions use opposite sides");
+  const narrow = { ...e0, fr: e0.fr.map(() => 1.0), fl: e0.fl.map(() => 1.0) };
+  check(Math.abs(edgePoint(narrow, 1, 5, 3).lat) <= 0.6 + 1e-9, "a narrow gap clamps the lane offset");
+  const slot0 = queueSlot(rect, "+w", 0), slot5 = queueSlot(rect, "+w", 5);
+  check(slot0.z >= 41 + 4 + 3 - 1e-9 && Math.abs(slot5.x - slot0.x) > 4 && Math.abs(slot5.z - slot0.z) < 1e-9, "queue slots form a row 3 m in front of the pitch");
+  const fig = figureArrays();
+  check(fig.triangles >= 60 && fig.triangles <= 100, `crowd figure has ${fig.triangles} triangles (about 90)`);
+  check(Array.from(fig.position).every(Number.isFinite) && Array.from(fig.normal).every(v => Math.abs(v) <= 1.0001), "figure geometry is finite with unit normals");
+  equal(fig.info.length / 2, fig.position.length / 3, "every vertex has a part id and an animation group");
+  const look1 = makeLook(mulberry(5), "adult"), look2 = makeLook(mulberry(5), "adult");
+  equal(look1, look2, "looks are deterministic per seed");
+  check(makeLook(mulberry(5), "kid").scale < 0.75 && look1.scale > 0.88, "kids are smaller than adults");
+
+  // ---- audio (pure helpers)
+  const { organPhrase, pickVoices, voiceKindFor, voiceGain, MAX_VOICES } = audioMod;
+  const ph = organPhrase(4), ph2 = organPhrase(4), ph3 = organPhrase(9);
+  equal(ph, ph2, "the carousel tune is deterministic per seed");
+  check(JSON.stringify(ph) !== JSON.stringify(ph3), "different carousels play different tunes");
+  check(ph.beats === 24 && ph.notes.every(n => n.beat >= 0 && n.beat < 24 && n.dur > 0 && n.midi >= 30 && n.midi <= 100), "an 8-bar waltz phrase with sane notes");
+  check(ph.notes.every((n, i) => i === 0 || ph.notes[i - 1].beat <= n.beat), "the tune is in time order (the sequencer walks it in order)");
+  check(ph.notes.filter(n => n.kind === "bass").length === 8 && ph.notes.filter(n => n.kind === "mel").length >= 14, "oom-pah bass every bar plus a melody");
+  check(ITEMS.filter(i => i.cat !== "deco").every(i => voiceKindFor(i.id)), "every attraction and stall has a sound");
+  const cands = ["kanner", "kachel", "maus", "wheel", "scooter", "musik", "tent", "schiess", "lukas", "jules"].map((id, k) => ({ id, kind: voiceKindFor(id), x: k * 6, z: 0 }));
+  const picked = pickVoices(cands, { x: 0, z: 0 });
+  check(picked.length <= MAX_VOICES && MAX_VOICES === 6, "at most 6 voices");
+  check(picked.every((v, k) => k === 0 || picked[k - 1].level >= v.level), "voices are ranked loudest first");
+  equal(pickVoices([{ id: "kachel", kind: "fryer", x: 100, z: 0 }], { x: 0, z: 0 }).length, 0, "a far fryer is silent");
+  check(voiceGain("organ", 5) > voiceGain("organ", 30) && voiceGain("organ", 30) > voiceGain("organ", 60) && voiceGain("organ", 80) === 0, "voice level falls with distance and ends at its reach");
+
+  // ---- ride
+  const { wheelSpeedAt } = rideMod;
+  check(wheelSpeedAt(0) === 1.5 && Math.abs(wheelSpeedAt(0.5) - 6) < 1e-9 && wheelSpeedAt(1) === 1.5, "wheel: eases in, cruises at 6x, eases out");
+  let seconds = 0;
+  const steps = 4000;
+  for (let i = 0; i < steps; i++) { const p = (i + 0.5) / steps; seconds += (4 * Math.PI / steps) / (2 * Math.PI / 120 * wheelSpeedAt(p)); }
+  check(seconds > 38 && seconds < 52, `two revolutions take ${seconds.toFixed(1)} s (about 40 s)`);
+  let probe = 0;
+  for (let i = 0; i < steps; i++) { const p = (i + 0.5) / steps; probe += (6 * Math.PI / steps) / (2 * Math.PI / 120 * wheelSpeedAt(p)); }
+  check(probe > 55 && probe < 72, `the Probefahrt (3 revolutions) takes ${probe.toFixed(1)} s (about 60 s)`);
+
+  // ---- Foodie: a multiplier through the economy's own `bonus`, sim.js untouched
+  equal(foodieMultiplier(0), 1, "no Foodie stacks: x1");
+  near(foodieMultiplier(1), 1.05, 1e-12, "one stack x1.05");
+  near(foodieMultiplier(3), 1.05 ** 3, 1e-12, "three stacks x1.05^3");
+  equal(foodieMultiplier(9), foodieMultiplier(3), "never more than three stacks");
+  check(FOODIE.seconds === 180 && FOODIE.maxStacks === 3 && FOODIE.perFood === 1.05, "Foodie rules from the design: 3 minutes, 3 stacks, x1.05");
+  const state = sim.build(sim.createState({ now: 0 }), 0, "kachel").state;
+  const base = sim.economy(state, { ...sim.NEUTRAL_CONTEXT }).incomePerMin;
+  near(sim.economy(state, { ...sim.NEUTRAL_CONTEXT, bonus: 1.05 }).incomePerMin / base, 1.05, 1e-9, "ctx.bonus multiplies income and nothing else");
+  equal(sim.economy(state, { ...sim.NEUTRAL_CONTEXT, bonus: 1.05 }).stars, sim.economy(state).stars, "the bonus never changes the rating");
+  // the controller: eat, stacking, session rule, expiry, flags
+  let clock = 1_800_000_000_000;
+  const fakeWin = { parent: null, addEventListener() {}, setTimeout: () => 0 };
+  fakeWin.parent = fakeWin;
+  const game = createGame({ win: fakeWin, storage: null, now: () => clock, persist: false });
+  await game.start();
+  const built = { ...game.state, c: 1e6, tu: 8, pitches: game.state.pitches.map((e, i) => i === 0 ? sim.makeEntry("kachel", 1, 0, 0) : i === 1 ? sim.makeEntry("fritten", 0, 0, 0) : e) };
+  game.debugSetState(built);
+  const income0 = game.info().incomePerMin;
+  const first = game.eat("kachel");
+  check(first.ok && first.granted && first.stacks === 1 && Math.abs(first.mult - 1.05) < 1e-12, "first food: +1 stack");
+  near(game.info().incomePerMin / income0, 1.05, 1e-9, "income is 5 % higher right away");
+  const again = game.eat("kachel");
+  check(!again.granted && again.known && again.stacks === 1, "the same food again: no second stack (once per distinct food per session)");
+  const second = game.eat("fritten");
+  check(second.granted && second.stacks === 2, "a different food stacks");
+  near(game.info().incomePerMin / income0, 1.05 * 1.05, 1e-9, "two stacks: x1.1025");
+  game.eat("wurscht"); const fourth = game.eat("zocker");
+  check(!fourth.granted && fourth.full && fourth.stacks === 3, "a fourth food while three are active is not granted");
+  clock += 181_000;
+  game.update();
+  equal(game.foodie().stacks, 0, "stacks expire after 3 minutes");
+  near(game.info().incomePerMin / income0, 1, 1e-9, "income is back to normal");
+  check(game.eat("kachel").known, "an expired food is still 'known' this session (the session rule is not time based)");
+  check(game.setFlag("r") && game.hasFlag("r") && !game.setFlag("r") && game.state.ea.includes("r"), "flags: Op der Spëtzt is stored once in the save");
+  check(!game.setFlag("R") && !game.setFlag("rr"), "flags must be a single [a-z0-9]");
+}
+
 async function run() {
   if (process.argv.includes("--sync-pitches")) { syncPitches(); return; }
   verifyData();
@@ -1268,6 +1438,7 @@ async function run() {
   verifyPersistence();
   await verifyMigration();
   verifyI18n();
+  await verifyWalk();
   if (process.argv.includes("--table")) printTable();
   const p = section.pacing;
   console.log(`PASS: ${checks} checks; stars at ${p.starMinutes[2]}/${p.starMinutes[3]}/${p.starMinutes[4]}/${p.starMinutes[5]} min; save ${section.saveSizes.json} B JSON, ${section.saveSizes.jsonb} B jsonb.`);

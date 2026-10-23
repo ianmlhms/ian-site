@@ -59,8 +59,9 @@ import { flow as fouerModels } from "./fouer_models.mjs";
 import { flow as fouerBigModels } from "./fouer_big_models.mjs";
 import { flow as fouerGame } from "./fouer_game.mjs";
 import { flow as fouerMigration } from "./fouer_migration.mjs";
+import { flow as fouerWalk } from "./fouer_walk.mjs";
 
-const ALL = [fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, trainSimTouch, trainSimCareerLock, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
+const ALL = [fouerWorld, fouerModels, fouerBigModels, fouerGame, fouerMigration, fouerWalk, invitePop, invitesLight, mpLobbyConnect4, mpLobbySlf, mpLobbyQuick, mpLobbyGames, mpLobbyColor, mpLobbyParty, mpLobbyArcade, trainSim, trainSimAudio, trainSimTouch, trainSimCareerLock, paketExpress, kartLetzebuerg, kartLetzebuergMp, kartLetzebuergArcade, clientCommands, inboxCloud, busTycoon, newGroup, addMember, mediaCache, friendsAdd, slfRound, arcadePad, leaderboardTags, adminOnlineNotice, adminKartSaves, ccSigninHint, accountCheck, arcadeWeeklyStreak, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleLiveGift, idleResetSafety, leaderboardBigScores, driveMadLevels, testMode, mordsfall];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 if (!flows.length) { console.error(`No flow matches: ${words.join(", ")}\nAvailable: ${ALL.map((f) => f.name).join(", ")}`); process.exit(2); }

@@ -1,7 +1,8 @@
 /* Schueberfouer Tycoon W5: boots the first playable game.
  *   loading bar -> renderer + Glacis world + fair layer + env -> game.start() (local / cloud / backup / migration) -> camera fly-in -> play.
  * W2's stage.js (?stage=1) and W3's preview.js (?models=1) stay available as separate entry points of pb/fouer.html.
- * Hooks for later waves: window.__fouerHooks.startWalk / endWalk (W6 replaces them), window.__fouerGame (only with ?fouerDebug=1). */
+ * W6 adds the walk (walk.js), the crowd (crowd.js), the soundscape (audio.js) and the rides (ride.js); window.__fouerHooks.startWalk / endWalk drive them,
+ * window.__fouerGame (only with ?fouerDebug=1) exposes them for the flows. */
 import { createRenderer } from '/pb/fouer/renderer.js';
 import { createWorld } from '/pb/fouer/world/index.js';
 import { createEnv } from '/pb/fouer/world/sky.js';
@@ -13,6 +14,12 @@ import { createGame, pitchIndex } from '/pb/fouer/game.js';
 import { createSceneBridge } from '/pb/fouer/scene.js';
 import { createUi } from '/pb/fouer/ui.js';
 import { createSfx } from '/pb/fouer/sfx.js';
+import { createAudio } from '/pb/fouer/audio.js';
+import { createMask, createWalk } from '/pb/fouer/walk.js';
+import { createCrowd } from '/pb/fouer/crowd.js';
+import { createRide } from '/pb/fouer/ride.js';
+import { CORRIDORS } from '/pb/fouer/models/npc.js';
+import { ENTRANCES } from '/pb/fouer/models/props.js';
 import { LANGS, t as translate, formatMoney } from '/pb/fouer/i18n.js';
 import { PITCHES, ITEM_BY_ID } from '/pb/fouer/data.js';
 
@@ -82,9 +89,9 @@ async function boot() {
   const markers = world.parts.pitches;
   markers.setMode('outline');
   const fair = await createFairLayer({ T, root: r.gameRoot, pitches: markers.items, groundY: (u, w) => world.groundY(u, w), quality: r.state.quality, fieldPoly: world.fieldPoly, renderer: r, world });
-  let scene = null;
-  world.parts.fair = { setNight: k => { fair.setNight(k); if (scene) scene.setNight(k); }, dispose: () => fair.dispose() };
-  r.on('quality', q => fair.setQuality(q));
+  let scene = null; let crowd = null;
+  world.parts.fair = { setNight: k => { fair.setNight(k); if (scene) scene.setNight(k); if (crowd) crowd.setNight(k); }, dispose: () => fair.dispose() };
+  r.on('quality', q => { fair.setQuality(q); if (crowd) crowd.setQuality(q); });
   setLoad(0.9, translate(lang, 'load.start'));
 
   // a first-time player starts at golden hour with clear weather (still "Random": the day drifts on from there)
@@ -100,40 +107,52 @@ async function boot() {
   r.poses.overview = Object.assign({}, r.framePose());
 
   await started;
-  const sfx = createSfx();
+  let sfx = null; let ui = null; let walk = null; let ride = null;
   scene = createSceneBridge({ T, r, world, fair, markers, game, quality: r.state.quality, onGates: () => { ui.toast(translate(ui.lang, 'toast.entrance')); sfx.star(); } });
+  // ---- W6: walkable mask, crowd, soundscape, rides, walk
+  const rects = scene.rects;
+  const faces = PITCHES.map(p => p.face);
+  // the street the tram runs in (Allée Scheffer + the Theater stop and the plaza beside the NE portal): samples of the track in game metres, every 5 m
+  const streetSamples = (() => {
+    const tr = world.parts.tram && world.parts.tram.track; if (!tr) return [];
+    const out = [];
+    for (let s = 8405; s <= 8910; s += 5) {
+      const a = tr.at(s), b = tr.at(s + 1); const A = world.toGame(a.x, a.z), B = world.toGame(b.x, b.z); const l = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
+      out.push({ u: A[0], w: A[1], tu: (B[0] - A[0]) / l, tw: (B[1] - A[1]) / l });
+    }
+    return out;
+  })();
+  const npcInfo = fair.baseInfo && fair.baseInfo.npc;
+  const mask = createMask({
+    fieldPoly: world.fieldPoly, corridors: CORRIDORS, rects, faces, entrances: ENTRANCES, lane: streetSamples,
+    grid: npcInfo && npcInfo.grid ? { g: npcInfo.grid, nu: npcInfo.gridDims[0], nw: npcInfo.gridDims[1], cell: npcInfo.gridDims[2], u0: npcInfo.gridDims[3], w0: npcInfo.gridDims[4] } : null,
+  });
+  const getFocus = () => (walk && walk.active && !ride.active ? { x: walk.view.x, z: walk.view.z, yaw: walk.view.yaw, walk: true } : { x: r.rig.cu, z: r.rig.cw, yaw: r.rig.cyaw, walk: false });
+  const laneLine = streetSamples.map(q => ({ x: q.u, z: q.w }));
+  crowd = createCrowd({ T, r, world, game, mask, corridors: CORRIDORS, polylines: laneLine.length > 5 ? [{ name: 'allee', pts: laneLine, lane: 2.3, chunk: 4 }] : [], rects, faces, quality: r.state.quality, env, getFocus, onBleat: () => ui.toast(translate(ui.lang, 'sheep.say'), 1800) });
+  const items = { faceOf: i => faces[i], cycleOf: i => { const pit = fair.pits.get(PITCHES[i].id); return pit && pit.near && pit.near.userData.cycle ? pit.near.userData.cycle : 45; } };
+  const getListener = () => {
+    if (walk && walk.active) { const d = r.camera.getWorldDirection(new T.Vector3()); return { x: r.camera.position.x, y: r.camera.position.y, z: r.camera.position.z, fx: d.x, fy: d.y, fz: d.z, dist: 0 }; }
+    return { x: r.rig.cu, y: r.rig.cy + 2, z: r.rig.cw, fx: Math.cos(r.rig.cyaw), fy: 0, fz: Math.sin(r.rig.cyaw), dist: r.rig.cdist };
+  };
+  const audio = createAudio({ game, r, world, env, tram: world.parts.tram, rects, items, crowd, getListener });
+  sfx = createSfx(audio);
   const hooks = {
-    walking: false, saved: null, bar: null,
+    walking: false,
     onWalkChange() {},
-    startWalk() {
-      if (hooks.walking) return;
-      hooks.walking = true;
-      const rig = r.rig;
-      hooks.saved = { tu: rig.tu, tw: rig.tw, yaw: rig.yaw, dist: rig.dist, tilt: rig.tilt };
-      const built = game.state.pitches.findIndex(Boolean);
-      const target = scene.rects[built >= 0 ? built : pitchIndex('P01')];
-      r.flyTo({ tu: target.u, tw: target.w + 8, yaw: Math.PI / 2 * 0 + 0.15, dist: 42, tilt: -10 * DEG }, 1.3);
-      hooks.onWalkChange(true);
-      const bar = document.createElement('div'); bar.className = 'walkbar';
-      bar.innerHTML = '<span></span><button class="btn" type="button"></button>';
-      bar.firstChild.textContent = translate(ui.lang, 'walk.soon'); bar.lastChild.textContent = translate(ui.lang, 'walk.exit');
-      bar.lastChild.addEventListener('click', () => hooks.endWalk());
-      $('ui').append(bar); hooks.bar = bar;
-    },
-    endWalk() {
-      if (!hooks.walking) return;
-      hooks.walking = false;
-      if (hooks.bar) { hooks.bar.remove(); hooks.bar = null; }
-      if (hooks.saved) r.flyTo(hooks.saved, 1.0);
-      hooks.onWalkChange(false);
-    },
+    startWalk() { if (walk) walk.start(); },
+    endWalk() { if (walk) walk.end(); },
+    /** a tap on Hämmi (builder view and walk): bleat */
+    tapSheep(x, y) { if (!crowd.tapSheep(x, y)) return false; crowd.bleat(); audio.unlock(); audio.bleat(); return true; },
   };
   window.__fouerHooks = hooks;
-  window.addEventListener('keydown', e => { if (e.key === 'Escape') hooks.endWalk(); });
-  const ui = createUi({
+  ui = createUi({
     root: $('ui'), game, scene, r, env, hooks, sfx, lang, debug,
-    setLang: code => { try { localStorage.setItem(LANG_KEY, code); } catch (error) { /* storage blocked */ } },
+    setLang: code => { try { localStorage.setItem(LANG_KEY, code); } catch (error) { /* storage blocked */ } if (walk) walk.refreshLabels(); },
   });
+  let fairTime = 0;       // the fair layer's own clock (fair.update(dt) adds dt every frame): the coaster ride needs the model time
+  ride = createRide({ T, r, world, fair, game, scene, ui, audio, crowd, rects, faces, getWalk: () => walk, getFairTime: () => fairTime, translate });
+  walk = createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, crowd, ride, mask, env, hooks, rects, items, tram: world.parts.tram, translate });
   scene.sync();
   fair.flush(r.camera);
 
@@ -141,8 +160,13 @@ async function boot() {
     env.update(dt, r.camera);
     world.update(dt);
     fair.update(dt, r.camera);
+    fairTime += dt;
     game.update();
     scene.update(dt);
+    ride.update(dt);          // after the fair (the wheel has moved) and before the walk camera is placed
+    walk.update(dt);
+    crowd.update(dt);
+    audio.update(dt);
     ui.update(dt);
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) game.flushSave(); });
@@ -192,7 +216,7 @@ async function boot() {
       setFreeCamera: o => r.setFreeCamera(o),
     };
     window.__fouerGame = {
-      game, ui, scene, fair, sfx, hooks, r, world, env, markers,
+      game, ui, scene, fair, sfx, hooks, r, world, env, markers, walk, crowd, audio, ride, mask,
       advance: (sec) => game.advance(sec),
       setClockOffset: ms => { clockOffset = ms; },
       snapshot() {

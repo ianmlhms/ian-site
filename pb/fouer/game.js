@@ -18,6 +18,12 @@ const TEST_RATING = 1000;
 const ALL_PITCHES_MASK = 2 ** PITCH_COUNT - 1;
 const FIRST_COIN_SECONDS = 3.2;                  // the "guests pay" bubble stays this long, then step 4 starts
 
+/** "Foodie" (W6, DESIGN 5): eating at a food stall in the walk gives x1.05 income for 3 minutes, once per distinct food per session, at most 3 stacked.
+ * It rides on the economy's own `bonus` multiplier (sim.economy already multiplies income by ctx.bonus), so sim.js is untouched. */
+export const FOODIE = Object.freeze({ perFood: 1.05, seconds: 180, maxStacks: 3 });
+export const foodieMultiplier = stacks => FOODIE.perFood ** Math.max(0, Math.min(FOODIE.maxStacks, Math.floor(stacks)));
+const withBonus = (base, mult) => mult === 1 ? base : { ...base, bonus: base.bonus * mult };
+
 export const TUTORIAL = Object.freeze({
   firstBuild: 1,        // steps 1 + 2 of DESIGN 1: tap the glowing pitch, tap "Build"
   coin: 3,              // step 3: first coin
@@ -66,7 +72,10 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
 
   let state = sim.createState({ name, now: now() });
   let events = eventsAt(now());
-  let ctx = economyContext(events);
+  let baseCtx = economyContext(events);
+  let ctx = baseCtx;
+  let foodieEntries = [];         // [{ item, until }] (wall clock ms): the active Foodie stacks
+  const eatenThisSession = new Set();
   let persistence = null;
   let ready = false;
   let wall = now();
@@ -351,6 +360,43 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     return result.applied;
   }
 
+  // ---- Foodie (eating in the walk) and small flags ----
+  function applyFoodie() {
+    ctx = withBonus(baseCtx, foodieMultiplier(foodieEntries.length));
+    infoCache = null;
+    emit("foodie", foodie());
+  }
+  function foodie(at = now()) {
+    const live = foodieEntries.filter(entry => entry.until > at);
+    const left = live.length ? Math.max(0, Math.min(...live.map(entry => entry.until)) - at) / 1000 : 0;
+    return { stacks: live.length, mult: foodieMultiplier(live.length), left, items: live.map(entry => entry.item) };
+  }
+  function expireFoodie(at) {
+    if (!foodieEntries.length) return;
+    const live = foodieEntries.filter(entry => entry.until > at);
+    if (live.length !== foodieEntries.length) { foodieEntries = live; applyFoodie(); }
+  }
+  /** The player ate `itemId` at a food stall. Cosmetic apart from the Foodie bonus: no cash changes hands. */
+  function eat(itemId) {
+    const at = now();
+    expireFoodie(at);
+    const known = eatenThisSession.has(itemId);
+    const base = { ok: true, item: itemId, granted: false, known, full: false };
+    if (known) return { ...base, ...foodie(at) };
+    if (foodieEntries.length >= FOODIE.maxStacks) return { ...base, full: true, ...foodie(at) };
+    eatenThisSession.add(itemId);
+    foodieEntries = [...foodieEntries, { item: itemId, until: at + FOODIE.seconds * 1000 }];
+    applyFoodie();
+    return { ...base, granted: true, ...foodie(at) };
+  }
+  const hasFlag = flag => state.ea.includes(flag);
+  /** one-letter achievement / trial flags in the save (`ea`: "g" starter gift, "r" Op der Spëtzt, "p" Probefahrt used) */
+  function setFlag(flag) {
+    if (!/^[a-z0-9]$/.test(flag) || hasFlag(flag) || state.ea.length >= 8) return false;
+    setState({ ...state, ea: state.ea + flag }, "flag", { flag });
+    return true;
+  }
+
   // ---- time ----
   function markActive() { lastInput = now(); }
 
@@ -359,7 +405,7 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     const dayChanged = next.today !== events.today;
     events = next;
     const nextCtx = economyContext(next);
-    if (JSON.stringify(nextCtx) !== JSON.stringify(ctx)) { ctx = nextCtx; infoCache = null; }
+    if (JSON.stringify(nextCtx) !== JSON.stringify(baseCtx)) { baseCtx = nextCtx; ctx = withBonus(baseCtx, foodieMultiplier(foodieEntries.length)); infoCache = null; }
     const stamped = sim.stampToday(state, next);
     if (stamped !== state) {
       state = stamped;
@@ -391,6 +437,7 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     const elapsed = (at - wall) / 1000;
     wall = at;
     if (!ready) return;
+    if (foodieEntries.length) expireFoodie(at);
     if (elapsed < 0) { state = sim.touch(state, at); return; }       // the clock went backwards: just resync
     if (elapsed > AWAY_GAP_SECONDS) {
       refreshEvents(at);
@@ -530,6 +577,7 @@ export function createGame({ win = globalThis, storage = null, now = () => Date.
     get testMode() { return testMode; }, get persistence() { return persistence; }, get startup() { return flags.startup; },
     get pendingOffline() { return pendingOffline; }, get pendingLetter() { return pendingLetter; },
     info, stars, banners: () => bannersAt(events), refreshEvents, entries, builtCount,
+    eat, foodie, hasFlag, setFlag,
     pitchStatus, pitchUsable, voucherFits, buildOptions, manageInfo, glowPitches, goal: () => sim.nextGoal(state, ctx),
     tutorial: tutorialInfo, acknowledgeTutorial, skipTutorial,
     build, upgrade, setLook, replace, claimFireworks, applyGift,

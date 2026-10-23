@@ -103,6 +103,8 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   function refreshBanners() {
     banners.innerHTML = "";
     for (const id of game.banners().slice(0, 2)) banners.append(el("div", "pill", esc(T(`event.${id}`))));
+    const foodie = game.foodie();
+    if (foodie.stacks) banners.append(el("div", "pill foodie", `🍴 ${esc(T("foodie.title"))} ×${(Math.round(foodie.mult * 100) / 100).toFixed(2).replace(/0$/, "")}`));
   }
 
   function applyChrome() {
@@ -388,8 +390,10 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
 
   // ---------------------------------------------------------------- tapping the world
   function onTap(event) {
-    const index = scene.pick(event.clientX, event.clientY, event.ground);
+    if (walking) return;                                        // the walk handles its own taps
     sfx.unlock();
+    if (hooks.tapSheep && hooks.tapSheep(event.clientX, event.clientY)) return;     // Hämmi bleats (W6)
+    const index = scene.pick(event.clientX, event.clientY, event.ground);
     if (index >= 0) { if (index === selected) return; openPitch(index); return; }
     if (sheetEl) closeSheet();
   }
@@ -474,6 +478,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   }
 
   function updateCoins(dt) {
+    if (walking) return;                                        // no coin pops / queue clocks in the first-person walk (the queues are real figures there)
     const info = game.info();
     const rows = new Map(info.perPitch.map(row => [row.pitch, row]));
     for (const row of rows.values()) {
@@ -724,6 +729,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
   game.on("tutorial", () => { bubbleKey = null; refreshAll(); });
   game.on("star", ({ stars }) => { sfx.star(); toast(T("toast.starUp", { stars })); });
   game.on("events", () => { refreshBanners(); maybeStamp(); maybeFireworks(); });
+  game.on("foodie", () => refreshBanners());
   game.on("stamp", payload => { maybeStamp(); void payload; });
   game.on("offline", report => { showOffline(report); });
   game.on("letter", letter => { showLetter(letter); });
@@ -743,7 +749,7 @@ export function createUi({ root, game, scene, r, env, hooks, sfx, lang: initialL
 
   let sheetClock = 0;
   return {
-    toast, openPitch, closeSheet, showLetter, showOffline, showStamps, refreshAll, changeLang,
+    toast, openPitch, closeSheet, showLetter, showOffline, showStamps, refreshAll, changeLang, money,
     get lang() { return lang; }, get selected() { return selected; }, get sheetMode() { return sheetMode; }, get modalOpen() { return modalOpen; },
     update(dt) {
       // the cash counter rolls towards the real value
