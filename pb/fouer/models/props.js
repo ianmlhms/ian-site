@@ -5,23 +5,19 @@
 import { Builder, mulberry, col, shade, C, GOLD, lerp, TAU } from './kit.js';
 import { getMaterials } from './materials.js';
 import { fitText, star } from './atlas.js';
+import { ENTRANCES, ALLEYS as NET, createReservations, rimW } from '../layout.js';
 
 const WARM = 0xffd890; const MULTI = [0xff5a4a, 0x5ad07a, 0x5aa8ff, 0xffd23c, 0xff8ad0];
 
-/** the seven public entrances (DESIGN 4.2): kind 'boom' (SW, red-white barriers), 'portal' (NE, painted arch), 'gate' (frame + sign).  u,w game metres, face = outward direction */
-export const ENTRANCES = [
-  { id: 'E1', kind: 'boom', u: 17, w: 56, face: '-u', star: 1 },
-  { id: 'E2', kind: 'gate', u: 130, w: 118.5, face: '+w', star: 2 },
-  { id: 'E3', kind: 'gate', u: 190, w: 127.5, face: '+w', star: 2 },
-  { id: 'E4', kind: 'gate', u: 250, w: 110, face: '+w', star: 4 },
-  { id: 'E5', kind: 'gate', u: 112, w: 5, face: '-w', star: 4 },
-  { id: 'E6', kind: 'gate', u: 196, w: 2.5, face: '-w', star: 5 },
-  { id: 'E7', kind: 'portal', u: 282, w: 56, face: '+u', star: 3 },
-];
+/** the seven public entrances live in layout.js (the walkway network is data there); re-exported here for the scene bridge, the flows and older imports */
+export { ENTRANCES };
 const YAW = { '+w': 0, '-w': Math.PI, '+u': Math.PI / 2, '-u': -Math.PI / 2 };
+const HAA = NET.find((a) => a.id === 'haaptallee'); const FRE = NET.find((a) => a.id === 'fressgaass');
+const KERB = 0.27;          // lamp posts, bins and masts stand on the kerb line, just outside the walkway (layout.js KERB_R / KERB_OUT)
+/** the two long alleys with lamps / strings: `w` = the two kerb lines (outside the alley rectangle) */
 const ALLEYS = [
-  { name: 'haaptallee', w: [50.4, 62.6], u: [24, 276], step: 20, strings: true },
-  { name: 'fressgaass', w: [24.2, 31.4], u: [30, 280], step: 24, strings: false },
+  { name: 'haaptallee', w: [HAA.w[0] - KERB, HAA.w[1] + KERB], u: [24, 276], step: 20, strings: true },
+  { name: 'fressgaass', w: [FRE.w[0] - KERB, FRE.w[1] + KERB], u: [30, 280], step: 24, strings: false },
 ];
 
 /* ------------------------------------------------------------------ pieces */
@@ -129,18 +125,33 @@ function gateFrame(b, x, y, z, yaw, idx) {
 export function buildProps({ T, pitches, fieldPoly, groundY, seed = 1, quality = 'medium' }) {
   const M = getMaterials(); const r = mulberry(seed * 23 + 1);
   const b = new Builder({ seed, rnd: r, far: false }); let count = 0; const solids = []; const boxes = [];
-  // alley lamps + bulb strings + bins + benches
+  const res = createReservations((pitches || []).map((p) => ({ id: p.id, u: p.u, w: p.w, size: p.size, face: p.face || '+w' })));
+  const SHIFTS = [0, 2, -2, 4, -4, 6, -6, 8, -8];
+  // alley lamps + bulb strings + bins + benches: everything stands on the kerb line OUTSIDE the walkway (layout.js); a post that would stand in a crossing moves along the kerb
   ALLEYS.forEach((al, ai) => {
     const poles = [];
-    for (let u = al.u[0]; u <= al.u[1]; u += al.step) { al.w.forEach((w, k) => { const y = groundY(u, w); lampPost(b, u, w, y, k ? -1 : 1); poles.push([u, w, y, k]); solids.push({ u, w, r: 0.24 }); count++; }); }
+    for (let u0 = al.u[0]; u0 <= al.u[1]; u0 += al.step) {
+      const du = SHIFTS.find((d) => al.w.every((w) => !res.blocksCircle(u0 + d, w, 0.24)));
+      if (du === undefined) continue;
+      const u = u0 + du;
+      al.w.forEach((w, k) => { const y = groundY(u, w); lampPost(b, u, w, y, k ? -1 : 1); poles.push([u, w, y, k]); solids.push({ u, w, r: 0.24 }); count++; });
+    }
     if (al.strings) {
       const byU = new Map(); poles.forEach((p) => { if (!byU.has(p[0])) byU.set(p[0], []); byU.get(p[0]).push(p); });
       const us = [...byU.keys()].sort((a, c) => a - c);
       us.forEach((u, i) => { const [p0, p1] = byU.get(u).sort((a, c) => a[3] - c[3]); stringLights(b, [u, p0[2] + 5.0, p0[1]], [u, p1[2] + 5.0, p1[1]], 0.8, 14, i & 1 ? MULTI : [WARM, 0xfff4d0]); if (i > 0) { const q = byU.get(us[i - 1]).sort((a, c) => a[3] - c[3]); [[q[0], p0], [q[1], p1]].forEach(([qa, pa]) => stringLights(b, [qa[0], qa[2] + 5.1, qa[1]], [pa[0], pa[2] + 5.1, pa[1]], 0.55, 14, [WARM, 0xfff4d0, WARM, 0xffc870])); } });
       us.forEach((u, i) => { if (i % 2) { const [p0, p1] = byU.get(u).sort((a, c) => a[3] - c[3]); b.pennants([u + 1.2, p0[2] + 4.5, p0[1]], [u + 1.2, p1[2] + 4.5, p1[1]], 16, MULTI, 0.45, { sag: 0.6 }); } });
     }
-    for (let u = al.u[0] + 9; u <= al.u[1]; u += 31) { const w = al.w[ai & 1 ? 0 : 1] + (ai ? 0.6 : (r() < 0.5 ? 0.6 : -0.6)); bin(b, u, groundY(u, w), w, 0); solids.push({ u, w, r: 0.34 }); count++; }
-    for (let u = al.u[0] + 22; u <= al.u[1]; u += 58) { const w = al.w[0] - 0.4; bench(b, u, groundY(u, w), w, Math.PI); boxes.push({ u0: u - 0.9, u1: u + 0.9, w0: w - 0.3, w1: w + 0.3 }); count++; }
+    for (let u0 = al.u[0] + 9; u0 <= al.u[1]; u0 += 31) {
+      const w = ai & 1 ? al.w[0] : (r() < 0.5 ? al.w[0] : al.w[1]);
+      const u = SHIFTS.map((d) => u0 + d).find((x) => !res.blocksCircle(x, w, 0.26)); if (u === undefined) continue;
+      bin(b, u, groundY(u, w), w, 0); solids.push({ u, w, r: 0.26 }); count++;
+    }
+    for (let u0 = al.u[0] + 22; u0 <= al.u[1]; u0 += 58) {
+      const w = al.w[0] - 0.4;
+      const u = SHIFTS.map((d) => u0 + d).find((x) => !res.hits({ u0: x - 0.9, u1: x + 0.9, w0: w - 0.3, w1: w + 0.3 })); if (u === undefined) continue;
+      bench(b, u, groundY(u, w), w, Math.PI); boxes.push({ u0: u - 0.9, u1: u + 0.9, w0: w - 0.3, w1: w + 0.3 }); count++;
+    }
   });
   // crowd barriers along the SE rim (the long edge from (240,138) to (26,104)); gaps at the entrance gates
   const rim = []; for (let t = 0; t <= 1.0001; t += 1 / 36) rim.push([lerp(30, 236, t), lerp(105.5, 136.5, t)]);

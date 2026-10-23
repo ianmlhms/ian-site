@@ -225,8 +225,14 @@ async function boot() {
       showPitches: m => markers.setMode(m === true ? 'glow' : m === false ? 'off' : m),
       setFreeCamera: o => r.setFreeCamera(o),
     };
+    let accessOverlay = null;
     window.__fouerGame = {
       game, ui, scene, fair, sfx, hooks, r, world, env, markers, walk, crowd, audio, ride, mask, events,
+      /** access wave: the walkway network painted on the ground (alleys blue, lanes red, service lane orange, forecourts green, entrance points white) */
+      async accessOverlay(on = true) {
+        if (!accessOverlay) { const m = await import('/pb/fouer/models/access-debug.js'); accessOverlay = m.createAccessOverlay({ T, root: r.gameRoot, groundY: (u, w) => world.groundY(u, w), pitches: PITCHES }); }
+        accessOverlay.show(on); return on;
+      },
       advance: (sec) => game.advance(sec),
       setClockOffset: ms => { clockOffset = ms; },
       snapshot() {

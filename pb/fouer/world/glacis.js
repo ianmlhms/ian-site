@@ -130,10 +130,14 @@ export async function createGlacis({ T, TS, bundle, quality = 'medium', frame, o
     uGF: { value: new T.Vector4(FRAME_COS, FRAME_SIN, frame.rootPos[0], frame.rootPos[1]) },
     uWet: { value: 0 }, uWear: { value: quality === 'low' ? 0.5 : 1 },
     uAl: { value: [0, 1, 2, 3, 4, 5, 6, 7].map(() => new T.Vector4(0, 0, 0, 0)) },
+    // access wave: the whole walkway network (alleys, forecourts, service lane) as a 1 m raster, sampled with bilinear filtering (soft edges)
+    uAlTex: { value: new T.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, T.RGBAFormat) },
+    uAlBox: { value: new T.Vector4(0, 0, 1, 1) },
   };
+  WEAR.uAlTex.value.needsUpdate = true;
   const WEAR_FRAG = `
-uniform vec4 uGF; uniform float uWet; uniform float uWear; uniform vec4 uAl[8];
-float wearAlley(vec2 g) { float m = 0.0; for (int k = 0; k < 8; k++) { vec4 a = uAl[k]; vec2 d = max(vec2(a.x - g.x, a.z - g.y), vec2(g.x - a.y, g.y - a.w)); m = max(m, 1.0 - smoothstep(0.0, 1.6, max(d.x, d.y))); } return m; }
+uniform vec4 uGF; uniform float uWet; uniform float uWear; uniform vec4 uAl[8]; uniform sampler2D uAlTex; uniform vec4 uAlBox;
+float wearAlley(vec2 g) { float m = 0.0; for (int k = 0; k < 8; k++) { vec4 a = uAl[k]; vec2 d = max(vec2(a.x - g.x, a.z - g.y), vec2(g.x - a.y, g.y - a.w)); m = max(m, 1.0 - smoothstep(0.0, 1.6, max(d.x, d.y))); } vec2 t = (g - uAlBox.xy) / uAlBox.zw; if (t.x > 0.0 && t.x < 1.0 && t.y > 0.0 && t.y < 1.0) m = max(m, texture2D(uAlTex, t).r); return m; }
 vec3 wearGround(vec3 rgb, vec3 wp) {
   vec2 g = vec2(uGF.z + uGF.x * wp.x - uGF.y * wp.z, uGF.w + uGF.y * wp.x + uGF.x * wp.z);
   float box = smoothstep(9.0, 13.0, g.x) * (1.0 - smoothstep(293.0, 298.0, g.x)) * smoothstep(3.0, 6.0, g.y) * (1.0 - smoothstep(134.0, 139.0, g.y));
@@ -164,7 +168,7 @@ vec3 wearGround(vec3 rgb, vec3 wp) {
     const prev = mat.onBeforeCompile; const key = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
     mat.onBeforeCompile = (sh, rr) => {
       if (prev) prev(sh, rr);
-      sh.uniforms.uGF = WEAR.uGF; sh.uniforms.uWet = WEAR.uWet; sh.uniforms.uWear = WEAR.uWear; sh.uniforms.uAl = WEAR.uAl;
+      sh.uniforms.uGF = WEAR.uGF; sh.uniforms.uWet = WEAR.uWet; sh.uniforms.uWear = WEAR.uWear; sh.uniforms.uAl = WEAR.uAl; sh.uniforms.uAlTex = WEAR.uAlTex; sh.uniforms.uAlBox = WEAR.uAlBox;
       sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = wearGround(diffuseColor.rgb, vWP);')
         .replace('void main()', WEAR_FRAG + '\nvoid main()');
     };
@@ -652,6 +656,14 @@ vec3 wearGround(vec3 rgb, vec3 wp) {
     /** wet ground 0..1 (sky.js, rain): darker asphalt with puddles */
     setWet(k) { WEAR.uWet.value = k; },
     /** the alley rectangles that get the swept / tyre-marked look: [{ u: [u0, u1], w: [w0, w1] }] (models/fair.js passes CORRIDORS) */
+    /** the walkway raster of layout.js rasterZones (cell 1 m): { data (flags 1 alley, 2 forecourt, 4 service), nu, nw, u0, w0, cell } -> swept, lighter ground with tyre marks */
+    setWearField(f) {
+      if (!f) { WEAR.uAlBox.value.set(0, 0, 1, 1); return; }
+      const px = new Uint8Array(f.nu * f.nw * 4);
+      for (let k = 0; k < f.data.length; k++) { const v = f.data[k]; px[k * 4] = v & 1 ? 255 : v & 4 ? 235 : v & 2 ? 205 : 0; px[k * 4 + 3] = 255; }
+      const tex = new T.DataTexture(px, f.nu, f.nw, T.RGBAFormat); tex.magFilter = T.LinearFilter; tex.minFilter = T.LinearFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
+      WEAR.uAlTex.value = tex; WEAR.uAlBox.value.set(f.u0, f.w0, f.nu * f.cell, f.nw * f.cell);
+    },
     setWearAlleys(list) { WEAR.uAl.value.forEach((v, i) => { const c = list && list[i]; if (c) v.set(c.u[0], c.u[1], c.w[0], c.w[1]); else v.set(0, 0, 0, 0); }); },
     setWear(k) { WEAR.uWear.value = k; },
     update(dt) { ground.update(Math.min(0.1, dt || 0.016)); treeLod.update(); },

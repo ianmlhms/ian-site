@@ -18,7 +18,7 @@ const NEAR_WALK = 40, NEAR_RIDE = 110, NEAR_BUILDER = 175, NEAR_HI = 12;       /
 const NEAR_PROP = 24;                       // carried things (candy floss, balloons, pushchairs) are drawn within this distance
 const BUILDER_SHARE = 0.6;                  // the builder view shows a thinner crowd
 const QUEUE_SHARE = 0.3;                    // queue rows may use at most this share of the guests
-const LANE_BASE = { haaptallee: 2.1, fressgaass: 1.0 };
+const LANE_BASE = { haaptallee: 2.1, fressgaass: 1.0, "sud-west": 1.6, "sud-ost": 1.2, service: 0.8 };
 const SPEED_RANGE = [1.0, 1.55];
 
 /** how many guests are shown: the quality cap times a factor from the economy's guest rate (lambda per minute) */
@@ -42,6 +42,7 @@ export function buildGraph(mask, corridors, { minPiece = 8, margin = 0.5, polyli
   for (const c of corridors) {
     if (/^gate/.test(c.name)) continue;
     const du = c.u[1] - c.u[0], dw = c.w[1] - c.w[0];
+    if (c.line) { const [a, b] = c.line; segs.push({ name: c.name, x0: a[0], z0: a[1], x1: b[0], z1: b[1], lane: LANE_BASE[c.name] ?? 1.0 }); continue; }      // layout.js hands over the centre line (cross alleys reach the centre of the alley they join, the service lane is diagonal)
     if (du >= dw) { const z = (c.w[0] + c.w[1]) / 2; segs.push({ name: c.name, x0: c.u[0] + 4, z0: z, x1: c.u[1] - 4, z1: z, lane: LANE_BASE[c.name] ?? 1.0 }); }
     else { const x = (c.u[0] + c.u[1]) / 2; segs.push({ name: c.name, x0: x, z0: c.w[0], x1: x, z1: c.w[1], lane: LANE_BASE[c.name] ?? 1.0 }); }
   }

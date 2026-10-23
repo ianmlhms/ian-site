@@ -300,14 +300,16 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   await evalG(page, g => g.ride.setTestSpeedup(6));
   await evalG(page, g => g.walk.setInputKeys(["f", "r"]));
   const gone = await waitIdle(16000);
+  // access wave: the keys (forward + right) stay held while the test waits for the stamp card; measure the walker the moment the ride is over, then release them (kerb lamp posts no longer sit in the lane to stop the strafe)
+  const landed = await evalG(page, g => ({ ...g.walk.view }));
+  await evalG(page, g => g.walk.setInputKeys([]));
   await sleep(1100);
   const log = await stopLog();
   h.expect(gone, "scooter: the timer ends the ride (about 60 s)");
   h.expect(log.stamp, "scooter: the stamp card was shown");
   const done = await evalG(page, g => ({ ea: g.game.state.ea, hasS: g.game.hasFlag("s"), walking: g.walk.active }));
   h.expect(done.hasS && (done.ea.match(/s/g) || []).length === 1 && done.walking, `scooter: flag "s" stored once (${done.ea})`);
-  const after = await evalG(page, g => ({ view: { ...g.walk.view }, keys: g.walk.inputState().keys }));
-  h.expect(Math.hypot(after.view.x - spot.x, after.view.z - spot.z) < 1, "scooter: the walker is back at the entrance");
+  h.expect(Math.hypot(landed.x - spot.x, landed.z - spot.z) < 1, `scooter: the walker is back at the entrance (${Math.hypot(landed.x - spot.x, landed.z - spot.z).toFixed(2)} m off when the ride ended)`);
   await evalG(page, g => g.walk.setInputKeys([]));
   h.expect(log.max.draws <= WALK_DRAWS && log.max.tris <= WALK_TRIS, `scooter: perf ${log.max.draws} draws / ${Math.round(log.max.tris / 1000)}k triangles`);
 }

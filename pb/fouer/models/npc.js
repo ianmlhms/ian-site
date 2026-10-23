@@ -7,7 +7,7 @@
  * 15 skins (hall tent x3, chalet, kiosk, trailer, camelot x2, temple gable, fisher hut, arch stall, game stall, sweets booth, kids ride, chair-ride canopy, worksite).
  * Fully procedural, no real names: the lettering is generic (Fritten, Bratwurst, Crêpes, Bar, Café ...). */
 import { Builder, mulberry, col, shade, C, PAL, GOLD, lerp, TAU, drape } from './kit.js';
-import { ENTRANCES } from './props.js';
+import { ENTRANCES, ALLEYS, SERVICE, FRONTAGE, corridors as layoutCorridors, createReservations, rasterZones, pointInPoly as layoutInPoly } from '../layout.js';
 import { backLot } from './clutter.js';
 import { hallTent } from './tents.js';
 import { buildStall, awning } from './stallkit.js';
@@ -293,27 +293,38 @@ export function buildPitchNpc({ T, rect, seed = 1, far = false, bigFor, noLock =
 /* ------------------------------------------------------------------ the background fair */
 function inPoly(poly, u, w) { let ins = false; for (let k = 0, j = poly.length - 1; k < poly.length; j = k++) { const [ui, wi] = poly[k]; const [uj, wj] = poly[j]; if ((wi > w) !== (wj > w) && u < ((uj - ui) * (w - wi)) / (wj - wi + 1e-12) + ui) ins = !ins; } return ins; }
 const CELL = 2; const U0 = -20; const W0 = -24; const NU = 160; const NW = 90;
-function makeGrid() { return { g: new Uint8Array(NU * NW), mark(u0, u1, w0, w1) { const i0 = Math.max(0, Math.floor((u0 - U0) / CELL)); const i1 = Math.min(NU - 1, Math.floor((u1 - U0) / CELL)); const j0 = Math.max(0, Math.floor((w0 - W0) / CELL)); const j1 = Math.min(NW - 1, Math.floor((w1 - W0) / CELL)); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.g[j * NU + i] = 1; }, free(u0, u1, w0, w1) { const i0 = Math.max(0, Math.floor((u0 - U0) / CELL)); const i1 = Math.min(NU - 1, Math.floor((u1 - U0) / CELL)); const j0 = Math.max(0, Math.floor((w0 - W0) / CELL)); const j1 = Math.min(NW - 1, Math.floor((w1 - W0) / CELL)); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (this.g[j * NU + i]) return false; return true; } }; }
+function makeGrid() {
+  const cells = (u0, u1, w0, w1) => [Math.max(0, Math.floor((u0 - U0) / CELL)), Math.min(NU - 1, Math.floor((u1 - U0) / CELL)), Math.max(0, Math.floor((w0 - W0) / CELL)), Math.min(NW - 1, Math.floor((w1 - W0) / CELL))];
+  // bit 1 = a stall / pitch, bit 2 = a walkway zone of layout.js (alley, forecourt, service lane; rounded OUT to whole cells): everybody else treats any non-zero cell as taken
+  return {
+    g: new Uint8Array(NU * NW),
+    mark(u0, u1, w0, w1, bit = 1) { const [i0, i1, j0, j1] = cells(u0, u1, w0, w1); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) this.g[j * NU + i] |= bit; },
+    free(u0, u1, w0, w1, bits = 1) { const [i0, i1, j0, j1] = cells(u0, u1, w0, w1); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (this.g[j * NU + i] & bits) return false; return true; },
+  };
+}
 
-/** alley corridors and gate zones that must stay clear (data-driven, same numbers as DESIGN 4.2 and props.js) */
-export const CORRIDORS = [
-  { name: 'haaptallee', u: [10, 292], w: [50.2, 62.4] }, { name: 'fressgaass', u: [10, 292], w: [24.6, 31.2] },
-  { name: 'cross66', u: [63, 69], w: [20, 112] }, { name: 'cross130', u: [127, 133], w: [20, 118] }, { name: 'cross190', u: [187, 193], w: [14, 122] }, { name: 'cross250', u: [247, 253], w: [8, 112] },
-  { name: 'gate-sw', u: [8, 32], w: [38, 72] }, { name: 'gate-ne', u: [262, 296], w: [44, 70] },
-];
+/** alley corridors that must stay clear: the walkway network of layout.js (Haaptallee, Fressgaass, south alley, cross alleys, entrance lanes, SE service lane).  Same shape as before
+ * ({ name, u: [a, b], w: [c, d], line? }) so the crowd graph, the swept-ground shader and the filler keep working; the numbers live in pb/fouer/layout.js only. */
+export const CORRIDORS = layoutCorridors();
+/** the entrance lanes are alleys of the layout now (the old GATE_LANES hack is gone) */
+export const GATE_LANES = [];
+/** distance a row of stalls keeps from the alley edge on top of the frontage strip (m): the stall rect itself is grown by 0.2 m when it is tested */
+const ROW_SET = 0.25;
+const ALLEY_BY_ID = Object.fromEntries(ALLEYS.map((a) => [a.id, a]));
+const HA = ALLEY_BY_ID.haaptallee; const FG = ALLEY_BY_ID.fressgaass; const SAW = ALLEY_BY_ID['sud-west']; const SAE = ALLEY_BY_ID['sud-ost'];
 const ROWS = [
-  { name: 'N', front: 22.5, face: '+w', depth: 17, skins: { hallWide: 5, hall: 7, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 3, arch: 2, game: 2, sweets: 2, temple: 1, fisher: 1, pizza: 2, popcorn: 2, icecream: 1, balloon: 2, tiki: 1, claw: 1, funhouse: 1, souvenir: 2, bouncy: 1 } },
-  { name: 'F', front: 32.3, face: '-w', depth: 8, skins: { chalet: 3, kiosk: 3, trailer: 4, game: 3, sweets: 3, pizza: 2, popcorn: 2, icecream: 2, arch: 2, claw: 2, balloon: 1, tiki: 1, temple: 1, fisher: 1, souvenir: 2 } },
-  { name: 'M1', front: 49, face: '+w', depth: 17, skins: { hallWide: 4, hall: 6, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 4, arch: 2, game: 3, sweets: 3, temple: 1, fisher: 1, kids: 1, pizza: 2, popcorn: 2, icecream: 2, balloon: 2, tiki: 1, claw: 2, funhouse: 1, souvenir: 2, bouncy: 1 } },
-  { name: 'M2', front: 64, face: '-w', depth: 20, skins: { hallWide: 5, hall: 6, trailer: 3, kiosk: 2, game: 2, chalet: 2, kids: 1, chair: 1, sweets: 1, pizza: 1, balloon: 1, claw: 1, funhouse: 1, bouncy: 1, souvenir: 1 } },
-  { name: 'S', front: 95, face: '-w', depth: 17, skins: { hallWide: 3, hall: 4, hallSmall: 3, kiosk: 3, trailer: 3, chalet: 2, sweets: 2, game: 2, arch: 1, pizza: 2, popcorn: 2, icecream: 2, tiki: 1, claw: 1, souvenir: 2, balloon: 1 } },
+  { name: 'N', front: FG.w[0] - FRONTAGE.main - ROW_SET, face: '+w', depth: 17, skins: { hallWide: 5, hall: 7, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 3, arch: 2, game: 2, sweets: 2, temple: 1, fisher: 1, pizza: 2, popcorn: 2, icecream: 1, balloon: 2, tiki: 1, claw: 1, funhouse: 1, souvenir: 2, bouncy: 1 } },
+  { name: 'F', front: FG.w[1] + FRONTAGE.main + ROW_SET, face: '-w', depth: 8, skins: { chalet: 3, kiosk: 3, trailer: 4, game: 3, sweets: 3, pizza: 2, popcorn: 2, icecream: 2, arch: 2, claw: 2, balloon: 1, tiki: 1, temple: 1, fisher: 1, souvenir: 2 } },
+  { name: 'M1', front: HA.w[0] - FRONTAGE.main - ROW_SET, face: '+w', depth: 17, skins: { hallWide: 4, hall: 6, hallSmall: 2, chalet: 3, kiosk: 2, trailer: 4, arch: 2, game: 3, sweets: 3, temple: 1, fisher: 1, kids: 1, pizza: 2, popcorn: 2, icecream: 2, balloon: 2, tiki: 1, claw: 2, funhouse: 1, souvenir: 2, bouncy: 1 } },
+  { name: 'M2', front: HA.w[1] + FRONTAGE.main + ROW_SET, face: '-w', depth: 20, skins: { hallWide: 5, hall: 6, trailer: 3, kiosk: 2, game: 2, chalet: 2, kids: 1, chair: 1, sweets: 1, pizza: 1, balloon: 1, claw: 1, funhouse: 1, bouncy: 1, souvenir: 1 } },
+  // south alley: the north side (behind the M2 pitches) faces +w, the south side (next to the S pitches) faces -w
+  { name: 'SNw', front: SAW.w[0] - FRONTAGE.main - ROW_SET, face: '+w', depth: 9, u: [58, 114], skins: { hall: 4, hallSmall: 3, tentS: 4, chalet: 3, kiosk: 3, trailer: 3, game: 2, sweets: 2, pizza: 2, popcorn: 1, icecream: 1, souvenir: 1 } },
+  { name: 'SNe', front: SAE.w[0] - FRONTAGE.main - ROW_SET, face: '+w', depth: 12, u: [114, 262], skins: { hall: 4, hallSmall: 3, tentS: 4, chalet: 3, kiosk: 3, trailer: 3, game: 2, sweets: 2, pizza: 2, popcorn: 1, icecream: 1, souvenir: 1 } },
+  { name: 'S', front: SAE.w[1] + FRONTAGE.main + ROW_SET, face: '-w', depth: 17, skins: { hallWide: 3, hall: 4, hallSmall: 3, kiosk: 3, trailer: 3, chalet: 2, sweets: 2, game: 2, arch: 1, pizza: 2, popcorn: 2, icecream: 2, tiki: 1, claw: 1, souvenir: 2, balloon: 1 } },
 ];
-
-/** gate lanes: a walkway from every gate that does not lie on a cross alley to the nearest long alley (kept free of stalls; the walk mask and the filler agree) */
-export const GATE_LANES = ENTRANCES.filter((e) => e.kind === 'gate' && e.face === '-w').map((e) => ({ name: 'gatelane-' + e.id, u: [e.u - 3.4, e.u + 3.4], w: [e.w - 4, 24.6] }));
 
 /** the strip the filler keeps free round a pitch (m): sides / back, and in front (polish 2: 0.7 / 0.8 -> 0.45 / 0.5, the aisles between pitches and stalls were wide bare asphalt) */
-export const PIT_M = 0.45, PIT_F = 0.5;
+export const PIT_M = 0.3, PIT_F = 0.5;
 const FINE = 0.5;                    // the filler's own occupancy grid (0.5 m) next to the coarse 2 m one that the other modules know
 /** corridor distance helper: how far is (u, w) from the nearest alley corridor (rectangles)? */
 function corridorDist(u, w) {
@@ -343,17 +354,17 @@ const pickW = (m, rr) => { let t = Object.values(m).reduce((a, v) => a + v, 0) *
 /** Pack a grid of 1 m cells with stalls of natural size.  The scan runs from the lower-left; at every free corner each candidate skin draws a random natural size, the ones
  * that fit the free run are weighted by weight x sqrt(area) and one is picked (a thin leftover is absorbed by the stall); nothing fits: a service strip (crates, gensets) when
  * there is a little room, else skip.  `free(i, j)` = cell free and inside; `put(i, j, sw, sd, skin | null)` draws + marks (null = a service strip); `weights(i, j)` -> table. */
-export function packFree({ nu, nw, free, weights, rf, put, margin = 0.35, maxRun = 30, maxDepth = 20, cell = 1 }) {
+export function packFree({ nu, nw, free, weights, rf, put, margin = 0.3, maxRun = 30, maxDepth = 20, cell = 1 }) {
   let n = 0; const maxRunC = Math.round(maxRun / cell); const maxDepthC = Math.round(maxDepth / cell);
   for (let j = 0; j < nw; j++) for (let i = 0; i < nu; i++) {
     if (!free(i, j)) continue;
     let run = 1; while (run < maxRunC && free(i + run, j)) run++;
-    if (run * cell < 3) continue;
+    if (run * cell < 2.4) continue;
     const col = new Array(run);
     for (let k = 0; k < run; k++) { let d = 0; while (d < maxDepthC && free(i + k, j + d)) d++; col[k] = d; }
     const depthFor = (sw) => { let m = 1e9; const kk = Math.min(run, Math.ceil((sw + margin) / cell - 1e-6)); for (let k = 0; k < kk; k++) m = Math.min(m, col[k]); return m * cell; };
     const runM = run * cell;
-    if (depthFor(2.6) < 2) continue;
+    if (depthFor(2.2) < 1.8) continue;
     const wt = weights(i, j); let best = null; let bestScore = 0;
     for (const name of Object.keys(wt)) {
       const sk = SKINS[name]; if (!sk) continue;
@@ -369,7 +380,7 @@ export function packFree({ nu, nw, free, weights, rf, put, margin = 0.35, maxRun
       if (put(i, j, sw, sd, best.name)) n++;
     } else {
       const dav = depthFor(3);
-      if (dav >= 2 && runM >= 3 && put(i, j, Math.min(runM - margin, 8), Math.min(dav - margin, 3.2), null)) n++;
+      if (dav >= 1.8 && runM >= 2.4 && put(i, j, Math.min(runM - margin, 8), Math.min(dav - margin, 3.2), null)) n++;
     }
   }
   return n;
@@ -388,14 +399,35 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   const markAll = (u0, u1, w0, w1) => { grid.mark(u0, u1, w0, w1); fineMark(u0, u1, w0, w1); };
   const stalls = [];                                    // exact footprints { u0, u1, w0, w1 } (walk collision, coverage)
   const addStall = (cu, cw, w, d, over = 0.15, k = '', f = '') => { stalls.push({ k, f, u0: +(cu - w / 2 - over).toFixed(2), u1: +(cu + w / 2 + over).toFixed(2), w0: +(cw - d / 2 - over).toFixed(2), w1: +(cw + d / 2 + over).toFixed(2) }); };
-  pitches.forEach((p) => {
-    const [du, dw] = SIZE[p.size] || SIZE.S; const f = p.face || '+w';
-    let u0 = p.u - du / 2 - PIT_M; let u1 = p.u + du / 2 + PIT_M; let w0 = p.w - dw / 2 - PIT_M; let w1 = p.w + dw / 2 + PIT_M;
-    if (f === '+w') w1 += PIT_F; else if (f === '-w') w0 -= PIT_F; else if (f === '+u') u1 += 4; else u0 -= 4;
-    markAll(u0, u1, w0, w1);
-  });
-  CORRIDORS.forEach((c) => markAll(c.u[0], c.u[1], c.w[0], c.w[1]));
-  GATE_LANES.forEach((c) => markAll(c.u[0], c.u[1], c.w[0], c.w[1]));
+  // the walkway network of layout.js: alleys, entrance lanes, service lane and one forecourt in front of every pitch.  The coarse grid takes the zones as bit 2 (rounded out to 2 m
+  // cells: clutter's free-field filler treats any non-zero cell as taken), the fine grid exactly (0.5 m) plus the frontage strip (where tables, lamps and banners stand).
+  const pitchList = pitches.map((p) => ({ id: p.id, u: p.u, w: p.w, size: p.size, face: p.face || '+w' }));
+  const res = createReservations(pitchList);
+  const zr = rasterZones(pitchList, { cell: CELL, u0: U0, w0: W0, nu: NU, nw: NW });
+  for (let k = 0; k < zr.data.length; k++) if (zr.data[k]) grid.g[k] |= 2;
+  const zf = rasterZones(pitchList, { cell: FINE, u0: U0, w0: W0, nu: FNU, nw: FNW });
+  for (let k = 0; k < zf.data.length; k++) if (zf.data[k] && fine[k] !== 2) fine[k] = 1;
+  for (let j = 0; j < FNW; j++) for (let i = 0; i < FNU; i++) {                    // the frontage strip along the long alleys: no stalls (the fine packer keeps out of it too)
+    if (fine[j * FNU + i]) continue;
+    const cr = { u0: U0 + i * FINE, u1: U0 + (i + 1) * FINE, w0: W0 + j * FINE, w1: W0 + (j + 1) * FINE };
+    if (res.hitsFrontage(cr)) fine[j * FNU + i] = 1;
+  }
+  const pitchRects = pitchList.map((p) => { const [du, dw] = SIZE[p.size] || SIZE.S; return { u0: p.u - du / 2 - PIT_M, u1: p.u + du / 2 + PIT_M, w0: p.w - dw / 2 - PIT_M, w1: p.w + dw / 2 + PIT_M }; });
+  pitchRects.forEach((q) => markAll(q.u0, q.u1, q.w0, q.w1));
+  const rectOk = (rect) => !res.hits(rect) && !res.hitsFrontage(rect);
+  /** the way a stall at (u, w) faces: towards the nearest alley (a long alley wins a tie by a metre), along w for the long alleys, along u for a cross alley next to it */
+  const faceToward = (u, w) => {
+    let best = null;
+    for (const a of ALLEYS) {
+      const du = Math.max(a.u[0] - u, 0, u - a.u[1]); const dw = Math.max(a.w[0] - w, 0, w - a.w[1]); const d = Math.hypot(du, dw) - (a.kind === 'main' ? 1 : 0);
+      if (!best || d < best.d) best = { d, a, du, dw };
+    }
+    const svc = SERVICE.pts; let sd = 1e9; for (let k = 0; k < svc.length; k++) { const p0 = svc[k], p1 = svc[(k + 1) % svc.length]; const ex = p1[0] - p0[0], ez = p1[1] - p0[1]; const t = Math.max(0, Math.min(1, ((u - p0[0]) * ex + (w - p0[1]) * ez) / (ex * ex + ez * ez || 1))); sd = Math.min(sd, Math.hypot(u - p0[0] - ex * t, w - p0[1] - ez * t)); }
+    if (sd < best.d - 2) return '+w';       // a back lot beside the service lane (SE of everything that faces an alley)
+    const a = best.a; const cu = (a.u[0] + a.u[1]) / 2; const cw = (a.w[0] + a.w[1]) / 2;
+    if (a.axis === 'w' && best.du >= best.dw) return u < cu ? '+u' : '-u';
+    return w < cw ? '+w' : '-w';
+  };
   let count = 0; const byKind = {}; const triKind = {};      // triKind: triangles per skin (diagnostics for the budget)
   const trisNow = () => { let t = 0; for (const k of Object.keys(b.ch)) t += b.ch[k].tris; return t; };
   const place = (skin, u, w, face, rr, maxW, maxD) => {
@@ -409,11 +441,11 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   };
   const wsum = (m) => Object.values(m).reduce((a, v) => a + v, 0);
   const pickSkin = (m, rr) => { let t = rr() * wsum(m); for (const [k, v] of Object.entries(m)) { t -= v; if (t <= 0) return k; } return Object.keys(m)[0]; };
-  const fits = (u0, u1, w0, w1) => grid.free(u0, u1, w0, w1) && [[u0, w0], [u1, w0], [u0, w1], [u1, w1], [(u0 + u1) / 2, (w0 + w1) / 2]].every(([u, w]) => inPoly(fieldPoly, u, w));
+  const fits = (u0, u1, w0, w1) => grid.free(u0, u1, w0, w1) && rectOk({ u0, u1, w0, w1 }) && [[u0, w0], [u1, w0], [u0, w1], [u1, w1], [(u0 + u1) / 2, (w0 + w1) / 2]].every(([u, w]) => inPoly(fieldPoly, u, w));
   // rows of stalls along the alleys
   ROWS.forEach((row, ri) => {
-    const rr = mulberry(seed * 31 + ri * 977); let u = 14;
-    while (u < 292) {
+    const rr = mulberry(seed * 31 + ri * 977); let u = row.u ? row.u[0] : 14; const uEnd = row.u ? row.u[1] : 292;
+    while (u < uEnd) {
       const skin = pickSkin(row.skins, rr); const s = SKINS[skin];
       let w = rangeVal(rr, s.w); let d = Math.min(rangeVal(rr, s.d), row.depth);
       // try the chosen skin, then shrink to the smallest ones when the gap is tight
@@ -433,7 +465,7 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
   });
   // gap filling: several greedy passes (big to small) over the whole field in a shuffled scan order; the front looks at the nearest alley
   const rp = mulberry(seed * 53 + 5);
-  const alleyW = [27.7, 56]; const nearestFace = (u, w, d) => { const c = w + d / 2; const t = alleyW.reduce((a, v) => (Math.abs(v - c) < Math.abs(a - c) ? v : a), alleyW[0]); return c < t ? '+w' : '-w'; };
+  const nearestFace = (u, w, d) => faceToward(u, w + d / 2);
   const cells = []; for (let w = 4; w < 126; w += 2) for (let u = 14; u < 292; u += 2) cells.push([u, w]);
   for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(rp() * (i + 1)); [cells[i], cells[j]] = [cells[j], cells[i]]; }
   [['hall', 0.85], ['hallSmall', 0.85], ['funhouse', 0.3, 5], ['bouncy', 0.3, 3], ['trailer', 0.7], ['pizza', 0.5, 12], ['icecream', 0.5, 8], ['chalet', 0.7], ['kiosk', 0.7], ['balloon', 0.5, 8], ['tiki', 0.4, 4], ['sweets', 0.6], ['game', 0.6], ['claw', 0.5, 8], ['souvenir', 0.6, 10], ['arch', 0.5], ['popcorn', 0.8, 12], ['camelot', 0.9], ['popcorn', 0.6, 4], ['camelot', 0.9]].forEach(([skin, prob, cap]) => {
@@ -441,7 +473,7 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
     for (const [u, w] of cells) {
       if (cap && placed >= cap) break;
       if (rp() > prob) continue;
-      const sw = rangeVal(rp, s.w); const sd = rangeVal(rp, s.d); const face = nearestFace(u, w, sd);
+      const sw = rangeVal(rp, s.w); const sd = rangeVal(rp, s.d); const face = faceToward(u + sw / 2, w + sd / 2);
       if (fits(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3)) { placed++; place(skin, u + sw / 2, w + sd / 2, face, rp, sw, sd); grid.mark(u - 0.3, u + sw + 0.3, w - 0.3, w + sd + 0.3); }
     }
   });
@@ -453,7 +485,7 @@ export function buildNpcFair({ T, pitches, fieldPoly, groundY, seed = 1, quality
     nu: FNU, nw: FNW, free: cellFree, rf, cell: FINE,
     weights: (i, j) => { const w = W0 + j * FINE; return w > 100 ? FILL_SMALL : w < 26 ? FILL_NW : FILL_MID; },
     put: (i, j, sw, sd, skin) => {
-      const u = U0 + i * FINE; const w = W0 + j * FINE; const gap = 0.35;
+      const u = U0 + i * FINE; const w = W0 + j * FINE; const gap = 0.3;
       const cu = u + (sw + gap) / 2; const cw = w + (sd + gap) / 2;
       if (![[u, w], [u + sw + gap, w], [u, w + sd + gap], [u + sw + gap, w + sd + gap]].every(([x, z]) => inPoly(fieldPoly, x, z))) { fineMark(u, u + 1, w, w + 1); return false; }
       const interior = corridorDist(cu, cw) > 2.5 && w > 4; const y = groundY(cu, cw);

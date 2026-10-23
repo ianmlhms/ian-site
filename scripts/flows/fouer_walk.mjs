@@ -167,7 +167,8 @@ export const flow = {
     await page.keyboard.down("KeyW"); await sleep(5200); await page.keyboard.up("KeyW");
     const stall = (await walkState()).view;
     h.expect(stall.z > rect0.w + rect0.dw / 2 + 0.2 && stall.z < 50, `a built stall blocks the walker (stopped at w ${stall.z.toFixed(2)}, front edge ${rect0.w + rect0.dw / 2})`);
-    const npcBox = await evalG(page, g => { const b = g.mask.npc.filter(q => q.w1 > 46 && q.w1 <= 50.01 && q.u1 - q.u0 >= 6 && q.u0 > 120 && q.u1 < 240).sort((a, c) => a.u0 - c.u0)[0] ?? null; return b ? { ...b } : null; });
+    // access wave: the stalls keep 1.2 m back from the alley (layout.js FRONTAGE), so the north-side stall edge is at about w 48.5 and the stalls are mostly small
+    const npcBox = await evalG(page, g => { const b = g.mask.npc.filter(q => q.w1 > 44 && q.w1 <= 50.01 && q.u1 - q.u0 >= 3.5 && q.u0 > 100 && q.u1 < 250).sort((a, c) => a.u0 - c.u0)[0] ?? null; return b ? { ...b } : null; });
     if (h.expect(npcBox !== null, "an NPC stall on the north side of the main alley exists in the mask")) {
       await place((npcBox.u0 + npcBox.u1) / 2, 53, -Math.PI / 2);
       await page.keyboard.down("KeyW"); await sleep(4200); await page.keyboard.up("KeyW");

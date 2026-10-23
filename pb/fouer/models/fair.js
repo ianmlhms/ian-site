@@ -159,18 +159,20 @@ export async function createFairLayer({ T, root, pitches, groundY, quality = 'me
   const baseInfo = { npc: null, props: null };
   if (buildBase) {
     const npcMod = await import('./npc.js'); const propMod = await import('./props.js');
-    if (world && world.glacis && world.glacis.setWearAlleys) world.glacis.setWearAlleys(npcMod.CORRIDORS.filter((c) => !c.name.startsWith('gate-')));   // swept alleys + tyre marks in the ground shader
+    const layoutMod = await import('../layout.js');
+    const pitchDefs = [...pits.values()].map((q) => ({ id: q.rect.id, u: q.rect.u, w: q.rect.w, size: q.rect.size, face: q.rect.face }));
+    if (world && world.glacis && world.glacis.setWearField) world.glacis.setWearField(layoutMod.rasterZones(pitchDefs, { cell: 1, u0: -10, w0: -10, nu: 320, nw: 170 }));   // swept alleys + forecourts + tyre marks in the ground shader (the whole walkway network)
     const holders = [];
     const laneSamples = lane || sampleLane(world);
     baseInfo.npc = npcMod.buildNpcFair({ T, pitches: [...pits.values()].map((q) => q.rect), fieldPoly, groundY, seed, quality, lane: laneSamples });
     baseInfo.props = propMod.buildProps({ T, pitches: [...pits.values()].map((q) => q.rect), fieldPoly, groundY, seed, quality });
     const clutterMod = await import('./clutter.js');
-    baseInfo.clutter = clutterMod.buildClutter({ T, fieldPoly, groundY, seed, quality, grid: baseInfo.npc.grid, gridDims: baseInfo.npc.gridDims });
+    baseInfo.clutter = clutterMod.buildClutter({ T, fieldPoly, groundY, seed, quality, grid: baseInfo.npc.grid, gridDims: baseInfo.npc.gridDims, pitches: pitchDefs, stalls: baseInfo.npc.stalls });
     // polish 2: exact stall footprints + small solids for the walk collision ride on the occupancy array (walk.js createMask reads grid.g.stalls / solids / boxes)
     baseInfo.solids = [...baseInfo.props.solids, ...baseInfo.clutter.solids]; baseInfo.boxes = [...baseInfo.props.boxes, ...baseInfo.clutter.boxes];
     baseInfo.npc.grid.stalls = baseInfo.npc.stalls; baseInfo.npc.grid.solids = baseInfo.solids; baseInfo.npc.grid.boxes = baseInfo.boxes;
     // the faded parking-bay paint is only seen in the alleys now (stalls, pitches and plots cover the rest): drop it from the ground decor (-10k triangles)
-    if (world && world.glacis && world.glacis.cullFieldBays) baseInfo.baysCulled = world.glacis.cullFieldBays((u, w) => npcMod.CORRIDORS.some((c) => u >= c.u[0] - 1 && u <= c.u[1] + 1 && w >= c.w[0] - 1 && w <= c.w[1] + 1));
+    if (world && world.glacis && world.glacis.cullFieldBays) baseInfo.baysCulled = world.glacis.cullFieldBays((u, w) => npcMod.CORRIDORS.some((c) => !c.line && u >= c.u[0] - 1 && u <= c.u[1] + 1 && w >= c.w[0] - 1 && w <= c.w[1] + 1));
     [baseInfo.npc.group, baseInfo.props.group, baseInfo.clutter.group].forEach((g) => holders.push(g));
     const tmp = new T.Group(); holders.forEach((g) => tmp.add(g));
     baseBatch.build(collect(M, tmp)); tmp.clear();

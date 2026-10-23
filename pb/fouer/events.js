@@ -14,6 +14,7 @@
  * Test override: ?fouerDate= (test mode only, main.js) moves the whole clock; __fouerGame.events.{debugShow, state} with ?fouerDebug=1.
  * No real showmen's names or brands; the mascot is Hämmi. */
 import { CEREMONY_START, CEREMONY_SECONDS, PARADE_HOURS, FIREWORKS_HOUR, FIREWORKS_SECONDS, luxParts } from "./calendar.js";
+import { ALLEYS } from "./layout.js";
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -25,7 +26,8 @@ export function mulberry(seed) {
 }
 
 /* ------------------------------------------------------------------------------------------------ the show clock */
-export const ALLEY = Object.freeze({ w: 56.5, w0: 50.4, w1: 62.6 });          // the Haaptallee (props.js ALLEYS)
+const HAAPTALLEE = ALLEYS.find(a => a.id === "haaptallee");
+export const ALLEY = Object.freeze({ w: (HAAPTALLEE.w[0] + HAAPTALLEE.w[1]) / 2, w0: HAAPTALLEE.w[0], w1: HAAPTALLEE.w[1] });          // the Haaptallee (layout.js)
 export const PARADE = Object.freeze({ speed: 1.55, startU: 6, tail: 27, endU: 292, total: 205 });   // lead metres per second, formation length, where the tail must have left
 export const OPENING_SECONDS = CEREMONY_SECONDS;
 export const FIREWORKS_TOTAL = FIREWORKS_SECONDS;
@@ -107,7 +109,7 @@ export const paradeLeadU = t => PARADE.startU + PARADE.speed * Math.max(0, t);
 /** Is the whole formation off the field at second `t`? (the tail has passed PARADE.endU) */
 export const paradeDone = t => paradeLeadU(t) - PARADE.tail > PARADE.endU;
 /** The pitches facing the main alley get the Hämmelsmarsch bonus (calendar.js); the cloth banner hangs here: */
-export const BANNER = Object.freeze({ u: 36, w0: 50.4, w1: 62.6, height: 6.4, drop: 1.7 });
+export const BANNER = Object.freeze({ u: 36, w0: HAAPTALLEE.w[0], w1: HAAPTALLEE.w[1], height: 6.4, drop: 1.7 });
 
 /* ------------------------------------------------------------------------------------------------ the firework schedule (seeded by the year) */
 export const SHELL_KINDS = Object.freeze(["peony", "willow", "ring", "crackle", "double"]);

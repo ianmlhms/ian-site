@@ -9,6 +9,7 @@
  *        slack between the model and the edge of its pitch slot.  Skipped for the far LOD and for rides with their own material.
  */
 import { Builder, mulberry, col, shade, C, GOLD, lerp, TAU, drape } from './kit.js';
+import { ALLEYS as NET, createReservations, rimW } from '../layout.js';
 
 const CRATES = [0xd8433a, 0x2d6fd0, 0xf4c430, 0x2f9a58, 0xe9e5d8, 0xee7a2a];
 const CLOTH = [0xd8283a, 0x2d6fd0, 0xf6ead0, 0x2f9a58, 0xf4c430, 0x7a47c8, 0x25a6a6];
@@ -84,50 +85,70 @@ function caravan(b, r, x, z, yaw, len = 6.4) {
 function lamp(b, x, y, z) { b.cyl(x, y, z, 0.08, 0.06, 3.2, 4, 0x2f2f35); b.bulb(x, y + 3.25, z, WARM, 0.5); }
 
 /* ------------------------------------------------------------------ the field */
+const HAA = NET.find((a) => a.id === 'haaptallee'); const FRE = NET.find((a) => a.id === 'fressgaass'); const SAW = NET.find((a) => a.id === 'sud-west'); const SAE = NET.find((a) => a.id === 'sud-ost');
+/** the long alleys that get edge dressing (the dressing stands OUTSIDE the walkway, in the frontage strip the stalls keep free: layout.js FRONTAGE) */
 const AL = [
-  { name: 'haaptallee', u: [24, 276], w: [50.4, 62.6], gap: 5.5, tables: 0.4 },
-  { name: 'fressgaass', u: [30, 280], w: [24.2, 31.4], gap: 7.5, tables: 0.3 },
+  { name: 'haaptallee', u: [24, 276], w: [HAA.w[0], HAA.w[1]], gap: 4.8, tables: 0.4 },
+  { name: 'fressgaass', u: [30, 280], w: [FRE.w[0], FRE.w[1]], gap: 6.5, tables: 0.3 },
+  { name: 'sud-west', u: [60, 112], w: [SAW.w[0], SAW.w[1]], gap: 7, tables: 0.3 },
+  { name: 'sud-ost', u: [112, 260], w: [SAE.w[0], SAE.w[1]], gap: 7, tables: 0.3 },
 ];
-const CROSS = [{ u: 66, w: [22, 112] }, { u: 130, w: [22, 118] }, { u: 190, w: [16, 122] }, { u: 250, w: [10, 112] }];
+const CROSS = NET.filter((a) => a.axis === 'w');            // cross alleys + entrance lanes: banner poles on the kerb, flag lines overhead
+const LONG_W = [[22.5, 33.5], [48.5, 63.5], [86.5, 101.5]];  // the long alleys' w ranges (flag lines are hung there by props.js instead)
 
 function inPoly(poly, u, w) { let ins = false; for (let k = 0, j = poly.length - 1; k < poly.length; j = k++) { const [ui, wi] = poly[k]; const [uj, wj] = poly[j]; if ((wi > w) !== (wj > w) && u < ((uj - ui) * (w - wi)) / (wj - wi + 1e-12) + ui) ins = !ins; } return ins; }
 
-export function buildClutter({ T, fieldPoly, groundY, seed = 1, quality = 'medium', grid = null, gridDims = null, pitches = [] }) {
+export function buildClutter({ T, fieldPoly, groundY, seed = 1, quality = 'medium', grid = null, gridDims = null, pitches = [], stalls = [] }) {
   const r = mulberry(seed * 4001 + 9); const b = new Builder({ seed, rnd: r, far: false }); b.jit = 0.06; let count = 0;
   const solids = []; const boxes = [];                      // small solids for the walk collision: circles { u, w, r } and caravan boxes { u0, u1, w0, w1 }
   const at = (u, w, yaw, fn, rad) => { const y = groundY(u, w); b.push().translate(u, y, w).rotY(yaw || 0); b.aoY = y; fn(); b.pop(); b.aoY = 0; count++; if (rad) solids.push({ u: +u.toFixed(2), w: +w.toFixed(2), r: rad }); };
   const dens = quality === 'low' ? 0.55 : quality === 'high' ? 1.1 : 0.85;
 
-  // 1. alley-edge dressing: on both edges of the two long alleys (the walking lane in the middle stays free)
+  // layout.js: nothing stands on an alley, a forecourt or an entrance lane.  `free(u, w, rad)` = a circle that may stand here (kerb furniture excepted), not on a pitch slot either.
+  const pitchList = (pitches || []).map((p) => ({ id: p.id, u: p.u, w: p.w, size: p.size, face: p.face || '+w' }));
+  const res = createReservations(pitchList);
+  const SZ = { S: [8, 8], M: [16, 16], L: [30, 18], XL: [56, 30], W: [40, 24] };
+  const slots = pitchList.map((p) => { const [du, dw] = SZ[p.size] || SZ.S; return { u0: p.u - du / 2, u1: p.u + du / 2, w0: p.w - dw / 2, w1: p.w + dw / 2 }; });
+  const onSlot = (u, w, rad) => slots.some((q) => u + rad > q.u0 && u - rad < q.u1 && w + rad > q.w0 && w - rad < q.w1);
+  const onStall = (u, w, rad) => stalls.some((q) => u + rad > q.u0 - 0.1 && u - rad < q.u1 + 0.1 && w + rad > q.w0 - 0.1 && w - rad < q.w1 + 0.1);
+  const free = (u, w, rad) => !res.blocksCircle(u, w, rad) && !onSlot(u, w, rad) && !onStall(u, w, rad) && inPoly(fieldPoly, u, w);
+
+  // 1. alley-edge dressing: on both edges of the two long alleys, OUTSIDE the walkway (the walking lane stays free; the NPC stalls keep the frontage strip clear for this)
+  const OFF = { table: 1.1, crates: 1.0, aframe: 0.7, bin: 0.4, banner: 0.3 };
   AL.forEach((al, ai) => {
     [0, 1].forEach((side) => {
       const rr = mulberry(seed * 31 + ai * 7 + side); let u = al.u[0] + 2 + rr() * 4;
+      const wAt = (off) => (side ? al.w[1] + off : al.w[0] - off); const yaw = side ? Math.PI : 0;      // front looks at the middle of the alley
       while (u < al.u[1]) {
-        const w = side ? al.w[1] - 0.9 - rr() * 0.5 : al.w[0] + 0.9 + rr() * 0.5; const yaw = side ? Math.PI : 0;      // front looks at the middle of the alley
         const t = rr();
         if (rr() < dens) {
-          if (t < al.tables) at(u, w, yaw + (rr() - 0.5) * 0.6, () => tableGroup(b, rr, 0, 0, 0, rr() < 0.7), 1.2);
-          else if (t < 0.55) at(u, w, yaw, () => { crateStack(b, rr, 0, 0, rr() * 0.6); barrel(b, rr, 0.9, 0.1); if (rr() < 0.5) barrel(b, rr, 1.3, -0.3, 0.7); }, 0.95);
-          else if (t < 0.72) at(u, w, yaw, () => aFrame(b, rr, 0, 0, (rr() - 0.5) * 0.5, pick(rr, BOARD_TEXT), rr() < 0.3 ? 2 : 0), 0.4);
-          else if (t < 0.86) at(u, w, yaw, () => { bin(b, 0, 0); if (rr() < 0.6) bin(b, 0.6, 0.1); }, 0.5);
-          else at(u, w, yaw, () => bannerPole(b, rr, 0, 0, side ? Math.PI : 0, pick(rr, ['FOUER', 'BIER', 'CRÊPES', 'FRITTEN', 'GLACE']), rr() < 0.35 ? 2 : 0), 0.2);
+          if (t < al.tables) { const w = wAt(OFF.table); if (free(u, w, 0.9)) at(u, w, yaw + (rr() - 0.5) * 0.6, () => tableGroup(b, rr, 0, 0, 0, rr() < 0.7), 0.9); }
+          else if (t < 0.55) { const w = wAt(OFF.crates); if (free(u, w, 0.95)) at(u, w, yaw, () => { crateStack(b, rr, 0, 0, rr() * 0.6); barrel(b, rr, 0.9, 0.1); if (rr() < 0.5) barrel(b, rr, 1.3, -0.3, 0.7); }, 0.95); }
+          else if (t < 0.72) { const w = wAt(OFF.aframe); if (free(u, w, 0.4)) at(u, w, yaw, () => aFrame(b, rr, 0, 0, (rr() - 0.5) * 0.5, pick(rr, BOARD_TEXT), rr() < 0.3 ? 2 : 0), 0.4); }
+          else if (t < 0.86) { const w = wAt(OFF.bin); if (free(u, w, 0.5)) at(u, w, yaw, () => { bin(b, 0, 0); if (rr() < 0.6) bin(b, 0.6, 0.1); }, 0.5); }
+          else { const w = wAt(OFF.banner); if (free(u, w, 0.2)) at(u, w, yaw, () => bannerPole(b, rr, 0, 0, side ? Math.PI : 0, pick(rr, ['FOUER', 'BIER', 'CRÊPES', 'FRITTEN', 'GLACE']), rr() < 0.35 ? 2 : 0), 0.2); }
         }
         u += al.gap * (0.7 + rr() * 0.8);
       }
     });
   });
 
-  // 2. cross alleys: banner poles on one edge, flag lines across every 11 m, now and then a flood mast
+  // 2. cross alleys + entrance lanes: banner poles on the kerb (outside the lane), flag lines overhead every 11 m, now and then a flood mast
   CROSS.forEach((ca, ci) => {
-    const rr = mulberry(seed * 53 + ci); const y0 = groundY(ca.u, 60);
+    const rr = mulberry(seed * 53 + ci);
+    const inLong = (w) => LONG_W.some(([a, c]) => w > a && w < c);
     for (let w = ca.w[0] + 4; w < ca.w[1]; w += 11 + rr() * 3) {
-      if (w > 49 && w < 64 || w > 23 && w < 32.5) continue;                    // the long alleys have their own strings
-      const ya = groundY(ca.u - 2.6, w); const yb = groundY(ca.u + 2.6, w);
-      b.pennants([ca.u - 3.0, ya + 4.8, w], [ca.u + 3.0, yb + 4.8, w], 12, [0xd8283a, 0xf4c430, 0x2d6fd0, 0xf6ead0, 0x2f9a58], 0.42, { sag: 0.4 }); count++;
-      if (rr() < 0.55) { const n = 8; for (let k = 0; k <= n; k++) { const t = k / n; b.bulb(lerp(ca.u - 3.0, ca.u + 3.0, t), lerp(ya, yb, t) + 4.6 - Math.sin(Math.PI * t) * 0.45, w, rr() < 0.5 ? WARM : 0xfff4d0, 0.2); } }
+      if (inLong(w)) continue;                                                // the long alleys have their own strings
+      const ya = groundY(ca.u[0] - 0.3, w); const yb = groundY(ca.u[1] + 0.3, w);
+      b.pennants([ca.u[0] - 0.3, ya + 4.8, w], [ca.u[1] + 0.3, yb + 4.8, w], 12, [0xd8283a, 0xf4c430, 0x2d6fd0, 0xf6ead0, 0x2f9a58], 0.42, { sag: 0.4 }); count++;
+      if (rr() < 0.55) { const n = 8; for (let k = 0; k <= n; k++) { const t = k / n; b.bulb(lerp(ca.u[0] - 0.3, ca.u[1] + 0.3, t), lerp(ya, yb, t) + 4.6 - Math.sin(Math.PI * t) * 0.45, w, rr() < 0.5 ? WARM : 0xfff4d0, 0.2); } }
     }
-    for (let w = ca.w[0] + 10; w < ca.w[1]; w += 31 + rr() * 8) { if (w > 49 && w < 64 || w > 23 && w < 32.5) continue; at(ca.u + (rr() < 0.5 ? -2.4 : 2.4), w, 0, () => bannerPole(b, rr, 0, 0, rr() < 0.5 ? 0 : Math.PI, pick(rr, ['FOUER', 'LOS', 'BONBONS', 'WÄIN']), 0), 0.2); }
-    if (ci % 2 === 0) at(ca.u + 3.4, ca.w[0] + 22, 0, () => floodMast(b, rr, 0, 0), 0.3);
+    for (let w = ca.w[0] + 10; w < ca.w[1]; w += 31 + rr() * 8) {
+      if (inLong(w)) continue;
+      const u = rr() < 0.5 ? ca.u[0] - 0.27 : ca.u[1] + 0.27; if (!free(u, w, 0.2)) continue;
+      at(u, w, 0, () => bannerPole(b, rr, 0, 0, rr() < 0.5 ? 0 : Math.PI, pick(rr, ['FOUER', 'LOS', 'BONBONS', 'WÄIN']), 0), 0.2);
+    }
+    if (ci % 2 === 0) { const w = ca.w[0] + 22; const u = ca.u[1] + 0.27; if (!inLong(w) && free(u, w, 0.25)) at(u, w, 0, () => floodMast(b, rr, 0, 0), 0.25); }
   });
 
   // 3. free-field filler: every free cell block of the npc occupancy grid gets tables / crates / gensets; the SE rim becomes the service lane
@@ -147,11 +168,11 @@ export function buildClutter({ T, fieldPoly, groundY, seed = 1, quality = 'mediu
       if (freeBlock(i, j, 3, 3) && rf() < 0.8 * dens) { mark(i, j, 3, 3); at(u + 3, w + 3, rf() * TAU, () => { const t = rf(); if (rim && t < 0.3) { portaloo(b, rf, 0, 0, 0); portaloo(b, rf, 1.2, 0, 0); } else if (t < 0.45) tableGroup(b, rf, 0, 0, 0, true); else if (t < 0.65) { crateStack(b, rf, 0, 0); pallet(b, rf, 1.5, 0.3, 0.2, true); barrel(b, rf, -1, 0.4); } else if (t < 0.8) { genset(b, rf, 0, 0, 0); cableRamp(b, 1.5, 0.2, 0); } else { tableGroup(b, rf, 0, 0, 0, true); crateStack(b, rf, 2.0, 0.8); } }, 1.3); continue; }
       if (freeBlock(i, j, 2, 2) && rf() < 0.7 * dens) { mark(i, j, 2, 2); at(u + 2, w + 2, rf() * TAU, () => { const t = rf(); if (t < 0.4) crateStack(b, rf, 0, 0); else if (t < 0.7) { bin(b, 0, 0); barrel(b, rf, 0.8, 0.2); } else pallet(b, rf, 0, 0, 0, true); }, 0.8); continue; }
     }
-    // fence panels along the lane edge (SE rim)
-    for (let u = 38; u < 230; u += 33 + rf() * 20) { const w = 106 + (u - 30) * 0.15; if (inPoly(fieldPoly, u, w + 2) && (!grid || !grid[Math.floor((w + 1 - W0) / CELL) * NU + Math.floor((u - U0) / CELL)])) at(u, w, 0.15, () => fencePanels(b, 0, 0, 0, 2), 0.6); }
+    // fence panels along the rim, outside the service lane (they hug the rim barrier; never across an entrance lane)
+    for (let u = 38; u < 230; u += 33 + rf() * 20) { const w = rimW(u) - 0.45; const rect = { u0: u - 0.2, u1: u + 7.2, w0: w - 0.3, w1: w + 0.3 }; if (inPoly(fieldPoly, u, w + 0.2) && !res.hits(rect, 0.2) && !onSlot(u + 3.5, w, 3.6) && !onStall(u + 3.5, w, 3.6)) at(u, w, 0.15, () => fencePanels(b, 0, 0, 0, 2), 0.6); }
   }
-  // 4. flood masts at the four corners of the Haaptallee crossings + lamps in the service lane
-  [[66, 56], [130, 56], [190, 56], [250, 56]].forEach(([u, w], i) => { if (i % 2) return; at(u + 3.5, w, 0, () => floodMast(b, r, 0, 0), 0.3); });
+  // 4. flood masts on the kerb at four crossings of the Haaptallee (outside the walkway)
+  [[HAA.u[0] + 41.2, HAA.w[1] + 0.27], [94.5 - 0.27, HAA.w[0] - 0.27], [171 - 0.27, HAA.w[1] + 0.27], [226.5 + 0.27, HAA.w[0] - 0.27]].forEach(([u, w]) => { if (free(u, w, 0.25)) at(u, w, 0, () => floodMast(b, r, 0, 0), 0.25); });
 
   const g = b.finish({ id: 'clutter', look: 0, level: 1, size: [300, 150], height: 9, kind: 'clutter' }); g.name = 'fouer-clutter';
   return { group: g, count, tris: g.userData.tris, bulbs: g.userData.bulbs, solids, boxes };

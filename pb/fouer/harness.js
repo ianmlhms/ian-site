@@ -14,6 +14,7 @@ import * as walkMod from "./walk.js";
 import * as crowdMod from "./crowd.js";
 import * as audioMod from "./audio.js";
 import * as rideMod from "./ride.js";
+import * as layout from "./layout.js";
 import { FOODIE, foodieMultiplier, createGame } from "./game.js";
 import { RIDES, STALLS } from "../park/data.js";
 import { createState as v1Create, tick as v1Tick } from "../park/sim.js";
@@ -21,6 +22,7 @@ import { canPlace as v1CanPlace, place as v1Place, placePath as v1PlacePath, KIN
 import { serializeSave as v1Serialize } from "../park/save.js";
 import { verifyLaunch } from "./harness-w7.js";
 import { verifyRides } from "./harness-rides.js";
+import { execFileSync } from "node:child_process";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const DAY_MS = 86400000;
@@ -1249,6 +1251,77 @@ function verifyI18n() {
   check(!/\bDate\.now\b|new Date\(\)/.test(fs.readFileSync(`${here}sim.js`, "utf8")), "sim.js never reads the clock");
 }
 
+// ---------------------------------------------------------------- access wave: the walkway network (layout.js)
+
+/** the validator fails loudly: every offender is named in the message */
+function verifyAccess() {
+  const pitches = PITCHES.map(pitch => ({ ...pitch }));
+  const sizeOf = pitch => SIZES[pitch.size];
+  // 1. widths, faces, forecourts, overlaps: the static checks name the pitch / alley
+  const stat = layout.validateStatic({ pitches });
+  equal(stat.errors, [], "the layout is valid: widths, pitch faces, forecourts, alleys inside the field (offenders: " + stat.errors.slice(0, 5).join(" | ") + ")");
+  const alley = id => layout.ALLEYS.find(a => a.id === id);
+  const width = a => (a.axis === "u" ? a.w[1] - a.w[0] : a.u[1] - a.u[0]);
+  check(width(alley("haaptallee")) >= 12 && width(alley("fressgaass")) >= 8, "Haaptallee 12 m, Fressgaass 8 m");
+  check(layout.ALLEYS.filter(a => a.kind === "cross" || a.kind === "lane" || a.id.startsWith("sud")).every(a => width(a) >= 7), "cross alleys, entrance lanes and the south alley are at least 7 m wide");
+  check(layout.SERVICE.width >= 5, `the SE service lane is at least 5 m wide (${layout.SERVICE.width} m)`);
+  check(layout.ENTRANCES.length === 7 && layout.ENTRANCES.every(e => layout.ALLEYS.some(a => a.id === e.lane)), "7 entrances, each one with a lane that leads in");
+  check(layout.FIELD_POLY.length === 36, "the Glacis outline is in layout.js (the fouer-access flow compares it with the baked world)");
+  // 2. forecourts: full pitch width, depth by size, touching an alley, not blocked by another pitch
+  for (const pitch of pitches) {
+    const f = layout.forecourtOf(pitch);
+    check(f.depth >= layout.FORECOURT_MIN[pitch.size], `${pitch.id}: forecourt ${f.depth} m deep (min ${layout.FORECOURT_MIN[pitch.size]} m for ${pitch.size})`);
+    const along = pitch.face === "+u" || pitch.face === "-u" ? [f.w1 - f.w0, sizeOf(pitch).w] : [f.u1 - f.u0, sizeOf(pitch).u];
+    near(along[0], along[1], 1e-9, `${pitch.id}: the forecourt is as wide as the pitch`);
+    check(f.alley !== null && f.gap <= layout.APRON_MAX, `${pitch.id} faces alley ${f.alley} (${f.gap} m away)`);
+  }
+  equal(pitches.map(layout.pitchEntrance).every(e => Number.isFinite(e.x) && Number.isFinite(e.z)), true, "every pitch has an entrance point");
+  // 3. footprints: nothing may stand on a walkway (the real NPC / clutter footprints are checked by the fouer-access flow, which builds the fair)
+  const front = pitches.find(pitch => pitch.id === "P13"), fc = layout.forecourtOf(front);
+  const mid = { u: (fc.u0 + fc.u1) / 2, w: (fc.w0 + fc.w1) / 2 };
+  const bad = layout.validateFootprints({ pitches, stalls: [{ k: "trailer", u0: mid.u - 2, u1: mid.u + 2, w0: mid.w - 1.5, w1: mid.w + 1.5 }] });
+  check(bad.length === 1 && /forecourt-P13|haaptallee/.test(bad[0]), "a stall in front of the Autoscooter pitch is reported with its zone: " + bad.join(" | "));
+  check(layout.validateFootprints({ pitches, stalls: [{ k: "x", u0: 10, u1: 14, w0: 45, w1: 49 }], solids: [{ u: 80, w: 56, r: 0.3 }] }).length === 1, "a bin in the middle of the Haaptallee is reported");
+  equal(layout.validateFootprints({ pitches, solids: [{ u: 120, w: 49.73, r: 0.24 }, { u: 120, w: 62.27, r: 0.24 }] }), [], "lamp posts on the kerb line (0.27 m outside the alley edge) are allowed");
+  check(layout.validateFootprints({ pitches, solids: [{ u: 120, w: 62.6, r: 0.5 }] }).length > 0, "a fat solid on the kerb line is not kerb furniture");
+  check(layout.validateStallFaces({ stalls: [{ k: "trailer", f: "-w", u0: 20, u1: 25, w0: 46, w1: 48.8 }] }).length === 1, "a stall at the Haaptallee that turns its back to it is reported");
+  // 4. a layout that breaks the rules is rejected, naming the culprit
+  const wrongFace = layout.validateStatic({ pitches: pitches.map(p => (p.id === "P13" ? { ...p, face: "+w" } : p)) });
+  check(wrongFace.errors.some(e => /P13/.test(e)), "a pitch that faces away from its alley is named: " + wrongFace.errors.join(" | "));
+  const moved = layout.validateStatic({ pitches: pitches.map(p => (p.id === "P07" ? { ...p, u: 62 } : p)) });
+  check(moved.errors.some(e => /P07/.test(e)), "a pitch pushed onto the Riserad passage is named: " + moved.errors.join(" | "));
+  const narrow = layout.validateStatic({ pitches, alleys: layout.ALLEYS.map(a => (a.id === "haaptallee" ? { ...a, w: [52, 60] } : a)) });
+  check(narrow.errors.some(e => /haaptallee/.test(e)), "a Haaptallee that is only 8 m wide is rejected: " + narrow.errors.slice(0, 2).join(" | "));
+  // 5. the walk mask: breadth-first search from every open entrance reaches every pitch front for the fresh fair, star 3 and the full fair
+  const full = layout.validateLayout({ pitches, createMask: walkMod.createMask, pitchSolids: walkMod.pitchSolids, stars: [1, 2, 3, 4, 5] });
+  equal(full.errors, [], "every pitch front is reachable from every open entrance at every star (offenders: " + full.errors.slice(0, 4).join(" | ") + ")");
+  section.access = { entrances: layout.ENTRANCES.length, reach: full.stats.reach };
+  const wall = layout.validateLayout({ pitches, stalls: [{ k: "wall", u0: 94, u1: 102, w0: 49, w1: 63 }, { k: "wall", u0: 56, u1: 68, w0: 49, w1: 63 }], createMask: walkMod.createMask, pitchSolids: walkMod.pitchSolids, stars: [1] });
+  check(!wall.ok && wall.errors.some(e => /not reachable|blocked/.test(e)), "a wall of stalls across the Haaptallee makes pitches unreachable and the validator says which: " + wall.errors.slice(0, 2).join(" | "));
+  const noSw = layout.validateLayout({ pitches, createMask: walkMod.createMask, pitchSolids: walkMod.pitchSolids, stars: [5], entrances: layout.ENTRANCES.filter(e => e.id !== "E1") });
+  equal(noSw.errors, [], "the fair is also walkable without the SW entrance");
+  // 6. the corridors handed to the crowd graph follow the alleys
+  const cor = layout.corridors();
+  check(cor.length === layout.ALLEYS.length + 1 && cor.every(c => c.name && c.u && c.w), "corridors() lists every alley plus the service lane");
+  check(cor.filter(c => c.line).every(c => c.line.length === 2), "cross alleys and the service lane hand their centre line to the crowd graph");
+  const raster = layout.rasterZones(pitches, { cell: 1, u0: 0, w0: -10, nu: 300, nw: 160 });
+  const cell = (u, w) => raster.data[Math.floor(w - raster.w0) * raster.nu + Math.floor(u - raster.u0)];
+  check((cell(150, 56) & 1) === 1 && (cell(150, 60) & 2) === 2 && cell(135, 28) === 1 && cell(150, 75) === 0, "the zone raster marks alleys and forecourts (wear shader, packer)");
+}
+
+
+/** the REAL NPC fair, props and clutter (models/npc.js, props.js, clutter.js) built in a child process with a stand-in THREE (harness-access.js): no footprint on a walkway for three seeds / both qualities,
+ * every stall at an alley faces it, and the walker still reaches every pitch front with all of it in the way */
+function verifyAccessBuilt() {
+  const raw = execFileSync(process.execPath, [`${here}harness-access.js`], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const line = raw.split("\n").find(row => row.startsWith("ACCESS-JSON "));
+  check(Boolean(line), "harness-access.js reports");
+  const out = JSON.parse(line.slice("ACCESS-JSON ".length));
+  for (const [name, errors] of Object.entries(out.errors)) equal(errors.slice(0, 8), [], `${name}: no NPC stall, prop or clutter footprint on an alley, forecourt or entrance lane; stalls at an alley face it; every pitch reachable (${errors.length} offenders)`);
+  for (const run of out.runs) check(run.stalls > 150, `seed ${run.seed} ${run.quality}: the fair is still dense (${run.stalls} stalls, ${run.solids} solids)`);
+  section.accessBuilt = { runs: out.runs, reach: out.reach };
+}
+
 // ---------------------------------------------------------------- main
 
 function syncPitches() {
@@ -1449,6 +1522,7 @@ async function run() {
   if (process.argv.includes("--sync-pitches")) { syncPitches(); return; }
   verifyData();
   verifyPitches();
+  verifyAccess();
   verifyCalendar();
   verifyBasics();
   verifyTutorial();
@@ -1466,6 +1540,7 @@ async function run() {
   await verifyRides({ check, equal, near });
   await verifyWalk();
   await verifyLaunch({ check, equal, near, lux, deepFreeze });
+  verifyAccessBuilt();
   if (process.argv.includes("--table")) printTable();
   const p = section.pacing;
   console.log(`PASS: ${checks} checks; stars at ${p.starMinutes[2]}/${p.starMinutes[3]}/${p.starMinutes[4]}/${p.starMinutes[5]} min; save ${section.saveSizes.json} B JSON, ${section.saveSizes.jsonb} B jsonb.`);
