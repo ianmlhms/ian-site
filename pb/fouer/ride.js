@@ -1,6 +1,6 @@
 /* Schueberfouer Tycoon W6 "Ride" + the Rides wave: every ride attraction can be ridden from the walk (DESIGN section 5).
  *
- *   Wheel (W6): interact on the boarding platform -> fade -> the camera sits in a gondola eye (ud.gondolaAnchor(i); that gondola is hidden), the wheel runs at
+ *   Wheel (W6): interact on the boarding platform -> fade -> the camera sits in the seated eye of a gondola (ud.gondolaAnchor(i); that gondola is hidden, rides/cabin.js puts its interior around you), the wheel runs at
  *          6x for two revolutions (about 40 s; the pioneers' free "Probefahrt" is three revolutions = 60 s on a temporary wheel), free look by dragging,
  *          the cabin is upright by construction -> fade -> back on the platform. First completed ride = the stamp "Op der Spëtzt" (flag 'r' in the save).
  *   Rides wave: rides/catalog.js says what each attraction is (seat ride on an animated seat of the model, coaster, flume, ghost train, bumper cars) and
@@ -12,6 +12,7 @@ import { RIDE_DEFS, defOf, flagOf, isHigh } from "./rides/catalog.js";
 import { createSeatRig, createTrackRig } from "./rides/rigs.js";
 import { createGhostRig } from "./rides/ghost.js";
 import { createDriveRig } from "./rides/drive.js";
+import { createCabin, CABIN_LOOK } from "./rides/cabin.js";
 import { createFx } from "./rides/fx.js";
 import { createRideSound } from "./rides/sound.js";
 import { readReduceMotion, writeReduceMotion } from "./rides/settings.js";
@@ -22,7 +23,8 @@ const WHEEL_SPEED = 6;
 const WHEEL_REVS = 2;
 const PROBE_REVS = 3;
 const FADE_MS = 420;
-const EYE_OUT = 2.1;                                     // metres in front of the cabin centre (the rim is at 1.15)
+const WHEEL_SPEED_CALM = 4;                              // cruise speed of the wheel with the reduce-motion option (x of the normal speed)
+const CABIN_NEAR = 0.08;                                // near plane inside the cabin (the walk's 0.2 would clip the bench and the safety bar)
 const SPEED_UP_AT = 0.07, SLOW_DOWN_AT = 0.9;           // share of the ride where the wheel is still speeding up / already slowing
 export const FLAG_RIDDEN = "r";                         // save flag: "Op der Spëtzt" stamp earned
 export const FLAG_PROBE = "p";                          // save flag: the pioneers' free Probefahrt was used
@@ -30,17 +32,17 @@ export const FLAG_PROBE = "p";                          // save flag: the pionee
 export { readReduceMotion, writeReduceMotion };
 
 /** wheel speed over the ride progress p (0..1): ease in, cruise at 6x, ease out to 2x for the landing (pure, harness-tested) */
-export function wheelSpeedAt(p) {
+export function wheelSpeedAt(p, calm = false) {
   const up = clamp(p / SPEED_UP_AT, 0, 1), down = clamp((1 - p) / (1 - SLOW_DOWN_AT), 0, 1);
   const k = Math.min(up * up * (3 - 2 * up), down * down * (3 - 2 * down));
-  return 1.5 + (WHEEL_SPEED - 1.5) * k;
+  return 1.5 + ((calm ? WHEEL_SPEED_CALM : WHEEL_SPEED) - 1.5) * k;
 }
 
 export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = null, rects, faces, getWalk, getFairTime, translate }) {
   const wheelPitch = PITCHES.findIndex(p => p.size === "W");
   const T_ = (key, params) => translate(ui.lang, key, params);
   let speedup = 1;                                         // tests only: run the rides faster so the full ride fits a flow
-  const st = { active: false, kind: null, id: null, def: null, phase: "idle", ud: null, pitch: -1, gondola: 0, startAngle: 0, travelled: 0, lastAngle: 0, time: 0, total: 1, speed0: 1, probe: null, frame: null, ridden: false, peak: 0, rig: null, aborted: false, completed: false, look: null };
+  const st = { active: false, kind: null, id: null, def: null, phase: "idle", ud: null, pitch: -1, gondola: 0, startAngle: 0, travelled: 0, lastAngle: 0, time: 0, total: 1, speed0: 1, probe: null, frame: null, cabin: null, near: null, ridden: false, peak: 0, rig: null, aborted: false, completed: false, look: null };
   const frameOut = { position: new T.Vector3(), forward: new T.Vector3(0, 0, 1), up: new T.Vector3(0, 1, 0) };
   const rgt = new T.Vector3();
   const snd = createRideSound(audio);
@@ -59,10 +61,11 @@ export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = 
     return null;
   }
 
+  /** the camera is the seated eye of the ridden gondola (inside its first-person cabin, which is placed on the same anchor, so both follow the gondola exactly) */
   function frameOfWheel() {
     const a = st.ud.gondolaAnchor(st.gondola);
-    // the eye sits just outside the front rim (the cabin is hidden): from inside the rim plane the rim and spokes would fill the view
-    frameOut.position.copy(a.eye).addScaledVector(a.forward, EYE_OUT); frameOut.forward.copy(a.forward); frameOut.up.set(0, 1, 0);
+    if (st.cabin) st.cabin.place(a, st.ud.nightK ?? 0);
+    frameOut.position.copy(a.eye); frameOut.forward.copy(a.forward); frameOut.up.set(0, 1, 0);
     return frameOut;
   }
   /** the frame of a rig plus the camera shake (screen-shake of a landing, hits, rattles); the reduce-motion option damps it */
@@ -108,8 +111,13 @@ export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = 
       st.speed0 = ud.ride.speed;
       st.lastAngle = ud.ride.angle();
       st.total = (opts.revs ?? WHEEL_REVS) * TAU;
-      ud.ride.setGondolaVisible(st.gondola, false);
-      ud.ride.speed = wheelSpeedAt(0);
+      calmNow = readReduceMotion();
+      ud.ride.setGondolaVisible(st.gondola, false);                      // the ridden gondola's outside is hidden: its first-person cabin takes its place
+      ud.ride.speed = wheelSpeedAt(0, calmNow);
+      st.cabin = createCabin(T, ud.gondolaStyle);
+      r.scene.add(st.cabin.group);
+      st.cabin.place(ud.gondolaAnchor(st.gondola), ud.nightK ?? 0); st.cabin.show();
+      st.near = r.camera.near; r.camera.near = CABIN_NEAR; r.camera.updateProjectionMatrix();
       st.frame = frameOfWheel;
     } else {
       calmNow = readReduceMotion();
@@ -142,6 +150,8 @@ export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = 
     st.phase = "fadeIn";
     if (!instant) await walk.fade(1, FADE_MS);
     if (st.kind === "wheel" && st.ud) { st.ud.ride.setGondolaVisible(st.gondola, true); st.ud.ride.speed = st.speed0 || 1; }
+    if (st.cabin) { st.cabin.dispose(); st.cabin = null; }
+    if (st.near !== null) { r.camera.near = st.near; r.camera.updateProjectionMatrix(); st.near = null; }
     if (st.rig) { try { st.rig.stop(); } catch (error) { console.warn("[fouer] ride cleanup failed", error); } }
     if (fx) fx.hide();
     snd.stopBed();
@@ -185,7 +195,7 @@ export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = 
       let d = angle - st.lastAngle; if (d < -Math.PI) d += TAU; if (d < 0) d = 0;
       st.travelled += d; st.lastAngle = angle;
       const p = clamp(st.travelled / st.total, 0, 1);
-      ud.ride.speed = wheelSpeedAt(p) * speedup;
+      ud.ride.speed = wheelSpeedAt(p, calmNow) * speedup;
       audio.setWind(clamp(ud.ride.speed / WHEEL_SPEED, 0, 1) * clamp((ud.gondolaAnchor(st.gondola).eye.y - 8) / 45, 0.15, 1));
       if (st.travelled >= st.total - 0.02) finish();
     } else if (st.rig) {
@@ -237,6 +247,10 @@ export function createRide({ T, r, world, fair, game, scene, ui, audio, crowd = 
     get steering() { return st.active && st.kind === "drive"; },
     get progress() { return st.kind === "wheel" ? (st.total ? clamp(st.travelled / st.total, 0, 1) : 0) : (st.rig ? st.rig.progress : 0); },
     get peakHeight() { return st.peak; },
+    /** the drag-look range of the ride (relative to the seat): inside the wheel's cabin the head turns about 100 degrees each way; null = the walk's own limits */
+    get lookLimits() { return st.active && st.kind === "wheel" ? CABIN_LOOK : null; },
+    /** tests only: the first-person cabin of the wheel ride (null outside the ride) */
+    get cabin() { return st.cabin; },
     get fx() { return fx; },
     /** tests only: the running rig (the bumper-car rig exposes `sim`) */
     get rig() { return st.rig; },

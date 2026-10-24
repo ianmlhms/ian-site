@@ -6,7 +6,7 @@ import { makeKit, rng, clamp, lerp, bulb, festoon, railing, padSlab, pennant, sh
 import { buildTrackRide } from './coaster-kit.js';
 import { litSign, ticketBooth, nameOf, GOLD, DARK, collar } from './coaster-props.js';
 
-const PAL = [
+export const PAL = [
   { fascia: 0x8a1c2a, fasciaB: 0xefe3c2, trim: 0xe7b53b, barrier: [0xb8212e, 0xefe3c2], rail: 0xe7b53b, floor: 0x2e3542, floorGlow: [[0.5, 0.2, 1], [0.1, 0.55, 1]], uv: [0.55, 0.25, 1], bulbs: [[1, 0.85, 0.5], [1, 0.45, 0.2]], sign: [1, 0.6, 0.15], board: 0x2a1220, wall: [0x5a2a8a, 0x2aa0d0, 0xe83a8a],
     booth: 0xefe3c2, boothRoof: 0xa2272b, beam: 0x6c747c, carCols: [0x9fb4c8, 0x9fcdb0, 0xd9a0a0, 0xb6a0d8, 0xe8c060], carAcc: [0xf08a22, 0xe3242b, 0x2f6fe0, 0xf2c80c], pole: [0xb8212e, 0xefe3c2], flag: 0x2d4fa0, led: [[1, 0.5, 0.15], [1, 0.9, 0.5]] },
   { fascia: 0x2a1a66, fasciaB: 0x120a30, trim: 0x40e8ff, barrier: [0x35e6ff, 0xc7168e], rail: 0x40e8ff, floor: 0x1c2038, floorGlow: [[0.1, 0.9, 1], [1, 0.1, 0.8]], uv: [0.6, 0.2, 1], bulbs: [[0.2, 0.9, 1], [1, 0.2, 0.85]], sign: [0.2, 0.95, 1], board: 0x0c0820, wall: [0x2a1a90, 0x35e6ff, 0xff5ac0],
@@ -19,7 +19,7 @@ const PAL = [
 const FL = { x0: -13.5, x1: 13.5, z0: -8.1, z1: 5.6 };
 const HALL = { x: 14.2, zBack: -8.8, zFront: 8.3 };
 const PORCH_Z0 = 5.9;                   // the roofed porch with the cash booths starts here (it was 4.4)
-const CEIL = 3.9; const FLOOR_Y = 0.45;
+export const CEIL = 3.9; export const FLOOR_Y = 0.45;
 const PERIOD = 48;
 const UV_Z = [0.125, 0.375, 0.625, 0.875].map((k) => FL.z0 + k * (FL.z1 - FL.z0));       // the four UV light bars over the floor (rides/drive.js lays its bulb rows under the same ones)
 
@@ -171,6 +171,13 @@ function buildStatic(b, cfg, near, name) {
 }
 function chase(K, geo, handles, t, k) {
   for (const h of handles.lamps) { const w = (((t * 1.4 - h.k / (h.kind === 'fascia' ? 14 : 12)) % 1) + 1) % 1; const f = 0.3 + 0.7 * Math.pow(1 - w, 2); const c = handles.led[h.k % 2]; K.setLamp(geo, h.s, h.n, [c[0] * f, c[1] * f, c[2] * f]); }
+}
+
+/** rides/scooter-cars.js: the cars of the ride's own interior (same car, riders and pole as the hall model's cars): one geometry, a vertex range per car (K.dynamic moves them) */
+export function buildRideCars(K, { look = 0, count = 8 } = {}) {
+  const pal = PAL[clamp(look | 0, 0, 2)]; const b = K.builder(); const ranges = [];
+  for (let j = 0; j < count; j++) { const v0 = b.count; carBody(b, true, pal.carCols[j % pal.carCols.length], pal.carAcc[j % pal.carAcc.length], pal, true, j + 1); ranges.push([v0, b.count - v0]); }
+  return { geometry: b.geometry(), ranges, pal };
 }
 
 function build(opts = {}) {

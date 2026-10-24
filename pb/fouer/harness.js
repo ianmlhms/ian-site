@@ -14,6 +14,7 @@ import * as walkMod from "./walk.js";
 import * as crowdMod from "./crowd.js";
 import * as audioMod from "./audio.js";
 import * as rideMod from "./ride.js";
+import { CABIN_LOOK } from "./rides/cabin.js";
 import * as layout from "./layout.js";
 import { auditFloating } from "./float-audit.js";
 import { FOODIE, foodieMultiplier, createGame } from "./game.js";
@@ -1513,6 +1514,13 @@ async function verifyWalk() {
   let probe = 0;
   for (let i = 0; i < steps; i++) { const p = (i + 0.5) / steps; probe += (6 * Math.PI / steps) / (2 * Math.PI / 120 * wheelSpeedAt(p)); }
   check(probe > 55 && probe < 72, `the Probefahrt (3 revolutions) takes ${probe.toFixed(1)} s (about 60 s)`);
+  // reduce motion: the same ease in / out, a lower cruise (4x), a longer ride; the default is unchanged
+  check(wheelSpeedAt(0, true) === 1.5 && Math.abs(wheelSpeedAt(0.5, true) - 4) < 1e-9 && wheelSpeedAt(1, true) === 1.5 && wheelSpeedAt(0.5, false) === wheelSpeedAt(0.5), "wheel with reduce motion: same ease, cruise at 4x");
+  let calmSeconds = 0;
+  for (let i = 0; i < steps; i++) { const p = (i + 0.5) / steps; calmSeconds += (4 * Math.PI / steps) / (2 * Math.PI / 120 * wheelSpeedAt(p, true)); }
+  check(calmSeconds > seconds * 1.2 && calmSeconds < 75, `two revolutions with reduce motion take ${calmSeconds.toFixed(1)} s (longer than ${seconds.toFixed(1)} s)`);
+  // the free look in the gondola's cabin: about 100 degrees each way, more down than up, never behind the seat
+  check(CABIN_LOOK.yaw > 1.5 && CABIN_LOOK.yaw < 2.0 && CABIN_LOOK.pitchDown < -0.6 && CABIN_LOOK.pitchUp > 0.6 && CABIN_LOOK.pitchUp < 1.2, "cabin look limits: yaw +-100 degrees, pitch -48 .. +55 degrees");
 
   // ---- Foodie: a multiplier through the economy's own `bonus`, sim.js untouched
   equal(foodieMultiplier(0), 1, "no Foodie stacks: x1");

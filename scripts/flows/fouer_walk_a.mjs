@@ -282,6 +282,11 @@ export async function builderRideChecks(h) {
     await page.waitForFunction(() => window.__fouerGame.ride.active && window.__fouerGame.ride.phase === "riding", null, { timeout: 15000 }).catch(() => {});
     const during = await cam();
     h.expect(during.walking && during.riding && during.from, `${ride.k}: tapping it fades into the ride (riding, started from the builder)`);
+    if (ride.k === "wheel") {
+      // the first-person cabin also exists when the ride starts from the builder view: the camera sits in the gondola's box, the shell on its anchor
+      const c = await evalG(page, g => { const i = g.ride.info(), ud = g.fair.pits.get("P24").near.userData, a = ud.gondolaAnchor(i.gondola), cab = g.ride.cabin; return { inBox: a.box.clone().expandByScalar(1e-4).containsPoint(g.r.camera.position), shell: Boolean(cab && cab.group.visible && cab.group.position.distanceTo(a.position) < 1e-3) }; });
+      h.expect(c.inBox && c.shell, "wheel: from the builder view too the camera sits inside the gondola and its cabin shell is around it");
+    }
     if (n === 1) await h.shot("builder-ride-riding");
     if (ride.k === "kette") {
       await sleep(1800);

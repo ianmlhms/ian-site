@@ -1,10 +1,18 @@
-/* Autoscooter ride (rides wave): you drive bumper car 0 on the hall floor for about a minute (WASD / arrows / joystick), the other cars are driven by the AI of
- * rides/bumper.js. The hall model calls ud.drive(j, matrix) for every car while this rig runs. Hits shake the camera, flash the screen, play a bump and
- * throw sparks from the poles at the ceiling grid. */
+/* Autoscooter ride (rides wave, "bigger inside"): you drive bumper car 0 for about a minute (WASD / arrows / joystick) in the ride's own interior hall, 40 x 22 m
+ * (rides/scooter-hall.js), the other cars (player + 7, every one with a rider) are driven by the AI of rides/bumper.js.  The hall on the map keeps its L pitch (30 x 18 m);
+ * while this rig runs the interior stands in the model's frame on its own camera layer, so the real map is not drawn at all (the camera sees layer LAYER only).
+ * Hits shake the camera, flash the screen, play a bump and throw sparks from the poles at the ceiling grid. */
 import { createBumper } from "./bumper.js";
 import { createSmoother } from "./rigs.js";
-import { makeBuilder, makeTexBuilder, glowTexture, steelFloorTexture, airbrushTexture } from "./mesh.js";
+import { makeBuilder } from "./mesh.js";
+import { buildScooterHall, HALL } from "./scooter-hall.js";
+import { createFleet } from "./scooter-cars.js";
+import { PAL } from "../models/hall-scooter.js";
 
+/** the interior lives on this camera layer; the camera shows nothing else while the ride runs */
+export const RIDE_LAYER = 6;
+/** the player's car + 7 AI cars (the real hall has 10 - 12 on its smaller floor: this one is meant to feel roomy) */
+export const RIDE_CARS = 8;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 /** the driver's eye in the car's frame (metres): 1.5 above the floor, 0.42 behind the car centre (over the seat), looking a little down.  The wheel (CENTER, R 0.115) is 0.72 m ahead and 0.38 m
  * below the eye, so it fills about 18 % of the screen height at the bottom (the old 0.21 m wheel 0.67 m in front of a 1.25 m eye took half the screen); the bonnet is a slim band behind it. */
@@ -12,45 +20,21 @@ const EYE_UP = 1.5, EYE_BACK = 0.42, PITCH = -0.05;
 export const WHEEL = { center: [0, 1.1, 0.32], r: 0.09, ax: [1, 0, 0], ay: [0, 0.87, 0.5], maxTurn: 0.95 };
 
 export function createDriveRig(env) {
-  const { T, ud, def, id, fx, snd, audio, calm, walk, group } = env;
-  const floor = ud.floor, floorY = ud.floorY ?? 0.45, ceilY = ud.ceilY ?? 3.9;
-  const sim = createBumper({ floor, count: ud.carCount ?? 8, seed: (env.pitch | 0) + 11 });
+  const { T, ud, def, id, fx, snd, calm, walk, group, r } = env;
+  const floor = HALL.floor, floorY = ud.floorY ?? 0.45, ceilY = ud.ceilY ?? 3.9;
+  const sim = createBumper({ floor, count: RIDE_CARS, seed: (env.pitch | 0) + 11 });
   const out = { position: new T.Vector3(), forward: new T.Vector3(0, 0, 1), up: new T.Vector3(0, 1, 0) };
   const smoother = createSmoother(T);
-  const st = { rt: 0, over: false, zap: 1, bumps: 0, input: { throttle: 0, steer: 0 }, bob: 0 };
-  const tmp = new T.Vector3(), tmpF = new T.Vector3();
+  const st = { rt: 0, over: false, zap: 1, bumps: 0, input: { throttle: 0, steer: 0 }, bob: 0, started: false };
+  const tmp = new T.Vector3(), tmpF = new T.Vector3(), carM = new T.Matrix4();
   let sparks = null, sparkPos = null, sparkLife = null;
-  const extras = [];                                  // everything this rig adds to the model group (removed in stop())
+  const root = new T.Group(); root.name = "scooter-interior";        // the interior, in the hall model's frame, as a child of the scene (not of the model: the map is not drawn)
   const mats = [];
-  let cockpit = null, bulbs = null, wheelG = null, wheelAxis = null, wheelAngle = 0;
+  let cockpit = null, wheelG = null, wheelAxis = null, wheelAngle = 0, hall = null, fleet = null, layerMask = null, exposure = null, offFrame = null;
   const carc = ud.carColors ?? { body: 0x9fb4c8, acc: 0xf08a22, pole: [0xb8212e, 0xefe3c2], uv: [0.55, 0.25, 1] };
+  const look = ud.tier ? ud.tier.look : 0;
   const basic = o => { const m = new T.MeshBasicMaterial({ fog: false, ...o }); mats.push(m); return m; };
-  const add = o => { group.add(o); extras.push(o); return o; };
-
-  /** the hall, brighter and festive: a real dark-steel floor (plates, scuffs, sheen of the light bars and the UV pools), airbrush / mirror walls, rows of bulbs under the ceiling and on the barrier */
-  function buildHall() {
-    const fl = ud.floor, w = fl.x1 - fl.x0 + 0.6, d = fl.z1 - fl.z0 + 0.6;
-    const floorTex = steelFloorTexture(T); mats.push(floorTex);
-    const floorMesh = new T.Mesh(new T.PlaneGeometry(w, d), basic({ map: floorTex }));
-    floorMesh.rotation.x = -Math.PI / 2; floorMesh.position.set((fl.x0 + fl.x1) / 2, floorY + 0.012, (fl.z0 + fl.z1) / 2); floorMesh.name = "ride-floor"; add(floorMesh);
-    // side walls: an airbrush mural on one, a mirror wall on the other
-    const tb = [makeTexBuilder(T), makeTexBuilder(T)]; const y0 = floorY + 0.35, y1 = ceilY + 0.15, xs = [fl.x0 - 0.75, fl.x1 + 0.75];
-    const walls = [airbrushTexture(T, "fun", 3), airbrushTexture(T, "mirror", 5)]; walls.forEach(t => mats.push(t));
-    tb[0].quad([xs[0], y0, fl.z1], [xs[0], y0, fl.z0], [xs[0], y1, fl.z0], [xs[0], y1, fl.z1], 0, 0, 1, 1);
-    tb[1].quad([xs[1], y0, fl.z0], [xs[1], y0, fl.z1], [xs[1], y1, fl.z1], [xs[1], y1, fl.z0], 0, 0, 1, 1);
-    tb.forEach((b, i) => { const m = b.mesh(basic({ map: walls[i], side: T.DoubleSide })); m.name = "ride-wall"; add(m); });
-    // bulbs: three rows under the light bars, a row along the barrier rail
-    const pos = [], col = [], c = new T.Color(); const palette = [0xfff0c0, 0xff6ad0, 0x6ae8ff, 0xffd060];
-    const push = (x, y, z, k) => { pos.push(x, y, z); c.set(palette[k % palette.length]); col.push(c.r, c.g, c.b); };
-    let n = 0;
-    for (const k of [0.125, 0.375, 0.625, 0.875]) for (const dz of [-0.55, 0.55]) for (let x = fl.x0 + 0.4; x <= fl.x1 - 0.4; x += 0.55) push(x, ceilY - 0.12, fl.z0 + k * (fl.z1 - fl.z0) + dz, n++);       // under the four UV bars of the hall model
-    for (let x = fl.x0; x <= fl.x1; x += 0.5) { push(x, floorY + 1.32, fl.z0 - 0.05, n++); if (Math.abs(x) > 2) push(x, floorY + 1.32, fl.z1 + 0.05, n++); }
-    for (let z = fl.z0; z <= fl.z1; z += 0.5) { push(fl.x0 - 0.05, floorY + 1.32, z, n++); push(fl.x1 + 0.05, floorY + 1.32, z, n++); }
-    const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(new Float32Array(pos), 3)); g.setAttribute("color", new T.BufferAttribute(new Float32Array(col), 3));
-    const gt = glowTexture(T); mats.push(gt);
-    bulbs = new T.Points(g, new T.PointsMaterial({ size: 0.26, map: gt, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false })); mats.push(bulbs.material);
-    bulbs.frustumCulled = false; bulbs.name = "ride-bulbs"; bulbs.renderOrder = 4; add(bulbs);
-  }
+  const add = o => { root.add(o); return o; };
 
   /** your own car in first person (car 0 of the model is hidden): a slim sloping bonnet with a stripe, the dashboard, the rubber bumper ring, a small steering wheel (it turns with the stick),
    * your two hands in orange sleeves on the rim, the pole behind.  Everything below the horizon line of the screen's bottom fifth. */
@@ -105,7 +89,7 @@ export function createDriveRig(env) {
     g.fillStyle = grad; g.fillRect(0, 0, 32, 32);
     const mat = new T.PointsMaterial({ size: 1.0, map: new T.CanvasTexture(c), transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false, color: 0xcfe4ff });
     sparks = new T.Points(geo, mat); sparks.frustumCulled = false; sparks.name = "ride-sparks"; sparks.renderOrder = 5;
-    group.add(sparks);
+    root.add(sparks);
   }
   function updateSparks(dt) {
     const poleTop = ceilY - floorY - 0.1;
@@ -126,25 +110,57 @@ export function createDriveRig(env) {
     st.bob += dt * (6 + c.speed * 2);
     const bob = calm() ? 0 : Math.sin(st.bob) * 0.012 * clamp(c.speed / 5, 0, 1);
     const fx_ = Math.sin(c.yaw), fz_ = Math.cos(c.yaw);
-    group.updateWorldMatrix(true, false);
-    tmp.set(c.x - fx_ * EYE_BACK, floorY + EYE_UP + bob, c.z - fz_ * EYE_BACK).applyMatrix4(group.matrixWorld);
-    tmpF.set(fx_, PITCH, fz_).normalize().transformDirection(group.matrixWorld);
+    tmp.set(c.x - fx_ * EYE_BACK, floorY + EYE_UP + bob, c.z - fz_ * EYE_BACK).applyMatrix4(root.matrixWorld);
+    tmpF.set(fx_, PITCH, fz_).normalize().transformDirection(root.matrixWorld);
     out.position.copy(tmp); out.forward.copy(tmpF);
     // lean into the corner a little (roll the up vector sideways): lateral slip of the tyres
     const lean = calm() ? 0 : clamp(-c.slip * 0.015, -0.08, 0.08);
-    out.up.set(Math.cos(c.yaw) * lean, 1, -Math.sin(c.yaw) * lean).transformDirection(group.matrixWorld);
+    out.up.set(Math.cos(c.yaw) * lean, 1, -Math.sin(c.yaw) * lean).transformDirection(root.matrixWorld);
     smoother.apply(out, dt, calm() ? 0.18 : 0.03);
+  }
+  function poseCars() {
+    for (let j = 1; j < sim.cars.length; j++) { const c = sim.cars[j]; carM.makeRotationY(c.yaw); carM.setPosition(c.x, floorY, c.z); fleet.set(j, carM); }
+    fleet.commit();
+  }
+  /** the interior is built while the screen is black (ride.js fades first); nothing of the map is drawn from here on */
+  function build() {
+    group.updateWorldMatrix(true, false);
+    group.matrixWorld.decompose(root.position, root.quaternion, root.scale);
+    const title = String(env.T_("item.scooter")).toUpperCase();
+    hall = buildScooterHall(T, { pal: fleetPal(), floorY, ceilY, title, calm });
+    root.add(hall.group);
+    fleet = createFleet(T, { look, count: sim.cars.length }); fleet.hide(0); root.add(fleet.mesh);
+    buildCockpit(); makeSparks();
+    r.scene.add(root); root.updateMatrixWorld(true);
+    root.traverse(o => o.layers.set(RIDE_LAYER));
+    layerMask = r.camera.layers.mask; r.camera.layers.set(RIDE_LAYER);
+    exposure = r.renderer.toneMappingExposure; r.renderer.toneMappingExposure = 1;
+    offFrame = r.on("frame", () => { r.renderer.toneMappingExposure = 1; });         // after the sky module (it changes the exposure with the hour, also during the fades): the hall is lit by itself
+  }
+  const fleetPal = () => PAL[Math.max(0, Math.min(2, look | 0))];
+  function release() {
+    if (offFrame) { offFrame(); offFrame = null; }
+    if (layerMask !== null) { r.camera.layers.mask = layerMask; layerMask = null; }
+    if (exposure !== null) { r.renderer.toneMappingExposure = exposure; exposure = null; }
+    if (root.parent) root.parent.remove(root);
+    if (sparks) { sparks.geometry.dispose(); sparks.material.map.dispose(); sparks.material.dispose(); sparks = null; }
+    if (hall) { hall.dispose(); hall = null; }
+    if (fleet) { fleet.dispose(); fleet = null; }
+    root.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    mats.forEach(m => m.dispose()); mats.length = 0;
   }
   return {
     kind: "drive", id,
     start() {
-      if (ud.setAnimated) ud.setAnimated(true); if (ud.setLOD) ud.setLOD(1);
-      ud.drive = (j, m) => { const c = sim.cars[j]; if (!c || j === 0) return false; m.makeRotationY(c.yaw); m.setPosition(c.x, floorY, c.z); return true; };      // car 0 is drawn by the cockpit
-      buildHall(); buildCockpit(); makeSparks();
-      snd.startBed("scooter"); snd.startMusic();
-      frameOf(0);
-      fx.hint(env.T_("drive.hint"), 8);
-      fx.score(env.T_("drive.score", { n: 0 }));
+      try {
+        build();
+        poseCars();
+        snd.startBed("scooter"); snd.startMusic();
+        frameOf(0);
+        fx.hint(env.T_("drive.hint"), 8);
+        fx.score(env.T_("drive.score", { n: 0 }));
+        st.started = true;
+      } catch (error) { release(); throw error; }
     },
     update(dt) {
       if (st.over) return true;
@@ -162,6 +178,8 @@ export function createDriveRig(env) {
       const p = sim.cars[0];
       snd.setBed(clamp(p.speed / 6.4, 0, 1), clamp(p.speed / 12, 0, 0.5));
       updateSparks(dt);
+      poseCars();
+      hall.update(st.rt);
       frameOf(dt);
       cockpit.position.set(p.x, floorY, p.z); cockpit.rotation.y = p.yaw;
       wheelAngle += (st.input.steer * WHEEL.maxTurn - wheelAngle) * clamp(dt * 9, 0, 1); if (wheelG) wheelG.quaternion.setFromAxisAngle(wheelAxis, wheelAngle);       // the wheel follows the stick
@@ -173,14 +191,13 @@ export function createDriveRig(env) {
     get progress() { return clamp(st.rt / def.dur, 0, 1); },
     get left() { return Math.max(0, def.dur - st.rt); },
     get speed() { return sim.cars[0].speed; },
-    debug() { const c = sim.cars[0]; return { x: c.x, z: c.z, yaw: c.yaw, speed: c.speed, bumps: sim.stats.playerBumps, allBumps: sim.stats.bumps, carBumps: sim.stats.carBumps, wallBumps: sim.stats.wallBumps, rt: st.rt, others: sim.cars.slice(1).map(o => [o.x, o.z]), arena: sim.arena }; },
+    get root() { return root; },
+    debug() { const c = sim.cars[0]; return { x: c.x, z: c.z, yaw: c.yaw, speed: c.speed, bumps: sim.stats.playerBumps, allBumps: sim.stats.bumps, carBumps: sim.stats.carBumps, wallBumps: sim.stats.wallBumps, rt: st.rt, others: sim.cars.slice(1).map(o => [o.x, o.z]), arena: sim.arena,
+      floor: { ...HALL.floor }, cars: sim.cars.length, riders: sim.cars.length, interior: true, carTris: fleet ? fleet.tris : 0 }; },
     sim,
     stop() {
-      ud.drive = null;
-      if (sparks) { group.remove(sparks); sparks.geometry.dispose(); sparks.material.map.dispose(); sparks.material.dispose(); sparks = null; }
       snd.stopBed(); snd.stopMusic(); fx.score("");
-      for (const o of extras) { group.remove(o); o.traverse(q => { if (q.geometry) q.geometry.dispose(); }); }
-      mats.forEach(m => m.dispose());
+      release();
     },
   };
 }

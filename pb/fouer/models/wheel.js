@@ -12,7 +12,8 @@
  *
  * userData API: animate(t, dt, nightK), setNight(k), setLOD(0|1), setAnimated(bool), gondolaAnchor(i),
  *   ride = { count, period, speed, angle(), setAngle(a), boardingIndex(), board(), setGondolaVisible(i, on) }
- * gondolaAnchor(i) -> { index, position (cabin floor, world), eye (head height, world), pivot (hanger point), quaternion (always the group's yaw: upright), matrix, up, forward, angle } */
+ * gondolaAnchor(i) -> { index, position (cabin floor, world), eye (seated eye height, centred, a little behind the middle of the cabin, world), pivot (hanger point), quaternion (always the group's yaw: upright),
+ *   matrix, up, forward, angle, box (the cabin's world bounding box, Box3), dims } */
 import { makeKit, finishModel, rng, clamp, lerp, smooth, bulb, flag, sheep, glassWin } from './big-kit.js';
 
 export const WHEEL_SPEC = Object.freeze({
@@ -36,6 +37,10 @@ const PAL = [
     booth: 0xf2f0e6, boothRoof: 0x2f64b8, signPanel: [1, 0.84, 0.5], bulb: [1, 0.85, 0.5], cable: 0xa3acb4, flag: 0x2f64b8, plinth: 0x2f64b8,
   },
 ];
+/** the cabin in metres, relative to the hanger point (pivot), local frame (+z = outward on the boarding side, +y up); it matches buildGondolas (scale 1.25):
+ *  the floor pan lies at -2.325, the roof slab edge at -0.3, the outer trim at x +-1.1 / z +-0.8625; the glass planes at x +-0.93 / z +-0.68.  The first-person cabin (rides/cabin.js)
+ *  is built inside this box; the seated eye (1.2 m above the floor) sits at the middle of the bench's width, a little behind the middle of the cabin. */
+export const GONDOLA = Object.freeze({ halfX: 1.1, halfZ: 0.8625, top: -0.3, floor: -2.325, innerX: 0.93, innerZ: 0.68, eyeAboveFloor: 1.2, eyeZ: -0.3 });
 const GOLD = 0xf0c24a;
 const GREY = 0x5c6166;
 const STEEL = 0xb9bec2;
@@ -88,18 +93,23 @@ function build(opts = {}) {
 
   const ud = group.userData;
   const upQ = new T.Quaternion(); const tmpV = new T.Vector3();
+  const G = GONDOLA;
+  const boxPts = [-1, 1].flatMap(sx => [G.floor, G.top].flatMap(y => [-1, 1].map(sz => new T.Vector3(sx * G.halfX, y, sz * G.halfZ))));
   ud.gondolaAnchor = (i) => {
     const n = ((i % gondolaCount) + gondolaCount) % gondolaCount;
     group.updateMatrixWorld(true);
     const [px, py] = pivotAt(n, state.angle);
     const pivot = new T.Vector3(px, py, 0);
-    const floor = pivot.clone().add(tmpV.set(0, -1.8, 0)); const eye = pivot.clone().add(tmpV.set(0, -0.7, 0));
+    const floor = pivot.clone().add(tmpV.set(0, G.floor, 0)); const eye = pivot.clone().add(tmpV.set(0, G.floor + G.eyeAboveFloor, G.eyeZ));
     const matrix = new T.Matrix4();
     group.getWorldQuaternion(upQ);
     const world = (v) => v.clone().applyMatrix4(group.matrixWorld);
     matrix.compose(world(floor), upQ.clone(), new T.Vector3(1, 1, 1));
-    return { index: n, position: world(floor), eye: world(eye), pivot: world(pivot), quaternion: upQ.clone(), matrix, up: new T.Vector3(0, 1, 0).applyQuaternion(upQ), forward: new T.Vector3(0, 0, 1).applyQuaternion(upQ), angle: state.angle + ang(n, gondolaCount) };
+    const box = new T.Box3().setFromPoints(boxPts.map(v => v.clone().add(pivot).applyMatrix4(group.matrixWorld)));
+    return { index: n, position: world(floor), eye: world(eye), pivot: world(pivot), quaternion: upQ.clone(), matrix, up: new T.Vector3(0, 1, 0).applyQuaternion(upQ), forward: new T.Vector3(0, 0, 1).applyQuaternion(upQ), angle: state.angle + ang(n, gondolaCount), box, dims: G };
   };
+  /** colours of the gondolas (hex) for the first-person cabin of the ride */
+  ud.gondolaStyle = { body: pal.gBody, band: pal.gBand, roof: pal.gRoof, trim: pal.gTrim, gold: level >= 4 ? GOLD : null, floor: 0x44494d };
   ud.ride = {
     /** hide / show one cabin (the first-person camera sits inside it: W6 hides it for the ride, shows it again afterwards) */
     setGondolaVisible: (i, on) => { if (on) hidden.delete(i); else hidden.add(i); if (parts.near) update(parts.near, 0, 0, ud.nightK, 1); update(parts.far, 0, 0, ud.nightK, 0); },

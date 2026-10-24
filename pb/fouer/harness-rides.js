@@ -5,6 +5,8 @@ import { RIDE_DEFS, RIDE_FLAGS, RIDEABLE, speedAt, createProgram, rideTimeAtCloc
 import { createBumper, driveCar, arenaOf, BUMPER, makeRandom } from "./rides/bumper.js";
 import { ghostControls, ghostPath, GHOST_DOORS, GHOST_SCARES, levelFrame } from "./rides/ghost.js";
 import { levelAssist } from "./rides/rigs.js";
+import { HALL } from "./rides/scooter-hall.js";
+import { RIDE_CARS } from "./rides/drive.js";
 import { FUN, FLAGS_MAX, createGame } from "./game.js";
 import * as save from "./save.js";
 import * as sim from "./sim.js";
@@ -132,6 +134,26 @@ export async function verifyRides({ check, equal, near }) {
   const a1 = createBumper({ floor, count: 8, seed: 4 }), a2 = createBumper({ floor, count: 8, seed: 4 });
   for (let i = 0; i < 600; i++) { a1.step(1 / 60, { throttle: 1, steer: 0.3 }); a2.step(1 / 60, { throttle: 1, steer: 0.3 }); }
   equal(a1.cars.map(c => [c.x, c.z]), a2.cars.map(c => [c.x, c.z]), "same seed and input: the same ride");
+  // bigger inside: the ride has its own 40 x 22 m hall with 8 cars; they start spread out, roam the whole floor, hunt the player in pairs at most and do not get stuck
+  const HF = HALL.floor, harena = arenaOf(HF);
+  check(HF.x1 - HF.x0 >= 38 && HF.z1 - HF.z0 >= 20 && RIDE_CARS >= 7 && RIDE_CARS <= 9, `the interior floor is ${HF.x1 - HF.x0} x ${HF.z1 - HF.z0} m with ${RIDE_CARS} cars`);
+  check(HALL.bars.every(z => z > HF.z0 && z < HF.z1) && HALL.wallX > HF.x1 && HALL.wallZ0 < HF.z0, "the five light bars hang over the floor, the walls stand outside it");
+  for (const seed of [11, 14, 20]) {
+    const big = createBumper({ floor: HF, count: RIDE_CARS, seed });
+    let gap = 1e9; for (let i = 0; i < big.cars.length; i++) for (let j = i + 1; j < big.cars.length; j++) gap = Math.min(gap, Math.hypot(big.cars[i].x - big.cars[j].x, big.cars[i].z - big.cars[j].z));
+    check(gap >= 3.5, `seed ${seed}: the cars start at least 3.5 m apart (${gap.toFixed(1)} m)`);
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, maxHunters = 0, stuck = 0, outside = 0;
+    for (let i = 0; i < 60 * 60; i++) {
+      big.step(1 / 60, { throttle: 0.6, steer: Math.sin(i / 120) });
+      let hunters = 0;
+      for (let j = 1; j < big.cars.length; j++) { const c = big.cars[j]; minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x); minZ = Math.min(minZ, c.z); maxZ = Math.max(maxZ, c.z); if (c.ai.hunting && c.ai.prey === 0) hunters++; if (c.x < harena.x0 || c.x > harena.x1 || c.z < harena.z0 || c.z > harena.z1) outside++; }
+      maxHunters = Math.max(maxHunters, hunters);
+    }
+    for (let j = 1; j < big.cars.length; j++) if (big.cars[j].speed < 0.3) stuck++;
+    check(maxX - minX > 28 && maxZ - minZ > 14, `seed ${seed}: the AI cars roam the whole floor (${(maxX - minX).toFixed(0)} x ${(maxZ - minZ).toFixed(0)} m)`);
+    check(maxHunters <= 2, `seed ${seed}: at most two cars chase the player at once (${maxHunters})`);
+    check(outside === 0 && stuck <= 1, `seed ${seed}: nobody leaves the barrier (${outside}) and ${stuck} cars stand still after a minute`);
+  }
 
   /* ------------------------------------------------ ghost train path */
   const ctrl = ghostControls(); const gp = ghostPath(ctrl);

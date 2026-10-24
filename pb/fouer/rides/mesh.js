@@ -63,9 +63,9 @@ export function makeTexBuilder(T) {
   return { quad, mesh, get count() { return pos.length / 18; } };
 }
 
-const canvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; };
-const rnd = seed => { let a = seed | 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
-const tex = (T, c, o = {}) => { const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; if (o.repeat) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.repeat[0], o.repeat[1]); } t.anisotropy = 4; return t; };
+export const canvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; };
+export const rnd = seed => { let a = seed | 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+export const tex = (T, c, o = {}) => { const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; if (o.repeat) { t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(o.repeat[0], o.repeat[1]); } t.anisotropy = 4; return t; };
 
 /** a soft round glow (additive sprites): rgb "r,g,b" */
 export function glowTexture(T, rgb = "255,255,255") {

@@ -269,7 +269,18 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   const rig = async () => (await info()).rig;
   const r0 = await rig();
   h.expect(r0 && r0.arena && r0.speed < 0.5, `scooter: the car stands at the start (${r0 ? r0.speed.toFixed(2) : "?"} m/s)`);
-  h.expect(await evalG(page, g => Boolean([...g.fair.pits.values()].some(p => p.near && p.near.getObjectByName && p.near.getObjectByName("ride-sparks")))), "scooter: the pole sparks exist");
+  h.expect(await evalG(page, g => Boolean(g.r.scene.getObjectByName("ride-sparks"))), "scooter: the pole sparks exist");
+  // bigger inside: the ride is driven in its own interior hall; the map is not drawn (the camera sees the interior's layer only), the picture is cheap
+  const inter = await evalG(page, g => ({ mask: g.r.camera.layers.mask, root: Boolean(g.r.scene.getObjectByName("scooter-interior")), calls: g.r.state.lastInfo.calls, tris: g.r.state.lastInfo.triangles, onMapLayer: g.r.camera.layers.test({ layers: { mask: 1 } }) }));
+  h.expect(inter.root && inter.mask === (1 << 6) && !inter.onMapLayer, `scooter: the interior hall is on its own camera layer, the map is not drawn (mask ${inter.mask})`);
+  h.expect(inter.calls > 5 && inter.calls <= 80 && inter.tris <= 120000, `scooter: the interior is cheap (${inter.calls} draws / ${Math.round(inter.tris / 1000)}k triangles)`);
+  h.expect(r0.floor && r0.floor.x1 - r0.floor.x0 >= 38 && r0.floor.z1 - r0.floor.z0 >= 20, `scooter: the interior floor is ${r0.floor ? (r0.floor.x1 - r0.floor.x0).toFixed(0) + " x " + (r0.floor.z1 - r0.floor.z0).toFixed(0) : "?"} m (at least 38 x 20; the hall on the map is 30 x 18)`);
+  h.expect(r0.cars >= 7 && r0.cars <= 9 && r0.riders === r0.cars, `scooter: ${r0.cars} cars, every one with a seated rider (${r0.riders}); fewer and more spread out than the 10 - 12 of the small floor`);
+  { // spread out at the start: no two cars closer than 3.5 m, nobody within 6 m of the player
+    const pts = [[r0.x, r0.z], ...r0.others]; let minAll = 1e9, minPlayer = 1e9;
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) { const d = Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1]); minAll = Math.min(minAll, d); if (i === 0) minPlayer = Math.min(minPlayer, d); }
+    h.expect(minAll >= 3.5 && minPlayer >= 6, `scooter: the cars start spread out (closest pair ${minAll.toFixed(1)} m, nearest to you ${minPlayer.toFixed(1)} m)`);
+  }
   await sleep(1500);
   const idle = await rig();
   h.expect(Math.hypot(idle.x - r0.x, idle.z - r0.z) < 1.5, "scooter: without input the car does not drive away by itself");
@@ -282,7 +293,7 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   h.expect(Array.isArray(camMoved), "scooter: the camera sits in the car");
   // for the screenshot: put the car in the middle of the hall looking along its length, among the other cars
   await evalG(page, g => g.walk.setInputKeys([]));
-  await evalG(page, g => { const c = g.ride.rig.sim.cars[0]; c.x = -9; c.z = -2; c.yaw = Math.PI / 2; c.vx = c.vz = 0; });
+  await evalG(page, g => { const c = g.ride.rig.sim.cars[0]; c.x = -9; c.z = 1; c.yaw = Math.PI / 2; c.vx = c.vz = 0; });
   await evalG(page, g => g.walk.setInputKeys(["f"]));
   await sleep(1300);
   await h.shot("scooter-drive");
@@ -309,11 +320,10 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   while (Date.now() - t0 < 12000 && !(rr.bumps > 0)) { await sleep(300); rr = await rig(); }
   h.expect(rr.bumps > 0, `scooter: driving into the barrier / the other cars gives bumps (${rr.bumps}; barrier ${rr.wallBumps}, cars ${rr.carBumps})`);
   await h.shot("scooter-bump");
-  const hall = await evalG(page, g => { const p = [...g.fair.pits.values()].find(q => q.near && q.near.userData.floor); const ud = p.near.userData; return { cars: ud.carCount, riders: ud.riders, area: (ud.floor.x1 - ud.floor.x0) * (ud.floor.z1 - ud.floor.z0), depth: ud.floor.z1 - ud.floor.z0 }; });
-  h.expect(hall.area >= 340 && hall.depth >= 13, `scooter: the driving floor fills the L pitch (${hall.area.toFixed(0)} m2, ${hall.depth.toFixed(1)} m deep; it was 299 / 11.5)`);
-  h.expect(hall.cars >= 10 && hall.riders === hall.cars, `scooter: ${hall.cars} cars, every one with a seated rider (${hall.riders})`);
+  const hall = await rig();
+  h.expect(hall.floor && (hall.floor.x1 - hall.floor.x0) * (hall.floor.z1 - hall.floor.z0) >= 38 * 20 && hall.carTris > 1000, `scooter: the driving floor is ${((hall.floor.x1 - hall.floor.x0) * (hall.floor.z1 - hall.floor.z0)).toFixed(0)} m2 (it was 370 on the map's hall), the cars have their riders (${Math.round(hall.carTris / 1000)}k triangles)`);
   // the rim of the wheel projected to the screen (the real rim, not a bounding box): its share of the viewport height, and where its lower edge is
-  const wheelShare = () => evalG(page, async g => { const T = window.__fouer.THREE; const { WHEEL } = await import("/pb/fouer/rides/drive.js"); const R = WHEEL.r; const p = [...g.fair.pits.values()].find(q => q.near && q.near.getObjectByName("ride-wheel")); const w = p.near.getObjectByName("ride-wheel"); w.updateWorldMatrix(true, true); const cam = g.r.camera; cam.updateMatrixWorld(true);
+  const wheelShare = () => evalG(page, async g => { const T = window.__fouer.THREE; const { WHEEL } = await import("/pb/fouer/rides/drive.js"); const R = WHEEL.r; const w = g.r.scene.getObjectByName("ride-wheel"); w.updateWorldMatrix(true, true); const cam = g.r.camera; cam.updateMatrixWorld(true);
     let y0 = 9, y1 = -9, x0 = 9, x1 = -9; for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2; const v = w.localToWorld(new T.Vector3(Math.cos(a) * R, Math.sin(a) * R * 0.87, Math.sin(a) * R * 0.5)).project(cam); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); }
     return { h: (y1 - y0) / 2, w: (x1 - x0) / 2, bottom: (y0 + 1) / 2 }; });
   const wPortrait = await wheelShare();
@@ -343,7 +353,9 @@ async function scooterChecks(set, spot, h, page, evalG, startLog, stopLog, tapSe
   h.expect(done.hasS && (done.ea.match(/s/g) || []).length === 1 && done.walking, `scooter: flag "s" stored once (${done.ea})`);
   h.expect(Math.hypot(landed.x - spot.x, landed.z - spot.z) < 1, `scooter: the walker is back at the entrance (${Math.hypot(landed.x - spot.x, landed.z - spot.z).toFixed(2)} m off when the ride ended)`);
   await evalG(page, g => g.walk.setInputKeys([]));
-  h.expect(log.max.draws <= WALK_DRAWS && log.max.tris <= WALK_TRIS, `scooter: perf ${log.max.draws} draws / ${Math.round(log.max.tris / 1000)}k triangles`);
+  h.expect(log.max.draws <= WALK_DRAWS && log.max.tris <= WALK_TRIS, `scooter: perf ${log.max.draws} draws / ${Math.round(log.max.tris / 1000)}k triangles (budget ${WALK_DRAWS} / ${WALK_TRIS / 1000}k; the interior needs far less)`);
+  const gone2 = await evalG(page, g => ({ mask: g.r.camera.layers.mask, root: Boolean(g.r.scene.getObjectByName("scooter-interior")), hallPits: [...g.fair.pits.values()].some(p => p.near && p.near.getObjectByName && p.near.getObjectByName("ride-wheel")) }));
+  h.expect(gone2.mask === 1 && !gone2.root && !gone2.hallPits, `scooter: afterwards the map is drawn again and the interior is gone (mask ${gone2.mask})`);
 }
 
 runIfMain(import.meta.url, flow);

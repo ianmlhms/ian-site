@@ -5,7 +5,7 @@
 
 export const BUMPER = Object.freeze({
   radius: 0.95, accel: 7.5, reverseAccel: 4, vMax: 6.4, vReverse: 2.2, drag: 0.35, coast: 1.2, grip: 5.5, steerRate: 2.1, steerLowSpeed: 2.0,
-  restitution: 0.72, wallRestitution: 0.5, bumpMin: 1.1, bumpCooldown: 0.4, aiSpeed: [2.6, 4.6], aiSteer: 1.6, mass: 1,
+  restitution: 0.72, wallRestitution: 0.5, bumpMin: 1.1, bumpCooldown: 0.4, aiSpeed: [2.8, 5.0], aiSteer: 1.6, mass: 1,
 });
 
 /** small deterministic generator (mulberry32) */
@@ -47,7 +47,7 @@ export function createBumper({ floor, count = 8, seed = 1, cfg = BUMPER, playerS
     const x = arena.x0 + 2 + spanX * (c + 0.5 + (r % 2) * 0.25) / cols * (1 / 1) + (rnd() - 0.5) * 1.2;
     const z = arena.z0 + 1.5 + spanZ * (r + 0.5) / Math.ceil(count / cols) + (rnd() - 0.5) * 0.8;
     cars.push({ x: clamp(x, arena.x0 + cfg.radius, arena.x1 - cfg.radius), z: clamp(z, arena.z0 + cfg.radius, arena.z1 - cfg.radius), yaw: rnd() * Math.PI * 2 - Math.PI, vx: 0, vz: 0, speed: 0, slip: 0,
-      ai: { until: 0, steer: 0, target: 2.6 + rnd() * 2, bias: 0, hunt: rnd() < 0.4, wx: 0, wz: 0 } });
+      ai: { until: 0, steer: 0, target: 2.6 + rnd() * 2, bias: 0, hunt: rnd() < 0.4, wx: 0, wz: 0, hunting: false, stillSince: 0, backUntil: 0, backSteer: 1 } });
   }
   const start = playerStart ?? { x: (arena.x0 + arena.x1) / 2, z: arena.z1 - cfg.radius - 0.3, yaw: Math.PI };
   Object.assign(cars[0], { x: start.x, z: start.z, yaw: start.yaw, vx: 0, vz: 0 });
@@ -62,33 +62,56 @@ export function createBumper({ floor, count = 8, seed = 1, cfg = BUMPER, playerS
     if (now < ai.until) return;
     ai.until = now + 0.8 + rnd() * 2.2;
     ai.target = cfg.aiSpeed[0] + rnd() * (cfg.aiSpeed[1] - cfg.aiSpeed[0]);
-    // spread out: head for the emptiest of three random spots on the floor (a bigger floor with 9 - 11 cars should not turn into one pile)
+    // spread out: head for the emptiest of a few random spots on the floor (a bigger floor should not turn into one pile); more tries when other cars crowd this one
+    let crowd = 0; for (let j = 0; j < cars.length; j++) if (j !== i && Math.hypot(cars[j].x - car.x, cars[j].z - car.z) < 4.2) crowd++;
     let bestSpot = null, bestGap = -1;
-    for (let k = 0; k < 3; k++) {
+    for (let k = 0; k < (crowd >= 2 ? 7 : 3); k++) {
       const wx = arena.x0 + 1.5 + rnd() * (arena.x1 - arena.x0 - 3), wz = arena.z0 + 1.5 + rnd() * (arena.z1 - arena.z0 - 3);
       let gap = 1e9; for (let j = 0; j < cars.length; j++) if (j !== i) gap = Math.min(gap, Math.hypot(cars[j].x - wx, cars[j].z - wz));
       if (gap > bestGap) { bestGap = gap; bestSpot = [wx, wz]; }
     }
-    ai.wx = bestSpot[0]; ai.wz = bestSpot[1];
+    ai.wx = bestSpot[0]; ai.wz = bestSpot[1]; const wasHunting = Boolean(ai.hunting); ai.hunting = false;
     let steer = clamp(-wrapAngle(Math.atan2(ai.wx - car.x, ai.wz - car.z) - car.yaw) * 1.3, -1, 1) + (rnd() - 0.5) * 0.4;
-    if (ai.hunt && now > 5 && rnd() < 0.5) {                      // nobody hunts the player in the first seconds: he gets to roll off the start                    // go for the nearest other car (mostly the player)
-      let best = null, bd = 1e9;
-      for (let j = 0; j < cars.length; j++) { if (j === i) continue; const d = Math.hypot(cars[j].x - car.x, cars[j].z - car.z) - (j === 0 ? 3 : 0); if (d < bd) { bd = d; best = cars[j]; } }
-      if (best) { const want = Math.atan2(best.x - car.x, best.z - car.z); steer = clamp(-wrapAngle(want - car.yaw) * 1.5, -1, 1); }
+    if (ai.hunt && now > 5 && now >= (ai.coolUntil ?? 0) && rnd() < 0.5) {                      // nobody hunts the player in the first seconds: he gets to roll off the start; a hunt lasts a few seconds, then the car cools off
+      // a hunter goes for the player when he is within reach (a little ahead of him), otherwise for the nearest car
+      const p = cars[0], dp = Math.hypot(p.x - car.x, p.z - car.z);
+      let best = null, lead = 0;
+      let onPlayer = 0; for (let j = 1; j < cars.length; j++) if (j !== i && cars[j].ai && cars[j].ai.hunting && cars[j].ai.prey === 0) onPlayer++;       // at most two cars chase the player at once (no pile-ups around him)
+      if (dp < 26 && onPlayer < 2 && rnd() < 0.7) { best = p; lead = 0.35; }
+      else { let bd = 1e9; for (let j = 0; j < cars.length; j++) { if (j === i || (j === 0 && onPlayer >= 2)) continue; const d = Math.hypot(cars[j].x - car.x, cars[j].z - car.z); if (d < bd) { bd = d; best = cars[j]; } } }
+      if (best) {
+        const want = Math.atan2(best.x + best.vx * lead - car.x, best.z + best.vz * lead - car.z); steer = clamp(-wrapAngle(want - car.yaw) * 1.5, -1, 1);
+        ai.prey = best === p ? 0 : -1; if (!wasHunting) ai.huntStart = now;
+        if (now - (ai.huntStart ?? now) > 4.5) { ai.coolUntil = now + 3.5; ai.prey = -1; }          // enough: wander for a while
+        else { ai.hunting = true; ai.target = cfg.aiSpeed[1]; ai.until = now + 0.5 + rnd(); }       // re-aim often while the prey moves
+      }
     }
     ai.steer = steer;
   }
   function aiControl(car, i, now) {
+    const ai = car.ai;
+    if (ai.backUntil && now < ai.backUntil) return { throttle: -0.9, steer: ai.backSteer };        // wedged against the barrier or a car: back out
     aiThink(car, i, now);
-    // steer away from the barrier when it gets close ahead
     const fx = Math.sin(car.yaw), fz = Math.cos(car.yaw), look = 3.4;
+    // stuck for more than a second while trying to drive: reverse out and pick a new goal
+    if (car.speed < 0.6 && ai.target > 1) { if (!ai.stillSince) ai.stillSince = now; else if (now - ai.stillSince > 1.1) { ai.backUntil = now + 0.8; ai.backSteer = rnd() < 0.5 ? -1 : 1; ai.stillSince = 0; ai.until = 0; } }
+    else ai.stillSince = 0;
+    // steer away from the barrier when it gets close ahead
     const px = car.x + fx * look, pz = car.z + fz * look;
-    let steer = car.ai.steer;
+    let steer = ai.steer;
     if (px < arena.x0 + 0.6 || px > arena.x1 - 0.6 || pz < arena.z0 + 0.6 || pz > arena.z1 - 0.6) {
       const cx = (arena.x0 + arena.x1) / 2, cz = (arena.z0 + arena.z1) / 2;
       const want = Math.atan2(cx - car.x, cz - car.z); steer = clamp(-wrapAngle(want - car.yaw) * 2, -1, 1);
+    } else if (!ai.hunting) {                                      // ... and from a car right ahead (hunters want the contact)
+      let near = 1e9, lat = 0;
+      for (let j = 0; j < cars.length; j++) {
+        if (j === i) continue;
+        const dx = cars[j].x - car.x, dz = cars[j].z - car.z, d = Math.hypot(dx, dz);
+        if (d < 4.4 && d > 1e-3 && (dx * fx + dz * fz) / d > 0.4 && d < near) { near = d; lat = dx * Math.cos(car.yaw) - dz * Math.sin(car.yaw); }
+      }
+      if (near < 1e9) steer = clamp(steer + (lat > 0 ? -1 : 1) * (1.2 - near / 4.4), -1, 1);
     }
-    const throttle = car.speed < car.ai.target ? 0.9 : 0.1;
+    const throttle = car.speed < ai.target ? 0.9 : 0.1;
     return { throttle, steer: steer * cfg.aiSteer / 1.6 };
   }
 

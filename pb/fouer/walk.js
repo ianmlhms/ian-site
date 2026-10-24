@@ -726,6 +726,8 @@ export function createWalk({ T, r, world, fair, game, scene, ui, sfx, audio, cro
     const frame = ride.active ? ride.frame() : null;
     if (frame) {
       // ride: base orientation from the ride (upright wheel gondola / coaster frame), the drag-look rotates relative to it
+      const lim = ride.lookLimits;                                  // the wheel's cabin: the head turns only so far
+      if (lim) { view.yaw = clamp(view.yaw, -lim.yaw, lim.yaw); view.pitch = clamp(view.pitch, lim.pitchDown, lim.pitchUp); }
       rideBasis.f.copy(frame.forward).normalize(); rideBasis.u.copy(frame.up).normalize();
       rideBasis.rgt.crossVectors(rideBasis.f, rideBasis.u).normalize();
       m4.makeBasis(rideBasis.rgt, rideBasis.u, rideBasis.f.clone().negate());      // camera looks down its -z

@@ -255,11 +255,48 @@ export const flow = {
     const speed0 = await evalG(page, g => g.world && g.fair.pits.get("P24").near.userData.ride.speed);
     const platform = (await walkState()).view;
     await evalG(page, g => g.ride.setTestSpeedup(1));
+    // the wheel ride, every frame: the camera is inside the hidden gondola's bounding box (anchor + its dimensions), sits on the anchor's eye, the first-person cabin follows the same anchor,
+    // and the camera is nowhere near the rim / spoke geometry (the rim and the spokes lie outside the glass, |z| >= 0.9 from the middle of the wheel)
+    await evalG(page, g => {
+      const L = window.__wlog = { n: 0, outBox: 0, maxFollow: 0, maxShell: 0, shellHidden: 0, minEyeH: 9, maxEyeH: -9, maxSide: 0, maxZ: 0, minRim: 1e9, box: null, near: null, yawClamp: null };
+      const T = g.r.THREE, v = new T.Vector3(), q = new T.Vector3();
+      const tick = () => {
+        if (L.stop) return;
+        const i = g.ride.info();
+        if (i.active && i.phase === "riding" && i.kind === "wheel") {
+          const m = g.fair.pits.get("P24").near, ud = m.userData, a = ud.gondolaAnchor(i.gondola), cam = g.r.camera.position;
+          L.n++; L.near = g.r.camera.near; L.box = [a.box.min.toArray(), a.box.max.toArray()];
+          if (!a.box.clone().expandByScalar(1e-4).containsPoint(cam)) L.outBox++;
+          L.maxFollow = Math.max(L.maxFollow, cam.distanceTo(a.eye));
+          const cab = g.ride.cabin;
+          if (!cab || !cab.group.visible) L.shellHidden++; else L.maxShell = Math.max(L.maxShell, cab.group.position.distanceTo(a.position), cab.group.quaternion.angleTo(a.quaternion));
+          const eyeH = cam.y - a.position.y; L.minEyeH = Math.min(L.minEyeH, eyeH); L.maxEyeH = Math.max(L.maxEyeH, eyeH);
+          v.copy(cam).sub(a.position).applyQuaternion(a.quaternion.clone().invert()); L.maxSide = Math.max(L.maxSide, Math.abs(v.x));
+          q.copy(cam); m.worldToLocal(q); L.maxZ = Math.max(L.maxZ, Math.abs(q.z));
+          if (L.n % 6 === 0) {
+            const rm = ud.parts.near.rotorMesh; rm.updateWorldMatrix(true, false); q.copy(cam); rm.worldToLocal(q);
+            const P = rm.geometry.attributes.position.array; let best = 1e9;
+            for (let k = 0; k < P.length; k += 3) { const dx = P[k] - q.x, dy = P[k + 1] - q.y, dz = P[k + 2] - q.z; const d = dx * dx + dy * dy + dz * dz; if (d < best) best = d; }
+            L.minRim = Math.min(L.minRim, Math.sqrt(best));
+          }
+        }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     await tapSel(".wk-act");
-    let maxY = 0, minUp = 1, samples = 0, maxRoll = 0, started = false, peakPhase = 0;
+    let maxY = 0, minUp = 1, samples = 0, maxRoll = 0, started = false, peakPhase = 0, lookLimit = null;
     for (let k = 0; k < 40; k++) {
       await sleep(2500);
       const s = await evalG(page, g => { const c = g.r.camera; const T = g.r.THREE; const right = new T.Vector3(1, 0, 0).applyQuaternion(c.quaternion); const up = new T.Vector3(0, 1, 0).applyQuaternion(c.quaternion); return { ride: g.ride.info(), y: c.position.y, roll: Math.abs(right.y), up: up.y, fade: getComputedStyle(document.querySelector(".wk-fade")).opacity }; });
+      if (s.ride.active && s.ride.phase === "riding" && samples === 2) {
+        // free look is limited inside the cabin (about 100 degrees each way, -48 .. +55 up and down) whatever the drag asks for
+        await evalG(page, g => g.walk.setLook(3, -1)); await sleep(300);
+        lookLimit = await evalG(page, g => ({ yaw: g.walk.view.yaw, pitch: g.walk.view.pitch }));
+        await evalG(page, g => g.walk.setLook(-3, 1.4)); await sleep(300);
+        lookLimit.back = await evalG(page, g => ({ yaw: g.walk.view.yaw, pitch: g.walk.view.pitch }));
+        await evalG(page, g => g.walk.setLook(0, 0));
+      }
       if (s.ride.active && s.ride.phase === "riding") { started = true; samples++; maxY = Math.max(maxY, s.y); minUp = Math.min(minUp, s.up); maxRoll = Math.max(maxRoll, s.roll); if (samples === 4) { await h.shot("04-wheel-top"); } }
       if (started && !s.ride.active) break;
     }
@@ -267,10 +304,20 @@ export const flow = {
     h.expect(started && samples > 8, `the ride runs (${samples} samples while riding)`);
     h.expect(peakPhase > 40, `the camera climbs to the top of the wheel (${peakPhase.toFixed(1)} m)`);
     h.expect(minUp > 0.97 && maxRoll < 0.03, `the view stays upright (min up ${minUp.toFixed(3)}, max roll ${maxRoll.toFixed(3)})`);
+    h.expect(lookLimit && Math.abs(lookLimit.yaw - 100 * Math.PI / 180) < 1e-6 && Math.abs(lookLimit.pitch + 48 * Math.PI / 180) < 1e-6 && Math.abs(lookLimit.back.yaw + 100 * Math.PI / 180) < 1e-6 && Math.abs(lookLimit.back.pitch - 55 * Math.PI / 180) < 1e-6, `free look inside the cabin is limited (${lookLimit ? JSON.stringify(lookLimit) : "no sample"})`);
+    const wl = await evalG(page, g => { window.__wlog.stop = true; return window.__wlog; });
+    h.expect(wl.n > 150, `the point of view was sampled every frame (${wl.n} frames)`);
+    h.expect(wl.outBox === 0 && wl.box, `the camera is inside the gondola's bounding box for the whole ride (${wl.outBox} of ${wl.n} frames outside; the box is ${wl.box ? (wl.box[1][0] - wl.box[0][0]).toFixed(2) + " x " + (wl.box[1][1] - wl.box[0][1]).toFixed(2) + " x " + (wl.box[1][2] - wl.box[0][2]).toFixed(2) + " m" : "?"})`);
+    h.expect(wl.maxFollow < 1e-3 && wl.maxShell < 1e-3 && wl.shellHidden === 0, `the camera sits on the gondola anchor's eye and the cabin shell on its floor, every frame (camera ${wl.maxFollow.toExponential(1)} m, shell ${wl.maxShell.toExponential(1)}, hidden frames ${wl.shellHidden})`);
+    h.expect(wl.minEyeH > 1.1 && wl.maxEyeH < 1.3 && wl.maxSide < 1e-3, `seated eye height 1.1 - 1.3 m above the cabin floor and centred (${wl.minEyeH.toFixed(2)} - ${wl.maxEyeH.toFixed(2)} m, sideways ${wl.maxSide.toExponential(1)} m)`);
+    h.expect(wl.maxZ < 0.6 && wl.minRim > 0.5, `the camera is not inside the rim / spokes: between the two rims (|z| <= ${wl.maxZ.toFixed(2)} m, they start at 0.9) and ${wl.minRim.toFixed(2)} m from the nearest rim / spoke vertex`);
+    h.expect(Math.abs(wl.near - 0.08) < 1e-9, `the near plane is small inside the cabin (${wl.near})`);
     await sleep(1400);
     const after = await evalG(page, g => ({ ride: g.ride.info(), view: { ...g.walk.view }, ea: g.game.state.ea, speed: g.fair.pits.get("P24").near.userData.ride.speed, stamp: !document.querySelector(".wk-stamp").hidden, fade: getComputedStyle(document.querySelector(".wk-fade")).opacity }));
     h.expect(!after.ride.active && after.ride.progress > 0.95, "the ride ends by itself after two revolutions");
     h.expect(Math.hypot(after.view.x - platform.x, after.view.z - platform.z) < 0.05, "back on the platform where the ride began");
+    const cleanup = await evalG(page, g => ({ cabin: g.ride.cabin === null, inScene: Boolean(g.r.scene.getObjectByName("ride-cabin")), near: g.r.camera.near }));
+    h.expect(cleanup.cabin && !cleanup.inScene && Math.abs(cleanup.near - 0.2) < 1e-9, `the cabin shell is removed after the ride and the walk's near plane is back (near ${cleanup.near}, shell in the scene: ${cleanup.inScene})`);
     h.expect(after.ea.includes("r") && after.stamp, "the stamp Op der Spëtzt is stored (flag r in the save) and shown");
     h.expect(Math.abs(after.speed - speed0) < 1e-6, `the wheel runs at its normal speed again (${after.speed})`);
 
