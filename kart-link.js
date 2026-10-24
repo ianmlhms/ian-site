@@ -20,6 +20,7 @@ const STRINGS = {
   phoneTitle: { lb: "KartTracker-App verbannen", de: "KartTracker-App verbinden", en: "Link the KartTracker app" },
   phoneIntro: { lb: "Dëse Link verbënnt d'KartTracker-App op dengem iPhone mat dengem Kont. Nei Sessioune ginn do gespäichert, an déi, déi d'App schonn eropgelueden huet, ginn dobäi iwwerholl.", de: "Dieser Link verbindet die KartTracker-App auf deinem iPhone mit deinem Konto. Neue Sitzungen werden dort gespeichert, und die bereits hochgeladenen werden übernommen.", en: "This links the KartTracker app on your iPhone to your account. New sessions are saved there, and sessions the app already uploaded are added." },
   phoneInvalid: { lb: "Dëse Link huet kee gültege Code. Maach en an der KartTracker-App nach eng Kéier op (Astellungen › Karting-Kont).", de: "Dieser Link enthält keinen gültigen Code. Öffne ihn erneut in der KartTracker-App (Einstellungen › Karting-Konto).", en: "This link does not contain a valid code. Open it again from the KartTracker app (Settings › Karting account)." },
+  phoneSignedOut: { lb: "Mell dech un oder erstall e Karting-Kont, fir dësen iPhone ze verbannen.", de: "Melde dich an oder erstelle ein Karting-Konto, um dieses iPhone zu verbinden.", en: "Sign in or create a karting account to link this iPhone." },
   phoneName: { lb: "Numm vum Apparat (optional)", de: "Name des Geräts (optional)", en: "Device name (optional)" },
   phonePlaceholder: { lb: "z. B. Mäin iPhone", de: "z. B. Mein iPhone", en: "e.g. My iPhone" },
   phoneLink: { lb: "Dësen iPhone verbannen", de: "Dieses iPhone verbinden", en: "Link this iPhone" },
@@ -33,7 +34,7 @@ const rawToken = new URLSearchParams(location.search).get("t") || "";
 const token = TOKEN_SHAPE.test(rawToken) ? rawToken.toLowerCase() : "";
 const isPhone = new URLSearchParams(location.search).get("d") === "iphone";
 const PHONE_KEYS = {
-  title: "phoneTitle", intro: "phoneIntro", invalidToken: "phoneInvalid", watchName: "phoneName",
+  title: "phoneTitle", intro: "phoneIntro", signedOut: "phoneSignedOut", invalidToken: "phoneInvalid", watchName: "phoneName",
   watchPlaceholder: "phonePlaceholder", linkButton: "phoneLink", success: "phoneSuccess",
 };
 const PHONE_DEFAULT_NAME = "iPhone";
