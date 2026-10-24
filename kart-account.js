@@ -6,7 +6,7 @@ const MIN_PASSWORD_LENGTH = 8;
 const LOCALES = { lb: "lb-LU", de: "de-DE", en: "en-GB" };
 const STRINGS = {
   title: { lb: "Mäi Karting", de: "Mein Karting", en: "My karting" },
-  intro: { lb: "Deng KartTracker-Sessiounen an deng Garmin-Aueren op enger Plaz.", de: "Deine KartTracker-Sitzungen und Garmin-Uhren an einem Ort.", en: "Your KartTracker sessions and Garmin watches in one place." },
+  intro: { lb: "Deng KartTracker-Sessiounen, Aueren an iPhonen op enger Plaz.", de: "Deine KartTracker-Sitzungen, Uhren und iPhones an einem Ort.", en: "Your KartTracker sessions, watches and iPhones in one place." },
   signIn: { lb: "Umellen", de: "Anmelden", en: "Sign in" },
   create: { lb: "Karting-Kont erstellen", de: "Karting-Konto erstellen", en: "Create karting account" },
   email: { lb: "E-Mail", de: "E-Mail", en: "Email" },
@@ -37,11 +37,11 @@ const STRINGS = {
   signedInAs: { lb: "Ugemellt als {name}", de: "Angemeldet als {name}", en: "Signed in as {name}" },
   signOut: { lb: "Ofmellen", de: "Abmelden", en: "Sign out" },
   sessions: { lb: "Sessiounen", de: "Sitzungen", en: "Sessions" },
-  watches: { lb: "Aueren", de: "Uhren", en: "Watches" },
+  watches: { lb: "Apparater", de: "Geräte", en: "Devices" },
   loading: { lb: "Lueden…", de: "Laden…", en: "Loading…" },
   loadError: { lb: "Deng Donnéeë konnten net geluede ginn. Probéier nach eng Kéier.", de: "Deine Daten konnten nicht geladen werden. Versuche es erneut.", en: "Your data could not be loaded. Try again." },
-  noSessions: { lb: "Nach keng Sessiounen — verbann deng Garmin-Auer: maach KartTracker op der Auer op a scann de QR-Code.", de: "Noch keine Sitzungen — verbinde deine Garmin-Uhr: Öffne KartTracker auf der Uhr und scanne den QR-Code.", en: "No sessions yet — link your Garmin watch: open KartTracker on the watch and scan the QR code." },
-  noWatches: { lb: "Nach keng Auer verbonnen — maach KartTracker op der Auer op a scann de QR-Code.", de: "Noch keine Uhr verbunden — öffne KartTracker auf der Uhr und scanne den QR-Code.", en: "No watches linked yet — open KartTracker on the watch and scan the QR code." },
+  noSessions: { lb: "Nach keng Sessiounen — verbann deng Garmin-Auer (QR-Code op der Auer scannen) oder d'KartTracker-App um iPhone (Astellungen › Karting-Kont).", de: "Noch keine Sitzungen — verbinde deine Garmin-Uhr (QR-Code auf der Uhr scannen) oder die KartTracker-App auf dem iPhone (Einstellungen › Karting-Konto).", en: "No sessions yet — link your Garmin watch (scan the QR code on the watch) or the KartTracker iPhone app (Settings › Karting account)." },
+  noWatches: { lb: "Nach näischt verbonnen — scann de QR-Code op der Garmin-Auer oder verbann d'KartTracker-App um iPhone.", de: "Noch nichts verbunden — scanne den QR-Code auf der Garmin-Uhr oder verbinde die KartTracker-App auf dem iPhone.", en: "Nothing linked yet — scan the QR code on your Garmin watch or link the KartTracker iPhone app." },
   laps: { lb: "{n} Ronnen", de: "{n} Runden", en: "{n} laps" },
   bestLap: { lb: "Bescht Ronn {time}", de: "Beste Runde {time}", en: "Best lap {time}" },
   view: { lb: "Ukucken", de: "Ansehen", en: "View" },
@@ -58,8 +58,15 @@ const STRINGS = {
   neverSeen: { lb: "Nach net gesinn", de: "Noch nicht gesehen", en: "Not seen yet" },
   sessionCount: { lb: "{n} Sessiounen", de: "{n} Sitzungen", en: "{n} sessions" },
   unlink: { lb: "Trennen", de: "Trennen", en: "Unlink" },
-  unlinkConfirm: { lb: "Dës Auer trennen? Gespäichert Sessioune bleiwen an dengem Kont.", de: "Diese Uhr trennen? Gespeicherte Sitzungen bleiben in deinem Konto.", en: "Unlink this watch? Saved sessions will stay in your account." },
-  unlinkError: { lb: "D'Auer konnt net getrennt ginn.", de: "Die Uhr konnte nicht getrennt werden.", en: "The watch could not be unlinked." },
+  unlinkConfirm: { lb: "Dësen Apparat trennen? Gespäichert Sessioune bleiwen an dengem Kont.", de: "Dieses Gerät trennen? Gespeicherte Sitzungen bleiben in deinem Konto.", en: "Unlink this device? Saved sessions will stay in your account." },
+  unlinkError: { lb: "Den Apparat konnt net getrennt ginn.", de: "Das Gerät konnte nicht getrennt werden.", en: "The device could not be unlinked." },
+  deleteAccount: { lb: "Kont läschen", de: "Konto löschen", en: "Delete account" },
+  deleteAccountIntro: { lb: "Läscht däi Karting-Kont mat all senge Sessiounen a verbonnenen Apparater. Dat kann net réckgängeg gemaach ginn.", de: "Löscht dein Karting-Konto mit allen Sitzungen und verbundenen Geräten. Das kann nicht rückgängig gemacht werden.", en: "Deletes your karting account with all its sessions and linked devices. This cannot be undone." },
+  deleteAccountButton: { lb: "Karting-Kont läschen", de: "Karting-Konto löschen", en: "Delete karting account" },
+  deleteAccountConfirm: { lb: "Däi Karting-Kont an all Sessioune fir ëmmer läschen?", de: "Dein Karting-Konto und alle Sitzungen endgültig löschen?", en: "Permanently delete your karting account and all its sessions?" },
+  deleteAccountFull: { lb: "Dëst ass e komplette ian.lu-Kont. Fir e ze läschen, schreif un konto@ian.lu.", de: "Das ist ein vollständiges ian.lu-Konto. Um es zu löschen, schreibe an konto@ian.lu.", en: "This is a full ian.lu account. To delete it, write to konto@ian.lu." },
+  deleteAccountError: { lb: "De Kont konnt net geläscht ginn. Probéier nach eng Kéier.", de: "Das Konto konnte nicht gelöscht werden. Versuche es erneut.", en: "The account could not be deleted. Try again." },
+  accountDeleted: { lb: "Däi Karting-Kont ass geläscht.", de: "Dein Karting-Konto wurde gelöscht.", en: "Your karting account has been deleted." },
   untitled: { lb: "Karting-Sessioun", de: "Karting-Sitzung", en: "Karting session" },
   signOutError: { lb: "D'Ofmelle konnt net ofgeschloss ginn.", de: "Die Abmeldung konnte nicht abgeschlossen werden.", en: "Sign-out could not be completed." },
 };
@@ -327,7 +334,11 @@ function dashboardMarkup() {
   </section>
   ${flash ? `<p class="msg ok" role="status">${esc(flash)}</p>` : ""}
   <section class="ui-card"><div class="section-head"><h2>${esc(text("sessions"))}</h2><span class="count" id="sessionCount"></span></div><div id="sessions"><div class="loading">${esc(text("loading"))}</div></div></section>
-  <section class="ui-card"><div class="section-head"><h2>${esc(text("watches"))}</h2><span class="count" id="watchCount"></span></div><div id="watches"><div class="loading">${esc(text("loading"))}</div></div></section>`;
+  <section class="ui-card"><div class="section-head"><h2>${esc(text("watches"))}</h2><span class="count" id="watchCount"></span></div><div id="watches"><div class="loading">${esc(text("loading"))}</div></div></section>
+  <section class="ui-card" id="delete-account"><div class="section-head"><h2>${esc(text("deleteAccount"))}</h2></div>
+    <p class="msg">${esc(text("deleteAccountIntro"))}</p>
+    <button class="ui-btn ui-btn--ghost danger" type="button" id="deleteAccountButton">${esc(text("deleteAccountButton"))}</button>
+    <p class="msg" id="deleteAccountMessage" role="status" aria-live="polite"></p></section>`;
 }
 
 function emptyMarkup(icon, message) {
@@ -484,6 +495,29 @@ async function refreshDashboard() {
   await loadDashboard(version);
 }
 
+async function deleteAccount() {
+  if (!confirm(text("deleteAccountConfirm"))) return;
+  const button = $("deleteAccountButton");
+  const message = $("deleteAccountMessage");
+  button.disabled = true;
+  message.className = "msg";
+  message.textContent = "…";
+  try {
+    const { data, error } = await sb.rpc("kart_delete_my_account");
+    if (error) throw error;
+    if (data !== true) throw new Error("Account delete was not accepted");
+    await auth.signOut().catch((signOutError) => console.error("Sign out after delete failed", signOutError));
+    render();
+    app.insertAdjacentHTML("afterbegin", `<p class="msg ok" role="status">${esc(text("accountDeleted"))}</p>`);
+  } catch (error) {
+    console.error("Kart account delete failed", error);
+    const isFullAccount = String(error?.message || "").includes("only karting accounts");
+    message.className = "msg err";
+    message.textContent = text(isFullAccount ? "deleteAccountFull" : "deleteAccountError");
+    button.disabled = false;
+  }
+}
+
 async function signOut() {
   const button = $("signOutButton");
   button.disabled = true;
@@ -519,6 +553,8 @@ function render() {
   if (goToDestination()) return;
   app.innerHTML = dashboardMarkup();
   $("signOutButton").addEventListener("click", signOut);
+  $("deleteAccountButton").addEventListener("click", deleteAccount);
+  if (location.hash === "#delete-account") $("delete-account").scrollIntoView({ block: "center" });
   void loadDashboard(version);
 }
 

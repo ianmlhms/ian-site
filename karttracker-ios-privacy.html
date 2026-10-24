@@ -91,7 +91,7 @@
     <section data-lang="en" lang="en">
       <header class="p-head">
         <h1 class="ui-title">KartTracker for iPhone &amp; Apple Watch: privacy policy</h1>
-        <p class="updated"><span aria-hidden="true">🗓️</span> Last updated: 24 October 2026</p>
+        <p class="updated"><span aria-hidden="true">🗓️</span> Last updated: 25 October 2026</p>
       </header>
       <p class="lead">KartTracker is a free karting lap timer for Apple Watch with a companion iPhone app, made by Ian Mulheims in Luxembourg as a hobby project. This page explains what the app stores, what leaves your devices and how to delete it. The Garmin version has <a href="karttracker-privacy.html">its own policy</a>; for the rest of ian.lu, see the <a href="privacy.html">general privacy policy</a>.</p>
 
@@ -104,9 +104,9 @@
         <h2><span class="ico" aria-hidden="true">✨</span> In short</h2>
         <ul>
           <li>Your sessions, tracks, location and heart rate stay on your iPhone and Apple Watch.</li>
-          <li>Something is uploaded only when you tap <strong>Share Web Link</strong> on a session.</li>
+          <li>Something is uploaded only when you tap <strong>Share Web Link</strong> on a session, or when you link an optional karting account (then new sessions are saved to it).</li>
           <li>A shared session is visible to whoever has its link, and to no one else. <strong>Stop Sharing</strong> deletes it.</li>
-          <li>No accounts, no ads, no analytics or tracking in the app, nothing is sold.</li>
+          <li>No account needed, no ads, no analytics or tracking in the app, nothing is sold.</li>
           <li>Health data is never used for advertising and never stored in iCloud by the app.</li>
         </ul>
       </div>
@@ -142,13 +142,19 @@
       </div>
 
       <div class="ui-card">
-        <h3><span class="ico num" aria-hidden="true">5</span> Where shared sessions are stored</h3>
+        <h3><span class="ico num" aria-hidden="true">5</span> Karting account (optional)</h3>
+        <p>In <strong>Settings › Karting account</strong> you can link the app to a free ian.lu karting account, the same one the Garmin app uses. The app creates a random 128-bit code for your iPhone and keeps it in the iPhone's keychain; ian.lu stores only a one-way hash of it. Linking opens <code>ian.lu/kart-link.html</code>, where you sign in or create the account (email address, password and a username). The app then shows your username, also on the watch.</p>
+        <p>While linked, new sessions (the data listed in 4) are saved to your account automatically; you can turn that off, or save sessions one by one. On <a href="kart-account.html">My karting</a> you can rename and delete sessions, unlink devices and delete the account. <strong>Unlink this iPhone</strong> in the app stops new uploads and creates a new code; sessions already saved stay in the account.</p>
+      </div>
+
+      <div class="ui-card">
+        <h3><span class="ico num" aria-hidden="true">6</span> Where shared sessions are stored</h3>
         <p>Shared sessions are stored with <strong>Supabase</strong> in Frankfurt, Germany (EU). The session page counts visits with <strong>GoatCounter</strong>, which uses no cookies and stores no personal data.</p>
       </div>
 
       <div class="ui-card">
         <h2><span class="ico" aria-hidden="true">🗑️</span> Keeping and deleting data</h2>
-        <p>Data on your devices stays until you delete it: swipe to delete a session or lap in the app, or delete the app to remove everything. A shared session stays online until you tap <strong>Stop Sharing</strong> on it in the iPhone app. If you no longer have the iPhone it was shared from, send the link to <a href="mailto:konto@ian.lu">konto@ian.lu</a> and it will be deleted.</p>
+        <p>Data on your devices stays until you delete it: swipe to delete a session or lap in the app, or delete the app to remove everything. A shared session stays online until you tap <strong>Stop Sharing</strong> on it in the iPhone app. If you no longer have the iPhone it was shared from, send the link to <a href="mailto:konto@ian.lu">konto@ian.lu</a> and it will be deleted. Sessions in a karting account can be deleted on <a href="kart-account.html">My karting</a>, where you can also delete the whole account with all its sessions (<a href="kart-account.html#delete-account">Delete account</a>).</p>
       </div>
 
       <div class="ui-card">
@@ -158,7 +164,7 @@
 
       <div class="ui-card">
         <h2><span class="ico" aria-hidden="true">🧒</span> Children</h2>
-        <p>KartTracker is not aimed at children under 16. If you are under 16, please ask your parents before sharing sessions.</p>
+        <p>KartTracker is not aimed at children under 16. If you are under 16, please ask your parents before sharing sessions or creating a karting account.</p>
       </div>
     </section>
   </main>

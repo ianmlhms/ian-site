@@ -16,6 +16,14 @@ const STRINGS = {
   linkError: { lb: "D'Auer konnt net verbonne ginn. Probéier nach eng Kéier.", de: "Die Uhr konnte nicht verbunden werden. Versuche es erneut.", en: "The watch could not be linked. Try again." },
   signInError: { lb: "Du bass net méi ugemellt. Mell dech nach eng Kéier un.", de: "Du bist nicht mehr angemeldet. Melde dich erneut an.", en: "You are no longer signed in. Sign in again." },
   success: { lb: "Verbonnen! {n} fréier Sessioune bäigesat.", de: "Verbunden! {n} frühere Sitzungen hinzugefügt.", en: "Linked! {n} earlier sessions added." },
+  // iPhone app variant (kart-link.html?t=…&d=iphone)
+  phoneTitle: { lb: "KartTracker-App verbannen", de: "KartTracker-App verbinden", en: "Link the KartTracker app" },
+  phoneIntro: { lb: "Dëse Link verbënnt d'KartTracker-App op dengem iPhone mat dengem Kont. Nei Sessioune ginn do gespäichert, an déi, déi d'App schonn eropgelueden huet, ginn dobäi iwwerholl.", de: "Dieser Link verbindet die KartTracker-App auf deinem iPhone mit deinem Konto. Neue Sitzungen werden dort gespeichert, und die bereits hochgeladenen werden übernommen.", en: "This links the KartTracker app on your iPhone to your account. New sessions are saved there, and sessions the app already uploaded are added." },
+  phoneInvalid: { lb: "Dëse Link huet kee gültege Code. Maach en an der KartTracker-App nach eng Kéier op (Astellungen › Karting-Kont).", de: "Dieser Link enthält keinen gültigen Code. Öffne ihn erneut in der KartTracker-App (Einstellungen › Karting-Konto).", en: "This link does not contain a valid code. Open it again from the KartTracker app (Settings › Karting account)." },
+  phoneName: { lb: "Numm vum Apparat (optional)", de: "Name des Geräts (optional)", en: "Device name (optional)" },
+  phonePlaceholder: { lb: "z. B. Mäin iPhone", de: "z. B. Mein iPhone", en: "e.g. My iPhone" },
+  phoneLink: { lb: "Dësen iPhone verbannen", de: "Dieses iPhone verbinden", en: "Link this iPhone" },
+  phoneSuccess: { lb: "Verbonnen! {n} Sessioune bäigesat. Du kanns elo zréck an d'App.", de: "Verbunden! {n} Sitzungen hinzugefügt. Du kannst jetzt zurück zur App.", en: "Linked! {n} sessions added. You can go back to the app now." },
   myKarting: { lb: "Bei Mäi Karting", de: "Zu Mein Karting", en: "Go to My karting" },
   loadError: { lb: "D'Umeldung konnt net geluede ginn. Probéier nach eng Kéier.", de: "Die Anmeldung konnte nicht geladen werden. Versuche es erneut.", en: "Sign-in could not be loaded. Try again." },
 };
@@ -23,11 +31,17 @@ const STRINGS = {
 const app = document.getElementById("app");
 const rawToken = new URLSearchParams(location.search).get("t") || "";
 const token = TOKEN_SHAPE.test(rawToken) ? rawToken.toLowerCase() : "";
+const isPhone = new URLSearchParams(location.search).get("d") === "iphone";
+const PHONE_KEYS = {
+  title: "phoneTitle", intro: "phoneIntro", invalidToken: "phoneInvalid", watchName: "phoneName",
+  watchPlaceholder: "phonePlaceholder", linkButton: "phoneLink", success: "phoneSuccess",
+};
+const PHONE_DEFAULT_NAME = "iPhone";
 let sb = null;
 let linkedCount = null;
 
 function text(key, values = {}) {
-  const entry = STRINGS[key];
+  const entry = STRINGS[(isPhone && PHONE_KEYS[key]) || key];
   const template = entry?.[window.I18N?.lang] || entry?.en || key;
   return Object.entries(values).reduce(
     (value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)),
@@ -99,7 +113,7 @@ async function linkWatch(event) {
   try {
     const { data, error } = await sb.rpc("kart_link_device", {
       p_token: token,
-      p_name: name || null,
+      p_name: name || (isPhone ? PHONE_DEFAULT_NAME : null),
     });
     if (error) throw error;
     const result = Array.isArray(data) ? data[0] : data;
