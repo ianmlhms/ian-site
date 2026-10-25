@@ -1,0 +1,3 @@
+2 images (medium, 1024x1024): sandstone, sheet_beech
+11 images (medium, 1024x1024): sandstone_moss, wet_rock, bark_beech, bark_oak, litter_summer, litter_autumn, moss, dirt_roots, foam, grass, sky
+3 images (medium, 1024x1024): sheet_oak, sheet_fern, sheet_ivy
