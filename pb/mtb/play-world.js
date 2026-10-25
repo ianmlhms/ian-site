@@ -58,7 +58,7 @@ export function trailRuntime(t, network, surface, medals) {
   const gate = { index: indexAtS(GATE_AT) }, arch = { index: indexAtS(Math.max(GATE_AT + 5, length - FINISH_BEFORE)) };
   const features = network.features.filter((f) => f.way === `trail-${t.id}`);
   return Object.freeze({
-    id: t.id, grade: t.grade, name: t.name, blurb: t.blurb, line: t.line, length, rawLength: t.length, climb: t.climb, descent: t.descent, centre, s, count: n, cps, features, posts: t.posts || [],
+    id: t.id, grade: t.grade, name: t.name, focus: t.focus || null, blurb: t.blurb, line: t.line, length, rawLength: t.length, climb: t.climb, descent: t.descent, centre, s, count: n, cps, features, posts: t.posts || [],
     gate, arch, nearest, headingAt, indexAtS, medals: medals || null,
     start: { x: centre[0][0], z: centre[0][1], heading: headingAt(0) },
     checkpointRadius: CHECKPOINT_RADIUS,

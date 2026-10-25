@@ -195,7 +195,7 @@ def straighten(line, streams, pad=5.0):
     return line
 
 
-def trim_ends(line, height_at, max_trim=90.0, grade=0.16):
+def trim_ends(line, height_at, max_trim=90.0, grade=0.16, trim_end=True):
     """A trail ends where the path ends, often at the foot of a bank or in a little hook: a rider would stall on the last climb. Cut the ends at the last 2 m step steeper than `grade`
     (uphill in the riding direction at the end, uphill against it at the start) within `max_trim` metres."""
     xs, zs, s = dense_line(line)
@@ -208,7 +208,7 @@ def trim_ends(line, height_at, max_trim=90.0, grade=0.16):
         if step[i] < -grade:                   # the first metres go UP steeply when ridden backwards: the start is at the foot of a bank
             lo = i + 1
     for i in range(len(step) - 1, -1, -1):
-        if s[-1] - s[i] > max_trim:
+        if not trim_end or s[-1] - s[i] > max_trim:
             break
         if step[i] > grade:
             hi = i
@@ -289,8 +289,18 @@ def build(td, a, streams):
     G = GRADE_FEATURES[grade]
     rng = random.Random(int(style.get("seed", 1)) * 7919 + len(td["id"]))
     placer = Placer(a["length"])
+    # the stone footbridge of the Schiessentuempel (trails.def.json `stoneBridge`): a bridge feature that mutes the carving under the deck; its own physics deck is decks.js landmarkDeck
+    sb = td.get("stoneBridge")
+    stone_s = 0.0
+    if sb:
+        sx, sz = sb["x"] - sb["ax"] * sb["half"], sb["z"] - sb["az"] * sb["half"]
+        j = int(np.argmin((a["x"] - sx) ** 2 + (a["z"] - sz) ** 2))
+        placer.add(a, "bridge", float(a["s"][j]), 2 * sb["half"], w=sb["w"], stone=True)
+        stone_s = float(a["s"][j])
     # bridges first: they are fixed by the geography
     for s, x, z, kind in crossings(a, streams):
+        if sb and math.hypot(x - sb["x"], z - sb["z"]) < 16.0:
+            continue                                                    # the stone bridge crosses here
         length = 9.0 if kind == 5 else 7.0
         s0 = s - length / 2
         if s0 < EDGE_FREE * 0.5 or s0 + length > a["length"] - EDGE_FREE * 0.5 or a["blocked"][int(s0 / DENSE):int((s0 + length) / DENSE) + 1].any():
@@ -359,6 +369,8 @@ def build(td, a, streams):
 
     def post(kind, s, n_=0):
         x, z, i = at(a, s)
+        if sb and kind != "finish" and math.hypot(x - sb["x"], z - sb["z"]) < sb["half"] + 2.0:
+            return                                                      # nothing is nailed to the bridge
         yaw = float(a["heading"][i])
         rx, rz = -math.sin(yaw), math.cos(yaw)
         posts.append({"k": kind, "x": round(x + rx * POST_OFFSET, 1), "z": round(z + rz * POST_OFFSET, 1), "yaw": round(yaw, 3), "n": n_})
@@ -374,5 +386,5 @@ def build(td, a, streams):
         last = s
     if total - last > SIGN_SPACING * 1.4:
         post("dir", (last + total) / 2, 0)
-    post("finish", total - 6.0)
+    post("finish", (stone_s - 6.0) if sb else total - 6.0)       # (on the footbridge trail the finish board stands at the foot of the bridge)
     return features, cps, posts

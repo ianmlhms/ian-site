@@ -97,10 +97,10 @@
    "fr": "Piste du Schiessentümpel"
   },
   "blurb": {
-   "lb": "Duerch d'Dall vun der Schwaarzer Iernz erof an dann zum Schiessentümpel",
-   "de": "Durchs Tal der Schwarzen Ernz hinab und dann zum Schiessentümpel",
-   "en": "Down the Black Ernz valley and then to the Schiessentümpel",
-   "fr": "Dans la vallée de l'Ernz noire puis jusqu'au Schiessentümpel"
+   "lb": "Duerch d'Dall vun der Schwaarzer Iernz erop, iwwer d'Steebréck bis bei de Schiessentümpel",
+   "de": "Durchs Tal der Schwarzen Ernz hinauf, über die Steinbrücke bis zum Schiessentümpel",
+   "en": "Up the Black Ernz valley, over the stone arch bridge to the Schiessentümpel",
+   "fr": "Dans la vallée de l'Ernz noire, par le pont de pierre jusqu'au Schiessentümpel"
   },
   "via": [
    [
@@ -126,6 +126,18 @@
    [
     1595,
     5691
+   ],
+   [
+    1570,
+    5730
+   ],
+   [
+    1563,
+    5783
+   ],
+   [
+    1558,
+    5799
    ]
   ],
   "style": {
@@ -141,7 +153,21 @@
    "leaves": 2
   },
   "seenPenalty": 1.0,
-  "gradeLimit": 3.0
+  "gradeLimit": 3.0,
+  "stoneBridge": {
+   "x": 1543.5,
+   "z": 5794.4,
+   "ax": -0.8845,
+   "az": -0.4666,
+   "half": 6.3,
+   "w": 2.2,
+   "before": 4,
+   "after": 2
+  },
+  "focus": [
+   1545.7,
+   5784.6
+  ]
  },
  {
   "id": "binzelt-rocks",

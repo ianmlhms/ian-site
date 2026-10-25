@@ -64,7 +64,9 @@ const FRAGMENT = `
     float foam = clamp(slope * 1.5 * (0.4 + 0.9 * thread) + smoothstep(0.78, 1.0, abs(lat)) * thread * 0.55 + flowMask * 0.7 + churn * smoothstep(0.25, 0.7, boil + churn * 0.35), 0.0, 1.0);
     col = mix(col, vec3(0.88, 0.94, 0.94) * (0.6 + 0.4 * uSunColor.g + 0.2 * uAmbSky.g), foam);
     col = paintLightW(col, vec3(0.0, 1.0, 0.0), 1.0, 1.0, vWorld) * 0.35 + col * 0.65;
-    float alpha = clamp((0.62 + 0.3 * centre + foam * 0.35 + churn * 0.3) * fade * (1.0 - smoothstep(0.55, 1.0, abs(lat)) * 0.92), 0.0, 0.97);
+    // around the falls and on steep stretches the sheet shrinks to the white core: its flat edges never cut across the boulders and the banks
+    float core = 1.0 - smoothstep(0.25, 0.7, abs(lat)) * clamp(churn * 2.5 + slope * 2.0, 0.0, 1.0);
+    float alpha = clamp((0.62 + 0.3 * centre + foam * 0.35 + churn * 0.3) * fade * (1.0 - smoothstep(0.55, 1.0, abs(lat)) * 0.92) * core, 0.0, 0.97);
     gl_FragColor = vec4(applyFogW(col, vDist, vWorld.y), alpha);
   }
 `;
@@ -91,7 +93,7 @@ const FOAM_FRAGMENT = `
     vec2 uv = vUv * 0.5 + vSeed * 7.0;
     float n = texture2D(uNoise, uv * 1.7 + vec2(0.0, uTime * 0.25)).g * 0.6 + texture2D(uNoise, uv * 3.9 - vec2(0.0, uTime * 0.4)).b * 0.5;
     float ring = smoothstep(0.38, 0.55, r) * (1.0 - smoothstep(0.7, 1.0, r));
-    float a = ring * smoothstep(0.35, 0.75, n) * 0.85 * (1.0 - smoothstep(60.0, 110.0, vDist));
+    float a = ring * smoothstep(0.4, 0.8, n) * 0.5 * (1.0 - smoothstep(40.0, 80.0, vDist));
     if (a < 0.02) discard;
     vec3 col = vec3(0.9, 0.94, 0.95) * (0.7 + 0.3 * uSunColor.g + 0.2 * uAmbSky.g);
     gl_FragColor = vec4(applyFogW(col, vDist, vWorld.y), a);
@@ -242,7 +244,7 @@ export function createWaterView({ scene, network, env, quality, stones = [], foa
       if (n >= FOAM_CAPACITY) break;
       if (Math.abs(s.x - cx) > R || Math.abs(s.z - cz) > R) continue;
       pos.array[n * 3] = s.x; pos.array[n * 3 + 1] = s.y + 0.02; pos.array[n * 3 + 2] = s.z;
-      siz.array[n * 2] = s.size; siz.array[n * 2 + 1] = s.seed;
+      siz.array[n * 2] = Math.min(s.size, 0.7); siz.array[n * 2 + 1] = s.seed;          // (a ring never grows into a wide flat sheet that cuts across the neighbouring boulders)
       n++;
     }
     fg.instanceCount = n; pos.needsUpdate = true; siz.needsUpdate = true;

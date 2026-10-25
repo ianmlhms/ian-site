@@ -197,7 +197,7 @@ async function boot() {
   const crownPush = { dx: 0, dy: 0, dz: 0 }, camRock = { nx: 0, nz: 0, pen: 0 }, camHit = { nx: 0, nz: 0, pen: 0 };
   const trunkOrRock = (x, z, r) => { const a = trees.collide(x, z, r, camHit); const b = rocks.collide(x, z, r, -1e9, camRock); if (b && (!a || b.pen > a.pen)) { camHit.nx = b.nx; camHit.nz = b.nz; camHit.pen = b.pen; return camHit; } return a; };
   const chase = createChaseCamera(surface, trunkOrRock, (x, y, z, r) => trees.pushOutOfCrowns(x, y, z, r, crownPush));
-  let camMode = 0;
+  let camMode = 0, focusBlend = 0;
   const persistence = createPersistence({ getState: () => progress, onState: (p) => { progress = p; applyLoadout(); refreshMenu(); }, onError: (message) => console.warn('[mtb] save', message), publishOverall: false });
   const save = (next) => { progress = next; persistence.scheduleSave(); };
 
@@ -544,6 +544,12 @@ async function boot() {
     else if (!replay) ghostRider.root.visible = false;
 
     const c = frozenCamera || chase.update(replay ? replayBike() : bike, dt, camMode, elapsed);
+    const focus = current.trail && current.trail.focus;                  // a trail that ends at a sight (the Schiessentuempel falls): once finished, the camera turns to look at it
+    focusBlend = !frozenCamera && focus && game.mode === 'finished' ? Math.min(1, focusBlend + dt * 0.7) : Math.max(0, focusBlend - dt * 2);
+    if (focusBlend > 0 && focus) {
+      const k = focusBlend * focusBlend * (3 - 2 * focusBlend);
+      c.tx += (focus[0] - c.tx) * k; c.tz += (focus[1] - c.tz) * k; c.ty += (surface.height(focus[0], focus[1]) + 1.2 - c.ty) * k;
+    }
     camera.position.set(c.x, c.y, c.z);
     camera.lookAt(c.tx, c.ty, c.tz);
     if (Math.abs(camera.fov - c.fov) > 0.05) { camera.fov = c.fov; camera.updateProjectionMatrix(); }

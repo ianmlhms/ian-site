@@ -18,7 +18,7 @@ export const DECK = Object.freeze({
 export function buildDecks(features, surface) {
   const decks = [];
   for (const f of features) {
-    if (f.k !== 'bridge') continue;
+    if (f.k !== 'bridge' || f.stone) continue;                 // (the stone footbridge is landmarkDeck())
     const dx = f.x1 - f.x0, dz = f.z1 - f.z0;
     const len = Math.hypot(dx, dz);
     if (len < 2) continue;

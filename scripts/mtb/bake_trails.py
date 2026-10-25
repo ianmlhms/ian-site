@@ -95,7 +95,14 @@ def main():
                 print("   leg", a, "->", b, "%.0f m (straight %.0f)" % (sum(math.hypot(g.pos[x][0] - g.pos[y][0], g.pos[x][1] - g.pos[y][1]) for x, y in zip(seg, seg[1:])), math.hypot(a[0] - b[0], a[1] - b[1])))
             keys.extend(seg if not keys else seg[1:])
         keys = remove_cycles(keys)
-        line = TF.straighten(TF.trim_ends([g.pos[k] for k in keys], height_at), streams)
+        sb = td.get("stoneBridge")
+        line = TF.straighten(TF.trim_ends([g.pos[k] for k in keys], height_at, trim_end=not sb), streams)         # (a trail that ends on the stone bridge keeps its whole climb)
+        if sb:                                    # the trail ends ON the Schiessentuempel stone footbridge and a few metres beyond it: approach point, deck start, deck end, run-out (a straight line across the river)
+            ux, uz, hf = sb["ax"], sb["az"], sb["half"]
+            sx, sz = sb["x"] - ux * hf, sb["z"] - uz * hf
+            ex, ez = sb["x"] + ux * hf, sb["z"] + uz * hf
+            tail = [(sx - ux * sb["before"], sz - uz * sb["before"]), (sx, sz), (ex, ez), (ex + ux * sb["after"], ez + uz * sb["after"])]
+            line = list(line) + tail
         for u, v in zip(keys, keys[1:]):
             used.add((u, v)); used.add((v, u))
         # drop immediate reversals (route goes out and comes back along the same edge at a via point)
@@ -109,7 +116,7 @@ def main():
         others.append((an["x"], an["z"]))
         shared = round(float(an["blocked"].mean()), 2)
         trails.append({"id": td["id"], "grade": td["grade"], "name": td["name"], "blurb": td.get("blurb", {}), "length": round(length, 1), "climb": round(climb, 1), "descent": round(descent, 1),
-                       "yield": shared > 0.01, "line": [[round(x, 1), round(z, 1)] for x, z in line], "features": features, "cps": cps, "posts": posts})
+                       "yield": shared > 0.01, "focus": td.get("focus"), "line": [[round(x, 1), round(z, 1)] for x, z in line], "features": features, "cps": cps, "posts": posts})
         kinds = {}
         for f in features:
             kinds[f["k"]] = kinds.get(f["k"], 0) + 1

@@ -7,7 +7,7 @@
 import { Builder, V3, M, tube } from './geo-builder.js';
 import { createSolidMaterial } from './solid-material.js';
 import { rootCentres } from './trail-features.js';
-import { DECK } from './decks.js';
+import { DECK, deckAt } from './decks.js';
 
 const THREE = window.THREE;
 const GRADE = { green: [0.25, 0.75, 0.35], blue: [0.24, 0.55, 1.0], red: [0.9, 0.28, 0.25], black: [0.12, 0.12, 0.14] };
@@ -49,6 +49,9 @@ export function createProps({ scene, env, surface, trails, decks }) {
   const meshes = [];
   const addMesh = (builder, material = mat, name = '') => { const m = new THREE.Mesh(builder.build(), material); m.frustumCulled = false; m.name = name; scene.add(m); meshes.push(m); return m; };
   const groundY = (x, z) => surface.height(x, z);
+  const deckScratch = { deck: null, along: 0, top: 0, slope: 0 };
+  /** Ground for the gate and arch: the terrain, or the top of a stone bridge deck (a finish ON the Schiessentuempel footbridge stands on the deck, narrower than the deck). */
+  const gateY = (x, z) => { const g = surface.height(x, z); const hit = deckAt(decks, x, z, 1e9, deckScratch); return hit && hit.deck.kind === 'stone' && hit.top > g ? hit.top : g; };
 
   // ------------------------------------------------------------ signposts
   function sign(b, p, grade) {
@@ -153,14 +156,17 @@ export function createProps({ scene, env, surface, trails, decks }) {
   const dispose = (m) => { if (!m) return; scene.remove(m); m.geometry.dispose(); const i = meshes.indexOf(m); if (i >= 0) meshes.splice(i, 1); };
   function frameAt(t, i) { const a = t.centre[Math.max(0, i - 1)], c = t.centre[Math.min(t.count - 1, i + 1)]; const dx = c[0] - a[0], dz = c[1] - a[1], l = Math.hypot(dx, dz) || 1; return { x: t.centre[i][0], z: t.centre[i][1], yaw: Math.atan2(dz, dx), rx: -dz / l, rz: dx / l, tx: dx / l, tz: dz / l }; }
   function gate(b, t, i, finish) {
-    const f = frameAt(t, i), half = finish ? 2.6 : 2.1, h = finish ? 3.7 : 3.3;
+    const f = frameAt(t, i);
+    const onDeck = deckAt(decks, f.x, f.z, 1e9, deckScratch);
+    const onStone = onDeck && onDeck.deck.kind === 'stone';
+    const half = onStone ? Math.max(0.6, onDeck.deck.w / 2 - 0.3) : finish ? 2.6 : 2.1, h = finish ? 3.7 : 3.3;
     const gc = GRADE[t.grade];
     for (const s of [-1, 1]) {
-      const x = f.x + f.rx * half * s, z = f.z + f.rz * half * s, y = groundY(x, z);
+      const x = f.x + f.rx * half * s, z = f.z + f.rz * half * s, y = gateY(x, z);
       beam(b, V3(x, y - 0.4, z), V3(x, y + h, z), 0.28, 0.28, WOOD_DARK);
       box(b, x, y + h + 0.05, z, 0.5, 0.1, 0.5, f.yaw, WOOD_LIGHT);
     }
-    const ya = groundY(f.x + f.rx * half, f.z + f.rz * half) + h - 0.15, yb = groundY(f.x - f.rx * half, f.z - f.rz * half) + h - 0.15;
+    const ya = gateY(f.x + f.rx * half, f.z + f.rz * half) + h - 0.15, yb = gateY(f.x - f.rx * half, f.z - f.rz * half) + h - 0.15;
     const left = V3(f.x - f.rx * half, yb, f.z - f.rz * half), right = V3(f.x + f.rx * half, ya, f.z + f.rz * half);
     beam(b, left, right, 0.16, 0.16, WOOD);
     const cols = finish ? 14 : 8;                                         // the banner: chequered for the finish, stripes in the grade colour for the start
