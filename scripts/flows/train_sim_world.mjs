@@ -13,6 +13,7 @@ import { scanRoute } from '../zuch/hole_lib.mjs';
 const RAIL_ROUTES = ['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris'];
 const MIN_PATCH_ROAD_REACH_M = 60;  // a crossing inside a station patch (Munsbach, Rue de Beyren) lies on the REAL road of the patch: it runs as far as the real road does (here a T-junction with Rue Principale after 69 m)
 const MIN_ROAD_REACH_M = 120;       // the road continues at least this far (along the road) beyond the crossing on both sides
+const MAX_PATCH_ROAD_GRADE = 0.18;   // roads of a station patch follow the real LiDAR relief (Rue de Beyren drops 16 % into the Syre valley), nobody designed them
 const MAX_ROAD_GRADE = 0.11;       // the profile is clamped to 5.5 %; the sample-to-sample figure peaks at the junction mouths (pins of two roads meet)
 const SURFACE_TOL_M = 0.2;          // terrain function vs design height along the road
 const MESH_TOL_UP_M = 0.2;          // the strip mesh may not stand above the road surface by more than this
@@ -30,7 +31,7 @@ export const flow = {
       await sim.start(route);
       const rep = await sim.evalGame(({ track, THREE, world }, args) => {
         const plan = track.crossingRoads;
-        const out = { n: track.crossings.length, planned: plan ? plan.crossings.length : 0, bad: [], reach: [], patchReach: [], maxGrade: 0, nanCount: 0, meshProblems: [], surfaceProblems: [] };
+        const out = { n: track.crossings.length, planned: plan ? plan.crossings.length : 0, bad: [], reach: [], patchReach: [], maxGrade: 0, patchGrade: 0, nanCount: 0, meshProblems: [], surfaceProblems: [] };
         if (!plan) return out;
         const ls = world.landscape;
         plan.crossings.forEach((c) => {
@@ -41,7 +42,7 @@ export const flow = {
           c.roads.forEach((r) => {
             r.pts.forEach((p, i) => {
               if (![p.x, p.z, p.yT].every(Number.isFinite)) out.nanCount += 1;
-              if (i > 0) { const q = r.pts[i - 1]; const g = Math.abs(p.yT - q.yT) / Math.max(0.5, Math.hypot(p.x - q.x, p.z - q.z)); out.maxGrade = Math.max(out.maxGrade, g); }
+              if (i > 0) { const q = r.pts[i - 1]; const g = Math.abs(p.yT - q.yT) / Math.max(0.5, Math.hypot(p.x - q.x, p.z - q.z)); if (r.kind === 'patch') out.patchGrade = Math.max(out.patchGrade, g); else out.maxGrade = Math.max(out.maxGrade, g); }
               const y = track.terrainHeightAt(p.x, p.z);
               if (Math.abs(y - p.yT) > args.surfaceTol) out.surfaceProblems.push({ s: Math.round(c.s), road: r.id, u: Math.round(p.u), dy: Math.round((y - p.yT) * 100) / 100 });
               if (i % 4 === 0 && r.kind === 'asphalt') {
@@ -66,6 +67,7 @@ export const flow = {
       h.expect(rep.patchReach.every((r) => r >= MIN_PATCH_ROAD_REACH_M), `${route}: patch crossings (real station roads) reach >= ${MIN_PATCH_ROAD_REACH_M} m (${rep.patchReach.join(', ') || 'none'})`);
       h.eq([rep.n, rep.nanCount], [rep.planned, 0], `${route}: ${rep.n} crossings, every one has a planned road, no NaN`);
       h.expect(rep.reach.every((r) => r >= MIN_ROAD_REACH_M), `${route}: the road reaches >= ${MIN_ROAD_REACH_M} m on both sides of every crossing (${rep.reach.join(', ')})`);
+      h.expect(rep.patchGrade <= MAX_PATCH_ROAD_GRADE, `${route}: real station roads follow the real relief (max ${(rep.patchGrade * 100).toFixed(1)} %)`);
       h.expect(rep.maxGrade <= MAX_ROAD_GRADE, `${route}: road grade <= ${MAX_ROAD_GRADE * 100} % (max ${(rep.maxGrade * 100).toFixed(1)} %)`);
       h.eq(rep.surfaceProblems.slice(0, 3), [], `${route}: the terrain follows the designed road height (<= ${SURFACE_TOL_M} m)`);
       h.eq(rep.meshProblems.slice(0, 3), [], `${route}: the strip mesh carries the road (no floating road, no sunken road)`);

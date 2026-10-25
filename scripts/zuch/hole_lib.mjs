@@ -32,7 +32,7 @@ export async function scanRoute(sim, routeId, { step = 150, from = 40, to = Infi
     await sim.page.evaluate((ts) => { __tsTest.placeAt(ts, 0); const w = __tsTest.internals().world; if (w.landscape && w.landscape.warm) w.landscape.warm(w.track.baseS ? w.track.baseS(ts) : ts); }, s);
     await sim.frames(2);
     if (prep) await prep(sim, s);
-    const res = await sim.page.evaluate(({ s, poses, W, H, deg }) => {
+    const res = await sim.page.evaluate(({ s, poses, W, H, deg, minPits }) => {
       const { scene, camera, renderer, world, THREE } = __tsTest.internals();
       const track = __tsTest.trackInfo();
       const ls = world.landscape;
@@ -80,12 +80,12 @@ export async function scanRoute(sim, routeId, { step = 150, from = 40, to = Infi
           }
         }
         // one isolated sampled pixel (about 7 px of the 256 x 144 target) is a rasterisation sliver at a triangle edge, not a hole: cone_probe.mjs shows the strip watertight there
-        if (pits >= MIN_PIT_SAMPLES || voids > 0) out.push({ pose: p.name, count, pits, voids, pit, maxAngleDeg: Math.round(maxAng * 10) / 10, first });
+        if (pits >= minPits || voids > 0) out.push({ pose: p.name, count, pits, voids, pit, maxAngleDeg: Math.round(maxAng * 10) / 10, first });
       }
       renderer.setRenderTarget(null); renderer.setClearColor(oldClear, oldAlpha); scene.background = oldBg; rt.dispose();
       ls.setHoleMode(false);
       return out;
-    }, { s, poses, W: RT_W, H: RT_H, deg: HOLE_BELOW_HORIZON_DEG });
+    }, { s, poses, W: RT_W, H: RT_H, deg: HOLE_BELOW_HORIZON_DEG, minPits: MIN_PIT_SAMPLES });
     report.poses += poses.length;
     res.forEach((r) => report.flaggedPoses.push({ s, ...r }));
     if (res.length) log(`  hole poses at s=${s}: ` + res.map((r) => `${r.pose}(${r.pits} pit px ${JSON.stringify(r.pit)}, ${r.voids} void px, ${r.count}px, first ${JSON.stringify(r.first)})`).join(' '));
