@@ -32,65 +32,70 @@ const VERTEX = `
 `;
 const FRAGMENT = `
   precision highp float;
-  uniform sampler2D uRock, uNoise, uMoss;
+  uniform sampler2D uRock, uRockMoss, uRockWet, uNoise, uMoss;
   uniform float uDetail;
   varying vec3 vWorld; varying vec3 vNormal; varying vec3 vColor; varying float vDist; varying float vLocalY; varying float vSeed; varying float vTop; varying vec3 vMP;
   ${PAINT_LIGHT_GLSL}
+  const float SCALE = 0.21;                                           // 1 / metres per texture repeat
+  float lum(vec3 c){ return dot(c, vec3(0.3, 0.59, 0.11)); }
+  // the painted material, projected from the three world axes (faces are painted from the side they face)
+  vec3 tri(sampler2D t, vec3 P, vec3 w, float s){
+    vec3 c = vec3(0.0);
+    if (w.x > 0.02) c += texture2D(t, vec2(P.z, -P.y) * s).rgb * w.x;
+    if (w.z > 0.02) c += texture2D(t, vec2(P.x, -P.y) * s + 0.37).rgb * w.z;
+    if (w.y > 0.02) c += texture2D(t, P.xz * s + 0.71).rgb * w.y;
+    return c;
+  }
   void main(){
     vec3 N = normalize(vNormal);
     if (!gl_FrontFacing) N = -N;
     vec3 P = vWorld;
-    // triplanar weights: faces are painted from the side they face
-    vec3 w = pow(abs(N), vec3(4.0)); w /= (w.x + w.y + w.z);
-    vec2 uvX = vec2(P.z * 0.23, P.y * 0.34), uvZ = vec2(P.x * 0.23, P.y * 0.34), uvY = P.xz * 0.23;
-    vec3 grain = texture2D(uRock, uvX).rgb * w.x + texture2D(uRock, uvZ).rgb * w.z + texture2D(uRock, uvY).rgb * w.y;
+    vec3 w = pow(abs(N), vec3(5.0)); w /= (w.x + w.y + w.z);
     float nA = texture2D(uNoise, P.xz * 0.05 + P.y * 0.03).r;
-    // strata: horizontal bands in the world height, each layer with its own tone (pale cream .. ochre .. rusty)
-    float band = P.y * 4.6 + nA * 5.0;
-    float layer = floor(band / 6.2832);
-    float tone = texture2D(uNoise, vec2(layer * 0.37 + 0.11, vSeed * 0.5)).g;
-    vec3 pale = vec3(0.64, 0.61, 0.5), ochre = vec3(0.6, 0.53, 0.38), rusty = vec3(0.5, 0.41, 0.3);
-    vec3 rockC = mix(mix(pale, ochre, smoothstep(0.2, 0.55, tone)), rusty, smoothstep(0.6, 0.9, tone));
-    rockC *= 0.72 + 0.5 * (grain.r + grain.g) * 0.5;
-    float strata = sin(band) * 0.5 + 0.5;
-    rockC *= mix(0.86, 1.08, strata);
-    // honeycomb weathering (tafoni): pits of a few decimetres, lit rim, dark hollow
-    float pits = 0.0;
-    if (uDetail > 0.5) {
-      vec2 hu = (w.x > w.z ? vec2(P.z, P.y) : vec2(P.x, P.y)) * 0.7 + vec2(nA * 1.4, 0.0);
-      vec4 hn = texture2D(uNoise, hu * 0.7);
-      float cell = smoothstep(0.66, 0.78, hn.b * 0.7 + hn.g * 0.55);
-      pits = cell * (1.0 - smoothstep(25.0, 70.0, vDist)) * (1.0 - w.y);
-    }
-    rockC *= 1.0 - 0.16 * pits;
-    // dark water streaks running down the face
+    float nB = texture2D(uNoise, P.xz * 0.13 + P.y * 0.11).g;
+    float nC = texture2D(uNoise, P.xz * 0.45 + P.y * 0.4).b;
+    // sandstone: the painted wall, a little greyer and cooler than the paint (the real rock is grey-ochre, not orange), large-scale tone changes per layer
+    vec3 sand = tri(uRock, P, w, SCALE);
+    float tone = texture2D(uNoise, vec2(floor(P.y * 1.3 + nA * 3.0) * 0.37 + 0.11, vSeed * 0.5)).g;
+    sand = mix(vec3(lum(sand)), sand, 0.62) * mix(vec3(1.0, 0.97, 0.88), vec3(0.9, 0.9, 0.84), tone);
+    sand *= 0.84 + 0.3 * nB;
+    float sandL = lum(sand);
+    // moss cover: thick on the up-facing parts and the damp foot, patchy on the faces (north faces and shade carry more), thicker when wet
+    float damp = 1.0 - smoothstep(0.1, 2.2, vLocalY);
+    float mossAmt = smoothstep(0.4, 0.95, N.y) * 0.85 + damp * 0.55 + (1.0 - w.y) * 0.2;
+    mossAmt = mossAmt * smoothstep(0.2, 0.75, nA * 0.5 + nB * 0.5 + 0.12 + uWet * 0.2 + (1.0 - clamp(dot(N, normalize(uSunDir)), 0.0, 1.0)) * 0.18);
+    mossAmt = clamp(mossAmt, 0.0, 0.92);
+    vec3 mossT = uDetail > 0.5 ? tri(uRockMoss, P, w, SCALE * 0.9) : vec3(0.36, 0.5, 0.2);
+    mossT = mix(mossT, mossT * vec3(0.78, 0.98, 0.64), 0.35);
+    vec3 albedo = mix(sand, mossT, mossAmt) * mix(vec3(1.0), vColor, 0.55) * 1.04;
+    // pits and cracks darken (the painting has them; this adds fine grain from the noise)
+    albedo *= 0.9 + 0.2 * nC;
+    // dark water streaks running down the faces
     float streak = texture2D(uNoise, vec2((P.x + P.z) * 0.8, P.y * 0.03)).g;
-    rockC *= 1.0 - 0.45 * smoothstep(0.55, 0.85, streak) * (1.0 - w.y);
-    // moss: on the ledges (up-facing), on the damp foot, in the hollows
-    vec3 mossC = mix(texture2D(uMoss, P.xz * 0.1 + P.y * 0.05).rgb, vec3(0.34, 0.5, 0.2), 0.45) * 1.05;
-    float mossN = texture2D(uNoise, P.xz * 0.045 + P.y * 0.035).g * 0.65 + texture2D(uNoise, P.xz * 0.11 + P.y * 0.08).b * 0.35;
-    float moss = smoothstep(0.5, 0.95, N.y) * 0.7 + (1.0 - smoothstep(0.1, 1.4, vLocalY)) * 0.45 + pits * 0.2;
-    moss = clamp(moss * smoothstep(0.25, 0.7, mossN + 0.1 + uWet * 0.25), 0.0, 0.85);
-    vec3 albedo = mix(rockC, mossC, moss) * mix(vec3(1.0), vColor, 0.7) * 1.12;
-    if (abs(vSeed - 2.0) < 0.01) {                       // old rough masonry (the footbridge): irregular courses, dark wet stone, moss and ivy
+    albedo *= 1.0 - 0.38 * smoothstep(0.55, 0.88, streak) * (1.0 - w.y) * (1.0 - mossAmt * 0.6);
+    float bumpL = mix(sandL, lum(mossT), mossAmt);
+    if (abs(vSeed - 2.0) < 0.01) {                       // old rough masonry (the footbridge): irregular courses of dark wet stone, moss and ivy
       float across = abs(N.z) > 0.5 ? vMP.x : vMP.z;
       float row = floor(vMP.y / 0.32 + 0.35 * sin(across * 0.9));
       float col = across / 0.7 + fract(sin(row * 7.1) * 43758.5) * 3.0;
       vec2 f = vec2(fract(col), fract(vMP.y / 0.32 + 0.35 * sin(across * 0.9)));
-      float joint = 1.0 - smoothstep(0.0, 0.1, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)) * 1.1);
+      float joint = 1.0 - smoothstep(0.0, 0.12, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)) * 1.1);
       float h = fract(sin((floor(col) + row * 17.0) * 12.9898) * 43758.5453);
-      vec3 stone = mix(vec3(0.34, 0.36, 0.32), vec3(0.5, 0.46, 0.38), h);
-      stone *= 0.8 + 0.3 * texture2D(uNoise, vMP.xy * 1.3 + vMP.zz * 0.4).g;
+      vec3 stone = tri(uRockWet, P, w, 0.5) * mix(vec3(0.9, 1.0, 1.0), vec3(1.5, 1.35, 1.1), h) + vec3(0.03, 0.03, 0.02);
       float ivy = smoothstep(0.35, 0.65, texture2D(uNoise, vMP.xy * 0.35 + 0.2).b + 0.25 * (1.0 - smoothstep(0.0, 2.2, vMP.y + 2.2)));
-      albedo = mix(stone, mossC * vec3(0.75, 0.95, 0.65), clamp(0.35 + ivy * 0.55 + moss * 0.5, 0.0, 0.88));
-      albedo *= 1.0 - 0.5 * joint;
+      albedo = mix(stone, mossT * vec3(0.8, 1.0, 0.7), clamp(0.28 + ivy * 0.5 + mossAmt * 0.4, 0.0, 0.85));
+      albedo *= 1.0 - 0.55 * joint;
+      bumpL = lum(albedo) + (1.0 - joint) * 0.2;
     }
-    if (vSeed > 2.5) { albedo = mix(rockC * 0.5, mossC * vec3(0.7, 0.9, 0.62), 0.8) * 0.85; albedo *= 0.85 + 0.3 * texture2D(uNoise, P.xz * 0.6 + P.y).g; }      // stones in the water: dark, wet, mossy
-    // small normal wobble so the faces are not glassy
-    vec2 dn = texture2D(uNoise, P.xz * 0.9 + P.y * 0.6).gb - 0.5;
-    N = normalize(N + vec3(dn.x, dn.y * 0.5, dn.y) * 0.16 * (1.0 - smoothstep(30.0, 90.0, vDist)));
+    if (vSeed > 2.5) {                                    // stones in and by the water: dark, wet, mossy, with a lit rim
+      vec3 wet = tri(uRockWet, P, w, 0.45);
+      albedo = mix(wet, mossT * vec3(0.62, 0.8, 0.5), 0.35 + 0.3 * nB) * 1.25;
+      bumpL = lum(wet);
+    }
+    if (uDetail > 0.5) N = bumpNormal(N, P, bumpL, 0.035 * (1.0 - smoothstep(20.0, 70.0, vDist)));
     float sunMul = mix(1.0, 0.8, uCloud * 0.6);
     vec3 col = paintLightW(albedo, N, sunMul, 1.35, P);
+    col *= 1.0 - 0.25 * uWet;
     col = pow(col, vec3(0.97));
     gl_FragColor = vec4(applyFogW(col, vDist, P.y), 1.0);
   }
@@ -101,7 +106,7 @@ export function createRockView({ scene, rocks, env, quality, textures }) {
   group.name = 'mtb-rocks';
   scene.add(group);
   const material = new THREE.ShaderMaterial({
-    uniforms: { ...env.uniforms, uRock: { value: textures.sandstone }, uMoss: { value: textures.moss }, uDetail: { value: quality.id === 'low' ? 0 : 1 } },
+    uniforms: { ...env.uniforms, uRock: { value: textures.sandstone }, uRockMoss: { value: textures.rockMoss }, uRockWet: { value: textures.rockWet }, uMoss: { value: textures.moss }, uDetail: { value: quality.id === 'low' ? 0 : 1 } },
     vertexShader: VERTEX, fragmentShader: FRAGMENT, side: THREE.DoubleSide,
   });
   const models = buildRockModels();

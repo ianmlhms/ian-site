@@ -99,6 +99,7 @@ async function boot() {
   setLoad(0.7, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
   const textures = createPaintTextures(renderer, qualityId);
+  await textures.ready;                                             // the painted set (data/tex) replaces the canvas fallbacks before the first frame
   const mapTexture = (arr, filter = THREE.LinearFilter) => { const tex = new THREE.DataTexture(arr, maps.nx, maps.nz, THREE.RGBAFormat); tex.magFilter = filter; tex.minFilter = filter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true; return tex; };
   const worldMaps = { cover: mapTexture(maps.cover), canopy: mapTexture(maps.canopy), field: mapTexture(maps.field, THREE.NearestFilter) };
   const env = createEnv({ noiseTexture: textures.noise, params: { time: param('time'), weather: param('weather'), season: param('season') } });

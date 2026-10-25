@@ -36,6 +36,15 @@ export const PAINT_LIGHT_GLSL = `
   vec3 paintLightW(vec3 albedo, vec3 N, float sunMul, float shade, vec3 P){
     return paintLight(albedo, N, sunMul, shade) + albedo * lampLight(P, N);
   }
+  // bump mapping from the luminance of the painted albedo (screen-space derivatives: no height map files). lum = luminance at this texel, k = strength.
+  vec3 bumpNormal(vec3 N, vec3 P, float lum, float k){
+    vec3 dpx = dFdx(P), dpy = dFdy(P);
+    float dlx = dFdx(lum), dly = dFdy(lum);
+    vec3 r1 = cross(dpy, N), r2 = cross(N, dpx);
+    float det = dot(dpx, r1);
+    vec3 grad = sign(det) * (dlx * r1 + dly * r2);
+    return normalize(abs(det) * N - k * grad);
+  }
   vec3 applyFog(vec3 col, float dist){
     float f = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
     return mix(col, uFogColor, clamp(f, 0.0, 1.0));

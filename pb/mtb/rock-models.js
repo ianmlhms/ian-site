@@ -7,6 +7,7 @@ import { createRng, valueNoise, hash2 } from './noise.js';
 
 const THREE = window.THREE;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const CREASE_COS = Math.cos(52 * Math.PI / 180);    // faces meeting at more than this stay a crisp edge (blocky sandstone), flatter joins are smooth
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 /** Recess of the strata at height y (0 .. 1): a stack of layers, soft ones eaten back. Returns metres-in-unit (0 .. 0.13). */
@@ -63,7 +64,7 @@ function displaceSlab(geo, variant, seed) {
 function slabGeometry(variant, seed, near) {
   const geo = new THREE.BoxGeometry(1, 1, 1, near ? 12 : 2, near ? 10 : 3, near ? 4 : 2);
   displaceSlab(geo, variant, seed);
-  return finish(geo, near ? 'slab' : 'slab-far', seed, false);
+  return finish(geo, near ? 'slab' : 'slab-far', seed, true);
 }
 
 function boulderGeometry(seed, near, round = false) {
@@ -108,12 +109,25 @@ function finish(geo, label, seed, smooth = true) {
     return g;
   }
   const key = (i) => `${Math.round(p.getX(i) * 400)},${Math.round(p.getY(i) * 400)},${Math.round(p.getZ(i) * 400)}`;
-  const sum = new Map(), n = g.attributes.normal;
-  for (let i = 0; i < p.count; i++) { const k = key(i); const s = sum.get(k) || [0, 0, 0]; s[0] += n.getX(i); s[1] += n.getY(i); s[2] += n.getZ(i); sum.set(k, s); }
+  const n = g.attributes.normal;
+  const flat = Float32Array.from(n.array);
+  const groups = new Map();
+  for (let i = 0; i < p.count; i++) { const k = key(i); const list = groups.get(k); if (list) list.push(i); else groups.set(k, [i]); }
+  const smoothed = new Float32Array(flat.length);
+  for (let i = 0; i < p.count; i++) {                                // crease-aware: only faces within the crease angle of this face join its smoothing group
+    let sx = 0, sy = 0, sz = 0;
+    const fx = flat[i * 3], fy = flat[i * 3 + 1], fz = flat[i * 3 + 2];
+    for (const j of groups.get(key(i))) {
+      const jx = flat[j * 3], jy = flat[j * 3 + 1], jz = flat[j * 3 + 2];
+      if (fx * jx + fy * jy + fz * jz > CREASE_COS) { sx += jx; sy += jy; sz += jz; }
+    }
+    smoothed[i * 3] = sx; smoothed[i * 3 + 1] = sy; smoothed[i * 3 + 2] = sz;
+  }
+  const sum = { get: (k) => null };
   const col = new Float32Array(p.count * 3);
   for (let i = 0; i < p.count; i++) {
-    const s = sum.get(key(i)), l = Math.hypot(s[0], s[1], s[2]) || 1;
-    n.setXYZ(i, s[0] / l, s[1] / l, s[2] / l);
+    const sx = smoothed[i * 3], sy = smoothed[i * 3 + 1], sz = smoothed[i * 3 + 2], l = Math.hypot(sx, sy, sz) || 1;
+    n.setXYZ(i, sx / l, sy / l, sz / l);
     const ao = label.startsWith('boulder') ? 0.72 + 0.4 * clamp01(p.getY(i) * 1.6) : 0.7 + 0.4 * clamp01(p.getY(i) * 1.2 + p.getZ(i) * 0.2 + 0.3);
     const tone = 0.9 + 0.2 * valueNoise(p.getX(i) * 4 + seed * 3, p.getY(i) * 4 + p.getZ(i) * 4, 9);
     col[i * 3] = ao * tone; col[i * 3 + 1] = ao * tone * 0.97; col[i * 3 + 2] = ao * tone * 0.92;
