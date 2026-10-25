@@ -3,6 +3,7 @@
  * The strip is a little wider than the flat bed, so its edges disappear under the banks (the terrain is higher there). One chunk per 512 m world block. */
 import { WORLD, WAY_KINDS } from './config.js';
 
+const WATER_CHUNK = 192;           // m (see below).            // m: ribbons are chunked finely, so frustum culling drops the water behind the camera (a 512 m chunk was ~100 k triangles in view)
 const BANK_EXTRA = 0.5;            // m the strip reaches under the bank on each side
 const FADE_LENGTH = 6;             // m at the ends of a stream where the water fades in / out
 export const WATER_KINDS = ['stream', 'river', 'ditch'];
@@ -12,7 +13,7 @@ export function buildWaterChunks(network) {
   const S = network.samples;
   const chunks = new Map();
   const chunkOf = (x, z) => {
-    const bx = Math.floor(x / WORLD.block), bz = Math.floor(z / WORLD.block), key = bx * 1000 + bz;
+    const bx = Math.floor(x / WATER_CHUNK), bz = Math.floor(z / WATER_CHUNK), key = bx * 1000 + bz;
     let c = chunks.get(key);
     if (!c) { c = { bx, bz, pos: [], nor: [], aux: [], idx: [] }; chunks.set(key, c); }
     return c;

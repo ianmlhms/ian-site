@@ -114,7 +114,7 @@ export function buildBroadleaf(species, variant, detail) {
   }
   // --- leaf clusters: at the limb ends, along the limbs, and scattered through the crown volume
   const size = style.clusterSize;
-  const cards = detail === 0 ? 7 : 3;
+  const cards = detail === 0 ? 6 : 3;
   const cardSize = detail === 0 ? size : size * 1.45;
   for (const e of ends) addCluster(b, rng, e, cardSize, cards, crown, style);
   if (detail === 0) for (const m of mids) addCluster(b, rng, m, cardSize * 0.9, cards, crown, style);

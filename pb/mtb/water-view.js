@@ -5,6 +5,7 @@ import { PAINT_LIGHT_GLSL } from './light-glsl.js';
 
 const THREE = window.THREE;
 const FOAM_CAPACITY = 700;
+const WATER_REACH = Object.freeze({ low: 130, medium: 190, high: 260 });      // m
 
 const VERTEX = `
   attribute vec4 aux;
@@ -231,6 +232,10 @@ export function createWaterView({ scene, network, env, quality, stones = [], foa
 
   /** Foam rings for the stones near the camera: stones = list of { x, z, y (water level), size }. */
   function updateFoam(cx, cz, list) {
+    for (const m of chunks.values()) {                                // water far away is hidden by the fog anyway: chunks beyond the reach are not drawn at all
+      const sp = m.geometry.boundingSphere;
+      m.visible = Math.hypot(sp.center.x - cx, sp.center.z - cz) - sp.radius < WATER_REACH[quality.id || 'high'];
+    }
     let n = 0;
     const R = quality.rockNear * 1.2;
     for (const s of list.concat(landings)) {
