@@ -391,6 +391,20 @@
       });
     }
 
+    /* ---- road surfaces: asphalt ribbons with edge / centre lines and kerbs on the painted roads; the road over the level crossing joins the deck of infra.js */
+    if (TS.stationRoads) {
+      try {
+        const pc = ((track.crossingRoads && track.crossingRoads.crossings) || []).find((c) => c.patch && c.patchName === patch.name) || null;
+        const rec = TS.stationRoads.build({
+          data, quality,
+          world: (x, z) => world(x, z),
+          groundY: (wx, wz) => track.terrainHeightAt(wx, wz) + GROUND_LIFT,
+          crossing: pc ? { road: pc.road, roadIndex: pc.roadIndex, used: pc.used, lLo: pc.lLo, lHi: pc.lHi, deckY: pc.formY + 0.05 } : null,
+        });
+        group.add(rec.group); disposables.push(rec); stats.tris += rec.stats.tris;
+      } catch (error) { console.warn('[Lokféierer] station roads of ' + patch.name + ' failed', error); }
+    }
+
     /* ---- trees (LiDAR canopy) */
     {
       const share = TREE_SHARE[quality] || 0.6;
@@ -398,7 +412,11 @@
       if (list.length && o.treeField) {
         /* the pooled, LOD-sorted tree field (tree-field.js) draws them: LiDAR height / crown radius pick the species and the scale */
         const lists = { oak: [], beech: [], spruce: [] }; const meta = o.treeField.meta;
+        // boxes of the buildings: a crown must not reach into a roof (the LiDAR canopy of a tree beside a house overlaps the footprint)
+        const boxes = (data.buildings || []).map((b) => { let x0 = Infinity; let x1 = -Infinity; let z0 = Infinity; let z1 = -Infinity; (b.ground || []).forEach((p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); z0 = Math.min(z0, p[1]); z1 = Math.max(z1, p[1]); }); return { x0, x1, z0, z1 }; });
+        const nearHouse = (x, z, r) => boxes.some((b) => x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r);
         list.forEach((t, i) => {
+          if (nearHouse(t[0], t[1], Math.min(3.2, t[3] * 0.55))) return;
           const w = world(t[0], t[1]); const y = track.terrainHeightAt(w.x, w.z) - 0.15;
           const h = clamp(t[2], 3, 32); const r = clamp(t[3], 1.2, 9);
           const conifer = t[3] / Math.max(1, t[2]) < 0.26;

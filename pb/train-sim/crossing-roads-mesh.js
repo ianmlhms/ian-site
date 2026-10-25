@@ -223,6 +223,7 @@
 
   /* ---- one crossing */
   function build(crossing, plan, opts) {
+    if (crossing.patch) { const g = new T.Group(); g.name = 'crossing-road-patch-' + crossing.index; return g; }   // the road of a patch crossing is drawn by station-roads.js
     const quality = (opts && opts.quality) || 'medium';
     const mats = materials();
     const group = new T.Group();

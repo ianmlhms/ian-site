@@ -100,7 +100,7 @@
     const world = (s, lat) => { const f = frameOf(s); return { x: f.x + f.rx * lat, z: f.z + f.rz * lat }; };
 
     ctx.crossings.forEach((cr, index) => {
-      const crossing = planCrossing(ctx, cr, index, frameOf, world, roads);
+      const crossing = cr.patch ? planPatchCrossing(ctx, cr, index, frameOf, world) : planCrossing(ctx, cr, index, frameOf, world, roads);
       if (crossing) crossings.push(crossing);
     });
 
@@ -356,6 +356,53 @@
     return {
       index, s: sc, layout, info, roads: made, junctions, rows, lats, X2, lLo, lHi, formY,
       sMin: sc + spanB, sMax: sc + spanA,
+    };
+  }
+
+  /* A crossing inside a station patch (patch-crossings.js): the road is the real road of the patch, drawn by station-roads.js on the patch ground.  The plan
+     only keeps what other modules need: the straight over the crossing (lLo, lHi, X2, formY), the two arms (far end -> deck end, world x / z / y) for the
+     traffic, and no terrain work (the patch relief already holds the road). */
+  const PATCH_ARM_LIFT = 0.18;       // the patch roads lie this far above the terrain (painted ground lift + ribbon lift of station-roads.js)
+  const PATCH_ARM_LIMIT_X = 150;
+  function planPatchCrossing(ctx, cr, index, frameOf, world) {
+    const sc = cr.s;
+    const f0 = frameOf(sc);
+    const X2 = ctx.secondLat ? ctx.secondLat(sc) : 0;
+    const lLo = Math.min(0, X2) - INFRA_RUN;
+    const lHi = Math.max(0, X2) + INFRA_RUN;
+    const formY = f0.y - ctx.formationDrop;
+    const patch = cr.patch;
+    const pts = patch.road;
+    const at = (p) => { const w = world(patch.sMid - p.z, p.x); return { x: w.x, z: w.z, y: ctx.baseHeightAt(w.x, w.z) + PATCH_ARM_LIFT, l: p.x }; };
+    const i0 = pts.findIndex((p, i) => i < pts.length - 1 && Math.min(p.x, pts[i + 1].x) <= 0 && Math.max(p.x, pts[i + 1].x) > 0);
+    const arms = { 1: [], '-1': [] };
+    if (i0 >= 0) {
+      const dir = pts[i0 + 1].x > pts[i0].x ? 1 : -1;
+      const outward = { 1: dir > 0 ? pts.slice(i0 + 1) : pts.slice(0, i0 + 1).reverse(), '-1': dir > 0 ? pts.slice(0, i0 + 1).reverse() : pts.slice(i0 + 1) };
+      [1, -1].forEach((sd) => {
+        const edgeL = sd > 0 ? lHi : lLo;
+        const seq = outward[sd].filter((p) => sd * p.x > sd * edgeL && Math.abs(p.x) <= PATCH_ARM_LIMIT_X);
+        if (!seq.length) return;
+        const z0 = seq[0].z;                                                          // the straightened part: the road runs at the crossing z up to the blend
+        const nearEdge = { x: edgeL, z: z0 };
+        arms[sd] = [nearEdge].concat(seq).map(at).reverse();                          // far end first, deck end last
+      });
+    }
+    /* the arms as road records for the checks and tools that walk plan.crossings[].roads (kind 'patch': drawn by station-roads.js, no terrain work) */
+    const roadsOut = [1, -1].filter((sd) => arms[sd].length > 1).map((sd) => {
+      const near = arms[sd].slice().reverse();                                   // deck end first
+      let u = 0;
+      const pts = near.map((p, i) => {
+        if (i > 0) u += Math.hypot(p.x - near[i - 1].x, p.z - near[i - 1].z);
+        const dx = p.x - f0.x; const dz = p.z - f0.z;
+        return { x: p.x, z: p.z, yT: p.y - PATCH_ARM_LIFT, a: dx * f0.tx + dz * f0.tz, l: dx * f0.rx + dz * f0.rz, u, hw: cr.hw };
+      });
+      return { id: 'm' + index + (sd > 0 ? 'r' : 'l'), kind: 'patch', hw: cr.hw, markings: false, index, role: 'patch', parent: null, joint: 'end', pts, len: u, crossing: sc };
+    });
+    return {
+      index, s: sc, layout: 'patch', patch: true, info: { layout: 'patch', sides: [{ sd: 1, type: 'patch', j: lHi }, { sd: -1, type: 'patch', j: lLo }] },
+      roads: roadsOut, junctions: [], rows: [], lats: [], X2, lLo, lHi, formY, hw: cr.hw, arms, sMin: sc - 40, sMax: sc + 40,
+      patchName: patch.name, roadIndex: patch.roadIndex, used: patch.used, road: patch.road,
     };
   }
 

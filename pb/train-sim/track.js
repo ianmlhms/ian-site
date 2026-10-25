@@ -357,6 +357,8 @@
     const kind = def.kind;
     const formationDrop = kind === 'tram' ? FORM_TRAM : FORM_RAIL;
     const comp = compileItems(def);
+    /* real level crossings that live inside a station patch (Munsbach: Rue de Beyren) exist whatever the authored route says (patch-crossings.js) */
+    if (kind !== 'tram' && window.TS.patchCrossings) comp.crossings = window.TS.patchCrossings.merge(comp.stations, comp.crossings);
     const length = comp.length;
     const real = kind !== 'tram' && window.TS.realLine ? window.TS.realLine.resolve(def, comp) : null;   // real scenery of the Mosel line (rivers, relief, land classes, roads)
     const n = Math.floor(length / STEP) + 1;

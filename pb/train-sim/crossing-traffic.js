@@ -191,7 +191,10 @@
         const suffix = sd > 0 ? 'r' : 'l';
         const arms = [];
         const centre = (road, reverse) => (reverse ? road.pts.slice().reverse() : road.pts).map((p) => ({ x: p.x, y: p.yT + plan.ROAD_LIFT, z: p.z }));
-        if (sideInfo.type === 'T') {
+        if (sideInfo.type === 'patch') {
+          const arm = c.arms && c.arms[sd];
+          if (arm && arm.length > 2) arms.push(arm.map((p) => ({ x: p.x, y: p.y, z: p.z })));
+        } else if (sideInfo.type === 'T') {
           const cross = c.roads.find((r) => r.id === 'x' + c.index + suffix);
           const par = c.roads.find((r) => r.id === 'p' + c.index + suffix);
           const mouth = par ? par.pts.find((p) => Math.abs(p.a) < 1.6) || par.pts[0] : null;
