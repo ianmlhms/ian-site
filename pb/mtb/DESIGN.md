@@ -46,18 +46,18 @@ Venv: `/Users/Ian/Library/Caches/luxtram-work/.venv` (numpy rasterio shapely pil
 
 **Trails** are routed, not drawn: `trails.def.json` lists an id, a colour, four names and via points (world metres); `bake_trails.py` finds the cheapest route over the OSM way graph (paths preferred, a grade penalty per colour so a blue trail avoids a 45 degree scramble, no out-and-back, spurs removed). Every trail is therefore a real path. Output: the node chain, length, climb, descent, steepest 20 m.
 
-## 4. The six trails (W2 bakes all of them; W1 has the first)
+## 4. The six trails (W3 built all six; routes, grades and numbers in W3-PLAY-NOTES.md)
 
 | id | colour | idea | region |
 |---|---|---|---|
-| hallerbaach-flow | blue | **built (W1)**: 2.9 km, 90 m of descent, rim path then the gorge floor, a flowing run with berms | Haller gorge, x 400-2500, z 1320-1760 |
-| aesbaach-rondell | green | 1.5-2 km beginner loop on wide forest tracks near the village, no drops | around Haller / Beaufort plateau |
-| rotzbaach-rocks | red | technical: sandstone corridors, steps, roots, a short rock slab | Berdorf rock labyrinth, x 4200-4500, z 1200-1500 |
-| binzelt-black | black | steep descent through the Binzeltschlüff and Werschrummschlüff clefts, drops, a gap jump | x 3900-4000, z 2100-2300 |
-| schiessentuempel | blue/red | down the Black Ernz valley to the waterfall and over its stone bridge, ends at the cascade | Müllerthal village, x 1900-2100, z 4900-5300 |
-| maratoun | red | the **Mëllerdall Marathon**: the official MTB loop (`mtb/gpx/beaufort-berdorf.gpx`) stitched over the other trails, ~20 km, medals by time | the whole box |
+| ernz-waldwee | green | 2.0 km wide forest track in the Black Ernz valley, rollers and roots, no jumps | x 3400-4200, z 2700-3900 |
+| hallerbach-flow | blue | 2.9 km, 86 m of descent: rim path then the gorge floor, a flowing run with berms and small kickers | Haller gorge, x 230-2500, z 1320-1760 |
+| schiessentuempel | blue | 2.9 km from the Black Ernz valley through Müllerthal village to the gorge path above the Schiessentümpel | x 1600-2330, z 3870-5700 |
+| binzelt-rocks | red | 1.3 km on the MTB-tagged paths above the Binzeltschlüff, rock stairs, drops | x 3900-4660, z 1380-2100 |
+| waschbrunnen-black | black | 1.3 km, 174 m of descent: Felsenweg info, Totenkammer, Waschbrunnen, Steinkreuz | x 3760-4590, z 790-1030 |
+| maratoun | red | the **Mëllerdall Marathon**: the part of the official GPX (`mtb/gpx/beaufort-berdorf.gpx`) inside the world box, 10.25 km point to point, Berdorf NE to Beaufort | x 650-4960, z 170-1620 |
 
-Trail "features" (kickers, drops, rollers, berms, wooden bridges, rock slabs) are stylised additions along the real path (W3): `trails.def.json` gets a `features` list (`{ s, kind, ... }`) that modifies the bed profile of the carve (section 5) and adds closed solids (bridges). Weather and time of day never touch times, medals or scores.
+Trail "features" (kickers, drops, rollers, berms, wooden bridges, boardwalks, rock slabs, roots, mud, leaf litter) are added along the real path by `scripts/mtb/trail_features.py` and carved into the bed (`trail-features.js`); bridges are found automatically where a trail crosses a stream (the deck is a closed solid in the physics ground, `decks.js`). Weather and time of day never touch times, medals or scores.
 
 ## 5. Zero holes: the architecture
 

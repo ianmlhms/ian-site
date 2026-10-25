@@ -51,7 +51,8 @@ export const flow = {
     const last = results[results.length - 1];
     h.expect(last.points >= 6 && last.points <= 18, `${last.points} medal points after six trails`);
     h.expect(last.bikes[0] && last.bikes[1] === last.points >= 3 && last.bikes[2] === last.points >= 8 && last.bikes[3] === last.points >= 14, `bikes unlock at 3 / 8 / 14 points (${last.bikes.join(",")} at ${last.points})`);
-    h.expect(results.filter((r) => r.ghostChars > 0).length <= 3 && results[results.length - 1].ghostChars > 100, "at most three ghosts are kept, the latest one is stored compactly");
+    const ghosts = await page.evaluate(() => Object.fromEntries(Object.entries(window.__mtb.progress.g).map(([k, v]) => [k, v.length])));
+    h.expect(Object.keys(ghosts).length <= 3 && Object.values(ghosts).every((n) => n > 100 && n < 1800), `at most three ghosts are kept, each stored in under 1800 characters (${JSON.stringify(ghosts)})`);
 
     h.step("the save is small, survives a reload and merges with a cloud copy without losing progress");
     const saved = await page.evaluate(() => { window.__mtb.persistence.pushSave(); const raw = localStorage.getItem("pb_mtb_save") || ""; return { bytes: new TextEncoder().encode(raw).length, medals: JSON.parse(raw).m }; });
@@ -66,7 +67,7 @@ export const flow = {
       const m = window.__mtb;
       const before = m.progress;
       const cloud = { ...before, m: "100000", b: "1,,,,,", tb: 1000 };
-      window.postMessage({ __pbLoadSave: 1, data: cloud }, "*");
+      m.persistence.applyIncoming(cloud);
       await new Promise((r) => setTimeout(r, 400));
       return { medals: m.progress.m, firstBest: m.progress.b.split(",")[0], was: before.b.split(",")[0] };
     });

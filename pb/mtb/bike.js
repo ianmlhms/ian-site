@@ -107,7 +107,8 @@ export function stepBike(s, input, dt, surface, groundAt, env = {}) {
     const wetDrag = 1 + wet * 0.35 * (ground.kind === 'mud' || ground.kind === 'dirt' || ground.kind === 'grass' || ground.kind === 'forest' ? 1 : 0.2);
     const resist = ground.crr * spec.crrK * wetDrag * normalAccel
       + ground.rough * spec.rough * 0.9 * smoothstep(1, 8, speed3)
-      + 0.5 * BIKE.airDensity * BIKE.cdA * spec.cdaK * speed3 * speed3 / spec.mass;
+      + 0.5 * BIKE.airDensity * BIKE.cdA * spec.cdaK * speed3 * speed3 / spec.mass
+      + Math.max(0, speed3 - BIKE.softCapStart) * BIKE.softCapDrag;
     if (speed3 > 1e-3) { aF -= resist * (vf / speed3); aL -= resist * (vl / speed3); }
 
     // brakes: the weight moves forward when braking (front bites, rear skids first)

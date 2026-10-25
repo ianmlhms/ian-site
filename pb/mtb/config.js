@@ -113,7 +113,9 @@ export const BIKE = Object.freeze({
   fixedStep: 1 / 120,
   bodyRadius: 0.32,         // m: the bike's radius against tree trunks
   treeBump: 0.55,           // speed kept when the bike slides along a trunk (the part into the trunk is lost)
-  maxSpeed: 26,             // m/s hard cap (93 km/h): a descent never runs away
+  softCapStart: 15.5,       // m/s: above this a trail descent adds drag (roots, ruts, vegetation, a rider who sits up) ...
+  softCapDrag: 0.5,         // ... of this many m/s2 per m/s over the start: a 30 % drop tops out near 68 km/h, never a runaway
+  maxSpeed: 24,             // m/s hard cap (86 km/h)
 });
 
 /* Ground materials the physics knows (dry values): rolling resistance coefficient, tyre grip (friction coefficient), roughness (extra rolling drag, scaled by how the bike

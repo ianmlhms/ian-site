@@ -92,7 +92,7 @@ export const flow = {
     const bikes = await page.evaluate(() => [...document.querySelectorAll(".bike")].map((b) => ({ locked: b.classList.contains("locked"), cur: b.classList.contains("cur") })));
     h.expect(bikes.length === 4 && bikes[0].cur && bikes.slice(1).every((b) => b.locked), "four bikes: the hardtail is chosen, the rest are locked at the start");
     await h.shot("bikes");
-    await page.evaluate(async () => { const m = window.__mtb; window.postMessage({ __pbLoadSave: 1, data: { ...m.progress, m: "333333", tb: 99999 } }, "*"); await new Promise((r) => setTimeout(r, 300)); m.openMenu("bikes"); });
+    await page.evaluate(async () => { const m = window.__mtb; m.persistence.applyIncoming({ ...m.progress, m: "333333", tb: 99999 }); await new Promise((r) => setTimeout(r, 300)); m.openMenu("bikes"); });
     await page.click('.bike:nth-child(3)');
     h.eq(await page.evaluate(() => window.__mtb.progress.bk), "enduro", "an unlocked bike can be chosen (enduro) and the rider model is rebuilt");
     await page.evaluate(() => window.__mtb.closeMenu());
