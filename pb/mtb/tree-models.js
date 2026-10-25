@@ -151,7 +151,7 @@ export function buildShrub(kind) {
   const n = kind === 'holly' ? 9 : 7;
   for (let i = 0; i < n; i++) {
     const a = rng() * 6.28, rr = Math.sqrt(rng()) * (kind === 'holly' ? 0.38 : 0.5), y = (kind === 'holly' ? 0.28 : 0.2) + rng() * (kind === 'holly' ? 0.62 : 0.5);
-    addCluster(b, rng, V3(Math.cos(a) * rr, y, Math.sin(a) * rr), kind === 'holly' ? 0.34 : 0.4, 4, crown, style, 0.95);
+    addCluster(b, rng, V3(Math.cos(a) * rr, y, Math.sin(a) * rr), kind === 'holly' ? 0.22 : 0.27, 4, crown, style, 0.95);
   }
   return b.build();
 }
@@ -207,7 +207,7 @@ export function buildHedge() {
   const b = new Builder();
   const crown = { cx: 0, cy: 0.5, cz: 0, rad: 0.7 };
   const style = { tile: TILE_ID.shrub, tint: [1.0, 1.05, 0.88] };
-  for (let i = 0; i < 6; i++) addCluster(b, rng, V3((i / 5 - 0.5) * 1.1, 0.3 + rng() * 0.4, (rng() - 0.5) * 0.3), 0.4, 4, crown, style, 1.25);
+  for (let i = 0; i < 6; i++) addCluster(b, rng, V3((i / 5 - 0.5) * 1.1, 0.3 + rng() * 0.4, (rng() - 0.5) * 0.3), 0.3, 5, crown, style, 1.25);
   return b.build();
 }
 

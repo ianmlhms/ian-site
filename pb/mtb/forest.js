@@ -18,6 +18,7 @@ const spruceShare = [0.03, 0.03, 0.75, 0.3];     // by leaf type: the share of t
 const scratch = { grass: 0, built: 0, water: 0, rock: 0, cover: 0, height: 0, wet: 0 };
 const cell = { field: 0, leaf: 0, hedge: 0 };
 const nrm = { x: 0, y: 1, z: 0 };
+const SAPLING_CLEAR = 3.0;              // m from the centre line of any trail, path or track (a sapling is a bush at rider height)
 const SAPLING_MARGIN = 2.4;             // m: saplings keep this far from every way (they would fill the picture next to the rider)
 
 /** True when no way (trail, path, track, stream) is closer than `r` metres to (x, z): 8 probes on a circle plus the centre. */
@@ -47,7 +48,7 @@ const baseHeightEstimate = (m) => Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, m.he
 
 /** Trees of block (bx, bz): Float32Array stride 6 [x, y, z, height, species, seed]. `clearance(x, z)` returns the way coverage (0..1) at a point.
  *  Always the full set: thinning for the quality level happens when drawing, so collisions never depend on the quality setting. */
-export function treesOfBlock(bx, bz, { map, surface, clearance }) {
+export function treesOfBlock(bx, bz, { map, surface, clearance, ridden = null }) {
   const rng = createRng((bx * 73856093) ^ (bz * 19349663) ^ 0x5bd1e995);
   const out = [];
   const x0 = bx * BLOCK, z0 = bz * BLOCK, step = BLOCK / CANDIDATES;
@@ -82,7 +83,7 @@ export function treesOfBlock(bx, bz, { map, surface, clearance }) {
       const roll = rng(), sizeRoll = rng(), seed = rng();
       const m = sampleWorldMap(map, x, z, scratch);
       const chance = m.cover * (1 - m.built) * (1 - m.water) * (1 - m.grass) * (1 - m.rock) * 0.55;
-      if (roll > chance || !wayFree(clearance, x, z, SAPLING_MARGIN)) continue;
+      if (roll > chance || !wayFree(clearance, x, z, SAPLING_MARGIN) || (ridden && ridden.nearest(x, z, SAPLING_CLEAR + 0.01) < SAPLING_CLEAR)) continue;
       surface.normal(x, z, nrm);
       if (nrm.y < 0.7) continue;
       out.push(x, surface.height(x, z), z, SAPLING_HEIGHT_MIN + sizeRoll * (SAPLING_HEIGHT_MAX - SAPLING_HEIGHT_MIN), SPECIES.sapling, seed);
@@ -92,14 +93,14 @@ export function treesOfBlock(bx, bz, { map, surface, clearance }) {
 }
 
 /** Cached tree blocks + trunk and crown collision: the same index feeds the renderer, the bike and the camera. */
-export function createTreeIndex({ map, surface, clearance }) {
+export function createTreeIndex({ map, surface, clearance, ridden = null }) {
   const blocks = new Map();
   const LIMIT = 1200;
   function block(bx, bz) {
     const key = bx * 100003 + bz;
     let b = blocks.get(key);
     if (!b) {
-      b = treesOfBlock(bx, bz, { map, surface, clearance });
+      b = treesOfBlock(bx, bz, { map, surface, clearance, ridden });
       blocks.set(key, b);
       if (blocks.size > LIMIT) blocks.delete(blocks.keys().next().value);
     } else { blocks.delete(key); blocks.set(key, b); }

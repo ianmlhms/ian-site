@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadWorldData } from './world-data.js';
 import { buildPureWorld } from './world-build.js';
+import { CLEAR } from './undergrowth.js';
 import { selectTiles, leafAt, tilesTouching, tileKey } from './quadtree.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { createBikeState, advanceBike } from './bike.js';
@@ -424,6 +425,7 @@ const trailPoints = trails.map((t) => trailLine(t));
 /* ---------------------------------------------------------------- H2: dead wood and roots do not float */
 section('H2 dead wood');
 {
+  const checked = { ferns: 0, shrubs: 0, hedges: 0, dead: 0 }, tooClose = { ferns: 0, shrubs: 0, hedges: 0, dead: 0 };
   let logs = 0, roots = 0, stumps = 0, floatingLogs = 0, buriedLogs = 0, floatingRoots = 0, rootsOnTrail = 0, nonFinite = 0;
   const rng = createRng(77);
   const blocks = [];
@@ -431,7 +433,7 @@ section('H2 dead wood');
   for (const line of trailPoints) for (let i = 0; i < line.length; i += 25) blocks.push([Math.floor(line[i][0] / 32), Math.floor(line[i][1] / 32)]);
   for (const [bx, bz] of blocks) {
     const u = world.undergrowth.block(bx, bz);
-    for (let i = 0; i < u.length * 0 + u.logs.length; i += 8) {
+    for (let i = 0; i < u.logs.length; i += 8) {
       logs++;
       const [x, y, z, scale, yaw, , stretch, pitch] = [u.logs[i], u.logs[i + 1], u.logs[i + 2], u.logs[i + 3], u.logs[i + 4], u.logs[i + 5], u.logs[i + 6], u.logs[i + 7]];
       if (![x, y, z, scale, yaw, stretch, pitch].every(Number.isFinite)) { nonFinite++; continue; }
@@ -455,11 +457,19 @@ section('H2 dead wood');
       if (clearanceAt(x, z) > 0.04) rootsOnTrail++;                                                  // (a root grows from a trunk that is beside the way, not on it)
     }
     stumps += u.stumps.length / 8;
+    const near = (list, limit, tag) => { for (let i = 0; i < list.length; i += 8) { checked[tag]++; if (world.ridden.nearest(list[i], list[i + 2], limit + 0.5) < limit) tooClose[tag]++; } };
+    near(u.ferns, CLEAR.fern - 0.05, 'ferns'); near(u.holly, CLEAR.shrub - 0.05, 'shrubs'); near(u.brambles, CLEAR.shrub - 0.05, 'shrubs'); near(u.hedges, CLEAR.hedge - 0.05, 'hedges'); near(u.stumps, CLEAR.dead - 0.05, 'dead');
+    for (let i = 0; i < u.logs.length; i += 8) {
+      checked.dead++;
+      const len = u.logs[i + 3] * u.logs[i + 6] / 2, a = u.logs[i + 4];
+      for (const q of [-1, -0.5, 0, 0.5, 1]) if (world.ridden.nearest(u.logs[i] + Math.cos(a) * len * q, u.logs[i + 2] - Math.sin(a) * len * q, CLEAR.dead + 0.5) < CLEAR.dead - 0.05) { tooClose.dead++; break; }
+    }
   }
   check(`dead wood: ${logs} logs, ${roots} roots, ${Math.round(stumps)} stumps are finite`, nonFinite === 0);
   check('no fallen log floats: it touches the ground and no end hovers more than 0.75 m above it', floatingLogs === 0, `${floatingLogs} floating logs`);
   check('no log is buried deeper than 0.9 m', buriedLogs === 0, `${buriedLogs} buried logs`);
   check('every root starts and ends at the ground (follows the slope)', floatingRoots === 0, `${floatingRoots} floating roots`);
+  check(`undergrowth keeps clear of EVERY trail, path and track centre line (ferns >= ${CLEAR.fern} m, shrubs ${CLEAR.shrub} m, hedges ${CLEAR.hedge} m, logs and stumps ${CLEAR.dead} m; ${checked.ferns + checked.shrubs + checked.hedges + checked.dead} checked)`, tooClose.ferns + tooClose.shrubs + tooClose.hedges + tooClose.dead === 0, JSON.stringify(tooClose));
   stats.deadWood = `${logs} logs, ${roots} roots`;
 }
 
@@ -467,6 +477,7 @@ section('H2 dead wood');
 section('I rocks');
 const rocks = world.rocks;
 {
+  let rockChecks = 0, tooCloseRocks = 0;
   let count = 0, nonFinite = 0, badSink = 0, floating = 0, worstGap = 1e9, onWay = 0, slabs = 0, boulders = 0, stones = 0;
   const rng = createRng(2024);
   const blocks = [];
@@ -500,11 +511,14 @@ const rocks = world.rocks;
         if (bottom > ground - 0.15) floating++;
       }
       if (r.kind !== KIND.stone) { field.height(r.x, r.z, info); if (info.coverage > 0.02) onWay++; }
+      const limit = r.kind === KIND.stone ? 1.15 : 2.4;                                    // KEEP_CLEAR 2.5 m (rocks.js) minus a tolerance
+      for (const p of (r.kind <= KIND.overhang ? ring : ring.slice(-1))) { rockChecks++; if (world.ridden.nearest(p[0], p[2], limit + 0.5) < limit) { tooCloseRocks++; if (process.env.MTB_DEBUG) console.log('too close', r.kind, r.x.toFixed(1), r.z.toFixed(1), world.ridden.nearest(p[0], p[2], 3).toFixed(2)); } }
     }
   }
   check(`rocks: finite, sink between 0.25 and 6 m (${count.toLocaleString()} rocks: ${slabs.toLocaleString()} slabs, ${boulders.toLocaleString()} boulders, ${stones.toLocaleString()} stream stones)`, count > 300 && nonFinite === 0 && badSink === 0, `${nonFinite} NaN, ${badSink} bad sinks`);
   check(`every rock solid reaches BELOW the terrain on every side (bottom ring minus sink is under the physics surface; worst margin ${worstGap.toFixed(2)} m)`, floating === 0 && worstGap > 0.15, `${floating} ring points not buried`);
   check('no slab or boulder stands on a way (trail, path, track, road, stream)', onWay === 0, `${onWay} rocks on ways`);
+  check(`no rock body comes within 2.4 m of the centre line of ANY trail, path or track (stream stones 1.15 m; ${rockChecks.toLocaleString()} body points)`, tooCloseRocks === 0, `${tooCloseRocks} points too close`);
   stats.rocksChecked = count; stats.rockWorstMargin = worstGap;
   let blockedTrail = 0, probes = 0;
   for (const line of trailPoints) for (let i = 0; i < line.length; i += 1) { probes++; if (rocks.collide(line[i][0], line[i][1], 0.5, surface.height(line[i][0], line[i][1]) + 0.5, bikeHit)) blockedTrail++; }

@@ -46,7 +46,7 @@ export const GROUND_FRAGMENT = `
     else { c = vec3(0.34, 0.5, 0.26); rowAmp = 0.05; spacing = 4.0; }                                  // clover
     c *= 0.93 + 0.14 * h3 + (nLo.g - 0.5) * 0.1;
     float s = sin(across * 6.2832 / spacing);
-    c *= 1.0 + rowAmp * s * near;
+    c *= 1.0 + rowAmp * 0.6 * s * near;
     // a slightly darker headland along the field, from the noise
     c *= 0.97 + 0.06 * nMid.r;
     return c;
@@ -62,7 +62,7 @@ export const GROUND_FRAGMENT = `
     vec4 nMid = texture2D(uNoise, P * 0.031 + 0.37);
     vec4 nHi = texture2D(uNoise, P * 0.17 + 0.71);
     float near = 1.0 - smoothstep(180.0, 700.0, vDist);           // detail fades with distance (the fog takes over)
-    float rowNear = 1.0 - smoothstep(60.0, 260.0, vDist);
+    float rowNear = (1.0 - smoothstep(25.0, 140.0, vDist)) * 0.45;      // crop rows are a hint, not a corduroy carpet
     #ifdef LOW
       vec2 warp = (nLo.rg - 0.5) * 2.0;
     #else

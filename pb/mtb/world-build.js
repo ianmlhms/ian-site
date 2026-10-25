@@ -11,6 +11,8 @@ import { createRockIndex, createSampleIndex } from './rocks.js';
 import { attachCascades } from './landmarks.js';
 import { findFalls } from './water.js';
 
+export const RIDDEN_KINDS = Object.freeze(['trail', 'path', 'track']);
+
 export function buildPureWorld(data) {
   const ways = data.ways.filter((w) => !w.bridge && !w.tunnel);
   const streams = attachCascades(data.streams.filter((w) => !w.tunnel), data.falls);       // culverts are not carved; waterfalls become staircases
@@ -21,11 +23,12 @@ export function buildPureWorld(data) {
   const info = { coverage: 0, way: -1, stream: 0 };
   const clearance = (x, z) => { field.height(x, z, info); return info.coverage; };
   const maps = buildWorldMap({ classes: data.classes, canopy: data.canopy, near: data.near, leaf: data.leaf, fields: data.fields, cliffs: data.cliffs });
-  const trees = createTreeIndex({ map: maps, surface, clearance });
-  const undergrowth = createUndergrowthIndex({ map: maps, surface, clearance, trees });
+  const ridden = createSampleIndex(field.network, RIDDEN_KINDS);        // every way a bike or a walker uses, whichever trails the game defines: rocks, logs, shrubs keep clear of it
+  const trees = createTreeIndex({ map: maps, surface, clearance, ridden });
+  const undergrowth = createUndergrowthIndex({ map: maps, surface, clearance, trees, ridden });
   const walkable = createSampleIndex(field.network, ['trail', 'path']);
   const brooks = createSampleIndex(field.network, ['stream', 'river', 'ditch'], (kind) => WAY_KINDS[kind].halfWidth);
   const falls = findFalls(field.network);
-  const rocks = createRockIndex({ map: maps, surface, clearance, ways: walkable, streams: brooks, falls });
-  return { ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks, falls };
+  const rocks = createRockIndex({ map: maps, surface, clearance, ways: walkable, ridden, streams: brooks, falls });
+  return { ridden, ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks, falls };
 }
