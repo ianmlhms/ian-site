@@ -445,6 +445,14 @@
 
     const second = kind === 'tram' ? null : planSecond(stations, comp.tunnels, bridges, comp.crossings, signals, kappa, length);
 
+    /* Real surroundings of stations (station-surround.js): inside the patch of a station the real LiDAR relief replaces the generic hills */
+    const surroundPatches = kind !== 'tram' && window.TS.stationSurround && window.TS.stationSurround.heightPatches ? window.TS.stationSurround.heightPatches(stations, frameAt) : [];
+    const applyPatches = (s, lat, h, formY) => {
+      let out = h;
+      for (let i = 0; i < surroundPatches.length; i++) out = surroundPatches[i].blend(s, lat, out, formY);
+      return out;
+    };
+
     /* ---- biome lookup */
     const biomeKeys = comp.biomes;
     function biomeAt(s) {
@@ -640,6 +648,7 @@
 
       let h = formY + nz * amp;
       h += valley * smooth01(q.d / width) * (0.6 + 0.4 * (nz * 0.5 + 0.5));
+      if (surroundPatches.length) h = applyPatches(q.s, q.lat, h, formY);
       if (cov > 0.01) h += cov * (1 - smooth01(q.d / (30 + cov * 1.6)));
       // the ground over a tunnel never dips into the (double-track) tube: crown 7.5 m above the formation + 0.7 m of cover, tapering off beside the tunnel
       if (cov > 0.01 && kind !== 'tram') h = Math.max(h, formY + 8.2 * smooth01(cov / 4) * (1 - smooth01((q.d - 8) / 7)));
@@ -752,6 +761,15 @@
       terrainHeightAt,
       terrainBaseHeightAt,
       crossingRoads: roadPlan,
+      surroundPatches,
+      /* true inside the real patch of a station (the generic scenery keeps out of it) */
+      inSurround: surroundPatches.length ? (x, z) => { const q = nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 }); return surroundPatches.some((p) => p.covers(q.s, q.lat)); } : () => false,
+      /* extra terrain strip vertices for the chunk [s0, s1): rows (arc lengths) and lateral columns, from the crossing roads and the real station patches */
+      meshHints: {
+        rows: (s0, s1) => (roadPlan ? roadPlan.extraRows(s0, s1) : []).concat(...surroundPatches.map((p) => p.extraRows(s0, s1))),
+        lats: (s0, s1) => (roadPlan ? roadPlan.extraLats(s0, s1) : []),
+        latsAll: (s0, s1) => [].concat(...surroundPatches.map((p) => p.extraLats(s0, s1))),
+      },
       nearest: (x, z) => Object.assign({}, nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 })),
       nearestS: (x, z) => nearest(x, z, scratch).s,
       distanceToTrack: (x, z) => nearest(x, z, scratch).d,
