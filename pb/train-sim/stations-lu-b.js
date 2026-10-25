@@ -731,6 +731,9 @@
     return { cars, house, postShelter, timberShelter, silo, bikebox, lampOld, paveStrip, glassRoofShelter, footbridge, clockFace, cylTower, texBox, concBatch, leanCanopy, yellowDisplay, paving, waveCanopy, lift, stairOpening, X, vc, glow, glass, glassDark, steel, tex, matTex, facadeBatch, roofBatch, timberBatch, plainBatch, quadO, triUV, walls, roof, chimney, dormer, glassPane, bench, bin, lamp, clockPole, totem, sign, yellowBoard, boxShelter, glassShelter, track, platformBox, steelB: steel };
   }
 
+  // the kit is shared with the later station files (stations-lu-c.js ...)
+  window.TS.stationKits = Object.assign(window.TS.stationKits || {}, { luB: makeKit });
+
   /* ================================================================ PAFENDALL-KIERCHBIERG (Pfaffenthal-Kirchberg)
    * Refs: refs/ST-LU-B/Pafendall_1..4 + Pafendall_s* (Commons: Gare Pfaffenthal-Kirchberg 10-2017 *, Luxembourg Kirchberg-Pfaffenthal station 2024 *).
    * 2017 station in the Alzette valley cut: two side platforms with silver folded (origami) canopies, grey tiled platforms, concrete retaining

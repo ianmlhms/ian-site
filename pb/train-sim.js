@@ -126,7 +126,7 @@
   const endless = { order: [], index: 0, loops: 0, total: { cash: 0, points: 0 }, active: false };
   let frameHandle = 0, lastFrame = 0, hudClock = 0, todClock = 0, accum = 0, elapsedReal = 0;
   let toastWait = 0, demoAngle = 0, demoTimer = 0, scorePosted = 0, serviceStartedAt = 0;
-  let testMode = false, errorsSeen = 0, forcedPlan = null, lastSpadToast = 0, calmServices = false;
+  let testMode = false, testFreeCam = null, errorsSeen = 0, forcedPlan = null, lastSpadToast = 0, calmServices = false;
   const settle = { sig: '', stable: 0 };   // test hook only: how many frames the camera has not moved
 
   /* ------------------------------------------------------------ device */
@@ -454,6 +454,8 @@
     await frameDelay();
     if (isLux && TS.luxtram && TS.luxtram.preload) await safe('luxtram preload', () => TS.luxtram.preload((f) => loaderSet(f * 0.14)), Promise.resolve());   // track, world and landmark data: real byte progress
     loaderSet(isLux ? 0.16 : 0.15);
+    if (!isLux && TS.realLine && TS.realLine.preload) await safe('real line preload', () => TS.realLine.preload(routeDef), Promise.resolve());   // scenery data of the Mosel line (rivers, relief, land, roads)
+    if (!isLux && TS.stationSurround && TS.stationSurround.preload) await safe('station surround preload', () => TS.stationSurround.preload(routeDef.stations), Promise.resolve());   // real surroundings of stations (patch data), before the track is built
     const track = build('track', 'build', [routeDef]);
     if (!track) throw new Error('Track build failed');
     let resumeSim = null, resumeWorld = null;
@@ -720,6 +722,12 @@
   function updateCamera(dt, state) {
     const w = world;
     if (!w || !camera) return;
+    if (testFreeCam) {   // test hook only (__tsTest.setFreeCam): scenery checks and screenshot tours place the camera anywhere
+      camera.position.set(testFreeCam.pos[0], testFreeCam.pos[1], testFreeCam.pos[2]);
+      camera.lookAt(testFreeCam.look[0], testFreeCam.look[1], testFreeCam.look[2]);
+      if (testFreeCam.fov && Math.abs(camera.fov - testFreeCam.fov) > 0.01) { camera.fov = testFreeCam.fov; camera.updateProjectionMatrix(); }
+      return;
+    }
     const L = trainLength(), frontS = state ? state.s : 0;
     const k = 1 - Math.exp(-7 * dt);
     if (camMode === 'cab') {
@@ -1534,6 +1542,7 @@
       if (w.crossingClosed.get(i) !== closed) {
         w.crossingClosed.set(i, closed);
         safe('setCrossing', () => w.infra.setCrossing(i, closed));
+        safe('crossing traffic', () => w.landscape && w.landscape.setCrossing && w.landscape.setCrossing(w.track.baseS ? w.track.baseS(c.s) : c.s, closed));
       }
       if (closed && Math.abs(c.s - state.s) < 400) sfx('signalBell', 1, clamp(1 - Math.abs(c.s - state.s) / 400, 0.05, 1));
     });
@@ -2472,7 +2481,9 @@
       setSpeed(kmh) { if (world) world.sim.setSpeed(kmh / 3.6); },
       stationReport() { return world && world.infra && world.infra.stationReport ? world.infra.stationReport() : null; },
       trackInfo() { return world ? world.track : null; },
-      internals() { return { scene, camera, renderer, world, THREE }; },   // test-only: automated scenery checks (scripts/flows, tour)
+      internals() { return { scene, camera, renderer, world, THREE }; },
+      /* { pos:[x,y,z], look:[x,y,z], fov? } puts the camera anywhere (null = back to the normal camera) */
+      setFreeCam(cam) { testFreeCam = cam && Array.isArray(cam.pos) && Array.isArray(cam.look) ? { pos: cam.pos.slice(0, 3), look: cam.look.slice(0, 3), fov: cam.fov || 0 } : null; return !!testFreeCam; },   // test-only: automated scenery checks (scripts/flows, tour)
       setGrade(g) { if (world) world.sim.setGradeOverride(g); },
       placeAt(s, kmh = 0) { const w = world; if (!w || phase !== 'running') return false; w.sim.place(s, kmh / 3.6); w.state = w.sim.step(0, { lever: input.lever, passengers: w.onboard }); return true; },
       forcePlan(plan) { forcedPlan = plan ? { pattern: 'RB', pass: [], tsr: [], incidents: [], ...plan } : null; },

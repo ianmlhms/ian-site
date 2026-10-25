@@ -19,6 +19,7 @@ window.TS = window.TS || {};
     low:    { ahead: 4, behind: 1, strip: 90,  trees: 0.3, shadow: 0,    rain: 1800, houses: 0.6, rowStep: 25, cars: 16, far: true }
   };
   const LAT_OFFSETS = [0, 3, 6, 9, 13, 18, 24, 31, 40, 52, 66, 82, 100, 120, 150];
+  const ROAD_LAT_OFFSETS = [-12, -8, -5.2, -3.6, -2, 0, 2, 3.6, 5.2, 8, 12];   // extra terrain columns beside a road that runs parallel to the line (crossing-roads.js)
 
   /* ---------- small math helpers ---------- */
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -263,8 +264,10 @@ window.TS = window.TS || {};
       geo.computeVertexNormals();
       mb.addGeo(geo, placeM(x, y, z, x * 3.1, rx, ry, rz), leafCol(pair, y0, y1));
     };
+    const bark = C('#4a3a2c');
+    let mb = new MB();
+    if (!TS.treeKit) { // fallback: the old flat-shaded species (tree-kit.js builds the painted ones)
     // oak: broad, layered blobs
-    let mb = new MB(); const bark = C('#4a3a2c');
     mb.addGeo(cylGeo(0.22, 0.38, 3.2, 6), placeM(0, 1.6, 0), bark);
     [[0, 4.6, 0, 2.7, 2.1, 2.7], [1.7, 3.8, 0.7, 1.9, 1.6, 1.9], [-1.6, 4.0, -0.6, 2.0, 1.7, 2.0], [0.3, 6.0, 0.1, 1.9, 1.5, 1.9], [-0.4, 3.6, 1.6, 1.6, 1.3, 1.6]]
       .forEach(b => blob(mb, b[0], b[1], b[2], b[3], b[4], b[5], LEAF.oak, 2, 7.5));
@@ -291,6 +294,7 @@ window.TS = window.TS || {};
     mb = new MB(); // bush / hedge shrub
     blob(mb, 0, 0.55, 0, 1.0, 0.75, 1.0, LEAF.bush, 0, 1.4, 1); blob(mb, 0.7, 0.4, 0.2, 0.7, 0.55, 0.7, LEAF.bush, 0, 1.2, 0);
     kit.bush = mb.build();
+    }
     mb = new MB(); // grass tuft for the verge
     [[0.12, 0, 0], [0.4, 2.1, 0.1], [-0.38, 4.2, -0.1]].forEach(([tilt, rot, off], i) => {
       const g = new T.ConeGeometry(0.09, 0.55 + i * 0.06, 3, 1).translate(off * 0.2, 0.27, 0), m = new T.Matrix4().makeRotationY(rot).multiply(new T.Matrix4().makeRotationZ(tilt));
@@ -651,7 +655,7 @@ window.TS = window.TS || {};
   function create(scene, track, opts) {
     const quality = opts && QUALITY[opts.quality] ? opts.quality : 'medium';
     const Q = QUALITY[quality];
-    const L = track.length, seedBase = hashString(String(track.id || 'route'));
+    const L = track.length, seedBase = hashString(String(track.sceneryId || track.id || 'route'));
     const riverSide = (seedBase & 1) ? 1 : -1;
     const root = new T.Group(); root.name = 'landscape'; scene.add(root);
     const chunks = new Map();
@@ -715,23 +719,30 @@ window.TS = window.TS || {};
     }
     // A1's terrainHeightAt already shapes formation, cuttings, tunnel covers, bridge valleys and the river bed.
     const riverBridges = bridges.filter(b => b.waterY !== null && b.waterY !== undefined);
-    function groundY(info, lat, x, z, sExact) {
-      let h = terrainH(x, z);
-      if (riverBridges.length) { // cut a river channel through the meadow under a river viaduct (A1 only digs a bowl)
-        const s = sExact === undefined ? info.s : sExact;
-        for (const b of riverBridges) {
-          const du = Math.abs(s - (b.s0 + b.s1) / 2); if (du > 90) continue;
-          const hw = Math.min(8 + (b.s1 - b.s0) * 0.1, (b.s1 - b.s0) / 2 + 3);
-          const c = (1 - smooth(hw, hw + 16, du)) * (1 - smooth(70, 125, Math.abs(lat)));
-          if (c > 0) h = lerp(h, Math.min(h, b.waterY - 1.5), c);
-        }
+    /* river channel under a river viaduct (A1 only digs a bowl): the strip mesh lies lower than terrainHeightAt there */
+    function carveRiver(h, s, lat) {
+      for (const b of riverBridges) {
+        const du = Math.abs(s - (b.s0 + b.s1) / 2); if (du > 90) continue;
+        const hw = Math.min(8 + (b.s1 - b.s0) * 0.1, (b.s1 - b.s0) / 2 + 3);
+        const c = (1 - smooth(hw, hw + 16, du)) * (1 - smooth(70, 125, Math.abs(lat)));
+        if (c > 0) h = lerp(h, Math.min(h, b.waterY - 1.5), c);
       }
       return h;
     }
+    function groundY(info, lat, x, z, sExact) {
+      const h = terrainH(x, z);
+      return riverBridges.length ? carveRiver(h, sExact === undefined ? info.s : sExact, lat) : h;
+    }
+    /* the height of the drawn strip ground at a world point (test hook for the hole detector) */
+    function groundHeightAt(x, z) { const q = track.nearest(x, z); return groundY(rowInfo(q.s), q.lat, x, z, q.s); }
     const riverLat = w => w.side * w.offset;
     const worldAt = (info, lat) => ({ x: info.f.x + info.f.rx * lat, z: info.f.z + info.f.rz * lat });
     const yawOf = f => Math.atan2(-f.tz, f.tx);
 
+    /* real line: ground colour by land class (strip) and far colour by the coarse class raster; classes in real-line.js CLASS */
+    const CLS_GROUND = ['#a3b45a', '#7ba947', '#4a7a38', '#9db056', '#7f9c5a', '#8a8a80', '#6a8a5a', '#7da24a', '#8a8c80', '#6f8d4a', '#a79e88', '#7da24e', '#80ad4c'].map(C);
+    const FAR_CROPS = ['#cbb868', '#9db455', '#8aa850', '#b99f5c', '#c9c470', '#7fae4a'].map(C);
+    const CLS_FAR = ['#b9b45f', '#7fae4a', '#3b6430', '#a3ae56', '#8c9a70', '#858580', '#5d8fa6', '#74a447', '#8d8b84', '#6b8d46', '#a89f8a', '#7aa84a', '#80ad4c'].map(C);
     function groundColor(info, x, z, nY, lat, h) {
       const pal = PAL[info.biome] || PAL.farmland, a = Math.abs(lat);
       const c = mixColor(pal.g1, pal.g2, fbm(x * 0.008, z * 0.008));
@@ -742,6 +753,7 @@ window.TS = window.TS || {};
       if (rock > 0) c.lerp(pal.rock, rock * 0.85);
       if (info.biome === 'industrial') { c.lerp(COL.red, 0.3 + 0.4 * fbm(x * 0.02, z * 0.02)).lerp(COL.dark, 0.5 * smooth(0.5, 0.75, fbm(x * 0.03 + 9, z * 0.03))); c.lerp(COL.slag, 0.55 * smooth(0.55, 0.8, fbm(x * 0.045 - 5, z * 0.045 + 2))); }
       if (info.wat) { const dd = Math.abs(lat - riverLat(info.wat)), m = 1 - smooth(info.wat.halfWidth + 2, info.wat.halfWidth + 16, dd); if (m > 0) c.lerp(h < info.wat.y + 0.4 ? COL.mud : COL.sand, m * 0.85); }
+      if (track.real && info.biome !== 'tramcity') c.lerp(CLS_GROUND[track.real.landAt(info.s, lat)] || CLS_GROUND[0], 0.72);
       if (info.biome === 'tramcity') { c.lerp(COL.yard, 0.9); if (a < 9.4) c.lerp(COL.asphalt, smooth(9.6, 8.6, a)); else if (a < 13.2) c.lerp(COL.side, smooth(9.2, 9.9, a) * smooth(13.4, 12.5, a)); }
       else if (info.biome === 'city') { if (a < 25) c.lerp(COL.yard, smooth(26, 20, a) * 0.95); if (a > 21 && a < 25) c.lerp(COL.side, 0.35); }
       c.multiplyScalar(b);
@@ -769,6 +781,14 @@ window.TS = window.TS || {};
     const matFar = withSnow(new T.MeshLambertMaterial({ vertexColors: true, map: texGrass() }), 1);
     const mats = [matLamp, matSmoke, matTerrain, matFieldRows, matFieldVines, matFieldMeadow, matHouse, matBlock, matRoof, matRoad, matLeaf, matCar, matWater, matFar];
     const treeKit = buildTreeKit(), carGeo = buildCarGeo();
+    /* painted trees (tree-kit.js) in one LOD-sorted, frustum-culled pool for the whole route (tree-field.js); the chunks only hand over their per-species lists */
+    let treeFieldKit = null, treeField = null;
+    try {
+      if (TS.treeKit && TS.treeField) {
+        treeFieldKit = TS.treeKit.create({ decorate: (m) => withSnow(m, 0.55), antialias: quality !== 'low' });
+        treeField = TS.treeField.create({ parent: root, kit: treeFieldKit, quality, shadows: !!Q.shadow });
+      }
+    } catch (e) { console.warn(TAG + 'tree field failed, using the plain trees', e); treeField = null; treeFieldKit = null; }
 
     /* --- shared grid mesher (draped quads with smooth normals) --- */
     function addGrid(mb, grid, uvFn, colorFn, lift) {
@@ -800,18 +820,28 @@ window.TS = window.TS || {};
       if (track.kind !== 'tram') for (const tn of tunnels) for (const ps of [tn.s0, tn.s1]) {
         if (ps >= s0 - 0.5 && ps <= s0 + CHUNK + 0.5) rowS.push(ps - 0.3, ps + 0.3);
       }
+      /* roads at level crossings (crossing-roads.js): rows and columns where the road runs, so the strip mesh follows the road exactly (rows strictly inside this chunk only) */
+      const roadPlan = track.crossingRoads, hints = track.meshHints;
+      const lats = LAT.slice();
+      if (hints) {
+        for (const s of hints.rows(s0 + 0.02, s0 + CHUNK - 0.02)) if (s > s0 + 0.02 && s < s0 + CHUNK - 0.02 && !rowS.some(r => Math.abs(r - s) < 0.45)) rowS.push(s);
+        for (const lat of hints.lats(s0, s0 + CHUNK)) for (const off of ROAD_LAT_OFFSETS) { const v = lat + off; if (Math.abs(v) < W - 2 && !lats.some(l => Math.abs(l - v) < 0.6)) lats.push(v); }
+        for (const v of hints.latsAll(s0, s0 + CHUNK)) if (Math.abs(v) < W - 2 && !lats.some(l => Math.abs(l - v) < 0.9)) lats.push(v);
+        lats.sort((p, q) => p - q);
+      }
+      void roadPlan;
       rowS.sort((p, q) => p - q);
       const portalPad = new Set();   // the pad rows of a portal pair: the quads between them (the ground's cliff face at the mouth) get a hole so the bore stays open
       if (track.kind !== 'tram') for (const tn of tunnels) for (const ps of [tn.s0, tn.s1]) if (ps >= s0 - 0.5 && ps <= s0 + CHUNK + 0.5) for (let a = 0; a + 2 < rowS.length; a++) if (rowS[a + 1] >= ps - 0.3 - 1e-6 && rowS[a + 2] <= ps + 0.3 + 1e-6) portalPad.add(a);
       for (let jj = 0; jj < rowS.length; jj++) {
         const s = rowS[jj], info = rowInfo(s), f = frame(s), row = [];
-        for (let i = 0; i < LAT.length; i++) {
-          const lat = LAT[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat;
+        for (let i = 0; i < lats.length; i++) {
+          const lat = lats[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat;
           row.push({ x, z, y: groundY(info, lat, x, z, s), lat, info });
         }
         grid.push(row);
       }
-      const mb = new MB(), inner = grid.slice(1, grid.length - 1), nB = LAT.length;
+      const mb = new MB(), inner = grid.slice(1, grid.length - 1), nB = lats.length;
       // use the padded rows for normals: build a grid with one extra row on each side, then drop them
       const full = grid;
       const nA = full.length, base = mb.count, n = new T.Vector3(), u = new T.Vector3(), v = new T.Vector3();
@@ -824,7 +854,7 @@ window.TS = window.TS || {};
       }
       const nR = nA - 2;
       for (let a = 0; a < nR - 1; a++) for (let b = 0; b < nB - 1; b++) {
-        if (portalPad.has(a) && Math.abs(LAT[b]) <= PORTAL_HOLE && Math.abs(LAT[b + 1]) <= PORTAL_HOLE) continue;
+        if (portalPad.has(a) && Math.abs(lats[b]) <= PORTAL_HOLE && Math.abs(lats[b + 1]) <= PORTAL_HOLE) continue;
         const i0 = base + a * nB + b, i1 = i0 + 1, i2 = i0 + nB, i3 = i2 + 1;
         mb.i.push(i0, i1, i2, i1, i3, i2);
       }
@@ -904,7 +934,10 @@ window.TS = window.TS || {};
       const bMid = biomeAt(sMid), bStart = biomeAt(s0 + 5), bEnd = biomeAt(s1 - 5);
       const place = (s, lat) => { const f = frame(s), info = rowInfo(s), x = f.x + f.rx * lat, z = f.z + f.rz * lat; return { f, info, x, z, y: groundY(info, lat, x, z) }; };
       const r3 = r => { const c = r() < 0.15 ? C('#f2e2a0') : C('#ffffff'); return c.multiplyScalar(0.75 + r() * 0.4); };
+      const roadPlanC = track.crossingRoads;
+      const onRoad = (x, z, m) => (!!roadPlanC && roadPlanC.reserved(x, z, m)) || (!!track.inSurround && track.inSurround(x, z));   // crossing roads (crossing-roads.js) and the real station patches (station-surround.js): nothing generic grows or stands there
       const addTree = (name, x, y, z, sc, r) => {
+        if (onRoad(x, z, name === 'bush' ? 1.6 : 3.4)) return;
         const tint = r() < 0.12 ? C('#e6e4a8') : C('#ffffff'); tint.multiplyScalar(0.82 + r() * 0.32);
         trees[name].push({ x, y, z, rot: r() * 6.28, sc, tint });
       };
@@ -915,9 +948,11 @@ window.TS = window.TS || {};
         return chunkRoads[chunkRoads.length - 1];
       };
 
+      const realMode = !!(track.real && TS.realScenery);   // Mosel line: villages, fields, woods, roads and trees come from the real data (real-scenery.js)
+
       /* ---- villages ---- */
       const vp = (VILLAGE_P[bMid] || 0) * Q.houses;
-      if (vp > 0 && rng() < vp && !inTunnel(sMid, 140) && !inBridge(sMid, 140)) {
+      if (!realMode && vp > 0 && rng() < vp && !inTunnel(sMid, 140) && !inBridge(sMid, 140)) {
         const side = rng() < 0.5 ? -1 : 1, L0 = 30 + rng() * 14, sC = sMid + (rng() - 0.5) * 60, half = 55 + rng() * 45;
         addRoadRibbon(() => side * L0, sC - half - 14, sC + half + 14, 3.3).city = true;
         markOcc(sC - half - 16, sC + half + 16, side * (L0 - 18), side * (L0 + 32));
@@ -928,7 +963,7 @@ window.TS = window.TS || {};
             const s = sC + ds + rng() * 3, lat = side * (L0 + row * (9.5 + rng() * 3));
             const wantChurch = !churchDone && row === 1 && Math.abs(ds) < half * 0.5 && rng() < 0.35;
             const p = place(s, lat);
-            if (inTunnel(s, 30) || inBridge(s, 40)) continue;
+            if (inTunnel(s, 30) || inBridge(s, 40) || onRoad(p.x, p.z, 9)) continue;
             const facing = (row === -1 ? side : -side), yaw = yawOf(p.f) + (facing > 0 ? 0 : Math.PI), M0 = placeM(p.x, p.y - 0.1, p.z, yaw);
             if (wantChurch) { churchDone = true; addChurch(mbHouse, mbRoof, M0, rng); }
             else addHouse(mbHouse, mbRoof, M0, rng, {});
@@ -938,9 +973,9 @@ window.TS = window.TS || {};
       }
 
       /* ---- lone farms ---- */
-      if (['farmland', 'highspeed', 'ardennes', 'forest', 'vineyard'].includes(bMid) && rng() < 0.32 * Q.houses && !inTunnel(sMid, 120) && !inBridge(sMid, 120)) {
+      if (!realMode && ['farmland', 'highspeed', 'ardennes', 'forest', 'vineyard'].includes(bMid) && rng() < 0.32 * Q.houses && !inTunnel(sMid, 120) && !inBridge(sMid, 120)) {
         const side = rng() < 0.5 ? -1 : 1, sF = sMid + (rng() - 0.5) * 100, lF = side * (42 + rng() * 40);
-        if (!isOcc(sF - 30, sF + 30, lF - 22, lF + 22)) {
+        if (!isOcc(sF - 30, sF + 30, lF - 22, lF + 22) && !onRoad(place(sF, lF).x, place(sF, lF).z, 26)) {
           const p = place(sF, lF), yaw = yawOf(p.f) + (side > 0 ? Math.PI : 0), cs = Math.cos(yaw), sn = Math.sin(yaw);
           const at = (dx, dz) => placeM(p.x + cs * dx + sn * dz, groundY(p.info, lF, p.x + cs * dx + sn * dz, p.z - sn * dx + cs * dz) - 0.1, p.z - sn * dx + cs * dz, yaw);
           addHouse(mbHouse, mbRoof, at(0, 0), rng, { w: 12, d: 8, floors: 2, annex: false });
@@ -954,7 +989,7 @@ window.TS = window.TS || {};
 
       /* ---- city blocks ---- */
       const cityBiomes = bMid === 'city' || bMid === 'tramcity';
-      if (cityBiomes && !track.ownScenery) { // LUXTRAM: routes with ownScenery draw their own city (luxtram-world.js)
+      if (cityBiomes && !track.ownScenery && !realMode) { // LUXTRAM: routes with ownScenery draw their own city (luxtram-world.js)
         const tram = bMid === 'tramcity';
         for (const side of [-1, 1]) {
           const rows = tram ? [{ l: 14.5, dep: 14, fl: [3, 7] }, { l: 40, dep: 18, fl: [5, 10] }] : [{ l: 25, dep: 18, fl: [4, 9] }, { l: 62, dep: 20, fl: [6, 12] }];
@@ -993,7 +1028,7 @@ window.TS = window.TS || {};
       function tramLike() { return bMid === 'tramcity'; }
 
       /* ---- industry ---- */
-      if (bMid === 'industrial') {
+      if (bMid === 'industrial' && !realMode) {
         const side = rng() < 0.5 ? -1 : 1;
         if (hash2(k, seedBase & 255) < 0.34 && !inTunnel(sMid, 80)) {
           const p = place(sMid + (rng() - 0.5) * 60, side * (88 + rng() * 25));
@@ -1036,7 +1071,7 @@ window.TS = window.TS || {};
       }
 
       /* ---- wind turbines ---- */
-      const tp = bMid === 'highspeed' ? 0.65 : bMid === 'farmland' ? 0.08 : 0;
+      const tp = realMode ? 0 : bMid === 'highspeed' ? 0.65 : bMid === 'farmland' ? 0.08 : 0;
       const turbineSpots = [];
       if (tp > 0 && rng() < tp) {
         const n = 1 + Math.floor(rng() * 2);
@@ -1045,7 +1080,7 @@ window.TS = window.TS || {};
 
       /* ---- woodlots & fields ---- */
       const wild = bMid === 'forest' || bMid === 'ardennes';
-      if (!cityBiomes && bMid !== 'industrial' && !wild) {
+      if (!realMode && !cityBiomes && bMid !== 'industrial' && !wild) {
         const nWood = Math.floor(rng() * 2.2);
         for (let n = 0; n < nWood; n++) {
           const side = rng() < 0.5 ? -1 : 1, sa = s0 + rng() * (CHUNK - 70), la = 22 + rng() * 60, w = { s0: sa, s1: sa + 40 + rng() * 70, l0: side * la, l1: side * (la + 25 + rng() * 45) };
@@ -1055,7 +1090,7 @@ window.TS = window.TS || {};
         }
       }
       const fieldP = (FIELD_P[bMid] === undefined ? 0 : FIELD_P[bMid]) * (quality === 'low' ? 0.8 : 1);
-      if (fieldP > 0) {
+      if (fieldP > 0 && !realMode) {
         for (const side of [-1, 1]) {
           let sCur = s0 + rng() * 15;
           while (sCur < s1 - 25) {
@@ -1077,9 +1112,11 @@ window.TS = window.TS || {};
         }
       }
       function nearStationField(s, l) { return l < 18 && nearStation(s, 20); }
-      function addField(fm, r, biome, sa, sb, la, lb) {
+      function addField(fm, r, biome, sa, sb, la, lb, forceKind) {
+        if (track.inSurround) { const c = [[sa, la], [sa, lb], [sb, la], [sb, lb], [(sa + sb) / 2, (la + lb) / 2]]; if (c.some(([ss, ll]) => { const f = frame(ss); return track.inSurround(f.x + f.rx * ll, f.z + f.rz * ll); })) return; }
         let kind;
-        if (biome === 'vineyard') kind = r() < 0.96 ? 'vines' : 'meadow';
+        if (forceKind) kind = forceKind;
+        else if (biome === 'vineyard') kind = r() < 0.96 ? 'vines' : 'meadow';
         else if (biome === 'suburb' || biome === 'ardennes' || biome === 'river') kind = r() < 0.7 ? 'meadow' : pick(r, ['rowsGold', 'rowsGreen']);
         else kind = pick(r, ['rowsGold', 'rowsGold', 'rowsGreen', 'rowsGreen', 'rowsBrown', 'rowsRape', 'meadow', 'meadow']);
         const spec = FIELD_KINDS[kind], tint = C(pick(r, spec.tint)), mb = kind === 'vines' ? fm.vines : spec.tex === 'rows' ? fm.rows : fm.meadow;
@@ -1113,7 +1150,7 @@ window.TS = window.TS || {};
 
       /* ---- country roads ---- */
       const roadGroup = Math.floor(k / 3);
-      if (!cityBiomes && bMid !== 'industrial' && hash2(roadGroup, seedBase & 1023) < (bMid === 'highspeed' ? 0.35 : 0.6)) {
+      if (!realMode && !cityBiomes && bMid !== 'industrial' && hash2(roadGroup, seedBase & 1023) < (bMid === 'highspeed' ? 0.35 : 0.6)) {
         const side = hash2(roadGroup, 77) < 0.5 ? -1 : 1, off = 38 + 12 * hash2(roadGroup, 5), ph = hash2(roadGroup, 9) * 6;
         const latFn = s => side * (off + 10 * Math.sin(s / 310 + ph));
         if (!isOcc(s0, s1, side * (off - 14), side * (off + 14)) && !inTunnel(sMid, 130) && !inBridge(sMid, 130)) {
@@ -1123,7 +1160,7 @@ window.TS = window.TS || {};
       }
 
       /* ---- trees ---- */
-      const nAttempt = Math.round((wild ? 1150 : 600) * Q.trees);
+      const nAttempt = realMode ? 0 : Math.round((wild ? 1150 : 600) * Q.trees);
       for (let n = 0; n < nAttempt; n++) {
         const s = s0 + rng() * CHUNK, side = rng() < 0.5 ? -1 : 1;
         const lmin = nearStation(s, 25) ? 18 : TREE_CLEAR_LAT, lat = side * (lmin + (W - 8 - lmin) * Math.pow(rng(), 1.3));
@@ -1142,10 +1179,18 @@ window.TS = window.TS || {};
         addTree(name, x, groundY(info, lat, x, z) - 0.15, z, lerp(sc[0], sc[1], rng()), rng);
       }
       // tree belt right beside the track in open country (gives depth to the cab view)
-      if (!cityBiomes && !wild && bMid !== 'industrial') for (let s = s0 + 4; s < s1; s += 7 + rng() * 8) {
+      if (!realMode && !cityBiomes && !wild && bMid !== 'industrial') for (let s = s0 + 4; s < s1; s += 7 + rng() * 8) {
         if (rng() > 0.45 * Q.trees + 0.15 || nearStation(s, 30) || inTunnel(s, 20) || inBridge(s, 30)) continue;
         const side = rng() < 0.5 ? -1 : 1, p = place(s, side * (TREE_CLEAR_LAT + 1 + rng() * 6)), nm = pickSpecies('def', rng()), sc = SPECIES_SCALE[nm];
         addTree(nm, p.x, p.y - 0.15, p.z, lerp(sc[0], sc[1], rng()), rng);
+      }
+
+      /* ---- real scenery of the Mosel line (replaces the generic villages / fields / woods / roads / trees above) ---- */
+      if (realMode) {
+        TS.realScenery.fill({
+          k, s0, s1, rng, Q, W, track, real: track.real, place, frame, rowInfo, groundY, yawOf, placeM, addTree, pickSpecies, addField, fieldMB, mbHouse, mbBlock, mbRoof, mbRoad, addGrid,
+          addHouse, addBlock, addChurch, addShed, chunkRoads, isOcc, markOcc, inTunnel, inBridge, riverBridgeAt, nearStation, onRoad, TREE_CLEAR_LAT, C, pick, T, SPECIES_SCALE,
+        });
       }
 
       /* ---- grass tufts on the verge (cab-view texture) ---- */
@@ -1201,14 +1246,28 @@ window.TS = window.TS || {};
         blades.position.set(0, 89.5, 6.2); group.add(hubG); turbines.push({ spin: blades, speed: 0.9 + rng() * 0.6, group: hubG });
       }
       const hubs = [];
+      if (treeField) { // species handled by the tree field leave the chunk's own instancing (the field keeps one pooled mesh per species and LOD for the whole route)
+        const mine = {}; let some = false;
+        for (const name of Object.keys(trees)) if (treeField.has(name) && trees[name].length) { mine[name] = trees[name]; some = true; }
+        if (some) treeField.add(k, mine);
+      }
       for (const name of Object.keys(trees)) {
         const list = trees[name]; if (!list.length) continue;
+        if (treeField && treeField.has(name)) continue;
         const im = new T.InstancedMesh(treeKit[name], name === 'lampHead' ? matLamp : matLeaf, list.length), m = new T.Matrix4(), q = new T.Quaternion();
         list.forEach((t, i) => { q.setFromAxisAngle(UP, t.rot); m.compose(TMP_P.set(t.x, t.y, t.z), q, TMP_S.set(t.sc, t.sc * (0.92 + 0.16 * hash2(i, k)), t.sc)); im.setMatrixAt(i, m); im.setColorAt(i, t.tint); });
         im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
         im.castShadow = quality !== 'low' && name !== 'tuft' && name !== 'sheep' && name !== 'lampHead'; im.receiveShadow = false; if (im.computeBoundingSphere) im.computeBoundingSphere(); group.add(im); hubs.push(im);
       }
+      if (terr) terr.name = 'ls-terrain';
       void terr;
+      /* ---- roads at level crossings: the chunk that holds the crossing builds the whole road (asphalt, lines, signs) */
+      if (roadPlanC && TS.crossingRoadsMesh) {
+        for (const c of roadPlanC.crossings) {
+          if (c.s < s0 || c.s >= s1) continue;
+          try { group.add(TS.crossingRoadsMesh.build(c, roadPlanC, { quality })); } catch (e) { console.warn(TAG + 'crossing road ' + c.index + ' failed', e); }
+        }
+      }
       root.add(group);
       return { k, group, roads: chunkRoads };
     }
@@ -1223,6 +1282,7 @@ window.TS = window.TS || {};
       let h = farCache.get(key); if (h !== undefined) return h;
       h = terrainH(x, z); const d = distToTrack(x, z);
       if (d < W) {
+        if (riverBridges.length) { const q = track.nearest(x, z); h = carveRiver(h, q.s, q.lat); }   // the far ground stays below the carved river channel too
         const f = 1 - smooth(W - 40, W, d);
         let low = h - 22 * f;
         /* tunnel corridor: the coarse far triangles (24 m / 96 m grid) must never cross the tube.  A vertex next to a tunnel (+/- FAR_TUNNEL_PAD m along it, which
@@ -1240,6 +1300,16 @@ window.TS = window.TS || {};
     const FAR_LAND = [C('#86a84e'), C('#3f6a33'), C('#bfae5c'), C('#7ea84c'), C('#807d70')];
     let forestTh = 0.56;
     function farColor(x, z, nY) {
+      if (track.real) {
+        const q = track.nearest(x, z);
+        if (Math.abs(q.lat) < 1500) {
+          const cls = track.real.farAt(q.s, q.lat);
+          const c = CLS_FAR[cls].clone();
+          if (cls === 0 || cls === 1) { const pv = hash2(Math.floor(x / 80), Math.floor(z / 80)); c.lerp(FAR_CROPS[Math.floor(pv * FAR_CROPS.length) % FAR_CROPS.length], cls === 0 ? 0.8 : 0.45); }   // parcel mosaic
+          c.lerp(FAR_LAND[4], smooth(0.1, 0.36, 1 - nY) * 0.7);
+          return c.multiplyScalar(0.88 + 0.24 * vnoise(x * 0.012, z * 0.012) + 0.1 * (vnoise(x * 0.05, z * 0.05) - 0.5));
+        }
+      }
       const n = fbm(x * 0.0009 + 3, z * 0.0009), m = fbm(x * 0.003, z * 0.003 + 8);
       const c = n > forestTh ? mixColor(FAR_LAND[3], FAR_LAND[1], smooth(forestTh, forestTh + 0.1, n)) : mixColor(FAR_LAND[0], m > 0.5 ? FAR_LAND[2] : FAR_LAND[3], smooth(0.4, 0.6, m));
       c.lerp(FAR_LAND[4], smooth(0.1, 0.36, 1 - nY) * 0.8);
@@ -1482,6 +1552,7 @@ window.TS = window.TS || {};
 
     function disposeChunk(c) {
       root.remove(c.group);
+      if (treeField) treeField.remove(c.k);
       c.group.traverse(o => {
         if (o.isInstancedMesh) o.dispose();
         else if (o.isMesh && o.geometry) { o.geometry.dispose(); const wi = waterMeshes.indexOf(o); if (wi >= 0) waterMeshes.splice(wi, 1); }
@@ -1565,6 +1636,9 @@ window.TS = window.TS || {};
       waterNormal.offset.x = (elapsed * 0.012) % 1; waterNormal.offset.y = (elapsed * 0.02) % 1;
       for (const t of turbines) t.spin.rotation.z += dt * t.speed;
       if (carList.length) updateCars(dt);
+      if (crossTraffic) crossTraffic.update(dt, s, camera);
+      if (surround) surround.update(s);
+      if (treeField) treeField.update(camera || null, dt);
       firstUpdate = false;
     }
 
@@ -1583,15 +1657,34 @@ window.TS = window.TS || {};
       if (disposed) return; disposed = true;
       for (const c of chunks.values()) disposeChunk(c);
       chunks.clear(); roadsAll.clear();
+      if (crossTraffic) crossTraffic.dispose();
+      if (surround) surround.dispose();
       scene.remove(root);
       root.traverse(o => { if (o.isMesh || o.isPoints || o.isLine) { if (!o.isInstancedMesh || o === carMesh) { if (o.geometry && o.geometry !== carGeo) o.geometry.dispose(); } if (o.material && o.material.isShaderMaterial) o.material.dispose(); } });
+      if (treeField) treeField.dispose(); if (treeFieldKit) treeFieldKit.dispose();
       occ.dispose(); carGeo.dispose(); Object.keys(treeKit).forEach(n => treeKit[n].dispose()); carMesh.dispose();
-      mats.forEach(m => m.dispose()); skyMat.dispose(); sun.shadow && sun.shadow.map && sun.shadow.map.dispose();
+      holeMat.dispose(); mats.forEach(m => m.dispose()); skyMat.dispose(); sun.shadow && sun.shadow.map && sun.shadow.map.dispose();
       if (scene.fog === ownFog) scene.fog = prevFog || null;
     }
 
+    /* test hooks (scripts/zuch/hole_scan.mjs): holeMode hides everything that could fill a hole in the ground (sky dome, backdrop hills, the safety plane) so a
+       magenta clear colour shows wherever no ground is drawn; terrainMeshes() lists the streamed strip meshes for ray checks */
+    const holeMat = new T.MeshBasicMaterial({ color: 0xff00ff });
+    function setHoleMode(on) { sky.visible = !on; hills.forEach(h => { h.visible = !on; }); flat.visible = !on; [farL1, farL2].forEach(l => { l.mesh.material = on ? holeMat : l.mat; }); }
+    const terrainMeshes = () => { const out = []; chunks.forEach(c => c.group.traverse(o => { if (o.isMesh && o.name === 'ls-terrain') out.push(o); })); return out; };
+
+    /* traffic at the level crossings (crossing-traffic.js): vehicles queue at the barriers */
+    let crossTraffic = null;
+    try { crossTraffic = track.crossingRoads && track.crossingRoads.crossings.length && TS.crossingTraffic ? TS.crossingTraffic.create({ root, plan: track.crossingRoads, quality, getNight: () => look.night }) : null; }
+    catch (e) { console.warn(TAG + 'crossing traffic failed', e); crossTraffic = null; }
+    /* the real surroundings of stations (station-surround.js): painted ground, LOD2 buildings, trees, built near the player */
+    let surround = null;
+    try { surround = track.surroundPatches && track.surroundPatches.length && TS.stationSurround ? TS.stationSurround.create({ root, track, quality, width: W, materials: { water: matWater }, treeField }) : null; }
+    catch (e) { console.warn(TAG + 'station surround failed', e); surround = null; }
+    const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
+
     setWeather('clear', true); setTimeOfDay(12);
-    return { update, setTimeOfDay, setWeather, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
+    return { update, setTimeOfDay, setWeather, setCrossing, setHoleMode, terrainMeshes, groundHeightAt, farMeshes: () => [farL1.mesh, farL2.mesh], stripWidth: W, crossingTraffic: () => crossTraffic, treeField: () => treeField, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
   }
 
   TS.landscape = { create, CHUNK };

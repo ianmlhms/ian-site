@@ -352,7 +352,7 @@ async function railTunnelChecks(h, frame) {
   h.step('rail tunnels: the ground height over every tunnel bore is above the crown (all rail routes, both directions)');
   const res = await frame.evaluate(() => {
     const out = [];
-    for (const base of ['east', 'north', 'trier', 'brussels', 'paris']) for (const id of [base, base + '~r']) {
+    for (const base of ['north', 'trier', 'brussels', 'paris']) for (const id of [base, base + '~r']) {   // (the Mosel line east / wittlich has no tunnel: the real line has none; trier's is on the Wittlich - Cochem leg)
       const track = TS.track.build(TS.routes.get(id)), tb = track.base || track;
       let worst = 99, samples = 0;
       for (const tn of track.tunnels) for (let s = tn.s0 + 1; s <= tn.s1 - 1; s += 5) {   // the ground steps up exactly at the portals (the portal wall hides the step): sample from 1 m inside

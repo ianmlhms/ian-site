@@ -28,7 +28,8 @@
   const PLATFORM_H_RAIL = 0.76;
   const PLATFORM_H_TRAM = 0.3;
   const BLINK_PERIOD = 0.55;
-  const CROSSING_ROAD_HALF = 22;
+  const CROSSING_ROAD_HALF = 13;      // crossing-roads.js continues the road from here (INFRA_RUN)
+  const CROSSING_ROAD_LIFT = 0.05;      // the road lies this far above the formation (= crossing-roads.js ROAD_LIFT)
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const mulberry = (seed) => {
@@ -1583,7 +1584,6 @@
   }
 
   /* ================================================================ crossings */
-  const CAR_COLORS = ['#c9c9c6', '#25354a', '#8c1f24', '#2e5a3a', '#d7d2c4', '#1d1f22'];
   const lampDisc = (on) => mat('xlamp' + on, () => new T.MeshBasicMaterial({ color: on ? 0xff2a1a : 0x2e0a07 }));
 
   function armGeometry(env, dir) {
@@ -1608,16 +1608,21 @@
     const X2 = track.kind === 'tram' ? 0 : secLatAt(track, cr.s);
     const xLo = Math.min(0, X2);
     const xHi = Math.max(0, X2);
+    const RH = cr.hw || 2.9;     // half width of the road over the crossing (the real road of a station patch can be wider than the authored 5.8 m)
     const road = local.get('asphalt', () => M.tex('asphalt', tex.asphalt()));
-    const prof = [[xLo - CROSSING_ROAD_HALF, FORM_Y + 0.03], [xLo - 12, FORM_Y + 0.03], [xLo - 4.6, -0.05], [xHi + 4.6, -0.05], [xHi + 12, FORM_Y + 0.03], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.03]];
+    const prof = [[xLo - CROSSING_ROAD_HALF, FORM_Y + CROSSING_ROAD_LIFT], [xLo - 12, FORM_Y + CROSSING_ROAD_LIFT], [xLo - 4.6, -0.05], [xHi + 4.6, -0.05], [xHi + 12, FORM_Y + CROSSING_ROAD_LIFT], [xHi + CROSSING_ROAD_HALF, FORM_Y + CROSSING_ROAD_LIFT]];
     for (let i = 0; i < prof.length - 1; i++) {
       const p = prof[i];
       const n2 = prof[i + 1];
-      road.quad([p[0], p[1], -2.9], [n2[0], n2[1], -2.9], [n2[0], n2[1], 2.9], [p[0], p[1], 2.9], [0, 1, 0], WHITE, [[p[0] / 4, -0.7], [n2[0] / 4, -0.7], [n2[0] / 4, 0.7], [p[0] / 4, 0.7]]);
+      road.quad([p[0], p[1], -RH], [n2[0], n2[1], -RH], [n2[0], n2[1], RH], [p[0], p[1], RH], [0, 1, 0], WHITE, [[p[0] / 4, -RH / 4.14], [n2[0] / 4, -RH / 4.14], [n2[0] / 4, RH / 4.14], [p[0] / 4, RH / 4.14]]);
     }
     const marks = local.get('mark', mark);
-    [-1, 1].forEach((sd) => {
-      marks.quad([xLo - CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [xLo - CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [0, 1, 0], [0.9, 0.9, 0.86]);
+    [-1, 1].forEach((sd) => {   // white edge lines follow the road's profile (the road climbs to rail level over the crossing)
+      for (let i = 0; i < prof.length - 1; i++) {
+        const p = prof[i];
+        const n2 = prof[i + 1];
+        marks.quad([p[0], p[1] + 0.02, sd * (RH - 0.2)], [n2[0], n2[1] + 0.02, sd * (RH - 0.2)], [n2[0], n2[1] + 0.02, sd * (RH - 0.32)], [p[0], p[1] + 0.02, sd * (RH - 0.32)], [0, 1, 0], [0.9, 0.9, 0.86]);
+      }
     });
     const vc = local.get('vc', M.vc, true);
     const lampsA = new Batch();
@@ -1625,7 +1630,7 @@
     const discGeo = new T.CircleGeometry(0.19, 14);
     [[1, -1], [1, 1], [-1, -1], [-1, 1]].forEach(([sx, sz]) => {
       const px = sx > 0 ? xHi + 3.9 : xLo - 3.9;
-      const pz = sz * 3.4;
+      const pz = sz * (RH + 0.5);
       vc.box(px, 1.1, pz, 0.16, 3.0, 0.16, col('#e9e6dc'));
       vc.box(px, 0.5, pz, 0.17, 0.5, 0.17, col('#c8242b'));
       vc.box(px, 2.7, pz, 0.34, 1.0, 0.18, col('#1a1b1d'));
@@ -1656,32 +1661,18 @@
     [[1, -1], [1, 1], [-1, -1], [-1, 1]].forEach(([sx, sz]) => {
       const dir = -sz; // arm reaches towards the road centre line
       const arm = new T.Mesh(armGeometry(env, dir), M.vc());
-      arm.position.set(sx > 0 ? xHi + 3.9 : xLo - 3.9, 1.15, sz * 3.4);
+      arm.position.set(sx > 0 ? xHi + 3.9 : xLo - 3.9, 1.15, sz * (RH + 0.5));
       arm.userData.shared = true;
       group.add(arm);
       arms.push({ mesh: arm, dir, angle: 0 });
     });
-    // waiting cars
-    const rnd = mulberry(Math.floor(cr.s));
-    const carB = new Batch();
-    [[xHi + 10, -1.4, 1], [xLo - 11, 1.4, -1]].forEach(([x, z, dirX]) => {
-      const c = col(CAR_COLORS[Math.floor(rnd() * CAR_COLORS.length)]);
-      carB.box(x, FORM_Y + 0.75, z, 4.3, 0.75, 1.8, c);
-      carB.box(x - dirX * 0.2, FORM_Y + 1.4, z, 2.3, 0.62, 1.7, c);
-      carB.box(x - dirX * 0.2, FORM_Y + 1.42, z, 2.32, 0.4, 1.72, col('#22303a'));
-      [[-1.4, -0.9], [-1.4, 0.9], [1.4, -0.9], [1.4, 0.9]].forEach(([ox, oz]) => carB.box(x + ox, FORM_Y + 0.33, z + oz, 0.66, 0.66, 0.24, col('#141415')));
-      carB.box(x + dirX * 2.16, FORM_Y + 0.8, z, 0.05, 0.2, 1.3, col('#ffefb0'));
-    });
-    const cars = carB.mesh(M.vc(), false, true);
-    group.add(cars);
-    cars.visible = closed;
+    // the cars that wait at the barriers are real traffic now (crossing-traffic.js)
     const api = {
       group,
       closed,
       angle: 0,
       setClosed(v) {
         this.closed = v;
-        cars.visible = v;
       },
       tick(now, dt) {
         const target = this.closed ? 0 : 1;
@@ -1885,6 +1876,8 @@
         if (sx > 0) plat.quad(v(A), v(B), v(C), v(D), [0, 1, 0], WHITE, uv);
         else plat.quad(v(A), v(D), v(C), v(B), [0, 1, 0], WHITE, [uv[0], uv[3], uv[2], uv[1]]);
       }
+    } else if (real && real.ownPlatform) {
+      /* the station model draws its own slab, kerb and paving (e.g. Munsbach: panelled concrete kerb, pavers, yellow line) */
     } else {
       const midX = pf(edge + W / 2);
       concrete.box(midX, (H + FORM_Y) / 2 - 0.005, 0, W, H - FORM_Y - 0.01, L, col('#b9b6af'));
@@ -2803,7 +2796,7 @@
             const stride = Math.max(1, Math.floor(pos.count / 120));
             for (let k = 0; k < pos.count; k += stride) {
               v.fromBufferAttribute(pos, k).applyMatrix4(m.matrixWorld);
-              if (v.y > track.frameAt(st.s).pos.y + 0.1 && v.y < track.frameAt(st.s).pos.y + 0.5 && track.nearest) { const nq = track.nearest(v.x, v.z); if (nq && nq.d < 12) lats.push(nq.lat); }   // platform top / body vertices only
+              if (v.y > group.position.y + 0.3 && v.y < group.position.y + 0.95 && track.nearest) { const nq = track.nearest(v.x, v.z); if (nq && nq.d < 12) lats.push(nq.lat); }   // platform top vertices only (relative to the group origin = track height at the platform middle: on a gradient the marker stop height is metres off)
             }
           });
           lats.sort((a, b) => a - b);
