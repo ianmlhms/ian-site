@@ -21,6 +21,8 @@ import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
 import { createBikeState, advanceBike, groundResolver } from './bike.js';
 import { createChaseCamera } from './camera.js';
 import { createRng } from './noise.js';
+import { buildWorldMap } from './world-map.js';
+import { createTreeIndex, TRUNK_RADIUS_PER_METRE, STRIDE } from './forest.js';
 import { QUADTREE, WORLD, CAMERA } from './config.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -47,6 +49,11 @@ const trailWays = data.trails.trails.flatMap((t) => t.ways);
 const field = createHeightField({ near: data.near, far: data.far, ways: [...rideWays, ...trailWays] });
 const surface = createSurface(field);
 const groundAt = groundResolver(field);
+const worldMap = buildWorldMap({ classes: data.classes, canopy: data.canopy, near: data.near });
+const clearanceAt = (() => { const info = { coverage: 0, way: -1 }; return (x, z) => { field.height(x, z, info); return info.coverage; }; })();
+const trees = createTreeIndex({ map: worldMap, surface, clearance: clearanceAt });
+const camHit = { nx: 0, nz: 0, pen: 0 }, bikeHit = { nx: 0, nz: 0, pen: 0 };
+const physicsEnv = { gripScale: 1, collide: (x, z, r) => trees.collide(x, z, r, bikeHit) };
 
 /* ---------------------------------------------------------------- A: data */
 section('A data');
@@ -161,6 +168,16 @@ const selections = [];
   stats.avgLeaves = Math.round(leafCount / selections.length);
   check(`quadtree leaves are a partition (${selections.length} rider positions, ${leafCount} leaves)`, gaps === 0 && overlap === 0 && bad === 0, `gaps ${gaps}, overlaps ${overlap}, bad ${bad}`);
   check('tile budget: at most 330 leaves per selection', maxLeaves <= 330, `max ${maxLeaves}, avg ${stats.avgLeaves}`);
+  // no far-plane void: in all eight directions the tiles reach at least 9 km from the rider (the view is fogged long before that)
+  let short = 0;
+  for (const { px, pz, sel } of selections.slice(0, 12)) {
+    for (let a = 0; a < 8; a++) {
+      const x = px + Math.cos(a * Math.PI / 4) * 9000, z = pz + Math.sin(a * Math.PI / 4) * 9000;
+      const leaf = leafAt(sel.split, x, z);
+      if (!leaf || !sel.leaves.some((l) => l.key === leaf.key)) short++;
+    }
+  }
+  check('the tiles reach 9 km from the rider in all eight directions (no void at the far plane)', short === 0, `${short} directions end early`);
   // the rider's own 3x3 tiles are always LOD 0 even at hysteresis edges
   let finest = 0;
   for (const { px, pz, sel } of selections) { const l = leafAt(sel.split, px, pz); if (l && l.size === QUADTREE.minSize) finest++; }
@@ -251,6 +268,27 @@ section('D render == physics along every trail');
   check(`render mesh height == physics surface height (${compared.toLocaleString()} points, every 0.5 m along ${trails.length} trails)`, trails.length > 0 && compared > 0 && worst <= 1e-3, `worst ${worst.toExponential(2)} m at ${worstAt}`);
 }
 
+/* ---------------------------------------------------------------- D2: vertices sit on the height function */
+section('D2 vertex positions');
+{
+  let worst = 0, checked = 0, skirtBad = 0;
+  const probe = trails.length ? trailLine(trails[0]) : [[1000, 1000]];
+  for (const [px, pz] of [probe[0], probe[Math.floor(probe.length / 2)], probe[probe.length - 1], [WORLD.width / 2, WORLD.depth / 2]]) {
+    const sel = selectTiles(px, pz, {});
+    const leaf = leafAt(sel.split, px, pz);
+    const mesh = meshFor(leaf, sel.split);
+    for (let j = 1; j < 32; j += 3) for (let i = 1; i < 32; i += 3) {
+      const v = j * 33 + i;
+      const x = mesh.x0 + mesh.positions[v * 3], z = mesh.z0 + mesh.positions[v * 3 + 2];
+      worst = Math.max(worst, Math.abs(mesh.positions[v * 3 + 1] - field.heightForStep(x, z, mesh.step)));
+      checked++;
+    }
+    for (let k = 0; k < 33; k++) if (mesh.positions[(mesh.gridVertexCount + k) * 3 + 1] > mesh.positions[k * 3 + 1] - 1) skirtBad++;
+  }
+  check(`interior vertices lie on height(x, z) (${checked} checked, worst ${worst.toExponential(1)} m, float32 precision)`, worst < 2e-3, `${worst}`);
+  check('skirts hang below their edge', skirtBad === 0, `${skirtBad} skirt vertices too high`);
+}
+
 /* ---------------------------------------------------------------- E: trails */
 section('E the trails');
 {
@@ -294,14 +332,14 @@ section('E the trails');
 section('F/G bike and camera');
 {
   const dt = 1 / 60;
-  let rides = 0, cameraBelow = 0, cameraChecks = 0, nan = 0, belowSurface = 0, minClear = 1e9, maxSpeed = 0, finished = 0;
+  let cameraInTrunk = 0, rides = 0, cameraBelow = 0, cameraChecks = 0, nan = 0, belowSurface = 0, minClear = 1e9, maxSpeed = 0, finished = 0;
   const rng = createRng(31);
   for (const t of trails) {
     const line = trailLine(t);
     if (line.length < 3) continue;
     const startHeading = Math.atan2(line[3][1] - line[0][1], line[3][0] - line[0][0]);
     let s = createBikeState(line[0][0], line[0][1], startHeading, surface);
-    const cam = createChaseCamera(surface);
+    const cam = createChaseCamera(surface, (x, z, r) => trees.collide(x, z, r, camHit));
     cam.snap(s);
     let wp = 1, time = 0, stuck = 0;
     const maxTime = QUICK ? 40 : 900;
@@ -315,7 +353,7 @@ section('F/G bike and camera');
       const steer = Math.max(-1, Math.min(1, err * 1.8));
       const speed = Math.hypot(s.vx, s.vz);
       const input = { throttle: speed < 8.5 ? 1 : 0.3, brake: speed > 12 ? 0.5 : 0, steer, jump: false };
-      s = advanceBike(s, input, dt, surface, groundAt, {});
+      s = advanceBike(s, input, dt, surface, groundAt, physicsEnv);
       time += dt;
       if (![s.x, s.y, s.z, s.vx, s.vy, s.vz].every(Number.isFinite)) { nan++; break; }
       const g = surface.height(s.x, s.z);
@@ -336,20 +374,52 @@ section('F/G bike and camera');
   for (let i = 0; i < 3000; i++) {
     const x = WORLD.playInset + rng() * (WORLD.width - 2 * WORLD.playInset), z = WORLD.playInset + rng() * (WORLD.depth - 2 * WORLD.playInset);
     const s = Object.freeze({ ...createBikeState(x, z, rng() * 6.28, surface), vx: (rng() - 0.5) * 20, vz: (rng() - 0.5) * 20 });
-    const cam = createChaseCamera(surface); cam.snap(s);
+    const cam = createChaseCamera(surface, (x, z, r) => trees.collide(x, z, r, camHit)); cam.snap(s);
     let c;
     for (let k = 0; k < 4; k++) c = cam.update(s, 1 / 30);
     cameraChecks++;
     const cg = surface.height(c.x, c.z);
     minClear = Math.min(minClear, c.y - cg);
     if (c.y < cg + CAMERA.minClearance - 1e-6) cameraBelow++;
+    const inside = trees.collide(c.x, c.z, 0.3, camHit);
+    if (inside) cameraInTrunk++;
   }
   stats.cameraMinClearance = minClear; stats.cameraChecks = cameraChecks;
   check(`camera is never below ground + ${CAMERA.minClearance} m (${cameraChecks.toLocaleString()} camera poses, min clearance ${minClear.toFixed(2)} m)`, cameraBelow === 0, `${cameraBelow} violations`);
+  check(`the camera never sits inside a tree trunk (random poses in forest and meadow)`, cameraInTrunk === 0, `${cameraInTrunk} poses inside a trunk`);
   check('bike state stays finite on every trail ride', nan === 0, `${nan} rides with NaN`);
   check('the bike never sinks below the physics surface', belowSurface === 0, `${belowSurface} steps`);
   check(`bike speed stays physical (max ${maxSpeed.toFixed(1)} m/s)`, maxSpeed < 27);
   check('a scripted rider follows every trail to its end', trails.length > 0 && (QUICK || finished === rides), `${finished}/${rides}`);
+}
+
+/* ---------------------------------------------------------------- H: forest */
+section('H forest');
+{
+  let treeCount = 0, onTrail = 0, nonFinite = 0, tooTall = 0, floating = 0;
+  const info = { coverage: 0, way: -1 };
+  const rng = createRng(99);
+  for (let n = 0; n < (QUICK ? 60 : 240); n++) {
+    const bx = Math.floor((WORLD.playInset + rng() * (WORLD.width - 2 * WORLD.playInset)) / 32), bz = Math.floor((WORLD.playInset + rng() * (WORLD.depth - 2 * WORLD.playInset)) / 32);
+    const t = trees.block(bx, bz);
+    for (let i = 0; i < t.length; i += STRIDE) {
+      treeCount++;
+      for (let k = 0; k < 6; k++) if (!Number.isFinite(t[i + k])) nonFinite++;
+      field.height(t[i], t[i + 2], info);
+      if (info.coverage > 0.04) onTrail++;
+      if (t[i + 3] > 38 || t[i + 3] < 4) tooTall++;
+      if (Math.abs(t[i + 1] - surface.height(t[i], t[i + 2])) > 1e-3) floating++;
+    }
+  }
+  check(`trees: finite, 4..38 m tall, standing on the ground (${treeCount.toLocaleString()} trees sampled)`, treeCount > 500 && nonFinite === 0 && tooTall === 0 && floating === 0, `${nonFinite} NaN, ${tooTall} bad heights, ${floating} floating`);
+  check('no tree stands on a way (trail, path, track, road) in the sampled blocks', onTrail === 0, `${onTrail} trees on ways`);
+  let blocked = 0, probes = 0;
+  for (const t of trails) {
+    const line = trailLine(t);
+    for (let i = 0; i < line.length; i += 2) { probes++; if (trees.collide(line[i][0], line[i][1], 0.9, bikeHit)) blocked++; }
+  }
+  check(`every trail is free of trunks over its whole length (${probes} probes of 0.9 m radius)`, probes > 0 && blocked === 0, `${blocked} probes hit a trunk`);
+  stats.treesSampled = treeCount;
 }
 
 /* ---------------------------------------------------------------- summary */

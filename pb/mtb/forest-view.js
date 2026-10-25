@@ -1,12 +1,13 @@
 /* Draws the forest: four instanced meshes (beech / spruce x near / far detail), wind sway in the vertex shader, painted lighting shared with the ground.
  * Trees come from forest.js per 32 m block; the instance buffers are refilled when the camera has moved a few metres. */
-import { treesOfBlock, BLOCK, SPECIES } from './forest.js';
+import { BLOCK, SPECIES, STRIDE } from './forest.js';
 import { buildBeech, buildSpruce } from './tree-models.js';
 import { PAINT_LIGHT_GLSL } from './ground-shader.js';
 
 const THREE = window.THREE;
 const REFILL_DISTANCE = 6;
 const NEAR_RADIUS = 62;                 // trees closer than this use the detailed model
+const ALWAYS_DRAWN = 45;                // trees closer than this are drawn at every quality (the bike collides with them)
 const CAPACITY = { nearBeech: 900, nearSpruce: 500, farBeech: 7000, farSpruce: 4000 };
 const BLOCK_CACHE_LIMIT = 900;
 
@@ -48,7 +49,7 @@ const FRAGMENT = `
   }
 `;
 
-export function createForestView({ scene, surface, map, clearance, env, quality }) {
+export function createForestView({ scene, trees, env, quality }) {
   const group = new THREE.Group();
   group.name = 'mtb-forest';
   scene.add(group);
@@ -71,20 +72,8 @@ export function createForestView({ scene, surface, map, clearance, env, quality 
     group.add(mesh);
     sets[name] = { g, pos, par, cap, n: 0 };
   }
-  const blocks = new Map();
   let last = { x: 1e9, z: 1e9 };
   const stats = { near: 0, far: 0, blocks: 0 };
-
-  function block(bx, bz) {
-    const key = bx * 100003 + bz;
-    let b = blocks.get(key);
-    if (!b) {
-      b = treesOfBlock(bx, bz, { map, surface, clearance, density: quality.treeDensity });
-      blocks.set(key, b);
-      if (blocks.size > BLOCK_CACHE_LIMIT) blocks.delete(blocks.keys().next().value);
-    }
-    return b;
-  }
 
   function refill(cx, cz) {
     for (const s of Object.values(sets)) s.n = 0;
@@ -92,11 +81,12 @@ export function createForestView({ scene, surface, map, clearance, env, quality 
     let near = 0, far = 0;
     for (let bz = b0z; bz <= b1z; bz++) {
       for (let bx = b0x; bx <= b1x; bx++) {
-        const t = block(bx, bz);
-        for (let i = 0; i < t.length; i += 6) {
+        const t = trees.block(bx, bz);
+        for (let i = 0; i < t.length; i += STRIDE) {
           const x = t[i], z = t[i + 2];
           const d = Math.hypot(x - cx, z - cz);
           if (d > r) continue;
+          if (d > ALWAYS_DRAWN && ((t[i + 5] * 7.31) % 1) > quality.treeDensity) continue;      // thinning for the quality level (never near the rider)
           const isNear = d < NEAR_RADIUS;
           const name = (isNear ? 'near' : 'far') + (t[i + 4] === SPECIES.spruce ? 'Spruce' : 'Beech');
           const s = sets[name];
@@ -110,7 +100,7 @@ export function createForestView({ scene, surface, map, clearance, env, quality 
       }
     }
     for (const s of Object.values(sets)) { s.g.instanceCount = s.n; s.pos.needsUpdate = true; s.par.needsUpdate = true; }
-    stats.near = near; stats.far = far; stats.blocks = blocks.size;
+    stats.near = near; stats.far = far; stats.blocks = trees.blocks.size;
   }
 
   return {

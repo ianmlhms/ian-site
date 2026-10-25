@@ -58,18 +58,18 @@ const M = (x, y, z, sx = 1, sy = 1, sz = 1, ry = 0) => new THREE.Matrix4().compo
 export function buildBeech(detail) {
   const rng = createRng(101 + detail);
   const b = new Builder();
-  const barkBase = [0.5, 0.45, 0.4];
+  const barkBase = [0.34, 0.3, 0.26];
   const t = trunk(0.62, 0.0115, 0.0075, detail === 0 ? 5 : 8, barkBase);
   b.add(t.g, M(0, 0, 0), (v) => { const k = 0.8 + 0.4 * valueNoise(v.y * 9, (v.x + v.z) * 160, 1); const moss = Math.max(0, valueNoise(v.y * 5 + 3, (v.x - v.z) * 90, 4) - 0.55) * 1.4; return [barkBase[0] * k * (1 - moss * 0.35), barkBase[1] * k * (1 + moss * 0.18), barkBase[2] * k * (1 - moss * 0.3)]; });
   const crowns = detail === 0 ? [[0, 0.74, 0, 0.32]] : [[0, 0.76, 0, 0.27], [0.15, 0.62, 0.05, 0.2], [-0.13, 0.66, -0.08, 0.22], [0.04, 0.9, -0.1, 0.18], [-0.05, 0.84, 0.14, 0.17]];
   for (const [x, y, z, r] of crowns) {
-    const green = tint([0.3, 0.5, 0.2], rng, 0.4);
+    const green = tint([0.28, 0.46, 0.17], rng, 0.5);
     const geo = blob(r, detail === 0 ? 0 : 1, rng, 0.6);
     b.add(geo, M(x, y, z, 1, 1, 1, rng() * 6), (v, n) => {
       const top = Math.min(1, Math.max(0, (v.y - (y - r)) / (2 * r)));
-      const shade = 0.55 + 0.6 * top + 0.18 * n.y;
+      const shade = 0.5 + 0.7 * top + 0.16 * n.y;
       const gold = Math.max(0, valueNoise(v.x * 9, v.z * 9 + v.y * 4, 5) - 0.62) * 1.3;        // a few yellowing leaf clusters
-      return [(green[0] + gold * 0.5) * shade, (green[1] + gold * 0.22) * shade, (green[2]) * shade * (1 - gold * 0.4)];
+      return [(green[0] + gold * 0.5) * shade * (0.9 + 0.2 * top), (green[1] + gold * 0.22) * shade, (green[2]) * shade * (1 - gold * 0.4) * (1.15 - 0.3 * top)];
     });
   }
   return b.build();
@@ -78,7 +78,7 @@ export function buildBeech(detail) {
 export function buildSpruce(detail) {
   const rng = createRng(202 + detail);
   const b = new Builder();
-  const bark = [0.34, 0.26, 0.2];
+  const bark = [0.3, 0.22, 0.17];
   const t = trunk(0.3, 0.009, 0.006, 5, bark);
   b.add(t.g, M(0, 0, 0), () => bark);
   const tiers = detail === 0 ? 2 : 5;

@@ -13,7 +13,7 @@ export const PAINT_LIGHT_GLSL = `
     float banded = floor(diff * 4.0 + 0.5) / 4.0;
     diff = mix(diff, banded, 0.22);
     vec3 amb = mix(uAmbGround, uAmbSky, N.y * 0.5 + 0.5);
-    vec3 light = amb * shade * 0.62 + uSunColor * diff * sunMul * 0.74;
+    vec3 light = amb * shade * 0.8 + uSunColor * diff * sunMul * 0.7;
     vec3 c = albedo * light;
     return c / (1.0 + c * 0.22) * 1.12;                    // soft shoulder: bright sunlit leaves roll off instead of clipping to neon
   }
@@ -84,7 +84,8 @@ export const GROUND_FRAGMENT = `
     // ---- weights
     float steep = smoothstep(0.86, 0.60, N.y);                                      // 0 flat .. 1 cliff
     float rockW = clamp(steep + mc.a, 0.0, 1.0);
-    float mossW = clamp(mk.b * 1.15 + (nMid.a - 0.55) * 0.9 + mk.r * 0.18, 0.0, 1.0);
+    float rockMoss = smoothstep(0.35, 0.75, mk.b * 0.9 + mk.r * 0.35 + (nHi.g - 0.5) * 0.9) * 0.85;       // the sandstone of the gorges is mostly green
+    float mossW = clamp(mk.b * 1.35 + (nMid.a - 0.5) * 1.0 + mk.r * 0.3 + 0.08, 0.0, 1.0);
     mossW = smoothstep(0.4, 0.78, mossW) * (1.0 - smoothstep(0.35, 0.55, steep)) * (1.0 - mc.r);
     float ledgeMoss = smoothstep(0.55, 0.86, N.y) * steep * 0.0 + smoothstep(0.62, 0.8, N.y) * smoothstep(0.18, 0.4, steep + mc.a) * smoothstep(0.35, 0.7, nHi.r + mk.b * 0.4);
     float grassW = smoothstep(0.35, 0.7, mc.r + (nMid.g - 0.5) * 0.25) * (1.0 - rockW);
@@ -94,7 +95,7 @@ export const GROUND_FRAGMENT = `
     vec3 albedo = litter;
     albedo = mix(albedo, mossC, mossW * 0.9);
     albedo = mix(albedo, grassC, grassW);
-    albedo = mix(albedo, rockC, rockW);
+    albedo = mix(albedo, mix(rockC, mossC * vec3(0.78, 0.92, 0.7), rockMoss * (1.0 - steep * 0.55)), rockW);
     albedo = mix(albedo, mossC * vec3(0.9, 1.0, 0.85), clamp(ledgeMoss, 0.0, 1.0) * 0.8 * (1.0 - trailW));
     // seen from afar the forest is its canopy, not its floor: painted leaf blotches (the trees themselves are only drawn within uTreeRadius)
     float farK = smoothstep(uTreeRadius * 0.55, uTreeRadius * 1.5, vDist) * mk.r * (1.0 - rockW * 0.8) * (1.0 - grassW);
@@ -115,7 +116,7 @@ export const GROUND_FRAGMENT = `
     float sunY = clamp(uSunDir.y, 0.0, 1.0);
     float openSun = mix(1.0, dapple * (0.35 + 0.75 * sunY), forest);
     float sunMul = cloudShadow * openSun;
-    float shade = mix(1.0, 0.86, forest) * (0.72 + 0.28 * smoothstep(0.1, 0.9, N.y));
+    float shade = mix(1.0, 0.92, forest) * (0.78 + 0.22 * smoothstep(0.1, 0.9, N.y));
     vec3 col = paintLight(albedo, N, sunMul, shade);
     col = pow(col, vec3(0.97));
     col = applyFog(col, vDist);

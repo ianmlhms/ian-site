@@ -77,6 +77,7 @@ export const CAMERA = Object.freeze({
   lookAhead: 1.2,
   minClearance: 0.55,       // the camera never gets closer than this to the ground (m)
   clearanceProbe: 6,        // ground probes along the camera boom
+  bodyRadius: 0.55,         // the camera is a ball of this radius: it never sits inside a trunk
 });
 
 /* Bike physics (SI units). One rider + bike point mass on the physics surface; see DESIGN.md section 6. */
@@ -99,6 +100,8 @@ export const BIKE = Object.freeze({
   jumpPreload: 0.32,        // s to full pre-load
   landingHard: 7.5,         // m/s normal speed at touch-down that costs speed (not a crash yet)
   fixedStep: 1 / 120,
+  bodyRadius: 0.32,         // m: the bike's radius against tree trunks
+  treeBump: 0.55,           // speed kept when the bike slides along a trunk (the part into the trunk is lost)
   maxSpeed: 26,             // m/s hard cap (93 km/h): a descent never runs away
 });
 

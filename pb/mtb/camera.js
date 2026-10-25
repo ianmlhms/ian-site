@@ -8,7 +8,7 @@ import { CAMERA } from './config.js';
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 
-export function createChaseCamera(surface) {
+export function createChaseCamera(surface, collide = null) {
   let yaw = null;                       // smoothed heading the camera sits behind
   let fovNow = CAMERA.fov;
   let height = null;
@@ -44,12 +44,20 @@ export function createChaseCamera(surface) {
     const cx = lerp(eyeX, wantX, t), cz = lerp(eyeZ, wantZ, t);
     const floor = surface.height(cx, cz) + CAMERA.minClearance;
     const cyy = Math.max(lerp(eyeY, wantY, t), floor);
-    out.x = cx; out.y = cyy; out.z = cz;
+    let px = cx, pz = cz;
+    if (collide) {                      // never inside a trunk: two passes push the ball out of up to two neighbouring trunks
+      for (let pass = 0; pass < 2; pass++) {
+        const hit = collide(px, pz, CAMERA.bodyRadius);
+        if (!hit) break;
+        px += hit.nx * hit.pen; pz += hit.nz * hit.pen;
+      }
+    }
+    out.x = px; out.y = Math.max(cyy, surface.height(px, pz) + CAMERA.minClearance); out.z = pz;
     out.tx = state.x + cy * CAMERA.lookAhead; out.tz = state.z + sy * CAMERA.lookAhead; out.ty = riderY + 1.0;
     const targetFov = CAMERA.fov + clamp(speed - 6, 0, 16) * 0.85;
     fovNow += (targetFov - fovNow) * Math.min(1, dt * 2.5);
     out.fov = fovNow;
-    out.boom = Math.hypot(cx - state.x, cz - state.z);
+    out.boom = Math.hypot(px - state.x, pz - state.z);
     return out;
   }
   return { update, snap, out };

@@ -14,6 +14,7 @@ import { createEnv, TIME_PRESETS, WEATHER_IDS } from './env.js';
 import { createGroundMaterial } from './ground-shader.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
+import { createTreeIndex } from './forest.js';
 import { createRider } from './rider.js';
 import { createInput } from './input.js';
 import { LANGS, t as translate, trailName } from './i18n.js';
@@ -108,7 +109,8 @@ async function boot() {
 
   // ---- world
   const terrain = createTerrainView({ scene, surface, field, material: groundMaterial, quality });
-  const forest = createForestView({ scene, surface, map: maps, clearance, env, quality });
+  const trees = createTreeIndex({ map: maps, surface, clearance });
+  const forest = createForestView({ scene, trees, env, quality });
   const rider = createRider(env);
   scene.add(rider.root);
 
@@ -121,8 +123,10 @@ async function boot() {
   for (let i = info.first; i < info.first + info.count; i++) centre.push([field.network.samples.px[i], field.network.samples.pz[i]]);
   const startIndex = Math.min(centre.length - 4, Math.max(0, Number(param('at') || 0)));
   const headingAt = (i) => { const a = centre[Math.max(0, i - 1)], b = centre[Math.min(centre.length - 1, i + 2)]; return Math.atan2(b[1] - a[1], b[0] - a[0]); };
+  const camHit = { nx: 0, nz: 0, pen: 0 }, bikeHit = { nx: 0, nz: 0, pen: 0 };
+  const physicsEnv = { gripScale: 1, collide: (x, z, r) => trees.collide(x, z, r, bikeHit) };
   let bike = createBikeState(centre[startIndex][0], centre[startIndex][1], headingAt(startIndex), surface);
-  const chase = createChaseCamera(surface);
+  const chase = createChaseCamera(surface, (x, z, r) => trees.collide(x, z, r, camHit));
   chase.snap(bike);
 
   setLoad(0.86, 'load.build');
@@ -188,7 +192,8 @@ async function boot() {
     const dt = Math.min(MAX_FRAME_S, Math.max(0.0005, (now - last) / 1000));
     last = now; elapsed += dt;
     const inp = input.read(scriptedInput);
-    bike = advanceBike(bike, inp, dt, surface, groundAt, { gripScale: env.gripScale() });
+    physicsEnv.gripScale = env.gripScale();
+    bike = advanceBike(bike, inp, dt, surface, groundAt, physicsEnv);
     // the invisible wall of the playable box
     const lo = WORLD.playInset, hiX = WORLD.width - WORLD.playInset, hiZ = WORLD.depth - WORLD.playInset;
     if (bike.x < lo || bike.x > hiX || bike.z < lo || bike.z > hiZ) {
@@ -248,7 +253,7 @@ async function boot() {
   document.documentElement.dataset.mtbReady = '1';
 
   window.__mtb = {
-    version: 'w1', renderer, scene, camera, field, surface, env, terrain, forest, rider, quality, trail, centre, perf, data,
+    version: 'w1', renderer, scene, camera, field, surface, env, terrain, forest, trees, rider, quality, trail, centre, perf, data,
     get bike() { return bike; },
     setBike(b) { bike = Object.freeze({ ...bike, ...b }); },
     reset, teleport(x, z, heading = bike.heading) { bike = createBikeState(x, z, heading, surface); chase.snap(bike); },

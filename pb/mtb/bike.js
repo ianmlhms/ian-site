@@ -160,6 +160,23 @@ export function stepBike(s, input, dt, surface, groundAt, env = {}) {
     }
   }
 
+  // trunks: a bike that hits a tree slides along it and loses the speed that went into it (a hard hit is a crash in W2)
+  if (env.collide) {
+    const hit = env.collide(x, z, BIKE.bodyRadius);
+    if (hit) {
+      x += hit.nx * hit.pen; z += hit.nz * hit.pen;
+      const vn = vx * hit.nx + vz * hit.nz;
+      if (vn < 0) {
+        lastImpact = Math.max(lastImpact, -vn);
+        vx -= hit.nx * vn; vz -= hit.nz * vn;
+        const k = BIKE.treeBump;
+        vx *= k; vz *= k;
+      }
+      const g = surface.height(x, z);
+      if (grounded || y < g) y = g;
+    }
+  }
+
   // lean into the turn: the bank angle that balances the centripetal acceleration
   const speedNow = Math.hypot(vx, vz);
   const wantLean = clamp(Math.atan2(speedNow * yawRate, BIKE.gravity), -BIKE.leanMax, BIKE.leanMax) * (grounded ? 1 : 0.4);

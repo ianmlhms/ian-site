@@ -50,8 +50,8 @@ function knee(hip, foot, l1, l2) {
 export function createRider(env, palette = {}) {
   const root = new THREE.Group(); root.name = 'mtb-rider';
   const tilt = new THREE.Group(); root.add(tilt);                 // pitch (z) and lean (x)
-  const frameMat = paint(env, palette.frame || '#2f7d4f'), darkMat = paint(env, '#26292b'), tireMat = paint(env, '#1b1c1e'), rimMat = paint(env, '#9aa2a6');
-  const skin = paint(env, '#e0b08a'), jersey = paint(env, palette.jersey || '#e8892c'), shorts = paint(env, '#2a3340'), helmetMat = paint(env, palette.helmet || '#f2f0e6'), shoeMat = paint(env, '#30343a');
+  const frameMat = paint(env, palette.frame || '#d8452e'), darkMat = paint(env, '#26292b'), tireMat = paint(env, '#1b1c1e'), rimMat = paint(env, '#9aa2a6');
+  const skin = paint(env, '#e0b08a'), jersey = paint(env, palette.jersey || '#2b6fd0'), shorts = paint(env, '#2a3340'), helmetMat = paint(env, palette.helmet || '#f2f0e6'), shoeMat = paint(env, '#30343a');
 
   // --- bike
   const bike = new THREE.Group(); tilt.add(bike);

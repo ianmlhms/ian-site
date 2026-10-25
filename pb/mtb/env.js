@@ -12,20 +12,20 @@ const RANDOM_WEATHER = ['clear', 'clear', 'clear', 'cloudy', 'fog', 'rain'];
 const c = (r, g, b) => [r, g, b];
 const KEYS = [
   { h: 5, el: -9, sun: c(0.45, 0.35, 0.5), i: 0.0, top: c(0.04, 0.07, 0.16), hor: c(0.28, 0.3, 0.42), amb: c(0.18, 0.22, 0.32), gnd: c(0.09, 0.09, 0.11), fog: c(0.28, 0.3, 0.4), dens: 0.00045, stars: 0.5 },
-  { h: 6.5, el: 5, sun: c(1.0, 0.62, 0.38), i: 0.7, top: c(0.28, 0.42, 0.7), hor: c(0.98, 0.72, 0.55), amb: c(0.42, 0.48, 0.62), gnd: c(0.28, 0.24, 0.2), fog: c(0.86, 0.7, 0.62), dens: 0.00055, stars: 0 },
+  { h: 6.5, el: 5, sun: c(1.0, 0.62, 0.38), i: 0.7, top: c(0.28, 0.42, 0.7), hor: c(0.98, 0.72, 0.55), amb: c(0.56, 0.6, 0.74), gnd: c(0.4, 0.34, 0.28), fog: c(0.86, 0.7, 0.62), dens: 0.00055, stars: 0 },
   { h: 9, el: 28, sun: c(1.0, 0.9, 0.72), i: 1.0, top: c(0.22, 0.46, 0.82), hor: c(0.74, 0.84, 0.92), amb: c(0.52, 0.62, 0.76), gnd: c(0.34, 0.3, 0.24), fog: c(0.72, 0.82, 0.9), dens: 0.0004, stars: 0 },
   { h: 13, el: 56, sun: c(1.0, 0.96, 0.86), i: 1.05, top: c(0.16, 0.4, 0.85), hor: c(0.68, 0.82, 0.95), amb: c(0.54, 0.66, 0.82), gnd: c(0.36, 0.32, 0.26), fog: c(0.7, 0.82, 0.93), dens: 0.00035, stars: 0 },
   { h: 17, el: 32, sun: c(1.0, 0.86, 0.62), i: 1.0, top: c(0.2, 0.42, 0.78), hor: c(0.9, 0.84, 0.76), amb: c(0.5, 0.57, 0.7), gnd: c(0.36, 0.3, 0.22), fog: c(0.86, 0.8, 0.7), dens: 0.0004, stars: 0 },
-  { h: 18.8, el: 9, sun: c(1.0, 0.68, 0.36), i: 0.9, top: c(0.22, 0.36, 0.66), hor: c(1.0, 0.7, 0.46), amb: c(0.46, 0.48, 0.62), gnd: c(0.34, 0.26, 0.2), fog: c(0.92, 0.72, 0.55), dens: 0.0005, stars: 0 },
-  { h: 20.3, el: -3, sun: c(0.9, 0.4, 0.3), i: 0.25, top: c(0.1, 0.14, 0.34), hor: c(0.8, 0.45, 0.42), amb: c(0.26, 0.28, 0.42), gnd: c(0.16, 0.13, 0.14), fog: c(0.6, 0.4, 0.42), dens: 0.00045, stars: 0.2 },
-  { h: 22.5, el: -20, sun: c(0.45, 0.55, 0.8), i: 0.0, top: c(0.02, 0.04, 0.12), hor: c(0.1, 0.14, 0.28), amb: c(0.16, 0.2, 0.34), gnd: c(0.07, 0.08, 0.12), fog: c(0.1, 0.14, 0.26), dens: 0.0004, stars: 1 },
+  { h: 18.8, el: 9, sun: c(1.0, 0.68, 0.36), i: 0.9, top: c(0.22, 0.36, 0.66), hor: c(1.0, 0.7, 0.46), amb: c(0.62, 0.6, 0.72), gnd: c(0.46, 0.36, 0.28), fog: c(0.92, 0.72, 0.55), dens: 0.0005, stars: 0 },
+  { h: 20.3, el: -3, sun: c(0.9, 0.4, 0.3), i: 0.25, top: c(0.1, 0.14, 0.34), hor: c(0.8, 0.45, 0.42), amb: c(0.4, 0.4, 0.56), gnd: c(0.26, 0.2, 0.22), fog: c(0.6, 0.4, 0.42), dens: 0.00045, stars: 0.2 },
+  { h: 22.5, el: -20, sun: c(0.45, 0.55, 0.8), i: 0.0, top: c(0.02, 0.04, 0.12), hor: c(0.1, 0.14, 0.28), amb: c(0.3, 0.36, 0.56), gnd: c(0.14, 0.16, 0.24), fog: c(0.1, 0.14, 0.26), dens: 0.0004, stars: 1 },
   { h: 29, el: -9, sun: c(0.45, 0.35, 0.5), i: 0.0, top: c(0.04, 0.07, 0.16), hor: c(0.28, 0.3, 0.42), amb: c(0.18, 0.22, 0.32), gnd: c(0.09, 0.09, 0.11), fog: c(0.28, 0.3, 0.4), dens: 0.00045, stars: 0.5 },
 ];
 const WEATHER = Object.freeze({
   clear: { cloud: 0.28, sun: 1, fog: 1, grey: 0, wet: 0, rain: 0, amb: 1 },
-  cloudy: { cloud: 0.82, sun: 0.42, fog: 1.5, grey: 0.45, wet: 0.1, rain: 0, amb: 1.12 },
-  fog: { cloud: 0.7, sun: 0.3, fog: 6.5, grey: 0.6, wet: 0.3, rain: 0, amb: 1.15 },
-  rain: { cloud: 1, sun: 0.2, fog: 2.6, grey: 0.7, wet: 1, rain: 1, amb: 1.1 },
+  cloudy: { cloud: 0.82, sun: 0.45, fog: 1.6, grey: 0.45, wet: 0.1, rain: 0, amb: 1.55 },
+  fog: { cloud: 0.7, sun: 0.3, fog: 20, grey: 0.6, wet: 0.3, rain: 0, amb: 1.75 },
+  rain: { cloud: 1, sun: 0.2, fog: 5, grey: 0.7, wet: 1, rain: 1, amb: 1.6 },
 });
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -87,7 +87,7 @@ export function createEnv({ noiseTexture, params = {} }) {
     az = sunUp ? phase : Math.PI * 0.8;
     const dir = u.uSunDir.value;
     dir.set(Math.cos(az) * Math.cos(el * Math.PI / 180), Math.sin(el * Math.PI / 180), Math.sin(az) * Math.cos(el * Math.PI / 180)).normalize();
-    const strength = sunUp ? kf.i * cur.sun : 0.26 * (1 - cur.grey * 0.4);
+    const strength = sunUp ? kf.i * cur.sun : 0.42 * (1 - cur.grey * 0.4);
     const col = sunUp ? kf.sun : [0.52, 0.62, 0.9];
     u.uSunColor.value.set(col[0] * strength, col[1] * strength, col[2] * strength);
     u.uFogDensity.value = kf.dens * cur.fog;
