@@ -4,7 +4,7 @@
 export const SCHIESSENTUEMPEL = Object.freeze({
   x: 1545.7, z: 5784.6,
   cascade: { length: 19, steps: 3, pool: 0.0 },
-  bridge: { upstream: 8, span: 5.4, width: 2.2, rise: 2.0, archRadius: 1.75, abutment: 2.4 },      // metres: distance upstream of the falls, clear span, deck width, hump above the banks
+  bridge: { upstream: 8, span: 5.4, width: 2.2, rise: 2.0, archRadius: 1.75, abutment: 3.6 },      // metres: distance upstream of the falls, clear span, deck width, hump above the banks
 });
 const OTHER_FALL = Object.freeze({ length: 11, steps: 2, pool: 0.0 });
 

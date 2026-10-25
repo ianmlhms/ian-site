@@ -74,6 +74,7 @@ export function createChaseCamera(surface, collide = null, pushOut = null) {
     const amp = CAMERA.shake * (clamp((speed - 9) / 14, 0, 1) + rough);
     out.y += Math.sin(time * 47) * amp * 0.6 + Math.sin(time * 71 + 1) * amp * 0.4;
     out.x += Math.sin(time * 53 + 2) * amp * 0.5; out.z += Math.cos(time * 59 + 3) * amp * 0.5;
+    out.y = Math.max(out.y, surface.height(out.x, out.z) + CAMERA.minClearance);          // the shake never dips the lens into the ground
     const targetFov = (mode === 1 ? CAMERA.helmetFov : CAMERA.fov) + clamp(speed - 6, 0, 16) * 0.85;
     fovNow += (targetFov - fovNow) * Math.min(1, dt * 2.5);
     out.fov = fovNow;

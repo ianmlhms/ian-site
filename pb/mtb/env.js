@@ -82,7 +82,7 @@ export function createEnv({ noiseTexture, params = {} }) {
     uFogColor: { value: V() }, uFogDensity: { value: 0.0004 }, uFogBase: { value: 0 }, uFogHD: { value: 0 }, uFogHF: { value: 0.045 },
     uTime: { value: 0 }, uCloud: { value: 0.3 }, uWet: { value: 0 }, uRain: { value: 0 }, uStars: { value: 0 }, uNight: { value: 0 }, uGlow: { value: 0 }, uOvercast: { value: 0 },
     uSeason: { value: 0 }, uWind: { value: new THREE.Vector2(0.6, 0.25) }, uNoise: { value: noiseTexture },
-    uMoon: { value: V() }, uLampPos: { value: V() }, uLampDir: { value: new THREE.Vector3(1, -0.1, 0) }, uLampColor: { value: new THREE.Vector3(1.0, 0.86, 0.62) }, uLampOn: { value: 0 },
+    uMoon: { value: V() }, uSkyPaint: { value: noiseTexture }, uLampPos: { value: V() }, uLampDir: { value: new THREE.Vector3(1, -0.1, 0) }, uLampColor: { value: new THREE.Vector3(1.0, 0.86, 0.62) }, uLampOn: { value: 0 },
   };
   const cur = { cloud: 0.3, sun: 1, fog: 1, grey: 0, dim: 1, wet: 0, rain: 0, amb: 1, hd: 0, milk: 0, season: seasonId === 'autumn' ? 1 : 0 };
   let target = WEATHER[weatherId];
@@ -130,13 +130,14 @@ export function createEnv({ noiseTexture, params = {} }) {
     uniforms: u, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
     vertexShader: `varying vec3 vDir; void main(){ vDir = position; vec4 p = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * p; gl_Position.z = gl_Position.w * 0.99999; }`,
     fragmentShader: `
-      uniform vec3 uSunDir, uSunColor, uSkyTop, uSkyHorizon, uMoon, uFogColor; uniform float uTime, uCloud, uStars, uNight, uGlow, uOvercast, uRain; uniform vec2 uWind; uniform sampler2D uNoise;
+      uniform vec3 uSunDir, uSunColor, uSkyTop, uSkyHorizon, uMoon, uFogColor; uniform float uTime, uCloud, uStars, uNight, uGlow, uOvercast, uRain; uniform vec2 uWind; uniform sampler2D uNoise, uSkyPaint;
       varying vec3 vDir;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       void main(){
         vec3 d = normalize(vDir);
         float up = max(d.y, 0.0);
-        vec3 col = mix(uSkyHorizon, uSkyTop, pow(up, 0.5));
+        vec3 col = mix(uSkyHorizon, uSkyTop, pow(up, 0.62));
+        col = mix(col, vec3(dot(col, vec3(0.33))), 0.12 * (1.0 - up));            // a calmer haze near the horizon
         // below the horizon: the same horizon colour (the fog colour), so the far hills melt into it
         col = mix(col, uSkyHorizon * 0.9, smoothstep(0.0, -0.25, d.y));
         vec3 sd3 = normalize(uSunDir);
@@ -157,19 +158,19 @@ export function createEnv({ noiseTexture, params = {} }) {
         float md = max(dot(d, normalize(uMoon + vec3(0.0, 0.0001, 0.0))), 0.0);
         float moonOn = step(0.01, length(uMoon)) * (1.0 - uOvercast * 0.8) * smoothstep(0.0, 0.08, d.y);
         col += vec3(0.86, 0.92, 1.0) * (smoothstep(0.99935, 0.99965, md) * 1.3 + pow(md, 160.0) * 0.28 + pow(md, 14.0) * 0.06) * moonOn * length(uMoon);
-        // clouds: two noise layers on a plane above the viewer, drifting with the wind
+        // clouds: a painted cloud tile on a plane above the viewer, drifting with the wind (white tops, lilac-grey undersides); more cover = a lower threshold
         if (d.y > 0.0) {
-          vec2 uv = d.xz / (d.y + 0.22) * 0.55;
-          vec2 w = uWind * uTime * 0.012;
-          float n1 = texture2D(uNoise, uv * 0.35 + w).r, n2 = texture2D(uNoise, uv * 0.9 + w * 1.7).g;
-          float n = n1 * 0.62 + n2 * 0.38;
-          float cov = smoothstep(1.0 - uCloud * 0.85 - 0.12, 1.0 - uCloud * 0.85 + 0.2, n);
-          cov *= smoothstep(0.0, 0.22, d.y);
-          float lit = clamp(0.55 + 0.6 * dot(normalize(uSunDir.xz + 0.001), normalize(d.xz + 0.001)) * (1.0 - n * 0.4), 0.0, 1.2);
-          vec3 cloudCol = mix(uSkyHorizon * 0.55 + vec3(0.1), vec3(1.0, 0.98, 0.94) * (0.55 + 0.55 * clamp(uSunDir.y * 2.2, 0.0, 1.0)), lit * 0.8 * (1.0 - uNight));
-          cloudCol = mix(cloudCol, cloudCol * (uSunColor * 0.6 + 0.5), 0.5);
-          cloudCol = mix(cloudCol, uSkyHorizon * (0.55 - 0.18 * uRain) , uOvercast * 0.6);
-          col = mix(col, cloudCol, cov * (0.88 - 0.25 * uCloud));
+          vec2 uv = d.xz / (d.y + 0.22) * 0.5;
+          vec2 w = uWind * uTime * 0.006;
+          vec3 pc = texture2D(uSkyPaint, uv * 0.85 + w).rgb;
+          vec3 pc2 = texture2D(uSkyPaint, uv * 0.37 + w * 0.6 + 0.43).rgb;
+          float cl = smoothstep(0.64 - uCloud * 0.34, 0.9 - uCloud * 0.34, pc.r * 0.7 + pc2.r * 0.3);
+          cl *= smoothstep(0.0, 0.2, d.y);
+          float lit = clamp(0.55 + 0.6 * dot(normalize(uSunDir.xz + 0.001), normalize(d.xz + 0.001)), 0.0, 1.2);
+          vec3 cloudCol = pc * mix(vec3(0.5, 0.55, 0.7), vec3(1.0, 0.98, 0.94) * (0.7 + 0.45 * clamp(uSunDir.y * 2.2, 0.0, 1.0)), lit * 0.8 * (1.0 - uNight));
+          cloudCol = mix(cloudCol, cloudCol * (uSunColor * 0.6 + 0.5), 0.5) * (1.0 - 0.75 * uNight);
+          cloudCol = mix(cloudCol, uSkyHorizon * (0.6 - 0.18 * uRain), uOvercast * 0.65);
+          col = mix(col, cloudCol, cl * (0.95 - 0.2 * uCloud) * (1.0 - smoothstep(0.35, 0.0, d.y) * 0.5));
         }
         // stars
         if (uStars > 0.01 && d.y > 0.0) {

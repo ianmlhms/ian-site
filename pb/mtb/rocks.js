@@ -26,6 +26,7 @@ const HEIGHT_RANGE = [3.0, 6.0];           // slab height along the slope
 const WIDTH_RANGE = [4.6, 8.8];
 const DEPTH = 1.8;                         // how far a slab reaches into the hill
 const FACE_LIFT = 0.28;                    // the face stands this far in front of the slope (the strata recesses stay in front of the ground)
+const KEEP_CLEAR = 2.5;                    // m: no rock body, log or stump within this distance of the centre line of ANY trail, path or track (whichever trails exist)
 const CORRIDOR_STEP = 6;                   // m of trail between two corridor-rock checks
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const scratch = { grass: 0, built: 0, water: 0, rock: 0, cover: 0, height: 0, wet: 0 };
@@ -65,10 +66,12 @@ export function rocksOfBlock(bx, bz, ctx) {
   const rng = createRng((bx * 2654435761) ^ (bz * 40503) ^ 0x2545f491);
   const out = [];
   const x0 = bx * BLOCK, z0 = bz * BLOCK;
+  const keepClear = (x, z, r = KEEP_CLEAR) => !ctx.ridden || ctx.ridden.nearest(x, z, r + 0.01) >= r;
   const footprintFree = (cx, cz, f, w, d) => {
-    for (const [u, v] of [[0, 0.3], [-0.5, 0.3], [0.5, 0.3], [-0.25, 0.3], [0.25, 0.3], [0, 0], [-0.5, 0], [0.5, 0], [-0.25, 0], [0.25, 0], [0, -0.5], [-0.5, -0.5], [0.5, -0.5], [0, -1]]) {
+    for (const [u, v] of [[0, 0.3], [-0.5, 0.3], [0.5, 0.3], [-0.25, 0.3], [0.25, 0.3], [0, 0], [-0.5, 0], [0.5, 0], [-0.25, 0], [0.25, 0], [0, -0.5], [-0.5, -0.5], [0.5, -0.5], [0, -1], [-0.5, -1], [0.5, -1]]) {
       const o = along(f, u * w, 0, v * d);
       if (clearance(cx + o[0], cz + o[2]) > WALL_CLEARANCE) return false;
+      if (v <= 0 && !keepClear(cx + o[0], cz + o[2])) return false;                    // (v > 0 is the open side in front of the face)
     }
     return true;
   };
@@ -122,7 +125,7 @@ export function rocksOfBlock(bx, bz, ctx) {
       if (rocky < 0.6) continue;
       for (const side of [-1, 1]) {
         if (rng() < 0.22) continue;                                                 // a gap now and then: an opening in the wall
-        const offset = 2.55 + rng() * 0.7;
+        const offset = 2.95 + rng() * 0.7;
         const lx = s.x + s.nx * side * offset, lz = s.z + s.nz * side * offset;
         if (lx < x0 || lx >= x0 + BLOCK || lz < z0 || lz >= z0 + BLOCK) continue;
         const face = { x: -s.nx * side, y: 0.1, z: -s.nz * side };               // the wall looks at the way (a little leaned back)
@@ -143,7 +146,7 @@ export function rocksOfBlock(bx, bz, ctx) {
     const chance = 0.05 + 0.5 * m.rock + 0.4 * cell.cliff + 0.45 * smooth(0.95, 0.7, nrm.y) + 0.12 * m.wet * m.cover;
     if (roll > chance || m.built > 0.1 || m.water > 0.3 || m.grass > 0.6 || clearance(x, z) > WALL_CLEARANCE) continue;
     const size = 0.7 + sizeRoll * sizeRoll * 2.4 + (sizeRoll > 0.97 ? 1.6 : 0);
-    if (!wayFree(clearance, x, z, size * 0.75 + 0.4)) continue;                  // a boulder never touches the trail corridor
+    if (!wayFree(clearance, x, z, size * 0.75 + 0.4) || !keepClear(x, z, KEEP_CLEAR + size * 0.5)) continue;     // a boulder never touches the trail corridor (any trail, path or track)
     const y = surface.height(x, z);
     const ext = size * 0.6;
     const bx = size * (1.0 + (seed - 0.5) * 0.4), bz = size * (0.85 + (1 - seed) * 0.3);
@@ -160,6 +163,7 @@ export function rocksOfBlock(bx, bz, ctx) {
       if (rng() > 0.45) continue;
       const lat = (rng() - 0.5) * 2 * s.halfWidth * 1.15, size = 0.22 + rng() * rng() * 0.8;
       const x = s.x + s.nx * lat, z = s.z + s.nz * lat;
+      if (!keepClear(x, z, 1.2)) continue;
       const y = s.water - size * 0.35;
       let worst = 0;                                                                    // the stone's foot must reach below the channel floor all around it
       for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
@@ -171,16 +175,27 @@ export function rocksOfBlock(bx, bz, ctx) {
   if (ctx.falls) {
     for (const f of ctx.falls) {
       if (Math.floor(f.x / BLOCK) !== bx || Math.floor(f.z / BLOCK) !== bz) continue;
-      for (const t0 of [-0.5, -0.17, 0.17, 0.5, -0.36, 0.33]) {
-        const inPool = Math.abs(t0) > 0.3 && t0 !== -0.5 && t0 !== 0.5;                     // two extra stones lie below the lip, in the pool
-        const t = t0 + (rng() - 0.5) * 0.08, size = (inPool ? 0.8 : 1.15) + rng() * 0.8, lat = t * f.width;
-        const along = (inPool ? -1.9 : 0) + (rng() - 0.5) * 1.3;                            // along the flow (the curtain's normal)
-        const fx = -f.nz, fz = f.nx;
-        const x = f.x + f.nx * lat + fx * along, z = f.z + f.nz * lat + fz * along, y = (inPool ? f.bottom : f.top) - size * 0.42;
+      // big dark boulders: two heavy ones on the flanks of the lip, two smaller ones that split the water into three thick streams, and stones in the plunge pool
+      for (const [t0, big, inPool] of [[-0.52, 1.0, false], [0.5, 1.0, false], [-0.2, 0.55, false], [0.19, 0.5, false], [-0.34, 0.6, true], [0.3, 0.75, true], [0.0, 0.5, true]]) {
+        const t = t0 + (rng() - 0.5) * 0.06, size = (inPool ? 0.9 : 1.15) * (0.6 + 0.5 * big) + rng() * 0.6 + (big >= 1 ? 0.55 : 0), lat = t * f.width;
+        const along = (inPool ? -2.1 : 0) + (rng() - 0.5) * (inPool ? 1.6 : 0.8);          // along the flow (the curtain's normal)
+        const x = f.x + f.nx * lat + f.fx * along, z = f.z + f.nz * lat + f.fz * along, y = (inPool ? f.bottom : f.top) - size * (big >= 1 ? 0.3 : 0.4);
         let worst = 0;
         for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
         if (worst + 0.35 > MAX_SINK) continue;
-        out.push(x, y, z, rng() * 6.283, 0, size * (1.0 + rng() * 0.25), size * 0.85, size * 1.0, Math.max(0.5, worst + 0.35), KIND.stone, 3 + rng(), y + size * 0.8);
+        out.push(x, y, z, rng() * 6.283, 0, size * (1.0 + rng() * 0.25), size * (big >= 1 ? 1.05 : 0.85), size * 1.0, Math.max(0.5, worst + 0.35), KIND.stone, 3 + rng(), y + size * 0.8);
+      }
+      // big mossy boulders strewn on both banks around the pool and the cascade (the real place is a chaos of dark boulders under ferns)
+      for (let k = 0; k < 9; k++) {
+        const side = k % 2 === 0 ? -1 : 1, size = 1.1 + rng() * rng() * 2.2 + (k < 2 ? 0.5 : 0);
+        const lat = f.width / 2 + 0.7 + rng() * 2.6, along = -3.5 + rng() * 7.5;
+        const x = f.x + f.nx * side * lat + f.fx * along, z = f.z + f.nz * side * lat + f.fz * along;
+        if (clearance(x, z) > WALL_CLEARANCE || !keepClear(x, z, KEEP_CLEAR + size * 0.5)) continue;
+        const y = surface.height(x, z) + size * 0.12;
+        let worst = 0;
+        for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
+        if (worst + 0.35 > MAX_SINK) continue;
+        out.push(x, y, z, rng() * 6.283, 0, size * (1.0 + rng() * 0.3), size * (0.8 + rng() * 0.3), size * 0.95, Math.max(0.5, worst + 0.35), rng() < 0.6 ? KIND.stone : (rng() < 0.5 ? KIND.boulderA : KIND.boulderB), rng() < 0.6 ? 3 + rng() : rng(), y + size * 0.8);
       }
     }
   }
@@ -202,8 +217,21 @@ export function createSampleIndex(network, kinds, halfWidthOf = () => 0) {
     if (list) list.push(i); else blocks.set(key, [i]);
   }
   const spacing = 1.5;
+  /** Distance (m) from (x, z) to the nearest sample of the indexed ways, or `reach` when none is closer (looks at the 3 x 3 blocks around the point, reach <= 32). */
+  function nearest(x, z, reach = 8) {
+    const bx = Math.floor(x / BLOCK), bz = Math.floor(z / BLOCK);
+    let best = reach * reach;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const list = blocks.get((bx + dx) * 100003 + bz + dz);
+        if (!list) continue;
+        for (let k = 0; k < list.length; k++) { const i = list[k], ddx = S.px[i] - x, ddz = S.pz[i] - z, d2 = ddx * ddx + ddz * ddz; if (d2 < best) best = d2; }
+      }
+    }
+    return Math.sqrt(best);
+  }
   return {
-    spacing,
+    spacing, nearest,
     samplesIn(bx, bz) {
       const list = blocks.get(bx * 100003 + bz) || [];
       return list.map((i) => ({ x: S.px[i], z: S.pz[i], nx: S.nx[i], nz: S.nz[i], water: S.water[i], halfWidth: halfWidthOf(wayKind(wayOfSample[i])) }));

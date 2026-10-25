@@ -1,11 +1,12 @@
-/* The foliage atlas, painted with canvas strokes at start-up (no photographs): 8 tiles of 256 px in a 4 x 2 grid, alpha-tested by the forest shader.
+/* The foliage atlas: 16 tiles of 256 px in a 4 x 4 grid, alpha-tested by the forest shader. Tiles 0..7 are drawn with canvas strokes at start-up (fallback, no photographs);
+ * the painted atlas (data/tex/leaf-atlas.webp, paint-textures.js) replaces beech, oak, fern, shrub and adds painted variants 8..15 (beech 8-10, oak 11-13, fern 14-15).
  *   0 beech sprig  1 oak sprig  2 fern frond  3 holly / shrub leaves  4 grass tuft  5 bramble  6 spruce twig  7 meadow herbs
  * The colour canvas is opaque (the background carries the average leaf colour, so mip-mapping never pulls dark fringes into the leaves) and the alpha
  * comes from a second canvas. Every tile is drawn from a seed: same picture every run. */
 import { createRng } from './noise.js';
 
 const TILE = 256;
-const COLS = 4, ROWS = 2;
+const COLS = 4, ROWS = 4;
 const TAU = Math.PI * 2;
 export const ATLAS = Object.freeze({ cols: COLS, rows: ROWS, tile: TILE });
 export const TILE_ID = Object.freeze({ beech: 0, oak: 1, fern: 2, shrub: 3, grass: 4, bramble: 5, spruce: 6, herbs: 7 });

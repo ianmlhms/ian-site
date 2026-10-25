@@ -16,7 +16,7 @@ import { createRockView } from './rock-view.js';
 import { createWaterView } from './water-view.js';
 import { createRain, createLeaves, createShafts, createBirds, createInsects } from './effects.js';
 import { createHikers } from './hikers.js';
-import { placeBridge, SCHIESSENTUEMPEL } from './landmarks.js';
+import { SCHIESSENTUEMPEL } from './landmarks.js';
 import { buildBridge } from './bridge-model.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createTerrainView } from './terrain-view.js';
@@ -131,11 +131,13 @@ async function boot() {
   setLoad(0.7, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
   const textures = createPaintTextures(renderer, qualityId);
+  await textures.ready;                                             // the painted set (data/tex) replaces the canvas fallbacks before the first frame
   const mapTexture = (arr, filter = THREE.LinearFilter) => { const tex = new THREE.DataTexture(arr, maps.nx, maps.nz, THREE.RGBAFormat); tex.magFilter = filter; tex.minFilter = filter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true; return tex; };
   const worldMaps = { cover: mapTexture(maps.cover), canopy: mapTexture(maps.canopy), field: mapTexture(maps.field, THREE.NearestFilter) };
   const saved0 = settingsOf(progress);
   const envParams = { time: param('time') || (readKey('pb_mtb_time') ? null : saved0.time !== 'random' ? saved0.time : null), weather: param('weather') || (readKey('pb_mtb_weather') ? null : saved0.weather !== 'random' ? saved0.weather : null), season: param('season') };
   const env = createEnv({ noiseTexture: textures.noise, params: envParams });
+  env.uniforms.uSkyPaint.value = textures.sky;                      // the painted cloud tile
   if (holeMode) env.sky.visible = false;
   scene.add(env.sky);
   const groundFull = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, false);
@@ -147,7 +149,7 @@ async function boot() {
   const terrain = createTerrainView({ scene, surface, field, material: groundFor(quality), quality });
   const forest = createForestView({ scene, trees, undergrowth, env, quality, textures, meadow: { map: maps, surface, clearance: world.clearance } });
   const rockView = createRockView({ scene, rocks, env, quality, textures });
-  const bridge = placeBridge(field.network, surface);
+  const bridge = world.bridge;
   if (bridge) {
     const parts = buildBridge({ span: bridge.span, width: bridge.width, abutment: bridge.abutment, rise: bridge.rise, deck: bridge.deck - bridge.water, endL: bridge.endL - bridge.water, endR: bridge.endR - bridge.water });
     rockView.addLandmark(parts.stone, bridge.x, bridge.water, bridge.z, bridge.yaw, 1.0, 2.0);
@@ -155,7 +157,7 @@ async function boot() {
     wood.position.set(bridge.x, bridge.water, bridge.z); wood.rotation.y = bridge.yaw; wood.frustumCulled = false; wood.name = 'footbridge railing';
     scene.add(wood);
   }
-  const water = createWaterView({ scene, network: field.network, env, quality });
+  const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam });
   const props = createProps({ scene, env, surface, trails, decks });
   const riderLook = () => { const s = settingsOf(progress); void s; return { bike: progress.bk || 'hardtail', frame: COLOUR_HEX[progress.col] || COLOUR_HEX.red, helmet: HELMET_HEX[progress.hm] || HELMET_HEX.plain }; };
   let rider = createRider(env, riderLook());

@@ -5,11 +5,15 @@ import { QUADTREE } from './config.js';
 import { createRng, fbm } from './noise.js';
 import { sampleWorldMap, sampleFieldCell, MAP_CELL } from './world-map.js';
 import { SPECIES, wayFree } from './forest.js';
+import { SCHIESSENTUEMPEL } from './landmarks.js';
 
 export const BLOCK = QUADTREE.minSize;
 export const U_STRIDE = 8;
 const FERN_GRID = 11;                    // candidate cells per side (2.9 m)
+/** m from the centre line of any trail, path or track (the way is up to 1.5 m wide each side): ferns stay 1.5 m from the edge of the narrowest, shrubs and hedges well clear, dead wood 2.5 m (roots cross the way on purpose). */
+export const CLEAR = Object.freeze({ fern: 1.9, shrub: 3.2, hedge: 3.0, dead: 2.5 });
 const SHRUB_GRID = 4;
+const FERN_THICKET_R = 26, FERN_THICKET_COUNT = 160;   // around the Schiessentuempel: radius (m) and ferns per block that touches it
 const ROOT_PROBE = [2.2, 3.2];           // m from the trunk: where we look for a way
 const ROOT_MIN_COVER = 0.3;
 const nrm = { x: 0, y: 1, z: 0 };
@@ -19,7 +23,8 @@ const cell = { field: 0, leaf: 0, hedge: 0 };
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 /** { ferns, holly, brambles, hedges, logs, stumps, roots } of block (bx, bz). `trees` = the tree list of the same block (roots grow from big trunks next to a way). */
-export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
+export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees, ridden = null }) {
+  const clearOf = (x, z, r) => !ridden || ridden.nearest(x, z, r + 0.01) >= r;
   const rng = createRng((bx * 83492791) ^ (bz * 297642901) ^ 0x1b873593);
   const x0 = bx * BLOCK, z0 = bz * BLOCK;
   const lists = { ferns: [], holly: [], brambles: [], hedges: [], logs: [], stumps: [], roots: [] };
@@ -31,14 +36,29 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
       const x = x0 + (i + 0.5) * fstep + (rng() - 0.5) * fstep, z = z0 + (j + 0.5) * fstep + (rng() - 0.5) * fstep;
       const roll = rng(), seed = rng(), sizeRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
-      const forest = m.cover * (1 - m.grass) * (1 - m.built) * (1 - m.water) * (1 - m.rock);
+      sampleFieldCell(map, x, z, cell);
+      const forest = Math.max(m.cover * (1 - m.grass) * (1 - m.built) * (1 - m.water) * (1 - m.rock), cell.cliff * 0.7 * (1 - m.grass) * (1 - m.water));     // ferns fill the foot of the cliffs too
       if (forest < 0.25) continue;
-      const clump = smooth(-0.1, 0.45, fbm(x, z, 11, 2, 41)) * (0.45 + 0.9 * m.wet);
+      const clump = smooth(-0.1, 0.45, fbm(x, z, 11, 2, 41)) * (0.45 + 0.9 * m.wet + 0.9 * cell.cliff);
       if (roll > clump * forest) continue;
-      if (!wayFree(clearance, x, z, 0.9)) continue;
+      if (!wayFree(clearance, x, z, 0.9) || !clearOf(x, z, CLEAR.fern)) continue;
       surface.normal(x, z, nrm);
       if (nrm.y < 0.66) continue;
       lists.ferns.push(x, surface.height(x, z), z, 0.45 + sizeRoll * 0.5, rng() * 6.283, seed, 1, 0);
+    }
+  }
+
+  // ---- the Schiessentuempel: the banks of the falls are a thicket of ferns hanging over the dark boulders
+  const lx = SCHIESSENTUEMPEL.x, lz = SCHIESSENTUEMPEL.z;
+  if (lx > x0 - FERN_THICKET_R && lx < x0 + BLOCK + FERN_THICKET_R && lz > z0 - FERN_THICKET_R && lz < z0 + BLOCK + FERN_THICKET_R) {
+    for (let k = 0; k < FERN_THICKET_COUNT; k++) {
+      const a = rng() * 6.283, r = Math.sqrt(rng()) * FERN_THICKET_R, size = rng(), seed = rng();
+      const x = lx + Math.cos(a) * r, z = lz + Math.sin(a) * r;
+      if (x < x0 || x >= x0 + BLOCK || z < z0 || z >= z0 + BLOCK) continue;
+      if (!wayFree(clearance, x, z, 0.5) || !clearOf(x, z, CLEAR.fern)) continue;
+      surface.normal(x, z, nrm);
+      if (nrm.y < 0.45) continue;
+      lists.ferns.push(x, surface.height(x, z), z, 0.7 + size * 0.8, rng() * 6.283, seed, 1, 0);
     }
   }
 
@@ -50,12 +70,12 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
       const roll = rng(), seed = rng(), sizeRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
       if (m.grass > 0.5 || m.built > 0.3 || m.water > 0.3 || m.rock > 0.5) continue;
-      if (!wayFree(clearance, x, z, 2.2)) continue;
+      if (!wayFree(clearance, x, z, 2.2) || !clearOf(x, z, CLEAR.shrub)) continue;
       surface.normal(x, z, nrm);
       if (nrm.y < 0.68) continue;
       const patch = smooth(0.0, 0.5, fbm(x, z, 38, 2, 77));
-      if (m.cover > 0.55 && roll < 0.5 * patch + 0.1 * m.wet) lists.holly.push(x, surface.height(x, z), z, 1.0 + sizeRoll * 1.1, rng() * 6.283, seed, 1, 0);
-      else if (m.cover < 0.6 && m.cover > 0.05 && roll < 0.35 * patch + 0.18) lists.brambles.push(x, surface.height(x, z), z, 1.1 + sizeRoll * 1.0, rng() * 6.283, seed, 1, 0);
+      if (m.cover > 0.55 && roll < 0.5 * patch + 0.1 * m.wet) lists.holly.push(x, surface.height(x, z), z, 0.85 + sizeRoll * 0.65, rng() * 6.283, seed, 1, 0);
+      else if (m.cover < 0.6 && m.cover > 0.05 && roll < 0.35 * patch + 0.18) lists.brambles.push(x, surface.height(x, z), z, 0.9 + sizeRoll * 0.6, rng() * 6.283, seed, 1, 0);
     }
   }
 
@@ -68,7 +88,7 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
       if (!cell.hedge) continue;
       const jitter = (rng() - 0.5) * 1.2;
       const hx = cell.hedge === 1 ? x + jitter : x, hz = cell.hedge === 1 ? z : z + jitter;
-      if (clearance(hx, hz) > 0.01) continue;
+      if (clearance(hx, hz) > 0.01 || !clearOf(hx, hz, CLEAR.hedge)) continue;
       const s = 1.1 + rng() * 0.5;
       lists.hedges.push(hx, surface.height(hx, hz), hz, s, cell.hedge === 1 ? Math.PI / 2 : 0, rng(), (MAP_CELL + 0.4) / s / 1.1, 0);
     }
@@ -81,16 +101,17 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
     const x = x0 + 3 + rng() * (BLOCK - 6), z = z0 + 3 + rng() * (BLOCK - 6), yaw = rng() * 6.283, len = 2.4 + rng() * 3.4, radius = 0.12 + rng() * 0.12;
     const ax = Math.cos(yaw) * len / 2, az = Math.sin(yaw) * len / 2;
     let blocked = false;
-    for (let q = -4; q <= 4; q++) if (clearance(x + ax * q / 4, z + az * q / 4) > 0.01) blocked = true;      // the whole log is clear of every way
+    for (let q = -4; q <= 4; q++) if (clearance(x + ax * q / 4, z + az * q / 4) > 0.01 || !clearOf(x + ax * q / 4, z + az * q / 4, CLEAR.dead)) blocked = true;      // the whole log is clear of every way
     if (blocked) continue;
     const hA = surface.height(x - ax, z - az), hB = surface.height(x + ax, z + az), hM = surface.height(x, z);
-    const y = Math.max((hA + hB) / 2, hM) + radius * 0.25;
+    if (hM < (hA + hB) / 2 - 0.45 || hM > (hA + hB) / 2 + 0.55 || Math.abs(hB - hA) > 0.9 * len * 0.5) continue;      // a log never bridges a hollow or hangs on a steep drop
+    const y = (hA + hB) / 2 + radius * 0.25;
     const scale = radius / 0.075;
     lists.logs.push(x, y, z, scale, -yaw, rng(), len / scale, Math.atan2(hB - hA, len));
   }
   if (rng() < 0.4 * wood) {
     const x = x0 + 3 + rng() * (BLOCK - 6), z = z0 + 3 + rng() * (BLOCK - 6);
-    if (clearance(x, z) <= 0.01) { const m = sampleWorldMap(map, x, z, scratch); if (m.grass < 0.4) lists.stumps.push(x, surface.height(x, z) - 0.05, z, 0.28 + rng() * 0.22, rng() * 6.283, rng(), 0.5 + rng() * 0.5, 0); }
+    if (clearance(x, z) <= 0.01 && clearOf(x, z, CLEAR.dead)) { const m = sampleWorldMap(map, x, z, scratch); if (m.grass < 0.4) lists.stumps.push(x, surface.height(x, z) - 0.05, z, 0.28 + rng() * 0.22, rng() * 6.283, rng(), 0.5 + rng() * 0.5, 0); }
   }
 
   // ---- roots: a big trunk beside a way sends a root across it
@@ -119,14 +140,14 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
 }
 
 /** Cached undergrowth blocks. */
-export function createUndergrowthIndex({ map, surface, clearance, trees }) {
+export function createUndergrowthIndex({ map, surface, clearance, trees, ridden = null }) {
   const blocks = new Map();
   const LIMIT = 500;
   function block(bx, bz) {
     const key = bx * 100003 + bz;
     let b = blocks.get(key);
     if (!b) {
-      b = undergrowthOfBlock(bx, bz, { map, surface, clearance, trees: trees.block(bx, bz) });
+      b = undergrowthOfBlock(bx, bz, { map, surface, clearance, trees: trees.block(bx, bz), ridden });
       blocks.set(key, b);
       if (blocks.size > LIMIT) blocks.delete(blocks.keys().next().value);
     } else { blocks.delete(key); blocks.set(key, b); }

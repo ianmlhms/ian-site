@@ -2,7 +2,7 @@
  * All textures tile seamlessly (every stroke is drawn wrapped around the edges). Colours are display (sRGB) values: the whole game shades in
  * display space, which is what gives the soft gouache look. */
 import { createRng } from './noise.js';
-import { paintLeafAtlas } from './leaf-textures.js';
+import { paintLeafAtlas, ATLAS } from './leaf-textures.js';
 
 const T = () => window.THREE;
 const TAU = Math.PI * 2;
@@ -142,6 +142,47 @@ function noiseData(size, seed) {
   return data;
 }
 
+/* The painted set (scripts/mtb/gen_textures.py, gpt-image-2, kept in data/tex/): hand-painted tileable materials. They replace the canvas-drawn fallbacks above
+ * before the first frame (`textures.ready`); when a file is missing the canvas version stays, the game still runs. */
+const TEX_URL = new URL('./data/tex/', import.meta.url);
+const TEX_FILES = Object.freeze({
+  litter: 'litter_summer', litterAutumn: 'litter_autumn', moss: 'moss', dirt: 'dirt_roots', sandstone: 'sandstone', rockMoss: 'sandstone_moss', rockWet: 'wet_rock',
+  barkBeech: 'bark_beech', barkOak: 'bark_oak', grass: 'grass', foam: 'foam', sky: 'sky',
+});
+
+function loadImage(name) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`texture ${name} failed to load`));
+    img.src = new URL(`${name}.webp`, TEX_URL).href;
+  });
+}
+
+const PAINTED_TILES = Object.freeze([0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15]);   // the canvas tiles 4..7 (grass, bramble, spruce, herbs) stay
+
+/** Copies the painted tiles (RGBA, picture rows top-down) over the canvas atlas in place (its rows run bottom-up). */
+function overlayLeafAtlas(atlas, img) {
+  const cv = document.createElement('canvas');
+  cv.width = img.width; cv.height = img.height;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0);
+  const painted = ctx.getImageData(0, 0, cv.width, cv.height).data;
+  if (cv.width !== atlas.width || cv.height !== atlas.height) throw new Error('painted leaf atlas has the wrong size');
+  const tile = ATLAS.tile;
+  for (const id of PAINTED_TILES) {
+    const col = id % ATLAS.cols, row = Math.floor(id / ATLAS.cols);
+    for (let ty = 0; ty < tile; ty++) {
+      for (let tx = 0; tx < tile; tx++) {
+        const i = ((row * tile + ty) * cv.width + col * tile + tx) * 4;
+        const o = ((cv.height - 1 - (row * tile + ty)) * cv.width + col * tile + tx) * 4;
+        atlas.data[o] = painted[i]; atlas.data[o + 1] = painted[i + 1]; atlas.data[o + 2] = painted[i + 2]; atlas.data[o + 3] = painted[i + 3];
+      }
+    }
+  }
+}
+
 /** Builds all textures. `renderer` supplies the anisotropy limit. */
 export function createPaintTextures(renderer, quality) {
   const THREE = T();
@@ -167,7 +208,25 @@ export function createPaintTextures(renderer, quality) {
   leafAtlas.wrapS = leafAtlas.wrapT = THREE.ClampToEdgeWrapping;
   leafAtlas.magFilter = THREE.LinearFilter; leafAtlas.minFilter = THREE.LinearMipmapLinearFilter; leafAtlas.generateMipmaps = true;
   leafAtlas.anisotropy = aniso; leafAtlas.colorSpace = THREE.NoColorSpace; leafAtlas.flipY = false; leafAtlas.needsUpdate = true;
-  return { litter: make(litter(size, 11)), moss: make(moss(size, 12)), dirt: make(dirt(size, 13)), sandstone: make(sandstone(size, 14)), noise, leafAtlas, size };
+  const textures = { litter: make(litter(size, 11)), moss: make(moss(size, 12)), dirt: make(dirt(size, 13)), sandstone: make(sandstone(size, 14)), noise, leafAtlas, size, painted: false };
+  // painted extras start as separate textures (canvas fallbacks); the files replace their images before the first frame, a missing file never breaks the game
+  for (const key of ['litterAutumn', 'rockMoss', 'rockWet', 'barkBeech', 'barkOak', 'grass', 'foam', 'sky']) textures[key] = make(key === 'litterAutumn' ? litter(size, 15) : key === 'grass' ? moss(size, 16) : key.startsWith('bark') ? dirt(size, 17) : key === 'foam' || key === 'sky' ? canvas(8) : sandstone(size, 18));
+  const loads = Object.entries(TEX_FILES).map(async ([key, file]) => {
+    try {
+      const img = await loadImage(file);
+      textures[key].image = img; textures[key].needsUpdate = true;
+      return true;
+    } catch (error) { console.warn('[mtb] painted texture missing, using the canvas fallback:', file, error); return false; }
+  });
+  loads.push((async () => {
+    try {
+      overlayLeafAtlas(atlas, await loadImage('leaf-atlas'));
+      leafAtlas.needsUpdate = true;
+      return true;
+    } catch (error) { console.warn('[mtb] painted leaf atlas missing, using the canvas atlas', error); return false; }
+  })());
+  textures.ready = Promise.all(loads).then((results) => { textures.painted = results.every(Boolean); return textures; });
+  return textures;
 }
 
 export { litter as drawLitter, moss as drawMoss, dirt as drawDirt, sandstone as drawSandstone };

@@ -77,6 +77,7 @@ export function createProps({ scene, env, surface, trails, decks }) {
   // ------------------------------------------------------------ bridges
   const bridges = new Builder();
   for (const d of decks) {
+    if (d.kind === 'stone') continue;                                    // the arch footbridge is drawn by bridge-model.js
     const ax = d.ux, az = d.uz, rx = -az, rz = ax;                       // along and right (x east, z south)
     const hw = d.w / 2;
     const at = (u, side, lift = 0) => { const t = u / d.len; return V3(d.x0 + ax * u + rx * side, d.topA + (d.topB - d.topA) * t + lift, d.z0 + az * u + rz * side); };

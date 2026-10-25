@@ -1,7 +1,8 @@
 /* The pure play world: the zero-holes world (world-build.js) plus everything the game needs on top of it, shared by the browser (main.js), the Node harness and the flows:
  * bridge decks and the composed ground, the ground resolver (surfaces), and for every trail its runtime description (centre line, arc length, checkpoints, gates, signposts, features). */
 import { buildPureWorld } from './world-build.js';
-import { buildDecks, createGround } from './decks.js';
+import { buildDecks, landmarkDeck, createGround } from './decks.js';
+import { placeBridge } from './landmarks.js';
 import { groundResolver, createBikeState } from './bike.js';
 import { sampleWorldMap } from './world-map.js';
 import { BIKES, PLAY } from './config.js';
@@ -15,6 +16,8 @@ export function buildPlayWorld(data) {
   const world = buildPureWorld(data);
   const { field, surface, maps } = world;
   const decks = buildDecks(field.network.features, surface);
+  const bridge = placeBridge(field.network, surface);                  // the Schiessentuempel stone footbridge: a deck like the plank bridges (one deck system)
+  if (bridge) decks.push(landmarkDeck(bridge, decks.length));
   const ground = createGround(surface, decks);
   const probe = {};
   const classify = (x, z) => { sampleWorldMap(maps, x, z, probe); return probe.rock > 0.5 ? 'rock' : probe.grass > 0.5 ? 'grass' : 'forest'; };
@@ -31,7 +34,7 @@ export function buildPlayWorld(data) {
     return a;
   };
   void hitA;
-  return { ...world, decks, ground, groundAt, classify, collide, trails, trailById: new Map(trails.map((t) => [t.id, t])) };
+  return { ...world, decks, bridge, ground, groundAt, classify, collide, trails, trailById: new Map(trails.map((t) => [t.id, t])) };
 }
 
 /** A trail as the game plays it. `centre` = the carved (smoothed) samples [[x, z], ...] every 1 m, `s` their arc length (m). */
