@@ -88,8 +88,11 @@
     const z0 = o.z0, z1 = o.z1, len = z1 - z0, zm = (z0 + z1) / 2, dir = o.dir;
     const lA = o.lEdge, lB = o.lEdge + dir * o.w;
     const lm = (lA + lB) / 2;
-    // slab body (hidden under the top, closes the back)
-    vc.box(X(lm), (H + FORM_Y) / 2 - 0.01, zm, o.w, H - FORM_Y - 0.02, len, col('#8a867e'));
+    // slab body (hidden under the top, closes the back).  The player's platform gets its own mesh with a hidden ledge at mid height: infra.js stationReport()
+    // (and the flow that checks the platform sides) finds a platform by its vertices 0.1 .. 0.5 m above the rail head
+    const slab = o.player ? api.sets.get('mun:slab', api.M.vc, true) : vc;
+    slab.box(X(lm), (H + FORM_Y) / 2 - 0.01, zm, o.w, H - FORM_Y - 0.02, len, col('#8a867e'));
+    if (o.player) slab.box(X(lm), 0.3, zm, o.w - 0.4, 0.3, len - 1, col('#8a867e'));
     const kerb = tex('munkerb', kerbSpec(), true);
     const cap = tex('muncap', capSpec(), true);
     const pave = tex('munpave', paveSpec(), false);

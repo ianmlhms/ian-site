@@ -739,6 +739,10 @@ window.TS = window.TS || {};
     const worldAt = (info, lat) => ({ x: info.f.x + info.f.rx * lat, z: info.f.z + info.f.rz * lat });
     const yawOf = f => Math.atan2(-f.tz, f.tx);
 
+    /* real line: ground colour by land class (strip) and far colour by the coarse class raster; classes in real-line.js CLASS */
+    const CLS_GROUND = ['#a3b45a', '#7ba947', '#4a7a38', '#9db056', '#7f9c5a', '#8a8a80', '#6a8a5a', '#7da24a', '#8a8c80', '#6f8d4a', '#a79e88', '#7da24e', '#80ad4c'].map(C);
+    const FAR_CROPS = ['#cbb868', '#9db455', '#8aa850', '#b99f5c', '#c9c470', '#7fae4a'].map(C);
+    const CLS_FAR = ['#b9b45f', '#7fae4a', '#3b6430', '#a3ae56', '#8c9a70', '#858580', '#5d8fa6', '#74a447', '#8d8b84', '#6b8d46', '#a89f8a', '#7aa84a', '#80ad4c'].map(C);
     function groundColor(info, x, z, nY, lat, h) {
       const pal = PAL[info.biome] || PAL.farmland, a = Math.abs(lat);
       const c = mixColor(pal.g1, pal.g2, fbm(x * 0.008, z * 0.008));
@@ -749,6 +753,7 @@ window.TS = window.TS || {};
       if (rock > 0) c.lerp(pal.rock, rock * 0.85);
       if (info.biome === 'industrial') { c.lerp(COL.red, 0.3 + 0.4 * fbm(x * 0.02, z * 0.02)).lerp(COL.dark, 0.5 * smooth(0.5, 0.75, fbm(x * 0.03 + 9, z * 0.03))); c.lerp(COL.slag, 0.55 * smooth(0.55, 0.8, fbm(x * 0.045 - 5, z * 0.045 + 2))); }
       if (info.wat) { const dd = Math.abs(lat - riverLat(info.wat)), m = 1 - smooth(info.wat.halfWidth + 2, info.wat.halfWidth + 16, dd); if (m > 0) c.lerp(h < info.wat.y + 0.4 ? COL.mud : COL.sand, m * 0.85); }
+      if (track.real && info.biome !== 'tramcity') c.lerp(CLS_GROUND[track.real.landAt(info.s, lat)] || CLS_GROUND[0], 0.72);
       if (info.biome === 'tramcity') { c.lerp(COL.yard, 0.9); if (a < 9.4) c.lerp(COL.asphalt, smooth(9.6, 8.6, a)); else if (a < 13.2) c.lerp(COL.side, smooth(9.2, 9.9, a) * smooth(13.4, 12.5, a)); }
       else if (info.biome === 'city') { if (a < 25) c.lerp(COL.yard, smooth(26, 20, a) * 0.95); if (a > 21 && a < 25) c.lerp(COL.side, 0.35); }
       c.multiplyScalar(b);
@@ -1295,6 +1300,16 @@ window.TS = window.TS || {};
     const FAR_LAND = [C('#86a84e'), C('#3f6a33'), C('#bfae5c'), C('#7ea84c'), C('#807d70')];
     let forestTh = 0.56;
     function farColor(x, z, nY) {
+      if (track.real) {
+        const q = track.nearest(x, z);
+        if (Math.abs(q.lat) < 1500) {
+          const cls = track.real.farAt(q.s, q.lat);
+          const c = CLS_FAR[cls].clone();
+          if (cls === 0 || cls === 1) { const pv = hash2(Math.floor(x / 80), Math.floor(z / 80)); c.lerp(FAR_CROPS[Math.floor(pv * FAR_CROPS.length) % FAR_CROPS.length], cls === 0 ? 0.8 : 0.45); }   // parcel mosaic
+          c.lerp(FAR_LAND[4], smooth(0.1, 0.36, 1 - nY) * 0.7);
+          return c.multiplyScalar(0.88 + 0.24 * vnoise(x * 0.012, z * 0.012) + 0.1 * (vnoise(x * 0.05, z * 0.05) - 0.5));
+        }
+      }
       const n = fbm(x * 0.0009 + 3, z * 0.0009), m = fbm(x * 0.003, z * 0.003 + 8);
       const c = n > forestTh ? mixColor(FAR_LAND[3], FAR_LAND[1], smooth(forestTh, forestTh + 0.1, n)) : mixColor(FAR_LAND[0], m > 0.5 ? FAR_LAND[2] : FAR_LAND[3], smooth(0.4, 0.6, m));
       c.lerp(FAR_LAND[4], smooth(0.1, 0.36, 1 - nY) * 0.8);

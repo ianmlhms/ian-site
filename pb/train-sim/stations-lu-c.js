@@ -60,7 +60,7 @@
       const { sx, H, W, edge, col, WHITE, zA, zB } = api;
       const { X, vc, quadO, tex, roof, glow } = k;
       const lB = edge + W;
-      if (window.TS.munsbachPlatform) window.TS.munsbachPlatform.build(api, k, { lEdge: edge, w: W, dir: 1, z0: zB, z1: zA });
+      if (window.TS.munsbachPlatform) window.TS.munsbachPlatform.build(api, k, { lEdge: edge, w: W, dir: 1, z0: zB, z1: zA, player: true });
       const z0 = -90.7;                   // real LOD2 footprint z -90.7 .. -73.4
       const z1 = z0 + BL;
       const l0 = lB + 0.05;
