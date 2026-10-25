@@ -15,7 +15,7 @@ const ALWAYS_DRAWN = 45;                // trees closer than this are drawn at e
 
 const VERTEX = `
   attribute vec3 iPos; attribute vec4 iParams; attribute vec2 iShape; attribute vec3 color; attribute float aLeaf;
-  uniform vec2 uWind; uniform float uBend, uFlutter;
+  uniform vec2 uWind; uniform float uBend, uFlutter, uTime;
   varying vec3 vColor; varying vec3 vNormal; varying float vDist; varying vec3 vWorld; varying float vHeight; varying vec2 vUv; varying float vLeaf; varying float vSeed;
   void main(){
     float s = iParams.x, ang = iParams.y;
@@ -60,7 +60,7 @@ const FRAGMENT = `
     if (tile >= 0.0) {
       vec4 tex = texture2D(uAtlas, vUv);
       if (tex.a < 0.5) discard;
-      albedo = vColor * tex.rgb * 1.32;
+      albedo = vColor * tex.rgb * vec3(1.04, 1.0, 0.96);
       isLeaf = 1.0;
       // autumn: every tree turns at its own time, every cluster has its own colour (holly and spruce stay green)
       float evergreen = step(2.5, tile) * step(tile, 3.5) + step(5.5, tile) * step(tile, 6.5);
@@ -87,7 +87,7 @@ const FRAGMENT = `
       float trans = pow(clamp(dot(V, -L) * 0.5 + 0.5, 0.0, 1.0), 4.0) * (1.0 - wrap * 0.4);
       col += albedo * vec3(0.9, 1.0, 0.35) * uSunColor * trans * 0.55 * sunMul;
     } else {
-      col = paintLightW(albedo, N, sunMul, shade, vWorld);
+      col = paintLightW(albedo * 1.3, N, sunMul, 1.1, vWorld);                // bark: lifted out of the shade, light grey beech stems read as stems, not as poles
     }
     col = col * (1.0 - 0.22 * uWet);
     col = pow(col, vec3(0.97));
@@ -109,7 +109,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
 
   // name, geometry, material, capacity, stride of its source list
   const defs = {
-    nearBeechA: [buildBroadleaf('beech', 0, 0), treeMat, 420], nearBeechB: [buildBroadleaf('beech', 1, 0), treeMat, 420], nearOak: [buildBroadleaf('oak', 0, 0), treeMat, 320], nearSpruce: [buildSpruce(1), treeMat, 300],
+    nearBeechA: [buildBroadleaf('beech', 0, 0), treeMat, 420], nearBeechB: [buildBroadleaf('beech', 1, 0), treeMat, 420], nearOak: [buildBroadleaf('oak', 0, 0), treeMat, 320], nearSpruce: [buildSpruce(2), treeMat, 300],
     midBeech: [buildBroadleaf('beech', 2, 1), treeMat, 1400], midOak: [buildBroadleaf('oak', 1, 1), treeMat, 900], midSpruce: [buildSpruce(1), treeMat, 700],
     farBeech: [buildBlobTree('beech', 0), treeMat, 3600], farOak: [buildBlobTree('oak', 0), treeMat, 1800], farSpruce: [buildSpruce(0), treeMat, 1600],
     sapling: [buildSapling(0), lowMat, 900],

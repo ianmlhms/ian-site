@@ -78,9 +78,11 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
   const wood = smooth(0.2, 0.7, sampleWorldMap(map, x0 + 16, z0 + 16, scratch).cover);
   const logCount = rng() < 0.55 * wood ? 1 + (rng() < 0.3 ? 1 : 0) : 0;
   for (let k = 0; k < logCount; k++) {
-    const x = x0 + 3 + rng() * (BLOCK - 6), z = z0 + 3 + rng() * (BLOCK - 6), yaw = rng() * 6.283, len = 2.6 + rng() * 4.2, radius = 0.16 + rng() * 0.18;
+    const x = x0 + 3 + rng() * (BLOCK - 6), z = z0 + 3 + rng() * (BLOCK - 6), yaw = rng() * 6.283, len = 2.4 + rng() * 3.4, radius = 0.12 + rng() * 0.12;
     const ax = Math.cos(yaw) * len / 2, az = Math.sin(yaw) * len / 2;
-    if (clearance(x, z) > 0.01 || clearance(x + ax, z + az) > 0.01 || clearance(x - ax, z - az) > 0.01) continue;
+    let blocked = false;
+    for (let q = -4; q <= 4; q++) if (clearance(x + ax * q / 4, z + az * q / 4) > 0.01) blocked = true;      // the whole log is clear of every way
+    if (blocked) continue;
     const hA = surface.height(x - ax, z - az), hB = surface.height(x + ax, z + az), hM = surface.height(x, z);
     const y = Math.max((hA + hB) / 2, hM) + radius * 0.25;
     const scale = radius / 0.075;

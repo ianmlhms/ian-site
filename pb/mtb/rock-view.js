@@ -43,37 +43,41 @@ const FRAGMENT = `
     // triplanar weights: faces are painted from the side they face
     vec3 w = pow(abs(N), vec3(4.0)); w /= (w.x + w.y + w.z);
     vec2 uvX = vec2(P.z * 0.23, P.y * 0.34), uvZ = vec2(P.x * 0.23, P.y * 0.34), uvY = P.xz * 0.23;
-    vec3 rockC = texture2D(uRock, uvX).rgb * w.x + texture2D(uRock, uvZ).rgb * w.z + texture2D(uRock, uvY).rgb * w.y;
+    vec3 grain = texture2D(uRock, uvX).rgb * w.x + texture2D(uRock, uvZ).rgb * w.z + texture2D(uRock, uvY).rgb * w.y;
     float nA = texture2D(uNoise, P.xz * 0.05 + P.y * 0.03).r;
-    // strata: horizontal bands in the world height, each with its own tone
-    float band = P.y * 5.2 + nA * 6.0;
+    // strata: horizontal bands in the world height, each layer with its own tone (pale cream .. ochre .. rusty)
+    float band = P.y * 4.6 + nA * 5.0;
+    float layer = floor(band / 6.2832);
+    float tone = texture2D(uNoise, vec2(layer * 0.37 + 0.11, vSeed * 0.5)).g;
+    vec3 pale = vec3(0.86, 0.74, 0.54), ochre = vec3(0.8, 0.6, 0.38), rusty = vec3(0.7, 0.45, 0.28);
+    vec3 rockC = mix(mix(pale, ochre, smoothstep(0.2, 0.55, tone)), rusty, smoothstep(0.6, 0.9, tone));
+    rockC *= 0.72 + 0.5 * (grain.r + grain.g) * 0.5;
     float strata = sin(band) * 0.5 + 0.5;
-    rockC *= mix(0.78, 1.12, strata) * (0.95 + 0.1 * sin(P.y * 23.0 + nA * 8.0));
-    rockC = mix(rockC, rockC * vec3(1.06, 0.94, 0.8) + vec3(0.05, 0.0, -0.03), smoothstep(0.3, 0.7, texture2D(uNoise, vec2(floor(band / 6.2832) * 0.37, vSeed)).g));    // ochre / pale layers
+    rockC *= mix(0.86, 1.08, strata);
     // honeycomb weathering (tafoni): pits of a few decimetres, lit rim, dark hollow
     float pits = 0.0;
     if (uDetail > 0.5) {
-      vec2 hu = (w.x > w.z ? vec2(P.z, P.y) : vec2(P.x, P.y)) * 2.3 + vec2(nA * 1.4, 0.0);
+      vec2 hu = (w.x > w.z ? vec2(P.z, P.y) : vec2(P.x, P.y)) * 1.3 + vec2(nA * 1.4, 0.0);
       vec4 hn = texture2D(uNoise, hu * 0.7);
-      float cell = smoothstep(0.52, 0.66, hn.b * 0.7 + hn.g * 0.55);
+      float cell = smoothstep(0.7, 0.8, hn.b * 0.7 + hn.g * 0.55);
       pits = cell * (1.0 - smoothstep(25.0, 70.0, vDist)) * (1.0 - w.y);
     }
-    rockC *= 1.0 - 0.38 * pits;
+    rockC *= 1.0 - 0.3 * pits;
     // dark water streaks running down the face
     float streak = texture2D(uNoise, vec2((P.x + P.z) * 0.8, P.y * 0.03)).g;
-    rockC *= 1.0 - 0.36 * smoothstep(0.58, 0.88, streak) * (1.0 - w.y);
+    rockC *= 1.0 - 0.28 * smoothstep(0.6, 0.9, streak) * (1.0 - w.y);
     // moss: on the ledges (up-facing), on the damp foot, in the hollows
-    vec3 mossC = texture2D(uMoss, P.xz * 0.37 + P.y * 0.11).rgb * 0.95;
-    float mossN = texture2D(uNoise, P.xz * 0.19 + P.y * 0.12).b;
-    float moss = smoothstep(0.3, 0.9, N.y) * 0.85 + (1.0 - smoothstep(0.1, 1.4, vLocalY)) * 0.55 + pits * 0.35;
-    moss = clamp(moss * smoothstep(0.25, 0.7, mossN + 0.18 + uWet * 0.2), 0.0, 0.92);
-    vec3 albedo = mix(rockC, mossC, moss) * vColor;
+    vec3 mossC = texture2D(uMoss, P.xz * 0.16 + P.y * 0.07).rgb * 0.95;
+    float mossN = texture2D(uNoise, P.xz * 0.045 + P.y * 0.035).g * 0.65 + texture2D(uNoise, P.xz * 0.11 + P.y * 0.08).b * 0.35;
+    float moss = smoothstep(0.45, 0.95, N.y) * 0.75 + (1.0 - smoothstep(0.1, 1.2, vLocalY)) * 0.5 + pits * 0.25;
+    moss = clamp(moss * smoothstep(0.38, 0.62, mossN + 0.06 + uWet * 0.2), 0.0, 0.85);
+    vec3 albedo = mix(rockC, mossC, moss) * mix(vec3(1.0), vColor, 0.7) * 1.12;
     albedo *= 1.0 - 0.22 * uWet;
     // small normal wobble so the faces are not glassy
     vec2 dn = texture2D(uNoise, P.xz * 0.9 + P.y * 0.6).gb - 0.5;
-    N = normalize(N + vec3(dn.x, dn.y * 0.5, dn.y) * 0.3 * (1.0 - smoothstep(30.0, 90.0, vDist)));
+    N = normalize(N + vec3(dn.x, dn.y * 0.5, dn.y) * 0.16 * (1.0 - smoothstep(30.0, 90.0, vDist)));
     float sunMul = mix(1.0, 0.8, uCloud * 0.6);
-    vec3 col = paintLightW(albedo, N, sunMul, 0.84, P);
+    vec3 col = paintLightW(albedo, N, sunMul, 1.35, P);
     col = pow(col, vec3(0.97));
     gl_FragColor = vec4(applyFogW(col, vDist, P.y), 1.0);
   }

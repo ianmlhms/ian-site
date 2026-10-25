@@ -268,7 +268,7 @@ export function buildBlobTree(species, detail) {
   const green = tint3(species === 'oak' ? [0.3, 0.44, 0.16] : [0.32, 0.5, 0.18], rng, 0.4);
   for (const [x, y, z, rad] of crowns) {
     const geo = blob(rad, 1, 0.5, 0.78);
-    b.add(geo.toNonIndexed(), M(x, y, z, 1, 1, 1, rng() * 6), (v, n) => {
+    b.add(geo, M(x, y, z, 1, 1, 1, rng() * 6), (v, n) => {
       const top = clamp01((v.y - (y - rad)) / (2 * rad));
       const shade = 0.5 + 0.55 * top + 0.12 * n.y;
       const gold = Math.max(0, valueNoise(v.x * 9, v.z * 9 + v.y * 4, 5) - 0.62) * 1.3;
@@ -278,23 +278,41 @@ export function buildBlobTree(species, detail) {
   return b.build();
 }
 
+/** Spruce: drooping tiers of twig cards around a straight trunk (detail 0 = far: stacked cones; 1 = mid: 5 tiers of 6 cards; 2 = near: 9 tiers of 8 cards). Only used where OSM says needle forest. */
 export function buildSpruce(detail) {
   const rng = createRng(202 + detail);
   const b = new Builder();
-  const bark = [0.3, 0.22, 0.17];
-  const trunkG = new THREE.CylinderGeometry(0.006, 0.009, 0.3, 5, 1, true).translate(0, 0.15, 0).toNonIndexed();
-  b.add(trunkG, M(0, 0, 0), () => bark);
-  const tiers = detail === 0 ? 3 : 7;
-  for (let i = 0; i < tiers; i++) {
-    const f = i / (tiers - 1 || 1);
-    const radius = (0.2 - 0.14 * f) * (detail === 0 ? 1.15 : 1), height = (detail === 0 ? 0.5 : 0.28) - 0.1 * f, y = 0.16 + f * (detail === 0 ? 0.5 : 0.68);
-    const g = new THREE.ConeGeometry(radius, height, detail === 0 ? 6 : 10, 1, true).toNonIndexed();
-    const green = tint3([0.14, 0.32, 0.2], rng, 0.3);
-    b.add(g, M(0, y + height / 2 - 0.06, 0, 1, 1, 1, rng() * 6), (v, n) => {
-      const low = clamp01((v.y - y) / height);
-      const shade = 0.5 + 0.55 * low + 0.12 * n.y;
-      return [green[0] * shade, green[1] * shade, green[2] * shade];
-    }, -1);
+  const bark = [0.36, 0.27, 0.21];
+  const trunkG = new THREE.CylinderGeometry(0.0065, 0.011, detail === 0 ? 0.35 : 0.9, 5, 1, true).translate(0, detail === 0 ? 0.17 : 0.45, 0);
+  b.add(trunkG, M(0, 0, 0), (v) => mul3(bark, 0.8 + 0.4 * valueNoise(v.y * 20, v.x * 90, 2)));
+  if (detail === 0) {
+    for (let i = 0; i < 3; i++) {
+      const f = i / 2, radius = 0.17 - 0.1 * f, height = 0.5 - 0.12 * f, y = 0.14 + f * 0.5;
+      const g = new THREE.ConeGeometry(radius, height, 6, 1, true);
+      const green = tint3([0.16, 0.34, 0.22], rng, 0.3);
+      b.add(g, M(0, y + height / 2 - 0.06, 0, 1, 1, 1, rng() * 6), (v, n) => { const low = clamp01((v.y - y) / height); const shade = 0.55 + 0.55 * low + 0.12 * n.y; return [green[0] * shade, green[1] * shade, green[2] * shade]; }, -1);
+    }
+    return b.build();
+  }
+  const rect = tileRect(TILE_ID.spruce);
+  const tiers = detail === 1 ? 6 : 10, per = detail === 1 ? 6 : 8;
+  for (let t = 0; t < tiers; t++) {
+    const f = t / (tiers - 1), y = 0.1 + f * 0.86;
+    const reach = (0.17 * Math.pow(1 - f, 0.9) + 0.02) * (detail === 1 ? 1.15 : 1.0);
+    const a0 = rng() * 6.28;
+    for (let k = 0; k < per; k++) {
+      const az = a0 + (k / per) * 6.28 + (rng() - 0.5) * 0.3;
+      const droop = 0.5 + rng() * 0.25 - 0.25 * f;                                   // branches hang, the top ones point up
+      const dir = V3(Math.cos(az) * Math.cos(droop), -Math.sin(droop) + 0.15, Math.sin(az) * Math.cos(droop)).normalize();
+      const len = reach * (0.85 + rng() * 0.3);
+      const centre = V3(dir.x * len * 0.5, y + dir.y * len * 0.5, dir.z * len * 0.5);
+      const right = V3(-dir.z, 0, dir.x).normalize();
+      const ln = V3(dir.x * 0.4, 0.8, dir.z * 0.4).normalize();
+      const q = card(centre, right, dir, len * 0.62, len * 0.5, ln, rect);
+      const ao = 0.62 + 0.45 * f + 0.15 * rng();
+      b.addArrays(q.pos, q.nor, q.idx, () => [0.82 * ao, 0.95 * ao, 0.85 * ao], q.uvs, TILE_ID.spruce + rng() * 0.49);
+    }
   }
   return b.build();
 }
+const mul3 = (c, k) => [c[0] * k, c[1] * k, c[2] * k];

@@ -108,10 +108,7 @@ def main():
             draw.polygon(pts, fill=4)
             draw.line(pts, fill=4, width=2)
             nb += 1
-    # water ways: rivers 3 m wide, streams 1.5 m
-    for el in load_osm("waterways"):
-        if el["type"] == "way" and el.get("geometry"):
-            draw.line(to_px(el["geometry"]), fill=5, width=2 if el["tags"].get("waterway") == "river" else 1)
+    # (W2) streams are real carved channels with their own water ribbon now (bake_features.py): the class raster only keeps water AREAS, no painted stripes
     arr = np.array(img, dtype=np.uint8)
     blob = rle(arr)
     with open(os.path.join(OUT_DIR, "classes.bin"), "wb") as fh:

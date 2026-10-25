@@ -108,7 +108,7 @@ export function createShafts({ scene, env, quality, surface, map }) {
     uniforms: { ...env.uniforms, uIntensity: { value: 0 } },
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     vertexShader: `
-      attribute vec4 iBase; uniform float uIntensity; varying vec2 vUv; varying float vA;
+      attribute vec4 iBase; uniform vec3 uSunDir; uniform float uIntensity; varying vec2 vUv; varying float vA;
       void main(){
         vec3 D = normalize(uSunDir);
         float len = 26.0 + iBase.w * 12.0;

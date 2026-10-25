@@ -289,7 +289,7 @@ async function boot() {
   document.documentElement.dataset.mtbReady = '1';
 
   window.__mtb = {
-    version: 'w2', renderer, scene, camera, field, surface, env, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, streams, maps, quality, trail, centre, perf, data,
+    version: 'w2', renderer, scene, camera, field, surface, env, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, quality, trail, centre, perf, data,
     get bike() { return bike; },
     setBike(b) { bike = Object.freeze({ ...bike, ...b }); },
     reset, teleport(x, z, heading = bike.heading) { bike = createBikeState(x, z, heading, surface); chase.snap(bike); },

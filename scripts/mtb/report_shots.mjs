@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /* Developer tool: the screenshot series of a wave report.
- *   node scripts/mtb/report_shots.mjs OUT_DIR
+ *   node scripts/mtb/report_shots.mjs OUT_DIR [scene-name-prefix,...]
  * One headless Chromium (one at a time!), several scenarios; every shot is a PNG in OUT_DIR. */
 import fs from "node:fs";
 import path from "node:path";
 import { launchBrowser, startServer } from "../flows/lib.mjs";
 
 const out = process.argv[2];
+const only = (process.argv[3] || "").split(",").filter(Boolean);
 fs.mkdirSync(out, { recursive: true });
 const BASE = "/pb/mtb.html?debug=1&weather=clear";
 const at = (frac) => `const c = m.centre[Math.floor(m.centre.length * ${frac})]; m.teleport(c[0], c[1]);`;
@@ -41,7 +42,7 @@ const browser = await launchBrowser({ fullChromium: true });
 const { server, origin } = await startServer();
 const log = [];
 try {
-  for (const scene of SCENES) {
+  for (const scene of SCENES.filter((sc) => !only.length || only.some((o) => sc.name.startsWith(o)))) {
     const [w, h] = scene.size || [1280, 720];
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, hasTouch: !!scene.touch, isMobile: !!scene.touch });
     const page = await ctx.newPage();
