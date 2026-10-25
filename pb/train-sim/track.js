@@ -26,6 +26,7 @@
   const VALLEY_MIN_H = 6;      // bridges at least this high get a finer ground mesh around them
   const VALLEY_PAD = 90;
   const VALLEY_ROW = 5;
+  const VALLEY_COL_MARGIN = 260; // the extra columns reach one chunk beyond the valley rows: the shared edge of two chunks has the same vertices on both sides (no crack where the valley wall fades)
   const VALLEY_LAT = 112;
   const VALLEY_LAT_STEP = 7;
   const PASS_LIMIT = 110; // km/h through a station the service does not stop at
@@ -756,7 +757,7 @@
     };
     const valleyLats = (s0, s1) => {
       const out = [];
-      if (valleyBridges.some((b) => s1 > b.s0 - VALLEY_PAD && s0 < b.s1 + VALLEY_PAD)) for (let l = -VALLEY_LAT; l <= VALLEY_LAT; l += VALLEY_LAT_STEP) out.push(l);
+      if (valleyBridges.some((b) => s1 > b.s0 - VALLEY_PAD - VALLEY_COL_MARGIN && s0 < b.s1 + VALLEY_PAD + VALLEY_COL_MARGIN)) for (let l = -VALLEY_LAT; l <= VALLEY_LAT; l += VALLEY_LAT_STEP) out.push(l);
       return out;
     };
 

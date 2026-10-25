@@ -38,7 +38,17 @@ Changed: routes.js (master line, `pw`, `passNames`), track.js (crossing plan, su
 landscape.js (extra rows / columns, carve, traffic, surround, hole-mode hooks), infra.js (crossing stub 13 m, waiting-car boxes removed), sim.js (fixed passes), config.js / menu.js
 (wittlich), stations-lu-b.js (exports its kit), train-sim.js (free-cam test hook, preload, crossing notify), train-sim.html (scripts, versions).
 
-## Numbers (see the report for the gate results)
+## Gate results (25 Oct 2026, local desktop Chrome)
+
+* `node scripts/flows/run_all.mjs train`: train-sim, train-sim-audio, train-sim-touch, train-sim-career-lock and the new train-sim-world all PASS (the tunnel check no longer lists `east`: the real
+  line has no tunnel).
+* `python3 scripts/check_site.py`: one warning, `karttracker-ios-privacy.html` orphan (pre-existing, not this branch).  `cv_head.py`: PROBLEMS: 0.
+* Hole scan, all rail routes, step 300 m (render poses / rays): before the fixes north 8 flagged poses + 60 ray failures, brussels 10 + 73, paris 4 + 54, east 0 + 41, wittlich 0 + 81 (pits of 22 m
+  under river viaducts); after: west 0/0, south 0/0, metz 0/0, brussels 0 + 6 (0.5 m mesh steps on valley walls), wittlich 3 flagged poses of 1 px each + 0 rays, trier same, north 1 + 32 (0.5-0.9 m
+  steps on the Pafendall / viaduct walls), paris 2 poses of 1 and 9 px.  The remaining findings are hairline cracks (1-9 magenta pixels at 80-130 m) and sub-metre mesh steps, no visible holes.
+* WebKit smoke (`scripts/zuch/webkit_smoke.mjs`, medium quality): no errors; crossing 221 draws / 377 k triangles, Munsbach 203 draws / 677 k triangles.
+
+## Numbers
 
 * Munsbach vs a typical station on the same line (renderer.info, high, desktop Chrome, shadows on): cab view 1.68 M triangles / 237 draws, aerial 1.05 M / 121; before (Oetrange):
   0.60 M / 262 and 0.57 M / 207.  The extra comes from the forest chunks of the new Roodt leg (tree instancing at quality high) - the station patch itself is ~120 k

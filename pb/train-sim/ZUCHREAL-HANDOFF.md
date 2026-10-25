@@ -37,7 +37,7 @@ Python env for the data pipeline: `/Users/Ian/Library/Caches/luxtram-work/.venv/
    Kreuz Konz, Tréier Süd, Ehrang, Föhren, Hetzerath, Sehlem, Salmtal) need references + models.  Each needs photo | screenshot montage.
 5. **Real line geometry** (REAL-LINES.md section 1): `scripts/zuch/build_real_line.py` does not exist yet.  Mosel line first (data: Geofabrik extract for Luxembourg; for Germany the
    Rheinland-Pfalz extract from download.geofabrik.de, ~400 MB; Overpass is blocked from this machine, SSL handshake failure).
-6. **Pits / floating things**: the hole scan shows no pits left after the carve fix, but village road ribbons / lamps on steep valley walls under viaducts float (landscape.js
+6. **Pits / floating things**: the hole scan shows only hairline cracks (1-9 px) after the carve fix (probably chunk seams where the extra columns differ: see `valleyLats` margin in track.js and `extraLats` for roads / patches), but village road ribbons / lamps on steep valley walls under viaducts float (landscape.js
    `ribbonMesh` samples every 8 m, `addRoadRibbon` for villages in `buildChunk`); the water slab under river bridges is a plain rectangle (landscape.js water section).
 7. Patch data limits: the straightening shrinks features on the inside of tight curves (Munsbach: tightest radius ~583 m, 73 % at 160 m lateral); DEM shows faint ghost edges of building
    footprints; trees are removed within 7.5 m of the track; sidewalks only where OSM tags them.
@@ -61,8 +61,7 @@ $PY scripts/zuch/check_station_patch.py pb/train-sim/data/stations/munsbach.json
 ```
 Test hooks in the game: `?test=1` -> `__tsTest.setFreeCam({pos, look, fov})`, `placeAt(s, kmh)`, `internals()`, `trackInfo()`; `world.landscape.setHoleMode(on)`,
 `.terrainMeshes()`, `.groundHeightAt(x, z)`, `.crossingTraffic()` (`.state()`, `.setClosed(s, bool)`, `.sites`).
-Before-state worktree used for the "before" screenshots (detached origin/main + the free-cam hook only): `<scratchpad>/before` (`git worktree list` shows it; remove with
-`git worktree remove --force <path>` when no longer needed).
+The "before" screenshots were taken from a detached origin/main worktree with only the free-cam hook patched in (removed again).
 
 ## Reports / screenshots
 
