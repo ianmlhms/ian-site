@@ -101,6 +101,7 @@ export function rideTrail({ line, grade, start, step, respawn, rescue, ground, d
   const bot = createBot(line, grade, opts);
   let s = start;
   let t = 0, crashes = 0, maxSpeed = 0, air = 0, nan = 0, below = 0, stuck = 0, rescues = 0;
+  const rescueAt = [], crashAt = [];
   const splits = new Array(checkpoints.length).fill(0);
   let nextCp = 0;
   const end = line[line.length - 1];
@@ -110,12 +111,12 @@ export function rideTrail({ line, grade, start, step, respawn, rescue, ground, d
     t += dt;
     if (![s.x, s.y, s.z, s.vx, s.vy, s.vz].every(Number.isFinite)) { nan++; break; }
     if (s.y < ground(s.x, s.z) - 1e-6) below++;
-    if (s.crashed) { crashes++; s = respawn(s, bot.progress()); }
+    if (s.crashed) { crashes++; crashAt.push([Math.round(s.x), Math.round(s.z), s.crashed]); s = respawn(s, bot.progress()); }
     const sp = Math.hypot(s.vx, s.vy, s.vz);
     maxSpeed = Math.max(maxSpeed, sp);
     if (!s.grounded) air += dt;
     while (nextCp < checkpoints.length && bot.progress() >= checkpoints[nextCp]) splits[nextCp++] = t;
-    if (Math.hypot(s.vx, s.vz) < 0.25 && t > 6) { if (++stuck > 150) { if (!rescue || rescues >= 6) break; s = rescue(s, bot.progress()); rescues++; stuck = 0; } } else stuck = 0;
+    if (Math.hypot(s.vx, s.vz) < 0.25 && t > 6) { if (++stuck > 150) { if (!rescue || rescues >= 6) break; rescueAt.push([Math.round(s.x), Math.round(s.z), bot.progress()]); s = rescue(s, bot.progress()); rescues++; stuck = 0; } } else stuck = 0;
   }
-  return { time: t, crashes, rescues, finished: bot.done(), maxSpeed, airTime: air, nan, below, splits, state: s, end, progress: bot.progress(), length: bot.plan.pts.length };
+  return { time: t, crashes, rescues, rescueAt, crashAt, finished: bot.done(), maxSpeed, airTime: air, nan, below, splits, state: s, end, progress: bot.progress(), length: bot.plan.pts.length };
 }

@@ -13,12 +13,18 @@ import { createBikeState, stepBike, advanceBike } from './bike.js';
 import { BIKES, BIKE_IDS, PLAY, SURFACES, BIKE } from './config.js';
 import { rideTrail } from './bot.js';
 import { createGround } from './decks.js';
+import { createGame, medalFor, poseOnTrail, GAME } from './game.js';
+import { createBot } from './bot.js';
+import { encodeGhost, decodeGhost, ghostAt } from './ghost.js';
+import { createProgress, recordRun, medalOf, bestMs, ghostFor, TRAIL_IDS } from './progress.js';
+import { serializeProgress } from './save.js';
+import { t as tr, LANGS, keysOf, placeholders } from './i18n.js';
 import { featureOffset, KICKER, DROP, dropFallLength, lipFallLength } from './trail-features.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
-const only = ['physics', 'rides', 'trails'].filter(flag);
+const only = ['physics', 'rides', 'trails', 'game', 'i18n'].filter(flag);
 const want = (k) => only.length === 0 || only.includes(k);
 const QUICK = flag('quick'), VERBOSE = flag('verbose');
 const trailArg = (args.find((a) => a.startsWith('--trail=')) || '').slice(8);
@@ -258,8 +264,11 @@ function respawnFor(trail, ground) { return (s, planIndex) => stateAt(trail, Mat
 
 async function rideChecks(play) {
   section('R the reference rider on every trail');
-  const { ground, groundAt, trails } = play;
+  const { ground, groundAt, trails, trees, rocks } = play;
   const out = {};
+  const hitA = { nx: 0, nz: 0, pen: 0 };
+  let bikeY = 0;
+  const collide = (x, z, r) => play.collide(x, z, r, bikeY, hitA);      // the same trunks and rocks the game uses
   for (const t of trails) {
     if (trailArg && t.id !== trailArg) continue;
     if (QUICK && t.id === 'maratoun') continue;
@@ -272,14 +281,14 @@ async function rideChecks(play) {
     const checkpoints = t.cps.map((c) => Math.round(c.s / planSpacing));
     const res = rideTrail({
       line, grade: t.grade, start,
-      step: (s, input, dt) => advanceBike(s, input, dt, ground, groundAt, { bike: spec, wet: 0, shield: s.shield, collide: null }),
+      step: (s, input, dt) => { bikeY = s.y; return advanceBike(s, input, dt, ground, groundAt, { bike: spec, wet: 0, shield: s.shield, collide }); },
       respawn: (s) => { const cps = t.cps.filter((c) => c.s < t.s[t.nearest(s.x, s.z)] - 20); return stateAt(t, cps.length ? cps[cps.length - 1].index : 0, ground, 1); },
       rescue: (s) => stateAt(t, t.nearest(s.x, s.z) + 4, ground, 2),
       ground: (x, z) => ground.height(x, z), dt: 1 / 60, maxTime: t.length / 2.5, checkpoints,
     });
     out[t.id] = res;
     const avg = t.length / res.time;
-    console.log(`  ${t.id.padEnd(18)} ${res.finished ? 'finished' : 'DID NOT FINISH'} in ${res.time.toFixed(0)} s (avg ${(avg * 3.6).toFixed(1)} km/h, max ${(res.maxSpeed * 3.6).toFixed(0)}), crashes ${res.crashes}, rescues ${res.rescues}, air ${res.airTime.toFixed(1)} s, progress ${res.progress}/${res.length}  [${((Date.now() - t1) / 1000).toFixed(1)} s]`);
+    console.log(`  ${t.id.padEnd(18)} ${res.finished ? 'finished' : 'DID NOT FINISH'} in ${res.time.toFixed(0)} s (avg ${(avg * 3.6).toFixed(1)} km/h, max ${(res.maxSpeed * 3.6).toFixed(0)}), crashes ${res.crashes}, rescues ${res.rescues}${res.rescueAt.length ? ' ' + JSON.stringify(res.rescueAt) : ''}${res.crashAt.length ? ' crashes at ' + JSON.stringify(res.crashAt) : ''}, air ${res.airTime.toFixed(1)} s, progress ${res.progress}/${res.length}  [${((Date.now() - t1) / 1000).toFixed(1)} s]`);
     check(`${t.id}: the reference rider finishes (${res.time.toFixed(0)} s)`, res.finished && res.nan === 0 && res.below === 0);
     check(`${t.id}: ... with at most 1 crash per 3 km (${res.crashes}) and 2 rescues (${res.rescues})`, res.crashes <= Math.ceil(t.length / 3000) && res.rescues <= 2);
     check(`${t.id}: average speed ${(avg * 3.6).toFixed(1)} km/h is sensible (8..38)`, avg * 3.6 > 8 && avg * 3.6 < 38);
@@ -288,9 +297,125 @@ async function rideChecks(play) {
   return out;
 }
 
+
+/* ---------------------------------------------------------------- G: the game loop with the reference rider */
+function gameChecks(play) {
+  section('G game loop (card, countdown, checkpoints, finish, medals, ghost, crash, rescue, free ride, save)');
+  const { ground, groundAt, trails } = play;
+  const hit = { nx: 0, nz: 0, pen: 0 };
+  let bikeY = 0;
+  const env = (s) => ({ bike: BIKES.trail, wet: 0, shield: s.shield, collide: (x, z, r) => play.collide(x, z, r, bikeY, hit) });
+  const t = trails.find((x) => x.id === 'hallerbach-flow');
+  const game = createGame();
+  game.showCard(t, { bestMs: 0 });
+  check('a new game opens on the start card', game.mode === 'card' && game.trail === t);
+  game.begin();
+  let s = stateAt(t, 0, ground);
+  const seen = [];
+  let frames = 0;
+  while (game.mode === 'countdown' && frames++ < 600) { for (const e of game.update(1 / 60, s, {})) seen.push(e.type + (e.n || '')); }
+  check(`the countdown says 3, 2, 1, go (${seen.join(' ')}) and takes about 3 s (${(frames / 60).toFixed(2)} s)`, seen.join(' ') === 'countdown3 countdown2 countdown1 go' && frames >= 178 && frames <= 183);
+  const bot = createBot(t.centre.slice(0, t.arch.index + 4), t.grade);
+  const log = { cps: [], crash: 0, finish: null };
+  let steps = 0;
+  while (game.mode === 'run' && steps++ < 60 * 900) {
+    const input = bot.input(s);
+    bikeY = s.y;
+    s = advanceBike(s, input, 1 / 60, ground, groundAt, env(s));
+    for (const e of game.update(1 / 60, s, input)) {
+      if (e.type === 'checkpoint') log.cps.push(e);
+      if (e.type === 'finish') log.finish = e;
+      if (e.type === 'crash') log.crash++;
+    }
+  }
+  check(`all ${t.cps.length} checkpoints counted, in order, with increasing split times`, log.cps.length === t.cps.length && log.cps.every((c, i) => c.n === i + 1 && (i === 0 || c.ms > log.cps[i - 1].ms)));
+  check('the finish arch ends the run once', game.mode === 'finished' && log.finish && log.finish.ms > 200000 && log.finish.ms < 700000, log.finish ? `${(log.finish.ms / 1000).toFixed(1)} s` : 'no finish');
+  const medalTable = t.medals;
+  check(`the reference rider wins silver (${(log.finish.ms / 1000).toFixed(1)} s vs gold ${medalTable.gold} / silver ${medalTable.silver} / bronze ${medalTable.bronze}): medal ${log.finish.medal}`, log.finish.medal >= 2);
+  check('medalFor: gold < silver < bronze thresholds and nothing beyond', medalFor(medalTable.gold * 1000, medalTable) === 3 && medalFor(medalTable.silver * 1000, medalTable) === 2 && medalFor(medalTable.bronze * 1000, medalTable) === 1 && medalFor(medalTable.bronze * 1000 + 1500, medalTable) === 0);
+  // split deltas against the best run: the second ride compares with the first
+  const ghostText = encodeGhost(log.finish.ghost);
+  const decoded = decodeGhost(ghostText);
+  check(`the ghost encodes to ${ghostText.length} characters and decodes (${decoded ? decoded.s.length : 0} samples)`, ghostText.length < 1800 && decoded && decoded.s.length > 100);
+  // the ghost follows the run: the bike's s at the checkpoint times equals the ghost's s within 2 m
+  let worstGhost = 0;
+  for (const c of log.cps) { const g = ghostAt(decoded, c.ms); worstGhost = Math.max(worstGhost, Math.abs(g.s - t.cps[c.n - 1].s)); }
+  check(`the ghost is where the rider was at every checkpoint (worst ${worstGhost.toFixed(1)} m)`, worstGhost < 10);
+  const pose = poseOnTrail(t, 500, 0);
+  check('a ghost pose on the trail lies on the centre line', Number.isFinite(pose.x) && t.nearest(pose.x, pose.z) >= 0 && pose.index > 100);
+  // second ride: green / red deltas against the best splits
+  const game2 = createGame();
+  game2.showCard(t, { bestMs: log.finish.ms, bestSplits: log.cps.map((c) => c.ms - 1000), ghostMs: log.finish.ms });
+  game2.begin(); let s2 = stateAt(t, 0, ground); const bot2 = createBot(t.centre.slice(0, t.arch.index + 4), t.grade); const deltas = [];
+  for (let i = 0; i < 60 * 900 && game2.mode !== 'finished'; i++) {
+    const input = game2.mode === 'run' ? bot2.input(s2) : {};
+    if (game2.mode === 'run') { bikeY = s2.y; s2 = advanceBike(s2, input, 1 / 60, ground, groundAt, env(s2)); }
+    for (const e of game2.update(1 / 60, s2, input)) if (e.type === 'checkpoint') deltas.push(e.delta);
+  }
+  check('the second ride gets split deltas against the best (red: 1 s slower than the faked best)', deltas.length === t.cps.length && deltas.every((d) => d > 800 && d < 1300), deltas.map((d) => Math.round(d)).join(','));
+  check('and it finishes in the same time as the first (deterministic)', game2.result && Math.abs(game2.result.ms - log.finish.ms) < 100, `${game2.result && game2.result.ms} vs ${log.finish.ms}`);
+
+  // crash -> respawn at the last checkpoint within 1.5 s
+  const g3 = createGame(); g3.showCard(t); g3.begin();
+  let s3 = stateAt(t, 0, ground); for (let i = 0; i < 200; i++) g3.update(1 / 60, s3, {});
+  const cp1 = t.cps[0];
+  s3 = stateAt(t, cp1.index + 3, ground, 5); for (let i = 0; i < 5; i++) g3.update(1 / 60, s3, { throttle: 1 });
+  check('riding through the first checkpoint counts it', g3.cpNext === 1 && g3.lastCp === cp1.index);
+  const crashed = { ...s3, crashed: 'landing' };
+  let evs = []; let tt = 0;
+  while (tt < 3) { evs.push(...g3.update(1 / 60, crashed, {}).map((e) => ({ ...e, at: tt }))); tt += 1 / 60; if (evs.some((e) => e.type === 'respawn')) break; }
+  const respawn = evs.find((e) => e.type === 'respawn');
+  check(`a crash tumbles for ${respawn ? respawn.at.toFixed(2) : '?'} s (< 1.5 s), then respawns at the last checkpoint`, evs[0] && evs[0].type === 'crash' && respawn && respawn.at < 1.5 && respawn.index === cp1.index && g3.crashes === 1);
+  // stuck: pedalling without moving for 3.4 s -> rescue
+  const g4 = createGame(); g4.showCard(t); g4.begin(); const s4 = stateAt(t, 600, ground); for (let i = 0; i < 200; i++) g4.update(1 / 60, s4, {});
+  let rescued = null; for (let i = 0; i < 60 * 6 && !rescued; i++) rescued = g4.update(1 / 60, s4, { throttle: 1 }).find((e) => e.type === 'rescue');
+  check('pedalling on the spot for 3.4 s puts the rider back on the trail', !!rescued && rescued.index >= 0);
+  const g5 = createGame(); g5.showCard(t); g5.begin(); let s5 = stateAt(t, 400, ground); for (let i = 0; i < 200; i++) g5.update(1 / 60, s5, {});
+  s5 = { ...s5, x: s5.x + 80, z: s5.z + 80 };
+  let lost = null; for (let i = 0; i < 60 * 6 && !lost; i++) lost = g5.update(1 / 60, s5, {}).find((e) => e.type === 'rescue');
+  check('being lost 38 m from the trail for 4 s puts the rider back too', !!lost);
+
+  // free ride: viewpoints
+  const g6 = createGame(); const vps = [{ index: 0, x: t.centre[300][0], z: t.centre[300][1], name: 'A' }, { index: 1, x: t.centre[900][0], z: t.centre[900][1], name: 'B' }];
+  g6.startFree(t, vps);
+  const found = []; for (const idx of [100, 300, 301, 900]) { const st = stateAt(t, idx, ground); for (const e of g6.update(1 / 60, st, {})) if (e.type === 'viewpoint') found.push(e.index); }
+  check('free ride collects each viewpoint once', found.join() === '0,1' && g6.found.size === 2);
+
+  // progress + save: a recorded run, unlocks, the 8192-byte limit
+  let prog = createProgress();
+  const rr = recordRun(prog, { trailId: t.id, ms: log.finish.ms, checkpointsMs: log.cps.map((c) => Math.round(c.ms)), ghostText, medal: log.finish.medal });
+  prog = rr.progress;
+  check(`recording a run stores the medal ${medalOf(prog, t.id)}, the best time, the ghost and unlocks the next trail`, medalOf(prog, t.id) >= 2 && bestMs(prog, t.id) === log.finish.ms && !!ghostFor(prog, t.id));
+  const json = serializeProgress(prog);
+  check(`the save with one ghost is ${json.length} bytes (limit 7000)`, json.length < 3000);
+  // every trail's ghost fits: simulate all six trails with 35 min ghosts
+  let big = createProgress();
+  for (const id of TRAIL_IDS) { const n = 560; const samples = Array.from({ length: n * 4 }, (_, i) => ({ t: i * 500, s: i * 1.2, o: Math.sin(i / 9) * 3 })); big = recordRun(big, { trailId: id, ms: 1000000 + n, checkpointsMs: [1, 2, 3], ghostText: encodeGhost(samples), medal: 3 }).progress; }
+  let bigJson = ''; let ok = true; try { bigJson = serializeProgress(big); } catch (error) { ok = false; }
+  check(`six trails with ghosts still save under the limit (${bigJson.length} bytes, at most 3 ghosts kept)`, ok && bigJson.length < 7000 && Object.keys(big.g || {}).length <= 3);
+}
+
+/* ---------------------------------------------------------------- L: i18n */
+function i18nChecks(play) {
+  section('L i18n: lb / de / en / fr');
+  const base = keysOf('lb');
+  for (const lang of LANGS) {
+    const keys = keysOf(lang);
+    const missing = base.filter((k) => !keys.includes(k)), extra = keys.filter((k) => !base.includes(k));
+    check(`${lang}: ${keys.length} texts, none missing, none extra`, missing.length === 0 && extra.length === 0, `missing ${missing.slice(0, 4).join(',')} extra ${extra.slice(0, 4).join(',')}`);
+    const badPlaceholders = base.filter((k) => placeholders('lb', k).sort().join() !== placeholders(lang, k).sort().join());
+    check(`${lang}: placeholders match the Luxembourgish text`, badPlaceholders.length === 0, badPlaceholders.slice(0, 4).join(','));
+    const empty = keys.filter((k) => !tr(lang, k).trim());
+    check(`${lang}: no empty text`, empty.length === 0);
+  }
+  for (const trail of play.trails) for (const lang of LANGS) check(`${trail.id}: name and blurb in ${lang}`, !!(trail.name && trail.name[lang] && trail.blurb && trail.blurb[lang]));
+}
+
 if (want('physics')) physicsChecks();
-if (want('trails') || want('rides')) {
+if (want('trails') || want('rides') || want('game') || want('i18n')) {
   const play = await worldChecks();
+  if (want('game')) gameChecks(play);
+  if (want('i18n')) i18nChecks(play);
   if (want('rides')) {
     const rides = await rideChecks(play);
     const stored = JSON.parse(fs.readFileSync(path.join(HERE, 'data', 'medals.json'), 'utf8'));

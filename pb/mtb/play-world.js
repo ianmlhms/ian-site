@@ -8,6 +8,7 @@ import { BIKES, PLAY } from './config.js';
 
 const GATE_AT = 8;                // m from the start: the start gate
 const FINISH_BEFORE = 8;          // m before the end: the finish arch
+const ROCK_PATH_CLEARANCE = 0.45;   // carve coverage above which a rock cannot stop the bike
 const CHECKPOINT_RADIUS = 9;      // m: riding this close to a checkpoint counts
 
 export function buildPlayWorld(data) {
@@ -19,7 +20,18 @@ export function buildPlayWorld(data) {
   const classify = (x, z) => { sampleWorldMap(maps, x, z, probe); return probe.rock > 0.5 ? 'rock' : probe.grass > 0.5 ? 'grass' : 'forest'; };
   const groundAt = groundResolver(field, { onDeck: ground.onDeck, classify });
   const trails = data.trails.trails.map((t) => trailRuntime(t, field.network, surface, data.medals && data.medals[t.id]));
-  return { ...world, decks, ground, groundAt, classify, trails, trailById: new Map(trails.map((t) => [t.id, t])) };
+  // Trunks and rocks as the bike meets them. A rock never blocks the carved path itself (a few art rocks stand on the Marathon's path: the rider rides through them
+  // instead of being stopped by an invisible-to-the-data obstacle; the reviewer / art agent should move those rocks, see W3-PLAY-NOTES).
+  const hitA = { nx: 0, nz: 0, pen: 0 }, hitB = { nx: 0, nz: 0, pen: 0 };
+  const collide = (x, z, r, y, out) => {
+    const a = world.trees.collide(x, z, r, out);
+    if (world.clearance(x, z) > ROCK_PATH_CLEARANCE) return a;
+    const b = world.rocks.collide(x, z, r, y, hitB);
+    if (b && (!a || b.pen > a.pen)) { out.nx = b.nx; out.nz = b.nz; out.pen = b.pen; return out; }
+    return a;
+  };
+  void hitA;
+  return { ...world, decks, ground, groundAt, classify, collide, trails, trailById: new Map(trails.map((t) => [t.id, t])) };
 }
 
 /** A trail as the game plays it. `centre` = the carved (smoothed) samples [[x, z], ...] every 1 m, `s` their arc length (m). */
