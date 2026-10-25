@@ -19,6 +19,7 @@ window.TS = window.TS || {};
     low:    { ahead: 4, behind: 1, strip: 90,  trees: 0.3, shadow: 0,    rain: 1800, houses: 0.6, rowStep: 25, cars: 16, far: true }
   };
   const LAT_OFFSETS = [0, 3, 6, 9, 13, 18, 24, 31, 40, 52, 66, 82, 100, 120, 150];
+  const ROAD_LAT_OFFSETS = [-12, -8, -5.2, -3.6, -2, 0, 2, 3.6, 5.2, 8, 12];   // extra terrain columns beside a road that runs parallel to the line (crossing-roads.js)
 
   /* ---------- small math helpers ---------- */
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -800,18 +801,26 @@ window.TS = window.TS || {};
       if (track.kind !== 'tram') for (const tn of tunnels) for (const ps of [tn.s0, tn.s1]) {
         if (ps >= s0 - 0.5 && ps <= s0 + CHUNK + 0.5) rowS.push(ps - 0.3, ps + 0.3);
       }
+      /* roads at level crossings (crossing-roads.js): rows and columns where the road runs, so the strip mesh follows the road exactly (rows strictly inside this chunk only) */
+      const roadPlan = track.crossingRoads;
+      const lats = LAT.slice();
+      if (roadPlan) {
+        for (const s of roadPlan.extraRows(s0 + 0.02, s0 + CHUNK - 0.02)) if (s > s0 + 0.02 && s < s0 + CHUNK - 0.02 && !rowS.some(r => Math.abs(r - s) < 0.45)) rowS.push(s);
+        for (const lat of roadPlan.extraLats(s0, s0 + CHUNK)) for (const off of ROAD_LAT_OFFSETS) { const v = lat + off; if (Math.abs(v) < W - 2 && !lats.some(l => Math.abs(l - v) < 0.6)) lats.push(v); }
+        lats.sort((p, q) => p - q);
+      }
       rowS.sort((p, q) => p - q);
       const portalPad = new Set();   // the pad rows of a portal pair: the quads between them (the ground's cliff face at the mouth) get a hole so the bore stays open
       if (track.kind !== 'tram') for (const tn of tunnels) for (const ps of [tn.s0, tn.s1]) if (ps >= s0 - 0.5 && ps <= s0 + CHUNK + 0.5) for (let a = 0; a + 2 < rowS.length; a++) if (rowS[a + 1] >= ps - 0.3 - 1e-6 && rowS[a + 2] <= ps + 0.3 + 1e-6) portalPad.add(a);
       for (let jj = 0; jj < rowS.length; jj++) {
         const s = rowS[jj], info = rowInfo(s), f = frame(s), row = [];
-        for (let i = 0; i < LAT.length; i++) {
-          const lat = LAT[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat;
+        for (let i = 0; i < lats.length; i++) {
+          const lat = lats[i], x = f.x + f.rx * lat, z = f.z + f.rz * lat;
           row.push({ x, z, y: groundY(info, lat, x, z, s), lat, info });
         }
         grid.push(row);
       }
-      const mb = new MB(), inner = grid.slice(1, grid.length - 1), nB = LAT.length;
+      const mb = new MB(), inner = grid.slice(1, grid.length - 1), nB = lats.length;
       // use the padded rows for normals: build a grid with one extra row on each side, then drop them
       const full = grid;
       const nA = full.length, base = mb.count, n = new T.Vector3(), u = new T.Vector3(), v = new T.Vector3();
@@ -824,7 +833,7 @@ window.TS = window.TS || {};
       }
       const nR = nA - 2;
       for (let a = 0; a < nR - 1; a++) for (let b = 0; b < nB - 1; b++) {
-        if (portalPad.has(a) && Math.abs(LAT[b]) <= PORTAL_HOLE && Math.abs(LAT[b + 1]) <= PORTAL_HOLE) continue;
+        if (portalPad.has(a) && Math.abs(lats[b]) <= PORTAL_HOLE && Math.abs(lats[b + 1]) <= PORTAL_HOLE) continue;
         const i0 = base + a * nB + b, i1 = i0 + 1, i2 = i0 + nB, i3 = i2 + 1;
         mb.i.push(i0, i1, i2, i1, i3, i2);
       }
@@ -904,7 +913,10 @@ window.TS = window.TS || {};
       const bMid = biomeAt(sMid), bStart = biomeAt(s0 + 5), bEnd = biomeAt(s1 - 5);
       const place = (s, lat) => { const f = frame(s), info = rowInfo(s), x = f.x + f.rx * lat, z = f.z + f.rz * lat; return { f, info, x, z, y: groundY(info, lat, x, z) }; };
       const r3 = r => { const c = r() < 0.15 ? C('#f2e2a0') : C('#ffffff'); return c.multiplyScalar(0.75 + r() * 0.4); };
+      const roadPlanC = track.crossingRoads;
+      const onRoad = (x, z, m) => !!roadPlanC && roadPlanC.reserved(x, z, m);   // crossing roads (crossing-roads.js): nothing grows or stands on them
       const addTree = (name, x, y, z, sc, r) => {
+        if (onRoad(x, z, name === 'bush' ? 1.6 : 3.4)) return;
         const tint = r() < 0.12 ? C('#e6e4a8') : C('#ffffff'); tint.multiplyScalar(0.82 + r() * 0.32);
         trees[name].push({ x, y, z, rot: r() * 6.28, sc, tint });
       };
@@ -928,7 +940,7 @@ window.TS = window.TS || {};
             const s = sC + ds + rng() * 3, lat = side * (L0 + row * (9.5 + rng() * 3));
             const wantChurch = !churchDone && row === 1 && Math.abs(ds) < half * 0.5 && rng() < 0.35;
             const p = place(s, lat);
-            if (inTunnel(s, 30) || inBridge(s, 40)) continue;
+            if (inTunnel(s, 30) || inBridge(s, 40) || onRoad(p.x, p.z, 9)) continue;
             const facing = (row === -1 ? side : -side), yaw = yawOf(p.f) + (facing > 0 ? 0 : Math.PI), M0 = placeM(p.x, p.y - 0.1, p.z, yaw);
             if (wantChurch) { churchDone = true; addChurch(mbHouse, mbRoof, M0, rng); }
             else addHouse(mbHouse, mbRoof, M0, rng, {});
@@ -940,7 +952,7 @@ window.TS = window.TS || {};
       /* ---- lone farms ---- */
       if (['farmland', 'highspeed', 'ardennes', 'forest', 'vineyard'].includes(bMid) && rng() < 0.32 * Q.houses && !inTunnel(sMid, 120) && !inBridge(sMid, 120)) {
         const side = rng() < 0.5 ? -1 : 1, sF = sMid + (rng() - 0.5) * 100, lF = side * (42 + rng() * 40);
-        if (!isOcc(sF - 30, sF + 30, lF - 22, lF + 22)) {
+        if (!isOcc(sF - 30, sF + 30, lF - 22, lF + 22) && !onRoad(place(sF, lF).x, place(sF, lF).z, 26)) {
           const p = place(sF, lF), yaw = yawOf(p.f) + (side > 0 ? Math.PI : 0), cs = Math.cos(yaw), sn = Math.sin(yaw);
           const at = (dx, dz) => placeM(p.x + cs * dx + sn * dz, groundY(p.info, lF, p.x + cs * dx + sn * dz, p.z - sn * dx + cs * dz) - 0.1, p.z - sn * dx + cs * dz, yaw);
           addHouse(mbHouse, mbRoof, at(0, 0), rng, { w: 12, d: 8, floors: 2, annex: false });
@@ -1209,6 +1221,13 @@ window.TS = window.TS || {};
         im.castShadow = quality !== 'low' && name !== 'tuft' && name !== 'sheep' && name !== 'lampHead'; im.receiveShadow = false; if (im.computeBoundingSphere) im.computeBoundingSphere(); group.add(im); hubs.push(im);
       }
       void terr;
+      /* ---- roads at level crossings: the chunk that holds the crossing builds the whole road (asphalt, lines, signs) */
+      if (roadPlanC && TS.crossingRoadsMesh) {
+        for (const c of roadPlanC.crossings) {
+          if (c.s < s0 || c.s >= s1) continue;
+          try { group.add(TS.crossingRoadsMesh.build(c, roadPlanC, { quality })); } catch (e) { console.warn(TAG + 'crossing road ' + c.index + ' failed', e); }
+        }
+      }
       root.add(group);
       return { k, group, roads: chunkRoads };
     }
@@ -1565,6 +1584,7 @@ window.TS = window.TS || {};
       waterNormal.offset.x = (elapsed * 0.012) % 1; waterNormal.offset.y = (elapsed * 0.02) % 1;
       for (const t of turbines) t.spin.rotation.z += dt * t.speed;
       if (carList.length) updateCars(dt);
+      if (crossTraffic) crossTraffic.update(dt, s, camera);
       firstUpdate = false;
     }
 
@@ -1583,6 +1603,7 @@ window.TS = window.TS || {};
       if (disposed) return; disposed = true;
       for (const c of chunks.values()) disposeChunk(c);
       chunks.clear(); roadsAll.clear();
+      if (crossTraffic) crossTraffic.dispose();
       scene.remove(root);
       root.traverse(o => { if (o.isMesh || o.isPoints || o.isLine) { if (!o.isInstancedMesh || o === carMesh) { if (o.geometry && o.geometry !== carGeo) o.geometry.dispose(); } if (o.material && o.material.isShaderMaterial) o.material.dispose(); } });
       occ.dispose(); carGeo.dispose(); Object.keys(treeKit).forEach(n => treeKit[n].dispose()); carMesh.dispose();
@@ -1590,8 +1611,14 @@ window.TS = window.TS || {};
       if (scene.fog === ownFog) scene.fog = prevFog || null;
     }
 
+    /* traffic at the level crossings (crossing-traffic.js): vehicles queue at the barriers */
+    let crossTraffic = null;
+    try { crossTraffic = track.crossingRoads && track.crossingRoads.crossings.length && TS.crossingTraffic ? TS.crossingTraffic.create({ root, plan: track.crossingRoads, quality, getNight: () => look.night }) : null; }
+    catch (e) { console.warn(TAG + 'crossing traffic failed', e); crossTraffic = null; }
+    const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
+
     setWeather('clear', true); setTimeOfDay(12);
-    return { update, setTimeOfDay, setWeather, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
+    return { update, setTimeOfDay, setWeather, setCrossing, crossingTraffic: () => crossTraffic, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
   }
 
   TS.landscape = { create, CHUNK };

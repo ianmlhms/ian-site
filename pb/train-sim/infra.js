@@ -28,7 +28,8 @@
   const PLATFORM_H_RAIL = 0.76;
   const PLATFORM_H_TRAM = 0.3;
   const BLINK_PERIOD = 0.55;
-  const CROSSING_ROAD_HALF = 22;
+  const CROSSING_ROAD_HALF = 13;      // crossing-roads.js continues the road from here (INFRA_RUN)
+  const CROSSING_ROAD_LIFT = 0.05;      // the road lies this far above the formation (= crossing-roads.js ROAD_LIFT)
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const mulberry = (seed) => {
@@ -1583,7 +1584,6 @@
   }
 
   /* ================================================================ crossings */
-  const CAR_COLORS = ['#c9c9c6', '#25354a', '#8c1f24', '#2e5a3a', '#d7d2c4', '#1d1f22'];
   const lampDisc = (on) => mat('xlamp' + on, () => new T.MeshBasicMaterial({ color: on ? 0xff2a1a : 0x2e0a07 }));
 
   function armGeometry(env, dir) {
@@ -1609,15 +1609,19 @@
     const xLo = Math.min(0, X2);
     const xHi = Math.max(0, X2);
     const road = local.get('asphalt', () => M.tex('asphalt', tex.asphalt()));
-    const prof = [[xLo - CROSSING_ROAD_HALF, FORM_Y + 0.03], [xLo - 12, FORM_Y + 0.03], [xLo - 4.6, -0.05], [xHi + 4.6, -0.05], [xHi + 12, FORM_Y + 0.03], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.03]];
+    const prof = [[xLo - CROSSING_ROAD_HALF, FORM_Y + CROSSING_ROAD_LIFT], [xLo - 12, FORM_Y + CROSSING_ROAD_LIFT], [xLo - 4.6, -0.05], [xHi + 4.6, -0.05], [xHi + 12, FORM_Y + CROSSING_ROAD_LIFT], [xHi + CROSSING_ROAD_HALF, FORM_Y + CROSSING_ROAD_LIFT]];
     for (let i = 0; i < prof.length - 1; i++) {
       const p = prof[i];
       const n2 = prof[i + 1];
       road.quad([p[0], p[1], -2.9], [n2[0], n2[1], -2.9], [n2[0], n2[1], 2.9], [p[0], p[1], 2.9], [0, 1, 0], WHITE, [[p[0] / 4, -0.7], [n2[0] / 4, -0.7], [n2[0] / 4, 0.7], [p[0] / 4, 0.7]]);
     }
     const marks = local.get('mark', mark);
-    [-1, 1].forEach((sd) => {
-      marks.quad([xLo - CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.7], [xHi + CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [xLo - CROSSING_ROAD_HALF, FORM_Y + 0.05, sd * 2.58], [0, 1, 0], [0.9, 0.9, 0.86]);
+    [-1, 1].forEach((sd) => {   // white edge lines follow the road's profile (the road climbs to rail level over the crossing)
+      for (let i = 0; i < prof.length - 1; i++) {
+        const p = prof[i];
+        const n2 = prof[i + 1];
+        marks.quad([p[0], p[1] + 0.02, sd * 2.7], [n2[0], n2[1] + 0.02, sd * 2.7], [n2[0], n2[1] + 0.02, sd * 2.58], [p[0], p[1] + 0.02, sd * 2.58], [0, 1, 0], [0.9, 0.9, 0.86]);
+      }
     });
     const vc = local.get('vc', M.vc, true);
     const lampsA = new Batch();
@@ -1661,27 +1665,13 @@
       group.add(arm);
       arms.push({ mesh: arm, dir, angle: 0 });
     });
-    // waiting cars
-    const rnd = mulberry(Math.floor(cr.s));
-    const carB = new Batch();
-    [[xHi + 10, -1.4, 1], [xLo - 11, 1.4, -1]].forEach(([x, z, dirX]) => {
-      const c = col(CAR_COLORS[Math.floor(rnd() * CAR_COLORS.length)]);
-      carB.box(x, FORM_Y + 0.75, z, 4.3, 0.75, 1.8, c);
-      carB.box(x - dirX * 0.2, FORM_Y + 1.4, z, 2.3, 0.62, 1.7, c);
-      carB.box(x - dirX * 0.2, FORM_Y + 1.42, z, 2.32, 0.4, 1.72, col('#22303a'));
-      [[-1.4, -0.9], [-1.4, 0.9], [1.4, -0.9], [1.4, 0.9]].forEach(([ox, oz]) => carB.box(x + ox, FORM_Y + 0.33, z + oz, 0.66, 0.66, 0.24, col('#141415')));
-      carB.box(x + dirX * 2.16, FORM_Y + 0.8, z, 0.05, 0.2, 1.3, col('#ffefb0'));
-    });
-    const cars = carB.mesh(M.vc(), false, true);
-    group.add(cars);
-    cars.visible = closed;
+    // the cars that wait at the barriers are real traffic now (crossing-traffic.js)
     const api = {
       group,
       closed,
       angle: 0,
       setClosed(v) {
         this.closed = v;
-        cars.visible = v;
       },
       tick(now, dt) {
         const target = this.closed ? 0 : 1;

@@ -623,7 +623,7 @@
       return arrAt(Y, fi) - formationDrop - RIVER_BELOW;
     }
 
-    function terrainHeightAt(x, z) {
+    function terrainBaseHeightAt(x, z) {
       const q = nearest(x, z, scratch);
       const fi = q.i;
       const trackY = q.y;
@@ -711,6 +711,23 @@
     const bridgeAt = (s) => bridges.find((b) => s >= b.s0 && s <= b.s1) || null;
     const stationAt = (s) => stations.findIndex((st) => s >= st.platformStart && s <= st.platformEnd);
 
+    /* Roads at level crossings (crossing-roads.js): a smooth long road with cuts and fills, planned on the plain terrain, then folded into terrainHeightAt so
+       the strip mesh, the far ground and every tree / house query see the same ground. */
+    let roadPlan = null;
+    if (kind !== 'tram' && comp.crossings.length && window.TS.crossingRoads) {
+      try {
+        roadPlan = window.TS.crossingRoads.plan({
+          id: def.id, length, crossings: comp.crossings, frameAt, baseHeightAt: terrainBaseHeightAt, formationDrop,
+          secondLat: (s) => (second ? second.lat(s) : 0), tunnels: comp.tunnels, bridges, stations, water,
+        });
+      } catch (error) {
+        console.warn('[Lokféierer] track: crossing roads failed', error);
+        roadPlan = null;
+      }
+    }
+    const terrainHeightAt = roadPlan ? (x, z) => roadPlan.adjust(x, z, terrainBaseHeightAt(x, z)) : terrainBaseHeightAt;
+    const isReservedWithRoads = roadPlan ? (x, z) => isReserved(x, z) || roadPlan.reserved(x, z, 1.5) : isReserved;
+
     return {
       id: def.id,
       kind,
@@ -727,6 +744,8 @@
       crossings: comp.crossings,
       biomeAt,
       terrainHeightAt,
+      terrainBaseHeightAt,
+      crossingRoads: roadPlan,
       nearest: (x, z) => Object.assign({}, nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 })),
       nearestS: (x, z) => nearest(x, z, scratch).s,
       distanceToTrack: (x, z) => nearest(x, z, scratch).d,
@@ -735,7 +754,7 @@
       bridgeAt,
       stationAt,
       corridorHalfWidth,
-      isReserved,
+      isReserved: isReservedWithRoads,
       platformInfo,
       second,
     };
