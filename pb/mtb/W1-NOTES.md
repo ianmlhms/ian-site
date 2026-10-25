@@ -1,6 +1,6 @@
 # W1 "World": notes for the reviewer
 
-Branch `mtb` (worktree `/Users/Ian/Library/Caches/website-mtb`), 6 commits, nothing pushed, nothing deployed.
+Branch `mtb` (worktree `/Users/Ian/Library/Caches/website-mtb`), 5 commits, nothing pushed, nothing deployed.
 Run: `node pb/mtb/harness.js` (34 checks, ~15 s), `node scripts/flows/run_all.mjs mtb` (3 flows, Chromium), `node scripts/flows/run_webkit.mjs mtb-world mtb-holes mtb-ride` (WebKit, all pass), open `/pb/mtb.html` (`?debug=1` gives `window.__mtb`, `?q=low|medium|high`, `?time=dawn|morning|noon|evening|dusk|night`, `?weather=clear|cloudy|fog|rain`, `?holes=1` hole-detector mode).
 
 ## What was built
@@ -27,7 +27,7 @@ Run: `node pb/mtb/harness.js` (34 checks, ~15 s), `node scripts/flows/run_all.mj
 | WebKit (`run_webkit.mjs mtb-...`) | **3/3 pass** (headless WebKit has WebGL here) |
 | `python3 scripts/check_site.py` | no new warnings (the one orphan warning, `karttracker-ios-privacy.html`, is on main already) |
 | `cv_head.py` | **PROBLEMS: 0** |
-| Hole detector (browser) | **0 hole pixels** over 72 poses (12 along the trail at rider height, 12 looking down the trail, 28 random up to 120 m high, 16 at the four world edges looking out); self-test with one tile removed reports 676 hole pixels |
+| Hole detector (browser) | **0 hole pixels** over 72 poses (12 along the trail at rider height, 12 looking down the trail, 28 random up to 120 m high, 16 at the four world edges looking out); self-test with one 32 m tile removed (trees hidden, seen from 12 m up) reports 22,329 hole pixels in Chromium and 16,072 in WebKit |
 | Budgets (flow-asserted) | low <= 130 calls / 330 k tris, medium <= 190 / 520 k, high <= 230 / 900 k. Measured (headless, desktop GPU): low 117 calls / 287 k, medium 121-135 / 308-408 k, high 57-156 / 345-541 k. Data 3.9 MB (flow limit 6 MB). JS heap 121 MB, ready after 1.6 s on the Mini |
 
 ## Screenshots and montages

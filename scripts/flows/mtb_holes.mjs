@@ -92,8 +92,9 @@ export const flow = {
       const g = m.surface.height(tile.leaf.x0 + 16, tile.leaf.z0 + 16);
       const keep = tile.mesh;
       keep.visible = false;
-      const probe = await window.__probe([{ x: tile.leaf.x0 + 16, z: tile.leaf.z0 + 16 - 40, up: 6, yaw: 90, pitch: -12, kind: "selftest" }]);
-      keep.visible = true;
+      m.forest.group.visible = false;                      // trees must not hide the gap
+      const probe = await window.__probe([{ x: tile.leaf.x0 + 16, z: tile.leaf.z0 + 16 - 14, up: 12, yaw: 90, pitch: -50, kind: "selftest" }]);
+      keep.visible = true; m.forest.group.visible = true;
       return { holes: probe.holes, g };
     });
     h.expect(hidden.holes > 100, `a missing 32 m tile is seen as ${hidden.holes} hole pixels (the detector works)`);
