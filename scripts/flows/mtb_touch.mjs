@@ -53,7 +53,7 @@ export const flow = {
       await press(page, '#touchControls [data-btn="throttle"]', 11, pedal.x, pedal.y);
       await press(page, "#touchControls .pad", 12, pad.x, pad.y);
       await page.evaluate(({ x, y }) => document.querySelector("#touchControls .pad").dispatchEvent(new PointerEvent("pointermove", { pointerId: 12, clientX: x + 55, clientY: y, bubbles: true, pointerType: "touch" })), pad);
-      await h.pause(3000);
+      await h.pause(1500);                                   // (the first trail runs through a gorge: a thumb held at full lock for longer than this rides into the wall, which is what a real rider does too)
       const s1 = await page.evaluate(() => { const b = window.__mtb.bike; return { v: Math.hypot(b.vx, b.vz) * 3.6, h: b.heading }; });
       h.expect(s1.v > 5 && Math.abs(s1.h - h0) > 0.05, `pedal + steer at the same time: ${s1.v.toFixed(0)} km/h, heading changed ${((s1.h - h0) * 57.3).toFixed(0)} degrees`);
       await h.shot(`run-${size.name}`);
@@ -65,7 +65,7 @@ export const flow = {
       const v2 = await page.evaluate(() => Math.hypot(window.__mtb.bike.vx, window.__mtb.bike.vz) * 3.6);
       await release(page, '#touchControls [data-btn="brake"]', 13);
       h.expect(v2 < s1.v * 0.6, `the brake button slows the bike (${s1.v.toFixed(0)} -> ${v2.toFixed(0)} km/h)`);
-      await page.evaluate(() => { const m = window.__mtb; m.reset(70); m.setBike({ vx: 7 * Math.cos(m.bike.heading), vz: 7 * Math.sin(m.bike.heading) }); });
+      await page.evaluate(() => { const m = window.__mtb, t = m.trail; let at = 70; for (let i = 40; i < t.count - 80; i += 4) { const dh = Math.abs(Math.atan2(Math.sin(t.headingAt(i + 30) - t.headingAt(i)), Math.cos(t.headingAt(i + 30) - t.headingAt(i)))); const [x0, z0] = t.centre[i], [x1, z1] = t.centre[i + 30]; if (dh < 0.06 && Math.abs(m.surface.height(x1, z1) - m.surface.height(x0, z0)) < 0.8 && !t.features.some((f) => f.i0 !== undefined && f.i1 > i - 10 && f.i0 < i + 40)) { at = i; break; } } m.reset(at); m.setBike({ vx: 7 * Math.cos(m.bike.heading), vz: 7 * Math.sin(m.bike.heading) }); });
       const jump = await center(page, '#touchControls [data-btn="jump"]');
       await press(page, '#touchControls [data-btn="jump"]', 14, jump.x, jump.y);
       await h.pause(450);
