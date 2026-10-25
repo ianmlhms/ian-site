@@ -13,7 +13,7 @@ import { createBikeState, stepBike, advanceBike } from './bike.js';
 import { BIKES, BIKE_IDS, PLAY, SURFACES, BIKE } from './config.js';
 import { rideTrail } from './bot.js';
 import { createGround } from './decks.js';
-import { createGame, medalFor, poseOnTrail, GAME } from './game.js';
+import { createGame, medalFor, poseOnTrail, minRunMs, GAME } from './game.js';
 import { createBot } from './bot.js';
 import { encodeGhost, decodeGhost, ghostAt } from './ghost.js';
 import { createProgress, recordRun, medalOf, bestMs, ghostFor, TRAIL_IDS } from './progress.js';
@@ -354,6 +354,27 @@ function gameChecks(play) {
   }
   check('the second ride gets split deltas against the best (red: 1 s slower than the faked best)', deltas.length === t.cps.length && deltas.every((d) => d > 800 && d < 1300), deltas.map((d) => Math.round(d)).join(','));
   check('and it finishes in the same time as the first (deterministic)', game2.result && Math.abs(game2.result.ms - log.finish.ms) < 100, `${game2.result && game2.result.ms} vs ${log.finish.ms}`);
+
+  // a run only counts when every checkpoint was passed in order, and fast enough to be a ride
+  {
+    const tp = trails.find((x) => x.id === 'ernz-waldwee');
+    const g3 = createGame();
+    g3.showCard(tp, { bestMs: 0 }); g3.begin();
+    let sb = stateAt(tp, 0, ground);
+    for (let k = 0; k < 400 && g3.mode !== 'run'; k++) g3.update(1 / 60, sb, {});
+    const evs = [];
+    sb = stateAt(tp, tp.arch.index + 1, ground);                       // teleport next to the finish arch: no checkpoint was passed
+    for (let k = 0; k < 5; k++) for (const e of g3.update(1 / 60, sb, {})) evs.push(e.type);
+    check('a teleport to the finish arch is not a finish: the arch needs every checkpoint, the rider is sent back to the first missed one', g3.mode === 'run' && evs.includes('missed') && evs.includes('respawn') && !evs.includes('finish'), evs.join(' '));
+    const g4 = createGame();
+    g4.showCard(tp, { bestMs: 0 }); g4.begin();
+    for (let k = 0; k < 400 && g4.mode !== 'run'; k++) g4.update(1 / 60, sb, {});
+    const fin = [];
+    for (const cp of tp.cps) for (let k = 0; k < 4; k++) g4.update(1 / 60, stateAt(tp, cp.index, ground), {});      // visit every checkpoint in order, but in a few frames
+    for (let k = 0; k < 5; k++) for (const e of g4.update(1 / 60, stateAt(tp, tp.arch.index, ground), {})) if (e.type === 'finish') fin.push(e);
+    check(`a 16 s "ride" of ${(tp.length / 1000).toFixed(1)} km (minimum ${(minRunMs(tp) / 1000).toFixed(0)} s) is shown as invalid: no medal, no best`, fin.length === 1 && fin[0].valid === false && fin[0].medal === 0 && fin[0].isBest === false && g4.mode === 'finished', fin[0] ? `${(fin[0].ms / 1000).toFixed(1)} s valid ${fin[0].valid}` : 'no finish');
+    check('every trail needs at least length / 20 m/s, and the honest reference time is far above it', trails.every((x) => minRunMs(x) > 0 && minRunMs(x) < x.medals.gold * 1000 * 0.7), trails.map((x) => `${x.id} ${(minRunMs(x) / 1000).toFixed(0)}/${x.medals.gold}`).join(' '));
+  }
 
   // crash -> respawn at the last checkpoint within 1.5 s
   const g3 = createGame(); g3.showCard(t); g3.begin();

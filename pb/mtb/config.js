@@ -138,6 +138,7 @@ export const WAY_SURFACE = Object.freeze({ trail: 'dirt', path: 'dirt', track: '
 
 /* Pedalling, braking, pumping, jumping and crashing (see DESIGN-PLAY.md for the reasoning). */
 export const PLAY = Object.freeze({
+  maxRunSpeed: 20,                           // m/s (72 km/h): no honest run averages more than this over a whole trail (the soft cap is 15.5 m/s); a faster time is a teleport or a cheat and is never posted
   brakeBlend: { front: 0.55, rear: 0.85 },   // a single brake input (touch, S key) is split like this between the two brakes
   weightTransfer: 0.49,                      // h / L: how much of the weight moves to the front wheel per g of braking
   flipDecel: 9.4,                            // m/s2 (braking + downhill pull) at which a front-brake-only stop goes over the bars

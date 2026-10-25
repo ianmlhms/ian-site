@@ -24,7 +24,7 @@ import { createForestView } from './forest-view.js';
 import { createRider, COLOUR_HEX, HELMET_HEX } from './rider.js';
 import { createInput } from './input.js';
 import { createProps } from './props.js';
-import { createGame, poseOnTrail, MEDAL_NAME } from './game.js';
+import { createGame, poseOnTrail, minRunMs, MEDAL_NAME } from './game.js';
 import { createUi } from './ui.js';
 import { createMapBackdrop } from './map-paint.js';
 import { createAudio } from './audio.js';
@@ -188,7 +188,7 @@ async function boot() {
   // ---- game, ui, sound, saves
   const game = createGame();
   const audio = createAudio({ win: window });
-  const reporter = createScoreReporter({ arcade: window.Arcade, trailName: (id) => trailName(trailById.get(id), lang) });
+  const reporter = createScoreReporter({ arcade: window.Arcade, trailName: (id) => trailName(trailById.get(id), lang), minMsFor: (id) => (trailById.has(id) ? minRunMs(trailById.get(id)) : 0) });
   const rpc = dailyRpc();
   const hit = { nx: 0, nz: 0, pen: 0 };
   let bikeY = 0;
@@ -198,7 +198,7 @@ async function boot() {
   const trunkOrRock = (x, z, r) => { const a = trees.collide(x, z, r, camHit); const b = rocks.collide(x, z, r, -1e9, camRock); if (b && (!a || b.pen > a.pen)) { camHit.nx = b.nx; camHit.nz = b.nz; camHit.pen = b.pen; return camHit; } return a; };
   const chase = createChaseCamera(surface, trunkOrRock, (x, y, z, r) => trees.pushOutOfCrowns(x, y, z, r, crownPush));
   let camMode = 0;
-  const persistence = createPersistence({ getState: () => progress, onState: (p) => { progress = p; applyLoadout(); refreshMenu(); }, onError: (message) => console.warn('[mtb] save', message) });
+  const persistence = createPersistence({ getState: () => progress, onState: (p) => { progress = p; applyLoadout(); refreshMenu(); }, onError: (message) => console.warn('[mtb] save', message), publishOverall: false });
   const save = (next) => { progress = next; persistence.scheduleSave(); };
 
   let current = { trail: null, kind: 'trail', dailyInfo: null };
@@ -309,7 +309,7 @@ async function boot() {
     chase.snap(bike);
     props.setActiveTrail(t); props.setFlags(t, 0); props.setViewpoints([], null);
     writeKey(LAST_KEY, t.id);
-    reporter.selectBoard(null);
+    reporter.selectBoard(t.id, trailName(t, lang));                    // the arcade header and leaderboard follow the trail on the card: "Best" is this trail's best time
     showCard(); setHudMode(); input.showTouchUi(true);
   }
   function startRun() {
@@ -362,6 +362,7 @@ async function boot() {
       } else if (e.type === 'crash') { ui.banner(tr('hud.crash'), 'bad', 1500); audio.event('crash', { severity: Math.min(1, bike.lastImpact / 12) }); }
       else if (e.type === 'respawn') respawnAt(e.index, e.reason);
       else if (e.type === 'rescue') { respawnAt(e.index, 'rescue'); ui.toast(tr('hud.rescue')); }
+      else if (e.type === 'missed') ui.toast(tr('hud.missed', { n: e.n }));
       else if (e.type === 'viewpoint') onViewpoint(e);
       else if (e.type === 'finish') onFinish(e);
     }
@@ -390,6 +391,12 @@ async function boot() {
   function onFinish(e) {
     const t = current.trail;
     rides++;
+    if (e.valid === false) {                                           // an impossible time (teleport, cheat): shown, never saved, medalled, ghosted or posted
+      console.warn('[mtb] a run faster than the trail allows is not counted', t.id, e.ms);
+      ui.showFinish({ trail: t, ms: e.ms, medal: 0, isBest: false, bestMs: bestMs(progress, t.id), crashes: e.crashes, splits: e.splits, bestSplits: bestSplits(progress, t.id), nextMedal: null, unlocks: [], beatGhost: false, ghostLost: false, hasNext: true, daily: false, valid: false });
+      setHudMode();
+      return;
+    }
     const before = progress;
     const ghostText = encodeGhost(e.ghost);
     const run = recordRun(progress, { trailId: t.id, ms: e.ms, checkpointsMs: e.splits.map((v) => Math.round(v)), ghostText, medal: e.medal });
@@ -403,7 +410,6 @@ async function boot() {
     if (e.kind === 'daily') next = recordDaily(next, { day: dayNumber(), ms: e.ms }).progress;
     save(next);
     if (run.isBest && e.kind !== 'daily') reporter.submitRun(t.id, e.ms, trailName(t, lang));
-    try { window.Arcade && window.Arcade.setBoard && window.Arcade.setBoard(null); } catch (error) { console.warn('[mtb] board reset', error); }
     if (e.kind === 'daily') rpc.submit(e.ms).then(() => ui.setFinishNote(tr('daily.sent'))).catch((error) => ui.setFinishNote(error && error.message === 'signed-out' ? tr('daily.signin') : ''));
     const prevBest = e.bestMs;
     ui.showFinish({ trail: t, ms: e.ms, medal: e.medal, isBest: run.isBest, bestMs: prevBest, crashes: e.crashes, splits: e.splits, bestSplits: bestSplits(before, t.id), nextMedal: game.nextMedal(e.ms), unlocks, beatGhost: e.beatGhost, ghostLost: ghostData && !e.beatGhost, hasNext: true, daily: e.kind === 'daily' });

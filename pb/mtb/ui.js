@@ -190,7 +190,8 @@ export function createUi({ root, lang, trails, handlers, touch = false }) {
         <div class="fin-best">${esc(T('finish.best'))}: ${formatTime(d.isBest ? d.ms : d.bestMs, true)}${d.crashes ? ` · ${esc(T('finish.crashes'))}: ${d.crashes}` : ''}</div>
         ${d.beatGhost ? `<div class="fin-ghost">👻 ${esc(T('finish.ghostWon'))}</div>` : d.ghostLost ? `<div class="fin-ghost lost">👻 ${esc(T('finish.ghostLost'))}</div>` : ''}
         ${d.nextMedal ? `<div class="fin-next">${esc(T('finish.nextMedal', { medal: T(`medal.${MEDAL_KEYS[d.nextMedal.medal]}`), time: formatTime(d.nextMedal.seconds * 1000) }))}</div>` : ''}
-        ${(d.unlocks || []).map((u) => `<div class="fin-unlock">🔓 ${esc(T('finish.unlocked', { what: u }))}</div>`).join('')}
+        ${(d.unlocks || []).map((u) => `<div class="fin-unlock"><span class="okmark">✓</span> ${esc(T('finish.unlocked', { what: u }))}</div>`).join('')}
+        ${d.valid === false ? `<div class="fin-invalid">${esc(T('finish.invalid'))}</div>` : ''}
         ${d.daily ? `<div class="fin-daily" id="finDaily"></div>` : ''}
         <div class="fin-splits">${rows}</div>
         <div class="fin-btns"></div>

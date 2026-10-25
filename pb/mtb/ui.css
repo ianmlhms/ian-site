@@ -134,3 +134,6 @@ body.menuopen #touchControls, body.cardopen #touchControls { display: none; }
 /* small screens and portrait */
 @media (max-width: 760px) { .trails-grid { grid-template-columns: 1fr; } .mhud .hud-tl { max-width: 46vw; } .mhud .clock { font-size: 24px; } .mcard { padding: 10px 12px; } .card-head .ct { font-size: 19px; } .mhint .hi { min-width: 62px; padding: 4px 4px; } }
 @media (max-height: 520px) { .mcard { width: min(520px, 60vw); left: auto; right: 12px; transform: none; bottom: 8px; animation: none; } .card-stats, .card-medals { margin-top: 5px; } .fin-medal .medal { font-size: 44px; } }
+
+.fin-unlock .okmark { display: inline-block; width: 20px; height: 20px; line-height: 20px; border-radius: 50%; background: #5fd68a; color: #0c2a18; font-weight: 900; font-size: 13px; text-align: center; margin-right: 4px; }
+.fin-invalid { margin: 6px 0; padding: 6px 10px; border-radius: 10px; background: #ff8a6b22; color: #ffc9bb; font-size: 13px; }

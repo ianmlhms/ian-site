@@ -7,7 +7,7 @@
  *           'finished'   the result is known (medal, new best); the rider rolls out
  *           'free'       free ride over the whole valley: no clock, viewpoints are collected
  *   events  update() returns a list of { type, ... } the shell turns into sounds, toasts and screens:
- *           countdown {n}, go, checkpoint {n, total, ms, delta}, crash {cause}, respawn {index, reason}, rescue {index}, finish {ms, medal, ...}, viewpoint {index}
+ *           countdown {n}, go, checkpoint {n, total, ms, delta}, crash {cause}, respawn {index, reason}, rescue {index}, missed {n, total} (arch reached without every checkpoint), finish {ms, valid, medal, ...}, viewpoint {index}
  * Nothing here knows about the weather: times and medals are times. */
 import { PLAY } from './config.js';
 
@@ -27,6 +27,9 @@ export const GAME = Object.freeze({
 export const MEDAL_VALUE = Object.freeze({ none: 0, bronze: 1, silver: 2, gold: 3 });
 export const MEDAL_NAME = Object.freeze(['none', 'bronze', 'silver', 'gold']);
 
+/** The shortest time (ms) a real ride of this trail can take: its length at PLAY.maxRunSpeed. A faster finish is not a ride. */
+export const minRunMs = (trail) => Math.ceil((trail.length / PLAY.maxRunSpeed) * 1000);
+
 /** Medal (0..3) for a time in ms against a medals table { gold, silver, bronze } in seconds. */
 export function medalFor(ms, table) {
   if (!table || !Number.isFinite(ms)) return 0;
@@ -41,7 +44,7 @@ export function createGame() {
     mode: 'card', kind: 'trail', trail: null, viewpoints: [], found: new Set(),
     timeMs: 0, countdown: 0, lastCount: 99,
     progress: 0, cpNext: 0, lastCp: 0, splits: [], bestSplits: [], bestMs: 0, ghostBestMs: 0,
-    crashes: 0, rescues: 0, resets: 0, crashT: 0, stuckT: 0, lostT: 0, shield: 0,
+    crashes: 0, rescues: 0, resets: 0, crashT: 0, stuckT: 0, lostT: 0, shield: 0, finishRetryT: 0,
     ghostT: 0, ghost: [], result: null,
   };
   const events = [];
@@ -70,7 +73,7 @@ export function createGame() {
     /** Puts the trail on the start card. `info` = { bestMs, bestSplits, ghostMs, kind: 'trail' | 'daily' }. */
     showCard(trail, info = {}) {
       Object.assign(g, { mode: 'card', kind: info.kind || 'trail', trail, timeMs: 0, countdown: 0, lastCount: 99, progress: 0, cpNext: 0, lastCp: 0, splits: [], bestSplits: info.bestSplits || [], bestMs: info.bestMs || 0, ghostBestMs: info.ghostMs || 0,
-        crashes: 0, rescues: 0, resets: 0, crashT: 0, stuckT: 0, lostT: 0, shield: 0, ghostT: 0, ghost: [], result: null });
+        crashes: 0, rescues: 0, resets: 0, crashT: 0, stuckT: 0, lostT: 0, shield: 0, finishRetryT: 0, ghostT: 0, ghost: [], result: null });
     },
     /** From the card: 3 - 2 - 1 - Go. */
     begin() { if (g.mode !== 'card') return; g.mode = 'countdown'; g.countdown = GAME.countdownSeconds; g.lastCount = 99; },
@@ -154,13 +157,24 @@ export function createGame() {
         g.ghostT -= GAME.ghostEvery;
         g.ghost.push({ t: Math.round(g.timeMs), s: trail.s[g.progress], o: lateral(trail, g.progress, bike.x, bike.z) });
       }
-      // the finish arch
-      if (g.progress >= trail.arch.index && dist < GAME.finishReach) {
+      // the finish arch. A run only counts when EVERY checkpoint was passed in order: a rider who reaches the arch without them (a shortcut across a bend, a lost checkpoint)
+      // goes back to the first missed one, the clock keeps running.
+      if (g.progress >= trail.arch.index && dist < GAME.finishReach && g.cpNext < trail.cps.length) {
+        if (g.finishRetryT <= 0) {
+          g.finishRetryT = 2;
+          g.shield = PLAY.respawnShield;
+          emit({ type: 'missed', n: g.cpNext + 1, total: trail.cps.length });
+          emit({ type: 'respawn', index: trail.cps[g.cpNext].index, reason: 'missed' });
+        }
+      }
+      if (g.finishRetryT > 0) g.finishRetryT -= dt;
+      if (g.progress >= trail.arch.index && dist < GAME.finishReach && g.cpNext >= trail.cps.length) {
         const ms = Math.round(g.timeMs);
+        const valid = ms >= minRunMs(trail);                  // the plausible-speed rule: shorter than length / 20 m/s is no ride, it is shown but never saved, medalled or posted
         g.mode = 'finished';
         g.ghost.push({ t: ms, s: trail.s[g.progress], o: lateral(trail, g.progress, bike.x, bike.z) });
-        const medal = medalFor(ms, trail.medals);
-        g.result = { ms, medal, isBest: g.bestMs === 0 || ms < g.bestMs, crashes: g.crashes, rescues: g.rescues, splits: [...g.splits], bestMs: g.bestMs, ghost: g.ghost, kind: g.kind, beatGhost: g.ghostBestMs > 0 && ms < g.ghostBestMs };
+        const medal = valid ? medalFor(ms, trail.medals) : 0;
+        g.result = { ms, valid, medal, isBest: valid && (g.bestMs === 0 || ms < g.bestMs), crashes: g.crashes, rescues: g.rescues, splits: [...g.splits], bestMs: g.bestMs, ghost: g.ghost, kind: g.kind, beatGhost: valid && g.ghostBestMs > 0 && ms < g.ghostBestMs };
         emit({ type: 'finish', ...g.result });
       }
       return events;

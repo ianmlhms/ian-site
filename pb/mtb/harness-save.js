@@ -552,6 +552,11 @@ function fakeEnv({ testMode = false, standalone = false, injected = undefined, s
   const p = createPersistence({ getState: () => state, onState: (s) => { state = s; loaded.push(s); }, onError: (m) => errors.push(m), env: f.env });
   check('creation asks the parent for the cloud save exactly once', f.posted.length === 1 && same(f.posted[0].message, { __pbWantSave: 1 }));
   check('creation publishes the arcade score', f.scores.length === 1 && f.scores[0] === overallScore(state));
+  {
+    const g = fakeEnv();
+    createPersistence({ getState: () => state, onState: () => {}, env: g.env, publishOverall: false }).pushSave();
+    check('publishOverall: false keeps the plain arcade board free (the game shows trail times in the header)', g.scores.length === 0);
+  }
   p.scheduleSave(); p.scheduleSave();
   check('scheduleSave does not post before the debounce', f.posted.length === 1 && f.pendingTimers() === 2);
   f.advance(SAVE_DELAY_MS - 1);
@@ -692,6 +697,10 @@ section('score reporter');
   calls.length = 0;
   quiet(() => check('invalid trail / time submit nothing', [['nope', 5000], ['maratoun', 12], ['maratoun', NaN], [undefined, 5000]].every(([id, ms]) => reporter.submitRun(id, ms) === false) && calls.length === 0));
   check('board names stay within the 80 char limit', (() => { calls.length = 0; reporter.submitRun('maratoun', 5000, 'x'.repeat(500)); return calls[0][1].name.length <= 80; })());
+  calls.length = 0;
+  const strict = createScoreReporter({ arcade, minMsFor: (id) => (id === 'ernz-waldwee' ? 100000 : 0) });
+  quiet(() => check('an impossible time (faster than the trail allows) is never posted: 16.3 s on a 2 km trail is refused', strict.submitRun('ernz-waldwee', 16299) === false && calls.length === 0));
+  check('a believable time is posted', strict.submitRun('ernz-waldwee', 316000) === true && calls.length === 2);
   const none = createScoreReporter({});
   check('a missing arcade (standalone page) is harmless', none.submitRun('maratoun', 5000) === false && none.selectBoard('maratoun') === false && createScoreReporter().submitRun('maratoun', 5000) === false);
   const broken = createScoreReporter({ arcade: { setBoard() { throw new Error('x'); }, score() { throw new Error('y'); } } });

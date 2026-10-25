@@ -165,7 +165,8 @@ export function loadInitialProgress(env = browserEnv()) {
   return pickBest([win.__pbSave, readStorage(storage, LOCAL_KEY), readStorage(storage, BACKUP_KEY)]);
 }
 
-export function createPersistence({ getState, onState, onError = () => {}, env = browserEnv() }) {
+/** publishOverall: also post the medals-and-viewpoints number to the plain `mtb` arcade board (default). The game turns it off: its header and leaderboard show the trail times, and a trail board must never receive that number. */
+export function createPersistence({ getState, onState, onError = () => {}, env = browserEnv(), publishOverall = true }) {
   const { win, parent, storage } = env;
   const isStandalone = !parent || parent === win;
   let timer = null, deadline = null, lastKey = null, lastError = null, lastBackup = -Infinity, lastScore = null;
@@ -180,6 +181,7 @@ export function createPersistence({ getState, onState, onError = () => {}, env =
     timer = deadline = null;
   };
   const publishScore = (progress) => {
+    if (!publishOverall) return;
     const score = overallScore(progress);
     if (score === lastScore) return;
     lastScore = score;
@@ -262,7 +264,8 @@ const boardName = (trailName, trailId) => {
  * and sends timeScore(ms). `trailName(id)` (or a third argument) gives the display name. Without an `arcade`
  * (standalone page) every call is a harmless no-op returning false.
  */
-export function createScoreReporter({ arcade, trailName = (id) => id } = {}) {
+/** minMsFor(trailId) = the shortest believable time of a trail (game.js minRunMs): anything faster is never posted. */
+export function createScoreReporter({ arcade, trailName = (id) => id, minMsFor = () => 0 } = {}) {
   const available = () => Boolean(arcade && typeof arcade.setBoard === 'function' && typeof arcade.score === 'function');
   const nameFor = (trailId, name) => boardName(name ?? trailName(trailId), trailId);
   function selectBoard(trailId, name) {
@@ -278,6 +281,7 @@ export function createScoreReporter({ arcade, trailName = (id) => id } = {}) {
     if (!available()) return false;
     const score = timeScore(ms);
     if (score === null || !TRAIL_IDS.includes(trailId)) { console.warn('[mtb] ignored an invalid leaderboard run', trailId, ms); return false; }
+    if (ms < minMsFor(trailId)) { console.warn('[mtb] ignored an impossible leaderboard time', trailId, ms); return false; }
     if (!selectBoard(trailId, name)) return false;
     try { arcade.score(score); return true; } catch (error) { console.warn('[mtb] could not submit the run', error.message); return false; }
   }
