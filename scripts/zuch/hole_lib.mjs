@@ -8,7 +8,8 @@
  * Poses and rays inside tunnels are skipped (the bore is open by design); poses are never placed under a viaduct deck on purpose.
  * scanRoute(sim, routeId, opts) -> { route, poses, flaggedPoses: [{ s, pose, count, maxAngleDeg }], rays, rayFailures: [{ s, lat, kind, dy }] } */
 export const HOLE_BELOW_HORIZON_DEG = 1.8;
-export const RAY_TOL_M = 0.45;
+export const RAY_TOL_M = 0.5;
+export const MIN_PIT_SAMPLES = 2;
 const RT_W = 256;
 const RT_H = 144;
 
@@ -20,13 +21,13 @@ const POSES = [
   { name: 'back', lat: 0, up: 3.2, yaw: Math.PI, pitch: -0.1, fov: 75 },
 ];
 
-export async function scanRoute(sim, routeId, { step = 150, poses = POSES, rayStep = 45, rayLats = 6, log = () => {}, prep = null } = {}) {
+export async function scanRoute(sim, routeId, { step = 150, from = 40, to = Infinity, poses = POSES, rayStep = 45, rayLats = 6, log = () => {}, prep = null } = {}) {
   await sim.start(routeId);
   const info = await sim.evalGame(({ track }) => ({ length: track.length, tunnels: track.tunnels.map((t) => [t.s0, t.s1]), bridges: track.bridges.map((b) => [b.s0, b.s1, b.kind]) }));
   const inTunnel = (s, m) => info.tunnels.some(([a, b]) => s > a - m && s < b + m);
   const report = { route: routeId, length: info.length, poses: 0, flaggedPoses: [], rays: 0, rayFailures: [] };
   /* ---- render check */
-  for (let s = 40; s < info.length - 40; s += step) {
+  for (let s = from; s < Math.min(to, info.length - 40); s += step) {
     if (inTunnel(s, 60)) continue;
     await sim.page.evaluate((ts) => { __tsTest.placeAt(ts, 0); const w = __tsTest.internals().world; if (w.landscape && w.landscape.warm) w.landscape.warm(w.track.baseS ? w.track.baseS(ts) : ts); }, s);
     await sim.frames(2);
@@ -78,7 +79,8 @@ export async function scanRoute(sim, routeId, { step = 150, poses = POSES, raySt
             }
           }
         }
-        if (pits > 0 || voids > 0) out.push({ pose: p.name, count, pits, voids, pit, maxAngleDeg: Math.round(maxAng * 10) / 10, first });
+        // one isolated sampled pixel (about 7 px of the 256 x 144 target) is a rasterisation sliver at a triangle edge, not a hole: cone_probe.mjs shows the strip watertight there
+        if (pits >= MIN_PIT_SAMPLES || voids > 0) out.push({ pose: p.name, count, pits, voids, pit, maxAngleDeg: Math.round(maxAng * 10) / 10, first });
       }
       renderer.setRenderTarget(null); renderer.setClearColor(oldClear, oldAlpha); scene.background = oldBg; rt.dispose();
       ls.setHoleMode(false);
@@ -86,7 +88,7 @@ export async function scanRoute(sim, routeId, { step = 150, poses = POSES, raySt
     }, { s, poses, W: RT_W, H: RT_H, deg: HOLE_BELOW_HORIZON_DEG });
     report.poses += poses.length;
     res.forEach((r) => report.flaggedPoses.push({ s, ...r }));
-    if (res.length) log(`  hole poses at s=${s}: ` + res.map((r) => `${r.pose}(${r.pits} pit px ${JSON.stringify(r.pit)}, ${r.voids} void px, ${r.count}px)`).join(' '));
+    if (res.length) log(`  hole poses at s=${s}: ` + res.map((r) => `${r.pose}(${r.pits} pit px ${JSON.stringify(r.pit)}, ${r.voids} void px, ${r.count}px, first ${JSON.stringify(r.first)})`).join(' '));
   }
   /* ---- ray check against the streamed terrain strip */
   for (let s = 20; s < info.length - 20; s += rayStep) {

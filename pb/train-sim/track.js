@@ -23,7 +23,7 @@
   const D0_BASE = 7.5; // flat formation half-width
   const D0_RAIL = 10.5; // rail: the second main track + its ballast and masts need the formation to reach 8 m on one side
   const D0_STATION = 26;
-  const VALLEY_MIN_H = 6;      // bridges at least this high get a finer ground mesh around them
+  const VALLEY_MIN_H = 4;      // bridges at least this high get a finer ground mesh around them
   const VALLEY_PAD = 90;
   const VALLEY_ROW = 5;
   const VALLEY_COL_MARGIN = 260; // the extra columns reach one chunk beyond the valley rows: the shared edge of two chunks has the same vertices on both sides (no crack where the valley wall fades)

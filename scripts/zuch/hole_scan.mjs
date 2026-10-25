@@ -10,13 +10,15 @@ const flag = (name, def) => { const i = args.indexOf('--' + name); if (i < 0) re
 const step = Number(flag('step', '150'));
 const quality = flag('quality', 'high');
 const out = flag('out', '');
+const from = Number(flag('from', '40'));
+const to = Number(flag('to', 'Infinity'));
 const root = flag('root', undefined);
 const routes = (args[0] || 'west').split(',');
 const sim = await openSim({ quality, root });
 let bad = 0;
 try {
   for (const r of routes) {
-    const rep = await scanRoute(sim, r, { step, log: console.log });
+    const rep = await scanRoute(sim, r, { step, from, to, log: console.log });
     console.log(`${r}: ${rep.poses} poses, ${rep.flaggedPoses.length} flagged; ${rep.rays} rays, ${rep.rayFailures.length} failures`);
     rep.rayFailures.slice(0, 12).forEach((f) => console.log('   ray', JSON.stringify(f)));
     bad += rep.flaggedPoses.length + rep.rayFailures.length;

@@ -11,6 +11,7 @@ import { simOnPage } from '../zuch/zlib.mjs';
 import { scanRoute } from '../zuch/hole_lib.mjs';
 
 const RAIL_ROUTES = ['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris'];
+const MIN_PATCH_ROAD_REACH_M = 60;  // a crossing inside a station patch (Munsbach, Rue de Beyren) lies on the REAL road of the patch: it runs as far as the real road does (here a T-junction with Rue Principale after 69 m)
 const MIN_ROAD_REACH_M = 120;       // the road continues at least this far (along the road) beyond the crossing on both sides
 const MAX_ROAD_GRADE = 0.11;       // the profile is clamped to 5.5 %; the sample-to-sample figure peaks at the junction mouths (pins of two roads meet)
 const SURFACE_TOL_M = 0.2;          // terrain function vs design height along the road
@@ -29,7 +30,7 @@ export const flow = {
       await sim.start(route);
       const rep = await sim.evalGame(({ track, THREE, world }, args) => {
         const plan = track.crossingRoads;
-        const out = { n: track.crossings.length, planned: plan ? plan.crossings.length : 0, bad: [], reach: [], maxGrade: 0, nanCount: 0, meshProblems: [], surfaceProblems: [] };
+        const out = { n: track.crossings.length, planned: plan ? plan.crossings.length : 0, bad: [], reach: [], patchReach: [], maxGrade: 0, nanCount: 0, meshProblems: [], surfaceProblems: [] };
         if (!plan) return out;
         const ls = world.landscape;
         plan.crossings.forEach((c) => {
@@ -56,12 +57,13 @@ export const flow = {
           [1, -1].forEach((sd) => {
             let best = 0;
             c.roads.forEach((r) => r.pts.forEach((p) => { if (Math.sign(p.l) === sd || (p.l === 0 && sd > 0)) best = Math.max(best, Math.hypot(p.a, Math.abs(p.l))); }));
-            out.reach.push(Math.round(best));
+            (c.patch ? out.patchReach : out.reach).push(Math.round(best));
           });
         });
         return out;
-      }, { surfaceTol: SURFACE_TOL_M, up: MESH_TOL_UP_M, down: MESH_TOL_DOWN_M });
+      }, { surfaceTol: SURFACE_TOL_M, up: MESH_TOL_UP_M, down: MESH_TOL_DOWN_M, patchMin: MIN_PATCH_ROAD_REACH_M });
       crossingsSeen.push({ route, n: rep.n });
+      h.expect(rep.patchReach.every((r) => r >= MIN_PATCH_ROAD_REACH_M), `${route}: patch crossings (real station roads) reach >= ${MIN_PATCH_ROAD_REACH_M} m (${rep.patchReach.join(', ') || 'none'})`);
       h.eq([rep.n, rep.nanCount], [rep.planned, 0], `${route}: ${rep.n} crossings, every one has a planned road, no NaN`);
       h.expect(rep.reach.every((r) => r >= MIN_ROAD_REACH_M), `${route}: the road reaches >= ${MIN_ROAD_REACH_M} m on both sides of every crossing (${rep.reach.join(', ')})`);
       h.expect(rep.maxGrade <= MAX_ROAD_GRADE, `${route}: road grade <= ${MAX_ROAD_GRADE * 100} % (max ${(rep.maxGrade * 100).toFixed(1)} %)`);
