@@ -16,6 +16,7 @@ import sys
 
 import numpy as np
 import shapely
+from shapely import STRtree
 from shapely.geometry import LineString, Point
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -866,6 +867,35 @@ def write_layout(segs, legs_meta, stations, path_json, path_meta):
         json.dump(legs_meta, f)
 
 
+def write_features(segs, legs_meta, res, tiles, dem, land):
+    import real_line_scenery as sc
+    waters = [w for w in tiles["waterways"] if w["t"].get("waterway") in ("river", "canal")]
+    wtree = STRtree([w["g"] for w in waters])
+    roads = [w for w in tiles["highways"] if w["t"].get("highway") in sc.ROAD_CLASSES]
+    rtree = STRtree([w["g"] for w in roads])
+    out = {}
+    for lid, meta in legs_meta.items():
+        route = meta["route"]
+        attrs, stops, feats, legs, _, _ = res[route]
+        g = sc.LegGeom(attrs, meta)
+        rd = sc.roads_of_leg(g, roads, rtree)
+        out[lid] = {
+            "L": round(g.length, 1),
+            "land": sc.land_raster(g, land),
+            "water": sc.water_windows(g, waters, wtree),
+            "roads": rd,
+            "relief": sc.relief(g, dem),
+            "places": sc.places_of_leg(g, tiles["places"]),
+            "crossings": sc.crossings_of_leg(g, feats["crossings"], rd),
+        }
+        print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]))
+    doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "classes": __import__("real_line_land").CLASS_NAMES, "legs": out}
+    path = os.path.join(OUT, "mosel-features.json")
+    with open(path, "w") as f:
+        json.dump(doc, f, separators=(",", ":"), ensure_ascii=False)
+    print("features ->", path, os.path.getsize(path) // 1024, "kB")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("stage", choices=["layout", "emit"])
@@ -881,6 +911,7 @@ def main():
         segs, legs_meta, stations, res = emit(routes, pts, tiles, dem, land)
         segs = order_segments(segs, res)
         write_layout(segs, legs_meta, stations, os.path.join(OUT, "mosel-layout.json"), os.path.join(rp.CACHE, "mosel-legs-meta.json"))
+        write_features(segs, legs_meta, res, tiles, dem, land)
         for seg, items in segs.items():
             print(seg, " | ".join(it["name"] if it["t"] == "station" else "%s %d" % (it["id"], it["length"]) for it in items))
         return

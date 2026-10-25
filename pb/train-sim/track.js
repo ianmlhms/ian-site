@@ -52,6 +52,8 @@
   const RIVER_OFFSET = 95;
   const RIVER_HALF = 24;
   const RIVER_BELOW = 6;
+  const REAL_RELIEF_GAIN = 1.1;   // real line: the generic valley term is scaled by (0.6 + 0.4 noise) <= 1, so the real heights are lifted a little
+  const REAL_RELIEF_WIDTH = 200;  // ... and reached at this lateral distance
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const smooth01 = (t) => {
@@ -90,6 +92,17 @@
   }
 
   /* ------------------------------------------------------- array tools */
+  /* blur of a quantity that only exists where weight > 0 (river centre line): weighted average, 0 where there is no weight */
+  function weightedBlur(values, weight, radius) {
+    const num = new Float64Array(values.length);
+    for (let i = 0; i < values.length; i++) num[i] = values[i] * weight[i];
+    const a = boxBlur(num, radius);
+    const w = boxBlur(weight, radius);
+    const out = new Float64Array(values.length);
+    for (let i = 0; i < values.length; i++) out[i] = w[i] > 1e-4 ? a[i] / w[i] : 0;
+    return out;
+  }
+
   function boxBlur(src, radius) {
     if (radius < 1) return Float64Array.from(src);
     const n = src.length;
@@ -119,7 +132,7 @@
     const kind = def.kind;
     const sd = def.stationDefaults;
     const lastIndex = def.layout.length - 1;
-    const result = { items: [], stations: [], tunnels: [], bridges: [], crossings: [], biomes: [], limitsRaw: [], length: 0 };
+    const result = { items: [], stations: [], tunnels: [], bridges: [], crossings: [], biomes: [], limitsRaw: [], legs: [], length: 0 };
     let s = 0;
     let cruise = def.cruise;
     let biome = (def.biomes && def.biomes[0]) || 'farmland';
@@ -153,6 +166,11 @@
         result.items.push({ t: 'station', s0: s, s1: s + len, kappa: 0, g: 0 });
       } else {
         len = it.len;
+        if (it.legId) {   // real-line legs: the scenery data of data/real/mosel-features.json is keyed by the leg id
+          const last = result.legs[result.legs.length - 1];
+          if (last && last.id === it.legId) last.s1 = s + len;
+          else result.legs.push({ id: it.legId, s0: s, s1: s + len });
+        }
         if (it.limit) cruise = it.limit;
         if (it.biome) {
           biome = it.biome;
@@ -339,6 +357,7 @@
     const formationDrop = kind === 'tram' ? FORM_TRAM : FORM_RAIL;
     const comp = compileItems(def);
     const length = comp.length;
+    const real = kind !== 'tram' && window.TS.realLine ? window.TS.realLine.resolve(def, comp) : null;   // real scenery of the Mosel line (rivers, relief, land classes, roads)
     const n = Math.floor(length / STEP) + 1;
     const smoothing = SMOOTH[kind] || SMOOTH.rail;
     const noise = makeNoise(hashString(def.sceneryId || def.id));   // routes that share a line (sceneryId) share their ground and scenery
@@ -478,19 +497,36 @@
     const valRaw = new Float64Array(n);
     const widRaw = new Float64Array(n);
     const riverRaw = new Float64Array(n);
+    const valLRaw = real ? new Float64Array(n) : null;     // real line: terrain height 220 m left / right of the track (DEM), replaces the generic valley
+    const valRRaw = real ? new Float64Array(n) : null;
+    const rivLatRaw = real ? new Float64Array(n) : null;   // real line: river centre (signed lateral offset) and half width, weighted by the river presence
+    const rivHalfRaw = real ? new Float64Array(n) : null;
     for (let i = 0; i < n; i++) {
       const biome = biomeAt(i * STEP);
       const r = RELIEF[biome] || RELIEF.farmland;
       ampRaw[i] = r.amp;
       valRaw[i] = r.valley;
       widRaw[i] = r.width;
-      riverRaw[i] = biome === 'river' ? 1 : 0;
+      riverRaw[i] = !real && biome === 'river' ? 1 : 0;
+      if (real) {
+        const rel = real.reliefAt(i * STEP);
+        valLRaw[i] = rel.l * REAL_RELIEF_GAIN;
+        valRRaw[i] = rel.r * REAL_RELIEF_GAIN;
+        widRaw[i] = REAL_RELIEF_WIDTH;
+        const w = real.water.find((x) => i * STEP >= x.s0 && i * STEP <= x.s1);
+        if (w) { riverRaw[i] = 1; rivLatRaw[i] = w.side * w.off; rivHalfRaw[i] = w.half; }
+      }
     }
     const blurR = Math.round(160 / STEP);
     const ampArr = boxBlur(ampRaw, blurR);
     const valArr = boxBlur(valRaw, blurR);
     const widArr = boxBlur(widRaw, blurR);
     const riverArr = boxBlur(riverRaw, Math.round(120 / STEP));
+    const valLArr = real ? boxBlur(valLRaw, Math.round(100 / STEP)) : null;
+    const valRArr = real ? boxBlur(valRRaw, Math.round(100 / STEP)) : null;
+    // river centre / half width: blurred weighted averages (only where the river is)
+    const rivLatArr = real ? weightedBlur(rivLatRaw, riverRaw, Math.round(120 / STEP)) : null;
+    const rivHalfArr = real ? weightedBlur(rivHalfRaw, riverRaw, Math.round(120 / STEP)) : null;
 
     const cover = new Float64Array(n);
     comp.tunnels.forEach((tn) => {
@@ -646,7 +682,7 @@
       const trackY = q.y;
       const formY = trackY - formationDrop;
       const amp = arrAt(ampArr, fi);
-      const valley = arrAt(valArr, fi);
+      const valley = real ? (q.lat < 0 ? arrAt(valLArr, fi) : arrAt(valRArr, fi)) : arrAt(valArr, fi);
       const width = arrAt(widArr, fi);
       const cov = arrAt(cover, fi);
       const dep = arrAt(depth, fi);
@@ -664,7 +700,9 @@
       const river = arrAt(riverArr, fi);
       if (river > 0.02) {
         const base = waterLevelAtIndex(fi) - 2.5;
-        const amount = river * (1 - smooth01((Math.abs(q.lat - riverSide * RIVER_OFFSET) - RIVER_HALF) / 55));
+        const rLat = real ? arrAt(rivLatArr, fi) : riverSide * RIVER_OFFSET;
+        const rHalf = real ? arrAt(rivHalfArr, fi) : RIVER_HALF;
+        const amount = river * (1 - smooth01((Math.abs(q.lat - rLat) - rHalf) / 55));
         if (h > base) h = lerp(h, base, amount);
       }
 
@@ -684,6 +722,7 @@
     function water(s) {
       const fi = clamp(s / STEP, 0, n - 1.0001);
       if (arrAt(riverArr, fi) < 0.5) return null;
+      if (real) { const lat = arrAt(rivLatArr, fi); return { y: waterLevelAtIndex(fi), side: lat < 0 ? -1 : 1, offset: Math.abs(lat), halfWidth: arrAt(rivHalfArr, fi) }; }
       return { y: waterLevelAtIndex(fi), side: riverSide, offset: RIVER_OFFSET, halfWidth: RIVER_HALF };
     }
 
@@ -794,6 +833,7 @@
       nearestS: (x, z) => nearest(x, z, scratch).s,
       distanceToTrack: (x, z) => nearest(x, z, scratch).d,
       water,
+      real,                       // real scenery data (TS.realLine) of the Mosel line, or null
       inTunnel,
       bridgeAt,
       stationAt,
@@ -908,6 +948,7 @@
       id: o.id || base.id, def: o.def || base.def, base, reverse: true, passFixed: (base.passFixed || []).map((i) => n - 1 - i).sort((a, b) => a - b), baseS: (s) => L - s, frameAt, stations, signals, tunnels, bridges, crossings, inTunnel, bridgeAt, stationAt,
       limits: mirrorLimits(base.limits, L, base.kind, o.minLenAt), platformInfo,
       biomeAt: (s) => base.biomeAt(L - s),
+      real: base.real ? base.real.mirror(L) : null,
       nearest, nearestS: (x, z) => nearest(x, z).s, distanceToTrack: (x, z) => nearest(x, z).d,
       water: (s) => { const w = base.water ? base.water(L - s) : null; return w ? Object.assign({}, w, { side: -w.side }) : null; },
       corridorHalfWidth: (s, side) => base.corridorHalfWidth(L - s, -side),

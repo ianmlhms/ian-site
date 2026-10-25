@@ -932,9 +932,11 @@ window.TS = window.TS || {};
         return chunkRoads[chunkRoads.length - 1];
       };
 
+      const realMode = !!(track.real && TS.realScenery);   // Mosel line: villages, fields, woods, roads and trees come from the real data (real-scenery.js)
+
       /* ---- villages ---- */
       const vp = (VILLAGE_P[bMid] || 0) * Q.houses;
-      if (vp > 0 && rng() < vp && !inTunnel(sMid, 140) && !inBridge(sMid, 140)) {
+      if (!realMode && vp > 0 && rng() < vp && !inTunnel(sMid, 140) && !inBridge(sMid, 140)) {
         const side = rng() < 0.5 ? -1 : 1, L0 = 30 + rng() * 14, sC = sMid + (rng() - 0.5) * 60, half = 55 + rng() * 45;
         addRoadRibbon(() => side * L0, sC - half - 14, sC + half + 14, 3.3).city = true;
         markOcc(sC - half - 16, sC + half + 16, side * (L0 - 18), side * (L0 + 32));
@@ -955,7 +957,7 @@ window.TS = window.TS || {};
       }
 
       /* ---- lone farms ---- */
-      if (['farmland', 'highspeed', 'ardennes', 'forest', 'vineyard'].includes(bMid) && rng() < 0.32 * Q.houses && !inTunnel(sMid, 120) && !inBridge(sMid, 120)) {
+      if (!realMode && ['farmland', 'highspeed', 'ardennes', 'forest', 'vineyard'].includes(bMid) && rng() < 0.32 * Q.houses && !inTunnel(sMid, 120) && !inBridge(sMid, 120)) {
         const side = rng() < 0.5 ? -1 : 1, sF = sMid + (rng() - 0.5) * 100, lF = side * (42 + rng() * 40);
         if (!isOcc(sF - 30, sF + 30, lF - 22, lF + 22) && !onRoad(place(sF, lF).x, place(sF, lF).z, 26)) {
           const p = place(sF, lF), yaw = yawOf(p.f) + (side > 0 ? Math.PI : 0), cs = Math.cos(yaw), sn = Math.sin(yaw);
@@ -971,7 +973,7 @@ window.TS = window.TS || {};
 
       /* ---- city blocks ---- */
       const cityBiomes = bMid === 'city' || bMid === 'tramcity';
-      if (cityBiomes && !track.ownScenery) { // LUXTRAM: routes with ownScenery draw their own city (luxtram-world.js)
+      if (cityBiomes && !track.ownScenery && !realMode) { // LUXTRAM: routes with ownScenery draw their own city (luxtram-world.js)
         const tram = bMid === 'tramcity';
         for (const side of [-1, 1]) {
           const rows = tram ? [{ l: 14.5, dep: 14, fl: [3, 7] }, { l: 40, dep: 18, fl: [5, 10] }] : [{ l: 25, dep: 18, fl: [4, 9] }, { l: 62, dep: 20, fl: [6, 12] }];
@@ -1010,7 +1012,7 @@ window.TS = window.TS || {};
       function tramLike() { return bMid === 'tramcity'; }
 
       /* ---- industry ---- */
-      if (bMid === 'industrial') {
+      if (bMid === 'industrial' && !realMode) {
         const side = rng() < 0.5 ? -1 : 1;
         if (hash2(k, seedBase & 255) < 0.34 && !inTunnel(sMid, 80)) {
           const p = place(sMid + (rng() - 0.5) * 60, side * (88 + rng() * 25));
@@ -1053,7 +1055,7 @@ window.TS = window.TS || {};
       }
 
       /* ---- wind turbines ---- */
-      const tp = bMid === 'highspeed' ? 0.65 : bMid === 'farmland' ? 0.08 : 0;
+      const tp = realMode ? 0 : bMid === 'highspeed' ? 0.65 : bMid === 'farmland' ? 0.08 : 0;
       const turbineSpots = [];
       if (tp > 0 && rng() < tp) {
         const n = 1 + Math.floor(rng() * 2);
@@ -1062,7 +1064,7 @@ window.TS = window.TS || {};
 
       /* ---- woodlots & fields ---- */
       const wild = bMid === 'forest' || bMid === 'ardennes';
-      if (!cityBiomes && bMid !== 'industrial' && !wild) {
+      if (!realMode && !cityBiomes && bMid !== 'industrial' && !wild) {
         const nWood = Math.floor(rng() * 2.2);
         for (let n = 0; n < nWood; n++) {
           const side = rng() < 0.5 ? -1 : 1, sa = s0 + rng() * (CHUNK - 70), la = 22 + rng() * 60, w = { s0: sa, s1: sa + 40 + rng() * 70, l0: side * la, l1: side * (la + 25 + rng() * 45) };
@@ -1072,7 +1074,7 @@ window.TS = window.TS || {};
         }
       }
       const fieldP = (FIELD_P[bMid] === undefined ? 0 : FIELD_P[bMid]) * (quality === 'low' ? 0.8 : 1);
-      if (fieldP > 0) {
+      if (fieldP > 0 && !realMode) {
         for (const side of [-1, 1]) {
           let sCur = s0 + rng() * 15;
           while (sCur < s1 - 25) {
@@ -1094,10 +1096,11 @@ window.TS = window.TS || {};
         }
       }
       function nearStationField(s, l) { return l < 18 && nearStation(s, 20); }
-      function addField(fm, r, biome, sa, sb, la, lb) {
+      function addField(fm, r, biome, sa, sb, la, lb, forceKind) {
         if (track.inSurround) { const c = [[sa, la], [sa, lb], [sb, la], [sb, lb], [(sa + sb) / 2, (la + lb) / 2]]; if (c.some(([ss, ll]) => { const f = frame(ss); return track.inSurround(f.x + f.rx * ll, f.z + f.rz * ll); })) return; }
         let kind;
-        if (biome === 'vineyard') kind = r() < 0.96 ? 'vines' : 'meadow';
+        if (forceKind) kind = forceKind;
+        else if (biome === 'vineyard') kind = r() < 0.96 ? 'vines' : 'meadow';
         else if (biome === 'suburb' || biome === 'ardennes' || biome === 'river') kind = r() < 0.7 ? 'meadow' : pick(r, ['rowsGold', 'rowsGreen']);
         else kind = pick(r, ['rowsGold', 'rowsGold', 'rowsGreen', 'rowsGreen', 'rowsBrown', 'rowsRape', 'meadow', 'meadow']);
         const spec = FIELD_KINDS[kind], tint = C(pick(r, spec.tint)), mb = kind === 'vines' ? fm.vines : spec.tex === 'rows' ? fm.rows : fm.meadow;
@@ -1131,7 +1134,7 @@ window.TS = window.TS || {};
 
       /* ---- country roads ---- */
       const roadGroup = Math.floor(k / 3);
-      if (!cityBiomes && bMid !== 'industrial' && hash2(roadGroup, seedBase & 1023) < (bMid === 'highspeed' ? 0.35 : 0.6)) {
+      if (!realMode && !cityBiomes && bMid !== 'industrial' && hash2(roadGroup, seedBase & 1023) < (bMid === 'highspeed' ? 0.35 : 0.6)) {
         const side = hash2(roadGroup, 77) < 0.5 ? -1 : 1, off = 38 + 12 * hash2(roadGroup, 5), ph = hash2(roadGroup, 9) * 6;
         const latFn = s => side * (off + 10 * Math.sin(s / 310 + ph));
         if (!isOcc(s0, s1, side * (off - 14), side * (off + 14)) && !inTunnel(sMid, 130) && !inBridge(sMid, 130)) {
@@ -1141,7 +1144,7 @@ window.TS = window.TS || {};
       }
 
       /* ---- trees ---- */
-      const nAttempt = Math.round((wild ? 1150 : 600) * Q.trees);
+      const nAttempt = realMode ? 0 : Math.round((wild ? 1150 : 600) * Q.trees);
       for (let n = 0; n < nAttempt; n++) {
         const s = s0 + rng() * CHUNK, side = rng() < 0.5 ? -1 : 1;
         const lmin = nearStation(s, 25) ? 18 : TREE_CLEAR_LAT, lat = side * (lmin + (W - 8 - lmin) * Math.pow(rng(), 1.3));
@@ -1160,10 +1163,18 @@ window.TS = window.TS || {};
         addTree(name, x, groundY(info, lat, x, z) - 0.15, z, lerp(sc[0], sc[1], rng()), rng);
       }
       // tree belt right beside the track in open country (gives depth to the cab view)
-      if (!cityBiomes && !wild && bMid !== 'industrial') for (let s = s0 + 4; s < s1; s += 7 + rng() * 8) {
+      if (!realMode && !cityBiomes && !wild && bMid !== 'industrial') for (let s = s0 + 4; s < s1; s += 7 + rng() * 8) {
         if (rng() > 0.45 * Q.trees + 0.15 || nearStation(s, 30) || inTunnel(s, 20) || inBridge(s, 30)) continue;
         const side = rng() < 0.5 ? -1 : 1, p = place(s, side * (TREE_CLEAR_LAT + 1 + rng() * 6)), nm = pickSpecies('def', rng()), sc = SPECIES_SCALE[nm];
         addTree(nm, p.x, p.y - 0.15, p.z, lerp(sc[0], sc[1], rng()), rng);
+      }
+
+      /* ---- real scenery of the Mosel line (replaces the generic villages / fields / woods / roads / trees above) ---- */
+      if (realMode) {
+        TS.realScenery.fill({
+          k, s0, s1, rng, Q, W, track, real: track.real, place, frame, rowInfo, groundY, yawOf, placeM, addTree, pickSpecies, addField, fieldMB, mbHouse, mbBlock, mbRoof, mbRoad, addGrid,
+          addHouse, addBlock, addChurch, addShed, chunkRoads, isOcc, markOcc, inTunnel, inBridge, riverBridgeAt, nearStation, onRoad, TREE_CLEAR_LAT, C, pick, T, SPECIES_SCALE,
+        });
       }
 
       /* ---- grass tufts on the verge (cab-view texture) ---- */
