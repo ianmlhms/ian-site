@@ -1,7 +1,7 @@
 /* Draws the forest and its undergrowth: instanced meshes (one draw call per kind and level of detail), wind sway and leaf flutter in the vertex shader, leaf cards
  * alpha-tested from the painted atlas, translucent backlit foliage, autumn colours as a season option, painted lighting shared with the ground.
  * Trees come from forest.js, ferns / shrubs / hedges / logs / roots from undergrowth.js, both per 32 m block; the instance buffers are refilled when the camera has moved. */
-import { BLOCK, SPECIES, STRIDE } from './forest.js';
+import { BLOCK, SPECIES, STRIDE, girthOf } from './forest.js';
 import { U_STRIDE } from './undergrowth.js';
 import { buildBroadleaf, buildSapling, buildShrub, buildFern, buildHedge, buildLog, buildStump, buildRoot, buildBlobTree, buildSpruce, buildTuft } from './tree-models.js';
 import { TILE_ID } from './leaf-textures.js';
@@ -14,13 +14,14 @@ const REFILL_DISTANCE = 5;
 const ALWAYS_DRAWN = 45;                // trees closer than this are drawn at every quality (the bike collides with them)
 
 const VERTEX = `
-  attribute vec3 iPos; attribute vec4 iParams; attribute vec2 iShape; attribute vec3 color; attribute float aLeaf;
+  attribute vec3 iPos; attribute vec4 iParams; attribute vec3 iShape; attribute vec3 color; attribute float aLeaf;
   uniform vec2 uWind; uniform float uBend, uFlutter, uTime;
   varying vec3 vColor; varying vec3 vNormal; varying float vDist; varying vec3 vWorld; varying float vHeight; varying vec2 vUv; varying float vLeaf; varying float vSeed;
   void main(){
     float s = iParams.x, ang = iParams.y;
+    vec3 shape = iShape;
     float c = cos(ang), sn = sin(ang);
-    vec3 p = position; p.x *= iShape.x; p *= s;
+    vec3 p = position; p.x *= iShape.x; p.xz *= iShape.z; p *= s;
     vec3 n0 = normal;
     float cp = cos(iShape.y), sp = sin(iShape.y);
     p = vec3(cp * p.x - sp * p.y, sp * p.x + cp * p.y, p.z); n0 = vec3(cp * n0.x - sp * n0.y, sp * n0.x + cp * n0.y, n0.z);
@@ -47,7 +48,7 @@ const VERTEX = `
 `;
 const FRAGMENT = `
   precision highp float;
-  uniform sampler2D uNoise, uAtlas;
+  uniform sampler2D uNoise, uAtlas, uBarkBeech, uBarkOak;
   varying vec3 vColor; varying vec3 vNormal; varying float vDist; varying vec3 vWorld; varying float vHeight; varying vec2 vUv; varying float vLeaf; varying float vSeed;
   ${PAINT_LIGHT_GLSL}
   void main(){
@@ -57,10 +58,12 @@ const FRAGMENT = `
     if (!gl_FrontFacing && tile >= 0.0) N = -N;
     vec3 albedo = vColor;
     float isLeaf = 0.0;
+    float bump = 0.0;
     if (tile >= 0.0) {
       vec4 tex = texture2D(uAtlas, vUv);
       if (tex.a < 0.5) discard;
-      albedo = vColor * tex.rgb * vec3(1.04, 1.0, 0.96);
+      float oak = step(0.5, tile) * step(tile, 1.5) + step(10.5, tile) * step(tile, 13.5);
+      albedo = vColor * tex.rgb * mix(vec3(0.8, 0.97, 0.74) * mix(vec3(1.0), vec3(0.82, 0.96, 0.78), oak), vec3(1.04, 1.0, 0.96), uSeason);                // summer: fresh green (the painted sprigs are lime), autumn keeps the paint
       isLeaf = 1.0;
       // autumn: every tree turns at its own time, every cluster has its own colour (holly and spruce stay green)
       float evergreen = step(2.5, tile) * step(tile, 3.5) + step(5.5, tile) * step(tile, 6.5);
@@ -69,9 +72,18 @@ const FRAGMENT = `
       aut = mix(aut, vec3(0.55, 0.34, 0.14), step(0.82, rnd));
       float lum = dot(tex.rgb, vec3(0.3, 0.55, 0.15));
       albedo = mix(albedo, aut * (0.55 + 1.5 * lum) * (vColor.g * 1.1), turn * 0.88);
+    } else if (tile < -1.5) {
+      // painted bark, projected from the two horizontal axes (trunks are upright): beech smooth grey-green, oak and everything else dark and furrowed
+      vec3 aw = pow(abs(N), vec3(4.0)); float wx = aw.x / (aw.x + aw.z + 0.0001);
+      vec2 uvx = vec2(vWorld.z * 0.62, -vWorld.y * 0.52), uvz = vec2(vWorld.x * 0.62 + 0.4, -vWorld.y * 0.52);
+      vec3 tb = tile > -2.5 ? texture2D(uBarkOak, uvx).rgb * wx + texture2D(uBarkOak, uvz).rgb * (1.0 - wx) : texture2D(uBarkBeech, uvx).rgb * wx + texture2D(uBarkBeech, uvz).rgb * (1.0 - wx);
+      float ao = clamp(dot(vColor, vec3(0.333)) / (tile > -2.5 ? 0.4 : 0.55), 0.35, 1.25);       // the model's own darkening (foot, moss, limbs) rides on the painting
+      albedo = tb * ao * (tile > -2.5 ? 1.15 : 1.0);
+      float k = texture2D(uNoise, vWorld.xz * 0.35 + vWorld.yy * 0.12).g;
+      albedo *= 0.88 + 0.24 * k;
+      bump = dot(tb, vec3(0.3, 0.59, 0.11));
     } else {
-      vec3 wp = vWorld * 0.9;
-      float k = texture2D(uNoise, wp.xz * 0.4 + wp.yy * 0.15).g;
+      float k = texture2D(uNoise, vWorld.xz * 0.4 + vWorld.yy * 0.15).g;
       albedo *= 0.88 + 0.24 * k;
     }
     // light: leaves are thin, the sun shines through them (backlit canopy glows), bark is plain
@@ -87,7 +99,8 @@ const FRAGMENT = `
       float trans = pow(clamp(dot(V, -L) * 0.5 + 0.5, 0.0, 1.0), 4.0) * (1.0 - wrap * 0.4);
       col += albedo * vec3(0.9, 1.0, 0.35) * uSunColor * trans * 0.55 * sunMul;
     } else {
-      col = paintLightW(albedo * 1.3, N, sunMul, 1.1, vWorld);                // bark: lifted out of the shade, light grey beech stems read as stems, not as poles
+      if (tile < -1.5) { float dist = length(cameraPosition - vWorld); N = bumpNormal(N, vWorld, bump, 0.05 * (1.0 - smoothstep(10.0, 40.0, dist))); }
+      col = paintLightW(albedo * (tile < -1.5 ? 1.12 : 1.3), N, sunMul, 1.1, vWorld);                // bark: lifted out of the shade, stems read as stems, not as poles
     }
     col = col * (1.0 - 0.22 * uWet);
     col = pow(col, vec3(0.97));
@@ -102,7 +115,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
   group.name = 'mtb-forest';
   scene.add(group);
   const make = (bend, flutter) => new THREE.ShaderMaterial({
-    uniforms: { ...env.uniforms, uAtlas: { value: textures.leafAtlas }, uBend: { value: bend }, uFlutter: { value: flutter } },
+    uniforms: { ...env.uniforms, uAtlas: { value: textures.leafAtlas }, uBarkBeech: { value: textures.barkBeech }, uBarkOak: { value: textures.barkOak }, uBend: { value: bend }, uFlutter: { value: flutter } },
     vertexShader: VERTEX, fragmentShader: FRAGMENT, side: THREE.DoubleSide,
   });
   const treeMat = make(0.035, 0.05), lowMat = make(0.012, 0.03), deadMat = make(0.0, 0.0), grassMat = make(0.16, 0.02);
@@ -123,7 +136,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
     g.index = geo.index; g.attributes = geo.attributes;
     const pos = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); pos.setUsage(THREE.DynamicDrawUsage);
     const par = new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4); par.setUsage(THREE.DynamicDrawUsage);
-    const shp = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2); shp.setUsage(THREE.DynamicDrawUsage);
+    const shp = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); shp.setUsage(THREE.DynamicDrawUsage);
     g.setAttribute('iPos', pos); g.setAttribute('iParams', par); g.setAttribute('iShape', shp);
     g.instanceCount = 0;
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
@@ -132,13 +145,13 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
     group.add(mesh);
     sets[name] = { g, pos, par, shp, cap, n: 0 };
   }
-  function put(set, x, y, z, scale, yaw, seed, stretch = 1, pitch = 0) {
+  function put(set, x, y, z, scale, yaw, seed, stretch = 1, pitch = 0, girth = 1) {
     const s = sets[set];
     if (s.n >= s.cap) return false;
     const o = s.n++;
     s.pos.array[o * 3] = x; s.pos.array[o * 3 + 1] = y; s.pos.array[o * 3 + 2] = z;
     s.par.array[o * 4] = scale; s.par.array[o * 4 + 1] = yaw; s.par.array[o * 4 + 2] = seed; s.par.array[o * 4 + 3] = (seed * 7.31) % 1;
-    s.shp.array[o * 2] = stretch; s.shp.array[o * 2 + 1] = pitch;
+    s.shp.array[o * 3] = stretch; s.shp.array[o * 3 + 1] = pitch; s.shp.array[o * 3 + 2] = girth;
     return true;
   }
 
@@ -180,17 +193,18 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
           const d = Math.hypot(x - cx, z - cz);
           const species = t[i + 4], seed = t[i + 5], h = t[i + 3], y = t[i + 1] - 0.15;
           if (species === SPECIES.sapling) { if (d < midR * 0.7 && put('sapling', x, y, z, h, seed * 6.283, seed)) mid++; continue; }
+          const girth = girthOf(seed, species);
           if (d > R) continue;
           if (d > ALWAYS_DRAWN && ((seed * 7.31) % 1) > Q.treeDensity) continue;      // thinning for the quality level (never near the rider)
           const yaw = seed * 6.283;
           if (d < nearR) {
             const name = species === SPECIES.spruce ? 'nearSpruce' : species === SPECIES.oak ? 'nearOak' : (seed * 3.7) % 1 < 0.5 ? 'nearBeechA' : 'nearBeechB';
-            if (put(name, x, y, z, h, yaw, seed)) { near++; continue; }
+            if (put(name, x, y, z, h, yaw, seed, 1, 0, girth)) { near++; continue; }
           }
           if (d < midR) {
-            if (put(species === SPECIES.spruce ? 'midSpruce' : species === SPECIES.oak ? 'midOak' : 'midBeech', x, y, z, h, yaw, seed)) { mid++; continue; }
+            if (put(species === SPECIES.spruce ? 'midSpruce' : species === SPECIES.oak ? 'midOak' : 'midBeech', x, y, z, h, yaw, seed, 1, 0, girth)) { mid++; continue; }
           }
-          if (put(species === SPECIES.spruce ? 'farSpruce' : species === SPECIES.oak ? 'farOak' : 'farBeech', x, y, z, h, yaw, seed)) far++;
+          if (put(species === SPECIES.spruce ? 'farSpruce' : species === SPECIES.oak ? 'farOak' : 'farBeech', x, y, z, h, yaw, seed, 1, 0, girth)) far++;
         }
         if (Math.hypot(bx * BLOCK + BLOCK / 2 - cx, bz * BLOCK + BLOCK / 2 - cz) > groundR + BLOCK) continue;
         const u = undergrowth.block(bx, bz);

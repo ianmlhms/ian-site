@@ -147,7 +147,7 @@ function noiseData(size, seed) {
 const TEX_URL = new URL('./data/tex/', import.meta.url);
 const TEX_FILES = Object.freeze({
   litter: 'litter_summer', litterAutumn: 'litter_autumn', moss: 'moss', dirt: 'dirt_roots', sandstone: 'sandstone', rockMoss: 'sandstone_moss', rockWet: 'wet_rock',
-  barkBeech: 'bark_beech', barkOak: 'bark_oak', grass: 'grass', foam: 'foam',
+  barkBeech: 'bark_beech', barkOak: 'bark_oak', grass: 'grass', foam: 'foam', sky: 'sky',
 });
 
 function loadImage(name) {
@@ -210,7 +210,7 @@ export function createPaintTextures(renderer, quality) {
   leafAtlas.anisotropy = aniso; leafAtlas.colorSpace = THREE.NoColorSpace; leafAtlas.flipY = false; leafAtlas.needsUpdate = true;
   const textures = { litter: make(litter(size, 11)), moss: make(moss(size, 12)), dirt: make(dirt(size, 13)), sandstone: make(sandstone(size, 14)), noise, leafAtlas, size, painted: false };
   // painted extras start as separate textures (canvas fallbacks); the files replace their images before the first frame, a missing file never breaks the game
-  for (const key of ['litterAutumn', 'rockMoss', 'rockWet', 'barkBeech', 'barkOak', 'grass', 'foam']) textures[key] = make(key === 'litterAutumn' ? litter(size, 15) : key === 'grass' ? moss(size, 16) : key.startsWith('bark') ? dirt(size, 17) : key === 'foam' ? canvas(8) : sandstone(size, 18));
+  for (const key of ['litterAutumn', 'rockMoss', 'rockWet', 'barkBeech', 'barkOak', 'grass', 'foam', 'sky']) textures[key] = make(key === 'litterAutumn' ? litter(size, 15) : key === 'grass' ? moss(size, 16) : key.startsWith('bark') ? dirt(size, 17) : key === 'foam' || key === 'sky' ? canvas(8) : sandstone(size, 18));
   const loads = Object.entries(TEX_FILES).map(async ([key, file]) => {
     try {
       const img = await loadImage(file);

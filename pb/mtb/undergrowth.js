@@ -5,11 +5,13 @@ import { QUADTREE } from './config.js';
 import { createRng, fbm } from './noise.js';
 import { sampleWorldMap, sampleFieldCell, MAP_CELL } from './world-map.js';
 import { SPECIES, wayFree } from './forest.js';
+import { SCHIESSENTUEMPEL } from './landmarks.js';
 
 export const BLOCK = QUADTREE.minSize;
 export const U_STRIDE = 8;
 const FERN_GRID = 11;                    // candidate cells per side (2.9 m)
 const SHRUB_GRID = 4;
+const FERN_THICKET_R = 26, FERN_THICKET_COUNT = 160;   // around the Schiessentuempel: radius (m) and ferns per block that touches it
 const ROOT_PROBE = [2.2, 3.2];           // m from the trunk: where we look for a way
 const ROOT_MIN_COVER = 0.3;
 const nrm = { x: 0, y: 1, z: 0 };
@@ -39,6 +41,20 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
       surface.normal(x, z, nrm);
       if (nrm.y < 0.66) continue;
       lists.ferns.push(x, surface.height(x, z), z, 0.45 + sizeRoll * 0.5, rng() * 6.283, seed, 1, 0);
+    }
+  }
+
+  // ---- the Schiessentuempel: the banks of the falls are a thicket of ferns hanging over the dark boulders
+  const lx = SCHIESSENTUEMPEL.x, lz = SCHIESSENTUEMPEL.z;
+  if (lx > x0 - FERN_THICKET_R && lx < x0 + BLOCK + FERN_THICKET_R && lz > z0 - FERN_THICKET_R && lz < z0 + BLOCK + FERN_THICKET_R) {
+    for (let k = 0; k < FERN_THICKET_COUNT; k++) {
+      const a = rng() * 6.283, r = Math.sqrt(rng()) * FERN_THICKET_R, size = rng(), seed = rng();
+      const x = lx + Math.cos(a) * r, z = lz + Math.sin(a) * r;
+      if (x < x0 || x >= x0 + BLOCK || z < z0 || z >= z0 + BLOCK) continue;
+      if (!wayFree(clearance, x, z, 0.5)) continue;
+      surface.normal(x, z, nrm);
+      if (nrm.y < 0.45) continue;
+      lists.ferns.push(x, surface.height(x, z), z, 0.7 + size * 0.8, rng() * 6.283, seed, 1, 0);
     }
   }
 

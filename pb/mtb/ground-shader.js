@@ -86,6 +86,7 @@ export const GROUND_FRAGMENT = `
     #ifndef LOW
       litter = mix(litter, texture2D(uLitter, Qs * 0.31).rgb, sideK);
     #endif
+    litter = mix(vec3(dot(litter, vec3(0.3, 0.59, 0.11))), litter, 0.74) * vec3(0.98, 0.96, 0.92);        // the painted litter is rich: calmer, browner
     litter *= (0.62 + 0.78 * texture2D(uLitter, Q * 0.047).r);
     litter = mix(litter, litter * vec3(0.95, 0.82, 0.68) + vec3(0.03, 0.0, -0.02), mk.r * 0.55);                     // dense canopy: a little cooler (not darker: the light comes through)
     litter = mix(litter, litter * vec3(1.18, 1.02, 0.78), nLo.b * 0.5 * (1.0 - mk.r));  // open ground: warmer

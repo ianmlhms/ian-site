@@ -17,6 +17,7 @@ import { TILE_ID, tileRect } from './leaf-textures.js';
 const THREE = window.THREE;
 const BEECH_BARK = [0.56, 0.58, 0.52];
 const OAK_BARK = [0.44, 0.38, 0.31];
+const BARK_BEECH = -3, BARK_DARK = -2;      // aLeaf: >= 0 a leaf atlas tile, -1 plain vertex colours, -2 painted dark furrowed bark (oak, dead wood), -3 painted smooth grey beech bark
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const SPECIES_STYLE = Object.freeze({
   beech: { bark: BEECH_BARK, fork: 0.5, crownR: 0.235, trunkR: 0.0148, limbs: 5, tile: TILE_ID.beech, tint: [1.0, 1.0, 0.94], clusterSize: 0.1, lean: 0.03 },
@@ -78,7 +79,8 @@ export function buildBroadleaf(species, variant, detail) {
     radii.push(style.trunkR * (1 + 1.0 * Math.exp(-(yy + 0.012) / 0.035)) * (1 - 0.26 * t));
   }
   const tr = tube(pts, radii, detail === 0 ? 9 : 6, true);
-  b.addArrays(tr.pos, tr.nor, tr.idx, (v, n, i) => bark(v, n, i));
+  const BARK = species === 'oak' ? BARK_DARK : BARK_BEECH;
+  b.addArrays(tr.pos, tr.nor, tr.idx, (v, n, i) => bark(v, n, i), null, BARK);
   // --- primary limbs and twigs
   const crownH = 1 - fork.y;
   const crown = { cx: fork.x, cy: fork.y + crownH * 0.52, cz: fork.z, rad: style.crownR };
@@ -97,7 +99,7 @@ export function buildBroadleaf(species, variant, detail) {
     const r0 = radii[radii.length - 1] * (0.62 + rng() * 0.2);
     const lr = path.map((_, i) => Math.max(0.0016, r0 * (1 - i / steps) * (1 - 0.15 * i / steps)));
     const lt = tube(path, lr, detail === 0 ? 5 : 4, true);
-    b.addArrays(lt.pos, lt.nor, lt.idx, (v, n, i) => { const c = bark(v, n, i); return [c[0] * 0.95, c[1] * 0.95, c[2] * 0.95]; });
+    b.addArrays(lt.pos, lt.nor, lt.idx, (v, n, i) => { const c = bark(v, n, i); return [c[0] * 0.95, c[1] * 0.95, c[2] * 0.95]; }, null, BARK);
     ends.push(end); mids.push(path[Math.floor(steps * 0.62)]);
     if (detail === 0) {
       for (const t of [0.5, 0.78]) {                                          // twigs
@@ -105,7 +107,7 @@ export function buildBroadleaf(species, variant, detail) {
         const az2 = az + (rng() < 0.5 ? -1 : 1) * (0.5 + rng() * 0.6), len = 0.07 + rng() * 0.06;
         const e2 = V3(p.x + Math.cos(az2) * len, p.y + len * (0.3 + rng() * 0.5), p.z + Math.sin(az2) * len);
         const tw = tube(bezier(p, V3(p.x + Math.cos(az2) * len * 0.3, p.y + len * 0.2, p.z + Math.sin(az2) * len * 0.3), V3(e2.x - Math.cos(az2) * len * 0.3, e2.y - len * 0.1, e2.z - Math.sin(az2) * len * 0.3), e2, 3), [0.0034, 0.003, 0.0022, 0.0014], 3, true);
-        b.addArrays(tw.pos, tw.nor, tw.idx, (v, n, i) => { const c = bark(v, n, i); return [c[0] * 0.9, c[1] * 0.9, c[2] * 0.9]; });
+        b.addArrays(tw.pos, tw.nor, tw.idx, (v, n, i) => { const c = bark(v, n, i); return [c[0] * 0.9, c[1] * 0.9, c[2] * 0.9]; }, null, BARK);
         ends.push(e2);
       }
     }
@@ -132,7 +134,7 @@ export function buildSapling(variant) {
   const pts = [V3(0, -0.02, 0), V3(top.x * 0.3, 0.3, top.z * 0.3), V3(top.x * 0.7, 0.65, top.z * 0.7), top];
   const tr = tube(pts, [0.016, 0.012, 0.008, 0.004], 5, true);
   const bark = barkColor('beech', rng);
-  b.addArrays(tr.pos, tr.nor, tr.idx, (v, n, i) => { const c = bark(v, n, i); return [c[0] * 0.92, c[1] * 1.0, c[2] * 0.85]; });
+  b.addArrays(tr.pos, tr.nor, tr.idx, (v, n, i) => { const c = bark(v, n, i); return [c[0] * 0.92, c[1] * 1.0, c[2] * 0.85]; }, null, BARK_BEECH);
   const crown = { cx: 0, cy: 0.62, cz: 0, rad: 0.4 };
   for (let i = 0; i < 7; i++) {
     const a = rng() * 6.28, rr = 0.1 + rng() * 0.22, y = 0.34 + rng() * 0.64;
@@ -216,7 +218,7 @@ export function buildLog() {
   for (let i = 0; i <= 6; i++) { pts.push(V3(i / 6 - 0.5, 0.05 * Math.sin(i * 0.9), 0)); radii.push(0.075 + 0.012 * Math.sin(i * 2.1) - 0.01 * i / 6); }
   const t = tube(pts, radii, 8, true);
   const bark = barkColor('oak', rng);
-  b.addArrays(t.pos, t.nor, t.idx, (v, n, i) => { const c = bark(new THREE.Vector3(v.z * 3, v.x * 4 + 2, v.y * 3), n, i); const moss = Math.max(0, n.y) * (0.5 + 0.5 * valueNoise(v.x * 9, 3, 4)); return [c[0] * 0.8 * (1 - moss * 0.3), c[1] * 0.85 * (1 + moss * 0.25), c[2] * 0.75 * (1 - moss * 0.35)]; });
+  b.addArrays(t.pos, t.nor, t.idx, (v, n, i) => { const c = bark(new THREE.Vector3(v.z * 3, v.x * 4 + 2, v.y * 3), n, i); const moss = Math.max(0, n.y) * (0.5 + 0.5 * valueNoise(v.x * 9, 3, 4)); return [c[0] * 0.8 * (1 - moss * 0.3), c[1] * 0.85 * (1 + moss * 0.25), c[2] * 0.75 * (1 - moss * 0.35)]; }, null, BARK_DARK);
   return b.build();
 }
 
@@ -226,7 +228,7 @@ export function buildStump() {
   const pts = [V3(0, -0.1, 0), V3(0, 0.3, 0), V3(0.01, 0.7, 0), V3(0.03, 1.0, 0)], radii = [1.25, 1.0, 0.92, 0.88];
   const t = tube(pts, radii, 9, true);
   const bark = barkColor('oak', rng);
-  b.addArrays(t.pos, t.nor, t.idx, (v, n, i) => { const c = bark(new THREE.Vector3(v.x * 2, v.y * 1.4 + 0.02, v.z * 2), n, i); const top = clamp01((v.y - 0.88) * 12); return [c[0] * (1 - top * 0.1) * (1 + top * 0.5), c[1] * (1 + top * 0.4), c[2] * (1 + top * 0.1)]; });
+  b.addArrays(t.pos, t.nor, t.idx, (v, n, i) => { const c = bark(new THREE.Vector3(v.x * 2, v.y * 1.4 + 0.02, v.z * 2), n, i); const top = clamp01((v.y - 0.88) * 12); return [c[0] * (1 - top * 0.1) * (1 + top * 0.5), c[1] * (1 + top * 0.4), c[2] * (1 + top * 0.1)]; }, null, BARK_DARK);
   return b.build();
 }
 
@@ -236,7 +238,7 @@ export function buildRoot() {
   const pts = [], radii = [];
   for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push(V3(t, Math.sin(Math.PI * Math.min(1, t * 1.15)) * 0.5 - 0.02, 0)); radii.push(0.5 * (1 - 0.8 * t) + 0.05); }
   const t = tube(pts, radii, 6, true);
-  b.addArrays(t.pos, t.nor, t.idx, (v) => [0.3 * (0.85 + 0.2 * valueNoise(v.x * 14, 2, 2)), 0.26 * (0.9 + 0.12 * valueNoise(v.x * 10, 5, 6)), 0.2]);
+  b.addArrays(t.pos, t.nor, t.idx, (v) => [0.4 * (0.85 + 0.2 * valueNoise(v.x * 14, 2, 2)), 0.36 * (0.9 + 0.12 * valueNoise(v.x * 10, 5, 6)), 0.28], null, BARK_DARK);
   return b.build();
 }
 

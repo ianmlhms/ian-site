@@ -103,6 +103,7 @@ async function boot() {
   const mapTexture = (arr, filter = THREE.LinearFilter) => { const tex = new THREE.DataTexture(arr, maps.nx, maps.nz, THREE.RGBAFormat); tex.magFilter = filter; tex.minFilter = filter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true; return tex; };
   const worldMaps = { cover: mapTexture(maps.cover), canopy: mapTexture(maps.canopy), field: mapTexture(maps.field, THREE.NearestFilter) };
   const env = createEnv({ noiseTexture: textures.noise, params: { time: param('time'), weather: param('weather'), season: param('season') } });
+  env.uniforms.uSkyPaint.value = textures.sky;                      // the painted cloud tile
   if (holeMode) env.sky.visible = false;
   scene.add(env.sky);
   const groundFull = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, false);
@@ -124,7 +125,7 @@ async function boot() {
     wood.position.set(bridge.x, bridge.water, bridge.z); wood.rotation.y = bridge.yaw; wood.frustumCulled = false; wood.name = 'footbridge railing';
     scene.add(wood);
   }
-  const water = createWaterView({ scene, network: field.network, env, quality });
+  const water = createWaterView({ scene, network: field.network, env, quality, foamTexture: textures.foam });
   const rider = createRider(env);
   scene.add(rider.root);
   const rain = createRain({ scene, env, quality }), leaves = createLeaves({ scene, env, quality }), shafts = createShafts({ scene, env, quality, surface, map: maps });

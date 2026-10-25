@@ -171,16 +171,27 @@ export function rocksOfBlock(bx, bz, ctx) {
   if (ctx.falls) {
     for (const f of ctx.falls) {
       if (Math.floor(f.x / BLOCK) !== bx || Math.floor(f.z / BLOCK) !== bz) continue;
-      for (const t0 of [-0.5, -0.17, 0.17, 0.5, -0.36, 0.33]) {
-        const inPool = Math.abs(t0) > 0.3 && t0 !== -0.5 && t0 !== 0.5;                     // two extra stones lie below the lip, in the pool
-        const t = t0 + (rng() - 0.5) * 0.08, size = (inPool ? 0.8 : 1.15) + rng() * 0.8, lat = t * f.width;
-        const along = (inPool ? -1.9 : 0) + (rng() - 0.5) * 1.3;                            // along the flow (the curtain's normal)
-        const fx = -f.nz, fz = f.nx;
-        const x = f.x + f.nx * lat + fx * along, z = f.z + f.nz * lat + fz * along, y = (inPool ? f.bottom : f.top) - size * 0.42;
+      // big dark boulders: two heavy ones on the flanks of the lip, two smaller ones that split the water into three thick streams, and stones in the plunge pool
+      for (const [t0, big, inPool] of [[-0.52, 1.0, false], [0.5, 1.0, false], [-0.2, 0.55, false], [0.19, 0.5, false], [-0.34, 0.6, true], [0.3, 0.75, true], [0.0, 0.5, true]]) {
+        const t = t0 + (rng() - 0.5) * 0.06, size = (inPool ? 0.9 : 1.15) * (0.6 + 0.5 * big) + rng() * 0.6 + (big >= 1 ? 0.55 : 0), lat = t * f.width;
+        const along = (inPool ? -2.1 : 0) + (rng() - 0.5) * (inPool ? 1.6 : 0.8);          // along the flow (the curtain's normal)
+        const x = f.x + f.nx * lat + f.fx * along, z = f.z + f.nz * lat + f.fz * along, y = (inPool ? f.bottom : f.top) - size * (big >= 1 ? 0.3 : 0.4);
         let worst = 0;
         for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
         if (worst + 0.35 > MAX_SINK) continue;
-        out.push(x, y, z, rng() * 6.283, 0, size * (1.0 + rng() * 0.25), size * 0.85, size * 1.0, Math.max(0.5, worst + 0.35), KIND.stone, 3 + rng(), y + size * 0.8);
+        out.push(x, y, z, rng() * 6.283, 0, size * (1.0 + rng() * 0.25), size * (big >= 1 ? 1.05 : 0.85), size * 1.0, Math.max(0.5, worst + 0.35), KIND.stone, 3 + rng(), y + size * 0.8);
+      }
+      // big mossy boulders strewn on both banks around the pool and the cascade (the real place is a chaos of dark boulders under ferns)
+      for (let k = 0; k < 9; k++) {
+        const side = k % 2 === 0 ? -1 : 1, size = 1.1 + rng() * rng() * 2.2 + (k < 2 ? 0.5 : 0);
+        const lat = f.width / 2 + 0.7 + rng() * 2.6, along = -3.5 + rng() * 7.5;
+        const x = f.x + f.nx * side * lat + f.fx * along, z = f.z + f.nz * side * lat + f.fz * along;
+        if (clearance(x, z) > WALL_CLEARANCE) continue;
+        const y = surface.height(x, z) + size * 0.12;
+        let worst = 0;
+        for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
+        if (worst + 0.35 > MAX_SINK) continue;
+        out.push(x, y, z, rng() * 6.283, 0, size * (1.0 + rng() * 0.3), size * (0.8 + rng() * 0.3), size * 0.95, Math.max(0.5, worst + 0.35), rng() < 0.6 ? KIND.stone : (rng() < 0.5 ? KIND.boulderA : KIND.boulderB), rng() < 0.6 ? 3 + rng() : rng(), y + size * 0.8);
       }
     }
   }

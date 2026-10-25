@@ -35,6 +35,14 @@ export const SHAPES = Object.freeze([
   { trunk: 0.012, crownY: 0.62, crownR: 0.3, crownH: 0.38 },      // sapling
 ]);
 export const STRIDE = 6;
+/** Girth of a tree: the width scale of its whole model (trunk AND crown, so an old tree is a broad one). Mostly slim to normal, a few percent are big old giants.
+ *  The renderer (forest-view.js) and the collision (below) both use it. Saplings are not scaled. */
+export function girthOf(seed, species) {
+  if (species === SPECIES.sapling) return 1;
+  const u = (seed * 91.7) % 1;
+  const old = u > 0.9 ? (u - 0.9) * 7 : 0;                      // the top 10 %: up to 1.7x
+  return (species === SPECIES.spruce ? 0.9 : 0.8) + 0.4 * u + old;
+}
 const baseHeightEstimate = (m) => Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, m.height > 4 ? m.height * 1.2 : 12));
 
 /** Trees of block (bx, bz): Float32Array stride 6 [x, y, z, height, species, seed]. `clearance(x, z)` returns the way coverage (0..1) at a point.
@@ -52,7 +60,7 @@ export function treesOfBlock(bx, bz, { map, surface, clearance }) {
       if (m.grass > 0.5 && m.cover < 0.4) chance = 0.02 * m.grass;               // an orchard tree, a hedge tree in a meadow
       chance *= 1 - 0.8 * m.rock;
       if (roll > chance) continue;
-      if (!wayFree(clearance, x, z, 0.3 + 0.02 * HEIGHT_MAX * (baseHeightEstimate(m) / HEIGHT_MAX))) continue;     // the way network keeps its corridor free, a thick trunk keeps a little further away
+      if (!wayFree(clearance, x, z, 0.3 + 0.02 * HEIGHT_MAX * (baseHeightEstimate(m) / HEIGHT_MAX) * Math.max(1, girthOf(seed, SPECIES.beech) * 0.95))) continue;     // the way network keeps its corridor free, a thick trunk keeps a little further away
       const y = surface.height(x, z);
       surface.normal(x, z, nrm);
       if (nrm.y < 0.62 && rng() < 0.8) continue;                                     // cliffs carry few trees
@@ -106,7 +114,7 @@ export function createTreeIndex({ map, surface, clearance }) {
         const t = block(bx, bz);
         for (let i = 0; i < t.length; i += STRIDE) {
           const dx = x - t[i], dz = z - t[i + 2];
-          const reach = r + t[i + 3] * SHAPES[t[i + 4]].trunk;
+          const reach = r + t[i + 3] * SHAPES[t[i + 4]].trunk * girthOf(t[i + 5], t[i + 4]);
           const d2 = dx * dx + dz * dz;
           if (d2 >= reach * reach) continue;
           const d = Math.sqrt(d2) || 1e-6;
@@ -119,7 +127,7 @@ export function createTreeIndex({ map, surface, clearance }) {
   }
   /** Pushes a sphere (x, y, z, r) out of the crowns (ellipsoids): returns { dx, dy, dz } to ADD to the position, or null. Used by the camera (the bike never reaches a crown). */
   function pushOutOfCrowns(x, y, z, r, out = { dx: 0, dy: 0, dz: 0 }) {
-    const reachMax = 14;
+    const reachMax = 24;
     const bx0 = Math.floor((x - reachMax) / BLOCK), bx1 = Math.floor((x + reachMax) / BLOCK), bz0 = Math.floor((z - reachMax) / BLOCK), bz1 = Math.floor((z + reachMax) / BLOCK);
     let best = 0;
     for (let bz = bz0; bz <= bz1; bz++) {
@@ -127,7 +135,7 @@ export function createTreeIndex({ map, surface, clearance }) {
         const t = block(bx, bz);
         for (let i = 0; i < t.length; i += STRIDE) {
           const sh = SHAPES[t[i + 4]], h = t[i + 3];
-          const a = h * sh.crownR + r, b = h * sh.crownH + r;
+          const a = h * sh.crownR * girthOf(t[i + 5], t[i + 4]) + r, b = h * sh.crownH + r;
           const dx = x - t[i], dy = y - (t[i + 1] + h * sh.crownY), dz = z - t[i + 2];
           if (Math.abs(dx) > a || Math.abs(dz) > a || Math.abs(dy) > b) continue;
           const q = (dx * dx + dz * dz) / (a * a) + (dy * dy) / (b * b);

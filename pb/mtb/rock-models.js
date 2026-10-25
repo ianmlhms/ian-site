@@ -7,6 +7,7 @@ import { createRng, valueNoise, hash2 } from './noise.js';
 
 const THREE = window.THREE;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const CREASE_COS_SLAB = Math.cos(58 * Math.PI / 180);
 const CREASE_COS = Math.cos(52 * Math.PI / 180);    // faces meeting at more than this stay a crisp edge (blocky sandstone), flatter joins are smooth
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
@@ -61,10 +62,119 @@ function displaceSlab(geo, variant, seed) {
   return geo;
 }
 
+/* A sandstone wall as a stack of bedding bands: every band is a grid of rounded blocks separated by V-shaped joint grooves, hard bands stand out, soft ones are eaten back, and a
+ * horizontal ledge (tread) joins each band to the next one (moss collects on it, an overhang casts a dark crevice under it). Slab space: x -0.5 .. 0.5 along the contour, y 0 .. 1
+ * up the slope, z -1 .. 0 into the hill (the face is at z about 0). Columns are shared by all bands, so the treads connect without T-junctions. */
+const BAND_LAYERS = [0.17, 0.12, 0.22, 0.14, 0.19, 0.16];
 function slabGeometry(variant, seed, near) {
-  const geo = new THREE.BoxGeometry(1, 1, 1, near ? 12 : 2, near ? 10 : 3, near ? 4 : 2);
-  displaceSlab(geo, variant, seed);
-  return finish(geo, near ? 'slab' : 'slab-far', seed, true);
+  const rng = createRng(Math.floor(seed * 1000) + (near ? 11 : 29));
+  const overhang = variant === 'overhang';
+  const C = near ? 15 : 7;                                         // columns across the face
+  const rows = near ? 3 : 2;                                       // vertex rows per band (front face)
+  const total = BAND_LAYERS.reduce((a, v) => a + v, 0);
+  const tri = [];                                                  // flat triangle list: [x, y, z, skirt, ao] x 3
+  const V = (x, y, z, ao = 1) => [x, y, z, y <= 1e-4 ? 1 : 0, ao];
+  const push = (a, b, c, want) => {                                // orient outward (want = rough outward direction)
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    if (nx * want[0] + ny * want[1] + nz * want[2] < 0) tri.push(a, c, b); else tri.push(a, b, c);
+  };
+  const strip = (r0, r1, want) => { for (let i = 0; i < r0.length - 1; i++) { push(r0[i], r0[i + 1], r1[i + 1], want); push(r0[i], r1[i + 1], r1[i], want); } };
+  const noise = (x, y) => valueNoise(x * 3.1 + seed * 13, y * 2.6, 4) - 0.5;
+  // bands
+  let y0 = 0;
+  const bands = [];
+  for (let i = 0; i < BAND_LAYERS.length; i++) {
+    const h = BAND_LAYERS[i] / total * (0.85 + 0.3 * rng());
+    const y1 = i === BAND_LAYERS.length - 1 ? 1 : Math.min(1, y0 + h);
+    const hard = rng() < 0.5;
+    let depth = hard ? -0.012 - 0.025 * rng() : -0.10 - 0.07 * rng();
+    if (overhang && y0 < 0.45) depth -= 0.36 * (1 - y0 / 0.45);
+    const period = 3 + Math.floor(rng() * 2), phase = Math.floor(rng() * period);
+    const cols = [];
+    for (let c = 0; c < C; c++) {
+      const groove = near ? (c - phase) % period === 0 && c > 0 && c < C - 1 : false;
+      const block = Math.floor((c - phase + period * 4) / period);
+      const x = -0.5 + c / (C - 1) + (c > 0 && c < C - 1 ? (valueNoise(c * 1.7, i * 3.3, 6) - 0.5) * 0.35 / (C - 1) : 0);
+      cols.push({ x: c === 0 ? -0.5 + (hard ? 0 : 0.03) : c === C - 1 ? 0.5 - (hard ? 0 : 0.03) : x, groove, bz: (hash2(block, i, Math.floor(seed * 97)) - 0.5) * 0.055 });
+    }
+    bands.push({ y0, y1, depth, cols });
+    y0 = y1;
+  }
+  const rowZ = near ? [-0.032, 0.0, -0.02] : [-0.02, -0.02];
+  const rowAO = near ? [0.62, 1.0, 0.85] : [0.7, 0.9];
+  const frontRow = (band, r) => {
+    const y = band.y0 + (band.y1 - band.y0) * (rows === 1 ? 0 : r / (rows - 1));
+    const rowPoly = band.cols.map((col, c) => {
+      const edge = c === 0 || c === C - 1 ? -0.035 : 0;
+      const z = band.depth + col.bz + rowZ[r] + (col.groove ? -0.03 : 0.0) + edge + noise(col.x, y) * 0.03;
+      const ao = rowAO[r] * (col.groove ? 0.55 : 1) * (0.9 + 0.2 * valueNoise(col.x * 7 + seed, y * 9, 8));
+      return V(col.x, y, Math.min(0, z), ao);
+    });
+    return rowPoly;
+  };
+  const faces = bands.map((band) => Array.from({ length: rows }, (_, r) => frontRow(band, r)));
+  for (let i = 0; i < bands.length; i++) {
+    for (let r = 0; r < rows - 1; r++) strip(faces[i][r], faces[i][r + 1], [0, 0, 1]);
+    if (i < bands.length - 1) {                                      // the ledge between this band and the next
+      const top = faces[i][rows - 1], bottom = faces[i + 1][0];
+      const up = bottom.reduce((a, v, c) => a + (v[2] - top[c][2]), 0) < 0;   // the next band is set back: the tread faces up
+      strip(top, bottom, [0, up ? 1 : -1, 0]);
+    }
+  }
+  // sides: from the front edge of each band to the back (x = +-0.5, z = -1)
+  const back = (x, y, ao = 0.6) => V(x, y, -1, ao);
+  for (const side of [0, 1]) {
+    const dir = side === 0 ? -1 : 1;
+    for (let i = 0; i < bands.length; i++) {
+      for (let r = 0; r < rows - 1; r++) {
+        const f0 = faces[i][r][side === 0 ? 0 : C - 1], f1 = faces[i][r + 1][side === 0 ? 0 : C - 1];
+        const b0 = back(dir * 0.5, f0[1]), b1 = back(dir * 0.5, f1[1]);
+        push(f0, f1, b1, [dir, 0, 0]); push(f0, b1, b0, [dir, 0, 0]);
+      }
+    }
+  }
+  // top: the front polyline of the top band, the middle (slightly domed and rolled off at the sides) and the back edge
+  const topFront = faces[bands.length - 1][rows - 1];
+  const mid = topFront.map((v) => V(v[0], 1 + 0.03 - 0.05 * Math.pow(Math.abs(v[0]) * 2, 3) + noise(v[0] * 2, 5) * 0.04, v[2] * 0.4 - 0.32, 0.95));
+  const rear = topFront.map((v) => V(v[0] * 0.98, 1 - 0.03 * Math.pow(Math.abs(v[0]) * 2, 3), -1, 0.8));
+  strip(topFront, mid, [0, 1, 0]); strip(mid, rear, [0, 1, 0]);
+  // back: one big quad per band chain (hidden in the hill, closes the solid)
+  for (const band of bands) { const q = [back(-0.5, band.y0), back(0.5, band.y0), back(0.5, band.y1), back(-0.5, band.y1)]; push(q[0], q[1], q[2], [0, 0, -1]); push(q[0], q[2], q[3], [0, 0, -1]); }
+  const pos = new Float32Array(tri.length * 3), skirt = new Float32Array(tri.length), ao = new Float32Array(tri.length);
+  tri.forEach((v, i) => { pos[i * 3] = v[0]; pos[i * 3 + 1] = v[1]; pos[i * 3 + 2] = v[2]; skirt[i] = v[3]; ao[i] = v[4]; });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aSkirt', new THREE.BufferAttribute(skirt, 1));
+  geo.computeVertexNormals();
+  smoothByCrease(geo, CREASE_COS_SLAB);
+  const colour = new Float32Array(tri.length * 3);
+  for (let i = 0; i < tri.length; i++) {
+    const tone = 0.92 + 0.16 * valueNoise(pos[i * 3] * 4 + seed * 3, pos[i * 3 + 1] * 4 + pos[i * 3 + 2] * 4, 9), k = ao[i] * (0.82 + 0.3 * Math.min(1, pos[i * 3 + 1] * 1.2)) * tone;
+    colour[i * 3] = k; colour[i * 3 + 1] = k * 0.97; colour[i * 3 + 2] = k * 0.92;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colour, 3));
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/** Crease-aware smoothing of a non-indexed geometry's normals: faces that meet within the crease angle share a normal (rounded weathering), steeper joins stay crisp (ledges, joints). */
+function smoothByCrease(g, creaseCos) {
+  const p = g.attributes.position, n = g.attributes.normal;
+  const key = (i) => `${Math.round(p.getX(i) * 400)},${Math.round(p.getY(i) * 400)},${Math.round(p.getZ(i) * 400)}`;
+  const flat = Float32Array.from(n.array);
+  const groups = new Map();
+  for (let i = 0; i < p.count; i++) { const k = key(i); const list = groups.get(k); if (list) list.push(i); else groups.set(k, [i]); }
+  for (let i = 0; i < p.count; i++) {
+    let sx = 0, sy = 0, sz = 0;
+    const fx = flat[i * 3], fy = flat[i * 3 + 1], fz = flat[i * 3 + 2];
+    for (const j of groups.get(key(i))) {
+      const jx = flat[j * 3], jy = flat[j * 3 + 1], jz = flat[j * 3 + 2];
+      if (fx * jx + fy * jy + fz * jz > creaseCos) { sx += jx; sy += jy; sz += jz; }
+    }
+    const l = Math.hypot(sx, sy, sz) || 1;
+    n.setXYZ(i, sx / l, sy / l, sz / l);
+  }
 }
 
 function boulderGeometry(seed, near, round = false) {

@@ -10,6 +10,13 @@ export const COMMON_UNIFORMS_GLSL = `
 
 export const PAINT_LIGHT_GLSL = `
   ${COMMON_UNIFORMS_GLSL}
+  // filmic tone mapping (an ACES fit) with a little saturation back: sunlit leaves roll off and glow instead of clipping to neon, shade stays rich instead of muddy
+  vec3 tonemapPaint(vec3 c){
+    vec3 x = c * 0.8;
+    vec3 t = clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+    float l = dot(t, vec3(0.3, 0.59, 0.11));
+    return clamp(mix(vec3(l), t, 1.16), 0.0, 1.0);
+  }
   vec3 paintLight(vec3 albedo, vec3 N, float sunMul, float shade){
     float ndl = dot(N, normalize(uSunDir));
     float diff = smoothstep(-0.12, 0.85, ndl);
@@ -18,7 +25,7 @@ export const PAINT_LIGHT_GLSL = `
     vec3 amb = mix(uAmbGround, uAmbSky, N.y * 0.5 + 0.5);
     vec3 light = amb * shade * 0.8 + uSunColor * diff * sunMul * 0.7;
     vec3 c = albedo * light;
-    return c / (1.0 + c * 0.22) * 1.12;                    // soft shoulder: bright sunlit leaves roll off instead of clipping to neon
+    return tonemapPaint(c);
   }
   // the rider's lamp: a spot cone along the bars plus a soft warm glow around the rider
   vec3 lampLight(vec3 P, vec3 N){
