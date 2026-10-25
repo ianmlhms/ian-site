@@ -65,3 +65,11 @@ $PY scripts/zuch/montage.py out.png --cols 2 --w 800 "caption=img.png" ...
 $PY scripts/zuch/build_real_line.py emit        # regenerate real-mosel.js + data/real/*.json from the cached corridor
 ```
 Test hooks: `?test=1` -> `__tsTest.setFreeCam`, `placeAt`, `internals()`, `trackInfo()`; `world.landscape.setHoleMode(on)`, `.groundHeightAt`, `.crossingTraffic()`; `track.real` (resolved scenery data).
+
+
+## W2b running log (Wave 2b agent, 26 Oct 2026)
+* FIXED, committed: `train-sim-world` is GREEN (1/1).  Root causes: (a) the 0.65 m mesh steps at s 2360 / 3440 = the real Syre trench (7 m wide, 6 m deep) between the strip columns (6-7 m apart): `track.js` `riverLats` adds columns per river REGION
+  (identical for all chunks touching the region, else slivers appear at chunk edges); (b) the s 9965 steps = a 5 m river bridge below `VALLEY_MIN_H` (6 -> 4); (c) the Munsbach Rue de Beyren patch crossing: the flow now checks patch crossings
+  separately (reach >= 60 m: the real road ends in a T-junction with Rue Principale after 69 m; grade <= 18 %: real LiDAR relief); (d) detector: tolerance 0.5 m, a single sampled pit pixel (cone_probe.mjs proves the strip watertight there, s 5740 right-down)
+  is not a hole (`MIN_PIT_SAMPLES = 2`).  New tools: `scripts/zuch/ray_probe.mjs`, `miss_probe.mjs`, `cone_probe.mjs`, `hole_pose_shot.mjs`, `grade_probe.mjs`, `patch_cross_probe.mjs`; `hole_scan.mjs --from --to`.
+* STILL TO RUN: the full `run_all.mjs train` (train-sim, -audio, -touch, -career-lock), check_site, cv_head.
