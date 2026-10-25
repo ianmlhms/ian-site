@@ -20,11 +20,24 @@ A side agent (trees, perf, Munsbach fixes; brief `scratchpad/brief-zuch-w2-trees
   Roads stop at the strip edge (+-150 m); ribbons on steep ground (cross slope > 1.7 m) are not drawn (they would float).
 * Aerial screenshots: `w2/aerial1/` (Munsbach - Roodt: villages along the real streets, A1 viaduct road).
 
+## Gate state at the end of this session (26 Oct 2026)
+
+* `check_site.py`: only the pre-existing karttracker-ios-privacy orphan.  `cv_head.py`: PROBLEMS: 0.
+* `run_all.mjs train-sim`: 213 checks ok, then FAIL at "tram career: switch, separate wallet, playable immediately" (frame.waitForFunction timeout 40 s; the side agent was running a browser at the same time - re-run alone before blaming the code; it is a tram step).
+* `run_all.mjs train-sim-world` (expectations updated for 11 / 25 / 26 stations and the branches; the new shared-tail checks pass): FAIL east / wittlich / trier "the road reaches >= 120 m": the list contains a crossing with reach 0 / 0 at s ~5470 = the Munsbach
+  Rue de Beyren crossing registered by the side agent from the patch (no planned road there by design: the flow must skip patch crossings or give them the patch road); and `east` hole scan: two 0.65 m mesh steps at s 2360 / 3440, lat -26 / +26 (new, not on the Wave 1 list:
+  suspect the sided relief term `valL / valR` or the real road ribbons; run `node scripts/zuch/hole_scan.mjs east --step 300 --out <dir>`).  Other flows (audio, touch, career-lock) were not re-run after Wave 2.  The crossings are thinned in `build_leg` (CROSS_* constants) so the
+  Wave 1 planner finds room (130 m from tunnels / bridges, 170 m from platforms): wittlich now has about 6, trier 5 (real line: 21).
+
+## Reviewer note on Oetrange (answered)
+The empty plain came from missing scenery in the 290 m station blocks (no leg data there).  Now every station block has its own record `st:<name>` (land raster, water, roads, relief), parcels are cut 20-60 x 45-110 m with hedges / tree lines and crops, houses and
+trees stand to +-290 m, the far ground is coloured by a coarse land-class raster with a parcel mosaic, streams (Syre) are drawn.  Proof: `reports/zuchreal/w2/aerial2/aerial-004140.png`.  Better parcels would come from the national agricultural parcel register
+(LPIS, data.public.lu "parcelles agricoles") instead of cutting the OSM areas procedurally - not done.
+
 ## NOT done / open (in priority order)
 
-1. **Gates not finished** (the 35 min `run_all.mjs train` was started at the end of the session and its result is not in this file; `train_sim_world.mjs` encodes Wave 1 expectations: station counts of east / wittlich / trier, `trier` passes 11 stations, "identical
-   stations +-6 m" - update it for 25 / 26 stations, the branches, 11-stop east, Cents-Hamm).  `check_site.py`, `cv_head.py`: not run after Wave 2 code.
-2. **Far ground colour**: the strip (+-150 m) is coloured by biome, the far ground by noise: visible colour step at the strip edge (dark green vs yellow).  `pipeline`: the features file now also has `far` rasters (60 m cells, +-1500 m;
+1. **Gates**: see "Gate state" above (world flow failures to fix; full `run_all.mjs train` not run to the end).
+2. (done, see reviewer note) **Far ground colour**: the strip (+-150 m) is coloured by biome, the far ground by noise: visible colour step at the strip edge (dark green vs yellow).  `pipeline`: the features file now also has `far` rasters (60 m cells, +-1500 m;
    `real_line_scenery.far_raster`, run `build_real_line.py emit` again, not yet regenerated).  JS: in landscape.js `farColor(x, z, nY)` use `track.nearest` + `track.real.farClassAt(s, lat)` (add to real-line.js; classes -> colours: field gold-green,
    meadow light green, forest dark green, vine yellow-green, resid / urban grey-green, indus grey, water blue); and in `groundColor` blend the strip ground by `real.landAt(s, lat)` (forest floor darker, fields lighter).
 3. **Real level crossings**: positions come from the OSM crossings that survived the layout (about 10 of 21 on `wittlich`; dropped: inside station blocks, on arcs, too close to bridges / tunnels).  The crossing roads are still the Wave 1 synthetic

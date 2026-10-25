@@ -334,7 +334,7 @@
     "from": "Manternach",
     "to": "Mertert",
     "length": 1115,
-    "spec": "s35:g0.25:v90:bsuburb s70:g1:X:bfarmland l549/64:g1:bforest s60:g-0.5:T s*:g-1 s60:g-0.75:Br,5,w r459/122 r459/48:g-1 l526/135:g-1 r594/121:g-1:bindustrial s34:g-0.75:bfarmland l513/52:g-0.75 l513/45:g-1 r594/104:g-1 s32:g-1 s43:g-1:bsuburb"
+    "spec": "s46:g0.5:v90:bsuburb s40:g1:bfarmland l549/62:g1:bforest s60:g-0.5:T s*:g-1 s60:g-0.75:Br,5,w r459/123 r459/49:g-1 l526/135:g-1 r594/122:g-1:bindustrial s34:g-0.75:bfarmland l513/52:g-0.75 l513/45:g-1 r594/104:g-1 s32:g-1 s48:g-1:bsuburb"
    },
    {
     "t": "station",
@@ -380,7 +380,7 @@
     "from": "Igel",
     "to": "Tréier-Zewen",
     "length": 324,
-    "spec": "r481/59:g-0.5:v80:bforest s48:g-1:v90 s64:g-1:bindustrial s70:g-1:X:bsuburb s*:g-0.25"
+    "spec": "r481/59:g-0.5:v80:bforest s49:g-1:v90 s82:g-1:bindustrial s*:g-0.5:bsuburb"
    },
    {
     "t": "station",
@@ -392,7 +392,7 @@
     "from": "Tréier-Zewen",
     "to": "Tréier-Euren",
     "length": 737,
-    "spec": "s60:g-0.5:v90:bsuburb s163:g-0.5:bcity s* s70:X s60 s38:g0.25:bsuburb"
+    "spec": "s60:g-0.5:v90:bsuburb s163:g-0.5:bcity s* s38:g0.25:bsuburb"
    },
    {
     "t": "station",
@@ -556,7 +556,7 @@
     "from": "Hetzerath",
     "to": "Sehlem",
     "length": 971,
-    "spec": "s70:g-0.5:v120:X:bsuburb s*:g-0.5 s87:bfarmland s60:g0.5 l1003/86:g0.25 l1003/173:g-0.75 s64:g-1 s58 s72:g0.25:bforest s70:g0.25:bfarmland l1003/132:g1:bcity"
+    "spec": "s*:g-0.5:v120:bsuburb s93:bfarmland s63:g0.5 l1003/86:g0.25 l1003/173:g-0.75 s68:g-1 s61 s76:g0.25:bforest s74:g0.25:bfarmland l1003/132:g1:bcity"
    },
    {
     "t": "station",
@@ -580,7 +580,7 @@
     "from": "Salmtal",
     "to": "Wittlich",
     "length": 1750,
-    "spec": "l855/55:g-1:v110:bsuburb s60:g-1:Br,15,w s74:g0.25 s70:g0.75:X s32:g0.5:bfarmland s81:g0.25 s86:g1 s48:g-0.5 l855/155:g-1 s57:g-0.75 s48:g-0.5 s70:g-0.5:X s*:g-0.5:v100 l718/145:g0.25 s136:g-0.5 s67:g-1 s60:g-0.75:Br,9,w s56:g-0.25 s38:g0.5 r624/177:g1 s53:g0.5:bsuburb"
+    "spec": "l855/55:g-1:v110:bsuburb s60:g-1:Br,15,w s67:g0.25 r644/164:g0.75 s31:g0.5:bfarmland s73:g0.25 s78:g1 s43:g-0.5 l855/155:g-1 s52:g-0.75 s43:g-0.5 s70:g-0.5:X s*:g-0.5:v100 l718/145:g0.25 s122:g-0.5 s60:g-1 s60:g-0.75:Br,9,w s51:g-0.25 s35:g0.5 r624/177:g1 s48:g0.5:bsuburb"
    },
    {
     "t": "station",

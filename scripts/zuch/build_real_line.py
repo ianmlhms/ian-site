@@ -41,6 +41,9 @@ GRADE_MAX = 1.0            # authored grade % (the sim multiplies by 2.4 and cla
 BRIDGE_MIN_REAL = 28.0
 TUNNEL_MIN_REAL = 45.0
 MIN_PIECE_GAME = 30.0
+CROSS_END_GAME = 150.0     # game metres a crossing keeps from the station blocks at the ends of its leg
+CROSS_EQUIP_GAME = 150.0   # ... from bridges and tunnels
+CROSS_CROSS_GAME = 260.0   # ... from the next crossing
 SIDE_SEARCH = 90.0         # platforms within this distance of the track decide the platform side
 
 
@@ -375,6 +378,22 @@ def build_leg(attrs, a, b, length_game, bridges=(), tunnels=(), crossings=(), bi
                 continue
         clean.append(w)
     wins = clean
+    # crossing roads need room (crossing-roads.js: 130 m from tunnels / bridges, 170 m from platforms, other crossings): drop crossings that would not get it
+    def far_enough(w):
+        ctr = (w["s0"] + w["s1"]) / 2
+        if ctr < CROSS_END_GAME * k or span - ctr < CROSS_END_GAME * k:
+            return False
+        for o in wins:
+            if o is w:
+                continue
+            gap = (o["s0"] - w["s1"]) if o["s0"] >= w["s1"] else (w["s0"] - o["s1"])
+            need = CROSS_CROSS_GAME if o["kind"] == "crossing" else CROSS_EQUIP_GAME
+            if gap < need * k:
+                return False
+        return True
+    for w in [w for w in wins if w["kind"] == "crossing"]:
+        if not far_enough(w):
+            wins.remove(w)
     # a crossing sits on a straight: move it to the nearest straight (within 300 real m) or drop it
     arcs = [p for p in fitp if p["kind"] == "c"]
     def in_arc(x):
