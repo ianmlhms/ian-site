@@ -21,6 +21,10 @@ import { createBikeState, advanceBike } from './bike.js';
 import { createChaseCamera } from './camera.js';
 import { createRng } from './noise.js';
 import { STRIDE, SHAPES } from './forest.js';
+import { R_STRIDE, KIND, slabFrame, slabBottomRing } from './rocks.js';
+import { placeBridge, SCHIESSENTUEMPEL } from './landmarks.js';
+import { WAY_KINDS } from './config.js';
+import { WATER_KINDS } from './water.js';
 import { QUADTREE, WORLD, CAMERA } from './config.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -414,6 +418,148 @@ section('H forest');
   }
   check(`every trail is free of trunks over its whole length (${probes} probes of 0.9 m radius)`, probes > 0 && blocked === 0, `${blocked} probes hit a trunk`);
   stats.treesSampled = treeCount;
+}
+
+/* ---------------------------------------------------------------- I: sandstone */
+section('I rocks');
+const rocks = world.rocks;
+const trailPoints = trails.map((t) => trailLine(t));
+{
+  let count = 0, nonFinite = 0, badSink = 0, floating = 0, worstGap = 1e9, onWay = 0, slabs = 0, boulders = 0, stones = 0;
+  const rng = createRng(2024);
+  const blocks = [];
+  for (let n = 0; n < (QUICK ? 120 : 600); n++) blocks.push([Math.floor((WORLD.playInset + rng() * (WORLD.width - 2 * WORLD.playInset)) / 32), Math.floor((WORLD.playInset + rng() * (WORLD.depth - 2 * WORLD.playInset)) / 32)]);
+  for (const line of trailPoints) for (let i = 0; i < line.length; i += 20) blocks.push([Math.floor(line[i][0] / 32), Math.floor(line[i][1] / 32)]);
+  const info = { coverage: 0, way: -1, stream: 0 };
+  for (const [bx, bz] of blocks) {
+    const t = rocks.block(bx, bz);
+    for (let i = 0; i < t.length; i += R_STRIDE) {
+      count++;
+      const r = { x: t[i], y: t[i + 1], z: t[i + 2], yaw: t[i + 3], alpha: t[i + 4], sx: t[i + 5], sy: t[i + 6], sz: t[i + 7], sink: t[i + 8], kind: t[i + 9] };
+      for (let k = 0; k < R_STRIDE; k++) if (!Number.isFinite(t[i + k])) nonFinite++;
+      if (r.sink < 0.25 || r.sink > 6.01) badSink++;
+      const ring = [];
+      if (r.kind <= KIND.overhang) {
+        slabs++;
+        const ca = Math.cos(r.alpha), sa = Math.sin(r.alpha);
+        const f = slabFrame(Math.sin(r.yaw) * sa, sa, Math.cos(r.yaw) * sa);
+        // slabFrame takes the face normal (nx, ny, nz): ny = sin(alpha), horizontal part cos(alpha)
+        const f2 = slabFrame(Math.sin(r.yaw) * ca, sa, Math.cos(r.yaw) * ca);
+        ring.push(...slabBottomRing(r, f2));
+      } else {
+        if (r.kind === KIND.stone) stones++; else boulders++;
+        const rad = r.kind === KIND.stone ? r.sx * 0.5 : Math.max(r.sx, r.sz) * 0.45;
+        for (let a = 0; a < 8; a++) ring.push([r.x + Math.cos(a * Math.PI / 4) * rad, r.y, r.z + Math.sin(a * Math.PI / 4) * rad]);
+        ring.push([r.x, r.y, r.z]);
+      }
+      for (const p of ring) {
+        const bottom = p[1] - r.sink, ground = surface.height(p[0], p[2]);
+        worstGap = Math.min(worstGap, ground - bottom);
+        if (bottom > ground - 0.15) floating++;
+      }
+      if (r.kind !== KIND.stone) { field.height(r.x, r.z, info); if (info.coverage > 0.02) onWay++; }
+    }
+  }
+  check(`rocks: finite, sink between 0.25 and 6 m (${count.toLocaleString()} rocks: ${slabs.toLocaleString()} slabs, ${boulders.toLocaleString()} boulders, ${stones.toLocaleString()} stream stones)`, count > 300 && nonFinite === 0 && badSink === 0, `${nonFinite} NaN, ${badSink} bad sinks`);
+  check(`every rock solid reaches BELOW the terrain on every side (bottom ring minus sink is under the physics surface; worst margin ${worstGap.toFixed(2)} m)`, floating === 0 && worstGap > 0.15, `${floating} ring points not buried`);
+  check('no slab or boulder stands on a way (trail, path, track, road, stream)', onWay === 0, `${onWay} rocks on ways`);
+  stats.rocksChecked = count; stats.rockWorstMargin = worstGap;
+  let blockedTrail = 0, probes = 0;
+  for (const line of trailPoints) for (let i = 0; i < line.length; i += 1) { probes++; if (rocks.collide(line[i][0], line[i][1], 0.5, surface.height(line[i][0], line[i][1]) + 0.5, bikeHit)) blockedTrail++; }
+  check(`every trail is free of rocks over its whole length (${probes} probes of 0.5 m)`, probes > 0 && blockedTrail === 0, `${blockedTrail} probes hit a rock`);
+  // corridors: how much of the trail runs between walls
+  let corridor = 0;
+  for (const line of trailPoints) for (let i = 0; i < line.length; i += 2) {
+    const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)];
+    const tx = b[0] - a[0], tz = b[1] - a[1], len = Math.hypot(tx, tz) || 1, nx = -tz / len, nz = tx / len;
+    let left = false, right = false;
+    for (const d of [3.4, 4.2]) {
+      if (rocks.collide(line[i][0] + nx * d, line[i][1] + nz * d, 0.5, -1e9, camHit)) left = true;
+      if (rocks.collide(line[i][0] - nx * d, line[i][1] - nz * d, 0.5, -1e9, camHit)) right = true;
+    }
+    if (left || right) corridor++;
+  }
+  stats.corridorMetres = corridor * 2 * 1.5;
+  check(`rock walls flank the trail (${Math.round(corridor * 3)} m of the trail have a wall within 4 m)`, QUICK || corridor * 3 > 200, `${corridor * 3} m`);
+}
+
+/* ---------------------------------------------------------------- J: water */
+section('J water');
+{
+  const net = field.network, S = net.samples;
+  let samples = 0, nonFinite = 0, shallow = 0, deep = 0, uphill = 0, bankLow = 0, edgeChecks = 0;
+  for (const info of net.ways) {
+    if (!WATER_KINDS.includes(info.kind)) continue;
+    const kind = WAY_KINDS[info.kind];
+    for (let i = info.first; i < info.first + info.count; i++) {
+      samples++;
+      if (!Number.isFinite(S.water[i]) || !Number.isFinite(S.px[i])) { nonFinite++; continue; }
+      const ground = surface.height(S.px[i], S.pz[i]);
+      const depth = S.water[i] - ground;
+      if (depth < 0.02) shallow++;                              // the water must stand above the channel floor
+      if (depth > 1.2) deep++;
+      if (i > info.first && (S.water[info.first] >= S.water[info.first + info.count - 1] ? 1 : -1) * (S.water[i] - S.water[i - 1]) > 0.02) uphill++;      // and never run uphill (an OSM way drawn against the flow is read backwards)
+      if (i % 3 === 0) {
+        for (const side of [-1, 1]) {
+          const lat = kind.halfWidth + 0.5;
+          edgeChecks++;
+          if (surface.height(S.px[i] + S.nx[i] * side * lat, S.pz[i] + S.nz[i] * side * lat) < S.water[i] - 0.25) bankLow++;
+        }
+      }
+    }
+  }
+  check(`water ribbons: ${samples.toLocaleString()} samples, all finite`, samples > 1000 && nonFinite === 0, `${nonFinite} NaN`);
+  check(`the water surface lies in its channel (0.02 .. 1.2 m above the carved floor) at ${(100 * (1 - (shallow + deep) / samples)).toFixed(1)} % of the samples`, (shallow + deep) / samples < 0.03, `${shallow} too shallow, ${deep} too deep`);
+  check('the water never runs uphill (sampled every 1.5 m along the flow)', uphill === 0, `${uphill} uphill steps`);
+  check(`the ribbon edges are hidden under the banks (terrain at the edge within 0.25 m of the surface or higher: ${(100 * (1 - bankLow / edgeChecks)).toFixed(1)} %)`, bankLow / edgeChecks < 0.25, `${bankLow} of ${edgeChecks} edge points`);
+  stats.waterSamples = samples;
+  // the cascade: the river falls in sharp steps at the Schiessentümpel
+  let fall = null, best = 1e18;
+  for (const info of net.ways) if (info.kind === 'river') for (let i = info.first; i < info.first + info.count; i++) { const d = (S.px[i] - SCHIESSENTUEMPEL.x) ** 2 + (S.pz[i] - SCHIESSENTUEMPEL.z) ** 2; if (d < best) { best = d; fall = { info, i }; } }
+  let drops = 0, total = 0, maxStep = 0;
+  for (let i = fall.i - 14; i < fall.i + 14; i++) { const dz = S.water[i] - S.water[i + 1]; total += Math.max(0, dz); if (dz > 0.25) { drops++; maxStep = Math.max(maxStep, dz); } }
+  stats.cascade = `${total.toFixed(2)} m over 28 samples, ${drops} steep samples, steepest ${maxStep.toFixed(2)} m per sample`;
+  check('the Schiessentümpel is a staircase: the river drops at least 2.2 m within 28 samples in at least 3 sharp steps', total >= 2.2 && drops >= 3, stats.cascade);
+  // the footbridge
+  const br = placeBridge(net, surface);
+  check('the footbridge is placed on the river upstream of the falls', !!br && Math.hypot(br.x - SCHIESSENTUEMPEL.x, br.z - SCHIESSENTUEMPEL.z) < 40);
+  if (br) {
+    const half = br.span / 2 + br.abutment, base = br.water - 2.2 - 1.0;                     // bridge-model.js BASE and the instance sink
+    let worst = 1e9;
+    for (const [u, v] of [[-half, -br.width / 2], [-half, br.width / 2], [half, -br.width / 2], [half, br.width / 2], [-half, 0], [half, 0], [-br.span / 2, 0], [br.span / 2, 0], [0, -br.width / 2], [0, br.width / 2]]) {
+      const x = br.x + br.across[0] * u + br.flow[0] * v, z = br.z + br.across[1] * u + br.flow[1] * v;
+      worst = Math.min(worst, surface.height(x, z) - base);
+    }
+    check(`the footbridge base is below the terrain at every corner and under the arch (margin ${worst.toFixed(2)} m)`, worst > 0.3);
+    check('the deck is above the water and reaches the banks (deck >= bank + 0.3, arch clear height >= 1.3 m)', br.deck >= Math.max(br.endL, br.endR) + 0.2 && br.deck - br.water >= br.rise + 1.3, `deck ${br.deck.toFixed(2)} water ${br.water.toFixed(2)}`);
+    stats.bridge = `deck ${(br.deck - br.water).toFixed(2)} m above the water, span ${br.span} m`;
+  }
+}
+
+/* ---------------------------------------------------------------- K: camera against crowns and rocks */
+section('K camera vs crowns and rocks');
+{
+  const crownPush = { dx: 0, dy: 0, dz: 0 }, hitA = { nx: 0, nz: 0, pen: 0 }, hitB = { nx: 0, nz: 0, pen: 0 };
+  const trunkOrRock = (x, z, r) => { const a = trees.collide(x, z, r, hitA); const b = rocks.collide(x, z, r, -1e9, hitB); if (b && (!a || b.pen > a.pen)) { hitA.nx = b.nx; hitA.nz = b.nz; hitA.pen = b.pen; return hitA; } return a; };
+  const pushOut = (x, y, z, r) => trees.pushOutOfCrowns(x, y, z, r, crownPush);
+  let poses = 0, inCrown = 0, inRock = 0, inTrunk = 0;
+  const rng = createRng(555);
+  const positions = [];
+  for (const line of trailPoints) for (let i = 0; i < line.length; i += (QUICK ? 40 : 6)) positions.push([line[i][0], line[i][1], line[Math.min(line.length - 1, i + 2)]]);
+  for (let n = 0; n < (QUICK ? 150 : 900); n++) positions.push([WORLD.playInset + rng() * (WORLD.width - 2 * WORLD.playInset), WORLD.playInset + rng() * (WORLD.depth - 2 * WORLD.playInset), null]);
+  for (const [x, z, nxt] of positions) {
+    const heading = nxt ? Math.atan2(nxt[1] - z, nxt[0] - x) : rng() * 6.283;
+    const s = createBikeState(x, z, heading, surface);
+    const cam = createChaseCamera(surface, trunkOrRock, pushOut); cam.snap(s);
+    let c; for (let k = 0; k < 4; k++) c = cam.update(s, 1 / 30);
+    poses++;
+    if (trees.pushOutOfCrowns(c.x, c.y, c.z, 0.3, crownPush)) inCrown++;
+    if (rocks.collide(c.x, c.z, 0.3, c.y - 0.5, hitB)) inRock++;
+    if (trees.collide(c.x, c.z, 0.3, hitA)) inTrunk++;
+  }
+  check(`the camera never sits inside a tree crown (${poses.toLocaleString()} camera poses on the trails and in the world)`, inCrown === 0, `${inCrown} poses in a crown`);
+  check('the camera never sits inside a rock wall or boulder', inRock === 0, `${inRock} poses in a rock`);
+  check('the camera never sits inside a trunk (crowns and rocks pushed too)', inTrunk === 0, `${inTrunk} poses in a trunk`);
 }
 
 /* ---------------------------------------------------------------- summary */

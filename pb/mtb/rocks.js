@@ -11,6 +11,7 @@
 import { QUADTREE } from './config.js';
 import { createRng } from './noise.js';
 import { sampleWorldMap, sampleFieldCell } from './world-map.js';
+import { wayFree } from './forest.js';
 
 export const BLOCK = QUADTREE.minSize;
 export const R_STRIDE = 12;
@@ -50,10 +51,12 @@ export function slabBottomRing(r, f) {
   return out;
 }
 
+/** How far the bottom of a solid must be lowered so that it lies under the terrain on every side; null when that would take more than MAX_SINK (the rock stands on an edge: skip it). */
 function sinkFor(ring, surface) {
   let worst = -1e9;
   for (const p of ring) worst = Math.max(worst, p[1] - surface.height(p[0], p[2]));
-  return Math.min(MAX_SINK, Math.max(MIN_SINK, worst + SINK_MARGIN));
+  const sink = Math.max(MIN_SINK, worst + SINK_MARGIN);
+  return sink > MAX_SINK ? null : sink;
 }
 
 /** The rocks of block (bx, bz). ctx: { map, surface, clearance, ways (trail / path sample index), streams (stream sample index) }. */
@@ -63,7 +66,7 @@ export function rocksOfBlock(bx, bz, ctx) {
   const out = [];
   const x0 = bx * BLOCK, z0 = bz * BLOCK;
   const footprintFree = (cx, cz, f, w, d) => {
-    for (const [u, v] of [[0, 0], [-0.5, 0], [0.5, 0], [0, -0.5], [-0.5, -0.5], [0.5, -0.5], [0, -1]]) {
+    for (const [u, v] of [[0, 0.3], [-0.5, 0.3], [0.5, 0.3], [-0.25, 0.3], [0.25, 0.3], [0, 0], [-0.5, 0], [0.5, 0], [-0.25, 0], [0.25, 0], [0, -0.5], [-0.5, -0.5], [0.5, -0.5], [0, -1]]) {
       const o = along(f, u * w, 0, v * d);
       if (clearance(cx + o[0], cz + o[2]) > WALL_CLEARANCE) return false;
     }
@@ -80,6 +83,7 @@ export function rocksOfBlock(bx, bz, ctx) {
     if (!footprintFree(fx, fz, f, w, DEPTH)) return false;
     const r = { x: fx, y: fy, z: fz, sx: w, sz: DEPTH };
     const sink = sinkFor(slabBottomRing(r, f), surface);
+    if (sink === null) return false;
     out.push(fx, fy, fz, f.yaw, f.alpha, w, h, DEPTH, sink, kind, seed, fy + f.y[1] * h);
     return true;
   };
@@ -139,10 +143,15 @@ export function rocksOfBlock(bx, bz, ctx) {
     const chance = 0.05 + 0.5 * m.rock + 0.4 * cell.cliff + 0.45 * smooth(0.95, 0.7, nrm.y) + 0.12 * m.wet * m.cover;
     if (roll > chance || m.built > 0.1 || m.water > 0.3 || m.grass > 0.6 || clearance(x, z) > WALL_CLEARANCE) continue;
     const size = 0.7 + sizeRoll * sizeRoll * 2.4 + (sizeRoll > 0.97 ? 1.6 : 0);
+    if (!wayFree(clearance, x, z, size * 0.75 + 0.4)) continue;                  // a boulder never touches the trail corridor
     const y = surface.height(x, z);
+    const ext = size * 0.6;
+    const bx = size * (1.0 + (seed - 0.5) * 0.4), bz = size * (0.85 + (1 - seed) * 0.3);
     let worst = 0;
-    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) worst = Math.max(worst, y - surface.height(x + dx * size * 0.5, z + dz * size * 0.5), surface.height(x + dx * size * 0.5, z + dz * size * 0.5) - y);
-    const sink = Math.min(MAX_SINK, Math.max(0.3, worst + SINK_MARGIN + size * 0.12));
+    for (let a = 0; a < 8; a++) worst = Math.max(worst, y + size * 0.1 - surface.height(x + Math.cos(a * Math.PI / 4) * Math.max(bx, bz) * 0.6, z + Math.sin(a * Math.PI / 4) * Math.max(bx, bz) * 0.6));
+    void ext; void bz;
+    const sink = Math.max(0.3, worst + SINK_MARGIN);
+    if (sink > MAX_SINK) continue;
     out.push(x, y + size * 0.1, z, yaw, 0, size * (1.0 + (seed - 0.5) * 0.4), size * (0.7 + sizeRoll * 0.2), size * (0.85 + (1 - seed) * 0.3), sink, kindRoll < 0.5 ? KIND.boulderA : KIND.boulderB, seed, y + size * 0.8);
   }
   // ---- stones in and beside the streams
@@ -152,7 +161,9 @@ export function rocksOfBlock(bx, bz, ctx) {
       const lat = (rng() - 0.5) * 2 * s.halfWidth * 1.15, size = 0.22 + rng() * rng() * 0.8;
       const x = s.x + s.nx * lat, z = s.z + s.nz * lat;
       const y = s.water - size * 0.35;
-      out.push(x, y, z, rng() * 6.283, 0, size * 1.1, size * 0.75, size * 0.9, 0.4, KIND.stone, rng(), y + size * 0.7);
+      let worst = 0;                                                                    // the stone's foot must reach below the channel floor all around it
+      for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
+      out.push(x, y, z, rng() * 6.283, 0, size * 1.1, size * 0.75, size * 0.9, Math.max(0.4, worst + 0.3), KIND.stone, rng(), y + size * 0.7);
     }
   }
   return Float32Array.from(out);
@@ -212,7 +223,7 @@ export function createRockIndex(ctx) {
             const nxh = Math.sin(t[i + 3]), nzh = Math.cos(t[i + 3]);                      // horizontal direction of the face normal
             const px = x - t[i], pz = z - t[i + 2];
             const along = px * nzh - pz * nxh, front = px * nxh + pz * nzh;                // along the contour, out of the face
-            if (Math.abs(along) > t[i + 5] * 0.5 + r * 0.6 || front > r || front < -(t[i + 7] + t[i + 6] * Math.cos(t[i + 4]))) continue;
+            if (Math.abs(along) > t[i + 5] * 0.5 + r * 0.6 || front > r || front < -(t[i + 7] * Math.cos(t[i + 4]) + t[i + 6] * Math.sin(t[i + 4]))) continue;
             const pen = r - front;
             if (pen > best) { best = pen; out.nx = nxh; out.nz = nzh; out.pen = pen; }
             continue;
