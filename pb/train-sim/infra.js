@@ -2796,7 +2796,7 @@
             const stride = Math.max(1, Math.floor(pos.count / 120));
             for (let k = 0; k < pos.count; k += stride) {
               v.fromBufferAttribute(pos, k).applyMatrix4(m.matrixWorld);
-              if (v.y > track.frameAt(st.s).pos.y + 0.1 && v.y < track.frameAt(st.s).pos.y + 0.5 && track.nearest) { const nq = track.nearest(v.x, v.z); if (nq && nq.d < 12) lats.push(nq.lat); }   // platform top / body vertices only
+              if (v.y > group.position.y + 0.3 && v.y < group.position.y + 0.95 && track.nearest) { const nq = track.nearest(v.x, v.z); if (nq && nq.d < 12) lats.push(nq.lat); }   // platform top vertices only (relative to the group origin = track height at the platform middle: on a gradient the marker stop height is metres off)
             }
           });
           lats.sort((a, b) => a - b);
