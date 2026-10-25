@@ -221,13 +221,6 @@
     for (let i = 0; i < PAD_SEGMENTS; i++) mb.tri(centre, first + ((i + 1) % PAD_SEGMENTS), first + i);
   }
 
-  /* interpolated design height of a polyline at the sample whose `a` (or distance) is closest */
-  function nearestSample(road, x, z) {
-    let best = Infinity; let hit = road.pts[0];
-    road.pts.forEach((p) => { const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z); if (d < best) { best = d; hit = p; } });
-    return hit;
-  }
-
   /* ---- one crossing */
   function build(crossing, plan, opts) {
     const quality = (opts && opts.quality) || 'medium';
@@ -313,8 +306,6 @@
     });
 
     // signs on the cross roads: warning triangle and the three / two / one stripe markers (right of the approaching traffic), yield sign at the junction
-    const signMats = [];
-    void signMats;
     crossing.roads.filter((r) => r.role === 'cross' && r.kind === 'asphalt').forEach((road) => {
       const pts = road.pts;
       const at = (u) => {
@@ -363,7 +354,6 @@
       m.castShadow = quality === 'high';
       group.add(m);
     }
-    void nearestSample;
     return group;
   }
 

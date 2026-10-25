@@ -63,6 +63,16 @@ Photo-modelled before: Sandweiler-Contern, Oetrange, Betzder, Manternach, Merter
 (stations-abroad.js).  New in Wave 1: **Munsbach** (stations-lu-c.js, the template station with real surroundings, see ZUCHREAL-W1-NOTES.md).  Still generic: Roodt-Syr, Wecker,
 Igel, Kreuz Konz, Tréier Süd, Ehrang, Föhren, Hetzerath, Sehlem, Salmtal.
 
+### Real level crossings on line 30 (OSM `railway=level_crossing`, Geofabrik extract 25 Oct 2026) - for the Wave 2 real positions
+
+The authored `X` flags are placeholders.  The real line has these (lat, lon; barrier type from the tags):
+Sandweiler-Contern + 0.9 km (49.5929, 6.2520, double half barrier); Oetrange - Munsbach (49.6210, 6.2672, signals, barrier); **Munsbach station, Rue de Beyren, ~110-130 m ahead of the
+platform middle** (49.6308, 6.2686, full barrier); before Roodt (49.6544, 6.2975, lights + bell); **Roodt station** (49.6657, 6.3029, double half); Roodt - Betzdorf (49.6774, 6.3145) and
+(49.6797, 6.3191), lights + bell; **Betzdorf station** (49.6890, 6.3493, double half); (49.6932, 6.3642); **Wecker** (49.7004, 6.3904, full); **Manternach station** (49.7065, 6.4240, half) and
+(49.7073, 6.4298, double half / full); Mertert area: several (49.6942-49.6961, 6.4657-6.4694, no barrier = tracks / paths) and (49.7026, 6.4774-6.4774, half / full).
+In the Luxembourg city section there are none on the main line.  The crossing planner must take the real road class and direction from the OSM road through the node
+(Wave 2: `plan.ctx.realCrossings` + the patch roads of a station with a patch: the road of the patch IS the crossing road there, no synthetic one).
+
 ## 3. Other lines (Wave 2+)
 
 * West (Lëtzebuerg - Kleinbettingen, line 70): Hollerich/Bertrange/Mamer/Capellen; the A6 parallel, fields of the Grand Duchy; Mamer-Lycée is not a stop.

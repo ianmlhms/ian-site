@@ -34,6 +34,7 @@ try {
     '5-platform-along': { s: sf + 70, lat: sd * (st.edge + 1.4), up: st.height + 1.7, yaw: 0, pitch: -0.01, fov: 64 },
     '6-building-close': { s: sf + 4, lat: -sd * 4.5, up: st.height + 1.6, yaw: toPlatform, pitch: -0.01, fov: 50, ahead: 40 },
     '8-bikebox': { s: sf - 12, lat: sd * (st.edge + st.width + 7), up: 1.7, target: { s: sf + 8, lat: sd * 8, up: 1.5 }, fov: 58 },
+    '9-along-far': { s: st.mid - focusZ + 48, lat: -sd * 7.6, up: st.height + 1.7, yaw: Math.PI, pitch: -0.01, fov: 62 },
     '7-wide': { s: sf + 120, lat: -sd * 40, up: 14, target: { s: sf - 20, lat: sd * 12, up: 3 }, fov: 62 },
   };
   const stats = {};
