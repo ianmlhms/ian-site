@@ -264,8 +264,10 @@ window.TS = window.TS || {};
       geo.computeVertexNormals();
       mb.addGeo(geo, placeM(x, y, z, x * 3.1, rx, ry, rz), leafCol(pair, y0, y1));
     };
+    const bark = C('#4a3a2c');
+    let mb = new MB();
+    if (!TS.treeKit) { // fallback: the old flat-shaded species (tree-kit.js builds the painted ones)
     // oak: broad, layered blobs
-    let mb = new MB(); const bark = C('#4a3a2c');
     mb.addGeo(cylGeo(0.22, 0.38, 3.2, 6), placeM(0, 1.6, 0), bark);
     [[0, 4.6, 0, 2.7, 2.1, 2.7], [1.7, 3.8, 0.7, 1.9, 1.6, 1.9], [-1.6, 4.0, -0.6, 2.0, 1.7, 2.0], [0.3, 6.0, 0.1, 1.9, 1.5, 1.9], [-0.4, 3.6, 1.6, 1.6, 1.3, 1.6]]
       .forEach(b => blob(mb, b[0], b[1], b[2], b[3], b[4], b[5], LEAF.oak, 2, 7.5));
@@ -292,6 +294,7 @@ window.TS = window.TS || {};
     mb = new MB(); // bush / hedge shrub
     blob(mb, 0, 0.55, 0, 1.0, 0.75, 1.0, LEAF.bush, 0, 1.4, 1); blob(mb, 0.7, 0.4, 0.2, 0.7, 0.55, 0.7, LEAF.bush, 0, 1.2, 0);
     kit.bush = mb.build();
+    }
     mb = new MB(); // grass tuft for the verge
     [[0.12, 0, 0], [0.4, 2.1, 0.1], [-0.38, 4.2, -0.1]].forEach(([tilt, rot, off], i) => {
       const g = new T.ConeGeometry(0.09, 0.55 + i * 0.06, 3, 1).translate(off * 0.2, 0.27, 0), m = new T.Matrix4().makeRotationY(rot).multiply(new T.Matrix4().makeRotationZ(tilt));
@@ -773,6 +776,14 @@ window.TS = window.TS || {};
     const matFar = withSnow(new T.MeshLambertMaterial({ vertexColors: true, map: texGrass() }), 1);
     const mats = [matLamp, matSmoke, matTerrain, matFieldRows, matFieldVines, matFieldMeadow, matHouse, matBlock, matRoof, matRoad, matLeaf, matCar, matWater, matFar];
     const treeKit = buildTreeKit(), carGeo = buildCarGeo();
+    /* painted trees (tree-kit.js) in one LOD-sorted, frustum-culled pool for the whole route (tree-field.js); the chunks only hand over their per-species lists */
+    let treeFieldKit = null, treeField = null;
+    try {
+      if (TS.treeKit && TS.treeField) {
+        treeFieldKit = TS.treeKit.create({ decorate: (m) => withSnow(m, 0.55), antialias: quality !== 'low' });
+        treeField = TS.treeField.create({ parent: root, kit: treeFieldKit, quality, shadows: !!Q.shadow });
+      }
+    } catch (e) { console.warn(TAG + 'tree field failed, using the plain trees', e); treeField = null; treeFieldKit = null; }
 
     /* --- shared grid mesher (draped quads with smooth normals) --- */
     function addGrid(mb, grid, uvFn, colorFn, lift) {
@@ -1230,8 +1241,14 @@ window.TS = window.TS || {};
         blades.position.set(0, 89.5, 6.2); group.add(hubG); turbines.push({ spin: blades, speed: 0.9 + rng() * 0.6, group: hubG });
       }
       const hubs = [];
+      if (treeField) { // species handled by the tree field leave the chunk's own instancing (the field keeps one pooled mesh per species and LOD for the whole route)
+        const mine = {}; let some = false;
+        for (const name of Object.keys(trees)) if (treeField.has(name) && trees[name].length) { mine[name] = trees[name]; some = true; }
+        if (some) treeField.add(k, mine);
+      }
       for (const name of Object.keys(trees)) {
         const list = trees[name]; if (!list.length) continue;
+        if (treeField && treeField.has(name)) continue;
         const im = new T.InstancedMesh(treeKit[name], name === 'lampHead' ? matLamp : matLeaf, list.length), m = new T.Matrix4(), q = new T.Quaternion();
         list.forEach((t, i) => { q.setFromAxisAngle(UP, t.rot); m.compose(TMP_P.set(t.x, t.y, t.z), q, TMP_S.set(t.sc, t.sc * (0.92 + 0.16 * hash2(i, k)), t.sc)); im.setMatrixAt(i, m); im.setColorAt(i, t.tint); });
         im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
@@ -1520,6 +1537,7 @@ window.TS = window.TS || {};
 
     function disposeChunk(c) {
       root.remove(c.group);
+      if (treeField) treeField.remove(c.k);
       c.group.traverse(o => {
         if (o.isInstancedMesh) o.dispose();
         else if (o.isMesh && o.geometry) { o.geometry.dispose(); const wi = waterMeshes.indexOf(o); if (wi >= 0) waterMeshes.splice(wi, 1); }
@@ -1605,6 +1623,7 @@ window.TS = window.TS || {};
       if (carList.length) updateCars(dt);
       if (crossTraffic) crossTraffic.update(dt, s, camera);
       if (surround) surround.update(s);
+      if (treeField) treeField.update(camera || null, dt);
       firstUpdate = false;
     }
 
@@ -1627,6 +1646,7 @@ window.TS = window.TS || {};
       if (surround) surround.dispose();
       scene.remove(root);
       root.traverse(o => { if (o.isMesh || o.isPoints || o.isLine) { if (!o.isInstancedMesh || o === carMesh) { if (o.geometry && o.geometry !== carGeo) o.geometry.dispose(); } if (o.material && o.material.isShaderMaterial) o.material.dispose(); } });
+      if (treeField) treeField.dispose(); if (treeFieldKit) treeFieldKit.dispose();
       occ.dispose(); carGeo.dispose(); Object.keys(treeKit).forEach(n => treeKit[n].dispose()); carMesh.dispose();
       holeMat.dispose(); mats.forEach(m => m.dispose()); skyMat.dispose(); sun.shadow && sun.shadow.map && sun.shadow.map.dispose();
       if (scene.fog === ownFog) scene.fog = prevFog || null;
@@ -1649,7 +1669,7 @@ window.TS = window.TS || {};
     const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
 
     setWeather('clear', true); setTimeOfDay(12);
-    return { update, setTimeOfDay, setWeather, setCrossing, setHoleMode, terrainMeshes, groundHeightAt, farMeshes: () => [farL1.mesh, farL2.mesh], stripWidth: W, crossingTraffic: () => crossTraffic, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
+    return { update, setTimeOfDay, setWeather, setCrossing, setHoleMode, terrainMeshes, groundHeightAt, farMeshes: () => [farL1.mesh, farL2.mesh], stripWidth: W, crossingTraffic: () => crossTraffic, treeField: () => treeField, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
   }
 
   TS.landscape = { create, CHUNK };
