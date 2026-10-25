@@ -244,12 +244,9 @@
       if (pts.length < 2) return;
       if (road.kind === 'gravel') {
         ribbon(gravel, pts, -road.hw, road.hw, 0, (p) => { const k = 0.9 + 0.1 * Math.sin(p.u * 0.37 + p.x); return [k, k, k]; }, 4);
-        const e = road.joint === 'start' ? pts[0] : pts[pts.length - 1];
-        if (road.role === 'tail') {
-          const far = road.joint === 'start' ? pts[pts.length - 1] : pts[pts.length - 1];
-          disc(gravel, far.x, far.z, far.yT + lift, 4.2, [0.95, 0.95, 0.95]);
-        }
-        void e;
+        // turning places at the dead ends of a gravel lane
+        if (road.role === 'tail') disc(gravel, pts[pts.length - 1].x, pts[pts.length - 1].z, pts[pts.length - 1].yT + lift, PAD_RADIUS, [0.95, 0.95, 0.95]);
+        else if (road.role === 'parallel') [pts[0], pts[pts.length - 1]].forEach((e) => disc(gravel, e.x, e.z, e.yT + lift, PAD_RADIUS, [0.95, 0.95, 0.95]));
         return;
       }
       const junction = junctionOf(road);

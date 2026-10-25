@@ -14,6 +14,7 @@
 
   const LANE_OFFSET = 1.45;            // lane centre from the road centre line
   const BIKE_OFFSET = 2.15;
+  const NARROW_OFFSET = 0.75;           // lane centre on a 3 m wide gravel lane
   const STOP_LINE_FROM_RAIL = 8.2;     // metres beyond the outer rail where the stop line lies
   const ZONE_END_FROM_RAIL = 8.2;      // the crossing zone ends this far beyond the other outer rail
   const PATH_STEP = 2.0;
@@ -202,7 +203,9 @@
             [fromMinus, fromPlus].forEach((seg) => {
               if (seg.length < 3) return;
               const pts = seg.map((p) => ({ x: p.x, y: p.yT + plan.ROAD_LIFT, z: p.z }));
-              arms.push(pts.concat([jct], crossRev));
+              const arm = pts.concat([jct], crossRev);
+              arm.narrow = !!sideInfo.lane;      // a gravel lane is 3 m wide: vehicles keep nearer its middle
+              arms.push(arm);
             });
           }
         } else if (sideInfo.type === 'bend') {
@@ -248,7 +251,8 @@
             const straight = crossLine(from);
             const outPts = armOut.slice().reverse();                 // crossing → far end
             const centreLine = armIn.concat(straight.slice(1), outPts.slice(1));
-            const lane = laneOf(centreLine, LANE_OFFSET);
+            const narrow = armIn.narrow || armOut.narrow;
+            const lane = laneOf(centreLine, narrow ? NARROW_OFFSET : LANE_OFFSET);
             const bikeLane = laneOf(centreLine, BIKE_OFFSET);
             /* the stop line and the end of the crossing zone, as arc lengths: the nearest path points to the lat positions on the straight */
             const atLat = (lat, startIdx) => {

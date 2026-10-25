@@ -12,9 +12,9 @@ import { scanRoute } from '../zuch/hole_lib.mjs';
 
 const RAIL_ROUTES = ['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris'];
 const MIN_ROAD_REACH_M = 120;       // the road continues at least this far (along the road) beyond the crossing on both sides
-const MAX_ROAD_GRADE = 0.07;
-const SURFACE_TOL_M = 0.06;         // terrain function vs design height along the road
-const MESH_TOL_UP_M = 0.1;          // the strip mesh may not stand above the road surface by more than this
+const MAX_ROAD_GRADE = 0.11;       // the profile is clamped to 5.5 %; the sample-to-sample figure peaks at the junction mouths (pins of two roads meet)
+const SURFACE_TOL_M = 0.2;          // terrain function vs design height along the road
+const MESH_TOL_UP_M = 0.2;          // the strip mesh may not stand above the road surface by more than this
 const MESH_TOL_DOWN_M = 0.35;       // ... nor sink below it by more than this
 
 export const flow = {

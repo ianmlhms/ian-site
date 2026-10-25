@@ -40,7 +40,8 @@
   const BEND_R = 26;               // radius of a road that bends into the parallel road
   const LANE_LEN = 70;             // the asphalt ends in a gravel lane of this length
   const SMOOTH_R = 5;              // blur radius of the natural height (samples)
-  const START_RAMP = 22;           // m over which the profile joins the crossing level
+  const MAX_GRADE = 0.055;         // steepest road profile (5.5 %)
+  const START_RAMP = 40;           // m over which the profile joins the crossing level
   const INFLUENCE = 40;            // bounding box margin of a road for the terrain adjustment
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -143,7 +144,8 @@
     }
     const probe = { d: 0, y: 0, u: 0, hw: 0, road: null };
     function adjust(x, z, h) {
-      let out = h;
+      /* the nearest road (largest weight) decides: roads that overlap at a junction have the same height there, so the order does not matter */
+      let bestW = 0; let bestY = 0;
       for (let i = 0; i < roads.length; i++) {
         const r = roads[i]; const b = r.box;
         if (x < b.x0 || x > b.x1 || z < b.z0 || z > b.z1) continue;
@@ -151,11 +153,11 @@
         if (!q) continue;
         const inner = q.hw + SHOULDER + FLAT_EXTRA;
         if (q.d >= inner + BLEND_MAX) continue;
-        const blendLen = clamp(BLEND_MIN + Math.abs(out - q.y) * SLOPE_RUN, BLEND_MIN, BLEND_MAX);
+        const blendLen = clamp(BLEND_MIN + Math.abs(h - q.y) * SLOPE_RUN, BLEND_MIN, BLEND_MAX);
         const w = 1 - smooth01((q.d - inner) / blendLen);
-        if (w > 0) out = lerp(out, q.y, w);
+        if (w > bestW) { bestW = w; bestY = q.y; }
       }
-      return out;
+      return bestW > 0 ? lerp(h, bestY, bestW) : h;
     }
     /* design height of the road surface at a world point close to a road (null = none within the cross section) */
     function surfaceAt(x, z, margin) {
@@ -252,10 +254,10 @@
       const l0 = sd > 0 ? lHi : lLo;
       return make('x' + index + (sd > 0 ? 'r' : 'l'), kindName, hw, kindName === 'asphalt', straightLine(0, l0, 0, endsAt), 'cross');
     };
-    const parallelRoad = (id, sd, j, qa, qb, hwP, withLane) => {
+    const parallelRoad = (id, sd, j, qa, qb, hwP, withLane, kindName) => {
       /* asphalt from a = qa to a = qb along l = j; both ends optionally continue as a gravel lane of LANE_LEN m */
       const a0 = qa; const a1 = qb;
-      const main = make(id, 'asphalt', hwP, true, straightLine(a0, j, a1, j), 'parallel');
+      const main = make(id, kindName || 'asphalt', hwP, !kindName, straightLine(a0, j, a1, j), 'parallel');
       const extra = [];
       if (withLane) {
         if (a0 < -1) extra.push(make(id + 'm', 'gravel', HW_LANE, false, straightLine(a0, j, a0 - LANE_LEN, j), 'tail', id, 'start'));
@@ -314,36 +316,38 @@
         lats.push({ lat: j, s0: sc + Math.min(0, q * (R + run + LANE_LEN)) - 30, s1: sc + Math.max(0, q * (R + run + LANE_LEN)) + 30 });
         info.sides[k].bendQ = q;
       } else {
-        /* straight on as a field lane: asphalt up to the lateral position j (the lane starts), then gravel to the turning place */
-        const stop = Math.min(latMax - 4, Math.abs(j) + 22 + rng() * 14) * sd;
-        const road = make('f' + index, 'asphalt', HW_CROSS, true, straightLine(0, sd > 0 ? lHi : lLo, 0, j), 'cross');
-        polylines.push(road);
-        polylines.push(make('f' + index + 'g', 'gravel', HW_LANE, false, straightLine(0, j, 0, stop), 'tail', 'f' + index, 'end'));
-        info.sides[k].stop = stop;
+        /* a field lane: the road meets a gravel track that runs along the line (both ways); the asphalt ends at the track */
+        const hwPar = HW_LANE;
+        const qa = -Math.min(maxA(-1), 110 + rng() * 120);
+        const qb = Math.min(maxA(1), 110 + rng() * 120);
+        polylines.push(crossRoad(sd, j, j - sd * (hwPar + 0.05), HW_CROSS, 'asphalt'));
+        parallelRoad('p' + index + (sd > 0 ? 'r' : 'l'), sd, j, qa, qb, hwPar, false, 'gravel').forEach((p) => polylines.push(p));
+        lats.push({ lat: j, s0: sc + qa - 30, s1: sc + qb + 30 });
+        info.sides[k].type = 'T';
+        info.sides[k].lane = true;
       }
     });
 
     /* ---- sample, project to the world, design height */
     const made = polylines.map((p) => finishPolyline(p, ctx, world, frameOf, sc));
-    /* profile: parallel roads first (they only follow the natural ground), then the cross / bending roads (joined to the crossing level at the start and,
-       for a T, to the height of the road they end on), then the gravel tails (joined to the end of the road they continue) */
-    made.filter((r) => r.role === 'parallel').forEach((r) => profile(r, ctx, null, null));
-    made.filter((r) => r.role === 'cross' || r.role === 'bend').forEach((r) => {
-      let endY = null;
-      if (r.role === 'cross') {
-        const end = r.pts[r.pts.length - 1];
-        let bd = Infinity;
-        made.forEach((other) => {
-          if (other.role !== 'parallel') return;
-          other.pts.forEach((p) => { const d = Math.hypot(p.x - end.x, p.z - end.z); if (d < bd && d < 8) { bd = d; endY = p.yT; } });
-        });
+    /* profile: the cross / bending roads first (pinned to the crossing level at the start, free end), then the parallel roads (pinned to the height the
+       cross road arrives with at the junction), then the gravel tails (pinned to the end of the road they continue) */
+    made.filter((r) => r.role === 'cross' || r.role === 'bend').forEach((r) => profile(r, ctx, [{ u: 0, y: formY }]));
+    made.filter((r) => r.role === 'parallel').forEach((r) => {
+      const cross = made.find((m) => m.role === 'cross' && m.id.slice(1) === r.id.slice(1));
+      const pins = [];
+      if (cross) {
+        const end = cross.pts[cross.pts.length - 1];
+        let bi = 0; let bd = Infinity;
+        r.pts.forEach((p, i) => { const d = Math.hypot(p.x - end.x, p.z - end.z); if (d < bd) { bd = d; bi = i; } });
+        pins.push({ u: r.pts[bi].u, y: end.yT });
       }
-      profile(r, ctx, formY, endY);
+      profile(r, ctx, pins);
     });
     made.filter((r) => r.role === 'tail').forEach((r) => {
       const parent = made.find((m) => m.id === r.parent);
       const pj = parent ? (r.joint === 'start' ? parent.pts[0] : parent.pts[parent.pts.length - 1]) : null;
-      profile(r, ctx, pj ? pj.yT : null, null);
+      profile(r, ctx, pj ? [{ u: 0, y: pj.yT }] : []);
     });
     made.forEach((r) => roadsOut.push(r));
 
@@ -374,16 +378,18 @@
 
   /* design height of the terrain under the road: the natural ground smoothed over ~30 m, joined to the crossing level at the start
      and (when given) to the height of the road it ends on at the end.  The drawn road lies ROAD_LIFT above it. */
-  function profile(r, ctx, startConstraint, endConstraint) {
+  function profile(r, ctx, pins) {
     const nat = r.pts.map((q) => ctx.baseHeightAt(q.x, q.z));
     const sm = blur(nat, SMOOTH_R);
-    const L = r.len;
+    const nearest = (u) => { let bi = 0; let bd = Infinity; r.pts.forEach((q, i) => { const d = Math.abs(q.u - u); if (d < bd) { bd = d; bi = i; } }); return bi; };
+    const corr = pins.map((pn) => ({ u: pn.u, y: pn.y, d: pn.y - sm[nearest(pn.u)] }));
+    const raw = r.pts.map((q, i) => { let y = sm[i]; corr.forEach((c) => { y += c.d * (1 - smooth01(Math.abs(q.u - c.u) / START_RAMP)); }); return y; });
+    /* never steeper than MAX_GRADE from a pinned height: the profile is clamped into the cone of grades that radiates from every pin */
     r.pts.forEach((q, i) => {
-      let y = sm[i];
-      if (startConstraint !== null && startConstraint !== undefined) y += (startConstraint - sm[0]) * (1 - smooth01(q.u / START_RAMP));
-      if (endConstraint !== null && endConstraint !== undefined) y += (endConstraint - sm[sm.length - 1]) * smooth01((q.u - (L - START_RAMP)) / START_RAMP);
+      let lo = -Infinity; let hi = Infinity;
+      pins.forEach((pn) => { lo = Math.max(lo, pn.y - MAX_GRADE * Math.abs(q.u - pn.u)); hi = Math.min(hi, pn.y + MAX_GRADE * Math.abs(q.u - pn.u)); });
       q.nat = nat[i];
-      q.yT = y;
+      q.yT = pins.length ? (lo > hi ? (lo + hi) / 2 : clamp(raw[i], lo, hi)) : raw[i];
     });
   }
 
