@@ -1,0 +1,40 @@
+[
+  {
+    "id": "hallerbach-flow",
+    "grade": "blue",
+    "name": {
+      "lb": "Hallerbaach-Flow",
+      "de": "Hallerbach-Flow",
+      "en": "Hallerbach Flow",
+      "fr": "Flow du Hallerbach"
+    },
+    "blurb": {
+      "lb": "Fléissend duerch d'Schlucht vun der Haller",
+      "de": "Flüssig durch die Schlucht der Haller",
+      "en": "Flowing through the Haller gorge",
+      "fr": "Fluide à travers les gorges de la Haller"
+    },
+    "via": [
+      [
+        1330,
+        1640
+      ],
+      [
+        2250,
+        1650
+      ],
+      [
+        2390,
+        1890
+      ],
+      [
+        3000,
+        1790
+      ],
+      [
+        3380,
+        1810
+      ]
+    ]
+  }
+]
