@@ -96,7 +96,8 @@
     const inside = [X(lm), (H + FORM_Y) / 2, zm];   // inside the slab: quadO turns every face away from it (the kerb towards the track, the top upwards)
     const yK0 = H - KERB_TEX_H + 0.06, yK1 = H - 0.015;
     // kerb face towards the track: u runs along z (one unit per KERB_UNIT), v 0 (bottom) .. 1 (top)
-    quadO(kerb, [X(lA), yK0, z0], [X(lA), yK0, z1], [X(lA), yK1, z1], [X(lA), yK1, z0], inside, WHITE, [[0, 0], [len / KERB_UNIT, 0], [len / KERB_UNIT, (yK1 - yK0) / KERB_TEX_H], [0, (yK1 - yK0) / KERB_TEX_H]]);
+    const lK = lA - dir * 0.015;     // a hair in front of the slab body (no z-fight)
+    quadO(kerb, [X(lK), yK0, z0], [X(lK), yK0, z1], [X(lK), yK1, z1], [X(lK), yK1, z0], inside, WHITE, [[0, 0], [len / KERB_UNIT, 0], [len / KERB_UNIT, (yK1 - yK0) / KERB_TEX_H], [0, (yK1 - yK0) / KERB_TEX_H]]);
     // below the unit: ballast-side concrete down to the formation
     vc.box(X(lA + dir * 0.02), (yK0 + FORM_Y) / 2, zm, 0.04, yK0 - FORM_Y, len, col('#76726a'));
     // cap (the light edge strip) and the paving
