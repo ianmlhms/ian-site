@@ -23,6 +23,7 @@
   const D0_BASE = 7.5; // flat formation half-width
   const D0_RAIL = 10.5; // rail: the second main track + its ballast and masts need the formation to reach 8 m on one side
   const D0_STATION = 26;
+  const PASS_LIMIT = 110; // km/h through a station the service does not stop at
   const STATION_MASK_PAD = 14;
   const GRADE_SCALE = 2.4; // authored grades are scaled so the hills read in a short compressed route
   const GRADE_MAX = { rail: 0.025, hst: 0.035, tram: 0.06 };
@@ -140,7 +141,8 @@
         stationCount += 1;
         if (it.biome) biome = it.biome;
         result.biomes.push({ s, biome });
-        result.limitsRaw.push({ s, kmh: Math.min(cruise, sd.stationLimit), station: true });
+        const passing = (def.passNames || []).includes(it.name);   // an express runs through this station at line speed
+        result.limitsRaw.push({ s, kmh: Math.min(cruise, passing ? PASS_LIMIT : sd.stationLimit), station: true });
         result.items.push({ t: 'station', s0: s, s1: s + len, kappa: 0, g: 0 });
       } else {
         len = it.len;
@@ -332,7 +334,7 @@
     const length = comp.length;
     const n = Math.floor(length / STEP) + 1;
     const smoothing = SMOOTH[kind] || SMOOTH.rail;
-    const noise = makeNoise(hashString(def.id));
+    const noise = makeNoise(hashString(def.sceneryId || def.id));   // routes that share a line (sceneryId) share their ground and scenery
 
     // station mask: 1 inside a station zone, fading out (used to force straight + level + wide flat ground)
     const stationMask = new Float64Array(n);
@@ -717,7 +719,7 @@
     if (kind !== 'tram' && comp.crossings.length && window.TS.crossingRoads) {
       try {
         roadPlan = window.TS.crossingRoads.plan({
-          id: def.id, length, crossings: comp.crossings, frameAt, baseHeightAt: terrainBaseHeightAt, formationDrop,
+          id: def.sceneryId || def.id, length, crossings: comp.crossings, frameAt, baseHeightAt: terrainBaseHeightAt, formationDrop,
           secondLat: (s) => (second ? second.lat(s) : 0), tunnels: comp.tunnels, bridges, stations, water,
         });
       } catch (error) {
@@ -728,8 +730,12 @@
     const terrainHeightAt = roadPlan ? (x, z) => roadPlan.adjust(x, z, terrainBaseHeightAt(x, z)) : terrainBaseHeightAt;
     const isReservedWithRoads = roadPlan ? (x, z) => isReserved(x, z) || roadPlan.reserved(x, z, 1.5) : isReserved;
 
+    const passFixed = stations.map((st, i) => (i > 0 && i < stations.length - 1 && (def.passNames || []).includes(st.name) ? i : -1)).filter((i) => i >= 0);
+
     return {
       id: def.id,
+      sceneryId: def.sceneryId || def.id,
+      passFixed,
       kind,
       def,
       length,
@@ -861,7 +867,7 @@
       return Object.assign({}, p, { sideSign: st.side === 'right' ? 1 : -1, s0: st.platformStart, s1: st.platformEnd, sMarker: st.s, exits: p.exits.map((e) => ({ s: L - e.s, lat: e.lat })) });
     };
     const out = Object.assign({}, base, {
-      id: o.id || base.id, def: o.def || base.def, base, reverse: true, baseS: (s) => L - s, frameAt, stations, signals, tunnels, bridges, crossings, inTunnel, bridgeAt, stationAt,
+      id: o.id || base.id, def: o.def || base.def, base, reverse: true, passFixed: (base.passFixed || []).map((i) => n - 1 - i).sort((a, b) => a - b), baseS: (s) => L - s, frameAt, stations, signals, tunnels, bridges, crossings, inTunnel, bridgeAt, stationAt,
       limits: mirrorLimits(base.limits, L, base.kind, o.minLenAt), platformInfo,
       biomeAt: (s) => base.biomeAt(L - s),
       nearest, nearestS: (x, z) => nearest(x, z).s, distanceToTrack: (x, z) => nearest(x, z).d,

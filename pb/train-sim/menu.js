@@ -213,9 +213,10 @@
   const FALLBACK_ROUTES = {
     west: { name: { lb: 'Lëtzebuerg – Klengbetten', de: 'Luxemburg – Kleinbettingen', en: 'Luxembourg – Kleinbettingen' }, n: 5, km: 16, kind: 'rail' },
     south: { name: { lb: 'Lëtzebuerg – Esch – Rodange', de: 'Luxemburg – Esch – Rodange', en: 'Luxembourg – Esch – Rodange' }, n: 9, km: 38, kind: 'rail' },
-    east: { name: { lb: 'Lëtzebuerg – Waasserbëlleg', de: 'Luxemburg – Wasserbillig', en: 'Luxembourg – Wasserbillig' }, n: 7, km: 28, kind: 'rail' },
+    east: { name: { lb: 'Lëtzebuerg – Waasserbëlleg', de: 'Luxemburg – Wasserbillig', en: 'Luxembourg – Wasserbillig' }, n: 10, km: 37, kind: 'rail' },
+    wittlich: { name: { lb: 'Lëtzebuerg – Tréier – Wittlech', de: 'Luxemburg – Trier – Wittlich', en: 'Luxembourg – Trier – Wittlich' }, n: 21, km: 100, kind: 'rail' },
     north: { name: { lb: 'Lëtzebuerg – Ettelbréck – Clierf', de: 'Luxemburg – Ettelbrück – Clervaux', en: 'Luxembourg – Ettelbruck – Clervaux' }, n: 9, km: 63, kind: 'rail' },
-    trier: { name: { lb: 'Lëtzebuerg – Tréier – Koblenz', de: 'Luxemburg – Trier – Koblenz', en: 'Luxembourg – Trier – Koblenz' }, n: 7, km: 190, kind: 'rail' },
+    trier: { name: { lb: 'Lëtzebuerg – Tréier – Koblenz', de: 'Luxemburg – Trier – Koblenz', en: 'Luxembourg – Trier – Koblenz' }, n: 12, km: 190, kind: 'rail' },
     metz: { name: { lb: 'Lëtzebuerg – Metz – Nancy', de: 'Luxemburg – Metz – Nancy', en: 'Luxembourg – Metz – Nancy' }, n: 6, km: 150, kind: 'rail' },
     brussels: { name: { lb: 'Lëtzebuerg – Arlon – Bréissel', de: 'Luxemburg – Arlon – Brüssel', en: 'Luxembourg – Arlon – Brussels' }, n: 6, km: 220, kind: 'rail' },
     paris: { name: { lb: 'TGV Lëtzebuerg – Paris-Est', de: 'TGV Luxemburg – Paris-Est', en: 'TGV Luxembourg – Paris-Est' }, n: 4, km: 370, kind: 'hst' },
@@ -229,7 +230,7 @@
     return {
       id,
       name: live && live.name ? pick(live.name) : pick(fb.name),
-      stops: live && Array.isArray(live.stations) ? live.stations.length : fb.n,
+      stops: live && Number.isFinite(live.stopCount) ? live.stopCount : live && Array.isArray(live.stations) ? live.stations.length : fb.n,
       km: km === null ? null : km,
       kind: live && live.kind ? live.kind : kindFromRule,
     };

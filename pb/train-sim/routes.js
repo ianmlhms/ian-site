@@ -71,7 +71,8 @@
     const defaults = STATION_DEFAULTS[def.kind];
     const stationLen = defaults.approachBefore + defaults.platformLen + defaults.approachAfter;
     const lengthM = layout.reduce((sum, it) => sum + (it.t === 'station' ? stationLen : it.len), 0);
-    return Object.freeze(Object.assign({ stationDefaults: defaults, stations, layout, lengthM }, def));
+    const passNames = Object.freeze((def.passNames || []).filter((n, i, all) => stations.indexOf(n) > 0 && stations.indexOf(n) < stations.length - 1 && all.indexOf(n) === i));
+    return Object.freeze(Object.assign({ stationDefaults: defaults, stations, layout, lengthM, stopCount: stations.length - passNames.length, sceneryId: def.id }, def, { passNames }));
   }
 
   /* ---------------------------------------------------------------- 1 west */
@@ -120,29 +121,6 @@
     ]
   );
 
-  /* ---------------------------------------------------------------- 3 east */
-  const east = makeRoute(
-    {
-      id: 'east', kind: 'rail', region: 'Ost', cruise: 120, biomes: ['city', 'suburb', 'farmland', 'forest', 'river'],
-      name: { lb: 'Lëtzebuerg – Wasserbëlleg', de: 'Luxemburg – Wasserbillig', en: 'Luxembourg – Wasserbillig' },
-    },
-    [
-      station('Lëtzebuerg', 3, 'right', 'city'),
-      ...leg(1300, 's200:v60:bcity r500/220:g0.3 s* l800/240:g0.8 s200:bsuburb'),
-      station('Sandweiler-Contern', 1, 'left', 'suburb'),
-      ...leg(1500, 's250:v120:bfarmland l1200/320:g-0.3 s*:X r900/280 s250'),
-      station('Oetrange', 1, 'right', 'farmland'),
-      ...leg(1500, 's250:bfarmland r1000/300:g-0.6 s*:v110 s260:T l1100/300 s200:X'),
-      station('Betzder', 1, 'left', 'farmland'),
-      ...leg(1500, 's250:bfarmland r900/280:g-0.9 s* s120:Br,7,w l800/280 s200'),
-      station('Manternach', 2, 'right', 'forest'),
-      ...leg(1600, 's250:bforest l900/300:g-0.7 s*:v100 r1000/280:bfarmland s200:X'),
-      station('Mertert', 1, 'left', 'river'),
-      ...leg(1500, 's300:v100:briver r1100/300:g-0.2 s* l1200/280 s250:v80'),
-      station('Wasserbëlleg', 2, 'right', 'river', true),
-    ]
-  );
-
   /* --------------------------------------------------------------- 4 north */
   const north = makeRoute(
     {
@@ -170,27 +148,94 @@
     ]
   );
 
-  /* --------------------------------------------------------------- 6 trier */
+  /* ------------------------------------------------- the Mosel line (east, wittlich, trier)
+   * Lëtzebuerg - Sandweiler-Contern - Oetrange - Munsbach - Roodt-Syr - Betzder - Wecker - Manternach - Mertert - Wasserbëlleg - Igel - Kreuz Konz -
+   * Tréier Süd - Tréier Hbf - Ehrang - Schweich - Föhren - Hetzerath - Sehlem - Salmtal - Wittlich - Cochem - Koblenz Hbf.
+   * The line is authored ONCE (moselBody); three services run on slices of it, so the curves, stations, crossings, bridges and scenery are identical
+   * wherever they share track (sceneryId 'mosel' seeds the landscape and the crossing roads).  east = up to Wasserbëlleg (all stops), wittlich = up to
+   * Wittlich (all stops, the RB 83 of the real timetable), trier = the whole line as an express: it runs through the stations in passNames at line speed.
+   * See pb/train-sim/REAL-LINES.md for the real stop list and its sources. */
+  const MOSEL_PASS_LIMIT = 110;
+  const moselBody = [
+    station('Lëtzebuerg', 3, 'right', 'city'),
+    ...leg(1500, 's120:v60:bcity r450/220:g0.3 s230:bsuburb:v90 l900/260:bfarmland s*:v110'),
+    station('Sandweiler-Contern', 1, 'left', 'suburb'),
+    ...leg(1000, 's180:v110:bfarmland r1300/260:g-0.2 s*:X l1000/200 s120'),
+    station('Oetrange', 1, 'right', 'farmland'),
+    ...leg(1000, 's150:bfarmland l900/240:g0.5 s*:v100:bsuburb r800/200 s100'),
+    station('Munsbach', 1, 'left', 'suburb'),
+    ...leg(1300, 's150:bsuburb r700/260:g-0.4 s*:bforest l800/280:g0.6 s*:X r900/220 s120'),
+    station('Roodt-Syr', 1, 'right', 'forest'),
+    ...leg(1150, 's150:bforest l900/260:g0.3 s*:Br,6,w r1000/240 s120:bfarmland'),
+    station('Betzder', 1, 'left', 'farmland'),
+    ...leg(900, 's120:bfarmland r1100/240 s*:X l1200/200 s100'),
+    station('Wecker', 1, 'left', 'farmland'),
+    ...leg(850, 's120 l1000/230:g-0.3 s* r900/200 s100'),
+    station('Manternach', 2, 'right', 'forest'),
+    ...leg(1100, 's150:bforest r1000/260:g-0.4 s*:Br,7,w l900/240 s120:briver'),
+    station('Mertert', 1, 'left', 'river'),
+    ...leg(800, 's120:briver l1300/220 s*:v90 r900/180 s80'),
+    station('Wasserbëlleg', 2, 'right', 'river'),
+    ...leg(1200, 's150:v80:briver s*:Bs,9,w r1000/260:g0.2 s*:v100 l900/220 s120'),
+    station('Igel', 1, 'right', 'river'),
+    ...leg(1300, 's150:briver r1200/260 s*:X l1100/240:bsuburb s*:v100 r900/200 s100'),
+    station('Kreuz Konz', 1, 'left', 'suburb'),
+    ...leg(1000, 's150 l800/240:bsuburb s*:Br,12,w r900/220:bcity s100'),
+    station('Tréier Süd', 1, 'right', 'city'),
+    ...leg(800, 's120:v70:bcity r500/180 s*:v60 l600/150 s60'),
+    station('Tréier Hbf', 3, 'right', 'city'),
+    ...leg(1300, 's150:v60:bcity l700/220 s*:v90:bsuburb r800/250:briver s*:X l900/200 s100'),
+    station('Ehrang', 1, 'left', 'industrial'),
+    ...leg(1300, 's150:v100:bindustrial r900/260:briver s*:v120:bvineyard l1000/260 s*:X r900/200 s100'),
+    station('Schweich', 1, 'left', 'vineyard'),
+    ...leg(1000, 's150:bvineyard l1100/240 s*:X:bfarmland r1000/200 s100'),
+    station('Föhren', 1, 'right', 'farmland'),
+    ...leg(900, 's120:bfarmland r900/220 s*:X l1000/200 s100'),
+    station('Hetzerath', 1, 'left', 'farmland'),
+    ...leg(800, 's120 l900/200:g0.4 s*:bforest r800/180 s80'),
+    station('Sehlem', 1, 'right', 'forest'),
+    ...leg(800, 's120:bforest r800/200:g0.3 s* l900/180 s80:bfarmland'),
+    station('Salmtal', 1, 'left', 'farmland'),
+    ...leg(1600, 's150:bfarmland l1000/260 s*:X r1100/280:g-0.4 s*:v100 l900/220:bsuburb s150'),
+    station('Wittlich', 2, 'right', 'farmland'),
+    ...leg(2200, 's300:v120:bvineyard l1000/300:g-0.5 s*:v140 s560:T:v120 r900/320 s*'),
+    station('Cochem', 2, 'left', 'vineyard'),
+    ...leg(1800, 's300:v120:briver r1000/320 s*:v140 l1100/300:bsuburb s200:v100:bcity'),
+    station('Koblenz Hbf', 3, 'right', 'city'),
+  ];
+  const moselSlice = (lastStation) => {
+    const end = moselBody.findIndex((it) => it.t === 'station' && it.name === lastStation);
+    return moselBody.slice(0, end + 1).map((it, i, all) => (i === all.length - 1 ? Object.assign({}, it, { terminus: true }) : it));
+  };
+  const MOSEL_BIOMES = ['city', 'suburb', 'farmland', 'forest', 'river', 'vineyard', 'industrial'];
+  const MOSEL_STOPS_TRIER = ['Lëtzebuerg', 'Sandweiler-Contern', 'Wasserbëlleg', 'Igel', 'Kreuz Konz', 'Tréier Süd', 'Tréier Hbf', 'Schweich', 'Föhren', 'Wittlich', 'Cochem', 'Koblenz Hbf'];
+
+  /* ---------------------------------------------------------------- 3 east (all stops, ends at Wasserbëlleg) */
+  const east = makeRoute(
+    {
+      id: 'east', kind: 'rail', region: 'Ost', cruise: 120, biomes: MOSEL_BIOMES, sceneryId: 'mosel',
+      name: { lb: 'Lëtzebuerg – Wasserbëlleg', de: 'Luxemburg – Wasserbillig', en: 'Luxembourg – Wasserbillig' },
+    },
+    moselSlice('Wasserbëlleg')
+  );
+
+  /* ------------------------------------------------- 3b wittlich (all stops, the RB 83) */
+  const wittlich = makeRoute(
+    {
+      id: 'wittlich', kind: 'rail', region: 'Ost', cruise: 120, biomes: MOSEL_BIOMES, sceneryId: 'mosel',
+      name: { lb: 'Lëtzebuerg – Tréier – Wittlech', de: 'Luxemburg – Trier – Wittlich', en: 'Luxembourg – Trier – Wittlich' },
+    },
+    moselSlice('Wittlich')
+  );
+
+  /* --------------------------------------------------------------- 6 trier (express: RE 11 + RE 1 to Koblenz) */
   const trier = makeRoute(
     {
-      id: 'trier', kind: 'rail', region: 'Däitschland', cruise: 140, biomes: ['city', 'suburb', 'farmland', 'river', 'vineyard'],
+      id: 'trier', kind: 'rail', region: 'Däitschland', cruise: 140, biomes: MOSEL_BIOMES, sceneryId: 'mosel',
       name: { lb: 'Lëtzebuerg – Tréier – Koblenz', de: 'Luxemburg – Trier – Koblenz', en: 'Luxembourg – Trier – Koblenz' },
+      passNames: moselBody.filter((it) => it.t === 'station' && !MOSEL_STOPS_TRIER.includes(it.name)).map((it) => it.name),
     },
-    [
-      station('Lëtzebuerg', 3, 'right', 'city'),
-      ...leg(2400, 's300:v60:bcity r600/260 s*:v120:bsuburb l1200/320:g-0.8 s500:bfarmland:v140 r1500/300 s*:X'),
-      station('Wasserbëlleg', 2, 'left', 'river'),
-      ...leg(1800, 's300:v100:briver r1400/300 s*:v140 s140:Br,9,w l1300/300:bsuburb s200:v100:bcity'),
-      station('Tréier Hbf', 3, 'right', 'city'),
-      ...leg(1600, 's300:v100:bcity l1200/320:bsuburb s*:v140:briver r1400/300:bvineyard s*:v120'),
-      station('Schweich', 1, 'left', 'vineyard'),
-      ...leg(2000, 's300:v120:bvineyard r1100/320 s*:v140 l1000/320 s200:X:v120'),
-      station('Wittlich', 2, 'right', 'farmland'),
-      ...leg(2200, 's300:v120:bvineyard l1000/300:g-0.5 s*:v140 s560:T:v120 r900/320 s*'),
-      station('Cochem', 2, 'left', 'vineyard'),
-      ...leg(1800, 's300:v120:briver r1000/320 s*:v140 l1100/300:bsuburb s200:v100:bcity'),
-      station('Koblenz Hbf', 3, 'right', 'city', true),
-    ]
+    moselSlice('Koblenz Hbf')
   );
 
   /* ---------------------------------------------------------------- 7 metz */
@@ -252,7 +297,7 @@
     ]
   );
 
-  const list = [west, south, east, north, trier, metz, brussels, paris];
+  const list = [west, south, east, wittlich, north, trier, metz, brussels, paris];
 
   /* Return direction: every route can also be driven the other way. The id of that direction is `<routeId>~r`; it is derived here (same
      ownership / price / career as the forward route, see TS.routeDir). TS.track.build(def) understands def.reverse + def.base. */

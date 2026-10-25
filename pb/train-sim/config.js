@@ -103,6 +103,7 @@
     west: Object.freeze({ price: 0, needs: Object.freeze(['rail']), fareBase: 20 }),
     south: Object.freeze({ price: 1800, needs: Object.freeze(['rail']), fareBase: 26 }),
     east: Object.freeze({ price: 9000, needs: Object.freeze(['rail']), fareBase: 24 }),
+    wittlich: Object.freeze({ price: 12000, needs: Object.freeze(['rail']), fareBase: 34 }),
     north: Object.freeze({ price: 16000, needs: Object.freeze(['rail']), fareBase: 32 }),
     trier: Object.freeze({ price: 38000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 55 }),
     metz: Object.freeze({ price: 52000, needs: Object.freeze(['kiss', 'ic', 'hst']), fareBase: 50 }),
@@ -110,7 +111,7 @@
     paris: Object.freeze({ price: 140000, needs: Object.freeze(['hst']), fareBase: 120 }),
   });
   /* Fallback order if TS.routes isn't loaded. The Luxtram routes are appended by luxtram.js (tram career). */
-  const routeOrder = Object.freeze(['west', 'south', 'east', 'north', 'trier', 'metz', 'brussels', 'paris']);
+  const routeOrder = Object.freeze(['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris']);
 
   const economy = Object.freeze({
     farePerPassengerKm: 3, // plus routeRules[route].fareBase per delivered passenger

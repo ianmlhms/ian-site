@@ -652,7 +652,7 @@ window.TS = window.TS || {};
   function create(scene, track, opts) {
     const quality = opts && QUALITY[opts.quality] ? opts.quality : 'medium';
     const Q = QUALITY[quality];
-    const L = track.length, seedBase = hashString(String(track.id || 'route'));
+    const L = track.length, seedBase = hashString(String(track.sceneryId || track.id || 'route'));
     const riverSide = (seedBase & 1) ? 1 : -1;
     const root = new T.Group(); root.name = 'landscape'; scene.add(root);
     const chunks = new Map();

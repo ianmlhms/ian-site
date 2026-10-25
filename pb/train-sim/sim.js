@@ -109,12 +109,13 @@
   const EMPTY_PLAN = Object.freeze({ pattern: 'RB', pass: Object.freeze([]), tsr: Object.freeze([]), incidents: Object.freeze([]) });
   function planService(track, train, opts = {}) {
     const rng = opts.rng || Math.random, stations = track.stations || [], n = stations.length, base = sortedLimits(track);
-    if (opts.varied === false || (opts.services || 0) < 1 || n < 2) return EMPTY_PLAN;
+    const fixedPass = (track.passFixed || []).filter(i => i > 0 && i < n - 1);   // an express service (route.passNames): always runs through these stations
+    if (opts.varied === false || (opts.services || 0) < 1 || n < 2) return fixedPass.length ? Object.freeze({ ...EMPTY_PLAN, pattern: 'RE', pass: Object.freeze(fixedPass.slice()) }) : EMPTY_PLAN;
     const intermediate = [];
     for (let i = 1; i < n - 1; i++) intermediate.push(i);
     const isTram = (train && train.kind === 'tram') || track.kind === 'tram';
-    let pass = [];
-    if (!isTram && intermediate.length >= RE_MIN_INTERMEDIATE && rng() < (opts.reChance ?? RE_CHANCE)) {
+    let pass = fixedPass.slice();
+    if (!fixedPass.length && !isTram && intermediate.length >= RE_MIN_INTERMEDIATE && rng() < (opts.reChance ?? RE_CHANCE)) {
       const count = intermediate.length >= 5 && rng() < 0.5 ? 2 : 1, pool = intermediate.slice();
       while (pass.length < count && pool.length) pass.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
       pass.sort((a, b) => a - b);
