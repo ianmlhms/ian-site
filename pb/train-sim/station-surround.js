@@ -165,7 +165,7 @@
         const dist = Math.abs(p.sMid - s);
         if (!built.has(i) && dist < ACTIVE_RANGE) {
           try {
-            const rec = TS.stationSurroundMesh.build(p, { track, quality: opts.quality, materials: opts.materials || {}, EXT_X, EXT_Z, width: opts.width });
+            const rec = TS.stationSurroundMesh.build(p, { track, quality: opts.quality, materials: opts.materials || {}, EXT_X, EXT_Z, width: opts.width, treeField: opts.treeField || null });
             if (rec && rec.group) { opts.root.add(rec.group); built.set(i, rec); }
           } catch (error) {
             console.warn(TAG + 'build of ' + p.name + ' failed', error);

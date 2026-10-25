@@ -1664,7 +1664,7 @@ window.TS = window.TS || {};
     catch (e) { console.warn(TAG + 'crossing traffic failed', e); crossTraffic = null; }
     /* the real surroundings of stations (station-surround.js): painted ground, LOD2 buildings, trees, built near the player */
     let surround = null;
-    try { surround = track.surroundPatches && track.surroundPatches.length && TS.stationSurround ? TS.stationSurround.create({ root, track, quality, width: W, materials: { water: matWater } }) : null; }
+    try { surround = track.surroundPatches && track.surroundPatches.length && TS.stationSurround ? TS.stationSurround.create({ root, track, quality, width: W, materials: { water: matWater }, treeField }) : null; }
     catch (e) { console.warn(TAG + 'station surround failed', e); surround = null; }
     const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
 

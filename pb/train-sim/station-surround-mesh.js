@@ -273,6 +273,7 @@
     /* patch (x lateral, z along backwards) -> world */
     const world = (x, z) => { const f = frame(patch.sMid - z); return { x: f.x + f.rx * x, z: f.z + f.rz * x, form: f.y }; };
     const stats = { buildings: 0, trees: 0, tris: 0 };
+    let treeKey = null;
 
     /* ---- painted ground */
     {
@@ -394,7 +395,21 @@
     {
       const share = TREE_SHARE[quality] || 0.6;
       const list = (data.trees || []).filter((t, i) => Math.abs(t[0]) < stripW - 6 && hash2(i, 77) < share);
-      if (list.length) {
+      if (list.length && o.treeField) {
+        /* the pooled, LOD-sorted tree field (tree-field.js) draws them: LiDAR height / crown radius pick the species and the scale */
+        const lists = { oak: [], beech: [], spruce: [] }; const meta = o.treeField.meta;
+        list.forEach((t, i) => {
+          const w = world(t[0], t[1]); const y = track.terrainHeightAt(w.x, w.z) - 0.15;
+          const h = clamp(t[2], 3, 32); const r = clamp(t[3], 1.2, 9);
+          const conifer = t[3] / Math.max(1, t[2]) < 0.26;
+          const name = conifer ? 'spruce' : (r / h > 0.36 ? 'oak' : 'beech');
+          const sc = r / meta[name].r; const sy = clamp(h / (meta[name].h * sc), 0.6, 1.8);
+          const v = hash2(i, 41);
+          lists[name].push({ x: w.x, y, z: w.z, rot: hash2(i, 31) * 6.28, sc, sy, tint: { r: 0.9 + v * 0.2, g: 0.92 + v * 0.16, b: 0.88 + v * 0.18 } });
+        });
+        treeKey = 'surround:' + patch.name;
+        o.treeField.add(treeKey, lists); stats.trees += list.length;
+      } else if (list.length) {
         const blob = new T.IcosahedronGeometry(1, 1);
         const trunk = new T.CylinderGeometry(0.12, 0.2, 1, 6);
         const broad = mergeTree(blob, trunk, false); const cone = mergeTree(blob, trunk, true);
@@ -467,6 +482,7 @@
     return {
       group, stats,
       dispose() {
+        if (treeKey && o.treeField) o.treeField.remove(treeKey);
         group.traverse((obj) => { if (obj.isInstancedMesh) obj.dispose(); });
         disposables.forEach((d) => { if (d && d.dispose) d.dispose(); });
       },

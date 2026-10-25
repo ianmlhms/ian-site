@@ -14,7 +14,7 @@ window.TS = window.TS || {};
   const T = THREE;
   const ATLAS = 512;
   const TILES = { c0: [0, 0, 256, 256], c1: [256, 0, 256, 256], c2: [0, 256, 256, 256], bark: [256, 256, 128, 256], birch: [384, 256, 128, 256] };
-  const SPECIES = ['oak', 'beech', 'birch', 'spruce', 'poplar', 'bush'];
+  const SPECIES = ['oak', 'beech', 'birch', 'spruce', 'poplar', 'bush', 'tuft'];
 
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -253,6 +253,7 @@ window.TS = window.TS || {};
         addBlob(gb, { cx: b[0], cy: lod === 2 ? def.cy2 : b[1], cz: b[2], rx: b[3] * sc, ry: b[4] * sc, rz: b[5] * sc, detail, amp: lod === 0 ? 0.2 : 0.12, freq: 2.0, seed: i * 3.1 + def.seed, color: col, uv: uvOf, lift: 0.26 });
       });
       if (lod === 0) def.blobs.forEach((b, i) => addCards(gb, { cx: b[0], cy: b[1], cz: b[2], rx: b[3], ry: b[4], rz: b[5], count: Math.max(4, Math.round(def.density * ellipsoidArea(b[3], b[4], b[5]) * 0.9)), seed: i + def.seed, w0: def.card[0], w1: def.card[1], minY: -0.2, off: 0.97, lightC: def.crown, color: col }));
+      if (lod === 1) { const b = def.blobs[0]; addCards(gb, { cx: b[0], cy: b[1], cz: b[2], rx: b[3], ry: b[4], rz: b[5], count: Math.max(5, Math.round(def.density * 0.42 * ellipsoidArea(b[3], b[4], b[5]))), seed: def.seed + 40, w0: def.card[0] * 1.5, w1: def.card[1] * 1.7, minY: 0, off: 0.98, lightC: def.crown, color: col }); }
       return gb.geometry();
     };
     for (let lod = 0; lod < 3; lod++) out.push(mk(lod));
@@ -297,6 +298,25 @@ window.TS = window.TS || {};
     return out;
   }
 
+  /* grass tuft of the verge (cab-view texture): 3 blades near, 2 crossed quads mid, nothing far (meta.range) */
+  function tuftSpecies() {
+    const out = [], lo = C('#4a6f2a'), hi = C('#a3b45a');
+    const mk = (lod) => {
+      const gb = new GB(), uv = coreUv(0.5, 0.5), blades = lod === 0 ? [[0.12, 0, 0], [0.4, 2.1, 0.1], [-0.38, 4.2, -0.1]] : [[0.2, 0.4, 0], [-0.2, 2.2, 0]];
+      blades.forEach(([tilt, rot, off], i) => {
+        const h = 0.55 + i * 0.06, w = lod === 0 ? 0.09 : 0.12, sides = lod === 0 ? 3 : 2, cr = Math.cos(rot), sr = Math.sin(rot);
+        const rotY = (x, y, z) => [x * cr + z * sr, y, -x * sr + z * cr];
+        const ring = [];
+        for (let k = 0; k < sides; k++) { const a = (k / sides) * Math.PI * 2, q = rotY(off * 0.2 + Math.cos(a) * w, 0, Math.sin(a) * w); ring.push(gb.vert(q[0], q[1], q[2], 0, 1, 0, uv, lo)); }
+        const t = rotY(off * 0.2 - Math.sin(tilt) * h, Math.cos(tilt) * h, 0), tip = gb.vert(t[0], t[1], t[2], 0, 1, 0, uv, hi);
+        for (let k = 0; k < sides; k++) gb.tri(ring[k], tip, ring[(k + 1) % sides]);
+      });
+      return gb.geometry();
+    };
+    out.push(mk(0), mk(1), mk(1));
+    return out;
+  }
+
   const DEFS = {
     oak: { seed: 1, y0: 2.8, y1: 7.6, crown: [0, 4.9, 0], cy2: 4.8, farScale: 1.1, mid: 3, card: [1.7, 2.5], density: 0.5,
       trunk: { pts: [[0, 0, 0], [0, 0.5, 0], [0, 1.6, 0.05], [0, 3.0, 0.1]], radii: [0.52, 0.36, 0.28, 0.24] },
@@ -318,12 +338,15 @@ window.TS = window.TS || {};
       blobs: [[0, 0.62, 0, 1.0, 0.78, 1.0, 12], [0.7, 0.42, 0.2, 0.7, 0.56, 0.7, 6]] }
   };
   /* approximate height / crown radius of every species at scale 1 (the station patch maps LiDAR heights onto them) */
-  const META = { oak: { h: 8, r: 3.4 }, beech: { h: 8.7, r: 2.4 }, birch: { h: 7.7, r: 1.9 }, spruce: { h: 9, r: 2.2 }, poplar: { h: 12.6, r: 1.3 }, bush: { h: 1.4, r: 1.3 } };
+  const META = {
+    oak: { h: 8, r: 3.4 }, beech: { h: 8.7, r: 2.4 }, birch: { h: 7.7, r: 1.9 }, spruce: { h: 9, r: 2.2 }, poplar: { h: 12.6, r: 1.3 }, bush: { h: 1.4, r: 1.3 },
+    tuft: { h: 0.6, r: 0.4, range: [30, 80], noShadow: true },   // range: lod0 / lod1 distance at high quality (scaled with the quality), nothing beyond
+  };
 
   function create(opts) {
     const o = opts || {};
     const geos = {};
-    SPECIES.forEach((sp) => { geos[sp] = sp === 'spruce' ? spruceSpecies() : broadSpecies(sp, DEFS[sp]); });
+    SPECIES.forEach((sp) => { geos[sp] = sp === 'spruce' ? spruceSpecies() : sp === 'tuft' ? tuftSpecies() : broadSpecies(sp, DEFS[sp]); });
     const material = new T.MeshLambertMaterial({ map: atlas(), vertexColors: true, side: T.DoubleSide, alphaTest: 0.42 });
     if (o.antialias) material.alphaToCoverage = true;
     const decorated = o.decorate ? o.decorate(material) || material : material;

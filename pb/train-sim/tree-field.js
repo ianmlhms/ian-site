@@ -49,7 +49,7 @@ window.TS = window.TS || {};
       mesh.setColorAt(0, new T.Color(1, 1, 1));
       mesh.instanceColor.setUsage(T.DynamicDrawUsage);
       mesh.frustumCulled = false;                   // culled per instance below
-      mesh.castShadow = shadows && lod < 2; mesh.receiveShadow = false;
+      mesh.castShadow = shadows && lod < 2 && !(kit.meta[species[si]] || {}).noShadow; mesh.receiveShadow = false;
       mesh.count = 0; mesh.visible = false;
       mesh.name = 'trees-' + species[si] + '-lod' + lod;
       group.add(mesh);
@@ -97,7 +97,7 @@ window.TS = window.TS || {};
         view.copy(camera.matrixWorld).invert(); pv.multiplyMatrices(proj, view); frustum.setFromProjectionMatrix(pv); haveFrustum = true;
       }
       const planes = frustum.planes, cx = camPos.x, cy = camPos.y, cz = camPos.z;
-      const l0 = lv.l0, l1 = lv.l1, l0s = l0 * l0, l1s = l1 * l1, skeep = lv.shadowKeep, skeeps = skeep * skeep;
+      const skeep = lv.shadowKeep, skeeps = skeep * skeep, rscale = lv.l1 / LEVELS.high.l1;
       const thinSpan = lv.thinTo - lv.thinFrom;
       const n = species.length;
       const out = new Array(n);
@@ -109,10 +109,12 @@ window.TS = window.TS || {};
       regs.forEach((per) => {
         for (let si = 0; si < n; si++) {
           const a = per[si]; if (!a) continue;
-          const cnt = a.length / STRIDE, o3 = out[si], hMid = meta[names[si]].h * 0.5;
+          const cnt = a.length / STRIDE, o3 = out[si], mt = meta[names[si]], hMid = mt.h * 0.5;
+          const l0s = mt.range ? Math.pow(mt.range[0] * rscale, 2) : lv.l0 * lv.l0, l1v = mt.range ? mt.range[1] * rscale : lv.l1, l1s = l1v * l1v, cutFar = !!mt.range;
           for (let i = 0; i < cnt; i++) {
             const b = i * STRIDE, dx = a[b] - cx, dy = a[b + 1] - cy, dz = a[b + 2] - cz, d2 = dx * dx + dy * dy + dz * dz;
             let lod = d2 < l0s ? 0 : d2 < l1s ? 1 : 2, mul = 1;
+            if (lod === 2 && cutFar) continue;
             if (lod === 2) {
               const d = Math.sqrt(d2);
               if (d > lv.thinFrom) {
@@ -170,7 +172,7 @@ window.TS = window.TS || {};
       pools.forEach((row) => row.forEach((p) => { if (p) { group.remove(p.mesh); p.mesh.dispose(); } }));
       parent.remove(group); regs.clear();
     }
-    return { add, remove, update, refresh, stats, dispose, has: (name) => index[name] !== undefined, group, levels: lv };
+    return { add, remove, update, refresh, stats, dispose, has: (name) => index[name] !== undefined, group, levels: lv, meta: kit.meta };
   }
 
   TS.treeField = Object.freeze({ create, LEVELS });
