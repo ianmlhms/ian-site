@@ -716,19 +716,22 @@ window.TS = window.TS || {};
     }
     // A1's terrainHeightAt already shapes formation, cuttings, tunnel covers, bridge valleys and the river bed.
     const riverBridges = bridges.filter(b => b.waterY !== null && b.waterY !== undefined);
-    function groundY(info, lat, x, z, sExact) {
-      let h = terrainH(x, z);
-      if (riverBridges.length) { // cut a river channel through the meadow under a river viaduct (A1 only digs a bowl)
-        const s = sExact === undefined ? info.s : sExact;
-        for (const b of riverBridges) {
-          const du = Math.abs(s - (b.s0 + b.s1) / 2); if (du > 90) continue;
-          const hw = Math.min(8 + (b.s1 - b.s0) * 0.1, (b.s1 - b.s0) / 2 + 3);
-          const c = (1 - smooth(hw, hw + 16, du)) * (1 - smooth(70, 125, Math.abs(lat)));
-          if (c > 0) h = lerp(h, Math.min(h, b.waterY - 1.5), c);
-        }
+    /* river channel under a river viaduct (A1 only digs a bowl): the strip mesh lies lower than terrainHeightAt there */
+    function carveRiver(h, s, lat) {
+      for (const b of riverBridges) {
+        const du = Math.abs(s - (b.s0 + b.s1) / 2); if (du > 90) continue;
+        const hw = Math.min(8 + (b.s1 - b.s0) * 0.1, (b.s1 - b.s0) / 2 + 3);
+        const c = (1 - smooth(hw, hw + 16, du)) * (1 - smooth(70, 125, Math.abs(lat)));
+        if (c > 0) h = lerp(h, Math.min(h, b.waterY - 1.5), c);
       }
       return h;
     }
+    function groundY(info, lat, x, z, sExact) {
+      const h = terrainH(x, z);
+      return riverBridges.length ? carveRiver(h, sExact === undefined ? info.s : sExact, lat) : h;
+    }
+    /* the height of the drawn strip ground at a world point (test hook for the hole detector) */
+    function groundHeightAt(x, z) { const q = track.nearest(x, z); return groundY(rowInfo(q.s), q.lat, x, z, q.s); }
     const riverLat = w => w.side * w.offset;
     const worldAt = (info, lat) => ({ x: info.f.x + info.f.rx * lat, z: info.f.z + info.f.rz * lat });
     const yawOf = f => Math.atan2(-f.tz, f.tx);
@@ -1223,6 +1226,7 @@ window.TS = window.TS || {};
         im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
         im.castShadow = quality !== 'low' && name !== 'tuft' && name !== 'sheep' && name !== 'lampHead'; im.receiveShadow = false; if (im.computeBoundingSphere) im.computeBoundingSphere(); group.add(im); hubs.push(im);
       }
+      if (terr) terr.name = 'ls-terrain';
       void terr;
       /* ---- roads at level crossings: the chunk that holds the crossing builds the whole road (asphalt, lines, signs) */
       if (roadPlanC && TS.crossingRoadsMesh) {
@@ -1245,6 +1249,7 @@ window.TS = window.TS || {};
       let h = farCache.get(key); if (h !== undefined) return h;
       h = terrainH(x, z); const d = distToTrack(x, z);
       if (d < W) {
+        if (riverBridges.length) { const q = track.nearest(x, z); h = carveRiver(h, q.s, q.lat); }   // the far ground stays below the carved river channel too
         const f = 1 - smooth(W - 40, W, d);
         let low = h - 22 * f;
         /* tunnel corridor: the coarse far triangles (24 m / 96 m grid) must never cross the tube.  A vertex next to a tunnel (+/- FAR_TUNNEL_PAD m along it, which
@@ -1612,9 +1617,15 @@ window.TS = window.TS || {};
       scene.remove(root);
       root.traverse(o => { if (o.isMesh || o.isPoints || o.isLine) { if (!o.isInstancedMesh || o === carMesh) { if (o.geometry && o.geometry !== carGeo) o.geometry.dispose(); } if (o.material && o.material.isShaderMaterial) o.material.dispose(); } });
       occ.dispose(); carGeo.dispose(); Object.keys(treeKit).forEach(n => treeKit[n].dispose()); carMesh.dispose();
-      mats.forEach(m => m.dispose()); skyMat.dispose(); sun.shadow && sun.shadow.map && sun.shadow.map.dispose();
+      holeMat.dispose(); mats.forEach(m => m.dispose()); skyMat.dispose(); sun.shadow && sun.shadow.map && sun.shadow.map.dispose();
       if (scene.fog === ownFog) scene.fog = prevFog || null;
     }
+
+    /* test hooks (scripts/zuch/hole_scan.mjs): holeMode hides everything that could fill a hole in the ground (sky dome, backdrop hills, the safety plane) so a
+       magenta clear colour shows wherever no ground is drawn; terrainMeshes() lists the streamed strip meshes for ray checks */
+    const holeMat = new T.MeshBasicMaterial({ color: 0xff00ff });
+    function setHoleMode(on) { sky.visible = !on; hills.forEach(h => { h.visible = !on; }); flat.visible = !on; [farL1, farL2].forEach(l => { l.mesh.material = on ? holeMat : l.mat; }); }
+    const terrainMeshes = () => { const out = []; chunks.forEach(c => c.group.traverse(o => { if (o.isMesh && o.name === 'ls-terrain') out.push(o); })); return out; };
 
     /* traffic at the level crossings (crossing-traffic.js): vehicles queue at the barriers */
     let crossTraffic = null;
@@ -1627,7 +1638,7 @@ window.TS = window.TS || {};
     const setCrossing = (crossingS, closed) => { if (crossTraffic) crossTraffic.setClosed(crossingS, closed); };
 
     setWeather('clear', true); setTimeOfDay(12);
-    return { update, setTimeOfDay, setWeather, setCrossing, crossingTraffic: () => crossTraffic, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
+    return { update, setTimeOfDay, setWeather, setCrossing, setHoleMode, terrainMeshes, groundHeightAt, farMeshes: () => [farL1.mesh, farL2.mesh], stripWidth: W, crossingTraffic: () => crossTraffic, dispose, warm, stats, sun, moon, hemi, group: root, quality, getWeather: () => weatherName, getTimeOfDay: () => timeOfDay, getLook: () => look };
   }
 
   TS.landscape = { create, CHUNK };

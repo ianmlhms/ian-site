@@ -58,3 +58,17 @@ orthophoto pixel may be shipped or used for colours**.
 ## Index
 `pb/train-sim/data/stations/index.json` = `{"v":1,"stations":{"Munsbach":"munsbach"}}` (display name -> file key).  `build_station_patch.py` merges its station into
 it on every run (never overwrites other entries).
+
+## Details of the implementation (build_station_patch.py)
+* **Rings are implicitly closed**: the first vertex is NOT repeated at the end (building ground / roof / wall faces, platforms, water).  Faces are planar LOD2 polygons
+  (roofs/walls are taken from the national LOD2.2 model; the vertices are transformed one by one with the same straightening).
+* **Vertical straightening**: the real track gradient is removed from *all* heights (`y = z_abs - y0 - profile(z)`), so the straightened main track is level at y = 0
+  (corridor |x| <= 5 m is baked flat, blended out to |x| = 9 m).  The removed profile is stored as `"trackY": [[z, y], ...]` (20 m steps, rail-level relative to y0) so the
+  game may add the grade back.  `--keep-grade` keeps the gradient in the heights instead.  At Munsbach the profile is within +-0.2 m.
+* LOD2 building heights are shifted by the median (LOD2 ground - DTM) offset when it exceeds 0.25 m, so the buildings sit on the DTM (Munsbach: 0.52 m).
+* Buildings without a LOD2 model (sheds, new buildings) are emitted from the OSM footprint with `roofs: []` and `walls: []` (renderer extrudes `h`).  `h` = eave height
+  above `base` (LOD2: lowest roof vertex minus lowest ground vertex).  `building=roof` (platform canopies) are not buildings; they become `shelter` POIs.
+* Water `y` is the DTM level at the river / pond (25th percentile of the outline heights); long rivers are cut into 60 m pieces so the surface follows the gradient.
+* `trees` come only from the LiDAR canopy; OSM `natural=tree` nodes are added as `poi` `tree` only where no canopy tree is within 3 m.
+* The straightening is a pure projection onto the smoothed track (Gaussian sigma 8 m on the OSM way chain, ends extended straight).  Inside a curve of radius R
+  features at lateral distance d are compressed along z by the factor 1 - d/R (outside: stretched); the script logs the tightest radius.

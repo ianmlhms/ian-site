@@ -23,6 +23,11 @@
   const D0_BASE = 7.5; // flat formation half-width
   const D0_RAIL = 10.5; // rail: the second main track + its ballast and masts need the formation to reach 8 m on one side
   const D0_STATION = 26;
+  const VALLEY_MIN_H = 6;      // bridges at least this high get a finer ground mesh around them
+  const VALLEY_PAD = 90;
+  const VALLEY_ROW = 5;
+  const VALLEY_LAT = 112;
+  const VALLEY_LAT_STEP = 7;
   const PASS_LIMIT = 110; // km/h through a station the service does not stop at
   const STATION_MASK_PAD = 14;
   const GRADE_SCALE = 2.4; // authored grades are scaled so the hills read in a short compressed route
@@ -136,6 +141,7 @@
           platformEnd,
           side: it.side,
           size: it.size,
+          platformWidth: it.pw,
           terminus: first || last,
         });
         stationCount += 1;
@@ -709,7 +715,7 @@
       const tram = kind === 'tram';
       const big = !tram && st.size >= 3;
       const edge = tram ? 1.5 : 1.7;
-      const width = tram ? 3.0 : big ? 7.0 : 5.2;
+      const width = st.platformWidth || (tram ? 3.0 : big ? 7.0 : 5.2);
       return {
         edge, width, backEdge: edge + width, height: tram ? 0.3 : 0.76,
         sideSign: st.side === 'right' ? 1 : -1,
@@ -741,6 +747,19 @@
 
     const passFixed = stations.map((st, i) => (i > 0 && i < stations.length - 1 && (def.passNames || []).includes(st.name) ? i : -1)).filter((i) => i >= 0);
 
+    /* the valley under a bridge is steep: finer strip rows / columns there, so the drawn ground follows terrainHeightAt (trees, roads and lamps stand on that function) */
+    const valleyBridges = kind === 'tram' ? [] : bridges.filter((b) => b.h >= VALLEY_MIN_H);
+    const valleyRows = (s0, s1) => {
+      const out = [];
+      valleyBridges.forEach((b) => { for (let s = Math.ceil(Math.max(s0, b.s0 - VALLEY_PAD) / VALLEY_ROW) * VALLEY_ROW; s <= Math.min(s1, b.s1 + VALLEY_PAD); s += VALLEY_ROW) out.push(s); });
+      return out;
+    };
+    const valleyLats = (s0, s1) => {
+      const out = [];
+      if (valleyBridges.some((b) => s1 > b.s0 - VALLEY_PAD && s0 < b.s1 + VALLEY_PAD)) for (let l = -VALLEY_LAT; l <= VALLEY_LAT; l += VALLEY_LAT_STEP) out.push(l);
+      return out;
+    };
+
     return {
       id: def.id,
       sceneryId: def.sceneryId || def.id,
@@ -766,9 +785,9 @@
       inSurround: surroundPatches.length ? (x, z) => { const q = nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 }); return surroundPatches.some((p) => p.covers(q.s, q.lat)); } : () => false,
       /* extra terrain strip vertices for the chunk [s0, s1): rows (arc lengths) and lateral columns, from the crossing roads and the real station patches */
       meshHints: {
-        rows: (s0, s1) => (roadPlan ? roadPlan.extraRows(s0, s1) : []).concat(...surroundPatches.map((p) => p.extraRows(s0, s1))),
+        rows: (s0, s1) => (roadPlan ? roadPlan.extraRows(s0, s1) : []).concat(...surroundPatches.map((p) => p.extraRows(s0, s1)), valleyRows(s0, s1)),
         lats: (s0, s1) => (roadPlan ? roadPlan.extraLats(s0, s1) : []),
-        latsAll: (s0, s1) => [].concat(...surroundPatches.map((p) => p.extraLats(s0, s1))),
+        latsAll: (s0, s1) => [].concat(...surroundPatches.map((p) => p.extraLats(s0, s1)), valleyLats(s0, s1)),
       },
       nearest: (x, z) => Object.assign({}, nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 })),
       nearestS: (x, z) => nearest(x, z, scratch).s,

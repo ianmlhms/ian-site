@@ -63,7 +63,8 @@
     return items.map((it) => (it.fill ? Object.assign({}, it, { len: rest, fill: undefined }) : it));
   }
 
-  const station = (name, size, side, biome, terminus) => ({ t: 'station', name, size, side, biome, terminus: !!terminus });
+  /* pw = platform width in m (default by size: 5.2, big stations 7); real stations that are narrower say so */
+  const station = (name, size, side, biome, terminus, pw) => ({ t: 'station', name, size, side, biome, terminus: !!terminus, pw });
 
   function makeRoute(def, body) {
     const stations = body.filter((it) => it.t === 'station').map((it) => it.name);
@@ -163,7 +164,7 @@
     ...leg(1000, 's180:v110:bfarmland r1300/260:g-0.2 s*:X l1000/200 s120'),
     station('Oetrange', 1, 'right', 'farmland'),
     ...leg(1000, 's150:bfarmland l900/240:g0.5 s*:v100:bsuburb r800/200 s100'),
-    station('Munsbach', 1, 'left', 'suburb'),
+    station('Munsbach', 1, 'left', 'suburb', false, 3.2),
     ...leg(1300, 's150:bsuburb r700/260:g-0.4 s*:bforest l800/280:g0.6 s*:X r900/220 s120'),
     station('Roodt-Syr', 1, 'right', 'forest'),
     ...leg(1150, 's150:bforest l900/260:g0.3 s*:Br,6,w r1000/240 s120:bfarmland'),

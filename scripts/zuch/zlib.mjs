@@ -16,6 +16,13 @@ export async function openSim({ quality = 'high', width = 1280, height = 720, tr
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   await context.addInitScript(([q, w, t]) => { try { localStorage.setItem('ts_quality', q); localStorage.setItem('ts_weather', w); localStorage.setItem('ts_tod', t); } catch (_) { /* no storage */ } }, [quality, weather, tod]);
   const page = await context.newPage();
+  const sim = await simOnPage(page, origin, { quality, train });
+  sim.close = async () => { await browser.close(); server.close(); };
+  return sim;
+}
+
+/* the same API on a page of an existing browser context (the flow runner): opens the standalone game page and waits for the menu */
+export async function simOnPage(page, origin, { quality = 'high', train = 'emu' } = {}) {
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error' || /warn/i.test(m.type()) && /Lokf/.test(m.text())) errors.push(m.type() + ': ' + m.text()); });
@@ -26,7 +33,7 @@ export async function openSim({ quality = 'high', width = 1280, height = 720, tr
 
   const api = {
     page, errors, origin,
-    async close() { await browser.close(); server.close(); },
+    async close() { /* replaced by openSim */ },
     async start(routeId, trainId = train) {
       await page.evaluate(([r, t]) => __tsTest.startService(r, t, 'career'), [routeId, trainId]);
       await page.waitForFunction(() => { const s = __tsTest.state(); return s.phase === 'running' && !document.getElementById('loading')?.hidden === false; }, null, { timeout: 120000 }).catch(() => {});

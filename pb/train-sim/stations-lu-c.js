@@ -42,10 +42,10 @@
       const { sx, H, W, edge, col, WHITE } = api;
       const { X, vc, quadO, tex, plainBatch, roof, glow } = k;
       const lB = edge + W;
-      const BL = 18.6;                    // building length along the platform
-      const BD = 7.0;                     // depth
+      const BL = 17.3;                    // building length along the platform (real LOD2 footprint, z -90.7 .. -73.4)
+      const BD = 6.5;                     // depth
       const EAVES = 3.5;
-      const z0 = -4.5;
+      const z0 = -90.7;
       const z1 = z0 + BL;
       const l0 = lB + 0.05;
       const l1 = l0 + BD;
@@ -53,7 +53,7 @@
       const maroon = '#7d1c2d';
 
       /* front facade (towards the track): plaster, plinth, doors, window */
-      const doors = [{ u: 2.0, w: 0.95, kind: 'wc' }, { u: 4.9, w: 1.05, kind: 'wifi' }, { u: 7.7, w: 1.05, kind: 'T' }, { u: 10.8, w: 1.05, kind: 'plain' }];
+      const doors = [{ u: 2.0, w: 0.95, kind: 'wc' }, { u: 4.7, w: 1.05, kind: 'wifi' }, { u: 7.3, w: 1.05, kind: 'T' }, { u: 10.1, w: 1.05, kind: 'plain' }];
       const front = tex('munfront', {
         w: Math.round(BL * PX), h: Math.round(EAVES * PX),
         draw: (c, w, h) => {
@@ -72,13 +72,13 @@
             if (d.kind === 'wc') { c.fillStyle = '#e6e2d4'; c.fillRect(x - 0.9 * PX, doorTop + 0.2 * PX, 0.5 * PX, 0.3 * PX); c.fillStyle = '#333'; c.font = 'bold ' + 0.22 * PX + 'px Arial'; c.fillText('WC', x - 0.65 * PX, doorTop + 0.43 * PX); }
           });
           // window at the right end: light stone surround, maroon casement
-          const wx = 14.9 * PX; const wy = doorTop + 0.45 * PX; const ww = 1.25 * PX; const wh = 1.55 * PX;
+          const wx = 14.0 * PX; const wy = doorTop + 0.45 * PX; const ww = 1.25 * PX; const wh = 1.55 * PX;
           c.fillStyle = '#e6dec2'; c.fillRect(wx - 0.28 * PX, wy - 0.28 * PX, ww + 0.56 * PX, wh + 0.5 * PX);
           c.fillStyle = maroon; c.fillRect(wx, wy, ww, wh);
           c.fillStyle = 'rgba(140,166,180,0.9)'; c.fillRect(wx + 0.09 * PX, wy + 0.09 * PX, ww - 0.18 * PX, wh * 0.46); c.fillRect(wx + 0.09 * PX, wy + wh * 0.52, ww - 0.18 * PX, wh * 0.42);
           c.fillStyle = '#c8c0a2'; c.fillRect(wx - 0.3 * PX, wy + wh + 0.2 * PX, ww + 0.6 * PX, 0.1 * PX);                // sill
           // ventilation grille
-          c.fillStyle = '#6b2430'; c.fillRect(17.3 * PX, doorTop + 1.2 * PX, 0.45 * PX, 0.3 * PX);
+          c.fillStyle = '#6b2430'; c.fillRect(16.4 * PX, doorTop + 1.2 * PX, 0.45 * PX, 0.3 * PX);
         },
       });
       const xf = X(l0);
@@ -102,7 +102,7 @@
       vc.box(X(l0 + 0.15), yTop - 1.7, z0 + 11.2, 0.08, 3.4, 0.08, col('#8d9296'));
 
       /* cantilever canopy: maroon steel, diagonal struts, translucent cream panels (z0 + 0.4 .. z0 + 12.6) */
-      const cz0 = z0 + 0.5; const cz1 = z0 + 12.8;
+      const cz0 = z0 + 0.5; const cz1 = z0 + 12.2;
       const cOut = 3.0;                                  // projection over the platform
       const yWall = H + 3.45; const yOut = H + 2.95;
       const panel = plainBatch('#e9e4c9');
@@ -118,33 +118,31 @@
       }
       for (let l = 0.6; l < cOut; l += 0.75) vc.box(X(l0 - l), yWall - (yWall - yOut) * (l / cOut) + 0.07, (cz0 + cz1) / 2, 0.05, 0.05, cz1 - cz0, mr);   // purlins
       [cz0, cz1].forEach((z) => vc.box(X(l0 - 0.1), (H + yWall) / 2, z, 0.18, yWall - H, 0.18, mr));      // end posts at the wall
-      k.clockFace(l0 - 0.04, H + 3.05, z0 + 9.2, 0.62, -1);
+      k.clockFace(l0 - 0.04, H + 3.05, z0 + 8.6, 0.62, -1);
 
-      /* platform furniture */
-      k.bench(lB - 1.0, z0 + 1.2, '#7d1f26');
-      k.yellowBoard(edge + 3.3, z0 - 26, 'Munsbach');
-      k.yellowBoard(edge + 3.3, z1 + 40, 'Munsbach');
-      [z0 - 12, z0 + 14, z1 + 12].forEach((z) => k.totem(edge + 1.5, z));
+      /* platform furniture (the platform is 3.2 m wide: everything stands between the kerb and the building) */
+      k.bench(lB - 0.8, z0 + 1.2, '#7d1f26');
+      k.yellowBoard(lB - 1.0, z0 - 24, 'Munsbach');
+      k.yellowBoard(lB - 1.0, z1 + 38, 'Munsbach');
+      [z0 - 12, z0 + 14, z1 + 12, z1 + 44].forEach((z) => k.totem(edge + 1.0, z));
       // pink ticket machine beside the left name board
-      vc.box(X(edge + 3.3), H + 1.0, z0 - 20, 0.5, 2.0, 0.6, col('#b02a6e'));
-      vc.box(X(edge + 3.3) - sx * 0.27, H + 1.3, z0 - 20, 0.04, 0.7, 0.45, col('#e8e8ec'));
-      [z0 - 40, z0 - 8, z1 + 6, z1 + 30, z1 + 58].forEach((z) => k.lamp(edge + 2.6, z, '#9aa0a4', 5.4));
-      [z0 - 7, z1 + 14].forEach((z) => k.bin(lB - 0.7, z, '#d9631a'));
-      vc.box(X(edge + 2.0), H + 0.6, z0 + 14, 0.32, 1.2, 0.3, col('#c9ccce'));                      // telephone box PK 15,326
-      glow.box(X(edge + 2.0) - sx * 0.17, H + 0.8, z0 + 14, 0.03, 0.3, 0.2, col('#f6f4ea'));
+      vc.box(X(lB - 1.0), H + 1.0, z0 - 19, 0.5, 2.0, 0.6, col('#b02a6e'));
+      vc.box(X(lB - 1.0) - sx * 0.27, H + 1.3, z0 - 19, 0.04, 0.7, 0.45, col('#e8e8ec'));
+      [z0 - 44, z0 - 8, z1 + 6, z1 + 30, z1 + 58].forEach((z) => k.lamp(lB - 0.5, z, '#9aa0a4', 5.4));
+      [z0 - 6, z1 + 8].forEach((z) => k.bin(lB - 0.5, z, '#d9631a'));
+      vc.box(X(lB - 0.5), H + 0.6, z0 + 14, 0.32, 1.2, 0.3, col('#c9ccce'));                      // telephone box PK 15,326
+      glow.box(X(lB - 0.5) - sx * 0.17, H + 0.8, z0 + 14, 0.03, 0.3, 0.2, col('#f6f4ea'));
       // perforated white CFL bike box beside the end of the building
       k.bikebox(l1 - 2.2, z1 + 3.4);
       vc.box(X(l1 - 2.2) - sx * 1.22, H + 1.9, z1 + 3.4, 0.05, 0.5, 1.8, col('#2a2d30'));
-      // bollards and a fence towards the street
-      [-14, -9, 28, 34].forEach((z) => vc.box(X(l1 + 1.5), H + 0.55, z, 0.12, 1.1, 0.12, col('#d9d4cc')));
-      // across the second track: the opposite side platform (edge 6.2 m from the main track, tan pavers, kerb recesses), yellow name board, "A" letter sign
-      k.platformBox(-6.2, 4.2, -1, -100, 100);
-      k.yellowBoard(-7.6, z0 - 12, 'Munsbach');
-      k.sign(-7.2, z0 + 22, 'A', 'blue');
-      [z0 - 30, z0 + 8, z1 + 26].forEach((z) => k.totem(-7.4, z));
-      [z0 - 44, z0 - 6, z0 + 30, z1 + 40].forEach((z) => k.lamp(-8.4, z, '#9aa0a4', 5.4));
-      k.bench(-9.4, z0 + 6, '#7d1f26');
-      k.bin(-9.6, z0 + 16, '#d9631a');
+      // the opposite side platform (real: edge 5.2 m from the main track, 3.2 m wide), yellow name board, "A" letter sign
+      k.platformBox(-6.2, 3.2, -1, -95, 95);
+      k.yellowBoard(-7.5, z0 + 6, 'Munsbach');
+      k.sign(-7.2, z0 + 40, 'A', 'blue');
+      [z0 - 20, z0 + 20, z1 + 36].forEach((z) => k.totem(-7.4, z));
+      [z0 - 44, z0 - 8, z0 + 30, z1 + 30].forEach((z) => k.lamp(-8.4, z, '#9aa0a4', 5.4));
+      k.bench(-8.6, z0 + 14, '#7d1f26');
+      k.bin(-8.8, z0 + 24, '#d9631a');
     },
   });
 })();
