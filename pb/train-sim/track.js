@@ -803,6 +803,41 @@
       return out;
     };
 
+    /* real river trench: narrow (Syre 7 m) and 6+ m deep, so the strip needs columns inside and beside it, else the mesh averages the trench away (0.65 m steps).
+       Two neighbouring chunks must carry EXACTLY the same columns along their shared edge (else a sliver crack opens): every river stretch gets one column set
+       that all the chunks touching it (plus a margin where the 120 m blur of the river has faded the trench) use. */
+    const RIVER_REGION_GAP = 300;
+    const RIVER_REGION_MARGIN = 280;
+    const RIVER_DENSE = 1.5;
+    const RIVER_MID = 3;
+    const RIVER_FAR = 5.5;
+    const riverRegions = [];
+    if (real) {
+      let cur = null;
+      for (let i = 0; i < n; i += 2) {
+        if (arrAt(riverArr, i) < 0.02) continue;
+        const s = i * STEP; const lat = arrAt(rivLatArr, i); const half = arrAt(rivHalfArr, i);
+        if (cur && s - cur.s1 < RIVER_REGION_GAP) { cur.s1 = s; cur.lo = Math.min(cur.lo, lat); cur.hi = Math.max(cur.hi, lat); cur.half = Math.max(cur.half, half); }
+        else { cur = { s0: s, s1: s, lo: lat, hi: lat, half }; riverRegions.push(cur); }
+      }
+      riverRegions.forEach((r) => {
+        const k = Math.max(1, r.half / 3.5);
+        const cols = new Set();
+        const add = (v) => cols.add(Math.round(v * 2) / 2);
+        for (let v = r.lo - 4.5 * k; v <= r.hi + 4.5 * k + 1e-6; v += RIVER_DENSE) add(v);
+        for (let v = r.lo - 11 * k; v < r.lo - 4.5 * k; v += RIVER_MID) add(v);
+        for (let v = r.hi + 4.5 * k; v <= r.hi + 11 * k; v += RIVER_MID) add(v);
+        for (let v = r.lo - 16 * k; v < r.lo - 11 * k; v += RIVER_FAR) add(v);
+        for (let v = r.hi + 11 * k; v <= r.hi + 16 * k; v += RIVER_FAR) add(v);
+        r.lats = Array.from(cols).sort((p, q) => p - q);
+      });
+    }
+    const riverLats = (s0, s1) => {
+      const out = [];
+      riverRegions.forEach((r) => { if (s1 > r.s0 - RIVER_REGION_MARGIN && s0 < r.s1 + RIVER_REGION_MARGIN) out.push(...r.lats); });
+      return out;
+    };
+
     return {
       id: def.id,
       sceneryId: def.sceneryId || def.id,
@@ -830,7 +865,7 @@
       meshHints: {
         rows: (s0, s1) => (roadPlan ? roadPlan.extraRows(s0, s1) : []).concat(...surroundPatches.map((p) => p.extraRows(s0, s1)), valleyRows(s0, s1)),
         lats: (s0, s1) => (roadPlan ? roadPlan.extraLats(s0, s1) : []),
-        latsAll: (s0, s1) => [].concat(...surroundPatches.map((p) => p.extraLats(s0, s1)), valleyLats(s0, s1)),
+        latsAll: (s0, s1) => [].concat(...surroundPatches.map((p) => p.extraLats(s0, s1)), valleyLats(s0, s1), riverLats(s0, s1)),
       },
       nearest: (x, z) => Object.assign({}, nearest(x, z, { s: 0, d: 0, lat: 0, y: 0 })),
       nearestS: (x, z) => nearest(x, z, scratch).s,
