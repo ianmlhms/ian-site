@@ -67,5 +67,44 @@ export function createSurface(field) {
     return out;
   }
 
-  return { height, normal, block, field, blockCount: () => blocks.size };
+  /* Decks: solid structures that carry the rider ABOVE the carved terrain (the Schiessentuempel footbridge). A deck is an overlay of the physics surface only (the render tiles
+   * stay the plain lattice: the bridge is drawn as its own solid). Inside its footprint the surface is max(terrain, deck): the arch opening below stays carved, the ramps
+   * blend into the banks. Deck frame: x across the river (local u), z along the river (local w); heights are absolute metres. */
+  const decks = [];
+  function addDeck(d) {
+    const deck = { ...d, c: Math.cos(d.yaw), s: Math.sin(d.yaw) };
+    for (const k of ['x', 'z', 'yaw', 'half', 'flat', 'width', 'level', 'endL', 'endR']) if (!Number.isFinite(deck[k])) throw new Error(`addDeck: ${k} is not finite`);
+    decks.push(deck);
+    return decks.length - 1;
+  }
+  /** Profile of a deck along its local u: the flat top, then a ramp down to the bank at both ends. Returns { h, slope } or null outside the footprint. */
+  function deckProfile(d, x, z) {
+    const dx = x - d.x, dz = z - d.z;
+    const u = dx * d.c - dz * d.s, w = dx * d.s + dz * d.c;
+    if (Math.abs(u) > d.half || Math.abs(w) > d.width / 2) return null;
+    const au = Math.abs(u);
+    if (au <= d.flat) return { h: d.level, slope: 0, u, w };
+    const end = u < 0 ? d.endL : d.endR, t = (au - d.flat) / Math.max(1e-6, d.half - d.flat);
+    return { h: d.level + (end - d.level) * t, slope: (end - d.level) / Math.max(1e-6, d.half - d.flat) * Math.sign(u), u, w };
+  }
+  const baseHeight = height, baseNormal = normal;
+  function heightWithDecks(x, z) {
+    let h = baseHeight(x, z);
+    for (const d of decks) { const p = deckProfile(d, x, z); if (p && p.h > h) h = p.h; }
+    return h;
+  }
+  function normalWithDecks(x, z, out) {
+    baseNormal(x, z, out);
+    if (!decks.length) return out;
+    const terrain = baseHeight(x, z);
+    for (const d of decks) {
+      const p = deckProfile(d, x, z);
+      if (!p || p.h <= terrain) continue;
+      // the slope runs along local u: gradient (world) = slope * (c, -s)
+      const gx = p.slope * d.c, gz = -p.slope * d.s, len = Math.hypot(gx, 1, gz);
+      out.x = -gx / len; out.y = 1 / len; out.z = -gz / len;
+    }
+    return out;
+  }
+  return { height: heightWithDecks, normal: normalWithDecks, terrainHeight: baseHeight, addDeck, deckProfile, decks, block, field, blockCount: () => blocks.size };
 }

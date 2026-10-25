@@ -15,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadWorldData } from './world-data.js';
 import { buildPureWorld } from './world-build.js';
+import { bridgeDeck } from './landmarks.js';
 import { CLEAR } from './undergrowth.js';
 import { selectTiles, leafAt, tilesTouching, tileKey } from './quadtree.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
@@ -589,6 +590,27 @@ section('J water');
     check(`the footbridge base is below the terrain at every corner and under the arch (margin ${worst.toFixed(2)} m)`, worst > 0.3);
     check('the deck is above the water and reaches the banks (deck >= bank + 0.3, deck >= crown + 0.7 m)', br.deck >= Math.max(br.endL, br.endR) + 0.2 && br.deck - br.water >= br.rise + 0.7, `deck ${br.deck.toFixed(2)} water ${br.water.toFixed(2)}`);
     stats.bridge = `deck ${(br.deck - br.water).toFixed(2)} m above the water, span ${br.span} m`;
+    // the deck is part of the physics surface (a rider can cross the bridge): continuous along the axis, never below the terrain, joined to the banks at both ends
+    const deck = bridgeDeck(br), id = surface.addDeck(deck);
+    const ax = [Math.cos(deck.yaw), -Math.sin(deck.yaw)];                 // local u in world (x, z)
+    let maxStep = 0, below = 0, samples = 0, prev = null, centreOk = true;
+    for (let u = -deck.half - 1.5; u <= deck.half + 1.5; u += 0.25) {
+      const x = deck.x + ax[0] * u, z = deck.z + ax[1] * u, h = surface.height(x, z);
+      samples++;
+      if (h < surface.terrainHeight(x, z) - 1e-6) below++;
+      if (prev !== null) maxStep = Math.max(maxStep, Math.abs(h - prev));
+      prev = h;
+      if (Math.abs(u) < deck.flat - 0.2 && Math.abs(h - deck.level) > 1e-6) centreOk = false;
+    }
+    let edgeGap = 0;
+    if (process.env.MTB_DEBUG) for (let u = -deck.half - 2; u <= deck.half + 2; u += 0.5) { const x = deck.x + ax[0] * u, z = deck.z + ax[1] * u; console.log('deck u', u.toFixed(1), 'surface', surface.height(x, z).toFixed(2), 'terrain', surface.terrainHeight(x, z).toFixed(2)); }
+    for (const side of [-1, 1]) { const u = side * deck.half, x = deck.x + ax[0] * u, z = deck.z + ax[1] * u; edgeGap = Math.max(edgeGap, (side < 0 ? deck.endL : deck.endR) - surface.terrainHeight(x, z)); }          // the ramp end must not hang in the air above the bank
+    check(`the footbridge deck is in the physics surface: flat top at ${deck.level.toFixed(2)} m, never below the terrain, no step above 0.45 m per 0.25 m along the axis (worst ${maxStep.toFixed(2)} m over ${samples} samples)`, centreOk && below === 0 && maxStep <= 0.45, `centre ok ${centreOk}, ${below} below terrain, step ${maxStep.toFixed(2)}`);
+    check(`the deck ramps end in the banks (the ramp end is at most 0.3 m above the terrain; worst ${edgeGap.toFixed(2)} m)`, edgeGap < 0.3, `gap ${edgeGap.toFixed(2)}`);
+    const nrm = { x: 0, y: 0, z: 0 };
+    surface.normal(deck.x + ax[0] * (deck.flat + 0.5), deck.z + ax[1] * (deck.flat + 0.5), nrm);
+    check('the deck ramp has a tilted normal and the flat top a vertical one', Math.abs(nrm.y) < 0.9999 && nrm.y > 0.5, `normal y ${nrm.y.toFixed(4)}`);
+    surface.decks.splice(id, 1);                                          // the harness world is shared: take the deck out again
   }
 }
 

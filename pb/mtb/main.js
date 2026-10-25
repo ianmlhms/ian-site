@@ -17,6 +17,7 @@ import { createRain, createLeaves, createShafts, createBirds, createInsects } fr
 import { createHikers } from './hikers.js';
 import { placeBridge } from './landmarks.js';
 import { buildBridge } from './bridge-model.js';
+import { bridgeDeck } from './landmarks.js';
 import { createSolidMaterial } from './solid-material.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
@@ -120,6 +121,7 @@ async function boot() {
   const bridge = placeBridge(field.network, surface);
   if (bridge) {
     const parts = buildBridge({ span: bridge.span, width: bridge.width, abutment: bridge.abutment, rise: bridge.rise, deck: bridge.deck - bridge.water, endL: bridge.endL - bridge.water, endR: bridge.endR - bridge.water });
+    surface.addDeck(bridgeDeck(bridge));                              // the deck is rideable: a physics overlay (surface.js)
     rockView.addLandmark(parts.stone, bridge.x, bridge.water, bridge.z, bridge.yaw, 1.0, 2.0);
     const wood = new THREE.Mesh(parts.wood, createSolidMaterial(env));
     wood.position.set(bridge.x, bridge.water, bridge.z); wood.rotation.y = bridge.yaw; wood.frustumCulled = false; wood.name = 'footbridge railing';
