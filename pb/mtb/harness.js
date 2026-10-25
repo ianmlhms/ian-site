@@ -519,9 +519,16 @@ const rocks = world.rocks;
   check(`no rock body comes within 2.4 m of the centre line of ANY trail, path or track (stream stones 1.15 m; ${rockChecks.toLocaleString()} body points)`, tooCloseRocks === 0, `${tooCloseRocks} points too close`);
   stats.rocksChecked = count; stats.rockWorstMargin = worstGap;
   let blockedTrail = 0, probes = 0;
-  const blockedAt = [];
-  trailPoints.forEach((line, ti) => { for (let i = 0; i < line.length; i += 1) { probes++; if (rocks.collide(line[i][0], line[i][1], 0.5, surface.height(line[i][0], line[i][1]) + 0.5, bikeHit)) { blockedTrail++; if (blockedAt.length < 6) blockedAt.push(`${trails[ti].id}@${i}`); } } });
-  check(`trails are (almost) free of rocks (${probes} probes of 0.5 m; the bike ignores rocks on the carved path, see play-world.js)`, probes > 0 && blockedTrail <= 40, `${blockedTrail} probes hit a rock (${blockedAt.join(', ')})`);
+  /* A probe deeper than the bike radius + 0.3 m inside a slab is BEHIND its face, buried in the hill: invisible, and the game lets the bike ride through it (play-world.js). Boulders are covered by the body-ring check above (>= 2.4 m). */
+  const BIKE_R = 1.2, blockedAt = [], perTrail = [];
+  trailPoints.forEach((line, ti) => {
+    let hits = 0;
+    for (let i = 0; i < line.length; i += 1) { probes++; const rh = rocks.collide(line[i][0], line[i][1], BIKE_R, surface.height(line[i][0], line[i][1]) + 0.5, bikeHit);
+      if (rh && rh.pen <= BIKE_R + 0.3) { blockedTrail++; hits++; if (blockedAt.length < 6) blockedAt.push(`${trails[ti].id}@${i}`); } }
+    perTrail.push(`${trails[ti].id} ${line.length} m, ${hits} rock hits`);
+  });
+  stats.trailRockClear = perTrail.join('; ');
+  check(`all ${trailPoints.length} trails are free of rocks over their whole length, with a 1.2 m radius bike, no slab face within 0.3 m (${probes} probes of 1 m; ${perTrail.join('; ')})`, probes > 0 && blockedTrail === 0, `${blockedTrail} probes hit a rock (${blockedAt.join(', ')})`);
   // corridors: how much of the trail runs between walls
   let corridor = 0;
   for (const line of trailPoints) for (let i = 0; i < line.length; i += 2) {
