@@ -227,16 +227,16 @@ async function worldChecks() {
   check(`feature surfaces are what the physics reads (${surfaceChecked} checked)`, surfaceMisses <= Math.ceil(surfaceChecked * 0.08), `${surfaceMisses} misses`);
   // bridge decks
   const deckProblems = [];
-  for (const d of decks) {
+  for (const d of decks.filter((x) => x.kind !== 'stone')) {         // (the stone footbridge has its own checks in harness.js section J)
     const gA = surface.height(d.x0, d.z0), gB = surface.height(d.x1, d.z1);
     if (Math.abs(d.topA - gA) > 0.35 || Math.abs(d.topB - gB) > 0.35) deckProblems.push(`deck ${d.id} ends are ${(d.topA - gA).toFixed(2)} / ${(d.topB - gB).toFixed(2)} m from the bank`);
     for (let k = 0; k <= 8; k++) { const t = k / 8; const gx = d.x0 + (d.x1 - d.x0) * t, gz = d.z0 + (d.z1 - d.z0) * t; if (surface.height(gx, gz) > d.topA + (d.topB - d.topA) * t + 0.02) deckProblems.push(`deck ${d.id} is below the ground at ${k}/8`); }
     if (!(d.len > 5 && d.len < 14)) deckProblems.push(`deck ${d.id} length ${d.len.toFixed(1)}`);
   }
-  check(`${decks.length} bridge decks: ends meet the banks (< 0.35 m), never below the ground, 5..14 m long`, deckProblems.length === 0, deckProblems.slice(0, 3).join('; '));
+  check(`${decks.length - decks.filter((x) => x.kind === 'stone').length} plank bridge decks: ends meet the banks (< 0.35 m), never below the ground, 5..14 m long`, deckProblems.length === 0, deckProblems.slice(0, 3).join('; '));
   const g2 = createGround(surface, decks);
   if (decks.length) {
-    const d = decks[0], mx = (d.x0 + d.x1) / 2, mz = (d.z0 + d.z1) / 2;
+    const d = decks.find((x) => x.kind !== 'stone') || decks[0], mx = (d.x0 + d.x1) / 2, mz = (d.z0 + d.z1) / 2;
     g2.hint(d.topA + 0.5);
     const onTop = g2.height(mx, mz);
     g2.hint(surface.height(mx, mz) - 1);                 // a rider below the deck does not climb onto it
