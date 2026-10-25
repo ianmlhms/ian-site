@@ -23,6 +23,7 @@ Branch `mtb-play` (worktree `~/Library/Caches/website-mtb-play`) = the art branc
 - **Spray**: the "flat glass sheets" across the cascade were the foam rings of the stream stones (flat discs at water level, one per big boulder at the pool). They are capped in size and fainter; the real mist is camera-facing soft sprites and stays. The water ribbon also shrinks to its white core around falls.
 - **Camera**: the speed shake could push the lens 1 mm below the ground clearance (the harness caught it); it is clamped after the shake now.
 - **Keep off the trails**: the art branch's exclusion corridor (KEEP_CLEAR 2.5 m around every trail, path and track for rocks, logs, stumps; ferns 1.9, shrubs 3.2, hedges 3.0) is checked in `harness.js` for every OSM path, track and all six trails; a new per-trail probe (1.2 m radius) reports 0 rock hits on all six trails (the only overlap left is 6 m of the Marathon that runs behind the face of a big slab buried in the hill: invisible, the game lets the bike ride through it).
+- **Flows**: `mtb_touch` no longer holds full lock for 3 s (the new first trail starts in a gorge, a rider turning in place there hits the wall, as in real life) and picks a flat straight stretch for the jump test.
 - **Notes**: `W3-PLAY-NOTES.md` has the pump numbers re-measured at 270 W (trail bike +0.9 m/s, hardtail +2.6, downhill +0.0), the flat and climb speeds, and the soft speed cap (a 30 % descent tops out near 63 km/h).
 
 ## Gate numbers (final build)
@@ -32,10 +33,10 @@ Branch `mtb-play` (worktree `~/Library/Caches/website-mtb-play`) = the art branc
 | `node pb/mtb/harness-play.js` | PASS 163 checks (physics, the six trails ridden by the reference rider with 0 crashes and 0 rescues, game loop, finish validation, i18n lb / de / en / fr) |
 | `node pb/mtb/harness-save.js` | 301 passed |
 | `node pb/mtb/harness-audio.js` | 167 passed |
-| `node scripts/flows/run_all.mjs mtb` (Chromium) | FLOWS_CHROMIUM |
-| `node scripts/flows/run_webkit.mjs mtb-world mtb-holes mtb-ride mtb-menu mtb-touch mtb-trails` | FLOWS_WEBKIT |
-| `python3 scripts/check_site.py` | CHECK_SITE |
-| `cv_head.py` | CV_HEAD |
+| `node scripts/flows/run_all.mjs mtb` (Chromium) | 6/6 pass (world, holes, ride, trails, menu, touch; iPad portrait and landscape touch included) |
+| `node scripts/flows/run_webkit.mjs mtb-world mtb-holes mtb-ride mtb-menu mtb-touch mtb-trails` | 6/6 pass |
+| `python3 scripts/check_site.py` | no new warnings (the one orphan, `karttracker-ios-privacy.html`, is on main already) |
+| `cv_head.py` | PROBLEMS: 0 |
 | Draw calls at the start card | low 138 (budget 140), medium 156, high 174; gorge poses (art): high max 807 k triangles, medium 462 k, low 329 k |
 | Data | 4.5 MB baked + 0.95 MB painted textures (limit 6 MB) |
 

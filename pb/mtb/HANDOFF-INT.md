@@ -15,5 +15,9 @@ Brief: scratchpad/brief-mtb-integrate.md. Updated after every step.
 - [x] Schiessentuempel trail now follows the real road to the falls (via ... [1595,5691],[1570,5730],[1563,5783],[1558,5799]), then a straight tail across the stone bridge (`stoneBridge` in the def); ends ON the bridge deck (finish arch narrowed to the deck, camera turns to the falls after the finish via trail.focus). Tools: `scripts/mtb/trail-shots.mjs` (rides the real loop and shoots).
 - [x] Water foam rings capped (they were the flat glass sheets across the boulders at the Schiessentuempel); water ribbon shrinks to its core near falls.
 
+- [x] Keep-off-trail: harness.js now probes all six trails with a 1.2 m radius (0 rock hits; buried-slab interior ignored) next to the existing 2.4 m body-ring and undergrowth checks for every OSM path/track.
+- [x] W3-PLAY-NOTES.md updated; thumbnail `pb/thumbs/mtb.webp` (28 KB) + tile checked; montages in website-overnight/reports/mtb/release/ (11 sheets); RELEASE-NOTES.md written; `scripts/mtb-floor.sql` (optional) + daily floor in `scripts/mtb.sql`.
+- [x] FINAL GATES (all green): harness 86, harness-play 163, harness-save 301, harness-audio 167, Chromium flows 6/6, WebKit flows 6/6, check_site (only the known orphan), cv_head PROBLEMS: 0.
+
 ## Open
-5 keep-off-trail harness check for all six trails, 6 notes, 7 thumb, 8 montage, 9 release notes, final gates (flows chromium + webkit, check_site, cv_head).
+Nothing blocking. See RELEASE-NOTES.md "Known issues". Candidates for a next wave: parallel falls at the Schiessentuempel (2D cascade in trails.js channelBed), Beaufort ruin / Berdorf edge, a real-iPad performance pass, human playtest of the feel.
