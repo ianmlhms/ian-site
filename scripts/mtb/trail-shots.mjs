@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* Developer tool: ride a trail with the reference rider in the real game loop (many frames per tick, no teleport) and take screenshots at chosen distances.
- *   node scripts/mtb/trail-shots.mjs OUTDIR --trail id --at name:metres[,name:metres...] [--fromEnd] [--size 1280x720] [--q high] [--time noon] [--weather clear] [--hideui] [--finish name]
+ *   node scripts/mtb/trail-shots.mjs OUTDIR --trail id --at name:metres[,name:metres...] [--fromEnd] [--size 1280x720] [--q high] [--time noon] [--weather clear] [--hideui] [--season summer|autumn] [--finish name]
  * metres = arc length from the start (or from the end with --fromEnd); `--finish name` also rides to the end and shoots the finish. One browser at a time. */
 import { launchBrowser, startServer } from "../flows/lib.mjs";
 import path from "node:path";
@@ -22,7 +22,7 @@ try {
   const page = await (await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 })).newPage();
   page.on("console", (m) => { if (m.type() === "error") console.log("[page error]", m.text().slice(0, 300)); });
   page.on("pageerror", (e) => console.log("[pageerror]", String(e).slice(0, 400)));
-  await page.goto(`${origin}/pb/mtb.html?debug=1&q=${opt("--q", "high")}&time=${opt("--time", "noon")}&weather=${opt("--weather", "clear")}&trail=${trail}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${origin}/pb/mtb.html?debug=1&q=${opt("--q", "high")}&time=${opt("--time", "noon")}&weather=${opt("--weather", "clear")}&season=${opt("--season", "summer")}&trail=${trail}`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.documentElement.dataset.mtbReady === "1" || document.documentElement.dataset.bootError, null, { timeout: 120000 });
   await page.waitForTimeout(800);
   await page.evaluate(async (id) => {
