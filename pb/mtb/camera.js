@@ -17,7 +17,7 @@ export function createChaseCamera(surface, collide = null, pushOut = null) {
   /** Reset (respawn): snap behind the rider. */
   function snap(state) { yaw = state.heading; height = null; }
 
-  function update(state, dt) {
+  function update(state, dt, mode = 0, time = 0) {
     if (yaw === null) yaw = state.heading;
     // follow the heading with a lag that is shorter the faster the rider turns
     let d = state.heading - yaw;
@@ -30,10 +30,10 @@ export function createChaseCamera(surface, collide = null, pushOut = null) {
     const riderY = Math.max(state.y, ground);
     if (height === null) height = riderY;
     height += (riderY - height) * Math.min(1, dt * 5);        // vertical smoothing: no bobbing over bumps
-    const dist = CAMERA.followDistance + Math.min(1.1, speed * 0.05);
+    const dist = (mode === 2 ? CAMERA.farDistance : CAMERA.followDistance) + Math.min(1.1, speed * 0.05);
     const rx = -sy, rz = cy;                                    // the rider's right (x east, z south)
     const wantX = state.x - cy * dist + rx * CAMERA.sideOffset, wantZ = state.z - sy * dist + rz * CAMERA.sideOffset;
-    const wantY = Math.max(height, riderY - 0.4) + CAMERA.followHeight + Math.min(0.5, speed * 0.015);
+    const wantY = Math.max(height, riderY - 0.4) + (mode === 2 ? CAMERA.farHeight : CAMERA.followHeight) + Math.min(0.5, speed * 0.015);
     // shorten the boom until every probe clears the ground
     const eyeX = state.x, eyeY = riderY + 1.1, eyeZ = state.z;
     let t = 1;
@@ -64,7 +64,17 @@ export function createChaseCamera(surface, collide = null, pushOut = null) {
     }
     out.x = px; out.y = py; out.z = pz;
     out.tx = state.x + cy * CAMERA.lookAhead; out.tz = state.z + sy * CAMERA.lookAhead; out.ty = riderY + CAMERA.lookHeight;
-    const targetFov = CAMERA.fov + clamp(speed - 6, 0, 16) * 0.85;
+    if (mode === 1) {                  // helmet camera: the eye on the helmet, a little head shake, looking down the trail
+      const hx = state.x + cy * CAMERA.helmetForward, hz = state.z + sy * CAMERA.helmetForward;
+      out.x = hx; out.z = hz; out.y = Math.max(riderY + CAMERA.helmetHeight - 0.25 * Math.abs(state.lean), surface.height(hx, hz) + CAMERA.minClearance);
+      out.tx = state.x + cy * 14; out.tz = state.z + sy * 14; out.ty = riderY + 0.8 - clamp(state.vy * 0.05, -0.4, 0.4);
+    }
+    // speed sensation: a little shake that grows with speed and rough ground, a wider view when fast
+    const rough = state.grounded ? clamp(state.slip * 0.06 + (state.compression || 0) * 0.5, 0, 0.5) : 0;
+    const amp = CAMERA.shake * (clamp((speed - 9) / 14, 0, 1) + rough);
+    out.y += Math.sin(time * 47) * amp * 0.6 + Math.sin(time * 71 + 1) * amp * 0.4;
+    out.x += Math.sin(time * 53 + 2) * amp * 0.5; out.z += Math.cos(time * 59 + 3) * amp * 0.5;
+    const targetFov = (mode === 1 ? CAMERA.helmetFov : CAMERA.fov) + clamp(speed - 6, 0, 16) * 0.85;
     fovNow += (targetFov - fovNow) * Math.min(1, dt * 2.5);
     out.fov = fovNow;
     out.boom = Math.hypot(px - state.x, pz - state.z);

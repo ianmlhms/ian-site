@@ -7,18 +7,12 @@
 <meta name="robots" content="noindex">
 <title>MTB Mëllerdall · Arcade</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="/pb/mtb/ui.css?v=2">
+<link rel="stylesheet" href="/pb/mtb/ui.css?v=3">
 <script src="/pb/arcade-kit.js?v=34" data-arcade-id="mtb" data-arcade-title="MTB Mëllerdall"></script>
 </head>
 <body>
 <main id="shell">
   <canvas id="mtbCanvas" tabindex="0" role="img" aria-label="Mountain biking through the Mullerthal: a chase view of a rider on a forest trail."></canvas>
-  <div id="title"><span>Mullerthal · Lëtzebuerg</span><b>MTB Mëllerdall</b></div>
-  <div id="hud" aria-live="polite">
-    <div id="speed"><b id="hudSpeed">0</b><small id="hudSpeedUnit">km/h</small></div>
-    <div id="trailInfo"><span id="trailGrade" class="grade"></span><span id="trailName"></span><div class="bar"><i id="trailBar"></i></div></div>
-    <div id="hint"></div>
-  </div>
   <div id="loading" role="status"><div class="box"><div class="ico">🚵</div><b>MTB Mëllerdall</b><div id="bar"><i></i></div><small id="loadMsg">…</small><div class="slow" id="loadSlow" hidden><span id="loadSlowText"></span><br><button type="button" id="loadRetry"></button></div></div></div>
 </main>
 <script>
@@ -56,7 +50,7 @@ if(!window.THREE){
 </script>
 <script type="module">
   // Imports are absolute: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
-  import("/pb/mtb/main.js?v=2");
+  import("/pb/mtb/main.js?v=3");
 </script>
 </body>
 </html>

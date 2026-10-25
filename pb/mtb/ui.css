@@ -1,41 +1,124 @@
-:root { color-scheme: dark; --ink: #fff7e0; --muted: #b8c4b4; --panel: #10201ae6; --line: #ffffff26; --gold: #ffcf5c; --accent: #7bd88f; }
+:root { color-scheme: dark; --ink: #fff7e0; --muted: #b8c4b4; --panel: #10201ae8; --panel2: #162b22f2; --line: #ffffff26; --gold: #ffcf5c; --accent: #7bd88f; --accent2: #4fb870; --warn: #ff8a6b; }
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0e1a14; }
 body { display: flex; flex-direction: column; font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", "Segoe UI", system-ui, sans-serif; color: var(--ink); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
-button { font: inherit; color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
+.hidden { display: none !important; }
 #shell { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; isolation: isolate; }
 #mtbCanvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
-#title { position: absolute; left: 14px; top: calc(10px + env(safe-area-inset-top)); pointer-events: none; text-shadow: 0 1px 6px #000a; }
-#title span { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-#title b { font-size: 18px; letter-spacing: -.3px; }
-
-/* HUD: small, in the corners, never over the trail */
+#title { display: none; }
 #hud { position: absolute; inset: 0; pointer-events: none; }
-#speed { position: absolute; right: 14px; top: calc(10px + env(safe-area-inset-top)); text-align: right; text-shadow: 0 1px 6px #000a; }
-#speed b { font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
-#speed small { font-size: 12px; color: var(--muted); margin-left: 3px; }
-#trailInfo { position: absolute; left: 14px; top: calc(48px + env(safe-area-inset-top)); font-size: 13px; color: var(--ink); text-shadow: 0 1px 6px #000a; }
-#trailInfo .bar { width: 150px; height: 5px; border-radius: 3px; background: #ffffff30; margin-top: 5px; overflow: hidden; }
-#trailInfo .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
-.grade { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid #fff8; }
-.grade.green { background: #3fbf5a; } .grade.blue { background: #3d8bff; } .grade.red { background: #e5483f; } .grade.black { background: #222; }
-#hint { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 8px 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; text-align: center; max-width: min(92vw, 560px); transition: opacity .8s; }
-#hint.gone { opacity: 0; }
-body.touch #hint { bottom: calc(150px + env(safe-area-inset-bottom)); }
+#speed, #trailInfo, #hint { display: none; }
 
-/* touch controls: a steering pad bottom-left, three buttons bottom-right; together under 15 % of the screen */
+/* HUD (in the corners, never over the trail) */
+.mhud { position: absolute; inset: 0; pointer-events: none; z-index: 10; text-shadow: 0 1px 6px #000b; }
+.mhud .hud-tl { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top)); max-width: 40vw; }
+.mhud .trail-line { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mhud .sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.mhud .bar { width: min(190px, 34vw); height: 5px; border-radius: 3px; background: #ffffff30; margin-top: 5px; overflow: hidden; }
+.mhud .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+.mhud .hud-tc { position: absolute; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translateX(-50%); text-align: center; }
+.mhud .clock { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+.mhud .split { min-height: 22px; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .3s; }
+.mhud .split.show { opacity: 1; } .mhud .split.good { color: #6dff8c; } .mhud .split.bad { color: #ff8a7a; }
+.mhud .hud-tr { position: absolute; right: calc(10px + env(safe-area-inset-right)); top: calc(8px + env(safe-area-inset-top)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.mhud .speed b { font-size: 32px; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+.mhud .speed small { font-size: 12px; color: var(--muted); margin-left: 3px; }
+.mhud .hud-btns { display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; justify-content: flex-end; max-width: 60vw; }
+.hbtn { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--line); background: #10201acc; font-size: 20px; display: grid; place-items: center; padding: 0; text-shadow: none; }
+.hbtn:active { transform: scale(.94); }
+.mhud .toast { position: absolute; left: 50%; top: 22%; transform: translate(-50%, -8px); padding: 8px 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); font-weight: 700; opacity: 0; transition: opacity .25s, transform .25s; text-shadow: none; max-width: 86vw; text-align: center; }
+.mhud .toast.show { opacity: 1; transform: translate(-50%, 0); }
+.mhud .toast.good { border-color: #6dff8c88; } .mhud .toast.warn { border-color: #ff8a6b99; }
+.mhud .banner { position: absolute; left: 50%; top: 32%; transform: translate(-50%, 0) scale(.9); font-size: 34px; font-weight: 900; letter-spacing: -.5px; opacity: 0; transition: opacity .2s, transform .2s; color: var(--gold); text-align: center; max-width: 90vw; }
+.mhud .banner.show { opacity: 1; transform: translate(-50%, 0) scale(1); } .mhud .banner.bad { color: #ff9a8a; }
+.grade { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid #fff9; flex: none; }
+.grade.green { background: #3fbf5a; } .grade.blue { background: #3d8bff; } .grade.red { background: #e5483f; } .grade.black { background: #222; }
+.mhud[data-mode="card"] .hud-tr .speed, .mhud[data-mode="card"] .hud-btns .hbtn:not(:first-child) { display: none; }
+
+/* start card: bottom centre, the bike and the trail stay visible above it */
+.mcard { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(560px, 94vw); padding: 14px 16px 12px; border-radius: 22px; background: var(--panel2); border: 1px solid var(--line); box-shadow: 0 10px 40px #0009; z-index: 30; backdrop-filter: blur(6px); animation: rise .35s ease-out; }
+@keyframes rise { from { opacity: 0; } }
+.card-head { display: flex; gap: 8px; align-items: center; } .card-head .grade { width: 18px; height: 18px; margin-right: 4px; }
+.card-head .ct { font-size: 22px; letter-spacing: -.3px; } .card-head .cs { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.3; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 9px; background: var(--gold); color: #3a2a00; font-weight: 800; font-size: 11px; }
+.card-stats { display: flex; gap: 14px; margin-top: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; } .card-stats b { color: var(--ink); } .card-stats .gl { margin-left: auto; font-weight: 700; }
+.card-medals { display: flex; gap: 8px; margin-top: 8px; } .card-medals .mt { flex: 1; text-align: center; background: #ffffff12; border-radius: 12px; padding: 6px 4px; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; }
+.medal { font-size: 18px; vertical-align: -2px; } .medal.m0 { opacity: .35; }
+.card-best { margin-top: 8px; font-size: 14px; } .card-best b { font-variant-numeric: tabular-nums; } .ghost { color: #9fd6ff; font-size: 12px; margin-left: 6px; }
+.locked { margin-top: 8px; padding: 6px 10px; border-radius: 10px; background: #ff8a6b22; color: #ffc9bb; font-size: 13px; }
+.card-go { margin-top: 10px; }
+.bigstart { width: 100%; min-height: 58px; border-radius: 20px; border: 0; background: linear-gradient(180deg, #8fe6a0, #4fb870); color: #0b2415; font-size: 26px; font-weight: 900; letter-spacing: .3px; box-shadow: 0 4px 0 #2e7d4a, 0 8px 18px #0006; text-shadow: none; animation: pulse 1.6s ease-in-out infinite; }
+.bigstart:active { transform: translateY(2px); box-shadow: 0 2px 0 #2e7d4a; } .bigstart:disabled { filter: grayscale(.9); opacity: .55; animation: none; }
+@keyframes pulse { 50% { filter: brightness(1.12); } }
+.card-sub { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.sbtn { flex: 1 1 auto; min-height: 44px; padding: 6px 12px; border-radius: 14px; border: 1px solid var(--line); background: #ffffff14; font-weight: 700; font-size: 14px; text-align: center; }
+.sbtn small { display: block; font-weight: 500; font-size: 11.5px; color: var(--muted); margin-top: 1px; } .sbtn.wide { width: 100%; text-align: left; }
+.sbtn:active { background: #ffffff30; }
+
+/* the animated hint: four steps light up one after the other */
+.mhint { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 8px; padding: 8px 10px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); z-index: 12; transition: opacity .8s; pointer-events: none; }
+.mhint.gone { opacity: 0; } body.touch .mhint { bottom: calc(112px + env(safe-area-inset-bottom)); }
+.mhint .hi { min-width: 74px; text-align: center; padding: 6px 8px; border-radius: 14px; opacity: .55; transition: all .3s; }
+.mhint .hi.on { opacity: 1; background: #7bd88f33; transform: translateY(-3px) scale(1.06); }
+.mhint .ico { display: block; font-size: 24px; } .mhint .cap { display: block; font-size: 12px; font-weight: 800; } .mhint .keys { display: block; font-size: 11px; color: var(--muted); }
+
+/* 3 - 2 - 1 - Go */
+.mcount { position: absolute; inset: 0; display: grid; align-content: start; justify-items: center; padding-top: 15%; pointer-events: none; z-index: 40; }
+.mcount .lights { display: flex; gap: 14px; padding: 10px 18px; background: #111c; border-radius: 30px; border: 2px solid #ffffff44; } .mcount .lights i { width: 28px; height: 28px; border-radius: 50%; background: #2a2a2a; } .mcount .lights i.r { background: #ff3b30; box-shadow: 0 0 18px #ff3b30; }
+.mcount.go .lights i { background: #34c759; box-shadow: 0 0 18px #34c759; }
+.mcount .num { font-size: 110px; font-weight: 900; line-height: 1.1; text-shadow: 0 4px 20px #000a; } .mcount.go .num { color: #7bff8f; }
+.mcount.pop .num { animation: pop .5s ease-out; } @keyframes pop { from { transform: scale(1.8); opacity: 0; } }
+
+/* finish */
+.mfinish { position: absolute; inset: 0; display: grid; place-items: center; background: #0008; z-index: 50; padding: 12px; }
+.fin-box { width: min(520px, 94vw); max-height: 94%; overflow: auto; padding: 18px 18px 14px; border-radius: 24px; background: var(--panel2); border: 1px solid var(--line); text-align: center; animation: rise2 .4s ease-out; }
+@keyframes rise2 { from { opacity: 0; } }
+.fin-title { font-size: 30px; font-weight: 900; } .fin-trail { color: var(--muted); margin-top: 2px; }
+.fin-medal { margin: 8px 0; } .fin-medal .medal { font-size: 64px; display: block; animation: spin .8s ease-out; } .fin-medal .mn { font-weight: 800; }
+@keyframes spin { from { transform: rotateY(180deg) scale(.4); opacity: 0; } }
+.fin-time { font-size: 20px; } .fin-time b { font-size: 36px; font-variant-numeric: tabular-nums; display: block; } .newbest { display: inline-block; padding: 2px 10px; border-radius: 10px; background: var(--gold); color: #3a2a00; font-weight: 900; font-size: 14px; }
+.fin-best, .fin-next { color: var(--muted); font-size: 14px; margin-top: 4px; } .fin-ghost { margin-top: 6px; color: #9fd6ff; font-weight: 700; } .fin-ghost.lost { color: var(--muted); }
+.fin-unlock { margin-top: 6px; padding: 6px 10px; border-radius: 12px; background: #ffcf5c22; color: var(--gold); font-weight: 800; }
+.fin-splits { display: flex; gap: 6px 10px; flex-wrap: wrap; justify-content: center; font-size: 12px; margin-top: 10px; color: var(--muted); font-variant-numeric: tabular-nums; } .sp.good { color: #6dff8c; } .sp.bad { color: #ff9a8a; }
+.fin-btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; } .fin-btns .bigstart { flex: 1 1 100%; font-size: 22px; min-height: 52px; animation: none; }
+
+/* menu */
+.mmenu { position: absolute; inset: 0; display: grid; place-items: center; background: #0009; z-index: 60; padding: 8px; }
+.menu-box { width: min(980px, 98vw); max-height: 98%; display: flex; flex-direction: column; border-radius: 22px; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; }
+.menu-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); } .menu-head b { font-size: 18px; }
+.menu-tabs { display: flex; gap: 4px; flex: 1; overflow-x: auto; } .tab { min-height: 44px; padding: 0 14px; border-radius: 14px; border: 0; background: transparent; font-weight: 700; white-space: nowrap; } .tab.on { background: #7bd88f33; color: #c9ffd5; }
+.x { width: 44px; height: 44px; border-radius: 14px; border: 1px solid var(--line); background: #ffffff14; font-size: 18px; }
+.menu-body { padding: 12px; overflow: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+.trails-grid { display: grid; grid-template-columns: minmax(0, 420px) 1fr; gap: 12px; } .map-wrap canvas { width: 100%; height: auto; border-radius: 16px; border: 2px solid #ffffff33; display: block; touch-action: manipulation; } .map-cap { text-align: center; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.trail-list { display: flex; flex-direction: column; gap: 6px; } .trail-row { display: flex; align-items: center; gap: 8px; min-height: 54px; padding: 6px 12px; border-radius: 16px; border: 1px solid var(--line); background: #ffffff10; text-align: left; } .trail-row.cur { border-color: var(--accent); background: #7bd88f22; } .trail-row.locked { opacity: .7; }
+.trail-row .tn { flex: 1; min-width: 0; } .trail-row b { display: block; } .trail-row small { color: var(--muted); font-size: 12px; }
+.menu-extra { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.bikes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; } .bike { padding: 12px; border-radius: 18px; border: 1px solid var(--line); background: #ffffff10; } .bike.cur { border-color: var(--accent); background: #7bd88f22; } .bike.locked { opacity: .6; }
+.bike .bn { display: flex; align-items: center; gap: 8px; font-size: 17px; flex-wrap: wrap; } .bike .sw { width: 18px; height: 18px; border-radius: 6px; border: 1px solid #fff8; } .bike p { margin: 6px 0; font-size: 13px; color: var(--muted); }
+.bars label { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 3px 0; } .bars .b { flex: 1; height: 7px; background: #ffffff22; border-radius: 4px; overflow: hidden; margin-left: auto; width: 55%; } .bars .b i { display: block; height: 100%; background: var(--accent); }
+.bike-points { margin-bottom: 8px; color: var(--gold); font-weight: 800; }
+.settings { display: flex; flex-direction: column; gap: 8px; max-width: 520px; } .srow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 4px 12px; border-radius: 14px; background: #ffffff10; font-weight: 700; }
+.srow select { min-height: 40px; padding: 0 10px; border-radius: 10px; background: #0b1810; border: 1px solid var(--line); max-width: 55%; } .note { color: var(--muted); font-size: 12.5px; margin: 4px 2px; }
+.help h4 { margin: 10px 0 4px; } .help ul { margin: 0; padding-left: 20px; line-height: 1.6; font-size: 14px; } .help .tips { margin-top: 12px; list-style: none; padding: 0; }
+.morient { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); padding: 10px 16px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); z-index: 70; text-align: center; max-width: 80vw; }
+
+/* touch controls: steering pad bottom-left, brake / pedal / jump bottom-right; together under 15 % of the screen */
 #touchControls { position: absolute; inset: auto 0 0 0; height: 0; pointer-events: none; z-index: 20; }
-#touchControls .pad { position: absolute; left: calc(14px + env(safe-area-inset-left)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 168px; height: 76px; border-radius: 38px; background: #ffffff1c; border: 2px solid #ffffff44; pointer-events: auto; touch-action: none; display: grid; place-items: center; }
+#touchControls .pad { position: absolute; left: calc(14px + env(safe-area-inset-left)); bottom: calc(16px + env(safe-area-inset-bottom)); width: 168px; height: 76px; border-radius: 38px; background: #ffffff1c; border: 2px solid #ffffff44; pointer-events: auto; touch-action: none; display: grid; place-items: center; }
 #touchControls .pad .knob { position: absolute; width: 58px; height: 58px; border-radius: 50%; background: #ffffff66; border: 2px solid #fff9; left: 50%; margin-left: -29px; }
 #touchControls .pad .lbl { position: absolute; font-size: 15px; color: #fff9; letter-spacing: 70px; padding-left: 70px; pointer-events: none; }
-#touchControls .btns { position: absolute; right: calc(14px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: flex-end; }
-#touchControls .tbtn { pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid #ffffff55; background: #ffffff22; font-size: 22px; display: grid; place-items: center; backdrop-filter: blur(2px); }
+#touchControls .btns { position: absolute; right: calc(12px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: flex-end; }
+#touchControls .tbtn { pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid #ffffff55; background: #ffffff22; font-size: 22px; display: grid; place-items: center; backdrop-filter: blur(2px); padding: 0; }
+#touchControls .tbtn small { display: block; font-size: 9px; margin-top: -2px; opacity: .8; }
 #touchControls .tbtn.big { width: 84px; height: 84px; background: #7bd88f44; border-color: #7bd88faa; font-size: 26px; }
 #touchControls .on { background: #ffffff55 !important; }
 body:not(.touch) #touchControls { display: none; }
+body.menuopen #touchControls, body.cardopen #touchControls { display: none; }
 
-#loading { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #2a4a36, #0b1810); z-index: 60; transition: opacity .6s; }
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #2a4a36, #0b1810); z-index: 80; transition: opacity .6s; }
 #loading.done { opacity: 0; pointer-events: none; }
 #loading .box { text-align: center; width: min(340px, 80%); }
 #loading .ico { font-size: 54px; margin-bottom: 6px; animation: bob 1.4s ease-in-out infinite; }
@@ -46,4 +129,8 @@ body:not(.touch) #touchControls { display: none; }
 #loading .slow { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.35; }
 #loading .slow button { margin-top: 10px; padding: 9px 18px; border-radius: 18px; border: 1px solid #ffffff44; background: #ffffff18; font-weight: 700; cursor: pointer; }
 @keyframes bob { 50% { transform: translateY(-6px); } }
-@media (prefers-reduced-motion: reduce) { #loading .ico { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #loading .ico, .bigstart, .mcard, .fin-box, .fin-medal .medal, .mcount.pop .num { animation: none !important; } }
+
+/* small screens and portrait */
+@media (max-width: 760px) { .trails-grid { grid-template-columns: 1fr; } .mhud .hud-tl { max-width: 46vw; } .mhud .clock { font-size: 24px; } .mcard { padding: 10px 12px; } .card-head .ct { font-size: 19px; } .mhint .hi { min-width: 62px; padding: 4px 4px; } }
+@media (max-height: 520px) { .mcard { width: min(520px, 60vw); left: auto; right: 12px; transform: none; bottom: 8px; animation: none; } .card-stats, .card-medals { margin-top: 5px; } .fin-medal .medal { font-size: 44px; } }

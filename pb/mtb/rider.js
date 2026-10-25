@@ -37,7 +37,7 @@ const VERTEX = `
 `;
 const FRAGMENT = `
   precision highp float;
-  varying vec3 vN; varying vec3 vC; varying vec3 vWorld; varying float vDist;
+  varying vec3 vN; varying vec3 vC; varying vec3 vWorld; varying float vDist; uniform float uAlpha; uniform vec3 uTint;
   ${PAINT_LIGHT_GLSL}
   void main(){
     vec3 N = normalize(vN);
@@ -46,7 +46,7 @@ const FRAGMENT = `
     vec3 c = paintLightW(vC, N, mix(1.0, 0.8, uCloud * 0.6), 1.0, vWorld);
     c += uAmbSky * pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 3.0) * 0.12 * vC;              // a faint rim keeps the dark parts readable against the forest
     c *= 1.0 - 0.2 * uWet;
-    gl_FragColor = vec4(applyFogW(pow(c, vec3(0.97)), vDist, vWorld.y), 1.0);
+    gl_FragColor = vec4(applyFogW(pow(c, vec3(0.97)), vDist, vWorld.y) * uTint, uAlpha);
   }
 `;
 
@@ -80,10 +80,10 @@ function discRing(b, centre, rIn, rOut, color, zOff = 0) {            // a flat 
   b.addArrays(pos, nor, idx, () => color);
 }
 
-function wheelGeometry(rimColor, tyreColor) {
+function wheelGeometry(rimColor, tyreColor, tyreMinor = 0.034) {
   const b = new Builder();
-  const tyre = new THREE.TorusGeometry(WHEEL_R - 0.034, 0.034, 10, 32);
-  b.add(tyre, M(0, 0, 0), (v) => { const k = 0.82 + 0.18 * Math.sin(Math.atan2(v.y, v.x) * 36); const side = Math.abs(v.z) / 0.034; return mul(tyreColor, k * (1 - 0.25 * side * side) * (1 + 0.5 * Math.max(0, side - 0.8))); });
+  const tyre = new THREE.TorusGeometry(WHEEL_R - tyreMinor, tyreMinor, 10, 32);
+  b.add(tyre, M(0, 0, 0), (v) => { const k = 0.82 + 0.18 * Math.sin(Math.atan2(v.y, v.x) * 36); const side = Math.abs(v.z) / tyreMinor; return mul(tyreColor, k * (1 - 0.25 * side * side) * (1 + 0.5 * Math.max(0, side - 0.8))); });
   const rim = new THREE.TorusGeometry(WHEEL_R - 0.07, 0.009, 6, 32);
   b.add(rim, M(0, 0, 0, 1, 1, 1.9), () => rimColor);
   for (let i = 0; i < 28; i++) {                                         // spokes: from the hub flange to the rim, crossing over
@@ -117,11 +117,23 @@ function place(mesh, from, to) {
   mesh.quaternion.setFromUnitVectors(V3(0, 1, 0), d.normalize());
 }
 
+/* The four bikes look different: tyre width, tube thickness, a rear shock (not on the hardtail), a second fork crown and a full-face helmet on the downhill bike. */
+const BIKE_LOOK = Object.freeze({
+  hardtail: { tyre: 0.027, tube: 0.9, shock: false, crown2: false, fullFace: false, travel: 0.04 },
+  trail: { tyre: 0.033, tube: 1.0, shock: true, crown2: false, fullFace: false, travel: 0.07 },
+  enduro: { tyre: 0.039, tube: 1.12, shock: true, crown2: false, fullFace: false, travel: 0.09 },
+  downhill: { tyre: 0.045, tube: 1.25, shock: true, crown2: true, fullFace: true, travel: 0.11 },
+});
+export const COLOUR_HEX = Object.freeze({ red: '#d8452e', blue: '#2b6fd0', green: '#2f9e6b', yellow: '#e8c32a', orange: '#e8832a', purple: '#7b49c8', black: '#26282b', white: '#eeeeea' });
+export const HELMET_HEX = Object.freeze({ plain: '#f2f0e6', stripe: '#f2f0e6', flame: '#e8832a', gold: '#e8c32a' });
+
 export function createRider(env, palette = {}) {
+  const look = BIKE_LOOK[palette.bike] || BIKE_LOOK.trail;
   const frameC = col(palette.frame || '#d8452e'), jerseyC = col(palette.jersey || '#2b6fd0'), helmetC = col(palette.helmet || '#f2f0e6');
   const shortsC = col('#2a3340'), skinC = col('#d9a67f'), darkC = col('#25282b'), glovesC = col('#30343a'), shoeC = col('#3a3f46'), padC = col('#1d2023');
   const tyreC = col('#1d1e20'), rimC = col('#aeb4b8'), forkC = col('#c9a23a');
-  const material = new THREE.ShaderMaterial({ uniforms: { ...env.uniforms }, vertexShader: VERTEX, fragmentShader: FRAGMENT, side: THREE.DoubleSide });
+  const ghost = palette.ghost === true;
+  const material = new THREE.ShaderMaterial({ uniforms: { ...env.uniforms, uAlpha: { value: ghost ? 0.42 : 1 }, uTint: { value: ghost ? new THREE.Vector3(0.7, 0.9, 1.25) : new THREE.Vector3(1, 1, 1) } }, vertexShader: VERTEX, fragmentShader: FRAGMENT, side: THREE.DoubleSide, transparent: ghost, depthWrite: !ghost });
   const meshOf = (b) => { const m = new THREE.Mesh(b.build ? b.build() : b, material); m.frustumCulled = false; return m; };
 
   const root = new THREE.Group(); root.name = 'mtb-rider';
@@ -138,7 +150,10 @@ export function createRider(env, palette = {}) {
     rod(fb, BB.clone().add(V3(0, 0, s * 0.02)), REAR_AXLE.clone().add(V3(0, 0, s * 0.062)), 0.014, 0.011, frameC, 5);                // chain stays
     rod(fb, REAR_AXLE.clone().add(V3(0, 0, s * 0.062)), SEAT_CLUSTER.clone().add(V3(0.01, -0.06, s * 0.012)), 0.01, 0.01, frameC, 5);   // seat stays
   }
-  rod(fb, V3(-0.3, 0.62, 0.0), V3(-0.38, 0.345, 0), 0.012, 0.012, darkC, 5);                // rear shock link (a small linkage rod)
+  if (look.shock) {
+    rod(fb, V3(-0.3, 0.62, 0.0), V3(-0.38, 0.345, 0), 0.012, 0.012, darkC, 5);                // rear shock link (a small linkage rod)
+    rod(fb, V3(-0.12, 0.5, 0.03), V3(-0.3, 0.36, 0.03), 0.026, 0.02, forkC, 6);                // the rear shock body
+  }
   fb.add(new THREE.CylinderGeometry(0.1, 0.1, 0.012, 20).rotateX(Math.PI / 2), M(0, 0.31, 0.055), () => darkC);     // chainring
   rod(fb, V3(0.0, 0.31, 0.058), V3(-0.56, 0.355, 0.056), 0.004, 0.004, [0.2, 0.2, 0.22], 3);       // chain (upper run)
   rod(fb, V3(0.0, 0.21, 0.058), V3(-0.56, 0.31, 0.056), 0.004, 0.004, [0.2, 0.2, 0.22], 3);        // chain (lower run)
@@ -148,7 +163,7 @@ export function createRider(env, palette = {}) {
   bikeG.add(meshOf(fb));
 
   // ---- wheels
-  const wheelGeo = wheelGeometry(rimC, tyreC);
+  const wheelGeo = wheelGeometry(rimC, tyreC, look.tyre);
   const rearWheel = new THREE.Mesh(wheelGeo, material); rearWheel.position.copy(REAR_AXLE); rearWheel.frustumCulled = false; bikeG.add(rearWheel);
 
   // ---- steering assembly: bars, stem, upper fork (rotates about the head-tube axis)
@@ -166,6 +181,7 @@ export function createRider(env, palette = {}) {
   sb.add(new THREE.CylinderGeometry(0.026, 0.026, 0.05, 8), M(0, -0.02, 0), () => darkC);     // headset cup
   const crown = rel(HEAD_LOW);
   sb.add(new THREE.BoxGeometry(0.07, 0.04, 0.16), M(crown.x, crown.y - 0.02, 0), () => darkC);            // fork crown
+  if (look.crown2) sb.add(new THREE.BoxGeometry(0.07, 0.04, 0.18), M(crown.x + 0.0, crown.y + 0.1, 0), () => darkC);            // the downhill bike's second crown
   for (const s of [-1, 1]) rod(sb, V3(crown.x, crown.y - 0.03, s * 0.075), V3(crown.x, crown.y - 0.03, s * 0.075).addScaledVector(FORK_AXIS, 0.17), 0.016, 0.016, forkC, 7);   // stanchions
   steerG.add(meshOf(sb));
   // ---- lower fork + front wheel (slides up the head axis when the fork compresses, steers with the bars)
@@ -207,6 +223,7 @@ export function createRider(env, palette = {}) {
   torsoB.add(new THREE.BoxGeometry(0.1, 0.34, 0.2), M(-0.095, 0.26, 0), () => [0.15, 0.17, 0.2]);
   const torso = meshOf(torsoB); body.add(torso);
   const headB = new Builder();
+  if (look.fullFace) headB.add(new THREE.BoxGeometry(0.1, 0.07, 0.14), M(0.12, 0.13, 0, 1, 1, 1, 0, 0, -0.35), () => mul(helmetC, 0.9));        // the full-face chin bar
   capsule(headB, 0.07, 0.044, 0.04, skinC, 1, 1, 8);                                          // neck
   headB.add(new THREE.SphereGeometry(0.092, 12, 10), M(0.015, 0.2, 0, 1, 1.08, 0.95), () => skinC);
   const shell = new THREE.SphereGeometry(0.118, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62);
@@ -305,6 +322,14 @@ export function createRider(env, palette = {}) {
       // the bike leans fully into the turn, the rider a little less (hips out, head up)
       tilt.rotation.set(state.lean * 0.9, 0, extra.pitch);
       body.rotation.set(-state.lean * 0.16, 0, 0);
+      if (state.crashed) {                                          // a stylised tumble: the bike pitches over, rolls onto its side and the rider lies beside it
+        const k = Math.min(1, state.crashT / 0.75);
+        const e = 1 - (1 - k) * (1 - k);
+        tilt.rotation.set(state.lean * 0.9 + e * 1.45, 0, extra.pitch - 0.7 * Math.sin(Math.PI * k));
+        root.position.y += 0.55 * Math.sin(Math.PI * Math.min(1, k * 1.1)) * Math.min(1, 1.6 - k);
+        body.rotation.set(-state.lean * 0.16 - e * 0.9, 0, e * 0.4);
+        body.position.set(-0.2 * e, 0.0, 0.3 * e);
+      } else body.position.set(0, 0, 0);
       const dt = extra.dt || 0.016;
       const sp = Math.hypot(state.vx, state.vy, state.vz);
       spin += sp * dt / WHEEL_R;
@@ -315,7 +340,7 @@ export function createRider(env, palette = {}) {
       // steering about the (tilted) head-tube axis; the fork lowers slide up the axis when compressing
       steerQ.setFromAxisAngle(forkAxisUp.clone().normalize(), -state.steer * 0.35);
       steerG.quaternion.copy(steerQ);
-      lowerG.position.copy(forkAxisUp).multiplyScalar(comp * 0.07);
+      lowerG.position.copy(forkAxisUp).multiplyScalar(comp * look.travel);
       crankG.rotation.z = (pose.stand > 0.5 ? 0 : state.crank);
       for (const p of pedals) p.rotation.z = 0;
       poseBody(state, extra);

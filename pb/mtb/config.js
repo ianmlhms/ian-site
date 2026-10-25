@@ -83,6 +83,10 @@ export const CAMERA = Object.freeze({
   lookAhead: 5.5,           // the camera looks this far ahead along the heading
   lookHeight: 1.0,          // ... at this height above the rider's ground
   minClearance: 0.55,       // the camera never gets closer than this to the ground (m)
+  farDistance: 7.2,         // the far chase camera
+  farHeight: 3.4,
+  helmetForward: 0.32, helmetHeight: 1.72, helmetFov: 78,
+  shake: 0.055,             // m of camera shake at full speed on rough ground
   clearanceProbe: 6,        // ground probes along the camera boom
   bodyRadius: 0.55,         // the camera is a ball of this radius: it never sits inside a trunk, a crown or a rock
 });
