@@ -14,6 +14,7 @@ window.TS = window.TS || {};
   const T = THREE;
   const ATLAS = 512;
   const TILES = { c0: [0, 0, 256, 256], c1: [256, 0, 256, 256], c2: [0, 256, 256, 256], bark: [256, 256, 128, 256], birch: [384, 256, 128, 256] };
+  const WHITE = [504, 250];
   const SPECIES = ['oak', 'beech', 'birch', 'spruce', 'poplar', 'bush', 'tuft'];
 
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -87,6 +88,7 @@ window.TS = window.TS || {};
     paintCluster(g, TILES.c0[0], TILES.c0[1], 256, 11); paintCluster(g, TILES.c1[0], TILES.c1[1], 256, 23); paintCluster(g, TILES.c2[0], TILES.c2[1], 256, 37);
     paintBark(g, TILES.bark[0], TILES.bark[1], TILES.bark[2], TILES.bark[3], 5, false);
     paintBark(g, TILES.birch[0], TILES.birch[1], TILES.birch[2], TILES.birch[3], 9, true);
+    g.fillStyle = '#fff'; g.fillRect(WHITE[0] - 5, WHITE[1] - 5, 10, 10);       // a pure white texel block: geometry that only wants its vertex colours (grass tufts)
     const tex = new T.CanvasTexture(c);
     tex.colorSpace = T.NoColorSpace;          // painted values multiply the vertex colours directly
     tex.wrapS = tex.wrapT = T.ClampToEdgeWrapping; tex.anisotropy = 2;
@@ -300,9 +302,9 @@ window.TS = window.TS || {};
 
   /* grass tuft of the verge (cab-view texture): 3 blades near, 2 crossed quads mid, nothing far (meta.range) */
   function tuftSpecies() {
-    const out = [], lo = C('#4a6f2a'), hi = C('#a3b45a');
+    const out = [], lo = C('#5d8a34'), hi = C('#b6c760');
     const mk = (lod) => {
-      const gb = new GB(), uv = coreUv(0.5, 0.5), blades = lod === 0 ? [[0.12, 0, 0], [0.4, 2.1, 0.1], [-0.38, 4.2, -0.1]] : [[0.2, 0.4, 0], [-0.2, 2.2, 0]];
+      const gb = new GB(), uv = [WHITE[0] / ATLAS, 1 - WHITE[1] / ATLAS], blades = lod === 0 ? [[0.12, 0, 0], [0.4, 2.1, 0.1], [-0.38, 4.2, -0.1]] : [[0.2, 0.4, 0], [-0.2, 2.2, 0]];
       blades.forEach(([tilt, rot, off], i) => {
         const h = 0.55 + i * 0.06, w = lod === 0 ? 0.09 : 0.12, sides = lod === 0 ? 3 : 2, cr = Math.cos(rot), sr = Math.sin(rot);
         const rotY = (x, y, z) => [x * cr + z * sr, y, -x * sr + z * cr];
