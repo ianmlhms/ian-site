@@ -4,7 +4,7 @@
 import { runIfMain } from "./lib.mjs";
 
 const PAGE = "/pb/mtb.html?debug=1&q=medium&time=noon&weather=clear";
-const DATA_BUDGET = 6 * 1024 * 1024;
+const DATA_BUDGET = 6 * 1024 * 1024;       // the baked data (4.5 MB) plus the painted texture set (data/tex, about 1 MB)
 /* W2 budgets: unchanged for medium and high; `low` gets 140 draw calls (was 130) for the forest / rock / water / rider sets, its triangles stay at 330 k (measured at the trail start: low 133 calls / 258 k, medium 147 / 433 k, high 166 / 774 k; the busiest gorge scenes reach about 1.0 M triangles on high). */
 const BUDGET = { low: { calls: 140, tris: 330000 }, medium: { calls: 190, tris: 520000 }, high: { calls: 230, tris: 900000 } };
 
@@ -44,6 +44,16 @@ export const flow = {
       h.expect(s.calls > 20 && s.calls <= BUDGET[q].calls, `${q}: ${s.calls} draw calls (<= ${BUDGET[q].calls})`);
       h.expect(s.tris > 30000 && s.tris <= BUDGET[q].tris, `${q}: ${s.tris} triangles (<= ${BUDGET[q].tris})`);
       await h.shot("quality-" + q);
+      // W3 art: a busy gorge pose (rock walls, beech forest, a stream) must fit the same budget, not only the trail start
+      const g = await page.evaluate(async () => {
+        const m = window.__mtb, c = m.centre[780], d = m.centre[786], yaw = Math.atan2(d[1] - c[1], d[0] - c[0]);
+        m.teleport(c[0], c[1]);
+        const y = m.surface.height(c[0], c[1]) + 1.6;
+        m.setCamera({ x: c[0], y, z: c[1], tx: c[0] + Math.cos(yaw) * 50, ty: y, tz: c[1] + Math.sin(yaw) * 50, fov: 70 });
+        await new Promise((r) => setTimeout(r, 2200));
+        return { calls: m.perf.drawCalls, tris: m.perf.triangles };
+      });
+      h.expect(g.calls <= BUDGET[q].calls && g.tris <= BUDGET[q].tris, `${q} gorge pose: ${g.calls} draw calls, ${g.tris} triangles (<= ${BUDGET[q].calls} / ${BUDGET[q].tris})`);
     }
 
     h.step("weather + time: the choice changes the scene and is stored; Random is the default");

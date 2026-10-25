@@ -64,6 +64,7 @@ const FRAGMENT = `
       if (tex.a < 0.5) discard;
       float oak = step(0.5, tile) * step(tile, 1.5) + step(10.5, tile) * step(tile, 13.5);
       albedo = vColor * tex.rgb * mix(vec3(0.8, 0.97, 0.74) * mix(vec3(1.0), vec3(0.82, 0.96, 0.78), oak), vec3(1.04, 1.0, 0.96), uSeason);                // summer: fresh green (the painted sprigs are lime), autumn keeps the paint
+      albedo.r = mix(albedo.r, min(albedo.r, albedo.g * 0.7), 1.0 - uSeason);               // summer leaves stay green: no lime-yellow crowns (autumn is the season option)
       isLeaf = 1.0;
       // autumn: every tree turns at its own time, every cluster has its own colour (holly and spruce stay green)
       float evergreen = step(2.5, tile) * step(tile, 3.5) + step(5.5, tile) * step(tile, 6.5);

@@ -17,13 +17,13 @@ fs.mkdirSync(out, { recursive: true });
 
 /* pose: { at: [x, z] | { trail: index }, up: metres above the ground, yaw: degrees (0 = east, 90 = south), pitch, fov }; hideRider: true */
 const SPECS = [
-  { name: "montage-w2-1-schiessentuempel", ref: "trail1.jpg", caption: "Schiessentümpel: the cascade below the arched footbridge", size: [720, 1088], q: "high", time: "noon", weather: "clear", season: "summer",
+  { name: "montage-w3-1-schiessentuempel", ref: "trail1.jpg", caption: "Schiessentümpel: the cascade below the arched footbridge", size: [720, 1088], q: "high", time: "noon", weather: "clear", season: "summer",
     pose: { at: [1556.5, 5764.5], up: 2.4, yaw: 108, pitch: 8, fov: 52 } },
-  { name: "montage-w2-2-rock-corridor", ref: "wolfsschlucht090.jpg", caption: "Rock corridor: sandstone walls on both sides of the way", size: [1280, 720], q: "high", time: "noon", weather: "clear", season: "summer",
+  { name: "montage-w3-2-rock-corridor", ref: "wolfsschlucht090.jpg", caption: "Rock corridor: sandstone walls on both sides of the way", size: [1280, 720], q: "high", time: "noon", weather: "clear", season: "summer",
     pose: { trail: 38, up: 1.6, yawFromTrail: true, pitch: 6, fov: 64 } },
-  { name: "montage-w2-3-beech-trail", ref: "enlightened.jpg", caption: "Beech forest trail", size: [1080, 720], q: "high", time: "morning", weather: "clear", season: "summer",
+  { name: "montage-w3-3-beech-trail", ref: "enlightened.jpg", caption: "Beech forest trail", size: [1080, 720], q: "high", time: "morning", weather: "clear", season: "summer",
     pose: { trail: 2210, up: 1.7, yawFromTrail: true, pitch: 4, fov: 74 } },
-  { name: "montage-w2-4-meadow-plateau", ref: "plateau_beaufort.jpg", caption: "Meadow plateau: crop fields, hedges, woods", size: [960, 720], q: "high", time: "noon", weather: "cloudy", season: "summer",
+  { name: "montage-w3-4-meadow-plateau", ref: "plateau_beaufort.jpg", caption: "Meadow plateau: crop fields, hedges, woods", size: [960, 720], q: "high", time: "noon", weather: "cloudy", season: "summer",
     pose: { at: [740, 1940], up: 11, yaw: 270, pitch: -7, fov: 55 } },
 ];
 

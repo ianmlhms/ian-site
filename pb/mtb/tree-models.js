@@ -273,7 +273,7 @@ export function buildBlobTree(species, detail) {
     b.add(geo, M(x, y, z, 1, 1, 1, rng() * 6), (v, n) => {
       const top = clamp01((v.y - (y - rad)) / (2 * rad));
       const shade = 0.5 + 0.55 * top + 0.12 * n.y;
-      const gold = Math.max(0, valueNoise(v.x * 9, v.z * 9 + v.y * 4, 5) - 0.62) * 1.3;
+      const gold = Math.max(0, valueNoise(v.x * 9, v.z * 9 + v.y * 4, 5) - 0.7) * 0.7;
       return [(green[0] + gold * 0.5) * shade, (green[1] + gold * 0.2) * shade, green[2] * shade * (1 - gold * 0.3)];
     }, -1);
   }

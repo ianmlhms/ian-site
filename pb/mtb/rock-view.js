@@ -62,7 +62,9 @@ const FRAGMENT = `
     float sandL = lum(sand);
     // moss cover: thick on the up-facing parts and the damp foot, patchy on the faces (north faces and shade carry more), thicker when wet
     float damp = 1.0 - smoothstep(0.1, 2.2, vLocalY);
-    float mossAmt = smoothstep(0.4, 0.95, N.y) * 0.85 + damp * 0.55 + (1.0 - w.y) * 0.2;
+    // ivy / moss curtains hang from the top edges down the faces in vertical strips
+    float curtain = smoothstep(0.5, 0.78, texture2D(uNoise, vec2((P.x + P.z) * 0.9, P.y * 0.05 + vSeed)).g) * smoothstep(0.25, 0.9, vTop) * (1.0 - w.y);
+    float mossAmt = smoothstep(0.4, 0.95, N.y) * 0.85 + damp * 0.7 + (1.0 - w.y) * 0.3 + curtain * 0.7;
     mossAmt = mossAmt * smoothstep(0.2, 0.75, nA * 0.5 + nB * 0.5 + 0.12 + uWet * 0.2 + (1.0 - clamp(dot(N, normalize(uSunDir)), 0.0, 1.0)) * 0.18);
     mossAmt = clamp(mossAmt, 0.0, 0.92);
     vec3 mossT = uDetail > 0.5 ? tri(uRockMoss, P, w, SCALE * 0.9) : vec3(0.36, 0.5, 0.2);

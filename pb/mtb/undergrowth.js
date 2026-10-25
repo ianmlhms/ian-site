@@ -36,9 +36,10 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees, rid
       const x = x0 + (i + 0.5) * fstep + (rng() - 0.5) * fstep, z = z0 + (j + 0.5) * fstep + (rng() - 0.5) * fstep;
       const roll = rng(), seed = rng(), sizeRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
-      const forest = m.cover * (1 - m.grass) * (1 - m.built) * (1 - m.water) * (1 - m.rock);
+      sampleFieldCell(map, x, z, cell);
+      const forest = Math.max(m.cover * (1 - m.grass) * (1 - m.built) * (1 - m.water) * (1 - m.rock), cell.cliff * 0.7 * (1 - m.grass) * (1 - m.water));     // ferns fill the foot of the cliffs too
       if (forest < 0.25) continue;
-      const clump = smooth(-0.1, 0.45, fbm(x, z, 11, 2, 41)) * (0.45 + 0.9 * m.wet);
+      const clump = smooth(-0.1, 0.45, fbm(x, z, 11, 2, 41)) * (0.45 + 0.9 * m.wet + 0.9 * cell.cliff);
       if (roll > clump * forest) continue;
       if (!wayFree(clearance, x, z, 0.9) || !clearOf(x, z, CLEAR.fern)) continue;
       surface.normal(x, z, nrm);
