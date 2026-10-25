@@ -30,6 +30,7 @@ begin
   perform public.assert_not_kart();
   cap := case p_game when 'paket-express-daily' then 1000000 when 'mtb-daily' then 10000000 else null end;
   if cap is null or p_score is null or p_score < 0 or p_score > cap then return false; end if;
+  if p_game = 'mtb-daily' and p_score > 9940000 then return false; end if;      -- a daily run under 60 s is not a ride (same floor as scripts/mtb-floor.sql)
   insert into public.daily_scores(day, user_id, game_id, username, score, updated_at)
   values(public.lux_today(), uid, p_game, (select username from public.profiles where id = uid), p_score, now())
   on conflict (day, user_id, game_id) do update
