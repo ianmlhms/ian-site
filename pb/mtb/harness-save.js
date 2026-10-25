@@ -686,7 +686,7 @@ section('score reporter');
   reporter.submitRun('maratoun', 2100000, 'Maratoun');
   check('the caller may pass the display name', calls[0][1].name === 'MTB Mëllerdall · Maratoun');
   calls.length = 0;
-  check('selectBoard only sets the board', reporter.selectBoard('binzelt-black', 'Binzelt') === true && calls.length === 1 && calls[0][1].id === 'mtb-binzelt-black');
+  check('selectBoard only sets the board', reporter.selectBoard('waschbrunnen-black', 'Binzelt') === true && calls.length === 1 && calls[0][1].id === 'mtb-waschbrunnen-black');
   calls.length = 0;
   check('selectBoard(null) clears the board', reporter.selectBoard(null) === true && same(calls, [['board', null]]));
   calls.length = 0;

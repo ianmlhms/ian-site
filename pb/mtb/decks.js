@@ -8,6 +8,7 @@ export const DECK = Object.freeze({
   sink: 0.7,                // m the abutment blocks reach below the bank (they are buried: no gap, nothing floats)
   overhang: 0.35,           // m the deck extends beyond its end samples, onto the banks
   stickBelow: 0.45,         // the bike counts as "on" the deck when it is at most this far below the surface
+  maxGrade: 0.3,            // rise / run of a deck
   margin: 0.1,              // m beside the deck that still count as deck for the bike (rails keep it on)
 });
 
@@ -29,6 +30,7 @@ export function buildDecks(features, surface) {
       const line = topA + (topB - topA) * t;
       if (g > line) { const raise = g - line; topA += raise; topB += raise; }
     }
+    if (Math.abs(topB - topA) / total > DECK.maxGrade) continue;            // (the baker already refuses these; a deck is never a wall)
     decks.push(Object.freeze({ id: decks.length, x0: a.x, z0: a.z, x1: b.x, z1: b.z, ux, uz, len: total, w: f.w || 1.9, yaw: Math.atan2(dz, dx), topA, topB, way: f.way }));
   }
   return decks;

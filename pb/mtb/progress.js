@@ -14,7 +14,7 @@
 import { decodeGhost } from './ghost.js';
 
 export const SAVE_VERSION = 1;
-export const TRAIL_IDS = Object.freeze(['ernz-waldwee', 'hallerbach-flow', 'schiessentuempel', 'rotzbaach-rocks', 'binzelt-black', 'maratoun']);
+export const TRAIL_IDS = Object.freeze(['ernz-waldwee', 'hallerbach-flow', 'schiessentuempel', 'binzelt-rocks', 'waschbrunnen-black', 'maratoun']);
 export const MARATHON_ID = 'maratoun';
 export const BIKE_IDS = Object.freeze(['hardtail', 'trail', 'enduro', 'downhill']);
 export const COLOUR_IDS = Object.freeze(['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'black', 'white']);

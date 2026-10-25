@@ -25,6 +25,7 @@ from common import OUT_DIR
 
 DENSE = 2.0                 # m between analysis points
 EDGE_FREE = 45.0            # no feature within this distance of the start and the finish (the gate and the arch need calm ground)
+MAX_DECK_GRADE = 0.16       # a bridge deck is never steeper than this (rise / run)
 MIN_GAP = 22.0              # m between features
 KINDS_STREAM = (4, 5)       # stream, river (ditches are too small for a bridge)
 GRADE_FEATURES = {
@@ -293,6 +294,9 @@ def build(td, a, streams):
         length = 9.0 if kind == 5 else 7.0
         s0 = s - length / 2
         if s0 < EDGE_FREE * 0.5 or s0 + length > a["length"] - EDGE_FREE * 0.5 or a["blocked"][int(s0 / DENSE):int((s0 + length) / DENSE) + 1].any():
+            continue
+        hA, hB = float(np.interp(s0, a["s"], a["h"])), float(np.interp(s0 + length, a["s"], a["h"]))
+        if abs(hB - hA) / length > MAX_DECK_GRADE:                      # a bridge over a creek at the foot of a stair would be a ramp: the trail fords it instead
             continue
         placer.add(a, "bridge", s0, length, w=1.9)
     slope, kappa, cls = a["slope"], a["kappa"], a["cls"]

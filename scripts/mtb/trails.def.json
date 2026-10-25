@@ -97,10 +97,10 @@
    "fr": "Piste du Schiessentümpel"
   },
   "blurb": {
-   "lb": "Duerch d'Schwaarz-Iernz-Dall bis bei de Waasserfall a seng Steebréck",
-   "de": "Durchs Tal der Schwarzen Ernz bis zum Wasserfall und seiner Steinbrücke",
-   "en": "Down the Black Ernz valley to the waterfall and its stone bridge",
-   "fr": "Par la vallée de l'Ernz noire jusqu'à la cascade et son pont de pierre"
+   "lb": "Duerch d'Dall vun der Schwaarzer Iernz erof an dann zum Schiessentümpel",
+   "de": "Durchs Tal der Schwarzen Ernz hinab und dann zum Schiessentümpel",
+   "en": "Down the Black Ernz valley and then to the Schiessentümpel",
+   "fr": "Dans la vallée de l'Ernz noire puis jusqu'au Schiessentümpel"
   },
   "via": [
    [
@@ -112,32 +112,20 @@
     4781
    ],
    [
-    1768,
-    5329
+    2007,
+    5266
    ],
    [
-    1706,
-    5450
+    1905,
+    5448
    ],
    [
-    1550,
-    5666
+    1707,
+    5549
    ],
    [
-    1527,
-    5751
-   ],
-   [
-    1531,
-    5779
-   ],
-   [
-    1522,
-    5817
-   ],
-   [
-    1474,
-    5913
+    1595,
+    5691
    ]
   ],
   "style": {
@@ -156,73 +144,19 @@
   "gradeLimit": 3.0
  },
  {
-  "id": "rotzbaach-rocks",
+  "id": "binzelt-rocks",
   "grade": "red",
   "name": {
-   "lb": "Rotzbaach-Fielsen",
-   "de": "Rotzbach-Felsen",
-   "en": "Rotzbach Rocks",
-   "fr": "Rochers du Rotzbach"
+   "lb": "Binzelt-Fielsen",
+   "de": "Binzelt-Felsen",
+   "en": "Binzelt Rocks",
+   "fr": "Rochers du Binzelt"
   },
   "blurb": {
-   "lb": "Duerch d'Fielsegäss vu Berdref: Stufen, Wuerzelen, eng Fielsplack",
-   "de": "Durch die Felsengassen von Berdorf: Stufen, Wurzeln, eine Felsplatte",
-   "en": "Through the rock alleys of Berdorf: steps, roots, a rock slab",
-   "fr": "Dans les ruelles rocheuses de Berdorf : marches, racines, une dalle de roche"
-  },
-  "via": [
-   [
-    4600,
-    1420
-   ],
-   [
-    4430,
-    1300
-   ],
-   [
-    4390,
-    1170
-   ],
-   [
-    4383,
-    1034
-   ],
-   [
-    4500,
-    900
-   ],
-   [
-    4630,
-    793
-   ]
-  ],
-  "style": {
-   "seed": 5,
-   "rollers": 2,
-   "kickers": 2,
-   "drops": 3,
-   "berms": 3,
-   "slabs": 3,
-   "roots": 4,
-   "mud": 0,
-   "boardwalks": 0,
-   "leaves": 2
-  }
- },
- {
-  "id": "binzelt-black",
-  "grade": "black",
-  "name": {
-   "lb": "Binzelt-Schwaarz",
-   "de": "Binzelt-Schwarz",
-   "en": "Binzelt Black",
-   "fr": "Binzelt Noir"
-  },
-  "blurb": {
-   "lb": "Steil erof duerch d'Binzeltschlüff: Sprénge, Drops a ganz schmuel Gäss",
-   "de": "Steil hinab durch die Binzeltschlüff: Sprünge, Drops und ganz enge Gassen",
-   "en": "Steep down through the Binzelt cleft: jumps, drops and very tight alleys",
-   "fr": "Raide descente par la faille de Binzelt : sauts, drops et ruelles étroites"
+   "lb": "Duerch d'Binzeltschlüff: Fielsentrap, Wuerzelen a kleng Sprénge",
+   "de": "Durch die Binzeltschlüff: Felsentreppe, Wurzeln und kleine Sprünge",
+   "en": "Through the Binzelt cleft: rock stairs, roots and small jumps",
+   "fr": "Par la faille de Binzelt : escaliers de roche, racines et petits sauts"
   },
   "via": [
    [
@@ -246,28 +180,66 @@
     2071
    ],
    [
-    3926,
-    2134
+    3903,
+    2094
+   ]
+  ],
+  "style": {
+   "seed": 5,
+   "rollers": 2,
+   "kickers": 2,
+   "drops": 2,
+   "berms": 3,
+   "slabs": 3,
+   "roots": 4,
+   "mud": 0,
+   "boardwalks": 0,
+   "leaves": 2
+  }
+ },
+ {
+  "id": "waschbrunnen-black",
+  "grade": "black",
+  "name": {
+   "lb": "Waschbrunnen-Schwaarz",
+   "de": "Waschbrunnen-Schwarz",
+   "en": "Waschbrunnen Black",
+   "fr": "Waschbrunnen Noire"
+  },
+  "blurb": {
+   "lb": "184 Meter erof duerch d'Fielsegäss vu Berdref: Totekammer, Waschbrunnen, Steekräiz",
+   "de": "184 Meter hinab durch die Felsengassen von Berdorf: Totenkammer, Waschbrunnen, Steinkreuz",
+   "en": "184 metres down through the rock alleys of Berdorf: Totenkammer, Waschbrunnen, Steinkreuz",
+   "fr": "184 mètres de descente dans les ruelles rocheuses de Berdorf : Totenkammer, Waschbrunnen, Steinkreuz"
+  },
+  "via": [
+   [
+    4587,
+    1030
    ],
    [
-    3941,
-    2202
+    4424,
+    1108
    ],
    [
-    3963,
-    2234
+    4307,
+    1058
    ],
    [
-    3976,
-    2274
+    4325,
+    936
    ],
    [
-    3936,
-    2336
+    4256,
+    735
    ],
    [
-    3841,
-    2562
+    4053,
+    606
+   ],
+   [
+    3767,
+    794
    ]
   ],
   "style": {
@@ -275,14 +247,15 @@
    "rollers": 1,
    "kickers": 3,
    "drops": 4,
-   "berms": 3,
-   "slabs": 2,
+   "berms": 4,
+   "slabs": 3,
    "roots": 3,
    "mud": 0,
    "boardwalks": 0,
    "leaves": 2
   },
-  "seenPenalty": 1.0
+  "seenPenalty": 1.0,
+  "gradeLimit": 3.0
  },
  {
   "id": "maratoun",

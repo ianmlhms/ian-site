@@ -193,7 +193,7 @@ async function worldChecks() {
   const play = buildPlayWorld(data);
   const { surface, ground, groundAt, trails, decks, field } = play;
   console.log(`  world built in ${((Date.now() - t0) / 1000).toFixed(1)} s: ${trails.length} trails, ${decks.length} bridge decks`);
-  check('six trails, ids in the unlock order', trails.map((t) => t.id).join() === 'ernz-waldwee,hallerbach-flow,schiessentuempel,rotzbaach-rocks,binzelt-black,maratoun', trails.map((t) => t.id).join());
+  check('six trails, ids in the unlock order', trails.map((t) => t.id).join() === 'ernz-waldwee,hallerbach-flow,schiessentuempel,binzelt-rocks,waschbrunnen-black,maratoun', trails.map((t) => t.id).join());
   check('the four grades are all present', ['green', 'blue', 'red', 'black'].every((g) => trails.some((t) => t.grade === g)));
   const marathon = trails.find((t) => t.id === 'maratoun');
   check(`the Marathon is the long one (${Math.round(marathon.length)} m, > 9 km) on the official GPX`, marathon.length > 9000);
@@ -247,6 +247,13 @@ async function worldChecks() {
   return play;
 }
 
+/** Medal times from the reference ride: gold a little faster than the reference rider, silver a little slower, bronze generous. */
+export const MEDAL_FACTORS = Object.freeze({ gold: 0.95, silver: 1.12, bronze: 1.5 });
+function medalTable(time, splits) {
+  const r1 = (v) => Math.round(v * 10) / 10;
+  return { ref: r1(time), gold: r1(time * MEDAL_FACTORS.gold), silver: r1(time * MEDAL_FACTORS.silver), bronze: r1(time * MEDAL_FACTORS.bronze), splits: splits.map(r1) };
+}
+
 function respawnFor(trail, ground) { return (s, planIndex) => stateAt(trail, Math.max(0, trail.nearest(s.x, s.z, 0) - 4), ground, 1); }
 
 async function rideChecks(play) {
@@ -286,11 +293,18 @@ if (want('trails') || want('rides')) {
   const play = await worldChecks();
   if (want('rides')) {
     const rides = await rideChecks(play);
+    const stored = JSON.parse(fs.readFileSync(path.join(HERE, 'data', 'medals.json'), 'utf8'));
     if (flag('write-medals')) {
       const medals = {};
-      for (const [id, r] of Object.entries(rides)) if (r.finished) medals[id] = { ref: Math.round(r.time * 10) / 10, splits: r.splits.map((v) => Math.round(v * 10) / 10) };
-      fs.writeFileSync(path.join(HERE, 'data', 'medals.ref.json'), JSON.stringify(medals));
-      console.log('  wrote data/medals.ref.json');
+      for (const [id, r] of Object.entries(rides)) if (r.finished) medals[id] = medalTable(r.time, r.splits);
+      fs.writeFileSync(path.join(HERE, 'data', 'medals.json'), JSON.stringify(medals));
+      console.log('  wrote data/medals.json');
+    } else if (!QUICK && !trailArg) {
+      for (const [id, r] of Object.entries(rides)) {
+        const m = stored[id];
+        check(`${id}: stored medal times match the reference ride (${m ? m.ref : 'none'} s vs ${r.time.toFixed(1)} s, within 4 %)`, !!m && Math.abs(m.ref - r.time) < 0.04 * r.time);
+        if (m) check(`${id}: gold < silver < bronze, all within 3 x the reference`, m.gold < m.silver && m.silver < m.bronze && m.bronze < 3 * m.ref && m.gold > 0.6 * m.ref);
+      }
     }
   }
 }
