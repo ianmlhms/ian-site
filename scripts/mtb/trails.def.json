@@ -164,10 +164,13 @@
    "before": 4,
    "after": 2
   },
-  "focus": [
-   1545.7,
-   5784.6
-  ]
+  "focus": {
+   "camX": 1553,
+   "camZ": 5766,
+   "camUp": 4.2,
+   "lookX": 1528,
+   "lookZ": 5790
+  }
  },
  {
   "id": "binzelt-rocks",

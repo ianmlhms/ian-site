@@ -544,11 +544,13 @@ async function boot() {
     else if (!replay) ghostRider.root.visible = false;
 
     const c = frozenCamera || chase.update(replay ? replayBike() : bike, dt, camMode, elapsed);
-    const focus = current.trail && current.trail.focus;                  // a trail that ends at a sight (the Schiessentuempel falls): once finished, the camera turns to look at it
-    focusBlend = !frozenCamera && focus && game.mode === 'finished' ? Math.min(1, focusBlend + dt * 0.7) : Math.max(0, focusBlend - dt * 2);
+    const focus = current.trail && current.trail.focus;                  // a trail that ends at a sight (the Schiessentuempel falls): once finished, the camera glides to a spot below the bridge and looks across at the rider on the deck, the falls beside the finish card
+    focusBlend = !frozenCamera && focus && game.mode === 'finished' ? Math.min(1, focusBlend + dt * 0.6) : Math.max(0, focusBlend - dt * 2);
     if (focusBlend > 0 && focus) {
       const k = focusBlend * focusBlend * (3 - 2 * focusBlend);
-      c.tx += (focus[0] - c.tx) * k; c.tz += (focus[1] - c.tz) * k; c.ty += (surface.height(focus[0], focus[1]) + 1.2 - c.ty) * k;
+      const fy = surface.height(focus.camX, focus.camZ) + focus.camUp, ly = surface.height(focus.lookX, focus.lookZ) + 2.2;
+      c.x += (focus.camX - c.x) * k; c.y += (fy - c.y) * k; c.z += (focus.camZ - c.z) * k;
+      c.tx += (focus.lookX - c.tx) * k; c.ty += (ly - c.ty) * k; c.tz += (focus.lookZ - c.tz) * k;
     }
     camera.position.set(c.x, c.y, c.z);
     camera.lookAt(c.tx, c.ty, c.tz);
