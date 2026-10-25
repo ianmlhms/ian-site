@@ -39,7 +39,7 @@ export function createInput({ root, onAction }) {
   root.appendChild(ui);
   const pad = ui.querySelector('.pad'), knob = ui.querySelector('.knob');
   const bindPointer = (el, kind) => {
-    el.addEventListener('pointerdown', (e) => { e.preventDefault(); el.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { kind, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY }); usedTouch = true; el.classList.add('on'); });
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (error) { /* synthetic pointer (tests): no capture needed */ } pointers.set(e.pointerId, { kind, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY }); usedTouch = true; el.classList.add('on'); });
     const move = (e) => { const p = pointers.get(e.pointerId); if (p) { p.x = e.clientX; p.y = e.clientY; } };
     const up = (e) => { pointers.delete(e.pointerId); el.classList.remove('on'); };
     el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);

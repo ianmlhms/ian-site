@@ -2,8 +2,8 @@
  * Frame: x = east, y = up, z = south, metres, origin = the NORTH-WEST corner of the world box (scripts/mtb/common.py maps it onto LUREF). */
 
 export const WORLD = Object.freeze({
-  width: 6144,              // m (x), 12 blocks of 512
-  depth: 4608,              // m (z), 9 blocks of 512
+  width: 5632,              // m (x), 11 blocks of 512
+  depth: 5632,              // m (z), 11 blocks of 512
   block: 512,
   playInset: 192,           // the playable box is the world minus this border; beyond it an invisible wall turns the rider back
   featherDist: 128,         // the 2 m LiDAR grid fades into the 32 m distant-hills grid over this distance from its edge
@@ -27,6 +27,7 @@ export const QUADTREE = Object.freeze({
   rootZ: -12288,
   splitFactor: 1.0,         // a 64 m node splits when the rider is within 64 m: LOD 0 tiles (32 m, 1 m spacing) cover every tile within 64 m, so the rider's 3 x 3 tiles (>= 32 m margin) are always LOD 0
   splitHysteresis: 0.08,
+  protectedSize: 128,       // nodes up to this size always use the full split factor (the 3 x 3 LOD 0 rule); a quality setting only coarsens the bigger, farther nodes
   skirtDepth: 2.5,          // m the skirt hangs below its edge (belt and braces behind the exact stitching)
   skirtPerStep: 0.6,        // + this many m per m of node spacing
   carveFullStep: 1,         // way carving is applied in full up to this node spacing ...

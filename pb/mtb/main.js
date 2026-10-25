@@ -104,6 +104,7 @@ async function boot() {
   if (holeMode) env.sky.visible = false;
   scene.add(env.sky);
   const groundMaterial = createGroundMaterial(THREE, env, textures, worldMaps, WORLD);
+  groundMaterial.uniforms.uTreeRadius.value = quality.treeRadius;
 
   // ---- world
   const terrain = createTerrainView({ scene, surface, field, material: groundMaterial, quality });
@@ -207,6 +208,7 @@ async function boot() {
     camera.lookAt(c.tx, c.ty, c.tz);
     if (Math.abs(camera.fov - c.fov) > 0.05) { camera.fov = c.fov; camera.updateProjectionMatrix(); }
     camera.far = quality.far;
+    groundMaterial.uniforms.uTreeRadius.value = quality.treeRadius;
 
     env.update(dt, camera, elapsed);
     terrain.update(frozenCamera ? c.x : bike.x, frozenCamera ? c.z : bike.z);

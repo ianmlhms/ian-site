@@ -46,7 +46,7 @@ export function createTerrainView({ scene, surface, field, material, quality }) 
     frame += 1;
     if (Math.hypot(px - last.x, pz - last.z) <= RESELECT_DISTANCE && stats.pending === 0 && lastScale === quality.lodScale) return stats;
     lastScale = quality.lodScale;
-    const sel = selectTiles(px, pz, { previous: split, scale: 1 / quality.lodScale, maxDistance: quality.far * 1.45 });
+    const sel = selectTiles(px, pz, { previous: split, scale: quality.lodScale, maxDistance: quality.far * 1.45 });
     split = sel.split;
     last = { x: px, z: pz };
     const centre = (l) => Math.hypot(l.x0 + l.size / 2 - px, l.z0 + l.size / 2 - pz);

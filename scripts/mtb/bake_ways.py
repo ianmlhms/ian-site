@@ -13,7 +13,7 @@ import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import OSM_DIR, OUT_DIR, RAW_DIR, WORLD_H, WORLD_W, lonlat_to_world  # noqa: E402
+from common import OUT_DIR, RAW_DIR, WORLD_H, WORLD_W, load_osm, lonlat_to_world  # noqa: E402
 from shapely.geometry import LineString, box  # noqa: E402
 
 KIND = {"trail": 0, "path": 1, "track": 2, "road": 3}
@@ -81,12 +81,11 @@ def unused_runs(geometry, used):
 
 def main():
     used = load_used_edges()
-    data = json.load(open(os.path.join(OSM_DIR, "ways.json"), encoding="utf-8"))
     clip = box(-MARGIN, -MARGIN, WORLD_W + MARGIN, WORLD_H + MARGIN)
     meta = []
     blob = bytearray()
     total_pts = 0
-    for el in data["elements"]:
+    for el in load_osm("ways"):
         tags = el.get("tags", {})
         kind = HIGHWAY_KIND.get(tags.get("highway"))
         if not kind or "geometry" not in el:

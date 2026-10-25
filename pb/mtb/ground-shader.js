@@ -13,8 +13,9 @@ export const PAINT_LIGHT_GLSL = `
     float banded = floor(diff * 4.0 + 0.5) / 4.0;
     diff = mix(diff, banded, 0.22);
     vec3 amb = mix(uAmbGround, uAmbSky, N.y * 0.5 + 0.5);
-    vec3 light = amb * shade + uSunColor * diff * sunMul;
-    return albedo * light;
+    vec3 light = amb * shade * 0.62 + uSunColor * diff * sunMul * 0.74;
+    vec3 c = albedo * light;
+    return c / (1.0 + c * 0.22) * 1.12;                    // soft shoulder: bright sunlit leaves roll off instead of clipping to neon
   }
   vec3 applyFog(vec3 col, float dist){
     float f = 1.0 - exp(-pow(dist * uFogDensity, 2.0));
@@ -38,7 +39,7 @@ export const GROUND_FRAGMENT = `
   precision highp float;
   uniform sampler2D uLitter, uMoss, uDirt, uRock, uNoise, uMapCover, uMapCanopy;
   uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor;
-  uniform float uFogDensity, uTime, uWet, uNight, uCloud;
+  uniform float uFogDensity, uTime, uWet, uNight, uCloud, uTreeRadius;
   uniform vec2 uWorldSize, uWind;
   varying vec3 vWorld; varying vec3 vNormal; varying float vCover; varying float vDist;
   ${PAINT_LIGHT_GLSL}
@@ -68,7 +69,7 @@ export const GROUND_FRAGMENT = `
     litter = mix(litter, litter * vec3(0.78, 0.82, 0.74), mk.r * 0.55);                 // dense canopy: cooler, darker floor
     litter = mix(litter, litter * vec3(1.18, 1.02, 0.78), nLo.b * 0.5 * (1.0 - mk.r));  // open ground: warmer
     vec3 mossC = mix(texture2D(uMoss, Q * 0.37).rgb, texture2D(uMoss, Qs * 0.37).rgb, sideK) * (0.7 + 0.6 * texture2D(uMoss, Q * 0.06).g);
-    vec3 grassC = mix(vec3(0.42, 0.6, 0.24), vec3(0.64, 0.7, 0.3), nMid.r) * (0.62 + 0.75 * texture2D(uMoss, Q * 0.5).g);
+    vec3 grassC = mix(vec3(0.4, 0.5, 0.22), vec3(0.58, 0.58, 0.28), nMid.r) * (0.62 + 0.75 * texture2D(uMoss, Q * 0.5).g);
     grassC = mix(grassC, vec3(0.76, 0.7, 0.34), mk.a * 0.6 * step(0.5, nLo.g));         // farmland: patches of stubble
     vec3 dirtC = texture2D(uDirt, Q * 0.62).rgb * (0.82 + 0.4 * nMid.g);
     // sandstone: horizontal strata from the world height, vertical weathering streaks
@@ -95,6 +96,12 @@ export const GROUND_FRAGMENT = `
     albedo = mix(albedo, grassC, grassW);
     albedo = mix(albedo, rockC, rockW);
     albedo = mix(albedo, mossC * vec3(0.9, 1.0, 0.85), clamp(ledgeMoss, 0.0, 1.0) * 0.8 * (1.0 - trailW));
+    // seen from afar the forest is its canopy, not its floor: painted leaf blotches (the trees themselves are only drawn within uTreeRadius)
+    float farK = smoothstep(uTreeRadius * 0.55, uTreeRadius * 1.5, vDist) * mk.r * (1.0 - rockW * 0.8) * (1.0 - grassW);
+    vec3 canopyC = mix(vec3(0.15, 0.25, 0.12), vec3(0.3, 0.4, 0.17), smoothstep(0.3, 0.8, nMid.g * 0.6 + nHi.b * 0.5));
+    canopyC = mix(canopyC, vec3(0.36, 0.34, 0.14), smoothstep(0.78, 0.92, nLo.g) * 0.55);       // a few golden / spruce-dark patches
+    albedo = mix(albedo, canopyC * (0.8 + 0.4 * texture2D(uMoss, Q * 0.2).g), farK);
+    trailW *= 1.0 - smoothstep(110.0, 260.0, vDist);                                   // a 1 m path cannot be drawn by far, coarse tiles
     albedo = mix(albedo, dirtC * (1.0 - 0.32 * uWet), trailW);
     albedo = mix(albedo, vec3(0.6, 0.58, 0.54) * (0.8 + 0.4 * nHi.g), smoothstep(0.4, 0.8, mc.g));          // built-up ground
     albedo = mix(albedo, vec3(0.16, 0.3, 0.34), smoothstep(0.4, 0.8, mc.b));
@@ -120,7 +127,7 @@ export function createGroundMaterial(THREE, env, textures, worldMaps, worldSize)
   const uniforms = {
     ...env.uniforms,
     uLitter: { value: textures.litter }, uMoss: { value: textures.moss }, uDirt: { value: textures.dirt }, uRock: { value: textures.sandstone },
-    uMapCover: { value: worldMaps.cover }, uMapCanopy: { value: worldMaps.canopy }, uWorldSize: { value: new THREE.Vector2(worldSize.width, worldSize.depth) },
+    uTreeRadius: { value: 150 }, uMapCover: { value: worldMaps.cover }, uMapCanopy: { value: worldMaps.canopy }, uWorldSize: { value: new THREE.Vector2(worldSize.width, worldSize.depth) },
   };
   return new THREE.ShaderMaterial({ uniforms, vertexShader: GROUND_VERTEX, fragmentShader: GROUND_FRAGMENT, side: THREE.FrontSide });
 }

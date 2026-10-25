@@ -19,6 +19,9 @@ import { flow as ccSigninHint } from "./cc_signin_hint.mjs";
 import { flow as invitesLight } from "./invite_pop_light.mjs";
 import { flow as adminKartSaves } from "./admin_kart_saves.mjs";
 import { flow as mediaCache } from "./messenger_media_cache.mjs";
+import { flow as mtbWorld } from "./mtb_world.mjs";
+import { flow as mtbHoles } from "./mtb_holes.mjs";
+import { flow as mtbRide } from "./mtb_ride.mjs";
 
 const GLOBAL_PLAYWRIGHT = "/opt/homebrew/lib/node_modules/@playwright/cli/node_modules/playwright";
 async function importPlaywright() {
@@ -32,7 +35,7 @@ async function importPlaywright() {
   throw new Error("Playwright not found: set PLAYWRIGHT_DIR to a playwright package folder.");
 }
 
-const ALL = [mediaCache, adminKartSaves, invitesLight, ccSigninHint, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleResetSafety, leaderboardBigScores, driveMadLevels];
+const ALL = [mtbWorld, mtbHoles, mtbRide, mediaCache, adminKartSaves, invitesLight, ccSigninHint, idleRebirthHalloween, idleMoreContent, idleSoftcap, idleResetSafety, leaderboardBigScores, driveMadLevels];
 const words = process.argv.slice(2);
 const flows = words.length ? ALL.filter((f) => words.some((w) => f.name.includes(w))) : ALL;
 const { webkit } = await importPlaywright();

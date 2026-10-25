@@ -28,14 +28,14 @@ OUT_DIR = os.path.join(REPO, "pb", "mtb", "data")
 for _d in (OSM_DIR, RAW_DIR, OUT_DIR):
     os.makedirs(_d, exist_ok=True)
 
-# ---- the world: a block grid of 512 m blocks (12 x 9 = 6.14 x 4.61 km) --------------------------------------------------
+# ---- the world: a block grid of 512 m blocks (11 x 11 = 5.63 x 5.63 km) --------------------------------------------------
 BLOCK = 512.0
-BLOCKS_X = 12
-BLOCKS_Z = 9
-WORLD_W = BLOCK * BLOCKS_X       # 6144 m
-WORLD_H = BLOCK * BLOCKS_Z       # 4608 m
-ORIGIN_E = 87000.0               # LUREF easting of x = 0   (west edge): Schiessentümpel at x 376, Berdorf at x 5340, Hohllay at x 5943
-ORIGIN_N_TOP = 100608.0          # LUREF northing of z = 0  (north edge): Beaufort castle at z ~700, Müllerthal village at z ~3100
+BLOCKS_X = 11
+BLOCKS_Z = 11
+WORLD_W = BLOCK * BLOCKS_X       # 5632 m
+WORLD_H = BLOCK * BLOCKS_Z       # 5632 m
+ORIGIN_E = 87900.0               # LUREF easting of x = 0   (west edge): Beaufort castle at x 550, Haller 310, Schiessentümpel 2000, Berdorf 5090, Hohllay 5040
+ORIGIN_N_TOP = 100308.0          # LUREF northing of z = 0  (north edge): Beaufort castle at z 356, Berdorf 1800, Schiessentümpel 4990, Müllerthal village 5315
 FAR_MARGIN = 8192.0              # the distant-hills field reaches this far beyond the playable box on every side
 
 
@@ -94,6 +94,10 @@ def overpass(query, cache_name, tries=3):
     raise SystemExit("All Overpass mirrors failed for %s: %s" % (cache_name, last))
 
 
+# OSM is fetched in two tiles because the first download (north) was done before the world was moved south: (south, west, north, east) in WGS84.
+OSM_TILES = {"": (49.7947, 6.2598, 49.8434, 6.3564), "_s": None}   # "_s" is filled in below
+
+
 def _wgs_box(margin=400.0):
     lons, lats = [], []
     for x, z in ((-margin, -margin), (WORLD_W + margin, -margin), (-margin, WORLD_H + margin), (WORLD_W + margin, WORLD_H + margin)):
@@ -104,3 +108,22 @@ def _wgs_box(margin=400.0):
 
 
 WGS_BOX = _wgs_box()
+_s, _w, _n, _e = WGS_BOX
+OSM_TILES["_s"] = (_s, min(_w, 6.2598) - 0.0005, 49.7947 + 0.0004, max(_e, 6.3564) + 0.0005)       # the strip south of the first tile (and a little east)
+
+
+def load_osm(name):
+    """Elements of an Overpass download over all tiles, merged (a way that crosses two tiles is kept once)."""
+    seen, out = set(), []
+    for suffix in OSM_TILES:
+        path = os.path.join(OSM_DIR, name + suffix + ".json")
+        if not os.path.exists(path) or os.path.getsize(path) < 50:
+            continue
+        with open(path, encoding="utf-8") as fh:
+            for el in json.load(fh).get("elements", []):
+                key = (el.get("type"), el.get("id"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(el)
+    return out

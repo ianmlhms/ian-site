@@ -9,7 +9,7 @@ import json
 import math
 import os
 
-from common import OSM_DIR, lonlat_to_world
+from common import load_osm, lonlat_to_world
 
 PENALTY = {"path": 1.0, "footway": 1.05, "track": 1.1, "cycleway": 1.2, "bridleway": 1.0, "service": 1.8, "unclassified": 3.5,
            "residential": 4.0, "tertiary": 4.5, "secondary": 6.0, "living_street": 4.0, "pedestrian": 4.0, "steps": 30.0}
@@ -84,6 +84,6 @@ class Graph:
 
 def load_graph():
     g = Graph()
-    for el in json.load(open(os.path.join(OSM_DIR, "ways.json"), encoding="utf-8"))["elements"]:
+    for el in load_osm("ways"):
         g.add_way(el)
     return g

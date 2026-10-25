@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import OSM_DIR, OUT_DIR, RAW_DIR, REPO, lonlat_to_world  # noqa: E402
+from common import OUT_DIR, RAW_DIR, REPO, lonlat_to_world, load_osm  # noqa: E402
 
 x0, z0, w, h = [float(v) for v in sys.argv[1:5]]
 out = sys.argv[5]
@@ -28,7 +28,7 @@ d = ImageDraw.Draw(img)
 f = ImageFont.load_default()
 T = lambda x, z: ((x - x0) / mpp, (z - z0) / mpp)
 col = {"path": (255, 140, 0), "footway": (255, 170, 0), "steps": (255, 220, 0), "track": (60, 60, 255), "cycleway": (0, 190, 255), "service": (120, 120, 120)}
-for e in json.load(open(os.path.join(OSM_DIR, "ways.json"), encoding="utf-8"))["elements"]:
+for e in load_osm("ways"):
     t = e["tags"]
     xs, zs = lonlat_to_world([p["lon"] for p in e["geometry"]], [p["lat"] for p in e["geometry"]])
     if xs.max() < x0 or xs.min() > x0 + w or zs.max() < z0 or zs.min() > z0 + h:

@@ -18,7 +18,7 @@ from shapely.geometry import LineString
 from shapely.ops import polygonize, unary_union
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from common import OSM_DIR, OUT_DIR, WORLD_H, WORLD_W, lonlat_to_world  # noqa: E402
+from common import OUT_DIR, WORLD_H, WORLD_W, load_osm, lonlat_to_world  # noqa: E402
 
 CELL = 4.0
 NX, NZ = int(WORLD_W / CELL), int(WORLD_H / CELL)
@@ -83,7 +83,7 @@ def main():
     img = Image.new("L", (NX, NZ), 0)
     draw = ImageDraw.Draw(img)
     items = []
-    for el in json.load(open(os.path.join(OSM_DIR, "areas.json"), encoding="utf-8"))["elements"]:
+    for el in load_osm("areas"):
         k = klass(el.get("tags", {}))
         if k is None:
             continue
@@ -102,14 +102,14 @@ def main():
                 draw.polygon(ring, fill=0)
     # buildings: footprint + one cell
     nb = 0
-    for el in json.load(open(os.path.join(OSM_DIR, "buildings.json"), encoding="utf-8"))["elements"]:
+    for el in load_osm("buildings"):
         if el.get("geometry") and len(el["geometry"]) > 3:
             pts = to_px(el["geometry"])
             draw.polygon(pts, fill=4)
             draw.line(pts, fill=4, width=2)
             nb += 1
     # water ways: rivers 3 m wide, streams 1.5 m
-    for el in json.load(open(os.path.join(OSM_DIR, "waterways.json"), encoding="utf-8"))["elements"]:
+    for el in load_osm("waterways"):
         if el["type"] == "way" and el.get("geometry"):
             draw.line(to_px(el["geometry"]), fill=5, width=2 if el["tags"].get("waterway") == "river" else 1)
     arr = np.array(img, dtype=np.uint8)
@@ -119,10 +119,9 @@ def main():
     counts = {int(k): int((arr == k).sum()) for k in range(8)}
     print("classes.bin", len(blob), "bytes;", nb, "buildings;", {k: "%.1f%%" % (100 * v / arr.size) for k, v in counts.items()})
     # POI / landmarks
-    poi_path = os.path.join(OSM_DIR, "poi.json")
-    if os.path.exists(poi_path):
+    if True:
         pois = []
-        for el in json.load(open(poi_path, encoding="utf-8"))["elements"]:
+        for el in load_osm("poi") + [e for e in load_osm("waterways") if e["type"] == "node"]:
             t = el.get("tags", {})
             lat = el.get("lat") or el.get("center", {}).get("lat")
             lon = el.get("lon") or el.get("center", {}).get("lon")
