@@ -67,7 +67,7 @@ export function buildBeech(detail) {
     const geo = blob(r, detail === 0 ? 0 : 1, rng, 0.6);
     b.add(geo, M(x, y, z, 1, 1, 1, rng() * 6), (v, n) => {
       const top = Math.min(1, Math.max(0, (v.y - (y - r)) / (2 * r)));
-      const shade = 0.5 + 0.7 * top + 0.16 * n.y;
+      const shade = 0.46 + 0.56 * top + 0.14 * n.y;
       const gold = Math.max(0, valueNoise(v.x * 9, v.z * 9 + v.y * 4, 5) - 0.62) * 1.3;        // a few yellowing leaf clusters
       return [(green[0] + gold * 0.5) * shade * (0.9 + 0.2 * top), (green[1] + gold * 0.22) * shade, (green[2]) * shade * (1 - gold * 0.4) * (1.15 - 0.3 * top)];
     });

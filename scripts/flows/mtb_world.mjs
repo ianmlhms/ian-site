@@ -71,6 +71,24 @@ export const flow = {
     }
     await page.evaluate(() => localStorage.removeItem("pb_mtb_lang"));
 
+    h.step("runs as a srcdoc iframe, the way the arcade loads games");
+    await boot(h, "/pb/mtb.html?q=low&time=noon&weather=clear");
+    const framed = await page.evaluate(async () => {
+      const html = await (await fetch("/pb/mtb.html", { cache: "no-cache" })).text();
+      const frame = document.createElement("iframe");
+      frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0;z-index:999";
+      frame.srcdoc = html;
+      document.body.appendChild(frame);
+      const t0 = Date.now();
+      while (Date.now() - t0 < 90000) {
+        const d = frame.contentDocument && frame.contentDocument.documentElement;
+        if (d && (d.dataset.mtbReady === "1" || d.dataset.bootError)) return { ready: d.dataset.mtbReady === "1", error: d.dataset.bootError || "", frames: frame.contentWindow.__mtb ? frame.contentWindow.__mtb.perf.frames : -1 };
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      return { ready: false, error: "timeout" };
+    });
+    h.expect(framed.ready && framed.error === "", `the game boots inside a srcdoc iframe (${framed.error || "no error"})`);
+
     h.step("render loop stops when the page is hidden and resumes");
     await boot(h, "/pb/mtb.html?debug=1&q=low&time=noon&weather=clear");
     const f0 = await page.evaluate(() => window.__mtb.perf.frames);

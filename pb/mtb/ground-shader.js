@@ -70,7 +70,7 @@ export const GROUND_FRAGMENT = `
     litter = mix(litter, litter * vec3(1.18, 1.02, 0.78), nLo.b * 0.5 * (1.0 - mk.r));  // open ground: warmer
     vec3 mossC = mix(texture2D(uMoss, Q * 0.37).rgb, texture2D(uMoss, Qs * 0.37).rgb, sideK) * (0.7 + 0.6 * texture2D(uMoss, Q * 0.06).g);
     vec3 grassC = mix(vec3(0.4, 0.5, 0.22), vec3(0.58, 0.58, 0.28), nMid.r) * (0.62 + 0.75 * texture2D(uMoss, Q * 0.5).g);
-    grassC = mix(grassC, vec3(0.76, 0.7, 0.34), mk.a * 0.6 * step(0.5, nLo.g));         // farmland: patches of stubble
+    grassC = mix(grassC, vec3(0.7, 0.66, 0.34), mk.a * 0.4 * smoothstep(0.42, 0.66, nLo.g));         // farmland: patches of stubble
     vec3 dirtC = texture2D(uDirt, Q * 0.62).rgb * (0.82 + 0.4 * nMid.g);
     // sandstone: horizontal strata from the world height, vertical weathering streaks
     vec2 ruv = vec2((vWorld.x + vWorld.z) * 0.23, vWorld.y * 0.34);
@@ -99,7 +99,7 @@ export const GROUND_FRAGMENT = `
     albedo = mix(albedo, mossC * vec3(0.9, 1.0, 0.85), clamp(ledgeMoss, 0.0, 1.0) * 0.8 * (1.0 - trailW));
     // seen from afar the forest is its canopy, not its floor: painted leaf blotches (the trees themselves are only drawn within uTreeRadius)
     float farK = smoothstep(uTreeRadius * 0.55, uTreeRadius * 1.5, vDist) * mk.r * (1.0 - rockW * 0.8) * (1.0 - grassW);
-    vec3 canopyC = mix(vec3(0.15, 0.25, 0.12), vec3(0.3, 0.4, 0.17), smoothstep(0.3, 0.8, nMid.g * 0.6 + nHi.b * 0.5));
+    vec3 canopyC = mix(vec3(0.17, 0.29, 0.13), vec3(0.33, 0.45, 0.2), smoothstep(0.3, 0.8, nMid.g * 0.6 + nHi.b * 0.5));
     canopyC = mix(canopyC, vec3(0.36, 0.34, 0.14), smoothstep(0.78, 0.92, nLo.g) * 0.55);       // a few golden / spruce-dark patches
     albedo = mix(albedo, canopyC * (0.8 + 0.4 * texture2D(uMoss, Q * 0.2).g), farK);
     trailW *= 1.0 - smoothstep(110.0, 260.0, vDist);                                   // a 1 m path cannot be drawn by far, coarse tiles

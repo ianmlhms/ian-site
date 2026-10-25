@@ -36,14 +36,21 @@ const VERTEX = `
 `;
 const FRAGMENT = `
   precision highp float;
-  uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uWet, uCloud;
+  uniform vec3 uSunDir, uSunColor, uAmbSky, uAmbGround, uFogColor; uniform float uFogDensity, uWet, uCloud; uniform sampler2D uNoise;
   varying vec3 vColor; varying vec3 vNormal; varying float vDist; varying vec3 vWorld; varying float vHeight;
   ${PAINT_LIGHT_GLSL}
   void main(){
     vec3 N = normalize(vNormal);
     float sunMul = mix(1.0, 0.75, uCloud * 0.6);
     float shade = 0.78 + 0.3 * vHeight;
-    vec3 col = paintLight(vColor * (1.0 - 0.22 * uWet), N, sunMul, shade);
+    // painted leaf clusters: brush-sized patches of lighter and darker leaves, in world space so they do not swim
+    vec3 wp = vWorld * 0.55;
+    float leafA = texture2D(uNoise, wp.xy * 0.9 + wp.zy * 0.6).b, leafB = texture2D(uNoise, wp.zx * 0.35 + 0.3).g;
+    float leaf = smoothstep(0.25, 0.8, leafA * 0.6 + leafB * 0.5);
+    float isLeaf = smoothstep(0.02, 0.12, vColor.g - vColor.r);
+    vec3 base = vColor * mix(1.0, 0.72 + 0.62 * leaf, isLeaf);
+    base = mix(base, base * vec3(1.18, 1.08, 0.72), smoothstep(0.7, 0.95, leafB) * 0.5 * isLeaf);
+    vec3 col = paintLight(base * (1.0 - 0.22 * uWet), N, sunMul, shade);
     col = pow(col, vec3(0.97));
     gl_FragColor = vec4(applyFog(col, vDist), 1.0);
   }
