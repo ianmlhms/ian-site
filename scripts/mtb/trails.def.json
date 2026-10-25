@@ -1,40 +1,540 @@
 [
-  {
-    "id": "hallerbach-flow",
-    "grade": "blue",
-    "name": {
-      "lb": "Hallerbaach-Flow",
-      "de": "Hallerbach-Flow",
-      "en": "Hallerbach Flow",
-      "fr": "Flow du Hallerbach"
-    },
-    "blurb": {
-      "lb": "Fléissend duerch d'Schlucht vun der Haller",
-      "de": "Flüssig durch die Schlucht der Haller",
-      "en": "Flowing through the Haller gorge",
-      "fr": "Fluide à travers les gorges de la Haller"
-    },
-    "via": [
-      [
-        430,
-        1340
-      ],
-      [
-        1350,
-        1350
-      ],
-      [
-        1490,
-        1590
-      ],
-      [
-        2100,
-        1490
-      ],
-      [
-        2480,
-        1510
-      ]
-    ]
+ {
+  "id": "hallerbach-flow",
+  "grade": "blue",
+  "name": {
+   "lb": "Hallerbaach-Flow",
+   "de": "Hallerbach-Flow",
+   "en": "Hallerbach Flow",
+   "fr": "Flow du Hallerbach"
+  },
+  "blurb": {
+   "lb": "Fléissend duerch d'Schlucht vun der Haller",
+   "de": "Flüssig durch die Schlucht der Haller",
+   "en": "Flowing through the Haller gorge",
+   "fr": "Fluide à travers les gorges de la Haller"
+  },
+  "via": [
+   [
+    430,
+    1340
+   ],
+   [
+    1350,
+    1350
+   ],
+   [
+    1490,
+    1590
+   ],
+   [
+    2100,
+    1490
+   ],
+   [
+    2480,
+    1510
+   ]
+  ],
+  "style": {
+   "seed": 11,
+   "rollers": 4,
+   "kickers": 2,
+   "drops": 0,
+   "berms": 4,
+   "slabs": 0,
+   "roots": 3,
+   "mud": 1,
+   "boardwalks": 1,
+   "leaves": 3
   }
+ },
+ {
+  "id": "ernz-waldwee",
+  "grade": "green",
+  "name": {
+   "lb": "Ernz-Waldwee",
+   "de": "Ernz-Waldweg",
+   "en": "Ernz Forest Way",
+   "fr": "Chemin forestier de l'Ernz"
+  },
+  "blurb": {
+   "lb": "Breet Weeër, sanft Hiwwelen, ideal fir den Ufank",
+   "de": "Breite Wege, sanfte Hügel, ideal zum Einstieg",
+   "en": "Wide tracks, gentle hills, perfect to start",
+   "fr": "Larges chemins, douces collines, idéal pour débuter"
+  },
+  "via": [
+   [
+    3389,
+    3915
+   ],
+   [
+    4207,
+    2739
+   ]
+  ],
+  "style": {
+   "seed": 3,
+   "rollers": 3,
+   "kickers": 0,
+   "drops": 0,
+   "berms": 3,
+   "slabs": 0,
+   "roots": 2,
+   "mud": 0,
+   "boardwalks": 0,
+   "leaves": 2
+  }
+ },
+ {
+  "id": "rotzbaach-rocks",
+  "grade": "red",
+  "name": {
+   "lb": "Rotzbaach-Fielsen",
+   "de": "Rotzbach-Felsen",
+   "en": "Rotzbach Rocks",
+   "fr": "Rochers du Rotzbach"
+  },
+  "blurb": {
+   "lb": "Duerch d'Fielsegäss vu Berdref: Stufen, Wuerzelen, eng Fielsplack",
+   "de": "Durch die Felsengassen von Berdorf: Stufen, Wurzeln, eine Felsplatte",
+   "en": "Through the rock alleys of Berdorf: steps, roots, a rock slab",
+   "fr": "Dans les ruelles rocheuses de Berdorf : marches, racines, une dalle de roche"
+  },
+  "via": [
+   [
+    4600,
+    1420
+   ],
+   [
+    4430,
+    1300
+   ],
+   [
+    4390,
+    1170
+   ],
+   [
+    4383,
+    1034
+   ],
+   [
+    4500,
+    900
+   ],
+   [
+    4630,
+    793
+   ]
+  ],
+  "style": {
+   "seed": 5,
+   "rollers": 2,
+   "kickers": 2,
+   "drops": 3,
+   "berms": 3,
+   "slabs": 3,
+   "roots": 4,
+   "mud": 0,
+   "boardwalks": 0,
+   "leaves": 2
+  }
+ },
+ {
+  "id": "binzelt-black",
+  "grade": "black",
+  "name": {
+   "lb": "Binzelt-Schwaarz",
+   "de": "Binzelt-Schwarz",
+   "en": "Binzelt Black",
+   "fr": "Binzelt Noir"
+  },
+  "blurb": {
+   "lb": "Steil erof duerch d'Binzeltschlüff: Sprénge, Drops a ganz schmuel Gäss",
+   "de": "Steil hinab durch die Binzeltschlüff: Sprünge, Drops und ganz enge Gassen",
+   "en": "Steep down through the Binzelt cleft: jumps, drops and very tight alleys",
+   "fr": "Raide descente par la faille de Binzelt : sauts, drops et ruelles étroites"
+  },
+  "via": [
+   [
+    4662,
+    1379
+   ],
+   [
+    4112,
+    1827
+   ],
+   [
+    4180,
+    1917
+   ],
+   [
+    3979,
+    2093
+   ],
+   [
+    3911,
+    2071
+   ],
+   [
+    3926,
+    2134
+   ],
+   [
+    3941,
+    2202
+   ],
+   [
+    3963,
+    2234
+   ],
+   [
+    3976,
+    2274
+   ],
+   [
+    3936,
+    2336
+   ],
+   [
+    3841,
+    2562
+   ]
+  ],
+  "style": {
+   "seed": 7,
+   "rollers": 1,
+   "kickers": 3,
+   "drops": 4,
+   "berms": 3,
+   "slabs": 2,
+   "roots": 3,
+   "mud": 0,
+   "boardwalks": 0,
+   "leaves": 2
+  },
+  "seenPenalty": 1.0
+ },
+ {
+  "id": "schiessentuempel",
+  "grade": "blue",
+  "name": {
+   "lb": "Schiessentümpel-Trail",
+   "de": "Schiessentümpel-Trail",
+   "en": "Schiessentümpel Trail",
+   "fr": "Piste du Schiessentümpel"
+  },
+  "blurb": {
+   "lb": "Duerch d'Schwaarz-Iernz-Dall bis bei de Waasserfall a seng Steebréck",
+   "de": "Durchs Tal der Schwarzen Ernz bis zum Wasserfall und seiner Steinbrücke",
+   "en": "Down the Black Ernz valley to the waterfall and its stone bridge",
+   "fr": "Par la vallée de l'Ernz noire jusqu'à la cascade et son pont de pierre"
+  },
+  "via": [
+   [
+    2332,
+    3868
+   ],
+   [
+    2139,
+    4781
+   ],
+   [
+    1768,
+    5329
+   ],
+   [
+    1706,
+    5450
+   ],
+   [
+    1550,
+    5666
+   ],
+   [
+    1527,
+    5751
+   ],
+   [
+    1531,
+    5779
+   ],
+   [
+    1522,
+    5817
+   ],
+   [
+    1474,
+    5913
+   ]
+  ],
+  "style": {
+   "seed": 9,
+   "rollers": 3,
+   "kickers": 2,
+   "drops": 1,
+   "berms": 3,
+   "slabs": 2,
+   "roots": 3,
+   "mud": 1,
+   "boardwalks": 1,
+   "leaves": 2
+  }
+ },
+ {
+  "id": "maratoun",
+  "grade": "red",
+  "name": {
+   "lb": "Mëllerdall-Maratoun",
+   "de": "Müllerthal-Marathon",
+   "en": "Mëllerdall Marathon",
+   "fr": "Marathon du Mullerthal"
+  },
+  "blurb": {
+   "lb": "De längste Wee: dee offiziellen MTB-Rondell vu Berdref bis op Bofort",
+   "de": "Der längste Weg: die offizielle MTB-Runde von Berdorf nach Beaufort",
+   "en": "The longest ride: the official MTB loop from Berdorf to Beaufort",
+   "fr": "La plus longue : la boucle VTT officielle de Berdorf à Beaufort"
+  },
+  "source": "mtb/gpx/beaufort-berdorf.gpx (the part inside the world box)",
+  "via": [
+   [
+    4960,
+    238
+   ],
+   [
+    5023,
+    406
+   ],
+   [
+    4925,
+    526
+   ],
+   [
+    4959,
+    558
+   ],
+   [
+    4906,
+    655
+   ],
+   [
+    4791,
+    792
+   ],
+   [
+    4650,
+    958
+   ],
+   [
+    4648,
+    1110
+   ],
+   [
+    4810,
+    1287
+   ],
+   [
+    5033,
+    1543
+   ],
+   [
+    4899,
+    1555
+   ],
+   [
+    4795,
+    1404
+   ],
+   [
+    4662,
+    1379
+   ],
+   [
+    4481,
+    1428
+   ],
+   [
+    4349,
+    1561
+   ],
+   [
+    4176,
+    1692
+   ],
+   [
+    4118,
+    1861
+   ],
+   [
+    4198,
+    2003
+   ],
+   [
+    4016,
+    2065
+   ],
+   [
+    3899,
+    2040
+   ],
+   [
+    3802,
+    1999
+   ],
+   [
+    3756,
+    1970
+   ],
+   [
+    3762,
+    1804
+   ],
+   [
+    3772,
+    1668
+   ],
+   [
+    3730,
+    1483
+   ],
+   [
+    3591,
+    1563
+   ],
+   [
+    3590,
+    1441
+   ],
+   [
+    3514,
+    1576
+   ],
+   [
+    3467,
+    1416
+   ],
+   [
+    3277,
+    1585
+   ],
+   [
+    3133,
+    1671
+   ],
+   [
+    2937,
+    1668
+   ],
+   [
+    2794,
+    1573
+   ],
+   [
+    2556,
+    1533
+   ],
+   [
+    2416,
+    1542
+   ],
+   [
+    2250,
+    1523
+   ],
+   [
+    2071,
+    1492
+   ],
+   [
+    1910,
+    1521
+   ],
+   [
+    1742,
+    1591
+   ],
+   [
+    1546,
+    1622
+   ],
+   [
+    1378,
+    1596
+   ],
+   [
+    1416,
+    1447
+   ],
+   [
+    1450,
+    1323
+   ],
+   [
+    1484,
+    1146
+   ],
+   [
+    1418,
+    1013
+   ],
+   [
+    1254,
+    915
+   ],
+   [
+    1051,
+    778
+   ],
+   [
+    952,
+    650
+   ],
+   [
+    981,
+    536
+   ],
+   [
+    956,
+    377
+   ],
+   [
+    1096,
+    413
+   ],
+   [
+    1047,
+    196
+   ],
+   [
+    902,
+    321
+   ],
+   [
+    773,
+    354
+   ],
+   [
+    696,
+    250
+   ],
+   [
+    696,
+    250
+   ]
+  ],
+  "style": {
+   "seed": 13,
+   "rollers": 14,
+   "kickers": 8,
+   "drops": 5,
+   "berms": 16,
+   "slabs": 6,
+   "roots": 12,
+   "mud": 4,
+   "boardwalks": 3,
+   "leaves": 8
+  }
+ }
 ]

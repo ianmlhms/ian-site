@@ -67,7 +67,9 @@ export async function loadWorldData(read, onProgress = () => {}) {
   const ways = decodeWays(await read('ways.bin'), await json('ways.json'));
   onProgress(0.7, 'trails');
   const trails = await json('trails.json');
-  for (const t of trails.trails) t.ways = [{ id: `trail-${t.id}`, kind: 'trail', pts: t.line }];       // carved as kind 'trail' (berms, banking)
+  for (const t of trails.trails) t.ways = [{ id: `trail-${t.id}`, kind: 'trail', pts: t.line, features: t.features || [], yield: t.yield === true }];       // carved as kind 'trail' (berms, banking, features)
+  let medals = {};
+  try { medals = await json('medals.json'); } catch (error) { console.warn('[mtb] medals.json missing (medal times fall back to the trail length)', error); }
   onProgress(0.8, 'canopy');
   const canopy = decodeCanopy(await read('canopy.bin'));
   onProgress(0.9, 'classes');
@@ -81,5 +83,5 @@ export async function loadWorldData(read, onProgress = () => {}) {
   const leaf = decodeRle(await read('leaf.bin'));
   const fields = decodeRle(await read('fields.bin'));
   onProgress(1, 'done');
-  return { info, near, far, ways, trails, canopy, classes, landmarks, streams, cliffs, falls, leaf, fields };
+  return { info, near, far, ways, trails, canopy, classes, landmarks, streams, cliffs, falls, leaf, fields, medals };
 }

@@ -17,13 +17,15 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import OUT_DIR, RAW_DIR  # noqa: E402
 from network import load_graph  # noqa: E402
+import trail_features as TF  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SEEN_PENALTY = 2.2      # an edge ridden by an earlier leg costs this much more (no out-and-back unless the alternative is more than twice as long)
 SNAP_MAX = 60.0         # a via point farther than this from any way is an error (typo in the definition)
 
 
 DTM = np.load(os.path.join(RAW_DIR, "dtm2.npy"))
-GRADE_LIMIT = {"green": 0.09, "blue": 0.15, "red": 0.26, "black": 0.5}     # steepest comfortable grade per colour (rise / run)
+GRADE_LIMIT = {"green": 0.09, "blue": 0.2, "red": 0.35, "black": 2.0}     # steepest comfortable grade per colour (rise / run)
 GRADE_WEIGHT = 120.0
 
 
@@ -71,8 +73,14 @@ def grade_penalty(graph, grade):
 def main():
     defs = json.load(open(os.path.join(HERE, "trails.def.json"), encoding="utf-8"))
     g = load_graph()
+    steps_pen = float(os.environ.get("MTB_STEPS_PENALTY", "2.5"))        # the Mullerthal gorge paths have stairs: a ride over them is stylised, not a detour of kilometres
+    for a in g.adj:
+        g.adj[a] = [(v, ln, steps_pen if g.ways[wi]["highway"] == "steps" else pen, wi, si) for (v, ln, pen, wi, si) in g.adj[a]]
     used = set()
     trails = []
+    classes = TF.load_classes()
+    streams = TF.load_streams()
+    others = []                                 # dense lines of the trails baked so far (a later trail yields where it shares their path)
     for td in defs:
         keys = []
         penalty = grade_penalty(g, td["grade"])
@@ -82,7 +90,9 @@ def main():
             if max(da, db) > SNAP_MAX:
                 raise SystemExit("%s: via point %s is %.0f m from the nearest way" % (td["id"], a if da > db else b, max(da, db)))
             seen = set(zip(keys, keys[1:])) | set(zip(keys[1:], keys))
-            seg = g.route(ka, kb, lambda e: penalty(e) * (8.0 if e in seen else 1.0))        # no out-and-back along the same way
+            seg = g.route(ka, kb, lambda e: penalty(e) * (td.get("seenPenalty", SEEN_PENALTY) if e in seen else 1.0))        # no out-and-back along the same way
+            if os.environ.get("MTB_VERBOSE"):
+                print("   leg", a, "->", b, "%.0f m (straight %.0f)" % (sum(math.hypot(g.pos[x][0] - g.pos[y][0], g.pos[x][1] - g.pos[y][1]) for x, y in zip(seg, seg[1:])), math.hypot(a[0] - b[0], a[1] - b[1])))
             keys.extend(seg if not keys else seg[1:])
         keys = remove_cycles(keys)
         line = [g.pos[k] for k in keys]
@@ -93,8 +103,17 @@ def main():
         hs = terrain_profile(line)
         climb = sum(max(0.0, hs[i + 1] - hs[i]) for i in range(len(hs) - 1))
         descent = sum(max(0.0, hs[i] - hs[i + 1]) for i in range(len(hs) - 1))
+        an = TF.analyse(line, height_at, classes)
+        an["blocked"] = TF.block_near(an, others)
+        features, cps, posts = TF.build(td, an, streams)
+        others.append((an["x"], an["z"]))
+        shared = round(float(an["blocked"].mean()), 2)
         trails.append({"id": td["id"], "grade": td["grade"], "name": td["name"], "blurb": td.get("blurb", {}), "length": round(length, 1), "climb": round(climb, 1), "descent": round(descent, 1),
-                       "line": [[round(x, 1), round(z, 1)] for x, z in line]})
+                       "yield": shared > 0.01, "line": [[round(x, 1), round(z, 1)] for x, z in line], "features": features, "cps": cps, "posts": posts})
+        kinds = {}
+        for f in features:
+            kinds[f["k"]] = kinds.get(f["k"], 0) + 1
+        print("   %d checkpoints, %d signposts, %.0f %% shared with earlier trails, features %s" % (len(cps), len(posts), shared * 100, kinds))
         # steepest 20 m stretch of the route (rise / run on the LiDAR terrain), the number that decides whether a rider can pedal it
         worst = 0.0
         acc = [0.0]
