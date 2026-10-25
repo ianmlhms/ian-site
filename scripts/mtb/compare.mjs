@@ -37,7 +37,7 @@ try {
     page.on("pageerror", (e) => console.log("[pageerror]", String(e).slice(0, 300)));
     await page.goto(`${origin}/pb/mtb.html?debug=1&q=${spec.q}&time=${spec.time}&weather=${spec.weather}&season=${spec.season}`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => document.documentElement.dataset.mtbReady === "1" || document.documentElement.dataset.bootError, null, { timeout: 120000 });
-    await page.addStyleTag({ content: "#hud, #title, #hint, #touchControls { display: none !important; } header, .arcade-bar, [class*='arcade'] { display: none !important; }" });
+    await page.addStyleTag({ content: ".mhud, .mcard, .mhint, .mtouch, .mfin, .mmenu, #mtbMenuBtn, #hud, #title, #hint, #touchControls { display: none !important; } header, .arcade-bar, [class*='arcade'] { display: none !important; }" });
     await page.evaluate((p) => {
       const m = window.__mtb;
       let x, z, yaw = p.yaw;
