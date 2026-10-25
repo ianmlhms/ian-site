@@ -54,9 +54,29 @@ function polylineValue(T, x, z, field) {
   return field.heightForStep(x, z, ns);          // cannot happen for a partition; harmless fallback
 }
 
+/** The boundary vertices of a leaf that touch a coarser tile: [{ v, x, z, tile }] (v = vertex index in the grid). */
+export function stitchesOf(leaf, split) {
+  const { x0, z0, step } = leaf;
+  const out = [];
+  for (let j = 0; j <= CELLS; j++) {
+    for (let i = 0; i <= CELLS; i++) {
+      if (!(i === 0 || j === 0 || i === CELLS || j === CELLS)) { i = CELLS - 1; continue; }
+      const wx = x0 + i * step, wz = z0 + j * step;
+      let coarse = null;
+      for (const T of tilesTouching(split, wx, wz)) if (T.step > step && (!coarse || T.step > coarse.step)) coarse = T;
+      if (coarse) out.push({ v: j * SIDE + i, x: wx, z: wz, tile: coarse });
+    }
+  }
+  return out;
+}
+
+/** A string that changes exactly when the stitched geometry of the leaf would change. */
+export function stitchSignature(leaf, split) {
+  return stitchesOf(leaf, split).map((s) => `${s.v}@${s.tile.key}`).join('|');
+}
+
 /**
- * Returns { positions, normals, cover, indices, vertexCount, skirtStart, boundary, signature }.
- *  boundary[v] = the coarser tile that boundary vertex v was stitched to (or null).
+ * Returns { positions, normals, cover, indices, vertexCount, signature, ... } (tile-local positions).
  */
 export function buildTileMesh(leaf, nodes, split, field) {
   const { x0, z0, step, size } = leaf;
@@ -67,21 +87,16 @@ export function buildTileMesh(leaf, nodes, split, field) {
   const normals = new Float32Array((vertexCount + skirtVerts) * 3);
   const cover = new Float32Array(vertexCount + skirtVerts);
   const skirtDepth = QUADTREE.skirtDepth + QUADTREE.skirtPerStep * step;
-  const stitched = [];                          // signature parts
-  const boundaryTile = new Array(skirtVerts).fill(null);
+  const stitchAt = new Map();
+  for (const st of stitchesOf(leaf, split)) stitchAt.set(st.v, st);
 
   for (let j = 0; j <= CELLS; j++) {
     for (let i = 0; i <= CELLS; i++) {
       const v = j * SIDE + i;
       const a = (j + 1) * APRON_SIDE + (i + 1);
       let y = h[a];
-      const onEdge = i === 0 || j === 0 || i === CELLS || j === CELLS;
-      if (onEdge) {
-        const wx = x0 + i * step, wz = z0 + j * step;
-        let coarse = null;
-        for (const T of tilesTouching(split, wx, wz)) if (T.step > step && (!coarse || T.step > coarse.step)) coarse = T;
-        if (coarse) { y = polylineValue(coarse, wx, wz, field); stitched.push(`${v}@${coarse.key}`); }
-      }
+      const st = stitchAt.get(v);
+      if (st) y = polylineValue(st.tile, st.x, st.z, field);
       positions[v * 3] = i * step; positions[v * 3 + 1] = y; positions[v * 3 + 2] = j * step;
       const dhdx = (h[a + 1] - h[a - 1]) / (2 * step);
       const dhdz = (h[a + APRON_SIDE] - h[a - APRON_SIDE]) / (2 * step);
@@ -126,8 +141,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
   for (let i = 0; i < CELLS; i++) wall(CELLS * SIDE + i + 1, CELLS * SIDE + i);             // south edge
   for (let j = 0; j < CELLS; j++) wall((j + 1) * SIDE, j * SIDE);                           // west edge
   for (let j = 0; j < CELLS; j++) wall(j * SIDE + CELLS, (j + 1) * SIDE + CELLS);           // east edge
-  void boundaryTile;
-  return { positions, normals, cover, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: stitched.join('|'), size, x0, z0, step };
+  return { positions, normals, cover, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
 }
 
 /** Exact height of the built mesh (grid triangles only, no skirts) at a world point inside the tile, by vertical ray vs triangle. */

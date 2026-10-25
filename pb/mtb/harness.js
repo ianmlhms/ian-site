@@ -219,10 +219,10 @@ section('D render == physics along every trail');
   for (const t of trails) {
     const line = trailLine(t);
     if (line.length < 2) continue;
-    // ride along: rider position every ~60 m of the trail, compare everything within 70 m on the trail line
+    // ride along: rider position every ~60 m of the trail, compare everything within 30 m on the trail line
     let acc = 0; let last = line[0];
     const stops = [];
-    for (const p of line) { acc += Math.hypot(p[0] - last[0], p[1] - last[1]); last = p; if (acc >= (QUICK ? 240 : 80)) { stops.push(p); acc = 0; } }
+    for (const p of line) { acc += Math.hypot(p[0] - last[0], p[1] - last[1]); last = p; if (acc >= (QUICK ? 240 : 40)) { stops.push(p); acc = 0; } }
     if (!stops.length) stops.push(line[0]);
     let prev = null;
     for (const [px, pz] of stops) {
@@ -235,9 +235,9 @@ section('D render == physics along every trail');
         const n = Math.max(1, Math.ceil(len / 0.5));
         for (let k = 0; k <= n; k++) {
           const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n;
-          if (Math.hypot(x - px, z - pz) > 70) continue;
+          if (Math.hypot(x - px, z - pz) > 30) continue;
           const leaf = leafAt(sel.split, x, z);
-          if (leaf.size !== QUADTREE.minSize) { check('the trail within 70 m of the rider is LOD 0', false, `${leaf.key} at ${x.toFixed(1)},${z.toFixed(1)}`); continue; }
+          if (leaf.size !== QUADTREE.minSize) { check('the trail within 30 m of the rider is LOD 0', false, `${leaf.key} at ${x.toFixed(1)},${z.toFixed(1)}`); continue; }
           let m = meshes.get(leaf.key);
           if (!m) { m = meshFor(leaf, sel.split); meshes.set(leaf.key, m); }
           const d = Math.abs(meshHeightAt(m, x, z) - surface.height(x, z));

@@ -25,7 +25,7 @@ export const QUADTREE = Object.freeze({
   rootSize: 32768,
   rootX: -12288,            // multiple of rootSize / 8; the box (0..6144, 0..4608) and its 8 km margin lie inside
   rootZ: -12288,
-  splitFactor: 1.25,        // LOD 0 tiles (32 m, 1 m spacing) are used within 1.25 * 64 = 80 m of the rider (physics == render there)
+  splitFactor: 1.0,         // a 64 m node splits when the rider is within 64 m: LOD 0 tiles (32 m, 1 m spacing) cover every tile within 64 m, so the rider's 3 x 3 tiles (>= 32 m margin) are always LOD 0
   splitHysteresis: 0.08,
   skirtDepth: 2.5,          // m the skirt hangs below its edge (belt and braces behind the exact stitching)
   skirtPerStep: 0.6,        // + this many m per m of node spacing
@@ -37,7 +37,7 @@ export const QUADTREE = Object.freeze({
 
 /* Trail carving: one profile per kind of way. halfWidth = flat bed, width = where the ground is untouched again (m). */
 export const WAY_KINDS = Object.freeze({
-  trail: { halfWidth: 0.55, width: 2.6, berm: true, spacing: 1 },       // the ridden MTB trails (berms, banking)
+  trail: { halfWidth: 0.45, width: 2.0, berm: true, spacing: 1 },       // the ridden MTB trails (berms, banking)
   path: { halfWidth: 0.4, width: 1.7, berm: false, spacing: 1.5 },
   track: { halfWidth: 1.5, width: 3.8, berm: false, spacing: 2 },
   road: { halfWidth: 2.8, width: 5.6, berm: false, spacing: 2 },

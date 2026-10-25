@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1a14">
+<meta name="robots" content="noindex">
+<title>MTB Mëllerdall · Arcade</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/pb/mtb/ui.css?v=1">
+<script src="/pb/arcade-kit.js?v=34" data-arcade-id="mtb" data-arcade-title="MTB Mëllerdall" data-arcade-lower-is-better></script>
+</head>
+<body>
+<main id="shell">
+  <canvas id="mtbCanvas" tabindex="0" role="img" aria-label="Mountain biking through the Mullerthal: a chase view of a rider on a forest trail."></canvas>
+  <div id="title"><span>Mullerthal · Lëtzebuerg</span><b>MTB Mëllerdall</b></div>
+  <div id="hud" aria-live="polite">
+    <div id="speed"><b id="hudSpeed">0</b><small id="hudSpeedUnit">km/h</small></div>
+    <div id="trailInfo"><span id="trailGrade" class="grade"></span><span id="trailName"></span><div class="bar"><i id="trailBar"></i></div></div>
+    <div id="hint"></div>
+  </div>
+  <div id="loading" role="status"><div class="box"><div class="ico">🚵</div><b>MTB Mëllerdall</b><div id="bar"><i></i></div><small id="loadMsg">…</small><div class="slow" id="loadSlow" hidden><span id="loadSlowText"></span><br><button type="button" id="loadRetry"></button></div></div></div>
+</main>
+<script>
+/* The loading screen: honest progress (main.js calls set(p, label) between its real steps) and a calm retry offer when nothing has happened for 12 s. */
+(function () {
+  var bar = document.querySelector("#bar i"), msg = document.getElementById("loadMsg"), slow = document.getElementById("loadSlow"), slowText = document.getElementById("loadSlowText"), retry = document.getElementById("loadRetry");
+  var STR = {
+    lb: { code: "Code gëtt gelueden …", slow: "Dauert méi laang wéi gewinnt …", retry: "Nei probéieren" },
+    de: { code: "Code wird geladen …", slow: "Dauert länger als sonst …", retry: "Nochmal versuchen" },
+    en: { code: "Loading the code …", slow: "Taking longer than usual …", retry: "Try again" },
+    fr: { code: "Chargement du code …", slow: "Plus long que d'habitude …", retry: "Réessayer" }
+  };
+  var lang = "lb";
+  try { var own = localStorage.getItem("pb_mtb_lang"), site = localStorage.getItem("site_lang"); lang = STR[own] ? own : STR[site] ? site : "lb"; } catch (e) { /* storage blocked */ }
+  var T = STR[lang], STALL_MS = 12000, last = Date.now(), value = 0, done = false;
+  function setBar(p) { bar.style.transform = "scaleX(" + Math.max(0, Math.min(1, p)) + ")"; }
+  var api = window.__mtbLoad = {
+    set: function (p, label) { if (done) return; value = Math.max(value, p); last = Date.now(); slow.hidden = true; setBar(value); if (label) msg.textContent = label; },
+    done: function () { if (done) return; done = true; setBar(1); msg.textContent = ""; slow.hidden = true; clearInterval(timer); document.getElementById("loading").classList.add("done"); },
+    fail: function (text) { done = true; clearInterval(timer); if (text) msg.textContent = text; slowText.textContent = T.slow; retry.textContent = T.retry; slow.hidden = false; }
+  };
+  retry.addEventListener("click", function () { location.reload(); });
+  var timer = setInterval(function () { if (!done && Date.now() - last > STALL_MS) { slowText.textContent = T.slow; retry.textContent = T.retry; slow.hidden = false; } }, 1000);
+  msg.textContent = T.code; api.set(0.02, T.code);
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+window.addEventListener("error",function(event){document.documentElement.dataset.bootError=event.message||"script-error"});
+if(!window.THREE){
+  document.documentElement.dataset.bootError="three-missing";
+  if(window.__mtbLoad)window.__mtbLoad.fail("three.js r160 failed to load");
+  throw new Error("three.js r160 failed to load");
+}
+</script>
+<script type="module">
+  // Imports are absolute: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
+  import("/pb/mtb/main.js?v=1");
+</script>
+</body>
+</html>

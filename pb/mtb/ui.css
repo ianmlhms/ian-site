@@ -1,0 +1,49 @@
+:root { color-scheme: dark; --ink: #fff7e0; --muted: #b8c4b4; --panel: #10201ae6; --line: #ffffff26; --gold: #ffcf5c; --accent: #7bd88f; }
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0e1a14; }
+body { display: flex; flex-direction: column; font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", "Segoe UI", system-ui, sans-serif; color: var(--ink); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+#shell { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; isolation: isolate; }
+#mtbCanvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+#title { position: absolute; left: 14px; top: calc(10px + env(safe-area-inset-top)); pointer-events: none; text-shadow: 0 1px 6px #000a; }
+#title span { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+#title b { font-size: 18px; letter-spacing: -.3px; }
+
+/* HUD: small, in the corners, never over the trail */
+#hud { position: absolute; inset: 0; pointer-events: none; }
+#speed { position: absolute; right: 14px; top: calc(10px + env(safe-area-inset-top)); text-align: right; text-shadow: 0 1px 6px #000a; }
+#speed b { font-size: 34px; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+#speed small { font-size: 12px; color: var(--muted); margin-left: 3px; }
+#trailInfo { position: absolute; left: 14px; top: calc(48px + env(safe-area-inset-top)); font-size: 13px; color: var(--ink); text-shadow: 0 1px 6px #000a; }
+#trailInfo .bar { width: 150px; height: 5px; border-radius: 3px; background: #ffffff30; margin-top: 5px; overflow: hidden; }
+#trailInfo .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+.grade { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid #fff8; }
+.grade.green { background: #3fbf5a; } .grade.blue { background: #3d8bff; } .grade.red { background: #e5483f; } .grade.black { background: #222; }
+#hint { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 8px 14px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; text-align: center; max-width: min(92vw, 560px); transition: opacity .8s; }
+#hint.gone { opacity: 0; }
+body.touch #hint { bottom: calc(150px + env(safe-area-inset-bottom)); }
+
+/* touch controls: a steering pad bottom-left, three buttons bottom-right; together under 15 % of the screen */
+#touchControls { position: absolute; inset: auto 0 0 0; height: 0; pointer-events: none; z-index: 20; }
+#touchControls .pad { position: absolute; left: calc(14px + env(safe-area-inset-left)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 168px; height: 76px; border-radius: 38px; background: #ffffff1c; border: 2px solid #ffffff44; pointer-events: auto; touch-action: none; display: grid; place-items: center; }
+#touchControls .pad .knob { position: absolute; width: 58px; height: 58px; border-radius: 50%; background: #ffffff66; border: 2px solid #fff9; left: 50%; margin-left: -29px; }
+#touchControls .pad .lbl { position: absolute; font-size: 15px; color: #fff9; letter-spacing: 70px; padding-left: 70px; pointer-events: none; }
+#touchControls .btns { position: absolute; right: calc(14px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: flex-end; }
+#touchControls .tbtn { pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid #ffffff55; background: #ffffff22; font-size: 22px; display: grid; place-items: center; backdrop-filter: blur(2px); }
+#touchControls .tbtn.big { width: 84px; height: 84px; background: #7bd88f44; border-color: #7bd88faa; font-size: 26px; }
+#touchControls .on { background: #ffffff55 !important; }
+body:not(.touch) #touchControls { display: none; }
+
+#loading { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #2a4a36, #0b1810); z-index: 60; transition: opacity .6s; }
+#loading.done { opacity: 0; pointer-events: none; }
+#loading .box { text-align: center; width: min(340px, 80%); }
+#loading .ico { font-size: 54px; margin-bottom: 6px; animation: bob 1.4s ease-in-out infinite; }
+#loading b { font-size: 26px; letter-spacing: -.5px; }
+#bar { position: relative; height: 8px; border-radius: 4px; background: #ffffff22; margin-top: 18px; overflow: hidden; }
+#bar i { position: absolute; inset: 0; display: block; border-radius: 4px; background: linear-gradient(90deg, #7bd88f, #ffcf5c); transform-origin: 0 50%; transform: scaleX(0); transition: transform .25s ease-out; }
+#loading small { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; min-height: 15px; }
+#loading .slow { margin-top: 14px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+#loading .slow button { margin-top: 10px; padding: 9px 18px; border-radius: 18px; border: 1px solid #ffffff44; background: #ffffff18; font-weight: 700; cursor: pointer; }
+@keyframes bob { 50% { transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { #loading .ico { animation: none; } }

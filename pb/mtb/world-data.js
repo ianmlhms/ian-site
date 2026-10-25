@@ -1,6 +1,6 @@
 /* Loads and decodes the baked world files (pb/mtb/data/*). `read(name)` returns a Promise<Uint8Array>: the browser passes a fetch based
  * reader, the Node harness an fs based one, so both run the same decoding code. */
-import { decodeGrid, gridChecksum } from './codec.js';
+import { decodeGrid, decodeRle, gridChecksum } from './codec.js';
 
 const KIND_NAMES = ['trail', 'path', 'track', 'road'];
 const FLAG_BRIDGE = 1;
@@ -70,6 +70,10 @@ export async function loadWorldData(read, onProgress = () => {}) {
   for (const t of trails.trails) t.ways = [{ id: `trail-${t.id}`, kind: 'trail', pts: t.line }];       // carved as kind 'trail' (berms, banking)
   onProgress(0.8, 'canopy');
   const canopy = decodeCanopy(await read('canopy.bin'));
+  onProgress(0.9, 'classes');
+  const classes = decodeRle(await read('classes.bin'));
+  let landmarks = [];
+  try { landmarks = await json('landmarks.json'); } catch (error) { console.warn('[mtb] landmarks.json missing', error); }
   onProgress(1, 'done');
-  return { info, near, far, ways, trails, canopy };
+  return { info, near, far, ways, trails, canopy, classes, landmarks };
 }
