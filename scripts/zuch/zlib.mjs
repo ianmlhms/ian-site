@@ -69,6 +69,11 @@ export async function simOnPage(page, origin, { quality = 'high', train = 'emu' 
         }
       });
     },
+    /* the game's own cab camera with the train standing at s (no free camera) */
+    async viewCab({ s, settle = 30 }) {
+      await page.evaluate((ts) => { __tsTest.setFreeCam(null); __tsTest.placeAt(ts, 0); const w = __tsTest.internals().world; w.landscape.warm(ts); }, s);
+      await api.frames(settle);
+    },
     async shot(file, opts = {}) {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       await api.hideUi();

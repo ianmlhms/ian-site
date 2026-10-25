@@ -22,6 +22,7 @@
   const BAY = 3.0;                 // facade bay width and floor height of the facade textures (m)
   const WATER_LIFT = 0.02;
   const TREE_SHARE = { high: 1, medium: 0.6, low: 0.3 };
+  const WALL_TINTS = [[1, 1, 1], [1, 0.95, 0.86], [0.94, 0.96, 1], [1, 0.9, 0.88], [0.9, 0.95, 0.9], [1, 0.98, 0.92]];   // plaster colours (multiply the facade texture)
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -140,7 +141,7 @@
   function windowAt(c, x, y, w, h, frame, shutter) {
     c.fillStyle = '#d9d6cc'; c.fillRect(x - 0.1 * PXM, y - 0.1 * PXM, w + 0.2 * PXM, h + 0.24 * PXM);        // reveal / sill
     c.fillStyle = frame; c.fillRect(x, y, w, h);
-    const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#7c93a6'); g.addColorStop(1, '#3d4a58');
+    const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#a9c3d6'); g.addColorStop(1, '#5d7388');
     c.fillStyle = g; c.fillRect(x + 0.07 * PXM, y + 0.07 * PXM, w - 0.14 * PXM, h * 0.5 - 0.1 * PXM); c.fillRect(x + 0.07 * PXM, y + h * 0.52, w - 0.14 * PXM, h * 0.48 - 0.1 * PXM);
     c.fillStyle = frame; c.fillRect(x + w / 2 - 0.03 * PXM, y, 0.06 * PXM, h);
     if (shutter) { c.fillStyle = shutter; c.fillRect(x - 0.38 * PXM, y, 0.34 * PXM, h); c.fillRect(x + w + 0.04 * PXM, y, 0.34 * PXM, h); }
@@ -183,7 +184,7 @@
   function roofTexture(kind) {
     return canvasTexture('surf:roof:' + kind, 128, 128, (c, w, h) => {
       const r = mulberry(hashStr(kind));
-      const base = { slate: '#585d64', tile: '#9a553c', flat: '#6f7276', zinc: '#8d949a' }[kind];
+      const base = { slate: '#80868e', tile: '#b4694c', flat: '#8c8f93', zinc: '#a6adb3' }[kind];
       c.fillStyle = base; c.fillRect(0, 0, w, h);
       if (kind === 'slate' || kind === 'tile') {
         const rows = 12;
@@ -324,6 +325,7 @@
         const levels = Math.max(1, b.levels || Math.round((b.h || 6) / 3));
         const baseY = b.base !== undefined ? b.base : 0;
         const tint = 0.9 + 0.2 * hash2(bi, 13);
+        const wt = WALL_TINTS[Math.floor(hash2(bi, 21) * WALL_TINTS.length) % WALL_TINTS.length];
         const wmb = wallMB(facade);
         const cx = b.ground.reduce((s, p) => s + p[0], 0) / b.ground.length; const cz = b.ground.reduce((s, p) => s + p[1], 0) / b.ground.length;
         const addFace = (mb, ring, kind) => {
@@ -349,7 +351,7 @@
             let u; let v;
             if (kind === 'wall') { u = ((p[0] * hx + p[2] * hz - pmin) / width) * bays; v = (p[1] - baseY) / floorH; } else { u = p[0] / 2.4; v = p[2] / 2.4; }
             const tn = kind === 'roof' ? tint : 1;
-            return mb.vert(w.x, y, w.z, nxn, nyn, nzn, [tn, tn, tn], u, v);
+            return mb.vert(w.x, y, w.z, nxn, nyn, nzn, kind === 'roof' ? [tn, tn, tn] : wt, u, v);
           });
           for (let t = 0; t < tris.length; t += 3) mb.i.push(ids[tris[t]], ids[tris[t + 1]], ids[tris[t + 2]]);
         };
@@ -473,6 +475,7 @@
 
   /* one low-poly tree (unit height, unit crown radius): trunk + crown (blob or cone stack), vertex-coloured */
   function mergeTree(blob, trunk, conifer) {
+    const blobTop = new T.IcosahedronGeometry(1, 0);
     const mb = new MB();
     const add = (geo, sx, sy, sz, ty, col) => {
       const g = geo.index ? geo.toNonIndexed() : geo.clone();
@@ -487,8 +490,9 @@
       add(cone, 0.8, 0.5, 0.8, 0.45, [0.14, 0.34, 0.18]); add(cone, 0.6, 0.45, 0.6, 0.72, [0.16, 0.38, 0.2]); add(cone, 0.38, 0.4, 0.38, 0.92, [0.18, 0.42, 0.22]);
       cone.dispose();
     } else {
-      add(blob, 1, 0.42, 1, 0.62, [0.26, 0.48, 0.2]); add(blob, 0.72, 0.3, 0.72, 0.86, [0.32, 0.55, 0.24]);
+      add(blob, 1, 0.42, 1, 0.62, [0.26, 0.48, 0.2]); add(blobTop, 0.72, 0.3, 0.72, 0.86, [0.32, 0.55, 0.24]);
     }
+    blobTop.dispose();
     return mb.geometry();
   }
 

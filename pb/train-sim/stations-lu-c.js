@@ -40,11 +40,11 @@
     build(api) {
       const k = makeKit(api);
       const { sx, H, W, edge, col, WHITE } = api;
-      const { X, vc, quadO, tex, plainBatch, roof, glow } = k;
-      const lB = edge + W;
+      const { X, vc, quadO, tex, roof, glow } = k;
+            const lB = edge + W;
       const BL = 17.3;                    // building length along the platform (real LOD2 footprint, z -90.7 .. -73.4)
       const BD = 6.5;                     // depth
-      const EAVES = 3.5;
+      const EAVES = 3.75;
       const z0 = -90.7;
       const z1 = z0 + BL;
       const l0 = lB + 0.05;
@@ -88,13 +88,13 @@
       // the front is read from the track: with the platform on the left of the travel direction (sx < 0) the texture runs the other way along z
       const uA = sx > 0 ? 0 : 1; const uB = 1 - uA;
       quadO(front, [xf, yA, z0], [xf, yA, z1], [xf, yTop, z1], [xf, yTop, z0], hint, WHITE, [[uA, 0.085], [uB, 0.085], [uB, 1], [uA, 1]]);
-      const plain = plainBatch(wall);
+      const wallCol = col(wall);
       const xb = X(l1);
-      quadO(plain, [xb, yA, z0], [xb, yA, z1], [xb, yTop, z1], [xb, yTop, z0], hint, WHITE, [[0, 0], [BL / 7, 0], [BL / 7, 0.6], [0, 0.6]]);
-      [z0, z1].forEach((z) => quadO(plain, [xf, yA, z], [xb, yA, z], [xb, yTop, z], [xf, yTop, z], hint, WHITE, [[0, 0], [BD / 7, 0], [BD / 7, 0.6], [0, 0.6]]));
+      quadO(vc, [xb, yA, z0], [xb, yA, z1], [xb, yTop, z1], [xb, yTop, z0], hint, wallCol);
+      [z0, z1].forEach((z) => quadO(vc, [xf, yA, z], [xb, yA, z], [xb, yTop, z], [xf, yTop, z], hint, wallCol));
       vc.box(X(l0 + BD / 2), yTop - 0.05, (z0 + z1) / 2, BD + 0.3, 0.1, BL + 0.3, col('#cfc7aa'));
       /* low gable roof, ridge along the platform; white fascia */
-      roof({ kind: 'gable', mat: 'slate', l0, l1, z0, z1, y: yTop + 0.05, rise: 1.7, ov: 0.5, gableHex: wall, ridgeCol: '#3b3e43' });
+      roof({ kind: 'gable', mat: 'slate', l0, l1, z0, z1, y: yTop + 0.05, rise: 2.4, ov: 0.45, gableCol: wall, ridgeCol: '#3b3e43' });
       vc.box(X(l0 - 0.5), yTop + 0.08, (z0 + z1) / 2, 0.08, 0.16, BL + 1.0, col('#f1efe8'));
       vc.box(X(l1 + 0.5), yTop + 0.08, (z0 + z1) / 2, 0.08, 0.16, BL + 1.0, col('#f1efe8'));
       /* the end gable of the right end: chimney-free; a small roof drain */
@@ -105,10 +105,11 @@
       const cz0 = z0 + 0.5; const cz1 = z0 + 12.2;
       const cOut = 3.0;                                  // projection over the platform
       const yWall = H + 3.45; const yOut = H + 2.95;
-      const panel = plainBatch('#e9e4c9');
+      const panel = tex('munpanel', { w: 64, h: 64, draw: (c, w, h) => { c.fillStyle = '#8d2437'; c.fillRect(0, 0, w, h); c.fillStyle = '#f3efdc'; c.fillRect(3, 3, w - 6, h - 6); c.fillStyle = 'rgba(200,196,170,0.5)'; c.fillRect(3, h / 2, w - 6, 2); } });
       const ch = [X(l0 - cOut / 2), yWall, (cz0 + cz1) / 2];
-      quadO(panel, [X(l0), yWall, cz0], [X(l0), yWall, cz1], [X(l0 - cOut), yOut, cz1], [X(l0 - cOut), yOut, cz0], [ch[0], ch[1] - 5, ch[2]], WHITE, [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      quadO(panel, [X(l0), yWall - 0.05, cz0], [X(l0), yWall - 0.05, cz1], [X(l0 - cOut), yOut - 0.05, cz1], [X(l0 - cOut), yOut - 0.05, cz0], [ch[0], ch[1] + 5, ch[2]], WHITE, [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      const panesZ = (cz1 - cz0) / 1.55; const panesL = cOut / 0.85;
+      quadO(panel, [X(l0), yWall, cz0], [X(l0), yWall, cz1], [X(l0 - cOut), yOut, cz1], [X(l0 - cOut), yOut, cz0], [ch[0], ch[1] - 5, ch[2]], WHITE, [[0, 0], [panesZ, 0], [panesZ, panesL], [0, panesL]]);
+      quadO(panel, [X(l0), yWall - 0.04, cz0], [X(l0), yWall - 0.04, cz1], [X(l0 - cOut), yOut - 0.04, cz1], [X(l0 - cOut), yOut - 0.04, cz0], [ch[0], ch[1] + 5, ch[2]], WHITE, [[0, 0], [panesZ, 0], [panesZ, panesL], [0, panesL]]);
       const mr = col(maroon);
       vc.box(X(l0 - cOut), yOut + 0.02, (cz0 + cz1) / 2, 0.12, 0.16, cz1 - cz0 + 0.1, mr);        // edge beam
       vc.box(X(l0 - 0.05), yWall + 0.02, (cz0 + cz1) / 2, 0.12, 0.16, cz1 - cz0 + 0.1, mr);       // wall plate
@@ -116,6 +117,7 @@
         vc.between([X(l0 - 0.05), yWall, z], [X(l0 - cOut), yOut, z], 0.07, mr, 0.1);              // rafter
         vc.between([X(l0 - 0.05), yWall - 1.15, z], [X(l0 - cOut + 0.15), yOut - 0.1, z], 0.06, mr, 0.08);   // strut from the wall
       }
+      for (let z = cz0 + 0.4; z < cz1; z += 0.78) vc.between([X(l0 - 0.05), yWall + 0.03, z], [X(l0 - cOut), yOut + 0.03, z], 0.035, mr, 0.04);   // glazing bars
       for (let l = 0.6; l < cOut; l += 0.75) vc.box(X(l0 - l), yWall - (yWall - yOut) * (l / cOut) + 0.07, (cz0 + cz1) / 2, 0.05, 0.05, cz1 - cz0, mr);   // purlins
       [cz0, cz1].forEach((z) => vc.box(X(l0 - 0.1), (H + yWall) / 2, z, 0.18, yWall - H, 0.18, mr));      // end posts at the wall
       k.clockFace(l0 - 0.04, H + 3.05, z0 + 8.6, 0.62, -1);
