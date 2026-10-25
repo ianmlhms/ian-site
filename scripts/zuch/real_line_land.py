@@ -58,15 +58,17 @@ class LandIndex:
         self.tree = STRtree(self.geoms)
         self.prio = np.array([PRIORITY[c] for c in self.cls])
 
-    def at(self, e, n, default=FIELD):
-        """Class at points (vectorised): the highest-priority polygon covering each point."""
+    def at(self, e, n, default=FIELD, ids=False):
+        """Class at points (vectorised): the highest-priority polygon covering each point.  ids=True also returns the polygon index (parcel id, -1 = none)."""
         e, n = np.asarray(e, float), np.asarray(n, float)
         pts = shapely.points(e, n)
         pi, gi = self.tree.query(pts, predicate="within")
         best = np.full(len(e), -1)
         out = np.full(len(e), default)
+        pid = np.full(len(e), -1)
         for p, g in zip(pi, gi):
-            if self.prio[g] > best[p]:
+            if self.prio[g] > best[p] or (self.prio[g] == best[p] and self.geoms[g].area < self.geoms[pid[p]].area):
                 best[p] = self.prio[g]
                 out[p] = self.cls[g]
-        return out
+                pid[p] = g
+        return (out, pid) if ids else out

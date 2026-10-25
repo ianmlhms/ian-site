@@ -2,6 +2,32 @@
 
 Status: written in Wave 1 of the "zuchreal" work (25 Oct 2026).  Wave 2 implements the curve derivation below for the Mosel line first, then the other lines.
 
+
+## Wave 2: what is implemented (26 Oct 2026)
+
+**Decision (Ian, 25 Oct):** `wittlich` follows today's real RB 83 = the Trier Weststrecke on the left bank (no Trier Hbf); `trier` (RE, via Trier Hbf) keeps its own routing.
+Verified stop list of the RB 83 since 3 Mar 2025 (SPNV-Nord press release 11/2024, "Reaktivierungsprojekt Weststrecke Trier"): Luxemburg, **Cents-Hamm**, Sandweiler-Contern, Oetrange,
+Munsbach, Roodt/Syre, Betzdorf, Wecker, Manternach, Mertert, Wasserbillig, Igel, Trier-Zewen, Trier-Euren, Trier West, Trier-Pallien, Trier Hafenstraße, **Ehrang Ort, Quint**, Schweich, Föhren, Hetzerath,
+Sehlem, Salmtal, Wittlich.  (The Wave 1 note "Cents-Hamm is not a stop" and "no Ehrang" were wrong for the RB 83; Pfalzel is only served by RB 71 / RE.)  RB 84 (Hafenstraße - Zewen - Kreuz Konz - Konz) and
+RE 11 cross the Konzer Moselbrücke to Kreuz Konz.
+
+**Geometry (scripts/zuch/build_real_line.py, real_line_path.py, real_line_fit.py, real_line_dem.py, real_line_land.py, real_line_scenery.py, osm_rail.py, fetch_corridor.py):**
+`fetch_corridor.py` caches the OSM features of five corridor tiles (Geofabrik Luxembourg + Rheinland-Pfalz extracts, `~/Library/Caches/zuch-work/realline/corridor-*.pkl`); `build_real_line.py emit` then
+1. builds the main-track graph (railway=rail, no yard / siding / spur; near-miss switches snapped at 2.6 m) and a Dijkstra chain per segment: A (Lux - Igel), W (Igel - Zewen - Euren - West - Pallien - Ehrang Ort),
+   H (Igel - Kreuz Konz - Süd - Hbf - Pfalzel - Ehrang Ort), tail B (Hafenstraße - Wittlich); dead-end spurs the shortest path takes at switches are cut out;
+2. the branches split at J1 (about 1.8 km behind Igel, where the Konz bridge line leaves) and are cut 260 m before the Hafenstraße block (J2); the tail geometry of the Weststrecke is used for both services;
+3. fits every leg (real stretch between two station blocks of 290 m) with straights / arcs (piecewise-linear heading by dynamic programming), keeps the real radius (capped at the radius the line speed needs, floor 380 m) and compresses
+   the LENGTH (game length = 0.27 x real, clamped 480 - 1750 m; arcs compressed at most 2.2x), so a 15 degree real bend becomes a shorter bend of the same radius;
+4. takes grades from the Copernicus 30 m surface model (smoothed, 0.25 % steps, +-1 % authored = x2.4 in the sim), maxspeed from the OSM tags, bridges / tunnels from the way tags (kind and height from the DEM and the nearest river),
+   level crossings from railway=level_crossing, biomes from the landuse around the line (city / suburb / industrial / vineyard / forest / farmland);
+5. emits `pb/train-sim/real-mosel.js` (layout, loaded before routes.js) and `data/real/mosel-features.json` (scenery per leg in game coordinates: land-class raster 20 x 15 m up to +-330 m, river windows, roads, relief,
+   villages, level crossing hints).  The two branches get the same game length (shorter one is stretched), so the tail has the same s on both services.
+`routes.js` builds `moselBodyWest` (A + W + B) and `moselBodyHbf` (A + H + B + the authored Cochem / Koblenz tail); leg items carry `legId`.  `track.js` takes relief (terrain height 220 m left / right of the line) and river
+(side, offset, width) from the data; `real-line.js` resolves the data per track (also mirrored for the return direction); `real-scenery.js` fills every chunk (real roads as ribbons, houses along the real streets in
+residential cells, fields / vineyards / meadows, forest trees, industry sheds); landscape.js skips its generic villages / farms / fields / woods / country roads / trees when `track.real` exists.
+Re-run: `/Users/Ian/Library/Caches/luxtram-work/.venv/bin/python scripts/zuch/fetch_corridor.py lux trier wittlich cochem gap koblenz` (once, ~10 min) then `.../python scripts/zuch/build_real_line.py emit` (~2 min).
+Cochem / Koblenz stay authored (the real Wittlich - Cochem line is 28 km, Cochem - Koblenz 48 km).
+
 ## 1. How a line becomes "recognisably the real one"
 
 The routes are authored layouts (`routes.js`, token language: straights, curves, grades, flags `T` tunnel / `B` bridge / `X` level crossing / `b` biome).  The legs are compressed

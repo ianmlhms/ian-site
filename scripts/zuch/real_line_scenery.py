@@ -29,9 +29,9 @@ ROAD_MAX_LAT = 330.0
 RELIEF_STEP = 50.0
 RELIEF_LAT = 220.0
 WATER_MAX = 330.0
-RIVER_HALF = {"Mosel": 55.0, "Sauer": 28.0, "Saar": 40.0, "Syre": 7.0, "Kyll": 11.0, "Alzette": 12.0, "Salm": 8.0, "Lieser": 7.0, "Ruwer": 6.0, "Moselle": 55.0}
+RIVER_HALF = {"Kackeschbaach": 2.5, "Mosel": 55.0, "Sauer": 28.0, "Saar": 40.0, "Syre": 7.0, "Kyll": 11.0, "Alzette": 12.0, "Salm": 8.0, "Lieser": 7.0, "Ruwer": 6.0, "Moselle": 55.0}
 RIVER_MIN_OFFSET = 30.0   # clear water edge from the track corridor
-ROAD_CLASSES = {"motorway": 14.0, "motorway_link": 5.0, "trunk": 7.0, "trunk_link": 4.5, "primary": 7.0, "primary_link": 4.5, "secondary": 6.4, "secondary_link": 4.2, "tertiary": 6.0,
+ROAD_CLASSES = {"service": 3.6, "track": 3.2, "motorway": 14.0, "motorway_link": 5.0, "trunk": 7.0, "trunk_link": 4.5, "primary": 7.0, "primary_link": 4.5, "secondary": 6.4, "secondary_link": 4.2, "tertiary": 6.0,
                 "tertiary_link": 4.0, "unclassified": 5.0, "residential": 5.2}
 CLASS_CODE = "0123456789abcdef"
 
@@ -74,14 +74,39 @@ def land_raster(g, land):
     n = max(2, int(round(g.length / ROW_M)))
     sg = (np.arange(n) + 0.5) * g.length / n
     p, r, _ = g.frame(g.real_of(sg))
-    rows = []
+    rows, pids = [], []
     for j in range(COLS):
         lat = LAT0 + (j + 0.5) * COL_M
         q = p + r * lat
-        rows.append(land.at(q[:, 0], q[:, 1]))
+        c, pid = land.at(q[:, 0], q[:, 1], ids=True)
+        rows.append(c)
+        pids.append(pid)
     grid = np.array(rows).T                    # (n, COLS)
+    pg = np.array(pids).T
     text = ["".join(CLASS_CODE[int(c)] for c in row) for row in grid]
-    return {"rows": text, "n": n, "ds": round(g.length / n, 3)}
+    # parcel ids (0..15 per polygon): neighbouring parcels of the same class differ, so field boundaries (hedges, tint) survive the raster
+    parcels = ["".join("0" if x < 0 else CLASS_CODE[(int(x) * 7 + (int(x) >> 4)) % 16] for x in row) for row in pg]
+    return {"rows": text, "parcels": parcels, "n": n, "ds": round(g.length / n, 3)}
+
+
+FAR_ROW = 60.0
+FAR_COL = 60.0
+FAR_COLS = 50             # -1500 .. +1500
+FAR_LAT0 = -1500.0
+
+
+def far_raster(g, land):
+    """Coarse land classes up to 1.5 km beside the line: colours the far ground (rows of FAR_ROW game metres)."""
+    n = max(2, int(round(g.length / FAR_ROW)))
+    sg = (np.arange(n) + 0.5) * g.length / n
+    p, r, _ = g.frame(g.real_of(sg))
+    rows = []
+    for j in range(FAR_COLS):
+        lat = FAR_LAT0 + (j + 0.5) * FAR_COL
+        q = p + r * lat
+        rows.append(land.at(q[:, 0], q[:, 1]))
+    grid = np.array(rows).T
+    return {"rows": ["".join(CLASS_CODE[int(c)] for c in row) for row in grid], "n": n, "ds": round(g.length / n, 3)}
 
 
 def water_windows(g, waters, tree):
@@ -125,7 +150,7 @@ def water_windows(g, waters, tree):
             continue
         name = max(set(w["names"]), key=w["names"].count)
         kind = max(set(w["kinds"]), key=w["kinds"].count)
-        half = RIVER_HALF.get(name, 6.0 if kind == "river" else 3.5)
+        half = RIVER_HALF.get(name, 6.0 if kind in ("river", "canal") else 2.4)
         lat = float(np.median(w["lats"]))
         off = clamp(lat, half + RIVER_MIN_OFFSET, 260.0)
         res.append({"s0": round(float(g.game_of(w["s0"])), 1), "s1": round(float(g.game_of(w["s1"])), 1), "side": w["side"], "off": round(off, 1), "half": half, "name": name,

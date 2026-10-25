@@ -24,6 +24,11 @@
   const HOUSE_SPACING = 17;
   const HOUSE_SETBACK = 6;
   const MAX_HOUSES = 90;
+  const OBJ_LAT = 290;                // houses and trees stand up to here; fields / road ribbons only inside the strip (the far ground carries the land colours beyond)
+  const FAR_LIFT = 0.3;               // ribbons on the coarse far ground sit this much higher (its triangles are 24 m wide)
+  const PARCEL_W = [20, 60];
+  const PARCEL_S = [45, 110];
+  const MEADOW_CROP = 0.3;            // OSM tags most Luxembourg grassland and arable land as meadow / nothing: a third of the small parcels are crops
   const FIELD_MAX_S = 95;             // fields longer than this are split (crop variety)
     const VILLAGE_CLASSES = new Set(['residential', 'unclassified', 'tertiary', 'secondary', 'primary']);
   const ROAD_LINE_CLASSES = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary']);
@@ -40,7 +45,7 @@
       const line = [];
       for (let j = 0; j < nCol; j++) {
         const l0 = R.lat0 + j * R.col;
-        line.push({ s0: row.s, s1: row.s + row.ds, l0, l1: l0 + R.col, cls: parseInt(row.text[j], 16), used: false });
+        line.push({ s0: row.s, s1: row.s + row.ds, l0, l1: l0 + R.col, cls: parseInt(row.text[j], 16), par: row.parcels ? parseInt(row.parcels[j], 16) : 0, used: false });
       }
       cells.push(line);
     });
@@ -57,16 +62,16 @@
         const cell = cells[i][j];
         if (cell.used || !accept(cell)) continue;
         let j1 = j;
-        while (j1 + 1 < nC && !cells[i][j1 + 1].used && cells[i][j1 + 1].cls === cell.cls) j1++;
+        while (j1 + 1 < nC && !cells[i][j1 + 1].used && cells[i][j1 + 1].cls === cell.cls && cells[i][j1 + 1].par === cell.par) j1++;
         let i1 = i;
         while (i1 + 1 < nR && i1 + 1 - i < (maxRows || 99)) {
           let ok = true;
-          for (let q = j; q <= j1; q++) if (cells[i1 + 1][q].used || cells[i1 + 1][q].cls !== cell.cls) { ok = false; break; }
+          for (let q = j; q <= j1; q++) if (cells[i1 + 1][q].used || cells[i1 + 1][q].cls !== cell.cls || cells[i1 + 1][q].par !== cell.par) { ok = false; break; }
           if (!ok) break;
           i1++;
         }
         for (let a = i; a <= i1; a++) for (let b = j; b <= j1; b++) cells[a][b].used = true;
-        out.push({ s0: cells[i][j].s0, s1: cells[i1][j].s1, l0: cells[i][j].l0, l1: cells[i][j1].l1, cls: cell.cls });
+        out.push({ s0: cells[i][j].s0, s1: cells[i1][j].s1, l0: cells[i][j].l0, l1: cells[i][j1].l1, cls: cell.cls, par: cell.par });
       }
     }
     return out;
@@ -131,7 +136,8 @@
         const bad = Math.abs(left.y - right.y) > STEEP_CROSS || q.s < -20 || q.s > c.track.length + 20;
         if (bad) { if (piece.length >= 2) pieces.push(piece); piece = []; return; }
         const hi = Math.max(left.y, right.y, cy);
-        piece.push({ q, left: Object.assign(left, { y: hi }), mid: { x: q.x, z: q.z, y: hi }, right: Object.assign(right, { y: hi }) });
+        const lift = Math.abs(q.lat) > c.W - 6 ? FAR_LIFT : 0;
+        piece.push({ q, left: Object.assign(left, { y: hi + lift }), mid: { x: q.x, z: q.z, y: hi + lift }, right: Object.assign(right, { y: hi + lift }) });
       });
       if (piece.length >= 2) pieces.push(piece);
       pieces.forEach((pc) => {
@@ -140,10 +146,10 @@
           if (i) dist += Math.hypot(e.mid.x - pc[i - 1].mid.x, e.mid.z - pc[i - 1].mid.z);
           return [Object.assign({ d: dist }, e.left), Object.assign({ d: dist }, e.mid), Object.assign({ d: dist }, e.right)];
         });
-        const white = c.C('#ffffff');
-        c.addGrid(c.mbRoad, grid, (p, a, b) => [b / 2, p.d / 8], () => white, 0.07);
+        const tint = rd.c === 'track' ? c.C('#e9dcb8') : rd.c === 'service' ? c.C('#d8d4cc') : c.C('#ffffff');
+        c.addGrid(c.mbRoad, grid, (p, a, b) => [b / 2, p.d / 8], () => tint, 0.07);
         // chunk roads for the cars (streets with a real class only)
-        if (rd.c !== 'service' && pc.length > 3) {
+        if (rd.c !== 'service' && rd.c !== 'track' && pc.length > 3) {
           const pts = pc.map((e) => ({ x: e.mid.x, y: e.mid.y + 0.1, z: e.mid.z }));
           const cum = [0];
           for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
@@ -190,10 +196,11 @@
     const dens = FOREST_DENSITY * c.Q.trees;
     cells.forEach((row) => row.forEach((cell) => {
       if (cell.cls !== c.real.CLASS.forest && cell.cls !== c.real.CLASS.scrub) return;
-      if (Math.abs((cell.l0 + cell.l1) / 2) > c.W - 4) return;
+      const cl = Math.abs((cell.l0 + cell.l1) / 2);
+      if (cl > OBJ_LAT) return;
       const forest = cell.cls === c.real.CLASS.forest;
       const area = (cell.s1 - cell.s0) * (cell.l1 - cell.l0);
-      let n = area * (forest ? dens : SCRUB_DENSITY * c.Q.trees);
+      let n = area * (forest ? dens : SCRUB_DENSITY * c.Q.trees) * (cl > c.W ? 0.55 : 1);
       n = Math.floor(n) + (c.rng() < n % 1 ? 1 : 0);
       for (let i = 0; i < n; i++) {
         const s = cell.s0 + c.rng() * (cell.s1 - cell.s0);
@@ -218,6 +225,31 @@
     return h < 0.3 ? 'rowsGold' : h < 0.55 ? 'rowsGreen' : h < 0.72 ? 'rowsBrown' : h < 0.82 ? 'rowsRape' : 'meadow';
   }
 
+  /* hedge / tree line on the long edges of a parcel (field boundaries of the real land use) */
+  function pcKind(c) {
+    const h = c.rng();
+    return h < 0.34 ? 'rowsGold' : h < 0.62 ? 'rowsGreen' : h < 0.8 ? 'rowsBrown' : 'rowsRape';
+  }
+
+  function hedge(c, r, segs, prob) {
+    if (r.cls === c.real.CLASS.vine) return;
+    [r.l0, r.l1].forEach((lat, side) => {
+      if (Math.abs(lat) < c.TREE_CLEAR_LAT + 1 || Math.abs(lat) > c.W - 3 || c.rng() > (prob === undefined ? 0.62 : prob)) return;
+      const edge = lat + (side === 0 ? 0.4 : -0.4);
+      for (let s = r.s0 + 1; s < r.s1 - 1; s += 2.6) {
+        if (!treeOk(c, s, edge)) continue;
+        const p = c.place(s, edge);
+        if (segs.length && roadClearance(segs, p.x, p.z).d < 1.5) continue;
+        c.addTree('bush', p.x, p.y - 0.1, p.z, 0.75 + c.rng() * 0.4, c.rng);
+      }
+      if (c.rng() < 0.5) for (let s = r.s0 + 4; s < r.s1 - 3; s += 9 + c.rng() * 6) {
+        if (!treeOk(c, s, edge)) continue;
+        const p = c.place(s, edge);
+        c.addTree(c.rng() < 0.5 ? 'oak' : 'beech', p.x, p.y - 0.15, p.z, 0.8 + c.rng() * 0.35, c.rng);
+      }
+    });
+  }
+
   function placeFields(c, cells, segs) {
     const K = c.real.CLASS;
     const open = new Set([K.field, K.meadow, K.vine, K.orchard, K.park, K.cemetery, K.quarry]);
@@ -237,8 +269,24 @@
         }
       }
       if (l1 - l0 < 8) return;
-      c.addField(c.fieldMB, c.rng, 'farmland', r.s0 + 1.2, r.s1 - 1.2, l0 + 0.8, l1 - 0.8, kind);
-      void segs;
+      if (r.cls === K.vine || r.cls === K.cemetery || r.cls === K.quarry) { c.addField(c.fieldMB, c.rng, 'farmland', r.s0 + 1.2, r.s1 - 1.2, l0 + 0.8, l1 - 0.8, kind); return; }
+      // real parcels are small: the land-use area is cut into parcels of 20-60 m x 45-110 m, each with its own crop / grass, bordered by hedges and tree lines
+      for (let la2 = l0; la2 < l1 - 6;) {
+        let w = PARCEL_W[0] + c.rng() * (PARCEL_W[1] - PARCEL_W[0]);
+        if (l1 - (la2 + w) < 24) w = l1 - la2;
+        for (let sa = r.s0; sa < r.s1 - 6;) {
+          let len = PARCEL_S[0] + c.rng() * (PARCEL_S[1] - PARCEL_S[0]);
+          if (r.s1 - (sa + len) < 36) len = r.s1 - sa;
+          const pc = { s0: sa, s1: sa + len, l0: la2, l1: la2 + w, cls: r.cls };
+          const crop = r.cls === K.meadow || r.cls === K.park || r.cls === K.orchard ? (c.rng() < MEADOW_CROP ? pcKind(c) : 'meadow') : r.cls === K.field ? (c.rng() < 0.18 ? 'meadow' : pcKind(c)) : kind;
+          if (pc.l1 - pc.l0 > 7 && pc.s1 - pc.s0 > 9) {
+            c.addField(c.fieldMB, c.rng, 'farmland', pc.s0 + 0.9, pc.s1 - 0.9, pc.l0 + 0.7, pc.l1 - 0.7, crop);
+            hedge(c, pc, segs, 0.4);
+          }
+          sa += len;
+        }
+        la2 += w;
+      }
     });
   }
 
@@ -305,7 +353,7 @@
       if (c.rng() > (cell.cls === K.urban ? 0.5 : 0.32)) return;
       const s = cell.s0 + c.rng() * (cell.s1 - cell.s0);
       const lat = cell.l0 + c.rng() * (cell.l1 - cell.l0);
-      if (Math.abs(lat) > c.W - 6) return;
+      if (Math.abs(lat) > OBJ_LAT) return;
       const f = c.frame(s);
       put(s, lat, c.yawOf(f) + (c.rng() < 0.3 ? Math.PI / 2 : 0), cell.cls === K.urban);
     }));

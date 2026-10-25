@@ -1,69 +1,54 @@
-# Zuchsimulator "zuchreal" - handoff after Wave 1
+# Zuchsimulator "zuchreal" - handoff after Wave 2, part 1 (task 1 mostly done; tasks 2-4 open)
 
-Worktree `/Users/Ian/Library/Caches/website-zuchreal`, branch `zuchreal` (based on origin/main 8199762a), commit often, **no push / no deploy / not main**.  The reviewer is Claude Opus.
-Rules that matter (from the brief): painted realism only (no orthophoto anywhere visible), reference photos + photo | screenshot montage for every station touched, weather / time stay
-player-choosable, one browser at a time (Mac mini 16 GB), iPad performance (instancing, quality levels), small new modules instead of growing the 140 KB files, don't break saves /
-career / the Tramsimulator lock.  Reference photos live in `~/Library/Caches/zuch-refs/<Station>/` (NOT in the repo).  Open-data caches: `~/Library/Caches/zuch-work/`.
-Python env for the data pipeline: `/Users/Ian/Library/Caches/luxtram-work/.venv/bin/python`.
+Worktree `/Users/Ian/Library/Caches/website-zuchreal`, branch `zuchreal` (Wave 1 is on origin/main), commit often, **no push / no deploy / not main**.  Reviewer: Claude Opus.
+Rules (brief `scratchpad/brief-zuch.md` + `brief-zuch-w2.md`): painted realism only (no orthophoto), reference photos + photo | screenshot montage for every station touched, weather / time stay player-choosable, ONE browser at a time
+(Mac mini 16 GB), iPad performance (instancing, quality levels), new small modules, don't break saves / career / the Tramsimulator lock.  Photos: `~/Library/Caches/zuch-refs/<Station>/` (not in the repo).
+Open data caches: `~/Library/Caches/zuch-work/` (`lux.osm.pbf`, `rlp.osm.pbf` = Rheinland-Pfalz extract 260 MB, `realline/corridor-*.pkl`, `dem/` Copernicus tiles, `scratch/` probes).
+Python: `/Users/Ian/Library/Caches/luxtram-work/.venv/bin/python` (numpy rasterio pyogrio shapely pillow pyproj scipy).  Reports: `~/Library/CloudStorage/OneDrive-Mulheims/website-overnight/reports/zuchreal/w2/`.
+A side agent (trees, perf, Munsbach fixes; brief `scratchpad/brief-zuch-w2-trees-perf.md`) works in parallel on the same branch: its files are `tree-kit*.js` (new) + local edits in landscape.js / stations-lu-c.js / infra.js; check `git log` for its commits and its report.
 
-## Done and verified (numbers in the Wave 1 report)
+## Done in Wave 2 (task 1, numbers verified by `scripts/zuch/route_probe.mjs`)
 
-* Crossing roads everywhere (plan / mesh / traffic).  Verified by flow `train-sim-world`: all crossings of all 9 rail routes have a planned road, reach >= 120 m on both sides, grade <= 11 %
-  sample-to-sample (clamped to 5.5 %), terrain function = design height within 0.2 m, the strip mesh within +0.2 / -0.35 m of the road surface; vehicles queue at the stop line and flow again.
-* Shared Mosel line: east / wittlich / trier have identical stations (+-6 m) and crossings; trier passes 11 stations; wittlich is registered (price 12 000, order after east, `~r` works).
-* Munsbach: model + real patch; flow checks the patch is built (1 group, > 2000 triangles) and the corridor is flat.
-* Hole detector (render + ray) in the flow for west and east; whole-line scans of all routes were run before / after the river-bridge fix (see the report).
+* **RB 83 decision implemented** (stop list verified against the SPNV-Nord press release, see REAL-LINES.md "Wave 2"): `wittlich` = Lux - Cents-Hamm - ... - Igel - Zewen - Euren - West - Pallien - Hafenstraße - Ehrang Ort - Quint -
+  Schweich - Föhren - Hetzerath - Sehlem - Salmtal - Wittlich (25 stops, 28.4 km game length); `trier` = A + Kreuz Konz - Tréier Süd - Tréier Hbf + tail + authored Cochem / Koblenz (26 stations, 33.0 km); `east` = Lux .. Wasserbëlleg (11 stops).
+  Both branches have the same game length, so the tail stations are at the same s on both services (Hafenstraße platformStart 19071 on both).  NOT done: the world POSITION of the tail differs between the two services (branch end poses are not
+  forced to be equal): the generic ground noise (hills) of the shared tail therefore differs; real data (rivers, roads, land classes) is keyed by leg and identical.
+* **OSM -> leg geometry tool** (`scripts/zuch/build_real_line.py` + `real_line_*.py`, `osm_rail.py`, `fetch_corridor.py`): real curve sequence / sides / radii, grades (DEM), maxspeed, bridges, tunnels, level crossings, biomes per leg.  Output
+  `pb/train-sim/real-mosel.js` (+ `data/real/mosel-layout.json`, `data/real/mosel-features.json`).  Re-run: see REAL-LINES.md.  QA plot of real vs game heading: `build_real_line.py layout --route wittlich --plot x.png`.
+* **Real scenery** (`real-line.js`, `real-scenery.js`, hooks in `track.js` / `landscape.js` / `train-sim.js` / `train-sim.html`): rivers on the real side with real offset / width (Syre 7 m, Sauer 28, Mosel 55 half width), real relief (DEM height 220 m
+  left / right), land classes (forest / fields / vineyards / meadows / orchards / residential / urban / industry) from OSM landuse, real roads (A1, N1, CR, village streets) as ribbons with cars, houses along the real residential streets, churches at village centres.
+  Roads stop at the strip edge (+-150 m); ribbons on steep ground (cross slope > 1.7 m) are not drawn (they would float).
+* Aerial screenshots: `w2/aerial1/` (Munsbach - Roodt: villages along the real streets, A1 viaduct road).
 
-## Done, not verified (or only by eye)
+## NOT done / open (in priority order)
 
-* iPad / WebKit performance (never run on WebKit here; only desktop Chrome).  Medium quality numbers were not collected.
-* The crossing roads on the return directions (`~r`) were only checked by the flow's start check, not by screenshots.
-* Night / rain look of the crossing roads and the Munsbach patch (materials are Lambert, so they follow the scene lights, but nobody looked).
-
-## Open items (root causes and where to work)
-
-1. **Weststrecke decision** (REAL-LINES.md): RB 83 uses the left bank since 3 Mar 2025 (Zewen, Euren, West, Pallien, Hafenstraße, no Trier Hbf / Ehrang).  Wave 1 follows the brief
-   (via Kreuz Konz / Trier Süd / Trier Hbf / Ehrang).  Switching = edit the legs and station names between Igel and Schweich in `moselBody` (routes.js), keep `sceneryId`.
-2. **Real level crossings** (REAL-LINES.md has the OSM list): replace the authored `X` flags on the Mosel line by the real ones; where a station patch exists the patch road is the
-   crossing road (Munsbach: Rue de Beyren ~110-130 m ahead of the platform middle; today it is painted ground, tracks pass through it with no equipment).  Plan: add the crossing to
-   `comp.crossings` in track.js from the patch road that crosses the corridor, mark it `real: true`, let `planCrossing` build only the infra record (no synthetic road) and let
-   crossing-traffic use the patch road polyline.
-3. **Munsbach vs photos** (montage in the report folder): platform kerb (concrete with recesses) and tan paver texture are generic, catenary masts are the generic ones (real: tall rusty
-   concrete masts), the building's right block is taller in reality, no roof drain / gutters, the far platform has no shelter; patch roads are painted only: add 3D road ribbons
-   with kerbs / markings from `data.roads` (see how crossing-roads-mesh.js builds ribbons) and traffic on them (crossing-traffic.js can take any polyline).
-4. **More stations** (task 2 list): Lëtzebuerg Gare, Ettelbréck, Esch-Uelzecht, Belval-Université, Bettembuerg, Miersch, Clierf, Wasserbëlleg, Kautebaach, Pafendall-Kierchbierg are
-   photo-modelled but have generic surroundings: `build_station_patch.py <key> --name ... --lat --lon --heading-hint ...`, then `reg()` side / z of the building from the
-   patch (`station: 1` building ring), add the name to the loader index automatically (index.json is merged).  The Mosel line stations without a model (Roodt-Syr, Wecker, Igel,
-   Kreuz Konz, Tréier Süd, Ehrang, Föhren, Hetzerath, Sehlem, Salmtal) need references + models.  Each needs photo | screenshot montage.
-5. **Real line geometry** (REAL-LINES.md section 1): `scripts/zuch/build_real_line.py` does not exist yet.  Mosel line first (data: Geofabrik extract for Luxembourg; for Germany the
-   Rheinland-Pfalz extract from download.geofabrik.de, ~400 MB; Overpass is blocked from this machine, SSL handshake failure).
-6. **Pits / floating things**: the hole scan shows only hairline cracks (1-9 px) after the carve fix (probably chunk seams where the extra columns differ: see `valleyLats` margin in track.js and `extraLats` for roads / patches), but village road ribbons / lamps on steep valley walls under viaducts float (landscape.js
-   `ribbonMesh` samples every 8 m, `addRoadRibbon` for villages in `buildChunk`); the water slab under river bridges is a plain rectangle (landscape.js water section).
-7. Patch data limits: the straightening shrinks features on the inside of tight curves (Munsbach: tightest radius ~583 m, 73 % at 160 m lateral); DEM shows faint ghost edges of building
-   footprints; trees are removed within 7.5 m of the track; sidewalks only where OSM tags them.
-8. `train_sim_world.mjs` takes ~6 minutes (9 routes x crossing checks + hole scan on 2 routes); `run_all.mjs train` takes ~35 minutes in total.
-9. check_site.py warns about `karttracker-ios-privacy.html` (orphan): pre-existing, not from this branch.
-10. The luxtram files (`luxtram*.js`, `data/luxtram`) were not touched; the tram routes have no crossing roads (planner skips `kind === 'tram'`) and no hole scan yet (run
-    `node scripts/zuch/hole_scan.mjs luxtram-kierchbierg,...`; the tram strip is `ownScenery`).
+1. **Gates not finished** (the 35 min `run_all.mjs train` was started at the end of the session and its result is not in this file; `train_sim_world.mjs` encodes Wave 1 expectations: station counts of east / wittlich / trier, `trier` passes 11 stations, "identical
+   stations +-6 m" - update it for 25 / 26 stations, the branches, 11-stop east, Cents-Hamm).  `check_site.py`, `cv_head.py`: not run after Wave 2 code.
+2. **Far ground colour**: the strip (+-150 m) is coloured by biome, the far ground by noise: visible colour step at the strip edge (dark green vs yellow).  `pipeline`: the features file now also has `far` rasters (60 m cells, +-1500 m;
+   `real_line_scenery.far_raster`, run `build_real_line.py emit` again, not yet regenerated).  JS: in landscape.js `farColor(x, z, nY)` use `track.nearest` + `track.real.farClassAt(s, lat)` (add to real-line.js; classes -> colours: field gold-green,
+   meadow light green, forest dark green, vine yellow-green, resid / urban grey-green, indus grey, water blue); and in `groundColor` blend the strip ground by `real.landAt(s, lat)` (forest floor darker, fields lighter).
+3. **Real level crossings**: positions come from the OSM crossings that survived the layout (about 10 of 21 on `wittlich`; dropped: inside station blocks, on arcs, too close to bridges / tunnels).  The crossing roads are still the Wave 1 synthetic
+   ones: `crossing-roads.js` should take the real hints (`real.crossings` has `s`, `barrier`, nearest real road on the left / right (lat, class)) so the road T-junctions into the REAL parallel road; the real ribbons of `real-scenery.js` currently
+   draw the same parallel roads again beside the synthetic ones (look at the crossings in `w2/` shots).  Munsbach's Rue de Beyren crossing: the side agent owns it.
+4. **Task 2 stations on this line** (nothing done): Roodt (Syre), Oetrange, Betzder, Wecker, Sandweiler-Contern, Manternach, Mertert, Wasserbëlleg, Cents-Hamm (new, generic), then Igel, Zewen, Euren, West, Pallien, Hafenstraße, Ehrang Ort, Quint, Schweich,
+   Föhren, Hetzerath, Sehlem, Salmtal, Wittlich Hbf, Kreuz Konz, Trier Süd, Trier Hbf: photos from Wikimedia Commons into `~/Library/Caches/zuch-refs/<Station>/`, `scripts/zuch/build_station_patch.py` (Luxembourg only: LiDAR + LOD2; for German stations
+   it needs OSM buildings + the Copernicus DEM or RLP open LiDAR / LoD2), `reg()` model (see stations-lu-c.js Munsbach), montage.  Station sides are now computed from OSM platforms (`real-mosel.js` `stations[...].side`; where the OSM platform was not found
+   the side of the previous stop was used: Zewen, Euren, West, Pallien, Hafenstraße, Ehrang Ort, Föhren, Sehlem, Salmtal are guesses) - check each against photos.  The existing models (stations-lu-b.js: Sandweiler-Contern, Oetrange, Betzder, Manternach, Mertert,
+   Wasserbëlleg; stations-abroad.js: Tréier Hbf, Schweich, Wittlich) use the sides given by the old authored routes: compare with `real-mosel.js` and flip the model if needed.
+5. **Task 3 Lëtzebuerg Gare Centrale** (nothing done): station building with clock tower, platforms, long canopy, forecourt; real surroundings via the patch pipeline; photos + montage.
+6. **Task 4 leftovers**: floating road ribbons / lamps on steep viaduct walls (the new real roads skip steep ribbons; generic `ribbonMesh` villages still float), plain water slab under bridges, hairline cracks / ray failures (north Pafendall, brussels), hole scan on the tram.
+7. Task 5 other routes (north first) not started: the same pipeline works for any line (`PLAN` / `STOPS` in `real_line_path.py` are Mosel-specific: generalise).
+8. Pose closing of the two branches (see above) and Cochem / Koblenz legs are authored.
+9. `real_line_scenery.roads_of_leg` keeps only roads with both ends cut at +-11 m of the corridor; overpasses of real roads over the line are not modelled (the road simply ends at the corridor).
 
 ## How to run things
 
 ```
-node scripts/flows/run_all.mjs train                      # all train flows incl. train-sim-world
-node scripts/flows/run_all.mjs train-sim-world            # only the new world flow
-node scripts/zuch/hole_scan.mjs west,east --step 300 --out <dir>     # render + ray hole detector, exit 1 on findings
-node scripts/zuch/crossing_shots.mjs <dir> west,south,wittlich,north,metz,brussels [--root <other worktree>]
-node scripts/zuch/crossing_cab.mjs <dir> west 0           # the driver's view, barriers closed, queue
-node scripts/zuch/station_shots.mjs <dir> east Munsbach --focusZ -82 --forecourtLat 12 --tag v1   # 8 viewpoints; compare with the photos
-$PY scripts/zuch/montage.py out.png --cols 2 --w 800 "caption=img.png" ...                         # photo | screenshot sheets
-$PY scripts/zuch/build_station_patch.py munsbach --name Munsbach --lat 49.63055 --lon 6.26852 --heading-hint east
-$PY scripts/zuch/check_station_patch.py pb/train-sim/data/stations/munsbach.json
+node scripts/zuch/route_probe.mjs wittlich [--shots dir --every 2500]      # route basics (stations, crossings, bridges, tunnels) + cab shots
+node scripts/zuch/route_aerial.mjs wittlich dir 5800 7400 400              # aerial shots along s
+node scripts/flows/run_all.mjs train                                       # all train flows (35 min)
+node scripts/zuch/station_shots.mjs <dir> east Munsbach --focusZ -82 --forecourtLat 12 --tag v1
+$PY scripts/zuch/montage.py out.png --cols 2 --w 800 "caption=img.png" ...
+$PY scripts/zuch/build_real_line.py emit        # regenerate real-mosel.js + data/real/*.json from the cached corridor
 ```
-Test hooks in the game: `?test=1` -> `__tsTest.setFreeCam({pos, look, fov})`, `placeAt(s, kmh)`, `internals()`, `trackInfo()`; `world.landscape.setHoleMode(on)`,
-`.terrainMeshes()`, `.groundHeightAt(x, z)`, `.crossingTraffic()` (`.state()`, `.setClosed(s, bool)`, `.sites`).
-The "before" screenshots were taken from a detached origin/main worktree with only the free-cam hook patched in (removed again).
-
-## Reports / screenshots
-
-`~/Library/CloudStorage/OneDrive-Mulheims/website-overnight/reports/zuchreal/w1/`: `crossings-before/`, `crossings-after/` (4 views per crossing), `montage-crossings/` (before | after per
-crossing), `cab/` (driver's view with the queue), `munsbach/` (viewpoints + photo | screenshot montages), `holes/` (scan reports).
+Test hooks: `?test=1` -> `__tsTest.setFreeCam`, `placeAt`, `internals()`, `trackInfo()`; `world.landscape.setHoleMode(on)`, `.groundHeightAt`, `.crossingTraffic()`; `track.real` (resolved scenery data).

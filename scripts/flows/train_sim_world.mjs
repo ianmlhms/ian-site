@@ -105,19 +105,24 @@ export const flow = {
       lines[id] = await sim.evalGame(({ track }) => ({ st: track.stations.map((s) => [s.name, Math.round(s.platformStart)]), cross: track.crossings.map((c) => Math.round(c.s)), len: Math.round(track.length), pass: track.passFixed, scenery: track.sceneryId, plan: __tsTest.state().pattern, passIdx: __tsTest.state().passIndices, stops: track.stations.length - track.passFixed.length }));
     }
     const prefixSame = (a, b, n) => a.st.slice(0, n).every((s, i) => s[0] === b.st[i][0] && Math.abs(s[1] - b.st[i][1]) <= 6);
-    h.expect(prefixSame(lines.east, lines.wittlich, lines.east.st.length - 1) && prefixSame(lines.wittlich, lines.trier, lines.wittlich.st.length - 1), 'the three services have the same stations at the same positions (up to the last station of the shorter one)');
+    const IGEL = lines.east.st.findIndex((s) => s[0] === 'Igel') + 1;   // shared Lux - Igel track (east ends at Wasserbëlleg, before it)
+    const tailOf = (l) => l.st.filter((s) => ['Tréier Hafestrooss', 'Ehrang Ort', 'Quint', 'Schweich', 'Föhren', 'Hetzerath', 'Sehlem', 'Salmtal', 'Wittlich'].includes(s[0]));
+    h.expect(prefixSame(lines.east, lines.wittlich, lines.east.st.length - 1) && prefixSame(lines.wittlich, lines.trier, 12), 'the services have the same stations at the same positions on the shared track Lux - Igel');
+    h.expect(tailOf(lines.wittlich).length === 9 && tailOf(lines.trier).length === 9 && tailOf(lines.wittlich).every((s, i) => s[0] === tailOf(lines.trier)[i][0] && Math.abs(s[1] - tailOf(lines.trier)[i][1]) <= 6), 'wittlich (Weststrecke) and trier (Hbf branch) meet again: the tail stations are at the same s');
+    h.expect(lines.wittlich.st.some((s) => s[0] === 'Tréier West') && !lines.wittlich.st.some((s) => s[0] === 'Tréier Hbf') && lines.trier.st.some((s) => s[0] === 'Tréier Hbf') && !lines.trier.st.some((s) => s[0] === 'Tréier West'), 'RB 83 runs over the Weststrecke (no Hbf), the express over Trier Hbf');
+    void IGEL;
     h.expect(lines.east.cross.every((c, i) => Math.abs(c - lines.wittlich.cross[i]) <= 2) && lines.east.cross.length <= lines.wittlich.cross.length, 'the crossings of east are the first crossings of wittlich');
     h.eq([lines.east.scenery, lines.wittlich.scenery, lines.trier.scenery], ['mosel', 'mosel', 'mosel'], 'one scenery id');
-    h.eq([lines.east.st.length, lines.wittlich.st.length, lines.trier.st.length], [10, 21, 23], 'east: 10 stations, wittlich: 21, trier: 23 on the line');
-    h.eq([lines.east.pass.length, lines.wittlich.pass.length, lines.trier.pass.length, lines.trier.stops], [0, 0, 11, 12], 'east and wittlich stop everywhere, trier runs through 11 of 23 and stops 12 times');
+    h.eq([lines.east.st.length, lines.wittlich.st.length, lines.trier.st.length], [11, 25, 26], 'east: 11 stations, wittlich (RB 83): 25, trier: 26 on the line');
+    h.eq([lines.east.pass.length, lines.wittlich.pass.length, lines.trier.pass.length, lines.trier.stops], [0, 0, 14, 12], 'east and wittlich stop everywhere, trier runs through 14 of 26 and stops 12 times');
     h.eq(lines.trier.passIdx, lines.trier.pass, 'the express plan passes exactly the fixed stations');
-    h.eq(lines.wittlich.st.map((s) => s[0]).slice(0, 10), ['Lëtzebuerg', 'Sandweiler-Contern', 'Oetrange', 'Munsbach', 'Roodt-Syr', 'Betzder', 'Wecker', 'Manternach', 'Mertert', 'Wasserbëlleg'], 'east stop list: Munsbach, Roodt and Wecker are on the line');
+    h.eq(lines.wittlich.st.map((s) => s[0]).slice(0, 11), ['Lëtzebuerg', 'Cents-Hamm', 'Sandweiler-Contern', 'Oetrange', 'Munsbach', 'Roodt-Syr', 'Betzder', 'Wecker', 'Manternach', 'Mertert', 'Wasserbëlleg'], 'east stop list: Munsbach, Roodt and Wecker are on the line');
     const cfg = await page.evaluate(() => ({ price: TS.config.routeRules.wittlich && TS.config.routeRules.wittlich.price, order: TS.config.routeOrder.slice(), route: !!TS.routes.get('wittlich') && !!TS.routes.get('wittlich~r') }));
     h.expect(cfg.price > 0 && cfg.order.includes('wittlich') && cfg.route, `wittlich is registered (price ${cfg.price}, order ${cfg.order.join(',')}) with a return direction`);
     for (const id of ['wittlich~r', 'trier~r']) {
       await sim.start(id);
       const back = await sim.evalGame(({ track }) => ({ n: track.stations.length, first: track.stations[0].name, pass: track.passFixed.length }));
-      h.expect(back.first === (id === 'wittlich~r' ? 'Wittlich' : 'Koblenz Hbf') && back.n === (id === 'wittlich~r' ? 21 : 23), `${id}: starts at ${back.first} with ${back.n} stations, ${back.pass} passed`);
+      h.expect(back.first === (id === 'wittlich~r' ? 'Wittlich' : 'Koblenz Hbf') && back.n === (id === 'wittlich~r' ? 25 : 26), `${id}: starts at ${back.first} with ${back.n} stations, ${back.pass} passed`);
     }
 
     h.step('Munsbach: the real relief, buildings and trees around the station');

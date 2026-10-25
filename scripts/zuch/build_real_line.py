@@ -867,14 +867,20 @@ def write_layout(segs, legs_meta, stations, path_json, path_meta):
         json.dump(legs_meta, f)
 
 
-def write_features(segs, legs_meta, res, tiles, dem, land):
+def write_features(segs, legs_meta, stations, res, tiles, dem, land):
     import real_line_scenery as sc
-    waters = [w for w in tiles["waterways"] if w["t"].get("waterway") in ("river", "canal")]
+    waters = [w for w in tiles["waterways"] if w["t"].get("waterway") in ("river", "canal", "stream")]
     wtree = STRtree([w["g"] for w in waters])
     roads = [w for w in tiles["highways"] if w["t"].get("highway") in sc.ROAD_CLASSES]
     rtree = STRtree([w["g"] for w in roads])
     out = {}
-    for lid, meta in legs_meta.items():
+    # the station blocks (290 m: approach + platform + approach) get their own scenery records "st:<name>": the real stretch around the stop, 1:1
+    blocks = {}
+    for name, st in stations.items():
+        blocks["st:" + name] = {"route": st["route"], "from": name, "to": name, "real": [st["s_real"] - HALF_BLOCK, st["s_real"] + HALF_BLOCK], "k": 1.0, "mapping": [[0.0, 0.0], [2 * HALF_BLOCK, 2 * HALF_BLOCK]]}
+    all_meta = dict(legs_meta)
+    all_meta.update(blocks)
+    for lid, meta in all_meta.items():
         route = meta["route"]
         attrs, stops, feats, legs, _, _ = res[route]
         g = sc.LegGeom(attrs, meta)
@@ -882,6 +888,7 @@ def write_features(segs, legs_meta, res, tiles, dem, land):
         out[lid] = {
             "L": round(g.length, 1),
             "land": sc.land_raster(g, land),
+            "far": sc.far_raster(g, land),
             "water": sc.water_windows(g, waters, wtree),
             "roads": rd,
             "relief": sc.relief(g, dem),
@@ -889,7 +896,7 @@ def write_features(segs, legs_meta, res, tiles, dem, land):
             "crossings": sc.crossings_of_leg(g, feats["crossings"], rd),
         }
         print("  features", lid, meta["from"], "->", meta["to"], "roads", len(rd), "water", len(out[lid]["water"]), "places", len(out[lid]["places"]), "crossings", len(out[lid]["crossings"]))
-    doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "classes": __import__("real_line_land").CLASS_NAMES, "legs": out}
+    doc = {"version": 1, "row": sc.ROW_M, "col": sc.COL_M, "lat0": sc.LAT0, "cols": sc.COLS, "far": {"row": sc.FAR_ROW, "col": sc.FAR_COL, "lat0": sc.FAR_LAT0, "cols": sc.FAR_COLS}, "classes": __import__("real_line_land").CLASS_NAMES, "legs": out}
     path = os.path.join(OUT, "mosel-features.json")
     with open(path, "w") as f:
         json.dump(doc, f, separators=(",", ":"), ensure_ascii=False)
@@ -911,7 +918,7 @@ def main():
         segs, legs_meta, stations, res = emit(routes, pts, tiles, dem, land)
         segs = order_segments(segs, res)
         write_layout(segs, legs_meta, stations, os.path.join(OUT, "mosel-layout.json"), os.path.join(rp.CACHE, "mosel-legs-meta.json"))
-        write_features(segs, legs_meta, res, tiles, dem, land)
+        write_features(segs, legs_meta, stations, res, tiles, dem, land)
         for seg, items in segs.items():
             print(seg, " | ".join(it["name"] if it["t"] == "station" else "%s %d" % (it["id"], it["length"]) for it in items))
         return

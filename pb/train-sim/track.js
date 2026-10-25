@@ -147,6 +147,7 @@
         len = before + sd.platformLen + after;
         const platformStart = s + before;
         const platformEnd = platformStart + sd.platformLen;
+        result.legs.push({ id: 'st:' + it.name, s0: s, s1: s + len });   // real line: the station block has its own scenery record
         result.stations.push({
           id: 'st' + stationCount,
           name: it.name,

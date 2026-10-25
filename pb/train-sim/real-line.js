@@ -49,6 +49,7 @@
     const places = [];
     const crossings = [];
     const rasters = [];
+    const fars = [];
     const relief = [];
     legs.forEach((l) => {
       l.f.water.forEach((w) => water.push({ s0: l.s0 + w.s0 * l.k, s1: l.s0 + w.s1 * l.k, side: w.side, off: w.off, half: w.half, name: w.name, kind: w.kind }));
@@ -56,7 +57,8 @@
       l.f.places.forEach((p) => places.push({ name: p.name, kind: p.kind, s: l.s0 + p.s * l.k, lat: p.lat }));
       l.f.crossings.forEach((c) => crossings.push({ s: l.s0 + c.s * l.k, barrier: c.barrier, l: c.l, r: c.r, leg: l.id }));
       const r = l.f.land;
-      rasters.push({ s0: l.s0, s1: l.s1, ds: r.ds * l.k, n: r.n, rows: r.rows });
+      rasters.push({ s0: l.s0, s1: l.s1, ds: r.ds * l.k, n: r.n, rows: r.rows, parcels: r.parcels || null });
+      if (l.f.far) fars.push({ s0: l.s0, s1: l.s1, ds: l.f.far.ds * l.k, n: l.f.far.n, rows: l.f.far.rows });
       relief.push({ s0: l.s0, s1: l.s1, step: l.f.relief.step * l.k, l: l.f.relief.l, r: l.f.relief.r });
     });
     water.sort((a, b) => a.s0 - b.s0);
@@ -87,6 +89,16 @@
       if (col < 0 || col >= doc.cols) return CLASS.field;
       return parseInt(e.rows[row][col], 16);
     };
+    /* coarse far raster (60 m cells, +-1500 m): colours the far ground beyond the strip */
+    const farAt = (s, lat) => {
+      const e = find(fars, s);
+      const far = doc.far;
+      if (!e || !far) return landAt(s, lat);
+      const row = clamp(Math.floor((s - e.s0) / e.ds), 0, e.n - 1);
+      const col = Math.floor((lat - far.lat0) / far.col);
+      if (col < 0 || col >= far.cols) return CLASS.field;
+      return parseInt(e.rows[row][col], 16);
+    };
     /* the cells of the raster: iteration helper for the chunk builder, [s0, s1) in absolute s */
     const rowsIn = (s0, s1) => {
       const out = [];
@@ -95,13 +107,13 @@
         for (let i = Math.max(0, Math.floor((s0 - e.s0) / e.ds)); i < e.n; i++) {
           const a = e.s0 + i * e.ds;
           if (a >= s1) break;
-          out.push({ s: a, ds: e.ds, text: e.rows[i] });
+          out.push({ s: a, ds: e.ds, text: e.rows[i], parcels: e.parcels ? e.parcels[i] : null });
         }
       });
       return out;
     };
     const api = {
-      water, roads, places, crossings, reliefAt, landAt, rowsIn, CLASS, lat0: doc.lat0, col: doc.col, cols: doc.cols,
+      water, roads, places, crossings, reliefAt, landAt, farAt, rowsIn, CLASS, lat0: doc.lat0, col: doc.col, cols: doc.cols,
       crossingHints: (index) => crossings[index] || null,
       mirrored: false,
     };
@@ -112,7 +124,8 @@
       places: places.map((p) => Object.assign({}, p, { s: L - p.s, lat: -p.lat })),
       reliefAt: (s) => { const q = reliefAt(L - s); return { l: q.r, r: q.l }; },
       landAt: (s, lat) => landAt(L - s, -lat),
-      rowsIn: (s0, s1) => rowsIn(L - s1, L - s0).map((r) => ({ s: L - r.s - r.ds, ds: r.ds, text: r.text.split('').reverse().join('') })).reverse(),
+      farAt: (s, lat) => farAt(L - s, -lat),
+      rowsIn: (s0, s1) => rowsIn(L - s1, L - s0).map((r) => ({ s: L - r.s - r.ds, ds: r.ds, text: r.text.split('').reverse().join(''), parcels: r.parcels ? r.parcels.split('').reverse().join('') : null })).reverse(),
       crossingHints: (index) => { const c = crossings[crossings.length - 1 - index]; return c ? { s: L - c.s, barrier: c.barrier, l: c.r, r: c.l } : null; },
     });
     return Object.freeze(api);
