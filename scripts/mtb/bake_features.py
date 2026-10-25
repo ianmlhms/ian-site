@@ -73,6 +73,31 @@ def clipped_lines(geometry, clip):
     return out
 
 
+DUPLICATE_BUFFER = 14.0     # m: a waterway that runs within this distance of a longer one for most of its length is the same water mapped twice
+DUPLICATE_SHARE = 0.6
+
+
+def dedupe_parallel(items):
+    """OSM maps the Black Ernz twice (the river line and a parallel stream line): two channels carved side by side would give a second water ribbon on the hillside."""
+    ranked = sorted(items, key=lambda it: -LineString(it[4]).length)
+    kept, kept_shapes = [], []
+    dropped = 0
+    for it in ranked:
+        line = LineString(it[4])
+        inside = 0.0
+        for other in kept_shapes:
+            if other.distance(line) > DUPLICATE_BUFFER:
+                continue
+            inside = max(inside, line.intersection(other.buffer(DUPLICATE_BUFFER)).length / max(line.length, 1e-6))
+        if inside >= DUPLICATE_SHARE:
+            dropped += 1
+            continue
+        kept.append(it)
+        kept_shapes.append(line)
+    print("streams: dropped", dropped, "duplicate lines")
+    return kept
+
+
 def bake_streams(clip):
     items, falls = [], []
     for el in load_osm("waterways"):
@@ -88,6 +113,7 @@ def bake_streams(clip):
         underground = tags.get("tunnel") not in (None, "no") or tags.get("culvert") not in (None, "no")
         for pts in clipped_lines(el["geometry"], clip):
             items.append((kind, 2 if underground else 0, el["id"], tags, pts))
+    items = dedupe_parallel(items)
     write_lines("streams", items)
     with open(os.path.join(OUT_DIR, "falls.json"), "w", encoding="utf-8") as fh:
         json.dump(falls, fh, ensure_ascii=False, separators=(",", ":"))

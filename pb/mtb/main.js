@@ -15,6 +15,9 @@ import { createRockView } from './rock-view.js';
 import { createWaterView } from './water-view.js';
 import { createRain, createLeaves, createShafts, createBirds, createInsects } from './effects.js';
 import { createHikers } from './hikers.js';
+import { placeBridge } from './landmarks.js';
+import { buildBridge } from './bridge-model.js';
+import { createSolidMaterial } from './solid-material.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
 import { createRider } from './rider.js';
@@ -111,6 +114,15 @@ async function boot() {
   const terrain = createTerrainView({ scene, surface, field, material: groundMaterial, quality });
   const forest = createForestView({ scene, trees, undergrowth, env, quality, textures, meadow: { map: maps, surface, clearance } });
   const rockView = createRockView({ scene, rocks, env, quality, textures });
+  // the Schiessentümpel footbridge
+  const bridge = placeBridge(field.network, surface);
+  if (bridge) {
+    const parts = buildBridge({ span: bridge.span, width: bridge.width, abutment: bridge.abutment, rise: bridge.rise, deck: bridge.deck - bridge.water, endL: bridge.endL - bridge.water, endR: bridge.endR - bridge.water });
+    rockView.addLandmark(parts.stone, bridge.x, bridge.water, bridge.z, bridge.yaw, 1.0, 2.0);
+    const wood = new THREE.Mesh(parts.wood, createSolidMaterial(env));
+    wood.position.set(bridge.x, bridge.water, bridge.z); wood.rotation.y = bridge.yaw; wood.frustumCulled = false; wood.name = 'footbridge railing';
+    scene.add(wood);
+  }
   const water = createWaterView({ scene, network: field.network, env, quality });
   const rider = createRider(env);
   scene.add(rider.root);
@@ -289,7 +301,7 @@ async function boot() {
   document.documentElement.dataset.mtbReady = '1';
 
   window.__mtb = {
-    version: 'w2', renderer, scene, camera, field, surface, env, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, quality, trail, centre, perf, data,
+    version: 'w2', renderer, scene, camera, field, surface, env, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, world, maps, bridge, quality, trail, centre, perf, data,
     get bike() { return bike; },
     setBike(b) { bike = Object.freeze({ ...bike, ...b }); },
     reset, teleport(x, z, heading = bike.heading) { bike = createBikeState(x, z, heading, surface); chase.snap(bike); },

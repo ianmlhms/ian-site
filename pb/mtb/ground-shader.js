@@ -143,7 +143,7 @@ export const GROUND_FRAGMENT = `
     trailW *= 1.0 - smoothstep(110.0, 260.0, vDist);
     albedo = mix(albedo, dirtC * (1.0 - 0.32 * uWet), trailW);
     albedo = mix(albedo, vec3(0.6, 0.58, 0.54) * (0.8 + 0.4 * nHi.g), smoothstep(0.4, 0.8, mc.g));
-    albedo = mix(albedo, vec3(0.16, 0.3, 0.34), smoothstep(0.4, 0.8, mc.b));
+    albedo = mix(albedo, mossC * vec3(0.55, 0.7, 0.55), smoothstep(0.4, 0.8, mc.b));        // mapped ponds: dark wet mud and moss (no blue paint on the slopes)
     // stream channel: dark wet gravel and stones on the bed, mossy banks
     vec3 bedC = mix(dirtC * vec3(0.55, 0.55, 0.5), rockC * 0.62, smoothstep(0.35, 0.7, nHi.g));
     albedo = mix(albedo, mossC * vec3(0.85, 1.0, 0.8), bankW * 0.75);

@@ -4,7 +4,7 @@
 import { QUADTREE } from './config.js';
 import { createRng, fbm } from './noise.js';
 import { sampleWorldMap, sampleFieldCell, MAP_CELL } from './world-map.js';
-import { SPECIES } from './forest.js';
+import { SPECIES, wayFree } from './forest.js';
 
 export const BLOCK = QUADTREE.minSize;
 export const U_STRIDE = 8;
@@ -35,10 +35,10 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
       if (forest < 0.25) continue;
       const clump = smooth(-0.1, 0.45, fbm(x, z, 11, 2, 41)) * (0.45 + 0.9 * m.wet);
       if (roll > clump * forest) continue;
-      if (clearance(x, z) > 0.01) continue;
+      if (!wayFree(clearance, x, z, 0.9)) continue;
       surface.normal(x, z, nrm);
       if (nrm.y < 0.66) continue;
-      lists.ferns.push(x, surface.height(x, z), z, 0.55 + sizeRoll * 0.65, rng() * 6.283, seed, 1, 0);
+      lists.ferns.push(x, surface.height(x, z), z, 0.45 + sizeRoll * 0.5, rng() * 6.283, seed, 1, 0);
     }
   }
 
@@ -50,7 +50,7 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
       const roll = rng(), seed = rng(), sizeRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
       if (m.grass > 0.5 || m.built > 0.3 || m.water > 0.3 || m.rock > 0.5) continue;
-      if (clearance(x, z) > 0.01) continue;
+      if (!wayFree(clearance, x, z, 2.2)) continue;
       surface.normal(x, z, nrm);
       if (nrm.y < 0.68) continue;
       const patch = smooth(0.0, 0.5, fbm(x, z, 38, 2, 77));

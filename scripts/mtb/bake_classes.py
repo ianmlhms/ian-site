@@ -29,7 +29,12 @@ LEISURE = {"park": 2, "pitch": 2, "golf_course": 2, "garden": 2, "playground": 2
 ORDER = {2: 0, 3: 0, 1: 1, 7: 1, 6: 2, 4: 3, 5: 4}        # paint order: grass/farmland, forest/scrub, rock, built-up, water
 
 
+STILL_WATER = {"pond", "lake", "basin", "reservoir", "lagoon"}
+
+
 def klass(tags):
+    if tags.get("natural") == "water" and tags.get("water") not in STILL_WATER:
+        return None                 # (W2) rivers, streams and untyped water polygons are carved channels with a water ribbon, not painted ground
     if tags.get("natural") in NATURAL:
         return NATURAL[tags["natural"]]
     if tags.get("landuse") in LANDUSE:

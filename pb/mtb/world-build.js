@@ -8,10 +8,11 @@ import { buildWorldMap } from './world-map.js';
 import { createTreeIndex } from './forest.js';
 import { createUndergrowthIndex } from './undergrowth.js';
 import { createRockIndex, createSampleIndex } from './rocks.js';
+import { attachCascades } from './landmarks.js';
 
 export function buildPureWorld(data) {
   const ways = data.ways.filter((w) => !w.bridge && !w.tunnel);
-  const streams = data.streams.filter((w) => !w.tunnel);                 // culverts are not carved
+  const streams = attachCascades(data.streams.filter((w) => !w.tunnel), data.falls);       // culverts are not carved; waterfalls become staircases
   const trailWays = data.trails.trails.flatMap((trail) => trail.ways);
   const field = createHeightField({ near: data.near, far: data.far, ways: [...ways, ...streams, ...trailWays] });
   const surface = createSurface(field);

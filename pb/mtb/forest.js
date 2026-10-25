@@ -14,15 +14,23 @@ const SAPLING_HEIGHT_MIN = 1.6, SAPLING_HEIGHT_MAX = 5.5;
 const OAK_NOISE_SCALE = 170;
 export const SPECIES = Object.freeze({ beech: 0, spruce: 1, oak: 2, sapling: 3 });
 export const LEAF = Object.freeze({ unknown: 0, broadleaved: 1, needleleaved: 2, mixed: 3 });
-const spruceShare = [0.03, 0.03, 0.92, 0.5];     // by leaf type: the share of the trees that are spruces
+const spruceShare = [0.03, 0.03, 0.75, 0.3];     // by leaf type: the share of the trees that are spruces
 const scratch = { grass: 0, built: 0, water: 0, rock: 0, cover: 0, height: 0, wet: 0 };
 const cell = { field: 0, leaf: 0, hedge: 0 };
 const nrm = { x: 0, y: 1, z: 0 };
+const SAPLING_MARGIN = 2.4;             // m: saplings keep this far from every way (they would fill the picture next to the rider)
+
+/** True when no way (trail, path, track, stream) is closer than `r` metres to (x, z): 8 probes on a circle plus the centre. */
+export function wayFree(clearance, x, z, r) {
+  if (clearance(x, z) > 0.04) return false;
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; if (clearance(x + Math.cos(a) * r, z + Math.sin(a) * r) > 0.04) return false; }
+  return true;
+}
 
 /** Collision shape per species: trunk radius per metre of height, and the crown ellipsoid (centre height, horizontal radius, half height; all per metre of height). */
 export const SHAPES = Object.freeze([
   { trunk: 0.0135, crownY: 0.74, crownR: 0.235, crownH: 0.26 },   // beech
-  { trunk: 0.0105, crownY: 0.58, crownR: 0.15, crownH: 0.4 },     // spruce
+  { trunk: 0.0105, crownY: 0.61, crownR: 0.19, crownH: 0.39 },    // spruce
   { trunk: 0.016, crownY: 0.7, crownR: 0.34, crownH: 0.3 },       // oak
   { trunk: 0.012, crownY: 0.62, crownR: 0.3, crownH: 0.38 },      // sapling
 ]);
@@ -64,7 +72,7 @@ export function treesOfBlock(bx, bz, { map, surface, clearance }) {
       const roll = rng(), sizeRoll = rng(), seed = rng();
       const m = sampleWorldMap(map, x, z, scratch);
       const chance = m.cover * (1 - m.built) * (1 - m.water) * (1 - m.grass) * (1 - m.rock) * 0.55;
-      if (roll > chance || clearance(x, z) > 0.04) continue;
+      if (roll > chance || !wayFree(clearance, x, z, SAPLING_MARGIN)) continue;
       surface.normal(x, z, nrm);
       if (nrm.y < 0.7) continue;
       out.push(x, surface.height(x, z), z, SAPLING_HEIGHT_MIN + sizeRoll * (SAPLING_HEIGHT_MAX - SAPLING_HEIGHT_MIN), SPECIES.sapling, seed);

@@ -7,6 +7,7 @@
  * where two ways cross, where one bends back on itself (hairpins) and where a way ends. That is the reason there are no steps or
  * holes at junctions. Pure functions: the same code feeds the render mesh, the physics lattice and the Node harness. */
 import { CARVE, WAY_KINDS } from './config.js';
+import { valueNoise } from './noise.js';
 
 const CELL = 8;                                   // spatial hash cell (m); the biggest kernel radius is below CELL
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -54,15 +55,33 @@ function gaussianSmooth(values, sigmaSamples) {
 }
 
 /** The bed of a water channel: the smoothed ground minus the channel depth, never rising along the flow (the way direction is the flow direction;
- *  a way that climbs overall is read backwards). `steps` (optional [{ at, drop, width }], `at` in metres along the way) turns a stretch into a cascade:
- *  the height lost over the stretch is redistributed into sharp drops, so the ends of the stretch keep the terrain level (no trench). */
-export function channelBed(smoothed, depth, steps) {
+ *  a way that climbs overall is read backwards). `cascade` (optional { index, count, steps, pool }): a stretch of `count` samples around sample `index` becomes a
+ *  staircase of `steps` drops with plunge pools: the height lost over the stretch is redistributed into sharp steps, so the ends of the stretch keep the terrain
+ *  level (no trench downstream, no dam upstream). */
+export function channelBed(smoothed, depth, cascade) {
   const n = smoothed.length;
   const down = smoothed[0] >= smoothed[n - 1];
   const order = down ? [...smoothed.keys()] : [...smoothed.keys()].reverse();
   const out = new Array(n);
   let level = Infinity;
   for (const i of order) { level = Math.min(level, smoothed[i] - depth); out[i] = level; }
+  if (cascade) {
+    const half = Math.floor(cascade.count / 2);
+    const lo = Math.max(0, cascade.index - half), hi = Math.min(n - 1, cascade.index + half);
+    // `lo..hi` runs in index order; the flow runs from the higher end to the lower one
+    const top = down ? lo : hi, bottom = down ? hi : lo;
+    const hTop = out[top], hBottom = out[bottom];
+    const k = cascade.steps;
+    for (let i = lo; i <= hi; i++) {
+      const t = Math.abs(i - top) / Math.max(1, Math.abs(bottom - top));            // 0 at the top of the cascade, 1 at its foot
+      const u = t * k, fl = Math.min(k - 1, Math.floor(u)), fr = u - fl;
+      const sm = Math.min(1, Math.max(0, (fr - 0.62) / 0.3));
+      const stairs = (fl + sm * sm * (3 - 2 * sm)) / k;
+      // plunge pool below every drop
+      const pool = cascade.pool * Math.exp(-Math.pow((fr - 0.05) * (hi - lo) / k / 1.2, 2)) * (fl > 0 || fr > 0.7 ? 1 : 0);
+      out[i] = hTop + (hBottom - hTop) * stairs - pool * 0;
+    }
+  }
   return out;
 }
 
@@ -94,7 +113,15 @@ export function createTrailNetwork(ways, baseHeight) {
     const nxs = tz.map((v) => v), nzs = tx.map((v) => -v);                 // normal = (tz, -tx)
     const ground = rs.x.map((x, i) => baseHeight(x, rs.z[i]));
     let bedH = gaussianSmooth(ground, CARVE.bedSmoothing / kind.spacing);
-    if (kind.flow) bedH = channelBed(bedH, kind.depth, way.steps);
+    if (kind.flow) {
+      let cascade = null;
+      if (way.cascade) {                                       // { x, z, length, steps, pool }: where the stream is a staircase of falls
+        let best = 0, bd = 1e18;
+        for (let i = 0; i < n; i++) { const d = (rs.x[i] - way.cascade.x) ** 2 + (rs.z[i] - way.cascade.z) ** 2; if (d < bd) { bd = d; best = i; } }
+        if (bd < 25 * 25) cascade = { index: best, count: Math.round(way.cascade.length / kind.spacing), steps: way.cascade.steps, pool: way.cascade.pool || 0 };
+      }
+      bedH = channelBed(bedH, kind.depth, cascade);
+    }
     // signed curvature (1/m): heading change per metre, smoothed over about +-4 m
     const heading = tx.map((v, i) => Math.atan2(tz[i], v));
     const turn = new Array(n).fill(0);
@@ -114,7 +141,7 @@ export function createTrailNetwork(ways, baseHeight) {
     for (let i = 0; i < n; i++) {
       if (i > 0) sAlong += Math.hypot(rs.x[i] - rs.x[i - 1], rs.z[i] - rs.z[i - 1]);
       px.push(rs.x[i]); pz.push(rs.z[i]);
-      bed.push(bedH[i]);
+      bed.push(kind.flow ? bedH[i] - 0.14 * (valueNoise(sAlong * 0.35, wi * 1.7, 9) - 0.4) * Math.min(1, kind.depth * 2) : bedH[i]);       // pools and riffles in the bed (the water surface stays level, see below)
       const bank = kind.berm ? Math.max(-CARVE.tiltMax, Math.min(CARVE.tiltMax, kappa[i] * 3.2)) : 0;     // banked towards the centre of the turn
       const half = Math.max(-CARVE.tiltMax, Math.min(CARVE.tiltMax, crossS[i] * (kind.tiltScale === undefined ? 0.5 : kind.tiltScale)));       // half-bench on a side hill (a channel follows the slope only a little)
       tilt.push(Math.max(-CARVE.tiltMax, Math.min(CARVE.tiltMax, half + bank)));
@@ -122,7 +149,7 @@ export function createTrailNetwork(ways, baseHeight) {
       const k = kind.berm ? Math.min(1, Math.abs(kappa[i]) / CARVE.bermCurvature) : 0;
       berm.push(k * CARVE.bermHeight);
       side.push(kappa[i] > 0 ? 1 : -1);          // the berm stands on the OUTSIDE of the turn (normal = left of travel; kappa > 0 turns right)
-      rad.push(radius);
+      rad.push(kind.flow ? radius * (0.72 + 0.55 * valueNoise(sAlong * 0.09, wi * 3.1, 5)) : radius);                // a natural channel is not a canal: it widens and narrows
       inv.push(kind.spacing / sref);
       wayOf.push(wi);
       sOf.push(sAlong);

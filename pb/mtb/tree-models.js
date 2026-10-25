@@ -50,7 +50,7 @@ function addCluster(b, rng, c, size, cards, crown, style, shadeBoost = 1) {
     // the card's up axis leans outward-and-up (sprigs reach out), its right axis is random in the horizontal plane
     const up = V3(dir.x * 0.5 + outN.x * 0.4, 0.55 + dir.y * 0.35 + outN.y * 0.3, dir.z * 0.5 + outN.z * 0.4).normalize();
     const right = V3(-up.z * 0.4 + (rng() - 0.5), (rng() - 0.5) * 0.4, up.x * 0.4 + (rng() - 0.5)).cross(up).normalize();
-    const half = size * (0.82 + rng() * 0.3);
+    const half = size * (0.8 + rng() * 0.3);
     const ln = V3(dir.x * 0.5 + outN.x, dir.y * 0.5 + outN.y + 0.2, dir.z * 0.5 + outN.z).normalize();
     const q = card(centre, right, up, half, half, ln, rect);
     // the sprig grows from the bottom edge of its tile: shift the card up so the pivot sits at its centre of mass
@@ -112,7 +112,7 @@ export function buildBroadleaf(species, variant, detail) {
   }
   // --- leaf clusters: at the limb ends, along the limbs, and scattered through the crown volume
   const size = style.clusterSize;
-  const cards = detail === 0 ? 7 : 3;
+  const cards = detail === 0 ? 8 : 3;
   const cardSize = detail === 0 ? size : size * 1.45;
   for (const e of ends) addCluster(b, rng, e, cardSize, cards, crown, style);
   if (detail === 0) for (const m of mids) addCluster(b, rng, m, cardSize * 0.9, cards, crown, style);
@@ -236,7 +236,7 @@ export function buildRoot() {
   const pts = [], radii = [];
   for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push(V3(t, Math.sin(Math.PI * Math.min(1, t * 1.15)) * 0.5 - 0.02, 0)); radii.push(0.5 * (1 - 0.8 * t) + 0.05); }
   const t = tube(pts, radii, 6, true);
-  b.addArrays(t.pos, t.nor, t.idx, (v) => [0.5 * (0.85 + 0.2 * valueNoise(v.x * 14, 2, 2)), 0.44 * (0.9 + 0.12 * valueNoise(v.x * 10, 5, 6)), 0.36]);
+  b.addArrays(t.pos, t.nor, t.idx, (v) => [0.3 * (0.85 + 0.2 * valueNoise(v.x * 14, 2, 2)), 0.26 * (0.9 + 0.12 * valueNoise(v.x * 10, 5, 6)), 0.2]);
   return b.build();
 }
 
@@ -267,7 +267,7 @@ export function buildBlobTree(species, detail) {
   const crowns = [[0, cy, 0, r], [r * 0.5, cy - h * 0.25, 0.1 * r, r * 0.72], [-r * 0.45, cy - h * 0.1, -0.2 * r, r * 0.74]];
   const green = tint3(species === 'oak' ? [0.3, 0.44, 0.16] : [0.32, 0.5, 0.18], rng, 0.4);
   for (const [x, y, z, rad] of crowns) {
-    const geo = blob(rad, 1, 0.5, 0.78);
+    const geo = blob(rad, 0, 0.45, 0.78);
     b.add(geo, M(x, y, z, 1, 1, 1, rng() * 6), (v, n) => {
       const top = clamp01((v.y - (y - rad)) / (2 * rad));
       const shade = 0.5 + 0.55 * top + 0.12 * n.y;
@@ -297,8 +297,8 @@ export function buildSpruce(detail) {
   const rect = tileRect(TILE_ID.spruce);
   const tiers = detail === 1 ? 6 : 10, per = detail === 1 ? 6 : 8;
   for (let t = 0; t < tiers; t++) {
-    const f = t / (tiers - 1), y = 0.1 + f * 0.86;
-    const reach = (0.17 * Math.pow(1 - f, 0.9) + 0.02) * (detail === 1 ? 1.15 : 1.0);
+    const f = t / (tiers - 1), y = 0.22 + f * 0.74;
+    const reach = (0.15 * Math.pow(1 - f, 0.9) + 0.02) * (detail === 1 ? 1.1 : 1.0);
     const a0 = rng() * 6.28;
     for (let k = 0; k < per; k++) {
       const az = a0 + (k / per) * 6.28 + (rng() - 0.5) * 0.3;

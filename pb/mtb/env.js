@@ -18,7 +18,7 @@ const MOON_COLOR = Object.freeze([0.5, 0.64, 1.0]);
 
 const c = (r, g, b) => [r, g, b];
 const KEYS = [
-  { h: 5, el: -9, sun: c(0.45, 0.35, 0.5), i: 0.0, top: c(0.03, 0.05, 0.14), hor: c(0.12, 0.14, 0.26), amb: c(0.3, 0.38, 0.62), gnd: c(0.13, 0.16, 0.25), fog: c(0.1, 0.13, 0.24), dens: 0.0007, stars: 1, glow: 0.0, moon: 1 },
+  { h: 5, el: -9, sun: c(0.45, 0.35, 0.5), i: 0.0, top: c(0.03, 0.05, 0.14), hor: c(0.12, 0.14, 0.26), amb: c(0.38, 0.48, 0.76), gnd: c(0.16, 0.2, 0.3), fog: c(0.1, 0.13, 0.24), dens: 0.0007, stars: 1, glow: 0.0, moon: 1 },
   { h: 6.5, el: 5, sun: c(1.0, 0.62, 0.38), i: 0.7, top: c(0.28, 0.42, 0.7), hor: c(0.98, 0.72, 0.55), amb: c(0.56, 0.6, 0.74), gnd: c(0.4, 0.34, 0.28), fog: c(0.86, 0.7, 0.62), dens: 0.0006, stars: 0, glow: 0.9, moon: 0 },
   { h: 9, el: 28, sun: c(1.0, 0.9, 0.72), i: 1.0, top: c(0.22, 0.46, 0.82), hor: c(0.74, 0.84, 0.92), amb: c(0.52, 0.62, 0.76), gnd: c(0.34, 0.3, 0.24), fog: c(0.72, 0.82, 0.9), dens: 0.0004, stars: 0, glow: 0.1, moon: 0 },
   { h: 13, el: 56, sun: c(1.0, 0.96, 0.86), i: 1.05, top: c(0.16, 0.4, 0.85), hor: c(0.68, 0.82, 0.95), amb: c(0.54, 0.66, 0.82), gnd: c(0.36, 0.32, 0.26), fog: c(0.7, 0.82, 0.93), dens: 0.00035, stars: 0, glow: 0.0, moon: 0 },
@@ -26,8 +26,8 @@ const KEYS = [
   { h: 18.8, el: 9, sun: c(1.0, 0.64, 0.3), i: 0.92, top: c(0.2, 0.34, 0.64), hor: c(1.0, 0.68, 0.42), amb: c(0.62, 0.58, 0.7), gnd: c(0.46, 0.34, 0.26), fog: c(0.94, 0.7, 0.5), dens: 0.0005, stars: 0, glow: 1.0, moon: 0 },
   { h: 20.4, el: 1.5, sun: c(1.0, 0.34, 0.26), i: 0.5, top: c(0.12, 0.13, 0.4), hor: c(1.0, 0.46, 0.38), amb: c(0.52, 0.46, 0.7), gnd: c(0.3, 0.22, 0.3), fog: c(0.72, 0.42, 0.5), dens: 0.00055, stars: 0.35, glow: 1.0, moon: 0.2 },
   { h: 21.8, el: -12, sun: c(0.6, 0.3, 0.4), i: 0.0, top: c(0.05, 0.07, 0.2), hor: c(0.3, 0.26, 0.44), amb: c(0.36, 0.42, 0.66), gnd: c(0.16, 0.17, 0.28), fog: c(0.2, 0.2, 0.36), dens: 0.0006, stars: 0.8, glow: 0.3, moon: 0.9 },
-  { h: 23, el: -22, sun: c(0.45, 0.55, 0.8), i: 0.0, top: c(0.03, 0.05, 0.14), hor: c(0.12, 0.14, 0.26), amb: c(0.3, 0.38, 0.62), gnd: c(0.13, 0.16, 0.25), fog: c(0.1, 0.13, 0.24), dens: 0.0007, stars: 1, glow: 0.0, moon: 1 },
-  { h: 29, el: -9, sun: c(0.45, 0.35, 0.5), i: 0.0, top: c(0.03, 0.05, 0.14), hor: c(0.12, 0.14, 0.26), amb: c(0.3, 0.38, 0.62), gnd: c(0.13, 0.16, 0.25), fog: c(0.1, 0.13, 0.24), dens: 0.0007, stars: 1, glow: 0.0, moon: 1 },
+  { h: 23, el: -22, sun: c(0.45, 0.55, 0.8), i: 0.0, top: c(0.03, 0.05, 0.14), hor: c(0.12, 0.14, 0.26), amb: c(0.38, 0.48, 0.76), gnd: c(0.16, 0.2, 0.3), fog: c(0.1, 0.13, 0.24), dens: 0.0007, stars: 1, glow: 0.0, moon: 1 },
+  { h: 29, el: -9, sun: c(0.45, 0.35, 0.5), i: 0.0, top: c(0.03, 0.05, 0.14), hor: c(0.12, 0.14, 0.26), amb: c(0.38, 0.48, 0.76), gnd: c(0.16, 0.2, 0.3), fog: c(0.1, 0.13, 0.24), dens: 0.0007, stars: 1, glow: 0.0, moon: 1 },
 ];
 /* weather: cloud cover, sun share, distance fog multiplier, desaturation, brightness, wetness, rain, ambient multiplier, height-fog density / fall-off, fog tint towards milky white */
 const WEATHER = Object.freeze({

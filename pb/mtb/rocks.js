@@ -17,15 +17,15 @@ export const R_STRIDE = 12;
 export const KIND = Object.freeze({ slabA: 0, slabB: 1, overhang: 2, boulderA: 3, boulderB: 4, stone: 5 });
 const SLAB_GRID = 6;                       // slab candidates per side of a block (5.3 m)
 const BOULDER_CANDIDATES = 9;
-const STEEP_FULL = 0.5, STEEP_NONE = 0.8;  // normal.y: slope probability ramps from 0 (n.y 0.8, 37 degrees) to 1 (n.y 0.5, 60 degrees)
+const STEEP_FULL = 0.55, STEEP_NONE = 0.83;  // normal.y: slope probability ramps from 0 (n.y 0.8, 37 degrees) to 1 (n.y 0.5, 60 degrees)
 const WALL_CLEARANCE = 0.02;               // way coverage allowed under a rock footprint
 const MIN_SINK = 0.7, MAX_SINK = 6;
 const SINK_MARGIN = 0.6;                   // m the bottom goes below the lowest terrain under the footprint
-const HEIGHT_RANGE = [2.4, 5.2];           // slab height along the slope
-const WIDTH_RANGE = [3.6, 7.2];
+const HEIGHT_RANGE = [3.0, 6.0];           // slab height along the slope
+const WIDTH_RANGE = [4.6, 8.8];
 const DEPTH = 1.8;                         // how far a slab reaches into the hill
 const FACE_LIFT = 0.28;                    // the face stands this far in front of the slope (the strata recesses stay in front of the ground)
-const CORRIDOR_STEP = 9;                   // m of trail between two corridor-rock checks
+const CORRIDOR_STEP = 6;                   // m of trail between two corridor-rock checks
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const scratch = { grass: 0, built: 0, water: 0, rock: 0, cover: 0, height: 0, wet: 0 };
 const cell = { field: 0, leaf: 0, hedge: 0, cliff: 0 };
@@ -69,12 +69,14 @@ export function rocksOfBlock(bx, bz, ctx) {
     }
     return true;
   };
-  const pushSlab = (px, pz, n, h, w, kind, seed) => {
+  /** A slab: laid over a slope (the default: its face parallels the slope) or standing on the ground (`standing`: a free wall of a corridor, vertical). */
+  const pushSlab = (px, pz, n, h, w, kind, seed, standing = false) => {
     const f = slabFrame(n.x, n.y, n.z);
     if (f.hl < 0.35) return false;                                  // not steep enough to lay a wall on
-    // the foot of the slab: half a slab height down the slope from the sampled point, lifted out of the slope by FACE_LIFT
     const py = surface.height(px, pz);
-    const fx = px - f.y[0] * h * 0.5 + f.z[0] * FACE_LIFT, fy = py - f.y[1] * h * 0.5 + f.z[1] * FACE_LIFT, fz = pz - f.y[2] * h * 0.5 + f.z[2] * FACE_LIFT;
+    const fx = standing ? px + f.z[0] * FACE_LIFT : px - f.y[0] * h * 0.5 + f.z[0] * FACE_LIFT;
+    const fy = standing ? py : py - f.y[1] * h * 0.5 + f.z[1] * FACE_LIFT;
+    const fz = standing ? pz + f.z[2] * FACE_LIFT : pz - f.y[2] * h * 0.5 + f.z[2] * FACE_LIFT;
     if (!footprintFree(fx, fz, f, w, DEPTH)) return false;
     const r = { x: fx, y: fy, z: fz, sx: w, sz: DEPTH };
     const sink = sinkFor(slabBottomRing(r, f), surface);
@@ -93,25 +95,37 @@ export function rocksOfBlock(bx, bz, ctx) {
       const m = sampleWorldMap(map, x, z, scratch);
       const steep = smooth(STEEP_NONE, STEEP_FULL, nrm.y);
       const hint = Math.max(cell.cliff, m.rock);
-      const chance = Math.min(1, steep * (0.55 + 0.45 * hint) + (hint > 0.5 && nrm.y < 0.88 ? 0.35 * hint : 0));
+      const chance = Math.min(1, steep * (1.25 + 0.5 * hint) + (hint > 0.5 && nrm.y < 0.88 ? 0.35 * hint : 0));
       if (roll > chance) continue;
       const h = HEIGHT_RANGE[0] + (HEIGHT_RANGE[1] - HEIGHT_RANGE[0]) * (0.3 + 0.7 * sizeRoll) * (0.7 + 0.5 * steep);
       const w = WIDTH_RANGE[0] + (WIDTH_RANGE[1] - WIDTH_RANGE[0]) * wRoll;
       pushSlab(x, z, nrm, h, w, kindRoll < 0.16 ? KIND.overhang : kindRoll < 0.58 ? KIND.slabA : KIND.slabB, seed);
     }
   }
-  // ---- cut banks along the trails and paths: a rock wall on the up-slope side where the ground leans towards the way
+  // ---- rock corridors: along a trail or path through rocky ground (OSM cliff lines or steep banks nearby) free-standing sandstone walls rise on both sides, with a cleft between
   if (ctx.ways) {
     for (const s of ctx.ways.samplesIn(bx, bz)) {
       if (rng() > 1 / (CORRIDOR_STEP / ctx.ways.spacing)) continue;
+      let rocky = 0;
       for (const side of [-1, 1]) {
-        if (rng() < 0.45) continue;
-        const lx = s.x + s.nx * side * 3.1, lz = s.z + s.nz * side * 3.1;
+        for (const d of [3, 5, 8]) {
+          sampleFieldCell(map, s.x + s.nx * side * d, s.z + s.nz * side * d, cell);
+          if (cell.cliff > 0) rocky = Math.max(rocky, 1);
+          surface.normal(s.x + s.nx * side * d, s.z + s.nz * side * d, nrm);
+          if (nrm.y < 0.8) rocky = Math.max(rocky, 0.7);
+        }
+      }
+      if (rocky < 0.6) continue;
+      for (const side of [-1, 1]) {
+        if (rng() < 0.22) continue;                                                 // a gap now and then: an opening in the wall
+        const offset = 2.55 + rng() * 0.7;
+        const lx = s.x + s.nx * side * offset, lz = s.z + s.nz * side * offset;
         if (lx < x0 || lx >= x0 + BLOCK || lz < z0 || lz >= z0 + BLOCK) continue;
-        surface.normal(lx, lz, nrm);
-        // the bank must face the way (its normal points at the trail) and lean steeply enough
-        if (nrm.y > 0.86 || nrm.x * s.nx * side + nrm.z * s.nz * side > -0.2) continue;
-        pushSlab(lx, lz, nrm, 1.6 + rng() * 2.2, 3.4 + rng() * 3.2, rng() < 0.5 ? KIND.slabA : KIND.slabB, rng());
+        const face = { x: -s.nx * side, y: 0.1, z: -s.nz * side };               // the wall looks at the way (a little leaned back)
+        const len = Math.hypot(face.x, face.y, face.z);
+        face.x /= len; face.y /= len; face.z /= len;
+        const h = 3.2 + 4.8 * (0.5 + 0.5 * Math.sin(s.x * 0.071 + s.z * 0.053 + side)) * (0.6 + 0.6 * rng());
+        pushSlab(lx, lz, face, h, 4.6 + rng() * 3.4, rng() < 0.5 ? KIND.slabA : KIND.slabB, rng(), true);
       }
     }
   }
@@ -194,10 +208,17 @@ export function createRockIndex(ctx) {
           const kind = t[i + 9];
           if (kind === KIND.stone) continue;                                                // pebbles do not stop a bike
           const slab = kind <= KIND.overhang;
-          // a slab: a circle in the middle of its footprint; a boulder: a circle of its size
-          const reach = r + (slab ? t[i + 5] * 0.42 : Math.max(t[i + 5], t[i + 7]) * 0.5);
-          let cx = t[i], cz = t[i + 2];
-          if (slab) { cx -= Math.sin(t[i + 3]) * t[i + 7] * 0.35; cz -= Math.cos(t[i + 3]) * t[i + 7] * 0.35; }
+          if (slab) {                                                                      // an oriented box: face + depth, as long as the slab
+            const nxh = Math.sin(t[i + 3]), nzh = Math.cos(t[i + 3]);                      // horizontal direction of the face normal
+            const px = x - t[i], pz = z - t[i + 2];
+            const along = px * nzh - pz * nxh, front = px * nxh + pz * nzh;                // along the contour, out of the face
+            if (Math.abs(along) > t[i + 5] * 0.5 + r * 0.6 || front > r || front < -(t[i + 7] + t[i + 6] * Math.cos(t[i + 4]))) continue;
+            const pen = r - front;
+            if (pen > best) { best = pen; out.nx = nxh; out.nz = nzh; out.pen = pen; }
+            continue;
+          }
+          const reach = r + Math.max(t[i + 5], t[i + 7]) * 0.45;
+          const cx = t[i], cz = t[i + 2];
           const dx = x - cx, dz = z - cz, d2 = dx * dx + dz * dz;
           if (d2 >= reach * reach) continue;
           const d = Math.sqrt(d2) || 1e-6, pen = reach - d;

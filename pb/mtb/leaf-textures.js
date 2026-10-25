@@ -187,9 +187,25 @@ function herbs(color, mask, rng) {
   }
 }
 
+/** A leafy clump: many small leaves heaped in a soft ellipse (no twig structure), painted back to front so the lower leaves are darker. */
+function clump(color, mask, rng, opts) {
+  const { lobes, base, tip, count, len, wid } = opts;
+  const leaves = [];
+  for (let i = 0; i < count; i++) {
+    const a = rng() * TAU, r = Math.sqrt(rng());
+    const x = 128 + Math.cos(a) * r * 104, y = 132 + Math.sin(a) * r * 98;
+    leaves.push({ x, y, ang: rng() * TAU, len: len * (0.75 + rng() * 0.5), wid: wid * (0.8 + rng() * 0.4), k: 1 - (y / 256) * 0.6 + (rng() - 0.5) * 0.35 });
+  }
+  leaves.sort((p, q) => p.y - q.y);                                  // top first: lower leaves are drawn over them... bottom last (they shade nothing, just overlap)
+  for (const l of leaves) {
+    const dark = Math.max(0, Math.min(1, l.k));
+    dual(color, mask, (ctx, isMask) => drawLeaf(ctx, isMask, l.x, l.y, l.ang, l.len, l.wid, mix([base[0] * 0.55, base[1] * 0.55, base[2] * 0.55], base, dark), mix(base, tip, dark), rng, lobes, false));
+  }
+}
+
 const PAINTERS = [
-  (c, m, rng, ox, oy) => sprig(c, m, ox, oy, rng, { leaves: 13, leafLen: 74, leafWid: 31, base: [52, 98, 26], tip: [118, 158, 52], lobes: false, twig: 'rgb(92,70,50)' }),
-  (c, m, rng, ox, oy) => sprig(c, m, ox, oy, rng, { leaves: 10, leafLen: 84, leafWid: 34, base: [58, 92, 28], tip: [112, 144, 52], lobes: true, twig: 'rgb(80,62,46)' }),
+  (c, m, rng) => clump(c, m, rng, { count: 120, len: 40, wid: 17, base: [48, 92, 26], tip: [112, 152, 50], lobes: false }),
+  (c, m, rng) => clump(c, m, rng, { count: 90, len: 46, wid: 19, base: [54, 86, 28], tip: [108, 140, 50], lobes: true }),
   (c, m, rng) => fernFrond(c, m, rng),
   (c, m, rng) => shrubLeaves(c, m, rng, true),
   (c, m, rng) => grassTuft(c, m, rng),

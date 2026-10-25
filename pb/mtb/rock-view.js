@@ -11,7 +11,7 @@ const NAMES = ['slabA', 'slabB', 'overhang', 'boulderA', 'boulderB', 'stone'];
 
 const VERTEX = `
   attribute vec3 iPos; attribute vec4 iRot; attribute vec3 iScale; attribute vec3 color; attribute float aSkirt;
-  varying vec3 vWorld; varying vec3 vNormal; varying vec3 vColor; varying float vDist; varying float vLocalY; varying float vSeed; varying float vTop;
+  varying vec3 vWorld; varying vec3 vNormal; varying vec3 vColor; varying float vDist; varying float vLocalY; varying float vSeed; varying float vTop; varying vec3 vMP;
   void main(){
     float yaw = iRot.x, alpha = iRot.y, sink = iRot.z;
     vec3 p = position * iScale;
@@ -24,7 +24,7 @@ const VERTEX = `
     n = vec3(cy * n.x + sy * n.z, n.y, -sy * n.x + cy * n.z);
     vec3 world = p + iPos;
     world.y -= sink * aSkirt;
-    vWorld = world; vNormal = n; vColor = color; vLocalY = position.y * iScale.y; vSeed = iRot.w; vTop = position.y;
+    vWorld = world; vNormal = n; vColor = color; vLocalY = position.y * iScale.y; vSeed = iRot.w; vTop = position.y; vMP = position * iScale;
     vec4 mv = viewMatrix * vec4(world, 1.0);
     vDist = length(mv.xyz);
     gl_Position = projectionMatrix * mv;
@@ -34,7 +34,7 @@ const FRAGMENT = `
   precision highp float;
   uniform sampler2D uRock, uNoise, uMoss;
   uniform float uDetail;
-  varying vec3 vWorld; varying vec3 vNormal; varying vec3 vColor; varying float vDist; varying float vLocalY; varying float vSeed; varying float vTop;
+  varying vec3 vWorld; varying vec3 vNormal; varying vec3 vColor; varying float vDist; varying float vLocalY; varying float vSeed; varying float vTop; varying vec3 vMP;
   ${PAINT_LIGHT_GLSL}
   void main(){
     vec3 N = normalize(vNormal);
@@ -49,7 +49,7 @@ const FRAGMENT = `
     float band = P.y * 4.6 + nA * 5.0;
     float layer = floor(band / 6.2832);
     float tone = texture2D(uNoise, vec2(layer * 0.37 + 0.11, vSeed * 0.5)).g;
-    vec3 pale = vec3(0.86, 0.74, 0.54), ochre = vec3(0.8, 0.6, 0.38), rusty = vec3(0.7, 0.45, 0.28);
+    vec3 pale = vec3(0.78, 0.67, 0.5), ochre = vec3(0.74, 0.55, 0.36), rusty = vec3(0.64, 0.42, 0.27);
     vec3 rockC = mix(mix(pale, ochre, smoothstep(0.2, 0.55, tone)), rusty, smoothstep(0.6, 0.9, tone));
     rockC *= 0.72 + 0.5 * (grain.r + grain.g) * 0.5;
     float strata = sin(band) * 0.5 + 0.5;
@@ -57,21 +57,33 @@ const FRAGMENT = `
     // honeycomb weathering (tafoni): pits of a few decimetres, lit rim, dark hollow
     float pits = 0.0;
     if (uDetail > 0.5) {
-      vec2 hu = (w.x > w.z ? vec2(P.z, P.y) : vec2(P.x, P.y)) * 1.3 + vec2(nA * 1.4, 0.0);
+      vec2 hu = (w.x > w.z ? vec2(P.z, P.y) : vec2(P.x, P.y)) * 0.7 + vec2(nA * 1.4, 0.0);
       vec4 hn = texture2D(uNoise, hu * 0.7);
-      float cell = smoothstep(0.7, 0.8, hn.b * 0.7 + hn.g * 0.55);
+      float cell = smoothstep(0.66, 0.78, hn.b * 0.7 + hn.g * 0.55);
       pits = cell * (1.0 - smoothstep(25.0, 70.0, vDist)) * (1.0 - w.y);
     }
-    rockC *= 1.0 - 0.3 * pits;
+    rockC *= 1.0 - 0.16 * pits;
     // dark water streaks running down the face
     float streak = texture2D(uNoise, vec2((P.x + P.z) * 0.8, P.y * 0.03)).g;
     rockC *= 1.0 - 0.28 * smoothstep(0.6, 0.9, streak) * (1.0 - w.y);
     // moss: on the ledges (up-facing), on the damp foot, in the hollows
-    vec3 mossC = texture2D(uMoss, P.xz * 0.16 + P.y * 0.07).rgb * 0.95;
+    vec3 mossC = mix(texture2D(uMoss, P.xz * 0.1 + P.y * 0.05).rgb, vec3(0.34, 0.5, 0.2), 0.45) * 1.05;
     float mossN = texture2D(uNoise, P.xz * 0.045 + P.y * 0.035).g * 0.65 + texture2D(uNoise, P.xz * 0.11 + P.y * 0.08).b * 0.35;
-    float moss = smoothstep(0.45, 0.95, N.y) * 0.75 + (1.0 - smoothstep(0.1, 1.2, vLocalY)) * 0.5 + pits * 0.25;
-    moss = clamp(moss * smoothstep(0.38, 0.62, mossN + 0.06 + uWet * 0.2), 0.0, 0.85);
+    float moss = smoothstep(0.5, 0.95, N.y) * 0.7 + (1.0 - smoothstep(0.1, 1.4, vLocalY)) * 0.45 + pits * 0.2;
+    moss = clamp(moss * smoothstep(0.3, 0.8, mossN + 0.05 + uWet * 0.25), 0.0, 0.75);
     vec3 albedo = mix(rockC, mossC, moss) * mix(vec3(1.0), vColor, 0.7) * 1.12;
+    if (vSeed > 1.5) {                                   // dressed masonry (the footbridge): courses of blocks with mortar joints, moss on the damp foot and the top
+      float across = abs(N.z) > 0.5 ? vMP.x : vMP.z;
+      float row = floor(vMP.y / 0.28);
+      float col = across / 0.62 + mod(row, 2.0) * 0.5;
+      vec2 f = vec2(fract(col), fract(vMP.y / 0.28));
+      float joint = 1.0 - smoothstep(0.0, 0.07, min(min(f.x, 1.0 - f.x) * 0.62 * 0.5, min(f.y, 1.0 - f.y) * 0.28 * 0.5) * 6.0);
+      float h = fract(sin((floor(col) + row * 17.0) * 12.9898) * 43758.5453);
+      vec3 stone = mix(vec3(0.66, 0.6, 0.5), vec3(0.78, 0.68, 0.52), h);
+      stone *= 0.9 + 0.16 * texture2D(uNoise, vMP.xy * 0.9 + vMP.zz * 0.3).g;
+      albedo = mix(stone, mossC * 0.9, clamp(moss * 1.2 + (1.0 - smoothstep(0.0, 1.8, vMP.y + 2.2)) * 0.5 * mossN, 0.0, 0.8));
+      albedo *= 1.0 - 0.45 * joint;
+    }
     albedo *= 1.0 - 0.22 * uWet;
     // small normal wobble so the faces are not glassy
     vec2 dn = texture2D(uNoise, P.xz * 0.9 + P.y * 0.6).gb - 0.5;
@@ -146,7 +158,22 @@ export function createRockView({ scene, rocks, env, quality, textures }) {
     stats.near = nNear; stats.far = nFar;
   }
 
+  /** One extra static instance of a model with the rock material (the footbridge): geometry needs the aSkirt attribute. */
+  function addLandmark(geometry, x, y, z, yaw, sink, seed) {
+    const g = new THREE.InstancedBufferGeometry();
+    g.index = geometry.index; g.attributes = geometry.attributes;
+    g.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array([x, y, z]), 3));
+    g.setAttribute('iRot', new THREE.InstancedBufferAttribute(new Float32Array([yaw, 0, sink, seed]), 4));
+    g.setAttribute('iScale', new THREE.InstancedBufferAttribute(new Float32Array([1, 1, 1]), 3));
+    g.instanceCount = 1;
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    const mesh = new THREE.Mesh(g, material);
+    mesh.frustumCulled = false; mesh.name = 'landmark stone';
+    group.add(mesh);
+    return mesh;
+  }
   return {
+    addLandmark, material,
     group, stats, sets, stones,
     update(cx, cz, force = false) { if (force || Math.hypot(cx - last.x, cz - last.z) > REFILL_DISTANCE) { refill(cx, cz); last = { x: cx, z: cz }; } },
     dispose() { for (const s of Object.values(sets)) s.g.dispose(); material.dispose(); },
