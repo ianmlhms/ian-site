@@ -1,5 +1,43 @@
 [
  {
+  "id": "ernz-waldwee",
+  "grade": "green",
+  "name": {
+   "lb": "Ernz-Waldwee",
+   "de": "Ernz-Waldweg",
+   "en": "Ernz Forest Way",
+   "fr": "Chemin forestier de l'Ernz"
+  },
+  "blurb": {
+   "lb": "Breet Weeër, sanft Hiwwelen, ideal fir den Ufank",
+   "de": "Breite Wege, sanfte Hügel, ideal zum Einstieg",
+   "en": "Wide tracks, gentle hills, perfect to start",
+   "fr": "Larges chemins, douces collines, idéal pour débuter"
+  },
+  "via": [
+   [
+    3389,
+    3915
+   ],
+   [
+    4207,
+    2739
+   ]
+  ],
+  "style": {
+   "seed": 3,
+   "rollers": 3,
+   "kickers": 0,
+   "drops": 0,
+   "berms": 3,
+   "slabs": 0,
+   "roots": 2,
+   "mud": 0,
+   "boardwalks": 0,
+   "leaves": 2
+  }
+ },
+ {
   "id": "hallerbach-flow",
   "grade": "blue",
   "name": {
@@ -50,42 +88,72 @@
   }
  },
  {
-  "id": "ernz-waldwee",
-  "grade": "green",
+  "id": "schiessentuempel",
+  "grade": "blue",
   "name": {
-   "lb": "Ernz-Waldwee",
-   "de": "Ernz-Waldweg",
-   "en": "Ernz Forest Way",
-   "fr": "Chemin forestier de l'Ernz"
+   "lb": "Schiessentümpel-Trail",
+   "de": "Schiessentümpel-Trail",
+   "en": "Schiessentümpel Trail",
+   "fr": "Piste du Schiessentümpel"
   },
   "blurb": {
-   "lb": "Breet Weeër, sanft Hiwwelen, ideal fir den Ufank",
-   "de": "Breite Wege, sanfte Hügel, ideal zum Einstieg",
-   "en": "Wide tracks, gentle hills, perfect to start",
-   "fr": "Larges chemins, douces collines, idéal pour débuter"
+   "lb": "Duerch d'Schwaarz-Iernz-Dall bis bei de Waasserfall a seng Steebréck",
+   "de": "Durchs Tal der Schwarzen Ernz bis zum Wasserfall und seiner Steinbrücke",
+   "en": "Down the Black Ernz valley to the waterfall and its stone bridge",
+   "fr": "Par la vallée de l'Ernz noire jusqu'à la cascade et son pont de pierre"
   },
   "via": [
    [
-    3389,
-    3915
+    2332,
+    3868
    ],
    [
-    4207,
-    2739
+    2139,
+    4781
+   ],
+   [
+    1768,
+    5329
+   ],
+   [
+    1706,
+    5450
+   ],
+   [
+    1550,
+    5666
+   ],
+   [
+    1527,
+    5751
+   ],
+   [
+    1531,
+    5779
+   ],
+   [
+    1522,
+    5817
+   ],
+   [
+    1474,
+    5913
    ]
   ],
   "style": {
-   "seed": 3,
+   "seed": 9,
    "rollers": 3,
-   "kickers": 0,
-   "drops": 0,
+   "kickers": 2,
+   "drops": 1,
    "berms": 3,
-   "slabs": 0,
-   "roots": 2,
-   "mud": 0,
-   "boardwalks": 0,
+   "slabs": 2,
+   "roots": 3,
+   "mud": 1,
+   "boardwalks": 1,
    "leaves": 2
-  }
+  },
+  "seenPenalty": 1.0,
+  "gradeLimit": 3.0
  },
  {
   "id": "rotzbaach-rocks",
@@ -215,72 +283,6 @@
    "leaves": 2
   },
   "seenPenalty": 1.0
- },
- {
-  "id": "schiessentuempel",
-  "grade": "blue",
-  "name": {
-   "lb": "Schiessentümpel-Trail",
-   "de": "Schiessentümpel-Trail",
-   "en": "Schiessentümpel Trail",
-   "fr": "Piste du Schiessentümpel"
-  },
-  "blurb": {
-   "lb": "Duerch d'Schwaarz-Iernz-Dall bis bei de Waasserfall a seng Steebréck",
-   "de": "Durchs Tal der Schwarzen Ernz bis zum Wasserfall und seiner Steinbrücke",
-   "en": "Down the Black Ernz valley to the waterfall and its stone bridge",
-   "fr": "Par la vallée de l'Ernz noire jusqu'à la cascade et son pont de pierre"
-  },
-  "via": [
-   [
-    2332,
-    3868
-   ],
-   [
-    2139,
-    4781
-   ],
-   [
-    1768,
-    5329
-   ],
-   [
-    1706,
-    5450
-   ],
-   [
-    1550,
-    5666
-   ],
-   [
-    1527,
-    5751
-   ],
-   [
-    1531,
-    5779
-   ],
-   [
-    1522,
-    5817
-   ],
-   [
-    1474,
-    5913
-   ]
-  ],
-  "style": {
-   "seed": 9,
-   "rollers": 3,
-   "kickers": 2,
-   "drops": 1,
-   "berms": 3,
-   "slabs": 2,
-   "roots": 3,
-   "mud": 1,
-   "boardwalks": 1,
-   "leaves": 2
-  }
  },
  {
   "id": "maratoun",

@@ -154,6 +154,73 @@ def crossings(a, streams):
     return merged
 
 
+def straighten(line, streams, pad=5.0):
+    """A bridge deck is a straight plank: where the trail crosses a stream, the line is made straight for (deck length / 2 + pad) metres either side of the crossing
+    (the real footbridges are straight too; only the approach bends). Returns a new node chain; the original nodes outside the straightened stretches are kept."""
+    for _ in range(3):                                         # a straightened stretch can move a crossing: repeat until stable
+        xs, zs, s = dense_line(line)
+        a = {"x": xs, "z": zs, "s": s}
+        found = crossings(a, streams)
+        if not found:
+            return line
+        cum = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff([p[0] for p in line]), np.diff([p[1] for p in line])))])
+        cuts = []
+        for cs, cx, cz, kind in found:
+            half = (9.0 if kind == 5 else 7.0) / 2 + pad
+            cuts.append((max(0.0, cs - half), min(float(s[-1]), cs + half)))
+        merged = []
+        for lo, hi in cuts:
+            if merged and lo <= merged[-1][1] + 1.0:
+                merged[-1] = (merged[-1][0], max(hi, merged[-1][1]))
+            else:
+                merged.append((lo, hi))
+        out = []
+        pos = lambda m: (float(np.interp(m, s, xs)), float(np.interp(m, s, zs)))
+        k = 0
+        for lo, hi in merged:
+            while k < len(line) and cum[k] < lo - 0.5:
+                out.append(tuple(line[k]))
+                k += 1
+            out.append(pos(lo))
+            out.append(pos(hi))
+            while k < len(line) and cum[k] <= hi + 0.5:
+                k += 1
+        while k < len(line):
+            out.append(tuple(line[k]))
+            k += 1
+        if len(out) == len(line) and all(abs(p[0] - q[0]) < 0.01 and abs(p[1] - q[1]) < 0.01 for p, q in zip(out, line)):
+            return line
+        line = out
+    return line
+
+
+def trim_ends(line, height_at, max_trim=90.0, grade=0.16):
+    """A trail ends where the path ends, often at the foot of a bank or in a little hook: a rider would stall on the last climb. Cut the ends at the last 2 m step steeper than `grade`
+    (uphill in the riding direction at the end, uphill against it at the start) within `max_trim` metres."""
+    xs, zs, s = dense_line(line)
+    h = np.array([height_at(x, z) for x, z in zip(xs, zs)])
+    step = np.diff(h) / np.maximum(np.diff(s), 1e-6)
+    lo, hi = 0, len(s) - 1
+    for i in range(len(step)):
+        if s[i] > max_trim:
+            break
+        if step[i] < -grade:                   # the first metres go UP steeply when ridden backwards: the start is at the foot of a bank
+            lo = i + 1
+    for i in range(len(step) - 1, -1, -1):
+        if s[-1] - s[i] > max_trim:
+            break
+        if step[i] > grade:
+            hi = i
+    # a bank right at the end: also drop the climb itself (everything after the last flat-ish step)
+    if lo == 0 and hi == len(s) - 1:
+        return line
+    cum = np.concatenate([[0.0], np.cumsum(np.hypot(np.diff([p[0] for p in line]), np.diff([p[1] for p in line])))])
+    out = [(float(xs[lo]), float(zs[lo]))]
+    out += [tuple(p) for p, c in zip(line, cum) if s[lo] + 1.0 < c < s[hi] - 1.0]
+    out.append((float(xs[hi]), float(zs[hi])))
+    return out
+
+
 def at(a, s):
     i = int(np.clip(round(s / DENSE), 0, len(a["s"]) - 1))
     return float(a["x"][i]), float(a["z"][i]), i

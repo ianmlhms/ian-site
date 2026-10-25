@@ -10,6 +10,8 @@ import { CARVE, WAY_KINDS } from './config.js';
 import { valueNoise } from './noise.js';
 import { resolveFeatures } from './trail-features.js';
 
+export const WAY_KIND_NAMES = Object.freeze(['trail', 'path', 'track', 'road', 'stream', 'river', 'ditch']);
+const WAY_KIND_CODE = Object.freeze(Object.fromEntries(WAY_KIND_NAMES.map((k, i) => [k, i])));
 const YIELD_DISTANCE = 4.5;                       // m: a yielding trail drops its carve this close to another trail's samples
 const CELL = 8;                                   // spatial hash cell (m); the biggest kernel radius is below CELL
 const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -92,7 +94,7 @@ export function channelBed(smoothed, depth, cascade) {
  * baseHeight(x, z): the terrain without any way.
  */
 export function createTrailNetwork(ways, baseHeight) {
-  const px = [], pz = [], bed = [], tilt = [], nxArr = [], nzArr = [], berm = [], side = [], rad = [], inv = [], wayOf = [], sOf = [], water = [], isStream = [], surfArr = [];
+  const px = [], pz = [], bed = [], tilt = [], nxArr = [], nzArr = [], berm = [], side = [], rad = [], inv = [], wayOf = [], sOf = [], water = [], isStream = [], surfArr = [], kindArr = [];
   const wayInfo = [], featureList = [];
   const trailGrid = new Map();                      // samples of the (non-yielding) trails so far: a trail that yields does not carve where it shares their path
   const gridKey = (x, z) => `${Math.floor(x / 4)},${Math.floor(z / 4)}`;
@@ -162,6 +164,7 @@ export function createTrailNetwork(ways, baseHeight) {
       const muted = (feat && feat.mute[i] === 1) || (way.yield && nearTrail(rs.x[i], rs.z[i]));
       inv.push(muted ? 0 : kind.spacing / sref);
       surfArr.push(feat ? feat.surf[i] : 0);
+      kindArr.push(WAY_KIND_CODE[way.kind] ?? 0);
       wayOf.push(wi);
       sOf.push(sAlong);
       water.push(kind.flow ? bedH[i] + kind.waterDepth : NaN);
@@ -172,7 +175,7 @@ export function createTrailNetwork(ways, baseHeight) {
     if (feat) for (const f of feat.resolved) featureList.push({ ...f, way: way.id, first: px.length - n, x0: rs.x[f.i0], z0: rs.z[f.i0], x1: rs.x[f.i1], z1: rs.z[f.i1] });
   }
   const count = px.length;
-  const P = { px: Float32Array.from(px), pz: Float32Array.from(pz), bed: Float32Array.from(bed), tilt: Float32Array.from(tilt), nx: Float32Array.from(nxArr), nz: Float32Array.from(nzArr), berm: Float32Array.from(berm), side: Int8Array.from(side), rad: Float32Array.from(rad), inv: Float32Array.from(inv), way: Int32Array.from(wayOf), s: Float32Array.from(sOf), water: Float32Array.from(water), stream: Uint8Array.from(isStream), surf: Uint8Array.from(surfArr) };
+  const P = { px: Float32Array.from(px), pz: Float32Array.from(pz), bed: Float32Array.from(bed), tilt: Float32Array.from(tilt), nx: Float32Array.from(nxArr), nz: Float32Array.from(nzArr), berm: Float32Array.from(berm), side: Int8Array.from(side), rad: Float32Array.from(rad), inv: Float32Array.from(inv), way: Int32Array.from(wayOf), s: Float32Array.from(sOf), water: Float32Array.from(water), stream: Uint8Array.from(isStream), surf: Uint8Array.from(surfArr), kind: Uint8Array.from(kindArr) };
 
   // spatial hash (CSR): cell -> sample indices
   const cellOf = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
@@ -211,16 +214,17 @@ export function createTrailNetwork(ways, baseHeight) {
         }
       }
     }
-    if (sum <= 1e-6) { out.coverage = 0; out.bed = 0; out.way = -1; out.stream = 0; out.surf = 0; return out; }
+    if (sum <= 1e-6) { out.coverage = 0; out.bed = 0; out.way = -1; out.stream = 0; out.surf = 0; out.kind = 0; return out; }
     out.coverage = smoothstep(CARVE.coverLow, CARVE.coverHigh, Math.min(1, sum));
     out.stream = out.coverage * (streamSum / sum);                      // how much of the shaping is a water channel (0..1): feeds the stream-bed paint
     out.bed = bedSum / sum;
     out.way = nearestWay;
     out.surf = nearestI >= 0 ? P.surf[nearestI] : 0;
+    out.kind = nearestI >= 0 ? P.kind[nearestI] : 0;
     return out;
   }
 
   return { carve, samples: P, count, ways: wayInfo, features: featureList };
 }
 
-export function createCarveScratch() { return { coverage: 0, bed: 0, way: -1, stream: 0, surf: 0 }; }
+export function createCarveScratch() { return { coverage: 0, bed: 0, way: -1, stream: 0, surf: 0, kind: 0 }; }

@@ -92,7 +92,7 @@ export const BIKE = Object.freeze({
   mass: 86,                 // rider + bike (kg)
   gravity: 9.81,
   wheelbase: 1.12,
-  power: 210,               // W of a fit rider at full throttle
+  power: 270,               // W of a fit rider at full throttle (short climbs: a rider gives more than the sustained 200 W for a few seconds)
   pedalForceMax: 330,       // N at the rear wheel (tractive limit before grip)
   cdA: 0.52,                // m2, upright rider
   airDensity: 1.2,
@@ -112,7 +112,63 @@ export const BIKE = Object.freeze({
   maxSpeed: 26,             // m/s hard cap (93 km/h): a descent never runs away
 });
 
-/* Ground materials the physics knows: rolling resistance, grip (friction coefficient), extra drag. Weather multiplies the grip later (never the rewards). */
+/* Ground materials the physics knows (dry values): rolling resistance coefficient, tyre grip (friction coefficient), roughness (extra rolling drag, scaled by how the bike
+ * soaks it up). Rain (the weather choice) multiplies the grip by (1 - wet * WET_LOSS[kind]); it never touches medals or scores. */
+export const SURFACES = Object.freeze({
+  dirt: { crr: 0.013, grip: 1.0, rough: 0.08, wetLoss: 0.2 },
+  track: { crr: 0.016, grip: 0.95, rough: 0.05, wetLoss: 0.14 },       // gravel / forest track
+  road: { crr: 0.009, grip: 1.05, rough: 0.0, wetLoss: 0.3 },
+  rock: { crr: 0.011, grip: 1.1, rough: 0.25, wetLoss: 0.42 },
+  roots: { crr: 0.028, grip: 0.78, rough: 0.55, wetLoss: 0.4 },
+  mud: { crr: 0.075, grip: 0.56, rough: 0.1, wetLoss: 0.08 },
+  leaves: { crr: 0.032, grip: 0.8, rough: 0.12, wetLoss: 0.28 },
+  wood: { crr: 0.01, grip: 0.95, rough: 0.12, wetLoss: 0.45 },
+  grass: { crr: 0.055, grip: 0.74, rough: 0.1, wetLoss: 0.22 },
+  water: { crr: 0.09, grip: 0.62, rough: 0.1, wetLoss: 0 },
+  forest: { crr: 0.05, grip: 0.7, rough: 0.2, wetLoss: 0.22 },         // off the path: litter, moss, undergrowth
+});
+export const SURFACE_OF_CODE = Object.freeze(['dirt', 'rock', 'roots', 'mud', 'leaves', 'wood']);     // trail-features.js SURF codes
+export const WAY_SURFACE = Object.freeze({ trail: 'dirt', path: 'dirt', track: 'track', road: 'road', stream: 'water', river: 'water', ditch: 'water' });
+
+/* Pedalling, braking, pumping, jumping and crashing (see DESIGN-PLAY.md for the reasoning). */
+export const PLAY = Object.freeze({
+  brakeBlend: { front: 0.55, rear: 0.85 },   // a single brake input (touch, S key) is split like this between the two brakes
+  weightTransfer: 0.49,                      // h / L: how much of the weight moves to the front wheel per g of braking
+  flipDecel: 9.4,                            // m/s2 (braking + downhill pull) at which a front-brake-only stop goes over the bars
+  rearLockLateral: 0.7,                      // lateral grip kept when the rear wheel skids
+  frontWash: 0.5,                            // lateral grip lost at full front brake and full steering
+  pumpHeight: 0.3,                           // m the rider's centre moves between crouch and extension
+  pumpGainMax: 1.6,                          // m/s per pump at most
+  popMin: 0.12,                              // pre-load below this never pops (a tap is a pump)
+  popMinSpeed: 0.6,                          // m/s of take-off speed below which the bike stays on the ground
+  popValleyG: 1.5,                           // no pop in a valley that presses the bike down harder than this many g
+  perfectImpact: 2.5,                        // m/s normal speed at touch-down for a "perfect" landing
+  goodImpact: 5.5,
+  slideCrash: 8.5,                           // m/s of sideways slide on the ground that tips the bike over (low side)
+  hitCrash: 5.4,                             // m/s into a trunk or a rock that is a crash
+  sideLandCrash: 6.5,                        // m/s sideways at touch-down
+  tumbleDecay: 2.6,                          // 1/s: speed decay while tumbling
+  respawnTime: 1.4,                          // s from the crash to the rider standing at the checkpoint (< 1.5 s, never frustrating)
+  pushAssist: 1.7,                           // m/s2: below walking pace the rider pushes the bike up a bank instead of stalling
+  pushFade: [0.9, 2.4],                      // m/s: full assist below the first speed, none above the second
+  respawnShield: 1.5,                        // s of invulnerability after a respawn
+});
+
+/* The four bikes (a generic hardtail, trail bike, enduro bike and downhill bike, no brands). Everything the physics, the rider model and the HUD need.
+ *   mass kg incl. rider; powerK drive multiplier on flat (weight and gearing); travel m of suspension (fork / shock): drawn, and it eats landings and roughness;
+ *   grip multiplies tyre grip; crrK multiplies rolling resistance; cdaK drag; brakeF / brakeR m/s2 at full lever; steerK / steerRef steering quickness; stab straight-line stability at speed
+ *   (less lean wobble); pump / pop efficiency of pumping and jumping; crashImpact m/s normal speed at touch-down that is a crash; hardImpact: landings above this cost speed;
+ *   rough: how much of the ground roughness reaches the bike (hardtail 1 .. downhill 0.35). */
+export const BIKES = Object.freeze({
+  hardtail: { id: 'hardtail', mass: 84.5, powerK: 1.06, travel: 0.1, grip: 0.95, crrK: 0.94, cdaK: 1.0, brakeF: 7.0, brakeR: 4.4, steerK: 1.12, steerRef: 6.2, stab: 0.85, pump: 1.2, pop: 1.1, crashImpact: 9.6, hardImpact: 5.8, rough: 1.0, stick: 0.045, color: '#2f9e6b' },
+  trail: { id: 'trail', mass: 86, powerK: 1.0, travel: 0.13, grip: 1.0, crrK: 1.0, cdaK: 1.0, brakeF: 7.4, brakeR: 4.8, steerK: 1.0, steerRef: 5.5, stab: 1.0, pump: 1.0, pop: 1.0, crashImpact: 11.5, hardImpact: 7.5, rough: 0.7, stick: 0.058, color: '#d8452e' },
+  enduro: { id: 'enduro', mass: 88.5, powerK: 0.94, travel: 0.17, grip: 1.06, crrK: 1.06, cdaK: 1.04, brakeF: 7.9, brakeR: 5.1, steerK: 0.94, steerRef: 5.0, stab: 1.15, pump: 0.88, pop: 0.95, crashImpact: 13.2, hardImpact: 9.0, rough: 0.5, stick: 0.07, color: '#e69a1f' },
+  downhill: { id: 'downhill', mass: 92, powerK: 0.84, travel: 0.2, grip: 1.12, crrK: 1.16, cdaK: 1.1, brakeF: 8.5, brakeR: 5.5, steerK: 0.88, steerRef: 4.6, stab: 1.35, pump: 0.78, pop: 0.9, crashImpact: 15.2, hardImpact: 11.0, rough: 0.35, stick: 0.082, color: '#7b49c8' },
+});
+export const BIKE_IDS = Object.freeze(['hardtail', 'trail', 'enduro', 'downhill']);
+export const CLEAN_GROUND = Object.freeze({ kind: 'dirt', ...SURFACES.dirt });
+
+/* The legacy W1 table, kept for tools that read it. */
 export const GROUND = Object.freeze({
   trail: { crr: 0.013, grip: 1.0 },
   track: { crr: 0.016, grip: 0.95 },

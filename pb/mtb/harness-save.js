@@ -501,7 +501,7 @@ section('pickBest');
 {
   const a = recordRun(FRESH, { trailId: TRAIL_IDS[0], ms: 400000, medal: 1 }).progress;
   const b = recordRun(FRESH, { trailId: TRAIL_IDS[1], ms: 500000, medal: 2 }).progress;
-  const merged = pickBest([a, JSON.stringify(b), null, undefined, 'garbage', { v: 2 }, { hello: 1 }, [], 5]);
+  const merged = quiet(() => pickBest([a, JSON.stringify(b), null, undefined, 'garbage', { v: 2 }, { hello: 1 }, [], 5]));
   check('pickBest merges objects and JSON strings, skips junk', merged && merged.m === '120000' && bestMs(merged, TRAIL_IDS[0]) === 400000 && bestMs(merged, TRAIL_IDS[1]) === 500000);
   quiet(() => check('pickBest returns null when nothing decodes', pickBest([null, 'x', { v: 2 }, undefined]) === null && pickBest([]) === null && pickBest(undefined) === null));
   check('pickBest of one source is that source normalised', same(pickBest([a]), a));
@@ -662,7 +662,7 @@ function fakeEnv({ testMode = false, standalone = false, injected = undefined, s
   // errors are reported once and never swallowed silently
   const errors = [];
   const f = fakeEnv();
-  const p = createPersistence({ getState: () => { throw new Error('boom'); }, onState: () => {}, onError: (m) => errors.push(m), env: f.env });
+  const p = quiet(() => createPersistence({ getState: () => { throw new Error('boom'); }, onState: () => {}, onError: (m) => errors.push(m), env: f.env }));
   const ok = quiet(() => p.pushSave());
   check('a failing getState is reported, pushSave returns false', ok === false && errors.length >= 1);
   const count = errors.length;

@@ -53,9 +53,9 @@ def remove_cycles(keys):
     return out
 
 
-def grade_penalty(graph, grade):
+def grade_penalty(graph, grade, limit_override=None):
     """Edge multiplier: 1 up to the colour's comfortable grade, growing quadratically beyond it (a blue trail avoids a 45 degree scramble)."""
-    limit = GRADE_LIMIT[grade]
+    limit = GRADE_LIMIT[grade] if limit_override is None else limit_override
     cache = {}
 
     def penalty(edge):
@@ -83,7 +83,7 @@ def main():
     others = []                                 # dense lines of the trails baked so far (a later trail yields where it shares their path)
     for td in defs:
         keys = []
-        penalty = grade_penalty(g, td["grade"])
+        penalty = grade_penalty(g, td["grade"], td.get("gradeLimit"))
         for a, b in zip(td["via"], td["via"][1:]):
             ka, da = g.nearest(*a)
             kb, db = g.nearest(*b)
@@ -95,7 +95,7 @@ def main():
                 print("   leg", a, "->", b, "%.0f m (straight %.0f)" % (sum(math.hypot(g.pos[x][0] - g.pos[y][0], g.pos[x][1] - g.pos[y][1]) for x, y in zip(seg, seg[1:])), math.hypot(a[0] - b[0], a[1] - b[1])))
             keys.extend(seg if not keys else seg[1:])
         keys = remove_cycles(keys)
-        line = [g.pos[k] for k in keys]
+        line = TF.straighten(TF.trim_ends([g.pos[k] for k in keys], height_at), streams)
         for u, v in zip(keys, keys[1:]):
             used.add((u, v)); used.add((v, u))
         # drop immediate reversals (route goes out and comes back along the same edge at a via point)
