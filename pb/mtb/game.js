@@ -45,6 +45,7 @@ export function createGame() {
     ghostT: 0, ghost: [], result: null,
   };
   const events = [];
+  const pending = [];                 // events raised between two updates (a reset asked by the player)
   const emit = (e) => events.push(e);
 
   /** Local nearest centre index (windowed, global search when lost). */
@@ -81,12 +82,14 @@ export function createGame() {
     reset() {
       if (g.mode !== 'run' && g.mode !== 'free') return;
       g.resets++;
-      emit({ type: 'respawn', index: g.mode === 'run' ? g.lastCp : g.progress, reason: 'reset' });
+      pending.push({ type: 'respawn', index: g.mode === 'run' ? g.lastCp : g.progress, reason: 'reset' });
       g.crashT = 0; g.shield = PLAY.respawnShield;
     },
     /** One frame. `bike` = the physics state, `input` = { throttle, ... } (to tell "stuck" from "waiting"). Returns the events of this frame (the same array, cleared next call). */
     update(dt, bike, input = {}) {
       events.length = 0;
+      for (const e of pending) events.push(e);
+      pending.length = 0;
       if (g.shield > 0) g.shield = Math.max(0, g.shield - dt);
       const trail = g.trail;
       if (!trail) return events;

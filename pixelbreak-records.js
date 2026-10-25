@@ -111,6 +111,13 @@ const SCORE_FORMATS = {
     const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), t = ms % 1000;
     return m + ":" + String(s).padStart(2, "0") + "." + String(t).padStart(3, "0");
   },
+  // MTB Mëllerdall: a trail time is stored as MTB_TIME_BASE - milliseconds (higher is better, no SQL needed). Shown as m:ss.mmm.
+  mtb(score) {
+    const ms = 10_000_000 - score;
+    if (!Number.isFinite(ms) || ms < 0) return String(score);
+    const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), t = Math.round(ms % 1000);
+    return m + ":" + String(s).padStart(2, "0") + "." + String(t).padStart(3, "0");
+  },
   // Geometry Dash: below 1000 a plain best %, from 1000 up a finished run (1000 + 999 - attempts).
   gd(score) {
     if (score < 1000) return score + " %";

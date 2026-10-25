@@ -1,8 +1,9 @@
-/* Flow: MTB Mëllerdall W1 "Ride". The bike rides the first trail from start to finish with scripted input (a fast, rendering-free simulation inside the page
- * using the very same physics and surface), then real keyboard and touch input move the bike in the live game. */
+/* Flow: MTB Mëllerdall W3 "Ride". The reference rider finishes the first trail inside the real game loop (start card, countdown, checkpoints, finish, medal), then real keyboard and touch
+ * input move the bike in the live game. */
 import { runIfMain } from "./lib.mjs";
 
 const PAGE = "/pb/mtb.html?debug=1&q=low&time=noon&weather=clear";
+const ready = (page) => page.waitForFunction(() => document.documentElement.dataset.mtbReady === "1" || document.documentElement.dataset.bootError, null, { timeout: 120000 });
 
 export const flow = {
   name: "mtb-ride",
@@ -13,41 +14,45 @@ export const flow = {
     const errors = [];
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
     await h.goto(PAGE);
-    await page.waitForFunction(() => document.documentElement.dataset.mtbReady === "1" || document.documentElement.dataset.bootError, null, { timeout: 120000 });
+    await ready(page);
 
-    h.step("scripted rider finishes the whole trail (physics only, 120 Hz steps)");
-    const ride = await page.evaluate(() => {
+    h.step("start card -> 3-2-1-Go -> the reference rider finishes the first trail in the real game loop (no rendering, 60 Hz ticks)");
+    const run = await page.evaluate(async () => {
+      const { createBot } = await import("/pb/mtb/bot.js");
       const m = window.__mtb;
-      const line = m.centre;
-      m.stop();                                              // no rendering while we simulate
-      m.reset(0);
-      let wp = 1, t = 0, stuck = 0, nan = 0, belowGround = 0, vmax = 0, airTime = 0;
-      const dt = 1 / 60;
-      while (wp < line.length - 1 && t < 900) {
-        const s = m.bike;
-        while (wp < line.length - 1 && Math.hypot(line[wp][0] - s.x, line[wp][1] - s.z) < 7) wp++;
-        let err = Math.atan2(line[wp][1] - s.z, line[wp][0] - s.x) - s.heading;
-        while (err > Math.PI) err -= 2 * Math.PI;
-        while (err < -Math.PI) err += 2 * Math.PI;
-        const speed = Math.hypot(s.vx, s.vz);
-        m.step(dt, { throttle: speed < 8.5 ? 1 : 0.3, brake: speed > 12 ? 0.5 : 0, steer: Math.max(-1, Math.min(1, err * 1.8)), jump: false });
+      m.stop();                                                // no rendering while we simulate
+      const t = m.trail;
+      const modes = [m.game.mode];
+      await m.startRun();
+      const bot = createBot(t.centre.slice(0, t.arch.index + 4), t.grade);
+      const events = [];
+      let frames = 0, nan = 0, below = 0, vmax = 0;
+      while (m.game.mode !== "finished" && frames < 60 * 900) {
+        const inp = m.game.mode === "run" ? bot.input(m.bike) : { throttle: 0, brake: 0, steer: 0, jump: false };
+        m.tick(1 / 60, inp);
+        if (modes[modes.length - 1] !== m.game.mode) modes.push(m.game.mode);
         const b = m.bike;
         if (![b.x, b.y, b.z, b.vx, b.vy, b.vz].every(Number.isFinite)) { nan++; break; }
-        if (b.y < m.surface.height(b.x, b.z) - 1e-6) belowGround++;
+        if (b.y < m.ground.height(b.x, b.z) - 1e-6) below++;
         vmax = Math.max(vmax, Math.hypot(b.vx, b.vy, b.vz));
-        if (!b.grounded) airTime += dt;
-        if (speed < 0.2 && t > 6) { if (++stuck > 120) break; } else stuck = 0;
-        t += dt;
+        frames++;
       }
-      return { wp, n: line.length, t, nan, belowGround, vmax, airTime, odo: m.bike.odometer };
+      const g = m.game;
+      return { modes, frames, nan, below, vmax, result: g.result && { ms: g.result.ms, medal: g.result.medal, isBest: g.result.isBest, crashes: g.result.crashes, splits: g.result.splits.length }, cps: t.cps.length, finishVisible: !!document.querySelector(".mfinish:not(.hidden)"), medalText: (document.querySelector(".fin-medal .mn") || {}).textContent || "" };
     });
-    h.expect(ride.wp >= ride.n - 2, `reached the end of the trail (${ride.wp}/${ride.n}) in ${ride.t.toFixed(0)} s, ${ride.odo.toFixed(0)} m`);
-    h.eq([ride.nan, ride.belowGround], [0, 0], "no NaN and never below the physics surface");
-    h.expect(ride.vmax < 27, `speed stays physical (max ${(ride.vmax * 3.6).toFixed(0)} km/h)`);
+    h.eq(run.modes.join(">"), "card>countdown>run>finished", "the game goes card, countdown, run, finished");
+    h.eq([run.nan, run.below], [0, 0], "no NaN and never below the ground");
+    h.expect(run.result && run.result.splits === run.cps, `every checkpoint was counted (${run.result && run.result.splits}/${run.cps})`);
+    h.expect(run.result && run.result.medal >= 2 && run.result.crashes === 0, `the reference rider wins silver or gold without a crash (${run.result && (run.result.ms / 1000).toFixed(1)} s, medal ${run.result && run.result.medal})`);
+    h.expect(run.finishVisible && run.medalText.length > 0, `the finish screen is up: ${run.medalText}`);
+    h.expect(run.vmax < 27.5, `speed stays physical (max ${(run.vmax * 3.6).toFixed(0)} km/h)`);
+    await page.evaluate(() => { window.__mtb.persistence.pushSave(); });
+    h.expect(await page.evaluate(() => /"m":"[1-3]/.test(localStorage.getItem("pb_mtb_save") || "")), "the medal is saved in localStorage");
 
-    h.step("live game: keyboard W moves the bike, S brakes it, R puts it back on the trail");
-    await page.reload();
-    await page.waitForFunction(() => document.documentElement.dataset.mtbReady === "1", null, { timeout: 120000 });
+    h.step("live game: keyboard W moves the bike, S brakes it, R puts it back on the last checkpoint");
+    await h.goto(PAGE + "&autostart=1");
+    await ready(page);
+    await page.waitForFunction(() => window.__mtb.game.mode === "run", null, { timeout: 20000 });
     await page.keyboard.down("KeyW");
     await h.pause(4000);
     const fast = await page.evaluate(() => { const b = window.__mtb.bike; return { v: Math.hypot(b.vx, b.vz) * 3.6, odo: b.odometer }; });
@@ -61,13 +66,25 @@ export const flow = {
     await page.keyboard.down("KeyD"); await page.keyboard.down("KeyW"); await h.pause(1500);
     await page.keyboard.up("KeyD"); await page.keyboard.up("KeyW");
     await page.keyboard.press("KeyR");
-    await h.pause(400);
+    await h.pause(500);
     const back = await page.evaluate(() => { const m = window.__mtb; const b = m.bike; let best = 1e9; for (const [x, z] of m.centre) best = Math.min(best, Math.hypot(x - b.x, z - b.z)); return { off: best, v: Math.hypot(b.vx, b.vz) }; });
     h.expect(back.off < 3 && back.v < 1.5, `R: back on the trail (${back.off.toFixed(1)} m from the line, ${back.v.toFixed(1)} m/s)`);
 
+    h.step("space: a tap does not pop, a hold pops the bike into the air; Q and E are the two brakes");
+    await page.evaluate(() => { const m = window.__mtb; m.reset(60); m.setBike({ vx: 7 * Math.cos(m.bike.heading), vz: 7 * Math.sin(m.bike.heading) }); });
+    await page.keyboard.down("Space"); await h.pause(450); await page.keyboard.up("Space");
+    const air = await page.evaluate(() => new Promise((res) => { let maxAir = 0; const t0 = performance.now(); const id = setInterval(() => { const b = window.__mtb.bike; if (!b.grounded) maxAir = Math.max(maxAir, b.airTime); if (performance.now() - t0 > 900) { clearInterval(id); res(maxAir); } }, 16); }));
+    h.expect(air > 0.15, `holding Space then releasing: airborne for ${air.toFixed(2)} s`);
+    await page.evaluate(() => { const m = window.__mtb; m.reset(80); m.setBike({ vx: 9 * Math.cos(m.bike.heading), vz: 9 * Math.sin(m.bike.heading) }); });
+    await page.keyboard.down("KeyE"); await h.pause(300);
+    const brakes = await page.evaluate(() => { const b = window.__mtb.bike; return { f: b.brakeF, r: b.brakeR }; });
+    await page.keyboard.up("KeyE");
+    h.expect(brakes.f > 0.9 && brakes.r < 0.1, `E is the front brake only (front ${brakes.f.toFixed(2)}, rear ${brakes.r.toFixed(2)})`);
+
     h.step("touch: the steering pad and the pedal button drive the bike; the controls stay small");
-    await page.reload();
-    await page.waitForFunction(() => document.documentElement.dataset.mtbReady === "1", null, { timeout: 120000 });
+    await h.goto(PAGE + "&autostart=1");
+    await ready(page);
+    await page.waitForFunction(() => window.__mtb.game.mode === "run", null, { timeout: 20000 });
     const geo = await page.evaluate(() => {
       const vw = window.innerWidth, vh = window.innerHeight;
       const rects = [...document.querySelectorAll("#touchControls .pad, #touchControls .tbtn")].map((e) => e.getBoundingClientRect());
@@ -79,7 +96,6 @@ export const flow = {
     h.expect(geo.minSide >= 44, `smallest control is ${geo.minSide.toFixed(0)} px (>= 44 px)`);
     const go = await page.locator('#touchControls [data-btn="throttle"]').boundingBox();
     const pad = await page.locator("#touchControls .pad").boundingBox();
-    await page.touchscreen.tap(go.x + go.width / 2, go.y + go.height / 2);       // a tap is short; hold with raw pointer events instead:
     await page.evaluate(({ x, y }) => {
       const el = document.querySelector('#touchControls [data-btn="throttle"]');
       el.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 7, clientX: x, clientY: y, bubbles: true, pointerType: "touch", isPrimary: true }));

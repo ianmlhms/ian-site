@@ -484,16 +484,9 @@ async function boot() {
     ghostRider.apply(st, { dt: 0.016, pitch, standing: false, brake: 0 });
   };
 
-  function frame(now) {
-    if (!running) return;
-    requestAnimationFrame(frame);
-    if (contextLost || document.hidden) { last = now; return; }
-    const dt = Math.min(MAX_FRAME_S, Math.max(0.0005, (now - last) / 1000));
-    last = now; elapsed += dt;
-    const inp = input.read(scriptedInput);
-    if (replay) { replay.t += dt * 1000; if (replay.t > replay.ghost.duration + 1500 || replay.t > REPLAY_SECONDS_MAX * 1000 * 60) { replay = null; ghostRider.root.visible = false; ui.showFinish(lastFinish()); } }
+  /** One logical step of the game: physics, game state machine, events. No rendering (the flows call it directly to ride a whole trail in a few seconds). */
+  function logic(dt, inp) {
     const mode = game.mode;
-    applyViewOffset();
     if (!frozen() && !ui.isMenuOpen() && !replay) {
       physicsEnv.wet = wetNow();
       physicsEnv.shield = game.shield;
@@ -507,6 +500,18 @@ async function boot() {
     } else if (frozen()) {
       applyEvents(game.update(dt, bike, inp));
     }
+  }
+
+  function frame(now) {
+    if (!running) return;
+    requestAnimationFrame(frame);
+    if (contextLost || document.hidden) { last = now; return; }
+    const dt = Math.min(MAX_FRAME_S, Math.max(0.0005, (now - last) / 1000));
+    last = now; elapsed += dt;
+    const inp = input.read(scriptedInput);
+    if (replay) { replay.t += dt * 1000; if (replay.t > replay.ghost.duration + 1500 || replay.t > REPLAY_SECONDS_MAX * 1000 * 60) { replay = null; ghostRider.root.visible = false; ui.showFinish(lastFinish()); } }
+    applyViewOffset();
+    logic(dt, inp);
     // events from the physics (landings) for sound and feedback
     if (bike.landSeq !== lastLand) {
       lastLand = bike.landSeq;
@@ -612,7 +617,7 @@ async function boot() {
     setCamera(pose) { frozenCamera = pose ? { fov: 62, ...pose } : null; },
     snapCamera: () => chase.snap(bike),
     step(seconds, inputOverride) { bike = advanceBike(bike, inputOverride || { throttle: 0, brake: 0, steer: 0 }, seconds, ground, groundAt, physicsEnv); },
-    enterCard, startRun, startFree, startDaily, openMenu, closeMenu, showFinishForTest: (d) => ui.showFinish(d),
+    tick(dt, inp) { logic(dt, inp || scriptedInput || input.read(null)); }, enterCard, startRun, startFree, startDaily, openMenu, closeMenu, showFinishForTest: (d) => ui.showFinish(d),
     stop() { running = false; },
     elapsed: () => elapsed,
   };

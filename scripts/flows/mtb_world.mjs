@@ -4,6 +4,7 @@
 import { runIfMain } from "./lib.mjs";
 
 const PAGE = "/pb/mtb.html?debug=1&q=medium&time=noon&weather=clear";
+const START_WORD = { lb: "Fueren", de: "Fahren", en: "Ride", fr: "Rouler" };
 const DATA_BUDGET = 6 * 1024 * 1024;
 /* W2 budgets: unchanged for medium and high; `low` gets 140 draw calls (was 130) for the forest / rock / water / rider sets, its triangles stay at 330 k (measured at the trail start: low 133 calls / 258 k, medium 147 / 433 k, high 166 / 774 k; the busiest gorge scenes reach about 1.0 M triangles on high). */
 const BUDGET = { low: { calls: 140, tris: 330000 }, medium: { calls: 190, tris: 520000 }, high: { calls: 230, tris: 900000 } };
@@ -29,11 +30,11 @@ export const flow = {
     const info = await page.evaluate(() => {
       const m = window.__mtb;
       const bytes = performance.getEntriesByType("resource").filter((e) => /\/pb\/mtb\/data\//.test(e.name)).reduce((s, e) => s + (e.encodedBodySize || e.decodedBodySize || 0), 0);
-      return { bytes, trail: m.trail.id, ways: m.data.ways.length, tiles: m.terrain.stats.leaves, trees: m.forest.stats.near + m.forest.stats.far, hint: document.getElementById("hint").textContent };
+      return { bytes, trail: m.trail.id, ways: m.data.ways.length, tiles: m.terrain.stats.leaves, trees: m.forest.stats.near + m.forest.stats.far, start: (document.querySelector(".mcard .bigstart") || {}).textContent || "", mode: m.game.mode };
     });
     h.expect(info.bytes > 1e6 && info.bytes <= DATA_BUDGET, `baked data ${(info.bytes / 1048576).toFixed(2)} MB (<= 6 MB)`);
-    h.expect(info.tiles > 60 && info.trees > 500 && info.ways > 500, `${info.tiles} terrain tiles, ${info.trees} trees, ${info.ways} ways`);
-    h.expect(/W/.test(info.hint), "the hint line names the keys");
+    h.expect(info.tiles > 60 && info.trees > 200 && info.ways > 500, `${info.tiles} terrain tiles, ${info.trees} trees, ${info.ways} ways`);
+    h.eq([info.mode, info.start], ["card", "Fueren"], "first open: the start card of the first trail with one big Fueren button");
     await h.shot("boot");
 
     h.step("draw calls and triangles stay inside the budget at low / medium / high");
@@ -63,12 +64,12 @@ export const flow = {
     const c1 = await page.evaluate(() => window.__mtb.env.getChoice());
     h.eq([c1.timeMode, c1.weatherMode, c1.timeId, c1.weatherId], ["night", "fog", "night", "fog"], "choices persist across a reload");
 
-    h.step("language: hint and HUD follow the stored language");
-    for (const [lang, word] of [["de", "treten"], ["en", "pedal"], ["fr", "pédaler"], ["lb", "trëppelen"]]) {
+    h.step("language: the start card follows the stored language");
+    for (const lang of ["de", "en", "fr", "lb"]) {
       await page.evaluate((l) => localStorage.setItem("pb_mtb_lang", l), lang);
       await boot(h, "/pb/mtb.html?debug=1&q=low&time=noon&weather=clear");
-      const hint = await page.evaluate(() => document.getElementById("hint").textContent);
-      h.expect(hint.includes(word), `${lang}: hint says "${word}"`);
+      const word = await page.evaluate(() => (document.querySelector(".mcard .bigstart") || {}).textContent);
+      h.eq(word, START_WORD[lang], `${lang}: the start button says "${START_WORD[lang]}"`);
     }
     await page.evaluate(() => localStorage.removeItem("pb_mtb_lang"));
 

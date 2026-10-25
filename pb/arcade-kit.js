@@ -378,7 +378,7 @@
       oldBar.insertAdjacentElement("afterend", context);
     }
     if (!options.id) return;
-    import("../pixelbreak-records.js?v=52").then(() => {
+    import("../pixelbreak-records.js?v=53").then(() => {
       window.PB?.registerStandalone?.({
         id: options.id,
         name: options.title,
