@@ -1,20 +1,22 @@
-/* MTB Mëllerdall W1: boots the world and the first rideable bike.
+/* MTB Mëllerdall W2: boots the world and the first rideable bike (W2: painted broadleaf forest, sandstone, water, animated life).
  *   loading bar -> data -> height field + physics surface -> painted textures -> env (sky, sun, fog) -> terrain tiles + forest -> bike on trail 1 -> ride.
- * ?q=low|medium|high  ?time=dawn|morning|noon|evening|dusk|night  ?weather=clear|cloudy|fog|rain  ?trail=<id>  ?debug=1 (window.__mtb)  ?holes=1 (hole detector mode)
+ * ?q=low|medium|high  ?time=dawn|morning|noon|evening|dusk|night  ?weather=clear|cloudy|fog|rain  ?season=summer|autumn  ?trail=<id>  ?debug=1 (window.__mtb)  ?holes=1 (hole detector mode)
  * The page is also loaded as a srcdoc iframe by the arcade, so every URL here is built from import.meta.url or is absolute. */
 import { WORLD, QUALITY, QUADTREE } from './config.js';
 import { loadWorldData } from './world-data.js';
-import { createHeightField } from './heightfield.js';
-import { createSurface } from './surface.js';
-import { createBikeState, advanceBike, groundResolver, speedKmh } from './bike.js';
+import { createBikeState, advanceBike, speedKmh } from './bike.js';
 import { createChaseCamera } from './camera.js';
 import { createPaintTextures } from './paint-textures.js';
-import { buildWorldMap } from './world-map.js';
-import { createEnv, TIME_PRESETS, WEATHER_IDS } from './env.js';
+
+import { createEnv, TIME_PRESETS, WEATHER_IDS, SEASON_IDS } from './env.js';
 import { createGroundMaterial } from './ground-shader.js';
+import { buildPureWorld } from './world-build.js';
+import { createRockView } from './rock-view.js';
+import { createWaterView } from './water-view.js';
+import { createRain, createLeaves, createShafts, createBirds, createInsects } from './effects.js';
+import { createHikers } from './hikers.js';
 import { createTerrainView } from './terrain-view.js';
 import { createForestView } from './forest-view.js';
-import { createTreeIndex } from './forest.js';
 import { createRider } from './rider.js';
 import { createInput } from './input.js';
 import { LANGS, t as translate, trailName } from './i18n.js';
@@ -87,32 +89,34 @@ async function boot() {
   const data = await loadWorldData(reader(new URL('./data/', import.meta.url)), (p, what) => setLoad(0.08 + 0.52 * p, `load.${what}`));
   setLoad(0.62, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
-  const ways = data.ways.filter((w) => !w.bridge && !w.tunnel);
-  const trailWays = data.trails.trails.flatMap((trail) => trail.ways);
-  const field = createHeightField({ near: data.near, far: data.far, ways: [...ways, ...trailWays] });
-  const surface = createSurface(field);
-  const groundAt = groundResolver(field);
-  const clearance = (() => { const info = { coverage: 0, way: -1 }; return (x, z) => { field.height(x, z, info); return info.coverage; }; })();
+  const world = buildPureWorld(data);
+  const { field, surface, groundAt, clearance, maps, trees, undergrowth, rocks } = world;
 
   // ---- painted textures, world maps, env
   setLoad(0.7, 'load.build');
   await new Promise((r) => setTimeout(r, 0));
   const textures = createPaintTextures(renderer, qualityId);
-  const maps = buildWorldMap({ classes: data.classes, canopy: data.canopy, near: data.near });
-  const mapTexture = (arr) => { const tex = new THREE.DataTexture(arr, maps.nx, maps.nz, THREE.RGBAFormat); tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true; return tex; };
-  const worldMaps = { cover: mapTexture(maps.cover), canopy: mapTexture(maps.canopy) };
-  const env = createEnv({ noiseTexture: textures.noise, params: { time: param('time'), weather: param('weather') } });
+  const mapTexture = (arr, filter = THREE.LinearFilter) => { const tex = new THREE.DataTexture(arr, maps.nx, maps.nz, THREE.RGBAFormat); tex.magFilter = filter; tex.minFilter = filter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true; return tex; };
+  const worldMaps = { cover: mapTexture(maps.cover), canopy: mapTexture(maps.canopy), field: mapTexture(maps.field, THREE.NearestFilter) };
+  const env = createEnv({ noiseTexture: textures.noise, params: { time: param('time'), weather: param('weather'), season: param('season') } });
   if (holeMode) env.sky.visible = false;
   scene.add(env.sky);
-  const groundMaterial = createGroundMaterial(THREE, env, textures, worldMaps, WORLD);
-  groundMaterial.uniforms.uTreeRadius.value = quality.treeRadius;
+  const groundFull = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, false);
+  const groundCheap = createGroundMaterial(THREE, env, textures, worldMaps, WORLD, true);
+  const groundFor = (q) => (q.cheapGround ? groundCheap : groundFull);
+  const groundMaterial = groundFor(quality);
+  for (const m of [groundFull, groundCheap]) m.uniforms.uTreeRadius.value = quality.treeRadius;
 
   // ---- world
   const terrain = createTerrainView({ scene, surface, field, material: groundMaterial, quality });
-  const trees = createTreeIndex({ map: maps, surface, clearance });
-  const forest = createForestView({ scene, trees, env, quality });
+  const forest = createForestView({ scene, trees, undergrowth, env, quality, textures, meadow: { map: maps, surface, clearance } });
+  const rockView = createRockView({ scene, rocks, env, quality, textures });
+  const water = createWaterView({ scene, network: field.network, env, quality });
   const rider = createRider(env);
   scene.add(rider.root);
+  const rain = createRain({ scene, env, quality }), leaves = createLeaves({ scene, env, quality }), shafts = createShafts({ scene, env, quality, surface, map: maps });
+  const birds = createBirds({ scene, env, quality }), insects = createInsects({ scene, env, quality, surface, map: maps, clearance });
+  const hikers = createHikers({ scene, env, surface, paths: world.ways.filter((w) => w.kind === 'path') });
 
   // ---- the first trail
   const trails = data.trails.trails;
@@ -124,9 +128,26 @@ async function boot() {
   const startIndex = Math.min(centre.length - 4, Math.max(0, Number(param('at') || 0)));
   const headingAt = (i) => { const a = centre[Math.max(0, i - 1)], b = centre[Math.min(centre.length - 1, i + 2)]; return Math.atan2(b[1] - a[1], b[0] - a[0]); };
   const camHit = { nx: 0, nz: 0, pen: 0 }, bikeHit = { nx: 0, nz: 0, pen: 0 };
-  const physicsEnv = { gripScale: 1, collide: (x, z, r) => trees.collide(x, z, r, bikeHit) };
+  const rockHit = { nx: 0, nz: 0, pen: 0 };
+  /** Trunks and rocks: the deeper penetration wins (the bike slides along either). */
+  let bikeY = 0;
+  const collideAll = (x, z, r, out) => {
+    const a = trees.collide(x, z, r, out);
+    const b = rocks.collide(x, z, r, bikeY, rockHit);
+    if (b && (!a || b.pen > a.pen)) { out.nx = b.nx; out.nz = b.nz; out.pen = b.pen; return out; }
+    return a;
+  };
+  const physicsEnv = { gripScale: 1, collide: (x, z, r) => collideAll(x, z, r, bikeHit) };
   let bike = createBikeState(centre[startIndex][0], centre[startIndex][1], headingAt(startIndex), surface);
-  const chase = createChaseCamera(surface, (x, z, r) => trees.collide(x, z, r, camHit));
+  const crownPush = { dx: 0, dy: 0, dz: 0 }, camRock = { nx: 0, nz: 0, pen: 0 };
+  const trunkOrRock = (x, z, r) => {                              // the camera never sits inside a trunk or beside-through a rock wall
+    const a = trees.collide(x, z, r, camHit);
+    const b = rocks.collide(x, z, r, -1e9, camRock);
+    if (b && (!a || b.pen > a.pen)) { camHit.nx = b.nx; camHit.nz = b.nz; camHit.pen = b.pen; return camHit; }
+    return a;
+  };
+  const crownsAndRocks = (x, y, z, r) => trees.pushOutOfCrowns(x, y, z, r, crownPush);
+  const chase = createChaseCamera(surface, trunkOrRock, crownsAndRocks);
   chase.snap(bike);
 
   setLoad(0.86, 'load.build');
@@ -136,7 +157,8 @@ async function boot() {
 
   // ---- HUD + input
   const hint = $('hint');
-  hint.textContent = tr('hint.keys');
+  const touchDevice = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  hint.textContent = tr(touchDevice ? 'hint.touch' : 'hint.keys');            // touch devices get the touch hint, never the keyboard one
   $('hudSpeedUnit').textContent = tr('hud.speed');
   $('trailName').textContent = trailName(trail, lang);
   $('trailGrade').className = `grade ${trail.grade}`;
@@ -161,6 +183,7 @@ async function boot() {
     if (a === 'reset') reset(nearest);
     if (a === 'time') { const ids = Object.keys(TIME_PRESETS); env.setTime(ids[(ids.indexOf(env.state.timeId) + 1) % ids.length]); }
     if (a === 'weather') env.setWeather(WEATHER_IDS[(WEATHER_IDS.indexOf(env.state.weatherId) + 1) % WEATHER_IDS.length]);
+    if (a === 'season') env.setSeason(SEASON_IDS[(SEASON_IDS.indexOf(env.state.seasonId) + 1) % SEASON_IDS.length]);
   } });
   let hintLeft = HINT_SECONDS;
 
@@ -183,7 +206,9 @@ async function boot() {
   const perf = { frames: 0, fps: 0, ms: 0, drawCalls: 0, triangles: 0, adapt: 0 };
   let perfT = 0, perfFrames = 0, slowT = 0;
   const wheelbase = rider.wheelbase;
-  const extra = { dt: 0.016, pitch: 0, standing: false, spin: 0 };
+  const extra = { dt: 0.016, pitch: 0, standing: false, spin: 0, brake: 0 };
+  const lampPos = new THREE.Vector3(), lampDir = new THREE.Vector3();
+  let foamTimer = 0;
 
   function frame(now) {
     if (!running) return;
@@ -206,18 +231,28 @@ async function boot() {
     const hF = surface.height(bike.x + fx * half, bike.z + fz * half), hR = surface.height(bike.x - fx * half, bike.z - fz * half);
     extra.dt = dt; extra.pitch = bike.grounded ? Math.atan2(hF - hR, wheelbase) : Math.atan2(bike.vy, Math.hypot(bike.vx, bike.vz) + 0.1) * 0.5;
     extra.standing = bike.cadence < 5 && Math.hypot(bike.vx, bike.vz) > 5;
+    extra.brake = inp.brake || 0;
+    bikeY = bike.y;
     rider.apply(bike, extra);
+    rider.lamp(lampPos, lampDir);
+    env.setLamp(lampPos, lampDir);
 
     const c = frozenCamera || chase.update(bike, dt);
     camera.position.set(c.x, c.y, c.z);
     camera.lookAt(c.tx, c.ty, c.tz);
     if (Math.abs(camera.fov - c.fov) > 0.05) { camera.fov = c.fov; camera.updateProjectionMatrix(); }
     camera.far = quality.far;
-    groundMaterial.uniforms.uTreeRadius.value = quality.treeRadius;
+    for (const m of [groundFull, groundCheap]) m.uniforms.uTreeRadius.value = quality.treeRadius;
 
     env.update(dt, camera, elapsed);
+    env.setFogBase(surface.height(c.x, c.z));
     terrain.update(frozenCamera ? c.x : bike.x, frozenCamera ? c.z : bike.z);
     forest.update(c.x, c.z);
+    rockView.update(c.x, c.z);
+    foamTimer -= dt;
+    if (foamTimer <= 0) { foamTimer = 0.4; water.updateFoam(c.x, c.z, rockView.stones); }
+    rain.update(); leaves.update(); shafts.update(c.x, c.z); birds.update(); insects.update(c.x, c.z);
+    hikers.update(dt, bike.x, bike.z);
     renderer.render(scene, camera);
 
     // HUD
@@ -234,6 +269,7 @@ async function boot() {
       if (slowT >= ADAPT_WINDOW_S && quality.id !== 'low' && !debug) {
         const next = quality.id === 'high' ? 'medium' : 'low';
         Object.assign(quality, QUALITY[next], { id: next });
+        terrain.setMaterial(groundFor(quality));
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatio)); resize();
         try { localStorage.setItem(QUALITY_KEY, next); } catch (error) { console.warn('[mtb] storage blocked', error); }
         perf.adapt++; slowT = 0;
@@ -253,7 +289,7 @@ async function boot() {
   document.documentElement.dataset.mtbReady = '1';
 
   window.__mtb = {
-    version: 'w1', renderer, scene, camera, field, surface, env, terrain, forest, trees, rider, quality, trail, centre, perf, data,
+    version: 'w2', renderer, scene, camera, field, surface, env, terrain, forest, trees, undergrowth, rocks, rockView, water, rider, rain, leaves, shafts, birds, insects, hikers, streams, maps, quality, trail, centre, perf, data,
     get bike() { return bike; },
     setBike(b) { bike = Object.freeze({ ...bike, ...b }); },
     reset, teleport(x, z, heading = bike.heading) { bike = createBikeState(x, z, heading, surface); chase.snap(bike); },

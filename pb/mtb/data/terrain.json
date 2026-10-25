@@ -1,33 +1,33 @@
 {
- "terrainBytes": 2915764,
+ "terrainBytes": 3184615,
  "terrain": {
   "nx": 2817,
-  "nz": 2817,
+  "nz": 3073,
   "step": 2.0,
   "quant": 0.1,
-  "checksum": 683719162825,
+  "checksum": 577186699377,
   "min": 166.6999969482422,
   "max": 383.29998779296875,
-  "despiked": 40
+  "despiked": 42
  },
- "farBytes": 223427,
+ "farBytes": 229096,
  "far": {
   "nx": 689,
-  "nz": 689,
+  "nz": 705,
   "step": 32.0,
   "margin": 8192.0,
   "quant": 0.25,
-  "checksum": 554092742383,
+  "checksum": 406346254895,
   "min": 153.5,
-  "max": 433.5
+  "max": 435.0
  },
- "canopyBytes": 562449,
+ "canopyBytes": 619933,
  "canopy": {
   "nx": 705,
-  "nz": 705,
+  "nz": 769,
   "step": 8.0,
-  "checksumHeight": 372608859598,
-  "checksumCover": 526885930003,
-  "meanCover": 0.39401172979226395
+  "checksumHeight": 197385887705,
+  "checksumCover": 771754110913,
+  "meanCover": 0.3971145726696732
  }
 }

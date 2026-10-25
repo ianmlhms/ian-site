@@ -8,7 +8,8 @@ const THREE = window.THREE;
 const RESELECT_DISTANCE = 4;          // m the rider moves before the tile set is re-evaluated
 const CACHE_LIMIT = 700;
 
-export function createTerrainView({ scene, surface, field, material, quality }) {
+export function createTerrainView({ scene, surface, field, material: initialMaterial, quality }) {
+  let material = initialMaterial;
   const group = new THREE.Group();
   group.name = 'mtb-terrain';
   scene.add(group);
@@ -25,6 +26,7 @@ export function createTerrainView({ scene, surface, field, material, quality }) 
     g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
     g.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3));
     g.setAttribute('aCover', new THREE.BufferAttribute(mesh.cover, 1));
+    g.setAttribute('aStream', new THREE.BufferAttribute(mesh.stream, 1));
     g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
     let lo = Infinity, hi = -Infinity;
     for (let i = 1; i < mesh.positions.length; i += 3) { const y = mesh.positions[i]; if (y < lo) lo = y; if (y > hi) hi = y; }
@@ -87,5 +89,8 @@ export function createTerrainView({ scene, surface, field, material, quality }) 
     return stats;
   }
 
-  return { group, update, buildAll, tiles, stats, dispose() { for (const t of tiles.values()) t.mesh.geometry.dispose(); } };
+  /** Swaps the ground shader of every tile (the cheaper one for the `low` quality level). */
+  function setMaterial(next) { material = next; for (const t of tiles.values()) t.mesh.material = next; }
+
+  return { group, update, buildAll, setMaterial, tiles, stats, dispose() { for (const t of tiles.values()) t.mesh.geometry.dispose(); } };
 }

@@ -2,7 +2,7 @@
  * reader, the Node harness an fs based one, so both run the same decoding code. */
 import { decodeGrid, decodeRle, gridChecksum } from './codec.js';
 
-const KIND_NAMES = ['trail', 'path', 'track', 'road'];
+const KIND_NAMES = ['trail', 'path', 'track', 'road', 'stream', 'river', 'ditch', 'cliff'];
 const FLAG_BRIDGE = 1;
 const FLAG_TUNNEL = 2;
 const DECIMETRE = 0.1;
@@ -74,6 +74,12 @@ export async function loadWorldData(read, onProgress = () => {}) {
   const classes = decodeRle(await read('classes.bin'));
   let landmarks = [];
   try { landmarks = await json('landmarks.json'); } catch (error) { console.warn('[mtb] landmarks.json missing', error); }
+  // W2 features: streams (flow direction = way direction), cliff lines (the drop is on the RIGHT of the way direction), forest leaf type, field ids
+  const streams = decodeWays(await read('streams.bin'), await json('streams.json'));
+  const cliffs = decodeWays(await read('cliffs.bin'), await json('cliffs.json'));
+  const falls = await json('falls.json');
+  const leaf = decodeRle(await read('leaf.bin'));
+  const fields = decodeRle(await read('fields.bin'));
   onProgress(1, 'done');
-  return { info, near, far, ways, trails, canopy, classes, landmarks };
+  return { info, near, far, ways, trails, canopy, classes, landmarks, streams, cliffs, falls, leaf, fields };
 }

@@ -22,7 +22,7 @@ export function createHeightField({ near, far, ways }) {
     const g = groundHeight(x, z);
     network.carve(x, z, scratch);
     const c = scratch.coverage;
-    if (info) { info.coverage = c; info.way = scratch.way; }
+    if (info) { info.coverage = c; info.way = scratch.way; info.stream = scratch.stream; }
     return c <= 0 ? g : g * (1 - c) + scratch.bed * c;
   }
   /** The height a lattice of spacing `step` should show: coarse lattices cannot sample a 1 m wide path, so the carve fades out with the spacing.
@@ -31,12 +31,12 @@ export function createHeightField({ near, far, ways }) {
     if (step <= QUADTREE.carveFullStep) return height(x, z, info);
     const g = groundHeight(x, z);
     if (step >= QUADTREE.carveFadeStep) {
-      if (info) { network.carve(x, z, scratch); info.coverage = scratch.coverage; info.way = scratch.way; }
+      if (info) { network.carve(x, z, scratch); info.coverage = scratch.coverage; info.way = scratch.way; info.stream = 0; }
       return g;
     }
     const k = 1 - (step - QUADTREE.carveFullStep) / (QUADTREE.carveFadeStep - QUADTREE.carveFullStep);
     network.carve(x, z, scratch);
-    if (info) { info.coverage = scratch.coverage; info.way = scratch.way; }
+    if (info) { info.coverage = scratch.coverage; info.way = scratch.way; info.stream = scratch.stream * k; }
     const c = scratch.coverage * k;
     return c <= 0 ? g : g * (1 - c) + scratch.bed * c;
   }

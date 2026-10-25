@@ -8,7 +8,7 @@ import { CAMERA } from './config.js';
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 
-export function createChaseCamera(surface, collide = null) {
+export function createChaseCamera(surface, collide = null, pushOut = null) {
   let yaw = null;                       // smoothed heading the camera sits behind
   let fovNow = CAMERA.fov;
   let height = null;
@@ -31,7 +31,8 @@ export function createChaseCamera(surface, collide = null) {
     if (height === null) height = riderY;
     height += (riderY - height) * Math.min(1, dt * 5);        // vertical smoothing: no bobbing over bumps
     const dist = CAMERA.followDistance + Math.min(1.1, speed * 0.05);
-    const wantX = state.x - cy * dist, wantZ = state.z - sy * dist;
+    const rx = -sy, rz = cy;                                    // the rider's right (x east, z south)
+    const wantX = state.x - cy * dist + rx * CAMERA.sideOffset, wantZ = state.z - sy * dist + rz * CAMERA.sideOffset;
     const wantY = Math.max(height, riderY - 0.4) + CAMERA.followHeight + Math.min(0.5, speed * 0.015);
     // shorten the boom until every probe clears the ground
     const eyeX = state.x, eyeY = riderY + 1.1, eyeZ = state.z;
@@ -52,8 +53,17 @@ export function createChaseCamera(surface, collide = null) {
         px += hit.nx * hit.pen; pz += hit.nz * hit.pen;
       }
     }
-    out.x = px; out.y = Math.max(cyy, surface.height(px, pz) + CAMERA.minClearance); out.z = pz;
-    out.tx = state.x + cy * CAMERA.lookAhead; out.tz = state.z + sy * CAMERA.lookAhead; out.ty = riderY + 1.0;
+    let py = Math.max(cyy, surface.height(px, pz) + CAMERA.minClearance);
+    if (pushOut) {                      // crowns and rocks: push the ball out (a rock only counts while the camera is lower than its top)
+      for (let pass = 0; pass < 2; pass++) {
+        const hit = pushOut(px, py, pz, CAMERA.bodyRadius);
+        if (!hit) break;
+        px += hit.dx; py += hit.dy; pz += hit.dz;
+      }
+      py = Math.max(py, surface.height(px, pz) + CAMERA.minClearance);
+    }
+    out.x = px; out.y = py; out.z = pz;
+    out.tx = state.x + cy * CAMERA.lookAhead; out.tz = state.z + sy * CAMERA.lookAhead; out.ty = riderY + CAMERA.lookHeight;
     const targetFov = CAMERA.fov + clamp(speed - 6, 0, 16) * 0.85;
     fovNow += (targetFov - fovNow) * Math.min(1, dt * 2.5);
     out.fov = fovNow;

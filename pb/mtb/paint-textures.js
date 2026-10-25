@@ -2,6 +2,7 @@
  * All textures tile seamlessly (every stroke is drawn wrapped around the edges). Colours are display (sRGB) values: the whole game shades in
  * display space, which is what gives the soft gouache look. */
 import { createRng } from './noise.js';
+import { paintLeafAtlas } from './leaf-textures.js';
 
 const T = () => window.THREE;
 const TAU = Math.PI * 2;
@@ -161,7 +162,12 @@ export function createPaintTextures(renderer, quality) {
   noise.wrapS = noise.wrapT = THREE.RepeatWrapping;
   noise.magFilter = THREE.LinearFilter; noise.minFilter = THREE.LinearMipmapLinearFilter; noise.generateMipmaps = true;
   noise.colorSpace = THREE.NoColorSpace; noise.needsUpdate = true;
-  return { litter: make(litter(size, 11)), moss: make(moss(size, 12)), dirt: make(dirt(size, 13)), sandstone: make(sandstone(size, 14)), noise, size };
+  const atlas = paintLeafAtlas();
+  const leafAtlas = new THREE.DataTexture(atlas.data, atlas.width, atlas.height, THREE.RGBAFormat);
+  leafAtlas.wrapS = leafAtlas.wrapT = THREE.ClampToEdgeWrapping;
+  leafAtlas.magFilter = THREE.LinearFilter; leafAtlas.minFilter = THREE.LinearMipmapLinearFilter; leafAtlas.generateMipmaps = true;
+  leafAtlas.anisotropy = aniso; leafAtlas.colorSpace = THREE.NoColorSpace; leafAtlas.flipY = false; leafAtlas.needsUpdate = true;
+  return { litter: make(litter(size, 11)), moss: make(moss(size, 12)), dirt: make(dirt(size, 13)), sandstone: make(sandstone(size, 14)), noise, leafAtlas, size };
 }
 
 export { litter as drawLitter, moss as drawMoss, dirt as drawDirt, sandstone as drawSandstone };

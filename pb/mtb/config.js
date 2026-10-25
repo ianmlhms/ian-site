@@ -3,7 +3,7 @@
 
 export const WORLD = Object.freeze({
   width: 5632,              // m (x), 11 blocks of 512
-  depth: 5632,              // m (z), 11 blocks of 512
+  depth: 6144,              // m (z), 12 blocks of 512 (W2 added a row in the south: the Schiessentümpel lies at z 5785)
   block: 512,
   playInset: 192,           // the playable box is the world minus this border; beyond it an invisible wall turns the rider back
   featherDist: 128,         // the 2 m LiDAR grid fades into the 32 m distant-hills grid over this distance from its edge
@@ -42,6 +42,11 @@ export const WAY_KINDS = Object.freeze({
   path: { halfWidth: 0.4, width: 1.7, berm: false, spacing: 1.5 },
   track: { halfWidth: 1.5, width: 3.8, berm: false, spacing: 2 },
   road: { halfWidth: 2.8, width: 5.6, berm: false, spacing: 2 },
+  /* W2 water: the way is a channel carved into the ground (bed = smoothed ground - depth, never rising along the flow); `waterDepth` is how
+   * deep the water stands in it. Streams do not berm and follow the cross slope only a little (a water surface is level). */
+  stream: { halfWidth: 0.55, width: 2.6, berm: false, spacing: 1.5, depth: 0.5, waterDepth: 0.22, tiltScale: 0.3, flow: true },
+  river: { halfWidth: 1.7, width: 5.4, berm: false, spacing: 2, depth: 0.7, waterDepth: 0.34, tiltScale: 0.25, flow: true },
+  ditch: { halfWidth: 0.3, width: 1.5, berm: false, spacing: 1.5, depth: 0.22, waterDepth: 0.08, tiltScale: 0.3, flow: true },
 });
 
 export const CARVE = Object.freeze({
@@ -64,20 +69,22 @@ export const SURFACE = Object.freeze({
 });
 
 export const QUALITY = Object.freeze({
-  low: { pixelRatio: 1, lodScale: 0.6, treeRadius: 90, treeDensity: 0.45, shadows: false, far: 5200 },
-  medium: { pixelRatio: 1.25, lodScale: 0.8, treeRadius: 150, treeDensity: 0.7, shadows: false, far: 7000 },
-  high: { pixelRatio: 2, lodScale: 1, treeRadius: 220, treeDensity: 1, shadows: true, far: 9000 },
+  low: { pixelRatio: 1, lodScale: 0.6, treeRadius: 90, treeDensity: 0.45, nearTree: 36, midTree: 62, groundCover: 40, fernRadius: 30, shrubRadius: 40, rockRadius: 90, rockNear: 40, tuftRadius: 0, lifeDetail: 0.4, shadows: false, far: 5200, cheapGround: true },
+  medium: { pixelRatio: 1.25, lodScale: 0.8, treeRadius: 150, treeDensity: 0.7, nearTree: 50, midTree: 105, groundCover: 62, fernRadius: 48, shrubRadius: 62, rockRadius: 140, rockNear: 55, tuftRadius: 16, lifeDetail: 0.7, shadows: false, far: 7000, cheapGround: false },
+  high: { pixelRatio: 2, lodScale: 1, treeRadius: 220, treeDensity: 1, nearTree: 62, midTree: 135, groundCover: 90, fernRadius: 70, shrubRadius: 90, rockRadius: 190, rockNear: 70, tuftRadius: 24, lifeDetail: 1, shadows: true, far: 9000, cheapGround: false },
 });
 
 export const CAMERA = Object.freeze({
   fov: 62,
   near: 0.1,
-  followDistance: 3.6,
-  followHeight: 1.65,
-  lookAhead: 1.2,
+  followDistance: 4.1,
+  followHeight: 2.15,       // higher than W1: the trail ahead stays in view over the rider
+  sideOffset: 0.55,         // m to the rider's right: the rider is not exactly in the middle of the picture
+  lookAhead: 5.5,           // the camera looks this far ahead along the heading
+  lookHeight: 1.0,          // ... at this height above the rider's ground
   minClearance: 0.55,       // the camera never gets closer than this to the ground (m)
   clearanceProbe: 6,        // ground probes along the camera boom
-  bodyRadius: 0.55,         // the camera is a ball of this radius: it never sits inside a trunk
+  bodyRadius: 0.55,         // the camera is a ball of this radius: it never sits inside a trunk, a crown or a rock
 });
 
 /* Bike physics (SI units). One rider + bike point mass on the physics surface; see DESIGN.md section 6. */

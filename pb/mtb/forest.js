@@ -1,19 +1,31 @@
-/* Tree placement: deterministic, per 32 m block, from the LiDAR canopy (height, cover) and the land-cover maps. Pure (no THREE): the browser draws the
- * result, the harness checks that no tree stands on a trail. A block always gives the same trees, so nothing pops when it is built again. */
+/* Tree placement: deterministic, per 32 m block, from the LiDAR canopy (height, cover), the land-cover maps and the OSM leaf type. Pure (no THREE): the browser draws
+ * the result, the harness checks that no tree stands on a way. A block always gives the same trees, so nothing pops when it is built again.
+ *   species: beech and oak (broadleaf, the real Mullerthal), spruce ONLY where OSM says needle forest (leaf_type) or mixed forest (some), saplings under the canopy. */
 import { QUADTREE } from './config.js';
 import { createRng, fbm } from './noise.js';
-import { sampleWorldMap } from './world-map.js';
+import { sampleWorldMap, sampleFieldCell } from './world-map.js';
 
 export const BLOCK = QUADTREE.minSize;
 const CANDIDATES = 6;                    // candidate trees per side of a block (5.3 m apart before the jitter)
+const SAPLING_CANDIDATES = 5;
 const JITTER = 2.3;
 const HEIGHT_MIN = 5, HEIGHT_MAX = 36;
-const CONIFER_NOISE_SCALE = 260;
-export const SPECIES = Object.freeze({ beech: 0, spruce: 1 });
+const SAPLING_HEIGHT_MIN = 1.6, SAPLING_HEIGHT_MAX = 5.5;
+const OAK_NOISE_SCALE = 170;
+export const SPECIES = Object.freeze({ beech: 0, spruce: 1, oak: 2, sapling: 3 });
+export const LEAF = Object.freeze({ unknown: 0, broadleaved: 1, needleleaved: 2, mixed: 3 });
+const spruceShare = [0.03, 0.03, 0.92, 0.5];     // by leaf type: the share of the trees that are spruces
 const scratch = { grass: 0, built: 0, water: 0, rock: 0, cover: 0, height: 0, wet: 0 };
+const cell = { field: 0, leaf: 0, hedge: 0 };
 const nrm = { x: 0, y: 1, z: 0 };
 
-export const TRUNK_RADIUS_PER_METRE = 0.0115;      // trunk base radius = this * tree height (the model's unit trunk is 0.0115 wide)
+/** Collision shape per species: trunk radius per metre of height, and the crown ellipsoid (centre height, horizontal radius, half height; all per metre of height). */
+export const SHAPES = Object.freeze([
+  { trunk: 0.0135, crownY: 0.74, crownR: 0.235, crownH: 0.26 },   // beech
+  { trunk: 0.0105, crownY: 0.58, crownR: 0.15, crownH: 0.4 },     // spruce
+  { trunk: 0.016, crownY: 0.7, crownR: 0.34, crownH: 0.3 },       // oak
+  { trunk: 0.012, crownY: 0.62, crownR: 0.3, crownH: 0.38 },      // sapling
+]);
 export const STRIDE = 6;
 
 /** Trees of block (bx, bz): Float32Array stride 6 [x, y, z, height, species, seed]. `clearance(x, z)` returns the way coverage (0..1) at a point.
@@ -21,11 +33,11 @@ export const STRIDE = 6;
 export function treesOfBlock(bx, bz, { map, surface, clearance }) {
   const rng = createRng((bx * 73856093) ^ (bz * 19349663) ^ 0x5bd1e995);
   const out = [];
-  const x0 = bx * BLOCK, z0 = bz * BLOCK, cell = BLOCK / CANDIDATES;
+  const x0 = bx * BLOCK, z0 = bz * BLOCK, step = BLOCK / CANDIDATES;
   for (let j = 0; j < CANDIDATES; j++) {
     for (let i = 0; i < CANDIDATES; i++) {
-      const x = x0 + (i + 0.5) * cell + (rng() - 0.5) * 2 * JITTER, z = z0 + (j + 0.5) * cell + (rng() - 0.5) * 2 * JITTER;
-      const roll = rng(), sizeRoll = rng(), seed = rng();
+      const x = x0 + (i + 0.5) * step + (rng() - 0.5) * 2 * JITTER, z = z0 + (j + 0.5) * step + (rng() - 0.5) * 2 * JITTER;
+      const roll = rng(), sizeRoll = rng(), seed = rng(), speciesRoll = rng();
       const m = sampleWorldMap(map, x, z, scratch);
       let chance = m.cover * (1 - m.built) * (1 - m.water);
       if (m.grass > 0.5 && m.cover < 0.4) chance = 0.02 * m.grass;               // an orchard tree, a hedge tree in a meadow
@@ -37,14 +49,31 @@ export function treesOfBlock(bx, bz, { map, surface, clearance }) {
       if (nrm.y < 0.62 && rng() < 0.8) continue;                                     // cliffs carry few trees
       const baseHeight = m.height > 4 ? m.height : 9 + sizeRoll * 5;
       const height = Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, baseHeight * (0.82 + sizeRoll * 0.4)));
-      const conifer = fbm(x, z, CONIFER_NOISE_SCALE, 2, 9) > 0.22 + 0.2 * (1 - m.wet);
-      out.push(x, y, z, height, conifer ? SPECIES.spruce : SPECIES.beech, seed);
+      sampleFieldCell(map, x, z, cell);
+      let species = SPECIES.beech;
+      if (speciesRoll < spruceShare[cell.leaf]) species = SPECIES.spruce;
+      else if (fbm(x, z, OAK_NOISE_SCALE, 2, 5) > 0.16 + 0.3 * m.wet) species = SPECIES.oak;
+      out.push(x, y, z, height, species, seed);
+    }
+  }
+  // saplings: young trees in the gaps and under the canopy (never in meadows, never on a way)
+  const sstep = BLOCK / SAPLING_CANDIDATES;
+  for (let j = 0; j < SAPLING_CANDIDATES; j++) {
+    for (let i = 0; i < SAPLING_CANDIDATES; i++) {
+      const x = x0 + (i + 0.5) * sstep + (rng() - 0.5) * sstep * 0.9, z = z0 + (j + 0.5) * sstep + (rng() - 0.5) * sstep * 0.9;
+      const roll = rng(), sizeRoll = rng(), seed = rng();
+      const m = sampleWorldMap(map, x, z, scratch);
+      const chance = m.cover * (1 - m.built) * (1 - m.water) * (1 - m.grass) * (1 - m.rock) * 0.55;
+      if (roll > chance || clearance(x, z) > 0.04) continue;
+      surface.normal(x, z, nrm);
+      if (nrm.y < 0.7) continue;
+      out.push(x, surface.height(x, z), z, SAPLING_HEIGHT_MIN + sizeRoll * (SAPLING_HEIGHT_MAX - SAPLING_HEIGHT_MIN), SPECIES.sapling, seed);
     }
   }
   return Float32Array.from(out);
 }
 
-/** Cached tree blocks + trunk collision: the same index feeds the renderer, the bike and the camera. */
+/** Cached tree blocks + trunk and crown collision: the same index feeds the renderer, the bike and the camera. */
 export function createTreeIndex({ map, surface, clearance }) {
   const blocks = new Map();
   const LIMIT = 1200;
@@ -67,7 +96,7 @@ export function createTreeIndex({ map, surface, clearance }) {
         const t = block(bx, bz);
         for (let i = 0; i < t.length; i += STRIDE) {
           const dx = x - t[i], dz = z - t[i + 2];
-          const reach = r + t[i + 3] * TRUNK_RADIUS_PER_METRE;
+          const reach = r + t[i + 3] * SHAPES[t[i + 4]].trunk;
           const d2 = dx * dx + dz * dz;
           if (d2 >= reach * reach) continue;
           const d = Math.sqrt(d2) || 1e-6;
@@ -78,5 +107,28 @@ export function createTreeIndex({ map, surface, clearance }) {
     }
     return best > 0 ? out : null;
   }
-  return { block, collide, blocks };
+  /** Pushes a sphere (x, y, z, r) out of the crowns (ellipsoids): returns { dx, dy, dz } to ADD to the position, or null. Used by the camera (the bike never reaches a crown). */
+  function pushOutOfCrowns(x, y, z, r, out = { dx: 0, dy: 0, dz: 0 }) {
+    const reachMax = 14;
+    const bx0 = Math.floor((x - reachMax) / BLOCK), bx1 = Math.floor((x + reachMax) / BLOCK), bz0 = Math.floor((z - reachMax) / BLOCK), bz1 = Math.floor((z + reachMax) / BLOCK);
+    let best = 0;
+    for (let bz = bz0; bz <= bz1; bz++) {
+      for (let bx = bx0; bx <= bx1; bx++) {
+        const t = block(bx, bz);
+        for (let i = 0; i < t.length; i += STRIDE) {
+          const sh = SHAPES[t[i + 4]], h = t[i + 3];
+          const a = h * sh.crownR + r, b = h * sh.crownH + r;
+          const dx = x - t[i], dy = y - (t[i + 1] + h * sh.crownY), dz = z - t[i + 2];
+          if (Math.abs(dx) > a || Math.abs(dz) > a || Math.abs(dy) > b) continue;
+          const q = (dx * dx + dz * dz) / (a * a) + (dy * dy) / (b * b);
+          if (q >= 1) continue;
+          const s = 1 / Math.sqrt(Math.max(q, 1e-6)) - 1;           // radial projection onto the ellipsoid surface
+          const pen = Math.hypot(dx * s, dy * s, dz * s);
+          if (pen > best) { best = pen; out.dx = dx * s; out.dy = dy * s; out.dz = dz * s; }
+        }
+      }
+    }
+    return best > 0 ? out : null;
+  }
+  return { block, collide, pushOutOfCrowns, blocks };
 }

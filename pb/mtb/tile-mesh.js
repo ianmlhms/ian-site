@@ -19,18 +19,20 @@ export function computeTileNodes(leaf, surface, field) {
   const { x0, z0, step } = leaf;
   if (step === 1) {
     const b = surface.block(x0 / QUADTREE.minSize, z0 / QUADTREE.minSize);       // same lattice as the physics
-    return { h: b.h, cover: b.cover, shared: true };
+    return { h: b.h, cover: b.cover, stream: b.stream, shared: true };
   }
   const h = new Float32Array(APRON_SIDE * APRON_SIDE);
   const cover = new Float32Array(APRON_SIDE * APRON_SIDE);
-  const info = { coverage: 0, way: -1 };
+  const stream = new Float32Array(APRON_SIDE * APRON_SIDE);
+  const info = { coverage: 0, way: -1, stream: 0 };
   for (let j = 0; j < APRON_SIDE; j++) {
     for (let i = 0; i < APRON_SIDE; i++) {
       h[j * APRON_SIDE + i] = field.heightForStep(x0 + (i - 1) * step, z0 + (j - 1) * step, step, info);
       cover[j * APRON_SIDE + i] = info.coverage;
+      stream[j * APRON_SIDE + i] = info.stream;
     }
   }
-  return { h, cover, shared: false };
+  return { h, cover, stream, shared: false };
 }
 
 /** Value of the coarser tile T's edge polyline at the boundary point (x, z) (T's spacing grid is aligned to multiples of its step). */
@@ -80,12 +82,13 @@ export function stitchSignature(leaf, split) {
  */
 export function buildTileMesh(leaf, nodes, split, field) {
   const { x0, z0, step, size } = leaf;
-  const h = nodes.h, c = nodes.cover;
+  const h = nodes.h, c = nodes.cover, strm = nodes.stream;
   const vertexCount = SIDE * SIDE;
   const skirtVerts = 4 * SIDE;
   const positions = new Float32Array((vertexCount + skirtVerts) * 3);
   const normals = new Float32Array((vertexCount + skirtVerts) * 3);
   const cover = new Float32Array(vertexCount + skirtVerts);
+  const stream = new Float32Array(vertexCount + skirtVerts);
   const skirtDepth = QUADTREE.skirtDepth + QUADTREE.skirtPerStep * step;
   const stitchAt = new Map();
   for (const st of stitchesOf(leaf, split)) stitchAt.set(st.v, st);
@@ -102,7 +105,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
       const dhdz = (h[a + APRON_SIDE] - h[a - APRON_SIDE]) / (2 * step);
       const inv = 1 / Math.hypot(dhdx, 1, dhdz);
       normals[v * 3] = -dhdx * inv; normals[v * 3 + 1] = inv; normals[v * 3 + 2] = -dhdz * inv;
-      cover[v] = c[a];
+      cover[v] = c[a]; stream[v] = strm[a];
     }
   }
   // skirts: duplicate every boundary vertex lower down (order: north row, south row, west column, east column)
@@ -111,7 +114,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
   const addSkirt = (v) => {
     positions[sv * 3] = positions[v * 3]; positions[sv * 3 + 1] = positions[v * 3 + 1] - skirtDepth; positions[sv * 3 + 2] = positions[v * 3 + 2];
     normals[sv * 3] = normals[v * 3]; normals[sv * 3 + 1] = normals[v * 3 + 1]; normals[sv * 3 + 2] = normals[v * 3 + 2];
-    cover[sv] = cover[v];
+    cover[sv] = cover[v]; stream[sv] = stream[v];
     skirtOf[v] = sv++;
   };
   for (let i = 0; i <= CELLS; i++) addSkirt(i);
@@ -141,7 +144,7 @@ export function buildTileMesh(leaf, nodes, split, field) {
   for (let i = 0; i < CELLS; i++) wall(CELLS * SIDE + i + 1, CELLS * SIDE + i);             // south edge
   for (let j = 0; j < CELLS; j++) wall((j + 1) * SIDE, j * SIDE);                           // west edge
   for (let j = 0; j < CELLS; j++) wall(j * SIDE + CELLS, (j + 1) * SIDE + CELLS);           // east edge
-  return { positions, normals, cover, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
+  return { positions, normals, cover, stream, indices: indices.subarray(0, n), vertexCount: vertexCount + skirtVerts, gridVertexCount: vertexCount, signature: [...stitchAt.values()].map((st) => `${st.v}@${st.tile.key}`).join('|'), size, x0, z0, step };
 }
 
 /** Exact height of the built mesh (grid triangles only, no skirts) at a world point inside the tile, by vertical ray vs triangle. */

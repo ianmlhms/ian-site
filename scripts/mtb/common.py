@@ -28,10 +28,10 @@ OUT_DIR = os.path.join(REPO, "pb", "mtb", "data")
 for _d in (OSM_DIR, RAW_DIR, OUT_DIR):
     os.makedirs(_d, exist_ok=True)
 
-# ---- the world: a block grid of 512 m blocks (11 x 11 = 5.63 x 5.63 km) --------------------------------------------------
+# ---- the world: a block grid of 512 m blocks (11 x 12 = 5.63 x 6.14 km; W2 added a row in the south for the Schiessentümpel) --------------------------------------------------
 BLOCK = 512.0
 BLOCKS_X = 11
-BLOCKS_Z = 11
+BLOCKS_Z = 12
 WORLD_W = BLOCK * BLOCKS_X       # 5632 m
 WORLD_H = BLOCK * BLOCKS_Z       # 5632 m
 ORIGIN_E = 87900.0               # LUREF easting of x = 0   (west edge): Beaufort castle at x 550, Haller 310, Schiessentümpel 2000, Berdorf 5090, Hohllay 5040
@@ -43,7 +43,6 @@ _to_luref = Transformer.from_crs(4326, 2169, always_xy=True)
 _to_wgs = Transformer.from_crs(2169, 4326, always_xy=True)
 
 
-WGS_BOX = None  # set below: south, west, north, east of the world plus a margin (OSM queries)
 
 
 def lonlat_to_world(lon, lat):
@@ -95,21 +94,25 @@ def overpass(query, cache_name, tries=3):
 
 
 # OSM is fetched in two tiles because the first download (north) was done before the world was moved south: (south, west, north, east) in WGS84.
-OSM_TILES = {"": (49.7947, 6.2598, 49.8434, 6.3564), "_s": None}   # "_s" is filled in below
+OSM_TILES = {"": (49.7947, 6.2598, 49.8434, 6.3564), "_s": None, "_s2": None}   # "_s", "_s2" are filled in below
 
 
-def _wgs_box(margin=400.0):
+def _wgs_box(height, margin=400.0):
     lons, lats = [], []
-    for x, z in ((-margin, -margin), (WORLD_W + margin, -margin), (-margin, WORLD_H + margin), (WORLD_W + margin, WORLD_H + margin)):
+    for x, z in ((-margin, -margin), (WORLD_W + margin, -margin), (-margin, height + margin), (WORLD_W + margin, height + margin)):
         lo, la = world_to_lonlat(x, z)
         lons.append(lo)
         lats.append(la)
     return (round(min(lats), 4), round(min(lons), 4), round(max(lats), 4), round(max(lons), 4))
 
 
-WGS_BOX = _wgs_box()
-_s, _w, _n, _e = WGS_BOX
+# W1 box (5632 m deep): tiles "" and "_s" were downloaded for it. W2 adds one block row: the strip "_s2" continues south of "_s" (with 150 m overlap).
+_W1_DEPTH = 5632.0
+_s, _w, _n, _e = _wgs_box(_W1_DEPTH)
 OSM_TILES["_s"] = (_s, min(_w, 6.2598) - 0.0005, 49.7947 + 0.0004, max(_e, 6.3564) + 0.0005)       # the strip south of the first tile (and a little east)
+_s2, _w2, _n2, _e2 = _wgs_box(WORLD_H)
+WGS_BOX = (_s2, _w2, _n2, _e2)
+OSM_TILES["_s2"] = (_s2, min(_w2, 6.2598) - 0.0005, _s + 0.0004, max(_e2, 6.3564) + 0.0005)
 
 
 def load_osm(name):

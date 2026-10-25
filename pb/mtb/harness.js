@@ -14,15 +14,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadWorldData } from './world-data.js';
-import { createHeightField } from './heightfield.js';
-import { createSurface } from './surface.js';
+import { buildPureWorld } from './world-build.js';
 import { selectTiles, leafAt, tilesTouching, tileKey } from './quadtree.js';
 import { computeTileNodes, buildTileMesh, meshHeightAt } from './tile-mesh.js';
-import { createBikeState, advanceBike, groundResolver } from './bike.js';
+import { createBikeState, advanceBike } from './bike.js';
 import { createChaseCamera } from './camera.js';
 import { createRng } from './noise.js';
-import { buildWorldMap } from './world-map.js';
-import { createTreeIndex, TRUNK_RADIUS_PER_METRE, STRIDE } from './forest.js';
+import { STRIDE, SHAPES } from './forest.js';
 import { QUADTREE, WORLD, CAMERA } from './config.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -44,14 +42,9 @@ const t0 = Date.now();
 
 const read = async (name) => new Uint8Array(fs.readFileSync(path.join(DATA, name)));
 const data = await loadWorldData(read);
-const rideWays = data.ways.filter((w) => !w.bridge && !w.tunnel);
-const trailWays = data.trails.trails.flatMap((t) => t.ways);
-const field = createHeightField({ near: data.near, far: data.far, ways: [...rideWays, ...trailWays] });
-const surface = createSurface(field);
-const groundAt = groundResolver(field);
-const worldMap = buildWorldMap({ classes: data.classes, canopy: data.canopy, near: data.near });
-const clearanceAt = (() => { const info = { coverage: 0, way: -1 }; return (x, z) => { field.height(x, z, info); return info.coverage; }; })();
-const trees = createTreeIndex({ map: worldMap, surface, clearance: clearanceAt });
+const world = buildPureWorld(data);
+const { field, surface, groundAt, maps: worldMap, trees, clearance: clearanceAt } = world;
+const rideWays = world.ways, trailWays = world.trailWays;
 const camHit = { nx: 0, nz: 0, pen: 0 }, bikeHit = { nx: 0, nz: 0, pen: 0 };
 const physicsEnv = { gripScale: 1, collide: (x, z, r) => trees.collide(x, z, r, bikeHit) };
 
@@ -407,11 +400,12 @@ section('H forest');
       for (let k = 0; k < 6; k++) if (!Number.isFinite(t[i + k])) nonFinite++;
       field.height(t[i], t[i + 2], info);
       if (info.coverage > 0.04) onTrail++;
-      if (t[i + 3] > 38 || t[i + 3] < 4) tooTall++;
+      const lo = t[i + 4] === 3 ? 1.5 : 4;
+      if (t[i + 3] > 38 || t[i + 3] < lo) tooTall++;
       if (Math.abs(t[i + 1] - surface.height(t[i], t[i + 2])) > 1e-3) floating++;
     }
   }
-  check(`trees: finite, 4..38 m tall, standing on the ground (${treeCount.toLocaleString()} trees sampled)`, treeCount > 500 && nonFinite === 0 && tooTall === 0 && floating === 0, `${nonFinite} NaN, ${tooTall} bad heights, ${floating} floating`);
+  check(`trees: finite, 4..38 m tall (saplings 1.5+), standing on the ground (${treeCount.toLocaleString()} trees sampled)`, treeCount > 500 && nonFinite === 0 && tooTall === 0 && floating === 0, `${nonFinite} NaN, ${tooTall} bad heights, ${floating} floating`);
   check('no tree stands on a way (trail, path, track, road) in the sampled blocks', onTrail === 0, `${onTrail} trees on ways`);
   let blocked = 0, probes = 0;
   for (const t of trails) {

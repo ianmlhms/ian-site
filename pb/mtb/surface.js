@@ -22,12 +22,13 @@ export function createSurface(field) {
     if (b) { blocks.delete(k); blocks.set(k, b); return b; }      // refresh LRU order
     const h = new Float32Array(SIDE * SIDE);
     const cover = new Float32Array(SIDE * SIDE);          // how much of the way network shapes each node (0..1): feeds the ground shader
+    const stream = new Float32Array(SIDE * SIDE);         // how much of that is a water channel (0..1): feeds the stream-bed paint
     const x0 = bx * BLOCK, z0 = bz * BLOCK;
-    const info = { coverage: 0, way: -1 };
+    const info = { coverage: 0, way: -1, stream: 0 };
     for (let j = 0; j < SIDE; j++) {
-      for (let i = 0; i < SIDE; i++) { h[j * SIDE + i] = field.height(x0 + i - APRON, z0 + j - APRON, info); cover[j * SIDE + i] = info.coverage; }
+      for (let i = 0; i < SIDE; i++) { h[j * SIDE + i] = field.height(x0 + i - APRON, z0 + j - APRON, info); cover[j * SIDE + i] = info.coverage; stream[j * SIDE + i] = info.stream; }
     }
-    b = { bx, bz, x0, z0, h, cover, side: SIDE, apron: APRON };
+    b = { bx, bz, x0, z0, h, cover, stream, side: SIDE, apron: APRON };
     blocks.set(k, b);
     if (blocks.size > MAX_BLOCKS) blocks.delete(blocks.keys().next().value);
     return b;

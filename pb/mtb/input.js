@@ -19,7 +19,7 @@ export function createInput({ root, onAction }) {
     if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
     const code = e.code;
     if (Object.values(KEYS).some((list) => list.includes(code))) { e.preventDefault(); usedKeyboard = true; }
-    if (isDown) { if (!down.has(code)) { down.add(code); if (code === 'KeyR') onAction('reset'); if (code === 'KeyC') onAction('camera'); if (code === 'KeyT') onAction('time'); if (code === 'KeyG') onAction('weather'); if (code === 'KeyH') onAction('help'); } }
+    if (isDown) { if (!down.has(code)) { down.add(code); if (code === 'KeyR') onAction('reset'); if (code === 'KeyC') onAction('camera'); if (code === 'KeyT') onAction('time'); if (code === 'KeyG') onAction('weather'); if (code === 'KeyV') onAction('season'); if (code === 'KeyH') onAction('help'); } }
     else down.delete(code);
   };
   window.addEventListener('keydown', (e) => onKey(e, true));

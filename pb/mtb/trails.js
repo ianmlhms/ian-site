@@ -53,12 +53,25 @@ function gaussianSmooth(values, sigmaSamples) {
   return out;
 }
 
+/** The bed of a water channel: the smoothed ground minus the channel depth, never rising along the flow (the way direction is the flow direction;
+ *  a way that climbs overall is read backwards). `steps` (optional [{ at, drop, width }], `at` in metres along the way) turns a stretch into a cascade:
+ *  the height lost over the stretch is redistributed into sharp drops, so the ends of the stretch keep the terrain level (no trench). */
+export function channelBed(smoothed, depth, steps) {
+  const n = smoothed.length;
+  const down = smoothed[0] >= smoothed[n - 1];
+  const order = down ? [...smoothed.keys()] : [...smoothed.keys()].reverse();
+  const out = new Array(n);
+  let level = Infinity;
+  for (const i of order) { level = Math.min(level, smoothed[i] - depth); out[i] = level; }
+  return out;
+}
+
 /**
  * ways: [{ id, kind: 'trail'|'path'|'track'|'road', pts: [[x, z], ...] }]
  * baseHeight(x, z): the terrain without any way.
  */
 export function createTrailNetwork(ways, baseHeight) {
-  const px = [], pz = [], bed = [], tilt = [], nxArr = [], nzArr = [], berm = [], side = [], rad = [], inv = [], wayOf = [], sOf = [];
+  const px = [], pz = [], bed = [], tilt = [], nxArr = [], nzArr = [], berm = [], side = [], rad = [], inv = [], wayOf = [], sOf = [], water = [], isStream = [];
   const wayInfo = [];
   for (let wi = 0; wi < ways.length; wi++) {
     const way = ways[wi];
@@ -80,7 +93,8 @@ export function createTrailNetwork(ways, baseHeight) {
     }
     const nxs = tz.map((v) => v), nzs = tx.map((v) => -v);                 // normal = (tz, -tx)
     const ground = rs.x.map((x, i) => baseHeight(x, rs.z[i]));
-    const bedH = gaussianSmooth(ground, CARVE.bedSmoothing / kind.spacing);
+    let bedH = gaussianSmooth(ground, CARVE.bedSmoothing / kind.spacing);
+    if (kind.flow) bedH = channelBed(bedH, kind.depth, way.steps);
     // signed curvature (1/m): heading change per metre, smoothed over about +-4 m
     const heading = tx.map((v, i) => Math.atan2(tz[i], v));
     const turn = new Array(n).fill(0);
@@ -102,7 +116,7 @@ export function createTrailNetwork(ways, baseHeight) {
       px.push(rs.x[i]); pz.push(rs.z[i]);
       bed.push(bedH[i]);
       const bank = kind.berm ? Math.max(-CARVE.tiltMax, Math.min(CARVE.tiltMax, kappa[i] * 3.2)) : 0;     // banked towards the centre of the turn
-      const half = Math.max(-CARVE.tiltMax, Math.min(CARVE.tiltMax, crossS[i] * 0.5));                      // half-bench on a side hill
+      const half = Math.max(-CARVE.tiltMax, Math.min(CARVE.tiltMax, crossS[i] * (kind.tiltScale === undefined ? 0.5 : kind.tiltScale)));       // half-bench on a side hill (a channel follows the slope only a little)
       tilt.push(Math.max(-CARVE.tiltMax, Math.min(CARVE.tiltMax, half + bank)));
       nxArr.push(nxs[i]); nzArr.push(nzs[i]);
       const k = kind.berm ? Math.min(1, Math.abs(kappa[i]) / CARVE.bermCurvature) : 0;
@@ -112,11 +126,13 @@ export function createTrailNetwork(ways, baseHeight) {
       inv.push(kind.spacing / sref);
       wayOf.push(wi);
       sOf.push(sAlong);
+      water.push(kind.flow ? bedH[i] + kind.waterDepth : NaN);
+      isStream.push(kind.flow ? 1 : 0);
     }
     wayInfo.push({ id: way.id, kind: way.kind, first: px.length - n, count: n });
   }
   const count = px.length;
-  const P = { px: Float32Array.from(px), pz: Float32Array.from(pz), bed: Float32Array.from(bed), tilt: Float32Array.from(tilt), nx: Float32Array.from(nxArr), nz: Float32Array.from(nzArr), berm: Float32Array.from(berm), side: Int8Array.from(side), rad: Float32Array.from(rad), inv: Float32Array.from(inv), way: Int32Array.from(wayOf), s: Float32Array.from(sOf) };
+  const P = { px: Float32Array.from(px), pz: Float32Array.from(pz), bed: Float32Array.from(bed), tilt: Float32Array.from(tilt), nx: Float32Array.from(nxArr), nz: Float32Array.from(nzArr), berm: Float32Array.from(berm), side: Int8Array.from(side), rad: Float32Array.from(rad), inv: Float32Array.from(inv), way: Int32Array.from(wayOf), s: Float32Array.from(sOf), water: Float32Array.from(water), stream: Uint8Array.from(isStream) };
 
   // spatial hash (CSR): cell -> sample indices
   const cellOf = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
@@ -133,7 +149,7 @@ export function createTrailNetwork(ways, baseHeight) {
   /** Writes { coverage, bed, tilt... } for the point into `out`: coverage 0..1 (0: no way here) and the bed height there. */
   function carve(x, z, out) {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
-    let sum = 0, bedSum = 0, bermSum = 0, nearest = 1e9, nearestWay = -1;
+    let sum = 0, bedSum = 0, streamSum = 0, nearest = 1e9, nearestWay = -1;
     for (let dz = -1; dz <= 1; dz++) {
       for (let dx = -1; dx <= 1; dx++) {
         const list = cells.get(`${cx + dx},${cz + dz}`) || EMPTY;
@@ -149,13 +165,15 @@ export function createTrailNetwork(ways, baseHeight) {
           const off = lat * P.side[i] - CARVE.bermOffset;
           const bump = P.berm[i] > 0 ? P.berm[i] * Math.exp(-(off * off) / (2 * CARVE.bermSigma * CARVE.bermSigma)) : 0;
           sum += w;
+          if (P.stream[i]) streamSum += w;
           bedSum += w * (P.bed[i] + P.tilt[i] * lat + bump);
           if (r2 < nearest) { nearest = r2; nearestWay = P.way[i]; }
         }
       }
     }
-    if (sum <= 1e-6) { out.coverage = 0; out.bed = 0; out.way = -1; return out; }
+    if (sum <= 1e-6) { out.coverage = 0; out.bed = 0; out.way = -1; out.stream = 0; return out; }
     out.coverage = smoothstep(CARVE.coverLow, CARVE.coverHigh, Math.min(1, sum));
+    out.stream = out.coverage * (streamSum / sum);                      // how much of the shaping is a water channel (0..1): feeds the stream-bed paint
     out.bed = bedSum / sum;
     out.way = nearestWay;
     return out;
@@ -164,4 +182,4 @@ export function createTrailNetwork(ways, baseHeight) {
   return { carve, samples: P, count, ways: wayInfo };
 }
 
-export function createCarveScratch() { return { coverage: 0, bed: 0, way: -1 }; }
+export function createCarveScratch() { return { coverage: 0, bed: 0, way: -1, stream: 0 }; }

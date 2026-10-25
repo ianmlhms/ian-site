@@ -69,7 +69,7 @@ export const flow = {
       const m = window.__mtb;
       const rng = (() => { let s = 12345; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
       const poses = [];
-      const box = { x0: 192, x1: 5632 - 192, z0: 192, z1: 5632 - 192 };
+      const box = { x0: 192, x1: 5632 - 192, z0: 192, z1: 6144 - 192 };
       for (let i = 0; i < 12; i++) { const c = m.centre[Math.floor((i + 0.5) / 12 * m.centre.length)]; poses.push({ x: c[0], z: c[1], up: 1.7, yaw: rng() * 360, pitch: -8 + rng() * 14, kind: "trail" }); }
       for (let i = 0; i < 12; i++) { const c = m.centre[Math.floor((i + 0.5) / 12 * m.centre.length)]; poses.push({ x: c[0], z: c[1], up: 1.7, yaw: 90 + 40 * rng(), pitch: -20 - 20 * rng(), kind: "trail-down" }); }
       while (poses.length < N - 16) poses.push({ x: box.x0 + rng() * (box.x1 - box.x0), z: box.z0 + rng() * (box.z1 - box.z0), up: 1.6 + Math.pow(rng(), 2) * 120, yaw: rng() * 360, pitch: -45 + rng() * 50, kind: "random" });
