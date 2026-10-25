@@ -41,7 +41,7 @@ function stroke(ctx, x, y, len, wid, angle, color, alpha) {
 function litter(size, seed) {
   const rng = createRng(seed), c = canvas(size), ctx = c.getContext('2d');
   ctx.fillStyle = 'rgb(104,80,54)'; ctx.fillRect(0, 0, size, size);
-  const palette = [[138, 100, 60], [118, 86, 52], [152, 116, 70], [92, 70, 46], [166, 134, 86], [104, 92, 58], [124, 80, 52], [96, 98, 56]];
+  const palette = [[150, 100, 58], [126, 84, 50], [164, 116, 66], [96, 68, 44], [176, 136, 84], [112, 88, 56], [136, 80, 48], [104, 84, 52]];
   for (let i = 0; i < size * 2.6; i++) {
     const x = rng() * size, y = rng() * size, len = 3 + rng() * 9, wid = len * (0.35 + rng() * 0.3), a = rng() * TAU;
     const col = rgb(palette[(rng() * palette.length) | 0], 14, rng);

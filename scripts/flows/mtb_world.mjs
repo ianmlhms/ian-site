@@ -5,7 +5,8 @@ import { runIfMain } from "./lib.mjs";
 
 const PAGE = "/pb/mtb.html?debug=1&q=medium&time=noon&weather=clear";
 const DATA_BUDGET = 6 * 1024 * 1024;
-const BUDGET = { low: { calls: 130, tris: 330000 }, medium: { calls: 190, tris: 520000 }, high: { calls: 230, tris: 900000 } };
+/* W2 budgets: unchanged for medium and high; `low` gets 140 draw calls (was 130) for the forest / rock / water / rider sets, its triangles stay at 330 k (measured at the trail start: low 133 calls / 258 k, medium 147 / 433 k, high 166 / 774 k; the busiest gorge scenes reach about 1.0 M triangles on high). */
+const BUDGET = { low: { calls: 140, tris: 330000 }, medium: { calls: 190, tris: 520000 }, high: { calls: 230, tris: 900000 } };
 
 async function boot(h, url = PAGE) {
   await h.goto(url);

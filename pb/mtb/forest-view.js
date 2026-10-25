@@ -114,7 +114,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
     farBeech: [buildBlobTree('beech', 0), treeMat, 3600], farOak: [buildBlobTree('oak', 0), treeMat, 1800], farSpruce: [buildSpruce(0), treeMat, 1600],
     sapling: [buildSapling(0), lowMat, 900],
     fern: [buildFern(), lowMat, 2600], holly: [buildShrub('holly'), lowMat, 420], bramble: [buildShrub('bramble'), lowMat, 420], hedge: [buildHedge(), lowMat, 700],
-    tuft: [buildTuft(TILE_ID.grass), grassMat, 2400], herbs: [buildTuft(TILE_ID.herbs), grassMat, 700],
+    tuft: [buildTuft(TILE_ID.grass), grassMat, 3600], herbs: [buildTuft(TILE_ID.herbs), grassMat, 900],
     log: [buildLog(), deadMat, 120], stump: [buildStump(), deadMat, 80], root: [buildRoot(), deadMat, 160],
   };
   const sets = {};
@@ -148,7 +148,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
   const meadowScratch = { grass: 0, built: 0, water: 0, rock: 0, cover: 0, height: 0, wet: 0 };
   /** Grass tufts and herbs on a fixed world grid around the camera (so they never swim); the meadows only. */
   function fillTufts(cx, cz) {
-    const R = Q.tuftRadius, cs = 1.1;
+    const R = Q.tuftRadius, cs = 0.85;
     const i0 = Math.floor((cx - R) / cs), i1 = Math.floor((cx + R) / cs), j0 = Math.floor((cz - R) / cs), j1 = Math.floor((cz + R) / cs);
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
@@ -161,7 +161,7 @@ export function createForestView({ scene, trees, undergrowth, env, quality: Q, t
         if (meadow.clearance(x, z) > 0.03) continue;
         const k = hash2(i, j, 54), fade = 1 - Math.min(1, Math.max(0, (d - R * 0.65) / (R * 0.35)));
         if (fade <= 0.05) continue;
-        put(k < 0.18 ? 'herbs' : 'tuft', x, meadow.surface.height(x, z) - 0.02, z, (0.55 + hash2(i, j, 55) * 0.55) * fade, hash2(i, j, 56) * 6.283, k);
+        put(k < 0.18 ? 'herbs' : 'tuft', x, meadow.surface.height(x, z) - 0.02, z, (0.3 + hash2(i, j, 55) * 0.3) * fade, hash2(i, j, 56) * 6.283, k);
       }
     }
   }

@@ -75,7 +75,7 @@ export function channelBed(smoothed, depth, cascade) {
     for (let i = lo; i <= hi; i++) {
       const t = Math.abs(i - top) / Math.max(1, Math.abs(bottom - top));            // 0 at the top of the cascade, 1 at its foot
       const u = t * k, fl = Math.min(k - 1, Math.floor(u)), fr = u - fl;
-      const sm = Math.min(1, Math.max(0, (fr - 0.62) / 0.3));
+      const sm = Math.min(1, Math.max(0, (fr - 0.8) / 0.13));
       const stairs = (fl + sm * sm * (3 - 2 * sm)) / k;
       // plunge pool below every drop
       const pool = cascade.pool * Math.exp(-Math.pow((fr - 0.05) * (hi - lo) / k / 1.2, 2)) * (fl > 0 || fr > 0.7 ? 1 : 0);

@@ -1,6 +1,6 @@
 /* Draws the water: ribbon chunks (water.js) with an animated flowing shader (two scrolling noise normal layers, sky reflection by Fresnel, sun glint, foam on the
  * steep stretches, at the banks and around the stones), plus foam rings around the stones in the stream (instanced). Transparent, drawn after the ground. */
-import { buildWaterChunks } from './water.js';
+import { buildWaterChunks, findFalls } from './water.js';
 import { PAINT_LIGHT_GLSL } from './light-glsl.js';
 
 const THREE = window.THREE;
@@ -86,6 +86,42 @@ const FOAM_FRAGMENT = `
   }
 `;
 
+const FALL_VERTEX = `
+  attribute vec4 iPos; attribute vec4 iDir;            // x, bottom y, z, width ;  across.x, across.z, height, seed
+  varying vec2 vUv; varying vec3 vWorld; varying float vDist; varying float vSeed; varying float vH;
+  void main(){
+    vec3 across = vec3(iDir.x, 0.0, iDir.y);
+    vec3 world = vec3(iPos.x, iPos.y + (position.y + 0.5) * iDir.z, iPos.z) + across * position.x * iPos.w;
+    // the curtain bulges out over the lip and falls away from the wall
+    vec3 flow = normalize(cross(across, vec3(0.0, 1.0, 0.0)));
+    world += flow * sin((position.y + 0.5) * 1.57) * 0.0;
+    vUv = vec2(position.x + 0.5, position.y + 0.5); vWorld = world; vSeed = iDir.w; vH = iDir.z;
+    vec4 mv = viewMatrix * vec4(world, 1.0);
+    vDist = length(mv.xyz);
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+const FALL_FRAGMENT = `
+  precision highp float;
+  uniform sampler2D uNoise;
+  varying vec2 vUv; varying vec3 vWorld; varying float vDist; varying float vSeed; varying float vH;
+  ${PAINT_LIGHT_GLSL}
+  void main(){
+    float t = uTime;
+    float streak = texture2D(uNoise, vec2(vUv.x * 7.0 + vSeed * 9.0, vUv.y * 0.9 / max(vH, 0.5) * 2.0 - t * 1.4)).g;
+    float streak2 = texture2D(uNoise, vec2(vUv.x * 17.0 + 0.3, vUv.y * 1.6 / max(vH, 0.5) * 2.0 - t * 2.4)).b;
+    float body = smoothstep(0.42, 0.78, streak * 0.6 + streak2 * 0.5);
+    // the boulders on the lip split the water into separate streams (they stand at u = 0, 0.33, 0.67, 1)
+    float gaps = smoothstep(0.03, 0.1, abs(vUv.x - 0.0)) * smoothstep(0.03, 0.1, abs(vUv.x - 0.333)) * smoothstep(0.03, 0.1, abs(vUv.x - 0.667)) * smoothstep(0.03, 0.1, abs(vUv.x - 1.0));
+    float edge = gaps;
+    float lip = smoothstep(0.82, 1.0, vUv.y);
+    float foot = 1.0 - smoothstep(0.0, 0.2, vUv.y);
+    float a = clamp(0.35 + body * 0.6 + lip * 0.2 + foot * 0.4, 0.0, 0.95) * edge * (0.6 + 0.4 * body);
+    vec3 col = vec3(0.86, 0.92, 0.94) * (0.62 + 0.3 * uSunColor.g + 0.35 * uAmbSky.g) + vec3(0.0, 0.03, 0.04) * (1.0 - body);
+    gl_FragColor = vec4(applyFogW(col, vDist, vWorld.y), a);
+  }
+`;
+
 export function createWaterView({ scene, network, env, quality, stones = [] }) {
   const group = new THREE.Group();
   group.name = 'mtb-water';
@@ -121,11 +157,27 @@ export function createWaterView({ scene, network, env, quality, stones = [] }) {
   foam.frustumCulled = false; foam.renderOrder = 6; foam.name = 'water foam rings';
   group.add(foam);
 
+  // waterfalls: vertical white curtains where the stream drops (and a big foam ring where it lands)
+  const falls = findFalls(network);
+  const fq = new THREE.PlaneGeometry(1, 1);
+  const fgeo = new THREE.InstancedBufferGeometry();
+  fgeo.index = fq.index; fgeo.attributes = { ...fq.attributes };
+  const fPos = new Float32Array(Math.max(1, falls.length) * 4), fDir = new Float32Array(Math.max(1, falls.length) * 4);
+  falls.forEach((f, k) => { fPos.set([f.x, f.bottom, f.z, f.width], k * 4); fDir.set([f.nx, f.nz, f.top - f.bottom, (k * 0.137) % 1], k * 4); });
+  fgeo.setAttribute('iPos', new THREE.InstancedBufferAttribute(fPos, 4)); fgeo.setAttribute('iDir', new THREE.InstancedBufferAttribute(fDir, 4));
+  fgeo.instanceCount = falls.length;
+  fgeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+  const fallMat = new THREE.ShaderMaterial({ uniforms: { ...env.uniforms }, vertexShader: FALL_VERTEX, fragmentShader: FALL_FRAGMENT, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  const fallMesh = new THREE.Mesh(fgeo, fallMat);
+  fallMesh.frustumCulled = false; fallMesh.renderOrder = 7; fallMesh.name = 'waterfalls';
+  group.add(fallMesh);
+  const landings = falls.map((f) => ({ x: f.x - f.nz * 0.0, z: f.z, y: f.bottom, size: f.width * 0.62, seed: (f.x * 0.01) % 1 }));
+
   /** Foam rings for the stones near the camera: stones = list of { x, z, y (water level), size }. */
   function updateFoam(cx, cz, list) {
     let n = 0;
     const R = quality.rockNear * 1.2;
-    for (const s of list) {
+    for (const s of list.concat(landings)) {
       if (n >= FOAM_CAPACITY) break;
       if (Math.abs(s.x - cx) > R || Math.abs(s.z - cz) > R) continue;
       pos.array[n * 3] = s.x; pos.array[n * 3 + 1] = s.y + 0.02; pos.array[n * 3 + 2] = s.z;
@@ -134,5 +186,5 @@ export function createWaterView({ scene, network, env, quality, stones = [] }) {
     }
     fg.instanceCount = n; pos.needsUpdate = true; siz.needsUpdate = true;
   }
-  return { group, chunks, updateFoam, dispose() { for (const m of chunks.values()) m.geometry.dispose(); material.dispose(); fg.dispose(); foamMat.dispose(); } };
+  return { group, chunks, falls, updateFoam, dispose() { for (const m of chunks.values()) m.geometry.dispose(); material.dispose(); fg.dispose(); foamMat.dispose(); } };
 }

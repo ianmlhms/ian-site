@@ -163,7 +163,25 @@ export function rocksOfBlock(bx, bz, ctx) {
       const y = s.water - size * 0.35;
       let worst = 0;                                                                    // the stone's foot must reach below the channel floor all around it
       for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
-      out.push(x, y, z, rng() * 6.283, 0, size * 1.1, size * 0.75, size * 0.9, Math.max(0.4, worst + 0.3), KIND.stone, rng(), y + size * 0.7);
+      if (worst + 0.3 > MAX_SINK) continue;
+      out.push(x, y, z, rng() * 6.283, 0, size * 1.1, size * 0.75, size * 0.9, Math.max(0.4, worst + 0.3), KIND.stone, 3 + rng(), y + size * 0.7);
+    }
+  }
+  // ---- mossy boulders on the lip of every waterfall (the water pours over and between them)
+  if (ctx.falls) {
+    for (const f of ctx.falls) {
+      if (Math.floor(f.x / BLOCK) !== bx || Math.floor(f.z / BLOCK) !== bz) continue;
+      for (const t0 of [-0.5, -0.17, 0.17, 0.5, -0.36, 0.33]) {
+        const inPool = Math.abs(t0) > 0.3 && t0 !== -0.5 && t0 !== 0.5;                     // two extra stones lie below the lip, in the pool
+        const t = t0 + (rng() - 0.5) * 0.08, size = (inPool ? 0.8 : 1.15) + rng() * 0.8, lat = t * f.width;
+        const along = (inPool ? -1.9 : 0) + (rng() - 0.5) * 1.3;                            // along the flow (the curtain's normal)
+        const fx = -f.nz, fz = f.nx;
+        const x = f.x + f.nx * lat + fx * along, z = f.z + f.nz * lat + fz * along, y = (inPool ? f.bottom : f.top) - size * 0.42;
+        let worst = 0;
+        for (let a = 0; a < 8; a++) worst = Math.max(worst, y - surface.height(x + Math.cos(a * Math.PI / 4) * size * 0.62, z + Math.sin(a * Math.PI / 4) * size * 0.62));
+        if (worst + 0.35 > MAX_SINK) continue;
+        out.push(x, y, z, rng() * 6.283, 0, size * (1.0 + rng() * 0.25), size * 0.85, size * 1.0, Math.max(0.5, worst + 0.35), KIND.stone, 3 + rng(), y + size * 0.8);
+      }
     }
   }
   return Float32Array.from(out);

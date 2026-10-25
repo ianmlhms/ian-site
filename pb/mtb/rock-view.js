@@ -49,7 +49,7 @@ const FRAGMENT = `
     float band = P.y * 4.6 + nA * 5.0;
     float layer = floor(band / 6.2832);
     float tone = texture2D(uNoise, vec2(layer * 0.37 + 0.11, vSeed * 0.5)).g;
-    vec3 pale = vec3(0.78, 0.67, 0.5), ochre = vec3(0.74, 0.55, 0.36), rusty = vec3(0.64, 0.42, 0.27);
+    vec3 pale = vec3(0.64, 0.61, 0.5), ochre = vec3(0.6, 0.53, 0.38), rusty = vec3(0.5, 0.41, 0.3);
     vec3 rockC = mix(mix(pale, ochre, smoothstep(0.2, 0.55, tone)), rusty, smoothstep(0.6, 0.9, tone));
     rockC *= 0.72 + 0.5 * (grain.r + grain.g) * 0.5;
     float strata = sin(band) * 0.5 + 0.5;
@@ -65,26 +65,27 @@ const FRAGMENT = `
     rockC *= 1.0 - 0.16 * pits;
     // dark water streaks running down the face
     float streak = texture2D(uNoise, vec2((P.x + P.z) * 0.8, P.y * 0.03)).g;
-    rockC *= 1.0 - 0.28 * smoothstep(0.6, 0.9, streak) * (1.0 - w.y);
+    rockC *= 1.0 - 0.45 * smoothstep(0.55, 0.85, streak) * (1.0 - w.y);
     // moss: on the ledges (up-facing), on the damp foot, in the hollows
     vec3 mossC = mix(texture2D(uMoss, P.xz * 0.1 + P.y * 0.05).rgb, vec3(0.34, 0.5, 0.2), 0.45) * 1.05;
     float mossN = texture2D(uNoise, P.xz * 0.045 + P.y * 0.035).g * 0.65 + texture2D(uNoise, P.xz * 0.11 + P.y * 0.08).b * 0.35;
     float moss = smoothstep(0.5, 0.95, N.y) * 0.7 + (1.0 - smoothstep(0.1, 1.4, vLocalY)) * 0.45 + pits * 0.2;
-    moss = clamp(moss * smoothstep(0.3, 0.8, mossN + 0.05 + uWet * 0.25), 0.0, 0.75);
+    moss = clamp(moss * smoothstep(0.25, 0.7, mossN + 0.1 + uWet * 0.25), 0.0, 0.85);
     vec3 albedo = mix(rockC, mossC, moss) * mix(vec3(1.0), vColor, 0.7) * 1.12;
-    if (vSeed > 1.5) {                                   // dressed masonry (the footbridge): courses of blocks with mortar joints, moss on the damp foot and the top
+    if (abs(vSeed - 2.0) < 0.01) {                       // old rough masonry (the footbridge): irregular courses, dark wet stone, moss and ivy
       float across = abs(N.z) > 0.5 ? vMP.x : vMP.z;
-      float row = floor(vMP.y / 0.28);
-      float col = across / 0.62 + mod(row, 2.0) * 0.5;
-      vec2 f = vec2(fract(col), fract(vMP.y / 0.28));
-      float joint = 1.0 - smoothstep(0.0, 0.07, min(min(f.x, 1.0 - f.x) * 0.62 * 0.5, min(f.y, 1.0 - f.y) * 0.28 * 0.5) * 6.0);
+      float row = floor(vMP.y / 0.32 + 0.35 * sin(across * 0.9));
+      float col = across / 0.7 + fract(sin(row * 7.1) * 43758.5) * 3.0;
+      vec2 f = vec2(fract(col), fract(vMP.y / 0.32 + 0.35 * sin(across * 0.9)));
+      float joint = 1.0 - smoothstep(0.0, 0.1, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)) * 1.1);
       float h = fract(sin((floor(col) + row * 17.0) * 12.9898) * 43758.5453);
-      vec3 stone = mix(vec3(0.66, 0.6, 0.5), vec3(0.78, 0.68, 0.52), h);
-      stone *= 0.9 + 0.16 * texture2D(uNoise, vMP.xy * 0.9 + vMP.zz * 0.3).g;
-      albedo = mix(stone, mossC * 0.9, clamp(moss * 1.2 + (1.0 - smoothstep(0.0, 1.8, vMP.y + 2.2)) * 0.5 * mossN, 0.0, 0.8));
-      albedo *= 1.0 - 0.45 * joint;
+      vec3 stone = mix(vec3(0.34, 0.36, 0.32), vec3(0.5, 0.46, 0.38), h);
+      stone *= 0.8 + 0.3 * texture2D(uNoise, vMP.xy * 1.3 + vMP.zz * 0.4).g;
+      float ivy = smoothstep(0.35, 0.65, texture2D(uNoise, vMP.xy * 0.35 + 0.2).b + 0.25 * (1.0 - smoothstep(0.0, 2.2, vMP.y + 2.2)));
+      albedo = mix(stone, mossC * vec3(0.75, 0.95, 0.65), clamp(0.35 + ivy * 0.55 + moss * 0.5, 0.0, 0.88));
+      albedo *= 1.0 - 0.5 * joint;
     }
-    albedo *= 1.0 - 0.22 * uWet;
+    if (vSeed > 2.5) { albedo = mix(rockC * 0.5, mossC * vec3(0.7, 0.9, 0.62), 0.8) * 0.85; albedo *= 0.85 + 0.3 * texture2D(uNoise, P.xz * 0.6 + P.y).g; }      // stones in the water: dark, wet, mossy
     // small normal wobble so the faces are not glassy
     vec2 dn = texture2D(uNoise, P.xz * 0.9 + P.y * 0.6).gb - 0.5;
     N = normalize(N + vec3(dn.x, dn.y * 0.5, dn.y) * 0.16 * (1.0 - smoothstep(30.0, 90.0, vDist)));

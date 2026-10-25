@@ -15,12 +15,12 @@ import { createRng, valueNoise } from './noise.js';
 import { TILE_ID, tileRect } from './leaf-textures.js';
 
 const THREE = window.THREE;
-const BEECH_BARK = [0.62, 0.6, 0.55];
+const BEECH_BARK = [0.56, 0.58, 0.52];
 const OAK_BARK = [0.44, 0.38, 0.31];
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const SPECIES_STYLE = Object.freeze({
-  beech: { bark: BEECH_BARK, fork: 0.5, crownR: 0.235, trunkR: 0.0118, limbs: 5, tile: TILE_ID.beech, tint: [1.0, 1.0, 0.94], clusterSize: 0.1, lean: 0.01 },
-  oak: { bark: OAK_BARK, fork: 0.34, crownR: 0.34, trunkR: 0.0135, limbs: 6, tile: TILE_ID.oak, tint: [0.96, 0.98, 0.86], clusterSize: 0.105, lean: 0.03 },
+  beech: { bark: BEECH_BARK, fork: 0.5, crownR: 0.235, trunkR: 0.0148, limbs: 5, tile: TILE_ID.beech, tint: [1.0, 1.0, 0.94], clusterSize: 0.1, lean: 0.03 },
+  oak: { bark: OAK_BARK, fork: 0.34, crownR: 0.34, trunkR: 0.0175, limbs: 6, tile: TILE_ID.oak, tint: [0.96, 0.98, 0.86], clusterSize: 0.105, lean: 0.03 },
 });
 
 function barkColor(species, rng) {
@@ -75,7 +75,7 @@ export function buildBroadleaf(species, variant, detail) {
     const t = i / (rings - 1);
     const yy = -0.012 + (fork.y + 0.012) * t;
     pts.push(V3(fork.x * t * t, yy, fork.z * t * t));
-    radii.push(style.trunkR * (1 + 0.85 * Math.exp(-(yy + 0.012) / 0.03)) * (1 - 0.34 * t));
+    radii.push(style.trunkR * (1 + 1.0 * Math.exp(-(yy + 0.012) / 0.035)) * (1 - 0.26 * t));
   }
   const tr = tube(pts, radii, detail === 0 ? 9 : 6, true);
   b.addArrays(tr.pos, tr.nor, tr.idx, (v, n, i) => bark(v, n, i));
@@ -112,11 +112,11 @@ export function buildBroadleaf(species, variant, detail) {
   }
   // --- leaf clusters: at the limb ends, along the limbs, and scattered through the crown volume
   const size = style.clusterSize;
-  const cards = detail === 0 ? 8 : 3;
+  const cards = detail === 0 ? 7 : 3;
   const cardSize = detail === 0 ? size : size * 1.45;
   for (const e of ends) addCluster(b, rng, e, cardSize, cards, crown, style);
   if (detail === 0) for (const m of mids) addCluster(b, rng, m, cardSize * 0.9, cards, crown, style);
-  const fill = detail === 0 ? 11 : 3;
+  const fill = detail === 0 ? 9 : 3;
   for (let i = 0; i < fill; i++) {
     const a = rng() * 6.28, rr = Math.sqrt(rng()) * style.crownR * 0.9, yy = crown.cy + (rng() - 0.35) * crownH * 0.6;
     addCluster(b, rng, V3(crown.cx + Math.cos(a) * rr, yy, crown.cz + Math.sin(a) * rr), cardSize, cards, crown, style, 0.95);
@@ -193,8 +193,8 @@ export function buildTuft(tile = TILE_ID.grass) {
   for (let k = 0; k < 3; k++) {
     const a = (k / 3) * Math.PI + rng() * 0.3, dir = V3(Math.cos(a), 0, Math.sin(a));
     const q = card(V3(0, 0.5, 0), dir, V3(0, 1, 0), 0.5, 0.5, V3(0, 1, 0), rect);
-    const tint = [0.9 + rng() * 0.2, 0.92 + rng() * 0.16, 0.8 + rng() * 0.2];
-    b.addArrays(q.pos, q.nor, q.idx, (v) => [tint[0] * (0.62 + 0.5 * v.y), tint[1] * (0.62 + 0.5 * v.y), tint[2] * (0.6 + 0.3 * v.y)], q.uvs, tile + rng() * 0.49);
+    const tint = [1.05 + rng() * 0.2, 1.1 + rng() * 0.16, 0.9 + rng() * 0.2];
+    b.addArrays(q.pos, q.nor, q.idx, (v) => [tint[0] * (0.8 + 0.5 * v.y), tint[1] * (0.8 + 0.5 * v.y), tint[2] * (0.75 + 0.3 * v.y)], q.uvs, tile + rng() * 0.49);
   }
   return b.build();
 }
@@ -205,7 +205,7 @@ export function buildHedge() {
   const b = new Builder();
   const crown = { cx: 0, cy: 0.5, cz: 0, rad: 0.7 };
   const style = { tile: TILE_ID.shrub, tint: [1.0, 1.05, 0.88] };
-  for (let i = 0; i < 6; i++) addCluster(b, rng, V3((i / 5 - 0.5) * 1.1, 0.35 + rng() * 0.5, (rng() - 0.5) * 0.3), 0.42, 4, crown, style, 1);
+  for (let i = 0; i < 6; i++) addCluster(b, rng, V3((i / 5 - 0.5) * 1.1, 0.3 + rng() * 0.4, (rng() - 0.5) * 0.3), 0.4, 4, crown, style, 1.25);
   return b.build();
 }
 
@@ -260,11 +260,11 @@ export function buildBlobTree(species, detail) {
   const b = new Builder();
   const style = SPECIES_STYLE[species];
   const fork = style.fork;
-  const trunkG = new THREE.CylinderGeometry(style.trunkR * 0.7, style.trunkR * 1.05, fork + 0.2, 5, 1, true).translate(0, (fork + 0.2) / 2 - 0.02, 0);
+  const trunkG = new THREE.CylinderGeometry(style.trunkR * 0.7, style.trunkR * 1.05, fork + 0.2, 4, 1, true).translate(0, (fork + 0.2) / 2 - 0.02, 0);
   const bark = barkColor(species, rng);
   b.add(trunkG.toNonIndexed(), M(0, 0, 0), (v, n, i) => bark(v, n, i));
   const cy = fork + (1 - fork) * 0.5, r = style.crownR * 1.35, h = (1 - fork) * 0.5;
-  const crowns = [[0, cy, 0, r], [r * 0.5, cy - h * 0.25, 0.1 * r, r * 0.72], [-r * 0.45, cy - h * 0.1, -0.2 * r, r * 0.74]];
+  const crowns = detail === 0 ? [[0, cy, 0, r * 1.05], [r * 0.55, cy - h * 0.25, 0.1 * r, r * 0.7]] : [[0, cy, 0, r], [r * 0.5, cy - h * 0.25, 0.1 * r, r * 0.72], [-r * 0.45, cy - h * 0.1, -0.2 * r, r * 0.74]];
   const green = tint3(species === 'oak' ? [0.3, 0.44, 0.16] : [0.32, 0.5, 0.18], rng, 0.4);
   for (const [x, y, z, rad] of crowns) {
     const geo = blob(rad, 0, 0.45, 0.78);
@@ -298,7 +298,7 @@ export function buildSpruce(detail) {
   const tiers = detail === 1 ? 6 : 10, per = detail === 1 ? 6 : 8;
   for (let t = 0; t < tiers; t++) {
     const f = t / (tiers - 1), y = 0.22 + f * 0.74;
-    const reach = (0.15 * Math.pow(1 - f, 0.9) + 0.02) * (detail === 1 ? 1.1 : 1.0);
+    const reach = (0.105 * Math.pow(1 - f, 0.9) + 0.015) * (detail === 1 ? 1.1 : 1.0);
     const a0 = rng() * 6.28;
     for (let k = 0; k < per; k++) {
       const az = a0 + (k / per) * 6.28 + (rng() - 0.5) * 0.3;
@@ -308,7 +308,7 @@ export function buildSpruce(detail) {
       const centre = V3(dir.x * len * 0.5, y + dir.y * len * 0.5, dir.z * len * 0.5);
       const right = V3(-dir.z, 0, dir.x).normalize();
       const ln = V3(dir.x * 0.4, 0.8, dir.z * 0.4).normalize();
-      const q = card(centre, right, dir, len * 0.62, len * 0.5, ln, rect);
+      const q = card(centre, right, dir, len * 0.5, len * 0.5, ln, rect);
       const ao = 0.62 + 0.45 * f + 0.15 * rng();
       b.addArrays(q.pos, q.nor, q.idx, () => [0.82 * ao, 0.95 * ao, 0.85 * ao], q.uvs, TILE_ID.spruce + rng() * 0.49);
     }

@@ -55,3 +55,33 @@ export function buildWaterChunks(network) {
   }
   return [...chunks.values()].map((c) => ({ bx: c.bx, bz: c.bz, positions: Float32Array.from(c.pos), normals: Float32Array.from(c.nor), aux: Float32Array.from(c.aux), indices: Uint32Array.from(c.idx), vertexCount: c.pos.length / 3 }));
 }
+
+const FALL_MIN_DROP = 0.35;        // m of water level between two neighbouring samples that makes a waterfall
+
+/** Waterfalls: runs of steep samples along a stream become vertical curtains. Returns [{ x, z, nx, nz, top, bottom, width }] (nx, nz = across the stream). */
+export function findFalls(network) {
+  const S = network.samples;
+  const falls = [];
+  for (const info of network.ways) {
+    if (!WATER_KINDS.includes(info.kind)) continue;
+    const kind = WAY_KINDS[info.kind];
+    const dir = S.water[info.first] >= S.water[info.first + info.count - 1] ? 1 : -1;       // +1: the flow runs along the way
+    let i = info.first;
+    while (i < info.first + info.count - 1) {
+      const a = dir > 0 ? i : i + 1, b = dir > 0 ? i + 1 : i;                                // a upstream, b downstream
+      if (S.water[a] - S.water[b] >= FALL_MIN_DROP) {
+        let j = i + 1;
+        let top = S.water[a], bottom = S.water[b], last = b;
+        while (j < info.first + info.count - 1) {
+          const a2 = dir > 0 ? j : j + 1, b2 = dir > 0 ? j + 1 : j;
+          if (S.water[a2] - S.water[b2] < FALL_MIN_DROP * 0.5) break;
+          bottom = S.water[b2]; last = b2; j++;
+        }
+        const mid = Math.round((a + last) / 2);
+        falls.push({ x: S.px[mid], z: S.pz[mid], nx: S.nx[mid], nz: S.nz[mid], top, bottom, width: (kind.halfWidth + 0.3) * 2 });
+        i = j;
+      } else i++;
+    }
+  }
+  return falls;
+}

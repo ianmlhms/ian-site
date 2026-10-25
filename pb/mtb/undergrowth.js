@@ -69,7 +69,7 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
       const jitter = (rng() - 0.5) * 1.2;
       const hx = cell.hedge === 1 ? x + jitter : x, hz = cell.hedge === 1 ? z : z + jitter;
       if (clearance(hx, hz) > 0.01) continue;
-      const s = 1.5 + rng() * 0.7;
+      const s = 1.1 + rng() * 0.5;
       lists.hedges.push(hx, surface.height(hx, hz), hz, s, cell.hedge === 1 ? Math.PI / 2 : 0, rng(), (MAP_CELL + 0.4) / s / 1.1, 0);
     }
   }
@@ -105,9 +105,12 @@ export function undergrowthOfBlock(bx, bz, { map, surface, clearance, trees }) {
     if (bestC < ROOT_MIN_COVER) continue;
     const rr = createRng(Math.floor(tx * 131 + tz * 17));
     if (rr() > 0.8) continue;
-    const radius = 0.09 + rr() * 0.07, len = 3.2 + rr() * 1.4, scale = radius / 0.5;
+    const radius = 0.045 + rr() * 0.04, len = 2.6 + rr() * 1.2, scale = radius / 0.5;
     const rx = tx + Math.cos(bestA) * trees[t + 3] * 0.012, rz = tz + Math.sin(bestA) * trees[t + 3] * 0.012;
-    lists.roots.push(rx, surface.height(rx, rz) - 0.02, rz, scale, -bestA, rr(), len / scale, 0);
+    const ex = rx + Math.cos(bestA) * len, ez = rz + Math.sin(bestA) * len, h0 = surface.height(rx, rz), h1 = surface.height(ex, ez);
+    if (Math.abs(h1 - h0) / len > 0.45) continue;                                                // too steep for a root to follow
+    const pitch = Math.atan2(h1 - h0, len);                      // the root follows the slope, and goes into the ground at both ends
+    lists.roots.push(rx, h0 - 0.04, rz, scale, -bestA, rr(), len / scale, pitch);
   }
 
   const out = {};

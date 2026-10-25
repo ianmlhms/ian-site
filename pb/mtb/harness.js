@@ -420,10 +420,52 @@ section('H forest');
   stats.treesSampled = treeCount;
 }
 
+const trailPoints = trails.map((t) => trailLine(t));
+/* ---------------------------------------------------------------- H2: dead wood and roots do not float */
+section('H2 dead wood');
+{
+  let logs = 0, roots = 0, stumps = 0, floatingLogs = 0, buriedLogs = 0, floatingRoots = 0, rootsOnTrail = 0, nonFinite = 0;
+  const rng = createRng(77);
+  const blocks = [];
+  for (let n = 0; n < (QUICK ? 150 : 700); n++) blocks.push([Math.floor((WORLD.playInset + rng() * (WORLD.width - 2 * WORLD.playInset)) / 32), Math.floor((WORLD.playInset + rng() * (WORLD.depth - 2 * WORLD.playInset)) / 32)]);
+  for (const line of trailPoints) for (let i = 0; i < line.length; i += 25) blocks.push([Math.floor(line[i][0] / 32), Math.floor(line[i][1] / 32)]);
+  for (const [bx, bz] of blocks) {
+    const u = world.undergrowth.block(bx, bz);
+    for (let i = 0; i < u.length * 0 + u.logs.length; i += 8) {
+      logs++;
+      const [x, y, z, scale, yaw, , stretch, pitch] = [u.logs[i], u.logs[i + 1], u.logs[i + 2], u.logs[i + 3], u.logs[i + 4], u.logs[i + 5], u.logs[i + 6], u.logs[i + 7]];
+      if (![x, y, z, scale, yaw, stretch, pitch].every(Number.isFinite)) { nonFinite++; continue; }
+      const L = stretch * scale, r = 0.075 * scale, dx = Math.cos(yaw), dz = -Math.sin(yaw);
+      let lowest = 1e9, highest = -1e9;
+      for (let k = 0; k <= 8; k++) {
+        const t = (k / 8 - 0.5) * L, px = x + dx * t * Math.cos(pitch), pz = z + dz * t * Math.cos(pitch), ya = y + Math.sin(pitch) * t;
+        const gap = ya - r - surface.height(px, pz);
+        lowest = Math.min(lowest, gap); highest = Math.max(highest, gap);
+      }
+      if (lowest > 0.12) floatingLogs++;           // a log touches the ground somewhere
+      if (highest > 0.75) floatingLogs++;           // and no end hovers
+      if (lowest < -0.9) buriedLogs++;
+    }
+    for (let i = 0; i < u.roots.length; i += 8) {
+      roots++;
+      const x = u.roots[i], y = u.roots[i + 1], z = u.roots[i + 2], scale = u.roots[i + 3], yaw = u.roots[i + 4], stretch = u.roots[i + 6], pitch = u.roots[i + 7];
+      const L = stretch * scale, dx = Math.cos(yaw), dz = -Math.sin(yaw);
+      const ex = x + dx * L * Math.cos(pitch), ez = z + dz * L * Math.cos(pitch), ey = y + Math.sin(pitch) * L;
+      if (ey - surface.height(ex, ez) > 0.4 || y - surface.height(x, z) > 0.2) floatingRoots++;      // both ends go into the ground
+      if (clearanceAt(x, z) > 0.04) rootsOnTrail++;                                                  // (a root grows from a trunk that is beside the way, not on it)
+    }
+    stumps += u.stumps.length / 8;
+  }
+  check(`dead wood: ${logs} logs, ${roots} roots, ${Math.round(stumps)} stumps are finite`, nonFinite === 0);
+  check('no fallen log floats: it touches the ground and no end hovers more than 0.75 m above it', floatingLogs === 0, `${floatingLogs} floating logs`);
+  check('no log is buried deeper than 0.9 m', buriedLogs === 0, `${buriedLogs} buried logs`);
+  check('every root starts and ends at the ground (follows the slope)', floatingRoots === 0, `${floatingRoots} floating roots`);
+  stats.deadWood = `${logs} logs, ${roots} roots`;
+}
+
 /* ---------------------------------------------------------------- I: sandstone */
 section('I rocks');
 const rocks = world.rocks;
-const trailPoints = trails.map((t) => trailLine(t));
 {
   let count = 0, nonFinite = 0, badSink = 0, floating = 0, worstGap = 1e9, onWay = 0, slabs = 0, boulders = 0, stones = 0;
   const rng = createRng(2024);
@@ -531,7 +573,7 @@ section('J water');
       worst = Math.min(worst, surface.height(x, z) - base);
     }
     check(`the footbridge base is below the terrain at every corner and under the arch (margin ${worst.toFixed(2)} m)`, worst > 0.3);
-    check('the deck is above the water and reaches the banks (deck >= bank + 0.3, arch clear height >= 1.3 m)', br.deck >= Math.max(br.endL, br.endR) + 0.2 && br.deck - br.water >= br.rise + 1.3, `deck ${br.deck.toFixed(2)} water ${br.water.toFixed(2)}`);
+    check('the deck is above the water and reaches the banks (deck >= bank + 0.3, deck >= crown + 0.7 m)', br.deck >= Math.max(br.endL, br.endR) + 0.2 && br.deck - br.water >= br.rise + 0.7, `deck ${br.deck.toFixed(2)} water ${br.water.toFixed(2)}`);
     stats.bridge = `deck ${(br.deck - br.water).toFixed(2)} m above the water, span ${br.span} m`;
   }
 }

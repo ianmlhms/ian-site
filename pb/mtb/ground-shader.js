@@ -87,7 +87,7 @@ export const GROUND_FRAGMENT = `
       litter = mix(litter, texture2D(uLitter, Qs * 0.31).rgb, sideK);
     #endif
     litter *= (0.62 + 0.78 * texture2D(uLitter, Q * 0.047).r);
-    litter = mix(litter, litter * vec3(0.8, 0.86, 0.76), mk.r * 0.4);                     // dense canopy: a little cooler (not darker: the light comes through)
+    litter = mix(litter, litter * vec3(0.95, 0.82, 0.68) + vec3(0.03, 0.0, -0.02), mk.r * 0.55);                     // dense canopy: a little cooler (not darker: the light comes through)
     litter = mix(litter, litter * vec3(1.18, 1.02, 0.78), nLo.b * 0.5 * (1.0 - mk.r));  // open ground: warmer
     litter = mix(litter, litter * vec3(1.45, 0.86, 0.46) + vec3(0.07, 0.0, -0.03), uSeason * 0.75 * (0.55 + 0.45 * nMid.g)); // autumn: the floor turns copper
     vec3 mossC = texture2D(uMoss, Q * 0.37).rgb;
@@ -97,7 +97,7 @@ export const GROUND_FRAGMENT = `
     mossC *= (0.7 + 0.6 * texture2D(uMoss, Q * 0.06).g);
     vec3 dirtC = texture2D(uDirt, Q * 0.62).rgb * (0.82 + 0.4 * nMid.g);
     // meadows: calm large-scale colour (no camouflage), the fields carry their own crop pattern
-    vec4 mf = texture2D(uMapField, mapUv);                  // field id / 255, leaf type, hedge, cliff hint
+    vec4 mf = texture2D(uMapField, clamp((P + (nMid.rg - 0.5) * 9.0) / uWorldSize, 0.0, 1.0));      // field id / 255, leaf type, hedge, cliff hint (the lookup is warped a few metres: no stair-stepped field borders)
     float fid = floor(mf.r * 255.0 + 0.5);
     vec3 grassC = mix(vec3(0.43, 0.54, 0.25), vec3(0.5, 0.58, 0.27), smoothstep(0.35, 0.7, nLo.g)) * (0.9 + 0.2 * texture2D(uMoss, Q * 0.5).g * near + 0.0);
     if (fid > 0.5) {
@@ -120,8 +120,8 @@ export const GROUND_FRAGMENT = `
     float steep = smoothstep(0.86, 0.60, N.y);                                      // 0 flat .. 1 cliff
     float rockW = clamp(steep + mc.a + mf.a * 0.7 * smoothstep(0.93, 0.75, N.y), 0.0, 1.0);
     float rockMoss = smoothstep(0.35, 0.75, mk.b * 0.9 + mk.r * 0.35 + (nHi.g - 0.5) * 0.9) * 0.85;
-    float mossW = clamp(mk.b * 1.35 + (nMid.a - 0.5) * 1.0 + mk.r * 0.3 + 0.08, 0.0, 1.0);
-    mossW = smoothstep(0.4, 0.78, mossW) * (1.0 - smoothstep(0.35, 0.55, steep)) * (1.0 - mc.r);
+    float mossW = clamp(mk.b * 1.3 + (nMid.a - 0.5) * 0.8 - 0.2, 0.0, 1.0);
+    mossW = smoothstep(0.45, 0.85, mossW) * 0.85 * (1.0 - smoothstep(0.35, 0.55, steep)) * (1.0 - mc.r);
     float ledgeMoss = smoothstep(0.62, 0.8, N.y) * smoothstep(0.18, 0.4, steep + mc.a) * smoothstep(0.35, 0.7, nHi.r + mk.b * 0.4);
     float grassW = smoothstep(0.35, 0.7, mc.r + (nMid.g - 0.5) * 0.25) * (1.0 - rockW);
     float edgeNoise = (nHi.r - 0.5) * 0.3 + (nMid.r - 0.5) * 0.2;

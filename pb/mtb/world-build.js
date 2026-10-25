@@ -9,6 +9,7 @@ import { createTreeIndex } from './forest.js';
 import { createUndergrowthIndex } from './undergrowth.js';
 import { createRockIndex, createSampleIndex } from './rocks.js';
 import { attachCascades } from './landmarks.js';
+import { findFalls } from './water.js';
 
 export function buildPureWorld(data) {
   const ways = data.ways.filter((w) => !w.bridge && !w.tunnel);
@@ -24,6 +25,7 @@ export function buildPureWorld(data) {
   const undergrowth = createUndergrowthIndex({ map: maps, surface, clearance, trees });
   const walkable = createSampleIndex(field.network, ['trail', 'path']);
   const brooks = createSampleIndex(field.network, ['stream', 'river', 'ditch'], (kind) => WAY_KINDS[kind].halfWidth);
-  const rocks = createRockIndex({ map: maps, surface, clearance, ways: walkable, streams: brooks });
-  return { ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks };
+  const falls = findFalls(field.network);
+  const rocks = createRockIndex({ map: maps, surface, clearance, ways: walkable, streams: brooks, falls });
+  return { ways, streams, trailWays, field, surface, groundAt, clearance, maps, trees, undergrowth, rocks, walkable, brooks, falls };
 }

@@ -3,7 +3,7 @@
  * vertical grooves, the top and the edges are rounded, the lower part may be undercut (overhang). The bottom ring of every model is marked aSkirt = 1: the vertex
  * shader lowers it by the instance's `sink`, so the solid always reaches below the terrain.
  * Two levels of detail: near (about 300 triangles) and far (about 70). */
-import { createRng, valueNoise } from './noise.js';
+import { createRng, valueNoise, hash2 } from './noise.js';
 
 const THREE = window.THREE;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -33,6 +33,11 @@ function displaceSlab(geo, variant, seed) {
     const front = smooth(-0.3, 0, z), side = smooth(0.32, 0.5, Math.abs(x));
     const rec = strata(clamp01(y), seed);
     z -= rec * front;
+    // fractured planes: the face is cut into blocks (vertical joints, bedding planes); every block stands a little proud or sits a little back, with hard edges
+    const bi = Math.floor((x + 0.5) * 6 + seed * 3), bj = Math.floor(y * 5 + seed * 2);
+    const blockOff = (hash2(bi, bj, Math.floor(seed * 97)) - 0.5) * 0.17;
+    z += blockOff * front;
+    x += (hash2(bi + 7, bj, Math.floor(seed * 97)) - 0.5) * 0.05 * side;
     x -= Math.sign(x) * strata(clamp01(y + 0.2), seed + 3) * 0.7 * side;
     // block joints: vertical grooves in the face
     const joint = Math.max(0, 1 - Math.abs(x - (valueNoise(seed * 5.1, 4.4, 1) - 0.5) * 0.6) * 38) * 0.05;
@@ -56,12 +61,12 @@ function displaceSlab(geo, variant, seed) {
 }
 
 function slabGeometry(variant, seed, near) {
-  const geo = new THREE.BoxGeometry(1, 1, 1, near ? 9 : 3, near ? 8 : 3, near ? 5 : 2);
+  const geo = new THREE.BoxGeometry(1, 1, 1, near ? 12 : 2, near ? 10 : 3, near ? 4 : 2);
   displaceSlab(geo, variant, seed);
-  return finish(geo, near ? 'slab' : 'slab-far', seed);
+  return finish(geo, near ? 'slab' : 'slab-far', seed, false);
 }
 
-function boulderGeometry(seed, near) {
+function boulderGeometry(seed, near, round = false) {
   const geo = new THREE.IcosahedronGeometry(0.5, near ? 2 : 1);
   const p = geo.attributes.position;
   const skirt = new Float32Array(p.count);
@@ -71,16 +76,16 @@ function boulderGeometry(seed, near) {
     x *= k; z *= k; y *= k;
     const ledge = 0.05 * Math.sin((y + 0.5) * 17 + seed * 5);
     x *= 1 + ledge; z *= 1 + ledge;
-    y = Math.max(0, y * 0.9 + 0.12);
+    y = Math.max(0, y * (round ? 1.3 : 0.9) + (round ? 0.1 : 0.12));
     if (y <= 0.02) { skirt[i] = 1; y = 0; }
     p.setXYZ(i, x * 1.02, y, z * 0.96);
   }
   geo.setAttribute('aSkirt', new THREE.BufferAttribute(skirt, 1));
-  return finish(geo, 'boulder', seed);
+  return finish(geo, round ? 'boulder-round' : 'boulder', seed);
 }
 
 /** Smooth normals (merged by position), vertex colour AO, a position-keyed uv. */
-function finish(geo, label, seed) {
+function finish(geo, label, seed, smooth = true) {
   geo.deleteAttribute('uv');
   const g = geo.index ? geo.toNonIndexed() : geo;
   const skirtSrc = geo.attributes.aSkirt;
@@ -95,6 +100,13 @@ function finish(geo, label, seed) {
   g.setAttribute('aSkirt', skirt);
   // smooth normals: average the face normals of the vertices that share a quantised position
   g.computeVertexNormals();
+  if (!smooth) {                                                 // flat shading: fractured planes keep their hard edges
+    const col2 = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++) { const ao = 0.7 + 0.4 * clamp01(p.getY(i) * 1.2 + p.getZ(i) * 0.2 + 0.3), tone = 0.9 + 0.2 * valueNoise(p.getX(i) * 4 + seed * 3, p.getY(i) * 4 + p.getZ(i) * 4, 9); col2[i * 3] = ao * tone; col2[i * 3 + 1] = ao * tone * 0.97; col2[i * 3 + 2] = ao * tone * 0.92; }
+    g.setAttribute('color', new THREE.BufferAttribute(col2, 3));
+    g.computeBoundingSphere();
+    return g;
+  }
   const key = (i) => `${Math.round(p.getX(i) * 400)},${Math.round(p.getY(i) * 400)},${Math.round(p.getZ(i) * 400)}`;
   const sum = new Map(), n = g.attributes.normal;
   for (let i = 0; i < p.count; i++) { const k = key(i); const s = sum.get(k) || [0, 0, 0]; s[0] += n.getX(i); s[1] += n.getY(i); s[2] += n.getZ(i); sum.set(k, s); }
@@ -118,6 +130,6 @@ export function buildRockModels() {
     overhang: { near: slabGeometry('overhang', 0.38, true), far: slabGeometry('overhang', 0.38, false) },
     boulderA: { near: boulderGeometry(0.3, true), far: boulderGeometry(0.3, false) },
     boulderB: { near: boulderGeometry(0.7, true), far: boulderGeometry(0.7, false) },
-    stone: { near: boulderGeometry(0.5, false), far: boulderGeometry(0.5, false) },
+    stone: { near: boulderGeometry(0.5, true, true), far: boulderGeometry(0.5, false, true) },
   };
 }

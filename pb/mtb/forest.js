@@ -29,12 +29,13 @@ export function wayFree(clearance, x, z, r) {
 
 /** Collision shape per species: trunk radius per metre of height, and the crown ellipsoid (centre height, horizontal radius, half height; all per metre of height). */
 export const SHAPES = Object.freeze([
-  { trunk: 0.0135, crownY: 0.74, crownR: 0.235, crownH: 0.26 },   // beech
-  { trunk: 0.0105, crownY: 0.61, crownR: 0.19, crownH: 0.39 },    // spruce
-  { trunk: 0.016, crownY: 0.7, crownR: 0.34, crownH: 0.3 },       // oak
+  { trunk: 0.0165, crownY: 0.74, crownR: 0.235, crownH: 0.26 },   // beech
+  { trunk: 0.0105, crownY: 0.61, crownR: 0.14, crownH: 0.39 },    // spruce
+  { trunk: 0.0195, crownY: 0.7, crownR: 0.34, crownH: 0.3 },       // oak
   { trunk: 0.012, crownY: 0.62, crownR: 0.3, crownH: 0.38 },      // sapling
 ]);
 export const STRIDE = 6;
+const baseHeightEstimate = (m) => Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, m.height > 4 ? m.height * 1.2 : 12));
 
 /** Trees of block (bx, bz): Float32Array stride 6 [x, y, z, height, species, seed]. `clearance(x, z)` returns the way coverage (0..1) at a point.
  *  Always the full set: thinning for the quality level happens when drawing, so collisions never depend on the quality setting. */
@@ -51,12 +52,13 @@ export function treesOfBlock(bx, bz, { map, surface, clearance }) {
       if (m.grass > 0.5 && m.cover < 0.4) chance = 0.02 * m.grass;               // an orchard tree, a hedge tree in a meadow
       chance *= 1 - 0.8 * m.rock;
       if (roll > chance) continue;
-      if (clearance(x, z) > 0.04) continue;                                          // the way network keeps its corridor free
+      if (!wayFree(clearance, x, z, 0.3 + 0.02 * HEIGHT_MAX * (baseHeightEstimate(m) / HEIGHT_MAX))) continue;     // the way network keeps its corridor free, a thick trunk keeps a little further away
       const y = surface.height(x, z);
       surface.normal(x, z, nrm);
       if (nrm.y < 0.62 && rng() < 0.8) continue;                                     // cliffs carry few trees
       const baseHeight = m.height > 4 ? m.height : 9 + sizeRoll * 5;
-      const height = Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, baseHeight * (0.82 + sizeRoll * 0.4)));
+      let height = Math.min(HEIGHT_MAX, Math.max(HEIGHT_MIN, baseHeight * (0.82 + sizeRoll * 0.4)));
+      if (m.grass > 0.5 && m.cover < 0.4) height = Math.min(height, 5.5 + sizeRoll * 3);       // an orchard tree, a hedge tree: small
       sampleFieldCell(map, x, z, cell);
       let species = SPECIES.beech;
       if (speciesRoll < spruceShare[cell.leaf]) species = SPECIES.spruce;
