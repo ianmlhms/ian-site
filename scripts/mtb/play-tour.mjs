@@ -40,13 +40,19 @@ try {
       const { createBot } = await import("/pb/mtb/bot.js");
       const m = window.__mtb;
       const bot = createBot(m.trail.centre.slice(0, m.trail.arch.index + 4), m.trail.grade);
+      window.__bot = bot;
       window.__botTimer = setInterval(() => { if (m.game.mode === "run") m.setInput({ ...bot.input(m.bike), jump: false }); else m.setInput(null); }, 16);
     });
     await page.waitForTimeout(9000);
     if (only.includes("run")) await shot("run-hud");
     if (only.includes("finish")) {
-      // fast-forward: teleport near the end of the trail
-      await page.evaluate(() => { const m = window.__mtb; const t = m.trail; m.setBike({ ...m.bike }); const i = t.arch.index - 40; const s = m.bike; m.reset(i); });
+      // fast-forward: the reference rider keeps riding the REAL game loop, many frames per tick (no teleport: a run only counts with every checkpoint and a believable time)
+      await page.evaluate(() => {
+        clearInterval(window.__botTimer);
+        const m = window.__mtb;
+        let frames = 0;
+        while (m.game.mode !== "finished" && frames++ < 60 * 3600) m.tick(1 / 60, m.game.mode === "run" ? window.__bot.input(m.bike) : { throttle: 0, brake: 0, steer: 0, jump: false });
+      });
       await page.waitForFunction(() => window.__mtb.game.mode === "finished", null, { timeout: 90000 });
       await page.waitForTimeout(900);
       await shot("finish");

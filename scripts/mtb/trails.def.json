@@ -3,25 +3,25 @@
   "id": "ernz-waldwee",
   "grade": "green",
   "name": {
-   "lb": "Ernz-Waldwee",
-   "de": "Ernz-Waldweg",
-   "en": "Ernz Forest Way",
-   "fr": "Chemin forestier de l'Ernz"
+   "lb": "Haller-Waldwee",
+   "de": "Haller-Waldweg",
+   "en": "Haller Forest Way",
+   "fr": "Chemin forestier de la Haller"
   },
   "blurb": {
-   "lb": "Breet Weeër, sanft Hiwwelen, ideal fir den Ufank",
-   "de": "Breite Wege, sanfte Hügel, ideal zum Einstieg",
-   "en": "Wide tracks, gentle hills, perfect to start",
-   "fr": "Larges chemins, douces collines, idéal pour débuter"
+   "lb": "Sanft duerch de Bësch laanscht Sandsteefielsen, ideal fir den Ufank",
+   "de": "Sanft durch den Wald an Sandsteinfelsen vorbei, ideal zum Einstieg",
+   "en": "Gently through the forest past sandstone rocks, perfect to start",
+   "fr": "Doucement à travers la forêt, le long des rochers de grès, idéal pour débuter"
   },
   "via": [
    [
-    3389,
-    3915
+    1430,
+    1105
    ],
    [
-    4207,
-    2739
+    2420,
+    1580
    ]
   ],
   "style": {
