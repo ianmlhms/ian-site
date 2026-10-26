@@ -219,13 +219,17 @@
     brick: { wall: '#a9573f', frame: '#f1ede4', shutter: null, kind: 'brick' },
     shop: { wall: '#cfc9bd', frame: '#2f3438', shutter: null, kind: 'shop' },
     industrial: { wall: '#aeb4b8', frame: '#4a5157', shutter: null, kind: 'industrial' },
+    /* W3 abroad patches (build_abroad_station_patch.py, no LOD2 wall-face detail, a footprint + a height only): regional render instead of the Luxembourg mix,
+     * picked from the patch's own "region" field (see FACADE_BY_KIND_REGION below) -- French lime render / stone dressing, Belgian brick row houses. */
+    frenchRender: { wall: '#e7dbbd', frame: '#8c9094', shutter: '#5c6a53', kind: 'frenchRender' },
+    belgianBrick: { wall: '#893a2c', frame: '#efece2', shutter: null, kind: 'belgianBrick' },
   };
   function facadeTexture(name) {
     const spec = FACADES[name];
     return canvasTexture('surf:facade:' + name, 128, 128, (c, w, h) => {
       const r = mulberry(hashStr(name));
       c.fillStyle = spec.wall; c.fillRect(0, 0, w, h);
-      if (spec.kind === 'brick') {
+      if (spec.kind === 'brick' || spec.kind === 'belgianBrick') {
         for (let y = 0; y < h; y += 8) for (let x = ((y / 8) % 2) * 8; x < w + 8; x += 16) { c.fillStyle = 'rgba(' + (r() > 0.5 ? '255,235,210' : '40,20,10') + ',' + (0.06 + r() * 0.1) + ')'; c.fillRect(x, y, 15, 7); }
         c.fillStyle = 'rgba(210,200,185,0.45)'; for (let y = 0; y < h; y += 8) c.fillRect(0, y + 7, w, 1);
       } else {
@@ -243,7 +247,9 @@
         return;
       }
       const ww = 1.15 * PXM; const wh = 1.5 * PXM;
-      windowAt(c, (w - ww) / 2, h - 0.95 * PXM - wh, ww, wh, spec.frame, spec.shutter);
+      const wy = h - 0.95 * PXM - wh;
+      windowAt(c, (w - ww) / 2, wy, ww, wh, spec.frame, spec.shutter);
+      if (spec.kind === 'belgianBrick') { c.fillStyle = '#efece2'; c.fillRect((w - ww) / 2 - 0.12 * PXM, wy - 0.22 * PXM, ww + 0.24 * PXM, 0.16 * PXM); }   // a pale stone lintel over the brick
       if (spec.kind === 'apart') { c.fillStyle = '#b8b3a6'; c.fillRect(0, h - 0.18 * PXM, w, 0.18 * PXM); c.fillStyle = 'rgba(90,90,90,0.5)'; c.fillRect(0, h - 0.18 * PXM - 0.55 * PXM, w, 0.05 * PXM); }
     }, true);
   }
@@ -262,6 +268,15 @@
     house: ['houseA', 'houseB', 'houseA'], apartments: ['apart', 'apart', 'houseA'], commercial: ['shop', 'apart'], retail: ['shop'], industrial: ['industrial'],
     garage: ['industrial', 'houseB'], shed: ['industrial'], church: ['houseA'], other: ['houseA', 'apart'],
   };
+  /* abroad patches (data.region 'fr' | 'be', set by build_abroad_station_patch.py): French lime render / stone for Thionville, Metz-Ville, Pont-à-Mousson,
+   * Nancy-Ville, Champagne-Ardenne TGV, Paris-Est; Belgian brick row houses for Arlon, Libramont, Namur, Bruxelles-Midi. */
+  const FACADE_BY_KIND_REGION = {
+    fr: { house: ['frenchRender', 'frenchRender', 'houseA'], apartments: ['frenchRender', 'apart'], commercial: ['shop', 'frenchRender'], retail: ['shop'],
+          industrial: ['industrial'], garage: ['industrial', 'frenchRender'], shed: ['industrial'], church: ['frenchRender'], other: ['frenchRender', 'apart'] },
+    be: { house: ['belgianBrick', 'belgianBrick', 'houseB'], apartments: ['belgianBrick', 'apart'], commercial: ['shop', 'belgianBrick'], retail: ['shop'],
+          industrial: ['industrial'], garage: ['industrial', 'belgianBrick'], shed: ['industrial'], church: ['belgianBrick'], other: ['belgianBrick', 'apart'] },
+  };
+  const facadeTableFor = (data) => (data.region && FACADE_BY_KIND_REGION[data.region]) || FACADE_BY_KIND;
 
   /* ground colours (sRGB 0-255) */
   const CLASS_COL = [
@@ -417,7 +432,8 @@
           /* a building of the station area that the photos show (goods shed, toilet hut ...): painted from its own style entry */
           try { TS.stationBuilding.build({ T, b, style: Object.assign({}, sty.otherBase || {}, sty.others[b.id], { doors: sty.others[b.id].doors || [], extras: sty.others[b.id].extras || null }), world, rotN, group, disposables, triangulate3, MB, roofTexture, stats, batch }); stats.buildings += 1; return; } catch (error) { console.warn('[Lokféierer] station-area building ' + b.id + ' failed', error); }
         }
-        const names = FACADE_BY_KIND[b.kind] || FACADE_BY_KIND.other;
+        const kindTable = facadeTableFor(data);
+        const names = kindTable[b.kind] || kindTable.other;
         const facade = names[Math.floor(hash2(bi, 5) * names.length) % names.length];
         const roofKind = b.roof === 'flat' ? (b.kind === 'industrial' ? 'zinc' : 'flat') : (hash2(bi, 9) < 0.28 ? 'tile' : 'slate');
         const levels = Math.max(1, b.levels || Math.round((b.h || 6) / 3));
