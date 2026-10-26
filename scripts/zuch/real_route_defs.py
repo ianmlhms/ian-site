@@ -9,6 +9,7 @@ ROUTES = {
     # line 10, RB: every stop between Luxembourg and Clervaux (the real line goes on to Troisvierges)
     "north": {
         "prefix": "N",
+        "first_side": "right",
         "tiles": ["north-a", "north-b"],
         "stops": [
             ("Luxembourg", "Lëtzebuerg", 3),
@@ -35,6 +36,7 @@ ROUTES = {
     # line 60, RB: Luxembourg - Bettembourg - Esch - Belval - Differdange - Pétange - Rodange, every stop
     "south": {
         "prefix": "S",
+        "first_side": "right",
         "tiles": ["south"],
         "stops": [
             ("Luxembourg", "Lëtzebuerg", 3),
@@ -59,6 +61,7 @@ ROUTES = {
     # line 50: Luxembourg - Bertrange-Strassen - Mamer-Lycée - Mamer - Capellen - Kleinbettingen (the trains go on to Arlon)
     "west": {
         "prefix": "W",
+        "first_side": "right",
         "tiles": ["west"],
         "stops": [
             ("Luxembourg", "Lëtzebuerg", 3),

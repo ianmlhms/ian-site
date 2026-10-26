@@ -12,6 +12,7 @@ on the rail graph, no branches.  Options per route in real_route_defs.py (stops,
 """
 import argparse
 import json
+import math
 import os
 import pickle
 import sys
@@ -24,7 +25,7 @@ from shapely.geometry import LineString, Point
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_real_line as brl  # noqa: E402
 import real_line_scenery as sc  # noqa: E402
-from osm_rail import RailGraph, num, resample  # noqa: E402
+from osm_rail import TO_WGS, RailGraph, num, resample  # noqa: E402
 from real_line_dem import Dem  # noqa: E402
 from real_line_land import LandIndex  # noqa: E402
 from real_line_path import CACHE  # noqa: E402
@@ -40,7 +41,7 @@ BIG_BRIDGE_LEN = 140.0        # a bridge longer than this over water with a high
 
 
 def load_route_tiles(names):
-    layers = ("rails", "railpoints", "waterways", "highways", "landuse", "places", "misc")
+    layers = ("rails", "railpoints", "waterways", "highways", "landuse", "places", "misc", "platpoly", "stbuild")
     out = {k: [] for k in layers}
     seen = {k: set() for k in layers}
     for name in names:
@@ -126,65 +127,94 @@ def route_features(attrs, dem, tiles):
 
 
 # ------------------------------------------------------------------------------------------------------------------------------ stations
-def station_layout(attrs, s_stop, platforms, rails, main_line):
-    """Platforms (lateral offset of the edge nearest to the track, along-track extent relative to the stop, + = right of travel) and the other tracks
-    (lateral offsets) within PLATFORM_REACH of the stop, from OSM.  Used for the platform layout of the station models."""
-    i0 = int(max(0, (s_stop - PLATFORM_REACH) // attrs.step))
-    i1 = int(min(len(attrs.xy) - 2, (s_stop + PLATFORM_REACH) // attrs.step))
+def _frame_samples(attrs, s_stop):
+    i0 = int(max(0, (s_stop - PLATFORM_REACH - 30) // attrs.step))
+    i1 = int(min(len(attrs.xy) - 2, (s_stop + PLATFORM_REACH + 30) // attrs.step))
     idx = np.arange(i0, i1 + 1)
     p = attrs.xy[idx]
     t = attrs.xy[idx + 1] - attrs.xy[idx]
     t /= np.hypot(t[:, 0], t[:, 1])[:, None] + 1e-9
     r = np.c_[t[:, 1], -t[:, 0]]            # right-hand normal
-    s_of = idx * attrs.step
+    return p, r, idx * attrs.step - s_stop
 
-    def lateral(g, step=4.0):
-        """(s_rel, lat) samples of a geometry's points within the lateral band of the stop."""
-        out = []
-        parts = [g] if g.geom_type == "LineString" else list(g.geoms) if hasattr(g, "geoms") else []
-        for ls in parts:
-            if ls.geom_type != "LineString" or ls.length < 1:
-                continue
-            n = max(2, int(ls.length // step) + 1)
-            for k in range(n):
-                q = ls.interpolate(ls.length * k / (n - 1))
-                d2 = (p[:, 0] - q.x) ** 2 + (p[:, 1] - q.y) ** 2
-                j = int(d2.argmin())
-                lat = float((q.x - p[j, 0]) * r[j, 0] + (q.y - p[j, 1]) * r[j, 1])
-                if abs(lat) <= PLATFORM_LAT_MAX and d2[j] < (PLATFORM_LAT_MAX * 1.4) ** 2:
-                    out.append((float(s_of[j] - s_stop), lat))
-        return out
 
+def _to_track(p, r, srel, xy):
+    """(s_rel, lat) of points xy (N,2) in the frame of the sampled main track (nearest sample)."""
+    d2 = ((xy[:, None, :] - p[None, :, :]) ** 2).sum(axis=2)
+    j = d2.argmin(axis=1)
+    lat = (xy[:, 0] - p[j, 0]) * r[j, 0] + (xy[:, 1] - p[j, 1]) * r[j, 1]
+    return srel[j], lat, np.sqrt(d2[np.arange(len(xy)), j])
+
+
+def _ring_points(g, step=2.5):
+    parts = []
+    geoms = [g] if g.geom_type in ("LineString", "Polygon") else list(getattr(g, "geoms", []))
+    for q in geoms:
+        if q.geom_type == "Polygon":
+            parts.append(q.exterior)
+        elif q.geom_type == "LineString":
+            parts.append(q)
+    pts = []
+    for ls in parts:
+        if ls.length < 1:
+            continue
+        n = max(2, int(ls.length // step) + 1)
+        pts += [ls.interpolate(ls.length * k / (n - 1)).coords[0] for k in range(n)]
+    return np.array(pts) if pts else np.zeros((0, 2))
+
+
+def station_layout(attrs, s_stop, platforms, rails, buildings=()):
+    """Platforms, other tracks and the station building within PLATFORM_REACH of the stop, from OSM, in the frame of the main track (s relative to the stop, lat + = right
+    of the direction of travel).  platforms: [{g, t, poly}] (polygons = railway=platform areas, lines = platform / platform_edge ways).
+    Returns (platforms [{lat (centre of the platform), edge (the edge nearest to the track), w, s0, s1, ref}], tracks [lat], building side (+1 / -1 / 0) and its lat)."""
+    p, r, srel = _frame_samples(attrs, s_stop)
     plats = []
     for pl in platforms:
-        if pl["g"].distance(Point(*attrs.xy[min(len(attrs.xy) - 1, int(s_stop // attrs.step))])) > PLATFORM_REACH + PLATFORM_LAT_MAX:
+        pts = _ring_points(pl["g"])
+        if len(pts) < 3:
             continue
-        pts = [(s, lat) for s, lat in lateral(pl["g"]) if abs(s) <= PLATFORM_REACH and abs(lat) >= 1.2]
-        if len(pts) < 2:
+        s, lat, dist = _to_track(p, r, srel, pts)
+        ok = (np.abs(s) <= PLATFORM_REACH) & (np.abs(lat) <= PLATFORM_LAT_MAX) & (dist < PLATFORM_LAT_MAX * 1.4)
+        if ok.sum() < 3:
             continue
-        ss = [x[0] for x in pts]
-        lat = float(np.median([x[1] for x in pts])) if len(pts) > 2 else pts[0][1]
-        edge = min((x[1] for x in pts), key=abs)
-        plats.append({"lat": round(lat, 1), "edge": round(edge, 1), "s0": round(min(ss), 1), "s1": round(max(ss), 1), "ref": pl["t"].get("ref", "")})
-    # one platform per OSM way pair: the edge line and the area of the same platform are merged when they overlap and lie within 4 m laterally
-    plats.sort(key=lambda q: q["lat"])
-    merged = []
+        s, lat = s[ok], lat[ok]
+        if (lat > 0.8).any() and (lat < -0.8).any():
+            continue                                   # a ring that spans the track corridor: not a platform
+        sgn = 1.0 if lat.mean() > 0 else -1.0
+        near, far = float(np.abs(lat).min()), float(np.abs(lat).max())
+        if near < 0.6:
+            continue
+        w = far - near if pl["poly"] else 0.0
+        plats.append({"edge": round(sgn * near, 1), "w": round(w, 1), "s0": round(float(s.min()), 1), "s1": round(float(s.max()), 1), "ref": pl["t"].get("ref", ""), "poly": pl["poly"]})
+    # a platform line (edge) that lies on the edge of a polygon of the same side is the same platform
+    polys = [q for q in plats if q["poly"]]
+    items = list(polys)
     for q in plats:
-        m = next((x for x in merged if abs(x["lat"] - q["lat"]) < 4.5 and q["s0"] < x["s1"] and q["s1"] > x["s0"]), None)
+        if q["poly"]:
+            continue
+        if any(np.sign(o["edge"]) == np.sign(q["edge"]) and abs(abs(o["edge"]) - abs(q["edge"])) < 2.5 and q["s0"] < o["s1"] and q["s1"] > o["s0"] for o in polys):
+            continue
+        items.append(dict(q, w=3.0))
+    items.sort(key=lambda q: q["edge"])
+    merged = []
+    for q in items:   # the pieces of one platform (several polygons end to end) are merged
+        m = next((x for x in merged if np.sign(x["edge"]) == np.sign(q["edge"]) and abs(x["edge"] - q["edge"]) < 1.5 and q["s0"] < x["s1"] + 12 and q["s1"] > x["s0"] - 12), None)
         if m:
             m["s0"], m["s1"] = min(m["s0"], q["s0"]), max(m["s1"], q["s1"])
-            if abs(q["edge"]) < abs(m["edge"]):
-                m["edge"] = q["edge"]
-            m["lat"] = round((m["lat"] + q["lat"]) / 2, 1)
+            m["w"] = max(m["w"], q["w"])
         else:
             merged.append(dict(q))
+    out = [{"edge": q["edge"], "w": q["w"], "lat": round(q["edge"] + np.sign(q["edge"]) * q["w"] / 2, 1), "s0": q["s0"], "s1": q["s1"], "ref": q["ref"]} for q in merged]
     tracks = []
     for rl in rails:
         if rl["t"].get("railway") != "rail" or rl["t"].get("service") in ("yard",):
             continue
-        for s, lat in lateral(rl["g"], 6.0):
-            if abs(s) <= PLATFORM_REACH * 0.7 and 2.5 < abs(lat) < PLATFORM_LAT_MAX:
-                tracks.append(round(lat * 2) / 2)
+        pts = _ring_points(rl["g"], 6.0)
+        if len(pts) < 2:
+            continue
+        s, lat, dist = _to_track(p, r, srel, pts)
+        ok = (np.abs(s) <= PLATFORM_REACH * 0.7) & (np.abs(lat) > 2.5) & (np.abs(lat) < PLATFORM_LAT_MAX) & (dist < PLATFORM_LAT_MAX * 1.4)
+        tracks += [round(float(x) * 2) / 2 for x in lat[ok]]
     vals, cnts = np.unique(tracks, return_counts=True) if tracks else (np.array([]), np.array([]))
     others = [float(v) for v, c in zip(vals, cnts) if c >= 4]
     cl = []
@@ -193,7 +223,14 @@ def station_layout(attrs, s_stop, platforms, rails, main_line):
             cl[-1].append(v)
         else:
             cl.append([v])
-    return merged, [round(float(np.mean(c)), 1) for c in cl]
+    # the station building: the nearest train_station building within 110 m of the stop (its centroid decides the side)
+    bside, blat, bd = 0, 0.0, 1e9
+    for b in buildings:
+        c = b["g"].centroid
+        s, lat, dist = _to_track(p, r, srel, np.array([[c.x, c.y]]))
+        if abs(s[0]) <= 110 and dist[0] < bd and dist[0] < 90:
+            bd, bside, blat = dist[0], (1 if lat[0] > 0 else -1), float(lat[0])
+    return out, [round(float(np.mean(c)), 1) for c in cl], bside, round(blat, 1)
 
 
 # ------------------------------------------------------------------------------------------------------------------------------ legs
@@ -269,13 +306,21 @@ def build(route_id, dem=None):
         biomes = ardennes_windows(biomes, s_a)
     biomes = urban_halo(biomes, stops)
     platforms = [p for p in tiles["rails"] if p["t"].get("railway") in ("platform", "platform_edge")]
+    plat_geoms = [{"g": p["g"], "t": p["t"], "poly": False} for p in platforms] + [{"g": p["g"], "t": p["t"], "poly": True} for p in tiles.get("platpoly", [])]
     for st in stops:
         side = brl.platform_side(attrs, st, platforms)
-        st["side"] = "right" if (side or 1) > 0 else "left"
-        st["side_known"] = side is not None
+        st["plat"], st["trk"], bside, blat = station_layout(attrs, st["s"], plat_geoms, tiles["rails"], tiles.get("stbuild", []))
+        st["bside"], st["blat"] = bside, blat
+        # side of the station = the side of the platform of the player's track: the one the station building stands at when that platform is next to the track (edge <= 3.2 m), else the nearest platform polygon, else the platform lines
+        near = sorted(st["plat"], key=lambda q: abs(q["edge"]))
+        building_platform = bside and any(np.sign(q["edge"]) == bside and abs(q["edge"]) <= 3.2 for q in st["plat"])
+        pick = bside if building_platform else (1 if near and near[0]["edge"] > 0 else -1 if near else None) or side
+        st["side"] = "right" if (pick or 1) > 0 else "left"
+        st["side_known"] = pick is not None
         st["biome"] = "city" if st["size"] >= 3 else next((w[2] for w in biomes if w[0] <= st["s"] <= w[1]), "farmland")
-        st["plat"], st["trk"] = station_layout(attrs, st["s"], platforms, tiles["rails"], line)
     brl.side_fix(stops)
+    if spec.get("first_side"):
+        stops[0]["side"] = spec["first_side"]
     legs = []
     for i in range(len(stops) - 1):
         A, B = stops[i], stops[i + 1]
@@ -298,7 +343,7 @@ def report(res):
     attrs, stops, feats, legs = res["attrs"], res["stops"], res["feats"], res["legs"]
     print("route %d m real; %d stops; %d bridges %d tunnels %d crossings" % (attrs.length, len(stops), len(feats["bridges"]), len(feats["tunnels"]), len(feats["crossings"])))
     for st in stops:
-        print("  stop %-24s s=%6.0f off %3.0f side %-5s%s biome %-10s plat %s trk %s" % (st["game"], st["s"], st["off"], st["side"], "" if st["side_known"] else "?", st["biome"], [(q["lat"], q["s0"], q["s1"]) for q in st["plat"]], st["trk"]))
+        print("  stop %-24s s=%6.0f off %3.0f side %-5s%s bldg %2d biome %-10s plat %s trk %s" % (st["game"], st["s"], st["off"], st["side"], "" if st["side_known"] else "?", st["bside"], st["biome"], [(q["edge"], q["w"], q["s0"], q["s1"]) for q in st["plat"]], st["trk"]))
     for leg in legs:
         print("%-24s -> %-24s real %5d m game %4d  %s" % (leg["from"], leg["to"], leg["real_gap"], leg["length"], leg["spec"][:170]))
     for b in feats["bridges"]:
@@ -319,12 +364,18 @@ def emit(route_id, res):
             lid = "%s%02d" % (spec["prefix"], i + 1)
             segs.append({"t": "leg", "id": lid, "from": lg["from"], "to": lg["to"], "length": lg["length"], "spec": lg["spec"]})
             legs_meta[lid] = {"route": route_id, "from": lg["from"], "to": lg["to"], "real": lg["real"], "k": lg["k"], "mapping": lg["mapping"], "pieces": lg["pieces"]}
-    stations = {st["game"]: {"size": st["size"], "side": st["side"], "biome": st["biome"], "osm": st["osm"], "s_real": round(st["s"], 1),
-                             "plat": st["plat"], "trk": st["trk"]} for st in stops}
+    stations = {}
+    for st in stops:
+        i = min(len(attrs.xy) - 2, int(st["s"] // attrs.step))
+        p = attrs.xy[i] + (attrs.xy[i + 1] - attrs.xy[i]) * ((st["s"] - i * attrs.step) / attrs.step)
+        t = attrs.xy[min(i + 3, len(attrs.xy) - 1)] - attrs.xy[max(i - 2, 0)]
+        lon, lat = TO_WGS.transform(float(p[0]), float(p[1]))
+        stations[st["game"]] = {"size": st["size"], "side": st["side"], "biome": st["biome"], "osm": st["osm"], "s_real": round(st["s"], 1), "plat": st["plat"], "trk": st["trk"], "bside": st["bside"],
+                                "lat": round(lat, 6), "lon": round(lon, 6), "heading": round(math.degrees(math.atan2(t[0], t[1])) % 360, 1)}
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, "%s-layout.json" % route_id), "w") as f:
         json.dump({"version": 1, "stations": stations, "segments": {"main": segs}}, f, ensure_ascii=False, indent=1)
-    slim = {"version": 1, "id": route_id, "stations": {n: {k: v[k] for k in ("size", "side", "biome", "plat", "trk")} for n, v in stations.items()}, "segments": {"main": segs}}
+    slim = {"version": 1, "id": route_id, "stations": {n: {k: v[k] for k in ("size", "side", "biome", "plat", "trk", "bside")} for n, v in stations.items()}, "segments": {"main": segs}}
     js = os.path.join(REPO, "pb", "train-sim", "real-%s.js" % route_id)
     with open(js, "w") as f:
         f.write("/* GENERATED by scripts/zuch/build_real_route.py emit %s (OSM main track, see pb/train-sim/REAL-LINES.md \"W2c\"). Do not edit by hand. */\n" % route_id)

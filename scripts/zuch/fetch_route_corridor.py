@@ -28,6 +28,27 @@ TILES = {   # name: (UTM 32N box (E0, N0, E1, N1), [pbf files])
 }
 
 
+EXTRA_LAYERS = [   # platform polygons (closed ways are multipolygons in the OGR layers) and station buildings
+    ("platpoly", "multipolygons", "other_tags LIKE '%\"railway\"=>\"platform\"%'"),
+    ("stbuild", "multipolygons", "building = 'train_station' OR other_tags LIKE '%train_station%' OR other_tags LIKE '%\"public_transport\"=>\"station\"%'"),
+]
+
+
+def fetch_extra(tile):
+    """Adds the EXTRA_LAYERS to an existing route-<tile>.pkl (no need to read the big layers again)."""
+    box, pbfs = TILES[tile]
+    bb = bbox_wgs(*box)
+    path = os.path.join(OUT, "route-%s.pkl" % tile)
+    with open(path, "rb") as f:
+        out = pickle.load(f)
+    for name, layer, where in EXTRA_LAYERS:
+        feats = read_layer(layer, bb, where=where, pbfs=pbfs)
+        out[name] = [{"id": f["id"], "wkb": f["g"].wkb, "t": f["t"]} for f in feats]
+        print("  ", tile, name, len(feats), flush=True)
+    with open(path, "wb") as f:
+        pickle.dump(out, f)
+
+
 def fetch(tile):
     box, pbfs = TILES[tile]
     bb = bbox_wgs(*box)
@@ -55,5 +76,8 @@ def fetch(tile):
 
 
 if __name__ == "__main__":
-    for t in sys.argv[1:] or list(TILES):
-        fetch(t)
+    args = sys.argv[1:]
+    extra = "--extra" in args
+    args = [a for a in args if a != "--extra"]
+    for t in args or list(TILES):
+        (fetch_extra if extra else fetch)(t)
