@@ -201,4 +201,69 @@
       f.bench(HE.far.width - 0.4, 0, '#5a5f66');
     },
   });
+
+  /* ---- a plain DB stop without a station building: two side platforms (the one next to the game track on the declared side, the opposite one across the second track), glass shelters, name
+   * plates, number cubes, masts, benches.  spec = { name, nearShelters: [z], nearTicket: z, nearPlates: [z], nearMasts: [z], nearBenches: [z], far: { edge, width, z0, z1, track, shelters, plates, masts, benches } } */
+  function buildDbHalt(api, spec) {
+    const { H, W, col } = api;
+    const k = makeKit(api);
+    const f = mirrorKit(api);
+    const lB = api.edge + W;
+    spec.nearPlates.forEach((z) => dbNameBoard(api, k, 3.4, z, spec.name));
+    k.sign(2.6, spec.nearPlates[0] + 22, '1', 'blue');
+    spec.nearMasts.forEach((z) => dbMast(k, 4.0, z));
+    spec.nearShelters.forEach((z) => k.glassShelter(lB - 2.4, z, 5.2, 1.9, '#5c6368', '#6c7378'));
+    k.vc.box(k.X(lB - 0.9), H + 1.0, spec.nearTicket, 0.5, 2.0, 0.6, col('#3a4650'));
+    spec.nearBenches.forEach((z) => k.bench(lB - 0.7, z, '#5a5f66'));
+    k.bin(lB - 0.6, spec.nearTicket + 6, '#3b4046');
+    const fa = spec.far;
+    k.track(-fa.track, -135, 135, { pole: true });
+    k.platformBox(-fa.edge, fa.width, -1, fa.z0, fa.z1);
+    fa.plates.forEach((z) => dbNameBoard(api, f, fa.edge + 0.6, z, spec.name, true));
+    f.sign(fa.edge + 0.4, fa.plates[0] + 22, '2', 'blue');
+    fa.shelters.forEach((z) => f.glassShelter(fa.edge + fa.width - 2.6, z, 5.2, 1.9, '#5c6368', '#6c7378'));
+    fa.masts.forEach((z) => dbMast(f, fa.edge + 1.6, z));
+    fa.benches.forEach((z) => f.bench(fa.edge + fa.width - 0.8, z, '#5a5f66'));
+  }
+
+  /* ================================================================ FÖHREN (no reference photo on Commons: built from the patch, DB standard furniture)
+   * Patch: the game track (x 0) runs along the platform on the LEFT (x -0.8 .. -7.7, z -96 .. 96), second track at x 3.5, platform on the RIGHT (x 5.1 .. 10.9, z -76 .. 94); the ticket machine
+   * and a shelter stand on the left platform at z 37, a shelter on the right platform at z 35.  No station building (houses of the village far behind on the left). */
+  reg('Föhren', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      buildDbHalt(api, {
+        name: 'Föhren', nearShelters: [37], nearTicket: 31, nearPlates: [-55, 62], nearMasts: [-80, -52, -24, 4, 32, 60, 86], nearBenches: [-12, 48],
+        far: { edge: 5.0, width: 5.9, z0: -76, z1: 94, track: 3.5, shelters: [35], plates: [-45, 55], masts: [-65, -38, -10, 18, 46, 74], benches: [-20] },
+      });
+    },
+  });
+
+  /* ================================================================ SEHLEM (no reference photo on Commons: built from the patch, DB standard furniture)
+   * Patch: game track x 0, platform on the LEFT (x -2.1 .. -9.0, z -90 .. 78, shelter at z 18), second track at x 3.4, platform on the RIGHT (x 4.8 .. 11.2, z -90 .. 90, shelter at z 19). */
+  reg('Sehlem', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      buildDbHalt(api, {
+        name: 'Sehlem', nearShelters: [18], nearTicket: 12, nearPlates: [-50, 48], nearMasts: [-75, -48, -22, 6, 32, 58], nearBenches: [-14, 30],
+        far: { edge: 4.9, width: 6.3, z0: -90, z1: 90, track: 3.4, shelters: [19], plates: [-40, 55], masts: [-70, -44, -18, 10, 36, 62, 84], benches: [-10] },
+      });
+    },
+  });
+
+  /* ================================================================ SALMTAL (no reference photo on Commons: built from the patch, DB standard furniture)
+   * Patch: game track x 0, platform on the LEFT (x -1.6 .. -12.5, z -70 .. 69; wide at the bus stop, shelters at z 24 and 40, ticket machine z 35), second track at x 3.2, platform on the
+   * RIGHT (x 5 .. 14.2, z -70 .. 70, shelter at z 29); a building spans the tracks at z 53 .. 66 (generic surroundings, unchanged). */
+  reg('Salmtal', {
+    canopy: false,
+    furniture: false,
+    build(api) {
+      buildDbHalt(api, {
+        name: 'Salmtal', nearShelters: [], nearTicket: 56, nearPlates: [-45, 8], nearMasts: [-60, -34, -8, 18, 50], nearBenches: [-31, 2],
+        far: { edge: 4.9, width: 6.5, z0: -70, z1: 70, track: 3.2, shelters: [29], plates: [-35, 45], masts: [-55, -28, -2, 24, 52], benches: [-12] },
+      });
+    },
+  });
 })();

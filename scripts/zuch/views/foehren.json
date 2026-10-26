@@ -1,0 +1,9 @@
+{
+  "route": "wittlich", "station": "Föhren", "refs": "Foehren",
+  "views": [
+    { "photo": "noref.png", "pos": [-3.0, 70, 1.7], "look": [-4, -30, 2.4], "fov": 62, "note": "near platform ahead (no reference photo)" },
+    { "photo": "noref.png", "pos": [3.0, 50, 1.7], "look": [-6, 10, 2.2], "fov": 62, "note": "across to the near platform" },
+    { "photo": "noref.png", "pos": [-3.0, -60, 1.7], "look": [6, 30, 2.4], "fov": 62, "note": "far platform from ahead" },
+    { "photo": "noref.png", "pos": [-20, 20, 12], "look": [0, 0, 0], "fov": 60, "note": "from above" }
+  ]
+}

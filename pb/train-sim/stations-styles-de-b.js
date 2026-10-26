@@ -53,4 +53,14 @@
       api.box(13.5, 6.2, 4.0, 0.8, 1.6, 0.8, '#8a4a3a');
     },
   });
+
+  /* SALMTAL.  No reference photo on Commons.  The LoD2 'house' w197932877 (x -8.3 .. -3.4, z 26 .. 45, hip roof, ridge 7.2 m) sits on the left platform exactly where OSM has the shelters, the ticket
+   * machine and the bench: it is the station building / waiting hall, flagged station:1 (plaster colour and roof are a guess without a photo).  The LoD2 'house' w197932850 (x -10 .. 14, z 59 .. 66,
+   * ridge 13.6 m) spans the tracks and both platforms: an overbridge / misclassified object (a train would run through it), so it is not drawn. */
+  reg('Salmtal', {
+    wall: '#dcd3bc', trim: '#cfc6ae', plinth: { h: 0.5, col: '#8e8a80' }, band: null, roof: 'tile', roofTint: '#d8bfae', fascia: '#e9e5d8', floorH: 3.2, bayM: 3.3, stain: true,
+    win: { w: 1.05, h: 1.5, kind: 'rect', frame: '#f1eee4', reveal: '#cfc5ae', sill: true },
+    doors: [{ z: 35.5, w: 1.1, h: 2.2, col: '#5a5f66', face: 'front' }],
+    others: { w197932850: { hidden: true } },
+  });
 })();
