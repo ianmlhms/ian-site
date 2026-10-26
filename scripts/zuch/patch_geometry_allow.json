@@ -1,0 +1,33 @@
+{
+ "_note": "patch key -> building ids (or id:kind) reviewed and accepted; every entry has a reason in _why",
+ "luxembourg": [
+  "w362239328",
+  "w924507665"
+ ],
+ "rodange.h": [
+  "ACT_5669d03e-8d7e-4759-b571-4fdffeab8d6f",
+  "ACT_b5919a73-9d9b-49d7-bd88-da0f8fbdabc1",
+  "ACT_f3d8f080-0384-4307-86b5-38ef316d9691"
+ ],
+ "bertrange-strassen.h": [
+  "w817717377"
+ ],
+ "lamadelaine.h": [
+  "w32596422"
+ ],
+ "mamer-lycee.h": [
+  "w182036718"
+ ],
+ "nidderkuer.h": [
+  "w27557900"
+ ],
+ "trier-hbf": [
+  "w1337797702"
+ ],
+ "_why": {
+  "luxembourg": "w362239328 = the 237 m platform canopy block (station-yard.js draws its roof faces with columns, its walls are skipped); w924507665 sits on a retaining wall",
+  "rodange.h": "the Rodange steelworks halls are really 250-285 m long",
+  "bertrange-strassen.h / lamadelaine.h / mamer-lycee.h / nidderkuer.h": "long curved industrial / school facades; triangulate3 drops any face it cannot cover, so a warped ring never renders as a ribbon",
+  "trier-hbf": "building on the raised station forecourt"
+ }
+}

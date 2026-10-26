@@ -4,11 +4,13 @@
  *   - east / wittlich / trier share one line: same stations and crossings at the same positions; trier passes the stations it does not serve (RE), the others stop
  *     everywhere; stop counts; the new route is registered with a price and an order position
  *   - Munsbach: the real LiDAR relief, buildings and trees are built around the station, no console errors
+ *   - station patch geometry (scripts/zuch/patch_geometry_check.mjs): no degenerate / huge / twisted / floating LOD2 faces
  *   - hole detector (scripts/zuch/hole_lib.mjs): no hole / pit in the ground on west and east, no missing terrain under any ray
  * Standalone game page (no arcade, no Supabase).  Runs in about three minutes. */
 import { runIfMain } from './lib.mjs';
 import { simOnPage } from '../zuch/zlib.mjs';
 import { scanRoute } from '../zuch/hole_lib.mjs';
+import { checkAll as checkPatchGeometry } from '../zuch/patch_geometry_check.mjs';
 
 const RAIL_ROUTES = ['west', 'south', 'east', 'wittlich', 'north', 'trier', 'metz', 'brussels', 'paris'];
 const MIN_PATCH_ROAD_REACH_M = 30;  // a crossing inside a station patch (Munsbach, Rue de Beyren) lies on the REAL road of the patch: it runs as far as the real road does (here a T-junction with Rue Principale after 69 m)
@@ -26,6 +28,14 @@ export const flow = {
   async run(h) {
     const sim = await simOnPage(await h.context.newPage(), h.origin, { quality: 'high' });
     const page = sim.page;
+
+    h.step('station patches: no degenerate, huge, twisted, out-of-footprint or floating LOD2 faces (scripts/zuch/patch_geometry_check.mjs, reviewed exceptions in patch_geometry_allow.json)');
+    {
+      const dropped = [];
+      const bad = checkPatchGeometry([], dropped);
+      h.expect(bad.length === 0, 'patch geometry: ' + bad.length + ' bad face(s): ' + bad.slice(0, 6).map((p) => p.patch + ' ' + p.id + ' [' + p.kind + '] ' + p.what).join('; '));
+      console.log('    patch geometry: ' + dropped.length + ' sliver faces are dropped by the renderer');
+    }
 
     h.step('level crossings: every crossing has a real road on both sides, on the terrain');
     const crossingsSeen = [];

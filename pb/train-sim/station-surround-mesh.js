@@ -86,7 +86,17 @@
     }
     const ax = Math.abs(nx); const ay = Math.abs(ny); const az = Math.abs(nz);
     const proj = ay >= ax && ay >= az ? (p) => [p[0], p[2]] : ax >= az ? (p) => [p[1], p[2]] : (p) => [p[0], p[1]];
-    return { tris: triangulate2(ring.map(proj)), normal: [nx, ny, nz] };
+    const tris = triangulate2(ring.map(proj));
+    /* a ring whose projection overlaps itself (a strongly warped LOD2 face, ring order broken) triangulates into spikes / ribbons: the triangles must cover the ring's own area */
+    const ringArea = Math.hypot(nx, ny, nz) / 2;
+    let triArea = 0;
+    for (let t = 0; t < tris.length; t += 3) {
+      const a = ring[tris[t]]; const b = ring[tris[t + 1]]; const c = ring[tris[t + 2]];
+      const ux = b[0] - a[0]; const uy = b[1] - a[1]; const uz = b[2] - a[2]; const vx = c[0] - a[0]; const vy = c[1] - a[1]; const vz = c[2] - a[2];
+      triArea += Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
+    }
+    if (!(ringArea > 1e-4) || !Number.isFinite(triArea) || Math.abs(triArea - ringArea) > 0.35 * ringArea + 0.05) return { tris: [], normal: [nx, ny, nz] };
+    return { tris, normal: [nx, ny, nz] };
   }
 
   /* ---------------------------------------------------------------- buildings without LOD2 faces: footprint extrusion
