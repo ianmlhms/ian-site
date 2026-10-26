@@ -191,19 +191,21 @@ export function bankBoulders(c, surface, network = null) {
   const rng = createRng(BANK_SEED);
   const out = [], w = { x: 0, z: 0 };
   const uEnd = c.faceU + LEDGE.poolCentreU + LEDGE.poolRadiusU + 3;
-  for (let u = -0.8; u < uEnd; u += 1.25 + rng() * 0.9) {
+  for (let u = -0.8; u < uEnd; u += 1.0 + rng() * 0.8) {
     for (const side of [-1, 1]) {
       const level = u < c.faceU ? c.lipY - 0.5 : c.poolY + 0.45;
       let edge = 1.2;
       while (edge < 9.5) { toWorld(c, u, side * edge, w); if (surface.height(w.x, w.z) >= level) break; edge += 0.4; }
       if (edge >= 9.5) continue;
-      const size = 0.55 + rng() * rng() * 1.5 + (rng() < 0.18 ? 0.8 : 0);
-      const v = side * (edge + (rng() - 0.3) * 2.4 + size * 0.3);
-      if (u < BRIDGE_ZONE_U && Math.abs(v) < BRIDGE_ZONE_V) continue;
-      if (u < c.faceU + 0.6 && Math.abs(v) < 5.3) continue;                        // (the big boulders of the ledge stand there)
-      const b = { u: u + (rng() - 0.5) * 0.8, v, rx: size * (1 + 0.3 * rng()), ry: size * (0.65 + 0.3 * rng()), rz: size, seed: rng() };
-      toWorld(c, b.u, b.v, w);
-      if (!onWay(w.x, w.z, b.rz + KEEP_CLEAR)) out.push(b);                         // nobody rides or walks through a boulder: they keep clear of every way
+      for (const row of [0, 1]) {                                                  // the first row at the water line, a second, bigger one up the slope (it hides the steep wall of the pool)
+        const size = (row === 0 ? 0.55 + rng() * rng() * 1.5 + (rng() < 0.18 ? 0.8 : 0) : 1.0 + rng() * 1.3);
+        const v = side * (edge + (rng() - 0.3) * 2.4 + size * 0.3 + row * (1.8 + rng() * 1.4));
+        if (u < BRIDGE_ZONE_U && Math.abs(v) < BRIDGE_ZONE_V) continue;
+        if (u < c.faceU + 0.6 && Math.abs(v) < 5.3) continue;                        // (the big boulders of the ledge stand there)
+        const b = { u: u + (rng() - 0.5) * 0.8, v, rx: size * (1 + 0.3 * rng()), ry: size * (0.65 + 0.3 * rng()), rz: size, seed: rng() };
+        toWorld(c, b.u, b.v, w);
+        if (!onWay(w.x, w.z, b.rz + KEEP_CLEAR)) out.push(b);                         // nobody rides or walks through a boulder: they keep clear of every way
+      }
     }
   }
   return out;

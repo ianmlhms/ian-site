@@ -18,7 +18,7 @@ fs.mkdirSync(out, { recursive: true });
 /* pose: { at: [x, z] | { trail: index }, up: metres above the ground, yaw: degrees (0 = east, 90 = south), pitch, fov }; hideRider: true */
 const SPECS = [
   { name: "montage-p1-schiessentuempel-falls", ref: "schiess2020_101.jpg", caption: "Schiessentümpel: four falls side by side over one ledge", size: [1280, 960], q: "high", time: "noon", weather: "clear", season: "summer",
-    pose: { cascade: [11, -0.8, 1.5, 0, 0, 1.6], fov: 46 } },
+    pose: { finishView: true, dy: -0.4, dty: -0.6, fov: 52 } },
   { name: "montage-p2-schiessentuempel-photo2", ref: "schiess6020.jpg", caption: "Schiessentümpel: the falls from the side", size: [1280, 782], q: "high", time: "noon", weather: "clear", season: "summer",
     pose: { cascade: [9, 4.0, 1.4, 0, -1.5, 1.2], fov: 52 } },
   { name: "montage-p3-beaufort-ruin-a", ref: "beaufort_alt.jpg", caption: "Beaufort medieval castle ruin from the road", size: [1280, 900], q: "high", time: "noon", weather: "clear", season: "summer",
@@ -55,6 +55,12 @@ try {
     await page.evaluate((p) => {
       const m = window.__mtb;
       let x, z, yaw = p.yaw;
+      if (p.finishView) {                                      // the camera of the finish view of the Schiessentuempel trail, as the game puts it
+        const f = m.world.finishView;
+        m.teleport(f.x, f.z); m.rider.setVisible(false);
+        m.setCamera({ x: f.x, y: f.y + (p.dy || 0), z: f.z, tx: f.tx, ty: f.ty + (p.dty || 0), tz: f.tz, fov: p.fov });
+        return;
+      }
       if (p.cascade) {                                         // pose in the Schiessentuempel cascade frame [u, v, y above the pool, lookU, lookV, lookY above the pool]
         const c = m.cascade, [u, v, y0, lu, lv, ly] = p.cascade;
         const at = (a, b) => ({ x: c.x + c.f[0] * a + c.a[0] * b, z: c.z + c.f[1] * a + c.a[1] * b });
